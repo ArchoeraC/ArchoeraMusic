@@ -1722,6 +1722,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'This software is for technical exploration and research only. If any platform finds this software inappropriate, please contact the developer for adjustment or removal.';
 
   @override
+  String get settingsSectionFontCredits => 'Font Credits';
+
+  @override
+  String get settingsFontCreditsText =>
+      'This software bundles the following fonts:\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, used under the MiSans Font Intellectual Property License Agreement)\n· HarmonyOS Sans SC (© Huawei, used under the HarmonyOS Sans Font License Agreement)';
+
+  @override
   String get commonNoLyrics => 'No lyrics';
 
   @override

@@ -1747,6 +1747,24 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           ),
         ),
         const SizedBox(height: 12),
+        _sectionTitle(scheme, l10n.settingsSectionFontCredits),
+        _card(
+          scheme,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Text(
+                l10n.settingsFontCreditsText,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.6,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         _sectionTitle(scheme, l10n.settingsSectionDeclaration),
         _card(
           scheme,

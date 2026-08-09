@@ -1681,6 +1681,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsDeclineFooter => '이 소프트웨어는 기술적 탐구와 연구만을 목적으로 합니다.';
 
   @override
+  String get settingsSectionFontCredits => '글꼴 저작권 고지';
+
+  @override
+  String get settingsFontCreditsText =>
+      '이 소프트웨어에는 다음 글꼴이 포함되어 있습니다.\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, MiSans 글꼴 지식재산권 허락 계약에 따라 사용)\n· HarmonyOS Sans SC (© Huawei, HarmonyOS Sans 글꼴 허락 계약에 따라 사용)';
+
+  @override
   String get commonNoLyrics => '가사 없음';
 
   @override

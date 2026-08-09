@@ -1666,6 +1666,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。';
 
   @override
+  String get settingsSectionFontCredits => '字体署名';
+
+  @override
+  String get settingsFontCreditsText =>
+      '本软件内置以下字体：\n· Noto Sans CJK SC（SIL Open Font License 1.1）\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· HarmonyOS Sans SC（© Huawei，依据《HarmonyOS Sans 字体许可协议》授权使用）';
+
+  @override
   String get commonNoLyrics => '暂无歌词';
 
   @override
@@ -3650,6 +3657,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       '本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。';
 
   @override
+  String get settingsSectionFontCredits => '字体署名';
+
+  @override
+  String get settingsFontCreditsText =>
+      '本软件内置以下字体：\n· Noto Sans CJK SC（SIL Open Font License 1.1）\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· HarmonyOS Sans SC（© Huawei，依据《HarmonyOS Sans 字体许可协议》授权使用）';
+
+  @override
   String get commonNoLyrics => '暂无歌词';
 
   @override
@@ -5632,6 +5646,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get settingsDeclineFooter =>
       '本軟體僅用於技術探索與研究。如相關平台認為本軟體不妥，可隨時聯繫開發者進行調整或移除。';
+
+  @override
+  String get settingsSectionFontCredits => '字體署名';
+
+  @override
+  String get settingsFontCreditsText =>
+      '本軟體內建以下字體：\n· Noto Sans CJK SC（SIL Open Font License 1.1）\n· MiSans（© Xiaomi，依據《MiSans 字體知識產權許可協議》授權使用）\n· HarmonyOS Sans SC（© Huawei，依據《HarmonyOS Sans 字體許可協議》授權使用）';
 
   @override
   String get commonNoLyrics => '暫無歌詞';

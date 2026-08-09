@@ -505,6 +505,8 @@
   "settingsDecline5Title": "5. Disclaimer\n",
   "settingsDecline5Body": "This software is provided \"as is\" without any express or implied warranties. Any direct or indirect losses arising from use or inability to use, or from API changes, account restrictions, feature failures of online platforms shall be borne by the user.\n\n",
   "settingsDeclineFooter": "This software is for technical exploration and research only. If any platform finds this software inappropriate, please contact the developer for adjustment or removal.",
+  "settingsSectionFontCredits": "Font Credits",
+  "settingsFontCreditsText": "This software bundles the following fonts:\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, used under the MiSans Font Intellectual Property License Agreement)\n· HarmonyOS Sans SC (© Huawei, used under the HarmonyOS Sans Font License Agreement)",
   "commonNoLyrics": "No lyrics",
   "commonTrackCount": "{count} tracks",
   "settingsSearchColorTitle": "Played / Unplayed color",

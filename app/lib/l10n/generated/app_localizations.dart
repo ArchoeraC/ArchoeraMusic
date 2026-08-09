@@ -3140,6 +3140,18 @@ abstract class AppLocalizations {
   /// **'本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。'**
   String get settingsDeclineFooter;
 
+  /// No description provided for @settingsSectionFontCredits.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'字体署名'**
+  String get settingsSectionFontCredits;
+
+  /// No description provided for @settingsFontCreditsText.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本软件内置以下字体：\n· Noto Sans CJK SC（SIL Open Font License 1.1）\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· HarmonyOS Sans SC（© Huawei，依据《HarmonyOS Sans 字体许可协议》授权使用）'**
+  String get settingsFontCreditsText;
+
   /// No description provided for @commonNoLyrics.
   ///
   /// In zh_CN, this message translates to:

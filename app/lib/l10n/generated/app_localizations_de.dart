@@ -1740,6 +1740,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diese Software dient nur der technischen Erforschung und Forschung.';
 
   @override
+  String get settingsSectionFontCredits => 'Schriftartennennung';
+
+  @override
+  String get settingsFontCreditsText =>
+      'Diese Software enthält die folgenden Schriftarten:\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, verwendet gemäß der MiSans Font Intellectual Property License Agreement)\n· HarmonyOS Sans SC (© Huawei, verwendet gemäß der HarmonyOS Sans Font License Agreement)';
+
+  @override
   String get commonNoLyrics => 'Keine Songtexte';
 
   @override

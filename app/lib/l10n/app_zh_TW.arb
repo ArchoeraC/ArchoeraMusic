@@ -505,6 +505,8 @@
   "settingsDecline5Title": "五、免責聲明\n",
   "settingsDecline5Body": "本軟體按「現狀」提供，不對其作出任何明示或默示的保證。因使用或無法使用本軟體，或因線上平台介面變更、帳號限制、功能失效等產生的任何直接或間接損失，均由使用者自行承擔。\n\n",
   "settingsDeclineFooter": "本軟體僅用於技術探索與研究。如相關平台認為本軟體不妥，可隨時聯繫開發者進行調整或移除。",
+  "settingsSectionFontCredits": "字體署名",
+  "settingsFontCreditsText": "本軟體內建以下字體：\n· Noto Sans CJK SC（SIL Open Font License 1.1）\n· MiSans（© Xiaomi，依據《MiSans 字體知識產權許可協議》授權使用）\n· HarmonyOS Sans SC（© Huawei，依據《HarmonyOS Sans 字體許可協議》授權使用）",
   "commonNoLyrics": "暫無歌詞",
   "commonTrackCount": "{count} 首",
   "settingsSearchColorTitle": "已唱 / 未唱顏色",

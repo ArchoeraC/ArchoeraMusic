@@ -1757,6 +1757,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Ce logiciel est uniquement pour l\'exploration et la recherche techniques.';
 
   @override
+  String get settingsSectionFontCredits => 'Crédits des polices';
+
+  @override
+  String get settingsFontCreditsText =>
+      'Ce logiciel intègre les polices suivantes :\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, utilisée conformément à l\'accord de licence de propriété intellectuelle de la police MiSans)\n· HarmonyOS Sans SC (© Huawei, utilisée conformément à l\'accord de licence de la police HarmonyOS Sans)';
+
+  @override
   String get commonNoLyrics => 'Pas de paroles';
 
   @override

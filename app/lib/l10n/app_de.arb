@@ -505,6 +505,8 @@
   "settingsDecline5Title": "5. Haftungsausschluss\n",
   "settingsDecline5Body": "Diese Software wird「wie besehen」ohne ausdrückliche oder stillschweigende Garantien bereitgestellt.\n\n",
   "settingsDeclineFooter": "Diese Software dient nur der technischen Erforschung und Forschung.",
+  "settingsSectionFontCredits": "Schriftartennennung",
+  "settingsFontCreditsText": "Diese Software enthält die folgenden Schriftarten:\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, verwendet gemäß der MiSans Font Intellectual Property License Agreement)\n· HarmonyOS Sans SC (© Huawei, verwendet gemäß der HarmonyOS Sans Font License Agreement)",
   "commonNoLyrics": "Keine Songtexte",
   "commonTrackCount": "{count} Titel",
   "settingsSearchColorTitle": "Abgespielt / Nicht abgespielt Farbe",

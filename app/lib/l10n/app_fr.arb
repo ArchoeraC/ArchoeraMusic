@@ -505,6 +505,8 @@
   "settingsDecline5Title": "5. Clause de non-responsabilité\n",
   "settingsDecline5Body": "Ce logiciel est fourni「tel quel」sans garanties expresses ou implicites.\n\n",
   "settingsDeclineFooter": "Ce logiciel est uniquement pour l'exploration et la recherche techniques.",
+  "settingsSectionFontCredits": "Crédits des polices",
+  "settingsFontCreditsText": "Ce logiciel intègre les polices suivantes :\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, utilisée conformément à l'accord de licence de propriété intellectuelle de la police MiSans)\n· HarmonyOS Sans SC (© Huawei, utilisée conformément à l'accord de licence de la police HarmonyOS Sans)",
   "commonNoLyrics": "Pas de paroles",
   "commonTrackCount": "{count} pistes",
   "settingsSearchColorTitle": "Couleur lu / non lu",
