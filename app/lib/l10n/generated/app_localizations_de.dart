@@ -1440,6 +1440,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSectionFilter => 'Wiedergabefilter';
 
   @override
+  String get settingsDjMode => 'Fuck DJ Mode';
+
+  @override
   String get settingsDjModeOn =>
       'DJ-/Mainstream-Titel automatisch überspringen';
 
@@ -1448,22 +1451,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Bei DJ-Version automatisch zum nächsten Titel springen';
 
   @override
-  String get settingsDjModeNote =>
-      'Titel mit DJ / Douyin / Influencer im Titel oder Künstler automatisch überspringen';
-
-  @override
   String get settingsSectionLyricsFilter => 'Songtexte';
 
   @override
   String get settingsUncensor => 'Unanständige Wörter entsperren';
 
   @override
-  String get settingsUncensorOn =>
-      'Zensierte Wörter wiederherstellen（f**k → fuck）';
+  String get settingsUncensorOn => 'fuck';
 
   @override
-  String get settingsUncensorOff =>
-      'Mit * maskierte Wörter wiederherstellen（f**k → fuck）';
+  String get settingsUncensorOff => 'f**k';
 
   @override
   String get settingsSectionListDisplay => 'Listendarstellung';
@@ -1496,6 +1493,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsShowSubtitleOff => 'Keine Aliase in der Liste';
+
+  @override
+  String get settingsPerformanceMode => 'Leistungsmodus';
+
+  @override
+  String get settingsPerformanceModeOn => 'Derzeit im eingefrorenen Modus';
+
+  @override
+  String get settingsPerformanceModeOff => 'Derzeit im Animationsmodus';
 
   @override
   String get settingsSectionDir => 'Verzeichnis';

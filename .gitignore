@@ -35,6 +35,10 @@ app/core/subsonic/transcoder/target/
 # downloader（Rust 下载器 cdylib）
 app/core/downloader/target/
 
+# 打包输出（packaging/linux/package*.sh 的中间暂存与最终产物）
+dist/
+packaging/linux/work/
+
 # IDE / 编辑器
 .idea/
 .vscode/

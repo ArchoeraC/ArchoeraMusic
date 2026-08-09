@@ -3,6 +3,9 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+import 'glass_surface.dart';
+
 class SDialog extends StatelessWidget {
   const SDialog({
     super.key,
@@ -52,48 +55,56 @@ class SDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final dialog = Theme.of(context).dialogTheme;
     return Dialog(
       insetPadding: const EdgeInsets.all(48),
-      child: SizedBox(
-        width: width,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: Theme.of(context).dialogTheme.titleTextStyle),
-              if (description != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  description!,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: scheme.onSurfaceVariant,
-                    height: 1.4,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      // 图片风格下为毛玻璃（blur(16)），背景图不再清晰透出
+      child: GlassDialogSurface(
+        radius: BorderRadius.circular(AppRadius.dialog),
+        color: dialog.backgroundColor ?? scheme.surfaceContainerLow,
+        child: SizedBox(
+          width: width,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).dialogTheme.titleTextStyle),
+                if (description != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    description!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: scheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 480),
+                  child: SingleChildScrollView(
+                    child: child,
                   ),
                 ),
-              ],
-              const SizedBox(height: 16),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 480),
-                child: SingleChildScrollView(
-                  child: child,
-                ),
-              ),
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    for (var i = 0; i < actions.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 10),
-                      actions[i],
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      for (var i = 0; i < actions.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 10),
+                        actions[i],
+                      ],
                     ],
-                  ],
-                ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

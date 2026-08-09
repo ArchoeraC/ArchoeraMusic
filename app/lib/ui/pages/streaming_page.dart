@@ -165,7 +165,9 @@ class _StreamingPageState extends ConsumerState<StreamingPage>
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: TabBar(
             controller: _tab,
-            isScrollable: false,
+            // TabAlignment.start 仅对可滚动 TabBar 有效：必须 isScrollable，
+            // 否则指示条偏移与标签不一致（对「歌单」高亮定位错误）。
+            isScrollable: true,
             tabAlignment: TabAlignment.start,
             tabs: [
               Tab(text: l10n.streamingTabsSongs),

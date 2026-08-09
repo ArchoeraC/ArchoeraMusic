@@ -6,6 +6,7 @@ import '../../core/netease/track.dart';
 import '../../core/playback/playback_notifier.dart';
 import '../../core/state/providers.dart';
 import '../../l10n/l10n.dart';
+import '../widgets/glass_surface.dart';
 import '../widgets/s_context_menu.dart';
 import '../widgets/s_controls.dart';
 import '../widgets/song_list.dart';
@@ -98,22 +99,31 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     final l10n = context.l10n;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.pageHistoryClearTitle, style: const TextStyle(fontSize: 16)),
-        content: Text(l10n.pageHistoryClearMessage, style: const TextStyle(fontSize: 13)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
+      builder: (ctx) => GlassDialogSurface(
+        radius: BorderRadius.circular(16),
+        color: Theme.of(ctx).dialogTheme.backgroundColor ??
+            Theme.of(ctx).colorScheme.surfaceContainerLow,
+        child: AlertDialog(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          title: Text(l10n.pageHistoryClearTitle,
+              style: const TextStyle(fontSize: 16)),
+          content: Text(l10n.pageHistoryClearMessage,
+              style: const TextStyle(fontSize: 13)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.commonCancel),
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.commonClear),
-          ),
-        ],
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.commonClear),
+            ),
+          ],
+        ),
       ),
     );
     if (ok != true) return;

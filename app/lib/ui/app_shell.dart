@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/playback/playback_notifier.dart';
 import '../core/state/app_prefs.dart';
 import 'widgets/nav_header.dart';
 import 'widgets/player_bar.dart';
@@ -31,6 +32,13 @@ class AppShell extends ConsumerWidget {
     // 图片风格「有效」才渲染背景（无图时回退 solid，对齐原版 effectiveStyle）
     final imageStyle =
         prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
+    final floating = prefs.floatingPlayerBar;
+    final collapsed = prefs.sidebarCollapsed;
+    // 播放条可见时，停靠模式给内容底部留白（对齐原版 mb-20），
+    // 防止被全宽停靠条遮挡；悬浮模式占满全高（侧边栏可到底）。
+    final showBar = ref.watch(
+      playbackProvider.select((s) => s.source != null || s.hasQueue),
+    );
     final content = Row(
       children: [
         SideBar(navigationShell: navigationShell),
@@ -53,15 +61,28 @@ class AppShell extends ConsumerWidget {
       ],
     );
     return Scaffold(
-      body: imageStyle
-          ? Stack(
-              children: [
-                Positioned.fill(child: _AppBackground(prefs: prefs)),
-                content,
-              ],
-            )
-          : content,
-      bottomNavigationBar: const PlayerBar(),
+      body: Stack(
+        children: [
+          if (imageStyle)
+            Positioned.fill(child: _AppBackground(prefs: prefs)),
+          // 内容层（停靠模式且播放条可见时底部让位；悬浮模式占满全高）
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: !floating && showBar ? 82 : 0),
+              child: content,
+            ),
+          ),
+          // 底部播放条（悬浮层，不占布局空间——对齐原版 MainLayout 的
+          // fixed 播放条：悬浮模式侧边栏可占满侧边；播放条从侧边栏
+          // 右侧开始，避免盖住侧边栏底部）
+          Positioned(
+            left: floating ? (collapsed ? 64.0 : 240.0) + 1 : 0,
+            right: 0,
+            bottom: 0,
+            child: const PlayerBar(),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -142,6 +163,8 @@ class _BranchTransitionState extends State<_BranchTransition>
   void didUpdateWidget(covariant _BranchTransition old) {
     super.didUpdateWidget(old);
     if (old.index != widget.index && widget.transition != 'none') {
+      // 性能模式（MediaQuery.disableAnimations）：跳过分支转场动效
+      if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
       _ctrl.forward(from: 0);
     }
   }
@@ -154,7 +177,10 @@ class _BranchTransitionState extends State<_BranchTransition>
 
   @override
   Widget build(BuildContext context) {
-    if (widget.transition == 'none') return widget.child;
+    if (widget.transition == 'none' ||
+        (MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
+      return widget.child;
+    }
     final curved = CurvedAnimation(
       parent: _ctrl,
       curve: Curves.easeOut,

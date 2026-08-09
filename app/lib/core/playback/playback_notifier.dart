@@ -172,6 +172,11 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   ///   绝对 = 引擎相对值 + _sessionOffsetMs；seek 命令反向：WAV 相对 = 目标 - _sessionOffsetMs。
   int _sessionOffsetMs = 0;
 
+  /// 会话重启后需保持暂停（seek 回退到会话偏移之前且原为暂停态）：
+  /// 引擎转码完成后 miniaudio 会自动开始播放，EnginePlaying 事件到达时
+  /// 若此标志为 true 则立即暂停（不置 playing），避免闪播。
+  bool _pendingPauseAfterReady = false;
+
   @override
   PlaybackState build() {
     ref.onDispose(() {
@@ -208,6 +213,8 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         _persistSession();
       }
     });
+    // 偏好变化（性能模式/频谱开关）时同步 FFT 轮询启停，无需重启引擎。
+    ref.listen(appPrefsProvider, (_, _) => _syncFftPolling());
     return const PlaybackState();
   }
 
@@ -831,17 +838,39 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   ///
   /// [offset] 为**绝对位置**（进度条/快捷键语义）；恢复续播会话（偏移 > 0）
   /// 时引擎 WAV 仅含 offset 之后的音频，命令需换算为 WAV 相对位置。
+  ///
+  /// 目标早于会话起始偏移时（如记忆恢复后把进度条往回拖），当前 WAV 不含
+  /// 更早的音频，本地 seek 会卡在恢复点（回到 offset 处，音频无法后退）。
+  /// 此时从目标位置重启引擎会话重新转码，恢复后可自由前后拖动。
   Future<void> seek(Duration offset) async {
     final engine = _engine;
-    if (engine == null || state.source == null) return;
+    final src = state.source;
+    if (engine == null || src == null) return;
     try {
-      final relMs =
-          math.max(0, offset.inMilliseconds - _sessionOffsetMs);
+      final targetMs = offset.inMilliseconds;
+      if (targetMs < _sessionOffsetMs) {
+        _log('seek 目标早于会话偏移，重启引擎重转码: '
+            '${targetMs}ms < ${_sessionOffsetMs}ms');
+        final wasPlaying = state.playing;
+        _pendingPauseAfterReady = !wasPlaying;
+        state = state.copyWith(buffering: true);
+        final passthrough = ref.read(appPrefsProvider).passthrough;
+        await _startSession(
+          src,
+          offsetMs: math.max(0, targetMs),
+          bitrate: qualityBitrate[state.quality] ?? 128000,
+          passthrough: passthrough,
+        );
+        // _startSession 已置 position = 新偏移，EngineReady/Playing 回填时长
+        return;
+      }
+      final relMs = targetMs - _sessionOffsetMs;
       await engine.seek(Duration(milliseconds: relMs));
       // 立即回填绝对位置（引擎 seek 后首帧位置事件前，UI 不闪回 0:00）
       state = state.copyWith(position: offset);
-      _log('seek ok: ${offset.inMilliseconds}ms');
+      _log('seek ok: ${targetMs}ms');
     } catch (e) {
+      _pendingPauseAfterReady = false;
       _log('seek 失败: $e');
       rethrow;
     }
@@ -851,6 +880,7 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   Future<void> stop() async {
     _stopFftPolling();
     _sessionOffsetMs = 0;
+    _pendingPauseAfterReady = false;
     await _stopEngine();
     state = state.copyWith(
       source: null,
@@ -932,6 +962,17 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         if (durMs > 0) {
           state = state.copyWith(duration: Duration(milliseconds: durMs));
         }
+        if (_pendingPauseAfterReady) {
+          // seek 回退重启会话且原为暂停态：miniaudio 加载即自动开播，
+          // 立即暂停保持原暂停语义（不闪播）
+          _pendingPauseAfterReady = false;
+          // ignore: discarded_futures
+          unawaited(_engine?.pause());
+          state = state.copyWith(playing: false, buffering: false);
+          _syncFftPolling();
+          _log('播放器就绪: miniaudio 已加载（保持暂停）');
+          return;
+        }
         state = state.copyWith(playing: true, buffering: false);
         _syncFftPolling();
         _log('播放器就绪: miniaudio 播放 WAV');
@@ -991,7 +1032,9 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
 
   /// 播放状态变化时同步轮询启停（引擎存在且播放中才拉取频谱）。
   void _syncFftPolling() {
-    if (_engine != null && state.playing) {
+    // 性能模式：不拉取频谱（FFT 轮询与 PCM 分析全停，省 CPU）
+    final performanceMode = ref.read(appPrefsProvider).performanceMode;
+    if (!performanceMode && _engine != null && state.playing) {
       _startFftPolling();
     } else {
       _stopFftPolling();

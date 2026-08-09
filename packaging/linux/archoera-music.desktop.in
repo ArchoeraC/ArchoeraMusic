@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=ArchoeraMusic
+GenericName=Music Player
+Comment=An open-source music player
+Exec=@EXEC@
+Icon=com.archoera.archoera_music
+Terminal=false
+Categories=Audio;Music;AudioVideo;
+Keywords=music;player;audio;subsonic;netease;kugou;
+StartupWMClass=archoera_music

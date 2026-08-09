@@ -46,6 +46,12 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
   /// 悬停中：显示完整 Slider（可拖动）；否则简化细条。
   bool _hovered = false;
 
+  /// 拖拽中：保持完整 Slider 不退出（修复「拖出轨道区域即中断」）——
+  /// 鼠标拖到播放条外/远处时悬停态会退出，若此时把 Slider 换回简化细条，
+  /// 其手势识别器被销毁、onChangeEnd 不触发，父级 _dragMs 残留在最后位置，
+  /// 造成后续交互跳转异常（对齐原版 SSlider：pointer capture 期间持续生效）。
+  bool _dragging = false;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -60,7 +66,7 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
         child: LayoutBuilder(
           builder: (context, c) {
             final rect = _trackRect(context, c.maxWidth, c.maxHeight);
-            return _hovered
+            return (_hovered || _dragging)
                 ? _buildSlider(scheme, rect)
                 : _buildBar(scheme, rect);
           },
@@ -101,8 +107,12 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
           child: Slider(
             value: widget.value,
             max: widget.max,
+            onChangeStart: (v) => setState(() => _dragging = true),
+            onChangeEnd: (v) {
+              setState(() => _dragging = false);
+              widget.onChangeEnd?.call(v);
+            },
             onChanged: widget.onChanged,
-            onChangeEnd: widget.onChangeEnd,
           ),
         ),
         if (widget.buffering) _bufferLayer(scheme, rect),

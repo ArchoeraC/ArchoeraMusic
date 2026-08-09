@@ -1381,13 +1381,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionFilter => '播放过滤';
 
   @override
-  String get settingsDjModeOn => '自动跳过 DJ / 口水歌';
+  String get settingsDjMode => '去™的 DJ';
 
   @override
-  String get settingsDjModeOff => '遇到 DJ 版歌曲自动跳下一首';
+  String get settingsDjModeOn => '世界清净了awa';
 
   @override
-  String get settingsDjModeNote => '标题或歌手含 DJ / 抖音 / 网红 等关键词的曲目自动跳过';
+  String get settingsDjModeOff => '哎嘿嘿(ˉ﹃ˉ)';
 
   @override
   String get settingsSectionLyricsFilter => '歌词';
@@ -1396,10 +1396,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsUncensor => '解锁脏话';
 
   @override
-  String get settingsUncensorOn => '还原歌词中被星号遮蔽的词（f**k → fuck）';
+  String get settingsUncensorOn => 'fuck';
 
   @override
-  String get settingsUncensorOff => '还原歌词中被 * 遮盖的单词（f**k → fuck）';
+  String get settingsUncensorOff => 'f**k';
 
   @override
   String get settingsSectionListDisplay => '列表显示';
@@ -1430,6 +1430,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsShowSubtitleOff => '列表不展示别名';
+
+  @override
+  String get settingsPerformanceMode => '性能模式';
+
+  @override
+  String get settingsPerformanceModeOn => '当前为冻效模式';
+
+  @override
+  String get settingsPerformanceModeOff => '当前为动效模式';
 
   @override
   String get settingsSectionDir => '目录';
@@ -3522,13 +3531,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSectionFilter => '播放过滤';
 
   @override
-  String get settingsDjModeOn => '自动跳过 DJ / 口水歌';
+  String get settingsDjMode => '去™的 DJ';
 
   @override
-  String get settingsDjModeOff => '遇到 DJ 版歌曲自动跳下一首';
+  String get settingsDjModeOn => '世界清净了awa';
 
   @override
-  String get settingsDjModeNote => '标题或歌手含 DJ / 抖音 / 网红 等关键词的曲目自动跳过';
+  String get settingsDjModeOff => '哎嘿嘿(ˉ﹃ˉ)';
 
   @override
   String get settingsSectionLyricsFilter => '歌词';
@@ -3537,10 +3546,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsUncensor => '解锁脏话';
 
   @override
-  String get settingsUncensorOn => '还原歌词中被星号遮蔽的词（f**k → fuck）';
+  String get settingsUncensorOn => 'fuck';
 
   @override
-  String get settingsUncensorOff => '还原歌词中被 * 遮盖的单词（f**k → fuck）';
+  String get settingsUncensorOff => 'f**k';
 
   @override
   String get settingsSectionListDisplay => '列表显示';
@@ -3571,6 +3580,15 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsShowSubtitleOff => '列表不展示别名';
+
+  @override
+  String get settingsPerformanceMode => '性能模式';
+
+  @override
+  String get settingsPerformanceModeOn => '当前为冻效模式';
+
+  @override
+  String get settingsPerformanceModeOff => '当前为动效模式';
 
   @override
   String get settingsSectionDir => '目录';
@@ -5663,13 +5681,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSectionFilter => '播放過濾';
 
   @override
-  String get settingsDjModeOn => '自動跳過 DJ / 口水歌';
+  String get settingsDjMode => '去™的 DJ';
 
   @override
-  String get settingsDjModeOff => '遇到 DJ 版歌曲自動跳下一首';
+  String get settingsDjModeOn => '世界清淨了awa';
 
   @override
-  String get settingsDjModeNote => '標題或歌手含 DJ / 抖音 / 網紅 等關鍵詞的曲目自動跳過';
+  String get settingsDjModeOff => '哎嘿嘿(ˉ﹃ˉ)';
 
   @override
   String get settingsSectionLyricsFilter => '歌詞';
@@ -5678,10 +5696,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsUncensor => '解鎖髒話';
 
   @override
-  String get settingsUncensorOn => '還原歌詞中被星號遮蔽的詞（f**k → fuck）';
+  String get settingsUncensorOn => 'fuck';
 
   @override
-  String get settingsUncensorOff => '還原歌詞中被 * 遮蓋的單字（f**k → fuck）';
+  String get settingsUncensorOff => 'f**k';
 
   @override
   String get settingsSectionListDisplay => '列表顯示';
@@ -5712,6 +5730,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsShowSubtitleOff => '列表不展示別名';
+
+  @override
+  String get settingsPerformanceMode => '效能模式';
+
+  @override
+  String get settingsPerformanceModeOn => '目前為凍效模式';
+
+  @override
+  String get settingsPerformanceModeOff => '目前為動效模式';
 
   @override
   String get settingsSectionDir => '目錄';

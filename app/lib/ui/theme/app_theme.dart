@@ -113,6 +113,42 @@ abstract final class AppRadius {
   static const pill = 100.0;
 }
 
+/// 应用扩展色：暴露不受图片背景样式影响的常驻 UI 底色。
+@immutable
+class AppChromeColors extends ThemeExtension<AppChromeColors> {
+  const AppChromeColors({
+    required this.playerBarBackground,
+    required this.playerBackground,
+  });
+
+  /// 播放条背景
+  final Color playerBarBackground;
+
+  /// 全屏播放器背景（实底，图片风格下也不半透明/毛玻璃）
+  final Color playerBackground;
+
+  @override
+  AppChromeColors copyWith({
+    Color? playerBarBackground,
+    Color? playerBackground,
+  }) =>
+      AppChromeColors(
+        playerBarBackground: playerBarBackground ?? this.playerBarBackground,
+        playerBackground: playerBackground ?? this.playerBackground,
+      );
+
+  @override
+  AppChromeColors lerp(AppChromeColors? other, double t) {
+    if (other == null) return this;
+    return AppChromeColors(
+      playerBarBackground:
+          Color.lerp(playerBarBackground, other.playerBarBackground, t)!,
+      playerBackground:
+          Color.lerp(playerBackground, other.playerBackground, t)!,
+    );
+  }
+}
+
 /// CJK 字体回退链。
 ///
 /// 主字体为内置 Noto Sans SC（Google 开源，字形度量最标准）；回退链
@@ -136,12 +172,16 @@ const List<String> _cjkFontFallback = [
 /// [solid] 纯色中性色板（主题色来源=solid）：主/次色用灰阶，界面不随主题色
 /// （对齐原版 SOLID_PALETTE_DARK/LIGHT）。
 /// [globalTint] 全局着色：surface 家族向主色轻微偏移（对齐原版 globalTint）。
+/// [imageBackground] 图片背景风格（appearanceStyle=image）：surface 家族半透明化，
+/// 让底层背景图透出且内容可读（对齐原版 global.css data-appearance-style=image 规则：
+/// 常规内容 22%、悬浮层 55%；可读性由 AppBackground 的 dim 遮罩保证，弹窗保持实底）。
 /// [fontFamily] 界面字体（设置「界面字体」，默认内置 MiSans）。
 ThemeData buildAppTheme(AppPalette c, Brightness brightness,
     {Color? accentSeed,
     String fontFamily = 'MiSans',
     bool globalTint = false,
-    bool solid = false}) {
+    bool solid = false,
+    bool imageBackground = false}) {
   final dark = brightness == Brightness.dark;
   final custom = accentSeed != null;
 
@@ -190,11 +230,27 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
   final tint = globalTint && accentSeed != null;
   Color tinted(Color base) =>
       tint ? Color.lerp(base, accentSeed, 0.06)! : base;
-  final surface = tinted(c.surface);
-  final surfaceAlt = tinted(c.surfaceAlt);
-  final surfacePanel = tinted(c.surfacePanel);
-  final surfaceBright = tinted(c.surfaceBright);
-  final field = tinted(c.field);
+
+  // 图片背景模式：surface 家族半透明化让背景图透出（弹窗/卡片实底用下方 c.* 原始色）。
+  final Color surface;
+  final Color surfaceAlt;
+  final Color surfacePanel;
+  final Color surfaceBright;
+  final Color field;
+  if (imageBackground) {
+    final scrim = c.surfaceBright.withValues(alpha: 0.22);
+    surface = scrim;
+    surfaceAlt = scrim;
+    surfacePanel = scrim;
+    surfaceBright = c.surfaceBright.withValues(alpha: 0.55);
+    field = scrim;
+  } else {
+    surface = tinted(c.surface);
+    surfaceAlt = tinted(c.surfaceAlt);
+    surfacePanel = tinted(c.surfacePanel);
+    surfaceBright = tinted(c.surfaceBright);
+    field = tinted(c.field);
+  }
 
   final scheme = ColorScheme.fromSeed(
     seedColor: c.primary,
@@ -225,6 +281,20 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
     surfaceTint: Colors.transparent,
   );
 
+  // 播放条底色：图片背景风格下恢复毛玻璃——0.7 高不透明 + 外层 BackdropFilter
+  // 模糊（对齐原版 global.css footer 播放栏：surface-bright/0.7 + blur16）；
+  // 纯色风格恒为面板实底（tinted 跟随全局着色），不做半透明
+  final playerBarBg = imageBackground
+      ? c.surfaceBright.withValues(alpha: 0.7)
+      : tinted(c.surfacePanel);
+  // 全屏播放器背景：恒为面板实底，不随 image 风格半透明化（对齐原版
+  // FullPlayer 独立背景体系——播放界面不跟随全局图片背景设定）
+  final playerBg = tinted(c.surfacePanel);
+  final chromeColors = AppChromeColors(
+    playerBarBackground: playerBarBg,
+    playerBackground: playerBg,
+  );
+
   final base = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -233,6 +303,7 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
     // 统一中英混排度量（消除字体错位）
     fontFamily: fontFamily,
     fontFamilyFallback: _cjkFontFallback,
+    extensions: [chromeColors],
   );
 
   final inputFill = dark ? field : surfaceAlt;
@@ -347,7 +418,7 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
       ),
       textStyle: TextStyle(color: c.onSurface, fontSize: 13),
     ),
-    // 页面转场：淡入 + 轻微上移（对齐原版 route-fade 的柔和感；
+    // 页面转场：淡入 + 轻微上移
     // 覆盖全部平台，含 /player 之外的嵌套路由 push）
     pageTransitionsTheme: PageTransitionsTheme(
       builders: {

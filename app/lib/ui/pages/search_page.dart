@@ -497,7 +497,9 @@ class _SearchPageState extends ConsumerState<SearchPage>
                 const SizedBox(height: 12),
                 TabBar(
                   controller: _tabs,
-                  isScrollable: false,
+                  // TabAlignment.start 仅对可滚动 TabBar 有效：必须 isScrollable，
+                  // 否则指示条偏移与标签不一致。
+                  isScrollable: true,
                   tabAlignment: TabAlignment.start,
                   tabs: [
                     Tab(text: l10n.commonSongs),

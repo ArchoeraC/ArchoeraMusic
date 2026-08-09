@@ -95,8 +95,11 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
     final playing = ref.watch(playbackProvider.select((s) => s.playing));
     final prefs = ref.watch(appPrefsProvider);
 
-    // 设置关闭频谱：不渲染（空占位保持布局稳定）
-    if (!prefs.enableSpectrum) {
+    // 频谱关闭（或性能模式自动关闭）：不渲染（空占位保持布局稳定），
+    // 同时停掉 60fps ticker 重绘省电——性能模式下与关闭频谱完全等价。
+    final enabled = prefs.enableSpectrum && !prefs.performanceMode;
+    if (!enabled) {
+      _ticker.muted = true;
       return SizedBox(width: double.infinity, height: widget.height);
     }
 

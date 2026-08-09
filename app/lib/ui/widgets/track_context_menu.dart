@@ -16,6 +16,7 @@ import '../../core/state/app_prefs.dart';
 import '../../core/state/providers.dart';
 import '../../l10n/l10n.dart';
 import 'comment_dialog.dart';
+import 'glass_surface.dart';
 import 'kugou_login_button.dart';
 import 'netease_login_dialog.dart';
 import 's_context_menu.dart';
@@ -162,27 +163,34 @@ Future<bool> _showLoginPrompt(BuildContext context, String platform) async {
     builder: (ctx) {
       final scheme = Theme.of(ctx).colorScheme;
       final l10n = ctx.l10n;
-      return AlertDialog(
-        icon: Icon(Icons.lock_outline, color: scheme.onSurfaceVariant),
-        title: Text(l10n.downloadRequiresLoginTitle),
-        content: Text(
-          l10n.downloadRequiresLoginContent(platform),
-          style: TextStyle(
-            fontSize: 13,
-            color: scheme.onSurfaceVariant,
-            height: 1.5,
+      return GlassDialogSurface(
+        radius: BorderRadius.circular(16),
+        color: Theme.of(ctx).dialogTheme.backgroundColor ??
+            Theme.of(ctx).colorScheme.surfaceContainerLow,
+        child: AlertDialog(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          icon: Icon(Icons.lock_outline, color: scheme.onSurfaceVariant),
+          title: Text(l10n.downloadRequiresLoginTitle),
+          content: Text(
+            l10n.downloadRequiresLoginContent(platform),
+            style: TextStyle(
+              fontSize: 13,
+              color: scheme.onSurfaceVariant,
+              height: 1.5,
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.commonGoLogin),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.commonGoLogin),
-          ),
-        ],
       );
     },
   );
@@ -200,45 +208,52 @@ Future<String?> _pickDownloadQuality(
     builder: (ctx) {
       final scheme = Theme.of(ctx).colorScheme;
       final l10n = ctx.l10n;
-      return AlertDialog(
-        title: Text(l10n.downloadQualityTitle),
-        contentPadding: const EdgeInsets.symmetric(vertical: 8),
-        content: SizedBox(
-          width: 260,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final l in levels)
-                ListTile(
-                  dense: true,
-                  leading: Icon(
-                    l == 'hi-res' || l == 'lossless'
-                        ? Icons.high_quality_outlined
-                        : Icons.music_note_outlined,
-                    size: 18,
-                    color: scheme.onSurfaceVariant,
+      return GlassDialogSurface(
+        radius: BorderRadius.circular(16),
+        color: Theme.of(ctx).dialogTheme.backgroundColor ??
+            Theme.of(ctx).colorScheme.surfaceContainerLow,
+        child: AlertDialog(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          title: Text(l10n.downloadQualityTitle),
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          content: SizedBox(
+            width: 260,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final l in levels)
+                  ListTile(
+                    dense: true,
+                    leading: Icon(
+                      l == 'hi-res' || l == 'lossless'
+                          ? Icons.high_quality_outlined
+                          : Icons.music_note_outlined,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    title: Text(l10nQualityLabel(l10n, l)),
+                    trailing: l == defaultQuality
+                        ? Text(
+                            l10n.commonDefault,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: scheme.primary.withValues(alpha: 0.7),
+                            ),
+                          )
+                        : null,
+                    onTap: () => Navigator.pop(ctx, l),
                   ),
-                  title: Text(l10nQualityLabel(l10n, l)),
-                  trailing: l == defaultQuality
-                      ? Text(
-                          l10n.commonDefault,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: scheme.primary.withValues(alpha: 0.7),
-                          ),
-                        )
-                      : null,
-                  onTap: () => Navigator.pop(ctx, l),
-                ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.commonCancel),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.commonCancel),
-          ),
-        ],
       );
     },
   );

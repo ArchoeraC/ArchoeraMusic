@@ -11,6 +11,7 @@ import '../../core/state/app_prefs.dart';
 import '../../core/state/lyrics_provider.dart';
 import '../../core/state/providers.dart';
 import '../../l10n/l10n.dart';
+import '../theme/app_theme.dart';
 import '../widgets/cover_image.dart';
 import '../widgets/comment_dialog.dart';
 import '../widgets/lyrics_view.dart';
@@ -148,7 +149,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         onPointerSignal: (_) => _pokeControls(),
         child: Stack(
           children: [
-            // 背景渐变（对齐 FullPlayer PlayerBackground：暗色氛围）
+            // 背景渐变（对齐 FullPlayer PlayerBackground：暗色氛围）。
+            // 终点色用 AppChromeColors.playerBackground（恒为面板实底）——
+            // 播放界面完全不跟随图片背景设定，image 风格下也不半透明透出背景图。
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -157,7 +160,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
                     end: Alignment.bottomRight,
                     colors: [
                       colorScheme.primary.withValues(alpha: 0.28),
-                      colorScheme.surface,
+                      Theme.of(
+                            context,
+                          ).extension<AppChromeColors>()?.playerBackground ??
+                          colorScheme.surface,
                     ],
                   ),
                 ),
@@ -771,6 +777,13 @@ class _CoverSwitcherState extends State<_CoverSwitcher>
     super.didUpdateWidget(old);
     // 封面身份变化 → 触发旧封面离场（完成后换新封面入场）
     if (widget.coverKey != old.coverKey) {
+      // 性能模式（MediaQuery.disableAnimations）：跳过切歌动效，直接换封面
+      if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+        _ctrl.stop();
+        _leaving = false;
+        _shown = widget.child;
+        return;
+      }
       _leaving = true;
       _ctrl.duration = Duration(
         milliseconds: widget.slide ? _slideLeaveMs : _scaleLeaveMs,

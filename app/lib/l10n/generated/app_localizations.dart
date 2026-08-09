@@ -2636,23 +2636,23 @@ abstract class AppLocalizations {
   /// **'播放过滤'**
   String get settingsSectionFilter;
 
+  /// No description provided for @settingsDjMode.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'去™的 DJ'**
+  String get settingsDjMode;
+
   /// No description provided for @settingsDjModeOn.
   ///
   /// In zh_CN, this message translates to:
-  /// **'自动跳过 DJ / 口水歌'**
+  /// **'世界清净了awa'**
   String get settingsDjModeOn;
 
   /// No description provided for @settingsDjModeOff.
   ///
   /// In zh_CN, this message translates to:
-  /// **'遇到 DJ 版歌曲自动跳下一首'**
+  /// **'哎嘿嘿(ˉ﹃ˉ)'**
   String get settingsDjModeOff;
-
-  /// No description provided for @settingsDjModeNote.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'标题或歌手含 DJ / 抖音 / 网红 等关键词的曲目自动跳过'**
-  String get settingsDjModeNote;
 
   /// No description provided for @settingsSectionLyricsFilter.
   ///
@@ -2669,13 +2669,13 @@ abstract class AppLocalizations {
   /// No description provided for @settingsUncensorOn.
   ///
   /// In zh_CN, this message translates to:
-  /// **'还原歌词中被星号遮蔽的词（f**k → fuck）'**
+  /// **'fuck'**
   String get settingsUncensorOn;
 
   /// No description provided for @settingsUncensorOff.
   ///
   /// In zh_CN, this message translates to:
-  /// **'还原歌词中被 * 遮盖的单词（f**k → fuck）'**
+  /// **'f**k'**
   String get settingsUncensorOff;
 
   /// No description provided for @settingsSectionListDisplay.
@@ -2737,6 +2737,24 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'列表不展示别名'**
   String get settingsShowSubtitleOff;
+
+  /// No description provided for @settingsPerformanceMode.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'性能模式'**
+  String get settingsPerformanceMode;
+
+  /// No description provided for @settingsPerformanceModeOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前为冻效模式'**
+  String get settingsPerformanceModeOn;
+
+  /// No description provided for @settingsPerformanceModeOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前为动效模式'**
+  String get settingsPerformanceModeOff;
 
   /// No description provided for @settingsSectionDir.
   ///

@@ -1,0 +1,48 @@
+# Arch Linux 打包定义（配合 packaging/linux/package.sh arch 在 CI 中构建）
+# 产物：archoera-music-<pkgver>-1-x86_64.pkg.tar.zst
+# 说明：bundle.tar.zst / archoera-music.desktop / com.archoera.archoera_music.png
+#       由 package.sh arch 预置在同目录（md5sums=SKIP）。
+
+pkgname=archoera-music
+pkgver=0.8.4
+pkgrel=1
+pkgdesc="An open-source music player, connect to alternative music service, support offline playback"
+arch=('x86_64')
+url="https://github.com/BetaStudio2/ArchoeraMusic"
+license=('AGPL-3.0-only')
+depends=(
+  'glibc'
+  'gcc-libs'
+  'gtk3'
+  'libayatana-appindicator'
+  'libdbusmenu-glib'
+  'libepoxy'
+  'fontconfig'
+  'fribidi'
+  'libx11'
+  'libxi'
+  'at-spi2-atk'
+  'libcloudproviders'
+  'ffmpeg'
+  'taglib'
+  'curl'
+  'openssl'
+  'sqlite'
+  'xz'
+  'zlib'
+)
+source=('bundle.tar.zst' 'archoera-music.desktop' 'com.archoera.archoera_music.png')
+md5sums=('SKIP' 'SKIP' 'SKIP')
+
+package() {
+  # 整个 bundle 装到 /opt/archoera-music（FFI/引擎子进程均相对可执行文件定位）
+  install -d "$pkgdir/opt/archoera-music"
+  cp -a "$srcdir/bundle/." "$pkgdir/opt/archoera-music/"
+  install -d "$pkgdir/usr/bin"
+  ln -s /opt/archoera-music/archoera_music "$pkgdir/usr/bin/archoera_music"
+  # 桌面条目 + 图标（文件名 = 应用 ID，保证 Wayland 任务栏图标映射）
+  install -Dm644 "$srcdir/archoera-music.desktop" \
+    "$pkgdir/usr/share/applications/com.archoera.archoera_music.desktop"
+  install -Dm644 "$srcdir/com.archoera.archoera_music.png" \
+    "$pkgdir/usr/share/icons/hicolor/512x512/apps/com.archoera.archoera_music.png"
+}

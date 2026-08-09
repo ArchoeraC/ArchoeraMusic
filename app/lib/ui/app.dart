@@ -213,6 +213,8 @@ class ArchoeraMusicApp extends ConsumerWidget {
     final globalTint = prefs.globalTint || imageStyle;
     final effectiveThemeMode = imageStyle ? ThemeMode.dark : themeMode;
     final fontFamily = prefs.fontFamily;
+    // 性能模式：全局关闭动效（隐式 Animated* 系列自动 0 时长）+ 频谱关闭。
+    final performanceMode = prefs.performanceMode;
     return _AuthBootstrap(
       child: MaterialApp.router(
         title: 'ArchoeraMusic',
@@ -224,19 +226,34 @@ class ArchoeraMusicApp extends ConsumerWidget {
             accentSeed: accent,
             fontFamily: fontFamily,
             globalTint: globalTint,
-            solid: prefs.themeSource == 'solid'),
+            solid: prefs.themeSource == 'solid',
+            imageBackground: imageStyle),
         darkTheme: buildAppTheme(AppPalette.dark, Brightness.dark,
             accentSeed: accent,
             fontFamily: fontFamily,
             globalTint: globalTint,
-            solid: prefs.themeSource == 'solid'),
+            solid: prefs.themeSource == 'solid',
+            imageBackground: imageStyle),
         themeMode: effectiveThemeMode,
         routerConfig: appRouter,
-        builder: (context, child) => SplashGate(
-          child: AppShortcuts(
-            child: ToastOverlay(child: child ?? const SizedBox.shrink()),
-          ),
-        ),
+        builder: (context, child) {
+          // 性能模式：在应用子树外加一层 MediaQuery.disableAnimations——
+          // MaterialApp 自身的 MediaQuery 位于本 builder 之上，此处覆盖
+          // 只影响应用子树（Navigator/路由/浮层），隐式 Animated* 组件
+          // 会自动按 disableAnimations 退化为 0 时长（Flutter 内建支持）。
+          var appChild = child ?? const SizedBox.shrink();
+          if (performanceMode) {
+            appChild = MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: true),
+              child: appChild,
+            );
+          }
+          return SplashGate(
+            child: AppShortcuts(
+              child: ToastOverlay(child: appChild),
+            ),
+          );
+        },
       ),
     );
   }

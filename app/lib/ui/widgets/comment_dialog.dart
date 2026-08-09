@@ -16,6 +16,7 @@ import '../../core/netease/track.dart';
 import '../../core/state/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import 'glass_surface.dart';
 import 'netease_login_dialog.dart';
 import 's_controls.dart';
 import 'toast.dart';
@@ -244,17 +245,22 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
-      backgroundColor: scheme.surfaceContainer,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 560,
-          maxHeight: 560,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      // 图片风格下为毛玻璃（blur(16)），背景图不再清晰透出
+      child: GlassDialogSurface(
+        radius: BorderRadius.circular(16),
+        color: scheme.surfaceContainer,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 560,
+            maxHeight: 560,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             // ── 标题行 ─────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
@@ -419,6 +425,7 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
                 ),
               ),
           ],
+        ),
         ),
       ),
     );

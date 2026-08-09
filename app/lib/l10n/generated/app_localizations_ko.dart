@@ -1393,14 +1393,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsSectionFilter => '재생 필터';
 
   @override
+  String get settingsDjMode => 'Fuck DJ Mode';
+
+  @override
   String get settingsDjModeOn => 'DJ 리믹스 등 저품질 트랙 자동 건너뛰기';
 
   @override
   String get settingsDjModeOff => 'DJ 버전 감지시 자동으로 다음 곡으로 건너뛰기';
-
-  @override
-  String get settingsDjModeNote =>
-      '제목·아티스트에 DJ 등이 포함된 트랙은 로드 시 자동 건너뜀（Fuck DJ Mode 준수）.';
 
   @override
   String get settingsSectionLyricsFilter => '가사';
@@ -1409,10 +1408,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsUncensor => '비속어 잠금 해제';
 
   @override
-  String get settingsUncensorOn => '가사의 f**k 등 가려진 단어 복원';
+  String get settingsUncensorOn => 'fuck';
 
   @override
-  String get settingsUncensorOff => '가사의 *로 마스크된 단어 복원（f**k → fuck）';
+  String get settingsUncensorOff => 'f**k';
 
   @override
   String get settingsSectionListDisplay => '목록 표시';
@@ -1443,6 +1442,15 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsShowSubtitleOff => '목록에 아티스트만 표시, 별칭 없음';
+
+  @override
+  String get settingsPerformanceMode => '성능 모드';
+
+  @override
+  String get settingsPerformanceModeOn => '현재 동결 모드';
+
+  @override
+  String get settingsPerformanceModeOff => '현재 애니메이션 모드';
 
   @override
   String get settingsSectionDir => '디렉토리';

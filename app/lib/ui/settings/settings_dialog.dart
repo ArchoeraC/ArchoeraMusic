@@ -15,6 +15,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../app.dart';
 import '../theme/app_theme.dart';
+import '../widgets/glass_surface.dart';
 import '../widgets/s_controls.dart';
 import '../widgets/toast.dart';
 import 'streaming_server_list.dart';
@@ -92,6 +93,17 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   double? _downloadSpeedDraft;
   double? _downloadHistoryLimitDraft;
 
+  /// 设置分类导航锚点（animated 滑动指示条测量用；key 为分类）。
+  final Map<SettingsCategory, GlobalKey> _catKeys = {};
+  /// 分类列表容器锚点（指示条坐标参照系）。
+  final GlobalKey _catHostKey = GlobalKey();
+
+  /// 滑动指示条当前位置（相对分类列表容器；与侧边栏 animated 模式同语义）。
+  double _catIndicatorLeft = 0;
+  double _catIndicatorTop = 0;
+  double _catIndicatorHeight = 0;
+  bool _catIndicatorReady = false;
+
   @override
   void initState() {
     super.initState();
@@ -146,6 +158,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsLyricLineHeight, l10n.settingsSearchLyricLineHeightSubtitle, Icons.line_weight),
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsSearchColorTitle, l10n.settingsSearchColorSubtitle, Icons.palette_outlined),
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsSearchDesktopLyricsTitle, l10n.settingsSearchDesktopLyricsSubtitle, Icons.desktop_windows_outlined),
+      _SearchEntry(SettingsCategory.preset, l10n.settingsPerformanceMode, l10n.settingsPerformanceModeOn, Icons.bolt_outlined),
       _SearchEntry(SettingsCategory.preset, l10n.settingsSearchDjModeTitle, l10n.settingsDjModeOn, Icons.auto_fix_high_outlined),
       _SearchEntry(SettingsCategory.preset, l10n.settingsUncensor, l10n.settingsSearchUncensorSubtitle, Icons.auto_fix_normal_outlined),
       _SearchEntry(SettingsCategory.preset, l10n.settingsHideVip, l10n.settingsSearchHideVipSubtitle, Icons.workspace_premium_outlined),
@@ -164,26 +177,62 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     ];
   }
 
+  /// 测量选中分类在列表容器中的位置，驱动滑动指示条
+  /// （对齐侧边栏 animated 模式；分类切换后经 postFrameCallback 调用）。
+  void _updateCategoryIndicator() {
+    if (ref.read(appPrefsProvider).sidebarNavStyle != 'animated') return;
+    final hostCtx = _catHostKey.currentContext;
+    final itemCtx = _catKeys[_category]?.currentContext;
+    if (hostCtx == null || itemCtx == null || !itemCtx.mounted) return;
+    final hostBox = hostCtx.findRenderObject() as RenderBox?;
+    final itemBox = itemCtx.findRenderObject() as RenderBox?;
+    if (hostBox == null || itemBox == null) return;
+    final pos = itemBox.localToGlobal(Offset.zero, ancestor: hostBox);
+    final left = pos.dx;
+    final top = pos.dy;
+    final height = itemBox.size.height;
+    if (!_catIndicatorReady ||
+        left != _catIndicatorLeft ||
+        top != _catIndicatorTop ||
+        height != _catIndicatorHeight) {
+      setState(() {
+        _catIndicatorLeft = left;
+        _catIndicatorTop = top;
+        _catIndicatorHeight = height;
+        _catIndicatorReady = true;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
     final window = MediaQuery.sizeOf(context);
+    // 设置分类导航与侧边栏使用同样的高亮动效（对齐原版 SettingsMenu：
+    // nav-style 跟随 appearance.sidebarNavStyle）
+    final animated = ref.watch(appPrefsProvider).sidebarNavStyle == 'animated';
+    // 布局完成后测量选中分类位置（animated 滑动指示条）
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateCategoryIndicator());
     return Dialog(
-      backgroundColor: scheme.surfaceContainerHighest,
+      backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.dialog),
         side: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
       ),
-      child: SizedBox(
-        width: (window.width * 0.8).clamp(640.0, 960.0),
-        height: (window.height * 0.84).clamp(480.0, 660.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      // 图片风格下为毛玻璃（blur(16)），背景图不再清晰透出
+      child: GlassDialogSurface(
+        radius: BorderRadius.circular(AppRadius.dialog),
+        color: scheme.surfaceContainerHighest,
+        child: SizedBox(
+          width: (window.width * 0.8).clamp(640.0, 960.0),
+          height: (window.height * 0.84).clamp(480.0, 660.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             SizedBox(
               width: 210,
               child: Padding(
@@ -222,11 +271,35 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                     ),
                     const SizedBox(height: 18),
                     Expanded(
-                      child: ListView(
-                        padding: EdgeInsets.zero,
+                      child: Stack(
+                        key: _catHostKey,
                         children: [
-                          for (final cat in SettingsCategory.values)
-                            _buildCategoryItem(scheme, cat, l10n),
+                          ListView(
+                            padding: EdgeInsets.zero,
+                            children: [
+                              for (final cat in SettingsCategory.values)
+                                _buildCategoryItem(scheme, cat, l10n, animated),
+                            ],
+                          ),
+                          // 滑动高亮指示条（对齐侧边栏 animated 模式：
+                          // left 跟随选中项左缘，top/height 上下各内缩 10px）
+                          if (animated && _catIndicatorReady)
+                            AnimatedPositioned(
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeOut,
+                              left: _catIndicatorLeft,
+                              top: _catIndicatorTop + 10,
+                              height: _catIndicatorHeight - 20,
+                              width: 3,
+                              child: IgnorePointer(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: scheme.primary,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -243,15 +316,20 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
 
-  Widget _buildCategoryItem(ColorScheme scheme, SettingsCategory cat, AppLocalizations l10n) {
+  Widget _buildCategoryItem(ColorScheme scheme, SettingsCategory cat,
+      AppLocalizations l10n, bool animated) {
     final selected = _category == cat;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1.5),
       child: AnimatedContainer(
+        // 位置锚点：animated 滑动指示条据此定位（挂在背景容器上，
+        // 使 top+10 / height-20 与静态模式完全对齐）
+        key: _catKeys[cat] ??= GlobalKey(),
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
         decoration: BoxDecoration(
@@ -273,6 +351,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
+                  // 静态指示条（对齐 SMenu default；animated 模式交给容器级滑动条）
                   Positioned(
                     left: 0,
                     top: 10,
@@ -281,7 +360,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                       duration: const Duration(milliseconds: 150),
                       width: 3,
                       decoration: BoxDecoration(
-                        color: selected
+                        color: !animated && selected
                             ? scheme.primary
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(2),
@@ -1559,6 +1638,25 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 性能模式：关闭所有动效 + 自动关闭音频频谱（全局开关）
+        _sectionTitle(scheme, l10n.settingsPerformanceMode),
+        _card(
+          scheme,
+          children: [
+            _SettingTile(
+              icon: prefs.performanceMode ? Icons.bolt : Icons.bolt_outlined,
+              title: l10n.settingsPerformanceMode,
+              subtitle: prefs.performanceMode
+                  ? l10n.settingsPerformanceModeOn
+                  : l10n.settingsPerformanceModeOff,
+              trailing: Switch(
+                value: prefs.performanceMode,
+                onChanged: (v) => notifier.setPerformanceMode(v),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
         _sectionTitle(scheme, l10n.settingsSectionFilter),
         _card(
           scheme,
@@ -1567,7 +1665,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
               icon: prefs.fuckDjMode
                   ? Icons.auto_fix_high
                   : Icons.auto_fix_high_outlined,
-              title: 'Fuck DJ Mode',
+              title: l10n.settingsDjMode,
               subtitle: prefs.fuckDjMode
                   ? l10n.settingsDjModeOn
                   : l10n.settingsDjModeOff,
@@ -1577,14 +1675,6 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          l10n.settingsDjModeNote,
-          style: TextStyle(
-            fontSize: 12,
-            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
-          ),
         ),
         const SizedBox(height: 20),
         _sectionTitle(scheme, l10n.settingsSectionLyricsFilter),
@@ -2273,10 +2363,16 @@ class _AccentPickerDialogState extends State<_AccentPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = widget.l10n;
     final color = _hsv.toColor();
-    return AlertDialog(
-      title: Text(l10n.settingsPickerTitle),
+    return GlassDialogSurface(
+      radius: BorderRadius.circular(24),
+      color: scheme.surfaceContainerHighest,
+      child: AlertDialog(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        title: Text(l10n.settingsPickerTitle),
       content: SizedBox(
         width: 300,
         child: Column(
@@ -2332,6 +2428,7 @@ class _AccentPickerDialogState extends State<_AccentPickerDialog> {
           child: Text(l10n.settingsApply),
         ),
       ],
+      ),
     );
   }
 }

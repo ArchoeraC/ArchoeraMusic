@@ -6,6 +6,7 @@ import '../../core/netease/track.dart';
 import '../../core/playback/playback_notifier.dart';
 import '../../core/state/providers.dart';
 import '../../l10n/l10n.dart';
+import 'glass_surface.dart';
 import 's_controls.dart';
 import 'song_list.dart';
 import 'cover_grid.dart';
@@ -246,15 +247,20 @@ class _TrackListDialogState extends ConsumerState<TrackListDialog> {
     final listHeight = (window.height * 0.6).clamp(300.0, 560.0);
 
     return Dialog(
-      backgroundColor: theme.colorScheme.surfaceContainerHigh,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 80, vertical: 48),
-      child: SizedBox(
-        // 随窗口自适应：偏好 780 宽，小窗口按比例收缩
-        width: (MediaQuery.sizeOf(context).width * 0.68).clamp(560.0, 780.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      // 图片风格下为毛玻璃（blur(16)），背景图不再清晰透出
+      child: GlassDialogSurface(
+        radius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceContainerHigh,
+        child: SizedBox(
+          // 随窗口自适应：偏好 780 宽，小窗口按比例收缩
+          width: (MediaQuery.sizeOf(context).width * 0.68).clamp(560.0, 780.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // ── 头部 ─────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
@@ -403,6 +409,7 @@ class _TrackListDialogState extends ConsumerState<TrackListDialog> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -498,16 +505,21 @@ class _KugouBrowseDialogState extends ConsumerState<_KugouBrowseDialog> {
     final theme = Theme.of(context);
     final l10n = context.l10n;
     return Dialog(
-      backgroundColor: theme.colorScheme.surfaceContainerHigh,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 80, vertical: 48),
-      child: SizedBox(
-        // 随窗口自适应：偏好 860×660，小窗口按比例收缩并留边距
-        width: (MediaQuery.sizeOf(context).width * 0.72).clamp(600.0, 860.0),
-        height: (MediaQuery.sizeOf(context).height * 0.84)
-            .clamp(460.0, 660.0),
-        child: Column(
-          children: [
+      // 图片风格下为毛玻璃（blur(16)），背景图不再清晰透出
+      child: GlassDialogSurface(
+        radius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceContainerHigh,
+        child: SizedBox(
+          // 随窗口自适应：偏好 860×660，小窗口按比例收缩并留边距
+          width: (MediaQuery.sizeOf(context).width * 0.72).clamp(600.0, 860.0),
+          height: (MediaQuery.sizeOf(context).height * 0.84)
+              .clamp(460.0, 660.0),
+          child: Column(
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
               child: Row(
@@ -597,6 +609,7 @@ class _KugouBrowseDialogState extends ConsumerState<_KugouBrowseDialog> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

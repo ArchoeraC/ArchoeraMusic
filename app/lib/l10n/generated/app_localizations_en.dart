@@ -1426,14 +1426,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionFilter => 'Playback filter';
 
   @override
+  String get settingsDjMode => 'Fuck DJ Mode';
+
+  @override
   String get settingsDjModeOn => 'Auto-skip DJ remixes / car hits';
 
   @override
   String get settingsDjModeOff => 'Auto-skip to next track on DJ versions';
-
-  @override
-  String get settingsDjModeNote =>
-      'Auto-skip tracks with DJ / 抖音 / 网红 etc. in title or artist';
 
   @override
   String get settingsSectionLyricsFilter => 'Lyrics';
@@ -1442,11 +1441,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsUncensor => 'Unlock profanity';
 
   @override
-  String get settingsUncensorOn =>
-      'Restore *-masked words in lyrics (f**k → fuck)';
+  String get settingsUncensorOn => 'fuck';
 
   @override
-  String get settingsUncensorOff => 'Restore words masked by * (f**k → fuck)';
+  String get settingsUncensorOff => 'f**k';
 
   @override
   String get settingsSectionListDisplay => 'List display';
@@ -1479,6 +1477,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsShowSubtitleOff => 'No aliases in list';
+
+  @override
+  String get settingsPerformanceMode => 'Performance Mode';
+
+  @override
+  String get settingsPerformanceModeOn => 'Currently in frozen mode';
+
+  @override
+  String get settingsPerformanceModeOff => 'Currently in motion mode';
 
   @override
   String get settingsSectionDir => 'Directory';

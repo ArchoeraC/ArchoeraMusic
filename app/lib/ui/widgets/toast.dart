@@ -1,8 +1,8 @@
 /// 全局 toast 消息（对齐原项目 SPlayer-Next SToast 经典布局）。
 ///
-/// 布局：顶部居中堆叠；卡片 = 主题背景 + 类型彩色边框 + 底部倒计时进度条；
-/// 进入/离开动画 = 淡入 + 下滑（对齐原版 classic 风格）。无关闭按钮、
-/// 不拦截点击（纯展示，pointer-events-none）。
+/// 布局：顶部居中堆叠；卡片 = 主题背景 + 类型彩色边框；进入/离开动画 =
+/// 淡入 + 下滑（对齐原版 classic 风格）。无关闭按钮、不拦截点击（纯展示，
+/// pointer-events-none）。
 library;
 
 import 'dart:async';
@@ -154,12 +154,25 @@ class _ToastItemViewState extends State<_ToastItemView>
 
   bool get _leaving => widget.item.leaving;
 
+  /// 性能模式（MediaQuery.disableAnimations）：跳过进入/离开动效。
+  bool get _noAnim =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
   @override
   void initState() {
     super.initState();
     _ctrl.forward();
     // 侦听外部 dismiss（自动关闭定时触发）→ 播离开动画后移除
     toastController.addListener(_onControllerChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 性能模式：进入动画直接跳到完全显示（首次帧内生效，打断 forward）
+    if (_noAnim && _ctrl.value < 1) {
+      _ctrl.value = 1;
+    }
   }
 
   @override
@@ -170,40 +183,23 @@ class _ToastItemViewState extends State<_ToastItemView>
   }
 
   void _onControllerChanged() {
-    if (_leaving && !_ctrl.isAnimating && _ctrl.value >= 1) {
-      _ctrl.reverse().then((_) {
-        if (mounted) toastController.remove(widget.item.id);
-      });
+    if (_leaving) {
+      // 性能模式：无离开动画，直接移除
+      if (_noAnim) {
+        toastController.remove(widget.item.id);
+        return;
+      }
+      if (!_ctrl.isAnimating && _ctrl.value >= 1) {
+        _ctrl.reverse().then((_) {
+          if (mounted) toastController.remove(widget.item.id);
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
-    // 进度条倒计时：仅类型色动画条（从满到空、左对齐收缩，时长与
-    // 自动关闭一致）。不画全宽轨道线，避免文字下方出现一条横线。
-    final progress = TweenAnimationBuilder<double>(
-      tween: Tween(begin: 1, end: 0),
-      duration: widget.item.duration,
-      curve: Curves.linear,
-      builder: (context, v, _) => Container(
-        height: 2,
-        color: Colors.transparent,
-        alignment: Alignment.centerLeft,
-        child: FractionallySizedBox(
-          alignment: Alignment.centerLeft,
-          widthFactor: v,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: _barColor,
-              borderRadius: BorderRadius.circular(2),
-            ),
-            child: const SizedBox(width: double.infinity, height: 2),
-          ),
-        ),
-      ),
-    );
 
     return AnimatedBuilder(
       animation: _ctrl,
@@ -223,7 +219,6 @@ class _ToastItemViewState extends State<_ToastItemView>
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         constraints: const BoxConstraints(minWidth: 200, maxWidth: 420),
-        clipBehavior: Clip.antiAlias, // 进度条贴底，裁剪圆角
         decoration: BoxDecoration(
           color: scheme.surfaceBright,
           borderRadius: BorderRadius.circular(8),
@@ -236,26 +231,18 @@ class _ToastItemViewState extends State<_ToastItemView>
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 文字区：显式 onSurface 颜色（ToastOverlay 位于 Material
-            // 之外，不能用默认黑色；留底部空间给进度条）
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-              child: Text(
-                widget.item.message,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: scheme.onSurface,
-                ),
-              ),
+        // 仅文字区：显式 onSurface 颜色（ToastOverlay 位于 Material
+        // 之外，不能用默认黑色）
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Text(
+            widget.item.message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13.5,
+              color: scheme.onSurface,
             ),
-            // 底部倒计时进度条（卡片最底部）
-            progress,
-          ],
+          ),
         ),
       ),
     );
@@ -270,18 +257,6 @@ class _ToastItemViewState extends State<_ToastItemView>
       ToastType.error => scheme.error.withValues(alpha: 0.6),
       ToastType.default_ || ToastType.info =>
         scheme.primary.withValues(alpha: 0.45),
-    };
-  }
-
-  /// 类型 → 进度条色（对齐原版 classicBar；default/info 跟随主题主色，
-  /// 避免固定蓝色与自定义/系统主题色冲突）
-  Color get _barColor {
-    final scheme = Theme.of(context).colorScheme;
-    return switch (widget.item.type) {
-      ToastType.success => const Color(0xFF27AE60),
-      ToastType.warning => const Color(0xFFD68910),
-      ToastType.error => scheme.error,
-      ToastType.default_ || ToastType.info => scheme.primary,
     };
   }
 }

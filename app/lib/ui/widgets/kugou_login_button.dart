@@ -19,6 +19,7 @@ import '../../core/kugou/direct/kugou_request.dart';
 import '../../core/state/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import 'glass_surface.dart';
 import 'toast.dart';
 
 /// 顶栏登录入口（未登录 → 「扫码登录」；已登录 → 昵称 + 「退出登录」）。
@@ -206,64 +207,70 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
-    return AlertDialog(
-      title: Text(l10n.loginKugouQrLogin(l10n.brandKugou)),
-      content: SizedBox(
-        width: 260,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_loadingKey)
-              const Padding(
-                padding: EdgeInsets.all(48),
-                child: CircularProgressIndicator(),
-              )
-            else if (_key != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+    return GlassDialogSurface(
+      radius: BorderRadius.circular(16),
+      color: theme.colorScheme.surfaceContainerHigh,
+      child: AlertDialog(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        title: Text(l10n.loginKugouQrLogin(l10n.brandKugou)),
+        content: SizedBox(
+          width: 260,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_loadingKey)
+                const Padding(
+                  padding: EdgeInsets.all(48),
+                  child: CircularProgressIndicator(),
+                )
+              else if (_key != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: QrImageView(
+                    data: '$kgQrLoginPage?qrcode=$_key',
+                    version: QrVersions.auto,
+                    size: 200,
+                  ),
                 ),
-                child: QrImageView(
-                  data: '$kgQrLoginPage?qrcode=$_key',
-                  version: QrVersions.auto,
-                  size: 200,
+                const SizedBox(height: 12),
+                Text(
+                  _statusText(l10n),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _statusText(l10n),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              ] else ...[
+                const SizedBox(height: 12),
+                Icon(Icons.error_outline,
+                    size: 40, color: theme.colorScheme.error),
+                const SizedBox(height: 8),
+                Text(
+                  _error,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
                 ),
-              ),
-            ] else ...[
-              const SizedBox(height: 12),
-              Icon(Icons.error_outline,
-                  size: 40, color: theme.colorScheme.error),
-              const SizedBox(height: 8),
-              Text(
-                _error,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 12),
-              FilledButton.tonalIcon(
-                onPressed: _initQr,
-                icon: const Icon(Icons.refresh),
-                label: Text(l10n.loginRegenerate),
-              ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: _initQr,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(l10n.loginRegenerate),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.commonCancel),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(l10n.commonCancel),
-        ),
-      ],
     );
   }
 }

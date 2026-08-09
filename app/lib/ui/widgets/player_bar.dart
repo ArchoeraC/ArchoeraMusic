@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import '../../core/playback/playback_notifier.dart';
 import '../../core/state/app_prefs.dart';
 import '../../core/state/providers.dart';
 import '../../l10n/l10n.dart';
+import '../theme/app_theme.dart';
 import 'cover_image.dart';
 import 'playback_slider.dart';
 import 'queue_panel.dart';
@@ -54,6 +57,13 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
     // source 为 null 但队列/位置就绪）：此时播放/切歌/打开播放页都应可用。
     final hasContent = hasSource || hasQueue;
     final floating = prefs.floatingPlayerBar;
+    // 图片背景风格（有效时）：播放条恢复毛玻璃——0.7 高不透明底色
+    // + BackdropFilter 模糊（对齐原版 footer 播放栏 blur16）；纯色风格
+    // 走实底，不包模糊层
+    final imageMode =
+        prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
+    // 播放条底色走扩展色（image 模式 = surfaceBright/0.7，纯色 = 面板实底）
+    final chrome = Theme.of(context).extension<AppChromeColors>()!;
 
     // 内容：顶部进度条 + 主体行（两种模式共用，仅容器不同）
     // 注：source 可能为 null（播放条退出动画期间），文本做空串兜底
@@ -244,7 +254,7 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
 
     // 内容容器（两种模式共用）
     final content = floating
-        // 悬浮模式：底部居中圆角胶囊（玻璃面板 + 阴影，对齐原版 floating）
+        // 悬浮模式：底部居中圆角胶囊（阴影 + 毛玻璃/面板实底）
         //
         // 注意：不能用 Center 包裹——bottomNavigationBar 给子项的约束是
         // maxHeight = 窗口剩余高度，Center 无尺寸因子会撑满整窗（主界面被
@@ -257,27 +267,44 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
               heightFactor: 1,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 960),
-                child: Material(
-                  color: theme.colorScheme.surfaceBright,
-                  elevation: 10,
-                  shadowColor: Colors.black.withValues(alpha: 0.35),
-                  clipBehavior: Clip.antiAlias,
-                  shape: RoundedRectangleBorder(
+                child: Container(
+                  // 阴影放在裁剪/模糊层外，避免被圆角裁剪掉
+                  decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    side: BorderSide(
-                        color:
-                            theme.colorScheme.primary.withValues(alpha: 0.12)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  child: SafeArea(top: false, child: bar),
+                  // image 模式毛玻璃：ClipRRect 先裁剪圆角，BackdropFilter
+                  // 再模糊下方主界面（对齐原版 footer blur16）
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: _glass(imageMode, child: Material(
+                      color: chrome.playerBarBackground,
+                      clipBehavior: Clip.antiAlias,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        side: BorderSide(
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.12)),
+                      ),
+                      child: SafeArea(top: false, child: bar),
+                    )),
+                  ),
                 ),
               ),
             ),
           )
-        // 默认模式：全宽停靠条
-        : Material(
+        // 默认模式：全宽停靠条（image 模式毛玻璃，纯色面板实底）
+        : _glass(imageMode, child: Material(
+            color: chrome.playerBarBackground,
             elevation: 8,
             child: SafeArea(child: bar),
-          );
+          ));
 
     // 未播放时隐藏播放条（不占底部空间）；用 AnimatedSwitcher 做
     // 进入/退出动效（高度收缩 + 淡入淡出，对齐原版 PlayerBar 过渡）
@@ -301,6 +328,16 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
           : const SizedBox.shrink(key: ValueKey('player-bar-hidden')),
     );
   }
+}
+
+/// 播放条毛玻璃包裹层：image 模式下对下方主界面做 blur16 模糊（对齐原版
+/// global.css footer 播放栏 backdrop-filter: blur(16px)）；纯色风格直通实底。
+Widget _glass(bool imageMode, {required Widget child}) {
+  if (!imageMode) return child;
+  return BackdropFilter(
+    filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+    child: child,
+  );
 }
 
 /// 取触发按钮的全局矩形（锚定浮层用；未布局/脱离时返回 null）。

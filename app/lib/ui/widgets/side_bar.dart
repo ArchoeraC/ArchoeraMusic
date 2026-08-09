@@ -53,6 +53,9 @@ class _SideBarState extends ConsumerState<SideBar> {
   final GlobalKey _navHostKey = GlobalKey();
 
   /// 滑动指示条当前位置（相对导航容器）。
+  /// left 跟随选中项左缘：ListView 自带 horizontal padding，固定 0 会把
+  /// 指示条放在高亮背景（从 x=10 开始）的左侧之外。
+  double _indicatorLeft = 0;
   double _indicatorTop = 0;
   double _indicatorHeight = 0;
   bool _indicatorReady = false;
@@ -104,12 +107,16 @@ class _SideBarState extends ConsumerState<SideBar> {
     final itemBox = itemCtx.findRenderObject() as RenderBox?;
     if (hostBox == null || itemBox == null) return;
     final pos = itemBox.localToGlobal(Offset.zero, ancestor: hostBox);
+    final left = pos.dx;
+    final top = pos.dy;
     final height = itemBox.size.height;
     if (!_indicatorReady ||
-        pos.dy != _indicatorTop ||
+        left != _indicatorLeft ||
+        top != _indicatorTop ||
         height != _indicatorHeight) {
       setState(() {
-        _indicatorTop = pos.dy;
+        _indicatorLeft = left;
+        _indicatorTop = top;
         _indicatorHeight = height;
         _indicatorReady = true;
       });
@@ -231,9 +238,11 @@ class _SideBarState extends ConsumerState<SideBar> {
                   AnimatedPositioned(
                     duration: const Duration(milliseconds: 250),
                     curve: Curves.easeOut,
-                    left: 0,
-                    top: _indicatorTop,
-                    height: _indicatorHeight,
+                    // 对齐 SMenu animated：left 跟随选中项左缘；top/height
+                    // 上下各内缩 10px，与静态模式（Positioned top:10/bottom:10）一致
+                    left: _indicatorLeft,
+                    top: _indicatorTop + 10,
+                    height: _indicatorHeight - 20,
                     width: 3,
                     child: IgnorePointer(
                       child: Container(
@@ -273,92 +282,92 @@ class _SideBarState extends ConsumerState<SideBar> {
     final colorScheme = theme.colorScheme;
     final selected = _currentIndex == item.index;
     final foreground = selected ? colorScheme.primary : colorScheme.onSurface;
-    // 位置锚点：animated 模式下滑动指示条据此定位
+    // 位置锚点：animated 模式下滑动指示条据此定位。挂在背景容器
+    // （AnimatedContainer）上，使测量结果即选中项背景本身的位置与尺寸，
+    // top+10 / height-20 即可与静态模式（Positioned top:10/bottom:10）完全对齐。
     final anchor = _navKeys[item.index] ??= GlobalKey();
 
-    return KeyedSubtree(
-      key: anchor,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1.5),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            color: selected
-                ? colorScheme.primary.withValues(alpha: 0.10)
-                : Colors.transparent,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      child: AnimatedContainer(
+        key: anchor,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: selected
+              ? colorScheme.primary.withValues(alpha: 0.10)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
             borderRadius: BorderRadius.circular(8),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              hoverColor: selected
-                  ? Colors.transparent
-                  : colorScheme.onSurface.withValues(alpha: 0.05),
-              onTap: () => _goBranch(item.index),
-              child: SizedBox(
-                height: 40,
-                // 内容行需垂直居中：Stack 默认 topStart 对齐会把 20px 高的
-                // 内容行顶到 40px 容器顶部（指示条用 Positioned 不受影响）
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // 左侧选中指示条（对齐 SMenu default 模式；
-                    // animated 模式交给容器级滑动条，此处隐藏）
-                    Positioned(
-                      left: 0,
-                      top: 10,
-                      bottom: 10,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOut,
-                        width: 3,
-                        decoration: BoxDecoration(
-                          color: !animated && selected
-                              ? colorScheme.primary
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+            hoverColor: selected
+                ? Colors.transparent
+                : colorScheme.onSurface.withValues(alpha: 0.05),
+            onTap: () => _goBranch(item.index),
+            child: SizedBox(
+              height: 40,
+              // 内容行需垂直居中：Stack 默认 topStart 对齐会把 20px 高的
+              // 内容行顶到 40px 容器顶部（指示条用 Positioned 不受影响）
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // 左侧选中指示条（对齐 SMenu default 模式；
+                  // animated 模式交给容器级滑动条，此处隐藏）
+                  Positioned(
+                    left: 0,
+                    top: 10,
+                    bottom: 10,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOut,
+                      width: 3,
+                      decoration: BoxDecoration(
+                        color: !animated && selected
+                            ? colorScheme.primary
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    // 内容行
-                    Row(
-                      mainAxisAlignment: collapsed
-                          ? MainAxisAlignment.center
-                          : MainAxisAlignment.start,
-                      children: [
-                        if (!collapsed) const SizedBox(width: 12),
-                        Icon(
-                          selected ? item.selectedIcon : item.icon,
-                          size: 19,
-                          color: foreground,
-                        ),
-                        // 折叠时文字淡出（对齐 SMenu opacity 过渡）
-                        Expanded(
-                          child: AnimatedOpacity(
-                            duration: const Duration(milliseconds: 200),
-                            opacity: collapsed ? 0 : 1,
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 12),
-                              child: Text(
-                                item.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: foreground,
-                                  fontWeight: selected
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                ),
+                  ),
+                  // 内容行
+                  Row(
+                    mainAxisAlignment: collapsed
+                        ? MainAxisAlignment.center
+                        : MainAxisAlignment.start,
+                    children: [
+                      if (!collapsed) const SizedBox(width: 12),
+                      Icon(
+                        selected ? item.selectedIcon : item.icon,
+                        size: 19,
+                        color: foreground,
+                      ),
+                      // 折叠时文字淡出（对齐 SMenu opacity 过渡）
+                      Expanded(
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 200),
+                          opacity: collapsed ? 0 : 1,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: Text(
+                              item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: foreground,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                               ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),

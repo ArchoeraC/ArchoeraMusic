@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/downloader/download_controller.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../widgets/glass_surface.dart';
 import '../widgets/toast.dart';
 
 /// 删除 / 清空确认弹窗的选择结果（null = 取消）。
@@ -26,23 +27,30 @@ Future<_DeleteChoice?> _confirmDelete(
   final l10n = context.l10n;
   return showDialog<_DeleteChoice>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title, style: const TextStyle(fontSize: 16)),
-      content: Text(message, style: const TextStyle(fontSize: 13)),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n.commonCancel),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, _DeleteChoice.taskOnly),
-          child: Text(l10n.downloadDeleteTaskOnly),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _DeleteChoice.withMedia),
-          child: Text(l10n.downloadDeleteWithMedia),
-        ),
-      ],
+    builder: (context) => GlassDialogSurface(
+      radius: BorderRadius.circular(16),
+      color: Theme.of(context).dialogTheme.backgroundColor ??
+          Theme.of(context).colorScheme.surfaceContainerLow,
+      child: AlertDialog(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        title: Text(title, style: const TextStyle(fontSize: 16)),
+        content: Text(message, style: const TextStyle(fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.commonCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, _DeleteChoice.taskOnly),
+            child: Text(l10n.downloadDeleteTaskOnly),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, _DeleteChoice.withMedia),
+            child: Text(l10n.downloadDeleteWithMedia),
+          ),
+        ],
+      ),
     ),
   );
 }

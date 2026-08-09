@@ -1391,14 +1391,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsSectionFilter => '再生フィルター';
 
   @override
+  String get settingsDjMode => 'Fuck DJ Mode';
+
+  @override
   String get settingsDjModeOn => 'DJ / ありきたりな曲を自動スキップ';
 
   @override
   String get settingsDjModeOff => 'DJ版の曲を検出したら自動で次の曲へ';
-
-  @override
-  String get settingsDjModeNote =>
-      'タイトルまたはアーティストに DJ / 抖音 / 网红 などのキーワードを含む曲を自動スキップ';
 
   @override
   String get settingsSectionLyricsFilter => '歌詞';
@@ -1407,10 +1406,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsUncensor => '不適切語のロック解除';
 
   @override
-  String get settingsUncensorOn => '歌詞の伏せ字を復元（f**k → fuck）';
+  String get settingsUncensorOn => 'fuck';
 
   @override
-  String get settingsUncensorOff => '歌詞の*で伏せられた単語を復元（f**k → fuck）';
+  String get settingsUncensorOff => 'f**k';
 
   @override
   String get settingsSectionListDisplay => 'リスト表示';
@@ -1441,6 +1440,15 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsShowSubtitleOff => 'リストに別名を表示しない';
+
+  @override
+  String get settingsPerformanceMode => 'パフォーマンスモード';
+
+  @override
+  String get settingsPerformanceModeOn => '現在凍結モード';
+
+  @override
+  String get settingsPerformanceModeOff => '現在アニメーションモード';
 
   @override
   String get settingsSectionDir => 'ディレクトリ';

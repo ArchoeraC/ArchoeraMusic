@@ -1445,6 +1445,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSectionFilter => 'Filtre de lecture';
 
   @override
+  String get settingsDjMode => 'Fuck DJ Mode';
+
+  @override
   String get settingsDjModeOn =>
       'Passer automatiquement les pistes de basse qualité comme les remix DJ';
 
@@ -1453,22 +1456,16 @@ class AppLocalizationsFr extends AppLocalizations {
       'Passer automatiquement à la piste suivante quand une version DJ est détectée';
 
   @override
-  String get settingsDjModeNote =>
-      'Les pistes dont le titre ou l\'artiste contient DJ etc. sont passées automatiquement（Fuck DJ Mode）.';
-
-  @override
   String get settingsSectionLyricsFilter => 'Paroles';
 
   @override
   String get settingsUncensor => 'Débloquer les grossièretés';
 
   @override
-  String get settingsUncensorOn =>
-      'Restaurer les mots censurés comme f**k dans les paroles';
+  String get settingsUncensorOn => 'fuck';
 
   @override
-  String get settingsUncensorOff =>
-      'Restaurer les mots masqués par * dans les paroles（f**k → fuck）';
+  String get settingsUncensorOff => 'f**k';
 
   @override
   String get settingsSectionListDisplay => 'Affichage de la liste';
@@ -1505,6 +1502,15 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsShowSubtitleOff =>
       'La liste affiche uniquement l\'artiste, sans alias';
+
+  @override
+  String get settingsPerformanceMode => 'Mode performance';
+
+  @override
+  String get settingsPerformanceModeOn => 'Actuellement en mode figé';
+
+  @override
+  String get settingsPerformanceModeOff => 'Actuellement en mode animation';
 
   @override
   String get settingsSectionDir => 'Répertoire';

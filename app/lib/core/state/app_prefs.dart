@@ -59,6 +59,7 @@ class AppPrefs {
   static const _hideVipTagKey = 'preset.hideVipTag';
   static const _hideQualityTagKey = 'preset.hideQualityTag';
   static const _showSubtitleKey = 'preset.showSubtitle';
+  static const _performanceModeKey = 'preset.performanceMode';
 
   /// 原音质直通（不转码）：开 = 引擎保持源采样率播放（Hi-Res/无损不降质，
   /// 默认）；关 = 统一 48kHz 转码管线（与 Web/批量行为一致）。
@@ -277,6 +278,11 @@ class AppPrefs {
   /// 歌曲列表显示副标题（别名，如「(Live)」；默认开）。
   bool get showSubtitle => _data[_showSubtitleKey] as bool? ?? true;
 
+  /// 性能模式：关闭所有动效并自动关闭音频频谱（默认关）。
+  ///
+  /// 开 = 全局隐式动效 0 时长 + 频谱开关视为关闭（FFT 轮询/渲染全停）。
+  bool get performanceMode => _data[_performanceModeKey] as bool? ?? false;
+
   AppPrefs copyWithPassthrough(bool value) =>
       AppPrefs(data: {..._data, _passthroughKey: value});
 
@@ -341,21 +347,31 @@ class AppPrefs {
       );
 
   /// 设置图片背景配置（选图 / 模糊 / 遮罩 / 缩放）。
+  ///
+  /// [image] 为 null 时**移除**已落盘的背景图路径（清除按钮）：不能像其他
+  /// 字段用 null-aware 元素——旧键会经 `..._data` 残留，导致清除后背景图
+  /// 仍生效（与 copyWithAccent 相同的问题）。
   AppPrefs copyWithBackground({
     String? image,
     int? blur,
     double? dim,
     double? scale,
-  }) =>
-      AppPrefs(
-        data: {
-          ..._data,
-          _backgroundImageKey: ?image,
-          _backgroundBlurKey: ?blur?.clamp(0, 80),
-          _backgroundDimKey: ?dim?.clamp(0.3, 0.9),
-          _backgroundScaleKey: ?scale?.clamp(1, 2),
-        },
-      );
+  }) {
+    final data = Map<String, dynamic>.of(_data);
+    if (image == null) {
+      data.remove(_backgroundImageKey);
+    } else {
+      data[_backgroundImageKey] = image;
+    }
+    return AppPrefs(
+      data: {
+        ...data,
+        _backgroundBlurKey: ?blur?.clamp(0, 80),
+        _backgroundDimKey: ?dim?.clamp(0.3, 0.9),
+        _backgroundScaleKey: ?scale?.clamp(1, 2),
+      },
+    );
+  }
 
   /// 设置页面切换动效（none/fade/slide/zoom；非法值不写入）。
   AppPrefs copyWithRouteTransition(String value) => AppPrefs(
@@ -465,6 +481,7 @@ class AppPrefs {
 
   /// 强迫症设置（对齐原项目 preset：Fuck DJ / 解锁脏话 / 标签与副标题）。
   AppPrefs copyWithPreset({
+    bool? performanceMode,
     bool? fuckDjMode,
     bool? uncensorProfanity,
     bool? hideVipTag,
@@ -474,6 +491,7 @@ class AppPrefs {
       AppPrefs(
         data: {
           ..._data,
+          _performanceModeKey: ?performanceMode,
           _fuckDjModeKey: ?fuckDjMode,
           _uncensorProfanityKey: ?uncensorProfanity,
           _hideVipTagKey: ?hideVipTag,
@@ -677,8 +695,9 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置强迫症配置（播放过滤 / 歌词还原 / 列表标签与副标题）。
+  /// 设置强迫症配置（播放过滤 / 歌词还原 / 列表标签与副标题 / 性能模式）。
   void setPreset({
+    bool? performanceMode,
     bool? fuckDjMode,
     bool? uncensorProfanity,
     bool? hideVipTag,
@@ -686,12 +705,19 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     bool? showSubtitle,
   }) {
     state = state.copyWithPreset(
+      performanceMode: performanceMode,
       fuckDjMode: fuckDjMode,
       uncensorProfanity: uncensorProfanity,
       hideVipTag: hideVipTag,
       hideQualityTag: hideQualityTag,
       showSubtitle: showSubtitle,
     );
+    state.save();
+  }
+
+  /// 设置性能模式（关闭所有动效 + 自动关闭音频频谱）。
+  void setPerformanceMode(bool value) {
+    state = state.copyWithPreset(performanceMode: value);
     state.save();
   }
 }
