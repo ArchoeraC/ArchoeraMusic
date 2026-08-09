@@ -1,0 +1,421 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/netease/track.dart';
+import '../../core/playback/playback_notifier.dart';
+import '../../core/state/app_prefs.dart';
+import '../../core/state/providers.dart';
+import '../../l10n/l10n.dart';
+import 'cover_image.dart';
+import 'playback_slider.dart';
+import 'queue_panel.dart';
+import 'spectrum_view.dart';
+import 'toast.dart';
+
+/// 底部播放条（对齐原项目 PlayerBar.vue，应用壳常驻，§10.7）。
+///
+/// 布局：顶部进度条（拖动 seek，后端重启引擎）+
+/// 主体行 = 左「封面 + 曲名/副标题」（点击展开全屏播放器）+ 播放控制
+/// + 右「时间 + 迷你频谱」。
+class PlayerBar extends ConsumerStatefulWidget {
+  const PlayerBar({super.key});
+
+  @override
+  ConsumerState<PlayerBar> createState() => _PlayerBarState();
+}
+
+class _PlayerBarState extends ConsumerState<PlayerBar> {
+  /// 拖动中的进度（ms）；null = 跟随播放器实时位置。
+  double? _dragMs;
+
+  static String _fmt(Duration d) {
+    final m = d.inMinutes.toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = context.l10n;
+    final notifier = ref.read(playbackProvider.notifier);
+    final prefs = ref.watch(appPrefsProvider);
+    // 选择性订阅低频字段（播放位置/FFT 每 50ms 更新，不重建播放条本体）
+    final hasSource =
+        ref.watch(playbackProvider.select((s) => s.source != null));
+    final track = ref.watch(playbackProvider.select((s) => s.track));
+    final title = ref.watch(playbackProvider.select((s) => s.title));
+    final subtitle = ref.watch(playbackProvider.select((s) => s.subtitle));
+    final buffering = ref.watch(playbackProvider.select((s) => s.buffering));
+    final playing = ref.watch(playbackProvider.select((s) => s.playing));
+    final hasQueue = ref.watch(playbackProvider.select((s) => s.hasQueue));
+    // 有内容 = 引擎源（在播/加载）或有恢复的现场（会话记忆恢复的暂停队列，
+    // source 为 null 但队列/位置就绪）：此时播放/切歌/打开播放页都应可用。
+    final hasContent = hasSource || hasQueue;
+    final floating = prefs.floatingPlayerBar;
+
+    // 内容：顶部进度条 + 主体行（两种模式共用，仅容器不同）
+    // 注：source 可能为 null（播放条退出动画期间），文本做空串兜底
+    final bar = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 22,
+          // 进度条独立订阅位置/时长：50ms 更新只重建滑块，不重建整条
+          child: Consumer(
+            builder: (context, ref, _) {
+              final s = ref.watch(playbackProvider.select(
+                (s) => (pos: s.position, dur: s.duration)));
+              final durMs = s.dur.inMilliseconds;
+              final ms = (_dragMs ?? s.pos.inMilliseconds)
+                  .clamp(0, durMs < 1 ? 1 : durMs)
+                  .toDouble();
+              return PlaybackSlider(
+                value: ms,
+                max: durMs < 1 ? 1 : durMs.toDouble(),
+                buffering: buffering,
+                onChanged: hasSource
+                    ? (v) => setState(() => _dragMs = v)
+                    : null,
+                onChangeEnd: hasSource
+                    ? (v) async {
+                        setState(() => _dragMs = null);
+                        try {
+                          await notifier
+                              .seek(Duration(milliseconds: v.round()));
+                        } catch (_) {
+                          // 错误已记入播放日志
+                        }
+                      }
+                    : null,
+              );
+            },
+          ),
+        ),
+        SizedBox(
+          height: 60,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                // 左：封面（点击展开全屏播放器）+ 曲名/副标题（仅封面可点）
+                Expanded(
+                  child: Row(
+                    children: [
+                      Tooltip(
+                        message: l10n.playerBarOpenPlayer,
+                        child: _BarCover(
+                          cover: track?.cover,
+                          onTap: hasContent
+                              ? () => context.push('/player')
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              // 标题缺失时不回退 source（引擎转码源=本地
+                              // 绝对路径/在线 URL，不该作为展示标题）
+                              title ?? l10n.playerBarUntitled,
+                              style: theme.textTheme.titleSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              hasContent
+                                  ? (buffering
+                                        ? l10n.playerBarBuffering
+                                        : (subtitle ?? ''))
+                                  : l10n.playerBarIdleHint,
+                              style: theme.textTheme.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // 三键（居中主轴）：上一首/播放暂停/下一首。
+                // 左右两侧均为弹性栏，保证三键严格居中。
+                IconButton(
+                  tooltip: l10n.commonPrevious,
+                  onPressed: hasQueue
+                      ? notifier.playPrevious
+                      : null,
+                  icon: const Icon(Icons.skip_previous),
+                ),
+                IconButton(
+                  tooltip: buffering ? l10n.commonLoading : l10n.playerBarPlayPause,
+                  onPressed: hasContent && !buffering ? notifier.toggle : null,
+                  icon: buffering
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(playing ? Icons.pause : Icons.play_arrow),
+                ),
+                IconButton(
+                  tooltip: l10n.commonNext,
+                  onPressed: hasQueue
+                      ? notifier.playNext
+                      : null,
+                  icon: const Icon(Icons.skip_next),
+                ),
+                // 右栏（弹性，右对齐）：时间与频谱 → 播放列表 → 红心
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 时间 + 迷你频谱
+                        SizedBox(
+                          width: 150,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              // 时间（独立订阅位置/时长，50ms 只重建本行）
+                              Consumer(
+                                builder: (context, ref, _) {
+                                  final s = ref.watch(playbackProvider.select(
+                                    (s) => (pos: s.position,
+                                        dur: s.duration)));
+                                  return Text(
+                                    '${_fmt(s.pos)} / ${_fmt(s.dur)}',
+                                    style: theme.textTheme.bodySmall,
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 4),
+                              SizedBox(
+                                width: 120,
+                                height: 12,
+                                child: SpectrumView(
+                                  height: 12,
+                                  barWidth: 2,
+                                  radius: 1,
+                                  color: theme.colorScheme.primary,
+                                  opacity:
+                                      0.15, // 迷你态弱化（对齐原版 0.65/0.15）
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // 播放列表（锚定浮层，对齐顶栏账号菜单动效）
+                        Builder(
+                          builder: (btnCtx) => IconButton(
+                            tooltip: l10n.playerBarPlaylist,
+                            onPressed: hasQueue
+                                ? () => QueuePanel.show(
+                                      context,
+                                      style: QueuePanelStyle.popup,
+                                      anchor: _anchorOf(btnCtx),
+                                    )
+                                : null,
+                            icon: const Icon(Icons.queue_music),
+                          ),
+                        ),
+                        // 红心（当前曲目喜欢切换；仅可登录平台曲目显示）
+                        if (track != null &&
+                            (track.source == 'netease' ||
+                                track.source == 'kugou'))
+                          _BarLikeButton(track: track),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    // 内容容器（两种模式共用）
+    final content = floating
+        // 悬浮模式：底部居中圆角胶囊（玻璃面板 + 阴影，对齐原版 floating）
+        //
+        // 注意：不能用 Center 包裹——bottomNavigationBar 给子项的约束是
+        // maxHeight = 窗口剩余高度，Center 无尺寸因子会撑满整窗（主界面被
+        // 挤出、只剩播放条）；用 Align(heightFactor: 1) 把高度锁为内容高度，
+        // 水平仍全宽居中。
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 960),
+                child: Material(
+                  color: theme.colorScheme.surfaceBright,
+                  elevation: 10,
+                  shadowColor: Colors.black.withValues(alpha: 0.35),
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    side: BorderSide(
+                        color:
+                            theme.colorScheme.primary.withValues(alpha: 0.12)),
+                  ),
+                  child: SafeArea(top: false, child: bar),
+                ),
+              ),
+            ),
+          )
+        // 默认模式：全宽停靠条
+        : Material(
+            elevation: 8,
+            child: SafeArea(child: bar),
+          );
+
+    // 未播放时隐藏播放条（不占底部空间）；用 AnimatedSwitcher 做
+    // 进入/退出动效（高度收缩 + 淡入淡出，对齐原版 PlayerBar 过渡）
+    // 可见条件：有引擎源（source）或有恢复的现场（queue 非空，如「会话记忆」
+    // 恢复的暂停会话——source 为 null 但队列/位置已就绪，播放条应显示）。
+    final showBar = hasSource || hasQueue;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) => SizeTransition(
+        sizeFactor: animation,
+        alignment: Alignment.bottomCenter, // 底部对齐：向上展开/向下收起
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+      child: showBar
+          ? KeyedSubtree(
+              key: const ValueKey('player-bar'),
+              child: content,
+            )
+          : const SizedBox.shrink(key: ValueKey('player-bar-hidden')),
+    );
+  }
+}
+
+/// 取触发按钮的全局矩形（锚定浮层用；未布局/脱离时返回 null）。
+Rect? _anchorOf(BuildContext context) {
+  final box = context.findRenderObject();
+  if (box is! RenderBox || !box.attached) return null;
+  return box.localToGlobal(Offset.zero) & box.size;
+}
+
+/// 播放条封面：悬浮时显示遮罩 + 上箭头（暗示点击展开播放页，
+/// 对齐 SPlayer-Next TrackInfo 的 group-hover 效果）。
+class _BarCover extends StatefulWidget {
+  const _BarCover({this.cover, this.onTap});
+
+  final String? cover;
+  final VoidCallback? onTap;
+
+  @override
+  State<_BarCover> createState() => _BarCoverState();
+}
+
+class _BarCoverState extends State<_BarCover> {
+  static const _size = 40.0;
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: widget.onTap == null
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
+            children: [
+              CoverImage(
+                cover: widget.cover,
+                width: _size,
+                height: _size,
+                radius: 8,
+                iconSize: 22,
+              ),
+              // 悬浮遮罩 + 上箭头（200ms 过渡，对齐原版 group-hover）
+              AnimatedOpacity(
+                opacity: _hovered ? 1 : 0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                child: Container(
+                  width: _size,
+                  height: _size,
+                  color: Colors.black.withValues(alpha: 0.4),
+                  child: const Center(
+                    child: Icon(
+                      Icons.keyboard_arrow_up,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 播放条红心按钮（当前曲目喜欢切换；失败提示）。
+class _BarLikeButton extends ConsumerStatefulWidget {
+  const _BarLikeButton({required this.track});
+
+  final Track track;
+
+  @override
+  ConsumerState<_BarLikeButton> createState() => _BarLikeButtonState();
+}
+
+class _BarLikeButtonState extends ConsumerState<_BarLikeButton> {
+  bool _busy = false;
+
+  Future<void> _toggle() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final ok = await ref
+          .read(likeControllerProvider)
+          .toggle(widget.track);
+      if (!ok && mounted) {
+        toast(
+          widget.track.source == 'kugou'
+              ? context.l10n.toastLoginRequiredKugou
+              : context.l10n.toastLoginRequiredNetease,
+          type: ToastType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final liked = ref.watch(likeControllerProvider).isLiked(widget.track);
+    return IconButton(
+      tooltip: liked ? context.l10n.commonUnlike : context.l10n.commonLike,
+      onPressed: _toggle,
+      icon: Icon(
+        liked ? Icons.favorite : Icons.favorite_border,
+        color: liked ? Colors.redAccent : null,
+      ),
+    );
+  }
+}

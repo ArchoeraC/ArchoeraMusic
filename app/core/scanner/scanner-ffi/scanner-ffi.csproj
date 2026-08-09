@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>scanner-ffi</AssemblyName>
+    <RootNamespace>SPlayer.Scanner.Ffi</RootNamespace>
+    <!-- NativeAOT 共享库：dotnet publish -r &lt;rid&gt; 产出 libscanner-ffi.so/.dylib/.dll，
+         供 Flutter FFI 直接调用，彻底脱离 sidecar 子进程 -->
+    <OutputType>Library</OutputType>
+    <PublishAot>true</PublishAot>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 共享 scanner 源码（与 CLI 同源，仅排除 Program.cs 入口与 Ffi.cs 自身） -->
+    <Compile Include="../*.cs" Exclude="../Program.cs;Ffi.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TagLibSharp: 音频元数据解析（MP3/FLAC/OGG/M4A/APE/WAV/DSF 等） -->
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <!-- Microsoft.Data.Sqlite: 直写 SQLite（与 CLI 一致） -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- NativeAOT 默认启用 trimming，TagLib.File.Create 依赖反射注册具体文件类型；
+         保留整个程序集防止运行期 "No file type found" -->
+    <TrimmerRootAssembly Include="TagLibSharp" />
+  </ItemGroup>
+
+  <!-- 产物约定：复制到 scanner/build/（与 audio-engine/build 同级约定）；
+       libe_sqlite3.so 为 SQLitePCLRaw DllImport 依赖，须与主库同目录由 Dart 侧预加载 -->
+  <Target Name="CopyToScannerBuild" AfterTargets="Publish">
+    <Copy SourceFiles="$(PublishDir)$(AssemblyName).so"
+          DestinationFolder="$(MSBuildProjectDirectory)/../build/"
+          Condition="Exists('$(PublishDir)$(AssemblyName).so')" />
+    <Copy SourceFiles="$(PublishDir)libe_sqlite3.so"
+          DestinationFolder="$(MSBuildProjectDirectory)/../build/"
+          Condition="Exists('$(PublishDir)libe_sqlite3.so')" />
+  </Target>
+
+</Project>

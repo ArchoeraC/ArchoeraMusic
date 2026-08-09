@@ -1,0 +1,7 @@
+# gen_l10n 配置：lib/l10n/app_<locale>.arb → 生成到 lib/l10n/generated/。
+arb-dir: lib/l10n
+template-arb-file: app_zh_CN.arb
+output-dir: lib/l10n/generated
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false
