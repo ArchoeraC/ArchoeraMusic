@@ -130,46 +130,98 @@ const List<String> _cjkFontFallback = [
 
 /// 主题工厂：由 [AppPalette] 构建 [ThemeData]。
 ///
-/// [accentSeed] 自定义主色种子（设置「主题色」）：非空时 primary/secondary
-/// 家族由 `ColorScheme.fromSeed` 按该种子动态生成（对齐原版
-/// appearance.themeSource=custom）；空则使用设计体系固定亮蓝。
+/// [accentSeed] 自定义主色种子（设置「主题色来源」custom/cover）：非空时
+/// primary/secondary 家族由 `ColorScheme.fromSeed` 按该种子动态生成（对齐原版
+/// generatePalette）；空则使用设计体系固定亮蓝。
+/// [solid] 纯色中性色板（主题色来源=solid）：主/次色用灰阶，界面不随主题色
+/// （对齐原版 SOLID_PALETTE_DARK/LIGHT）。
+/// [globalTint] 全局着色：surface 家族向主色轻微偏移（对齐原版 globalTint）。
 /// [fontFamily] 界面字体（设置「界面字体」，默认内置 MiSans）。
 ThemeData buildAppTheme(AppPalette c, Brightness brightness,
-    {Color? accentSeed, String fontFamily = 'MiSans'}) {
+    {Color? accentSeed,
+    String fontFamily = 'MiSans',
+    bool globalTint = false,
+    bool solid = false}) {
+  final dark = brightness == Brightness.dark;
   final custom = accentSeed != null;
-  final generated = ColorScheme.fromSeed(
-    seedColor: accentSeed ?? c.primary,
-    brightness: brightness,
-  );
+
+  // 主/次色家族：solid 用中性灰阶（对齐 SOLID_PALETTE）；否则按种子生成
+  final Color primary;
+  final Color onPrimary;
+  final Color primaryContainer;
+  final Color onPrimaryContainer;
+  final Color secondary;
+  final Color onSecondary;
+  final Color secondaryContainer;
+  final Color onSecondaryContainer;
+  if (solid) {
+    primary = dark ? const Color(0xFFE4E6EC) : const Color(0xFF2A2D35);
+    onPrimary = dark ? const Color(0xFF101318) : const Color(0xFFFFFFFF);
+    primaryContainer =
+        dark ? const Color(0xFF2A2F3A) : const Color(0xFFE4E6EC);
+    onPrimaryContainer =
+        dark ? const Color(0xFFD6DAE3) : const Color(0xFF23262E);
+    secondary = dark ? const Color(0xFF9AA1B5) : const Color(0xFF5B6273);
+    onSecondary = dark ? const Color(0xFF101318) : const Color(0xFFFFFFFF);
+    secondaryContainer =
+        dark ? const Color(0xFF2A2F3A) : const Color(0xFFEDEFF6);
+    onSecondaryContainer =
+        dark ? const Color(0xFFD6DAE3) : const Color(0xFF23262E);
+  } else {
+    final generated = ColorScheme.fromSeed(
+      seedColor: accentSeed ?? c.primary,
+      brightness: brightness,
+    );
+    primary = custom ? generated.primary : c.primary;
+    onPrimary = custom ? generated.onPrimary : c.onPrimary;
+    primaryContainer =
+        custom ? generated.primaryContainer : c.primaryContainer;
+    onPrimaryContainer =
+        custom ? generated.onPrimaryContainer : c.onPrimaryContainer;
+    secondary = custom ? generated.secondary : c.secondary;
+    onSecondary = custom ? generated.onSecondary : c.onSecondary;
+    secondaryContainer =
+        custom ? generated.secondaryContainer : c.secondaryContainer;
+    onSecondaryContainer =
+        custom ? generated.onSecondaryContainer : c.onSecondaryContainer;
+  }
+
+  // 全局着色：surface 家族向主色轻微偏移（6%，克制不喧宾夺主）
+  final tint = globalTint && accentSeed != null;
+  Color tinted(Color base) =>
+      tint ? Color.lerp(base, accentSeed, 0.06)! : base;
+  final surface = tinted(c.surface);
+  final surfaceAlt = tinted(c.surfaceAlt);
+  final surfacePanel = tinted(c.surfacePanel);
+  final surfaceBright = tinted(c.surfaceBright);
+  final field = tinted(c.field);
+
   final scheme = ColorScheme.fromSeed(
     seedColor: c.primary,
     brightness: brightness,
   ).copyWith(
-    primary: custom ? generated.primary : c.primary,
-    onPrimary: custom ? generated.onPrimary : c.onPrimary,
-    primaryContainer: custom ? generated.primaryContainer : c.primaryContainer,
-    onPrimaryContainer:
-        custom ? generated.onPrimaryContainer : c.onPrimaryContainer,
-    secondary: custom ? generated.secondary : c.secondary,
-    onSecondary: custom ? generated.onSecondary : c.onSecondary,
-    secondaryContainer:
-        custom ? generated.secondaryContainer : c.secondaryContainer,
-    onSecondaryContainer:
-        custom ? generated.onSecondaryContainer : c.onSecondaryContainer,
+    primary: primary,
+    onPrimary: onPrimary,
+    primaryContainer: primaryContainer,
+    onPrimaryContainer: onPrimaryContainer,
+    secondary: secondary,
+    onSecondary: onSecondary,
+    secondaryContainer: secondaryContainer,
+    onSecondaryContainer: onSecondaryContainer,
     error: c.error,
     onError: c.onError,
     errorContainer: c.errorContainer,
     onErrorContainer: c.onErrorContainer,
-    surface: c.surface,
+    surface: surface,
     onSurface: c.onSurface,
     onSurfaceVariant: c.onSurfaceVariant,
     outline: c.outline,
     outlineVariant: c.outline.withValues(alpha: 0.55),
-    surfaceContainerLowest: c.surface,
-    surfaceContainerLow: c.surfaceAlt,
-    surfaceContainer: c.surfacePanel,
-    surfaceContainerHigh: c.surfacePanel,
-    surfaceContainerHighest: c.surfaceBright,
+    surfaceContainerLowest: surface,
+    surfaceContainerLow: surfaceAlt,
+    surfaceContainer: surfacePanel,
+    surfaceContainerHigh: surfacePanel,
+    surfaceContainerHighest: surfaceBright,
     surfaceTint: Colors.transparent,
   );
 
@@ -183,11 +235,11 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
     fontFamilyFallback: _cjkFontFallback,
   );
 
-  final inputFill = brightness == Brightness.dark ? c.field : c.surfaceAlt;
+  final inputFill = dark ? field : surfaceAlt;
 
   return base.copyWith(
-    scaffoldBackgroundColor: c.surface,
-    canvasColor: c.surface,
+    scaffoldBackgroundColor: surface,
+    canvasColor: surface,
     // 文本统一前景色 + 回退字体链 + 行内 leading 均匀分布
     //
     // leadingDistribution=even：中文字体 ascent 通常大于 descent，

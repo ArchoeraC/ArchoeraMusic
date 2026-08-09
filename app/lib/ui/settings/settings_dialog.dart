@@ -1,6 +1,9 @@
 /// 全局设置弹窗（对齐原项目 SettingsDialog：左侧分类菜单 + 右侧内容区）。
 library;
 
+import 'dart:io' show File;
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +11,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/playback/playback_notifier.dart';
 import '../../core/state/app_prefs.dart';
 import '../../core/state/data_dir.dart';
-import '../../core/state/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../app.dart';
@@ -124,7 +126,11 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   List<_SearchEntry> _buildSearchIndex(AppLocalizations l10n) {
     return [
       _SearchEntry(SettingsCategory.appearance, l10n.settingsThemeMode, l10n.settingsThemeModeDesc, Icons.dark_mode_outlined),
-      _SearchEntry(SettingsCategory.appearance, l10n.settingsAccentTitle, l10n.settingsSearchAccentSubtitle, Icons.palette_outlined),
+      _SearchEntry(SettingsCategory.appearance, l10n.settingsThemeSource, l10n.settingsSearchThemeSourceSubtitle, Icons.color_lens_outlined),
+      _SearchEntry(SettingsCategory.appearance, l10n.settingsGlobalTint, l10n.settingsSearchGlobalTintSubtitle, Icons.tonality_outlined),
+      _SearchEntry(SettingsCategory.appearance, l10n.settingsAppearanceStyle, l10n.settingsSearchBackgroundSubtitle, Icons.image_outlined),
+      _SearchEntry(SettingsCategory.appearance, l10n.settingsRouteTransition, l10n.settingsSearchRouteTransitionSubtitle, Icons.animation_outlined),
+      _SearchEntry(SettingsCategory.appearance, l10n.settingsSidebarCollapsed, l10n.settingsSearchSidebarSubtitle, Icons.menu_open),
       _SearchEntry(SettingsCategory.appearance, l10n.settingsFloatingBar, l10n.settingsSearchFloatingBarSubtitle, Icons.rounded_corner),
       _SearchEntry(SettingsCategory.appearance, l10n.settingsSectionFont, l10n.settingsSearchFontSubtitle, Icons.font_download_outlined),
       _SearchEntry(SettingsCategory.appearance, l10n.settingsLanguageTitle, l10n.settingsSearchLanguageSubtitle, Icons.language_outlined),
@@ -134,6 +140,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
       _SearchEntry(SettingsCategory.playback, l10n.settingsAutoPlay, l10n.settingsSearchAutoPlaySubtitle, Icons.play_circle_outline),
       _SearchEntry(SettingsCategory.playback, l10n.settingsSpectrum, l10n.settingsSearchSpectrumSubtitle, Icons.graphic_eq),
       _SearchEntry(SettingsCategory.playback, l10n.settingsSpectrumBarWidth, l10n.settingsSearchSpectrumWidthSubtitle, Icons.view_column_outlined),
+      _SearchEntry(SettingsCategory.playback, l10n.settingsTransitionStyle, l10n.settingsTransitionStyleDesc, Icons.animation_outlined),
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsPlayerLyrics, l10n.settingsSearchPlayerLyricsSubtitle, Icons.lyrics_outlined),
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsLyricFontSize, l10n.settingsSearchLyricFontSizeSubtitle, Icons.format_size),
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsLyricLineHeight, l10n.settingsSearchLyricLineHeightSubtitle, Icons.line_weight),
@@ -547,11 +554,14 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     final themeMode = ref.watch(themeModeProvider);
     final prefs = ref.watch(appPrefsProvider);
     final accent = prefs.accent;
-    final accentSystem = prefs.accentSystem;
-    final sysColor = ref.watch(systemAccentProvider).value;
+    final notifier = ref.read(appPrefsProvider.notifier);
+    // 图片风格「有效」才有背景子项可调（无图时回退 solid，对齐原版 effectiveStyle）
+    final imageStyle =
+        prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // ── 主题 ──
         _sectionTitle(scheme, l10n.settingsSectionTheme),
         _card(
           scheme,
@@ -582,25 +592,170 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           ),
         ),
         const SizedBox(height: 20),
+
+        // 主题色来源（default / custom / cover / solid）
         _sectionTitle(scheme, l10n.settingsSectionAccent),
         _card(
           scheme,
           children: [
             _SettingTile(
-              icon: Icons.palette_outlined,
-              title: l10n.settingsAccentTitle,
-              subtitle: accentSystem
-                  ? (sysColor != null
-                      ? l10n.settingsAccentSystem(_hexOf(sysColor))
-                      : l10n.settingsAccentSystemFallback)
-                  : accent == null
-                      ? l10n.settingsAccentDefault
-                      : l10n.settingsAccentCustom,
-              trailing: _accentSwatches(scheme, accent, accentSystem, l10n),
+              icon: Icons.color_lens_outlined,
+              title: l10n.settingsThemeSource,
+              subtitle: l10n.settingsThemeSourceDesc,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption(
+                      'default', l10n.settingsThemeSourceDefault),
+                  SSegmentedOption(
+                      'custom', l10n.settingsThemeSourceCustom),
+                  SSegmentedOption('cover', l10n.settingsThemeSourceCover),
+                  SSegmentedOption('solid', l10n.settingsThemeSourceSolid),
+                ],
+                selected: prefs.themeSource,
+                onChanged: (v) => notifier.setThemeSource(v),
+              ),
             ),
           ],
         ),
+        if (prefs.themeSource == 'custom') ...[
+          const SizedBox(height: 8),
+          _card(
+            scheme,
+            children: [
+              _SettingTile(
+                icon: Icons.palette_outlined,
+                title: l10n.settingsAccentTitle,
+                subtitle: l10n.settingsThemeSourceCustomHint,
+                trailing: _accentSwatches(scheme, accent, l10n),
+              ),
+            ],
+          ),
+        ] else if (prefs.themeSource == 'cover') ...[
+          const SizedBox(height: 8),
+          Text(
+            l10n.settingsThemeSourceCoverHint,
+            style: TextStyle(
+              fontSize: 12,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+
+        // 全局着色
+        _card(
+          scheme,
+          children: [
+            _SettingTile(
+              icon: Icons.tonality_outlined,
+              title: l10n.settingsGlobalTint,
+              subtitle: l10n.settingsGlobalTintDesc,
+              trailing: Switch(
+                value: prefs.globalTint,
+                onChanged: (v) => notifier.setGlobalTint(v),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          l10n.settingsGlobalTintNote,
+          style: TextStyle(
+            fontSize: 12,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+        ),
         const SizedBox(height: 20),
+
+        // ── 外观风格（纯色 / 图片背景）──
+        _sectionTitle(scheme, l10n.settingsSectionStyle),
+        _card(
+          scheme,
+          children: [
+            _SettingTile(
+              icon: Icons.image_outlined,
+              title: l10n.settingsAppearanceStyle,
+              subtitle: l10n.settingsAppearanceStyleDesc,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption(
+                      'solid', l10n.settingsAppearanceStyleSolid),
+                  SSegmentedOption(
+                      'image', l10n.settingsAppearanceStyleImage),
+                ],
+                selected: prefs.appearanceStyle,
+                onChanged: (v) => notifier.setAppearanceStyle(v),
+              ),
+            ),
+          ],
+        ),
+        if (prefs.appearanceStyle == 'image') ...[
+          const SizedBox(height: 8),
+          _backgroundCard(scheme, prefs, l10n, notifier),
+          if (imageStyle) ...[
+            const SizedBox(height: 12),
+            _card(
+              scheme,
+              children: [
+                _SettingTile(
+                  icon: Icons.blur_on_outlined,
+                  title: l10n.settingsBackgroundBlur,
+                  subtitle:
+                      l10n.settingsBackgroundBlurDesc(prefs.backgroundBlur),
+                  trailing: SizedBox(
+                    width: 140,
+                    child: Slider(
+                      value: prefs.backgroundBlur.toDouble(),
+                      min: 0,
+                      max: 80,
+                      divisions: 16,
+                      label: '${prefs.backgroundBlur}px',
+                      onChanged: (v) =>
+                          notifier.setBackground(blur: v.round()),
+                    ),
+                  ),
+                ),
+                _SettingTile(
+                  icon: Icons.dark_mode_outlined,
+                  title: l10n.settingsBackgroundDim,
+                  subtitle:
+                      l10n.settingsBackgroundDimDesc(prefs.backgroundDim),
+                  trailing: SizedBox(
+                    width: 140,
+                    child: Slider(
+                      value: prefs.backgroundDim,
+                      min: 0.3,
+                      max: 0.9,
+                      divisions: 12,
+                      label: '${(prefs.backgroundDim * 100).round()}%',
+                      onChanged: (v) => notifier.setBackground(dim: v),
+                    ),
+                  ),
+                ),
+                _SettingTile(
+                  icon: Icons.zoom_out_map_outlined,
+                  title: l10n.settingsBackgroundScale,
+                  subtitle:
+                      l10n.settingsBackgroundScaleDesc(prefs.backgroundScale),
+                  trailing: SizedBox(
+                    width: 140,
+                    child: Slider(
+                      value: prefs.backgroundScale,
+                      min: 1,
+                      max: 2,
+                      divisions: 20,
+                      label: '${prefs.backgroundScale.toStringAsFixed(1)}x',
+                      onChanged: (v) => notifier.setBackground(scale: v),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+        const SizedBox(height: 20),
+
+        // ── 布局 ──
         _sectionTitle(scheme, l10n.settingsSectionLayout),
         _card(
           scheme,
@@ -613,14 +768,55 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                   : l10n.settingsFloatingBarOff,
               trailing: Switch(
                 value: prefs.floatingPlayerBar,
-                onChanged: (value) => ref
-                    .read(appPrefsProvider.notifier)
-                    .setFloatingPlayerBar(value),
+                onChanged: (value) => notifier.setFloatingPlayerBar(value),
+              ),
+            ),
+            _SettingTile(
+              icon: prefs.sidebarCollapsed
+                  ? Icons.menu_open
+                  : Icons.menu_rounded,
+              title: l10n.settingsSidebarCollapsed,
+              subtitle: l10n.settingsSidebarCollapsedDesc,
+              trailing: Switch(
+                value: prefs.sidebarCollapsed,
+                onChanged: (value) => notifier.setSidebar(collapsed: value),
+              ),
+            ),
+            _SettingTile(
+              icon: Icons.arrow_right_alt,
+              title: l10n.settingsSidebarNavStyle,
+              subtitle: l10n.settingsSidebarNavStyleDesc,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption(
+                      'default', l10n.settingsSidebarNavStyleDefault),
+                  SSegmentedOption(
+                      'animated', l10n.settingsSidebarNavStyleAnimated),
+                ],
+                selected: prefs.sidebarNavStyle,
+                onChanged: (v) => notifier.setSidebar(navStyle: v),
+              ),
+            ),
+            _SettingTile(
+              icon: Icons.animation_outlined,
+              title: l10n.settingsRouteTransition,
+              subtitle: l10n.settingsRouteTransitionDesc,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption('none', l10n.settingsRouteTransitionNone),
+                  SSegmentedOption('fade', l10n.settingsRouteTransitionFade),
+                  SSegmentedOption('slide', l10n.settingsRouteTransitionSlide),
+                  SSegmentedOption('zoom', l10n.settingsRouteTransitionZoom),
+                ],
+                selected: prefs.routeTransition,
+                onChanged: (v) => notifier.setRouteTransition(v),
               ),
             ),
           ],
         ),
         const SizedBox(height: 20),
+
+        // ── 字体 ──
         _sectionTitle(scheme, l10n.settingsSectionFont),
         _card(
           scheme,
@@ -640,14 +836,14 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                   SSegmentedOption('HarmonyOS Sans SC', l10n.settingsFontHarmonyLabel),
                 ],
                 selected: prefs.fontFamily,
-                onChanged: (family) => ref
-                    .read(appPrefsProvider.notifier)
-                    .setFontFamily(family),
+                onChanged: (family) => notifier.setFontFamily(family),
               ),
             ),
           ],
         ),
         const SizedBox(height: 20),
+
+        // ── 语言 ──
         _sectionTitle(scheme, l10n.settingsSectionLanguage),
         _card(
           scheme,
@@ -661,6 +857,8 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           ],
         ),
         const SizedBox(height: 20),
+
+        // ── 封面圆角 ──
         _sectionTitle(scheme, l10n.settingsSectionCover),
         _card(
           scheme,
@@ -678,15 +876,128 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                   SSegmentedOption(12, l10n.settingsCoverRadiusLargeLabel),
                 ],
                 selected: prefs.coverRadius,
-                onChanged: (v) => ref
-                    .read(appPrefsProvider.notifier)
-                    .setCoverRadius(v),
+                onChanged: (v) => notifier.setCoverRadius(v),
               ),
             ),
           ],
         ),
       ],
     );
+  }
+
+  /// 背景图选择卡（对齐原版 BackgroundImagePicker：横向预览 + 替换/清除）。
+  Widget _backgroundCard(ColorScheme scheme, AppPrefs prefs,
+      AppLocalizations l10n, AppPrefsNotifier notifier) {
+    final path = prefs.backgroundImage;
+    return _card(
+      scheme,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(Icons.wallpaper_outlined,
+                    size: 18, color: scheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.settingsBackgroundImage,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      path ?? l10n.settingsBackgroundImageDesc,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // 横向预览（对齐原版 96×56）
+              if (path != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.file(
+                    File(path),
+                    width: 96,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      width: 96,
+                      height: 56,
+                      color: scheme.onSurface.withValues(alpha: 0.06),
+                      child: Icon(Icons.broken_image_outlined,
+                          size: 20,
+                          color: scheme.onSurfaceVariant.withValues(alpha: 0.6)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              SizedBox(
+                height: 28,
+                child: SButton(
+                  label: path == null
+                      ? l10n.settingsBackgroundPick
+                      : l10n.settingsBackgroundReplace,
+                  variant: SButtonVariant.secondary,
+                  size: SButtonSize.small,
+                  onPressed: _pickBackgroundImage,
+                ),
+              ),
+              if (path != null) ...[
+                const SizedBox(width: 6),
+                SizedBox(
+                  height: 28,
+                  child: SButton(
+                    label: l10n.settingsBackgroundClear,
+                    variant: SButtonVariant.ghost,
+                    size: SButtonSize.small,
+                    onPressed: () => notifier.setBackground(image: null),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickBackgroundImage() async {
+    const typeGroup = XTypeGroup(
+      label: 'images',
+      extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'],
+    );
+    String? path;
+    try {
+      final file = await openFile(acceptedTypeGroups: const [typeGroup]);
+      path = file?.path;
+    } catch (_) {
+      // 文件选择器不可用时静默忽略（自用项目，无返回值不阻塞）
+    }
+    if (path == null || !mounted) return;
+    ref.read(appPrefsProvider.notifier).setBackground(image: path);
   }
 
   static const _localeSystem = '__system__';
@@ -765,11 +1076,10 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     );
   }
 
-  Widget _accentSwatches(ColorScheme scheme, int? accent, bool accentSystem, AppLocalizations l10n) {
-    final currentColor =
-        accentSystem ? null : (accent == null ? scheme.primary : Color(accent));
-    final customSelected = !accentSystem && accent != null &&
-        !_accentPresets.contains(accent);
+  Widget _accentSwatches(ColorScheme scheme, int? accent, AppLocalizations l10n) {
+    final currentColor = accent == null ? scheme.primary : Color(accent);
+    final customSelected =
+        accent != null && !_accentPresets.contains(accent);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -782,13 +1092,12 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
             child: InkWell(
               customBorder: const CircleBorder(),
               onTap: () {
-                ref.read(appPrefsProvider.notifier).setAccentSystem(false);
                 ref.read(appPrefsProvider.notifier).setAccent(v);
               },
               child: _swatchCircle(
                 scheme,
                 color: v == null ? scheme.primary : Color(v),
-                selected: !accentSystem && accent == v,
+                selected: accent == v,
                 checkColor: v == null
                     ? scheme.onPrimary
                     : Color(v).computeLuminance() > 0.5
@@ -799,35 +1108,18 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
           ),
         const SizedBox(width: 4),
         Tooltip(
-          message: l10n.settingsAccentSystemTooltip,
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: () =>
-                ref.read(appPrefsProvider.notifier).setAccentSystem(true),
-            child: _swatchCircle(
-              scheme,
-              color: scheme.surfaceBright,
-              selected: accentSystem,
-              icon: Icons.brightness_auto,
-              iconColor: accentSystem
-                  ? scheme.primary
-                  : scheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        Tooltip(
           message: l10n.settingsAccentCustomTooltip,
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: () => _pickAccent(scheme, accent, l10n),
             child: _swatchCircle(
               scheme,
-              color: currentColor ?? scheme.surfaceBright,
+              color: currentColor,
               selected: customSelected,
               icon: Icons.colorize,
               iconColor: customSelected
                   ? scheme.primary
-                  : (currentColor?.computeLuminance() ?? 0) > 0.5
+                  : currentColor.computeLuminance() > 0.5
                       ? Colors.black
                       : Colors.white,
             ),
@@ -873,14 +1165,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
       ),
     );
     if (color == null || !mounted) return;
-    final notifier = ref.read(appPrefsProvider.notifier);
-    notifier.setAccentSystem(false);
-    notifier.setAccent(color.toARGB32());
-  }
-
-  static String _hexOf(Color c) {
-    final v = c.toARGB32() & 0xFFFFFF;
-    return '#${v.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+    ref.read(appPrefsProvider.notifier).setAccent(color.toARGB32());
   }
 
   Widget _buildPlayback(ColorScheme scheme, AppLocalizations l10n) {
@@ -1041,6 +1326,28 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                       .read(appPrefsProvider.notifier)
                       .setSpectrumBarWidth(v.round()),
                 ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _sectionTitle(scheme, l10n.settingsTransitionStyle),
+        _card(
+          scheme,
+          children: [
+            _SettingTile(
+              icon: Icons.animation_outlined,
+              title: l10n.settingsTransitionStyle,
+              subtitle: l10n.settingsTransitionStyleDesc,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption('scale', l10n.settingsTransitionStyleScale),
+                  SSegmentedOption('slide', l10n.settingsTransitionStyleSlide),
+                ],
+                selected: prefs.transitionStyle,
+                onChanged: (v) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setTransitionStyle(v),
               ),
             ),
           ],

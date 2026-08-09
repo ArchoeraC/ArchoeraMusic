@@ -2462,6 +2462,30 @@ abstract class AppLocalizations {
   /// **'{width}px（1~12，全屏播放器）'**
   String settingsSpectrumBarWidthDesc(Object width);
 
+  /// No description provided for @settingsTransitionStyle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'媒体信息切换动效'**
+  String get settingsTransitionStyle;
+
+  /// No description provided for @settingsTransitionStyleDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切歌时封面与歌曲信息的过渡动画效果'**
+  String get settingsTransitionStyleDesc;
+
+  /// No description provided for @settingsTransitionStyleScale.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'缩放'**
+  String get settingsTransitionStyleScale;
+
+  /// No description provided for @settingsTransitionStyleSlide.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'侧边滑动'**
+  String get settingsTransitionStyleSlide;
+
   /// No description provided for @settingsSectionShortcuts.
   ///
   /// In zh_CN, this message translates to:
@@ -3205,6 +3229,270 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'自定义主色种子 · 色板'**
   String get settingsSearchAccentSubtitle;
+
+  /// No description provided for @settingsThemeSource.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'主题色来源'**
+  String get settingsThemeSource;
+
+  /// No description provided for @settingsThemeSourceDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'主题色的获取方式'**
+  String get settingsThemeSourceDesc;
+
+  /// No description provided for @settingsThemeSourceDefault.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'跟随系统'**
+  String get settingsThemeSourceDefault;
+
+  /// No description provided for @settingsThemeSourceCustom.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义主色'**
+  String get settingsThemeSourceCustom;
+
+  /// No description provided for @settingsThemeSourceCover.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'跟随封面'**
+  String get settingsThemeSourceCover;
+
+  /// No description provided for @settingsThemeSourceSolid.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无主题色'**
+  String get settingsThemeSourceSolid;
+
+  /// No description provided for @settingsThemeSourceCustomHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'选取主色种子，主/次色由它动态生成'**
+  String get settingsThemeSourceCustomHint;
+
+  /// No description provided for @settingsThemeSourceCoverHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'实时从当前播放封面提取主色（不可用时回退默认色）'**
+  String get settingsThemeSourceCoverHint;
+
+  /// No description provided for @settingsGlobalTint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'全局着色'**
+  String get settingsGlobalTint;
+
+  /// No description provided for @settingsGlobalTintDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将主题色应用到全局界面'**
+  String get settingsGlobalTintDesc;
+
+  /// No description provided for @settingsGlobalTintNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'存在主题色（自定义/跟随封面）时生效；图片背景模式下强制开启。'**
+  String get settingsGlobalTintNote;
+
+  /// No description provided for @settingsSectionStyle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'背景风格'**
+  String get settingsSectionStyle;
+
+  /// No description provided for @settingsAppearanceStyle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'外观风格'**
+  String get settingsAppearanceStyle;
+
+  /// No description provided for @settingsAppearanceStyleDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'应用主背景的呈现方式'**
+  String get settingsAppearanceStyleDesc;
+
+  /// No description provided for @settingsAppearanceStyleSolid.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'纯色背景'**
+  String get settingsAppearanceStyleSolid;
+
+  /// No description provided for @settingsAppearanceStyleImage.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义图片'**
+  String get settingsAppearanceStyleImage;
+
+  /// No description provided for @settingsBackgroundImage.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'背景图片'**
+  String get settingsBackgroundImage;
+
+  /// No description provided for @settingsBackgroundImageDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'选择本地图片作为应用背景；图片模式强制暗色 + 全局着色'**
+  String get settingsBackgroundImageDesc;
+
+  /// No description provided for @settingsBackgroundPick.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'选择图片'**
+  String get settingsBackgroundPick;
+
+  /// No description provided for @settingsBackgroundReplace.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'更换'**
+  String get settingsBackgroundReplace;
+
+  /// No description provided for @settingsBackgroundClear.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清除'**
+  String get settingsBackgroundClear;
+
+  /// No description provided for @settingsBackgroundBlur.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'背景模糊'**
+  String get settingsBackgroundBlur;
+
+  /// No description provided for @settingsBackgroundBlurDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'对背景图片应用高斯模糊（{blur}px）'**
+  String settingsBackgroundBlurDesc(Object blur);
+
+  /// No description provided for @settingsBackgroundDim.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'遮罩浓度'**
+  String get settingsBackgroundDim;
+
+  /// No description provided for @settingsBackgroundDimDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'叠加的黑色遮罩透明度（{dim}%），越高前景越易读'**
+  String settingsBackgroundDimDesc(Object dim);
+
+  /// No description provided for @settingsBackgroundScale.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'缩放大小'**
+  String get settingsBackgroundScale;
+
+  /// No description provided for @settingsBackgroundScaleDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'背景图的缩放倍数（{scale}x）'**
+  String settingsBackgroundScaleDesc(Object scale);
+
+  /// No description provided for @settingsSidebarCollapsed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'折叠侧边栏'**
+  String get settingsSidebarCollapsed;
+
+  /// No description provided for @settingsSidebarCollapsedDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将侧边栏折叠为图标模式'**
+  String get settingsSidebarCollapsedDesc;
+
+  /// No description provided for @settingsSidebarNavStyle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'导航高亮动效'**
+  String get settingsSidebarNavStyle;
+
+  /// No description provided for @settingsSidebarNavStyleDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换侧边栏导航高亮指示器的动画风格'**
+  String get settingsSidebarNavStyleDesc;
+
+  /// No description provided for @settingsSidebarNavStyleDefault.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'静态'**
+  String get settingsSidebarNavStyleDefault;
+
+  /// No description provided for @settingsSidebarNavStyleAnimated.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'滑动'**
+  String get settingsSidebarNavStyleAnimated;
+
+  /// No description provided for @settingsRouteTransition.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'页面切换动效'**
+  String get settingsRouteTransition;
+
+  /// No description provided for @settingsRouteTransitionDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换页面时的过渡动画效果'**
+  String get settingsRouteTransitionDesc;
+
+  /// No description provided for @settingsRouteTransitionNone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无'**
+  String get settingsRouteTransitionNone;
+
+  /// No description provided for @settingsRouteTransitionFade.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'淡入淡出'**
+  String get settingsRouteTransitionFade;
+
+  /// No description provided for @settingsRouteTransitionSlide.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'滑动'**
+  String get settingsRouteTransitionSlide;
+
+  /// No description provided for @settingsRouteTransitionZoom.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'缩放'**
+  String get settingsRouteTransitionZoom;
+
+  /// No description provided for @settingsSearchThemeSourceSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'默认主题色 · 自定义主色 · 跟随封面 · 无主题色'**
+  String get settingsSearchThemeSourceSubtitle;
+
+  /// No description provided for @settingsSearchGlobalTintSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将主题色应用到全局界面'**
+  String get settingsSearchGlobalTintSubtitle;
+
+  /// No description provided for @settingsSearchBackgroundSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'纯色 / 图片 · 模糊 · 遮罩 · 缩放'**
+  String get settingsSearchBackgroundSubtitle;
+
+  /// No description provided for @settingsSearchSidebarSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'折叠侧边栏 · 静态 / 滑动高亮'**
+  String get settingsSearchSidebarSubtitle;
+
+  /// No description provided for @settingsSearchRouteTransitionSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无 · 淡入淡出 · 滑动 · 缩放'**
+  String get settingsSearchRouteTransitionSubtitle;
 
   /// No description provided for @settingsSearchFloatingBarSubtitle.
   ///

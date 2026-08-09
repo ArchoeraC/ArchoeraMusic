@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 ///
 /// 实现：`gsettings get org.gnome.desktop.interface accent-color`
 /// （GNOME 42+ 内置主题色；48+ 支持 `rgb(r,g,b)` 自定义值）。
-/// 非 Linux / 无 gsettings / 未设置时返回 null，调用方回退自定义色。
+/// 非 Linux / 无 gsettings / 未设置时返回 null，调用方回退设计体系默认亮蓝。
 class SystemAccent {
   const SystemAccent._();
 

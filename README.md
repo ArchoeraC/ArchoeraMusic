@@ -113,7 +113,8 @@ ArchoeraMusic/
 
 ## 构建与运行
 
-> 后续会补充完整脚本与 CI。当前为开发阶段。
+> CI：仓库 `.github/workflows/` 提供三端（Linux / Windows / macOS）完整构建
+> workflows，手动触发或推送 `v*` 标签时构建全部原生模块 + Flutter 应用并上传产物。
 
 ### 前置
 

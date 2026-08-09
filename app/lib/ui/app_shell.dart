@@ -1,7 +1,11 @@
+import 'dart:io' show File;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/state/app_prefs.dart';
 import 'widgets/nav_header.dart';
 import 'widgets/player_bar.dart';
 import 'widgets/side_bar.dart';
@@ -10,8 +14,12 @@ import 'widgets/side_bar.dart';
 /// 左侧 SideBar（可折叠分组导航）+ 右侧（顶部 NavHeader + 页面区）
 /// + 底部 PlayerBar（常驻播放条）。
 ///
-/// 页面区切换带 220ms 淡入（对齐原版 RouterView out-in 过渡；
-/// 侧边栏分支为 IndexedStack 保持状态，故用轻量淡入而非整页转场）。
+/// 页面区切换带分支转场（对齐原版 RouterView out-in 过渡 + global.css
+/// route-fade/slide/zoom；侧边栏分支为 IndexedStack 保持状态，故用轻量
+/// 过渡而非整页转场）。
+///
+/// 图片背景风格（appearanceStyle=image）：整个 body 叠一层封面图
+/// （对齐原版 AppBackground.vue：fixed inset-0 + cover + 模糊/缩放 + 暗遮罩）。
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.navigationShell});
 
@@ -19,55 +27,121 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      body: Row(
-        children: [
-          SideBar(navigationShell: navigationShell),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: Column(
-              children: [
-                const NavHeader(),
-                const Divider(height: 1),
-                Expanded(
-                  child: _BranchFade(
-                    index: navigationShell.currentIndex,
-                    child: navigationShell,
-                  ),
+    final prefs = ref.watch(appPrefsProvider);
+    // 图片风格「有效」才渲染背景（无图时回退 solid，对齐原版 effectiveStyle）
+    final imageStyle =
+        prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
+    final content = Row(
+      children: [
+        SideBar(navigationShell: navigationShell),
+        const VerticalDivider(width: 1),
+        Expanded(
+          child: Column(
+            children: [
+              const NavHeader(),
+              const Divider(height: 1),
+              Expanded(
+                child: _BranchTransition(
+                  index: navigationShell.currentIndex,
+                  transition: prefs.routeTransition,
+                  child: navigationShell,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+    return Scaffold(
+      body: imageStyle
+          ? Stack(
+              children: [
+                Positioned.fill(child: _AppBackground(prefs: prefs)),
+                content,
+              ],
+            )
+          : content,
       bottomNavigationBar: const PlayerBar(),
     );
   }
 }
 
-/// 侧边栏分支切换淡入（keyed 淡入：切换分支时从透明快速恢复）。
-class _BranchFade extends StatefulWidget {
-  const _BranchFade({required this.index, required this.child});
+/// 图片背景层（对齐原版 AppBackground.vue）：
+/// 封面图（cover 裁切）+ 高斯模糊 + 缩放 + 黑色遮罩（dim），忽略指针事件。
+class _AppBackground extends StatelessWidget {
+  const _AppBackground({required this.prefs});
+
+  final AppPrefs prefs;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = prefs.backgroundImage;
+    if (path == null || path.isEmpty) return const SizedBox.shrink();
+    Widget image = Image.file(
+      File(path),
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      // 文件被移动/删除时静默回退纯色背景（不崩溃）
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+    );
+    if (prefs.backgroundBlur > 0) {
+      final sigma = prefs.backgroundBlur.toDouble();
+      image = ImageFiltered(
+        imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+        child: image,
+      );
+    }
+    if (prefs.backgroundScale != 1) {
+      image = Transform.scale(scale: prefs.backgroundScale, child: image);
+    }
+    return ClipRect(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          image,
+          ColoredBox(
+            color: Colors.black.withValues(alpha: prefs.backgroundDim),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 侧边栏分支切换转场（对齐原版 route-fade/slide/zoom 的进入动画，
+/// out-in 语义下只对进入的新分支做动画）：
+///  - none：无转场，直接显示；
+///  - fade：150ms 淡入（原版进入 0.15s）；
+///  - slide：从右侧 +6px 滑入（原版 route-slide 进入 translateX(6px)）；
+///  - zoom：从 0.97 放大到 1（原版 route-zoom 进入 scale(0.97)）。
+class _BranchTransition extends StatefulWidget {
+  const _BranchTransition({
+    required this.index,
+    required this.transition,
+    required this.child,
+  });
 
   final int index;
+  final String transition;
   final Widget child;
 
   @override
-  State<_BranchFade> createState() => _BranchFadeState();
+  State<_BranchTransition> createState() => _BranchTransitionState();
 }
 
-class _BranchFadeState extends State<_BranchFade>
+class _BranchTransitionState extends State<_BranchTransition>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 220),
+    duration: const Duration(milliseconds: 150),
     value: 1,
   );
 
   @override
-  void didUpdateWidget(covariant _BranchFade old) {
+  void didUpdateWidget(covariant _BranchTransition old) {
     super.didUpdateWidget(old);
-    if (old.index != widget.index) {
+    if (old.index != widget.index && widget.transition != 'none') {
       _ctrl.forward(from: 0);
     }
   }
@@ -80,9 +154,31 @@ class _BranchFadeState extends State<_BranchFade>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
-      child: widget.child,
+    if (widget.transition == 'none') return widget.child;
+    final curved = CurvedAnimation(
+      parent: _ctrl,
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
     );
+    return switch (widget.transition) {
+      'slide' => FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.008, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: widget.child,
+          ),
+        ),
+      'zoom' => FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
+            child: widget.child,
+          ),
+        ),
+      _ => FadeTransition(opacity: curved, child: widget.child),
+    };
   }
 }

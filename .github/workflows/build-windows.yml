@@ -1,0 +1,94 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pkg-config & mingw (CGO / FFmpeg pkg-config 查找)
+        shell: bash
+        run: choco install pkgconfiglite mingw -y --no-progress
+
+      - name: Install vcpkg deps (ffmpeg / taglib / curl / openssl / sqlite3 / nlohmann-json)
+        shell: bash
+        run: vcpkg install ffmpeg:x64-windows taglib:x64-windows curl:x64-windows openssl:x64-windows sqlite3:x64-windows nlohmann-json:x64-windows
+        env:
+          VCPKG_ROOT: C:\vcpkg
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Prebuild Rust tempo staticlib (MSVC 命名归一化)
+        shell: bash
+        run: |
+          cd app/core/audio-engine/tempo-rs
+          cargo build --release --target-dir ../build/tempo-target
+          find ../build/tempo-target/release -maxdepth 1 \( -name '*.lib' -o -name '*.a' \) -exec cp {} ../build/tempo-target/release/libaudio_tempo.lib \;
+          cp ../build/tempo-target/release/libaudio_tempo.lib ../build/libaudio_tempo.lib
+
+      - name: Build audio-engine (C + FFmpeg via vcpkg)
+        shell: bash
+        run: |
+          export PKG_CONFIG_PATH="C:/vcpkg/installed/x64-windows/lib/pkgconfig"
+          cmake -S app/core/audio-engine -B app/core/audio-engine/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+          cmake --build app/core/audio-engine/build --config Release
+
+      - name: Build scraper (C++)
+        shell: bash
+        run: |
+          cmake -S app/core/scraper -B app/core/scraper/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+          cmake --build app/core/scraper/build --config Release
+
+      - name: Build scanner (C# NativeAOT)
+        shell: bash
+        run: bash app/core/scanner/build.sh win-x64
+
+      - name: Build downloader (Rust cdylib)
+        shell: bash
+        run: cargo build --release --manifest-path app/core/downloader/Cargo.toml
+
+      - name: Build subsonic (Go + Rust transcoder)
+        shell: bash
+        run: bash app/core/subsonic/build.sh
+
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: app
+        run: dart analyze lib
+
+      - name: Test (unit smoke)
+        working-directory: app
+        run: flutter test test/widget_test.dart
+
+      - name: Build Flutter Windows
+        working-directory: app
+        run: flutter build windows --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-windows-x64
+          path: app/build/windows/x64/runner/Release
+          if-no-files-found: error

@@ -23,8 +23,18 @@ class AppPrefs {
   static const _sessionMemoryKey = 'player.sessionMemory';
   static const _enableSpectrumKey = 'player.enableSpectrum';
   static const _spectrumBarWidthKey = 'player.spectrumBarWidth';
+  static const _transitionStyleKey = 'player.transitionStyle';
   static const _accentKey = 'appearance.accent';
-  static const _accentSystemKey = 'appearance.accentSystem';
+  static const _themeSourceKey = 'appearance.themeSource';
+  static const _globalTintKey = 'appearance.globalTint';
+  static const _appearanceStyleKey = 'appearance.appearanceStyle';
+  static const _backgroundImageKey = 'appearance.backgroundImage';
+  static const _backgroundBlurKey = 'appearance.backgroundBlur';
+  static const _backgroundDimKey = 'appearance.backgroundDim';
+  static const _backgroundScaleKey = 'appearance.backgroundScale';
+  static const _routeTransitionKey = 'appearance.routeTransition';
+  static const _sidebarCollapsedKey = 'appearance.sidebarCollapsed';
+  static const _sidebarNavStyleKey = 'appearance.sidebarNavStyle';
   static const _localeKey = 'appearance.locale';
   static const _floatingBarKey = 'appearance.floatingPlayerBar';
   static const _fontFamilyKey = 'appearance.fontFamily';
@@ -88,14 +98,73 @@ class AppPrefs {
     return v.round().clamp(1, 12);
   }
 
+  /// 封面切换动效样式（'scale' 缩放 / 'slide' 侧边滑动；默认 scale）。
+  /// 对齐原版 settings.player.transitionStyle，全屏播放器切歌时
+  /// 封面与歌曲信息的过渡动画。
+  String get transitionStyle {
+    final v = _data[_transitionStyleKey];
+    if (v == 'scale' || v == 'slide') return v as String;
+    return 'scale';
+  }
+
   /// 自定义主色（ARGB 值）；null = 使用设计体系默认亮蓝。
   /// 对齐原版 appearance.themeSource=custom + customColor（hex）。
   int? get accent => _data[_accentKey] as int?;
 
-  /// 跟随系统主题色（Linux/GNOME 读取 `org.gnome.desktop.interface`
-  /// accent-color；读取失败或非 Linux 回退 [accent]；默认关）。
-  bool get accentSystem =>
-      _data[_accentSystemKey] as bool? ?? false;
+  /// 主题色来源（对齐原版 appearance.themeSource）：
+  /// - `default`：跟随系统主题色（读取系统 accent-color，失败回退默认亮蓝）；
+  /// - `custom`：自定义主色（[accentColor]）；
+  /// - `cover`：从当前播放曲目封面取色（实时跟随）；
+  /// - `solid`：纯色中性色板（无主题色，主/次色用灰阶）。
+  String get themeSource {
+    final v = _data[_themeSourceKey];
+    if (v == 'custom' || v == 'cover' || v == 'solid') return v as String;
+    return 'default';
+  }
+
+  /// 全局着色（对齐原版 appearance.globalTint）：将主题色轻微应用到
+  /// 全局界面（surface 家族向主色偏移），默认关。
+  bool get globalTint => _data[_globalTintKey] as bool? ?? false;
+
+  /// 外观风格（对齐原版 appearance.appearanceStyle）：
+  /// `solid` 纯色背景 / `image` 自定义图片背景。
+  String get appearanceStyle {
+    final v = _data[_appearanceStyleKey];
+    return v == 'image' ? 'image' : 'solid';
+  }
+
+  /// 背景图片路径（磁盘绝对路径；null = 未选择，对齐 imageBackground.src）。
+  String? get backgroundImage => _data[_backgroundImageKey] as String?;
+
+  /// 背景模糊（px，0~80，对齐 imageBackground.blur，默认 0）。
+  int get backgroundBlur =>
+      ((_data[_backgroundBlurKey] as num?)?.toInt() ?? 0).clamp(0, 80);
+
+  /// 遮罩浓度（0.3~0.9，对齐 imageBackground.dim，默认 0.4）。
+  double get backgroundDim =>
+      ((_data[_backgroundDimKey] as num?)?.toDouble() ?? 0.4).clamp(0.3, 0.9);
+
+  /// 背景图缩放（1~2，对齐 imageBackground.scale，默认 1.2）。
+  double get backgroundScale =>
+      ((_data[_backgroundScaleKey] as num?)?.toDouble() ?? 1.2).clamp(1, 2);
+
+  /// 页面切换动效（对齐原版 appearance.routeTransition）：
+  /// `none` 无 / `fade` 淡入淡出 / `slide` 滑动 / `zoom` 缩放。
+  String get routeTransition {
+    final v = _data[_routeTransitionKey];
+    if (v == 'none' || v == 'slide' || v == 'zoom') return v as String;
+    return 'fade';
+  }
+
+  /// 折叠侧边栏（对齐原版 appearance.sidebarCollapsed，默认关）。
+  bool get sidebarCollapsed => _data[_sidebarCollapsedKey] as bool? ?? false;
+
+  /// 侧边栏导航高亮动效（对齐原版 appearance.sidebarNavStyle）：
+  /// `default` 静态指示条 / `animated` 滑动高亮条。
+  String get sidebarNavStyle {
+    final v = _data[_sidebarNavStyleKey];
+    return v == 'animated' ? 'animated' : 'default';
+  }
 
   /// 界面语言（BCP-47 字符串如 `zh-CN` / `en`；null = 跟随系统，默认）。
   /// 设置页「语言」选择，取值范围与 [AppLocalizations.supportedLocales] 对齐。
@@ -225,6 +294,14 @@ class AppPrefs {
         },
       );
 
+  /// 设置封面切换动效样式（非法值不写入，getter 回退默认 scale）。
+  AppPrefs copyWithTransitionStyle(String value) => AppPrefs(
+        data: {
+          ..._data,
+          if (value == 'scale' || value == 'slide') _transitionStyleKey: value,
+        },
+      );
+
   /// 设置自定义主色（null = 恢复默认亮蓝，**移除**落盘的自定义值）。
   ///
   /// 不能用 `_accentKey: ?accent`：null-aware 元素只「不写入」，旧键仍会
@@ -239,10 +316,63 @@ class AppPrefs {
     return AppPrefs(data: data);
   }
 
-  AppPrefs copyWithAccentSystem(bool value) => AppPrefs(
+  /// 设置主题色来源（非法值不写入，getter 回退默认 default）。
+  AppPrefs copyWithThemeSource(String value) => AppPrefs(
         data: {
           ..._data,
-          _accentSystemKey: value,
+          if (value == 'default' || value == 'custom' || value == 'cover' || value == 'solid')
+            _themeSourceKey: value,
+        },
+      );
+
+  AppPrefs copyWithGlobalTint(bool value) => AppPrefs(
+        data: {
+          ..._data,
+          _globalTintKey: value,
+        },
+      );
+
+  /// 设置外观风格（solid / image；非法值不写入）。
+  AppPrefs copyWithAppearanceStyle(String value) => AppPrefs(
+        data: {
+          ..._data,
+          if (value == 'solid' || value == 'image') _appearanceStyleKey: value,
+        },
+      );
+
+  /// 设置图片背景配置（选图 / 模糊 / 遮罩 / 缩放）。
+  AppPrefs copyWithBackground({
+    String? image,
+    int? blur,
+    double? dim,
+    double? scale,
+  }) =>
+      AppPrefs(
+        data: {
+          ..._data,
+          _backgroundImageKey: ?image,
+          _backgroundBlurKey: ?blur?.clamp(0, 80),
+          _backgroundDimKey: ?dim?.clamp(0.3, 0.9),
+          _backgroundScaleKey: ?scale?.clamp(1, 2),
+        },
+      );
+
+  /// 设置页面切换动效（none/fade/slide/zoom；非法值不写入）。
+  AppPrefs copyWithRouteTransition(String value) => AppPrefs(
+        data: {
+          ..._data,
+          if (value == 'none' || value == 'fade' || value == 'slide' || value == 'zoom')
+            _routeTransitionKey: value,
+        },
+      );
+
+  /// 设置侧边栏（折叠状态 / 导航高亮动效）。
+  AppPrefs copyWithSidebar({bool? collapsed, String? navStyle}) => AppPrefs(
+        data: {
+          ..._data,
+          _sidebarCollapsedKey: ?collapsed,
+          if (navStyle == 'default' || navStyle == 'animated')
+            _sidebarNavStyleKey: navStyle,
         },
       );
 
@@ -419,16 +549,56 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置封面切换动效样式（scale / slide）。
+  void setTransitionStyle(String value) {
+    state = state.copyWithTransitionStyle(value);
+    state.save();
+  }
+
   /// 设置自定义主色（null = 恢复默认亮蓝）。
   void setAccent(int? accent) {
     state = state.copyWithAccent(accent);
     state.save();
   }
 
-  /// 设置「跟随系统主题色」开关（开启后主色取系统主题色，
-  /// 读取失败时回退当前自定义色）。
-  void setAccentSystem(bool value) {
-    state = state.copyWithAccentSystem(value);
+  /// 设置主题色来源（default/custom/cover/solid）。
+  void setThemeSource(String value) {
+    state = state.copyWithThemeSource(value);
+    state.save();
+  }
+
+  /// 设置全局着色开关。
+  void setGlobalTint(bool value) {
+    state = state.copyWithGlobalTint(value);
+    state.save();
+  }
+
+  /// 设置外观风格（solid/image）。
+  void setAppearanceStyle(String value) {
+    state = state.copyWithAppearanceStyle(value);
+    state.save();
+  }
+
+  /// 设置图片背景配置（选图 / 模糊 / 遮罩 / 缩放）。
+  void setBackground({String? image, int? blur, double? dim, double? scale}) {
+    state = state.copyWithBackground(
+      image: image,
+      blur: blur,
+      dim: dim,
+      scale: scale,
+    );
+    state.save();
+  }
+
+  /// 设置页面切换动效（none/fade/slide/zoom）。
+  void setRouteTransition(String value) {
+    state = state.copyWithRouteTransition(value);
+    state.save();
+  }
+
+  /// 设置侧边栏（折叠状态 / 导航高亮动效）。
+  void setSidebar({bool? collapsed, String? navStyle}) {
+    state = state.copyWithSidebar(collapsed: collapsed, navStyle: navStyle);
     state.save();
   }
 

@@ -1299,6 +1299,19 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get settingsTransitionStyle => 'メディア情報の切り替えアニメーション';
+
+  @override
+  String get settingsTransitionStyleDesc =>
+      '曲の切り替え時にアルバムカバーと曲情報のトランジションアニメーション';
+
+  @override
+  String get settingsTransitionStyleScale => 'スケール';
+
+  @override
+  String get settingsTransitionStyleSlide => 'スライド';
+
+  @override
   String get settingsSectionShortcuts => 'ショートカット';
 
   @override
@@ -1713,6 +1726,147 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSearchAccentSubtitle => 'カスタムプライマリカラーシード · パレット';
+
+  @override
+  String get settingsThemeSource => 'テーマカラーソース';
+
+  @override
+  String get settingsThemeSourceDesc => 'プライマリカラーの取得元';
+
+  @override
+  String get settingsThemeSourceDefault => 'システムに従う';
+
+  @override
+  String get settingsThemeSourceCustom => 'カスタム';
+
+  @override
+  String get settingsThemeSourceCover => 'ジャケット連動';
+
+  @override
+  String get settingsThemeSourceSolid => 'なし';
+
+  @override
+  String get settingsThemeSourceCustomHint => 'シード色を選ぶと、プライマリ/セカンダリが動的に生成されます';
+
+  @override
+  String get settingsThemeSourceCoverHint =>
+      '現在再生中のジャケットから代表色をリアルタイム抽出（取得できない場合はデフォルトにフォールバック）';
+
+  @override
+  String get settingsGlobalTint => 'グローバルティント';
+
+  @override
+  String get settingsGlobalTintDesc => 'テーマカラーをインターフェース全体に微妙に適用';
+
+  @override
+  String get settingsGlobalTintNote =>
+      'テーマカラー（カスタム/ジャケット連動）がある場合に有効。画像背景モードでは強制オン。';
+
+  @override
+  String get settingsSectionStyle => '背景スタイル';
+
+  @override
+  String get settingsAppearanceStyle => '外観スタイル';
+
+  @override
+  String get settingsAppearanceStyleDesc => 'メイン背景の表示方法';
+
+  @override
+  String get settingsAppearanceStyleSolid => '単色';
+
+  @override
+  String get settingsAppearanceStyleImage => '画像';
+
+  @override
+  String get settingsBackgroundImage => '背景画像';
+
+  @override
+  String get settingsBackgroundImageDesc =>
+      'ローカル画像をアプリの背景に選択（画像モードはダーク + グローバルティント強制）';
+
+  @override
+  String get settingsBackgroundPick => '画像を選択';
+
+  @override
+  String get settingsBackgroundReplace => '変更';
+
+  @override
+  String get settingsBackgroundClear => 'クリア';
+
+  @override
+  String get settingsBackgroundBlur => '背景ぼかし';
+
+  @override
+  String settingsBackgroundBlurDesc(Object blur) {
+    return '背景画像にガウスぼかしを適用（${blur}px）';
+  }
+
+  @override
+  String get settingsBackgroundDim => 'マスク濃度';
+
+  @override
+  String settingsBackgroundDimDesc(Object dim) {
+    return '黒のオーバーレイ透明度（$dim%）— 高いほど前景が読みやすく';
+  }
+
+  @override
+  String get settingsBackgroundScale => 'ズームサイズ';
+
+  @override
+  String settingsBackgroundScaleDesc(Object scale) {
+    return '背景画像のズーム倍率（${scale}x）';
+  }
+
+  @override
+  String get settingsSidebarCollapsed => 'サイドバーを折りたたむ';
+
+  @override
+  String get settingsSidebarCollapsedDesc => 'サイドバーをアイコンのみ表示に折りたたむ';
+
+  @override
+  String get settingsSidebarNavStyle => 'ナビハイライトアニメ';
+
+  @override
+  String get settingsSidebarNavStyleDesc => 'ナビゲーションのハイライトインジケータのアニメーションスタイル';
+
+  @override
+  String get settingsSidebarNavStyleDefault => '静的';
+
+  @override
+  String get settingsSidebarNavStyleAnimated => 'スライド';
+
+  @override
+  String get settingsRouteTransition => 'ページ遷移アニメ';
+
+  @override
+  String get settingsRouteTransitionDesc => 'ページ切り替え時のトランジションアニメーション';
+
+  @override
+  String get settingsRouteTransitionNone => 'なし';
+
+  @override
+  String get settingsRouteTransitionFade => 'フェード';
+
+  @override
+  String get settingsRouteTransitionSlide => 'スライド';
+
+  @override
+  String get settingsRouteTransitionZoom => 'ズーム';
+
+  @override
+  String get settingsSearchThemeSourceSubtitle => 'デフォルト · カスタム · ジャケット連動 · なし';
+
+  @override
+  String get settingsSearchGlobalTintSubtitle => 'テーマカラーをインターフェース全体に適用';
+
+  @override
+  String get settingsSearchBackgroundSubtitle => '単色 / 画像 · ぼかし · マスク · ズーム';
+
+  @override
+  String get settingsSearchSidebarSubtitle => 'サイドバー折りたたみ · 静的 / スライドハイライト';
+
+  @override
+  String get settingsSearchRouteTransitionSubtitle => 'なし · フェード · スライド · ズーム';
 
   @override
   String get settingsSearchFloatingBarSubtitle => '下部のフローティングカプセル · 全幅ドック';

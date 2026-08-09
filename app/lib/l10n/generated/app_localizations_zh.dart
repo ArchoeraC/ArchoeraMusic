@@ -1290,6 +1290,18 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsTransitionStyle => '媒体信息切换动效';
+
+  @override
+  String get settingsTransitionStyleDesc => '切歌时封面与歌曲信息的过渡动画效果';
+
+  @override
+  String get settingsTransitionStyleScale => '缩放';
+
+  @override
+  String get settingsTransitionStyleSlide => '侧边滑动';
+
+  @override
   String get settingsSectionShortcuts => '快捷键';
 
   @override
@@ -1700,6 +1712,144 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSearchAccentSubtitle => '自定义主色种子 · 色板';
+
+  @override
+  String get settingsThemeSource => '主题色来源';
+
+  @override
+  String get settingsThemeSourceDesc => '主题色的获取方式';
+
+  @override
+  String get settingsThemeSourceDefault => '跟随系统';
+
+  @override
+  String get settingsThemeSourceCustom => '自定义主色';
+
+  @override
+  String get settingsThemeSourceCover => '跟随封面';
+
+  @override
+  String get settingsThemeSourceSolid => '无主题色';
+
+  @override
+  String get settingsThemeSourceCustomHint => '选取主色种子，主/次色由它动态生成';
+
+  @override
+  String get settingsThemeSourceCoverHint => '实时从当前播放封面提取主色（不可用时回退默认色）';
+
+  @override
+  String get settingsGlobalTint => '全局着色';
+
+  @override
+  String get settingsGlobalTintDesc => '将主题色应用到全局界面';
+
+  @override
+  String get settingsGlobalTintNote => '存在主题色（自定义/跟随封面）时生效；图片背景模式下强制开启。';
+
+  @override
+  String get settingsSectionStyle => '背景风格';
+
+  @override
+  String get settingsAppearanceStyle => '外观风格';
+
+  @override
+  String get settingsAppearanceStyleDesc => '应用主背景的呈现方式';
+
+  @override
+  String get settingsAppearanceStyleSolid => '纯色背景';
+
+  @override
+  String get settingsAppearanceStyleImage => '自定义图片';
+
+  @override
+  String get settingsBackgroundImage => '背景图片';
+
+  @override
+  String get settingsBackgroundImageDesc => '选择本地图片作为应用背景；图片模式强制暗色 + 全局着色';
+
+  @override
+  String get settingsBackgroundPick => '选择图片';
+
+  @override
+  String get settingsBackgroundReplace => '更换';
+
+  @override
+  String get settingsBackgroundClear => '清除';
+
+  @override
+  String get settingsBackgroundBlur => '背景模糊';
+
+  @override
+  String settingsBackgroundBlurDesc(Object blur) {
+    return '对背景图片应用高斯模糊（${blur}px）';
+  }
+
+  @override
+  String get settingsBackgroundDim => '遮罩浓度';
+
+  @override
+  String settingsBackgroundDimDesc(Object dim) {
+    return '叠加的黑色遮罩透明度（$dim%），越高前景越易读';
+  }
+
+  @override
+  String get settingsBackgroundScale => '缩放大小';
+
+  @override
+  String settingsBackgroundScaleDesc(Object scale) {
+    return '背景图的缩放倍数（${scale}x）';
+  }
+
+  @override
+  String get settingsSidebarCollapsed => '折叠侧边栏';
+
+  @override
+  String get settingsSidebarCollapsedDesc => '将侧边栏折叠为图标模式';
+
+  @override
+  String get settingsSidebarNavStyle => '导航高亮动效';
+
+  @override
+  String get settingsSidebarNavStyleDesc => '切换侧边栏导航高亮指示器的动画风格';
+
+  @override
+  String get settingsSidebarNavStyleDefault => '静态';
+
+  @override
+  String get settingsSidebarNavStyleAnimated => '滑动';
+
+  @override
+  String get settingsRouteTransition => '页面切换动效';
+
+  @override
+  String get settingsRouteTransitionDesc => '切换页面时的过渡动画效果';
+
+  @override
+  String get settingsRouteTransitionNone => '无';
+
+  @override
+  String get settingsRouteTransitionFade => '淡入淡出';
+
+  @override
+  String get settingsRouteTransitionSlide => '滑动';
+
+  @override
+  String get settingsRouteTransitionZoom => '缩放';
+
+  @override
+  String get settingsSearchThemeSourceSubtitle => '默认主题色 · 自定义主色 · 跟随封面 · 无主题色';
+
+  @override
+  String get settingsSearchGlobalTintSubtitle => '将主题色应用到全局界面';
+
+  @override
+  String get settingsSearchBackgroundSubtitle => '纯色 / 图片 · 模糊 · 遮罩 · 缩放';
+
+  @override
+  String get settingsSearchSidebarSubtitle => '折叠侧边栏 · 静态 / 滑动高亮';
+
+  @override
+  String get settingsSearchRouteTransitionSubtitle => '无 · 淡入淡出 · 滑动 · 缩放';
 
   @override
   String get settingsSearchFloatingBarSubtitle => '底部悬浮胶囊 · 全宽停靠';
@@ -3281,6 +3431,18 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
+  String get settingsTransitionStyle => '媒体信息切换动效';
+
+  @override
+  String get settingsTransitionStyleDesc => '切歌时封面与歌曲信息的过渡动画效果';
+
+  @override
+  String get settingsTransitionStyleScale => '缩放';
+
+  @override
+  String get settingsTransitionStyleSlide => '侧边滑动';
+
+  @override
   String get settingsSectionShortcuts => '快捷键';
 
   @override
@@ -3691,6 +3853,144 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSearchAccentSubtitle => '自定义主色种子 · 色板';
+
+  @override
+  String get settingsThemeSource => '主题色来源';
+
+  @override
+  String get settingsThemeSourceDesc => '主题色的获取方式';
+
+  @override
+  String get settingsThemeSourceDefault => '跟随系统';
+
+  @override
+  String get settingsThemeSourceCustom => '自定义主色';
+
+  @override
+  String get settingsThemeSourceCover => '跟随封面';
+
+  @override
+  String get settingsThemeSourceSolid => '无主题色';
+
+  @override
+  String get settingsThemeSourceCustomHint => '选取主色种子，主/次色由它动态生成';
+
+  @override
+  String get settingsThemeSourceCoverHint => '实时从当前播放封面提取主色（不可用时回退默认色）';
+
+  @override
+  String get settingsGlobalTint => '全局着色';
+
+  @override
+  String get settingsGlobalTintDesc => '将主题色应用到全局界面';
+
+  @override
+  String get settingsGlobalTintNote => '存在主题色（自定义/跟随封面）时生效；图片背景模式下强制开启。';
+
+  @override
+  String get settingsSectionStyle => '背景风格';
+
+  @override
+  String get settingsAppearanceStyle => '外观风格';
+
+  @override
+  String get settingsAppearanceStyleDesc => '应用主背景的呈现方式';
+
+  @override
+  String get settingsAppearanceStyleSolid => '纯色背景';
+
+  @override
+  String get settingsAppearanceStyleImage => '自定义图片';
+
+  @override
+  String get settingsBackgroundImage => '背景图片';
+
+  @override
+  String get settingsBackgroundImageDesc => '选择本地图片作为应用背景；图片模式强制暗色 + 全局着色';
+
+  @override
+  String get settingsBackgroundPick => '选择图片';
+
+  @override
+  String get settingsBackgroundReplace => '更换';
+
+  @override
+  String get settingsBackgroundClear => '清除';
+
+  @override
+  String get settingsBackgroundBlur => '背景模糊';
+
+  @override
+  String settingsBackgroundBlurDesc(Object blur) {
+    return '对背景图片应用高斯模糊（${blur}px）';
+  }
+
+  @override
+  String get settingsBackgroundDim => '遮罩浓度';
+
+  @override
+  String settingsBackgroundDimDesc(Object dim) {
+    return '叠加的黑色遮罩透明度（$dim%），越高前景越易读';
+  }
+
+  @override
+  String get settingsBackgroundScale => '缩放大小';
+
+  @override
+  String settingsBackgroundScaleDesc(Object scale) {
+    return '背景图的缩放倍数（${scale}x）';
+  }
+
+  @override
+  String get settingsSidebarCollapsed => '折叠侧边栏';
+
+  @override
+  String get settingsSidebarCollapsedDesc => '将侧边栏折叠为图标模式';
+
+  @override
+  String get settingsSidebarNavStyle => '导航高亮动效';
+
+  @override
+  String get settingsSidebarNavStyleDesc => '切换侧边栏导航高亮指示器的动画风格';
+
+  @override
+  String get settingsSidebarNavStyleDefault => '静态';
+
+  @override
+  String get settingsSidebarNavStyleAnimated => '滑动';
+
+  @override
+  String get settingsRouteTransition => '页面切换动效';
+
+  @override
+  String get settingsRouteTransitionDesc => '切换页面时的过渡动画效果';
+
+  @override
+  String get settingsRouteTransitionNone => '无';
+
+  @override
+  String get settingsRouteTransitionFade => '淡入淡出';
+
+  @override
+  String get settingsRouteTransitionSlide => '滑动';
+
+  @override
+  String get settingsRouteTransitionZoom => '缩放';
+
+  @override
+  String get settingsSearchThemeSourceSubtitle => '默认主题色 · 自定义主色 · 跟随封面 · 无主题色';
+
+  @override
+  String get settingsSearchGlobalTintSubtitle => '将主题色应用到全局界面';
+
+  @override
+  String get settingsSearchBackgroundSubtitle => '纯色 / 图片 · 模糊 · 遮罩 · 缩放';
+
+  @override
+  String get settingsSearchSidebarSubtitle => '折叠侧边栏 · 静态 / 滑动高亮';
+
+  @override
+  String get settingsSearchRouteTransitionSubtitle => '无 · 淡入淡出 · 滑动 · 缩放';
 
   @override
   String get settingsSearchFloatingBarSubtitle => '底部悬浮胶囊 · 全宽停靠';
@@ -5272,6 +5572,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get settingsTransitionStyle => '媒體資訊切換動效';
+
+  @override
+  String get settingsTransitionStyleDesc => '切換歌曲時封面與歌曲資訊的過渡動畫效果';
+
+  @override
+  String get settingsTransitionStyleScale => '縮放';
+
+  @override
+  String get settingsTransitionStyleSlide => '側邊滑動';
+
+  @override
   String get settingsSectionShortcuts => '快速鍵';
 
   @override
@@ -5682,6 +5994,144 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSearchAccentSubtitle => '自訂主色種子 · 色板';
+
+  @override
+  String get settingsThemeSource => '主題色來源';
+
+  @override
+  String get settingsThemeSourceDesc => '主題色的取得方式';
+
+  @override
+  String get settingsThemeSourceDefault => '跟隨系統';
+
+  @override
+  String get settingsThemeSourceCustom => '自訂主色';
+
+  @override
+  String get settingsThemeSourceCover => '跟隨封面';
+
+  @override
+  String get settingsThemeSourceSolid => '無主題色';
+
+  @override
+  String get settingsThemeSourceCustomHint => '選取主色種子，主/次色由它動態產生';
+
+  @override
+  String get settingsThemeSourceCoverHint => '即時從目前播放封面擷取主色（無法取得時回退預設色）';
+
+  @override
+  String get settingsGlobalTint => '全域著色';
+
+  @override
+  String get settingsGlobalTintDesc => '將主題色套用到全域介面';
+
+  @override
+  String get settingsGlobalTintNote => '存在主題色（自訂/跟隨封面）時生效；圖片背景模式下強制開啟。';
+
+  @override
+  String get settingsSectionStyle => '背景風格';
+
+  @override
+  String get settingsAppearanceStyle => '外觀風格';
+
+  @override
+  String get settingsAppearanceStyleDesc => '應用主背景的呈現方式';
+
+  @override
+  String get settingsAppearanceStyleSolid => '純色背景';
+
+  @override
+  String get settingsAppearanceStyleImage => '自訂圖片';
+
+  @override
+  String get settingsBackgroundImage => '背景圖片';
+
+  @override
+  String get settingsBackgroundImageDesc => '選擇本機圖片作為應用背景；圖片模式強制深色 + 全域著色';
+
+  @override
+  String get settingsBackgroundPick => '選擇圖片';
+
+  @override
+  String get settingsBackgroundReplace => '更換';
+
+  @override
+  String get settingsBackgroundClear => '清除';
+
+  @override
+  String get settingsBackgroundBlur => '背景模糊';
+
+  @override
+  String settingsBackgroundBlurDesc(Object blur) {
+    return '對背景圖片套用高斯模糊（${blur}px）';
+  }
+
+  @override
+  String get settingsBackgroundDim => '遮罩濃度';
+
+  @override
+  String settingsBackgroundDimDesc(Object dim) {
+    return '疊加的黑色遮罩透明度（$dim%），越高前景越易讀';
+  }
+
+  @override
+  String get settingsBackgroundScale => '縮放大小';
+
+  @override
+  String settingsBackgroundScaleDesc(Object scale) {
+    return '背景圖的縮放倍數（${scale}x）';
+  }
+
+  @override
+  String get settingsSidebarCollapsed => '摺疊側邊欄';
+
+  @override
+  String get settingsSidebarCollapsedDesc => '將側邊欄摺疊為圖示模式';
+
+  @override
+  String get settingsSidebarNavStyle => '導覽高亮動效';
+
+  @override
+  String get settingsSidebarNavStyleDesc => '切換側邊欄導覽高亮指示器的動畫風格';
+
+  @override
+  String get settingsSidebarNavStyleDefault => '靜態';
+
+  @override
+  String get settingsSidebarNavStyleAnimated => '滑動';
+
+  @override
+  String get settingsRouteTransition => '頁面切換動效';
+
+  @override
+  String get settingsRouteTransitionDesc => '切換頁面時的轉場動畫效果';
+
+  @override
+  String get settingsRouteTransitionNone => '無';
+
+  @override
+  String get settingsRouteTransitionFade => '淡入淡出';
+
+  @override
+  String get settingsRouteTransitionSlide => '滑動';
+
+  @override
+  String get settingsRouteTransitionZoom => '縮放';
+
+  @override
+  String get settingsSearchThemeSourceSubtitle => '預設主題色 · 自訂主色 · 跟隨封面 · 無主題色';
+
+  @override
+  String get settingsSearchGlobalTintSubtitle => '將主題色套用到全域介面';
+
+  @override
+  String get settingsSearchBackgroundSubtitle => '純色 / 圖片 · 模糊 · 遮罩 · 縮放';
+
+  @override
+  String get settingsSearchSidebarSubtitle => '摺疊側邊欄 · 靜態 / 滑動高亮';
+
+  @override
+  String get settingsSearchRouteTransitionSubtitle => '無 · 淡入淡出 · 滑動 · 縮放';
 
   @override
   String get settingsSearchFloatingBarSubtitle => '底部懸浮膠囊 · 全寬停靠';

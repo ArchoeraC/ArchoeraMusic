@@ -1,0 +1,79 @@
+name: Build Linux
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux:
+    name: Linux x64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config clang \
+            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
+            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build audio-engine (C + Rust tempo)
+        run: |
+          cmake -S app/core/audio-engine -B app/core/audio-engine/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build app/core/audio-engine/build -j"$(nproc)"
+
+      - name: Build scraper (C++)
+        run: |
+          cmake -S app/core/scraper -B app/core/scraper/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build app/core/scraper/build -j"$(nproc)"
+
+      - name: Build scanner (C# NativeAOT)
+        run: bash app/core/scanner/build.sh linux-x64
+
+      - name: Build downloader (Rust cdylib)
+        run: cargo build --release --manifest-path app/core/downloader/Cargo.toml
+
+      - name: Build subsonic (Go + Rust transcoder)
+        run: bash app/core/subsonic/build.sh
+
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: app
+        run: dart analyze lib
+
+      - name: Test (unit smoke)
+        working-directory: app
+        run: flutter test test/widget_test.dart
+
+      - name: Build Flutter Linux
+        working-directory: app
+        run: flutter build linux --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-linux-x64
+          path: app/build/linux/x64/release/bundle
+          if-no-files-found: error

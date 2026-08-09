@@ -44,7 +44,15 @@ pkg_check_modules(FFMPEG REQUIRED
 
 # ── Rust tempo 库 ──────────────────────────────────────────
 set(TEMPO_RS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tempo-rs)
-set(TEMPO_LIB ${CMAKE_CURRENT_BINARY_DIR}/libaudio_tempo.a)
+# Rust staticlib 命名：MSVC 输出 `.lib`（链接需 MSVC 格式），其余平台 `.a`。
+# 若实际产物名不同（如 MSVC 下 audio_tempo.lib），CI 中先归一化为下面的期望名。
+if(MSVC)
+    set(TEMPO_LIB ${CMAKE_CURRENT_BINARY_DIR}/libaudio_tempo.lib)
+    set(TEMPO_RUST_SRC libaudio_tempo.lib)
+else()
+    set(TEMPO_LIB ${CMAKE_CURRENT_BINARY_DIR}/libaudio_tempo.a)
+    set(TEMPO_RUST_SRC libaudio_tempo.a)
+endif()
 
 # 尝试查找 cargo
 find_program(CARGO_EXE cargo)
@@ -54,7 +62,7 @@ if(CARGO_EXE)
         OUTPUT ${TEMPO_LIB}
         COMMAND ${CARGO_EXE} build --release --target-dir ${CMAKE_CURRENT_BINARY_DIR}/tempo-target
         COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_BINARY_DIR}/tempo-target/release/libaudio_tempo.a
+            ${CMAKE_CURRENT_BINARY_DIR}/tempo-target/release/${TEMPO_RUST_SRC}
             ${TEMPO_LIB}
         WORKING_DIRECTORY ${TEMPO_RS_DIR}
         COMMENT "Building Rust tempo library (audio_tempo)"
@@ -117,7 +125,14 @@ target_link_libraries(splayer-audio-engine PRIVATE audio_engine_static)
 # 如果 Rust tempo 可用，链接
 if(TEMPO_AVAILABLE)
     add_dependencies(splayer-audio-engine tempo_lib)
-    target_link_libraries(splayer-audio-engine PRIVATE ${TEMPO_LIB} stdc++)
+    # C++ 运行时按平台：MSVC 用默认 CRT / AppleClang 用 libc++ / GCC 用 stdc++
+    if(MSVC)
+        target_link_libraries(splayer-audio-engine PRIVATE ${TEMPO_LIB})
+    elseif(APPLE)
+        target_link_libraries(splayer-audio-engine PRIVATE ${TEMPO_LIB} c++)
+    else()
+        target_link_libraries(splayer-audio-engine PRIVATE ${TEMPO_LIB} stdc++)
+    endif()
     target_compile_definitions(splayer-audio-engine PRIVATE HAS_TEMPO=1)
 endif()
 
@@ -145,7 +160,13 @@ target_link_directories(archoera_mediaengine PRIVATE ${FFMPEG_LIBRARY_DIRS})
 target_compile_options(archoera_mediaengine PRIVATE ${FFMPEG_CFLAGS_OTHER})
 if(TEMPO_AVAILABLE)
     add_dependencies(archoera_mediaengine tempo_lib)
-    target_link_libraries(archoera_mediaengine PRIVATE ${TEMPO_LIB} stdc++)
+    if(MSVC)
+        target_link_libraries(archoera_mediaengine PRIVATE ${TEMPO_LIB})
+    elseif(APPLE)
+        target_link_libraries(archoera_mediaengine PRIVATE ${TEMPO_LIB} c++)
+    else()
+        target_link_libraries(archoera_mediaengine PRIVATE ${TEMPO_LIB} stdc++)
+    endif()
     target_compile_definitions(archoera_mediaengine PRIVATE HAS_TEMPO=1)
 endif()
 

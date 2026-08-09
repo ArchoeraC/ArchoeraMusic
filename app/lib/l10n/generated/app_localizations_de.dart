@@ -1343,6 +1343,19 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get settingsTransitionStyle => 'Medienübergang';
+
+  @override
+  String get settingsTransitionStyleDesc =>
+      'Übergangsanimation beim Titelwechsel';
+
+  @override
+  String get settingsTransitionStyleScale => 'Skalierung';
+
+  @override
+  String get settingsTransitionStyleSlide => 'Schieben';
+
+  @override
   String get settingsSectionShortcuts => 'Tastenkürzel';
 
   @override
@@ -1777,6 +1790,158 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsSearchAccentSubtitle =>
       'Benutzerdefinierte Primärfarb-Seed · Palette';
+
+  @override
+  String get settingsThemeSource => 'Quelle der Themenfarbe';
+
+  @override
+  String get settingsThemeSourceDesc => 'Woher die Primärfarbe stammt';
+
+  @override
+  String get settingsThemeSourceDefault => 'System folgen';
+
+  @override
+  String get settingsThemeSourceCustom => 'Benutzerdefiniert';
+
+  @override
+  String get settingsThemeSourceCover => 'Cover folgen';
+
+  @override
+  String get settingsThemeSourceSolid => 'Keine';
+
+  @override
+  String get settingsThemeSourceCustomHint =>
+      'Wählen Sie eine Seed-Farbe; Primär/Sekundär wird daraus generiert';
+
+  @override
+  String get settingsThemeSourceCoverHint =>
+      'Extrahiert die dominante Farbe des aktuellen Covers in Echtzeit (Fallback auf Standard, wenn nicht verfügbar)';
+
+  @override
+  String get settingsGlobalTint => 'Globaler Farbton';
+
+  @override
+  String get settingsGlobalTintDesc =>
+      'Themenfarbe dezent auf die gesamte Oberfläche anwenden';
+
+  @override
+  String get settingsGlobalTintNote =>
+      'Wirksam, wenn eine Themenfarbe vorhanden ist (benutzerdefiniert / Cover); im Bildmodus erzwungen.';
+
+  @override
+  String get settingsSectionStyle => 'Hintergrundstil';
+
+  @override
+  String get settingsAppearanceStyle => 'Darstellungsstil';
+
+  @override
+  String get settingsAppearanceStyleDesc =>
+      'Wie der Haupthintergrund dargestellt wird';
+
+  @override
+  String get settingsAppearanceStyleSolid => 'Einfarbig';
+
+  @override
+  String get settingsAppearanceStyleImage => 'Bild';
+
+  @override
+  String get settingsBackgroundImage => 'Hintergrundbild';
+
+  @override
+  String get settingsBackgroundImageDesc =>
+      'Lokales Bild als App-Hintergrund wählen (Bildmodus erzwingt dunkles Design + globalen Farbton)';
+
+  @override
+  String get settingsBackgroundPick => 'Bild wählen';
+
+  @override
+  String get settingsBackgroundReplace => 'Ersetzen';
+
+  @override
+  String get settingsBackgroundClear => 'Löschen';
+
+  @override
+  String get settingsBackgroundBlur => 'Hintergrundunschärfe';
+
+  @override
+  String settingsBackgroundBlurDesc(Object blur) {
+    return 'Gaußsche Unschärfe auf das Hintergrundbild angewendet (${blur}px)';
+  }
+
+  @override
+  String get settingsBackgroundDim => 'Maskenstärke';
+
+  @override
+  String settingsBackgroundDimDesc(Object dim) {
+    return 'Deckkraft der schwarzen Überlagerung ($dim%); höher = Vordergrund besser lesbar';
+  }
+
+  @override
+  String get settingsBackgroundScale => 'Zoomgröße';
+
+  @override
+  String settingsBackgroundScaleDesc(Object scale) {
+    return 'Zoomfaktor des Hintergrundbilds (${scale}x)';
+  }
+
+  @override
+  String get settingsSidebarCollapsed => 'Seitenleiste einklappen';
+
+  @override
+  String get settingsSidebarCollapsedDesc =>
+      'Seitenleiste in den Nur-Symbole-Modus einklappen';
+
+  @override
+  String get settingsSidebarNavStyle => 'Navigations-Highlight-Animation';
+
+  @override
+  String get settingsSidebarNavStyleDesc =>
+      'Animationsstil des aktiven Navigations-Highlights';
+
+  @override
+  String get settingsSidebarNavStyleDefault => 'Statisch';
+
+  @override
+  String get settingsSidebarNavStyleAnimated => 'Animiert';
+
+  @override
+  String get settingsRouteTransition => 'Seitenübergang';
+
+  @override
+  String get settingsRouteTransitionDesc =>
+      'Übergangsanimation beim Wechseln der Seiten';
+
+  @override
+  String get settingsRouteTransitionNone => 'Keine';
+
+  @override
+  String get settingsRouteTransitionFade => 'Ausblenden';
+
+  @override
+  String get settingsRouteTransitionSlide => 'Schieben';
+
+  @override
+  String get settingsRouteTransitionZoom => 'Zoom';
+
+  @override
+  String get settingsSearchThemeSourceSubtitle =>
+      'Standardthema · Benutzerdefiniert · Cover folgen · Kein Thema';
+
+  @override
+  String get settingsSearchGlobalTintSubtitle =>
+      'Oberfläche mit der Themenfarbe einfärben';
+
+  @override
+  String get settingsSearchBackgroundSubtitle =>
+      'Einfarbig / Bild · Unschärfe · Maske · Zoom';
+
+  @override
+  String get settingsSearchSidebarSubtitle =>
+      'Seitenleiste einklappen · Statisch / Animiert';
+
+  @override
+  String get settingsSearchRouteTransitionSubtitle =>
+      'Keine · Ausblenden · Schieben · Zoom';
 
   @override
   String get settingsSearchFloatingBarSubtitle =>

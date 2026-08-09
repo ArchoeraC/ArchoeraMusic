@@ -1330,6 +1330,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsTransitionStyle => 'Track Transition';
+
+  @override
+  String get settingsTransitionStyleDesc =>
+      'Transition animation when switching tracks';
+
+  @override
+  String get settingsTransitionStyleScale => 'Scale';
+
+  @override
+  String get settingsTransitionStyleSlide => 'Slide';
+
+  @override
   String get settingsSectionShortcuts => 'Shortcuts';
 
   @override
@@ -1759,6 +1772,158 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsSearchAccentSubtitle =>
       'Custom primary color seed · Palette';
+
+  @override
+  String get settingsThemeSource => 'Theme color source';
+
+  @override
+  String get settingsThemeSourceDesc => 'Where the primary color comes from';
+
+  @override
+  String get settingsThemeSourceDefault => 'Follow system';
+
+  @override
+  String get settingsThemeSourceCustom => 'Custom';
+
+  @override
+  String get settingsThemeSourceCover => 'Follow cover';
+
+  @override
+  String get settingsThemeSourceSolid => 'None';
+
+  @override
+  String get settingsThemeSourceCustomHint =>
+      'Pick a seed color; primary/secondary are generated from it';
+
+  @override
+  String get settingsThemeSourceCoverHint =>
+      'Extracts the dominant color from the current cover in real time (falls back to default when unavailable)';
+
+  @override
+  String get settingsGlobalTint => 'Global tint';
+
+  @override
+  String get settingsGlobalTintDesc =>
+      'Apply the theme color subtly to the whole interface';
+
+  @override
+  String get settingsGlobalTintNote =>
+      'Takes effect when a theme color is available (custom / cover); forced on in image background mode.';
+
+  @override
+  String get settingsSectionStyle => 'Background style';
+
+  @override
+  String get settingsAppearanceStyle => 'Appearance style';
+
+  @override
+  String get settingsAppearanceStyleDesc =>
+      'How the main background is rendered';
+
+  @override
+  String get settingsAppearanceStyleSolid => 'Solid';
+
+  @override
+  String get settingsAppearanceStyleImage => 'Image';
+
+  @override
+  String get settingsBackgroundImage => 'Background image';
+
+  @override
+  String get settingsBackgroundImageDesc =>
+      'Pick a local image as the app background; image mode forces dark theme and global tint';
+
+  @override
+  String get settingsBackgroundPick => 'Choose image';
+
+  @override
+  String get settingsBackgroundReplace => 'Replace';
+
+  @override
+  String get settingsBackgroundClear => 'Clear';
+
+  @override
+  String get settingsBackgroundBlur => 'Background blur';
+
+  @override
+  String settingsBackgroundBlurDesc(Object blur) {
+    return 'Gaussian blur applied to the background image (${blur}px)';
+  }
+
+  @override
+  String get settingsBackgroundDim => 'Mask strength';
+
+  @override
+  String settingsBackgroundDimDesc(Object dim) {
+    return 'Dark overlay opacity ($dim%); higher keeps the foreground more readable';
+  }
+
+  @override
+  String get settingsBackgroundScale => 'Zoom size';
+
+  @override
+  String settingsBackgroundScaleDesc(Object scale) {
+    return 'Zoom factor of the background image (${scale}x)';
+  }
+
+  @override
+  String get settingsSidebarCollapsed => 'Collapsed sidebar';
+
+  @override
+  String get settingsSidebarCollapsedDesc =>
+      'Collapse the sidebar to icon-only mode';
+
+  @override
+  String get settingsSidebarNavStyle => 'Nav highlight animation';
+
+  @override
+  String get settingsSidebarNavStyleDesc =>
+      'Animation style of the active navigation highlight';
+
+  @override
+  String get settingsSidebarNavStyleDefault => 'Static';
+
+  @override
+  String get settingsSidebarNavStyleAnimated => 'Animated';
+
+  @override
+  String get settingsRouteTransition => 'Page transition';
+
+  @override
+  String get settingsRouteTransitionDesc =>
+      'Transition animation when switching pages';
+
+  @override
+  String get settingsRouteTransitionNone => 'None';
+
+  @override
+  String get settingsRouteTransitionFade => 'Fade';
+
+  @override
+  String get settingsRouteTransitionSlide => 'Slide';
+
+  @override
+  String get settingsRouteTransitionZoom => 'Zoom';
+
+  @override
+  String get settingsSearchThemeSourceSubtitle =>
+      'Default theme · Custom · Follow cover · No theme';
+
+  @override
+  String get settingsSearchGlobalTintSubtitle =>
+      'Tint the whole interface with the theme color';
+
+  @override
+  String get settingsSearchBackgroundSubtitle =>
+      'Solid / Image · Blur · Mask · Zoom';
+
+  @override
+  String get settingsSearchSidebarSubtitle =>
+      'Collapse sidebar · Static / Animated highlight';
+
+  @override
+  String get settingsSearchRouteTransitionSubtitle =>
+      'None · Fade · Slide · Zoom';
 
   @override
   String get settingsSearchFloatingBarSubtitle =>

@@ -14,6 +14,7 @@ import 'pages/search_page.dart';
 import 'pages/streaming_detail_pages.dart';
 import 'pages/streaming_page.dart';
 import 'theme/app_theme.dart';
+import 'theme/cover_color.dart';
 import 'widgets/app_shortcuts.dart';
 import 'widgets/splash_screen.dart';
 import 'widgets/toast.dart';
@@ -194,9 +195,23 @@ class ArchoeraMusicApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final prefs = ref.watch(appPrefsProvider);
     final locale = ref.watch(localeProvider);
-    // 主色种子：开启「跟随系统主题色」时取系统色（读取失败回退自定义色）
+    // 主色种子（对齐原版 theme.ts generatePalette + trackedColorForCover）：
+    // custom → 自定义主色；cover → 当前播放封面提取；default → 跟随系统主题色
+    // （读取失败回退默认亮蓝）；solid → 无种子（中性灰阶）。
+    final coverAccent = ref.watch(coverColorProvider);
     final systemAccent = ref.watch(systemAccentProvider).value;
-    final accent = prefs.accentSystem ? systemAccent : prefs.accentColor;
+    final accent = switch (prefs.themeSource) {
+      'custom' => prefs.accentColor,
+      'cover' => coverAccent,
+      'default' => systemAccent,
+      _ => null,
+    };
+    // 图片背景风格（有效时）强制暗色 + 全局着色（对齐原版 effectiveStyle/isDark/
+    // effectiveGlobalTint：appearanceStyle=image 无 src 时回退 solid）
+    final imageStyle =
+        prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
+    final globalTint = prefs.globalTint || imageStyle;
+    final effectiveThemeMode = imageStyle ? ThemeMode.dark : themeMode;
     final fontFamily = prefs.fontFamily;
     return _AuthBootstrap(
       child: MaterialApp.router(
@@ -206,10 +221,16 @@ class ArchoeraMusicApp extends ConsumerWidget {
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         theme: buildAppTheme(AppPalette.light, Brightness.light,
-            accentSeed: accent, fontFamily: fontFamily),
+            accentSeed: accent,
+            fontFamily: fontFamily,
+            globalTint: globalTint,
+            solid: prefs.themeSource == 'solid'),
         darkTheme: buildAppTheme(AppPalette.dark, Brightness.dark,
-            accentSeed: accent, fontFamily: fontFamily),
-        themeMode: themeMode,
+            accentSeed: accent,
+            fontFamily: fontFamily,
+            globalTint: globalTint,
+            solid: prefs.themeSource == 'solid'),
+        themeMode: effectiveThemeMode,
         routerConfig: appRouter,
         builder: (context, child) => SplashGate(
           child: AppShortcuts(

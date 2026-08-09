@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/state/app_prefs.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import 'app_logo.dart';
@@ -23,6 +24,12 @@ class _NavItem {
 ///  - 悬浮态：`onSurface 5%` 背景；
 ///  - Logo 点击回首页（对齐 SideBarLogo.vue，hover 轻微放大）。
 ///
+/// 折叠状态 / 导航高亮动效来自设置（appearance.sidebarCollapsed /
+/// appearance.sidebarNavStyle，对齐原版）：
+///  - collapsed：侧边栏折叠为图标模式（宽度 240 → 64）；
+///  - sidebarNavStyle=animated：选中指示条改为容器级滑动高亮
+///    （AnimatedPositioned 平滑移动，对齐 SMenu animated 模式）。
+///
 /// 导航分组（对齐原版 SideBar：只放内容入口，工具入口不上侧边栏）：
 /// 音乐：首页/音乐库 · 个人：我喜欢/收藏/历史/下载。
 /// 搜索由顶栏搜索框进入（隐藏壳分支）；设置由顶栏齿轮弹窗进入。
@@ -36,35 +43,43 @@ class SideBar extends ConsumerStatefulWidget {
 }
 
 class _SideBarState extends ConsumerState<SideBar> {
-  /// 折叠状态（Phase 1 本地态，后续并入设置 appearance.sidebarCollapsed）。
-  bool _collapsed = false;
-
   /// Logo hover 缩放（对齐 SideBarLogo.vue hover:scale-105）。
   double _logoScale = 1.0;
 
+  /// 导航项位置锚点（animated 指示条测量用；key 为分支 index）。
+  final Map<int, GlobalKey> _navKeys = {};
+
+  /// 导航列表容器锚点（指示条坐标参照系）。
+  final GlobalKey _navHostKey = GlobalKey();
+
+  /// 滑动指示条当前位置（相对导航容器）。
+  double _indicatorTop = 0;
+  double _indicatorHeight = 0;
+  bool _indicatorReady = false;
+
   List<(String, List<_NavItem>)> _navGroups(AppLocalizations l10n) => [
-    (l10n.sidebarGroupMusic, [
-      _NavItem(0, l10n.sidebarHome, Icons.home_outlined, Icons.home),
-      _NavItem(
-        1,
-        l10n.sidebarLibrary,
-        Icons.library_music_outlined,
-        Icons.library_music,
-      ),
-      _NavItem(
-        7,
-        l10n.sidebarStreaming,
-        Icons.dns_outlined,
-        Icons.dns,
-      ),
-    ]),
-    (l10n.sidebarGroupPersonal, [
-      _NavItem(2, l10n.sidebarLiked, Icons.favorite_outline, Icons.favorite),
-      _NavItem(3, l10n.sidebarFavorites, Icons.star_outline, Icons.star),
-      _NavItem(4, l10n.sidebarHistory, Icons.history, Icons.history),
-      _NavItem(5, l10n.sidebarDownload, Icons.download_outlined, Icons.download),
-    ]),
-  ];
+        (l10n.sidebarGroupMusic, [
+          _NavItem(0, l10n.sidebarHome, Icons.home_outlined, Icons.home),
+          _NavItem(
+            1,
+            l10n.sidebarLibrary,
+            Icons.library_music_outlined,
+            Icons.library_music,
+          ),
+          _NavItem(
+            7,
+            l10n.sidebarStreaming,
+            Icons.dns_outlined,
+            Icons.dns,
+          ),
+        ]),
+        (l10n.sidebarGroupPersonal, [
+          _NavItem(2, l10n.sidebarLiked, Icons.favorite_outline, Icons.favorite),
+          _NavItem(3, l10n.sidebarFavorites, Icons.star_outline, Icons.star),
+          _NavItem(4, l10n.sidebarHistory, Icons.history, Icons.history),
+          _NavItem(5, l10n.sidebarDownload, Icons.download_outlined, Icons.download),
+        ]),
+      ];
 
   int get _currentIndex => widget.navigationShell.currentIndex;
 
@@ -76,12 +91,43 @@ class _SideBarState extends ConsumerState<SideBar> {
     );
   }
 
+  /// 测量选中项在导航容器中的位置，驱动滑动指示条。
+  ///
+  /// 折叠/展开或切换分支后经 postFrameCallback 调用；位置未变时不做
+  /// setState（避免 rebuild → 再测量 的死循环）。
+  void _updateIndicator() {
+    if (ref.read(appPrefsProvider).sidebarNavStyle != 'animated') return;
+    final hostCtx = _navHostKey.currentContext;
+    final itemCtx = _navKeys[_currentIndex]?.currentContext;
+    if (hostCtx == null || itemCtx == null || !itemCtx.mounted) return;
+    final hostBox = hostCtx.findRenderObject() as RenderBox?;
+    final itemBox = itemCtx.findRenderObject() as RenderBox?;
+    if (hostBox == null || itemBox == null) return;
+    final pos = itemBox.localToGlobal(Offset.zero, ancestor: hostBox);
+    final height = itemBox.size.height;
+    if (!_indicatorReady ||
+        pos.dy != _indicatorTop ||
+        height != _indicatorHeight) {
+      setState(() {
+        _indicatorTop = pos.dy;
+        _indicatorHeight = height;
+        _indicatorReady = true;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l10n = context.l10n;
-    final width = _collapsed ? 64.0 : 240.0;
+    final prefs = ref.watch(appPrefsProvider);
+    final collapsed = prefs.sidebarCollapsed;
+    final navStyle = prefs.sidebarNavStyle;
+    final animated = navStyle == 'animated';
+    final width = collapsed ? 64.0 : 240.0;
+    // 布局完成后测量选中项位置（折叠/展开切换后指示条跟随）
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateIndicator());
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -117,10 +163,10 @@ class _SideBarState extends ConsumerState<SideBar> {
                           // 折叠时文字淡出（保留宽度占位过渡）
                           AnimatedOpacity(
                             duration: const Duration(milliseconds: 200),
-                            opacity: _collapsed ? 0 : 1,
+                            opacity: collapsed ? 0 : 1,
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
-                              width: _collapsed ? 0 : 110,
+                              width: collapsed ? 0 : 110,
                               child: Padding(
                                 padding: const EdgeInsets.only(left: 10),
                                 child: Text(
@@ -146,33 +192,58 @@ class _SideBarState extends ConsumerState<SideBar> {
             ),
           ),
           const Divider(height: 1),
-          // 导航菜单（分组）
+          // 导航菜单（分组）；animated 模式叠一层容器级滑动指示条
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(
-                horizontal: _collapsed ? 10 : 10,
-                vertical: 8,
-              ),
+            child: Stack(
+              key: _navHostKey,
               children: [
-                for (final (groupTitle, items) in _navGroups(l10n)) ...[
-                  if (!_collapsed)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 5),
-                      child: Text(
-                        groupTitle,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                          color: colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.6),
+                ListView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: collapsed ? 10 : 10,
+                    vertical: 8,
+                  ),
+                  children: [
+                    for (final (groupTitle, items) in _navGroups(l10n)) ...[
+                      if (!collapsed)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 5),
+                          child: Text(
+                            groupTitle,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.5,
+                              color: colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox(height: 12),
+                      for (final item in items)
+                        _buildNavItem(theme, item, collapsed, animated),
+                    ],
+                  ],
+                ),
+                // 滑动高亮指示条（SMenu animated：绝对定位左 3px 圆角主色条，
+                // AnimatedPositioned 平滑更新 top/height，对齐 transition-[top,height] duration-250）
+                if (animated && _indicatorReady)
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                    left: 0,
+                    top: _indicatorTop,
+                    height: _indicatorHeight,
+                    width: 3,
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary,
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                    )
-                  else
-                    const SizedBox(height: 12),
-                  for (final item in items) _buildNavItem(theme, item),
-                ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -181,10 +252,12 @@ class _SideBarState extends ConsumerState<SideBar> {
           SizedBox(
             height: 48,
             child: IconButton(
-              tooltip: _collapsed ? l10n.sidebarExpand : l10n.sidebarCollapse,
-              onPressed: () => setState(() => _collapsed = !_collapsed),
+              tooltip: collapsed ? l10n.sidebarExpand : l10n.sidebarCollapse,
+              onPressed: () => ref
+                  .read(appPrefsProvider.notifier)
+                  .setSidebar(collapsed: !collapsed),
               icon: Icon(
-                _collapsed ? Icons.menu_open : Icons.menu_rounded,
+                collapsed ? Icons.menu_open : Icons.menu_rounded,
                 size: 20,
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -195,89 +268,97 @@ class _SideBarState extends ConsumerState<SideBar> {
     );
   }
 
-  Widget _buildNavItem(ThemeData theme, _NavItem item) {
+  Widget _buildNavItem(
+      ThemeData theme, _NavItem item, bool collapsed, bool animated) {
     final colorScheme = theme.colorScheme;
     final selected = _currentIndex == item.index;
     final foreground = selected ? colorScheme.primary : colorScheme.onSurface;
+    // 位置锚点：animated 模式下滑动指示条据此定位
+    final anchor = _navKeys[item.index] ??= GlobalKey();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1.5),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        decoration: BoxDecoration(
-          color: selected
-              ? colorScheme.primary.withValues(alpha: 0.10)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
+    return KeyedSubtree(
+      key: anchor,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1.5),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            color: selected
+                ? colorScheme.primary.withValues(alpha: 0.10)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
-            hoverColor: selected
-                ? Colors.transparent
-                : colorScheme.onSurface.withValues(alpha: 0.05),
-            onTap: () => _goBranch(item.index),
-            child: SizedBox(
-              height: 40,
-              // 内容行需垂直居中：Stack 默认 topStart 对齐会把 20px 高的
-              // 内容行顶到 40px 容器顶部（指示条用 Positioned 不受影响）
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // 左侧选中指示条（对齐 SMenu default 模式）
-                  Positioned(
-                    left: 0,
-                    top: 10,
-                    bottom: 10,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOut,
-                      width: 3,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? colorScheme.primary
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(2),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              hoverColor: selected
+                  ? Colors.transparent
+                  : colorScheme.onSurface.withValues(alpha: 0.05),
+              onTap: () => _goBranch(item.index),
+              child: SizedBox(
+                height: 40,
+                // 内容行需垂直居中：Stack 默认 topStart 对齐会把 20px 高的
+                // 内容行顶到 40px 容器顶部（指示条用 Positioned 不受影响）
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // 左侧选中指示条（对齐 SMenu default 模式；
+                    // animated 模式交给容器级滑动条，此处隐藏）
+                    Positioned(
+                      left: 0,
+                      top: 10,
+                      bottom: 10,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOut,
+                        width: 3,
+                        decoration: BoxDecoration(
+                          color: !animated && selected
+                              ? colorScheme.primary
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  ),
-                  // 内容行
-                  Row(
-                    mainAxisAlignment: _collapsed
-                        ? MainAxisAlignment.center
-                        : MainAxisAlignment.start,
-                    children: [
-                      if (!_collapsed) const SizedBox(width: 12),
-                      Icon(
-                        selected ? item.selectedIcon : item.icon,
-                        size: 19,
-                        color: foreground,
-                      ),
-                      // 折叠时文字淡出（对齐 SMenu opacity 过渡）
-                      Expanded(
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 200),
-                          opacity: _collapsed ? 0 : 1,
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 12),
-                            child: Text(
-                              item.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: foreground,
-                                fontWeight:
-                                    selected ? FontWeight.w600 : FontWeight.w400,
+                    // 内容行
+                    Row(
+                      mainAxisAlignment: collapsed
+                          ? MainAxisAlignment.center
+                          : MainAxisAlignment.start,
+                      children: [
+                        if (!collapsed) const SizedBox(width: 12),
+                        Icon(
+                          selected ? item.selectedIcon : item.icon,
+                          size: 19,
+                          color: foreground,
+                        ),
+                        // 折叠时文字淡出（对齐 SMenu opacity 过渡）
+                        Expanded(
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 200),
+                            opacity: collapsed ? 0 : 1,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 12),
+                              child: Text(
+                                item.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: foreground,
+                                  fontWeight: selected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

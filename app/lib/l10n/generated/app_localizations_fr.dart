@@ -1347,6 +1347,19 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get settingsTransitionStyle => 'Transition des médias';
+
+  @override
+  String get settingsTransitionStyleDesc =>
+      'Animation de transition lors du changement de chanson';
+
+  @override
+  String get settingsTransitionStyleScale => 'Échelle';
+
+  @override
+  String get settingsTransitionStyleSlide => 'Glissement';
+
+  @override
   String get settingsSectionShortcuts => 'Raccourcis';
 
   @override
@@ -1794,6 +1807,158 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsSearchAccentSubtitle =>
       'Graine de couleur primaire personnalisée · Palette';
+
+  @override
+  String get settingsThemeSource => 'Source de la couleur du thème';
+
+  @override
+  String get settingsThemeSourceDesc => 'D\'où vient la couleur primaire';
+
+  @override
+  String get settingsThemeSourceDefault => 'Suivre le système';
+
+  @override
+  String get settingsThemeSourceCustom => 'Personnalisée';
+
+  @override
+  String get settingsThemeSourceCover => 'Suivre la pochette';
+
+  @override
+  String get settingsThemeSourceSolid => 'Aucune';
+
+  @override
+  String get settingsThemeSourceCustomHint =>
+      'Choisissez une couleur de base ; le primaire/secondaire est généré à partir d\'elle';
+
+  @override
+  String get settingsThemeSourceCoverHint =>
+      'Extrait la couleur dominante de la pochette actuelle en temps réel (repli sur la couleur par défaut si indisponible)';
+
+  @override
+  String get settingsGlobalTint => 'Teinte globale';
+
+  @override
+  String get settingsGlobalTintDesc =>
+      'Applique subtilement la couleur du thème à toute l\'interface';
+
+  @override
+  String get settingsGlobalTintNote =>
+      'Effectif lorsqu\'une couleur de thème existe (personnalisée / pochette) ; forcé en mode image de fond.';
+
+  @override
+  String get settingsSectionStyle => 'Style de fond';
+
+  @override
+  String get settingsAppearanceStyle => 'Style d\'apparence';
+
+  @override
+  String get settingsAppearanceStyleDesc =>
+      'Comment le fond principal est rendu';
+
+  @override
+  String get settingsAppearanceStyleSolid => 'Couleur unie';
+
+  @override
+  String get settingsAppearanceStyleImage => 'Image';
+
+  @override
+  String get settingsBackgroundImage => 'Image de fond';
+
+  @override
+  String get settingsBackgroundImageDesc =>
+      'Choisissez une image locale comme fond ; le mode image force le thème sombre et la teinte globale';
+
+  @override
+  String get settingsBackgroundPick => 'Choisir une image';
+
+  @override
+  String get settingsBackgroundReplace => 'Remplacer';
+
+  @override
+  String get settingsBackgroundClear => 'Effacer';
+
+  @override
+  String get settingsBackgroundBlur => 'Flou de fond';
+
+  @override
+  String settingsBackgroundBlurDesc(Object blur) {
+    return 'Flou gaussien appliqué à l\'image de fond (${blur}px)';
+  }
+
+  @override
+  String get settingsBackgroundDim => 'Intensité du voile';
+
+  @override
+  String settingsBackgroundDimDesc(Object dim) {
+    return 'Opacité du voile noir ($dim%) ; plus élevée = premier plan plus lisible';
+  }
+
+  @override
+  String get settingsBackgroundScale => 'Zoom';
+
+  @override
+  String settingsBackgroundScaleDesc(Object scale) {
+    return 'Facteur de zoom de l\'image de fond (${scale}x)';
+  }
+
+  @override
+  String get settingsSidebarCollapsed => 'Barre latérale réduite';
+
+  @override
+  String get settingsSidebarCollapsedDesc =>
+      'Réduire la barre latérale au mode icônes uniquement';
+
+  @override
+  String get settingsSidebarNavStyle => 'Animation du surlignage de navigation';
+
+  @override
+  String get settingsSidebarNavStyleDesc =>
+      'Style d\'animation de l\'indicateur de navigation actif';
+
+  @override
+  String get settingsSidebarNavStyleDefault => 'Statique';
+
+  @override
+  String get settingsSidebarNavStyleAnimated => 'Animé';
+
+  @override
+  String get settingsRouteTransition => 'Transition de page';
+
+  @override
+  String get settingsRouteTransitionDesc =>
+      'Animation de transition lors du changement de page';
+
+  @override
+  String get settingsRouteTransitionNone => 'Aucune';
+
+  @override
+  String get settingsRouteTransitionFade => 'Fondu';
+
+  @override
+  String get settingsRouteTransitionSlide => 'Glissement';
+
+  @override
+  String get settingsRouteTransitionZoom => 'Zoom';
+
+  @override
+  String get settingsSearchThemeSourceSubtitle =>
+      'Thème par défaut · Personnalisée · Suivre la pochette · Aucun';
+
+  @override
+  String get settingsSearchGlobalTintSubtitle =>
+      'Teinte toute l\'interface avec la couleur du thème';
+
+  @override
+  String get settingsSearchBackgroundSubtitle =>
+      'Unie / Image · Flou · Voile · Zoom';
+
+  @override
+  String get settingsSearchSidebarSubtitle =>
+      'Réduire la barre · Surlignage statique / animé';
+
+  @override
+  String get settingsSearchRouteTransitionSubtitle =>
+      'Aucune · Fondu · Glissement · Zoom';
 
   @override
   String get settingsSearchFloatingBarSubtitle =>

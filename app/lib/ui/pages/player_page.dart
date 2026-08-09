@@ -35,6 +35,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   /// 拖动中的进度（ms）；null = 跟随播放器实时位置。
   double? _dragMs;
 
+  /// 切歌方向（slide 样式用）：播放顺序递增 = 下一首（新封面从右进），
+  /// 递减 = 上一首（从左进）。对齐原版 watch(playIndex) 判定。
+  bool _slideNext = true;
+
   /// 底部播放控件（进度条+控制区）是否可见。事件驱动：鼠标移动/点击/
   /// 滚轮任意操作都会重置 5 秒倒计时（监听 PointerHover 事件，非轮询），
   /// 倒计时结束后淡出控件。
@@ -98,6 +102,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     final hasSource = ref.watch(
       playbackProvider.select((s) => s.source != null),
     );
+    final source = ref.watch(playbackProvider.select((s) => s.source));
     final current = ref.watch(playbackProvider.select((s) => s.track));
     final title = ref.watch(playbackProvider.select((s) => s.title));
     final subtitle = ref.watch(playbackProvider.select((s) => s.subtitle));
@@ -110,6 +115,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     // 有内容 = 引擎源（在播/加载）或有恢复的现场（会话记忆恢复的暂停队列，
     // source 为 null 但队列/位置就绪）：播放/切歌/模式切换应可用。
     final hasContent = hasSource || hasQueue;
+    // 切歌方向（slide 样式用）：队列索引递增 = 下一首，递减 = 上一首。
+    // 在切歌（封面 key 变化）之前先于队列索引变化触发，方向先就位。
+    ref.listen(playbackProvider.select((s) => s.queueIndex), (prev, next) {
+      if (prev != null && prev != next) {
+        _slideNext = next > prev;
+      }
+    });
     final canLike =
         current != null &&
         (current.source == 'netease' || current.source == 'kugou');
@@ -118,7 +130,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         : false;
 
     // 播放器内歌词显示偏好（顶栏歌词开关 + 设置页「播放器内歌词」共用）。
-    final showLyrics = ref.watch(appPrefsProvider).showLyricsInPlayer;
+    final prefs = ref.watch(appPrefsProvider);
+    final showLyrics = prefs.showLyricsInPlayer;
+    final transitionStyle = prefs.transitionStyle;
     final hasLyrics = ref
         .watch(currentLyricsProvider)
         .maybeWhen(data: (l) => l.isNotEmpty, orElse: () => false);
@@ -237,6 +251,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
                                 0.85,
                                 1.6,
                               );
+
+                          // 封面切换动效身份（对齐原版 :key="track.id"）：
+                          // 在线曲目用 平台/曲目 id（与标题同帧更新）；
+                          // 本地文件无 track，用 source（文件路径）作 key。
+                          final coverKey = current != null
+                              ? '${current.source}/${current.id}'
+                              : 'local:$source';
 
                           // 封面块：封面大图 + 下方曲目信息（对齐 PlayerData）
                           final coverBlock = Column(
@@ -370,7 +391,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
                                     curve: Curves.easeOutCubic,
                                     child: Align(
                                       alignment: Alignment.center,
-                                      child: RepaintBoundary(child: coverBlock),
+                                      child: RepaintBoundary(
+                                        child: _CoverSwitcher(
+                                          coverKey: coverKey,
+                                          slide: transitionStyle == 'slide',
+                                          next: _slideNext,
+                                          child: coverBlock,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -673,6 +701,144 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 封面切换动效（对齐原项目 FullPlayer/index.vue 的封面 Transition）：
+///
+/// 切歌（封面 [coverKey] 变化）时旧封面先离场、新封面再入场（Vue
+/// `mode="out-in"`，两段动画不重叠）。样式跟随偏好：
+/// - scale（默认）：±10px 微位移 + 淡入淡出（对齐 scale-switch）；
+/// - slide：全幅滑动（对齐 slide-edge），方向跟随播放顺序：下一首
+///   新封面从右进、旧封面向左出；上一首相反。
+///
+/// 时长/曲线对齐原版：scale 离场 0.2s ease / 入场 0.35s easeOutExpo；
+/// slide 离场 0.35s ease / 入场 0.4s easeOutExpo
+/// （`cubic-bezier(0.16,1,0.3,1)` 即 Flutter [Curves.easeOutExpo]）。
+class _CoverSwitcher extends StatefulWidget {
+  const _CoverSwitcher({
+    required this.coverKey,
+    required this.slide,
+    required this.next,
+    required this.child,
+  });
+
+  /// 封面身份（切歌即变化，触发 out-in 动效）。
+  final Object coverKey;
+
+  /// 滑动样式开关（false = 默认缩放样式）。
+  final bool slide;
+
+  /// 切歌方向（true = 下一首，新封面从右进）。
+  final bool next;
+
+  final Widget child;
+
+  @override
+  State<_CoverSwitcher> createState() => _CoverSwitcherState();
+}
+
+class _CoverSwitcherState extends State<_CoverSwitcher>
+    with SingleTickerProviderStateMixin {
+  // scale-switch：离场 0.2s ease / 入场 0.35s easeOutExpo（±10px）
+  static const _scaleLeaveMs = 200;
+  static const _scaleEnterMs = 350;
+  // slide-edge：离场 0.35s ease / 入场 0.4s easeOutExpo（±100%）
+  static const _slideLeaveMs = 350;
+  static const _slideEnterMs = 400;
+
+  late final AnimationController _ctrl;
+
+  /// 当前展示的封面块（离场阶段 = 旧封面；入场/静止 = 新封面）。
+  Widget _shown = const SizedBox.shrink();
+
+  /// 是否处于「旧封面离场」阶段（false 且动画中 = 新封面入场）。
+  bool _leaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _shown = widget.child;
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _scaleEnterMs),
+    )..addStatusListener(_onStatus);
+  }
+
+  @override
+  void didUpdateWidget(covariant _CoverSwitcher old) {
+    super.didUpdateWidget(old);
+    // 封面身份变化 → 触发旧封面离场（完成后换新封面入场）
+    if (widget.coverKey != old.coverKey) {
+      _leaving = true;
+      _ctrl.duration = Duration(
+        milliseconds: widget.slide ? _slideLeaveMs : _scaleLeaveMs,
+      );
+      _ctrl.forward(from: 0);
+    }
+  }
+
+  void _onStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    if (!_leaving) return; // 入场完成 → 静止展示新封面
+    // 离场完成 → 换上最新封面入场
+    _leaving = false;
+    setState(() => _shown = widget.child);
+    _ctrl.duration = Duration(
+      milliseconds: widget.slide ? _slideEnterMs : _scaleEnterMs,
+    );
+    _ctrl.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final t = _ctrl.value;
+        // 位移曲线：离场 ease；入场 easeOutExpo（对齐原版 cubic-bezier）。
+        final posT = _leaving
+            ? Curves.ease.transform(t)
+            : Curves.easeOutExpo.transform(t);
+        final opT = Curves.ease.transform(t);
+        return LayoutBuilder(
+          builder: (context, c) {
+            // 位移像素：scale 固定 10px；slide 为块宽度的 100%
+            final width = c.maxWidth;
+            final double dx;
+            final double opacity;
+            if (_leaving) {
+              // 旧封面滑出（下一首 → 左出；上一首 → 右出）
+              final dir = widget.next ? -1.0 : 1.0;
+              dx = widget.slide ? dir * width * posT : -10.0 * posT;
+              opacity = 1 - opT;
+            } else if (_ctrl.isAnimating) {
+              // 新封面滑入（下一首 → 右进；上一首 → 左进）
+              final dir = widget.next ? 1.0 : -1.0;
+              dx = widget.slide ? dir * width * (1 - posT) : 10.0 * (1 - posT);
+              opacity = opT;
+            } else {
+              // 静止：完整展示当前封面
+              dx = 0;
+              opacity = 1;
+            }
+            return Opacity(
+              opacity: opacity.clamp(0.0, 1.0),
+              child: Transform.translate(
+                offset: Offset(dx, 0),
+                child: _shown,
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

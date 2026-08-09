@@ -1301,6 +1301,18 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get settingsTransitionStyle => '미디어 정보 전환';
+
+  @override
+  String get settingsTransitionStyleDesc => '곡 전환 시 앨범 커버와 곡 정보의 전환 애니메이션';
+
+  @override
+  String get settingsTransitionStyleScale => '스케일';
+
+  @override
+  String get settingsTransitionStyleSlide => '슬라이드';
+
+  @override
   String get settingsSectionShortcuts => '단축키';
 
   @override
@@ -1715,6 +1727,147 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSearchAccentSubtitle => '사용자 정의 기본 색상 시드 · 팔레트';
+
+  @override
+  String get settingsThemeSource => '테마 색상 소스';
+
+  @override
+  String get settingsThemeSourceDesc => '기본 색상을 가져오는 방식';
+
+  @override
+  String get settingsThemeSourceDefault => '시스템 따르기';
+
+  @override
+  String get settingsThemeSourceCustom => '사용자 정의';
+
+  @override
+  String get settingsThemeSourceCover => '커버 연동';
+
+  @override
+  String get settingsThemeSourceSolid => '없음';
+
+  @override
+  String get settingsThemeSourceCustomHint => '시드 색상을 고르면 기본/보조 색상이 동적으로 생성됩니다';
+
+  @override
+  String get settingsThemeSourceCoverHint =>
+      '현재 재생 중인 커버에서 대표 색상을 실시간 추출 (불가 시 기본 색상으로 대체)';
+
+  @override
+  String get settingsGlobalTint => '글로벌 틴트';
+
+  @override
+  String get settingsGlobalTintDesc => '테마 색상을 인터페이스 전체에 은은하게 적용';
+
+  @override
+  String get settingsGlobalTintNote =>
+      '테마 색상(사용자 정의/커버 연동)이 있을 때 적용됩니다. 이미지 배경 모드에서는 강제로 켜집니다.';
+
+  @override
+  String get settingsSectionStyle => '배경 스타일';
+
+  @override
+  String get settingsAppearanceStyle => '외관 스타일';
+
+  @override
+  String get settingsAppearanceStyleDesc => '메인 배경의 표시 방식';
+
+  @override
+  String get settingsAppearanceStyleSolid => '단색 배경';
+
+  @override
+  String get settingsAppearanceStyleImage => '이미지';
+
+  @override
+  String get settingsBackgroundImage => '배경 이미지';
+
+  @override
+  String get settingsBackgroundImageDesc =>
+      '로컬 이미지를 앱 배경으로 선택 (이미지 모드는 다크 + 글로벌 틴트 강제)';
+
+  @override
+  String get settingsBackgroundPick => '이미지 선택';
+
+  @override
+  String get settingsBackgroundReplace => '변경';
+
+  @override
+  String get settingsBackgroundClear => '지우기';
+
+  @override
+  String get settingsBackgroundBlur => '배경 흐림';
+
+  @override
+  String settingsBackgroundBlurDesc(Object blur) {
+    return '배경 이미지에 가우시안 블러 적용 (${blur}px)';
+  }
+
+  @override
+  String get settingsBackgroundDim => '마스크 강도';
+
+  @override
+  String settingsBackgroundDimDesc(Object dim) {
+    return '검은 오버레이 불투명도 ($dim%) — 높을수록 전경이 잘 보임';
+  }
+
+  @override
+  String get settingsBackgroundScale => '확대 배율';
+
+  @override
+  String settingsBackgroundScaleDesc(Object scale) {
+    return '배경 이미지의 확대 배율 (${scale}x)';
+  }
+
+  @override
+  String get settingsSidebarCollapsed => '사이드바 접기';
+
+  @override
+  String get settingsSidebarCollapsedDesc => '사이드바를 아이콘만 표시하는 모드로 접기';
+
+  @override
+  String get settingsSidebarNavStyle => '내비게이션 하이라이트 애니메이션';
+
+  @override
+  String get settingsSidebarNavStyleDesc => '활성 내비게이션 하이라이트 표시기의 애니메이션 스타일';
+
+  @override
+  String get settingsSidebarNavStyleDefault => '정적';
+
+  @override
+  String get settingsSidebarNavStyleAnimated => '슬라이드';
+
+  @override
+  String get settingsRouteTransition => '페이지 전환 애니메이션';
+
+  @override
+  String get settingsRouteTransitionDesc => '페이지 전환 시의 전환 애니메이션 효과';
+
+  @override
+  String get settingsRouteTransitionNone => '없음';
+
+  @override
+  String get settingsRouteTransitionFade => '페이드';
+
+  @override
+  String get settingsRouteTransitionSlide => '슬라이드';
+
+  @override
+  String get settingsRouteTransitionZoom => '확대';
+
+  @override
+  String get settingsSearchThemeSourceSubtitle => '기본 테마 · 사용자 정의 · 커버 연동 · 없음';
+
+  @override
+  String get settingsSearchGlobalTintSubtitle => '테마 색상을 인터페이스 전체에 적용';
+
+  @override
+  String get settingsSearchBackgroundSubtitle => '단색 / 이미지 · 블러 · 마스크 · 배율';
+
+  @override
+  String get settingsSearchSidebarSubtitle => '사이드바 접기 · 정적 / 슬라이드 하이라이트';
+
+  @override
+  String get settingsSearchRouteTransitionSubtitle => '없음 · 페이드 · 슬라이드 · 확대';
 
   @override
   String get settingsSearchFloatingBarSubtitle => '하단 플로팅 캡슐 · 전체 너비 도킹';

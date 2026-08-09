@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart' show Color;
+import 'dart:ui' show Color;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 
@@ -6,7 +7,6 @@ import '../history/history_store.dart';
 import '../kugou/direct/kugou_api.dart';
 import '../netease/apis_netease_caller.dart';
 import '../netease/netease_api.dart';
-import 'app_prefs.dart';
 import 'event_bus.dart';
 import 'like_controller.dart';
 import 'system_accent.dart';
@@ -79,13 +79,11 @@ final historyStoreProvider = Provider<HistoryStore>((ref) {
 final likeControllerProvider =
     ChangeNotifierProvider<LikeController>((ref) => LikeController(ref));
 
-// ── 系统主题色 ──────────────────────────────────────────────────
-
-/// 系统主题色（「跟随系统主题色」开启时作为主色种子）。
+/// 系统主题色（主题色来源 = default「跟随系统」时作为主色种子）。
 ///
-/// 未开启 / 非 Linux / 读取失败时为 null。结果按 prefs 缓存：
-/// 切换开关会使其重新计算（Riverpod 依赖感知）。
-final systemAccentProvider = FutureProvider<Color?>((ref) async {
-  if (!ref.watch(appPrefsProvider).accentSystem) return null;
+/// 实时读取系统（GNOME accent-color）；非 Linux / 无法读取返回 null，
+/// 调用方回退设计体系默认亮蓝（对齐原版 themeSource=default 的
+/// DEFAULT_PRIMARY 语义）。
+final systemAccentProvider = FutureProvider<Color?>((ref) {
   return SystemAccent.read();
 });
