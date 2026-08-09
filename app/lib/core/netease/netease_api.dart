@@ -399,8 +399,9 @@ class NeteaseApi {
 
   /// 用户红心歌曲 id 列表（likelist，需登录）。
   ///
-  /// **返回 List 保留接口顺序**：likelist 的 ids 本身即按收藏时间倒序
-  /// （最新收藏在前）。切勿转 Set——HashSet 无序会打乱「我喜欢」排序。
+  /// **仅用于红心状态判定（Set 集合），不做展示排序**：likelist 的 ids
+  /// 顺序并不保证按收藏时间排列。「我喜欢」列表的展示顺序请用 [likedSongs]
+  /// （走「我喜欢的音乐」歌单，trackIds 顺序即收藏先后）。
   Future<List<String>> likedIds(String uid) async {
     final body = await _call('likelist', {'uid': uid});
     final idsRaw = body?['ids'];
@@ -412,12 +413,17 @@ class NeteaseApi {
         .toList();
   }
 
-  /// 用户喜欢的歌曲（likelist + song_detail 批量补全，需登录）。
+  /// 用户喜欢的歌曲（「我喜欢的音乐」歌单全量，需登录）。
   ///
-  /// 顺序 = likelist 接口顺序（收藏时间倒序，最新在前）。
+  /// 对齐 SPlayer-Next `user.ts` ensureLikedPlaylist：不直接用 likelist
+  /// （ids 顺序不保证按收藏时间），而是拉取用户第一个自建歌单「我喜欢的
+  /// 音乐」——歌单 trackIds 顺序即收藏先后（最新在前），经 [playlistDetail]
+  /// 保序补全曲目详情。
   Future<List<Track>> likedSongs(String uid) async {
-    final ids = await likedIds(uid);
-    return _songsByIds(ids);
+    final playlists = await userPlaylists(uid, limit: 1);
+    if (playlists.isEmpty) return const [];
+    final detail = await playlistDetail(playlists.first.id);
+    return detail.tracks;
   }
 
   /// 红心 / 取消红心（对齐 SPlayer-Next like.ts：`trackId/like/time:3`）。
@@ -546,8 +552,8 @@ class NeteaseApi {
   /// 批量取歌曲详情（song_detail，≤1000 ids/次），**保持输入 id 顺序**返回。
   ///
   /// song_detail 接口返回顺序与请求顺序无关，这里建 id→Track 映射后按
-  /// [ids] 逐个取出（无详情/下架的 id 跳过）。歌单与「我喜欢」都依赖此
-  /// 保序语义（歌单 trackIds / likelist ids 本身就是有序的）。
+  /// [ids] 逐个取出（无详情/下架的 id 跳过）。歌单依赖此保序语义
+  /// （歌单 trackIds 顺序即收藏/收录先后）；likelist 不做展示排序。
   Future<List<Track>> _songsByIds(List<String> ids) async {
     if (ids.isEmpty) return const [];
     final byId = <String, Track>{};
