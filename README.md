@@ -14,6 +14,8 @@
 6. [文档](#文档)
 7. [许可证（Licensing）](#许可证licensing)
 8. [第三方声明](#第三方声明)
+9. [特别鸣谢（Acknowledgements）](#特别鸣谢acknowledgements)
+10. [联系与贡献](#联系与贡献)
 
 ---
 
@@ -22,7 +24,7 @@
 ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面为主（Linux / Windows / macOS）」，UI 层采用 Flutter 开发。
 
 - 连接**网易云音乐 / 酷狗音乐 / QQ 音乐**等在线服务（纯 Dart 直连，无需代理侧车）
-- 支持本地音乐库扫描、元数据刮削、离线下载
+- 支持本地音乐库扫描与元数据刮削
 - 内置统一 C 音频引擎：EQ / 响度归一化 / 限幅器 / FFT 频谱 / 变速变调 / Opus 转码管线
 - 桌面端 **零 TCP 端口暴露**：控制面走 stdio JSON-RPC、媒体面走 UNIX 域套接字（UDS）→ 本地文件落盘
 - 可选内置 **Subsonic 兼容服务端**（Go），支持手机端 App / Web 端远程消费本机媒体库
@@ -40,7 +42,7 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面�
 | 音乐库扫描 | ✅ 可用 | C# NativeAOT `splayer-scanner`（TagLibSharp） |
 | 元数据刮削 | ✅ 可用 | C++ `splayer-scraper`（多源并发 + 评分合并） |
 | Subsonic 服务 | ✅ 可用 | Go 实现；桌面端 FFI 自举消费 |
-| 国际化 | ✅ 进行中 | 8 语言，gen_l10n ARB 管道 |
+| 国际化 | ✅ 可用 | 9 语言，gen_l10n ARB 管道 |
 | 桌面集成 | Phase 3+ | 托盘、媒体键、桌面歌词窗口 |
 
 ---
@@ -83,28 +85,29 @@ ArchoeraMusic/
 ├── README.md                   # 本文件
 ├── .gitignore
 ├── app/                        # Flutter 应用
-│   ├── pubspec.yaml            # 版本 0.8.3-pre.2+rev.3
+│   ├── pubspec.yaml            # 版本 0.8.5-pre.2+rev.1
 │   ├── l10n.yaml               # 国际化配置
 │   ├── analysis_options.yaml
 │   ├── assets/                 # 字体（NotoSC / MiSans / HarmonyOS SC）、图标
 │   ├── lib/
 │   │   ├── main.dart
-│   │   ├── core/
-│   │   │   ├── apis/           # 纯 Dart 平台 API：netease / kugou / qqmusic / lyric
-│   │   │   ├── playback/       # 播放层：audio_engine_process / pcm_analyzer / fft_bindings / media_renderer
-│   │   │   └── scanner/        # FFI 回调绑定（splayer-scanner）
-│   │   ├── services/           # PlaybackController / 会话 / 存储
-│   │   └── ui/                 # pages / widgets / theme / l10n
+│   │   ├── apis/               # 纯 Dart 平台 API：netease / kugou / qqmusic / lyric
+│   │   ├── app/                # 应用壳：bootstrap / router / shell / theme_provider
+│   │   ├── pages/              # 页面：home / library / liked / streaming / player 等
+│   │   ├── services/           # 业务层：playback / scanner / scraper / streaming / subsonic
+│   │   ├── stores/             # Riverpod 状态：app_prefs / playback_session / event_bus
+│   │   ├── settings/           # 设置弹窗与媒体源管理
+│   │   ├── theme/              # 主题与封面取色
+│   │   ├── widgets/            # 组件：common / layout / player / list / dialogs
+│   │   └── l10n/               # 国际化（ARB 源 + 生成）
 │   ├── linux/ windows/ macos/  # 平台壳
 │   └── core/                   # 多语言原生模块（源码）
 │       ├── audio-engine/       # C + Rust tempo-rs（FFmpeg / Opus / EQ / FFT / Tempo）
 │       ├── scanner/            # C# NativeAOT（TagLibSharp + SqliteDirectWriter）
 │       ├── scraper/            # C++（多源刮削 + TagLib 写入）
-│       ├── downloader/         # Rust cdylib（FFI 回调，无轮询）
 │       └── subsonic/           # Go Subsonic 服务（桌面 FFI / 独立服务共享）
 └── docs/
-    ├── architecture.md         # 完整架构规划（v3，详细设计）
-    └── download-module.md      # 下载引擎设计（FFI 回调，v2）
+    └── architecture.md         # 完整架构规划（v3，详细设计）
 ```
 
 ---
@@ -119,7 +122,7 @@ ArchoeraMusic/
 - Flutter SDK `^3.12.2`（`cat app/pubspec.yaml | grep sdk`）
 - CMake / C 工具链（构建 audio-engine）
 - .NET SDK（构建 scanner）
-- Rust 工具链（构建 downloader / tempo-rs / transcoder）
+- Rust 工具链（构建 tempo-rs / transcoder）
 - Go 工具链（构建 subsonic）
 
 ### 快速开始
@@ -133,7 +136,6 @@ cd ArchoeraMusic
 #   audio-engine:    app/core/audio-engine/build/ → libarchoera_mediaengine.so / libfft.so / splayer-audio-engine
 #   scanner:         app/core/scanner/build.sh    → scanner-ffi.so
 #   scraper:         app/core/scraper CMake       → libarchoera_scraper.so
-#   downloader:      app/core/downloader          → libarchoera_downloader.so
 #   subsonic(桌面):  app/core/subsonic + CGO_ENABLED=1 go build -buildmode=c-shared → libarchoera_subsonic.so
 
 # 3. 启动 Flutter
@@ -147,7 +149,6 @@ flutter run -d linux      # 或 windows / macos
 ## 文档
 
 - [架构规划（完整 v3）](docs/architecture.md) —— 进程模型 / 音频管线 / FFI 桥接 / 实施路线
-- [下载引擎设计（FFI 回调版 v2）](docs/download-module.md) —— 无轮询戒律 / Rust 下沉 / 签名自研
 
 ---
 
@@ -172,7 +173,6 @@ flutter run -d linux      # 或 windows / macos
 | C 音频引擎 | `app/core/audio-engine/THIRD-PARTY-LICENSES.md` | miniaudio / FFmpeg 等 |
 | 扫描器（C#） | `app/core/scanner/THIRD-PARTY-LICENSES.md` | TagLibSharp / SQLitePCLRaw |
 | 刮削器（C++） | `app/core/scraper/THIRD-PARTY-LICENSES.md` | TagLib / nlohmann-json |
-| 下载引擎（Rust） | `app/core/downloader/THIRD-PARTY-LICENSES.md` | 自研签名优先，可选第三方 SDK 备胎 |
 | Subsonic（Go + Rust） | `app/core/subsonic/THIRD-PARTY-LICENSES.md` | 转码器 / Go 依赖 |
 
 所有第三方依赖均为 **Permissive License（MIT / Apache-2.0 / WTFPL / BSD-3 / ISC / OFL）**，与 AGPL-3.0 完全兼容。
@@ -258,4 +258,4 @@ flutter run -d linux      # 或 windows / macos
 
 - 仓库：<https://github.com/BetaStudio2/ArchoeraMusic>
 
-贡献前请阅读 [docs/architecture.md](docs/architecture.md) 中的实施路线与技术戒律（特别是下载模块的「永久禁止轮询」条款）。PR 合入前需要通过签名或显式确认接受上文「贡献者授权」条款。
+贡献前请阅读 [docs/architecture.md](docs/architecture.md) 中的实施路线与技术戒律。PR 合入前需要通过签名或显式确认接受上文「贡献者授权」条款。
