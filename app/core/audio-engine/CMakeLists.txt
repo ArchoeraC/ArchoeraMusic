@@ -187,7 +187,9 @@ target_compile_options(archoera_mediaengine PRIVATE ${FFMPEG_CFLAGS_OTHER})
 if(TEMPO_AVAILABLE)
     add_dependencies(archoera_mediaengine tempo_lib)
     if(MSVC)
-        target_link_libraries(archoera_mediaengine PRIVATE ${TEMPO_LIB})
+        # Rust std 的 Windows 写入路径引用 NtWriteFile/RtlNtStatusToDosError
+        # （ntdll.dll），staticlib 不传递链接要求，需在此显式补 ntdll.lib
+        target_link_libraries(archoera_mediaengine PRIVATE ${TEMPO_LIB} ntdll)
     elseif(APPLE)
         target_link_libraries(archoera_mediaengine PRIVATE ${TEMPO_LIB} c++)
     else()
