@@ -47,3 +47,5 @@ packaging/linux/work/
 # 系统
 .DS_Store
 *.log
+
+*.key
