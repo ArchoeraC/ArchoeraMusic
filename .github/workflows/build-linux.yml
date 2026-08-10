@@ -114,6 +114,8 @@ jobs:
             archlinux:latest bash -c '
               pacman -Sy --noconfirm --needed base-devel >/dev/null 2>&1 || exit 1
               chown -R nobody:nobody .
+              # 新版 archlinux 镜像给 nobody 设了账户过期，su 会报 "account has expired"，先清除
+              chage -E -1 nobody
               su nobody -s /bin/bash -c "HOME=/tmp makepkg -f --skipinteg --nocheck" || exit 1
             '
           cp packaging/linux/work/arch/*.pkg.tar.zst dist/linux/
