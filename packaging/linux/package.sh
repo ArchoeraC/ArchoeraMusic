@@ -178,7 +178,7 @@ pkg_arch() {
   cp "$stage_icons/hicolor/512x512/apps/$APP_ID.png" \
     "$arch_dir/$APP_ID.png"
   # 运行 makepkg 的容器命令（由 workflow 执行）：
-  echo "→ $arch_dir （docker: archlinux 容器内运行 makepkg -f --skipinteg --nocheck）"
+  echo "→ $arch_dir （docker: archlinux 容器内运行 makepkg -f --skipinteg --nocheck --nodeps）"
 }
 
 case "$fmt" in

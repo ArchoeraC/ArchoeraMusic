@@ -116,7 +116,9 @@ jobs:
               chown -R nobody:nobody .
               # 新版 archlinux 镜像给 nobody 设了账户过期，su 会报 "account has expired"，先清除
               chage -E -1 nobody
-              su nobody -s /bin/bash -c "HOME=/tmp makepkg -f --skipinteg --nocheck" || exit 1
+              # 预构建产物打包：--nodeps 跳过运行时依赖检查（depends 仍写入
+              # .PKGINFO 供安装端使用），避免容器内安装整套依赖拖慢 CI
+              su nobody -s /bin/bash -c "HOME=/tmp makepkg -f --skipinteg --nocheck --nodeps" || exit 1
             '
           cp packaging/linux/work/arch/*.pkg.tar.zst dist/linux/
           echo "→ dist/linux/$(ls dist/linux/ | grep '\.pkg\.tar\.zst$')"
