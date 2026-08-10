@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:archoera_music/core/downloader/downloader_ffi.dart';
+import 'package:archoera_music/services/downloader/downloader_ffi.dart';
 
 /// downloader cdylib 的 FFI 冒烟测试：验证 .so 可加载、全部导出符号签名匹配、
 /// init → enqueue → cancel → destroy 全生命周期可用。

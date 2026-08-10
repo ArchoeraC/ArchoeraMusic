@@ -39,7 +39,6 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面�
 | 播放控制 | ✅ 可用 | 10 段 EQ、响度归一化、限幅器、变速变调 |
 | 音乐库扫描 | ✅ 可用 | C# NativeAOT `splayer-scanner`（TagLibSharp） |
 | 元数据刮削 | ✅ 可用 | C++ `splayer-scraper`（多源并发 + 评分合并） |
-| 下载引擎 | ✅ 可用 | Rust cdylib + FFI 回调架构|
 | Subsonic 服务 | ✅ 可用 | Go 实现；桌面端 FFI 自举消费 |
 | 国际化 | ✅ 进行中 | 8 语言，gen_l10n ARB 管道 |
 | 桌面集成 | Phase 3+ | 托盘、媒体键、桌面歌词窗口 |
@@ -62,7 +61,6 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面�
 │  ├─ C   `splayer-audio-engine`  解码→DSP→Opus 编码（主引擎）   │
 │  ├─ C#  `splayer-scanner`       音乐库扫描 TagLibSharp         │
 │  ├─ C++ `splayer-scraper`       元数据刮削 + TagLib 写入       │
-│  ├─ Rust `archoera-downloader`  下载引擎（FFI 回调）           │
 │  ├─ Rust tempo-rs               变速变调（静态链接进 C 引擎）   │
 │  └─ Go  `archoera-subsonic`     Subsonic 服务端（可选启用）     │
 └───────────────────────────────────────────────────────────────┘

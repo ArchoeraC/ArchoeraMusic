@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/state/app_prefs.dart';
+import '../stores/app_prefs.dart';
 import 'generated/app_localizations.dart';
 
 /// 当前生效 Locale：设置的语言优先，否则跟随系统。

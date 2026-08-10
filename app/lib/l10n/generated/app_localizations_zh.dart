@@ -1087,6 +1087,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAboutSubtitle => '版本 · 项目信息';
 
   @override
+  String get settingsCatDeveloper => '开发者';
+
+  @override
+  String get settingsDeveloperSubtitle => '开发者模式 · 隐藏接口';
+
+  @override
+  String get settingsDeveloperTitle => '开发者模式';
+
+  @override
+  String get settingsDeveloperMode => '开发者模式';
+
+  @override
+  String get settingsDeveloperModeOn => '已开启（下载接口可见）';
+
+  @override
+  String get settingsDeveloperModeOff => '已关闭（下载接口隐藏）';
+
+  @override
+  String get settingsDeveloperDownloadModule => '下载模块';
+
+  @override
+  String get settingsDeveloperDownloadModuleDesc =>
+      '侧边栏「下载」入口、曲目右键「下载」与设置「下载」分类仅在开发者模式开启后显示。';
+
+  @override
+  String get settingsDeveloperNote => '开发者模式面向本地调试与自用，开启后请自行承担相关责任。';
+
+  @override
+  String get settingsDeveloperEnabled => '开发者模式已开启';
+
+  @override
+  String get settingsDeveloperDisabled => '开发者模式已关闭';
+
+  @override
+  String get settingsDeveloperHoldHint => '长按 10 秒开启开发者模式（鼠标：按住不放）';
+
+  @override
   String get settingsSearchHint => '搜索设置…';
 
   @override
@@ -1246,6 +1283,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '关闭转码保持源采样率播放，开启则统一 48kHz 输出；切换后自动重载当前曲目生效。';
 
   @override
+  String get volumeMute => '静音';
+
+  @override
+  String get volumeUnmute => '取消静音';
+
+  @override
   String get settingsSectionMemory => '记忆与启动';
 
   @override
@@ -1288,6 +1331,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String settingsSpectrumBarWidthDesc(Object width) {
     return '${width}px（1~12，全屏播放器）';
   }
+
+  @override
+  String get settingsBarSpectrum => '播放条频谱';
+
+  @override
+  String get settingsBarSpectrumOn => '播放条时间下方显示迷你频谱（无歌词或关闭迷你歌词时）';
+
+  @override
+  String get settingsBarSpectrumOff => '播放条不显示迷你频谱';
+
+  @override
+  String get settingsCoverBeatScale => '封面跟随节奏缩放';
+
+  @override
+  String get settingsCoverBeatScaleOn => '封面随鼓点轻微缩放';
+
+  @override
+  String get settingsCoverBeatScaleOff => '封面静止（仅播放/暂停缩放）';
 
   @override
   String get settingsTransitionStyle => '媒体信息切换动效';
@@ -1342,6 +1403,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsPlayerLyricsOff => '全屏播放器不显示歌词';
+
+  @override
+  String get settingsBarLyrics => '播放条歌词';
+
+  @override
+  String get settingsBarLyricsOn => '播放条时间下方显示当前歌词（过长自动滚动）';
+
+  @override
+  String get settingsBarLyricsOff => '播放条不显示迷你歌词';
+
+  @override
+  String get settingsShowTranslation => '显示翻译';
+
+  @override
+  String get settingsShowTranslationOn => '歌词翻译显示在原句后的括号内';
+
+  @override
+  String get settingsShowTranslationOff => '不显示歌词翻译';
 
   @override
   String get settingsSectionLyricStyle => '歌词样式';
@@ -1966,6 +2045,109 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsMediaSourceSubtitle =>
       '流媒体服务器（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsCatScrape => '刮削';
+
+  @override
+  String get settingsScrapeSubtitle => '多源元数据补齐 · 封面 / 歌词 / 标签';
+
+  @override
+  String get settingsSectionScrapeDirs => '刮削目录';
+
+  @override
+  String get settingsScrapeDirsHint => '每行一个目录；留空跟随媒体库扫描目录';
+
+  @override
+  String get settingsScrapeDirsEmptyNote => '未配置刮削目录，刮削时将跟随媒体库扫描目录。';
+
+  @override
+  String settingsScrapeDirsNote(Object dirs) {
+    return '当前生效目录：$dirs';
+  }
+
+  @override
+  String get settingsSectionScrapeSources => '数据源';
+
+  @override
+  String get settingsScrapeSourceMusicBrainz => 'MusicBrainz';
+
+  @override
+  String get settingsScrapeSourceDeezer => 'Deezer';
+
+  @override
+  String get settingsScrapeSourceItunes => 'iTunes';
+
+  @override
+  String get settingsScrapeSourceNetease => '网易云音乐';
+
+  @override
+  String get settingsScrapeSourceQQMusic => 'QQ 音乐';
+
+  @override
+  String get settingsScrapeSourceKugou => '酷狗音乐';
+
+  @override
+  String get settingsScrapeSourceKuwo => '酷我音乐';
+
+  @override
+  String get settingsScrapeSourceMigu => '咪咕音乐';
+
+  @override
+  String get settingsScrapeSourceAcoustID => 'AcoustID（音频指纹）';
+
+  @override
+  String get settingsScrapeSourceDesc => '开启后参与多源查询、相似度比对与评分合并';
+
+  @override
+  String get settingsSectionScrapeProgress => '刮削进度';
+
+  @override
+  String get settingsScrapeStart => '开始刮削';
+
+  @override
+  String get settingsScrapeCancel => '取消刮削';
+
+  @override
+  String get settingsScrapeScanning => '正在扫描目录…';
+
+  @override
+  String settingsScrapeCurrent(Object file) {
+    return '正在处理：$file';
+  }
+
+  @override
+  String get settingsScrapeSuccess => '成功';
+
+  @override
+  String get settingsScrapeFailed => '失败';
+
+  @override
+  String get settingsScrapeSkipped => '跳过';
+
+  @override
+  String get settingsScrapeNotFound => '未匹配';
+
+  @override
+  String get settingsScrapeIdle => '尚未刮削，点击下方按钮开始。';
+
+  @override
+  String get settingsScrapeNoDirs => '没有可刮削的目录，请先配置刮削目录或媒体库扫描目录。';
+
+  @override
+  String get settingsScrapeDone => '刮削完成';
+
+  @override
+  String get settingsScrapeCanceled => '刮削已取消';
+
+  @override
+  String get toastScrapeNoDirs => '没有可刮削的目录';
+
+  @override
+  String get toastScrapeDirsUpdated => '刮削目录已保存';
+
+  @override
+  String get toastScrapeStarted => '已开始刮削';
 
   @override
   String get commonDelete => '删除';
@@ -3236,6 +3418,43 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsAboutSubtitle => '版本 · 项目信息';
 
   @override
+  String get settingsCatDeveloper => '开发者';
+
+  @override
+  String get settingsDeveloperSubtitle => '开发者模式 · 隐藏接口';
+
+  @override
+  String get settingsDeveloperTitle => '开发者模式';
+
+  @override
+  String get settingsDeveloperMode => '开发者模式';
+
+  @override
+  String get settingsDeveloperModeOn => '已开启（下载接口可见）';
+
+  @override
+  String get settingsDeveloperModeOff => '已关闭（下载接口隐藏）';
+
+  @override
+  String get settingsDeveloperDownloadModule => '下载模块';
+
+  @override
+  String get settingsDeveloperDownloadModuleDesc =>
+      '侧边栏「下载」入口、曲目右键「下载」与设置「下载」分类仅在开发者模式开启后显示。';
+
+  @override
+  String get settingsDeveloperNote => '开发者模式面向本地调试与自用，开启后请自行承担相关责任。';
+
+  @override
+  String get settingsDeveloperEnabled => '开发者模式已开启';
+
+  @override
+  String get settingsDeveloperDisabled => '开发者模式已关闭';
+
+  @override
+  String get settingsDeveloperHoldHint => '长按 10 秒开启开发者模式（鼠标：按住不放）';
+
+  @override
   String get settingsSearchHint => '搜索设置…';
 
   @override
@@ -3395,6 +3614,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       '关闭转码保持源采样率播放，开启则统一 48kHz 输出；切换后自动重载当前曲目生效。';
 
   @override
+  String get volumeMute => '静音';
+
+  @override
+  String get volumeUnmute => '取消静音';
+
+  @override
   String get settingsSectionMemory => '记忆与启动';
 
   @override
@@ -3437,6 +3662,24 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String settingsSpectrumBarWidthDesc(Object width) {
     return '${width}px（1~12，全屏播放器）';
   }
+
+  @override
+  String get settingsBarSpectrum => '播放条频谱';
+
+  @override
+  String get settingsBarSpectrumOn => '播放条时间下方显示迷你频谱（无歌词或关闭迷你歌词时）';
+
+  @override
+  String get settingsBarSpectrumOff => '播放条不显示迷你频谱';
+
+  @override
+  String get settingsCoverBeatScale => '封面跟随节奏缩放';
+
+  @override
+  String get settingsCoverBeatScaleOn => '封面随鼓点轻微缩放';
+
+  @override
+  String get settingsCoverBeatScaleOff => '封面静止（仅播放/暂停缩放）';
 
   @override
   String get settingsTransitionStyle => '媒体信息切换动效';
@@ -3491,6 +3734,24 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsPlayerLyricsOff => '全屏播放器不显示歌词';
+
+  @override
+  String get settingsBarLyrics => '播放条歌词';
+
+  @override
+  String get settingsBarLyricsOn => '播放条时间下方显示当前歌词（过长自动滚动）';
+
+  @override
+  String get settingsBarLyricsOff => '播放条不显示迷你歌词';
+
+  @override
+  String get settingsShowTranslation => '显示翻译';
+
+  @override
+  String get settingsShowTranslationOn => '歌词翻译显示在原句后的括号内';
+
+  @override
+  String get settingsShowTranslationOff => '不显示歌词翻译';
 
   @override
   String get settingsSectionLyricStyle => '歌词样式';
@@ -4115,6 +4376,109 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   @override
   String get settingsMediaSourceSubtitle =>
       '流媒体服务器（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsCatScrape => '刮削';
+
+  @override
+  String get settingsScrapeSubtitle => '多源元数据补齐 · 封面 / 歌词 / 标签';
+
+  @override
+  String get settingsSectionScrapeDirs => '刮削目录';
+
+  @override
+  String get settingsScrapeDirsHint => '每行一个目录；留空跟随媒体库扫描目录';
+
+  @override
+  String get settingsScrapeDirsEmptyNote => '未配置刮削目录，刮削时将跟随媒体库扫描目录。';
+
+  @override
+  String settingsScrapeDirsNote(Object dirs) {
+    return '当前生效目录：$dirs';
+  }
+
+  @override
+  String get settingsSectionScrapeSources => '数据源';
+
+  @override
+  String get settingsScrapeSourceMusicBrainz => 'MusicBrainz';
+
+  @override
+  String get settingsScrapeSourceDeezer => 'Deezer';
+
+  @override
+  String get settingsScrapeSourceItunes => 'iTunes';
+
+  @override
+  String get settingsScrapeSourceNetease => '网易云音乐';
+
+  @override
+  String get settingsScrapeSourceQQMusic => 'QQ 音乐';
+
+  @override
+  String get settingsScrapeSourceKugou => '酷狗音乐';
+
+  @override
+  String get settingsScrapeSourceKuwo => '酷我音乐';
+
+  @override
+  String get settingsScrapeSourceMigu => '咪咕音乐';
+
+  @override
+  String get settingsScrapeSourceAcoustID => 'AcoustID（音频指纹）';
+
+  @override
+  String get settingsScrapeSourceDesc => '开启后参与多源查询、相似度比对与评分合并';
+
+  @override
+  String get settingsSectionScrapeProgress => '刮削进度';
+
+  @override
+  String get settingsScrapeStart => '开始刮削';
+
+  @override
+  String get settingsScrapeCancel => '取消刮削';
+
+  @override
+  String get settingsScrapeScanning => '正在扫描目录…';
+
+  @override
+  String settingsScrapeCurrent(Object file) {
+    return '正在处理：$file';
+  }
+
+  @override
+  String get settingsScrapeSuccess => '成功';
+
+  @override
+  String get settingsScrapeFailed => '失败';
+
+  @override
+  String get settingsScrapeSkipped => '跳过';
+
+  @override
+  String get settingsScrapeNotFound => '未匹配';
+
+  @override
+  String get settingsScrapeIdle => '尚未刮削，点击下方按钮开始。';
+
+  @override
+  String get settingsScrapeNoDirs => '没有可刮削的目录，请先配置刮削目录或媒体库扫描目录。';
+
+  @override
+  String get settingsScrapeDone => '刮削完成';
+
+  @override
+  String get settingsScrapeCanceled => '刮削已取消';
+
+  @override
+  String get toastScrapeNoDirs => '没有可刮削的目录';
+
+  @override
+  String get toastScrapeDirsUpdated => '刮削目录已保存';
+
+  @override
+  String get toastScrapeStarted => '已开始刮削';
 
   @override
   String get commonDelete => '删除';
@@ -5385,6 +5749,43 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsAboutSubtitle => '版本 · 專案資訊';
 
   @override
+  String get settingsCatDeveloper => '開發者';
+
+  @override
+  String get settingsDeveloperSubtitle => '開發者模式 · 隱藏介面';
+
+  @override
+  String get settingsDeveloperTitle => '開發者模式';
+
+  @override
+  String get settingsDeveloperMode => '開發者模式';
+
+  @override
+  String get settingsDeveloperModeOn => '已開啟（下載介面可見）';
+
+  @override
+  String get settingsDeveloperModeOff => '已關閉（下載介面隱藏）';
+
+  @override
+  String get settingsDeveloperDownloadModule => '下載模組';
+
+  @override
+  String get settingsDeveloperDownloadModuleDesc =>
+      '側邊欄「下載」入口、曲目右鍵「下載」與設定「下載」分類僅在開發者模式開啟後顯示。';
+
+  @override
+  String get settingsDeveloperNote => '開發者模式面向本機除錯與自用，開啟後請自行承擔相關責任。';
+
+  @override
+  String get settingsDeveloperEnabled => '開發者模式已開啟';
+
+  @override
+  String get settingsDeveloperDisabled => '開發者模式已關閉';
+
+  @override
+  String get settingsDeveloperHoldHint => '長按 10 秒開啟開發者模式（滑鼠：按住不放）';
+
+  @override
   String get settingsSearchHint => '搜尋設定…';
 
   @override
@@ -5544,6 +5945,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '關閉轉碼保持源取樣率播放，開啟則統一 48kHz 輸出；切換後自動重載目前曲目生效。';
 
   @override
+  String get volumeMute => '靜音';
+
+  @override
+  String get volumeUnmute => '取消靜音';
+
+  @override
   String get settingsSectionMemory => '記憶與啟動';
 
   @override
@@ -5586,6 +5993,24 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String settingsSpectrumBarWidthDesc(Object width) {
     return '${width}px（1~12，全螢幕播放器）';
   }
+
+  @override
+  String get settingsBarSpectrum => '播放列頻譜';
+
+  @override
+  String get settingsBarSpectrumOn => '播放列時間下方顯示迷你頻譜（無歌詞或關閉迷你歌詞時）';
+
+  @override
+  String get settingsBarSpectrumOff => '播放列不顯示迷你頻譜';
+
+  @override
+  String get settingsCoverBeatScale => '封面跟隨節奏縮放';
+
+  @override
+  String get settingsCoverBeatScaleOn => '封面隨鼓點輕微縮放';
+
+  @override
+  String get settingsCoverBeatScaleOff => '封面靜止（僅播放/暫停縮放）';
 
   @override
   String get settingsTransitionStyle => '媒體資訊切換動效';
@@ -5640,6 +6065,24 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsPlayerLyricsOff => '全螢幕播放器不顯示歌詞';
+
+  @override
+  String get settingsBarLyrics => '播放列歌詞';
+
+  @override
+  String get settingsBarLyricsOn => '播放列時間下方顯示目前歌詞（過長自動捲動）';
+
+  @override
+  String get settingsBarLyricsOff => '播放列不顯示迷你歌詞';
+
+  @override
+  String get settingsShowTranslation => '顯示翻譯';
+
+  @override
+  String get settingsShowTranslationOn => '歌詞翻譯顯示在原句後的括號內';
+
+  @override
+  String get settingsShowTranslationOff => '不顯示歌詞翻譯';
 
   @override
   String get settingsSectionLyricStyle => '歌詞樣式';
@@ -6265,6 +6708,109 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get settingsMediaSourceSubtitle =>
       '串流媒體伺服器（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsCatScrape => '刮削';
+
+  @override
+  String get settingsScrapeSubtitle => '多來源中繼資料補齊 · 封面 / 歌詞 / 標籤';
+
+  @override
+  String get settingsSectionScrapeDirs => '刮削目錄';
+
+  @override
+  String get settingsScrapeDirsHint => '每行一個目錄；留空跟隨媒體庫掃描目錄';
+
+  @override
+  String get settingsScrapeDirsEmptyNote => '未設定刮削目錄，刮削時將跟隨媒體庫掃描目錄。';
+
+  @override
+  String settingsScrapeDirsNote(Object dirs) {
+    return '目前生效目錄：$dirs';
+  }
+
+  @override
+  String get settingsSectionScrapeSources => '資料來源';
+
+  @override
+  String get settingsScrapeSourceMusicBrainz => 'MusicBrainz';
+
+  @override
+  String get settingsScrapeSourceDeezer => 'Deezer';
+
+  @override
+  String get settingsScrapeSourceItunes => 'iTunes';
+
+  @override
+  String get settingsScrapeSourceNetease => '網易雲音樂';
+
+  @override
+  String get settingsScrapeSourceQQMusic => 'QQ 音樂';
+
+  @override
+  String get settingsScrapeSourceKugou => '酷狗音樂';
+
+  @override
+  String get settingsScrapeSourceKuwo => '酷我音樂';
+
+  @override
+  String get settingsScrapeSourceMigu => '咪咕音樂';
+
+  @override
+  String get settingsScrapeSourceAcoustID => 'AcoustID（音訊指紋）';
+
+  @override
+  String get settingsScrapeSourceDesc => '開啟後參與多來源查詢、相似度比對與評分合併';
+
+  @override
+  String get settingsSectionScrapeProgress => '刮削進度';
+
+  @override
+  String get settingsScrapeStart => '開始刮削';
+
+  @override
+  String get settingsScrapeCancel => '取消刮削';
+
+  @override
+  String get settingsScrapeScanning => '正在掃描目錄…';
+
+  @override
+  String settingsScrapeCurrent(Object file) {
+    return '正在處理：$file';
+  }
+
+  @override
+  String get settingsScrapeSuccess => '成功';
+
+  @override
+  String get settingsScrapeFailed => '失敗';
+
+  @override
+  String get settingsScrapeSkipped => '略過';
+
+  @override
+  String get settingsScrapeNotFound => '未比對';
+
+  @override
+  String get settingsScrapeIdle => '尚未刮削，點擊下方按鈕開始。';
+
+  @override
+  String get settingsScrapeNoDirs => '沒有可刮削的目錄，請先設定刮削目錄或媒體庫掃描目錄。';
+
+  @override
+  String get settingsScrapeDone => '刮削完成';
+
+  @override
+  String get settingsScrapeCanceled => '刮削已取消';
+
+  @override
+  String get toastScrapeNoDirs => '沒有可刮削的目錄';
+
+  @override
+  String get toastScrapeDirsUpdated => '刮削目錄已儲存';
+
+  @override
+  String get toastScrapeStarted => '已開始刮削';
 
   @override
   String get commonDelete => '刪除';

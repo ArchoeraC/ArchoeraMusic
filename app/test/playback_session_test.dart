@@ -2,8 +2,8 @@ library;
 
 import 'dart:io';
 
-import 'package:archoera_music/core/netease/track.dart';
-import 'package:archoera_music/core/playback/playback_session.dart';
+import 'package:archoera_music/services/netease/track.dart';
+import 'package:archoera_music/services/playback/playback_session.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

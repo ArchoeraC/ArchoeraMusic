@@ -115,7 +115,26 @@ endif()
 target_link_directories(audio_engine_static PUBLIC ${FFMPEG_LIBRARY_DIRS})
 target_compile_options(audio_engine_static PUBLIC ${FFMPEG_CFLAGS_OTHER})
 
-# ── CLI 二进制 ──────────────────────────────────────────────
+# ── FFT 共享库（Dart FFI 客户端频谱分析；EnginePaths.libfftPath）──────────
+# 独立编译 src/fft.c（无外部依赖，仅 libm）。注意全局 -fvisibility=hidden
+# 会隐藏所有导出符号，此目标需恢复 default 可见性，否则 Dart 侧
+# DynamicLibrary.lookup('fft_create') 等将找不到符号。
+add_library(fft SHARED src/fft.c)
+set_target_properties(fft PROPERTIES C_VISIBILITY_PRESET default)
+# 全局 add_compile_options(-fvisibility=hidden) 位于编译参数末尾，会覆盖
+# C_VISIBILITY_PRESET；需在此目标显式追加 default（GCC/Clang 后者生效）。
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(fft PRIVATE -fvisibility=default)
+endif()
+target_include_directories(fft PRIVATE ${AUDIO_ENGINE_INCLUDES})
+if(MATH_LIBRARY)
+    target_link_libraries(fft PRIVATE ${MATH_LIBRARY})
+endif()
+
+# ── CLI 二进制（Windows/MSVC 跳过：main.c 深度依赖 POSIX——
+#    unistd/fcntl/getopt_long/clock_gettime 等，且桌面端 FFI 库
+#    archoera_mediaengine 已覆盖 Windows 用途，CLI 仅为调试/独立运行）──────
+if(NOT MSVC)
 add_executable(splayer-audio-engine
     src/main.c
     ${AUDIO_ENGINE_EXTRA_SOURCES}
@@ -140,6 +159,7 @@ endif()
 install(TARGETS splayer-audio-engine
     RUNTIME DESTINATION bin
 )
+endif()
 
 # ── 共享库（Dart FFI 桌面端，替代进程 IPC；archoera_mediaengine）────────
 find_package(Threads REQUIRED)
@@ -148,6 +168,12 @@ target_include_directories(archoera_mediaengine PRIVATE
     ${AUDIO_ENGINE_INCLUDES}
     ${FFMPEG_INCLUDE_DIRS}
 )
+if(MSVC)
+    # MSVC 无系统 pthread.h：include/compat 提供最小 pthread 兼容层，
+    # 覆盖 mediaengine_lib.c 用到的 mutex/cond/thread/nanosleep
+    target_include_directories(archoera_mediaengine PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/compat)
+endif()
 target_link_libraries(archoera_mediaengine PRIVATE
     audio_engine_static
     ${FFMPEG_LIBRARIES}

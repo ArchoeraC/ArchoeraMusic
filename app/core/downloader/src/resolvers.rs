@@ -216,6 +216,9 @@ async fn kg_register_device(client: &reqwest::Client, mid: &str) -> Result<Strin
 /// v5/url 单档请求。status=2（需验证）时返回 [KgUrlError::NeedsDfidRefresh]。
 struct KgUrlError {
     needs_dfid_refresh: bool,
+    /// true = 服务端返回付费墙（pay_block_tpl）：该档位需 VIP 权限，
+    /// 换 dfid 无用，应立即降级下一档，不做无谓的 register_dev 重试。
+    is_paywall: bool,
     msg: String,
 }
 
@@ -261,6 +264,14 @@ async fn kg_song_url(
     params.insert("key".into(), key);
     let signature = kg::kg_signature(&params, "", kg::KG_LITE_SIGN_SALT);
     params.insert("signature".into(), signature);
+    log::debug!(
+        "Kugou v5/url 请求: hash={hash_lc} quality={quality_param} dfid={dfid} 登录态={}",
+        if token.is_empty() && userid.is_empty() {
+            "未注入"
+        } else {
+            "已注入"
+        }
+    );
 
     let url = format!("{KG_SONG_URL}?{}", kg_query_string(&params));
     let mut headers = kg_base_headers(mid, ts, Some("trackercdn.kugou.com"));
@@ -275,14 +286,14 @@ async fn kg_song_url(
         .headers(headers)
         .send()
         .await
-        .map_err(|e| KgUrlError { needs_dfid_refresh: false, msg: format!("v5/url HTTP 失败: {e}") })?;
+        .map_err(|e| KgUrlError { needs_dfid_refresh: false, is_paywall: false, msg: format!("v5/url HTTP 失败: {e}") })?;
     let status = resp.status();
     let text = resp
         .text()
         .await
-        .map_err(|e| KgUrlError { needs_dfid_refresh: false, msg: format!("v5/url 读响应失败: {e}") })?;
+        .map_err(|e| KgUrlError { needs_dfid_refresh: false, is_paywall: false, msg: format!("v5/url 读响应失败: {e}") })?;
     let body: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| KgUrlError { needs_dfid_refresh: false, msg: format!("v5/url 响应非 JSON (HTTP {status}): {e}") })?;
+        .map_err(|e| KgUrlError { needs_dfid_refresh: false, is_paywall: false, msg: format!("v5/url 响应非 JSON (HTTP {status}): {e}") })?;
 
     let code = body.get("status").and_then(|v| v.as_i64()).unwrap_or(0);
     match code {
@@ -295,8 +306,12 @@ async fn kg_song_url(
                 .map(str::to_string)
                 .unwrap_or_default();
             if first.is_empty() {
-                return Err(KgUrlError { needs_dfid_refresh: false, msg: "v5/url status=1 但无 url".into() });
+                return Err(KgUrlError { needs_dfid_refresh: false, is_paywall: false, msg: "v5/url status=1 但无 url".into() });
             }
+            log::debug!(
+                "Kugou v5/url status=1 命中: quality={quality_param} url={}...",
+                first.chars().take(90).collect::<String>()
+            );
             Ok(ResolvedUrl {
                 url: first,
                 quality_key: quality_param_to_key(quality_param),
@@ -305,9 +320,33 @@ async fn kg_song_url(
                 extra_headers: vec![],
             })
         }
-        2 => Err(KgUrlError { needs_dfid_refresh: true, msg: "v5/url status=2 需要刷新 dfid".into() }),
-        3 => Err(KgUrlError { needs_dfid_refresh: false, msg: format!("v5/url status=3 VIP 限制: {}", text) }),
-        other => Err(KgUrlError { needs_dfid_refresh: false, msg: format!("v5/url status={other}: {text}") }),
+        2 => {
+            // status=2 语义需区分（实测 2026-08：酷狗对无权限档位返回
+            // trans_param.pay_block_tpl=1 付费墙模板，换 dfid 无法解锁）：
+            // 付费墙 → 立即降级下一档；否则保持旧行为（SSA「需要验证」→
+            // 换新 dfid 重试一次）。
+            let is_paywall = body
+                .get("trans_param")
+                .and_then(|t| t.get("pay_block_tpl"))
+                .and_then(|v| v.as_i64())
+                .map(|v| v != 0)
+                .unwrap_or(false);
+            log::debug!(
+                "Kugou v5/url status=2: quality={quality_param} 原因={}",
+                if is_paywall { "付费墙→降级" } else { "需刷新 dfid" }
+            );
+            Err(KgUrlError {
+                needs_dfid_refresh: !is_paywall,
+                is_paywall,
+                msg: if is_paywall {
+                    "v5/url status=2 该档位需 VIP（付费墙），降级".into()
+                } else {
+                    "v5/url status=2 需要刷新 dfid".into()
+                },
+            })
+        }
+        3 => Err(KgUrlError { needs_dfid_refresh: false, is_paywall: false, msg: format!("v5/url status=3 VIP 限制: {}", text) }),
+        other => Err(KgUrlError { needs_dfid_refresh: false, is_paywall: false, msg: format!("v5/url status={other}: {text}") }),
     }
 }
 
@@ -366,6 +405,7 @@ impl PlatformUrlResolver for KugouResolver {
                             }
                         },
                     };
+                    log::debug!("Kugou 尝试档位 {qk}: hash={hash}");
                     match kg_song_url(&client, &mid, &dfid, hash, qp, &userid, &token).await {
                         Ok(resolved) => return Ok(resolved),
                         Err(e) if e.needs_dfid_refresh && !tried_refresh => {
@@ -375,7 +415,11 @@ impl PlatformUrlResolver for KugouResolver {
                         }
                         Err(e) => {
                             // 该档位失败 → 继续降级链
-                            log::debug!("Kugou {} 档失败: {}", qk, e.msg);
+                            if e.is_paywall {
+                                log::debug!("Kugou {qk} 档需 VIP（付费墙），降级");
+                            } else {
+                                log::debug!("Kugou {} 档失败: {}", qk, e.msg);
+                            }
                             break;
                         }
                     }
@@ -406,8 +450,8 @@ pub struct NeteaseResolver;
 
 const NM_WEAPI_URL: &str = "https://music.163.com/weapi/song/enhance/download/url/v1";
 const NM_PLAYER_URL: &str = "https://music.163.com/weapi/song/enhance/player/url/v1";
-const NM_DOMAIN: &str = "https://music.163.com";
-const NM_WEAPI_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0";
+pub(crate) const NM_DOMAIN: &str = "https://music.163.com";
+pub(crate) const NM_WEAPI_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0";
 
 /// 品质 key → weapi level 参数（对齐 neteaseLevels）
 fn netease_level_for_key(key: &str, quality: Quality) -> &'static str {
@@ -441,8 +485,8 @@ fn rand_hex_bytes(n: usize) -> String {
 }
 
 /// 对齐 Dart _processCookieObject：补齐 cookie 必备字段（跳过需网络注册的
-/// MUSIC_A；匿名下载 URL 无需登录态）。
-fn build_netease_cookie(user_cookie: Option<&str>) -> String {
+/// MUSIC_A；匿名下载 URL 无需登录态）。metadata.rs（元数据拉取）复用。
+pub(crate) fn build_netease_cookie(user_cookie: Option<&str>) -> String {
     use std::collections::HashMap;
     let mut c: HashMap<String, String> = HashMap::new();
     if let Some(uc) = user_cookie {
@@ -513,6 +557,7 @@ async fn nm_download_url(
         "csrf_token": "",
         "e_r": false,
     });
+    log::debug!("Netease download/url 请求: id={platform_id} level={level} 带cookie={}字符", cookie_header.len());
     let (params, enc_sec_key) = nm::weapi_encrypt(&data);
 
     let resp = client
@@ -550,6 +595,11 @@ async fn nm_download_url(
         .unwrap_or_else(|| "mp3".to_string());
     let size = data.get("size").and_then(|v| v.as_u64());
 
+    log::debug!(
+        "Netease download/url 命中: level={level} ext={ext} size={:?} url={}...",
+        size,
+        url.chars().take(80).collect::<String>()
+    );
     Ok(Some(ResolvedUrl {
         url,
         quality_key: level_to_key(level),
@@ -592,6 +642,7 @@ async fn nm_player_url(
         "encodeType": "flac",
         "e_r": true,
     });
+    log::debug!("Netease player/url 请求: id={platform_id} level={level} 带cookie={}字符", cookie_header.len());
     let (params, enc_sec_key) = nm::weapi_encrypt(&data);
 
     let resp = client
@@ -642,6 +693,11 @@ async fn nm_player_url(
         .unwrap_or_else(|| "mp3".to_string());
     let size = item.get("size").and_then(|v| v.as_u64());
 
+    log::debug!(
+        "Netease player/url 命中: level={level} ext={ext} size={:?} url={}...",
+        size,
+        url.chars().take(80).collect::<String>()
+    );
     Ok(Some(ResolvedUrl {
         url,
         quality_key: level_to_key(level),

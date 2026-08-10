@@ -1130,6 +1130,48 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsAboutSubtitle => 'Version · Informations sur le projet';
 
   @override
+  String get settingsCatDeveloper => 'Développeur';
+
+  @override
+  String get settingsDeveloperSubtitle =>
+      'Mode développeur · Fonctions masquées';
+
+  @override
+  String get settingsDeveloperTitle => 'Mode développeur';
+
+  @override
+  String get settingsDeveloperMode => 'Mode développeur';
+
+  @override
+  String get settingsDeveloperModeOn =>
+      'Activé (fonctions de téléchargement visibles)';
+
+  @override
+  String get settingsDeveloperModeOff =>
+      'Désactivé (fonctions de téléchargement masquées)';
+
+  @override
+  String get settingsDeveloperDownloadModule => 'Module de téléchargement';
+
+  @override
+  String get settingsDeveloperDownloadModuleDesc =>
+      'L\'entrée « Télécharger » de la barre latérale, l\'élément « Télécharger » du menu contextuel et la catégorie « Télécharger » des réglages ne sont visibles que lorsque le mode développeur est activé.';
+
+  @override
+  String get settingsDeveloperNote =>
+      'Le mode développeur est destiné au débogage local et à un usage personnel. Utilisation à vos risques et périls.';
+
+  @override
+  String get settingsDeveloperEnabled => 'Mode développeur activé';
+
+  @override
+  String get settingsDeveloperDisabled => 'Mode développeur désactivé';
+
+  @override
+  String get settingsDeveloperHoldHint =>
+      'Maintenez 10 secondes pour activer le mode développeur (souris : maintenir enfoncé)';
+
+  @override
   String get settingsSearchHint => 'Rechercher des paramètres…';
 
   @override
@@ -1297,6 +1339,12 @@ class AppLocalizationsFr extends AppLocalizations {
       'Le passthrough conserve la fréquence source ; sinon rééchantillonnage à 48kHz. Effet après rechargement de la piste.';
 
   @override
+  String get volumeMute => 'Couper le son';
+
+  @override
+  String get volumeUnmute => 'Rétablir le son';
+
+  @override
   String get settingsSectionMemory => 'Mémoire et démarrage';
 
   @override
@@ -1345,6 +1393,28 @@ class AppLocalizationsFr extends AppLocalizations {
   String settingsSpectrumBarWidthDesc(Object width) {
     return '${width}px（1~12, lecteur plein écran uniquement）';
   }
+
+  @override
+  String get settingsBarSpectrum => 'Spectre de la barre de lecture';
+
+  @override
+  String get settingsBarSpectrumOn =>
+      'Mini spectre sous l\'heure (si pas de paroles ou mini paroles désactivées)';
+
+  @override
+  String get settingsBarSpectrumOff =>
+      'Masquer le mini spectre de la barre de lecture';
+
+  @override
+  String get settingsCoverBeatScale =>
+      'Mettre la pochette à l\'échelle du rythme';
+
+  @override
+  String get settingsCoverBeatScaleOn => 'La pochette pulse au rythme';
+
+  @override
+  String get settingsCoverBeatScaleOff =>
+      'Pochette statique（seulement lecture/pause）';
 
   @override
   String get settingsTransitionStyle => 'Transition des médias';
@@ -1403,6 +1473,27 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsPlayerLyricsOff =>
       'Pas de zone de paroles dans le lecteur plein écran';
+
+  @override
+  String get settingsBarLyrics => 'Paroles de la barre de lecture';
+
+  @override
+  String get settingsBarLyricsOn =>
+      'Parole actuelle sous l\'heure (défilement automatique si trop long)';
+
+  @override
+  String get settingsBarLyricsOff =>
+      'Masquer les mini paroles de la barre de lecture';
+
+  @override
+  String get settingsShowTranslation => 'Afficher la traduction';
+
+  @override
+  String get settingsShowTranslationOn =>
+      'Traduction entre parenthèses après la ligne originale';
+
+  @override
+  String get settingsShowTranslationOff => 'Masquer la traduction des paroles';
 
   @override
   String get settingsSectionLyricStyle => 'Style des paroles';
@@ -2094,6 +2185,115 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsMediaSourceSubtitle =>
       'Serveurs de streaming (Subsonic / Jellyfin / Emby)';
+
+  @override
+  String get settingsCatScrape => 'Scraping';
+
+  @override
+  String get settingsScrapeSubtitle =>
+      'Métadonnées multi-sources : pochette / paroles / tags';
+
+  @override
+  String get settingsSectionScrapeDirs => 'Répertoires de scraping';
+
+  @override
+  String get settingsScrapeDirsHint =>
+      'Un répertoire par ligne ; vide suit les répertoires de scan de la bibliothèque';
+
+  @override
+  String get settingsScrapeDirsEmptyNote =>
+      'Aucun répertoire de scraping configuré ; les répertoires de scan de la bibliothèque seront utilisés.';
+
+  @override
+  String settingsScrapeDirsNote(Object dirs) {
+    return 'Répertoires effectifs : $dirs';
+  }
+
+  @override
+  String get settingsSectionScrapeSources => 'Sources de données';
+
+  @override
+  String get settingsScrapeSourceMusicBrainz => 'MusicBrainz';
+
+  @override
+  String get settingsScrapeSourceDeezer => 'Deezer';
+
+  @override
+  String get settingsScrapeSourceItunes => 'iTunes';
+
+  @override
+  String get settingsScrapeSourceNetease => 'Netease Cloud Music';
+
+  @override
+  String get settingsScrapeSourceQQMusic => 'QQ Music';
+
+  @override
+  String get settingsScrapeSourceKugou => 'Kugou Music';
+
+  @override
+  String get settingsScrapeSourceKuwo => 'Kuwo Music';
+
+  @override
+  String get settingsScrapeSourceMigu => 'Migu Music';
+
+  @override
+  String get settingsScrapeSourceAcoustID => 'AcoustID (empreinte audio)';
+
+  @override
+  String get settingsScrapeSourceDesc =>
+      'Une fois activé, participe à la recherche multi-sources, à la comparaison de similarité et à la fusion des scores';
+
+  @override
+  String get settingsSectionScrapeProgress => 'Progression du scraping';
+
+  @override
+  String get settingsScrapeStart => 'Démarrer le scraping';
+
+  @override
+  String get settingsScrapeCancel => 'Annuler le scraping';
+
+  @override
+  String get settingsScrapeScanning => 'Analyse des répertoires…';
+
+  @override
+  String settingsScrapeCurrent(Object file) {
+    return 'Traitement : $file';
+  }
+
+  @override
+  String get settingsScrapeSuccess => 'Réussi';
+
+  @override
+  String get settingsScrapeFailed => 'Échec';
+
+  @override
+  String get settingsScrapeSkipped => 'Ignoré';
+
+  @override
+  String get settingsScrapeNotFound => 'Non trouvé';
+
+  @override
+  String get settingsScrapeIdle =>
+      'Pas encore scrapé. Cliquez sur le bouton ci-dessous pour commencer.';
+
+  @override
+  String get settingsScrapeNoDirs =>
+      'Aucun répertoire à scraper. Configurez d\'abord des répertoires de scraping ou de scan de la bibliothèque.';
+
+  @override
+  String get settingsScrapeDone => 'Scraping terminé';
+
+  @override
+  String get settingsScrapeCanceled => 'Scraping annulé';
+
+  @override
+  String get toastScrapeNoDirs => 'Aucun répertoire à scraper';
+
+  @override
+  String get toastScrapeDirsUpdated => 'Répertoires de scraping enregistrés';
+
+  @override
+  String get toastScrapeStarted => 'Scraping démarré';
 
   @override
   String get commonDelete => 'Supprimer';

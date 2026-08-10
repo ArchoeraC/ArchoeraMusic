@@ -4,8 +4,8 @@
 // ignore_for_file: avoid_print
 import 'dart:io';
 
-import 'package:archoera_music/core/scraper/scraper_bindings.dart';
-import 'package:archoera_music/core/scraper/scraper_client.dart';
+import 'package:archoera_music/services/scraper/scraper_bindings.dart';
+import 'package:archoera_music/services/scraper/scraper_client.dart';
 
 Future<void> main() async {
   // 1) 库定位与加载

@@ -65,7 +65,9 @@ jobs:
 
       - name: Build Flutter macOS
         working-directory: app
-        run: flutter build macos --release --no-codesign
+        # 工程 Release 配置已用 ad-hoc 签名（CODE_SIGN_IDENTITY = "-"），CI 无需证书；
+        # 现行 Flutter 的 build macos 不再支持 --no-codesign，去掉即可。
+        run: flutter build macos --release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

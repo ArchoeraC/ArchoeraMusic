@@ -27,9 +27,9 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
-import 'package:archoera_music/core/apis/kugou/api.dart';
-import 'package:archoera_music/core/apis/netease/api.dart';
-import 'package:archoera_music/core/downloader/downloader_ffi.dart';
+import 'package:archoera_music/apis/kugou/api.dart';
+import 'package:archoera_music/apis/netease/api.dart';
+import 'package:archoera_music/services/downloader/downloader_ffi.dart';
 
 const _defaultRoot = '/tmp/archoera_e2e_download';
 

@@ -1118,6 +1118,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAboutSubtitle => 'Version · Project info';
 
   @override
+  String get settingsCatDeveloper => 'Developer';
+
+  @override
+  String get settingsDeveloperSubtitle => 'Developer mode · Hidden features';
+
+  @override
+  String get settingsDeveloperTitle => 'Developer Mode';
+
+  @override
+  String get settingsDeveloperMode => 'Developer Mode';
+
+  @override
+  String get settingsDeveloperModeOn => 'Enabled (download features visible)';
+
+  @override
+  String get settingsDeveloperModeOff => 'Disabled (download features hidden)';
+
+  @override
+  String get settingsDeveloperDownloadModule => 'Download Module';
+
+  @override
+  String get settingsDeveloperDownloadModuleDesc =>
+      'The sidebar “Download” entry, the “Download” context-menu item, and the “Download” settings category are only shown when Developer Mode is on.';
+
+  @override
+  String get settingsDeveloperNote =>
+      'Developer Mode is intended for local debugging and personal use. Use at your own risk.';
+
+  @override
+  String get settingsDeveloperEnabled => 'Developer Mode enabled';
+
+  @override
+  String get settingsDeveloperDisabled => 'Developer Mode disabled';
+
+  @override
+  String get settingsDeveloperHoldHint =>
+      'Hold for 10 seconds to enable Developer Mode (mouse: press and hold)';
+
+  @override
   String get settingsSearchHint => 'Search settings…';
 
   @override
@@ -1283,6 +1322,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'No transcoding: keep source sample rate; otherwise unify to 48kHz. Current track reloads to apply.';
 
   @override
+  String get volumeMute => 'Mute';
+
+  @override
+  String get volumeUnmute => 'Unmute';
+
+  @override
   String get settingsSectionMemory => 'Memory & startup';
 
   @override
@@ -1328,6 +1373,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsSpectrumBarWidthDesc(Object width) {
     return '${width}px (1~12, full-screen player)';
   }
+
+  @override
+  String get settingsBarSpectrum => 'Player-bar spectrum';
+
+  @override
+  String get settingsBarSpectrumOn =>
+      'Mini spectrum under the time (when no lyrics or mini lyrics off)';
+
+  @override
+  String get settingsBarSpectrumOff => 'No mini spectrum in the player bar';
+
+  @override
+  String get settingsCoverBeatScale => 'Scale cover to beat';
+
+  @override
+  String get settingsCoverBeatScaleOn => 'Cover pulses with the beat';
+
+  @override
+  String get settingsCoverBeatScaleOff =>
+      'Cover stays static (play/pause scale only)';
 
   @override
   String get settingsTransitionStyle => 'Track Transition';
@@ -1385,6 +1450,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPlayerLyricsOff => 'No lyrics in full-screen player';
+
+  @override
+  String get settingsBarLyrics => 'Player-bar lyrics';
+
+  @override
+  String get settingsBarLyricsOn =>
+      'Show current lyric under the time (auto-scroll when too long)';
+
+  @override
+  String get settingsBarLyricsOff => 'No mini lyrics in the player bar';
+
+  @override
+  String get settingsShowTranslation => 'Show translation';
+
+  @override
+  String get settingsShowTranslationOn =>
+      'Show translation in brackets after the original line';
+
+  @override
+  String get settingsShowTranslationOff => 'Hide lyric translation';
 
   @override
   String get settingsSectionLyricStyle => 'Lyrics style';
@@ -2056,6 +2141,115 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsMediaSourceSubtitle =>
       'Streaming servers (Subsonic / Jellyfin / Emby)';
+
+  @override
+  String get settingsCatScrape => 'Scrape';
+
+  @override
+  String get settingsScrapeSubtitle =>
+      'Multi-source metadata: cover / lyrics / tags';
+
+  @override
+  String get settingsSectionScrapeDirs => 'Scrape Directories';
+
+  @override
+  String get settingsScrapeDirsHint =>
+      'One directory per line; leave empty to follow library scan dirs';
+
+  @override
+  String get settingsScrapeDirsEmptyNote =>
+      'No scrape dirs configured; library scan dirs will be used.';
+
+  @override
+  String settingsScrapeDirsNote(Object dirs) {
+    return 'Effective dirs: $dirs';
+  }
+
+  @override
+  String get settingsSectionScrapeSources => 'Data Sources';
+
+  @override
+  String get settingsScrapeSourceMusicBrainz => 'MusicBrainz';
+
+  @override
+  String get settingsScrapeSourceDeezer => 'Deezer';
+
+  @override
+  String get settingsScrapeSourceItunes => 'iTunes';
+
+  @override
+  String get settingsScrapeSourceNetease => 'Netease Cloud Music';
+
+  @override
+  String get settingsScrapeSourceQQMusic => 'QQ Music';
+
+  @override
+  String get settingsScrapeSourceKugou => 'Kugou Music';
+
+  @override
+  String get settingsScrapeSourceKuwo => 'Kuwo Music';
+
+  @override
+  String get settingsScrapeSourceMigu => 'Migu Music';
+
+  @override
+  String get settingsScrapeSourceAcoustID => 'AcoustID (audio fingerprint)';
+
+  @override
+  String get settingsScrapeSourceDesc =>
+      'When enabled, participates in multi-source lookup, similarity matching and score merging';
+
+  @override
+  String get settingsSectionScrapeProgress => 'Scrape Progress';
+
+  @override
+  String get settingsScrapeStart => 'Start Scraping';
+
+  @override
+  String get settingsScrapeCancel => 'Cancel Scraping';
+
+  @override
+  String get settingsScrapeScanning => 'Scanning directories…';
+
+  @override
+  String settingsScrapeCurrent(Object file) {
+    return 'Processing: $file';
+  }
+
+  @override
+  String get settingsScrapeSuccess => 'Success';
+
+  @override
+  String get settingsScrapeFailed => 'Failed';
+
+  @override
+  String get settingsScrapeSkipped => 'Skipped';
+
+  @override
+  String get settingsScrapeNotFound => 'Not matched';
+
+  @override
+  String get settingsScrapeIdle =>
+      'Not scraped yet. Click the button below to start.';
+
+  @override
+  String get settingsScrapeNoDirs =>
+      'No directories to scrape. Configure scrape dirs or library scan dirs first.';
+
+  @override
+  String get settingsScrapeDone => 'Scraping complete';
+
+  @override
+  String get settingsScrapeCanceled => 'Scraping canceled';
+
+  @override
+  String get toastScrapeNoDirs => 'No directories to scrape';
+
+  @override
+  String get toastScrapeDirsUpdated => 'Scrape dirs saved';
+
+  @override
+  String get toastScrapeStarted => 'Scraping started';
 
   @override
   String get commonDelete => 'Delete';

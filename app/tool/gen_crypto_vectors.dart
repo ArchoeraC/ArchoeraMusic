@@ -15,9 +15,9 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:archoera_music/core/apis/netease/core/config.dart';
-import 'package:archoera_music/core/apis/netease/core/crypto.dart' as nm;
-import 'package:archoera_music/core/kugou/direct/kugou_crypto.dart' as kg;
+import 'package:archoera_music/apis/netease/core/config.dart';
+import 'package:archoera_music/apis/netease/core/crypto.dart' as nm;
+import 'package:archoera_music/services/kugou/kugou_crypto.dart' as kg;
 
 // ─────────────────────────────────────────────────────────────
 // Kugou 向量输入（固定，确定性）

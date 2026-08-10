@@ -9,6 +9,7 @@
 // ============================================================
 
 pub mod crypto;
+pub mod metadata;
 pub mod models;
 pub mod resolvers;
 pub mod tag;
@@ -151,6 +152,26 @@ fn phase_str(p: TaskPhase) -> &'static str {
 static GLOBAL: Lazy<Mutex<GlobalState>> = Lazy::new(|| Mutex::new(GlobalState::default()));
 
 // ============================================================
+// stderr 日志器：log::* 在未注册 logger 时是 no-op（此前 resolvers 的
+// debug 日志全部不可见），注册后 `flutter run -d linux` 控制台即可看到
+// Rust 下载引擎的日志（write_tags 失败、Kugou 档位降级原因等）。
+// ============================================================
+
+static LOGGER_ONCE: std::sync::Once = std::sync::Once::new();
+
+struct StderrLogger;
+
+impl log::Log for StderrLogger {
+    fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+        true
+    }
+    fn log(&self, record: &log::Record<'_>) {
+        eprintln!("[downloader] {}: {}", record.level(), record.args());
+    }
+    fn flush(&self) {}
+}
+
+// ============================================================
 // 事件 JSON 协议（§12：Rust push → Dart pull-free）
 // ============================================================
 
@@ -158,7 +179,16 @@ static GLOBAL: Lazy<Mutex<GlobalState>> = Lazy::new(|| Mutex::new(GlobalState::d
 #[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 enum DownloadEvent {
     Progress { task_id: String, received: u64, total: Option<u64>, speed: u64 },
-    Done { task_id: String, file_path: String, file_size: u64, actual_quality: String },
+    /// [title]/[artist]/[album] 为 v2.1 元数据增强后的结果（引擎自主寻找）
+    Done {
+        task_id: String,
+        file_path: String,
+        file_size: u64,
+        actual_quality: String,
+        title: String,
+        artist: String,
+        album: String,
+    },
     Error { task_id: String, error: String, retryable: bool, stage: String },
     Already { task_id: String, file_path: String },
     State { task_id: String, from: String, to: String },
@@ -569,11 +599,44 @@ async fn run_task(
         }
         (new_dest, new_tmp)
     };
+    log::debug!(
+        "解析完成: quality_key={} file_ext={} → dest={}",
+        resolved.quality_key,
+        resolved.file_ext,
+        dest.display()
+    );
 
     match download_to_file(&client, &resolved, &dest, &tmp, &cancel, &paused, task_id).await {
         Ok(size) => {
-            // v2：rename 完成后写音乐标签（失败不阻断，仅日志）
-            let _ = tag::write_tags(&dest, &request);
+            // v2.1：下载完成后自主寻找元数据（内嵌标签 + 平台 API）并写完整标签
+            // （标签/封面/歌词），best-effort 不阻断下载。enrich 在 rename 落盘后
+            // 执行，保证读到的即最终文件。
+            let enriched = metadata::enrich_file(&client, &request, &dest).await;
+            if let Err(e) = tag::write_tags(
+                &dest,
+                &tag::TagContent {
+                    title: &enriched.title,
+                    artist: &enriched.artist,
+                    album: &enriched.album,
+                    lyrics: enriched.lyrics.as_deref(),
+                    cover: enriched
+                        .cover
+                        .as_ref()
+                        .map(|(data, mime)| (data.as_slice(), mime.as_str())),
+                },
+            ) {
+                log::warn!(
+                    "写标签失败（不阻断下载）: {} title={} artist={} album={} 有歌词={} 有封面={} err={e}",
+                    dest.display(),
+                    enriched.title,
+                    enriched.artist,
+                    enriched.album,
+                    enriched.lyrics.is_some(),
+                    enriched.cover.is_some(),
+                );
+            } else {
+                log::debug!("写标签完成: {}", dest.display());
+            }
             set_phase(task_id, TaskPhase::Done);
             let _ = {
                 let mut g = GLOBAL.lock().unwrap();
@@ -584,6 +647,9 @@ async fn run_task(
                 file_path: dest.to_string_lossy().into_owned(),
                 file_size: size,
                 actual_quality: resolved.quality_key,
+                title: enriched.title,
+                artist: enriched.artist,
+                album: enriched.album,
             });
         }
         Err(e) => {
@@ -795,6 +861,12 @@ pub extern "C" fn archoera_downloader_init(
     if root_dir.is_null() || event_cb.is_null() {
         return -1;
     }
+
+    // 注册 stderr 日志器（幂等，仅首次生效）
+    LOGGER_ONCE.call_once(|| {
+        log::set_boxed_logger(Box::new(StderrLogger)).ok();
+        log::set_max_level(log::LevelFilter::Debug);
+    });
     let root_dir_str = match unsafe { CStr::from_ptr(root_dir) }.to_str() {
         Ok(s) => s.to_string(),
         Err(_) => return -2,

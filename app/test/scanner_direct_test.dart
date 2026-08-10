@@ -2,9 +2,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:archoera_music/core/scanner/library_scanner.dart';
-import 'package:archoera_music/core/scanner/scanner_ffi.dart';
-import 'package:archoera_music/core/scanner/tracks_db.dart';
+import 'package:archoera_music/services/scanner/library_scanner.dart';
+import 'package:archoera_music/services/scanner/scanner_ffi.dart';
+import 'package:archoera_music/services/scanner/tracks_db.dart';
 
 /// 生成最小合法 WAV（44 字节 RIFF header + PCM 静音），TagLib 可解析。
 Uint8List makeWav({int sampleRate = 44100, double seconds = 0.2}) {

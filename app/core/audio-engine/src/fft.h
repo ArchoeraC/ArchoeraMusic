@@ -198,12 +198,37 @@ int fft_get_size(const FFTAnalyzer *fft);
 int fft_get_sample_rate(const FFTAnalyzer *fft);
 
 /**
- * 已处理音频时间（秒）
+ * 获取已处理音频时间（秒）
  *
  * 基于每声道样本计数，粒度 = 缓冲满间隔（≈ fft_size/2 样本），
  * 比管线 position（帧粒度）更细，用于按音频位置驱动频谱推送。
  */
 double fft_get_processed_seconds(const FFTAnalyzer *fft);
+
+/**
+ * 取走本帧脉冲命中标志（并清除）
+ *
+ * 封面跟随节奏缩放：C 侧在每帧频谱计算时检测低频（kick 40~150Hz）、
+ * 中频（snare/主音 150~2kHz）、高频（hihat/合成音 2k~10kHz）三个频段
+ * 的能量突增（相对各自滑动基线），任一命中即置位。本函数取走标志供
+ * 前端消费（拉模式每帧调用一次）；未启用 / 无数据 / 未命中时返回 false。
+ *
+ * @param fft 实例
+ * @return 上一帧是否有脉冲
+ */
+bool fft_take_beat(FFTAnalyzer *fft);
+
+/**
+ * 取走本帧脉冲强度（0~1，并清除）
+ *
+ * 强度 = 三频段能量突增幅度的加权最大值（突增越猛越接近 1），不仅限于
+ * 鼓点——高频电子合成音/打击乐瞬态同样贡献。前端据此区分脉冲大小：
+ * 弱脉冲轻微缩放、强脉冲大幅缩放。
+ *
+ * @param fft 实例
+ * @return 上一帧脉冲强度（0~1；无命中为 0）
+ */
+float fft_take_beat_strength(FFTAnalyzer *fft);
 
 /**
  * 每完成一帧 FFT 频谱计算后的回调（新频谱已就绪，可读取）

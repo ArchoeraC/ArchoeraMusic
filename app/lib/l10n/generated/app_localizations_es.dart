@@ -1132,6 +1132,48 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAboutSubtitle => 'Versión · Información del proyecto';
 
   @override
+  String get settingsCatDeveloper => 'Desarrollador';
+
+  @override
+  String get settingsDeveloperSubtitle =>
+      'Modo desarrollador · Funciones ocultas';
+
+  @override
+  String get settingsDeveloperTitle => 'Modo desarrollador';
+
+  @override
+  String get settingsDeveloperMode => 'Modo desarrollador';
+
+  @override
+  String get settingsDeveloperModeOn =>
+      'Activado (funciones de descarga visibles)';
+
+  @override
+  String get settingsDeveloperModeOff =>
+      'Desactivado (funciones de descarga ocultas)';
+
+  @override
+  String get settingsDeveloperDownloadModule => 'Módulo de descarga';
+
+  @override
+  String get settingsDeveloperDownloadModuleDesc =>
+      'La entrada «Descargar» de la barra lateral, el elemento «Descargar» del menú contextual y la categoría «Descargar» de la configuración solo se muestran con el modo desarrollador activado.';
+
+  @override
+  String get settingsDeveloperNote =>
+      'El modo desarrollador está pensado para depuración local y uso personal. Úsalo bajo tu responsabilidad.';
+
+  @override
+  String get settingsDeveloperEnabled => 'Modo desarrollador activado';
+
+  @override
+  String get settingsDeveloperDisabled => 'Modo desarrollador desactivado';
+
+  @override
+  String get settingsDeveloperHoldHint =>
+      'Mantén pulsado 10 segundos para activar el modo desarrollador (ratón: mantener pulsado)';
+
+  @override
   String get settingsSearchHint => 'Buscar ajustes…';
 
   @override
@@ -1301,6 +1343,12 @@ class AppLocalizationsEs extends AppLocalizations {
       'Paso activado: frecuencia original; desactivado: salida 48kHz. Efectivo al recargar la pista actual.';
 
   @override
+  String get volumeMute => 'Silenciar';
+
+  @override
+  String get volumeUnmute => 'Activar sonido';
+
+  @override
   String get settingsSectionMemory => 'Memoria e inicio';
 
   @override
@@ -1347,6 +1395,27 @@ class AppLocalizationsEs extends AppLocalizations {
   String settingsSpectrumBarWidthDesc(Object width) {
     return '${width}px（1~12, pantalla completa）';
   }
+
+  @override
+  String get settingsBarSpectrum => 'Espectro de la barra de reproducción';
+
+  @override
+  String get settingsBarSpectrumOn =>
+      'Mini espectro bajo la hora (sin letras o mini letras desactivadas)';
+
+  @override
+  String get settingsBarSpectrumOff =>
+      'Ocultar mini espectro en la barra de reproducción';
+
+  @override
+  String get settingsCoverBeatScale => 'Escalar portada al ritmo';
+
+  @override
+  String get settingsCoverBeatScaleOn => 'La portada pulsa con el ritmo';
+
+  @override
+  String get settingsCoverBeatScaleOff =>
+      'Portada estática（solo reproducción/pausa）';
 
   @override
   String get settingsTransitionStyle => 'Transición de medios';
@@ -1405,6 +1474,27 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsPlayerLyricsOff =>
       'Sin letras en el reproductor pantalla completa';
+
+  @override
+  String get settingsBarLyrics => 'Letras de la barra de reproducción';
+
+  @override
+  String get settingsBarLyricsOn =>
+      'Letra actual bajo la hora (desplazamiento automático si es muy larga)';
+
+  @override
+  String get settingsBarLyricsOff =>
+      'Ocultar mini letras en la barra de reproducción';
+
+  @override
+  String get settingsShowTranslation => 'Mostrar traducción';
+
+  @override
+  String get settingsShowTranslationOn =>
+      'Traducción entre paréntesis después de la línea original';
+
+  @override
+  String get settingsShowTranslationOff => 'Ocultar traducción de letras';
 
   @override
   String get settingsSectionLyricStyle => 'Estilo de letras';
@@ -2087,6 +2177,115 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsMediaSourceSubtitle =>
       'Servidores de streaming (Subsonic / Jellyfin / Emby)';
+
+  @override
+  String get settingsCatScrape => 'Raspado';
+
+  @override
+  String get settingsScrapeSubtitle =>
+      'Metadatos multi-fuente: portada / letra / etiquetas';
+
+  @override
+  String get settingsSectionScrapeDirs => 'Directorios de raspado';
+
+  @override
+  String get settingsScrapeDirsHint =>
+      'Un directorio por línea; vacío sigue los directorios de escaneo de la biblioteca';
+
+  @override
+  String get settingsScrapeDirsEmptyNote =>
+      'Sin directorios de raspado configurados; se usarán los de escaneo de la biblioteca.';
+
+  @override
+  String settingsScrapeDirsNote(Object dirs) {
+    return 'Directorios efectivos: $dirs';
+  }
+
+  @override
+  String get settingsSectionScrapeSources => 'Fuentes de datos';
+
+  @override
+  String get settingsScrapeSourceMusicBrainz => 'MusicBrainz';
+
+  @override
+  String get settingsScrapeSourceDeezer => 'Deezer';
+
+  @override
+  String get settingsScrapeSourceItunes => 'iTunes';
+
+  @override
+  String get settingsScrapeSourceNetease => 'Netease Cloud Music';
+
+  @override
+  String get settingsScrapeSourceQQMusic => 'QQ Music';
+
+  @override
+  String get settingsScrapeSourceKugou => 'Kugou Music';
+
+  @override
+  String get settingsScrapeSourceKuwo => 'Kuwo Music';
+
+  @override
+  String get settingsScrapeSourceMigu => 'Migu Music';
+
+  @override
+  String get settingsScrapeSourceAcoustID => 'AcoustID (huella de audio)';
+
+  @override
+  String get settingsScrapeSourceDesc =>
+      'Si está activado, participa en la consulta multi-fuente, la comparación de similitud y la fusión de puntuaciones';
+
+  @override
+  String get settingsSectionScrapeProgress => 'Progreso del raspado';
+
+  @override
+  String get settingsScrapeStart => 'Iniciar raspado';
+
+  @override
+  String get settingsScrapeCancel => 'Cancelar raspado';
+
+  @override
+  String get settingsScrapeScanning => 'Escaneando directorios…';
+
+  @override
+  String settingsScrapeCurrent(Object file) {
+    return 'Procesando: $file';
+  }
+
+  @override
+  String get settingsScrapeSuccess => 'Éxito';
+
+  @override
+  String get settingsScrapeFailed => 'Fallido';
+
+  @override
+  String get settingsScrapeSkipped => 'Omitido';
+
+  @override
+  String get settingsScrapeNotFound => 'Sin coincidencia';
+
+  @override
+  String get settingsScrapeIdle =>
+      'Aún no raspado. Haga clic en el botón de abajo para comenzar.';
+
+  @override
+  String get settingsScrapeNoDirs =>
+      'No hay directorios para raspar. Configure directorios de raspado o de escaneo de la biblioteca primero.';
+
+  @override
+  String get settingsScrapeDone => 'Raspado completado';
+
+  @override
+  String get settingsScrapeCanceled => 'Raspado cancelado';
+
+  @override
+  String get toastScrapeNoDirs => 'No hay directorios para raspar';
+
+  @override
+  String get toastScrapeDirsUpdated => 'Directorios de raspado guardados';
+
+  @override
+  String get toastScrapeStarted => 'Raspado iniciado';
 
   @override
   String get commonDelete => 'Eliminar';

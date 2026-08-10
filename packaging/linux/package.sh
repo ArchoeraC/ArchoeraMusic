@@ -77,7 +77,7 @@ pkg_deb() {
   local root="$stage/deb"
   mkdir -p "$root$DEST_PREFIX" "$root/usr/bin" \
     "$root/usr/share/applications" "$root/usr/share/metainfo" \
-    "$root/DEBIAN"
+    "$root/usr/share/icons" "$root/DEBIAN"
   cp -a "$stage_bundle/." "$root$DEST_PREFIX/"
   ln -s "$DEST_PREFIX/$BIN" "$root/usr/bin/$BIN"
   install -m644 "$stage_desktop" \

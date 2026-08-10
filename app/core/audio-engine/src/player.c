@@ -6,7 +6,9 @@
  *     seek 即时跳转，无重解码）
  *   - 输出设备：ALSA/PulseAudio/PipeWire（Linux）、WASAPI（Windows）、
  *     CoreAudio（macOS），跨平台零系统依赖
- * 位置事件按音频位置驱动（每 100ms 音频 1 帧，与 FFT 推送同策略）。
+ * 位置事件按音频位置驱动（每 50ms 音频 1 帧，对齐 FFT 拉模式 50ms 轮询：
+ * 若保持 100ms，Dart _pollSpectrum 两次读到同一 position，FFT 窗口实际
+ * 每 100ms 才前进一次（10Hz），节拍检测命中率会掉 ~40%（实测 127→74/min）。
  */
 #define _POSIX_C_SOURCE 200809L
 
@@ -20,8 +22,8 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
-/* 位置事件推送间隔（音频秒） */
-#define POSITION_INTERVAL_MS 100
+/* 位置事件推送间隔（音频秒）：50ms 对齐 FFT 拉模式轮询（20Hz 分析） */
+#define POSITION_INTERVAL_MS 50
 
 struct PlayerCtx {
     ma_engine engine;

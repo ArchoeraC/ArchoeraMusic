@@ -36,6 +36,9 @@ install -m 644 %{stage_path}/archoera-music.desktop \
 mkdir -p %{buildroot}/usr/share/metainfo
 install -m 644 %{stage_path}/com.archoera.archoera_music.metainfo.xml \
   %{buildroot}/usr/share/metainfo/com.archoera.archoera_music.metainfo.xml
+# 先建 icons 目录再 cp -a：否则 hicolor 层级会被吞掉（icons 直接落在 icons/ 下，
+# 导致 %files 的 hicolor/*/apps/*.png 通配匹配不到——CI 曾因此失败）
+mkdir -p %{buildroot}/usr/share/icons
 cp -a %{stage_path}/icons/hicolor %{buildroot}/usr/share/icons/
 
 %files

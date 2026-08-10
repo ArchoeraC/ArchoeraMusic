@@ -5,7 +5,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:archoera_music/core/state/event_bus.dart';
+import 'package:archoera_music/stores/event_bus.dart';
 
 void main() {
   test('EventBus 按类型过滤订阅', () async {

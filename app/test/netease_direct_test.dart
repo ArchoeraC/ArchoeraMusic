@@ -6,9 +6,9 @@
 /// 加密原语与请求层来自 apis 包（app/lib/core/apis/netease/，纯 Dart 直连）。
 library;
 
-import 'package:archoera_music/core/apis/netease/core/crypto.dart';
-import 'package:archoera_music/core/netease/apis_netease_caller.dart';
-import 'package:archoera_music/core/netease/netease_api.dart';
+import 'package:archoera_music/apis/netease/core/crypto.dart';
+import 'package:archoera_music/services/netease/apis_netease_caller.dart';
+import 'package:archoera_music/services/netease/netease_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

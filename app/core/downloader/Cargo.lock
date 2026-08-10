@@ -33,6 +33,7 @@ dependencies = [
  "anyhow",
  "base64",
  "cbc",
+ "flate2",
  "futures",
  "hex",
  "lofty",

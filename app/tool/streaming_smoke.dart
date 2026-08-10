@@ -6,13 +6,13 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:archoera_music/core/streaming/jellyfin_client.dart';
-import 'package:archoera_music/core/streaming/streaming_client.dart';
-import 'package:archoera_music/core/streaming/streaming_errors.dart';
-import 'package:archoera_music/core/streaming/streaming_models.dart';
-import 'package:archoera_music/core/streaming/streaming_session.dart';
-import 'package:archoera_music/core/streaming/streaming_store.dart';
-import 'package:archoera_music/core/streaming/streaming_types.dart';
+import 'package:archoera_music/services/streaming/jellyfin_client.dart';
+import 'package:archoera_music/services/streaming/streaming_client.dart';
+import 'package:archoera_music/services/streaming/streaming_errors.dart';
+import 'package:archoera_music/services/streaming/streaming_models.dart';
+import 'package:archoera_music/services/streaming/streaming_session.dart';
+import 'package:archoera_music/services/streaming/streaming_store.dart';
+import 'package:archoera_music/services/streaming/streaming_types.dart';
 
 Future<void> main() async {
   // 1) JellyItem 解析 + jellyItemToTrack 全字段

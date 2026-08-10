@@ -6,10 +6,10 @@ library;
 
 import 'dart:io';
 
-import 'package:archoera_music/core/netease/apis_netease_caller.dart';
-import 'package:archoera_music/core/netease/netease_api.dart';
-import 'package:archoera_music/core/playback/audio_engine_process.dart';
-import 'package:archoera_music/core/playback/pcm_analyzer.dart';
+import 'package:archoera_music/services/netease/apis_netease_caller.dart';
+import 'package:archoera_music/services/netease/netease_api.dart';
+import 'package:archoera_music/services/playback/audio_engine_process.dart';
+import 'package:archoera_music/services/playback/pcm_analyzer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1096,6 +1096,43 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAboutSubtitle => 'バージョン · プロジェクト情報';
 
   @override
+  String get settingsCatDeveloper => '開発者';
+
+  @override
+  String get settingsDeveloperSubtitle => '開発者モード · 隠し機能';
+
+  @override
+  String get settingsDeveloperTitle => '開発者モード';
+
+  @override
+  String get settingsDeveloperMode => '開発者モード';
+
+  @override
+  String get settingsDeveloperModeOn => '有効（ダウンロード機能を表示）';
+
+  @override
+  String get settingsDeveloperModeOff => '無効（ダウンロード機能を非表示）';
+
+  @override
+  String get settingsDeveloperDownloadModule => 'ダウンロードモジュール';
+
+  @override
+  String get settingsDeveloperDownloadModuleDesc =>
+      'サイドバーの「ダウンロード」、コンテキストメニューの「ダウンロード」、設定の「ダウンロード」カテゴリは開発者モード有効時のみ表示されます。';
+
+  @override
+  String get settingsDeveloperNote => '開発者モードはローカルデバッグと個人利用を想定しています。利用は自己責任です。';
+
+  @override
+  String get settingsDeveloperEnabled => '開発者モードを有効にしました';
+
+  @override
+  String get settingsDeveloperDisabled => '開発者モードを無効にしました';
+
+  @override
+  String get settingsDeveloperHoldHint => '10秒長押しで開発者モードを有効化（マウス：押し続ける）';
+
+  @override
   String get settingsSearchHint => '設定を検索…';
 
   @override
@@ -1255,6 +1292,12 @@ class AppLocalizationsJa extends AppLocalizations {
       'トランスコードOFFでソースのサンプルレートを維持、ONで48kHzに統一出力；切替後は現在の曲を自動リロードして有効。';
 
   @override
+  String get volumeMute => 'ミュート';
+
+  @override
+  String get volumeUnmute => 'ミュート解除';
+
+  @override
   String get settingsSectionMemory => 'メモリと起動';
 
   @override
@@ -1297,6 +1340,24 @@ class AppLocalizationsJa extends AppLocalizations {
   String settingsSpectrumBarWidthDesc(Object width) {
     return '${width}px（1~12、フルスクリーンプレーヤー）';
   }
+
+  @override
+  String get settingsBarSpectrum => 'プレイバーのスペクトラム';
+
+  @override
+  String get settingsBarSpectrumOn => '時刻の下にミニスペクトラムを表示（歌詞なしまたはミニ歌詞オフ時）';
+
+  @override
+  String get settingsBarSpectrumOff => 'プレイバーにミニスペクトラムを表示しない';
+
+  @override
+  String get settingsCoverBeatScale => 'カバーをビートに合わせて拡大';
+
+  @override
+  String get settingsCoverBeatScaleOn => 'カバーがビートに合わせてパルス';
+
+  @override
+  String get settingsCoverBeatScaleOff => 'カバーは静止（再生/一時停止のみ）';
 
   @override
   String get settingsTransitionStyle => 'メディア情報の切り替えアニメーション';
@@ -1352,6 +1413,24 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsPlayerLyricsOff => 'フルスクリーンプレーヤーに歌詞を表示しない';
+
+  @override
+  String get settingsBarLyrics => 'プレイバーの歌詞';
+
+  @override
+  String get settingsBarLyricsOn => '時刻の下に現在の歌詞を表示（長い場合は自動スクロール）';
+
+  @override
+  String get settingsBarLyricsOff => 'プレイバーにミニ歌詞を表示しない';
+
+  @override
+  String get settingsShowTranslation => '翻訳を表示';
+
+  @override
+  String get settingsShowTranslationOn => '原句の後の括弧内に翻訳を表示';
+
+  @override
+  String get settingsShowTranslationOff => '歌詞の翻訳を表示しない';
 
   @override
   String get settingsSectionLyricStyle => '歌詞スタイル';
@@ -1984,6 +2063,110 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get settingsMediaSourceSubtitle =>
       'ストリーミングサーバー（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsCatScrape => 'スクレイピング';
+
+  @override
+  String get settingsScrapeSubtitle => '複数ソースのメタデータ補完：カバー / 歌詞 / タグ';
+
+  @override
+  String get settingsSectionScrapeDirs => 'スクレイプ対象ディレクトリ';
+
+  @override
+  String get settingsScrapeDirsHint => '1行に1ディレクトリ。空欄ならライブラリのスキャン先に従う';
+
+  @override
+  String get settingsScrapeDirsEmptyNote => 'スクレイプ先が未設定のため、ライブラリのスキャン先を使用します。';
+
+  @override
+  String settingsScrapeDirsNote(Object dirs) {
+    return '現在有効なディレクトリ：$dirs';
+  }
+
+  @override
+  String get settingsSectionScrapeSources => 'データソース';
+
+  @override
+  String get settingsScrapeSourceMusicBrainz => 'MusicBrainz';
+
+  @override
+  String get settingsScrapeSourceDeezer => 'Deezer';
+
+  @override
+  String get settingsScrapeSourceItunes => 'iTunes';
+
+  @override
+  String get settingsScrapeSourceNetease => 'Netease Cloud Music';
+
+  @override
+  String get settingsScrapeSourceQQMusic => 'QQ 音楽';
+
+  @override
+  String get settingsScrapeSourceKugou => '酷狗音楽';
+
+  @override
+  String get settingsScrapeSourceKuwo => '酷我音楽';
+
+  @override
+  String get settingsScrapeSourceMigu => '咪咕音楽';
+
+  @override
+  String get settingsScrapeSourceAcoustID => 'AcoustID（音声フィンガープリント）';
+
+  @override
+  String get settingsScrapeSourceDesc => '有効にすると、複数ソースの検索・類似度照合・スコア統合に参加します';
+
+  @override
+  String get settingsSectionScrapeProgress => 'スクレイプ進捗';
+
+  @override
+  String get settingsScrapeStart => 'スクレイプ開始';
+
+  @override
+  String get settingsScrapeCancel => 'スクレイプ中止';
+
+  @override
+  String get settingsScrapeScanning => 'ディレクトリをスキャン中…';
+
+  @override
+  String settingsScrapeCurrent(Object file) {
+    return '処理中：$file';
+  }
+
+  @override
+  String get settingsScrapeSuccess => '成功';
+
+  @override
+  String get settingsScrapeFailed => '失敗';
+
+  @override
+  String get settingsScrapeSkipped => 'スキップ';
+
+  @override
+  String get settingsScrapeNotFound => '未マッチ';
+
+  @override
+  String get settingsScrapeIdle => 'まだ実行されていません。下のボタンから開始してください。';
+
+  @override
+  String get settingsScrapeNoDirs =>
+      'スクレイプ対象のディレクトリがありません。スクレイプ先またはライブラリのスキャン先を設定してください。';
+
+  @override
+  String get settingsScrapeDone => 'スクレイプ完了';
+
+  @override
+  String get settingsScrapeCanceled => 'スクレイプ中止';
+
+  @override
+  String get toastScrapeNoDirs => 'スクレイプ対象のディレクトリがありません';
+
+  @override
+  String get toastScrapeDirsUpdated => 'スクレイプ先を保存しました';
+
+  @override
+  String get toastScrapeStarted => 'スクレイプを開始しました';
 
   @override
   String get commonDelete => '削除';

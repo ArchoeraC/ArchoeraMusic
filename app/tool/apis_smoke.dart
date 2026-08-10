@@ -1,13 +1,13 @@
 // 临时冒烟测试：验证 apis 纯 Dart 直连三平台核心链路。
 // 用法：dart run tool/apis_smoke.dart
 // ignore_for_file: avoid_print
-import 'package:archoera_music/core/apis/kugou/api.dart';
-import 'package:archoera_music/core/apis/lyric/kugou.dart';
-import 'package:archoera_music/core/apis/lyric/netease.dart';
-import 'package:archoera_music/core/apis/lyric/qqmusic.dart';
-import 'package:archoera_music/core/apis/netease/api.dart';
-import 'package:archoera_music/core/apis/qqmusic/api.dart';
-import 'package:archoera_music/core/netease/track.dart';
+import 'package:archoera_music/apis/kugou/api.dart';
+import 'package:archoera_music/apis/lyric/kugou.dart';
+import 'package:archoera_music/apis/lyric/netease.dart';
+import 'package:archoera_music/apis/lyric/qqmusic.dart';
+import 'package:archoera_music/apis/netease/api.dart';
+import 'package:archoera_music/apis/qqmusic/api.dart';
+import 'package:archoera_music/services/netease/track.dart';
 
 Future<void> main() async {
   var pass = 0;

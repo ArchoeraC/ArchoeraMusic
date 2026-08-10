@@ -10,9 +10,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:archoera_music/core/kugou/direct/kugou_api.dart';
-import 'package:archoera_music/core/kugou/direct/kugou_crypto.dart';
-import 'package:archoera_music/core/netease/track.dart';
+import 'package:archoera_music/services/kugou/kugou_api.dart';
+import 'package:archoera_music/services/kugou/kugou_crypto.dart';
+import 'package:archoera_music/services/netease/track.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

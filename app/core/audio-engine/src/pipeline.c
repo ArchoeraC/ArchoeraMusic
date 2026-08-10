@@ -379,8 +379,12 @@ void pipeline_set_preamp(AudioPipeline *p, float preamp_db)
 void pipeline_set_volume(AudioPipeline *p, float volume)
 {
     if (!p || !p->limiter) return;
-    float adjusted = limiter_get_threshold(p->limiter) + 20.0f * log10f(volume);
-    limiter_set_threshold(p->limiter, adjusted);
+    /* 音量作为绝对增益叠加在限幅器基准阈值上（非累加当前阈值）：
+       此前累加式在 volume=0 时 log10(0) → -inf 会永久污染阈值状态，
+       恢复音量后 limiter 阈值仍为 -inf，转码输出持续静音（表现为
+       「引擎暂停/无声音」）。volume<=0 用有限值 -120dB 表示静音。 */
+    float gain_db = (volume > 0.0f) ? 20.0f * log10f(volume) : -120.0f;
+    limiter_set_threshold(p->limiter, p->cfg.limiter_threshold_db + gain_db);
 }
 
 void pipeline_set_pcm_out_cb(AudioPipeline *p, PcmOutCallback cb, void *user_data)

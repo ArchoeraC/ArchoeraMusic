@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'core/apis/runtime.dart';
-import 'core/state/netease_session.dart';
-import 'ui/app.dart';
-import 'ui/widgets/cover_image.dart';
-import 'ui/widgets/tray_integration.dart';
+import 'apis/runtime.dart';
+import 'stores/netease_session.dart';
+import 'app/app.dart';
+import 'widgets/list/cover_image.dart';
+import 'widgets/common/tray_integration.dart';
 
 /// ArchoeraMusic — 应用入口。
 ///

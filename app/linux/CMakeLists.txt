@@ -112,6 +112,25 @@ if(GO)
   add_dependencies(${BINARY_NAME} subsonic_go)
 endif()
 
+# === ArchoeraMusic audio-engine：内嵌 CMake 构建链（一键构建）===
+# flutter build / flutter run 时自动调用 cmake 产出 libfft.so /
+# libarchoera_mediaengine.so / splayer-audio-engine 到 audio-engine/build/
+#（与下方 OPTIONAL install 路径一致），无需手动 cmake 预构建。
+# cmake 自身增量编译，无变更时仅 ~0.1s。依赖系统 ffmpeg-devel
+#（pkg-config libavformat/libavcodec/libavutil/libswresample）与 cargo
+#（tempo 变速变调，缺失时仅告警降级）。构建产物固定 Release（audio-engine
+# 内部 Rust tempo 亦仅 release 构建），与 Flutter 构建模式解耦。
+find_program(AUDIO_ENGINE_CMAKE cmake REQUIRED)
+set(AUDIO_ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine")
+set(AUDIO_ENGINE_BUILD_DIR "${AUDIO_ENGINE_DIR}/build")
+add_custom_target(audio_engine_cmake ALL
+  COMMAND ${AUDIO_ENGINE_CMAKE} -S "${AUDIO_ENGINE_DIR}" -B "${AUDIO_ENGINE_BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
+  COMMAND ${AUDIO_ENGINE_CMAKE} --build "${AUDIO_ENGINE_BUILD_DIR}" -j
+  COMMENT "cmake build archoera-audio-engine (libfft + mediaengine)"
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} audio_engine_cmake)
+
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
 

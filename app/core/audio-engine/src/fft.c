@@ -69,6 +69,16 @@ struct FFTAnalyzer {
     /* 缓冲满（频谱计算）次数：每次消耗 fft_size/2 样本（首次数满消耗 fft_size），
      * 用于样本级精确计算音频位置 */
     long long filled_count;
+
+    /* 节拍检测（封面跟随节奏缩放）：低/中/高频段能量滑动基线 +
+     * 冷却帧计数 + 本帧脉冲强度（0~1，拉模式下由 fft_take_beat_strength
+     * 取走并清除；无脉冲为 0） */
+    float beat_ema_low;
+    float beat_ema_mid;
+    float beat_ema_high;
+    int beat_seed_frames;   /* 基线建立期（前 3 帧只记基线不触发） */
+    int beat_cooldown;
+    float beat_strength;
 };
 
 /* ─── 工具函数 ─────────────────────────────────────────────── */
@@ -193,6 +203,122 @@ static void update_peak(float *peak, const float *spectrum,
     }
 }
 
+/* 脉冲频段配置（封面跟随节奏缩放）：
+ * 低频 = kick 主体（40~150Hz）；中频 = snare/主音泛音（150~2kHz）；
+ * 高频 = hihat/电子合成音/打击乐瞬态（2k~10kHz）。
+ * trigger_ratio：能量/滑动基线达到该比值视为脉冲起始；peak_ratio：达到
+ * 该比值强度记 1.0；weight：综合权重（中高频略低，避免一有能量就乱跳）；
+ * use_max：1 = 取频段内最大 bin（瞬态/hat 敏感，避免平均稀释），
+ *         0 = 频段平均（kick/snare 能量分散多个 bin）。
+ * 参数经真实 mp3 校准（2026-08，西憂花-ふわふわhazy 265s 实测，目标
+ * ~130BPM 4-on-floor）：低频收窄至 40~150Hz 保持 kick 命中率，中高频
+ * 拓宽脉冲来源（合成音/瞬态也能触发），冷却 2 帧 ≈100ms 防连击同时
+ * 允许高频密集瞬态。 */
+typedef struct {
+    float lo_freq;
+    float hi_freq;
+    float trigger_ratio;
+    float peak_ratio;
+    float weight;
+    int use_max;
+} BeatBand;
+
+static const BeatBand kBeatBands[3] = {
+    { 40.0f, 150.0f, 1.3f, 2.2f, 1.0f, 0 },
+    { 150.0f, 2000.0f, 1.4f, 2.8f, 0.85f, 0 },
+    { 2000.0f, 10000.0f, 1.6f, 3.5f, 0.7f, 1 },
+};
+
+static float *beat_ema_of(FFTAnalyzer *fft, int band)
+{
+    return band == 0 ? &fft->beat_ema_low
+         : band == 1 ? &fft->beat_ema_mid
+                     : &fft->beat_ema_high;
+}
+
+static float beat_band_energy(const FFTAnalyzer *fft, int b0, int b1, int use_max)
+{
+    float sum = 0.0f, mx = 0.0f;
+    for (int i = b0; i < b1; i++) {
+        float l = fft->spectrum[i];
+        float r = fft->spectrum_r[i];
+        float v = l > r ? l : r;
+        sum += v;
+        if (v > mx) mx = v;
+    }
+    return use_max ? mx : sum / (float)(b1 - b0);
+}
+
+static void detect_beat(FFTAnalyzer *fft, int half)
+{
+    if (!fft->enabled) return;
+
+    float freq_per_bin = (float)fft->sample_rate / (float)fft->fft_size;
+
+    fft->beat_strength = 0.0f;
+
+    /* 基线建立期：前 3 帧各频段仅记录能量基线，不触发。此后 EMA 永不
+     * 重置——瞬态间能量归零时基线自然衰减（×0.85），避免每次脉冲都被
+     * 当作「首帧基线」而漏检（曾导致高频段完全不触发）。 */
+    if (fft->beat_seed_frames < 3) {
+        fft->beat_seed_frames++;
+        for (int b = 0; b < 3; b++) {
+            const BeatBand *band = &kBeatBands[b];
+            int b0 = (int)(band->lo_freq / freq_per_bin);
+            int b1 = (int)(band->hi_freq / freq_per_bin);
+            if (b0 < 0) b0 = 0;
+            if (b1 > half) b1 = half;
+            if (b1 <= b0) b1 = b0 + 1;
+            *beat_ema_of(fft, b) = beat_band_energy(fft, b0, b1, band->use_max);
+        }
+        return;
+    }
+
+    /* 三频段独立测能量突增，强度取加权最大值（脉冲不只局限于鼓点） */
+    float best = 0.0f;
+    for (int b = 0; b < 3; b++) {
+        const BeatBand *band = &kBeatBands[b];
+        int b0 = (int)(band->lo_freq / freq_per_bin);
+        int b1 = (int)(band->hi_freq / freq_per_bin);
+        if (b0 < 0) b0 = 0;
+        if (b1 > half) b1 = half;
+        if (b1 <= b0) b1 = b0 + 1;
+
+        float energy = beat_band_energy(fft, b0, b1, band->use_max);
+        float *ema = beat_ema_of(fft, b);
+        /* 本帧近静音（含频段内瞬态间隙）：不触发，基线仅衰减 */
+        if (energy < 1e-3f) {
+            *ema *= 0.85f;
+            continue;
+        }
+        /* 基线被长时间静音拖到极低：用当前能量轻量拉回，不触发（防噪声） */
+        if (*ema < 1e-4f) {
+            *ema = energy * 0.15f;
+            continue;
+        }
+        float ratio = energy / *ema;
+        *ema = *ema * 0.85f + energy * 0.15f;
+
+        if (ratio > band->trigger_ratio) {
+            float s = (ratio - band->trigger_ratio) /
+                      (band->peak_ratio - band->trigger_ratio);
+            if (s > 1.0f) s = 1.0f;
+            s *= band->weight;
+            if (s > best) best = s;
+        }
+    }
+    /* 冷却每帧递减（与是否命中无关）：触发后恰好 2 帧静默期，
+     * 之后恢复检测——此前冷却只在命中帧递减，连续静音帧会让冷却
+     * 永不解锁，吞掉后续所有脉冲（合成信号验证复现）。 */
+    if (fft->beat_cooldown > 0) {
+        fft->beat_cooldown--;
+        return;
+    }
+    if (best <= 0.0f) return;
+    fft->beat_cooldown = 2; /* ≈100ms（约 50ms/帧），防连击 */
+    fft->beat_strength = best;
+}
+
 /* ─── 公共 API ─────────────────────────────────────────────── */
 
 FFTAnalyzer* fft_create(int sample_rate, int fft_size)
@@ -272,6 +398,22 @@ double fft_get_processed_seconds(const FFTAnalyzer *fft)
     return (double)total / (double)fft->sample_rate;
 }
 
+bool fft_take_beat(FFTAnalyzer *fft)
+{
+    if (!fft) return false;
+    bool hit = fft->beat_strength > 0.0f;
+    fft->beat_strength = 0.0f;
+    return hit;
+}
+
+float fft_take_beat_strength(FFTAnalyzer *fft)
+{
+    if (!fft) return 0.0f;
+    float s = fft->beat_strength;
+    fft->beat_strength = 0.0f;
+    return s;
+}
+
 void fft_set_smoothing(FFTAnalyzer *fft, float alpha)
 {
     if (!fft) return;
@@ -339,6 +481,9 @@ static void process_buffers(FFTAnalyzer *fft, int half)
                half, fft->peak_decay);
     update_peak(fft->peak_spectrum_r, fft->spectrum_r,
                half, fft->peak_decay);
+
+    /* 节拍检测（封面跟随节奏缩放）：先于帧回调，确保回调触发时标志就绪 */
+    detect_beat(fft, half);
 
     /* 新频谱已就绪：通知订阅者（每缓冲满计算一次即触发一次） */
     if (fft->frame_cb) {

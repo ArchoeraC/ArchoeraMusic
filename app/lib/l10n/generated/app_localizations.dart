@@ -2078,6 +2078,78 @@ abstract class AppLocalizations {
   /// **'版本 · 项目信息'**
   String get settingsAboutSubtitle;
 
+  /// No description provided for @settingsCatDeveloper.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开发者'**
+  String get settingsCatDeveloper;
+
+  /// No description provided for @settingsDeveloperSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开发者模式 · 隐藏接口'**
+  String get settingsDeveloperSubtitle;
+
+  /// No description provided for @settingsDeveloperTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开发者模式'**
+  String get settingsDeveloperTitle;
+
+  /// No description provided for @settingsDeveloperMode.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开发者模式'**
+  String get settingsDeveloperMode;
+
+  /// No description provided for @settingsDeveloperModeOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开启（下载接口可见）'**
+  String get settingsDeveloperModeOn;
+
+  /// No description provided for @settingsDeveloperModeOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已关闭（下载接口隐藏）'**
+  String get settingsDeveloperModeOff;
+
+  /// No description provided for @settingsDeveloperDownloadModule.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下载模块'**
+  String get settingsDeveloperDownloadModule;
+
+  /// No description provided for @settingsDeveloperDownloadModuleDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'侧边栏「下载」入口、曲目右键「下载」与设置「下载」分类仅在开发者模式开启后显示。'**
+  String get settingsDeveloperDownloadModuleDesc;
+
+  /// No description provided for @settingsDeveloperNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开发者模式面向本地调试与自用，开启后请自行承担相关责任。'**
+  String get settingsDeveloperNote;
+
+  /// No description provided for @settingsDeveloperEnabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开发者模式已开启'**
+  String get settingsDeveloperEnabled;
+
+  /// No description provided for @settingsDeveloperDisabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开发者模式已关闭'**
+  String get settingsDeveloperDisabled;
+
+  /// No description provided for @settingsDeveloperHoldHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'长按 10 秒开启开发者模式（鼠标：按住不放）'**
+  String get settingsDeveloperHoldHint;
+
   /// No description provided for @settingsSearchHint.
   ///
   /// In zh_CN, this message translates to:
@@ -2378,6 +2450,18 @@ abstract class AppLocalizations {
   /// **'关闭转码保持源采样率播放，开启则统一 48kHz 输出；切换后自动重载当前曲目生效。'**
   String get settingsPassthroughNote;
 
+  /// No description provided for @volumeMute.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'静音'**
+  String get volumeMute;
+
+  /// No description provided for @volumeUnmute.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'取消静音'**
+  String get volumeUnmute;
+
   /// No description provided for @settingsSectionMemory.
   ///
   /// In zh_CN, this message translates to:
@@ -2461,6 +2545,42 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'{width}px（1~12，全屏播放器）'**
   String settingsSpectrumBarWidthDesc(Object width);
+
+  /// No description provided for @settingsBarSpectrum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放条频谱'**
+  String get settingsBarSpectrum;
+
+  /// No description provided for @settingsBarSpectrumOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放条时间下方显示迷你频谱（无歌词或关闭迷你歌词时）'**
+  String get settingsBarSpectrumOn;
+
+  /// No description provided for @settingsBarSpectrumOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放条不显示迷你频谱'**
+  String get settingsBarSpectrumOff;
+
+  /// No description provided for @settingsCoverBeatScale.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'封面跟随节奏缩放'**
+  String get settingsCoverBeatScale;
+
+  /// No description provided for @settingsCoverBeatScaleOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'封面随鼓点轻微缩放'**
+  String get settingsCoverBeatScaleOn;
+
+  /// No description provided for @settingsCoverBeatScaleOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'封面静止（仅播放/暂停缩放）'**
+  String get settingsCoverBeatScaleOff;
 
   /// No description provided for @settingsTransitionStyle.
   ///
@@ -2569,6 +2689,42 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'全屏播放器不显示歌词'**
   String get settingsPlayerLyricsOff;
+
+  /// No description provided for @settingsBarLyrics.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放条歌词'**
+  String get settingsBarLyrics;
+
+  /// No description provided for @settingsBarLyricsOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放条时间下方显示当前歌词（过长自动滚动）'**
+  String get settingsBarLyricsOn;
+
+  /// No description provided for @settingsBarLyricsOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放条不显示迷你歌词'**
+  String get settingsBarLyricsOff;
+
+  /// No description provided for @settingsShowTranslation.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'显示翻译'**
+  String get settingsShowTranslation;
+
+  /// No description provided for @settingsShowTranslationOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词翻译显示在原句后的括号内'**
+  String get settingsShowTranslationOn;
+
+  /// No description provided for @settingsShowTranslationOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不显示歌词翻译'**
+  String get settingsShowTranslationOff;
 
   /// No description provided for @settingsSectionLyricStyle.
   ///
@@ -3721,6 +3877,204 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'流媒体服务器（Subsonic / Jellyfin / Emby）'**
   String get settingsMediaSourceSubtitle;
+
+  /// No description provided for @settingsCatScrape.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刮削'**
+  String get settingsCatScrape;
+
+  /// No description provided for @settingsScrapeSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'多源元数据补齐 · 封面 / 歌词 / 标签'**
+  String get settingsScrapeSubtitle;
+
+  /// No description provided for @settingsSectionScrapeDirs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刮削目录'**
+  String get settingsSectionScrapeDirs;
+
+  /// No description provided for @settingsScrapeDirsHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'每行一个目录；留空跟随媒体库扫描目录'**
+  String get settingsScrapeDirsHint;
+
+  /// No description provided for @settingsScrapeDirsEmptyNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未配置刮削目录，刮削时将跟随媒体库扫描目录。'**
+  String get settingsScrapeDirsEmptyNote;
+
+  /// No description provided for @settingsScrapeDirsNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前生效目录：{dirs}'**
+  String settingsScrapeDirsNote(Object dirs);
+
+  /// No description provided for @settingsSectionScrapeSources.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'数据源'**
+  String get settingsSectionScrapeSources;
+
+  /// No description provided for @settingsScrapeSourceMusicBrainz.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'MusicBrainz'**
+  String get settingsScrapeSourceMusicBrainz;
+
+  /// No description provided for @settingsScrapeSourceDeezer.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Deezer'**
+  String get settingsScrapeSourceDeezer;
+
+  /// No description provided for @settingsScrapeSourceItunes.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'iTunes'**
+  String get settingsScrapeSourceItunes;
+
+  /// No description provided for @settingsScrapeSourceNetease.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'网易云音乐'**
+  String get settingsScrapeSourceNetease;
+
+  /// No description provided for @settingsScrapeSourceQQMusic.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ 音乐'**
+  String get settingsScrapeSourceQQMusic;
+
+  /// No description provided for @settingsScrapeSourceKugou.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷狗音乐'**
+  String get settingsScrapeSourceKugou;
+
+  /// No description provided for @settingsScrapeSourceKuwo.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷我音乐'**
+  String get settingsScrapeSourceKuwo;
+
+  /// No description provided for @settingsScrapeSourceMigu.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'咪咕音乐'**
+  String get settingsScrapeSourceMigu;
+
+  /// No description provided for @settingsScrapeSourceAcoustID.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'AcoustID（音频指纹）'**
+  String get settingsScrapeSourceAcoustID;
+
+  /// No description provided for @settingsScrapeSourceDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启后参与多源查询、相似度比对与评分合并'**
+  String get settingsScrapeSourceDesc;
+
+  /// No description provided for @settingsSectionScrapeProgress.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刮削进度'**
+  String get settingsSectionScrapeProgress;
+
+  /// No description provided for @settingsScrapeStart.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开始刮削'**
+  String get settingsScrapeStart;
+
+  /// No description provided for @settingsScrapeCancel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'取消刮削'**
+  String get settingsScrapeCancel;
+
+  /// No description provided for @settingsScrapeScanning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在扫描目录…'**
+  String get settingsScrapeScanning;
+
+  /// No description provided for @settingsScrapeCurrent.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在处理：{file}'**
+  String settingsScrapeCurrent(Object file);
+
+  /// No description provided for @settingsScrapeSuccess.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'成功'**
+  String get settingsScrapeSuccess;
+
+  /// No description provided for @settingsScrapeFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'失败'**
+  String get settingsScrapeFailed;
+
+  /// No description provided for @settingsScrapeSkipped.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'跳过'**
+  String get settingsScrapeSkipped;
+
+  /// No description provided for @settingsScrapeNotFound.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未匹配'**
+  String get settingsScrapeNotFound;
+
+  /// No description provided for @settingsScrapeIdle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'尚未刮削，点击下方按钮开始。'**
+  String get settingsScrapeIdle;
+
+  /// No description provided for @settingsScrapeNoDirs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'没有可刮削的目录，请先配置刮削目录或媒体库扫描目录。'**
+  String get settingsScrapeNoDirs;
+
+  /// No description provided for @settingsScrapeDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刮削完成'**
+  String get settingsScrapeDone;
+
+  /// No description provided for @settingsScrapeCanceled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刮削已取消'**
+  String get settingsScrapeCanceled;
+
+  /// No description provided for @toastScrapeNoDirs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'没有可刮削的目录'**
+  String get toastScrapeNoDirs;
+
+  /// No description provided for @toastScrapeDirsUpdated.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刮削目录已保存'**
+  String get toastScrapeDirsUpdated;
+
+  /// No description provided for @toastScrapeStarted.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开始刮削'**
+  String get toastScrapeStarted;
 
   /// No description provided for @commonDelete.
   ///

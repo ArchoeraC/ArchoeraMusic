@@ -16,12 +16,12 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:archoera_music/core/streaming/streaming_types.dart';
-import 'package:archoera_music/core/subsonic/subsonic_admin.dart';
-import 'package:archoera_music/core/subsonic/subsonic_bindings.dart';
-import 'package:archoera_music/core/subsonic/subsonic_client.dart';
-import 'package:archoera_music/core/subsonic/subsonic_controller.dart';
-import 'package:archoera_music/core/subsonic/subsonic_local.dart';
+import 'package:archoera_music/services/streaming/streaming_types.dart';
+import 'package:archoera_music/services/subsonic/subsonic_admin.dart';
+import 'package:archoera_music/services/subsonic/subsonic_bindings.dart';
+import 'package:archoera_music/services/subsonic/subsonic_client.dart';
+import 'package:archoera_music/services/subsonic/subsonic_controller.dart';
+import 'package:archoera_music/services/subsonic/subsonic_local.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
 void main() async {

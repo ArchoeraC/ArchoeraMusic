@@ -1098,6 +1098,45 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsAboutSubtitle => '버전 · 프로젝트 정보';
 
   @override
+  String get settingsCatDeveloper => '개발자';
+
+  @override
+  String get settingsDeveloperSubtitle => '개발자 모드 · 숨김 기능';
+
+  @override
+  String get settingsDeveloperTitle => '개발자 모드';
+
+  @override
+  String get settingsDeveloperMode => '개발자 모드';
+
+  @override
+  String get settingsDeveloperModeOn => '활성화됨 (다운로드 기능 표시)';
+
+  @override
+  String get settingsDeveloperModeOff => '비활성화됨 (다운로드 기능 숨김)';
+
+  @override
+  String get settingsDeveloperDownloadModule => '다운로드 모듈';
+
+  @override
+  String get settingsDeveloperDownloadModuleDesc =>
+      '사이드바의 \'다운로드\' 항목, 상황에 맞는 메뉴의 \'다운로드\', 설정의 \'다운로드\' 카테고리는 개발자 모드가 켜진 경우에만 표시됩니다.';
+
+  @override
+  String get settingsDeveloperNote =>
+      '개발자 모드는 로컬 디버깅 및 개인 용도로 제공됩니다. 사용에 따른 책임은 본인에게 있습니다.';
+
+  @override
+  String get settingsDeveloperEnabled => '개발자 모드가 활성화되었습니다';
+
+  @override
+  String get settingsDeveloperDisabled => '개발자 모드가 비활성화되었습니다';
+
+  @override
+  String get settingsDeveloperHoldHint =>
+      '개발자 모드를 켜려면 10초 동안 길게 누르세요 (마우스: 누른 채 유지)';
+
+  @override
   String get settingsSearchHint => '설정 검색…';
 
   @override
@@ -1257,6 +1296,12 @@ class AppLocalizationsKo extends AppLocalizations {
       '패스스루 ON 시 소스 샘플레이트 유지；OFF 시 48kHz로 리샘플링. 현재 곡 리로드 후 적용.';
 
   @override
+  String get volumeMute => '음소거';
+
+  @override
+  String get volumeUnmute => '음소거 해제';
+
+  @override
   String get settingsSectionMemory => '메모리 및 시작';
 
   @override
@@ -1299,6 +1344,24 @@ class AppLocalizationsKo extends AppLocalizations {
   String settingsSpectrumBarWidthDesc(Object width) {
     return '${width}px（1~12, 전체화면 플레이어만）';
   }
+
+  @override
+  String get settingsBarSpectrum => '플레이바 스펙트럼';
+
+  @override
+  String get settingsBarSpectrumOn => '시간 아래에 미니 스펙트럼 표시（가사 없음 또는 미니 가사 끔 시）';
+
+  @override
+  String get settingsBarSpectrumOff => '플레이바에 미니 스펙트럼 표시 안 함';
+
+  @override
+  String get settingsCoverBeatScale => '커버 리듬에 맞춰 확대';
+
+  @override
+  String get settingsCoverBeatScaleOn => '커버가 박자에 맞춰 미세하게 펄스';
+
+  @override
+  String get settingsCoverBeatScaleOff => '커버 고정（재생/일시정지 확대만）';
 
   @override
   String get settingsTransitionStyle => '미디어 정보 전환';
@@ -1354,6 +1417,24 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsPlayerLyricsOff => '전체화면 플레이어에 가사 영역 없음';
+
+  @override
+  String get settingsBarLyrics => '플레이바 가사';
+
+  @override
+  String get settingsBarLyricsOn => '시간 아래에 현재 가사 표시（길면 자동 스크롤）';
+
+  @override
+  String get settingsBarLyricsOff => '플레이바에 미니 가사 표시 안 함';
+
+  @override
+  String get settingsShowTranslation => '번역 표시';
+
+  @override
+  String get settingsShowTranslationOn => '원문 뒤 괄호 안에 번역 표시';
+
+  @override
+  String get settingsShowTranslationOff => '가사 번역 표시 안 함';
 
   @override
   String get settingsSectionLyricStyle => '가사 스타일';
@@ -1986,6 +2067,111 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get settingsMediaSourceSubtitle =>
       '스트리밍 서버 (Subsonic / Jellyfin / Emby)';
+
+  @override
+  String get settingsCatScrape => '스크레이핑';
+
+  @override
+  String get settingsScrapeSubtitle => '다중 소스 메타데이터 보완 · 표지 / 가사 / 태그';
+
+  @override
+  String get settingsSectionScrapeDirs => '스크레이프 대상 디렉터리';
+
+  @override
+  String get settingsScrapeDirsHint => '한 줄에 하나의 디렉터리. 비워 두면 라이브러리 스캔 경로를 따름';
+
+  @override
+  String get settingsScrapeDirsEmptyNote =>
+      '스크레이프 경로가 설정되지 않아 라이브러리 스캔 경로를 사용합니다.';
+
+  @override
+  String settingsScrapeDirsNote(Object dirs) {
+    return '현재 적용 경로: $dirs';
+  }
+
+  @override
+  String get settingsSectionScrapeSources => '데이터 소스';
+
+  @override
+  String get settingsScrapeSourceMusicBrainz => 'MusicBrainz';
+
+  @override
+  String get settingsScrapeSourceDeezer => 'Deezer';
+
+  @override
+  String get settingsScrapeSourceItunes => 'iTunes';
+
+  @override
+  String get settingsScrapeSourceNetease => 'Netease Cloud Music';
+
+  @override
+  String get settingsScrapeSourceQQMusic => 'QQ 뮤직';
+
+  @override
+  String get settingsScrapeSourceKugou => '쿠거우 뮤직';
+
+  @override
+  String get settingsScrapeSourceKuwo => '쿠워 뮤직';
+
+  @override
+  String get settingsScrapeSourceMigu => '미구 뮤직';
+
+  @override
+  String get settingsScrapeSourceAcoustID => 'AcoustID(오디오 지문)';
+
+  @override
+  String get settingsScrapeSourceDesc => '켜면 다중 소스 조회, 유사도 비교 및 점수 병합에 참여합니다';
+
+  @override
+  String get settingsSectionScrapeProgress => '스크레이프 진행';
+
+  @override
+  String get settingsScrapeStart => '스크레이프 시작';
+
+  @override
+  String get settingsScrapeCancel => '스크레이프 취소';
+
+  @override
+  String get settingsScrapeScanning => '디렉터리 스캔 중…';
+
+  @override
+  String settingsScrapeCurrent(Object file) {
+    return '처리 중: $file';
+  }
+
+  @override
+  String get settingsScrapeSuccess => '성공';
+
+  @override
+  String get settingsScrapeFailed => '실패';
+
+  @override
+  String get settingsScrapeSkipped => '건너뜀';
+
+  @override
+  String get settingsScrapeNotFound => '불일치';
+
+  @override
+  String get settingsScrapeIdle => '아직 실행되지 않았습니다. 아래 버튼으로 시작하세요.';
+
+  @override
+  String get settingsScrapeNoDirs =>
+      '스크레이프할 디렉터리가 없습니다. 스크레이프 경로 또는 라이브러리 스캔 경로를 먼저 설정하세요.';
+
+  @override
+  String get settingsScrapeDone => '스크레이프 완료';
+
+  @override
+  String get settingsScrapeCanceled => '스크레이프 취소됨';
+
+  @override
+  String get toastScrapeNoDirs => '스크레이프할 디렉터리가 없습니다';
+
+  @override
+  String get toastScrapeDirsUpdated => '스크레이프 경로가 저장되었습니다';
+
+  @override
+  String get toastScrapeStarted => '스크레이프를 시작했습니다';
 
   @override
   String get commonDelete => '삭제';
