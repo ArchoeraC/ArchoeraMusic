@@ -85,7 +85,7 @@ ArchoeraMusic/
 ├── README.md                   # 本文件
 ├── .gitignore
 ├── app/                        # Flutter 应用
-│   ├── pubspec.yaml            # 版本 0.8.5-pre.2+rev.1
+│   ├── pubspec.yaml            # 版本 0.8.6-pre.3+rev.5
 │   ├── l10n.yaml               # 国际化配置
 │   ├── analysis_options.yaml
 │   ├── assets/                 # 字体（NotoSC / MiSans / HarmonyOS SC）、图标
