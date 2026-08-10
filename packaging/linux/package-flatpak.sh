@@ -36,8 +36,9 @@ flatpak --user remote-add --if-not-exists flathub \
   https://flathub.org/repo/flathub.flatpakrepo
 flatpak --user install -y --noninteractive "$RUNTIME"
 
-# 1) init：SDK 与 Runtime 都指向 Platform（本方式不编译，无需完整 SDK）
-flatpak --user build-init "$appdir" "$APP_ID" "$RUNTIME" "$RUNTIME"
+# 1) init：SDK 与 Runtime 都指向 Platform（本方式不编译，无需完整 SDK）。
+#    注：build-* 系列命令只操作本地目录，不接受 --user（报 Unknown option）。
+flatpak build-init "$appdir" "$APP_ID" "$RUNTIME" "$RUNTIME"
 
 # 2) 放入 bundle（/app 根布局与 tar.gz 完全一致）
 cp -a "$bundle/." "$appdir/files/"
@@ -64,7 +65,7 @@ for size in 32 48 64 128 256 512; do
 done
 
 # 4) finish：网络（媒体服务）、音频、图形（X11/Wayland/DRI）、home（本地曲库）
-flatpak --user build-finish \
+flatpak build-finish \
   --command=$BIN \
   --share=ipc --share=network \
   --socket=x11 --socket=wayland --socket=pulseaudio \
@@ -72,7 +73,7 @@ flatpak --user build-finish \
   "$appdir"
 
 # 5) 导出 + 打包为单文件 .flatpak
-flatpak --user build-export --no-update-summary "$repo" "$appdir"
-flatpak --user build-bundle "$repo" \
+flatpak build-export --no-update-summary "$repo" "$appdir"
+flatpak build-bundle "$repo" \
   "$DIST/$APP_NAME-v$version-linux-x86_64.flatpak" "$APP_ID"
 echo "→ $DIST/$APP_NAME-v$version-linux-x86_64.flatpak"
