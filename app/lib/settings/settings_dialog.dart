@@ -1535,7 +1535,8 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 .read(appPrefsProvider.notifier)
                 .setBarDisplay(barLyrics: value),
           ),
-          // 播放条高级歌词：歌词含逐字时间轴（YRC/KRC）时卡拉OK 逐字高亮
+          // 播放条高级歌词：歌词含逐字时间轴（YRC/KRC）时卡拉OK 逐字高亮；
+          // 开启时自动关闭翻译并禁用翻译开关（逐字高亮与翻译互斥）
           _switchTile(
             prefs.barEnhancedLyrics
                 ? Icons.mic_external_on_outlined
@@ -1545,11 +1546,16 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                 ? l10n.settingsBarEnhancedLyricsOn
                 : l10n.settingsBarEnhancedLyricsOff,
             prefs.barEnhancedLyrics,
-            (value) => ref
-                .read(appPrefsProvider.notifier)
-                .setBarDisplay(barEnhancedLyrics: value),
+            (value) {
+              ref
+                  .read(appPrefsProvider.notifier)
+                  .setBarDisplay(barEnhancedLyrics: value);
+              if (value) {
+                ref.read(appPrefsProvider.notifier).setShowTranslation(false);
+              }
+            },
           ),
-          // 显示翻译：全屏播放器歌词 + 播放条迷你歌词共用
+          // 显示翻译：全屏播放器歌词 + 播放条迷你歌词共用；卡拉OK 开启时禁用
           _switchTile(
             prefs.showTranslation
                 ? Icons.translate
@@ -1562,6 +1568,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
             (value) => ref
                 .read(appPrefsProvider.notifier)
                 .setShowTranslation(value),
+            enabled: !prefs.barEnhancedLyrics,
           ),
         ]),
         const SizedBox(height: 20),
@@ -2380,13 +2387,18 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
     String title,
     String subtitle,
     bool value,
-    ValueChanged<bool>? onChanged,
-  ) {
+    ValueChanged<bool>? onChanged, {
+    bool enabled = true,
+  }) {
     return _SettingTile(
       icon: icon,
       title: title,
       subtitle: subtitle,
-      trailing: Switch(value: value, onChanged: onChanged),
+      enabled: enabled,
+      trailing: Switch(
+        value: value,
+        onChanged: enabled ? onChanged : null,
+      ),
     );
   }
 
@@ -2504,6 +2516,7 @@ class _SettingTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.trailing,
+    this.enabled = true,
   });
 
   final IconData icon;
@@ -2511,9 +2524,21 @@ class _SettingTile extends StatelessWidget {
   final String subtitle;
   final Widget trailing;
 
+  /// 禁用时整行变灰（图标/标题/副标题降透明度），配合右侧控件禁用。
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final fg = enabled
+        ? scheme.primary
+        : scheme.primary.withValues(alpha: 0.35);
+    final textFg = enabled
+        ? scheme.onSurface
+        : scheme.onSurface.withValues(alpha: 0.38);
+    final subFg = enabled
+        ? scheme.onSurfaceVariant.withValues(alpha: 0.75)
+        : scheme.onSurfaceVariant.withValues(alpha: 0.35);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
@@ -2522,10 +2547,10 @@ class _SettingTile extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.10),
+              color: fg.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, size: 18, color: scheme.primary),
+            child: Icon(icon, size: 18, color: fg),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2537,7 +2562,7 @@ class _SettingTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: scheme.onSurface,
+                    color: textFg,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -2547,7 +2572,7 @@ class _SettingTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 11.5,
-                    color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                    color: subFg,
                   ),
                 ),
               ],
