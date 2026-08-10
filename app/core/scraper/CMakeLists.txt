@@ -43,11 +43,16 @@ if(NOT nlohmann_json_FOUND)
 endif()
 
 # ---------- 编译选项 ----------
-add_compile_options(-Wall -Wextra -Wpedantic)
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_options(-g -O0)
+if(MSVC)
+    # MSVC 不接受 -Wall/-Wextra 等 GCC 风格参数（D8021: invalid numeric argument）
+    add_compile_options(/W3)
 else()
-    add_compile_options(-O2)
+    add_compile_options(-Wall -Wextra -Wpedantic)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_compile_options(-g -O0)
+    else()
+        add_compile_options(-O2)
+    endif()
 endif()
 
 # ---------- FFI 共享库 ----------
