@@ -9,6 +9,91 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
+  String get menuTrackDetail => '미디어 상세';
+
+  @override
+  String get trackDetailDuration => '재생 시간';
+
+  @override
+  String get trackDetailArtist => '아티스트';
+
+  @override
+  String get trackDetailAlbum => '앨범';
+
+  @override
+  String get trackDetailSource => '소스';
+
+  @override
+  String get trackDetailPath => '경로';
+
+  @override
+  String get trackDetailFileSize => '파일 크기';
+
+  @override
+  String get trackDetailCodec => '코덱';
+
+  @override
+  String get trackDetailSampleRate => '샘플레이트';
+
+  @override
+  String get trackDetailBitDepth => '비트 심도';
+
+  @override
+  String get trackDetailBitrate => '비트레이트';
+
+  @override
+  String get trackDetailChannels => '채널';
+
+  @override
+  String get trackSourceLocal => '로컬 파일';
+
+  @override
+  String get trackSourceStreaming => '스트리밍';
+
+  @override
+  String get trackDetailQuality => '음질';
+
+  @override
+  String get batchSelectAll => '전체 선택';
+
+  @override
+  String get batchInvert => '선택 반전';
+
+  @override
+  String get batchPlay => '선택 재생';
+
+  @override
+  String get batchAddQueue => '대기열에 추가';
+
+  @override
+  String get batchDownload => '일괄 다운로드';
+
+  @override
+  String get batchExit => '다중 선택 종료';
+
+  @override
+  String get batchSelectHint => '다중 선택';
+
+  @override
+  String toastBatchAddedToQueue(Object count) {
+    return '대기열에 $count곡 추가됨';
+  }
+
+  @override
+  String toastBatchAddedToDownloadQueue(Object count) {
+    return '다운로드 대기열에 $count곡 추가됨';
+  }
+
+  @override
+  String get settingsBarEnhancedLyrics => '바 고급 가사';
+
+  @override
+  String get settingsBarEnhancedLyricsOn => '단어 시간 가사가 있으면 노래방 하이라이트 표시';
+
+  @override
+  String get settingsBarEnhancedLyricsOff => '바에 일반 가사 항상 표시';
+
+  @override
   String get settingsSectionClose => '앱 닫기';
 
   @override

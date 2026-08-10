@@ -9,6 +9,93 @@ class AppLocalizationsDe extends AppLocalizations {
   AppLocalizationsDe([String locale = 'de']) : super(locale);
 
   @override
+  String get menuTrackDetail => 'Mediadetails';
+
+  @override
+  String get trackDetailDuration => 'Dauer';
+
+  @override
+  String get trackDetailArtist => 'Interpret';
+
+  @override
+  String get trackDetailAlbum => 'Album';
+
+  @override
+  String get trackDetailSource => 'Quelle';
+
+  @override
+  String get trackDetailPath => 'Pfad';
+
+  @override
+  String get trackDetailFileSize => 'Dateigröße';
+
+  @override
+  String get trackDetailCodec => 'Codec';
+
+  @override
+  String get trackDetailSampleRate => 'Abtastrate';
+
+  @override
+  String get trackDetailBitDepth => 'Bittiefe';
+
+  @override
+  String get trackDetailBitrate => 'Bitrate';
+
+  @override
+  String get trackDetailChannels => 'Kanäle';
+
+  @override
+  String get trackSourceLocal => 'Lokale Datei';
+
+  @override
+  String get trackSourceStreaming => 'Streaming';
+
+  @override
+  String get trackDetailQuality => 'Qualität';
+
+  @override
+  String get batchSelectAll => 'Alle auswählen';
+
+  @override
+  String get batchInvert => 'Auswahl umkehren';
+
+  @override
+  String get batchPlay => 'Auswahl abspielen';
+
+  @override
+  String get batchAddQueue => 'Zur Warteschlange hinzufügen';
+
+  @override
+  String get batchDownload => 'Massen-Download';
+
+  @override
+  String get batchExit => 'Mehrfachauswahl beenden';
+
+  @override
+  String get batchSelectHint => 'Mehrfachauswahl';
+
+  @override
+  String toastBatchAddedToQueue(Object count) {
+    return '$count Titel zur Warteschlange hinzugefügt';
+  }
+
+  @override
+  String toastBatchAddedToDownloadQueue(Object count) {
+    return '$count Titel zur Download-Warteschlange hinzugefügt';
+  }
+
+  @override
+  String get settingsBarEnhancedLyrics => 'Erweiterte Leiste-Lyrics';
+
+  @override
+  String get settingsBarEnhancedLyricsOn =>
+      'Karaoke-Hervorhebung anzeigen, wenn wortgenaue Lyrics verfügbar sind';
+
+  @override
+  String get settingsBarEnhancedLyricsOff =>
+      'Immer einfache Lyrics in der Leiste anzeigen';
+
+  @override
   String get settingsSectionClose => 'App schließen';
 
   @override

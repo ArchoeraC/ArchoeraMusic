@@ -9,6 +9,93 @@ class AppLocalizationsFr extends AppLocalizations {
   AppLocalizationsFr([String locale = 'fr']) : super(locale);
 
   @override
+  String get menuTrackDetail => 'Détails du média';
+
+  @override
+  String get trackDetailDuration => 'Durée';
+
+  @override
+  String get trackDetailArtist => 'Artiste';
+
+  @override
+  String get trackDetailAlbum => 'Album';
+
+  @override
+  String get trackDetailSource => 'Source';
+
+  @override
+  String get trackDetailPath => 'Chemin';
+
+  @override
+  String get trackDetailFileSize => 'Taille du fichier';
+
+  @override
+  String get trackDetailCodec => 'Codec';
+
+  @override
+  String get trackDetailSampleRate => 'Fréquence d\'échantillonnage';
+
+  @override
+  String get trackDetailBitDepth => 'Profondeur de bits';
+
+  @override
+  String get trackDetailBitrate => 'Débit binaire';
+
+  @override
+  String get trackDetailChannels => 'Canaux';
+
+  @override
+  String get trackSourceLocal => 'Fichier local';
+
+  @override
+  String get trackSourceStreaming => 'Streaming';
+
+  @override
+  String get trackDetailQuality => 'Qualité';
+
+  @override
+  String get batchSelectAll => 'Tout sélectionner';
+
+  @override
+  String get batchInvert => 'Inverser la sélection';
+
+  @override
+  String get batchPlay => 'Lire la sélection';
+
+  @override
+  String get batchAddQueue => 'Ajouter à la file';
+
+  @override
+  String get batchDownload => 'Téléchargement groupé';
+
+  @override
+  String get batchExit => 'Quitter la sélection multiple';
+
+  @override
+  String get batchSelectHint => 'Sélection multiple';
+
+  @override
+  String toastBatchAddedToQueue(Object count) {
+    return '$count pistes ajoutées à la file';
+  }
+
+  @override
+  String toastBatchAddedToDownloadQueue(Object count) {
+    return '$count pistes ajoutées à la file de téléchargement';
+  }
+
+  @override
+  String get settingsBarEnhancedLyrics => 'Paroles de barre avancées';
+
+  @override
+  String get settingsBarEnhancedLyricsOn =>
+      'Afficher le surlignage karaoké si les paroles sont synchronisées mot à mot';
+
+  @override
+  String get settingsBarEnhancedLyricsOff =>
+      'Toujours afficher les paroles simples dans la barre';
+
+  @override
   String get settingsSectionClose => 'Fermer l\'application';
 
   @override

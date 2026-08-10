@@ -9,6 +9,93 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get menuTrackDetail => 'Media details';
+
+  @override
+  String get trackDetailDuration => 'Duration';
+
+  @override
+  String get trackDetailArtist => 'Artist';
+
+  @override
+  String get trackDetailAlbum => 'Album';
+
+  @override
+  String get trackDetailSource => 'Source';
+
+  @override
+  String get trackDetailPath => 'Path';
+
+  @override
+  String get trackDetailFileSize => 'File size';
+
+  @override
+  String get trackDetailCodec => 'Codec';
+
+  @override
+  String get trackDetailSampleRate => 'Sample rate';
+
+  @override
+  String get trackDetailBitDepth => 'Bit depth';
+
+  @override
+  String get trackDetailBitrate => 'Bitrate';
+
+  @override
+  String get trackDetailChannels => 'Channels';
+
+  @override
+  String get trackSourceLocal => 'Local file';
+
+  @override
+  String get trackSourceStreaming => 'Streaming';
+
+  @override
+  String get trackDetailQuality => 'Quality';
+
+  @override
+  String get batchSelectAll => 'Select all';
+
+  @override
+  String get batchInvert => 'Invert selection';
+
+  @override
+  String get batchPlay => 'Play selected';
+
+  @override
+  String get batchAddQueue => 'Add to queue';
+
+  @override
+  String get batchDownload => 'Batch download';
+
+  @override
+  String get batchExit => 'Exit multi-select';
+
+  @override
+  String get batchSelectHint => 'Multi-select';
+
+  @override
+  String toastBatchAddedToQueue(Object count) {
+    return '$count tracks added to queue';
+  }
+
+  @override
+  String toastBatchAddedToDownloadQueue(Object count) {
+    return '$count tracks added to download queue';
+  }
+
+  @override
+  String get settingsBarEnhancedLyrics => 'Enhanced bar lyrics';
+
+  @override
+  String get settingsBarEnhancedLyricsOn =>
+      'Show karaoke highlight when word-timed lyrics are available';
+
+  @override
+  String get settingsBarEnhancedLyricsOff =>
+      'Always show plain lyrics in the bar';
+
+  @override
   String get settingsSectionClose => 'Closing app';
 
   @override

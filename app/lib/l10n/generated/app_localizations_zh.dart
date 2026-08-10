@@ -9,6 +9,91 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get menuTrackDetail => '媒体详细信息';
+
+  @override
+  String get trackDetailDuration => '时长';
+
+  @override
+  String get trackDetailArtist => '歌手';
+
+  @override
+  String get trackDetailAlbum => '专辑';
+
+  @override
+  String get trackDetailSource => '来源';
+
+  @override
+  String get trackDetailPath => '路径';
+
+  @override
+  String get trackDetailFileSize => '文件大小';
+
+  @override
+  String get trackDetailCodec => '编码';
+
+  @override
+  String get trackDetailSampleRate => '采样率';
+
+  @override
+  String get trackDetailBitDepth => '位深';
+
+  @override
+  String get trackDetailBitrate => '比特率';
+
+  @override
+  String get trackDetailChannels => '声道';
+
+  @override
+  String get trackSourceLocal => '本地文件';
+
+  @override
+  String get trackSourceStreaming => '流媒体';
+
+  @override
+  String get trackDetailQuality => '音质';
+
+  @override
+  String get batchSelectAll => '全选';
+
+  @override
+  String get batchInvert => '反选';
+
+  @override
+  String get batchPlay => '播放所选';
+
+  @override
+  String get batchAddQueue => '加入队列';
+
+  @override
+  String get batchDownload => '批量下载';
+
+  @override
+  String get batchExit => '退出多选';
+
+  @override
+  String get batchSelectHint => '批量选择';
+
+  @override
+  String toastBatchAddedToQueue(Object count) {
+    return '已加入播放队列 $count 首';
+  }
+
+  @override
+  String toastBatchAddedToDownloadQueue(Object count) {
+    return '已加入下载队列 $count 首';
+  }
+
+  @override
+  String get settingsBarEnhancedLyrics => '播放条高级歌词';
+
+  @override
+  String get settingsBarEnhancedLyricsOn => '歌词含逐字时间轴时显示卡拉OK高亮';
+
+  @override
+  String get settingsBarEnhancedLyricsOff => '播放条始终显示普通歌词';
+
+  @override
   String get settingsSectionClose => '关闭应用';
 
   @override
@@ -2340,6 +2425,91 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   AppLocalizationsZhCn() : super('zh_CN');
 
   @override
+  String get menuTrackDetail => '媒体详细信息';
+
+  @override
+  String get trackDetailDuration => '时长';
+
+  @override
+  String get trackDetailArtist => '歌手';
+
+  @override
+  String get trackDetailAlbum => '专辑';
+
+  @override
+  String get trackDetailSource => '来源';
+
+  @override
+  String get trackDetailPath => '路径';
+
+  @override
+  String get trackDetailFileSize => '文件大小';
+
+  @override
+  String get trackDetailCodec => '编码';
+
+  @override
+  String get trackDetailSampleRate => '采样率';
+
+  @override
+  String get trackDetailBitDepth => '位深';
+
+  @override
+  String get trackDetailBitrate => '比特率';
+
+  @override
+  String get trackDetailChannels => '声道';
+
+  @override
+  String get trackSourceLocal => '本地文件';
+
+  @override
+  String get trackSourceStreaming => '流媒体';
+
+  @override
+  String get trackDetailQuality => '音质';
+
+  @override
+  String get batchSelectAll => '全选';
+
+  @override
+  String get batchInvert => '反选';
+
+  @override
+  String get batchPlay => '播放所选';
+
+  @override
+  String get batchAddQueue => '加入队列';
+
+  @override
+  String get batchDownload => '批量下载';
+
+  @override
+  String get batchExit => '退出多选';
+
+  @override
+  String get batchSelectHint => '批量选择';
+
+  @override
+  String toastBatchAddedToQueue(Object count) {
+    return '已加入播放队列 $count 首';
+  }
+
+  @override
+  String toastBatchAddedToDownloadQueue(Object count) {
+    return '已加入下载队列 $count 首';
+  }
+
+  @override
+  String get settingsBarEnhancedLyrics => '播放条高级歌词';
+
+  @override
+  String get settingsBarEnhancedLyricsOn => '歌词含逐字时间轴时显示卡拉OK高亮';
+
+  @override
+  String get settingsBarEnhancedLyricsOff => '播放条始终显示普通歌词';
+
+  @override
   String get settingsSectionClose => '关闭应用';
 
   @override
@@ -4669,6 +4839,91 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
 class AppLocalizationsZhTw extends AppLocalizationsZh {
   AppLocalizationsZhTw() : super('zh_TW');
+
+  @override
+  String get menuTrackDetail => '媒體詳細資訊';
+
+  @override
+  String get trackDetailDuration => '時長';
+
+  @override
+  String get trackDetailArtist => '歌手';
+
+  @override
+  String get trackDetailAlbum => '專輯';
+
+  @override
+  String get trackDetailSource => '來源';
+
+  @override
+  String get trackDetailPath => '路徑';
+
+  @override
+  String get trackDetailFileSize => '檔案大小';
+
+  @override
+  String get trackDetailCodec => '編碼';
+
+  @override
+  String get trackDetailSampleRate => '取樣率';
+
+  @override
+  String get trackDetailBitDepth => '位元深度';
+
+  @override
+  String get trackDetailBitrate => '位元率';
+
+  @override
+  String get trackDetailChannels => '聲道';
+
+  @override
+  String get trackSourceLocal => '本機檔案';
+
+  @override
+  String get trackSourceStreaming => '串流';
+
+  @override
+  String get trackDetailQuality => '音質';
+
+  @override
+  String get batchSelectAll => '全選';
+
+  @override
+  String get batchInvert => '反選';
+
+  @override
+  String get batchPlay => '播放所選';
+
+  @override
+  String get batchAddQueue => '加入佇列';
+
+  @override
+  String get batchDownload => '批次下載';
+
+  @override
+  String get batchExit => '退出多選';
+
+  @override
+  String get batchSelectHint => '批次選擇';
+
+  @override
+  String toastBatchAddedToQueue(Object count) {
+    return '已加入播放佇列 $count 首';
+  }
+
+  @override
+  String toastBatchAddedToDownloadQueue(Object count) {
+    return '已加入下載佇列 $count 首';
+  }
+
+  @override
+  String get settingsBarEnhancedLyrics => '播放條進階歌詞';
+
+  @override
+  String get settingsBarEnhancedLyricsOn => '歌詞含逐字時間軸時顯示卡拉OK高亮';
+
+  @override
+  String get settingsBarEnhancedLyricsOff => '播放條始終顯示一般歌詞';
 
   @override
   String get settingsSectionClose => '關閉應用';

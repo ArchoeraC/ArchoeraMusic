@@ -9,6 +9,91 @@ class AppLocalizationsJa extends AppLocalizations {
   AppLocalizationsJa([String locale = 'ja']) : super(locale);
 
   @override
+  String get menuTrackDetail => 'メディア詳細';
+
+  @override
+  String get trackDetailDuration => '再生時間';
+
+  @override
+  String get trackDetailArtist => 'アーティスト';
+
+  @override
+  String get trackDetailAlbum => 'アルバム';
+
+  @override
+  String get trackDetailSource => 'ソース';
+
+  @override
+  String get trackDetailPath => 'パス';
+
+  @override
+  String get trackDetailFileSize => 'ファイルサイズ';
+
+  @override
+  String get trackDetailCodec => 'コーデック';
+
+  @override
+  String get trackDetailSampleRate => 'サンプルレート';
+
+  @override
+  String get trackDetailBitDepth => 'ビット深度';
+
+  @override
+  String get trackDetailBitrate => 'ビットレート';
+
+  @override
+  String get trackDetailChannels => 'チャンネル';
+
+  @override
+  String get trackSourceLocal => 'ローカルファイル';
+
+  @override
+  String get trackSourceStreaming => 'ストリーミング';
+
+  @override
+  String get trackDetailQuality => '音質';
+
+  @override
+  String get batchSelectAll => 'すべて選択';
+
+  @override
+  String get batchInvert => '選択を反転';
+
+  @override
+  String get batchPlay => '選択を再生';
+
+  @override
+  String get batchAddQueue => 'キューに追加';
+
+  @override
+  String get batchDownload => '一括ダウンロード';
+
+  @override
+  String get batchExit => '複数選択を終了';
+
+  @override
+  String get batchSelectHint => '複数選択';
+
+  @override
+  String toastBatchAddedToQueue(Object count) {
+    return 'キューに $count 曲追加しました';
+  }
+
+  @override
+  String toastBatchAddedToDownloadQueue(Object count) {
+    return 'ダウンロードキューに $count 曲追加しました';
+  }
+
+  @override
+  String get settingsBarEnhancedLyrics => 'バー拡張歌詞';
+
+  @override
+  String get settingsBarEnhancedLyricsOn => 'ワードタイム歌詞がある場合カラオケハイライトを表示';
+
+  @override
+  String get settingsBarEnhancedLyricsOff => 'バーに通常の歌詞を常に表示';
+
+  @override
   String get settingsSectionClose => 'アプリを閉じる';
 
   @override

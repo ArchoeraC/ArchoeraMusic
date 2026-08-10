@@ -244,6 +244,8 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
       _SearchEntry(SettingsCategory.playback, l10n.settingsSpectrumBarWidth, l10n.settingsSearchSpectrumWidthSubtitle, Icons.view_column_outlined),
       _SearchEntry(SettingsCategory.playback, l10n.settingsTransitionStyle, l10n.settingsTransitionStyleDesc, Icons.animation_outlined),
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsPlayerLyrics, l10n.settingsSearchPlayerLyricsSubtitle, Icons.lyrics_outlined),
+      _SearchEntry(SettingsCategory.lyrics, l10n.settingsBarLyrics, l10n.settingsBarLyricsOn, Icons.menu_book_outlined),
+      _SearchEntry(SettingsCategory.lyrics, l10n.settingsBarEnhancedLyrics, l10n.settingsBarEnhancedLyricsOn, Icons.mic_external_on_outlined),
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsLyricFontSize, l10n.settingsSearchLyricFontSizeSubtitle, Icons.format_size),
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsLyricLineHeight, l10n.settingsSearchLyricLineHeightSubtitle, Icons.line_weight),
       _SearchEntry(SettingsCategory.lyrics, l10n.settingsSearchColorTitle, l10n.settingsSearchColorSubtitle, Icons.palette_outlined),
@@ -1532,6 +1534,20 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
             (value) => ref
                 .read(appPrefsProvider.notifier)
                 .setBarDisplay(barLyrics: value),
+          ),
+          // 播放条高级歌词：歌词含逐字时间轴（YRC/KRC）时卡拉OK 逐字高亮
+          _switchTile(
+            prefs.barEnhancedLyrics
+                ? Icons.mic_external_on_outlined
+                : Icons.mic_external_on,
+            l10n.settingsBarEnhancedLyrics,
+            prefs.barEnhancedLyrics
+                ? l10n.settingsBarEnhancedLyricsOn
+                : l10n.settingsBarEnhancedLyricsOff,
+            prefs.barEnhancedLyrics,
+            (value) => ref
+                .read(appPrefsProvider.notifier)
+                .setBarDisplay(barEnhancedLyrics: value),
           ),
           // 显示翻译：全屏播放器歌词 + 播放条迷你歌词共用
           _switchTile(

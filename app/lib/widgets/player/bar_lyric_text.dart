@@ -31,7 +31,8 @@ class _BarLyricTextState extends ConsumerState<BarLyricText> {
     final positionMs = ref.watch(
       playbackProvider.select((s) => s.position.inMilliseconds),
     );
-    final showTranslation = ref.watch(appPrefsProvider).showTranslation;
+    final prefs = ref.watch(appPrefsProvider);
+    final showTranslation = prefs.showTranslation;
     final groups = ref
         .watch(currentLyricsProvider)
         .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
@@ -41,12 +42,6 @@ class _BarLyricTextState extends ConsumerState<BarLyricText> {
     if (idx < 0) return SizedBox(height: widget.height);
 
     final g = groups[idx];
-    final trans = showTranslation ? g.translation : null;
-    final text = (trans != null && trans.isNotEmpty)
-        ? '${g.original.text}（$trans）'
-        : g.original.text;
-    if (text.isEmpty) return SizedBox(height: widget.height);
-
     final scheme = Theme.of(context).colorScheme;
     final style = TextStyle(
       fontSize: 11,
@@ -54,6 +49,49 @@ class _BarLyricTextState extends ConsumerState<BarLyricText> {
       color: scheme.primary,
       fontWeight: FontWeight.w500,
     );
+
+    // 高级歌词（YRC/KRC 逐字片段）且「播放条高级歌词」开启：
+    // 卡拉OK 逐字高亮（已唱实色 / 未唱 40% 透明度），翻译弱化追加；
+    // 否则整行普通文本（原文 + 可选翻译）。
+    final fragments = g.fragments;
+    final useKaraoke =
+        prefs.barEnhancedLyrics && fragments != null && fragments.isNotEmpty;
+    final transText = (showTranslation &&
+            g.translation != null &&
+            g.translation!.isNotEmpty)
+        ? g.translation!
+        : '';
+    final TextSpan span;
+    if (useKaraoke) {
+      span = TextSpan(
+        style: style,
+        children: [
+          for (final f in fragments)
+            TextSpan(
+              text: f.text,
+              style: TextStyle(
+                color: (g.original.timeMs + f.startMs) <= positionMs
+                    ? scheme.primary
+                    : scheme.primary.withValues(alpha: 0.4),
+              ),
+            ),
+          if (transText.isNotEmpty)
+            TextSpan(
+              text: '（$transText）',
+              style: TextStyle(
+                color: scheme.primary.withValues(alpha: 0.45),
+              ),
+            ),
+        ],
+      );
+    } else {
+      final text = transText.isNotEmpty
+          ? '${g.original.text}（$transText）'
+          : g.original.text;
+      if (text.isEmpty) return SizedBox(height: widget.height);
+      span = TextSpan(text: text, style: style);
+    }
+
     // 歌词行切换动效（对齐 SPlayer-Next TrackInfo slide-up：进入 250ms
     // 从下方 4px 滑入 + 淡入，退出 150ms；性能模式动效归零）
     return SizedBox(
@@ -81,26 +119,25 @@ class _BarLyricTextState extends ConsumerState<BarLyricText> {
           );
         },
         child: LayoutBuilder(
-          // 行变化（含翻译开关切换）才触发过渡：以「索引 + 文本」为 key，
-          // 同一行重复播放（同 key）不闪动
-          key: ValueKey('$idx:$text'),
+          // 行变化（含翻译开关切换）才触发过渡：以「索引 + 原文 + 翻译」为
+          // key，同一行重复播放（同 key）不闪动
+          key: ValueKey('$idx:${g.original.text}:$transText'),
           builder: (context, constraints) {
             final painter = TextPainter(
-              text: TextSpan(text: text, style: style),
+              text: span,
               maxLines: 1,
               textDirection: TextDirection.ltr,
             )..layout();
             // 超宽：循环滚动（对齐 SMarquee overflow → scrolling）
             if (painter.width > constraints.maxWidth) {
-              return _Marquee(text: text, style: style);
+              return _Marquee(text: span.toPlainText(), span: span);
             }
             return Align(
               alignment: Alignment.centerRight,
-              child: Text(
-                text,
+              child: Text.rich(
+                span,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: style,
               ),
             );
           },
@@ -110,12 +147,15 @@ class _BarLyricTextState extends ConsumerState<BarLyricText> {
   }
 }
 
-/// 循环滚动文本（溢出才渲染本组件；延迟 2s 启动，30px/s，间距 50px）。
+/// 循环滚动富文本（溢出才渲染本组件；延迟 2s 启动，30px/s，间距 50px）。
+///
+/// [text] 仅用于行切换比对（卡拉OK 高亮下每 50ms 重建 span，颜色变化
+/// 不重置滚动；[span] 为实际渲染内容）。
 class _Marquee extends StatefulWidget {
-  const _Marquee({required this.text, required this.style});
+  const _Marquee({required this.text, required this.span});
 
   final String text;
-  final TextStyle style;
+  final TextSpan span;
 
   @override
   State<_Marquee> createState() => _MarqueeState();
@@ -161,7 +201,7 @@ class _MarqueeState extends State<_Marquee>
   void _start() {
     if (!mounted) return;
     final painter = TextPainter(
-      text: TextSpan(text: widget.text, style: widget.style),
+      text: widget.span,
       maxLines: 1,
       textDirection: TextDirection.ltr,
     )..layout();
@@ -200,9 +240,9 @@ class _MarqueeState extends State<_Marquee>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(widget.text, maxLines: 1, style: widget.style),
+                  Text.rich(widget.span, maxLines: 1),
                   SizedBox(width: _gap),
-                  Text(widget.text, maxLines: 1, style: widget.style),
+                  Text.rich(widget.span, maxLines: 1),
                 ],
               ),
             ),

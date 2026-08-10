@@ -110,6 +110,168 @@ abstract class AppLocalizations {
     Locale('zh', 'TW'),
   ];
 
+  /// No description provided for @menuTrackDetail.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'媒体详细信息'**
+  String get menuTrackDetail;
+
+  /// No description provided for @trackDetailDuration.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'时长'**
+  String get trackDetailDuration;
+
+  /// No description provided for @trackDetailArtist.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌手'**
+  String get trackDetailArtist;
+
+  /// No description provided for @trackDetailAlbum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'专辑'**
+  String get trackDetailAlbum;
+
+  /// No description provided for @trackDetailSource.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'来源'**
+  String get trackDetailSource;
+
+  /// No description provided for @trackDetailPath.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'路径'**
+  String get trackDetailPath;
+
+  /// No description provided for @trackDetailFileSize.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'文件大小'**
+  String get trackDetailFileSize;
+
+  /// No description provided for @trackDetailCodec.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'编码'**
+  String get trackDetailCodec;
+
+  /// No description provided for @trackDetailSampleRate.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'采样率'**
+  String get trackDetailSampleRate;
+
+  /// No description provided for @trackDetailBitDepth.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'位深'**
+  String get trackDetailBitDepth;
+
+  /// No description provided for @trackDetailBitrate.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'比特率'**
+  String get trackDetailBitrate;
+
+  /// No description provided for @trackDetailChannels.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'声道'**
+  String get trackDetailChannels;
+
+  /// No description provided for @trackSourceLocal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本地文件'**
+  String get trackSourceLocal;
+
+  /// No description provided for @trackSourceStreaming.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流媒体'**
+  String get trackSourceStreaming;
+
+  /// No description provided for @trackDetailQuality.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音质'**
+  String get trackDetailQuality;
+
+  /// No description provided for @batchSelectAll.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'全选'**
+  String get batchSelectAll;
+
+  /// No description provided for @batchInvert.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'反选'**
+  String get batchInvert;
+
+  /// No description provided for @batchPlay.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放所选'**
+  String get batchPlay;
+
+  /// No description provided for @batchAddQueue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'加入队列'**
+  String get batchAddQueue;
+
+  /// No description provided for @batchDownload.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'批量下载'**
+  String get batchDownload;
+
+  /// No description provided for @batchExit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'退出多选'**
+  String get batchExit;
+
+  /// No description provided for @batchSelectHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'批量选择'**
+  String get batchSelectHint;
+
+  /// No description provided for @toastBatchAddedToQueue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已加入播放队列 {count} 首'**
+  String toastBatchAddedToQueue(Object count);
+
+  /// No description provided for @toastBatchAddedToDownloadQueue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已加入下载队列 {count} 首'**
+  String toastBatchAddedToDownloadQueue(Object count);
+
+  /// No description provided for @settingsBarEnhancedLyrics.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放条高级歌词'**
+  String get settingsBarEnhancedLyrics;
+
+  /// No description provided for @settingsBarEnhancedLyricsOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词含逐字时间轴时显示卡拉OK高亮'**
+  String get settingsBarEnhancedLyricsOn;
+
+  /// No description provided for @settingsBarEnhancedLyricsOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放条始终显示普通歌词'**
+  String get settingsBarEnhancedLyricsOff;
+
   /// No description provided for @settingsSectionClose.
   ///
   /// In zh_CN, this message translates to:

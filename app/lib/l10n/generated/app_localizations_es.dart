@@ -9,6 +9,93 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get menuTrackDetail => 'Detalles del medio';
+
+  @override
+  String get trackDetailDuration => 'Duración';
+
+  @override
+  String get trackDetailArtist => 'Artista';
+
+  @override
+  String get trackDetailAlbum => 'Álbum';
+
+  @override
+  String get trackDetailSource => 'Fuente';
+
+  @override
+  String get trackDetailPath => 'Ruta';
+
+  @override
+  String get trackDetailFileSize => 'Tamaño del archivo';
+
+  @override
+  String get trackDetailCodec => 'Códec';
+
+  @override
+  String get trackDetailSampleRate => 'Frecuencia de muestreo';
+
+  @override
+  String get trackDetailBitDepth => 'Profundidad de bits';
+
+  @override
+  String get trackDetailBitrate => 'Tasa de bits';
+
+  @override
+  String get trackDetailChannels => 'Canales';
+
+  @override
+  String get trackSourceLocal => 'Archivo local';
+
+  @override
+  String get trackSourceStreaming => 'Streaming';
+
+  @override
+  String get trackDetailQuality => 'Calidad';
+
+  @override
+  String get batchSelectAll => 'Seleccionar todo';
+
+  @override
+  String get batchInvert => 'Invertir selección';
+
+  @override
+  String get batchPlay => 'Reproducir selección';
+
+  @override
+  String get batchAddQueue => 'Agregar a la cola';
+
+  @override
+  String get batchDownload => 'Descarga masiva';
+
+  @override
+  String get batchExit => 'Salir de selección múltiple';
+
+  @override
+  String get batchSelectHint => 'Selección múltiple';
+
+  @override
+  String toastBatchAddedToQueue(Object count) {
+    return '$count pistas agregadas a la cola';
+  }
+
+  @override
+  String toastBatchAddedToDownloadQueue(Object count) {
+    return '$count pistas agregadas a la cola de descarga';
+  }
+
+  @override
+  String get settingsBarEnhancedLyrics => 'Letra de barra avanzada';
+
+  @override
+  String get settingsBarEnhancedLyricsOn =>
+      'Mostrar resaltado karaoke si hay letra sincronizada palabra a palabra';
+
+  @override
+  String get settingsBarEnhancedLyricsOff =>
+      'Mostrar siempre letra simple en la barra';
+
+  @override
   String get settingsSectionClose => 'Cerrar aplicación';
 
   @override

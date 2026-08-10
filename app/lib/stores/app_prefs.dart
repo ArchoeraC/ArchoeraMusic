@@ -59,6 +59,7 @@ class AppPrefs {
   static const _volumeKey = 'player.volume';
   static const _barLyricsKey = 'player.barLyrics';
   static const _barSpectrumKey = 'player.barSpectrum';
+  static const _barEnhancedLyricsKey = 'lyrics.barEnhanced';
   static const _showTranslationKey = 'lyrics.showTranslation';
 
   // ── 刮削设置（对齐 SPlayer-Next 刮削器多源方案）──
@@ -323,6 +324,11 @@ class AppPrefs {
   /// 播放条迷你频谱（独立于播放页频谱开关；默认开）。
   bool get barSpectrum => _data[_barSpectrumKey] as bool? ?? true;
 
+  /// 播放条高级歌词（默认开）：歌词含逐字时间轴（YRC/KRC）时，
+  /// 播放条迷你歌词以卡拉OK 逐字高亮显示；关闭则始终显示普通整行歌词。
+  bool get barEnhancedLyrics =>
+      _data[_barEnhancedLyricsKey] as bool? ?? true;
+
   /// 歌词显示翻译（播放条迷你歌词与全屏播放器；默认开）。
   bool get showTranslation => _data[_showTranslationKey] as bool? ?? true;
 
@@ -559,12 +565,17 @@ class AppPrefs {
         data: {..._data, _volumeKey: value.clamp(0.0, 1.0)},
       );
 
-  /// 播放条歌词 / 播放条频谱 / 歌词翻译显示开关。
-  AppPrefs copyWithBarDisplay({bool? barLyrics, bool? barSpectrum}) => AppPrefs(
+  /// 播放条歌词 / 播放条频谱 / 播放条高级歌词开关。
+  AppPrefs copyWithBarDisplay({
+    bool? barLyrics,
+    bool? barSpectrum,
+    bool? barEnhancedLyrics,
+  }) => AppPrefs(
         data: {
           ..._data,
           _barLyricsKey: ?barLyrics,
           _barSpectrumKey: ?barSpectrum,
+          _barEnhancedLyricsKey: ?barEnhancedLyrics,
         },
       );
 
@@ -716,11 +727,16 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置播放条歌词 / 播放条频谱显示开关。
-  void setBarDisplay({bool? barLyrics, bool? barSpectrum}) {
+  /// 设置播放条歌词 / 播放条频谱 / 播放条高级歌词显示开关。
+  void setBarDisplay({
+    bool? barLyrics,
+    bool? barSpectrum,
+    bool? barEnhancedLyrics,
+  }) {
     state = state.copyWithBarDisplay(
       barLyrics: barLyrics,
       barSpectrum: barSpectrum,
+      barEnhancedLyrics: barEnhancedLyrics,
     );
     state.save();
   }

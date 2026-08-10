@@ -8,7 +8,12 @@
 #include <cstdint>
 #include <fstream>
 #include <algorithm>
+#include <cstdlib>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
 
 namespace splayer::scraper {
 
@@ -23,12 +28,27 @@ namespace splayer::scraper {
 /// \param maxOverride 环境变量硬上限（0=不限制）
 inline int detectParallelism(bool isCpuBound = false, int maxOverride = 0) {
     // CPU 核心数
-    long cpuCount = sysconf(_SC_NPROCESSORS_ONLN);
+    long cpuCount = 0;
+#ifdef _WIN32
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    cpuCount = static_cast<long>(si.dwNumberOfProcessors);
+#else
+    cpuCount = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
     if (cpuCount < 1) cpuCount = 2;
 
     // 总物理内存（MB）
     long totalMemMb = 0;
     long availableMemMb = 0;
+#ifdef _WIN32
+    MEMORYSTATUSEX ms;
+    ms.dwLength = sizeof(ms);
+    if (GlobalMemoryStatusEx(&ms)) {
+        totalMemMb = static_cast<long>(ms.ullTotalPhys / (1024 * 1024));
+        availableMemMb = static_cast<long>(ms.ullAvailPhys / (1024 * 1024));
+    }
+#else
     std::ifstream meminfo("/proc/meminfo");
     if (meminfo.is_open()) {
         std::string line;
@@ -47,6 +67,7 @@ inline int detectParallelism(bool isCpuBound = false, int maxOverride = 0) {
             }
         }
     }
+#endif
 
     // 1) CPU 基数
     long base = isCpuBound

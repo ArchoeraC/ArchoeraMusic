@@ -20,6 +20,9 @@ app/core/scanner/build/
 app/core/scanner/scanner-ffi/bin/
 app/core/scanner/scanner-ffi/obj/
 
+# vcpkg manifest 模式默认安装目录（workflow 已用 VCPKG_INSTALLED_DIR 指到 C:\vcpkg\installed，此处兜底）
+app/vcpkg_installed/
+
 # scraper（C++ 刮削器 FFI / CLI 构建产物；build/ 由 app/core/scraper CMake 产出）
 app/core/scraper/build/
 

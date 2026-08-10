@@ -21,6 +21,7 @@ import 'kugou_login_button.dart';
 import 'netease_login_dialog.dart';
 import 's_context_menu.dart';
 import 's_dialog.dart';
+import 'track_detail_dialog.dart';
 import '../common/toast.dart';
 
 /// 弹出通用曲目右键菜单。
@@ -75,6 +76,12 @@ void showTrackContextMenu(
             icon: Icons.download_outlined,
             onTap: () => _startDownload(context, ref, track),
           ),
+        SContextMenuItem.divider(),
+        SContextMenuItem(
+          label: l10n.menuTrackDetail,
+          icon: Icons.info_outline,
+          onTap: () => showTrackDetailDialog(context, track: track),
+        ),
       ],
       ...extra,
     ],
@@ -110,26 +117,54 @@ Future<void> _startDownload(
     toast(context.l10n.toastNoQualityInfo);
     return;
   }
-  if (!await _ensureLoggedIn(context, ref, track.source)) return;
+  await downloadTracks(context, ref, [track]);
+}
+
+/// 批量下载（列表批量操作栏 / 单曲下载共用）：
+/// 登录校验 + 一次音质选择 + 逐首入队。
+///
+/// 仅处理在线曲目（网易云/酷狗；无下载接口的本地/流媒体曲目跳过）；
+/// 酷狗曲目下载前补齐 hash 链（历史/收藏等旧入口的 Track 可能只有 128k
+/// hash，直接下载会被静默降级；补全后能拿到最高可用音质）。
+Future<void> downloadTracks(
+  BuildContext context,
+  WidgetRef ref,
+  List<Track> tracks,
+) async {
+  final online = tracks
+      .where((t) => t.source == 'netease' || t.source == 'kugou')
+      .toList();
+  if (online.isEmpty) return;
+  // 批量曲目可能混平台：任一平台未登录都拦截（提示登录对应平台）
+  for (final src in const ['kugou', 'netease']) {
+    if (online.any((t) => t.source == src)) {
+      if (!await _ensureLoggedIn(context, ref, src)) return;
+    }
+  }
   if (!context.mounted) return;
   final l10n = context.l10n;
   final defaultQuality = ref.read(appPrefsProvider).downloadQuality;
   final quality = await _pickDownloadQuality(context, defaultQuality);
   if (quality == null || !context.mounted) return;
   final controller = ref.read(downloadControllerProvider.notifier);
-  // Kugou：下载前补齐 hash 链（历史/收藏等旧入口的 Track 可能只有 128k
-  // hash，直接下载会被静默降级；补全后能拿到最高可用音质）。
-  var target = track;
-  if (track.source == 'kugou' && track.kugou != null) {
-    final enriched =
-        await ref.read(kugouApiProvider).enrichKugouHashes(target);
-    if (enriched != null) target = enriched;
+  var ok = 0;
+  for (final t in online) {
+    if (!context.mounted) return;
+    var target = t;
+    if (t.source == 'kugou' && t.kugou != null) {
+      final enriched = await ref.read(kugouApiProvider).enrichKugouHashes(target);
+      if (enriched != null) target = enriched;
+    }
+    if (controller.enqueue(target, quality: quality) != null) ok++;
   }
-  final taskId = controller.enqueue(target, quality: quality);
-  if (taskId != null) {
-    toast(l10n.toastAddedToDownloadQueue(l10nQualityLabel(l10n, quality)));
-  } else {
-    toast(l10n.toastDownloadEngineNotReady);
+  if (context.mounted) {
+    if (ok > 1) {
+      toast(l10n.toastBatchAddedToDownloadQueue(ok));
+    } else if (ok == 1) {
+      toast(l10n.toastAddedToDownloadQueue(l10nQualityLabel(l10n, quality)));
+    } else {
+      toast(l10n.toastDownloadEngineNotReady);
+    }
   }
 }
 
