@@ -73,5 +73,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ArchoeraMusic-macos-arm64
-          path: app/build/macos/Build/Products/Release/ArchoeraMusic.app
+          path: app/build/macos/Build/Products/Release/archoera_music.app
           if-no-files-found: error

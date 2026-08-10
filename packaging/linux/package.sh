@@ -128,9 +128,10 @@ pkg_rpm() {
     --define "app_version $version_rpm" \
     --define "_rpmfilename %{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}.rpm" \
     -bb "$topdir/SPECS/archoera-music.spec"
-  cp "$topdir/RPMS/x86_64/archoera-music-$version_rpm-1.x86_64.rpm" \
-    "$DIST/"
-  echo "→ $DIST/archoera-music-$version_rpm-1.x86_64.rpm"
+  # _rpmfilename 被 --define 重写后 rpm 将包输出到 RPMS/ 根目录（而非按 arch 分目录），
+  # 用 find 兜底定位，避免路径假设（CI 曾因硬编码 RPMS/x86_64/ 失败）。
+  find "$topdir/RPMS" -name '*.rpm' -exec cp {} "$DIST/" \;
+  echo "→ $DIST/$(ls "$DIST" | grep '\.rpm$' | tail -1)"
 }
 
 # ── AppImage：通用便携 ────────────────────────────────────────────────
