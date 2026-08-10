@@ -33,7 +33,7 @@ bundle="$(cd "$bundle" && pwd)"
 
 # 各包管理器对版本号的限制
 version_deb="$version"                    # deb 允许 . + -
-version_rpm="${version//+/_}"             # rpm 不允许 '+'
+version_rpm="${version//[+-]/_}"          # rpm 不允许 '+' 与 '-'（- 分隔 version-release）
 version_arch="${version//[+-]/_}"         # arch pkgver 只允许 [A-Za-z0-9.]
 
 mkdir -p "$DIST"

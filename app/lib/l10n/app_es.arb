@@ -444,7 +444,7 @@
   "settingsSectionDir": "Directorio",
   "settingsDownloadRootHint": "Carpeta de descarga（Enter para guardar）",
   "settingsRestoreDefault": "Restaurar predeterminado",
-  "settingsDownloadRootNote": "Predeterminado: ~/Music/ArchoeraMusic; cambiar carpeta termina descargas en curso. Enter para guardar.",
+  "settingsDownloadRootNote": "Por defecto: la carpeta de la biblioteca; cambiar carpeta termina descargas en curso. Enter para guardar.",
   "settingsSectionFilename": "Nombre de archivo",
   "settingsDownloadTemplateHint": "Plantilla de nombre de archivo（Enter para guardar）",
   "settingsDownloadTemplateNote": "Marcadores: <artist> · <title> · <album>. Solo afecta tareas futuras; Enter para guardar.",

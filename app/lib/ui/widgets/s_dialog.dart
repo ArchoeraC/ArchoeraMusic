@@ -60,6 +60,12 @@ class SDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.all(48),
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
+      // 裁剪整个弹窗画布到 shape 圆角（Dialog 默认 Clip.none，仅设 shape
+      // 不会裁剪 child，会导致 ColoredBox/毛玻璃溢出成直角）
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.dialog),
+      ),
+      clipBehavior: Clip.antiAlias,
       // 图片风格下为毛玻璃（blur(16)），背景图不再清晰透出
       child: GlassDialogSurface(
         radius: BorderRadius.circular(AppRadius.dialog),

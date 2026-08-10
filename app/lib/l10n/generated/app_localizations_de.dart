@@ -1514,7 +1514,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsDownloadRootNote =>
-      'Standard: ~/Music/ArchoeraMusic; Ordnerwechsel beendet laufende Downloads. Enter zum Speichern.';
+      'Standard: folgt dem Bibliotheksordner; Ordnerwechsel beendet laufende Downloads. Enter zum Speichern.';
 
   @override
   String get settingsSectionFilename => 'Dateiname';

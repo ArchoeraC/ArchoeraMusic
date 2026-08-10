@@ -444,7 +444,7 @@
   "settingsSectionDir": "目錄",
   "settingsDownloadRootHint": "下載目錄（Enter 儲存）",
   "settingsRestoreDefault": "恢復預設",
-  "settingsDownloadRootNote": "預設儲存到 ~/Music/ArchoeraMusic；修改目錄按 Enter 儲存，進行中的下載任務會終止。",
+  "settingsDownloadRootNote": "預設跟隨媒體庫目錄；修改目錄按 Enter 儲存，進行中的下載任務會終止。",
   "settingsSectionFilename": "檔名",
   "settingsDownloadTemplateHint": "檔名模板（Enter 儲存）",
   "settingsDownloadTemplateNote": "佔位符：<artist> · <title> · <album>；只影響之後入隊的任務，按 Enter 儲存立即生效。",

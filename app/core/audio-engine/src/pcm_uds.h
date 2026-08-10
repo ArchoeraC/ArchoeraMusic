@@ -7,7 +7,17 @@
 #ifndef PCM_UDS_H
 #define PCM_UDS_H
 
+#ifdef _WIN32
+/* Windows 无 AF_UNIX：提供 iovec 类型与函数声明（stub 实现），
+ * 避免 main.c / static lib 依赖 POSIX 头（sys/uio.h 等）。 */
+#include <stddef.h>
+typedef struct iovec {
+    void *iov_base;
+    size_t iov_len;
+} iovec;
+#else
 #include <sys/uio.h>
+#endif
 
 typedef struct PcmUds PcmUds;
 

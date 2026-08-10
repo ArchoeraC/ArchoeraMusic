@@ -1461,7 +1461,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsDownloadRootNote =>
-      'デフォルト: ~/Music/ArchoeraMusic；フォルダを変更してEnterで保存。進行中のダウンロードは終了します。';
+      'デフォルト: メディアライブラリのフォルダに従う；フォルダを変更してEnterで保存。進行中のダウンロードは終了します。';
 
   @override
   String get settingsSectionFilename => 'ファイル名';

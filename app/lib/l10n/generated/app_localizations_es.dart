@@ -1522,7 +1522,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsDownloadRootNote =>
-      'Predeterminado: ~/Music/ArchoeraMusic; cambiar carpeta termina descargas en curso. Enter para guardar.';
+      'Por defecto: la carpeta de la biblioteca; cambiar carpeta termina descargas en curso. Enter para guardar.';
 
   @override
   String get settingsSectionFilename => 'Nombre de archivo';

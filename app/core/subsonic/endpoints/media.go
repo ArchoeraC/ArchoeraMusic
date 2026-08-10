@@ -37,7 +37,6 @@ import (
 	"github.com/splayer/subsonic-go/xmlutil"
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
-	"golang.org/x/sys/unix"
 )
 
 // transcoderBin 转码器动态库路径（config 注入，libarchoera_transcoder.so）
@@ -178,10 +177,9 @@ type TranscodeOpts struct {
 	Channels      int
 }
 
-// dropPageCache 通知内核丢弃文件页面缓存，避免整首歌数据常驻内存
-func dropPageCache(f *os.File) {
-	_ = unix.Fadvise(int(f.Fd()), 0, 0, unix.FADV_DONTNEED)
-}
+// dropPageCache 通知内核丢弃文件页面缓存，避免整首歌数据常驻内存。
+// Linux 用 posix_fadvise(POSIX_FADV_DONTNEED)；其他平台为空操作
+// （实现见 dropcache_linux.go / dropcache_other.go）。
 
 // serveDirectFile 直接发送原始文件，支持 Range
 // context-aware 流式拷贝：每 32KB 检查断连；结束后释放 OS 页面缓存

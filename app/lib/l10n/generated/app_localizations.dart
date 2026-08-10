@@ -2777,7 +2777,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsDownloadRootNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'默认保存到 ~/Music/ArchoeraMusic；修改目录回车保存，进行中的下载任务会终止。'**
+  /// **'默认跟随媒体库目录；修改目录回车保存，进行中的下载任务会终止。'**
   String get settingsDownloadRootNote;
 
   /// No description provided for @settingsSectionFilename.

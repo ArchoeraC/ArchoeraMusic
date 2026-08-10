@@ -444,7 +444,7 @@
   "settingsSectionDir": "目录",
   "settingsDownloadRootHint": "下载目录（回车保存）",
   "settingsRestoreDefault": "恢复默认",
-  "settingsDownloadRootNote": "默认保存到 ~/Music/ArchoeraMusic；修改目录回车保存，进行中的下载任务会终止。",
+  "settingsDownloadRootNote": "默认跟随媒体库目录；修改目录回车保存，进行中的下载任务会终止。",
   "settingsSectionFilename": "文件名",
   "settingsDownloadTemplateHint": "文件名模板（回车保存）",
   "settingsDownloadTemplateNote": "占位符：<artist> · <title> · <album>；只影响之后入队的任务，回车保存立即生效。",

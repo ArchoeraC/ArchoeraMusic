@@ -223,6 +223,8 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
         borderRadius: BorderRadius.circular(AppRadius.dialog),
         side: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
       ),
+      // 裁剪整个弹窗画布到 shape 圆角（Dialog 默认 Clip.none）
+      clipBehavior: Clip.antiAlias,
       // 图片风格下为毛玻璃（blur(16)），背景图不再清晰透出
       child: GlassDialogSurface(
         radius: BorderRadius.circular(AppRadius.dialog),

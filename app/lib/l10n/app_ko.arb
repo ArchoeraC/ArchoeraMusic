@@ -444,7 +444,7 @@
   "settingsSectionDir": "디렉토리",
   "settingsDownloadRootHint": "다운로드 폴더（Enter로 저장）",
   "settingsRestoreDefault": "기본값으로 복원",
-  "settingsDownloadRootNote": "기본 ~/Music/ArchoeraMusic（라이브러리 인식）；폴더 변경 시 진행 중 다운로드 종료. Enter로 저장.",
+  "settingsDownloadRootNote": "기본은 미디어 라이브러리 폴더를 따름；폴더 변경 시 진행 중 다운로드 종료. Enter로 저장.",
   "settingsSectionFilename": "파일명",
   "settingsDownloadTemplateHint": "파일명 템플릿（Enter로 저장）",
   "settingsDownloadTemplateNote": "플레이스홀더: <artist> · <title> · <album>. 이후 큐에 추가된 작업에만 적용；Enter로 저장.",

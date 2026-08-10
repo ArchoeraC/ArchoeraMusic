@@ -1450,8 +1450,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsRestoreDefault => '恢复默认';
 
   @override
-  String get settingsDownloadRootNote =>
-      '默认保存到 ~/Music/ArchoeraMusic；修改目录回车保存，进行中的下载任务会终止。';
+  String get settingsDownloadRootNote => '默认跟随媒体库目录；修改目录回车保存，进行中的下载任务会终止。';
 
   @override
   String get settingsSectionFilename => '文件名';
@@ -3600,8 +3599,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsRestoreDefault => '恢复默认';
 
   @override
-  String get settingsDownloadRootNote =>
-      '默认保存到 ~/Music/ArchoeraMusic；修改目录回车保存，进行中的下载任务会终止。';
+  String get settingsDownloadRootNote => '默认跟随媒体库目录；修改目录回车保存，进行中的下载任务会终止。';
 
   @override
   String get settingsSectionFilename => '文件名';
@@ -5751,7 +5749,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsDownloadRootNote =>
-      '預設儲存到 ~/Music/ArchoeraMusic；修改目錄按 Enter 儲存，進行中的下載任務會終止。';
+      '預設跟隨媒體庫目錄；修改目錄按 Enter 儲存，進行中的下載任務會終止。';
 
   @override
   String get settingsSectionFilename => '檔名';

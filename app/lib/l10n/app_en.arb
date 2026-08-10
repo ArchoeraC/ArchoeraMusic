@@ -444,7 +444,7 @@
   "settingsSectionDir": "Directory",
   "settingsDownloadRootHint": "Download folder (Enter to save)",
   "settingsRestoreDefault": "Restore default",
-  "settingsDownloadRootNote": "Default: ~/Music/ArchoeraMusic; changing folder terminates ongoing downloads. Press Enter to save.",
+  "settingsDownloadRootNote": "Defaults to the library folder; changing folder terminates ongoing downloads. Press Enter to save.",
   "settingsSectionFilename": "Filename",
   "settingsDownloadTemplateHint": "Filename template (Enter to save)",
   "settingsDownloadTemplateNote": "Placeholders: <artist> · <title> · <album>. Only affects tasks queued later; press Enter to save.",

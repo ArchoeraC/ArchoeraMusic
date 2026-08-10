@@ -34,7 +34,15 @@ class GlassDialogSurface extends ConsumerWidget {
     final prefs = ref.watch(appPrefsProvider);
     final imageStyle =
         prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
-    if (!imageStyle) return ColoredBox(color: color, child: child);
+    // 非图片风格：实底面板 + 圆角裁剪（变暗由弹窗外 barrier 承担，
+    // 弹窗本体保持与图片风格一致的实底可读性；圆角由本容器裁剪，
+    // Dialog 侧配合 clipBehavior 保证画布也被裁剪，不出现直角溢出）。
+    if (!imageStyle) {
+      return ClipRRect(
+        borderRadius: radius,
+        child: ColoredBox(color: color, child: child),
+      );
+    }
     return ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(

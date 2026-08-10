@@ -1463,7 +1463,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsDownloadRootNote =>
-      '기본 ~/Music/ArchoeraMusic（라이브러리 인식）；폴더 변경 시 진행 중 다운로드 종료. Enter로 저장.';
+      '기본은 미디어 라이브러리 폴더를 따름；폴더 변경 시 진행 중 다운로드 종료. Enter로 저장.';
 
   @override
   String get settingsSectionFilename => '파일명';

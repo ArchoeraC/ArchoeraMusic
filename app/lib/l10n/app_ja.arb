@@ -444,7 +444,7 @@
   "settingsSectionDir": "ディレクトリ",
   "settingsDownloadRootHint": "ダウンロードフォルダ（Enterで保存）",
   "settingsRestoreDefault": "デフォルトに戻す",
-  "settingsDownloadRootNote": "デフォルト: ~/Music/ArchoeraMusic；フォルダを変更してEnterで保存。進行中のダウンロードは終了します。",
+  "settingsDownloadRootNote": "デフォルト: メディアライブラリのフォルダに従う；フォルダを変更してEnterで保存。進行中のダウンロードは終了します。",
   "settingsSectionFilename": "ファイル名",
   "settingsDownloadTemplateHint": "ファイル名テンプレート（Enterで保存）",
   "settingsDownloadTemplateNote": "プレースホルダー: <artist> · <title> · <album>；以降にキューされたタスクのみに影響。Enterで保存、即座に有効。",

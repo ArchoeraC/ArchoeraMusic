@@ -444,7 +444,7 @@
   "settingsSectionDir": "Répertoire",
   "settingsDownloadRootHint": "Dossier de téléchargement（Entrée pour enregistrer）",
   "settingsRestoreDefault": "Restaurer la valeur par défaut",
-  "settingsDownloadRootNote": "Par défaut : ~/Music/ArchoeraMusic（reconnu par la bibliothèque）；changer de dossier interrompt les téléchargements en cours. Entrée pour valider.",
+  "settingsDownloadRootNote": "Par défaut : suit le dossier de la bibliothèque；changer de dossier interrompt les téléchargements en cours. Entrée pour valider.",
   "settingsSectionFilename": "Nom de fichier",
   "settingsDownloadTemplateHint": "Modèle de nom de fichier（Entrée pour enregistrer）",
   "settingsDownloadTemplateNote": "Espaces réservés : <artist> · <title> · <album>. S'applique aux nouvelles tâches uniquement ; Entrée pour valider.",

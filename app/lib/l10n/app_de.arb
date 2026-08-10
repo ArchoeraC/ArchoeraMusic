@@ -444,7 +444,7 @@
   "settingsSectionDir": "Verzeichnis",
   "settingsDownloadRootHint": "Download-Ordner（Enter zum Speichern）",
   "settingsRestoreDefault": "Standard wiederherstellen",
-  "settingsDownloadRootNote": "Standard: ~/Music/ArchoeraMusic; Ordnerwechsel beendet laufende Downloads. Enter zum Speichern.",
+  "settingsDownloadRootNote": "Standard: folgt dem Bibliotheksordner; Ordnerwechsel beendet laufende Downloads. Enter zum Speichern.",
   "settingsSectionFilename": "Dateiname",
   "settingsDownloadTemplateHint": "Dateinamenvorlage（Enter zum Speichern）",
   "settingsDownloadTemplateNote": "Platzhalter: <artist> · <title> · <album>; gilt nur für neue Aufgaben. Enter zum Speichern, sofort wirksam.",

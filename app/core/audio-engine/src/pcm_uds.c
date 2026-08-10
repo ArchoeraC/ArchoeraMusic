@@ -7,6 +7,14 @@
 #define _POSIX_C_SOURCE 200809L
 #include "pcm_uds.h"
 
+#ifdef _WIN32
+/* Windows 无 AF_UNIX：stub（create 返回 NULL，其余无操作），
+ * 保证 audio_engine_static / CLI 可链接；PCM 流出在 Windows 暂不支持。 */
+PcmUds* pcm_uds_create(const char *path) { (void)path; return NULL; }
+int pcm_uds_wait_conn(PcmUds *u, int timeout_ms) { (void)u; (void)timeout_ms; return -1; }
+int pcm_uds_push(PcmUds *u, const struct iovec *iov, int iovcnt) { (void)u; (void)iov; (void)iovcnt; return -1; }
+void pcm_uds_destroy(PcmUds *u) { (void)u; }
+#else
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -159,3 +167,4 @@ void pcm_uds_destroy(PcmUds *u)
     if (u->path[0]) unlink(u->path);
     free(u);
 }
+#endif /* _WIN32 */

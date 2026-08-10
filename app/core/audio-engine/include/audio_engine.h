@@ -14,7 +14,13 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#ifdef _WIN32
+/* MSVC 无 sys/types.h 的 ssize_t：用 Windows SDK 的 SSIZE_T */
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#else
 #include <sys/types.h> /* ssize_t */
+#endif
 
 #ifdef __cplusplus
 extern "C" {
