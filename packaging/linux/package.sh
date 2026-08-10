@@ -137,7 +137,8 @@ pkg_rpm() {
 # ── AppImage：通用便携 ────────────────────────────────────────────────
 pkg_appimage() {
   local appdir="$stage/appimage/ArchoeraMusic.AppDir"
-  mkdir -p "$appdir/usr/lib/archoera-music" "$appdir/usr/share/metainfo"
+  mkdir -p "$appdir/usr/lib/archoera-music" "$appdir/usr/share/metainfo" \
+    "$appdir/usr/share/icons"
   cp -a "$stage_bundle/." "$appdir/usr/lib/archoera-music/"
   # AppRun 在 AppDir 内启动真实二进制（/proc/self/exe 相对路径保持正确）
   cat > "$appdir/AppRun" <<EOF
@@ -153,9 +154,16 @@ EOF
   cp -a "$stage_icons/hicolor" "$appdir/usr/share/icons/hicolor"
   install -m644 "$stage_metainfo" \
     "$appdir/usr/share/metainfo/$APP_ID.metainfo.xml"
-  # CI 无 FUSE：用 --appimage-extract-and-run 运行 appimagetool 本体
-  appimagetool --appimage-extract-and-run "$appdir" \
-    "$DIST/$APP_NAME-v$version-linux-x86_64.AppImage"
+  # CI 无 FUSE：用 --appimage-extract-and-run 运行 appimagetool 本体。
+  # type2 runtime 经 APPIMAGE_RUNTIME_FILE 预下载传入，避免每次打包联网
+  # 下载（CI 网络抖动时 appimagetool 内置 libcurl 易 TLS 失败）。
+  if [[ -n "${APPIMAGE_RUNTIME_FILE:-}" && -f "$APPIMAGE_RUNTIME_FILE" ]]; then
+    appimagetool --appimage-extract-and-run --runtime-file "$APPIMAGE_RUNTIME_FILE" \
+      "$appdir" "$DIST/$APP_NAME-v$version-linux-x86_64.AppImage"
+  else
+    appimagetool --appimage-extract-and-run "$appdir" \
+      "$DIST/$APP_NAME-v$version-linux-x86_64.AppImage"
+  fi
   echo "→ $DIST/$APP_NAME-v$version-linux-x86_64.AppImage"
 }
 

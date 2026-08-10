@@ -90,6 +90,8 @@ jobs:
           wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage
           chmod +x /tmp/appimagetool.AppImage
           sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
+          # type2 runtime 预下载（appimagetool 打包时不再联网下载，规避网络抖动）
+          wget -q https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 -O /tmp/type2-runtime
 
       - name: Package tar.gz (纯二进制)
         run: bash packaging/linux/package.sh tar app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
@@ -102,6 +104,8 @@ jobs:
 
       - name: Package AppImage (通用)
         run: bash packaging/linux/package.sh appimage app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+        env:
+          APPIMAGE_RUNTIME_FILE: /tmp/type2-runtime
 
       - name: Package Arch pkg.tar.zst (makepkg in archlinux container)
         run: |
