@@ -106,3 +106,40 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# === ArchoeraMusic 原生产物打包（与 linux/CMakeLists.txt 对齐）===
+# 引擎模块位于 app/core/{audio-engine,scanner,scraper,subsonic}，产物由独立构建链
+# 产出（CI workflow 在 flutter build 前显式构建）；install 拷贝进 bundle：
+#   Release/audio-engine/build/{splayer-audio-engine.exe,archoera_mediaengine.dll,fft.dll}
+#   Release/scanner/build/{scanner-ffi.dll,libe_sqlite3.dll}
+#   Release/scraper/build/archoera_scraper.dll
+#   Release/subsonic/build/{libarchoera_subsonic.dll,archoera_transcoder.dll}
+#   Release/core/downloader/target/release/archoera_downloader.dll
+# 路径对齐各 FFI 绑定的「exe 祖先链向上找 X/build/」约定；源产物缺失时跳过
+#（OPTIONAL），保证未构建原生模块时仍可跑 Flutter 构建。
+set(ENGINE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine/build")
+set(SCANNER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/scanner/build")
+set(SCRAPER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/scraper/build")
+set(SUBSONIC_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/subsonic/build")
+
+install(PROGRAMS "${ENGINE_SRC_DIR}/splayer-audio-engine.exe"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/audio-engine/build" COMPONENT Runtime OPTIONAL)
+install(FILES "${ENGINE_SRC_DIR}/archoera_mediaengine.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/audio-engine/build" COMPONENT Runtime OPTIONAL)
+install(FILES "${ENGINE_SRC_DIR}/fft.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/audio-engine/build" COMPONENT Runtime OPTIONAL)
+install(FILES "${SCANNER_SRC_DIR}/scanner-ffi.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/scanner/build" COMPONENT Runtime OPTIONAL)
+install(FILES "${SCANNER_SRC_DIR}/libe_sqlite3.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/scanner/build" COMPONENT Runtime OPTIONAL)
+install(FILES "${SCRAPER_SRC_DIR}/archoera_scraper.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/scraper/build" COMPONENT Runtime OPTIONAL)
+install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_subsonic.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/subsonic/build" COMPONENT Runtime OPTIONAL)
+install(FILES "${SUBSONIC_SRC_DIR}/archoera_transcoder.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/subsonic/build" COMPONENT Runtime OPTIONAL)
+
+# downloader：cargo 内嵌构建链产出 target/release/archoera_downloader.dll
+#（download 目标为 ALL，flutter build 前已随 workflow 显式 cargo build）。
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../core/downloader/target/release/archoera_downloader.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/core/downloader/target/release" COMPONENT Runtime)

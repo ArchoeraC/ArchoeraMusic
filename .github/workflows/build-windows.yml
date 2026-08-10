@@ -19,6 +19,12 @@ jobs:
         shell: bash
         run: choco install pkgconfiglite mingw -y --no-progress
 
+      - name: Cache vcpkg installed (ffmpeg/taglib 等预编译，跨 run 秒级恢复)
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-installed-v1
+
       - name: Install vcpkg deps (ffmpeg / taglib / curl / openssl / sqlite3 / nlohmann-json)
         shell: bash
         run: vcpkg install ffmpeg:x64-windows taglib:x64-windows curl:x64-windows openssl:x64-windows sqlite3:x64-windows nlohmann-json:x64-windows
