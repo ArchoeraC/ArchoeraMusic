@@ -18,7 +18,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # of the product and file versions while build-number is used as the build suffix.
 # 语义化版本：x.y.z[-预发布标签][+构建号]，如 0.8.3-preview / 0.8.3-pre.2+rev.3
 # （Dart 版本号语法不允许 '.' 分段预发布/构建号；运行时按 0.8.3.pre.2.rev.3 风格显示）
-version: 0.8.6-pre.3+rev.14
+version: 0.8.6-pre.3+rev.16
 
 environment:
   sdk: ^3.12.2
