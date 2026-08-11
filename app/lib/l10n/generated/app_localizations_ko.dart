@@ -1693,6 +1693,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsShowSubtitleOff => '목록에 아티스트만 표시, 별칭 없음';
 
   @override
+  String get settingsEnergySaving => '절전 모드';
+
+  @override
+  String get settingsEnergySavingNote =>
+      '켜면 스펙트럼 캡처 빈도가 약 300ms로 낮아져(기본 100ms) CPU 사용량을 절약합니다. 렌더링과 보간에는 영향이 없으며 즉시 적용됩니다.';
+
+  @override
+  String get settingsEnergySavingOn => '현재 프레임 축소 모드';
+
+  @override
+  String get settingsEnergySavingOff => '현재 표준 모드';
+
+  @override
+  String get settingsSearchEnergySavingSubtitle => '스펙트럼 캡처 빈도를 낮춰 CPU 절약';
+
+  @override
   String get settingsPerformanceMode => '성능 모드';
 
   @override

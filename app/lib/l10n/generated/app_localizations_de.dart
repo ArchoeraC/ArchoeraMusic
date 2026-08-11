@@ -1758,6 +1758,23 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsShowSubtitleOff => 'Keine Aliase in der Liste';
 
   @override
+  String get settingsEnergySaving => 'Energiesparmodus';
+
+  @override
+  String get settingsEnergySavingNote =>
+      'Wenn aktiviert, sinkt die Spektrum-Framerate auf ~300ms (Standard: 100ms) und spart CPU; Rendering und Interpolation bleiben unberührt, die Änderung greift sofort.';
+
+  @override
+  String get settingsEnergySavingOn => 'Derzeit im Frameraten-Modus';
+
+  @override
+  String get settingsEnergySavingOff => 'Derzeit im Standardmodus';
+
+  @override
+  String get settingsSearchEnergySavingSubtitle =>
+      'Spektrum-Framerate senken, um CPU zu sparen';
+
+  @override
   String get settingsPerformanceMode => 'Leistungsmodus';
 
   @override

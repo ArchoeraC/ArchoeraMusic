@@ -1771,6 +1771,24 @@ class AppLocalizationsFr extends AppLocalizations {
       'La liste affiche uniquement l\'artiste, sans alias';
 
   @override
+  String get settingsEnergySaving => 'Mode économie d\'énergie';
+
+  @override
+  String get settingsEnergySavingNote =>
+      'Une fois activé, la fréquence du spectre passe à ~300ms (référence 100ms), économisant le CPU ; le rendu et l\'interpolation ne sont pas affectés, le changement s\'applique instantanément.';
+
+  @override
+  String get settingsEnergySavingOn =>
+      'Actuellement en mode réduction de fréquence';
+
+  @override
+  String get settingsEnergySavingOff => 'Actuellement en mode standard';
+
+  @override
+  String get settingsSearchEnergySavingSubtitle =>
+      'Réduire la fréquence du spectre pour économiser le CPU';
+
+  @override
   String get settingsPerformanceMode => 'Mode performance';
 
   @override

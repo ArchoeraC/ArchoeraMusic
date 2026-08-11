@@ -1676,6 +1676,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsShowSubtitleOff => '列表不展示别名';
 
   @override
+  String get settingsEnergySaving => '节能模式';
+
+  @override
+  String get settingsEnergySavingNote =>
+      '开启后频谱取帧频率降至约 300ms 一帧（默认 100ms 基线），降低 CPU 占用；频谱渲染与插值不受影响，切换实时生效。';
+
+  @override
+  String get settingsEnergySavingOn => '当前为降帧模式';
+
+  @override
+  String get settingsEnergySavingOff => '当前为标准模式';
+
+  @override
+  String get settingsSearchEnergySavingSubtitle => '降低频谱取帧频率以节省 CPU';
+
+  @override
   String get settingsPerformanceMode => '性能模式';
 
   @override
@@ -4351,6 +4367,22 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsShowSubtitleOff => '列表不展示别名';
 
   @override
+  String get settingsEnergySaving => '节能模式';
+
+  @override
+  String get settingsEnergySavingNote =>
+      '开启后频谱取帧频率降至约 300ms 一帧（默认 100ms 基线），降低 CPU 占用；频谱渲染与插值不受影响，切换实时生效。';
+
+  @override
+  String get settingsEnergySavingOn => '当前为降帧模式';
+
+  @override
+  String get settingsEnergySavingOff => '当前为标准模式';
+
+  @override
+  String get settingsSearchEnergySavingSubtitle => '降低频谱取帧频率以节省 CPU';
+
+  @override
   String get settingsPerformanceMode => '性能模式';
 
   @override
@@ -7024,6 +7056,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsShowSubtitleOff => '列表不展示別名';
+
+  @override
+  String get settingsEnergySaving => '節能模式';
+
+  @override
+  String get settingsEnergySavingNote =>
+      '開啟後頻譜取幀頻率降至約 300ms 一幀（預設 100ms 基線），降低 CPU 占用；頻譜渲染與插值不受影響，切換即時生效。';
+
+  @override
+  String get settingsEnergySavingOn => '目前為降幀模式';
+
+  @override
+  String get settingsEnergySavingOff => '目前為標準模式';
+
+  @override
+  String get settingsSearchEnergySavingSubtitle => '降低頻譜取幀頻率以節省 CPU';
 
   @override
   String get settingsPerformanceMode => '效能模式';

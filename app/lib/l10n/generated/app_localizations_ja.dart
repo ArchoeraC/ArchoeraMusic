@@ -1688,6 +1688,22 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsShowSubtitleOff => 'リストに別名を表示しない';
 
   @override
+  String get settingsEnergySaving => '省エネモード';
+
+  @override
+  String get settingsEnergySavingNote =>
+      '有効にするとスペクトル取得頻度が約 300ms に下がり（既定 100ms）、CPU 使用量を削減。レンダリングと補間には影響せず、即時反映されます。';
+
+  @override
+  String get settingsEnergySavingOn => '現在フレーム間引きモード';
+
+  @override
+  String get settingsEnergySavingOff => '現在標準モード';
+
+  @override
+  String get settingsSearchEnergySavingSubtitle => 'スペクトル取得頻度を下げて CPU を節約';
+
+  @override
   String get settingsPerformanceMode => 'パフォーマンスモード';
 
   @override

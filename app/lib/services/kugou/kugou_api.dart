@@ -668,17 +668,80 @@ class KugouApi extends ChangeNotifier {
     return all;
   }
 
-  /// 私有歌单（用户歌单/"我喜欢"）歌曲单页（get_list_all_file）。
+  /// 私有歌单（用户歌单/"我喜欢"）歌曲单页。
   ///
-  /// 返回 `(tracks, total)`：tracks 为当页歌曲（按歌单 sort **降序**，
-  /// 最新收藏在前，对齐酷狗 App），total 为歌单总数（data.count）。
-  /// 供全量循环与收藏列表分页加载共用。
+  /// 返回 `(tracks, total)`：tracks 为当页歌曲，**保持接口返回顺序**
+  /// （最新收藏在前）。[gid] 非空时走公开歌单接口
+  /// `/pubsongs/v2/get_other_list_file_nofilt`（global_collection_id，
+  /// 按「最新收藏在前」稳定分页，对齐 MoeKoeMusic /playlist/track/all
+  /// 方案）；该 id 无法用于公开接口（实为 listid）时回退个人接口
+  /// `/v4/get_list_all_file`。两种接口均不按 sort 排序——sort 字段在
+  /// 部分条目缺失/不稳定，依赖它会打乱接口顺序。
   Future<(List<Track>, int)> playlistTracksNewPage(
     String listid, {
+    String? gid,
     int page = 1,
     int pagesize = 60,
   }) async {
     if (session == null) return (const <Track>[], 0);
+    if (gid != null && gid.isNotEmpty) {
+      try {
+        return await _playlistTracksByGid(gid, page: page, pagesize: pagesize);
+      } catch (_) {
+        // 该 id 无法用于公开歌单接口（实为 listid 或接口异常）→ 回退个人接口
+      }
+    }
+    return _playlistTracksByListid(listid, page: page, pagesize: pagesize);
+  }
+
+  /// 公开歌单接口单页（get_other_list_file_nofilt，GET + android 签名）。
+  ///
+  /// 对齐 KuGouMusicApi playlist_track_all.js：begin_idx 分页 + plat/mode/
+  /// personal_switch/extend_fields；歌曲在 `data.songs`，总数在
+  /// `data.list_info.count`。条目字段（name="歌手 - 歌名" 合并名、
+  /// relate_goods 档位）由 [kgTrackFromKgPlain] 的 preferMergedName 处理。
+  Future<(List<Track>, int)> _playlistTracksByGid(
+    String gid, {
+    required int page,
+    required int pagesize,
+  }) async {
+    final resp = await _gateway(
+      '/pubsongs/v2/get_other_list_file_nofilt',
+      method: 'GET',
+      query: {
+        'begin_idx': (page - 1) * pagesize,
+        'plat': 1,
+        'type': 1,
+        'mode': 1,
+        'personal_switch': 1,
+        'extend_fields': 'abtags,hot_cmt,popularization',
+        'pagesize': pagesize,
+        'global_collection_id': gid,
+      },
+    );
+    final data = resp is Map ? resp['data'] : null;
+    final songs = data is Map ? data['songs'] : null;
+    final tracks = songs is List
+        ? songs
+              .whereType<Map<String, dynamic>>()
+              .map((s) => kgTrackFromKgPlain(s, preferMergedName: true))
+              .where((t) => t.kugou != null)
+              .toList()
+        : const <Track>[];
+    final listInfo = data is Map ? data['list_info'] : null;
+    final totalRaw = listInfo is Map ? listInfo['count'] : null;
+    final total = totalRaw is num
+        ? totalRaw.toInt()
+        : int.tryParse('$totalRaw') ?? tracks.length;
+    return (tracks, total);
+  }
+
+  /// 个人歌单接口单页（get_list_all_file，POST + listid）。
+  Future<(List<Track>, int)> _playlistTracksByListid(
+    String listid, {
+    required int page,
+    required int pagesize,
+  }) async {
     final resp = await _gateway(
       '/v4/get_list_all_file',
       method: 'POST',
@@ -702,16 +765,12 @@ class KugouApi extends ChangeNotifier {
     final songs = data is Map ? data['info'] : null;
     final tracks = <Track>[];
     if (songs is List) {
-      final pageTracks =
-          songs
-              .whereType<Map<String, dynamic>>()
-              .map(kgTrackFromKgPlain)
-              .where((t) => t.kugou != null)
-              .toList()
-            ..sort(
-              (a, b) => (b.kugou?.sort ?? 0).compareTo(a.kugou?.sort ?? 0),
-            );
-      tracks.addAll(pageTracks);
+      tracks.addAll(
+        songs
+            .whereType<Map<String, dynamic>>()
+            .map(kgTrackFromKgPlain)
+            .where((t) => t.kugou != null),
+      );
     }
     final totalRaw = data is Map ? data['count'] : null;
     final total = totalRaw is num
@@ -720,11 +779,12 @@ class KugouApi extends ChangeNotifier {
     return (tracks, total);
   }
 
-  /// 私有歌单（用户歌单/"我喜欢"）全量歌曲（playlist_track_all_new）。
+  /// 私有歌单（用户歌单/"我喜欢"）全量歌曲。
   ///
   /// 60/页循环翻页至接口返回的 count（总数），无硬上限——「我喜欢」
-  /// 可上千首，此前默认截断 300 首导致列表不完整。
-  Future<List<Track>> playlistTracksAllNew(String listid) async {
+  /// 可上千首，此前默认截断 300 首导致列表不完整。[gid] 非空时走公开
+  /// 歌单接口（顺序稳定），否则回退 listid 个人接口。
+  Future<List<Track>> playlistTracksAllNew(String listid, {String? gid}) async {
     const pagesize = 60;
     final all = <Track>[];
     var page = 1;
@@ -732,6 +792,7 @@ class KugouApi extends ChangeNotifier {
     while (page <= 200) {
       final (tracks, total) = await playlistTracksNewPage(
         listid,
+        gid: gid,
         page: page,
         pagesize: pagesize,
       );
@@ -744,14 +805,21 @@ class KugouApi extends ChangeNotifier {
     return all;
   }
 
-  /// 「我喜欢」歌曲分页（供收藏列表按需加载；每页按歌单 sort 升序）。
+  /// 「我喜欢」歌曲分页（供收藏列表按需加载；每页保持接口顺序，
+  /// 最新收藏在前，见 [playlistTracksNewPage]）。
   Future<(List<Track>, int)> likedTracksPage({
     int page = 1,
     int pagesize = 60,
   }) async {
+    final gid = await likeGid();
     final listid = await likeListId();
-    if (listid == null) return (const <Track>[], 0);
-    return playlistTracksNewPage(listid, page: page, pagesize: pagesize);
+    if (gid == null && listid == null) return (const <Track>[], 0);
+    return playlistTracksNewPage(
+      listid ?? gid!,
+      gid: gid,
+      page: page,
+      pagesize: pagesize,
+    );
   }
 
   /// 「我喜欢」红心 hash 集合（轻量）。
@@ -759,15 +827,17 @@ class KugouApi extends ChangeNotifier {
   /// 分页循环只取 hash，不保留完整 Track 快照——LikeController 全量
   /// 同步红心状态时避免一次性构造并持有全部曲目对象（GC 友好）。
   Future<Set<String>> likedHashSet() async {
+    final gid = await likeGid();
     final listid = await likeListId();
-    if (listid == null) return const {};
+    if (gid == null && listid == null) return const {};
     const pagesize = 60;
     final hashes = <String>{};
     var page = 1;
     // 安全上限：60 首/页 × 200 页 = 12000 首，防接口异常时死循环
     while (page <= 200) {
       final (tracks, total) = await playlistTracksNewPage(
-        listid,
+        listid ?? gid!,
+        gid: gid,
         page: page,
         pagesize: pagesize,
       );
@@ -902,21 +972,40 @@ class KugouApi extends ChangeNotifier {
     return _likeListId;
   }
 
-  /// 清除「我喜欢」listid 缓存（登录态/歌单变更后调用）。
-  void invalidateLikeListId() => _likeListId = null;
+  /// 「我喜欢」歌单公开 id（进程内缓存；无公开 id 返回 null）。
+  String? _likeGid;
 
-  /// 「我喜欢」歌曲列表：user_playlist 匹配 `name == '我喜欢'` 的 listid →
-  /// playlist_track_all_new 拉全量（对齐 MoeKoeMusic Library.vue 约定）。
+  /// 查找「我喜欢」歌单的公开 id（list_create_gid / global_collection_id，
+  /// 对齐 MoeKoeMusic Library.vue：打开歌单用 global_collection_id 调
+  /// `/playlist/track/all` 公开接口，分页顺序稳定「最新收藏在前」）。
+  /// 账号数据缺失公开 id 时返回 null（调用方回退 listid 个人接口）。
+  Future<String?> likeGid() async {
+    final cached = _likeGid;
+    if (cached != null) return cached;
+    final lib = await userLibrary();
+    final like = lib.items.where((p) => p.title == '我喜欢').toList();
+    final item = like.isEmpty ? null : like.first;
+    // userLibrary 的 id 已 gid 优先；与 listid 相同说明无公开 id
+    final gid = item != null && item.id != item.listid ? item.id : null;
+    _likeGid = gid;
+    return gid;
+  }
+
+  /// 清除「我喜欢」listid/gid 缓存（登录态/歌单变更后调用）。
+  void invalidateLikeListId() {
+    _likeListId = null;
+    _likeGid = null;
+  }
+
+  /// 「我喜欢」歌曲列表：优先用公开 id 走公开歌单接口
+  /// （get_other_list_file_nofilt，顺序稳定「最新收藏在前」，对齐
+  /// MoeKoeMusic /playlist/track/all 方案）；无公开 id 时回退
+  /// listid + playlist_track_all_new 个人接口。
   Future<List<Track>> likedTracks() async {
+    final gid = await likeGid();
     final listid = await likeListId();
-    if (listid == null) return const [];
-    final tracks = await playlistTracksAllNew(listid);
-    // 按收藏序号 sort 降序（最新收藏在前，与酷狗 App 展示顺序一致）；
-    // 分页接口返回顺序不稳定，不能依赖 reversed；sort 缺失时
-    // 退化为原接口顺序（旧数据兜底）。
-    final sorted = List<Track>.of(tracks)
-      ..sort((a, b) => (b.kugou?.sort ?? 0).compareTo(a.kugou?.sort ?? 0));
-    return sorted;
+    if (gid == null && listid == null) return const [];
+    return playlistTracksAllNew(listid ?? gid!, gid: gid);
   }
 
   /// 添加歌曲到「我喜欢」（对齐 KuGouMusicApi playlist_tracks_add.js）。

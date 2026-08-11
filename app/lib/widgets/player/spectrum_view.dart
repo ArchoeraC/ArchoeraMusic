@@ -125,7 +125,9 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
     }
     // 对齐原版：播放时 opacity（默认 0.65），暂停时同比例压暗
     // （原版 show ? 0.65 : 0.15，保持相同 0.15/0.65 比例缩放）
-    final targetOpacity = playing ? widget.opacity : widget.opacity * (0.15 / 0.65);
+    final targetOpacity = playing
+        ? widget.opacity
+        : widget.opacity * (0.15 / 0.65);
     // 暂停节能：停止 ticker 重绘（对齐原版暂停停止 RAF）
     _ticker.muted = !playing;
 
@@ -207,14 +209,8 @@ class _SpectrumPainter extends CustomPainter {
   int nowMs = 0;
 
   /// 双声道三态缓冲：prev（上一推送帧）/ curr（当前推送帧）/ display（平滑值）。
-  final List<Float64List> _prev = [
-    Float64List(fftSize),
-    Float64List(fftSize),
-  ];
-  final List<Float64List> _curr = [
-    Float64List(fftSize),
-    Float64List(fftSize),
-  ];
+  final List<Float64List> _prev = [Float64List(fftSize), Float64List(fftSize)];
+  final List<Float64List> _curr = [Float64List(fftSize), Float64List(fftSize)];
   final List<Float64List> _display = [
     Float64List(fftSize),
     Float64List(fftSize),
@@ -226,17 +222,23 @@ class _SpectrumPainter extends CustomPainter {
   int _lastUpdateMs = 0;
 
   /// 推入一帧新数据（ldata/rdata 为 128 bins [0,1]）。
+  ///
+  /// 降帧协商：对非法样本（NaN/Inf/负值，FFT 异常帧可能产生）按 0
+  /// 归一化，防止污染 _display 缓冲后逐帧扩散导致绘制崩溃。
   void pushFrame(FftFrame frame, int nowMs) {
     final l = frame.ldata;
     final r = frame.rdata;
     for (var i = 0; i < fftSize; i++) {
       _prev[0][i] = _curr[0][i];
       _prev[1][i] = _curr[1][i];
-      _curr[0][i] = i < l.length ? l[i] : 0.0;
-      _curr[1][i] = i < r.length ? r[i] : 0.0;
+      _curr[0][i] = i < l.length ? _finite(l[i]) : 0.0;
+      _curr[1][i] = i < r.length ? _finite(r[i]) : 0.0;
     }
     _lastUpdateMs = nowMs;
   }
+
+  /// 非法样本归一化（NaN/Inf/负值 → 0）。
+  static double _finite(double v) => v.isFinite && v >= 0 ? v : 0.0;
 
   /// 清空全部缓冲（停止播放时调用）。
   void reset() {
@@ -256,13 +258,15 @@ class _SpectrumPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // 1) 帧间时间插值：在 prev→curr 间按推送进度线性过渡，消除 20Hz 阶梯
-    final t = math.min((nowMs - _lastUpdateMs) / pushIntervalMs, 1.0).clamp(0.0, 1.0);
+    final t = math
+        .min((nowMs - _lastUpdateMs) / pushIntervalMs, 1.0)
+        .clamp(0.0, 1.0);
     for (var c = 0; c < 2; c++) {
       final prev = _prev[c];
       final curr = _curr[c];
       final disp = _display[c];
       for (var i = 0; i < fftSize; i++) {
-        final target = prev[i] + (curr[i] - prev[i]) * t;
+        final target = _finite(prev[i] + (curr[i] - prev[i]) * t);
         if (target > disp[i]) {
           // 上行快：向目标接近 40%
           disp[i] += (target - disp[i]) * attack;
@@ -302,7 +306,12 @@ class _SpectrumPainter extends CustomPainter {
       if (barHeight <= _minBarHeight) continue;
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(i * slotWidth, size.height - barHeight, barWidth, barHeight),
+          Rect.fromLTWH(
+            i * slotWidth,
+            size.height - barHeight,
+            barWidth,
+            barHeight,
+          ),
           Radius.circular(radius),
         ),
         paint,

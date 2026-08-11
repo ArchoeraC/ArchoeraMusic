@@ -350,6 +350,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 节能模式：降低频谱取帧频率以节省 CPU（默认关，见 [AppPrefs.energySavingMode]）。
+  void setEnergySaving(bool value) {
+    state = state.copyWithPreset(energySavingMode: value);
+    state.save();
+  }
+
   /// 设置开发者模式（隐藏下载接口的开关）。
   ///
   /// 会话级开关：不落盘（save() 会把整个 data 连带写盘，若持久化，

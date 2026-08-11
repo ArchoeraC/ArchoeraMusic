@@ -308,6 +308,12 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
       ),
       _SearchEntry(
         SettingsCategory.preset,
+        l10n.settingsEnergySaving,
+        l10n.settingsSearchEnergySavingSubtitle,
+        Icons.energy_savings_leaf_outlined,
+      ),
+      _SearchEntry(
+        SettingsCategory.preset,
         l10n.settingsPerformanceMode,
         l10n.settingsPerformanceModeOn,
         Icons.bolt_outlined,

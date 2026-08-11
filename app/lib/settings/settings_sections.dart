@@ -1258,6 +1258,25 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 节能模式：降低频谱取帧频率（300ms 一帧）以节省 CPU
+        SettingSection(
+          title: l10n.settingsEnergySaving,
+          note: l10n.settingsEnergySavingNote,
+          children: [
+            SettingSwitchTile(
+              icon: prefs.energySavingMode
+                  ? Icons.energy_savings_leaf
+                  : Icons.energy_savings_leaf_outlined,
+              title: l10n.settingsEnergySaving,
+              subtitle: prefs.energySavingMode
+                  ? l10n.settingsEnergySavingOn
+                  : l10n.settingsEnergySavingOff,
+              value: prefs.energySavingMode,
+              onChanged: notifier.setEnergySaving,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
         // 性能模式：关闭所有动效 + 自动关闭音频频谱（全局开关）
         SettingSection(
           title: l10n.settingsPerformanceMode,

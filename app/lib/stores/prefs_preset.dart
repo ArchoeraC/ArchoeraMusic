@@ -7,6 +7,7 @@ const hideVipTagKey = 'preset.hideVipTag';
 const hideQualityTagKey = 'preset.hideQualityTag';
 const showSubtitleKey = 'preset.showSubtitle';
 const performanceModeKey = 'preset.performanceMode';
+const energySavingModeKey = 'preset.energySavingMode';
 
 /// 预设域偏好（对齐原项目 preset）：播放过滤/歌词还原/列表标签/性能模式。
 extension PresetPrefs on AppPrefs {
@@ -30,9 +31,16 @@ extension PresetPrefs on AppPrefs {
   /// 开 = 全局隐式动效 0 时长 + 频谱开关视为关闭（FFT 轮询/渲染全停）。
   bool get performanceMode => data[performanceModeKey] as bool? ?? false;
 
+  /// 节能模式：降低频谱取帧频率（约 300ms 一帧）以节省 CPU（默认关）。
+  ///
+  /// 关 = 取帧保持 100ms 基线（性能优化后的默认）。开 = 进一步降帧，
+  /// 频谱刷新变慢但 CPU/IO 负担更低；频谱渲染与插值协商不受影响。
+  bool get energySavingMode => data[energySavingModeKey] as bool? ?? false;
+
   /// 强迫症设置（对齐原项目 preset：Fuck DJ / 解锁脏话 / 标签与副标题）。
   AppPrefs copyWithPreset({
     bool? performanceMode,
+    bool? energySavingMode,
     bool? fuckDjMode,
     bool? uncensorProfanity,
     bool? hideVipTag,
@@ -42,6 +50,7 @@ extension PresetPrefs on AppPrefs {
     initialData: {
       ...data,
       performanceModeKey: ?performanceMode,
+      energySavingModeKey: ?energySavingMode,
       fuckDjModeKey: ?fuckDjMode,
       uncensorProfanityKey: ?uncensorProfanity,
       hideVipTagKey: ?hideVipTag,
