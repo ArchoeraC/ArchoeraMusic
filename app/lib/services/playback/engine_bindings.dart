@@ -62,15 +62,28 @@ final class EngineConfigC extends Struct {
   external bool tempoPitchSync;
 }
 
-typedef _CreateNative = Pointer<Opaque> Function(
-    Pointer<Utf8>, Pointer<EngineConfigC>, Pointer<Utf8>, Pointer<Utf8>,
-    Pointer<Utf8>, Int32);
-typedef _CreateDart = Pointer<Opaque> Function(
-    Pointer<Utf8>, Pointer<EngineConfigC>, Pointer<Utf8>, Pointer<Utf8>,
-    Pointer<Utf8>, int);
+typedef _CreateNative =
+    Pointer<Opaque> Function(
+      Pointer<Utf8>,
+      Pointer<EngineConfigC>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Int32,
+    );
+typedef _CreateDart =
+    Pointer<Opaque> Function(
+      Pointer<Utf8>,
+      Pointer<EngineConfigC>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      int,
+    );
 typedef _CommandNative = Int32 Function(Pointer<Opaque>, Pointer<Utf8>);
 typedef _CommandDart = int Function(Pointer<Opaque>, Pointer<Utf8>);
-typedef _PollEventNative = Int32 Function(Pointer<Opaque>, Pointer<Uint8>, Int32);
+typedef _PollEventNative =
+    Int32 Function(Pointer<Opaque>, Pointer<Uint8>, Int32);
 typedef _PollEventDart = int Function(Pointer<Opaque>, Pointer<Uint8>, int);
 typedef _IsDoneNative = Int32 Function(Pointer<Opaque>);
 typedef _IsDoneDart = int Function(Pointer<Opaque>);
@@ -93,25 +106,33 @@ class EngineBindings {
     final name = Platform.isWindows
         ? 'archoera_mediaengine.dll'
         : (Platform.isMacOS
-            ? 'libarchoera_mediaengine.dylib'
-            : 'libarchoera_mediaengine.so');
+              ? 'libarchoera_mediaengine.dylib'
+              : 'libarchoera_mediaengine.so');
     return '${EnginePaths.resolveEngineDir()}/build/$name';
   }
 
   final DynamicLibrary _lib;
 
   late final _CreateDart _create = _lib
-      .lookupFunction<_CreateNative, _CreateDart>('archoera_mediaengine_create');
+      .lookupFunction<_CreateNative, _CreateDart>(
+        'archoera_mediaengine_create',
+      );
   late final _CommandDart _command = _lib
-      .lookupFunction<_CommandNative, _CommandDart>('archoera_mediaengine_command');
+      .lookupFunction<_CommandNative, _CommandDart>(
+        'archoera_mediaengine_command',
+      );
   late final _PollEventDart _pollEvent = _lib
       .lookupFunction<_PollEventNative, _PollEventDart>(
-          'archoera_mediaengine_poll_event');
+        'archoera_mediaengine_poll_event',
+      );
   late final _IsDoneDart _isDone = _lib
-      .lookupFunction<_IsDoneNative, _IsDoneDart>('archoera_mediaengine_is_done');
+      .lookupFunction<_IsDoneNative, _IsDoneDart>(
+        'archoera_mediaengine_is_done',
+      );
   late final _DestroyDart _destroy = _lib
       .lookupFunction<_DestroyNative, _DestroyDart>(
-          'archoera_mediaengine_destroy');
+        'archoera_mediaengine_destroy',
+      );
 
   /// 创建引擎会话（失败抛 [StateError]，错误信息取引擎 errbuf）。
   ///
@@ -135,7 +156,9 @@ class EngineBindings {
       errBuf.cast(),
       128,
     );
-    final errMsg = h == nullptr ? errBuf.cast<Utf8>().toDartString().trim() : '';
+    final errMsg = h == nullptr
+        ? errBuf.cast<Utf8>().toDartString().trim()
+        : '';
     calloc.free(src);
     calloc.free(dir);
     calloc.free(pf);
@@ -194,7 +217,8 @@ Pointer<EngineConfigC> engineConfigFromParams({
     ..bitrate = bitrate
     ..frameSizeMs = 20
     ..startOffsetMs = offsetMs
-    ..skipEncoder = false // 播放模式由库内强制置 true
+    ..skipEncoder =
+        false // 播放模式由库内强制置 true
     ..limiterEnabled = true
     ..limiterThresholdDb = -1.0
     ..fftEnabled = false

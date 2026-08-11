@@ -53,6 +53,12 @@ class CoverImage extends StatelessWidget {
     final c = cover;
     if (c == null || c.isEmpty) return placeholder;
 
+    // 解码降采样：按显示尺寸 × dpr 解码，避免大图整幅解码后缩小的内存浪费
+    // （封面原图常为 500~1000px，小尺寸展示时解码开销可降 90%+）。
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final targetW = (width * dpr).round().clamp(1, 2048);
+    final targetH = (height * dpr).round().clamp(1, 2048);
+
     final Widget image;
     if (!c.startsWith('http')) {
       // 本地文件：file:// 前缀剥离后按绝对路径读
@@ -64,6 +70,8 @@ class CoverImage extends StatelessWidget {
         width: width,
         height: height,
         fit: BoxFit.cover,
+        cacheWidth: targetW,
+        cacheHeight: targetH,
         errorBuilder: (_, _, _) => placeholder,
       );
     } else {
@@ -72,15 +80,14 @@ class CoverImage extends StatelessWidget {
         width: width,
         height: height,
         fit: BoxFit.cover,
+        cacheWidth: targetW,
+        cacheHeight: targetH,
         errorBuilder: (_, _, _) => placeholder,
         loadingBuilder: (context, child, progress) =>
             progress == null ? child : placeholder,
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: image,
-    );
+    return ClipRRect(borderRadius: BorderRadius.circular(radius), child: image);
   }
 }

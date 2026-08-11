@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/scanner/library_store.dart';
 import '../stores/app_prefs.dart';
+import '../widgets/common/fps_monitor.dart';
 import '../widgets/layout/nav_header.dart';
 import '../widgets/layout/player_bar.dart';
 import '../widgets/layout/side_bar.dart';
@@ -71,8 +72,7 @@ class AppShell extends ConsumerWidget {
     return Scaffold(
       body: Stack(
         children: [
-          if (imageStyle)
-            Positioned.fill(child: _AppBackground(prefs: prefs)),
+          if (imageStyle) Positioned.fill(child: _AppBackground(prefs: prefs)),
           // 内容层（停靠模式且播放条可见时底部让位；悬浮模式占满全高）
           Positioned.fill(
             child: Padding(
@@ -89,6 +89,8 @@ class AppShell extends ConsumerWidget {
             bottom: 0,
             child: const PlayerBar(),
           ),
+          // Dev 模式性能监控（右上角小窗；默认 SizedBox.shrink 零开销）
+          const Positioned(top: 10, right: 10, child: FpsMonitorHost()),
         ],
       ),
     );
@@ -106,11 +108,19 @@ class _AppBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = prefs.backgroundImage;
     if (path == null || path.isEmpty) return const SizedBox.shrink();
+    // 背景铺满全屏又带模糊/遮罩，无需原图全分辨率：按屏幕物理尺寸解码，
+    // 大壁纸（4K+）可省数 MB 解码位图内存。
+    final screen = MediaQuery.sizeOf(context);
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final decodeW = (screen.width * dpr).round().clamp(1, 2560);
+    final decodeH = (screen.height * dpr).round().clamp(1, 2560);
     Widget image = Image.file(
       File(path),
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
+      cacheWidth: decodeW,
+      cacheHeight: decodeH,
       // 文件被移动/删除时静默回退纯色背景（不崩溃）
       errorBuilder: (_, _, _) => const SizedBox.shrink(),
     );
@@ -196,22 +206,22 @@ class _BranchTransitionState extends State<_BranchTransition>
     );
     return switch (widget.transition) {
       'slide' => FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.008, 0),
-              end: Offset.zero,
-            ).animate(curved),
-            child: widget.child,
-          ),
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.008, 0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: widget.child,
         ),
+      ),
       'zoom' => FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
-            child: widget.child,
-          ),
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
+          child: widget.child,
         ),
+      ),
       _ => FadeTransition(opacity: curved, child: widget.child),
     };
   }

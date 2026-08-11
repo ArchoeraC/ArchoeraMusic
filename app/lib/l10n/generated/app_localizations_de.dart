@@ -99,6 +99,34 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSectionClose => 'App schließen';
 
   @override
+  String get settingsSectionPower => 'Energiesparen';
+
+  @override
+  String get settingsPowerSaver => 'Energiesparmodus';
+
+  @override
+  String get settingsPowerSaverOn =>
+      'Rendering im Hintergrund drosseln (5 FPS minimiert, 1 FPS bei Fokusverlust oder ausgeschaltetem Bildschirm)';
+
+  @override
+  String get settingsPowerSaverOff => 'Immer mit voller Bildrate rendern';
+
+  @override
+  String get settingsSuppressSleep => 'Systemschlaf verhindern';
+
+  @override
+  String get settingsSuppressSleepOn =>
+      'System während der Wiedergabe wach halten, damit die Hintergrundwiedergabe nicht unterbrochen wird';
+
+  @override
+  String get settingsSuppressSleepOff =>
+      'System kann je nach Leerlaufplan schlafen';
+
+  @override
+  String get settingsPowerSaverNote =>
+      'Der Energiesparmodus senkt die Bildrate über Fensterzustandsereignisse (kein Polling). Bei ausgeblendetem Fenster oder ausgeschaltetem Display stoppt die Engine das Rendering bereits. „Systemschlaf verhindern“ gilt nur während der Wiedergabe.';
+
+  @override
   String get settingsCloseBehavior => 'Beim Schließen der App';
 
   @override
@@ -153,6 +181,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get commonLossless => 'Verlustfrei';
+
+  @override
+  String get commonOriginal => 'Original';
 
   @override
   String get commonMore => 'Mehr';
@@ -348,6 +379,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get songListTitle => 'Titel';
+
+  @override
+  String get songListScrollTop => 'Nach oben';
+
+  @override
+  String get songListLocatePlaying => 'Wiedergabe finden';
 
   @override
   String toastAddedToDownloadQueue(Object quality) {
@@ -787,6 +824,50 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get pageFavLoginDesc =>
       'Per QR bei NetEase anmelden, Favoriten synchronisieren';
+
+  @override
+  String get pageFavKgCreated => 'Erstellte Wiedergabelisten';
+
+  @override
+  String get pageFavKgCollectedPlaylist => 'Gespeicherte Wiedergabelisten';
+
+  @override
+  String get pageFavKgCollectedAlbum => 'Gespeicherte Alben';
+
+  @override
+  String pageFavKgCreatedCount(Object count) {
+    return '$count erstellte Wiedergabelisten';
+  }
+
+  @override
+  String get pageFavKgCreatedLoginHint =>
+      'Melde dich an, um deine erstellten Wiedergabelisten zu sehen';
+
+  @override
+  String pageFavKgCollectedPlaylistCount(Object count) {
+    return '$count gespeicherte Wiedergabelisten';
+  }
+
+  @override
+  String get pageFavKgCollectedPlaylistLoginHint =>
+      'Melde dich an, um deine gespeicherten Wiedergabelisten zu sehen';
+
+  @override
+  String pageFavKgCollectedAlbumCount(Object count) {
+    return '$count gespeicherte Alben';
+  }
+
+  @override
+  String get pageFavKgCollectedAlbumLoginHint =>
+      'Melde dich an, um deine gespeicherten Alben zu sehen';
+
+  @override
+  String get pageFavKugouLoginDesc =>
+      'Per QR bei Kugou anmelden, um erstellte/gespeicherte Wiedergabelisten und Alben zu synchronisieren';
+
+  @override
+  String get pageFavKugouEmptyHint =>
+      'Wird automatisch synchronisiert, wenn du in der Kugou-App favorisierst';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1245,6 +1326,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsDeveloperNote =>
       'Der Entwicklermodus ist für lokale Fehlersuche und den Eigengebrauch gedacht. Nutzung auf eigene Verantwortung.';
+
+  @override
+  String get settingsDevFpsMonitor => 'FPS-/Speicher-Monitor-Overlay';
+
+  @override
+  String get settingsDevFpsMonitorDesc =>
+      'Zeigt FPS, durchschnittliche Framedauer und Prozessspeicher oben rechts in Echtzeit (zum Einklappen klicken). Standardmäßig aus; wird zusammen mit dem Entwicklermodus deaktiviert.';
 
   @override
   String get settingsDeveloperEnabled => 'Entwicklermodus aktiviert';
@@ -1859,6 +1947,152 @@ class AppLocalizationsDe extends AppLocalizations {
       'Medienbibliothek und Benutzerdaten physisch getrennt; Pfade über ARCHOERA_DATA_DIR überschreibbar.';
 
   @override
+  String get settingsSectionCache => 'Cache-Verwaltung';
+
+  @override
+  String get settingsCacheNote =>
+      'Caches beschleunigen Surfen und Wiedergabe; sie werden nach dem Leeren automatisch neu aufgebaut. Bibliothek, Verlauf und Konten sind nicht betroffen.';
+
+  @override
+  String get settingsCacheGroupDisk => 'Datenbank-Caches (Datenträger)';
+
+  @override
+  String get settingsCacheGroupMem => 'Arbeitsspeicher-Caches (im Prozess)';
+
+  @override
+  String get settingsCacheLiked => '\"Gemocht\"-Listencache';
+
+  @override
+  String get settingsCacheLyric => 'Liedtext-Cache';
+
+  @override
+  String get settingsCacheLyricMatch => 'Liedtext-Abgleich-Cache';
+
+  @override
+  String get settingsCacheLyricTtml => 'TTML-Liedtext-Cache';
+
+  @override
+  String get settingsCacheCover => 'Coverbild-Cache';
+
+  @override
+  String settingsCacheEntries(Object count) {
+    return '$count Einträge';
+  }
+
+  @override
+  String settingsCacheImages(Object count) {
+    return '$count Bilder';
+  }
+
+  @override
+  String get settingsCacheRefresh => 'Aktualisieren';
+
+  @override
+  String get settingsCacheClear => 'Leeren';
+
+  @override
+  String get settingsCacheClearAll => 'Alle leeren';
+
+  @override
+  String settingsCacheClearConfirmTitle(Object name) {
+    return '\"$name\" leeren?';
+  }
+
+  @override
+  String get settingsCacheClearConfirmDesc =>
+      'Alle Daten dieses Caches werden gelöscht; er wird bei der nächsten Nutzung automatisch neu aufgebaut. Nicht rückgängig zu machen.';
+
+  @override
+  String get settingsCacheClearAllConfirmTitle => 'Alle Caches leeren?';
+
+  @override
+  String get settingsCacheClearAllConfirmDesc =>
+      'Löscht alle obigen Caches (Arbeitsspeicher und Datenträger). Bibliothek, Verlauf und Konten sind nicht betroffen.';
+
+  @override
+  String toastCacheCleared(Object name) {
+    return '$name-Cache geleert';
+  }
+
+  @override
+  String get toastCacheAllCleared => 'Alle Caches geleert';
+
+  @override
+  String get settingsSecuritySection => 'Sicheres Vernichten';
+
+  @override
+  String get settingsSecurityNote =>
+      'Löscht unwiderruflich alle lokalen Anmeldedaten und Sitzungen (Streaming-Server-Passwörter, Netease-/Kugou-Sitzungen, lokale Subsonic-Konten) und macht die Plattform-Tokens ungültig. Bibliothek, Verlauf und Downloads bleiben unberührt.';
+
+  @override
+  String get settingsSecurityStreaming => 'Streaming-Server-Anmeldedaten';
+
+  @override
+  String settingsSecurityStreamingCount(Object count) {
+    return '$count Server';
+  }
+
+  @override
+  String get settingsSecurityStreamingDesc => 'Passwörter und Zugriffstokens';
+
+  @override
+  String get settingsSecuritySession => 'Sitzungen von Drittanbieter-Konten';
+
+  @override
+  String get settingsSecuritySessionDesc => 'Netease-/Kugou-Anmeldestatus';
+
+  @override
+  String get settingsSecurityUserDb => 'Lokale Benutzerdatenbank';
+
+  @override
+  String get settingsSecurityUserDbDesc => 'Subsonic-Konten und Favoriten';
+
+  @override
+  String get settingsSecurityLoggedIn => 'Angemeldet';
+
+  @override
+  String get settingsSecurityDestroy => 'Vernichten';
+
+  @override
+  String get settingsSecurityDestroyAll => 'Alles vernichten';
+
+  @override
+  String settingsSecurityConfirmTitle(Object name) {
+    return '„$name“ vernichten?';
+  }
+
+  @override
+  String get settingsSecurityConfirmAllTitle =>
+      'Alle sensiblen Daten vernichten?';
+
+  @override
+  String settingsSecurityConfirmDesc(Object word) {
+    return 'Die Tokens der betroffenen Plattformen werden ungültig gemacht, Dateien werden überschrieben und gelöscht. Dieser Vorgang ist unwiderruflich. Geben Sie „$word“ ein, um zu bestätigen.';
+  }
+
+  @override
+  String get settingsSecurityConfirmWord => 'vernichten';
+
+  @override
+  String settingsSecurityConfirmHint(Object word) {
+    return '„$word“ eingeben';
+  }
+
+  @override
+  String toastSecurityDestroyed(Object name) {
+    return 'Vernichtet: $name';
+  }
+
+  @override
+  String get toastSecurityAllDestroyed =>
+      'Alle sensiblen Daten wurden vernichtet';
+
+  @override
+  String toastSecurityDestroyFailed(Object path) {
+    return 'Vernichten fehlgeschlagen, Datei kann zurückbleiben: $path';
+  }
+
+  @override
   String get settingsVersion => 'Version';
 
   @override
@@ -2139,6 +2373,49 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsSearchCoverRadiusSubtitle =>
       'Quadratisch · Abgerundet · Stark abgerundet';
+
+  @override
+  String get settingsSectionWeather => 'Wetter';
+
+  @override
+  String get settingsWeather => 'Wetter-Widget';
+
+  @override
+  String get settingsWeatherDesc =>
+      'Mini-Wetter (Symbol + Temperatur) links vom Avatar';
+
+  @override
+  String get settingsWeatherAutoLocate => 'Automatische Ortung';
+
+  @override
+  String get settingsWeatherAutoLocateDesc =>
+      'Grobe Position über Netzwerk-IP (Datenschutz: standardmäßig aus)';
+
+  @override
+  String get settingsWeatherCity => 'Manuelle Stadt';
+
+  @override
+  String get settingsWeatherCityHint =>
+      'Keine IP-Ortung mehr nach Eintrag (z. B. München)';
+
+  @override
+  String get settingsWeatherNote =>
+      'Datenschutz: Wetterdaten von Open-Meteo (kostenlos, kein API-Schlüssel). Bei automatischer Ortung wird die IP an ip-api.com gesendet, nur zur Wetterabfrage, nicht gespeichert. Widget und Ortung sind standardmäßig deaktiviert.';
+
+  @override
+  String get settingsSearchWeatherSubtitle =>
+      'Mini-Wetter-Widget in der Kopfzeile (Symbol + Temperatur)';
+
+  @override
+  String get weatherRefresh => 'Wetter aktualisieren';
+
+  @override
+  String get weatherNoLocation =>
+      'Stadt eintragen oder Ortung in den Einstellungen aktivieren';
+
+  @override
+  String get weatherUnavailable =>
+      'Wetter nicht verfügbar, zum Wiederholen tippen';
 
   @override
   String get settingsSearchPassthroughSubtitle =>

@@ -93,9 +93,9 @@ Future<void> showPlaylistDetailDialog(
     subtitle: playlist.subtitle,
     cover: playlist.cover,
     loadTracks: (ref) async {
-      final detail = await ref.read(neteaseApiProvider).playlistDetail(
-            playlist.id,
-          );
+      final detail = await ref
+          .read(neteaseApiProvider)
+          .playlistDetail(playlist.id);
       return detail.tracks;
     },
   );
@@ -258,128 +258,128 @@ class _TrackListDialogState extends ConsumerState<TrackListDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-            // ── 头部 ─────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _HeaderCover(cover: widget.cover),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (widget.subtitle != null &&
-                            widget.subtitle!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+              // ── 头部 ─────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HeaderCover(cover: widget.cover),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            widget.subtitle!,
-                            maxLines: 1,
+                            widget.title,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ],
-                        const SizedBox(height: 12),
-                        FutureBuilder<List<Track>>(
-                          future: _future,
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                              return SButton(
-                                label: l10n.trackListPlayAll,
-                                icon: Icons.play_arrow_rounded,
-                                variant: SButtonVariant.primary,
-                                onPressed: () => _playAll(snapshot.data!),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: l10n.commonClose,
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, size: 18),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            // ── 曲目列表 ─────────────────────────────────────────
-            Flexible(
-              child: FutureBuilder<List<Track>>(
-                future: _future,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return SizedBox(
-                      height: listHeight,
-                      child: _spinner(),
-                    );
-                  }
-                  if (snapshot.hasError) {
-                    return SizedBox(
-                      height: listHeight,
-                      child: _ErrorView(
-                        message: l10n.commonLoadFailed('${snapshot.error}'),
-                        onRetry: _reload,
-                      ),
-                    );
-                  }
-                  final tracks = snapshot.data ?? const <Track>[];
-                  if (tracks.isEmpty) {
-                    return SizedBox(
-                      height: listHeight,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.music_off_outlined,
-                              size: 42,
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.5),
-                            ),
-                            const SizedBox(height: 10),
+                          if (widget.subtitle != null &&
+                              widget.subtitle!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
                             Text(
-                              l10n.trackListEmptyDailyLogin(l10n.brandNetease),
+                              widget.subtitle!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
+                          const SizedBox(height: 12),
+                          FutureBuilder<List<Track>>(
+                            future: _future,
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData &&
+                                  snapshot.data!.isNotEmpty) {
+                                return SButton(
+                                  label: l10n.trackListPlayAll,
+                                  icon: Icons.play_arrow_rounded,
+                                  variant: SButtonVariant.primary,
+                                  onPressed: () => _playAll(snapshot.data!),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: l10n.commonClose,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              // ── 曲目列表 ─────────────────────────────────────────
+              Flexible(
+                child: FutureBuilder<List<Track>>(
+                  future: _future,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return SizedBox(height: listHeight, child: _spinner());
+                    }
+                    if (snapshot.hasError) {
+                      return SizedBox(
+                        height: listHeight,
+                        child: _ErrorView(
+                          message: l10n.commonLoadFailed('${snapshot.error}'),
+                          onRetry: _reload,
                         ),
+                      );
+                    }
+                    final tracks = snapshot.data ?? const <Track>[];
+                    if (tracks.isEmpty) {
+                      return SizedBox(
+                        height: listHeight,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.music_off_outlined,
+                                size: 42,
+                                color: theme.colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.5),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                l10n.trackListEmptyDailyLogin(
+                                  l10n.brandNetease,
+                                ),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    return SizedBox(
+                      height: listHeight,
+                      child: SongList(
+                        items: tracks,
+                        playingId: playingId,
+                        isPlaying: isPlaying,
+                        onPlay: _playTrack,
+                        onContextMenu: _onTrackMenu,
                       ),
                     );
-                  }
-                  return SizedBox(
-                    height: listHeight,
-                    child: SongList(
-                      items: tracks,
-                      playingId: playingId,
-                      isPlaying: isPlaying,
-                      onPlay: _playTrack,
-                      onContextMenu: _onTrackMenu,
-                    ),
-                  );
-                },
+                  },
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -413,6 +413,8 @@ class _HeaderCover extends StatelessWidget {
         width: 96,
         height: 96,
         fit: BoxFit.cover,
+        cacheWidth: (96 * MediaQuery.devicePixelRatioOf(context)).round(),
+        cacheHeight: (96 * MediaQuery.devicePixelRatioOf(context)).round(),
         errorBuilder: (_, _, _) => placeholder,
         loadingBuilder: (context, child, progress) =>
             progress == null ? child : placeholder,
@@ -490,73 +492,75 @@ class _KugouBrowseDialogState extends ConsumerState<_KugouBrowseDialog> {
         child: SizedBox(
           // 随窗口自适应：偏好 860×660，小窗口按比例收缩并留边距
           width: (MediaQuery.sizeOf(context).width * 0.72).clamp(600.0, 860.0),
-          height: (MediaQuery.sizeOf(context).height * 0.84)
-              .clamp(460.0, 660.0),
+          height: (MediaQuery.sizeOf(context).height * 0.84).clamp(
+            460.0,
+            660.0,
+          ),
           child: Column(
             children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: l10n.commonClose,
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, size: 18),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-            Expanded(
-              child: FutureBuilder<List<CoverItem>>(
-                future: _future,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return _spinner();
-                  }
-                  if (snapshot.hasError) {
-                    return _ErrorView(
-                      message: l10n.commonLoadFailed('${snapshot.error}'),
-                      onRetry: () =>
-                          setState(() => _future = widget.loader(ref)),
-                    );
-                  }
-                  final items = snapshot.data ?? const <CoverItem>[];
-                  if (items.isEmpty) {
-                    return Center(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+                child: Row(
+                  children: [
+                    Expanded(
                       child: Text(
-                        l10n.commonEmptyContent,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        widget.title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    );
-                  }
-                  return CoverGrid(
-                    items: items,
-                    maxCrossAxisExtent: 200,
-                    artist: widget.artist,
-                    childAspectRatio: widget.artist ? 0.82 : 0.78,
-                    onTap: (item) {
-                      Navigator.of(context).pop();
-                      widget.onItemTap(context, item);
-                    },
-                  );
-                },
+                    ),
+                    IconButton(
+                      tooltip: l10n.commonClose,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+              Expanded(
+                child: FutureBuilder<List<CoverItem>>(
+                  future: _future,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return _spinner();
+                    }
+                    if (snapshot.hasError) {
+                      return _ErrorView(
+                        message: l10n.commonLoadFailed('${snapshot.error}'),
+                        onRetry: () =>
+                            setState(() => _future = widget.loader(ref)),
+                      );
+                    }
+                    final items = snapshot.data ?? const <CoverItem>[];
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Text(
+                          l10n.commonEmptyContent,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      );
+                    }
+                    return CoverGrid(
+                      items: items,
+                      maxCrossAxisExtent: 200,
+                      artist: widget.artist,
+                      childAspectRatio: widget.artist ? 0.82 : 0.78,
+                      onTap: (item) {
+                        Navigator.of(context).pop();
+                        widget.onItemTap(context, item);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

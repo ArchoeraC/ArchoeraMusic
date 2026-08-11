@@ -194,7 +194,10 @@ String kgRsaRawEncryptHex(String jsonStr, {String pem = kgLitePublicKeyPem}) {
   final enc = RSAEngine();
   enc.init(true, PublicKeyParameter<RSAPublicKey>(RSAPublicKey(n, e)));
   final out = enc.process(padded);
-  return out.map((b) => b.toRadixString(16).padLeft(2, '0')).join().toUpperCase();
+  return out
+      .map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join()
+      .toUpperCase();
 }
 
 // ─── 请求签名（signature / signKey） ─────────────────────────────────────
@@ -224,8 +227,7 @@ String kgSignKey(
   int userid,
   int appid, {
   String salt = kgKeySalt,
-}) =>
-    kgMd5('$hash$salt$appid$mid$userid');
+}) => kgMd5('$hash$salt$appid$mid$userid');
 
 /// web 签名：md5(salt + 排序 key=value 串 + salt)。
 /// 与 android 版（[kgSignature]）区别：盐值不同且不含请求体 data，
@@ -249,5 +251,4 @@ String kgSignParamsKey(
   int? appid,
   int? clientver,
   String salt = kgLiteSignSalt,
-}) =>
-    kgMd5('${appid ?? kgLiteAppid}$salt${clientver ?? kgLiteClientver}$data');
+}) => kgMd5('${appid ?? kgLiteAppid}$salt${clientver ?? kgLiteClientver}$data');

@@ -97,6 +97,32 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsSectionClose => 'アプリを閉じる';
 
   @override
+  String get settingsSectionPower => '省電力';
+
+  @override
+  String get settingsPowerSaver => '省電力モード';
+
+  @override
+  String get settingsPowerSaverOn =>
+      'バックグラウンドで描画を抑止（最小化時 5 FPS、非フォーカス/画面オフ時 1 FPS）';
+
+  @override
+  String get settingsPowerSaverOff => '常にフルレートで描画';
+
+  @override
+  String get settingsSuppressSleep => 'システムのスリープを無効化';
+
+  @override
+  String get settingsSuppressSleepOn => '再生中はシステムを起動状態に保ち、バックグラウンド再生の中断を防ぐ';
+
+  @override
+  String get settingsSuppressSleepOff => 'システムはアイドル時にスリープする可能性があります';
+
+  @override
+  String get settingsPowerSaverNote =>
+      '省電力モードはウィンドウ状態イベントを監視して描画レートを下げます（ポーリングなし）。ウィンドウ非表示やディスプレイオフ時はエンジン自体が描画を停止します。「スリープ無効化」は再生中のみ有効です。';
+
+  @override
   String get settingsCloseBehavior => 'アプリを閉じるとき';
 
   @override
@@ -149,6 +175,9 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get commonLossless => 'ロスレス';
+
+  @override
+  String get commonOriginal => '原曲';
 
   @override
   String get commonMore => 'もっと見る';
@@ -341,6 +370,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get songListTitle => 'タイトル';
+
+  @override
+  String get songListScrollTop => 'トップへ戻る';
+
+  @override
+  String get songListLocatePlaying => '再生位置を探す';
 
   @override
   String toastAddedToDownloadQueue(Object quality) {
@@ -766,6 +801,46 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get pageFavLoginDesc =>
       'NetEase Cloud Music にQRログインし、お気に入りのプレイリスト・アルバム・アーティストを同期';
+
+  @override
+  String get pageFavKgCreated => '作成したプレイリスト';
+
+  @override
+  String get pageFavKgCollectedPlaylist => 'お気に入りのプレイリスト';
+
+  @override
+  String get pageFavKgCollectedAlbum => 'お気に入りのアルバム';
+
+  @override
+  String pageFavKgCreatedCount(Object count) {
+    return '$count 件の作成済みプレイリスト';
+  }
+
+  @override
+  String get pageFavKgCreatedLoginHint => 'ログインすると作成したプレイリストを表示できます';
+
+  @override
+  String pageFavKgCollectedPlaylistCount(Object count) {
+    return '$count 件のお気に入りプレイリスト';
+  }
+
+  @override
+  String get pageFavKgCollectedPlaylistLoginHint =>
+      'ログインするとお気に入りのプレイリストを表示できます';
+
+  @override
+  String pageFavKgCollectedAlbumCount(Object count) {
+    return '$count 件のお気に入りアルバム';
+  }
+
+  @override
+  String get pageFavKgCollectedAlbumLoginHint => 'ログインするとお気に入りのアルバムを表示できます';
+
+  @override
+  String get pageFavKugouLoginDesc => 'QRコードで酷狗にログインし、作成・お気に入りのプレイリストとアルバムを同期';
+
+  @override
+  String get pageFavKugouEmptyHint => '酷狗アプリでお気に入りにすると自動同期されます';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1207,6 +1282,13 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsDeveloperNote => '開発者モードはローカルデバッグと個人利用を想定しています。利用は自己責任です。';
+
+  @override
+  String get settingsDevFpsMonitor => 'FPS/メモリ監視オーバーレイ';
+
+  @override
+  String get settingsDevFpsMonitorDesc =>
+      '右上に FPS・平均フレーム時間・プロセスメモリをリアルタイム表示（クリックで折りたたみ）。既定ではオフ。開発者モードをオフにすると一緒にオフになります。';
 
   @override
   String get settingsDeveloperEnabled => '開発者モードを有効にしました';
@@ -1792,6 +1874,150 @@ class AppLocalizationsJa extends AppLocalizations {
       'メディアライブラリとユーザーデータは物理的に分離；パスは環境変数 ARCHOERA_DATA_DIR で上書き可能。';
 
   @override
+  String get settingsSectionCache => 'キャッシュ管理';
+
+  @override
+  String get settingsCacheNote =>
+      'キャッシュは閲覧と再生を高速化します。削除後は自動的に再構築され、ライブラリ・履歴・アカウントには影響しません。';
+
+  @override
+  String get settingsCacheGroupDisk => 'データベースキャッシュ（ディスク）';
+
+  @override
+  String get settingsCacheGroupMem => 'メモリキャッシュ（プロセス内）';
+
+  @override
+  String get settingsCacheLiked => '「いいね」リストキャッシュ';
+
+  @override
+  String get settingsCacheLyric => '歌詞コンテンツキャッシュ';
+
+  @override
+  String get settingsCacheLyricMatch => '歌詞マッチングキャッシュ';
+
+  @override
+  String get settingsCacheLyricTtml => 'TTML歌詞キャッシュ';
+
+  @override
+  String get settingsCacheCover => 'ジャケット画像キャッシュ';
+
+  @override
+  String settingsCacheEntries(Object count) {
+    return '$count 件';
+  }
+
+  @override
+  String settingsCacheImages(Object count) {
+    return '$count 枚';
+  }
+
+  @override
+  String get settingsCacheRefresh => '更新';
+
+  @override
+  String get settingsCacheClear => '削除';
+
+  @override
+  String get settingsCacheClearAll => 'すべて削除';
+
+  @override
+  String settingsCacheClearConfirmTitle(Object name) {
+    return '「$name」を削除しますか？';
+  }
+
+  @override
+  String get settingsCacheClearConfirmDesc =>
+      'このキャッシュの全データを削除します。次回使用時に自動的に再構築され、取り消しはできません。';
+
+  @override
+  String get settingsCacheClearAllConfirmTitle => 'すべてのキャッシュを削除しますか？';
+
+  @override
+  String get settingsCacheClearAllConfirmDesc =>
+      '上記の全キャッシュ（メモリとディスク）を削除します。ライブラリ・履歴・アカウントには影響しません。';
+
+  @override
+  String toastCacheCleared(Object name) {
+    return '$nameのキャッシュを削除しました';
+  }
+
+  @override
+  String get toastCacheAllCleared => 'すべてのキャッシュを削除しました';
+
+  @override
+  String get settingsSecuritySection => '安全な破棄';
+
+  @override
+  String get settingsSecurityNote =>
+      '本機の全アカウント資格情報とログインセッション（ストリーミングサーバーのパスワード、網易雲/酷狗のログイン状態、ローカル Subsonic アカウント）を不可逆に削除し、プラットフォームのトークンを無効化します。ライブラリ・履歴・ダウンロードファイルには影響しません。';
+
+  @override
+  String get settingsSecurityStreaming => 'ストリーミングサーバー資格情報';
+
+  @override
+  String settingsSecurityStreamingCount(Object count) {
+    return '$count 台のサーバー';
+  }
+
+  @override
+  String get settingsSecurityStreamingDesc => 'パスワードとアクセストークン';
+
+  @override
+  String get settingsSecuritySession => 'サードパーティのセッション';
+
+  @override
+  String get settingsSecuritySessionDesc => '網易雲 / 酷狗 のログイン状態';
+
+  @override
+  String get settingsSecurityUserDb => 'ローカルユーザーデータベース';
+
+  @override
+  String get settingsSecurityUserDbDesc => 'Subsonic アカウントとお気に入り';
+
+  @override
+  String get settingsSecurityLoggedIn => 'ログイン中';
+
+  @override
+  String get settingsSecurityDestroy => '破棄';
+
+  @override
+  String get settingsSecurityDestroyAll => 'すべて破棄';
+
+  @override
+  String settingsSecurityConfirmTitle(Object name) {
+    return '「$name」を破棄しますか？';
+  }
+
+  @override
+  String get settingsSecurityConfirmAllTitle => 'すべての機密データを破棄しますか？';
+
+  @override
+  String settingsSecurityConfirmDesc(Object word) {
+    return '関連プラットフォームのトークンを無効化し、ファイルを上書きして削除します。この操作は元に戻せません。続行するには「$word」と入力してください。';
+  }
+
+  @override
+  String get settingsSecurityConfirmWord => '破棄';
+
+  @override
+  String settingsSecurityConfirmHint(Object word) {
+    return '「$word」と入力';
+  }
+
+  @override
+  String toastSecurityDestroyed(Object name) {
+    return '破棄しました：$name';
+  }
+
+  @override
+  String get toastSecurityAllDestroyed => 'すべての機密データを破棄しました';
+
+  @override
+  String toastSecurityDestroyFailed(Object path) {
+    return '破棄に失敗しました。ファイルが残っている可能性があります：$path';
+  }
+
+  @override
   String get settingsVersion => 'バージョン';
 
   @override
@@ -2052,6 +2278,44 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSearchCoverRadiusSubtitle => 'スクエア · 角丸 · 大きな角丸';
+
+  @override
+  String get settingsSectionWeather => '天気';
+
+  @override
+  String get settingsWeather => '天気ウィジェット';
+
+  @override
+  String get settingsWeatherDesc => 'アバター左にミニ天気（アイコン＋気温）';
+
+  @override
+  String get settingsWeatherAutoLocate => '自動位置情報';
+
+  @override
+  String get settingsWeatherAutoLocateDesc =>
+      'ネットワーク IP でおおよその位置を取得（プライバシー：初期オフ）';
+
+  @override
+  String get settingsWeatherCity => '手動の都市';
+
+  @override
+  String get settingsWeatherCityHint => '入力後は IP 位置情報を使わない（例：東京）';
+
+  @override
+  String get settingsWeatherNote =>
+      'プライバシー：天気データは Open-Meteo（無料・キー不要）。自動位置情報を有効にすると IP を ip-api.com に送信し大まかな位置を得ます。天気取得のみに使用し保存しません。ウィジェットと位置情報は初期状態でオフです。';
+
+  @override
+  String get settingsSearchWeatherSubtitle => '上部バーのミニ天気ウィジェット（アイコン＋気温）';
+
+  @override
+  String get weatherRefresh => '天気を更新';
+
+  @override
+  String get weatherNoLocation => '設定で都市を入力するか自動位置情報を有効にしてください';
+
+  @override
+  String get weatherUnavailable => '天気を取得できません。タップで再試行';
 
   @override
   String get settingsSearchPassthroughSubtitle => 'トランスコードなし · 48kHzパイプライン';

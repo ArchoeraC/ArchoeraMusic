@@ -97,6 +97,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionClose => '关闭应用';
 
   @override
+  String get settingsSectionPower => '节能';
+
+  @override
+  String get settingsPowerSaver => '节能模式';
+
+  @override
+  String get settingsPowerSaverOn => '后台自动降帧（最小化 5 FPS，失焦/熄屏 1 FPS）';
+
+  @override
+  String get settingsPowerSaverOff => '始终满帧渲染';
+
+  @override
+  String get settingsSuppressSleep => '禁用系统休眠';
+
+  @override
+  String get settingsSuppressSleepOn => '播放时保持系统唤醒，防止后台播放中断';
+
+  @override
+  String get settingsSuppressSleepOff => '系统可能按空闲计划休眠';
+
+  @override
+  String get settingsPowerSaverNote =>
+      '节能模式监听窗口状态事件自动降帧，无需轮询；窗口不可见或显示器关闭时，渲染引擎本身已停止绘制。「禁用系统休眠」仅在播放中生效。';
+
+  @override
   String get settingsCloseBehavior => '关闭应用时';
 
   @override
@@ -149,6 +174,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get commonLossless => '无损';
+
+  @override
+  String get commonOriginal => '原唱';
 
   @override
   String get commonMore => '更多';
@@ -341,6 +369,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get songListTitle => '标题';
+
+  @override
+  String get songListScrollTop => '回到顶部';
+
+  @override
+  String get songListLocatePlaying => '定位播放位置';
 
   @override
   String toastAddedToDownloadQueue(Object quality) {
@@ -762,6 +796,45 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pageFavLoginDesc => '扫码登录网易云，同步收藏的歌单、专辑与歌手';
+
+  @override
+  String get pageFavKgCreated => '创建的歌单';
+
+  @override
+  String get pageFavKgCollectedPlaylist => '收藏的歌单';
+
+  @override
+  String get pageFavKgCollectedAlbum => '收藏的专辑';
+
+  @override
+  String pageFavKgCreatedCount(Object count) {
+    return '共 $count 个创建的歌单';
+  }
+
+  @override
+  String get pageFavKgCreatedLoginHint => '登录后可查看创建的歌单';
+
+  @override
+  String pageFavKgCollectedPlaylistCount(Object count) {
+    return '共 $count 个收藏歌单';
+  }
+
+  @override
+  String get pageFavKgCollectedPlaylistLoginHint => '登录后可查看收藏的歌单';
+
+  @override
+  String pageFavKgCollectedAlbumCount(Object count) {
+    return '共 $count 张收藏专辑';
+  }
+
+  @override
+  String get pageFavKgCollectedAlbumLoginHint => '登录后可查看收藏的专辑';
+
+  @override
+  String get pageFavKugouLoginDesc => '扫码登录酷狗，同步创建与收藏的歌单、专辑';
+
+  @override
+  String get pageFavKugouEmptyHint => '在酷狗 App 收藏后自动同步';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1198,6 +1271,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsDeveloperNote => '开发者模式面向本地调试与自用，开启后请自行承担相关责任。';
+
+  @override
+  String get settingsDevFpsMonitor => 'FPS/内存监控浮层';
+
+  @override
+  String get settingsDevFpsMonitorDesc =>
+      '右上角实时显示 FPS、平均帧耗时与进程内存（点击可收起）。默认关闭；关闭开发者模式时一并关闭。';
 
   @override
   String get settingsDeveloperEnabled => '开发者模式已开启';
@@ -1778,6 +1858,148 @@ class AppLocalizationsZh extends AppLocalizations {
       '媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERA_DATA_DIR 覆盖。';
 
   @override
+  String get settingsSectionCache => '缓存管理';
+
+  @override
+  String get settingsCacheNote => '缓存用于加速浏览与播放，清除后会自动重建；不会影响曲库、历史与账号信息。';
+
+  @override
+  String get settingsCacheGroupDisk => '数据库缓存（磁盘）';
+
+  @override
+  String get settingsCacheGroupMem => '内存缓存（进程内）';
+
+  @override
+  String get settingsCacheLiked => '「我喜欢」列表缓存';
+
+  @override
+  String get settingsCacheLyric => '歌词内容缓存';
+
+  @override
+  String get settingsCacheLyricMatch => '歌词匹配缓存';
+
+  @override
+  String get settingsCacheLyricTtml => 'TTML 歌词缓存';
+
+  @override
+  String get settingsCacheCover => '封面图片缓存';
+
+  @override
+  String settingsCacheEntries(Object count) {
+    return '$count 条';
+  }
+
+  @override
+  String settingsCacheImages(Object count) {
+    return '$count 张';
+  }
+
+  @override
+  String get settingsCacheRefresh => '刷新';
+
+  @override
+  String get settingsCacheClear => '清除';
+
+  @override
+  String get settingsCacheClearAll => '清空全部';
+
+  @override
+  String settingsCacheClearConfirmTitle(Object name) {
+    return '清除「$name」？';
+  }
+
+  @override
+  String get settingsCacheClearConfirmDesc => '将删除该缓存下的全部数据，下次使用时自动重建，不可撤销。';
+
+  @override
+  String get settingsCacheClearAllConfirmTitle => '清空全部缓存？';
+
+  @override
+  String get settingsCacheClearAllConfirmDesc =>
+      '将删除上方全部缓存（内存与磁盘），不影响曲库、历史与账号信息。';
+
+  @override
+  String toastCacheCleared(Object name) {
+    return '已清除$name缓存';
+  }
+
+  @override
+  String get toastCacheAllCleared => '已清空全部缓存';
+
+  @override
+  String get settingsSecuritySection => '安全销毁';
+
+  @override
+  String get settingsSecurityNote =>
+      '不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、网易云/酷狗登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。';
+
+  @override
+  String get settingsSecurityStreaming => '流媒体服务器凭据';
+
+  @override
+  String settingsSecurityStreamingCount(Object count) {
+    return '$count 台服务器';
+  }
+
+  @override
+  String get settingsSecurityStreamingDesc => '密码与访问令牌';
+
+  @override
+  String get settingsSecuritySession => '第三方账号会话';
+
+  @override
+  String get settingsSecuritySessionDesc => '网易云 / 酷狗 登录状态';
+
+  @override
+  String get settingsSecurityUserDb => '本地用户库';
+
+  @override
+  String get settingsSecurityUserDbDesc => 'Subsonic 账号与收藏数据';
+
+  @override
+  String get settingsSecurityLoggedIn => '已登录';
+
+  @override
+  String get settingsSecurityDestroy => '销毁';
+
+  @override
+  String get settingsSecurityDestroyAll => '一键销毁全部';
+
+  @override
+  String settingsSecurityConfirmTitle(Object name) {
+    return '销毁「$name」？';
+  }
+
+  @override
+  String get settingsSecurityConfirmAllTitle => '确认销毁全部敏感数据？';
+
+  @override
+  String settingsSecurityConfirmDesc(Object word) {
+    return '将主动失效相关平台 token、覆盖写入并删除文件，此操作不可恢复。输入「$word」以确认。';
+  }
+
+  @override
+  String get settingsSecurityConfirmWord => '销毁';
+
+  @override
+  String settingsSecurityConfirmHint(Object word) {
+    return '输入「$word」';
+  }
+
+  @override
+  String toastSecurityDestroyed(Object name) {
+    return '已销毁：$name';
+  }
+
+  @override
+  String get toastSecurityAllDestroyed => '全部敏感数据已销毁';
+
+  @override
+  String toastSecurityDestroyFailed(Object path) {
+    return '销毁失败，文件仍可能残留：$path';
+  }
+
+  @override
   String get settingsVersion => '版本';
 
   @override
@@ -2034,6 +2256,43 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSearchCoverRadiusSubtitle => '直角 · 圆角 · 大圆角';
+
+  @override
+  String get settingsSectionWeather => '天气';
+
+  @override
+  String get settingsWeather => '天气组件';
+
+  @override
+  String get settingsWeatherDesc => '顶栏头像左侧显示微型天气（图标 + 温度）';
+
+  @override
+  String get settingsWeatherAutoLocate => '自动定位';
+
+  @override
+  String get settingsWeatherAutoLocateDesc => '按网络 IP 获取大致位置查询天气（涉及隐私，默认关闭）';
+
+  @override
+  String get settingsWeatherCity => '手动城市';
+
+  @override
+  String get settingsWeatherCityHint => '填写城市名后不再进行 IP 定位（例如：杭州）';
+
+  @override
+  String get settingsWeatherNote =>
+      '隐私说明：天气数据来自 Open-Meteo（免费、无需密钥）。开启「自动定位」时，本机 IP 会发送至 ip-api.com 换取大致位置，仅用于查询天气、不落盘。天气组件与定位默认均关闭。';
+
+  @override
+  String get settingsSearchWeatherSubtitle => '顶栏显示微型天气组件（图标 + 温度）';
+
+  @override
+  String get weatherRefresh => '刷新天气';
+
+  @override
+  String get weatherNoLocation => '请在设置中填写城市或开启自动定位';
+
+  @override
+  String get weatherUnavailable => '天气获取失败，点击重试';
 
   @override
   String get settingsSearchPassthroughSubtitle => '不转码 · 48kHz 转码管线';
@@ -2513,6 +2772,31 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSectionClose => '关闭应用';
 
   @override
+  String get settingsSectionPower => '节能';
+
+  @override
+  String get settingsPowerSaver => '节能模式';
+
+  @override
+  String get settingsPowerSaverOn => '后台自动降帧（最小化 5 FPS，失焦/熄屏 1 FPS）';
+
+  @override
+  String get settingsPowerSaverOff => '始终满帧渲染';
+
+  @override
+  String get settingsSuppressSleep => '禁用系统休眠';
+
+  @override
+  String get settingsSuppressSleepOn => '播放时保持系统唤醒，防止后台播放中断';
+
+  @override
+  String get settingsSuppressSleepOff => '系统可能按空闲计划休眠';
+
+  @override
+  String get settingsPowerSaverNote =>
+      '节能模式监听窗口状态事件自动降帧，无需轮询；窗口不可见或显示器关闭时，渲染引擎本身已停止绘制。「禁用系统休眠」仅在播放中生效。';
+
+  @override
   String get settingsCloseBehavior => '关闭应用时';
 
   @override
@@ -2565,6 +2849,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get commonLossless => '无损';
+
+  @override
+  String get commonOriginal => '原唱';
 
   @override
   String get commonMore => '更多';
@@ -2757,6 +3044,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get songListTitle => '标题';
+
+  @override
+  String get songListScrollTop => '回到顶部';
+
+  @override
+  String get songListLocatePlaying => '定位播放位置';
 
   @override
   String toastAddedToDownloadQueue(Object quality) {
@@ -3178,6 +3471,45 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get pageFavLoginDesc => '扫码登录网易云，同步收藏的歌单、专辑与歌手';
+
+  @override
+  String get pageFavKgCreated => '创建的歌单';
+
+  @override
+  String get pageFavKgCollectedPlaylist => '收藏的歌单';
+
+  @override
+  String get pageFavKgCollectedAlbum => '收藏的专辑';
+
+  @override
+  String pageFavKgCreatedCount(Object count) {
+    return '共 $count 个创建的歌单';
+  }
+
+  @override
+  String get pageFavKgCreatedLoginHint => '登录后可查看创建的歌单';
+
+  @override
+  String pageFavKgCollectedPlaylistCount(Object count) {
+    return '共 $count 个收藏歌单';
+  }
+
+  @override
+  String get pageFavKgCollectedPlaylistLoginHint => '登录后可查看收藏的歌单';
+
+  @override
+  String pageFavKgCollectedAlbumCount(Object count) {
+    return '共 $count 张收藏专辑';
+  }
+
+  @override
+  String get pageFavKgCollectedAlbumLoginHint => '登录后可查看收藏的专辑';
+
+  @override
+  String get pageFavKugouLoginDesc => '扫码登录酷狗，同步创建与收藏的歌单、专辑';
+
+  @override
+  String get pageFavKugouEmptyHint => '在酷狗 App 收藏后自动同步';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -3614,6 +3946,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsDeveloperNote => '开发者模式面向本地调试与自用，开启后请自行承担相关责任。';
+
+  @override
+  String get settingsDevFpsMonitor => 'FPS/内存监控浮层';
+
+  @override
+  String get settingsDevFpsMonitorDesc =>
+      '右上角实时显示 FPS、平均帧耗时与进程内存（点击可收起）。默认关闭；关闭开发者模式时一并关闭。';
 
   @override
   String get settingsDeveloperEnabled => '开发者模式已开启';
@@ -4194,6 +4533,148 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       '媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERA_DATA_DIR 覆盖。';
 
   @override
+  String get settingsSectionCache => '缓存管理';
+
+  @override
+  String get settingsCacheNote => '缓存用于加速浏览与播放，清除后会自动重建；不会影响曲库、历史与账号信息。';
+
+  @override
+  String get settingsCacheGroupDisk => '数据库缓存（磁盘）';
+
+  @override
+  String get settingsCacheGroupMem => '内存缓存（进程内）';
+
+  @override
+  String get settingsCacheLiked => '「我喜欢」列表缓存';
+
+  @override
+  String get settingsCacheLyric => '歌词内容缓存';
+
+  @override
+  String get settingsCacheLyricMatch => '歌词匹配缓存';
+
+  @override
+  String get settingsCacheLyricTtml => 'TTML 歌词缓存';
+
+  @override
+  String get settingsCacheCover => '封面图片缓存';
+
+  @override
+  String settingsCacheEntries(Object count) {
+    return '$count 条';
+  }
+
+  @override
+  String settingsCacheImages(Object count) {
+    return '$count 张';
+  }
+
+  @override
+  String get settingsCacheRefresh => '刷新';
+
+  @override
+  String get settingsCacheClear => '清除';
+
+  @override
+  String get settingsCacheClearAll => '清空全部';
+
+  @override
+  String settingsCacheClearConfirmTitle(Object name) {
+    return '清除「$name」？';
+  }
+
+  @override
+  String get settingsCacheClearConfirmDesc => '将删除该缓存下的全部数据，下次使用时自动重建，不可撤销。';
+
+  @override
+  String get settingsCacheClearAllConfirmTitle => '清空全部缓存？';
+
+  @override
+  String get settingsCacheClearAllConfirmDesc =>
+      '将删除上方全部缓存（内存与磁盘），不影响曲库、历史与账号信息。';
+
+  @override
+  String toastCacheCleared(Object name) {
+    return '已清除$name缓存';
+  }
+
+  @override
+  String get toastCacheAllCleared => '已清空全部缓存';
+
+  @override
+  String get settingsSecuritySection => '安全销毁';
+
+  @override
+  String get settingsSecurityNote =>
+      '不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、网易云/酷狗登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。';
+
+  @override
+  String get settingsSecurityStreaming => '流媒体服务器凭据';
+
+  @override
+  String settingsSecurityStreamingCount(Object count) {
+    return '$count 台服务器';
+  }
+
+  @override
+  String get settingsSecurityStreamingDesc => '密码与访问令牌';
+
+  @override
+  String get settingsSecuritySession => '第三方账号会话';
+
+  @override
+  String get settingsSecuritySessionDesc => '网易云 / 酷狗 登录状态';
+
+  @override
+  String get settingsSecurityUserDb => '本地用户库';
+
+  @override
+  String get settingsSecurityUserDbDesc => 'Subsonic 账号与收藏数据';
+
+  @override
+  String get settingsSecurityLoggedIn => '已登录';
+
+  @override
+  String get settingsSecurityDestroy => '销毁';
+
+  @override
+  String get settingsSecurityDestroyAll => '一键销毁全部';
+
+  @override
+  String settingsSecurityConfirmTitle(Object name) {
+    return '销毁「$name」？';
+  }
+
+  @override
+  String get settingsSecurityConfirmAllTitle => '确认销毁全部敏感数据？';
+
+  @override
+  String settingsSecurityConfirmDesc(Object word) {
+    return '将主动失效相关平台 token、覆盖写入并删除文件，此操作不可恢复。输入「$word」以确认。';
+  }
+
+  @override
+  String get settingsSecurityConfirmWord => '销毁';
+
+  @override
+  String settingsSecurityConfirmHint(Object word) {
+    return '输入「$word」';
+  }
+
+  @override
+  String toastSecurityDestroyed(Object name) {
+    return '已销毁：$name';
+  }
+
+  @override
+  String get toastSecurityAllDestroyed => '全部敏感数据已销毁';
+
+  @override
+  String toastSecurityDestroyFailed(Object path) {
+    return '销毁失败，文件仍可能残留：$path';
+  }
+
+  @override
   String get settingsVersion => '版本';
 
   @override
@@ -4450,6 +4931,43 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSearchCoverRadiusSubtitle => '直角 · 圆角 · 大圆角';
+
+  @override
+  String get settingsSectionWeather => '天气';
+
+  @override
+  String get settingsWeather => '天气组件';
+
+  @override
+  String get settingsWeatherDesc => '顶栏头像左侧显示微型天气（图标 + 温度）';
+
+  @override
+  String get settingsWeatherAutoLocate => '自动定位';
+
+  @override
+  String get settingsWeatherAutoLocateDesc => '按网络 IP 获取大致位置查询天气（涉及隐私，默认关闭）';
+
+  @override
+  String get settingsWeatherCity => '手动城市';
+
+  @override
+  String get settingsWeatherCityHint => '填写城市名后不再进行 IP 定位（例如：杭州）';
+
+  @override
+  String get settingsWeatherNote =>
+      '隐私说明：天气数据来自 Open-Meteo（免费、无需密钥）。开启「自动定位」时，本机 IP 会发送至 ip-api.com 换取大致位置，仅用于查询天气、不落盘。天气组件与定位默认均关闭。';
+
+  @override
+  String get settingsSearchWeatherSubtitle => '顶栏显示微型天气组件（图标 + 温度）';
+
+  @override
+  String get weatherRefresh => '刷新天气';
+
+  @override
+  String get weatherNoLocation => '请在设置中填写城市或开启自动定位';
+
+  @override
+  String get weatherUnavailable => '天气获取失败，点击重试';
 
   @override
   String get settingsSearchPassthroughSubtitle => '不转码 · 48kHz 转码管线';
@@ -4929,6 +5447,31 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSectionClose => '關閉應用';
 
   @override
+  String get settingsSectionPower => '節能';
+
+  @override
+  String get settingsPowerSaver => '節能模式';
+
+  @override
+  String get settingsPowerSaverOn => '背景自動降幀（最小化 5 FPS，失焦/熄屏 1 FPS）';
+
+  @override
+  String get settingsPowerSaverOff => '始終滿幀渲染';
+
+  @override
+  String get settingsSuppressSleep => '停用系統休眠';
+
+  @override
+  String get settingsSuppressSleepOn => '播放時保持系統喚醒，防止背景播放中斷';
+
+  @override
+  String get settingsSuppressSleepOff => '系統可能依閒置計畫休眠';
+
+  @override
+  String get settingsPowerSaverNote =>
+      '節能模式監聽視窗狀態事件自動降幀，無需輪詢；視窗不可見或顯示器關閉時，渲染引擎本身已停止繪製。「停用系統休眠」僅在播放中生效。';
+
+  @override
   String get settingsCloseBehavior => '關閉應用程式時';
 
   @override
@@ -4981,6 +5524,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get commonLossless => '無損';
+
+  @override
+  String get commonOriginal => '原唱';
 
   @override
   String get commonMore => '更多';
@@ -5173,6 +5719,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get songListTitle => '標題';
+
+  @override
+  String get songListScrollTop => '回到頂部';
+
+  @override
+  String get songListLocatePlaying => '定位播放位置';
 
   @override
   String toastAddedToDownloadQueue(Object quality) {
@@ -5594,6 +6146,45 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get pageFavLoginDesc => '掃碼登入網易雲，同步收藏的歌單、專輯與歌手';
+
+  @override
+  String get pageFavKgCreated => '建立的歌單';
+
+  @override
+  String get pageFavKgCollectedPlaylist => '收藏的歌單';
+
+  @override
+  String get pageFavKgCollectedAlbum => '收藏的專輯';
+
+  @override
+  String pageFavKgCreatedCount(Object count) {
+    return '共 $count 個建立的歌單';
+  }
+
+  @override
+  String get pageFavKgCreatedLoginHint => '登入後可查看建立的歌單';
+
+  @override
+  String pageFavKgCollectedPlaylistCount(Object count) {
+    return '共 $count 個收藏歌單';
+  }
+
+  @override
+  String get pageFavKgCollectedPlaylistLoginHint => '登入後可查看收藏的歌單';
+
+  @override
+  String pageFavKgCollectedAlbumCount(Object count) {
+    return '共 $count 張收藏專輯';
+  }
+
+  @override
+  String get pageFavKgCollectedAlbumLoginHint => '登入後可查看收藏的專輯';
+
+  @override
+  String get pageFavKugouLoginDesc => '掃碼登入酷狗，同步建立與收藏的歌單、專輯';
+
+  @override
+  String get pageFavKugouEmptyHint => '在酷狗 App 收藏後自動同步';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -6030,6 +6621,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsDeveloperNote => '開發者模式面向本機除錯與自用，開啟後請自行承擔相關責任。';
+
+  @override
+  String get settingsDevFpsMonitor => 'FPS/記憶體監控浮層';
+
+  @override
+  String get settingsDevFpsMonitorDesc =>
+      '右上角即時顯示 FPS、平均影格耗時與程序記憶體（點擊可收起）。預設關閉；關閉開發者模式時一併關閉。';
 
   @override
   String get settingsDeveloperEnabled => '開發者模式已開啟';
@@ -6611,6 +7209,148 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '媒體庫與使用者資料實體拆分；路徑可用環境變數 ARCHOERA_DATA_DIR 覆蓋。';
 
   @override
+  String get settingsSectionCache => '快取管理';
+
+  @override
+  String get settingsCacheNote => '快取用於加速瀏覽與播放，清除後會自動重建；不會影響曲庫、歷史與帳號資訊。';
+
+  @override
+  String get settingsCacheGroupDisk => '資料庫快取（磁碟）';
+
+  @override
+  String get settingsCacheGroupMem => '記憶體快取（行程內）';
+
+  @override
+  String get settingsCacheLiked => '「我喜歡」清單快取';
+
+  @override
+  String get settingsCacheLyric => '歌詞內容快取';
+
+  @override
+  String get settingsCacheLyricMatch => '歌詞比對快取';
+
+  @override
+  String get settingsCacheLyricTtml => 'TTML 歌詞快取';
+
+  @override
+  String get settingsCacheCover => '封面圖片快取';
+
+  @override
+  String settingsCacheEntries(Object count) {
+    return '$count 筆';
+  }
+
+  @override
+  String settingsCacheImages(Object count) {
+    return '$count 張';
+  }
+
+  @override
+  String get settingsCacheRefresh => '重新整理';
+
+  @override
+  String get settingsCacheClear => '清除';
+
+  @override
+  String get settingsCacheClearAll => '全部清空';
+
+  @override
+  String settingsCacheClearConfirmTitle(Object name) {
+    return '清除「$name」？';
+  }
+
+  @override
+  String get settingsCacheClearConfirmDesc => '將刪除該快取下的全部資料，下次使用時自動重建，不可復原。';
+
+  @override
+  String get settingsCacheClearAllConfirmTitle => '全部清空快取？';
+
+  @override
+  String get settingsCacheClearAllConfirmDesc =>
+      '將刪除上方全部快取（記憶體與磁碟），不影響曲庫、歷史與帳號資訊。';
+
+  @override
+  String toastCacheCleared(Object name) {
+    return '已清除$name快取';
+  }
+
+  @override
+  String get toastCacheAllCleared => '已全部清空快取';
+
+  @override
+  String get settingsSecuritySection => '安全銷毀';
+
+  @override
+  String get settingsSecurityNote =>
+      '不可逆地刪除本機全部帳號憑證與登入會話（串流伺服器密碼、網易雲/酷狗登入態、本機 Subsonic 帳號），並主動失效平台 token；不影響曲庫、歷史與下載檔案。';
+
+  @override
+  String get settingsSecurityStreaming => '串流伺服器憑證';
+
+  @override
+  String settingsSecurityStreamingCount(Object count) {
+    return '$count 台伺服器';
+  }
+
+  @override
+  String get settingsSecurityStreamingDesc => '密碼與存取權杖';
+
+  @override
+  String get settingsSecuritySession => '第三方帳號會話';
+
+  @override
+  String get settingsSecuritySessionDesc => '網易雲 / 酷狗 登入狀態';
+
+  @override
+  String get settingsSecurityUserDb => '本機使用者庫';
+
+  @override
+  String get settingsSecurityUserDbDesc => 'Subsonic 帳號與收藏資料';
+
+  @override
+  String get settingsSecurityLoggedIn => '已登入';
+
+  @override
+  String get settingsSecurityDestroy => '銷毀';
+
+  @override
+  String get settingsSecurityDestroyAll => '一鍵銷毀全部';
+
+  @override
+  String settingsSecurityConfirmTitle(Object name) {
+    return '銷毀「$name」？';
+  }
+
+  @override
+  String get settingsSecurityConfirmAllTitle => '確認銷毀全部敏感資料？';
+
+  @override
+  String settingsSecurityConfirmDesc(Object word) {
+    return '將主動失效相關平台 token、覆蓋寫入並刪除檔案，此操作不可恢復。輸入「$word」以確認。';
+  }
+
+  @override
+  String get settingsSecurityConfirmWord => '銷毀';
+
+  @override
+  String settingsSecurityConfirmHint(Object word) {
+    return '輸入「$word」';
+  }
+
+  @override
+  String toastSecurityDestroyed(Object name) {
+    return '已銷毀：$name';
+  }
+
+  @override
+  String get toastSecurityAllDestroyed => '全部敏感資料已銷毀';
+
+  @override
+  String toastSecurityDestroyFailed(Object path) {
+    return '銷毀失敗，檔案仍可能殘留：$path';
+  }
+
+  @override
   String get settingsVersion => '版本';
 
   @override
@@ -6867,6 +7607,43 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSearchCoverRadiusSubtitle => '直角 · 圓角 · 大圓角';
+
+  @override
+  String get settingsSectionWeather => '天氣';
+
+  @override
+  String get settingsWeather => '天氣元件';
+
+  @override
+  String get settingsWeatherDesc => '頭像左側顯示微型天氣（圖示 + 溫度）';
+
+  @override
+  String get settingsWeatherAutoLocate => '自動定位';
+
+  @override
+  String get settingsWeatherAutoLocateDesc => '依網路 IP 取得大致位置查詢天氣（涉及隱私，預設關閉）';
+
+  @override
+  String get settingsWeatherCity => '手動城市';
+
+  @override
+  String get settingsWeatherCityHint => '填寫城市名後不再進行 IP 定位（例如：杭州）';
+
+  @override
+  String get settingsWeatherNote =>
+      '隱私說明：天氣資料來自 Open-Meteo（免費、無需金鑰）。開啟「自動定位」時，本機 IP 會傳送至 ip-api.com 換取大致位置，僅用於查詢天氣、不落盤。天氣元件與定位預設均關閉。';
+
+  @override
+  String get settingsSearchWeatherSubtitle => '頂欄顯示微型天氣元件（圖示 + 溫度）';
+
+  @override
+  String get weatherRefresh => '重新整理天氣';
+
+  @override
+  String get weatherNoLocation => '請在設定中填寫城市或開啟自動定位';
+
+  @override
+  String get weatherUnavailable => '天氣取得失敗，點擊重試';
 
   @override
   String get settingsSearchPassthroughSubtitle => '不轉碼 · 48kHz 轉碼管線';

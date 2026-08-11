@@ -16,6 +16,12 @@ abstract class SessionStore {
 abstract class LyricCacheStore {
   Map<String, dynamic>? get(String platform, String platformId);
   void set(String platform, String platformId, Map<String, dynamic>? result);
+
+  /// 缓存条目数（缓存管理统计用）。
+  int get count;
+
+  /// 清空全部缓存（缓存管理「清除」用）。
+  void clear();
 }
 
 /// fuzzy 匹配缓存命中记录（对齐 MatchedRecord）
@@ -35,6 +41,12 @@ abstract class LyricMatchCacheStore {
     String platformId, [
     Map<String, dynamic>? extra,
   ]);
+
+  /// 缓存条目数（缓存管理统计用）。
+  int get count;
+
+  /// 清空全部缓存（缓存管理「清除」用）。
+  void clear();
 }
 
 /// TTML 未命中哨兵（区别于负缓存 null）
@@ -48,6 +60,12 @@ const Object lyricTtmlMiss = _TtmlMiss();
 abstract class LyricTtmlCacheStore {
   Object? get(String platform, String id);
   void set(String platform, String id, String? content);
+
+  /// 缓存条目数（缓存管理统计用）。
+  int get count;
+
+  /// 清空全部缓存（缓存管理「清除」用）。
+  void clear();
 }
 
 /// 宿主运行时能力
@@ -58,10 +76,10 @@ class ApisRuntime {
     LyricCacheStore? lyricCache,
     LyricMatchCacheStore? lyricMatchCache,
     LyricTtmlCacheStore? lyricTtmlCache,
-  })  : sessionStore = sessionStore ?? _MemSessionStore(),
-        lyricCache = lyricCache ?? _MemLyricCacheStore(),
-        lyricMatchCache = lyricMatchCache ?? _MemMatchCacheStore(),
-        lyricTtmlCache = lyricTtmlCache ?? _MemTtmlCacheStore();
+  }) : sessionStore = sessionStore ?? _MemSessionStore(),
+       lyricCache = lyricCache ?? _MemLyricCacheStore(),
+       lyricMatchCache = lyricMatchCache ?? _MemMatchCacheStore(),
+       lyricTtmlCache = lyricTtmlCache ?? _MemTtmlCacheStore();
 
   /// 读取宿主设置（未知 key 返回 null）
   final dynamic Function(String key) getSetting;
@@ -100,6 +118,12 @@ class _MemLyricCacheStore implements LyricCacheStore {
   @override
   void set(String platform, String platformId, Map<String, dynamic>? result) =>
       _map['$platform:$platformId'] = result;
+
+  @override
+  int get count => _map.length;
+
+  @override
+  void clear() => _map.clear();
 }
 
 class _MemMatchCacheStore implements LyricMatchCacheStore {
@@ -115,9 +139,16 @@ class _MemMatchCacheStore implements LyricMatchCacheStore {
     String platform,
     String platformId, [
     Map<String, dynamic>? extra,
-  ]) =>
-      _map['$fingerprint:$platform'] =
-          MatchedRecord(platformId: platformId, extra: extra);
+  ]) => _map['$fingerprint:$platform'] = MatchedRecord(
+    platformId: platformId,
+    extra: extra,
+  );
+
+  @override
+  int get count => _map.length;
+
+  @override
+  void clear() => _map.clear();
 }
 
 class _MemTtmlCacheStore implements LyricTtmlCacheStore {
@@ -133,6 +164,12 @@ class _MemTtmlCacheStore implements LyricTtmlCacheStore {
   @override
   void set(String platform, String id, String? content) =>
       _map['$platform:$id'] = content;
+
+  @override
+  int get count => _map.length;
+
+  @override
+  void clear() => _map.clear();
 }
 
 ApisRuntime _runtime = ApisRuntime();

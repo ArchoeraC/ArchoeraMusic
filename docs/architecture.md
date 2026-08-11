@@ -623,8 +623,6 @@ ArchoeraMusic/
 
 **桥接关键点（sidecar_process.dart）**
 - 随机空闲端口：`bind(0)` 取号后释放（自用竞争可接受）
-- 自包含数据根：`SPLAYER_DATA_DIR` → `~/.local/share/ArchoeraMusic`
-- **stdin 看门狗**：Flutter 以管道模式 spawn；宿主进程死亡（含 kill -9）→ 管道关闭 → sidecar `stdin 'end'` 自退出（[index.ts](file:///home/betastudio2/文档/SPlayer-Next/ArchoeraMusic/sidecar/index.ts) 末尾，`SPLAYER_PARENT_WATCHDOG=true` 启用，不影响上游行为）
 - 环境覆盖：`ARCHOERA_SIDECAR` / `ARCHOERA_DATA_DIR`（打包阶段替换路径用）
 
 **验证记录**：`/api/health` 200；`/api/audio/status` `{available:true, format:"ogg/opus"}`；C 引擎 tone.wav→OGG 转码成功（`OggS` 魔数）；kill -9 硬杀应用后侧车自退出无孤儿。
@@ -632,9 +630,8 @@ ArchoeraMusic/
 ### 12.0.1 Phase 1 首步：桥接改造落地说明（已完成，2026-08-05）
 
 **产物**
-- `sidecar/rpc.ts`：RPC 适配器（`SPLAYER_RPC=true` 门控）。stdin 读 JSON-RPC 请求 → **复用 Hono `app.request()` 映射全部既有路由（路由零改动）**；JSON 响应 → `data`，非 JSON（文件/转码流）→ cancel body 并返回媒体口 URL（`stream:true`）；`PING` 替代 `/api/health`；订阅 `utils/events` 事件总线 → stdout 事件行（含初始快照，对齐 WS 行为）；模块加载即把 `console.log/debug` 重定向 stderr，stdout 只留协议行
+- `sidecar/rpc.ts`：RPC 适配器（环境变量门控启用）。stdin 读 JSON-RPC 请求 → **复用 Hono `app.request()` 映射全部既有路由（路由零改动）**；JSON 响应 → `data`，非 JSON（文件/转码流）→ cancel body 并返回媒体口 URL（`stream:true`）；`PING` 替代 `/api/health`；订阅 `utils/events` 事件总线 → stdout 事件行（含初始快照，对齐 WS 行为）；模块加载即把 `console.log/debug` 重定向 stderr，stdout 只留协议行
 - `app/lib/core/sidecar/rpc_client.dart`：Dart RPC 客户端——stdin 写请求 / stdout 解析响应与事件；`call()` 统一错误模型 `ApiException(code, message)`；幂等 GET 指数退避重试（≤3）；`StreamUrlResult` 承载媒体口 URL；`Stream<SidecarEvent> events`（`scan:*`/`audio:fft`/`download:*`）
-- `app/lib/core/sidecar/sidecar_process.dart`：spawn 时加 `SPLAYER_RPC=true`；就绪检测由 HTTP 健康轮询 → **RPC ping**；暴露 `rpc`；`stop()`/退出时 `rpc.close()`
 - `sidecar/utils/events.ts`：`ServerEvent` 增加 `audio:fft`（桌面端经 stdout 透传，§10.1）；`routes/audio.ts` FFT 回调同时 `emit()`（保留 WS 广播，Web 兼容）
 - `sidecar/index.ts`：SIGTERM handler 修复——`shutdown()` 后 `process.exit(0)`（原只清理不退出，导致 SIGTERM 杀不掉）
 

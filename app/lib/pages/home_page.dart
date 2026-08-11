@@ -126,8 +126,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _playAllAlbum(CoverItem album) async {
     final l10n = context.l10n;
     try {
-      final tracks =
-          await ref.read(neteaseApiProvider).albumTracks(album.id);
+      final tracks = await ref.read(neteaseApiProvider).albumTracks(album.id);
       if (tracks.isEmpty) {
         _toast(l10n.toastAlbumEmpty);
         return;
@@ -155,7 +154,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       context,
       title: l10n.pageHomePlaylistSquare,
       loader: (ref) => ref.read(kugouApiProvider).topPlaylists(),
-      onItemTap: (ctx, playlist) => showKugouPlaylistDetailDialog(ctx, playlist),
+      onItemTap: (ctx, playlist) =>
+          showKugouPlaylistDetailDialog(ctx, playlist),
     );
   }
 
@@ -212,173 +212,213 @@ class _HomePageState extends ConsumerState<HomePage> {
         : l10n.greetingFallback;
 
     return Scaffold(
+      // 居中限宽（对齐 SPlayer-Next Home.vue `mx-auto max-w-[1400px]`）：
+      // 常规窗口内容自动铺满内容区，超宽窗口两侧留白——与本项目其他页面
+      // 的左右留宽保持一致，不做暴力铺满。
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1240),
+            constraints: const BoxConstraints(maxWidth: 1400),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  l10n.pageHomeTitle,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                    color: scheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.pageHomeGreeting(greeting, name),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
-                  ),
-                ),
+                _buildHeader(l10n, scheme, greeting, name),
                 const SizedBox(height: 20),
-                HomeDailyHero(
-                  loggedIn: account != null,
-                  title: l10n.pageHomeDaily,
-                  subtitleLoggedIn: l10n.pageHomeDailyLoggedIn,
-                  subtitleLoginHint: l10n.pageHomeDailyLoginHint,
-                  playLabel: l10n.pageHomeDailyPlay,
-                  loginLabel: l10n.pageHomeDailyLogin,
-                  onPlay: _openDaily,
-                ),
+                _buildDailyHero(account != null, l10n),
                 const SizedBox(height: 20),
-                GridView.count(
-                  crossAxisCount: 4,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 2.3,
-                  children: [
-                    HomeActionCard(
-                      icon: Icons.wb_sunny_outlined,
-                      title: l10n.pageHomeDaily,
-                      subtitle: l10n.trackListDailyRecommendSubtitle,
-                      onTap: _openDaily,
-                    ),
-                    HomeActionCard(
-                      icon: Icons.leaderboard_outlined,
-                      title: l10n.pageHomeRankTitle,
-                      subtitle: l10n.pageHomeRankSubtitle,
-                      onTap: _openRank,
-                    ),
-                    HomeActionCard(
-                      icon: Icons.queue_music_outlined,
-                      title: l10n.pageHomePlaylistSquare,
-                      subtitle: l10n.pageHomePlaylistSquareSubtitle,
-                      onTap: _openPlaylistSquare,
-                    ),
-                    HomeActionCard(
-                      icon: Icons.mic_external_on_outlined,
-                      title: l10n.commonArtists,
-                      subtitle: l10n.pageHomeArtistSubtitle,
-                      onTap: _openMoreArtists,
-                    ),
-                  ],
-                ),
+                _buildQuickActions(l10n),
                 const SizedBox(height: 24),
                 if (_loading && !_data.loaded)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 80),
-                    child: Center(
-                      child: SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      ),
-                    ),
-                  )
+                  _buildLoading()
                 else if (_error.isNotEmpty && !_data.loaded)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 60),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.cloud_off_outlined,
-                              size: 44, color: scheme.error),
-                          const SizedBox(height: 10),
-                          Text(
-                            l10n.pageHomeLoadFailed,
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _error,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          SButton(
-                            label: l10n.commonRetry,
-                            icon: Icons.refresh,
-                            variant: SButtonVariant.secondary,
-                            onPressed: _fetchAll,
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else ...[
-                  HomeSectionTitle(
-                    title: l10n.pageHomePlaylists,
-                    subtitle: l10n.pageHomePlaylistsSubtitle,
-                    moreLabel: l10n.commonMore,
-                    onMore: _openMorePlaylists,
-                  ),
-                  CoverRail(
-                    items: _data.playlists,
-                    onTap: _openPlaylist,
-                    onPlay: _playAllPlaylist,
-                    radius: coverRadius,
-                    cardWidth: 150,
-                    height: 198,
-                    loading: _loading && _data.playlists.isEmpty,
-                  ),
-                  const SizedBox(height: 26),
-                  HomeSectionTitle(
-                    title: l10n.pageHomeNewAlbums,
-                    subtitle: l10n.pageHomeNewAlbumsSubtitle,
-                    moreLabel: l10n.commonMore,
-                    onMore: _openMoreAlbums,
-                  ),
-                  CoverRail(
-                    items: _data.albums,
-                    onTap: _openAlbum,
-                    onPlay: _playAllAlbum,
-                    radius: coverRadius,
-                    cardWidth: 150,
-                    height: 198,
-                    loading: _loading && _data.albums.isEmpty,
-                  ),
-                  const SizedBox(height: 26),
-                  HomeSectionTitle(
-                    title: l10n.pageHomeHotArtists,
-                    subtitle: l10n.pageHomeHotArtistsSubtitle,
-                    moreLabel: l10n.commonMore,
-                    onMore: _openMoreArtists,
-                  ),
-                  CoverRail(
-                    items: _data.artists,
-                    onTap: _openArtist,
-                    artist: true,
-                    radius: coverRadius,
-                    cardWidth: 150,
-                    height: 198,
-                    loading: _loading && _data.artists.isEmpty,
-                  ),
-                ],
+                  _buildError(theme, l10n)
+                else
+                  _buildSections(l10n, coverRadius),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  // ─── 页面区块（拆分方法，保持 build 精简）────────────────────────
+
+  Widget _buildHeader(
+    AppLocalizations l10n,
+    ColorScheme scheme,
+    String greeting,
+    String name,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.pageHomeTitle,
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+            color: scheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          l10n.pageHomeGreeting(greeting, name),
+          style: TextStyle(
+            fontSize: 13,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDailyHero(bool loggedIn, AppLocalizations l10n) {
+    return HomeDailyHero(
+      loggedIn: loggedIn,
+      title: l10n.pageHomeDaily,
+      subtitleLoggedIn: l10n.pageHomeDailyLoggedIn,
+      subtitleLoginHint: l10n.pageHomeDailyLoginHint,
+      playLabel: l10n.pageHomeDailyPlay,
+      loginLabel: l10n.pageHomeDailyLogin,
+      onPlay: _openDaily,
+    );
+  }
+
+  Widget _buildQuickActions(AppLocalizations l10n) {
+    return GridView.count(
+      crossAxisCount: 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 2.3,
+      children: [
+        HomeActionCard(
+          icon: Icons.wb_sunny_outlined,
+          title: l10n.pageHomeDaily,
+          subtitle: l10n.trackListDailyRecommendSubtitle,
+          onTap: _openDaily,
+        ),
+        HomeActionCard(
+          icon: Icons.leaderboard_outlined,
+          title: l10n.pageHomeRankTitle,
+          subtitle: l10n.pageHomeRankSubtitle,
+          onTap: _openRank,
+        ),
+        HomeActionCard(
+          icon: Icons.queue_music_outlined,
+          title: l10n.pageHomePlaylistSquare,
+          subtitle: l10n.pageHomePlaylistSquareSubtitle,
+          onTap: _openPlaylistSquare,
+        ),
+        HomeActionCard(
+          icon: Icons.mic_external_on_outlined,
+          title: l10n.commonArtists,
+          subtitle: l10n.pageHomeArtistSubtitle,
+          onTap: _openMoreArtists,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoading() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 80),
+      child: Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildError(ThemeData theme, AppLocalizations l10n) {
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.cloud_off_outlined, size: 44, color: scheme.error),
+            const SizedBox(height: 10),
+            Text(l10n.pageHomeLoadFailed, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 4),
+            Text(
+              _error,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 14),
+            SButton(
+              label: l10n.commonRetry,
+              icon: Icons.refresh,
+              variant: SButtonVariant.secondary,
+              onPressed: _fetchAll,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSections(AppLocalizations l10n, double coverRadius) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        HomeSectionTitle(
+          title: l10n.pageHomePlaylists,
+          subtitle: l10n.pageHomePlaylistsSubtitle,
+          moreLabel: l10n.commonMore,
+          onMore: _openMorePlaylists,
+        ),
+        CoverRail(
+          items: _data.playlists,
+          onTap: _openPlaylist,
+          onPlay: _playAllPlaylist,
+          radius: coverRadius,
+          cardWidth: 150,
+          height: 198,
+          loading: _loading && _data.playlists.isEmpty,
+        ),
+        const SizedBox(height: 26),
+        HomeSectionTitle(
+          title: l10n.pageHomeNewAlbums,
+          subtitle: l10n.pageHomeNewAlbumsSubtitle,
+          moreLabel: l10n.commonMore,
+          onMore: _openMoreAlbums,
+        ),
+        CoverRail(
+          items: _data.albums,
+          onTap: _openAlbum,
+          onPlay: _playAllAlbum,
+          radius: coverRadius,
+          cardWidth: 150,
+          height: 198,
+          loading: _loading && _data.albums.isEmpty,
+        ),
+        const SizedBox(height: 26),
+        HomeSectionTitle(
+          title: l10n.pageHomeHotArtists,
+          subtitle: l10n.pageHomeHotArtistsSubtitle,
+          moreLabel: l10n.commonMore,
+          onMore: _openMoreArtists,
+        ),
+        CoverRail(
+          items: _data.artists,
+          onTap: _openArtist,
+          artist: true,
+          radius: coverRadius,
+          cardWidth: 150,
+          height: 198,
+          loading: _loading && _data.artists.isEmpty,
+        ),
+      ],
     );
   }
 }

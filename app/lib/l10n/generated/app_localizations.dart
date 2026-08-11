@@ -278,6 +278,54 @@ abstract class AppLocalizations {
   /// **'关闭应用'**
   String get settingsSectionClose;
 
+  /// No description provided for @settingsSectionPower.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'节能'**
+  String get settingsSectionPower;
+
+  /// No description provided for @settingsPowerSaver.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'节能模式'**
+  String get settingsPowerSaver;
+
+  /// No description provided for @settingsPowerSaverOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'后台自动降帧（最小化 5 FPS，失焦/熄屏 1 FPS）'**
+  String get settingsPowerSaverOn;
+
+  /// No description provided for @settingsPowerSaverOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'始终满帧渲染'**
+  String get settingsPowerSaverOff;
+
+  /// No description provided for @settingsSuppressSleep.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'禁用系统休眠'**
+  String get settingsSuppressSleep;
+
+  /// No description provided for @settingsSuppressSleepOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放时保持系统唤醒，防止后台播放中断'**
+  String get settingsSuppressSleepOn;
+
+  /// No description provided for @settingsSuppressSleepOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统可能按空闲计划休眠'**
+  String get settingsSuppressSleepOff;
+
+  /// No description provided for @settingsPowerSaverNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'节能模式监听窗口状态事件自动降帧，无需轮询；窗口不可见或显示器关闭时，渲染引擎本身已停止绘制。「禁用系统休眠」仅在播放中生效。'**
+  String get settingsPowerSaverNote;
+
   /// No description provided for @settingsCloseBehavior.
   ///
   /// In zh_CN, this message translates to:
@@ -385,6 +433,12 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'无损'**
   String get commonLossless;
+
+  /// No description provided for @commonOriginal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'原唱'**
+  String get commonOriginal;
 
   /// No description provided for @commonMore.
   ///
@@ -757,6 +811,18 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'标题'**
   String get songListTitle;
+
+  /// No description provided for @songListScrollTop.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'回到顶部'**
+  String get songListScrollTop;
+
+  /// No description provided for @songListLocatePlaying.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'定位播放位置'**
+  String get songListLocatePlaying;
 
   /// No description provided for @toastAddedToDownloadQueue.
   ///
@@ -1495,6 +1561,72 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'扫码登录网易云，同步收藏的歌单、专辑与歌手'**
   String get pageFavLoginDesc;
+
+  /// No description provided for @pageFavKgCreated.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'创建的歌单'**
+  String get pageFavKgCreated;
+
+  /// No description provided for @pageFavKgCollectedPlaylist.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'收藏的歌单'**
+  String get pageFavKgCollectedPlaylist;
+
+  /// No description provided for @pageFavKgCollectedAlbum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'收藏的专辑'**
+  String get pageFavKgCollectedAlbum;
+
+  /// No description provided for @pageFavKgCreatedCount.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'共 {count} 个创建的歌单'**
+  String pageFavKgCreatedCount(Object count);
+
+  /// No description provided for @pageFavKgCreatedLoginHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录后可查看创建的歌单'**
+  String get pageFavKgCreatedLoginHint;
+
+  /// No description provided for @pageFavKgCollectedPlaylistCount.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'共 {count} 个收藏歌单'**
+  String pageFavKgCollectedPlaylistCount(Object count);
+
+  /// No description provided for @pageFavKgCollectedPlaylistLoginHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录后可查看收藏的歌单'**
+  String get pageFavKgCollectedPlaylistLoginHint;
+
+  /// No description provided for @pageFavKgCollectedAlbumCount.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'共 {count} 张收藏专辑'**
+  String pageFavKgCollectedAlbumCount(Object count);
+
+  /// No description provided for @pageFavKgCollectedAlbumLoginHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录后可查看收藏的专辑'**
+  String get pageFavKgCollectedAlbumLoginHint;
+
+  /// No description provided for @pageFavKugouLoginDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫码登录酷狗，同步创建与收藏的歌单、专辑'**
+  String get pageFavKugouLoginDesc;
+
+  /// No description provided for @pageFavKugouEmptyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在酷狗 App 收藏后自动同步'**
+  String get pageFavKugouEmptyHint;
 
   /// No description provided for @pageSearchLoadingTrack.
   ///
@@ -2293,6 +2425,18 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'开发者模式面向本地调试与自用，开启后请自行承担相关责任。'**
   String get settingsDeveloperNote;
+
+  /// No description provided for @settingsDevFpsMonitor.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'FPS/内存监控浮层'**
+  String get settingsDevFpsMonitor;
+
+  /// No description provided for @settingsDevFpsMonitorDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'右上角实时显示 FPS、平均帧耗时与进程内存（点击可收起）。默认关闭；关闭开发者模式时一并关闭。'**
+  String get settingsDevFpsMonitorDesc;
 
   /// No description provided for @settingsDeveloperEnabled.
   ///
@@ -3374,6 +3518,246 @@ abstract class AppLocalizations {
   /// **'媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERA_DATA_DIR 覆盖。'**
   String get settingsStorageNote;
 
+  /// No description provided for @settingsSectionCache.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'缓存管理'**
+  String get settingsSectionCache;
+
+  /// No description provided for @settingsCacheNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'缓存用于加速浏览与播放，清除后会自动重建；不会影响曲库、历史与账号信息。'**
+  String get settingsCacheNote;
+
+  /// No description provided for @settingsCacheGroupDisk.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'数据库缓存（磁盘）'**
+  String get settingsCacheGroupDisk;
+
+  /// No description provided for @settingsCacheGroupMem.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内存缓存（进程内）'**
+  String get settingsCacheGroupMem;
+
+  /// No description provided for @settingsCacheLiked.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'「我喜欢」列表缓存'**
+  String get settingsCacheLiked;
+
+  /// No description provided for @settingsCacheLyric.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词内容缓存'**
+  String get settingsCacheLyric;
+
+  /// No description provided for @settingsCacheLyricMatch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词匹配缓存'**
+  String get settingsCacheLyricMatch;
+
+  /// No description provided for @settingsCacheLyricTtml.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'TTML 歌词缓存'**
+  String get settingsCacheLyricTtml;
+
+  /// No description provided for @settingsCacheCover.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'封面图片缓存'**
+  String get settingsCacheCover;
+
+  /// No description provided for @settingsCacheEntries.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{count} 条'**
+  String settingsCacheEntries(Object count);
+
+  /// No description provided for @settingsCacheImages.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{count} 张'**
+  String settingsCacheImages(Object count);
+
+  /// No description provided for @settingsCacheRefresh.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刷新'**
+  String get settingsCacheRefresh;
+
+  /// No description provided for @settingsCacheClear.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清除'**
+  String get settingsCacheClear;
+
+  /// No description provided for @settingsCacheClearAll.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清空全部'**
+  String get settingsCacheClearAll;
+
+  /// No description provided for @settingsCacheClearConfirmTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清除「{name}」？'**
+  String settingsCacheClearConfirmTitle(Object name);
+
+  /// No description provided for @settingsCacheClearConfirmDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将删除该缓存下的全部数据，下次使用时自动重建，不可撤销。'**
+  String get settingsCacheClearConfirmDesc;
+
+  /// No description provided for @settingsCacheClearAllConfirmTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清空全部缓存？'**
+  String get settingsCacheClearAllConfirmTitle;
+
+  /// No description provided for @settingsCacheClearAllConfirmDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将删除上方全部缓存（内存与磁盘），不影响曲库、历史与账号信息。'**
+  String get settingsCacheClearAllConfirmDesc;
+
+  /// No description provided for @toastCacheCleared.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已清除{name}缓存'**
+  String toastCacheCleared(Object name);
+
+  /// No description provided for @toastCacheAllCleared.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已清空全部缓存'**
+  String get toastCacheAllCleared;
+
+  /// No description provided for @settingsSecuritySection.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'安全销毁'**
+  String get settingsSecuritySection;
+
+  /// No description provided for @settingsSecurityNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、网易云/酷狗登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。'**
+  String get settingsSecurityNote;
+
+  /// No description provided for @settingsSecurityStreaming.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流媒体服务器凭据'**
+  String get settingsSecurityStreaming;
+
+  /// No description provided for @settingsSecurityStreamingCount.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{count} 台服务器'**
+  String settingsSecurityStreamingCount(Object count);
+
+  /// No description provided for @settingsSecurityStreamingDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'密码与访问令牌'**
+  String get settingsSecurityStreamingDesc;
+
+  /// No description provided for @settingsSecuritySession.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'第三方账号会话'**
+  String get settingsSecuritySession;
+
+  /// No description provided for @settingsSecuritySessionDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'网易云 / 酷狗 登录状态'**
+  String get settingsSecuritySessionDesc;
+
+  /// No description provided for @settingsSecurityUserDb.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本地用户库'**
+  String get settingsSecurityUserDb;
+
+  /// No description provided for @settingsSecurityUserDbDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Subsonic 账号与收藏数据'**
+  String get settingsSecurityUserDbDesc;
+
+  /// No description provided for @settingsSecurityLoggedIn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已登录'**
+  String get settingsSecurityLoggedIn;
+
+  /// No description provided for @settingsSecurityDestroy.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'销毁'**
+  String get settingsSecurityDestroy;
+
+  /// No description provided for @settingsSecurityDestroyAll.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'一键销毁全部'**
+  String get settingsSecurityDestroyAll;
+
+  /// No description provided for @settingsSecurityConfirmTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'销毁「{name}」？'**
+  String settingsSecurityConfirmTitle(Object name);
+
+  /// No description provided for @settingsSecurityConfirmAllTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确认销毁全部敏感数据？'**
+  String get settingsSecurityConfirmAllTitle;
+
+  /// No description provided for @settingsSecurityConfirmDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将主动失效相关平台 token、覆盖写入并删除文件，此操作不可恢复。输入「{word}」以确认。'**
+  String settingsSecurityConfirmDesc(Object word);
+
+  /// No description provided for @settingsSecurityConfirmWord.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'销毁'**
+  String get settingsSecurityConfirmWord;
+
+  /// No description provided for @settingsSecurityConfirmHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'输入「{word}」'**
+  String settingsSecurityConfirmHint(Object word);
+
+  /// No description provided for @toastSecurityDestroyed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已销毁：{name}'**
+  String toastSecurityDestroyed(Object name);
+
+  /// No description provided for @toastSecurityAllDestroyed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'全部敏感数据已销毁'**
+  String get toastSecurityAllDestroyed;
+
+  /// No description provided for @toastSecurityDestroyFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'销毁失败，文件仍可能残留：{path}'**
+  String toastSecurityDestroyFailed(Object path);
+
   /// No description provided for @settingsVersion.
   ///
   /// In zh_CN, this message translates to:
@@ -3853,6 +4237,78 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'直角 · 圆角 · 大圆角'**
   String get settingsSearchCoverRadiusSubtitle;
+
+  /// No description provided for @settingsSectionWeather.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'天气'**
+  String get settingsSectionWeather;
+
+  /// No description provided for @settingsWeather.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'天气组件'**
+  String get settingsWeather;
+
+  /// No description provided for @settingsWeatherDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'顶栏头像左侧显示微型天气（图标 + 温度）'**
+  String get settingsWeatherDesc;
+
+  /// No description provided for @settingsWeatherAutoLocate.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动定位'**
+  String get settingsWeatherAutoLocate;
+
+  /// No description provided for @settingsWeatherAutoLocateDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'按网络 IP 获取大致位置查询天气（涉及隐私，默认关闭）'**
+  String get settingsWeatherAutoLocateDesc;
+
+  /// No description provided for @settingsWeatherCity.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'手动城市'**
+  String get settingsWeatherCity;
+
+  /// No description provided for @settingsWeatherCityHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'填写城市名后不再进行 IP 定位（例如：杭州）'**
+  String get settingsWeatherCityHint;
+
+  /// No description provided for @settingsWeatherNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'隐私说明：天气数据来自 Open-Meteo（免费、无需密钥）。开启「自动定位」时，本机 IP 会发送至 ip-api.com 换取大致位置，仅用于查询天气、不落盘。天气组件与定位默认均关闭。'**
+  String get settingsWeatherNote;
+
+  /// No description provided for @settingsSearchWeatherSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'顶栏显示微型天气组件（图标 + 温度）'**
+  String get settingsSearchWeatherSubtitle;
+
+  /// No description provided for @weatherRefresh.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刷新天气'**
+  String get weatherRefresh;
+
+  /// No description provided for @weatherNoLocation.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请在设置中填写城市或开启自动定位'**
+  String get weatherNoLocation;
+
+  /// No description provided for @weatherUnavailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'天气获取失败，点击重试'**
+  String get weatherUnavailable;
 
   /// No description provided for @settingsSearchPassthroughSubtitle.
   ///

@@ -203,9 +203,12 @@ class CoverCard extends StatelessWidget {
         color: theme.colorScheme.primary,
       ),
     );
-    final subtitle = subtitleOverride ??
+    final subtitle =
+        subtitleOverride ??
         (item.subtitle.isEmpty
-            ? (item.trackCount > 0 ? l10n.commonTrackCount(item.trackCount) : '')
+            ? (item.trackCount > 0
+                  ? l10n.commonTrackCount(item.trackCount)
+                  : '')
             : item.subtitle);
     return MouseRegion(
       cursor: onTap == null
@@ -218,8 +221,9 @@ class CoverCard extends StatelessWidget {
           hoverColor: theme.colorScheme.onSurface.withValues(alpha: 0.04),
           onTap: onTap,
           child: Column(
-            crossAxisAlignment:
-                artist ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+            crossAxisAlignment: artist
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
             children: [
               Expanded(
                 // 非歌手卡片：圆角方形封面；歌手卡片保持圆形头像（对齐原版
@@ -261,8 +265,12 @@ class CoverCard extends StatelessWidget {
   }
 
   /// 封面本体：方形内容区 + 悬浮遮罩（由外层 Clip 决定圆角/圆形裁剪）。
-  Widget _coverBody(CoverItem item, Widget placeholder, ThemeData theme,
-      VoidCallback? onTap) {
+  Widget _coverBody(
+    CoverItem item,
+    Widget placeholder,
+    ThemeData theme,
+    VoidCallback? onTap,
+  ) {
     return AspectRatio(
       aspectRatio: 1,
       child: Stack(
@@ -271,9 +279,12 @@ class CoverCard extends StatelessWidget {
           if (item.cover == null || item.cover!.isEmpty)
             placeholder
           else
+            // 网格封面显示约 120~200px，解码上限 320px 兼顾 2x 屏与内存
             Image.network(
               item.cover!,
               fit: BoxFit.cover,
+              cacheWidth: 320,
+              cacheHeight: 320,
               errorBuilder: (_, _, _) => placeholder,
               loadingBuilder: (context, child, progress) =>
                   progress == null ? child : placeholder,
@@ -332,10 +343,7 @@ class _HoverOverlayState extends State<_HoverOverlay> {
           duration: animDuration(context, const Duration(milliseconds: 200)),
           // 未悬停（按钮透明）时不拦截点击：点击落到卡片 InkWell
           // （进入详情）；悬停后才可点按钮触发「播放全部」。
-          child: IgnorePointer(
-            ignoring: !_hovered,
-            child: _playButton(),
-          ),
+          child: IgnorePointer(ignoring: !_hovered, child: _playButton()),
         ),
       );
     }
@@ -374,9 +382,6 @@ class _HoverOverlayState extends State<_HoverOverlay> {
             onTap: widget.onPlay,
             child: circle,
           );
-    return Align(
-      alignment: Alignment.bottomRight,
-      child: button,
-    );
+    return Align(alignment: Alignment.bottomRight, child: button);
   }
 }

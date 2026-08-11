@@ -88,24 +88,25 @@ class PlaybackSnapshot {
   }
 
   Map<String, dynamic> toJson() => {
-        'queue': queue.map((t) => t.toJson()).toList(),
-        'queueIndex': queueIndex,
-        'positionMs': positionMs,
-        'repeatMode': repeatMode,
-        'shuffle': shuffle,
-        'quality': quality,
-        'playing': playing,
-        'title': title,
-        'subtitle': subtitle,
-        'trackId': trackId,
-        'track': track?.toJson(),
-        'source': source,
-      };
+    'queue': queue.map((t) => t.toJson()).toList(),
+    'queueIndex': queueIndex,
+    'positionMs': positionMs,
+    'repeatMode': repeatMode,
+    'shuffle': shuffle,
+    'quality': quality,
+    'playing': playing,
+    'title': title,
+    'subtitle': subtitle,
+    'trackId': trackId,
+    'track': track?.toJson(),
+    'source': source,
+  };
 
   factory PlaybackSnapshot.fromJson(Map<String, dynamic> json) {
     final trackJson = json['track'];
     return PlaybackSnapshot(
-      queue: (json['queue'] as List?)
+      queue:
+          (json['queue'] as List?)
               ?.whereType<Map>()
               .map((e) => Track.fromJson(Map<String, dynamic>.from(e)))
               .toList() ??

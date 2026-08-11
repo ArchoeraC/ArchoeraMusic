@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/l10n.dart';
+import '../services/power/power_saver.dart';
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../theme/app_theme.dart';
@@ -45,48 +46,54 @@ class ArchoeraMusicApp extends ConsumerWidget {
     final fontFamily = prefs.fontFamily;
     // 性能模式：全局关闭动效（隐式 Animated* 系列自动 0 时长）+ 频谱关闭。
     final performanceMode = prefs.performanceMode;
-    return AuthBootstrap(
-      child: MaterialApp.router(
-        title: 'ArchoeraMusic',
-        // 国际化：locale 跟随设置/系统；Material 内建文案（菜单/日期等）自动本地化
-        locale: locale,
-        supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        theme: buildAppTheme(AppPalette.light, Brightness.light,
+    return PowerSaverHost(
+      child: AuthBootstrap(
+        child: MaterialApp.router(
+          title: 'ArchoeraMusic',
+          // 国际化：locale 跟随设置/系统；Material 内建文案（菜单/日期等）自动本地化
+          locale: locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          theme: buildAppTheme(
+            AppPalette.light,
+            Brightness.light,
             accentSeed: accent,
             fontFamily: fontFamily,
             globalTint: globalTint,
             solid: prefs.themeSource == 'solid',
             imageBackground: imageStyle,
-            performanceMode: performanceMode),
-        darkTheme: buildAppTheme(AppPalette.dark, Brightness.dark,
+            performanceMode: performanceMode,
+          ),
+          darkTheme: buildAppTheme(
+            AppPalette.dark,
+            Brightness.dark,
             accentSeed: accent,
             fontFamily: fontFamily,
             globalTint: globalTint,
             solid: prefs.themeSource == 'solid',
             imageBackground: imageStyle,
-            performanceMode: performanceMode),
-        themeMode: effectiveThemeMode,
-        routerConfig: appRouter,
-        builder: (context, child) {
-          // 性能模式：在应用子树外加一层 MediaQuery.disableAnimations——
-          // MaterialApp 自身的 MediaQuery 位于本 builder 之上，此处覆盖
-          // 影响 SplashGate 及以下（Navigator/路由/浮层），隐式 Animated*
-          // 组件会自动按 disableAnimations 退化为 0 时长（Flutter 内建支持）。
-          var appChild = child ?? const SizedBox.shrink();
-          Widget gate = SplashGate(
-            child: AppShortcuts(
-              child: ToastOverlay(child: appChild),
-            ),
-          );
-          if (performanceMode) {
-            gate = MediaQuery(
-              data: MediaQuery.of(context).copyWith(disableAnimations: true),
-              child: gate,
+            performanceMode: performanceMode,
+          ),
+          themeMode: effectiveThemeMode,
+          routerConfig: appRouter,
+          builder: (context, child) {
+            // 性能模式：在应用子树外加一层 MediaQuery.disableAnimations——
+            // MaterialApp 自身的 MediaQuery 位于本 builder 之上，此处覆盖
+            // 影响 SplashGate 及以下（Navigator/路由/浮层），隐式 Animated*
+            // 组件会自动按 disableAnimations 退化为 0 时长（Flutter 内建支持）。
+            var appChild = child ?? const SizedBox.shrink();
+            Widget gate = SplashGate(
+              child: AppShortcuts(child: ToastOverlay(child: appChild)),
             );
-          }
-          return gate;
-        },
+            if (performanceMode) {
+              gate = MediaQuery(
+                data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                child: gate,
+              );
+            }
+            return gate;
+          },
+        ),
       ),
     );
   }

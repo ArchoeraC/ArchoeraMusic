@@ -76,7 +76,9 @@ class _StreamingArtistDetailPageState
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final playback = ref.watch(playbackProvider);
+    final playback = ref.watch(
+      playbackProvider.select((s) => (trackId: s.trackId, playing: s.playing)),
+    );
     final artists = ref.watch(streamingProvider.select((s) => s.artists));
     final meta = artists.where((a) => a.id == widget.id).firstOrNull;
     final albums = _albums;

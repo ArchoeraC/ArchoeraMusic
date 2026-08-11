@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/liked/liked_loader.dart';
 import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
 import '../stores/providers.dart';
@@ -17,6 +18,11 @@ import '../widgets/dialogs/track_context_menu.dart';
 ///
 /// 平台切换（网易云 / 酷狗）：登录对应平台后拉取「红心收藏」/ 酷狗
 /// 「我喜欢」歌单 → SongList 可播放。未登录显示对应平台登录引导。
+///
+/// 数据加载走 [LikedListController]（拆分自本页的过度嵌套状态机）：
+/// - SQLite 缓存秒开（进页面先渲染已缓存段）；
+/// - SWR 后台刷新最新第一页；
+/// - 滚动触底按需加载下一页（SongList onReachBottom），不全量暴力拉取。
 class LikedPage extends ConsumerStatefulWidget {
   const LikedPage({super.key});
 
@@ -25,95 +31,61 @@ class LikedPage extends ConsumerStatefulWidget {
 }
 
 class _LikedPageState extends ConsumerState<LikedPage> {
-  List<Track> _tracks = const [];
-  bool _loading = false;
-  bool _loaded = false;
-  String _error = '';
   String _platform = 'netease';
   bool _resolving = false;
 
+  LikedListController? _controller;
+
   bool get _neteaseLoggedIn => ref.read(neteaseAuthProvider) != null;
   bool get _kugouLoggedIn => ref.read(kugouApiProvider).session != null;
+
+  /// 当前平台是否已登录（内容区据此显示数据或登录引导）。
+  bool get _loggedIn =>
+      _platform == 'kugou' ? _kugouLoggedIn : _neteaseLoggedIn;
 
   @override
   void initState() {
     super.initState();
     // 默认选已登录平台（网易云优先）；都未登录保持网易云引导
     if (!_neteaseLoggedIn && _kugouLoggedIn) _platform = 'kugou';
-    if (_platform == 'kugou' ? _kugouLoggedIn : _neteaseLoggedIn) {
-      _fetch();
-    }
+    _controller = _create();
+    if (_loggedIn) _controller!.init();
   }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  LikedListController _create() =>
+      LikedListController(ref, platform: _platform);
 
   void _switchPlatform(String platform) {
     if (platform == _platform) return;
-    setState(() {
-      _platform = platform;
-      _tracks = const [];
-      _loaded = false;
-      _error = '';
-    });
-    if (platform == 'kugou' ? _kugouLoggedIn : _neteaseLoggedIn) {
-      _fetch();
-    }
+    _controller?.dispose();
+    setState(() => _platform = platform);
+    _controller = _create();
+    if (_loggedIn) _controller!.init();
   }
 
   /// 登录态变化（登录成功 / 退出）时刷新当前平台列表。
   void _onAuthChanged() {
-    final logged = _platform == 'kugou' ? _kugouLoggedIn : _neteaseLoggedIn;
-    setState(() {
-      _tracks = const [];
-      _loaded = false;
-      _error = '';
-    });
-    if (logged) _fetch();
-  }
-
-  Future<void> _fetch() async {
-    setState(() {
-      _loading = true;
-      _error = '';
-    });
-    try {
-      final List<Track> tracks;
-      if (_platform == 'kugou') {
-        tracks = await ref.read(kugouApiProvider).likedTracks();
-      } else {
-        final account = ref.read(neteaseAuthProvider);
-        if (account == null) {
-          setState(() {
-            _loading = false;
-            _loaded = true;
-          });
-          return;
-        }
-        tracks = await ref.read(neteaseApiProvider).likedSongs(account.userId);
-      }
-      if (!mounted) return;
-      setState(() {
-        _tracks = tracks;
-        _loaded = true;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = '$e';
-        _loaded = true;
-        _loading = false;
-      });
-    }
+    _controller?.reset();
+    if (_loggedIn) _controller!.init();
   }
 
   void _toast(String msg) => toast(msg);
 
-  /// 播放全部（当前平台「我喜欢」全量作为播放队列；网易云/酷狗分开）。
+  /// 播放全部：仅播已加载部分（分页语义——未滚动加载到的歌曲不在队列，
+  /// 避免为「播放全部」一次性暴力拉取全量收藏）。
   Future<void> _playAll() async {
-    if (_tracks.isEmpty) return;
+    final tracks = _controller?.tracks ?? const <Track>[];
+    if (tracks.isEmpty) return;
     try {
-      await ref.read(playbackProvider.notifier).playQueue(_tracks);
+      await ref.read(playbackProvider.notifier).playQueue(tracks);
       if (!mounted) return;
-      _toast(context.l10n.toastPlayedAll(_tracks.length));
+      _toast(context.l10n.toastPlayedAll(tracks.length));
     } catch (_) {
       // 错误已记入播放日志
     }
@@ -136,7 +108,9 @@ class _LikedPageState extends ConsumerState<LikedPage> {
         _toast(context.l10n.trackListNoPlayableSource);
         return;
       }
-      await ref.read(playbackProvider.notifier).playNow(track, resolvedUrl: url);
+      await ref
+          .read(playbackProvider.notifier)
+          .playNow(track, resolvedUrl: url);
     } catch (e) {
       if (mounted) _toast(context.l10n.trackListPlaySourceFailed('$e'));
     } finally {
@@ -151,18 +125,16 @@ class _LikedPageState extends ConsumerState<LikedPage> {
     final ok = await controller.toggle(track);
     if (!mounted) return;
     if (!ok) {
-      _toast(_platform == 'kugou'
-          ? l10n.toastLoginRequiredKugou
-          : l10n.toastLoginRequiredNetease);
+      _toast(
+        _platform == 'kugou'
+            ? l10n.toastLoginRequiredKugou
+            : l10n.toastLoginRequiredNetease,
+      );
       return;
     }
     // 取消喜欢 → 从平台红心列表移除该行
     if (!controller.isLiked(track)) {
-      setState(() {
-        _tracks = _tracks
-            .where((t) => !(t.source == track.source && t.id == track.id))
-            .toList();
-      });
+      _controller?.removeTrack(track.source, track.id);
     }
   }
 
@@ -180,17 +152,15 @@ class _LikedPageState extends ConsumerState<LikedPage> {
         final ok = await controller.toggle(t);
         if (!mounted) return;
         if (!ok) {
-          _toast(_platform == 'kugou'
-              ? l10n.toastLoginRequiredKugou
-              : l10n.toastLoginRequiredNetease);
+          _toast(
+            _platform == 'kugou'
+                ? l10n.toastLoginRequiredKugou
+                : l10n.toastLoginRequiredNetease,
+          );
           return;
         }
         if (!controller.isLiked(t)) {
-          setState(() {
-            _tracks = _tracks
-                .where((x) => !(x.source == t.source && x.id == t.id))
-                .toList();
-          });
+          _controller?.removeTrack(t.source, t.id);
         }
       },
     );
@@ -208,10 +178,12 @@ class _LikedPageState extends ConsumerState<LikedPage> {
     ref.listen(neteaseAuthProvider, (_, next) => _onAuthChanged());
     ref.listen(kugouApiProvider, (_, next) => _onAuthChanged());
 
-    final logged = _platform == 'kugou' ? _kugouLoggedIn : _neteaseLoggedIn;
-    final subtitle = !logged
-        ? (_platform == 'kugou' ? l10n.pageLikedKugouLoginHint : l10n.pageLikedNeteaseLoginHint)
-        : l10n.commonSongCountHint(_tracks.length);
+    final controller = _controller!;
+    final subtitle = !_loggedIn
+        ? (_platform == 'kugou'
+              ? l10n.pageLikedKugouLoginHint
+              : l10n.pageLikedNeteaseLoginHint)
+        : l10n.commonSongCountHint(controller.total);
 
     return Scaffold(
       body: Column(
@@ -241,15 +213,18 @@ class _LikedPageState extends ConsumerState<LikedPage> {
                         subtitle,
                         style: TextStyle(
                           fontSize: 13,
-                          color: scheme.onSurfaceVariant
-                              .withValues(alpha: 0.75),
+                          color: scheme.onSurfaceVariant.withValues(
+                            alpha: 0.75,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                if (logged && _loaded && _tracks.isNotEmpty) ...[
+                if (_loggedIn &&
+                    controller.loaded &&
+                    controller.tracks.isNotEmpty) ...[
                   SButton(
                     label: l10n.commonPlayAll,
                     icon: Icons.play_arrow_rounded,
@@ -268,22 +243,27 @@ class _LikedPageState extends ConsumerState<LikedPage> {
                   onChanged: _switchPlatform,
                 ),
                 const SizedBox(width: 12),
-                if (logged && _loaded && _tracks.isNotEmpty)
+                if (_loggedIn &&
+                    controller.loaded &&
+                    controller.tracks.isNotEmpty)
                   SButton(
                     label: l10n.commonRefresh,
                     icon: Icons.refresh,
                     variant: SButtonVariant.secondary,
-                    onPressed: _fetch,
+                    onPressed: controller.refresh,
                   ),
               ],
             ),
           ),
           const SizedBox(height: 12),
           const Divider(height: 1),
-          // ── 内容区状态机 ─────────────────────────────────────
+          // ── 内容区状态机（订阅 loader，拆分后的薄 UI） ─────────
           Expanded(
-            child: !logged
-                ? LoginGuide(
+            child: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) {
+                if (!_loggedIn) {
+                  return LoginGuide(
                     icon: Icons.favorite_outline,
                     title: l10n.pageLikedLoginTitle,
                     description: _platform == 'kugou'
@@ -301,27 +281,35 @@ class _LikedPageState extends ConsumerState<LikedPage> {
                         showNeteaseLoginDialog(context);
                       }
                     },
-                  )
-                : _loading && !_loaded
-                ? const Center(
+                  );
+                }
+                if (controller.loading && !controller.loaded) {
+                  return const Center(
                     child: SizedBox(
                       width: 28,
                       height: 28,
                       child: CircularProgressIndicator(strokeWidth: 2.5),
                     ),
-                  )
-                : _error.isNotEmpty && !_loaded
-                ? Center(
+                  );
+                }
+                if (controller.error.isNotEmpty && !controller.loaded) {
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline,
-                            size: 48, color: scheme.error),
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: scheme.error,
+                        ),
                         const SizedBox(height: 10),
-                        Text(l10n.pageLikedLoadFailed, style: theme.textTheme.bodyMedium),
+                        Text(
+                          l10n.pageLikedLoadFailed,
+                          style: theme.textTheme.bodyMedium,
+                        ),
                         const SizedBox(height: 4),
                         Text(
-                          _error,
+                          controller.error,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
@@ -331,21 +319,21 @@ class _LikedPageState extends ConsumerState<LikedPage> {
                           label: l10n.commonRetry,
                           icon: Icons.refresh,
                           variant: SButtonVariant.secondary,
-                          onPressed: _fetch,
+                          onPressed: controller.refresh,
                         ),
                       ],
                     ),
-                  )
-                : _tracks.isEmpty
-                ? Center(
+                  );
+                }
+                if (controller.tracks.isEmpty) {
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.favorite_border,
                           size: 48,
-                          color: scheme.onSurfaceVariant
-                              .withValues(alpha: 0.5),
+                          color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -363,21 +351,25 @@ class _LikedPageState extends ConsumerState<LikedPage> {
                         ),
                       ],
                     ),
-                  )
-                : SongList(
-                    items: _tracks,
-                    playingId: playingId,
-                    isPlaying: isPlaying,
-                    onPlay: _playTrack,
-                    onContextMenu: _onTrackMenu,
-                    likedIds:
-                        ref.watch(likeControllerProvider).idsFor(_platform),
-                    onToggleLike: _toggleLike,
-                  ),
+                  );
+                }
+                return SongList(
+                  items: controller.tracks,
+                  playingId: playingId,
+                  isPlaying: isPlaying,
+                  onPlay: _playTrack,
+                  onContextMenu: _onTrackMenu,
+                  hasMore: controller.hasMore,
+                  loadingMore: controller.loadingMore,
+                  onReachBottom: controller.loadMore,
+                  likedIds: ref.watch(likeControllerProvider).idsFor(_platform),
+                  onToggleLike: _toggleLike,
+                );
+              },
+            ),
           ),
         ],
       ),
     );
   }
 }
-

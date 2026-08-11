@@ -137,6 +137,7 @@ void fft_get_spectrum_db_stereo(const FFTAnalyzer *fft,
  *
  * 对数频段映射（80~2000Hz，与前端渲染一致）→ 段内平均幅度 → dB →
  * (dB + 60) / 60 归一化到 [0, 1]（-60dB 为 0，0dB 为 1）。
+ * 低于噪声门限（≈ -52dB）的归一化值直接置 0，抑制背景噪声细节。
  *
  * @param fft         实例
  * @param out_mag_l   输出左声道归一化谱（[0,1]），至少 bins 个元素

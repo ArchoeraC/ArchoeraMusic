@@ -94,6 +94,16 @@ func Close() {
 	}
 }
 
+// CloseUserDB 关闭用户库连接并置空（安全销毁 user.db 前调用：
+// Go 进程持有连接时 Windows 下文件无法覆盖/删除；销毁后服务端
+// 需经 OpenUserDB 重建，或由宿主重启服务实例）。
+func CloseUserDB() {
+	if userPool != nil {
+		userPool.Close()
+		userPool = nil
+	}
+}
+
 // DefaultDBPath 返回默认媒体库路径
 func DefaultDBPath() string {
 	return filepath.Join(defaultDataDir(), "database", "library.db")

@@ -31,9 +31,11 @@ class _SongsTabState extends ConsumerState<StreamingSongsTab> {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return songs;
     return songs
-        .where((t) =>
-            t.title.toLowerCase().contains(q) ||
-            t.artistNames.toLowerCase().contains(q))
+        .where(
+          (t) =>
+              t.title.toLowerCase().contains(q) ||
+              t.artistNames.toLowerCase().contains(q),
+        )
         .toList();
   }
 
@@ -42,7 +44,10 @@ class _SongsTabState extends ConsumerState<StreamingSongsTab> {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final state = ref.watch(streamingProvider);
-    final playback = ref.watch(playbackProvider);
+    // 只订阅行高亮需要的低频字段：引擎位置/FFT 每 50ms 更新，全量
+    // watch playbackProvider 会让本页每 50ms 整页重建（性能优化）。
+    final playingId = ref.watch(playbackProvider.select((s) => s.trackId));
+    final isPlaying = ref.watch(playbackProvider.select((s) => s.playing));
     final songs = state.songs;
     final filtered = _filtered(songs);
     final notifier = ref.read(playbackProvider.notifier);
@@ -99,8 +104,8 @@ class _SongsTabState extends ConsumerState<StreamingSongsTab> {
           Expanded(
             child: SongList(
               items: filtered,
-              playingId: playback.trackId,
-              isPlaying: playback.playing,
+              playingId: playingId,
+              isPlaying: isPlaying,
               showSource: false,
               onPlay: (t) => playList(filtered, t),
               onContextMenu: (t, pos) => showTrackContextMenu(

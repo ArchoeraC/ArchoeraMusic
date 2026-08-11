@@ -164,8 +164,8 @@ class AudioEngineProcess {
       throw UnsupportedError('Windows 桌面端暂未启用（需构建 Windows 动态库）');
     }
     final sockDir = Directory(
-            '/tmp/archoera-${Platform.localHostname}-$pid-${DateTime.now().millisecondsSinceEpoch}')
-        ..createSync(recursive: true);
+      '/tmp/archoera-${Platform.localHostname}-$pid-${DateTime.now().millisecondsSinceEpoch}',
+    )..createSync(recursive: true);
     final playerFile = '${sockDir.path}/stream.wav';
 
     // FFI create 在后台 isolate 执行：pipeline_create 打开解码器/网络 IO 可能
@@ -219,32 +219,42 @@ class AudioEngineProcess {
       final map = jsonDecode(line) as Map<String, dynamic>;
       switch (map['type']) {
         case 'ready':
-          final outRate = (map['out_sample_rate'] as num?)?.toInt() ??
+          final outRate =
+              (map['out_sample_rate'] as num?)?.toInt() ??
               (map['sample_rate'] as num?)?.toInt() ??
               0;
-          _emit(EngineReady(
-            version: map['version'] as String? ?? '',
-            durationMs: (map['duration_ms'] as num?)?.toInt() ?? 0,
-            sampleRate: (map['sample_rate'] as num?)?.toInt() ?? 0,
-            outSampleRate: outRate,
-            channels: (map['channels'] as num?)?.toInt() ?? 0,
-          ));
+          _emit(
+            EngineReady(
+              version: map['version'] as String? ?? '',
+              durationMs: (map['duration_ms'] as num?)?.toInt() ?? 0,
+              sampleRate: (map['sample_rate'] as num?)?.toInt() ?? 0,
+              outSampleRate: outRate,
+              channels: (map['channels'] as num?)?.toInt() ?? 0,
+            ),
+          );
           // PCM 分析器按管线实际输出采样率打开（FFI 频轴正确）
           unawaited(_openPcm(outRate));
         case 'status':
-          _emit(EngineStatus(
-            positionMs: (map['position_ms'] as num?)?.toInt() ?? 0,
-            durationMs: (map['duration_ms'] as num?)?.toInt() ?? 0,
-            playing: (map['playing'] as bool?) ?? (map['playing'] as num?) == 1,
-          ));
+          _emit(
+            EngineStatus(
+              positionMs: (map['position_ms'] as num?)?.toInt() ?? 0,
+              durationMs: (map['duration_ms'] as num?)?.toInt() ?? 0,
+              playing:
+                  (map['playing'] as bool?) ?? (map['playing'] as num?) == 1,
+            ),
+          );
         case 'playing':
-          _emit(EnginePlaying(
-            durationMs: (map['duration_ms'] as num?)?.toInt() ?? 0,
-          ));
+          _emit(
+            EnginePlaying(
+              durationMs: (map['duration_ms'] as num?)?.toInt() ?? 0,
+            ),
+          );
         case 'position':
-          _emit(EnginePosition(
-            positionMs: (map['position_ms'] as num?)?.toInt() ?? 0,
-          ));
+          _emit(
+            EnginePosition(
+              positionMs: (map['position_ms'] as num?)?.toInt() ?? 0,
+            ),
+          );
         case 'player:ended':
           _emit(const EnginePlayerEnded());
         case 'done':
@@ -298,8 +308,7 @@ class AudioEngineProcess {
   Future<void> sendCommand(String type, Map<String, dynamic> fields) async {
     if (_stopped) return;
     final ptr = Pointer<Opaque>.fromAddress(handle);
-    EngineBindings.instance.command(
-        ptr, jsonEncode({'type': type, ...fields}));
+    EngineBindings.instance.command(ptr, jsonEncode({'type': type, ...fields}));
   }
 
   /// 播放控制快捷命令（行协议，见 mediaengine_lib.c handle_command）。
@@ -307,7 +316,8 @@ class AudioEngineProcess {
   Future<void> pause() => sendCommand('pause', {});
   Future<void> seek(Duration position) =>
       sendCommand('seek', {'position_ms': position.inMilliseconds});
-  Future<void> setVolume(double gain) => sendCommand('set_volume', {'gain': gain});
+  Future<void> setVolume(double gain) =>
+      sendCommand('set_volume', {'gain': gain});
 
   /// 停止：destroy（join 引擎线程）→ 清理会话目录与本地通道。
   Future<void> stop() async {
@@ -317,6 +327,12 @@ class AudioEngineProcess {
     _pcm = null;
     _pollTimer?.cancel();
     _pollTimer = null;
+    // 放行 pending done：stop 由新 load 抢占触发（缓冲中切歌）时，旧会话
+    // `_startSession` 的 `await engine.done` 立即返回，不再挂等转码完成阻塞
+    // 加载链；正常 done 已完成的场景此处不重复。
+    if (!_doneCompleter.isCompleted) {
+      _doneCompleter.complete();
+    }
 
     if (handle != 0) {
       final h = handle;

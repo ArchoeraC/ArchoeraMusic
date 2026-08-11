@@ -99,6 +99,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionClose => 'Closing app';
 
   @override
+  String get settingsSectionPower => 'Power saving';
+
+  @override
+  String get settingsPowerSaver => 'Power Saving Mode';
+
+  @override
+  String get settingsPowerSaverOn =>
+      'Throttle rendering in background (5 FPS minimized, 1 FPS unfocused or screen off)';
+
+  @override
+  String get settingsPowerSaverOff => 'Always render at full frame rate';
+
+  @override
+  String get settingsSuppressSleep => 'Prevent system sleep';
+
+  @override
+  String get settingsSuppressSleepOn =>
+      'Keep system awake during playback so background playback isn\'t interrupted';
+
+  @override
+  String get settingsSuppressSleepOff => 'System may sleep on idle schedule';
+
+  @override
+  String get settingsPowerSaverNote =>
+      'Power saving reacts to window state events (no polling); the engine already stops drawing when the window is hidden or the display is off. Prevent system sleep only applies while playing.';
+
+  @override
   String get settingsCloseBehavior => 'When closing the app';
 
   @override
@@ -152,6 +179,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonLossless => 'Lossless';
+
+  @override
+  String get commonOriginal => 'Original';
 
   @override
   String get commonMore => 'More';
@@ -345,6 +375,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get songListTitle => 'Title';
+
+  @override
+  String get songListScrollTop => 'Back to top';
+
+  @override
+  String get songListLocatePlaying => 'Locate playing song';
 
   @override
   String toastAddedToDownloadQueue(Object quality) {
@@ -782,6 +818,50 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get pageFavLoginDesc =>
       'Scan to log in to Netease and sync favorite playlists, albums and artists';
+
+  @override
+  String get pageFavKgCreated => 'Created playlists';
+
+  @override
+  String get pageFavKgCollectedPlaylist => 'Collected playlists';
+
+  @override
+  String get pageFavKgCollectedAlbum => 'Collected albums';
+
+  @override
+  String pageFavKgCreatedCount(Object count) {
+    return '$count created playlists';
+  }
+
+  @override
+  String get pageFavKgCreatedLoginHint =>
+      'Log in to view your created playlists';
+
+  @override
+  String pageFavKgCollectedPlaylistCount(Object count) {
+    return '$count collected playlists';
+  }
+
+  @override
+  String get pageFavKgCollectedPlaylistLoginHint =>
+      'Log in to view your collected playlists';
+
+  @override
+  String pageFavKgCollectedAlbumCount(Object count) {
+    return '$count collected albums';
+  }
+
+  @override
+  String get pageFavKgCollectedAlbumLoginHint =>
+      'Log in to view your collected albums';
+
+  @override
+  String get pageFavKugouLoginDesc =>
+      'Scan to log in to Kugou and sync created and collected playlists and albums';
+
+  @override
+  String get pageFavKugouEmptyHint =>
+      'Synced automatically when you favorite in the Kugou app';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1232,6 +1312,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsDeveloperNote =>
       'Developer Mode is intended for local debugging and personal use. Use at your own risk.';
+
+  @override
+  String get settingsDevFpsMonitor => 'FPS/Memory monitor overlay';
+
+  @override
+  String get settingsDevFpsMonitorDesc =>
+      'Shows FPS, average frame time and process memory in real time at the top-right corner (tap to collapse). Off by default; also turned off when developer mode is disabled.';
 
   @override
   String get settingsDeveloperEnabled => 'Developer Mode enabled';
@@ -1839,6 +1926,150 @@ class AppLocalizationsEn extends AppLocalizations {
       'Media library and user data are physically separated; paths overridable via ARCHOERA_DATA_DIR.';
 
   @override
+  String get settingsSectionCache => 'Cache management';
+
+  @override
+  String get settingsCacheNote =>
+      'Caches speed up browsing and playback; they rebuild automatically after clearing. Your library, history and accounts are not affected.';
+
+  @override
+  String get settingsCacheGroupDisk => 'Database caches (disk)';
+
+  @override
+  String get settingsCacheGroupMem => 'Memory caches (in-process)';
+
+  @override
+  String get settingsCacheLiked => '\"Liked\" list cache';
+
+  @override
+  String get settingsCacheLyric => 'Lyric content cache';
+
+  @override
+  String get settingsCacheLyricMatch => 'Lyric match cache';
+
+  @override
+  String get settingsCacheLyricTtml => 'TTML lyric cache';
+
+  @override
+  String get settingsCacheCover => 'Cover image cache';
+
+  @override
+  String settingsCacheEntries(Object count) {
+    return '$count entries';
+  }
+
+  @override
+  String settingsCacheImages(Object count) {
+    return '$count images';
+  }
+
+  @override
+  String get settingsCacheRefresh => 'Refresh';
+
+  @override
+  String get settingsCacheClear => 'Clear';
+
+  @override
+  String get settingsCacheClearAll => 'Clear all';
+
+  @override
+  String settingsCacheClearConfirmTitle(Object name) {
+    return 'Clear \"$name\"?';
+  }
+
+  @override
+  String get settingsCacheClearConfirmDesc =>
+      'This deletes all data of this cache; it rebuilds automatically on next use. This cannot be undone.';
+
+  @override
+  String get settingsCacheClearAllConfirmTitle => 'Clear all caches?';
+
+  @override
+  String get settingsCacheClearAllConfirmDesc =>
+      'This deletes all caches above (memory and disk). Your library, history and accounts are not affected.';
+
+  @override
+  String toastCacheCleared(Object name) {
+    return '$name cache cleared';
+  }
+
+  @override
+  String get toastCacheAllCleared => 'All caches cleared';
+
+  @override
+  String get settingsSecuritySection => 'Secure wipe';
+
+  @override
+  String get settingsSecurityNote =>
+      'Irreversibly deletes all local account credentials and sessions (streaming server passwords, Netease/Kugou sessions, local Subsonic accounts) and revokes platform tokens. Library, history and downloads are not affected.';
+
+  @override
+  String get settingsSecurityStreaming => 'Streaming server credentials';
+
+  @override
+  String settingsSecurityStreamingCount(Object count) {
+    return '$count servers';
+  }
+
+  @override
+  String get settingsSecurityStreamingDesc => 'Passwords and access tokens';
+
+  @override
+  String get settingsSecuritySession => 'Third-party account sessions';
+
+  @override
+  String get settingsSecuritySessionDesc => 'Netease / Kugou sign-in status';
+
+  @override
+  String get settingsSecurityUserDb => 'Local user database';
+
+  @override
+  String get settingsSecurityUserDbDesc => 'Subsonic accounts and favorites';
+
+  @override
+  String get settingsSecurityLoggedIn => 'Signed in';
+
+  @override
+  String get settingsSecurityDestroy => 'Wipe';
+
+  @override
+  String get settingsSecurityDestroyAll => 'Wipe all';
+
+  @override
+  String settingsSecurityConfirmTitle(Object name) {
+    return 'Wipe “$name”?';
+  }
+
+  @override
+  String get settingsSecurityConfirmAllTitle => 'Wipe all sensitive data?';
+
+  @override
+  String settingsSecurityConfirmDesc(Object word) {
+    return 'Tokens on the affected platforms will be revoked, then files are overwritten and deleted. This cannot be undone. Type “$word” to confirm.';
+  }
+
+  @override
+  String get settingsSecurityConfirmWord => 'wipe';
+
+  @override
+  String settingsSecurityConfirmHint(Object word) {
+    return 'Type “$word”';
+  }
+
+  @override
+  String toastSecurityDestroyed(Object name) {
+    return 'Wiped: $name';
+  }
+
+  @override
+  String get toastSecurityAllDestroyed => 'All sensitive data wiped';
+
+  @override
+  String toastSecurityDestroyFailed(Object path) {
+    return 'Wipe failed, file may remain: $path';
+  }
+
+  @override
   String get settingsVersion => 'Version';
 
   @override
@@ -2119,6 +2350,47 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsSearchCoverRadiusSubtitle =>
       'Square · Rounded · Large rounded';
+
+  @override
+  String get settingsSectionWeather => 'Weather';
+
+  @override
+  String get settingsWeather => 'Weather widget';
+
+  @override
+  String get settingsWeatherDesc =>
+      'Mini weather (icon + temperature) on the left of the avatar';
+
+  @override
+  String get settingsWeatherAutoLocate => 'Auto locate';
+
+  @override
+  String get settingsWeatherAutoLocateDesc =>
+      'Use network IP for a rough location (privacy: off by default)';
+
+  @override
+  String get settingsWeatherCity => 'Manual city';
+
+  @override
+  String get settingsWeatherCityHint => 'No IP lookup once set (e.g. Hangzhou)';
+
+  @override
+  String get settingsWeatherNote =>
+      'Privacy: weather data from Open-Meteo (free, no API key). When auto locate is on, your IP is sent to ip-api.com for a rough location, used only to fetch weather and not stored. Both the widget and location are off by default.';
+
+  @override
+  String get settingsSearchWeatherSubtitle =>
+      'Mini weather widget in the top bar (icon + temperature)';
+
+  @override
+  String get weatherRefresh => 'Refresh weather';
+
+  @override
+  String get weatherNoLocation =>
+      'Set a city or enable auto locate in settings';
+
+  @override
+  String get weatherUnavailable => 'Weather unavailable, tap to retry';
 
   @override
   String get settingsSearchPassthroughSubtitle =>

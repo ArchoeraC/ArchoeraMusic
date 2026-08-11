@@ -4,24 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../services/lyrics/lyric_line.dart';
 import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
 import '../stores/app_prefs.dart';
 import '../stores/lyrics_provider.dart';
 import '../stores/providers.dart';
-import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../theme/app_theme.dart';
-import '../widgets/list/cover_image.dart';
 import '../widgets/dialogs/comment_dialog.dart';
 import '../widgets/player/cover_switcher.dart';
-import '../widgets/player/ctrl_icon.dart';
-import '../widgets/player/hover_volume_control.dart';
-import '../widgets/player/lyrics_view.dart';
 import '../widgets/player/playback_progress_slider.dart';
+import '../widgets/player/player_controls_row.dart';
+import '../widgets/player/player_cover.dart';
+import '../widgets/player/player_lyrics_block.dart';
 import '../widgets/player/quality_menu.dart';
-import '../widgets/player/queue_panel.dart';
 import '../widgets/player/spectrum_view.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/common/anim.dart';
@@ -104,279 +100,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final ok = await ref.read(likeControllerProvider).toggle(track);
     if (!ok && mounted) {
       toast(
-        track.source == 'kugou' ? l10n.toastLoginRequiredKugou : l10n.toastLoginRequiredNetease,
+        track.source == 'kugou'
+            ? l10n.toastLoginRequiredKugou
+            : l10n.toastLoginRequiredNetease,
         type: ToastType.error,
       );
     }
-  }
-
-  /// 节拍脉冲增量：0→0.5 冲至峰值，0.5→1 回落到 0。峰值随脉冲强度
-  /// 区分（[beatStrength] 0~1）：弱脉冲（~0.25）≈0.6%，强脉冲（1.0）
-  /// ≈2.4%——鼓点越猛缩放越明显，高频合成音瞬态也有小幅脉冲。
-  double _pulseDelta(double t) {
-    final peak = 0.002 + 0.022 * _lastBeatStrength;
-    if (t <= 0.5) return peak * (t / 0.5);
-    return peak * (1 - (t - 0.5) / 0.5);
-  }
-
-  // ── 主体分区（缩减 build 嵌套，按职责拆分）────────────────
-
-  /// 封面块：封面大图 + 下方曲名/副标题（对齐 PlayerData）。
-  ///
-  /// 缩放：播放 1.0 / 暂停 0.9（对齐原版 PlayerCover scale-100/scale-90，
-  /// 500ms 弹性过渡），之上叠加节拍脉冲（设置开启时鼓点命中轻微放大回弹）。
-  Widget _buildCoverBlock({
-    required double size,
-    required ColorScheme colorScheme,
-    required Track? current,
-    required bool hasContent,
-    required String? title,
-    required String? subtitle,
-    required AppLocalizations l10n,
-    required bool playing,
-  }) {
-    final theme = Theme.of(context);
-    final cover = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 32,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: CoverImage(
-        cover: current?.cover,
-        width: size,
-        height: size,
-        radius: 24,
-        iconSize: 110,
-      ),
-    );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedScale(
-          scale: playing ? 1.0 : 0.9,
-          duration: animDuration(context, const Duration(milliseconds: 500)),
-          curve: Curves.easeOutBack,
-          child: AnimatedBuilder(
-            animation: _coverPulse,
-            builder: (context, child) => Transform.scale(
-              scale: 1 + _pulseDelta(_coverPulse.value),
-              child: child,
-            ),
-            child: cover,
-          ),
-        ),
-        const SizedBox(height: 20),
-        // 曲名（标题缺失时显示占位，不回退 source 的本地绝对路径/在线 URL）
-        Text(
-          hasContent
-              ? (title ?? l10n.playerBarUntitled)
-              : l10n.playerPageNotPlaying,
-          style: theme.textTheme.titleLarge,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 6),
-        // 副标题（歌手等）
-        Text(
-          hasContent ? (subtitle ?? '') : l10n.playerPageLoadHint,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
-  /// 歌词区（当前行居中高亮 + 点击 seek）：Consumer 独立订阅位置/
-  /// 歌词/样式，50ms 更新只重建本区。
-  Widget _buildLyricsBlock({
-    required bool hasLyrics,
-    required double lyricScale,
-    required PlaybackNotifier notifier,
-    required bool hasSource,
-    required ColorScheme colorScheme,
-  }) {
-    if (!hasLyrics) {
-      return Center(
-        child: Icon(
-          Icons.lyrics_outlined,
-          size: 64,
-          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-        ),
-      );
-    }
-    return ClipRect(
-      child: Consumer(
-        builder: (context, ref, _) {
-          final pos = ref.watch(
-            playbackProvider.select((s) => s.position.inMilliseconds),
-          );
-          final groups = ref
-              .watch(currentLyricsProvider)
-              .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
-          final prefs = ref.watch(appPrefsProvider);
-          return LyricsView(
-            groups: groups,
-            positionMs: pos,
-            fontSize: prefs.lyricFontSize * lyricScale,
-            lineHeight: prefs.lyricLineHeight * lyricScale,
-            playedColor: Color(prefs.lyricPlayedColor),
-            unplayedColor: Color(prefs.lyricUnplayedColor),
-            showTranslation: prefs.showTranslation,
-            onSeek: hasSource
-                ? (ms) => notifier.seek(Duration(milliseconds: ms))
-                : null,
-          );
-        },
-      ),
-    );
-  }
-
-  /// 底部控制区：左组（红心）- 中组（播放键居中）- 右组（播放列表）。
-  Widget _buildControlsRow({
-    required ColorScheme colorScheme,
-    required AppLocalizations l10n,
-    required PlaybackNotifier notifier,
-    required bool hasContent,
-    required bool hasQueue,
-    required bool canLike,
-    required bool liked,
-    required Track? current,
-    required bool shuffle,
-    required String repeatMode,
-    required bool playing,
-    required bool buffering,
-  }) {
-    return Row(
-      children: [
-        // 左组（左对齐）：红心
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              if (canLike)
-                CtrlIcon(
-                  tooltip: liked ? l10n.commonUnlike : l10n.commonLike,
-                  icon: liked ? Icons.favorite : Icons.favorite_border,
-                  size: 24,
-                  color: liked ? Colors.redAccent : colorScheme.onSurfaceVariant,
-                  onPressed: () => _toggleLike(current!),
-                ),
-            ],
-          ),
-        ),
-        // 中组：控制行 随机 | 上一首 | 播放 | 下一首 | 循环
-        SizedBox(
-          width: 380,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              CtrlIcon(
-                tooltip: shuffle ? l10n.queueShuffleOff : l10n.queueShuffle,
-                icon: Icons.shuffle,
-                size: 20,
-                color: shuffle ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                onPressed: hasContent ? notifier.toggleShuffle : null,
-              ),
-              const SizedBox(width: 12),
-              CtrlIcon(
-                tooltip: l10n.commonPrevious,
-                icon: Icons.skip_previous,
-                size: 26,
-                color: colorScheme.onSurface,
-                onPressed: hasQueue ? notifier.playPrevious : null,
-              ),
-              const SizedBox(width: 14),
-              // 播放/暂停：主轴中心（透明底 + 填充圆 icon）
-              Tooltip(
-                message: buffering
-                    ? l10n.commonLoading
-                    : (playing ? l10n.commonPause : l10n.commonPlay),
-                child: InkResponse(
-                  radius: 28,
-                  onTap: hasContent && !buffering ? notifier.toggle : null,
-                  child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(
-                          playing
-                              ? Icons.pause_circle_filled
-                              : Icons.play_circle_filled,
-                          size: 48,
-                          color: colorScheme.primary.withValues(
-                            alpha: buffering ? 0.35 : 1,
-                          ),
-                        ),
-                        if (buffering)
-                          const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 3),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              CtrlIcon(
-                tooltip: l10n.commonNext,
-                icon: Icons.skip_next,
-                size: 26,
-                color: colorScheme.onSurface,
-                onPressed: hasQueue ? notifier.playNext : null,
-              ),
-              const SizedBox(width: 12),
-              CtrlIcon(
-                tooltip: repeatMode == 'list'
-                    ? l10n.queueRepeatList
-                    : l10n.queueRepeatOne,
-                icon: repeatMode == 'one' ? Icons.repeat_one : Icons.repeat,
-                size: 20,
-                color: colorScheme.primary,
-                onPressed: hasContent ? notifier.cycleRepeatMode : null,
-              ),
-            ],
-          ),
-        ),
-        // 右组（右对齐）：音量（滑条 + 静音）→ 播放列表
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // 音量：悬浮式控件（hover 800ms 展开滑条，5s 未操作自动
-              // 收起；独立 Consumer 订阅，拖动不重建整页）
-              const HoverVolumeSlider(sliderWidth: 104),
-              CtrlIcon(
-                tooltip: l10n.playerBarPlaylist,
-                icon: Icons.queue_music,
-                size: 24,
-                onPressed: hasQueue
-                    ? () => QueuePanel.show(context, style: QueuePanelStyle.slide)
-                    : null,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 
   @override
@@ -488,7 +217,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                           // 歌词开关（对齐 FullPlayer 顶栏：有歌词可切换，
                           // 无歌词禁用；开 = 主色高亮）
                           Tooltip(
-                            message: showLyrics ? l10n.playerBarHideLyrics : l10n.playerBarShowLyrics,
+                            message: showLyrics
+                                ? l10n.playerBarHideLyrics
+                                : l10n.playerBarShowLyrics,
                             child: InkResponse(
                               radius: 24,
                               onTap: hasLyrics
@@ -565,29 +296,27 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                               : 'local:$source';
 
                           // 封面块：封面大图 + 下方曲目信息（对齐 PlayerData）
-                          final coverBlock = _buildCoverBlock(
+                          final coverBlock = PlayerCoverBlock(
                             size: size,
-                            colorScheme: colorScheme,
                             current: current,
                             hasContent: hasContent,
                             title: title,
                             subtitle: subtitle,
-                            l10n: l10n,
                             playing: playing,
+                            pulse: _coverPulse,
+                            beatStrength: _lastBeatStrength,
+                            l10n: l10n,
                           );
 
-                          // 歌词区（当前行居中高亮 + 点击 seek；数据源
-                          // currentLyricsProvider：平台 lyric 层（纯 Dart
-                          // 直连）→ parseLrc → 时间轴有序行；「播放器内歌词」
-                          // 偏好开关控制显示；字号/行距/颜色走「设置 → 歌词」）
-                          // 用 Consumer 独立订阅播放位置/歌词数据/样式，
-                          // 50ms 位置更新只重建歌词区，不波及页面其余部分。
-                          final lyricsBlock = _buildLyricsBlock(
+                          // 歌词区（当前行居中高亮 + 点击 seek；内部 Consumer
+                          // 独立订阅位置/歌词/样式，50ms 更新只重建本区）
+                          final lyricsBlock = PlayerLyricsBlock(
                             hasLyrics: hasLyrics,
                             lyricScale: lyricScale,
-                            notifier: notifier,
-                            hasSource: hasSource,
-                            colorScheme: colorScheme,
+                            onSeek: hasSource
+                                ? (ms) =>
+                                      notifier.seek(Duration(milliseconds: ms))
+                                : null,
                           );
 
                           // 封面/歌词分栏：歌词开 = 左 45% 封面 + 右 55% 歌词；
@@ -612,8 +341,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                         ? Offset.zero
                                         : const Offset(11 / 18, 0),
                                     duration: animDuration(
-                                        context,
-                                        const Duration(milliseconds: 600)),
+                                      context,
+                                      const Duration(milliseconds: 600),
+                                    ),
                                     curve: Curves.easeOutCubic,
                                     child: Align(
                                       alignment: Alignment.center,
@@ -637,8 +367,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                     ignoring: !showLyrics || !hasLyrics,
                                     child: AnimatedOpacity(
                                       duration: animDuration(
-                                          context,
-                                          const Duration(milliseconds: 600)),
+                                        context,
+                                        const Duration(milliseconds: 600),
+                                      ),
                                       curve: Curves.easeOutCubic,
                                       opacity: (showLyrics && hasLyrics)
                                           ? 1
@@ -662,7 +393,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                     ),
                     // 状态提示（引擎会话 ID 为内部调试信息，不展示）
                     Text(
-                      !hasContent ? l10n.playerPageLoadHint : (buffering ? l10n.playerBarBuffering : ''),
+                      !hasContent
+                          ? l10n.playerPageLoadHint
+                          : (buffering ? l10n.playerBarBuffering : ''),
                       style: theme.textTheme.bodySmall,
                     ),
                     // 底部叠加层：频谱垫底，控件浮在频谱之上（控件原生透明，
@@ -677,7 +410,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         AnimatedOpacity(
                           opacity: _controlsVisible ? 0.4 : 1,
                           duration: animDuration(
-                              context, const Duration(milliseconds: 300)),
+                            context,
+                            const Duration(milliseconds: 300),
+                          ),
                           curve: Curves.easeOut,
                           child: RepaintBoundary(
                             child: SizedBox(
@@ -691,7 +426,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         AnimatedOpacity(
                           opacity: _controlsVisible ? 1 : 0,
                           duration: animDuration(
-                              context, const Duration(milliseconds: 300)),
+                            context,
+                            const Duration(milliseconds: 300),
+                          ),
                           curve: Curves.easeOut,
                           child: IgnorePointer(
                             ignoring: !_controlsVisible,
@@ -716,10 +453,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                 // 右组（播放列表）。透明底、不凸显控件样式。
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
-                                  child: _buildControlsRow(
-                                    colorScheme: colorScheme,
-                                    l10n: l10n,
-                                    notifier: notifier,
+                                  child: PlayerControlsRow(
                                     hasContent: hasContent,
                                     hasQueue: hasQueue,
                                     canLike: canLike,
@@ -729,6 +463,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                     repeatMode: repeatMode,
                                     playing: playing,
                                     buffering: buffering,
+                                    onToggleLike: _toggleLike,
                                   ),
                                 ),
                               ],

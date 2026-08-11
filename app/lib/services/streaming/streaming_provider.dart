@@ -262,7 +262,10 @@ class StreamingNotifier extends Notifier<StreamingState> {
       var working = cfg;
       if (needsAccessToken(cfg.type)) {
         final auth = await client.authenticate();
-        working = cfg.copyWith(accessToken: auth.accessToken, userId: auth.userId);
+        working = cfg.copyWith(
+          accessToken: auth.accessToken,
+          userId: auth.userId,
+        );
       }
       final ping = await StreamingClient(working).ping();
       if (!ping.ok) {
@@ -273,9 +276,13 @@ class StreamingNotifier extends Notifier<StreamingState> {
         );
         return;
       }
-      working = working.copyWith(lastConnected: DateTime.now().millisecondsSinceEpoch);
+      working = working.copyWith(
+        lastConnected: DateTime.now().millisecondsSinceEpoch,
+      );
       state = state.copyWith(
-        servers: [for (final s in state.servers) s.id == working.id ? working : s],
+        servers: [
+          for (final s in state.servers) s.id == working.id ? working : s,
+        ],
         connecting: false,
         connected: true,
         connectionError: null,
@@ -304,6 +311,14 @@ class StreamingNotifier extends Notifier<StreamingState> {
       playlists: const [],
     );
     _songsLoaded = _albumsLoaded = _artistsLoaded = _playlistsLoaded = false;
+  }
+
+  /// 清空全部服务器配置与连接状态并持久化（安全销毁流程调用；
+  /// 随后文件本身被覆盖删除，此处落盘空列表仅保证内存态一致）。
+  Future<void> clearAll() async {
+    await disconnect();
+    state = state.copyWith(servers: const [], activeServerId: null);
+    _persist();
   }
 
   StreamingClient? get _client {
@@ -410,5 +425,6 @@ class StreamingNotifier extends Notifier<StreamingState> {
 }
 
 /// 流媒体控制器 Provider。
-final streamingProvider =
-    NotifierProvider<StreamingNotifier, StreamingState>(StreamingNotifier.new);
+final streamingProvider = NotifierProvider<StreamingNotifier, StreamingState>(
+  StreamingNotifier.new,
+);

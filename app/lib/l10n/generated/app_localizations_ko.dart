@@ -97,6 +97,33 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsSectionClose => '앱 닫기';
 
   @override
+  String get settingsSectionPower => '절전';
+
+  @override
+  String get settingsPowerSaver => '절전 모드';
+
+  @override
+  String get settingsPowerSaverOn =>
+      '백그라운드에서 렌더링 감소（최소화 시 5 FPS, 포커스 아님/화면 꺼짐 시 1 FPS）';
+
+  @override
+  String get settingsPowerSaverOff => '항상 최대 프레임으로 렌더링';
+
+  @override
+  String get settingsSuppressSleep => '시스템 절전 비활성화';
+
+  @override
+  String get settingsSuppressSleepOn =>
+      '재생 중에는 시스템을 깨운 상태로 유지하여 백그라운드 재생이 중단되지 않게 합니다';
+
+  @override
+  String get settingsSuppressSleepOff => '시스템이 유휴 시 절전될 수 있습니다';
+
+  @override
+  String get settingsPowerSaverNote =>
+      '절전 모드는 창 상태 이벤트를 수신하여 프레임을 낮춥니다（폴링 없음）. 창이 숨겨지거나 화면이 꺼지면 엔진이 이미 렌더링을 중단합니다.（시스템 절전 비활성화는 재생 중에만 적용됩니다.）';
+
+  @override
   String get settingsCloseBehavior => '앱을 닫을 때';
 
   @override
@@ -149,6 +176,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get commonLossless => '무손실';
+
+  @override
+  String get commonOriginal => '원곡';
 
   @override
   String get commonMore => '더 보기';
@@ -341,6 +371,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get songListTitle => '제목';
+
+  @override
+  String get songListScrollTop => '맨 위로';
+
+  @override
+  String get songListLocatePlaying => '재생 위치 찾기';
 
   @override
   String toastAddedToDownloadQueue(Object quality) {
@@ -768,6 +804,46 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get pageFavLoginDesc =>
       'NetEase Cloud Music 계정으로 QR 로그인하여 즐겨찾기 플레이리스트, 앨범, 아티스트를 동기화하세요';
+
+  @override
+  String get pageFavKgCreated => '내가 만든 플레이리스트';
+
+  @override
+  String get pageFavKgCollectedPlaylist => '저장한 플레이리스트';
+
+  @override
+  String get pageFavKgCollectedAlbum => '저장한 앨범';
+
+  @override
+  String pageFavKgCreatedCount(Object count) {
+    return '생성한 플레이리스트 $count개';
+  }
+
+  @override
+  String get pageFavKgCreatedLoginHint => '로그인하면 만든 플레이리스트를 볼 수 있습니다';
+
+  @override
+  String pageFavKgCollectedPlaylistCount(Object count) {
+    return '저장한 플레이리스트 $count개';
+  }
+
+  @override
+  String get pageFavKgCollectedPlaylistLoginHint =>
+      '로그인하면 저장한 플레이리스트를 볼 수 있습니다';
+
+  @override
+  String pageFavKgCollectedAlbumCount(Object count) {
+    return '저장한 앨범 $count장';
+  }
+
+  @override
+  String get pageFavKgCollectedAlbumLoginHint => '로그인하면 저장한 앨범을 볼 수 있습니다';
+
+  @override
+  String get pageFavKugouLoginDesc => '쿠거우에 QR 로그인하여 생성·저장한 플레이리스트와 앨범을 동기화하세요';
+
+  @override
+  String get pageFavKugouEmptyHint => '쿠거우 앱에서 즐겨찾기하면 자동 동기화됩니다';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1210,6 +1286,13 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get settingsDeveloperNote =>
       '개발자 모드는 로컬 디버깅 및 개인 용도로 제공됩니다. 사용에 따른 책임은 본인에게 있습니다.';
+
+  @override
+  String get settingsDevFpsMonitor => 'FPS/메모리 모니터 오버레이';
+
+  @override
+  String get settingsDevFpsMonitorDesc =>
+      '오른쪽 위에 FPS·평균 프레임 시간·프로세스 메모리를 실시간 표시(클릭 시 접기). 기본 꺼짐. 개발자 모드를 끄면 함께 꺼집니다.';
 
   @override
   String get settingsDeveloperEnabled => '개발자 모드가 활성화되었습니다';
@@ -1795,6 +1878,150 @@ class AppLocalizationsKo extends AppLocalizations {
       '미디어 라이브러리와 사용자 데이터는 물리적으로 분리；경로는 ARCHOERA_DATA_DIR로 재정의 가능.';
 
   @override
+  String get settingsSectionCache => '캐시 관리';
+
+  @override
+  String get settingsCacheNote =>
+      '캐시는 탐색과 재생을 빠르게 합니다. 삭제 후 자동으로 다시 생성되며 라이브러리·기록·계정에는 영향을 주지 않습니다.';
+
+  @override
+  String get settingsCacheGroupDisk => '데이터베이스 캐시(디스크)';
+
+  @override
+  String get settingsCacheGroupMem => '메모리 캐시(프로세스 내)';
+
+  @override
+  String get settingsCacheLiked => '「좋아요」 목록 캐시';
+
+  @override
+  String get settingsCacheLyric => '가사 내용 캐시';
+
+  @override
+  String get settingsCacheLyricMatch => '가사 매칭 캐시';
+
+  @override
+  String get settingsCacheLyricTtml => 'TTML 가사 캐시';
+
+  @override
+  String get settingsCacheCover => '커버 이미지 캐시';
+
+  @override
+  String settingsCacheEntries(Object count) {
+    return '$count개';
+  }
+
+  @override
+  String settingsCacheImages(Object count) {
+    return '$count장';
+  }
+
+  @override
+  String get settingsCacheRefresh => '새로고침';
+
+  @override
+  String get settingsCacheClear => '삭제';
+
+  @override
+  String get settingsCacheClearAll => '모두 삭제';
+
+  @override
+  String settingsCacheClearConfirmTitle(Object name) {
+    return '「$name」을(를) 삭제할까요?';
+  }
+
+  @override
+  String get settingsCacheClearConfirmDesc =>
+      '이 캐시의 모든 데이터가 삭제됩니다. 다음 사용 시 자동으로 다시 생성되며 되돌릴 수 없습니다.';
+
+  @override
+  String get settingsCacheClearAllConfirmTitle => '모든 캐시를 삭제할까요?';
+
+  @override
+  String get settingsCacheClearAllConfirmDesc =>
+      '위의 모든 캐시(메모리·디스크)가 삭제됩니다. 라이브러리·기록·계정에는 영향을 주지 않습니다.';
+
+  @override
+  String toastCacheCleared(Object name) {
+    return '$name 캐시가 삭제되었습니다';
+  }
+
+  @override
+  String get toastCacheAllCleared => '모든 캐시가 삭제되었습니다';
+
+  @override
+  String get settingsSecuritySection => '안전 파기';
+
+  @override
+  String get settingsSecurityNote =>
+      '기기의 모든 계정 자격 증명과 로그인 세션(스트리밍 서버 비밀번호, Netease/Kugou 로그인 상태, 로컬 Subsonic 계정)을 되돌릴 수 없게 삭제하고 플랫폼 토큰을 무효화합니다. 라이브러리·기록·다운로드 파일에는 영향을 주지 않습니다.';
+
+  @override
+  String get settingsSecurityStreaming => '스트리밍 서버 자격 증명';
+
+  @override
+  String settingsSecurityStreamingCount(Object count) {
+    return '서버 $count대';
+  }
+
+  @override
+  String get settingsSecurityStreamingDesc => '비밀번호 및 액세스 토큰';
+
+  @override
+  String get settingsSecuritySession => '타사 계정 세션';
+
+  @override
+  String get settingsSecuritySessionDesc => 'Netease / Kugou 로그인 상태';
+
+  @override
+  String get settingsSecurityUserDb => '로컬 사용자 데이터베이스';
+
+  @override
+  String get settingsSecurityUserDbDesc => 'Subsonic 계정 및 즐겨찾기 데이터';
+
+  @override
+  String get settingsSecurityLoggedIn => '로그인됨';
+
+  @override
+  String get settingsSecurityDestroy => '파기';
+
+  @override
+  String get settingsSecurityDestroyAll => '모두 파기';
+
+  @override
+  String settingsSecurityConfirmTitle(Object name) {
+    return '「$name」을(를) 파기하시겠습니까?';
+  }
+
+  @override
+  String get settingsSecurityConfirmAllTitle => '모든 민감한 데이터를 파기하시겠습니까?';
+
+  @override
+  String settingsSecurityConfirmDesc(Object word) {
+    return '관련 플랫폼 토큰을 무효화하고 파일을 덮어쓴 후 삭제합니다. 이 작업은 되돌릴 수 없습니다. 계속하려면 「$word」를 입력하세요.';
+  }
+
+  @override
+  String get settingsSecurityConfirmWord => '파기';
+
+  @override
+  String settingsSecurityConfirmHint(Object word) {
+    return '「$word」 입력';
+  }
+
+  @override
+  String toastSecurityDestroyed(Object name) {
+    return '파기됨: $name';
+  }
+
+  @override
+  String get toastSecurityAllDestroyed => '모든 민감한 데이터가 파기되었습니다';
+
+  @override
+  String toastSecurityDestroyFailed(Object path) {
+    return '파기에 실패했습니다. 파일이 남아 있을 수 있습니다: $path';
+  }
+
+  @override
   String get settingsVersion => '버전';
 
   @override
@@ -2055,6 +2282,44 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSearchCoverRadiusSubtitle => '직사각형 · 둥글게 · 크게 둥글게';
+
+  @override
+  String get settingsSectionWeather => '날씨';
+
+  @override
+  String get settingsWeather => '날씨 위젯';
+
+  @override
+  String get settingsWeatherDesc => '아바타 왼쪽에 미니 날씨(아이콘+기온) 표시';
+
+  @override
+  String get settingsWeatherAutoLocate => '자동 위치';
+
+  @override
+  String get settingsWeatherAutoLocateDesc =>
+      '네트워크 IP로 대략적인 위치 확인(개인정보: 기본 꺼짐)';
+
+  @override
+  String get settingsWeatherCity => '수동 도시';
+
+  @override
+  String get settingsWeatherCityHint => '입력하면 IP 위치를 사용하지 않음(예: 서울)';
+
+  @override
+  String get settingsWeatherNote =>
+      '개인정보: 날씨 데이터는 Open-Meteo(무료, 키 불필요). 자동 위치를 켜면 IP가 ip-api.com으로 전송되어 대략적인 위치를 얻습니다. 날씨 조회에만 사용하며 저장하지 않습니다. 위젯과 위치는 기본 꺼짐입니다.';
+
+  @override
+  String get settingsSearchWeatherSubtitle => '상단 바의 미니 날씨 위젯(아이콘+기온)';
+
+  @override
+  String get weatherRefresh => '날씨 새로고침';
+
+  @override
+  String get weatherNoLocation => '설정에서 도시를 입력하거나 자동 위치를 켜세요';
+
+  @override
+  String get weatherUnavailable => '날씨를 불러오지 못했습니다. 탭하여 다시 시도';
 
   @override
   String get settingsSearchPassthroughSubtitle => '트랜스코딩 안함 · 48kHz 파이프라인';

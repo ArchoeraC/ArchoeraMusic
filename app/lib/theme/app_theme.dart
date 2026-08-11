@@ -131,20 +131,25 @@ class AppChromeColors extends ThemeExtension<AppChromeColors> {
   AppChromeColors copyWith({
     Color? playerBarBackground,
     Color? playerBackground,
-  }) =>
-      AppChromeColors(
-        playerBarBackground: playerBarBackground ?? this.playerBarBackground,
-        playerBackground: playerBackground ?? this.playerBackground,
-      );
+  }) => AppChromeColors(
+    playerBarBackground: playerBarBackground ?? this.playerBarBackground,
+    playerBackground: playerBackground ?? this.playerBackground,
+  );
 
   @override
   AppChromeColors lerp(AppChromeColors? other, double t) {
     if (other == null) return this;
     return AppChromeColors(
-      playerBarBackground:
-          Color.lerp(playerBarBackground, other.playerBarBackground, t)!,
-      playerBackground:
-          Color.lerp(playerBackground, other.playerBackground, t)!,
+      playerBarBackground: Color.lerp(
+        playerBarBackground,
+        other.playerBarBackground,
+        t,
+      )!,
+      playerBackground: Color.lerp(
+        playerBackground,
+        other.playerBackground,
+        t,
+      )!,
     );
   }
 }
@@ -178,13 +183,16 @@ const List<String> _cjkFontFallback = [
 /// [fontFamily] 界面字体（设置「界面字体」，默认内置 MiSans）。
 /// [performanceMode] 性能模式：InkWell 点击水波纹/高亮改透明（NoSplash），
 /// 与 MediaQuery.disableAnimations 一起实现全局无动效。
-ThemeData buildAppTheme(AppPalette c, Brightness brightness,
-    {Color? accentSeed,
-    String fontFamily = 'MiSans',
-    bool globalTint = false,
-    bool solid = false,
-    bool imageBackground = false,
-    bool performanceMode = false}) {
+ThemeData buildAppTheme(
+  AppPalette c,
+  Brightness brightness, {
+  Color? accentSeed,
+  String fontFamily = 'MiSans',
+  bool globalTint = false,
+  bool solid = false,
+  bool imageBackground = false,
+  bool performanceMode = false,
+}) {
   final dark = brightness == Brightness.dark;
   final custom = accentSeed != null;
 
@@ -200,16 +208,18 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
   if (solid) {
     primary = dark ? const Color(0xFFE4E6EC) : const Color(0xFF2A2D35);
     onPrimary = dark ? const Color(0xFF101318) : const Color(0xFFFFFFFF);
-    primaryContainer =
-        dark ? const Color(0xFF2A2F3A) : const Color(0xFFE4E6EC);
-    onPrimaryContainer =
-        dark ? const Color(0xFFD6DAE3) : const Color(0xFF23262E);
+    primaryContainer = dark ? const Color(0xFF2A2F3A) : const Color(0xFFE4E6EC);
+    onPrimaryContainer = dark
+        ? const Color(0xFFD6DAE3)
+        : const Color(0xFF23262E);
     secondary = dark ? const Color(0xFF9AA1B5) : const Color(0xFF5B6273);
     onSecondary = dark ? const Color(0xFF101318) : const Color(0xFFFFFFFF);
-    secondaryContainer =
-        dark ? const Color(0xFF2A2F3A) : const Color(0xFFEDEFF6);
-    onSecondaryContainer =
-        dark ? const Color(0xFFD6DAE3) : const Color(0xFF23262E);
+    secondaryContainer = dark
+        ? const Color(0xFF2A2F3A)
+        : const Color(0xFFEDEFF6);
+    onSecondaryContainer = dark
+        ? const Color(0xFFD6DAE3)
+        : const Color(0xFF23262E);
   } else {
     final generated = ColorScheme.fromSeed(
       seedColor: accentSeed ?? c.primary,
@@ -217,22 +227,23 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
     );
     primary = custom ? generated.primary : c.primary;
     onPrimary = custom ? generated.onPrimary : c.onPrimary;
-    primaryContainer =
-        custom ? generated.primaryContainer : c.primaryContainer;
-    onPrimaryContainer =
-        custom ? generated.onPrimaryContainer : c.onPrimaryContainer;
+    primaryContainer = custom ? generated.primaryContainer : c.primaryContainer;
+    onPrimaryContainer = custom
+        ? generated.onPrimaryContainer
+        : c.onPrimaryContainer;
     secondary = custom ? generated.secondary : c.secondary;
     onSecondary = custom ? generated.onSecondary : c.onSecondary;
-    secondaryContainer =
-        custom ? generated.secondaryContainer : c.secondaryContainer;
-    onSecondaryContainer =
-        custom ? generated.onSecondaryContainer : c.onSecondaryContainer;
+    secondaryContainer = custom
+        ? generated.secondaryContainer
+        : c.secondaryContainer;
+    onSecondaryContainer = custom
+        ? generated.onSecondaryContainer
+        : c.onSecondaryContainer;
   }
 
   // 全局着色：surface 家族向主色轻微偏移（6%，克制不喧宾夺主）
   final tint = globalTint && accentSeed != null;
-  Color tinted(Color base) =>
-      tint ? Color.lerp(base, accentSeed, 0.06)! : base;
+  Color tinted(Color base) => tint ? Color.lerp(base, accentSeed, 0.06)! : base;
 
   // 图片背景模式：surface 家族半透明化让背景图透出（弹窗/卡片实底用下方 c.* 原始色）。
   final Color surface;
@@ -255,34 +266,35 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
     field = tinted(c.field);
   }
 
-  final scheme = ColorScheme.fromSeed(
-    seedColor: c.primary,
-    brightness: brightness,
-  ).copyWith(
-    primary: primary,
-    onPrimary: onPrimary,
-    primaryContainer: primaryContainer,
-    onPrimaryContainer: onPrimaryContainer,
-    secondary: secondary,
-    onSecondary: onSecondary,
-    secondaryContainer: secondaryContainer,
-    onSecondaryContainer: onSecondaryContainer,
-    error: c.error,
-    onError: c.onError,
-    errorContainer: c.errorContainer,
-    onErrorContainer: c.onErrorContainer,
-    surface: surface,
-    onSurface: c.onSurface,
-    onSurfaceVariant: c.onSurfaceVariant,
-    outline: c.outline,
-    outlineVariant: c.outline.withValues(alpha: 0.55),
-    surfaceContainerLowest: surface,
-    surfaceContainerLow: surfaceAlt,
-    surfaceContainer: surfacePanel,
-    surfaceContainerHigh: surfacePanel,
-    surfaceContainerHighest: surfaceBright,
-    surfaceTint: Colors.transparent,
-  );
+  final scheme =
+      ColorScheme.fromSeed(
+        seedColor: c.primary,
+        brightness: brightness,
+      ).copyWith(
+        primary: primary,
+        onPrimary: onPrimary,
+        primaryContainer: primaryContainer,
+        onPrimaryContainer: onPrimaryContainer,
+        secondary: secondary,
+        onSecondary: onSecondary,
+        secondaryContainer: secondaryContainer,
+        onSecondaryContainer: onSecondaryContainer,
+        error: c.error,
+        onError: c.onError,
+        errorContainer: c.errorContainer,
+        onErrorContainer: c.onErrorContainer,
+        surface: surface,
+        onSurface: c.onSurface,
+        onSurfaceVariant: c.onSurfaceVariant,
+        outline: c.outline,
+        outlineVariant: c.outline.withValues(alpha: 0.55),
+        surfaceContainerLowest: surface,
+        surfaceContainerLow: surfaceAlt,
+        surfaceContainer: surfacePanel,
+        surfaceContainerHigh: surfacePanel,
+        surfaceContainerHighest: surfaceBright,
+        surfaceTint: Colors.transparent,
+      );
 
   // 播放条底色：图片背景风格下恢复毛玻璃——0.7 高不透明 + 外层 BackdropFilter
   // 模糊（对齐原版 global.css footer 播放栏：surface-bright/0.7 + blur16）；
@@ -344,13 +356,17 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
     ),
     // 图标按钮（统一圆角）
     iconButtonTheme: IconButtonThemeData(
       style: ButtonStyle(
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.control),
+          ),
         ),
         foregroundColor: WidgetStatePropertyAll(c.onSurface),
         overlayColor: WidgetStateProperty.resolveWith(
@@ -364,7 +380,10 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: inputFill,
-      hintStyle: TextStyle(color: c.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 13),
+      hintStyle: TextStyle(
+        color: c.onSurfaceVariant.withValues(alpha: 0.7),
+        fontSize: 13,
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.control),
@@ -376,11 +395,18 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.control),
-        borderSide: BorderSide(color: scheme.primary.withValues(alpha: 0.7), width: 1.2),
+        borderSide: BorderSide(
+          color: scheme.primary.withValues(alpha: 0.7),
+          width: 1.2,
+        ),
       ),
     ),
     // 对话框
     dialogTheme: DialogThemeData(
+      // Flutter 3.44+ 中 DialogThemeData 默认 insetPadding 为 EdgeInsets.zero，
+      // 未显式设置 insetPadding 的 Dialog/AlertDialog 会直接铺满窗口；
+      // 全局兜底为 48，与 SDialog 等显式设置保持一致。
+      insetPadding: const EdgeInsets.all(48),
       backgroundColor: c.surfacePanel,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -398,7 +424,9 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
     scrollbarTheme: ScrollbarThemeData(
       thickness: const WidgetStatePropertyAll(6),
       thumbColor: WidgetStatePropertyAll(
-        c.onSurface.withValues(alpha: brightness == Brightness.dark ? 0.22 : 0.28),
+        c.onSurface.withValues(
+          alpha: brightness == Brightness.dark ? 0.22 : 0.28,
+        ),
       ),
       thumbVisibility: const WidgetStatePropertyAll(true),
       radius: const Radius.circular(3),
@@ -409,7 +437,11 @@ ThemeData buildAppTheme(AppPalette c, Brightness brightness,
         color: c.surfaceBright,
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       textStyle: TextStyle(color: c.onSurface, fontSize: 12),
@@ -496,9 +528,10 @@ class _FadeSlidePageTransitionsBuilder extends PageTransitionsBuilder {
     return FadeTransition(
       opacity: curved,
       child: SlideTransition(
-        position:
-            Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero)
-                .animate(curved),
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.03),
+          end: Offset.zero,
+        ).animate(curved),
         child: child,
       ),
     );

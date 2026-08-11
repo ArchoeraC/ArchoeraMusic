@@ -50,7 +50,9 @@ class LikeController extends ChangeNotifier {
       final account = _ref.read(neteaseAuthProvider);
       if (account != null) {
         try {
-          final ids = await _ref.read(neteaseApiProvider).likedIds(account.userId);
+          final ids = await _ref
+              .read(neteaseApiProvider)
+              .likedIds(account.userId);
           if (!_sameSet(_neteaseIds, ids.toSet())) {
             _neteaseIds
               ..clear()
@@ -63,12 +65,12 @@ class LikeController extends ChangeNotifier {
         _neteaseIds.clear();
       }
 
-      // 酷狗：找「我喜欢」歌单拉全量（需登录）
+      // 酷狗：轻量分页拉 hash 集合（需登录）；不构造完整 Track 快照，
+      // 降低启动全量同步的 GC/内存压力
       final kugou = _ref.read(kugouApiProvider);
       if (kugou.session != null) {
         try {
-          final tracks = await kugou.likedTracks();
-          final ids = tracks.map((t) => t.kugou?.hash ?? t.id).toSet();
+          final ids = await kugou.likedHashSet();
           if (!_sameSet(_kugouIds, ids)) {
             _kugouIds
               ..clear()

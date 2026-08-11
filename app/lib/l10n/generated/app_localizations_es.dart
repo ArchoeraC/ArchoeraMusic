@@ -99,6 +99,34 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsSectionClose => 'Cerrar aplicación';
 
   @override
+  String get settingsSectionPower => 'Ahorro de energía';
+
+  @override
+  String get settingsPowerSaver => 'Modo de ahorro de energía';
+
+  @override
+  String get settingsPowerSaverOn =>
+      'Reducir el renderizado en segundo plano (5 FPS minimizado, 1 FPS sin foco o pantalla apagada)';
+
+  @override
+  String get settingsPowerSaverOff => 'Renderizar siempre a máxima frecuencia';
+
+  @override
+  String get settingsSuppressSleep => 'Evitar la suspensión del sistema';
+
+  @override
+  String get settingsSuppressSleepOn =>
+      'Mantener el sistema despierto durante la reproducción para no interrumpir la reproducción en segundo plano';
+
+  @override
+  String get settingsSuppressSleepOff =>
+      'El sistema puede suspender según el plan de inactividad';
+
+  @override
+  String get settingsPowerSaverNote =>
+      'El modo ahorro de energía escucha eventos de estado de ventana (sin sondeo); el motor ya detiene el renderizado cuando la ventana está oculta o la pantalla apagada. Evitar la suspensión del sistema solo se aplica durante la reproducción.';
+
+  @override
   String get settingsCloseBehavior => 'Al cerrar la aplicación';
 
   @override
@@ -153,6 +181,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get commonLossless => 'Sin pérdida';
+
+  @override
+  String get commonOriginal => 'Original';
 
   @override
   String get commonMore => 'Más';
@@ -348,6 +379,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get songListTitle => 'Título';
+
+  @override
+  String get songListScrollTop => 'Volver arriba';
+
+  @override
+  String get songListLocatePlaying => 'Ubicar reproducción';
 
   @override
   String toastAddedToDownloadQueue(Object quality) {
@@ -789,6 +826,50 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get pageFavLoginDesc =>
       'Inicia sesión con QR en NetEase para sincronizar listas, álbumes y artistas favoritos';
+
+  @override
+  String get pageFavKgCreated => 'Listas creadas';
+
+  @override
+  String get pageFavKgCollectedPlaylist => 'Listas guardadas';
+
+  @override
+  String get pageFavKgCollectedAlbum => 'Álbumes guardados';
+
+  @override
+  String pageFavKgCreatedCount(Object count) {
+    return '$count listas creadas';
+  }
+
+  @override
+  String get pageFavKgCreatedLoginHint =>
+      'Inicia sesión para ver tus listas creadas';
+
+  @override
+  String pageFavKgCollectedPlaylistCount(Object count) {
+    return '$count listas guardadas';
+  }
+
+  @override
+  String get pageFavKgCollectedPlaylistLoginHint =>
+      'Inicia sesión para ver tus listas guardadas';
+
+  @override
+  String pageFavKgCollectedAlbumCount(Object count) {
+    return '$count álbumes guardados';
+  }
+
+  @override
+  String get pageFavKgCollectedAlbumLoginHint =>
+      'Inicia sesión para ver tus álbumes guardados';
+
+  @override
+  String get pageFavKugouLoginDesc =>
+      'Inicia sesión con QR en Kugou para sincronizar listas y álbumes creados o guardados';
+
+  @override
+  String get pageFavKugouEmptyHint =>
+      'Se sincroniza automáticamente al guardar en la app de Kugou';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1249,6 +1330,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsDeveloperNote =>
       'El modo desarrollador está pensado para depuración local y uso personal. Úsalo bajo tu responsabilidad.';
+
+  @override
+  String get settingsDevFpsMonitor => 'Superposición de monitor FPS/memoria';
+
+  @override
+  String get settingsDevFpsMonitorDesc =>
+      'Muestra en tiempo real FPS, tiempo medio de fotograma y memoria del proceso en la esquina superior derecha (clic para plegar). Desactivado por defecto; también se desactiva al apagar el modo desarrollador.';
 
   @override
   String get settingsDeveloperEnabled => 'Modo desarrollador activado';
@@ -1871,6 +1959,154 @@ class AppLocalizationsEs extends AppLocalizations {
       'Biblioteca y datos de usuario separados físicamente; rutas anulables con ARCHOERA_DATA_DIR';
 
   @override
+  String get settingsSectionCache => 'Gestión de caché';
+
+  @override
+  String get settingsCacheNote =>
+      'La caché acelera la navegación y la reproducción; se reconstruye automáticamente al borrarla. No afecta a la biblioteca, el historial ni las cuentas.';
+
+  @override
+  String get settingsCacheGroupDisk => 'Caché de base de datos (disco)';
+
+  @override
+  String get settingsCacheGroupMem => 'Caché en memoria (en el proceso)';
+
+  @override
+  String get settingsCacheLiked => 'Caché de la lista «Me gusta»';
+
+  @override
+  String get settingsCacheLyric => 'Caché de letras';
+
+  @override
+  String get settingsCacheLyricMatch => 'Caché de coincidencias de letras';
+
+  @override
+  String get settingsCacheLyricTtml => 'Caché de letras TTML';
+
+  @override
+  String get settingsCacheCover => 'Caché de portadas';
+
+  @override
+  String settingsCacheEntries(Object count) {
+    return '$count entradas';
+  }
+
+  @override
+  String settingsCacheImages(Object count) {
+    return '$count imágenes';
+  }
+
+  @override
+  String get settingsCacheRefresh => 'Actualizar';
+
+  @override
+  String get settingsCacheClear => 'Borrar';
+
+  @override
+  String get settingsCacheClearAll => 'Borrar todo';
+
+  @override
+  String settingsCacheClearConfirmTitle(Object name) {
+    return '¿Borrar «$name»?';
+  }
+
+  @override
+  String get settingsCacheClearConfirmDesc =>
+      'Se eliminarán todos los datos de esta caché; se reconstruirá automáticamente al usarla de nuevo. No se puede deshacer.';
+
+  @override
+  String get settingsCacheClearAllConfirmTitle => '¿Borrar toda la caché?';
+
+  @override
+  String get settingsCacheClearAllConfirmDesc =>
+      'Se eliminará toda la caché anterior (memoria y disco). No afecta a la biblioteca, el historial ni las cuentas.';
+
+  @override
+  String toastCacheCleared(Object name) {
+    return 'Caché de $name borrada';
+  }
+
+  @override
+  String get toastCacheAllCleared => 'Toda la caché borrada';
+
+  @override
+  String get settingsSecuritySection => 'Destrucción segura';
+
+  @override
+  String get settingsSecurityNote =>
+      'Elimina de forma irreversible todas las credenciales y sesiones de cuenta (contraseñas de servidores de streaming, sesiones de Netease/Kugou, cuentas locales de Subsonic) e invalida los tokens de las plataformas. No afecta a la biblioteca, el historial ni las descargas.';
+
+  @override
+  String get settingsSecurityStreaming =>
+      'Credenciales de servidores de streaming';
+
+  @override
+  String settingsSecurityStreamingCount(Object count) {
+    return '$count servidores';
+  }
+
+  @override
+  String get settingsSecurityStreamingDesc => 'Contraseñas y tokens de acceso';
+
+  @override
+  String get settingsSecuritySession => 'Sesiones de cuentas de terceros';
+
+  @override
+  String get settingsSecuritySessionDesc =>
+      'Estado de inicio de sesión de Netease / Kugou';
+
+  @override
+  String get settingsSecurityUserDb => 'Base de usuarios local';
+
+  @override
+  String get settingsSecurityUserDbDesc => 'Cuentas de Subsonic y favoritos';
+
+  @override
+  String get settingsSecurityLoggedIn => 'Sesión iniciada';
+
+  @override
+  String get settingsSecurityDestroy => 'Destruir';
+
+  @override
+  String get settingsSecurityDestroyAll => 'Destruir todo';
+
+  @override
+  String settingsSecurityConfirmTitle(Object name) {
+    return '¿Destruir «$name»?';
+  }
+
+  @override
+  String get settingsSecurityConfirmAllTitle =>
+      '¿Destruir todos los datos sensibles?';
+
+  @override
+  String settingsSecurityConfirmDesc(Object word) {
+    return 'Se invalidarán los tokens de las plataformas afectadas y los archivos se sobrescribirán y eliminarán. Esta operación es irreversible. Escriba «$word» para confirmar.';
+  }
+
+  @override
+  String get settingsSecurityConfirmWord => 'destruir';
+
+  @override
+  String settingsSecurityConfirmHint(Object word) {
+    return 'Escriba «$word»';
+  }
+
+  @override
+  String toastSecurityDestroyed(Object name) {
+    return 'Destruido: $name';
+  }
+
+  @override
+  String get toastSecurityAllDestroyed =>
+      'Se han destruido todos los datos sensibles';
+
+  @override
+  String toastSecurityDestroyFailed(Object path) {
+    return 'Error al destruir, el archivo puede permanecer: $path';
+  }
+
+  @override
   String get settingsVersion => 'Versión';
 
   @override
@@ -2152,6 +2388,48 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsSearchCoverRadiusSubtitle =>
       'Cuadrado · Redondeado · Muy redondeado';
+
+  @override
+  String get settingsSectionWeather => 'Clima';
+
+  @override
+  String get settingsWeather => 'Widget de clima';
+
+  @override
+  String get settingsWeatherDesc =>
+      'Clima mini (icono + temperatura) a la izquierda del avatar';
+
+  @override
+  String get settingsWeatherAutoLocate => 'Ubicación automática';
+
+  @override
+  String get settingsWeatherAutoLocateDesc =>
+      'Ubicación aproximada por IP de red (privacidad: desactivada por defecto)';
+
+  @override
+  String get settingsWeatherCity => 'Ciudad manual';
+
+  @override
+  String get settingsWeatherCityHint =>
+      'Sin ubicación por IP una vez rellenado (p. ej. Madrid)';
+
+  @override
+  String get settingsWeatherNote =>
+      'Privacidad: datos de Open-Meteo (gratis, sin clave). Con ubicación automática, tu IP se envía a ip-api.com para una ubicación aproximada, solo para el clima, sin guardarse. Widget y ubicación están desactivados por defecto.';
+
+  @override
+  String get settingsSearchWeatherSubtitle =>
+      'Widget de clima mini en la barra superior (icono + temperatura)';
+
+  @override
+  String get weatherRefresh => 'Actualizar clima';
+
+  @override
+  String get weatherNoLocation =>
+      'Introduce una ciudad o activa la ubicación en ajustes';
+
+  @override
+  String get weatherUnavailable => 'Clima no disponible, toca para reintentar';
 
   @override
   String get settingsSearchPassthroughSubtitle =>
