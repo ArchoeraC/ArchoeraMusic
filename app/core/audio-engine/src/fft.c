@@ -28,6 +28,9 @@
 #define DEFAULT_SMOOTHING 0.0f    /* 无平滑 */
 #define DEFAULT_PEAK_DECAY 0.01f  /* 每帧衰减 1% */
 #define MIN_DB -120.0f            /* dB 下限 */
+#define NOISE_FLOOR 0.04f         /* 归一化噪声门限（≈ -52dB）：低于此值
+                                    直接置 0，抑制背景噪声/量化毛刺成为
+                                    半高 bar，频谱更干净、渲染开销更小 */
 
 struct FFTAnalyzer {
     int sample_rate;
@@ -37,6 +40,11 @@ struct FFTAnalyzer {
 
     /* 窗函数 */
     float *window;
+
+    /* 预计算查表（对齐 Electron Rust 端 rustfft 的工程思路：创建时一次
+     * 构建，运行时直接查表，避免每帧重算位反转与三角函数递推） */
+    int *bitrev;        /* 位反转表（fft_size 项） */
+    float *twiddle;     /* 旋转因子表（fft_size/2 对 cos/sin，W_n^k） */
 
     /* 输入缓冲（左声道） */
     float *input_buf;
@@ -104,17 +112,21 @@ static int log2_int(int n)
 
 /*
  * 原地计算 FFT（迭代版本，避免递归）
- * 输入：fft_real, fft_imag（长度 fft_size）
- * 输出：fft_real, fft_imag（频域数据）
+ * 输入：real, imag（长度 size）
+ * 输出：real, imag（频域数据）
+ *
+ * 性能：位反转与旋转因子均预计算查表（bitrev / twiddle，见 fft_create），
+ * 每帧只做纯整数查表 + 蝶形复乘，无逐位反转循环、无三角函数/复乘递推
+ * （对齐 Electron Rust 端 rustfft 的 SIMD 查表思路；精度优于递推——递推
+ * 每次复乘更新因子会累积舍入误差）。
  */
-static void compute_fft_inplace(float *real, float *imag, int size, int order)
+static void compute_fft_inplace(float *real, float *imag,
+                                const int *bitrev, const float *twiddle,
+                                int size, int order)
 {
-    /* 位反转置换 */
+    /* 位反转置换（查表 O(n)，替代逐位反转 O(n log n)） */
     for (int i = 0; i < size; i++) {
-        int j = 0;
-        for (int k = 0; k < order; k++) {
-            j = (j << 1) | ((i >> k) & 1);
-        }
+        int j = bitrev[i];
         if (j > i) {
             float tmp = real[i];
             real[i] = real[j];
@@ -125,19 +137,18 @@ static void compute_fft_inplace(float *real, float *imag, int size, int order)
         }
     }
 
-    /* 蝶形运算 */
+    /* 蝶形运算：块内第 j 个因子的指数 = j * (size/m)，
+     * 即 W_m^j = W_size^(j*size/m)，直接查 twiddle 表 */
     for (int stage = 1; stage <= order; stage++) {
         int m = 1 << stage;           /* 子问题大小 */
         int half_m = m >> 1;
-        float angle = -2.0f * M_PI / m;
-        float w_real = cosf(angle);
-        float w_imag = sinf(angle);
+        int step = size >> stage;     /* 因子指数步长（size/m） */
 
         for (int k = 0; k < size; k += m) {
-            float wr = 1.0f;
-            float wi = 0.0f;
-
             for (int j = 0; j < half_m; j++) {
+                const float *w = twiddle + 2 * (j * step);
+                float wr = w[0];
+                float wi = w[1];
                 int idx1 = k + j;
                 int idx2 = k + j + half_m;
 
@@ -149,12 +160,6 @@ static void compute_fft_inplace(float *real, float *imag, int size, int order)
                 imag[idx2] = imag[idx1] - ti;
                 real[idx1] += tr;
                 imag[idx1] += ti;
-
-                /* 旋转因子更新 */
-                float new_wr = wr * w_real - wi * w_imag;
-                float new_wi = wr * w_imag + wi * w_real;
-                wr = new_wr;
-                wi = new_wi;
             }
         }
     }
@@ -343,6 +348,8 @@ FFTAnalyzer* fft_create(int sample_rate, int fft_size)
 
     /* 分配内存 */
     fft->window = malloc(fft_size * sizeof(float));
+    fft->bitrev = malloc(fft_size * sizeof(int));
+    fft->twiddle = malloc(fft_size * sizeof(float));
     fft->input_buf = malloc(fft_size * sizeof(float));
     fft->input_buf_r = malloc(fft_size * sizeof(float));
     fft->fft_real = malloc(fft_size * sizeof(float));
@@ -354,7 +361,8 @@ FFTAnalyzer* fft_create(int sample_rate, int fft_size)
     fft->raw_spectrum_r = malloc(half * sizeof(float));
     fft->peak_spectrum_r = malloc(half * sizeof(float));
 
-    if (!fft->window || !fft->input_buf || !fft->input_buf_r ||
+    if (!fft->window || !fft->bitrev || !fft->twiddle ||
+        !fft->input_buf || !fft->input_buf_r ||
         !fft->fft_real || !fft->fft_imag || !fft->spectrum ||
         !fft->raw_spectrum || !fft->peak_spectrum ||
         !fft->spectrum_r || !fft->raw_spectrum_r || !fft->peak_spectrum_r) {
@@ -365,6 +373,20 @@ FFTAnalyzer* fft_create(int sample_rate, int fft_size)
     /* 初始化 Hamming 窗（对齐 Electron Rust 端 0.54 - 0.46*cos） */
     for (int i = 0; i < fft_size; i++) {
         fft->window[i] = 0.54f - 0.46f * cosf(2.0f * M_PI * i / (fft_size - 1));
+    }
+
+    /* 预计算位反转表与旋转因子表（创建一次，每帧直接查表） */
+    for (int i = 0; i < fft_size; i++) {
+        int j = 0;
+        for (int k = 0; k < fft->fft_order; k++) {
+            j = (j << 1) | ((i >> k) & 1);
+        }
+        fft->bitrev[i] = j;
+    }
+    for (int k = 0; k < half; k++) {
+        float angle = -2.0f * M_PI * k / (float)fft_size;
+        fft->twiddle[2 * k] = cosf(angle);
+        fft->twiddle[2 * k + 1] = sinf(angle);
     }
 
     /* 初始化峰值谱 */
@@ -456,6 +478,7 @@ static void process_buffers(FFTAnalyzer *fft, int half)
         fft->fft_imag[j] = 0.0f;
     }
     compute_fft_inplace(fft->fft_real, fft->fft_imag,
+                       fft->bitrev, fft->twiddle,
                        fft->fft_size, fft->fft_order);
     compute_magnitude(fft->fft_real, fft->fft_imag,
                     fft->raw_spectrum, fft->fft_size);
@@ -466,6 +489,7 @@ static void process_buffers(FFTAnalyzer *fft, int half)
         fft->fft_imag[j] = 0.0f;
     }
     compute_fft_inplace(fft->fft_real, fft->fft_imag,
+                       fft->bitrev, fft->twiddle,
                        fft->fft_size, fft->fft_order);
     compute_magnitude(fft->fft_real, fft->fft_imag,
                     fft->raw_spectrum_r, fft->fft_size);
@@ -757,13 +781,14 @@ void fft_get_spectrum_norm_stereo(const FFTAnalyzer *fft,
             avg_r = sum_r / (float)(bin_hi - bin_lo);
         }
 
-        /* dB → 归一化 [0,1]：-60dB 为 0，0dB 为 1 */
+        /* dB → 归一化 [0,1]：-60dB 为 0，0dB 为 1；
+         * 低于噪声门限的归一化值直接置 0（抑制背景噪声细节） */
         float db_l = 20.0f * log10f(avg_l + 1e-10f);
         float db_r = 20.0f * log10f(avg_r + 1e-10f);
         float norm_l = (db_l + 60.0f) / 60.0f;
         float norm_r = (db_r + 60.0f) / 60.0f;
-        out_mag_l[i] = norm_l < 0.0f ? 0.0f : (norm_l > 1.0f ? 1.0f : norm_l);
-        out_mag_r[i] = norm_r < 0.0f ? 0.0f : (norm_r > 1.0f ? 1.0f : norm_r);
+        out_mag_l[i] = norm_l <= NOISE_FLOOR ? 0.0f : (norm_l >= 1.0f ? 1.0f : norm_l);
+        out_mag_r[i] = norm_r <= NOISE_FLOOR ? 0.0f : (norm_r >= 1.0f ? 1.0f : norm_r);
     }
 }
 
@@ -832,6 +857,8 @@ void fft_destroy(FFTAnalyzer *fft)
 {
     if (!fft) return;
     free(fft->window);
+    free(fft->bitrev);
+    free(fft->twiddle);
     free(fft->input_buf);
     free(fft->input_buf_r);
     free(fft->fft_real);

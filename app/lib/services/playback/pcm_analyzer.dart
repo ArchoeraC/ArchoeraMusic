@@ -30,10 +30,7 @@ class PcmAnalyzer {
 
   /// 打开已存在（或正在写入）的 PCM 文件。文件未写完时 [scan]/[frameAt]
   /// 按当前文件大小增量处理，转码完成后再调用 [scan] 补全索引。
-  static Future<PcmAnalyzer> open(
-    String path, {
-    int sampleRate = 48000,
-  }) async {
+  static Future<PcmAnalyzer> open(String path, {int sampleRate = 48000}) async {
     final raf = await File(path).open(mode: FileMode.read);
     return PcmAnalyzer._(raf, FftAnalyzer(sampleRate: sampleRate), sampleRate);
   }
@@ -180,7 +177,13 @@ class PcmAnalyzer {
 
   /// 读取块 [start, start+take) 样本并下混为左右声道，写入 [fill, fill+take)。
   void _readBlockDownmix(
-      int bi, int start, int take, Float64List l, Float64List r, int fill) {
+    int bi,
+    int start,
+    int take,
+    Float64List l,
+    Float64List r,
+    int fill,
+  ) {
     try {
       final foff = _fileOffsets[bi];
       _raf.setPositionSync(foff);

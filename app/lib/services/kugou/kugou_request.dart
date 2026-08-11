@@ -485,7 +485,8 @@ Future<Map<String, dynamic>> kgComments(
 }) async {
   final client = HttpClient();
   try {
-    final query = 'r=commentsv2/getCommentWithLike'
+    final query =
+        'r=commentsv2/getCommentWithLike'
         '&code=$kgCommentCode'
         '&p=$page'
         '&pagesize=$pagesize'

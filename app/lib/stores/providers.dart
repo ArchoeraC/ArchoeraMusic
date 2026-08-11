@@ -7,6 +7,7 @@ import '../services/history/history_store.dart';
 import '../services/kugou/kugou_api.dart';
 import '../services/netease/apis_netease_caller.dart';
 import '../services/netease/netease_api.dart';
+import '../services/weather/weather_notifier.dart';
 import 'event_bus.dart';
 import 'like_controller.dart';
 import 'system_accent.dart';
@@ -24,8 +25,8 @@ final neteaseApiProvider = Provider<NeteaseApi>((ref) {
 /// 可用），再读取持久化会话中的账号；[logout] 清空会话。
 final neteaseAuthProvider =
     NotifierProvider<NeteaseAuthNotifier, NeteaseAccount?>(
-  NeteaseAuthNotifier.new,
-);
+      NeteaseAuthNotifier.new,
+    );
 
 class NeteaseAuthNotifier extends Notifier<NeteaseAccount?> {
   @override
@@ -48,6 +49,9 @@ class NeteaseAuthNotifier extends Notifier<NeteaseAccount?> {
     await ref.read(neteaseApiProvider).logout();
     state = null;
   }
+
+  /// 仅清空本地登录态（不发请求；安全销毁流程在主动失效 token 后兜底调用）。
+  void clear() => state = null;
 }
 
 // ── 直连酷狗 API ────────────────────────────────────────────────
@@ -56,6 +60,13 @@ class NeteaseAuthNotifier extends Notifier<NeteaseAccount?> {
 ///
 /// [ChangeNotifierProvider]：登录态（session）变化时通知 UI 重建。
 final kugouApiProvider = ChangeNotifierProvider<KugouApi>((ref) => KugouApi());
+
+// ── 顶栏微型天气 ────────────────────────────────────────────────
+
+/// 天气状态（默认关闭，见 `appearance.weatherEnabled`；关闭时不发请求）。
+final weatherProvider = ChangeNotifierProvider<WeatherNotifier>(
+  (ref) => WeatherNotifier(),
+);
 
 // ── 事件总线 ────────────────────────────────────────────────────
 
@@ -76,8 +87,9 @@ final historyStoreProvider = Provider<HistoryStore>((ref) {
 });
 
 /// 红心状态（网易云 / 酷狗「我喜欢」）。
-final likeControllerProvider =
-    ChangeNotifierProvider<LikeController>((ref) => LikeController(ref));
+final likeControllerProvider = ChangeNotifierProvider<LikeController>(
+  (ref) => LikeController(ref),
+);
 
 /// 系统主题色（主题色来源 = default「跟随系统」时作为主色种子）。
 ///

@@ -13,144 +13,10 @@ import '../streaming/streaming_provider.dart';
 import '../streaming/streaming_session.dart';
 import 'audio_engine_process.dart';
 import 'dj_mode.dart';
-import 'fft_frame.dart';
 import 'playback_session.dart';
+import 'playback_state.dart';
 
 export 'fft_frame.dart' show FftFrame;
-
-/// 播放模式（对齐原项目 RepeatMode：'list' 列表循环 / 'one' 单曲循环）。
-/// 原项目的 'off' 已移除——队列播完末尾回绕，始终循环。
-const repeatModeCycle = ['list', 'one'];
-
-/// 播放模式文案。
-const repeatModeLabels = <String, String>{
-  'list': '列表循环',
-  'one': '单曲循环',
-};
-
-/// 播放状态（UI 层只读）。
-class PlaybackState {
-  const PlaybackState({
-    this.source,
-    this.title,
-    this.subtitle,
-    this.trackId,
-    this.track,
-    this.quality = 'hq',
-    this.sessionId,
-    this.playing = false,
-    this.position = Duration.zero,
-    this.duration = Duration.zero,
-    this.logs = const [],
-    this.fft,
-    this.queue = const [],
-    this.queueIndex = -1,
-    this.repeatMode = 'list',
-    this.shuffle = false,
-    this.buffering = false,
-    this.volume = 1.0,
-  });
-
-  /// 引擎转码源（本地文件路径 / 在线 URL）。
-  final String? source;
-
-  /// 展示标题（播放条/全屏播放器用；缺省回退 source）。
-  final String? title;
-
-  /// 展示副标题（歌手等）。
-  final String? subtitle;
-
-  /// 曲目 id（列表 playingId 高亮用；本地文件无 id 时为空）。
-  final String? trackId;
-
-  /// 当前曲目（音质切换等需要平台/品质信息；本地文件时为 null）。
-  final Track? track;
-
-  /// 当前音质档位（lq/sq/hq/lossless/hi-res，对齐 SPlayer-Next）。
-  final String quality;
-
-  final String? sessionId;
-  final bool playing;
-  final Duration position;
-  final Duration duration;
-  final List<String> logs;
-
-  /// 最近一帧 FFT 频谱（128 bins [0,1]，对数映射 80~2000Hz）。
-  final FftFrame? fft;
-
-  /// 播放队列（当前列表，UI 只读；原项目 queue store 对应物）。
-  final List<Track> queue;
-
-  /// 当前曲目在队列中的索引（-1 = 未在队列中）。
-  final int queueIndex;
-
-  /// 播放模式（repeatModeCycle：'list' 列表循环 / 'one' 单曲循环）。
-  final String repeatMode;
-
-  /// 随机播放开关（on = 洗牌队列，当前曲置顶）。
-  final bool shuffle;
-
-  /// 缓冲/加载中（引擎转码、音源解析期间为 true，进入播放后置 false）。
-  final bool buffering;
-
-  /// 播放音量（0~1，对齐 SPlayer-Next status.volume；用户音量落
-  /// AppPrefs，退出确认弹窗的 duck 为临时值，关闭弹窗即恢复）。
-  final double volume;
-
-  /// 队列是否非空（切歌按钮可用性）。
-  bool get hasQueue => queue.isNotEmpty;
-
-  /// 队列中正在播放的曲目（未在队列时返回 null）。
-  Track? get currentQueueTrack =>
-      queueIndex >= 0 && queueIndex < queue.length ? queue[queueIndex] : null;
-
-  /// copyWith 哨兵：允许把 [fft] 显式置空。
-  static const Object _unset = Object();
-
-  PlaybackState copyWith({
-    String? source,
-    Object? title = _unset,
-    Object? subtitle = _unset,
-    Object? trackId = _unset,
-    Object? track = _unset,
-    String? quality,
-    String? sessionId,
-    bool? playing,
-    Duration? position,
-    Duration? duration,
-    List<String>? logs,
-    Object? fft = _unset,
-    List<Track>? queue,
-    Object? queueIndex = _unset,
-    String? repeatMode,
-    bool? shuffle,
-    bool? buffering,
-    double? volume,
-  }) {
-    return PlaybackState(
-      source: source ?? this.source,
-      title: identical(title, _unset) ? this.title : title as String?,
-      subtitle:
-          identical(subtitle, _unset) ? this.subtitle : subtitle as String?,
-      trackId: identical(trackId, _unset) ? this.trackId : trackId as String?,
-      track: identical(track, _unset) ? this.track : track as Track?,
-      quality: quality ?? this.quality,
-      sessionId: sessionId ?? this.sessionId,
-      playing: playing ?? this.playing,
-      position: position ?? this.position,
-      duration: duration ?? this.duration,
-      logs: logs ?? this.logs,
-      fft: identical(fft, _unset) ? this.fft : fft as FftFrame?,
-      queue: queue ?? this.queue,
-      queueIndex:
-          identical(queueIndex, _unset) ? this.queueIndex : queueIndex as int,
-      repeatMode: repeatMode ?? this.repeatMode,
-      shuffle: shuffle ?? this.shuffle,
-      buffering: buffering ?? this.buffering,
-      volume: volume ?? this.volume,
-    );
-  }
-}
 
 /// 播放控制器（Notifier）：应用层单一播放状态源（架构文档 §5.3）。
 ///
@@ -312,16 +178,29 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   /// 诊断计数：无帧可取时周期性打印 PCM 状态。
   int _diagCounter = 0;
 
+  /// 最近一次取帧位置（毫秒）：取帧节流基准（性能优化）。
+  ///
+  /// 引擎位置事件 ~50ms 一条，但频谱取帧含同步磁盘 IO + 下混 + FFT，
+  /// 按 100ms 节流后 UI 线程负担减半；插值/平滑由 _SpectrumPainter
+  /// 承担，10Hz 推送下视觉依旧流畅（原 Web 端也是 50ms 推送 + 帧间
+  /// 插值消除阶梯）。初始 -1000 保证首帧立即取。
+  int _lastSpectrumAtMs = -1000;
+
   void _pollSpectrum() {
     if (!_fftActive) return;
+    final posMs = state.position.inMilliseconds;
+    if (posMs - _lastSpectrumAtMs < 100) return;
+    _lastSpectrumAtMs = posMs;
     final pcm = _engine?.pcm;
     if (pcm == null) return;
-    final frame = pcm.frameAt(state.position.inMilliseconds);
+    final frame = pcm.frameAt(posMs);
     if (frame == null) {
       _diagCounter++;
       if (_diagCounter % 40 == 0) {
-        _log('FFT 诊断: pos=${state.position.inMilliseconds}ms '
-            '块=${pcm.blockCount} 字节=${pcm.bytesIn}');
+        _log(
+          'FFT 诊断: pos=${state.position.inMilliseconds}ms '
+          '块=${pcm.blockCount} 字节=${pcm.bytesIn}',
+        );
       }
       return;
     }
@@ -370,16 +249,24 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     if (track == null) return;
     // 「启动时自动播放」偏好（默认关）：仅恢复现场（暂停态），点播放从保存位置继续
     final autoPlay = ref.read(appPrefsProvider).autoPlayOnLaunch;
-    _log('恢复会话: ${queue.length} 首 @${snapshot.positionMs}ms '
-        '${snapshot.playing && autoPlay ? '自动续播' : '暂停'}');
+    _log(
+      '恢复会话: ${queue.length} 首 @${snapshot.positionMs}ms '
+      '${snapshot.playing && autoPlay ? '自动续播' : '暂停'}',
+    );
     if (!snapshot.playing || !autoPlay) return;
-    await _resumeFrom(track,
-        offsetMs: snapshot.positionMs, quality: snapshot.quality);
+    await _resumeFrom(
+      track,
+      offsetMs: snapshot.positionMs,
+      quality: snapshot.quality,
+    );
   }
 
   /// 从指定位置续播 [track]（恢复会话 / 暂停态点播放共用）。
-  Future<void> _resumeFrom(Track track,
-      {required int offsetMs, String? quality}) async {
+  Future<void> _resumeFrom(
+    Track track, {
+    required int offsetMs,
+    String? quality,
+  }) async {
     final q = quality ?? state.quality;
     try {
       final url = await _resolveSource(track, quality: q);
@@ -401,20 +288,22 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     if (!ref.read(appPrefsProvider).sessionMemory) return;
     final s = state;
     if (s.queue.isEmpty && s.track == null && s.source == null) return;
-    const PlaybackSessionStore().save(PlaybackSnapshot.fromState(
-      queue: s.queue,
-      queueIndex: s.queueIndex,
-      position: s.position,
-      repeatMode: s.repeatMode,
-      shuffle: s.shuffle,
-      quality: s.quality,
-      playing: s.playing,
-      title: s.title,
-      subtitle: s.subtitle,
-      trackId: s.trackId,
-      track: s.track,
-      source: s.source,
-    ));
+    const PlaybackSessionStore().save(
+      PlaybackSnapshot.fromState(
+        queue: s.queue,
+        queueIndex: s.queueIndex,
+        position: s.position,
+        repeatMode: s.repeatMode,
+        shuffle: s.shuffle,
+        quality: s.quality,
+        playing: s.playing,
+        title: s.title,
+        subtitle: s.subtitle,
+        trackId: s.trackId,
+        track: s.track,
+        source: s.source,
+      ),
+    );
     _lastPersistPosMs = s.position.inMilliseconds;
   }
 
@@ -435,6 +324,11 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     String quality = 'hq',
     int offsetMs = 0,
   }) {
+    final gen = ++_loadGen;
+    // 抢占式切歌：立即停掉当前引擎（stop 放行其 pending done，旧 load 任务
+    // 快速收尾），新任务无需排队等旧会话转码完成即可启动——缓冲中可切歌。
+    // ignore: discarded_futures
+    unawaited(_stopEngine());
     final task = _loadChain.then((_) async {
       // 转码完成前即可展示标题（_startSession 内部 copyWith 保留之）
       state = state.copyWith(
@@ -446,12 +340,27 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         buffering: true,
       );
       try {
-        final useBitrate =
-            track != null ? (qualityBitrate[quality] ?? bitrate) : bitrate;
+        final useBitrate = track != null
+            ? (qualityBitrate[quality] ?? bitrate)
+            : bitrate;
         final passthrough = ref.read(appPrefsProvider).passthrough;
-        await _startSession(source,
-            offsetMs: offsetMs, bitrate: useBitrate, passthrough: passthrough);
+        await _startSession(
+          source,
+          offsetMs: offsetMs,
+          bitrate: useBitrate,
+          passthrough: passthrough,
+          gen: gen,
+        );
+        if (gen != _loadGen) {
+          // 已被更新的 load 取代：放弃收尾（历史记录由新会话负责）
+          _log('load 被新会话取代: $source');
+          return;
+        }
         _log('load ok: $source');
+        // 播放成功：重置连续失败计数与换源保护（对齐 SPlayer-Next
+        // 成功时 consecutiveFailures = 0）
+        _consecutiveFailures = 0;
+        _fallbackAttempted.clear();
         // 历史播放记录（本地存储，同曲去重置顶；对齐 SPlayer-Next
         // history.record 在播放成功后调用）。失败静默，不影响播放。
         final current = state.track;
@@ -530,6 +439,20 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   /// 串行播放队列（见 [load]）。
   Future<void> _loadChain = Future<void>.value();
 
+  /// 加载代际号：每次 [load] 递增。旧代际会话（创建中/转码中）发现被取代后
+  /// 立即停掉自身引擎，不再等待转码完成——缓冲中切歌不再排队干等旧转码。
+  int _loadGen = 0;
+
+  /// 连续加载失败计数（成功播放时归零；对齐 SPlayer-Next consecutiveFailures）。
+  int _consecutiveFailures = 0;
+
+  /// 连续失败硬上限（对齐 SPlayer-Next MAX_CONSECUTIVE_FAILURES）。
+  static const _maxConsecutiveFailures = 5;
+
+  /// 本失败序列中已尝试过平台换源的曲目内容键（规范化标题|歌手，见
+  /// [_tryFallbackSource]）：防止网/狗同曲互切死循环；播放成功时清空。
+  final Set<String> _fallbackAttempted = {};
+
   // ── 播放队列 / 切歌（对齐原项目 core/player 语义）───────────────────
 
   /// 统一解析曲目播放源。
@@ -568,18 +491,21 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         _log('流媒体服务器不存在: $serverId（${track.title}）');
         return null;
       }
-      return StreamingClient(cfg).getStreamUrl(
-        originalId,
-        playSessionId: sessionIdForTrack(track.id),
-      );
+      return StreamingClient(
+        cfg,
+      ).getStreamUrl(originalId, playSessionId: sessionIdForTrack(track.id));
     }
     _log('暂不支持的播放源: ${track.source}（${track.title}）');
     return null;
   }
 
   /// 按元信息加载并播放（队列切歌统一入口；失败记录日志返回 false）。
-  Future<bool> _playTrackMeta(String url, Track track,
-      {String? quality, int offsetMs = 0}) async {
+  Future<bool> _playTrackMeta(
+    String url,
+    Track track, {
+    String? quality,
+    int offsetMs = 0,
+  }) async {
     final q = quality ?? state.quality;
     try {
       await load(
@@ -599,7 +525,11 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     }
   }
 
-  /// 播放队列中当前索引曲目（解析失败仅记录日志，不打断播放）。
+  /// 播放队列中当前索引曲目。
+  ///
+  /// 解析/加载失败不打断播放流程：先尝试 [多源自动切换]（_tryFallbackSource），
+  /// 无替代版本则自动跳过到下一首（_skipOnFailure，对齐 SPlayer-Next
+  /// skipOnFailure：连续失败达上限或队列长度时停播）。
   Future<void> _playCurrent() async {
     // Fuck DJ Mode：加载 DJ 版曲目前自动跳到下一首（对齐原项目 loadTrack；
     // guard 上限 = 队列长度，防整队都是 DJ 时死循环）
@@ -620,12 +550,140 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     final idx = state.queueIndex;
     if (idx < 0 || idx >= q.length) return;
     final track = q[idx];
-    final url = await _resolveSource(track, quality: state.quality);
+    final String? url;
+    try {
+      url = await _resolveSource(track, quality: state.quality);
+    } catch (e) {
+      _log('解析播放源异常: ${track.title}: $e');
+      return _handleTrackFailure(track, '解析播放源异常');
+    }
     if (url == null || url.isEmpty) {
-      _log('无法解析播放源，跳过: ${track.title}');
+      _log('无法解析播放源: ${track.title}');
+      await _handleTrackFailure(track, '无可用播放源');
       return;
     }
-    await _playTrackMeta(url, track);
+    final ok = await _playTrackMeta(url, track);
+    if (!ok) {
+      await _handleTrackFailure(track, '播放加载失败');
+    }
+  }
+
+  /// 单曲失败兜底：先尝试其他平台同名版本自动换源（[多源切换]，对齐
+  /// Mineradio provider-fallback），换源未接管则自动跳过下一首；达到连续
+  /// 失败上限/队列长度时停播（对齐 SPlayer-Next skipOnFailure）。
+  Future<void> _handleTrackFailure(Track track, String reason) async {
+    _log('播放失败: ${track.title}（$reason）');
+    if (await _tryFallbackSource(track)) return;
+    await _skipOnFailure('${track.title}：$reason');
+  }
+
+  /// 连续失败保护：递增失败计数，达上限或队列长度则停播，否则跳下一首。
+  ///
+  /// 对齐 SPlayer-Next `skipOnFailure`：`consecutiveFailures++`，
+  /// 达到 `MAX_CONSECUTIVE_FAILURES(5)` 或 `queue.queueLength` 交
+  /// `onQueueEnded` 停下，否则 nextTrack。
+  Future<void> _skipOnFailure(String reason) async {
+    _log('自动跳过无法播放的曲目: $reason');
+    _consecutiveFailures++;
+    if (_consecutiveFailures >= _maxConsecutiveFailures ||
+        _consecutiveFailures >= state.queue.length) {
+      _consecutiveFailures = 0;
+      _log('连续失败达上限，停止播放');
+      await stop();
+      return;
+    }
+    _advanceNext();
+    await _playCurrent();
+  }
+
+  /// 多源自动切换（对齐 Mineradio `provider-fallback`）：当前平台无源/
+  /// 无法播放时，用「标题 + 歌手」在其他平台搜索同名版本；命中且可解析
+  /// 播放 URL 则替换队列条目并播放。返回是否成功接管（未接管时由调用方
+  /// 决定跳过）。
+  ///
+  /// 防死循环：本失败序列中同一内容（规范化标题|歌手）只尝试一次换源，
+  /// 防止网/狗同曲互切（netease → kugou 失败 → 又搜回 netease）。
+  Future<bool> _tryFallbackSource(Track track) async {
+    // 本地/流媒体曲目无平台搜索语义，直接放弃换源
+    if (track.source == 'local' || track.source == 'streaming') return false;
+    final title = track.title.trim();
+    if (title.isEmpty) return false;
+    // 同一内容在本次失败序列中已尝试过换源 → 直接跳过（防互切死循环）
+    final contentKey = _trackContentKey(track);
+    if (_fallbackAttempted.contains(contentKey)) return false;
+    _fallbackAttempted.add(contentKey);
+
+    final artist = track.artistNames.trim();
+    final keyword = [title, if (artist.isNotEmpty) artist].join(' ');
+    final candidates = <Track>[];
+    try {
+      if (track.source == 'netease') {
+        candidates.addAll(
+          (await ref.read(kugouApiProvider).searchSongs(keyword, limit: 20))
+              .items,
+        );
+      } else {
+        candidates.addAll(
+          (await ref.read(neteaseApiProvider).searchSongs(keyword, limit: 20))
+              .items,
+        );
+      }
+    } catch (e) {
+      _log('换源搜索失败: $e');
+      return false;
+    }
+    for (final cand in candidates) {
+      if (cand.source == track.source) continue;
+      if (!_isSameTitleArtist(track, cand)) continue;
+      final url = await _resolveSource(cand, quality: state.quality);
+      if (url == null || url.isEmpty) continue;
+      _log('自动换源: ${track.title} → ${cand.source} 版本（${cand.title}）');
+      final q = List.of(state.queue);
+      if (state.queueIndex < 0 || state.queueIndex >= q.length) return false;
+      q[state.queueIndex] = cand;
+      state = state.copyWith(queue: q);
+      // 同步原始队列（关闭随机时恢复顺序用）
+      final orig = _originalQueue;
+      if (orig != null && state.queueIndex < orig.length) {
+        orig[state.queueIndex] = cand;
+      }
+      final ok = await _playTrackMeta(url, cand);
+      return ok;
+    }
+    return false;
+  }
+
+  /// 曲目内容键（规范化标题|歌手，用于换源去重，对齐 Mineradio
+  /// `sourceFallbackRecoveryContentKey`）。
+  static String _trackContentKey(Track track) {
+    final artists =
+        track.artists
+            .map((a) => _normText(a.name))
+            .where((s) => s.isNotEmpty)
+            .toList()
+          ..sort();
+    final title = _normText(track.title);
+    return '$title|${artists.join(',')}';
+  }
+
+  /// 规范化匹配文本：去除括号副题（live/remix 等）与分隔符，对齐
+  /// Mineradio `normalizeMatchText`。
+  static String _normText(String s) => s
+      .replaceAll(RegExp(r'[（(【\[].*?[）)】\]]'), '')
+      .replaceAll(RegExp(r'''[\s·・\-—_.,，。:："'‘’/\\|]+'''), '')
+      .toLowerCase();
+
+  /// 标题 + 歌手（任一歌手重叠）匹配，对齐 Mineradio `isSameTitleArtist`。
+  static bool _isSameTitleArtist(Track a, Track b) {
+    if (_normText(a.title) != _normText(b.title)) return false;
+    final aa = a.artists
+        .map((x) => _normText(x.name))
+        .where((s) => s.isNotEmpty);
+    final ba = b.artists
+        .map((x) => _normText(x.name))
+        .where((s) => s.isNotEmpty);
+    if (aa.isEmpty || ba.isEmpty) return false;
+    return aa.any(ba.contains);
   }
 
   /// 前进到下一首：末尾回绕；随机模式末尾重新洗牌（当前曲置顶、新队列 index=1）。
@@ -691,11 +749,13 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
       final url = resolvedUrl ?? await _resolveSource(track);
       if (url == null || url.isEmpty) {
         _log('无法解析播放源: ${track.title}');
+        await _handleTrackFailure(track, '无可用播放源');
         return;
       }
       state = state.copyWith(queue: [track], queueIndex: 0);
       _originalQueue = List.of(state.queue);
-      await _playTrackMeta(url, track);
+      final ok = await _playTrackMeta(url, track);
+      if (!ok) await _handleTrackFailure(track, '播放加载失败');
       return;
     }
     final existing = _indexOfTrack(q, track);
@@ -710,9 +770,11 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     final url = resolvedUrl ?? await _resolveSource(track);
     if (url == null || url.isEmpty) {
       _log('无法解析播放源: ${track.title}');
+      await _handleTrackFailure(track, '无可用播放源');
       return;
     }
-    await _playTrackMeta(url, track);
+    final ok = await _playTrackMeta(url, track);
+    if (!ok) await _handleTrackFailure(track, '播放加载失败');
   }
 
   /// 播放上一首（首位回绕到末尾，对齐原项目 prevTrack）。
@@ -920,9 +982,14 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
       if (idx < 0 || idx >= q.length) return;
       final track = q[idx];
       final url = await _resolveSource(track, quality: state.quality);
-      if (url == null || url.isEmpty) return;
+      if (url == null || url.isEmpty) {
+        _log('单曲循环无法解析播放源: ${track.title}');
+        await _handleTrackFailure(track, '单曲循环无可用播放源');
+        return;
+      }
       _log('单曲循环: ${track.title}');
-      await _playTrackMeta(url, track);
+      final ok = await _playTrackMeta(url, track);
+      if (!ok) await _handleTrackFailure(track, '单曲循环播放失败');
       return;
     }
     await playNext();
@@ -943,8 +1010,10 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     try {
       final targetMs = offset.inMilliseconds;
       if (targetMs < _sessionOffsetMs) {
-        _log('seek 目标早于会话偏移，重启引擎重转码: '
-            '${targetMs}ms < ${_sessionOffsetMs}ms');
+        _log(
+          'seek 目标早于会话偏移，重启引擎重转码: '
+          '${targetMs}ms < ${_sessionOffsetMs}ms',
+        );
         final wasPlaying = state.playing;
         _pendingPauseAfterReady = !wasPlaying;
         state = state.copyWith(buffering: true);
@@ -995,10 +1064,17 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   ///
   /// [passthrough] 原音质直通（来自设置开关）：true = 引擎保持源采样率；
   /// false = 统一 48kHz 转码管线。
-  Future<void> _startSession(String source,
-      {required int offsetMs,
-      required int bitrate,
-      bool passthrough = true}) async {
+  ///
+  /// [gen] 为发起方捕获的加载代际号（见 [load]）；0 表示不参与抢占检查
+  /// （seek 回退重启会话等内部路径）。创建中/转码中被更新的 load 取代时
+  /// 立即停掉自身引擎，不再等待转码完成——缓冲中切歌的落点。
+  Future<void> _startSession(
+    String source, {
+    required int offsetMs,
+    required int bitrate,
+    bool passthrough = true,
+    int gen = 0,
+  }) async {
     await _stopEngine();
     final engine = await AudioEngineProcess.start(
       source: source,
@@ -1006,6 +1082,12 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
       bitrate: bitrate,
       passthrough: passthrough,
     );
+    // 创建期间被更新的 load 取代：丢弃刚创建的引擎（不播放、不监听）
+    if (gen != 0 && gen != _loadGen) {
+      _log('会话被新 load 取代，丢弃刚创建的引擎');
+      await engine.stop();
+      return;
+    }
     _engine = engine;
     _sessionOffsetMs = offsetMs;
     _engineSubs.add(engine.events.listen(_onEngineEvent));
@@ -1026,16 +1108,26 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     // 取帧由 _syncFftActive 门控：进入播放（EnginePlaying）才启用事件驱动取帧
     // 等待完整转码（done 时 WAV 已落盘完整）→ 引擎自播
     await engine.done;
+    // 转码期间被更新的 load 取代（stop 已放行 done）：不进入自播阶段，
+    // 引擎已被新会话停掉，此处仅收尾
+    if (gen != 0 && gen != _loadGen) {
+      _log('会话被新 load 取代（转码完成）');
+      return;
+    }
     _log('转码完成，引擎开始播放 WAV');
   }
 
   void _onEngineEvent(EngineEvent event) {
     switch (event) {
       case EngineReady():
-        _log('引擎就绪: v${event.version} ${event.durationMs}ms @${event.sampleRate}Hz/${event.channels}ch');
+        _log(
+          '引擎就绪: v${event.version} ${event.durationMs}ms @${event.sampleRate}Hz/${event.channels}ch',
+        );
         // 完整时长（原 SPlayer-Next 行为：前端拿到完整时长，转码中即可显示）
         if (event.durationMs > 0) {
-          state = state.copyWith(duration: Duration(milliseconds: event.durationMs));
+          state = state.copyWith(
+            duration: Duration(milliseconds: event.durationMs),
+          );
         }
       case EngineStatus():
         if (event.playing != null) {
@@ -1045,8 +1137,10 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         // 位置为 WAV 相对值，转绝对（含会话偏移）
         if (event.positionMs > 0) {
           state = state.copyWith(
-              position: Duration(
-                  milliseconds: event.positionMs + _sessionOffsetMs));
+            position: Duration(
+              milliseconds: event.positionMs + _sessionOffsetMs,
+            ),
+          );
         }
       case EngineDone():
         _log('引擎转码完成');
@@ -1134,9 +1228,7 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
       if (track == null || state.playing) return;
       _log('从保存位置续播: ${track.title} @${state.position.inMilliseconds}ms');
       // ignore: discarded_futures
-      unawaited(
-        _resumeFrom(track, offsetMs: state.position.inMilliseconds),
-      );
+      unawaited(_resumeFrom(track, offsetMs: state.position.inMilliseconds));
       return;
     }
     if (state.playing) {
@@ -1162,5 +1254,6 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
 }
 
 /// 播放控制器（单一播放状态源，AppShell 渲染后可用）。
-final playbackProvider =
-    NotifierProvider<PlaybackNotifier, PlaybackState>(PlaybackNotifier.new);
+final playbackProvider = NotifierProvider<PlaybackNotifier, PlaybackState>(
+  PlaybackNotifier.new,
+);

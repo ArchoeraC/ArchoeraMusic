@@ -30,13 +30,14 @@ class EnginePaths {
     final fromCwd = Directory('${cwd.path}/core/audio-engine');
     if (fromCwd.existsSync()) return fromCwd.absolute.path;
 
-    throw StateError(
-        '无法定位 audio-engine：请设置 ARCHOERA_AUDIO_ENGINE 环境变量');
+    throw StateError('无法定位 audio-engine：请设置 ARCHOERA_AUDIO_ENGINE 环境变量');
   }
 
   /// 独立 FFT 分析库（fft.c 编译的共享库，Flutter FFI 复用 C 引擎分析器）。
   static String libfftPath() {
-    final name = Platform.isWindows ? 'fft.dll' : (Platform.isMacOS ? 'libfft.dylib' : 'libfft.so');
+    final name = Platform.isWindows
+        ? 'fft.dll'
+        : (Platform.isMacOS ? 'libfft.dylib' : 'libfft.so');
     return '${resolveEngineDir()}/build/$name';
   }
 }

@@ -66,7 +66,9 @@ class _StreamingPlaylistDetailPageState
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final playback = ref.watch(playbackProvider);
+    final playback = ref.watch(
+      playbackProvider.select((s) => (trackId: s.trackId, playing: s.playing)),
+    );
     final playlists = ref.watch(streamingProvider.select((s) => s.playlists));
     final meta = playlists.where((p) => p.id == widget.id).firstOrNull;
     final songs = _songs;
@@ -78,8 +80,7 @@ class _StreamingPlaylistDetailPageState
         title: meta?.name ?? '',
         subtitle: [
           if (meta?.owner?.isNotEmpty == true) meta!.owner!,
-          if (songs != null)
-            l10n.streamingPlaylistSongs(songs.length),
+          if (songs != null) l10n.streamingPlaylistSongs(songs.length),
         ].join(' · '),
         onPlayAll: songs == null || songs.isEmpty
             ? null

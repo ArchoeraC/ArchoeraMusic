@@ -1,9 +1,13 @@
+import 'dart:async' show Timer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme_provider.dart';
+import '../../services/weather/weather_notifier.dart';
 import '../../settings/settings_dialog.dart';
+import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
@@ -51,10 +55,10 @@ class _NavHeaderState extends ConsumerState<NavHeader> {
 
   /// 主题循环按钮图标（展示当前模式）。
   IconData get _themeIcon => switch (ref.watch(themeModeProvider)) {
-        ThemeMode.light => Icons.light_mode_outlined,
-        ThemeMode.dark => Icons.dark_mode_outlined,
-        ThemeMode.system => Icons.brightness_auto_outlined,
-      };
+    ThemeMode.light => Icons.light_mode_outlined,
+    ThemeMode.dark => Icons.dark_mode_outlined,
+    ThemeMode.system => Icons.brightness_auto_outlined,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +88,8 @@ class _NavHeaderState extends ConsumerState<NavHeader> {
               onSubmitted: _submitSearch,
             ),
             const Spacer(),
+            // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）
+            const _WeatherMini(),
             // 账号（多平台：网易云 / 酷狗 / QQ 音乐占位）
             const _AccountsMenu(),
             const SizedBox(width: 4),
@@ -111,13 +117,11 @@ class _NavHeaderState extends ConsumerState<NavHeader> {
                     children: [
                       Icon(_themeIcon, size: 17),
                       const SizedBox(width: 10),
-                      Text(
-                        switch (ref.watch(themeModeProvider)) {
-                          ThemeMode.light => l10n.navHeaderThemeLight,
-                          ThemeMode.dark => l10n.navHeaderThemeDark,
-                          ThemeMode.system => l10n.navHeaderThemeSystem,
-                        },
-                      ),
+                      Text(switch (ref.watch(themeModeProvider)) {
+                        ThemeMode.light => l10n.navHeaderThemeLight,
+                        ThemeMode.dark => l10n.navHeaderThemeDark,
+                        ThemeMode.system => l10n.navHeaderThemeSystem,
+                      }),
                     ],
                   ),
                 ),
@@ -176,10 +180,7 @@ class _AccountsMenu extends ConsumerWidget {
 
         Widget primary;
         if (primaryNetease) {
-          primary = _AccountAvatar(
-            avatarUrl: avatarUrl,
-            nickname: neteaseNick,
-          );
+          primary = _AccountAvatar(avatarUrl: avatarUrl, nickname: neteaseNick);
         } else if (primaryKugou) {
           primary = _AccountAvatar(
             avatarUrl: kugou.avatarUrl,
@@ -428,12 +429,17 @@ class _AccountAvatar extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final url = avatarUrl?.trim();
     if (url != null && url.isNotEmpty) {
+      // 头像仅 34px，按 dpr 降采样解码（原始头像图常为数百像素）
+      final dpr = MediaQuery.devicePixelRatioOf(context);
+      final avatarPx = (34 * dpr).round();
       return ClipOval(
         child: Image.network(
           url,
           width: 34,
           height: 34,
           fit: BoxFit.cover,
+          cacheWidth: avatarPx,
+          cacheHeight: avatarPx,
           errorBuilder: (_, _, _) => _fallback(colorScheme),
         ),
       );
@@ -457,6 +463,137 @@ class _AccountAvatar extends StatelessWidget {
           fontSize: 14,
           fontWeight: FontWeight.w600,
           color: colorScheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
+/// 微型天气（顶栏头像左侧）：图标 + 温度，默认关闭（隐私优先）。
+///
+/// 位置来源：IP 自动定位（默认关）或设置页手动城市。开启后立即拉取并每
+/// 30 分钟静默刷新，点击立即刷新；关闭时停表、零请求。数据仅展示在
+/// 悬浮提示（城市 · 温度），不落盘。
+class _WeatherMini extends ConsumerStatefulWidget {
+  const _WeatherMini();
+
+  @override
+  ConsumerState<_WeatherMini> createState() => _WeatherMiniState();
+}
+
+class _WeatherMiniState extends ConsumerState<_WeatherMini> {
+  /// 静默刷新间隔（微型组件不常驻请求）。
+  static const _refreshInterval = Duration(minutes: 30);
+
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  /// 当前位置配置（来自偏好）。
+  ({bool autoLocate, String? city}) get _locator {
+    final prefs = ref.read(appPrefsProvider);
+    return (autoLocate: prefs.weatherAutoLocate, city: prefs.weatherCity);
+  }
+
+  /// 开关/位置变化时同步：开启则立即拉取并启动周期刷新；关闭则停表。
+  void _sync() {
+    _timer?.cancel();
+    _timer = null;
+    if (!ref.read(appPrefsProvider).weatherEnabled) return;
+    final loc = _locator;
+    ref
+        .read(weatherProvider)
+        .refresh(autoLocate: loc.autoLocate, city: loc.city);
+    _timer = Timer.periodic(_refreshInterval, (_) {
+      final l = _locator;
+      ref.read(weatherProvider).refresh(autoLocate: l.autoLocate, city: l.city);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = ref.watch(appPrefsProvider);
+    // 偏好变化（开关 / 自动定位 / 城市）→ 同步拉取与定时器
+    ref.listen(appPrefsProvider, (prev, next) {
+      if (prev?.weatherEnabled != next.weatherEnabled ||
+          prev?.weatherAutoLocate != next.weatherAutoLocate ||
+          prev?.weatherCity != next.weatherCity) {
+        _sync();
+      }
+    });
+    if (!prefs.weatherEnabled) return const SizedBox.shrink();
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    final w = ref.watch(weatherProvider);
+    final loc = _locator;
+
+    final Widget content;
+    final String tooltip;
+    final now = w.now;
+    if (now != null) {
+      content = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(now.icon, size: 14, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 3),
+          Text(
+            '${now.tempC.round()}°',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      );
+      tooltip =
+          '${now.city} · ${now.tempC.toStringAsFixed(1)}°C · '
+          '${l10n.weatherRefresh}';
+    } else if (w.loading) {
+      // 首次拉取中：占位图标（避免闪烁）
+      content = Icon(
+        Icons.cloud_outlined,
+        size: 14,
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+      );
+      tooltip = '';
+    } else if (w.error == weatherNoLocationError) {
+      content = Icon(
+        Icons.cloud_off_outlined,
+        size: 14,
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+      );
+      tooltip = l10n.weatherNoLocation;
+    } else {
+      content = Icon(
+        Icons.cloud_off_outlined,
+        size: 14,
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+      );
+      tooltip = l10n.weatherUnavailable;
+    }
+
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 600),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => ref
+            .read(weatherProvider)
+            .refresh(autoLocate: loc.autoLocate, city: loc.city),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: content,
         ),
       ),
     );

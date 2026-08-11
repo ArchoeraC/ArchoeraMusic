@@ -23,22 +23,19 @@ import '../common/toast.dart';
 
 /// 酷狗评论 → 弹窗通用展示模型（字段与 NeteaseComment 对齐）。
 NeteaseComment _kgToTile(KugouComment c) => NeteaseComment(
-      id: c.id,
-      userName: c.userName,
-      avatar: c.avatar,
-      text: c.text,
-      location: c.location,
-      likedCount: c.likedCount,
-      replyTotal: c.replyTotal,
-      time: c.timeMs,
-      reply: c.reply.map(_kgToTile).toList(),
-    );
+  id: c.id,
+  userName: c.userName,
+  avatar: c.avatar,
+  text: c.text,
+  location: c.location,
+  likedCount: c.likedCount,
+  replyTotal: c.replyTotal,
+  time: c.timeMs,
+  reply: c.reply.map(_kgToTile).toList(),
+);
 
 /// 打开歌曲评论弹窗。
-Future<void> showCommentDialog(
-  BuildContext context, {
-  required Track track,
-}) {
+Future<void> showCommentDialog(BuildContext context, {required Track track}) {
   return showDialog<void>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.5),
@@ -58,6 +55,9 @@ class CommentDialog extends ConsumerStatefulWidget {
 }
 
 class _CommentDialogState extends ConsumerState<CommentDialog> {
+  /// 累计评论条数上限：超出截断并停止触底加载（防长回复列表撑爆内存）。
+  static const _maxComments = 400;
+
   /// 匹配到的网易云歌曲 id（null = 匹配中/失败）。
   String? _songId;
 
@@ -137,6 +137,8 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   Future<void> _load({bool reset = false}) async {
     final id = _songId;
     if (id == null) return;
+    // 已达累计上限：停止触底加载（列表截断保留最新 [_maxComments] 条）
+    if (!reset && (_page?.list.length ?? 0) >= _maxComments) return;
     final nextPage = reset ? 1 : (_page?.page ?? 1) + 1;
     setState(() {
       _loading = true;
@@ -146,18 +148,11 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
       final page = _isKugou
           ? await _loadKg(id, page: nextPage)
           : _hot
-              ? await _api.songHotComments(id, page: nextPage)
-              : await _api.songComments(id, page: nextPage);
+          ? await _api.songHotComments(id, page: nextPage)
+          : await _api.songComments(id, page: nextPage);
       if (!mounted) return;
       setState(() {
-        _page = reset
-            ? page
-            : NeteaseCommentPage(
-                list: [...?_page?.list, ...page.list],
-                total: page.total,
-                page: nextPage,
-                limit: page.limit,
-              );
+        _page = reset ? page : _mergePage(page, nextPage);
         _loading = false;
       });
     } catch (_) {
@@ -180,9 +175,22 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
     );
   }
 
+  /// 下一页并入累计列表并限长：超过 [_maxComments] 从尾部截断（保留最新）。
+  NeteaseCommentPage _mergePage(NeteaseCommentPage next, int page) {
+    final merged = [...?_page?.list, ...next.list];
+    final capped = merged.length > _maxComments
+        ? merged.sublist(merged.length - _maxComments)
+        : merged;
+    return NeteaseCommentPage(
+      list: capped,
+      total: next.total,
+      page: page,
+      limit: next.limit,
+    );
+  }
+
   void _onScroll() {
-    if (_scroll.position.pixels >=
-        _scroll.position.maxScrollExtent - 240) {
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 240) {
       _load();
     }
   }
@@ -253,117 +261,116 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
         radius: BorderRadius.circular(16),
         color: scheme.surfaceContainer,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 560,
-            maxHeight: 560,
-          ),
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-            // ── 标题行 ─────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.commentTitle,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.track.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: l10n.commonClose,
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            // ── Tab：热门 / 最新（酷狗无「最新」，整行隐藏）──────────
-            if (!_isKugou)
+              // ── 标题行 ─────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: SSegmented<bool>(
-                  options: [
-                    SSegmentedOption(true, l10n.commentHot),
-                    SSegmentedOption(false, l10n.commentLatest),
-                  ],
-                  selected: _hot,
-                  onChanged: _switchTab,
-                ),
-              ),
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-            // ── 评论列表 ───────────────────────────────────────
-            Expanded(child: _buildListArea(scheme, l10n)),
-            // ── 发送评论输入栏（仅网易云源；酷狗接口需签名鉴权未接入）────
-            if (!_isKugou && _songId != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
                 child: Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: _input,
-                        enabled: !_sending,
-                        maxLength: 500,
-                        style: theme.textTheme.bodyMedium,
-                        decoration: InputDecoration(
-                          hintText: l10n.commentInputHint,
-                          hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                            color: scheme.onSurfaceVariant,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.commentTitle,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                          counterText: '',
-                          isDense: true,
-                          filled: true,
-                          fillColor: scheme.surface.withValues(alpha: 0.6),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.track.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _send(),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      tooltip: l10n.commentSend,
-                      onPressed: _sending ? null : _send,
-                      icon: _sending
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.send, size: 18),
+                    IconButton(
+                      tooltip: l10n.commonClose,
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
               ),
-          ],
-        ),
+              // ── Tab：热门 / 最新（酷狗无「最新」，整行隐藏）──────────
+              if (!_isKugou)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: SSegmented<bool>(
+                    options: [
+                      SSegmentedOption(true, l10n.commentHot),
+                      SSegmentedOption(false, l10n.commentLatest),
+                    ],
+                    selected: _hot,
+                    onChanged: _switchTab,
+                  ),
+                ),
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+              // ── 评论列表 ───────────────────────────────────────
+              Expanded(child: _buildListArea(scheme, l10n)),
+              // ── 发送评论输入栏（仅网易云源；酷狗接口需签名鉴权未接入）────
+              if (!_isKugou && _songId != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _input,
+                          enabled: !_sending,
+                          maxLength: 500,
+                          style: theme.textTheme.bodyMedium,
+                          decoration: InputDecoration(
+                            hintText: l10n.commentInputHint,
+                            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            counterText: '',
+                            isDense: true,
+                            filled: true,
+                            fillColor: scheme.surface.withValues(alpha: 0.6),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _send(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        tooltip: l10n.commentSend,
+                        onPressed: _sending ? null : _send,
+                        icon: _sending
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.send, size: 18),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -381,7 +388,8 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
         return _EmptyHint(
           icon: Icons.cloud_off_outlined,
           text: l10n.commentNotFound(
-              _isKugou ? l10n.brandKugou : l10n.brandNetease),
+            _isKugou ? l10n.brandKugou : l10n.brandNetease,
+          ),
         );
       }
       return _commentSpinner();
@@ -443,9 +451,8 @@ class _CommentTile extends StatelessWidget {
     if (t == null) return '';
     final dt = DateTime.fromMillisecondsSinceEpoch(t);
     final now = DateTime.now();
-    final sameDay = dt.year == now.year &&
-        dt.month == now.month &&
-        dt.day == now.day;
+    final sameDay =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
     if (sameDay) return '$hh:$mm';
@@ -581,12 +588,17 @@ class _Avatar extends StatelessWidget {
     );
     final url = avatar;
     if (url == null || url.isEmpty) return placeholder;
+    // 头像 36px，按 dpr 降采样解码
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final avatarPx = (radius * 2 * dpr).round();
     return ClipOval(
       child: Image.network(
         withPicSize(url, 100),
         width: radius * 2,
         height: radius * 2,
         fit: BoxFit.cover,
+        cacheWidth: avatarPx,
+        cacheHeight: avatarPx,
         errorBuilder: (_, _, _) => placeholder,
       ),
     );
@@ -607,13 +619,17 @@ class _EmptyHint extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 40, color: scheme.onSurfaceVariant.withValues(alpha: 0.5)),
+          Icon(
+            icon,
+            size: 40,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+          ),
           const SizedBox(height: 10),
           Text(
             text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),

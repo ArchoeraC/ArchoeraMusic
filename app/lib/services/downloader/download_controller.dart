@@ -182,27 +182,26 @@ class DownloadTask {
     int? fileSize,
     String? actualQuality,
     int? speed,
-  }) =>
-      DownloadTask(
-        taskId: taskId,
-        trackId: trackId ?? this.trackId,
-        source: source ?? this.source,
-        platformId: platformId ?? this.platformId,
-        title: title ?? this.title,
-        artist: artist ?? this.artist,
-        album: album ?? this.album,
-        quality: quality ?? this.quality,
-        status: status ?? this.status,
-        error: error ?? this.error,
-        retryable: retryable ?? this.retryable,
-        stage: stage ?? this.stage,
-        received: received ?? this.received,
-        total: total ?? this.total,
-        filePath: filePath ?? this.filePath,
-        fileSize: fileSize ?? this.fileSize,
-        actualQuality: actualQuality ?? this.actualQuality,
-        speed: speed ?? this.speed,
-      );
+  }) => DownloadTask(
+    taskId: taskId,
+    trackId: trackId ?? this.trackId,
+    source: source ?? this.source,
+    platformId: platformId ?? this.platformId,
+    title: title ?? this.title,
+    artist: artist ?? this.artist,
+    album: album ?? this.album,
+    quality: quality ?? this.quality,
+    status: status ?? this.status,
+    error: error ?? this.error,
+    retryable: retryable ?? this.retryable,
+    stage: stage ?? this.stage,
+    received: received ?? this.received,
+    total: total ?? this.total,
+    filePath: filePath ?? this.filePath,
+    fileSize: fileSize ?? this.fileSize,
+    actualQuality: actualQuality ?? this.actualQuality,
+    speed: speed ?? this.speed,
+  );
 }
 
 // ----------------------------------------------------------------
@@ -225,8 +224,7 @@ class DownloadState {
   /// 任务列表（入队顺序，新任务追加在尾部）。
   final List<DownloadTask> tasks;
 
-  int get activeCount =>
-      tasks.where((t) => t.isActive).length;
+  int get activeCount => tasks.where((t) => t.isActive).length;
 
   int get doneCount => tasks.where((t) => t.isDone).length;
 
@@ -234,12 +232,11 @@ class DownloadState {
     bool? initializing,
     String? initError,
     List<DownloadTask>? tasks,
-  }) =>
-      DownloadState(
-        initializing: initializing ?? this.initializing,
-        initError: initError ?? this.initError,
-        tasks: tasks ?? this.tasks,
-      );
+  }) => DownloadState(
+    initializing: initializing ?? this.initializing,
+    initError: initError ?? this.initError,
+    tasks: tasks ?? this.tasks,
+  );
 }
 
 // ----------------------------------------------------------------
@@ -345,10 +342,7 @@ class DownloadController extends Notifier<DownloadState> {
       }
     } catch (e) {
       if (gen != _gen) return;
-      state = state.copyWith(
-        initializing: false,
-        initError: '下载引擎初始化失败：$e',
-      );
+      state = state.copyWith(initializing: false, initError: '下载引擎初始化失败：$e');
       return;
     }
     _engine = engine;
@@ -368,7 +362,9 @@ class DownloadController extends Notifier<DownloadState> {
     final engine = _engine;
     if (engine == null || !engine.isInitialized) return null;
     final q = quality ?? ref.read(appPrefsProvider).downloadQuality;
-    final (code, taskId) = engine.enqueue(buildDownloadRequest(track, quality: q));
+    final (code, taskId) = engine.enqueue(
+      buildDownloadRequest(track, quality: q),
+    );
     if (code != 0 || taskId.isEmpty) return null;
     // 事件可能在 enqueue 同步回调期间已创建占位任务（无元数据）→ 合并元数据。
     // 同一任务重复入队（Rust 去重返回相同 taskId）也走此路径，元数据幂等。
@@ -393,11 +389,14 @@ class DownloadController extends Notifier<DownloadState> {
     if (engine == null || !engine.isInitialized) return;
     engine.cancel(taskId);
     // 先置 canceled，随后 Rust 的 Error(已取消) 事件是幂等覆盖。
-    _applyTask(taskId, (t) => (t ?? DownloadTask(taskId: taskId)).copyWith(
-      status: 'canceled',
-      error: '已取消',
-      retryable: false,
-    ));
+    _applyTask(
+      taskId,
+      (t) => (t ?? DownloadTask(taskId: taskId)).copyWith(
+        status: 'canceled',
+        error: '已取消',
+        retryable: false,
+      ),
+    );
   }
 
   /// 重试失败/已取消任务（Rust 复用原 taskId，URL 重新解析）。
@@ -415,10 +414,13 @@ class DownloadController extends Notifier<DownloadState> {
     if (engine == null || !engine.isInitialized) return;
     engine.pause(taskId);
     // 本地乐观置 paused（Rust 随后推 state 事件幂等覆盖）。
-    _applyTask(taskId, (t) => (t ?? DownloadTask(taskId: taskId)).copyWith(
-      status: 'paused',
-      speed: 0,
-    ));
+    _applyTask(
+      taskId,
+      (t) => (t ?? DownloadTask(taskId: taskId)).copyWith(
+        status: 'paused',
+        speed: 0,
+      ),
+    );
   }
 
   /// 移除下载任务：删除任务项 + .tmp 缓存；[deleteFile] 为 true 时精确删除
@@ -453,9 +455,7 @@ class DownloadController extends Notifier<DownloadState> {
     engine.pauseAll();
     // queued → paused 由 Rust 同步推 state；running 由下载循环推
     final tasks = state.tasks
-        .map((t) => t.isActive
-            ? t.copyWith(status: 'paused', speed: 0)
-            : t)
+        .map((t) => t.isActive ? t.copyWith(status: 'paused', speed: 0) : t)
         .toList();
     state = state.copyWith(tasks: tasks);
   }
@@ -528,7 +528,10 @@ class DownloadController extends Notifier<DownloadState> {
           (t) => (t ?? DownloadTask(taskId: taskId)).copyWith(
             status: to,
             // 进入暂停/终态时速度归零
-            speed: (to == 'paused' || to == 'done' || to == 'canceled' ||
+            speed:
+                (to == 'paused' ||
+                    to == 'done' ||
+                    to == 'canceled' ||
                     to == 'failed')
                 ? 0
                 : null,
@@ -546,24 +549,21 @@ class DownloadController extends Notifier<DownloadState> {
       case 'done':
         // v2.1：Done 事件携带引擎自主寻找的 title/artist/album，非空才覆盖
         // （避免空串冲掉 enqueue 时已展示的元数据）。
-        _applyTask(
-          taskId,
-          (t) {
-            final cur = t ?? DownloadTask(taskId: taskId);
-            final enrTitle = evt['title'] as String? ?? '';
-            final enrArtist = evt['artist'] as String? ?? '';
-            final enrAlbum = evt['album'] as String? ?? '';
-            return cur.copyWith(
-              status: 'done',
-              filePath: evt['filePath'] as String?,
-              fileSize: (evt['fileSize'] as num?)?.toInt(),
-              actualQuality: evt['actualQuality'] as String?,
-              title: enrTitle.isNotEmpty ? enrTitle : null,
-              artist: enrArtist.isNotEmpty ? enrArtist : null,
-              album: enrAlbum.isNotEmpty ? enrAlbum : null,
-            );
-          },
-        );
+        _applyTask(taskId, (t) {
+          final cur = t ?? DownloadTask(taskId: taskId);
+          final enrTitle = evt['title'] as String? ?? '';
+          final enrArtist = evt['artist'] as String? ?? '';
+          final enrAlbum = evt['album'] as String? ?? '';
+          return cur.copyWith(
+            status: 'done',
+            filePath: evt['filePath'] as String?,
+            fileSize: (evt['fileSize'] as num?)?.toInt(),
+            actualQuality: evt['actualQuality'] as String?,
+            title: enrTitle.isNotEmpty ? enrTitle : null,
+            artist: enrArtist.isNotEmpty ? enrArtist : null,
+            album: enrAlbum.isNotEmpty ? enrAlbum : null,
+          );
+        });
       case 'error':
         final msg = evt['error'] as String? ?? '未知错误';
         // Rust 取消路径统一推 Error(已取消, retryable=false)
@@ -603,19 +603,21 @@ class DownloadController extends Notifier<DownloadState> {
     state = state.copyWith(tasks: tasks);
   }
 
-  /// 记录上限裁剪：failed/canceled 条目超过 [downloadHistoryLimitProvider]
-  /// 时按入队顺序淘汰最旧（任务列表尾部追加，最旧在前）。与 Rust
-  /// `prune_finished` 语义一致；Rust 裁剪不发事件，UI 在此同步。
+  /// 记录上限裁剪：failed/canceled/done/already 条目超过
+  /// [downloadHistoryLimitProvider] 时按入队顺序淘汰最旧（任务列表尾部
+  /// 追加，最旧在前）。与 Rust `prune_finished` 语义一致；Rust 裁剪不发
+  /// 事件，UI 在此同步。done/already 已落盘，可安全淘汰释放内存。
   void _pruneHistory() {
     final limit = ref.read(downloadHistoryLimitProvider);
     final tasks = state.tasks;
-    final failedCount = tasks.where((t) => t.isFailed).length;
-    if (failedCount <= limit) return;
-    final dropCount = failedCount - limit;
+    // 已完成 / 已失败 / 已取消均视为历史记录（进行中任务不受裁）
+    final finished = tasks.where((t) => t.isDone || t.isFailed).length;
+    if (finished <= limit) return;
+    final dropCount = finished - limit;
     final dropIds = <String>{};
     for (final t in tasks) {
       if (dropIds.length >= dropCount) break;
-      if (t.isFailed) dropIds.add(t.taskId);
+      if (t.isDone || t.isFailed) dropIds.add(t.taskId);
     }
     if (dropIds.isEmpty) return;
     state = state.copyWith(
@@ -632,7 +634,10 @@ final downloadControllerProvider =
 // ----------------------------------------------------------------
 
 /// 由 [Track] 构造 enqueue 请求 JSON（对齐 Rust `EnqueueRequest` camelCase）。
-Map<String, dynamic> buildDownloadRequest(Track track, {String quality = 'hq'}) {
+Map<String, dynamic> buildDownloadRequest(
+  Track track, {
+  String quality = 'hq',
+}) {
   final kugou = track.kugou;
   return {
     'trackId': track.id,

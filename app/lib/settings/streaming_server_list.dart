@@ -50,7 +50,8 @@ class StreamingServerList extends ConsumerStatefulWidget {
   const StreamingServerList({super.key});
 
   @override
-  ConsumerState<StreamingServerList> createState() => _StreamingServerListState();
+  ConsumerState<StreamingServerList> createState() =>
+      _StreamingServerListState();
 }
 
 class _StreamingServerListState extends ConsumerState<StreamingServerList> {
@@ -187,9 +188,10 @@ class _StreamingServerListState extends ConsumerState<StreamingServerList> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _TypeTag(label: streamingTypeLabels[cfg.type] ?? cfg.type.name),
-                    if (isActive)
-                      _buildStatusTag(l10n, state, isConnected),
+                    _TypeTag(
+                      label: streamingTypeLabels[cfg.type] ?? cfg.type.name,
+                    ),
+                    if (isActive) _buildStatusTag(l10n, state, isConnected),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -241,8 +243,8 @@ class _StreamingServerListState extends ConsumerState<StreamingServerList> {
           color: isConnected
               ? _okGreen
               : (state.connectionError != null && isActive)
-                  ? scheme.error
-                  : _warnOrange,
+              ? scheme.error
+              : _warnOrange,
         ),
       ),
     );
@@ -260,8 +262,8 @@ class _StreamingServerListState extends ConsumerState<StreamingServerList> {
         label: isConnected
             ? l10n.streamingServerConnected
             : (state.connecting
-                ? l10n.commonLoading
-                : l10n.streamingServerDisconnected),
+                  ? l10n.commonLoading
+                  : l10n.streamingServerDisconnected),
         color: isConnected ? _okGreen : _warnOrange,
       ),
     );
@@ -436,11 +438,7 @@ class _TypeTag extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: c,
-        ),
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c),
       ),
     );
   }
@@ -496,8 +494,12 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
   }
 
   String? _validate(AppLocalizations l10n) {
-    if (_nameCtrl.text.trim().isEmpty) return l10n.streamingServerErrorNameEmpty;
-    if (_hostCtrl.text.trim().isEmpty) return l10n.streamingServerErrorHostEmpty;
+    if (_nameCtrl.text.trim().isEmpty) {
+      return l10n.streamingServerErrorNameEmpty;
+    }
+    if (_hostCtrl.text.trim().isEmpty) {
+      return l10n.streamingServerErrorHostEmpty;
+    }
     final port = _portCtrl.text.trim();
     if (port.isNotEmpty) {
       final p = int.tryParse(port);
@@ -513,15 +515,15 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
   }
 
   StreamingServerInput get _input => StreamingServerInput(
-        name: _nameCtrl.text.trim(),
-        type: _type,
-        host: _isLocal ? 'localhost' : _hostCtrl.text.trim(),
-        port: int.tryParse(_portCtrl.text.trim()),
-        isArchoeraServer: _isLocal,
-        useHttps: _useHttps,
-        username: _userCtrl.text.trim(),
-        password: _passCtrl.text,
-      );
+    name: _nameCtrl.text.trim(),
+    type: _type,
+    host: _isLocal ? 'localhost' : _hostCtrl.text.trim(),
+    port: int.tryParse(_portCtrl.text.trim()),
+    isArchoeraServer: _isLocal,
+    useHttps: _useHttps,
+    username: _userCtrl.text.trim(),
+    password: _passCtrl.text,
+  );
 
   Future<void> _handleTest(AppLocalizations l10n) async {
     final invalid = _validate(l10n);
@@ -566,7 +568,11 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
     }
     if (!mounted) return;
     Navigator.of(context).pop();
-    toast(existing == null ? l10n.streamingServerAdded : l10n.streamingServerUpdated);
+    toast(
+      existing == null
+          ? l10n.streamingServerAdded
+          : l10n.streamingServerUpdated,
+    );
   }
 
   @override
@@ -578,11 +584,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _field(
-          scheme,
-          l10n.streamingServerType,
-          child: _typeDropdown(scheme),
-        ),
+        _field(scheme, l10n.streamingServerType, child: _typeDropdown(scheme)),
         _field(
           scheme,
           l10n.streamingServerName,
@@ -665,10 +667,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
         _field(
           scheme,
           l10n.streamingServerPassword,
-          child: SInput(
-            controller: _passCtrl,
-            obscureText: true,
-          ),
+          child: SInput(controller: _passCtrl, obscureText: true),
         ),
         // 校验错误
         if (_formError != null)
@@ -685,8 +684,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
             ),
           ),
         // 测试结果
-        if (_testResult != null)
-          _buildTestResult(scheme, l10n, testOk),
+        if (_testResult != null) _buildTestResult(scheme, l10n, testOk),
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -706,9 +704,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
               variant: SButtonVariant.secondary,
               size: SButtonSize.small,
               loading: _testing,
-              onPressed: _submitting
-                  ? null
-                  : () => _handleTest(l10n),
+              onPressed: _submitting ? null : () => _handleTest(l10n),
             ),
             const SizedBox(width: 10),
             SButton(
@@ -754,8 +750,8 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
                 child: Text(
                   testOk
                       ? (result.version != null
-                          ? '${l10n.streamingServerTestOk} · v${result.version}'
-                          : l10n.streamingServerTestOk)
+                            ? '${l10n.streamingServerTestOk} · v${result.version}'
+                            : l10n.streamingServerTestOk)
                       : l10n.streamingServerTestFail,
                   style: TextStyle(
                     fontSize: 12,
@@ -770,10 +766,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
             const SizedBox(height: 4),
             Text(
               result.error!,
-              style: TextStyle(
-                fontSize: 11,
-                color: scheme.onSurfaceVariant,
-              ),
+              style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
             ),
           ],
         ],
@@ -813,11 +806,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
     );
   }
 
-  Widget _field(
-    ColorScheme scheme,
-    String label, {
-    required Widget child,
-  }) {
+  Widget _field(ColorScheme scheme, String label, {required Widget child}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(

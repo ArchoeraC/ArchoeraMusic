@@ -86,30 +86,32 @@ class KugouTrackInfo {
   final int? sort;
 
   Map<String, dynamic> toJson() => {
-        'hash': hash,
-        'hashes': hashes,
-        'sizes': sizes,
-        'fileid': fileid,
-        'albumId': albumId,
-        'mixSongId': mixSongId,
-        'sort': sort,
-      };
+    'hash': hash,
+    'hashes': hashes,
+    'sizes': sizes,
+    'fileid': fileid,
+    'albumId': albumId,
+    'mixSongId': mixSongId,
+    'sort': sort,
+  };
 
   factory KugouTrackInfo.fromJson(Map<String, dynamic> json) => KugouTrackInfo(
-        hash: json['hash']?.toString() ?? '',
-        hashes: (json['hashes'] as Map?)?.map(
-              (k, v) => MapEntry(k.toString(), v.toString()),
-            ) ??
-            const {},
-        sizes: (json['sizes'] as Map?)?.map(
-              (k, v) => MapEntry(k.toString(), (v as num).toInt()),
-            ) ??
-            const {},
-        fileid: (json['fileid'] as num?)?.toInt(),
-        albumId: (json['albumId'] as num?)?.toInt(),
-        mixSongId: (json['mixSongId'] as num?)?.toInt(),
-        sort: (json['sort'] as num?)?.toInt(),
-      );
+    hash: json['hash']?.toString() ?? '',
+    hashes:
+        (json['hashes'] as Map?)?.map(
+          (k, v) => MapEntry(k.toString(), v.toString()),
+        ) ??
+        const {},
+    sizes:
+        (json['sizes'] as Map?)?.map(
+          (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+        ) ??
+        const {},
+    fileid: (json['fileid'] as num?)?.toInt(),
+    albumId: (json['albumId'] as num?)?.toInt(),
+    mixSongId: (json['mixSongId'] as num?)?.toInt(),
+    sort: (json['sort'] as num?)?.toInt(),
+  );
 
   /// 可用品质 key 列表。
   List<String> get available => hashes.keys.toList();
@@ -171,10 +173,9 @@ const qualityLabels = <String, String>{
 /// 酷狗 `singername`（"A、B"）→ 歌手列表。
 List<TrackArtist> kugouArtists(String? raw) {
   if (raw == null || raw.isEmpty) return const [];
-  final names = kgDecodeName(raw)
-      .split(RegExp(r'、|,|;|/'))
-      .map((s) => s.trim())
-      .where((s) => s.isNotEmpty);
+  final names = kgDecodeName(
+    raw,
+  ).split(RegExp(r'、|,|;|/')).map((s) => s.trim()).where((s) => s.isNotEmpty);
   return names.map((n) => TrackArtist(name: n)).toList();
 }
 
@@ -186,16 +187,16 @@ class TrackArtist {
   final String name;
 
   factory TrackArtist.fromNetease(Map<String, dynamic> json) => TrackArtist(
-        id: json['id']?.toString(),
-        name: json['name']?.toString() ?? '',
-      );
+    id: json['id']?.toString(),
+    name: json['name']?.toString() ?? '',
+  );
 
   Map<String, dynamic> toJson() => {'id': id, 'name': name};
 
   factory TrackArtist.fromJson(Map<String, dynamic> json) => TrackArtist(
-        id: json['id']?.toString(),
-        name: json['name']?.toString() ?? '',
-      );
+    id: json['id']?.toString(),
+    name: json['name']?.toString() ?? '',
+  );
 }
 
 /// 专辑。
@@ -218,10 +219,10 @@ class TrackAlbum {
   Map<String, dynamic> toJson() => {'id': id, 'name': name, 'cover': cover};
 
   factory TrackAlbum.fromJson(Map<String, dynamic> json) => TrackAlbum(
-        id: json['id']?.toString(),
-        name: json['name']?.toString() ?? '',
-        cover: json['cover']?.toString(),
-      );
+    id: json['id']?.toString(),
+    name: json['name']?.toString() ?? '',
+    cover: json['cover']?.toString(),
+  );
 }
 
 /// 音频品质信息（流媒体服务器返回，对齐 @shared/types/player Track.quality）。
@@ -241,20 +242,20 @@ class TrackQuality {
   final String codec;
 
   Map<String, dynamic> toJson() => {
-        'sampleRate': sampleRate,
-        'channels': channels,
-        'bitsPerSample': bitsPerSample,
-        'bitRate': bitRate,
-        'codec': codec,
-      };
+    'sampleRate': sampleRate,
+    'channels': channels,
+    'bitsPerSample': bitsPerSample,
+    'bitRate': bitRate,
+    'codec': codec,
+  };
 
   factory TrackQuality.fromJson(Map<String, dynamic> json) => TrackQuality(
-        sampleRate: (json['sampleRate'] as num?)?.toInt() ?? 0,
-        channels: (json['channels'] as num?)?.toInt() ?? 2,
-        bitsPerSample: (json['bitsPerSample'] as num?)?.toInt() ?? 0,
-        bitRate: (json['bitRate'] as num?)?.toInt() ?? 0,
-        codec: json['codec']?.toString() ?? '',
-      );
+    sampleRate: (json['sampleRate'] as num?)?.toInt() ?? 0,
+    channels: (json['channels'] as num?)?.toInt() ?? 2,
+    bitsPerSample: (json['bitsPerSample'] as num?)?.toInt() ?? 0,
+    bitRate: (json['bitRate'] as num?)?.toInt() ?? 0,
+    codec: json['codec']?.toString() ?? '',
+  );
 }
 
 /// 歌曲（netease / kugou song → Track）。
@@ -277,6 +278,7 @@ class Track {
     this.coverOriginal,
     this.fileSize,
     this.quality,
+    this.isOriginal = false,
   });
 
   final String id;
@@ -320,37 +322,41 @@ class Track {
   /// 文件大小（字节；仅服务器明确返回时存在）。
   final int? fileSize;
 
-  /// 音频品质信息（仅流媒体服务器返回时存在）。
+  /// 音频品质信息（网易云 hr/sq/h/m/l、酷狗最高档、流媒体服务器返回时存在）。
   final TrackQuality? quality;
+
+  /// 是否为原唱（酷狗 `IsOriginal == 1` 时置位；翻唱/伴奏不置位）。
+  final bool isOriginal;
 
   String get artistNames => artists.map((a) => a.name).join(' / ');
 
   /// 替换酷狗品质信息，其余字段原样保留（下载前补齐 hash 链时使用）。
   Track copyWithKugou(KugouTrackInfo? kugou) => Track(
-        id: id,
-        title: title,
-        comment: comment,
-        artists: artists,
-        album: album,
-        duration: duration,
-        cover: cover,
-        fee: fee,
-        source: source,
-        kugou: kugou,
-        localPath: localPath,
-        lyrics: lyrics,
-        serverId: serverId,
-        originalId: originalId,
-        coverOriginal: coverOriginal,
-        fileSize: fileSize,
-        quality: quality,
-      );
+    id: id,
+    title: title,
+    comment: comment,
+    artists: artists,
+    album: album,
+    duration: duration,
+    cover: cover,
+    fee: fee,
+    source: source,
+    kugou: kugou,
+    localPath: localPath,
+    lyrics: lyrics,
+    serverId: serverId,
+    originalId: originalId,
+    coverOriginal: coverOriginal,
+    fileSize: fileSize,
+    quality: quality,
+    isOriginal: isOriginal,
+  );
 
   /// 列表副标题：歌手 + 副标题。
   String get subtitle => [
-        if (artistNames.isNotEmpty) artistNames,
-        if (comment != null && comment!.isNotEmpty) '（$comment）',
-      ].join(' ');
+    if (artistNames.isNotEmpty) artistNames,
+    if (comment != null && comment!.isNotEmpty) '（$comment）',
+  ].join(' ');
 
   /// 网易云 song 对象 → Track（对齐 songToTrack）。
   factory Track.fromNeteaseSong(Map<String, dynamic> song) {
@@ -380,7 +386,48 @@ class Track {
       duration: song['dt'] ?? song['duration'] ?? 0,
       cover: album?.cover,
       fee: _toTrackFee(song['fee']),
+      quality: _pickNeteaseQuality(song),
     );
+  }
+
+  /// 由 song 的 `hr`/`sq`/`h`/`m`/`l` 字段选择最佳音质（对齐
+  /// SPlayer-Next `utils/format/netease.ts` 的 pickQuality）：
+  /// 优先 Hi-Res（flac 24bit，采样率按 96kHz 起步）→ 无损（flac 16bit）
+  /// → 最高 MP3 档（h=320k / m=192k / l=128k）。搜索/歌单接口不返回
+  /// hr/sq 时安全回退为 null（列表不显示音质标签）。
+  static TrackQuality? _pickNeteaseQuality(Map<String, dynamic> song) {
+    TrackQuality mp3(Map<String, dynamic> q, int bits) => TrackQuality(
+      codec: 'mp3',
+      sampleRate: (q['sr'] as num?)?.toInt() ?? 0,
+      bitsPerSample: bits,
+      bitRate: (q['br'] as num?)?.toInt() ?? 0,
+      channels: 2,
+    );
+    final hr = song['hr'];
+    if (hr is Map<String, dynamic>) {
+      return TrackQuality(
+        codec: 'flac',
+        sampleRate: ((hr['sr'] as num?)?.toInt() ?? 0) >= 96000
+            ? (hr['sr'] as num).toInt()
+            : 96000,
+        bitsPerSample: 24,
+        bitRate: (hr['br'] as num?)?.toInt() ?? 0,
+        channels: 2,
+      );
+    }
+    final sq = song['sq'];
+    if (sq is Map<String, dynamic>) {
+      return TrackQuality(
+        codec: 'flac',
+        sampleRate: (sq['sr'] as num?)?.toInt() ?? 0,
+        bitsPerSample: 16,
+        bitRate: (sq['br'] as num?)?.toInt() ?? 0,
+        channels: 2,
+      );
+    }
+    final mp3Raw = song['h'] ?? song['m'] ?? song['l'];
+    if (mp3Raw is Map<String, dynamic>) return mp3(mp3Raw, 16);
+    return null;
   }
 
   /// 酷狗 song 对象 → Track（兼容 mobilecdn 小写字段与 songsearch PascalCase 字段）。
@@ -407,11 +454,11 @@ class Track {
       final singers = song['Singers'];
       artists = singers is List
           ? singers
-              .whereType<Map<String, dynamic>>()
-              .map((s) => s['name']?.toString() ?? '')
-              .where((n) => n.isNotEmpty)
-              .map((n) => TrackArtist(name: kgDecodeName(n)))
-              .toList()
+                .whereType<Map<String, dynamic>>()
+                .map((s) => s['name']?.toString() ?? '')
+                .where((n) => n.isNotEmpty)
+                .map((n) => TrackArtist(name: kgDecodeName(n)))
+                .toList()
           : const [];
     }
 
@@ -431,10 +478,16 @@ class Track {
     }
 
     add('128k', hash, song['filesize'] ?? song['FileSize']);
-    add('320k', song['320hash'] ?? song['HQFileHash'],
-        song['320filesize'] ?? song['HQFileSize']);
-    add('flac', song['sqhash'] ?? song['SQFileHash'],
-        song['sqfilesize'] ?? song['SQFileSize']);
+    add(
+      '320k',
+      song['320hash'] ?? song['HQFileHash'],
+      song['320filesize'] ?? song['HQFileSize'],
+    );
+    add(
+      'flac',
+      song['sqhash'] ?? song['SQFileHash'],
+      song['sqfilesize'] ?? song['SQFileSize'],
+    );
     add(
       'flac24bit',
       song['hires_hash'] ?? song['reshash'] ?? song['ResFileHash'],
@@ -456,17 +509,32 @@ class Track {
       artists: artists,
       album: albumName.isEmpty
           ? null
-          : TrackAlbum(
-              name: albumName,
-              cover: kgFillCover(coverTpl, 300),
-            ),
+          : TrackAlbum(name: albumName, cover: kgFillCover(coverTpl, 300)),
       duration: sec * 1000,
       cover: kgFillCover(coverTpl, 300),
       source: 'kugou',
       kugou: hashes.isEmpty
           ? null
           : KugouTrackInfo(hash: hash, hashes: hashes, sizes: sizes),
+      // 原唱标识（MoeKoeMusic `Number(IsOriginal) === 1`）+ 酷狗版权
+      // privilege == 10 → VIP（对齐 MoeKoeMusic PlaylistDetail）
+      isOriginal: _kgIsOriginal(song['IsOriginal'] ?? song['isOriginal']),
+      fee: _kgFee(song['privilege']),
     );
+  }
+
+  /// 酷狗 `IsOriginal`（1=原唱）→ bool；兼容数字与字符串。
+  static bool _kgIsOriginal(Object? raw) {
+    if (raw == null) return false;
+    if (raw is num) return raw.toInt() == 1;
+    return raw.toString() == '1' || raw.toString().toLowerCase() == 'true';
+  }
+
+  /// 酷狗版权 `privilege` → TrackFee（10=VIP 需会员；其余视作免费）。
+  static int _kgFee(Object? raw) {
+    if (raw == null) return 0;
+    final v = raw is num ? raw.toInt() : int.tryParse(raw.toString()) ?? 0;
+    return v == 10 ? 1 : 0;
   }
 
   /// fee → TrackFee（0/8=免费，1=VIP，4=购买）。
@@ -480,24 +548,25 @@ class Track {
 
   /// 序列化（历史/收藏本地持久化快照）。
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'comment': comment,
-        'artists': artists.map((a) => a.toJson()).toList(),
-        'album': album?.toJson(),
-        'duration': duration,
-        'cover': cover,
-        'fee': fee,
-        'source': source,
-        'kugou': kugou?.toJson(),
-        'localPath': localPath,
-        'lyrics': lyrics,
-        'serverId': serverId,
-        'originalId': originalId,
-        'coverOriginal': coverOriginal,
-        'fileSize': fileSize,
-        'quality': quality?.toJson(),
-      };
+    'id': id,
+    'title': title,
+    'comment': comment,
+    'artists': artists.map((a) => a.toJson()).toList(),
+    'album': album?.toJson(),
+    'duration': duration,
+    'cover': cover,
+    'fee': fee,
+    'source': source,
+    'kugou': kugou?.toJson(),
+    'localPath': localPath,
+    'lyrics': lyrics,
+    'serverId': serverId,
+    'originalId': originalId,
+    'coverOriginal': coverOriginal,
+    'fileSize': fileSize,
+    'quality': quality?.toJson(),
+    'isOriginal': isOriginal,
+  };
 
   /// 反序列化（[toJson] 逆操作；缺失字段给安全默认值）。
   factory Track.fromJson(Map<String, dynamic> json) {
@@ -507,7 +576,8 @@ class Track {
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       comment: json['comment']?.toString(),
-      artists: (json['artists'] as List?)
+      artists:
+          (json['artists'] as List?)
               ?.whereType<Map>()
               .map((e) => TrackArtist.fromJson(Map<String, dynamic>.from(e)))
               .toList() ??
@@ -531,6 +601,7 @@ class Track {
       quality: quality is Map
           ? TrackQuality.fromJson(Map<String, dynamic>.from(quality))
           : null,
+      isOriginal: json['isOriginal'] == true,
     );
   }
 }
@@ -556,11 +627,11 @@ class PlaylistItem {
   final bool subscribed;
 
   factory PlaylistItem.fromNetease(Map<String, dynamic> json) => PlaylistItem(
-        id: json['id'].toString(),
-        name: json['name']?.toString() ?? '',
-        cover: withPicSize(json['coverImgUrl']?.toString()),
-        trackCount: json['trackCount'] ?? 0,
-        owner: json['creator']?['nickname']?.toString(),
-        subscribed: json['subscribed'] == true,
-      );
+    id: json['id'].toString(),
+    name: json['name']?.toString() ?? '',
+    cover: withPicSize(json['coverImgUrl']?.toString()),
+    trackCount: json['trackCount'] ?? 0,
+    owner: json['creator']?['nickname']?.toString(),
+    subscribed: json['subscribed'] == true,
+  );
 }

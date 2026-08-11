@@ -99,6 +99,34 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSectionClose => 'Fermer l\'application';
 
   @override
+  String get settingsSectionPower => 'Économie d\'énergie';
+
+  @override
+  String get settingsPowerSaver => 'Mode d\'économie d\'énergie';
+
+  @override
+  String get settingsPowerSaverOn =>
+      'Réduire le rendu en arrière-plan (5 FPS en réduction, 1 FPS sans focus ou écran éteint)';
+
+  @override
+  String get settingsPowerSaverOff => 'Toujours rendre à pleine fréquence';
+
+  @override
+  String get settingsSuppressSleep => 'Empêcher la mise en veille du système';
+
+  @override
+  String get settingsSuppressSleepOn =>
+      'Garder le système éveillé pendant la lecture pour ne pas interrompre la lecture en arrière-plan';
+
+  @override
+  String get settingsSuppressSleepOff =>
+      'Le système peut se mettre en veille après inactivité';
+
+  @override
+  String get settingsPowerSaverNote =>
+      'Le mode économie d\'énergie écoute les événements d\'état de fenêtre (sans sondage) ; le moteur arrête déjà le rendu quand la fenêtre est masquée ou l\'écran éteint. « Empêcher la mise en veille » ne s\'applique que pendant la lecture.';
+
+  @override
   String get settingsCloseBehavior => 'À la fermeture de l\'application';
 
   @override
@@ -153,6 +181,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get commonLossless => 'Sans perte';
+
+  @override
+  String get commonOriginal => 'Original';
 
   @override
   String get commonMore => 'Plus';
@@ -348,6 +379,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get songListTitle => 'Titre';
+
+  @override
+  String get songListScrollTop => 'Retour en haut';
+
+  @override
+  String get songListLocatePlaying => 'Localiser la lecture';
 
   @override
   String toastAddedToDownloadQueue(Object quality) {
@@ -787,6 +824,50 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get pageFavLoginDesc =>
       'Connectez-vous par QR avec NetEase Cloud Music pour synchroniser playlists, albums et artistes';
+
+  @override
+  String get pageFavKgCreated => 'Playlists créées';
+
+  @override
+  String get pageFavKgCollectedPlaylist => 'Playlists enregistrées';
+
+  @override
+  String get pageFavKgCollectedAlbum => 'Albums enregistrés';
+
+  @override
+  String pageFavKgCreatedCount(Object count) {
+    return '$count playlists créées';
+  }
+
+  @override
+  String get pageFavKgCreatedLoginHint =>
+      'Connectez-vous pour voir vos playlists créées';
+
+  @override
+  String pageFavKgCollectedPlaylistCount(Object count) {
+    return '$count playlists enregistrées';
+  }
+
+  @override
+  String get pageFavKgCollectedPlaylistLoginHint =>
+      'Connectez-vous pour voir vos playlists enregistrées';
+
+  @override
+  String pageFavKgCollectedAlbumCount(Object count) {
+    return '$count albums enregistrés';
+  }
+
+  @override
+  String get pageFavKgCollectedAlbumLoginHint =>
+      'Connectez-vous pour voir vos albums enregistrés';
+
+  @override
+  String get pageFavKugouLoginDesc =>
+      'Connectez-vous par QR avec Kugou pour synchroniser playlists et albums créés ou enregistrés';
+
+  @override
+  String get pageFavKugouEmptyHint =>
+      'Synchronisation automatique après favori dans l\'app Kugou';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1247,6 +1328,14 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsDeveloperNote =>
       'Le mode développeur est destiné au débogage local et à un usage personnel. Utilisation à vos risques et périls.';
+
+  @override
+  String get settingsDevFpsMonitor =>
+      'Superposition de surveillance FPS/mémoire';
+
+  @override
+  String get settingsDevFpsMonitorDesc =>
+      'Affiche en temps réel les FPS, le temps de frame moyen et la mémoire du processus en haut à droite (cliquer pour réduire). Désactivé par défaut ; désactivé aussi lorsque le mode développeur est coupé.';
 
   @override
   String get settingsDeveloperEnabled => 'Mode développeur activé';
@@ -1877,6 +1966,154 @@ class AppLocalizationsFr extends AppLocalizations {
       'Médias（tracks）et données utilisateur（subsonic_*）physiquement séparés ; chemins surchargeables via ARCHOERA_DATA_DIR.';
 
   @override
+  String get settingsSectionCache => 'Gestion du cache';
+
+  @override
+  String get settingsCacheNote =>
+      'Le cache accélère la navigation et la lecture ; il se reconstruit automatiquement après suppression. La bibliothèque, l\'historique et les comptes ne sont pas affectés.';
+
+  @override
+  String get settingsCacheGroupDisk => 'Cache de base de données (disque)';
+
+  @override
+  String get settingsCacheGroupMem => 'Cache en mémoire (dans le processus)';
+
+  @override
+  String get settingsCacheLiked => 'Cache de la liste « J\'aime »';
+
+  @override
+  String get settingsCacheLyric => 'Cache du contenu des paroles';
+
+  @override
+  String get settingsCacheLyricMatch => 'Cache de correspondance des paroles';
+
+  @override
+  String get settingsCacheLyricTtml => 'Cache de paroles TTML';
+
+  @override
+  String get settingsCacheCover => 'Cache des pochettes';
+
+  @override
+  String settingsCacheEntries(Object count) {
+    return '$count entrées';
+  }
+
+  @override
+  String settingsCacheImages(Object count) {
+    return '$count images';
+  }
+
+  @override
+  String get settingsCacheRefresh => 'Actualiser';
+
+  @override
+  String get settingsCacheClear => 'Vider';
+
+  @override
+  String get settingsCacheClearAll => 'Tout vider';
+
+  @override
+  String settingsCacheClearConfirmTitle(Object name) {
+    return 'Vider « $name » ?';
+  }
+
+  @override
+  String get settingsCacheClearConfirmDesc =>
+      'Supprime toutes les données de ce cache ; il se reconstruit automatiquement à la prochaine utilisation. Irréversible.';
+
+  @override
+  String get settingsCacheClearAllConfirmTitle => 'Vider tous les caches ?';
+
+  @override
+  String get settingsCacheClearAllConfirmDesc =>
+      'Supprime tous les caches ci-dessus (mémoire et disque). La bibliothèque, l\'historique et les comptes ne sont pas affectés.';
+
+  @override
+  String toastCacheCleared(Object name) {
+    return 'Cache $name vidé';
+  }
+
+  @override
+  String get toastCacheAllCleared => 'Tous les caches vidés';
+
+  @override
+  String get settingsSecuritySection => 'Destruction sécurisée';
+
+  @override
+  String get settingsSecurityNote =>
+      'Supprime de façon irréversible tous les identifiants et sessions de compte (mots de passe des serveurs de streaming, sessions Netease/Kugou, comptes Subsonic locaux) et invalide les jetons de la plateforme. La bibliothèque, l\'historique et les téléchargements ne sont pas affectés.';
+
+  @override
+  String get settingsSecurityStreaming =>
+      'Identifiants des serveurs de streaming';
+
+  @override
+  String settingsSecurityStreamingCount(Object count) {
+    return '$count serveur(s)';
+  }
+
+  @override
+  String get settingsSecurityStreamingDesc =>
+      'Mots de passe et jetons d\'accès';
+
+  @override
+  String get settingsSecuritySession => 'Sessions de comptes tiers';
+
+  @override
+  String get settingsSecuritySessionDesc => 'État de connexion Netease / Kugou';
+
+  @override
+  String get settingsSecurityUserDb => 'Base d\'utilisateurs locale';
+
+  @override
+  String get settingsSecurityUserDbDesc => 'Comptes Subsonic et favoris';
+
+  @override
+  String get settingsSecurityLoggedIn => 'Connecté';
+
+  @override
+  String get settingsSecurityDestroy => 'Détruire';
+
+  @override
+  String get settingsSecurityDestroyAll => 'Tout détruire';
+
+  @override
+  String settingsSecurityConfirmTitle(Object name) {
+    return 'Détruire « $name » ?';
+  }
+
+  @override
+  String get settingsSecurityConfirmAllTitle =>
+      'Détruire toutes les données sensibles ?';
+
+  @override
+  String settingsSecurityConfirmDesc(Object word) {
+    return 'Les jetons des plateformes concernées seront invalidés, puis les fichiers seront écrasés et supprimés. Cette opération est irréversible. Saisissez « $word » pour confirmer.';
+  }
+
+  @override
+  String get settingsSecurityConfirmWord => 'détruire';
+
+  @override
+  String settingsSecurityConfirmHint(Object word) {
+    return 'Saisissez « $word »';
+  }
+
+  @override
+  String toastSecurityDestroyed(Object name) {
+    return 'Détruit : $name';
+  }
+
+  @override
+  String get toastSecurityAllDestroyed =>
+      'Toutes les données sensibles ont été détruites';
+
+  @override
+  String toastSecurityDestroyFailed(Object path) {
+    return 'Échec de la destruction, le fichier peut subsister : $path';
+  }
+
+  @override
   String get settingsVersion => 'Version';
 
   @override
@@ -2159,6 +2396,48 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsSearchCoverRadiusSubtitle =>
       'Carré · Arrondi · Très arrondi';
+
+  @override
+  String get settingsSectionWeather => 'Météo';
+
+  @override
+  String get settingsWeather => 'Widget météo';
+
+  @override
+  String get settingsWeatherDesc =>
+      'Mini météo (icône + température) à gauche de l\'avatar';
+
+  @override
+  String get settingsWeatherAutoLocate => 'Localisation automatique';
+
+  @override
+  String get settingsWeatherAutoLocateDesc =>
+      'Position approximative via IP (confidentialité : désactivée par défaut)';
+
+  @override
+  String get settingsWeatherCity => 'Ville manuelle';
+
+  @override
+  String get settingsWeatherCityHint =>
+      'Plus de localisation IP une fois renseignée (ex. Paris)';
+
+  @override
+  String get settingsWeatherNote =>
+      'Confidentialité : données météo d\'Open-Meteo (gratuit, sans clé). Avec la localisation automatique, votre IP est envoyée à ip-api.com pour une position approximative, utilisée uniquement pour la météo, non stockée. Widget et localisation sont désactivés par défaut.';
+
+  @override
+  String get settingsSearchWeatherSubtitle =>
+      'Mini widget météo dans la barre supérieure (icône + température)';
+
+  @override
+  String get weatherRefresh => 'Actualiser la météo';
+
+  @override
+  String get weatherNoLocation =>
+      'Saisissez une ville ou activez la localisation dans les réglages';
+
+  @override
+  String get weatherUnavailable => 'Météo indisponible, toucher pour réessayer';
 
   @override
   String get settingsSearchPassthroughSubtitle =>

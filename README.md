@@ -1,21 +1,28 @@
+<p align="center">
+  <img src="logo.png" width="128" height="128" alt="ArchoeraMusic">
+</p>
+
 # ArchoeraMusic
 
 > 开源、多端、面向本地与在线音乐的混合架构播放器
+
+<p align="center">
+  <img src="screenshot.png" width="720" alt="ArchoeraMusic 主界面">
+</p>
 
 ---
 
 ## 目录
 
 1. [项目简介](#项目简介)
-2. [功能概览](#功能概览)
-3. [技术架构](#技术架构)
-4. [项目结构](#项目结构)
-5. [构建与运行](#构建与运行)
-6. [文档](#文档)
-7. [许可证（Licensing）](#许可证licensing)
-8. [第三方声明](#第三方声明)
-9. [特别鸣谢（Acknowledgements）](#特别鸣谢acknowledgements)
-10. [联系与贡献](#联系与贡献)
+2. [技术架构](#技术架构)
+3. [项目结构](#项目结构)
+4. [构建与运行](#构建与运行)
+5. [文档](#文档)
+6. [许可证（Licensing）](#许可证licensing)
+7. [第三方声明](#第三方声明)
+8. [特别鸣谢（Acknowledgements）](#特别鸣谢acknowledgements)
+9. [联系与贡献](#联系与贡献)
 
 ---
 
@@ -28,24 +35,6 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面�
 - 内置统一 C 音频引擎：EQ / 响度归一化 / 限幅器 / FFT 频谱 / 变速变调 / Opus 转码管线
 - 桌面端原生模块 **FFI 直连**（`archoera_mediaengine` 共享库），零子进程、零 TCP 端口暴露
 - 可选内置 **Subsonic 兼容服务端**（Go），并支持 Subsonic / Jellyfin 流媒体服务器聚合
-
----
-
-## 功能概览
-
-| 模块 | 状态 | 说明 |
-|---|---|---|
-| 在线平台 API | ✅ 可用 | 网易云（weapi / eapi，~80 模块）、酷狗、QQ 音乐（纯 Dart） |
-| 歌词渲染与匹配 | ✅ 可用 | 多源回退、KRC/QRC/YRC/TTML 标准化 |
-| 播放引擎 | ✅ 可用 | C 引擎 + libmpv 渲染，FFT 频谱拉模式 |
-| 播放控制 | ✅ 可用 | 10 段 EQ、响度归一化、限幅器、变速变调 |
-| 音乐库扫描 | ✅ 可用 | C# NativeAOT `archoera-scanner`（TagLibSharp） |
-| 元数据刮削 | ✅ 可用 | C++ `archoera-scraper`（多源并发 + 评分合并） |
-| 下载管理 | ✅ 可用 | Rust `archoera-downloader`（Kugou / Netease 自研签名） |
-| Subsonic 服务 | ✅ 可用 | Go 实现；桌面端 FFI 自举消费 |
-| 流媒体聚合 | ✅ 可用 | Subsonic / Jellyfin 多服务器 |
-| 国际化 | ✅ 可用 | 9 语言，gen_l10n ARB 管道 |
-| 桌面集成 | Phase 3+ | 托盘、媒体键、桌面歌词窗口 |
 
 ---
 

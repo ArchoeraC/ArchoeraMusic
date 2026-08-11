@@ -18,7 +18,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # of the product and file versions while build-number is used as the build suffix.
 # 语义化版本：x.y.z[-预发布标签][+构建号]，如 0.8.3-preview / 0.8.3-pre.2+rev.3
 # （Dart 版本号语法不允许 '.' 分段预发布/构建号；运行时按 0.8.3.pre.2.rev.3 风格显示）
-version: 0.8.6-pre.3+rev.16
+version: 0.8.7-pre.1+rev.1
 
 environment:
   sdk: ^3.12.2
@@ -51,6 +51,10 @@ dependencies:
   file_selector: ^1.1.0
   tray_manager: ^0.5.3
   window_manager: ^0.5.2
+  # 防止系统休眠（保持播放不中断；Linux 走 XDG Desktop Portal）
+  wakelock_plus: ^1.7.0
+  # Linux 屏幕状态事件订阅（org.freedesktop.ScreenSaver.ActiveChanged，节能模式）
+  dbus: ^0.7.14
 dev_dependencies:
   flutter_test:
     sdk: flutter

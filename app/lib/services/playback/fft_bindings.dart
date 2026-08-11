@@ -14,10 +14,10 @@ typedef _FftProcessFrameNative =
     Void Function(Pointer<Opaque>, Pointer<Float>, Pointer<Float>, Int32);
 typedef _FftProcessFrameDart =
     void Function(Pointer<Opaque>, Pointer<Float>, Pointer<Float>, int);
-typedef _FftNormStereoNative = Void Function(
-    Pointer<Opaque>, Pointer<Float>, Pointer<Float>, Int32);
-typedef _FftNormStereoDart = void Function(
-    Pointer<Opaque>, Pointer<Float>, Pointer<Float>, int);
+typedef _FftNormStereoNative =
+    Void Function(Pointer<Opaque>, Pointer<Float>, Pointer<Float>, Int32);
+typedef _FftNormStereoDart =
+    void Function(Pointer<Opaque>, Pointer<Float>, Pointer<Float>, int);
 typedef _FftTakeBeatStrengthNative = Float Function(Pointer<Opaque>);
 typedef _FftTakeBeatStrengthDart = double Function(Pointer<Opaque>);
 typedef _FftDestroyNative = Void Function(Pointer<Opaque>);
@@ -34,26 +34,34 @@ typedef _FftDestroyDart = void Function(Pointer<Opaque>);
 /// Rust 端 analyze()（环形缓冲取最新样本），不依赖 C 侧流式累积器
 /// （fft_process_multi 供实时播放线程持续喂样本用）。
 class FftAnalyzer {
-  FftAnalyzer({
-    this.sampleRate = 48000,
-    this.fftSize = 2048,
-    this.bins = 128,
-  }) {
+  FftAnalyzer({this.sampleRate = 48000, this.fftSize = 2048, this.bins = 128}) {
     final lib = DynamicLibrary.open(EnginePaths.libfftPath());
-    _create = lib.lookupFunction<_FftCreateNative, _FftCreateDart>('fft_create');
-    _setEnabled =
-        lib.lookupFunction<_FftSetEnabledNative, _FftSetEnabledDart>('fft_set_enabled');
-    _processFrame =
-        lib.lookupFunction<_FftProcessFrameNative, _FftProcessFrameDart>('fft_process_frame');
+    _create = lib.lookupFunction<_FftCreateNative, _FftCreateDart>(
+      'fft_create',
+    );
+    _setEnabled = lib.lookupFunction<_FftSetEnabledNative, _FftSetEnabledDart>(
+      'fft_set_enabled',
+    );
+    _processFrame = lib
+        .lookupFunction<_FftProcessFrameNative, _FftProcessFrameDart>(
+          'fft_process_frame',
+        );
     _norm = lib.lookupFunction<_FftNormStereoNative, _FftNormStereoDart>(
-        'fft_get_spectrum_norm_stereo');
-    _takeBeatStrength = lib.lookupFunction<_FftTakeBeatStrengthNative,
-        _FftTakeBeatStrengthDart>('fft_take_beat_strength');
-    _destroy = lib.lookupFunction<_FftDestroyNative, _FftDestroyDart>('fft_destroy');
+      'fft_get_spectrum_norm_stereo',
+    );
+    _takeBeatStrength = lib
+        .lookupFunction<_FftTakeBeatStrengthNative, _FftTakeBeatStrengthDart>(
+          'fft_take_beat_strength',
+        );
+    _destroy = lib.lookupFunction<_FftDestroyNative, _FftDestroyDart>(
+      'fft_destroy',
+    );
 
     _handle = _create(sampleRate, fftSize);
     if (_handle == nullptr) {
-      throw StateError('fft_create 失败 (sampleRate=$sampleRate, fftSize=$fftSize)');
+      throw StateError(
+        'fft_create 失败 (sampleRate=$sampleRate, fftSize=$fftSize)',
+      );
     }
     // fft_create 默认 disabled，必须显式启用
     _setEnabled(_handle, 1);

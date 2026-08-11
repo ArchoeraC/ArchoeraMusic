@@ -76,6 +76,9 @@ class _SearchPageState extends ConsumerState<SearchPage>
     with SingleTickerProviderStateMixin {
   static const _pageSize = 50;
 
+  /// 单 tab 累计条数上限：超过即截断并停 more（防无限加载撑爆内存）。
+  static const _maxTabItems = 300;
+
   late final TabController _tabs;
 
   _TabState<Track> _songs = const _TabState();
@@ -172,6 +175,16 @@ class _SearchPageState extends ConsumerState<SearchPage>
   /// 当前 tab 已加载且为空。
   bool get _emptyResult => _currentState.loaded && _currentState.items.isEmpty;
 
+  /// 追加下一页并限制累计条数：超 [maxItems] 从尾部截断（保留最新），
+  /// 由调用方据返回长度决定是否继续加载。
+  List<T> _boundedAppend<T>(List<T> current, List<T> next) {
+    if (next.isEmpty) return current;
+    final merged = [...current, ...next];
+    return merged.length > _maxTabItems
+        ? merged.sublist(merged.length - _maxTabItems)
+        : merged;
+  }
+
   Future<void> _fetch({required bool append}) async {
     if (_query.isEmpty) return;
     final tab = _tab;
@@ -218,6 +231,10 @@ class _SearchPageState extends ConsumerState<SearchPage>
         final kg = results[1];
         final mergedHasMore = ne.hasMore || kg.hasMore;
         if (!mounted) return;
+        final mergedItems = _boundedAppend(_songs.items, [
+          ...ne.items,
+          ...kg.items,
+        ]);
         setState(() {
           if (append) {
             _aggNeteaseLoaded += ne.items.length;
@@ -227,9 +244,9 @@ class _SearchPageState extends ConsumerState<SearchPage>
             _aggKugouLoaded = kg.items.length;
           }
           _songs = _songs.copyWith(
-            items: [..._songs.items, ...ne.items, ...kg.items],
+            items: mergedItems,
             total: ne.total + kg.total,
-            hasMore: mergedHasMore,
+            hasMore: mergedHasMore && mergedItems.length < _maxTabItems,
             loaded: true,
             loading: false,
             loadingMore: false,
@@ -254,11 +271,12 @@ class _SearchPageState extends ConsumerState<SearchPage>
         );
       }
       if (!mounted) return;
+      final mergedItems = _boundedAppend(_songs.items, result.items);
       setState(() {
         _songs = _songs.copyWith(
-          items: [..._songs.items, ...result.items],
+          items: mergedItems,
           total: result.total,
-          hasMore: result.hasMore,
+          hasMore: result.hasMore && mergedItems.length < _maxTabItems,
           loaded: true,
           loading: false,
           loadingMore: false,
@@ -332,10 +350,11 @@ class _SearchPageState extends ConsumerState<SearchPage>
         };
       }
       if (!mounted) return;
+      final mergedItems = _boundedAppend(current.items, result.items);
       final merged = _TabState<CoverItem>(
-        items: [...current.items, ...result.items],
+        items: mergedItems,
         total: result.total,
-        hasMore: result.hasMore,
+        hasMore: result.hasMore && mergedItems.length < _maxTabItems,
         loaded: true,
         loading: false,
         loadingMore: false,
@@ -528,7 +547,10 @@ class _SearchPageState extends ConsumerState<SearchPage>
                     onRetry: () => _fetch(append: false),
                   )
                 : _initialLoading
-                ? SearchEmptyState(icon: Icons.hourglass_top, title: l10n.pageSearching)
+                ? SearchEmptyState(
+                    icon: Icons.hourglass_top,
+                    title: l10n.pageSearching,
+                  )
                 : _emptyResult
                 ? SearchEmptyState(
                     icon: Icons.search_off,
@@ -581,4 +603,3 @@ class _SearchPageState extends ConsumerState<SearchPage>
     );
   }
 }
-

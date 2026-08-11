@@ -12,7 +12,6 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -20,371 +19,12 @@ import '../../apis/runtime.dart';
 import '../netease/netease_api.dart' show CoverItem, SearchResult;
 import '../netease/track.dart';
 import 'kugou_crypto.dart';
+import 'kugou_parse.dart';
 import 'kugou_request.dart';
+import 'kugou_types.dart';
 
-/// KRC 歌词密钥（lx-music kg.js）
-const _krcKey = <int>[
-  0x40, 0x47, 0x61, 0x77, 0x5e, 0x32, 0x74, 0x47, //
-  0x51, 0x36, 0x31, 0x2d, 0xce, 0xd2, 0x6e, 0x69,
-];
-
-/// 歌词结果（lrc 行级 + krc 逐字 + 翻译 + 罗马音）。
-class KugouLyric {
-  const KugouLyric({required this.lrc, this.krc = '', this.trans = '', this.roma = ''});
-
-  final String lrc;
-  final String krc;
-  final String trans;
-  final String roma;
-}
-
-/// 酷狗歌曲评论（commentsv2/getCommentWithLike 条目）。
-class KugouComment {
-  const KugouComment({
-    required this.id,
-    required this.userName,
-    required this.text,
-    this.avatar,
-    this.location,
-    this.likedCount = 0,
-    this.replyTotal = 0,
-    this.timeMs,
-    this.reply = const [],
-  });
-
-  final String id;
-  final String userName;
-  final String? avatar;
-  final String text;
-
-  /// IP 属地（如「河南」）。
-  final String? location;
-  final int likedCount;
-  final int replyTotal;
-
-  /// 评论时间（毫秒；addtime 'YYYY-MM-DD HH:MM:SS' 解析失败为 null）。
-  final int? timeMs;
-
-  /// 被回复的引用内容（replys 首个）。
-  final List<KugouComment> reply;
-}
-
-/// 酷狗歌曲评论分页。
-class KugouCommentPage {
-  const KugouCommentPage({
-    required this.list,
-    required this.total,
-    required this.page,
-    required this.limit,
-  });
-
-  final List<KugouComment> list;
-  final int total;
-  final int page;
-  final int limit;
-
-  bool get hasMore => page * limit < total && list.isNotEmpty;
-}
-
-/// 评论条目 → [KugouComment]（点赞取 `like.likenum`；`addtime` 字符串转
-/// 毫秒；`replys` 首个递归解析为引用回复）。
-KugouComment _commentFromKg(Map<String, dynamic> c) {
-  final like = c['like'];
-  final liked = like is Map ? (like['likenum'] as num?)?.toInt() ?? 0 : 0;
-  final replys = c['replys'];
-  final replies = replys is List
-      ? replys
-          .whereType<Map<String, dynamic>>()
-          .take(1)
-          .map(_commentFromKg)
-          .toList()
-      : const <KugouComment>[];
-  return KugouComment(
-    id: c['id']?.toString() ?? c['pid']?.toString() ?? '',
-    userName: c['user_name']?.toString() ?? '匿名用户',
-    avatar: c['user_pic']?.toString(),
-    text: c['content']?.toString() ?? '',
-    location: c['location']?.toString(),
-    likedCount: liked,
-    replyTotal: (c['reply_num'] as num?)?.toInt() ?? 0,
-    timeMs:
-        DateTime.tryParse(c['addtime']?.toString() ?? '')?.millisecondsSinceEpoch,
-    reply: replies,
-  );
-}
-
-/// 毫秒 → `MM:SS.xxx`（对齐 krc.ts msToTimeTag）。
-String _msToTimeTag(int ms) {
-  final m = (ms ~/ 60000).toString().padLeft(2, '0');
-  final s = ((ms % 60000) ~/ 1000).toString().padLeft(2, '0');
-  final x = (ms % 1000).toString().padLeft(3, '0');
-  return '$m:$s.$x';
-}
-
-/// 解析解密后的 KRC 文本 → 四种歌词（对齐 krc.ts parseKrc）。
-KugouLyric _parseKrc(String raw) {
-  var text = raw.replaceAll('\r', '');
-  // KRC 头部元数据行（[id:$]/[ar:]/[ti:]/[al:]/[by:]/[hash:]/[sign:]/
-  // [qq:]/[total:]/[offset:]）整体移除——此前仅移除 [id:$] 行，其余
-  // 残留进 lrc 文本污染行级解析。注意 [id:$xxxx] 值后直接 ']'（无冒号），
-  // 故冒号部分可选。
-  text = text.replaceAll(
-      RegExp(r'^\[(?:id:\$\w+|ar|ti|al|by|hash|sign|qq|total|offset)(?::[^\]]*)?\](?:\r?\n)?',
-          multiLine: true),
-      '');
-
-  // 翻译 & 罗马音以 [language:base64(json)] 整体嵌入
-  List<String>? transLines;
-  List<String>? romaLines;
-  final langMatch = RegExp(r'\[language:([\w=\\/+]+)\]').firstMatch(text);
-  if (langMatch != null) {
-    text = text.replaceAll(RegExp(r'\[language:[\w=\\/+]+\]\n'), '');
-    try {
-      final json = jsonDecode(utf8.decode(base64.decode(langMatch.group(1)!)));
-      final content = json is Map ? json['content'] : null;
-      if (content is List) {
-        for (final item in content) {
-          if (item is! Map) continue;
-          final type = item['type'];
-          final lc = item['lyricContent'];
-          if (lc is! List) continue;
-          final lines = lc
-              .map((arr) => arr is List ? arr.join('') : arr.toString())
-              .toList();
-          if (type == 0) {
-            romaLines = lines;
-          } else if (type == 1) {
-            transLines = lines;
-          }
-        }
-      }
-    } catch (_) {
-      // 译文解析失败不影响主歌词
-    }
-  }
-
-  // 逐行替换行首时间标签，并同步给翻译/罗马音补时间头
-  var idx = 0;
-  final krcBody = text.replaceAllMapped(
-    RegExp(r'\[((\d+),\d+)\].*'),
-    (m) {
-      final startMs = int.parse(m.group(2)!);
-      final tag = _msToTimeTag(startMs);
-      if (romaLines != null && idx < romaLines.length) {
-        romaLines[idx] = '[$tag]${romaLines[idx]}';
-      }
-      if (transLines != null && idx < transLines.length) {
-        transLines[idx] = '[$tag]${transLines[idx]}';
-      }
-      idx++;
-      return m.group(0)!.replaceFirst(m.group(1)!, tag);
-    },
-  );
-
-  // 字级时间标签 <offset,dur,0> → <offset,dur>
-  final krc = kgDecodeName(
-    krcBody.replaceAllMapped(
-      RegExp(r'<(\d+,\d+),\d+>'),
-      (m) => '<${m.group(1)}>',
-    ),
-  );
-  final lrc = krc.replaceAll(RegExp(r'<\d+,\d+>'), '');
-
-  return KugouLyric(
-    lrc: lrc,
-    krc: krc,
-    trans: kgDecodeName(transLines?.join('\n') ?? ''),
-    roma: kgDecodeName(romaLines?.join('\n') ?? ''),
-  );
-}
-
-/// 解密 KRC base64 内容（base64 → 去头 4 字节 → XOR → zlib inflate → utf8）。
-KugouLyric decodeKrc(String base64Content) {
-  if (base64Content.isEmpty) throw const FormatException('empty krc content');
-  final buf = base64.decode(base64Content).sublist(4);
-  for (var i = 0; i < buf.length; i++) {
-    buf[i] ^= _krcKey[i % 16];
-  }
-  final inflated = ZLibCodec().decode(buf);
-  return _parseKrc(utf8.decode(inflated, allowMalformed: true));
-}
-
-/// 秒/毫秒双兼容时长：KG 各接口字段单位不统一（time_length/timelen/
-/// timelength 有 s 也有 ms），值 < 1000 按秒处理。返回毫秒。
-int _kgDurationMs(Object? raw) {
-  if (raw == null) return 0;
-  final v = raw is num ? raw.toInt() : int.tryParse(raw.toString()) ?? 0;
-  return v < 1000 ? v * 1000 : v;
-}
-
-/// 歌单条目 `name`（形如 "歌手 - 歌名.mp3"）需剥离的音频扩展名。
-const _kgAudioExts = <String>{
-  'mp3', 'flac', 'm4a', 'aac', 'ogg', 'ape', 'wav', 'wma', 'ac3', 'aiff',
-  'alac', 'opus',
-};
-
-/// 歌单条目 id：hash（音频文件级唯一键）优先，audio_id 仅作兜底，
-/// 保证每首歌 id 唯一（历史去重/红心匹配依赖；与 Track.fromKugouSong 一致）。
-String _kgTrackId(Map<String, dynamic> item, String hash) {
-  if (hash.isNotEmpty) return hash;
-  final audioId = item['audio_id'];
-  if (audioId is num && audioId > 0) return audioId.toString();
-  return '';
-}
-
-/// 从「歌单/榜单/推荐/搜索」通用条目结构构建 [Track]（source == 'kugou'）。
-///
-/// 兼容字段别名（对齐 MoeKoeMusic formatPlaylistTracks 等映射）：
-/// - 名称：`songname` / `ori_audio_name` / `audio_name` / `name`（"歌手 - 歌名"合并名拆分）
-/// - 歌手：`author_name` / `singername`
-/// - 封面：`trans_param.union_cover` / `sizable_cover` / `cover`（含 {size} 占位）
-/// - 品质：`hash` + `320hash`/`sqhash`/`hires_hash`，或 `hash_320`/`hash_flac`/`hash_flac_24bit`
-Track _trackFromKgPlain(Map<String, dynamic> item) {
-  final hash = item['hash']?.toString() ?? '';
-  var name = item['songname']?.toString() ??
-      item['ori_audio_name']?.toString() ??
-      item['audio_name']?.toString() ??
-      '';
-  // 歌手：优先 singerinfo 列表（歌单/榜单条目格式，如「我喜欢」歌单）
-  var author = '';
-  final singerInfo = item['singerinfo'];
-  if (singerInfo is List && singerInfo.isNotEmpty) {
-    author = singerInfo
-        .whereType<Map<String, dynamic>>()
-        .map((s) => s['name']?.toString() ?? '')
-        .where((s) => s.isNotEmpty)
-        .join(' / ');
-  }
-  if (author.isEmpty) {
-    author = item['author_name']?.toString() ??
-        item['singername']?.toString() ??
-        '';
-  }
-  final merged = item['name']?.toString() ?? '';
-  if (name.isEmpty && merged.isNotEmpty) {
-    // 合并名形如 "歌手 - 歌名.mp3"：剥离音频扩展名后按 " - " 拆分
-    var m = merged;
-    final dot = m.lastIndexOf('.');
-    if (dot > 0 && dot > m.lastIndexOf(' ')) {
-      final ext = m.substring(dot + 1).toLowerCase();
-      if (_kgAudioExts.contains(ext)) m = m.substring(0, dot);
-    }
-    final idx = m.indexOf(' - ');
-    if (idx > 0) {
-      name = m.substring(idx + 3);
-      if (author.isEmpty) author = m.substring(0, idx);
-    } else {
-      name = m;
-    }
-  }
-  String? coverTpl;
-  final tp = item['trans_param'];
-  if (tp is Map) coverTpl = tp['union_cover']?.toString();
-  coverTpl ??= item['sizable_cover']?.toString() ?? item['cover']?.toString();
-
-  final hashes = <String, String>{};
-  final sizes = <String, int>{};
-  if (hash.isNotEmpty) hashes['128k'] = hash;
-  void add(String key, Object? h, Object? s) {
-    final hs = h?.toString() ?? '';
-    if (hs.isEmpty) return;
-    hashes[key] = hs;
-    final sz =
-        s is num ? s.toInt() : (s != null ? int.tryParse(s.toString()) : null);
-    if (sz != null && sz > 0) sizes[key] = sz;
-  }
-
-  add('320k', item['320hash'] ?? item['hash_320'], item['320filesize']);
-  add('flac', item['sqhash'] ?? item['hash_flac'], item['sqfilesize']);
-  add(
-    'flac24bit',
-    item['hires_hash'] ?? item['hash_flac_24bit'] ?? item['hash_hires'],
-    item['hires_filesize'],
-  );
-
-  String? albumName;
-  final ai = item['albuminfo'];
-  if (ai is Map) albumName = ai['name']?.toString();
-  albumName ??= item['album_name']?.toString();
-
-  // 私有歌单条目附加信息（「我喜欢」移除需要 fileid；添加需要 album_id/mixsongid；
-  // sort 为收藏序号，越小越早——「我喜欢」按此升序展示，与酷狗 App 一致）
-  final fileid = item['fileid'];
-  final albumId = item['album_id'];
-  final mixSongId = item['mixsongid'];
-  final sort = item['sort'];
-
-  return Track(
-    id: _kgTrackId(item, hash),
-    title: kgDecodeName(name),
-    artists: author.isEmpty ? const [] : kugouArtists(author),
-    album: albumName == null || albumName.isEmpty
-        ? null
-        : TrackAlbum(
-            name: kgDecodeName(albumName),
-            cover: kgFillCover(coverTpl, 300),
-          ),
-    duration: _kgDurationMs(item['time_length'] ??
-        item['timelen'] ??
-        item['timelength'] ??
-        item['duration']),
-    cover: kgFillCover(coverTpl, 300),
-    source: 'kugou',
-    kugou: hashes.isEmpty
-        ? null
-        : KugouTrackInfo(
-            hash: hash,
-            hashes: hashes,
-            sizes: sizes,
-            fileid: fileid is num
-                ? fileid.toInt()
-                : (fileid != null ? int.tryParse('$fileid') : null),
-            albumId: albumId is num
-                ? albumId.toInt()
-                : (albumId != null ? int.tryParse('$albumId') : null),
-            mixSongId: mixSongId is num
-                ? mixSongId.toInt()
-                : (mixSongId != null ? int.tryParse('$mixSongId') : null),
-            sort: sort is num
-                ? sort.toInt()
-                : (sort != null ? int.tryParse('$sort') : null),
-          ),
-  );
-}
-
-/// 酷狗登录会话（扫码登录成功后的 token/userid，v5/url 请求 VIP 曲目用）。
-class KugouSession {
-  const KugouSession({
-    required this.token,
-    required this.userid,
-    this.nickname,
-    this.avatarUrl,
-  });
-
-  final String token;
-  final String userid;
-  final String? nickname;
-
-  /// 用户头像（user_detail 接口 data.pic；未获取到为 null）。
-  final String? avatarUrl;
-
-  Map<String, String> toJson() => {
-        'token': token,
-        'userid': userid,
-        'nickname': ?nickname,
-        'avatarUrl': ?avatarUrl,
-      };
-
-  factory KugouSession.fromJson(Map<String, dynamic> json) => KugouSession(
-        token: json['token']?.toString() ?? '',
-        userid: json['userid']?.toString() ?? '',
-        nickname: json['nickname']?.toString(),
-        avatarUrl: json['avatarUrl']?.toString(),
-      );
-
-  @override
-  String toString() => 'KugouSession(userid=$userid, nickname=$nickname)';
-}
+export 'kugou_parse.dart';
+export 'kugou_types.dart';
 
 /// 会话在宿主会话存储中的平台键。
 const _kugouSessionPlatform = 'kugou';
@@ -425,9 +65,7 @@ class KugouApi extends ChangeNotifier {
   void saveSession(String token, String userid, {String? nickname}) {
     session = KugouSession(token: token, userid: userid, nickname: nickname);
     _likeListId = null;
-    getRuntime()
-        .sessionStore
-        .save(_kugouSessionPlatform, session!.toJson());
+    getRuntime().sessionStore.save(_kugouSessionPlatform, session!.toJson());
     notifyListeners();
   }
 
@@ -445,8 +83,7 @@ class KugouApi extends ChangeNotifier {
       );
       final pic = info['pic']?.toString();
       final nick = info['nickname']?.toString();
-      if ((pic == null || pic.isEmpty) &&
-          (nick == null || nick.isEmpty)) {
+      if ((pic == null || pic.isEmpty) && (nick == null || nick.isEmpty)) {
         return; // 无有效更新
       }
       session = KugouSession(
@@ -455,9 +92,7 @@ class KugouApi extends ChangeNotifier {
         nickname: nick == null || nick.isEmpty ? current.nickname : nick,
         avatarUrl: pic == null || pic.isEmpty ? current.avatarUrl : pic,
       );
-      getRuntime()
-          .sessionStore
-          .save(_kugouSessionPlatform, session!.toJson());
+      getRuntime().sessionStore.save(_kugouSessionPlatform, session!.toJson());
       notifyListeners();
     } catch (_) {
       // 头像获取失败不影响播放功能，静默
@@ -486,8 +121,7 @@ class KugouApi extends ChangeNotifier {
 
   /// 轮询扫码状态。返回 {status, token, userid, nickname}：
   /// 0=过期 / 1=等待 / 2=待确认 / 4=成功（成功后调用 [saveSession]）。
-  Future<Map<String, dynamic>> qrCheck(String key) =>
-      kgQrCheck(key, mid: _mid);
+  Future<Map<String, dynamic>> qrCheck(String key) => kgQrCheck(key, mid: _mid);
 
   // ─── 搜索 ─────────────────────────────────────────────────────────
 
@@ -555,8 +189,9 @@ class KugouApi extends ChangeNotifier {
     final newSizes = <String, int>{};
     for (final k in wanted) {
       final old = kugou.hashes[k];
-      newHashes[k] =
-          (old != null && old.isNotEmpty) ? old : (src.hashes[k] ?? '');
+      newHashes[k] = (old != null && old.isNotEmpty)
+          ? old
+          : (src.hashes[k] ?? '');
       final os = kugou.sizes[k];
       newSizes[k] = (os != null && os > 0) ? os : (src.sizes[k] ?? 0);
     }
@@ -577,20 +212,23 @@ class KugouApi extends ChangeNotifier {
     int page,
     int limit,
   ) async {
-    final uri = Uri.parse(kgMobilecdnUrl).replace(queryParameters: {
-      'keyword': keyword,
-      'page': '$page',
-      'pagesize': '$limit',
-      'format': 'json',
-      'showtype': '1',
-    });
+    final uri = Uri.parse(kgMobilecdnUrl).replace(
+      queryParameters: {
+        'keyword': keyword,
+        'page': '$page',
+        'pagesize': '$limit',
+        'format': 'json',
+        'showtype': '1',
+      },
+    );
     final body = await kgGet(uri);
     final data = body is Map<String, dynamic> ? body['data'] : null;
     final info = data is Map<String, dynamic> ? data['info'] : null;
     final raw = info is List ? info : const [];
     final total = (data is Map<String, dynamic> ? data['total'] : null);
-    final totalNum =
-        total is num ? total.toInt() : (total != null ? int.tryParse(total.toString()) ?? 0 : 0);
+    final totalNum = total is num
+        ? total.toInt()
+        : (total != null ? int.tryParse(total.toString()) ?? 0 : 0);
 
     final items = <Track>[];
     final seen = <String>{};
@@ -623,25 +261,28 @@ class KugouApi extends ChangeNotifier {
     int page,
     int limit,
   ) async {
-    final uri = Uri.parse(kgSearchUrl).replace(queryParameters: {
-      'keyword': keyword,
-      'page': '$page',
-      'pagesize': '$limit',
-      'userid': '0',
-      'clientver': '',
-      'platform': 'WebFilter',
-      'filter': '2',
-      'iscorrection': '1',
-      'privilege_filter': '0',
-      'area_code': '1',
-    });
+    final uri = Uri.parse(kgSearchUrl).replace(
+      queryParameters: {
+        'keyword': keyword,
+        'page': '$page',
+        'pagesize': '$limit',
+        'userid': '0',
+        'clientver': '',
+        'platform': 'WebFilter',
+        'filter': '2',
+        'iscorrection': '1',
+        'privilege_filter': '0',
+        'area_code': '1',
+      },
+    );
     final body = await kgGet(uri);
     final data = body is Map<String, dynamic> ? body['data'] : null;
     final lists = data is Map<String, dynamic> ? data['lists'] : null;
     final raw = lists is List ? lists : const [];
     final total = (data is Map<String, dynamic> ? data['total'] : null);
-    final totalNum =
-        total is num ? total.toInt() : (total != null ? int.tryParse(total.toString()) ?? 0 : 0);
+    final totalNum = total is num
+        ? total.toInt()
+        : (total != null ? int.tryParse(total.toString()) ?? 0 : 0);
 
     final items = <Track>[];
     final seen = <String>{};
@@ -703,8 +344,11 @@ class KugouApi extends ChangeNotifier {
   /// 单档 URL 请求（dfid 用 register_dev 真实值，对齐 MoeKouMusic 后端
   /// 先 /register/dev 再 /song/url 的链路；status=2 需验证时换新 dfid
   /// 重试一次）。
-  Future<String?> _tryUrl(String hash, String qualityParam,
-      {bool retried = false}) async {
+  Future<String?> _tryUrl(
+    String hash,
+    String qualityParam, {
+    bool retried = false,
+  }) async {
     final dfid = await _getDfid();
     final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final hashLc = hash.toLowerCase();
@@ -735,17 +379,20 @@ class KugouApi extends ChangeNotifier {
     params['signature'] = kgSignature(params, salt: kgLiteSignSalt);
 
     final uri = Uri.parse('$kgSongUrl?${kgQueryString(params)}');
-    final body = await kgGet(uri, headers: {
-      'User-Agent': kgAndroidUa,
-      'x-router': 'trackercdn.kugou.com',
-      'dfid': dfid,
-      'clienttime': '$ts',
-      'mid': _mid,
-      'kg-rc': '1',
-      'kg-thash': '5d816a0',
-      'kg-rec': '1',
-      'kg-rf': 'B9EDA08A64250DEFFBCADDEE00F8F25F',
-    });
+    final body = await kgGet(
+      uri,
+      headers: {
+        'User-Agent': kgAndroidUa,
+        'x-router': 'trackercdn.kugou.com',
+        'dfid': dfid,
+        'clienttime': '$ts',
+        'mid': _mid,
+        'kg-rc': '1',
+        'kg-thash': '5d816a0',
+        'kg-rec': '1',
+        'kg-rf': 'B9EDA08A64250DEFFBCADDEE00F8F25F',
+      },
+    );
     if (body is! Map<String, dynamic>) return null;
 
     final status = (body['status'] as num?)?.toInt() ?? 0;
@@ -774,15 +421,17 @@ class KugouApi extends ChangeNotifier {
     int? durationSeconds,
   }) async {
     final seconds = durationSeconds ?? 0;
-    final searchUri = Uri.parse(kgLyricSearchUrl).replace(queryParameters: {
-      'ver': '1',
-      'man': 'yes',
-      'client': 'pc',
-      'lrctxt': '1',
-      'keyword': name,
-      'hash': hash,
-      'timelength': '$seconds',
-    });
+    final searchUri = Uri.parse(kgLyricSearchUrl).replace(
+      queryParameters: {
+        'ver': '1',
+        'man': 'yes',
+        'client': 'pc',
+        'lrctxt': '1',
+        'keyword': name,
+        'hash': hash,
+        'timelength': '$seconds',
+      },
+    );
     final searchResp = await kgGet(searchUri, headers: kgLyricHeaders);
     if (searchResp is! Map<String, dynamic>) return null;
     final candidates = searchResp['candidates'];
@@ -797,14 +446,16 @@ class KugouApi extends ChangeNotifier {
     final contenttype = (cand['contenttype'] as num?)?.toInt() ?? 0;
     final fmt = krctype == 1 && contenttype != 1 ? 'krc' : 'lrc';
 
-    final dlUri = Uri.parse(kgLyricDownloadUrl).replace(queryParameters: {
-      'ver': '1',
-      'client': 'pc',
-      'charset': 'utf8',
-      'id': id,
-      'accesskey': accesskey,
-      'fmt': fmt,
-    });
+    final dlUri = Uri.parse(kgLyricDownloadUrl).replace(
+      queryParameters: {
+        'ver': '1',
+        'client': 'pc',
+        'charset': 'utf8',
+        'id': id,
+        'accesskey': accesskey,
+        'fmt': fmt,
+      },
+    );
     final dl = await kgGet(dlUri, headers: kgLyricHeaders);
     if (dl is! Map<String, dynamic>) return null;
     final content = dl['content']?.toString() ?? '';
@@ -821,7 +472,7 @@ class KugouApi extends ChangeNotifier {
   /// 歌曲评论（mcomment commentsv2/getCommentWithLike；无需登录）。
   ///
   /// [hash] 为歌曲 hash；返回分页评论。评论条目的 `replys` 首个作为
-  /// 引用回复（_commentFromKg 递归解析）。
+  /// 引用回复（kgCommentFromKg 递归解析）。
   Future<KugouCommentPage> songComments(
     String hash, {
     int page = 1,
@@ -832,9 +483,9 @@ class KugouApi extends ChangeNotifier {
     final listRaw = resp['list'];
     final list = listRaw is List
         ? listRaw
-            .whereType<Map<String, dynamic>>()
-            .map(_commentFromKg)
-            .toList()
+              .whereType<Map<String, dynamic>>()
+              .map(kgCommentFromKg)
+              .toList()
         : const <KugouComment>[];
     return KugouCommentPage(
       list: list,
@@ -855,19 +506,18 @@ class KugouApi extends ChangeNotifier {
     Map<String, String>? headers,
     String baseUrl = 'https://gateway.kugou.com',
     bool encryptKey = false,
-  }) =>
-      kgGateway(
-        path,
-        method: method,
-        query: query,
-        body: body,
-        headers: headers,
-        baseUrl: baseUrl,
-        encryptKey: encryptKey,
-        mid: _mid,
-        token: session?.token,
-        userid: session?.userid,
-      );
+  }) => kgGateway(
+    path,
+    method: method,
+    query: query,
+    body: body,
+    headers: headers,
+    baseUrl: baseUrl,
+    encryptKey: encryptKey,
+    mid: _mid,
+    token: session?.token,
+    userid: session?.userid,
+  );
 
   /// 每日推荐（需登录；未登录抛异常提示）。
   Future<List<Track>> everydayRecommend() async {
@@ -880,11 +530,16 @@ class KugouApi extends ChangeNotifier {
       query: {'platform': 'ios'},
       headers: {'x-router': 'everydayrec.service.kugou.com'},
     );
-    final list = resp is Map ? resp['song_list'] : null;
+    // 歌曲列表在 data.song_list（实测 gateway 响应统一包在 data 内）；
+    // 保留顶层读取作兼容兜底
+    final data = resp is Map ? resp['data'] : null;
+    final list = data is Map
+        ? (data['song_list'] ?? resp['song_list'])
+        : (resp is Map ? resp['song_list'] : null);
     if (list is! List) return const [];
     return list
         .whereType<Map<String, dynamic>>()
-        .map(_trackFromKgPlain)
+        .map(kgTrackFromKgPlain)
         .where((t) => t.kugou != null)
         .toList();
   }
@@ -927,7 +582,12 @@ class KugouApi extends ChangeNotifier {
       },
       headers: {'x-router': 'specialrec.service.kugou.com'},
     );
-    final list = resp is Map ? resp['special_list'] : null;
+    // 歌单列表在 data.special_list（实测 gateway 响应统一包在 data 内）；
+    // 保留顶层读取作兼容兜底
+    final data = resp is Map ? resp['data'] : null;
+    final list = data is Map
+        ? (data['special_list'] ?? resp['special_list'])
+        : (resp is Map ? resp['special_list'] : null);
     if (list is! List) return const [];
     return list.whereType<Map<String, dynamic>>().map((p) {
       final id = p['global_collection_id']?.toString() ?? '';
@@ -982,18 +642,25 @@ class KugouApi extends ChangeNotifier {
           'global_collection_id': id,
         },
       );
-      final songs = resp is Map ? resp['songs'] : null;
+      // 歌曲与 list_info 在 data 内（实测 gateway 响应统一包在 data 内）
+      final data = resp is Map ? resp['data'] : null;
+      final songs = data is Map
+          ? (data['songs'] ?? resp['songs'])
+          : (resp is Map ? resp['songs'] : null);
       if (songs is! List || songs.isEmpty) break;
       all.addAll(
         songs
             .whereType<Map<String, dynamic>>()
-            .map(_trackFromKgPlain)
+            .map(kgTrackFromKgPlain)
             .where((t) => t.kugou != null),
       );
-      final listInfo = resp is Map ? resp['list_info'] : null;
+      final listInfo = data is Map
+          ? (data['list_info'] ?? resp['list_info'])
+          : (resp is Map ? resp['list_info'] : null);
       final total = listInfo is Map ? listInfo['count'] : null;
-      final totalNum =
-          total is num ? total.toInt() : int.tryParse('$total') ?? 0;
+      final totalNum = total is num
+          ? total.toInt()
+          : int.tryParse('$total') ?? 0;
       if (songs.length < pagesize) break;
       if (totalNum > 0 && all.length >= totalNum) break;
       page++;
@@ -1001,53 +668,119 @@ class KugouApi extends ChangeNotifier {
     return all;
   }
 
+  /// 私有歌单（用户歌单/"我喜欢"）歌曲单页（get_list_all_file）。
+  ///
+  /// 返回 `(tracks, total)`：tracks 为当页歌曲（按歌单 sort 升序，
+  /// 对齐酷狗 App 先收藏在前），total 为歌单总数（data.count）。
+  /// 供全量循环与收藏列表分页加载共用。
+  Future<(List<Track>, int)> playlistTracksNewPage(
+    String listid, {
+    int page = 1,
+    int pagesize = 60,
+  }) async {
+    if (session == null) return (const <Track>[], 0);
+    final resp = await _gateway(
+      '/v4/get_list_all_file',
+      method: 'POST',
+      body: {
+        'listid': listid,
+        'userid': session!.userid,
+        'area_code': 1,
+        'show_relate_goods': 0,
+        'pagesize': pagesize,
+        'allplatform': 1,
+        'show_cover': 1,
+        'type': 0,
+        'token': session!.token,
+        'page': page,
+      },
+      headers: {'x-router': 'cloudlist.service.kugou.com'},
+    );
+    final data = resp is Map ? resp['data'] : null;
+    // v4/get_list_all_file 歌曲在 data.info（非 data.songs），
+    // 总数在 data.count（非 data.total）
+    final songs = data is Map ? data['info'] : null;
+    final tracks = <Track>[];
+    if (songs is List) {
+      final pageTracks =
+          songs
+              .whereType<Map<String, dynamic>>()
+              .map(kgTrackFromKgPlain)
+              .where((t) => t.kugou != null)
+              .toList()
+            ..sort(
+              (a, b) => (a.kugou?.sort ?? 0).compareTo(b.kugou?.sort ?? 0),
+            );
+      tracks.addAll(pageTracks);
+    }
+    final totalRaw = data is Map ? data['count'] : null;
+    final total = totalRaw is num
+        ? totalRaw.toInt()
+        : int.tryParse('$totalRaw') ?? tracks.length;
+    return (tracks, total);
+  }
+
   /// 私有歌单（用户歌单/"我喜欢"）全量歌曲（playlist_track_all_new）。
   ///
   /// 60/页循环翻页至接口返回的 count（总数），无硬上限——「我喜欢」
   /// 可上千首，此前默认截断 300 首导致列表不完整。
   Future<List<Track>> playlistTracksAllNew(String listid) async {
-    if (session == null) return const [];
     const pagesize = 60;
     final all = <Track>[];
     var page = 1;
     // 安全上限：60 首/页 × 200 页 = 12000 首，防接口异常时死循环
     while (page <= 200) {
-      final resp = await _gateway(
-        '/v4/get_list_all_file',
-        method: 'POST',
-        body: {
-          'listid': listid,
-          'userid': session!.userid,
-          'area_code': 1,
-          'show_relate_goods': 0,
-          'pagesize': pagesize,
-          'allplatform': 1,
-          'show_cover': 1,
-          'type': 0,
-          'token': session!.token,
-          'page': page,
-        },
-        headers: {'x-router': 'cloudlist.service.kugou.com'},
+      final (tracks, total) = await playlistTracksNewPage(
+        listid,
+        page: page,
+        pagesize: pagesize,
       );
-      final data = resp is Map ? resp['data'] : null;
-      // v4/get_list_all_file 歌曲在 data.info（非 data.songs），
-      // 总数在 data.count（非 data.total）
-      final songs = data is Map ? data['info'] : null;
-      if (songs is! List || songs.isEmpty) break;
-      all.addAll(
-        songs
-            .whereType<Map<String, dynamic>>()
-            .map(_trackFromKgPlain)
-            .where((t) => t.kugou != null),
-      );
-      final total = data is Map ? data['count'] : null;
-      final totalNum =
-          total is num ? total.toInt() : int.tryParse('$total') ?? 0;
-      if (songs.length < pagesize) break;
-      if (totalNum > 0 && all.length >= totalNum) break;
+      if (tracks.isEmpty) break;
+      all.addAll(tracks);
+      if (tracks.length < pagesize) break;
+      if (total > 0 && all.length >= total) break;
       page++;
     }
     return all;
+  }
+
+  /// 「我喜欢」歌曲分页（供收藏列表按需加载；每页按歌单 sort 升序）。
+  Future<(List<Track>, int)> likedTracksPage({
+    int page = 1,
+    int pagesize = 60,
+  }) async {
+    final listid = await likeListId();
+    if (listid == null) return (const <Track>[], 0);
+    return playlistTracksNewPage(listid, page: page, pagesize: pagesize);
+  }
+
+  /// 「我喜欢」红心 hash 集合（轻量）。
+  ///
+  /// 分页循环只取 hash，不保留完整 Track 快照——LikeController 全量
+  /// 同步红心状态时避免一次性构造并持有全部曲目对象（GC 友好）。
+  Future<Set<String>> likedHashSet() async {
+    final listid = await likeListId();
+    if (listid == null) return const {};
+    const pagesize = 60;
+    final hashes = <String>{};
+    var page = 1;
+    // 安全上限：60 首/页 × 200 页 = 12000 首，防接口异常时死循环
+    while (page <= 200) {
+      final (tracks, total) = await playlistTracksNewPage(
+        listid,
+        page: page,
+        pagesize: pagesize,
+      );
+      if (tracks.isEmpty) break;
+      for (final t in tracks) {
+        final h = t.kugou?.hash ?? t.id;
+        if (h.isNotEmpty) hashes.add(h);
+      }
+      if (tracks.length < pagesize) break;
+      if (total > 0 && hashes.length >= total) break;
+      page++;
+    }
+    return hashes;
   }
 
   /// 用户歌单列表（v7/get_all_list，需登录）。
@@ -1083,6 +816,76 @@ class KugouApi extends ChangeNotifier {
         subtitle: p['list_create_userid']?.toString() ?? '',
       );
     }).toList();
+  }
+
+  /// 拉取酷狗用户曲库并按归属分类（创建的歌单 / 收藏的歌单 / 收藏的专辑）。
+  ///
+  /// 对齐 MoeKoeMusic Library.vue 对 `/v7/get_all_list` 的解析：
+  /// - `list_create_userid == 登录 userid` 或 `name == '我喜欢'` → 创建的歌单；
+  /// - 其余按 `authors` 字段区分「收藏的歌单」（无）与「收藏的专辑」（有）。
+  /// 详情 id 取 `list_create_gid` 优先 / `global_collection_id` 兜底。
+  /// 保留 [userPlaylists]（id=listid）供「我喜欢」播放链路使用。
+  Future<KugouLibrary> userLibrary() async {
+    final s = session;
+    if (s == null) return const KugouLibrary(items: []);
+    final resp = await _gateway(
+      '/v7/get_all_list',
+      method: 'POST',
+      query: {
+        'plat': 1,
+        'userid': int.tryParse(s.userid) ?? 0,
+        'token': s.token,
+      },
+      body: {
+        'userid': s.userid,
+        'token': s.token,
+        'total_ver': 979,
+        'type': 2,
+        'page': 1,
+        'pagesize': 500,
+      },
+      headers: {'x-router': 'cloudlist.service.kugou.com'},
+    );
+    final data = resp is Map ? resp['data'] : null;
+    final info = data is Map ? data['info'] : null;
+    if (info is! List) return const KugouLibrary(items: []);
+    final mine = s.userid;
+    final items = <KugouLibraryItem>[];
+    for (final p in info.whereType<Map<String, dynamic>>()) {
+      final name = p['name']?.toString() ?? '';
+      if (name.isEmpty) continue;
+      final isMine =
+          p['list_create_userid']?.toString() == mine || name == '我喜欢';
+      final isAlbum = p['authors'] != null;
+      // 详情 id：公开歌单用 global_collection_id 系列；「我喜欢」为个人
+      // 歌单，无公开 id 时兜底 listid（点击走 likedTracks 个人链路）
+      final id =
+          p['list_create_gid']?.toString() ??
+          p['global_collection_id']?.toString() ??
+          (name == '我喜欢' ? p['listid']?.toString() ?? '' : '');
+      if (id.isEmpty) continue;
+      items.add(
+        KugouLibraryItem(
+          type: isMine
+              ? KugouLibraryType.createdPlaylist
+              : isAlbum
+              ? KugouLibraryType.collectedAlbum
+              : KugouLibraryType.collectedPlaylist,
+          id: id,
+          title: name,
+          cover: kgFillCover(p['pic']?.toString(), 300),
+          trackCount: p['count'] is num ? (p['count'] as num).toInt() : 0,
+          listid: p['listid']?.toString(),
+        ),
+      );
+    }
+    // 「我喜欢」置顶（对齐 MoeKoeMusic sort 优先）
+    items.sort((a, b) {
+      final al = a.title == '我喜欢' ? -1 : 0;
+      final bl = b.title == '我喜欢' ? -1 : 0;
+      return al - bl;
+    });
+    return KugouLibrary(items: items);
   }
 
   /// 「我喜欢」歌单 listid（进程内缓存；未找到返回 null）。
@@ -1220,7 +1023,15 @@ class KugouApi extends ChangeNotifier {
       return CoverItem(
         id: id,
         title: r['rankname']?.toString() ?? '',
-        cover: r['imgurl']?.toString() ?? r['banner']?.toString(),
+        // imgurl 含 {size} 占位，需 kgFillCover 填充（否则图片 URL 失效）
+        cover: kgFillCover(
+          r['imgurl']?.toString() ??
+              r['img_9']?.toString() ??
+              r['bannerurl']?.toString() ??
+              r['banner_9']?.toString() ??
+              r['banner']?.toString(),
+          300,
+        ),
         subtitle: r['intro']?.toString() ?? '',
       );
     }).toList();
@@ -1251,15 +1062,19 @@ class KugouApi extends ChangeNotifier {
     final data = resp is Map ? resp['data'] : null;
     final list = data is Map ? data['songlist'] : null;
     if (list is! List) return const [];
-    return list.whereType<Map<String, dynamic>>().map((s) {
-      // hash 嵌套在 deprecated 内（对齐 MoeKoeMusic formatArtistTracks 结构）
-      final deprecated = s['deprecated'];
-      final item = <String, dynamic>{
-        if (deprecated is Map) ...Map<String, dynamic>.from(deprecated),
-        ...s,
-      };
-      return _trackFromKgPlain(item);
-    }).where((t) => t.kugou != null).toList();
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map((s) {
+          // hash 嵌套在 deprecated 内（对齐 MoeKoeMusic formatArtistTracks 结构）
+          final deprecated = s['deprecated'];
+          final item = <String, dynamic>{
+            if (deprecated is Map) ...Map<String, dynamic>.from(deprecated),
+            ...s,
+          };
+          return kgTrackFromKgPlain(item);
+        })
+        .where((t) => t.kugou != null)
+        .toList();
   }
 
   /// 新碟上架（musicadservice/v1/mobile_newalbum_sp；chn/eur/jpn/kor 合并）。
@@ -1284,13 +1099,15 @@ class KugouApi extends ChangeNotifier {
       for (final a in list.whereType<Map<String, dynamic>>()) {
         final id = a['albumid']?.toString() ?? '';
         if (id.isEmpty) continue;
-        items.add(CoverItem(
-          id: id,
-          title: a['albumname']?.toString() ?? '',
-          cover: kgFillCover(a['imgurl']?.toString(), 300),
-          subtitle: a['singername']?.toString() ?? '',
-          trackCount: a['songcount'] is num ? a['songcount']!.toInt() : 0,
-        ));
+        items.add(
+          CoverItem(
+            id: id,
+            title: a['albumname']?.toString() ?? '',
+            cover: kgFillCover(a['imgurl']?.toString(), 300),
+            subtitle: a['singername']?.toString() ?? '',
+            trackCount: a['songcount'] is num ? a['songcount']!.toInt() : 0,
+          ),
+        );
       }
     }
     return items;
@@ -1338,29 +1155,35 @@ class KugouApi extends ChangeNotifier {
     final data = resp is Map ? resp['data'] : null;
     final songs = data is Map ? data['songs'] : null;
     if (songs is! List) return const [];
-    return songs.whereType<Map<String, dynamic>>().map((s) {
-      final audioInfo = s['audio_info'];
-      final base = s['base'];
-      final albumInfo = s['album_info'];
-      final hash =
-          audioInfo is Map ? audioInfo['hash']?.toString() ?? '' : '';
-      final item = <String, dynamic>{
-        'hash': hash,
-        'audio_name':
-            base is Map ? base['audio_name']?.toString() ?? '' : '',
-        'author_name':
-            base is Map ? base['author_name']?.toString() ?? '' : '',
-        'album_name': albumInfo is Map
-            ? albumInfo['album_name']?.toString() ?? ''
-            : '',
-        'duration': audioInfo is Map ? audioInfo['duration'] : null,
-        'hash_320': audioInfo is Map ? audioInfo['hash_320'] : null,
-        'hash_flac': audioInfo is Map ? audioInfo['hash_flac'] : null,
-        if (s['trans_param'] is Map)
-          'trans_param': s['trans_param'],
-      };
-      return _trackFromKgPlain(item);
-    }).where((t) => t.kugou != null).toList();
+    return songs
+        .whereType<Map<String, dynamic>>()
+        .map((s) {
+          final audioInfo = s['audio_info'];
+          final base = s['base'];
+          final albumInfo = s['album_info'];
+          final hash = audioInfo is Map
+              ? audioInfo['hash']?.toString() ?? ''
+              : '';
+          final item = <String, dynamic>{
+            'hash': hash,
+            'audio_name': base is Map
+                ? base['audio_name']?.toString() ?? ''
+                : '',
+            'author_name': base is Map
+                ? base['author_name']?.toString() ?? ''
+                : '',
+            'album_name': albumInfo is Map
+                ? albumInfo['album_name']?.toString() ?? ''
+                : '',
+            'duration': audioInfo is Map ? audioInfo['duration'] : null,
+            'hash_320': audioInfo is Map ? audioInfo['hash_320'] : null,
+            'hash_flac': audioInfo is Map ? audioInfo['hash_flac'] : null,
+            if (s['trans_param'] is Map) 'trans_param': s['trans_param'],
+          };
+          return kgTrackFromKgPlain(item);
+        })
+        .where((t) => t.kugou != null)
+        .toList();
   }
 
   /// 歌手详情（kmr/v3/author）。
@@ -1402,11 +1225,15 @@ class KugouApi extends ChangeNotifier {
       baseUrl: 'https://openapi.kugou.com',
     );
     final data = resp is Map ? resp['data'] : null;
-    final list = data is Map ? data['songlist'] : data is List ? data : null;
+    final list = data is Map
+        ? data['songlist']
+        : data is List
+        ? data
+        : null;
     if (list is! List) return const [];
     return list
         .whereType<Map<String, dynamic>>()
-        .map(_trackFromKgPlain)
+        .map(kgTrackFromKgPlain)
         .where((t) => t.kugou != null)
         .toList();
   }
@@ -1432,7 +1259,11 @@ class KugouApi extends ChangeNotifier {
       headers: {'x-router': 'openapi.kugou.com', 'kg-tid': '36'},
     );
     final data = resp is Map ? resp['data'] : null;
-    final list = data is Map ? data['album_list'] : data is List ? data : null;
+    final list = data is Map
+        ? data['album_list']
+        : data is List
+        ? data
+        : null;
     if (list is! List) return const [];
     return list.whereType<Map<String, dynamic>>().map((a) {
       final id = a['album_id']?.toString() ?? '';
@@ -1473,8 +1304,7 @@ class KugouApi extends ChangeNotifier {
     final data = resp is Map ? resp['data'] : null;
     final lists = data is Map ? data['lists'] : null;
     final total = data is Map ? data['total'] : null;
-    final totalNum =
-        total is num ? total.toInt() : int.tryParse('$total') ?? 0;
+    final totalNum = total is num ? total.toInt() : int.tryParse('$total') ?? 0;
     if (lists is! List) {
       return SearchResult(items: const [], total: totalNum, hasMore: false);
     }
@@ -1484,8 +1314,9 @@ class KugouApi extends ChangeNotifier {
         // gateway /v3/search/song 返回 PascalCase + Duration(ms) + Image 封面
         final hash = s['FileHash']?.toString() ?? s['hash']?.toString() ?? '';
         if (hash.isEmpty) continue;
-        final name = kgDecodeName((s['SongName'] ?? s['OriSongName'] ?? '')
-            .toString());
+        final name = kgDecodeName(
+          (s['SongName'] ?? s['OriSongName'] ?? '').toString(),
+        );
         final author = s['SingerName']?.toString() ?? '';
         final hashes = <String, String>{'128k': hash};
         void add(String key, Object? h) {
@@ -1497,48 +1328,54 @@ class KugouApi extends ChangeNotifier {
         add('flac', s['SQFileHash']);
         add('flac24bit', s['ResFileHash']);
         final cover = s['Image']?.toString();
-        items.add(Track(
-          id: s['AudioId']?.toString() ?? hash,
-          title: name,
-          artists: author.isEmpty ? const [] : kugouArtists(author),
-          album: null,
-          duration: _kgDurationMs(s['Duration']),
-          cover: kgFillCover(cover, 300),
-          source: 'kugou',
-          kugou: KugouTrackInfo(hash: hash, hashes: hashes, sizes: const {}),
-        ));
+        items.add(
+          Track(
+            id: s['AudioId']?.toString() ?? hash,
+            title: name,
+            artists: author.isEmpty ? const [] : kugouArtists(author),
+            album: null,
+            duration: kgDurationMs(s['Duration']),
+            cover: kgFillCover(cover, 300),
+            source: 'kugou',
+            kugou: KugouTrackInfo(hash: hash, hashes: hashes, sizes: const {}),
+          ),
+        );
       }
     } else {
       for (final c in lists.whereType<Map<String, dynamic>>()) {
-        final id = (c['SpecialID'] ??
-                c['AlbumID'] ??
-                c['AuthorID'] ??
-                c['albumid'] ??
-                c['authorid'])
-            ?.toString() ??
+        final id =
+            (c['SpecialID'] ??
+                    c['AlbumID'] ??
+                    c['AuthorID'] ??
+                    c['albumid'] ??
+                    c['authorid'])
+                ?.toString() ??
             '';
         if (id.isEmpty) continue;
-        final title = (c['specialname'] ??
-                c['albumname'] ??
-                c['authorname'] ??
-                c['AuthorName'] ??
-                c['AlbumName'])
-            ?.toString() ??
+        final title =
+            (c['specialname'] ??
+                    c['albumname'] ??
+                    c['authorname'] ??
+                    c['AuthorName'] ??
+                    c['AlbumName'])
+                ?.toString() ??
             '';
         final coverTpl = (c['img'] ?? c['imgurl'] ?? c['Avatar'] ?? c['ImgUrl'])
             ?.toString();
-        items.add(CoverItem(
-          id: id,
-          title: title,
-          cover: kgFillCover(coverTpl, 300),
-          subtitle: type == 'special'
-              ? (c['nickname']?.toString() ?? '')
-              : type == 'album'
-                  ? (c['singername']?.toString() ??
+        items.add(
+          CoverItem(
+            id: id,
+            title: title,
+            cover: kgFillCover(coverTpl, 300),
+            subtitle: type == 'special'
+                ? (c['nickname']?.toString() ?? '')
+                : type == 'album'
+                ? (c['singername']?.toString() ??
                       c['SingerName']?.toString() ??
                       '')
-                  : '',
-        ));
+                : '',
+          ),
+        );
       }
     }
     return SearchResult(
