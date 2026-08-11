@@ -9,6 +9,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)  # HTTPS + SHA1
 find_package(SQLite3 REQUIRED)  # scraper-state.db 直写
+# SQLite target 命名跨环境不一致：
+#   - CMake 标准 FindSQLite3（≥3.14）与新版 vcpkg：SQLite3::SQLite3
+#   - vcpkg 旧命名：SQLite::SQLite3（已废弃但部分工具链仍提供）
+#   - 旧版 FindSQLite3 / 部分发行版：不定义 target，仅提供变量
+if(TARGET SQLite3::SQLite3)
+    set(SQLITE3_TARGET SQLite3::SQLite3)
+elseif(TARGET SQLite::SQLite3)
+    set(SQLITE3_TARGET SQLite::SQLite3)
+else()
+    set(SQLITE3_TARGET "")
+endif()
 # Taglib：优先 Config 模式（Arch Linux 自带 taglib-config.cmake）
 # 失败后回退 FindTaglib.cmake（pkg-config 检测，适用 Alpine）
 find_package(TagLib CONFIG QUIET)
@@ -72,10 +83,16 @@ target_include_directories(archoera_scraper PRIVATE include)
 target_link_libraries(archoera_scraper PRIVATE
     CURL::libcurl
     OpenSSL::Crypto
-    SQLite3::SQLite3
     nlohmann_json::nlohmann_json
     Taglib::tag
 )
+if(SQLITE3_TARGET)
+    target_link_libraries(archoera_scraper PRIVATE ${SQLITE3_TARGET})
+else()
+    # 无 IMPORTED target：直接用 find_package 探测到的库/头路径
+    target_link_libraries(archoera_scraper PRIVATE ${SQLite3_LIBRARIES})
+    target_include_directories(archoera_scraper PRIVATE ${SQLite3_INCLUDE_DIRS})
+endif()
 
 # 安装目标
 install(TARGETS archoera_scraper LIBRARY DESTINATION lib)
