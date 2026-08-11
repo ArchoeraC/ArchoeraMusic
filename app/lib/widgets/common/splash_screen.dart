@@ -190,7 +190,7 @@ class _SplashScreenState extends State<SplashScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Archoera Music © | BetaStudio2',
+                          'ArchoeraMusic © BetaStudio2',
                           style: TextStyle(
                             fontSize: 12,
                             letterSpacing: 3,
