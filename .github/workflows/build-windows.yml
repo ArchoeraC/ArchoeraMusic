@@ -1,0 +1,99 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mingw (cgo C 编译器，go -buildmode=c-shared 需要)
+        shell: bash
+        # pkgconfiglite 已移除：Windows 原生模块不依赖 pkg-config
+        # （audio-engine 由 build_windows.bat 的 cl.exe 直编、scraper 走
+        #   vcpkg toolchain、subsonic 的 sqlite 为 pure-Go modernc 实现）
+        run: choco install mingw -y --no-progress
+
+      - name: Cache vcpkg installed (恢复；ffmpeg/taglib 等预编译跨 run 秒级恢复)
+        id: vcpkg-cache
+        uses: actions/cache@v4
+        with:
+          # manifest 模式安装根固定为 vcpkg.json 所在目录/vcpkg_installed
+          path: app/vcpkg_installed
+          key: vcpkg-installed-${{ hashFiles('app/vcpkg.json') }}
+
+      - name: Install vcpkg deps (manifest 模式，依赖清单见 app/vcpkg.json)
+        shell: bash
+        working-directory: app
+        # x64-windows-release：只编译/安装 Release 库，跳过 debug 变体
+        # （ffmpeg 等包 debug+release 双编译耗时可省一半，且无 debug 库可被误链）
+        # 注意：manifest 模式安装根固定为 ./vcpkg_installed，不受 VCPKG_INSTALLED_DIR
+        # 环境变量影响，不要手动覆盖以免与 CMake toolchain 的定位不一致。
+        run: vcpkg install --triplet x64-windows-release
+        env:
+          VCPKG_ROOT: C:\vcpkg
+
+      # save-always 已弃用（job 失败时不生效），改为显式 save：
+      # vcpkg install 成功后立即落缓存，此后任意步骤失败均不影响复用
+      - name: Cache vcpkg installed (保存，供下次 run 秒级恢复)
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: app/vcpkg_installed
+          key: vcpkg-installed-${{ hashFiles('app/vcpkg.json') }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: app/core/subsonic/go.sum
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build native modules (Windows bat 一站式引导)
+        shell: cmd
+        # 统一入口 app/core/build_windows.bat，在单个 cmd 会话内完成全部模块：
+        #   vswhere→vcvars64（MSVC 环境）→ audio-engine（cargo tempo + cl 直编
+        #   fft.dll/archoera_mediaengine.dll）→ scraper（CMake+vcpkg toolchain）
+        #   → scanner（dotnet publish）→ downloader（cargo）→ subsonic（go+rust）。
+        # 依赖由上方步骤提前安装，脚本只做编译引导。
+        env:
+          VCPKG_TARGET_TRIPLET: x64-windows-release
+        working-directory: app/core
+        run: build_windows.bat
+
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: app
+        run: dart analyze lib
+
+      - name: Test (unit smoke)
+        working-directory: app
+        run: flutter test test/widget_test.dart
+
+      - name: Build Flutter Windows
+        working-directory: app
+        run: flutter build windows --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-windows-x64
+          path: app/build/windows/x64/runner/Release
+          if-no-files-found: error

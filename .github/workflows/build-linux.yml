@@ -1,0 +1,142 @@
+name: Build Linux
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux:
+    name: Linux x64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config clang \
+            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
+            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libayatana-appindicator3-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: app/core/subsonic/go.sum
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build audio-engine (C + Rust tempo)
+        run: |
+          cmake -S app/core/audio-engine -B app/core/audio-engine/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build app/core/audio-engine/build -j"$(nproc)"
+
+      - name: Build scraper (C++)
+        run: |
+          cmake -S app/core/scraper -B app/core/scraper/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build app/core/scraper/build -j"$(nproc)"
+
+      - name: Build scanner (C# NativeAOT)
+        run: bash app/core/scanner/build.sh linux-x64
+
+      - name: Build downloader (Rust cdylib)
+        run: cargo build --release --manifest-path app/core/downloader/Cargo.toml
+
+      - name: Build subsonic (Go + Rust transcoder)
+        run: bash app/core/subsonic/build.sh
+
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: app
+        run: dart analyze lib
+
+      - name: Test (unit smoke)
+        working-directory: app
+        run: flutter test test/widget_test.dart
+
+      - name: Build Flutter Linux
+        working-directory: app
+        run: flutter build linux --release
+
+      - name: Resolve version
+        id: version
+        run: |
+          # 标签推送（v*）→ 去掉 v；手动触发 → 回退 pubspec 版本
+          VER="${GITHUB_REF_NAME#v}"
+          if [[ -z "$VER" || "$VER" == "$GITHUB_REF_NAME" ]]; then
+            VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
+          fi
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm flatpak
+          # appimagetool（CI 无 FUSE，运行时用 --appimage-extract-and-run）
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage
+          chmod +x /tmp/appimagetool.AppImage
+          sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
+          # type2 runtime 预下载（appimagetool 打包时不再联网下载，规避网络抖动）
+          wget -q https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 -O /tmp/type2-runtime
+
+      - name: Package tar.gz (纯二进制)
+        run: bash packaging/linux/package.sh tar app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+
+      - name: Package .deb (Debian/Ubuntu)
+        run: bash packaging/linux/package.sh deb app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+
+      - name: Package .rpm (Fedora/RHEL/openSUSE)
+        run: bash packaging/linux/package.sh rpm app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+
+      - name: Package AppImage (通用)
+        run: bash packaging/linux/package.sh appimage app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+        env:
+          APPIMAGE_RUNTIME_FILE: /tmp/type2-runtime
+
+      - name: Package Arch pkg.tar.zst (makepkg in archlinux container)
+        run: |
+          bash packaging/linux/package.sh arch app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+          docker run --rm -v "$PWD":/workspace -w /workspace/packaging/linux/work/arch \
+            archlinux:latest bash -c '
+              pacman -Sy --noconfirm --needed base-devel >/dev/null 2>&1 || exit 1
+              chown -R nobody:nobody .
+              # 新版 archlinux 镜像给 nobody 设了账户过期，su 会报 "account has expired"，先清除
+              chage -E -1 nobody
+              # 预构建产物打包：--nodeps 跳过运行时依赖检查（depends 仍写入
+              # .PKGINFO 供安装端使用），避免容器内安装整套依赖拖慢 CI
+              su nobody -s /bin/bash -c "HOME=/tmp makepkg -f --skipinteg --nocheck --nodeps" || exit 1
+            '
+          cp packaging/linux/work/arch/*.pkg.tar.zst dist/linux/
+          echo "→ dist/linux/$(ls dist/linux/ | grep '\.pkg\.tar\.zst$')"
+
+      - name: Package Flatpak (通用)
+        run: bash packaging/linux/package-flatpak.sh app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+
+      - name: Upload bundle artifact (原始 bundle)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-linux-x64
+          path: app/build/linux/x64/release/bundle
+          if-no-files-found: error
+
+      - name: Upload packages artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-linux-packages
+          path: dist/linux/*
+          if-no-files-found: error

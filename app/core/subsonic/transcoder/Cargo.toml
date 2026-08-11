@@ -1,0 +1,29 @@
+[package]
+name = "archoera-transcoder"
+version = "0.1.0"
+edition = "2021"
+description = "Archoera Subsonic 转码器（cdylib）：symphonia 解码 + mp3lame 编码，输出 MP3 到文件"
+publish = false
+
+[lib]
+name = "archoera_transcoder"
+crate-type = ["cdylib"]
+
+[dependencies]
+symphonia = { version = "0.5", default-features = false, features = [
+  "mp3",
+  "flac",
+  "ogg",
+  "vorbis",
+  "wav",
+  "aac",
+  "isomp4",
+  "pcm",
+] }
+mp3lame-encoder = "0.2"
+anyhow = "1"
+
+[profile.release]
+lto = true
+strip = "symbols"
+opt-level = "s"

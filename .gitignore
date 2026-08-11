@@ -1,0 +1,54 @@
+# ArchoeraMusic — 仓库级忽略
+
+# 根目录大文件（二进制归档/APK）
+*.tar.gz
+*.apk
+
+# Flutter / Dart
+app/build/
+app/.dart_tool/
+app/.flutter-plugins*
+app/android/.gradle/
+app/ios/Pods/
+app/.idea/
+app/.metadata
+
+# scanner（NativeAOT FFI / CLI 构建产物；build/ 由 app/core/scanner/build.sh 产出）
+app/core/scanner/bin/
+app/core/scanner/obj/
+app/core/scanner/build/
+app/core/scanner/scanner-ffi/bin/
+app/core/scanner/scanner-ffi/obj/
+
+# vcpkg manifest 模式默认安装目录（workflow 已用 VCPKG_INSTALLED_DIR 指到 C:\vcpkg\installed，此处兜底）
+app/vcpkg_installed/
+
+# scraper（C++ 刮削器 FFI / CLI 构建产物；build/ 由 app/core/scraper CMake 产出）
+app/core/scraper/build/
+
+# C 音频引擎（app/core/audio-engine/build/ 由 cmake 产出）
+app/core/audio-engine/build/
+app/core/audio-engine/tempo-target/
+app/core/audio-engine/tempo-rs/target/
+
+# subsonic（Go c-shared + Rust 转码器 cdylib；build/ 由 build.sh 产出）
+app/core/subsonic/build/
+app/core/subsonic/transcoder/target/
+
+# downloader（Rust 下载器 cdylib）
+app/core/downloader/target/
+
+# 打包输出（packaging/linux/package*.sh 的中间暂存与最终产物）
+dist/
+packaging/linux/work/
+
+# IDE / 编辑器
+.idea/
+.vscode/
+*.iml
+
+# 系统
+.DS_Store
+*.log
+
+*.key

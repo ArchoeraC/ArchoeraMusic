@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>scanner-ffi</AssemblyName>
+    <RootNamespace>Archoera.Scanner.Ffi</RootNamespace>
+    <!-- NativeAOT 共享库：dotnet publish -r &lt;rid&gt; 产出 libscanner-ffi.so/.dylib/.dll，
+         供 Flutter FFI 直接调用，彻底脱离 sidecar 子进程 -->
+    <OutputType>Library</OutputType>
+    <PublishAot>true</PublishAot>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- TagLibSharp 经 TrimmerRootAssembly 完整保留，不会实际 trim；
+         IL2104（Assembly produced trim warnings）属分析期汇总提示，抑制之 -->
+    <NoWarn>$(NoWarn);IL2104</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 共享 scanner 源码（与 CLI 同源，仅排除 Program.cs 入口与 Ffi.cs 自身） -->
+    <Compile Include="../*.cs" Exclude="../Program.cs;Ffi.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TagLibSharp: 音频元数据解析（MP3/FLAC/OGG/M4A/APE/WAV/DSF 等） -->
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <!-- Microsoft.Data.Sqlite: 直写 SQLite（与 CLI 一致） -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- NativeAOT 默认启用 trimming，TagLib.File.Create 依赖反射注册具体文件类型；
+         保留整个程序集防止运行期 "No file type found" -->
+    <TrimmerRootAssembly Include="TagLibSharp" />
+  </ItemGroup>
+
+  <!-- 产物约定：复制到 scanner/build/（与 audio-engine/build 同级约定）。
+       三平台命名差异：
+         - Linux   : libscanner-ffi.so + libe_sqlite3.so
+         - macOS   : libscanner-ffi.dylib + libe_sqlite3.dylib
+         - Windows : scanner-ffi.dll + e_sqlite3.dll（NativeAOT 无 lib 前缀；
+                     publish 目录含 x64 子目录，故用 $(PublishDir) 不硬编码路径） -->
+  <Target Name="CopyToScannerBuild" AfterTargets="Publish">
+    <ItemGroup>
+      <!-- 每个平台只存在自己的文件名；Exists 过滤防止跨平台 Copy 报 MSB3030 -->
+      <ScannerArtifacts Include="$(PublishDir)$(AssemblyName).so" Condition="Exists('$(PublishDir)$(AssemblyName).so')" />
+      <ScannerArtifacts Include="$(PublishDir)$(AssemblyName).dll" Condition="Exists('$(PublishDir)$(AssemblyName).dll')" />
+      <ScannerArtifacts Include="$(PublishDir)$(AssemblyName).dylib" Condition="Exists('$(PublishDir)$(AssemblyName).dylib')" />
+      <ScannerArtifacts Include="$(PublishDir)libe_sqlite3.so" Condition="Exists('$(PublishDir)libe_sqlite3.so')" />
+      <ScannerArtifacts Include="$(PublishDir)libe_sqlite3.dylib" Condition="Exists('$(PublishDir)libe_sqlite3.dylib')" />
+      <ScannerArtifacts Include="$(PublishDir)e_sqlite3.dll" Condition="Exists('$(PublishDir)e_sqlite3.dll')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ScannerArtifacts)"
+          DestinationFolder="$(MSBuildProjectDirectory)/../build/"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

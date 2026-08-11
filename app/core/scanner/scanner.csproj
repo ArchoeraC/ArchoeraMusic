@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>archoera-scanner</AssemblyName>
+    <RootNamespace>Archoera.Scanner</RootNamespace>
+    <!-- 框架依赖发布（runtime 由运行时镜像提供，跨架构友好） -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 子项目 scanner-ffi 是独立 AOT 库，不得编入 CLI -->
+    <Compile Remove="scanner-ffi/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TagLibSharp: 音频元数据解析（MP3/FLAC/OGG/M4A/APE/WAV/DSF 等） -->
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <!-- Microsoft.Data.Sqlite: 直写 SQLite，绕过 Node.js V8 堆 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>
