@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.archoera.archoera_music</id>
+  <name>ArchoeraMusic</name>
+  <summary>An open-source music player</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <description>
+    <p>ArchoeraMusic is an open-source music player that connects to alternative music services, supports offline playback, local library scanning and a built-in subsonic-compatible server.</p>
+  </description>
+  <launchable type="desktop-id">com.archoera.archoera_music.desktop</launchable>
+  <url type="homepage">https://github.com/BetaStudio2/ArchoeraMusic</url>
+  <url type="bugtracker">https://github.com/BetaStudio2/ArchoeraMusic/issues</url>
+  <releases>
+    <release version="@VERSION@" date="2026-08-10"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

@@ -1,0 +1,16 @@
+{
+  "name": "archoera-music",
+  "version-string": "0.8.6-pre.3",
+  "dependencies": [
+    "ffmpeg",
+    "taglib",
+    "curl",
+    "openssl",
+    "sqlite3",
+    "nlohmann-json",
+    {
+      "name": "pkgconf",
+      "host": true
+    }
+  ]
+}

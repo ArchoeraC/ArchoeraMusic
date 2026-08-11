@@ -1,0 +1,78 @@
+name: Build macOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: macOS arm64
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Homebrew deps
+        run: |
+          brew install ffmpeg taglib curl openssl sqlite nlohmann-json pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: app/core/subsonic/go.sum
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build audio-engine (C + Rust tempo)
+        run: |
+          cmake -S app/core/audio-engine -B app/core/audio-engine/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build app/core/audio-engine/build -j"$(sysctl -n hw.ncpu)"
+
+      - name: Build scraper (C++; openssl keg-only 需 CMAKE_PREFIX_PATH)
+        run: |
+          export CMAKE_PREFIX_PATH="/opt/homebrew/opt/openssl"
+          cmake -S app/core/scraper -B app/core/scraper/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build app/core/scraper/build -j"$(sysctl -n hw.ncpu)"
+
+      - name: Build scanner (C# NativeAOT)
+        run: bash app/core/scanner/build.sh osx-arm64
+
+      - name: Build downloader (Rust cdylib)
+        run: cargo build --release --manifest-path app/core/downloader/Cargo.toml
+
+      - name: Build subsonic (Go + Rust transcoder)
+        run: bash app/core/subsonic/build.sh
+
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: app
+        run: dart analyze lib
+
+      - name: Test (unit smoke)
+        working-directory: app
+        run: flutter test test/widget_test.dart
+
+      - name: Build Flutter macOS
+        working-directory: app
+        # 工程 Release 配置已用 ad-hoc 签名（CODE_SIGN_IDENTITY = "-"），CI 无需证书；
+        # 现行 Flutter 的 build macos 不再支持 --no-codesign，去掉即可。
+        run: flutter build macos --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-macos-arm64
+          path: app/build/macos/Build/Products/Release/archoera_music.app
+          if-no-files-found: error
