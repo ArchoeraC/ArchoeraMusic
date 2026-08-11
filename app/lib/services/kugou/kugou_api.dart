@@ -670,8 +670,8 @@ class KugouApi extends ChangeNotifier {
 
   /// 私有歌单（用户歌单/"我喜欢"）歌曲单页（get_list_all_file）。
   ///
-  /// 返回 `(tracks, total)`：tracks 为当页歌曲（按歌单 sort 升序，
-  /// 对齐酷狗 App 先收藏在前），total 为歌单总数（data.count）。
+  /// 返回 `(tracks, total)`：tracks 为当页歌曲（按歌单 sort **降序**，
+  /// 最新收藏在前，对齐酷狗 App），total 为歌单总数（data.count）。
   /// 供全量循环与收藏列表分页加载共用。
   Future<(List<Track>, int)> playlistTracksNewPage(
     String listid, {
@@ -709,7 +709,7 @@ class KugouApi extends ChangeNotifier {
               .where((t) => t.kugou != null)
               .toList()
             ..sort(
-              (a, b) => (a.kugou?.sort ?? 0).compareTo(b.kugou?.sort ?? 0),
+              (a, b) => (b.kugou?.sort ?? 0).compareTo(a.kugou?.sort ?? 0),
             );
       tracks.addAll(pageTracks);
     }
@@ -911,11 +911,11 @@ class KugouApi extends ChangeNotifier {
     final listid = await likeListId();
     if (listid == null) return const [];
     final tracks = await playlistTracksAllNew(listid);
-    // 按收藏序号 sort 升序（先收藏的在前，与酷狗 App 展示顺序一致）；
+    // 按收藏序号 sort 降序（最新收藏在前，与酷狗 App 展示顺序一致）；
     // 分页接口返回顺序不稳定，不能依赖 reversed；sort 缺失时
     // 退化为原接口顺序（旧数据兜底）。
     final sorted = List<Track>.of(tracks)
-      ..sort((a, b) => (a.kugou?.sort ?? 0).compareTo(b.kugou?.sort ?? 0));
+      ..sort((a, b) => (b.kugou?.sort ?? 0).compareTo(a.kugou?.sort ?? 0));
     return sorted;
   }
 
