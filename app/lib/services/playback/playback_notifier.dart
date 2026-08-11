@@ -181,15 +181,25 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   /// 最近一次取帧位置（毫秒）：取帧节流基准（性能优化）。
   ///
   /// 引擎位置事件 ~50ms 一条，但频谱取帧含同步磁盘 IO + 下混 + FFT，
-  /// 按 100ms 节流后 UI 线程负担减半；插值/平滑由 _SpectrumPainter
-  /// 承担，10Hz 推送下视觉依旧流畅（原 Web 端也是 50ms 推送 + 帧间
-  /// 插值消除阶梯）。初始 -1000 保证首帧立即取。
+  /// 按 [_fftPollIntervalMs] 节流后 UI 线程负担减半；插值/平滑由
+  /// _SpectrumPainter 承担，10Hz 推送下视觉依旧流畅（原 Web 端也是
+  /// 50ms 推送 + 帧间插值消除阶梯）。初始 -1000 保证首帧立即取。
   int _lastSpectrumAtMs = -1000;
+
+  /// 频谱取帧节流间隔（ms）：默认 100ms 基线；节能模式开 → 300ms
+  /// 进一步降帧省电（见 _syncFftActive，随偏好实时更新）。
+  int _fftPollIntervalMs = 100;
 
   void _pollSpectrum() {
     if (!_fftActive) return;
     final posMs = state.position.inMilliseconds;
-    if (posMs - _lastSpectrumAtMs < 100) return;
+    // 降帧协商：位置回退（seek 后退 / 切歌 / 会话重启）时视为节流基准
+    // 失效，立即重置并取帧——否则 posMs - _lastSpectrumAtMs 恒为负，
+    // FFT 被节流永久拦截（冻结到播放位置追平旧基准，表现如 FFT 崩溃）。
+    final sinceLast = posMs - _lastSpectrumAtMs;
+    if (sinceLast >= 0 && sinceLast < _fftPollIntervalMs) {
+      return; // 正常降帧节流（间隔由节能模式协商）
+    }
     _lastSpectrumAtMs = posMs;
     final pcm = _engine?.pcm;
     if (pcm == null) return;
@@ -1092,6 +1102,9 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     _sessionOffsetMs = offsetMs;
     _engineSubs.add(engine.events.listen(_onEngineEvent));
     _fftStarted = false;
+    // 新会话重置取帧节流基准：位置从新会话起点（可能回退）重新前进，
+    // 若不重置，首帧会被上一会话的 _lastSpectrumAtMs 节流拦截（FFT 冻结）
+    _lastSpectrumAtMs = -1000;
     // 新会话应用当前音量（引擎进程新起，默认 1.0）
     // ignore: discarded_futures
     unawaited(engine.setVolume(state.volume));
@@ -1213,9 +1226,11 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
 
   /// 同步 FFT 拉取开关（事件驱动，无 Timer）：仅在引擎存在、播放中且
   /// 非性能模式时允许按 EnginePosition 事件取帧；暂停/停播即停（节能）。
+  /// 同时按「节能模式」协商取帧节流间隔（100ms 基线 / 300ms 降帧）。
   void _syncFftActive() {
-    final performanceMode = ref.read(appPrefsProvider).performanceMode;
-    _fftActive = !performanceMode && _engine != null && state.playing;
+    final prefs = ref.read(appPrefsProvider);
+    _fftPollIntervalMs = prefs.energySavingMode ? 300 : 100;
+    _fftActive = !prefs.performanceMode && _engine != null && state.playing;
   }
 
   /// 播放/暂停切换（引擎 stdin 命令；音量/EQ 引擎参数化后续接入）。

@@ -149,10 +149,18 @@ String kgTrackId(Map<String, dynamic> item, String hash) {
 ///
 /// 兼容字段别名（对齐 MoeKoeMusic formatPlaylistTracks 等映射）：
 /// - 名称：`songname` / `ori_audio_name` / `audio_name` / `name`（"歌手 - 歌名"合并名拆分）
-/// - 歌手：`author_name` / `singername`
+/// - 歌手：`singerinfo` / `author_name` / `singername`，或合并名前半
 /// - 封面：`trans_param.union_cover` / `sizable_cover` / `cover`（含 {size} 占位）
-/// - 品质：`hash` + `320hash`/`sqhash`/`hires_hash`，或 `hash_320`/`hash_flac`/`hash_flac_24bit`
-Track kgTrackFromKgPlain(Map<String, dynamic> item) {
+/// - 品质：`hash` + `320hash`/`sqhash`/`hires_hash`，或 `hash_320`/`hash_flac`/`hash_flac_24bit`，
+///   以及公开歌单接口的 `relate_goods` 档位列表（level 0 不可用跳过）
+///
+/// [preferMergedName]：公开歌单接口（get_other_list_file_nofilt）的 `name`
+/// 恒为 "歌手 - 歌名" 合并名且无独立歌手字段，传 true 时强制以合并名拆分
+/// 覆盖歌名/歌手（对齐 MoeKoeMusic formatPlaylistTracks 的 split 逻辑）。
+Track kgTrackFromKgPlain(
+  Map<String, dynamic> item, {
+  bool preferMergedName = false,
+}) {
   final hash = item['hash']?.toString() ?? '';
   var name =
       item['songname']?.toString() ??
@@ -174,7 +182,7 @@ Track kgTrackFromKgPlain(Map<String, dynamic> item) {
         item['author_name']?.toString() ?? item['singername']?.toString() ?? '';
   }
   final merged = item['name']?.toString() ?? '';
-  if (name.isEmpty && merged.isNotEmpty) {
+  if (merged.isNotEmpty && (preferMergedName || name.isEmpty)) {
     // 合并名形如 "歌手 - 歌名.mp3"：剥离音频扩展名后按 " - " 拆分
     var m = merged;
     final dot = m.lastIndexOf('.');
@@ -184,9 +192,9 @@ Track kgTrackFromKgPlain(Map<String, dynamic> item) {
     }
     final idx = m.indexOf(' - ');
     if (idx > 0) {
-      name = m.substring(idx + 3);
+      if (preferMergedName || name.isEmpty) name = m.substring(idx + 3);
       if (author.isEmpty) author = m.substring(0, idx);
-    } else {
+    } else if (preferMergedName || name.isEmpty) {
       name = m;
     }
   }
@@ -216,14 +224,33 @@ Track kgTrackFromKgPlain(Map<String, dynamic> item) {
     item['hires_filesize'],
   );
 
+  // 公开歌单接口（get_other_list_file_nofilt）的音质档位列表：relate_goods
+  // 与主条目同结构（quality/hash/size/level），level 0 不可用跳过，
+  // 对齐 MoeKoeMusic OnlineMusicQueue getPrivilegeVariants。
+  final relateGoods = item['relate_goods'];
+  if (relateGoods is List && relateGoods.isNotEmpty) {
+    for (final g in relateGoods.whereType<Map<String, dynamic>>()) {
+      if ((g['level'] as num?)?.toInt() == 0) continue;
+      final h = g['hash']?.toString() ?? '';
+      if (h.isEmpty) continue;
+      final key = switch (g['quality']?.toString()) {
+        '320' => '320k',
+        'flac' => 'flac',
+        'high' => 'flac24bit',
+        _ => null,
+      };
+      if (key != null) add(key, h, g['size']);
+    }
+  }
+
   String? albumName;
   final ai = item['albuminfo'];
   if (ai is Map) albumName = ai['name']?.toString();
   albumName ??= item['album_name']?.toString();
 
   // 私有歌单条目附加信息（「我喜欢」移除需要 fileid；添加需要 album_id/mixsongid；
-  // sort 为收藏序号，越大越新——「我喜欢」按此**降序**展示
-  // （最新收藏在前），与酷狗 App 一致）。
+  // sort 为收藏序号（部分条目缺失/不稳定）——列表顺序由接口页序保证，
+  // 此处仅保留元数据供移除/去重等场景使用）。
   final fileid = item['fileid'];
   final albumId = item['album_id'];
   final mixSongId = item['mixsongid'];

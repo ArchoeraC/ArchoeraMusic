@@ -3200,6 +3200,36 @@ abstract class AppLocalizations {
   /// **'列表不展示别名'**
   String get settingsShowSubtitleOff;
 
+  /// No description provided for @settingsEnergySaving.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'节能模式'**
+  String get settingsEnergySaving;
+
+  /// No description provided for @settingsEnergySavingNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启后频谱取帧频率降至约 300ms 一帧（默认 100ms 基线），降低 CPU 占用；频谱渲染与插值不受影响，切换实时生效。'**
+  String get settingsEnergySavingNote;
+
+  /// No description provided for @settingsEnergySavingOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前为降帧模式'**
+  String get settingsEnergySavingOn;
+
+  /// No description provided for @settingsEnergySavingOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前为标准模式'**
+  String get settingsEnergySavingOff;
+
+  /// No description provided for @settingsSearchEnergySavingSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'降低频谱取帧频率以节省 CPU'**
+  String get settingsSearchEnergySavingSubtitle;
+
   /// No description provided for @settingsPerformanceMode.
   ///
   /// In zh_CN, this message translates to:

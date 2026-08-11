@@ -1738,6 +1738,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsShowSubtitleOff => 'No aliases in list';
 
   @override
+  String get settingsEnergySaving => 'Energy Saving Mode';
+
+  @override
+  String get settingsEnergySavingNote =>
+      'When enabled, spectrum frames drop to ~300ms apart (100ms baseline by default), lowering CPU usage; rendering and interpolation are unaffected, and the change applies instantly.';
+
+  @override
+  String get settingsEnergySavingOn => 'Currently in frame-throttled mode';
+
+  @override
+  String get settingsEnergySavingOff => 'Currently in standard mode';
+
+  @override
+  String get settingsSearchEnergySavingSubtitle =>
+      'Lower spectrum frame rate to save CPU';
+
+  @override
   String get settingsPerformanceMode => 'Performance Mode';
 
   @override

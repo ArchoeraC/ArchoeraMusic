@@ -1767,6 +1767,24 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsShowSubtitleOff => 'Sin alias en la lista';
 
   @override
+  String get settingsEnergySaving => 'Modo de ahorro de energía';
+
+  @override
+  String get settingsEnergySavingNote =>
+      'Al activarlo, la frecuencia del espectro baja a ~300ms (base 100ms), ahorrando CPU; el renderizado y la interpolación no se ven afectados y el cambio se aplica al instante.';
+
+  @override
+  String get settingsEnergySavingOn =>
+      'Actualmente en modo de reducción de fotogramas';
+
+  @override
+  String get settingsEnergySavingOff => 'Actualmente en modo estándar';
+
+  @override
+  String get settingsSearchEnergySavingSubtitle =>
+      'Reducir la frecuencia del espectro para ahorrar CPU';
+
+  @override
   String get settingsPerformanceMode => 'Modo de rendimiento';
 
   @override
