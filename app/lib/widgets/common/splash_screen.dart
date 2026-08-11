@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../l10n/l10n.dart';
 import '../layout/app_logo.dart';
 
 /// 启动动画（品牌 Splash）。
@@ -72,23 +71,27 @@ class _SplashScreenState extends State<SplashScreen>
   /// Logo：弹出式动效（淡入 + 上滑 + easeOutBack 放大过冲）。
   Widget _buildLogo() {
     return FadeTransition(
-      opacity: Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-        parent: _intro,
-        curve: const Interval(0, 0.4, curve: Curves.easeOut),
-      )),
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.18),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(
+      opacity: Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(
           parent: _intro,
-          curve: const Interval(0, 0.5, curve: Curves.easeOutCubic),
-        )),
+          curve: const Interval(0, 0.4, curve: Curves.easeOut),
+        ),
+      ),
+      child: SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 0.18), end: Offset.zero)
+            .animate(
+              CurvedAnimation(
+                parent: _intro,
+                curve: const Interval(0, 0.5, curve: Curves.easeOutCubic),
+              ),
+            ),
         child: ScaleTransition(
-          scale: Tween<double>(begin: 0.72, end: 1).animate(CurvedAnimation(
-            parent: _intro,
-            curve: const Interval(0, 0.62, curve: Curves.easeOutBack),
-          )),
+          scale: Tween<double>(begin: 0.72, end: 1).animate(
+            CurvedAnimation(
+              parent: _intro,
+              curve: const Interval(0, 0.62, curve: Curves.easeOutBack),
+            ),
+          ),
           child: const AppLogo(size: 54),
         ),
       ),
@@ -125,11 +128,12 @@ class _SplashScreenState extends State<SplashScreen>
         children: [
           // 主色径向光晕（静态氛围，入场淡入）
           FadeTransition(
-            opacity: Tween<double>(begin: 0, end: 1)
-                .animate(CurvedAnimation(
-              parent: _intro,
-              curve: const Interval(0, 0.55, curve: Curves.easeOut),
-            )),
+            opacity: Tween<double>(begin: 0, end: 1).animate(
+              CurvedAnimation(
+                parent: _intro,
+                curve: const Interval(0, 0.55, curve: Curves.easeOut),
+              ),
+            ),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
@@ -151,35 +155,62 @@ class _SplashScreenState extends State<SplashScreen>
               children: [
                 _buildLogo(),
                 const SizedBox(height: 24),
-                _buildBrand(TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface,
-                )),
+                _buildBrand(
+                  TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
                 const SizedBox(height: 10),
-                // 副标语（延迟淡入 + 轻微上滑）
+                // 版权署名 + 技术栈（延迟淡入 + 轻微上滑，两行）
                 FadeTransition(
-                  opacity: Tween<double>(begin: 0, end: 1)
-                      .animate(CurvedAnimation(
-                    parent: _intro,
-                    curve: const Interval(0.55, 0.95, curve: Curves.easeOut),
-                  )),
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.06),
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(
+                  opacity: Tween<double>(begin: 0, end: 1).animate(
+                    CurvedAnimation(
                       parent: _intro,
                       curve: const Interval(0.55, 0.95, curve: Curves.easeOut),
-                    )),
-                    child: Text(
-                      context.l10n.splashTagline,
-                      style: TextStyle(
-                        fontSize: 12,
-                        letterSpacing: 3,
-                        color:
-                            scheme.onSurfaceVariant.withValues(alpha: 0.6),
-                      ),
+                    ),
+                  ),
+                  child: SlideTransition(
+                    position:
+                        Tween<Offset>(
+                          begin: const Offset(0, 0.06),
+                          end: Offset.zero,
+                        ).animate(
+                          CurvedAnimation(
+                            parent: _intro,
+                            curve: const Interval(
+                              0.55,
+                              0.95,
+                              curve: Curves.easeOut,
+                            ),
+                          ),
+                        ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Archoera Music © | BetaStudio2',
+                          style: TextStyle(
+                            fontSize: 12,
+                            letterSpacing: 3,
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Powered By Flutter',
+                          style: TextStyle(
+                            fontSize: 12,
+                            letterSpacing: 3,
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

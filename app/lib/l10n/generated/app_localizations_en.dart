@@ -588,9 +588,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Scanned, please confirm the login on your phone';
 
   @override
-  String get splashTagline => 'Local · Online · Self-hosted';
-
-  @override
   String get trackListArtistHotSongs => 'Artist hot songs';
 
   @override

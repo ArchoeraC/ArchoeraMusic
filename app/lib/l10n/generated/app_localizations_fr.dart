@@ -593,9 +593,6 @@ class AppLocalizationsFr extends AppLocalizations {
       'Scanné, veuillez confirmer la connexion sur votre téléphone';
 
   @override
-  String get splashTagline => 'Local · En ligne · Auto-hébergé';
-
-  @override
   String get trackListArtistHotSongs => 'Chansons populaires de l\'artiste';
 
   @override

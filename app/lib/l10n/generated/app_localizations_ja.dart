@@ -577,9 +577,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get loginWaitingConfirm => 'スキャンしました。スマートフォンでログインを確認してください';
 
   @override
-  String get splashTagline => 'ローカル · オンライン · セルフホスト';
-
-  @override
   String get trackListArtistHotSongs => 'アーティストの人気曲';
 
   @override

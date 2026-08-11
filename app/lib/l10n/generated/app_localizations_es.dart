@@ -592,9 +592,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Escaneado, confirme el inicio de sesión en su teléfono';
 
   @override
-  String get splashTagline => 'Local · En línea · Autoalojado';
-
-  @override
   String get trackListArtistHotSongs => 'Canciones populares del artista';
 
   @override

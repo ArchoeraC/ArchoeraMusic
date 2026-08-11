@@ -578,10 +578,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get loginWaitingConfirm => '스캔되었습니다. 휴대폰에서 로그인을 확인해 주세요';
 
   @override
-  String get splashTagline => '로컬 · 온라인 · 자체 호스팅';
-
-  @override
-  String get trackListArtistHotSongs => '가수 인기곡';
+  String get trackListArtistHotSongs => '아티스트 인기곡';
 
   @override
   String get trackListArtistSongs => '가수 노래';
