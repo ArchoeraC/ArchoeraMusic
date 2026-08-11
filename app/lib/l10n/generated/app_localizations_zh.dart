@@ -573,10 +573,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginWaitingConfirm => '已扫码，请在手机上确认登录';
 
   @override
-  String get splashTagline => '本地 · 在线 · 自托管';
-
-  @override
-  String get trackListArtistHotSongs => '歌手热门歌曲';
+  String get trackListArtistHotSongs => '艺人热门歌曲';
 
   @override
   String get trackListArtistSongs => '歌手单曲';
@@ -3264,10 +3261,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginWaitingConfirm => '已扫码，请在手机上确认登录';
 
   @override
-  String get splashTagline => '本地 · 在线 · 自托管';
-
-  @override
-  String get trackListArtistHotSongs => '歌手热门歌曲';
+  String get trackListArtistHotSongs => '艺人热门歌曲';
 
   @override
   String get trackListArtistSongs => '歌手单曲';
@@ -5955,10 +5949,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get loginWaitingConfirm => '已掃碼，請在手機上確認登入';
 
   @override
-  String get splashTagline => '本機 · 線上 · 自架';
-
-  @override
-  String get trackListArtistHotSongs => '歌手熱門歌曲';
+  String get trackListArtistHotSongs => '藝人熱門歌曲';
 
   @override
   String get trackListArtistSongs => '歌手單曲';

@@ -1148,16 +1148,10 @@ abstract class AppLocalizations {
   /// **'已扫码，请在手机上确认登录'**
   String get loginWaitingConfirm;
 
-  /// No description provided for @splashTagline.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'本地 · 在线 · 自托管'**
-  String get splashTagline;
-
   /// No description provided for @trackListArtistHotSongs.
   ///
   /// In zh_CN, this message translates to:
-  /// **'歌手热门歌曲'**
+  /// **'艺人热门歌曲'**
   String get trackListArtistHotSongs;
 
   /// No description provided for @trackListArtistSongs.

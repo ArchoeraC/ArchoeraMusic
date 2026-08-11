@@ -593,10 +593,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Gescannt, bitte bestätigen Sie die Anmeldung auf Ihrem Telefon';
 
   @override
-  String get splashTagline => 'Lokal · Online · Selbst gehostet';
-
-  @override
-  String get trackListArtistHotSongs => 'Beliebte Titel des Künstlers';
+  String get trackListArtistHotSongs => 'Beliebte Songs des Künstlers';
 
   @override
   String get trackListArtistSongs => 'Künstler-Titel';
