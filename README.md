@@ -124,7 +124,7 @@ ArchoeraMusic/
 ### 前置
 
 - Flutter SDK `^3.12.2`（`cat app/pubspec.yaml | grep sdk`）
-- CMake / C 工具链（构建 audio-engine）
+- CMake ≥ 3.16 / C 工具链（构建 audio-engine / scraper；`FindSQLite3` 自 3.14 起才提供 `SQLite3::SQLite3` target，低版本将回退到变量链接）
 - .NET SDK（构建 scanner）
 - Rust 工具链（构建 tempo-rs / transcoder）
 - Go 工具链（构建 subsonic）
