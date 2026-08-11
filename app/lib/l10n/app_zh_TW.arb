@@ -543,7 +543,7 @@
   "settingsUserDbLabel": "使用者庫路徑",
   "settingsCopy": "複製",
   "toastCopied": "已複製{label}",
-  "settingsStorageNote": "媒體庫與使用者資料實體拆分；路徑可用環境變數 ARCHOERACAR_DATA 覆蓋。",
+  "settingsStorageNote": "媒體庫與使用者資料實體拆分；路徑可用環境變數 ARCHOERA_DATA_DIR 覆蓋。",
   "settingsVersion": "版本",
   "settingsVersionUnknown": "v未知 · Flutter 桌面端",
   "settingsVersionFormat": "v{version} · Flutter 桌面端",

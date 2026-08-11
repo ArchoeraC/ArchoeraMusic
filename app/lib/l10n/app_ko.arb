@@ -543,7 +543,7 @@
   "settingsUserDbLabel": "사용자 데이터 경로",
   "settingsCopy": "복사",
   "toastCopied": "{label} 복사됨",
-  "settingsStorageNote": "미디어 라이브러리와 사용자 데이터는 물리적으로 분리；경로는 ARCHOERACAR_DATA로 재정의 가능.",
+  "settingsStorageNote": "미디어 라이브러리와 사용자 데이터는 물리적으로 분리；경로는 ARCHOERA_DATA_DIR로 재정의 가능.",
   "settingsVersion": "버전",
   "settingsVersionUnknown": "v 알 수 없음 · Flutter 데스크톱",
   "settingsVersionFormat": "v{version} · Flutter 데스크톱",

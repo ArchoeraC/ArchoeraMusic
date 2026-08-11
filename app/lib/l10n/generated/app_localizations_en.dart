@@ -1836,7 +1836,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsStorageNote =>
-      'Media library and user data are physically separated; paths overridable via ARCHOERACAR_DATA.';
+      'Media library and user data are physically separated; paths overridable via ARCHOERA_DATA_DIR.';
 
   @override
   String get settingsVersion => 'Version';

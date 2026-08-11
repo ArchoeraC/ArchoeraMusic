@@ -3371,7 +3371,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsStorageNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERACAR_DATA 覆盖。'**
+  /// **'媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERA_DATA_DIR 覆盖。'**
   String get settingsStorageNote;
 
   /// No description provided for @settingsVersion.

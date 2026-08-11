@@ -543,7 +543,7 @@
   "settingsUserDbLabel": "User data path",
   "settingsCopy": "Copy",
   "toastCopied": "{label} copied",
-  "settingsStorageNote": "Media library and user data are physically separated; paths overridable via ARCHOERACAR_DATA.",
+  "settingsStorageNote": "Media library and user data are physically separated; paths overridable via ARCHOERA_DATA_DIR.",
   "settingsVersion": "Version",
   "settingsVersionUnknown": "v unknown · Flutter desktop",
   "settingsVersionFormat": "v{version} · Flutter desktop",

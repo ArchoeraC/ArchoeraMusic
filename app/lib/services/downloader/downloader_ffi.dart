@@ -25,7 +25,7 @@ class DownloaderLibrary {
   /// 解析 downloader 共享库路径。
   ///
   /// 优先级：
-  ///  1. 环境变量 `ARCHOERACAR_DOWNLOADER_SO`（.so 文件路径或含库文件的目录）；
+  ///  1. 环境变量 `ARCHOERA_DOWNLOADER_SO`（.so 文件路径或含库文件的目录）；
   ///  2. 从可执行文件沿父目录向上查找
   ///     `core/downloader/target/release/libarchoera_downloader.{ext}`，
   ///     再 fallback `target/debug/`；
@@ -33,7 +33,7 @@ class DownloaderLibrary {
   static String resolveSoPath() {
     final libName = _soFileName();
 
-    final override = Platform.environment['ARCHOERACAR_DOWNLOADER_SO'];
+    final override = Platform.environment['ARCHOERA_DOWNLOADER_SO'];
     if (override != null && override.isNotEmpty) {
       if (File(override).existsSync()) return override;
       final asDir = '$override/$libName';
@@ -58,7 +58,7 @@ class DownloaderLibrary {
     }
 
     throw StateError(
-        '无法定位 archoera_downloader：请设置 ARCHOERACAR_DOWNLOADER_SO 环境变量');
+        '无法定位 archoera_downloader：请设置 ARCHOERA_DOWNLOADER_SO 环境变量');
   }
 
   static String _soFileName() {

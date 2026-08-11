@@ -543,7 +543,7 @@
   "settingsUserDbLabel": "Ruta de datos de usuario",
   "settingsCopy": "Copiar",
   "toastCopied": "{label} copiado",
-  "settingsStorageNote": "Biblioteca y datos de usuario separados físicamente; rutas anulables con ARCHOERACAR_DATA",
+  "settingsStorageNote": "Biblioteca y datos de usuario separados físicamente; rutas anulables con ARCHOERA_DATA_DIR",
   "settingsVersion": "Versión",
   "settingsVersionUnknown": "v desconocida · Flutter escritorio",
   "settingsVersionFormat": "v{version} · Flutter escritorio",
