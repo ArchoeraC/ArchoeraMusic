@@ -222,7 +222,8 @@ Track kgTrackFromKgPlain(Map<String, dynamic> item) {
   albumName ??= item['album_name']?.toString();
 
   // 私有歌单条目附加信息（「我喜欢」移除需要 fileid；添加需要 album_id/mixsongid；
-  // sort 为收藏序号，越小越早——「我喜欢」按此升序展示，与酷狗 App 一致）
+  // sort 为收藏序号，越大越新——「我喜欢」按此**降序**展示
+  // （最新收藏在前），与酷狗 App 一致）。
   final fileid = item['fileid'];
   final albumId = item['album_id'];
   final mixSongId = item['mixsongid'];

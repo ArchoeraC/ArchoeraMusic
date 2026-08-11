@@ -179,10 +179,46 @@ class _SongRowState extends ConsumerState<SongRow> {
                                       padding: const EdgeInsets.only(right: 6),
                                       child: _SourceBadge(source: item.source),
                                     ),
+                                  Flexible(
+                                    child: Text(
+                                      item.title,
+                                      style: theme.textTheme.bodyLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w500,
+                                            color: isPlaying ? primary : null,
+                                          ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              // 副标题行：作者文本 + 内容属性标签
+                              // （VIP/原唱/音质统一放在作者之后，避免与标题混排；
+                              //  强迫症预设 hideVipTag / hideQualityTag 控制）
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      // 副标题：歌手 + 可选别名（强迫症预设控制）
+                                      _subtitleText(prefs, l10n),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: isPlaying
+                                                ? primary.withValues(alpha: 0.7)
+                                                : theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                          ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                   // 付费角标（VIP / EP；强迫症预设可隐藏）
                                   if (!prefs.hideVipTag && item.fee > 0)
                                     Padding(
-                                      padding: const EdgeInsets.only(right: 6),
+                                      padding: const EdgeInsets.only(left: 6),
                                       child: _Badge(
                                         label: item.fee == 1 ? 'VIP' : 'EP',
                                         textColor: const Color(0xFFE55B5B),
@@ -194,7 +230,7 @@ class _SongRowState extends ConsumerState<SongRow> {
                                   // 原唱角标（酷狗 IsOriginal；跟随音质标签开关）
                                   if (!prefs.hideQualityTag && item.isOriginal)
                                     Padding(
-                                      padding: const EdgeInsets.only(right: 6),
+                                      padding: const EdgeInsets.only(left: 6),
                                       child: _Badge(
                                         label: l10n.commonOriginal,
                                         textColor: Colors.white,
@@ -206,7 +242,7 @@ class _SongRowState extends ConsumerState<SongRow> {
                                   if (!prefs.hideQualityTag &&
                                       bestQuality != null)
                                     Padding(
-                                      padding: const EdgeInsets.only(right: 6),
+                                      padding: const EdgeInsets.only(left: 6),
                                       child: _Badge(
                                         label: bestQuality.label,
                                         textColor: bestQuality.lossless
@@ -227,31 +263,7 @@ class _SongRowState extends ConsumerState<SongRow> {
                                             : null,
                                       ),
                                     ),
-                                  Flexible(
-                                    child: Text(
-                                      item.title,
-                                      style: theme.textTheme.bodyLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w500,
-                                            color: isPlaying ? primary : null,
-                                          ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
                                 ],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                // 副标题：歌手 + 可选别名（强迫症预设控制）
-                                _subtitleText(prefs, l10n),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: isPlaying
-                                      ? primary.withValues(alpha: 0.7)
-                                      : theme.colorScheme.onSurfaceVariant,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
