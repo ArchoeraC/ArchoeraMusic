@@ -1081,7 +1081,7 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         // FFT（含脉冲强度），暂停/seek 时与播放位置天然对齐
         _pollSpectrum();
         // 诊断（AUTOPLAY）：每 5s 打印一次播放位置，验证引擎播放推进
-        if (Platform.environment['ARCHOERACAR_AUTOPLAY'] == '1' &&
+        if (Platform.environment['ARCHOERA_AUTOPLAY'] == '1' &&
             absMs > 0 &&
             (_lastPosLogMs == null || absMs - _lastPosLogMs! >= 5000)) {
           _lastPosLogMs = absMs;
@@ -1154,8 +1154,8 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     final logs = ['$ts $line', ...state.logs];
     if (logs.length > 200) logs.removeRange(200, logs.length);
     state = state.copyWith(logs: logs);
-    // 诊断：镜像到 stdout（ARCHOERACAR_AUTOPLAY=1 时）
-    if (Platform.environment['ARCHOERACAR_AUTOPLAY'] == '1') {
+    // 诊断：镜像到 stdout（ARCHOERA_AUTOPLAY=1 时）
+    if (Platform.environment['ARCHOERA_AUTOPLAY'] == '1') {
       stdout.writeln('[app:log] $ts $line');
     }
   }

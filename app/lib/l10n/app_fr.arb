@@ -543,7 +543,7 @@
   "settingsUserDbLabel": "Chemin des données utilisateur",
   "settingsCopy": "Copier",
   "toastCopied": "{label} copié",
-  "settingsStorageNote": "Médias（tracks）et données utilisateur（subsonic_*）physiquement séparés ; chemins surchargeables via ARCHOERACAR_DATA.",
+  "settingsStorageNote": "Médias（tracks）et données utilisateur（subsonic_*）physiquement séparés ; chemins surchargeables via ARCHOERA_DATA_DIR.",
   "settingsVersion": "Version",
   "settingsVersionUnknown": "v inconnue · Flutter bureau",
   "settingsVersionFormat": "v{version} · Flutter bureau",

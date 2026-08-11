@@ -1792,7 +1792,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsStorageNote =>
-      '미디어 라이브러리와 사용자 데이터는 물리적으로 분리；경로는 ARCHOERACAR_DATA로 재정의 가능.';
+      '미디어 라이브러리와 사용자 데이터는 물리적으로 분리；경로는 ARCHOERA_DATA_DIR로 재정의 가능.';
 
   @override
   String get settingsVersion => '버전';

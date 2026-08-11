@@ -1856,7 +1856,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsStorageNote =>
-      'Medienbibliothek und Benutzerdaten physisch getrennt; Pfade über ARCHOERACAR_DATA überschreibbar.';
+      'Medienbibliothek und Benutzerdaten physisch getrennt; Pfade über ARCHOERA_DATA_DIR überschreibbar.';
 
   @override
   String get settingsVersion => 'Version';

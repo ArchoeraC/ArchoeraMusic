@@ -1775,7 +1775,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsStorageNote =>
-      '媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERACAR_DATA 覆盖。';
+      '媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERA_DATA_DIR 覆盖。';
 
   @override
   String get settingsVersion => '版本';
@@ -4191,7 +4191,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsStorageNote =>
-      '媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERACAR_DATA 覆盖。';
+      '媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERA_DATA_DIR 覆盖。';
 
   @override
   String get settingsVersion => '版本';
@@ -6608,7 +6608,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsStorageNote =>
-      '媒體庫與使用者資料實體拆分；路徑可用環境變數 ARCHOERACAR_DATA 覆蓋。';
+      '媒體庫與使用者資料實體拆分；路徑可用環境變數 ARCHOERA_DATA_DIR 覆蓋。';
 
   @override
   String get settingsVersion => '版本';

@@ -22,14 +22,14 @@ class ScannerLibrary {
   /// 解析 scanner-ffi 共享库路径。
   ///
   /// 优先级：
-  ///  1. 环境变量 `ARCHOERACAR_SCANNER_FFI`（.so 文件路径或含 `scanner-ffi.so` 的目录）；
+  ///  1. 环境变量 `ARCHOERA_SCANNER_FFI`（.so 文件路径或含 `scanner-ffi.so` 的目录）；
   ///  2. 从可执行文件（[Platform.resolvedExecutable]）沿父目录向上查找
   ///     `scanner/build/scanner-ffi.so`；
   ///  3. dev 兜底：`flutter run` 的 cwd 为 `app/`，库在 `app/core/scanner/build/`。
   static String resolveSoPath() {
     final libName = _soFileName();
 
-    final override = Platform.environment['ARCHOERACAR_SCANNER_FFI'];
+    final override = Platform.environment['ARCHOERA_SCANNER_FFI'];
     if (override != null && override.isNotEmpty) {
       if (File(override).existsSync()) return override;
       final asDir = '$override/$libName';
@@ -47,7 +47,7 @@ class ScannerLibrary {
     final fromCwd = File('${Directory.current.path}/core/scanner/build/$libName');
     if (fromCwd.existsSync()) return fromCwd.absolute.path;
 
-    throw StateError('无法定位 scanner-ffi：请设置 ARCHOERACAR_SCANNER_FFI 环境变量');
+    throw StateError('无法定位 scanner-ffi：请设置 ARCHOERA_SCANNER_FFI 环境变量');
   }
 
   static String _soFileName() {

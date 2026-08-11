@@ -184,7 +184,7 @@ class LibraryScanner {
     _progressController.close();
   }
 
-  /// 默认数据目录（~/.local/share/ArchoeraMusic，ARCHOERACAR_DATA 可覆盖）。
+  /// 默认数据目录（~/.local/share/ArchoeraMusic，ARCHOERA_DATA_DIR 可覆盖）。
   static String defaultDataDir() => resolveDataDir();
 
   /// 默认曲库 DB 路径。

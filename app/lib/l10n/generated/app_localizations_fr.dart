@@ -1874,7 +1874,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsStorageNote =>
-      'Médias（tracks）et données utilisateur（subsonic_*）physiquement séparés ; chemins surchargeables via ARCHOERACAR_DATA.';
+      'Médias（tracks）et données utilisateur（subsonic_*）physiquement séparés ; chemins surchargeables via ARCHOERA_DATA_DIR.';
 
   @override
   String get settingsVersion => 'Version';

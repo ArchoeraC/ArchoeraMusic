@@ -1868,7 +1868,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsStorageNote =>
-      'Biblioteca y datos de usuario separados físicamente; rutas anulables con ARCHOERACAR_DATA';
+      'Biblioteca y datos de usuario separados físicamente; rutas anulables con ARCHOERA_DATA_DIR';
 
   @override
   String get settingsVersion => 'Versión';

@@ -1789,7 +1789,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsStorageNote =>
-      'メディアライブラリとユーザーデータは物理的に分離；パスは環境変数 ARCHOERACAR_DATA で上書き可能。';
+      'メディアライブラリとユーザーデータは物理的に分離；パスは環境変数 ARCHOERA_DATA_DIR で上書き可能。';
 
   @override
   String get settingsVersion => 'バージョン';

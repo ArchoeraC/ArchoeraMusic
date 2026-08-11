@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('PlaybackSnapshot 序列化往返 + 存储覆盖', () {
-    // 数据目录由命令行 ARCHOERACAR_DATA 指向临时目录（见下方执行方式）
+    // 数据目录由命令行 ARCHOERA_DATA_DIR 指向临时目录（见下方执行方式）
     const store = PlaybackSessionStore();
     final track = Track(
       id: '123',

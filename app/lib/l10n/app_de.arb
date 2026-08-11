@@ -543,7 +543,7 @@
   "settingsUserDbLabel": "Benutzerdatenpfad",
   "settingsCopy": "Kopieren",
   "toastCopied": "{label} kopiert",
-  "settingsStorageNote": "Medienbibliothek und Benutzerdaten physisch getrennt; Pfade über ARCHOERACAR_DATA überschreibbar.",
+  "settingsStorageNote": "Medienbibliothek und Benutzerdaten physisch getrennt; Pfade über ARCHOERA_DATA_DIR überschreibbar.",
   "settingsVersion": "Version",
   "settingsVersionUnknown": "v unbekannt · Flutter Desktop",
   "settingsVersionFormat": "v{version} · Flutter Desktop",

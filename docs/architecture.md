@@ -625,7 +625,7 @@ ArchoeraMusic/
 - 随机空闲端口：`bind(0)` 取号后释放（自用竞争可接受）
 - 自包含数据根：`SPLAYER_DATA_DIR` → `~/.local/share/ArchoeraMusic`
 - **stdin 看门狗**：Flutter 以管道模式 spawn；宿主进程死亡（含 kill -9）→ 管道关闭 → sidecar `stdin 'end'` 自退出（[index.ts](file:///home/betastudio2/文档/SPlayer-Next/ArchoeraMusic/sidecar/index.ts) 末尾，`SPLAYER_PARENT_WATCHDOG=true` 启用，不影响上游行为）
-- 环境覆盖：`ARCHOERACAR_SIDECAR` / `ARCHOERACAR_DATA`（打包阶段替换路径用）
+- 环境覆盖：`ARCHOERA_SIDECAR` / `ARCHOERA_DATA_DIR`（打包阶段替换路径用）
 
 **验证记录**：`/api/health` 200；`/api/audio/status` `{available:true, format:"ogg/opus"}`；C 引擎 tone.wav→OGG 转码成功（`OggS` 魔数）；kill -9 硬杀应用后侧车自退出无孤儿。
 
@@ -676,7 +676,7 @@ ArchoeraMusic/
 - `ogg_stream_bridge.dart`（OggFileSink）：stream.uds → `stream.ogg` 落盘（IOSink 非 `StreamConsumer<Uint8List>`，手动 listen，不可 pipe）
 - `pcm_analyzer.dart`（PcmAnalyzer）：pcm.uds → `stream.pcm` 落盘 + (posMs→fileOffset) 索引；`frameAt(pos)` 按需读帧
 - `fft_bindings.dart`（FftAnalyzer）：FFI libfft.so；`fft_set_enabled(1)` 显式；输入缓冲 fftSize×32（修复 6144 越界段错误）
-- `engine_paths.dart`：`ARCHOERACAR_AUDIO_ENGINE` → `resolvedExecutable` 祖先链找 `audio-engine` → cwd 兜底
+- `engine_paths.dart`：`ARCHOERA_AUDIO_ENGINE` → `resolvedExecutable` 祖先链找 `audio-engine` → cwd 兜底
 - `media_renderer.dart`：libmpv 播放本地完整 OGG；`seek()` 本地 seek
 - `playback_notifier.dart`：组合引擎+渲染器；ready 回填完整时长；done → open 文件；FFT 拉模式 50ms 轮询
 

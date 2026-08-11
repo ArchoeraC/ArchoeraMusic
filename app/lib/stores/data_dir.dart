@@ -1,18 +1,30 @@
 import 'dart:convert';
 import 'dart:io';
 
-/// 应用数据根目录（`~/.local/share/ArchoeraMusic`，Linux；Windows 为
-/// `AppData/Local`），可用环境变量 `ARCHOERACAR_DATA` 覆盖。
+/// 应用数据根目录（按平台约定）：
+///   - Linux：`~/.local/share/ArchoeraMusic`（XDG）
+///   - macOS：`~/Library/Application Support/ArchoeraMusic`
+///   - Windows：`%LOCALAPPDATA%\ArchoeraMusic`
+/// 可用环境变量 `ARCHOERA_DATA_DIR` 覆盖（与 scanner 侧一致）。
 ///
 /// 原实现内嵌于 sidecar 进程管理器，去侧车化后提取为共享 helper，
 /// 供偏好（prefs.json）、流媒体服务器列表（streaming_servers.json）与
 /// 扫描器默认库路径统一使用。
 String resolveDataDir() {
-  final override = Platform.environment['ARCHOERACAR_DATA'];
+  final override = Platform.environment['ARCHOERA_DATA_DIR'];
   if (override != null && override.isNotEmpty) return override;
-  final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '.';
-  final base = Platform.isLinux ? '$home/.local/share' : '$home/AppData/Local';
-  return '$base/ArchoeraMusic';
+  final home =
+      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '.';
+  if (Platform.isMacOS) {
+    return '$home/Library/Application Support/ArchoeraMusic';
+  }
+  if (Platform.isWindows) {
+    // LOCALAPPDATA 尊重用户重定向（如自定义用户目录 / 迁移盘符）
+    final local =
+        Platform.environment['LOCALAPPDATA'] ?? '$home/AppData/Local';
+    return '$local/ArchoeraMusic';
+  }
+  return '$home/.local/share/ArchoeraMusic';
 }
 
 /// 默认下载根目录：跟随媒体库——读取扫描目录配置（scan_dirs.json，
