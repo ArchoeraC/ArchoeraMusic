@@ -202,7 +202,7 @@ flutter run -d linux      # 或 windows / macos
 
 #### 2.3 升级到 AGPL-v4 的触发条件（非承诺，仅为指引）
 
-升级不是必然发生的。预计在以下任一条件成熟时考虑启动升级流程：
+升级不是必然发生的。预计在以下至少两项条件成熟时考虑启动升级流程：
 
 - GNU 官方正式发布 **AGPL-4.0** 并获得社区广泛采用；
 - AGPL-4.0 对 AI / LLM 训练场景、SaaS / 云端托管场景、或 DRM / 签名校验绕开等问题有更明确的条款补强；
@@ -241,14 +241,14 @@ flutter run -d linux      # 或 windows / macos
 
 ## 特别鸣谢（Acknowledgements）
 
-本项目在架构设计与实现思路上受到了以下开源项目的启发与支持（**仅借鉴思路，未引用其代码**）：
+本项目在架构设计与实现思路上受到了以下开源项目的启发与支持：
 
 - **[SPlayer-Next](https://github.com/SPlayer-Dev/SPlayer-Next)** —— 混合架构播放器设计、音频引擎管线与在线平台接入的整体思路
-- **[KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi)（MIT）** —— 酷狗平台接口调研与协议逆向思路参考
-- **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)（MIT）** —— 网易云平台接口调研与 weapi 加密流程思路参考
-- **[ncm-api-rs](https://github.com/SPlayer-Dev/ncm-api-rs)（WTFPL）** —— Rust 化网易云签名实现的备胎参考
-- **[MoeKoeMusic](https://github.com/MoeKoeMusic/MoeKoeMusic)** —— 开源高颜值酷狗第三方客户端，桌面端体验与平台接入思路参考
-- **[Mineradio](https://github.com/XxHuberrr/Mineradio)** —— Windows 桌面沉浸式音乐播放器，歌词舞台与视觉呈现思路参考
+- **[KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi)（MIT）** —— 酷狗平台接口调研与协议思路
+- **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)（MIT）** —— 网易云平台接口流程思路
+- **[ncm-api-rs](https://github.com/SPlayer-Dev/ncm-api-rs)（WTFPL）** —— Rust 化签名实现方案
+- **[MoeKoeMusic](https://github.com/MoeKoeMusic/MoeKoeMusic)** —— 开源高颜值酷狗第三方客户端，桌面端体验与平台接入思路
+- **[Mineradio](https://github.com/XxHuberrr/Mineradio)** —— Windows 桌面沉浸式音乐播放器，歌词舞台与视觉呈现思路
 
 > 特别说明：以上项目与 ArchoeraMusic **无代码归属关系**，本项目（含所引用的服务端代码）均由本仓库作者自行编写，不在 SPlayer / SPlayer-Next 主仓库内；此处仅表达对相关项目思路的认可与致谢。
 
