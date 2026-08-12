@@ -30,11 +30,11 @@
 
 ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面为主（Linux / Windows / macOS）」，UI 层采用 Flutter 开发。
 
-- 连接**网易云音乐 / 酷狗音乐 / QQ 音乐**等在线服务（纯 Dart 直连，无需代理侧车）
+- 连接**网易云音乐 / 酷狗音乐 / QQ 音乐**等在线服务
 - 支持本地音乐库扫描与元数据刮削、多平台下载
 - 内置统一 C 音频引擎：EQ / 响度归一化 / 限幅器 / FFT 频谱 / 变速变调 / Opus 转码管线
-- 桌面端原生模块 **FFI 直连**（`archoera_mediaengine` 共享库），零子进程、零 TCP 端口暴露
-- 可选内置 **Subsonic 兼容服务端**（Go），并支持 Subsonic / Jellyfin 流媒体服务器聚合
+- 桌面端原生模块 **FFI 直连**（`archoera_mediaengine` 共享库）
+- 可选启动 **Subsonic 兼容服务端**（Go），并支持 Subsonic / Jellyfin 流媒体服务器聚合
 
 ---
 
@@ -61,9 +61,9 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面�
 
 **关键架构决策**：
 
-- **平台协议层纯 Dart 化**：网易云/酷狗/QQ 音乐签名算法与请求逻辑全部 Dart 移植，无 Node 侧车
-- **桌面端原生 FFI 直连**：音频引擎（`archoera_mediaengine` 共享库）进程内转码 + libmpv 渲染，零子进程、零端口暴露
-- **统一音频管线**：在线/本地共用 C 引擎 Opus 转码管线，DSP 在引擎内完成
+- **平台协议层纯 Dart 化**：网易云/酷狗/QQ 音乐签名算法与请求逻辑全 Dart 化
+- **桌面端原生 FFI 直连**：音频引擎（`archoera_mediaengine` 共享库）进程内转码 + miniaudio
+- **统一音频管线**：在线/本地共用 C 引擎转码管线，DSP 在引擎内完成
 - **Subsonic 代码复用**：Go Subsonic 在桌面端与独立服务端**完全共享一份代码**，通过 build tag 区分（详见 [架构文档](docs/architecture.md)）
 
 ---
@@ -107,7 +107,7 @@ ArchoeraMusic/
 
 ## 构建与运行
 
-> CI：仓库 `.github/workflows/` 提供三端（Linux / Windows / macOS）完整构建
+> CI：仓库 `.github/workflows/` 提供三端（Linux / Windows / macOS）完整打包
 > workflows，手动触发或推送 `v*` 标签时构建全部原生模块 + Flutter 应用并上传产物。
 
 ### 前置
@@ -140,14 +140,13 @@ flutter pub get
 flutter run -d linux      # 或 windows / macos
 ```
 
-> 提示：Windows / macOS 桌面端的原生模块（audio-engine / scanner / scraper / downloader / subsonic）经 **FFI** 以共享库形式（`archoera_mediaengine.dll` / `libarchoera_subsonic.dylib` 等）打进应用 bundle，无需子进程。
+> 提示：Windows / macOS 桌面端的原生模块经 **FFI** 以共享库形式（`archoera_mediaengine.dll` / `libarchoera_subsonic.dylib` 等）打进应用，无需子进程。
 
 ---
 
 ## 文档
 
 - [架构设计](docs/architecture.md) —— 进程模型 / 音频管线 / FFI 桥接
-- [下载模块设计规范](docs/download-module.md) —— 下载引擎架构 / 事件机制 / 许可约束
 
 ---
 
