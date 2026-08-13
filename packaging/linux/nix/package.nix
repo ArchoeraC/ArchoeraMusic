@@ -87,6 +87,9 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
     mkdir -p $out/lib/archoera-music $out/bin
     cp -a $src/. $out/lib/archoera-music/
+    # cp -a 保留 bundle 的只读权限（native/ 目录 0555），先恢复可写，
+    # 否则下方 rm 无目录写权限（Nix 沙箱内 owner 亦无法删除）。
+    chmod -R u+w $out/lib/archoera-music
     # NixOS 上移除内嵌 FFmpeg 库（见上方 ffmpeg_7/ffmpeg_8 注释），
     # 引擎 NEEDED 由 store ffmpeg 经 autoPatchelfHook 补充 RUNPATH 满足。
     rm -f $out/lib/archoera-music/native/libavformat.so.* \
