@@ -131,6 +131,26 @@ jobs:
       - name: Package Flatpak (通用)
         run: bash packaging/linux/package-flatpak.sh app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
 
+      - name: Package NixOS flake (nixos/nix container, autoPatchelf)
+        # bundle 为 Release 预 strip 产物，autoPatchelfHook 在容器内补
+        # interpreter（NixOS 无 /lib64/ld-linux-x86-64.so.2）并追加 buildInputs
+        # store 路径 RUNPATH（NixOS 无 /usr/lib）。产物仅供 CI 验证构建链路 +
+        # 交付 portable 源包；用户机器上正规安装方式是跑 package.sh nix 后
+        # 在本机 nix build（store 路径与 nixpkgs 版本强绑定）。
+        run: |
+          bash packaging/linux/package.sh nix app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+          docker run --rm -v "$PWD":/workspace -w /workspace/packaging/linux/work/nix \
+            nixos/nix:latest bash -c '
+              nix --extra-experimental-features "nix-command flakes" build .#default --no-sandbox || exit 1
+            '
+          # result 是容器 store 的 symlink，cp -rL 跟随复制实际产物
+          mkdir -p dist/linux/nix
+          cp -rL packaging/linux/work/nix/result/. dist/linux/nix/
+          tar -C dist/linux/nix -czf \
+            "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz" .
+          rm -rf dist/linux/nix
+          echo "→ dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz"
+
       - name: Upload bundle artifact (原始 bundle)
         uses: actions/upload-artifact@v4
         with:
