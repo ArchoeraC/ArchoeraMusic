@@ -42,13 +42,15 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
   @override
   Widget build(BuildContext context) {
     // 登录态变化（含启动 init 后）时同步红心集合；
-    // 酷狗 provider 仅在登录/登出时 notify，不会因普通 API 调用触发。
+    // 酷狗 ChangeNotifier 会因头像刷新等任意 notify，故只监听 userid
+    // 实际变化（登录/登出）才同步，避免普通 API 调用触发全量重同步。
     ref.listen(neteaseAuthProvider, (_, _) {
       ref.read(likeControllerProvider).sync();
       // 登录/登出后把最新 cookie 重新注入下载引擎（幂等）
       ref.read(downloadControllerProvider.notifier).syncSessions();
     });
-    ref.listen(kugouApiProvider, (_, _) {
+    ref.listen(kugouApiProvider.select((s) => s.session?.userid), (prev, next) {
+      if (prev == next) return;
       ref.read(likeControllerProvider).sync();
       ref.read(downloadControllerProvider.notifier).syncSessions();
     });
