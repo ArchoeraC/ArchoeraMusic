@@ -1,15 +1,16 @@
 /// archoera_scraper FFI 绑定。
 ///
-/// 定位、加载 libarchoera_scraper.{so,dylib,dll}（与 scanner/audio-engine 相同的
-/// ancestors 查找模式：exe 祖先链找 `scraper/build/`，dev 兜底 `cwd/core/scraper/build`）。
+/// 定位、加载 libarchoera_scraper.{so,dylib,dll}（统一走 [NativeLibPaths]，
+/// ancestors 查找 + dev 兜底模式，见 native_lib_paths.dart）。
 /// 模块位于 app/core/scraper，产物 libarchoera_scraper.so 由该模块
 /// CMake 构建。
 library;
 
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+
+import '../native_lib_paths.dart';
 
 typedef ScraperCreateNative = Pointer<Void> Function(Pointer<Utf8> configJson);
 typedef ScraperCreateDart = Pointer<Void> Function(Pointer<Utf8> configJson);
@@ -63,27 +64,8 @@ class ScraperBindings {
     return DynamicLibrary.open(path);
   }
 
-  /// 查找共享库路径：Platform.resolvedExecutable 祖先链逐级找 `scraper/build/`；
-  /// 未命中回退 dev 兜底 `cwd/core/scraper/build/`。
+  /// 查找共享库路径：统一走 [NativeLibPaths]（祖先链 + dev 兜底）。
   static String? resolveSoPath() {
-    final fileName = Platform.isWindows
-        ? 'archoera_scraper.dll'
-        : Platform.isMacOS
-            ? 'libarchoera_scraper.dylib'
-            : 'libarchoera_scraper.so';
-
-    // 1) bundle：exe 祖先链找 scraper/build/
-    var dir = File(Platform.resolvedExecutable).parent;
-    for (var i = 0; i < 8; i++) {
-      final candidate = File('${dir.path}/scraper/build/$fileName');
-      if (candidate.existsSync()) return candidate.absolute.path;
-      dir = dir.parent;
-    }
-
-    // 2) dev 兜底：flutter run 的 cwd 为 app/ → app/core/scraper/build/
-    final fromCwd = File('${Directory.current.path}/core/scraper/build/$fileName');
-    if (fromCwd.existsSync()) return fromCwd.absolute.path;
-
-    return null;
+    return NativeLibPaths.resolve(NativeModule.scraper);
   }
 }

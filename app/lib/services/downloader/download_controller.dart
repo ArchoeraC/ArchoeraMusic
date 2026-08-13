@@ -12,6 +12,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -348,6 +349,7 @@ class DownloadController extends Notifier<DownloadState> {
     _engine = engine;
     _eventsSub = engine.events.listen(_handleEvent);
     engine.setHistoryLimit(historyLimit);
+    _injectIdentity();
     _injectSessions();
     state = state.copyWith(initializing: false, initError: null);
   }
@@ -491,9 +493,33 @@ class DownloadController extends Notifier<DownloadState> {
     engine.setMaxSpeed(bytesPerSec);
   }
 
-  /// 会话同步：登录 / 登出后重新注入 Rust（幂等）。
+  /// 会话同步：登录 / 登出后重新注入 Rust（幂等）。顺带重注入设备指纹，
+  /// 供设置页「重置设备指纹」即时生效（否则要等下次引擎重建）。
   void syncSessions() {
+    _injectIdentity();
     _injectSessions();
+  }
+
+  /// 设备指纹注入/清除：按「动态指纹」开关分流。
+  ///
+  /// 开关关（默认）：首次启动生成并持久化到 prefs，此后跨会话不变；引擎
+  /// 每次 init（含配置变更重建）后注入同值（幂等）。
+  /// 开关开：回退旧版「每次启动随机」动态值——不注入、不生成持久化指纹，
+  /// 并清除 Rust 侧已注入值（Rust 回落会话随机，见 clear_identity）。
+  void _injectIdentity() {
+    final engine = _engine;
+    if (engine == null || !engine.isInitialized) return;
+    final prefs = ref.read(appPrefsProvider);
+    if (prefs.downloadDynamicFingerprint) {
+      engine.clearDownloaderIdentity();
+      return;
+    }
+    var identity = prefs.downloaderIdentity;
+    if (identity == null) {
+      identity = jsonEncode(generateDownloaderIdentity());
+      ref.read(appPrefsProvider.notifier).setDownloaderIdentity(identity);
+    }
+    engine.setDownloaderIdentity(identity);
   }
 
   void _injectSessions() {
@@ -504,7 +530,7 @@ class DownloadController extends Notifier<DownloadState> {
     if (kugou != null && kugou.userid.isNotEmpty && kugou.token.isNotEmpty) {
       engine.setKugouSession(kugou.userid, kugou.token);
     }
-    // Netease：持久化 cookie（netease_session.json）
+    // Netease：持久化 cookie（经 vault 会话存储解密读取）
     final cookies = getRuntime().sessionStore.get('netease');
     if (cookies.isNotEmpty) {
       engine.setNeteaseCookie(

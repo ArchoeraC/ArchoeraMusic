@@ -1,9 +1,8 @@
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
-import 'engine_paths.dart';
+import '../native_lib_paths.dart';
 
 /// C 侧 `EngineConfig` 结构体映射（对齐 audio_engine.h，标准 ABI 布局）。
 final class EngineConfigC extends Struct {
@@ -103,12 +102,8 @@ class EngineBindings {
       _instance ??= EngineBindings._(DynamicLibrary.open(_libPath()));
 
   static String _libPath() {
-    final name = Platform.isWindows
-        ? 'archoera_mediaengine.dll'
-        : (Platform.isMacOS
-              ? 'libarchoera_mediaengine.dylib'
-              : 'libarchoera_mediaengine.so');
-    return '${EnginePaths.resolveEngineDir()}/build/$name';
+    return NativeLibPaths.resolveRequired(NativeModule.mediaEngine,
+        hint: '请设置 ARCHOERA_AUDIO_ENGINE 环境变量');
   }
 
   final DynamicLibrary _lib;

@@ -404,6 +404,12 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
       ),
       _SearchEntry(
         SettingsCategory.storage,
+        l10n.settingsSongCache,
+        l10n.settingsSearchSongCacheSubtitle,
+        Icons.offline_pin_outlined,
+      ),
+      _SearchEntry(
+        SettingsCategory.storage,
         l10n.settingsSecuritySection,
         l10n.settingsSecurityNote,
         Icons.delete_forever_outlined,

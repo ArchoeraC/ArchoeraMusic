@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
+import '../native_lib_paths.dart';
+
 /// scanner-ffi NativeAOT 库的定位、加载与 FFI 绑定。
 ///
 /// 纯 FFI 层：不持有任何 isolate 本地状态，可在任意 isolate 内
@@ -19,41 +21,11 @@ class ScannerLibrary {
 
   // ---------------------------------------------------------------- 定位
 
-  /// 解析 scanner-ffi 共享库路径。
-  ///
-  /// 优先级：
-  ///  1. 环境变量 `ARCHOERA_SCANNER_FFI`（.so 文件路径或含 `scanner-ffi.so` 的目录）；
-  ///  2. 从可执行文件（[Platform.resolvedExecutable]）沿父目录向上查找
-  ///     `scanner/build/scanner-ffi.so`；
-  ///  3. dev 兜底：`flutter run` 的 cwd 为 `app/`，库在 `app/core/scanner/build/`。
+  /// 解析 scanner-ffi 共享库路径：统一走 [NativeLibPaths]
+  /// （环境变量 → ancestors 链 → dev 兜底）。
   static String resolveSoPath() {
-    final libName = _soFileName();
-
-    final override = Platform.environment['ARCHOERA_SCANNER_FFI'];
-    if (override != null && override.isNotEmpty) {
-      if (File(override).existsSync()) return override;
-      final asDir = '$override/$libName';
-      if (File(asDir).existsSync()) return asDir;
-    }
-
-    final exe = Platform.resolvedExecutable;
-    var dir = File(exe).parent;
-    while (dir.path != dir.parent.path) {
-      final cand = File('${dir.path}/scanner/build/$libName');
-      if (cand.existsSync()) return cand.absolute.path;
-      dir = dir.parent;
-    }
-
-    final fromCwd = File('${Directory.current.path}/core/scanner/build/$libName');
-    if (fromCwd.existsSync()) return fromCwd.absolute.path;
-
-    throw StateError('无法定位 scanner-ffi：请设置 ARCHOERA_SCANNER_FFI 环境变量');
-  }
-
-  static String _soFileName() {
-    if (Platform.isWindows) return 'scanner-ffi.dll';
-    if (Platform.isMacOS) return 'scanner-ffi.dylib';
-    return 'scanner-ffi.so';
+    return NativeLibPaths.resolveRequired(NativeModule.scanner,
+        hint: '请设置 ARCHOERA_SCANNER_FFI 环境变量');
   }
 
   static String _sqliteLibName() {

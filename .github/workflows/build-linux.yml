@@ -45,24 +45,12 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Build audio-engine (C + Rust tempo)
-        run: |
-          cmake -S app/core/audio-engine -B app/core/audio-engine/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build app/core/audio-engine/build -j"$(nproc)"
-
-      - name: Build scraper (C++)
-        run: |
-          cmake -S app/core/scraper -B app/core/scraper/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build app/core/scraper/build -j"$(nproc)"
-
-      - name: Build scanner (C# NativeAOT)
-        run: bash app/core/scanner/build.sh linux-x64
-
-      - name: Build downloader (Rust cdylib)
-        run: cargo build --release --manifest-path app/core/downloader/Cargo.toml
-
-      - name: Build subsonic (Go + Rust transcoder)
-        run: bash app/core/subsonic/build.sh
+      - name: Build native modules (Linux 一站式脚本)
+        # 统一入口 app/core/build-linux.sh，收敛 audio-engine / scraper /
+        # scanner / vault / downloader / subsonic 全部原生模块编译：
+        # 本地开发与 CI 共用同一入口，逻辑改动只落一处（对齐 build_windows.bat）。
+        # 依赖由上方步骤提前安装，脚本只做编译引导。
+        run: bash app/core/build-linux.sh
 
       - name: Flutter pub get
         working-directory: app
@@ -75,6 +63,19 @@ jobs:
       - name: Test (unit smoke)
         working-directory: app
         run: flutter test test/widget_test.dart
+
+      - name: Test vault 会话存储（凭据保险库端到端）
+        working-directory: app
+        run: |
+          # headless runner 无 D-Bus Secret Service：构建测试二进制（VAULT_TESTING
+          # 条件编译，含测试明文存储；生产 build.sh 产物不含该逻辑，绝不用于测试）
+          bash core/vault/build-test.sh linux-x64
+          # 测试二进制需同时设置明文存储 env（显式 opt-in；生产二进制无此分支，
+          # 且 VaultProcess 默认路径校验 PROD 标记拒绝测试二进制，仅显式
+          # ARCHOERA_VAULT_BIN + 本 env 组合仅供测试）
+          ARCHOERA_VAULT_BIN=$PWD/core/vault/build/archoera-vault-test \
+          ARCHOERA_VAULT_INSECURE_FILE_STORE=1 \
+            flutter test test/vault_session_store_test.dart
 
       - name: Build Flutter Linux
         working-directory: app

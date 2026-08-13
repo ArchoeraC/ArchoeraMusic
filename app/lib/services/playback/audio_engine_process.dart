@@ -159,12 +159,10 @@ class AudioEngineProcess {
     double? tempoSpeed,
     double? tempoPitch,
   }) async {
-    if (Platform.isWindows) {
-      // 引擎动态库当前为 POSIX 构建；Windows 打包阶段需构建 archoera_mediaengine.dll
-      throw UnsupportedError('Windows 桌面端暂未启用（需构建 Windows 动态库）');
-    }
+    // 会话目录统一走系统临时目录（Windows %TEMP% / POSIX /tmp），
+    // 引擎 WAV/PCM 落盘 + miniaudio 播放 + PcmAnalyzer 按需读取均在此。
     final sockDir = Directory(
-      '/tmp/archoera-${Platform.localHostname}-$pid-${DateTime.now().millisecondsSinceEpoch}',
+      '${Directory.systemTemp.path}/archoera-${Platform.localHostname}-$pid-${DateTime.now().millisecondsSinceEpoch}',
     )..createSync(recursive: true);
     final playerFile = '${sockDir.path}/stream.wav';
 

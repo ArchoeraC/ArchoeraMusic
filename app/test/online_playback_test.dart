@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:archoera_music/services/netease/apis_netease_caller.dart';
 import 'package:archoera_music/services/netease/netease_api.dart';
+import 'package:archoera_music/services/netease/track.dart';
 import 'package:archoera_music/services/playback/audio_engine_process.dart';
 import 'package:archoera_music/services/playback/pcm_analyzer.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,13 +18,24 @@ void main() {
     '在线歌曲直连播放链路（取 URL → C 引擎完整转码 → WAV）',
     () async {
       // 1) 直连网易云：搜索 + 取可播 URL
+      //    热门曲目多为 VIP 独占（匿名仅试听片段被 resolvePlayUrl 拒绝），
+      //    因此遍历搜索命中取第一首可播曲目，避免样本抖动。
       final api = NeteaseApi(ApisNeteaseCaller());
-      final result = await api.searchSongs('周杰伦', limit: 1);
+      final result = await api.searchSongs('周杰伦', limit: 5);
       expect(result.items, isNotEmpty);
-      final url = await api.resolvePlayUrl(result.items.first.id);
-      expect(url, isNotNull);
+      String? url;
+      Track? picked;
+      for (final t in result.items) {
+        final u = await api.resolvePlayUrl(t.id);
+        if (u != null) {
+          url = u;
+          picked = t;
+          break;
+        }
+      }
+      expect(url, isNotNull, reason: '应在搜索命中中取到可播 URL');
       // ignore: avoid_print
-      print('[e2e] ${result.items.first.title} -> $url');
+      print('[e2e] ${picked!.title} -> $url');
 
       // 2) 直连 C 引擎转码（完整转码，等待 done）
       final engine = await AudioEngineProcess.start(source: url!);

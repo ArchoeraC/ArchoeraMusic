@@ -4,6 +4,7 @@
 /// 草稿值 / 私有辅助方法，仅在 build 内从 ref 读取偏好与 l10n。
 library;
 
+import 'dart:convert' show jsonEncode;
 import 'dart:io' show File;
 
 import 'package:file_selector/file_selector.dart';
@@ -13,12 +14,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../app/theme_provider.dart';
+import '../services/downloader/download_controller.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/scraper/scrape_controller.dart';
 import '../stores/app_prefs.dart';
 import '../stores/data_dir.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/toast.dart';
+import '../widgets/dialogs/s_dialog.dart';
 import '../widgets/player/s_controls.dart';
 import 'settings_color_picker.dart';
 import 'settings_widgets.dart';
@@ -1577,10 +1580,77 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
             ),
           ],
         ),
+        const SizedBox(height: 20),
+        SettingSection(
+          title: l10n.settingsSectionFingerprint,
+          note: l10n.settingsFingerprintNote,
+          children: [
+            SettingSwitchTile(
+              icon: Icons.published_with_changes_outlined,
+              title: l10n.settingsDownloadDynamicFingerprint,
+              subtitle: l10n.settingsDownloadDynamicFingerprintDesc,
+              value: prefs.downloadDynamicFingerprint,
+              onChanged: (v) {
+                ref
+                    .read(appPrefsProvider.notifier)
+                    .setDownloadDynamicFingerprint(v);
+                // 立即重注入/清除 Rust 侧指纹（开关切换即时生效，
+                // 不必等下次引擎重建/重启）
+                ref.read(downloadControllerProvider.notifier).syncSessions();
+              },
+            ),
+            SettingTile(
+              icon: Icons.fingerprint_outlined,
+              title: l10n.settingsResetFingerprint,
+              subtitle: l10n.settingsResetFingerprintDesc,
+              trailing: IconButton(
+                tooltip: l10n.settingsResetFingerprint,
+                iconSize: 18,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.refresh_outlined),
+                // 动态指纹开启时指纹不持久化，「重置」无意义 → 禁用
+                onPressed: prefs.downloadDynamicFingerprint
+                    ? null
+                    : () => _resetFingerprint(context, l10n),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         SettingNote(text: l10n.settingsGroupingNote),
       ],
     );
+  }
+
+  /// 重置设备指纹：重新生成并持久化，随后立即重注入 Rust（即时生效）。
+  Future<void> _resetFingerprint(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) async {
+    final ok = await SDialog.show<bool>(
+      context,
+      title: l10n.settingsResetFingerprint,
+      description: l10n.settingsResetFingerprintDesc,
+      child: const SizedBox.shrink(),
+      actions: [
+        SButton(
+          label: l10n.commonCancel,
+          variant: SButtonVariant.secondary,
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        SButton(
+          label: l10n.settingsResetFingerprint,
+          variant: SButtonVariant.error,
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
+    );
+    if (ok != true || !mounted) return;
+    ref
+        .read(appPrefsProvider.notifier)
+        .setDownloaderIdentity(jsonEncode(generateDownloaderIdentity()));
+    ref.read(downloadControllerProvider.notifier).syncSessions();
+    toast(l10n.toastFingerprintReset, type: ToastType.success);
   }
 
   void _saveDownloadRoot(String raw, AppLocalizations l10n) {

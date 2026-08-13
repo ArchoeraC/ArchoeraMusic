@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+
+import '../native_lib_paths.dart';
 
 /// archoera-downloader cdylib 的定位、加载与 FFI 绑定。
 ///
@@ -22,49 +23,11 @@ class DownloaderLibrary {
 
   // ---------------------------------------------------------------- 定位
 
-  /// 解析 downloader 共享库路径。
-  ///
-  /// 优先级：
-  ///  1. 环境变量 `ARCHOERA_DOWNLOADER_SO`（.so 文件路径或含库文件的目录）；
-  ///  2. 从可执行文件沿父目录向上查找
-  ///     `core/downloader/target/release/libarchoera_downloader.{ext}`，
-  ///     再 fallback `target/debug/`；
-  ///  3. dev 兜底：`flutter run` 的 cwd 为 `app/`，库在 `app/core/downloader/target/`。
+  /// 解析 downloader 共享库路径：统一走 [NativeLibPaths]
+  /// （环境变量 → ancestors 链 → dev 兜底；release 优先、debug 兜底）。
   static String resolveSoPath() {
-    final libName = _soFileName();
-
-    final override = Platform.environment['ARCHOERA_DOWNLOADER_SO'];
-    if (override != null && override.isNotEmpty) {
-      if (File(override).existsSync()) return override;
-      final asDir = '$override/$libName';
-      if (File(asDir).existsSync()) return asDir;
-    }
-
-    final exe = Platform.resolvedExecutable;
-    var dir = File(exe).parent;
-    while (dir.path != dir.parent.path) {
-      for (final flavor in const ['release', 'debug']) {
-        final cand =
-            File('${dir.path}/core/downloader/target/$flavor/$libName');
-        if (cand.existsSync()) return cand.absolute.path;
-      }
-      dir = dir.parent;
-    }
-
-    for (final flavor in const ['release', 'debug']) {
-      final fromCwd =
-          File('${Directory.current.path}/core/downloader/target/$flavor/$libName');
-      if (fromCwd.existsSync()) return fromCwd.absolute.path;
-    }
-
-    throw StateError(
-        '无法定位 archoera_downloader：请设置 ARCHOERA_DOWNLOADER_SO 环境变量');
-  }
-
-  static String _soFileName() {
-    if (Platform.isWindows) return 'archoera_downloader.dll';
-    if (Platform.isMacOS) return 'libarchoera_downloader.dylib';
-    return 'libarchoera_downloader.so';
+    return NativeLibPaths.resolveRequired(NativeModule.downloader,
+        hint: '请设置 ARCHOERA_DOWNLOADER_SO 环境变量');
   }
 
   // ---------------------------------------------------------------- 加载
@@ -118,6 +81,12 @@ class DownloaderLibrary {
   late final _SetNeteaseCookieDart _setNeteaseCookie = _lib.lookupFunction<
       _SetNeteaseCookieNative,
       _SetNeteaseCookieDart>('archoera_downloader_set_netease_cookie');
+  late final _SetIdentityDart _setIdentity = _lib.lookupFunction<
+      _SetIdentityNative,
+      _SetIdentityDart>('archoera_downloader_set_identity');
+  late final _ClearIdentityDart _clearIdentity = _lib.lookupFunction<
+      _ClearIdentityNative,
+      _ClearIdentityDart>('archoera_downloader_clear_identity');
   late final _FreeDart _free =
       _lib.lookupFunction<_FreeNative, _FreeDart>('archoera_downloader_free');
   late final _DestroyDart _destroy =
@@ -261,6 +230,23 @@ class DownloaderLibrary {
     }
   }
 
+  /// 注入设备指纹（Dart 持久化的 downloaderIdentity JSON；幂等）。
+  ///
+  /// 对齐 Rust `archoera_downloader_set_identity`：酷狗 mid / 网易
+  /// deviceId/_ntes_nuid 优先用注入值，未注入字段回落进程随机。
+  int setDownloaderIdentity(String identityJson) {
+    final p = identityJson.toNativeUtf8();
+    try {
+      return _setIdentity(p);
+    } finally {
+      calloc.free(p);
+    }
+  }
+
+  /// 清除设备指纹（对齐 Rust `archoera_downloader_clear_identity`）：
+  /// 回退旧版「每次启动随机」动态值行为（动态指纹开关开启路径）。
+  int clearDownloaderIdentity() => _clearIdentity();
+
   /// 释放 Rust 分配的 C 字符串（task_id、回调事件 ptr 都要调）。
   void free(Pointer<Void> ptr) => _free(ptr);
 
@@ -329,6 +315,12 @@ typedef _SetKugouSessionDart = int Function(Pointer<Utf8>, Pointer<Utf8>);
 
 typedef _SetNeteaseCookieNative = Int32 Function(Pointer<Utf8>);
 typedef _SetNeteaseCookieDart = int Function(Pointer<Utf8>);
+
+typedef _SetIdentityNative = Int32 Function(Pointer<Utf8> json);
+typedef _SetIdentityDart = int Function(Pointer<Utf8>);
+
+typedef _ClearIdentityNative = Int32 Function();
+typedef _ClearIdentityDart = int Function();
 
 typedef _FreeNative = Void Function(Pointer<Void>);
 typedef _FreeDart = void Function(Pointer<Void>);

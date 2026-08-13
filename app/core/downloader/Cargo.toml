@@ -43,6 +43,15 @@ lofty            = "0.19"
 # flate2 默认 miniz_oxide backend（纯 Rust，无 C 依赖），MIT/Apache-2.0。
 flate2           = "1"
 
+# ====== 内存保护（vault-3）：mlock 禁 swap + zeroize 防残留明文 ======
+# mlock/munlock（unix）+ MADV_DONTDUMP（Linux）；Windows VirtualLock 见下方
+# [target.'cfg(windows)'.dependencies]。
+zeroize          = { version = "1", default-features = false, features = ["alloc"] }
+libc             = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys      = { version = "0.52", features = ["Win32_System_Memory"] }
+
 [profile.release]
 lto       = true
 strip     = "symbols"

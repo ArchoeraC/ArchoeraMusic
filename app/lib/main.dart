@@ -6,16 +6,18 @@ import 'package:window_manager/window_manager.dart';
 
 import 'apis/runtime.dart';
 import 'services/power/frame_governor.dart';
-import 'stores/netease_session.dart';
+import 'services/streaming/streaming_store.dart';
+import 'stores/vault_session_store.dart';
 import 'app/app.dart';
 import 'widgets/list/cover_image.dart';
 import 'widgets/common/tray_integration.dart';
 
 /// ArchoeraMusic — 应用入口。
 ///
-/// 职责：ProviderScope 注入 + 宿主运行时注入（网易云会话落盘，登录态
-/// 跨重启保留）+ 窗口/托盘后台常驻。播放链路由 C 引擎内置 miniaudio
-/// 承担（无 libmpv/media_kit 依赖）。
+/// 职责：ProviderScope 注入 + 宿主运行时注入（账号会话经凭据保险库
+/// vault 加密落盘，登录态跨重启保留；vault 不可用时降级内存并告警）
+/// + 窗口/托盘后台常驻。播放链路由 C 引擎内置 miniaudio 承担
+/// （无 libmpv/media_kit 依赖）。
 Future<void> main() async {
   // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化，替代默认 binding
   PowerSavingFrameBinding.ensureInitialized();
@@ -23,14 +25,22 @@ Future<void> main() async {
   // 以 add 语义追加自定义头，传 UA 会与默认 Dart UA 叠加成双头被拒收。
   // 改全局 HttpClient 默认 UA 为浏览器 UA，天然保证单头。
   HttpOverrides.global = _BrowserUserAgentOverrides();
-  setRuntime(runtime: ApisRuntime(sessionStore: FileSessionStore()));
-  // 全局图片解码缓存上限（性能调优，借鉴 Electron/浏览器 HTTP 图片缓存
-  // 思路）：桌面端内存充裕，封面已按显示尺寸降采样（见 CoverImage，单图
-  // 约几十~几百 KB），缓存放宽到 1000 张 / 256MB——大列表快速滚动时避免
-  // 封面被过早逐出导致反复网络请求 + 解码的卡顿。
-  PaintingBinding.instance.imageCache
-    ..maximumSize = 1000
-    ..maximumSizeBytes = 256 * 1024 * 1024;
+  // 会话存储：vault 加密持久化（先加载/迁移旧明文，再注入宿主运行时，
+  // 保证 kugou/netease 提供者首次读取时已就绪）
+  final sessionStore = VaultSessionStore();
+  await sessionStore.initialize();
+  if (!sessionStore.vaultAvailable) {
+    // 凭据保险库不可用：登录态仅内存保留（不静默降级为明文持久化）
+    debugPrint('[vault] 凭据保险库不可用，登录态将不持久化（重启需重新登录）');
+  }
+  // 流媒体服务器凭据从 vault 预取进内存缓存（[load] 同步接口的凭据来源，
+  // 首帧读取前完成，避免同步接口依赖异步会话）
+  await StreamingStore.preloadSecrets();
+  setRuntime(runtime: ApisRuntime(sessionStore: sessionStore));
+  // 全局图片解码缓存：张数上限固定（防内存碎片）；字节上限由设置
+  // 「封面图片缓存上限」动态控制（默认下限 8 MiB，见 ArchoeraMusicApp，
+  // null = 无上限仅按张数约束）。
+  PaintingBinding.instance.imageCache.maximumSize = 1000;
   // 窗口管理（后台常驻：关闭到托盘需拦截窗口关闭事件）
   await windowManager.ensureInitialized();
   runApp(

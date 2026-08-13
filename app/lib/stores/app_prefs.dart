@@ -290,6 +290,22 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置设备指纹（首次启动生成后不变；持久化到 prefs）。
+  ///
+  /// 注入路径：download_controller init 引擎后 `setDownloaderIdentity` →
+  /// Rust `archoera_downloader_set_identity`。清除数据时一并删除即可重置。
+  void setDownloaderIdentity(String identityJson) {
+    state = state.copyWithDownloaderIdentity(identityJson);
+    state.save();
+  }
+
+  /// 动态设备指纹开关（默认关闭）：开启 = 回退旧版「每次启动随机」动态值，
+  /// 关闭 = 持久化指纹。切换后由调用方调 `syncSessions()` 立即重注入/清除。
+  void setDownloadDynamicFingerprint(bool value) {
+    state = state.copyWithDownloadDynamicFingerprint(value);
+    state.save();
+  }
+
   /// 设置「关闭应用时」行为（ask=每次询问 / background=后台播放 / quit=直接退出）。
   void setCloseBehavior(String value) {
     state = state.copyWithCloseBehavior(value);
@@ -353,6 +369,54 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 节能模式：降低频谱取帧频率以节省 CPU（默认关，见 [AppPrefs.energySavingMode]）。
   void setEnergySaving(bool value) {
     state = state.copyWithPreset(energySavingMode: value);
+    state.save();
+  }
+
+  /// 歌曲磁盘缓存开关（默认开，见 [AppPrefs.songCacheEnabled]）。
+  void setSongCacheEnabled(bool value) {
+    state = state.copyWithPreset(songCacheEnabled: value);
+    state.save();
+  }
+
+  /// 歌曲磁盘缓存上限（MiB，见 [AppPrefs.songCacheLimitMiB]）。
+  void setSongCacheLimitMiB(int value) {
+    state = state.copyWithPreset(
+      songCacheLimitMiB: value.clamp(
+        songCacheLimitMinMiB,
+        songCacheLimitMaxMiB,
+      ),
+    );
+    state.save();
+  }
+
+  /// 歌词缓存上限（MiB）：传 null 表示不修改；传 0 表示无上限
+  /// （[AppPrefs.lyricCacheLimitMiB] 返回 null）；其余按上下限收敛。
+  void setLyricCacheLimitMiB(int? value) {
+    if (value == null || value <= 0) {
+      state = state.copyWithPreset(lyricCacheLimitMiB: 0); // 无上限
+    } else {
+      state = state.copyWithPreset(
+        lyricCacheLimitMiB: value.clamp(
+          lyricCacheLimitMinMiB,
+          lyricCacheLimitMaxMiB,
+        ),
+      );
+    }
+    state.save();
+  }
+
+  /// 封面图片缓存上限（MiB）：语义同 [setLyricCacheLimitMiB]。
+  void setImageCacheLimitMiB(int? value) {
+    if (value == null || value <= 0) {
+      state = state.copyWithPreset(imageCacheLimitMiB: 0); // 无上限
+    } else {
+      state = state.copyWithPreset(
+        imageCacheLimitMiB: value.clamp(
+          imageCacheLimitMinMiB,
+          imageCacheLimitMaxMiB,
+        ),
+      );
+    }
     state.save();
   }
 

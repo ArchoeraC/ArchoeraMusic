@@ -3446,6 +3446,48 @@ abstract class AppLocalizations {
   /// **'按歌手分组 v2 已支持（平铺 / 按平台 / 按歌手）。'**
   String get settingsGroupingNote;
 
+  /// No description provided for @settingsSectionFingerprint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备指纹'**
+  String get settingsSectionFingerprint;
+
+  /// No description provided for @settingsFingerprintNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下载器向酷狗 / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。'**
+  String get settingsFingerprintNote;
+
+  /// No description provided for @settingsDownloadDynamicFingerprint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'动态设备指纹'**
+  String get settingsDownloadDynamicFingerprint;
+
+  /// No description provided for @settingsDownloadDynamicFingerprintDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启后设备标识每次启动随机生成（旧版行为），可能触发平台风控，默认关闭。'**
+  String get settingsDownloadDynamicFingerprintDesc;
+
+  /// No description provided for @settingsResetFingerprint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重置设备指纹'**
+  String get settingsResetFingerprint;
+
+  /// No description provided for @settingsResetFingerprintDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重置后本机在酷狗 / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？'**
+  String get settingsResetFingerprintDesc;
+
+  /// No description provided for @toastFingerprintReset.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已重置设备指纹'**
+  String get toastFingerprintReset;
+
   /// No description provided for @toastDownloadRootEmpty.
   ///
   /// In zh_CN, this message translates to:
@@ -3565,6 +3607,84 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'内存缓存（进程内）'**
   String get settingsCacheGroupMem;
+
+  /// No description provided for @settingsCacheLimitLyric.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词缓存上限'**
+  String get settingsCacheLimitLyric;
+
+  /// No description provided for @settingsCacheLimitCover.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'封面图片缓存上限'**
+  String get settingsCacheLimitCover;
+
+  /// No description provided for @settingsCacheLimitUnlimited.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无上限'**
+  String get settingsCacheLimitUnlimited;
+
+  /// No description provided for @settingsCacheNoLimitConfirmTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'取消缓存上限？'**
+  String get settingsCacheNoLimitConfirmTitle;
+
+  /// No description provided for @settingsCacheNoLimitConfirmDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无上限时歌词与封面图片缓存可无限制占用内存，可能造成内存压力与卡顿。确认取消上限？'**
+  String get settingsCacheNoLimitConfirmDesc;
+
+  /// No description provided for @settingsCacheNoLimitConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确认取消上限'**
+  String get settingsCacheNoLimitConfirm;
+
+  /// No description provided for @settingsSongCache.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌曲缓存'**
+  String get settingsSongCache;
+
+  /// No description provided for @settingsSongCacheNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放过的在线歌曲会缓存到本地磁盘，重播直接读取（省流量、加速、断网可播）。超过上限按 LRU 自动淘汰最旧曲目；下限 16 MiB 可完整缓存一首 320kbps 高品曲目（约 2.4 MiB/分钟）。清除后自动重建，不影响曲库、历史与账号。'**
+  String get settingsSongCacheNote;
+
+  /// No description provided for @settingsSongCacheOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开启，重播命中直接读取本地文件'**
+  String get settingsSongCacheOn;
+
+  /// No description provided for @settingsSongCacheOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已关闭，媒体缓存将不会保存到本地'**
+  String get settingsSongCacheOff;
+
+  /// No description provided for @settingsSongCacheLimitTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'缓存上限'**
+  String get settingsSongCacheLimitTitle;
+
+  /// No description provided for @settingsCacheSongs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{count} 首'**
+  String settingsCacheSongs(Object count);
+
+  /// No description provided for @settingsSearchSongCacheSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在线歌曲磁盘缓存开关与 MiB 上限'**
+  String get settingsSearchSongCacheSubtitle;
 
   /// No description provided for @settingsCacheLiked.
   ///
@@ -3781,6 +3901,492 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'销毁失败，文件仍可能残留：{path}'**
   String toastSecurityDestroyFailed(Object path);
+
+  /// No description provided for @settingsDeviceBindSection.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高级 · 设备绑定'**
+  String get settingsDeviceBindSection;
+
+  /// No description provided for @settingsDeviceBindNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'增强型可选项（opt-in）：本机免密 + 设备变更走恢复口令，不依赖系统安全存储。开启将读取本机设备标识（仅存本地、不会上传）。默认关闭，普通用户使用 v1 加密已足够。'**
+  String get settingsDeviceBindNote;
+
+  /// No description provided for @settingsDeviceBindSwitch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备绑定免密'**
+  String get settingsDeviceBindSwitch;
+
+  /// No description provided for @settingsDeviceBindSwitchDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本机自动解锁；换机/重装走恢复口令'**
+  String get settingsDeviceBindSwitchDesc;
+
+  /// No description provided for @settingsDeviceBindSwitchOffDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未启用。当前系统安全存储不可用，可开启设备绑定实现本机免密（无需口令）'**
+  String get settingsDeviceBindSwitchOffDesc;
+
+  /// No description provided for @settingsDeviceBindSwitchV1Desc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前为 v1（系统安全存储）模式；开启将升级为设备绑定（免密 + 恢复口令，既有数据保留）'**
+  String get settingsDeviceBindSwitchV1Desc;
+
+  /// No description provided for @settingsDeviceBindSwitchV2Desc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前为 v2（口令）模式；开启需先输入当前口令解锁，随后升级为设备绑定（本机免密）'**
+  String get settingsDeviceBindSwitchV2Desc;
+
+  /// No description provided for @settingsDeviceBindPrivacyTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启设备绑定免密？'**
+  String get settingsDeviceBindPrivacyTitle;
+
+  /// No description provided for @settingsDeviceBindPrivacyDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将读取本机设备标识（Linux machine-id / Windows MachineGuid / macOS IOPlatformUUID）用于绑定，仅存储于本地，不会上传。注意：此操作不可回到当前 OS 免密模式——日后关闭设备绑定将回落为口令模式（每次启动需输入口令）。'**
+  String get settingsDeviceBindPrivacyDesc;
+
+  /// No description provided for @settingsDeviceBindEnable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启'**
+  String get settingsDeviceBindEnable;
+
+  /// No description provided for @settingsDeviceBindRecoveryTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设置恢复口令（可选）'**
+  String get settingsDeviceBindRecoveryTitle;
+
+  /// No description provided for @settingsDeviceBindRecoveryDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'换机/重装后需用恢复口令解锁凭据。留空则不设置：设备变更后无法恢复（fail-closed，需销毁重建凭据）。'**
+  String get settingsDeviceBindRecoveryDesc;
+
+  /// No description provided for @settingsDeviceBindRecoveryHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'恢复口令'**
+  String get settingsDeviceBindRecoveryHint;
+
+  /// No description provided for @settingsDeviceBindSkip.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不设口令，直接开启'**
+  String get settingsDeviceBindSkip;
+
+  /// No description provided for @settingsDeviceBindChangeRecovery.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设置 / 修改恢复口令'**
+  String get settingsDeviceBindChangeRecovery;
+
+  /// No description provided for @settingsDeviceBindChangeRecoveryTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设置新的恢复口令'**
+  String get settingsDeviceBindChangeRecoveryTitle;
+
+  /// No description provided for @settingsDeviceBindChangeRecoveryDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'修改后旧口令立即失效。请务必记住新口令：换机/重装后凭据解锁将依赖它。'**
+  String get settingsDeviceBindChangeRecoveryDesc;
+
+  /// No description provided for @settingsDeviceBindRebind.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重新绑定当前设备'**
+  String get settingsDeviceBindRebind;
+
+  /// No description provided for @settingsDeviceBindRebindDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用当前设备指纹重密封，旧指纹立即失效（换机恢复后使用）'**
+  String get settingsDeviceBindRebindDesc;
+
+  /// No description provided for @settingsDeviceBindRebindTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重新绑定当前设备？'**
+  String get settingsDeviceBindRebindTitle;
+
+  /// No description provided for @settingsDeviceBindRebindConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'立即重新绑定'**
+  String get settingsDeviceBindRebindConfirm;
+
+  /// No description provided for @settingsDeviceBindClose.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭设备绑定'**
+  String get settingsDeviceBindClose;
+
+  /// No description provided for @settingsDeviceBindCloseDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清除设备熵绑定，vault 转为口令模式'**
+  String get settingsDeviceBindCloseDesc;
+
+  /// No description provided for @settingsDeviceBindCloseTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭设备绑定？'**
+  String get settingsDeviceBindCloseTitle;
+
+  /// No description provided for @settingsDeviceBindCloseConfirmDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将删除设备熵绑定，vault 转为口令模式：此后每次会话需输入口令。该口令即新会话口令，请牢记。输入当前恢复口令以确认。'**
+  String get settingsDeviceBindCloseConfirmDesc;
+
+  /// No description provided for @settingsDeviceBindCloseHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前恢复口令'**
+  String get settingsDeviceBindCloseHint;
+
+  /// No description provided for @settingsDeviceBindRecoveryBanner.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'检测到设备变更或熵文件损坏：凭据已锁定，需恢复口令解锁'**
+  String get settingsDeviceBindRecoveryBanner;
+
+  /// No description provided for @settingsDeviceBindRecover.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'恢复'**
+  String get settingsDeviceBindRecover;
+
+  /// No description provided for @settingsDeviceBindRecoverTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'输入恢复口令'**
+  String get settingsDeviceBindRecoverTitle;
+
+  /// No description provided for @settingsDeviceBindRecoverDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用恢复口令解锁凭据；成功后建议立即重新绑定当前设备恢复免密。'**
+  String get settingsDeviceBindRecoverDesc;
+
+  /// No description provided for @settingsDeviceBindShowPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'显示 / 隐藏口令'**
+  String get settingsDeviceBindShowPassword;
+
+  /// No description provided for @toastDeviceBindEnabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备绑定免密已开启'**
+  String get toastDeviceBindEnabled;
+
+  /// No description provided for @toastDeviceBindRecoverySet.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'恢复口令已更新'**
+  String get toastDeviceBindRecoverySet;
+
+  /// No description provided for @toastDeviceBindRebound.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已重新绑定当前设备'**
+  String get toastDeviceBindRebound;
+
+  /// No description provided for @toastDeviceBindClosed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备绑定已关闭，vault 已转为口令模式'**
+  String get toastDeviceBindClosed;
+
+  /// No description provided for @toastDeviceBindRecoveryNeeded.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未设置恢复口令，无法关闭设备绑定'**
+  String get toastDeviceBindRecoveryNeeded;
+
+  /// No description provided for @toastDeviceBindCloseFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭失败：{error}'**
+  String toastDeviceBindCloseFailed(Object error);
+
+  /// No description provided for @toastDeviceBindRecovered.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据已恢复，可重新绑定本机恢复免密'**
+  String get toastDeviceBindRecovered;
+
+  /// No description provided for @toastDeviceBindRecoverFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'恢复口令错误或解锁失败，凭据保持锁定'**
+  String get toastDeviceBindRecoverFailed;
+
+  /// No description provided for @settingsVaultSection.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据加密'**
+  String get settingsVaultSection;
+
+  /// No description provided for @settingsVaultNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'选择凭据的加密保护等级：v1 系统保护（默认）/ v2 口令保护 / v3 设备绑定（增强项 opt-in，读取本机设备标识，仅存本地、不会上传）。v1 ↔ v2 可随时互切；v3 为终点档，关闭后回落为 v2。'**
+  String get settingsVaultNote;
+
+  /// No description provided for @settingsVaultModeV1.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'v1 系统保护'**
+  String get settingsVaultModeV1;
+
+  /// No description provided for @settingsVaultModeV2.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'v2 口令保护'**
+  String get settingsVaultModeV2;
+
+  /// No description provided for @settingsVaultModeV3.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'v3 设备绑定'**
+  String get settingsVaultModeV3;
+
+  /// No description provided for @settingsVaultModeDescOs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'v1 系统保护：凭据由操作系统安全存储加密（Windows DPAPI / macOS 钥匙串 / Linux libsecret），本机免密。'**
+  String get settingsVaultModeDescOs;
+
+  /// No description provided for @settingsVaultModeDescPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'v2 口令保护：凭据由口令加密，每次启动需输入口令解锁。可随时切回 v1 系统保护。'**
+  String get settingsVaultModeDescPassword;
+
+  /// No description provided for @settingsVaultModeDescMultiseal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'v3 设备绑定：本机免密，设备变更时需恢复口令解锁。不可直接降回 v1——关闭后将回落为 v2 口令模式。'**
+  String get settingsVaultModeDescMultiseal;
+
+  /// No description provided for @settingsVaultModeDescUnknown.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'加密等级读取中…'**
+  String get settingsVaultModeDescUnknown;
+
+  /// No description provided for @settingsVaultSwitchToPasswordTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换到口令保护（v2）'**
+  String get settingsVaultSwitchToPasswordTitle;
+
+  /// No description provided for @settingsVaultSwitchToPasswordDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据将改由口令加密保护，每次启动需输入口令。主密钥与已有数据保留，此操作可随时切回系统保护（v1）。'**
+  String get settingsVaultSwitchToPasswordDesc;
+
+  /// No description provided for @settingsVaultSwitchToPasswordNewHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设置新口令'**
+  String get settingsVaultSwitchToPasswordNewHint;
+
+  /// No description provided for @settingsVaultSwitchToPasswordConfirmHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'再次输入新口令'**
+  String get settingsVaultSwitchToPasswordConfirmHint;
+
+  /// No description provided for @settingsVaultSwitchToPasswordMismatch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'两次输入不一致'**
+  String get settingsVaultSwitchToPasswordMismatch;
+
+  /// No description provided for @settingsVaultSwitchToOsTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换回系统保护（v1）'**
+  String get settingsVaultSwitchToOsTitle;
+
+  /// No description provided for @settingsVaultSwitchToOsDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据将改由操作系统安全存储保护，无需再输入口令。此操作可随时切回口令保护（v2）。'**
+  String get settingsVaultSwitchToOsDesc;
+
+  /// No description provided for @settingsVaultNeedUnlockFirst.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前口令保护未解锁：请先解锁后再切换'**
+  String get settingsVaultNeedUnlockFirst;
+
+  /// No description provided for @settingsVaultV3NoDirectV1.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备绑定（v3）不可直接降回 v1：请先关闭设备绑定，回落为 v2 口令模式'**
+  String get settingsVaultV3NoDirectV1;
+
+  /// No description provided for @settingsVaultCloseV3PasswordTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭设备绑定：设置新口令'**
+  String get settingsVaultCloseV3PasswordTitle;
+
+  /// No description provided for @settingsVaultCloseV3PasswordDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备绑定开启时未设置恢复口令（本机免密），关闭后将转为口令保护（v2）：请设置新的解锁口令。主密钥与已有数据保留，此口令每次启动都需输入。'**
+  String get settingsVaultCloseV3PasswordDesc;
+
+  /// No description provided for @toastVaultSwitchedToPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已切换到口令保护（v2）'**
+  String get toastVaultSwitchedToPassword;
+
+  /// No description provided for @toastVaultSwitchedToOs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已切换回系统保护（v1）'**
+  String get toastVaultSwitchedToOs;
+
+  /// No description provided for @settingsVaultRestartTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'需要重启应用'**
+  String get settingsVaultRestartTitle;
+
+  /// No description provided for @settingsVaultRestartDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'加密等级已切换成功。为保证数据库完整性与各模块状态一致，请重启应用生效。若为口令保护模式（v2），重启后将要求输入口令解锁，解锁前登录态与流媒体凭据暂不可用（显示为未登录）；重启期间播放与下载会中断。'**
+  String get settingsVaultRestartDesc;
+
+  /// No description provided for @settingsVaultRestartNow.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'立即重启'**
+  String get settingsVaultRestartNow;
+
+  /// No description provided for @settingsVaultRestartLater.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'稍后重启'**
+  String get settingsVaultRestartLater;
+
+  /// No description provided for @vaultCrashTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据模块异常退出'**
+  String get vaultCrashTitle;
+
+  /// No description provided for @vaultCrashDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据保险库进程意外终止，本地凭据可能已暴露。建议重新登录或销毁 vault 以重建凭据。'**
+  String get vaultCrashDesc;
+
+  /// No description provided for @vaultCrashReset.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'销毁并重建'**
+  String get vaultCrashReset;
+
+  /// No description provided for @vaultCrashDismiss.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'知道了'**
+  String get vaultCrashDismiss;
+
+  /// No description provided for @vaultVersionTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据保险库版本异常'**
+  String get vaultVersionTitle;
+
+  /// No description provided for @vaultVersionDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'检测到凭据保险库组件异常：其二进制副本可能已被替换或非官方构建，本地凭据可能已暴露。已删除异常副本并拒绝解密。请退出并重新安装应用。'**
+  String get vaultVersionDesc;
+
+  /// No description provided for @vaultVersionExit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'退出'**
+  String get vaultVersionExit;
+
+  /// No description provided for @vaultVersionReasonReplaced.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'检测到 vault 二进制被替换或非官方构建，已删除异常副本并拒绝解密。'**
+  String get vaultVersionReasonReplaced;
+
+  /// No description provided for @vaultVersionReasonMarkerMissing.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'vault 握手应答缺少官方构建标记。'**
+  String get vaultVersionReasonMarkerMissing;
+
+  /// No description provided for @vaultVersionReasonMarkerMismatch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'vault 构建标记与官方产物不符，已删除异常副本并拒绝解密。'**
+  String get vaultVersionReasonMarkerMismatch;
+
+  /// No description provided for @vaultUnlockTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'解锁凭据保险库'**
+  String get vaultUnlockTitle;
+
+  /// No description provided for @vaultUnlockDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据保险库为口令保护模式（v2）。请输入口令以解锁本地登录凭据与流媒体账号。'**
+  String get vaultUnlockDesc;
+
+  /// No description provided for @vaultUnlockHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'口令'**
+  String get vaultUnlockHint;
+
+  /// No description provided for @vaultUnlockConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'解锁'**
+  String get vaultUnlockConfirm;
+
+  /// No description provided for @vaultUnlockSkip.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂不解锁'**
+  String get vaultUnlockSkip;
+
+  /// No description provided for @vaultUnlockFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'口令错误，请重试'**
+  String get vaultUnlockFailed;
 
   /// No description provided for @settingsVersion.
   ///
