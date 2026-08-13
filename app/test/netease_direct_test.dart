@@ -9,6 +9,7 @@ library;
 import 'package:archoera_music/apis/netease/core/crypto.dart';
 import 'package:archoera_music/services/netease/apis_netease_caller.dart';
 import 'package:archoera_music/services/netease/netease_api.dart';
+import 'package:archoera_music/services/netease/track.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -40,12 +41,22 @@ void main() {
       expect(result.items, isNotEmpty, reason: 'cloudsearch 应返回歌曲');
       expect(result.total, greaterThanOrEqualTo(result.items.length));
 
-      // song_url：第一首歌取可播 URL
-      final url = await api.resolvePlayUrl(result.items.first.id);
-      expect(url, isNotNull, reason: 'song_url 应返回可播 URL');
+      // song_url：热门曲目多为 VIP 独占（匿名仅试听片段被 resolvePlayUrl 拒绝），
+      // 因此遍历搜索命中取第一首可播曲目，避免样本抖动（VIP 锁定 ≠ 链路故障）。
+      String? url;
+      Track? picked;
+      for (final t in result.items) {
+        final u = await api.resolvePlayUrl(t.id);
+        if (u != null) {
+          url = u;
+          picked = t;
+          break;
+        }
+      }
+      expect(url, isNotNull, reason: '应在搜索命中中取到可播 URL');
       expect(url!.startsWith('http'), isTrue);
       // ignore: avoid_print
-      print('URL[${result.items.first.title}] -> $url');
+      print('URL[${picked!.title}] -> $url');
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

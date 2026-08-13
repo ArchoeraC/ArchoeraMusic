@@ -37,6 +37,8 @@ jobs:
         # （ffmpeg 等包 debug+release 双编译耗时可省一半，且无 debug 库可被误链）
         # 注意：manifest 模式安装根固定为 ./vcpkg_installed，不受 VCPKG_INSTALLED_DIR
         # 环境变量影响，不要手动覆盖以免与 CMake toolchain 的定位不一致。
+        # 此处显式 install 仅为 vcpkg_installed 缓存加速；build_windows.bat 内含
+        # headers 缺失时自动 install 的幂等兜底，本地开发无需手动预装。
         run: vcpkg install --triplet x64-windows-release
         env:
           VCPKG_ROOT: C:\vcpkg
@@ -68,8 +70,11 @@ jobs:
         # 统一入口 app/core/build_windows.bat，在单个 cmd 会话内完成全部模块：
         #   vswhere→vcvars64（MSVC 环境）→ audio-engine（cargo tempo + cl 直编
         #   fft.dll/archoera_mediaengine.dll）→ scraper（CMake+vcpkg toolchain）
-        #   → scanner（dotnet publish）→ downloader（cargo）→ subsonic（go+rust）。
-        # 依赖由上方步骤提前安装，脚本只做编译引导。
+        #   → scanner（dotnet publish）→ downloader（cargo）→ subsonic（go+rust）
+        #   → vault（dotnet publish）。
+        # 依赖由上方步骤提前安装（vcpkg headers 缺失时 bat 内自动 install 兜底），
+        # 脚本只做编译引导。与 build-linux.sh / build-macos.sh 同构，本地开发
+        # 与 CI 共用同一入口，逻辑改动只落一处。
         env:
           VCPKG_TARGET_TRIPLET: x64-windows-release
         working-directory: app/core

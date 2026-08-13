@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>archoera-vault</AssemblyName>
+    <RootNamespace>Archoera.Vault</RootNamespace>
+    <!-- 凭据保险库：按需会话进程（NativeAOT 单文件可执行，无 .NET 运行时依赖）；
+         经 stdin/stdout 行协议与主进程通信（后续握手协议见 credential-vault-plan §3.8） -->
+    <PublishAot>true</PublishAot>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <StripSymbols>true</StripSymbols>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <NoWarn>$(NoWarn);IL2104</NoWarn>
+  </PropertyGroup>
+
+</Project>

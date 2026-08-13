@@ -9,9 +9,12 @@ rem    3. scraper      : CMake + vcpkg toolchain（Windows 保留 CMake）
 rem    4. scanner      : dotnet publish (NativeAOT) + e_sqlite3.dll
 rem    5. downloader   : cargo build --release (cdylib)
 rem    6. subsonic     : cargo transcoder + go c-shared + go standalone
+rem    7. vault        : dotnet publish (NativeAOT 凭据保险库)
 rem
 rem  依赖（vcpkg FFmpeg、MSVC、Rust、Go、.NET、CMake）由 CI workflow 提前安装，
-rem  本脚本只做编译引导。产物布局与 app/windows/CMakeLists.txt install 引用对齐。
+rem  本脚本只做编译引导；vcpkg FFmpeg headers 缺失时会自动 install 兜底
+rem （幂等），本地开发无需手动预装。产物布局与 app/windows/CMakeLists.txt
+rem  install 引用对齐。
 rem =====================================================================
 setlocal enabledelayedexpansion
 
@@ -26,9 +29,23 @@ set "VCPKG_TOOLCHAIN=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
 echo [build_windows] vcpkg prefix: %VCPKG_PREFIX%
 echo [build_windows] vcpkg toolchain: %VCPKG_TOOLCHAIN%
 
+rem 依赖幂等兜底：FFmpeg headers 缺失时自动 vcpkg install（manifest 模式，见 app/vcpkg.json）。
+rem 本地开发无需手动预装；CI 已显式 install（仅为 vcpkg_installed 缓存加速）会跳过此处。
+set "VCPKG_EXE=vcpkg"
+if exist "%VCPKG_ROOT%\vcpkg.exe" set "VCPKG_EXE=%VCPKG_ROOT%\vcpkg.exe"
 if not exist "%VCPKG_PREFIX%\include\libavformat\avformat.h" (
-    echo [build_windows] ERROR: FFmpeg headers not found ^(先执行 vcpkg install^)
-    exit /b 1
+    echo [build_windows] FFmpeg headers not found — 自动执行 vcpkg install ^(manifest 模式, triplet=%TRIPLET%^)...
+    pushd "%ROOT%.."
+    call "%VCPKG_EXE%" install --triplet "%TRIPLET%"
+    if errorlevel 1 (
+        echo [build_windows] ERROR: vcpkg install 失败
+        exit /b 1
+    )
+    popd
+    if not exist "%VCPKG_PREFIX%\include\libavformat\avformat.h" (
+        echo [build_windows] ERROR: vcpkg install 后仍缺 FFmpeg headers ^(检查 %VCPKG_PREFIX%^)
+        exit /b 1
+    )
 )
 
 rem =====================================================================
@@ -178,6 +195,21 @@ if not exist "%TRANS_SRC%" (
     exit /b 1
 )
 copy /y "%TRANS_SRC%" build\ >nul
+popd
+
+rem =====================================================================
+rem  7. vault：dotnet publish (NativeAOT 凭据保险库)
+rem =====================================================================
+echo [build_windows] ===== vault =====
+pushd "%ROOT%vault"
+if not exist build mkdir build
+dotnet publish src\Vault.csproj -c Release -r win-x64
+if errorlevel 1 exit /b 1
+copy /y "src\bin\Release\net9.0\win-x64\publish\archoera-vault.exe" build\ >nul
+if not exist "build\archoera-vault.exe" (
+    echo [build_windows] ERROR: archoera-vault.exe 未复制到 build/
+    exit /b 1
+)
 popd
 
 echo [build_windows] 全部模块构建完成

@@ -38,6 +38,12 @@ app/core/subsonic/transcoder/target/
 # downloader（Rust 下载器 cdylib）
 app/core/downloader/target/
 
+# vault（C# NativeAOT 凭据保险库；build*/ 由 build.sh / build-test.sh 产出）
+app/core/vault/build/
+app/core/vault/src/build/
+app/core/vault/src/bin/
+app/core/vault/src/obj/
+
 # 打包输出（packaging/linux/package*.sh 的中间暂存与最终产物）
 dist/
 packaging/linux/work/

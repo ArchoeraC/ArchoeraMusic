@@ -5,6 +5,8 @@
 /// 重启即失），保证库可独立运行。
 library;
 
+import 'dart:convert';
+
 /// 第三方音源账号会话（cookies）存储
 abstract class SessionStore {
   Map<String, String> get(String platform);
@@ -110,28 +112,57 @@ class _MemSessionStore implements SessionStore {
 
 class _MemLyricCacheStore implements LyricCacheStore {
   final _map = <String, Map<String, dynamic>?>{};
+  int _bytes = 0;
 
   @override
-  Map<String, dynamic>? get(String platform, String platformId) =>
-      _map['$platform:$platformId'];
+  Map<String, dynamic>? get(String platform, String platformId) {
+    final key = '$platform:$platformId';
+    final v = _map.remove(key);
+    if (v != null) _map[key] = v; // LRU 保活：重插使最近访问位于表尾
+    return _map[key];
+  }
 
   @override
-  void set(String platform, String platformId, Map<String, dynamic>? result) =>
-      _map['$platform:$platformId'] = result;
+  void set(String platform, String platformId, Map<String, dynamic>? result) {
+    final key = '$platform:$platformId';
+    final old = _map.remove(key);
+    if (old != null) _bytes -= _sizeOfLyric(old);
+    _map[key] = result;
+    _bytes += _sizeOfLyric(result);
+    _enforceLimit();
+  }
+
+  /// 超限按 LRU 淘汰（表头 = 最久未访问）。
+  void _enforceLimit() {
+    final limit = lyricCacheLimitBytes;
+    if (limit == null) return;
+    while (_bytes > limit && _map.isNotEmpty) {
+      final k = _map.keys.first;
+      _bytes -= _sizeOfLyric(_map.remove(k));
+    }
+  }
 
   @override
   int get count => _map.length;
 
   @override
-  void clear() => _map.clear();
+  void clear() {
+    _map.clear();
+    _bytes = 0;
+  }
 }
 
 class _MemMatchCacheStore implements LyricMatchCacheStore {
   final _map = <String, MatchedRecord>{};
+  int _bytes = 0;
 
   @override
-  MatchedRecord? get(String fingerprint, String platform) =>
-      _map['$fingerprint:$platform'];
+  MatchedRecord? get(String fingerprint, String platform) {
+    final key = '$fingerprint:$platform';
+    final v = _map.remove(key);
+    if (v != null) _map[key] = v; // LRU 保活
+    return _map[key];
+  }
 
   @override
   void set(
@@ -139,38 +170,89 @@ class _MemMatchCacheStore implements LyricMatchCacheStore {
     String platform,
     String platformId, [
     Map<String, dynamic>? extra,
-  ]) => _map['$fingerprint:$platform'] = MatchedRecord(
-    platformId: platformId,
-    extra: extra,
-  );
+  ]) {
+    final key = '$fingerprint:$platform';
+    final old = _map.remove(key);
+    if (old != null) _bytes -= 64;
+    _map[key] = MatchedRecord(platformId: platformId, extra: extra);
+    _bytes += 64;
+    _enforceLimit();
+  }
+
+  /// 超限按 LRU 淘汰（表头 = 最久未访问）。
+  void _enforceLimit() {
+    final limit = lyricMatchCacheLimitBytes;
+    if (limit == null) return;
+    while (_bytes > limit && _map.isNotEmpty) {
+      _map.remove(_map.keys.first);
+      _bytes -= 64;
+    }
+  }
 
   @override
   int get count => _map.length;
 
   @override
-  void clear() => _map.clear();
+  void clear() {
+    _map.clear();
+    _bytes = 0;
+  }
 }
 
 class _MemTtmlCacheStore implements LyricTtmlCacheStore {
   final _map = <String, String?>{};
+  int _bytes = 0;
 
   @override
   Object? get(String platform, String id) {
     final key = '$platform:$id';
+    final v = _map.remove(key);
+    if (v != null) _map[key] = v; // LRU 保活
     if (!_map.containsKey(key)) return lyricTtmlMiss;
     return _map[key];
   }
 
   @override
-  void set(String platform, String id, String? content) =>
-      _map['$platform:$id'] = content;
+  void set(String platform, String id, String? content) {
+    final key = '$platform:$id';
+    final old = _map.remove(key);
+    if (old != null) _bytes -= _sizeOfTtml(old);
+    _map[key] = content;
+    _bytes += _sizeOfTtml(content);
+    _enforceLimit();
+  }
+
+  /// 超限按 LRU 淘汰（表头 = 最久未访问）。
+  void _enforceLimit() {
+    final limit = lyricTtmlCacheLimitBytes;
+    if (limit == null) return;
+    while (_bytes > limit && _map.isNotEmpty) {
+      final k = _map.keys.first;
+      _bytes -= _sizeOfTtml(_map.remove(k));
+    }
+  }
 
   @override
   int get count => _map.length;
 
   @override
-  void clear() => _map.clear();
+  void clear() {
+    _map.clear();
+    _bytes = 0;
+  }
 }
+
+/// 歌词缓存上限（字节）；null = 无上限。由主程序按偏好设置。
+int? lyricCacheLimitBytes;
+int? lyricMatchCacheLimitBytes;
+int? lyricTtmlCacheLimitBytes;
+
+/// 歌词内容近似字节数：JSON 字符数（UTF-8 近似，含中文按多字节偏保守）。
+int _sizeOfLyric(Map<String, dynamic>? v) =>
+    v == null ? 0 : jsonEncode(v).length;
+
+/// TTML 文本近似字节数：UTF-16 码元数 × 2。
+int _sizeOfTtml(String? v) => v == null ? 0 : v.length * 2;
 
 ApisRuntime _runtime = ApisRuntime();
 

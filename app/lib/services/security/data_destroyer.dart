@@ -1,7 +1,8 @@
 /// 敏感数据安全销毁（对齐「不可逆覆盖写入并删除」语义）。
 ///
 /// 提供本机含账号凭据的敏感文件清单与不可逆擦除：
-/// - 流媒体服务器凭据（`streaming_servers.json`，明文密码 / accessToken）
+/// - 流媒体服务器凭据（`streaming_servers.json`，password/accessToken 已由
+///   凭据保险库接管，文件仅存非敏感字段；此文件擦除用于清空服务器列表）
 /// - 第三方账号会话（`netease_session.json`，网易云 cookies + 酷狗 token）
 /// - 本地用户库（`user.db`，Subsonic 账号与收藏）
 ///
@@ -48,11 +49,18 @@ class ShredResult {
   final int bytes;
 }
 
-/// 流媒体服务器凭据文件（明文 password / accessToken）。
+/// 流媒体服务器凭据文件（password/accessToken 经凭据保险库加密存储，
+/// 本文件仅含非敏感字段；擦除用于清空服务器列表，凭据随 vault 一并失效）。
 String streamingServersPath() => '${resolveDataDir()}/streaming_servers.json';
 
 /// 第三方账号会话文件（网易云 cookies + 酷狗 token，明文 JSON）。
+/// 新版已由凭据保险库（vault）接管，此文件仅存历史明文用于迁移/兜底清理。
 String sessionStorePath() => '${resolveDataDir()}/netease_session.json';
+
+/// 凭据保险库文件（AES-256-GCM 密文 + K_vault 份额；主密钥 2-of-2 拆分，
+/// 授权侧份额存 OS 安全存储）。销毁会话须连 [VaultProcess.destroy] 一并
+/// 清除 OS 份额，仅删文件不足以失效。
+String vaultFilePath() => '${resolveDataDir()}/credentials.vault';
 
 /// 本地 Subsonic 用户库（与 Go 侧 DefaultUserDBPath 同目录推导）。
 String userDbPath() => '${resolveDataDir()}/database/user.db';

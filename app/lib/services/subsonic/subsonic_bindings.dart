@@ -1,15 +1,16 @@
 /// archoera_subsonic FFI 绑定（Go c-shared 服务端库）。
 ///
-/// 定位、加载 libarchoera_subsonic.{so,dylib,dll}（与 scraper 相同的
-/// ancestors 查找模式：exe 祖先链找 `subsonic/build/`，dev 兜底
-/// `cwd/core/subsonic/build`）。产物由 app/core/subsonic/build.sh 构建
-/// （go build -buildmode=c-shared，含 Rust 转码器 dlopen 依赖）。
+/// 定位、加载 libarchoera_subsonic.{so,dylib,dll}（统一走 [NativeLibPaths]，
+/// ancestors 查找 + dev 兜底模式，见 native_lib_paths.dart）。产物由
+/// app/core/subsonic/build.sh 构建（go build -buildmode=c-shared，含 Rust
+/// 转码器 dlopen 依赖）。
 library;
 
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+
+import '../native_lib_paths.dart';
 
 typedef SubsonicCreateNative = IntPtr Function(Pointer<Utf8> configJson);
 typedef SubsonicCreateDart = int Function(Pointer<Utf8> configJson);
@@ -114,29 +115,8 @@ class SubsonicBindings {
     return DynamicLibrary.open(path);
   }
 
-  /// 查找共享库路径：Platform.resolvedExecutable 祖先链逐级找 `subsonic/build/`；
-  /// 未命中回退 dev 兜底 `cwd/core/subsonic/build/`。
+  /// 查找共享库路径：统一走 [NativeLibPaths]（祖先链 + dev 兜底）。
   static String? resolveSoPath() {
-    final fileName = Platform.isWindows
-        ? 'archoera_subsonic.dll'
-        : Platform.isMacOS
-        ? 'libarchoera_subsonic.dylib'
-        : 'libarchoera_subsonic.so';
-
-    // 1) bundle：exe 祖先链找 subsonic/build/
-    var dir = File(Platform.resolvedExecutable).parent;
-    for (var i = 0; i < 8; i++) {
-      final candidate = File('${dir.path}/subsonic/build/$fileName');
-      if (candidate.existsSync()) return candidate.absolute.path;
-      dir = dir.parent;
-    }
-
-    // 2) dev 兜底：flutter run 的 cwd 为 app/ → app/core/subsonic/build/
-    final fromCwd = File(
-      '${Directory.current.path}/core/subsonic/build/$fileName',
-    );
-    if (fromCwd.existsSync()) return fromCwd.absolute.path;
-
-    return null;
+    return NativeLibPaths.resolve(NativeModule.subsonic);
   }
 }

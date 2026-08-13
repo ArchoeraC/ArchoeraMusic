@@ -32,25 +32,12 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Build audio-engine (C + Rust tempo)
-        run: |
-          cmake -S app/core/audio-engine -B app/core/audio-engine/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build app/core/audio-engine/build -j"$(sysctl -n hw.ncpu)"
-
-      - name: Build scraper (C++; openssl keg-only 需 CMAKE_PREFIX_PATH)
-        run: |
-          export CMAKE_PREFIX_PATH="/opt/homebrew/opt/openssl"
-          cmake -S app/core/scraper -B app/core/scraper/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build app/core/scraper/build -j"$(sysctl -n hw.ncpu)"
-
-      - name: Build scanner (C# NativeAOT)
-        run: bash app/core/scanner/build.sh osx-arm64
-
-      - name: Build downloader (Rust cdylib)
-        run: cargo build --release --manifest-path app/core/downloader/Cargo.toml
-
-      - name: Build subsonic (Go + Rust transcoder)
-        run: bash app/core/subsonic/build.sh
+      - name: Build native modules (macOS 一站式脚本)
+        # 统一入口 app/core/build-macos.sh，收敛 audio-engine / scraper /
+        # scanner / vault / downloader / subsonic 全部原生模块编译：
+        # 本地开发与 CI 共用同一入口，逻辑改动只落一处（对齐 build_windows.bat）。
+        # 依赖由上方步骤提前安装，脚本只做编译引导。
+        run: bash app/core/build-macos.sh osx-arm64
 
       - name: Flutter pub get
         working-directory: app
@@ -69,6 +56,25 @@ jobs:
         # 工程 Release 配置已用 ad-hoc 签名（CODE_SIGN_IDENTITY = "-"），CI 无需证书；
         # 现行 Flutter 的 build macos 不再支持 --no-codesign，去掉即可。
         run: flutter build macos --release
+
+      - name: Bundle native libs into .app (native/ 平铺)
+        # macOS 无 CMake install 层（Flutter macOS 走 Xcode），FFI 库须在此显式拷入
+        # .app/Contents/native/（NativeLibPaths 祖先链从 exe 向上第 2 级 Contents 命中）。
+        # 与 linux/windows 的 bundle/native/ 平铺布局对齐（ffi-libs-layout 计划）。
+        run: |
+          set -euo pipefail
+          APP="app/build/macos/Build/Products/Release/archoera_music.app"
+          NATIVE="$APP/Contents/native"
+          mkdir -p "$NATIVE"
+          cp app/core/audio-engine/build/archoera-audio-engine "$NATIVE/" || true
+          cp app/core/audio-engine/build/*.dylib "$NATIVE/"
+          cp app/core/scanner/build/*.dylib "$NATIVE/"
+          cp app/core/scraper/build/*.dylib "$NATIVE/"
+          cp app/core/subsonic/build/*.dylib "$NATIVE/"
+          cp app/core/downloader/target/release/libarchoera_downloader.dylib "$NATIVE/"
+          cp app/core/vault/build/archoera-vault "$NATIVE/"
+          echo "native/ 内容:"
+          ls -la "$NATIVE"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

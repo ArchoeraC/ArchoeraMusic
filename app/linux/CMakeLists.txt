@@ -207,16 +207,16 @@ endif()
 
 # === ArchoeraMusic 原生产物打包（FFI 直连，降低运行时依赖）===
 # 引擎模块位于 app/core/{audio-engine,scanner,scraper,subsonic}（app 内部，路径关系固定，
-# 可随 app 独立部署），产物直接引用模块自身 build 目录，无需 cp：
-#   bundle/audio-engine/build/{archoera-audio-engine,libarchoera_mediaengine.so,libfft.so}
-#   bundle/scanner/build/{scanner-ffi.so,libe_sqlite3.so}
-#   bundle/scraper/build/{libarchoera_scraper.so}
-#   bundle/subsonic/build/{libarchoera_subsonic.so,libarchoera_transcoder.so}
-#   bundle/core/downloader/target/{release,debug}/libarchoera_downloader.so
-#     （downloader 为 cargo crate，按 target 目录镜像安装；downloader_ffi.dart
-#       从可执行文件父目录沿 core/downloader/target/{release,debug} 逐级查找）
+# 可随 app 独立部署），产物统一安装进 bundle/native/ 平铺（对齐 ffi-libs-layout 计划；
+# NativeLibPaths 祖先链优先查 native/，随后回退旧 <module>/build 布局）：
+#   bundle/native/{archoera-audio-engine,libarchoera_mediaengine.so,libfft.so}
+#   bundle/native/{scanner-ffi.so,libe_sqlite3.so}
+#   bundle/native/{libarchoera_scraper.so}
+#   bundle/native/{libarchoera_subsonic.so,libarchoera_transcoder.so}
+#   bundle/native/{archoera-vault}
+#   bundle/native/libarchoera_downloader.so
 # 产物由独立构建链产出（audio-engine/scraper: cmake; scanner: dotnet publish;
-# subsonic: build.sh 即 cargo + go）。
+# subsonic: build.sh 即 cargo + go；downloader: cargo）。
 # OPTIONAL：源产物缺失时跳过（如未构建 subsonic 仍可跑 Flutter 构建）。
 set(ENGINE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine/build")
 set(SCANNER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/scanner/build")
@@ -224,26 +224,31 @@ set(SCRAPER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/scraper/build")
 set(SUBSONIC_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/subsonic/build")
 
 install(PROGRAMS "${ENGINE_SRC_DIR}/archoera-audio-engine"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/audio-engine/build" COMPONENT Runtime OPTIONAL)
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${ENGINE_SRC_DIR}/libarchoera_mediaengine.so"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/audio-engine/build" COMPONENT Runtime OPTIONAL)
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${ENGINE_SRC_DIR}/libfft.so"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/audio-engine/build" COMPONENT Runtime OPTIONAL)
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/scanner-ffi.so"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/scanner/build" COMPONENT Runtime OPTIONAL)
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/libe_sqlite3.so"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/scanner/build" COMPONENT Runtime OPTIONAL)
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCRAPER_SRC_DIR}/libarchoera_scraper.so"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/scraper/build" COMPONENT Runtime OPTIONAL)
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_subsonic.so"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/subsonic/build" COMPONENT Runtime OPTIONAL)
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_transcoder.so"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/subsonic/build" COMPONENT Runtime OPTIONAL)
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+
+# vault（凭据保险库）：NativeAOT 可执行（dotnet publish，见 core/vault/build.sh），
+# 随包分发供 Dart 按需 spawn（凭据加解密 2-of-2；OS 授权份额存系统密钥环）。
+# 独立构建链产出（与 scanner 一致），缺失时跳过（会话降级为内存持久化）。
+set(VAULT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/vault/build")
+install(PROGRAMS "${VAULT_SRC_DIR}/archoera-vault"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 
 # downloader：产物由上方内嵌 cargo 构建链保证产出，镜像进 bundle 的
-# core/downloader/target/{debug|release}（路径对齐 downloader_ffi.dart 的
-# ancestors 查找：release 优先、debug 兜底，bundle 每次 install 前清空，
-# 因此 bundle 内只存在本次构建模式的目录，FFI 查找必然命中）。
+# native/（与其余 FFI 库平铺；NativeLibPaths 祖先链优先查 native/）。
 install(FILES "${DOWNLOADER_TARGET_DIR}/${DOWNLOADER_LIB_NAME}"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/core/downloader/target/${DOWNLOADER_MODE_DIR}"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native"
   COMPONENT Runtime)

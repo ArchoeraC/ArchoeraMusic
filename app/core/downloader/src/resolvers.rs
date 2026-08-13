@@ -186,14 +186,21 @@ async fn kg_register_device(client: &reqwest::Client, mid: &str) -> Result<Strin
         reqwest::header::HeaderValue::from_static("text/plain;charset=utf-8"),
     );
 
-    let resp = client
-        .post(&url)
-        .headers(headers)
-        .body(cipher)
-        .send()
-        .await
-        .map_err(|e| anyhow!("register_dev HTTP 失败: {e}"))?;
-    let bytes = resp.bytes().await.map_err(|e| anyhow!("register_dev 读响应失败: {e}"))?;
+    crate::request_pacing().await;
+    let resp = match client.post(&url).headers(headers).body(cipher).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            crate::failure_backoff().await;
+            return Err(anyhow!("register_dev HTTP 失败: {e}"));
+        }
+    };
+    let bytes = match resp.bytes().await {
+        Ok(b) => b,
+        Err(e) => {
+            crate::failure_backoff().await;
+            return Err(anyhow!("register_dev 读响应失败: {e}"));
+        }
+    };
 
     use base64::Engine;
     let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
@@ -208,7 +215,10 @@ async fn kg_register_device(client: &reqwest::Client, mid: &str) -> Result<Strin
         .and_then(|v| v.as_str())
         .map(str::to_string);
     match dfid {
-        Some(d) if !d.is_empty() => Ok(d),
+        Some(d) if !d.is_empty() => {
+            crate::reset_failures();
+            Ok(d)
+        }
         _ => bail!("register_dev 未返回 dfid: {text}"),
     }
 }
@@ -281,19 +291,41 @@ async fn kg_song_url(
             .unwrap_or_else(|_| reqwest::header::HeaderValue::from_static("-")),
     );
 
-    let resp = client
-        .get(&url)
-        .headers(headers)
-        .send()
-        .await
-        .map_err(|e| KgUrlError { needs_dfid_refresh: false, is_paywall: false, msg: format!("v5/url HTTP 失败: {e}") })?;
+    crate::request_pacing().await;
+    let resp = match client.get(&url).headers(headers).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            crate::failure_backoff().await;
+            return Err(KgUrlError {
+                needs_dfid_refresh: false,
+                is_paywall: false,
+                msg: format!("v5/url HTTP 失败: {e}"),
+            });
+        }
+    };
     let status = resp.status();
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| KgUrlError { needs_dfid_refresh: false, is_paywall: false, msg: format!("v5/url 读响应失败: {e}") })?;
-    let body: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| KgUrlError { needs_dfid_refresh: false, is_paywall: false, msg: format!("v5/url 响应非 JSON (HTTP {status}): {e}") })?;
+    let text = match resp.text().await {
+        Ok(t) => t,
+        Err(e) => {
+            crate::failure_backoff().await;
+            return Err(KgUrlError {
+                needs_dfid_refresh: false,
+                is_paywall: false,
+                msg: format!("v5/url 读响应失败: {e}"),
+            });
+        }
+    };
+    let body: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(v) => v,
+        Err(e) => {
+            crate::failure_backoff().await;
+            return Err(KgUrlError {
+                needs_dfid_refresh: false,
+                is_paywall: false,
+                msg: format!("v5/url 响应非 JSON (HTTP {status}): {e}"),
+            });
+        }
+    };
 
     let code = body.get("status").and_then(|v| v.as_i64()).unwrap_or(0);
     match code {
@@ -312,6 +344,7 @@ async fn kg_song_url(
                 "Kugou v5/url status=1 命中: quality={quality_param} url={}...",
                 first.chars().take(90).collect::<String>()
             );
+            crate::reset_failures();
             Ok(ResolvedUrl {
                 url: first,
                 quality_key: quality_param_to_key(quality_param),
@@ -497,9 +530,13 @@ pub(crate) fn build_netease_cookie(user_cookie: Option<&str>) -> String {
         }
     }
     let now = now_secs() * 1000;
+    // 设备指纹（Dart 注入）：优先注入值，其次用户 cookie，最后进程随机。
+    // 对齐 downloader-identity-plan §3.1：同一用户指纹跨会话稳定。
+    let ident = crate::downloader_identity();
     let ntes_nuid = c
         .get("_ntes_nuid")
         .cloned()
+        .or(ident.nm_nuid)
         .unwrap_or_else(|| rand_hex_bytes(16));
     let ntes_nnid = c
         .get("_ntes_nnid")
@@ -509,7 +546,7 @@ pub(crate) fn build_netease_cookie(user_cookie: Option<&str>) -> String {
         .get("WNMCID")
         .cloned()
         .unwrap_or_else(|| format!("{}.{now}.01.0", rand_letters(6)));
-    let device_id = c.get("deviceId").cloned().unwrap_or_else(|| {
+    let device_id = c.get("deviceId").cloned().or(ident.nm_device_id).unwrap_or_else(|| {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         (0..26)
@@ -524,7 +561,13 @@ pub(crate) fn build_netease_cookie(user_cookie: Option<&str>) -> String {
         ("_ntes_nnid".into(), ntes_nnid),
         ("WNMCID".into(), wnmcid),
         ("WEVNSM".into(), "1.0.0".into()),
-        ("osver".into(), "Microsoft-Windows-10-Professional-build-19045-64bit".into()),
+        // osver 优先用注入的真实系统版本（消除全用户共享「Win10 19045」群体指纹）
+        (
+            "osver".into(),
+            ident
+                .osver
+                .unwrap_or_else(|| "Microsoft-Windows-10-Professional-build-19045-64bit".to_string()),
+        ),
         ("deviceId".into(), device_id),
         ("os".into(), "pc".into()),
         ("channel".into(), "netease".into()),
@@ -560,7 +603,8 @@ async fn nm_download_url(
     log::debug!("Netease download/url 请求: id={platform_id} level={level} 带cookie={}字符", cookie_header.len());
     let (params, enc_sec_key) = nm::weapi_encrypt(&data);
 
-    let resp = client
+    crate::request_pacing().await;
+    let resp = match client
         .post(NM_WEAPI_URL)
         .header("Referer", NM_DOMAIN)
         .header("User-Agent", NM_WEAPI_UA)
@@ -571,12 +615,21 @@ async fn nm_download_url(
         ])
         .send()
         .await
-        .map_err(|e| anyhow!("netease weapi HTTP 失败: {e}"))?;
+    {
+        Ok(r) => r,
+        Err(e) => {
+            crate::failure_backoff().await;
+            return Err(anyhow!("netease weapi HTTP 失败: {e}"));
+        }
+    };
     let status = resp.status();
-    let body: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| anyhow!("netease weapi 响应解析失败 (HTTP {status}): {e}"))?;
+    let body: serde_json::Value = match resp.json().await {
+        Ok(v) => v,
+        Err(e) => {
+            crate::failure_backoff().await;
+            return Err(anyhow!("netease weapi 响应解析失败 (HTTP {status}): {e}"));
+        }
+    };
 
     let code = body.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
     if code != 200 {
@@ -600,6 +653,7 @@ async fn nm_download_url(
         size,
         url.chars().take(80).collect::<String>()
     );
+    crate::reset_failures();
     Ok(Some(ResolvedUrl {
         url,
         quality_key: level_to_key(level),
@@ -645,7 +699,8 @@ async fn nm_player_url(
     log::debug!("Netease player/url 请求: id={platform_id} level={level} 带cookie={}字符", cookie_header.len());
     let (params, enc_sec_key) = nm::weapi_encrypt(&data);
 
-    let resp = client
+    crate::request_pacing().await;
+    let resp = match client
         .post(NM_PLAYER_URL)
         .header("Referer", NM_DOMAIN)
         .header("User-Agent", NM_WEAPI_UA)
@@ -656,12 +711,21 @@ async fn nm_player_url(
         ])
         .send()
         .await
-        .map_err(|e| anyhow!("netease weapi 播放 URL HTTP 失败: {e}"))?;
+    {
+        Ok(r) => r,
+        Err(e) => {
+            crate::failure_backoff().await;
+            return Err(anyhow!("netease weapi 播放 URL HTTP 失败: {e}"));
+        }
+    };
     let status = resp.status();
-    let body: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| anyhow!("netease weapi 播放 URL 响应解析失败 (HTTP {status}): {e}"))?;
+    let body: serde_json::Value = match resp.json().await {
+        Ok(v) => v,
+        Err(e) => {
+            crate::failure_backoff().await;
+            return Err(anyhow!("netease weapi 播放 URL 响应解析失败 (HTTP {status}): {e}"));
+        }
+    };
 
     let code = body.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
     if code != 200 {
@@ -698,6 +762,7 @@ async fn nm_player_url(
         size,
         url.chars().take(80).collect::<String>()
     );
+    crate::reset_failures();
     Ok(Some(ResolvedUrl {
         url,
         quality_key: level_to_key(level),

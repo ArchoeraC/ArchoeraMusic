@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../apis/runtime.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/l10n.dart';
 import '../services/power/power_saver.dart';
@@ -10,9 +11,15 @@ import '../theme/app_theme.dart';
 import '../theme/cover_color.dart';
 import '../widgets/common/app_shortcuts.dart';
 import '../widgets/common/toast.dart';
+import '../widgets/common/vault_crash_gate.dart';
+import '../widgets/common/vault_unlock_gate.dart';
+import '../widgets/common/vault_version_gate.dart';
 import 'bootstrap.dart';
 import 'router.dart';
 import 'theme_provider.dart';
+
+/// 无上限哨兵：ImageCache.maximumSizeBytes 设为该值 ≈ 仅受张数约束。
+const _noLimitBytes = 1 << 60;
 
 /// ArchoeraMusic 应用根：主题 + 路由 + 启动门。
 ///
@@ -46,9 +53,26 @@ class ArchoeraMusicApp extends ConsumerWidget {
     final fontFamily = prefs.fontFamily;
     // 性能模式：全局关闭动效（隐式 Animated* 系列自动 0 时长）+ 频谱关闭。
     final performanceMode = prefs.performanceMode;
+    // 缓存上限动态应用（设置变更实时生效，幂等）：
+    // - 封面图片 ImageCache 字节上限按偏好（null = 无上限 → 仅张数约束）
+    // - 歌词/匹配/TTML 内存缓存字节上限注入 runtime（null = 无上限）
+    final imageCache = PaintingBinding.instance.imageCache;
+    final imageLimit = prefs.imageCacheLimitMiB;
+    imageCache
+      ..maximumSize = 1000
+      ..maximumSizeBytes = imageLimit == null
+          ? _noLimitBytes
+          : imageLimit * 1024 * 1024;
+    final lyricLimitBytes = prefs.lyricCacheLimitMiB == null
+        ? null
+        : prefs.lyricCacheLimitMiB! * 1024 * 1024;
+    lyricCacheLimitBytes = lyricLimitBytes;
+    lyricMatchCacheLimitBytes = lyricLimitBytes;
+    lyricTtmlCacheLimitBytes = lyricLimitBytes;
     return PowerSaverHost(
       child: AuthBootstrap(
-        child: MaterialApp.router(
+        child: VaultCrashGate(
+          child: MaterialApp.router(
           title: 'ArchoeraMusic',
           // 国际化：locale 跟随设置/系统；Material 内建文案（菜单/日期等）自动本地化
           locale: locale,
@@ -85,6 +109,12 @@ class ArchoeraMusicApp extends ConsumerWidget {
             Widget gate = SplashGate(
               child: AppShortcuts(child: ToastOverlay(child: appChild)),
             );
+            // v2 口令模式启动解锁门：vault 待口令解锁时全屏拦截，
+            // 解锁成功后放行（登录态恢复见解锁门内部）。无 vault 时直通。
+            gate = VaultUnlockGate(child: gate);
+            // vault 版本异常门（fail-closed）：握手发现非官方构建 → 副本已删、
+            // 解密已拒，全屏仅允许退出（置于最外层，任何状态都先过本门）。
+            gate = VaultVersionGate(child: gate);
             if (performanceMode) {
               gate = MediaQuery(
                 data: MediaQuery.of(context).copyWith(disableAnimations: true),
@@ -93,6 +123,7 @@ class ArchoeraMusicApp extends ConsumerWidget {
             }
             return gate;
           },
+          ),
         ),
       ),
     );

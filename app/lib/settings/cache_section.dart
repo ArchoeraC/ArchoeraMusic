@@ -1,10 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../apis/runtime.dart';
 import '../../l10n/l10n.dart';
+import '../../services/cache/song_cache.dart';
 import '../../services/liked/liked_cache.dart';
+import '../../stores/app_prefs.dart';
 import '../../widgets/common/toast.dart';
 import '../../widgets/dialogs/s_dialog.dart';
 import '../../widgets/player/s_controls.dart';
@@ -15,19 +18,21 @@ import 'settings_widgets.dart';
 ///
 /// 本项目实际可管理的缓存：
 /// - **磁盘（SQLite）**：「我喜欢」列表缓存 [LikedCacheStore]（liked.db）
+/// - **磁盘（文件）**：歌曲磁盘缓存 [SongCache]（流媒体歌曲文件级缓存，
+///   开关 + MiB 上限在面板顶部）
 /// - **内存（进程内）**：歌词内容 / 歌词匹配 / TTML 歌词缓存
 ///   （apis runtime 注入的进程内缓存，重启即失）与封面图片缓存
 ///   （Flutter [ImageCache]）
 ///
 /// 曲库 library.db / 历史 history.db / 账号 user.db 属用户数据，不在此列。
-class CacheSection extends StatefulWidget {
+class CacheSection extends ConsumerStatefulWidget {
   const CacheSection({super.key});
 
   @override
-  State<CacheSection> createState() => _CacheSectionState();
+  ConsumerState<CacheSection> createState() => _CacheSectionState();
 }
 
-class _CacheSectionState extends State<CacheSection> {
+class _CacheSectionState extends ConsumerState<CacheSection> {
   int _likedRows = 0;
   int _likedBytes = 0;
   int _lyricCount = 0;
@@ -35,6 +40,8 @@ class _CacheSectionState extends State<CacheSection> {
   int _ttmlCount = 0;
   int _imageBytes = 0;
   int _imageLive = 0;
+  int _songBytes = 0;
+  int _songFiles = 0;
 
   @override
   void initState() {
@@ -42,11 +49,12 @@ class _CacheSectionState extends State<CacheSection> {
     _refresh();
   }
 
-  /// 重算各缓存统计（同步：SQLite COUNT + 内存 map 计数 + ImageCache 字节）。
+  /// 重算各缓存统计（同步：SQLite COUNT + 文件扫描 + 内存 map 计数 + ImageCache 字节）。
   void _refresh() {
     final store = LikedCacheStore.shared;
     final file = File(LikedCacheStore.defaultDbPath());
     final imageCache = PaintingBinding.instance.imageCache;
+    final songStats = SongCache.shared.stats();
     setState(() {
       _likedRows = store.rowCount();
       _likedBytes = file.existsSync() ? file.lengthSync() : 0;
@@ -55,6 +63,8 @@ class _CacheSectionState extends State<CacheSection> {
       _ttmlCount = getRuntime().lyricTtmlCache.count;
       _imageBytes = imageCache.currentSize;
       _imageLive = imageCache.liveImageCount;
+      _songBytes = songStats.$1;
+      _songFiles = songStats.$2;
     });
   }
 
@@ -63,7 +73,8 @@ class _CacheSectionState extends State<CacheSection> {
       _lyricCount > 0 ||
       _matchCount > 0 ||
       _ttmlCount > 0 ||
-      _imageBytes > 0;
+      _imageBytes > 0 ||
+      _songFiles > 0;
 
   /// 二次确认后执行清除（对齐 SPlayer-Next：破坏性操作一律确认）。
   Future<void> _confirmClear(
@@ -103,8 +114,43 @@ class _CacheSectionState extends State<CacheSection> {
 
   void _clearLiked() => LikedCacheStore.shared.clearAll();
 
+  /// 缓存上限开关：开启 → 按最小值立即生效；关闭（= 无上限）→ 弹窗
+  /// 警告内存占用风险，确认后才真正写入（用户明确知情）。
+  Future<void> _onLimitToggle(
+    BuildContext context, {
+    required bool enabled,
+    required VoidCallback onEnable,
+    required VoidCallback onDisable,
+  }) async {
+    if (enabled) {
+      onEnable(); // 默认以最小值打开
+      return;
+    }
+    final l10n = context.l10n;
+    final ok = await SDialog.show<bool>(
+      context,
+      title: l10n.settingsCacheNoLimitConfirmTitle,
+      description: l10n.settingsCacheNoLimitConfirmDesc,
+      child: const SizedBox.shrink(),
+      actions: [
+        SButton(
+          label: l10n.commonCancel,
+          variant: SButtonVariant.secondary,
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        SButton(
+          label: l10n.settingsCacheNoLimitConfirm,
+          variant: SButtonVariant.error,
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
+    );
+    if (ok == true) onDisable();
+  }
+
   void _clearAll() {
     _clearLiked();
+    SongCache.shared.clear();
     getRuntime().lyricCache.clear();
     getRuntime().lyricMatchCache.clear();
     getRuntime().lyricTtmlCache.clear();
@@ -146,9 +192,62 @@ class _CacheSectionState extends State<CacheSection> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final likedPath = LikedCacheStore.defaultDbPath();
+    final prefs = ref.watch(appPrefsProvider);
+    final notifier = ref.read(appPrefsProvider.notifier);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 歌曲磁盘缓存：开关 + 上限（MiB）+ 统计/清除
+        SettingSection(
+          title: l10n.settingsSongCache,
+          note: l10n.settingsSongCacheNote,
+          children: [
+            SettingSwitchTile(
+              icon: prefs.songCacheEnabled
+                  ? Icons.offline_pin
+                  : Icons.offline_pin_outlined,
+              title: l10n.settingsSongCache,
+              subtitle: prefs.songCacheEnabled
+                  ? l10n.settingsSongCacheOn
+                  : l10n.settingsSongCacheOff,
+              value: prefs.songCacheEnabled,
+              onChanged: notifier.setSongCacheEnabled,
+            ),
+            if (prefs.songCacheEnabled)
+              SettingSliderTile(
+                icon: Icons.storage_outlined,
+                title: l10n.settingsSongCacheLimitTitle,
+                subtitle:
+                    '${prefs.songCacheLimitMiB} MiB · ${_formatBytes(prefs.songCacheLimitMiB * 1024 * 1024)}',
+                value: prefs.songCacheLimitMiB.toDouble(),
+                min: songCacheLimitMinMiB.toDouble(),
+                max: songCacheLimitMaxMiB.toDouble(),
+                divisions:
+                    (songCacheLimitMaxMiB - songCacheLimitMinMiB) ~/
+                    songCacheLimitStepMiB,
+                label: '${prefs.songCacheLimitMiB} MiB',
+                onChanged: (v) => notifier.setSongCacheLimitMiB(v.round()),
+              ),
+            _cacheRow(
+              context,
+              icon: Icons.audiotrack_outlined,
+              title: l10n.settingsSongCache,
+              info:
+                  '${_formatBytes(_songBytes)} · ${l10n.settingsCacheSongs(_songFiles)}',
+              enabled: _songFiles > 0,
+              onClear: () => _confirmClear(
+                context,
+                title: l10n.settingsCacheClearConfirmTitle(
+                  l10n.settingsSongCache,
+                ),
+                desc: l10n.settingsCacheClearConfirmDesc,
+                confirmLabel: l10n.settingsCacheClear,
+                toastMsg: l10n.toastCacheCleared(l10n.settingsSongCache),
+                action: () => SongCache.shared.clear(),
+              ),
+            ),
+          ],
+        ),
         // 操作行：刷新统计 + 一键清空
         SettingSection(
           title: l10n.settingsSectionCache,
@@ -215,6 +314,64 @@ class _CacheSectionState extends State<CacheSection> {
         SettingSection(
           title: l10n.settingsCacheGroupMem,
           children: [
+            // 歌词缓存上限（默认最小值开启；关闭 = 无上限，弹窗警告）
+            SettingSwitchTile(
+              icon: Icons.data_usage_outlined,
+              title: l10n.settingsCacheLimitLyric,
+              subtitle: prefs.lyricCacheLimitMiB == null
+                  ? l10n.settingsCacheLimitUnlimited
+                  : '${prefs.lyricCacheLimitMiB} MiB',
+              value: prefs.lyricCacheLimitMiB != null,
+              onChanged: (v) => _onLimitToggle(
+                context,
+                enabled: v,
+                onEnable: () =>
+                    notifier.setLyricCacheLimitMiB(lyricCacheLimitMinMiB),
+                onDisable: () => notifier.setLyricCacheLimitMiB(0),
+              ),
+            ),
+            if (prefs.lyricCacheLimitMiB != null)
+              SettingSliderTile(
+                icon: Icons.tune,
+                title: l10n.settingsCacheLimitLyric,
+                subtitle: '${prefs.lyricCacheLimitMiB} MiB',
+                value: prefs.lyricCacheLimitMiB!.toDouble(),
+                min: lyricCacheLimitMinMiB.toDouble(),
+                max: lyricCacheLimitMaxMiB.toDouble(),
+                divisions: lyricCacheLimitMaxMiB - lyricCacheLimitMinMiB,
+                label: '${prefs.lyricCacheLimitMiB} MiB',
+                onChanged: (v) => notifier.setLyricCacheLimitMiB(v.round()),
+              ),
+            // 封面图片缓存上限（默认最小值开启；关闭 = 无上限，弹窗警告）
+            SettingSwitchTile(
+              icon: Icons.photo_library_outlined,
+              title: l10n.settingsCacheLimitCover,
+              subtitle: prefs.imageCacheLimitMiB == null
+                  ? l10n.settingsCacheLimitUnlimited
+                  : '${prefs.imageCacheLimitMiB} MiB',
+              value: prefs.imageCacheLimitMiB != null,
+              onChanged: (v) => _onLimitToggle(
+                context,
+                enabled: v,
+                onEnable: () =>
+                    notifier.setImageCacheLimitMiB(imageCacheLimitMinMiB),
+                onDisable: () => notifier.setImageCacheLimitMiB(0),
+              ),
+            ),
+            if (prefs.imageCacheLimitMiB != null)
+              SettingSliderTile(
+                icon: Icons.tune,
+                title: l10n.settingsCacheLimitCover,
+                subtitle: '${prefs.imageCacheLimitMiB} MiB',
+                value: prefs.imageCacheLimitMiB!.toDouble(),
+                min: imageCacheLimitMinMiB.toDouble(),
+                max: imageCacheLimitMaxMiB.toDouble(),
+                divisions:
+                    (imageCacheLimitMaxMiB - imageCacheLimitMinMiB) ~/
+                    imageCacheLimitStepMiB,
+                label: '${prefs.imageCacheLimitMiB} MiB',
+                onChanged: (v) => notifier.setImageCacheLimitMiB(v.round()),
+              ),
             _cacheRow(
               context,
               icon: Icons.lyrics_outlined,

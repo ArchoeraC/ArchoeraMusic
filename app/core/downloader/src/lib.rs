@@ -9,12 +9,13 @@
 // ============================================================
 
 pub mod crypto;
+pub mod memsec;
 pub mod metadata;
 pub mod models;
 pub mod resolvers;
 pub mod tag;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::PathBuf;
@@ -27,8 +28,10 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::runtime::Handle;
+use zeroize::Zeroizing;
 
 use crate::crypto::kugou as kg;
+use crate::memsec::MlockSecret;
 use crate::models::*;
 use crate::resolvers::{KugouResolver, NeteaseResolver, PlatformUrlResolver};
 
@@ -37,12 +40,33 @@ use crate::resolvers::{KugouResolver, NeteaseResolver, PlatformUrlResolver};
 // ============================================================
 
 struct KugouState {
-    /// 进程级设备 mid（init 时生成：kg_calc_mid(kg_random_string(16))）
+    /// 设备 mid（init 随机生成；`archoera_downloader_set_identity` 注入后优先用注入值）
     mid: Option<String>,
     /// 真实 dfid（register_dev 获取；status=2 时置 None 触发重注册）
     dfid: Option<String>,
-    userid: String,
-    token: String,
+    /// 登录凭据（mlock 防 swap + zeroize 防残留；重赋值/登出自动清零）
+    userid: MlockSecret,
+    token: MlockSecret,
+}
+
+/// 下载器设备指纹（Dart 首次启动生成、prefs 持久化、FFI 注入）。
+///
+/// 隔离「全用户共享同一指纹」的群体风控聚类：不同用户 → 不同指纹；
+/// 同一用户 → 指纹跨会话稳定（首次生成后不变）。字段全可空：
+/// 未注入时回落进程随机（对齐 downloader-identity-plan §3.1）。
+#[derive(Default, Clone, Debug, serde::Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct DownloaderIdentity {
+    /// 酷狗 guid（随机 16 位大写字母数字）
+    kg_guid: Option<String>,
+    /// 酷狗 mid（= kg_calc_mid(kg_guid)；缺省时由 kg_guid 推导）
+    kg_mid: Option<String>,
+    /// 网易 deviceId（26 位大写 hex）
+    nm_device_id: Option<String>,
+    /// 网易 _ntes_nuid（32 位小写 hex）
+    nm_nuid: Option<String>,
+    /// 网易 osver（真实系统版本，Dart 生成；缺省回落硬编码旧值）
+    osver: Option<String>,
 }
 
 struct GlobalState {
@@ -53,7 +77,13 @@ struct GlobalState {
     subdir_strategy: i32,
     max_concurrent: usize,
     kugou: KugouState,
-    netease_cookie: Option<String>,
+    netease_cookie: Option<MlockSecret>,
+    /// 设备指纹（Dart 注入；见 [DownloaderIdentity]）
+    identity: DownloaderIdentity,
+    /// 连续失败计数（HTTP/网络层；成功清零）→ 指数退避（downloader-identity-plan §3.3）
+    consecutive_failures: u32,
+    /// 请求频率窗口（每分钟请求上限，pacing）
+    request_window: VecDeque<Instant>,
     tasks: HashMap<String, TaskEntry>,
     /// 当前占用并发槽的任务数（queued 不占槽）
     running: usize,
@@ -78,8 +108,11 @@ impl Default for GlobalState {
             root_dir: None,
             subdir_strategy: 0,
             max_concurrent: 3,
-            kugou: KugouState { mid: None, dfid: None, userid: String::new(), token: String::new() },
+            kugou: KugouState { mid: None, dfid: None, userid: MlockSecret::new(), token: MlockSecret::new() },
             netease_cookie: None,
+            identity: DownloaderIdentity::default(),
+            consecutive_failures: 0,
+            request_window: VecDeque::new(),
             tasks: HashMap::new(),
             running: 0,
             history_path: None,
@@ -320,12 +353,17 @@ pub(crate) fn http_client() -> reqwest::Client {
 }
 
 pub(crate) fn kugou_mid() -> String {
-    GLOBAL.lock()
-        .unwrap()
-        .kugou
-        .mid
-        .clone()
-        .expect("archoera_downloader_init 未调用")
+    // mid 为空（未注入指纹 / 被 clear_identity 清除）时惰性生成会话随机值并写回，
+    // 保证本次会话内稳定（模拟旧版「init 随机一次」行为；动态指纹开关开启路径）。
+    let mut g = GLOBAL.lock().unwrap();
+    match &g.kugou.mid {
+        Some(m) => m.clone(),
+        None => {
+            let m = kg::kg_calc_mid(&kg::kg_random_string(16));
+            g.kugou.mid = Some(m.clone());
+            m
+        }
+    }
 }
 
 pub(crate) fn kugou_dfid() -> Option<String> {
@@ -338,11 +376,90 @@ pub(crate) fn set_kugou_dfid(dfid: Option<String>) {
 
 pub(crate) fn kugou_session() -> (String, String) {
     let g = GLOBAL.lock().unwrap();
-    (g.kugou.userid.clone(), g.kugou.token.clone())
+    (
+        g.kugou.userid.as_str().to_string(),
+        g.kugou.token.as_str().to_string(),
+    )
 }
 
 pub(crate) fn netease_cookie() -> Option<String> {
-    GLOBAL.lock().unwrap().netease_cookie.clone()
+    GLOBAL.lock().unwrap().netease_cookie.as_ref().map(|s| s.as_str().to_string())
+}
+
+/// 设备指纹（resolvers 生成网易 cookie / 酷狗 mid 时优先取注入值）
+pub(crate) fn downloader_identity() -> DownloaderIdentity {
+    GLOBAL.lock().unwrap().identity.clone()
+}
+
+// ============================================================
+// 行为节流（downloader-identity-plan §3.3）：连续失败指数退避 +
+// 抖动、请求频率 pacing——降低触发平台风控的频率聚类。
+// ============================================================
+
+/// 连续失败退避基数（ms）：base 300ms，指数 x2，封顶 5s。
+const FAILURE_BACKOFF_BASE_MS: u64 = 300;
+const FAILURE_BACKOFF_CAP_MS: u64 = 5000;
+/// 请求频率上限（次/分钟）：窗口内达到上限后等待最旧请求滑出（防突发雪崩）。
+const REQUEST_RATE_PER_MIN: usize = 60;
+/// 频率窗口（秒）
+const REQUEST_WINDOW_SECS: u64 = 60;
+
+/// 连续失败计数清零（单次请求成功即视为恢复）。
+pub(crate) fn reset_failures() {
+    GLOBAL.lock().unwrap().consecutive_failures = 0;
+}
+
+/// 连续失败指数退避 + 随机抖动（±50%），在 HTTP 层错误后、下一次请求前调用。
+/// 人类化节奏：连续失败间隔 0.3s → 0.6s → 1.2s → 2.4s → 4.8s（封顶）→ …。
+pub(crate) async fn failure_backoff() {
+    let n = {
+        let mut g = GLOBAL.lock().unwrap();
+        g.consecutive_failures = g.consecutive_failures.saturating_add(1);
+        g.consecutive_failures
+    };
+    let exp = n.saturating_sub(1).min(4);
+    let base = FAILURE_BACKOFF_BASE_MS.saturating_mul(1u64 << exp);
+    let delay = base.min(FAILURE_BACKOFF_CAP_MS);
+    let jitter = {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        rng.gen_range(0..=delay / 2)
+    };
+    tokio::time::sleep(Duration::from_millis(delay + jitter)).await;
+}
+
+/// 请求频率门：每分钟 [REQUEST_RATE_PER_MIN] 次；窗口满时等待最旧请求
+/// 滑出窗口再放行。每次对外 HTTP 请求发起前调用（幂等；正常频率无感知）。
+pub(crate) async fn request_pacing() {
+    loop {
+        let now = Instant::now();
+        let wait = {
+            let mut g = GLOBAL.lock().unwrap();
+            let w = &mut g.request_window;
+            while w
+                .front()
+                .is_some_and(|t| now.duration_since(*t).as_secs() >= REQUEST_WINDOW_SECS)
+            {
+                w.pop_front();
+            }
+            if w.len() < REQUEST_RATE_PER_MIN {
+                w.push_back(now);
+                0
+            } else {
+                // 最旧请求滑出窗口还需的时间（+随机抖动，避免集体同拍）
+                use rand::Rng;
+                let elapsed = now.duration_since(*w.front().unwrap()).as_millis() as u64;
+                let base = REQUEST_WINDOW_SECS * 1000;
+                let mut jr = rand::thread_rng();
+                let jitter = jr.gen_range(0..1000u64);
+                base.saturating_sub(elapsed).saturating_add(jitter) as u64
+            }
+        };
+        if wait == 0 {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(wait)).await;
+    }
 }
 
 fn runtime_handle() -> Option<Handle> {
@@ -1397,16 +1514,16 @@ pub extern "C" fn archoera_downloader_set_kugou_session(
         return -1;
     }
     let uid = match unsafe { CStr::from_ptr(userid) }.to_str() {
-        Ok(s) => s.to_string(),
+        Ok(s) => Zeroizing::new(s.to_string()),
         Err(_) => return -2,
     };
     let tok = match unsafe { CStr::from_ptr(token) }.to_str() {
-        Ok(s) => s.to_string(),
+        Ok(s) => Zeroizing::new(s.to_string()),
         Err(_) => return -3,
     };
     let mut g = GLOBAL.lock().unwrap();
-    g.kugou.userid = uid;
-    g.kugou.token = tok;
+    g.kugou.userid.set(&uid);
+    g.kugou.token.set(&tok);
     0
 }
 
@@ -1416,11 +1533,55 @@ pub extern "C" fn archoera_downloader_set_netease_cookie(cookie_header: *const c
         return -1;
     }
     let ck = match unsafe { CStr::from_ptr(cookie_header) }.to_str() {
-        Ok(s) => s.to_string(),
+        Ok(s) => Zeroizing::new(s.to_string()),
         Err(_) => return -2,
     };
+    let mut sec = MlockSecret::new();
+    sec.set(&ck);
     let mut g = GLOBAL.lock().unwrap();
-    g.netease_cookie = Some(ck);
+    g.netease_cookie = Some(sec);
+    0
+}
+
+/// 注入设备指纹（Dart 持久化的 downloaderIdentity JSON，见 [DownloaderIdentity]）。
+///
+/// 优先用注入值：酷狗 mid 显式给 `kgMid` 直接用，否则由 `kgGuid` 推导；
+/// 网易 deviceId/_ntes_nuid 由 resolvers 消费。未注入字段回落 init 随机值。
+/// 幂等：可在 init 后随时调用，重复注入以最后一次为准。
+#[no_mangle]
+pub extern "C" fn archoera_downloader_set_identity(json: *const c_char) -> c_int {
+    if json.is_null() {
+        return -1;
+    }
+    let js = match unsafe { CStr::from_ptr(json) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+    let ident: DownloaderIdentity = match serde_json::from_str(js) {
+        Ok(i) => i,
+        Err(_) => return -3,
+    };
+    let mut g = GLOBAL.lock().unwrap();
+    if let Some(mid) = &ident.kg_mid {
+        g.kugou.mid = Some(mid.clone());
+    } else if let Some(guid) = &ident.kg_guid {
+        g.kugou.mid = Some(kg::kg_calc_mid(guid));
+    }
+    g.identity = ident;
+    0
+}
+
+/// 清除已注入的设备指纹，回退旧版「每次启动随机」动态值行为（动态指纹开关）。
+///
+/// 与 [archoera_downloader_set_identity] 互补：清空 identity（网易 cookie 各字段
+/// 回落进程随机，见 resolvers::build_netease_cookie 的 unwrap_or_else 分支）并置
+/// 空酷狗 mid——下一次 [kugou_mid] 惰性生成新的会话随机 mid（本会话内稳定）。
+/// 幂等：重复调用无副作用；随后再次注入指纹（set_identity）立即恢复持久化行为。
+#[no_mangle]
+pub extern "C" fn archoera_downloader_clear_identity() -> c_int {
+    let mut g = GLOBAL.lock().unwrap();
+    g.identity = DownloaderIdentity::default();
+    g.kugou.mid = None;
     0
 }
 
@@ -1440,7 +1601,7 @@ pub extern "C" fn archoera_downloader_free(ptr: *mut c_void) {
 pub extern "C" fn archoera_downloader_destroy() {
     let mut g = GLOBAL.lock().unwrap();
     g.event_cb = None;
-    g.kugou = KugouState { mid: None, dfid: None, userid: String::new(), token: String::new() };
+    g.kugou = KugouState { mid: None, dfid: None, userid: MlockSecret::new(), token: MlockSecret::new() };
     g.netease_cookie = None;
     g.tasks.clear();
     g.running = 0;
@@ -1483,5 +1644,76 @@ mod template_tests {
     #[test]
     fn sanitize_illegal_chars() {
         assert_eq!(sanitize_filename("a/b\\c:d*e?f\"g<h>i|j"), "a_b_c_d_e_f_g_h_i_j");
+    }
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::*;
+    use std::ffi::CString;
+
+    /// 三个用例共享全局 GLOBAL（并行会互相覆盖 identity）→ 串行执行。
+    static IDENTITY_TEST_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
+    fn set_identity_json(json: &str) -> i32 {
+        let c = CString::new(json).unwrap();
+        unsafe { archoera_downloader_set_identity(c.as_ptr()) }
+    }
+
+    /// 注入值优先：酷狗 mid / 网易 deviceId / _ntes_nuid 全部用注入值
+    #[test]
+    fn identity_injection_overrides_random() {
+        let _g = IDENTITY_TEST_LOCK.lock().unwrap();
+        set_identity_json(
+            r#"{"kgGuid":"ABCDEFGHIJKLMNOP","kgMid":"1234567890","nmDeviceId":"ABCDEF0123456789ABCDEF0123","nmNuid":"aabbccddeeff00112233445566778899","osver":"Microsoft-Windows-10-Professional-build-22631-64bit"}"#,
+        );
+        assert_eq!(kugou_mid(), "1234567890");
+        let cookie = resolvers::build_netease_cookie(None);
+        assert!(cookie.contains("deviceId=ABCDEF0123456789ABCDEF0123"), "{cookie}");
+        assert!(cookie.contains("_ntes_nuid=aabbccddeeff00112233445566778899"), "{cookie}");
+        assert!(cookie.contains("osver=Microsoft-Windows-10-Professional-build-22631-64bit"), "{cookie}");
+    }
+
+    /// kgMid 缺省时由 kgGuid 推导（kg_calc_mid）
+    #[test]
+    fn identity_mid_derived_from_guid() {
+        let _g = IDENTITY_TEST_LOCK.lock().unwrap();
+        set_identity_json(r#"{"kgGuid":"ABCDEFGHIJKLMNOP"}"#);
+        assert_eq!(kugou_mid(), kg::kg_calc_mid("ABCDEFGHIJKLMNOP"));
+    }
+
+    /// 非法 JSON 拒绝（返回 -3），不破坏既有状态
+    #[test]
+    fn identity_invalid_json_rejected() {
+        let _g = IDENTITY_TEST_LOCK.lock().unwrap();
+        assert_eq!(set_identity_json("not-json"), -3);
+        set_identity_json(r#"{"kgMid":"9876543210"}"#);
+        assert_eq!(set_identity_json(""), -3);
+        assert_eq!(kugou_mid(), "9876543210");
+    }
+
+    /// 动态指纹开关：clear 后回落会话随机（酷狗 mid 惰性生成且会话内稳定；
+    /// 网易 cookie 各字段回落进程随机），再注入恢复持久化指纹
+    #[test]
+    fn identity_clear_falls_back_to_random() {
+        let _g = IDENTITY_TEST_LOCK.lock().unwrap();
+        set_identity_json(
+            r#"{"kgMid":"1234567890","nmDeviceId":"ABCDEF0123456789ABCDEF0123","nmNuid":"aabbccddeeff00112233445566778899","osver":"Microsoft-Windows-10-Professional-build-22631-64bit"}"#,
+        );
+        assert_eq!(kugou_mid(), "1234567890");
+
+        // 清除 → 注入值不再生效
+        unsafe { archoera_downloader_clear_identity() };
+        let mid1 = kugou_mid();
+        assert_ne!(mid1, "1234567890");
+        // 会话内稳定：连续两次取 mid 相同（惰性生成只写回一次）
+        assert_eq!(kugou_mid(), mid1);
+        let cookie = resolvers::build_netease_cookie(None);
+        assert!(!cookie.contains("deviceId=ABCDEF0123456789ABCDEF0123"), "{cookie}");
+        assert!(!cookie.contains("_ntes_nuid=aabbccddeeff00112233445566778899"), "{cookie}");
+
+        // 再次注入 → 立即恢复持久化指纹（开关关闭路径）
+        set_identity_json(r#"{"kgMid":"1234567890"}"#);
+        assert_eq!(kugou_mid(), "1234567890");
     }
 }

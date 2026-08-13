@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../netease/track.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
+import '../cache/song_cache.dart';
 import '../streaming/streaming_client.dart';
 import '../streaming/streaming_provider.dart';
 import '../streaming/streaming_session.dart';
@@ -518,8 +519,34 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   }) async {
     final q = quality ?? state.quality;
     try {
+      var playUrl = url;
+      // 歌曲磁盘缓存：命中 → 直接播放本地缓存文件（省流量/加速/断网可播）；
+      // 未命中 → 播放照常走在线 URL，同时后台下载整曲入缓存供下次重播
+      // （对齐 SPlayer-Next songCache 异步模型，不增加播放延迟）。
+      final prefs = ref.read(appPrefsProvider);
+      if (prefs.songCacheEnabled &&
+          url.isNotEmpty &&
+          (track.source == 'kugou' || track.source == 'netease')) {
+        final id = track.source == 'kugou'
+            ? (track.kugou?.hash ?? track.id)
+            : track.id;
+        final key = SongCache.shared.cacheKeyFor(track.source, id, q);
+        final cached = SongCache.shared.lookup(key);
+        if (cached != null) {
+          playUrl = cached;
+        } else {
+          final referer = track.source == 'kugou'
+              ? 'https://www.kugou.com/'
+              : 'https://music.163.com/';
+          unawaited(
+            SongCache.shared
+                .storeAsync(key, url, referer: referer)
+                .then((_) => SongCache.shared.trim(prefs.songCacheLimitMiB)),
+          );
+        }
+      }
       await load(
-        url,
+        playUrl,
         bitrate: qualityBitrate[q] ?? 128000,
         title: track.title,
         subtitle: track.subtitle,

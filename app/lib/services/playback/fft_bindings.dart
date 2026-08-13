@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-import 'engine_paths.dart';
+import '../native_lib_paths.dart';
 import 'fft_frame.dart';
 
 typedef _FftCreateNative = Pointer<Opaque> Function(Int32, Int32);
@@ -35,7 +35,8 @@ typedef _FftDestroyDart = void Function(Pointer<Opaque>);
 /// （fft_process_multi 供实时播放线程持续喂样本用）。
 class FftAnalyzer {
   FftAnalyzer({this.sampleRate = 48000, this.fftSize = 2048, this.bins = 128}) {
-    final lib = DynamicLibrary.open(EnginePaths.libfftPath());
+    final lib = DynamicLibrary.open(
+        NativeLibPaths.resolveRequired(NativeModule.fft));
     _create = lib.lookupFunction<_FftCreateNative, _FftCreateDart>(
       'fft_create',
     );

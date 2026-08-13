@@ -1,3 +1,7 @@
+import 'dart:io' show Platform;
+import 'dart:math';
+
+import '../services/kugou/kugou_crypto.dart';
 import 'app_prefs.dart';
 import 'data_dir.dart';
 
@@ -9,6 +13,51 @@ const downloadQualityKey = 'download.quality';
 const downloadSpeedLimitKey = 'download.speedLimit';
 const downloadFilenameTemplateKey = 'download.filenameTemplate';
 const downloadHistoryLimitKey = 'download.historyLimit';
+const downloaderIdentityKey = 'download.downloaderIdentity';
+const downloadDynamicFingerprintKey = 'download.dynamicFingerprint';
+
+/// 生成下载器设备指纹（对齐 downloader-identity-plan §3.1，格式与 Rust
+/// `DownloaderIdentity` / resolvers.rs 消费侧一致）：
+/// - kgGuid：16 位大写字母数字（酷狗 guid，kgRandomString 字符池）
+/// - kgMid：`kg_calc_mid(kgGuid)`（md5 → 十进制大整数）
+/// - nmDeviceId：26 位大写 hex（对齐 resolvers.rs `{:X}` 随机 deviceId）
+/// - nmNuid：32 位小写 hex（对齐 resolvers.rs `rand_hex_bytes(16)`）
+/// - osver：网易系统版本伪装（[generateOsver]，Windows 读真实版本）
+///
+/// 首次启动生成后持久化，此后跨会话不变（同一用户指纹稳定、异用户隔离）。
+Map<String, String> generateDownloaderIdentity() {
+  final rng = Random.secure();
+  const hexDigits = '0123456789abcdef';
+  String randHex(int n) =>
+      List.generate(n, (_) => hexDigits[rng.nextInt(16)]).join();
+  final kgGuid = kgRandomString(16);
+  return {
+    'kgGuid': kgGuid,
+    'kgMid': kgCalcMid(kgGuid),
+    'nmDeviceId': randHex(26).toUpperCase(),
+    'nmNuid': randHex(32),
+    'osver': generateOsver(),
+  };
+}
+
+/// 网易 osver 系统版本字符串（对齐 resolvers.rs 回落格式
+/// `Microsoft-Windows-10-Professional-build-19045-64bit`）。
+///
+/// Windows：读真实系统版本（`Platform.operatingSystemVersion` 如
+/// "Windows 10 10.0.22631"），build ≥ 22000 记 Windows 11，否则 Windows 10。
+/// Linux/macOS：回落官方值——网易 osver 仅接受 Windows 风格字符串（下载器
+/// 始终伪装 Windows 客户端），改用本机真实系统名会被服务端拒绝
+/// （downloader-identity-plan §3.2 权衡，见该文档）。
+String generateOsver() {
+  const fallback = 'Microsoft-Windows-10-Professional-build-19045-64bit';
+  if (!Platform.isWindows) return fallback;
+  final m = RegExp(r'10\.0\.(\d+)').firstMatch(Platform.operatingSystemVersion);
+  final build = int.tryParse(m?.group(1) ?? '');
+  if (build == null) return fallback;
+  final name = build >= 22000 ? '11' : '10';
+  return 'Microsoft-Windows-$name-Professional-build-$build-64bit';
+}
+
 
 /// 下载音质档位（高→低，Rust 内部按此顺序自动降级）。
 /// 与 [qualityLabels]（netease/track.dart）键一致；集中定义避免散落字面量。
@@ -53,6 +102,30 @@ extension DownloadPrefs on AppPrefs {
   /// 下载记录上限：失败/取消的 finished 条目超过该值淘汰最旧（10~500，默认 100）。
   int get downloadHistoryLimit =>
       ((data[downloadHistoryLimitKey] as num?)?.toInt() ?? 100).clamp(10, 500);
+
+  /// 设备指纹 JSON（[generateDownloaderIdentity] 生成后持久化的原串；
+  /// null = 尚未生成，下载引擎 init 时生成并写回）。
+  String? get downloaderIdentity => data[downloaderIdentityKey] as String?;
+
+  /// 动态设备指纹开关（默认关闭）：开启后回退旧版「每次启动随机」动态值
+  /// 行为（Rust 下载器 mid/deviceId/_ntes_nuid 每次启动随机，可能触发平台
+  /// 风控；downloader-identity-plan §2 风险定性）。关闭 = 持久化指纹（默认）。
+  bool get downloadDynamicFingerprint =>
+      (data[downloadDynamicFingerprintKey] as bool?) ?? false;
+
+  AppPrefs copyWithDownloaderIdentity(String identityJson) {
+    return AppPrefs(initialData: {
+      ...data,
+      downloaderIdentityKey: identityJson,
+    });
+  }
+
+  AppPrefs copyWithDownloadDynamicFingerprint(bool value) {
+    return AppPrefs(initialData: {
+      ...data,
+      downloadDynamicFingerprintKey: value,
+    });
+  }
 
   AppPrefs copyWithDownload({
     String? rootDir,

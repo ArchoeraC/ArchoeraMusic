@@ -1883,6 +1883,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'Artist grouping v2 supported (Flat / By platform / By artist).';
 
   @override
+  String get settingsSectionFingerprint => 'Device fingerprint';
+
+  @override
+  String get settingsFingerprintNote =>
+      'Device ID carried in Kugou / Netease download requests; generated on first launch and kept stable, unique per user.';
+
+  @override
+  String get settingsDownloadDynamicFingerprint => 'Dynamic device fingerprint';
+
+  @override
+  String get settingsDownloadDynamicFingerprintDesc =>
+      'Regenerates the device ID on every launch (legacy behavior); may trigger platform risk control. Off by default.';
+
+  @override
+  String get settingsResetFingerprint => 'Reset device fingerprint';
+
+  @override
+  String get settingsResetFingerprintDesc =>
+      'After reset, this machine appears as a new device to Kugou / Netease; online sessions under the old fingerprint may stop working. Reset now?';
+
+  @override
+  String get toastFingerprintReset => 'Device fingerprint reset';
+
+  @override
   String get toastDownloadRootEmpty => 'Download folder cannot be empty';
 
   @override
@@ -1951,6 +1975,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsCacheGroupMem => 'Memory caches (in-process)';
+
+  @override
+  String get settingsCacheLimitLyric => 'Lyric cache limit';
+
+  @override
+  String get settingsCacheLimitCover => 'Cover image cache limit';
+
+  @override
+  String get settingsCacheLimitUnlimited => 'Unlimited';
+
+  @override
+  String get settingsCacheNoLimitConfirmTitle => 'Remove cache limit?';
+
+  @override
+  String get settingsCacheNoLimitConfirmDesc =>
+      'Without a limit, lyric and cover-image caches can grow unbounded in memory, causing memory pressure and lag. Remove the limit?';
+
+  @override
+  String get settingsCacheNoLimitConfirm => 'Remove limit';
+
+  @override
+  String get settingsSongCache => 'Song cache';
+
+  @override
+  String get settingsSongCacheNote =>
+      'Played online songs are cached to local disk so replays read the local file directly (saves traffic, faster, playable offline). Over the limit, the least recently used tracks are evicted automatically. The 16 MiB minimum fits a full 320kbps high-quality track (~2.4 MiB/min). Cleared caches rebuild automatically; library, history and accounts are not affected.';
+
+  @override
+  String get settingsSongCacheOn => 'On; cached replays read from local disk';
+
+  @override
+  String get settingsSongCacheOff =>
+      'Off; the media cache will not be saved locally';
+
+  @override
+  String get settingsSongCacheLimitTitle => 'Cache limit';
+
+  @override
+  String settingsCacheSongs(Object count) {
+    return '$count songs';
+  }
+
+  @override
+  String get settingsSearchSongCacheSubtitle =>
+      'Online-song disk cache toggle and MiB limit';
 
   @override
   String get settingsCacheLiked => '\"Liked\" list cache';
@@ -2082,6 +2151,294 @@ class AppLocalizationsEn extends AppLocalizations {
   String toastSecurityDestroyFailed(Object path) {
     return 'Wipe failed, file may remain: $path';
   }
+
+  @override
+  String get settingsDeviceBindSection => 'Advanced · Device Binding';
+
+  @override
+  String get settingsDeviceBindNote =>
+      'Enhanced opt-in: passwordless on this device + recovery password after a device change, without relying on OS secure storage. Enabling reads a local device identifier (stored locally only, never uploaded). Off by default; the default v1 encryption is sufficient for most users.';
+
+  @override
+  String get settingsDeviceBindSwitch => 'Device-bound passwordless';
+
+  @override
+  String get settingsDeviceBindSwitchDesc =>
+      'Auto-unlock on this device; recovery password after device change';
+
+  @override
+  String get settingsDeviceBindSwitchOffDesc =>
+      'Off. OS secure storage is unavailable here; enable device binding for passwordless unlock';
+
+  @override
+  String get settingsDeviceBindSwitchV1Desc =>
+      'Currently v1 (OS secure storage); enable to upgrade to device binding (passwordless + recovery password, existing data kept)';
+
+  @override
+  String get settingsDeviceBindSwitchV2Desc =>
+      'Currently v2 (password) mode; enable requires entering the current password to unlock, then upgrades to device binding (passwordless on this device)';
+
+  @override
+  String get settingsDeviceBindPrivacyTitle =>
+      'Enable device-bound passwordless?';
+
+  @override
+  String get settingsDeviceBindPrivacyDesc =>
+      'A local device identifier (Linux machine-id / Windows MachineGuid / macOS IOPlatformUUID) will be read and bound to your vault; it is stored locally only and never uploaded. Note: this cannot be reverted to the current OS passwordless mode — disabling device binding later falls back to password mode (enter your password at every launch).';
+
+  @override
+  String get settingsDeviceBindEnable => 'Enable';
+
+  @override
+  String get settingsDeviceBindRecoveryTitle =>
+      'Set a recovery password (optional)';
+
+  @override
+  String get settingsDeviceBindRecoveryDesc =>
+      'Use the recovery password to unlock credentials after a device change/reinstall. Leave blank to skip: credentials cannot be recovered after a device change (fail-closed; wipe and rebuild).';
+
+  @override
+  String get settingsDeviceBindRecoveryHint => 'Recovery password';
+
+  @override
+  String get settingsDeviceBindSkip => 'Enable without a password';
+
+  @override
+  String get settingsDeviceBindChangeRecovery =>
+      'Set / change recovery password';
+
+  @override
+  String get settingsDeviceBindChangeRecoveryTitle =>
+      'Set a new recovery password';
+
+  @override
+  String get settingsDeviceBindChangeRecoveryDesc =>
+      'The old password becomes invalid immediately. Remember the new one: it is required to unlock credentials after a device change.';
+
+  @override
+  String get settingsDeviceBindRebind => 'Rebind this device';
+
+  @override
+  String get settingsDeviceBindRebindDesc =>
+      'Re-seal with the current device fingerprint; the old fingerprint becomes invalid immediately (use after recovery)';
+
+  @override
+  String get settingsDeviceBindRebindTitle => 'Rebind this device?';
+
+  @override
+  String get settingsDeviceBindRebindConfirm => 'Rebind now';
+
+  @override
+  String get settingsDeviceBindClose => 'Turn off device binding';
+
+  @override
+  String get settingsDeviceBindCloseDesc =>
+      'Remove device-entropy seal; vault falls back to password mode';
+
+  @override
+  String get settingsDeviceBindCloseTitle => 'Turn off device binding?';
+
+  @override
+  String get settingsDeviceBindCloseConfirmDesc =>
+      'The device-entropy seal will be removed and the vault switches to password mode: a password is required for each session. That password becomes your new session password. Enter the current recovery password to confirm.';
+
+  @override
+  String get settingsDeviceBindCloseHint => 'Current recovery password';
+
+  @override
+  String get settingsDeviceBindRecoveryBanner =>
+      'Device changed or entropy file corrupted: credentials are locked and require the recovery password';
+
+  @override
+  String get settingsDeviceBindRecover => 'Recover';
+
+  @override
+  String get settingsDeviceBindRecoverTitle => 'Enter recovery password';
+
+  @override
+  String get settingsDeviceBindRecoverDesc =>
+      'Unlock credentials with the recovery password; after success, rebind this device to restore passwordless unlock.';
+
+  @override
+  String get settingsDeviceBindShowPassword => 'Show / hide password';
+
+  @override
+  String get toastDeviceBindEnabled => 'Device-bound passwordless enabled';
+
+  @override
+  String get toastDeviceBindRecoverySet => 'Recovery password updated';
+
+  @override
+  String get toastDeviceBindRebound => 'Device rebound';
+
+  @override
+  String get toastDeviceBindClosed =>
+      'Device binding off; vault now uses password mode';
+
+  @override
+  String get toastDeviceBindRecoveryNeeded =>
+      'No recovery password set; cannot turn off device binding';
+
+  @override
+  String toastDeviceBindCloseFailed(Object error) {
+    return 'Failed to turn off: $error';
+  }
+
+  @override
+  String get toastDeviceBindRecovered =>
+      'Credentials recovered; rebind this device to restore passwordless';
+
+  @override
+  String get toastDeviceBindRecoverFailed =>
+      'Recovery password incorrect or unlock failed; credentials stay locked';
+
+  @override
+  String get settingsVaultSection => 'Credential encryption';
+
+  @override
+  String get settingsVaultNote =>
+      'Choose how credentials are encrypted: v1 OS protection (default) / v2 password protection / v3 device binding (opt-in enhancement; reads a local device identifier, stored locally only, never uploaded). v1 ↔ v2 can be toggled freely; v3 is the terminal tier and falls back to v2 when disabled.';
+
+  @override
+  String get settingsVaultModeV1 => 'v1 OS protection';
+
+  @override
+  String get settingsVaultModeV2 => 'v2 Password';
+
+  @override
+  String get settingsVaultModeV3 => 'v3 Device binding';
+
+  @override
+  String get settingsVaultModeDescOs =>
+      'v1 OS protection: credentials are encrypted by OS secure storage (Windows DPAPI / macOS Keychain / Linux libsecret), passwordless on this machine.';
+
+  @override
+  String get settingsVaultModeDescPassword =>
+      'v2 Password protection: credentials are encrypted by a password; enter it at every launch to unlock. You can switch back to v1 OS protection anytime.';
+
+  @override
+  String get settingsVaultModeDescMultiseal =>
+      'v3 Device binding: passwordless on this device; a recovery password is required after a device change. It cannot drop straight back to v1 — disabling it falls back to v2 password mode.';
+
+  @override
+  String get settingsVaultModeDescUnknown => 'Reading encryption tier…';
+
+  @override
+  String get settingsVaultSwitchToPasswordTitle =>
+      'Switch to password protection (v2)';
+
+  @override
+  String get settingsVaultSwitchToPasswordDesc =>
+      'Credentials will be protected by a password entered at every launch. Your master key and existing data are kept; you can switch back to OS protection (v1) anytime.';
+
+  @override
+  String get settingsVaultSwitchToPasswordNewHint => 'Set a new password';
+
+  @override
+  String get settingsVaultSwitchToPasswordConfirmHint =>
+      'Re-enter the new password';
+
+  @override
+  String get settingsVaultSwitchToPasswordMismatch =>
+      'The two entries do not match';
+
+  @override
+  String get settingsVaultSwitchToOsTitle =>
+      'Switch back to OS protection (v1)';
+
+  @override
+  String get settingsVaultSwitchToOsDesc =>
+      'Credentials will be protected by the operating system\'s secure storage; no password needed. You can switch back to password protection (v2) anytime.';
+
+  @override
+  String get settingsVaultNeedUnlockFirst =>
+      'Password protection is not unlocked yet: unlock it first, then switch';
+
+  @override
+  String get settingsVaultV3NoDirectV1 =>
+      'Device binding (v3) cannot drop straight back to v1: disable device binding first to fall back to v2 password mode';
+
+  @override
+  String get settingsVaultCloseV3PasswordTitle =>
+      'Disable Device Binding: Set New Password';
+
+  @override
+  String get settingsVaultCloseV3PasswordDesc =>
+      'No recovery password was set when device binding was enabled (passwordless on this device). Disabling it switches to password protection (v2): please set a new unlock password. The master key and existing data are preserved; this password is required at every launch.';
+
+  @override
+  String get toastVaultSwitchedToPassword =>
+      'Switched to password protection (v2)';
+
+  @override
+  String get toastVaultSwitchedToOs => 'Switched back to OS protection (v1)';
+
+  @override
+  String get settingsVaultRestartTitle => 'Restart required';
+
+  @override
+  String get settingsVaultRestartDesc =>
+      'The encryption tier has been switched successfully. Restart the app to ensure database integrity and consistent state across all modules. In password protection mode (v2), you will be asked for your password after restart; login and streaming credentials are unavailable (shown as signed out) until then. Playback and downloads are interrupted during the restart.';
+
+  @override
+  String get settingsVaultRestartNow => 'Restart now';
+
+  @override
+  String get settingsVaultRestartLater => 'Later';
+
+  @override
+  String get vaultCrashTitle => 'Credential module exited abnormally';
+
+  @override
+  String get vaultCrashDesc =>
+      'The credential vault process terminated unexpectedly. Local credentials may have been exposed. Sign in again or wipe the vault to rebuild credentials.';
+
+  @override
+  String get vaultCrashReset => 'Wipe and rebuild';
+
+  @override
+  String get vaultCrashDismiss => 'OK';
+
+  @override
+  String get vaultVersionTitle => 'Credential vault version anomaly';
+
+  @override
+  String get vaultVersionDesc =>
+      'The credential vault component is anomalous: its binary may have been replaced or is a non-official build, and local credentials may have been exposed. The anomalous copy has been deleted and decryption refused. Please exit and reinstall the app.';
+
+  @override
+  String get vaultVersionExit => 'Exit';
+
+  @override
+  String get vaultVersionReasonReplaced =>
+      'The vault binary was replaced or is not an official build. The anomalous copy has been deleted and decryption refused.';
+
+  @override
+  String get vaultVersionReasonMarkerMissing =>
+      'The vault handshake response is missing the official build marker.';
+
+  @override
+  String get vaultVersionReasonMarkerMismatch =>
+      'The vault build marker does not match the official build. The anomalous copy has been deleted and decryption refused.';
+
+  @override
+  String get vaultUnlockTitle => 'Unlock credential vault';
+
+  @override
+  String get vaultUnlockDesc =>
+      'The credential vault is in password-protected mode (v2). Enter your password to unlock local login credentials and streaming accounts.';
+
+  @override
+  String get vaultUnlockHint => 'Password';
+
+  @override
+  String get vaultUnlockConfirm => 'Unlock';
+
+  @override
+  String get vaultUnlockSkip => 'Skip for now';
+
+  @override
+  String get vaultUnlockFailed => 'Wrong password, try again';
 
   @override
   String get settingsVersion => 'Version';

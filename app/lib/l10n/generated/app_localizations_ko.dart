@@ -1834,6 +1834,30 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsGroupingNote => '아티스트별 그룹화 v2 지원（플랫 / 플랫폼별 / 아티스트별）.';
 
   @override
+  String get settingsSectionFingerprint => '기기 지문';
+
+  @override
+  String get settingsFingerprintNote =>
+      '쿠거 / 넷이즈 다운로드 요청에 포함되는 기기 식별자. 첫 실행 시 생성되어 고정되며 사용자마다 다릅니다.';
+
+  @override
+  String get settingsDownloadDynamicFingerprint => '동적 기기 지문';
+
+  @override
+  String get settingsDownloadDynamicFingerprintDesc =>
+      '실행할 때마다 기기 식별자를 무작위로 생성합니다(기존 동작). 플랫폼 리스크 관리가 트리거될 수 있으며 기본적으로 꺼져 있습니다.';
+
+  @override
+  String get settingsResetFingerprint => '기기 지문 초기화';
+
+  @override
+  String get settingsResetFingerprintDesc =>
+      '초기화 후 이 기기는 쿠거 / 넷이즈에서 새 기기로 인식됩니다. 이전 지문의 온라인 상태가 유효하지 않을 수 있습니다. 초기화할까요?';
+
+  @override
+  String get toastFingerprintReset => '기기 지문이 초기화되었습니다';
+
+  @override
   String get toastDownloadRootEmpty => '다운로드 폴더는 비워둘 수 없습니다';
 
   @override
@@ -1902,6 +1926,49 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsCacheGroupMem => '메모리 캐시(프로세스 내)';
+
+  @override
+  String get settingsCacheLimitLyric => '가사 캐시 한도';
+
+  @override
+  String get settingsCacheLimitCover => '앨범 커버 이미지 캐시 한도';
+
+  @override
+  String get settingsCacheLimitUnlimited => '무제한';
+
+  @override
+  String get settingsCacheNoLimitConfirmTitle => '캐시 한도를 해제할까요?';
+
+  @override
+  String get settingsCacheNoLimitConfirmDesc =>
+      '한도가 없으면 가사와 커버 이미지 캐시가 메모리를 무제한으로 차지해 메모리 압박과 렉이 발생할 수 있습니다. 한도를 해제할까요?';
+
+  @override
+  String get settingsCacheNoLimitConfirm => '한도 해제';
+
+  @override
+  String get settingsSongCache => '노래 캐시';
+
+  @override
+  String get settingsSongCacheNote =>
+      '재생한 온라인 노래를 로컬 디스크에 캐시하여 재재생 시 직접 읽습니다(트래픽 절약·가속·오프라인 재생). 한도 초과 시 LRU로 가장 오래된 곡부터 자동 삭제됩니다. 하한 16 MiB는 320kbps 고음질 곡 1곡(약 2.4 MiB/분)을 온전히 캐시할 수 있는 값입니다. 삭제 후 자동 재구성되며 라이브러리·기록·계정에는 영향을 주지 않습니다.';
+
+  @override
+  String get settingsSongCacheOn => '켜짐: 캐시 적중 시 로컬 파일을 직접 재생';
+
+  @override
+  String get settingsSongCacheOff => '꺼짐: 미디어 캐시는 로컬에 저장되지 않습니다';
+
+  @override
+  String get settingsSongCacheLimitTitle => '캐시 한도';
+
+  @override
+  String settingsCacheSongs(Object count) {
+    return '$count곡';
+  }
+
+  @override
+  String get settingsSearchSongCacheSubtitle => '온라인 노래 디스크 캐시 켜기/끄기 및 MiB 한도';
 
   @override
   String get settingsCacheLiked => '「좋아요」 목록 캐시';
@@ -2033,6 +2100,271 @@ class AppLocalizationsKo extends AppLocalizations {
   String toastSecurityDestroyFailed(Object path) {
     return '파기에 실패했습니다. 파일이 남아 있을 수 있습니다: $path';
   }
+
+  @override
+  String get settingsDeviceBindSection => '高级 · 设备绑定';
+
+  @override
+  String get settingsDeviceBindNote =>
+      '增强型可选项（opt-in）：本机免密 + 设备变更走恢复口令，不依赖系统安全存储。开启将读取本机设备标识（仅存本地、绝不上传）。默认关闭，普通用户使用 v1 加密已足够。';
+
+  @override
+  String get settingsDeviceBindSwitch => '设备绑定免密';
+
+  @override
+  String get settingsDeviceBindSwitchDesc => '本机自动解锁；换机/重装走恢复口令';
+
+  @override
+  String get settingsDeviceBindSwitchOffDesc =>
+      '未启用。当前系统安全存储不可用，可开启设备绑定实现本机免密（无需口令）';
+
+  @override
+  String get settingsDeviceBindSwitchV1Desc =>
+      '当前为 v1（系统安全存储）模式；开启将升级为设备绑定（免密 + 恢复口令，既有数据保留）';
+
+  @override
+  String get settingsDeviceBindSwitchV2Desc =>
+      '当前为 v2（口令）模式；开启需先输入当前口令解锁，随后升级为设备绑定（本机免密）';
+
+  @override
+  String get settingsDeviceBindPrivacyTitle => '开启设备绑定免密？';
+
+  @override
+  String get settingsDeviceBindPrivacyDesc =>
+      '将读取本机设备标识（Linux machine-id / Windows MachineGuid / macOS IOPlatformUUID）用于绑定，仅存储于本地，绝不上传。注意：此操作不可回到当前 OS 免密模式——日后关闭设备绑定将回落为口令模式（每次启动需输入口令）。';
+
+  @override
+  String get settingsDeviceBindEnable => '开启';
+
+  @override
+  String get settingsDeviceBindRecoveryTitle => '设置恢复口令（可选）';
+
+  @override
+  String get settingsDeviceBindRecoveryDesc =>
+      '换机/重装后需用恢复口令解锁凭据。留空则不设置：设备变更后无法恢复（fail-closed，需销毁重建凭据）。';
+
+  @override
+  String get settingsDeviceBindRecoveryHint => '恢复口令';
+
+  @override
+  String get settingsDeviceBindSkip => '不设口令，直接开启';
+
+  @override
+  String get settingsDeviceBindChangeRecovery => '设置 / 修改恢复口令';
+
+  @override
+  String get settingsDeviceBindChangeRecoveryTitle => '设置新的恢复口令';
+
+  @override
+  String get settingsDeviceBindChangeRecoveryDesc =>
+      '修改后旧口令立即失效。请务必记住新口令：换机/重装后凭据解锁将依赖它。';
+
+  @override
+  String get settingsDeviceBindRebind => '重新绑定当前设备';
+
+  @override
+  String get settingsDeviceBindRebindDesc => '用当前设备指纹重密封，旧指纹立即失效（换机恢复后使用）';
+
+  @override
+  String get settingsDeviceBindRebindTitle => '重新绑定当前设备？';
+
+  @override
+  String get settingsDeviceBindRebindConfirm => '立即重新绑定';
+
+  @override
+  String get settingsDeviceBindClose => '关闭设备绑定';
+
+  @override
+  String get settingsDeviceBindCloseDesc => '清除设备熵绑定，vault 转为口令模式';
+
+  @override
+  String get settingsDeviceBindCloseTitle => '关闭设备绑定？';
+
+  @override
+  String get settingsDeviceBindCloseConfirmDesc =>
+      '将删除设备熵绑定，vault 转为口令模式：此后每次会话需输入口令。该口令即新会话口令，请牢记。输入当前恢复口令以确认。';
+
+  @override
+  String get settingsDeviceBindCloseHint => '当前恢复口令';
+
+  @override
+  String get settingsDeviceBindRecoveryBanner => '检测到设备变更或熵文件损坏：凭据已锁定，需恢复口令解锁';
+
+  @override
+  String get settingsDeviceBindRecover => '恢复';
+
+  @override
+  String get settingsDeviceBindRecoverTitle => '输入恢复口令';
+
+  @override
+  String get settingsDeviceBindRecoverDesc => '用恢复口令解锁凭据；成功后建议立即重新绑定当前设备恢复免密。';
+
+  @override
+  String get settingsDeviceBindShowPassword => '显示 / 隐藏口令';
+
+  @override
+  String get toastDeviceBindEnabled => '设备绑定免密已开启';
+
+  @override
+  String get toastDeviceBindRecoverySet => '恢复口令已更新';
+
+  @override
+  String get toastDeviceBindRebound => '已重新绑定当前设备';
+
+  @override
+  String get toastDeviceBindClosed => '设备绑定已关闭，vault 已转为口令模式';
+
+  @override
+  String get toastDeviceBindRecoveryNeeded => '未设置恢复口令，无法关闭设备绑定';
+
+  @override
+  String toastDeviceBindCloseFailed(Object error) {
+    return '关闭失败：$error';
+  }
+
+  @override
+  String get toastDeviceBindRecovered => '凭据已恢复，可重新绑定本机恢复免密';
+
+  @override
+  String get toastDeviceBindRecoverFailed => '恢复口令错误或解锁失败，凭据保持锁定';
+
+  @override
+  String get settingsVaultSection => '凭据加密';
+
+  @override
+  String get settingsVaultNote =>
+      '选择凭据的加密保护等级：v1 系统保护（默认）/ v2 口令保护 / v3 设备绑定（增强项 opt-in，读取本机设备标识，仅存本地、绝不上传）。v1 ↔ v2 可随时互切；v3 为终点档，关闭后回落为 v2。';
+
+  @override
+  String get settingsVaultModeV1 => 'v1 系统保护';
+
+  @override
+  String get settingsVaultModeV2 => 'v2 口令保护';
+
+  @override
+  String get settingsVaultModeV3 => 'v3 设备绑定';
+
+  @override
+  String get settingsVaultModeDescOs =>
+      'v1 系统保护：凭据由操作系统安全存储加密（Windows DPAPI / macOS 钥匙串 / Linux libsecret），本机免密。';
+
+  @override
+  String get settingsVaultModeDescPassword =>
+      'v2 口令保护：凭据由口令加密，每次启动需输入口令解锁。可随时切回 v1 系统保护。';
+
+  @override
+  String get settingsVaultModeDescMultiseal =>
+      'v3 设备绑定：本机免密，设备变更时需恢复口令解锁。不可直接降回 v1——关闭后将回落为 v2 口令模式。';
+
+  @override
+  String get settingsVaultModeDescUnknown => '加密等级读取中…';
+
+  @override
+  String get settingsVaultSwitchToPasswordTitle => '切换到口令保护（v2）';
+
+  @override
+  String get settingsVaultSwitchToPasswordDesc =>
+      '凭据将改由口令加密保护，每次启动需输入口令。主密钥与已有数据保留，此操作可随时切回系统保护（v1）。';
+
+  @override
+  String get settingsVaultSwitchToPasswordNewHint => '设置新口令';
+
+  @override
+  String get settingsVaultSwitchToPasswordConfirmHint => '再次输入新口令';
+
+  @override
+  String get settingsVaultSwitchToPasswordMismatch => '两次输入不一致';
+
+  @override
+  String get settingsVaultSwitchToOsTitle => '切换回系统保护（v1）';
+
+  @override
+  String get settingsVaultSwitchToOsDesc =>
+      '凭据将改由操作系统安全存储保护，无需再输入口令。此操作可随时切回口令保护（v2）。';
+
+  @override
+  String get settingsVaultNeedUnlockFirst => '当前口令保护未解锁：请先解锁后再切换';
+
+  @override
+  String get settingsVaultV3NoDirectV1 =>
+      '设备绑定（v3）不可直接降回 v1：请先关闭设备绑定，回落为 v2 口令模式';
+
+  @override
+  String get settingsVaultCloseV3PasswordTitle => '关闭设备绑定：设置新口令';
+
+  @override
+  String get settingsVaultCloseV3PasswordDesc =>
+      '设备绑定开启时未设置恢复口令（本机免密），关闭后将转为口令保护（v2）：请设置新的解锁口令。主密钥与已有数据保留，此口令每次启动都需输入。';
+
+  @override
+  String get toastVaultSwitchedToPassword => '已切换到口令保护（v2）';
+
+  @override
+  String get toastVaultSwitchedToOs => '已切换回系统保护（v1）';
+
+  @override
+  String get settingsVaultRestartTitle => '需要重启应用';
+
+  @override
+  String get settingsVaultRestartDesc =>
+      '加密等级已切换成功。为保证数据库完整性与各模块状态一致，请重启应用生效。若为口令保护模式（v2），重启后将要求输入口令解锁，解锁前登录态与流媒体凭据暂不可用（显示为未登录）；重启期间播放与下载会中断。';
+
+  @override
+  String get settingsVaultRestartNow => '立即重启';
+
+  @override
+  String get settingsVaultRestartLater => '稍后重启';
+
+  @override
+  String get vaultCrashTitle => '凭据模块异常退出';
+
+  @override
+  String get vaultCrashDesc => '凭据保险库进程意外终止，本地凭据可能已暴露。建议重新登录或销毁 vault 以重建凭据。';
+
+  @override
+  String get vaultCrashReset => '销毁并重建';
+
+  @override
+  String get vaultCrashDismiss => '知道了';
+
+  @override
+  String get vaultVersionTitle => '凭据保险库版本异常';
+
+  @override
+  String get vaultVersionDesc =>
+      '检测到凭据保险库组件异常：其二进制副本可能已被替换或非官方构建，本地凭据可能已暴露。已删除异常副本并拒绝解密。请退出并重新安装应用。';
+
+  @override
+  String get vaultVersionExit => '退出';
+
+  @override
+  String get vaultVersionReasonReplaced =>
+      '检测到 vault 二进制被替换或非官方构建，已删除异常副本并拒绝解密。';
+
+  @override
+  String get vaultVersionReasonMarkerMissing => 'vault 握手应答缺少官方构建标记。';
+
+  @override
+  String get vaultVersionReasonMarkerMismatch =>
+      'vault 构建标记与官方产物不符，已删除异常副本并拒绝解密。';
+
+  @override
+  String get vaultUnlockTitle => '解锁凭据保险库';
+
+  @override
+  String get vaultUnlockDesc => '凭据保险库为口令保护模式（v2）。请输入口令以解锁本地登录凭据与流媒体账号。';
+
+  @override
+  String get vaultUnlockHint => '口令';
+
+  @override
+  String get vaultUnlockConfirm => '解锁';
+
+  @override
+  String get vaultUnlockSkip => '暂不解锁';
+
+  @override
+  String get vaultUnlockFailed => '口令错误，请重试';
 
   @override
   String get settingsVersion => '버전';
