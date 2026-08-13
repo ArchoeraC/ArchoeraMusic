@@ -32,15 +32,16 @@
 , at-spi2-atk
 , libcloudproviders
   # mediaengine 链接的 FFmpeg soname 取决于构建机：CI（ubuntu-24.04
-  # FFmpeg 7.0.1）→ libavformat.so.61；本地较新 FFmpeg → libavformat.so.62。
-  # 两版本并存，autoPatchelfHook 按各 ELF 的 NEEDED 自动匹配。
+  # FFmpeg 6.1）→ libavformat.so.60；本地较新 FFmpeg → .62/.63。
+  # 多版本并存，autoPatchelfHook 按各 ELF 的 NEEDED 自动匹配。
   # 注：bundle 内嵌 FFmpeg 库（native/libav*.so）在 NixOS 上不适用——其
   # 编解码传递依赖（libx264 等）为构建机打包版本，Nix store 不提供；
   # 本包 installPhase 移除内嵌库，统一走 store ffmpeg（nixpkgs 版本由
   # flake 锁定，天然免疫「突然性 major 升级」），autoPatchelfHook 补 RUNPATH。
+, ffmpeg_6 # libavformat.so.60 / libavcodec.so.60（CI 构建产物 NEEDED）
 , ffmpeg_7 # libavformat.so.61 / libavcodec.so.61
 , ffmpeg_8 # libavformat.so.62 / libavcodec.so.62
-, taglib # libtag.so.2（scraper）
+, taglib_1 # libtag.so.1（scraper；CI ubuntu-24.04 taglib 1.13。nixpkgs 新版 taglib 2.x 为 libtag.so.2 不匹配）
 , curl # libcurl.so.4（scraper）
 , openssl_3 # libcrypto.so.3（scraper）
 , sqlite # libsqlite3.so.0（scraper）
@@ -70,9 +71,10 @@ stdenv.mkDerivation (finalAttrs: {
     libXi
     at-spi2-atk
     libcloudproviders
+    ffmpeg_6
     ffmpeg_7
     ffmpeg_8
-    taglib
+    taglib_1
     curl
     openssl_3
     sqlite

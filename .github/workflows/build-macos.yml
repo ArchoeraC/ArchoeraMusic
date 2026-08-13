@@ -11,7 +11,11 @@ permissions:
 jobs:
   build-macos:
     name: macOS arm64
-    runs-on: macos-14
+    # macos-15（Xcode 16）:macOS 14 runner 为 Xcode 15.4，其 /usr/lib/swift
+    # 缺少 libswift_Builtin_float 等 stub，NativeAOT Swift autolink 报 8 个
+    # __swift_FORCE_LOAD_$_swift_* 未定义（dotnet/runtime#125858 官方答复
+    # 要求 Xcode 16+，googleads-ios-unity#3760）。Xcode 16 SDK 含完整 stubs。
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
 
