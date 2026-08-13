@@ -170,6 +170,14 @@ flutter run -d linux      # 或 windows / macos
 - **边界**：信任根在主程序进程。攻击者**同时替换主程序（Dart 可执行 / FFI 库）** 或**在其内嵌主动联网上传程序段**时，vault 视主进程为合法握手对象、无法区分被篡改的主程序——此威胁（进程注入 / 信任根攻破）**超出应用层能力**，由 OS 信任链承担：Windows Authenticode 签名 / macOS 公证 / 安装包完整性校验（已列入 credential-vault-plan 待办）；
 - 本方案无法承诺具有拦截「同用户权限下完全控制进程 / 按源码重实现的攻击者」的能力（Kerckhoffs 原则，见 [credential-vault-plan §1.2](docs/credential-vault-plan.md)）。
 
+### 份额覆盖风险与恢复（OS 安全存储全局共享）
+
+- **现象**：解锁报 `The computed authentication tag did not match the input authentication tag`，应用降级为内存态（日志「凭据保险库不可用，登录态将不持久化」），功能可用但重启需重新登录。
+- **根因**：OS 模式（v1）下授权侧份额 S 存于 OS 安全存储（Linux Secret Service / macOS Keychain / Windows DPAPI），**存储键全局共享、无 per-app 隔离**（Linux 为 schema `archoera.vault` / account `master-share`）。同一设备上**任何一份应用副本**（安装包 / 开发 bundle / CI 产物）在 vault 未初始化时执行 `init` 都会**覆盖**该份额——若 vault 文件与份额不同代（例如更新前初始化、之后另一副本再次 `init` 覆盖份额），即出现上述解锁失败；**覆盖不可逆，旧份额无法找回，旧登录态不可恢复**。
+- **恢复**：删除应用数据目录下的 `credentials.vault`（及同目录 `vault.lockout` / `vault.auth` 残留），应用下次启动自动初始化全新 vault——**旧登录态丢失，需重新登录各平台账号**；或直接执行 `archoera-vault destroy <数据目录>`（一并删除份额与锁定状态）后重启应用。
+- **数据目录**：Linux `~/.local/share/ArchoeraMusic`；macOS/Windows 见应用数据目录（路径解析见 `resolveDataDir()`）。
+- **避免**：勿在同一设备上同时运行多份不同数据目录的应用副本并各自初始化；升级/替换安装包前如需保留登录态，**不要删除 vault 文件**，并避免在新副本上触发重新初始化。
+
 ---
 
 ## 文档
