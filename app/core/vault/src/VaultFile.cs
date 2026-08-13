@@ -8,12 +8,21 @@ namespace Archoera.Vault;
 /// OS 模式（v1，向后兼容）：
 ///   magic "AVLT"(4B) | version(1B)=1 | reserved(3B) | key_vault(32B, K_vault = K ⊕ S)
 ///   然后 entry_count(u32) | entries…
+/// OS 模式（v4，新增后端指纹，防构建形态混用数据目录）：
+///   magic "AVLT"(4B) | version(1B)=4 | reserved(3B) | key_vault(32B, K_vault = K ⊕ S)
+///   | backend_len(1B) | backend(utf8)                ← 份额存储后端指纹（如 "libsecret"）
+///   然后 entry_count(u32) | entries…
 /// 口令模式（v2）：
 ///   magic "AVLT"(4B) | version(1B)=2 | kdf(1B)=1 | reserved(2B)
 ///   | salt(16B) | m(u32) | t(u32) | p(u32)          ← Argon2id KDF 参数
 ///   | key_vault(32B, K_vault = K ⊕ S) | entry_count(u32) | entries…
 /// entry: uid_len(1B) | uid(utf8) | salt(16B) | nonce(12B) | ct_len(u32) | ciphertext(ct|tag)
 /// ```
+/// v4 只在 v1 布局头部追加 backend 指纹字段（写入时 S 份额所落的后端标识）。
+/// 解锁时若文件头指纹 ≠ 当前实际后端（如 PROD=libsecret 与 TEST=insecure 混用
+/// 同一数据目录）→ 抛 [VaultShareBackendMismatchException]，把此前模糊的
+/// GCM mismatch 升级为明确错误码；v1/v2/v3 旧文件无指纹字段（Backend=null），
+/// 解锁时跳过校验，保持向后兼容。
 /// 每条目独立 salt/nonce，AES-256-GCM（tag 16B 附于密文尾）。
 /// 磁盘上仅存密文与 K_vault 份额；主密钥 K 由 [KeySplit] 2-of-2 重建，永不落盘。
 /// 口令模式下 S 份额由 Argon2id 口令派生（[VaultService.InitPassword]），
@@ -74,11 +83,13 @@ public sealed class VaultSeal
 /// 文件头元数据（非密文，供 serve 握手前读取模式/参数）。
 /// v3 返回 [SealKinds]（只读 kind 列表，不加载密文）——serve 据此判定
 /// 是否有口令封装可走恢复（NEED_RECOVERY）。
+/// [Backend]：v4 OS 模式文件记录的份额后端指纹（v1/v2/v3 为 null，不校验）。
 public sealed record VaultHeader(
     VaultMode Mode,
     byte[]? Salt,
     Argon2id.KdfParams? Kdf,
-    IReadOnlyList<SealKind>? SealKinds = null);
+    IReadOnlyList<SealKind>? SealKinds = null,
+    string? Backend = null);
 
 public sealed class VaultFile
 {
@@ -86,6 +97,7 @@ public sealed class VaultFile
     public const byte Version = 1;        // OS 模式（v1 布局）
     public const byte VersionPassword = 2; // 口令模式（v2 布局）
     public const byte VersionMultiSeal = 3; // 多封装（v3 布局，BitLocker 式）
+    public const byte Version4 = 4;       // OS 模式 + 份额后端指纹（防构建形态混用）
     public const int SaltSize = 16;
     public const int NonceSize = 12;
     public const int TagSize = 16;
@@ -95,6 +107,10 @@ public sealed class VaultFile
 
     /// 份额锚定方式（OS 安全存储 / 口令派生 / 多封装）。
     public VaultMode Mode { get; init; } = VaultMode.OsStore;
+
+    /// v4 OS 模式记录的后端指纹（null = v1/v2/v3 旧文件无指纹，解锁不校验）。
+    /// 由 [VaultService.Init]/[SwitchMode] 写入当前 [ISecretStore.Backend]。
+    public string? Backend { get; init; }
 
     /// 口令模式的 Argon2id 盐（OS 模式为 null）。
     public byte[]? Salt { get; init; }
@@ -115,7 +131,9 @@ public sealed class VaultFile
         public required byte[] Ciphertext { get; init; }
     }
 
-    public static VaultFile Create(byte[] keyVault) => new() { KeyVault = keyVault };
+    /// OS 模式工厂：K_vault 份额 + 可选后端指纹（非 null → 写 v4 布局并记录）。
+    public static VaultFile Create(byte[] keyVault, string? backend = null)
+        => new() { KeyVault = keyVault, Backend = backend };
 
     /// 口令模式工厂：K_vault 份额 + KDF 盐/参数随文件头存储。
     public static VaultFile CreatePassword(byte[] keyVault, byte[] salt, Argon2id.KdfParams kdf)
@@ -138,10 +156,11 @@ public sealed class VaultFile
         using var br = new BinaryReader(fs);
         if (br.ReadUInt32() != Magic) throw new InvalidDataException("vault 文件头损坏（magic 不符）");
         var version = br.ReadByte();
-        if (version == Version)
+        if (version == Version || version == Version4)
         {
-            br.ReadBytes(3); // reserved（v1：kdf 位恒 0 = OS 模式）
-            return new VaultHeader(VaultMode.OsStore, null, null);
+            br.ReadBytes(3); // reserved（v1/v4：kdf 位恒 0 = OS 模式）
+            var backend = version == Version4 ? ReadBackend(br) : null;
+            return new VaultHeader(VaultMode.OsStore, null, null, null, backend);
         }
         if (version == VersionPassword)
         {
@@ -171,6 +190,13 @@ public sealed class VaultFile
             return new VaultHeader(VaultMode.MultiSeal, null, null, kinds);
         }
         throw new InvalidDataException("vault 版本不兼容");
+    }
+
+    /// 读 v4 后端指纹（1B 长度 + UTF8；长度 0 视为无指纹）。
+    private static string? ReadBackend(BinaryReader br)
+    {
+        var len = br.ReadByte();
+        return len == 0 ? null : Encoding.UTF8.GetString(br.ReadBytes(len));
     }
 
     /// 读单个封装块（kind + 参数 + 密文）。
@@ -230,10 +256,14 @@ public sealed class VaultFile
         if (br.ReadUInt32() != Magic) throw new InvalidDataException("vault 文件头损坏（magic 不符）");
         var version = br.ReadByte();
         VaultFile file;
-        if (version == Version)
+        if (version == Version || version == Version4)
         {
             br.ReadBytes(3);
-            file = new VaultFile { KeyVault = br.ReadBytes(KeySplit.KeySize) };
+            file = new VaultFile
+            {
+                KeyVault = br.ReadBytes(KeySplit.KeySize),
+                Backend = version == Version4 ? ReadBackend(br) : null,
+            };
         }
         else if (version == VersionPassword)
         {
@@ -318,6 +348,7 @@ public sealed class VaultFile
     private void WriteBody(BinaryWriter bw)
     {
         bw.Write(Magic);
+        var wroteKeyVault = false;
         if (Mode == VaultMode.Password)
         {
             bw.Write(VersionPassword);
@@ -334,18 +365,31 @@ public sealed class VaultFile
             bw.Write((byte)0); // flags
             bw.Write(new byte[2]); // reserved
             bw.Write(KeyVault);
+            wroteKeyVault = true;
             bw.Write((byte)Seals.Count);
             foreach (var seal in Seals)
             {
                 WriteSeal(bw, seal);
             }
         }
+        else if (Backend != null)
+        {
+            // v4：OS 模式 + 后端指纹（解锁时校验，防不同构建形态混用数据目录）
+            bw.Write(Version4);
+            bw.Write(new byte[3]);
+            bw.Write(KeyVault);
+            wroteKeyVault = true;
+            var b = Encoding.UTF8.GetBytes(Backend);
+            if (b.Length > byte.MaxValue) throw new InvalidDataException("后端指纹过长");
+            bw.Write((byte)b.Length);
+            bw.Write(b);
+        }
         else
         {
             bw.Write(Version);
             bw.Write(new byte[3]);
         }
-        if (Mode != VaultMode.MultiSeal)
+        if (!wroteKeyVault)
         {
             bw.Write(KeyVault);
         }

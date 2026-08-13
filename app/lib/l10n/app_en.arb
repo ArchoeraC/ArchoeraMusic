@@ -693,6 +693,8 @@
   "settingsVaultCloseV3PasswordDesc": "No recovery password was set when device binding was enabled (passwordless on this device). Disabling it switches to password protection (v2): please set a new unlock password. The master key and existing data are preserved; this password is required at every launch.",
   "toastVaultSwitchedToPassword": "Switched to password protection (v2)",
   "toastVaultSwitchedToOs": "Switched back to OS protection (v1)",
+  "settingsVaultShareBrokenBanner": "Credential vault shares are mismatched: storage backend mismatch or missing share. Local credentials cannot be decrypted. Rebuild the vault and sign in again.",
+  "settingsVaultShareBrokenRebuild": "Rebuild vault",
   "settingsVaultRestartTitle": "Restart required",
   "settingsVaultRestartDesc": "The encryption tier has been switched successfully. Restart the app to ensure database integrity and consistent state across all modules. In password protection mode (v2), you will be asked for your password after restart; login and streaming credentials are unavailable (shown as signed out) until then. Playback and downloads are interrupted during the restart.",
   "settingsVaultRestartNow": "Restart now",

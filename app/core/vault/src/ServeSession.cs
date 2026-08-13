@@ -92,9 +92,27 @@ public sealed class ServeSession
             // 设备变更/熵损坏且 vault 有口令封装 → 恢复流（不计入锁定退避）
             return Fail("NEED_RECOVERY " + ex.Message);
         }
+        catch (VaultShareBackendMismatchException ex)
+        {
+            // 后端不配对（PROD/TEST 混用同一数据目录）：环境配置错误，
+            // 非爆破向量——不记退避（修复路径=销毁重建，重建时 lockout 清零）
+            return Fail("SHARE_BACKEND_MISMATCH " + ex.Message);
+        }
+        catch (VaultShareMissingException ex)
+        {
+            // 授权侧份额缺失：数据已不可恢复，非爆破向量——不记退避
+            return Fail("SHARE_MISSING " + ex.Message);
+        }
+        catch (AuthenticationTagMismatchException ex)
+        {
+            // 份额/口令/文件不配对（GCM 认证失败，解锁主密钥或回读锚点失败）：
+            // 可能为口令错误或份额被替换——爆破相关，记退避
+            _lockout.RecordFailure();
+            return Fail("SHARE_MISMATCH " + ex.Message);
+        }
         catch (Exception ex)
         {
-            // 解锁失败（口令错误/份额缺失/文件篡改）→ 记录退避
+            // 其他解锁失败（口令错误/文件篡改等）→ 记录退避
             _lockout.RecordFailure();
             return Fail(ex.Message);
         }

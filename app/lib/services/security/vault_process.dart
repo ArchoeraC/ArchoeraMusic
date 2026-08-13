@@ -462,11 +462,24 @@ class VaultProcess {
     return line.startsWith('ok ') ? line.substring(3) : '';
   }
 
-  /// 按消息内容分类异常：`NEED_RECOVERY`（设备变更/熵损坏，有口令封装可恢复）
-  /// → [VaultNeedRecoveryException]；其余 → [VaultException]。
+  /// 按消息内容分类异常（前缀错误码，v4 服务端分类）：
+  ///   `NEED_RECOVERY` → [VaultNeedRecoveryException]（设备变更/熵损坏，有口令封装可恢复）
+  ///   `SHARE_BACKEND_MISMATCH` → [VaultShareBackendMismatchException]（v4 指纹校验）
+  ///   `SHARE_MISSING` → [VaultShareMissingException]（授权侧份额缺失）
+  ///   `SHARE_MISMATCH` → [VaultShareMismatchException]（GCM 认证失败，份额/口令不配对）
+  ///   其余 → [VaultException]。
   static VaultException _asException(String message) {
     if (message.startsWith('NEED_RECOVERY ')) {
       return VaultNeedRecoveryException(message);
+    }
+    if (message.startsWith('SHARE_BACKEND_MISMATCH ')) {
+      return VaultShareBackendMismatchException(message);
+    }
+    if (message.startsWith('SHARE_MISSING ')) {
+      return VaultShareMissingException(message);
+    }
+    if (message.startsWith('SHARE_MISMATCH ')) {
+      return VaultShareMismatchException(message);
     }
     return VaultException(message);
   }
@@ -734,6 +747,36 @@ class VaultNeedRecoveryException extends VaultException {
 
   @override
   String toString() => 'VaultNeedRecoveryException: $message';
+}
+
+/// 份额不配对（serve `err SHARE_MISMATCH`，GCM 认证失败）：vault 文件与授权侧
+/// 份额 S 不配对——口令错误 / 份额被替换 / 文件被篡改。已触发锁定退避，
+/// UI 应提示「凭据保险库不配对，需销毁重建」。
+class VaultShareMismatchException extends VaultException {
+  const VaultShareMismatchException(super.message);
+
+  @override
+  String toString() => 'VaultShareMismatchException: $message';
+}
+
+/// 授权侧份额缺失（serve `err SHARE_MISSING`）：vault 文件存在但对应后端
+/// 无 S 份额，数据不可恢复——UI 应引导销毁重建。
+class VaultShareMissingException extends VaultException {
+  const VaultShareMissingException(super.message);
+
+  @override
+  String toString() => 'VaultShareMissingException: $message';
+}
+
+/// 份额后端不配对（serve `err SHARE_BACKEND_MISMATCH`，v4 指纹校验）：vault
+/// 文件头记录的 backend ≠ 当前实际存储后端——不同构建形态（PROD=OS 安全存储 /
+/// TEST=明文文件）混用同一数据目录所致，S 份额与凭据库永久不配对。
+/// 非爆破向量（不触发锁定退避）；UI 应明确引导「销毁重建」而非反复重试。
+class VaultShareBackendMismatchException extends VaultException {
+  const VaultShareBackendMismatchException(super.message);
+
+  @override
+  String toString() => 'VaultShareBackendMismatchException: $message';
 }
 
 /// vault 版本/构建标记异常（握手应答 marker 非 PROD 或缺失，仅默认路径

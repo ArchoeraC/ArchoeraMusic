@@ -110,4 +110,56 @@ void main() {
     expect(VaultProcess.consumeCrashMarker(tmp.path), isFalse,
         reason: '消费后文件应删除');
   });
+
+  test('v4 后端指纹不配对 → serve 报 SHARE_BACKEND_MISMATCH（明确错误码）', () async {
+    final tmp = await Directory.systemTemp.createTemp('vault_v4_backend');
+    addTearDown(() => tmp.deleteSync(recursive: true));
+    if (!VaultProcess.available) {
+      markTestSkipped('vault 不可用，跳过');
+      return;
+    }
+
+    // 默认后端（insecure）初始化：v4 文件头记录 backend=insecure
+    await VaultProcess.init(tmp.path);
+
+    // 另一后端名（模拟不同构建形态 PROD/TEST 混用数据目录）访问同一目录
+    // → 明确错误码 SHARE_BACKEND_MISMATCH（此前为模糊的 GCM mismatch）
+    final rng = Random.secure();
+    final p = await Process.start(VaultProcess.binary, ['serve', tmp.path],
+        environment: {
+          ...Platform.environment,
+          VaultProcess.envParentOk: 'flutter_tester,dart',
+          'ARCHOERA_VAULT_INSECURE_BACKEND': 'other',
+        });
+    final h = base64Encode(List<int>.generate(32, (_) => rng.nextInt(256)));
+    final c = base64Encode(List<int>.generate(16, (_) => rng.nextInt(256)));
+    p.stdin.write('handshake $h $c\n');
+    await p.stdin.flush();
+    final resp = await p.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .first
+        .timeout(const Duration(seconds: 10));
+    expect(resp, startsWith('err SHARE_BACKEND_MISMATCH'),
+        reason: '不同后端访问应报明确错误码，而非模糊 GCM mismatch');
+    p.stdin.close();
+    await p.exitCode.timeout(const Duration(seconds: 5));
+
+    // 原后端访问 → 正常解锁（指纹配对，校验不破坏配对会话）
+    final p2 = await Process.start(VaultProcess.binary, ['serve', tmp.path],
+        environment: {
+          ...Platform.environment,
+          VaultProcess.envParentOk: 'flutter_tester,dart',
+        });
+    p2.stdin.write('handshake $h $c\n');
+    await p2.stdin.flush();
+    final resp2 = await p2.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .first
+        .timeout(const Duration(seconds: 10));
+    expect(resp2, startsWith('ok handshake'), reason: '配对后端应解锁');
+    p2.stdin.close();
+    await p2.exitCode.timeout(const Duration(seconds: 5));
+  });
 }

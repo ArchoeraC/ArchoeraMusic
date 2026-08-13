@@ -18,10 +18,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:window_manager/window_manager.dart';
 
 import '../../apis/netease/api.dart' show nmClearNeteaseCookies;
 import '../../apis/runtime.dart' show getRuntime;
+import '../../app/app_quit.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/security/data_destroyer.dart';
@@ -71,6 +71,14 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     final s = getRuntime().sessionStore;
     return (s is VaultSessionStore && s.needsRecovery) ||
         StreamingStore.needsRecovery;
+  }
+
+  /// 份额不配对（v4 后端指纹不符 / 份额缺失 / GCM 认证失败）：vault 无法
+  /// 解密且数据不可恢复——显示红色横幅引导「销毁重建」（非恢复流，无口令
+  /// 封装可解；不反复重试）。
+  bool get _shareBroken {
+    final s = getRuntime().sessionStore;
+    return s is VaultSessionStore && s.shareBroken;
   }
 
   /// v2（口令模式）本会话已解锁：会话口令内存持有，可执行需要口令的操作
@@ -201,6 +209,15 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     }
     final r = destroySensitiveFiles([vaultFilePath(), sessionStorePath()]);
     _afterDestroyed(l10n.settingsSecuritySession, r);
+  }
+
+  /// 份额不配对（[shareBroken]）恢复动作：销毁 vault（弹确认）→ 引导重启。
+  /// 重启后 vault 惰性重建（store 检测未初始化自动 init），重新登录即可——
+  /// 不反复重试（不配对是确定性环境故障，非瞬时错误）。
+  Future<void> _destroyBrokenVault() async {
+    await _destroySession();
+    if (!mounted) return;
+    await _restartApp();
   }
 
   Future<void> _destroyUserDb() async {
@@ -603,7 +620,9 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     } catch (e) {
       debugPrint('[vault] 重启应用失败（请手动重启）：$e');
     }
-    await windowManager.destroy();
+    // 退出统一走 exit(0) 链路：绕开 Flutter Linux GTK teardown 崩溃
+    // （windowManager.destroy → gtk_window_close → use-after-free 段错误）
+    await quitApplication(ref);
   }
 
   /// 设置/修改恢复口令（须已解锁）：旧口令立即失效。
@@ -854,6 +873,46 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
                     variant: SButtonVariant.secondary,
                     size: SButtonSize.small,
                     onPressed: _deviceBusy ? null : _recoverVault,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        // 份额不配对（v4 后端指纹不符/份额缺失/GCM 认证失败）：销毁重建引导
+        // （红色横幅，区别于可恢复的 _needsRecovery——无口令封装可解）
+        if (_shareBroken)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: scheme.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: scheme.error.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.broken_image_outlined,
+                      size: 18, color: scheme.error),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      l10n.settingsVaultShareBrokenBanner,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.error,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SButton(
+                    label: l10n.settingsVaultShareBrokenRebuild,
+                    variant: SButtonVariant.secondary,
+                    size: SButtonSize.small,
+                    onPressed: _deviceBusy ? null : _destroyBrokenVault,
                   ),
                 ],
               ),

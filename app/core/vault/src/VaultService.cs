@@ -10,6 +10,38 @@ public sealed class NeedRecoveryException : Exception
     public NeedRecoveryException(string message) : base(message) { }
 }
 
+/// 份额后端不配对（v4）：vault 文件头记录的 backend 指纹 ≠ 当前实际存储后端。
+/// 根因：不同构建形态（PROD=OS 安全存储 / TEST=明文文件）混用同一数据目录，
+/// 造成 S 份额与凭据库永久不配对（此前表现为模糊的 GCM mismatch）。
+/// 非爆破向量：不记锁定退避；主进程应识别 `SHARE_BACKEND_MISMATCH` 引导销毁重建。
+public sealed class VaultShareBackendMismatchException : Exception
+{
+    public string StoredBackend { get; }
+    public string CurrentBackend { get; }
+
+    public VaultShareBackendMismatchException(string stored, string current)
+        : base($"份额存储后端不配对：vault 记录 [{stored}]，当前为 [{current}]——"
+               + "不同构建形态混用同一数据目录所致，请销毁重建 vault")
+    {
+        StoredBackend = stored;
+        CurrentBackend = current;
+    }
+}
+
+/// 授权侧份额（S）缺失：vault 文件存在但对应后端无份额。
+/// 非爆破向量：不记锁定退避；主进程应识别 `SHARE_MISSING` 引导销毁重建
+/// （原份额不可恢复）。
+public sealed class VaultShareMissingException : Exception
+{
+    public string Backend { get; }
+
+    public VaultShareMissingException(string backend)
+        : base($"授权侧份额（S）缺失（后端 [{backend}]）：vault 无法解密，需销毁重建")
+    {
+        Backend = backend;
+    }
+}
+
 /// vault 服务（命令语义）：init / init-password / init-device / serve / destroy / status。
 ///
 /// 主密钥 K 永不落盘：文件头只存 K_vault = K ⊕ S（vault 侧份额），
@@ -55,7 +87,8 @@ public sealed class VaultService
         try
         {
             _store.Store(ShareKey, share);
-            VaultFile.Create(keyVault).Save(VaultPath);
+            // v4：写入当前后端指纹（解锁时校验，防 PROD/TEST 混用数据目录）
+            VaultFile.Create(keyVault, _store.Backend).Save(VaultPath);
         }
         catch
         {
@@ -284,8 +317,15 @@ public sealed class VaultService
             }
             return;
         }
+        // v4 后端指纹校验：文件头记录的后端 ≠ 当前实际后端 → 份额不配对
+        // （PROD/TEST 混用同一数据目录的典型症状），升级为明确异常而非 GCM mismatch。
+        // 旧版 v1/v2/v3 文件 Backend=null → 跳过校验（向后兼容）。
+        if (vault.Backend != null && vault.Backend != _store.Backend)
+        {
+            throw new VaultShareBackendMismatchException(vault.Backend, _store.Backend);
+        }
         var shareOs = _store.Load(ShareKey)
-            ?? throw new InvalidOperationException("授权侧份额（S）缺失：vault 无法解密，需销毁重建");
+            ?? throw new VaultShareMissingException(_store.Backend);
         try
         {
             KeySplit.Recombine(vault.KeyVault, shareOs, dest);
@@ -501,7 +541,7 @@ public sealed class VaultService
                     _store.Store(ShareKey, sOs);              // 先落 OS 安全存储
                     try
                     {
-                        var v1 = VaultFile.Create(newKeyVault);
+                        var v1 = VaultFile.Create(newKeyVault, _store.Backend);
                         v1.Entries.AddRange(vault.Entries);   // K 不变：条目原样沿用
                         v1.Save(VaultPath);
                     }

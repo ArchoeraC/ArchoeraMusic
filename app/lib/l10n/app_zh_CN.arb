@@ -693,6 +693,8 @@
   "settingsVaultCloseV3PasswordDesc": "设备绑定开启时未设置恢复口令（本机免密），关闭后将转为口令保护（v2）：请设置新的解锁口令。主密钥与已有数据保留，此口令每次启动都需输入。",
   "toastVaultSwitchedToPassword": "已切换到口令保护（v2）",
   "toastVaultSwitchedToOs": "已切换回系统保护（v1）",
+  "settingsVaultShareBrokenBanner": "凭据保险库份额不配对：存储后端不符或份额缺失，本地凭据无法解密。需销毁重建后重新登录。",
+  "settingsVaultShareBrokenRebuild": "销毁重建",
   "settingsVaultRestartTitle": "需要重启应用",
   "settingsVaultRestartDesc": "加密等级已切换成功。为保证数据库完整性与各模块状态一致，请重启应用生效。若为口令保护模式（v2），重启后将要求输入口令解锁，解锁前登录态与流媒体凭据暂不可用（显示为未登录）；重启期间播放与下载会中断。",
   "settingsVaultRestartNow": "立即重启",

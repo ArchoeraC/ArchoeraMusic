@@ -693,6 +693,8 @@
   "settingsVaultCloseV3PasswordDesc": "裝置綁定開啟時未設定復原密碼（本機免密），關閉後將轉為密碼保護（v2）：請設定新的解鎖密碼。主金鑰與既有資料保留，此密碼每次啟動都需輸入。",
   "toastVaultSwitchedToPassword": "已切換到密碼保護（v2）",
   "toastVaultSwitchedToOs": "已切換回系統保護（v1）",
+  "settingsVaultShareBrokenBanner": "憑證保險庫份額不配對：儲存後端不符或份額缺失，本機憑證無法解密。需銷毀重建後重新登入。",
+  "settingsVaultShareBrokenRebuild": "銷毀重建",
   "settingsVaultRestartTitle": "需要重新啟動應用程式",
   "settingsVaultRestartDesc": "加密等級已切換成功。為保證資料庫完整性與各模組狀態一致，請重新啟動應用程式生效。若為密碼保護模式（v2），重新啟動後將要求輸入密碼解鎖，解鎖前登入狀態與串流憑證暫時不可用（顯示為未登入）；重新啟動期間播放與下載會中斷。",
   "settingsVaultRestartNow": "立即重新啟動",

@@ -2374,6 +2374,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toastVaultSwitchedToOs => 'Switched back to OS protection (v1)';
 
   @override
+  String get settingsVaultShareBrokenBanner =>
+      'Credential vault shares are mismatched: storage backend mismatch or missing share. Local credentials cannot be decrypted. Rebuild the vault and sign in again.';
+
+  @override
+  String get settingsVaultShareBrokenRebuild => 'Rebuild vault';
+
+  @override
   String get settingsVaultRestartTitle => 'Restart required';
 
   @override

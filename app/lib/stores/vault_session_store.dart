@@ -26,6 +26,10 @@ class VaultSessionStore implements SessionStore {
   String? _mode;
   bool _needsRecovery = false;
 
+  /// 份额不配对（v4 指纹校验 backend 不符 / 份额缺失 / GCM 认证失败）：
+  /// vault 无法解密且数据不可恢复——UI 应引导「销毁重建」而非反复重试。
+  bool _shareBroken = false;
+
   /// v2 口令模式：本次会话的解锁口令（内存持有，仅用于 serve 握手；
   /// 绝不持久化/写盘；应用重启后需重新输入）。
   String? _sessionPassword;
@@ -79,6 +83,11 @@ class VaultSessionStore implements SessionStore {
   /// 设备变更/熵损坏：vault 有口令封装但熵路径解锁失败（serve `err NEED_RECOVERY`）
   /// → 需「恢复口令」解锁。与锁定退避不同：恢复场景非爆破尝试，不计退避。
   bool get needsRecovery => _needsRecovery;
+
+  /// 份额不配对（[VaultShareBackendMismatchException] / [VaultShareMissingException] /
+  /// [VaultShareMismatchException]）：vault 无法解密且数据不可恢复——
+  /// UI 应引导「销毁重建」（安全设置页显著提示），而非反复重试。
+  bool get shareBroken => _shareBroken;
 
   /// v1 ↔ v2 份额迁移（三档切换条：系统保护 ↔ 口令保护）：
   /// 主密钥 K 不变、既有条目原样沿用（无需重加密），仅切换授权份额 S
@@ -182,6 +191,7 @@ class VaultSessionStore implements SessionStore {
       }
       await _loadFromVault();
       _vaultOk = true;
+      _shareBroken = false; // 解锁成功（销毁重建或后端恢复）→ 复位不配对标记
     } on VaultNeedRecoveryException catch (e) {
       // 设备变更/熵损坏（v3 有口令封装）：fail-closed 不加载，标记待恢复。
       // 与普通不可用不同：这是「可恢复」状态，UI 应弹恢复流而非静默降级。
@@ -189,12 +199,28 @@ class VaultSessionStore implements SessionStore {
       _vaultOk = false;
       _cache.clear();
       stderr.writeln('[vault] 设备变更/熵损坏，需恢复口令解锁：$e');
+    } on VaultShareMismatchException catch (e) {
+      _markShareBroken(e);
+    } on VaultShareBackendMismatchException catch (e) {
+      _markShareBroken(e);
+    } on VaultShareMissingException catch (e) {
+      _markShareBroken(e);
     } catch (e) {
       // 缺 OS 安全存储 / 数据损坏等：内存降级，不静默写明文
       _vaultOk = false;
       _cache.clear();
       stderr.writeln('[vault] 凭据保险库不可用，登录态将不持久化：$e');
     }
+  }
+
+  /// 份额不配对（backend 指纹不符 / 份额缺失 / GCM 认证失败）：
+  /// vault 无法解密且数据不可恢复——标记 [shareBroken] 供 UI 引导销毁重建，
+  /// 不静默降级（不写明文、不重试），不触发恢复流（无口令封装可解）。
+  void _markShareBroken(VaultException e) {
+    _shareBroken = true;
+    _vaultOk = false;
+    _cache.clear();
+    stderr.writeln('[vault] 凭据保险库份额不配对，需销毁重建：$e');
   }
 
   /// 从 vault 加载全部平台会话（口令模式须传 [password]；迁移旧明文）。
@@ -283,6 +309,7 @@ class VaultSessionStore implements SessionStore {
         await VaultProcess.init(_dataDir);
       }
       _vaultOk = true;
+      _shareBroken = false; // 持久化成功（销毁重建后自动重建）→ 复位不配对标记
       final cookies = _cache[platform];
       if (cookies == null || cookies.isEmpty) {
         await VaultProcess.delete(_dataDir, _uidFor(platform),
@@ -296,6 +323,12 @@ class VaultSessionStore implements SessionStore {
       _needsRecovery = true;
       _vaultOk = false;
       stderr.writeln('[vault] 设备变更/熵损坏，需恢复口令解锁：$e');
+    } on VaultShareMismatchException catch (e) {
+      _markShareBroken(e);
+    } on VaultShareBackendMismatchException catch (e) {
+      _markShareBroken(e);
+    } on VaultShareMissingException catch (e) {
+      _markShareBroken(e);
     } catch (e) {
       _vaultOk = false;
       stderr.writeln('[vault] 持久化失败（登录态仅内存保留）：$e');

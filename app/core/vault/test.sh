@@ -159,12 +159,12 @@ p.stdin.write(("handshake %s %s\n" % (
     base64.b64encode(os.urandom(16)).decode())).encode())
 p.stdin.flush()
 resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("err"), "缺授权侧份额应拒绝握手: %r" % resp
+assert resp.startswith("err SHARE_MISSING"), "缺授权侧份额应 SHARE_MISSING: %r" % resp
 p.stdin.close(); p.wait(timeout=5)
 assert p.returncode != 0, "拒绝路径应非零退出"
 print("ok")
 PY
-pass "仅 vault 文件无法解密（2-of-2 生效）"
+pass "仅 vault 文件无法解密（2-of-2 生效，SHARE_MISSING）"
 
 # 恢复现场：重建
 run destroy "$DATA" >/dev/null || fail "destroy 失败"
@@ -190,11 +190,11 @@ p.stdin.write(("handshake %s %s\n" % (
     base64.b64encode(os.urandom(16)).decode())).encode())
 p.stdin.flush()
 resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("err"), "篡改后应认证失败: %r" % resp
+assert resp.startswith("err SHARE_MISMATCH"), "篡改后应 SHARE_MISMATCH: %r" % resp
 p.stdin.close(); p.wait(timeout=5)
 print("ok")
 PY
-pass "密文篡改被 GCM 认证拦截"
+pass "密文篡改被 GCM 认证拦截（SHARE_MISMATCH）"
 
 # 恢复现场：重建（篡改文件不可复用，供后续崩溃联动测试握手成功）
 run destroy "$DATA" >/dev/null || fail "destroy 失败"
@@ -730,5 +730,80 @@ print("ok")
 PY
 run status "$DATA8" | grep -q '"mode":"os"' || fail "v2→v1 后 status 应为 os"
 pass "v1 ↔ v2 互切（switch-mode：K 不变数据沿用 / 无口令被拒 / 口令切换 / 免密回归）"
+
+# ── 18. v4 后端指纹不配对（不同构建形态混用数据目录 → SHARE_BACKEND_MISMATCH）──
+DATA9="$(mktemp -d)"
+trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9"' EXIT
+
+# ① backend=a 初始化：v4 文件头记录后端指纹 a
+OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=a "$VAULT" init "$DATA9" 2>&1) || true
+case "$OUT" in
+  ok\ *) : ;;
+  *) fail "backend=a init 失败: $OUT";;
+esac
+python3 - "$DATA9/credentials.vault" <<'PY' || fail "v4 文件头应记录后端指纹"
+import sys
+d = open(sys.argv[1], 'rb').read()
+assert d[:4] == b'AVLT', "magic 不符"
+assert d[4] == 4, "应为 v4 布局，got %d" % d[4]
+blen = d[40]
+assert d[41:41 + blen] == b'a', "backend 指纹不符: %r" % d[41:41 + blen]
+print("ok")
+PY
+
+# ② backend=a 访问：指纹配对 → 握手解锁成功
+python3 - "$VAULT" "$DATA9" <<'PY' || fail "配对后端应解锁成功"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+env = dict(os.environ)
+env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "a"
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("ok handshake"), "配对后端应解锁: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+
+# ③ backend=b 访问同一目录（模拟另一构建形态）→ SHARE_BACKEND_MISMATCH（明确错误码）
+python3 - "$VAULT" "$DATA9" <<'PY' || fail "不配对后端应 SHARE_BACKEND_MISMATCH"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+env = dict(os.environ)
+env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "b"
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("err SHARE_BACKEND_MISMATCH"), "应 SHARE_BACKEND_MISMATCH: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+
+# ④ 回到 backend=a：仍可解锁（指纹校验只拦截不配对，不破坏配对会话）
+python3 - "$VAULT" "$DATA9" <<'PY' || fail "配对后端应始终可解锁"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+env = dict(os.environ)
+env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "a"
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("ok handshake"), "配对后端应解锁: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+pass "v4 后端指纹不配对（a 初始化/a 解锁/b → SHARE_BACKEND_MISMATCH/a 仍可解锁）"
 
 echo "全部通过 ✔"
