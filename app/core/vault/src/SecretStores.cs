@@ -16,6 +16,11 @@ public sealed class SecretStoreUnavailableException : Exception
 /// 实现：Windows DPAPI / macOS Keychain / Linux libsecret。
 public interface ISecretStore
 {
+    /// 存储后端指纹（写入 vault 文件头，解锁时校验——防不同构建形态
+    /// （PROD=OS 安全存储 / TEST=明文文件）混用同一数据目录造成份额与
+    /// 凭据库永久不配对，把 GCM mismatch 升级为明确错误码）。
+    string Backend { get; }
+
     byte[]? Load(string key);
     void Store(string key, byte[] value);
     void Delete(string key);
@@ -61,6 +66,11 @@ public sealed class InsecureFileStore : ISecretStore
 
     public InsecureFileStore(string dataDir) => _dir = dataDir;
 
+    /// 默认 `insecure`；测试可用 `ARCHOERA_VAULT_INSECURE_BACKEND` 覆盖后端名
+    /// （模拟「不同构建形态」混用同一数据目录，验证 v4 指纹 SHARE_BACKEND_MISMATCH）。
+    public string Backend =>
+        Environment.GetEnvironmentVariable("ARCHOERA_VAULT_INSECURE_BACKEND") ?? "insecure";
+
     private string PathFor(string key) => Path.Combine(_dir, $"insecure_{key.Replace('/', '_')}.bin");
 
     public byte[]? Load(string key)
@@ -91,6 +101,8 @@ public sealed class DpapiStore : ISecretStore
     private readonly string _file;
 
     public DpapiStore(string dataDir) => _file = Path.Combine(dataDir, "sshare.bin");
+
+    public string Backend => "dpapi";
 
     public byte[]? Load(string key)
     {
@@ -200,6 +212,8 @@ internal static class ProtectTransforms
 public sealed class KeychainStore : ISecretStore
 {
     private const string Service = "archoera.vault";
+
+    public string Backend => "keychain";
 
     private static IntPtr _cfStr(string s) => CFStringCreateWithCString(IntPtr.Zero, s, 0x08000100 /* kCFStringEncodingUTF8 */);
 
@@ -330,6 +344,8 @@ public sealed class KeychainStore : ISecretStore
 public sealed class LibsecretStore : ISecretStore
 {
     private const string SchemaName = "archoera.vault";
+
+    public string Backend => "libsecret";
 
     public LibsecretStore()
     {

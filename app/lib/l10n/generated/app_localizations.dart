@@ -4268,6 +4268,18 @@ abstract class AppLocalizations {
   /// **'已切换回系统保护（v1）'**
   String get toastVaultSwitchedToOs;
 
+  /// No description provided for @settingsVaultShareBrokenBanner.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据保险库份额不配对：存储后端不符或份额缺失，本地凭据无法解密。需销毁重建后重新登录。'**
+  String get settingsVaultShareBrokenBanner;
+
+  /// No description provided for @settingsVaultShareBrokenRebuild.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'销毁重建'**
+  String get settingsVaultShareBrokenRebuild;
+
   /// No description provided for @settingsVaultRestartTitle.
   ///
   /// In zh_CN, this message translates to:

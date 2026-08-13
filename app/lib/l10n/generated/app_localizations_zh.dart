@@ -2281,6 +2281,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastVaultSwitchedToOs => '已切换回系统保护（v1）';
 
   @override
+  String get settingsVaultShareBrokenBanner =>
+      '凭据保险库份额不配对：存储后端不符或份额缺失，本地凭据无法解密。需销毁重建后重新登录。';
+
+  @override
+  String get settingsVaultShareBrokenRebuild => '销毁重建';
+
+  @override
   String get settingsVaultRestartTitle => '需要重启应用';
 
   @override
@@ -5299,6 +5306,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get toastVaultSwitchedToOs => '已切换回系统保护（v1）';
+
+  @override
+  String get settingsVaultShareBrokenBanner =>
+      '凭据保险库份额不配对：存储后端不符或份额缺失，本地凭据无法解密。需销毁重建后重新登录。';
+
+  @override
+  String get settingsVaultShareBrokenRebuild => '销毁重建';
 
   @override
   String get settingsVaultRestartTitle => '需要重启应用';
@@ -8320,6 +8334,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get toastVaultSwitchedToOs => '已切換回系統保護（v1）';
+
+  @override
+  String get settingsVaultShareBrokenBanner =>
+      '憑證保險庫份額不配對：儲存後端不符或份額缺失，本機憑證無法解密。需銷毀重建後重新登入。';
+
+  @override
+  String get settingsVaultShareBrokenRebuild => '銷毀重建';
 
   @override
   String get settingsVaultRestartTitle => '需要重新啟動應用程式';

@@ -902,6 +902,8 @@
   "settingsVaultV3NoDirectV1": "设备绑定（v3）不可直接降回 v1：请先关闭设备绑定，回落为 v2 口令模式",
   "toastVaultSwitchedToPassword": "已切换到口令保护（v2）",
   "toastVaultSwitchedToOs": "已切换回系统保护（v1）",
+  "settingsVaultShareBrokenBanner": "Credential vault shares are mismatched: storage backend mismatch or missing share. Local credentials cannot be decrypted. Rebuild the vault and sign in again.",
+  "settingsVaultShareBrokenRebuild": "Rebuild vault",
   "settingsVaultRestartTitle": "需要重启应用",
   "settingsVaultRestartDesc": "加密等级已切换成功。为保证数据库完整性与各模块状态一致，请重启应用生效。若为口令保护模式（v2），重启后将要求输入口令解锁，解锁前登录态与流媒体凭据暂不可用（显示为未登录）；重启期间播放与下载会中断。",
   "settingsVaultRestartNow": "立即重启",
