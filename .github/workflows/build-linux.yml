@@ -123,12 +123,18 @@ jobs:
         # 在本机 nix build（store 路径与 nixpkgs 版本强绑定）。
         run: |
           bash packaging/linux/package.sh nix app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-          docker run --rm -v "$PWD":/workspace -w /workspace/packaging/linux/work/nix \
+          docker run --rm -v "$PWD":/workspace \
             -e PKG_VER="${{ steps.version.outputs.version }}" \
             nixos/nix:latest bash -c '
+              # /workspace 是 git 仓库且归宿主 runner 所有；nix 对 git 仓库
+              # 输入走 libgit2 且拒绝"非当前用户所有"（容器 root vs 宿主 1001）。
+              # 复制到容器内非 git 目录按 plain path（path:）输入构建，绕开
+              # libgit2 所有权检查（nix 仍把目录复制进 store 保证可复现）。
+              mkdir -p /tmp/nixbuild
+              cp -a /workspace/packaging/linux/work/nix/. /tmp/nixbuild/
+              cd /tmp/nixbuild
               nix --extra-experimental-features "nix-command flakes" build .#default --no-sandbox || exit 1
-              # result 是指向容器 /nix/store 的 symlink（宿主无此路径，cp -L 会失败），
-              # 必须在容器内 readlink 后打包完整 store 产物（lib/bin/share）
+              # result 指向容器 /nix/store，readlink 后打包完整 store 产物
               tar -C "$(readlink -f result)" -czf \
                 "/workspace/dist/linux/ArchoeraMusic-v${PKG_VER}-nixos-x86_64.tar.gz" .
             '
