@@ -27,6 +27,8 @@ depends=(
   'libxi'
   'at-spi2-atk'
   'libcloudproviders'
+  # ffmpeg：bundle 内嵌 FFmpeg 库的编解码传递依赖（libx264 等）供应者；
+  # 引擎链接自带 soname，系统 ffmpeg 升级不破坏应用（仅提供依赖库）。
   'ffmpeg'
   'taglib'
   'curl'

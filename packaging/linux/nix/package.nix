@@ -34,6 +34,10 @@
   # mediaengine 链接的 FFmpeg soname 取决于构建机：CI（ubuntu-24.04
   # FFmpeg 7.0.1）→ libavformat.so.61；本地较新 FFmpeg → libavformat.so.62。
   # 两版本并存，autoPatchelfHook 按各 ELF 的 NEEDED 自动匹配。
+  # 注：bundle 内嵌 FFmpeg 库（native/libav*.so）在 NixOS 上不适用——其
+  # 编解码传递依赖（libx264 等）为构建机打包版本，Nix store 不提供；
+  # 本包 installPhase 移除内嵌库，统一走 store ffmpeg（nixpkgs 版本由
+  # flake 锁定，天然免疫「突然性 major 升级」），autoPatchelfHook 补 RUNPATH。
 , ffmpeg_7 # libavformat.so.61 / libavcodec.so.61
 , ffmpeg_8 # libavformat.so.62 / libavcodec.so.62
 , taglib # libtag.so.2（scraper）
@@ -81,6 +85,12 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
     mkdir -p $out/lib/archoera-music $out/bin
     cp -a $src/. $out/lib/archoera-music/
+    # NixOS 上移除内嵌 FFmpeg 库（见上方 ffmpeg_7/ffmpeg_8 注释），
+    # 引擎 NEEDED 由 store ffmpeg 经 autoPatchelfHook 补充 RUNPATH 满足。
+    rm -f $out/lib/archoera-music/native/libavformat.so.* \
+          $out/lib/archoera-music/native/libavcodec.so.* \
+          $out/lib/archoera-music/native/libavutil.so.* \
+          $out/lib/archoera-music/native/libswresample.so.*
     ln -s $out/lib/archoera-music/archoera_music $out/bin/archoera_music
     # 桌面条目 + 图标（文件名 = 应用 ID，保证 Wayland 任务栏图标映射）
     install -Dm644 ${./archoera-music.desktop} \

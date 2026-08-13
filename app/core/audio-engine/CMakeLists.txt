@@ -45,6 +45,28 @@ pkg_check_modules(FFMPEG REQUIRED
     libswresample
 )
 
+# ── FFmpeg 运行库内嵌（Linux 自包含，防系统 FFmpeg major bump 破坏）─
+# FFmpeg 每次 major 升级都 bump soname（如 libavformat.so.62→.63），系统上
+# 所有链接旧 soname 的预编译二进制随即无法加载（官方声明要求下游全部重编）。
+# 为避免「系统升级 → 应用坏掉」，构建时把链接到的 FFmpeg 运行库实体拷入
+# build/ffmpeg/，由 app/linux 一并装进 bundle/native/；引擎 RUNPATH=$ORIGIN
+# 使加载器优先解析自带库，与系统 FFmpeg 完全解耦。
+# 注意：macOS 的 dylib install_name 是绝对路径，内嵌需 install_name_tool
+# 后处理，本块仅服务 Linux（ELF 按 soname 纯文件名解析）。
+if(NOT APPLE)
+  file(GLOB FFMPEG_RUNTIME_LIBS
+    "${FFMPEG_LIBRARY_DIRS}/libavformat.so.*"
+    "${FFMPEG_LIBRARY_DIRS}/libavcodec.so.*"
+    "${FFMPEG_LIBRARY_DIRS}/libavutil.so.*"
+    "${FFMPEG_LIBRARY_DIRS}/libswresample.so.*")
+  if(FFMPEG_RUNTIME_LIBS)
+    file(COPY ${FFMPEG_RUNTIME_LIBS} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/ffmpeg)
+    message(STATUS "FFmpeg 内嵌运行库 → ${CMAKE_CURRENT_BINARY_DIR}/ffmpeg/")
+  else()
+    message(WARNING "FFmpeg 运行库未找到（${FFMPEG_LIBRARY_DIRS}），bundle 将依赖系统 FFmpeg")
+  endif()
+endif()
+
 # ── Rust tempo 库 ──────────────────────────────────────────
 set(TEMPO_RS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tempo-rs)
 # Rust staticlib 命名（非 Windows 平台为 .a；MSVC 的 .lib 仅 Windows
@@ -182,6 +204,14 @@ if(TEMPO_AVAILABLE)
         target_link_libraries(archoera_mediaengine PRIVATE ${TEMPO_LIB} stdc++)
     endif()
     target_compile_definitions(archoera_mediaengine PRIVATE HAS_TEMPO=1)
+endif()
+
+# ── RUNPATH=$ORIGIN：bundle/native/ 平铺布局下引擎优先解析同目录内嵌
+#    FFmpeg 库（独立构建链产物被 app/linux 以 install(FILES) 直接拷贝，
+#    不经 CMake 安装后处理，故需链接期显式写入；引号防 shell 展开）。
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_options(archoera-audio-engine PRIVATE "-Wl,-rpath,'$ORIGIN'")
+  target_link_options(archoera_mediaengine PRIVATE "-Wl,-rpath,'$ORIGIN'")
 endif()
 
 # ── 测试 ────────────────────────────────────────────────────
