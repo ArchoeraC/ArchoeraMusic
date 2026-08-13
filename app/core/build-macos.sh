@@ -38,6 +38,13 @@ echo "[build-macos] ===== scanner (NativeAOT, RID=$RID) ====="
 bash "$ROOT/scanner/build.sh" "$RID"
 
 echo "[build-macos] ===== vault (NativeAOT 凭据保险库, RID=$RID) ====="
+# macOS NativeAOT Swift 库路径（dotnet/runtime#125858）：.NET 10 的
+# System.Security.Cryptography.Native.Apple 含 Swift 编译的 pal_swiftbindings.o，
+# 新版 Xcode（macOS-14/15 runner）下 ld_classic auto-link 找不到 swift_* 拆分库，
+# 会随机/稳定报 __swift_FORCE_LOAD_$_swift_* 未定义。官方 workaround 是给链接器
+# 追加 -L$(SDKROOT)/usr/lib/swift；此处显式导出 SDKROOT，csproj 在项目级
+# ItemGroup 消费（比 csproj 内 BeforeTargets 钩子更可靠，后者存在时序脆弱性）。
+export SDKROOT="$(xcrun --show-sdk-path)"
 bash "$ROOT/vault/build.sh" "$RID"
 
 echo "[build-macos] ===== downloader (Rust cdylib) ====="
