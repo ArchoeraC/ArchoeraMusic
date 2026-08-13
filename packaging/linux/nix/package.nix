@@ -16,11 +16,15 @@
 , stdenv
 , autoPatchelfHook
 , gtk3
+  # tray 插件链 libayatana-appindicator → libayatana-indicator + libdbusmenu-gtk3
+  # → ayatana-ido。包名以 nixpkgs 源码为准（epoxy→libepoxy、
+  # libayatana-indicator3→libayatana-indicator、libayatana-ido→ayatana-ido、
+  # libdbusmenu→libdbusmenu-gtk3）；显式列全链路，不依赖 propagate。
 , libayatana-appindicator
-, libayatana-indicator3
-, libayatana-ido
-, libdbusmenu
-, epoxy
+, libayatana-indicator
+, ayatana-ido
+, libdbusmenu-gtk3
+, libepoxy
 , fontconfig
 , fribidi
 , libX11
@@ -51,12 +55,11 @@ stdenv.mkDerivation (finalAttrs: {
 
   buildInputs = [
     gtk3
-    # tray 插件链 libayatana-indicator3/ido3：显式列出，不依赖 appindicator 的 propagate
     libayatana-appindicator
-    libayatana-indicator3
-    libayatana-ido
-    libdbusmenu
-    epoxy
+    libayatana-indicator
+    ayatana-ido
+    libdbusmenu-gtk3
+    libepoxy
     fontconfig
     fribidi
     libX11
