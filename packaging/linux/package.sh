@@ -9,6 +9,9 @@
 #   package.sh arch      <bundle> <版本>   → dist/linux/*.pkg.tar.zst     Arch/Manjaro 系
 #                                          （arch 仅预置工作目录，makepkg 由
 #                                            workflow 在 archlinux 容器内执行）
+#   package.sh nix       <bundle> <版本>   → work/nix/ 预置 flake 工作目录
+#                                          （bundle + desktop + icon + 版本注入，
+#                                            nix build 由 workflow 在 nixos/nix 容器内执行）
 #
 # 说明：bundle 必须保持完整目录结构（FFI 与引擎子进程均相对可执行文件定位）。
 set -euo pipefail
@@ -26,7 +29,7 @@ WORK="$HERE/work"
 
 fmt="${1:-}"; bundle="${2:-}"; version="${3:-}"
 if [[ -z "$fmt" || -z "$bundle" || -z "$version" ]]; then
-  echo "用法: package.sh <tar|deb|rpm|appimage|arch> <bundle路径> <版本>" >&2
+  echo "用法: package.sh <tar|deb|rpm|appimage|arch|nix> <bundle路径> <版本>" >&2
   exit 2
 fi
 bundle="$(cd "$bundle" && pwd)"
@@ -181,11 +184,26 @@ pkg_arch() {
   echo "→ $arch_dir （docker: archlinux 容器内运行 makepkg -f --skipinteg --nocheck --nodeps）"
 }
 
+# ── nix：预置 flake 工作目录（nixos/nix 容器内执行 nix build）────────
+pkg_nix() {
+  local nix_dir="$WORK/nix"
+  mkdir -p "$nix_dir"
+  # 源定义在 packaging/linux/nix/（提交进 git），拷入工作目录并注入版本
+  cp "$HERE/nix/flake.nix" "$nix_dir/flake.nix"
+  sed "s|@VERSION@|$version|g" "$HERE/nix/package.nix" > "$nix_dir/package.nix"
+  cp -a "$stage_bundle" "$nix_dir/bundle"
+  cp "$stage_desktop" "$nix_dir/archoera-music.desktop"
+  cp "$stage_icons/hicolor/512x512/apps/$APP_ID.png" \
+    "$nix_dir/com.archoera.archoera_music.png"
+  echo "→ $nix_dir （docker: nixos/nix 容器内运行 nix build .#default）"
+}
+
 case "$fmt" in
   tar)      pkg_tar ;;
   deb)      pkg_deb ;;
   rpm)      pkg_rpm ;;
   appimage) pkg_appimage ;;
   arch)     pkg_arch ;;
+  nix)      pkg_nix ;;
   *) echo "未知格式: $fmt" >&2; exit 2 ;;
 esac

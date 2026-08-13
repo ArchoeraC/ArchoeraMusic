@@ -10,6 +10,10 @@ pkgdesc="An open-source music player, connect to alternative music service, supp
 arch=('x86_64')
 url="https://github.com/BetaStudio2/ArchoeraMusic"
 license=('AGPL-3.0-only')
+# bundle 为 Release 预 strip 产物（Rust/Go/NativeAOT/C 均无调试符号），
+# 禁用 makepkg 的 strip/debug 处理：strip 无事可做，而 gdb-add-index 对
+# 无调试符号的 ELF 每次报 "No debugging symbols / No index was created"
+options=('!strip' '!debug')
 depends=(
   'glibc'
   'gcc-libs'
