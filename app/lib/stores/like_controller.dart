@@ -65,8 +65,9 @@ class LikeController extends ChangeNotifier {
         _neteaseIds.clear();
       }
 
-      // 酷狗：轻量分页拉 hash 集合（需登录）；不构造完整 Track 快照，
-      // 降低启动全量同步的 GC/内存压力
+      // 酷狗：轻量红心 hash 集合（likedHashSet 只分页取 hash，不构造
+      // Track / 不写库 / 不触碰收藏页全量列表），红心状态与列表解耦——
+      // 启动同步不做全量拉取，避免被进程退出/写失败影响（sync 语义）
       final kugou = _ref.read(kugouApiProvider);
       if (kugou.session != null) {
         try {

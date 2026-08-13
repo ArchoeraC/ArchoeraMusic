@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -49,14 +50,13 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
     _refresh();
   }
 
-  /// 重算各缓存统计（同步：SQLite COUNT + 文件扫描 + 内存 map 计数 + ImageCache 字节）。
+  /// 重算各缓存统计（「我喜欢」行数经后台 isolate 异步读 SQLite，
+  /// 不阻塞 UI；其余统计同步）。
   void _refresh() {
-    final store = LikedCacheStore.shared;
     final file = File(LikedCacheStore.defaultDbPath());
     final imageCache = PaintingBinding.instance.imageCache;
     final songStats = SongCache.shared.stats();
     setState(() {
-      _likedRows = store.rowCount();
       _likedBytes = file.existsSync() ? file.lengthSync() : 0;
       _lyricCount = getRuntime().lyricCache.count;
       _matchCount = getRuntime().lyricMatchCache.count;
@@ -65,6 +65,9 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
       _imageLive = imageCache.liveImageCount;
       _songBytes = songStats.$1;
       _songFiles = songStats.$2;
+    });
+    LikedCacheStore.shared.rowCount().then((c) {
+      if (mounted) setState(() => _likedRows = c);
     });
   }
 
@@ -112,7 +115,9 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
     }
   }
 
-  void _clearLiked() => LikedCacheStore.shared.clearAll();
+  Future<void> _clearLiked() async {
+    await LikedCacheStore.shared.clearAll();
+  }
 
   /// 缓存上限开关：开启 → 按最小值立即生效；关闭（= 无上限）→ 弹窗
   /// 警告内存占用风险，确认后才真正写入（用户明确知情）。
@@ -149,7 +154,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
   }
 
   void _clearAll() {
-    _clearLiked();
+    unawaited(_clearLiked());
     SongCache.shared.clear();
     getRuntime().lyricCache.clear();
     getRuntime().lyricMatchCache.clear();

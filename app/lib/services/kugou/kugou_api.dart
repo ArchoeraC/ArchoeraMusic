@@ -16,6 +16,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../../apis/runtime.dart';
+import '../liked/liked_cache.dart';
 import '../netease/netease_api.dart' show CoverItem, SearchResult;
 import '../netease/track.dart';
 import 'kugou_crypto.dart';
@@ -101,9 +102,16 @@ class KugouApi extends ChangeNotifier {
 
   /// 清除登录会话。
   void clearSession() {
+    final uid = session?.userid;
     session = null;
     _likeListId = null;
+    _likeGid = null;
     getRuntime().sessionStore.clear(_kugouSessionPlatform);
+    // 清空该用户「我喜欢」磁盘缓存（后台 isolate），避免「内存失效但
+    // 数据库残留」——旧缓存若不清，重登后读到的还是前账号/过期数据。
+    if (uid != null && uid.isNotEmpty) {
+      unawaited(LikedCacheStore.shared.invalidate('kugou', uid));
+    }
     notifyListeners();
   }
 
@@ -621,12 +629,16 @@ class KugouApi extends ChangeNotifier {
     return data is Map ? Map<String, dynamic>.from(data) : null;
   }
 
-  /// 公开歌单全量歌曲（playlist_track_all；60/页循环拉满，最多 [max] 首）。
+  /// 公开歌单全量歌曲（playlist_track_all；循环拉满，最多 [max] 首）。
+  ///
+  /// 终止条件只以接口 total 收敛（tracks.isEmpty 兜底防死循环），不依赖
+  /// 「本页不足 pagesize」——个别歌曲被解析过滤后页长会小于 pagesize，
+  /// 用页长判断会提前 break 导致歌单只拉到前若干首。
   Future<List<Track>> playlistTracksAll(String id, {int max = 300}) async {
-    const pagesize = 60;
+    const pagesize = 300;
     final all = <Track>[];
     var page = 1;
-    while (all.length < max) {
+    while (all.length < max && page <= 40) {
       final resp = await _gateway(
         '/pubsongs/v2/get_other_list_file_nofilt',
         method: 'GET',
@@ -648,12 +660,12 @@ class KugouApi extends ChangeNotifier {
           ? (data['songs'] ?? resp['songs'])
           : (resp is Map ? resp['songs'] : null);
       if (songs is! List || songs.isEmpty) break;
-      all.addAll(
-        songs
-            .whereType<Map<String, dynamic>>()
-            .map(kgTrackFromKgPlain)
-            .where((t) => t.kugou != null),
-      );
+      final parsed = songs
+          .whereType<Map<String, dynamic>>()
+          .map(kgTrackFromKgPlain)
+          .where((t) => t.kugou != null)
+          .toList();
+      all.addAll(parsed);
       final listInfo = data is Map
           ? (data['list_info'] ?? resp['list_info'])
           : (resp is Map ? resp['list_info'] : null);
@@ -661,7 +673,7 @@ class KugouApi extends ChangeNotifier {
       final totalNum = total is num
           ? total.toInt()
           : int.tryParse('$total') ?? 0;
-      if (songs.length < pagesize) break;
+      // 仅以接口 total 收敛；songs.isEmpty 兜底防死循环
       if (totalNum > 0 && all.length >= totalNum) break;
       page++;
     }
@@ -677,13 +689,16 @@ class KugouApi extends ChangeNotifier {
   /// 方案）；该 id 无法用于公开接口（实为 listid）时回退个人接口
   /// `/v4/get_list_all_file`。两种接口均不按 sort 排序——sort 字段在
   /// 部分条目缺失/不稳定，依赖它会打乱接口顺序。
-  Future<(List<Track>, int)> playlistTracksNewPage(
+  /// 返回 `(tracks, total, rawCount)`：tracks 为当页歌曲，total 为歌单
+  /// 总数（接口返回），rawCount 为当页 RAW 响应条数（过滤前，短页终止
+  /// 判定用——见 [playlistTracksAllNew]）。
+  Future<(List<Track>, int, int)> playlistTracksNewPage(
     String listid, {
     String? gid,
     int page = 1,
     int pagesize = 60,
   }) async {
-    if (session == null) return (const <Track>[], 0);
+    if (session == null) return (const <Track>[], 0, 0);
     if (gid != null && gid.isNotEmpty) {
       try {
         return await _playlistTracksByGid(gid, page: page, pagesize: pagesize);
@@ -700,7 +715,7 @@ class KugouApi extends ChangeNotifier {
   /// personal_switch/extend_fields；歌曲在 `data.songs`，总数在
   /// `data.list_info.count`。条目字段（name="歌手 - 歌名" 合并名、
   /// relate_goods 档位）由 [kgTrackFromKgPlain] 的 preferMergedName 处理。
-  Future<(List<Track>, int)> _playlistTracksByGid(
+  Future<(List<Track>, int, int)> _playlistTracksByGid(
     String gid, {
     required int page,
     required int pagesize,
@@ -733,11 +748,13 @@ class KugouApi extends ChangeNotifier {
     final total = totalRaw is num
         ? totalRaw.toInt()
         : int.tryParse('$totalRaw') ?? tracks.length;
-    return (tracks, total);
+    // rawCount：本页 RAW 响应条数（过滤前），短页终止判定用（见
+    // [playlistTracksAllNew]，对齐 MoeKoeMusic loadAllRemainingTracks）
+    return (tracks, total, songs is List ? songs.length : 0);
   }
 
   /// 个人歌单接口单页（get_list_all_file，POST + listid）。
-  Future<(List<Track>, int)> _playlistTracksByListid(
+  Future<(List<Track>, int, int)> _playlistTracksByListid(
     String listid, {
     required int page,
     required int pagesize,
@@ -776,67 +793,25 @@ class KugouApi extends ChangeNotifier {
     final total = totalRaw is num
         ? totalRaw.toInt()
         : int.tryParse('$totalRaw') ?? tracks.length;
-    return (tracks, total);
+    return (tracks, total, songs is List ? songs.length : 0);
   }
 
   /// 私有歌单（用户歌单/"我喜欢"）全量歌曲。
   ///
-  /// 60/页循环翻页至接口返回的 count（总数），无硬上限——「我喜欢」
-  /// 可上千首，此前默认截断 300 首导致列表不完整。[gid] 非空时走公开
-  /// 歌单接口（顺序稳定），否则回退 listid 个人接口。
+  /// 300/页循环翻页。终止条件 = 本页 RAW 响应不足即停 或 收敛到接口
+  /// total（对齐 MoeKoeMusic loadAllRemainingTracks 与 b2e6415 原链路，
+  /// **非纯 total 收敛**）：RAW 不足说明已是末页；total 仅作兜底防接口
+  /// 异常。逐条按 hash 去重防接口边界重复。[gid] 非空走公开歌单接口
+  /// （顺序稳定），否则回退 listid 个人接口。
   Future<List<Track>> playlistTracksAllNew(String listid, {String? gid}) async {
-    const pagesize = 60;
+    const pagesize = 300;
     final all = <Track>[];
+    final seen = <String>{};
     var page = 1;
-    // 安全上限：60 首/页 × 200 页 = 12000 首，防接口异常时死循环
-    while (page <= 200) {
-      final (tracks, total) = await playlistTracksNewPage(
+    // 安全上限：300 首/页 × 40 页 = 12000 首，防接口异常时死循环
+    while (page <= 40) {
+      final (tracks, total, rawCount) = await playlistTracksNewPage(
         listid,
-        gid: gid,
-        page: page,
-        pagesize: pagesize,
-      );
-      if (tracks.isEmpty) break;
-      all.addAll(tracks);
-      if (tracks.length < pagesize) break;
-      if (total > 0 && all.length >= total) break;
-      page++;
-    }
-    return all;
-  }
-
-  /// 「我喜欢」歌曲分页（供收藏列表按需加载；每页保持接口顺序，
-  /// 最新收藏在前，见 [playlistTracksNewPage]）。
-  Future<(List<Track>, int)> likedTracksPage({
-    int page = 1,
-    int pagesize = 60,
-  }) async {
-    final gid = await likeGid();
-    final listid = await likeListId();
-    if (gid == null && listid == null) return (const <Track>[], 0);
-    return playlistTracksNewPage(
-      listid ?? gid!,
-      gid: gid,
-      page: page,
-      pagesize: pagesize,
-    );
-  }
-
-  /// 「我喜欢」红心 hash 集合（轻量）。
-  ///
-  /// 分页循环只取 hash，不保留完整 Track 快照——LikeController 全量
-  /// 同步红心状态时避免一次性构造并持有全部曲目对象（GC 友好）。
-  Future<Set<String>> likedHashSet() async {
-    final gid = await likeGid();
-    final listid = await likeListId();
-    if (gid == null && listid == null) return const {};
-    const pagesize = 60;
-    final hashes = <String>{};
-    var page = 1;
-    // 安全上限：60 首/页 × 200 页 = 12000 首，防接口异常时死循环
-    while (page <= 200) {
-      final (tracks, total) = await playlistTracksNewPage(
-        listid ?? gid!,
         gid: gid,
         page: page,
         pagesize: pagesize,
@@ -844,13 +819,14 @@ class KugouApi extends ChangeNotifier {
       if (tracks.isEmpty) break;
       for (final t in tracks) {
         final h = t.kugou?.hash ?? t.id;
-        if (h.isNotEmpty) hashes.add(h);
+        if (h.isNotEmpty && seen.add(h)) all.add(t);
       }
-      if (tracks.length < pagesize) break;
-      if (total > 0 && hashes.length >= total) break;
+      // 本页 RAW 响应不足 → 末页；或已收敛到接口 total
+      if (rawCount < pagesize) break;
+      if (total > 0 && all.length >= total) break;
       page++;
     }
-    return hashes;
+    return all;
   }
 
   /// 用户歌单列表（v7/get_all_list，需登录）。
@@ -997,15 +973,50 @@ class KugouApi extends ChangeNotifier {
     _likeGid = null;
   }
 
-  /// 「我喜欢」歌曲列表：优先用公开 id 走公开歌单接口
-  /// （get_other_list_file_nofilt，顺序稳定「最新收藏在前」，对齐
-  /// MoeKoeMusic /playlist/track/all 方案）；无公开 id 时回退
-  /// listid + playlist_track_all_new 个人接口。
+  /// 「我喜欢」歌曲列表：**优先 listid 个人接口**（v4/get_list_all_file，
+  /// 能拉全量）。**不可用 gid 公开接口**（get_other_list_file_nofilt）——
+  /// 它是为普通（公开）歌单设计的：对私有的「我喜欢」歌单服务端只暴露
+  /// 前 ~600 首（实测 1271 首歌单仅拉到 596 首，且第二页起 count 字段
+  /// 被改写为剩余量）。gid 仅在 listid 缺失时兜底。
+  /// 返回**倒序**（接口按收藏先后排列，最新收藏在最后 → 反转后最新在前，
+  /// 对齐网易云 [likedSongs] 的展示语义）。
   Future<List<Track>> likedTracks() async {
-    final gid = await likeGid();
     final listid = await likeListId();
-    if (gid == null && listid == null) return const [];
-    return playlistTracksAllNew(listid ?? gid!, gid: gid);
+    if (listid != null) {
+      return (await playlistTracksAllNew(listid)).reversed.toList();
+    }
+    final gid = await likeGid();
+    if (gid == null) return const [];
+    return (await playlistTracksAllNew(gid, gid: gid)).reversed.toList();
+  }
+
+  /// 酷狗红心 hash 集合（轻量：分页只取 hash，不构造/保存 Track、不写库）。
+  ///
+  /// 对齐网易云 [likedIds]（likelist）语义——红心状态与「我喜欢」列表
+  /// 解耦：启动/登录态变化时由 LikeController 做轻量 id 同步（避免启动
+  /// 期全量 Track 拉取 + 写库被杀进程/写失败），全量列表仅进收藏页才拉。
+  Future<Set<String>> likedHashSet() async {
+    final listid = await likeListId();
+    if (listid == null) return const {};
+    const pagesize = 300;
+    final hashes = <String>{};
+    var page = 1;
+    while (page <= 40) {
+      final (tracks, total, rawCount) = await playlistTracksNewPage(
+        listid,
+        page: page,
+        pagesize: pagesize,
+      );
+      if (tracks.isEmpty) break;
+      for (final t in tracks) {
+        final h = t.kugou?.hash ?? t.id;
+        if (h.isNotEmpty) hashes.add(h);
+      }
+      if (rawCount < pagesize) break;
+      if (total > 0 && hashes.length >= total) break;
+      page++;
+    }
+    return hashes;
   }
 
   /// 添加歌曲到「我喜欢」（对齐 KuGouMusicApi playlist_tracks_add.js）。
@@ -1127,43 +1138,55 @@ class KugouApi extends ChangeNotifier {
   }
 
   /// 榜单歌曲（openapi/kmr/v2/rank/audio）。
+  ///
+  /// 循环翻页拉全量（60/页，安全上限 200 页），避免「播放全部」只取单页。
   Future<List<Track>> rankTracks(
     String rankId, {
     int page = 1,
     int pagesize = 60,
   }) async {
-    final resp = await _gateway(
-      '/openapi/kmr/v2/rank/audio',
-      method: 'POST',
-      body: {
-        'show_portrait_mv': 1,
-        'show_type_total': 1,
-        'filter_original_remarks': 1,
-        'area_code': 1,
-        'pagesize': pagesize,
-        'rank_cid': 0,
-        'type': 1,
-        'page': page,
-        'rank_id': rankId,
-      },
-      headers: {'kg-tid': '369'},
-    );
-    final data = resp is Map ? resp['data'] : null;
-    final list = data is Map ? data['songlist'] : null;
-    if (list is! List) return const [];
-    return list
-        .whereType<Map<String, dynamic>>()
-        .map((s) {
-          // hash 嵌套在 deprecated 内（对齐 MoeKoeMusic formatArtistTracks 结构）
-          final deprecated = s['deprecated'];
-          final item = <String, dynamic>{
-            if (deprecated is Map) ...Map<String, dynamic>.from(deprecated),
-            ...s,
-          };
-          return kgTrackFromKgPlain(item);
-        })
-        .where((t) => t.kugou != null)
-        .toList();
+    final all = <Track>[];
+    var p = page;
+    // 安全上限：60 首/页 × 200 页 = 12000 首，防接口异常时死循环
+    while (p - page < 200) {
+      final resp = await _gateway(
+        '/openapi/kmr/v2/rank/audio',
+        method: 'POST',
+        body: {
+          'show_portrait_mv': 1,
+          'show_type_total': 1,
+          'filter_original_remarks': 1,
+          'area_code': 1,
+          'pagesize': pagesize,
+          'rank_cid': 0,
+          'type': 1,
+          'page': p,
+          'rank_id': rankId,
+        },
+        headers: {'kg-tid': '369'},
+      );
+      final data = resp is Map ? resp['data'] : null;
+      final list = data is Map ? data['songlist'] : null;
+      if (list is! List || list.isEmpty) break;
+      final parsed = list
+          .whereType<Map<String, dynamic>>()
+          .map((s) {
+            // hash 嵌套在 deprecated 内（对齐 MoeKoeMusic formatArtistTracks 结构）
+            final deprecated = s['deprecated'];
+            final item = <String, dynamic>{
+              if (deprecated is Map) ...Map<String, dynamic>.from(deprecated),
+              ...s,
+            };
+            return kgTrackFromKgPlain(item);
+          })
+          .where((t) => t.kugou != null)
+          .toList();
+      if (parsed.isEmpty) break;
+      all.addAll(parsed);
+      if (list.length < pagesize) break;
+      p++;
+    }
+    return all;
   }
 
   /// 新碟上架（musicadservice/v1/mobile_newalbum_sp；chn/eur/jpn/kor 合并）。
@@ -1225,54 +1248,66 @@ class KugouApi extends ChangeNotifier {
   }
 
   /// 专辑歌曲（openapi.kugou.com/v1/album_audio/lite）。
+  ///
+  /// 循环翻页拉全量（60/页，安全上限 200 页），避免「播放全部」只取单页。
   Future<List<Track>> albumTracks(
     String albumId, {
     int page = 1,
     int pagesize = 60,
   }) async {
-    final resp = await _gateway(
-      '/v1/album_audio/lite',
-      method: 'POST',
-      body: {
-        'album_id': albumId,
-        'is_buy': '',
-        'page': page,
-        'pagesize': pagesize,
-      },
-      headers: {'x-router': 'openapi.kugou.com', 'kg-tid': '255'},
-    );
-    final data = resp is Map ? resp['data'] : null;
-    final songs = data is Map ? data['songs'] : null;
-    if (songs is! List) return const [];
-    return songs
-        .whereType<Map<String, dynamic>>()
-        .map((s) {
-          final audioInfo = s['audio_info'];
-          final base = s['base'];
-          final albumInfo = s['album_info'];
-          final hash = audioInfo is Map
-              ? audioInfo['hash']?.toString() ?? ''
-              : '';
-          final item = <String, dynamic>{
-            'hash': hash,
-            'audio_name': base is Map
-                ? base['audio_name']?.toString() ?? ''
-                : '',
-            'author_name': base is Map
-                ? base['author_name']?.toString() ?? ''
-                : '',
-            'album_name': albumInfo is Map
-                ? albumInfo['album_name']?.toString() ?? ''
-                : '',
-            'duration': audioInfo is Map ? audioInfo['duration'] : null,
-            'hash_320': audioInfo is Map ? audioInfo['hash_320'] : null,
-            'hash_flac': audioInfo is Map ? audioInfo['hash_flac'] : null,
-            if (s['trans_param'] is Map) 'trans_param': s['trans_param'],
-          };
-          return kgTrackFromKgPlain(item);
-        })
-        .where((t) => t.kugou != null)
-        .toList();
+    final all = <Track>[];
+    var p = page;
+    // 安全上限：60 首/页 × 200 页 = 12000 首，防接口异常时死循环
+    while (p - page < 200) {
+      final resp = await _gateway(
+        '/v1/album_audio/lite',
+        method: 'POST',
+        body: {
+          'album_id': albumId,
+          'is_buy': '',
+          'page': p,
+          'pagesize': pagesize,
+        },
+        headers: {'x-router': 'openapi.kugou.com', 'kg-tid': '255'},
+      );
+      final data = resp is Map ? resp['data'] : null;
+      final songs = data is Map ? data['songs'] : null;
+      if (songs is! List || songs.isEmpty) break;
+      final parsed = songs
+          .whereType<Map<String, dynamic>>()
+          .map((s) {
+            final audioInfo = s['audio_info'];
+            final base = s['base'];
+            final albumInfo = s['album_info'];
+            final hash = audioInfo is Map
+                ? audioInfo['hash']?.toString() ?? ''
+                : '';
+            final item = <String, dynamic>{
+              'hash': hash,
+              'audio_name': base is Map
+                  ? base['audio_name']?.toString() ?? ''
+                  : '',
+              'author_name': base is Map
+                  ? base['author_name']?.toString() ?? ''
+                  : '',
+              'album_name': albumInfo is Map
+                  ? albumInfo['album_name']?.toString() ?? ''
+                  : '',
+              'duration': audioInfo is Map ? audioInfo['duration'] : null,
+              'hash_320': audioInfo is Map ? audioInfo['hash_320'] : null,
+              'hash_flac': audioInfo is Map ? audioInfo['hash_flac'] : null,
+              if (s['trans_param'] is Map) 'trans_param': s['trans_param'],
+            };
+            return kgTrackFromKgPlain(item);
+          })
+          .where((t) => t.kugou != null)
+          .toList();
+      if (parsed.isEmpty) break;
+      all.addAll(parsed);
+      if (songs.length < pagesize) break;
+      p++;
+    }
+    return all;
   }
 
   /// 歌手详情（kmr/v3/author）。
@@ -1288,43 +1323,55 @@ class KugouApi extends ChangeNotifier {
   }
 
   /// 歌手单曲（openapi.kugou.com/kmr/v1/audio_group/author）。
+  ///
+  /// 循环翻页拉全量（60/页，安全上限 200 页），避免「播放全部」只取单页。
   Future<List<Track>> artistAudios(
     String authorId, {
     String sort = 'hot', // 'hot' 最热 / 'new' 最新
     int page = 1,
     int pagesize = 60,
   }) async {
-    final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final resp = await _gateway(
-      '/kmr/v1/audio_group/author',
-      method: 'POST',
-      body: {
-        'appid': 1005,
-        'clientver': 20489,
-        'mid': _mid,
-        'clienttime': ts,
-        'key': kgSignParamsKey('$ts'),
-        'author_id': authorId,
-        'pagesize': pagesize,
-        'page': page,
-        'sort': sort == 'hot' ? 1 : 2,
-        'area_code': 'all',
-      },
-      headers: {'x-router': 'openapi.kugou.com', 'kg-tid': '220'},
-      baseUrl: 'https://openapi.kugou.com',
-    );
-    final data = resp is Map ? resp['data'] : null;
-    final list = data is Map
-        ? data['songlist']
-        : data is List
-        ? data
-        : null;
-    if (list is! List) return const [];
-    return list
-        .whereType<Map<String, dynamic>>()
-        .map(kgTrackFromKgPlain)
-        .where((t) => t.kugou != null)
-        .toList();
+    final all = <Track>[];
+    var p = page;
+    // 安全上限：60 首/页 × 200 页 = 12000 首，防接口异常时死循环
+    while (p - page < 200) {
+      final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final resp = await _gateway(
+        '/kmr/v1/audio_group/author',
+        method: 'POST',
+        body: {
+          'appid': 1005,
+          'clientver': 20489,
+          'mid': _mid,
+          'clienttime': ts,
+          'key': kgSignParamsKey('$ts'),
+          'author_id': authorId,
+          'pagesize': pagesize,
+          'page': p,
+          'sort': sort == 'hot' ? 1 : 2,
+          'area_code': 'all',
+        },
+        headers: {'x-router': 'openapi.kugou.com', 'kg-tid': '220'},
+        baseUrl: 'https://openapi.kugou.com',
+      );
+      final data = resp is Map ? resp['data'] : null;
+      final list = data is Map
+          ? data['songlist']
+          : data is List
+          ? data
+          : null;
+      if (list is! List || list.isEmpty) break;
+      final parsed = list
+          .whereType<Map<String, dynamic>>()
+          .map(kgTrackFromKgPlain)
+          .where((t) => t.kugou != null)
+          .toList();
+      if (parsed.isEmpty) break;
+      all.addAll(parsed);
+      if (list.length < pagesize) break;
+      p++;
+    }
+    return all;
   }
 
   /// 歌手专辑（openapi.kugou.com/kmr/v1/author/albums）。

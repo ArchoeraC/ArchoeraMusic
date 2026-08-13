@@ -1,15 +1,17 @@
-/// 「我喜欢」收藏列表分页加载器（ChangeNotifier）。
+/// 「我喜欢」收藏列表全局数据源（ChangeNotifier，由 Riverpod provider 持有）。
 ///
-/// 借鉴 SPlayer-Next 库加载策略（IndexedDB 缓存 + 先缓存上屏再网络刷新）：
-/// - **缓存秒开**：进页面先读 SQLite 缓存（已加载段）立即渲染；
-/// - **SWR 后台刷新**：随后拉取最新第一页替换上屏并回写缓存；
-/// - **按需加载**：滚动触底才拉下一页（网易云 song_detail 批量补详情 /
-///   酷狗 get_list_all_file 单页），不一次性暴力拉全量；
-/// - **内存友好**：列表只持有已加载段，Track 对象随滚动增量生成，
-///   全量收藏不常驻（GC 友好）。
+/// **只管列表全量**：酷狗 / 网易云收藏 Track 一次拉全、缓存秒开。
+/// 红心状态与列表解耦——LikeController.sync 走各平台轻量 id 集合
+/// （网易云 likelist / 酷狗 likedHashSet 只取 hash），不经过这里，
+/// 避免启动同步触发全量拉取（与收藏页并行双拉、被进程退出/写失败干扰）。
+///
+/// 缓存策略（对齐 SPlayer-Next 库加载）：进收藏页先读 SQLite 缓存
+/// 「秒开」，后台 SWR 全量拉取替换上屏并回写缓存——回写在后台 isolate
+/// （LikedCacheStore 内部 [Isolate.run]），不阻塞 UI。
+/// 无分页：列表一次持有全量 Track（元数据轻量，千级仅数 MB）。
 library;
 
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,200 +20,162 @@ import '../../stores/providers.dart';
 import '../netease/track.dart';
 import 'liked_cache.dart';
 
-/// 单页拉取结果。
-typedef LikedPageResult = (List<Track>, int);
+/// 平台收藏列表状态（内存态；与磁盘缓存解耦）。
+class _PlatformLiked {
+  List<Track> tracks = const [];
+  int total = 0;
+  bool loaded = false;
+  bool loading = false;
+  String error = '';
+  bool initialized = false;
+  bool refreshing = false;
+}
 
-/// 「我喜欢」列表控制器：统一网易云 / 酷狗的分页 + 缓存策略。
-class LikedListController extends ChangeNotifier {
-  LikedListController(this._ref, {required this.platform});
+/// 全局「我喜欢」数据源（'netease' | 'kugou' 双平台，全量 + 缓存）。
+class LikedStore extends ChangeNotifier {
+  LikedStore(this._ref);
 
-  final WidgetRef _ref;
+  final Ref _ref;
 
-  /// 'netease' | 'kugou'。
-  final String platform;
+  final Map<String, _PlatformLiked> _platforms = {};
 
-  /// 网易云 song_detail 每批补详情条数（一次调用即可补 300 首）。
-  static const int neteasePageSize = 300;
+  _PlatformLiked _state(String platform) =>
+      _platforms.putIfAbsent(platform, _PlatformLiked.new);
 
-  /// 酷狗 get_list_all_file 每页条数（接口固定上限）。
-  static const int kugouPageSize = 60;
+  /// 平台当前已加载歌曲（全量，按收藏先后，最新在前）。
+  List<Track> tracks(String platform) => _state(platform).tracks;
 
-  List<Track> _tracks = const [];
-  int _total = 0;
-  bool _loaded = false;
-  bool _loading = false;
-  bool _loadingMore = false;
-  String _error = '';
+  /// 平台收藏总数（接口返回；缓存命中时为缓存总数）。
+  int total(String platform) => _state(platform).total;
 
-  bool _initialized = false;
-  bool _refreshing = false;
-  int _nextOffset = 0;
+  /// 平台是否已有可展示数据（缓存或网络成功）。
+  bool loaded(String platform) => _state(platform).loaded;
 
-  /// 网易云歌单 trackIds（进页面刷新时拉一次，触底加载复用，避免
-  /// 每页重复请求「我喜欢的音乐」歌单详情）。
-  List<String>? _neteaseIds;
+  /// 平台首屏加载中（无任何数据时页面显示 loading）。
+  bool loading(String platform) => _state(platform).loading;
 
-  /// 当前已加载歌曲（按收藏先后，最新在前）。
-  List<Track> get tracks => _tracks;
-
-  /// 收藏总数（接口返回；缓存命中时为缓存总数）。
-  int get total => _total;
-
-  /// 是否已有可展示数据（缓存或网络成功）。
-  bool get loaded => _loaded;
-
-  /// 首屏加载中（无任何数据时页面显示 loading）。
-  bool get loading => _loading;
-
-  bool get loadingMore => _loadingMore;
-
-  String get error => _error;
-
-  /// 触底加载更多可用（已加载数 < 总数）。
-  bool get hasMore => _loaded && _tracks.length < _total;
+  /// 平台加载错误（无缓存时的失败信息）。
+  String error(String platform) => _state(platform).error;
 
   /// 当前平台登录用户 key（网易云 uid / 酷狗 userid），缓存键。
-  String? get _userKey {
+  String? _userKey(String platform) {
     if (platform == 'kugou') {
       return _ref.read(kugouApiProvider).session?.userid;
     }
     return _ref.read(neteaseAuthProvider)?.userId;
   }
 
-  static LikedCacheStore _cacheStore() => LikedCacheStore.shared;
-
-  /// 首次进入：缓存秒开 + SWR 后台刷新第一页。幂等（重复调用忽略）。
-  Future<void> init() async {
-    if (_initialized) return;
-    _initialized = true;
-    await _hydrateFromCache();
-    await refresh();
+  /// 首次进入：缓存秒开 + 网络刷新全量。幂等（重复调用忽略）。
+  ///
+  /// 缓存读取失败**不阻断**网络刷新（降级为直接加载并记录）——否则
+  /// initialized 已置位、后续 ensureLoaded 全部短路，刷新被永久跳过
+  /// （历史「无法加载」根因）。
+  Future<void> ensureLoaded(String platform) async {
+    final s = _state(platform);
+    if (s.initialized) return;
+    s.initialized = true;
+    try {
+      await _hydrateFromCache(platform);
+    } catch (e) {
+      debugPrint('[liked] 缓存读取失败（降级直接加载）: $e');
+    }
+    await refresh(platform);
   }
 
-  /// SWR 刷新：拉最新第一页替换上屏，并回写缓存。
-  Future<void> refresh() async {
-    if (_refreshing) return;
-    _refreshing = true;
-    _loading = true;
-    _error = '';
+  /// 刷新：全量拉取替换上屏。仅 [writeCache] 为 true（用户显式点「刷新」）
+  /// 时回写 SQLite 缓存——默认不写，避免后台 SWR 写库被进程退出/写失败
+  /// 静默吞掉造成缓存与展示不一致（显式操作写回语义）。
+  Future<void> refresh(String platform, {bool writeCache = false}) async {
+    final s = _state(platform);
+    if (s.refreshing) return;
+    s.refreshing = true;
+    s.loading = true;
+    s.error = '';
     notifyListeners();
     try {
-      final key = _userKey;
+      final key = _userKey(platform);
       if (key == null) return; // 未登录由页面显示登录引导
-      // 网易云刷新时重新拉 trackIds（收藏可能已变化）
-      _neteaseIds = null;
-      final (page, total) = await _fetchPage(0);
-      _tracks = page;
-      _total = total;
-      _nextOffset = page.length;
-      _loaded = true;
-      _cacheStore().replace(platform, key, page, total: total);
+      final tracks = await _fetchAll(platform);
+      s.tracks = tracks;
+      s.total = tracks.length;
+      s.loaded = true;
+      if (writeCache) {
+        try {
+          await LikedCacheStore.shared.replace(platform, key, tracks);
+        } catch (e) {
+          debugPrint('[liked] 缓存写回失败（不影响展示）: $e');
+        }
+      }
     } catch (e) {
       // 有缓存时静默保留缓存展示；无缓存才报错
-      if (_tracks.isEmpty) _error = '$e';
-      _loaded = true;
+      if (s.tracks.isEmpty) s.error = '$e';
+      s.loaded = true;
     } finally {
-      _loading = false;
-      _refreshing = false;
+      s.refreshing = false;
+      s.loading = false;
       notifyListeners();
     }
   }
 
-  /// 触底加载下一页（增量追加 + 缓存增量落盘）。
-  Future<void> loadMore() async {
-    if (!hasMore || _loadingMore || _refreshing) return;
-    _loadingMore = true;
-    notifyListeners();
-    try {
-      final (page, total) = await _fetchPage(_nextOffset);
-      if (page.isEmpty) {
-        // 接口已无更多，按实际条数收敛 total
-        _total = _tracks.length;
-        return;
-      }
-      final startIndex = _tracks.length;
-      final merged = [..._tracks, ...page];
-      _tracks = merged;
-      _total = total;
-      _nextOffset = merged.length;
-      final key = _userKey;
-      if (key != null) {
-        _cacheStore().append(
-          platform,
-          key,
-          page,
-          startIndex: startIndex,
-          total: total,
-        );
-      }
-    } catch (_) {
-      // 触底加载失败静默（保留已加载部分，下次滚动再试）
-    } finally {
-      _loadingMore = false;
-      notifyListeners();
-    }
-  }
-
-  /// 取消喜欢后从列表移除该行（不重新拉取）。
-  void removeTrack(String source, String id) {
-    final before = _tracks.length;
-    _tracks = _tracks
+  /// 取消喜欢后从列表移除该行（不重新拉取），并同步重写缓存快照
+  /// （显式操作写回——否则重启后已取消的歌会从缓存「复活」）。
+  Future<void> removeTrack(String platform, String source, String id) async {
+    final s = _state(platform);
+    final before = s.tracks.length;
+    s.tracks = s.tracks
         .where((t) => !(t.source == source && t.id == id))
         .toList();
-    if (_tracks.length != before) {
-      _total = _tracks.length;
-      notifyListeners();
+    if (s.tracks.length == before) return;
+    s.total = s.tracks.length;
+    notifyListeners();
+    final key = _userKey(platform);
+    if (key == null) return;
+    try {
+      await LikedCacheStore.shared.replace(platform, key, s.tracks);
+    } catch (e) {
+      debugPrint('[liked] 缓存移除失败: $e');
     }
   }
 
-  /// 重置（登录态变化 / 切换平台时调用，下次 init 重新加载）。
-  void reset() {
-    _initialized = false;
-    _tracks = const [];
-    _total = 0;
-    _loaded = false;
-    _loading = false;
-    _loadingMore = false;
-    _error = '';
-    _nextOffset = 0;
-    _neteaseIds = null;
+  /// 重置平台（登录态变化时调用，下次 [ensureLoaded] 重新加载）。
+  void reset(String platform) {
+    final s = _state(platform);
+    s.initialized = false;
+    s.tracks = const [];
+    s.total = 0;
+    s.loaded = false;
+    s.loading = false;
+    s.error = '';
+    s.refreshing = false; // 清 refreshing，避免重置后刷新被旧请求挡住
     notifyListeners();
   }
 
   // ── 内部实现 ────────────────────────────────────────────────
 
-  /// 读缓存已加载段上屏（无缓存则跳过）。
-  Future<void> _hydrateFromCache() async {
-    final key = _userKey;
+  /// 读缓存全量上屏（无缓存则跳过）。
+  Future<void> _hydrateFromCache(String platform) async {
+    final key = _userKey(platform);
     if (key == null) return;
-    final store = _cacheStore();
-    final cachedTotal = store.total(platform, key);
+    final store = LikedCacheStore.shared;
+    final cachedTotal = await store.total(platform, key);
     if (cachedTotal == null || cachedTotal == 0) return;
-    final cached = store.loadRange(platform, key, limit: neteasePageSize);
+    final cached = await store.loadAll(platform, key);
     if (cached.isEmpty) return;
-    _tracks = cached;
-    _total = cachedTotal;
-    _nextOffset = cached.length;
-    _loaded = true;
+    final s = _state(platform);
+    s.tracks = cached;
+    s.total = cachedTotal;
+    s.loaded = true;
     notifyListeners();
   }
 
-  /// 拉取 [offset] 起的单页数据（酷狗按页号映射；网易云按 trackIds 切片）。
-  Future<LikedPageResult> _fetchPage(int offset) async {
+  /// 全量拉取当前平台收藏（酷狗 likedTracks / 网易云 likedSongs，
+  /// 均为循环翻页拉满）。
+  Future<List<Track>> _fetchAll(String platform) async {
     if (platform == 'kugou') {
-      final page = offset ~/ kugouPageSize + 1;
-      return _ref
-          .read(kugouApiProvider)
-          .likedTracksPage(page: page, pagesize: kugouPageSize);
+      return _ref.read(kugouApiProvider).likedTracks();
     }
     final account = _ref.read(neteaseAuthProvider);
-    if (account == null) return (const <Track>[], 0);
-    final api = _ref.read(neteaseApiProvider);
-    _neteaseIds ??= await api.likedTrackIds(account.userId);
-    final ids = _neteaseIds!;
-    if (offset >= ids.length) return (const <Track>[], ids.length);
-    final end = math.min(offset + neteasePageSize, ids.length);
-    final tracks = await api.songsDetailByIds(ids.sublist(offset, end));
-    return (tracks, ids.length);
+    if (account == null) return const <Track>[];
+    return _ref.read(neteaseApiProvider).likedSongs(account.userId);
   }
 }
