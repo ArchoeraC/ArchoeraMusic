@@ -13,7 +13,7 @@ jobs:
     name: Windows x64
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install mingw (cgo C 编译器，go -buildmode=c-shared 需要)
         shell: bash
@@ -24,7 +24,7 @@ jobs:
 
       - name: Cache vcpkg installed (恢复；ffmpeg/taglib 等预编译跨 run 秒级恢复)
         id: vcpkg-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           # manifest 模式安装根固定为 vcpkg.json 所在目录/vcpkg_installed
           path: app/vcpkg_installed
@@ -47,17 +47,17 @@ jobs:
       # vcpkg install 成功后立即落缓存，此后任意步骤失败均不影响复用
       - name: Cache vcpkg installed (保存，供下次 run 秒级恢复)
         if: steps.vcpkg-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: app/vcpkg_installed
           key: vcpkg-installed-${{ hashFiles('app/vcpkg.json') }}
 
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.23'
           cache-dependency-path: app/core/subsonic/go.sum
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
       - uses: subosito/flutter-action@v2

@@ -203,9 +203,11 @@ rem =====================================================================
 echo [build_windows] ===== vault =====
 pushd "%ROOT%vault"
 if not exist build mkdir build
-dotnet publish src\Vault.csproj -c Release -r win-x64
+rem -o 固定 publish 目录：不依赖 bin\x64\Release\<tfm>\win-x64 路径
+rem （Windows AOT 输出带 x64 前缀，且随 TFM 升级会漂移）
+dotnet publish src\Vault.csproj -c Release -r win-x64 -o build\publish
 if errorlevel 1 exit /b 1
-copy /y "src\bin\Release\net9.0\win-x64\publish\archoera-vault.exe" build\ >nul
+copy /y "build\publish\archoera-vault.exe" build\ >nul
 if not exist "build\archoera-vault.exe" (
     echo [build_windows] ERROR: archoera-vault.exe 未复制到 build/
     exit /b 1

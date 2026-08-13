@@ -19,6 +19,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JOBS="$(sysctl -n hw.ncpu)"
 RID="${1:-osx-arm64}"
 
+# 统一 macOS 部署目标：Rust 默认按构建机 SDK 出包（CI 为 14.5），而
+# CMake/clang 侧按 14.0 链接，混链会产生 "built for newer macOS version"
+# 警告，且最终 dylib 的最低系统版本会被抬高到 14.5。此处显式对齐到
+# 14.0（与 C 侧一致），cargo（tempo/downloader/transcoder）全部生效。
+export MACOSX_DEPLOYMENT_TARGET=14.0
+
 echo "[build-macos] ===== audio-engine ====="
 cmake -S "$ROOT/audio-engine" -B "$ROOT/audio-engine/build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$ROOT/audio-engine/build" -j"$JOBS"

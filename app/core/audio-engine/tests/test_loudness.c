@@ -33,12 +33,16 @@ int main(void) {
     for (int i = 0; i < 256; i++) pcm[i] = copy[i] = randf();
     loudness_process(loud, pcm, 128);
 
-    /* 检查至少有一个样本放大了 */
+    /* 检查至少有一个样本放大了（NDEBUG 下 assert 会被编译掉，
+       用返回码校验避免 "set but not used" 警告并保持 Release 下语义） */
     int amplified = 0;
     for (int i = 0; i < 256; i++) {
         if (fabsf(pcm[i]) > fabsf(copy[i]) + 0.001f) amplified++;
     }
-    assert(amplified > 0);
+    if (amplified == 0) {
+        loudness_destroy(loud);
+        return 1;
+    }
 
     /* 不应产生 NaN */
     for (int i = 0; i < 256; i++) {

@@ -78,13 +78,13 @@ class _KugouLoginButtonState extends ConsumerState<KugouLoginButton> {
             if (v == 'logout') _logout();
           },
           itemBuilder: (context) => session == null
-              ? [
-                  PopupMenuItem(value: 'login', child: Text(l10n.loginQrLogin)),
-                ]
+              ? [PopupMenuItem(value: 'login', child: Text(l10n.loginQrLogin))]
               : [
                   PopupMenuItem(
                     value: 'logout',
-                    child: Text(l10n.loginLogoutWithId(nickname ?? session.userid)),
+                    child: Text(
+                      l10n.loginLogoutWithId(nickname ?? session.userid),
+                    ),
                   ),
                 ],
           child: Padding(
@@ -178,7 +178,9 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
           final token = state['token']?.toString() ?? '';
           final userid = state['userid']?.toString() ?? '';
           if (token.isEmpty || userid.isEmpty) {
-            setState(() => _error = context.l10n.loginKugouResponseMissingToken);
+            setState(
+              () => _error = context.l10n.loginKugouResponseMissingToken,
+            );
             return;
           }
           _api.saveSession(
@@ -205,77 +207,93 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
   }
 
   String _statusText(AppLocalizations l10n) => switch (_status) {
-        2 => l10n.loginWaitingConfirm,
-        _ => l10n.loginKugouScanHint(l10n.brandKugou),
-      };
+    2 => l10n.loginWaitingConfirm,
+    _ => l10n.loginKugouScanHint(l10n.brandKugou),
+  };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
-    return GlassDialogSurface(
-      radius: BorderRadius.circular(16),
-      color: theme.colorScheme.surfaceContainerHigh,
-      child: AlertDialog(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        title: Text(l10n.loginKugouQrLogin(l10n.brandKugou)),
-        content: SizedBox(
-          width: 260,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_loadingKey)
-                const Padding(
-                  padding: EdgeInsets.all(48),
-                  child: CircularProgressIndicator(),
-                )
-              else if (_key != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: QrImageView(
-                    data: '$kgQrLoginPage?qrcode=$_key',
-                    version: QrVersions.auto,
-                    size: 200,
-                  ),
+    // 同网易弹窗：新版 Flutter DialogRoute 不包 Dialog（tight 全屏约束），
+    // M3 AlertDialog IntrinsicWidth 会被长文本固有宽度撑到全屏；ConstrainedBox
+    // 在 tight 约束下失效（enforce clamp），须先 Align 转 loose 再限宽。
+    return Align(
+      alignment: Alignment.center,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: GlassDialogSurface(
+          radius: BorderRadius.circular(16),
+          color: theme.colorScheme.surfaceContainerHigh,
+          child: AlertDialog(
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            title: Text(l10n.loginKugouQrLogin(l10n.brandKugou)),
+            content: SingleChildScrollView(
+              // 长错误文本（网络异常含 URL）可能在有限高度下溢出，
+              // 包一层垂直滚动兜底（宽度仍由内层 SizedBox 固定 260）。
+              child: SizedBox(
+                width: 260,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_loadingKey)
+                      const Padding(
+                        padding: EdgeInsets.all(48),
+                        child: CircularProgressIndicator(),
+                      )
+                    else if (_key != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: QrImageView(
+                          data: '$kgQrLoginPage?qrcode=$_key',
+                          version: QrVersions.auto,
+                          size: 200,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _statusText(l10n),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 12),
+                      Icon(
+                        Icons.error_outline,
+                        size: 40,
+                        color: theme.colorScheme.error,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _error,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.tonalIcon(
+                        onPressed: _initQr,
+                        icon: const Icon(Icons.refresh),
+                        label: Text(l10n.loginRegenerate),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  _statusText(l10n),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ] else ...[
-                const SizedBox(height: 12),
-                Icon(Icons.error_outline,
-                    size: 40, color: theme.colorScheme.error),
-                const SizedBox(height: 8),
-                Text(
-                  _error,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                FilledButton.tonalIcon(
-                  onPressed: _initQr,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(l10n.loginRegenerate),
-                ),
-              ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(l10n.commonCancel),
+              ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.commonCancel),
-          ),
-        ],
       ),
     );
   }

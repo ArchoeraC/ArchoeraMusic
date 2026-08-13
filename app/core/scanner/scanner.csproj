@@ -24,6 +24,11 @@
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <!-- Microsoft.Data.Sqlite: 直写 SQLite，绕过 Node.js V8 堆 -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <!-- CVE-2025-6965 (GHSA-2m69-gcr7-jv3q, High): SQLitePCLRaw.lib.e_sqlite3
+         <= 2.1.11 捆绑的 SQLite < 3.50.2 存在聚合项内存损坏，且无 2.1.x 补丁。
+         显式 pin 原生库到 3.50.3（纯静态库包、无 managed 依赖），仅升级原生
+         SQLite 二进制，managed 核心保持 2.x 与 Microsoft.Data.Sqlite 9 兼容。 -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
   </ItemGroup>
 
 </Project>
