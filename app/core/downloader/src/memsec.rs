@@ -10,7 +10,7 @@
 // 自动降级为普通堆分配（不阻塞登录与下载），zeroize 兜底保证清零目标。
 // ============================================================
 
-use std::alloc::{alloc, dealloc, Layout};
+use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::ptr;
 
 /// 页对齐大小（mlock 按整页生效；分配向上取整到该值）。
@@ -36,6 +36,10 @@ impl MlockSecret {
     }
 
     /// 分配 [size] 字节并（尽力）锁定。返回 (指针, 容量, 是否锁定)。
+    ///
+    /// 使用 [alloc_zeroed] 分配即清零：未写入区域恒为零（mlock 页若复用系统
+    /// 内存可能含其他进程残留数据，清零防泄露；同时保证收缩写入后旧尾部外
+    /// 区域不残留本对象旧值，overwrite_clears_old_content 不变量成立）。
     fn alloc_locked(size: usize) -> (*mut u8, usize, bool) {
         if size == 0 {
             return (ptr::null_mut(), 0, false);
@@ -43,7 +47,7 @@ impl MlockSecret {
         let cap = size.div_ceil(PAGE) * PAGE;
         // SAFETY: cap > 0，align 1，均为合法 Layout
         let layout = Layout::from_size_align(cap, 1).expect("MlockSecret layout");
-        let p = unsafe { alloc(layout) };
+        let p = unsafe { alloc_zeroed(layout) };
         if p.is_null() {
             return (ptr::null_mut(), 0, false);
         }

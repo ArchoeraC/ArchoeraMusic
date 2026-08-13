@@ -50,7 +50,9 @@ zeroize          = { version = "1", default-features = false, features = ["alloc
 libc             = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys      = { version = "0.52", features = ["Win32_System_Memory"] }
+# VirtualLock/VirtualUnlock 位于 Win32_System_Memory，但签名引用 Foundation::BOOL，
+# 必须同时启用 Win32_Foundation，否则 E0425（Windows CI 已实测复现）。
+windows-sys      = { version = "0.52", features = ["Win32_System_Memory", "Win32_Foundation"] }
 
 [profile.release]
 lto       = true
