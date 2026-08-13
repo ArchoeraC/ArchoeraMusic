@@ -215,13 +215,16 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
+    // 弹窗高度上限：视口 85%，防小窗口/高 DPI 下弹窗超过可视高度被截断
+    //（内容有垂直滚动兜底，超高时滚动而非溢出）。
+    final maxH = MediaQuery.sizeOf(context).height * 0.85;
     // 同网易弹窗：新版 Flutter DialogRoute 不包 Dialog（tight 全屏约束），
     // M3 AlertDialog IntrinsicWidth 会被长文本固有宽度撑到全屏；ConstrainedBox
     // 在 tight 约束下失效（enforce clamp），须先 Align 转 loose 再限宽。
     return Align(
       alignment: Alignment.center,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
+        constraints: BoxConstraints(maxWidth: 460, maxHeight: maxH),
         child: GlassDialogSurface(
           radius: BorderRadius.circular(16),
           color: theme.colorScheme.surfaceContainerHigh,
