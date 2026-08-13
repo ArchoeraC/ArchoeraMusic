@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../stores/app_prefs.dart';
 import '../../l10n/l10n.dart';
+import '../../app/app_quit.dart';
 import '../../app/router.dart';
 import '../dialogs/s_dialog.dart';
 
@@ -108,8 +109,8 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
   }
 
   Future<void> _quit() async {
-    // 播放现场由 playbackProvider dispose 同步落盘；销毁窗口走正常退出链路
-    await windowManager.destroy();
+    // Linux 退出绕开 GTK teardown 崩溃，统一走 exit(0)（见 quitApplication）
+    await quitApplication(ref);
   }
 
   // ── WindowListener ─────────────────────────────────────────────

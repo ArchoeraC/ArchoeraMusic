@@ -293,6 +293,11 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     }
   }
 
+  /// 退出前显式落盘播放现场（同步写）。正常退出由 dispose 调用
+  /// [_persistSession]；Linux 退出走 exit(0)（绕开 GTK teardown 崩溃，
+  /// 不触发 dispose），需在退出前主动调用。
+  void persistNow() => _persistSession();
+
   /// 落盘当前播放现场（同步写；无任何现场时跳过）。
   void _persistSession() {
     // 「会话记忆」关闭时不落盘（默认开）

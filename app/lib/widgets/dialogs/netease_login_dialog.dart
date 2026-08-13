@@ -112,6 +112,9 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
+    // 弹窗高度上限：视口 85%，防小窗口/高 DPI 下弹窗超过可视高度被截断
+    //（内容有垂直滚动兜底，超高时滚动而非溢出）。
+    final maxH = MediaQuery.sizeOf(context).height * 0.85;
     // 新版 Flutter DialogRoute 不再包 Dialog，弹窗根收到 tight 全屏约束；
     // M3 AlertDialog 用 IntrinsicWidth 定宽，长文本（错误消息等）固有宽度
     // 极大会把弹窗撑到全屏。ConstrainedBox 在 tight 父约束下会失效
@@ -119,7 +122,7 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
     return Align(
       alignment: Alignment.center,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
+        constraints: BoxConstraints(maxWidth: 460, maxHeight: maxH),
         child: GlassDialogSurface(
           radius: BorderRadius.circular(16),
           color: scheme.surfaceContainerHigh,
