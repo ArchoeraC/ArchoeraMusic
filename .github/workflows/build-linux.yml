@@ -124,16 +124,15 @@ jobs:
         run: |
           bash packaging/linux/package.sh nix app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
           docker run --rm -v "$PWD":/workspace -w /workspace/packaging/linux/work/nix \
+            -e PKG_VER="${{ steps.version.outputs.version }}" \
             nixos/nix:latest bash -c '
               nix --extra-experimental-features "nix-command flakes" build .#default --no-sandbox || exit 1
+              # result 是指向容器 /nix/store 的 symlink（宿主无此路径，cp -L 会失败），
+              # 必须在容器内 readlink 后打包完整 store 产物（lib/bin/share）
+              tar -C "$(readlink -f result)" -czf \
+                "/workspace/dist/linux/ArchoeraMusic-v${PKG_VER}-nixos-x86_64.tar.gz" .
             '
-          # result 是容器 store 的 symlink，cp -rL 跟随复制实际产物
-          mkdir -p dist/linux/nix
-          cp -rL packaging/linux/work/nix/result/. dist/linux/nix/
-          tar -C dist/linux/nix -czf \
-            "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz" .
-          rm -rf dist/linux/nix
-          echo "→ dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz"
+          ls -la dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz
 
       - name: Package Arch pkg.tar.zst (makepkg in archlinux container, 最后打包)
         # AUR 打包放 pipeline 末尾：makepkg 以 nobody 运行，残留文件所有权
