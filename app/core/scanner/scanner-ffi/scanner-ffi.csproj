@@ -27,12 +27,28 @@
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <!-- Microsoft.Data.Sqlite: 直写 SQLite（与 CLI 一致） -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <!-- CVE-2025-6965 (GHSA-2m69-gcr7-jv3q, High): 同 scanner.csproj，
+         pin 原生 SQLite 到 3.50.3 消除 NU1903，managed 核心保持 2.x -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- NativeAOT 默认启用 trimming，TagLib.File.Create 依赖反射注册具体文件类型；
          保留整个程序集防止运行期 "No file type found" -->
     <TrimmerRootAssembly Include="TagLibSharp" />
+  </ItemGroup>
+
+  <!-- NativeAOT 库内嵌 .NET 运行时：SQLitePCLRaw 经 DllImport("e_sqlite3")
+       在运行期按文件名 dlopen 原生 SQLite。.NET 10 AOT 起为纯文件名搜索，
+       RTLD_GLOBAL 绝对路径预加载不再命中（库无 SONAME，glibc 不识别为已加载）。
+       给产物加 RUNPATH（Linux $ORIGIN / macOS @loader_path），使任何进程
+       （flutter 测试、真机 bundle）加载 scanner-ffi 时均能在同目录解析
+       libe_sqlite3。Windows 默认按模块目录解析，无需处理。 -->
+  <ItemGroup>
+    <LinkerArg Include="-Wl,-rpath,'$ORIGIN'"
+               Condition="$(RuntimeIdentifier.StartsWith('linux'))" />
+    <LinkerArg Include="-Wl,-rpath,@loader_path"
+               Condition="$(RuntimeIdentifier.StartsWith('osx'))" />
   </ItemGroup>
 
   <!-- 产物约定：复制到 scanner/build/（与 audio-engine/build 同级约定）。

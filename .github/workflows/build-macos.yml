@@ -13,18 +13,18 @@ jobs:
     name: macOS arm64
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Homebrew deps
         run: |
           brew install ffmpeg taglib curl openssl sqlite nlohmann-json pkg-config
 
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.23'
           cache-dependency-path: app/core/subsonic/go.sum
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
       - uses: subosito/flutter-action@v2

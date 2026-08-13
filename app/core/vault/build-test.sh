@@ -7,7 +7,7 @@
 #   仅测试/CI 使用（无 Secret Service 的 headless 环境），绝不发布——
 #   生产二进制由 build.sh 产出，不含任何测试明文存储逻辑。
 #
-# 依赖：.NET 9+ SDK；NativeAOT 需 clang 等 C 编译链。
+# 依赖：.NET 10+ SDK；NativeAOT 需 clang 等 C 编译链。
 # 使用：./build-test.sh [RID]   # RID 默认 linux-x64
 set -euo pipefail
 cd "$(dirname "$0")"

@@ -13,7 +13,7 @@ jobs:
     name: Linux x64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install system dependencies
         run: |
@@ -26,18 +26,18 @@ jobs:
             libayatana-appindicator3-dev
 
       # 固定 CMake 版本：FindSQLite3 自 3.14 才定义 SQLite3::SQLite3 IMPORTED target，
-      # 不同 runner 镜像 / 发行版自带版本不一，统一固定避免依赖探测行为漂移
+      # 不同 runner 镜像 / 发行版自带版本不一，统一固定避免依赖探测行为漂移。
+      # 入参为 cmake-version（v2 无 version/use-cache 输入，传错会告警）
       - uses: jwlawson/actions-setup-cmake@v2
         with:
-          version: 'v3.28.7'
-          use-cache: true
+          cmake-version: 'v3.28.7'
 
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.23'
           cache-dependency-path: app/core/subsonic/go.sum
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
       - uses: subosito/flutter-action@v2

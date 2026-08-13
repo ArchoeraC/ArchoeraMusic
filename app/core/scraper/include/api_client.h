@@ -2465,13 +2465,12 @@ public:
 
         static constexpr int CHINESE_MIN_SCORE = 2;
         int bestChineseScore = -1;  // 记录最高评分，用于选择最佳封面源
-        int totalPassed = 0;        // 通过评分门槛的歌曲数
         for (const auto& cr : chineseResults) {
             int srcPassed = 0;
             for (const auto& song : cr.songs) {
                 int rawScore = scoreChineseSong(song, track);
                 if (rawScore < CHINESE_MIN_SCORE) continue;
-                ++srcPassed; ++totalPassed;
+                ++srcPassed;
                 // 归一化到 0-100：原始分 0-14，乘 7 = 0-98，加源优先级（0-5）
                 int score = rawScore * 7 + cr.priority;
                 ScrapeResult sr;
