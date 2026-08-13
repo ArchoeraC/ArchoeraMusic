@@ -17,16 +17,28 @@
     <NoWarn>$(NoWarn);IL2104</NoWarn>
   </PropertyGroup>
 
-  <!-- macOS NativeAOT Swift 库路径（dotnet/runtime#125858）：
-       .NET 的 System.Security.Cryptography.Native.Apple 含 Swift 编译的
-       pal_swiftbindings.o，其 __swift_FORCE_LOAD_$_swift_* 符号需从
-       $(SDKROOT)/usr/lib/swift 自动链接；新版 Xcode 下 clang auto-link 找不到
-       swift_Builtin_float / swiftsys_time 等拆分库 → 显式追加 -L 修复。
-       双保险：①项目级 LinkerArg（SDKROOT 由 build-macos.sh 显式 export，
-       静态求值必然生效）；②下方 BeforeTargets 钩子（SDKROOT 未设置时的
-       兜底，运行时求值，存在时序脆弱性）。 -->
+  <!-- macOS NativeAOT Swift 库链接（dotnet/runtime#125858）：
+       根因：.NET 10 的 macOS 默认部署目标 AppleMinOSVersion=12.0
+       （Microsoft.NETCore.Native.Unix.targets），而 macOS-14/15 runner 的
+       /usr/lib/swift 系统 Swift 运行时库（libswift_Builtin_float 等）minOS
+       ≥ 13 → ld_classic 按版本拒绝（"Could not find or use auto-linked
+       library"）。官方修复（PR #126893，.NET 11）正是把默认值提到 14.0；
+       AppleMinOSVersion 是公开属性，.NET 10 上直接覆盖即可（与原生模块
+       MACOSX_DEPLOYMENT_TARGET=14.0 一致，无兼容性回归）。 -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('osx'))">
+    <AppleMinOSVersion>14.0</AppleMinOSVersion>
+  </PropertyGroup>
+
+  <!-- 兜底：候选 Swift 库目录（未来 runner 镜像 /usr/lib/swift 缺库时生效）。
+       SDKROOT（SDK .tbd stub）与 SWIFT_TOOLCHAIN_LIB（toolchain macosx 目录）
+       均由 build-macos.sh 显式注入；项目级 ItemGroup 静态求值，必然生效。
+       ③下方 BeforeTargets 钩子为 SDKROOT 未设置时的最后兜底（运行时求值，
+       存在时序脆弱性）。 -->
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('osx')) and '$(SDKROOT)' != ''">
     <LinkerArg Include="-L$(SDKROOT)/usr/lib/swift" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('osx')) and '$(SWIFT_TOOLCHAIN_LIB)' != ''">
+    <LinkerArg Include="-L$(SWIFT_TOOLCHAIN_LIB)" />
   </ItemGroup>
 
   <Target Name="AddSwiftLibraryPaths"
