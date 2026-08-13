@@ -13,6 +13,7 @@ import 'prefs_player.dart';
 import 'prefs_power.dart';
 import 'prefs_preset.dart';
 import 'prefs_scrape.dart';
+import 'prefs_security.dart';
 
 export 'prefs_app.dart';
 export 'prefs_appearance.dart';
@@ -22,6 +23,7 @@ export 'prefs_player.dart';
 export 'prefs_power.dart';
 export 'prefs_preset.dart';
 export 'prefs_scrape.dart';
+export 'prefs_security.dart';
 
 /// 应用偏好（轻量 JSON 文件持久化，存数据目录 `prefs.json`）。
 ///
@@ -303,6 +305,20 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 关闭 = 持久化指纹。切换后由调用方调 `syncSessions()` 立即重注入/清除。
   void setDownloadDynamicFingerprint(bool value) {
     state = state.copyWithDownloadDynamicFingerprint(value);
+    state.save();
+  }
+
+  /// 设置凭据加密方案（crypto=LEGACY 单因子推荐 / vault=2-of-2 实验性）。
+  /// 由安全设置页/首次启动对话框在「销毁重建 + 冷切重启」后调用；
+  /// 重启后 [VaultSessionStore]/[StreamingStore] 惰性重建按本偏好初始化。
+  void setCredentialScheme(String value) {
+    state = state.copyWithCredentialScheme(value);
+    state.save();
+  }
+
+  /// 标记首次启动「加密方案选择」对话框已展示（一次性）。
+  void setSchemeDialogShown(bool value) {
+    state = state.copyWithSchemeDialogShown(value);
     state.save();
   }
 

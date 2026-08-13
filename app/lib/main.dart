@@ -7,6 +7,7 @@ import 'package:window_manager/window_manager.dart';
 import 'apis/runtime.dart';
 import 'services/power/frame_governor.dart';
 import 'services/streaming/streaming_store.dart';
+import 'stores/app_prefs.dart';
 import 'stores/vault_session_store.dart';
 import 'app/app.dart';
 import 'widgets/list/cover_image.dart';
@@ -26,8 +27,12 @@ Future<void> main() async {
   // 改全局 HttpClient 默认 UA 为浏览器 UA，天然保证单头。
   HttpOverrides.global = _BrowserUserAgentOverrides();
   // 会话存储：vault 加密持久化（先加载/迁移旧明文，再注入宿主运行时，
-  // 保证 kugou/netease 提供者首次读取时已就绪）
-  final sessionStore = VaultSessionStore();
+  // 保证 kugou/netease 提供者首次读取时已就绪）。默认加密方案（crypto
+  // 推荐 / vault 实验性）来自设置页偏好，控制惰性重建时初始化哪种方案。
+  final prefs = AppPrefs.load();
+  StreamingStore.defaultScheme = prefs.credentialScheme;
+  final sessionStore =
+      VaultSessionStore(defaultScheme: prefs.credentialScheme);
   await sessionStore.initialize();
   if (!sessionStore.vaultAvailable) {
     // 凭据保险库不可用：登录态仅内存保留（不静默降级为明文持久化）

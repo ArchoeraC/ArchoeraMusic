@@ -2102,276 +2102,353 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get settingsDeviceBindSection => '高级 · 设备绑定';
+  String get settingsDeviceBindSection => '고급 · 기기 바인딩';
 
   @override
   String get settingsDeviceBindNote =>
-      '增强型可选项（opt-in）：本机免密 + 设备变更走恢复口令，不依赖系统安全存储。开启将读取本机设备标识（仅存本地、绝不上传）。默认关闭，普通用户使用 v1 加密已足够。';
+      '확장 옵트인 기능: 이 기기에서는 비밀번호 없음 + 기기 변경 시 복구 비밀번호로 해제. OS 보안 저장소에 의존하지 않습니다. 활성화하면 이 기기의 식별자를 읽습니다(로컬에만 저장, 업로드하지 않음). 기본적으로 꺼져 있으며, 일반 사용자는 기본 v1 암호화로 충분합니다.';
 
   @override
-  String get settingsDeviceBindSwitch => '设备绑定免密';
+  String get settingsDeviceBindSwitch => '기기 바인딩 비밀번호 없음';
 
   @override
-  String get settingsDeviceBindSwitchDesc => '本机自动解锁；换机/重装走恢复口令';
+  String get settingsDeviceBindSwitchDesc =>
+      '이 기기에서는 자동 잠금 해제, 기기 변경 시 복구 비밀번호';
 
   @override
   String get settingsDeviceBindSwitchOffDesc =>
-      '未启用。当前系统安全存储不可用，可开启设备绑定实现本机免密（无需口令）';
+      '비활성화됨. 현재 OS 보안 저장소를 사용할 수 없어 기기 바인딩을 켜면 비밀번호 없이 잠금 해제할 수 있습니다';
 
   @override
   String get settingsDeviceBindSwitchV1Desc =>
-      '当前为 v1（系统安全存储）模式；开启将升级为设备绑定（免密 + 恢复口令，既有数据保留）';
+      '현재 v1(OS 보안 저장소) 모드. 켜면 기기 바인딩으로 업그레이드(비밀번호 없음 + 복구 비밀번호, 기존 데이터 유지)';
 
   @override
   String get settingsDeviceBindSwitchV2Desc =>
-      '当前为 v2（口令）模式；开启需先输入当前口令解锁，随后升级为设备绑定（本机免密）';
+      '현재 v2(비밀번호) 모드. 켜려면 현재 비밀번호로 잠금 해제한 뒤 기기 바인딩으로 업그레이드합니다(이 기기에서 비밀번호 없음)';
 
   @override
-  String get settingsDeviceBindPrivacyTitle => '开启设备绑定免密？';
+  String get settingsDeviceBindPrivacyTitle => '기기 바인딩 비밀번호 없음을 켤까요?';
 
   @override
   String get settingsDeviceBindPrivacyDesc =>
-      '将读取本机设备标识（Linux machine-id / Windows MachineGuid / macOS IOPlatformUUID）用于绑定，仅存储于本地，绝不上传。注意：此操作不可回到当前 OS 免密模式——日后关闭设备绑定将回落为口令模式（每次启动需输入口令）。';
+      '이 기기의 식별자(Linux machine-id / Windows MachineGuid / macOS IOPlatformUUID)를 읽어 바인딩합니다. 로컬에만 저장하며 업로드하지 않습니다. 주의: 이 작업은 현재 OS 비밀번호 없음 모드로 되돌릴 수 없습니다. 나중에 기기 바인딩을 끄면 비밀번호 모드(매번 시작 시 입력)로 전환됩니다.';
 
   @override
-  String get settingsDeviceBindEnable => '开启';
+  String get settingsDeviceBindEnable => '켜기';
 
   @override
-  String get settingsDeviceBindRecoveryTitle => '设置恢复口令（可选）';
+  String get settingsDeviceBindRecoveryTitle => '복구 비밀번호 설정(선택)';
 
   @override
   String get settingsDeviceBindRecoveryDesc =>
-      '换机/重装后需用恢复口令解锁凭据。留空则不设置：设备变更后无法恢复（fail-closed，需销毁重建凭据）。';
+      '기기 변경/재설치 후 복구 비밀번호로 자격 증명을 잠금 해제합니다. 비워 두면 설정하지 않음: 기기 변경 후 복구 불가(fail-closed, 폐기 후 재구축 필요).';
 
   @override
-  String get settingsDeviceBindRecoveryHint => '恢复口令';
+  String get settingsDeviceBindRecoveryHint => '복구 비밀번호';
 
   @override
-  String get settingsDeviceBindSkip => '不设口令，直接开启';
+  String get settingsDeviceBindSkip => '비밀번호 없이 켜기';
 
   @override
-  String get settingsDeviceBindChangeRecovery => '设置 / 修改恢复口令';
+  String get settingsDeviceBindChangeRecovery => '복구 비밀번호 설정/변경';
 
   @override
-  String get settingsDeviceBindChangeRecoveryTitle => '设置新的恢复口令';
+  String get settingsDeviceBindChangeRecoveryTitle => '새 복구 비밀번호 설정';
 
   @override
   String get settingsDeviceBindChangeRecoveryDesc =>
-      '修改后旧口令立即失效。请务必记住新口令：换机/重装后凭据解锁将依赖它。';
+      '변경 후 이전 비밀번호는 즉시 무효화됩니다. 새 비밀번호를 반드시 기억하세요: 기기 변경/재설치 후 자격 증명 잠금 해제는 이 비밀번호에 의존합니다.';
 
   @override
-  String get settingsDeviceBindRebind => '重新绑定当前设备';
+  String get settingsDeviceBindRebind => '현재 기기 다시 바인딩';
 
   @override
-  String get settingsDeviceBindRebindDesc => '用当前设备指纹重密封，旧指纹立即失效（换机恢复后使用）';
+  String get settingsDeviceBindRebindDesc =>
+      '현재 기기 지문으로 다시 봉인하며, 이전 지문은 즉시 무효화됩니다(복구 후 사용)';
 
   @override
-  String get settingsDeviceBindRebindTitle => '重新绑定当前设备？';
+  String get settingsDeviceBindRebindTitle => '현재 기기를 다시 바인딩할까요?';
 
   @override
-  String get settingsDeviceBindRebindConfirm => '立即重新绑定';
+  String get settingsDeviceBindRebindConfirm => '지금 다시 바인딩';
 
   @override
-  String get settingsDeviceBindClose => '关闭设备绑定';
+  String get settingsDeviceBindClose => '기기 바인딩 끄기';
 
   @override
-  String get settingsDeviceBindCloseDesc => '清除设备熵绑定，vault 转为口令模式';
+  String get settingsDeviceBindCloseDesc =>
+      '기기 엔트로피 봉인을 해제하고 vault는 비밀번호 모드로 전환';
 
   @override
-  String get settingsDeviceBindCloseTitle => '关闭设备绑定？';
+  String get settingsDeviceBindCloseTitle => '기기 바인딩을 끌까요?';
 
   @override
   String get settingsDeviceBindCloseConfirmDesc =>
-      '将删除设备熵绑定，vault 转为口令模式：此后每次会话需输入口令。该口令即新会话口令，请牢记。输入当前恢复口令以确认。';
+      '기기 엔트로피 봉인을 삭제하고 vault는 비밀번호 모드로 전환됩니다: 이후 매 세션마다 비밀번호 입력이 필요합니다. 그 비밀번호가 새 세션 비밀번호가 되므로 꼭 기억하세요. 현재 복구 비밀번호를 입력해 확인하세요.';
 
   @override
-  String get settingsDeviceBindCloseHint => '当前恢复口令';
+  String get settingsDeviceBindCloseHint => '현재 복구 비밀번호';
 
   @override
-  String get settingsDeviceBindRecoveryBanner => '检测到设备变更或熵文件损坏：凭据已锁定，需恢复口令解锁';
+  String get settingsDeviceBindRecoveryBanner =>
+      '기기 변경 또는 엔트로피 파일 손상 감지: 자격 증명이 잠겨 복구 비밀번호가 필요합니다';
 
   @override
-  String get settingsDeviceBindRecover => '恢复';
+  String get settingsDeviceBindRecover => '복구';
 
   @override
-  String get settingsDeviceBindRecoverTitle => '输入恢复口令';
+  String get settingsDeviceBindRecoverTitle => '복구 비밀번호 입력';
 
   @override
-  String get settingsDeviceBindRecoverDesc => '用恢复口令解锁凭据；成功后建议立即重新绑定当前设备恢复免密。';
+  String get settingsDeviceBindRecoverDesc =>
+      '복구 비밀번호로 자격 증명을 잠금 해제합니다. 성공 후 즉시 현재 기기를 다시 바인딩해 비밀번호 없음을 복원하는 것을 권장합니다.';
 
   @override
-  String get settingsDeviceBindShowPassword => '显示 / 隐藏口令';
+  String get settingsDeviceBindShowPassword => '비밀번호 표시/숨기기';
 
   @override
-  String get toastDeviceBindEnabled => '设备绑定免密已开启';
+  String get toastDeviceBindEnabled => '기기 바인딩 비밀번호 없음을 켰습니다';
 
   @override
-  String get toastDeviceBindRecoverySet => '恢复口令已更新';
+  String get toastDeviceBindRecoverySet => '복구 비밀번호를 갱신했습니다';
 
   @override
-  String get toastDeviceBindRebound => '已重新绑定当前设备';
+  String get toastDeviceBindRebound => '현재 기기를 다시 바인딩했습니다';
 
   @override
-  String get toastDeviceBindClosed => '设备绑定已关闭，vault 已转为口令模式';
+  String get toastDeviceBindClosed => '기기 바인딩을 껐습니다. vault는 비밀번호 모드입니다';
 
   @override
-  String get toastDeviceBindRecoveryNeeded => '未设置恢复口令，无法关闭设备绑定';
+  String get toastDeviceBindRecoveryNeeded =>
+      '복구 비밀번호가 설정되지 않아 기기 바인딩을 끌 수 없습니다';
 
   @override
   String toastDeviceBindCloseFailed(Object error) {
-    return '关闭失败：$error';
+    return '끄기 실패: $error';
   }
 
   @override
-  String get toastDeviceBindRecovered => '凭据已恢复，可重新绑定本机恢复免密';
+  String get toastDeviceBindRecovered =>
+      '자격 증명을 복구했습니다. 다시 바인딩하면 비밀번호 없음을 복원할 수 있습니다';
 
   @override
-  String get toastDeviceBindRecoverFailed => '恢复口令错误或解锁失败，凭据保持锁定';
+  String get toastDeviceBindRecoverFailed =>
+      '복구 비밀번호 오류 또는 잠금 해제 실패. 자격 증명은 잠긴 상태로 유지됩니다';
 
   @override
-  String get settingsVaultSection => '凭据加密';
+  String get settingsSchemeIntroTitle => '암호화 방식 안내';
+
+  @override
+  String get settingsSchemeIntroDesc =>
+      '로그인 자격 증명(쿠키)은 암호화 방식으로 보호됩니다. LEGACY 방식(권장)을 활성화했습니다: 마스터 키는 OS 보안 저장소에 보관되어 안정적이고 신뢰할 수 있습니다. 더 높은 보안이 필요하면 \'설정 → 자격 증명 암호화 방식\'에서 Vault(실험적)로 전환할 수 있습니다. 단, 전환 시 데이터베이스가 재구축되며 모든 로그인 자격 증명이 유실됩니다.';
+
+  @override
+  String get settingsSchemeIntroGotIt => '확인했습니다';
+
+  @override
+  String get settingsSchemeSection => '자격 증명 암호화 방식';
+
+  @override
+  String get settingsSchemeNote =>
+      '로그인 자격 증명의 암호화 방식을 선택합니다. LEGACY: OS 보안 저장소로 암호화, 안정적이고 신뢰할 수 있음(권장). Vault: 2-of-2 이중 요소 실험적 방식으로 보안성은 높지만 쿠키 유실 위험이 있습니다. 방식 전환 시 데이터베이스를 재구축하고 다시 로그인해야 합니다.';
+
+  @override
+  String get settingsSchemeCryptoTitle => 'LEGACY';
+
+  @override
+  String get settingsSchemeCryptoBadge => '권장';
+
+  @override
+  String get settingsSchemeCryptoDesc =>
+      '쿠키는 OS 보안 저장소로 암호화됩니다(Windows DPAPI / macOS 키체인 / Linux libsecret). 안정적이고 신뢰할 수 있습니다.';
+
+  @override
+  String get settingsSchemeCryptoModeDesc =>
+      'LEGACY 방식: 마스터 키 전체를 OS 보안 저장소가 보호합니다. 암호 강도와 안정성의 균형이 좋아 일상 사용에 적합합니다.';
+
+  @override
+  String get settingsSchemeVaultTitle => 'Vault';
+
+  @override
+  String get settingsSchemeVaultBadge => '실험적';
+
+  @override
+  String get settingsSchemeVaultDesc =>
+      '2-of-2 이중 요소 암호화(시스템 몫 + 사용자 몫 모두 필요). 오프라인 공격에 더 강하지만, 이상 발생 시 쿠키가 유실될 수 있습니다.';
+
+  @override
+  String get settingsSchemeVaultModeDesc =>
+      'Vault 방식: 마스터 키를 시스템 몫과 사용자 몫으로 분할하며 이중 요소가 모두 필요합니다. 봉인 단계로 v1 시스템 보호 / v2 비밀번호 보호 / v3 기기 바인딩을 선택할 수 있습니다.';
+
+  @override
+  String get settingsSchemeSwitchTitle => '암호화 방식을 전환할까요?';
+
+  @override
+  String get settingsSchemeSwitchToVaultWarning =>
+      'Vault는 실험적 방식입니다: 전환 후 쿠키 유실 위험이 있습니다.';
+
+  @override
+  String get settingsSchemeSwitchRebuildDesc =>
+      'LEGACY와 Vault는 암호화 데이터 구조가 호환되지 않아 전환 시 기존 vault를 폐기하고 데이터베이스를 재구축합니다. 모든 로그인 자격 증명(网易雲 / 酷狗 / 스트리밍 계정)이 유실되며 다시 로그인해야 합니다.';
+
+  @override
+  String get settingsSchemeSwitchKeep => '현재 유지';
+
+  @override
+  String get settingsSchemeSwitchConfirm => '전환하고 재구축';
+
+  @override
+  String get toastSchemeSwitched => '암호화 방식을 전환했습니다. 재시작 후 적용됩니다';
+
+  @override
+  String get settingsVaultSection => '자격 증명 암호화';
 
   @override
   String get settingsVaultNote =>
-      '选择凭据的加密保护等级：v1 系统保护（默认）/ v2 口令保护 / v3 设备绑定（增强项 opt-in，读取本机设备标识，仅存本地、绝不上传）。v1 ↔ v2 可随时互切；v3 为终点档，关闭后回落为 v2。';
+      '자격 증명의 암호화 보호 단계를 선택: v1 시스템 보호(기본) / v2 비밀번호 보호 / v3 기기 바인딩(확장 옵트인, 이 기기의 식별자를 읽고 로컬에만 저장, 업로드 없음). v1 ↔ v2는 언제든 전환 가능. v3는 종착 단계이며 끄면 v2로 돌아갑니다.';
 
   @override
-  String get settingsVaultModeV1 => 'v1 系统保护';
+  String get settingsVaultModeV1 => 'v1 시스템 보호';
 
   @override
-  String get settingsVaultModeV2 => 'v2 口令保护';
+  String get settingsVaultModeV2 => 'v2 비밀번호 보호';
 
   @override
-  String get settingsVaultModeV3 => 'v3 设备绑定';
+  String get settingsVaultModeV3 => 'v3 기기 바인딩';
 
   @override
   String get settingsVaultModeDescOs =>
-      'v1 系统保护：凭据由操作系统安全存储加密（Windows DPAPI / macOS 钥匙串 / Linux libsecret），本机免密。';
+      'v1 시스템 보호: 자격 증명을 OS 보안 저장소로 암호화(Windows DPAPI / macOS 키체인 / Linux libsecret), 이 기기에서 비밀번호 없음.';
 
   @override
   String get settingsVaultModeDescPassword =>
-      'v2 口令保护：凭据由口令加密，每次启动需输入口令解锁。可随时切回 v1 系统保护。';
+      'v2 비밀번호 보호: 자격 증명을 비밀번호로 암호화하며 매번 시작 시 입력 필요. 언제든 v1 시스템 보호로 되돌릴 수 있습니다.';
 
   @override
   String get settingsVaultModeDescMultiseal =>
-      'v3 设备绑定：本机免密，设备变更时需恢复口令解锁。不可直接降回 v1——关闭后将回落为 v2 口令模式。';
+      'v3 기기 바인딩: 이 기기에서 비밀번호 없음, 기기 변경 시 복구 비밀번호 필요. v1으로 직접 내릴 수 없습니다——끄면 v2 비밀번호 모드로 돌아갑니다.';
 
   @override
-  String get settingsVaultModeDescUnknown => '加密等级读取中…';
+  String get settingsVaultModeDescUnknown => '암호화 단계 읽는 중…';
 
   @override
-  String get settingsVaultSwitchToPasswordTitle => '切换到口令保护（v2）';
+  String get settingsVaultSwitchToPasswordTitle => '비밀번호 보호(v2)로 전환';
 
   @override
   String get settingsVaultSwitchToPasswordDesc =>
-      '凭据将改由口令加密保护，每次启动需输入口令。主密钥与已有数据保留，此操作可随时切回系统保护（v1）。';
+      '자격 증명이 비밀번호로 암호화되며 매번 시작 시 입력이 필요합니다. 마스터 키와 기존 데이터는 유지되며 언제든 시스템 보호(v1)로 되돌릴 수 있습니다.';
 
   @override
-  String get settingsVaultSwitchToPasswordNewHint => '设置新口令';
+  String get settingsVaultSwitchToPasswordNewHint => '새 비밀번호 설정';
 
   @override
-  String get settingsVaultSwitchToPasswordConfirmHint => '再次输入新口令';
+  String get settingsVaultSwitchToPasswordConfirmHint => '새 비밀번호 다시 입력';
 
   @override
-  String get settingsVaultSwitchToPasswordMismatch => '两次输入不一致';
+  String get settingsVaultSwitchToPasswordMismatch => '두 번 입력한 값이 일치하지 않습니다';
 
   @override
-  String get settingsVaultSwitchToOsTitle => '切换回系统保护（v1）';
+  String get settingsVaultSwitchToOsTitle => '시스템 보호(v1)로 되돌리기';
 
   @override
   String get settingsVaultSwitchToOsDesc =>
-      '凭据将改由操作系统安全存储保护，无需再输入口令。此操作可随时切回口令保护（v2）。';
+      '자격 증명이 OS 보안 저장소로 보호되며 비밀번호 입력이 필요 없어집니다. 언제든 비밀번호 보호(v2)로 되돌릴 수 있습니다.';
 
   @override
-  String get settingsVaultNeedUnlockFirst => '当前口令保护未解锁：请先解锁后再切换';
+  String get settingsVaultNeedUnlockFirst =>
+      '현재 비밀번호 보호가 잠금 해제되지 않았습니다: 먼저 잠금 해제 후 전환하세요';
 
   @override
   String get settingsVaultV3NoDirectV1 =>
-      '设备绑定（v3）不可直接降回 v1：请先关闭设备绑定，回落为 v2 口令模式';
+      '기기 바인딩(v3)은 v1으로 직접 내릴 수 없습니다: 먼저 기기 바인딩을 끄고 v2 비밀번호 모드로 돌아가세요';
 
   @override
-  String get settingsVaultCloseV3PasswordTitle => '关闭设备绑定：设置新口令';
+  String get settingsVaultCloseV3PasswordTitle => '기기 바인딩 끄기: 새 비밀번호 설정';
 
   @override
   String get settingsVaultCloseV3PasswordDesc =>
-      '设备绑定开启时未设置恢复口令（本机免密），关闭后将转为口令保护（v2）：请设置新的解锁口令。主密钥与已有数据保留，此口令每次启动都需输入。';
+      '기기 바인딩 활성화 시 복구 비밀번호를 설정하지 않았다면(이 기기 비밀번호 없음), 끄면 비밀번호 보호(v2)로 전환됩니다: 새 잠금 해제 비밀번호를 설정하세요. 마스터 키와 기존 데이터는 유지되며 이 비밀번호는 매번 시작 시 입력해야 합니다.';
 
   @override
-  String get toastVaultSwitchedToPassword => '已切换到口令保护（v2）';
+  String get toastVaultSwitchedToPassword => '비밀번호 보호(v2)로 전환했습니다';
 
   @override
-  String get toastVaultSwitchedToOs => '已切换回系统保护（v1）';
+  String get toastVaultSwitchedToOs => '시스템 보호(v1)로 되돌렸습니다';
 
   @override
   String get settingsVaultShareBrokenBanner =>
-      'Credential vault shares are mismatched: storage backend mismatch or missing share. Local credentials cannot be decrypted. Rebuild the vault and sign in again.';
+      'vault 몫이 불일치합니다: 저장소 백엔드 불일치 또는 몫 누락. 로컬 자격 증명을 복호화할 수 없습니다. vault를 재구축하고 다시 로그인하세요.';
 
   @override
-  String get settingsVaultShareBrokenRebuild => 'Rebuild vault';
+  String get settingsVaultShareBrokenRebuild => 'vault 재구축';
 
   @override
-  String get settingsVaultRestartTitle => '需要重启应用';
+  String get settingsVaultRestartTitle => '앱 재시작 필요';
 
   @override
   String get settingsVaultRestartDesc =>
-      '加密等级已切换成功。为保证数据库完整性与各模块状态一致，请重启应用生效。若为口令保护模式（v2），重启后将要求输入口令解锁，解锁前登录态与流媒体凭据暂不可用（显示为未登录）；重启期间播放与下载会中断。';
+      '암호화 단계를 전환했습니다. 데이터베이스 무결성과 각 모듈 상태를 일치시키려면 앱을 재시작하세요. 비밀번호 보호 모드(v2)인 경우 재시작 후 비밀번호 입력이 필요합니다. 잠금 해제 전에는 로그인 상태와 스트리밍 자격 증명을 사용할 수 없습니다(로그아웃 표시). 재시작 중 재생과 다운로드가 중단됩니다.';
 
   @override
-  String get settingsVaultRestartNow => '立即重启';
+  String get settingsVaultRestartNow => '지금 재시작';
 
   @override
-  String get settingsVaultRestartLater => '稍后重启';
+  String get settingsVaultRestartLater => '나중에 재시작';
 
   @override
-  String get vaultCrashTitle => '凭据模块异常退出';
+  String get vaultCrashTitle => '자격 증명 모듈이 비정상 종료됨';
 
   @override
-  String get vaultCrashDesc => '凭据保险库进程意外终止，本地凭据可能已暴露。建议重新登录或销毁 vault 以重建凭据。';
+  String get vaultCrashDesc =>
+      '자격 증명 vault 프로세스가 예기치 않게 종료되었습니다. 로컬 자격 증명이 노출되었을 수 있습니다. 다시 로그인하거나 vault를 폐기해 자격 증명을 재구축하세요.';
 
   @override
-  String get vaultCrashReset => '销毁并重建';
+  String get vaultCrashReset => '폐기하고 재구축';
 
   @override
-  String get vaultCrashDismiss => '知道了';
+  String get vaultCrashDismiss => '확인';
 
   @override
-  String get vaultVersionTitle => '凭据保险库版本异常';
+  String get vaultVersionTitle => '자격 증명 vault 버전 이상';
 
   @override
   String get vaultVersionDesc =>
-      '检测到凭据保险库组件异常：其二进制副本可能已被替换或非官方构建，本地凭据可能已暴露。已删除异常副本并拒绝解密。请退出并重新安装应用。';
+      '자격 증명 vault 구성 요소에 이상을 감지했습니다: 바이너리 사본이 교체되었거나 비공식 빌드일 수 있어 로컬 자격 증명이 노출되었을 수 있습니다. 이상 사본을 삭제하고 복호화를 거부했습니다. 앱을 종료하고 다시 설치하세요.';
 
   @override
-  String get vaultVersionExit => '退出';
+  String get vaultVersionExit => '종료';
 
   @override
   String get vaultVersionReasonReplaced =>
-      '检测到 vault 二进制被替换或非官方构建，已删除异常副本并拒绝解密。';
+      'vault 바이너리 교체 또는 비공식 빌드를 감지했습니다. 이상 사본을 삭제하고 복호화를 거부했습니다.';
 
   @override
-  String get vaultVersionReasonMarkerMissing => 'vault 握手应答缺少官方构建标记。';
+  String get vaultVersionReasonMarkerMissing =>
+      'vault 핸드셰이크 응답에 공식 빌드 마커가 없습니다.';
 
   @override
   String get vaultVersionReasonMarkerMismatch =>
-      'vault 构建标记与官方产物不符，已删除异常副本并拒绝解密。';
+      'vault 빌드 마커가 공식 산출물과 일치하지 않습니다. 이상 사본을 삭제하고 복호화를 거부했습니다.';
 
   @override
-  String get vaultUnlockTitle => '解锁凭据保险库';
+  String get vaultUnlockTitle => '자격 증명 vault 잠금 해제';
 
   @override
-  String get vaultUnlockDesc => '凭据保险库为口令保护模式（v2）。请输入口令以解锁本地登录凭据与流媒体账号。';
+  String get vaultUnlockDesc =>
+      '자격 증명 vault가 비밀번호 보호 모드(v2)입니다. 로컬 로그인 자격 증명과 스트리밍 계정을 잠금 해제하려면 비밀번호를 입력하세요.';
 
   @override
-  String get vaultUnlockHint => '口令';
+  String get vaultUnlockHint => '비밀번호';
 
   @override
-  String get vaultUnlockConfirm => '解锁';
+  String get vaultUnlockConfirm => '잠금 해제';
 
   @override
-  String get vaultUnlockSkip => '暂不解锁';
+  String get vaultUnlockSkip => '나중에 잠금 해제';
 
   @override
-  String get vaultUnlockFailed => '口令错误，请重试';
+  String get vaultUnlockFailed => '비밀번호가 올바르지 않습니다. 다시 시도하세요';
 
   @override
   String get settingsVersion => '버전';

@@ -36,7 +36,12 @@ class VaultSessionStore implements SessionStore {
 
   final String _dataDir;
 
-  VaultSessionStore({String? dataDir}) : _dataDir = dataDir ?? resolveDataDir();
+  /// 未初始化时的默认加密方案（`crypto`=LEGACY 单因子推荐 / `vault`=2-of-2 实验性）。
+  /// 已初始化的库按自身模式解锁，不受本值影响；惰性重建时按本值选择。
+  final String defaultScheme;
+
+  VaultSessionStore({String? dataDir, this.defaultScheme = 'crypto'})
+      : _dataDir = dataDir ?? resolveDataDir();
 
   /// vault 当前可用（加载/持久化最近一次成功）。
   bool get vaultAvailable => _vaultOk;
@@ -175,10 +180,17 @@ class VaultSessionStore implements SessionStore {
   Future<void> _initialize() async {
     if (!VaultProcess.available) return; // 缺二进制：纯内存
     try {
-      // 首次运行（新数据目录）惰性初始化 vault；已初始化则跳过
+      // 首次运行（新数据目录）惰性初始化 vault；已初始化则跳过。
+      // 默认 crypto（LEGACY 单因子，推荐稳定）；defaultScheme='vault'
+      // 时走 2-of-2（实验性，设置页/首次对话框选择后冷切重启生效）。
       if (!await VaultProcess.isInitialized(_dataDir)) {
-        await VaultProcess.init(_dataDir);
-        _mode = 'os';
+        if (defaultScheme == 'vault') {
+          await VaultProcess.init(_dataDir);
+          _mode = 'os';
+        } else {
+          await VaultProcess.initCrypto(_dataDir);
+          _mode = 'crypto';
+        }
       } else {
         _mode = await VaultProcess.mode(_dataDir);
       }
@@ -306,7 +318,12 @@ class VaultSessionStore implements SessionStore {
         return;
       }
       if (!await VaultProcess.isInitialized(_dataDir)) {
-        await VaultProcess.init(_dataDir);
+        // 惰性重建（销毁后重新登录自动重建）：按默认方案初始化
+        if (defaultScheme == 'vault') {
+          await VaultProcess.init(_dataDir);
+        } else {
+          await VaultProcess.initCrypto(_dataDir);
+        }
       }
       _vaultOk = true;
       _shareBroken = false; // 持久化成功（销毁重建后自动重建）→ 复位不配对标记

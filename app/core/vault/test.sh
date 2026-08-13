@@ -731,21 +731,21 @@ PY
 run status "$DATA8" | grep -q '"mode":"os"' || fail "v2→v1 后 status 应为 os"
 pass "v1 ↔ v2 互切（switch-mode：K 不变数据沿用 / 无口令被拒 / 口令切换 / 免密回归）"
 
-# ── 18. v4 后端指纹不配对（不同构建形态混用数据目录 → SHARE_BACKEND_MISMATCH）──
+# ── 18. 后端指纹不配对（不同构建形态混用数据目录 → SHARE_BACKEND_MISMATCH）──
 DATA9="$(mktemp -d)"
 trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9"' EXIT
 
-# ① backend=a 初始化：v4 文件头记录后端指纹 a
+# ① backend=a 初始化：'O' 代号文件头记录后端指纹 a
 OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=a "$VAULT" init "$DATA9" 2>&1) || true
 case "$OUT" in
   ok\ *) : ;;
   *) fail "backend=a init 失败: $OUT";;
 esac
-python3 - "$DATA9/credentials.vault" <<'PY' || fail "v4 文件头应记录后端指纹"
+python3 - "$DATA9/credentials.vault" <<'PY' || fail "'O' 代号文件头应记录后端指纹"
 import sys
 d = open(sys.argv[1], 'rb').read()
 assert d[:4] == b'AVLT', "magic 不符"
-assert d[4] == 4, "应为 v4 布局，got %d" % d[4]
+assert d[4] == ord('O'), "应为 'O' 代号（OS 模式），got %d" % d[4]
 blen = d[40]
 assert d[41:41 + blen] == b'a', "backend 指纹不符: %r" % d[41:41 + blen]
 print("ok")
@@ -804,6 +804,120 @@ assert resp.startswith("ok handshake"), "配对后端应解锁: %r" % resp
 p.stdin.close(); p.wait(timeout=5)
 print("ok")
 PY
-pass "v4 后端指纹不配对（a 初始化/a 解锁/b → SHARE_BACKEND_MISMATCH/a 仍可解锁）"
+pass "后端指纹不配对（a 初始化/a 解锁/b → SHARE_BACKEND_MISMATCH/a 仍可解锁）"
+
+# ── 19. LEGACY 方案（crypto 传统单因子）：K 整体存 OS 存储 / 免密 3 字段握手 ──
+DATA10="$(mktemp -d)"
+trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9" "$DATA10"' EXIT
+
+# ① init-crypto：'C' 代号文件头（key_vault 零占位 = 不含密钥材料）
+OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=crypto-b "$VAULT" init-crypto "$DATA10" 2>&1) || true
+case "$OUT" in
+  ok\ *) [ -n "${OUT#ok }" ] || fail "init-crypto 应返回非空锚点";;
+  *) fail "init-crypto 失败: $OUT";;
+esac
+[ -f "$DATA10/credentials.vault" ] || fail "init-crypto 应生成 credentials.vault"
+python3 - "$DATA10/credentials.vault" <<'PY' || fail "'C' 代号文件头校验失败"
+import sys
+d = open(sys.argv[1], 'rb').read()
+assert d[:4] == b'AVLT', "magic 不符"
+assert d[4] == ord('C'), "应为 'C' 代号（LEGACY crypto），got %d" % d[4]
+assert d[8:40] == bytes(32), "LEGACY 文件 key_vault 应为 32B 零占位（不含密钥材料）"
+blen = d[40]
+assert d[41:41 + blen] == b'crypto-b', "backend 指纹不符: %r" % d[41:41 + blen]
+print("ok")
+PY
+run status "$DATA10" | grep -q '"mode":"crypto"' || fail "LEGACY 模式 status 应为 mode=crypto"
+pass "init-crypto：'C' 代号文件头（key_vault 零占位 + 后端指纹）+ status mode=crypto"
+
+# ② serve 全链路：免密 3 字段握手 → set/get/delete/quit
+python3 - "$VAULT" "$DATA10" "$B64" "$UID1" <<'PY' || fail "crypto serve 链路失败"
+import base64, hashlib, hmac, os, subprocess, sys
+vault, data, b64, uid1 = sys.argv[1:5]
+env = dict(os.environ)
+env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "crypto-b"
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+
+def cmd(line, payload=None):
+    if payload is None:
+        p.stdin.write((line + "\n").encode())
+    else:
+        p.stdin.write((line + "\n" + payload + "\n").encode())
+    p.stdin.flush()
+    return p.stdout.readline().decode().rstrip("\n")
+
+# crypto 免密握手：3 字段（H=32B / C=16B），应答含锚点 + HMAC + 构建标记
+h, c = os.urandom(32), os.urandom(16)
+resp = cmd("handshake %s %s" % (
+    base64.b64encode(h).decode(), base64.b64encode(c).decode()))
+parts = resp.split(" ")
+assert parts[:2] == ["ok", "handshake"], "握手应答异常: %r" % resp
+t = base64.b64decode(parts[2])
+mac = base64.b64decode(parts[3])
+assert len(t) == 16, "锚点应 16B"
+assert mac == hmac.new(h, c, hashlib.sha256).digest(), "HMAC-SHA256 校验失败"
+assert parts[4].startswith("ARCHOERA-VAULT-TEST"), "握手应上报 TEST 构建标记: %r" % resp
+
+assert cmd("set %s" % uid1, b64) == "ok", "set 失败"
+assert cmd("get %s" % uid1).split(" ", 1)[1] == b64, "get 回读不一致"
+assert cmd("delete %s" % uid1) == "ok true", "delete 失败"
+assert cmd("get %s" % uid1) == "ok null", "删除后应无条目"
+assert cmd("quit") == "ok", "quit 失败"
+p.wait(timeout=5)
+assert p.returncode == 0, "quit 后应正常退出，got %r" % p.returncode
+print("ok")
+PY
+pass "crypto serve 全链路（免密握手 HMAC + set/get/delete/quit）"
+
+# ③ 缺 K（删 OS 存储条目）→ SHARE_MISSING，fail-closed（单因子同样 fail-closed）
+rm -f "$DATA10/insecure_master-share.bin"
+python3 - "$VAULT" "$DATA10" <<'PY' || fail "crypto 缺 K 应 fail-closed"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+env = dict(os.environ)
+env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "crypto-b"
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("err SHARE_MISSING"), "crypto 缺 K 应 SHARE_MISSING: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+pass "crypto 缺 K → SHARE_MISSING（fail-closed，无明文窗口）"
+
+# ④ 后端不配对：LEGACY 文件头指纹照常校验（防构建形态混用数据目录）
+#    重建 crypto 库后以不同后端访问 → SHARE_BACKEND_MISMATCH
+run destroy "$DATA10" >/dev/null || fail "destroy 失败"
+OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=x "$VAULT" init-crypto "$DATA10" 2>&1) || true
+case "$OUT" in
+  ok\ *) : ;;
+  *) fail "重建 init-crypto(x) 失败: $OUT";;
+esac
+python3 - "$VAULT" "$DATA10" <<'PY' || fail "crypto 不配对后端应 SHARE_BACKEND_MISMATCH"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+env = dict(os.environ)
+env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "y"
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("err SHARE_BACKEND_MISMATCH"), "应 SHARE_BACKEND_MISMATCH: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+
+# ⑤ destroy：vault 文件 + K 删除，status 未初始化
+run destroy "$DATA10" | grep -q '^ok$' || fail "destroy 失败"
+run status "$DATA10" | grep -q '"initialized":false' || fail "destroy 后应未初始化"
+pass "crypto 后端不配对（SHARE_BACKEND_MISMATCH）+ destroy 全量销毁"
 
 echo "全部通过 ✔"

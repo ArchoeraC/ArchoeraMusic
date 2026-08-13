@@ -4136,6 +4136,120 @@ abstract class AppLocalizations {
   /// **'恢复口令错误或解锁失败，凭据保持锁定'**
   String get toastDeviceBindRecoverFailed;
 
+  /// No description provided for @settingsSchemeIntroTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'加密方案说明'**
+  String get settingsSchemeIntroTitle;
+
+  /// No description provided for @settingsSchemeIntroDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录凭据（cookie）由加密方案保护。已为你启用 LEGACY 方案（推荐）：主密钥存于操作系统安全存储，稳定可靠。如需更高安全性，可在「设置 → 凭据加密方案」切换到 Vault（实验性）——注意该方案切换会重建数据库并丢失全部登录凭据。'**
+  String get settingsSchemeIntroDesc;
+
+  /// No description provided for @settingsSchemeIntroGotIt.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'知道了，继续'**
+  String get settingsSchemeIntroGotIt;
+
+  /// No description provided for @settingsSchemeSection.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'凭据加密方案'**
+  String get settingsSchemeSection;
+
+  /// No description provided for @settingsSchemeNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'选择登录凭据的加密方案。LEGACY：操作系统安全存储加密，稳定可靠（推荐）；Vault：2-of-2 双因子实验性方案，安全性更高但存在异常丢失 Cookie 风险。切换方案需重建数据库并重新登录。'**
+  String get settingsSchemeNote;
+
+  /// No description provided for @settingsSchemeCryptoTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'LEGACY'**
+  String get settingsSchemeCryptoTitle;
+
+  /// No description provided for @settingsSchemeCryptoBadge.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'推荐'**
+  String get settingsSchemeCryptoBadge;
+
+  /// No description provided for @settingsSchemeCryptoDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'cookie 由操作系统安全存储加密（Windows DPAPI / macOS 钥匙串 / Linux libsecret），稳定可靠。'**
+  String get settingsSchemeCryptoDesc;
+
+  /// No description provided for @settingsSchemeCryptoModeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'LEGACY 方案：主密钥整体由操作系统安全存储保护，加密强度与可用性稳定，适合日常使用。'**
+  String get settingsSchemeCryptoModeDesc;
+
+  /// No description provided for @settingsSchemeVaultTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Vault'**
+  String get settingsSchemeVaultTitle;
+
+  /// No description provided for @settingsSchemeVaultBadge.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'实验性'**
+  String get settingsSchemeVaultBadge;
+
+  /// No description provided for @settingsSchemeVaultDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'2-of-2 双因子加密（系统份额 + 用户份额缺一不可），抵御离线攻击更强，但存在异常丢失 Cookie 风险。'**
+  String get settingsSchemeVaultDesc;
+
+  /// No description provided for @settingsSchemeVaultModeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Vault 方案：主密钥拆分为系统份额与用户份额，双因子缺一不可；可再选 v1 系统保护 / v2 口令保护 / v3 设备绑定加密等级。'**
+  String get settingsSchemeVaultModeDesc;
+
+  /// No description provided for @settingsSchemeSwitchTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换加密方案？'**
+  String get settingsSchemeSwitchTitle;
+
+  /// No description provided for @settingsSchemeSwitchToVaultWarning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。'**
+  String get settingsSchemeSwitchToVaultWarning;
+
+  /// No description provided for @settingsSchemeSwitchRebuildDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'crypto 与 Vault 加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。'**
+  String get settingsSchemeSwitchRebuildDesc;
+
+  /// No description provided for @settingsSchemeSwitchKeep.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'保持当前'**
+  String get settingsSchemeSwitchKeep;
+
+  /// No description provided for @settingsSchemeSwitchConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换并重建'**
+  String get settingsSchemeSwitchConfirm;
+
+  /// No description provided for @toastSchemeSwitched.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'加密方案已切换，重启后生效'**
+  String get toastSchemeSwitched;
+
   /// No description provided for @settingsVaultSection.
   ///
   /// In zh_CN, this message translates to:

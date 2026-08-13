@@ -77,6 +77,21 @@ try
                 }
             }
             break;
+        case "init-crypto":
+            RequireArgs(args, 2);
+            {
+                // LEGACY（crypto 传统单因子，推荐）：K 整体存 OS 安全存储，无份额配对
+                var svc = new VaultService(args[1]);
+                svc.InitCrypto();
+                // 返回会话锚点 T（与 init 一致，主进程保存用于后续握手校验）
+                using (var mk = LockedBuffer.Alloc(KeySplit.KeySize))
+                {
+                    svc.LoadMasterKeyInto(mk.Span);
+                    var t = svc.GetOrCreateAuthAnchor(mk.Span);
+                    Console.WriteLine("ok " + Convert.ToBase64String(t));
+                }
+            }
+            break;
         case "init-password":
             RequireArgs(args, 2);
             {
@@ -182,6 +197,7 @@ static string ModeName(VaultMode mode) => mode switch
 {
     VaultMode.Password => "password",
     VaultMode.MultiSeal => "multiseal",
+    VaultMode.Crypto => "crypto",
     _ => "os",
 };
 

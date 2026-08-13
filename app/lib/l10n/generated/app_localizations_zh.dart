@@ -2207,6 +2207,71 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastDeviceBindRecoverFailed => '恢复口令错误或解锁失败，凭据保持锁定';
 
   @override
+  String get settingsSchemeIntroTitle => '加密方案说明';
+
+  @override
+  String get settingsSchemeIntroDesc =>
+      '登录凭据（cookie）由加密方案保护。已为你启用 LEGACY 方案（推荐）：主密钥存于操作系统安全存储，稳定可靠。如需更高安全性，可在「设置 → 凭据加密方案」切换到 Vault（实验性）——注意该方案切换会重建数据库并丢失全部登录凭据。';
+
+  @override
+  String get settingsSchemeIntroGotIt => '知道了，继续';
+
+  @override
+  String get settingsSchemeSection => '凭据加密方案';
+
+  @override
+  String get settingsSchemeNote =>
+      '选择登录凭据的加密方案。LEGACY：操作系统安全存储加密，稳定可靠（推荐）；Vault：2-of-2 双因子实验性方案，安全性更高但存在异常丢失 Cookie 风险。切换方案需重建数据库并重新登录。';
+
+  @override
+  String get settingsSchemeCryptoTitle => 'LEGACY';
+
+  @override
+  String get settingsSchemeCryptoBadge => '推荐';
+
+  @override
+  String get settingsSchemeCryptoDesc =>
+      'cookie 由操作系统安全存储加密（Windows DPAPI / macOS 钥匙串 / Linux libsecret），稳定可靠。';
+
+  @override
+  String get settingsSchemeCryptoModeDesc =>
+      'LEGACY 方案：主密钥整体由操作系统安全存储保护，加密强度与可用性稳定，适合日常使用。';
+
+  @override
+  String get settingsSchemeVaultTitle => 'Vault';
+
+  @override
+  String get settingsSchemeVaultBadge => '实验性';
+
+  @override
+  String get settingsSchemeVaultDesc =>
+      '2-of-2 双因子加密（系统份额 + 用户份额缺一不可），抵御离线攻击更强，但存在异常丢失 Cookie 风险。';
+
+  @override
+  String get settingsSchemeVaultModeDesc =>
+      'Vault 方案：主密钥拆分为系统份额与用户份额，双因子缺一不可；可再选 v1 系统保护 / v2 口令保护 / v3 设备绑定加密等级。';
+
+  @override
+  String get settingsSchemeSwitchTitle => '切换加密方案？';
+
+  @override
+  String get settingsSchemeSwitchToVaultWarning =>
+      'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。';
+
+  @override
+  String get settingsSchemeSwitchRebuildDesc =>
+      'crypto 与 Vault 加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。';
+
+  @override
+  String get settingsSchemeSwitchKeep => '保持当前';
+
+  @override
+  String get settingsSchemeSwitchConfirm => '切换并重建';
+
+  @override
+  String get toastSchemeSwitched => '加密方案已切换，重启后生效';
+
+  @override
   String get settingsVaultSection => '凭据加密';
 
   @override
@@ -5232,6 +5297,71 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get toastDeviceBindRecoverFailed => '恢复口令错误或解锁失败，凭据保持锁定';
+
+  @override
+  String get settingsSchemeIntroTitle => '加密方案说明';
+
+  @override
+  String get settingsSchemeIntroDesc =>
+      '登录凭据（cookie）由加密方案保护。已为你启用 LEGACY 方案（推荐）：主密钥存于操作系统安全存储，稳定可靠。如需更高安全性，可在「设置 → 凭据加密方案」切换到 Vault（实验性）——注意该方案切换会重建数据库并丢失全部登录凭据。';
+
+  @override
+  String get settingsSchemeIntroGotIt => '知道了，继续';
+
+  @override
+  String get settingsSchemeSection => '凭据加密方案';
+
+  @override
+  String get settingsSchemeNote =>
+      '选择登录凭据的加密方案。LEGACY：操作系统安全存储加密，稳定可靠（推荐）；Vault：2-of-2 双因子实验性方案，安全性更高但存在异常丢失 Cookie 风险。切换方案需重建数据库并重新登录。';
+
+  @override
+  String get settingsSchemeCryptoTitle => 'LEGACY';
+
+  @override
+  String get settingsSchemeCryptoBadge => '推荐';
+
+  @override
+  String get settingsSchemeCryptoDesc =>
+      'cookie 由操作系统安全存储加密（Windows DPAPI / macOS 钥匙串 / Linux libsecret），稳定可靠。';
+
+  @override
+  String get settingsSchemeCryptoModeDesc =>
+      'LEGACY 方案：主密钥整体由操作系统安全存储保护，加密强度与可用性稳定，适合日常使用。';
+
+  @override
+  String get settingsSchemeVaultTitle => 'Vault';
+
+  @override
+  String get settingsSchemeVaultBadge => '实验性';
+
+  @override
+  String get settingsSchemeVaultDesc =>
+      '2-of-2 双因子加密（系统份额 + 用户份额缺一不可），抵御离线攻击更强，但存在异常丢失 Cookie 风险。';
+
+  @override
+  String get settingsSchemeVaultModeDesc =>
+      'Vault 方案：主密钥拆分为系统份额与用户份额，双因子缺一不可；可再选 v1 系统保护 / v2 口令保护 / v3 设备绑定加密等级。';
+
+  @override
+  String get settingsSchemeSwitchTitle => '切换加密方案？';
+
+  @override
+  String get settingsSchemeSwitchToVaultWarning =>
+      'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。';
+
+  @override
+  String get settingsSchemeSwitchRebuildDesc =>
+      'crypto 与 Vault 加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。';
+
+  @override
+  String get settingsSchemeSwitchKeep => '保持当前';
+
+  @override
+  String get settingsSchemeSwitchConfirm => '切换并重建';
+
+  @override
+  String get toastSchemeSwitched => '加密方案已切换，重启后生效';
 
   @override
   String get settingsVaultSection => '凭据加密';
@@ -8260,6 +8390,71 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get toastDeviceBindRecoverFailed => '復原密碼錯誤或解鎖失敗，憑證保持鎖定';
+
+  @override
+  String get settingsSchemeIntroTitle => '加密方案說明';
+
+  @override
+  String get settingsSchemeIntroDesc =>
+      '登入憑證（cookie）由加密方案保護。已為你啟用 LEGACY 方案（推薦）：主金鑰存於作業系統安全儲存，穩定可靠。如需更高安全性，可在「設定 → 憑證加密方案」切換到 Vault（實驗性）——注意該方案切換會重建資料庫並遺失全部登入憑證。';
+
+  @override
+  String get settingsSchemeIntroGotIt => '知道了，繼續';
+
+  @override
+  String get settingsSchemeSection => '憑證加密方案';
+
+  @override
+  String get settingsSchemeNote =>
+      '選擇登入憑證的加密方案。LEGACY：作業系統安全儲存加密，穩定可靠（推薦）；Vault：2-of-2 雙因子實驗性方案，安全性更高但存在異常遺失 Cookie 風險。切換方案需重建資料庫並重新登入。';
+
+  @override
+  String get settingsSchemeCryptoTitle => 'LEGACY';
+
+  @override
+  String get settingsSchemeCryptoBadge => '推薦';
+
+  @override
+  String get settingsSchemeCryptoDesc =>
+      'cookie 由作業系統安全儲存加密（Windows DPAPI / macOS 鑰匙圈 / Linux libsecret），穩定可靠。';
+
+  @override
+  String get settingsSchemeCryptoModeDesc =>
+      'LEGACY 方案：主金鑰整體由作業系統安全儲存保護，加密強度與可用性穩定，適合日常使用。';
+
+  @override
+  String get settingsSchemeVaultTitle => 'Vault';
+
+  @override
+  String get settingsSchemeVaultBadge => '實驗性';
+
+  @override
+  String get settingsSchemeVaultDesc =>
+      '2-of-2 雙因子加密（系統份額 + 使用者份額缺一不可），對離線攻擊防護更強，但存在異常遺失 Cookie 風險。';
+
+  @override
+  String get settingsSchemeVaultModeDesc =>
+      'Vault 方案：主金鑰拆分為系統份額與使用者份額，雙因子缺一不可；可再選 v1 系統保護 / v2 密碼保護 / v3 裝置綁定加密等級。';
+
+  @override
+  String get settingsSchemeSwitchTitle => '切換加密方案？';
+
+  @override
+  String get settingsSchemeSwitchToVaultWarning =>
+      'Vault 為實驗性方案：切換後存在異常遺失 Cookie 的風險。';
+
+  @override
+  String get settingsSchemeSwitchRebuildDesc =>
+      'crypto 與 Vault 加密資料結構不相容，切換將銷毀現有保險庫並重建資料庫，所有登入憑證（網易雲 / 酷狗 / 串流帳號）將遺失，需重新登入。';
+
+  @override
+  String get settingsSchemeSwitchKeep => '保持目前';
+
+  @override
+  String get settingsSchemeSwitchConfirm => '切換並重建';
+
+  @override
+  String get toastSchemeSwitched => '加密方案已切換，重啟後生效';
 
   @override
   String get settingsVaultSection => '憑證加密';
