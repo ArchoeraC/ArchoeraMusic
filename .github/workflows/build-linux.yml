@@ -112,22 +112,6 @@ jobs:
         env:
           APPIMAGE_RUNTIME_FILE: /tmp/type2-runtime
 
-      - name: Package Arch pkg.tar.zst (makepkg in archlinux container)
-        run: |
-          bash packaging/linux/package.sh arch app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-          docker run --rm -v "$PWD":/workspace -w /workspace/packaging/linux/work/arch \
-            archlinux:latest bash -c '
-              pacman -Sy --noconfirm --needed base-devel >/dev/null 2>&1 || exit 1
-              chown -R nobody:nobody .
-              # 新版 archlinux 镜像给 nobody 设了账户过期，su 会报 "account has expired"，先清除
-              chage -E -1 nobody
-              # 预构建产物打包：--nodeps 跳过运行时依赖检查（depends 仍写入
-              # .PKGINFO 供安装端使用），避免容器内安装整套依赖拖慢 CI
-              su nobody -s /bin/bash -c "HOME=/tmp makepkg -f --skipinteg --nocheck --nodeps" || exit 1
-            '
-          cp packaging/linux/work/arch/*.pkg.tar.zst dist/linux/
-          echo "→ dist/linux/$(ls dist/linux/ | grep '\.pkg\.tar\.zst$')"
-
       - name: Package Flatpak (通用)
         run: bash packaging/linux/package-flatpak.sh app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
 
@@ -150,6 +134,28 @@ jobs:
             "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz" .
           rm -rf dist/linux/nix
           echo "→ dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz"
+
+      - name: Package Arch pkg.tar.zst (makepkg in archlinux container, 最后打包)
+        # AUR 打包放 pipeline 末尾：makepkg 以 nobody 运行，残留文件所有权
+        # 复杂（nobody/root），即使有残留也不影响前面各打包步骤；upload 前
+        # 仍执行清理归还 runner，保持工作区权限卫生。
+        run: |
+          bash packaging/linux/package.sh arch app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+          docker run --rm -v "$PWD":/workspace -w /workspace/packaging/linux/work/arch \
+            archlinux:latest bash -c '
+              pacman -Sy --noconfirm --needed base-devel >/dev/null 2>&1 || exit 1
+              chown -R nobody:nobody .
+              # 新版 archlinux 镜像给 nobody 设了账户过期，su 会报 "account has expired"，先清除
+              chage -E -1 nobody
+              # 预构建产物打包：--nodeps 跳过运行时依赖检查（depends 仍写入
+              # .PKGINFO 供安装端使用），避免容器内安装整套依赖拖慢 CI
+              su nobody -s /bin/bash -c "HOME=/tmp makepkg -f --skipinteg --nocheck --nodeps" || exit 1
+              # root 删 makepkg 中间目录 + 所有权归还 runner（挂载卷宿主 owner）
+              rm -rf pkg src
+              chown -R "$(stat -c %u:%g /workspace)" .
+            '
+          cp packaging/linux/work/arch/*.pkg.tar.zst dist/linux/
+          echo "→ dist/linux/$(ls dist/linux/ | grep '\.pkg\.tar\.zst$')"
 
       - name: Upload bundle artifact (原始 bundle)
         uses: actions/upload-artifact@v4

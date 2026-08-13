@@ -18,15 +18,19 @@
   </PropertyGroup>
 
   <!-- macOS NativeAOT Swift 库链接（dotnet/runtime#125858）：
-       根因：.NET 10 的 macOS 默认部署目标 AppleMinOSVersion=12.0
+       根因①：.NET 10 的 macOS 默认部署目标 AppleMinOSVersion=12.0
        （Microsoft.NETCore.Native.Unix.targets），而 macOS-14/15 runner 的
        /usr/lib/swift 系统 Swift 运行时库（libswift_Builtin_float 等）minOS
-       ≥ 13 → ld_classic 按版本拒绝（"Could not find or use auto-linked
-       library"）。官方修复（PR #126893，.NET 11）正是把默认值提到 14.0；
-       AppleMinOSVersion 是公开属性，.NET 10 上直接覆盖即可（与原生模块
-       MACOSX_DEPLOYMENT_TARGET=14.0 一致，无兼容性回归）。 -->
+       ≥ 13 → 链接器按版本拒绝。官方修复（PR #126893，.NET 11）把默认值
+       提到 14.0；AppleMinOSVersion 是公开属性，.NET 10 上直接覆盖即可。
+       根因②（#125858 主体）：Xcode 15 下 .NET 默认追加 -ld_classic
+       （UseLdClassicXCodeLinker，Unix.targets 285 行），而经典链接器无法
+       处理 pal_swiftbindings 的 Swift autolink（__swift_FORCE_LOAD_$_*
+       符号，dotnet/runtime#124609 证实新链接器 ld_prime 有兼容逻辑、经典
+       链接器没有）。禁用开关改用 ld_prime（Xcode 15 默认新链接器）。 -->
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('osx'))">
     <AppleMinOSVersion>14.0</AppleMinOSVersion>
+    <UseLdClassicXCodeLinker>false</UseLdClassicXCodeLinker>
   </PropertyGroup>
 
   <!-- 兜底：候选 Swift 库目录（未来 runner 镜像 /usr/lib/swift 缺库时生效）。
