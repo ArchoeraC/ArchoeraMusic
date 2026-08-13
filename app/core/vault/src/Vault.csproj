@@ -17,4 +17,22 @@
     <NoWarn>$(NoWarn);IL2104</NoWarn>
   </PropertyGroup>
 
+  <!-- macOS NativeAOT Swift 库路径（dotnet/runtime#125858 官方 workaround）：
+       .NET 的 System.Security.Cryptography.Native.Apple 含 Swift 编译的
+       pal_swiftbindings.o，其 __swift_FORCE_LOAD_$_swift_* 符号需从
+       $(SDKROOT)/usr/lib/swift 自动链接；新版 Xcode 下 clang auto-link 找不到
+       swift_Builtin_float / swiftsys_time 等拆分库 → 显式追加 -L 修复。 -->
+  <Target Name="AddSwiftLibraryPaths"
+          BeforeTargets="LinkNative"
+          Condition="$([MSBuild]::IsOSPlatform('osx'))">
+    <Exec Command="xcrun --show-sdk-path"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_MacSdkPath" />
+    </Exec>
+    <ItemGroup>
+      <LinkerArg Include="-L$(_MacSdkPath)/usr/lib/swift" />
+    </ItemGroup>
+  </Target>
+
 </Project>
