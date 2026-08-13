@@ -102,6 +102,33 @@ public sealed class VaultService
         }
     }
 
+    /// 初始化（LEGACY：crypto 传统单因子，推荐）：主密钥 K 整体存 OS 安全存储
+    /// （DPAPI/Keychain/libsecret），vault 文件不含密钥材料（key_vault=32B 零占位）。
+    /// 与 OS 模式（v1/v4，2-of-2 拆分）相比无份额配对、无口令、无设备熵，
+    /// 稳定性更高（不存在份额丢失导致的凭据整体丢失）；安全性降为单点
+    /// （OS 钥匙串被攻破 = 凭据全泄露）。
+    /// 失败回滚（授权侧写入失败时不残留半初始化 vault）。
+    public void InitCrypto()
+    {
+        if (Initialized) throw new InvalidOperationException("vault 已初始化，请先 destroy");
+        _lockout.Clear();
+        var master = RandomNumberGenerator.GetBytes(KeySplit.KeySize);
+        try
+        {
+            _store.Store(ShareKey, master); // K 整体入 OS 安全存储
+            VaultFile.CreateCrypto(_store.Backend).Save(VaultPath);
+        }
+        catch
+        {
+            if (File.Exists(VaultPath)) File.Delete(VaultPath);
+            throw;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(master);
+        }
+    }
+
     /// 初始化（口令模式，可选高级）：S 份额 = Argon2id(password, salt)。
     /// 口令绝不落盘/落 argv；salt 与 KDF 参数随文件头存储。
     /// [password] 用后由调用方清零（本方法仅读取）。
@@ -314,6 +341,26 @@ public sealed class VaultService
             {
                 CryptographicOperations.ZeroMemory(kSeal);
                 CryptographicOperations.ZeroMemory(entropy);
+            }
+            return;
+        }
+        // LEGACY（crypto 传统单因子）：K 整体存 OS 安全存储，无份额配对——
+        // 后端指纹照常校验（防 PROD/TEST 混用数据目录），取回即主密钥。
+        if (vault.Mode == VaultMode.Crypto)
+        {
+            if (vault.Backend != null && vault.Backend != _store.Backend)
+            {
+                throw new VaultShareBackendMismatchException(vault.Backend, _store.Backend);
+            }
+            var kCrypto = _store.Load(ShareKey)
+                ?? throw new VaultShareMissingException(_store.Backend);
+            try
+            {
+                kCrypto.CopyTo(dest);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(kCrypto);
             }
             return;
         }

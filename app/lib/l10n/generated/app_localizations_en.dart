@@ -2293,6 +2293,72 @@ class AppLocalizationsEn extends AppLocalizations {
       'Recovery password incorrect or unlock failed; credentials stay locked';
 
   @override
+  String get settingsSchemeIntroTitle => 'Encryption scheme';
+
+  @override
+  String get settingsSchemeIntroDesc =>
+      'Your login credentials (cookies) are protected by an encryption scheme. LEGACY (recommended) is enabled: the master key lives in OS secure storage — stable and reliable. For stronger protection you can switch to Vault (experimental) in Settings → Credential encryption scheme — note that switching rebuilds the database and loses all login credentials.';
+
+  @override
+  String get settingsSchemeIntroGotIt => 'Got it';
+
+  @override
+  String get settingsSchemeSection => 'Credential encryption scheme';
+
+  @override
+  String get settingsSchemeNote =>
+      'Choose how login credentials are encrypted. LEGACY: OS secure storage, stable and reliable (recommended). Vault: 2-of-2 dual-factor experimental scheme — stronger protection but may occasionally lose cookies. Switching schemes rebuilds the database and requires re-login.';
+
+  @override
+  String get settingsSchemeCryptoTitle => 'LEGACY';
+
+  @override
+  String get settingsSchemeCryptoBadge => 'Recommended';
+
+  @override
+  String get settingsSchemeCryptoDesc =>
+      'Cookies are encrypted by OS secure storage (Windows DPAPI / macOS Keychain / Linux libsecret). Stable and reliable.';
+
+  @override
+  String get settingsSchemeCryptoModeDesc =>
+      'LEGACY: the master key is protected entirely by the OS secure store. Balanced security and stability for daily use.';
+
+  @override
+  String get settingsSchemeVaultTitle => 'Vault';
+
+  @override
+  String get settingsSchemeVaultBadge => 'Experimental';
+
+  @override
+  String get settingsSchemeVaultDesc =>
+      '2-of-2 dual-factor encryption (system share + user share, both required). Stronger against offline attacks, but cookies may be lost on anomalies.';
+
+  @override
+  String get settingsSchemeVaultModeDesc =>
+      'Vault: the master key is split into a system share and a user share — both required. Choose v1 OS / v2 password / v3 device binding as the sealing tier.';
+
+  @override
+  String get settingsSchemeSwitchTitle => 'Switch encryption scheme?';
+
+  @override
+  String get settingsSchemeSwitchToVaultWarning =>
+      'Vault is experimental: cookies may be lost after switching.';
+
+  @override
+  String get settingsSchemeSwitchRebuildDesc =>
+      'LEGACY and Vault use incompatible encrypted structures. Switching destroys the current vault and rebuilds the database; all login credentials (Netease / Kugou / streaming accounts) will be lost and require re-login.';
+
+  @override
+  String get settingsSchemeSwitchKeep => 'Keep current';
+
+  @override
+  String get settingsSchemeSwitchConfirm => 'Switch and rebuild';
+
+  @override
+  String get toastSchemeSwitched =>
+      'Encryption scheme switched; effective after restart';
+
+  @override
   String get settingsVaultSection => 'Credential encryption';
 
   @override

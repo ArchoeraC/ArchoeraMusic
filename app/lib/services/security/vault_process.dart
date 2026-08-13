@@ -155,6 +155,24 @@ class VaultProcess {
     return payload;
   }
 
+  /// 初始化 vault（LEGACY：crypto 传统单因子，推荐）——主密钥 K 整体存
+  /// OS 安全存储（DPAPI/Keychain/libsecret），vault 文件不含密钥材料。
+  /// 无份额配对、无口令、无设备熵，稳定性高于 2-of-2（不存在份额丢失
+  /// 导致的凭据整体丢失）；安全性降为单点（OS 钥匙串被攻破 = 凭据全泄露）。
+  /// 返回并保存会话锚点 T（`vault.auth`）。
+  static Future<String> initCrypto(String dataDir) async {
+    final r = Process.runSync(binary, ['init-crypto', dataDir]);
+    final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
+    if (payload.isNotEmpty) {
+      try {
+        await File(_authFile(dataDir)).writeAsString(payload);
+      } catch (_) {
+        // 锚点保存失败不阻断初始化（后续会话将重新补建）
+      }
+    }
+    return payload;
+  }
+
   /// 初始化 vault（口令模式，可选高级）：授权侧份额 = Argon2id(password)。
   /// 口令经 stdin 首行传递，绝不落 argv；返回并保存会话锚点 T。
   static Future<String> initPassword(String dataDir, String password) async {
@@ -214,17 +232,18 @@ class VaultProcess {
         .contains('"initialized":true');
   }
 
-  /// 份额锚定模式：`os`（OS 安全存储）| `password`（口令派生）| `multiseal`（设备绑定）。
-  /// **未初始化（`initialized:false`，无 mode 字段）按默认 v1（os）返回**——
-  /// 应用启动即以 os 惰性初始化，未初始化即「尚未启用加密、默认 v1」；
-  /// 仅 status 异常/二进制缺失（解析抛 [VaultException]）由调用方兜底为 null。
+  /// 份额锚定模式：`crypto`（LEGACY 单因子）| `os`（OS 份额）| `password`
+  /// （口令派生）| `multiseal`（设备绑定）。
+  /// **未初始化（`initialized:false`，无 mode 字段）返回 null**——具体加密
+  /// 方案由 prefs 偏好兜底（[SecurityPrefs.credentialScheme]，默认 crypto）；
+  /// 仅 status 异常/二进制缺失（解析抛 [VaultException]）同样由调用方兜底为 null。
   static Future<String?> mode(String dataDir) async {
     final r = Process.runSync(binary, ['status', dataDir]);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     final mode = RegExp(r'"mode":"(\w+)"').firstMatch(payload)?.group(1);
     if (mode != null) return mode;
-    // 未初始化（无 mode 字段）→ 默认 v1（os）；已初始化却无 mode 视为读取失败
-    return payload.contains('"initialized":true') ? null : 'os';
+    // 未初始化（无 mode 字段）→ null（不虚构默认 v1：默认方案由 prefs 决定）
+    return null;
   }
 
   /// 设备绑定（v3）是否设置了恢复口令封装（kind=1）——决定关闭绑定时是

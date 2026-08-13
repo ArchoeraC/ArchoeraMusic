@@ -62,6 +62,37 @@ void main() {
     expect(reloaded2.get('netease'), {'MUSIC_U': 'cookie-x'});
   });
 
+  test('crypto 方案（LEGACY）：默认惰性 init-crypto → 模式 crypto + 往返回读 + 无明文', () async {
+    final tmp = await Directory.systemTemp.createTemp('vault_crypto_store');
+    addTearDown(() => tmp.deleteSync(recursive: true));
+
+    // 默认 defaultScheme='crypto'（推荐稳定）：未初始化库惰性走 init-crypto
+    final store = VaultSessionStore(dataDir: tmp.path);
+    await store.initialize();
+    expect(store.mode, 'crypto', reason: '默认偏好应初始化 LEGACY crypto 方案');
+    expect(store.vaultAvailable, isTrue);
+
+    store.save('kugou', {'token': 'crypto-tok'});
+    store.save('netease', {'MUSIC_U': 'crypto-cookie'});
+    await store.flush();
+
+    // 重建 store（模拟重启）：模式保持 crypto，数据回读一致
+    final reloaded = VaultSessionStore(dataDir: tmp.path);
+    await reloaded.initialize();
+    expect(reloaded.mode, 'crypto');
+    expect(reloaded.get('kugou'), {'token': 'crypto-tok'});
+    expect(reloaded.get('netease'), {'MUSIC_U': 'crypto-cookie'});
+
+    // 磁盘无明文（vault 文件与份额文件均不含明文串）
+    for (final f in tmp.listSync(recursive: true).whereType<File>()) {
+      final text = utf8.decode(f.readAsBytesSync(), allowMalformed: true);
+      expect(text.contains('crypto-tok'), isFalse,
+          reason: '${f.path} 不应含明文');
+      expect(text.contains('crypto-cookie'), isFalse,
+          reason: '${f.path} 不应含明文');
+    }
+  });
+
   test('旧明文 netease_session.json 首启迁移并删除', () async {
     final tmp = await Directory.systemTemp.createTemp('vault_migrate_test');
     addTearDown(() => tmp.deleteSync(recursive: true));
@@ -351,8 +382,8 @@ void main() {
       return;
     }
 
-    // v1（OS 份额）初始化 + 写入
-    final store = VaultSessionStore(dataDir: tmp.path);
+    // v1（OS 份额）初始化 + 写入（显式 vault 方案：默认偏好为 crypto）
+    final store = VaultSessionStore(dataDir: tmp.path, defaultScheme: 'vault');
     await store.initialize();
     expect(store.mode, 'os');
     store.save('kugou', {'token': 'tok-sw'});
@@ -417,7 +448,7 @@ void main() {
         reason: 'v3 被拒后应保持多封装');
   });
 
-  test('未初始化：mode() 返回 os（默认 v1，惰性初始化后即此模式）', () async {
+  test('未初始化：mode() 返回 null（方案由 prefs 兜底，默认 crypto）', () async {
     final tmp = await Directory.systemTemp.createTemp('vault_mode_uninit');
     addTearDown(() => tmp.deleteSync(recursive: true));
     if (!VaultProcess.available) {
@@ -425,8 +456,9 @@ void main() {
       return;
     }
     expect(await VaultProcess.isInitialized(tmp.path), isFalse);
-    // 未登录/全新数据目录：vault 尚未初始化，加密方案按默认 v1 展示
-    expect(await VaultProcess.mode(tmp.path), 'os');
+    // 未登录/全新数据目录：vault 尚未初始化，模式为 null（不虚构默认 v1），
+    // 具体加密方案由 prefs 偏好（默认 crypto）兜底展示
+    expect(await VaultProcess.mode(tmp.path), isNull);
   });
 
   test('v3 无恢复口令：hasRecovery=false，关闭以新口令免授权降级回读', () async {

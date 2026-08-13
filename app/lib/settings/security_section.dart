@@ -28,6 +28,7 @@ import '../../services/security/data_destroyer.dart';
 import '../../services/security/vault_process.dart';
 import '../../services/streaming/streaming_provider.dart';
 import '../../services/streaming/streaming_store.dart';
+import '../../stores/app_prefs.dart';
 import '../../stores/data_dir.dart';
 import '../../stores/providers.dart';
 import '../../stores/vault_session_store.dart';
@@ -97,6 +98,25 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
       return const {'os', 'multiseal'};
     }
     return const {};
+  }
+
+  /// 凭据加密方案（'crypto'=LEGACY 单因子 / 'vault'=2-of-2 实验性）。
+  /// 由 vault 实际模式推导（crypto → 'crypto'；os/password/multiseal → 'vault'；
+  /// 未初始化 → prefs 偏好兜底，保证首次启动卡片有默认选中态）。
+  String get _scheme {
+    if (_vaultMode == 'crypto') return 'crypto';
+    if (_vaultMode == 'os' ||
+        _vaultMode == 'password' ||
+        _vaultMode == 'multiseal') {
+      return 'vault';
+    }
+    return ref.read(appPrefsProvider).credentialScheme;
+  }
+
+  /// 方案卡片点击分发：目标 == 当前 → 忽略；否则走 [_switchScheme] 互切。
+  Future<void> _onSchemeSelected(String target) async {
+    if (_deviceBusy || target == _scheme) return;
+    await _switchScheme(target);
   }
 
   @override
@@ -457,6 +477,70 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
         mismatchText: l10n.settingsVaultSwitchToPasswordMismatch,
       ),
     );
+  }
+
+  /// 方案互切（crypto ↔ vault）：两种方案的加密数据结构不兼容，无法原地
+  /// 迁移——销毁现有凭据库 → 按目标方案重建（cookie 全部丢失）→ 写回方案
+  /// 偏好 → 冷切重启。方向警告：
+  ///   vault：实验性方案（份额/口令/设备绑定任一环节异常都可能频繁丢 Cookie）；
+  ///   统一：重建数据库（丢失全部已保存 Cookie）且必须冷启动。
+  Future<void> _switchScheme(String target) async {
+    final l10n = context.l10n;
+    final ok = await SDialog.show<bool>(
+      context,
+      title: l10n.settingsSchemeSwitchTitle,
+      description: [
+        if (target == 'vault') l10n.settingsSchemeSwitchToVaultWarning,
+        l10n.settingsSchemeSwitchRebuildDesc,
+      ].join('\n\n'),
+      child: const SizedBox.shrink(),
+      actions: [
+        SButton(
+          label: l10n.settingsSchemeSwitchKeep,
+          variant: SButtonVariant.secondary,
+          size: SButtonSize.small,
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        SButton(
+          label: l10n.settingsSchemeSwitchConfirm,
+          icon: Icons.sync_problem_outlined,
+          variant: SButtonVariant.primary,
+          size: SButtonSize.small,
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _deviceBusy = true);
+    try {
+      // 排空持久化队列（防在途写落到销毁后的空库上）→ 销毁 → 按目标方案重建
+      final s = getRuntime().sessionStore;
+      if (s is VaultSessionStore) await s.flush();
+      await StreamingStore.flush();
+      VaultProcess.destroy(resolveDataDir());
+      if (target == 'vault') {
+        await VaultProcess.init(resolveDataDir());
+      } else {
+        await VaultProcess.initCrypto(resolveDataDir());
+      }
+      // 同步方案偏好（重启后惰性重建与 UI 显示一致）与内存态
+      ref.read(appPrefsProvider.notifier).setCredentialScheme(target);
+      if (s is VaultSessionStore) {
+        s.syncMode(target == 'vault' ? 'os' : 'crypto');
+      }
+      StreamingStore.syncPasswordState(null);
+      if (!mounted) return;
+      if (await _promptRestartAfterModeChange() && mounted) {
+        await _restartApp();
+        return;
+      }
+      toast(l10n.toastSchemeSwitched, type: ToastType.success);
+    } on VaultException catch (e) {
+      toast(e.message, type: ToastType.error);
+    } finally {
+      if (mounted) setState(() => _deviceBusy = false);
+      await _refreshVault();
+    }
   }
 
   /// 三档切换条点击分发（v1 系统保护 ↔ v2 口令保护 可逆互切；v3 终点档）：
@@ -834,11 +918,12 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     );
   }
 
-  /// 高级 · 凭据加密（v1/v2/v3 三档切换条 + v3 设备绑定管理）。
+  /// 高级 · 凭据加密方案（Crypto 推荐 / Vault 实验性 二选一；Vault 内含
+  /// v1/v2/v3 加密等级 + v3 设备绑定管理）。
   Widget _buildDeviceBindSection(AppLocalizations l10n, ColorScheme scheme) {
     return SettingSection(
-      title: l10n.settingsVaultSection,
-      note: l10n.settingsVaultNote,
+      title: l10n.settingsSchemeSection,
+      note: l10n.settingsSchemeNote,
       children: [
         // 设备变更/熵损坏：恢复口令解锁入口（红色横幅）
         if (_needsRecovery)
@@ -918,110 +1003,159 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
               ),
             ),
           ),
-        // 三档加密等级切换条（v1 系统保护 ↔ v2 口令保护 可逆；v3 设备绑定终点档）
+        // 加密方案卡片（Crypto 推荐 / Vault 实验性 二选一）
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Row(
             children: [
-              _ModeSegmented(
-                values: const ['os', 'password', 'multiseal'],
-                labels: [
-                  l10n.settingsVaultModeV1,
-                  l10n.settingsVaultModeV2,
-                  l10n.settingsVaultModeV3,
-                ],
-                selected: _vaultMode,
-                disabledValues: _disabledModes,
-                onChanged: _onModeSelected,
+              Expanded(
+                child: _SchemeCard(
+                  value: 'crypto',
+                  selected: _scheme,
+                  busy: _deviceBusy,
+                  title: l10n.settingsSchemeCryptoTitle,
+                  badge: l10n.settingsSchemeCryptoBadge,
+                  badgeColor: scheme.primary,
+                  desc: l10n.settingsSchemeCryptoDesc,
+                  icon: Icons.vpn_key_outlined,
+                  onTap: _onSchemeSelected,
+                ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      _vaultModeDesc(l10n),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        height: 1.4,
-                        color:
-                            scheme.onSurfaceVariant.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SchemeCard(
+                  value: 'vault',
+                  selected: _scheme,
+                  busy: _deviceBusy,
+                  title: l10n.settingsSchemeVaultTitle,
+                  badge: l10n.settingsSchemeVaultBadge,
+                  badgeColor: scheme.error,
+                  desc: l10n.settingsSchemeVaultDesc,
+                  icon: Icons.shield_outlined,
+                  onTap: _onSchemeSelected,
+                ),
               ),
             ],
           ),
         ),
-        // 已开启：恢复口令管理入口
-        if (_isDeviceBound) ...[
-          SettingTile(
-            icon: Icons.password_outlined,
-            title: l10n.settingsDeviceBindChangeRecovery,
-            subtitle: l10n.settingsDeviceBindChangeRecoveryDesc,
-            trailing: IconButton(
-              tooltip: l10n.settingsDeviceBindChangeRecovery,
-              iconSize: 18,
-              visualDensity: VisualDensity.compact,
-              onPressed: _deviceBusy ? null : _changeRecoveryPassword,
-              icon: Icon(
-                Icons.chevron_right,
+        // 当前方案说明
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 14,
                 color: scheme.onSurfaceVariant,
               ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _schemeDesc(l10n),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Vault 方案内含三档加密等级（v1 系统保护 ↔ v2 口令保护 可逆；
+        // v3 设备绑定终点档）。Crypto 方案为单因子，无加密等级之分。
+        if (_scheme == 'vault') ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ModeCards(
+                  values: const ['os', 'password', 'multiseal'],
+                  labels: [
+                    l10n.settingsVaultModeV1,
+                    l10n.settingsVaultModeV2,
+                    l10n.settingsVaultModeV3,
+                  ],
+                  descriptions: [
+                    l10n.settingsVaultModeDescOs,
+                    l10n.settingsVaultModeDescPassword,
+                    l10n.settingsVaultModeDescMultiseal,
+                  ],
+                  icons: const [
+                    Icons.security_outlined,
+                    Icons.password_outlined,
+                    Icons.devices_outlined,
+                  ],
+                  selected: _vaultMode,
+                  disabledValues: _disabledModes,
+                  onChanged: _onModeSelected,
+                ),
+              ],
             ),
           ),
-          SettingTile(
-            icon: Icons.sync_lock_outlined,
-            title: l10n.settingsDeviceBindRebind,
-            subtitle: l10n.settingsDeviceBindRebindDesc,
-            trailing: IconButton(
-              tooltip: l10n.settingsDeviceBindRebind,
-              iconSize: 18,
-              visualDensity: VisualDensity.compact,
-              onPressed: _deviceBusy ? null : _rebindDevice,
-              icon: Icon(
-                Icons.chevron_right,
-                color: scheme.onSurfaceVariant,
+          // 已开启：恢复口令管理入口
+          if (_isDeviceBound) ...[
+            SettingTile(
+              icon: Icons.password_outlined,
+              title: l10n.settingsDeviceBindChangeRecovery,
+              subtitle: l10n.settingsDeviceBindChangeRecoveryDesc,
+              trailing: IconButton(
+                tooltip: l10n.settingsDeviceBindChangeRecovery,
+                iconSize: 18,
+                visualDensity: VisualDensity.compact,
+                onPressed: _deviceBusy ? null : _changeRecoveryPassword,
+                icon: Icon(
+                  Icons.chevron_right,
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
-          SettingTile(
-            icon: Icons.link_off_outlined,
-            title: l10n.settingsDeviceBindClose,
-            subtitle: l10n.settingsDeviceBindCloseDesc,
-            trailing: IconButton(
-              tooltip: l10n.settingsDeviceBindClose,
-              iconSize: 18,
-              visualDensity: VisualDensity.compact,
-              onPressed: _deviceBusy ? null : _disableDeviceBind,
-              icon: Icon(
-                Icons.chevron_right,
-                color: scheme.onSurfaceVariant,
+            SettingTile(
+              icon: Icons.sync_lock_outlined,
+              title: l10n.settingsDeviceBindRebind,
+              subtitle: l10n.settingsDeviceBindRebindDesc,
+              trailing: IconButton(
+                tooltip: l10n.settingsDeviceBindRebind,
+                iconSize: 18,
+                visualDensity: VisualDensity.compact,
+                onPressed: _deviceBusy ? null : _rebindDevice,
+                icon: Icon(
+                  Icons.chevron_right,
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
+            SettingTile(
+              icon: Icons.link_off_outlined,
+              title: l10n.settingsDeviceBindClose,
+              subtitle: l10n.settingsDeviceBindCloseDesc,
+              trailing: IconButton(
+                tooltip: l10n.settingsDeviceBindClose,
+                iconSize: 18,
+                visualDensity: VisualDensity.compact,
+                onPressed: _deviceBusy ? null : _disableDeviceBind,
+                icon: Icon(
+                  Icons.chevron_right,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
         ],
       ],
     );
   }
 
-  /// 切换条下方当前档说明：按 vault 模式区分文案。
-  String _vaultModeDesc(AppLocalizations l10n) {
-    switch (_vaultMode) {
-      case 'os':
-        return l10n.settingsVaultModeDescOs;
-      case 'password':
-        return l10n.settingsVaultModeDescPassword;
-      case 'multiseal':
-        return l10n.settingsVaultModeDescMultiseal;
+  /// 当前加密方案说明（方案卡片下方）：Crypto（单因子稳定）与
+  /// Vault（2-of-2 实验性）的总述；未初始化显示读取中。
+  String _schemeDesc(AppLocalizations l10n) {
+    switch (_scheme) {
+      case 'crypto':
+        return l10n.settingsSchemeCryptoModeDesc;
+      case 'vault':
+        return l10n.settingsSchemeVaultModeDesc;
       default:
         return l10n.settingsVaultModeDescUnknown;
     }
@@ -1232,12 +1366,124 @@ class _RecoveryPasswordFieldState extends State<_RecoveryPasswordField> {
   }
 }
 
-/// 三档加密等级切换条（v1 系统保护 / v2 口令保护 / v3 设备绑定）。
-/// 等宽拉伸 pill；[disabledValues] 内的档位灰显不可点（busy / v2 未解锁）。
-class _ModeSegmented extends StatelessWidget {
-  const _ModeSegmented({
+/// 加密方案选择卡片（Crypto 推荐 / Vault 实验性 二选一）。
+/// 选中态描边 + 勾选徽标 + 图标/标题/说明/badge 竖排；
+/// [busy] 期间整体禁用防重入。
+class _SchemeCard extends StatelessWidget {
+  const _SchemeCard({
+    required this.value,
+    required this.selected,
+    required this.busy,
+    required this.title,
+    required this.badge,
+    required this.badgeColor,
+    required this.desc,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String value;
+  final String selected;
+  final bool busy;
+  final String title;
+  final String badge;
+  final Color badgeColor;
+  final String desc;
+  final IconData icon;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isSelected = value == selected;
+    final fg = isSelected ? badgeColor : scheme.onSurface;
+    return MouseRegion(
+      cursor: busy ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: busy ? null : () => onTap(value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? badgeColor.withValues(alpha: 0.08)
+                : scheme.onSurface.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? badgeColor.withValues(alpha: 0.8)
+                  : scheme.outlineVariant.withValues(alpha: 0.5),
+              width: isSelected ? 1.6 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 18, color: fg),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: fg,
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(Icons.check_circle, size: 16, color: badgeColor),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                desc,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  height: 1.35,
+                  color: busy
+                      ? scheme.onSurfaceVariant.withValues(alpha: 0.35)
+                      : scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  badge,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: badgeColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Vault 方案三档加密等级纵向卡片列表（v1 系统保护 / v2 口令保护 / v3
+/// 设备绑定）。选中态描边 + 勾选；[disabledValues] 内的档位灰显不可点
+/// （busy / v2 未解锁）。
+class _ModeCards extends StatelessWidget {
+  const _ModeCards({
     required this.values,
     required this.labels,
+    required this.descriptions,
+    required this.icons,
     required this.selected,
     required this.disabledValues,
     required this.onChanged,
@@ -1245,6 +1491,8 @@ class _ModeSegmented extends StatelessWidget {
 
   final List<String> values;
   final List<String> labels;
+  final List<String> descriptions;
+  final List<IconData> icons;
   final String? selected;
   final Set<String> disabledValues;
   final ValueChanged<String> onChanged;
@@ -1252,28 +1500,22 @@ class _ModeSegmented extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: scheme.onSurface.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Row(
-        children: [
-          for (var i = 0; i < values.length; i++)
-            Expanded(
-              child: _buildItem(context, scheme, values[i], labels[i]),
-            ),
-        ],
-      ),
+    return Column(
+      children: [
+        for (var i = 0; i < values.length; i++)
+          Padding(
+            padding: EdgeInsets.only(bottom: i < values.length - 1 ? 8 : 0),
+            child: _buildItem(context, scheme, i),
+          ),
+      ],
     );
   }
 
-  Widget _buildItem(
-      BuildContext context, ColorScheme scheme, String value, String label) {
+  Widget _buildItem(BuildContext context, ColorScheme scheme, int i) {
+    final value = values[i];
     final isSelected = value == selected;
     final disabled = disabledValues.contains(value);
-    final fg = isSelected ? scheme.primary : scheme.onSurfaceVariant;
+    final fg = isSelected ? scheme.primary : scheme.onSurface;
     return MouseRegion(
       cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: GestureDetector(
@@ -1282,21 +1524,55 @@ class _ModeSegmented extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isSelected
-                ? scheme.primary.withValues(alpha: 0.12)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(100),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: disabled ? fg.withValues(alpha: 0.35) : fg,
+                ? scheme.primary.withValues(alpha: 0.08)
+                : scheme.onSurface.withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? scheme.primary.withValues(alpha: 0.7)
+                  : scheme.outlineVariant.withValues(alpha: 0.4),
+              width: isSelected ? 1.4 : 1,
             ),
+          ),
+          child: Row(
+            children: [
+              Icon(icons[i], size: 20, color: fg),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      labels[i],
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: disabled
+                            ? fg.withValues(alpha: 0.4)
+                            : fg,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      descriptions[i],
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        height: 1.35,
+                        color: disabled
+                            ? scheme.onSurfaceVariant.withValues(alpha: 0.3)
+                            : scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (isSelected)
+                Icon(Icons.check_circle, size: 18, color: scheme.primary),
+            ],
           ),
         ),
       ),

@@ -24,6 +24,10 @@ class StreamingStore {
   /// 测试注入：非空时替代 [resolveDataDir]（凭据路径与 vault 查找同步生效）。
   static String dataDirOverride = '';
 
+  /// 未初始化时的默认加密方案（与 [VaultSessionStore] 默认一致，crypto 推荐；
+  /// 测试可注入 'vault' 验证 2-of-2 分支）。
+  static String defaultScheme = 'crypto';
+
   static String _dir() =>
       dataDirOverride.isNotEmpty ? dataDirOverride : resolveDataDir();
 
@@ -113,6 +117,7 @@ class StreamingStore {
   /// 重置静态状态（测试隔离用；生产不调用）。
   static void resetForTest() {
     dataDirOverride = '';
+    defaultScheme = 'crypto';
     _secretCache.clear();
     _queue = Future.value();
     _warnedVaultDown = false;
@@ -159,7 +164,13 @@ class StreamingStore {
     try {
       if (!VaultProcess.available) return;
       if (!await VaultProcess.isInitialized(_dir())) {
-        await VaultProcess.init(_dir());
+        // 惰性初始化：默认 crypto（LEGACY 单因子推荐）；defaultScheme='vault'
+        // 时走 2-of-2（实验性，设置页选择后冷切重启生效）。
+        if (defaultScheme == 'vault') {
+          await VaultProcess.init(_dir());
+        } else {
+          await VaultProcess.initCrypto(_dir());
+        }
       }
       if (await VaultProcess.mode(_dir()) == 'password' &&
           _sessionPassword == null) {
@@ -331,7 +342,12 @@ class StreamingStore {
     try {
       if (!VaultProcess.available) return false;
       if (!await VaultProcess.isInitialized(_dir())) {
-        await VaultProcess.init(_dir());
+        // 惰性重建（销毁后自动重建）：按默认方案初始化
+        if (defaultScheme == 'vault') {
+          await VaultProcess.init(_dir());
+        } else {
+          await VaultProcess.initCrypto(_dir());
+        }
       }
       final cache = _secretCache[filePath] ?? const {};
       // 现有 + 已删除（已删除条目缓存已剔除 → sec 为 null → 走 delete）
