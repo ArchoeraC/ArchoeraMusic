@@ -229,6 +229,10 @@ install(FILES "${ENGINE_SRC_DIR}/libarchoera_mediaengine.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${ENGINE_SRC_DIR}/libfft.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# FFmpeg 内嵌运行库（audio-engine 构建时自系统 FFmpeg 拷入其 build/ffmpeg/；
+# 与引擎同装 native/，引擎 RUNPATH=$ORIGIN 优先解析，系统 FFmpeg 升级不影响）。
+install(DIRECTORY "${ENGINE_SRC_DIR}/ffmpeg/"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/scanner-ffi.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/libe_sqlite3.so"
@@ -252,3 +256,13 @@ install(PROGRAMS "${VAULT_SRC_DIR}/archoera-vault"
 install(FILES "${DOWNLOADER_TARGET_DIR}/${DOWNLOADER_LIB_NAME}"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native"
   COMPONENT Runtime)
+
+# 即时自编译能力：随包附引擎源码 + 重编译脚本（用系统 FFmpeg 重建引擎，
+# 适用于希望引擎跟随系统 FFmpeg 的用户；AUR 源码构建天然等效）。
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine/"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native/engine-src"
+  COMPONENT Runtime
+  PATTERN "build" EXCLUDE)
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine/rebuild-engine.sh"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native"
+  COMPONENT Runtime OPTIONAL)
