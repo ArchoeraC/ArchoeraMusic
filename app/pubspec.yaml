@@ -20,7 +20,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # （Dart 版本号语法不允许 '.' 分段预发布/构建号；运行时按 0.8.3.pre.2.rev.3 风格显示）
 # 注意：+ 后构建号必须为数字（Windows 构建号注入 FLUTTER_VERSION_BUILD，非数字
 # 会告警并归 0；rev.1 这类非数字标签不可用）
-version: 0.8.7-pre.1+5
+version: 0.8.7-pre.2+1
 
 environment:
   sdk: ^3.12.2
