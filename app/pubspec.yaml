@@ -79,6 +79,21 @@ hooks:
       source: system
       name: e_sqlite3
 
+# 实验性依赖升级（dev 工具链，不影响运行时依赖 sqlite3/go_router/riverpod）：
+#   - test 1.31.2 / test_api 0.7.13 / test_core 0.6.19 需 analyzer 13-14
+#   - analyzer 14.1.0 是 test 链传递依赖；flutter_lints 仅依赖 lints 纯规则集不受影响
+#   - hooks 2.1.0 需 meta ^1.19.0 + record_use ^1.0.0（sqlite3 约束允许 <3.0.0）
+# 验证通过则保留并同步约束，失败则移除本段回退。
+dependency_overrides:
+  analyzer: 14.1.0
+  test: 1.31.2
+  test_api: 0.7.13
+  test_core: 0.6.19
+  matcher: 0.12.20
+  meta: 1.19.0
+  hooks: 2.1.0
+  record_use: 1.1.0
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
