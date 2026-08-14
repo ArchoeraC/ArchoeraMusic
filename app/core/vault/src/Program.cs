@@ -11,6 +11,13 @@ using Archoera.Vault;
 //   archoera-vault selftest                          → ok          （Argon2id 自检，RFC 9106 向量）
 //   archoera-vault init <dataDir>                    → ok <b64T>   （2-of-2 拆分，S 存 OS 安全存储；
 //                                                                    返回会话锚点 T，主进程须保存）
+//   archoera-vault init-crypto <dataDir>             → ok <b64T>   （LEGACY 单因子：K 整体存 OS 安全存储；
+//                                                                    免密 3 字段握手，推荐）
+//   archoera-vault init-file <dataDir>               → ok <b64T>   （文件密钥模式：K 落盘 secret.key
+//                                                                    （0600）/可被 ARCHOERA_VAULT_SECRET_KEY
+//                                                                    env 覆盖，免 OS 钥匙串——headless/
+//                                                                    Docker 等无 Secret Service 场景，
+//                                                                    对应原 SPlayer-Next 服务端加密形态）
 //   archoera-vault init-password <dataDir>           → ok <b64T>   （口令模式：S = Argon2id(password)，
 //                                                                    口令经 stdin 第一行传入，绝不落 argv）
 //   archoera-vault status <dataDir>                  → ok <json>   （{"initialized":true|false,"mode":"os"|"password"}）
@@ -147,6 +154,24 @@ try
                 }
             }
             break;
+        case "init-file":
+            RequireArgs(args, 2);
+            {
+                // LEGACY 兼容方案（文件密钥模式）：K 整体存 dataDir/secret.key（0600），
+                // 免 OS 钥匙串——无 Secret Service 的 headless Linux / Docker 可用；
+                // 等价原 SPlayer-Next 服务端加密（secret.key / SPLAYER_SECRET_KEY）。
+                // ARCHOERA_VAULT_SECRET_KEY（hex64）可覆盖 K（env 优先，不持久化）。
+                var svc = new VaultService(args[1], new FileStore(args[1]));
+                svc.InitCrypto();
+                // 与 init-crypto 一致：返回会话锚点 T
+                using (var mk = LockedBuffer.Alloc(KeySplit.KeySize))
+                {
+                    svc.LoadMasterKeyInto(mk.Span);
+                    var t = svc.GetOrCreateAuthAnchor(mk.Span);
+                    Console.WriteLine("ok " + Convert.ToBase64String(t));
+                }
+            }
+            break;
         case "status":
             RequireArgs(args, 2);
             {
@@ -154,9 +179,9 @@ try
                 if (!svc.Initialized)
                     Console.WriteLine("ok {\"initialized\":false}");
                 else if (svc.Mode == VaultMode.MultiSeal)
-                    Console.WriteLine($"ok {{\"initialized\":true,\"mode\":\"multiseal\",\"has_recovery\":{(svc.HasRecovery ? "true" : "false")}}}");
+                    Console.WriteLine($"ok {{\"initialized\":true,\"mode\":\"multiseal\",\"backend\":\"{svc.Backend}\",\"has_recovery\":{(svc.HasRecovery ? "true" : "false")}}}");
                 else
-                    Console.WriteLine($"ok {{\"initialized\":true,\"mode\":\"{ModeName(svc.Mode)}\"}}");
+                    Console.WriteLine($"ok {{\"initialized\":true,\"mode\":\"{ModeName(svc.Mode)}\",\"backend\":\"{svc.Backend}\"}}");
             }
             break;
         case "serve":

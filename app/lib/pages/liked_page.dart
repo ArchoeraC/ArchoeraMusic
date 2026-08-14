@@ -8,8 +8,8 @@ import '../stores/providers.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/dialogs/kugou_login_button.dart';
 import '../widgets/dialogs/netease_login_dialog.dart';
-import '../widgets/common/login_guide.dart';
 import '../widgets/player/s_controls.dart';
+import '../widgets/streaming/empty_state.dart';
 import '../widgets/list/song_list.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/dialogs/track_context_menu.dart';
@@ -132,10 +132,7 @@ class _LikedPageState extends ConsumerState<LikedPage> {
       );
       return;
     }
-    // 取消喜欢 → 从平台红心列表移除该行
-    if (!controller.isLiked(track)) {
-      _store.removeTrack(_platform, track.source, track.id);
-    }
+    // 取消喜欢 → 列表移除 + 写库由 LikeController 统一维护
   }
 
   /// 行右键菜单（通用在线曲目菜单；取消收藏时从列表移除该行）。
@@ -157,10 +154,6 @@ class _LikedPageState extends ConsumerState<LikedPage> {
                 ? l10n.toastLoginRequiredKugou
                 : l10n.toastLoginRequiredNetease,
           );
-          return;
-        }
-        if (!controller.isLiked(t)) {
-          _store.removeTrack(_platform, t.source, t.id);
         }
       },
     );
@@ -270,13 +263,15 @@ class _LikedPageState extends ConsumerState<LikedPage> {
           // ── 内容区状态机（订阅全局 store，薄 UI） ─────────────
           Expanded(
             child: !_loggedIn
-                ? LoginGuide(
+                ? StreamingEmptyState(
                     icon: Icons.favorite_outline,
                     title: l10n.pageLikedLoginTitle,
-                    description: _platform == 'kugou'
+                    subtitle: _platform == 'kugou'
                         ? l10n.pageLikedKugouLoginDesc
                         : l10n.pageLikedNeteaseLoginDesc,
-                    onLogin: () async {
+                    buttonLabel: l10n.navHeaderQrLogin,
+                    buttonIcon: Icons.qr_code_2,
+                    onButton: () async {
                       if (_platform == 'kugou') {
                         await showDialog<bool>(
                           context: context,

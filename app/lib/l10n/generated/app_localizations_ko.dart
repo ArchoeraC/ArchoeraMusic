@@ -1514,6 +1514,21 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsBarSpectrum => '플레이바 스펙트럼';
 
   @override
+  String get settingsSpectrumStyle => '스펙트럼 스타일';
+
+  @override
+  String get settingsSpectrumStyleDesc => '스펙트럼 시각화 효과（막대 / 파형 / 위쪽 파형）';
+
+  @override
+  String get settingsSpectrumStyleBars => '막대';
+
+  @override
+  String get settingsSpectrumStyleWave => '파형';
+
+  @override
+  String get settingsSpectrumStyleWaveUp => '위쪽 파형';
+
+  @override
   String get settingsBarSpectrumOn => '시간 아래에 미니 스펙트럼 표시（가사 없음 또는 미니 가사 끔 시）';
 
   @override
@@ -2251,7 +2266,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSchemeNote =>
-      '로그인 자격 증명의 암호화 방식을 선택합니다. LEGACY: OS 보안 저장소로 암호화, 안정적이고 신뢰할 수 있음(권장). Vault: 2-of-2 이중 요소 실험적 방식으로 보안성은 높지만 쿠키 유실 위험이 있습니다. 방식 전환 시 데이터베이스를 재구축하고 다시 로그인해야 합니다.';
+      '로그인 자격 증명의 암호화 방식을 선택합니다. LEGACY: OS 보안 저장소로 암호화, 안정적이고 신뢰할 수 있음(권장). FILK(파일 키): 마스터 키를 로컬 secret.key에 저장, OS 키체인 불필요(단일 지점). Vault: 2-of-2 이중 요소 실험적 방식으로 보안성은 높지만 쿠키 유실 위험이 있습니다. 방식 전환 시 데이터베이스를 재구축하고 다시 로그인해야 합니다.';
 
   @override
   String get settingsSchemeCryptoTitle => 'LEGACY';
@@ -2266,6 +2281,20 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get settingsSchemeCryptoModeDesc =>
       'LEGACY 방식: 마스터 키 전체를 OS 보안 저장소가 보호합니다. 암호 강도와 안정성의 균형이 좋아 일상 사용에 적합합니다.';
+
+  @override
+  String get settingsSchemeFileTitle => 'FILK';
+
+  @override
+  String get settingsSchemeFileBadge => '호환';
+
+  @override
+  String get settingsSchemeFileDesc =>
+      '마스터 키를 로컬 secret.key 파일(0600)에 저장합니다. OS 키체인이 필요 없어 headless Linux / Docker용입니다. 로컬 파일 단일 지점: 키 파일이 유출되면 모든 자격 증명이 노출됩니다.';
+
+  @override
+  String get settingsSchemeFileModeDesc =>
+      'FILK(파일 키) 방식: 마스터 키를 secret.key(0600 원자 쓰기)에 저장합니다. 전형적인 서버 측 암호화 형태이며, OS 키체인이 없는 환경(headless/Docker)에서만 사용하세요.';
 
   @override
   String get settingsSchemeVaultTitle => 'Vault';
@@ -2289,8 +2318,12 @@ class AppLocalizationsKo extends AppLocalizations {
       'Vault는 실험적 방식입니다: 전환 후 쿠키 유실 위험이 있습니다.';
 
   @override
+  String get settingsSchemeSwitchToFileWarning =>
+      'FILK는 호환성 대체 방식입니다: 마스터 키는 로컬 파일에 보관되며 유출 시 모든 자격 증명이 노출됩니다. OS 키체인이 없는 headless/Docker 환경 전용입니다.';
+
+  @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'LEGACY와 Vault는 암호화 데이터 구조가 호환되지 않아 전환 시 기존 vault를 폐기하고 데이터베이스를 재구축합니다. 모든 로그인 자격 증명(网易雲 / 酷狗 / 스트리밍 계정)이 유실되며 다시 로그인해야 합니다.';
+      '각 방식은 암호화 데이터 구조가 호환되지 않아 전환 시 기존 vault를 폐기하고 데이터베이스를 재구축합니다. 모든 로그인 자격 증명(网易雲 / 酷狗 / 스트리밍 계정)이 유실되며 다시 로그인해야 합니다.';
 
   @override
   String get settingsSchemeSwitchKeep => '현재 유지';

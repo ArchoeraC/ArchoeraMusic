@@ -67,6 +67,14 @@ class EnginePosition extends EngineEvent {
   final int positionMs;
 }
 
+/// 降频协商回执（set_event_interval 的 C 侧确认，engine-event-push-plan §4.2）。
+/// Dart 收到后确认档位生效，后续 position 事件按新间隔到达。
+class EngineEventInterval extends EngineEvent {
+  const EngineEventInterval({required this.intervalMs});
+
+  final int intervalMs;
+}
+
 /// 播放自然结束（miniaudio EOF）。
 class EnginePlayerEnded extends EngineEvent {
   const EnginePlayerEnded();
@@ -253,6 +261,12 @@ class AudioEngineProcess {
               positionMs: (map['position_ms'] as num?)?.toInt() ?? 0,
             ),
           );
+        case 'event_interval':
+          _emit(
+            EngineEventInterval(
+              intervalMs: (map['interval_ms'] as num?)?.toInt() ?? 0,
+            ),
+          );
         case 'player:ended':
           _emit(const EnginePlayerEnded());
         case 'done':
@@ -316,6 +330,15 @@ class AudioEngineProcess {
       sendCommand('seek', {'position_ms': position.inMilliseconds});
   Future<void> setVolume(double gain) =>
       sendCommand('set_volume', {'gain': gain});
+
+  /// 降频协商：请求位置事件间隔（ms，normal 50 / minimized 500 / unfocused
+  /// 1000）。C 侧以 `event_interval` 回执确认实际生效值（以回执为准，
+  /// 不假设切换已生效）；恢复前台后主动发 [requestStatus] 精确对齐位置。
+  Future<void> setEventInterval(int intervalMs) =>
+      sendCommand('set_event_interval', {'interval_ms': intervalMs});
+
+  /// 拉取一次精确播放位置（恢复前台时进度/歌词立即对齐）。
+  Future<void> requestStatus() => sendCommand('get_status', {});
 
   /// 停止：destroy（join 引擎线程）→ 清理会话目录与本地通道。
   Future<void> stop() async {

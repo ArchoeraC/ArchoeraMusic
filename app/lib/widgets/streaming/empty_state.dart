@@ -11,6 +11,7 @@ class StreamingEmptyState extends StatelessWidget {
     this.subtitle,
     this.subtitleError = false,
     this.buttonLabel,
+    this.buttonIcon = Icons.link,
     this.buttonLoading = false,
     this.onButton,
   });
@@ -20,6 +21,7 @@ class StreamingEmptyState extends StatelessWidget {
   final String? subtitle;
   final bool subtitleError;
   final String? buttonLabel;
+  final IconData buttonIcon;
   final bool buttonLoading;
   final VoidCallback? onButton;
 
@@ -59,7 +61,7 @@ class StreamingEmptyState extends StatelessWidget {
               const SizedBox(height: 16),
               SButton(
                 label: buttonLabel!,
-                icon: Icons.link,
+                icon: buttonIcon,
                 variant: SButtonVariant.primary,
                 size: SButtonSize.medium,
                 loading: buttonLoading,

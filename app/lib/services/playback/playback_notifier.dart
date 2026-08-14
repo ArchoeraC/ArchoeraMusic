@@ -191,6 +191,10 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   /// 进一步降帧省电（见 _syncFftActive，随偏好实时更新）。
   int _fftPollIntervalMs = 100;
 
+  /// 引擎当前实际生效的位置事件间隔（ms，降频协商回执 event_interval 更新；
+  /// 默认 50 = normal 档）。_fftPollIntervalMs 取帧节流跟随该档位。
+  int _engineIntervalMs = 50;
+
   void _pollSpectrum() {
     if (!_fftActive) return;
     final posMs = state.position.inMilliseconds;
@@ -1226,6 +1230,12 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
           _lastPosLogMs = absMs;
           _log('播放位置: ${absMs}ms / ${state.duration.inMilliseconds}ms');
         }
+      case EngineEventInterval():
+        // 降频协商回执：记录 C 侧实际生效间隔，_fftPollIntervalMs 取帧节流
+        // 跟随档位（见 _syncFftActive）。以回执为准，双方节奏对齐
+        _engineIntervalMs = event.intervalMs;
+        _syncFftActive();
+        _log('事件间隔已协商: ${event.intervalMs}ms');
       case EnginePlayerEnded():
         state = state.copyWith(playing: false, buffering: false);
         _syncFftActive();
@@ -1258,11 +1268,29 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
 
   /// 同步 FFT 拉取开关（事件驱动，无 Timer）：仅在引擎存在、播放中且
   /// 非性能模式时允许按 EnginePosition 事件取帧；暂停/停播即停（节能）。
-  /// 同时按「节能模式」协商取帧节流间隔（100ms 基线 / 300ms 降帧）。
+  /// 取帧节流间隔 = 基线（100ms / 节能 300ms）与引擎事件间隔的较大者——
+  /// 降频档位下 position 事件本身变稀，FFT 取帧跟随（engine-event-push-plan）。
   void _syncFftActive() {
     final prefs = ref.read(appPrefsProvider);
-    _fftPollIntervalMs = prefs.energySavingMode ? 300 : 100;
+    _fftPollIntervalMs = math.max(
+      prefs.energySavingMode ? 300 : 100,
+      _engineIntervalMs,
+    );
     _fftActive = !prefs.performanceMode && _engine != null && state.playing;
+  }
+
+  /// 降频协商（engine-event-push-plan §4.1）：按节能档位向引擎请求位置事件
+  /// 间隔（normal 50 / minimized 500 / unfocused+screenOff 1000）。引擎未
+  /// 就绪时忽略——转码期协商被 C 侧记录，播放器启动即应用。
+  /// 恢复前台（≤50ms）时顺带拉一次 get_status 精确对齐位置/歌词。
+  Future<void> setEngineEventInterval(int intervalMs) {
+    final engine = _engine;
+    if (engine == null) return Future.value();
+    if (intervalMs <= 50) {
+      // ignore: discarded_futures
+      unawaited(engine.requestStatus());
+    }
+    return engine.setEventInterval(intervalMs);
   }
 
   /// 播放/暂停切换（引擎 stdin 命令；音量/EQ 引擎参数化后续接入）。

@@ -165,9 +165,12 @@ class StreamingStore {
       if (!VaultProcess.available) return;
       if (!await VaultProcess.isInitialized(_dir())) {
         // 惰性初始化：默认 crypto（LEGACY 单因子推荐）；defaultScheme='vault'
-        // 时走 2-of-2（实验性，设置页选择后冷切重启生效）。
+        // 时走 2-of-2（实验性）；'file' 走文件密钥模式（LEGACY 兼容，
+        // 免 OS 钥匙串）——设置页选择后冷切重启生效。
         if (defaultScheme == 'vault') {
           await VaultProcess.init(_dir());
+        } else if (defaultScheme == 'file') {
+          await VaultProcess.initFile(_dir());
         } else {
           await VaultProcess.initCrypto(_dir());
         }
@@ -345,6 +348,8 @@ class StreamingStore {
         // 惰性重建（销毁后自动重建）：按默认方案初始化
         if (defaultScheme == 'vault') {
           await VaultProcess.init(_dir());
+        } else if (defaultScheme == 'file') {
+          await VaultProcess.initFile(_dir());
         } else {
           await VaultProcess.initCrypto(_dir());
         }

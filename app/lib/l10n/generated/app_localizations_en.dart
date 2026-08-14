@@ -1549,6 +1549,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsBarSpectrum => 'Player-bar spectrum';
 
   @override
+  String get settingsSpectrumStyle => 'Spectrum style';
+
+  @override
+  String get settingsSpectrumStyleDesc =>
+      'Spectrum visualization effect (bars / wave / up wave)';
+
+  @override
+  String get settingsSpectrumStyleBars => 'Bars';
+
+  @override
+  String get settingsSpectrumStyleWave => 'Wave';
+
+  @override
+  String get settingsSpectrumStyleWaveUp => 'Up wave';
+
+  @override
   String get settingsBarSpectrumOn =>
       'Mini spectrum under the time (when no lyrics or mini lyrics off)';
 
@@ -2307,7 +2323,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSchemeNote =>
-      'Choose how login credentials are encrypted. LEGACY: OS secure storage, stable and reliable (recommended). Vault: 2-of-2 dual-factor experimental scheme — stronger protection but may occasionally lose cookies. Switching schemes rebuilds the database and requires re-login.';
+      'Choose how login credentials are encrypted. LEGACY: OS secure storage, stable and reliable (recommended). FILK (file key): master key in a local secret.key file — no OS keychain, for headless/Docker (single point of failure). Vault: 2-of-2 dual-factor experimental scheme — stronger protection but may occasionally lose cookies. Switching schemes rebuilds the database and requires re-login.';
 
   @override
   String get settingsSchemeCryptoTitle => 'LEGACY';
@@ -2322,6 +2338,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsSchemeCryptoModeDesc =>
       'LEGACY: the master key is protected entirely by the OS secure store. Balanced security and stability for daily use.';
+
+  @override
+  String get settingsSchemeFileTitle => 'FILK';
+
+  @override
+  String get settingsSchemeFileBadge => 'Compat';
+
+  @override
+  String get settingsSchemeFileDesc =>
+      'Master key stored in a local file (secret.key, 0600). No OS keychain needed — for headless Linux / Docker servers. Single point: if the key file leaks, all credentials are exposed.';
+
+  @override
+  String get settingsSchemeFileModeDesc =>
+      'FILK (file key): the master key is stored in a local file (secret.key, 0600 atomic write) — the classic service-side encryption layout. Use only when OS secure storage is unavailable (headless/Docker).';
 
   @override
   String get settingsSchemeVaultTitle => 'Vault';
@@ -2345,8 +2375,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Vault is experimental: cookies may be lost after switching.';
 
   @override
+  String get settingsSchemeSwitchToFileWarning =>
+      'FILK is a compatibility fallback: the master key lives in a local file. If that file leaks, all credentials are exposed. Use only for headless/Docker servers without an OS keychain.';
+
+  @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'LEGACY and Vault use incompatible encrypted structures. Switching destroys the current vault and rebuilds the database; all login credentials (Netease / Kugou / streaming accounts) will be lost and require re-login.';
+      'The schemes use incompatible encrypted structures. Switching destroys the current vault and rebuilds the database; all login credentials (Netease / Kugou / streaming accounts) will be lost and require re-login.';
 
   @override
   String get settingsSchemeSwitchKeep => 'Keep current';

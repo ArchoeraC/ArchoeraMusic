@@ -7,8 +7,8 @@ import '../../l10n/l10n.dart';
 import '../widgets/list/cover_grid.dart';
 import '../widgets/dialogs/netease_login_dialog.dart';
 import '../widgets/dialogs/kugou_login_button.dart';
-import '../widgets/common/login_guide.dart';
 import '../widgets/player/s_controls.dart';
+import '../widgets/streaming/empty_state.dart';
 import '../widgets/dialogs/track_list_dialog.dart';
 
 /// 收藏页（对齐原项目 Favorites.vue）。
@@ -338,13 +338,15 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
           // ── 内容区状态机 ─────────────────────────────────────
           Expanded(
             child: !_loggedIn
-                ? LoginGuide(
+                ? StreamingEmptyState(
                     icon: Icons.star_outline,
                     title: l10n.pageFavLoginTitle,
-                    description: _platform == _Platform.kugou
+                    subtitle: _platform == _Platform.kugou
                         ? l10n.pageFavKugouLoginDesc
                         : l10n.pageFavLoginDesc,
-                    onLogin: _login,
+                    buttonLabel: l10n.navHeaderQrLogin,
+                    buttonIcon: Icons.qr_code_2,
+                    onButton: _login,
                   )
                 : loading && !_loaded.contains(_cacheKey)
                 ? const Center(

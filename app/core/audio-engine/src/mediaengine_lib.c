@@ -59,6 +59,10 @@ typedef struct ArchoeraMediaEngine {
        修复「转码/加载阶段拖动进度条不跳转」：seek 命令不再被静默丢弃 */
     int seek_pending;
     double pending_seek_ms;
+
+    /* 降频协商的位置事件间隔（ms；0 = 未协商，播放器用默认 50ms）：
+       player 启动前协商则记录于此，播放器启动后立即应用 */
+    int pos_interval_ms;
 } ArchoeraMediaEngine;
 
 /* ── 事件/命令队列 ───────────────────────────────────────────── */
@@ -66,6 +70,20 @@ typedef struct ArchoeraMediaEngine {
 static void ev_enqueue(ArchoeraMediaEngine *e, const char *line)
 {
     pthread_mutex_lock(&e->ev_mutex);
+    /* position 事件「只保留最新」合并：队列已有 position 时覆盖最后一条
+       而非追加——恢复 50ms 前若理论上有积压（降频期不消费），从源头消除
+       突发与 FIFO 溢出（EV_CAP 512 有界）。语义：position 绝对值，最新有义 */
+    if (strncmp(line, "{\"type\":\"position\"", 18) == 0) {
+        for (int i = e->ev_count - 1; i >= 0; i--) {
+            int idx = (e->ev_head + i) % EV_CAP;
+            if (strncmp(e->ev_buf[idx], "{\"type\":\"position\"", 18) == 0) {
+                strncpy(e->ev_buf[idx], line, EV_LINE);
+                e->ev_buf[idx][EV_LINE] = '\0';
+                pthread_mutex_unlock(&e->ev_mutex);
+                return;
+            }
+        }
+    }
     if (e->ev_count < EV_CAP) {
         strncpy(e->ev_buf[e->ev_tail], line, EV_LINE);
         e->ev_buf[e->ev_tail][EV_LINE] = '\0';
@@ -340,6 +358,23 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
                 player_command(e->player, "seek", &pos, NULL);
             }
         }
+    } else if (strcmp(type, "set_event_interval") == 0) {
+        /* 降频协商（engine-event-push-plan §4.2）：Dart 发目标间隔 →
+           写入 player 运行期字段 → 立即回执 event_interval 确认实际生效值。
+           以 C 回执为准，Dart 不假设切换已生效 */
+        double iv = 0.0;
+        if (json_get_number(line, "interval_ms", &iv) == 0 && iv >= 20) {
+            int interval = (int)iv;
+            if (interval < 20) interval = 20;
+            e->pos_interval_ms = interval;
+            if (e->player) {
+                player_set_position_interval(e->player, interval);
+            }
+            char buf[96];
+            snprintf(buf, sizeof(buf),
+                "{\"type\":\"event_interval\",\"interval_ms\":%d}", interval);
+            ev_enqueue(e, buf);
+        }
     } else if (strcmp(type, "stop") == 0) {
         e->stop_requested = 1;
     }
@@ -422,6 +457,10 @@ static void *engine_thread(void *arg)
             e->player = player_start(e->wav_file, player_event_cb, e);
             if (!e->player) {
                 ev_enqueue(e, "{\"type\":\"error\",\"message\":\"player start failed\"}");
+            }
+            /* 转码期间协商的位置事件间隔：播放器启动后立即应用 */
+            if (e->player && e->pos_interval_ms > 0) {
+                player_set_position_interval(e->player, e->pos_interval_ms);
             }
             /* 转码期间记录的 seek 目标：播放器启动后立即应用
                （player 已存在时 seek 命令在 handle_command 即时执行过） */

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 
 import '../native_lib_paths.dart';
+import 'sqlite_preload.dart';
 
 /// scanner-ffi NativeAOT 库的定位、加载与 FFI 绑定。
 ///
@@ -36,61 +37,18 @@ class ScannerLibrary {
 
   // ---------------------------------------------------------------- 加载
 
-  // Linux glibc dlfcn.h 标志（libdl FFI 用，见 bits/dlfcn.h）
-  static const int _rtldNow = 0x2;
-  static const int _rtldGlobal = 0x100;
-  static const int _rtldDeepbind = 0x8;
-
-  static DynamicLibrary _libdl() {
-    // glibc ≥ 2.34 将 dlopen 并入 libc；旧版本在 libdl.so.2
-    try {
-      return DynamicLibrary.open('libdl.so.2');
-    } catch (_) {}
-    return DynamicLibrary.open('libc.so.6');
-  }
-
-  /// 预加载 `libe_sqlite3`（SQLitePCLRaw 的 .NET 侧通过
-  /// `DllImport("e_sqlite3")` 按名称解析它）。
-  ///
-  /// Linux 上必须带 [RTLD_DEEPBIND]：libe 内部通过 PLT 调用
-  /// `sqlite3_initialize@plt` 等，默认在**全局作用域**先解析，而进程里
-  /// 先加载的系统 `/usr/lib/libsqlite3.so` / Flutter bundle `libsqlite3.so`
-  /// 已导出同名符号，导致 libe 初始化了别人的 sqlite3Config（或根本没
-  /// 初始化）→ `sqlite3Malloc` 跳转地址 0 → 段错误。DEEPBIND 使 libe 的
-  /// 未定义符号优先在自己作用域解析，命中自己导出的实现。
-  ///
-  /// macOS（两级命名空间）与 Windows（每模块导入表）不存在全局符号
-  /// 遮蔽问题，走默认加载。
-  static void _preloadSqlite(String path) {
-    if (!Platform.isLinux) {
-      DynamicLibrary.open(path);
-      return;
-    }
-    final dlopen = _libdl().lookupFunction<
-        Pointer<Void> Function(Pointer<Utf8>, Int32),
-        Pointer<Void> Function(Pointer<Utf8>, int)>('dlopen');
-    final cstr = path.toNativeUtf8();
-    try {
-      final handle = dlopen(cstr, _rtldNow | _rtldGlobal | _rtldDeepbind);
-      if (handle == nullptr) {
-        throw StateError('dlopen($path) 失败');
-      }
-    } finally {
-      calloc.free(cstr);
-    }
-  }
-
   /// 加载共享库。[soPath] 为空时走 [resolveSoPath]。
   ///
-  /// 先预加载同目录的 `libe_sqlite3`（见 [_preloadSqlite]），否则
-  /// SQLitePCLRaw 运行期会因找不到符号失败。
+  /// 先预加载同目录的 `libe_sqlite3`（见 [preloadBundledSqlite]），否则
+  /// SQLitePCLRaw 运行期会因找不到符号失败（Linux 需 RTLD_DEEPBIND
+  /// 防系统 libsqlite3 全局符号遮蔽）。
   static ScannerLibrary load({String? soPath}) {
     final path = soPath ?? resolveSoPath();
     final dir = File(path).parent;
     final sqliteSo = File('${dir.path}/${_sqliteLibName()}');
     if (sqliteSo.existsSync()) {
       try {
-        _preloadSqlite(sqliteSo.path);
+        preloadBundledSqlite(path: sqliteSo.path);
       } catch (_) {
         // 系统库/已加载时忽略
       }

@@ -93,13 +93,13 @@ class PlaybackState {
   static const Object _unset = Object();
 
   PlaybackState copyWith({
-    String? source,
+    Object? source = _unset,
     Object? title = _unset,
     Object? subtitle = _unset,
     Object? trackId = _unset,
     Object? track = _unset,
     String? quality,
-    String? sessionId,
+    Object? sessionId = _unset,
     bool? playing,
     Duration? position,
     Duration? duration,
@@ -113,7 +113,7 @@ class PlaybackState {
     double? volume,
   }) {
     return PlaybackState(
-      source: source ?? this.source,
+      source: identical(source, _unset) ? this.source : source as String?,
       title: identical(title, _unset) ? this.title : title as String?,
       subtitle: identical(subtitle, _unset)
           ? this.subtitle
@@ -121,7 +121,9 @@ class PlaybackState {
       trackId: identical(trackId, _unset) ? this.trackId : trackId as String?,
       track: identical(track, _unset) ? this.track : track as Track?,
       quality: quality ?? this.quality,
-      sessionId: sessionId ?? this.sessionId,
+      sessionId: identical(sessionId, _unset)
+          ? this.sessionId
+          : sessionId as String?,
       playing: playing ?? this.playing,
       position: position ?? this.position,
       duration: duration ?? this.duration,

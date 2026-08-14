@@ -32,8 +32,9 @@ use lofty::tag::Accessor;
 use crate::crypto::netease as nm;
 use crate::models::{EnqueueRequest, SourcePlatform};
 
-/// 最大封面字节数（防恶意大图拖慢任务完成）
-const MAX_COVER_BYTES: u64 = 4 * 1024 * 1024;
+/// 封面大小安全阀（仅防异常响应拖慢任务，如 HTML 错误页/异常大文件）。
+/// 正常高清封面远低于此：网易原图为 2048×2048 PNG（约 10MB），不触顶。
+const MAX_COVER_BYTES: u64 = 50 * 1024 * 1024;
 
 /// 歌曲元数据（引擎自主寻找的结果；缺失字段为空串 / None）
 #[derive(Debug, Clone, Default)]
@@ -663,7 +664,11 @@ pub async fn download_cover(
     if bytes.len() < 8 {
         return None;
     }
-    let mime = mime.unwrap_or_else(|| guess_image_mime(&bytes));
+    // 魔数识别的真实类型优先（网易 CDN 会把 PNG 标成 image/jpg，头值不可信）；
+    // 未知格式（webp 等）回退响应头，再无则兜底 jpeg。
+    let mime = guess_image_mime(&bytes)
+        .or(mime)
+        .unwrap_or_else(|| "image/jpeg".to_string());
     Some((bytes, mime))
 }
 
@@ -906,18 +911,20 @@ fn decode_kg_name(s: &str) -> String {
     out
 }
 
-/// 魔数猜测图片 mime（响应头缺失时兜底）
-fn guess_image_mime(bytes: &[u8]) -> String {
+/// 魔数识别图片 mime（响应头缺失/不可信时兜底）。未知格式返回 None。
+fn guess_image_mime(bytes: &[u8]) -> Option<String> {
     if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        "image/jpeg".to_string()
+        Some("image/jpeg".to_string())
     } else if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
-        "image/png".to_string()
+        Some("image/png".to_string())
     } else if bytes.starts_with(b"GIF8") {
-        "image/gif".to_string()
+        Some("image/gif".to_string())
     } else if bytes.starts_with(b"BM") {
-        "image/bmp".to_string()
+        Some("image/bmp".to_string())
+    } else if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
+        Some("image/webp".to_string())
     } else {
-        "image/jpeg".to_string()
+        None
     }
 }
 

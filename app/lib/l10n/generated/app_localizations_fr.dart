@@ -1571,6 +1571,22 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsBarSpectrum => 'Spectre de la barre de lecture';
 
   @override
+  String get settingsSpectrumStyle => 'Style de spectre';
+
+  @override
+  String get settingsSpectrumStyleDesc =>
+      'Effet de visualisation du spectre (barres / onde / onde montante)';
+
+  @override
+  String get settingsSpectrumStyleBars => 'Barres';
+
+  @override
+  String get settingsSpectrumStyleWave => 'Onde';
+
+  @override
+  String get settingsSpectrumStyleWaveUp => 'Onde montante';
+
+  @override
   String get settingsBarSpectrumOn =>
       'Mini spectre sous l\'heure (si pas de paroles ou mini paroles désactivées)';
 
@@ -2361,7 +2377,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsSchemeNote =>
-      'Choisissez comment chiffrer les identifiants de connexion. LEGACY : stockage sécurisé du système, stable et fiable (recommandé). Vault : méthode expérimentale à double facteur 2-of-2 — protection renforcée mais risque de perte de cookies. Le changement de méthode reconstruit la base de données et nécessite une nouvelle connexion.';
+      'Choisissez comment chiffrer les identifiants de connexion. LEGACY : stockage sécurisé du système, stable et fiable (recommandé). FILK (clé fichier) : clé maîtresse dans un fichier secret.key local — pas de trousseau OS, pour headless/Docker (point unique). Vault : méthode expérimentale à double facteur 2-of-2 — protection renforcée mais risque de perte de cookies. Le changement de méthode reconstruit la base de données et nécessite une nouvelle connexion.';
 
   @override
   String get settingsSchemeCryptoTitle => 'LEGACY';
@@ -2376,6 +2392,20 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsSchemeCryptoModeDesc =>
       'Méthode LEGACY : la clé maîtresse est entièrement protégée par le stockage sécurisé du système. Bon équilibre entre sécurité et stabilité pour un usage quotidien.';
+
+  @override
+  String get settingsSchemeFileTitle => 'FILK';
+
+  @override
+  String get settingsSchemeFileBadge => 'Compat.';
+
+  @override
+  String get settingsSchemeFileDesc =>
+      'La clé maîtresse vit dans un fichier local (secret.key, 0600). Pas de trousseau OS requis — pour Linux sans interface / Docker. Point unique : si le fichier de clé fuit, tous les identifiants sont exposés.';
+
+  @override
+  String get settingsSchemeFileModeDesc =>
+      'Mode FILK (clé fichier) : la clé maîtresse est stockée dans secret.key (0600, écriture atomique) — la forme classique de chiffrement côté serveur. À utiliser uniquement sans trousseau OS (headless/Docker).';
 
   @override
   String get settingsSchemeVaultTitle => 'Vault';
@@ -2399,8 +2429,12 @@ class AppLocalizationsFr extends AppLocalizations {
       'Vault est expérimental : des cookies peuvent être perdus après le changement.';
 
   @override
+  String get settingsSchemeSwitchToFileWarning =>
+      'Le mode FILK est un repli de compatibilité : la clé maîtresse vit dans un fichier local. S\'il fuit, tous les identifiants sont exposés. Réservé aux environnements headless/Docker sans trousseau OS.';
+
+  @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'LEGACY et Vault utilisent des structures chiffrées incompatibles. Le changement détruit le coffre actuel et reconstruit la base de données ; tous les identifiants de connexion (Netease / Kugou / comptes de streaming) seront perdus et nécessiteront une nouvelle connexion.';
+      'Les méthodes utilisent des structures chiffrées incompatibles. Le changement détruit le coffre actuel et reconstruit la base de données ; tous les identifiants de connexion (Netease / Kugou / comptes de streaming) seront perdus et nécessiteront une nouvelle connexion.';
 
   @override
   String get settingsSchemeSwitchKeep => 'Conserver l\'actuel';

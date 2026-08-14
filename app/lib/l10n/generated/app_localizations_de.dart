@@ -1566,6 +1566,22 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsBarSpectrum => 'Spektrum der Playerleiste';
 
   @override
+  String get settingsSpectrumStyle => 'Spektrum-Stil';
+
+  @override
+  String get settingsSpectrumStyleDesc =>
+      'Spektrum-Visualisierung (Balken / Welle / Welle nach oben)';
+
+  @override
+  String get settingsSpectrumStyleBars => 'Balken';
+
+  @override
+  String get settingsSpectrumStyleWave => 'Welle';
+
+  @override
+  String get settingsSpectrumStyleWaveUp => 'Welle oben';
+
+  @override
   String get settingsBarSpectrumOn =>
       'Mini-Spektrum unter der Zeit (keine Lyrics oder Mini-Lyrics aus)';
 
@@ -2336,7 +2352,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsSchemeNote =>
-      'Wählen Sie, wie Anmeldedaten verschlüsselt werden. LEGACY: sicherer Systemspeicher, stabil und zuverlässig (empfohlen). Vault: experimentelles 2-of-2-Zwei-Faktor-Verfahren — stärkerer Schutz, aber gelegentlicher Cookie-Verlust möglich. Ein Wechsel baut die Datenbank neu auf und erfordert eine erneute Anmeldung.';
+      'Wählen Sie, wie Anmeldedaten verschlüsselt werden. LEGACY: sicherer Systemspeicher, stabil und zuverlässig (empfohlen). FILK (Dateischlüssel): Hauptschlüssel in lokaler secret.key-Datei — kein OS-Schlüsselbund, für headless/Docker (einzelner Schwachpunkt). Vault: experimentelles 2-of-2-Zwei-Faktor-Verfahren — stärkerer Schutz, aber gelegentlicher Cookie-Verlust möglich. Ein Wechsel baut die Datenbank neu auf und erfordert eine erneute Anmeldung.';
 
   @override
   String get settingsSchemeCryptoTitle => 'LEGACY';
@@ -2351,6 +2367,20 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsSchemeCryptoModeDesc =>
       'LEGACY-Verfahren: Der Hauptschlüssel wird vollständig durch den sicheren Systemspeicher geschützt. Ausgewogene Sicherheit und Stabilität für den täglichen Gebrauch.';
+
+  @override
+  String get settingsSchemeFileTitle => 'FILK';
+
+  @override
+  String get settingsSchemeFileBadge => 'Kompatibel';
+
+  @override
+  String get settingsSchemeFileDesc =>
+      'Hauptschlüssel liegt in einer lokalen Datei (secret.key, 0600). Kein OS-Schlüsselbund nötig — für headless Linux / Docker. Einzelner Schwachpunkt: Wenn die Schlüsseldatei ausläuft, sind alle Anmeldedaten offengelegt.';
+
+  @override
+  String get settingsSchemeFileModeDesc =>
+      'FILK (Dateischlüssel)-Verfahren: Der Hauptschlüssel wird in secret.key (0600, atomares Schreiben) abgelegt — die klassische serverseitige Verschlüsselungsform. Nur ohne OS-Schlüsselbund (headless/Docker) verwenden.';
 
   @override
   String get settingsSchemeVaultTitle => 'Vault';
@@ -2374,8 +2404,12 @@ class AppLocalizationsDe extends AppLocalizations {
       'Vault ist experimentell: Nach dem Wechsel können Cookies verloren gehen.';
 
   @override
+  String get settingsSchemeSwitchToFileWarning =>
+      'FILK ist ein Kompatibilitäts-Fallback: Der Hauptschlüssel liegt in einer lokalen Datei. Läuft diese aus, sind alle Anmeldedaten offengelegt. Nur für headless/Docker ohne OS-Schlüsselbund gedacht.';
+
+  @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'LEGACY und Vault verwenden inkompatible verschlüsselte Strukturen. Der Wechsel zerstört das aktuelle Tresorgewölbe und baut die Datenbank neu auf; alle Anmeldedaten (Netease / Kugou / Streaming-Konten) gehen verloren und erfordern eine erneute Anmeldung.';
+      'Die Verfahren verwenden inkompatible verschlüsselte Strukturen. Der Wechsel zerstört das aktuelle Tresorgewölbe und baut die Datenbank neu auf; alle Anmeldedaten (Netease / Kugou / Streaming-Konten) gehen verloren und erfordern eine erneute Anmeldung.';
 
   @override
   String get settingsSchemeSwitchKeep => 'Aktuelles beibehalten';

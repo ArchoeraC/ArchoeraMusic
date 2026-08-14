@@ -126,6 +126,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置频谱可视化样式（bars / wave / waveUp）。
+  void setSpectrumStyle(String value) {
+    state = state.copyWithSpectrumStyle(value);
+    state.save();
+  }
+
   /// 设置播放音量（0~1；退出确认弹窗的 duck 不落盘）。
   void setVolume(double value) {
     state = state.copyWithVolume(value);

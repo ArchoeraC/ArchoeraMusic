@@ -7,6 +7,7 @@ const sessionMemoryKey = 'player.sessionMemory';
 const enableSpectrumKey = 'player.enableSpectrum';
 const coverBeatScaleKey = 'player.coverBeatScale';
 const spectrumBarWidthKey = 'player.spectrumBarWidth';
+const spectrumStyleKey = 'player.spectrumStyle';
 const transitionStyleKey = 'player.transitionStyle';
 
 // ── 音量与播放条显示（对齐 SPlayer-Next 音量体系）─────────────
@@ -37,6 +38,11 @@ const bool defaultCoverBeatScale = false;
 /// 频谱柱宽（px，1~12，对齐原版 player.spectrumBarWidth 默认 4）。
 const int defaultSpectrumBarWidth = 4;
 
+/// 频谱可视化样式（'bars' 经典条形 / 'wave' 双向波形 / 'waveUp' 单向波形；
+/// 默认 bars）。三种为独立渲染效果，复用同一 FFT 数据缓冲，资源开销等同。
+const String defaultSpectrumStyle = 'bars';
+const Set<String> spectrumStyles = {'bars', 'wave', 'waveUp'};
+
 /// 播放器域偏好：直通/自动播放/会话记忆/频谱/封面动效/切歌动效/音量/播放条。
 extension PlayerPrefs on AppPrefs {
   bool get passthrough => data[passthroughKey] as bool? ?? defaultPassthrough;
@@ -60,6 +66,13 @@ extension PlayerPrefs on AppPrefs {
     final v = data[spectrumBarWidthKey] as num?;
     if (v == null) return defaultSpectrumBarWidth;
     return v.round().clamp(1, 12);
+  }
+
+  /// 频谱可视化样式（'bars' / 'wave' / 'waveUp'；非法值回退默认 bars）。
+  String get spectrumStyle {
+    final v = data[spectrumStyleKey];
+    if (spectrumStyles.contains(v)) return v as String;
+    return defaultSpectrumStyle;
   }
 
   /// 封面切换动效样式（'scale' 缩放 / 'slide' 侧边滑动；默认 scale）。
@@ -105,6 +118,14 @@ extension PlayerPrefs on AppPrefs {
       ...data,
       enableSpectrumKey: ?enable,
       spectrumBarWidthKey: ?barWidth?.clamp(1, 12),
+    },
+  );
+
+  /// 设置频谱可视化样式（非法值不写入，getter 回退默认 bars）。
+  AppPrefs copyWithSpectrumStyle(String value) => AppPrefs(
+    initialData: {
+      ...data,
+      if (spectrumStyles.contains(value)) spectrumStyleKey: value,
     },
   );
 

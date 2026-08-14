@@ -2852,6 +2852,36 @@ abstract class AppLocalizations {
   /// **'播放条频谱'**
   String get settingsBarSpectrum;
 
+  /// No description provided for @settingsSpectrumStyle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'频谱样式'**
+  String get settingsSpectrumStyle;
+
+  /// No description provided for @settingsSpectrumStyleDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'频谱可视化效果（条形 / 波形 / 单向波形）'**
+  String get settingsSpectrumStyleDesc;
+
+  /// No description provided for @settingsSpectrumStyleBars.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'条形'**
+  String get settingsSpectrumStyleBars;
+
+  /// No description provided for @settingsSpectrumStyleWave.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'波形'**
+  String get settingsSpectrumStyleWave;
+
+  /// No description provided for @settingsSpectrumStyleWaveUp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'单向波形'**
+  String get settingsSpectrumStyleWaveUp;
+
   /// No description provided for @settingsBarSpectrumOn.
   ///
   /// In zh_CN, this message translates to:
@@ -4163,7 +4193,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSchemeNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'选择登录凭据的加密方案。LEGACY：操作系统安全存储加密，稳定可靠（推荐）；Vault：2-of-2 双因子实验性方案，安全性更高但存在异常丢失 Cookie 风险。切换方案需重建数据库并重新登录。'**
+  /// **'选择登录凭据的加密方案。LEGACY：操作系统安全存储加密，稳定可靠（推荐）；FILK（文件密钥）：主密钥存本地 secret.key 文件，免 OS 钥匙串，供 Docker/无图形环境使用（本地文件单点风险）；Vault：2-of-2 双因子实验性方案，安全性更高但存在异常丢失 Cookie 风险。切换方案需重建数据库并重新登录。'**
   String get settingsSchemeNote;
 
   /// No description provided for @settingsSchemeCryptoTitle.
@@ -4189,6 +4219,30 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'LEGACY 方案：主密钥整体由操作系统安全存储保护，加密强度与可用性稳定，适合日常使用。'**
   String get settingsSchemeCryptoModeDesc;
+
+  /// No description provided for @settingsSchemeFileTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'FILK'**
+  String get settingsSchemeFileTitle;
+
+  /// No description provided for @settingsSchemeFileBadge.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'兼容'**
+  String get settingsSchemeFileBadge;
+
+  /// No description provided for @settingsSchemeFileDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'主密钥存本地 secret.key 文件（0600 权限），免 OS 钥匙串，供无图形环境的 Docker/服务器使用。本地文件单点：密钥文件泄露即凭据全泄露。'**
+  String get settingsSchemeFileDesc;
+
+  /// No description provided for @settingsSchemeFileModeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'FILK（文件密钥）方案：主密钥落盘 secret.key（0600 原子写），经典的服务端加密形态；仅在无 OS 钥匙串的 headless/Docker 环境使用。'**
+  String get settingsSchemeFileModeDesc;
 
   /// No description provided for @settingsSchemeVaultTitle.
   ///
@@ -4226,10 +4280,16 @@ abstract class AppLocalizations {
   /// **'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。'**
   String get settingsSchemeSwitchToVaultWarning;
 
+  /// No description provided for @settingsSchemeSwitchToFileWarning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'FILK 为兼容性降级方案：主密钥存于本地文件，一旦泄露全部凭据即暴露。仅限无 OS 钥匙串的 headless/Docker 环境使用。'**
+  String get settingsSchemeSwitchToFileWarning;
+
   /// No description provided for @settingsSchemeSwitchRebuildDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'crypto 与 Vault 加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。'**
+  /// **'各方案加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。'**
   String get settingsSchemeSwitchRebuildDesc;
 
   /// No description provided for @settingsSchemeSwitchKeep.

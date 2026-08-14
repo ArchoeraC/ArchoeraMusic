@@ -1498,6 +1498,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsBarSpectrum => '播放条频谱';
 
   @override
+  String get settingsSpectrumStyle => '频谱样式';
+
+  @override
+  String get settingsSpectrumStyleDesc => '频谱可视化效果（条形 / 波形 / 单向波形）';
+
+  @override
+  String get settingsSpectrumStyleBars => '条形';
+
+  @override
+  String get settingsSpectrumStyleWave => '波形';
+
+  @override
+  String get settingsSpectrumStyleWaveUp => '单向波形';
+
+  @override
   String get settingsBarSpectrumOn => '播放条时间下方显示迷你频谱（无歌词或关闭迷你歌词时）';
 
   @override
@@ -2221,7 +2236,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSchemeNote =>
-      '选择登录凭据的加密方案。LEGACY：操作系统安全存储加密，稳定可靠（推荐）；Vault：2-of-2 双因子实验性方案，安全性更高但存在异常丢失 Cookie 风险。切换方案需重建数据库并重新登录。';
+      '选择登录凭据的加密方案。LEGACY：操作系统安全存储加密，稳定可靠（推荐）；文件密钥：主密钥存本地 secret.key 文件，免 OS 钥匙串，供 Docker/无图形环境使用（本地文件单点风险）；Vault：2-of-2 双因子实验性方案，安全性更高但存在异常丢失 Cookie 风险。切换方案需重建数据库并重新登录。';
 
   @override
   String get settingsSchemeCryptoTitle => 'LEGACY';
@@ -2236,6 +2251,20 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsSchemeCryptoModeDesc =>
       'LEGACY 方案：主密钥整体由操作系统安全存储保护，加密强度与可用性稳定，适合日常使用。';
+
+  @override
+  String get settingsSchemeFileTitle => 'FILK';
+
+  @override
+  String get settingsSchemeFileBadge => '兼容';
+
+  @override
+  String get settingsSchemeFileDesc =>
+      '主密钥存本地 secret.key 文件（0600 权限），免 OS 钥匙串，供无图形环境的 Docker/服务器使用。本地文件单点：密钥文件泄露即凭据全泄露。';
+
+  @override
+  String get settingsSchemeFileModeDesc =>
+      'FILK（文件密钥）方案：主密钥落盘 secret.key（0600 原子写），经典的服务端加密形态；仅在无 OS 钥匙串的 headless/Docker 环境使用。';
 
   @override
   String get settingsSchemeVaultTitle => 'Vault';
@@ -2259,8 +2288,12 @@ class AppLocalizationsZh extends AppLocalizations {
       'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。';
 
   @override
+  String get settingsSchemeSwitchToFileWarning =>
+      'FILK 为兼容性降级方案：主密钥存于本地文件，一旦泄露全部凭据即暴露。仅限无 OS 钥匙串的 headless/Docker 环境使用。';
+
+  @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'crypto 与 Vault 加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。';
+      '各方案加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。';
 
   @override
   String get settingsSchemeSwitchKeep => '保持当前';
@@ -4590,6 +4623,21 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsBarSpectrum => '播放条频谱';
 
   @override
+  String get settingsSpectrumStyle => '频谱样式';
+
+  @override
+  String get settingsSpectrumStyleDesc => '频谱可视化效果（条形 / 波形 / 单向波形）';
+
+  @override
+  String get settingsSpectrumStyleBars => '条形';
+
+  @override
+  String get settingsSpectrumStyleWave => '波形';
+
+  @override
+  String get settingsSpectrumStyleWaveUp => '单向波形';
+
+  @override
   String get settingsBarSpectrumOn => '播放条时间下方显示迷你频谱（无歌词或关闭迷你歌词时）';
 
   @override
@@ -5313,7 +5361,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSchemeNote =>
-      '选择登录凭据的加密方案。LEGACY：操作系统安全存储加密，稳定可靠（推荐）；Vault：2-of-2 双因子实验性方案，安全性更高但存在异常丢失 Cookie 风险。切换方案需重建数据库并重新登录。';
+      '选择登录凭据的加密方案。LEGACY：操作系统安全存储加密，稳定可靠（推荐）；FILK（文件密钥）：主密钥存本地 secret.key 文件，免 OS 钥匙串，供 Docker/无图形环境使用（本地文件单点风险）；Vault：2-of-2 双因子实验性方案，安全性更高但存在异常丢失 Cookie 风险。切换方案需重建数据库并重新登录。';
 
   @override
   String get settingsSchemeCryptoTitle => 'LEGACY';
@@ -5328,6 +5376,20 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   @override
   String get settingsSchemeCryptoModeDesc =>
       'LEGACY 方案：主密钥整体由操作系统安全存储保护，加密强度与可用性稳定，适合日常使用。';
+
+  @override
+  String get settingsSchemeFileTitle => 'FILK';
+
+  @override
+  String get settingsSchemeFileBadge => '兼容';
+
+  @override
+  String get settingsSchemeFileDesc =>
+      '主密钥存本地 secret.key 文件（0600 权限），免 OS 钥匙串，供无图形环境的 Docker/服务器使用。本地文件单点：密钥文件泄露即凭据全泄露。';
+
+  @override
+  String get settingsSchemeFileModeDesc =>
+      'FILK（文件密钥）方案：主密钥落盘 secret.key（0600 原子写），经典的服务端加密形态；仅在无 OS 钥匙串的 headless/Docker 环境使用。';
 
   @override
   String get settingsSchemeVaultTitle => 'Vault';
@@ -5351,8 +5413,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。';
 
   @override
+  String get settingsSchemeSwitchToFileWarning =>
+      'FILK 为兼容性降级方案：主密钥存于本地文件，一旦泄露全部凭据即暴露。仅限无 OS 钥匙串的 headless/Docker 环境使用。';
+
+  @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'crypto 与 Vault 加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。';
+      '各方案加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。';
 
   @override
   String get settingsSchemeSwitchKeep => '保持当前';
@@ -7682,6 +7748,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsBarSpectrum => '播放列頻譜';
 
   @override
+  String get settingsSpectrumStyle => '頻譜樣式';
+
+  @override
+  String get settingsSpectrumStyleDesc => '頻譜可視化效果（條形 / 波形 / 單向波形）';
+
+  @override
+  String get settingsSpectrumStyleBars => '條形';
+
+  @override
+  String get settingsSpectrumStyleWave => '波形';
+
+  @override
+  String get settingsSpectrumStyleWaveUp => '單向波形';
+
+  @override
   String get settingsBarSpectrumOn => '播放列時間下方顯示迷你頻譜（無歌詞或關閉迷你歌詞時）';
 
   @override
@@ -8406,7 +8487,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSchemeNote =>
-      '選擇登入憑證的加密方案。LEGACY：作業系統安全儲存加密，穩定可靠（推薦）；Vault：2-of-2 雙因子實驗性方案，安全性更高但存在異常遺失 Cookie 風險。切換方案需重建資料庫並重新登入。';
+      '選擇登入憑證的加密方案。LEGACY：作業系統安全儲存加密，穩定可靠（推薦）；FILK（檔案金鑰）：主金鑰存本機 secret.key，免 OS 鑰匙圈，供 Docker/無圖形環境使用（本機檔案單點風險）；Vault：2-of-2 雙因子實驗性方案，安全性更高但存在異常遺失 Cookie 風險。切換方案需重建資料庫並重新登入。';
 
   @override
   String get settingsSchemeCryptoTitle => 'LEGACY';
@@ -8421,6 +8502,20 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get settingsSchemeCryptoModeDesc =>
       'LEGACY 方案：主金鑰整體由作業系統安全儲存保護，加密強度與可用性穩定，適合日常使用。';
+
+  @override
+  String get settingsSchemeFileTitle => 'FILK';
+
+  @override
+  String get settingsSchemeFileBadge => '相容';
+
+  @override
+  String get settingsSchemeFileDesc =>
+      '主金鑰存於本機 secret.key 檔案（0600 權限），免 OS 鑰匙圈，供無圖形環境的 Docker/伺服器使用。本機檔案單點：金鑰檔案外洩即憑證全部外洩。';
+
+  @override
+  String get settingsSchemeFileModeDesc =>
+      'FILK（檔案金鑰）方案：主金鑰落盤 secret.key（0600 原子寫入），經典的服務端加密形態；僅在無 OS 鑰匙圈的 headless/Docker 環境使用。';
 
   @override
   String get settingsSchemeVaultTitle => 'Vault';
@@ -8444,8 +8539,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       'Vault 為實驗性方案：切換後存在異常遺失 Cookie 的風險。';
 
   @override
+  String get settingsSchemeSwitchToFileWarning =>
+      'FILK 為相容性降級方案：主金鑰存於本機檔案，一旦外洩全部憑證即暴露。僅限無 OS 鑰匙圈的 headless/Docker 環境使用。';
+
+  @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'crypto 與 Vault 加密資料結構不相容，切換將銷毀現有保險庫並重建資料庫，所有登入憑證（網易雲 / 酷狗 / 串流帳號）將遺失，需重新登入。';
+      '各方案加密資料結構不相容，切換將銷毀現有保險庫並重建資料庫，所有登入憑證（網易雲 / 酷狗 / 串流帳號）將遺失，需重新登入。';
 
   @override
   String get settingsSchemeSwitchKeep => '保持目前';

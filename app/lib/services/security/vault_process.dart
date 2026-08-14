@@ -173,6 +173,26 @@ class VaultProcess {
     return payload;
   }
 
+  /// 初始化 vault（文件密钥模式，LEGACY 兼容）：主密钥 K 整体落盘
+  /// `$dataDir/secret.key`（0600 原子写；可被 `ARCHOERA_VAULT_SECRET_KEY`
+  /// hex64 env 覆盖，env 优先不持久化）——免 OS 钥匙串，供无 Secret
+  /// Service 的 headless Linux / Docker 使用（经典的服务端加密形态）。
+  /// **本地文件单点：密钥文件泄露 = 凭据全泄露（弱于 OS 存储），
+  /// 选用即显式接受该降级。** 复用 crypto 单因子全部配套（握手/崩溃联动/
+  /// 目录隔离/可销毁）。返回并保存会话锚点 T（`vault.auth`）。
+  static Future<String> initFile(String dataDir) async {
+    final r = Process.runSync(binary, ['init-file', dataDir]);
+    final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
+    if (payload.isNotEmpty) {
+      try {
+        await File(_authFile(dataDir)).writeAsString(payload);
+      } catch (_) {
+        // 锚点保存失败不阻断初始化（后续会话将重新补建）
+      }
+    }
+    return payload;
+  }
+
   /// 初始化 vault（口令模式，可选高级）：授权侧份额 = Argon2id(password)。
   /// 口令经 stdin 首行传递，绝不落 argv；返回并保存会话锚点 T。
   static Future<String> initPassword(String dataDir, String password) async {
@@ -244,6 +264,15 @@ class VaultProcess {
     if (mode != null) return mode;
     // 未初始化（无 mode 字段）→ null（不虚构默认 v1：默认方案由 prefs 决定）
     return null;
+  }
+
+  /// 份额后端（v4 指纹，status JSON `"backend"`）：`file`=文件密钥模式 /
+  /// `dpapi`/`keychain`/`libsecret`/`insecure`=OS 安全存储。crypto 模式由
+  /// 本字段区分「OS 存储」与「文件密钥」两种实现；未初始化返回 null。
+  static Future<String?> backend(String dataDir) async {
+    final r = Process.runSync(binary, ['status', dataDir]);
+    final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
+    return RegExp(r'"backend":"(\w+)"').firstMatch(payload)?.group(1);
   }
 
   /// 设备绑定（v3）是否设置了恢复口令封装（kind=1）——决定关闭绑定时是

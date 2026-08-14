@@ -61,16 +61,25 @@ public sealed class VaultService
     private readonly ISecretStore _store;
     private readonly VaultLockout _lockout;
 
-    public VaultService(string dataDir)
+    public VaultService(string dataDir) : this(dataDir, null) { }
+
+    /// [store] 注入用于显式选择后端（如文件密钥模式 init-file 直接给 FileStore；
+    /// null → 工厂按 vault 文件头/env/平台自动分发）。
+    public VaultService(string dataDir, ISecretStore? store)
     {
         _dataDir = dataDir;
-        _store = SecretStoreFactory.Create(dataDir);
+        _store = store ?? SecretStoreFactory.Create(dataDir);
         _lockout = new VaultLockout(dataDir);
     }
 
     public string VaultPath => Path.Combine(_dataDir, VaultFileName);
 
     public string DeviceSealPath => Path.Combine(_dataDir, DeviceSealFileName);
+
+    /// 当前份额后端（v4 指纹：file/dpapi/keychain/libsecret/insecure…）。
+    /// status 命令据此暴露，供主进程区分「OS 安全存储 crypto」与
+    /// 「文件密钥模式（file）」——两者模式同为 crypto 但安全性不同。
+    public string Backend => _store.Backend;
 
     public bool Initialized => File.Exists(VaultPath);
 

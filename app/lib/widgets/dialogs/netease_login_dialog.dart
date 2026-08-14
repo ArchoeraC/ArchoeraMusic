@@ -1,21 +1,23 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../stores/providers.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
-import '../common/glass_surface.dart';
 
-/// 网易云扫码登录弹窗（QR 登录：unikey → qrurl → 2s 轮询 loginQrCheck）。
+/// 网易云扫码登录（全屏毛玻璃页，QR 居中放大：unikey → qrurl → 2s 轮询
+/// loginQrCheck）。
 ///
 /// 803 确认成功后刷新 [neteaseAuthProvider] 并自动关闭；800 过期后显示
-/// 「刷新二维码」按钮。
+/// 「刷新二维码」按钮；点击二维码以外任意处（含 Esc）关闭，无关闭键。
 Future<void> showNeteaseLoginDialog(BuildContext context) {
   return showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.5),
+    barrierColor: Colors.transparent,
     barrierDismissible: true,
     builder: (_) => const _NeteaseLoginDialog(),
   );
@@ -112,165 +114,170 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
-    // 弹窗高度上限：视口 85%，防小窗口/高 DPI 下弹窗超过可视高度被截断
-    //（内容有垂直滚动兜底，超高时滚动而非溢出）。
-    final maxH = MediaQuery.sizeOf(context).height * 0.85;
-    // 新版 Flutter DialogRoute 不再包 Dialog，弹窗根收到 tight 全屏约束；
-    // M3 AlertDialog 用 IntrinsicWidth 定宽，长文本（错误消息等）固有宽度
-    // 极大会把弹窗撑到全屏。ConstrainedBox 在 tight 父约束下会失效
-    //（enforce 将 maxWidth clamp 回父值），必须先 Align 转 loose 再限宽。
-    return Align(
-      alignment: Alignment.center,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 460, maxHeight: maxH),
-        child: GlassDialogSurface(
-          radius: BorderRadius.circular(16),
-          color: scheme.surfaceContainerHigh,
-          child: AlertDialog(
-            backgroundColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            contentPadding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
-            content: SingleChildScrollView(
-              // 长错误文本（网络异常含 URL）可能在有限高度下溢出，
-              // 包一层垂直滚动兜底（宽度仍由内层 SizedBox 固定 260）。
-              child: SizedBox(
-                width: 260,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          l10n.loginNeteaseQrTitle(l10n.brandNetease),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+    // 全屏毛玻璃背景 + 居中实体化二维码卡片（白底 + 阴影悬浮）：
+    // 标题在卡片上方、状态在下方，点击卡片以外任意处直接关闭（无关闭键）。
+    // 毛玻璃直接自建 BackdropFilter（不依赖 GlassDialogSurface——它仅在
+    // 图片风格下 blur，且传不透明色时 blur 会被完全盖住，两风格都显示为
+    // 实底面板，看不到毛玻璃效果）。
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.of(context).pop(),
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: ColoredBox(
+            // 半透明面板色：主界面内容透过模糊可见，毛玻璃质感
+            color: scheme.surfaceContainerHigh.withValues(alpha: 0.8),
+            child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              // 卡片区域（含上下文字）消费点击，避免误触外层关闭
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {},
+                child: SizedBox(
+                  width: 320,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.loginNeteaseQrTitle(l10n.brandNetease),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
-                        IconButton(
-                          tooltip: l10n.commonClose,
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close, size: 18),
+                      ),
+                      const SizedBox(height: 20),
+                      // 实体化卡片：白底圆角 + 阴影悬浮，二维码需浅色底
+                      Container(
+                        width: 300,
+                        height: 300,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 24,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    if (_loading)
-                      const SizedBox(
-                        width: 200,
-                        height: 200,
                         child: Center(
-                          child: SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: CircularProgressIndicator(strokeWidth: 2.5),
-                          ),
+                          child: _loading
+                              ? const SizedBox(
+                                  width: 28,
+                                  height: 28,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : _error.isNotEmpty
+                              ? _buildError(scheme, l10n)
+                              : Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    QrImageView(
+                                      data: _qrUrl,
+                                      size: 260,
+                                      backgroundColor: Colors.white,
+                                    ),
+                                    if (_expired)
+                                      Container(
+                                        width: 260,
+                                        height: 260,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.55),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: FilledButton.icon(
+                                          onPressed: _createQr,
+                                          icon: const Icon(
+                                            Icons.refresh,
+                                            size: 18,
+                                          ),
+                                          label: Text(l10n.loginRefreshQr),
+                                        ),
+                                      ),
+                                    if (_confirmed)
+                                      Container(
+                                        width: 260,
+                                        height: 260,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.55),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: const Icon(
+                                          Icons.check_circle,
+                                          size: 48,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                         ),
-                      )
-                    else if (_error.isNotEmpty)
-                      Column(
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 40,
-                            color: scheme.error,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _error,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 16),
-                          FilledButton.icon(
-                            onPressed: _createQr,
-                            icon: const Icon(Icons.refresh, size: 18),
-                            label: Text(l10n.commonRetry),
-                          ),
-                        ],
-                      )
-                    else
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // 白色底（二维码需浅色背景才能扫出）
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: QrImageView(
-                                data: _qrUrl,
-                                size: 200,
-                                backgroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                          if (_expired)
-                            Container(
-                              width: 200,
-                              height: 200,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.55),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: FilledButton.icon(
-                                onPressed: _createQr,
-                                icon: const Icon(Icons.refresh, size: 18),
-                                label: Text(l10n.loginRefreshQr),
-                              ),
-                            ),
-                          if (_confirmed)
-                            Container(
-                              width: 200,
-                              height: 200,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.55),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.check_circle,
-                                size: 48,
-                                color: Colors.white,
-                              ),
-                            ),
-                        ],
                       ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 32,
-                      child: Center(
-                        child: Text(
-                          _confirmed
-                              ? l10n.loginSuccess
-                              : _expired
-                              ? l10n.loginQrExpired
-                              : _status.isEmpty
-                              ? l10n.loginFetchingQr
-                              : _status,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: _expired
-                                ? scheme.error
-                                : scheme.onSurfaceVariant,
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 24,
+                        child: Center(
+                          child: Text(
+                            _confirmed
+                                ? l10n.loginSuccess
+                                : _expired
+                                ? l10n.loginQrExpired
+                                : _status.isEmpty
+                                ? l10n.loginFetchingQr
+                                : _status,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: _expired
+                                  ? scheme.error
+                                  : scheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
+    ),
+  ),
+);
+  }
+
+  /// 错误状态（实体卡片内部）：图标 + 限行文本 + 重试按钮。
+  Widget _buildError(ColorScheme scheme, AppLocalizations l10n) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.error_outline, size: 48, color: scheme.error),
+        const SizedBox(height: 12),
+        Text(
+          _error,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.black87, fontSize: 13),
+          // 网络异常消息可能很长（含 URL/堆栈），限 4 行截断保持版面紧凑
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: _createQr,
+          icon: const Icon(Icons.refresh, size: 18),
+          label: Text(l10n.commonRetry),
+        ),
+      ],
     );
   }
 }
