@@ -82,10 +82,10 @@ class LikedStore extends ChangeNotifier {
     await refresh(platform);
   }
 
-  /// 刷新：全量拉取替换上屏。仅 [writeCache] 为 true（用户显式点「刷新」）
-  /// 时回写 SQLite 缓存——默认不写，避免后台 SWR 写库被进程退出/写失败
-  /// 静默吞掉造成缓存与展示不一致（显式操作写回语义）。
-  Future<void> refresh(String platform, {bool writeCache = false}) async {
+  /// 刷新：全量拉取替换上屏并**回写 SQLite 缓存**（缓存「秒开」的前提——
+  /// 否则每次进收藏页都全量重拉，数据库形同虚设）。拉取失败保留旧缓存
+  /// 展示（下次进入仍可秒开，不误删快照）。
+  Future<void> refresh(String platform, {bool writeCache = true}) async {
     final s = _state(platform);
     if (s.refreshing) return;
     s.refreshing = true;
@@ -114,6 +114,29 @@ class LikedStore extends ChangeNotifier {
       s.refreshing = false;
       s.loading = false;
       notifyListeners();
+    }
+  }
+
+  /// 增量更新：新喜欢一首歌时插入列表头部（最新在前）并**写库**——
+  /// 与「刷新=全量重拉+写库」同一持久化语义：列表任何变化都落库，
+  /// 否则新喜欢的歌在下次全量刷新前从列表/缓存快照中缺失。
+  ///
+  /// 仅当列表已加载（进过收藏页）时维护；未加载时跳过——全量刷新
+  /// 自然会包含该歌，无需维护。
+  Future<void> addTrack(String platform, Track t) async {
+    final s = _state(platform);
+    if (!s.loaded) return;
+    // 防重复插入（幂等）
+    if (s.tracks.any((x) => x.source == t.source && x.id == t.id)) return;
+    s.tracks = [t, ...s.tracks];
+    s.total = s.tracks.length;
+    notifyListeners();
+    final key = _userKey(platform);
+    if (key == null) return;
+    try {
+      await LikedCacheStore.shared.replace(platform, key, s.tracks);
+    } catch (e) {
+      debugPrint('[liked] 缓存增量写入失败: $e');
     }
   }
 

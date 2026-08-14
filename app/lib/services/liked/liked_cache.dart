@@ -123,18 +123,20 @@ class LikedCacheStore {
             'DELETE FROM liked_cache WHERE platform = ? AND user_key = ?',
             [platform, userKey],
           );
-          // 批量插入：一次 prepare/step 写入全部行（远快于逐条 execute）
-          final params = <List<Object?>>[];
-          for (var i = 0; i < payload.length; i++) {
-            params.add([platform, userKey, i, jsonEncode(payload[i])]);
-          }
-          if (params.isNotEmpty) {
-            db.execute(
-              'INSERT OR REPLACE INTO liked_cache '
-              '(platform, user_key, sort_order, track_json) '
-              'VALUES (?, ?, ?, ?)',
-              params,
-            );
+          // 批量插入：prepare 一次 + 逐行 execute（sqlite3 包 execute 只
+          // 接受单行扁平参数，嵌套列表会抛「Expected N parameters」导致
+          // 事务回滚、写入静默失效——这是历史上「缓存永远 0 行」的根因）
+          final stmt = db.prepare(
+            'INSERT OR REPLACE INTO liked_cache '
+            '(platform, user_key, sort_order, track_json) '
+            'VALUES (?, ?, ?, ?)',
+          );
+          try {
+            for (var i = 0; i < payload.length; i++) {
+              stmt.execute([platform, userKey, i, jsonEncode(payload[i])]);
+            }
+          } finally {
+            stmt.close();
           }
           db.execute(
             'INSERT INTO liked_meta (platform, user_key, total, updated_at) '

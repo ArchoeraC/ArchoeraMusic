@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:archoera_music/services/scanner/library_scanner.dart';
 import 'package:archoera_music/services/scanner/scanner_ffi.dart';
+import 'package:archoera_music/services/scanner/sqlite_preload.dart';
 import 'package:archoera_music/services/scanner/tracks_db.dart';
 
 /// 生成最小合法 WAV（44 字节 RIFF header + PCM 静音），TagLib 可解析。
@@ -32,6 +33,9 @@ Uint8List makeWav({int sampleRate = 44100, double seconds = 0.2}) {
 }
 
 void main() {
+  // 统一 dart sqlite3 与 scanner 的 SQLite 实例（hooks 配置按名 dlopen
+  // libe_sqlite3.so，先预加载 dev 目录的内置库，任何 sqlite3.open 之前）。
+  preloadBundledSqlite();
   // 定位共享库：dev 兜底 cwd=app/ → app/core/scanner/build/scanner-ffi.so
   final soPath = ScannerLibrary.resolveSoPath();
 

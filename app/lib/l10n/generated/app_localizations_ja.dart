@@ -1509,6 +1509,21 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsBarSpectrum => 'プレイバーのスペクトラム';
 
   @override
+  String get settingsSpectrumStyle => 'スペクトルスタイル';
+
+  @override
+  String get settingsSpectrumStyleDesc => 'スペクトル可視化効果（バー / 波形 / 上向き波形）';
+
+  @override
+  String get settingsSpectrumStyleBars => 'バー';
+
+  @override
+  String get settingsSpectrumStyleWave => '波形';
+
+  @override
+  String get settingsSpectrumStyleWaveUp => '上向き波形';
+
+  @override
   String get settingsBarSpectrumOn => '時刻の下にミニスペクトラムを表示（歌詞なしまたはミニ歌詞オフ時）';
 
   @override
@@ -2243,7 +2258,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSchemeNote =>
-      'ログイン認証情報の暗号化スキームを選択します。LEGACY：OS のセキュアストレージで暗号化、安定・信頼性が高い（推奨）。Vault：2-of-2 双因子の実験的スキームで安全性は高いが、クッキーが失われるリスクがあります。スキームの切り替え時はデータベースを再構築し、再ログインが必要です。';
+      'ログイン認証情報の暗号化スキームを選択します。LEGACY：OS のセキュアストレージで暗号化、安定・信頼性が高い（推奨）。FILK（ファイルキー）：マスターキーをローカルの secret.key に保存、OS キーチェーン不要（単一障害点）。Vault：2-of-2 双因子の実験的スキームで安全性は高いが、クッキーが失われるリスクがあります。スキームの切り替え時はデータベースを再構築し、再ログインが必要です。';
 
   @override
   String get settingsSchemeCryptoTitle => 'LEGACY';
@@ -2258,6 +2273,20 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get settingsSchemeCryptoModeDesc =>
       'LEGACY スキーム：マスターキー全体を OS のセキュアストレージが保護します。暗号強度と可用性のバランスが良く、日常利用に適しています。';
+
+  @override
+  String get settingsSchemeFileTitle => 'FILK';
+
+  @override
+  String get settingsSchemeFileBadge => '互換';
+
+  @override
+  String get settingsSchemeFileDesc =>
+      'マスターキーをローカルの secret.key ファイル（0600）に保存。OS キーチェーン不要で、ヘッドレス Linux / Docker 向け。ローカルファイル単一障害点：キーファイルが漏れるとすべての認証情報が露出します。';
+
+  @override
+  String get settingsSchemeFileModeDesc =>
+      'FILK（ファイルキー）方式：マスターキーを secret.key（0600 原子書き込み）に保存。古典的なサーバー側暗号化の形態。OS キーチェーンが無い環境（headless/Docker）でのみ使用してください。';
 
   @override
   String get settingsSchemeVaultTitle => 'Vault';
@@ -2281,8 +2310,12 @@ class AppLocalizationsJa extends AppLocalizations {
       'Vault は実験的スキームです：切り替え後、クッキーが失われるリスクがあります。';
 
   @override
+  String get settingsSchemeSwitchToFileWarning =>
+      'FILK は互換性フォールバックです：マスターキーはローカルファイルに保存され、漏洩するとすべての認証情報が露出します。OS キーチェーンが無いヘッドレス/Docker 環境専用です。';
+
+  @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'LEGACY と Vault は暗号化データ構造が互換でないため、切り替え時は既存の vault を破棄してデータベースを再構築します。すべてのログイン認証情報（网易雲 / 酷狗 / ストリーミングアカウント）が失われ、再ログインが必要です。';
+      '各スキームは暗号化データ構造が互換でないため、切り替え時は既存の vault を破棄してデータベースを再構築します。すべてのログイン認証情報（网易雲 / 酷狗 / ストリーミングアカウント）が失われ、再ログインが必要です。';
 
   @override
   String get settingsSchemeSwitchKeep => '現在のまま';

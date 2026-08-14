@@ -9,6 +9,28 @@ import '../../services/playback/playback_notifier.dart';
 import '../../stores/app_prefs.dart';
 import '../common/anim.dart';
 
+/// 频谱可视化样式（独立渲染效果，复用同一 FFT 数据缓冲，资源开销等同）。
+enum SpectrumStyle {
+  /// 经典条形：双声道镜像、底部对齐、圆角柱（原版默认）。
+  bars,
+
+  /// 波形线：镜像对称的频谱包络曲线，形似声波。
+  wave,
+
+  /// 单向上波形：包络曲线只向基线一侧（上）延伸，无镜像。
+  waveUp;
+
+  /// 偏好存储值（player.spectrumStyle）。
+  String get storageKey => name;
+
+  /// 从偏好字符串解析（非法值回退 bars）。
+  static SpectrumStyle fromStorage(String? value) =>
+      SpectrumStyle.values.firstWhere(
+        (e) => e.name == value,
+        orElse: () => SpectrumStyle.bars,
+      );
+}
+
 /// 频谱可视化（复刻 Web 端 BottomSpectrum.vue，架构文档 §10.1）。
 ///
 /// 链路：引擎直写 stream.pcm → PcmAnalyzer 按播放位置拉块 → FFI FFT →
@@ -29,6 +51,7 @@ class SpectrumView extends ConsumerStatefulWidget {
     this.color,
     this.opacity = 0.65,
     this.enabled,
+    this.style,
   });
 
   /// 画布高度（逻辑像素）。
@@ -50,6 +73,9 @@ class SpectrumView extends ConsumerStatefulWidget {
   /// 独立启用开关（null = 跟随全局「频谱」设置；播放条迷你频谱传
   /// `player.barSpectrum` 与该全局开关解耦）。
   final bool? enabled;
+
+  /// 频谱样式；null 时跟随设置（player.spectrumStyle）。
+  final SpectrumStyle? style;
 
   @override
   ConsumerState<SpectrumView> createState() => _SpectrumViewState();
@@ -113,13 +139,16 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
 
     final barWidth = widget.barWidth ?? prefs.spectrumBarWidth.toDouble();
     final color = widget.color ?? Theme.of(context).colorScheme.primary;
+    final style = widget.style ?? SpectrumStyle.fromStorage(prefs.spectrumStyle);
     // 仅样式/时间源变化时才更新并触发重绘（平时由 ticker 直接驱动绘制）
     if (_painter.barWidth != barWidth ||
         _painter.color != color ||
+        _painter.style != style ||
         _painter.nowMs != _clockMs) {
       _painter
         ..barWidth = barWidth
         ..color = color
+        ..style = style
         ..nowMs = _clockMs;
       _repaint.value++;
     }
@@ -204,6 +233,7 @@ class _SpectrumPainter extends CustomPainter {
   double barWidth;
   double radius;
   Color color = Colors.transparent;
+  SpectrumStyle style = SpectrumStyle.bars;
 
   /// 时间源（每 tick 更新）。
   int nowMs = 0;
@@ -277,15 +307,34 @@ class _SpectrumPainter extends CustomPainter {
       }
     }
 
-    // 2) 双声道镜像拼接：左倒序 + 右正序（跳过极低频），usableLen = 240
+    // 2) 双声道镜像拼接（各样式共用数据缓冲）：左倒序 + 右正序，
+    //    跳过极低频，usableLen = 240
+    final usableLen = _buildBins();
+    if (usableLen <= 0) return;
+
+    // 3) 按所选样式渲染（独立效果，复用同一缓冲，开销等同）
+    switch (style) {
+      case SpectrumStyle.bars:
+        _paintBars(canvas, size, usableLen);
+      case SpectrumStyle.wave:
+        _paintWave(canvas, size, usableLen, mirror: true);
+      case SpectrumStyle.waveUp:
+        _paintWave(canvas, size, usableLen, mirror: false);
+    }
+  }
+
+  /// 双声道镜像拼接：usableLen = (fftSize - skipLow) * 2。
+  int _buildBins() {
     final channelLength = fftSize - skipLow;
     for (var i = 0; i < channelLength; i++) {
       _stereo[i] = _display[0][fftSize - 1 - i];
       _stereo[channelLength + i] = _display[1][skipLow + i];
     }
-    final usableLen = channelLength * 2;
+    return channelLength * 2;
+  }
 
-    // 3) bar 布局：每根 bar 覆盖一段 bin，左右扩 1 邻居空间平滑
+  /// 经典条形：每根 bar 覆盖一段 bin，左右扩 1 邻居空间平滑，底部对齐。
+  void _paintBars(Canvas canvas, Size size, int usableLen) {
     final slotWidth = barWidth + barGap;
     final numBars = (size.width / slotWidth).floor();
     if (numBars <= 0) return;
@@ -319,10 +368,101 @@ class _SpectrumPainter extends CustomPainter {
     }
   }
 
+  /// 波形线：频谱包络曲线。mirror=true 上下镜像（wave）；false 只向基线
+  /// 一侧（上）延伸（waveUp）。渲染细节：
+  ///  - 3 点滑动平均平滑包络，抑制单 bin 毛刺
+  ///  - 二次贝塞尔以「相邻采样点中点」为终点、当前点为控制点，曲线圆滑
+  ///    经过采样包络，消除折线棱角
+  void _paintWave(
+    Canvas canvas,
+    Size size,
+    int usableLen, {
+    required bool mirror,
+  }) {
+    if (usableLen <= 1 || size.width <= 0) return;
+    final midY = size.height / 2;
+    final amp = math.max(size.height / 2 - 2, 1.0);
+
+    // 左右安全边距：波形线横贯整宽，若曲线贴边（x=0 / x=width），其端部
+    // 会被外层圆角遮罩裁切出线头「亮点」（迷你播放条为 30px 圆角）。
+    // 曲线端部应收束在遮罩圆角之外——由曲线自身留边距解决，而非加宽
+    // 遮罩兜底。全屏页无遮罩时亦保留统一内边距。
+    final pad = math.min(16.0, size.width * 0.05);
+    final curveWidth = size.width - 2 * pad;
+    if (curveWidth <= 2) return;
+    final stepX = curveWidth / (usableLen - 1);
+
+    // 3 点滑动平均（含边界收缩窗口），clamp 到 [0,1]
+    final smoothBins = Float64List(usableLen);
+    for (var i = 0; i < usableLen; i++) {
+      final lo = math.max(0, i - 1);
+      final hi = math.min(usableLen - 1, i + 1);
+      var sum = 0.0;
+      var n = 0;
+      for (var j = lo; j <= hi; j++) {
+        final raw = _stereo[j];
+        sum += raw < 0 ? 0.0 : (raw > 1 ? 1.0 : raw);
+        n++;
+      }
+      smoothBins[i] = sum / n;
+    }
+
+    // 边缘淡出：FFT 两端（最高频段）常有噪声 spike，未衰减时曲线从高位
+    // 出发，首段贝塞尔会在端部形成陡峭短竖线 + 圆帽，视觉突兀。
+    // 首尾 fadeLen 个 bin 线性衰减至基线（0），配合安全边距让曲线两端
+    // 在遮罩外平滑收束，无突兀线头。
+    const fadeLen = 12;
+    for (var i = 0; i < fadeLen && i < usableLen; i++) {
+      final k = i / fadeLen;
+      smoothBins[i] *= k;
+      final j = usableLen - 1 - i;
+      if (j > i) {
+        smoothBins[j] *= k;
+      }
+    }
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(1.5, math.min(3.0, barWidth))
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // sign=±1 决定曲线位于基线上方/下方
+    void trace(Path path, double sign) {
+      path.moveTo(pad, midY + sign * smoothBins[0] * amp);
+      for (var i = 0; i < usableLen - 1; i++) {
+        final y = midY + sign * smoothBins[i] * amp;
+        final yMid =
+            midY + sign * ((smoothBins[i] + smoothBins[i + 1]) / 2) * amp;
+        path.quadraticBezierTo(
+          pad + i * stepX,
+          y,
+          pad + (i + 0.5) * stepX,
+          yMid,
+        );
+      }
+      path.lineTo(
+        pad + (usableLen - 1) * stepX,
+        midY + sign * smoothBins[usableLen - 1] * amp,
+      );
+    }
+
+    final upper = Path();
+    trace(upper, -1);
+    canvas.drawPath(upper, paint);
+    if (mirror) {
+      final lower = Path();
+      trace(lower, 1);
+      canvas.drawPath(lower, paint);
+    }
+  }
+
   @override
   bool shouldRepaint(covariant _SpectrumPainter old) =>
       old.nowMs != nowMs ||
       old.barWidth != barWidth ||
       old.radius != radius ||
-      old.color != color;
+      old.color != color ||
+      old.style != style;
 }

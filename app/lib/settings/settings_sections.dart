@@ -958,6 +958,33 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   .read(appPrefsProvider.notifier)
                   .setSpectrumBarWidth(v.round()),
             ),
+            // 频谱样式：三种独立渲染效果（经典条形 / 双向波形 / 单向波形），
+            // 复用同一 FFT 数据缓冲，资源开销等同
+            SettingTile(
+              icon: Icons.blur_circular_outlined,
+              title: l10n.settingsSpectrumStyle,
+              subtitle: l10n.settingsSpectrumStyleDesc,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption(
+                    'bars',
+                    l10n.settingsSpectrumStyleBars,
+                  ),
+                  SSegmentedOption(
+                    'wave',
+                    l10n.settingsSpectrumStyleWave,
+                  ),
+                  SSegmentedOption(
+                    'waveUp',
+                    l10n.settingsSpectrumStyleWaveUp,
+                  ),
+                ],
+                selected: prefs.spectrumStyle,
+                onChanged: (v) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setSpectrumStyle(v),
+              ),
+            ),
             // 播放条迷你频谱：与全局「频谱」开关解耦（SpectrumView.enabled
             // 优先）；有歌词且开启「播放条歌词」时迷你频谱不显示
             SettingSwitchTile(

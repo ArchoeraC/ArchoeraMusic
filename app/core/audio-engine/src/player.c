@@ -22,7 +22,9 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
-/* 位置事件推送间隔（音频秒）：50ms 对齐 FFT 拉模式轮询（20Hz 分析） */
+/* 位置事件推送间隔默认值（音频秒）：50ms 对齐 FFT 拉模式轮询（20Hz 分析）。
+   运行期经 player_set_position_interval 可动态调整（降频协商，见
+   engine-event-push-plan：normal 50ms / minimized 500ms / unfocused 1000ms） */
 #define POSITION_INTERVAL_MS 50
 
 struct PlayerCtx {
@@ -32,6 +34,8 @@ struct PlayerCtx {
     int playing;
     double duration_ms;
     ma_uint64 sample_rate;
+    /* 位置事件间隔（ms，运行期可调，替代编译期常量） */
+    int position_interval_ms;
     ma_uint64 last_pos_frame;
     int ended_reported;
     int poll_count;
@@ -63,6 +67,7 @@ PlayerCtx *player_start(const char *ogg_path,
     if (!p) return NULL;
     p->on_event = on_event;
     p->user_data = user_data;
+    p->position_interval_ms = POSITION_INTERVAL_MS;
 
     /* 默认设备（ALSA/Pulse/PipeWire 自动选择）。headless 无设备时失败。 */
     r = ma_engine_init(NULL, &p->engine);
@@ -164,15 +169,26 @@ void player_command(PlayerCtx *p, const char *type,
     }
 }
 
+void player_set_position_interval(PlayerCtx *p, int interval_ms)
+{
+    if (!p) return;
+    if (interval_ms < 20) interval_ms = 20;
+    p->position_interval_ms = interval_ms;
+}
+
 int player_poll(PlayerCtx *p)
 {
     if (!p || !p->has_sound) return 0;
 
-    /* 位置事件：按音频位置驱动（每 POSITION_INTERVAL_MS 音频 1 帧） */
+    /* 位置事件：按音频位置驱动（每 position_interval_ms 音频 1 帧） */
     if (p->playing && p->sample_rate > 0) {
         ma_uint64 cur = 0;
         if (ma_sound_get_cursor_in_pcm_frames(&p->sound, &cur) == MA_SUCCESS) {
-            ma_uint64 step = p->sample_rate / (1000 / POSITION_INTERVAL_MS);
+            int interval = p->position_interval_ms;
+            if (interval < 20) interval = 20;   /* 下限 20ms（50Hz）防误设 */
+            ma_uint64 div = 1000 / interval;
+            if (div == 0) div = 1;              /* interval > 1000ms 兜底 */
+            ma_uint64 step = p->sample_rate / div;
             if (step == 0) step = 1;
             if (p->seek_pending) {
                 /* 等待游标进入目标区域（±400ms）后解除保护；期间不推送，

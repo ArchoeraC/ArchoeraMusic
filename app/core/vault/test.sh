@@ -808,7 +808,7 @@ pass "后端指纹不配对（a 初始化/a 解锁/b → SHARE_BACKEND_MISMATCH/
 
 # ── 19. LEGACY 方案（crypto 传统单因子）：K 整体存 OS 存储 / 免密 3 字段握手 ──
 DATA10="$(mktemp -d)"
-trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9" "$DATA10"' EXIT
+trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9" "$DATA10" "$DATA11"' EXIT
 
 # ① init-crypto：'C' 代号文件头（key_vault 零占位 = 不含密钥材料）
 OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=crypto-b "$VAULT" init-crypto "$DATA10" 2>&1) || true
@@ -870,6 +870,34 @@ print("ok")
 PY
 pass "crypto serve 全链路（免密握手 HMAC + set/get/delete/quit）"
 
+# ②b 跨目录独立性：目录 B 的 init 不得覆盖目录 A 的 K。OS 密钥环（libsecret/
+#    Keychain）是用户级全局槽位，曾导致「任何目录 init-crypto 都覆盖其他目录
+#    同一槽位 → 每次重编译/调试后 vault 失效（SHARE_MISMATCH）」——见 SecretKeyScope。
+DATA11="$(mktemp -d)"
+OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=crypto-b "$VAULT" init-crypto "$DATA11" 2>&1) || true
+case "$OUT" in
+  ok\ *) : ;;
+  *) fail "init-crypto B 失败: $OUT";;
+esac
+python3 - "$VAULT" "$DATA10" <<'PY' || fail "跨目录 init 覆盖了 A 的 K（SHARE_MISMATCH）"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+env = dict(os.environ)
+env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "crypto-b"
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("ok handshake"), "目录 B init 不应破坏目录 A: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+run destroy "$DATA11" >/dev/null || fail "destroy B 失败"
+pass "crypto 跨目录独立性（B init 不覆盖 A 的 K）"
+
 # ③ 缺 K（删 OS 存储条目）→ SHARE_MISSING，fail-closed（单因子同样 fail-closed）
 rm -f "$DATA10/insecure_master-share.bin"
 python3 - "$VAULT" "$DATA10" <<'PY' || fail "crypto 缺 K 应 fail-closed"
@@ -919,5 +947,158 @@ PY
 run destroy "$DATA10" | grep -q '^ok$' || fail "destroy 失败"
 run status "$DATA10" | grep -q '"initialized":false' || fail "destroy 后应未初始化"
 pass "crypto 后端不配对（SHARE_BACKEND_MISMATCH）+ destroy 全量销毁"
+
+# ── 20. 文件密钥模式（LEGACY 兼容方案）：K 落盘 secret.key，免 OS 钥匙串 ──
+#     headless/Docker 等无 Secret Service 场景；对应原 SPlayer-Next 服务端加密形态。
+DATA12="$(mktemp -d)"
+DATA13="$(mktemp -d)"
+trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9" "$DATA10" "$DATA11" "$DATA12" "$DATA13"' EXIT
+
+# ① init-file：'C' 代号文件头 + backend=file + secret.key（0600）+ status crypto
+OUT=$("$VAULT" init-file "$DATA12" 2>&1) || true
+case "$OUT" in
+  ok\ *) [ -n "${OUT#ok }" ] || fail "init-file 应返回非空锚点";;
+  *) fail "init-file 失败: $OUT";;
+esac
+[ -f "$DATA12/credentials.vault" ] || fail "init-file 应生成 credentials.vault"
+[ -f "$DATA12/secret.key" ] || fail "init-file 应生成 secret.key"
+[ "$(stat -c %a "$DATA12/secret.key")" = "600" ] || fail "secret.key 权限应 0600"
+python3 - "$DATA12/credentials.vault" <<'PY' || fail "file 模式文件头校验失败"
+import sys
+d = open(sys.argv[1], 'rb').read()
+assert d[:4] == b'AVLT', "magic 不符"
+assert d[4] == ord('C'), "应为 'C' 代号（单因子），got %d" % d[4]
+blen = d[40]
+assert d[41:41 + blen] == b'file', "backend 指纹应 file: %r" % d[41:41 + blen]
+print("ok")
+PY
+run status "$DATA12" | grep -q '"mode":"crypto"' || fail "file 模式 status 应为 mode=crypto"
+run status "$DATA12" | grep -q '"backend":"file"' || fail "file 模式 status 应暴露 backend=file（UI 据此区分 OS crypto）"
+pass "init-file：'C' 代号文件头（backend=file）+ secret.key 0600 + status mode=crypto/backend=file"
+
+# ② serve 全链路：免密 3 字段握手 → set/get/delete/quit（按文件头自动选 FileStore，无需 env）
+python3 - "$VAULT" "$DATA12" "$B64" "$UID1" <<'PY' || fail "file 模式 serve 链路失败"
+import base64, hashlib, hmac, os, subprocess, sys
+vault, data, b64, uid1 = sys.argv[1:5]
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+def cmd(line, payload=None):
+    if payload is None:
+        p.stdin.write((line + "\n").encode())
+    else:
+        p.stdin.write((line + "\n" + payload + "\n").encode())
+    p.stdin.flush()
+    return p.stdout.readline().decode().rstrip("\n")
+
+h, c = os.urandom(32), os.urandom(16)
+resp = cmd("handshake %s %s" % (
+    base64.b64encode(h).decode(), base64.b64encode(c).decode()))
+parts = resp.split(" ")
+assert parts[:2] == ["ok", "handshake"], "握手应答异常: %r" % resp
+assert len(base64.b64decode(parts[2])) == 16, "锚点应 16B"
+assert base64.b64decode(parts[3]) == hmac.new(h, c, hashlib.sha256).digest(), "HMAC 校验失败"
+assert parts[4].startswith("ARCHOERA-VAULT-TEST"), "应上报 TEST 标记: %r" % resp
+assert cmd("set %s" % uid1, b64) == "ok", "set 失败"
+assert cmd("get %s" % uid1).split(" ", 1)[1] == b64, "get 回读不一致"
+assert cmd("delete %s" % uid1) == "ok true", "delete 失败"
+assert cmd("get %s" % uid1) == "ok null", "删除后应无条目"
+assert cmd("quit") == "ok", "quit 失败"
+p.wait(timeout=5)
+assert p.returncode == 0, "quit 后应正常退出，got %r" % p.returncode
+print("ok")
+PY
+pass "file 模式 serve 全链路（按文件头自动 FileStore + 免密握手 HMAC + set/get/delete/quit）"
+
+# ③ 缺 secret.key → SHARE_MISSING（fail-closed，无明文窗口）
+mv "$DATA12/secret.key" "$DATA12/secret.key.bak"
+python3 - "$VAULT" "$DATA12" <<'PY' || fail "file 缺密钥应 SHARE_MISSING"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("err SHARE_MISSING"), "缺 secret.key 应 SHARE_MISSING: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+mv "$DATA12/secret.key.bak" "$DATA12/secret.key"
+pass "file 缺 secret.key → SHARE_MISSING（fail-closed）"
+
+# ④ env 密钥覆盖：错误 env → SHARE_MISMATCH；正确 env（init 时注入）→ 解锁
+KEYHEX=$(python3 -c "import secrets;print(secrets.token_hex(32))")
+python3 - "$VAULT" "$DATA12" "$KEYHEX" <<'PY' || fail "env 密钥不配对应 SHARE_MISMATCH"
+import base64, os, subprocess, sys
+vault, data, keyhex = sys.argv[1:4]
+env = dict(os.environ); env["ARCHOERA_VAULT_SECRET_KEY"] = keyhex
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("err SHARE_MISMATCH"), "错误 env 密钥应 SHARE_MISMATCH: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+OUT=$(ARCHOERA_VAULT_SECRET_KEY="$KEYHEX" "$VAULT" init-file "$DATA13" 2>&1) || true
+case "$OUT" in ok\ *) : ;; *) fail "env 密钥 init-file 失败: $OUT";; esac
+python3 - "$VAULT" "$DATA13" "$KEYHEX" <<'PY' || fail "正确 env 密钥应解锁"
+import base64, os, subprocess, sys
+vault, data, keyhex = sys.argv[1:4]
+env = dict(os.environ); env["ARCHOERA_VAULT_SECRET_KEY"] = keyhex
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("ok handshake"), "正确 env 密钥应解锁: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+pass "file env 密钥覆盖（错误 → SHARE_MISMATCH / 正确 → 解锁）"
+
+# ⑤ ARCHOERA_VAULT_BACKEND=file 初始化路径（等价 init-file，供主进程经 env 注入）
+run destroy "$DATA13" >/dev/null || fail "destroy DATA13 失败"
+OUT=$(ARCHOERA_VAULT_BACKEND=file "$VAULT" init-crypto "$DATA13" 2>&1) || true
+case "$OUT" in
+  ok\ *) [ -f "$DATA13/secret.key" ] || fail "env=file init-crypto 应生成 secret.key";;
+  *) fail "ARCHOERA_VAULT_BACKEND=file init-crypto 失败: $OUT";;
+esac
+pass "ARCHOERA_VAULT_BACKEND=file 初始化路径（等价 init-file）"
+
+# ⑥ 跨目录独立性：B 的 init-file 不覆盖 A 的密钥（文件按目录天然隔离，契约验证）
+#    先等 ④ env 错误解锁触发的 1s 锁定退避过期，避免误伤本用例
+sleep 2
+OUT=$("$VAULT" init-file "$DATA11" 2>&1) || true
+case "$OUT" in ok\ *) : ;; *) fail "init-file B 失败: $OUT";; esac
+python3 - "$VAULT" "$DATA12" <<'PY' || fail "目录 B init-file 不应破坏目录 A"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("ok handshake"), "目录 B init-file 不应破坏目录 A: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+pass "file 跨目录独立性（B init-file 不覆盖 A 的密钥）"
+
+# ⑦ destroy：secret.key + vault 文件全量删除
+run destroy "$DATA12" | grep -q '^ok$' || fail "destroy DATA12 失败"
+[ ! -f "$DATA12/secret.key" ] || fail "destroy 应删除 secret.key"
+[ ! -f "$DATA12/credentials.vault" ] || fail "destroy 应删除 credentials.vault"
+pass "file destroy 全量销毁（secret.key + vault 文件）"
 
 echo "全部通过 ✔"

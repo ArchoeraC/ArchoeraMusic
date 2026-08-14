@@ -37,7 +37,9 @@ enum PowerSaverReason {
 /// 不使用轮询。窗口隐藏 / 屏幕关闭时若引擎已内建停帧（GTK 无 vsync、
 /// 显示器关闭等），以引擎内建节能为准，本服务设置的帧率上限只是兜底。
 class PowerSaverService with WindowListener {
-  PowerSaverService();
+  PowerSaverService(this._ref);
+
+  final Ref _ref;
 
   /// 节能模式总开关（设置持久化，默认开）。
   bool _enabled = true;
@@ -64,6 +66,19 @@ class PowerSaverService with WindowListener {
     PowerSaverReason.unfocused: Duration(seconds: 1), // 1 FPS
     PowerSaverReason.screenOff: Duration(seconds: 1), // 1 FPS
   };
+
+  /// 引擎位置事件间隔（ms）按档位映射（engine-event-push-plan §4.1）：
+  /// 前台 normal 50ms（与现状等价）/ 最小化 minimized 500ms（2Hz 保底）/
+  /// 失焦、熄屏 1000ms（1Hz 保底）。
+  static const Map<PowerSaverReason, int> _engineIntervalByReason = {
+    PowerSaverReason.none: 50,
+    PowerSaverReason.minimized: 500,
+    PowerSaverReason.unfocused: 1000,
+    PowerSaverReason.screenOff: 1000,
+  };
+
+  /// 最近一次已发送的引擎事件间隔（避免每个窗口事件都重复刷命令）。
+  int? _lastEngineIntervalMs;
 
   /// 开始监听窗口状态（并异步探测 Linux 屏幕状态信号）。
   void attach() {
@@ -216,7 +231,26 @@ class PowerSaverService with WindowListener {
   void _apply() {
     final binding = WidgetsBinding.instance;
     if (binding is! PowerSavingFrameBinding) return;
-    binding.setFrameInterval(_intervalByReason[_reason] ?? Duration.zero);
+    final reason = _reason;
+    binding.setFrameInterval(_intervalByReason[reason] ?? Duration.zero);
+    // 降频协商（engine-event-push-plan §4.1）：档位变化时向引擎请求位置事件
+    // 间隔——事件源头减量，Dart 侧无需在降频期高频消费 position。引擎未
+    // 就绪时由 PlaybackNotifier 忽略（转码期协商被 C 侧记录，播放器启动即
+    // 应用）；恢复前台时 setEngineEventInterval(50) 内部触发 get_status 对齐。
+    final interval = _engineIntervalByReason[reason] ?? 50;
+    if (interval != _lastEngineIntervalMs) {
+      _lastEngineIntervalMs = interval;
+      unawaited(
+        _ref.read(playbackProvider.notifier).setEngineEventInterval(interval),
+      );
+    }
+  }
+
+  /// 强制按当前档位重新协商（新引擎会话建立后调用）：
+  /// 降频期切歌时新引擎默认 50ms，需立即应用当前档位避免高频事件。
+  void resync() {
+    _lastEngineIntervalMs = null;
+    _apply();
   }
 
   Future<void> dispose() async {
@@ -243,7 +277,7 @@ class PowerSaverService with WindowListener {
 
 /// 节能模式服务（应用级单例；随 ProviderScope 释放）。
 final powerSaverProvider = Provider<PowerSaverService>((ref) {
-  final svc = PowerSaverService();
+  final svc = PowerSaverService(ref);
   ref.onDispose(svc.dispose);
   return svc;
 });
@@ -282,6 +316,13 @@ class _PowerSaverHostState extends ConsumerState<PowerSaverHost> {
     // 播放 / 暂停联动唤醒锁：仅播放中且开关打开时才持有
     ref.listen(playbackProvider.select((s) => s.playing), (prev, next) {
       ref.read(powerSaverProvider).setPlaying(next);
+    });
+    // 新引擎会话建立（sessionId 变化）后按当前档位重新协商：
+    // 降频期切歌的新引擎默认 50ms，立即应用当前档位避免高频事件
+    ref.listen(playbackProvider.select((s) => s.sessionId), (prev, next) {
+      if (next != null && next != prev) {
+        ref.read(powerSaverProvider).resync();
+      }
     });
     return widget.child;
   }

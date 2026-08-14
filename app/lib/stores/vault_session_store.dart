@@ -182,11 +182,15 @@ class VaultSessionStore implements SessionStore {
     try {
       // 首次运行（新数据目录）惰性初始化 vault；已初始化则跳过。
       // 默认 crypto（LEGACY 单因子，推荐稳定）；defaultScheme='vault'
-      // 时走 2-of-2（实验性，设置页/首次对话框选择后冷切重启生效）。
+      // 时走 2-of-2（实验性）；'file' 走文件密钥模式（LEGACY 兼容，
+      // 免 OS 钥匙串）——设置页/首次对话框选择后冷切重启生效。
       if (!await VaultProcess.isInitialized(_dataDir)) {
         if (defaultScheme == 'vault') {
           await VaultProcess.init(_dataDir);
           _mode = 'os';
+        } else if (defaultScheme == 'file') {
+          await VaultProcess.initFile(_dataDir);
+          _mode = 'crypto';
         } else {
           await VaultProcess.initCrypto(_dataDir);
           _mode = 'crypto';
@@ -321,6 +325,8 @@ class VaultSessionStore implements SessionStore {
         // 惰性重建（销毁后重新登录自动重建）：按默认方案初始化
         if (defaultScheme == 'vault') {
           await VaultProcess.init(_dataDir);
+        } else if (defaultScheme == 'file') {
+          await VaultProcess.initFile(_dataDir);
         } else {
           await VaultProcess.initCrypto(_dataDir);
         }

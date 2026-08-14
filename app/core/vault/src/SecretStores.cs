@@ -31,6 +31,18 @@ public static class SecretStoreFactory
 {
     public static ISecretStore Create(string dataDir)
     {
+        // 文件密钥模式（LEGACY 兼容方案）：库为 file 后端时按 vault 文件头分发——
+        // serve/status 无需任何 env；头损坏回落默认分发（由后续指纹/解密暴露）。
+        if (IsFileModeVault(dataDir)) return new FileStore(dataDir);
+        // 初始化路径：vault 文件不存在时，显式 ARCHOERA_VAULT_BACKEND=file 选择
+        // 文件密钥模式（等价 init-file 命令，供主进程经 env 注入启动）；已有 vault
+        // 一律按文件头后端分发（env 不影响既有库，避免误伤其他后端）。
+        // 置于 VAULT_TESTING insecure 分支之前：显式 backend 选择始终优先。
+        if (Environment.GetEnvironmentVariable("ARCHOERA_VAULT_BACKEND") == "file"
+            && !File.Exists(Path.Combine(dataDir, VaultService.VaultFileName)))
+        {
+            return new FileStore(dataDir);
+        }
 #if VAULT_TESTING
         // 测试/CI 专用明文存储（仅 VAULT_TESTING 构建编译，生产二进制不含此分支）：
         // 须显式设置环境变量才启用（绝不静默降级），用于无 Secret Service 的
@@ -46,13 +58,87 @@ public static class SecretStoreFactory
         }
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            return new KeychainStore();
+            return new KeychainStore(dataDir);
         }
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            return new LibsecretStore();
+            return new LibsecretStore(dataDir);
         }
         throw new SecretStoreUnavailableException("不支持的平台：无可用 OS 安全存储");
+    }
+
+    /// 判断 vault 是否为文件密钥模式（读文件头 backend=file）。
+    private static bool IsFileModeVault(string dataDir)
+    {
+        var vaultPath = Path.Combine(dataDir, VaultService.VaultFileName);
+        if (!File.Exists(vaultPath)) return false;
+        try { return VaultFile.ReadHeader(vaultPath).Backend == "file"; }
+        catch { return false; }
+    }
+}
+
+/// 密钥环槽位作用域（修复「跨数据目录覆盖份额」根因）：
+/// libsecret / Keychain 是**用户级全局命名空间**——schema/服务名 + account 槽位
+/// 不区分应用数据目录，任何目录的 init 都会覆盖其他目录同一槽位的 K/S
+/// （实测复现：init-crypto 目录 A → init-crypto 目录 B → 目录 A 立即
+/// SHARE_MISMATCH，即用户反馈「每次重新编译后 vault 失效」的机制）。
+/// 新初始化一律写入 scoped 键（含 dataDir）；升级前旧库的 legacy 键在
+/// Load 时回退兼容。文件型后端（InsecureFileStore / DpapiStore）本就按
+/// 目录落盘隔离，无需作用域。
+internal static class SecretKeyScope
+{
+    public static string Scoped(string dataDir, string key) => $"{key}|{dataDir}";
+}
+
+/// 文件密钥后端（LEGACY 兼容方案，对应原 SPlayer-Next 服务端加密形态）：
+/// 主密钥 K 整体落盘 <dataDir>/secret.key（0600 原子写入），**无 OS 钥匙串依赖**，
+/// 适用于无 Secret Service 的 headless Linux / Docker 等场景。
+///   - `ARCHOERA_VAULT_SECRET_KEY`（hex 64 = 32B）覆盖 K（对应原项目
+///     SPLAYER_SECRET_KEY 语义：env 优先于文件，不持久化）；
+///   - 后端指纹 backend="file"：与其他后端（libsecret/dpapi/keychain/insecure…）
+///     互不配对——文件密钥库被 OS 存储后端访问 → SHARE_BACKEND_MISMATCH；
+///   - 安全性：本地文件单点（弱于 OS 存储），无份额配对/无口令——选用即显式
+///     接受「密钥文件泄露 = 凭据全泄露」。
+public sealed class FileStore : ISecretStore
+{
+    private readonly string _dataDir;
+
+    public FileStore(string dataDir) => _dataDir = dataDir;
+
+    public string Backend => "file";
+
+    private string KeyPath => Path.Combine(_dataDir, "secret.key");
+
+    public byte[]? Load(string key)
+    {
+        // env 覆盖优先（等价原项目 SPLAYER_SECRET_KEY：env 即密钥，不落盘）
+        var envKey = Environment.GetEnvironmentVariable("ARCHOERA_VAULT_SECRET_KEY");
+        if (envKey != null)
+        {
+            try { return Convert.FromHexString(envKey); }
+            catch (FormatException) { /* 非 hex64：忽略 env，回落密钥文件 */ }
+        }
+        if (!File.Exists(KeyPath)) return null;
+        var raw = File.ReadAllBytes(KeyPath);
+        return raw.Length == KeySplit.KeySize ? raw : null;
+    }
+
+    public void Store(string key, byte[] value)
+    {
+        Directory.CreateDirectory(_dataDir);
+        // 原子写：tmp + 0600 + rename（避免进程崩溃留下半写密钥文件）
+        var tmp = KeyPath + ".tmp";
+        File.WriteAllBytes(tmp, value);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(tmp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        File.Move(tmp, KeyPath, overwrite: true);
+    }
+
+    public void Delete(string key)
+    {
+        if (File.Exists(KeyPath)) File.Delete(KeyPath);
     }
 }
 
@@ -212,8 +298,14 @@ internal static class ProtectTransforms
 public sealed class KeychainStore : ISecretStore
 {
     private const string Service = "archoera.vault";
+    private readonly string _dataDir;
+
+    public KeychainStore(string dataDir) => _dataDir = dataDir;
 
     public string Backend => "keychain";
+
+    /// 数据目录作用域化 account（防跨目录覆盖；见 [SecretKeyScope]）。
+    private string Scoped(string key) => SecretKeyScope.Scoped(_dataDir, key);
 
     private static IntPtr _cfStr(string s) => CFStringCreateWithCString(IntPtr.Zero, s, 0x08000100 /* kCFStringEncodingUTF8 */);
 
@@ -248,10 +340,29 @@ public sealed class KeychainStore : ISecretStore
 
     public byte[]? Load(string key)
     {
+        // scoped 优先；legacy 回退（升级前创建的旧库存于未作用域化槽位）
+        return LoadAcct(Scoped(key)) ?? LoadAcct(key);
+    }
+
+    public void Store(string key, byte[] value)
+    {
+        // 覆盖写：仅删同 scoped account（绝不能删 legacy——那属于别的旧库）
+        DeleteAcct(Scoped(key));
+        StoreAcct(Scoped(key), value);
+    }
+
+    public void Delete(string key)
+    {
+        DeleteAcct(Scoped(key));
+        DeleteAcct(key); // 清理升级前 legacy 槽
+    }
+
+    private byte[]? LoadAcct(string account)
+    {
         var query = NewDict();
         SetString(query, "class", "genp");
         SetString(query, "svce", Service);
-        SetString(query, "acct", key);
+        SetString(query, "acct", account);
         SetString(query, "r_Data", "1");   // kSecReturnData
         SetString(query, "m_Limit", "m_LimI"); // kSecMatchLimitOne
         try
@@ -273,14 +384,14 @@ public sealed class KeychainStore : ISecretStore
         finally { CFRelease(query); }
     }
 
-    public void Store(string key, byte[] value)
+    private void StoreAcct(string account, byte[] value)
     {
-        // 覆盖写：先删旧条目（SecItemAdd 对同 service+account 返回 -25299 duplicate）
-        Delete(key);
+        // 覆盖写：先删同 account 旧条目（SecItemAdd 对同 service+account 返回 -25299 duplicate）
+        DeleteAcct(account);
         var attrs = NewDict();
         SetString(attrs, "class", "genp");
         SetString(attrs, "svce", Service);
-        SetString(attrs, "acct", key);
+        SetString(attrs, "acct", account);
         SetData(attrs, "v_Data", value);
         try
         {
@@ -290,12 +401,12 @@ public sealed class KeychainStore : ISecretStore
         finally { CFRelease(attrs); }
     }
 
-    public void Delete(string key)
+    private void DeleteAcct(string account)
     {
         var query = NewDict();
         SetString(query, "class", "genp");
         SetString(query, "svce", Service);
-        SetString(query, "acct", key);
+        SetString(query, "acct", account);
         try { SecItemDelete(query); } finally { CFRelease(query); }
     }
 
@@ -344,17 +455,22 @@ public sealed class KeychainStore : ISecretStore
 public sealed class LibsecretStore : ISecretStore
 {
     private const string SchemaName = "archoera.vault";
+    private readonly string _dataDir;
 
     public string Backend => "libsecret";
 
-    public LibsecretStore()
+    public LibsecretStore(string dataDir)
     {
+        _dataDir = dataDir;
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS")))
         {
             throw new SecretStoreUnavailableException(
                 "Linux Secret Service 不可用（无 D-Bus session bus）：凭据持久化需降级为口令派生或禁用");
         }
     }
+
+    /// 数据目录作用域化 account（防跨目录覆盖；见 [SecretKeyScope]）。
+    private string Scoped(string key) => SecretKeyScope.Scoped(_dataDir, key);
 
     /// SecretSchema：name + flags + 32 属性槽（此处仅 1 个 account 属性）。
     private static readonly int SchemaSize = Marshal.SizeOf<SecretSchema>();
@@ -419,9 +535,23 @@ public sealed class LibsecretStore : ISecretStore
 
     public byte[]? Load(string key)
     {
-        var ctx = Build(key);
+        // scoped 优先；legacy 回退（升级前创建的旧库存于未作用域化槽位）
+        return LoadAccount(Scoped(key)) ?? LoadAccount(key);
+    }
+
+    public void Store(string key, byte[] value) => StoreAccount(Scoped(key), value);
+
+    public void Delete(string key)
+    {
+        DeleteAccount(Scoped(key));
+        DeleteAccount(key); // 清理升级前 legacy 槽
+    }
+
+    private byte[]? LoadAccount(string account)
+    {
+        var ctx = Build(account);
         var err = IntPtr.Zero;
-        var acc = Marshal.StringToHGlobalAnsi(key);
+        var acc = Marshal.StringToHGlobalAnsi(account);
         var attr = Marshal.StringToHGlobalAnsi("account");
         try
         {
@@ -443,9 +573,9 @@ public sealed class LibsecretStore : ISecretStore
         finally { FreeError(ref err); FreeCtx(ctx); Marshal.FreeHGlobal(acc); Marshal.FreeHGlobal(attr); }
     }
 
-    public void Store(string key, byte[] value)
+    private void StoreAccount(string account, byte[] value)
     {
-        var ctx = Build(key);
+        var ctx = Build(account);
         // 份额经 Base64 存储（随机二进制不可直接走 UTF-8 字符串往返，会损坏）
         var pass = Marshal.StringToHGlobalAnsi(Convert.ToBase64String(value));
         var label = Marshal.StringToHGlobalAnsi("archoera.vault master share");
@@ -469,9 +599,9 @@ public sealed class LibsecretStore : ISecretStore
         }
     }
 
-    public void Delete(string key)
+    private void DeleteAccount(string account)
     {
-        var ctx = Build(key);
+        var ctx = Build(account);
         var err = IntPtr.Zero;
         try { secret_password_clearv_sync(ctx.Schema, ctx.Hash, IntPtr.Zero, out err); }
         finally { FreeError(ref err); FreeCtx(ctx); }

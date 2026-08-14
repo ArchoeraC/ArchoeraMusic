@@ -1572,6 +1572,22 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsBarSpectrum => 'Espectro de la barra de reproducción';
 
   @override
+  String get settingsSpectrumStyle => 'Estilo de espectro';
+
+  @override
+  String get settingsSpectrumStyleDesc =>
+      'Efecto de visualización del espectro (barras / onda / onda ascendente)';
+
+  @override
+  String get settingsSpectrumStyleBars => 'Barras';
+
+  @override
+  String get settingsSpectrumStyleWave => 'Onda';
+
+  @override
+  String get settingsSpectrumStyleWaveUp => 'Onda ascendente';
+
+  @override
   String get settingsBarSpectrumOn =>
       'Mini espectro bajo la hora (sin letras o mini letras desactivadas)';
 
@@ -2356,7 +2372,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsSchemeNote =>
-      'Elija cómo se cifran los credenciales de inicio de sesión. LEGACY: almacenamiento seguro del sistema, estable y fiable (recomendado). Vault: método experimental de doble factor 2-of-2 — protección más fuerte pero posible pérdida de cookies. El cambio de método reconstruye la base de datos y requiere volver a iniciar sesión.';
+      'Elija cómo se cifran los credenciales de inicio de sesión. LEGACY: almacenamiento seguro del sistema, estable y fiable (recomendado). FILK (clave de archivo): clave maestra en un archivo local secret.key — sin llavero del sistema, para headless/Docker (punto único). Vault: método experimental de doble factor 2-of-2 — protección más fuerte pero posible pérdida de cookies. El cambio de método reconstruye la base de datos y requiere volver a iniciar sesión.';
 
   @override
   String get settingsSchemeCryptoTitle => 'LEGACY';
@@ -2371,6 +2387,20 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsSchemeCryptoModeDesc =>
       'Método LEGACY: la clave maestra está protegida por completo por el almacenamiento seguro del sistema. Buen equilibrio entre seguridad y estabilidad para el uso diario.';
+
+  @override
+  String get settingsSchemeFileTitle => 'FILK';
+
+  @override
+  String get settingsSchemeFileBadge => 'Compat.';
+
+  @override
+  String get settingsSchemeFileDesc =>
+      'La clave maestra vive en un archivo local (secret.key, 0600). No requiere llavero del sistema — para Linux sin interfaz / Docker. Punto único: si el archivo de clave se filtra, todas las credenciales quedan expuestas.';
+
+  @override
+  String get settingsSchemeFileModeDesc =>
+      'Modo FILK (clave de archivo): la clave maestra se guarda en secret.key (0600, escritura atómica) — la forma clásica de cifrado del lado del servidor. Usar solo sin llavero del sistema (headless/Docker).';
 
   @override
   String get settingsSchemeVaultTitle => 'Vault';
@@ -2394,8 +2424,12 @@ class AppLocalizationsEs extends AppLocalizations {
       'Vault es experimental: las cookies pueden perderse tras el cambio.';
 
   @override
+  String get settingsSchemeSwitchToFileWarning =>
+      'El modo FILK es un respaldo de compatibilidad: la clave maestra vive en un archivo local. Si se filtra, todas las credenciales quedan expuestas. Solo para entornos headless/Docker sin llavero del sistema.';
+
+  @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'LEGACY y Vault usan estructuras cifradas incompatibles. El cambio destruye la bóveda actual y reconstruye la base de datos; todos los credenciales de inicio de sesión (Netease / Kugou / cuentas de streaming) se perderán y requerirán volver a iniciar sesión.';
+      'Los métodos usan estructuras cifradas incompatibles. El cambio destruye la bóveda actual y reconstruye la base de datos; todos los credenciales de inicio de sesión (Netease / Kugou / cuentas de streaming) se perderán y requerirán volver a iniciar sesión.';
 
   @override
   String get settingsSchemeSwitchKeep => 'Mantener el actual';

@@ -126,6 +126,18 @@ Dart → C 的 `sendCommand`（JSON 行 → 命令 FIFO）继续作为双向按�
 | `app/lib/services/power/power_saver.dart` | `_apply()` 按 `_reason` 联动引擎 `setEventInterval`（minimized→500 / unfocused、screenOff→1000 / none→50）；收到回执后置 `get_status` 对齐 |
 | `app/lib/services/playback/playback_notifier.dart` | 处理 `event_interval` 回执事件；`_fftPollIntervalMs` 与引擎档位联动（可选，取帧间隔跟随） |
 
+### 5.1 实施进度（2026-08-14）
+
+**第一步「源头降频」已落地 ✅**（协商协议完整，含恢复前台对齐）：
+
+- `player.c`：`POSITION_INTERVAL_MS` 常量保留为默认值，新增运行期字段 `position_interval_ms` + `player_set_position_interval`（下限钳制 20ms）；`player_poll` 的 `step` 引用该字段
+- `mediaengine_lib.c`：新增 `set_event_interval` 命令分支（解析 `interval_ms`，转码期协商记录于 `pos_interval_ms`，播放器启动后应用）；新增 `event_interval` 回执事件；`ev_enqueue` 对 position 事件做「只保留最新」合并（覆盖最后一条而非追加）
+- `audio_engine_process.dart`：新增 `EngineEventInterval` 事件类 + 回执分发；新增 `setEventInterval(ms)` / `requestStatus()` 快捷命令
+- `power_saver.dart`：`_apply()` 按 `_reason` 联动引擎协商（none→50 / minimized→500 / unfocused、screenOff→1000，仅档位变化时发送）；新增 `resync()` 覆盖降频期切歌场景（新会话建立后按当前档位重新协商）
+- `playback_notifier.dart`：处理 `event_interval` 回执（记录 `_engineIntervalMs`）；`_fftPollIntervalMs = max(基线, _engineIntervalMs)` 取帧跟随档位；`setEngineEventInterval(≤50)` 时顺带 `get_status` 精确对齐位置/歌词（`EngineStatus` 事件已处理位置对齐）
+
+**第二步「去轮询推送」（native port 唤醒）未实施 ⏳**：Dart 侧仍为 50ms `Timer.periodic` 轮询 + C 侧 FIFO；native port 跨线程投递待三平台验证，作为后续独立改动。
+
 ---
 
 ## 6. 风险与权衡

@@ -22,6 +22,11 @@ class LikeController extends ChangeNotifier {
 
   bool _syncing = false;
 
+  /// 同步进行中又收到新事件（登录/登出）时置位：当前一轮完成后立即
+  /// 用最新登录态再跑一轮——否则登录动作触发的 sync 会被 `_syncing`
+  /// 直接丢弃，导致「登录后红心集合不更新」（红心失效，重启才恢复）。
+  bool _pending = false;
+
   /// 是否已成功同步过一次（避免重复全量拉取）。
   bool _loaded = false;
   bool get loaded => _loaded;
@@ -42,53 +47,66 @@ class LikeController extends ChangeNotifier {
       source == 'kugou' ? _kugouIds : _neteaseIds;
 
   /// 同步双平台红心集合（各自失败互不影响）。
+  ///
+  /// 支持「合并重跑」：同步中收到的登录事件（见 [_pending]）不会丢失，
+  /// 当前一轮结束后用最新登录态再跑，避免登录动作被 _syncing 吞掉。
   Future<void> sync() async {
-    if (_syncing) return;
+    if (_syncing) {
+      _pending = true;
+      return;
+    }
     _syncing = true;
     try {
-      // 网易云：likelist（需登录）
-      final account = _ref.read(neteaseAuthProvider);
-      if (account != null) {
-        try {
-          final ids = await _ref
-              .read(neteaseApiProvider)
-              .likedIds(account.userId);
-          if (!_sameSet(_neteaseIds, ids.toSet())) {
-            _neteaseIds
-              ..clear()
-              ..addAll(ids);
-          }
-        } catch (_) {
-          // 网络失败保留旧集合
-        }
-      } else {
-        _neteaseIds.clear();
-      }
-
-      // 酷狗：轻量红心 hash 集合（likedHashSet 只分页取 hash，不构造
-      // Track / 不写库 / 不触碰收藏页全量列表），红心状态与列表解耦——
-      // 启动同步不做全量拉取，避免被进程退出/写失败影响（sync 语义）
-      final kugou = _ref.read(kugouApiProvider);
-      if (kugou.session != null) {
-        try {
-          final ids = await kugou.likedHashSet();
-          if (!_sameSet(_kugouIds, ids)) {
-            _kugouIds
-              ..clear()
-              ..addAll(ids);
-          }
-        } catch (_) {
-          // 网络失败保留旧集合
-        }
-      } else {
-        _kugouIds.clear();
-      }
-
-      _loaded = true;
-      notifyListeners();
+      do {
+        _pending = false;
+        await _syncOnce();
+      } while (_pending);
     } finally {
       _syncing = false;
     }
+  }
+
+  Future<void> _syncOnce() async {
+    // 网易云：likelist（需登录）
+    final account = _ref.read(neteaseAuthProvider);
+    if (account != null) {
+      try {
+        final ids = await _ref
+            .read(neteaseApiProvider)
+            .likedIds(account.userId);
+        if (!_sameSet(_neteaseIds, ids.toSet())) {
+          _neteaseIds
+            ..clear()
+            ..addAll(ids);
+        }
+      } catch (_) {
+        // 网络失败保留旧集合
+      }
+    } else {
+      _neteaseIds.clear();
+    }
+
+    // 酷狗：轻量红心 hash 集合（likedHashSet 只分页取 hash，不构造
+    // Track / 不写库 / 不触碰收藏页全量列表），红心状态与列表解耦——
+    // 启动同步不做全量拉取，避免被进程退出/写失败影响（sync 语义）
+    final kugou = _ref.read(kugouApiProvider);
+    if (kugou.session != null) {
+      try {
+        final ids = await kugou.likedHashSet();
+        if (!_sameSet(_kugouIds, ids)) {
+          _kugouIds
+            ..clear()
+            ..addAll(ids);
+        }
+      } catch (_) {
+        // 网络失败保留旧集合
+      }
+    } else {
+      _kugouIds.clear();
+    }
+
+    _loaded = true;
+    notifyListeners();
   }
 
   /// 切换红心：乐观更新 + 失败回滚（对齐 SPlayer-Next toggleLike）。
@@ -110,6 +128,7 @@ class LikeController extends ChangeNotifier {
         } else {
           await api.removeFromLike(track);
         }
+        _applyStoreDelta(track, target);
         return true;
       } catch (_) {
         // 回滚
@@ -128,6 +147,7 @@ class LikeController extends ChangeNotifier {
     notifyListeners();
     try {
       await _ref.read(neteaseApiProvider).like(track.id, like: target);
+      _applyStoreDelta(track, target);
       return true;
     } catch (_) {
       _neteaseIds
@@ -135,6 +155,19 @@ class LikeController extends ChangeNotifier {
         ..addAll(wasLiked ? {track.id} : const {});
       notifyListeners();
       return false;
+    }
+  }
+
+  /// 服务端确认成功后，同步维护收藏列表增量（新喜欢插入头部 /
+  /// 取消喜欢移除）并写库——与「刷新=全量重拉+写库」同一持久化语义，
+  /// 列表任何变化都落库（local 歌曲不参与平台收藏列表）。
+  void _applyStoreDelta(Track track, bool target) {
+    if (track.source != 'kugou' && track.source != 'netease') return;
+    final store = _ref.read(likedStoreProvider);
+    if (target) {
+      store.addTrack(track.source, track);
+    } else {
+      store.removeTrack(track.source, track.source, track.id);
     }
   }
 

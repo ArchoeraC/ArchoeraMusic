@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'apis/runtime.dart';
 import 'services/power/frame_governor.dart';
+import 'services/scanner/sqlite_preload.dart';
 import 'services/streaming/streaming_store.dart';
 import 'stores/app_prefs.dart';
 import 'stores/vault_session_store.dart';
@@ -20,6 +21,11 @@ import 'widgets/common/tray_integration.dart';
 /// + 窗口/托盘后台常驻。播放链路由 C 引擎内置 miniaudio 承担
 /// （无 libmpv/media_kit 依赖）。
 Future<void> main() async {
+  // 预加载内置 SQLite（libe_sqlite3）：dart sqlite3 包经 hooks 配置
+  // source: system 按名 dlopen("libe_sqlite3.so")，这里先按绝对路径加载，
+  // 使 dart sqlite3 与 scanner-ffi 共享同一 SQLite 实例（同版本），避免
+  // 双版本并行写同一 WAL 库导致删除写入丢失。必须在任何 sqlite3.open 前。
+  preloadBundledSqlite();
   // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化，替代默认 binding
   PowerSavingFrameBinding.ensureInitialized();
   // 网易云封面 CDN 拒绝 Dart 默认 UA（403）；Image.network 经 NetworkImage

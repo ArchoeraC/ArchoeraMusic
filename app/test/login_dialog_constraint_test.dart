@@ -1,15 +1,17 @@
-// 回归测试：扫码登录弹窗不得被撑到全屏。
+// 回归测试：扫码登录页为全屏毛玻璃形态，不使用 AlertDialog，且长错误
+// 消息不引起布局溢出。
 //
-// 根因：新版 Flutter DialogRoute 不再包 Dialog（pageBuilder 直接
-// Builder+SafeArea+Semantics），弹窗根收到 tight 全屏约束；M3
-// AlertDialog 用 IntrinsicWidth 定宽，长文本（错误消息等）固有宽度
-// 极大会把弹窗撑到全屏。修复：先 Align 转 loose 再套
-// ConstrainedBox(maxWidth: 460)（ConstrainedBox 在 tight 父约束下
-// enforce 会把 maxWidth clamp 回父值，单独加会失效）。
+// 历史：早期是紧凑 AlertDialog 弹窗，曾出现两个回归——
+//  1. 新版 Flutter DialogRoute 不再包 Dialog，弹窗根收到 tight 全屏约束，
+//     M3 AlertDialog 用 IntrinsicWidth 定宽，长文本（错误消息等）固有宽度
+//     极大会把弹窗撑到全屏宽；
+//  2. 高度上限取视口 85% 时，长错误文本会把弹窗顶满屏。
+//  现改为全屏毛玻璃登录页（QR 居中放大，中央 Expanded + 滚动兜底），
+//  不存在弹窗撑爆/截断问题。
 //
-// 本测试以「超长错误消息」驱动网易/酷狗两条弹窗路径（initState 拉取
-// 二维码立即失败 → 错误分支渲染长文本），断言 AlertDialog 渲染宽度
-// 远小于视口宽（默认 800×600 测试视口；修复前为 800 全屏）。
+// 本测试以「超长错误消息」驱动网易/酷狗两条登录路径（initState 拉取
+// 二维码立即失败 → 错误分支渲染长文本），断言：无 AlertDialog、全屏层
+// 填满视口（800×600）、错误提示可见、无布局溢出。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -24,13 +26,13 @@ import 'package:archoera_music/stores/providers.dart';
 import 'package:archoera_music/widgets/dialogs/kugou_login_button.dart';
 import 'package:archoera_music/widgets/dialogs/netease_login_dialog.dart';
 
-/// 立即抛超长错误文本的网易 API（触发错误分支 + IntrinsicWidth 撑大路径）。
+/// 立即抛超长错误文本的网易 API（触发错误分支渲染长文本）。
 class _FailingNeteaseApi extends NeteaseApi {
   _FailingNeteaseApi() : super(ApisNeteaseCaller());
 
   @override
   Future<String> loginQrKey() async {
-    throw Exception('模拟网络错误（超长错误消息用于复现弹窗被撑到全屏的回归）：${'x' * 200}');
+    throw Exception('模拟网络错误（超长错误消息用于复现登录页溢出回归）：${'x' * 200}');
   }
 }
 
@@ -38,14 +40,13 @@ class _FailingNeteaseApi extends NeteaseApi {
 class _FailingKugouApi extends KugouApi {
   @override
   Future<String> qrKey() async {
-    throw Exception('模拟网络错误（超长错误消息用于复现弹窗被撑到全屏的回归）：${'x' * 200}');
+    throw Exception('模拟网络错误（超长错误消息用于复现登录页溢出回归）：${'x' * 200}');
   }
 }
 
 void main() {
-  /// 弹出一个登录对话框（error 路径），断言 AlertDialog 宽度被约束在
-  /// 视口宽度以下（修复后为 460；修复前 = 全屏 800）。
-  Future<void> expectDialogBounded(
+  /// 打开登录页（error 路径），断言为全屏毛玻璃形态且无布局溢出。
+  Future<void> expectFullscreenLogin(
     WidgetTester tester,
     void Function(BuildContext) open,
   ) async {
@@ -81,21 +82,27 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
-    final size = tester.getSize(find.byType(AlertDialog));
     expect(
-      size.width,
-      lessThan(600),
-      reason: 'AlertDialog 不得被长文本撑到全屏（实际宽 ${size.width}）',
+      find.byType(AlertDialog),
+      findsNothing,
+      reason: '扫码登录页为全屏毛玻璃形态，不应再使用 AlertDialog',
     );
+    // 全屏毛玻璃层（BackdropFilter）填满视口（默认 800×600 测试视口）
+    final size = tester.getSize(find.byType(BackdropFilter));
+    expect(size.width, 800, reason: '登录页应铺满视口宽（实际 ${size.width}）');
+    expect(size.height, 600, reason: '登录页应铺满视口高（实际 ${size.height}）');
+    // 长错误消息可见（限 4 行截断，但不缺渲染）
+    expect(find.textContaining('模拟网络错误'), findsOneWidget);
+    // 无布局溢出（RenderFlex overflow 等）
+    expect(tester.takeException(), isNull, reason: '登录页不应有布局溢出');
   }
 
-  testWidgets('网易扫码登录弹窗：长错误消息不撑爆宽度', (tester) async {
-    await expectDialogBounded(tester, showNeteaseLoginDialog);
+  testWidgets('网易扫码登录页：全屏毛玻璃形态，长错误消息无溢出', (tester) async {
+    await expectFullscreenLogin(tester, showNeteaseLoginDialog);
   });
 
-  testWidgets('酷狗扫码登录弹窗：长错误消息不撑爆宽度', (tester) async {
-    await expectDialogBounded(
+  testWidgets('酷狗扫码登录页：全屏毛玻璃形态，长错误消息无溢出', (tester) async {
+    await expectFullscreenLogin(
       tester,
       (context) => showDialog<void>(
         context: context,

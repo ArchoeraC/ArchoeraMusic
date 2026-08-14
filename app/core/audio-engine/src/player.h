@@ -34,6 +34,9 @@ PlayerCtx *player_start(const char *ogg_path,
 void player_command(PlayerCtx *p, const char *type,
                     const double *pos_ms, const double *gain);
 
+/** 设置位置事件推送间隔（ms，降频协商）。<20ms 时钳制为 20ms。 */
+void player_set_position_interval(PlayerCtx *p, int interval_ms);
+
 /** 播放循环节拍：按音频位置周期推送 position 事件；播放自然结束返回 1。 */
 int player_poll(PlayerCtx *p);
 

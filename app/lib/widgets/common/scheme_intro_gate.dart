@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/router.dart';
 import '../../l10n/l10n.dart';
 import '../../stores/app_prefs.dart';
 
@@ -28,12 +29,20 @@ class _SchemeIntroGateState extends ConsumerState<SchemeIntroGate> {
 
   Future<void> _maybeShow() async {
     if (_done || !mounted) return;
-    _done = true;
     final shown = ref.read(appPrefsProvider).schemeDialogShown;
     if (shown || !mounted) return;
+    // 本门挂在 MaterialApp.router 的 builder（位于 Navigator 之上），自身
+    // context 没有 Navigator 祖先，showDialog 必须改用根 Navigator 的 context。
+    final navContext = rootNavigatorKey.currentContext;
+    if (navContext == null) {
+      // Navigator 尚未挂载（首帧），下一帧再试
+      WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShow());
+      return;
+    }
+    _done = true;
     final l10n = context.l10n;
     await showDialog<void>(
-      context: context,
+      context: navContext,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.security_outlined),

@@ -56,6 +56,11 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
   /// 驱动「设备绑定免密」开关状态；经 [VaultProcess.mode] 异步读取。
   String? _vaultMode;
 
+  /// vault 份额后端（v4 指纹：`file`=文件密钥模式 / dpapi/keychain/libsecret
+  /// =OS 安全存储）。crypto 模式由本字段区分「OS 存储」与「文件密钥」两种
+  /// 实现（两者 vault 模式同为 'crypto'，但安全性不同，UI 须分开展示）。
+  String? _vaultBackend;
+
   /// 设备绑定相关操作进行中（开关/管理行禁用防重入）。
   bool _deviceBusy = false;
 
@@ -100,10 +105,13 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     return const {};
   }
 
-  /// 凭据加密方案（'crypto'=LEGACY 单因子 / 'vault'=2-of-2 实验性）。
-  /// 由 vault 实际模式推导（crypto → 'crypto'；os/password/multiseal → 'vault'；
+  /// 凭据加密方案（'crypto'=LEGACY OS 单因子 / 'file'=文件密钥兼容 /
+  /// 'vault'=2-of-2 实验性）。
+  /// 由 vault 实际模式 + 后端推导（crypto+backend=file → 'file'；
+  /// crypto → 'crypto'；os/password/multiseal → 'vault'；
   /// 未初始化 → prefs 偏好兜底，保证首次启动卡片有默认选中态）。
   String get _scheme {
+    if (_vaultMode == 'crypto' && _vaultBackend == 'file') return 'file';
     if (_vaultMode == 'crypto') return 'crypto';
     if (_vaultMode == 'os' ||
         _vaultMode == 'password' ||
@@ -143,16 +151,21 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     _refreshVault();
   }
 
-  /// 异步刷新 vault 模式（驱动设备绑定开关；失败保持上次状态）。
+  /// 异步刷新 vault 模式 + 后端（驱动方案卡片选中态；失败保持上次状态）。
   Future<void> _refreshVault() async {
     String? mode;
+    String? backend;
     try {
       mode = await VaultProcess.mode(resolveDataDir());
+      backend = await VaultProcess.backend(resolveDataDir());
     } catch (_) {
       // 二进制缺失等：开关按未初始化处理（可首启设备绑定）
     }
-    if (!mounted || mode == _vaultMode) return;
-    setState(() => _vaultMode = mode);
+    if (!mounted || (mode == _vaultMode && backend == _vaultBackend)) return;
+    setState(() {
+      _vaultMode = mode;
+      _vaultBackend = backend;
+    });
   }
 
   // ── 主动失效 token + 清内存登录态 ──────────────────────────────
@@ -479,10 +492,12 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     );
   }
 
-  /// 方案互切（crypto ↔ vault）：两种方案的加密数据结构不兼容，无法原地
-  /// 迁移——销毁现有凭据库 → 按目标方案重建（cookie 全部丢失）→ 写回方案
-  /// 偏好 → 冷切重启。方向警告：
+  /// 方案互切（crypto ↔ file ↔ vault）：三种方案的加密数据结构不兼容，
+  /// 无法原地迁移——销毁现有凭据库 → 按目标方案重建（cookie 全部丢失）→
+  /// 写回方案偏好 → 冷切重启。方向警告：
   ///   vault：实验性方案（份额/口令/设备绑定任一环节异常都可能频繁丢 Cookie）；
+  ///   file：文件密钥兼容方案（本地文件单点，泄露即全破——仅供无 OS
+  ///         钥匙串的 headless/Docker 使用，选用即显式接受降级）；
   ///   统一：重建数据库（丢失全部已保存 Cookie）且必须冷启动。
   Future<void> _switchScheme(String target) async {
     final l10n = context.l10n;
@@ -491,6 +506,7 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
       title: l10n.settingsSchemeSwitchTitle,
       description: [
         if (target == 'vault') l10n.settingsSchemeSwitchToVaultWarning,
+        if (target == 'file') l10n.settingsSchemeSwitchToFileWarning,
         l10n.settingsSchemeSwitchRebuildDesc,
       ].join('\n\n'),
       child: const SizedBox.shrink(),
@@ -520,6 +536,8 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
       VaultProcess.destroy(resolveDataDir());
       if (target == 'vault') {
         await VaultProcess.init(resolveDataDir());
+      } else if (target == 'file') {
+        await VaultProcess.initFile(resolveDataDir());
       } else {
         await VaultProcess.initCrypto(resolveDataDir());
       }
@@ -1003,37 +1021,59 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
               ),
             ),
           ),
-        // 加密方案卡片（Crypto 推荐 / Vault 实验性 二选一）
+        // 加密方案卡片（LEGACY 推荐 / FILK 兼容 / Vault 实验性 三选一）
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: _SchemeCard(
-                  value: 'crypto',
-                  selected: _scheme,
-                  busy: _deviceBusy,
-                  title: l10n.settingsSchemeCryptoTitle,
-                  badge: l10n.settingsSchemeCryptoBadge,
-                  badgeColor: scheme.primary,
-                  desc: l10n.settingsSchemeCryptoDesc,
-                  icon: Icons.vpn_key_outlined,
-                  onTap: _onSchemeSelected,
+              // 同一行两卡等高（IntrinsicHeight）：不同语言的 desc 长度不同，
+              // 否则卡片高度随内容参差，视觉上显得不齐整。
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _SchemeCard(
+                        value: 'crypto',
+                        selected: _scheme,
+                        busy: _deviceBusy,
+                        title: l10n.settingsSchemeCryptoTitle,
+                        badge: l10n.settingsSchemeCryptoBadge,
+                        badgeColor: scheme.primary,
+                        desc: l10n.settingsSchemeCryptoDesc,
+                        icon: Icons.vpn_key_outlined,
+                        onTap: _onSchemeSelected,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _SchemeCard(
+                        value: 'file',
+                        selected: _scheme,
+                        busy: _deviceBusy,
+                        title: l10n.settingsSchemeFileTitle,
+                        badge: l10n.settingsSchemeFileBadge,
+                        badgeColor: scheme.tertiary,
+                        desc: l10n.settingsSchemeFileDesc,
+                        icon: Icons.key_outlined,
+                        onTap: _onSchemeSelected,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SchemeCard(
-                  value: 'vault',
-                  selected: _scheme,
-                  busy: _deviceBusy,
-                  title: l10n.settingsSchemeVaultTitle,
-                  badge: l10n.settingsSchemeVaultBadge,
-                  badgeColor: scheme.error,
-                  desc: l10n.settingsSchemeVaultDesc,
-                  icon: Icons.shield_outlined,
-                  onTap: _onSchemeSelected,
-                ),
+              const SizedBox(height: 10),
+              _SchemeCard(
+                value: 'vault',
+                selected: _scheme,
+                busy: _deviceBusy,
+                title: l10n.settingsSchemeVaultTitle,
+                badge: l10n.settingsSchemeVaultBadge,
+                badgeColor: scheme.error,
+                desc: l10n.settingsSchemeVaultDesc,
+                icon: Icons.shield_outlined,
+                onTap: _onSchemeSelected,
               ),
             ],
           ),
@@ -1148,12 +1188,14 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     );
   }
 
-  /// 当前加密方案说明（方案卡片下方）：Crypto（单因子稳定）与
-  /// Vault（2-of-2 实验性）的总述；未初始化显示读取中。
+  /// 当前加密方案说明（方案卡片下方）：Crypto（OS 单因子稳定）与
+  /// File（文件密钥兼容）与 Vault（2-of-2 实验性）的总述；未初始化显示读取中。
   String _schemeDesc(AppLocalizations l10n) {
     switch (_scheme) {
       case 'crypto':
         return l10n.settingsSchemeCryptoModeDesc;
+      case 'file':
+        return l10n.settingsSchemeFileModeDesc;
       case 'vault':
         return l10n.settingsSchemeVaultModeDesc;
       default:

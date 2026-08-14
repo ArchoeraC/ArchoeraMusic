@@ -68,6 +68,17 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+# dart sqlite3 包使用与 scanner-ffi 相同的内置 SQLite（libe_sqlite3，同版本
+# 同实例），避免同一进程内两个 SQLite 版本（系统/内置 3.53.x vs libe 3.50.x）
+# 并行操作同一 WAL 数据库导致写入丢失（增量扫描删除失效）。
+# 运行期按名 dlopen("libe_sqlite3.so")，需应用启动最早处先按绝对路径预加载
+# 该库（见 lib/services/scanner/sqlite_preload.dart）。
+hooks:
+  user_defines:
+    sqlite3:
+      source: system
+      name: e_sqlite3
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

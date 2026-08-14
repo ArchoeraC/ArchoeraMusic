@@ -283,17 +283,22 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
           ));
 
     // 未播放时隐藏播放条（不占底部空间）；用 AnimatedSwitcher 做
-    // 进入/退出动效（高度收缩 + 淡入淡出，对齐原版 PlayerBar 过渡）
+    // 进入/退出动效（对齐原版 MainLayout.vue 的 PlayerBar 过渡：底部
+    // translate-y-full 滑入/滑出，enter 300ms ease-out、leave 反向 ease-in）。
     // 可见条件：有引擎源（source）或有恢复的现场（queue 非空，如「会话记忆」
     // 恢复的暂停会话——source 为 null 但队列/位置已就绪，播放条应显示）。
     final showBar = hasSource || hasQueue;
     return AnimatedSwitcher(
-      duration: animDuration(context, const Duration(milliseconds: 250)),
+      duration: animDuration(context, const Duration(milliseconds: 300)),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
-      transitionBuilder: (child, animation) => SizeTransition(
-        sizeFactor: animation,
-        alignment: Alignment.bottomCenter, // 底部对齐：向上展开/向下收起
+      transitionBuilder: (child, animation) => SlideTransition(
+        // 从自身高度 100% 下方滑入（对齐原版 translate-y-full）；
+        // 悬浮层底部定位，滑出即超出窗口底部被裁掉。
+        position: Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(animation),
         child: FadeTransition(opacity: animation, child: child),
       ),
       child: showBar
