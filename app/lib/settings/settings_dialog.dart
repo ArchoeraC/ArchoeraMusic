@@ -20,6 +20,7 @@ import '../widgets/common/anim.dart';
 import '../widgets/common/glass_surface.dart';
 import '../widgets/common/toast.dart';
 import 'cache_section.dart';
+import 'history_section.dart';
 import 'security_section.dart';
 import 'settings_categories.dart';
 import 'settings_sections.dart';
@@ -728,6 +729,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     CacheSection(),
+                    HistorySection(),
                     StorageSection(),
                     SecuritySection(),
                   ],

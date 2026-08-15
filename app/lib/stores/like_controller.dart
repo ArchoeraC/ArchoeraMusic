@@ -35,9 +35,13 @@ class LikeController extends ChangeNotifier {
   ///
   /// 酷狗以歌曲 hash 为红心键（搜索条目 id 退化为 hash、歌单条目可能为
   /// audio_id，两者不一致会导致红心状态判定失败；hash 是稳定的歌曲标识）。
+  /// **hash 统一转小写匹配**：歌单接口存大写、mobilecdn 搜索返回小写，
+  /// 与 [songLikeKey] / likedHashSet 保持一致（否则已收藏误标非红心）。
   bool isLiked(Track track) {
     if (track.source == 'kugou') {
-      return _kugouIds.contains(track.kugou?.hash ?? track.id);
+      return _kugouIds.contains(
+        (track.kugou?.hash ?? track.id).toLowerCase(),
+      );
     }
     return _neteaseIds.contains(track.id);
   }
@@ -116,7 +120,7 @@ class LikeController extends ChangeNotifier {
     final target = !wasLiked;
 
     if (track.source == 'kugou') {
-      final key = track.kugou?.hash ?? track.id;
+      final key = (track.kugou?.hash ?? track.id).toLowerCase();
       _kugouIds
         ..remove(key)
         ..addAll(target ? {key} : const {});

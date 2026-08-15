@@ -335,6 +335,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get searchHistory => 'Search history';
+
+  @override
+  String get searchHistoryClear => 'Clear';
+
+  @override
+  String get searchHistoryEmpty => 'No search history';
+
+  @override
+  String get searchHot => 'Hot search';
+
+  @override
+  String searchQuick(Object query) {
+    return 'Search “$query”';
+  }
+
+  @override
   String get sidebarBackHome => 'Back to home';
 
   @override
@@ -1017,6 +1034,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playerBarCollapsePlayer => 'Collapse player';
+
+  @override
+  String get playerBarExitFullscreen => 'Exit Fullscreen';
+
+  @override
+  String get playerBarFullscreen => 'Fullscreen';
 
   @override
   String get playerBarHideLyrics => 'Hide lyrics';
@@ -1968,6 +1991,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsUserDbLabel => 'User data path';
 
   @override
+  String get settingsHistoryDb => 'Play history database';
+
+  @override
+  String get settingsHistoryDbLabel => 'History database path';
+
+  @override
+  String get settingsHistorySection => 'Play History';
+
+  @override
+  String get settingsHistoryNote =>
+      'Play history is stored in its own history.db (separate from the music library). Turning recording off keeps existing entries; without a limit the database keeps growing on disk and may slow down the history page.';
+
+  @override
+  String get settingsHistoryEnabled => 'Record play history';
+
+  @override
+  String get settingsHistoryEnabledOn =>
+      'Recording — entries are written after playback';
+
+  @override
+  String get settingsHistoryEnabledOff => 'Paused — existing entries are kept';
+
+  @override
+  String get settingsHistoryLimit => 'History size limit';
+
+  @override
+  String settingsHistoryLimitOn(Object count) {
+    return 'Up to $count entries';
+  }
+
+  @override
+  String get settingsHistoryLimitUnlimited => 'Unlimited';
+
+  @override
+  String get settingsHistoryNoLimitConfirmTitle => 'Remove the size limit?';
+
+  @override
+  String get settingsHistoryNoLimitConfirmDesc =>
+      'Without a limit, play history can grow indefinitely, taking up disk space and potentially slowing down the history page and the app. Remove the limit anyway?';
+
+  @override
+  String get settingsHistoryNoLimitConfirm => 'Keep it unlimited';
+
+  @override
+  String get settingsHistoryStats => 'History data';
+
+  @override
   String get settingsCopy => 'Copy';
 
   @override
@@ -2854,7 +2924,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsWeatherNote =>
-      'Privacy: weather data from Open-Meteo (free, no API key). When auto locate is on, your IP is sent to ip-api.com for a rough location, used only to fetch weather and not stored. Both the widget and location are off by default.';
+      'Privacy: weather data from Open-Meteo (free, no API key). When auto locate is on, your IP is sent to ipwho.is for a rough location, used only to fetch weather and not stored. Both the widget and location are off by default.';
+
+  @override
+  String get settingsWeatherPrivacyTitle => 'Enable weather widget?';
+
+  @override
+  String get settingsWeatherPrivacyBody =>
+      'Enabling will send requests to the third-party weather service Open-Meteo. In manual city mode, only the city name you entered is sent; no other personal information is uploaded.';
+
+  @override
+  String get settingsWeatherPrivacyEnable => 'Enable';
+
+  @override
+  String get settingsWeatherAutoLocateTitle => 'Enable auto locate?';
+
+  @override
+  String get settingsWeatherAutoLocateBody =>
+      'Auto locate uses ipwho.is to determine an approximate location from your network\'s public IP and sends those coordinates to Open-Meteo for weather. This may reveal the city or general area you are in. You can instead enter a city manually.';
+
+  @override
+  String get settingsWeatherLocateSource => 'Location source';
+
+  @override
+  String get settingsWeatherLocateSourceDesc =>
+      'System location is more accurate when available; falls back to IP';
+
+  @override
+  String get settingsWeatherLocateSourceIp => 'IP locate';
+
+  @override
+  String get settingsWeatherLocateSourceSystem => 'System';
+
+  @override
+  String get settingsWeatherLocateSystemTitle => 'Switch to system location?';
+
+  @override
+  String get settingsWeatherLocateSystemBody =>
+      'System location calls the operating system\'s location service (Windows Location / Linux GeoClue) for a more accurate position, used only for weather. The system will prompt for permission; falls back to IP when unavailable.';
 
   @override
   String get settingsSearchWeatherSubtitle =>

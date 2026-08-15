@@ -20,7 +20,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # （Dart 版本号语法不允许 '.' 分段预发布/构建号；运行时按 0.8.3.pre.2.rev.3 风格显示）
 # 注意：+ 后构建号必须为数字（Windows 构建号注入 FLUTTER_VERSION_BUILD，非数字
 # 会告警并归 0；rev.1 这类非数字标签不可用）
-version: 0.8.7-pre.2+1
+version: 0.8.7-pre.2+3
 
 environment:
   sdk: ^3.12.2
@@ -57,6 +57,7 @@ dependencies:
   wakelock_plus: ^1.7.0
   # Linux 屏幕状态事件订阅（org.freedesktop.ScreenSaver.ActiveChanged，节能模式）
   dbus: ^0.7.14
+  geolocator: ^14.0.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -71,13 +72,15 @@ dev_dependencies:
 # dart sqlite3 包使用与 scanner-ffi 相同的内置 SQLite（libe_sqlite3，同版本
 # 同实例），避免同一进程内两个 SQLite 版本（系统/内置 3.53.x vs libe 3.50.x）
 # 并行操作同一 WAL 数据库导致写入丢失（增量扫描删除失效）。
-# 运行期按名 dlopen("libe_sqlite3.so")，需应用启动最早处先按绝对路径预加载
-# 该库（见 lib/services/scanner/sqlite_preload.dart）。
+# 使用 source: process——native assets 直接从进程已加载的符号表解析（等价
+# DynamicLibrary.process()），避免按名 dlopen 因 libe_sqlite3.so 无 DT_SONAME
+# 而无法命中预加载句柄（glibc 行为；macOS dlopen 可命中已加载镜像故旧方案可
+# 用）。需应用启动最早处先按绝对路径以 RTLD_GLOBAL 预加载该库，使符号进入
+# 进程全局符号表（见 lib/services/scanner/sqlite_preload.dart）。
 hooks:
   user_defines:
     sqlite3:
-      source: system
-      name: e_sqlite3
+      source: process
 
 # 实验性依赖升级（dev 工具链，不影响运行时依赖 sqlite3/go_router/riverpod）：
 #   - test 1.31.2 / test_api 0.7.13 / test_core 0.6.19 需 analyzer 13-14

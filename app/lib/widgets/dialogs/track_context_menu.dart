@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../apis/runtime.dart';
 import '../../services/downloader/download_controller.dart';
+import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../stores/app_prefs.dart';
@@ -22,6 +23,7 @@ import 'netease_login_dialog.dart';
 import 's_context_menu.dart';
 import 's_dialog.dart';
 import 'track_detail_dialog.dart';
+import 'track_list_dialog.dart';
 import '../common/toast.dart';
 
 /// 弹出通用曲目右键菜单。
@@ -77,6 +79,25 @@ void showTrackContextMenu(
             onTap: () => _startDownload(context, ref, track),
           ),
         SContextMenuItem.divider(),
+        // 网易云曲目含歌手 id 时提供「查看歌手信息」（歌手热门歌曲弹窗）
+        if (track.source == 'netease' &&
+            track.artists.isNotEmpty &&
+            track.artists.first.id != null)
+          SContextMenuItem(
+            label: l10n.menuViewArtist,
+            icon: Icons.person_outline,
+            onTap: () {
+              final artist = track.artists.first;
+              showNeteaseArtistDialog(
+                context,
+                CoverItem(
+                  id: artist.id!,
+                  title: artist.name,
+                  cover: track.cover,
+                ),
+              );
+            },
+          ),
         SContextMenuItem(
           label: l10n.menuTrackDetail,
           icon: Icons.info_outline,

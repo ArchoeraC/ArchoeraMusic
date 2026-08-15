@@ -30,6 +30,7 @@ class PlayerControlsRow extends ConsumerWidget {
     required this.playing,
     required this.buffering,
     required this.onToggleLike,
+    required this.onShowComments,
   });
 
   /// 有内容 = 引擎源或在播/恢复的队列（模式切换可用）。
@@ -47,6 +48,9 @@ class PlayerControlsRow extends ConsumerWidget {
   /// 红心切换（由页面处理失败提示）。
   final ValueChanged<Track> onToggleLike;
 
+  /// 打开评论区（由页面处理，需当前曲目）。
+  final VoidCallback onShowComments;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -54,7 +58,7 @@ class PlayerControlsRow extends ConsumerWidget {
     final notifier = ref.read(playbackProvider.notifier);
     return Row(
       children: [
-        // 左组（左对齐）：红心
+        // 左组（左对齐）：红心 → 评论（对齐原版 FullPlayer 底栏左组顺序）
         Expanded(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.start,
@@ -69,6 +73,16 @@ class PlayerControlsRow extends ConsumerWidget {
                       : colorScheme.onSurfaceVariant,
                   onPressed: () => onToggleLike(current!),
                 ),
+              // 评论区（仅网易云/酷狗源，与红心同条件）
+              if (canLike) ...[
+                const SizedBox(width: 12),
+                CtrlIcon(
+                  tooltip: l10n.menuComment,
+                  icon: Icons.mode_comment_outlined,
+                  size: 24,
+                  onPressed: onShowComments,
+                ),
+              ],
             ],
           ),
         ),

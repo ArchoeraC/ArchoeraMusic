@@ -339,6 +339,23 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get searchHistory => 'Historial de búsqueda';
+
+  @override
+  String get searchHistoryClear => 'Borrar';
+
+  @override
+  String get searchHistoryEmpty => 'Sin historial';
+
+  @override
+  String get searchHot => 'Búsquedas populares';
+
+  @override
+  String searchQuick(Object query) {
+    return 'Buscar «$query»';
+  }
+
+  @override
   String get sidebarBackHome => 'Volver al inicio';
 
   @override
@@ -1027,6 +1044,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get playerBarCollapsePlayer => 'Contraer reproductor';
+
+  @override
+  String get playerBarExitFullscreen => 'Salir de pantalla completa';
+
+  @override
+  String get playerBarFullscreen => 'Pantalla completa';
 
   @override
   String get playerBarHideLyrics => 'Ocultar letra';
@@ -2003,6 +2026,54 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsUserDbLabel => 'Ruta de datos de usuario';
 
   @override
+  String get settingsHistoryDb => 'Base de datos del historial';
+
+  @override
+  String get settingsHistoryDbLabel => 'Ruta de la base del historial';
+
+  @override
+  String get settingsHistorySection => 'Historial de reproducción';
+
+  @override
+  String get settingsHistoryNote =>
+      'El historial se guarda en su propia history.db (separada de la biblioteca). Desactivar el registro conserva las entradas existentes; sin límite, la base crece indefinidamente y puede ralentizar la página de historial.';
+
+  @override
+  String get settingsHistoryEnabled => 'Registrar historial de reproducción';
+
+  @override
+  String get settingsHistoryEnabledOn =>
+      'Grabando — se escribe tras la reproducción';
+
+  @override
+  String get settingsHistoryEnabledOff =>
+      'Pausado — se conservan las entradas existentes';
+
+  @override
+  String get settingsHistoryLimit => 'Límite de entradas';
+
+  @override
+  String settingsHistoryLimitOn(Object count) {
+    return 'Hasta $count entradas';
+  }
+
+  @override
+  String get settingsHistoryLimitUnlimited => 'Sin límite';
+
+  @override
+  String get settingsHistoryNoLimitConfirmTitle => '¿Eliminar el límite?';
+
+  @override
+  String get settingsHistoryNoLimitConfirmDesc =>
+      'Sin límite, el historial puede crecer indefinidamente, ocupando espacio en disco y ralentizando la página de historial y la aplicación. ¿Eliminarlo de todos modos?';
+
+  @override
+  String get settingsHistoryNoLimitConfirm => 'Mantener sin límite';
+
+  @override
+  String get settingsHistoryStats => 'Datos del historial';
+
+  @override
   String get settingsCopy => 'Copiar';
 
   @override
@@ -2909,7 +2980,45 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsWeatherNote =>
-      'Privacidad: datos de Open-Meteo (gratis, sin clave). Con ubicación automática, tu IP se envía a ip-api.com para una ubicación aproximada, solo para el clima, sin guardarse. Widget y ubicación están desactivados por defecto.';
+      'Privacidad: datos de Open-Meteo (gratis, sin clave). Con ubicación automática, tu IP se envía a ipwho.is para una ubicación aproximada, solo para el clima, sin guardarse. Widget y ubicación están desactivados por defecto.';
+
+  @override
+  String get settingsWeatherPrivacyTitle => '¿Activar el widget del tiempo?';
+
+  @override
+  String get settingsWeatherPrivacyBody =>
+      'Al activarlo se envían solicitudes al servicio meteorológico de terceros Open-Meteo. En modo ciudad manual solo se envía la ciudad que escribiste; no se sube ninguna otra información personal.';
+
+  @override
+  String get settingsWeatherPrivacyEnable => 'Activar';
+
+  @override
+  String get settingsWeatherAutoLocateTitle => '¿Activar ubicación automática?';
+
+  @override
+  String get settingsWeatherAutoLocateBody =>
+      'La ubicación automática usa ipwho.is para obtener una posición aproximada a partir de la IP pública de tu red y envía esas coordenadas a Open-Meteo para el clima. Esto puede revelar tu ciudad o zona aproximada. También puedes escribir una ciudad manualmente.';
+
+  @override
+  String get settingsWeatherLocateSource => 'Fuente de ubicación';
+
+  @override
+  String get settingsWeatherLocateSourceDesc =>
+      'La ubicación del sistema es más precisa si está disponible; si no, IP';
+
+  @override
+  String get settingsWeatherLocateSourceIp => 'Ubicación IP';
+
+  @override
+  String get settingsWeatherLocateSourceSystem => 'Sistema';
+
+  @override
+  String get settingsWeatherLocateSystemTitle =>
+      '¿Cambiar a ubicación del sistema?';
+
+  @override
+  String get settingsWeatherLocateSystemBody =>
+      'La ubicación del sistema usa el servicio de ubicación del SO (ubicación de Windows / GeoClue de Linux) para una posición más precisa, solo para el clima. El sistema pedirá permiso; si no está disponible, se usará IP automáticamente.';
 
   @override
   String get settingsSearchWeatherSubtitle =>

@@ -94,12 +94,8 @@ final eventBusProvider = Provider<EventBus>((ref) {
 
 // ── 播放历史 / 红心状态 ─────────────────────────────────────────
 
-/// 播放历史本地存储（sqlite，首次使用时惰性打开）。
-final historyStoreProvider = Provider<HistoryStore>((ref) {
-  final store = HistoryStore.open();
-  ref.onDispose(store.close);
-  return store;
-});
+/// 播放历史本地存储（sqlite UI 线程同步直写，见 [HistoryStore]）。
+final historyStoreProvider = Provider<HistoryStore>((ref) => HistoryStore.shared);
 
 /// 红心状态（网易云 / 酷狗「我喜欢」）。
 final likeControllerProvider = ChangeNotifierProvider<LikeController>(

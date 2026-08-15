@@ -331,6 +331,23 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get searchHistory => '검색 기록';
+
+  @override
+  String get searchHistoryClear => '지우기';
+
+  @override
+  String get searchHistoryEmpty => '검색 기록이 없습니다';
+
+  @override
+  String get searchHot => '인기 검색';
+
+  @override
+  String searchQuick(Object query) {
+    return '\"$query\" 검색';
+  }
+
+  @override
   String get sidebarBackHome => '홈으로 돌아가기';
 
   @override
@@ -995,6 +1012,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get playerBarCollapsePlayer => '플레이어 접기';
+
+  @override
+  String get playerBarExitFullscreen => '전체 화면 종료';
+
+  @override
+  String get playerBarFullscreen => '전체 화면';
 
   @override
   String get playerBarHideLyrics => '가사 숨기기';
@@ -1918,6 +1941,52 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsUserDbLabel => '사용자 데이터 경로';
 
   @override
+  String get settingsHistoryDb => '재생 기록 데이터베이스';
+
+  @override
+  String get settingsHistoryDbLabel => '기록 데이터베이스 경로';
+
+  @override
+  String get settingsHistorySection => '재생 기록';
+
+  @override
+  String get settingsHistoryNote =>
+      '재생 기록은 별도의 history.db(라이브러리와 분리)에 저장됩니다. 기록을 끄면 새 항목이 추가되지 않으며 기존 기록은 유지됩니다. 무제한으로 두면 디스크를 계속 차지하고 기록 페이지 로딩이 느려질 수 있습니다.';
+
+  @override
+  String get settingsHistoryEnabled => '재생 기록 저장';
+
+  @override
+  String get settingsHistoryEnabledOn => '기록 중 — 재생 성공 후 자동 저장';
+
+  @override
+  String get settingsHistoryEnabledOff => '기록 일시 중지 — 기존 기록 유지';
+
+  @override
+  String get settingsHistoryLimit => '기록 상한 개수';
+
+  @override
+  String settingsHistoryLimitOn(Object count) {
+    return '최대 $count개';
+  }
+
+  @override
+  String get settingsHistoryLimitUnlimited => '무제한';
+
+  @override
+  String get settingsHistoryNoLimitConfirmTitle => '상한 개수를 해제할까요?';
+
+  @override
+  String get settingsHistoryNoLimitConfirmDesc =>
+      '상한을 없애면 재생 기록이 무한정 늘어나 디스크 공간을 차지하고 기록 페이지 로딩과 앱 응답이 느려질 수 있습니다. 그래도 해제할까요?';
+
+  @override
+  String get settingsHistoryNoLimitConfirm => '무제한 유지';
+
+  @override
+  String get settingsHistoryStats => '기록 데이터';
+
+  @override
   String get settingsCopy => '복사';
 
   @override
@@ -2769,7 +2838,44 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsWeatherNote =>
-      '개인정보: 날씨 데이터는 Open-Meteo(무료, 키 불필요). 자동 위치를 켜면 IP가 ip-api.com으로 전송되어 대략적인 위치를 얻습니다. 날씨 조회에만 사용하며 저장하지 않습니다. 위젯과 위치는 기본 꺼짐입니다.';
+      '개인정보: 날씨 데이터는 Open-Meteo(무료, 키 불필요). 자동 위치를 켜면 IP가 ipwho.is으로 전송되어 대략적인 위치를 얻습니다. 날씨 조회에만 사용하며 저장하지 않습니다. 위젯과 위치는 기본 꺼짐입니다.';
+
+  @override
+  String get settingsWeatherPrivacyTitle => '날씨 위젯을 활성화할까요?';
+
+  @override
+  String get settingsWeatherPrivacyBody =>
+      '활성화하면 제3자 날씨 서비스 Open-Meteo에 요청을 보냅니다. 수동 도시 모드에서는 입력한 도시 이름만 전송되며 다른 개인정보는 업로드되지 않습니다.';
+
+  @override
+  String get settingsWeatherPrivacyEnable => '활성화';
+
+  @override
+  String get settingsWeatherAutoLocateTitle => '자동 위치를 활성화할까요?';
+
+  @override
+  String get settingsWeatherAutoLocateBody =>
+      '자동 위치는 ipwho.is로 네트워크 출구 IP 기반 대략적인 위치를 얻고 그 좌표를 Open-Meteo에 보내 날씨를 조회합니다. 거주 도시 등 대략적인 위치가 노출될 수 있습니다. 수동으로 도시를 입력할 수도 있습니다.';
+
+  @override
+  String get settingsWeatherLocateSource => '위치 확인 방식';
+
+  @override
+  String get settingsWeatherLocateSourceDesc =>
+      '시스템 위치가 가능하면 우선(더 정확함)하며, 실패 시 IP로 자동 대체';
+
+  @override
+  String get settingsWeatherLocateSourceIp => 'IP 위치';
+
+  @override
+  String get settingsWeatherLocateSourceSystem => '시스템 위치';
+
+  @override
+  String get settingsWeatherLocateSystemTitle => '시스템 위치로 전환할까요?';
+
+  @override
+  String get settingsWeatherLocateSystemBody =>
+      '시스템 위치는 OS 위치 서비스(Windows Location / Linux GeoClue)를 사용해 더 정확한 위치를 가져오며, 날씨 조회에만 사용됩니다. 시스템 권한 안내가 표시되며, 사용할 수 없으면 IP로 자동 대체됩니다.';
 
   @override
   String get settingsSearchWeatherSubtitle => '상단 바의 미니 날씨 위젯(아이콘+기온)';

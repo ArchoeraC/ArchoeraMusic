@@ -330,6 +330,23 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get searchHistory => '検索履歴';
+
+  @override
+  String get searchHistoryClear => 'クリア';
+
+  @override
+  String get searchHistoryEmpty => '検索履歴はありません';
+
+  @override
+  String get searchHot => 'ホット検索';
+
+  @override
+  String searchQuick(Object query) {
+    return '「$query」を検索';
+  }
+
+  @override
   String get sidebarBackHome => 'ホームに戻る';
 
   @override
@@ -991,6 +1008,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get playerBarCollapsePlayer => 'プレーヤーを折りたたむ';
+
+  @override
+  String get playerBarExitFullscreen => '全画面を終了';
+
+  @override
+  String get playerBarFullscreen => '全画面';
 
   @override
   String get playerBarHideLyrics => '歌詞を非表示';
@@ -1914,6 +1937,52 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsUserDbLabel => 'ユーザーデータパス';
 
   @override
+  String get settingsHistoryDb => '再生履歴データベース';
+
+  @override
+  String get settingsHistoryDbLabel => '履歴データベースのパス';
+
+  @override
+  String get settingsHistorySection => '再生履歴';
+
+  @override
+  String get settingsHistoryNote =>
+      '再生履歴は独自の history.db（ライブラリと分離）に保存されます。記録をオフにしても既存の履歴は保持されます。無制限にするとディスクを占有し、履歴ページの読み込みが遅くなる可能性があります。';
+
+  @override
+  String get settingsHistoryEnabled => '再生履歴を記録';
+
+  @override
+  String get settingsHistoryEnabledOn => '記録中 — 再生成功後に書き込み';
+
+  @override
+  String get settingsHistoryEnabledOff => '記録停止 — 既存の履歴は保持';
+
+  @override
+  String get settingsHistoryLimit => '履歴の上限件数';
+
+  @override
+  String settingsHistoryLimitOn(Object count) {
+    return '最大 $count 件';
+  }
+
+  @override
+  String get settingsHistoryLimitUnlimited => '無制限';
+
+  @override
+  String get settingsHistoryNoLimitConfirmTitle => '上限を解除しますか？';
+
+  @override
+  String get settingsHistoryNoLimitConfirmDesc =>
+      '無制限の場合、再生履歴が際限なく増え、ディスク容量を占有し、履歴ページの読み込みやアプリの応答が遅くなる可能性があります。それでも解除しますか？';
+
+  @override
+  String get settingsHistoryNoLimitConfirm => '無制限のままにする';
+
+  @override
+  String get settingsHistoryStats => '履歴データ';
+
+  @override
   String get settingsCopy => 'コピー';
 
   @override
@@ -2761,7 +2830,44 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsWeatherNote =>
-      'プライバシー：天気データは Open-Meteo（無料・キー不要）。自動位置情報を有効にすると IP を ip-api.com に送信し大まかな位置を得ます。天気取得のみに使用し保存しません。ウィジェットと位置情報は初期状態でオフです。';
+      'プライバシー：天気データは Open-Meteo（無料・キー不要）。自動位置情報を有効にすると IP を ipwho.is に送信し大まかな位置を得ます。天気取得のみに使用し保存しません。ウィジェットと位置情報は初期状態でオフです。';
+
+  @override
+  String get settingsWeatherPrivacyTitle => '天気ウィジェットを有効にしますか？';
+
+  @override
+  String get settingsWeatherPrivacyBody =>
+      '有効にすると、第三者気象サービス Open-Meteo にリクエストを送信します。手動都市モードでは入力した都市名のみが送信され、その他の個人情報は送信されません。';
+
+  @override
+  String get settingsWeatherPrivacyEnable => '有効にする';
+
+  @override
+  String get settingsWeatherAutoLocateTitle => '自動位置情報を有効にしますか？';
+
+  @override
+  String get settingsWeatherAutoLocateBody =>
+      '自動位置情報は ipwho.is を使い、ネットワークの出口 IP からおおよその位置を取得し、その座標を Open-Meteo に送信して天気を取得します。お住まいの都市などおおよその位置が判明する可能性があります。手動で都市を入力することもできます。';
+
+  @override
+  String get settingsWeatherLocateSource => '位置情報の取得方法';
+
+  @override
+  String get settingsWeatherLocateSourceDesc =>
+      'システム位置情報が利用可能なら優先（より正確）；失敗時は IP に自動フォールバック';
+
+  @override
+  String get settingsWeatherLocateSourceIp => 'IP 位置情報';
+
+  @override
+  String get settingsWeatherLocateSourceSystem => 'システム';
+
+  @override
+  String get settingsWeatherLocateSystemTitle => 'システム位置情報に切り替えますか？';
+
+  @override
+  String get settingsWeatherLocateSystemBody =>
+      'システム位置情報は OS の位置情報サービス（Windows Location / Linux GeoClue）を利用し、より正確な位置を取得します（天気の確認のみに使用）。システムが許可を求めます。利用できない場合は IP に自動フォールバックします。';
 
   @override
   String get settingsSearchWeatherSubtitle => '上部バーのミニ天気ウィジェット（アイコン＋気温）';

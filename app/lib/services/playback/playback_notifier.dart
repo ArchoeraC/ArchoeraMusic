@@ -359,6 +359,8 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         quality: quality,
         buffering: true,
       );
+      // 新会话：历史记录标记复位（真正开始播放时记录一次）
+      _historyRecorded = false;
       try {
         final useBitrate = track != null
             ? (qualityBitrate[quality] ?? bitrate)
@@ -381,14 +383,6 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         // 成功时 consecutiveFailures = 0）
         _consecutiveFailures = 0;
         _fallbackAttempted.clear();
-        // 历史播放记录（本地存储，同曲去重置顶；对齐 SPlayer-Next
-        // history.record 在播放成功后调用）。失败静默，不影响播放。
-        final current = state.track;
-        if (current != null) {
-          try {
-            ref.read(historyStoreProvider).record(current);
-          } catch (_) {}
-        }
       } catch (e, s) {
         _log('load 失败: $e\n$s');
         state = state.copyWith(buffering: false);
@@ -465,6 +459,10 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
 
   /// 连续加载失败计数（成功播放时归零；对齐 SPlayer-Next consecutiveFailures）。
   int _consecutiveFailures = 0;
+
+  /// 当前会话历史是否已记录（真正开始播放时置位，避免重复记录；
+  /// [load] 开新会话时复位）。
+  bool _historyRecorded = false;
 
   /// 连续失败硬上限（对齐 SPlayer-Next MAX_CONSECUTIVE_FAILURES）。
   static const _maxConsecutiveFailures = 5;
@@ -1166,6 +1164,24 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     _log('转码完成，引擎开始播放 WAV');
   }
 
+  /// 记入播放历史（真正开始播放时调用，一次/会话）。
+  ///
+  /// 判定对齐 SPlayer-Next：`playbackStatus === 'playing'` 才记录，即引擎
+  /// 缓冲完成、miniaudio 真正出声后才落库——加载成功但随后失败/被秒切的
+  /// 曲目不记。写入为 UI 线程同步 sqlite（写量小，微秒级），失败内部
+  /// 记日志静默，不影响播放。
+  void _recordHistoryOnce() {
+    if (_historyRecorded) return;
+    final current = state.track;
+    if (current == null) return;
+    final prefs = ref.read(appPrefsProvider);
+    if (!prefs.historyEnabled) return;
+    _historyRecorded = true;
+    ref
+        .read(historyStoreProvider)
+        .record(current, limit: prefs.historyLimit);
+  }
+
   void _onEngineEvent(EngineEvent event) {
     switch (event) {
       case EngineReady():
@@ -1216,6 +1232,8 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         state = state.copyWith(playing: true, buffering: false);
         _syncFftActive();
         _log('播放器就绪: miniaudio 播放 WAV');
+        // 真正开始播放（miniaudio 加载 WAV 成功）→ 记入历史（一次/会话）
+        _recordHistoryOnce();
       case EnginePosition():
         // 引擎游标为 WAV 相对位置，转绝对（含会话偏移）供进度条/歌词/FFT 使用
         final absMs = event.positionMs + _sessionOffsetMs;

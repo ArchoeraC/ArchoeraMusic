@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -30,14 +32,39 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
   bool _loading = true;
   bool _resolving = false;
 
+  /// 历史变更订阅（IndexedStack 下页面常驻，订阅后任何 record/remove/
+  /// clear/trim 即时重载——事件驱动，无轮询/高频监听）。
+  StreamSubscription<HistoryChangedEvent>? _changesSub;
+
+  /// 突发变更合并（连播快速切歌时只重载一次，避免逐首整表重读）。
+  bool _reloadScheduled = false;
+
   @override
   void initState() {
     super.initState();
+    _changesSub = HistoryStore.changes
+        .on<HistoryChangedEvent>()
+        .listen((_) => _scheduleReload());
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _changesSub?.cancel();
+    super.dispose();
+  }
+
+  /// 变更事件 → 下一微任务合并重载（异步投递，不阻塞写入方调用链）。
+  void _scheduleReload() {
+    if (_reloadScheduled) return;
+    _reloadScheduled = true;
+    Future.microtask(() {
+      _reloadScheduled = false;
+      _load();
+    });
+  }
+
+  void _load() {
     final entries = ref.read(historyStoreProvider).entries();
     if (!mounted) return;
     setState(() {
@@ -84,13 +111,9 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     }
   }
 
-  /// 单条移除（右键菜单）。
+  /// 单条移除（右键菜单）。列表刷新由 [HistoryStore.changes] 事件驱动。
   void _removeEntry(Track track) {
     ref.read(historyStoreProvider).remove(track);
-    setState(() => _entries = _entries.where((e) {
-      final t = e.track;
-      return !(t.source == track.source && t.id == track.id);
-    }).toList());
     _toast(context.l10n.pageHistoryRemoved);
   }
 
@@ -118,7 +141,6 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     );
     if (ok != true) return;
     ref.read(historyStoreProvider).clear();
-    setState(() => _entries = const []);
     _toast(l10n.pageHistoryCleared);
   }
 

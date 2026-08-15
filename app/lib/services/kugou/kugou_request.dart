@@ -18,6 +18,9 @@ import 'kugou_crypto.dart';
 /// 主搜索（带封面）：mobilecdn 的 /api/v3/search/song，公网无鉴权
 const kgMobilecdnUrl = 'http://mobilecdn.kugou.com/api/v3/search/song';
 
+/// 热搜：mobilecdn 的 /api/v3/search/hot，公网无鉴权
+const kgSearchHotUrl = 'http://mobilecdn.kugou.com/api/v3/search/hot';
+
 /// 兜底搜索：songsearch.kugou.com（无封面）
 const kgSearchUrl = 'https://songsearch.kugou.com/song_search_v2';
 

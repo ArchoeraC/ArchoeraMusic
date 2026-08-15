@@ -728,6 +728,36 @@ abstract class AppLocalizations {
   /// **'{count} 首'**
   String queueTrackCount(Object count);
 
+  /// No description provided for @searchHistory.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'搜索历史'**
+  String get searchHistory;
+
+  /// No description provided for @searchHistoryClear.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清空'**
+  String get searchHistoryClear;
+
+  /// No description provided for @searchHistoryEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂无搜索历史'**
+  String get searchHistoryEmpty;
+
+  /// No description provided for @searchHot.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'热搜'**
+  String get searchHot;
+
+  /// No description provided for @searchQuick.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'搜索“{query}”'**
+  String searchQuick(Object query);
+
   /// No description provided for @sidebarBackHome.
   ///
   /// In zh_CN, this message translates to:
@@ -1891,6 +1921,18 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'收起播放器'**
   String get playerBarCollapsePlayer;
+
+  /// No description provided for @playerBarExitFullscreen.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'退出全屏'**
+  String get playerBarExitFullscreen;
+
+  /// No description provided for @playerBarFullscreen.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'全屏'**
+  String get playerBarFullscreen;
 
   /// No description provided for @playerBarHideLyrics.
   ///
@@ -3596,6 +3638,90 @@ abstract class AppLocalizations {
   /// **'用户库路径'**
   String get settingsUserDbLabel;
 
+  /// No description provided for @settingsHistoryDb.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放历史数据库'**
+  String get settingsHistoryDb;
+
+  /// No description provided for @settingsHistoryDbLabel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'历史库路径'**
+  String get settingsHistoryDbLabel;
+
+  /// No description provided for @settingsHistorySection.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放历史'**
+  String get settingsHistorySection;
+
+  /// No description provided for @settingsHistoryNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放历史独立存储于 history.db（与曲库分库）。关闭记录后不再新增，已有数据保留；不限制条数会持续占用磁盘并可能拖慢历史页加载。'**
+  String get settingsHistoryNote;
+
+  /// No description provided for @settingsHistoryEnabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'记录播放历史'**
+  String get settingsHistoryEnabled;
+
+  /// No description provided for @settingsHistoryEnabledOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在记录，播放成功后自动写入'**
+  String get settingsHistoryEnabledOn;
+
+  /// No description provided for @settingsHistoryEnabledOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已暂停记录，历史数据保留'**
+  String get settingsHistoryEnabledOff;
+
+  /// No description provided for @settingsHistoryLimit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'历史条数上限'**
+  String get settingsHistoryLimit;
+
+  /// No description provided for @settingsHistoryLimitOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'最多 {count} 条'**
+  String settingsHistoryLimitOn(Object count);
+
+  /// No description provided for @settingsHistoryLimitUnlimited.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不限制'**
+  String get settingsHistoryLimitUnlimited;
+
+  /// No description provided for @settingsHistoryNoLimitConfirmTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'取消条数上限？'**
+  String get settingsHistoryNoLimitConfirmTitle;
+
+  /// No description provided for @settingsHistoryNoLimitConfirmDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不限制时播放历史可无限制增长，持续占用磁盘空间，并可能拖慢历史页加载与应用响应。确认取消上限？'**
+  String get settingsHistoryNoLimitConfirmDesc;
+
+  /// No description provided for @settingsHistoryNoLimitConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仍然不限制'**
+  String get settingsHistoryNoLimitConfirm;
+
+  /// No description provided for @settingsHistoryStats.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'历史数据统计'**
+  String get settingsHistoryStats;
+
   /// No description provided for @settingsCopy.
   ///
   /// In zh_CN, this message translates to:
@@ -5099,8 +5225,74 @@ abstract class AppLocalizations {
   /// No description provided for @settingsWeatherNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'隐私说明：天气数据来自 Open-Meteo（免费、无需密钥）。开启「自动定位」时，本机 IP 会发送至 ip-api.com 换取大致位置，仅用于查询天气、不落盘。天气组件与定位默认均关闭。'**
+  /// **'隐私说明：天气数据来自 Open-Meteo（免费、无需密钥）。开启「自动定位」时，本机 IP 会发送至 ipwho.is 换取大致位置，仅用于查询天气、不落盘。天气组件与定位默认均关闭。'**
   String get settingsWeatherNote;
+
+  /// No description provided for @settingsWeatherPrivacyTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用天气组件？'**
+  String get settingsWeatherPrivacyTitle;
+
+  /// No description provided for @settingsWeatherPrivacyBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启后，应用会向第三方天气服务 Open-Meteo 请求数据。手动城市模式下仅发送你填写的城市名，不会上传其他个人信息。'**
+  String get settingsWeatherPrivacyBody;
+
+  /// No description provided for @settingsWeatherPrivacyEnable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用'**
+  String get settingsWeatherPrivacyEnable;
+
+  /// No description provided for @settingsWeatherAutoLocateTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用自动定位？'**
+  String get settingsWeatherAutoLocateTitle;
+
+  /// No description provided for @settingsWeatherAutoLocateBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动定位通过 ipwho.is 基于本机网络出口 IP 获取大致位置，并把坐标发送给 Open-Meteo 查询天气，可能暴露你所在城市等大致地理位置。也可以改为手动填写城市。'**
+  String get settingsWeatherAutoLocateBody;
+
+  /// No description provided for @settingsWeatherLocateSource.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'定位方式'**
+  String get settingsWeatherLocateSource;
+
+  /// No description provided for @settingsWeatherLocateSourceDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统定位优先时更精确；不可用时自动回退 IP'**
+  String get settingsWeatherLocateSourceDesc;
+
+  /// No description provided for @settingsWeatherLocateSourceIp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'IP 定位'**
+  String get settingsWeatherLocateSourceIp;
+
+  /// No description provided for @settingsWeatherLocateSourceSystem.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统定位'**
+  String get settingsWeatherLocateSourceSystem;
+
+  /// No description provided for @settingsWeatherLocateSystemTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'改用系统定位？'**
+  String get settingsWeatherLocateSystemTitle;
+
+  /// No description provided for @settingsWeatherLocateSystemBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统定位会调用操作系统的定位服务（Windows 定位 / Linux GeoClue）获取更精确的位置，仅用于查询天气。系统会弹出授权提示；不可用时自动回退 IP 定位。'**
+  String get settingsWeatherLocateSystemBody;
 
   /// No description provided for @settingsSearchWeatherSubtitle.
   ///

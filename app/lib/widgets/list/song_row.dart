@@ -12,8 +12,12 @@ import '../common/anim.dart';
 
 /// 红心匹配键：酷狗用歌曲 hash（搜索条目 id 退化为 hash、歌单条目可能为
 /// audio_id，不统一），网易云用 track.id（与 LikeController 保持一致）。
-String songLikeKey(Track t) =>
-    t.source == 'kugou' ? (t.kugou?.hash ?? t.id) : t.id;
+/// **酷狗 hash 统一转小写**：mobilecdn 搜索返回小写 hash，而「我喜欢」
+/// 歌单（v4/get_list_all_file）存大写——大小写敏感 contains 会导致
+/// 已收藏歌曲在搜索中误标为非红心（对齐 enrichKugouHashes 的 toLowerCase）。
+String songLikeKey(Track t) => t.source == 'kugou'
+    ? (t.kugou?.hash ?? t.id).toLowerCase()
+    : t.id;
 
 /// 行高（与 [SongList] 表头高度对齐，行组件内部使用）。
 const double _rowHeight = 68.0;
@@ -218,7 +222,7 @@ class _SongRowState extends ConsumerState<SongRow> {
                                   // 付费角标（VIP / EP；强迫症预设可隐藏）
                                   if (!prefs.hideVipTag && item.fee > 0)
                                     Padding(
-                                      padding: const EdgeInsets.only(left: 6),
+                                      padding: const EdgeInsets.only(left: 8),
                                       child: _Badge(
                                         label: item.fee == 1 ? 'VIP' : 'EP',
                                         textColor: const Color(0xFFE55B5B),
@@ -230,7 +234,7 @@ class _SongRowState extends ConsumerState<SongRow> {
                                   // 原唱角标（酷狗 IsOriginal；跟随音质标签开关）
                                   if (!prefs.hideQualityTag && item.isOriginal)
                                     Padding(
-                                      padding: const EdgeInsets.only(left: 6),
+                                      padding: const EdgeInsets.only(left: 8),
                                       child: _Badge(
                                         label: l10n.commonOriginal,
                                         textColor: Colors.white,
@@ -242,7 +246,7 @@ class _SongRowState extends ConsumerState<SongRow> {
                                   if (!prefs.hideQualityTag &&
                                       bestQuality != null)
                                     Padding(
-                                      padding: const EdgeInsets.only(left: 6),
+                                      padding: const EdgeInsets.only(left: 8),
                                       child: _Badge(
                                         label: bestQuality.label,
                                         textColor: bestQuality.lossless
@@ -271,8 +275,10 @@ class _SongRowState extends ConsumerState<SongRow> {
                       ],
                     ),
                   ),
-                  // 专辑
-                  if (widget.showAlbum)
+                  // 专辑（信息列与专辑列之间留 16px，避免歌手/音质标
+                  // 过长时过度贴近专辑列）
+                  if (widget.showAlbum) ...[
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Text(
                         item.album?.name.isNotEmpty == true
@@ -287,6 +293,7 @@ class _SongRowState extends ConsumerState<SongRow> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                  ],
                   const SizedBox(width: 28),
                   // 时长
                   if (widget.showDuration)
@@ -579,8 +586,11 @@ class _Badge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 9.5,
-          height: 1,
+          // fontSize 10 + height 1.2 → 文字行盒 12px，徽标总高约 15px，
+          // 与副标题歌手文本（bodySmall 12px × 1.33 ≈ 16px 行盒）中心对齐，
+          // 视觉偏差从 ~1.75px 降到 ~0.5px（原 9.5px/height 1 徽标明显偏小）
+          fontSize: 10,
+          height: 1.2,
           fontWeight: FontWeight.w600,
           color: textColor,
         ),

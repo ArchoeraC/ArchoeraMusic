@@ -329,6 +329,23 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get searchHistory => '搜索历史';
+
+  @override
+  String get searchHistoryClear => '清空';
+
+  @override
+  String get searchHistoryEmpty => '暂无搜索历史';
+
+  @override
+  String get searchHot => '热搜';
+
+  @override
+  String searchQuick(Object query) {
+    return '搜索“$query”';
+  }
+
+  @override
   String get sidebarBackHome => '返回首页';
 
   @override
@@ -983,6 +1000,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playerBarCollapsePlayer => '收起播放器';
+
+  @override
+  String get playerBarExitFullscreen => '退出全屏';
+
+  @override
+  String get playerBarFullscreen => '全屏';
 
   @override
   String get playerBarHideLyrics => '隐藏歌词';
@@ -1896,6 +1919,52 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsUserDbLabel => '用户库路径';
+
+  @override
+  String get settingsHistoryDb => '播放历史数据库';
+
+  @override
+  String get settingsHistoryDbLabel => '历史库路径';
+
+  @override
+  String get settingsHistorySection => '播放历史';
+
+  @override
+  String get settingsHistoryNote =>
+      '播放历史独立存储于 history.db（与曲库分库）。关闭记录后不再新增，已有数据保留；不限制条数会持续占用磁盘并可能拖慢历史页加载。';
+
+  @override
+  String get settingsHistoryEnabled => '记录播放历史';
+
+  @override
+  String get settingsHistoryEnabledOn => '正在记录，播放成功后自动写入';
+
+  @override
+  String get settingsHistoryEnabledOff => '已暂停记录，历史数据保留';
+
+  @override
+  String get settingsHistoryLimit => '历史条数上限';
+
+  @override
+  String settingsHistoryLimitOn(Object count) {
+    return '最多 $count 条';
+  }
+
+  @override
+  String get settingsHistoryLimitUnlimited => '不限制';
+
+  @override
+  String get settingsHistoryNoLimitConfirmTitle => '取消条数上限？';
+
+  @override
+  String get settingsHistoryNoLimitConfirmDesc =>
+      '不限制时播放历史可无限制增长，持续占用磁盘空间，并可能拖慢历史页加载与应用响应。确认取消上限？';
+
+  @override
+  String get settingsHistoryNoLimitConfirm => '仍然不限制';
+
+  @override
+  String get settingsHistoryStats => '历史数据统计';
 
   @override
   String get settingsCopy => '复制';
@@ -2730,7 +2799,43 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsWeatherNote =>
-      '隐私说明：天气数据来自 Open-Meteo（免费、无需密钥）。开启「自动定位」时，本机 IP 会发送至 ip-api.com 换取大致位置，仅用于查询天气、不落盘。天气组件与定位默认均关闭。';
+      '隐私说明：天气数据来自 Open-Meteo（免费、无需密钥）。开启「自动定位」时，本机 IP 会发送至 ipwho.is 换取大致位置，仅用于查询天气、不落盘。天气组件与定位默认均关闭。';
+
+  @override
+  String get settingsWeatherPrivacyTitle => '启用天气组件？';
+
+  @override
+  String get settingsWeatherPrivacyBody =>
+      '开启后，应用会向第三方天气服务 Open-Meteo 请求数据。手动城市模式下仅发送你填写的城市名，不会上传其他个人信息。';
+
+  @override
+  String get settingsWeatherPrivacyEnable => '启用';
+
+  @override
+  String get settingsWeatherAutoLocateTitle => '启用自动定位？';
+
+  @override
+  String get settingsWeatherAutoLocateBody =>
+      '自动定位通过 ipwho.is 基于本机网络出口 IP 获取大致位置，并把坐标发送给 Open-Meteo 查询天气，可能暴露你所在城市等大致地理位置。也可以改为手动填写城市。';
+
+  @override
+  String get settingsWeatherLocateSource => '定位方式';
+
+  @override
+  String get settingsWeatherLocateSourceDesc => '系统定位优先时更精确；不可用时自动回退 IP';
+
+  @override
+  String get settingsWeatherLocateSourceIp => 'IP 定位';
+
+  @override
+  String get settingsWeatherLocateSourceSystem => '系统定位';
+
+  @override
+  String get settingsWeatherLocateSystemTitle => '改用系统定位？';
+
+  @override
+  String get settingsWeatherLocateSystemBody =>
+      '系统定位会调用操作系统的定位服务（Windows 定位 / Linux GeoClue）获取更精确的位置，仅用于查询天气。系统会弹出授权提示；不可用时自动回退 IP 定位。';
 
   @override
   String get settingsSearchWeatherSubtitle => '顶栏显示微型天气组件（图标 + 温度）';
@@ -3454,6 +3559,23 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
+  String get searchHistory => '搜索历史';
+
+  @override
+  String get searchHistoryClear => '清空';
+
+  @override
+  String get searchHistoryEmpty => '暂无搜索历史';
+
+  @override
+  String get searchHot => '热搜';
+
+  @override
+  String searchQuick(Object query) {
+    return '搜索“$query”';
+  }
+
+  @override
   String get sidebarBackHome => '返回首页';
 
   @override
@@ -4108,6 +4230,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get playerBarCollapsePlayer => '收起播放器';
+
+  @override
+  String get playerBarExitFullscreen => '退出全屏';
+
+  @override
+  String get playerBarFullscreen => '全屏';
 
   @override
   String get playerBarHideLyrics => '隐藏歌词';
@@ -5023,6 +5151,52 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsUserDbLabel => '用户库路径';
 
   @override
+  String get settingsHistoryDb => '播放历史数据库';
+
+  @override
+  String get settingsHistoryDbLabel => '历史库路径';
+
+  @override
+  String get settingsHistorySection => '播放历史';
+
+  @override
+  String get settingsHistoryNote =>
+      '播放历史独立存储于 history.db（与曲库分库）。关闭记录后不再新增，已有数据保留；不限制条数会持续占用磁盘并可能拖慢历史页加载。';
+
+  @override
+  String get settingsHistoryEnabled => '记录播放历史';
+
+  @override
+  String get settingsHistoryEnabledOn => '正在记录，播放成功后自动写入';
+
+  @override
+  String get settingsHistoryEnabledOff => '已暂停记录，历史数据保留';
+
+  @override
+  String get settingsHistoryLimit => '历史条数上限';
+
+  @override
+  String settingsHistoryLimitOn(Object count) {
+    return '最多 $count 条';
+  }
+
+  @override
+  String get settingsHistoryLimitUnlimited => '不限制';
+
+  @override
+  String get settingsHistoryNoLimitConfirmTitle => '取消条数上限？';
+
+  @override
+  String get settingsHistoryNoLimitConfirmDesc =>
+      '不限制时播放历史可无限制增长，持续占用磁盘空间，并可能拖慢历史页加载与应用响应。确认取消上限？';
+
+  @override
+  String get settingsHistoryNoLimitConfirm => '仍然不限制';
+
+  @override
+  String get settingsHistoryStats => '历史数据统计';
+
+  @override
   String get settingsCopy => '复制';
 
   @override
@@ -5855,7 +6029,43 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsWeatherNote =>
-      '隐私说明：天气数据来自 Open-Meteo（免费、无需密钥）。开启「自动定位」时，本机 IP 会发送至 ip-api.com 换取大致位置，仅用于查询天气、不落盘。天气组件与定位默认均关闭。';
+      '隐私说明：天气数据来自 Open-Meteo（免费、无需密钥）。开启「自动定位」时，本机 IP 会发送至 ipwho.is 换取大致位置，仅用于查询天气、不落盘。天气组件与定位默认均关闭。';
+
+  @override
+  String get settingsWeatherPrivacyTitle => '启用天气组件？';
+
+  @override
+  String get settingsWeatherPrivacyBody =>
+      '开启后，应用会向第三方天气服务 Open-Meteo 请求数据。手动城市模式下仅发送你填写的城市名，不会上传其他个人信息。';
+
+  @override
+  String get settingsWeatherPrivacyEnable => '启用';
+
+  @override
+  String get settingsWeatherAutoLocateTitle => '启用自动定位？';
+
+  @override
+  String get settingsWeatherAutoLocateBody =>
+      '自动定位通过 ipwho.is 基于本机网络出口 IP 获取大致位置，并把坐标发送给 Open-Meteo 查询天气，可能暴露你所在城市等大致地理位置。也可以改为手动填写城市。';
+
+  @override
+  String get settingsWeatherLocateSource => '定位方式';
+
+  @override
+  String get settingsWeatherLocateSourceDesc => '系统定位优先时更精确；不可用时自动回退 IP';
+
+  @override
+  String get settingsWeatherLocateSourceIp => 'IP 定位';
+
+  @override
+  String get settingsWeatherLocateSourceSystem => '系统定位';
+
+  @override
+  String get settingsWeatherLocateSystemTitle => '改用系统定位？';
+
+  @override
+  String get settingsWeatherLocateSystemBody =>
+      '系统定位会调用操作系统的定位服务（Windows 定位 / Linux GeoClue）获取更精确的位置，仅用于查询天气。系统会弹出授权提示；不可用时自动回退 IP 定位。';
 
   @override
   String get settingsSearchWeatherSubtitle => '顶栏显示微型天气组件（图标 + 温度）';
@@ -6579,6 +6789,23 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get searchHistory => '搜尋歷史';
+
+  @override
+  String get searchHistoryClear => '清空';
+
+  @override
+  String get searchHistoryEmpty => '暫無搜尋歷史';
+
+  @override
+  String get searchHot => '熱搜';
+
+  @override
+  String searchQuick(Object query) {
+    return '搜尋「$query」';
+  }
+
+  @override
   String get sidebarBackHome => '返回首頁';
 
   @override
@@ -7233,6 +7460,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get playerBarCollapsePlayer => '收起播放器';
+
+  @override
+  String get playerBarExitFullscreen => '退出全螢幕';
+
+  @override
+  String get playerBarFullscreen => '全螢幕';
 
   @override
   String get playerBarHideLyrics => '隱藏歌詞';
@@ -8149,6 +8382,52 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsUserDbLabel => '使用者庫路徑';
 
   @override
+  String get settingsHistoryDb => '播放歷史資料庫';
+
+  @override
+  String get settingsHistoryDbLabel => '歷史庫路徑';
+
+  @override
+  String get settingsHistorySection => '播放歷史';
+
+  @override
+  String get settingsHistoryNote =>
+      '播放歷史獨立儲存於 history.db（與曲庫分庫）。關閉記錄後不再新增，既有資料保留；不限制筆數會持續佔用磁碟並可能拖慢歷史頁載入。';
+
+  @override
+  String get settingsHistoryEnabled => '記錄播放歷史';
+
+  @override
+  String get settingsHistoryEnabledOn => '記錄中，播放成功後自動寫入';
+
+  @override
+  String get settingsHistoryEnabledOff => '已暫停記錄，歷史資料保留';
+
+  @override
+  String get settingsHistoryLimit => '歷史筆數上限';
+
+  @override
+  String settingsHistoryLimitOn(Object count) {
+    return '最多 $count 筆';
+  }
+
+  @override
+  String get settingsHistoryLimitUnlimited => '不限制';
+
+  @override
+  String get settingsHistoryNoLimitConfirmTitle => '取消筆數上限？';
+
+  @override
+  String get settingsHistoryNoLimitConfirmDesc =>
+      '不限制時播放歷史可無限制增長，持續佔用磁碟空間，並可能拖慢歷史頁載入與應用程式回應。確認取消上限？';
+
+  @override
+  String get settingsHistoryNoLimitConfirm => '仍然不限制';
+
+  @override
+  String get settingsHistoryStats => '歷史資料統計';
+
+  @override
   String get settingsCopy => '複製';
 
   @override
@@ -8981,7 +9260,43 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsWeatherNote =>
-      '隱私說明：天氣資料來自 Open-Meteo（免費、無需金鑰）。開啟「自動定位」時，本機 IP 會傳送至 ip-api.com 換取大致位置，僅用於查詢天氣、不落盤。天氣元件與定位預設均關閉。';
+      '隱私說明：天氣資料來自 Open-Meteo（免費、無需金鑰）。開啟「自動定位」時，本機 IP 會傳送至 ipwho.is 換取大致位置，僅用於查詢天氣、不落盤。天氣元件與定位預設均關閉。';
+
+  @override
+  String get settingsWeatherPrivacyTitle => '啟用天氣元件？';
+
+  @override
+  String get settingsWeatherPrivacyBody =>
+      '開啟後，應用程式會向第三方天氣服務 Open-Meteo 請求資料。手動城市模式下僅傳送你填寫的城市名稱，不會上傳其他個人資訊。';
+
+  @override
+  String get settingsWeatherPrivacyEnable => '啟用';
+
+  @override
+  String get settingsWeatherAutoLocateTitle => '啟用自動定位？';
+
+  @override
+  String get settingsWeatherAutoLocateBody =>
+      '自動定位透過 ipwho.is 根據本機網路出口 IP 取得大致位置，並把座標傳送給 Open-Meteo 查詢天氣，可能暴露你所在城市等大致地理位置。也可以改為手動填寫城市。';
+
+  @override
+  String get settingsWeatherLocateSource => '定位方式';
+
+  @override
+  String get settingsWeatherLocateSourceDesc => '系統定位優先時更精確；不可用時自動回退 IP';
+
+  @override
+  String get settingsWeatherLocateSourceIp => 'IP 定位';
+
+  @override
+  String get settingsWeatherLocateSourceSystem => '系統定位';
+
+  @override
+  String get settingsWeatherLocateSystemTitle => '改用系統定位？';
+
+  @override
+  String get settingsWeatherLocateSystemBody =>
+      '系統定位會呼叫作業系統的定位服務（Windows 定位 / Linux GeoClue）取得更精確的位置，僅用於查詢天氣。系統會彈出授權提示；不可用時自動回退 IP 定位。';
 
   @override
   String get settingsSearchWeatherSubtitle => '頂欄顯示微型天氣元件（圖示 + 溫度）';

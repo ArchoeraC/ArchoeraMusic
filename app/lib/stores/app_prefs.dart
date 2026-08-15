@@ -8,21 +8,25 @@ import 'data_dir.dart';
 import 'prefs_app.dart';
 import 'prefs_appearance.dart';
 import 'prefs_download.dart';
+import 'prefs_history.dart';
 import 'prefs_lyrics.dart';
 import 'prefs_player.dart';
 import 'prefs_power.dart';
 import 'prefs_preset.dart';
 import 'prefs_scrape.dart';
+import 'prefs_search.dart';
 import 'prefs_security.dart';
 
 export 'prefs_app.dart';
 export 'prefs_appearance.dart';
 export 'prefs_download.dart';
+export 'prefs_history.dart';
 export 'prefs_lyrics.dart';
 export 'prefs_player.dart';
 export 'prefs_power.dart';
 export 'prefs_preset.dart';
 export 'prefs_scrape.dart';
+export 'prefs_search.dart';
 export 'prefs_security.dart';
 
 /// 应用偏好（轻量 JSON 文件持久化，存数据目录 `prefs.json`）。
@@ -135,6 +139,32 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置播放音量（0~1；退出确认弹窗的 duck 不落盘）。
   void setVolume(double value) {
     state = state.copyWithVolume(value);
+    state.save();
+  }
+
+  /// 记录一条搜索历史（去重置顶、超上限裁尾部；对齐原项目 data store）。
+  void addSearchHistory(String keyword) {
+    final word = keyword.trim();
+    if (word.isEmpty) return;
+    final next = [word, ...state.searchHistory.where((e) => e != word)];
+    final trimmed = next.length > maxSearchHistory
+        ? next.sublist(0, maxSearchHistory)
+        : next;
+    state = state.copyWithSearchHistory(trimmed);
+    state.save();
+  }
+
+  /// 移除单条搜索历史。
+  void removeSearchHistory(String keyword) {
+    final next = state.searchHistory.where((e) => e != keyword).toList();
+    if (next.length == state.searchHistory.length) return;
+    state = state.copyWithSearchHistory(next);
+    state.save();
+  }
+
+  /// 清空全部搜索历史。
+  void clearSearchHistory() {
+    state = state.copyWithSearchHistory(const []);
     state.save();
   }
 
@@ -259,6 +289,13 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置自动定位来源（`ip` 按出口 IP / `system` 系统定位优先，
+  /// 失败自动回退 IP；非法值不写入）。
+  void setWeatherLocateSource(String value) {
+    state = state.copyWithWeather(locateSource: value);
+    state.save();
+  }
+
   /// 设置播放器歌词样式。
   void setLyricStyle({
     double? fontSize,
@@ -325,6 +362,20 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 标记首次启动「加密方案选择」对话框已展示（一次性）。
   void setSchemeDialogShown(bool value) {
     state = state.copyWithSchemeDialogShown(value);
+    state.save();
+  }
+
+  /// 设置播放历史记录开关（关闭 = 暂停记录，已有数据保留，历史页仍可
+  /// 查看；重新开启后继续记录）。
+  void setHistoryEnabled(bool value) {
+    state = state.copyWithHistory(enabled: value);
+    state.save();
+  }
+
+  /// 设置播放历史条数上限（null = 不限制，落盘 0；由设置页在变更后
+  /// 调用 HistoryStore.trim 立即裁剪，本处只持久化偏好）。
+  void setHistoryLimit(int? value) {
+    state = state.copyWithHistory(limit: value);
     state.save();
   }
 
