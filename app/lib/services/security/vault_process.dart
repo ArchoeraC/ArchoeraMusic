@@ -453,8 +453,14 @@ class VaultProcess {
   static String _markerFile(String dataDir) => '$dataDir/vault.marker';
 
   /// spawn 方声明父进程白名单（血缘校验，vault 侧据此拒绝独立/脚本调用）。
+  /// Windows 下 [Platform.resolvedExecutable] 末段带 `.exe`，而 .NET 侧
+  /// `Process.GetProcessById(ppid).ProcessName` 返回**不含扩展名**的可执行名
+  /// → 必须去掉 `.exe` 才能配对（2026-08-15 修复实录）。
   static String _parentNames() {
-    final me = Platform.resolvedExecutable.split(Platform.pathSeparator).last;
+    final me = Platform.resolvedExecutable
+        .split(Platform.pathSeparator)
+        .last
+        .replaceAll(RegExp(r'\.exe$', caseSensitive: false), '');
     return [me, 'flutter_tester', 'dart', 'dart_tests', 'flutter']
         .where((n) => n.isNotEmpty)
         .join(',');
@@ -629,8 +635,13 @@ class _VaultSession {
       throw VaultException('vault 进程启动失败：${e.message}');
     }
     final s = _VaultSession._(p, dataDir);
-    s._reader.attach(
-        p.stdout.transform(utf8.decoder).transform(const LineSplitter()));
+    // 宽松 UTF-8 解码（allowMalformed）：vault 侧已强制 UTF-8 输出，但若
+    // 混入旧版/非 UTF-8 二进制（如 wine 下 GBK 错误消息），严格解码会抛错
+    // 导致协议行丢失 → 握手超时 → fail-closed 崩溃（2026-08-15 修复实录）。
+    // 宽松模式把非法字节替换为 U+FFFD，行结构（err/ok 前缀与错误码）不受影响。
+    s._reader.attach(p.stdout
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .transform(const LineSplitter()));
     // stderr 仅作日志（不解析协议）
     p.stderr.transform(utf8.decoder).listen((l) {
       stderr.write('[vault] $l');

@@ -43,6 +43,21 @@ using Archoera.Vault;
 const int ExitOk = 0;
 const int ExitErr = 1;
 
+// Windows（含 wine 默认代码页 936/GBK）下，.NET 控制台按系统代码页编码输出
+// 中文错误消息 → 主进程（Dart）按严格 UTF-8 解码即抛异常 → 协议行丢失 →
+// 握手超时 → fail-closed 崩溃（2026-08-15 修复实录）。协议文本统一 UTF-8：
+// 直接以原始句柄构造 UTF-8 流（AutoFlush），不依赖 SetConsoleOutputCP 的
+// 「附加控制台」限制；stdin 同步置 UTF-8，保证 v2 口令（可能含非 ASCII）按
+// UTF-8 读取一致。
+if (OperatingSystem.IsWindows())
+{
+    Console.SetOut(new StreamWriter(Console.OpenStandardOutput(),
+        new UTF8Encoding(false)) { AutoFlush = true });
+    Console.SetError(new StreamWriter(Console.OpenStandardError(),
+        new UTF8Encoding(false)) { AutoFlush = true });
+    Console.SetIn(new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false)));
+}
+
 if (args.Length == 0)
 {
     Console.WriteLine("err 缺少命令");
