@@ -1,6 +1,85 @@
 part of 'netease_api.dart';
 
-/// 搜索域（cloudsearch）：歌曲 / 专辑 / 歌手 / 歌单。
+/// 热搜词条（对齐原项目 HotSearchItem）。
+class HotSearchItem {
+  const HotSearchItem({
+    required this.keyword,
+    this.content,
+    this.iconUrl,
+    this.score,
+  });
+
+  final String keyword;
+
+  /// 描述/补充（如「本周上升」）。
+  final String? content;
+
+  /// 图标 url（如品牌图标）。
+  final String? iconUrl;
+
+  /// 热度。
+  final int? score;
+}
+
+/// 搜索建议-歌曲（对齐原项目 SuggestSongItem）。
+class SuggestSongItem {
+  const SuggestSongItem({
+    required this.id,
+    required this.name,
+    this.artist,
+    this.album,
+    this.source = 'netease',
+  });
+
+  final String id;
+  final String name;
+
+  /// 多个歌手用 " / " 连接。
+  final String? artist;
+  final String? album;
+
+  /// 来源平台（'netease' / 'kugou'；酷狗建议条目只有 songid，点击播放需
+  /// 按其 source 分发解析——网易云用 id 直取，酷狗先经搜索补 hash）。
+  final String source;
+}
+
+/// 搜索建议-简单条目（歌手 / 专辑 / 歌单，对齐原项目 SuggestSimpleItem）。
+class SuggestSimpleItem {
+  const SuggestSimpleItem({
+    required this.id,
+    required this.name,
+    this.subtitle,
+    this.source = 'netease',
+  });
+
+  final String id;
+  final String name;
+  final String? subtitle;
+
+  /// 来源平台（'netease' / 'kugou'；酷狗专辑条目点击需按其 source 分发
+  /// 到酷狗专辑详情弹窗——albumid 不能用于网易云专辑接口）。
+  final String source;
+}
+
+/// 搜索建议（分类：歌曲 / 专辑 / 歌手 / 歌单）。
+class SuggestData {
+  const SuggestData({
+    this.songs = const [],
+    this.albums = const [],
+    this.artists = const [],
+    this.playlists = const [],
+  });
+
+  final List<SuggestSongItem> songs;
+  final List<SuggestSimpleItem> albums;
+  final List<SuggestSimpleItem> artists;
+  final List<SuggestSimpleItem> playlists;
+
+  bool get isEmpty =>
+      songs.isEmpty && albums.isEmpty && artists.isEmpty && playlists.isEmpty;
+}
+
+/// 搜索域（cloudsearch）：歌曲 / 专辑 / 歌手 / 歌单 + 热搜 / 建议。
 mixin NeteaseSearchApi on NeteaseApiBase {
   /// cloudsearch type 编码（对齐原项目）。
   static const _typeSongs = 1;
@@ -149,5 +228,76 @@ mixin NeteaseSearchApi on NeteaseApiBase {
         trackCount: (playlist['trackCount'] as num?)?.toInt() ?? 0,
       );
     }).toList();
+  }
+
+  /// 网易云热搜（search_hot_detail；仅网易云，对齐原项目 getHotSearches，
+  /// 按热度排序，过滤空关键词）。接口失败返回空列表。
+  Future<List<HotSearchItem>> searchHot() async {
+    final body = await _call('search_hot_detail', const {});
+    final data = body?['data'];
+    if (data is! List) return const [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .where((row) => (row['searchWord']?.toString() ?? '').isNotEmpty)
+        .map((row) => HotSearchItem(
+              keyword: row['searchWord'].toString(),
+              content: row['content']?.toString(),
+              iconUrl: row['iconUrl']?.toString(),
+              score: (row['score'] as num?)?.toInt(),
+            ))
+        .toList();
+  }
+
+  /// 网易云搜索建议（search_suggest web；对齐原项目 getSearchSuggest，
+  /// 分类歌曲 / 专辑 / 歌手 / 歌单）。关键词空或失败返回空集。
+  Future<SuggestData> searchSuggest(String keyword) async {
+    final word = keyword.trim();
+    if (word.isEmpty) return const SuggestData();
+    final body = await _call('search_suggest', {'keywords': word, 'type': 'web'});
+    final result = body?['result'];
+    if (result is! Map<String, dynamic>) return const SuggestData();
+    final songs = (result['songs'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map((song) {
+      final artists = (song['artists'] as List? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map((a) => a['name']?.toString() ?? '')
+          .where((n) => n.isNotEmpty)
+          .join(' / ');
+      return SuggestSongItem(
+        id: song['id'].toString(),
+        name: song['name']?.toString() ?? '',
+        artist: artists.isEmpty ? null : artists,
+        album: song['album']?['name']?.toString(),
+      );
+    }).toList();
+    final albums = (result['albums'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map((album) => SuggestSimpleItem(
+              id: album['id'].toString(),
+              name: album['name']?.toString() ?? '',
+              subtitle: album['artist']?['name']?.toString(),
+            ))
+        .toList();
+    final artists = (result['artists'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map((artist) => SuggestSimpleItem(
+              id: artist['id'].toString(),
+              name: artist['name']?.toString() ?? '',
+            ))
+        .toList();
+    final playlists = (result['playlists'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map((playlist) => SuggestSimpleItem(
+              id: playlist['id'].toString(),
+              name: playlist['name']?.toString() ?? '',
+            ))
+        .toList();
+    return SuggestData(
+      songs: songs,
+      albums: albums,
+      artists: artists,
+      playlists: playlists,
+    );
   }
 }

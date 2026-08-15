@@ -339,6 +339,23 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get searchHistory => 'Suchverlauf';
+
+  @override
+  String get searchHistoryClear => 'Leeren';
+
+  @override
+  String get searchHistoryEmpty => 'Kein Suchverlauf';
+
+  @override
+  String get searchHot => 'Trends';
+
+  @override
+  String searchQuick(Object query) {
+    return '„$query“ suchen';
+  }
+
+  @override
   String get sidebarBackHome => 'Zurück zur Startseite';
 
   @override
@@ -1027,7 +1044,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerBarCollapsePlayer => 'Player minimieren';
 
   @override
-  String get playerBarHideLyrics => 'Songtext ausblenden';
+  String get playerBarExitFullscreen => 'Vollbild beenden';
+
+  @override
+  String get playerBarFullscreen => 'Vollbild';
+
+  @override
+  String get playerBarHideLyrics => 'Text ausblenden';
 
   @override
   String get playerBarShowLyrics => 'Songtext anzeigen';
@@ -1990,6 +2013,54 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsUserDbLabel => 'Benutzerdatenpfad';
 
   @override
+  String get settingsHistoryDb => 'Wiedergabeverlauf-Datenbank';
+
+  @override
+  String get settingsHistoryDbLabel => 'Pfad der Verlaufsdatenbank';
+
+  @override
+  String get settingsHistorySection => 'Wiedergabeverlauf';
+
+  @override
+  String get settingsHistoryNote =>
+      'Der Wiedergabeverlauf wird in einer eigenen history.db gespeichert (getrennt von der Musikbibliothek). Beim Deaktivieren bleiben vorhandene Einträge erhalten; ohne Begrenzung wächst die Datenbank unbegrenzt und kann die Verlaufsseite verlangsamen.';
+
+  @override
+  String get settingsHistoryEnabled => 'Wiedergabeverlauf aufzeichnen';
+
+  @override
+  String get settingsHistoryEnabledOn =>
+      'Aufzeichnung aktiv — Einträge nach Wiedergabe schreiben';
+
+  @override
+  String get settingsHistoryEnabledOff =>
+      'Pausiert — vorhandene Einträge bleiben erhalten';
+
+  @override
+  String get settingsHistoryLimit => 'Begrenzung der Verlaufseinträge';
+
+  @override
+  String settingsHistoryLimitOn(Object count) {
+    return 'Bis zu $count Einträge';
+  }
+
+  @override
+  String get settingsHistoryLimitUnlimited => 'Unbegrenzt';
+
+  @override
+  String get settingsHistoryNoLimitConfirmTitle => 'Begrenzung entfernen?';
+
+  @override
+  String get settingsHistoryNoLimitConfirmDesc =>
+      'Ohne Begrenzung kann der Verlauf unbegrenzt wachsen, Speicherplatz belegen und die Verlaufsseite sowie die App verlangsamen. Trotzdem entfernen?';
+
+  @override
+  String get settingsHistoryNoLimitConfirm => 'Unbegrenzt lassen';
+
+  @override
+  String get settingsHistoryStats => 'Verlaufsdaten';
+
+  @override
   String get settingsCopy => 'Kopieren';
 
   @override
@@ -2885,7 +2956,45 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsWeatherNote =>
-      'Datenschutz: Wetterdaten von Open-Meteo (kostenlos, kein API-Schlüssel). Bei automatischer Ortung wird die IP an ip-api.com gesendet, nur zur Wetterabfrage, nicht gespeichert. Widget und Ortung sind standardmäßig deaktiviert.';
+      'Datenschutz: Wetterdaten von Open-Meteo (kostenlos, kein API-Schlüssel). Bei automatischer Ortung wird die IP an ipwho.is gesendet, nur zur Wetterabfrage, nicht gespeichert. Widget und Ortung sind standardmäßig deaktiviert.';
+
+  @override
+  String get settingsWeatherPrivacyTitle => 'Wetter-Widget aktivieren?';
+
+  @override
+  String get settingsWeatherPrivacyBody =>
+      'Beim Aktivieren werden Anfragen an den Drittanbieter-Wetterdienst Open-Meteo gesendet. Im manuellen Stadtmodus wird nur die von Ihnen eingegebene Stadt übertragen, keine weiteren persönlichen Daten.';
+
+  @override
+  String get settingsWeatherPrivacyEnable => 'Aktivieren';
+
+  @override
+  String get settingsWeatherAutoLocateTitle =>
+      'Automatische Ortung aktivieren?';
+
+  @override
+  String get settingsWeatherAutoLocateBody =>
+      'Die automatische Ortung ermittelt über ipwho.is eine ungefähre Position anhand der öffentlichen IP Ihres Netzwerks und sendet diese Koordinaten an Open-Meteo für die Wetterabfrage. Dabei könnte Ihre Stadt bzw. grobe Position sichtbar werden. Alternativ können Sie eine Stadt manuell eingeben.';
+
+  @override
+  String get settingsWeatherLocateSource => 'Ortungsquelle';
+
+  @override
+  String get settingsWeatherLocateSourceDesc =>
+      'Systemortung ist genauer, wenn verfügbar; sonst automatisch IP';
+
+  @override
+  String get settingsWeatherLocateSourceIp => 'IP-Ortung';
+
+  @override
+  String get settingsWeatherLocateSourceSystem => 'System';
+
+  @override
+  String get settingsWeatherLocateSystemTitle => 'Zur Systemortung wechseln?';
+
+  @override
+  String get settingsWeatherLocateSystemBody =>
+      'Die Systemortung nutzt den Ortungsdienst des Betriebssystems (Windows-Standort / Linux GeoClue) für eine genauere Position, nur für die Wetterabfrage. Das System fragt um Erlaubnis; bei Nichtverfügbarkeit wird automatisch auf IP zurückgegriffen.';
 
   @override
   String get settingsSearchWeatherSubtitle =>

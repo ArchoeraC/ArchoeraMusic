@@ -366,7 +366,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
               title: l10n.settingsWeather,
               subtitle: l10n.settingsWeatherDesc,
               value: prefs.weatherEnabled,
-              onChanged: notifier.setWeatherEnabled,
+              onChanged: (v) => _setWeatherEnabled(context, l10n, notifier, v),
             ),
             if (prefs.weatherEnabled) ...[
               SettingSwitchTile(
@@ -374,14 +374,124 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                 title: l10n.settingsWeatherAutoLocate,
                 subtitle: l10n.settingsWeatherAutoLocateDesc,
                 value: prefs.weatherAutoLocate,
-                onChanged: notifier.setWeatherAutoLocate,
+                onChanged: (v) =>
+                    _setWeatherAutoLocate(context, l10n, notifier, v),
               ),
+              if (prefs.weatherAutoLocate)
+                SettingTile(
+                  icon: Icons.gps_fixed_outlined,
+                  title: l10n.settingsWeatherLocateSource,
+                  subtitle: l10n.settingsWeatherLocateSourceDesc,
+                  trailing: SSegmented<String>(
+                    options: [
+                      SSegmentedOption('ip', l10n.settingsWeatherLocateSourceIp),
+                      SSegmentedOption(
+                        'system',
+                        l10n.settingsWeatherLocateSourceSystem,
+                      ),
+                    ],
+                    selected: prefs.weatherLocateSource,
+                    onChanged: (v) => _setWeatherLocateSource(
+                      context,
+                      l10n,
+                      notifier,
+                      v,
+                    ),
+                  ),
+                ),
               _weatherCityField(scheme, l10n, notifier),
             ],
           ],
         ),
       ],
     );
+  }
+
+  /// 开启天气组件：仅「关闭 → 开启」需隐私确认（第三方服务 Open-Meteo），
+  /// 关闭动作直接放行。
+  Future<void> _setWeatherEnabled(
+    BuildContext context,
+    AppLocalizations l10n,
+    AppPrefsNotifier notifier,
+    bool v,
+  ) async {
+    if (v &&
+        !(await _confirmPrivacy(
+      context,
+      l10n,
+      title: l10n.settingsWeatherPrivacyTitle,
+      body: l10n.settingsWeatherPrivacyBody,
+    ))) {
+      return;
+    }
+    notifier.setWeatherEnabled(v);
+  }
+
+  /// 开启自动定位：涉及网络出口 IP（ipwho.is）换取大致位置，需额外确认。
+  Future<void> _setWeatherAutoLocate(
+    BuildContext context,
+    AppLocalizations l10n,
+    AppPrefsNotifier notifier,
+    bool v,
+  ) async {
+    if (v &&
+        !(await _confirmPrivacy(
+      context,
+      l10n,
+      title: l10n.settingsWeatherAutoLocateTitle,
+      body: l10n.settingsWeatherAutoLocateBody,
+    ))) {
+      return;
+    }
+    notifier.setWeatherAutoLocate(v);
+  }
+
+  /// 切换定位方式：改「系统定位」涉及系统定位服务（更精确），需额外确认。
+  Future<void> _setWeatherLocateSource(
+    BuildContext context,
+    AppLocalizations l10n,
+    AppPrefsNotifier notifier,
+    String v,
+  ) async {
+    if (v == 'system' &&
+        ref.read(appPrefsProvider).weatherLocateSource != 'system' &&
+        !(await _confirmPrivacy(
+      context,
+      l10n,
+      title: l10n.settingsWeatherLocateSystemTitle,
+      body: l10n.settingsWeatherLocateSystemBody,
+    ))) {
+      return;
+    }
+    notifier.setWeatherLocateSource(v);
+  }
+
+  /// 隐私确认对话框（SDialog + 取消/启用）。
+  Future<bool> _confirmPrivacy(
+    BuildContext context,
+    AppLocalizations l10n, {
+    required String title,
+    required String body,
+  }) async {
+    final ok = await SDialog.show<bool>(
+      context,
+      title: title,
+      description: body,
+      child: const SizedBox.shrink(),
+      actions: [
+        SButton(
+          label: l10n.commonCancel,
+          variant: SButtonVariant.secondary,
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        SButton(
+          label: l10n.settingsWeatherPrivacyEnable,
+          variant: SButtonVariant.primary,
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
+    );
+    return ok ?? false;
   }
 
   /// 手动城市输入卡（填写后不再进行 IP 定位；回车保存）。
@@ -2092,6 +2202,15 @@ class _StorageSectionState extends ConsumerState<StorageSection> {
               trailing: SettingCopyButton(
                 value: '$dataDir/database/user.db',
                 label: l10n.settingsUserDbLabel,
+              ),
+            ),
+            SettingTile(
+              icon: Icons.history,
+              title: l10n.settingsHistoryDb,
+              subtitle: '$dataDir/database/history.db',
+              trailing: SettingCopyButton(
+                value: '$dataDir/database/history.db',
+                label: l10n.settingsHistoryDbLabel,
               ),
             ),
           ],

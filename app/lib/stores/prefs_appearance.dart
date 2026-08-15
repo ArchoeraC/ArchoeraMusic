@@ -21,6 +21,7 @@ const coverRadiusKey = 'appearance.coverRadius';
 const weatherEnabledKey = 'appearance.weatherEnabled';
 const weatherAutoLocateKey = 'appearance.weatherAutoLocate';
 const weatherCityKey = 'appearance.weatherCity';
+const weatherLocateSourceKey = 'appearance.weatherLocateSource';
 
 /// 外观域偏好：主题色/背景/动效/侧边栏/语言/字体/封面圆角。
 extension AppearancePrefs on AppPrefs {
@@ -114,6 +115,15 @@ extension AppearancePrefs on AppPrefs {
 
   /// 手动城市名（非空时不进行 IP 定位；null = 未设置）。
   String? get weatherCity => data[weatherCityKey] as String?;
+
+  /// 自动定位来源（仅「自动定位」开启时生效）：
+  /// - `ip`（默认）：按网络出口 IP（ipwho.is）换取大致位置；
+  /// - `system`：优先调用系统定位（Windows 定位 / Linux GeoClue），
+  ///   失败或不可用时自动回退 IP 定位。
+  String get weatherLocateSource {
+    final v = data[weatherLocateSourceKey];
+    return v == 'system' ? 'system' : 'ip';
+  }
 
   /// 设置自定义主色（null = 恢复默认亮蓝，**移除**落盘的自定义值）。
   ///
@@ -224,11 +234,16 @@ extension AppearancePrefs on AppPrefs {
         },
       );
 
-  /// 设置顶栏微型天气配置（组件开关 / 自动定位 / 手动城市）。
+  /// 设置顶栏微型天气配置（组件开关 / 自动定位 / 定位来源 / 手动城市）。
   ///
   /// [city] 为 null 时**移除**已落盘的城市（清除手动城市，避免旧值经
   /// `...data` 残留——与 copyWithAccent 相同的问题）。
-  AppPrefs copyWithWeather({bool? enabled, bool? autoLocate, String? city}) {
+  AppPrefs copyWithWeather({
+    bool? enabled,
+    bool? autoLocate,
+    String? city,
+    String? locateSource,
+  }) {
     final d = Map<String, dynamic>.of(data);
     if (city == null) {
       d.remove(weatherCityKey);
@@ -240,6 +255,8 @@ extension AppearancePrefs on AppPrefs {
         ...d,
         weatherEnabledKey: ?enabled,
         weatherAutoLocateKey: ?autoLocate,
+        if (locateSource == 'system' || locateSource == 'ip')
+          weatherLocateSourceKey: locateSource,
       },
     );
   }

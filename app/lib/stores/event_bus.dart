@@ -6,8 +6,10 @@ import 'dart:async';
 /// 各模块事件（播放状态 / 扫描进度 / FFT 等）emit 到总线，
 /// UI 层统一 `bus.on<T>()` 消费。
 class EventBus {
-  final StreamController<Object> _controller =
-      StreamController<Object>.broadcast(sync: true);
+  EventBus({bool sync = true})
+      : _controller = StreamController<Object>.broadcast(sync: sync);
+
+  final StreamController<Object> _controller;
 
   /// 全量事件流（调试用）。
   Stream<Object> get stream => _controller.stream;

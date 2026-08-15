@@ -467,6 +467,19 @@ class _SearchPageState extends ConsumerState<SearchPage>
     );
   }
 
+  /// 行内红心切换：失败提示登录（对齐「我喜欢」页 _toggleLike 语义；
+  /// 成功由 SongList 红心填充态即时反馈，不再 toast）。
+  Future<void> _toggleLike(Track track) async {
+    final controller = ref.read(likeControllerProvider);
+    final ok = await controller.toggle(track);
+    if (!mounted) return;
+    if (!ok) {
+      _toast(track.source == 'kugou'
+          ? context.l10n.toastLoginRequiredKugou
+          : context.l10n.toastLoginRequiredNetease);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -475,6 +488,11 @@ class _SearchPageState extends ConsumerState<SearchPage>
     final playingId = ref.watch(playbackProvider.select((s) => s.trackId));
     final isPlaying = ref.watch(playbackProvider.select((s) => s.playing));
     final coverRadius = ref.watch(appPrefsProvider).coverRadius;
+    // 红心集合：聚合搜索混平台结果，按行键合并（网易云 id + 酷狗 hash，
+    // 与 songLikeKey / LikeController 一致）——修复「已收藏歌曲在搜索结果
+    // 中显示为非红心」（此前 SongList 未收到 likedIds）。
+    final like = ref.watch(likeControllerProvider);
+    final likedIds = {...like.idsFor('netease'), ...like.idsFor('kugou')};
 
     return Scaffold(
       body: Column(
@@ -568,6 +586,8 @@ class _SearchPageState extends ConsumerState<SearchPage>
                         hasMore: _songs.hasMore,
                         loadingMore: _songs.loadingMore,
                         showSource: _platform == 'all',
+                        likedIds: likedIds,
+                        onToggleLike: _toggleLike,
                         onContextMenu: _onTrackMenu,
                         onReachBottom: () => _fetch(append: true),
                       ),

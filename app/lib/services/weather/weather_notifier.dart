@@ -24,7 +24,13 @@ class WeatherNotifier extends ChangeNotifier {
   String? error;
 
   /// 拉取当前天气。由 UI 传入位置配置（来自偏好设置）。
-  Future<void> refresh({required bool autoLocate, String? city}) async {
+  ///
+  /// [locateSource]：`ip` 按出口 IP；`system` 优先系统定位（失败回退 IP）。
+  Future<void> refresh({
+    required bool autoLocate,
+    String? city,
+    String locateSource = 'ip',
+  }) async {
     // 未配置位置：不发请求，提示去设置（默认定位关闭的兜底）
     if (!autoLocate && (city == null || city.trim().isEmpty)) {
       now = null;
@@ -37,7 +43,11 @@ class WeatherNotifier extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      now = await fetchWeather(autoLocate: autoLocate, city: city);
+      now = await fetchWeather(
+        autoLocate: autoLocate,
+        city: city,
+        locateSource: locateSource,
+      );
     } catch (e) {
       now = null;
       error = '$e';

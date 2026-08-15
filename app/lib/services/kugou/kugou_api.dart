@@ -17,7 +17,14 @@ import 'package:flutter/foundation.dart';
 
 import '../../apis/runtime.dart';
 import '../liked/liked_cache.dart';
-import '../netease/netease_api.dart' show CoverItem, SearchResult;
+import '../netease/netease_api.dart'
+    show
+        CoverItem,
+        HotSearchItem,
+        SearchResult,
+        SuggestData,
+        SuggestSimpleItem,
+        SuggestSongItem;
 import '../netease/track.dart';
 import 'kugou_crypto.dart';
 import 'kugou_parse.dart';
@@ -318,7 +325,134 @@ class KugouApi extends ChangeNotifier {
     );
   }
 
-  // ─── 取 URL（音质切换） ───────────────────────────────────────────
+  // ─── 热搜 / 搜索建议（补全） ─────────────────────────────────────
+
+  /// 酷狗热搜（mobilecdn /api/v3/search/hot，公网无鉴权）。
+  ///
+  /// 返回 [HotSearchItem]（keyword 为热词，score 可能缺失）；接口失败抛
+  /// [KgApiException] 由调用方兜底静默。
+  Future<List<HotSearchItem>> searchHot({int count = 30}) async {
+    final uri = Uri.parse(kgSearchHotUrl).replace(
+      queryParameters: {'format': 'json', 'plat': '0', 'count': '$count'},
+    );
+    final body = await kgGet(uri);
+    final data = body is Map<String, dynamic> ? body['data'] : null;
+    final info = data is Map<String, dynamic> ? data['info'] : null;
+    if (info is! List) return const [];
+    return info
+        .whereType<Map<String, dynamic>>()
+        .where((row) => (row['keyword']?.toString() ?? '').isNotEmpty)
+        .map(
+          (row) => HotSearchItem(
+            keyword: row['keyword'].toString(),
+            score: (row['score'] as num?)?.toInt(),
+          ),
+        )
+        .toList();
+  }
+
+  /// 酷狗搜索建议（gateway /v2/getSearchTip，对齐 KuGouMusicApi
+  /// search_suggest.js：Android 签名 + `x-router: searchtip.kugou.com`）。
+  ///
+  /// 解析 `data.music_tip`（歌曲）与 `data.album_tip`（专辑）；建议条目
+  /// 只有 songid/name/singer/album_id，无 hash 与封面——歌曲点击播放需经
+  /// [suggestSongToTrack] 再解析。接口失败返回空 [SuggestData]。
+  Future<SuggestData> searchSuggest(String keyword) async {
+    final word = keyword.trim();
+    if (word.isEmpty) return const SuggestData();
+    final resp = await _gateway(
+      '/v2/getSearchTip',
+      method: 'GET',
+      query: {
+        'keyword': word,
+        'AlbumTipCount': 10,
+        'CorrectTipCount': 10,
+        'MVTipCount': 10,
+        'MusicTipCount': 10,
+        'radiotip': 1,
+      },
+      headers: {'x-router': 'searchtip.kugou.com'},
+    );
+    final data = resp is Map ? resp['data'] : null;
+    if (data is! Map) return const SuggestData();
+
+    final songs = <SuggestSongItem>[];
+    final musicTip = data['music_tip'];
+    if (musicTip is List) {
+      for (final m in musicTip.whereType<Map<String, dynamic>>()) {
+        final id = (m['songid'] ?? m['hash'] ?? '').toString();
+        final name = (m['name'] ?? '').toString().trim();
+        if (id.isEmpty || name.isEmpty) continue;
+        songs.add(
+          SuggestSongItem(
+            id: id,
+            name: name,
+            artist: (m['singer'] ?? '').toString().trim().isEmpty
+                ? null
+                : (m['singer'] ?? '').toString().trim(),
+            album: (m['album_name'] ?? '').toString().trim().isEmpty
+                ? null
+                : (m['album_name'] ?? '').toString().trim(),
+            source: 'kugou',
+          ),
+        );
+      }
+    }
+
+    final albums = <SuggestSimpleItem>[];
+    final albumTip = data['album_tip'];
+    if (albumTip is List) {
+      for (final a in albumTip.whereType<Map<String, dynamic>>()) {
+        final id = (a['albumid'] ?? a['album_id'] ?? a['id'] ?? '').toString();
+        final name = (a['albumname'] ?? a['album_name'] ?? '').toString().trim();
+        if (id.isEmpty || name.isEmpty) continue;
+        albums.add(
+          SuggestSimpleItem(
+            id: id,
+            name: name,
+            subtitle: (a['singername'] ?? a['singer'] ?? '').toString().trim(),
+            source: 'kugou',
+          ),
+        );
+      }
+    }
+    return SuggestData(songs: songs, albums: albums);
+  }
+
+  /// 把搜索建议歌曲（仅有 songid/name/singer，无 hash/封面）解析为完整
+  /// [Track]：按歌名快速 mobilecdn 搜索，名称 + 歌手匹配命中项。
+  ///
+  /// 命中即返回（含 hash 品质链与封面，可直接 [resolvePlayUrl] / 播放）；
+  /// 找不到返回 null。匹配策略：①歌名+歌手精确 → ②仅歌名 → ③首个结果。
+  Future<Track?> suggestSongToTrack(
+    String name, {
+    String? singer,
+  }) async {
+    final keyword = name.trim();
+    if (keyword.isEmpty) return null;
+    String norm(String s) => s.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+    final nn = norm(keyword);
+    final ns = norm(singer ?? '');
+    final result = await searchSongs(keyword, page: 1, limit: 20);
+    if (result.items.isEmpty) return null;
+    Track? best;
+    for (final t in result.items) {
+      if (norm(t.title) == nn &&
+          (ns.isEmpty || norm(t.artistNames) == ns)) {
+        best = t;
+        break;
+      }
+    }
+    if (best == null) {
+      for (final t in result.items) {
+        if (norm(t.title) == nn) {
+          best = t;
+          break;
+        }
+      }
+    }
+    return best ?? result.items.first;
+  }
 
   /// 解析可播放 URL（gateway.kugou.com/v5/url）。
   ///
@@ -997,19 +1131,35 @@ class KugouApi extends ChangeNotifier {
   /// 期全量 Track 拉取 + 写库被杀进程/写失败），全量列表仅进收藏页才拉。
   Future<Set<String>> likedHashSet() async {
     final listid = await likeListId();
-    if (listid == null) return const {};
+    if (listid == null) {
+      // 账号无 listid（数据异常）时兜底公开 gid，避免红心集合恒空
+      // （对齐 [likedTracks] 的 listid → gid 回落链路）。
+      final gid = await likeGid();
+      if (gid == null) return const {};
+      return _collectHashes(listid: listid, gid: gid);
+    }
+    return _collectHashes(listid: listid);
+  }
+
+  /// 分页收集「我喜欢」歌曲 hash 集合（listid 个人接口优先，gid 兜底）。
+  ///
+  /// **统一转小写**：歌单接口存大写 hash，而 mobilecdn 搜索返回小写，
+  /// 与红心匹配键（[songLikeKey] / LikeController）保持一致，否则
+  /// 已收藏歌曲在搜索结果中误标为非红心。
+  Future<Set<String>> _collectHashes({String? listid, String? gid}) async {
     const pagesize = 300;
     final hashes = <String>{};
     var page = 1;
     while (page <= 40) {
       final (tracks, total, rawCount) = await playlistTracksNewPage(
-        listid,
+        listid ?? '',
+        gid: gid,
         page: page,
         pagesize: pagesize,
       );
       if (tracks.isEmpty) break;
       for (final t in tracks) {
-        final h = t.kugou?.hash ?? t.id;
+        final h = (t.kugou?.hash ?? t.id).toLowerCase();
         if (h.isNotEmpty) hashes.add(h);
       }
       if (rawCount < pagesize) break;
@@ -1083,9 +1233,14 @@ class KugouApi extends ChangeNotifier {
       final hash = track.kugou?.hash ?? '';
       if (hash.isEmpty) throw KgApiException('缺少歌曲 hash，无法移除');
       final liked = await playlistTracksAllNew(listid);
+      // 大小写不敏感比较：搜索结果 hash 为小写（mobilecdn），歌单存大写
+      // FileHash——与红心匹配键（[songLikeKey]）一致，否则永远找不到 fileid
+      final h = hash.toLowerCase();
       for (final t in liked) {
-        if (t.kugou?.hash == hash && t.kugou?.fileid != null) {
-          fileid = t.kugou!.fileid;
+        final k = t.kugou;
+        if (k == null) continue;
+        if (k.hash.toLowerCase() == h && k.fileid != null) {
+          fileid = k.fileid;
           break;
         }
       }

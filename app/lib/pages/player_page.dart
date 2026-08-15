@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
@@ -35,7 +36,7 @@ class PlayerPage extends ConsumerStatefulWidget {
 }
 
 class _PlayerPageState extends ConsumerState<PlayerPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WindowListener {
   /// 拖动中的进度（ms）；null = 跟随播放器实时位置。
   double? _dragMs;
 
@@ -57,6 +58,26 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   /// 最近一次脉冲强度（0~1；脉冲按此缩放幅度，无脉冲帧不更新）。
   double _lastBeatStrength = 1;
 
+  /// 窗口是否处于完整全屏（进入全屏/还原按钮的图标与提示切换）。
+  /// 事件驱动：window_manager 窗口事件（含系统级全屏，如 F11）同步状态，
+  /// 无轮询。
+  bool _isFullScreen = false;
+
+  /// 完整全屏切换（对齐原版 FullPlayer 顶栏 Maximize/Minimize 按钮，
+  /// 由 useWindowControls → Electron setFullScreen 实现，这里走
+  /// window_manager.setFullScreen）。
+  Future<void> _toggleFullscreen() =>
+      windowManager.setFullScreen(!_isFullScreen);
+
+  @override
+  void onWindowEvent(String eventName) {
+    if (eventName == kWindowEventEnterFullScreen && !_isFullScreen) {
+      setState(() => _isFullScreen = true);
+    } else if (eventName == kWindowEventLeaveFullScreen && _isFullScreen) {
+      setState(() => _isFullScreen = false);
+    }
+  }
+
   void _pokeControls() {
     if (!_controlsVisible && mounted) {
       setState(() => _controlsVisible = true);
@@ -74,10 +95,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       vsync: this,
       duration: const Duration(milliseconds: 180),
     );
+    // 全屏按钮初始状态 + 监听窗口事件（进入/退出全屏时图标同步）
+    windowManager.addListener(this);
+    windowManager.isFullScreen().then((v) {
+      if (mounted && v != _isFullScreen) {
+        setState(() => _isFullScreen = v);
+      }
+    });
   }
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     _hideTimer?.cancel();
     _coverPulse.dispose();
     super.dispose();
@@ -244,16 +273,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                             ),
                           ),
                           const Spacer(),
-                          // 歌曲评论（仅网易云/酷狗源，与红心同条件）
-                          if (canLike)
-                            Tooltip(
-                              message: l10n.menuComment,
-                              child: IconButton(
-                                onPressed: () =>
-                                    showCommentDialog(context, track: current),
-                                icon: const Icon(Icons.mode_comment_outlined),
-                              ),
-                            ),
                           // 音质选择（右侧）
                           if (current != null)
                             QualityMenu(
@@ -261,6 +280,21 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                               current: quality,
                               onSelected: notifier.setQuality,
                             ),
+                          // 完整全屏/还原（对齐原版 FullPlayer 顶栏右上角
+                          // Maximize/Minimize 按钮；系统级全屏如 F11 也同步图标）
+                          Tooltip(
+                            message: _isFullScreen
+                                ? l10n.playerBarExitFullscreen
+                                : l10n.playerBarFullscreen,
+                            child: IconButton(
+                              onPressed: _toggleFullscreen,
+                              icon: Icon(
+                                _isFullScreen
+                                    ? Icons.fullscreen_exit
+                                    : Icons.fullscreen,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -464,6 +498,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                     playing: playing,
                                     buffering: buffering,
                                     onToggleLike: _toggleLike,
+                                    onShowComments: () => showCommentDialog(
+                                      context,
+                                      track: current!,
+                                    ),
                                   ),
                                 ),
                               ],

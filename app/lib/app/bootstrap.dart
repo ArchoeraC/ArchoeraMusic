@@ -33,6 +33,14 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
         // 恢复失败时现场保留暂停态，用户点播放即可重试。
         debugPrint('[bootstrap] 初始化异常: $e\n$s');
       }
+      // 启动同步红心集合（对齐 SPlayer-Next 启动时 fetchLikelist 预载）：
+      // 酷狗会话在 KugouApi 构造函数同步恢复（userid 首帧已就位），下方
+      // ref.listen 变更监听收不到「恢复」事件 → 不显式同步则酷狗红心恒为空。
+      // 网易云 init 完成的 state 变更会触发监听器再同步一次，sync 的
+      // _pending 合并 + _sameSet 去重保证重复调用幂等（至多重复一次网络请求）。
+      // 注：搜索结果红心不亮的主因是酷狗 hash 大小写（mobilecdn 小写 vs
+      // 歌单大写），已在 songLikeKey/_collectHashes/removeFromLike 统一小写。
+      ref.read(likeControllerProvider).sync();
       // 下载引擎初始化（触发 build → init 注册回调 + 注入已持久化会话）。
       // 放在登录态恢复之后：注入 Rust 的 session/cookie 始终取最新状态。
       ref.read(downloadControllerProvider);
