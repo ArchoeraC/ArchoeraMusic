@@ -30,7 +30,7 @@ public sealed unsafe class LockedBuffer : IDisposable
         try
         {
             new Span<byte>(ptr, size).Clear();
-            if (Mlock(ptr, (nuint)size) != 0)
+            if (MlockFailed(ptr, (nuint)size))
             {
                 throw new InvalidOperationException(
                     $"mlock 失败（errno={Marshal.GetLastPInvokeError()}）：内存保护不可用");
@@ -70,8 +70,12 @@ public sealed unsafe class LockedBuffer : IDisposable
     [DllImport("kernel32.dll", EntryPoint = "VirtualUnlock", SetLastError = true)]
     private static extern int virtual_unlock(byte* addr, nuint len);
 
-    private static int Mlock(byte* addr, nuint len) =>
-        IsWindows ? virtual_lock(addr, len) : mlock_nix(addr, len);
+    // 平台返回语义相反（2026-08-15 修复实录）：
+    //   Windows VirtualLock 成功返回非 0、失败返回 0；
+    //   Linux mlock 成功返回 0、失败返回 -1。
+    // 按 Linux 语义 `!= 0` 判失败会让 Windows 必然误报「mlock 失败」。
+    private static bool MlockFailed(byte* addr, nuint len) =>
+        IsWindows ? virtual_lock(addr, len) == 0 : mlock_nix(addr, len) != 0;
 
     private static int Munlock(byte* addr, nuint len) =>
         IsWindows ? virtual_unlock(addr, len) : munlock_nix(addr, len);

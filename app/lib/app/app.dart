@@ -72,8 +72,7 @@ class ArchoeraMusicApp extends ConsumerWidget {
     lyricTtmlCacheLimitBytes = lyricLimitBytes;
     return PowerSaverHost(
       child: AuthBootstrap(
-        child: VaultCrashGate(
-          child: MaterialApp.router(
+        child: MaterialApp.router(
           title: 'ArchoeraMusic',
           // 国际化：locale 跟随设置/系统；Material 内建文案（菜单/日期等）自动本地化
           locale: locale,
@@ -118,6 +117,11 @@ class ArchoeraMusicApp extends ConsumerWidget {
             // vault 版本异常门（fail-closed）：握手发现非官方构建 → 副本已删、
             // 解密已拒，全屏仅允许退出（置于最外层，任何状态都先过本门）。
             gate = VaultVersionGate(child: gate);
+            // vault 崩溃警告门：置于 MaterialApp.builder 内（MaterialApp 之下），
+            // 保证 Localizations/Navigator/ScaffoldMessenger 上下文可用。
+            // 此前置于 MaterialApp 之上 → context.l10n 空引用崩溃
+            // （2026-08-15 修复实录）。
+            gate = VaultCrashGate(child: gate);
             if (performanceMode) {
               gate = MediaQuery(
                 data: MediaQuery.of(context).copyWith(disableAnimations: true),
@@ -126,7 +130,6 @@ class ArchoeraMusicApp extends ConsumerWidget {
             }
             return gate;
           },
-          ),
         ),
       ),
     );
