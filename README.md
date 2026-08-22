@@ -285,7 +285,7 @@ flutter run -d linux      # 或 windows / macos
 - **[MoeKoeMusic](https://github.com/MoeKoeMusic/MoeKoeMusic)** —— 开源高颜值酷狗第三方客户端，桌面端体验与平台接入思路
 - **[Mineradio](https://github.com/XxHuberrr/Mineradio)** —— Windows 桌面沉浸式音乐播放器，歌词舞台与视觉呈现思路
 
-> 特别说明：本项目（含所引用的服务端代码）不在 SPlayer / SPlayer-Next 主仓库内；此处表达对相关项目思路的认可、采纳与致谢。
+> 特别说明：此处为表达对相关项目思路的认可、采纳与致谢。
 
 ---
 
