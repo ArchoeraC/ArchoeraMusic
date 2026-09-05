@@ -3405,16 +3405,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get loginQqQrLogin => 'QQ ミュージック QR コードでログイン';
 
   @override
-  String get loginQqTypeQq => 'QQ';
-
-  @override
-  String get loginQqTypeWx => 'WeChat';
-
-  @override
   String get loginQqScanHint => 'QQ アプリでスキャンしてログインしてください';
-
-  @override
-  String get loginQqWxScanHint => 'WeChat でスキャンしてログインしてください';
 
   @override
   String navHeaderQqId(String id) {

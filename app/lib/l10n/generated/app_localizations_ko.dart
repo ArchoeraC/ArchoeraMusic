@@ -3414,16 +3414,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get loginQqQrLogin => 'QQ 뮤직 QR 코드로 로그인';
 
   @override
-  String get loginQqTypeQq => 'QQ';
-
-  @override
-  String get loginQqTypeWx => 'WeChat';
-
-  @override
   String get loginQqScanHint => 'QQ 앱으로 스캔하여 로그인하세요';
-
-  @override
-  String get loginQqWxScanHint => 'WeChat으로 스캔하여 로그인하세요';
 
   @override
   String navHeaderQqId(String id) {

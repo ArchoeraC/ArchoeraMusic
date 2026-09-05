@@ -1026,10 +1026,7 @@
   "brandQqMusic": "QM",
   "platformQQMusic": "QQ ミュージック",
   "loginQqQrLogin": "QQ ミュージック QR コードでログイン",
-  "loginQqTypeQq": "QQ",
-  "loginQqTypeWx": "WeChat",
   "loginQqScanHint": "QQ アプリでスキャンしてログインしてください",
-  "loginQqWxScanHint": "WeChat でスキャンしてログインしてください",
   "navHeaderQqId": "QQ {id}",
   "@navHeaderQqId": {
     "placeholders": {

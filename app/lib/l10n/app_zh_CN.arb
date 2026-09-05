@@ -1026,10 +1026,7 @@
   "brandQqMusic": "QM",
   "platformQQMusic": "QM",
   "loginQqQrLogin": "QM扫码登录",
-  "loginQqTypeQq": "QQ",
-  "loginQqTypeWx": "微信",
   "loginQqScanHint": "请使用手机 QQ 扫一扫登录",
-  "loginQqWxScanHint": "请使用微信扫一扫登录",
   "navHeaderQqId": "QQ {id}",
   "@navHeaderQqId": {
     "placeholders": {
