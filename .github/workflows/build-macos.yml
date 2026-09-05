@@ -43,9 +43,9 @@ jobs:
           ZD="$HOME/.local/zig-$VER"
           if [ ! -x "$ZD/zig" ]; then
             mkdir -p "$HOME/.local"
-            curl -fsSL "https://ziglang.org/download/$VER/zig-macos-aarch64-$VER.tar.xz" -o /tmp/zig.tar.xz
+            curl -fsSL "https://ziglang.org/download/$VER/zig-aarch64-macos-$VER.tar.xz" -o /tmp/zig.tar.xz
             tar -C "$HOME/.local" -xf /tmp/zig.tar.xz
-            mv "$HOME/.local/zig-macos-aarch64-$VER" "$ZD"
+            mv "$HOME/.local/zig-aarch64-macos-$VER" "$ZD"
           fi
           echo "$ZD" >> "$GITHUB_PATH"
           zig version

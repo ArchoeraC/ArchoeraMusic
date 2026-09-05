@@ -73,9 +73,9 @@ jobs:
           $zd = Join-Path $env:LOCALAPPDATA "zig-$ver"
           if (!(Test-Path (Join-Path $zd 'zig.exe'))) {
             $zip = Join-Path $env:TEMP "zig.zip"
-            Invoke-WebRequest -Uri "https://ziglang.org/download/$ver/zig-windows-x86_64-$ver.zip" -OutFile $zip
+            Invoke-WebRequest -Uri "https://ziglang.org/download/$ver/zig-x86_64-windows-$ver.zip" -OutFile $zip
             Expand-Archive -Path $zip -DestinationPath $env:LOCALAPPDATA -Force
-            Move-Item (Join-Path $env:LOCALAPPDATA "zig-windows-x86_64-$ver") $zd -Force
+            Move-Item (Join-Path $env:LOCALAPPDATA "zig-x86_64-windows-$ver") $zd -Force
           }
           Add-Content $env:GITHUB_PATH $zd
           & (Join-Path $zd 'zig.exe') version
