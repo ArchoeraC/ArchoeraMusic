@@ -88,6 +88,7 @@ hooks:
 #   - hooks 2.1.0 需 meta ^1.19.0 + record_use ^1.0.0（sqlite3 约束允许 <3.0.0）
 # 验证通过则保留并同步约束，失败则移除本段回退。
 dependency_overrides:
+  code_assets: 1.2.1
   analyzer: 14.1.0
   test: 1.31.2
   test_api: 0.7.13
