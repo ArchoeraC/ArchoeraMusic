@@ -48,7 +48,8 @@ jobs:
             mv "$HOME/.local/zig-aarch64-macos-$VER" "$ZD"
           fi
           echo "$ZD" >> "$GITHUB_PATH"
-          zig version
+          # GITHUB_PATH 对当前步骤不生效：同步骤用绝对路径验证
+          "$ZD/zig" version
 
       - name: Build native modules (macOS 一站式脚本)
         # 统一入口 app/core/build-macos.sh，收敛 audio-engine / scraper /
