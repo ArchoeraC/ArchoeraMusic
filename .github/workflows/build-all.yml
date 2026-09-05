@@ -286,16 +286,14 @@ jobs:
           ls -la "$NATIVE"
 
       # ────────────────────── Linux：多发行版打包链 ────────────────────
-      - name: Resolve version
+      - name: Resolve version (from pubspec.yaml)
         if: matrix.os == 'linux'
         id: version
         run: |
-          # 标签推送（v*）→ 去掉 v；手动触发 → 回退 pubspec 版本
-          VER="${GITHUB_REF_NAME#v}"
-          if [[ -z "$VER" || "$VER" == "$GITHUB_REF_NAME" ]]; then
-            VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
-          fi
+          # 版本号一律以 app/pubspec.yaml 为唯一来源；发布 tag 应 push v$version。
+          VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "resolved version: ${VER}"
 
       - name: Install packaging tools
         if: matrix.os == 'linux'
