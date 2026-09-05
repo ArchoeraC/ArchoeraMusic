@@ -3592,16 +3592,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get loginQqQrLogin => 'Iniciar sesión con el código QR de QM';
 
   @override
-  String get loginQqTypeQq => 'QQ';
-
-  @override
-  String get loginQqTypeWx => 'WeChat';
-
-  @override
   String get loginQqScanHint => 'Escanea con la app de QQ para iniciar sesión';
-
-  @override
-  String get loginQqWxScanHint => 'Escanea con WeChat para iniciar sesión';
 
   @override
   String navHeaderQqId(String id) {

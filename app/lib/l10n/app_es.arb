@@ -1026,10 +1026,7 @@
   "brandQqMusic": "QM",
   "platformQQMusic": "QM",
   "loginQqQrLogin": "Iniciar sesión con el código QR de QM",
-  "loginQqTypeQq": "QQ",
-  "loginQqTypeWx": "WeChat",
   "loginQqScanHint": "Escanea con la app de QQ para iniciar sesión",
-  "loginQqWxScanHint": "Escanea con WeChat para iniciar sesión",
   "navHeaderQqId": "QQ {id}",
   "@navHeaderQqId": {
     "placeholders": {

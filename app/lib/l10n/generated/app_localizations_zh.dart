@@ -3365,16 +3365,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';
 
   @override
-  String get loginQqTypeQq => 'QQ';
-
-  @override
-  String get loginQqTypeWx => '微信';
-
-  @override
   String get loginQqScanHint => '請使用手機 QQ 掃一掃登入';
-
-  @override
-  String get loginQqWxScanHint => '請使用微信掃一掃登入';
 
   @override
   String navHeaderQqId(String id) {
@@ -6778,16 +6769,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginQqQrLogin => 'QM扫码登录';
 
   @override
-  String get loginQqTypeQq => 'QQ';
-
-  @override
-  String get loginQqTypeWx => '微信';
-
-  @override
   String get loginQqScanHint => '请使用手机 QQ 扫一扫登录';
-
-  @override
-  String get loginQqWxScanHint => '请使用微信扫一扫登录';
 
   @override
   String navHeaderQqId(String id) {
@@ -10192,16 +10174,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';
 
   @override
-  String get loginQqTypeQq => 'QQ';
-
-  @override
-  String get loginQqTypeWx => '微信';
-
-  @override
   String get loginQqScanHint => '請使用手機 QQ 掃一掃登入';
-
-  @override
-  String get loginQqWxScanHint => '請使用微信掃一掃登入';
 
   @override
   String navHeaderQqId(String id) {

@@ -1,7 +1,7 @@
 /// QM（QM）播放音源服务（对齐 kugou/netease 服务形态的轻量封装）。
 ///
 /// - 底层：apis/qqmusic（Dart 直连，musicu.fcg 明文 JSON + UA/comm 伪装）
-/// - 登录：QQ 扫码 / 微信扫码 → musickey 落盘到 host sessionStore（vault
+/// - 登录：QQ 扫码 → musickey 落盘到 host sessionStore（vault
 ///   加密，平台键 'qqmusic'）；cookie/uin 由 request 层自动注入
 /// - 搜索 / 歌单 / 专辑 / 歌手 / 榜单 → 归一为 netease 的 [Track]/[CoverItem]
 /// - 播放：song_url（music.vkey.GetVkey）多音质降级；访客可播免费曲，
@@ -137,7 +137,7 @@ class QqMusicApi extends ChangeNotifier {
 
   // ── 扫码登录 ─────────────────────────────────────────────────────────
 
-  /// 生成二维码（type = 'qq' | 'wx'）。
+  /// 生成二维码（type = 'qq'，默认 'qq'；微信扫码已停用）。
   /// 返回 {key, content(data:image/...base64)}。
   Future<Map<String, dynamic>> qrKey(String type) async {
     final body = await qmCall('login_qr_key', {'type': type});

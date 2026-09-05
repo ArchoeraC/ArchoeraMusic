@@ -1,10 +1,8 @@
 /// QM 二维码登录模块（对齐 login_qr.ts + core/credential.ts）。
 ///
-/// 支持 QQ 扫码与微信扫码两种原生协议：
-/// - QQ：ptlogin2 ptqrshow 出码 → ptqrlogin 轮询 → check_sig 取 p_skey →
+/// 仅支持 QQ 扫码登录（微信扫码协议已移除）：
+/// - ptlogin2 ptqrshow 出码 → ptqrlogin 轮询 → check_sig 取 p_skey →
 ///   graph.qq.com authorize 换 code → QQConnectLogin 换 musickey
-/// - WX：open.weixin.qq.com qrconnect 出码 → lp 轮询 → 拿 wx_code →
-///   music.login.LoginServer 换 musickey
 ///
 /// 成功后将凭据写入 host sessionStore（平台键 'qqmusic'，vault 加密）。
 library;
@@ -139,49 +137,14 @@ void _resetJar() => _cookieJar = <String, String>{};
 
 // ── 出码 ─────────────────────────────────────────────────────────────
 
-/// 获取二维码 Key 及图片内容（params.type = 'qq' | 'wx'，默认 'qq'）。
+/// 获取二维码 Key 及图片内容（params.type = 'qq'，默认 'qq'）。
 Future<Map<String, dynamic>> _qrKey(String type) async {
-  _resetJar();
   if (type == 'wx') {
-    final params = {
-      'appid': '',
-      'redirect_uri':
-          'https://y.qq.com/portal/wx_redirect.html?login_type=2&surl=https://y.qq.com/',
-      'response_type': 'code',
-      'scope': 'snsapi_login',
-      'state': 'STATE',
-      'href':
-          'https://y.qq.com/mediastyle/music_v17/src/css/popup_wechat.css#wechat_redirect',
-    };
-    final res = await _httpGet(
-      'https://open.weixin.qq.com/connect/qrconnect?${_joinForm(params)}',
-      headers: {'Referer': 'https://open.weixin.qq.com/connect/qrconnect'},
-    );
-    if (res.status != 200) {
-      throw HttpException('获取微信登录页面失败: HTTP ${res.status}');
-    }
-    final html = res.text;
-    final match = RegExp(r'uuid=([^"]+)"').firstMatch(html) ??
-        RegExp(r'uuid=([a-zA-Z0-9_-]+)').firstMatch(html);
-    final uuid = match?.group(1);
-    if (uuid == null) throw HttpException('获取微信登录二维码 uuid 失败');
-
-    final qrRes = await _httpGet(
-      'https://open.weixin.qq.com/connect/qrcode/$uuid',
-      headers: {'Referer': 'https://open.weixin.qq.com/connect/qrconnect'},
-    );
-    if (qrRes.status != 200) {
-      throw HttpException('获取微信登录二维码图片失败: HTTP ${qrRes.status}');
-    }
-    return <String, dynamic>{
-      'code': 200,
-      'key': uuid,
-      'content': 'data:image/jpeg;base64,${base64Encode(qrRes.body)}',
-      'type': 'wx',
-    };
+    throw HttpException('暂不支持微信扫码登录（该登录方式已停用），请使用手机 QQ 扫码');
   }
+  _resetJar();
 
-  // 默认 QQ 扫码
+  // QQ 扫码
   final url =
       'https://ssl.ptlogin2.qq.com/ptqrshow?appid=716027609&e=2&l=M&s=3&d=72&v=4&t=${DateTime.now().microsecondsSinceEpoch}&daid=383&pt_3rd_aid=100497308';
   final res = await _httpGet(
@@ -208,32 +171,7 @@ Future<Map<String, dynamic>> _qrKey(String type) async {
 /// 轮询扫码状态：0=过期/取消 1=等待 2=已扫码待确认 4=成功（已写 cookie）。
 Future<Map<String, dynamic>> _qrCheck(String key, String type) async {
   if (type == 'wx') {
-    final query = 'uuid=${Uri.encodeQueryComponent(key)}&_=${DateTime.now().millisecondsSinceEpoch}';
-    final res = await _httpGet(
-      'https://lp.open.weixin.qq.com/connect/l/qrconnect?$query',
-      headers: {'Referer': 'https://open.weixin.qq.com/'},
-      timeout: const Duration(seconds: 15),
-    );
-    final text = res.text;
-    final match = RegExp(r"window\.wx_errcode=(\d+);window\.wx_code='([^']*)'")
-        .firstMatch(text);
-    if (match == null) return {'code': 200, 'status': 1};
-    final errcode = int.tryParse(match.group(1) ?? '') ?? 0;
-    final wxCode = match.group(2) ?? '';
-
-    if (errcode == 404) return {'code': 200, 'status': 2};
-    if (errcode == 402 || errcode == 403) return {'code': 200, 'status': 0};
-    if (errcode == 405 && wxCode.isNotEmpty) {
-      final loginData = await qmRequest<Map<String, dynamic>>(
-        'music.login.LoginServer',
-        'Login',
-        {'code': wxCode, 'strAppid': ''},
-        session: false,
-        comm: {'tmeLoginType': 1},
-      );
-      return _finalizeLogin(loginData, 1);
-    }
-    return {'code': 200, 'status': 1};
+    throw HttpException('暂不支持微信扫码登录（该登录方式已停用），请使用手机 QQ 扫码');
   }
 
   // QQ 扫码检查
@@ -332,7 +270,7 @@ Future<Map<String, dynamic>> _qrCheck(String key, String type) async {
     );
     final uinMatch = RegExp(r'(?:\?|&)uin=(.+?)&').firstMatch(jumpUrl);
     final uin = uinMatch?.group(1) ?? '';
-    return _finalizeLogin(qqLoginData, 2, fallbackUin: uin);
+    return _finalizeLogin(qqLoginData, fallbackUin: uin);
   }
 
   return {'code': 200, 'status': 1};
@@ -345,26 +283,24 @@ String _randHex() {
 
 /// 登录成功收尾：校验凭据 → 写 cookie → 返回 UI 结果。
 Future<Map<String, dynamic>> _finalizeLogin(
-  Map<String, dynamic> loginData,
-  int loginType, {
+  Map<String, dynamic> loginData, {
   String fallbackUin = '',
 }) async {
   final uinStr = qmCredentialMusicId(loginData, fallbackUin);
   final musickey = loginData['musickey'];
   if (uinStr.isEmpty || musickey == null || '$musickey'.isEmpty) {
-    throw HttpException('${loginType == 1 ? '微信' : 'QQ'}登录响应缺少有效凭据');
+    throw HttpException('QQ登录响应缺少有效凭据');
   }
   final saved = qmCredentialToSession(
     loginData,
-    loginType,
+    2,
     fallbackMusicId: fallbackUin,
   );
   qmMergeQQMusicCookies(saved);
   final nick = loginData['nick'] ?? loginData['nickname'];
   final logo = loginData['logo'] ?? loginData['avatarUrl'];
-  final fallbackAvatar = loginType == 2
-      ? 'https://q.qlogo.cn/headimg_dl?dst_uin=$uinStr&spec=100'
-      : '';
+  final fallbackAvatar =
+      'https://q.qlogo.cn/headimg_dl?dst_uin=$uinStr&spec=100';
   return <String, dynamic>{
     'code': 200,
     'status': 4,

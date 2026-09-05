@@ -1,9 +1,7 @@
-/// QM扫码登录对话框（支持手机 QQ / 微信两种扫码，对齐
-/// SPlayer-Next 的 qqmusicQrLoginAdapter / qqmusicWxQrLoginAdapter）。
+/// QM扫码登录对话框（仅支持手机 QQ 扫码；微信扫码已停用，入口随之移除）。
 ///
-/// 流程：选择扫码方式（QQ / 微信）→ qrKey(type) 取 base64 二维码 →
-/// 1~2s 轮询 qrCheck(type, key) → status=4 登录成功（cookie 已落盘）
-/// → 刷新资料并关闭。
+/// 流程：qrKey() 取 base64 二维码 → 1~2s 轮询 qrCheck() → status=4 登录成功
+/// （cookie 已落盘）→ 刷新资料并关闭。
 library;
 
 import 'dart:async';
@@ -21,21 +19,17 @@ import '../../l10n/l10n.dart';
 import '../common/toast.dart';
 
 /// 打开 QM扫码登录弹窗。
-/// [initialType] 默认扫码方式：'qq'（手机 QQ）/ 'wx'（微信）。
-Future<bool?> showQqMusicLoginDialog(BuildContext context,
-    {String initialType = 'qq'}) {
+Future<bool?> showQqMusicLoginDialog(BuildContext context) {
   return showDialog<bool?>(
     context: context,
     barrierColor: Colors.transparent,
     barrierDismissible: true,
-    builder: (_) => _QqMusicLoginDialog(initialType: initialType),
+    builder: (_) => const _QqMusicLoginDialog(),
   );
 }
 
 class _QqMusicLoginDialog extends ConsumerStatefulWidget {
-  const _QqMusicLoginDialog({this.initialType = 'qq'});
-
-  final String initialType;
+  const _QqMusicLoginDialog();
 
   @override
   ConsumerState<_QqMusicLoginDialog> createState() =>
@@ -45,7 +39,6 @@ class _QqMusicLoginDialog extends ConsumerStatefulWidget {
 class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
   Timer? _poll;
 
-  late String _type = widget.initialType;
   String _key = '';
   Uint8List? _qrBytes;
   bool _loading = true;
@@ -80,7 +73,7 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
     });
     _poll?.cancel();
     try {
-      final qr = await _api.qrKey(_type);
+      final qr = await _api.qrKey('qq');
       if (!mounted) return;
       final content = qr['content'] as String? ?? '';
       final bytes = _dataUrlToBytes(content);
@@ -107,7 +100,7 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
   Future<void> _check() async {
     if (_key.isEmpty || _confirmed || _expired) return;
     try {
-      final state = await _api.qrCheck(_type, _key);
+      final state = await _api.qrCheck('qq', _key);
       if (!mounted) return;
       final status = (state['status'] as num?)?.toInt() ?? 1;
       if (status == 4) {
@@ -124,24 +117,15 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
           _error = context.l10n.loginQrExpiredRegenerate;
         });
       } else {
-        final l10n = context.l10n;
         setState(() {
           _hint = status == 2
-              ? l10n.loginWaitingConfirm
-              : _type == 'qq'
-              ? l10n.loginQqScanHint
-              : l10n.loginQqWxScanHint;
+              ? context.l10n.loginWaitingConfirm
+              : context.l10n.loginQqScanHint;
         });
       }
     } catch (_) {
       // 轮询失败静默，下一轮自动重试
     }
-  }
-
-  void _switchType(String type) {
-    if (type == _type) return;
-    _type = type;
-    _createQr();
   }
 
   /// `data:image/png;base64,...` → 图片字节。
@@ -194,29 +178,6 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          // QQ / 微信 扫码方式切换
-                          SegmentedButton<String>(
-                            segments: [
-                              ButtonSegment(
-                                value: 'qq',
-                                label: Text(l10n.loginQqTypeQq),
-                              ),
-                              ButtonSegment(
-                                value: 'wx',
-                                label: Text(l10n.loginQqTypeWx),
-                              ),
-                            ],
-                            selected: {_type},
-                            onSelectionChanged: (s) =>
-                                _switchType(s.first),
-                            showSelectedIcon: false,
-                            style: const ButtonStyle(
-                              visualDensity: VisualDensity.compact,
-                              tapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
                           Container(
                             width: 300,
                             height: 300,

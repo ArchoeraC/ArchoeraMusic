@@ -3,7 +3,7 @@
 /// 覆盖：
 /// - 搜索 → 归一 Track（含 mid/mediaMid/cover）
 /// - song_url：访客可对免费曲目取到可播 URL；VIP 曲目按接口语义抛 403
-/// - 扫码登录：qq/wx 出码真实请求（不扫码，仅验证拿到 key + 图）
+/// - 扫码登录：qq 出码真实请求（不扫码，仅验证拿到 key + 图）
 library;
 
 import 'package:archoera_music/apis/qqmusic/api.dart';

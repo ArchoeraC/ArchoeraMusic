@@ -6266,29 +6266,11 @@ abstract class AppLocalizations {
   /// **'QM扫码登录'**
   String get loginQqQrLogin;
 
-  /// No description provided for @loginQqTypeQq.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'QQ'**
-  String get loginQqTypeQq;
-
-  /// No description provided for @loginQqTypeWx.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'微信'**
-  String get loginQqTypeWx;
-
   /// No description provided for @loginQqScanHint.
   ///
   /// In zh_CN, this message translates to:
   /// **'请使用手机 QQ 扫一扫登录'**
   String get loginQqScanHint;
-
-  /// No description provided for @loginQqWxScanHint.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'请使用微信扫一扫登录'**
-  String get loginQqWxScanHint;
 
   /// No description provided for @navHeaderQqId.
   ///

@@ -3525,16 +3525,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginQqQrLogin => 'Sign in with QM QR code';
 
   @override
-  String get loginQqTypeQq => 'QQ';
-
-  @override
-  String get loginQqTypeWx => 'WeChat';
-
-  @override
   String get loginQqScanHint => 'Scan with the QQ app to sign in';
-
-  @override
-  String get loginQqWxScanHint => 'Scan with WeChat to sign in';
 
   @override
   String navHeaderQqId(String id) {

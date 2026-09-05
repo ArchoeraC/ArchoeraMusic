@@ -3564,16 +3564,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loginQqQrLogin => 'Mit QQ-Music-QR-Code anmelden';
 
   @override
-  String get loginQqTypeQq => 'QQ';
-
-  @override
-  String get loginQqTypeWx => 'WeChat';
-
-  @override
   String get loginQqScanHint => 'Mit der QQ-App scannen, um dich anzumelden';
-
-  @override
-  String get loginQqWxScanHint => 'Mit WeChat scannen, um dich anzumelden';
 
   @override
   String navHeaderQqId(String id) {
