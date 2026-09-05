@@ -44,8 +44,8 @@
   "commonCloseConfirmMessage": "Après la fermeture de la fenêtre principale",
   "commonCloseConfirmRemember": "Mémoriser mon choix et ne plus demander",
   "appName": "ArchoeraMusic",
-  "brandNetease": "Netease Music",
-  "brandKugou": "Kugou Music",
+  "brandNetease": "NT",
+  "brandKugou": "KG",
   "commonBack": "Retour",
   "commonCancel": "Annuler",
   "commonClose": "Fermer",
@@ -203,8 +203,8 @@
   "commonDone": "Terminé",
   "commonUnknownError": "Erreur inconnue",
   "commonSongCountHint": "{count} titres au total · Cliquer pour lire",
-  "platformNetease": "NetEase",
-  "platformKugou": "Kugou",
+  "platformNetease": "NT",
+  "platformKugou": "KG",
   "platformAll": "Tout",
   "toastPlayedAll": "{count} titres lus",
   "toastPlayFailed": "Échec de lecture : {msg}",
@@ -1023,7 +1023,7 @@
   "vaultUnlockFailed": "Mot de passe incorrect, réessayez",
   "settingsVaultCloseV3PasswordTitle": "Désactiver la liaison : définir un nouveau mot de passe",
   "settingsVaultCloseV3PasswordDesc": "Aucun mot de passe de récupération n'a été défini lors de l'activation de la liaison (sans mot de passe sur cet appareil). La désactiver passe en protection par mot de passe (v2) : définissez un nouveau mot de passe de déverrouillage. La clé maîtresse et les données existantes sont conservées ; ce mot de passe est requis à chaque lancement.",
-  "brandQqMusic": "QQ Music",
+  "brandQqMusic": "QM",
   "platformQQMusic": "QQ Music",
   "loginQqQrLogin": "Se connecter avec le QR code QQ Music",
   "loginQqTypeQq": "QQ",
@@ -1046,5 +1046,6 @@
   "searchPlatformError": "La plateforme a renvoyé une erreur ({code})",
   "searchWaitRetry": "Trop de requêtes, veuillez patienter puis réessayer",
   "qqMusicDownloadUnsupported": "Téléchargements QQ Music non pris en charge pour l’instant (contrôle des risques).",
-  "qqMusicDownloadSkipped": "{count} titre(s) QQ Music ignoré(s) : téléchargement non pris en charge."
+  "qqMusicDownloadSkipped": "{count} titre(s) QQ Music ignoré(s) : téléchargement non pris en charge.",
+  "platformQqMusic": "QM"
 }

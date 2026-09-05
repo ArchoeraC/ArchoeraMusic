@@ -1,4 +1,4 @@
-/// QQ 音乐（QM）播放音源服务（对齐 kugou/netease 服务形态的轻量封装）。
+/// QM（QM）播放音源服务（对齐 kugou/netease 服务形态的轻量封装）。
 ///
 /// - 底层：apis/qqmusic（Dart 直连，musicu.fcg 明文 JSON + UA/comm 伪装）
 /// - 登录：QQ 扫码 / 微信扫码 → musickey 落盘到 host sessionStore（vault
@@ -17,7 +17,7 @@ import '../../apis/qqmusic/core/request.dart';
 import '../netease/netease_api.dart' show CoverItem, SearchResult;
 import '../netease/track.dart';
 
-/// QQ 音乐业务异常（resolve 失败 / 登录缺失等；message 可直接展示）。
+/// QM业务异常（resolve 失败 / 登录缺失等；message 可直接展示）。
 ///
 /// [kind]/[code] 仅在请求层归一后携带（kind=risk 表示风控/限流拦截，code 为
 /// outer/inner 业务码），供界面决定本地化文案与重试策略。
@@ -36,7 +36,7 @@ class QqApiException implements Exception {
   String toString() => message;
 }
 
-/// **实验开关**：QQ 音乐「在线收藏」（红心同步）是否启用。
+/// **实验开关**：QM「在线收藏」（红心同步）是否启用。
 ///
 /// 在线红心 RPC（dirid=201 族）为社区逆向、非官方文档，存在接口失效 /
 /// 风控风险。开启后：
@@ -48,7 +48,7 @@ class QqApiException implements Exception {
 /// 影响），并参考 favorite.dart 顶部的调研来源替换端点族。
 const bool kQqFavExperimental = true;
 
-/// QQ 音乐登录资料（user_detail 归一）。
+/// QM登录资料（user_detail 归一）。
 class QqMusicProfile {
   const QqMusicProfile({
     required this.userId,
@@ -65,7 +65,7 @@ class QqMusicProfile {
   final int vipLevel;
 }
 
-/// 搜索请求统一入口（QQ 音乐模块协议）。
+/// 搜索请求统一入口（QM模块协议）。
 class QqMusicApi extends ChangeNotifier {
   QqMusicApi() {
     _loadProfileSilently();
@@ -316,9 +316,9 @@ class QqMusicApi extends ChangeNotifier {
     return raw.map(_toTrack).toList();
   }
 
-  /// 榜单分类（topid → 名称/封面）；QQ 音乐固定榜单入口。
+  /// 榜单分类（topid → 名称/封面）；QM固定榜单入口。
   static const leaderboardCategories = <CoverItem>[
-    CoverItem(id: '26', title: 'QQ 音乐巅峰榜·流行', trackCount: 100),
+    CoverItem(id: '26', title: 'QM巅峰榜·流行', trackCount: 100),
     CoverItem(id: '27', title: '新歌榜', trackCount: 100),
     CoverItem(id: '62', title: '热歌榜', trackCount: 100),
     CoverItem(id: '4', title: '飙升榜', trackCount: 100),
@@ -340,17 +340,17 @@ class QqMusicApi extends ChangeNotifier {
   /// 读「我喜欢」列表单页（favorite_list，dirid=201，登录态）。
   Future<Map<String, dynamic>> _favoritePage(int page, int num) async {
     final body = await qmCall('favorite_list', {'page': page, 'num': num});
-    if (body is! Map) throw QqApiException('QQ 音乐：收藏列表响应异常');
+    if (body is! Map) throw QqApiException('QM：收藏列表响应异常');
     final map = Map<String, dynamic>.from(body);
     final code = map['code'];
     if (code == 301 || map['loggedIn'] == false) {
-      throw QqApiException('需要登录 QQ 音乐账号');
+      throw QqApiException('需要登录 QM账号');
     }
     if (code != 200) {
       final msg = map['message']?.toString();
       throw QqApiException(msg?.isNotEmpty == true
-          ? 'QQ 音乐收藏：$msg'
-          : 'QQ 音乐收藏：读取失败 code=$code');
+          ? 'QM收藏：$msg'
+          : 'QM收藏：读取失败 code=$code');
     }
     return map;
   }
@@ -370,7 +370,7 @@ class QqMusicApi extends ChangeNotifier {
   }
 
   /// 轻量红心 songmid 集合（翻页只取 mid，不构造 Track；红心状态判定用，
-  /// 对齐酷狗 likedHashSet / 网易云 likedIds 语义）。
+  /// 对齐KG likedHashSet / NT likedIds 语义）。
   Future<Set<String>> likedSongmids() async {
     final mids = <String>{};
     var page = 1;
@@ -399,26 +399,26 @@ class QqMusicApi extends ChangeNotifier {
     String? songId,
   }) async {
     if (mid.trim().isEmpty) {
-      throw QqApiException('QQ 音乐：缺少 songmid，无法收藏');
+      throw QqApiException('QM：缺少 songmid，无法收藏');
     }
     final sid = songId?.trim() ?? '';
     if (sid.isEmpty || int.tryParse(sid) == null) {
-      throw QqApiException('QQ 音乐：缺少歌曲数字 id（songId），无法${like ? '收藏' : '取消收藏'}');
+      throw QqApiException('QM：缺少歌曲数字 id（songId），无法${like ? '收藏' : '取消收藏'}');
     }
     final body = await qmCall(like ? 'favorite_add' : 'favorite_remove', {
       'songId': sid,
       'mid': mid,
     });
-    if (body is! Map) throw QqApiException('QQ 音乐：收藏操作响应异常');
+    if (body is! Map) throw QqApiException('QM：收藏操作响应异常');
     final code = body['code'];
     if (code == 301 || body['loggedIn'] == false) {
-      throw QqApiException('需要登录 QQ 音乐账号');
+      throw QqApiException('需要登录 QM账号');
     }
     if (code != 200 || body['ok'] != true) {
       final msg = body['message']?.toString();
       throw QqApiException(msg?.isNotEmpty == true
-          ? 'QQ 音乐收藏失败：$msg'
-          : 'QQ 音乐收藏失败（实验接口未确认）');
+          ? 'QM收藏失败：$msg'
+          : 'QM收藏失败（实验接口未确认）');
     }
   }
 
@@ -438,19 +438,19 @@ class QqMusicApi extends ChangeNotifier {
         ? q!.mid
         : (track.id.isNotEmpty ? track.id : null);
     if (mid == null) {
-      throw QqApiException('QQ 音乐：缺少 songmid，无法解析播放链接');
+      throw QqApiException('QM：缺少 songmid，无法解析播放链接');
     }
     final body = await qmCall('song_url', {
       'mid': mid,
       'mediaMid': q?.mediaMid ?? '',
       'level': quality,
     });
-    if (body is! Map) throw QqApiException('QQ 音乐：播放链接解析失败');
+    if (body is! Map) throw QqApiException('QM：播放链接解析失败');
     if (body['code'] != 200) {
       final msg = body['message']?.toString();
       throw QqApiException(msg?.isNotEmpty == true
-          ? 'QQ 音乐：$msg'
-          : 'QQ 音乐：未能获取可播放链接');
+          ? 'QM：$msg'
+          : 'QM：未能获取可播放链接');
     }
     final data = body['data'];
     if (data is List && data.isNotEmpty) {
@@ -460,7 +460,7 @@ class QqMusicApi extends ChangeNotifier {
         if (url.isNotEmpty) return url;
       }
     }
-    throw QqApiException('QQ 音乐：未能获取可播放链接（可能需要登录/VIP 或无版权）');
+    throw QqApiException('QM：未能获取可播放链接（可能需要登录/VIP 或无版权）');
   }
 
   // ── 解析辅助 ─────────────────────────────────────────────────────────

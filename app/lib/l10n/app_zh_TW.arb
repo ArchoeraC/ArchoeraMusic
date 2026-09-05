@@ -44,8 +44,8 @@
   "commonCloseConfirmMessage": "關閉主視窗後",
   "commonCloseConfirmRemember": "記住我的選擇，不再詢問",
   "appName": "ArchoeraMusic",
-  "brandNetease": "網易雲音樂",
-  "brandKugou": "酷狗音樂",
+  "brandNetease": "NT",
+  "brandKugou": "KG",
   "commonBack": "返回",
   "commonCancel": "取消",
   "commonClose": "關閉",
@@ -203,8 +203,8 @@
   "commonDone": "完成",
   "commonUnknownError": "未知錯誤",
   "commonSongCountHint": "共 {count} 首歌曲 · 點擊播放",
-  "platformNetease": "網易雲",
-  "platformKugou": "酷狗",
+  "platformNetease": "NT",
+  "platformKugou": "KG",
   "platformAll": "聚合",
   "toastPlayedAll": "已播放全部 {count} 首",
   "toastPlayFailed": "播放失敗：{msg}",
@@ -1023,7 +1023,7 @@
   "streamingAlbumSongs": "{count} 首歌曲",
   "streamingArtistAlbums": "{count} 張專輯",
   "streamingPlaylistSongs": "{count} 首歌曲",
-  "brandQqMusic": "QQ 音樂",
+  "brandQqMusic": "QM",
   "platformQQMusic": "QQ 音樂",
   "loginQqQrLogin": "QQ 音樂掃碼登入",
   "loginQqTypeQq": "QQ",
@@ -1046,5 +1046,6 @@
   "searchPlatformError": "平台傳回錯誤（{code}）",
   "searchWaitRetry": "請求過於頻繁，請稍候再試",
   "qqMusicDownloadUnsupported": "QQ 音樂暫不支援下載（風控）。",
-  "qqMusicDownloadSkipped": "已略過 {count} 首 QQ 音樂（暫不支援下載）。"
+  "qqMusicDownloadSkipped": "已略過 {count} 首 QQ 音樂（暫不支援下載）。",
+  "platformQqMusic": "QM"
 }

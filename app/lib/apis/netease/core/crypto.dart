@@ -1,4 +1,4 @@
-/// 网易云 API 加解密层（Dart 移植）——对齐 apis/netease/core/crypto.ts。
+/// NT API 加解密层（Dart 移植）——对齐 apis/netease/core/crypto.ts。
 ///
 /// - weapi：AES-CBC(PRESET_KEY) → AES-CBC(secretKey) → RSA 裸加密(encSecKey)
 /// - eapi：AES-ECB(hex 大写)，签名 = md5(`nobody${url}use${text}md5forencrypt`)

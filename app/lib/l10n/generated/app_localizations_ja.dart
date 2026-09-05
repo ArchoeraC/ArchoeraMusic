@@ -147,10 +147,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get appName => 'ArchoeraMusic';
 
   @override
-  String get brandNetease => 'Netease Music';
+  String get brandNetease => 'NT';
 
   @override
-  String get brandKugou => 'Kugou Music';
+  String get brandKugou => 'KG';
 
   @override
   String get commonBack => '戻る';
@@ -675,10 +675,10 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => 'NetEase';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => 'Kugou';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => 'すべて';
@@ -3396,7 +3396,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get brandQqMusic => 'QQ ミュージック';
+  String get brandQqMusic => 'QM';
 
   @override
   String get platformQQMusic => 'QQ ミュージック';
@@ -3452,4 +3452,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String qqMusicDownloadSkipped(Object count) {
     return 'QQ Music の $count 曲はスキップ（ダウンロード非対応）。';
   }
+
+  @override
+  String get platformQqMusic => 'QM';
 }

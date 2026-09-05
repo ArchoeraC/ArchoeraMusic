@@ -201,7 +201,7 @@ class DownloaderEngine {
   }
 
   /// 清除设备指纹（动态指纹开关开启路径）：回退旧版「每次启动随机」动态值
-  /// 行为（酷狗 mid 下一次取值惰性生成会话随机；网易 cookie 字段回落随机）。
+  /// 行为（KG mid 下一次取值惰性生成会话随机；网易 cookie 字段回落随机）。
   int clearDownloaderIdentity() {
     _ensureInit();
     return _lib.clearDownloaderIdentity();

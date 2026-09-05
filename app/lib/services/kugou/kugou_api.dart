@@ -1,4 +1,4 @@
-/// 酷狗 API 封装（Dart 直连，对齐 apis/kugou + KuGouMusicApi）。
+/// KG API 封装（Dart 直连，对齐 apis/kugou + KuGouMusicApi）。
 ///
 /// - 搜索：mobilecdn.kugou.com（带封面，http）→ 兜底 songsearch.kugou.com
 /// - 取 URL：gateway.kugou.com/v5/url（android 签名 + key + 真实 dfid）
@@ -37,7 +37,7 @@ export 'kugou_types.dart';
 /// 会话在宿主会话存储中的平台键。
 const _kugouSessionPlatform = 'kugou';
 
-/// 酷狗 API 封装。
+/// KG API 封装。
 class KugouApi extends ChangeNotifier {
   KugouApi() {
     session = _restoreSession();
@@ -160,7 +160,7 @@ class KugouApi extends ChangeNotifier {
     return _searchLegacy(keyword, page, limit);
   }
 
-  /// 下载前补齐酷狗 hash 链：按 title 重新 mobilecdn 搜索，把匹配条目的
+  /// 下载前补齐KG hash 链：按 title 重新 mobilecdn 搜索，把匹配条目的
   /// 高音质 hash（320k/flac/flac24bit）合并进 [track]（原 hash 优先，缺档补上）。
   /// 历史/收藏/歌单等入口恢复的旧 Track 可能只有 128k hash，直接下载会被
   /// 静默降级；此方法保证下载能用上最高可用音质。已完整或无匹配返回 null。
@@ -327,7 +327,7 @@ class KugouApi extends ChangeNotifier {
 
   // ─── 热搜 / 搜索建议（补全） ─────────────────────────────────────
 
-  /// 酷狗热搜（mobilecdn /api/v3/search/hot，公网无鉴权）。
+  /// KG热搜（mobilecdn /api/v3/search/hot，公网无鉴权）。
   ///
   /// 返回 [HotSearchItem]（keyword 为热词，score 可能缺失）；接口失败抛
   /// [KgApiException] 由调用方兜底静默。
@@ -351,7 +351,7 @@ class KugouApi extends ChangeNotifier {
         .toList();
   }
 
-  /// 酷狗搜索建议（gateway /v2/getSearchTip，对齐 KuGouMusicApi
+  /// KG搜索建议（gateway /v2/getSearchTip，对齐 KuGouMusicApi
   /// search_suggest.js：Android 签名 + `x-router: searchtip.kugou.com`）。
   ///
   /// 解析 `data.music_tip`（歌曲）与 `data.album_tip`（专辑）；建议条目
@@ -662,7 +662,7 @@ class KugouApi extends ChangeNotifier {
   /// 每日推荐（需登录；未登录抛异常提示）。
   Future<List<Track>> everydayRecommend() async {
     if (session == null) {
-      throw KgApiException('每日推荐需要登录酷狗账号');
+      throw KgApiException('每日推荐需要登录KG账号');
     }
     final resp = await _gateway(
       '/everyday_song_recommend',
@@ -996,7 +996,7 @@ class KugouApi extends ChangeNotifier {
     }).toList();
   }
 
-  /// 拉取酷狗用户曲库并按归属分类（创建的歌单 / 收藏的歌单 / 收藏的专辑）。
+  /// 拉取KG用户曲库并按归属分类（创建的歌单 / 收藏的歌单 / 收藏的专辑）。
   ///
   /// 对齐 MoeKoeMusic Library.vue 对 `/v7/get_all_list` 的解析：
   /// - `list_create_userid == 登录 userid` 或 `name == '我喜欢'` → 创建的歌单；
@@ -1111,7 +1111,7 @@ class KugouApi extends ChangeNotifier {
   /// 前 ~600 首（实测 1271 首歌单仅拉到 596 首，且第二页起 count 字段
   /// 被改写为剩余量）。gid 仅在 listid 缺失时兜底。
   /// 返回**倒序**（接口按收藏先后排列，最新收藏在最后 → 反转后最新在前，
-  /// 对齐网易云 [likedSongs] 的展示语义）。
+  /// 对齐NT [likedSongs] 的展示语义）。
   Future<List<Track>> likedTracks() async {
     final listid = await likeListId();
     if (listid != null) {
@@ -1122,9 +1122,9 @@ class KugouApi extends ChangeNotifier {
     return (await playlistTracksAllNew(gid, gid: gid)).reversed.toList();
   }
 
-  /// 酷狗红心 hash 集合（轻量：分页只取 hash，不构造/保存 Track、不写库）。
+  /// KG红心 hash 集合（轻量：分页只取 hash，不构造/保存 Track、不写库）。
   ///
-  /// 对齐网易云 [likedIds]（likelist）语义——红心状态与「我喜欢」列表
+  /// 对齐NT [likedIds]（likelist）语义——红心状态与「我喜欢」列表
   /// 解耦：启动/登录态变化时由 LikeController 做轻量 id 同步（避免启动
   /// 期全量 Track 拉取 + 写库被杀进程/写失败），全量列表仅进收藏页才拉。
   Future<Set<String>> likedHashSet() async {
@@ -1174,7 +1174,7 @@ class KugouApi extends ChangeNotifier {
   /// bitrate, album_id, mixsongid}]`，query 带 `last_time/last_area`。
   Future<void> addToLike(Track track) async {
     final s = session;
-    if (s == null) throw KgApiException('需要登录酷狗账号');
+    if (s == null) throw KgApiException('需要登录KG账号');
     final listid = await likeListId();
     if (listid == null) throw KgApiException('未找到「我喜欢」歌单');
     final hash = track.kugou?.hash ?? '';
@@ -1222,7 +1222,7 @@ class KugouApi extends ChangeNotifier {
   /// 曲目无 fileid 字段，此时按 hash 从「我喜欢」歌单反查补全。
   Future<void> removeFromLike(Track track) async {
     final s = session;
-    if (s == null) throw KgApiException('需要登录酷狗账号');
+    if (s == null) throw KgApiException('需要登录KG账号');
     final listid = await likeListId();
     if (listid == null) throw KgApiException('未找到「我喜欢」歌单');
     var fileid = track.kugou?.fileid;

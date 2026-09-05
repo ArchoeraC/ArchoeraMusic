@@ -377,13 +377,13 @@ abstract class AppLocalizations {
   /// No description provided for @brandNetease.
   ///
   /// In zh_CN, this message translates to:
-  /// **'网易云音乐'**
+  /// **'NT'**
   String get brandNetease;
 
   /// No description provided for @brandKugou.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗音乐'**
+  /// **'KG'**
   String get brandKugou;
 
   /// No description provided for @commonBack.
@@ -1331,13 +1331,13 @@ abstract class AppLocalizations {
   /// No description provided for @platformNetease.
   ///
   /// In zh_CN, this message translates to:
-  /// **'网易云'**
+  /// **'NT'**
   String get platformNetease;
 
   /// No description provided for @platformKugou.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗'**
+  /// **'KG'**
   String get platformKugou;
 
   /// No description provided for @platformAll.
@@ -6251,7 +6251,7 @@ abstract class AppLocalizations {
   /// No description provided for @brandQqMusic.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐'**
+  /// **'QM'**
   String get brandQqMusic;
 
   /// No description provided for @platformQQMusic.
@@ -6343,6 +6343,12 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'已跳过 {count} 首 QQ 音乐（暂不支持下载）。'**
   String qqMusicDownloadSkipped(Object count);
+
+  /// No description provided for @platformQqMusic.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QM'**
+  String get platformQqMusic;
 }
 
 class _AppLocalizationsDelegate

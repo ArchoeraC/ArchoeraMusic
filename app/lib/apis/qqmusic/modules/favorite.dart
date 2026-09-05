@@ -1,6 +1,6 @@
 /// QM「我喜欢」（红心收藏，dirid=201）模块——**实验性**（社区逆向 RPC）。
 ///
-/// QQ 音乐把「♥ / 我喜欢」实现为一个**特殊目录歌单 dirid=201**（非普通
+/// QM把「♥ / 我喜欢」实现为一个**特殊目录歌单 dirid=201**（非普通
 /// disstid 歌单）。本模块按社区 OSS 逆向实现三个操作：
 ///
 /// - 读列表：`music.srfDissInfo.DissInfo / CgiGetDiss`（`disstid:0` +
@@ -11,7 +11,7 @@
 /// - 取消红心：`music.musicasset.PlaylistDetailWrite / DelSonglist`（同上）。
 ///
 /// ## 调研来源（2026-09-05 检索，均为近期活跃仓库）
-/// 1. `ylw1997/touchFish` `src/api/qqmusic.ts`（Mac 菜单栏 QQ 音乐播放器；
+/// 1. `ylw1997/touchFish` `src/api/qqmusic.ts`（Mac 菜单栏 QM播放器；
 ///   该文件最近提交 2026-08-24）：`getMyFavorite` dirid=201 读列表、
 ///   `addSongsToPlaylist/removeSongsFromPlaylist` dirId=201 增删；
 /// 2. `L-1124/QQMusicApi`（Python 封装库；`qqmusic_api/modules/user.py`
@@ -226,7 +226,7 @@ Future<Map<String, dynamic>> _writeFavorite(
     'code': 200,
     'loggedIn': true,
     'ok': ok,
-    'message': ok ? '' : 'QQ 音乐收藏写接口未确认（result.updateTime 缺失）',
+    'message': ok ? '' : 'QM收藏写接口未确认（result.updateTime 缺失）',
   };
 }
 
