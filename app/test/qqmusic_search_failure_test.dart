@@ -63,6 +63,64 @@ void main() {
     expect(calls, 1, reason: '风控错误不应自动重试（防刷高风控）');
   });
 
+  test('code0 但 meta.is_filter<0（额外验证过滤为空）→ 归 risk，且只发一次', () async {
+    // 实测 QQ 被「额外验证」拦时存在 request.code=0、但 meta.is_filter=-2 +
+    // estimate_sum 有值 + 结果体被过滤为空的形态：此前会被当作成功空结果
+    // 静默返回，既不提示也不进冷却。此处应归一为 risk（不自动重试）。
+    var calls = 0;
+    qmHttpTransport = (body, {extraHeaders, url}) async {
+      calls++;
+      return {
+        'code': 0,
+        'request': {
+          'code': 0,
+          'data': {
+            'body': <String, Object>{},
+            'meta': {'is_filter': -2, 'estimate_sum': 74266, 'sum': 0},
+          },
+        },
+      };
+    };
+
+    await expectLater(
+      api.searchSongs('周杰伦'),
+      throwsA(
+        isA<QqApiException>()
+            .having((e) => e.kind, 'kind', QmErrorKind.risk)
+            .having((e) => e.innerCode, 'innerCode', 2001),
+      ),
+    );
+    expect(calls, 1, reason: '额外验证过滤不应自动重试（防刷高风控）');
+  });
+
+  test('code0 且 is_filter=0 的正常响应不受影响', () async {
+    qmHttpTransport = (body, {extraHeaders, url}) async {
+      return _okBody({
+        'body': {
+          'item_song': [
+            {
+              'id': 1,
+              'mid': '004Z8Ihr0JIu5s',
+              'title': '晴天',
+              'interval': 269,
+              'singer': [
+                {'id': 2, 'mid': '003Nz2So3XXYek', 'name': '周杰伦'},
+              ],
+              'album': {'mid': '004Z8Ihr0JIu5s', 'name': '叶惠美'},
+              'file': {'media_mid': '004Z8Ihr0JIu5s', 'size_128mp3': 1},
+              'pay': {'pay_play': 0},
+            },
+          ],
+        },
+        'meta': {'is_filter': 0, 'estimate_sum': 74266, 'sum': 1},
+      });
+    };
+
+    final r = await api.searchSongs('晴天 周杰伦', page: 1, limit: 30);
+    expect(r.items, hasLength(1));
+    expect(r.items.first.title, '晴天');
+  });
+
   test('传输级瞬时错误 → 退避重试 3 次后抛 transient', () async {
     var calls = 0;
     qmHttpTransport = (body, {extraHeaders, url}) async {
