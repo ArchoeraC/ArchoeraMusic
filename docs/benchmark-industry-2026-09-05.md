@@ -239,3 +239,10 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng \
 - 配套既有基准驱动器：`tests/bench/run_bench.py`（Stable vs Era 全矩阵 OGG 管线，旧口径）、
   `tests/bench/gen_samples.sh`、`tests/bench/make_report.py`。
 - `zig build test` 596/596 不受本文档/脚本改动影响（未触碰 kernel/src/build.zig）。
+
+
+## 2026-09-06 更新（FLAC 提速后）
+
+- FLAC io 前瞻缓存修复后重跑 scorecard（`tests/bench/SCORE_2026-09-06.md` / data/SCORE_2026-09-06.csv，语料标准集）：
+  flac 由 97.9(A+，speed 欠分) → **100.0(A+)**；EraAudio 平均总分 **95.6 → 95.7**（相对 Stable/FFmpeg 97.6 = **98.1%**，Δ-1.9）。
+- 短板的“flac 直解慢”已消除（见 docs/engine-integration-bench.md §10）；本报告主表为 2026-09-05 快照，重跑命令见 §4/scorecard.py。
