@@ -85,6 +85,24 @@ const _retryBackoffMs = 300;
 /// `data.meta.is_filter=-12`、结果体为空）。
 const int _qmRiskInnerCode = 2001;
 
+/// 探测「额外验证 / 风控过滤」响应：外层/内层 code 均为 0，但
+/// `data.meta.is_filter` 为负（实测 -2 需额外验证 / -12 风控限流）且结果体被
+/// 过滤为空。返回负的 is_filter 值；正常响应返回 null。
+///
+/// 不加此探测时，这类响应会被当作「成功空结果」静默返回，既不提示用户也
+/// 不会进入 20s 冷却，容易造成反复重试把风控阈值刷得更高。
+int? _isFilterValueOf(Object? reqData) {
+  if (reqData is! Map) return null;
+  final meta = reqData['meta'];
+  if (meta is! Map) return null;
+  final v = meta['is_filter'];
+  if (v is num) {
+    final iv = v.toInt();
+    if (iv < 0) return iv;
+  }
+  return null;
+}
+
 /// 当前传输实现（默认直连；测试注入 fake 后由 [qmPostRaw] 统一出口）。
 QmHttpTransport qmHttpTransport = _defaultTransport;
 
@@ -305,7 +323,8 @@ Future<T> qmRequest<T>(
   };
 
   // 瞬时网络错误自动重试（带退避）；业务码错误：
-  // - inner/outer = 2001（风控/限流）**不自动重试**，直接抛 risk，避免刷高风控；
+  // - inner/outer = 2001（风控/限流）或 `meta.is_filter<0`（额外验证/风控过滤）
+  //   **均不自动重试**，直接抛 risk，避免刷高风控；
   // - 其余非零业务码按上游做法退避重试后再抛 code。
   Object? lastErr;
   for (var attempt = 0; attempt <= _maxRetry; attempt++) {
@@ -317,6 +336,19 @@ Future<T> qmRequest<T>(
           request is Map ? _codeOf(request['code']) : 0;
       if (outerCode == 0 && innerCode == 0) {
         final reqData = request is Map ? request['data'] : null;
+        final filterValue = _isFilterValueOf(reqData);
+        if (filterValue != null) {
+          // 服务端以 code 0 放行的「额外验证 / 风控过滤」响应（搜索/浏览类
+          // 接口带 meta.is_filter）。归一到 _qmRiskInnerCode 同一风控族，
+          // 让 UI 冷却与「停止自动重试」逻辑一致；真实原因保留在 message。
+          throw QmRequestException(
+            'QQ 音乐接口触发额外验证/风控过滤'
+            '（meta.is_filter=$filterValue，结果被过滤为空），已停止自动重试',
+            kind: QmErrorKind.risk,
+            outer: outerCode,
+            inner: _qmRiskInnerCode,
+          );
+        }
         return reqData as T;
       }
       final risk =
