@@ -103,7 +103,7 @@ rem .def 导出表（Dart FFI lookup 符号）
 >> build\fft.def echo     fft_destroy
 
 echo [build_windows] 编译 fft.dll...
-cl /nologo /O2 /MD /LD /I include /I src src\fft.c /Fe:build\fft.dll /link /DEF:build\fft.def
+cl /nologo /O2 /std:c11 /MD /LD /I include /I src src\fft.c /Fe:build\fft.dll /link /DEF:build\fft.def
 if errorlevel 1 exit /b 1
 
 rem --- 自研解码内核（EraAudio, Zig 静态库, windows-msvc ReleaseFast）---
@@ -127,7 +127,7 @@ echo             安装 Zig 0.16（https://ziglang.org/download）后重跑可�
 :zig_done
 
 echo [build_windows] 编译 archoera_mediaengine.dll...
-cl /nologo /O2 /MD /LD /I include /I src /I include\compat /I "%VCPKG_PREFIX%\include" ^
+cl /nologo /O2 /std:c11 /MD /LD /I include /I src /I include\compat /I "%VCPKG_PREFIX%\include" ^
     src\mediaengine_lib.c src\tempo.c src\decoder.c src\resampler.c ^
     src\encoder.c src\equalizer.c src\loudness.c src\limiter.c ^
     src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
