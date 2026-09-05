@@ -7,6 +7,7 @@
 
 const std = @import("std");
 const tables = @import("tables.zig");
+const builtin = @import("builtin");
 
 // glibc libm（与 reference C 同一实现，保证 expf/powf/log10f/sinf 位精确一致）。
 // 注意：Zig 会把 extern "c" 的 libm 符号静态解析到其自带 libm 实现（与 glibc
@@ -19,6 +20,7 @@ var libm_handle: ?*anyopaque = null;
 var libm_inited = false;
 
 fn libmSym(comptime name: [:0]const u8, comptime T: type) ?T {
+    if (builtin.os.tag != .linux) return null; // 非 Linux 直接用内置 libm
     if (!libm_inited) {
         libm_inited = true;
         libm_handle = dlopen("libm.so.6", RTLD_NOW);

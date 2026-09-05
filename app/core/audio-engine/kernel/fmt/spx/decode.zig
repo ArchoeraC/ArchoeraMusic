@@ -8,6 +8,7 @@
 //!   - exc_buf 以「基址 + 有符号偏移」访问，等价 C 的 exc 指针负回看。
 
 const std = @import("std");
+const builtin = @import("builtin");
 const t = @import("data.zig");
 
 // ---------------------------------------------------------------------------
@@ -247,6 +248,7 @@ extern "c" fn dlopen(filename: ?[*:0]const u8, flags: c_int) ?*anyopaque;
 extern "c" fn dlsym(handle: ?*anyopaque, symbol: [*:0]const u8) ?*anyopaque;
 
 fn cosfGlibc(x: f32) f32 {
+    if (builtin.os.tag != .linux) return @cos(x); // 非 Linux（win/mac）直接用内置
     if (!cosf_inited) {
         cosf_inited = true;
         // 经 dlopen("libm.so.6"/"libm.so.0") 取系统 libm 的 cosf（与 ffmpeg 所链
