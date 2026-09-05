@@ -432,7 +432,8 @@ fn seekToSample(f: *FlacCtx, target: u64) Error!void {
             pt = p;
         }
         if (pt) |p| {
-            try f.reader.seek(@intCast(p.stream_offset), .start);
+            const pos = (try seektableFrameStart(f, p.stream_offset)) orelse p.stream_offset;
+            try f.reader.seek(@intCast(pos), .start);
             f.samples_done = p.sample_number;
         } else {
             try f.reader.seek(@intCast(f.audio_start), .start);
@@ -452,12 +453,35 @@ fn seekToSample(f: *FlacCtx, target: u64) Error!void {
         f.samples_done = 0; // 由解码帧头回填
     }
 
-    // 解码丢弃至目标样本
+    // 解码丢弃至目标样本（坏帧 → 重同步跳过继续，与 readImpl 容错语义一致）
     while (f.samples_done < target) {
-        const r = (try decodeOneFrame(f)) orelse break;
+        const r = (decodeOneFrame(f) catch |err| switch (err) {
+            error.Corrupt => {
+                if (!try resyncToNextFrame(f)) break; // 无法定位后续帧：停在当前
+                continue;
+            },
+            else => return err,
+        }) orelse break;
         f.samples_done = r.sample_index + r.blocksize;
+        f.cur_blocksize = r.blocksize;
     }
     f.frame_cursor = f.cur_blocksize;
+}
+
+/// SEEKTABLE 帧起点定位：seekpoint 的 stream_offset 依 FLAC 规范（§SEEKTABLE）
+/// 为「相对首个音频帧」的偏移，但存在编码器/工具按文件绝对偏移写入，逐候选
+/// 校验帧头（CRC-8 + 一致性），全部失败再从候选起点前向扫描兜底。
+/// 返回真实帧起点；找不到返回 null。
+fn seektableFrameStart(f: *FlacCtx, sp_off: u64) Error!?u64 {
+    const file_size = try f.reader.size();
+    // 候选 1：规范相对偏移（音频起点 + 表中偏移）
+    const rel = f.audio_start +% sp_off;
+    if (rel < file_size and isValidFrameStart(f, rel)) return rel;
+    // 候选 2：绝对偏移（历史/容错兼容）
+    if (sp_off < file_size and isValidFrameStart(f, sp_off)) return sp_off;
+    // 兜底：从较早候选前向扫描定位真实帧边界（防落点越过目标，取较早者）
+    const scan_from = if (rel < file_size) @min(rel, f.audio_start) else f.audio_start;
+    return scanForFrame(f, scan_from);
 }
 
 /// 从 start 起逐块扫描 FLAC 帧同步（0xFF + 高 5 位 0xF8 模式），
@@ -921,6 +945,73 @@ test "flac 集成: seektable 定位 + 帧对齐 seek" {
     const n2 = try dec.read(&out, 1, &ch);
     try testing.expectEqual(@as(usize, 1), n2);
     try testing.expectEqualSlices(u8, &.{ 0x01, 0x00 }, &out); // 1
+}
+
+test "flac 集成: SEEKTABLE 规范相对偏移（音频起点 + 表中偏移）seek" {
+    // 回归：seekpoint stream_offset 依 FLAC 规范为「相对首个音频帧」偏移（音频
+    // 起点后常有 PICTURE/VORBIS_COMMENT 等大块元数据）；此前按文件绝对偏移 seek
+    // 会落进元数据区 → Corrupt，导致 EraAudio 断点续播/播放中 seek 失败。
+    // 6 帧 verbatim（blocksize 4096），值 1..24576；SEEKTABLE 每帧一点（相对偏移）。
+    const bs: u16 = 4096;
+    var w = TestBits.init();
+    defer w.deinit();
+    var v: i32 = 1;
+    for (0..6) |fi| {
+        const start = try writeFrameHeader(&w, fi, bs, 0, 16);
+        var buf: [4096]i32 = undefined;
+        for (&buf) |*s| {
+            s.* = v;
+            v += 1;
+        }
+        try writeVerbatimSubframe(&w, &buf, 16);
+        try finishFrame(&w, start);
+    }
+    const frames = try w.toOwnedSlice();
+    defer testing.allocator.free(frames);
+
+    const seek_points_bytes = 6 * 18;
+    const audio_start = 4 + 38 + 4 + seek_points_bytes;
+    const frame_len: usize = frames.len / 6;
+
+    var stream = std.ArrayList(u8).empty;
+    defer stream.deinit(testing.allocator);
+    try stream.appendSlice(testing.allocator, "fLaC");
+    try stream.appendSlice(testing.allocator, &.{ 0x00, 0x00, 0x00, 0x22 });
+    try stream.appendSlice(testing.allocator, &makeStreamInfoBytes(44100, 1, 16, 24576, bs));
+    try stream.appendSlice(testing.allocator, &.{ 0x83, 0x00, 0x00, 0x6C });
+    var pt: [6 * 18]u8 = undefined;
+    for (0..6) |i| {
+        std.mem.writeInt(u64, pt[i * 18 ..][0..8], i * bs, .big);
+        std.mem.writeInt(u64, pt[i * 18 ..][8..16], i * frame_len, .big); // 相对音频起点
+        std.mem.writeInt(u16, pt[i * 18 ..][16..18], bs, .big);
+    }
+    try stream.appendSlice(testing.allocator, &pt);
+    try stream.appendSlice(testing.allocator, frames);
+    const file = try stream.toOwnedSlice(testing.allocator);
+    defer testing.allocator.free(file);
+    try testing.expect(audio_start > 0);
+
+    var info: decoder.Info = undefined;
+    var dec = try openMem(testing.allocator, file, &info);
+    defer dec.deinit();
+
+    // seek ~317ms → 定位帧 3（样本 12288）后解码丢弃，帧对齐落在帧 4（值 16385）
+    try dec.seekMs(317);
+    var out: [2]u8 = undefined;
+    var ch: u8 = 0;
+    const n = try dec.read(&out, 1, &ch);
+    try testing.expectEqual(@as(usize, 1), n);
+    try testing.expectEqualSlices(u8, &.{ 0x01, 0x40 }, &out); // 16385 LE（帧 4 起点）
+
+    // seek 回开头 & 再跳 317ms（重复 seek 不漂移、不报 Corrupt）
+    try dec.seekMs(0);
+    const n0 = try dec.read(&out, 1, &ch);
+    try testing.expectEqual(@as(usize, 1), n0);
+    try testing.expectEqualSlices(u8, &.{ 0x01, 0x00 }, &out); // 1
+    try dec.seekMs(317);
+    const n2 = try dec.read(&out, 1, &ch);
+    try testing.expectEqual(@as(usize, 1), n2);
+    try testing.expectEqualSlices(u8, &.{ 0x01, 0x40 }, &out); // 16385 LE
 }
 
 test "flac 集成: 无 seektable 时估算 + sync 扫描 seek" {

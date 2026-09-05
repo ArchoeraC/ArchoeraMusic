@@ -1278,7 +1278,27 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     // 才到达，若以它作启动门槛，会话会一直处于 buffering/loading、playAll 等
     // 等待启动的调用挂到整曲播完（表现为「播放全部」卡死、期间无法切曲）。
     // ready（其后紧跟 playing）才是「会话已可出声」的收敛点。
-    await engine.started;
+    //
+    // 就绪等待设上限（30s）：引擎就绪迟迟不来（如网络开流/异常源把引擎线程
+    // 卡在阻塞 open）时不再无限 buffering/挂等 seek 的重启会话——超时即停掉
+    // 该引擎并按失败收敛（seek 在等待 started 期间不挂死）。
+    var startedInTime = false;
+    try {
+      await engine.started.timeout(const Duration(seconds: 30));
+      startedInTime = true;
+    } on TimeoutException {
+      _log('引擎就绪等待超时（30s），放弃该会话（seek/load 不挂死）');
+      startedInTime = false;
+    }
+    if (!startedInTime) {
+      // 等待期间被更新的 load 取代：让新会话继续，不抛错打扰
+      if (gen != 0 && gen != _loadGen) return;
+      if (!identical(_engine, engine)) return;
+      state = state.copyWith(buffering: false);
+      // ignore: discarded_futures
+      unawaited(engine.stop());
+      throw StateError('引擎启动超时（30s），已停止该会话');
+    }
     // 就绪前/就绪期间被更新的 load 取代（stop 已放行 started）：不进入后续
     // 收尾，引擎已被新会话停掉，此处仅结束本代任务
     if (gen != 0 && gen != _loadGen) {

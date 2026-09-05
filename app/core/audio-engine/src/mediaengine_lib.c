@@ -569,12 +569,21 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
 
 /* 重建会话（seek / 新解码段）：以 abs_start_ms（源绝对 ms）重建管线 + 输出
  * 文件；流播放器对象保留（设备不重建），游标基置 pos_base（事件 rel 基准）。
- * 调用前旧管线由调用方负责停喂。返回 0 成功。 */
+ * 事务式：先建好新管线/输出再停旧（失败返回 -1 且旧会话原样保留——seek 永不
+ * 因重建失败把引擎拖停；调用方只回执错误，主循环继续旧流）。返回 0 成功。 */
 static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_ms,
                                       double pos_base)
 {
     EngineConfig cfg2 = e->cfg;
+    AudioPipeline *np;
+
     cfg2.start_offset_ms = abs_start_ms;
+    /* 1) 先建新管线（含解码 seek；native 失败内部已回退 FFmpeg）——旧会话不动 */
+    np = pipeline_create(e->source, &cfg2, dummy_output, NULL);
+    if (!np) return -1;
+    pipeline_set_playback_streaming(np, true);
+
+    /* 2) 新管线就绪 → 停旧设备/缓冲、销毁旧管线与输出文件 */
     if (e->player && e->player_stream_mode) {
         player_stream_seek_reset(e->player); /* 停设备、清缓冲、游标归零 */
     }
@@ -582,8 +591,7 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
     if (e->wav) { fclose(e->wav); e->wav = NULL; }
     if (e->pcm) { fclose(e->pcm); e->pcm = NULL; }
 
-    e->p = pipeline_create(e->source, &cfg2, dummy_output, NULL);
-    if (!e->p) return -1;
+    e->p = np;
     if (e->player_file) {
         wav_begin(e); /* 截断重建 stream.wav */
         pipeline_set_playback_streaming(e->p, true);
@@ -633,7 +641,9 @@ static int mediaengine_stream_begin(ArchoeraMediaEngine *e)
     return 1;
 }
 
-/* 流式播放中 seek（rel 相对 session offset）→ 重建管线 + 播放器归位。 */
+/* 流式播放中 seek（rel 相对 session offset）→ 重建管线 + 播放器归位。
+ * 重建失败（解码器开不了目标段/设备不可用）不拖停引擎：回执错误，主循环沿用
+ * 旧流继续（旧会话未被销毁），用户可再次 seek/暂停，绝不「卡死/静音挂起」。 */
 static void mediaengine_stream_seek(ArchoeraMediaEngine *e, double rel_ms)
 {
     double dur_ms = pipeline_get_duration(e->p) * 1000.0;
@@ -642,8 +652,7 @@ static void mediaengine_stream_seek(ArchoeraMediaEngine *e, double rel_ms)
     abs_ms = (double)e->session_offset_ms + rel_ms;
     if (dur_ms > 0 && abs_ms > dur_ms) abs_ms = dur_ms;
     if (mediaengine_stream_rebuild(e, (int64_t)abs_ms, rel_ms) != 0) {
-        ev_enqueue(e, "{\"type\":\"error\",\"message\":\"seek 重建会话失败\"}");
-        e->stop_requested = 1;
+        ev_enqueue(e, "{\"type\":\"error\",\"message\":\"seek 重建会话失败，沿用当前播放\"}");
         return;
     }
     /* 立即确认位置（UI 立即回填；随后按设备消费继续推 position） */
@@ -656,16 +665,16 @@ static void mediaengine_stream_seek(ArchoeraMediaEngine *e, double rel_ms)
 }
 
 /* 流式主循环：解码（背压≈实时）→ 喂设备，穿插处理命令/位置事件；
- * EOF+flush 后喂完剩余即自然结束。返回 0 正常 / <0 错误码。 */
+ * EOF+flush 后喂完剩余即自然结束；缓冲排空期间若收到 seek（重建出新管线），
+ * 回到解码循环续播新段（seek 永不因「已在曲尾排空」而静默失效/挂死）。
+ * 返回 0 正常 / <0 错误码。 */
 static int mediaengine_stream_run(ArchoeraMediaEngine *e)
 {
     int code = 0;
 
-    for (;;) {
+    while (!e->stop_requested) {
         char line[CMD_LINE + 1];
         int playing = 1;
-
-        if (e->stop_requested) break;
 
         /* 暂停（设备停）时不解码：ring 满会自阻塞，且无需超前解码 */
         if (e->player) player_get_state(e->player, &playing, NULL, NULL);
@@ -693,6 +702,8 @@ static int mediaengine_stream_run(ArchoeraMediaEngine *e)
             }
         }
 
+        if (!e->p) break; /* 防御：无管线不进入解码 */
+
         ssize_t n = pipeline_process(e->p);
         if (n < 0) {
             char err[160];
@@ -700,41 +711,49 @@ static int mediaengine_stream_run(ArchoeraMediaEngine *e)
                 "{\"type\":\"error\",\"message\":\"pipeline error %zd\"}", (size_t)n);
             ev_enqueue(e, err);
             code = (int)n;
-            break;
-        }
-        if (n == 0) break; /* EOF */
-
-        while (cmd_dequeue(e, line, sizeof(line))) {
-            handle_command(e, line);
-        }
-        if (e->player) player_poll(e->player);
-    }
-
-    if (!e->stop_requested) {
-        int ret = pipeline_run(e->p); /* flush 残留（最后喂入缓冲） */
-        if (ret < 0) {
-            char err[160];
-            snprintf(err, sizeof(err), "{\"type\":\"error\",\"message\":\"flush %d\"}", ret);
-            ev_enqueue(e, err);
-            code = ret;
-        } else {
-            ev_enqueue(e, "{\"type\":\"done\"}");
-        }
-        if (e->wav) wav_finalize(e);
-        if (e->player && e->player_stream_mode) {
-            player_stream_end(e->player);
-            /* 缓冲尾段播完即自然结束；期间继续响应命令（含拖停） */
-            while (!e->stop_requested) {
-                char line[CMD_LINE + 1];
-                if (e->player && player_poll(e->player)) {
-                    break; /* 播放结束 */
-                }
-                while (cmd_dequeue(e, line, sizeof(line))) {
-                    handle_command(e, line);
-                }
-                struct timespec ts = {0, 20 * 1000000L};
-                nanosleep(&ts, NULL);
+            /* 对齐原语义：解码错误后仍执行 flush + 收尾（WAV 头回填/排空） */
+        } else if (n > 0) {
+            while (cmd_dequeue(e, line, sizeof(line))) {
+                handle_command(e, line);
             }
+            if (e->player) player_poll(e->player);
+            continue;
+        }
+
+        /* n == 0（本段 EOF）或解码错误：flush 残留 → 标记解码流结束 → 缓冲尾段播完自然结束 */
+        if (e->stop_requested) break;
+        {
+            int ret = pipeline_run(e->p); /* flush 残留（最后喂入缓冲） */
+            if (ret < 0) {
+                char err[160];
+                snprintf(err, sizeof(err), "{\"type\":\"error\",\"message\":\"flush %d\"}", ret);
+                ev_enqueue(e, err);
+                code = ret;
+                break;
+            }
+            ev_enqueue(e, "{\"type\":\"done\"}");
+            if (e->wav) wav_finalize(e);
+            if (e->player && e->player_stream_mode) {
+                AudioPipeline *eof_pipe = e->p;
+                player_stream_end(e->player);
+                /* 排空期间持续响应命令：seek（重建出新管线）→ 回到解码循环续播 */
+                for (;;) {
+                    if (e->stop_requested) break;
+                    while (cmd_dequeue(e, line, sizeof(line))) {
+                        handle_command(e, line);
+                    }
+                    if (e->p != eof_pipe) break; /* 已重建：新段解码 */
+                    if (e->player && player_poll(e->player)) break; /* 自然结束 */
+                    struct timespec ts = {0, 20 * 1000000L};
+                    nanosleep(&ts, NULL);
+                }
+                if (e->stop_requested) break;
+                if (e->p == eof_pipe) {
+                    break; /* 自然结束（无重建） */
+                }
+                continue; /* seek 重建：回到解码循环续播新段 */
+            }
+            break; /* 非流式（回退路径不会走到这） */
         }
     }
 

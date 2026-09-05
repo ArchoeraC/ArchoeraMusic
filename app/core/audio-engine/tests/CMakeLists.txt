@@ -44,5 +44,23 @@ add_test(NAME test_mediaengine_wait
          COMMAND test_mediaengine_wait
                  ${CMAKE_CURRENT_SOURCE_DIR}/../samples/aac/t48_m.wav)
 
+# EraAudio 原生内核 offset/seek 回归（headless：无音频设备依赖）。
+# fixture = 带 SEEKTABLE + PICTURE 的 FLAC（seekpoint 偏移为规范相对音频起点）；
+# 旧实现按绝对偏移 seek 落进元数据区 → Corrupt → 断点续播/seek 失败。
+# tempo.c 以无 HAS_TEMPO 的 stub 链接（与 test_mediaengine_wait 同法）。
+add_executable(test_native_seek test_native_seek.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tempo.c
+)
+target_link_libraries(test_native_seek PRIVATE audio_engine_static)
+target_include_directories(test_native_seek PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_native_seek
+         COMMAND test_native_seek
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac)
+set_tests_properties(test_native_seek PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # 集成测试（需要输入文件的跳过 CTEST，仅通过手动运行）
 # add_engine_test(test_pipeline test_pipeline.c)

@@ -299,3 +299,17 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
   在线源（GitHub 检索 clone 需鉴权，未得代码，按其“分开获取+聚合、单源容错”理念本端实现）。
 - 验证：dart analyze 0；新增 failure/state 测试 11 项（2001→risk 1 次、transient 重试、单源降级、冷却门禁）；bundle 393M。
 - 策略：不硬猜/不绕付费；IP 仍 2001 时应用单发+可读提示；建议住宅/真机 IP 验证（形态与上游一致）。
+
+
+## 19. 2026-09-05 流式 seek 卡死 / 断点续播失效（同根）修复
+- 根因：内核 FLAC `seekToSample` 把 seekpoint.stream_offset 当**文件绝对偏移**；规范上它是**相对首个音频帧**的
+  偏移。带大元数据（PICTURE/VORBIS_COMMENT，如用户 NETEASE flac audio_start≈449KB）时 seek 落进元数据 →
+  decodeOneFrame Corrupt → native seek 返回 ZK_CORRUPT → offset 起播（断点续播=start_offset>0）会话永不 ready，
+  播放中 seek 重建失败停播——②是①连带，唯一根因。Stable(FFmpeg) 路径不受影响。
+- 修复：fmt/flac `seektableFrameStart`（规范相对偏移=audio_start+off+CRC 校验，兼容绝对偏移旧编码器，失败前向扫描重同步）；
+  引擎 `mediaengine_stream_rebuild` 事务化（先建新管成功才停旧）、`mediaengine_stream_seek` 失败只回执不拖停、
+  主循环“段循环+排空循环”使 EOF 尾段 seek 能续播新段；`pipeline` native seek 失败自动回退 FFmpeg；
+  Dart `await engine.started` 加 30s 上限（超时按失败收敛）。
+- 验证：zk ABI r=3→0（30/60/120/200s）；FFI 双引擎×多格式多次 seek/offset 起播全部即时；zig 597/597、ctest 6/6、
+  dart analyze 0；新增 flac seektable 回归 + test_native_seek（无头）。注意：真机默认 sink 若漂到蓝牙 HFP 会饿死回调
+  （与本次无关），验证可 ARCHOERA_AUDIO_SINK 钉内置。
