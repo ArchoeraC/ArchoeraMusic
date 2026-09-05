@@ -44,8 +44,8 @@
   "commonCloseConfirmMessage": "メインウィンドウを閉じた後",
   "commonCloseConfirmRemember": "選択を記憶して次回から確認しない",
   "appName": "ArchoeraMusic",
-  "brandNetease": "Netease Music",
-  "brandKugou": "Kugou Music",
+  "brandNetease": "NT",
+  "brandKugou": "KG",
   "commonBack": "戻る",
   "commonCancel": "キャンセル",
   "commonClose": "閉じる",
@@ -203,8 +203,8 @@
   "commonDone": "完了",
   "commonUnknownError": "不明なエラー",
   "commonSongCountHint": "計 {count} 曲 · クリックで再生",
-  "platformNetease": "NetEase",
-  "platformKugou": "Kugou",
+  "platformNetease": "NT",
+  "platformKugou": "KG",
   "platformAll": "すべて",
   "toastPlayedAll": "{count} 曲をすべて再生しました",
   "toastPlayFailed": "再生に失敗しました：{msg}",
@@ -1023,7 +1023,7 @@
   "vaultUnlockFailed": "パスワードが正しくありません。再試行してください",
   "settingsVaultCloseV3PasswordTitle": "デバイスバインドを無効化：新しいパスワードを設定",
   "settingsVaultCloseV3PasswordDesc": "デバイスバインド有効時に復旧パスワード未設定（本機パスワード不要）の場合、無効化するとパスワード保護（v2）に移行します：新しいロック解除パスワードを設定してください。マスターキーと既存データは保持され、このパスワードは起動のたびに入力が必要です。",
-  "brandQqMusic": "QQ ミュージック",
+  "brandQqMusic": "QM",
   "platformQQMusic": "QQ ミュージック",
   "loginQqQrLogin": "QQ ミュージック QR コードでログイン",
   "loginQqTypeQq": "QQ",
@@ -1046,5 +1046,6 @@
   "searchPlatformError": "プラットフォームがエラーを返しました（{code}）",
   "searchWaitRetry": "リクエストが多すぎます。しばらくしてから再試行してください",
   "qqMusicDownloadUnsupported": "QQ Music のダウンロードは現在未対応です（リスク管理）。",
-  "qqMusicDownloadSkipped": "QQ Music の {count} 曲はスキップ（ダウンロード非対応）。"
+  "qqMusicDownloadSkipped": "QQ Music の {count} 曲はスキップ（ダウンロード非対応）。",
+  "platformQqMusic": "QM"
 }

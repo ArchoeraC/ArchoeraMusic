@@ -1,4 +1,4 @@
-/// 网易云 API 传输层：`call(name, params)` 返回网易云原始响应体
+/// NT API 传输层：`call(name, params)` 返回NT原始响应体
 /// （`{result: {...}}` / `{data: [...]}`），由 [NeteaseApi] 统一解析。
 ///
 /// 实现：`ApisNeteaseCaller`（纯 Dart 直连，apis 包全量移植，不经侧车）。
@@ -25,7 +25,7 @@ abstract class NeteaseCaller {
   Future<Map<String, dynamic>?> call(String name, Map<String, dynamic> params);
 }
 
-/// 网易云接口业务异常（code != 200 等；对齐原项目 NeteaseApiError）。
+/// NT接口业务异常（code != 200 等；对齐原项目 NeteaseApiError）。
 class NeteaseApiError implements Exception {
   NeteaseApiError(this.message, [this.body]);
 
@@ -71,7 +71,7 @@ class CoverItem {
   final String source;
 }
 
-/// 音质档位 → 网易云 song_url level 参数（对齐原项目 NETEASE_LEVEL）。
+/// 音质档位 → NT song_url level 参数（对齐原项目 NETEASE_LEVEL）。
 const neteaseLevels = <String, String>{
   'lq': 'standard',
   'sq': 'higher',
@@ -80,7 +80,7 @@ const neteaseLevels = <String, String>{
   'hi-res': 'hires',
 };
 
-/// 网易云 API 核心：传输层 + 业务域 mixin 的公共基类。
+/// NT API 核心：传输层 + 业务域 mixin 的公共基类。
 ///
 /// 业务域 mixin 的 superclass 约束指向本类（避免 `class A with M on A`
 /// 形成循环接口）；最终对外类型是 [NeteaseApi]。
@@ -95,11 +95,11 @@ class NeteaseApiBase {
   ) => _caller.call(name, params);
 }
 
-/// 网易云 API 封装：解析 + 业务方法，传输层由 [NeteaseCaller] 决定
+/// NT API 封装：解析 + 业务方法，传输层由 [NeteaseCaller] 决定
 /// （侧车 RPC 或 Dart 原生直连）。
 ///
 /// 对应原项目 `src/apis/search/netease.ts` + `src/apis/song/netease.ts`；
-/// caller 返回网易云原始响应体（`{result: {...}}` / `{data: [...]}`）。
+/// caller 返回NT原始响应体（`{result: {...}}` / `{data: [...]}`）。
 ///
 /// 业务域以 mixin 混合进本类：
 /// - [NeteaseSearchApi]：cloudsearch 搜索（歌曲/专辑/歌手/歌单）
@@ -116,7 +116,7 @@ class NeteaseApi extends NeteaseApiBase
         NeteaseCommentApi {
   NeteaseApi(super.caller);
 
-  /// 解析网易云 Track 的可播放 URL（song_url，对齐 resolveNeteaseUrl）。
+  /// 解析NT Track 的可播放 URL（song_url，对齐 resolveNeteaseUrl）。
   ///
   /// [quality] 为档位键（lq/sq/hq/lossless/hi-res），默认 hq（对齐原项目
   /// 默认 songLevel）。按用户偏好从高到低**自动降级**（如 lossless 失败 →
@@ -153,7 +153,7 @@ class NeteaseApi extends NeteaseApiBase
   }
 }
 
-/// 网易云登录账号（login_status profile 子集）。
+/// NT登录账号（login_status profile 子集）。
 class NeteaseAccount {
   const NeteaseAccount({
     required this.userId,

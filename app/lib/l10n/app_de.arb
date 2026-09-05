@@ -44,8 +44,8 @@
   "commonCloseConfirmMessage": "Nach dem Schließen des Hauptfensters",
   "commonCloseConfirmRemember": "Meine Auswahl merken und nicht erneut fragen",
   "appName": "ArchoeraMusic",
-  "brandNetease": "Netease Music",
-  "brandKugou": "Kugou Music",
+  "brandNetease": "NT",
+  "brandKugou": "KG",
   "commonBack": "Zurück",
   "commonCancel": "Abbrechen",
   "commonClose": "Schließen",
@@ -203,8 +203,8 @@
   "commonDone": "Fertig",
   "commonUnknownError": "Unbekannter Fehler",
   "commonSongCountHint": "Insgesamt {count} Titel · Zum Abspielen klicken",
-  "platformNetease": "NetEase",
-  "platformKugou": "Kugou",
+  "platformNetease": "NT",
+  "platformKugou": "KG",
   "platformAll": "Alle",
   "toastPlayedAll": "{count} Titel abgespielt",
   "toastPlayFailed": "Wiedergabefehler: {msg}",
@@ -1023,7 +1023,7 @@
   "vaultUnlockFailed": "Passwort falsch, bitte erneut versuchen",
   "settingsVaultCloseV3PasswordTitle": "Gerätebindung deaktivieren: Neues Passwort festlegen",
   "settingsVaultCloseV3PasswordDesc": "Bei Aktivierung der Gerätebindung wurde kein Wiederherstellungspasswort festgelegt (auf diesem Gerät passwortlos). Beim Deaktivieren wird auf Passwortschutz (v2) umgestellt: Legen Sie ein neues Entsperrungspasswort fest. Hauptschlüssel und vorhandene Daten bleiben erhalten; dieses Passwort ist bei jedem Start erforderlich.",
-  "brandQqMusic": "QQ Music",
+  "brandQqMusic": "QM",
   "platformQQMusic": "QQ Music",
   "loginQqQrLogin": "Mit QQ-Music-QR-Code anmelden",
   "loginQqTypeQq": "QQ",
@@ -1046,5 +1046,6 @@
   "searchPlatformError": "Plattformfehler ({code})",
   "searchWaitRetry": "Zu viele Anfragen, bitte kurz warten und erneut versuchen",
   "qqMusicDownloadUnsupported": "QQ-Musik-Downloads werden derzeit nicht unterstützt (Risikomanagement).",
-  "qqMusicDownloadSkipped": "{count} QQ-Musiktitel übersprungen: Downloads für QQ-Musik nicht unterstützt."
+  "qqMusicDownloadSkipped": "{count} QQ-Musiktitel übersprungen: Downloads für QQ-Musik nicht unterstützt.",
+  "platformQqMusic": "QM"
 }

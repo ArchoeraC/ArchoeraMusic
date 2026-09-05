@@ -146,10 +146,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appName => 'ArchoeraMusic';
 
   @override
-  String get brandNetease => '网易云音乐';
+  String get brandNetease => 'NT';
 
   @override
-  String get brandKugou => '酷狗音乐';
+  String get brandKugou => 'KG';
 
   @override
   String get commonBack => '返回';
@@ -671,10 +671,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => '网易云';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => '酷狗';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => '聚合';
@@ -3356,7 +3356,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get brandQqMusic => 'QQ 音乐';
+  String get brandQqMusic => 'QM';
 
   @override
   String get platformQQMusic => 'QQ 音乐';
@@ -3412,6 +3412,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String qqMusicDownloadSkipped(Object count) {
     return '已跳过 $count 首 QQ 音乐（暂不支持下载）。';
   }
+
+  @override
+  String get platformQqMusic => 'QM';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -3556,10 +3559,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get appName => 'ArchoeraMusic';
 
   @override
-  String get brandNetease => '网易云音乐';
+  String get brandNetease => 'NT';
 
   @override
-  String get brandKugou => '酷狗音乐';
+  String get brandKugou => 'KG';
 
   @override
   String get commonBack => '返回';
@@ -4081,10 +4084,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
-  String get platformNetease => '网易云';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => '酷狗';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => '聚合';
@@ -6766,7 +6769,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
-  String get brandQqMusic => 'QQ 音乐';
+  String get brandQqMusic => 'QM';
 
   @override
   String get platformQQMusic => 'QQ 音乐';
@@ -6822,6 +6825,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String qqMusicDownloadSkipped(Object count) {
     return '已跳过 $count 首 QQ 音乐（暂不支持下载）。';
   }
+
+  @override
+  String get platformQqMusic => 'QM';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -6966,10 +6972,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get appName => 'ArchoeraMusic';
 
   @override
-  String get brandNetease => '網易雲音樂';
+  String get brandNetease => 'NT';
 
   @override
-  String get brandKugou => '酷狗音樂';
+  String get brandKugou => 'KG';
 
   @override
   String get commonBack => '返回';
@@ -7491,10 +7497,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
-  String get platformNetease => '網易雲';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => '酷狗';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => '聚合';
@@ -10177,7 +10183,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
-  String get brandQqMusic => 'QQ 音樂';
+  String get brandQqMusic => 'QM';
 
   @override
   String get platformQQMusic => 'QQ 音樂';
@@ -10233,4 +10239,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String qqMusicDownloadSkipped(Object count) {
     return '已略過 $count 首 QQ 音樂（暫不支援下載）。';
   }
+
+  @override
+  String get platformQqMusic => 'QM';
 }

@@ -342,7 +342,7 @@ Future<T> qmRequest<T>(
           // 接口带 meta.is_filter）。归一到 _qmRiskInnerCode 同一风控族，
           // 让 UI 冷却与「停止自动重试」逻辑一致；真实原因保留在 message。
           throw QmRequestException(
-            'QQ 音乐接口触发额外验证/风控过滤'
+            'QM接口触发额外验证/风控过滤'
             '（meta.is_filter=$filterValue，结果被过滤为空），已停止自动重试',
             kind: QmErrorKind.risk,
             outer: outerCode,
@@ -355,7 +355,7 @@ Future<T> qmRequest<T>(
           outerCode == _qmRiskInnerCode || innerCode == _qmRiskInnerCode;
       if (risk) {
         throw QmRequestException(
-          'QQ 音乐接口拦截：请求过于频繁或触发风控'
+          'QM接口拦截：请求过于频繁或触发风控'
           '（outer=$outerCode inner=$innerCode）',
           kind: QmErrorKind.risk,
           outer: outerCode,
@@ -385,7 +385,7 @@ Future<T> qmRequest<T>(
     }
   }
   throw QmRequestException(
-    'QQ 音乐请求失败: $lastErr',
+    'QM请求失败: $lastErr',
     kind: QmErrorKind.transient,
     retryable: false,
   );

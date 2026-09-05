@@ -44,8 +44,8 @@
   "commonCloseConfirmMessage": "Después de cerrar la ventana principal",
   "commonCloseConfirmRemember": "Recordar mi elección y no volver a preguntar",
   "appName": "ArchoeraMusic",
-  "brandNetease": "Netease Music",
-  "brandKugou": "Kugou Music",
+  "brandNetease": "NT",
+  "brandKugou": "KG",
   "commonBack": "Atrás",
   "commonCancel": "Cancelar",
   "commonClose": "Cerrar",
@@ -203,8 +203,8 @@
   "commonDone": "Listo",
   "commonUnknownError": "Error desconocido",
   "commonSongCountHint": "{count} canciones en total · Haz clic para reproducir",
-  "platformNetease": "NetEase",
-  "platformKugou": "Kugou",
+  "platformNetease": "NT",
+  "platformKugou": "KG",
   "platformAll": "Todo",
   "toastPlayedAll": "Se reprodujeron todas las {count} canciones",
   "toastPlayFailed": "Error de reproducción: {msg}",
@@ -1023,7 +1023,7 @@
   "vaultUnlockFailed": "Contraseña incorrecta, inténtelo de nuevo",
   "settingsVaultCloseV3PasswordTitle": "Desactivar la vinculación: establecer nueva contraseña",
   "settingsVaultCloseV3PasswordDesc": "No se estableció una contraseña de recuperación al activar la vinculación (sin contraseña en este dispositivo). Al desactivarla se pasa a la protección por contraseña (v2): establezca una nueva contraseña de desbloqueo. La clave maestra y los datos existentes se conservan; esta contraseña se requiere en cada inicio.",
-  "brandQqMusic": "QQ Music",
+  "brandQqMusic": "QM",
   "platformQQMusic": "QQ Music",
   "loginQqQrLogin": "Iniciar sesión con el código QR de QQ Music",
   "loginQqTypeQq": "QQ",
@@ -1046,5 +1046,6 @@
   "searchPlatformError": "La plataforma devolvió un error ({code})",
   "searchWaitRetry": "Demasiadas solicitudes, espera un momento e inténtalo de nuevo",
   "qqMusicDownloadUnsupported": "Descargas de QQ Music no compatibles por ahora (control de riesgos).",
-  "qqMusicDownloadSkipped": "Se omitieron {count} temas de QQ Music: descargas no disponibles."
+  "qqMusicDownloadSkipped": "Se omitieron {count} temas de QQ Music: descargas no disponibles.",
+  "platformQqMusic": "QM"
 }

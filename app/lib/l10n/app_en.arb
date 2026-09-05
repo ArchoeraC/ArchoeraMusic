@@ -44,8 +44,8 @@
   "commonCloseConfirmMessage": "After closing the main window",
   "commonCloseConfirmRemember": "Remember my choice and don't ask again",
   "appName": "ArchoeraMusic",
-  "brandNetease": "Netease Music",
-  "brandKugou": "Kugou Music",
+  "brandNetease": "NT",
+  "brandKugou": "KG",
   "commonBack": "Back",
   "commonCancel": "Cancel",
   "commonClose": "Close",
@@ -203,8 +203,8 @@
   "commonDone": "Done",
   "commonUnknownError": "Unknown error",
   "commonSongCountHint": "{count} songs · Click to play",
-  "platformNetease": "Netease",
-  "platformKugou": "KuGou",
+  "platformNetease": "NT",
+  "platformKugou": "KG",
   "platformAll": "All",
   "toastPlayedAll": "Played all {count} songs",
   "toastPlayFailed": "Failed to play: {msg}",
@@ -1023,7 +1023,7 @@
   "streamingAlbumSongs": "{count} songs",
   "streamingArtistAlbums": "{count} albums",
   "streamingPlaylistSongs": "{count} songs",
-  "brandQqMusic": "QQ Music",
+  "brandQqMusic": "QM",
   "platformQQMusic": "QQ Music",
   "loginQqQrLogin": "Sign in with QQ Music QR code",
   "loginQqTypeQq": "QQ",
@@ -1046,5 +1046,6 @@
   "searchPlatformError": "Platform returned an error ({code})",
   "searchWaitRetry": "Too many requests, please wait a moment and retry",
   "qqMusicDownloadUnsupported": "QQ Music downloads are not supported for now (risk control).",
-  "qqMusicDownloadSkipped": "Skipped {count} QQ Music track(s): downloads not supported for QQ Music."
+  "qqMusicDownloadSkipped": "Skipped {count} QQ Music track(s): downloads not supported for QQ Music.",
+  "platformQqMusic": "QM"
 }
