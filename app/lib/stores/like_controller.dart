@@ -40,6 +40,43 @@ class LikeController extends ChangeNotifier {
   bool _loaded = false;
   bool get loaded => _loaded;
 
+  /// 本端「刚 toggle 过」的键（`平台\u0000键` → 时间）。
+  ///
+  /// 服务端写入不是瞬时的：乐观点亮/熄灭后，若此时权威列表刷新 / 同步返回
+  /// 的仍是旧快照，会误把刚点亮的熄灭、刚熄灭的回光。缓冲期内这些键一律
+  /// **以本地状态为准**，过期后自动让位给服务端权威（[reconcileGrace]）。
+  final Map<String, DateTime> _dirtyKeys = {};
+
+  /// 对账/同步缓冲期：期间本端本地改动优先，避免与「服务端写尚未生效」
+  /// 的旧快照竞争。
+  static const Duration reconcileGrace = Duration(seconds: 20);
+
+  bool _dirtyOf(String platform, String key) {
+    if (key.isEmpty) return false;
+    final full = '$platform\u0000$key';
+    final at = _dirtyKeys[full];
+    if (at == null) return false;
+    if (DateTime.now().difference(at) <= reconcileGrace) return true;
+    _dirtyKeys.remove(full);
+    return false;
+  }
+
+  void _markDirty(String platform, String key) {
+    if (key.isEmpty) return;
+    _pruneDirty();
+    _dirtyKeys['$platform\u0000$key'] = DateTime.now();
+  }
+
+  void _clearDirty(String platform, String key) {
+    if (key.isEmpty) return;
+    _dirtyKeys.remove('$platform\u0000$key');
+  }
+
+  void _pruneDirty() {
+    final now = DateTime.now();
+    _dirtyKeys.removeWhere((_, at) => now.difference(at) > reconcileGrace);
+  }
+
   /// QQ 红心键（songmid；缺失回退 Track.id）。
   static String _qqKey(Track t) => qqLikeKey(t);
 
@@ -52,9 +89,7 @@ class LikeController extends ChangeNotifier {
   /// QM以 **songmid** 为红心键（彻底摆脱「QQ 曲目误走 netease id」）。
   bool isLiked(Track track) {
     if (track.source == 'kugou') {
-      return _kugouIds.contains(
-        (track.kugou?.hash ?? track.id).toLowerCase(),
-      );
+      return _kugouIds.contains((track.kugou?.hash ?? track.id).toLowerCase());
     }
     if (track.source == 'qqmusic') {
       return _qqmusicIds.contains(_qqKey(track));
@@ -68,6 +103,70 @@ class LikeController extends ChangeNotifier {
     if (source == 'kugou') return _kugouIds;
     if (source == 'qqmusic') return _qqmusicIds;
     return _neteaseIds;
+  }
+
+  /// 用服务端权威「我喜欢的」列表对账该平台红心集合（收藏页刷新成功后调用）。
+  ///
+  /// - 仅 netease / kugou（服务端权威列表）；QQ 以本机 [QqLikedStore] 为
+  ///   主源、其「我喜欢」页红心与列表同源，不走本方法。
+  /// - **双向**：权威列表含 → 点亮；不含 → 熄灭（跨设备移除后刷新即熄灭）。
+  /// - **缓冲期**（[reconcileGrace]）内本端刚 toggle 的键以本地为准：
+  ///   服务端写入尚未生效时不因旧快照误覆盖（刚点亮不清除 / 刚熄灭不复活）。
+  ///
+  /// 仅当调用方确在展示该平台「我喜欢的」权威列表时才能调用——绝不能把普通
+  /// 歌单当收藏集合传进来（会把红心集合整体清空）。对账后 notify UI 重绘。
+  void reconcileFromAuthoritative(String platform, List<Track> tracks) {
+    if (platform != 'netease' && platform != 'kugou') return;
+    final serverKeys = <String>{};
+    for (final t in tracks) {
+      if (t.source != platform) continue;
+      if (platform == 'kugou') {
+        final h = (t.kugou?.hash ?? t.id).toLowerCase();
+        if (h.isNotEmpty) serverKeys.add(h);
+      } else if (t.id.isNotEmpty) {
+        serverKeys.add(t.id);
+      }
+    }
+    if (_alignToServer(platform, serverKeys)) notifyListeners();
+  }
+
+  /// 手动「同步在线收藏」/ 登录并入后刷新 QQ 红心（**add-only**，对应
+  /// [QqLikedStore.mergeOnline] 已并入本机列表的曲目）——使刷新后列表新增
+  /// 行的红心即时点亮；缓冲期内本端刚熄灭的键不因在线写未生效而回光。
+  void mergeOnlineQq(Iterable<Track> online) {
+    final prev = Set<String>.from(_qqmusicIds);
+    var changed = false;
+    for (final t in online) {
+      final mid = qqLikeKey(t);
+      if (mid.isEmpty || _qqmusicIds.contains(mid)) continue;
+      if (_dirtyOf('qqmusic', mid) && !prev.contains(mid)) continue;
+      _qqmusicIds.add(mid);
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+
+  /// 以服务端权威键集对齐平台集合（双向）。缓冲期内本端刚 toggle 的键以
+  /// 本地状态为准（保留刚点亮 / 不复活刚熄灭）；返回集合是否变化。
+  bool _alignToServer(String platform, Set<String> serverKeys) {
+    final cur = idsFor(platform);
+    _pruneDirty();
+    final next = <String>{};
+    // 缓冲期内本端刚点亮的键：旧快照未含也保留
+    for (final key in cur) {
+      if (_dirtyOf(platform, key)) next.add(key);
+    }
+    for (final key in serverKeys) {
+      if (key.isEmpty) continue;
+      // 缓冲期内本端刚熄灭的键：服务端滞后仍含也不复活
+      if (_dirtyOf(platform, key) && !cur.contains(key)) continue;
+      next.add(key);
+    }
+    if (_sameSet(cur, next)) return false;
+    cur
+      ..clear()
+      ..addAll(next);
+    return true;
   }
 
   /// 同步三平台红心集合（各自失败互不影响）。
@@ -98,11 +197,7 @@ class LikeController extends ChangeNotifier {
         final ids = await _ref
             .read(neteaseApiProvider)
             .likedIds(account.userId);
-        if (!_sameSet(_neteaseIds, ids.toSet())) {
-          _neteaseIds
-            ..clear()
-            ..addAll(ids);
-        }
+        _alignToServer('netease', ids.toSet());
       } catch (_) {
         // 网络失败保留旧集合
       }
@@ -117,11 +212,7 @@ class LikeController extends ChangeNotifier {
     if (kugou.session != null) {
       try {
         final ids = await kugou.likedHashSet();
-        if (!_sameSet(_kugouIds, ids)) {
-          _kugouIds
-            ..clear()
-            ..addAll(ids);
-        }
+        _alignToServer('kugou', ids);
       } catch (_) {
         // 网络失败保留旧集合
       }
@@ -140,19 +231,12 @@ class LikeController extends ChangeNotifier {
       if (kQqFavExperimental && qqApi.isLoggedIn) {
         try {
           final online = await qqApi.likedSongmids();
-          _qqmusicIds
-            ..clear()
-            ..addAll(local)
-            ..addAll(online);
+          _applyQqLiked(local, online);
         } catch (_) {
-          _qqmusicIds
-            ..clear()
-            ..addAll(local);
+          _replaceQqLiked(local);
         }
       } else {
-        _qqmusicIds
-          ..clear()
-          ..addAll(local);
+        _replaceQqLiked(local);
       }
     } catch (_) {
       // 本机库加载失败：保留内存态（下次 sync 重试）
@@ -160,6 +244,26 @@ class LikeController extends ChangeNotifier {
 
     _loaded = true;
     notifyListeners();
+  }
+
+  /// 以本机集合为底、并入在线 songmid（add-only）重建 QQ 红心集合；
+  /// 缓冲期内本端刚熄灭的键不因在线写未生效而回光。
+  void _applyQqLiked(Set<String> local, Iterable<String> online) {
+    final prev = Set<String>.from(_qqmusicIds);
+    _qqmusicIds
+      ..clear()
+      ..addAll(local);
+    for (final mid in online) {
+      if (mid.isEmpty || _qqmusicIds.contains(mid)) continue;
+      if (_dirtyOf('qqmusic', mid) && !prev.contains(mid)) continue;
+      _qqmusicIds.add(mid);
+    }
+  }
+
+  void _replaceQqLiked(Set<String> local) {
+    _qqmusicIds
+      ..clear()
+      ..addAll(local);
   }
 
   /// 切换红心：乐观更新 + 失败回滚（对齐 SPlayer-Next toggleLike）。
@@ -170,6 +274,8 @@ class LikeController extends ChangeNotifier {
 
     if (track.source == 'kugou') {
       final key = (track.kugou?.hash ?? track.id).toLowerCase();
+      // 缓冲期内服务端写未生效，权威列表刷新不覆盖本端刚做的改动
+      _markDirty('kugou', key);
       _kugouIds
         ..remove(key)
         ..addAll(target ? {key} : const {});
@@ -185,6 +291,7 @@ class LikeController extends ChangeNotifier {
         return true;
       } catch (_) {
         // 回滚
+        _clearDirty('kugou', key);
         _kugouIds
           ..remove(key)
           ..addAll(wasLiked ? {key} : const {});
@@ -198,6 +305,7 @@ class LikeController extends ChangeNotifier {
     }
 
     // NT
+    _markDirty('netease', track.id);
     _neteaseIds
       ..remove(track.id)
       ..addAll(target ? {track.id} : const {});
@@ -207,6 +315,7 @@ class LikeController extends ChangeNotifier {
       _applyStoreDelta(track, target);
       return true;
     } catch (_) {
+      _clearDirty('netease', track.id);
       _neteaseIds
         ..remove(track.id)
         ..addAll(wasLiked ? {track.id} : const {});
@@ -229,6 +338,7 @@ class LikeController extends ChangeNotifier {
     final key = _qqKey(track);
     if (key.isEmpty) return false;
 
+    _markDirty('qqmusic', key);
     _qqmusicIds
       ..remove(key)
       ..addAll(target ? {key} : const {});
@@ -250,6 +360,7 @@ class LikeController extends ChangeNotifier {
       return true;
     } catch (_) {
       // 回滚（在线接口失败 / 本机库异常）
+      _clearDirty('qqmusic', key);
       _qqmusicIds
         ..remove(key)
         ..addAll(wasLiked ? {key} : const {});
@@ -276,6 +387,8 @@ class LikeController extends ChangeNotifier {
   void reset() {
     _neteaseIds.clear();
     _kugouIds.clear();
+    // 登出后旧账号的缓冲标记不再适用（对账由重登后新一轮 sync 重算）
+    _dirtyKeys.clear();
     // 注：QQ 红心以本机库为主源，登出 QQ 不清空 _qqmusicIds（sync 会按
     // 登录态重算——未登录时仍保留本机 songmid）。
     _loaded = false;

@@ -85,6 +85,11 @@ class LikedStore extends ChangeNotifier {
   /// 刷新：全量拉取替换上屏并**回写 SQLite 缓存**（缓存「秒开」的前提——
   /// 否则每次进收藏页都全量重拉，数据库形同虚设）。拉取失败保留旧缓存
   /// 展示（下次进入仍可秒开，不误删快照）。
+  ///
+  /// 拉取成功（本平台「我喜欢的」权威列表）后，把歌曲键集对账回
+  /// [LikeController] 红心集合（见 [_reconcileHearts]）：跨设备新增/移除
+  /// 在刷新后即时点亮/熄灭红心。登录态已切换时丢弃过期结果（防止旧账号
+  /// 列表覆盖新账号 / 写错缓存）。
   Future<void> refresh(String platform, {bool writeCache = true}) async {
     final s = _state(platform);
     if (s.refreshing) return;
@@ -96,9 +101,11 @@ class LikedStore extends ChangeNotifier {
       final key = _userKey(platform);
       if (key == null) return; // 未登录由页面显示登录引导
       final tracks = await _fetchAll(platform);
+      if (_userKey(platform) != key) return; // 登录态已切换：丢弃过期结果
       s.tracks = tracks;
       s.total = tracks.length;
       s.loaded = true;
+      _reconcileHearts(platform, tracks);
       if (writeCache) {
         try {
           await LikedCacheStore.shared.replace(platform, key, tracks);
@@ -114,6 +121,25 @@ class LikedStore extends ChangeNotifier {
       s.refreshing = false;
       s.loading = false;
       notifyListeners();
+    }
+  }
+
+  /// 权威「我喜欢的」列表拉取成功后，把该平台歌曲键**双向对账**回红心
+  /// 集合：列表含 → 点亮；不含 → 熄灭（跨设备移除后刷新即熄灭）。
+  ///
+  /// 仅本 store（netease/kugou 收藏页权威列表）触发——普通歌单不经过本
+  /// store，不会被误当成收藏集合清空红心。QQ 本机红心列表不走本 store、
+  /// 红心与列表同源，无需对账。对账在 [LikeController] 内部有缓冲期防
+  /// 与本端刚 toggle 竞争；异常绝不影响列表展示。
+  void _reconcileHearts(String platform, List<Track> tracks) {
+    if (platform == 'kugou' || platform == 'netease') {
+      try {
+        _ref
+            .read(likeControllerProvider)
+            .reconcileFromAuthoritative(platform, tracks);
+      } catch (e) {
+        debugPrint('[liked] 红心对账失败（不影响列表展示）: $e');
+      }
     }
   }
 

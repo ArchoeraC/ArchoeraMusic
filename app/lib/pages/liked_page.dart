@@ -52,10 +52,9 @@ class _LikedPageState extends ConsumerState<LikedPage> {
   bool get _requiresLogin => _platform != _qqPlatform;
 
   /// 当前平台是否「可用」（内容区据此显示数据 / 登录引导 / 本机列表）。
-  bool get _loggedIn =>
-      _requiresLogin
-          ? (_platform == 'kugou' ? _kugouLoggedIn : _neteaseLoggedIn)
-          : true;
+  bool get _loggedIn => _requiresLogin
+      ? (_platform == 'kugou' ? _kugouLoggedIn : _neteaseLoggedIn)
+      : true;
 
   @override
   void initState() {
@@ -74,9 +73,7 @@ class _LikedPageState extends ConsumerState<LikedPage> {
   QqLikedStore get _qqStore => ref.read(qqLikedStoreProvider);
 
   List<Track> _tracks(String platform) =>
-      platform == _qqPlatform
-          ? _qqStore.tracks
-          : _store.tracks(platform);
+      platform == _qqPlatform ? _qqStore.tracks : _store.tracks(platform);
 
   void _ensureLoaded(String platform) {
     if (platform == _qqPlatform) {
@@ -95,6 +92,8 @@ class _LikedPageState extends ConsumerState<LikedPage> {
     try {
       final online = await ref.read(qqMusicApiProvider).likedSongs();
       await _qqStore.mergeOnline(online);
+      // 同步并入红心 songmid 集合（add-only）：列表新增行的红心即时点亮
+      ref.read(likeControllerProvider).mergeOnlineQq(online);
     } catch (_) {
       // 静默（页内右上角「同步在线收藏」按钮提供显式重试与提示）
     }
@@ -221,12 +220,10 @@ class _LikedPageState extends ConsumerState<LikedPage> {
     try {
       final online = await ref.read(qqMusicApiProvider).likedSongs();
       final n = await _qqStore.mergeOnline(online);
+      // 同步并入红心 songmid 集合（add-only）：列表新增行的红心即时点亮
+      ref.read(likeControllerProvider).mergeOnlineQq(online);
       if (!mounted) return;
-      _toast(
-        n > 0
-            ? l10n.pageLikedQqSynced(n)
-            : l10n.pageLikedQqSyncedNone,
-      );
+      _toast(n > 0 ? l10n.pageLikedQqSynced(n) : l10n.pageLikedQqSyncedNone);
     } catch (e) {
       if (!mounted) return;
       _toast(l10n.toastQqLikeSyncFailed);
@@ -249,18 +246,12 @@ class _LikedPageState extends ConsumerState<LikedPage> {
     ref.listen(neteaseAuthProvider, (prev, next) {
       _onAuthChanged('netease');
     });
-    ref.listen(
-      kugouApiProvider.select((s) => s.session?.userid),
-      (prev, next) {
-        if (prev != next) _onAuthChanged('kugou');
-      },
-    );
-    ref.listen(
-      qqMusicApiProvider.select((s) => s.isLoggedIn),
-      (prev, next) {
-        if (prev != next) _onAuthChanged(_qqPlatform);
-      },
-    );
+    ref.listen(kugouApiProvider.select((s) => s.session?.userid), (prev, next) {
+      if (prev != next) _onAuthChanged('kugou');
+    });
+    ref.listen(qqMusicApiProvider.select((s) => s.isLoggedIn), (prev, next) {
+      if (prev != next) _onAuthChanged(_qqPlatform);
+    });
 
     final neteaseStore = ref.watch(likedStoreProvider);
     final qqStore = ref.watch(qqLikedStoreProvider);
@@ -325,7 +316,7 @@ class _LikedPageState extends ConsumerState<LikedPage> {
                     (qq
                         ? qqLoaded && qqTracks.isNotEmpty
                         : store!.loaded(_platform) &&
-                            store.tracks(_platform).isNotEmpty)) ...[
+                              store.tracks(_platform).isNotEmpty)) ...[
                   SButton(
                     label: l10n.commonPlayAll,
                     icon: Icons.play_arrow_rounded,
@@ -348,17 +339,18 @@ class _LikedPageState extends ConsumerState<LikedPage> {
                 const SizedBox(width: 12),
                 if (_loggedIn &&
                     (qq
-                        ? qqLoaded &&
-                            (qqTracks.isNotEmpty || _qqLoggedIn)
+                        ? qqLoaded && (qqTracks.isNotEmpty || _qqLoggedIn)
                         : store!.loaded(_platform) &&
-                            store.tracks(_platform).isNotEmpty))
+                              store.tracks(_platform).isNotEmpty))
                   SButton(
                     label: qq ? l10n.pageLikedQqSyncOnline : l10n.commonRefresh,
                     icon: Icons.sync,
                     variant: SButtonVariant.secondary,
-                    onPressed: qq ? _refreshQqOnline : () {
-                      neteaseStore.refresh(_platform, writeCache: true);
-                    },
+                    onPressed: qq
+                        ? _refreshQqOnline
+                        : () {
+                            neteaseStore.refresh(_platform, writeCache: true);
+                          },
                   ),
               ],
             ),
@@ -396,9 +388,10 @@ class _LikedPageState extends ConsumerState<LikedPage> {
                           isPlaying: isPlaying,
                           onPlay: _playTrack,
                           onContextMenu: _onTrackMenu,
-                          likedIds: ref
-                              .watch(likeControllerProvider)
-                              .idsFor(_qqPlatform),
+                          // QQ 红心与「我喜欢」列表同源（本机 QqLikedStore
+                          // 为主源；在线 add-only 并入）——红心状态直接由
+                          // 列表本机集合判定，避免刷新并入后与红心集合脱节。
+                          likedIds: qqStore.midSet,
                           onToggleLike: _toggleLike,
                         )
                 : !_loggedIn

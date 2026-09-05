@@ -89,6 +89,8 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       final online = await qqApi.likedSongs();
       final store = ref.read(qqLikedStoreProvider);
       await store.mergeOnline(online);
+      // 并入红心 songmid 集合（add-only），搜索等场景红心与列表同步点亮
+      ref.read(likeControllerProvider).mergeOnlineQq(online);
     } catch (e) {
       debugPrint('[qq_liked] 登录后在线收藏并入失败（不影响本机红心）: $e');
     }
@@ -157,26 +159,23 @@ class _SplashGateState extends State<SplashGate>
           IgnorePointer(
             child: FadeTransition(
               opacity: Tween<double>(begin: 1, end: 0).animate(
-                CurvedAnimation(
-                  parent: _dismiss,
-                  curve: Curves.easeInCubic,
-                ),
+                CurvedAnimation(parent: _dismiss, curve: Curves.easeInCubic),
               ),
               child: ScaleTransition(
                 scale: Tween<double>(begin: 1, end: 0.98).animate(
-                  CurvedAnimation(
-                    parent: _dismiss,
-                    curve: Curves.easeInCubic,
-                  ),
+                  CurvedAnimation(parent: _dismiss, curve: Curves.easeInCubic),
                 ),
                 child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: Offset.zero,
-                    end: const Offset(0, -0.03),
-                  ).animate(CurvedAnimation(
-                    parent: _dismiss,
-                    curve: Curves.easeInCubic,
-                  )),
+                  position:
+                      Tween<Offset>(
+                        begin: Offset.zero,
+                        end: const Offset(0, -0.03),
+                      ).animate(
+                        CurvedAnimation(
+                          parent: _dismiss,
+                          curve: Curves.easeInCubic,
+                        ),
+                      ),
                   child: const SplashScreen(),
                 ),
               ),
