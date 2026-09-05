@@ -54,6 +54,8 @@ typedef struct {
     float tempo_speed;        /**< 播放速度 [0.5, 2.0], 默认 1.0 */
     float tempo_pitch;        /**< 音调偏移（半音）[-12, 12], 默认 0 */
     bool  tempo_pitch_sync;   /**< 保音调模式，默认 true */
+
+    int   engine_mode;        /**< 0=Stable(FFmpeg 默认) 1=EraAudio(自研内核,实验性) */
 } EngineConfig;
 
 /** 默认配置宏 */
@@ -76,6 +78,7 @@ typedef struct {
     .tempo_speed = 1.0f, \
     .tempo_pitch = 0.0f, \
     .tempo_pitch_sync = true, \
+    .engine_mode = 0, \
 })
 
 /** 管线实例（不透明指针） */
@@ -144,8 +147,18 @@ int pipeline_get_source_sample_rate(const AudioPipeline *p);
 /** 获取管线实际输出采样率（跟随源或用户指定；0 = 未知） */
 int pipeline_get_output_sample_rate(const AudioPipeline *p);
 
+/** 获取管线实际输出声道数（cfg.output_channels） */
+int pipeline_get_output_channels(const AudioPipeline *p);
+
 /** 获取源文件声道数 */
 int pipeline_get_source_channels(const AudioPipeline *p);
+
+/**
+ * 播放流式模式开关（§B 边解码边出声）：把单次 pipeline_process 的帧数上限
+ * 调小，使阻塞喂设备（pcm_out 环形缓冲背压）时每次调用耗时 ≈ 一块音频，
+ * 主循环可在调用间隙及时处理 play/pause/seek 命令（默认 batch 64 帧/次）。
+ */
+void pipeline_set_playback_streaming(AudioPipeline *p, bool streaming);
 
 /**
  * Phase 3: 运行时交互控制

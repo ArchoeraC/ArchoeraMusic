@@ -639,7 +639,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // 静态指示条（对齐 SMenu default；animated 模式交给容器级滑动条）
+                  // 静态指示条；animated 模式交给容器级滑动条
                   Positioned(
                     left: 0,
                     top: 10,

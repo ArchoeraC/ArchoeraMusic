@@ -21,3 +21,4 @@ QmModule qmHotSearch = (params) async {
 
   return {'code': 200, 'list': list};
 };
+

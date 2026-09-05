@@ -933,6 +933,37 @@ class AppLocalizationsEn extends AppLocalizations {
       'Liked songs in the Netease app sync here automatically';
 
   @override
+  String get toastQqLikeSyncFailed =>
+      'QQ Music online favorites sync failed (experimental API); the heart change was reverted';
+
+  @override
+  String get pageLikedQqHint =>
+      'QQ Music hearts are stored on this device and always available; sign in to experimentally sync online favorites';
+
+  @override
+  String get pageLikedQqEmptyTitle => 'No QQ Music liked songs yet';
+
+  @override
+  String get pageLikedQqEmptyHint =>
+      'Like any QQ Music song in search or playback to keep it here (stored on this device)';
+
+  @override
+  String get pageLikedQqLoginSync =>
+      'Sign in to QQ Music to sync online favorites (experimental)';
+
+  @override
+  String get pageLikedQqSyncOnline => 'Sync online favorites (experimental)';
+
+  @override
+  String pageLikedQqSynced(Object count) {
+    return 'Online favorites synced: $count new song(s) added';
+  }
+
+  @override
+  String get pageLikedQqSyncedNone =>
+      'Already in sync - no new online favorites to add';
+
+  @override
   String get pageLikedLoginTitle => 'Sign in to view your liked songs';
 
   @override
@@ -1514,6 +1545,109 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsPassthroughNote =>
       'No transcoding: keep source sample rate; otherwise unify to 48kHz. Current track reloads to apply.';
+
+  @override
+  String get settingsOutputDevice => 'Output device';
+
+  @override
+  String get settingsOutputDeviceSectionNote =>
+      'Play through a specific audio device. Changes take effect immediately or from the next track (no restart needed) and the choice is saved. It only switches when you pick explicitly; the app never reroutes on its own.';
+
+  @override
+  String get settingsOutputDeviceDefault => 'System default';
+
+  @override
+  String get settingsOutputDeviceDefaultDesc =>
+      'Follows the system\'s current output (no automatic rerouting)';
+
+  @override
+  String settingsOutputDeviceFormat(Object channels, Object rate) {
+    return '$rate Hz · $channels ch';
+  }
+
+  @override
+  String get settingsOutputDeviceDefaultTag => 'Default';
+
+  @override
+  String get settingsOutputDeviceLoadFailed =>
+      'Could not enumerate audio output devices (engine unavailable? staying on system default).';
+
+  @override
+  String get settingsOutputDeviceHfpNote =>
+      'This device is currently in a low-quality mode (e.g. Bluetooth hands-free/call HFP, typically 16 kHz mono). The engine outputs at the device\'s native format, so quality will be limited.';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideTitle =>
+      'How to enable Bluetooth A2DP (high-quality audio)';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideDesc =>
+      '1. Disconnect the Bluetooth headset, then reconnect it.\n2. In the system Bluetooth settings, switch the device to “Audio/A2DP” (on some systems labeled “Media audio”).\n3. If it still only appears as Headset/hands-free, unpair and pair it again.\nExact menus vary by system.';
+
+  @override
+  String get settingsOutputDeviceCallBadge => 'Call / low quality';
+
+  @override
+  String get settingsOutputDeviceCallConfirmTitle =>
+      'Play music through a call-quality device?';
+
+  @override
+  String get settingsOutputDeviceCallConfirmDesc =>
+      'This device outputs at call/low-quality grade, so music is nearly ruined (voice-grade audio). Most headphones won\'t use this mode for music, and some deliberately reject it — you may get silence or odd behavior. A2DP or another high-quality output is strongly recommended. The app never reroutes on its own; this only applies when you pick it explicitly.';
+
+  @override
+  String get settingsOutputDeviceUseQuality => 'Switch to high-quality output';
+
+  @override
+  String get settingsOutputDeviceUseCall => 'Use call-quality anyway';
+
+  @override
+  String get settingsOutputDeviceDefaultIsCall =>
+      'The system default output is a call/low-quality device (e.g. hands-free HFP). Music would play at voice grade — nearly ruined — and some headphones deliberately reject this profile, possibly staying silent or misbehaving. Switch to a high-quality output.';
+
+  @override
+  String get settingsOutputDeviceDefaultRowCallNote =>
+      'Selecting this routes music through the call/low-quality system default — the sound is nearly ruined; not recommended.';
+
+  @override
+  String settingsSinkChangedFailed(Object err) {
+    return 'Failed to switch output device: $err';
+  }
+
+  @override
+  String get settingsEngine => 'Decode engine';
+
+  @override
+  String get settingsEngineNote =>
+      'The decode engine is loaded when the app starts; changes only apply after a cold restart.';
+
+  @override
+  String get settingsEngineStableDesc =>
+      'FFmpeg decode kernel. Well-tested and the default.';
+
+  @override
+  String get settingsEngineEraAudioDesc =>
+      'In-house decode kernel. Newer; performance and memory are still being benchmarked.';
+
+  @override
+  String get settingsEngineExperimental => 'Experimental';
+
+  @override
+  String get settingsEngineEraAudioNote =>
+      'Experimental kernel: performance and memory are still under benchmark, and some formats or devices may misbehave. If you run into issues, switch back to Stable.';
+
+  @override
+  String get settingsEngineRestartTitle => 'Restart required';
+
+  @override
+  String get settingsEngineRestartDesc =>
+      'The decode engine preference is saved. The engine is loaded when the app starts, so restart the app to switch engines. The current engine keeps working until then; playback and downloads are interrupted during the restart.';
+
+  @override
+  String get settingsEngineRestartNow => 'Restart now';
+
+  @override
+  String get settingsEngineRestartLater => 'Later';
 
   @override
   String get volumeMute => 'Mute';
@@ -3379,5 +3513,66 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String streamingPlaylistSongs(Object count) {
     return '$count songs';
+  }
+
+  @override
+  String get brandQqMusic => 'QQ Music';
+
+  @override
+  String get platformQQMusic => 'QQ Music';
+
+  @override
+  String get loginQqQrLogin => 'Sign in with QQ Music QR code';
+
+  @override
+  String get loginQqTypeQq => 'QQ';
+
+  @override
+  String get loginQqTypeWx => 'WeChat';
+
+  @override
+  String get loginQqScanHint => 'Scan with the QQ app to sign in';
+
+  @override
+  String get loginQqWxScanHint => 'Scan with WeChat to sign in';
+
+  @override
+  String navHeaderQqId(String id) {
+    return 'QQ $id';
+  }
+
+  @override
+  String get toastQqNotSupported => 'Not supported for QQ Music';
+
+  @override
+  String searchSourceFailed(Object source) {
+    return '$source search is temporarily unavailable';
+  }
+
+  @override
+  String searchQqRiskDetail(Object code) {
+    return 'QQ Music rate-limited or risk-blocked the request (code $code); auto-retry is paused, please try again later';
+  }
+
+  @override
+  String get searchNetworkError =>
+      'Network error or request timeout, please try again later';
+
+  @override
+  String searchPlatformError(Object code) {
+    return 'Platform returned an error ($code)';
+  }
+
+  @override
+  String get searchWaitRetry =>
+      'Too many requests, please wait a moment and retry';
+
+  @override
+  String get qqMusicDownloadUnsupported =>
+      'QQ Music downloads are not supported for now (risk control).';
+
+  @override
+  String qqMusicDownloadSkipped(Object count) {
+    return 'Skipped $count QQ Music track(s): downloads not supported for QQ Music.';
   }
 }

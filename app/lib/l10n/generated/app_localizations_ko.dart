@@ -913,6 +913,35 @@ class AppLocalizationsKo extends AppLocalizations {
       'NetEase Cloud Music 앱에서 하트를 누르면 여기에 자동 동기화됩니다';
 
   @override
+  String get toastQqLikeSyncFailed =>
+      'QQ 뮤직 온라인 즐겨찾기 동기화에 실패했습니다(실험적 API). 좋아요 변경을 되돌렸습니다';
+
+  @override
+  String get pageLikedQqHint =>
+      'QQ 뮤직 좋아요는 기기에 저장되어 항상 사용할 수 있으며, 로그인하면 온라인 즐겨찾기를 실험적으로 동기화할 수 있습니다';
+
+  @override
+  String get pageLikedQqEmptyTitle => '아직 좋아요한 QQ 뮤직 곡이 없습니다';
+
+  @override
+  String get pageLikedQqEmptyHint =>
+      '검색/재생 페이지에서 QQ 뮤직 곡에 좋아요를 누르면 여기에 표시됩니다(이 기기에 저장)';
+
+  @override
+  String get pageLikedQqLoginSync => '로그인하여 온라인 즐겨찾기 동기화(실험)';
+
+  @override
+  String get pageLikedQqSyncOnline => '온라인 즐겨찾기 동기화(실험)';
+
+  @override
+  String pageLikedQqSynced(Object count) {
+    return '온라인 즐겨찾기 동기화 완료: 새 $count곡 추가됨';
+  }
+
+  @override
+  String get pageLikedQqSyncedNone => '이미 동기화됨 - 추가할 온라인 즐겨찾기가 없습니다';
+
+  @override
   String get pageLikedLoginTitle => '로그인하여 좋아요한 곡 보기';
 
   @override
@@ -1482,6 +1511,105 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get settingsPassthroughNote =>
       '패스스루 ON 시 소스 샘플레이트 유지；OFF 시 48kHz로 리샘플링. 현재 곡 리로드 후 적용.';
+
+  @override
+  String get settingsOutputDevice => '출력 장치';
+
+  @override
+  String get settingsOutputDeviceSectionNote =>
+      '지정한 오디오 장치로 재생합니다. 변경은 즉시/다음 곡부터 적용(재시작 불필요)되며 선택은 저장됩니다. 명시적으로 선택할 때만 전환되며, 자동으로 바뀌지 않습니다.';
+
+  @override
+  String get settingsOutputDeviceDefault => '시스템 기본값';
+
+  @override
+  String get settingsOutputDeviceDefaultDesc => '시스템의 현재 출력을 따름(자동 변경 없음)';
+
+  @override
+  String settingsOutputDeviceFormat(Object channels, Object rate) {
+    return '$rate Hz · $channels채널';
+  }
+
+  @override
+  String get settingsOutputDeviceDefaultTag => '기본';
+
+  @override
+  String get settingsOutputDeviceLoadFailed =>
+      '오디오 출력 장치를 나열할 수 없습니다(엔진 사용 불가? 시스템 기본값 유지).';
+
+  @override
+  String get settingsOutputDeviceHfpNote =>
+      '이 장치는 현재 저품질 모드입니다(예: 블루투스 핸즈프리/통화 HFP, 주로 16kHz 모노). 엔진은 장치의 기본 형식으로 출력하므로 음질이 제한됩니다.';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideTitle => '블루투스 A2DP(고음질 오디오) 활성화 방법';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideDesc =>
+      '1. 블루투스 헤드셋 연결을 해제한 후 다시 연결합니다.\n2. 시스템 블루투스 설정에서 장치를 “오디오/A2DP”(일부 시스템은 “미디어 오디오”)로 전환합니다.\n3. 여전히 Headset/핸즈프리만 표시되면 페어링을 해제한 후 다시 페어링합니다.\n정확한 메뉴는 시스템마다 다릅니다.';
+
+  @override
+  String get settingsOutputDeviceCallBadge => '통화·저음질';
+
+  @override
+  String get settingsOutputDeviceCallConfirmTitle => '통화 음질 기기로 음악을 재생할까요?';
+
+  @override
+  String get settingsOutputDeviceCallConfirmDesc =>
+      '이 기기는 통화/저음질 등급으로 출력되어 음악이 거의 망가집니다(음성 통화 수준). 대부분의 헤드폰은 이 모드로 음악을 재생하지 않으며, 일부 기기는 의도적으로 호환되지 않아 무음이나 비정상 동작이 생길 수 있습니다. A2DP 등 고음질 출력으로 전환하는 것을 강력히 권장합니다. 앱은 절대 자동으로 전환하지 않으며, 명시적으로 선택한 경우에만 적용됩니다.';
+
+  @override
+  String get settingsOutputDeviceUseQuality => '고음질 출력으로 전환';
+
+  @override
+  String get settingsOutputDeviceUseCall => '그대로 통화/저음질 사용';
+
+  @override
+  String get settingsOutputDeviceDefaultIsCall =>
+      '시스템 기본 출력이 통화/저음질 기기입니다(예: 핸즈프리 HFP). 음악이 통화급 음질로 거의 망가지며, 일부 헤드폰은 의도적으로 호환되지 않아 무음·이상 동작이 생길 수 있습니다. 고음질 출력으로 전환하세요.';
+
+  @override
+  String get settingsOutputDeviceDefaultRowCallNote =>
+      '이 항목을 선택하면 음악이 시스템 기본 통화/저음질 기기로 나가 음질이 거의 손상됩니다. 권장하지 않습니다.';
+
+  @override
+  String settingsSinkChangedFailed(Object err) {
+    return '출력 장치 전환 실패: $err';
+  }
+
+  @override
+  String get settingsEngine => '디코딩 엔진';
+
+  @override
+  String get settingsEngineNote =>
+      '디코딩 엔진은 앱 시작 시 로드되므로 변경 사항은 콜드 재시작 후에 적용됩니다.';
+
+  @override
+  String get settingsEngineStableDesc => 'FFmpeg 디코딩 커널. 검증되었으며 기본값입니다.';
+
+  @override
+  String get settingsEngineEraAudioDesc =>
+      '자체 개발 디코딩 커널. 신규이며 성능·메모리는 벤치마크 중입니다.';
+
+  @override
+  String get settingsEngineExperimental => '실험적';
+
+  @override
+  String get settingsEngineEraAudioNote =>
+      '실험적 커널: 성능과 메모리 사용량은 아직 벤치마크 중이며 일부 포맷·기기에서 문제가 발생할 수 있습니다. 문제가 있으면 이 설정에서 Stable로 되돌릴 수 있습니다.';
+
+  @override
+  String get settingsEngineRestartTitle => '재시작 필요';
+
+  @override
+  String get settingsEngineRestartDesc =>
+      '엔진 설정이 저장되었습니다. 엔진은 시작 시 로드되므로 전환하려면 재시작해야 합니다. 그 전까지는 현재 엔진이 계속 동작하며, 재시작 동안 재생과 다운로드가 중단됩니다.';
+
+  @override
+  String get settingsEngineRestartNow => '지금 재시작';
+
+  @override
+  String get settingsEngineRestartLater => '나중에';
 
   @override
   String get volumeMute => '음소거';
@@ -3274,5 +3402,63 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String streamingPlaylistSongs(Object count) {
     return '노래 $count곡';
+  }
+
+  @override
+  String get brandQqMusic => 'QQ 뮤직';
+
+  @override
+  String get platformQQMusic => 'QQ 뮤직';
+
+  @override
+  String get loginQqQrLogin => 'QQ 뮤직 QR 코드로 로그인';
+
+  @override
+  String get loginQqTypeQq => 'QQ';
+
+  @override
+  String get loginQqTypeWx => 'WeChat';
+
+  @override
+  String get loginQqScanHint => 'QQ 앱으로 스캔하여 로그인하세요';
+
+  @override
+  String get loginQqWxScanHint => 'WeChat으로 스캔하여 로그인하세요';
+
+  @override
+  String navHeaderQqId(String id) {
+    return 'QQ $id';
+  }
+
+  @override
+  String get toastQqNotSupported => 'QQ 뮤직에서는 지원하지 않습니다';
+
+  @override
+  String searchSourceFailed(Object source) {
+    return '$source 검색을 일시적으로 사용할 수 없습니다';
+  }
+
+  @override
+  String searchQqRiskDetail(Object code) {
+    return 'QQ Music 요청이 제한되거나 차단되었습니다(코드 $code). 자동 재시도를 중지했습니다. 잠시 후 다시 시도해 주세요';
+  }
+
+  @override
+  String get searchNetworkError => '네트워크 오류 또는 요청 시간 초과입니다. 잠시 후 다시 시도해 주세요';
+
+  @override
+  String searchPlatformError(Object code) {
+    return '플랫폼에서 오류를 반환했습니다($code)';
+  }
+
+  @override
+  String get searchWaitRetry => '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요';
+
+  @override
+  String get qqMusicDownloadUnsupported => 'QQ Music 다운로드는 현재 미지원입니다(리스크 관리).';
+
+  @override
+  String qqMusicDownloadSkipped(Object count) {
+    return 'QQ Music $count곡 건너뜀(다운로드 미지원).';
   }
 }

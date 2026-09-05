@@ -45,8 +45,9 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
     final notifier = ref.read(playbackProvider.notifier);
     final prefs = ref.watch(appPrefsProvider);
     // 选择性订阅低频字段（播放位置/FFT 每 50ms 更新，不重建播放条本体）
-    final hasSource =
-        ref.watch(playbackProvider.select((s) => s.source != null));
+    final hasSource = ref.watch(
+      playbackProvider.select((s) => s.source != null),
+    );
     final track = ref.watch(playbackProvider.select((s) => s.track));
     final title = ref.watch(playbackProvider.select((s) => s.title));
     final subtitle = ref.watch(playbackProvider.select((s) => s.subtitle));
@@ -71,6 +72,8 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
+          // 保留原版细条高度 22（不因触摸适配而放大观感）；触摸命中由
+          // PlaybackProgressSlider 的细条手势负责（横向拖动/点按 seek）
           height: 22,
           // 进度条独立订阅位置/时长：50ms 更新只重建滑块，不重建整条
           child: PlaybackProgressSlider(
@@ -135,13 +138,13 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
                 // 左右两侧均为弹性栏，保证三键严格居中。
                 IconButton(
                   tooltip: l10n.commonPrevious,
-                  onPressed: hasQueue
-                      ? notifier.playPrevious
-                      : null,
+                  onPressed: hasQueue ? notifier.playPrevious : null,
                   icon: const Icon(Icons.skip_previous),
                 ),
                 IconButton(
-                  tooltip: buffering ? l10n.commonLoading : l10n.playerBarPlayPause,
+                  tooltip: buffering
+                      ? l10n.commonLoading
+                      : l10n.playerBarPlayPause,
                   onPressed: hasContent && !buffering ? notifier.toggle : null,
                   icon: buffering
                       ? const SizedBox(
@@ -153,9 +156,7 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
                 ),
                 IconButton(
                   tooltip: l10n.commonNext,
-                  onPressed: hasQueue
-                      ? notifier.playNext
-                      : null,
+                  onPressed: hasQueue ? notifier.playNext : null,
                   icon: const Icon(Icons.skip_next),
                 ),
                 // 右栏（弹性，右对齐）：时间与频谱 → 播放列表 → 红心
@@ -175,9 +176,11 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
                               // 时间（独立订阅位置/时长，50ms 只重建本行）
                               Consumer(
                                 builder: (context, ref, _) {
-                                  final s = ref.watch(playbackProvider.select(
-                                    (s) => (pos: s.position,
-                                        dur: s.duration)));
+                                  final s = ref.watch(
+                                    playbackProvider.select(
+                                      (s) => (pos: s.position, dur: s.duration),
+                                    ),
+                                  );
                                   return Text(
                                     '${formatClock(s.pos)} / ${formatClock(s.dur)}',
                                     style: theme.textTheme.bodySmall,
@@ -204,10 +207,10 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
                             tooltip: l10n.playerBarPlaylist,
                             onPressed: hasQueue
                                 ? () => QueuePanel.show(
-                                      context,
-                                      style: QueuePanelStyle.popup,
-                                      anchor: _anchorOf(btnCtx),
-                                    )
+                                    context,
+                                    style: QueuePanelStyle.popup,
+                                    anchor: _anchorOf(btnCtx),
+                                  )
                                 : null,
                             icon: const Icon(Icons.queue_music),
                           ),
@@ -259,28 +262,36 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
                   // 再模糊下方主界面（对齐原版 footer blur16）
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(30),
-                    child: _glass(imageMode, child: Material(
-                      color: chrome.playerBarBackground,
-                      clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        side: BorderSide(
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.12)),
+                    child: _glass(
+                      imageMode,
+                      child: Material(
+                        color: chrome.playerBarBackground,
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          side: BorderSide(
+                            color: theme.colorScheme.primary.withValues(
+                              alpha: 0.12,
+                            ),
+                          ),
+                        ),
+                        child: SafeArea(top: false, child: bar),
                       ),
-                      child: SafeArea(top: false, child: bar),
-                    )),
+                    ),
                   ),
                 ),
               ),
             ),
           )
         // 默认模式：全宽停靠条（image 模式毛玻璃，纯色面板实底）
-        : _glass(imageMode, child: Material(
-            color: chrome.playerBarBackground,
-            elevation: 8,
-            child: SafeArea(child: bar),
-          ));
+        : _glass(
+            imageMode,
+            child: Material(
+              color: chrome.playerBarBackground,
+              elevation: 8,
+              child: SafeArea(child: bar),
+            ),
+          );
 
     // 未播放时隐藏播放条（不占底部空间）；用 AnimatedSwitcher 做
     // 进入/退出动效（对齐原版 MainLayout.vue 的 PlayerBar 过渡：底部
@@ -302,10 +313,7 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
         child: FadeTransition(opacity: animation, child: child),
       ),
       child: showBar
-          ? KeyedSubtree(
-              key: const ValueKey('player-bar'),
-              child: content,
-            )
+          ? KeyedSubtree(key: const ValueKey('player-bar'), child: content)
           : const SizedBox.shrink(key: ValueKey('player-bar-hidden')),
     );
   }
@@ -368,7 +376,10 @@ class _BarCoverState extends State<_BarCover> {
               // 悬浮遮罩 + 上箭头（200ms 过渡，对齐原版 group-hover）
               AnimatedOpacity(
                 opacity: _hovered ? 1 : 0,
-                duration: animDuration(context, const Duration(milliseconds: 200)),
+                duration: animDuration(
+                  context,
+                  const Duration(milliseconds: 200),
+                ),
                 curve: Curves.easeOut,
                 child: Container(
                   width: _size,
@@ -408,14 +419,14 @@ class _BarLikeButtonState extends ConsumerState<_BarLikeButton> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final ok = await ref
-          .read(likeControllerProvider)
-          .toggle(widget.track);
+      final ok = await ref.read(likeControllerProvider).toggle(widget.track);
       if (!ok && mounted) {
         toast(
-          widget.track.source == 'kugou'
-              ? context.l10n.toastLoginRequiredKugou
-              : context.l10n.toastLoginRequiredNetease,
+          switch (widget.track.source) {
+            'kugou' => context.l10n.toastLoginRequiredKugou,
+            'qqmusic' => context.l10n.toastQqLikeSyncFailed,
+            _ => context.l10n.toastLoginRequiredNetease,
+          },
           type: ToastType.error,
         );
       }

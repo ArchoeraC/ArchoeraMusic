@@ -134,6 +134,11 @@ Future<void> _startDownload(
   WidgetRef ref,
   Track track,
 ) async {
+  // QQ 音乐暂不做下载（风控/无下载源）：保留入口，点击给提示。
+  if (track.source == 'qqmusic') {
+    toast(context.l10n.qqMusicDownloadUnsupported);
+    return;
+  }
   if (track.source == 'kugou' && track.kugou == null) {
     toast(context.l10n.toastNoQualityInfo);
     return;
@@ -152,9 +157,19 @@ Future<void> downloadTracks(
   WidgetRef ref,
   List<Track> tracks,
 ) async {
+  final l10nQq = context.l10n;
   final online = tracks
       .where((t) => t.source == 'netease' || t.source == 'kugou')
       .toList();
+  // QQ 音乐暂不做下载（风控/无下载源）：保留入口但提示并跳过。
+  final qqCount = tracks.where((t) => t.source == 'qqmusic').length;
+  if (qqCount > 0) {
+    if (online.isEmpty) {
+      toast(l10nQq.qqMusicDownloadUnsupported);
+      return;
+    }
+    toast(l10nQq.qqMusicDownloadSkipped(qqCount));
+  }
   if (online.isEmpty) return;
   // 批量曲目可能混平台：任一平台未登录都拦截（提示登录对应平台）
   for (final src in const ['kugou', 'netease']) {

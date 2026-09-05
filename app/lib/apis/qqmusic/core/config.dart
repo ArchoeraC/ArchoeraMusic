@@ -8,28 +8,32 @@ const qmApiUrl = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
 final Map<String, String> qmHeaders = {
   'Content-Type': 'application/json',
   'Accept-Encoding': 'gzip',
-  'User-Agent': 'okhttp/3.14.9',
+  'User-Agent': 'QQMusic 14090008(android 15)',
   'Referer': 'https://y.qq.com',
-  'Cookie': 'tmeLoginType=-1;',
 };
 
 /// 请求体 comm 字段（伪装 Android 客户端）
 Map<String, Object> qmGetCommonParams() => {
-      'ct': 11,
-      'cv': '1003006',
-      'v': '1003006',
-      'os_ver': '15',
-      'phonetype': '24122RKC7C',
-      'tmeAppID': 'qqmusiclight',
-      'nettype': 'NETWORK_WIFI',
-      'udid': '0',
-      'OpenUDID': '0',
-      'QIMEI36': '0',
-      'uin': '0',
-    };
+  'ct': 11,
+  'cv': 14090008,
+  'v': 14090008,
+  'chid': '10003505',
+  'os_ver': '15',
+  'phonetype': '24122RKC7C',
+  'tmeAppID': 'qqmusic',
+  'nettype': 'NETWORK_WIFI',
+  'udid': '0',
+  'OpenUDID': '0',
+  'QIMEI36': '0',
+  'uin': '0',
+};
 
 /// Session 缓存时长（毫秒）
 const qmSessionTtl = 60 * 60 * 1000;
+
+/// 网页 UA（song_url / 扫码登录等 Web 接口使用）
+const qmWebUa =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 /// 歌手数组格式化工具：`[{name:'A'},{name:'B'}]` → `A / B`
 String qmFormatSingerName(

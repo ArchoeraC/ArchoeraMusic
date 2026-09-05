@@ -119,6 +119,8 @@ ArchoeraMusic/
 
 - Flutter SDK `^3.12.2`（`cat app/pubspec.yaml | grep sdk`）
 - CMake ≥ 3.16 / C 工具链（构建 audio-engine / scraper；`FindSQLite3` 自 3.14 起才提供 `SQLite3::SQLite3` target，低版本将回退到变量链接）
+- **Zig 0.16.x**（自研解码内核 EraAudio，`app/core/audio-engine/kernel`；编译顺序：先 `zig build -Doptimize=ReleaseFast`
+  再 cmake 构建 audio-engine，缺失时引擎回退 FFmpeg/Stable——详见 `docs/engine-integration-bench.md`）
 - .NET SDK（构建 scanner）
 - Rust 工具链（构建 tempo-rs / transcoder）
 - Go 工具链（构建 subsonic）
@@ -146,6 +148,47 @@ flutter run -d linux      # 或 windows / macos
 ```
 
 > 提示：Windows / macOS 桌面端的原生模块经 **FFI** 以共享库形式（`archoera_mediaengine.dll` / `libarchoera_subsonic.dylib` 等）打进应用，无需子进程。
+
+---
+
+## 自研解码内核基准（EraAudio，实验性）
+
+> 2026-09-05 行业对比（FFmpeg n9.0.1 / libFLAC / LAME / speexdec / libopus / libvorbis）。
+> 定位：**实验性参考，非发布承诺**。自研 Zig 内核（`--engine-mode 1`）当前为「优先尝试、
+> 失败回退 FFmpeg」的渐进接管路线，基准用于量化差距、排定优化项。
+> 全量方法/原始数据/复现见 [docs/benchmark-industry-2026-09-05.md](docs/benchmark-industry-2026-09-05.md)，
+> 引擎集成与旧口径基准见 [docs/engine-integration-bench.md](docs/engine-integration-bench.md)。
+
+**总体评分（100 = speed40 + memory30 + correctness20 + coverage10）**：
+EraAudio **95.6/100（A+；跨轮 95.0–95.6）** vs 引擎内 Stable/FFmpeg 97.6（A+）→
+**相对 FFmpeg ≈97.9%**（Δ≈−2.0，区间 97.0%–97.9%）；`flac -d` / `lame --decode`
+（各自格式、作地面真值）100；`speexdec` 80（极性分歧，见 doc）。同机：Intel i9-13980HX ·
+Linux · 200s 高熵噪声语料 · 解码→PCM 不重编码；lossless 类 native 输出与 FFmpeg **逐位一致**，
+lossy 类 `|corr|≥0.999`、`±≤1 LSB`（ac3/eac3≈0.96、speex 极性分歧另注）。贴近阈值行有
+±4 分跨轮抖动（ac3/flac/m4a），判档请看区间与分差方向。
+
+| 格式 | EraAudio | Stable(FFmpeg) | 格式 | EraAudio | Stable(FFmpeg) |
+|---|---|---|---|---|---|
+| flac(直解) | 97.9 A+ | 100 A+ | mp2 | 100 A+ | 96 A+ |
+| wav / wv / mka | 100 A+ | 100 A+ | opus | 100 A+ | 100 A+ |
+| tta | 82 B | 100 A+ | vorbis | 100 A+ | 100 A+ |
+| mp3 | 100 A+ | 96 A+ | aac(m4a) | 100 A+ | 96 A+ |
+| dts | 82 B | 96 A+ | aac(adts) | 100 A+ | 96 A+ |
+| speex | 88 B | 88 B | ac3 | 92 A | 100 A+ |
+| | | | eac3 | 92 A | 96 A+ |
+
+**已知短板（评分依据，详见 doc §6）**：① 直解 `.flac` native ≈46–50× 实时（比 FFmpeg 慢 ~20×，
+自研 flac 帧解码器待优化；经 mka 轨 ≈260–280× 正常）；② tta/dts 峰值 RSS 55/85MB（平台 ≈29MB，
+疑似整缓冲，待多尺寸验证）；③ ac3/eac3 PCM 与参考 corr≈0.96（长度对齐，内容级舍入差待核对）；
+④ speex 与独立 `speexdec` 极性分歧（libspeex 族同号，编码侧成因，按 |corr| 计分）。
+
+重跑命令（产物落 `app/core/audio-engine/tests/bench/`）：
+
+```bash
+cd app/core/audio-engine
+zig build -Doptimize=ReleaseFast && cmake --build build
+python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
+```
 
 ---
 
@@ -188,6 +231,8 @@ flutter run -d linux      # 或 windows / macos
 ## 文档
 
 - [架构设计](docs/architecture.md) —— 进程模型 / 音频管线 / FFI 桥接
+- [自研解码内核行业基准（EraAudio）](docs/benchmark-industry-2026-09-05.md) —— FFmpeg/libFLAC/LAME/speexdec 横评 + 评分（95.6 A+）
+- [引擎集成与基准（EraAudio vs Stable）](docs/engine-integration-bench.md) —— EOF/错误语义、内存流式化、样本数对齐
 
 ---
 

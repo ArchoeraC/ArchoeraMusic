@@ -404,7 +404,9 @@ class KugouApi extends ChangeNotifier {
     if (albumTip is List) {
       for (final a in albumTip.whereType<Map<String, dynamic>>()) {
         final id = (a['albumid'] ?? a['album_id'] ?? a['id'] ?? '').toString();
-        final name = (a['albumname'] ?? a['album_name'] ?? '').toString().trim();
+        final name = (a['albumname'] ?? a['album_name'] ?? '')
+            .toString()
+            .trim();
         if (id.isEmpty || name.isEmpty) continue;
         albums.add(
           SuggestSimpleItem(
@@ -424,10 +426,7 @@ class KugouApi extends ChangeNotifier {
   ///
   /// 命中即返回（含 hash 品质链与封面，可直接 [resolvePlayUrl] / 播放）；
   /// 找不到返回 null。匹配策略：①歌名+歌手精确 → ②仅歌名 → ③首个结果。
-  Future<Track?> suggestSongToTrack(
-    String name, {
-    String? singer,
-  }) async {
+  Future<Track?> suggestSongToTrack(String name, {String? singer}) async {
     final keyword = name.trim();
     if (keyword.isEmpty) return null;
     String norm(String s) => s.replaceAll(RegExp(r'\s+'), '').toLowerCase();
@@ -437,8 +436,7 @@ class KugouApi extends ChangeNotifier {
     if (result.items.isEmpty) return null;
     Track? best;
     for (final t in result.items) {
-      if (norm(t.title) == nn &&
-          (ns.isEmpty || norm(t.artistNames) == ns)) {
+      if (norm(t.title) == nn && (ns.isEmpty || norm(t.artistNames) == ns)) {
         best = t;
         break;
       }
@@ -1658,6 +1656,7 @@ class KugouApi extends ChangeNotifier {
             id: id,
             title: title,
             cover: kgFillCover(coverTpl, 300),
+            source: 'kugou',
             subtitle: type == 'special'
                 ? (c['nickname']?.toString() ?? '')
                 : type == 'album'

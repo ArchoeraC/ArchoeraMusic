@@ -21,14 +21,24 @@ export 'fft_frame.dart' show FftFrame;
 
 /// 播放控制器（Notifier）：应用层单一播放状态源（架构文档 §5.3）。
 ///
-/// 组合：AudioEngineProcess（直连 C 引擎：spawn + stdin 控制 + UDS 事件，
-/// 全速完整转码 PCM 落盘 WAV）+ 引擎内置 miniaudio 播放（§10.8，替代 libmpv）。
-/// 转码完成后引擎自播 WAV：完整时长（ready/playing 事件回填）、seek 走
-/// miniaudio 本地 seek（不重启引擎重转码）、位置/播放状态经引擎事件推送。
+/// 组合：AudioEngineProcess（直连 C 引擎：FFI create + 命令/事件 FIFO，
+/// 流式起播：边解码边出声，PCM 同时落盘 WAV/PCM）+ 引擎内置 miniaudio
+/// 播放（§10.8，替代 libmpv）。
+/// 会话启动门槛 = ready（见 [AudioEngineProcess.started]，done 在流式下只在
+/// 曲尾到达）；完整时长（ready/playing 事件回填）、seek 走引擎本地 seek
+/// （不重启引擎重转码）、位置/播放状态经引擎事件推送。无声设备回退旧路径：
+/// 全速完整转码落盘 WAV 后再自播。
 class PlaybackNotifier extends Notifier<PlaybackState> {
   final List<StreamSubscription<EngineEvent>> _engineSubs = [];
 
   AudioEngineProcess? _engine;
+
+  /// 输出设备切换失败通知（set_sink 回执 !ok）：设置页订阅后弹错误 toast。
+  ///
+  /// 仅通知当前引擎会话存在的失败；无会话时偏好已落盘，下次会话由引擎
+  /// 会话创建流程自动补发（失败只入日志，设置页已不在场无从提示）。
+  final StreamController<String> _sinkFailureCtrl =
+      StreamController<String>.broadcast();
 
   /// 最近一次播放位置诊断日志（AUTOPLAY，验证用）。
   int? _lastPosLogMs;
@@ -52,10 +62,36 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   /// 若此标志为 true 则立即暂停（不置 playing），避免闪播。
   bool _pendingPauseAfterReady = false;
 
+  /// 冷启动「启动时自动播放」续播尝试进行中（见 [restore]）。
+  ///
+  /// 目的：防止**中间态落盘覆盖「可续播」快照**。restore 先把现场恢复为
+  /// 暂停展示态（playing=false、position=恢复点）再异步启动引擎；若此刻
+  /// 正常持久化，会把磁盘上 `playing=true@offset` 的旧快照覆盖成
+  /// `playing=false`——当续播因冷启动瞬时原因失败（登录态/网络/解析未就绪、
+  /// 源文件暂不可达等）时，降级快照会被永久保留，之后**每次冷启动都不再
+  /// 自动续播**（表现为「断点续播失效」）。
+  ///
+  /// 置位期间 [_persistSession] 不允许把 paused 写盘覆盖可续播快照：
+  /// [_retryableSnapshot] 非空时暂停态写盘改为写回该「可续播」快照，只有
+  /// 真正进入播放（EnginePlaying）或续播尝试收敛（引擎错误/退出、stop）后
+  /// 才解除。失败时磁盘保留 `playing=true@位置` 现场，下次冷启动可重试。
+  bool _autoResumeInFlight = false;
+
+  /// 自动续播保护期间，暂停态写盘应写回的可续播快照（restore 开始时读取）。
+  PlaybackSnapshot? _retryableSnapshot;
+
+  /// 会话记忆偏好缓存（退出 dispose 时 Riverpod 已进入生命周期禁用期，
+  /// 不能再 `ref.read(appPrefsProvider)`，见 [build] 的 onDispose）。
+  bool _sessionMemoryEnabled = true;
+
   @override
   PlaybackState build() {
     ref.onDispose(() {
-      // 退出前同步落盘「关闭前最后一次」现场（同步写，进程销毁也能保住）
+      // 退出前同步落盘「关闭前最后一次」现场（同步写，进程销毁也能保住）。
+      // 注意：此时不能经 ref 读其它 provider（Riverpod dispose 生命周期禁读，
+      // 会抛断言）；会话记忆开关改用 build 期缓存的 [_sessionMemoryEnabled]。
+      _autoResumeInFlight = false;
+      _retryableSnapshot = null;
       _persistSession();
       _volumeApplyTimer?.cancel();
       _fftActive = false;
@@ -63,6 +99,7 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         s.cancel();
       }
       _engineSubs.clear();
+      _sinkFailureCtrl.close();
       // ignore: discarded_futures
       unawaited(_stopEngine());
     });
@@ -89,8 +126,12 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         _persistSession();
       }
     });
-    // 偏好变化（性能模式/频谱开关）时同步 FFT 轮询启停，无需重启引擎。
-    ref.listen(appPrefsProvider, (_, _) => _syncFftActive());
+    // 偏好变化时同步会话记忆缓存与 FFT 轮询启停，无需重启引擎。
+    _sessionMemoryEnabled = ref.read(appPrefsProvider).sessionMemory;
+    ref.listen(appPrefsProvider, (_, next) {
+      _sessionMemoryEnabled = next.sessionMemory;
+      _syncFftActive();
+    });
     // 初始音量 = 用户偏好（后续 setVolume 同步 prefs 与引擎）。
     return PlaybackState(volume: ref.read(appPrefsProvider).volume);
   }
@@ -171,6 +212,19 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     }
   }
 
+  /// 输出设备切换失败流（err 文本；见 [_sinkFailureCtrl]）。
+  Stream<String> get sinkFailures => _sinkFailureCtrl.stream;
+
+  /// 把输出设备偏好下发到当前引擎会话（`set_sink`，id 空串 = 系统默认）。
+  ///
+  /// 无会话时忽略——偏好已落盘，下次会话创建后由 [_startSession] 读取
+  /// 自动补发（重启后亦保持）。
+  Future<void> applyOutputSink(String sinkId) async {
+    final engine = _engine;
+    if (engine == null) return;
+    await engine.sendCommand('set_sink', {'id': sinkId});
+  }
+
   /// FFT 拉模式（§10.1，事件驱动无轮询）：引擎每 50ms 音频发一条
   /// EnginePosition 事件 → 更新 position 后立即按当前位置从本地 PCM
   /// 分析器缓冲取一帧。暂停/seek 时位置事件天然对齐，无独立 Timer。
@@ -235,7 +289,7 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   Future<void> restore() async {
     // 「会话记忆」关闭时不恢复任何现场（默认开）；顺带清掉可能残留的旧快照
     // （偏好文件被外部改为关闭等场景），保证关闭记忆期间磁盘零现场数据
-    if (!ref.read(appPrefsProvider).sessionMemory) {
+    if (!_sessionMemoryEnabled) {
       const PlaybackSessionStore().clear();
       return;
     }
@@ -243,9 +297,25 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     if (snapshot == null) return;
     final queue = snapshot.queue;
     if (queue.isEmpty && snapshot.track == null) return;
+    final track = snapshot.currentTrack;
+    if (track == null) return;
     var idx = snapshot.queueIndex;
     if (idx < -1 || idx >= queue.length) idx = -1;
+    // 恢复位置（毫秒）。尾部记忆边界：停点已越过/到达曲尾（当前曲目带完整
+    // 时长信息时）视为从头续播——否则从 duration 处起播会立即 EOF 自然切歌，
+    // 表现成「上次停在尾部却跳下一首/闪断」，不符合恢复现场的产品语义。
+    var posMs = snapshot.positionMs;
+    final durMs = track.duration;
+    if (durMs > 0 && posMs >= durMs) posMs = 0;
+    // 自动续播意图：仅「关闭前在播放」且偏好「启动时自动播放」开启（默认关）。
+    final autoPlay =
+        snapshot.playing && ref.read(appPrefsProvider).autoPlayOnLaunch;
     _originalQueue = List.of(queue);
+    // 续播尝试期间：暂停态中间落盘一律改写回该可续播快照，防止把磁盘上
+    // `playing=true` 的可续播快照覆盖成 paused（见 [_autoResumeInFlight]）——
+    // 若本次续播因冷启动瞬时原因失败，下次冷启动仍可自动续播。
+    _autoResumeInFlight = autoPlay;
+    _retryableSnapshot = autoPlay ? snapshot : null;
     state = state.copyWith(
       queue: List.of(queue),
       queueIndex: idx,
@@ -258,22 +328,27 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
       track: snapshot.track,
       playing: false,
       buffering: false,
-      position: Duration(milliseconds: snapshot.positionMs),
+      position: Duration(milliseconds: posMs),
     );
-    final track = snapshot.currentTrack;
-    if (track == null) return;
-    // 「启动时自动播放」偏好（默认关）：仅恢复现场（暂停态），点播放从保存位置继续
-    final autoPlay = ref.read(appPrefsProvider).autoPlayOnLaunch;
     _log(
-      '恢复会话: ${queue.length} 首 @${snapshot.positionMs}ms '
-      '${snapshot.playing && autoPlay ? '自动续播' : '暂停'}',
+      '恢复会话: ${queue.length} 首 @${posMs}ms '
+      '${autoPlay ? '自动续播' : '暂停'}',
     );
-    if (!snapshot.playing || !autoPlay) return;
+    if (!autoPlay) return;
     await _resumeFrom(
       track,
-      offsetMs: snapshot.positionMs,
+      offsetMs: posMs,
       quality: snapshot.quality,
     );
+    // flush 恢复期 state 变更触发的落盘回调（此刻仍在保护期内 → 写回可续播
+    // 快照而非降级 paused）。
+    await Future<void>.delayed(Duration.zero);
+    // 引擎从未创建即失败的终态（源解析失败等，无引擎事件会来解除保护）：
+    // 解除保护，磁盘此刻保留的仍是可续播快照，下次冷启动可重试。
+    if (!state.playing && _engine == null) {
+      _autoResumeInFlight = false;
+      _retryableSnapshot = null;
+    }
   }
 
   /// 从指定位置续播 [track]（恢复会话 / 暂停态点播放共用）。
@@ -289,6 +364,8 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         _log('恢复播放失败：无法解析播放源 ${track.title}');
         return;
       }
+      // 失败/成功均由 restore() 终态统一收敛保护（见 restore），此处不解除——
+      // 直接解除会早于恢复期 state 变更的回调落盘（降级写盘逃过保护）。
       await _playTrackMeta(url, track, quality: q, offsetMs: offsetMs);
     } catch (e) {
       // 解析/加载异常不打断启动流程：启动恢复与登录态初始化并行，此刻
@@ -300,15 +377,32 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   /// 退出前显式落盘播放现场（同步写）。正常退出由 dispose 调用
   /// [_persistSession]；Linux 退出走 exit(0)（绕开 GTK teardown 崩溃，
   /// 不触发 dispose），需在退出前主动调用。
+  ///
+  /// 自动续播保护未解除（续播尝试中/失败未重试）时，本方法也写回可续播
+  /// 快照，保证「启动即退出」不丢自动续播现场。
   void persistNow() => _persistSession();
+
+  /// 落盘单个 [PlaybackSnapshot]（同步写）。
+  void _writeSession(PlaybackSnapshot snapshot) {
+    const PlaybackSessionStore().save(snapshot);
+    _lastPersistPosMs = snapshot.positionMs;
+  }
 
   /// 落盘当前播放现场（同步写；无任何现场时跳过）。
   void _persistSession() {
+    // 自动续播保护期：禁止把 paused 写盘覆盖「可续播」快照。有可续播快照时
+    // 暂停态写盘改写回它（磁盘恒为 playing=true@位置，进程随时被杀都保得住）；
+    // 无可续播快照（尚未设置）则直接抑制写盘，等待终态解除保护。
+    if (_autoResumeInFlight && !state.playing) {
+      final retry = _retryableSnapshot;
+      if (retry != null) _writeSession(retry);
+      return;
+    }
     // 「会话记忆」关闭时不落盘（默认开）
-    if (!ref.read(appPrefsProvider).sessionMemory) return;
+    if (!_sessionMemoryEnabled) return;
     final s = state;
     if (s.queue.isEmpty && s.track == null && s.source == null) return;
-    const PlaybackSessionStore().save(
+    _writeSession(
       PlaybackSnapshot.fromState(
         queue: s.queue,
         queueIndex: s.queueIndex,
@@ -324,7 +418,6 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         source: s.source,
       ),
     );
-    _lastPersistPosMs = s.position.inMilliseconds;
   }
 
   /// 加载并播放（直连 C 引擎，AUTOPLAY 场景见 home_page）。
@@ -345,12 +438,12 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     int offsetMs = 0,
   }) {
     final gen = ++_loadGen;
-    // 抢占式切歌：立即停掉当前引擎（stop 放行其 pending done，旧 load 任务
-    // 快速收尾），新任务无需排队等旧会话转码完成即可启动——缓冲中可切歌。
+    // 抢占式切歌：立即停掉当前引擎（stop 放行其 pending started/done，旧 load
+    // 任务快速收尾），新任务无需排队等旧会话就绪/曲终即可启动——缓冲中可切歌。
     // ignore: discarded_futures
     unawaited(_stopEngine());
     final task = _loadChain.then((_) async {
-      // 转码完成前即可展示标题（_startSession 内部 copyWith 保留之）
+      // 就绪（ready）前即可展示标题（_startSession 内部 copyWith 保留之）
       state = state.copyWith(
         title: title,
         subtitle: subtitle,
@@ -429,6 +522,10 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         url = await ref
             .read(neteaseApiProvider)
             .resolvePlayUrl(track.id, quality: quality);
+      } else if (track.source == 'qqmusic') {
+        url = await ref
+            .read(qqMusicApiProvider)
+            .resolvePlayUrl(track, quality: quality);
       } else {
         url = null;
       }
@@ -494,6 +591,9 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     }
     if (track.source == 'netease') {
       return ref.read(neteaseApiProvider).resolvePlayUrl(track.id, quality: q);
+    }
+    if (track.source == 'qqmusic') {
+      return ref.read(qqMusicApiProvider).resolvePlayUrl(track, quality: q);
     }
     if (track.source == 'streaming') {
       final serverId = track.serverId;
@@ -1088,6 +1188,9 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     _fftActive = false;
     _sessionOffsetMs = 0;
     _pendingPauseAfterReady = false;
+    // 用户主动停止：快照保护解除（paused 可落盘，覆盖自动续播现场）
+    _autoResumeInFlight = false;
+    _retryableSnapshot = null;
     await _stopEngine();
     state = state.copyWith(
       source: null,
@@ -1104,14 +1207,20 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     _log('已停止');
   }
 
-  /// 启动引擎会话：全速完整转码 PCM 落盘 WAV，完成后引擎自播（miniaudio）。
+  /// 启动引擎会话（流式优先：边解码边出声，首块 PCM 即 playing；无声设备
+  /// 回退全速转码落盘 WAV 后自播）。
+  ///
+  /// 启动门槛 = 引擎 `ready`（[AudioEngineProcess.started]）：ready 后曲目
+  /// 已可出声（playing 紧跟其后），[load] 即可收敛。done 在流式下只在曲尾
+  /// EOF 到达，不能作为「会话已启动」的等待点——否则 playAll/切曲等 await
+  /// load 的流程会挂到整曲播完（卡死 loading、期间无法切换曲目）。
   ///
   /// [passthrough] 原音质直通（来自设置开关）：true = 引擎保持源采样率；
   /// false = 统一 48kHz 转码管线。
   ///
   /// [gen] 为发起方捕获的加载代际号（见 [load]）；0 表示不参与抢占检查
-  /// （seek 回退重启会话等内部路径）。创建中/转码中被更新的 load 取代时
-  /// 立即停掉自身引擎，不再等待转码完成——缓冲中切歌的落点。
+  /// （seek 回退重启会话等内部路径）。创建中/就绪前被更新的 load 取代时
+  /// 立即停掉自身引擎，不再等待——缓冲中切歌的落点。
   Future<void> _startSession(
     String source, {
     required int offsetMs,
@@ -1136,6 +1245,15 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     _sessionOffsetMs = offsetMs;
     _engineSubs.add(engine.events.listen(_onEngineEvent));
     _fftStarted = false;
+    // 输出设备偏好：会话创建后立即下发 set_sink（引擎为 FFI 进程内会话，
+    // env ARCHOERA_AUDIO_SINK 只在进程启动时读取；此处以 Dart 偏好显式
+    // 覆盖，'无选择 = 空串' 则不动引擎、尊重系统默认）。显式选择 → 即时/
+    // 下一曲生效，无需冷重启；偏好已持久化，重启后新会话同样命中此分支。
+    final sinkId = ref.read(appPrefsProvider).sink;
+    if (sinkId.isNotEmpty) {
+      // ignore: discarded_futures
+      unawaited(engine.sendCommand('set_sink', {'id': sinkId}));
+    }
     // 新会话重置取帧节流基准：位置从新会话起点（可能回退）重新前进，
     // 若不重置，首帧会被上一会话的 _lastSpectrumAtMs 节流拦截（FFT 冻结）
     _lastSpectrumAtMs = -1000;
@@ -1153,15 +1271,28 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
       fft: null,
     );
     // 取帧由 _syncFftActive 门控：进入播放（EnginePlaying）才启用事件驱动取帧
-    // 等待完整转码（done 时 WAV 已落盘完整）→ 引擎自播
-    await engine.done;
-    // 转码期间被更新的 load 取代（stop 已放行 done）：不进入自播阶段，
-    // 引擎已被新会话停掉，此处仅收尾
+    // 等待会话就绪（ready）→ 引擎自播（流式：首块 PCM 即出声；回退路径：
+    // 全速转码完成后再自播 WAV）。
+    //
+    // 注意：**不**再 `await engine.done`。done 在流式起播下只在曲尾/内容 EOF
+    // 才到达，若以它作启动门槛，会话会一直处于 buffering/loading、playAll 等
+    // 等待启动的调用挂到整曲播完（表现为「播放全部」卡死、期间无法切曲）。
+    // ready（其后紧跟 playing）才是「会话已可出声」的收敛点。
+    await engine.started;
+    // 就绪前/就绪期间被更新的 load 取代（stop 已放行 started）：不进入后续
+    // 收尾，引擎已被新会话停掉，此处仅结束本代任务
     if (gen != 0 && gen != _loadGen) {
-      _log('会话被新 load 取代（转码完成）');
+      _log('会话被新 load 取代（就绪前/就绪时）');
       return;
     }
-    _log('转码完成，引擎开始播放 WAV');
+    // 启动等待期间被 stop()/clearQueue 主动放弃（非 load 取代，gen 未变但
+    // _engine 已被置空/换新）：同样不进入成功收尾（load 对调用方仍正常返回，
+    // 但不再把本次当成「播放成功」清空失败计数）。
+    if (!identical(_engine, engine)) {
+      _log('会话已放弃（就绪等待期间被 stop）');
+      return;
+    }
+    _log('引擎会话就绪，开始播放');
   }
 
   /// 记入播放历史（真正开始播放时调用，一次/会话）。
@@ -1177,9 +1308,7 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     final prefs = ref.read(appPrefsProvider);
     if (!prefs.historyEnabled) return;
     _historyRecorded = true;
-    ref
-        .read(historyStoreProvider)
-        .record(current, limit: prefs.historyLimit);
+    ref.read(historyStoreProvider).record(current, limit: prefs.historyLimit);
   }
 
   void _onEngineEvent(EngineEvent event) {
@@ -1212,6 +1341,10 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
       case EnginePlaying():
         // 播放器就绪（miniaudio 已加载 WAV）：回填完整时长 + 进入播放。
         // 引擎上报为 WAV 时长（= 全量 - offset），换算回全量绝对时长。
+        // 自动续播已真正进入播放：解除快照保护（此处 state 已/即将置 playing，
+        // 后续中间态可正常落盘）。
+        _autoResumeInFlight = false;
+        _retryableSnapshot = null;
         final durMs = event.durationMs > 0
             ? event.durationMs + _sessionOffsetMs
             : 0;
@@ -1261,10 +1394,34 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
         // 队列播完自动切歌：单曲循环 seek 回开头，否则下一首
         unawaited(_onTrackEnded());
       case EngineError():
+        // 续播尝试失败收敛（ready 前错误）：解除保护并把磁盘收敛为可续播
+        // 快照（此前暂停态写盘已被改写为它，此处兜底一次），下次冷启动重试。
+        if (_autoResumeInFlight) {
+          final retry = _retryableSnapshot;
+          _autoResumeInFlight = false;
+          _retryableSnapshot = null;
+          if (retry != null) _writeSession(retry);
+        }
         _log('引擎错误: ${event.message}');
         state = state.copyWith(buffering: false);
+      case EngineSinkChanged():
+        if (event.ok) {
+          _log('输出设备已切换');
+        } else {
+          final err = event.err;
+          _log('切换输出设备失败: ${err ?? '未知错误'}');
+          if (err != null && err.isNotEmpty && !_sinkFailureCtrl.isClosed) {
+            _sinkFailureCtrl.add(err);
+          }
+        }
       case EngineExited():
         if (_engine != null) {
+          if (_autoResumeInFlight) {
+            final retry = _retryableSnapshot;
+            _autoResumeInFlight = false;
+            _retryableSnapshot = null;
+            if (retry != null) _writeSession(retry);
+          }
           _log('引擎退出 code=${event.code}');
           state = state.copyWith(buffering: false);
         }

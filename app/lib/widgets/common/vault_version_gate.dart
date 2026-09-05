@@ -55,16 +55,14 @@ class _VaultVersionGateState extends State<VaultVersionGate> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.gpp_bad_outlined,
-                    size: 64, color: scheme.error),
+                Icon(Icons.gpp_bad_outlined, size: 64, color: scheme.error),
                 const SizedBox(height: 20),
                 Text(
                   l10n.vaultVersionTitle,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 12),
                 Text(

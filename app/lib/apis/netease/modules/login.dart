@@ -12,7 +12,9 @@ import '../core/types.dart';
 String _md5(String text) => crypto.md5.convert(utf8.encode(text)).toString();
 
 NeteaseModule nmLogin = (query, request) async {
-  final password = (query['md5_password'] as String?) ?? _md5((query['password'] as String?) ?? '');
+  final password =
+      (query['md5_password'] as String?) ??
+      _md5((query['password'] as String?) ?? '');
   final data = <String, dynamic>{
     'type': '0',
     'https': 'true',
@@ -31,8 +33,11 @@ NeteaseModule nmLogin = (query, request) async {
     );
   }
   if (body['code'] == 200) {
-    final renamed = jsonDecode(jsonEncode(body).replaceAll('avatarImgId_str', 'avatarImgIdStr'))
-        as Map<String, dynamic>;
+    final renamed =
+        jsonDecode(
+              jsonEncode(body).replaceAll('avatarImgId_str', 'avatarImgIdStr'),
+            )
+            as Map<String, dynamic>;
     result = NeteaseResponse(
       status: 200,
       body: {...renamed, 'cookie': result.cookie.join(';')},

@@ -36,7 +36,8 @@ typedef _FftDestroyDart = void Function(Pointer<Opaque>);
 class FftAnalyzer {
   FftAnalyzer({this.sampleRate = 48000, this.fftSize = 2048, this.bins = 128}) {
     final lib = DynamicLibrary.open(
-        NativeLibPaths.resolveRequired(NativeModule.fft));
+      NativeLibPaths.resolveRequired(NativeModule.fft),
+    );
     _create = lib.lookupFunction<_FftCreateNative, _FftCreateDart>(
       'fft_create',
     );

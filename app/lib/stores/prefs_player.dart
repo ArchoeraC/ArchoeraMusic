@@ -2,6 +2,8 @@ import 'app_prefs.dart';
 
 // ── 播放器域键（audio./player. 前缀）─────────────────────────────
 const passthroughKey = 'audio.passthrough';
+const engineKey = 'audio.engine';
+const sinkKey = 'audio.sink';
 const autoPlayOnLaunchKey = 'player.autoPlayOnLaunch';
 const sessionMemoryKey = 'player.sessionMemory';
 const enableSpectrumKey = 'player.enableSpectrum';
@@ -20,6 +22,17 @@ const showTranslationKey = 'lyrics.showTranslation';
 /// 原音质直通（不转码）：开 = 引擎保持源采样率播放（Hi-Res/无损不降质，
 /// 默认）；关 = 统一 48kHz 转码管线（与 Web/批量行为一致）。
 const bool defaultPassthrough = true;
+
+/// 解码引擎（'stable' = FFmpeg 稳定默认 / 'eraudio' = 自研实验性内核）。
+/// 引擎在应用启动时加载，切换仅持久化偏好，需冷启动后由引擎会话读取生效。
+const String defaultEngine = 'stable';
+const Set<String> engineModes = {'stable', 'eraudio'};
+
+/// 输出设备偏好（'' = 系统默认，遵循系统默认输出、不自动改道）。
+///
+/// 引擎在会话内按 id 显式输出到指定设备；Dart 持久化本值并即时下发
+/// `set_sink`，无会话时下次会话创建后读取补发，重启后同样保持。
+const String defaultSink = '';
 
 /// 启动时自动播放（恢复会话时是否自动续播；默认关——仅恢复现场，点播放继续）。
 const bool defaultAutoPlayOnLaunch = false;
@@ -46,6 +59,16 @@ const Set<String> spectrumStyles = {'bars', 'wave', 'waveUp'};
 /// 播放器域偏好：直通/自动播放/会话记忆/频谱/封面动效/切歌动效/音量/播放条。
 extension PlayerPrefs on AppPrefs {
   bool get passthrough => data[passthroughKey] as bool? ?? defaultPassthrough;
+
+  /// 解码引擎（'stable' FFmpeg 稳定默认 / 'eraudio' 自研实验性；非法值回退）。
+  String get engine {
+    final v = data[engineKey];
+    if (engineModes.contains(v)) return v as String;
+    return defaultEngine;
+  }
+
+  /// 输出设备（'' = 系统默认；其余为引擎 list_sinks 返回的设备 id）。
+  String get sink => data[sinkKey] as String? ?? defaultSink;
 
   /// 启动时自动播放（恢复会话时自动续播）。
   bool get autoPlayOnLaunch =>
@@ -106,6 +129,15 @@ extension PlayerPrefs on AppPrefs {
 
   AppPrefs copyWithPassthrough(bool value) =>
       AppPrefs(initialData: {...data, passthroughKey: value});
+
+  /// 设置解码引擎（非法值不写入，getter 回退默认 stable）。
+  AppPrefs copyWithEngine(String value) => AppPrefs(
+    initialData: {...data, if (engineModes.contains(value)) engineKey: value},
+  );
+
+  /// 设置输出设备 id（'' = 系统默认；不校验，值仅来自引擎 list_sinks）。
+  AppPrefs copyWithSink(String value) =>
+      AppPrefs(initialData: {...data, sinkKey: value});
 
   AppPrefs copyWithAutoPlay(bool value) =>
       AppPrefs(initialData: {...data, autoPlayOnLaunchKey: value});

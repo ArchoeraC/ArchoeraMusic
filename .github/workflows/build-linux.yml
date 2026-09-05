@@ -41,12 +41,29 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Install Zig 0.16 (EraAudio kernel)
+        run: |
+          set -euo pipefail
+          VER=0.16.0
+          ZD="$HOME/.local/zig-$VER"
+          if [ ! -x "$ZD/zig" ]; then
+            mkdir -p "$HOME/.local"
+            curl -fsSL "https://ziglang.org/download/$VER/zig-linux-x86_64-$VER.tar.xz" -o /tmp/zig.tar.xz
+            tar -C "$HOME/.local" -xf /tmp/zig.tar.xz
+            mv "$HOME/.local/zig-linux-x86_64-$VER" "$ZD"
+          fi
+          echo "$ZD" >> "$GITHUB_PATH"
+          zig version
+
       - name: Build native modules (Linux 一站式脚本)
         # 统一入口 app/core/build-linux.sh，收敛 audio-engine / scraper /
         # scanner / vault / downloader / subsonic 全部原生模块编译：
         # 本地开发与 CI 共用同一入口，逻辑改动只落一处（对齐 build_windows.bat）。
         # 依赖由上方步骤提前安装，脚本只做编译引导。
         run: bash app/core/build-linux.sh
+
+      - name: Zig kernel tests (EraAudio 解码回归)
+        run: cd app/core/audio-engine && zig build test
 
       - name: Flutter pub get
         working-directory: app

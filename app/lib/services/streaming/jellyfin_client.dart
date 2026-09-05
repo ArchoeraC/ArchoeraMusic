@@ -47,12 +47,12 @@ class JellyfinClient {
 
   /// 构造请求头（Emby 用 X-Emby-Authorization，Jellyfin 用 Authorization）。
   Map<String, String> _headers() => {
-        'Content-Type': 'application/json',
-        if (_isEmby)
-          'X-Emby-Authorization': _buildAuthHeader()
-        else
-          'Authorization': _buildAuthHeader(),
-      };
+    'Content-Type': 'application/json',
+    if (_isEmby)
+      'X-Emby-Authorization': _buildAuthHeader()
+    else
+      'Authorization': _buildAuthHeader(),
+  };
 
   /// 给已剥离 api_key 的 image URL 附上当前 accessToken；无 token 直接透传。
   String attachAuthToUrl(String url) {
@@ -74,8 +74,14 @@ class JellyfinClient {
     String method = 'GET',
     Object? body,
   }) async {
-    final url = '${resolvedServerBaseUrl(config)}/${path.replaceFirst(RegExp(r'^/'), '')}';
-    final res = await fetchWithTimeout(url, method: method, headers: _headers(), body: body);
+    final url =
+        '${resolvedServerBaseUrl(config)}/${path.replaceFirst(RegExp(r'^/'), '')}';
+    final res = await fetchWithTimeout(
+      url,
+      method: method,
+      headers: _headers(),
+      body: body,
+    );
     ensureOk(res);
     if (res.statusCode == 204) return const {};
     final text = await readBody(res);
@@ -93,9 +99,16 @@ class JellyfinClient {
   Future<StreamingPingResult> ping() async {
     try {
       final json = await _callApi('System/Info/Public');
-      return StreamingPingResult(ok: true, version: json['Version']?.toString());
+      return StreamingPingResult(
+        ok: true,
+        version: json['Version']?.toString(),
+      );
     } catch (err) {
-      return StreamingPingResult(ok: false, error: err.toString(), code: classifyError(err));
+      return StreamingPingResult(
+        ok: false,
+        error: err.toString(),
+        code: classifyError(err),
+      );
     }
   }
 
@@ -109,7 +122,10 @@ class JellyfinClient {
     final accessToken = json['AccessToken']?.toString();
     final user = json['User'];
     final userId = user is Map ? user['Id']?.toString() : null;
-    if (accessToken == null || accessToken.isEmpty || userId == null || userId.isEmpty) {
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        userId == null ||
+        userId.isEmpty) {
       throw StreamingProtocolError('登录响应缺少 AccessToken/UserId');
     }
     return StreamingAuthResult(accessToken: accessToken, userId: userId);
@@ -128,7 +144,10 @@ class JellyfinClient {
   /// 取流播放 URL（universal 端点按 Container/AudioCodec 协商）。
   ///
   /// [playSessionId] 由上层维护（sessionIdForTrack）；不传则随机生成。
-  Future<String> getStreamUrl(String originalId, {String? playSessionId}) async {
+  Future<String> getStreamUrl(
+    String originalId, {
+    String? playSessionId,
+  }) async {
     final userId = _requireAuth();
     final query = <String, String>{
       'UserId': userId,
@@ -146,10 +165,15 @@ class JellyfinClient {
   }
 
   /// 调用 /Users/{id}/Items 拿条目列表。
-  Future<List<JellyItem>> _fetchUserItems(String userId, Map<String, Object> query) async {
+  Future<List<JellyItem>> _fetchUserItems(
+    String userId,
+    Map<String, Object> query,
+  ) async {
     final params = query.entries
-        .map((e) =>
-            '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value.toString())}')
+        .map(
+          (e) =>
+              '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value.toString())}',
+        )
         .join('&');
     final json = await _callApi('Users/$userId/Items?$params');
     return _itemsOf(json);
@@ -165,7 +189,10 @@ class JellyfinClient {
   }
 
   /// 拉专辑列表（按字母升序）。
-  Future<List<StreamingAlbum>> listAlbums({int limit = 500, int offset = 0}) async {
+  Future<List<StreamingAlbum>> listAlbums({
+    int limit = 500,
+    int offset = 0,
+  }) async {
     final userId = _requireAuth();
     final items = await _fetchUserItems(userId, {
       'IncludeItemTypes': 'MusicAlbum',
@@ -182,7 +209,8 @@ class JellyfinClient {
   Future<List<StreamingArtist>> listArtists() async {
     final userId = _requireAuth();
     final json = await _callApi(
-        'Artists?userId=$userId&Recursive=true&SortBy=Name&SortOrder=Ascending');
+      'Artists?userId=$userId&Recursive=true&SortBy=Name&SortOrder=Ascending',
+    );
     return _itemsOf(json).map((it) => jellyItemToArtist(config, it)).toList();
   }
 
@@ -227,7 +255,9 @@ class JellyfinClient {
   /// 拉指定歌单的歌曲。
   Future<List<Track>> getPlaylistSongs(String playlistId) async {
     final userId = _requireAuth();
-    final json = await _callApi('Playlists/$playlistId/Items?UserId=$userId&Fields=MediaSources');
+    final json = await _callApi(
+      'Playlists/$playlistId/Items?UserId=$userId&Fields=MediaSources',
+    );
     return _itemsOf(json).map((it) => jellyItemToTrack(config, it)).toList();
   }
 
@@ -261,12 +291,12 @@ class JellyfinClient {
   Future<StreamingSearchResult> search(String query) async {
     final userId = _requireAuth();
     Future<List<JellyItem>> byType(String type) => _fetchUserItems(userId, {
-          'IncludeItemTypes': type,
-          'Recursive': 'true',
-          'SearchTerm': query,
-          'Fields': 'MediaSources',
-          'Limit': 50,
-        });
+      'IncludeItemTypes': type,
+      'Recursive': 'true',
+      'SearchTerm': query,
+      'Fields': 'MediaSources',
+      'Limit': 50,
+    });
     final results = await Future.wait([
       byType('Audio'),
       byType('MusicAlbum'),
@@ -288,19 +318,26 @@ class JellyfinClient {
       final linesRaw = json['Lyrics'];
       final lines = linesRaw is List
           ? linesRaw
-              .whereType<Map>()
-              .map((l) => (
+                .whereType<Map>()
+                .map(
+                  (l) => (
                     start: (l['Start'] as num?)?.toInt() ?? 0,
                     text: l['Text']?.toString() ?? '',
-                  ))
-              .toList()
+                  ),
+                )
+                .toList()
           : <({int start, String text})>[];
       if (lines.isEmpty) return null;
       final meta = json['Metadata'];
       final isSyncedFlag = meta is Map ? meta['IsSynced'] : null;
-      final isSynced = isSyncedFlag is bool ? isSyncedFlag : lines.any((l) => l.start > 0);
+      final isSynced = isSyncedFlag is bool
+          ? isSyncedFlag
+          : lines.any((l) => l.start > 0);
       if (!isSynced) {
-        final text = lines.map((l) => l.text).where((t) => t.isNotEmpty).join('\n');
+        final text = lines
+            .map((l) => l.text)
+            .where((t) => t.isNotEmpty)
+            .join('\n');
         return text.isEmpty ? null : text;
       }
       return lines

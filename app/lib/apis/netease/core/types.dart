@@ -6,14 +6,16 @@ library;
 import 'request.dart';
 
 /// 请求函数签名（createRequest）
-typedef NeteaseRequestFn = Future<NeteaseResponse> Function(
-  String uri,
-  Map<String, dynamic> data,
-  NeteaseRequestOptions options,
-);
+typedef NeteaseRequestFn =
+    Future<NeteaseResponse> Function(
+      String uri,
+      Map<String, dynamic> data,
+      NeteaseRequestOptions options,
+    );
 
 /// 模块函数签名
-typedef NeteaseModule = Future<NeteaseResponse> Function(
-  Map<String, dynamic> query,
-  NeteaseRequestFn request,
-);
+typedef NeteaseModule =
+    Future<NeteaseResponse> Function(
+      Map<String, dynamic> query,
+      NeteaseRequestFn request,
+    );

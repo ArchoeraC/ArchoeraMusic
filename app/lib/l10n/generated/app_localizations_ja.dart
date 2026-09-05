@@ -910,6 +910,35 @@ class AppLocalizationsJa extends AppLocalizations {
       'NetEase Cloud Music App でハートをタップすると自動同期';
 
   @override
+  String get toastQqLikeSyncFailed =>
+      'QQ ミュージックのオンラインお気に入り同期に失敗しました（実験的API）。ハートの変更を取り消しました';
+
+  @override
+  String get pageLikedQqHint =>
+      'QQ ミュージックのハートは端末に保存され常に利用できます。ログインするとオンラインお気に入りを実験的に同期できます';
+
+  @override
+  String get pageLikedQqEmptyTitle => 'まだ QQ ミュージックのお気に入り曲がありません';
+
+  @override
+  String get pageLikedQqEmptyHint =>
+      '検索・再生ページで QQ ミュージックの曲をハートするとここに表示されます（端末に保存）';
+
+  @override
+  String get pageLikedQqLoginSync => 'ログインしてオンラインお気に入りを同期（実験）';
+
+  @override
+  String get pageLikedQqSyncOnline => 'オンラインお気に入りを同期（実験）';
+
+  @override
+  String pageLikedQqSynced(Object count) {
+    return 'オンラインお気に入りを同期しました：$count 曲追加';
+  }
+
+  @override
+  String get pageLikedQqSyncedNone => 'すでに同期済みです。追加するオンラインお気に入りはありません';
+
+  @override
   String get pageLikedLoginTitle => 'ログインしてお気に入りの曲を表示';
 
   @override
@@ -1477,6 +1506,106 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get settingsPassthroughNote =>
       'トランスコードOFFでソースのサンプルレートを維持、ONで48kHzに統一出力；切替後は現在の曲を自動リロードして有効。';
+
+  @override
+  String get settingsOutputDevice => '出力デバイス';
+
+  @override
+  String get settingsOutputDeviceSectionNote =>
+      '指定したオーディオデバイスへ再生出力します。切り替えは即時／次の曲から有効（再起動不要）で、選択は保存されます。明示的に選んだ場合のみ切り替え、自動で切り替わることはありません。';
+
+  @override
+  String get settingsOutputDeviceDefault => 'システム既定';
+
+  @override
+  String get settingsOutputDeviceDefaultDesc => 'システムの現在の出力に従う（自動切替はしない）';
+
+  @override
+  String settingsOutputDeviceFormat(Object channels, Object rate) {
+    return '$rate Hz · $channels ch';
+  }
+
+  @override
+  String get settingsOutputDeviceDefaultTag => '既定';
+
+  @override
+  String get settingsOutputDeviceLoadFailed =>
+      'オーディオ出力デバイスを列挙できません（エンジンが利用不可？システム既定のままにします）。';
+
+  @override
+  String get settingsOutputDeviceHfpNote =>
+      'このデバイスは現在低品質モードです（Bluetooth ハンズフリー/通話 HFP など、多くは 16kHz モノラル）。エンジンはデバイスのネイティブ形式で出力するため、音質が制限されます。';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideTitle =>
+      'Bluetooth A2DP（高音質オーディオ）を有効にする方法';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideDesc =>
+      '1. Bluetooth ヘッドセットを切断して再接続します。\n2. システムの Bluetooth 設定でデバイスを「オーディオ/A2DP」（一部のシステムでは「メディアオーディオ」）に切り替えます。\n3. それでも Headset/ハンズフリーのままなら、ペアリングを解除して再ペアリングしてください。\n正確なメニューはシステムによって異なります。';
+
+  @override
+  String get settingsOutputDeviceCallBadge => '通話・低品質';
+
+  @override
+  String get settingsOutputDeviceCallConfirmTitle => '通話品質のデバイスで音楽を再生しますか？';
+
+  @override
+  String get settingsOutputDeviceCallConfirmDesc =>
+      'このデバイスは通話・低品質グレードで出力され、音楽はほぼ台無しになります（音声通話並みの音質）。多くのヘッドフォンはこのモードで音楽を再生せず、一部の機器は意図的に非対応で、無音になったり異常な動作をしたりすることがあります。A2DP など高品質出力への切り替えを強く推奨します。アプリが自動で切り替えることはありません——明示的に選んだ場合のみ適用されます。';
+
+  @override
+  String get settingsOutputDeviceUseQuality => '高品質出力に切り替え';
+
+  @override
+  String get settingsOutputDeviceUseCall => 'このまま使用';
+
+  @override
+  String get settingsOutputDeviceDefaultIsCall =>
+      'システム既定の出力が通話・低品質デバイスです（例: ハンズフリー HFP）。音楽は通話品質でほぼ台無しになり、一部のヘッドフォンは意図的に非対応で無音・異常になることもあります。高品質出力への切り替えを推奨します。';
+
+  @override
+  String get settingsOutputDeviceDefaultRowCallNote =>
+      'これを選ぶと音楽はシステム既定の通話・低品質デバイスへ流れ、音質がほぼ損なわれます。非推奨です。';
+
+  @override
+  String settingsSinkChangedFailed(Object err) {
+    return '出力デバイスの切り替えに失敗しました：$err';
+  }
+
+  @override
+  String get settingsEngine => 'デコードエンジン';
+
+  @override
+  String get settingsEngineNote =>
+      'デコードエンジンはアプリ起動時に読み込まれるため、変更はコールド再起動後に反映されます。';
+
+  @override
+  String get settingsEngineStableDesc => 'FFmpeg デコードカーネル。実績があり既定です。';
+
+  @override
+  String get settingsEngineEraAudioDesc =>
+      '自社開発のデコードカーネル。新しく、性能・メモリはベンチマーク中です。';
+
+  @override
+  String get settingsEngineExperimental => '実験的';
+
+  @override
+  String get settingsEngineEraAudioNote =>
+      '実験的カーネル：性能とメモリ使用量はまだベンチマーク中で、一部のフォーマット・端末で問題が起きる可能性があります。問題があればこの設定から Stable に戻せます。';
+
+  @override
+  String get settingsEngineRestartTitle => '再起動が必要です';
+
+  @override
+  String get settingsEngineRestartDesc =>
+      'エンジン設定は保存されました。エンジンは起動時に読み込まれるため、切り替えには再起動が必要です。それまで現在のエンジンが動作し続け、再起動中は再生・ダウンロードが中断されます。';
+
+  @override
+  String get settingsEngineRestartNow => '今すぐ再起動';
+
+  @override
+  String get settingsEngineRestartLater => '後で';
 
   @override
   String get volumeMute => 'ミュート';
@@ -3264,5 +3393,63 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String streamingPlaylistSongs(Object count) {
     return '$count 曲';
+  }
+
+  @override
+  String get brandQqMusic => 'QQ ミュージック';
+
+  @override
+  String get platformQQMusic => 'QQ ミュージック';
+
+  @override
+  String get loginQqQrLogin => 'QQ ミュージック QR コードでログイン';
+
+  @override
+  String get loginQqTypeQq => 'QQ';
+
+  @override
+  String get loginQqTypeWx => 'WeChat';
+
+  @override
+  String get loginQqScanHint => 'QQ アプリでスキャンしてログインしてください';
+
+  @override
+  String get loginQqWxScanHint => 'WeChat でスキャンしてログインしてください';
+
+  @override
+  String navHeaderQqId(String id) {
+    return 'QQ $id';
+  }
+
+  @override
+  String get toastQqNotSupported => 'QQ ミュージックでは未対応です';
+
+  @override
+  String searchSourceFailed(Object source) {
+    return '$source の検索は一時的に利用できません';
+  }
+
+  @override
+  String searchQqRiskDetail(Object code) {
+    return 'QQ Music がアクセスを制限・遮断しました（コード $code）。自動再試行は停止しました。しばらくしてから再試行してください';
+  }
+
+  @override
+  String get searchNetworkError => 'ネットワークエラーまたはタイムアウトです。しばらくしてから再試行してください';
+
+  @override
+  String searchPlatformError(Object code) {
+    return 'プラットフォームがエラーを返しました（$code）';
+  }
+
+  @override
+  String get searchWaitRetry => 'リクエストが多すぎます。しばらくしてから再試行してください';
+
+  @override
+  String get qqMusicDownloadUnsupported => 'QQ Music のダウンロードは現在未対応です（リスク管理）。';
+
+  @override
+  String qqMusicDownloadSkipped(Object count) {
+    return 'QQ Music の $count 曲はスキップ（ダウンロード非対応）。';
   }
 }

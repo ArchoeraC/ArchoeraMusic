@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,8 +57,13 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
 
   Future<void> _initTray() async {
     trayManager.addListener(this);
+    // 托盘图标按平台取格式：Windows 强制 .ico（LoadImage 只支持 ICO，
+    // PNG 会导致透明占位）；Linux/macOS 用 PNG。
+    final iconAsset = Platform.isWindows
+        ? 'assets/icons/tray.ico'
+        : 'assets/icons/tray.png';
     // iconPath 为 pubspec 注册的资产路径（Linux 侧按 bundle flutter_assets 解析）
-    await trayManager.setIcon('assets/icons/tray.png');
+    await trayManager.setIcon(iconAsset);
     // setToolTip 在部分桌面插件实现中缺失（Linux 未实现），失败不影响核心功能
     try {
       await trayManager.setToolTip('ArchoeraMusic');
@@ -68,33 +74,39 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
   /// 托盘菜单（文案跟随当前界面语言）。
   Menu _buildMenu() {
     final l10n = ref.read(l10nProvider);
-    return Menu(items: [
-      MenuItem(key: 'show', label: l10n.trayShow, onClick: (_) => _showWindow()),
-      MenuItem.separator(),
-      MenuItem(
-        key: 'toggle',
-        label: l10n.trayPlayPause,
-        onClick: (_) => ref.read(playbackProvider.notifier).toggle(),
-      ),
-      MenuItem(
-        key: 'prev',
-        label: l10n.trayPrevious,
-        onClick: (_) {
-          // ignore: discarded_futures
-          unawaited(ref.read(playbackProvider.notifier).playPrevious());
-        },
-      ),
-      MenuItem(
-        key: 'next',
-        label: l10n.trayNext,
-        onClick: (_) {
-          // ignore: discarded_futures
-          unawaited(ref.read(playbackProvider.notifier).playNext());
-        },
-      ),
-      MenuItem.separator(),
-      MenuItem(key: 'quit', label: l10n.trayQuit, onClick: (_) => _quit()),
-    ]);
+    return Menu(
+      items: [
+        MenuItem(
+          key: 'show',
+          label: l10n.trayShow,
+          onClick: (_) => _showWindow(),
+        ),
+        MenuItem.separator(),
+        MenuItem(
+          key: 'toggle',
+          label: l10n.trayPlayPause,
+          onClick: (_) => ref.read(playbackProvider.notifier).toggle(),
+        ),
+        MenuItem(
+          key: 'prev',
+          label: l10n.trayPrevious,
+          onClick: (_) {
+            // ignore: discarded_futures
+            unawaited(ref.read(playbackProvider.notifier).playPrevious());
+          },
+        ),
+        MenuItem(
+          key: 'next',
+          label: l10n.trayNext,
+          onClick: (_) {
+            // ignore: discarded_futures
+            unawaited(ref.read(playbackProvider.notifier).playNext());
+          },
+        ),
+        MenuItem.separator(),
+        MenuItem(key: 'quit', label: l10n.trayQuit, onClick: (_) => _quit()),
+      ],
+    );
   }
 
   /// 语言切换后重建托盘菜单（托盘常驻，不随 Widget 树重建）。
@@ -178,8 +190,10 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
                 onTap: () =>
                     setDialogState(() => _closeRemember = !_closeRemember),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 2,
+                  ),
                   child: Row(
                     children: [
                       Checkbox(
@@ -193,9 +207,9 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
                           l10n.commonCloseConfirmRemember,
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: Theme.of(dialogContext)
-                                .colorScheme
-                                .onSurfaceVariant,
+                            color: Theme.of(
+                              dialogContext,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -236,8 +250,7 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-        onTap: () =>
-            Navigator.of(dialogContext).pop((value, _closeRemember)),
+        onTap: () => Navigator.of(dialogContext).pop((value, _closeRemember)),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
@@ -273,6 +286,16 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
     // 左键点击托盘：显示并聚焦主窗口
     // ignore: discarded_futures
     unawaited(_showWindow());
+  }
+
+  @override
+  void onTrayIconRightMouseDown() {
+    // Windows：tray_manager 插件在 WM_RBUTTONUP 只发事件、不会自动弹菜单，
+    // 需手动 popUpContextMenu()（macOS/Linux 由插件自动弹，避免重复弹）。
+    if (Platform.isWindows) {
+      // ignore: discarded_futures
+      unawaited(trayManager.popUpContextMenu());
+    }
   }
 
   @override

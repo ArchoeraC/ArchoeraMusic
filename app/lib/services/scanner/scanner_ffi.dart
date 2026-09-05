@@ -25,8 +25,10 @@ class ScannerLibrary {
   /// 解析 scanner-ffi 共享库路径：统一走 [NativeLibPaths]
   /// （环境变量 → ancestors 链 → dev 兜底）。
   static String resolveSoPath() {
-    return NativeLibPaths.resolveRequired(NativeModule.scanner,
-        hint: '请设置 ARCHOERA_SCANNER_FFI 环境变量');
+    return NativeLibPaths.resolveRequired(
+      NativeModule.scanner,
+      hint: '请设置 ARCHOERA_SCANNER_FFI 环境变量',
+    );
   }
 
   static String _sqliteLibName() {
@@ -59,12 +61,14 @@ class ScannerLibrary {
 
   // ---------------------------------------------------------------- FFI
 
-  late final _ScanDart _scan = _lib
-      .lookupFunction<_ScanNative, _ScanDart>('scanner_scan');
-  late final _CancelDart _cancel =
-      _lib.lookupFunction<_CancelNative, _CancelDart>('scanner_cancel');
-  late final _FreeDart _free =
-      _lib.lookupFunction<_FreeNative, _FreeDart>('scanner_free');
+  late final _ScanDart _scan = _lib.lookupFunction<_ScanNative, _ScanDart>(
+    'scanner_scan',
+  );
+  late final _CancelDart _cancel = _lib
+      .lookupFunction<_CancelNative, _CancelDart>('scanner_cancel');
+  late final _FreeDart _free = _lib.lookupFunction<_FreeNative, _FreeDart>(
+    'scanner_free',
+  );
 
   /// 同步阻塞执行扫描（须在子 isolate 调用，避免阻塞 UI 线程）。
   ///
@@ -124,30 +128,32 @@ class ScannerLibrary {
   void free(Pointer<Void> ptr) => _free(ptr);
 }
 
-typedef _ScanNative = Int32 Function(
-  Pointer<Utf8> dirsJson,
-  Pointer<Utf8> dbPath,
-  Pointer<Utf8> coverDir,
-  Pointer<Utf8> quarantineDir,
-  Int32 incremental,
-  Int32 batch,
-  Int32 maxParallelism,
-  Pointer<Void> onProgress,
-  Pointer<Pointer<Utf8>> outResult,
-  Pointer<Int32> outLen,
-);
-typedef _ScanDart = int Function(
-  Pointer<Utf8>,
-  Pointer<Utf8>,
-  Pointer<Utf8>,
-  Pointer<Utf8>,
-  int,
-  int,
-  int,
-  Pointer<Void>,
-  Pointer<Pointer<Utf8>>,
-  Pointer<Int32>,
-);
+typedef _ScanNative =
+    Int32 Function(
+      Pointer<Utf8> dirsJson,
+      Pointer<Utf8> dbPath,
+      Pointer<Utf8> coverDir,
+      Pointer<Utf8> quarantineDir,
+      Int32 incremental,
+      Int32 batch,
+      Int32 maxParallelism,
+      Pointer<Void> onProgress,
+      Pointer<Pointer<Utf8>> outResult,
+      Pointer<Int32> outLen,
+    );
+typedef _ScanDart =
+    int Function(
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      int,
+      int,
+      int,
+      Pointer<Void>,
+      Pointer<Pointer<Utf8>>,
+      Pointer<Int32>,
+    );
 
 typedef _CancelNative = Int32 Function();
 typedef _CancelDart = int Function();

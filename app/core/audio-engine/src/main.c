@@ -94,6 +94,21 @@ static int g_ctl_fd = -1;
 /* 播放器实例（--player-file 启用；转码 done 后进入播放模式） */
 static PlayerCtx *g_player = NULL;
 
+/* 单调时钟（ms，诊断/首包延迟测量） */
+static double now_mono_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1000000.0;
+}
+
+/* 流式播放（§B）：CLI player 模式首块 PCM 即出声，解码按设备消费节奏推进 */
+static int g_stream_playback = 0;       /* 当前为流式会话 */
+static double g_stream_seek_rel = -1.0; /* 待执行 seek（相对会话起点，ms） */
+static const char *g_cli_source = NULL; /* 源路径（会话重建用） */
+static EngineConfig g_cli_cfg;          /* 引擎配置快照（会话重建用） */
+static const char *g_cli_player_file = NULL;
+
 /* 播放模式 PCM 落盘（WAV，float32；miniaudio 内置 dr_wav 零依赖解码播放） */
 static FILE *g_wav_file = NULL;
 
@@ -142,16 +157,28 @@ static void wav_finalize(void)
 }
 
 /* PCM 流出回调：块头 [int32 pos_ms][int32 samples][int32 channels] + float PCM。
- * 播放模式（--player-file）同时把 PCM 落盘 WAV（miniaudio 内置解码播放）。 */
+ * 播放模式（--player-file）同时把 PCM 落盘 WAV（miniaudio 内置解码播放）。
+ * 流式播放时（g_player 为流）同一数据喂入 raw 设备环形缓冲（背压 → 解码≈实时）。 */
 static void on_pcm_out(const float *pcm, int samples, int channels,
                        double position_ms, void *user_data)
 {
+    static int first_logged = 0;
     (void)user_data;
     if (samples <= 0 || channels <= 0) return;
+
+    if (!first_logged && g_stream_playback) {
+        first_logged = 1;
+        fprintf(stderr, "[audio-engine] 首块 PCM 到达 t=%.0fms（流式出声点）\n",
+                now_mono_ms());
+    }
 
     if (g_wav_file) {
         fwrite(pcm, sizeof(float), (size_t)samples * (size_t)channels,
                g_wav_file);
+    }
+
+    if (g_player && g_stream_playback) {
+        player_stream_write(g_player, pcm, samples);
     }
 
     if (!g_pcm_uds) return;
@@ -384,6 +411,10 @@ static void print_usage(const char *prog)
         "                          播放中 stdin 接受 play/pause/seek/set_volume，\n"
         "                          位置经 control 事件（playing/position/player:ended）推送\n"
         "\n"
+        "解码引擎选项（EraAudio 实验性，原生优先）：\n"
+        "  --engine-mode <0|1>     0=Stable(FFmpeg 默认，现状) 1=EraAudio(自研 Zig\n"
+        "                          内核优先，未接管/失败回退 FFmpeg；默认 0）\n"
+        "\n"
         "其他:\n"
         "  -h, --help              显示帮助\n"
         "  -v, --version           显示版本\n"
@@ -471,7 +502,14 @@ static void handle_command(AudioPipeline *p, const char *line) {
     } else if (strcmp(type, "seek") == 0) {
         double pos = 0.0;
         if (json_get_number(line, "position_ms", &pos) == 0 && g_player) {
-            player_command(g_player, "seek", &pos, NULL);
+            if (g_stream_playback) {
+                /* 流式：交由会话循环在节拍点重建管线（停/重来一致）；
+                   此处仅由 player 立即回执一次位置，避免 UI 等待 */
+                g_stream_seek_rel = pos;
+                player_command(g_player, "seek", &pos, NULL);
+            } else {
+                player_command(g_player, "seek", &pos, NULL);
+            }
         }
     } else if (strcmp(type, "stop") == 0) {
         /* keep-alive 等待循环据此退出（桌面端主动停止也走 SIGTERM） */
@@ -535,6 +573,51 @@ static void on_fft_frame(void *user_data, int fft_size)
     }
 }
 
+/* 流式 seek/重开：销毁旧管线并按目标偏移重建（解码内容从 abs = g_offset + rel
+ * 继续），重开 WAV/PCM 落盘与播放器缓冲；事件位置继续为「相对会话起点」。
+ * rel 相对会话起点（session offset = g_offset_ms）。返回 0 成功。 */
+static int cli_stream_rebuild(double rel_ms)
+{
+    double dur_ms = g_pipeline ? pipeline_get_duration(g_pipeline) * 1000.0 : 0.0;
+    double abs_ms;
+    EngineConfig cfg2;
+    AudioPipeline *np;
+
+    if (!g_cli_source || !g_cli_player_file) return -1;
+    if (rel_ms < 0) rel_ms = 0;
+    abs_ms = (double)g_offset_ms + rel_ms;
+    if (dur_ms > 0 && abs_ms > dur_ms) abs_ms = dur_ms;
+
+    if (g_player) {
+        player_stream_seek_reset(g_player); /* 停设备、清缓冲、游标归零 */
+        player_stream_set_pos_base(g_player, abs_ms - (double)g_offset_ms);
+    }
+    if (g_pipeline) {
+        pipeline_destroy(g_pipeline);
+        g_pipeline = NULL;
+    }
+    if (g_wav_file) {
+        fclose(g_wav_file);
+        g_wav_file = NULL;
+    }
+
+    cfg2 = g_cli_cfg;
+    cfg2.start_offset_ms = (int64_t)abs_ms;
+    np = pipeline_create(g_cli_source, &cfg2,
+        g_stream_uds ? write_to_stream_uds : write_to_stdout, NULL);
+    if (!np) return -1;
+    pipeline_set_playback_streaming(np, true);
+    if (g_cli_player_file) {
+        wav_begin(g_cli_player_file, pipeline_get_output_sample_rate(np),
+                  g_cli_cfg.output_channels);
+    }
+    pipeline_set_pcm_out_cb(np, on_pcm_out, NULL);
+    pipeline_set_fft_frame_cb(np, on_fft_frame, np);
+    g_last_fft_pos = -1.0;
+    g_pipeline = np;
+    return 0;
+}
+
 static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
                            int keep_alive_ms, const char *player_file)
 {
@@ -566,6 +649,29 @@ static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
     g_last_fft_pos = -1.0;
     pipeline_set_fft_frame_cb(p, on_fft_frame, p);
 
+    /* ── 流式播放初始化（--player-file：首块 PCM 即出声，解码按设备消费节奏推进）。
+     *    无声/设备不可用时回退旧路径（全速解码 → 文件播放器）。
+     *    ARCHOERA_STREAM_DISABLE=1：调试/对拍用，强制走旧路径。 */
+    int streaming = 0;
+    if (player_file && !getenv("ARCHOERA_STREAM_DISABLE")) {
+        int rate = pipeline_get_output_sample_rate(p);
+        int ch   = pipeline_get_output_channels(p);
+        if (rate <= 0) rate = 48000;
+        if (ch <= 0) ch = 2;
+        player_start_options popts = PLAYER_START_OPTIONS_DEFAULT;
+        g_player = player_stream_open(NULL, &popts, rate, ch,
+                                      player_event_cb, NULL);
+        if (g_player) {
+            streaming = 1;
+            g_stream_playback = 1;
+            pipeline_set_playback_streaming(p, true);
+            fprintf(stderr, "[audio-engine] 流式播放启动（首块 PCM 即出声）\n");
+        } else {
+            g_stream_playback = 0;
+        }
+    }
+
+    if (!streaming) {
     /* 主循环：交替处理音频帧 + 检查 stdin 命令 */
     for (;;) {
         /* 处理若干音频帧 */
@@ -623,7 +729,7 @@ static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
         if (player_file) {
             /* WAV 头回填 + 关闭（播放器加载需要完整文件） */
             wav_finalize();
-            g_player = player_start(player_file, player_event_cb, NULL);
+            g_player = player_start(player_file, NULL, player_event_cb, NULL);
             if (!g_player) {
                 control_send_line(
                     "{\"type\":\"error\",\"message\":\"player start failed\"}");
@@ -699,6 +805,153 @@ static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
     }
 
     return ret;
+    }
+
+    /* ══ 流式会话（§B：边解码边出声）══
+     * 统一循环：解码（背压≈实时，小块处理便于轮询）→ 喂设备；暂停时不解码；
+     * EOF 后 flush 剩余并标记解码流结束，缓冲尾段播完自然结束（player:ended）。
+     * seek = 重建管线从目标偏移重解码（停/重来一致）。 */
+    {
+        int result = 0;
+        int decode_done = 0;
+        int need_flush = 1;
+        int ended = 0;
+        const double t_start = now_mono_ms();
+
+        while (!g_sigterm_received && !g_want_exit && !ended) {
+            /* 待执行 seek：重建管线从目标偏移解码 */
+            if (g_stream_seek_rel >= 0.0) {
+                double rel = g_stream_seek_rel;
+                g_stream_seek_rel = -1.0;
+                if (cli_stream_rebuild(rel) != 0) {
+                    control_send_line(
+                        "{\"type\":\"error\",\"message\":\"seek rebuild failed\"}");
+                    result = -1;
+                    break;
+                }
+                p = g_pipeline;
+                decode_done = 0;
+                need_flush = 1;
+                continue;
+            }
+
+            /* 解码段（EOF 前）：暂停（设备停）时不解码，仅轮询 */
+            if (!decode_done) {
+                int playing = 1;
+                if (g_player) player_get_state(g_player, &playing, NULL, NULL);
+                if (!playing) {
+                    for (;;) {
+                        ssize_t r = read(STDIN_FILENO, stdin_buf + stdin_pos,
+                                         sizeof(stdin_buf) - stdin_pos - 1);
+                        if (r <= 0) break;
+                        stdin_pos += r;
+                        stdin_buf[stdin_pos] = '\0';
+                        char *sol = stdin_buf;
+                        while (1) {
+                            char *nl = strchr(sol, '\n');
+                            if (!nl) break;
+                            *nl = '\0';
+                            if (nl > sol && *sol != '\0') {
+                                handle_command(p, sol);
+                            }
+                            sol = nl + 1;
+                        }
+                        if (sol > stdin_buf) {
+                            int leftover = (int)(stdin_buf + stdin_pos - sol);
+                            if (leftover > 0) {
+                                memmove(stdin_buf, sol, leftover);
+                            }
+                            stdin_pos = leftover;
+                            stdin_buf[stdin_pos] = '\0';
+                        }
+                    }
+                    if (g_player) player_poll(g_player);
+                    struct timespec ts = {0, 20 * 1000000L};
+                    nanosleep(&ts, NULL);
+                    continue;
+                }
+                /* 缓冲水位软门：解码≈实时推进，位置事件/命令轮询 ~20ms 节拍 */
+                if (g_player &&
+                    player_stream_buffered_ms(g_player) > 1400.0) {
+                    if (g_player) player_poll(g_player);
+                    struct timespec ts2 = {0, 20 * 1000000L};
+                    nanosleep(&ts2, NULL);
+                    continue;
+                }
+                ssize_t n = pipeline_process(p);
+                if (n < 0) {
+                    char err_buf[128];
+                    snprintf(err_buf, sizeof(err_buf),
+                        "{\"type\":\"error\",\"message\":\"pipeline error %zd\"}", (size_t)n);
+                    control_send_line(err_buf);
+                    result = (int)n;
+                    break;
+                }
+                if (n == 0) decode_done = 1; /* EOF */
+            }
+
+            /* EOF：flush 残留喂入缓冲 + 收尾输出文件 */
+            if (decode_done && need_flush) {
+                need_flush = 0;
+                if (!g_sigterm_received && !g_want_exit) {
+                    int r2 = pipeline_run(p);
+                    if (r2 < 0) {
+                        char err_buf[128];
+                        snprintf(err_buf, sizeof(err_buf),
+                            "{\"type\":\"error\",\"message\":\"flush %d\"}", r2);
+                        control_send_line(err_buf);
+                        result = r2;
+                        break;
+                    }
+                }
+                control_send_line("{\"type\":\"done\"}");
+                if (g_wav_file) wav_finalize();
+                if (g_player) player_stream_end(g_player);
+                fprintf(stderr,
+                    "[audio-engine] 流式解码完成 t=%.0fms（会话开始 %.0fms 后）\n",
+                    now_mono_ms(), now_mono_ms() - t_start);
+            }
+
+            /* 读取 stdin 命令（非阻塞） */
+            for (;;) {
+                ssize_t r = read(STDIN_FILENO, stdin_buf + stdin_pos,
+                                 sizeof(stdin_buf) - stdin_pos - 1);
+                if (r <= 0) break;
+                stdin_pos += r;
+                stdin_buf[stdin_pos] = '\0';
+                char *sol = stdin_buf;
+                while (1) {
+                    char *nl = strchr(sol, '\n');
+                    if (!nl) break;
+                    *nl = '\0';
+                    if (nl > sol && *sol != '\0') {
+                        handle_command(p, sol);
+                    }
+                    sol = nl + 1;
+                }
+                if (sol > stdin_buf) {
+                    int leftover = (int)(stdin_buf + stdin_pos - sol);
+                    if (leftover > 0) memmove(stdin_buf, sol, leftover);
+                    stdin_pos = leftover;
+                    stdin_buf[stdin_pos] = '\0';
+                }
+            }
+
+            /* 位置/结束事件（流式：player_poll 以设备消费驱动） */
+            if (g_player) {
+                if (player_poll(g_player)) ended = 1;
+            }
+        }
+
+        if (g_player) {
+            player_stop(g_player);
+            g_player = NULL;
+        }
+        g_stream_playback = 0;
+        fprintf(stderr, "[audio-engine] 流式会话结束: %s\n",
+                g_sigterm_received ? "SIGTERM" : "播放结束/stop");
+        return result;
+    }
 }
 
 int main(int argc, char *argv[])
@@ -742,6 +995,8 @@ int main(int argc, char *argv[])
         {"control-uds",       required_argument, 0, 'J'},
         /* 自写播放器（§10.8 替代 libmpv）：转码完成后播放该 OGG 文件 */
         {"player-file",       required_argument, 0, 'Y'},
+        /* 解码引擎选择 */
+        {"engine-mode",       required_argument, 0, 'M'},
         /* 通用 */
         {"help",              no_argument,       0, 'h'},
         {"version",           no_argument,       0, 'v'},
@@ -753,7 +1008,7 @@ int main(int argc, char *argv[])
     const char *stream_uds_path = NULL;
     const char *control_uds_path = NULL;
     const char *player_file = NULL;
-    while ((opt = getopt_long(argc, argv, "b:f:r:c:o:e:p:ng:Ll:s:FQ:R:PSIC:D:T:KUhvWJY", long_opts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "b:f:r:c:o:e:p:ng:Ll:s:FQ:R:PSIC:D:T:KUhvWJYM", long_opts, NULL)) != -1) {
         switch (opt) {
         case 'b': cfg.bitrate = atoi(optarg); break;
         case 'f': cfg.frame_size_ms = atoi(optarg); break;
@@ -783,6 +1038,7 @@ int main(int argc, char *argv[])
         case 'W': stream_uds_path = optarg; break;
         case 'J': control_uds_path = optarg; break;
         case 'Y': player_file = optarg; break;
+        case 'M': cfg.engine_mode = atoi(optarg); break;
         /* 通用 */
         case 'h': print_usage(argv[0]); return 0;
         case 'v': fprintf(stderr, "%s\n", audio_engine_version()); return 0;
@@ -797,6 +1053,13 @@ int main(int argc, char *argv[])
     }
 
     const char *source = argv[optind];
+
+    /* engine_mode 合法值 0(Stable)/1(EraAudio)；其它值按 Stable 处理 */
+    if (cfg.engine_mode != 0 && cfg.engine_mode != 1) {
+        fprintf(stderr, "[audio-engine] 警告：非法 engine_mode=%d，已回退 Stable(0)\n",
+                cfg.engine_mode);
+        cfg.engine_mode = 0;
+    }
 
     /* 安装 SIGTERM 处理器：TS 层发送 kill 时优雅关闭，而非被终止 */
     struct sigaction sa;
@@ -832,6 +1095,10 @@ int main(int argc, char *argv[])
     }
     if (interactive) fprintf(stderr, " / interactive(ctl_fd=%d)", control_fd);
     fprintf(stderr, "\n");
+    fprintf(stderr, "[audio-engine] 解码引擎: %s\n",
+            cfg.engine_mode == 1
+                ? "EraAudio（自研 Zig 内核优先，失败回退 FFmpeg）"
+                : "Stable（FFmpeg）");
 
     /* 控制输出目标：interactive 时默认 fd3（Web/Node），--control-uds 时走 UDS（桌面） */
     if (interactive && control_uds_path) {
@@ -896,6 +1163,11 @@ int main(int argc, char *argv[])
     /* player 模式：跳过 Opus 编码（仅 PCM 落盘 WAV/UDS，原生采样率直通） */
     cfg.skip_encoder = (player_file != NULL);
 
+    /* 会话重建快照（流式 seek 用） */
+    g_cli_source = source;
+    g_cli_cfg = cfg;
+    g_cli_player_file = player_file;
+
     AudioPipeline *p = pipeline_create(source, &cfg,
         g_stream_uds ? write_to_stream_uds : write_to_stdout, NULL);
     if (!p) {
@@ -920,6 +1192,8 @@ int main(int argc, char *argv[])
     /* 注册全局指针，供 SIGTERM 处理器访问 */
     g_pipeline = p;
 
+    fprintf(stderr, "[audio-engine] 会话开始 t=%.0fms\n", now_mono_ms());
+
     fprintf(stderr, "[audio-engine] 源: %dHz / %dch / 时长 %.1fs\n",
             pipeline_get_source_sample_rate(p),
             pipeline_get_source_channels(p),
@@ -939,7 +1213,7 @@ int main(int argc, char *argv[])
         if (g_pcm_uds) { pcm_uds_destroy(g_pcm_uds); g_pcm_uds = NULL; }
         if (g_stream_uds) { pcm_uds_destroy(g_stream_uds); g_stream_uds = NULL; }
         if (g_ctl_uds) { pcm_uds_destroy(g_ctl_uds); g_ctl_uds = NULL; }
-        pipeline_destroy(p);
+        if (g_pipeline) { pipeline_destroy(g_pipeline); g_pipeline = NULL; }
         return 3;
     }
 
@@ -947,6 +1221,6 @@ int main(int argc, char *argv[])
     if (g_pcm_uds) { pcm_uds_destroy(g_pcm_uds); g_pcm_uds = NULL; }
     if (g_stream_uds) { pcm_uds_destroy(g_stream_uds); g_stream_uds = NULL; }
     if (g_ctl_uds) { pcm_uds_destroy(g_ctl_uds); g_ctl_uds = NULL; }
-    pipeline_destroy(p);
+    if (g_pipeline) { pipeline_destroy(g_pipeline); g_pipeline = NULL; }
     return 0;
 }

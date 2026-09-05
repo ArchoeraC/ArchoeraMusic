@@ -1,0 +1,11 @@
+.{
+    .name = .archoera_kernel,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.16.0",
+    .fingerprint = 0xb50b02889c9072f2,
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "kernel",
+    },
+}

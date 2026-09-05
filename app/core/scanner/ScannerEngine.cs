@@ -28,10 +28,20 @@ namespace Archoera.Scanner;
 public sealed class ScannerEngine
 {
     /// <summary>支持的音频扩展名（小写，无点）</summary>
+    /// <remarks>
+    /// 2026-09-04 扩容：wma/mka/mpc/mpp/mp2/aifc——均为「内核可自研解码」
+    /// 且 TagLibSharp 2.3.0 实测可提元数据/时长（见 docs/format-support-matrix.md §2）。
+    /// 注：tta/asf/mp1/dts/ac3/mlp/amr/awb/latm/caf/au/w64 内核可解但 TagLib 无元数据，
+    /// 若需收录须走「内核 Info 兜底」（产品决策项），暂不进白名单。
+    /// </remarks>
     private static readonly HashSet<string> AudioExt = new(StringComparer.OrdinalIgnoreCase)
     {
         "mp3", "flac", "ogg", "opus", "oga", "m4a", "aac", "wav",
         "ape", "wv", "dsf", "dsd", "dff", "mp4", "aiff", "aif",
+        // 2026-09-04：自研解码族（TagLib 实测可提元数据）
+        "wma", "mka", "mpc", "mpp", "mp+", "mp2", "aifc",
+        // 2026-09-04 追加：m4b（音频书=mp4 容器）/ webm（音频，内核 matroska 已认）
+        "m4b", "webm",
     };
 
     private readonly IScannerDatabase _db;

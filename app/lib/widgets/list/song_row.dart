@@ -11,13 +11,22 @@ import 'cover_image.dart';
 import '../common/anim.dart';
 
 /// 红心匹配键：酷狗用歌曲 hash（搜索条目 id 退化为 hash、歌单条目可能为
-/// audio_id，不统一），网易云用 track.id（与 LikeController 保持一致）。
+/// audio_id，不统一），QQ 音乐用 **songmid**（Track.id 为数字 songid，
+/// 网易云同用数字 id——不区分来源会让 QQ 曲目误命中网易云红心集合），
+/// 网易云用 track.id（与 LikeController 保持一致）。
 /// **酷狗 hash 统一转小写**：mobilecdn 搜索返回小写 hash，而「我喜欢」
 /// 歌单（v4/get_list_all_file）存大写——大小写敏感 contains 会导致
 /// 已收藏歌曲在搜索中误标为非红心（对齐 enrichKugouHashes 的 toLowerCase）。
-String songLikeKey(Track t) => t.source == 'kugou'
-    ? (t.kugou?.hash ?? t.id).toLowerCase()
-    : t.id;
+String songLikeKey(Track t) {
+  if (t.source == 'kugou') {
+    return (t.kugou?.hash ?? t.id).toLowerCase();
+  }
+  if (t.source == 'qqmusic') {
+    final mid = t.qqmusic?.mid;
+    return (mid != null && mid.isNotEmpty) ? mid : t.id;
+  }
+  return t.id;
+}
 
 /// 行高（与 [SongList] 表头高度对齐，行组件内部使用）。
 const double _rowHeight = 68.0;
@@ -488,6 +497,8 @@ class _SourceBadge extends StatelessWidget {
       'netease' => ('云', const Color(0xFFC20C0C)),
       // 酷狗徽标为蓝底白字
       'kugou' => ('酷', const Color(0xFF00A7E0)),
+      // QQ 音乐徽标（品牌绿）
+      'qqmusic' => ('Q', const Color(0xFF31C27C)),
       _ => ('', Colors.transparent),
     };
     if (label.isEmpty) return const SizedBox.shrink();

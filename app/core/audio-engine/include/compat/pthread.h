@@ -44,6 +44,22 @@ typedef CONDITION_VARIABLE pthread_cond_t;
 #define pthread_cond_wait(c, m) \
     (SleepConditionVariableCS((c), (m), INFINITE) ? 0 : -1)
 
+/* wait_event 的限时等待（mediaengine_lib.c）：abstime 为 UTC 绝对时间
+   （调用方以 timespec_get(TIME_UTC) 计算），换算相对毫秒做限时 sleep；
+   返回 0 = 被唤醒/有信号，非 0 = 超时。调用方以自身条件与截止时间
+   重新判定，不依赖本返回值精确语义。 */
+static int pthread_cond_timedwait(pthread_cond_t *c, pthread_mutex_t *m,
+                                  const struct timespec *abstime)
+{
+    struct timespec now;
+    timespec_get(&now, TIME_UTC);
+    __int64 remain_ms = ((__int64)abstime->tv_sec - (__int64)now.tv_sec) * 1000
+                      + ((__int64)abstime->tv_nsec - (__int64)now.tv_nsec) / 1000000;
+    if (remain_ms < 0) remain_ms = 0;
+    DWORD ms = (DWORD)((remain_ms > 0xFFFFFFFELL) ? 0xFFFFFFFELL : remain_ms);
+    return SleepConditionVariableCS(c, m, ms) ? 0 : 1;
+}
+
 /* ── thread ────────────────────────────────────────────────── */
 /* pthread_create 的线程函数签名是 void* (*)(void*)，与 Win32 的
    DWORD WINAPI (*)(LPVOID) 不同，经一次 malloc 的 trampoline 转换。 */

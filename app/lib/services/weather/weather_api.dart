@@ -211,15 +211,16 @@ Future<_GeoPoint> _locateBySystem() async {
 /// 全部缺失或请求失败返回兜底「系统定位」（仅影响展示，天气仍按坐标）。
 Future<String> _reverseName(double lat, double lon) async {
   const fallback = '系统定位';
-  final uri = Uri.parse(
-    'https://api.bigdatacloud.net/data/reverse-geocode-client',
-  ).replace(
-    queryParameters: {
-      'latitude': '$lat',
-      'longitude': '$lon',
-      'localityLanguage': 'zh',
-    },
-  );
+  final uri =
+      Uri.parse(
+        'https://api.bigdatacloud.net/data/reverse-geocode-client',
+      ).replace(
+        queryParameters: {
+          'latitude': '$lat',
+          'longitude': '$lon',
+          'localityLanguage': 'zh',
+        },
+      );
   try {
     final body = await _getJson(uri);
     final city = body['city']?.toString().trim() ?? '';

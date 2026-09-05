@@ -170,6 +170,49 @@ const qualityLabels = <String, String>{
   'lq': 'LQ',
 };
 
+/// QQ 音乐歌曲信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
+class QqMusicTrackInfo {
+  const QqMusicTrackInfo({
+    required this.mid,
+    this.mediaMid = '',
+    this.sizes = const {},
+  });
+
+  /// songmid（GetVkey 的 songmid 参数）。
+  final String mid;
+
+  /// media_mid（GetVkey filename 前缀拼文件名用；空则按 `mid+mid` 回退）。
+  final String mediaMid;
+
+  /// 各档文件大小（字节；key 128/320/flac，仅供参考）。
+  final Map<String, int> sizes;
+
+  Map<String, dynamic> toJson() => {
+    'mid': mid,
+    'mediaMid': mediaMid,
+    'sizes': sizes,
+  };
+
+  factory QqMusicTrackInfo.fromJson(Map<String, dynamic> json) =>
+      QqMusicTrackInfo(
+        mid: json['mid']?.toString() ?? '',
+        mediaMid: json['mediaMid']?.toString() ?? '',
+        sizes:
+            (json['sizes'] as Map?)?.map(
+                  (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+                ) ??
+                const {},
+      );
+}
+
+/// QQ 封面 URL（albumMid → y.gtimg.cn 图床）。
+String qqCover(String? albumMid, [int size = 300]) {
+  final mid = albumMid?.trim() ?? '';
+  if (mid.isEmpty) return '';
+  return 'https://y.gtimg.cn/music/photo_new/T002R${size}x$size'
+      'M000$mid.jpg';
+}
+
 /// 酷狗 `singername`（"A、B"）→ 歌手列表。
 List<TrackArtist> kugouArtists(String? raw) {
   if (raw == null || raw.isEmpty) return const [];
@@ -271,6 +314,7 @@ class Track {
     this.fee = 0,
     this.source = 'netease',
     this.kugou,
+    this.qqmusic,
     this.localPath,
     this.lyrics,
     this.serverId,
@@ -298,11 +342,15 @@ class Track {
   /// 付费等级（0 免费 / 1 VIP / 2 购买，对齐 TrackFee）。
   final int fee;
 
-  /// 来源平台（'netease' / 'kugou' / 'local'，决定播放源解析与音质切换路径）。
+  /// 来源平台（'netease' / 'kugou' / 'qqmusic' / 'local'，决定播放源解析
+  /// 与音质切换路径）。
   final String source;
 
   /// 酷狗品质信息（source == 'kugou' 时存在）。
   final KugouTrackInfo? kugou;
+
+  /// QQ 音乐信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
+  final QqMusicTrackInfo? qqmusic;
 
   /// 本地曲目文件路径（source == 'local' 时存在，直接作播放源）。
   final String? localPath;
@@ -342,6 +390,7 @@ class Track {
     fee: fee,
     source: source,
     kugou: kugou,
+    qqmusic: qqmusic,
     localPath: localPath,
     lyrics: lyrics,
     serverId: serverId,
@@ -546,6 +595,85 @@ class Track {
     return 0;
   }
 
+  /// QQ 归一歌曲对象（qm 模块 song 字段）→ Track。
+  ///
+  /// 输入来自 apis/qqmusic modules/search|album|artist|song_list 归一后的
+  /// 结构（id/mid/name/artist/artists/album/albumMid/duration/mediaMid/pay/
+  /// cover/coverOriginal/sizes…）。
+  factory Track.fromQqMusicSong(Map<String, dynamic> song, {String? cover}) {
+    final albumMid = song['albumMid']?.toString() ?? '';
+    final mediaMid = song['mediaMid']?.toString() ?? '';
+    final mid = song['mid']?.toString() ?? '';
+    final albumName = song['album']?.toString() ?? '';
+    final pic = (cover != null && cover.isNotEmpty)
+        ? cover
+        : qqCover(albumMid);
+    final pay = song['pay'];
+    final payMap = pay is Map ? Map<String, dynamic>.from(pay) : const {};
+    final payalbum = (payMap['payalbum'] as num?)?.toInt() ?? 0;
+    final payplay = (payMap['payplay'] as num?)?.toInt() ?? 0;
+    final fee = payalbum > 0 ? 2 : (payplay > 0 ? 1 : 0);
+
+    List<TrackArtist> artists = const [];
+    final artistsRaw = song['artists'];
+    if (artistsRaw is List) {
+      artists = artistsRaw
+          .whereType<Map>()
+          .map(
+            (a) => TrackArtist(
+              id: (a['mid'] ?? a['id'])?.toString(),
+              name: a['name']?.toString() ?? '',
+            ),
+          )
+          .where((a) => a.name.isNotEmpty)
+          .toList();
+    }
+    if (artists.isEmpty) {
+      final artistStr = song['artist']?.toString() ?? '';
+      artists = artistStr.isEmpty
+          ? const []
+          : artistStr
+                .split(RegExp(r' / '))
+                .where((s) => s.isNotEmpty)
+                .map((n) => TrackArtist(name: n))
+                .toList();
+    }
+
+    final sizes = <String, int>{};
+    final sizeMap = <String, String>{
+      '128': 'size128',
+      '320': 'size320',
+      'flac': 'sizeFlac',
+      'ogg': 'sizeOgg',
+    };
+    sizeMap.forEach((key, field) {
+      final v = song[field];
+      if (v is num && v > 0) sizes[key] = v.toInt();
+    });
+
+    return Track(
+      id: '${song['id'] ?? ''}',
+      title: song['name']?.toString() ?? song['title']?.toString() ?? '',
+      artists: artists,
+      album: albumName.isEmpty
+          ? null
+          : TrackAlbum(name: albumName, cover: pic.isEmpty ? null : pic),
+      duration: (song['duration'] as num?)?.toInt() ?? 0,
+      cover: pic.isEmpty ? null : pic,
+      coverOriginal:
+          song['coverOriginal']?.toString().isNotEmpty == true
+          ? song['coverOriginal'].toString()
+          : qqCover(albumMid, 800),
+      fee: fee,
+      source: 'qqmusic',
+      qqmusic: QqMusicTrackInfo(
+        mid: mid,
+        mediaMid: mediaMid,
+        sizes: sizes,
+      ),
+    );
+  }
+
   /// 序列化（历史/收藏本地持久化快照）。
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -558,6 +686,7 @@ class Track {
     'fee': fee,
     'source': source,
     'kugou': kugou?.toJson(),
+    'qqmusic': qqmusic?.toJson(),
     'localPath': localPath,
     'lyrics': lyrics,
     'serverId': serverId,
@@ -571,6 +700,7 @@ class Track {
   /// 反序列化（[toJson] 逆操作；缺失字段给安全默认值）。
   factory Track.fromJson(Map<String, dynamic> json) {
     final kugou = json['kugou'];
+    final qqmusic = json['qqmusic'];
     final quality = json['quality'];
     return Track(
       id: json['id']?.toString() ?? '',
@@ -591,6 +721,9 @@ class Track {
       source: json['source']?.toString() ?? 'netease',
       kugou: kugou is Map
           ? KugouTrackInfo.fromJson(Map<String, dynamic>.from(kugou))
+          : null,
+      qqmusic: qqmusic is Map
+          ? QqMusicTrackInfo.fromJson(Map<String, dynamic>.from(qqmusic))
           : null,
       localPath: json['localPath']?.toString(),
       lyrics: json['lyrics']?.toString(),

@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../apis/lyric/kugou.dart';
 import '../apis/lyric/netease.dart';
+import '../apis/lyric/qqmusic.dart';
 import '../services/lyrics/lyric_line.dart';
 import '../services/lyrics/profanity.dart';
 import '../services/playback/playback_notifier.dart';
@@ -51,6 +52,19 @@ Future<List<LyricGroup>> _fetchGroups(Ref ref) async {
       if (match == null) return const [];
       // apis 层 KRC 已解成 LX 逐字格式（<offset,dur> 字级标签），
       // parseLyricGroups 会保留逐字；翻译（trans）一并对齐。
+      return parseLyricGroups(
+        content: match.content,
+        format: match.format,
+        translation: match.translation,
+      );
+
+    case 'qqmusic':
+      // 优先按 QQ 数字 songID 直取（QRC 逐字 + 翻译 + 罗马音），
+      // 无 id 时走「歌名+歌手 → 搜索 → 最佳候选」模糊链路。
+      final match = (trackId != null && trackId.isNotEmpty)
+          ? await qmGetLyricByPlatformId(trackId, track.qqmusic?.mid)
+          : await qmGetLyricByQuery(track);
+      if (match == null) return const [];
       return parseLyricGroups(
         content: match.content,
         format: match.format,

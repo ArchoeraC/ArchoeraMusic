@@ -259,10 +259,15 @@ install(FILES "${DOWNLOADER_TARGET_DIR}/${DOWNLOADER_LIB_NAME}"
 
 # 即时自编译能力：随包附引擎源码 + 重编译脚本（用系统 FFmpeg 重建引擎，
 # 适用于希望引擎跟随系统 FFmpeg 的用户；AUR 源码构建天然等效）。
+# 仅附可重编源码：排除一切缓存/产物/大文件，避免 bundle 膨胀（曾把
+# 13GB .zig-cache 打进包）。
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine/"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native/engine-src"
   COMPONENT Runtime
-  PATTERN "build" EXCLUDE)
+  PATTERN "build" EXCLUDE
+  PATTERN ".zig-cache" EXCLUDE
+  PATTERN "zig-out" EXCLUDE
+  PATTERN ".git" EXCLUDE)
 install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine/rebuild-engine.sh"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native"
   COMPONENT Runtime OPTIONAL)

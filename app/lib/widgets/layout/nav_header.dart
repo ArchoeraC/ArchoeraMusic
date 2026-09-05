@@ -18,6 +18,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../dialogs/kugou_login_button.dart';
 import '../dialogs/netease_login_dialog.dart';
+import '../dialogs/qqmusic_login_dialog.dart';
 import '../dialogs/track_list_dialog.dart';
 import '../player/s_controls.dart';
 import '../common/anim.dart';
@@ -1189,20 +1190,25 @@ class _AccountsMenu extends ConsumerWidget {
     final l10n = context.l10n;
     final netease = ref.watch(neteaseAuthProvider);
     final kugouApi = ref.read(kugouApiProvider);
+    final qqApi = ref.read(qqMusicApiProvider);
 
     return ListenableBuilder(
-      listenable: kugouApi,
+      listenable: Listenable.merge([kugouApi, qqApi]),
       builder: (context, _) {
         final kugou = kugouApi.session;
+        final qqProfile = qqApi.profile;
+        final qqLogged = qqApi.isLoggedIn;
 
-        // 主账号：网易云 > 酷狗
+        // 主账号：网易云 > 酷狗 > QQ 音乐
         final primaryNetease = netease != null;
         final primaryKugou = !primaryNetease && kugou != null;
-        final anyLoggedIn = primaryNetease || primaryKugou;
+        final primaryQq = !primaryNetease && !primaryKugou && qqLogged;
+        final anyLoggedIn = primaryNetease || primaryKugou || primaryQq;
 
         final avatarUrl = netease?.avatarUrl?.trim();
         final neteaseNick = netease?.nickname.trim() ?? '';
         final kugouNick = kugou?.nickname?.trim() ?? '';
+        final qqNick = qqProfile?.nickname.trim() ?? '';
 
         Widget primary;
         if (primaryNetease) {
@@ -1211,6 +1217,11 @@ class _AccountsMenu extends ConsumerWidget {
           primary = _AccountAvatar(
             avatarUrl: kugou.avatarUrl,
             nickname: kugouNick.isEmpty ? kugou.userid : kugouNick,
+          );
+        } else if (primaryQq) {
+          primary = _AccountAvatar(
+            avatarUrl: qqProfile?.avatarUrl,
+            nickname: qqNick.isEmpty ? qqApi.uin : qqNick,
           );
         } else {
           primary = Container(
@@ -1253,6 +1264,11 @@ class _AccountsMenu extends ConsumerWidget {
                 );
               case 'logout_kugou':
                 ref.read(kugouApiProvider).clearSession();
+              case 'login_qq':
+                showQqMusicLoginDialog(context);
+              case 'logout_qq':
+                ref.read(qqMusicApiProvider).logout();
+                toast(context.l10n.loginLoggedOut(context.l10n.brandQqMusic));
             }
           },
           itemBuilder: (_) => [
@@ -1283,19 +1299,19 @@ class _AccountsMenu extends ConsumerWidget {
                   ? l10n.navHeaderKugouId(kugou?.userid ?? '')
                   : kugouNick,
             ),
-            // ── QQ 音乐（占位） ────────────────────────────────
-            _MenuSectionLabel(l10n.navHeaderQqMusic),
-            PopupMenuItem(
-              value: 'qq_soon',
-              enabled: false,
-              height: 36,
-              child: Row(
-                children: [
-                  const Icon(Icons.hourglass_empty, size: 17),
-                  const SizedBox(width: 10),
-                  Text(l10n.navHeaderComingSoon),
-                ],
-              ),
+            // ── QQ 音乐（扫码登录：手机 QQ / 微信） ─────────────
+            ..._platformSection(
+              l10n: l10n,
+              title: l10n.navHeaderQqMusic,
+              loggedIn: qqLogged,
+              loginValue: 'login_qq',
+              logoutValue: 'logout_qq',
+              nameValue: 'name_qq',
+              avatarUrl: qqProfile?.avatarUrl,
+              avatarName: qqNick.isEmpty ? qqApi.uin : qqNick,
+              displayName: qqNick.isEmpty
+                  ? l10n.navHeaderQqId(qqApi.uin)
+                  : qqNick,
             ),
           ],
           child: Padding(
@@ -1311,7 +1327,9 @@ class _AccountsMenu extends ConsumerWidget {
                     child: Text(
                       primaryNetease
                           ? neteaseNick
-                          : (kugouNick.isEmpty ? l10n.brandKugou : kugouNick),
+                          : primaryKugou
+                          ? (kugouNick.isEmpty ? l10n.brandKugou : kugouNick)
+                          : (qqNick.isEmpty ? l10n.brandQqMusic : qqNick),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

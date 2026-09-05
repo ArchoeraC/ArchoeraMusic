@@ -54,9 +54,8 @@ class QueuePanel extends ConsumerWidget {
     QueuePanelStyle style = QueuePanelStyle.slide,
     Rect? anchor,
   }) {
-    final overlaySize = (Overlay.of(context).context.findRenderObject()
-            as RenderBox?)
-        ?.size ??
+    final overlaySize =
+        (Overlay.of(context).context.findRenderObject() as RenderBox?)?.size ??
         MediaQuery.sizeOf(context);
     const width = 400.0;
     const gap = 8.0; // popup：面板底边到触发按钮顶边的间距
@@ -68,20 +67,21 @@ class QueuePanel extends ConsumerWidget {
     final left = slide
         ? overlaySize.width - width - margin
         : a == null
-            ? overlaySize.width - width - margin
-            : (a.right - width)
-                .clamp(margin, overlaySize.width - width - margin)
-                .toDouble();
+        ? overlaySize.width - width - margin
+        : (a.right - width)
+              .clamp(margin, overlaySize.width - width - margin)
+              .toDouble();
     // slide：全高留上下边距；popup：从按钮顶部向上展开
     final bottom = slide
         ? margin
         : a == null
-            ? 96.0
-            : (overlaySize.height - a.top + gap)
-                .clamp(margin, overlaySize.height - width)
-                .toDouble();
-    final maxHeight =
-        (overlaySize.height - margin - bottom).clamp(240.0, 560.0).toDouble();
+        ? 96.0
+        : (overlaySize.height - a.top + gap)
+              .clamp(margin, overlaySize.height - width)
+              .toDouble();
+    final maxHeight = (overlaySize.height - margin - bottom)
+        .clamp(240.0, 560.0)
+        .toDouble();
 
     return showGeneralDialog<void>(
       context: context,
@@ -129,16 +129,17 @@ class QueuePanel extends ConsumerWidget {
           child: noAnim
               ? panel
               : SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(1, 0),
-                    end: Offset.zero,
-                  ).animate(
-                    CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                      reverseCurve: Curves.easeInCubic,
-                    ),
-                  ),
+                  position:
+                      Tween<Offset>(
+                        begin: const Offset(1, 0),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                          reverseCurve: Curves.easeInCubic,
+                        ),
+                      ),
                   child: panel,
                 ),
         ),
@@ -153,8 +154,9 @@ class QueuePanel extends ConsumerWidget {
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
-    final fade = CurveTween(curve: const Interval(0.0, 1.0 / 3.0))
-        .animate(animation);
+    final fade = CurveTween(
+      curve: const Interval(0.0, 1.0 / 3.0),
+    ).animate(animation);
     final panel = ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight!),
       child: glass,
@@ -195,23 +197,34 @@ class QueuePanel extends ConsumerWidget {
     final l10n = context.l10n;
     // 选择性订阅（播放位置/FFT 50ms 更新不重建队列面板）
     final shuffle = ref.watch(playbackProvider.select((s) => s.shuffle));
-    final repeatMode =
-        ref.watch(playbackProvider.select((s) => s.repeatMode));
-    final queueIndex =
-        ref.watch(playbackProvider.select((s) => s.queueIndex));
+    final repeatMode = ref.watch(playbackProvider.select((s) => s.repeatMode));
+    final queueIndex = ref.watch(playbackProvider.select((s) => s.queueIndex));
     final playing = ref.watch(playbackProvider.select((s) => s.playing));
 
     // slide：列表撑满剩余高度；popup：受 maxHeight 约束内部滚动
     final Widget listArea;
     if (style == QueuePanelStyle.slide) {
       listArea = Expanded(
-          child: _buildList(
-              context, queue, queueIndex, playing, notifier, scheme));
+        child: _buildList(
+          context,
+          queue,
+          queueIndex,
+          playing,
+          notifier,
+          scheme,
+        ),
+      );
     } else {
       listArea = ConstrainedBox(
         constraints: BoxConstraints(maxHeight: (maxHeight ?? 400) - 56),
         child: _buildList(
-            context, queue, queueIndex, playing, notifier, scheme),
+          context,
+          queue,
+          queueIndex,
+          playing,
+          notifier,
+          scheme,
+        ),
       );
     }
 
@@ -230,8 +243,9 @@ class QueuePanel extends ConsumerWidget {
               if (queue.isNotEmpty)
                 Text(
                   l10n.queueTrackCount(queue.length),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               const Spacer(),
               IconButton(
@@ -241,9 +255,7 @@ class QueuePanel extends ConsumerWidget {
                 icon: Icon(
                   Icons.shuffle,
                   size: 19,
-                  color: shuffle
-                      ? scheme.primary
-                      : scheme.onSurfaceVariant,
+                  color: shuffle ? scheme.primary : scheme.onSurfaceVariant,
                 ),
               ),
               IconButton(
@@ -307,8 +319,9 @@ class QueuePanel extends ConsumerWidget {
               const SizedBox(height: 10),
               Text(
                 l10n.queueEmpty,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: scheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -327,10 +340,8 @@ class QueuePanel extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       buildDefaultDragHandles: false,
       shrinkWrap: style != QueuePanelStyle.slide,
-      proxyDecorator: (child, index, animation) => Material(
-        color: Colors.transparent,
-        child: child,
-      ),
+      proxyDecorator: (child, index, animation) =>
+          Material(color: Colors.transparent, child: child),
       itemCount: queue.length,
       onReorderItem: (oldIndex, newIndex) =>
           notifier.moveInQueue(oldIndex, newIndex),
@@ -372,10 +383,7 @@ class QueuePanel extends ConsumerWidget {
               ),
             ],
           ),
-          child: Material(
-            type: MaterialType.transparency,
-            child: child,
-          ),
+          child: Material(type: MaterialType.transparency, child: child),
         ),
       ),
     );
@@ -450,12 +458,18 @@ class _QueueTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(track.title, style: titleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  track.title,
+                  style: titleStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 if (subtitle.isNotEmpty)
                   Text(
                     subtitle,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -470,8 +484,9 @@ class _QueueTile extends StatelessWidget {
           if (track.duration > 0)
             Text(
               formatMs(track.duration),
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ReorderableDragStartListener(
             index: index,
