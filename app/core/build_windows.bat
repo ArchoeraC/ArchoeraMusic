@@ -89,6 +89,8 @@ rem .def 导出表（Dart FFI lookup 符号）
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_create
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_command
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_poll_event
+>> build\archoera_mediaengine.def echo     archoera_mediaengine_wait_event
+>> build\archoera_mediaengine.def echo     archoera_mediaengine_list_sinks
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_session_dir
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_is_done
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_destroy
@@ -104,14 +106,32 @@ echo [build_windows] 编译 fft.dll...
 cl /nologo /O2 /MD /LD /I include /I src src\fft.c /Fe:build\fft.dll /link /DEF:build\fft.def
 if errorlevel 1 exit /b 1
 
+rem --- 自研解码内核（EraAudio, Zig 静态库, windows-msvc ReleaseFast）---
+rem 有 zig 才启用（/DHAS_ARCHOERA_KERNEL=1 + 链 archoera_kernel）；否则 native_decoder
+rem 走编译期空实现（Stable/FFmpeg）。顺序：先 zig build 再 cl 链接，kernel 改动后勿用陈旧产物。
+set "KERNEL_FLAG="
+set "KERNEL_LIB="
+where zig >nul 2>nul
+if %errorlevel%==0 (
+    echo [build_windows] 构建 Zig 内核(EraAudio, windows-msvc ReleaseFast)...
+    zig build -Dtarget=x86_64-windows-msvc -Doptimize=ReleaseFast
+    if errorlevel 1 exit /b 1
+    if exist "zig-out\lib\archoera_kernel.lib" set "KERNEL_LIB=zig-out\lib\archoera_kernel.lib"
+    if not defined KERNEL_LIB if exist "zig-out\lib\libarchoera_kernel.a" set "KERNEL_LIB=zig-out\lib\libarchoera_kernel.a"
+    if defined KERNEL_LIB set "KERNEL_FLAG=/DHAS_ARCHOERA_KERNEL=1"
+) else (
+    echo [build_windows] 警告: 未检测到 zig，EraAudio 内核不编译（引擎以 FFmpeg/Stable 运行）;
+    echo            安装 Zig 0.16（https://ziglang.org/download）后重跑可启用 EraAudio。
+)
+
 echo [build_windows] 编译 archoera_mediaengine.dll...
 cl /nologo /O2 /MD /LD /I include /I src /I include\compat /I "%VCPKG_PREFIX%\include" ^
     src\mediaengine_lib.c src\tempo.c src\decoder.c src\resampler.c ^
     src\encoder.c src\equalizer.c src\loudness.c src\limiter.c ^
-    src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
+    src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
     "%VCPKG_PREFIX%\lib\avformat.lib" "%VCPKG_PREFIX%\lib\avcodec.lib" ^
     "%VCPKG_PREFIX%\lib\avutil.lib" "%VCPKG_PREFIX%\lib\swresample.lib" ^
-    build\libaudio_tempo.lib ntdll.lib ^
+    build\libaudio_tempo.lib %KERNEL_FLAG% %KERNEL_LIB% ntdll.lib ^
     /Fe:build\archoera_mediaengine.dll /link /DEF:build\archoera_mediaengine.def
 if errorlevel 1 exit /b 1
 popd

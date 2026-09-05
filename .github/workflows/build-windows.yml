@@ -65,6 +65,21 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Install Zig 0.16 (EraAudio kernel, windows-msvc)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ver = '0.16.0'
+          $zd = Join-Path $env:LOCALAPPDATA "zig-$ver"
+          if (!(Test-Path (Join-Path $zd 'zig.exe'))) {
+            $zip = Join-Path $env:TEMP "zig.zip"
+            Invoke-WebRequest -Uri "https://ziglang.org/download/$ver/zig-windows-x86_64-$ver.zip" -OutFile $zip
+            Expand-Archive -Path $zip -DestinationPath $env:LOCALAPPDATA -Force
+            Move-Item (Join-Path $env:LOCALAPPDATA "zig-windows-x86_64-$ver") $zd -Force
+          }
+          Add-Content $env:GITHUB_PATH $zd
+          & (Join-Path $zd 'zig.exe') version
+
       - name: Build native modules (Windows bat 一站式引导)
         shell: cmd
         # 统一入口 app/core/build_windows.bat，在单个 cmd 会话内完成全部模块：
