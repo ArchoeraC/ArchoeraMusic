@@ -1299,7 +1299,7 @@ class _AccountsMenu extends ConsumerWidget {
                   ? l10n.navHeaderKugouId(kugou?.userid ?? '')
                   : kugouNick,
             ),
-            // ── QM（扫码登录：手机 QQ / 微信） ─────────────
+            // ── QM（扫码登录：手机 QQ） ─────────────────
             ..._platformSection(
               l10n: l10n,
               title: l10n.navHeaderQqMusic,

@@ -1,4 +1,4 @@
-/// QM扫码登录对话框（仅支持手机 QQ 扫码；微信扫码已停用，入口随之移除）。
+/// QM扫码登录对话框（仅支持手机 QQ 扫码）。
 ///
 /// 流程：qrKey() 取 base64 二维码 → 1~2s 轮询 qrCheck() → status=4 登录成功
 /// （cookie 已落盘）→ 刷新资料并关闭。
@@ -73,7 +73,7 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
     });
     _poll?.cancel();
     try {
-      final qr = await _api.qrKey('qq');
+      final qr = await _api.qrKey();
       if (!mounted) return;
       final content = qr['content'] as String? ?? '';
       final bytes = _dataUrlToBytes(content);
@@ -100,7 +100,7 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
   Future<void> _check() async {
     if (_key.isEmpty || _confirmed || _expired) return;
     try {
-      final state = await _api.qrCheck('qq', _key);
+      final state = await _api.qrCheck(_key);
       if (!mounted) return;
       final status = (state['status'] as num?)?.toInt() ?? 1;
       if (status == 4) {

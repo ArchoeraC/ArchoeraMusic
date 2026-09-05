@@ -61,8 +61,8 @@ void main() {
     );
   }, timeout: const Timeout(Duration(seconds: 40)));
 
-  test('登录出码：qq 扫码拿到 key + base64 图（真实请求，不扫码）', () async {
-    final qr = await api.qrKey('qq');
+  test('登录出码：QQ 扫码拿到 key + base64 图（真实请求，不扫码）', () async {
+    final qr = await api.qrKey();
     expect(qr['key'], isNotEmpty);
     expect(qr['content'], startsWith('data:image/'));
   }, timeout: const Timeout(Duration(seconds: 30)));

@@ -31,12 +31,9 @@ String qmCredentialMusicId(Map<String, dynamic> credential,
   return s.startsWith('o') ? s.substring(1) : s;
 }
 
-/// 将登录凭据转换为可持久化的会话字段。
-///
-/// [loginType] 1=微信扫码 / 2=QQ 扫码（对齐 TS `loginType`）。
+/// 将登录凭据转换为可持久化的会话字段（QQ 扫码登录，tmeLoginType=2）。
 Map<String, String> qmCredentialToSession(
-  Map<String, dynamic> credential,
-  int loginType, {
+  Map<String, dynamic> credential, {
   String fallbackMusicId = '',
 }) {
   final musicId = qmCredentialMusicId(credential, fallbackMusicId);
@@ -45,9 +42,8 @@ Map<String, String> qmCredentialToSession(
     'qm_str_musicid': musicId,
     'qm_keyst': '${credential['musickey'] ?? ''}',
     'qqmusic_key': '${credential['musickey'] ?? ''}',
-    'tmeLoginType': '${credential['loginType'] ?? loginType}',
+    'tmeLoginType': '${credential['loginType'] ?? 2}',
   };
-  if (loginType == 1) session['wxuin'] = musicId;
 
   void put(String key, String dest) {
     final v = credential[key];
@@ -55,9 +51,9 @@ Map<String, String> qmCredentialToSession(
   }
 
   put('encryptUin', 'euin');
-  put('openid', loginType == 1 ? 'wxopenid' : 'psrf_qqopenid');
+  put('openid', 'psrf_qqopenid');
   put('unionid', 'psrf_qqunionid');
-  put('refresh_token', loginType == 1 ? 'wxrefresh_token' : 'psrf_qqrefresh_token');
+  put('refresh_token', 'psrf_qqrefresh_token');
   put('access_token', 'psrf_qqaccess_token');
   put('refresh_key', 'qm_refresh_key');
   put('expired_at', 'psrf_access_token_expiresAt');

@@ -140,7 +140,6 @@ String qmGetQQMusicUin() {
   final raw =
       (cookies['qm_str_musicid'] ??
           cookies['uin'] ??
-          cookies['wxuin'] ??
           cookies['p_uin'] ??
           '')
           .trim();
@@ -299,17 +298,14 @@ Future<T> qmRequest<T>(
   final uin = qmGetQQMusicUin();
   final cookies = qmGetQQMusicCookies();
   final musickey = cookies['qm_keyst'] ?? cookies['qqmusic_key'];
-  final tmeLoginType = cookies['tmeLoginType'];
-  final loginType = tmeLoginType != null
-      ? int.tryParse(tmeLoginType)
-      : (musickey?.startsWith('W_X') == true ? 1 : 2);
 
   final baseComm = <String, Object>{
     ...qmGetCommonParams(),
     if (uin.isNotEmpty && uin != '0') ...{'uin': uin, 'qq': uin},
     if (musickey != null && musickey.isNotEmpty) ...{
       'authst': musickey,
-      'tmeLoginType': loginType ?? 2,
+      // QQ-only：登录凭据一律按 QQ 扫码（tmeLoginType=2）发送。
+      'tmeLoginType': 2,
     },
     if (session && _session.uid != null) 'uid': _session.uid!,
     if (session && _session.sid != null) 'sid': _session.sid!,

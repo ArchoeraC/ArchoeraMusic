@@ -6,7 +6,7 @@
 /// - session:true 接口（leaderboard 等）先引导 GetSession（1 次），并把
 ///   uid/sid/userip 注入后续业务请求；1h 内并发去重（第二次调用不再 GetSession）；
 /// - 已登录（cookie 带 musickey/uin/tmeLoginType）时 comm 注入
-///   uin/qq/authst/tmeLoginType；微信型 key（W_X 前缀）默认 tmeLoginType=1。
+///   uin/qq/authst/tmeLoginType=2（QQ 扫码）。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -200,10 +200,10 @@ void main() {
       expect(r.comm.containsKey('sid'), isFalse);
     });
 
-    test('微信型 key（W_X 前缀，无 tmeLoginType）→ 默认 tmeLoginType=1', () async {
+    test('已登录 key 无 tmeLoginType cookie → comm 注入 tmeLoginType=2（QQ）', () async {
       qmMergeQQMusicCookies({
         'qm_str_musicid': '888888',
-        'qm_keyst': 'W_Xwxkey',
+        'qm_keyst': 'key_abc',
       });
       final calls = <Map<String, dynamic>>[];
       qmHttpTransport = (body, {extraHeaders, url}) async {
@@ -214,8 +214,8 @@ void main() {
       await qmCall('search', {'keywords': '晴天', 'type': 0});
       final r = _Req(calls.single);
       expect(r.comm['uin'], '888888');
-      expect(r.comm['authst'], 'W_Xwxkey');
-      expect(r.comm['tmeLoginType'], 1);
+      expect(r.comm['authst'], 'key_abc');
+      expect(r.comm['tmeLoginType'], 2);
     });
   });
 }
