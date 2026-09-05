@@ -135,12 +135,12 @@ class QqMusicApi extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── 扫码登录 ─────────────────────────────────────────────────────────
+  // ── QQ 扫码登录 ──────────────────────────────────────────────────────
 
-  /// 生成二维码（type = 'qq'，默认 'qq'；微信扫码已停用）。
+  /// 生成 QQ 登录二维码。
   /// 返回 {key, content(data:image/...base64)}。
-  Future<Map<String, dynamic>> qrKey(String type) async {
-    final body = await qmCall('login_qr_key', {'type': type});
+  Future<Map<String, dynamic>> qrKey() async {
+    final body = await qmCall('login_qr_key', {'type': 'qq'});
     if (body is! Map) throw QqApiException('获取二维码失败');
     final code = body['code'];
     if (code != 200) throw QqApiException('获取二维码失败: ${body['message'] ?? code}');
@@ -149,13 +149,13 @@ class QqMusicApi extends ChangeNotifier {
     if (key.isEmpty || content.isEmpty) {
       throw QqApiException('二维码响应缺少 key/content');
     }
-    return {'key': key, 'content': content, 'type': body['type'] ?? type};
+    return {'key': key, 'content': content, 'type': body['type'] ?? 'qq'};
   }
 
-  /// 轮询扫码状态：0=过期/取消 1=等待 2=已扫码待确认 4=成功（cookie 已写入）。
+  /// 轮询 QQ 扫码状态：0=过期/取消 1=等待 2=已扫码待确认 4=成功（cookie 已写入）。
   /// 返回 {status, nickname?, avatarUrl?}。
-  Future<Map<String, dynamic>> qrCheck(String type, String key) async {
-    final body = await qmCall('login_qr_check', {'type': type, 'key': key});
+  Future<Map<String, dynamic>> qrCheck(String key) async {
+    final body = await qmCall('login_qr_check', {'type': 'qq', 'key': key});
     if (body is! Map) throw QqApiException('二维码状态轮询失败');
     final status = (body['status'] as num?)?.toInt() ?? 1;
     return <String, dynamic>{

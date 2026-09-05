@@ -1,6 +1,6 @@
 /// QM 二维码登录模块（对齐 login_qr.ts + core/credential.ts）。
 ///
-/// 仅支持 QQ 扫码登录（微信扫码协议已移除）：
+/// 仅支持 QQ 扫码登录：
 /// - ptlogin2 ptqrshow 出码 → ptqrlogin 轮询 → check_sig 取 p_skey →
 ///   graph.qq.com authorize 换 code → QQConnectLogin 换 musickey
 ///
@@ -137,11 +137,8 @@ void _resetJar() => _cookieJar = <String, String>{};
 
 // ── 出码 ─────────────────────────────────────────────────────────────
 
-/// 获取二维码 Key 及图片内容（params.type = 'qq'，默认 'qq'）。
+/// 获取 QQ 登录二维码 Key 及图片内容（仅 QQ 扫码）。
 Future<Map<String, dynamic>> _qrKey(String type) async {
-  if (type == 'wx') {
-    throw HttpException('暂不支持微信扫码登录（该登录方式已停用），请使用手机 QQ 扫码');
-  }
   _resetJar();
 
   // QQ 扫码
@@ -168,12 +165,8 @@ Future<Map<String, dynamic>> _qrKey(String type) async {
 
 // ── 轮询 ─────────────────────────────────────────────────────────────
 
-/// 轮询扫码状态：0=过期/取消 1=等待 2=已扫码待确认 4=成功（已写 cookie）。
+/// 轮询 QQ 扫码状态：0=过期/取消 1=等待 2=已扫码待确认 4=成功（已写 cookie）。
 Future<Map<String, dynamic>> _qrCheck(String key, String type) async {
-  if (type == 'wx') {
-    throw HttpException('暂不支持微信扫码登录（该登录方式已停用），请使用手机 QQ 扫码');
-  }
-
   // QQ 扫码检查
   final ptqrtoken = qmHash33(key, 0);
   final now = DateTime.now().millisecondsSinceEpoch;
@@ -230,7 +223,9 @@ Future<Map<String, dynamic>> _qrCheck(String key, String type) async {
       throw HttpException('获取 p_skey 失败');
     }
 
-    // authorize 换取授权 code
+    // authorize 换取授权 code。redirect_uri 为 QQ OAuth（client_id
+    // 100497308）在 y.qq.com 注册的回跳页，页面名含 "wx" 属上游命名，
+    // 属于 QQ 登录流程（非微信登录），不可改动。
     final authBody = <String, String>{
       'response_type': 'code',
       'client_id': '100497308',
@@ -293,7 +288,6 @@ Future<Map<String, dynamic>> _finalizeLogin(
   }
   final saved = qmCredentialToSession(
     loginData,
-    2,
     fallbackMusicId: fallbackUin,
   );
   qmMergeQQMusicCookies(saved);
