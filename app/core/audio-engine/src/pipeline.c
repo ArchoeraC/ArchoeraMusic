@@ -241,14 +241,31 @@ AudioPipeline* pipeline_create(const char *source,
         }
     }
 
-    /* 5. 如果指定了偏移量，seek 到目标位置 */
-    if (cfg->start_offset_ms > 0) {
-        if (p->native_active) {
-            if (native_decoder_seek_ms(p->native, cfg->start_offset_ms) != 0) {
-                fprintf(stderr, "%s native seek 到 %ldms 失败\n",
-                        LOG_TAG, (long)cfg->start_offset_ms);
+    /* 5. 如果指定了偏移量，seek 到目标位置。
+     *    EraAudio：自研内核 seek 失败（内核未覆盖/个别文件的 seek 缺陷）不再是
+     *    致命——回退 FFmpeg 解码器重开 + seek，保证 offset 起播/seek 重建永不
+     *    因「原生不会跳」而失败（断点续播/播放中跳转的兜底）。 */
+    if (cfg->start_offset_ms > 0 && p->native_active) {
+        if (native_decoder_seek_ms(p->native, cfg->start_offset_ms) != 0) {
+            fprintf(stderr, "%s EraAudio: 自研内核 seek 到 %ldms 失败"
+                            " → 回退 FFmpeg 解码器（offset 起播兜底）\n",
+                    LOG_TAG, (long)cfg->start_offset_ms);
+            native_decoder_close(p->native);
+            p->native = NULL;
+            p->native_active = false;
+            if (p->native_buf) { free(p->native_buf); p->native_buf = NULL; }
+            p->native_buf_frames = 0;
+            p->dec = decoder_open(source);
+            if (!p->dec) {
+                fprintf(stderr, "%s 回退 FFmpeg 也无法打开源: %s\n",
+                        LOG_TAG, source);
                 goto fail;
             }
+        }
+    }
+    if (cfg->start_offset_ms > 0) {
+        if (p->native_active) {
+            /* 上面已 seek 成功（或本会话起播无 native） */
         } else {
             int ret = decoder_seek_ms(p->dec, cfg->start_offset_ms);
             if (ret < 0) {
