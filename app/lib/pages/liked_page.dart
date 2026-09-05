@@ -22,14 +22,14 @@ import '../widgets/dialogs/track_context_menu.dart';
 
 /// 我喜欢页（对齐原项目 Liked.vue）。
 ///
-/// 平台切换（网易云 / 酷狗 / QQ 音乐）：
-/// - 网易云 / 酷狗：登录对应平台后拉取「红心收藏」/ 酷狗「我喜欢」歌单
+/// 平台切换（NT / KG / QM）：
+/// - NT / KG：登录对应平台后拉取「红心收藏」/ KG「我喜欢」歌单
 ///   → SongList 可播放（走 [LikedStore]，SQLite 缓存秒开 + SWR 全量刷新）；
-/// - QQ 音乐：**本机红心为主**（[QqLikedStore]，离线始终可用）——在搜索 /
+/// - QM：**本机红心为主**（[QqLikedStore]，离线始终可用）——在搜索 /
 ///   播放页给任意 QQ 曲目点亮红心即出现在此并可播放；登录 QQ 后可手动
 ///   「同步在线收藏」（实验性社区逆向 dirid=201 接口，失败不影响本机）。
 ///
-/// 数据加载：网易云/酷狗走 [LikedStore]（见 liked_loader.dart 注释），
+/// 数据加载：NT/KG走 [LikedStore]（见 liked_loader.dart 注释），
 /// QQ 走 [QqLikedStore]（见 qq_liked_store.dart：本机 JSON + 在线并入）。
 class LikedPage extends ConsumerStatefulWidget {
   const LikedPage({super.key});
@@ -48,7 +48,7 @@ class _LikedPageState extends ConsumerState<LikedPage> {
   bool get _kugouLoggedIn => ref.read(kugouApiProvider).session != null;
   bool get _qqLoggedIn => ref.read(qqMusicApiProvider).isLoggedIn;
 
-  /// 网易云 / 酷狗平台需对应账号登录；QQ 平台本机红心优先、不要求登录。
+  /// NT / KG平台需对应账号登录；QQ 平台本机红心优先、不要求登录。
   bool get _requiresLogin => _platform != _qqPlatform;
 
   /// 当前平台是否「可用」（内容区据此显示数据 / 登录引导 / 本机列表）。
@@ -60,8 +60,8 @@ class _LikedPageState extends ConsumerState<LikedPage> {
   @override
   void initState() {
     super.initState();
-    // 默认选已登录平台（网易云优先；无网易云/酷狗但已登录 QQ → QQ 本机
-    // 红心；都未登录保持网易云引导）
+    // 默认选已登录平台（NT优先；无NT/KG但已登录 QQ → QQ 本机
+    // 红心；都未登录保持NT引导）
     if (!_neteaseLoggedIn && _kugouLoggedIn) {
       _platform = 'kugou';
     } else if (!_neteaseLoggedIn && !_kugouLoggedIn && _qqLoggedIn) {

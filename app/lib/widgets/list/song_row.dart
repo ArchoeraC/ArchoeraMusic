@@ -10,11 +10,11 @@ import '../../utils/format.dart';
 import 'cover_image.dart';
 import '../common/anim.dart';
 
-/// 红心匹配键：酷狗用歌曲 hash（搜索条目 id 退化为 hash、歌单条目可能为
-/// audio_id，不统一），QQ 音乐用 **songmid**（Track.id 为数字 songid，
-/// 网易云同用数字 id——不区分来源会让 QQ 曲目误命中网易云红心集合），
-/// 网易云用 track.id（与 LikeController 保持一致）。
-/// **酷狗 hash 统一转小写**：mobilecdn 搜索返回小写 hash，而「我喜欢」
+/// 红心匹配键：KG用歌曲 hash（搜索条目 id 退化为 hash、歌单条目可能为
+/// audio_id，不统一），QM用 **songmid**（Track.id 为数字 songid，
+/// NT同用数字 id——不区分来源会让 QQ 曲目误命中NT红心集合），
+/// NT用 track.id（与 LikeController 保持一致）。
+/// **KG hash 统一转小写**：mobilecdn 搜索返回小写 hash，而「我喜欢」
 /// 歌单（v4/get_list_all_file）存大写——大小写敏感 contains 会导致
 /// 已收藏歌曲在搜索中误标为非红心（对齐 enrichKugouHashes 的 toLowerCase）。
 String songLikeKey(Track t) {
@@ -240,7 +240,7 @@ class _SongRowState extends ConsumerState<SongRow> {
                                         ).withValues(alpha: 0.4),
                                       ),
                                     ),
-                                  // 原唱角标（酷狗 IsOriginal；跟随音质标签开关）
+                                  // 原唱角标（KG IsOriginal；跟随音质标签开关）
                                   if (!prefs.hideQualityTag && item.isOriginal)
                                     Padding(
                                       padding: const EdgeInsets.only(left: 8),
@@ -250,7 +250,7 @@ class _SongRowState extends ConsumerState<SongRow> {
                                         background: theme.colorScheme.primary,
                                       ),
                                     ),
-                                  // 音质角标（酷狗 hash 链 / 网易云 quality；
+                                  // 音质角标（KG hash 链 / NT quality；
                                   // 无损档琥珀色高亮，对齐 SPlayer-Next）
                                   if (!prefs.hideQualityTag &&
                                       bestQuality != null)
@@ -495,9 +495,9 @@ class _SourceBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color) = switch (source) {
       'netease' => ('云', const Color(0xFFC20C0C)),
-      // 酷狗徽标为蓝底白字
+      // KG徽标为蓝底白字
       'kugou' => ('酷', const Color(0xFF00A7E0)),
-      // QQ 音乐徽标（品牌绿）
+      // QM徽标（品牌绿）
       'qqmusic' => ('Q', const Color(0xFF31C27C)),
       _ => ('', Colors.transparent),
     };
@@ -524,8 +524,8 @@ class _SourceBadge extends StatelessWidget {
 }
 
 /// 可用最高音质标签（label + 是否无损档）：
-/// - 酷狗：按 hash 链判断（Hi-Res/无损/HQ/SQ/LQ，见 KugouTrackInfo）；
-/// - 网易云：由 [Track.quality] 反推等级（对齐 SPlayer-Next quality.ts）。
+/// - KG：按 hash 链判断（Hi-Res/无损/HQ/SQ/LQ，见 KugouTrackInfo）；
+/// - NT：由 [Track.quality] 反推等级（对齐 SPlayer-Next quality.ts）。
 /// 返回 null 表示无可用信息（列表不显示音质标签）。
 ({String label, bool lossless})? _bestQuality(Track t, AppLocalizations l10n) {
   final k = t.kugou;

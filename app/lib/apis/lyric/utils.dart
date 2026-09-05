@@ -88,7 +88,7 @@ const double _nameContainMinRatio = 0.34;
 /// - album 全等（且 track 有 album）：+2
 /// - duration 接近（±5s）：+3
 ///
-/// 兜底：所有候选 name 均不相关时（平台改曲名，如酷狗《あのね》实为
+/// 兜底：所有候选 name 均不相关时（平台改曲名，如KG《あのね》实为
 /// 《Connect the World》），在「歌手精确 + 时长接近」候选中选**时长最接近
 /// track 且无并列**的那一个——时长是最强证据（同一作品各版本时长几乎
 /// 一致）；并列时无法区分，保持 null（宁缺毋滥）。

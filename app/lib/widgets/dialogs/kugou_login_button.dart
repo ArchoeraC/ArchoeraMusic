@@ -1,4 +1,4 @@
-/// 酷狗登录入口 + 扫码登录对话框。
+/// KG登录入口 + 扫码登录对话框。
 ///
 /// 对齐 SPlayer / MoeKoeMusic 方案：扫码登录拿 token/userid 后注入
 /// v5/url 请求，即可获取 VIP 曲目。登录态存 [KugouApi.session]

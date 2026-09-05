@@ -253,7 +253,7 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get navHeaderKugouMusic => 'Kugou Music';
+  String get navHeaderKugouMusic => 'KG';
 
   @override
   String get navHeaderLoginAccount => 'Se connecter (Netease / Kugou)';
@@ -265,10 +265,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get navHeaderNeteaseAccount => 'Compte Netease';
 
   @override
-  String get navHeaderNeteaseMusic => 'Netease Music';
+  String get navHeaderNeteaseMusic => 'NT';
 
   @override
-  String get navHeaderQqMusic => 'QQ Music';
+  String get navHeaderQqMusic => 'QM';
 
   @override
   String get navHeaderQrLogin => 'Connexion par code QR';
@@ -942,23 +942,22 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get toastQqLikeSyncFailed =>
-      'Échec de la synchronisation des favoris en ligne QQ Music (API expérimentale) ; la modification du cœur a été annulée';
+      'Échec de la synchronisation des favoris en ligne QM (API expérimentale) ; la modification du cœur a été annulée';
 
   @override
   String get pageLikedQqHint =>
-      'Les cœurs QQ Music sont enregistrés localement et toujours disponibles ; connectez-vous pour synchroniser expérimentalement les favoris en ligne';
+      'Les cœurs QM sont enregistrés localement et toujours disponibles ; connectez-vous pour synchroniser expérimentalement les favoris en ligne';
 
   @override
-  String get pageLikedQqEmptyTitle =>
-      'Aucun titre aimé QQ Music pour le moment';
+  String get pageLikedQqEmptyTitle => 'Aucun titre aimé QM pour le moment';
 
   @override
   String get pageLikedQqEmptyHint =>
-      'Aimez un titre QQ Music dans la recherche ou la lecture pour le retrouver ici (enregistré localement)';
+      'Aimez un titre QM dans la recherche ou la lecture pour le retrouver ici (enregistré localement)';
 
   @override
   String get pageLikedQqLoginSync =>
-      'Connectez-vous à QQ Music pour synchroniser les favoris en ligne (expérimental)';
+      'Connectez-vous à QM pour synchroniser les favoris en ligne (expérimental)';
 
   @override
   String get pageLikedQqSyncOnline =>
@@ -3328,10 +3327,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsScrapeSourceNetease => 'Netease Cloud Music';
 
   @override
-  String get settingsScrapeSourceQQMusic => 'QQ Music';
+  String get settingsScrapeSourceQQMusic => 'QM';
 
   @override
-  String get settingsScrapeSourceKugou => 'Kugou Music';
+  String get settingsScrapeSourceKugou => 'KG';
 
   @override
   String get settingsScrapeSourceKuwo => 'Kuwo Music';
@@ -3591,10 +3590,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ Music';
+  String get platformQQMusic => 'QM';
 
   @override
-  String get loginQqQrLogin => 'Se connecter avec le QR code QQ Music';
+  String get loginQqQrLogin => 'Se connecter avec le QR code QM';
 
   @override
   String get loginQqTypeQq => 'QQ';
@@ -3615,7 +3614,7 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get toastQqNotSupported => 'Non pris en charge pour QQ Music';
+  String get toastQqNotSupported => 'Non pris en charge pour QM';
 
   @override
   String searchSourceFailed(Object source) {
@@ -3624,7 +3623,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String searchQqRiskDetail(Object code) {
-    return 'QQ Music a limité ou bloqué la requête (code $code); nouvelle tentative automatique suspendue, réessayez plus tard';
+    return 'QM a limité ou bloqué la requête (code $code); nouvelle tentative automatique suspendue, réessayez plus tard';
   }
 
   @override
@@ -3642,11 +3641,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get qqMusicDownloadUnsupported =>
-      'Téléchargements QQ Music non pris en charge pour l’instant (contrôle des risques).';
+      'Téléchargements QM non pris en charge pour l’instant (contrôle des risques).';
 
   @override
   String qqMusicDownloadSkipped(Object count) {
-    return '$count titre(s) QQ Music ignoré(s) : téléchargement non pris en charge.';
+    return '$count titre(s) QM ignoré(s) : téléchargement non pris en charge.';
   }
 
   @override

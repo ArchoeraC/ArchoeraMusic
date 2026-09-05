@@ -1,8 +1,8 @@
-/// QQ 音乐红心（收藏）单元测试（**不联网**）。
+/// QM红心（收藏）单元测试（**不联网**）。
 ///
 /// 覆盖：
 /// - 红心键路由：songmid 为键（QqLikedStore.qqLikeKey / SongRow.songLikeKey
-///   一致），彻底避免「QQ 曲目误走网易云数字 id」；
+///   一致），彻底避免「QQ 曲目误走NT数字 id」；
 /// - [QqLikedStore] 本机持久化：add/remove/mergeOnline（add-only 不覆盖本地）
 ///   与跨实例重载（模拟重启）；
 /// - [QqMusicApi] 在线收藏参数 / 登录护栏：缺 songId、未登录写读均抛可读
@@ -63,7 +63,7 @@ void main() {
     test('SongRow.songLikeKey 与 LikeController 路由键一致（songmid）', () {
       final t = _qqTrack('1162906679', '004Z8Ihr0JIu5s');
       expect(songLikeKey(t), '004Z8Ihr0JIu5s');
-      // 网易云仍用数字 id（避免被 QQ songmid 串扰）
+      // NT仍用数字 id（避免被 QQ songmid 串扰）
       final ne = Track(id: '28451655', title: '网易', source: 'netease');
       expect(songLikeKey(ne), '28451655');
     });

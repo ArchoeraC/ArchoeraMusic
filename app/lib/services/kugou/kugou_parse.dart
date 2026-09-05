@@ -1,4 +1,4 @@
-/// 酷狗响应解析（KRC 歌词 + 歌单/榜单/搜索通用条目 → [Track]）。
+/// KG响应解析（KRC 歌词 + 歌单/榜单/搜索通用条目 → [Track]）。
 ///
 /// 从 `kugou_api.dart` 拆出：纯解析函数，与网络请求/会话解耦，便于
 /// 单测与复用。
@@ -300,14 +300,14 @@ Track kgTrackFromKgPlain(
   );
 }
 
-/// 酷狗 `IsOriginal`（1=原唱）→ bool；兼容数字与字符串。
+/// KG `IsOriginal`（1=原唱）→ bool；兼容数字与字符串。
 bool _kgIsOriginal(Object? raw) {
   if (raw == null) return false;
   if (raw is num) return raw.toInt() == 1;
   return raw.toString() == '1' || raw.toString().toLowerCase() == 'true';
 }
 
-/// 酷狗版权 `privilege` → TrackFee（10=VIP 需会员；其余视作免费）。
+/// KG版权 `privilege` → TrackFee（10=VIP 需会员；其余视作免费）。
 int _kgFee(Object? raw) {
   if (raw == null) return 0;
   final v = raw is num ? raw.toInt() : int.tryParse(raw.toString()) ?? 0;

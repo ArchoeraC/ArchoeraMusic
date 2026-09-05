@@ -9,7 +9,7 @@
 //  现改为全屏毛玻璃登录页（QR 居中放大，中央 Expanded + 滚动兜底），
 //  不存在弹窗撑爆/截断问题。
 //
-// 本测试以「超长错误消息」驱动网易/酷狗两条登录路径（initState 拉取
+// 本测试以「超长错误消息」驱动网易/KG两条登录路径（initState 拉取
 // 二维码立即失败 → 错误分支渲染长文本），断言：无 AlertDialog、全屏层
 // 填满视口（800×600）、错误提示可见、无布局溢出。
 
@@ -36,7 +36,7 @@ class _FailingNeteaseApi extends NeteaseApi {
   }
 }
 
-/// 立即抛超长错误文本的酷狗 API。
+/// 立即抛超长错误文本的KG API。
 class _FailingKugouApi extends KugouApi {
   @override
   Future<String> qrKey() async {
@@ -101,7 +101,7 @@ void main() {
     await expectFullscreenLogin(tester, showNeteaseLoginDialog);
   });
 
-  testWidgets('酷狗扫码登录页：全屏毛玻璃形态，长错误消息无溢出', (tester) async {
+  testWidgets('KG扫码登录页：全屏毛玻璃形态，长错误消息无溢出', (tester) async {
     await expectFullscreenLogin(
       tester,
       (context) => showDialog<void>(

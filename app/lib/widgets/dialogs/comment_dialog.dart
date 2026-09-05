@@ -1,9 +1,9 @@
-/// 歌曲评论弹窗（网易云对齐原项目 Comments.vue 核心交互；酷狗走
+/// 歌曲评论弹窗（NT对齐原项目 Comments.vue 核心交互；KG走
 /// mcomment commentsv2/getCommentWithLike）。
 ///
-/// 入口 [showCommentDialog]：网易云源先 [NeteaseApi.findNeteaseCommentId]
-/// 匹配网易云歌曲 id（异源走云搜索），再分「热门 / 最新」两 Tab 分页拉取；
-/// 酷狗源直接用歌曲 hash 拉酷狗评论（无 Tab）。触底自动加载下一页。
+/// 入口 [showCommentDialog]：NT源先 [NeteaseApi.findNeteaseCommentId]
+/// 匹配NT歌曲 id（异源走云搜索），再分「热门 / 最新」两 Tab 分页拉取；
+/// KG源直接用歌曲 hash 拉KG评论（无 Tab）。触底自动加载下一页。
 library;
 
 import 'package:flutter/material.dart';
@@ -21,7 +21,7 @@ import 'netease_login_dialog.dart';
 import '../player/s_controls.dart';
 import '../common/toast.dart';
 
-/// 酷狗评论 → 弹窗通用展示模型（字段与 NeteaseComment 对齐）。
+/// KG评论 → 弹窗通用展示模型（字段与 NeteaseComment 对齐）。
 NeteaseComment _kgToTile(KugouComment c) => NeteaseComment(
   id: c.id,
   userName: c.userName,
@@ -58,7 +58,7 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   /// 累计评论条数上限：超出截断并停止触底加载（防长回复列表撑爆内存）。
   static const _maxComments = 400;
 
-  /// 匹配到的网易云歌曲 id（null = 匹配中/失败）。
+  /// 匹配到的NT歌曲 id（null = 匹配中/失败）。
   String? _songId;
 
   /// 当前 Tab：true = 热门。
@@ -69,13 +69,13 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   bool _failed = false;
   final ScrollController _scroll = ScrollController();
 
-  /// 发送评论输入框（仅网易云源显示；酷狗发送接口需签名鉴权，未接入）。
+  /// 发送评论输入框（仅NT源显示；KG发送接口需签名鉴权，未接入）。
   final TextEditingController _input = TextEditingController();
   bool _sending = false;
 
   NeteaseApi get _api => ref.read(neteaseApiProvider);
 
-  /// 是否酷狗源（直接按歌曲 hash 拉酷狗评论，无 Tab、无需登录）。
+  /// 是否KG源（直接按歌曲 hash 拉KG评论，无 Tab、无需登录）。
   bool get _isKugou => widget.track.source == 'kugou';
 
   @override
@@ -92,7 +92,7 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
     super.dispose();
   }
 
-  /// 匹配歌曲 id → 拉首屏（酷狗源直接用歌曲 hash）。
+  /// 匹配歌曲 id → 拉首屏（KG源直接用歌曲 hash）。
   Future<void> _match() async {
     setState(() {
       _loading = true;
@@ -164,7 +164,7 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
     }
   }
 
-  /// 酷狗源拉取一页（按 hash 请求，KugouComment 转展示模型）。
+  /// KG源拉取一页（按 hash 请求，KugouComment 转展示模型）。
   Future<NeteaseCommentPage> _loadKg(String hash, {required int page}) async {
     final kp = await ref.read(kugouApiProvider).songComments(hash, page: page);
     return NeteaseCommentPage(
@@ -204,7 +204,7 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
     _load(reset: true);
   }
 
-  /// 发表评论（仅网易云源可用）：
+  /// 发表评论（仅NT源可用）：
   /// 未登录先引导扫码登录；空内容 / 重复评论（code 505）等失败均 toast。
   Future<void> _send() async {
     final id = _songId;
@@ -301,7 +301,7 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
                   ],
                 ),
               ),
-              // ── Tab：热门 / 最新（酷狗无「最新」，整行隐藏）──────────
+              // ── Tab：热门 / 最新（KG无「最新」，整行隐藏）──────────
               if (!_isKugou)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -318,7 +318,7 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
               const Divider(height: 1),
               // ── 评论列表 ───────────────────────────────────────
               Expanded(child: _buildListArea(scheme, l10n)),
-              // ── 发送评论输入栏（仅网易云源；酷狗接口需签名鉴权未接入）────
+              // ── 发送评论输入栏（仅NT源；KG接口需签名鉴权未接入）────
               if (!_isKugou && _songId != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),

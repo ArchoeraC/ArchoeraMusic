@@ -9,7 +9,7 @@ import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 
-/// 网易云扫码登录（全屏毛玻璃页，QR 居中放大：unikey → qrurl → 2s 轮询
+/// NT扫码登录（全屏毛玻璃页，QR 居中放大：unikey → qrurl → 2s 轮询
 /// loginQrCheck）。
 ///
 /// 803 确认成功后刷新 [neteaseAuthProvider] 并自动关闭；800 过期后显示

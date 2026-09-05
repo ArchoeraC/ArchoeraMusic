@@ -68,7 +68,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   /// 搜索框宽度伸展动效时长（保持原节奏，不随面板加长）。
   static const Duration _widthExpandMs = Duration(milliseconds: 180);
 
-  // ── 热搜 / 建议（网易云 + 酷狗，对齐原版 getHotSearches / getSearchSuggest）──
+  // ── 热搜 / 建议（NT + KG，对齐原版 getHotSearches / getSearchSuggest）──
   Timer? _suggestDebounce;
   String _suggestQuery = '';
   List<HotSearchItem> _hot = const [];
@@ -209,7 +209,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   }
 
   Future<void> _loadHot() async {
-    // 双平台热搜并行：网易云 + 酷狗，各自失败静默（对齐原版 console.warn）
+    // 双平台热搜并行：NT + KG，各自失败静默（对齐原版 console.warn）
     final futures = <Future<void>>[];
     if (_hot.isEmpty && !_hotLoading) {
       futures.add(_fetchNeteaseHot());
@@ -268,7 +268,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     final ne = results[0];
     final kg = results[1];
     setState(() {
-      // 酷狗建议条目 source=='kugou'，合并进同一分类列表（行内带平台角标）
+      // KG建议条目 source=='kugou'，合并进同一分类列表（行内带平台角标）
       _suggest = SuggestData(
         songs: [...ne.songs, ...kg.songs],
         albums: [...ne.albums, ...kg.albums],
@@ -302,8 +302,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   /// 建议歌曲：解析播放 URL → 完整转码播放。
   ///
   /// 建议条目本身只有标题/歌手（无封面），播放前先补齐完整 Track：
-  /// - 网易云：song_detail 批量取详情（含封面/歌手/专辑），失败回退轻量构造；
-  /// - 酷狗：建议只有 songid，按歌名搜索取 hash + 封面（[suggestSongToTrack]）。
+  /// - NT：song_detail 批量取详情（含封面/歌手/专辑），失败回退轻量构造；
+  /// - KG：建议只有 songid，按歌名搜索取 hash + 封面（[suggestSongToTrack]）。
   Future<void> _playSuggestSong(SuggestSongItem song) async {
     final String? url;
     final Track track;
@@ -320,7 +320,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
       track = resolved;
       url = await kugouApi.resolvePlayUrl(resolved.kugou!);
     } else {
-      // 网易云：先取详情补封面（建议条目无封面字段），失败回退轻量构造
+      // NT：先取详情补封面（建议条目无封面字段），失败回退轻量构造
       Track? detail;
       try {
         final list = await ref
@@ -359,7 +359,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     _searchFocus.unfocus();
   }
 
-  /// 建议专辑：按来源分发专辑详情弹窗（网易云 / 酷狗各自专辑接口，
+  /// 建议专辑：按来源分发专辑详情弹窗（NT / KG各自专辑接口，
   /// albumid 不能跨平台混用，对齐搜索页 `_onCoverTap` 的平台分发）。
   void _openSuggestAlbum(SuggestSimpleItem album) {
     _searchFocus.unfocus();
@@ -371,7 +371,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     }
   }
 
-  /// 建议歌手：网易云歌手热门歌曲弹窗。
+  /// 建议歌手：NT歌手热门歌曲弹窗。
   void _openSuggestArtist(SuggestSimpleItem artist) {
     _searchFocus.unfocus();
     showNeteaseArtistDialog(
@@ -380,7 +380,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     );
   }
 
-  /// 建议歌单：网易云歌单详情弹窗。
+  /// 建议歌单：NT歌单详情弹窗。
   void _openSuggestPlaylist(SuggestSimpleItem playlist) {
     _searchFocus.unfocus();
     showPlaylistDetailDialog(
@@ -463,7 +463,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
             const _WeatherMini(),
             // 与账号菜单保持间距（避免组件过小且贴太近）
             const SizedBox(width: 12),
-            // 账号（多平台：网易云 / 酷狗 / QQ 音乐占位）
+            // 账号（多平台：NT / KG / QM占位）
             const _AccountsMenu(),
             const SizedBox(width: 4),
             // 齿轮下拉（对齐 NavHeader SDropdownMenu：主题 + 全局设置）
@@ -531,7 +531,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
 /// topCenter，与播放条队列 popup 的 bottomCenter 方向相反）+ 淡入；
 /// 宽度由搜索框实时跟随（输入时伸展有上限）。
 ///
-/// 内容：空输入 → 搜索历史 chips + 网易云热搜 Top20；有输入 →
+/// 内容：空输入 → 搜索历史 chips + NT热搜 Top20；有输入 →
 /// 快捷搜索行 + 分类建议（歌曲 / 专辑 / 歌手 / 歌单）。
 class _SearchDropdown extends ConsumerWidget {
   const _SearchDropdown({
@@ -746,7 +746,7 @@ class _SearchDropdown extends ConsumerWidget {
       children.add(const SizedBox(height: 6));
     }
 
-    // 酷狗热搜（独立区段；标题带平台名区分，加载中占位，失败静默）
+    // KG热搜（独立区段；标题带平台名区分，加载中占位，失败静默）
     final kugouHotTitle = '${l10n.brandKugou} · ${l10n.searchHot}';
     if (kugouHotLoading) {
       children.add(_sectionTitle(
@@ -978,7 +978,7 @@ class _SearchDropdown extends ConsumerWidget {
     );
   }
 
-  /// 建议歌曲行：标题 + 歌手 · 专辑副标题（酷狗条目行内带平台角标）。
+  /// 建议歌曲行：标题 + 歌手 · 专辑副标题（KG条目行内带平台角标）。
   Widget _suggestSongRow(ColorScheme scheme, SuggestSongItem song) {
     final subtitle = [
       if (song.artist != null && song.artist!.isNotEmpty) song.artist!,
@@ -1097,8 +1097,8 @@ class _SearchDropdown extends ConsumerWidget {
   }
 }
 
-/// 建议行平台角标（酷狗：蓝底白字「酷」，对齐搜索页 SongRow 的
-/// _SourceBadge 样式；仅酷狗条目渲染，网易云不显示）。
+/// 建议行平台角标（KG：蓝底白字「酷」，对齐搜索页 SongRow 的
+/// _SourceBadge 样式；仅KG条目渲染，NT不显示）。
 class _SourceDot extends StatelessWidget {
   const _SourceDot();
 
@@ -1177,9 +1177,9 @@ class _HistoryChip extends StatelessWidget {
   }
 }
 
-/// 账号入口（多平台）：未登录显示登录入口，已登录显示主账号（优先网易云
-/// 头像）。菜单列出各平台登录态：网易云 / 酷狗（均支持扫码登录），
-/// QQ 音乐暂不可用（原版 SPlayer-Next 无登录；Mineradio 走祈水第三方
+/// 账号入口（多平台）：未登录显示登录入口，已登录显示主账号（优先NT
+/// 头像）。菜单列出各平台登录态：NT / KG（均支持扫码登录），
+/// QM暂不可用（原版 SPlayer-Next 无登录；Mineradio 走祈水第三方
 /// 授权平台，Flutter 桌面不移植）。
 class _AccountsMenu extends ConsumerWidget {
   const _AccountsMenu();
@@ -1199,7 +1199,7 @@ class _AccountsMenu extends ConsumerWidget {
         final qqProfile = qqApi.profile;
         final qqLogged = qqApi.isLoggedIn;
 
-        // 主账号：网易云 > 酷狗 > QQ 音乐
+        // 主账号：NT > KG > QM
         final primaryNetease = netease != null;
         final primaryKugou = !primaryNetease && kugou != null;
         final primaryQq = !primaryNetease && !primaryKugou && qqLogged;
@@ -1272,7 +1272,7 @@ class _AccountsMenu extends ConsumerWidget {
             }
           },
           itemBuilder: (_) => [
-            // ── 网易云 / 酷狗（同构：标题 + 登录入口 或 头像+昵称+退出）──
+            // ── NT / KG（同构：标题 + 登录入口 或 头像+昵称+退出）──
             ..._platformSection(
               l10n: l10n,
               title: l10n.navHeaderNeteaseMusic,
@@ -1299,7 +1299,7 @@ class _AccountsMenu extends ConsumerWidget {
                   ? l10n.navHeaderKugouId(kugou?.userid ?? '')
                   : kugouNick,
             ),
-            // ── QQ 音乐（扫码登录：手机 QQ / 微信） ─────────────
+            // ── QM（扫码登录：手机 QQ / 微信） ─────────────
             ..._platformSection(
               l10n: l10n,
               title: l10n.navHeaderQqMusic,
@@ -1354,7 +1354,7 @@ class _AccountsMenu extends ConsumerWidget {
   }
 
   /// 单个平台账号区段：标题 + 未登录「扫码登录」入口，或已登录的
-  /// 「头像 + 昵称」与退出项（网易云 / 酷狗同构复用）。
+  /// 「头像 + 昵称」与退出项（NT / KG同构复用）。
   List<PopupMenuEntry<String>> _platformSection({
     required AppLocalizations l10n,
     required String title,

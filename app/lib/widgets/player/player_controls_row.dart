@@ -73,7 +73,7 @@ class PlayerControlsRow extends ConsumerWidget {
                       : colorScheme.onSurfaceVariant,
                   onPressed: () => onToggleLike(current!),
                 ),
-              // 评论区（仅网易云/酷狗源，与红心同条件）
+              // 评论区（仅NT/KG源，与红心同条件）
               if (canLike) ...[
                 const SizedBox(width: 12),
                 CtrlIcon(

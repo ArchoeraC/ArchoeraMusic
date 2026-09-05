@@ -79,7 +79,7 @@ void showTrackContextMenu(
             onTap: () => _startDownload(context, ref, track),
           ),
         SContextMenuItem.divider(),
-        // 网易云曲目含歌手 id 时提供「查看歌手信息」（歌手热门歌曲弹窗）
+        // NT曲目含歌手 id 时提供「查看歌手信息」（歌手热门歌曲弹窗）
         if (track.source == 'netease' &&
             track.artists.isNotEmpty &&
             track.artists.first.id != null)
@@ -134,7 +134,7 @@ Future<void> _startDownload(
   WidgetRef ref,
   Track track,
 ) async {
-  // QQ 音乐暂不做下载（风控/无下载源）：保留入口，点击给提示。
+  // QM暂不做下载（风控/无下载源）：保留入口，点击给提示。
   if (track.source == 'qqmusic') {
     toast(context.l10n.qqMusicDownloadUnsupported);
     return;
@@ -149,8 +149,8 @@ Future<void> _startDownload(
 /// 批量下载（列表批量操作栏 / 单曲下载共用）：
 /// 登录校验 + 一次音质选择 + 逐首入队。
 ///
-/// 仅处理在线曲目（网易云/酷狗；无下载接口的本地/流媒体曲目跳过）；
-/// 酷狗曲目下载前补齐 hash 链（历史/收藏等旧入口的 Track 可能只有 128k
+/// 仅处理在线曲目（NT/KG；无下载接口的本地/流媒体曲目跳过）；
+/// KG曲目下载前补齐 hash 链（历史/收藏等旧入口的 Track 可能只有 128k
 /// hash，直接下载会被静默降级；补全后能拿到最高可用音质）。
 Future<void> downloadTracks(
   BuildContext context,
@@ -161,7 +161,7 @@ Future<void> downloadTracks(
   final online = tracks
       .where((t) => t.source == 'netease' || t.source == 'kugou')
       .toList();
-  // QQ 音乐暂不做下载（风控/无下载源）：保留入口但提示并跳过。
+  // QM暂不做下载（风控/无下载源）：保留入口但提示并跳过。
   final qqCount = tracks.where((t) => t.source == 'qqmusic').length;
   if (qqCount > 0) {
     if (online.isEmpty) {

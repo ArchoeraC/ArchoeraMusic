@@ -254,7 +254,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get navHeaderKugouMusic => 'Kugou Music';
+  String get navHeaderKugouMusic => 'KG';
 
   @override
   String get navHeaderLoginAccount => 'Anmelden (Netease / Kugou)';
@@ -266,10 +266,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get navHeaderNeteaseAccount => 'Netease-Konto';
 
   @override
-  String get navHeaderNeteaseMusic => 'Netease Music';
+  String get navHeaderNeteaseMusic => 'NT';
 
   @override
-  String get navHeaderQqMusic => 'QQ Music';
+  String get navHeaderQqMusic => 'QM';
 
   @override
   String get navHeaderQrLogin => 'Per QR-Code anmelden';
@@ -957,7 +957,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pageLikedQqLoginSync =>
-      'Bei QQ Music anmelden, um Online-Favoriten zu synchronisieren (experimentell)';
+      'Bei QM anmelden, um Online-Favoriten zu synchronisieren (experimentell)';
 
   @override
   String get pageLikedQqSyncOnline =>
@@ -3297,10 +3297,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsScrapeSourceNetease => 'Netease Cloud Music';
 
   @override
-  String get settingsScrapeSourceQQMusic => 'QQ Music';
+  String get settingsScrapeSourceQQMusic => 'QM';
 
   @override
-  String get settingsScrapeSourceKugou => 'Kugou Music';
+  String get settingsScrapeSourceKugou => 'KG';
 
   @override
   String get settingsScrapeSourceKuwo => 'Kuwo Music';
@@ -3558,7 +3558,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ Music';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'Mit QQ-Music-QR-Code anmelden';
@@ -3581,7 +3581,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get toastQqNotSupported => 'Für QQ Music nicht unterstützt';
+  String get toastQqNotSupported => 'Für QM nicht unterstützt';
 
   @override
   String searchSourceFailed(Object source) {
@@ -3590,7 +3590,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String searchQqRiskDetail(Object code) {
-    return 'QQ Music hat die Anfrage gedrosselt/risikogesperrt (Code $code); automatische Wiederholungen gestoppt, bitte später erneut versuchen';
+    return 'QM hat die Anfrage gedrosselt/risikogesperrt (Code $code); automatische Wiederholungen gestoppt, bitte später erneut versuchen';
   }
 
   @override

@@ -13,8 +13,8 @@ import '../widgets/dialogs/track_list_dialog.dart';
 
 /// 收藏页（对齐原项目 Favorites.vue）。
 ///
-/// 平台切换（网易云 / 酷狗）：网易云三 tab（歌单 / 专辑 / 歌手）保持原逻辑；
-/// 酷狗按 MoeKoeMusic Library.vue 对 `/v7/get_all_list` 的分类拆成
+/// 平台切换（NT / KG）：NT三 tab（歌单 / 专辑 / 歌手）保持原逻辑；
+/// KG按 MoeKoeMusic Library.vue 对 `/v7/get_all_list` 的分类拆成
 /// 「创建的歌单 / 收藏的歌单 / 收藏的专辑」三 tab。未登录对应平台显示登录引导。
 class FavoritesPage extends ConsumerStatefulWidget {
   const FavoritesPage({super.key});
@@ -25,10 +25,10 @@ class FavoritesPage extends ConsumerStatefulWidget {
 
 enum _Platform { netease, kugou }
 
-/// 网易云收藏 tab。
+/// NT收藏 tab。
 enum _FavTab { playlist, album, artist }
 
-/// 酷狗曲库 tab（对齐 MoeKoeMusic Library.vue 分类）。
+/// KG曲库 tab（对齐 MoeKoeMusic Library.vue 分类）。
 enum _KgTab { created, collectedPlaylist, collectedAlbum }
 
 class _FavoritesPageState extends ConsumerState<FavoritesPage> {
@@ -54,7 +54,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
       '${_platform.name}.'
       '${_platform == _Platform.kugou ? _kgTab.name : _tab.name}';
 
-  /// 酷狗三个 tab 的 key（一次 `/v7/get_all_list` 拉全部分类）。
+  /// KG三个 tab 的 key（一次 `/v7/get_all_list` 拉全部分类）。
   static const _kgKeys = [
     'kugou.created',
     'kugou.collectedPlaylist',

@@ -10,7 +10,7 @@ import 'package:archoera_music/services/playback/playback_session.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('真实网易云曲目 → PlaybackSnapshot 往返 → cover 存活', () async {
+  test('真实NT曲目 → PlaybackSnapshot 往返 → cover 存活', () async {
     // 1) 真实搜索拿曲目
     final api = NeteaseApi(ApisNeteaseCaller());
     final result = await api.searchSongs('周杰伦', limit: 3);

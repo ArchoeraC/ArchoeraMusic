@@ -1,4 +1,4 @@
-/// 酷狗数据模型（歌词 / 评论 / 登录会话 / 用户曲库分类）。
+/// KG数据模型（歌词 / 评论 / 登录会话 / 用户曲库分类）。
 ///
 /// 从 `kugou_api.dart` 拆出：与网络请求无关的纯类型定义与解析函数，
 /// 供 [KugouApi] 与调用方（评论弹窗等）共享。
@@ -21,7 +21,7 @@ class KugouLyric {
   final String roma;
 }
 
-/// 酷狗歌曲评论（commentsv2/getCommentWithLike 条目）。
+/// KG歌曲评论（commentsv2/getCommentWithLike 条目）。
 class KugouComment {
   const KugouComment({
     required this.id,
@@ -52,7 +52,7 @@ class KugouComment {
   final List<KugouComment> reply;
 }
 
-/// 酷狗歌曲评论分页。
+/// KG歌曲评论分页。
 class KugouCommentPage {
   const KugouCommentPage({
     required this.list,
@@ -97,7 +97,7 @@ KugouComment kgCommentFromKg(Map<String, dynamic> c) {
   );
 }
 
-/// 酷狗登录会话（扫码登录成功后的 token/userid，v5/url 请求 VIP 曲目用）。
+/// KG登录会话（扫码登录成功后的 token/userid，v5/url 请求 VIP 曲目用）。
 class KugouSession {
   const KugouSession({
     required this.token,
@@ -131,7 +131,7 @@ class KugouSession {
   String toString() => 'KugouSession(userid=$userid, nickname=$nickname)';
 }
 
-/// 酷狗用户曲库条目类型（对齐 MoeKoeMusic Library.vue 对 `/v7/get_all_list`
+/// KG用户曲库条目类型（对齐 MoeKoeMusic Library.vue 对 `/v7/get_all_list`
 /// 的分类：创建的歌单 / 收藏的歌单 / 收藏的专辑）。
 enum KugouLibraryType {
   /// 我创建的歌单（含系统「我喜欢」）。
@@ -144,7 +144,7 @@ enum KugouLibraryType {
   collectedAlbum,
 }
 
-/// 酷狗用户曲库条目。
+/// KG用户曲库条目。
 class KugouLibraryItem {
   const KugouLibraryItem({
     required this.type,
@@ -172,7 +172,7 @@ class KugouLibraryItem {
       CoverItem(id: id, title: title, cover: cover, trackCount: trackCount);
 }
 
-/// 酷狗用户曲库（登录态，按 [KugouLibraryType] 分类）。
+/// KG用户曲库（登录态，按 [KugouLibraryType] 分类）。
 class KugouLibrary {
   const KugouLibrary({required this.items});
 

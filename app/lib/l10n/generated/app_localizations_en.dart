@@ -251,7 +251,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get navHeaderKugouMusic => 'Kugou Music';
+  String get navHeaderKugouMusic => 'KG';
 
   @override
   String get navHeaderLoginAccount => 'Log in (Netease / Kugou)';
@@ -263,10 +263,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navHeaderNeteaseAccount => 'Netease account';
 
   @override
-  String get navHeaderNeteaseMusic => 'Netease Music';
+  String get navHeaderNeteaseMusic => 'NT';
 
   @override
-  String get navHeaderQqMusic => 'QQ Music';
+  String get navHeaderQqMusic => 'QM';
 
   @override
   String get navHeaderQrLogin => 'QR code login';
@@ -934,22 +934,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toastQqLikeSyncFailed =>
-      'QQ Music online favorites sync failed (experimental API); the heart change was reverted';
+      'QM online favorites sync failed (experimental API); the heart change was reverted';
 
   @override
   String get pageLikedQqHint =>
-      'QQ Music hearts are stored on this device and always available; sign in to experimentally sync online favorites';
+      'QM hearts are stored on this device and always available; sign in to experimentally sync online favorites';
 
   @override
-  String get pageLikedQqEmptyTitle => 'No QQ Music liked songs yet';
+  String get pageLikedQqEmptyTitle => 'No QM liked songs yet';
 
   @override
   String get pageLikedQqEmptyHint =>
-      'Like any QQ Music song in search or playback to keep it here (stored on this device)';
+      'Like any QM song in search or playback to keep it here (stored on this device)';
 
   @override
   String get pageLikedQqLoginSync =>
-      'Sign in to QQ Music to sync online favorites (experimental)';
+      'Sign in to QM to sync online favorites (experimental)';
 
   @override
   String get pageLikedQqSyncOnline => 'Sync online favorites (experimental)';
@@ -3259,10 +3259,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsScrapeSourceNetease => 'Netease Cloud Music';
 
   @override
-  String get settingsScrapeSourceQQMusic => 'QQ Music';
+  String get settingsScrapeSourceQQMusic => 'QM';
 
   @override
-  String get settingsScrapeSourceKugou => 'Kugou Music';
+  String get settingsScrapeSourceKugou => 'KG';
 
   @override
   String get settingsScrapeSourceKuwo => 'Kuwo Music';
@@ -3519,10 +3519,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ Music';
+  String get platformQQMusic => 'QM';
 
   @override
-  String get loginQqQrLogin => 'Sign in with QQ Music QR code';
+  String get loginQqQrLogin => 'Sign in with QM QR code';
 
   @override
   String get loginQqTypeQq => 'QQ';
@@ -3542,7 +3542,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get toastQqNotSupported => 'Not supported for QQ Music';
+  String get toastQqNotSupported => 'Not supported for QM';
 
   @override
   String searchSourceFailed(Object source) {
@@ -3551,7 +3551,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String searchQqRiskDetail(Object code) {
-    return 'QQ Music rate-limited or risk-blocked the request (code $code); auto-retry is paused, please try again later';
+    return 'QM rate-limited or risk-blocked the request (code $code); auto-retry is paused, please try again later';
   }
 
   @override
@@ -3569,11 +3569,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get qqMusicDownloadUnsupported =>
-      'QQ Music downloads are not supported for now (risk control).';
+      'QM downloads are not supported for now (risk control).';
 
   @override
   String qqMusicDownloadSkipped(Object count) {
-    return 'Skipped $count QQ Music track(s): downloads not supported for QQ Music.';
+    return 'Skipped $count QM track(s): downloads not supported for QM.';
   }
 
   @override

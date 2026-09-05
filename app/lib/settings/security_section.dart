@@ -1,12 +1,12 @@
 /// 存储分类下的「安全销毁」危险区（敏感数据不可逆擦除）。
 ///
 /// 对齐需求：必要情况下允许用户直接销毁敏感数据库 ——
-/// 主动失效 token（网易云 /api/logout）+ 随机数据覆盖写入并删除文件。
+/// 主动失效 token（NT /api/logout）+ 随机数据覆盖写入并删除文件。
 ///
 /// 覆盖清单（本项目实际含凭据的本地文件）：
 /// - 流媒体服务器凭据 [streamingServersPath]（password/accessToken 已由
 ///   凭据保险库 vault 加密存储，文件仅存非敏感字段）
-/// - 第三方账号会话 [sessionStorePath]（网易云 cookies + 酷狗 token，
+/// - 第三方账号会话 [sessionStorePath]（NT cookies + KG token，
 ///   已由 vault 接管，此文件仅存历史明文用于迁移/兜底清理）
 /// - 本地用户库 [userDbPath]（Subsonic 账号与收藏）
 ///

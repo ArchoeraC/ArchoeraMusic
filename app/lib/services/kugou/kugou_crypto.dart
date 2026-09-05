@@ -1,4 +1,4 @@
-/// 酷狗 API 加解密层（Dart 移植）
+/// KG API 加解密层（Dart 移植）
 ///
 /// 对齐 KuGouMusicApi util/{crypto,helper,util}.js：
 /// - register_dev：AES-128-CBC（key/iv 来自 md5(secretKey) 分段）+ RSA-PKCS1v1.5

@@ -1,4 +1,4 @@
-/// QQ 音乐扫码登录对话框（支持手机 QQ / 微信两种扫码，对齐
+/// QM扫码登录对话框（支持手机 QQ / 微信两种扫码，对齐
 /// SPlayer-Next 的 qqmusicQrLoginAdapter / qqmusicWxQrLoginAdapter）。
 ///
 /// 流程：选择扫码方式（QQ / 微信）→ qrKey(type) 取 base64 二维码 →
@@ -20,7 +20,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/toast.dart';
 
-/// 打开 QQ 音乐扫码登录弹窗。
+/// 打开 QM扫码登录弹窗。
 /// [initialType] 默认扫码方式：'qq'（手机 QQ）/ 'wx'（微信）。
 Future<bool?> showQqMusicLoginDialog(BuildContext context,
     {String initialType = 'qq'}) {

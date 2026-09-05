@@ -18,7 +18,7 @@ class LyricLine {
 
 /// 增强型歌词的逐字/逐词片段（卡拉OK 高亮粒度）。
 ///
-/// 来源：网易云 YRC（`<start,dur>字`）与酷狗 KRC（解密后同为 LX
+/// 来源：NT YRC（`<start,dur>字`）与KG KRC（解密后同为 LX
 /// 字级格式）；[startMs] 是相对**所在行起始**的偏移（毫秒）。
 class LyricFragment {
   const LyricFragment({
@@ -168,12 +168,12 @@ List<LyricGroup> parseLyricGroups({
     return t.isEmpty ? null : t;
   }
 
-  // 交错翻译合并：本地下载（酷狗等）的 LRC 常见「主行 + 同时间戳译文」
+  // 交错翻译合并：本地下载（KG等）的 LRC 常见「主行 + 同时间戳译文」
   // 的交错结构（`[mm:ss.xx]原文` 后紧跟 `[mm:ss.xx]译文`，如
   // `[00:37.472]僕は強くならなきゃいけない` + `[00:37.472]必须要让自己变得强大起来`）。
   // 若两行视为独立主行，译文会占一个时间轴槽位、译文也无法挂到主行
   // （渲染时把译文当当前行、原文行反而短暂缺失）。仅在**未单独提供**
-  // translation 参数时启用合并——在线平台（网易云/酷狗 API）主歌词与
+  // translation 参数时启用合并——在线平台（NT/KG API）主歌词与
   // 翻译分开返回，content 内不会交错，合并反而会误吞主行。
   final interleaved = translation == null || translation.trim().isEmpty;
   final groups = <LyricGroup>[];

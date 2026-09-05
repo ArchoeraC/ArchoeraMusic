@@ -2,7 +2,7 @@
 ///
 /// 合并 SPlayer-Next PlayerData 的音质详情（编码/采样率/位深/比特率/声道）
 /// 与 TagEditorDialog 的路径/文件大小字段：展示曲目标题、歌手、专辑、时长、
-/// 来源平台、酷狗音质档、音频技术信息（流媒体服务器返回）与本地路径/大小。
+/// 来源平台、KG音质档、音频技术信息（流媒体服务器返回）与本地路径/大小。
 library;
 
 import 'package:flutter/material.dart';
@@ -105,7 +105,7 @@ class _TrackDetailBody extends StatelessWidget {
           l10n.trackDetailSource,
           _sourceLabel(l10n, t),
         ),
-        // 酷狗音质档（含文件大小，如「无损 · 28.4MB」）
+        // KG音质档（含文件大小，如「无损 · 28.4MB」）
         if (kugouQuality != null)
           _field(scheme, Icons.high_quality_outlined, l10n.trackDetailQuality,
               kugouQuality),
@@ -125,7 +125,7 @@ class _TrackDetailBody extends StatelessWidget {
           _field(scheme, Icons.speaker, l10n.trackDetailChannels,
               '${q.channels}'),
         ],
-        // 文件大小（服务器返回或酷狗品质表）
+        // 文件大小（服务器返回或KG品质表）
         if (fileSize != null && fileSize > 0)
           _field(scheme, Icons.insert_drive_file_outlined,
               l10n.trackDetailFileSize, _formatBytes(fileSize)),
@@ -174,7 +174,7 @@ class _TrackDetailBody extends StatelessWidget {
         _ => t.source,
       };
 
-  /// 酷狗最高可用音质档文案（含大小），无 kugou 信息返回 null。
+  /// KG最高可用音质档文案（含大小），无 kugou 信息返回 null。
   String? _kugouQualityLabel(AppLocalizations l10n, Track t) {
     final k = t.kugou;
     if (k == null) return null;
@@ -191,7 +191,7 @@ class _TrackDetailBody extends StatelessWidget {
     return size == null ? label : '$label · ${_formatBytes(size)}';
   }
 
-  /// 酷狗品质表中最大的文件大小（按高→低档序）。
+  /// KG品质表中最大的文件大小（按高→低档序）。
   int? _kugouBestSize(Track t) {
     const order = ['flac24bit', 'flac', '320k', '128k'];
     final sizes = t.kugou?.sizes;

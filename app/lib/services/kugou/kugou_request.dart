@@ -1,4 +1,4 @@
-/// 酷狗请求层（Dart 移植）
+/// KG请求层（Dart 移植）
 ///
 /// 对齐 apis/kugou/core/request.ts + KuGouMusicApi util/request.js：
 /// - 搜索/歌词接口无鉴权（mobilecdn 需 http，证书是共享 CDN 的）

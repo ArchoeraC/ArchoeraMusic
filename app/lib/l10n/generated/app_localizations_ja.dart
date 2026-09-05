@@ -247,7 +247,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get navHeaderKugouMusic => 'Kugou Music';
+  String get navHeaderKugouMusic => 'KG';
 
   @override
   String get navHeaderLoginAccount => 'ログイン（Netease / Kugou）';
@@ -259,10 +259,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get navHeaderNeteaseAccount => 'Neteaseアカウント';
 
   @override
-  String get navHeaderNeteaseMusic => 'Netease Music';
+  String get navHeaderNeteaseMusic => 'NT';
 
   @override
-  String get navHeaderQqMusic => 'QQ Music';
+  String get navHeaderQqMusic => 'QM';
 
   @override
   String get navHeaderQrLogin => 'QRコードでログイン';
@@ -851,10 +851,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pageFavKgCollectedAlbumLoginHint => 'ログインするとお気に入りのアルバムを表示できます';
 
   @override
-  String get pageFavKugouLoginDesc => 'QRコードで酷狗にログインし、作成・お気に入りのプレイリストとアルバムを同期';
+  String get pageFavKugouLoginDesc => 'QRコードでKGにログインし、作成・お気に入りのプレイリストとアルバムを同期';
 
   @override
-  String get pageFavKugouEmptyHint => '酷狗アプリでお気に入りにすると自動同期されます';
+  String get pageFavKugouEmptyHint => 'KGアプリでお気に入りにすると自動同期されます';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -2001,7 +2001,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsFingerprintNote =>
-      '酷狗 / 网易のダウンロード要求に付与されるデバイス識別子。初回起動時に生成され固定、ユーザーごとに異なります。';
+      'KG / 网易のダウンロード要求に付与されるデバイス識別子。初回起動時に生成され固定、ユーザーごとに異なります。';
 
   @override
   String get settingsDownloadDynamicFingerprint => '動的デバイスフィンガープリント';
@@ -2015,7 +2015,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsResetFingerprintDesc =>
-      'リセット後、この端末は酷狗 / 网易から新しいデバイスと見なされます。古いフィンガープリントのオンライン状態は無効になる可能性があります。リセットしますか？';
+      'リセット後、この端末はKG / 网易から新しいデバイスと見なされます。古いフィンガープリントのオンライン状態は無効になる可能性があります。リセットしますか？';
 
   @override
   String get toastFingerprintReset => 'デバイスフィンガープリントをリセットしました';
@@ -2242,7 +2242,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSecurityNote =>
-      '本機の全アカウント資格情報とログインセッション（ストリーミングサーバーのパスワード、網易雲/酷狗のログイン状態、ローカル Subsonic アカウント）を不可逆に削除し、プラットフォームのトークンを無効化します。ライブラリ・履歴・ダウンロードファイルには影響しません。';
+      '本機の全アカウント資格情報とログインセッション（ストリーミングサーバーのパスワード、網易雲/KGのログイン状態、ローカル Subsonic アカウント）を不可逆に削除し、プラットフォームのトークンを無効化します。ライブラリ・履歴・ダウンロードファイルには影響しません。';
 
   @override
   String get settingsSecurityStreaming => 'ストリーミングサーバー資格情報';
@@ -2259,7 +2259,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsSecuritySession => 'サードパーティのセッション';
 
   @override
-  String get settingsSecuritySessionDesc => '網易雲 / 酷狗 のログイン状態';
+  String get settingsSecuritySessionDesc => '網易雲 / KG のログイン状態';
 
   @override
   String get settingsSecurityUserDb => 'ローカルユーザーデータベース';
@@ -2513,7 +2513,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      '各スキームは暗号化データ構造が互換でないため、切り替え時は既存の vault を破棄してデータベースを再構築します。すべてのログイン認証情報（网易雲 / 酷狗 / ストリーミングアカウント）が失われ、再ログインが必要です。';
+      '各スキームは暗号化データ構造が互換でないため、切り替え時は既存の vault を破棄してデータベースを再構築します。すべてのログイン認証情報（网易雲 / KG / ストリーミングアカウント）が失われ、再ログインが必要です。';
 
   @override
   String get settingsSchemeSwitchKeep => '現在のまま';
@@ -3145,7 +3145,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsScrapeSourceQQMusic => 'QQ 音楽';
 
   @override
-  String get settingsScrapeSourceKugou => '酷狗音楽';
+  String get settingsScrapeSourceKugou => 'KG音楽';
 
   @override
   String get settingsScrapeSourceKuwo => '酷我音楽';
@@ -3431,7 +3431,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String searchQqRiskDetail(Object code) {
-    return 'QQ Music がアクセスを制限・遮断しました（コード $code）。自動再試行は停止しました。しばらくしてから再試行してください';
+    return 'QM がアクセスを制限・遮断しました（コード $code）。自動再試行は停止しました。しばらくしてから再試行してください';
   }
 
   @override
@@ -3446,11 +3446,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get searchWaitRetry => 'リクエストが多すぎます。しばらくしてから再試行してください';
 
   @override
-  String get qqMusicDownloadUnsupported => 'QQ Music のダウンロードは現在未対応です（リスク管理）。';
+  String get qqMusicDownloadUnsupported => 'QM のダウンロードは現在未対応です（リスク管理）。';
 
   @override
   String qqMusicDownloadSkipped(Object count) {
-    return 'QQ Music の $count 曲はスキップ（ダウンロード非対応）。';
+    return 'QM の $count 曲はスキップ（ダウンロード非対応）。';
   }
 
   @override

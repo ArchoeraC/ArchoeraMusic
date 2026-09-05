@@ -313,7 +313,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
     );
   }
 
-  /// 聚合搜索（'all'）单曲：网易 + 酷狗 + QQ **三方并行、各源独立容错**。
+  /// 聚合搜索（'all'）单曲：网易 + KG + QQ **三方并行、各源独立容错**。
   ///
   /// 任一源失败只标记该源（展示「该源暂不可用」占位 + 手动重试），成功源
   /// 照常展示——修复「QQ 一源失败 → 整页 all 聚合一起失败」的问题。
@@ -442,7 +442,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
     }
   }
 
-  /// 酷狗分类搜索 type（album / author / special）。
+  /// KG分类搜索 type（album / author / special）。
   static String _kugouCoverType(_SearchTab tab) => switch (tab) {
     _SearchTab.albums => 'album',
     _SearchTab.artists => 'author',
@@ -818,7 +818,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
   /// 专辑 / 歌手 / 歌单点击（按平台分发详情弹窗）。
   ///
   /// 聚合（'all'）下结果混三方平台，按 **CoverItem.source** 分发到对应
-  /// 平台详情弹窗（网易云歌单/专辑/歌手、酷狗、QQ 均已接通曲目列表）。
+  /// 平台详情弹窗（NT歌单/专辑/歌手、KG、QQ 均已接通曲目列表）。
   void _onCoverTap(CoverItem item) {
     final src = _platform == 'all' ? item.source : _platform;
     if (src == 'kugou') {
@@ -919,10 +919,10 @@ class _SearchPageState extends ConsumerState<SearchPage>
     final playingId = ref.watch(playbackProvider.select((s) => s.trackId));
     final isPlaying = ref.watch(playbackProvider.select((s) => s.playing));
     final coverRadius = ref.watch(appPrefsProvider).coverRadius;
-    // 红心集合：聚合/单平台混来源结果按行键合并（网易云 id + 酷狗 hash
-    // + QQ songmid，与 songLikeKey / LikeController 一致）。QQ 音乐红心键
-    // 为 songmid（字母数字），与网易云数字 id 不会串扰；union 集合对三种
-    // 行键均有效——修复「已收藏歌曲显示为非红心」与「QQ 曲目误走网易云键」。
+    // 红心集合：聚合/单平台混来源结果按行键合并（NT id + KG hash
+    // + QQ songmid，与 songLikeKey / LikeController 一致）。QM红心键
+    // 为 songmid（字母数字），与NT数字 id 不会串扰；union 集合对三种
+    // 行键均有效——修复「已收藏歌曲显示为非红心」与「QQ 曲目误走NT键」。
     final like = ref.watch(likeControllerProvider);
     final likedIds = {
       ...like.idsFor('netease'),
@@ -930,7 +930,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
       ...like.idsFor('qqmusic'),
     };
     final rowLikedIds = likedIds;
-    // QQ 音乐红心已接入（本机 + 在线实验）：任意平台（含 'all' 聚合与
+    // QM红心已接入（本机 + 在线实验）：任意平台（含 'all' 聚合与
     // qqmusic 单平台）行内红心可用。
     final onToggleLike = _toggleLike;
 
@@ -961,8 +961,8 @@ class _SearchPageState extends ConsumerState<SearchPage>
                       ),
                     ),
                     const SizedBox(width: 16),
-                    // 平台切换（对齐原项目平台筛选；QQ 音乐四分类同酷狗；
-                    // 聚合=合并网易云+酷狗）
+                    // 平台切换（对齐原项目平台筛选；QM四分类同KG；
+                    // 聚合=合并NT+KG）
                     SSegmented<String>(
                       options: [
                         SSegmentedOption('netease', l10n.platformNetease),

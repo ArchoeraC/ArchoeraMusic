@@ -1,7 +1,7 @@
 /// 歌曲 / 歌单的轻量元数据模型（对齐 @shared/types/player 的 Track 子集）。
 ///
 /// 仅承载 UI 层展示与播放所需字段；数据来自 apis 包（纯 Dart 直连）
-/// 返回的网易云/酷狗原始对象（字段映射对齐原项目 `src/utils/format/netease.ts`）。
+/// 返回的NT/KG原始对象（字段映射对齐原项目 `src/utils/format/netease.ts`）。
 library;
 
 /// 封面 URL 拼尺寸（对齐 withPicSize：缺省 300 边长）。
@@ -50,7 +50,7 @@ String? kgFillCover(String? url, int size) {
   return url.replaceAll('{size}', '$size');
 }
 
-/// 酷狗歌曲品质信息（来自搜索结果：各档 hash + 文件大小）。
+/// KG歌曲品质信息（来自搜索结果：各档 hash + 文件大小）。
 class KugouTrackInfo {
   const KugouTrackInfo({
     required this.hash,
@@ -81,7 +81,7 @@ class KugouTrackInfo {
   final int? mixSongId;
 
   /// 用户歌单中的收藏序号（「我喜欢」条目；服务端按添加时间递增，
-  /// 越小越早——「我喜欢」列表按此升序 = 先收藏的在前，与酷狗 App
+  /// 越小越早——「我喜欢」列表按此升序 = 先收藏的在前，与KG App
   /// 展示顺序一致）。
   final int? sort;
 
@@ -170,7 +170,7 @@ const qualityLabels = <String, String>{
   'lq': 'LQ',
 };
 
-/// QQ 音乐歌曲信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
+/// QM歌曲信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
 class QqMusicTrackInfo {
   const QqMusicTrackInfo({
     required this.mid,
@@ -213,7 +213,7 @@ String qqCover(String? albumMid, [int size = 300]) {
       'M000$mid.jpg';
 }
 
-/// 酷狗 `singername`（"A、B"）→ 歌手列表。
+/// KG `singername`（"A、B"）→ 歌手列表。
 List<TrackArtist> kugouArtists(String? raw) {
   if (raw == null || raw.isEmpty) return const [];
   final names = kgDecodeName(
@@ -346,10 +346,10 @@ class Track {
   /// 与音质切换路径）。
   final String source;
 
-  /// 酷狗品质信息（source == 'kugou' 时存在）。
+  /// KG品质信息（source == 'kugou' 时存在）。
   final KugouTrackInfo? kugou;
 
-  /// QQ 音乐信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
+  /// QM信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
   final QqMusicTrackInfo? qqmusic;
 
   /// 本地曲目文件路径（source == 'local' 时存在，直接作播放源）。
@@ -370,15 +370,15 @@ class Track {
   /// 文件大小（字节；仅服务器明确返回时存在）。
   final int? fileSize;
 
-  /// 音频品质信息（网易云 hr/sq/h/m/l、酷狗最高档、流媒体服务器返回时存在）。
+  /// 音频品质信息（NT hr/sq/h/m/l、KG最高档、流媒体服务器返回时存在）。
   final TrackQuality? quality;
 
-  /// 是否为原唱（酷狗 `IsOriginal == 1` 时置位；翻唱/伴奏不置位）。
+  /// 是否为原唱（KG `IsOriginal == 1` 时置位；翻唱/伴奏不置位）。
   final bool isOriginal;
 
   String get artistNames => artists.map((a) => a.name).join(' / ');
 
-  /// 替换酷狗品质信息，其余字段原样保留（下载前补齐 hash 链时使用）。
+  /// 替换KG品质信息，其余字段原样保留（下载前补齐 hash 链时使用）。
   Track copyWithKugou(KugouTrackInfo? kugou) => Track(
     id: id,
     title: title,
@@ -407,7 +407,7 @@ class Track {
     if (comment != null && comment!.isNotEmpty) '（$comment）',
   ].join(' ');
 
-  /// 网易云 song 对象 → Track（对齐 songToTrack）。
+  /// NT song 对象 → Track（对齐 songToTrack）。
   factory Track.fromNeteaseSong(Map<String, dynamic> song) {
     final albumRaw = song['al'] ?? song['album'];
     final artistsRaw = (song['ar'] ?? song['artists'] ?? []) as List;
@@ -479,7 +479,7 @@ class Track {
     return null;
   }
 
-  /// 酷狗 song 对象 → Track（兼容 mobilecdn 小写字段与 songsearch PascalCase 字段）。
+  /// KG song 对象 → Track（兼容 mobilecdn 小写字段与 songsearch PascalCase 字段）。
   factory Track.fromKugouSong(Map<String, dynamic> song) {
     final hash = (song['hash'] ?? song['FileHash'] ?? '').toString();
     final audioId = song['audio_id'] ?? song['Audioid'];
@@ -549,7 +549,7 @@ class Track {
         : int.tryParse(durationSec.toString()) ?? 0;
 
     // id 以 hash（音频文件级唯一键）优先，audio_id 仅作兜底。
-    // 酷狗把同一作品的不同版本（不同专辑/音源）归并到同一个 audio_id，
+    // KG把同一作品的不同版本（不同专辑/音源）归并到同一个 audio_id，
     // 若用 audio_id 当 id，列表会同时高亮多个版本、队列会误判为同一首
     // （对齐原版 songToTrack 的 `song.hash || song.id`）。
     return Track(
@@ -565,21 +565,21 @@ class Track {
       kugou: hashes.isEmpty
           ? null
           : KugouTrackInfo(hash: hash, hashes: hashes, sizes: sizes),
-      // 原唱标识（MoeKoeMusic `Number(IsOriginal) === 1`）+ 酷狗版权
+      // 原唱标识（MoeKoeMusic `Number(IsOriginal) === 1`）+ KG版权
       // privilege == 10 → VIP（对齐 MoeKoeMusic PlaylistDetail）
       isOriginal: _kgIsOriginal(song['IsOriginal'] ?? song['isOriginal']),
       fee: _kgFee(song['privilege']),
     );
   }
 
-  /// 酷狗 `IsOriginal`（1=原唱）→ bool；兼容数字与字符串。
+  /// KG `IsOriginal`（1=原唱）→ bool；兼容数字与字符串。
   static bool _kgIsOriginal(Object? raw) {
     if (raw == null) return false;
     if (raw is num) return raw.toInt() == 1;
     return raw.toString() == '1' || raw.toString().toLowerCase() == 'true';
   }
 
-  /// 酷狗版权 `privilege` → TrackFee（10=VIP 需会员；其余视作免费）。
+  /// KG版权 `privilege` → TrackFee（10=VIP 需会员；其余视作免费）。
   static int _kgFee(Object? raw) {
     if (raw == null) return 0;
     final v = raw is num ? raw.toInt() : int.tryParse(raw.toString()) ?? 0;

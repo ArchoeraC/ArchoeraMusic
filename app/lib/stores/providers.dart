@@ -17,14 +17,14 @@ import 'event_bus.dart';
 import 'like_controller.dart';
 import 'system_accent.dart';
 
-// ── 直连网易云 API ──────────────────────────────────────────────
+// ── 直连NT API ──────────────────────────────────────────────
 
-/// 直连网易云（纯 Dart：apis 包全量移植，weapi/eapi/xeapi 加密，不经侧车 RPC）。
+/// 直连NT（纯 Dart：apis 包全量移植，weapi/eapi/xeapi 加密，不经侧车 RPC）。
 final neteaseApiProvider = Provider<NeteaseApi>((ref) {
   return NeteaseApi(ApisNeteaseCaller());
 });
 
-/// 网易云登录态（login_status 账号）。null = 未登录。
+/// NT登录态（login_status 账号）。null = 未登录。
 ///
 /// [NeteaseAuthNotifier.init] 在应用启动时调用：先匿名注册（让推荐类接口
 /// 可用），再读取持久化会话中的账号；[logout] 清空会话。
@@ -71,16 +71,16 @@ class NeteaseAuthNotifier extends Notifier<NeteaseAccount?> {
   }
 }
 
-// ── 直连酷狗 API ────────────────────────────────────────────────
+// ── 直连KG API ────────────────────────────────────────────────
 
-/// 直连酷狗（Dart 原生 HTTP + android 签名，不经侧车 RPC）。
+/// 直连KG（Dart 原生 HTTP + android 签名，不经侧车 RPC）。
 ///
 /// [ChangeNotifierProvider]：登录态（session）变化时通知 UI 重建。
 final kugouApiProvider = ChangeNotifierProvider<KugouApi>((ref) => KugouApi());
 
-// ── 直连 QQ 音乐 API ───────────────────────────────────────────────
+// ── 直连 QM API ───────────────────────────────────────────────
 
-/// 直连 QQ 音乐（apis/qqmusic Dart 移植，明文 JSON + UA/comm 伪装）。
+/// 直连 QM（apis/qqmusic Dart 移植，明文 JSON + UA/comm 伪装）。
 ///
 /// [ChangeNotifierProvider]：登录态（cookie 落盘 vault）变化时通知 UI。
 final qqMusicApiProvider = ChangeNotifierProvider<QqMusicApi>(
@@ -108,18 +108,18 @@ final eventBusProvider = Provider<EventBus>((ref) {
 /// 播放历史本地存储（sqlite UI 线程同步直写，见 [HistoryStore]）。
 final historyStoreProvider = Provider<HistoryStore>((ref) => HistoryStore.shared);
 
-/// 红心状态（网易云 / 酷狗「我喜欢」）。
+/// 红心状态（NT / KG「我喜欢」）。
 final likeControllerProvider = ChangeNotifierProvider<LikeController>(
   (ref) => LikeController(ref),
 );
 
-/// 全局「我喜欢」列表数据源（酷狗 / 网易云全量 Track + 缓存秒开；
+/// 全局「我喜欢」列表数据源（KG / NT全量 Track + 缓存秒开；
 /// 红心状态由 LikeController 独立轻量同步，不由此派生）。
 final likedStoreProvider = ChangeNotifierProvider<LikedStore>(
   (ref) => LikedStore(ref),
 );
 
-/// QQ 音乐红心收藏本机数据源（见 QqLikedStore：本机主源 + 在线实验并入）。
+/// QM红心收藏本机数据源（见 QqLikedStore：本机主源 + 在线实验并入）。
 /// 构造即异步加载本地 `qq_liked.json`；登录 QQ 后 LikeController 同步会把
 /// 在线「我喜欢」并入红心集合，「我喜欢」页刷新时把在线 Track 并入本列表。
 final qqLikedStoreProvider = ChangeNotifierProvider<QqLikedStore>(

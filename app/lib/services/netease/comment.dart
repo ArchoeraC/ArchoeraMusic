@@ -1,4 +1,4 @@
-/// 网易云歌曲评论模型（对齐原项目 `@shared/types/comment` 的
+/// NT歌曲评论模型（对齐原项目 `@shared/types/comment` 的
 /// MusicCommentItem / MusicCommentPage 子集）。
 library;
 
