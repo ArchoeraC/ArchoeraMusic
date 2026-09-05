@@ -1,8 +1,8 @@
 /// 「我喜欢」收藏列表全局数据源（ChangeNotifier，由 Riverpod provider 持有）。
 ///
-/// **只管列表全量**：酷狗 / 网易云收藏 Track 一次拉全、缓存秒开。
+/// **只管列表全量**：KG / NT收藏 Track 一次拉全、缓存秒开。
 /// 红心状态与列表解耦——LikeController.sync 走各平台轻量 id 集合
-/// （网易云 likelist / 酷狗 likedHashSet 只取 hash），不经过这里，
+/// （NT likelist / KG likedHashSet 只取 hash），不经过这里，
 /// 避免启动同步触发全量拉取（与收藏页并行双拉、被进程退出/写失败干扰）。
 ///
 /// 缓存策略（对齐 SPlayer-Next 库加载）：进收藏页先读 SQLite 缓存
@@ -57,7 +57,7 @@ class LikedStore extends ChangeNotifier {
   /// 平台加载错误（无缓存时的失败信息）。
   String error(String platform) => _state(platform).error;
 
-  /// 当前平台登录用户 key（网易云 uid / 酷狗 userid），缓存键。
+  /// 当前平台登录用户 key（NT uid / KG userid），缓存键。
   String? _userKey(String platform) {
     if (platform == 'kugou') {
       return _ref.read(kugouApiProvider).session?.userid;
@@ -191,7 +191,7 @@ class LikedStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 全量拉取当前平台收藏（酷狗 likedTracks / 网易云 likedSongs，
+  /// 全量拉取当前平台收藏（KG likedTracks / NT likedSongs，
   /// 均为循环翻页拉满）。
   Future<List<Track>> _fetchAll(String platform) async {
     if (platform == 'kugou') {

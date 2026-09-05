@@ -242,26 +242,26 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String navHeaderKugouId(Object id) {
-    return '酷狗 $id';
+    return 'KG $id';
   }
 
   @override
-  String get navHeaderKugouMusic => '酷狗音乐';
+  String get navHeaderKugouMusic => 'KG';
 
   @override
-  String get navHeaderLoginAccount => '登录账号（网易云 / 酷狗）';
+  String get navHeaderLoginAccount => '登录账号（NT / KG）';
 
   @override
   String get navHeaderLogout => '退出登录';
 
   @override
-  String get navHeaderNeteaseAccount => '网易云账号';
+  String get navHeaderNeteaseAccount => 'NT账号';
 
   @override
-  String get navHeaderNeteaseMusic => '网易云音乐';
+  String get navHeaderNeteaseMusic => 'NT';
 
   @override
-  String get navHeaderQqMusic => 'QQ 音乐';
+  String get navHeaderQqMusic => 'QM';
 
   @override
   String get navHeaderQrLogin => '扫码登录';
@@ -408,10 +408,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastLiked => '已添加到收藏';
 
   @override
-  String get toastLoginRequiredKugou => '操作失败（请确认已登录酷狗账号）';
+  String get toastLoginRequiredKugou => '操作失败（请确认已登录KG账号）';
 
   @override
-  String get toastLoginRequiredNetease => '操作失败（请确认已登录网易云账号）';
+  String get toastLoginRequiredNetease => '操作失败（请确认已登录NT账号）';
 
   @override
   String get toastNoQualityInfo => '该曲目无可用音质信息，无法下载';
@@ -803,13 +803,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageFavEmpty => '还没有收藏';
 
   @override
-  String get pageFavEmptyHint => '在网易云 App 收藏后自动同步';
+  String get pageFavEmptyHint => '在NT App 收藏后自动同步';
 
   @override
   String get pageFavLoginTitle => '登录后查看收藏';
 
   @override
-  String get pageFavLoginDesc => '扫码登录网易云，同步收藏的歌单、专辑与歌手';
+  String get pageFavLoginDesc => '扫码登录NT，同步收藏的歌单、专辑与歌手';
 
   @override
   String get pageFavKgCreated => '创建的歌单';
@@ -845,10 +845,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageFavKgCollectedAlbumLoginHint => '登录后可查看收藏的专辑';
 
   @override
-  String get pageFavKugouLoginDesc => '扫码登录酷狗，同步创建与收藏的歌单、专辑';
+  String get pageFavKugouLoginDesc => '扫码登录KG，同步创建与收藏的歌单、专辑';
 
   @override
-  String get pageFavKugouEmptyHint => '在酷狗 App 收藏后自动同步';
+  String get pageFavKugouEmptyHint => '在KG App 收藏后自动同步';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -885,10 +885,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageSearchFailed => '搜索失败';
 
   @override
-  String get pageLikedKugouLoginHint => '登录后可同步酷狗「我喜欢」';
+  String get pageLikedKugouLoginHint => '登录后可同步KG「我喜欢」';
 
   @override
-  String get pageLikedNeteaseLoginHint => '登录后可同步网易云收藏';
+  String get pageLikedNeteaseLoginHint => '登录后可同步NT收藏';
 
   @override
   String get pageLikedLoadFailed => '加载喜欢列表失败';
@@ -897,10 +897,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageLikedEmpty => '还没有喜欢的歌曲';
 
   @override
-  String get pageLikedKugouEmptyHint => '在酷狗 App 收藏后自动同步';
+  String get pageLikedKugouEmptyHint => '在KG App 收藏后自动同步';
 
   @override
-  String get pageLikedNeteaseEmptyHint => '在网易云 App 点亮红心后自动同步';
+  String get pageLikedNeteaseEmptyHint => '在NT App 点亮红心后自动同步';
 
   @override
   String get toastQqLikeSyncFailed => 'QQ 音樂線上收藏同步失敗（實驗介面），本次紅心已撤銷';
@@ -932,10 +932,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageLikedLoginTitle => '登录后查看我喜欢的歌曲';
 
   @override
-  String get pageLikedKugouLoginDesc => '扫码登录酷狗，同步「我喜欢」收藏';
+  String get pageLikedKugouLoginDesc => '扫码登录KG，同步「我喜欢」收藏';
 
   @override
-  String get pageLikedNeteaseLoginDesc => '扫码登录网易云，同步红心收藏';
+  String get pageLikedNeteaseLoginDesc => '扫码登录NT，同步红心收藏';
 
   @override
   String get libraryScanDirs => '扫描目录';
@@ -1091,7 +1091,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageHomeDailyLoggedIn => '根据你的口味，为你精心挑选';
 
   @override
-  String get pageHomeDailyLoginHint => '登录网易云账号后，每天为你更新';
+  String get pageHomeDailyLoginHint => '登录NT账号后，每天为你更新';
 
   @override
   String get pageHomeDailyPlay => '播放今日推荐';
@@ -1978,7 +1978,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsFingerprintNote =>
-      '下载器向酷狗 / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。';
+      '下载器向KG / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。';
 
   @override
   String get settingsDownloadDynamicFingerprint => '动态设备指纹';
@@ -1992,7 +1992,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsResetFingerprintDesc =>
-      '重置后本机在酷狗 / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？';
+      '重置后本机在KG / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？';
 
   @override
   String get toastFingerprintReset => '已重置设备指纹';
@@ -2217,7 +2217,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSecurityNote =>
-      '不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、网易云/酷狗登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。';
+      '不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、NT/KG登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。';
 
   @override
   String get settingsSecurityStreaming => '流媒体服务器凭据';
@@ -2234,7 +2234,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSecuritySession => '第三方账号会话';
 
   @override
-  String get settingsSecuritySessionDesc => '网易云 / 酷狗 登录状态';
+  String get settingsSecuritySessionDesc => 'NT / KG 登录状态';
 
   @override
   String get settingsSecurityUserDb => '本地用户库';
@@ -2484,7 +2484,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      '各方案加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。';
+      '各方案加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（NT / KG / 流媒体账号）将丢失，需重新登录。';
 
   @override
   String get settingsSchemeSwitchKeep => '保持当前';
@@ -3100,13 +3100,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScrapeSourceItunes => 'iTunes';
 
   @override
-  String get settingsScrapeSourceNetease => '网易云音乐';
+  String get settingsScrapeSourceNetease => 'NT';
 
   @override
-  String get settingsScrapeSourceQQMusic => 'QQ 音乐';
+  String get settingsScrapeSourceQQMusic => 'QM';
 
   @override
-  String get settingsScrapeSourceKugou => '酷狗音乐';
+  String get settingsScrapeSourceKugou => 'KG';
 
   @override
   String get settingsScrapeSourceKuwo => '酷我音乐';
@@ -3359,7 +3359,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ 音乐';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';
@@ -3406,11 +3406,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchWaitRetry => '請求過於頻繁，請稍候再試';
 
   @override
-  String get qqMusicDownloadUnsupported => 'QQ 音乐暂不支持下载（风控）。';
+  String get qqMusicDownloadUnsupported => 'QM暂不支持下载（风控）。';
 
   @override
   String qqMusicDownloadSkipped(Object count) {
-    return '已跳过 $count 首 QQ 音乐（暂不支持下载）。';
+    return '已跳过 $count 首 QM（暂不支持下载）。';
   }
 
   @override
@@ -3655,26 +3655,26 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String navHeaderKugouId(Object id) {
-    return '酷狗 $id';
+    return 'KG $id';
   }
 
   @override
-  String get navHeaderKugouMusic => '酷狗音乐';
+  String get navHeaderKugouMusic => 'KG';
 
   @override
-  String get navHeaderLoginAccount => '登录账号（网易云 / 酷狗）';
+  String get navHeaderLoginAccount => '登录账号（NT / KG）';
 
   @override
   String get navHeaderLogout => '退出登录';
 
   @override
-  String get navHeaderNeteaseAccount => '网易云账号';
+  String get navHeaderNeteaseAccount => 'NT账号';
 
   @override
-  String get navHeaderNeteaseMusic => '网易云音乐';
+  String get navHeaderNeteaseMusic => 'NT';
 
   @override
-  String get navHeaderQqMusic => 'QQ 音乐';
+  String get navHeaderQqMusic => 'QM';
 
   @override
   String get navHeaderQrLogin => '扫码登录';
@@ -3821,10 +3821,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get toastLiked => '已添加到收藏';
 
   @override
-  String get toastLoginRequiredKugou => '操作失败（请确认已登录酷狗账号）';
+  String get toastLoginRequiredKugou => '操作失败（请确认已登录KG账号）';
 
   @override
-  String get toastLoginRequiredNetease => '操作失败（请确认已登录网易云账号）';
+  String get toastLoginRequiredNetease => '操作失败（请确认已登录NT账号）';
 
   @override
   String get toastNoQualityInfo => '该曲目无可用音质信息，无法下载';
@@ -4216,13 +4216,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageFavEmpty => '还没有收藏';
 
   @override
-  String get pageFavEmptyHint => '在网易云 App 收藏后自动同步';
+  String get pageFavEmptyHint => '在NT App 收藏后自动同步';
 
   @override
   String get pageFavLoginTitle => '登录后查看收藏';
 
   @override
-  String get pageFavLoginDesc => '扫码登录网易云，同步收藏的歌单、专辑与歌手';
+  String get pageFavLoginDesc => '扫码登录NT，同步收藏的歌单、专辑与歌手';
 
   @override
   String get pageFavKgCreated => '创建的歌单';
@@ -4258,10 +4258,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageFavKgCollectedAlbumLoginHint => '登录后可查看收藏的专辑';
 
   @override
-  String get pageFavKugouLoginDesc => '扫码登录酷狗，同步创建与收藏的歌单、专辑';
+  String get pageFavKugouLoginDesc => '扫码登录KG，同步创建与收藏的歌单、专辑';
 
   @override
-  String get pageFavKugouEmptyHint => '在酷狗 App 收藏后自动同步';
+  String get pageFavKugouEmptyHint => '在KG App 收藏后自动同步';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -4298,10 +4298,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageSearchFailed => '搜索失败';
 
   @override
-  String get pageLikedKugouLoginHint => '登录后可同步酷狗「我喜欢」';
+  String get pageLikedKugouLoginHint => '登录后可同步KG「我喜欢」';
 
   @override
-  String get pageLikedNeteaseLoginHint => '登录后可同步网易云收藏';
+  String get pageLikedNeteaseLoginHint => '登录后可同步NT收藏';
 
   @override
   String get pageLikedLoadFailed => '加载喜欢列表失败';
@@ -4310,25 +4310,25 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageLikedEmpty => '还没有喜欢的歌曲';
 
   @override
-  String get pageLikedKugouEmptyHint => '在酷狗 App 收藏后自动同步';
+  String get pageLikedKugouEmptyHint => '在KG App 收藏后自动同步';
 
   @override
-  String get pageLikedNeteaseEmptyHint => '在网易云 App 点亮红心后自动同步';
+  String get pageLikedNeteaseEmptyHint => '在NT App 点亮红心后自动同步';
 
   @override
-  String get toastQqLikeSyncFailed => 'QQ 音乐在线收藏同步失败（实验接口），本次红心已撤销';
+  String get toastQqLikeSyncFailed => 'QM在线收藏同步失败（实验接口），本次红心已撤销';
 
   @override
-  String get pageLikedQqHint => 'QQ 音乐红心保存在本机（始终可用）；登录后可实验同步在线「我喜欢」';
+  String get pageLikedQqHint => 'QM红心保存在本机（始终可用）；登录后可实验同步在线「我喜欢」';
 
   @override
-  String get pageLikedQqEmptyTitle => '还没有 QQ 音乐红心歌曲';
+  String get pageLikedQqEmptyTitle => '还没有 QM红心歌曲';
 
   @override
-  String get pageLikedQqEmptyHint => '在搜索/播放页给 QQ 音乐歌曲点亮红心后会出现在这里（保存在本机）';
+  String get pageLikedQqEmptyHint => '在搜索/播放页给 QM歌曲点亮红心后会出现在这里（保存在本机）';
 
   @override
-  String get pageLikedQqLoginSync => '登录 QQ 音乐同步在线收藏（实验）';
+  String get pageLikedQqLoginSync => '登录 QM同步在线收藏（实验）';
 
   @override
   String get pageLikedQqSyncOnline => '同步在线收藏（实验）';
@@ -4345,10 +4345,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageLikedLoginTitle => '登录后查看我喜欢的歌曲';
 
   @override
-  String get pageLikedKugouLoginDesc => '扫码登录酷狗，同步「我喜欢」收藏';
+  String get pageLikedKugouLoginDesc => '扫码登录KG，同步「我喜欢」收藏';
 
   @override
-  String get pageLikedNeteaseLoginDesc => '扫码登录网易云，同步红心收藏';
+  String get pageLikedNeteaseLoginDesc => '扫码登录NT，同步红心收藏';
 
   @override
   String get libraryScanDirs => '扫描目录';
@@ -4504,7 +4504,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageHomeDailyLoggedIn => '根据你的口味，为你精心挑选';
 
   @override
-  String get pageHomeDailyLoginHint => '登录网易云账号后，每天为你更新';
+  String get pageHomeDailyLoginHint => '登录NT账号后，每天为你更新';
 
   @override
   String get pageHomeDailyPlay => '播放今日推荐';
@@ -5391,7 +5391,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsFingerprintNote =>
-      '下载器向酷狗 / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。';
+      '下载器向KG / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。';
 
   @override
   String get settingsDownloadDynamicFingerprint => '动态设备指纹';
@@ -5405,7 +5405,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsResetFingerprintDesc =>
-      '重置后本机在酷狗 / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？';
+      '重置后本机在KG / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？';
 
   @override
   String get toastFingerprintReset => '已重置设备指纹';
@@ -5630,7 +5630,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSecurityNote =>
-      '不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、网易云/酷狗登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。';
+      '不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、NT/KG登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。';
 
   @override
   String get settingsSecurityStreaming => '流媒体服务器凭据';
@@ -5647,7 +5647,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSecuritySession => '第三方账号会话';
 
   @override
-  String get settingsSecuritySessionDesc => '网易云 / 酷狗 登录状态';
+  String get settingsSecuritySessionDesc => 'NT / KG 登录状态';
 
   @override
   String get settingsSecurityUserDb => '本地用户库';
@@ -5897,7 +5897,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      '各方案加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。';
+      '各方案加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（NT / KG / 流媒体账号）将丢失，需重新登录。';
 
   @override
   String get settingsSchemeSwitchKeep => '保持当前';
@@ -6513,13 +6513,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsScrapeSourceItunes => 'iTunes';
 
   @override
-  String get settingsScrapeSourceNetease => '网易云音乐';
+  String get settingsScrapeSourceNetease => 'NT';
 
   @override
-  String get settingsScrapeSourceQQMusic => 'QQ 音乐';
+  String get settingsScrapeSourceQQMusic => 'QM';
 
   @override
-  String get settingsScrapeSourceKugou => '酷狗音乐';
+  String get settingsScrapeSourceKugou => 'KG';
 
   @override
   String get settingsScrapeSourceKuwo => '酷我音乐';
@@ -6772,10 +6772,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ 音乐';
+  String get platformQQMusic => 'QM';
 
   @override
-  String get loginQqQrLogin => 'QQ 音乐扫码登录';
+  String get loginQqQrLogin => 'QM扫码登录';
 
   @override
   String get loginQqTypeQq => 'QQ';
@@ -6795,7 +6795,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
-  String get toastQqNotSupported => 'QQ 音乐暂不支持该操作';
+  String get toastQqNotSupported => 'QM暂不支持该操作';
 
   @override
   String searchSourceFailed(Object source) {
@@ -6804,7 +6804,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String searchQqRiskDetail(Object code) {
-    return 'QQ 音乐接口限流或风控拦截（代码 $code），已停止自动重试，请稍后再试';
+    return 'QM接口限流或风控拦截（代码 $code），已停止自动重试，请稍后再试';
   }
 
   @override
@@ -6819,11 +6819,11 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get searchWaitRetry => '请求过于频繁，请稍候再试';
 
   @override
-  String get qqMusicDownloadUnsupported => 'QQ 音乐暂不支持下载（风控）。';
+  String get qqMusicDownloadUnsupported => 'QM暂不支持下载（风控）。';
 
   @override
   String qqMusicDownloadSkipped(Object count) {
-    return '已跳过 $count 首 QQ 音乐（暂不支持下载）。';
+    return '已跳过 $count 首 QM（暂不支持下载）。';
   }
 
   @override
@@ -7068,14 +7068,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String navHeaderKugouId(Object id) {
-    return '酷狗 $id';
+    return 'KG $id';
   }
 
   @override
-  String get navHeaderKugouMusic => '酷狗音樂';
+  String get navHeaderKugouMusic => 'KG音樂';
 
   @override
-  String get navHeaderLoginAccount => '登入帳號（網易雲 / 酷狗）';
+  String get navHeaderLoginAccount => '登入帳號（網易雲 / KG）';
 
   @override
   String get navHeaderLogout => '登出';
@@ -7234,7 +7234,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get toastLiked => '已加入收藏';
 
   @override
-  String get toastLoginRequiredKugou => '操作失敗（請確認已登入酷狗帳號）';
+  String get toastLoginRequiredKugou => '操作失敗（請確認已登入KG帳號）';
 
   @override
   String get toastLoginRequiredNetease => '操作失敗（請確認已登入網易雲帳號）';
@@ -7671,10 +7671,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageFavKgCollectedAlbumLoginHint => '登入後可查看收藏的專輯';
 
   @override
-  String get pageFavKugouLoginDesc => '掃碼登入酷狗，同步建立與收藏的歌單、專輯';
+  String get pageFavKugouLoginDesc => '掃碼登入KG，同步建立與收藏的歌單、專輯';
 
   @override
-  String get pageFavKugouEmptyHint => '在酷狗 App 收藏後自動同步';
+  String get pageFavKugouEmptyHint => '在KG App 收藏後自動同步';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -7711,7 +7711,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageSearchFailed => '搜尋失敗';
 
   @override
-  String get pageLikedKugouLoginHint => '登入後可同步酷狗「我喜歡」';
+  String get pageLikedKugouLoginHint => '登入後可同步KG「我喜歡」';
 
   @override
   String get pageLikedNeteaseLoginHint => '登入後可同步網易雲收藏';
@@ -7723,7 +7723,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageLikedEmpty => '還沒有喜歡的歌曲';
 
   @override
-  String get pageLikedKugouEmptyHint => '在酷狗 App 收藏後自動同步';
+  String get pageLikedKugouEmptyHint => '在KG App 收藏後自動同步';
 
   @override
   String get pageLikedNeteaseEmptyHint => '在網易雲 App 點亮紅心後自動同步';
@@ -7758,7 +7758,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageLikedLoginTitle => '登入後檢視我喜歡的歌曲';
 
   @override
-  String get pageLikedKugouLoginDesc => '掃碼登入酷狗，同步「我喜歡」收藏';
+  String get pageLikedKugouLoginDesc => '掃碼登入KG，同步「我喜歡」收藏';
 
   @override
   String get pageLikedNeteaseLoginDesc => '掃碼登入網易雲，同步紅心收藏';
@@ -8805,7 +8805,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsFingerprintNote =>
-      '下載器向酷狗 / 網易請求時攜帶的裝置識別碼；首次啟動產生後固定，不同使用者互不相同。';
+      '下載器向KG / 網易請求時攜帶的裝置識別碼；首次啟動產生後固定，不同使用者互不相同。';
 
   @override
   String get settingsDownloadDynamicFingerprint => '動態裝置指紋';
@@ -8819,7 +8819,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsResetFingerprintDesc =>
-      '重置後本機在酷狗 / 網易看來是新裝置，舊指紋下的線上狀態可能失效。確定重置？';
+      '重置後本機在KG / 網易看來是新裝置，舊指紋下的線上狀態可能失效。確定重置？';
 
   @override
   String get toastFingerprintReset => '已重置裝置指紋';
@@ -9044,7 +9044,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSecurityNote =>
-      '不可逆地刪除本機全部帳號憑證與登入會話（串流伺服器密碼、網易雲/酷狗登入態、本機 Subsonic 帳號），並主動失效平台 token；不影響曲庫、歷史與下載檔案。';
+      '不可逆地刪除本機全部帳號憑證與登入會話（串流伺服器密碼、網易雲/KG登入態、本機 Subsonic 帳號），並主動失效平台 token；不影響曲庫、歷史與下載檔案。';
 
   @override
   String get settingsSecurityStreaming => '串流伺服器憑證';
@@ -9061,7 +9061,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSecuritySession => '第三方帳號會話';
 
   @override
-  String get settingsSecuritySessionDesc => '網易雲 / 酷狗 登入狀態';
+  String get settingsSecuritySessionDesc => '網易雲 / KG 登入狀態';
 
   @override
   String get settingsSecurityUserDb => '本機使用者庫';
@@ -9311,7 +9311,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      '各方案加密資料結構不相容，切換將銷毀現有保險庫並重建資料庫，所有登入憑證（網易雲 / 酷狗 / 串流帳號）將遺失，需重新登入。';
+      '各方案加密資料結構不相容，切換將銷毀現有保險庫並重建資料庫，所有登入憑證（網易雲 / KG / 串流帳號）將遺失，需重新登入。';
 
   @override
   String get settingsSchemeSwitchKeep => '保持目前';
@@ -9933,7 +9933,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsScrapeSourceQQMusic => 'QQ 音樂';
 
   @override
-  String get settingsScrapeSourceKugou => '酷狗音樂';
+  String get settingsScrapeSourceKugou => 'KG音樂';
 
   @override
   String get settingsScrapeSourceKuwo => '酷我音樂';

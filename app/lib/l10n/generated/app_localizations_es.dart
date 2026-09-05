@@ -254,7 +254,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get navHeaderKugouMusic => 'Kugou Music';
+  String get navHeaderKugouMusic => 'KG';
 
   @override
   String get navHeaderLoginAccount => 'Iniciar sesión (Netease / Kugou)';
@@ -266,10 +266,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get navHeaderNeteaseAccount => 'Cuenta de Netease';
 
   @override
-  String get navHeaderNeteaseMusic => 'Netease Music';
+  String get navHeaderNeteaseMusic => 'NT';
 
   @override
-  String get navHeaderQqMusic => 'QQ Music';
+  String get navHeaderQqMusic => 'QM';
 
   @override
   String get navHeaderQrLogin => 'Iniciar sesión con código QR';
@@ -944,23 +944,23 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get toastQqLikeSyncFailed =>
-      'Error al sincronizar los favoritos en línea de QQ Music (API experimental); el cambio de «Me gusta» se ha revertido';
+      'Error al sincronizar los favoritos en línea de QM (API experimental); el cambio de «Me gusta» se ha revertido';
 
   @override
   String get pageLikedQqHint =>
-      'Los «Me gusta» de QQ Music se guardan en este dispositivo y siempre están disponibles; inicia sesión para sincronizar experimentalmente los favoritos en línea';
+      'Los «Me gusta» de QM se guardan en este dispositivo y siempre están disponibles; inicia sesión para sincronizar experimentalmente los favoritos en línea';
 
   @override
   String get pageLikedQqEmptyTitle =>
-      'Aún no hay canciones de QQ Music que te gusten';
+      'Aún no hay canciones de QM que te gusten';
 
   @override
   String get pageLikedQqEmptyHint =>
-      'Marca con el corazón cualquier canción de QQ Music en la búsqueda o reproducción para que aparezca aquí (se guarda en este dispositivo)';
+      'Marca con el corazón cualquier canción de QM en la búsqueda o reproducción para que aparezca aquí (se guarda en este dispositivo)';
 
   @override
   String get pageLikedQqLoginSync =>
-      'Inicia sesión en QQ Music para sincronizar favoritos en línea (experimental)';
+      'Inicia sesión en QM para sincronizar favoritos en línea (experimental)';
 
   @override
   String get pageLikedQqSyncOnline =>
@@ -3322,10 +3322,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsScrapeSourceNetease => 'Netease Cloud Music';
 
   @override
-  String get settingsScrapeSourceQQMusic => 'QQ Music';
+  String get settingsScrapeSourceQQMusic => 'QM';
 
   @override
-  String get settingsScrapeSourceKugou => 'Kugou Music';
+  String get settingsScrapeSourceKugou => 'KG';
 
   @override
   String get settingsScrapeSourceKuwo => 'Kuwo Music';
@@ -3586,10 +3586,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ Music';
+  String get platformQQMusic => 'QM';
 
   @override
-  String get loginQqQrLogin => 'Iniciar sesión con el código QR de QQ Music';
+  String get loginQqQrLogin => 'Iniciar sesión con el código QR de QM';
 
   @override
   String get loginQqTypeQq => 'QQ';
@@ -3609,7 +3609,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get toastQqNotSupported => 'No compatible con QQ Music';
+  String get toastQqNotSupported => 'No compatible con QM';
 
   @override
   String searchSourceFailed(Object source) {
@@ -3618,7 +3618,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String searchQqRiskDetail(Object code) {
-    return 'QQ Music limitó o bloqueó la solicitud (código $code); se detuvo el reintento automático, inténtalo más tarde';
+    return 'QM limitó o bloqueó la solicitud (código $code); se detuvo el reintento automático, inténtalo más tarde';
   }
 
   @override
@@ -3636,11 +3636,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get qqMusicDownloadUnsupported =>
-      'Descargas de QQ Music no compatibles por ahora (control de riesgos).';
+      'Descargas de QM no compatibles por ahora (control de riesgos).';
 
   @override
   String qqMusicDownloadSkipped(Object count) {
-    return 'Se omitieron $count temas de QQ Music: descargas no disponibles.';
+    return 'Se omitieron $count temas de QM: descargas no disponibles.';
   }
 
   @override

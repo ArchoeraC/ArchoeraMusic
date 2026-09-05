@@ -3,7 +3,7 @@
 /// 提供本机含账号凭据的敏感文件清单与不可逆擦除：
 /// - 流媒体服务器凭据（`streaming_servers.json`，password/accessToken 已由
 ///   凭据保险库接管，文件仅存非敏感字段；此文件擦除用于清空服务器列表）
-/// - 第三方账号会话（`netease_session.json`，网易云 cookies + 酷狗 token）
+/// - 第三方账号会话（`netease_session.json`，NT cookies + KG token）
 /// - 本地用户库（`user.db`，Subsonic 账号与收藏）
 ///
 /// 擦除 = 随机数据多次覆盖写入（默认 3 遍）再删除，避免常规恢复手段
@@ -53,7 +53,7 @@ class ShredResult {
 /// 本文件仅含非敏感字段；擦除用于清空服务器列表，凭据随 vault 一并失效）。
 String streamingServersPath() => '${resolveDataDir()}/streaming_servers.json';
 
-/// 第三方账号会话文件（网易云 cookies + 酷狗 token，明文 JSON）。
+/// 第三方账号会话文件（NT cookies + KG token，明文 JSON）。
 /// 新版已由凭据保险库（vault）接管，此文件仅存历史明文用于迁移/兜底清理。
 String sessionStorePath() => '${resolveDataDir()}/netease_session.json';
 

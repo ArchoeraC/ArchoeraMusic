@@ -1,4 +1,4 @@
-/// 端到端在线播放验证：直连网易云取 URL → C 引擎转码 → WAV 落盘。
+/// 端到端在线播放验证：直连NT取 URL → C 引擎转码 → WAV 落盘。
 ///
 /// 复现 PlaybackNotifier 链路（不含 libmpv，避免 GUI 依赖）：
 /// cloudsearch → song_url → AudioEngineProcess.start(URL) → done → 校验 stream.wav。
@@ -17,7 +17,7 @@ void main() {
   test(
     '在线歌曲直连播放链路（取 URL → C 引擎完整转码 → WAV）',
     () async {
-      // 1) 直连网易云：搜索 + 取可播 URL
+      // 1) 直连NT：搜索 + 取可播 URL
       //    热门曲目多为 VIP 独占（匿名仅试听片段被 resolvePlayUrl 拒绝），
       //    因此遍历搜索命中取第一首可播曲目，避免样本抖动。
       final api = NeteaseApi(ApisNeteaseCaller());

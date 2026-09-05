@@ -260,7 +260,7 @@ class DownloaderLibrary {
 
   /// 注入设备指纹（Dart 持久化的 downloaderIdentity JSON；幂等）。
   ///
-  /// 对齐 Rust `archoera_downloader_set_identity`：酷狗 mid / 网易
+  /// 对齐 Rust `archoera_downloader_set_identity`：KG mid / 网易
   /// deviceId/_ntes_nuid 优先用注入值，未注入字段回落进程随机。
   int setDownloaderIdentity(String identityJson) {
     final p = identityJson.toNativeUtf8();

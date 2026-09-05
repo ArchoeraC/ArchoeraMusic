@@ -22,7 +22,7 @@ import 'utils.dart';
 /// `{ lyric: string }` 结构取文本
 String? _lyricText(Object? obj) => obj is Map ? obj['lyric']?.toString() : null;
 
-/// ── 网易云新版 YRC 格式转换 ─────────────────────────────────────
+/// ── NT新版 YRC 格式转换 ─────────────────────────────────────
 ///
 /// 新版 YRC（lyric_new 近年版式，如《错位时空》艾辰版）与旧版不同：
 /// - 元数据行是 JSON：`{"t":-1000,"c":[{"tx":"作词: "},{"tx":"周仁"}]}`

@@ -84,7 +84,7 @@ class _SongListState extends ConsumerState<SongList> {
   /// 批量选择模式（表头切换为批量操作栏，行内序号变勾选框）。
   bool _batchActive = false;
 
-  /// 已选曲目 id 集合（键与 [songLikeKey] 一致：酷狗 hash / 网易云 id）。
+  /// 已选曲目 id 集合（键与 [songLikeKey] 一致：KG hash / NT id）。
   final Set<String> _selected = {};
 
   @override
@@ -348,8 +348,8 @@ class _SongListState extends ConsumerState<SongList> {
                       showSource: widget.showSource,
                       isPlaying: widget.playingId == item.id,
                       playingNow: widget.isPlaying,
-                      // 酷狗以 hash 为红心键（与 LikeController 一致）；
-                      // 网易云仍用 track.id
+                      // KG以 hash 为红心键（与 LikeController 一致）；
+                      // NT仍用 track.id
                       liked:
                           widget.likedIds?.contains(songLikeKey(item)) ?? false,
                       onPlay: widget.onPlay,

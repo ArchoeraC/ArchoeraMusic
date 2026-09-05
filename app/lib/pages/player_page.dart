@@ -112,7 +112,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     super.dispose();
   }
 
-  /// 当前曲目可选的音质档（酷狗按实际 hash 过滤；网易云全档位，
+  /// 当前曲目可选的音质档（KG按实际 hash 过滤；NT全档位，
   /// VIP 限制由解析层决定）。
   static List<String> _availableLevels(Track? track) {
     const levels = ['lq', 'sq', 'hq', 'lossless', 'hi-res'];

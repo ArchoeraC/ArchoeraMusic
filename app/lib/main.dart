@@ -28,7 +28,7 @@ Future<void> main() async {
   preloadBundledSqlite();
   // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化，替代默认 binding
   PowerSavingFrameBinding.ensureInitialized();
-  // 网易云封面 CDN 拒绝 Dart 默认 UA（403）；Image.network 经 NetworkImage
+  // NT封面 CDN 拒绝 Dart 默认 UA（403）；Image.network 经 NetworkImage
   // 以 add 语义追加自定义头，传 UA 会与默认 Dart UA 叠加成双头被拒收。
   // 改全局 HttpClient 默认 UA 为浏览器 UA，天然保证单头。
   HttpOverrides.global = _BrowserUserAgentOverrides();

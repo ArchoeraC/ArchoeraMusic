@@ -96,8 +96,8 @@ mixin NeteaseCommentApi on NeteaseApiBase, NeteaseSearchApi {
     );
   }
 
-  /// 匹配当前 [track] 的网易云歌曲 id（对齐 findNeteaseId）：
-  /// 网易云源直接用 id；异源用「标题 + 歌手」关键词 cloudsearch +
+  /// 匹配当前 [track] 的NT歌曲 id（对齐 findNeteaseId）：
+  /// NT源直接用 id；异源用「标题 + 歌手」关键词 cloudsearch +
   /// [pickBestCandidate] 挑最匹配项；找不到返回 null。
   Future<String?> findNeteaseCommentId(Track track) async {
     if (track.source == 'netease' && track.id.isNotEmpty) return track.id;

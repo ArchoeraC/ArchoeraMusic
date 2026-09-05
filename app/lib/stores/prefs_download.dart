@@ -18,7 +18,7 @@ const downloadDynamicFingerprintKey = 'download.dynamicFingerprint';
 
 /// 生成下载器设备指纹（对齐 downloader-identity-plan §3.1，格式与 Rust
 /// `DownloaderIdentity` / resolvers.rs 消费侧一致）：
-/// - kgGuid：16 位大写字母数字（酷狗 guid，kgRandomString 字符池）
+/// - kgGuid：16 位大写字母数字（KG guid，kgRandomString 字符池）
 /// - kgMid：`kg_calc_mid(kgGuid)`（md5 → 十进制大整数）
 /// - nmDeviceId：26 位大写 hex（对齐 resolvers.rs `{:X}` 随机 deviceId）
 /// - nmNuid：32 位小写 hex（对齐 resolvers.rs `rand_hex_bytes(16)`）

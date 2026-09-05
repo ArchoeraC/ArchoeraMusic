@@ -1,4 +1,4 @@
-/// QQ 音乐（QM）直连验证：真实请求云端。
+/// QM（QM）直连验证：真实请求云端。
 ///
 /// 覆盖：
 /// - 搜索 → 归一 Track（含 mid/mediaMid/cover）
@@ -79,7 +79,7 @@ void main() {
 
   test('歌单详情 song_list（真实请求）', () async {
     final tracks = await api.playlistTracks('2340100311');
-    // QQ 音乐官方巅峰榜歌单；只验证链路不崩，曲目可空
+    // QM官方巅峰榜歌单；只验证链路不崩，曲目可空
     expect(tracks, isA<List<Track>>());
   }, timeout: const Timeout(Duration(seconds: 30)));
 

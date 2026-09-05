@@ -1,4 +1,4 @@
-/// QQ 音乐（QM）请求层对齐单测（**不联网**，注入 fake 传输）。
+/// QM（QM）请求层对齐单测（**不联网**，注入 fake 传输）。
 ///
 /// 覆盖「Android 伪装 + GetSession 引导」的组网正确性：
 /// - 配置：UA/Referer/comm 与上游 /tmp/spx config.ts 逐字段一致；

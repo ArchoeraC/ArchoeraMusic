@@ -1,4 +1,4 @@
-/// 红心状态控制器（网易云 / 酷狗 / QQ 音乐三平台）。
+/// 红心状态控制器（NT / KG / QM三平台）。
 ///
 /// 对齐 SPlayer-Next `user.ts` 的 likedSongIds + toggleLike 语义：
 /// - 持有各平台已喜欢 id 集合，任意 UI 通过 [isLiked] 查询；
@@ -45,11 +45,11 @@ class LikeController extends ChangeNotifier {
 
   /// 当前曲目是否已喜欢（按 source 路由到对应平台集合）。
   ///
-  /// 酷狗以歌曲 hash 为红心键（搜索条目 id 退化为 hash、歌单条目可能为
+  /// KG以歌曲 hash 为红心键（搜索条目 id 退化为 hash、歌单条目可能为
   /// audio_id，两者不一致会导致红心状态判定失败；hash 是稳定的歌曲标识）。
   /// **hash 统一转小写匹配**：歌单接口存大写、mobilecdn 搜索返回小写，
   /// 与 [songLikeKey] / likedHashSet 保持一致（否则已收藏误标非红心）。
-  /// QQ 音乐以 **songmid** 为红心键（彻底摆脱「QQ 曲目误走 netease id」）。
+  /// QM以 **songmid** 为红心键（彻底摆脱「QQ 曲目误走 netease id」）。
   bool isLiked(Track track) {
     if (track.source == 'kugou') {
       return _kugouIds.contains(
@@ -62,8 +62,8 @@ class LikeController extends ChangeNotifier {
     return _neteaseIds.contains(track.id);
   }
 
-  /// 平台已喜欢 id 集合（'kugou' → 酷狗 hash；'qqmusic' → songmid；
-  /// 其余 → 网易云 id；SongList 渲染用）。
+  /// 平台已喜欢 id 集合（'kugou' → KG hash；'qqmusic' → songmid；
+  /// 其余 → NT id；SongList 渲染用）。
   Set<String> idsFor(String source) {
     if (source == 'kugou') return _kugouIds;
     if (source == 'qqmusic') return _qqmusicIds;
@@ -91,7 +91,7 @@ class LikeController extends ChangeNotifier {
   }
 
   Future<void> _syncOnce() async {
-    // 网易云：likelist（需登录）
+    // NT：likelist（需登录）
     final account = _ref.read(neteaseAuthProvider);
     if (account != null) {
       try {
@@ -110,7 +110,7 @@ class LikeController extends ChangeNotifier {
       _neteaseIds.clear();
     }
 
-    // 酷狗：轻量红心 hash 集合（likedHashSet 只分页取 hash，不构造
+    // KG：轻量红心 hash 集合（likedHashSet 只分页取 hash，不构造
     // Track / 不写库 / 不触碰收藏页全量列表），红心状态与列表解耦——
     // 启动同步不做全量拉取，避免被进程退出/写失败影响（sync 语义）
     final kugou = _ref.read(kugouApiProvider);
@@ -197,7 +197,7 @@ class LikeController extends ChangeNotifier {
       return _toggleQq(track);
     }
 
-    // 网易云
+    // NT
     _neteaseIds
       ..remove(track.id)
       ..addAll(target ? {track.id} : const {});

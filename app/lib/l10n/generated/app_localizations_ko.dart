@@ -248,7 +248,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get navHeaderKugouMusic => 'Kugou Music';
+  String get navHeaderKugouMusic => 'KG';
 
   @override
   String get navHeaderLoginAccount => '로그인(Netease / Kugou)';
@@ -2520,7 +2520,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      '각 방식은 암호화 데이터 구조가 호환되지 않아 전환 시 기존 vault를 폐기하고 데이터베이스를 재구축합니다. 모든 로그인 자격 증명(网易雲 / 酷狗 / 스트리밍 계정)이 유실되며 다시 로그인해야 합니다.';
+      '각 방식은 암호화 데이터 구조가 호환되지 않아 전환 시 기존 vault를 폐기하고 데이터베이스를 재구축합니다. 모든 로그인 자격 증명(网易雲 / KG / 스트리밍 계정)이 유실되며 다시 로그인해야 합니다.';
 
   @override
   String get settingsSchemeSwitchKeep => '현재 유지';
@@ -3440,7 +3440,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String searchQqRiskDetail(Object code) {
-    return 'QQ Music 요청이 제한되거나 차단되었습니다(코드 $code). 자동 재시도를 중지했습니다. 잠시 후 다시 시도해 주세요';
+    return 'QM 요청이 제한되거나 차단되었습니다(코드 $code). 자동 재시도를 중지했습니다. 잠시 후 다시 시도해 주세요';
   }
 
   @override
@@ -3455,11 +3455,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get searchWaitRetry => '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요';
 
   @override
-  String get qqMusicDownloadUnsupported => 'QQ Music 다운로드는 현재 미지원입니다(리스크 관리).';
+  String get qqMusicDownloadUnsupported => 'QM 다운로드는 현재 미지원입니다(리스크 관리).';
 
   @override
   String qqMusicDownloadSkipped(Object count) {
-    return 'QQ Music $count곡 건너뜀(다운로드 미지원).';
+    return 'QM $count곡 건너뜀(다운로드 미지원).';
   }
 
   @override

@@ -563,19 +563,19 @@ abstract class AppLocalizations {
   /// No description provided for @navHeaderKugouId.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗 {id}'**
+  /// **'KG {id}'**
   String navHeaderKugouId(Object id);
 
   /// No description provided for @navHeaderKugouMusic.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗音乐'**
+  /// **'KG'**
   String get navHeaderKugouMusic;
 
   /// No description provided for @navHeaderLoginAccount.
   ///
   /// In zh_CN, this message translates to:
-  /// **'登录账号（网易云 / 酷狗）'**
+  /// **'登录账号（NT / KG）'**
   String get navHeaderLoginAccount;
 
   /// No description provided for @navHeaderLogout.
@@ -587,19 +587,19 @@ abstract class AppLocalizations {
   /// No description provided for @navHeaderNeteaseAccount.
   ///
   /// In zh_CN, this message translates to:
-  /// **'网易云账号'**
+  /// **'NT账号'**
   String get navHeaderNeteaseAccount;
 
   /// No description provided for @navHeaderNeteaseMusic.
   ///
   /// In zh_CN, this message translates to:
-  /// **'网易云音乐'**
+  /// **'NT'**
   String get navHeaderNeteaseMusic;
 
   /// No description provided for @navHeaderQqMusic.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐'**
+  /// **'QM'**
   String get navHeaderQqMusic;
 
   /// No description provided for @navHeaderQrLogin.
@@ -881,13 +881,13 @@ abstract class AppLocalizations {
   /// No description provided for @toastLoginRequiredKugou.
   ///
   /// In zh_CN, this message translates to:
-  /// **'操作失败（请确认已登录酷狗账号）'**
+  /// **'操作失败（请确认已登录KG账号）'**
   String get toastLoginRequiredKugou;
 
   /// No description provided for @toastLoginRequiredNetease.
   ///
   /// In zh_CN, this message translates to:
-  /// **'操作失败（请确认已登录网易云账号）'**
+  /// **'操作失败（请确认已登录NT账号）'**
   String get toastLoginRequiredNetease;
 
   /// No description provided for @toastNoQualityInfo.
@@ -1571,7 +1571,7 @@ abstract class AppLocalizations {
   /// No description provided for @pageFavEmptyHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'在网易云 App 收藏后自动同步'**
+  /// **'在NT App 收藏后自动同步'**
   String get pageFavEmptyHint;
 
   /// No description provided for @pageFavLoginTitle.
@@ -1583,7 +1583,7 @@ abstract class AppLocalizations {
   /// No description provided for @pageFavLoginDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'扫码登录网易云，同步收藏的歌单、专辑与歌手'**
+  /// **'扫码登录NT，同步收藏的歌单、专辑与歌手'**
   String get pageFavLoginDesc;
 
   /// No description provided for @pageFavKgCreated.
@@ -1643,13 +1643,13 @@ abstract class AppLocalizations {
   /// No description provided for @pageFavKugouLoginDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'扫码登录酷狗，同步创建与收藏的歌单、专辑'**
+  /// **'扫码登录KG，同步创建与收藏的歌单、专辑'**
   String get pageFavKugouLoginDesc;
 
   /// No description provided for @pageFavKugouEmptyHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'在酷狗 App 收藏后自动同步'**
+  /// **'在KG App 收藏后自动同步'**
   String get pageFavKugouEmptyHint;
 
   /// No description provided for @pageSearchLoadingTrack.
@@ -1715,13 +1715,13 @@ abstract class AppLocalizations {
   /// No description provided for @pageLikedKugouLoginHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'登录后可同步酷狗「我喜欢」'**
+  /// **'登录后可同步KG「我喜欢」'**
   String get pageLikedKugouLoginHint;
 
   /// No description provided for @pageLikedNeteaseLoginHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'登录后可同步网易云收藏'**
+  /// **'登录后可同步NT收藏'**
   String get pageLikedNeteaseLoginHint;
 
   /// No description provided for @pageLikedLoadFailed.
@@ -1739,43 +1739,43 @@ abstract class AppLocalizations {
   /// No description provided for @pageLikedKugouEmptyHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'在酷狗 App 收藏后自动同步'**
+  /// **'在KG App 收藏后自动同步'**
   String get pageLikedKugouEmptyHint;
 
   /// No description provided for @pageLikedNeteaseEmptyHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'在网易云 App 点亮红心后自动同步'**
+  /// **'在NT App 点亮红心后自动同步'**
   String get pageLikedNeteaseEmptyHint;
 
   /// No description provided for @toastQqLikeSyncFailed.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐在线收藏同步失败（实验接口），本次红心已撤销'**
+  /// **'QM在线收藏同步失败（实验接口），本次红心已撤销'**
   String get toastQqLikeSyncFailed;
 
   /// No description provided for @pageLikedQqHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐红心保存在本机（始终可用）；登录后可实验同步在线「我喜欢」'**
+  /// **'QM红心保存在本机（始终可用）；登录后可实验同步在线「我喜欢」'**
   String get pageLikedQqHint;
 
   /// No description provided for @pageLikedQqEmptyTitle.
   ///
   /// In zh_CN, this message translates to:
-  /// **'还没有 QQ 音乐红心歌曲'**
+  /// **'还没有 QM红心歌曲'**
   String get pageLikedQqEmptyTitle;
 
   /// No description provided for @pageLikedQqEmptyHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'在搜索/播放页给 QQ 音乐歌曲点亮红心后会出现在这里（保存在本机）'**
+  /// **'在搜索/播放页给 QM歌曲点亮红心后会出现在这里（保存在本机）'**
   String get pageLikedQqEmptyHint;
 
   /// No description provided for @pageLikedQqLoginSync.
   ///
   /// In zh_CN, this message translates to:
-  /// **'登录 QQ 音乐同步在线收藏（实验）'**
+  /// **'登录 QM同步在线收藏（实验）'**
   String get pageLikedQqLoginSync;
 
   /// No description provided for @pageLikedQqSyncOnline.
@@ -1805,13 +1805,13 @@ abstract class AppLocalizations {
   /// No description provided for @pageLikedKugouLoginDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'扫码登录酷狗，同步「我喜欢」收藏'**
+  /// **'扫码登录KG，同步「我喜欢」收藏'**
   String get pageLikedKugouLoginDesc;
 
   /// No description provided for @pageLikedNeteaseLoginDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'扫码登录网易云，同步红心收藏'**
+  /// **'扫码登录NT，同步红心收藏'**
   String get pageLikedNeteaseLoginDesc;
 
   /// No description provided for @libraryScanDirs.
@@ -2099,7 +2099,7 @@ abstract class AppLocalizations {
   /// No description provided for @pageHomeDailyLoginHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'登录网易云账号后，每天为你更新'**
+  /// **'登录NT账号后，每天为你更新'**
   String get pageHomeDailyLoginHint;
 
   /// No description provided for @pageHomeDailyPlay.
@@ -3743,7 +3743,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsFingerprintNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'下载器向酷狗 / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。'**
+  /// **'下载器向KG / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。'**
   String get settingsFingerprintNote;
 
   /// No description provided for @settingsDownloadDynamicFingerprint.
@@ -3767,7 +3767,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsResetFingerprintDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'重置后本机在酷狗 / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？'**
+  /// **'重置后本机在KG / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？'**
   String get settingsResetFingerprintDesc;
 
   /// No description provided for @toastFingerprintReset.
@@ -4163,7 +4163,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSecurityNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、网易云/酷狗登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。'**
+  /// **'不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、NT/KG登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。'**
   String get settingsSecurityNote;
 
   /// No description provided for @settingsSecurityStreaming.
@@ -4193,7 +4193,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSecuritySessionDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'网易云 / 酷狗 登录状态'**
+  /// **'NT / KG 登录状态'**
   String get settingsSecuritySessionDesc;
 
   /// No description provided for @settingsSecurityUserDb.
@@ -4631,7 +4631,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSchemeSwitchRebuildDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'各方案加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（网易云 / 酷狗 / 流媒体账号）将丢失，需重新登录。'**
+  /// **'各方案加密数据结构不兼容，切换将销毁现有保险库并重建数据库，所有登录凭据（NT / KG / 流媒体账号）将丢失，需重新登录。'**
   String get settingsSchemeSwitchRebuildDesc;
 
   /// No description provided for @settingsSchemeSwitchKeep.
@@ -5783,19 +5783,19 @@ abstract class AppLocalizations {
   /// No description provided for @settingsScrapeSourceNetease.
   ///
   /// In zh_CN, this message translates to:
-  /// **'网易云音乐'**
+  /// **'NT'**
   String get settingsScrapeSourceNetease;
 
   /// No description provided for @settingsScrapeSourceQQMusic.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐'**
+  /// **'QM'**
   String get settingsScrapeSourceQQMusic;
 
   /// No description provided for @settingsScrapeSourceKugou.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗音乐'**
+  /// **'KG'**
   String get settingsScrapeSourceKugou;
 
   /// No description provided for @settingsScrapeSourceKuwo.
@@ -6257,13 +6257,13 @@ abstract class AppLocalizations {
   /// No description provided for @platformQQMusic.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐'**
+  /// **'QM'**
   String get platformQQMusic;
 
   /// No description provided for @loginQqQrLogin.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐扫码登录'**
+  /// **'QM扫码登录'**
   String get loginQqQrLogin;
 
   /// No description provided for @loginQqTypeQq.
@@ -6299,7 +6299,7 @@ abstract class AppLocalizations {
   /// No description provided for @toastQqNotSupported.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐暂不支持该操作'**
+  /// **'QM暂不支持该操作'**
   String get toastQqNotSupported;
 
   /// No description provided for @searchSourceFailed.
@@ -6311,7 +6311,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchQqRiskDetail.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐接口限流或风控拦截（代码 {code}），已停止自动重试，请稍后再试'**
+  /// **'QM接口限流或风控拦截（代码 {code}），已停止自动重试，请稍后再试'**
   String searchQqRiskDetail(Object code);
 
   /// No description provided for @searchNetworkError.
@@ -6335,13 +6335,13 @@ abstract class AppLocalizations {
   /// No description provided for @qqMusicDownloadUnsupported.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐暂不支持下载（风控）。'**
+  /// **'QM暂不支持下载（风控）。'**
   String get qqMusicDownloadUnsupported;
 
   /// No description provided for @qqMusicDownloadSkipped.
   ///
   /// In zh_CN, this message translates to:
-  /// **'已跳过 {count} 首 QQ 音乐（暂不支持下载）。'**
+  /// **'已跳过 {count} 首 QM（暂不支持下载）。'**
   String qqMusicDownloadSkipped(Object count);
 
   /// No description provided for @platformQqMusic.

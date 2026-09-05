@@ -9,7 +9,7 @@ import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
 import '../stores/providers.dart';
 import '../widgets/common/splash_screen.dart';
 
-/// 启动时初始化网易云登录态（匿名注册 + 读取持久化账号）。
+/// 启动时初始化NT登录态（匿名注册 + 读取持久化账号）。
 class AuthBootstrap extends ConsumerStatefulWidget {
   const AuthBootstrap({super.key, required this.child});
 
@@ -26,7 +26,7 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
     // 异步初始化：不阻塞首帧渲染
     Future<void>.microtask(() async {
       try {
-        // 并行：恢复播放现场（含位置续播）与网易云登录态初始化互不阻塞
+        // 并行：恢复播放现场（含位置续播）与NT登录态初始化互不阻塞
         await Future.wait([
           ref.read(playbackProvider.notifier).restore(),
           ref.read(neteaseAuthProvider.notifier).init(),
@@ -37,11 +37,11 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
         debugPrint('[bootstrap] 初始化异常: $e\n$s');
       }
       // 启动同步红心集合（对齐 SPlayer-Next 启动时 fetchLikelist 预载）：
-      // 酷狗会话在 KugouApi 构造函数同步恢复（userid 首帧已就位），下方
-      // ref.listen 变更监听收不到「恢复」事件 → 不显式同步则酷狗红心恒为空。
-      // 网易云 init 完成的 state 变更会触发监听器再同步一次，sync 的
+      // KG会话在 KugouApi 构造函数同步恢复（userid 首帧已就位），下方
+      // ref.listen 变更监听收不到「恢复」事件 → 不显式同步则KG红心恒为空。
+      // NT init 完成的 state 变更会触发监听器再同步一次，sync 的
       // _pending 合并 + _sameSet 去重保证重复调用幂等（至多重复一次网络请求）。
-      // 注：搜索结果红心不亮的主因是酷狗 hash 大小写（mobilecdn 小写 vs
+      // 注：搜索结果红心不亮的主因是KG hash 大小写（mobilecdn 小写 vs
       // 歌单大写），已在 songLikeKey/_collectHashes/removeFromLike 统一小写。
       ref.read(likeControllerProvider).sync();
       // 下载引擎初始化（触发 build → init 注册回调 + 注入已持久化会话）。
@@ -53,7 +53,7 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
   @override
   Widget build(BuildContext context) {
     // 登录态变化（含启动 init 后）时同步红心集合；
-    // 酷狗 ChangeNotifier 会因头像刷新等任意 notify，故只监听 userid
+    // KG ChangeNotifier 会因头像刷新等任意 notify，故只监听 userid
     // 实际变化（登录/登出）才同步，避免普通 API 调用触发全量重同步。
     ref.listen(neteaseAuthProvider, (_, _) {
       ref.read(likeControllerProvider).sync();
@@ -65,7 +65,7 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       ref.read(likeControllerProvider).sync();
       ref.read(downloadControllerProvider.notifier).syncSessions();
     });
-    // QQ 音乐登录态（isLoggedIn bool 变化）：
+    // QM登录态（isLoggedIn bool 变化）：
     // - 同步红心集合（本机 + 登录后并入在线 songmid）；
     // - 把在线「我喜欢」Track 并入本机 QQ 红心列表（add-only 实验接口，
     //   失败静默——本机红心不受影响）。登出仅清 cookie，不动本机红心。
