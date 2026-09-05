@@ -234,3 +234,32 @@ bundle 内嵌 FFmpeg 运行库 + 预编译引擎（0d5b65c，永远可用）
   dlopen 优雅降级（回退思路参照）
 - [FFmpeg 官方 ABI 说明](https://www.ffmpeg.org/doxygen/trunk/)：仅同 major 内保证向后兼容
 - HN 讨论：运行时依赖解析需谨慎，必须保留 bundle 兜底
+
+## 8. 2026-09-06 激活决策（随包 tcc + 数据目录布局；用户选择制）
+
+> 在「内置 FFmpeg 为默认/兜底」前提下，把自编译（跟随系统 FFmpeg）激活为**用户可选**模式：
+> 启动/启用时**优先探测系统 FFmpeg**；未找到或编译失败 → **该模式禁用**（回退内置，绝不破坏可用性）；
+> **内置 vs 跟随系统(自编译) 由用户在设置里选择**（不再全自动）。
+
+**运行时布局（放数据目录，避免写入 bundle 只读区/避免运行期改动随包区）**
+```
+<dataDir>/engine/                    # 首次启用时自 bundle 解包/拷贝
+├── tcc/                            # tcc 可执行（按平台；需 +x，Windows tcc.exe）
+├── headers/                        # FFmpeg 头文件（按 major 分目录 6.x/7.x/…）
+├── src/                            # 引擎 C 源码（编译所需子集，含编译清单）
+└── cache/<fp>/                     # 指纹 = (avformat|avcodec|avutil|swresample major)+src hash
+    └── engine-<fp>.so|.dylib|.dll  # 链接“系统 FFmpeg”编译产物
+```
+- bundle 仍内嵌：`native/engine-src`（既有源码）、新增 `native/engine-tool/`（tcc 二进制 + ffmpeg headers，首启用解包到数据目录）。
+- 加载器：Dart 按选择 dlopen 引擎（内置 bundle native/libarchoera_mediaengine.* 或 cache/…）。
+
+**探测边界（防“魔改/捆绑 FFmpeg”导致编译爆炸/串库）**
+- Windows：部分应用自带/注册**魔改 FFmpeg**（PATH 劫持、DLL 目录污染、改版 soname/符号），必须在判定“系统可用”前严格校验：
+  1) 只在**平台标准位置/加载器信任目录**探测（Windows：系统目录与用户选择目录；不扫 PATH 随机目录）；
+  2) 解析其真实版本与 `libav*` 三件套完整性，且 **major ∈ 随包支持的 headers 集合** 才认定可用；
+  3) ABI 冒烟：对“候选系统库”运行最小编译/运行探针（如编译 tiny 引擎或 dlopen+调用 av_version_info），不通过视为不可用 → 该模式禁用，避免用错误头对魔改库编译或运行崩溃。
+- macOS：系统通常无 FFmpeg；若用户装了（Homebrew / MacPorts）→ 走 Homebrew 前缀（opt/homebrew、/usr/local）+ brew 探测；同样做 major/完整性校验。系统无 → 禁用。
+- Linux：优先 ldconfig 缓存的真实 soname（避免 LD_LIBRARY_PATH 污染），major 匹配才可用。
+
+**平台策略**
+- Linux 为主；macOS 视 Homebrew 可用性（可选启用）；Windows：内嵌兜底为主，仅在“系统确实安装合规 FFmpeg 且用户显式开启”时允许（默认禁用并给出原因）。
