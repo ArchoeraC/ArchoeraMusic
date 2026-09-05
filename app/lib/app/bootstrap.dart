@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/downloader/download_controller.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
 import '../stores/providers.dart';
 import '../widgets/common/splash_screen.dart';
 
@@ -62,7 +65,33 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       ref.read(likeControllerProvider).sync();
       ref.read(downloadControllerProvider.notifier).syncSessions();
     });
+    // QQ 音乐登录态（isLoggedIn bool 变化）：
+    // - 同步红心集合（本机 + 登录后并入在线 songmid）；
+    // - 把在线「我喜欢」Track 并入本机 QQ 红心列表（add-only 实验接口，
+    //   失败静默——本机红心不受影响）。登出仅清 cookie，不动本机红心。
+    ref.listen(qqMusicApiProvider.select((s) => s.isLoggedIn), (prev, next) {
+      if (prev == next) return;
+      ref.read(likeControllerProvider).sync();
+      if (next == true) {
+        unawaited(_mergeQqOnlineFavorites(ref));
+      }
+    });
     return widget.child;
+  }
+
+  /// 登录 QQ 后把在线「我喜欢」（实验 dirid=201）并入本机列表（add-only）。
+  /// 失败/未开启实验开关时静默跳过——绝不覆盖或清空本机 QQ 红心。
+  static Future<void> _mergeQqOnlineFavorites(WidgetRef ref) async {
+    if (!kQqFavExperimental) return;
+    try {
+      final qqApi = ref.read(qqMusicApiProvider);
+      if (!qqApi.isLoggedIn) return;
+      final online = await qqApi.likedSongs();
+      final store = ref.read(qqLikedStoreProvider);
+      await store.mergeOnline(online);
+    } catch (e) {
+      debugPrint('[qq_liked] 登录后在线收藏并入失败（不影响本机红心）: $e');
+    }
   }
 }
 

@@ -3,6 +3,10 @@
 > 状态：规划稿 v3 · 2026-08-05
 > **更正（2026-08-09）**：本文早期以「复用 SPlayer-Next `server/` 方案」为前提的规划描述，仅作为**历史背景参考**。实际开发中，所引用的服务端代码（Go Subsonic、C 音频引擎、C# 扫描、C++ 刮削、Rust 下载引擎等）均由本仓库作者**自行编写**，**不在 SPlayer / SPlayer-Next 主仓库内**；SPlayer-Next 与本项目**无代码归属关系**，本项目不包含其代码。
 >
+> **更正（2026-08-07，播放链路）**：桌面端播放已从「spawn 子进程 + AF_UNIX 三路 UDS + libmpv 播 OGG」迁移为 **FFI 直连**——Dart 加载 `libarchoera_mediaengine`，引擎在**库内线程**完成转码（PCM 落盘 `stream.wav`）+ **miniaudio 自播**（`skip_encoder=true`，不再 Opus 编码）；Dart 50ms 轮询 `pollEvent`。本文 §5.1/§5.2/§9/§10.5 等章节的 UDS/libmpv 描述为**旧链路历史记录**，仅 CLI/Web 兼容路径（`main.c` + UDS）仍成立。
+>
+> **更正（2026-08-16，引擎路线）**：音频主引擎采用 **FFmpeg 默认主引擎 + Zig 内核渐进替换 + C 壳保留（FFI/CLI）** 路线（详见 `docs/audio-kernel-zig.md`：`-Duse-ffmpeg` 默认开启，Zig 内核逐格式验收后按格式接管，全部 T0/T1 接管后可选 `-Dzig-main=true` 升主）。本节 C 引擎描述为现状；迁移过程中 §5 播放链路默认仍走 FFmpeg（行为零回归），已接管格式经 Zig 内核（Dart/FFI 契约不变）。
+>
 > 定位：独立开发的 Flutter 混合架构音乐播放器（桌面为主），以 AGPL-3.0 开源
 >
 > **核心原则：Flutter 承载 UI 与业务层，后端与原生工具链整体自行编写（C 音频引擎 / C# 扫描 / C++ 刮削 / Rust 下载 / Go Subsonic）。**
@@ -24,17 +28,17 @@
 
 | 架构 | 承担 |
 |---|---|
-| Flutter / Dart | UI、动画、歌词渲染、状态管理、窗口；**媒体渲染端**（libmpv 播放 OGG/Opus 流） |
+| Flutter / Dart | UI、动画、歌词渲染、状态管理、窗口；**媒体渲染驱动**（FFI 直连引擎库，50ms 轮询 pollEvent；实际渲染由引擎内 miniaudio 承担） |
 | TypeScript（server/）| 平台 API 协议/加密、SQLite 数据层、业务路由、子进程调度、**播放服务（引擎生命周期管理）** —— 原样复用，不重写 |
-| C | **统一音频引擎（主引擎）**：FFmpeg 解码 + EQ/响度/限幅/FFT/变速变调 + Opus 编码（`archoera-audio-engine`）|
+| C | **统一音频引擎（主引擎）**：解码 + EQ/响度/限幅/FFT/变速变调 + PCM 输出 + miniaudio 自播（`archoera-audio-engine`；**2026-08-16 路线：FFmpeg 默认主 + Zig 内核渐进替换，见头部更正块**）|
 | C# | 音乐库扫描（TagLibSharp，`archoera-scanner`） |
 | C++ | 元数据刮削（多源并发，`archoera-scraper`） |
 | Rust | 下载引擎（CLI `archoera-downloader`）、`tempo-rs`（变速变调静态库，C 引擎内置）、媒体控制/任务栏歌词（napi，Phase 3）|
 | Go | Subsonic 协议层（自用桌面端可选启用） |
 
 > **音频架构要点**：桌面端与 Web 端共用**同一条 C 引擎管线**（`archoera-audio-engine`），
-> Flutter 只做"媒体渲染端"——播放侧车推送的 OGG/Opus 流（libmpv 解码出声），
-> 全部 DSP（EQ/响度/FFT/变速变调）在 C 引擎内完成。
+> 全部 DSP（EQ/响度/FFT/变速变调）在 C 引擎内完成；桌面端经 **FFI 直连**
+> `libarchoera_mediaengine`（库内线程转码 PCM 落盘 + miniaudio 自播，2026-08-07）。
 > Rust `native/audio-engine`（napi 直出）**不在 ArchoeraMusic 引入**，仅留在 SPlayer-Next 桌面端使用。
 
 **核心处理逻辑技术选型原则**
@@ -70,11 +74,11 @@
 | 下载 | `routes/download.ts` + Rust `archoera-downloader` CLI | **直接复用** |
 | 配置 | `config/store.ts` + `routes/config.ts` | **直接复用** |
 | 会话/凭据 | `database/sessions.ts`（平台 cookie）| **直接复用** |
-| 转码串流 | C `archoera-audio-engine` + `routes/audio.ts`（OGG/Opus）| **主引擎**：全部播放经此管线（详见 §5） |
+| 转码串流 | C `archoera-audio-engine`（+ `routes/audio.ts` OGG/Opus，Web 兼容）| **主引擎**：桌面端 FFI 直连（PCM 落盘 + miniaudio 自播，§5）；Web 兼容保留 OGG/Opus 流 |
 | 音频控制 | `routes/audio.ts`（`/api/audio/control/:id` 运行时控制）| **直接复用** + 扩展 `seek` |
 | 音频事件 | `routes/ws.ts`（`audio:subscribe` FFT 广播）| **直接复用** + 扩展 player 事件 |
 | Subsonic | Go `subsonic/`（:8081，TS 反向代理）| 桌面自用默认**不启用**，预留开关 |
-| 播放（桌面） | 原项目为 Rust napi `audio-engine`（Electron 主进程内加载）| **不引入**；桌面统一走 C 引擎 + libmpv 渲染 |
+| 播放（桌面） | 原项目为 Rust napi `audio-engine`（Electron 主进程内加载）| **不引入**；桌面统一走 C 引擎 FFI 直连 + miniaudio 自播（2026-08-07） |
 | 缓存 | `routes` 静态 `/api/cache/*`、封面/歌手缓存目录 | **直接复用** |
 
 **结论**：ArchoeraMusic 的「后端」不是重写 sidecar，而是**以 `server/` 为单进程后端**（fork/复制为 `sidecar/` 目录，随 SPlayer-Next 维护同步），Flutter 只是它的又一个 HTTP/WS 客户端。
@@ -94,7 +98,7 @@
 │  │ 桥接层：                                                       │ │
 │  │  · api_client（HTTP，localhost）→ 侧车                          │ │
 │  │  · ws_client（WebSocket 事件订阅）→ 侧车                        │ │
-│  │  · 媒体渲染端（libmpv 播放 OGG/Opus 流，media_kit）             │ │
+│  │  · 媒体渲染端（FFI 直连 libarchoera_mediaengine → miniaudio 自播）     │ │
 │  │  · ProcessManager（spawn 原生子进程，备用路径）                  │ │
 │  └───────────────────────────────────────────────────────────────┘ │
 └──────────────────────────┬────────────────────────────────────────┘
@@ -111,7 +115,7 @@
 │  │   ├─ spawn archoera-scanner        （C#，stdout JSON lines）     │
 │  │   ├─ spawn archoera-scraper        （C++，stderr 标记行）         │
 │  │   ├─ spawn archoera-downloader     （Rust CLI，stdout 进度）     │
-│  │   ├─ spawn archoera-audio-engine   （C，主音频引擎，见 §5）         │
+│  │   ├─ FFI 加载 archoera_mediaengine（C 引擎，库内线程，见 §5）        │ │
 │  │   └─（可选）spawn Go subsonic :8081                             │
 │  └─ napi 加载（Phase 3+）：media-ctrl / taskbar-lyric│
 └────────────────────────────────────────────────────────────────────┘
@@ -124,7 +128,7 @@
 | Electron 主进程（壳 + IPC + napi 加载）| Node 侧车（加载 napi + spawn 子进程）|
 | Vue 渲染层（web/）| Flutter UI |
 | Pinia stores / services/ | Riverpod / Dart 服务层 |
-| preload + IPC | 桥接层（HTTP + WS + 媒体渲染端 libmpv）|
+| preload + IPC | 桥接层（HTTP + WS + 媒体渲染：FFI 引擎直连 + miniaudio 自播）|
 | 歌词独立窗口（windows/）| Flutter 多窗口（桌面歌词等）|
 
 ---
@@ -173,7 +177,7 @@ sidecar/
 ```
 
 ### 4.5 侧车新增/调整（相对 server/ 的最小改动）
-1. **播放服务**（新增 `services/player.ts`）：统一管理 C 引擎实例生命周期——load 时按当前效果配置 spawn 引擎、seek 时以新 offset 重启引擎、切歌时 SIGTERM 旧引擎（引擎已有优雅关闭）；维护"播放器状态"（eq/volume/normalization/limiter/tempo/fft/bitrate），供新引擎实例继承
+1. **播放服务（新增 `services/player.ts`，Web 兼容路径）**：统一管理 C 引擎实例生命周期——load 时按当前效果配置 spawn 引擎、seek 时以新 offset 重启引擎、切歌时 SIGTERM 旧引擎（引擎已有优雅关闭）；维护"播放器状态"（eq/volume/normalization/limiter/tempo/fft/bitrate），供新引擎实例继承（桌面端已由 FFI 直连取代，§5.1）
 2. **`seek` 控制**：`/api/audio/control/:id` 增加 `{"type":"seek","position_ms":N}`；实现方式 = 重启引擎（`--offset N` + 继承效果配置），Flutter 端重新拉流（详见 §5.3）
 3. **WS 协议扩展**：现有 /ws 已有扫描/下载/FFT 广播，增加 `player:*` 事件通道（stateChanged/ended/sourceError/status）
 4. **媒体同步**（Phase 3）：media-ctrl napi 在侧车加载，位置/状态同步（对齐原 main 的 services/media.ts）
@@ -184,26 +188,29 @@ sidecar/
 ## 5. 音频播放链路（决策细化）
 
 > **决策：以 C 引擎 `archoera-audio-engine` 为统一主引擎**，桌面与 Web 共用一条音频管线。
-> Flutter 只做媒体渲染端（libmpv 播放完整转码 OGG）；EQ/响度/限幅/FFT/变速变调全部在 C 引擎内完成。
-> 桌面端 Flutter 经三路 UDS 直连引擎（§5.1）；Web 端经侧车播放服务（保留）。
+> EQ/响度/限幅/FFT/变速变调全部在 C 引擎内完成。桌面端 Flutter **FFI 直连**引擎库
+> （`libarchoera_mediaengine`，库内线程转码 PCM 落盘 + miniaudio 自播，2026-08-07 起
+> 取代「spawn 子进程 + 三路 UDS + libmpv」链路，§5.1）；Web 端经侧车播放服务（保留）。
 > Rust `native/audio-engine`（napi 直出）**不引入** ArchoeraMusic（仍留在 SPlayer-Next 桌面端维护）。
+> **引擎路线（2026-08-16 决策）**：主引擎采用 **FFmpeg 默认主 + Zig 内核渐进替换 + C 壳（FFI/CLI
+> 保留）**（详见 `docs/audio-kernel-zig.md`）；本节描述为 C 引擎现状，迁移过程中默认仍 FFmpeg
+> （零回归），Zig 逐格式验收后接管（Dart/FFI 契约不变）。
 
-### 5.1 链路总览（桌面端直连引擎，2026-08-06 落地）
+### 5.1 链路总览（桌面端 FFI 直连引擎，2026-08-07 落地，取代 08-06 spawn+UDS 链路）
 
 ```
 歌曲源（在线 URL / 本地文件 / 音乐库 trackId）
-  → Flutter 直连 spawn archoera-audio-engine <source> [--eq --preamp --normalization
-      --limiter --tempo --fft --keep-alive-ms]   （效果配置从播放器状态继承；桌面端不经侧车）
-  → C 管线：decode → resample → eq → loudness → limiter → tempo → fft → Opus encode → OGG
-  → 三路 UNIX 域套接字（UDS）：
-      stream.uds  → OGG 流 → OggFileSink 落盘 stream.ogg（全速完整转码）
-      pcm.uds     → 原始 float PCM 块 → PcmAnalyzer 落盘 + pos 索引
-      control.uds → 控制事件 JSON 行（ready/status/done/error）→ EngineEvent
-  → 转码完成（done）→ libmpv 直接播放本地完整 stream.ogg（恢复原 SPlayer-Next 行为：
-      完整时长、任意位置 seek）
-  → seek：libmpv 本地 seek（不重启引擎、不重转码）
+  → Dart `AudioEngineProcess` FFI 加载 libarchoera_mediaengine（EngineBindings，
+     效果配置从播放器状态继承；桌面端不经侧车）
+  → 库内引擎线程：decode → resample → eq → loudness → limiter → tempo → fft
+     （player 模式 skip_encoder=true，不再 Opus 编码）
+  → PCM 落盘 stream.wav（会话目录，全速完整转码）
+  → miniaudio 自播（src/player.c；加载 WAV 后播放 → EnginePlaying）
+  → 事件：事件 FIFO（ready/status/done/playing/position/ended/error）→ Dart 50ms
+     定时 pollEvent 轮询 → EngineEvent（position 只留最新；set_event_interval 降频协商）
+  → seek：miniaudio 即时 seek（不重启引擎、不重转码）
   → FFT：UI 按播放位置从本地 PCM 索引按需读帧 → libfft.so（FFI）分析 → 128 bins（拉模式，§10.1）
-  → 事件：ready / status / done / error → control.uds → Dart EngineEvent
+  → 停止：archoera_mediaengine_destroy（join 引擎线程 + 清会话目录）
 ```
 
 **Web 兼容路径（保留）**：侧车播放服务 `services/player.ts` + `/api/audio/stream` + WS `audio:*`；binding 归位 `sidecar/audio-engine/binding.ts` 可独立构建，桌面端不再调用。
@@ -212,62 +219,64 @@ sidecar/
 
 | 方案 | 说明 | 倾向 |
 |---|---|---|
-| **media_kit（libmpv）** | OGG/Opus/HTTP 流解码成熟；seek/音量/速度原生支持；三平台一套 API | ✅ 首选 |
-| just_audio + just_audio_mpv | 同上（同为 libmpv），API 更简单但灵活性低 | 备选 |
-| 纯 Dart 解码（ogg/opus 包）| 无系统依赖，但需自建音量/变速/同步，工作量大 | ✗ |
+| **miniaudio 自播（src/player.c）** | 引擎库内自播本地完整 WAV（stream.wav）；seek/音量原生支持；无额外进程、无 libmpv 依赖（2026-08-07 落地）| ✅ 首选 |
+| media_kit（libmpv） | OGG/Opus/HTTP 流解码成熟；三平台一套 API——保留为 Web 兼容路径（侧车播放服务）| 备选 |
+| 纯 Dart 解码 | 无系统依赖，但需自建音量/变速/同步，工作量大 | ✗ |
 
-> media_kit 三平台额外体积约 20~50MB（含 libmpv），自用桌面可接受。
+> 自播模式免去 libmpv 三平台 20~50MB 体积；Web 兼容路径仍可复用 media_kit。
 
 ### 5.3 关键控制流（桌面端直连）
 
-**Seek**：完整转码落盘后由 **libmpv 本地 seek**（`player.seek`）——不重启引擎、不重转码、无毛刺（2026-08-06 落地，取代原「重启引擎 + `--offset`」方案）
-**EQ/音量/变速变调实时调整**：引擎 stdin JSON 命令（交互模式已有）——Flutter `AudioEngineProcess.sendCommand` 直连调用
-**FFT 频谱**：PCM UDS → 本地落盘索引 → 按播放位置 `frameAt(pos)` 按需读帧 → FFI `libfft.so`（拉模式，§10.1）
-**进度/状态**：`get_status`（交互模式已有）+ libmpv 自身 position 双源
-**切歌**：旧引擎 SIGTERM（优雅关闭已有）+ 新引擎 spawn；预加载下一首为 Phase 3 优化项
+**Seek**：完整转码落盘后由 **miniaudio 即时 seek**——不重启引擎、不重转码、无毛刺（2026-08-07 落地，取代原「libmpv 本地 seek」方案）
+**EQ/音量/变速变调实时调整**：命令 FIFO（`archoera_mediaengine_command`，JSON 命令）——Flutter `AudioEngineProcess.sendCommand` 直连调用
+**FFT 频谱**：库内 PCM 输出 → 本地落盘索引 → 按播放位置 `frameAt(pos)` 按需读帧 → FFI `libfft.so`（拉模式，§10.1）
+**进度/状态**：事件 FIFO `pollEvent`（50ms 轮询，position 事件合并只留最新；`set_event_interval` 降频协商）
+**切歌**：`archoera_mediaengine_destroy`（join 引擎线程）+ 新建引擎实例（库内，无进程切换）；预加载下一首为 Phase 3 优化项
 
 ### 5.4 音质与带宽策略
 
-**统一 Opus 转码（在线与本地同管线）**
+**桌面端：PCM 落盘 + miniaudio 自播（player 模式，2026-08-07 起）**
 
-| 场景 | 输出格式 | 说明 |
+| 场景 | 输出 | 说明 |
 |---|---|---|
-| 在线音源 | Opus（QualityLevel 映射：`hi-res` 256 / `lossless` 192 / `hq` 128 / `sq` 96 / `lq` 64 kbps）| 有损重编码可接受，Opus ≥192kbps 听感透明 |
-| 本地文件 | Opus（建议 `lossless` 192kbps+ 或 `hi-res` 256kbps）| 与在线共用一条管线、一个输出格式；CPU/带宽均无压力 |
+| 在线音源 | **raw PCM（float）落盘 stream.wav**，miniaudio 自播 | 跳过 Opus 编码（`skip_encoder=true`）；管线 DSP 完整保留，无有损重编码 |
+| 本地文件 | 同上（同一条管线）| 与在线共用管线；无损直通播放 |
+| Web 兼容路径 | Opus（QualityLevel 映射：`hi-res` 256 / `lossless` 192 / `hq` 128 / `sq` 96 / `lq` 64 kbps）| 侧车播放服务保留（§12.0.2）|
 
-- **本地走转码无额外成本**：音频级处理单核实时因子 5~10x+；本地播放不经外网，不受带宽限制
-- **音质说明**：转码只作用于播放路径（播放时有损），**曲库磁盘文件保持无损原样**；Opus ≥192kbps 听感透明
-- **seek**：完整转码 + libmpv 本地 seek（§5.3），与在线一致，无毛刺
+- **播放无损**：桌面端不重编码，PCM 直出 + miniaudio 播放，无 Opus 二次有损
+- **曲库磁盘文件始终无损原样**（转码只作用于播放路径）
+- **seek**：完整转码 + miniaudio 即时 seek（§5.3），与在线一致，无毛刺
 
-**FLAC/raw PCM 直通模式（保留，可选）**
-- C 引擎编码阶段保留无损输出模式（FLAC / raw PCM），管线 DSP（EQ/响度/限幅/FFT/tempo）完全复用
-- 用途：本地 bit-perfect 回放（当用户选择"无损模式"时切换；默认仍统一 Opus）
-- 实现成本低：编码器抽象已存在，替换编码器即可；libmpv 播 FLAC 无需 Range
+**FLAC/raw PCM 直通模式（桌面端已默认）**
+- player 模式即 raw PCM 直通（`skip_encoder=true`），管线 DSP（EQ/响度/限幅/FFT/tempo）完全复用
+- FLAC 直通输出模式仍为可选（Web 兼容路径 / 无损回放场景）；FFT 与输出格式无关
 
 **FFT 与输出格式无关**
-- 管线顺序 `decode → resample → eq → loudness → limiter → tempo → **fft** → encode`：FFT 分析在编码**之前**
-- 数据链路：引擎 fd4（JSON 行）→ 侧车 → WS `audio:subscribe` → Flutter 频谱渲染——与输出 Opus/FLAC 无关，零改动
+- 管线顺序 `decode → resample → eq → loudness → limiter → tempo → **fft** →（encode，仅 Web 兼容）`：FFT 分析在编码**之前**
+- 桌面端数据链路：库内 PCM → PcmAnalyzer 落盘索引 → `frameAt(pos)` → FFI libfft.so（§10.1）；Web 兼容沿用引擎 fd4（JSON 行）→ 侧车 → WS `audio:subscribe`——均与输出格式无关
 
 **带宽分析（在线场景）**
-- 外网带宽只消耗在**源下载**；转码输出流走 localhost 回环，不计入外网
+- 外网带宽只消耗在**源下载**；桌面端转码输出即本地文件（无网络开销），Web 兼容路径输出走 localhost 回环，均不计入外网
 - 量级：Opus 192kbps ≈ 24KB/s（2Mbps 的 ~10%）；即使音源 FLAC ~1Mbps 也仅占 2Mbps 的一半
-- **降级策略**：播放服务监控源下载速率，当源下载速率低于消费速率（网络抖动/快进追赶）时，自动降级输出 bitrate（如 192→128kbps）并重启引擎，将"转码输出"与"源下载"解耦，保证播放平滑
+- **降级策略（Web 兼容路径）**：播放服务监控源下载速率，当源下载速率低于消费速率（网络抖动/快进追赶）时，自动降级输出 bitrate（如 192→128kbps）并重启引擎，将"转码输出"与"源下载"解耦，保证播放平滑
 
-### 5.5 播放控制语义（对齐 SPlayer-Next，桌面端直连）
+### 5.5 播放控制语义（对齐 SPlayer-Next，桌面端 FFI 直连）
 ```
-load(track) → Flutter spawn 引擎（直连三路 UDS）→ 完整转码 → done → libmpv 播放本地完整文件
-play / pause / stop / seek(sec)          （seek 走 libmpv 本地 seek；pause 走 libmpv）
-setVolume / setFadeDuration              （libmpv 侧音量；引擎 preamp 管余量）
-setEqualizerEnabled / setEqualizerBands / setPreampGain   → 引擎 stdin set_eq
-setNormalizationEnabled / setFftEnabled / getFftData(128)  → 引擎 stdin set_* + 本地 FFT（§10.1）
-setSpeed / setPitch / setPitchSync       → 引擎 stdin set_tempo_*（重启生效）
-事件：stateChanged / ended / sourceError / position / fftData / outputStalled
+load(track) → Dart FFI 创建引擎实例（EngineBindings.create，player 模式）→ 库内线程完整转码
+             → done（stream.wav 就绪）→ miniaudio 加载播放（EnginePlaying）
+play / pause / stop / seek(sec)          （seek 走 miniaudio 即时 seek；pause 走 miniaudio）
+setVolume / setFadeDuration              （miniaudio 侧音量；引擎 preamp 管余量）
+setEqualizerEnabled / setEqualizerBands / setPreampGain   → 命令 FIFO set_eq
+setNormalizationEnabled / setFftEnabled / getFftData(128)  → 命令 FIFO set_* + 本地 FFT（§10.1）
+setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生效）
+事件：事件 FIFO pollEvent（50ms 轮询，position 只留最新；set_event_interval 降频协商）
+      → stateChanged / ended / sourceError / position / fftData / outputStalled
 ```
 > 高频推送遵循原项目「隐藏即静默」：频谱不可见时不推 FFT；歌词窗口隐藏时不推位置。
 
 ### 5.6 C 引擎 spawn 参数与设置映射（可执行清单）
 
-**spawn 参数表**（`archoera-audio-engine`，参数与引擎 `--help` 一致）
+**spawn 参数表**（`archoera-audio-engine` CLI，参数与引擎 `--help` 一致；**桌面端 FFI 直连已改用 `EngineConfig` 结构体传参（`engine_bindings.dart`），本表对应 CLI/Web 兼容路径**）
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
@@ -285,10 +294,10 @@ setSpeed / setPitch / setPitchSync       → 引擎 stdin set_tempo_*（重启�
 | `--fft` / `--fft-size` / `--fft-interval-ms` | 1024 / 100ms | 频谱分析（对齐 Web 用 `--fft-interval-ms 50`） |
 | `--tempo` / `--tempo-speed` / `--tempo-pitch` / `--tempo-pitch-sync` | [0.5-2.0] / [-12..12] | 变速变调 |
 | `--interactive` + `--control-fd 3` + `--fft-fd 4` | 关 | 交互模式：fd3 写控制命令、fd4 读 FFT JSON |
-| `--keep-alive-ms <n>` | 0 | 转码完成（EOF）后保持进程存活 n ms 等待迟到消费者；桌面端用（默认 10s），避免短音频 done 前消费者未连上 |
-| `--stream-uds <path>` | — | OGG/Opus 流输出到 UDS（替代 stdout，桌面端）；引擎**等待消费者连上（15s）后才开始转码**，保证 OGG 从头完整 |
-| `--pcm-uds <path>` | — | 原始 float PCM 块输出到 UDS：`[pos_ms|samples|channels] + float`（小端，4096 samples/帧），供 FFT 拉模式（§10.1） |
-| `--control-uds <path>` | — | 控制事件 JSON 行输出到 UDS（替代 fd3；Dart `Process` 无法传额外 fd，桌面端必用）；`control_send_line()` 优先 UDS，否则 fd3（Web 兼容） |
+| `--keep-alive-ms <n>` | 0 | 转码完成（EOF）后保持进程存活 n ms 等待迟到消费者；Web 兼容路径用（默认 10s），避免短音频 done 前消费者未连上 |
+| `--stream-uds <path>` | — | OGG/Opus 流输出到 UDS（替代 stdout，Web 兼容路径）；引擎**等待消费者连上（15s）后才开始转码**，保证 OGG 从头完整 |
+| `--pcm-uds <path>` | — | 原始 float PCM 块输出到 UDS：`[pos_ms|samples|channels] + float`（小端，4096 samples/帧），供 FFT 拉模式（§10.1，Web 兼容） |
+| `--control-uds <path>` | — | 控制事件 JSON 行输出到 UDS（替代 fd3；Dart `Process` 无法传额外 fd，Web 兼容路径用）；`control_send_line()` 优先 UDS，否则 fd3（Web 兼容） |
 | stdout / stderr | — | 无 UDS 时 OGG/Opus 走 stdout（Web 兼容）；stderr 日志 |
 
 **QualityLevel → bitrate 映射**（对齐原项目 `web/api/player.ts`）
@@ -307,12 +316,12 @@ setSpeed / setPitch / setPitchSync       → 引擎 stdin set_tempo_*（重启�
 |---|---|---|
 | 音质 songLevel | `--bitrate` | — |
 | EQ 10 段 + 前级 | `--eq <gains>` + `--preamp` | `set_eq {gains, preamp}` |
-| 音量 volume | — | `set_volume {gain}`（主音量在 libmpv 侧，preamp 管余量） |
+| 音量 volume | — | `set_volume {gain}`（主音量在 miniaudio 侧（桌面端）/ libmpv 侧（Web 兼容），preamp 管余量） |
 | 响度归一化 | `--normalization` | `set_normalization {enabled}` |
 | 限幅器 | `--limiter-threshold`（默认启用） | `set_limiter {enabled}` |
 | 频谱显示 | `--fft` | `set_fft {enabled}` |
 | 变速/变调 | `--tempo --tempo-speed --tempo-pitch` | `set_tempo_speed` / `set_tempo_pitch` |
-| seek | —（桌面端 libmpv 本地 seek，§5.3）；`-o --offset`（Web 兼容：重启引擎） | `seek {position_ms}`（进程内，Phase 3+） |
+| seek | —（桌面端 miniaudio 即时 seek，§5.3）；`-o --offset`（Web 兼容：重启引擎） | `seek {position_ms}`（进程内，Phase 3+） |
 
 ---
 
@@ -323,7 +332,7 @@ setSpeed / setPitch / setPitchSync       → 引擎 stdin set_tempo_*（重启�
 | `archoera-scanner` | C#（TagLibSharp）| 侧车 spawn | stdout JSON lines 进度；`POST /api/db/upsert*` 写库 |
 | `archoera-scraper` | C++（libcurl + TagLib）| 侧车 spawn | stderr `[done N/Total]`；`POST /api/db/scrape/batch` |
 | `archoera-downloader` | Rust（reqwest）| 侧车 spawn | stdout JSON 进度；`POST /api/db/download/*` |
-| `archoera-audio-engine` | C（FFmpeg + libopus）| **主引擎**（侧车 spawn）| stdout OGG/Opus；交互模式 fd3 控制 / fd4 FFT；SIGTERM 优雅关闭 |
+| `archoera-audio-engine` | C（FFmpeg + miniaudio）| **主引擎**（Dart FFI 库内加载，2026-08-07）| FFI：`archoera_mediaengine_*`（库内线程转码 PCM 落盘 + miniaudio 自播 + pollEvent FIFO）；CLI/Web 兼容保留 stdout OGG + fd3 控制 / fd4 FFT |
 | `tempo-rs` | Rust（signalsmith-stretch）| 静态链接进 C 引擎 | C FFI（`HAS_TEMPO` 条件编译）|
 | Go `subsonic` | Go | 侧车 spawn（可选）| HTTP :8081，TS 反向代理 `/rest/*` |
 
@@ -384,20 +393,20 @@ setSpeed / setPitch / setPitchSync       → 引擎 stdin set_tempo_*（重启�
 
 ## 9. 通信协议（桌面端零 TCP 端口）
 
-**原则**：桌面端**不暴露任何 TCP 端口**——控制面走 stdin/stdout JSON-RPC，媒体面由引擎三路 UNIX 域套接字承载（Flutter 经 dart:io UDS 直连；完整转码落盘后 libmpv 播放本地文件，不再需要媒体口 HTTP 流）。
+**原则**：桌面端**不暴露任何 TCP 端口**——引擎控制走 Dart↔引擎 FFI 符号面（命令/事件 FIFO，库内），媒体面为库内线程直接转码落盘（`stream.wav`）+ miniaudio 自播；Web 兼容路径保留侧车播放服务（stdout/UDS 流）。
 
 | 通道 | 内容 | 端口占用 |
 |---|---|---|
 | **控制面：stdin/stdout JSON-RPC（Phase 1 桥接改造）** | Flutter ↔ 侧车全部 API 调用与事件推送（登录/搜索/歌词/曲库/配置）。**RPC 适配器复用 Hono `app.request()` 映射既有路由（路由零改动）**；stdout 行协议推送事件；`ping` 替代 `/api/health` | **无** |
-| **引擎控制：control.uds** | Flutter ↔ C 引擎控制事件 JSON 行（ready/status/done/error）——引擎 spawn 直连（不经侧车，§5.1） | **无（UDS）** |
-| **引擎媒体：stream.uds / pcm.uds** | 转码 OGG 流与原始 float PCM 块 → 本地落盘（完整文件）→ libmpv 播放 / FFT 按需读帧（§10.1） | **无（UDS）** |
+| **引擎控制：FFI 命令/事件 FIFO** | Flutter ↔ 引擎库内：`archoera_mediaengine_command`（JSON 命令）+ `archoera_mediaengine_poll_event`（50ms 轮询事件 FIFO）——Dart FFI 直连（不经侧车，§5.1） | **无（库内）** |
+| **引擎媒体：库内 PCM 落盘** | 库内线程转码 PCM → 会话目录 `stream.wav`（完整文件）→ miniaudio 自播 / FFT 按需读帧（§10.1） | **无（库内）** |
 | HTTP 其余路由 | 仅作 RPC 适配器的内部复用载体（经 `app.request()` 调用），桌面端不直接暴露 | 无 |
-| WS `/ws` | 桌面端**停用**（事件改走 stdout RPC + control.uds）；保留为 Web 兼容路径 | 无 |
-| 子进程 stdio | C#/C++/Rust CLI 进度（沿用）；C 引擎 stdin 命令 + fd3/fd4（Web 兼容路径沿用） | 无 |
+| WS `/ws` | 桌面端**停用**（事件改走 FFI 事件 FIFO）；保留为 Web 兼容路径 | 无 |
+| 子进程 stdio | C#/C++/Rust CLI 进度（沿用）；C 引擎 CLI 模式 stdin 命令 + fd3/fd4（Web 兼容路径沿用） | 无 |
 
-**安全**：桌面端零 TCP 端口；UDS socket 文件置于会话私有目录（`/tmp/archoera-{host}-{pid}-{ts}/`，0700）；侧车控制面无端口，天然不可从外部访问。
+**安全**：桌面端零 TCP 端口；会话目录置于临时私有目录（0700），库内 FIFO/文件不可从外部访问；侧车控制面无端口。
 
-**为何不再需要媒体口**：旧链路受「增长中文件 EOF / Dart 管道流无法喂 libmpv」约束而保留 loopback 单口；现改为**完整转码落盘**（引擎全速、done 后文件就绪，无 EOF 问题），libmpv 直接播放本地完整文件——loopback 端口与 `unix://` 探索均不再需要。Web 兼容路径（侧车 `/api/audio/stream`）保留于 sidecar。
+**为何不再需要媒体口**：桌面端转码与播放都在库内（PCM 落盘 `stream.wav` + miniaudio 自播），无进程间媒体通道、无 EOF 问题，loopback 端口与 UDS 均不再需要。Web 兼容路径（侧车 `/api/audio/stream`）保留于 sidecar。
 
 ---
 
@@ -415,13 +424,13 @@ setSpeed / setPitch / setPitchSync       → 引擎 stdin set_tempo_*（重启�
 
 ### 10.1 音频频谱（FFT 可视化）
 
-**数据链路（桌面端：UDS PCM → 本地索引 → 拉模式，2026-08-06 落地）**
+**数据链路（桌面端：库内 PCM 落盘 → 本地索引 → 拉模式，2026-08-07 更新）**
 
 ```
-C 引擎 fft 阶段（管线内 DSP 之后、编码之前，与输出 Opus/FLAC 无关，见 §5.4）
-  └─ pcm.uds（原始 float PCM 块：[pos_ms|samples|channels] + float，4096 samples/帧）
-        → PcmAnalyzer 落盘 stream.pcm + (posMs → fileOffset) 内存索引
-        → UI 按 media_kit 实际播放位置 frameAt(posMs) 二分定位 → 按需读文件
+C 引擎 fft 阶段（管线内 DSP 之后、编码之前，与输出格式无关，见 §5.4）
+  └─ 库内 PCM 输出 → 会话目录落盘（stream.pcm / stream.wav 同源）
+        → PcmAnalyzer 建 (posMs → fileOffset) 内存索引
+        → UI 按 miniaudio 实际播放位置（EnginePosition 事件）frameAt(posMs) 二分定位 → 按需读文件
         → FFI libfft.so（fft_process_multi / fft_get_spectrum_norm_stereo）→ 128 bins
         → 频谱组件（CustomPainter，RepaintBoundary 局部重绘）
 ```
@@ -483,16 +492,16 @@ C 引擎 fft 阶段（管线内 DSP 之后、编码之前，与输出 Opus/FLAC 
 - **归属**：队列 / 播放历史 / UI 偏好存 **Dart 本地**（drift 或 Hive，§8）；业务数据（曲库/统计）在侧车
 - **模型**：`nextQueue` + `prevHistory` + 当前索引；`PlaybackController` 管理
 - **播放模式**：顺序 / 列表循环 / 单曲循环 / 随机（复用原项目语义，随机种子可复现）
-- **切歌流程**：next/prev → `load(track)` → Flutter 换引擎（SIGTERM 旧 + spawn 新，继承播放器状态）→ 完整转码 → libmpv `open(新文件)`
+- **切歌流程**：next/prev → `load(track)` → Flutter 重建引擎实例（`archoera_mediaengine_destroy` 旧 + create 新，继承播放器状态，库内无进程切换）→ 完整转码 → miniaudio 播放新 `stream.wav`
 - **播放统计**：每曲播放完成写侧车 `playStats` 表（复用查询/迁移）；Last.fm scrobble 可选（Phase 3，复用 `apis/lastfm` 思路）
 
 ### 10.4 播放容错与降级
 
 | 场景 | 检测 | 处置 |
 |---|---|---|
-| 源失效（404/403/超时）| 引擎 stderr 错误 → control.uds `EngineError`（Web 兼容路径为侧车 `player:sourceError`） | 可选**自动换源**：以该曲目在另一平台的搜索匹配结果重取 URL 重载（自用增强，可关） |
+| 源失效（404/403/超时）| 引擎错误 → 事件 FIFO `EngineError`（Web 兼容路径为侧车 `player:sourceError`） | 可选**自动换源**：以该曲目在另一平台的搜索匹配结果重取 URL 重载（自用增强，可关） |
 | VIP/受限音质 | 音源返回受限码/低 bitrate | 正常播放 + UI 显示"受限音质（如 128k）"来源标记，不自动跳转 |
-| 网络抖动/断流 | libmpv `outputStalled` + 引擎暂停输出 | 带宽降级（§5.4）；重试失败 → 暂停 + 提示 |
+| 网络抖动/断流 | miniaudio `outputStalled` + 引擎暂停输出 | 带宽降级（§5.4）；重试失败 → 暂停 + 提示 |
 | 登录态过期 | 播放 403/401 | 提示重新登录（二维码），恢复后继续 |
 | 歌词源缺失 | `/api/lyric` 全源 miss | 显示"无歌词"，不影响播放 |
 
@@ -501,10 +510,10 @@ C 引擎 fft 阶段（管线内 DSP 之后、编码之前，与输出 Opus/FLAC 
 ### 10.5 桥接层细节（Dart）
 
 - **rpc_client**（控制面，侧车 API 调用）：stdin 写 JSON-RPC 请求（`{id, method:"GET|POST", path, body}`），stdout 读响应与事件行；内部复用 Hono `app.request()`（侧车侧，路由零改动）；幂等 GET 指数退避重试（≤3 次）；统一错误模型 `ApiException(code, message)`；事件经 EventBus 分发（§10 导语）
-- **audio_engine_process**（引擎直连，2026-08-06）：spawn 引擎 + stdin JSON 命令；等 3 个 socket 文件出现（8s）→ 并发连接 control.uds / pcm.uds / stream.uds；`EngineEvent`（ready/status/done/error/exited）；`done` Completer（转码完成 = OGG/PCM 文件就绪）；`stop()` = 关桥 → SIGTERM → 5s SIGKILL + 删会话目录；sessionId = socket 目录名
-- **ogg_stream_bridge → OggFileSink**（媒体面）：stream.uds → `stream.ogg` 落盘（IOSink 非 `StreamConsumer<Uint8List>`，手动 listen 累积，不可 pipe）
-- **media_renderer**（libmpv 封装）：播放**本地完整 OGG 文件**（替代旧链路媒体口 HTTP 流）；状态机 `idle → loading → playing → paused → ended/error`；position/duration 事件回灌 `PlaybackController`；`seek()` 本地 seek
-- **进程生命周期**：App 退出 → 引擎 SIGTERM → 侧车 SIGTERM → 等待 exit（超时 5s 强制）；崩溃检测 → 提示 + 自动重启（§4.3）
+- **audio_engine_process**（引擎 FFI 直连，2026-08-07，替代 08-06 spawn+UDS 链路）：Dart 加载 `libarchoera_mediaengine`（`EngineBindings.create`，player 模式）→ 库内线程转码；事件经线程安全 FIFO，Dart 50ms 定时 `pollEvent` 轮询 → `EngineEvent`（ready/status/done/playing/position/ended/error）；`done` Completer（转码完成 = stream.wav 就绪）；`stop()` = 后台 isolate 内 `archoera_mediaengine_destroy`（join 引擎线程）+ 删会话目录
+- **PCM 落盘**（媒体面）：player 模式 `skip_encoder=true`，管线 PCM 直写会话目录 `stream.wav`（完整文件，无 OGG/Opus 编码；`wavFilePath` = 会话目录）
+- **miniaudio 自播**（player.c，库内）：`EnginePlaying`（WAV 加载开始播放）/ `EnginePosition`（50ms position 事件）/ `EnginePlayerEnded`（EOF）；状态机 `idle → loading → playing → paused → ended/error`；`seek()` 即时 seek
+- **进程生命周期**：引擎线程在库内（无子进程）；App 退出 → `archoera_mediaengine_destroy`（join）；崩溃检测 → 提示 + 自动重启（§4.3）
 
 ### 10.6 桌面配置清单（并入侧车 `config/store`，desktop 分组）
 
@@ -585,8 +594,8 @@ ArchoeraMusic/
 │   │   ├── main.dart
 │   │   ├── core/
 │   │   │   ├── sidecar/        # 侧车桥接（rpc_client / sidecar_process）
-│   │   │   ├── playback/       # 播放层（2026-08-06）：audio_engine_process / ogg_stream_bridge / pcm_analyzer
-│   │   │   │                   #   / fft_bindings / fft_frame / media_renderer / playback_notifier / engine_paths
+│   │   │   ├── services/playback/ # 播放层（2026-08-07 FFI 直连）：audio_engine_process / engine_bindings
+│   │   │   │                   #   / pcm_analyzer / fft_bindings / fft_frame / playback_notifier / playback_state / playback_session
 │   │   │   └── state/          # providers（DI）
 │   │   ├── services/           # PlaybackController / LyricSync / ApiService / Session / Storage
 │   │   ├── features/           # search / playlist / player / settings / login / library / lyric-window
@@ -609,10 +618,10 @@ ArchoeraMusic/
 | 阶段 | 内容 | 出口标准 |
 |---|---|---|
 | **Phase 0** 骨架 ✅ | `flutter create`（linux/windows/macos）；复制 `server/` → `sidecar/` 并打通 esbuild 打包；构建 `archoera-audio-engine`；Flutter spawn 侧车 + health 探测 + 优雅退出；HTTP/WS 打通 | **已完成（2026-08-05，见 §12.0）**：`flutter run` 起 App，侧车在线，`/api/health` 200，`/api/audio/status` 引擎可用，看门狗防孤儿 |
-| **Phase 1** Netease + 播放 | **桥接改造（§9）✅**：控制面 stdio JSON-RPC（复用 Hono `app.request()`，事件走 stdout）；**桌面直连引擎播放（§5.1/§12.0.3）✅**：Flutter spawn 引擎三路 UDS → 完整转码落盘 → libmpv 播放本地文件，seek 本地跳转，FFT 拉模式；侧车 `services/player.ts` 保留 Web 兼容（§12.0.2）；Flutter：搜索页、播放页（歌词 + 频谱）、二维码登录、队列；歌词走 `/api/lyric`（含 resolve 标准化，§10.2） | 可登录、搜索、播放网易云歌曲，歌词/频谱同步，可 seek（本地瞬时、时长完整），控制面无端口 |
+| **Phase 1** Netease + 播放 | **桥接改造（§9）✅**：控制面 stdio JSON-RPC（复用 Hono `app.request()`，事件走 stdout）；**桌面直连引擎播放（§5.1）✅**：Flutter FFI 直连 `libarchoera_mediaengine` → 库内线程完整转码 PCM 落盘 → miniaudio 自播，seek 即时，FFT 拉模式（2026-08-07；§12.0.3 为 08-06 spawn+UDS 历史记录）；侧车 `services/player.ts` 保留 Web 兼容（§12.0.2）；Flutter：搜索页、播放页（歌词 + 频谱）、二维码登录、队列；歌词走 `/api/lyric`（含 resolve 标准化，§10.2） | 可登录、搜索、播放网易云歌曲，歌词/频谱同步，可 seek（本地瞬时、时长完整），控制面无端口 |
 | **Phase 2** KuGou | 更新 KuGouMusicApi 克隆 → 提取核心 → 移植 kugou 模块（song_url/榜单/歌单）进 sidecar；Flutter 接入酷狗搜索播放 | 可搜索播放酷狗歌曲 |
-| **Phase 3** 补全 | QQ 音乐接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一 Opus 转码（§5.4）；下载（Rust CLI）；桌面歌词窗口；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）| 核心功能对齐 SPlayer-Next 子集 |
-| **Phase 4** 优化 | C 引擎增强：进程内 seek、预加载/无缝切换、带宽降级策略（§5.4）、**FLAC/raw PCM 直通输出模式（本地 bit-perfect，可选）**；性能/内存基线（沿用原项目 memory discipline）；缓存与并发策略 | 播放体验优化，桌面集成完备 |
+| **Phase 3** 补全 | QQ 音乐接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一管线（PCM 落盘 + miniaudio 自播，§5.4）；下载（Rust CLI）；桌面歌词窗口；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）| 核心功能对齐 SPlayer-Next 子集 |
+| **Phase 4** 优化 | C 引擎增强：进程内 seek、预加载/无缝切换、带宽降级策略（§5.4，Web 兼容）、**FLAC 直通输出模式（可选，Web 兼容路径）**；性能/内存基线（沿用原项目 memory discipline）；缓存与并发策略 | 播放体验优化，桌面集成完备 |
 
 ### 12.0 Phase 0 落地说明（已完成）
 
@@ -664,7 +673,7 @@ ArchoeraMusic/
 - Node 侧：load → `playing:true` + sessionId；stream 200 `audio/ogg` + `OggS` 魔数；seek → 新引擎 `--offset 2000ms` + 新流 OggS；自然退出 → `player:done`；stop → `playing:false`
 - Flutter 端到端：`flutter build linux --debug` 通过；GUI 实测——点击「加载播放」→ RPC load → C 引擎转码 `/tmp/test-tone.wav` → media_kit 拉媒体口流 → 播放 → `转码完成`（code=0）→ `player:done`；SIGTERM 无孤儿
 
-### 12.0.3 桌面端直连 C 引擎（已完成，2026-08-06）
+### 12.0.3 桌面端直连 C 引擎（已完成，2026-08-06；**2026-08-07 已迁移为 FFI 直连库内播放，本节为 spawn+UDS 链路历史记录**）
 
 **背景**：旧链路「Flutter → 侧车播放服务 → binding → stdout OGG 流式 HTTP」存在两个体验问题——(1) 流式转码下前端拿到的是实时增长时长，对齐原项目「完整时长 + 任意 seek」语义失败；(2) 每次 seek 重启引擎重转码。改为 Flutter 直连引擎三路 UDS + **全速完整转码落盘 + libmpv 播放本地完整文件**。
 
@@ -705,7 +714,7 @@ ArchoeraMusic/
 | 侧车（Node）| `node:test`：apis 模块（mock 网络）、歌词管道（KRC/QRC/TTML **黄金文件**）、db 代理、config 迁移 |
 | 引擎 | 沿用 `server/audio-engine/tests/`（test_fft 等）三平台构建冒烟 |
 | Dart | 单元：api_client / ws_client / 队列模型 / 状态机；Widget：页面与歌词/频谱组件 |
-| 集成冒烟 | 起侧车 → `/api/health` → netease 搜索/歌词 → **桌面端直连引擎**（AUTOPLAY：三路 UDS → 转码落盘 → libmpv 播放 → FFT 拉模式）；Web 兼容路径：C 引擎 `status` + `stream` → WS 事件 |
+| 集成冒烟 | 起侧车 → `/api/health` → netease 搜索/歌词 → **桌面端 FFI 直连引擎**（AUTOPLAY：库内转码 PCM 落盘 → miniaudio 播放 → FFT 拉模式 → pollEvent 事件）；Web 兼容路径：C 引擎 `status` + `stream` → WS 事件 |
 | 手动回归 | 播放/seek/切歌/登录/下载核心路径清单（自用场景） |
 
 ---
@@ -716,11 +725,11 @@ ArchoeraMusic/
 |---|---|---|
 | server/ 同步成本 | 两仓库并行，server 持续演进 | 固定同步节奏 + diff 清单；sidecar 保持同构减少冲突 |
 | Node 运行时体积 | 三平台各 ~30-60MB + 原生二进制 | 官方 node 起步，评估 SEA；子进程二进制按平台裁剪 |
-| libmpv/media_kit 体积与依赖 | 三平台各 +20~50MB；需随包分发 FFmpeg 相关库 | media_kit 官方打包方案；体积自用可接受 |
-| **Opus 重编码音质** | 统一转码对本地无损源为播放路径有损重编码 | 库文件保持无损；播放 ≥192kbps 透明；FLAC 直通模式（可选）支持 bit-perfect 本地回放 |
-| **Seek 体验** | ~~重启引擎 seek 毛刺~~（桌面端已改 libmpv 本地 seek，无毛刺，2026-08-06）；Web 兼容路径仍为重启引擎 | Web 兼容路径保留 `--offset`；进程内 seek 为 Phase 3+ 可选优化 |
+| libmpv/media_kit 体积与依赖 | 桌面端已弃用（miniaudio 自播，2026-08-07）；仅 Web 兼容路径涉及 | media_kit 仅随侧车兼容路径保留 |
+| **Opus 重编码音质** | 桌面端已不再重编码（PCM 直出 + miniaudio，2026-08-07）；仅 Web 兼容路径有损 | 库文件保持无损；Web 兼容 Opus ≥192kbps 透明；FLAC 直通模式（可选）支持 bit-perfect |
+| **Seek 体验** | ~~重启引擎 seek 毛刺~~（桌面端已改 miniaudio 即时 seek，无毛刺，2026-08-07）；Web 兼容路径仍为重启引擎 | Web 兼容路径保留 `--offset`；进程内 seek 为 Phase 3+ 可选优化 |
 | 源下载抖动 | 在线播放依赖源下载速率 | 带宽降级策略（§5.4）：自动降级输出 bitrate 保平滑 |
-| C 引擎依赖 | 三平台需 FFmpeg/libopus 库（Windows 打包复杂）| Docker 构建链已有；Windows 用 vcpkg/预编译库 |
+| C 引擎依赖 | 三平台需 FFmpeg 库（Windows 打包复杂，vcpkg 已打通 2026-08-11）；**Zig 路线：FFmpeg 保持默认主引擎**（`-Duse-ffmpeg` 默认开），逐格式验收后 Zig 接管（详见 audio-kernel-zig.md）| Docker 构建链已有；Windows 用 vcpkg；`-Duse-ffmpeg=false` 纯 Zig 构建为可选裁剪 |
 | Flutter 多窗口成熟度 | 桌面歌词窗依赖第三方方案 | Phase 1 单窗口；预留多窗口抽象 |
 | KuGou token/平台差异 | 完整版 vs lite 版不通用 | 选定一版，modules 内封装隔离 |
 | 本机服务安全 | 随机端口仍可被探测 | 启动 token 校验（可开关）|
@@ -735,14 +744,14 @@ ArchoeraMusic/
 ## 附：已确认决策记录
 
 1. API 层承载：**Node 侧车**（= 复用 server/ 方案，非重写）
-2. **音频主引擎：C `archoera-audio-engine`（统一转码管线）**——桌面与 Web 共用；Flutter 用 libmpv 播放 OGG/Opus 流；Rust `native/audio-engine` 不引入
+2. **音频主引擎：C `archoera-audio-engine`（统一转码管线）**——桌面与 Web 共用；桌面端 FFI 直连（PCM 落盘 + miniaudio 自播，2026-08-07）；Rust `native/audio-engine` 不引入。**（2026-08-16 修订：FFmpeg 默认主引擎 + Zig 内核渐进替换 + C 壳保留，见 audio-kernel-zig.md）**
 3. KuGou 集成：**更新克隆 → 提取核心 → 移植进模块架构**
 4. 目标平台：**桌面为主**（Windows / macOS / Linux）
 5. 首期范围：**Netease + KuGou 在线音乐**
-6. 媒体渲染端：**media_kit（libmpv）**
+6. 媒体渲染端：~~media_kit（libmpv）~~ → **miniaudio 自播（src/player.c，2026-08-07）**；media_kit 保留为 Web 兼容路径
 7. SQLite 写入一律经 `/api/db/*` 代理（沿用 server 规范）
-8. C 引擎待补能力：`seek`（重启引擎方案先行，进程内 seek 为 Phase 3+ 优化）；本地默认统一 Opus 转码，**保留 FLAC/raw PCM 直通输出模式**（可选，本地 bit-perfect 用；FFT 不受输出格式影响）
-9. 带宽策略：转码输出走回环不占外网；源下载速率不足时自动降级输出 bitrate 保平滑
+8. C 引擎待补能力：`seek`（桌面端已 miniaudio 即时 seek，2026-08-07；Web 兼容路径仍为重启引擎方案，进程内 seek 为 Phase 3+ 优化）；桌面端 player 模式默认 raw PCM 直通（`skip_encoder=true`，miniaudio 自播），**FLAC 直通输出模式**（可选，Web 兼容路径；FFT 不受输出格式影响）
+9. 带宽策略：桌面端转码输出即本地文件（零网络开销），Web 兼容路径输出走回环不占外网；源下载速率不足时自动降级输出 bitrate 保平滑（Web 兼容）
 10. 队列 / 播放历史 / UI 偏好存 **Dart 本地**（drift/Hive）；业务数据（曲库/统计/会话）单一事实源在侧车
 11. 歌词流水线复用 server：多源回退 + 匹配缓存（lyricMatchCache）+ TTML 标准化（含翻译，lyricTtmlCache）
 12. 播放容错：源失效 → 可选自动换源（跨平台搜索匹配，自用增强可关）；受限音质正常播 + 来源标记
@@ -750,7 +759,7 @@ ArchoeraMusic/
 14. UI 策略：信息架构/交互保留，组件 Flutter 原生重写；**AMLL 歌词引擎 Dart 移植**；Web 端歌词解析（`parse*.ts` + `resolve.ts`）整体移入 sidecar 标准化，Flutter 零解析负担
 15. 歌词多源回退由**前端编排**（设置 `lyricSourceOrder`/`lyricFormatOrder`/`smartPreferOnline`），侧车只提供各平台 match/ttml 端点
 16. **核心处理逻辑必要时可用 C/C++**：Node GC 较差（长驻进程老生代/STW 停顿/对象碎片化）+ 性能瓶颈/算法密集时允许下沉原生（子进程 CLI 或 FFI）；下沉需 **profile 证据驱动**，默认复用优先，不主动重写
-17. **桌面端零 TCP 端口（§9，2026-08-06 更新）**：控制面走 stdin/stdout JSON-RPC（RPC 适配器复用 Hono `app.request()`，路由零改动，事件走 stdout）；媒体面由引擎三路 UDS 承载（完整转码落盘 → libmpv 播放本地文件，**不再需要 loopback 媒体口**）；server 默认绑 `127.0.0.1`（原默认 `::` 局域网暴露已修）；WS 桌面端停用、保留 Web 兼容路径
+17. **桌面端零 TCP 端口（§9，2026-08-06 定，2026-08-07 随 FFI 直连更新）**：控制面走 stdin/stdout JSON-RPC（RPC 适配器复用 Hono `app.request()`，路由零改动，事件走 stdout）；媒体面由**库内线程直接转码落盘（PCM → `stream.wav`）+ miniaudio 自播**承载（不再需要 loopback 媒体口，也不再用 UDS）；server 默认绑 `127.0.0.1`（原默认 `::` 局域网暴露已修）；WS 桌面端停用、保留 Web 兼容路径
 18. Flutter 原生能力直接用：i18n 走 `flutter_localizations` + `intl`/`gen_l10n`（ARB，非自研）；Dart 侧 `EventBus` 作为应用层统一事件通道（侧车事件 + 本地事件），UI 不直连传输层
-19. **桌面端直连 C 引擎（2026-08-06）**：Flutter spawn 引擎三路 UDS（stream/pcm/control），**全速完整转码落盘 → libmpv 播放本地完整 OGG**——恢复原 SPlayer-Next「完整时长 + 任意 seek」语义；seek 走 libmpv 本地 seek（不重启引擎、不重转码）；FFT 为拉模式（按播放位置从本地 PCM 索引读帧 + FFI libfft.so）；侧车播放服务保留 Web 兼容路径
+19. **桌面端 FFI 直连引擎（2026-08-07，取代 08-06 spawn+UDS 方案）**：Dart 加载 `libarchoera_mediaengine`，库内线程**全速完整转码 PCM 落盘 `stream.wav` → miniaudio 自播**（player 模式 `skip_encoder=true`，不再 Opus 编码）——恢复原 SPlayer-Next「完整时长 + 任意 seek」语义；seek 走 miniaudio 即时 seek（不重启引擎、不重转码）；事件 FIFO 50ms 轮询 `pollEvent`（position 只留最新，`set_event_interval` 降频协商）；FFT 为拉模式（按播放位置从本地 PCM 索引读帧 + FFI libfft.so）；侧车播放服务保留 Web 兼容路径
 20. **sidecar 播放路径收窄**：binding.ts 归位 `sidecar/audio-engine/`（随 sidecar 构建，`@main/audio-engine/binding` 可解析）；sidecar 后期可能更换方案（暂不深入优化）

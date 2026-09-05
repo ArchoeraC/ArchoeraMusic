@@ -26,8 +26,10 @@ class DownloaderLibrary {
   /// 解析 downloader 共享库路径：统一走 [NativeLibPaths]
   /// （环境变量 → ancestors 链 → dev 兜底；release 优先、debug 兜底）。
   static String resolveSoPath() {
-    return NativeLibPaths.resolveRequired(NativeModule.downloader,
-        hint: '请设置 ARCHOERA_DOWNLOADER_SO 环境变量');
+    return NativeLibPaths.resolveRequired(
+      NativeModule.downloader,
+      hint: '请设置 ARCHOERA_DOWNLOADER_SO 环境变量',
+    );
   }
 
   // ---------------------------------------------------------------- 加载
@@ -40,57 +42,77 @@ class DownloaderLibrary {
 
   // ---------------------------------------------------------------- FFI 绑定（§8.1）
 
-  late final _InitDart _init =
-      _lib.lookupFunction<_InitNative, _InitDart>('archoera_downloader_init');
+  late final _InitDart _init = _lib.lookupFunction<_InitNative, _InitDart>(
+    'archoera_downloader_init',
+  );
   late final _EnqueueDart _enqueue = _lib
-      .lookupFunction<_EnqueueNative, _EnqueueDart>('archoera_downloader_enqueue');
-  late final _CancelDart _cancel =
-      _lib.lookupFunction<_CancelNative, _CancelDart>('archoera_downloader_cancel');
-  late final _RetryDart _retry =
-      _lib.lookupFunction<_RetryNative, _RetryDart>('archoera_downloader_retry');
-  late final _PauseDart _pause =
-      _lib.lookupFunction<_PauseNative, _PauseDart>('archoera_downloader_pause');
+      .lookupFunction<_EnqueueNative, _EnqueueDart>(
+        'archoera_downloader_enqueue',
+      );
+  late final _CancelDart _cancel = _lib
+      .lookupFunction<_CancelNative, _CancelDart>('archoera_downloader_cancel');
+  late final _RetryDart _retry = _lib.lookupFunction<_RetryNative, _RetryDart>(
+    'archoera_downloader_retry',
+  );
+  late final _PauseDart _pause = _lib.lookupFunction<_PauseNative, _PauseDart>(
+    'archoera_downloader_pause',
+  );
   late final _RemoveDart _remove = _lib
       .lookupFunction<_RemoveNative, _RemoveDart>('archoera_downloader_remove');
-  late final _ClearDart _clear = _lib
-      .lookupFunction<_ClearNative, _ClearDart>('archoera_downloader_clear');
-  late final _PauseAllDart _pauseAll = _lib.lookupFunction<
-      _PauseAllNative,
-      _PauseAllDart>('archoera_downloader_pause_all');
-  late final _ResumeAllDart _resumeAll = _lib.lookupFunction<
-      _ResumeAllNative,
-      _ResumeAllDart>('archoera_downloader_resume_all');
-  late final _SetHistoryLimitDart _setHistoryLimit = _lib.lookupFunction<
-      _SetHistoryLimitNative,
-      _SetHistoryLimitDart>('archoera_downloader_set_history_limit');
-  late final _SetHistoryPathDart _setHistoryPath = _lib.lookupFunction<
-      _SetHistoryPathNative,
-      _SetHistoryPathDart>('archoera_downloader_set_history_path');
-  late final _SetMaxSpeedDart _setMaxSpeed = _lib.lookupFunction<
-      _SetMaxSpeedNative,
-      _SetMaxSpeedDart>('archoera_downloader_set_max_speed');
-  late final _SetFilenameTemplateDart _setFilenameTemplate = _lib.lookupFunction<
-      _SetFilenameTemplateNative,
-      _SetFilenameTemplateDart>('archoera_downloader_set_filename_template');
-  late final _ResumeDart _resume = _lib.lookupFunction<
-      _ResumeNative,
-      _ResumeDart>('archoera_downloader_resume_from_history');
-  late final _SetKugouSessionDart _setKugouSession = _lib.lookupFunction<
-      _SetKugouSessionNative,
-      _SetKugouSessionDart>('archoera_downloader_set_kugou_session');
-  late final _SetNeteaseCookieDart _setNeteaseCookie = _lib.lookupFunction<
-      _SetNeteaseCookieNative,
-      _SetNeteaseCookieDart>('archoera_downloader_set_netease_cookie');
-  late final _SetIdentityDart _setIdentity = _lib.lookupFunction<
-      _SetIdentityNative,
-      _SetIdentityDart>('archoera_downloader_set_identity');
-  late final _ClearIdentityDart _clearIdentity = _lib.lookupFunction<
-      _ClearIdentityNative,
-      _ClearIdentityDart>('archoera_downloader_clear_identity');
-  late final _FreeDart _free =
-      _lib.lookupFunction<_FreeNative, _FreeDart>('archoera_downloader_free');
-  late final _DestroyDart _destroy =
-      _lib.lookupFunction<_DestroyNative, _DestroyDart>('archoera_downloader_destroy');
+  late final _ClearDart _clear = _lib.lookupFunction<_ClearNative, _ClearDart>(
+    'archoera_downloader_clear',
+  );
+  late final _PauseAllDart _pauseAll = _lib
+      .lookupFunction<_PauseAllNative, _PauseAllDart>(
+        'archoera_downloader_pause_all',
+      );
+  late final _ResumeAllDart _resumeAll = _lib
+      .lookupFunction<_ResumeAllNative, _ResumeAllDart>(
+        'archoera_downloader_resume_all',
+      );
+  late final _SetHistoryLimitDart _setHistoryLimit = _lib
+      .lookupFunction<_SetHistoryLimitNative, _SetHistoryLimitDart>(
+        'archoera_downloader_set_history_limit',
+      );
+  late final _SetHistoryPathDart _setHistoryPath = _lib
+      .lookupFunction<_SetHistoryPathNative, _SetHistoryPathDart>(
+        'archoera_downloader_set_history_path',
+      );
+  late final _SetMaxSpeedDart _setMaxSpeed = _lib
+      .lookupFunction<_SetMaxSpeedNative, _SetMaxSpeedDart>(
+        'archoera_downloader_set_max_speed',
+      );
+  late final _SetFilenameTemplateDart _setFilenameTemplate = _lib
+      .lookupFunction<_SetFilenameTemplateNative, _SetFilenameTemplateDart>(
+        'archoera_downloader_set_filename_template',
+      );
+  late final _ResumeDart _resume = _lib
+      .lookupFunction<_ResumeNative, _ResumeDart>(
+        'archoera_downloader_resume_from_history',
+      );
+  late final _SetKugouSessionDart _setKugouSession = _lib
+      .lookupFunction<_SetKugouSessionNative, _SetKugouSessionDart>(
+        'archoera_downloader_set_kugou_session',
+      );
+  late final _SetNeteaseCookieDart _setNeteaseCookie = _lib
+      .lookupFunction<_SetNeteaseCookieNative, _SetNeteaseCookieDart>(
+        'archoera_downloader_set_netease_cookie',
+      );
+  late final _SetIdentityDart _setIdentity = _lib
+      .lookupFunction<_SetIdentityNative, _SetIdentityDart>(
+        'archoera_downloader_set_identity',
+      );
+  late final _ClearIdentityDart _clearIdentity = _lib
+      .lookupFunction<_ClearIdentityNative, _ClearIdentityDart>(
+        'archoera_downloader_clear_identity',
+      );
+  late final _FreeDart _free = _lib.lookupFunction<_FreeNative, _FreeDart>(
+    'archoera_downloader_free',
+  );
+  late final _DestroyDart _destroy = _lib
+      .lookupFunction<_DestroyNative, _DestroyDart>(
+        'archoera_downloader_destroy',
+      );
 
   /// 初始化下载引擎（启动时一次，唯一允许注册回调指针的入口）。
   ///
@@ -106,7 +128,13 @@ class DownloaderLibrary {
   }) {
     final root = rootDir.toNativeUtf8();
     try {
-      return _init(root, subdirStrategy, maxConcurrent, eventCb, freeFn ?? nullptr);
+      return _init(
+        root,
+        subdirStrategy,
+        maxConcurrent,
+        eventCb,
+        freeFn ?? nullptr,
+      );
     } finally {
       calloc.free(root);
     }
@@ -257,21 +285,19 @@ class DownloaderLibrary {
 // §8.1 C ABI typedef（Native <-> Dart）
 // ============================================================
 
-typedef _InitNative = Int32 Function(
-  Pointer<Utf8> rootDir,
-  Int32 subdirStrategy,
-  Int32 maxConcurrent,
-  Pointer<Void> eventCb,
-  Pointer<Void> freeFn,
-);
-typedef _InitDart = int Function(
-  Pointer<Utf8>, int, int, Pointer<Void>, Pointer<Void>
-);
+typedef _InitNative =
+    Int32 Function(
+      Pointer<Utf8> rootDir,
+      Int32 subdirStrategy,
+      Int32 maxConcurrent,
+      Pointer<Void> eventCb,
+      Pointer<Void> freeFn,
+    );
+typedef _InitDart =
+    int Function(Pointer<Utf8>, int, int, Pointer<Void>, Pointer<Void>);
 
-typedef _EnqueueNative = Int32 Function(
-  Pointer<Utf8> requestJson,
-  Pointer<Pointer<Utf8>> outTaskId,
-);
+typedef _EnqueueNative =
+    Int32 Function(Pointer<Utf8> requestJson, Pointer<Pointer<Utf8>> outTaskId);
 typedef _EnqueueDart = int Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>);
 
 typedef _CancelNative = Int32 Function(Pointer<Utf8> taskId);

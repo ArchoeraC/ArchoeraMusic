@@ -12,6 +12,10 @@
 .swiftpm/
 migrate_working_dir/
 
+# Zig (audio-engine/kernel)
+.zig-cache/
+zig-out/
+
 # IntelliJ related
 *.iml
 *.ipr

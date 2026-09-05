@@ -129,9 +129,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final ok = await ref.read(likeControllerProvider).toggle(track);
     if (!ok && mounted) {
       toast(
-        track.source == 'kugou'
-            ? l10n.toastLoginRequiredKugou
-            : l10n.toastLoginRequiredNetease,
+        switch (track.source) {
+          'kugou' => l10n.toastLoginRequiredKugou,
+          'qqmusic' => l10n.toastQqLikeSyncFailed,
+          _ => l10n.toastLoginRequiredNetease,
+        },
         type: ToastType.error,
       );
     }
@@ -182,7 +184,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     });
     final canLike =
         current != null &&
-        (current.source == 'netease' || current.source == 'kugou');
+        (current.source == 'netease' ||
+            current.source == 'kugou' ||
+            current.source == 'qqmusic');
     final liked = canLike
         ? ref.watch(likeControllerProvider).isLiked(current)
         : false;

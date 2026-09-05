@@ -67,6 +67,51 @@ if(NOT APPLE)
   endif()
 endif()
 
+# ── 自研 Zig 解码内核（EraAudio 原生优先解码；docs/audio-kernel-zig.md §16）─
+# libarchoera_kernel.a（zig build 静态库）经 include/kernel_bridge.h 的 zk_* C ABI
+# 被 src/native_decoder.c 调用，作为 FFmpeg 的渐进替换后端：
+#   - 源树已有预构建 zig-out/lib/libarchoera_kernel.a → 直接复用（拷入 build/，
+#     每次构建 copy_if_different 感知更新，避免重跑整库 zig 编译）；
+#   - 无预构建产物但存在 zig → add_custom_command 以 --prefix 现构建；
+#   - 两者皆无 → HAS_ARCHOERA_KERNEL 关闭，EraAudio 模式回退 FFmpeg（功能不受损）。
+# 内核与 C 壳同用 c_allocator（宿主 CRT malloc/free），静态库无跨 CRT 问题。
+set(ZK_SRC_LIB ${CMAKE_CURRENT_SOURCE_DIR}/zig-out/lib/libarchoera_kernel.a)
+set(ZK_LIB ${CMAKE_CURRENT_BINARY_DIR}/libarchoera_kernel.a)
+set(ZK_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/archoera_kernel-out)
+set(HAS_ARCHOERA_KERNEL FALSE)
+
+if(EXISTS ${ZK_SRC_LIB})
+    add_custom_command(
+        OUTPUT ${ZK_LIB}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ZK_SRC_LIB} ${ZK_LIB}
+        DEPENDS ${ZK_SRC_LIB}
+        COMMENT "复用预构建 Zig 解码内核（archoera_kernel）"
+        VERBATIM
+    )
+    add_custom_target(archoera_kernel_lib DEPENDS ${ZK_LIB})
+    set(HAS_ARCHOERA_KERNEL TRUE)
+else()
+    find_program(ZIG_EXE zig)
+    if(ZIG_EXE)
+        # 现构建：--prefix 指向本 build 目录，避免写源树 zig-out/
+        add_custom_command(
+            OUTPUT ${ZK_LIB}
+            COMMAND ${ZIG_EXE} build --prefix ${ZK_OUT_DIR} -Doptimize=ReleaseFast
+            COMMAND ${CMAKE_COMMAND} -E copy
+                ${ZK_OUT_DIR}/lib/libarchoera_kernel.a ${ZK_LIB}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMENT "构建 Zig 解码内核（archoera_kernel）"
+            VERBATIM
+        )
+        add_custom_target(archoera_kernel_lib DEPENDS ${ZK_LIB})
+        set(HAS_ARCHOERA_KERNEL TRUE)
+        message(STATUS "Zig 解码内核由 CMake 现构建（zig build）")
+    else()
+        message(WARNING
+            "zig 不可用且无预构建 libarchoera_kernel.a — EraAudio 模式将回退 FFmpeg")
+    endif()
+endif()
+
 # ── Rust tempo 库 ──────────────────────────────────────────
 set(TEMPO_RS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tempo-rs)
 # Rust staticlib 命名（非 Windows 平台为 .a；MSVC 的 .lib 仅 Windows
@@ -98,6 +143,7 @@ endif()
 # ── 源文件 ──────────────────────────────────────────────────
 set(AUDIO_ENGINE_SOURCES
     src/decoder.c
+    src/native_decoder.c
     src/resampler.c
     src/encoder.c
     src/equalizer.c
@@ -134,6 +180,15 @@ if(MATH_LIBRARY)
 endif()
 target_link_directories(audio_engine_static PUBLIC ${FFMPEG_LIBRARY_DIRS})
 target_compile_options(audio_engine_static PUBLIC ${FFMPEG_CFLAGS_OTHER})
+
+# ── Zig 解码内核接入：EraAudio 原生优先路径（native_decoder.c → zk_*）────
+if(HAS_ARCHOERA_KERNEL)
+    target_compile_definitions(audio_engine_static PUBLIC HAS_ARCHOERA_KERNEL=1)
+    # 内核静态库以 PUBLIC 透传到各可执行/共享库最终链接（静态库不合并依赖，
+    # 需在最终链接阶段解析 zk_* 符号；archoera_kernel_lib 先行构建保证产物存在）
+    add_dependencies(audio_engine_static archoera_kernel_lib)
+    target_link_libraries(audio_engine_static PUBLIC ${ZK_LIB})
+endif()
 
 # ── FFT 共享库（Dart FFI 客户端频谱分析；EnginePaths.libfftPath）──────────
 # 独立编译 src/fft.c（无外部依赖，仅 libm）。注意全局 -fvisibility=hidden

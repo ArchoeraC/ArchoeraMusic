@@ -57,6 +57,7 @@ class CoverItem {
     this.cover,
     this.subtitle = '',
     this.trackCount = 0,
+    this.source = 'netease',
   });
 
   final String id;
@@ -64,6 +65,10 @@ class CoverItem {
   final String? cover;
   final String subtitle;
   final int trackCount;
+
+  /// 来源平台（'netease' / 'kugou' / 'qqmusic'）。聚合搜索（'all'）混
+  /// 平台结果用于来源徽标与点击详情分发；单平台使用默认值即可。
+  final String source;
 }
 
 /// 音质档位 → 网易云 song_url level 参数（对齐原项目 NETEASE_LEVEL）。

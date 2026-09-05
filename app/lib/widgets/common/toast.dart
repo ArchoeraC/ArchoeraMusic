@@ -1,8 +1,10 @@
-/// 全局 toast 消息（对齐原项目 SPlayer-Next SToast 经典布局）。
+/// 全局 toast 消息提示（classic 卡片风格：主题背景 + 类型彩色边框）。
 ///
-/// 布局：顶部居中堆叠；卡片 = 主题背景 + 类型彩色边框；进入/离开动画 =
-/// 淡入 + 下滑（对齐原版 classic 风格）。无关闭按钮、不拦截点击（纯展示，
-/// pointer-events-none）。
+/// 布局：顶部居中堆叠；内容行 = 类型图标 + 文字（Flexible 限宽，超长
+/// 自动换行）。文字用主题 bodySmall（自带字体回退链、onSurface 前景与
+/// 均匀行内分布——ToastOverlay 位于 Material 之外，裸 TextStyle 会丢失
+/// 字体导致显示异常）。进入/离开动画 = 淡入 + 下滑。无关闭按钮、不拦截
+/// 点击（纯展示，pointer-events-none）。
 library;
 
 import 'dart:async';
@@ -217,42 +219,68 @@ class _ToastItemViewState extends State<_ToastItemView>
         final dy = _leaving ? -16 * (1 - v) : 16 * (1 - v);
         return Opacity(
           opacity: v,
-          child: Transform.translate(
-            offset: Offset(0, dy),
-            child: child,
-          ),
+          child: Transform.translate(offset: Offset(0, dy), child: child),
         );
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        constraints: const BoxConstraints(minWidth: 200, maxWidth: 420),
+        constraints: const BoxConstraints(maxWidth: 420),
         decoration: BoxDecoration(
           color: scheme.surfaceBright,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _borderColor, width: 1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _borderColor, width: 1.2),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 16,
-              offset: Offset(0, 6),
+              color: Color(0x40000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
             ),
           ],
         ),
-        // 仅文字区：显式 onSurface 颜色（ToastOverlay 位于 Material
-        // 之外，不能用默认黑色）
+        // 内容行 = 类型图标 + 文字（对齐参考 toast 的 Row 布局）；
+        // Flexible 保证文字限宽换行，短消息时卡片收缩包裹内容
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Text(
-            widget.item.message,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13.5,
-              color: scheme.onSurface,
-            ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_typeIcon, size: 16, color: _iconColor),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  widget.item.message,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  /// warning 语义色（classic 体系无主题 warning 色，沿用既有取值）
+  static const Color _warnColor = Color(0xFF6B4A1F);
+
+  /// 类型 → 图标（对齐参考实现：success ✓ / error ✗ / warning ⚠ / 其余 ℹ）
+  IconData get _typeIcon => switch (widget.item.type) {
+    ToastType.success => Icons.check_circle_outline,
+    ToastType.error => Icons.error_outline,
+    ToastType.warning => Icons.warning_amber_outlined,
+    ToastType.default_ || ToastType.info => Icons.info_outline,
+  };
+
+  /// 类型 → 图标色：实色保证 16px 小图标可读（边框仍用 classic 半透明）
+  Color get _iconColor {
+    final scheme = Theme.of(context).colorScheme;
+    return switch (widget.item.type) {
+      ToastType.warning => _warnColor,
+      ToastType.error => scheme.error,
+      ToastType.success ||
+      ToastType.default_ ||
+      ToastType.info => scheme.primary,
+    };
   }
 
   /// 类型 → 边框色（对齐原版 classicBorder；default/info 跟随主题主色）
@@ -260,10 +288,10 @@ class _ToastItemViewState extends State<_ToastItemView>
     final scheme = Theme.of(context).colorScheme;
     return switch (widget.item.type) {
       ToastType.success => scheme.primary.withValues(alpha: 0.55),
-      ToastType.warning => const Color(0xFF6B4A1F),
+      ToastType.warning => _warnColor,
       ToastType.error => scheme.error.withValues(alpha: 0.6),
-      ToastType.default_ || ToastType.info =>
-        scheme.primary.withValues(alpha: 0.45),
+      ToastType.default_ ||
+      ToastType.info => scheme.primary.withValues(alpha: 0.45),
     };
   }
 }

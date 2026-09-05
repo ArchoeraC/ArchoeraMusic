@@ -4,6 +4,10 @@
 > 来源：[archoera-robustness-score.md](./archoera-robustness-score.md)（综合 61/100）
 > 定位：把评分报告的改进路线图固化为可执行计划，标注与既有四份计划（凭据保险库 /
 > 下载器身份隔离 / FFI 库布局整理 / 引擎事件推送降频）的衔接，避免重复立项。
+> **更新（2026-08-16）**：第二阶段第 9 项「完善 Windows 支持」**已完成**（Windows FFmpeg
+> 构建链落地，2026-08-11 提交 99f230b，CI 验证通过，详见 §2 第 9 项）；2026-08-16 起
+> 引擎采用 FFmpeg 默认主 + Zig 渐进替换路线（`docs/audio-kernel-zig.md`），涉及引擎的改进项
+> 后续以该路线为准（默认仍 FFmpeg，行为零回归）。
 
 ---
 
@@ -61,7 +65,14 @@
    - 接入 CI（三平台 workflow 增加 `go test`）。
 
 8. **加密存储敏感凭据**（安全 +20，中）—— **已由 credential-vault-plan.md 承接，本计划不重复立项**；
-9. **完善 Windows 支持**（运维 +10，高）—— **已启动**：Windows 播放阻塞修复（audio_engine_process UnsupportedError + FFmpeg DLL 打包）完成，待 CI 验证；与 ffi-libs-layout-plan.md 衔接。
+9. **完善 Windows 支持**（运维 +10，高）—— **已完成**：Windows 播放阻塞修复（audio_engine_process UnsupportedError + FFmpeg DLL 打包）与 **Windows FFmpeg 构建链落地**（2026-08-11，提交 99f230b）——
+   - 根因：chocolatey pkg-config 0.28 无法解析 vcpkg 生成的 `.pc` 文件，且远程提交的回退方案破坏了其他端编译；
+   - 方案：**Windows 端（`app/core/build_windows.bat` + CI `build-windows.yml`）彻底不依赖 pkg-config**，改用 `find_path`/`find_library` 直接定位 vcpkg 库；vcpkg 采用 `x64-windows-release` triplet 仅编译 Release；CI 显式传 `-DVCPKG_TARGET_TRIPLET=x64-windows-release`；其他平台恢复 `pkg_check_modules REQUIRED` 原逻辑（详见本仓库音频引擎 CMakeLists.txt 头部注释）；
+   - Windows CI 构建已验证通过（run 31451734423）；
+   - **衔接**：与 ffi-libs-layout-plan.md 衔接；2026-08-16 起引擎采用 **FFmpeg 默认主 + Zig 渐进替换**
+     路线（`docs/audio-kernel-zig.md`）——FFmpeg 保持默认主引擎（`-Duse-ffmpeg` 默认开，Windows 经
+     vcpkg），Windows 构建后续将由 build.zig 承接；Zig 内核逐格式接管（`-Dzig-<fmt>=true`），全部
+     T0/T1 验收后可选 `-Dzig-main=true` 升主（默认仍 FFmpeg）。
 
 ### 第三阶段：长期优化（高难度）
 

@@ -903,6 +903,32 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageLikedNeteaseEmptyHint => '在网易云 App 点亮红心后自动同步';
 
   @override
+  String get toastQqLikeSyncFailed => 'QQ 音樂線上收藏同步失敗（實驗介面），本次紅心已撤銷';
+
+  @override
+  String get pageLikedQqHint => 'QQ 音樂紅心儲存在本機（始終可用）；登入後可實驗同步線上「我喜歡」';
+
+  @override
+  String get pageLikedQqEmptyTitle => '還沒有 QQ 音樂紅心歌曲';
+
+  @override
+  String get pageLikedQqEmptyHint => '在搜尋/播放頁給 QQ 音樂歌曲點亮紅心後會出現在這裡（儲存在本機）';
+
+  @override
+  String get pageLikedQqLoginSync => '登入 QQ 音樂同步線上收藏（實驗）';
+
+  @override
+  String get pageLikedQqSyncOnline => '同步線上收藏（實驗）';
+
+  @override
+  String pageLikedQqSynced(Object count) {
+    return '線上收藏已併入：新增 $count 首';
+  }
+
+  @override
+  String get pageLikedQqSyncedNone => '已是最新，無新增線上收藏';
+
+  @override
   String get pageLikedLoginTitle => '登录后查看我喜欢的歌曲';
 
   @override
@@ -1466,6 +1492,102 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsPassthroughNote =>
       '关闭转码保持源采样率播放，开启则统一 48kHz 输出；切换后自动重载当前曲目生效。';
+
+  @override
+  String get settingsOutputDevice => '输出设备';
+
+  @override
+  String get settingsOutputDeviceSectionNote =>
+      '播放输出到指定音频设备；切换即时/下一曲生效（无需重启），偏好会保存。只在你显式选择时切换，应用不会自动改道。';
+
+  @override
+  String get settingsOutputDeviceDefault => '系统默认';
+
+  @override
+  String get settingsOutputDeviceDefaultDesc => '跟随系统当前输出设备（引擎不自动改道）';
+
+  @override
+  String settingsOutputDeviceFormat(Object channels, Object rate) {
+    return '$rate Hz · $channels 声道';
+  }
+
+  @override
+  String get settingsOutputDeviceDefaultTag => '默认';
+
+  @override
+  String get settingsOutputDeviceLoadFailed => '无法枚举音频输出设备（引擎不可用？将保持系统默认）。';
+
+  @override
+  String get settingsOutputDeviceHfpNote =>
+      '此设备当前处于低质量模式（如蓝牙免提/通话 HFP，常见 16kHz 单声道）。引擎会以设备的原生格式输出，音质会受限。';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideTitle => '如何启用蓝牙 A2DP（高质量音频）';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideDesc =>
+      '1. 断开蓝牙耳机后重新连接；\n2. 在系统蓝牙设置中把该设备切到“音频/A2DP”（部分系统叫“媒体音频”）；\n3. 若列表中仍只有 Headset/免提模式，请取消配对后重新配对。\n不同系统的具体菜单位置可能不同。';
+
+  @override
+  String get settingsOutputDeviceCallBadge => '通话/低质';
+
+  @override
+  String get settingsOutputDeviceCallConfirmTitle => '让音乐走通话/低质设备？';
+
+  @override
+  String get settingsOutputDeviceCallConfirmDesc =>
+      '该设备以通话级/低质输出：音乐会按语音通话标准播放，几乎毁掉音质。多数耳机不会用它播放音乐，部分设备甚至会故意不兼容这一模式，可能导致无声或异常。强烈建议改用 A2DP 等高质量设备。应用绝不会自动改道——这只在你显式选择时生效。';
+
+  @override
+  String get settingsOutputDeviceUseQuality => '改用高质量输出';
+
+  @override
+  String get settingsOutputDeviceUseCall => '仍走通话/低质';
+
+  @override
+  String get settingsOutputDeviceDefaultIsCall =>
+      '系统默认输出当前是通话/低质设备（如蓝牙免提 HFP）。音乐会以通话级音质播放、几乎毁掉音质；部分耳机还故意不兼容，可能无声或异常。建议改用高质量输出。';
+
+  @override
+  String get settingsOutputDeviceDefaultRowCallNote =>
+      '选择此项将让音乐走系统默认的通话/低质设备，音质几乎损毁，不推荐。';
+
+  @override
+  String settingsSinkChangedFailed(Object err) {
+    return '切换输出设备失败：$err';
+  }
+
+  @override
+  String get settingsEngine => '解码引擎';
+
+  @override
+  String get settingsEngineNote => '解码引擎在应用启动时加载；此处切换需冷启动后生效。';
+
+  @override
+  String get settingsEngineStableDesc => 'FFmpeg 解码内核，久经验证，默认推荐。';
+
+  @override
+  String get settingsEngineEraAudioDesc => '自研解码内核，新一代；性能与内存仍在基准测试中。';
+
+  @override
+  String get settingsEngineExperimental => '实验性';
+
+  @override
+  String get settingsEngineEraAudioNote =>
+      '实验性内核：性能与内存占用仍在基准中，个别格式或设备可能出现异常；如遇问题可在本设置切回 Stable。';
+
+  @override
+  String get settingsEngineRestartTitle => '需要重启应用';
+
+  @override
+  String get settingsEngineRestartDesc =>
+      '解码引擎偏好已保存。引擎在应用启动时加载，请重启以切换引擎；重启前仍使用当前引擎，重启期间播放与下载会中断。';
+
+  @override
+  String get settingsEngineRestartNow => '立即重启';
+
+  @override
+  String get settingsEngineRestartLater => '稍后重启';
 
   @override
   String get volumeMute => '静音';
@@ -3232,6 +3354,64 @@ class AppLocalizationsZh extends AppLocalizations {
   String streamingPlaylistSongs(Object count) {
     return '$count 首歌曲';
   }
+
+  @override
+  String get brandQqMusic => 'QQ 音乐';
+
+  @override
+  String get platformQQMusic => 'QQ 音乐';
+
+  @override
+  String get loginQqQrLogin => 'QQ 音樂掃碼登入';
+
+  @override
+  String get loginQqTypeQq => 'QQ';
+
+  @override
+  String get loginQqTypeWx => '微信';
+
+  @override
+  String get loginQqScanHint => '請使用手機 QQ 掃一掃登入';
+
+  @override
+  String get loginQqWxScanHint => '請使用微信掃一掃登入';
+
+  @override
+  String navHeaderQqId(String id) {
+    return 'QQ $id';
+  }
+
+  @override
+  String get toastQqNotSupported => 'QQ 音樂暫不支援此操作';
+
+  @override
+  String searchSourceFailed(Object source) {
+    return '「$source」搜尋暫不可用';
+  }
+
+  @override
+  String searchQqRiskDetail(Object code) {
+    return 'QQ 音樂介面限流或風控攔截（代碼 $code），已停止自動重試，請稍後再試';
+  }
+
+  @override
+  String get searchNetworkError => '網路連線失敗或請求逾時，請稍後再試';
+
+  @override
+  String searchPlatformError(Object code) {
+    return '平台傳回錯誤（$code）';
+  }
+
+  @override
+  String get searchWaitRetry => '請求過於頻繁，請稍候再試';
+
+  @override
+  String get qqMusicDownloadUnsupported => 'QQ 音乐暂不支持下载（风控）。';
+
+  @override
+  String qqMusicDownloadSkipped(Object count) {
+    return '已跳过 $count 首 QQ 音乐（暂不支持下载）。';
+  }
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -4133,6 +4313,32 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageLikedNeteaseEmptyHint => '在网易云 App 点亮红心后自动同步';
 
   @override
+  String get toastQqLikeSyncFailed => 'QQ 音乐在线收藏同步失败（实验接口），本次红心已撤销';
+
+  @override
+  String get pageLikedQqHint => 'QQ 音乐红心保存在本机（始终可用）；登录后可实验同步在线「我喜欢」';
+
+  @override
+  String get pageLikedQqEmptyTitle => '还没有 QQ 音乐红心歌曲';
+
+  @override
+  String get pageLikedQqEmptyHint => '在搜索/播放页给 QQ 音乐歌曲点亮红心后会出现在这里（保存在本机）';
+
+  @override
+  String get pageLikedQqLoginSync => '登录 QQ 音乐同步在线收藏（实验）';
+
+  @override
+  String get pageLikedQqSyncOnline => '同步在线收藏（实验）';
+
+  @override
+  String pageLikedQqSynced(Object count) {
+    return '在线收藏已并入：新增 $count 首';
+  }
+
+  @override
+  String get pageLikedQqSyncedNone => '已是最新，无新增在线收藏';
+
+  @override
   String get pageLikedLoginTitle => '登录后查看我喜欢的歌曲';
 
   @override
@@ -4696,6 +4902,102 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   @override
   String get settingsPassthroughNote =>
       '关闭转码保持源采样率播放，开启则统一 48kHz 输出；切换后自动重载当前曲目生效。';
+
+  @override
+  String get settingsOutputDevice => '输出设备';
+
+  @override
+  String get settingsOutputDeviceSectionNote =>
+      '播放输出到指定音频设备；切换即时/下一曲生效（无需重启），偏好会保存。只在你显式选择时切换，应用不会自动改道。';
+
+  @override
+  String get settingsOutputDeviceDefault => '系统默认';
+
+  @override
+  String get settingsOutputDeviceDefaultDesc => '跟随系统当前输出设备（引擎不自动改道）';
+
+  @override
+  String settingsOutputDeviceFormat(Object channels, Object rate) {
+    return '$rate Hz · $channels 声道';
+  }
+
+  @override
+  String get settingsOutputDeviceDefaultTag => '默认';
+
+  @override
+  String get settingsOutputDeviceLoadFailed => '无法枚举音频输出设备（引擎不可用？将保持系统默认）。';
+
+  @override
+  String get settingsOutputDeviceHfpNote =>
+      '此设备当前处于低质量模式（如蓝牙免提/通话 HFP，常见 16kHz 单声道）。引擎会以设备的原生格式输出，音质会受限。';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideTitle => '如何启用蓝牙 A2DP（高质量音频）';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideDesc =>
+      '1. 断开蓝牙耳机后重新连接；\n2. 在系统蓝牙设置中把该设备切到“音频/A2DP”（部分系统叫“媒体音频”）；\n3. 若列表中仍只有 Headset/免提模式，请取消配对后重新配对。\n不同系统的具体菜单位置可能不同。';
+
+  @override
+  String get settingsOutputDeviceCallBadge => '通话/低质';
+
+  @override
+  String get settingsOutputDeviceCallConfirmTitle => '让音乐走通话/低质设备？';
+
+  @override
+  String get settingsOutputDeviceCallConfirmDesc =>
+      '该设备以通话级/低质输出：音乐会按语音通话标准播放，几乎毁掉音质。多数耳机不会用它播放音乐，部分设备甚至会故意不兼容这一模式，可能导致无声或异常。强烈建议改用 A2DP 等高质量设备。应用绝不会自动改道——这只在你显式选择时生效。';
+
+  @override
+  String get settingsOutputDeviceUseQuality => '改用高质量输出';
+
+  @override
+  String get settingsOutputDeviceUseCall => '仍走通话/低质';
+
+  @override
+  String get settingsOutputDeviceDefaultIsCall =>
+      '系统默认输出当前是通话/低质设备（如蓝牙免提 HFP）。音乐会以通话级音质播放、几乎毁掉音质；部分耳机还故意不兼容，可能无声或异常。建议改用高质量输出。';
+
+  @override
+  String get settingsOutputDeviceDefaultRowCallNote =>
+      '选择此项将让音乐走系统默认的通话/低质设备，音质几乎损毁，不推荐。';
+
+  @override
+  String settingsSinkChangedFailed(Object err) {
+    return '切换输出设备失败：$err';
+  }
+
+  @override
+  String get settingsEngine => '解码引擎';
+
+  @override
+  String get settingsEngineNote => '解码引擎在应用启动时加载；此处切换需冷启动后生效。';
+
+  @override
+  String get settingsEngineStableDesc => 'FFmpeg 解码内核，久经验证，默认推荐。';
+
+  @override
+  String get settingsEngineEraAudioDesc => '自研解码内核，新一代；性能与内存仍在基准测试中。';
+
+  @override
+  String get settingsEngineExperimental => '实验性';
+
+  @override
+  String get settingsEngineEraAudioNote =>
+      '实验性内核：性能与内存占用仍在基准中，个别格式或设备可能出现异常；如遇问题可在本设置切回 Stable。';
+
+  @override
+  String get settingsEngineRestartTitle => '需要重启应用';
+
+  @override
+  String get settingsEngineRestartDesc =>
+      '解码引擎偏好已保存。引擎在应用启动时加载，请重启以切换引擎；重启前仍使用当前引擎，重启期间播放与下载会中断。';
+
+  @override
+  String get settingsEngineRestartNow => '立即重启';
+
+  @override
+  String get settingsEngineRestartLater => '稍后重启';
 
   @override
   String get volumeMute => '静音';
@@ -6462,6 +6764,64 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String streamingPlaylistSongs(Object count) {
     return '$count 首歌曲';
   }
+
+  @override
+  String get brandQqMusic => 'QQ 音乐';
+
+  @override
+  String get platformQQMusic => 'QQ 音乐';
+
+  @override
+  String get loginQqQrLogin => 'QQ 音乐扫码登录';
+
+  @override
+  String get loginQqTypeQq => 'QQ';
+
+  @override
+  String get loginQqTypeWx => '微信';
+
+  @override
+  String get loginQqScanHint => '请使用手机 QQ 扫一扫登录';
+
+  @override
+  String get loginQqWxScanHint => '请使用微信扫一扫登录';
+
+  @override
+  String navHeaderQqId(String id) {
+    return 'QQ $id';
+  }
+
+  @override
+  String get toastQqNotSupported => 'QQ 音乐暂不支持该操作';
+
+  @override
+  String searchSourceFailed(Object source) {
+    return '「$source」搜索暂不可用';
+  }
+
+  @override
+  String searchQqRiskDetail(Object code) {
+    return 'QQ 音乐接口限流或风控拦截（代码 $code），已停止自动重试，请稍后再试';
+  }
+
+  @override
+  String get searchNetworkError => '网络连接失败或请求超时，请稍后重试';
+
+  @override
+  String searchPlatformError(Object code) {
+    return '平台返回错误（$code）';
+  }
+
+  @override
+  String get searchWaitRetry => '请求过于频繁，请稍候再试';
+
+  @override
+  String get qqMusicDownloadUnsupported => 'QQ 音乐暂不支持下载（风控）。';
+
+  @override
+  String qqMusicDownloadSkipped(Object count) {
+    return '已跳过 $count 首 QQ 音乐（暂不支持下载）。';
+  }
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -7363,6 +7723,32 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageLikedNeteaseEmptyHint => '在網易雲 App 點亮紅心後自動同步';
 
   @override
+  String get toastQqLikeSyncFailed => 'QQ 音樂線上收藏同步失敗（實驗介面），本次紅心已撤銷';
+
+  @override
+  String get pageLikedQqHint => 'QQ 音樂紅心儲存在本機（始終可用）；登入後可實驗同步線上「我喜歡」';
+
+  @override
+  String get pageLikedQqEmptyTitle => '還沒有 QQ 音樂紅心歌曲';
+
+  @override
+  String get pageLikedQqEmptyHint => '在搜尋/播放頁給 QQ 音樂歌曲點亮紅心後會出現在這裡（儲存在本機）';
+
+  @override
+  String get pageLikedQqLoginSync => '登入 QQ 音樂同步線上收藏（實驗）';
+
+  @override
+  String get pageLikedQqSyncOnline => '同步線上收藏（實驗）';
+
+  @override
+  String pageLikedQqSynced(Object count) {
+    return '線上收藏已併入：新增 $count 首';
+  }
+
+  @override
+  String get pageLikedQqSyncedNone => '已是最新，無新增線上收藏';
+
+  @override
   String get pageLikedLoginTitle => '登入後檢視我喜歡的歌曲';
 
   @override
@@ -7926,6 +8312,102 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get settingsPassthroughNote =>
       '關閉轉碼保持源取樣率播放，開啟則統一 48kHz 輸出；切換後自動重載目前曲目生效。';
+
+  @override
+  String get settingsOutputDevice => '輸出裝置';
+
+  @override
+  String get settingsOutputDeviceSectionNote =>
+      '播放輸出至指定音訊裝置；切換即時/下一曲生效（無需重新啟動），偏好會保存。只在您明確選擇時切換，應用程式不會自動改道。';
+
+  @override
+  String get settingsOutputDeviceDefault => '系統預設';
+
+  @override
+  String get settingsOutputDeviceDefaultDesc => '跟隨系統目前的輸出裝置（引擎不自動改道）';
+
+  @override
+  String settingsOutputDeviceFormat(Object channels, Object rate) {
+    return '$rate Hz · $channels 聲道';
+  }
+
+  @override
+  String get settingsOutputDeviceDefaultTag => '預設';
+
+  @override
+  String get settingsOutputDeviceLoadFailed => '無法列舉音訊輸出裝置（引擎不可用？將維持系統預設）。';
+
+  @override
+  String get settingsOutputDeviceHfpNote =>
+      '此裝置目前處於低品質模式（如藍牙免持/通話 HFP，常見 16kHz 單聲道）。引擎會以裝置的原生格式輸出，音質會受限。';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideTitle => '如何啟用藍牙 A2DP（高品質音訊）';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideDesc =>
+      '1. 斷開藍牙耳機後重新連線；\n2. 在系統藍牙設定中把該裝置切到「音訊/A2DP」（部分系統稱為「媒體音訊」）；\n3. 若清單中仍只有 Headset/免持模式，請取消配對後重新配對。\n不同系統的具體選單位置可能不同。';
+
+  @override
+  String get settingsOutputDeviceCallBadge => '通話/低品質';
+
+  @override
+  String get settingsOutputDeviceCallConfirmTitle => '讓音樂走通話/低品質裝置？';
+
+  @override
+  String get settingsOutputDeviceCallConfirmDesc =>
+      '此裝置以通話級/低品質輸出：音樂會按語音通話標準播放，幾乎毀掉音質。多數耳機不會用它播放音樂，部分裝置甚至會故意不相容此模式，可能導致無聲或異常。強烈建議改用 A2DP 等高品質裝置。應用絕不會自動改道——只在您明確選擇時生效。';
+
+  @override
+  String get settingsOutputDeviceUseQuality => '改用高品質輸出';
+
+  @override
+  String get settingsOutputDeviceUseCall => '仍走通話/低品質';
+
+  @override
+  String get settingsOutputDeviceDefaultIsCall =>
+      '系統預設輸出目前是通話/低品質裝置（如藍牙免持 HFP）。音樂會以通話級音質播放、幾乎毀掉音質；部分耳機還故意不相容，可能無聲或異常。建議改用高品質輸出。';
+
+  @override
+  String get settingsOutputDeviceDefaultRowCallNote =>
+      '選擇此項將讓音樂走系統預設的通話/低品質裝置，音質幾乎損毀，不建議。';
+
+  @override
+  String settingsSinkChangedFailed(Object err) {
+    return '切換輸出裝置失敗：$err';
+  }
+
+  @override
+  String get settingsEngine => '解碼引擎';
+
+  @override
+  String get settingsEngineNote => '解碼引擎在應用程式啟動時載入；在此切換需冷啟動後生效。';
+
+  @override
+  String get settingsEngineStableDesc => 'FFmpeg 解碼核心，久經驗證，預設推薦。';
+
+  @override
+  String get settingsEngineEraAudioDesc => '自研解碼核心，新一代；效能與記憶體仍在基準測試中。';
+
+  @override
+  String get settingsEngineExperimental => '實驗性';
+
+  @override
+  String get settingsEngineEraAudioNote =>
+      '實驗性核心：效能與記憶體佔用仍在基準中，部分格式或裝置可能出現異常；如遇問題可在本設定切回 Stable。';
+
+  @override
+  String get settingsEngineRestartTitle => '需要重新啟動應用程式';
+
+  @override
+  String get settingsEngineRestartDesc =>
+      '解碼引擎偏好已儲存。引擎在應用程式啟動時載入，請重新啟動以切換引擎；重新啟動前仍使用目前引擎，重新啟動期間播放與下載會中斷。';
+
+  @override
+  String get settingsEngineRestartNow => '立即重新啟動';
+
+  @override
+  String get settingsEngineRestartLater => '稍後重新啟動';
 
   @override
   String get volumeMute => '靜音';
@@ -9692,5 +10174,63 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String streamingPlaylistSongs(Object count) {
     return '$count 首歌曲';
+  }
+
+  @override
+  String get brandQqMusic => 'QQ 音樂';
+
+  @override
+  String get platformQQMusic => 'QQ 音樂';
+
+  @override
+  String get loginQqQrLogin => 'QQ 音樂掃碼登入';
+
+  @override
+  String get loginQqTypeQq => 'QQ';
+
+  @override
+  String get loginQqTypeWx => '微信';
+
+  @override
+  String get loginQqScanHint => '請使用手機 QQ 掃一掃登入';
+
+  @override
+  String get loginQqWxScanHint => '請使用微信掃一掃登入';
+
+  @override
+  String navHeaderQqId(String id) {
+    return 'QQ $id';
+  }
+
+  @override
+  String get toastQqNotSupported => 'QQ 音樂暫不支援此操作';
+
+  @override
+  String searchSourceFailed(Object source) {
+    return '「$source」搜尋暫不可用';
+  }
+
+  @override
+  String searchQqRiskDetail(Object code) {
+    return 'QQ 音樂介面限流或風控攔截（代碼 $code），已停止自動重試，請稍後再試';
+  }
+
+  @override
+  String get searchNetworkError => '網路連線失敗或請求逾時，請稍後再試';
+
+  @override
+  String searchPlatformError(Object code) {
+    return '平台傳回錯誤（$code）';
+  }
+
+  @override
+  String get searchWaitRetry => '請求過於頻繁，請稍候再試';
+
+  @override
+  String get qqMusicDownloadUnsupported => 'QQ 音樂暫不支援下載（風控）。';
+
+  @override
+  String qqMusicDownloadSkipped(Object count) {
+    return '已略過 $count 首 QQ 音樂（暫不支援下載）。';
   }
 }

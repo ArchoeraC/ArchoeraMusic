@@ -30,7 +30,7 @@
 | scraper（libarchoera_scraper） | `ScraperBindings.instance` 惰性单例 | — | 无 |
 | subsonic（libarchoera_subsonic） | `SubsonicBindings.instance` 惰性单例 | transcoder（Go 侧 dlopen） | 无 |
 | downloader（libarchoera_downloader） | `DownloaderEngine.init()`（下载页打开时） | — | Rust 侧 `destroy` 释放堆，库句柄保留 |
-| mediaEngine / fft | `AudioEngineProcess.start()` 每次会话 **spawn 独立进程** | ffmpeg（vcpkg，进程内） | **进程退出即归还** ✅（已有进程级隔离范式） |
+| mediaEngine / fft | `AudioEngineProcess.start()` 库内线程（**FFI 直连**，2026-08-07 起替代进程 spawn） | ffmpeg / miniaudio（库内；Linux 内嵌运行库 / Windows vcpkg） | `stop()` → `archoera_mediaengine_destroy`（join 引擎线程 + 释放）；库句柄保留（dart:ffi 无法 unload） |
 | transcoder（libarchoera_transcoder） | Go 侧 dlopen / Dart 注入绝对路径 | — | Go 运行时管理 |
 
 > 结论：**「一次性加载所有程序」现状并不存在**（启动仅预载 sqlite），主要缺口是
@@ -48,7 +48,8 @@
   且双开句柄的引用计数无法正确归零。
 
 由此确立**两档释放策略**（见 §4.3）：模块自身资源销毁（安全基线）与
-子进程隔离（真正归还内存，audio-engine 已示范）。
+子进程隔离（真正归还内存；audio-engine 已于 2026-08-07 迁走该范式改 FFI 直连，
+子进程化仅作 scanner / downloader 的备选）。
 
 ---
 
@@ -67,7 +68,7 @@
 ```
 scanner    → sqlite   （必须 RTLD_GLOBAL，且常驻）
 subsonic   → transcoder（Go 侧 dlopen，注册表只保证路径注入）
-mediaEngine→ fft / ffmpeg（进程内，audio-engine 产物同目录）
+mediaEngine→ fft / ffmpeg（同一库内依赖，产物平铺于 `native/`，进程内解析）
 ```
 `acquire(scanner)` 自动先 `ensureLoaded(sqlite)`；**只 preload 被依赖项，绝不一次性全载**。
 
@@ -76,8 +77,9 @@ mediaEngine→ fft / ffmpeg（进程内，audio-engine 产物同目录）
   `scraper_destroy` / subsonic 销毁）归还 native 堆内存；Dart 侧绑定位空、GC 回收；
   库句柄保留（dart:ffi 限制，.so 代码段常驻——各模块均很小，可接受）。
 - **Tier 2（激进 · 可选）**：重量级模块（scanner 的 C# runtime、downloader 的 Rust）
-  改造为**子进程隔离**（对齐 `AudioEngineProcess` spawn/stop 范式），「释放」= 终止
-  子进程，真实归还全部内存。进度事件经 stdout/管道或 IPC 回传。
+  改造为**子进程隔离**，「释放」= 终止子进程，真实归还全部内存。进度事件经 stdout/管道
+  或 IPC 回传。（audio-engine 的历史 spawn/stop 范式已于 2026-08-07 迁移到 FFI 直连，
+  子进程化仅作上述重量级模块的备选方案。）
 
 ### 4.4 与既有机制的关系
 - `preloadBundledSqlite`（RTLD_GLOBAL\|DEEPBIND）：保留为 sqlite 常驻加载的唯一入口；
@@ -104,7 +106,7 @@ mediaEngine→ fft / ffmpeg（进程内，audio-engine 产物同目录）
 | downloader | **有**：`DownloaderEngine.dispose()` 已调 Rust `destroy`（释放堆 + 断点落盘） | `DownloadController`（**非 autoDispose**）持 `DownloaderEngine`；`bootstrap.dart:46` `ref.read(downloadControllerProvider)` → **启动即常驻，违反按需** | **当前仅 `_teardown`（ProviderContainer 销毁时）**；需新增「空闲 suspend / 进入下载页 resume」 | `activeCount==0`（无 queued/resolving/running）+ `_gen` 丢弃异步 init 竞态 | **最大改动点**：bootstrap 强制常驻 + 全局 provider 无法按页销毁 → 需「惰性 init + 活跃会话计数」 |
 | scraper | **有**：`ScraperController.dispose()` → `archoera_scraper_destroy(handle)` ✅ | `ScraperBindings.instance` 惰性单例（库句柄常驻，接受）+ 每会话一个 `ScraperController` | `ScrapeController._cleanup()`（done/error/empty/run 失败）——**已完善**；仅剩注册表引用计数接入 | `state.scraping` 单会话；start 前先 `_scraper?.dispose()` 清残留 | 无 |
 | subsonic | **有**：`SubsonicController.dispose()` → `archoera_subsonic_destroy(handle)` ✅ | `SubsonicBindings.instance` 惰性单例；**Dart 侧当前无任何创建点**（Controller/Admin 定义了但未接入 UI） | 无会话可释放；唯一运行时路径 `goShredFiles`（handle=0，Go 全局单例，一次性销毁操作） | — | 按需已天然满足，阶段②无需接入点；`SubsonicAdmin` 接入 UI 后另行评估 |
-| mediaEngine | **进程退出即归还** ✅（spawn/stop 范式） | `AudioEngineProcess` | stop → 进程退出 | 播放会话 | 无 |
+| mediaEngine | **库内销毁** ✅：`archoera_mediaengine_destroy`（join 引擎线程 + 释放）；FFI 直连（2026-08-07 起，非进程 spawn） | `AudioEngineProcess`（`Isolate.run` 包裹 create/destroy；50ms 轮询 `pollEvent`） | `stop()` → destroy；库句柄保留（dart:ffi 无法 unload，.so 常驻可接受） | 播放会话 | 引擎线程 join 需在 Isolate 内执行（已实现），避免阻塞 UI isolate |
 | fft | **有**：`FftAnalyzer.dispose()` → `fft_destroy` ✅ | **每次播放会话新建 `FftAnalyzer`**（无句柄缓存），`PcmAnalyzer` 持用，`AudioEngineProcess._pcm` 生命周期绑定会话 | `AudioEngineProcess.stop` 时 `_pcm.dispose()`（native handle 归还）；库句柄重复 dlopen 引用计数累积（dart:ffi 无法归还） | 播放会话 | 阶段①注册表接入后改为复用句柄 + 引用计数管理 |
 | sqlite | **常驻**（共享实例契约） | `preloadBundledSqlite` | 永不释放 | — | — |
 

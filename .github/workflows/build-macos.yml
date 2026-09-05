@@ -36,6 +36,20 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Install Zig 0.16 (EraAudio kernel)
+        run: |
+          set -euo pipefail
+          VER=0.16.0
+          ZD="$HOME/.local/zig-$VER"
+          if [ ! -x "$ZD/zig" ]; then
+            mkdir -p "$HOME/.local"
+            curl -fsSL "https://ziglang.org/download/$VER/zig-macos-aarch64-$VER.tar.xz" -o /tmp/zig.tar.xz
+            tar -C "$HOME/.local" -xf /tmp/zig.tar.xz
+            mv "$HOME/.local/zig-macos-aarch64-$VER" "$ZD"
+          fi
+          echo "$ZD" >> "$GITHUB_PATH"
+          zig version
+
       - name: Build native modules (macOS 一站式脚本)
         # 统一入口 app/core/build-macos.sh，收敛 audio-engine / scraper /
         # scanner / vault / downloader / subsonic 全部原生模块编译：

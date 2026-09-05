@@ -94,6 +94,24 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置解码引擎（'stable' = FFmpeg 稳定默认 / 'eraudio' = 自研实验性）。
+  ///
+  /// 只持久化偏好，**不热替换引擎**——引擎在应用启动时加载，需冷启动后
+  /// 由引擎会话创建处（[AudioEngineProcess.start]）读取本偏好生效。
+  void setEngine(String value) {
+    state = state.copyWithEngine(value);
+    state.save();
+  }
+
+  /// 设置输出设备（'' = 系统默认；其余为引擎 list_sinks 返回的设备 id）。
+  ///
+  /// 只持久化偏好；是否即时下发由调用方决定（当前会话存在 → 发 set_sink，
+  /// 无会话 → 下次会话创建后由引擎会话流程读取本偏好自动下发）。
+  void setOutputSink(String id) {
+    state = state.copyWithSink(id);
+    state.save();
+  }
+
   /// 设置「启动时自动播放」开关。
   void setAutoPlayOnLaunch(bool value) {
     state = state.copyWithAutoPlay(value);

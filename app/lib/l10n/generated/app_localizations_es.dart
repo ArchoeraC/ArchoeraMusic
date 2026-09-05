@@ -943,6 +943,39 @@ class AppLocalizationsEs extends AppLocalizations {
       'Los corazones en NetEase se sincronizan automáticamente';
 
   @override
+  String get toastQqLikeSyncFailed =>
+      'Error al sincronizar los favoritos en línea de QQ Music (API experimental); el cambio de «Me gusta» se ha revertido';
+
+  @override
+  String get pageLikedQqHint =>
+      'Los «Me gusta» de QQ Music se guardan en este dispositivo y siempre están disponibles; inicia sesión para sincronizar experimentalmente los favoritos en línea';
+
+  @override
+  String get pageLikedQqEmptyTitle =>
+      'Aún no hay canciones de QQ Music que te gusten';
+
+  @override
+  String get pageLikedQqEmptyHint =>
+      'Marca con el corazón cualquier canción de QQ Music en la búsqueda o reproducción para que aparezca aquí (se guarda en este dispositivo)';
+
+  @override
+  String get pageLikedQqLoginSync =>
+      'Inicia sesión en QQ Music para sincronizar favoritos en línea (experimental)';
+
+  @override
+  String get pageLikedQqSyncOnline =>
+      'Sincronizar favoritos en línea (experimental)';
+
+  @override
+  String pageLikedQqSynced(Object count) {
+    return 'Favoritos en línea sincronizados: $count canción(es) nueva(s) añadidas';
+  }
+
+  @override
+  String get pageLikedQqSyncedNone =>
+      'Ya sincronizado - no hay favoritos en línea nuevos';
+
+  @override
   String get pageLikedLoginTitle =>
       'Inicia sesión para ver tus canciones favoritas';
 
@@ -1536,6 +1569,110 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsPassthroughNote =>
       'Paso activado: frecuencia original; desactivado: salida 48kHz. Efectivo al recargar la pista actual.';
+
+  @override
+  String get settingsOutputDevice => 'Dispositivo de salida';
+
+  @override
+  String get settingsOutputDeviceSectionNote =>
+      'Reproduce en un dispositivo de audio concreto. El cambio se aplica de inmediato o en la siguiente pista (sin reiniciar) y la elección se guarda. Solo cambia si lo eliges explícitamente; la app nunca redirige por su cuenta.';
+
+  @override
+  String get settingsOutputDeviceDefault => 'Predeterminado del sistema';
+
+  @override
+  String get settingsOutputDeviceDefaultDesc =>
+      'Sigue la salida actual del sistema (sin redirección automática)';
+
+  @override
+  String settingsOutputDeviceFormat(Object channels, Object rate) {
+    return '$rate Hz · $channels canales';
+  }
+
+  @override
+  String get settingsOutputDeviceDefaultTag => 'Predeterminado';
+
+  @override
+  String get settingsOutputDeviceLoadFailed =>
+      'No se pudieron enumerar los dispositivos de salida (¿motor no disponible? se mantiene el predeterminado del sistema).';
+
+  @override
+  String get settingsOutputDeviceHfpNote =>
+      'Este dispositivo está en modo de baja calidad (p. ej. Bluetooth manos libres/HFP, normalmente 16 kHz mono). El motor emite en el formato nativo del dispositivo, por lo que la calidad se ve limitada.';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideTitle =>
+      'Cómo activar Bluetooth A2DP (audio de alta calidad)';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideDesc =>
+      '1. Desconecta los auriculares Bluetooth y vuelve a conectarlos.\n2. En la configuración Bluetooth del sistema, cambia el dispositivo a “Audio/A2DP” (en algunos sistemas, “Audio multimedia”).\n3. Si solo aparece como Headset/manos libres, desvincula y vincula de nuevo.\nLos menús exactos varían según el sistema.';
+
+  @override
+  String get settingsOutputDeviceCallBadge => 'Llamada / baja calidad';
+
+  @override
+  String get settingsOutputDeviceCallConfirmTitle =>
+      '¿Reproducir música en un dispositivo de calidad de llamada?';
+
+  @override
+  String get settingsOutputDeviceCallConfirmDesc =>
+      'Este dispositivo emite en calidad de llamada/baja calidad: la música casi se destruye (audio de conversación). La mayoría de los auriculares no lo usan para música y algunos lo rechazan a propósito (posible silencio o comportamiento anómalo). Se recomienda encarecidamente una salida de alta calidad (A2DP, etc.). La app nunca redirige por su cuenta; solo se aplica si lo eliges explícitamente.';
+
+  @override
+  String get settingsOutputDeviceUseQuality =>
+      'Cambiar a salida de alta calidad';
+
+  @override
+  String get settingsOutputDeviceUseCall => 'Usar de todos modos';
+
+  @override
+  String get settingsOutputDeviceDefaultIsCall =>
+      'La salida predeterminada del sistema es un dispositivo de llamada/baja calidad (p. ej. manos libres HFP). La música casi se destruiría y algunos auriculares rechazan este perfil a propósito (posible silencio o anomalías). Cambia a una salida de alta calidad.';
+
+  @override
+  String get settingsOutputDeviceDefaultRowCallNote =>
+      'Elegir esto envía la música al predeterminado de llamada/baja calidad del sistema; el sonido casi se destruye. No recomendado.';
+
+  @override
+  String settingsSinkChangedFailed(Object err) {
+    return 'No se pudo cambiar el dispositivo de salida: $err';
+  }
+
+  @override
+  String get settingsEngine => 'Motor de decodificación';
+
+  @override
+  String get settingsEngineNote =>
+      'El motor de decodificación se carga al iniciar la app; el cambio solo se aplica tras un reinicio en frío.';
+
+  @override
+  String get settingsEngineStableDesc =>
+      'Núcleo de decodificación FFmpeg. Probado y el predeterminado.';
+
+  @override
+  String get settingsEngineEraAudioDesc =>
+      'Núcleo de decodificación propio. Más nuevo; el rendimiento y la memoria aún se están evaluando.';
+
+  @override
+  String get settingsEngineExperimental => 'Experimental';
+
+  @override
+  String get settingsEngineEraAudioNote =>
+      'Núcleo experimental: el rendimiento y el uso de memoria aún se están evaluando y algunos formatos o dispositivos pueden dar problemas. Si encuentras fallos, vuelve a Stable desde este ajuste.';
+
+  @override
+  String get settingsEngineRestartTitle => 'Se requiere reiniciar';
+
+  @override
+  String get settingsEngineRestartDesc =>
+      'La preferencia de motor se ha guardado. El motor se carga al iniciar la app, así que reiníciala para cambiar de motor. Hasta entonces seguirá funcionando el motor actual; la reproducción y las descargas se interrumpen durante el reinicio.';
+
+  @override
+  String get settingsEngineRestartNow => 'Reiniciar ahora';
+
+  @override
+  String get settingsEngineRestartLater => 'Más tarde';
 
   @override
   String get volumeMute => 'Silenciar';
@@ -3443,5 +3580,66 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String streamingPlaylistSongs(Object count) {
     return '$count canciones';
+  }
+
+  @override
+  String get brandQqMusic => 'QQ Music';
+
+  @override
+  String get platformQQMusic => 'QQ Music';
+
+  @override
+  String get loginQqQrLogin => 'Iniciar sesión con el código QR de QQ Music';
+
+  @override
+  String get loginQqTypeQq => 'QQ';
+
+  @override
+  String get loginQqTypeWx => 'WeChat';
+
+  @override
+  String get loginQqScanHint => 'Escanea con la app de QQ para iniciar sesión';
+
+  @override
+  String get loginQqWxScanHint => 'Escanea con WeChat para iniciar sesión';
+
+  @override
+  String navHeaderQqId(String id) {
+    return 'QQ $id';
+  }
+
+  @override
+  String get toastQqNotSupported => 'No compatible con QQ Music';
+
+  @override
+  String searchSourceFailed(Object source) {
+    return 'La búsqueda en $source no está disponible temporalmente';
+  }
+
+  @override
+  String searchQqRiskDetail(Object code) {
+    return 'QQ Music limitó o bloqueó la solicitud (código $code); se detuvo el reintento automático, inténtalo más tarde';
+  }
+
+  @override
+  String get searchNetworkError =>
+      'Error de red o tiempo de espera agotado, inténtelo más tarde';
+
+  @override
+  String searchPlatformError(Object code) {
+    return 'La plataforma devolvió un error ($code)';
+  }
+
+  @override
+  String get searchWaitRetry =>
+      'Demasiadas solicitudes, espera un momento e inténtalo de nuevo';
+
+  @override
+  String get qqMusicDownloadUnsupported =>
+      'Descargas de QQ Music no compatibles por ahora (control de riesgos).';
+
+  @override
+  String qqMusicDownloadSkipped(Object count) {
+    return 'Se omitieron $count temas de QQ Music: descargas no disponibles.';
   }
 }

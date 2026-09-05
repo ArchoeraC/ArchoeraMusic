@@ -38,7 +38,8 @@ class _VaultUnlockGateState extends ConsumerState<VaultUnlockGate> {
     // getRuntime 在 widget 测试未注入时可能抛错 → 容错按不需解锁处理。
     try {
       final s = getRuntime().sessionStore;
-      _needsUnlock = (s is VaultSessionStore && s.needsPassword) ||
+      _needsUnlock =
+          (s is VaultSessionStore && s.needsPassword) ||
           StreamingStore.needsPassword;
     } catch (_) {
       _needsUnlock = false;
@@ -105,10 +106,9 @@ class _VaultUnlockGateState extends ConsumerState<VaultUnlockGate> {
                 Text(
                   l10n.vaultUnlockTitle,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 10),
                 Text(

@@ -44,7 +44,10 @@ String nmAesCbcBase64(String text, String key) =>
 /// AES-ECB 加密 → 大写 hex（eapi/linuxapi 用）
 String nmAesEcbHexUpper(String text, String key) {
   final bytes = _aes128(text, key, cbc: false);
-  return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join().toUpperCase();
+  return bytes
+      .map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join()
+      .toUpperCase();
 }
 
 // ─── RSA 裸加密（RSA_NO_PADDING，对齐 node:crypto publicEncrypt） ────────
@@ -162,12 +165,22 @@ Uint8List _hexToBytes(String hex) {
 }
 
 /// AES-128-ECB 加解密（PKCS7 填充，对齐 node:crypto createCipheriv/createDecipheriv）
-Uint8List _aesEcbBytes(Uint8List input, Uint8List key, {required bool encrypt}) {
-  final cipher = PaddedBlockCipherImpl(PKCS7Padding(), ECBBlockCipher(AESEngine()));
-  cipher.init(encrypt, PaddedBlockCipherParameters<CipherParameters, CipherParameters>(
-    KeyParameter(key),
-    null,
-  ));
+Uint8List _aesEcbBytes(
+  Uint8List input,
+  Uint8List key, {
+  required bool encrypt,
+}) {
+  final cipher = PaddedBlockCipherImpl(
+    PKCS7Padding(),
+    ECBBlockCipher(AESEngine()),
+  );
+  cipher.init(
+    encrypt,
+    PaddedBlockCipherParameters<CipherParameters, CipherParameters>(
+      KeyParameter(key),
+      null,
+    ),
+  );
   return cipher.process(input);
 }
 
@@ -175,8 +188,13 @@ Uint8List _aesEcbBytes(Uint8List input, Uint8List key, {required bool encrypt}) 
 /// 密文是二进制，必须先解 AES 再判断 gzip 魔数，不能在解密前 utf8.decode。
 dynamic nmEapiResDecrypt(String encryptedHex, {bool aeapi = false}) {
   try {
-    final decrypted = _aesEcbBytes(_hexToBytes(encryptedHex), utf8.encode(nmEapiKey), encrypt: false);
-    final isGzip = decrypted.length >= 2 && decrypted[0] == 0x1f && decrypted[1] == 0x8b;
+    final decrypted = _aesEcbBytes(
+      _hexToBytes(encryptedHex),
+      utf8.encode(nmEapiKey),
+      encrypt: false,
+    );
+    final isGzip =
+        decrypted.length >= 2 && decrypted[0] == 0x1f && decrypted[1] == 0x8b;
     final bytes = isGzip ? GZipCodec().decode(decrypted) : decrypted;
     if (aeapi && !isGzip) return null;
     return jsonDecode(utf8.decode(bytes));
@@ -189,8 +207,12 @@ dynamic nmEapiResDecrypt(String encryptedHex, {bool aeapi = false}) {
 
 /// xeapi 签名密钥
 const nmXeapiSignKey = 'b1ced3e7b84e4c3f9c1ef8a7d6b2e4f1';
+
 /// xeapi 静态密钥（密文外层 AES 加密）
-final Uint8List _xeapiStaticKey = Uint8List.fromList(utf8.encode('0CoJUm6Qyw8W8jud'));
+final Uint8List _xeapiStaticKey = Uint8List.fromList(
+  utf8.encode('0CoJUm6Qyw8W8jud'),
+);
+
 /// X25519 基点（u 坐标 = 9）
 final Uint8List _x25519BasePoint = Uint8List(32)..[0] = 9;
 
@@ -312,19 +334,28 @@ Uint8List _x25519(Uint8List scalar, Uint8List u) {
 /// AES-128-GCM 加密 → 密文 + 16 字节认证标签（对齐 createCipheriv('aes-128-gcm') + getAuthTag）
 Uint8List _aesGcmEncrypt(Uint8List key, Uint8List iv, Uint8List plaintext) {
   final gcm = GCMBlockCipher(AESEngine());
-  gcm.init(true, AEADParameters<CipherParameters>(KeyParameter(key), 128, iv, Uint8List(0)));
+  gcm.init(
+    true,
+    AEADParameters<CipherParameters>(KeyParameter(key), 128, iv, Uint8List(0)),
+  );
   return gcm.process(plaintext);
 }
 
 /// xeapi 反爬签名：HMAC-SHA256(signKey, timestamp + nonce) → base64
-String nmXeapiSign(String timestamp, String nonce) =>
-    base64.encode(_hmacSha256(utf8.encode(nmXeapiSignKey), utf8.encode('$timestamp$nonce')));
+String nmXeapiSign(String timestamp, String nonce) => base64.encode(
+  _hmacSha256(utf8.encode(nmXeapiSignKey), utf8.encode('$timestamp$nonce')),
+);
 
 /// 由 ECDH 共享密钥 + 临时公钥派生 16 字节 AES 密钥（HKDF-SHA256 风格，对齐 deriveX25519AesKey）
-Uint8List _deriveX25519AesKey(Uint8List sharedSecret, Uint8List ephemeralPublicKey) {
+Uint8List _deriveX25519AesKey(
+  Uint8List sharedSecret,
+  Uint8List ephemeralPublicKey,
+) {
   final ikm = sharedSecret.isEmpty ? Uint8List(32) : sharedSecret;
   final prk = _hmacSha256(Uint8List(32), ikm);
-  final info = Uint8List(33)..setAll(0, ephemeralPublicKey)..[32] = 1;
+  final info = Uint8List(33)
+    ..setAll(0, ephemeralPublicKey)
+    ..[32] = 1;
   return Uint8List.sublistView(_hmacSha256(prk, info), 0, 16);
 }
 
@@ -345,14 +376,20 @@ Uint8List _xeapiMidTransform(Uint8List ciphertext) {
 }
 
 /// 用 X25519 ECDH + AES-GCM 封装动态密钥（S 字段，对齐 xeapiEncryptS）
-Uint8List _xeapiEncryptS(Uint8List dynamicKey, NmXeapiPublicKey publicKeyState, String os) {
+Uint8List _xeapiEncryptS(
+  Uint8List dynamicKey,
+  NmXeapiPublicKey publicKeyState,
+  String os,
+) {
   final peerRaw = base64.decode(publicKeyState.publicKey);
   final ephemeralPrivate = _randomBytes(32);
   final ephemeralPublic = _x25519(ephemeralPrivate, _x25519BasePoint);
   final sharedSecret = _x25519(ephemeralPrivate, peerRaw);
   final aesKey = _deriveX25519AesKey(sharedSecret, ephemeralPublic);
   final iv = _randomBytes(12);
-  final plaintext = utf8.encode('${base64.encode(dynamicKey)}|$os|${publicKeyState.sk ?? ''}');
+  final plaintext = utf8.encode(
+    '${base64.encode(dynamicKey)}|$os|${publicKeyState.sk ?? ''}',
+  );
   final encrypted = _aesGcmEncrypt(aesKey, iv, plaintext);
   final out = Uint8List(32 + 12 + encrypted.length);
   out.setAll(0, ephemeralPublic);
@@ -362,10 +399,16 @@ Uint8List _xeapiEncryptS(Uint8List dynamicKey, NmXeapiPublicKey publicKeyState, 
 }
 
 /// 构造 xeapi 明文（JSON：body/queryString/...，对齐 buildXeapiPlaintext）
-String _buildXeapiPlaintext(String uri, Map<String, dynamic> data, NmXeapiOptions options) {
+String _buildXeapiPlaintext(
+  String uri,
+  Map<String, dynamic> data,
+  NmXeapiOptions options,
+) {
   final fields = <String, String>{};
-  final contentType = options.contentType ?? 'application/x-www-form-urlencoded;charset=utf-8';
-  if (contentType.split(';').first.trim().toLowerCase() != 'application/x-www-form-urlencoded') {
+  final contentType =
+      options.contentType ?? 'application/x-www-form-urlencoded;charset=utf-8';
+  if (contentType.split(';').first.trim().toLowerCase() !=
+      'application/x-www-form-urlencoded') {
     fields['contentType'] = contentType;
   }
   final method = (options.method ?? 'POST').toUpperCase();
@@ -375,11 +418,14 @@ String _buildXeapiPlaintext(String uri, Map<String, dynamic> data, NmXeapiOption
   if (uriObj.hasQuery) fields['queryString'] = uriObj.query;
 
   final bodyData = Map<String, dynamic>.from(data)..remove('e_r');
-  final form = Uri(queryParameters: bodyData.map((k, v) => MapEntry(k, '$v'))).query;
+  final form = Uri(
+    queryParameters: bodyData.map((k, v) => MapEntry(k, '$v')),
+  ).query;
   fields['body'] = base64.encode(utf8.encode(form));
 
-  fields['queryString'] =
-      fields.containsKey('queryString') ? '${fields['queryString']}&e_r=true' : 'e_r=true';
+  fields['queryString'] = fields.containsKey('queryString')
+      ? '${fields['queryString']}&e_r=true'
+      : 'e_r=true';
   return jsonEncode(fields);
 }
 
@@ -389,8 +435,9 @@ String _buildXeapiPlaintext(String uri, Map<String, dynamic> data, NmXeapiOption
   Map<String, dynamic> data,
   NmXeapiOptions options,
 ) {
-  final activeSessionKey =
-      (options.sessionKey?.isNotEmpty ?? false) ? Uint8List.fromList(utf8.encode(options.sessionKey!)) : null;
+  final activeSessionKey = (options.sessionKey?.isNotEmpty ?? false)
+      ? Uint8List.fromList(utf8.encode(options.sessionKey!))
+      : null;
   final activeSessionId = options.sessionId ?? '';
   final dynamicKey = activeSessionKey ?? _randomBytes(16);
   final plaintext = utf8.encode(_buildXeapiPlaintext(uri, data, options));
@@ -400,31 +447,37 @@ String _buildXeapiPlaintext(String uri, Map<String, dynamic> data, NmXeapiOption
   final mid = _xeapiMidTransform(inner);
   final b = _aesEcbBytes(mid, dynamicKey, encrypt: true);
 
-  final s = _xeapiEncryptS(dynamicKey, options.publicKeyState, options.os ?? 'android');
+  final s = _xeapiEncryptS(
+    dynamicKey,
+    options.publicKeyState,
+    options.os ?? 'android',
+  );
 
   // R = AES-ECB(STATIC_KEY, `${version}|${有会话密钥时附带 sessionId}`)
-  final rPlain =
-      utf8.encode('${options.publicKeyState.version}|${activeSessionKey != null ? activeSessionId : ''}');
+  final rPlain = utf8.encode(
+    '${options.publicKeyState.version}|${activeSessionKey != null ? activeSessionId : ''}',
+  );
   final r = _aesEcbBytes(rPlain, _xeapiStaticKey, encrypt: true);
 
-  return (
-    B: base64.encode(b),
-    S: base64.encode(s),
-    R: base64.encode(r),
-  );
+  return (B: base64.encode(b), S: base64.encode(s), R: base64.encode(r));
 }
 
 /// xeapi 响应解密：AES-ECB(eapiKey) + 可选 gunzip + JSON（对齐 xeapiResDecrypt）
 dynamic nmXeapiResDecrypt(Uint8List body) {
   final decrypted = _aesEcbBytes(body, utf8.encode(nmEapiKey), encrypt: false);
-  final isGzip = decrypted.length >= 2 && decrypted[0] == 0x1f && decrypted[1] == 0x8b;
+  final isGzip =
+      decrypted.length >= 2 && decrypted[0] == 0x1f && decrypted[1] == 0x8b;
   final bytes = isGzip ? GZipCodec().decode(decrypted) : decrypted;
   return jsonDecode(utf8.decode(bytes));
 }
 
 /// 解密反爬接口返回的公钥包（对齐 xeapiDecryptPublicKey）
 NmXeapiPublicKey nmXeapiDecryptPublicKey(String encryptedData) {
-  final decrypted = _aesEcbBytes(base64.decode(encryptedData), _xeapiStaticKey, encrypt: false);
+  final decrypted = _aesEcbBytes(
+    base64.decode(encryptedData),
+    _xeapiStaticKey,
+    encrypt: false,
+  );
   final obj = jsonDecode(utf8.decode(decrypted)) as Map<String, dynamic>;
   return NmXeapiPublicKey(
     version: obj['version']?.toString() ?? '',

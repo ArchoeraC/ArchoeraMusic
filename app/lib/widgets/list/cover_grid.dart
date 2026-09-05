@@ -20,6 +20,7 @@ class CoverGrid extends StatelessWidget {
     this.childAspectRatio = 0.78,
     this.radius = 10,
     this.artist = false,
+    this.showSource = false,
     this.shrinkWrap = false,
     this.physics,
   });
@@ -44,6 +45,9 @@ class CoverGrid extends StatelessWidget {
 
   /// 歌手网格（圆形头像，对齐原版 CoverCard type=artist）。
   final bool artist;
+
+  /// 封面左上角显示来源平台小徽标（聚合搜索混多平台结果时开启）。
+  final bool showSource;
 
   /// 内嵌滚动容器（SingleChildScrollView / ListView 等无界高度场景）时
   /// 需收缩自身高度并禁用自身滚动，交由外层滚动。
@@ -81,6 +85,7 @@ class CoverGrid extends StatelessWidget {
           item: item,
           radius: radius,
           artist: artist,
+          showSource: showSource,
           onTap: () => onTap(item),
           onPlay: onPlay == null ? null : () => onPlay!(item),
         );
@@ -178,6 +183,7 @@ class CoverCard extends StatelessWidget {
     this.radius = 10,
     this.subtitleOverride,
     this.artist = false,
+    this.showSource = false,
   });
 
   final CoverItem item;
@@ -190,6 +196,9 @@ class CoverCard extends StatelessWidget {
 
   /// 歌手卡片（圆形头像 + 悬浮居中用户图标 + 文本居中，对齐原版 CoverCard type=artist）。
   final bool artist;
+
+  /// 封面左上角显示来源平台小徽标（聚合搜索混多平台结果时开启）。
+  final bool showSource;
 
   @override
   Widget build(BuildContext context) {
@@ -230,11 +239,23 @@ class CoverCard extends StatelessWidget {
                 // CoverList type=artist 的圆形设计）。
                 child: artist
                     ? ClipOval(
-                        child: _coverBody(item, placeholder, theme, onTap),
+                        child: _coverBody(
+                          item,
+                          placeholder,
+                          theme,
+                          onTap,
+                          showSource: showSource,
+                        ),
                       )
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(radius),
-                        child: _coverBody(item, placeholder, theme, onTap),
+                        child: _coverBody(
+                          item,
+                          placeholder,
+                          theme,
+                          onTap,
+                          showSource: showSource,
+                        ),
                       ),
               ),
               const SizedBox(height: 8),
@@ -269,8 +290,9 @@ class CoverCard extends StatelessWidget {
     CoverItem item,
     Widget placeholder,
     ThemeData theme,
-    VoidCallback? onTap,
-  ) {
+    VoidCallback? onTap, {
+    bool showSource = false,
+  }) {
     return AspectRatio(
       aspectRatio: 1,
       child: Stack(
@@ -300,7 +322,48 @@ class CoverCard extends StatelessWidget {
                 onPlay: artist ? null : onPlay,
               ),
             ),
+          // 来源平台徽标（聚合搜索混多平台结果时区分来源）
+          if (showSource)
+            Positioned(
+              left: 6,
+              top: 6,
+              child: _CoverSourceTag(source: item.source),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// 封面来源平台小徽标（左上角；聚合搜索区分三方来源）。
+class _CoverSourceTag extends StatelessWidget {
+  const _CoverSourceTag({required this.source});
+
+  final String source;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (source) {
+      'netease' => ('云', const Color(0xFFC20C0C)),
+      'kugou' => ('酷', const Color(0xFF00A7E0)),
+      'qqmusic' => ('Q', const Color(0xFF31C27C)),
+      _ => ('', Colors.transparent),
+    };
+    if (label.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 9,
+          height: 1,
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

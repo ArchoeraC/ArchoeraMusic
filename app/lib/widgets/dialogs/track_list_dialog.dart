@@ -34,6 +34,67 @@ Future<void> showKugouTracksDialog(
   );
 }
 
+/// QQ 音乐曲目列表弹窗（歌单 / 专辑 / 歌手单曲复用）。
+Future<void> showQqTracksDialog(
+  BuildContext context, {
+  required String title,
+  String? subtitle,
+  String? cover,
+  required Future<List<Track>> Function(WidgetRef ref) loadTracks,
+}) =>
+    showKugouTracksDialog(
+      context,
+      title: title,
+      subtitle: subtitle,
+      cover: cover,
+      loadTracks: loadTracks,
+    );
+
+/// QQ 音乐歌单详情弹窗（song_list 全量曲目）。
+Future<void> showQqPlaylistDetailDialog(
+  BuildContext context,
+  CoverItem playlist,
+) {
+  return showQqTracksDialog(
+    context,
+    title: playlist.title,
+    subtitle: playlist.subtitle,
+    cover: playlist.cover,
+    loadTracks: (ref) async {
+      final detail = await ref
+          .read(qqMusicApiProvider)
+          .playlistTracks(playlist.id, cover: playlist.cover);
+      return detail;
+    },
+  );
+}
+
+/// QQ 音乐专辑详情弹窗（专辑曲目）。
+Future<void> showQqAlbumDetailDialog(BuildContext context, CoverItem album) {
+  return showQqTracksDialog(
+    context,
+    title: album.title,
+    subtitle: album.subtitle,
+    cover: album.cover,
+    loadTracks: (ref) async {
+      final id = album.id;
+      final tracks = await ref.read(qqMusicApiProvider).albumTracks(id);
+      return tracks;
+    },
+  );
+}
+
+/// QQ 音乐歌手详情弹窗（歌手热门曲目）。
+Future<void> showQqArtistDetailDialog(BuildContext context, CoverItem artist) {
+  return showQqTracksDialog(
+    context,
+    title: artist.title,
+    subtitle: context.l10n.trackListArtistHotSongs,
+    cover: artist.cover,
+    loadTracks: (ref) => ref.read(qqMusicApiProvider).artistSongs(artist.id),
+  );
+}
+
 /// 酷狗歌单详情弹窗（公开歌单全量曲目）。
 Future<void> showKugouPlaylistDetailDialog(
   BuildContext context,
@@ -191,6 +252,8 @@ class _TrackListDialogState extends ConsumerState<TrackListDialog> {
         url = await ref.read(kugouApiProvider).resolvePlayUrl(track.kugou!);
       } else if (track.source == 'netease') {
         url = await ref.read(neteaseApiProvider).resolvePlayUrl(track.id);
+      } else if (track.source == 'qqmusic') {
+        url = await ref.read(qqMusicApiProvider).resolvePlayUrl(track);
       } else {
         url = null;
       }

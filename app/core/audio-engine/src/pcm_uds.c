@@ -19,6 +19,7 @@ void pcm_uds_destroy(PcmUds *u) { (void)u; }
 #include <sys/un.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -102,20 +103,31 @@ int pcm_uds_wait_conn(PcmUds *u, int timeout_ms)
     if (!u) return -1;
     if (u->conn_fd >= 0) return 0;
 
-    long long deadline_ms = timeout_ms > 0
-        ? (long long)((double)clock() * 1000.0 / CLOCKS_PER_SEC) + timeout_ms
-        : -1;
-
+    /* 事件驱动等待连接：poll(listen_fd) 阻塞在可读/超时上，不做忙轮询。
+       listen fd 为非阻塞，连接就绪后 accept 一次即返回。 */
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
     for (;;) {
-        try_accept(u);
         if (u->conn_fd >= 0) return 0;
 
-        if (deadline_ms >= 0) {
-            long long now_ms = (long long)((double)clock() * 1000.0 / CLOCKS_PER_SEC);
-            if (now_ms >= deadline_ms) return -1;
+        struct pollfd pfd = { .fd = u->listen_fd, .events = POLLIN, .revents = 0 };
+        int remain = -1;
+        if (timeout_ms >= 0) {
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            long long elapsed_ms =
+                (now.tv_sec - start.tv_sec) * 1000LL +
+                (now.tv_nsec - start.tv_nsec) / 1000000LL;
+            remain = (int)(timeout_ms - elapsed_ms);
+            if (remain < 0) return -1;
         }
-        struct timespec ts = {0, 5 * 1000000L};
-        nanosleep(&ts, NULL); /* 5ms 轮询，可被信号/超时中断 */
+        int r = poll(&pfd, 1, remain);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        if (r == 0) return -1; /* 超时 */
+        try_accept(u);
     }
 }
 

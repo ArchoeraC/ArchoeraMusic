@@ -10,6 +10,8 @@ import '../services/liked/liked_cache.dart';
 import '../services/liked/liked_loader.dart';
 import '../services/netease/apis_netease_caller.dart';
 import '../services/netease/netease_api.dart';
+import '../services/qqmusic/qq_liked_store.dart';
+import '../services/qqmusic/qqmusic_api.dart';
 import '../services/weather/weather_notifier.dart';
 import 'event_bus.dart';
 import 'like_controller.dart';
@@ -76,6 +78,15 @@ class NeteaseAuthNotifier extends Notifier<NeteaseAccount?> {
 /// [ChangeNotifierProvider]：登录态（session）变化时通知 UI 重建。
 final kugouApiProvider = ChangeNotifierProvider<KugouApi>((ref) => KugouApi());
 
+// ── 直连 QQ 音乐 API ───────────────────────────────────────────────
+
+/// 直连 QQ 音乐（apis/qqmusic Dart 移植，明文 JSON + UA/comm 伪装）。
+///
+/// [ChangeNotifierProvider]：登录态（cookie 落盘 vault）变化时通知 UI。
+final qqMusicApiProvider = ChangeNotifierProvider<QqMusicApi>(
+  (ref) => QqMusicApi(),
+);
+
 // ── 顶栏微型天气 ────────────────────────────────────────────────
 
 /// 天气状态（默认关闭，见 `appearance.weatherEnabled`；关闭时不发请求）。
@@ -106,6 +117,13 @@ final likeControllerProvider = ChangeNotifierProvider<LikeController>(
 /// 红心状态由 LikeController 独立轻量同步，不由此派生）。
 final likedStoreProvider = ChangeNotifierProvider<LikedStore>(
   (ref) => LikedStore(ref),
+);
+
+/// QQ 音乐红心收藏本机数据源（见 QqLikedStore：本机主源 + 在线实验并入）。
+/// 构造即异步加载本地 `qq_liked.json`；登录 QQ 后 LikeController 同步会把
+/// 在线「我喜欢」并入红心集合，「我喜欢」页刷新时把在线 Track 并入本列表。
+final qqLikedStoreProvider = ChangeNotifierProvider<QqLikedStore>(
+  (ref) => QqLikedStore(),
 );
 
 /// 系统主题色（主题色来源 = default「跟随系统」时作为主色种子）。

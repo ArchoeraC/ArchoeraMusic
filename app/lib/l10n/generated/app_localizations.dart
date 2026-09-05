@@ -1748,6 +1748,54 @@ abstract class AppLocalizations {
   /// **'在网易云 App 点亮红心后自动同步'**
   String get pageLikedNeteaseEmptyHint;
 
+  /// No description provided for @toastQqLikeSyncFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ 音乐在线收藏同步失败（实验接口），本次红心已撤销'**
+  String get toastQqLikeSyncFailed;
+
+  /// No description provided for @pageLikedQqHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ 音乐红心保存在本机（始终可用）；登录后可实验同步在线「我喜欢」'**
+  String get pageLikedQqHint;
+
+  /// No description provided for @pageLikedQqEmptyTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'还没有 QQ 音乐红心歌曲'**
+  String get pageLikedQqEmptyTitle;
+
+  /// No description provided for @pageLikedQqEmptyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在搜索/播放页给 QQ 音乐歌曲点亮红心后会出现在这里（保存在本机）'**
+  String get pageLikedQqEmptyHint;
+
+  /// No description provided for @pageLikedQqLoginSync.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录 QQ 音乐同步在线收藏（实验）'**
+  String get pageLikedQqLoginSync;
+
+  /// No description provided for @pageLikedQqSyncOnline.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'同步在线收藏（实验）'**
+  String get pageLikedQqSyncOnline;
+
+  /// No description provided for @pageLikedQqSynced.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在线收藏已并入：新增 {count} 首'**
+  String pageLikedQqSynced(Object count);
+
+  /// No description provided for @pageLikedQqSyncedNone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已是最新，无新增在线收藏'**
+  String get pageLikedQqSyncedNone;
+
   /// No description provided for @pageLikedLoginTitle.
   ///
   /// In zh_CN, this message translates to:
@@ -2791,6 +2839,174 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'关闭转码保持源采样率播放，开启则统一 48kHz 输出；切换后自动重载当前曲目生效。'**
   String get settingsPassthroughNote;
+
+  /// No description provided for @settingsOutputDevice.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'输出设备'**
+  String get settingsOutputDevice;
+
+  /// No description provided for @settingsOutputDeviceSectionNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放输出到指定音频设备；切换即时/下一曲生效（无需重启），偏好会保存。只在你显式选择时切换，应用不会自动改道。'**
+  String get settingsOutputDeviceSectionNote;
+
+  /// No description provided for @settingsOutputDeviceDefault.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统默认'**
+  String get settingsOutputDeviceDefault;
+
+  /// No description provided for @settingsOutputDeviceDefaultDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'跟随系统当前输出设备（引擎不自动改道）'**
+  String get settingsOutputDeviceDefaultDesc;
+
+  /// No description provided for @settingsOutputDeviceFormat.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{rate} Hz · {channels} 声道'**
+  String settingsOutputDeviceFormat(Object channels, Object rate);
+
+  /// No description provided for @settingsOutputDeviceDefaultTag.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'默认'**
+  String get settingsOutputDeviceDefaultTag;
+
+  /// No description provided for @settingsOutputDeviceLoadFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无法枚举音频输出设备（引擎不可用？将保持系统默认）。'**
+  String get settingsOutputDeviceLoadFailed;
+
+  /// No description provided for @settingsOutputDeviceHfpNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'此设备当前处于低质量模式（如蓝牙免提/通话 HFP，常见 16kHz 单声道）。引擎会以设备的原生格式输出，音质会受限。'**
+  String get settingsOutputDeviceHfpNote;
+
+  /// No description provided for @settingsOutputDeviceA2dpGuideTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'如何启用蓝牙 A2DP（高质量音频）'**
+  String get settingsOutputDeviceA2dpGuideTitle;
+
+  /// No description provided for @settingsOutputDeviceA2dpGuideDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'1. 断开蓝牙耳机后重新连接；\n2. 在系统蓝牙设置中把该设备切到“音频/A2DP”（部分系统叫“媒体音频”）；\n3. 若列表中仍只有 Headset/免提模式，请取消配对后重新配对。\n不同系统的具体菜单位置可能不同。'**
+  String get settingsOutputDeviceA2dpGuideDesc;
+
+  /// No description provided for @settingsOutputDeviceCallBadge.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'通话/低质'**
+  String get settingsOutputDeviceCallBadge;
+
+  /// No description provided for @settingsOutputDeviceCallConfirmTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'让音乐走通话/低质设备？'**
+  String get settingsOutputDeviceCallConfirmTitle;
+
+  /// No description provided for @settingsOutputDeviceCallConfirmDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'该设备以通话级/低质输出：音乐会按语音通话标准播放，几乎毁掉音质。多数耳机不会用它播放音乐，部分设备甚至会故意不兼容这一模式，可能导致无声或异常。强烈建议改用 A2DP 等高质量设备。应用绝不会自动改道——这只在你显式选择时生效。'**
+  String get settingsOutputDeviceCallConfirmDesc;
+
+  /// No description provided for @settingsOutputDeviceUseQuality.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'改用高质量输出'**
+  String get settingsOutputDeviceUseQuality;
+
+  /// No description provided for @settingsOutputDeviceUseCall.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仍走通话/低质'**
+  String get settingsOutputDeviceUseCall;
+
+  /// No description provided for @settingsOutputDeviceDefaultIsCall.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统默认输出当前是通话/低质设备（如蓝牙免提 HFP）。音乐会以通话级音质播放、几乎毁掉音质；部分耳机还故意不兼容，可能无声或异常。建议改用高质量输出。'**
+  String get settingsOutputDeviceDefaultIsCall;
+
+  /// No description provided for @settingsOutputDeviceDefaultRowCallNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'选择此项将让音乐走系统默认的通话/低质设备，音质几乎损毁，不推荐。'**
+  String get settingsOutputDeviceDefaultRowCallNote;
+
+  /// No description provided for @settingsSinkChangedFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换输出设备失败：{err}'**
+  String settingsSinkChangedFailed(Object err);
+
+  /// No description provided for @settingsEngine.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'解码引擎'**
+  String get settingsEngine;
+
+  /// No description provided for @settingsEngineNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'解码引擎在应用启动时加载；此处切换需冷启动后生效。'**
+  String get settingsEngineNote;
+
+  /// No description provided for @settingsEngineStableDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'FFmpeg 解码内核，久经验证，默认推荐。'**
+  String get settingsEngineStableDesc;
+
+  /// No description provided for @settingsEngineEraAudioDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自研解码内核，新一代；性能与内存仍在基准测试中。'**
+  String get settingsEngineEraAudioDesc;
+
+  /// No description provided for @settingsEngineExperimental.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'实验性'**
+  String get settingsEngineExperimental;
+
+  /// No description provided for @settingsEngineEraAudioNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'实验性内核：性能与内存占用仍在基准中，个别格式或设备可能出现异常；如遇问题可在本设置切回 Stable。'**
+  String get settingsEngineEraAudioNote;
+
+  /// No description provided for @settingsEngineRestartTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'需要重启应用'**
+  String get settingsEngineRestartTitle;
+
+  /// No description provided for @settingsEngineRestartDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'解码引擎偏好已保存。引擎在应用启动时加载，请重启以切换引擎；重启前仍使用当前引擎，重启期间播放与下载会中断。'**
+  String get settingsEngineRestartDesc;
+
+  /// No description provided for @settingsEngineRestartNow.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'立即重启'**
+  String get settingsEngineRestartNow;
+
+  /// No description provided for @settingsEngineRestartLater.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'稍后重启'**
+  String get settingsEngineRestartLater;
 
   /// No description provided for @volumeMute.
   ///
@@ -6031,6 +6247,102 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'{count} 首歌曲'**
   String streamingPlaylistSongs(Object count);
+
+  /// No description provided for @brandQqMusic.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ 音乐'**
+  String get brandQqMusic;
+
+  /// No description provided for @platformQQMusic.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ 音乐'**
+  String get platformQQMusic;
+
+  /// No description provided for @loginQqQrLogin.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ 音乐扫码登录'**
+  String get loginQqQrLogin;
+
+  /// No description provided for @loginQqTypeQq.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ'**
+  String get loginQqTypeQq;
+
+  /// No description provided for @loginQqTypeWx.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'微信'**
+  String get loginQqTypeWx;
+
+  /// No description provided for @loginQqScanHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请使用手机 QQ 扫一扫登录'**
+  String get loginQqScanHint;
+
+  /// No description provided for @loginQqWxScanHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请使用微信扫一扫登录'**
+  String get loginQqWxScanHint;
+
+  /// No description provided for @navHeaderQqId.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ {id}'**
+  String navHeaderQqId(String id);
+
+  /// No description provided for @toastQqNotSupported.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ 音乐暂不支持该操作'**
+  String get toastQqNotSupported;
+
+  /// No description provided for @searchSourceFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'「{source}」搜索暂不可用'**
+  String searchSourceFailed(Object source);
+
+  /// No description provided for @searchQqRiskDetail.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ 音乐接口限流或风控拦截（代码 {code}），已停止自动重试，请稍后再试'**
+  String searchQqRiskDetail(Object code);
+
+  /// No description provided for @searchNetworkError.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'网络连接失败或请求超时，请稍后重试'**
+  String get searchNetworkError;
+
+  /// No description provided for @searchPlatformError.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'平台返回错误（{code}）'**
+  String searchPlatformError(Object code);
+
+  /// No description provided for @searchWaitRetry.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请求过于频繁，请稍候再试'**
+  String get searchWaitRetry;
+
+  /// No description provided for @qqMusicDownloadUnsupported.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'QQ 音乐暂不支持下载（风控）。'**
+  String get qqMusicDownloadUnsupported;
+
+  /// No description provided for @qqMusicDownloadSkipped.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已跳过 {count} 首 QQ 音乐（暂不支持下载）。'**
+  String qqMusicDownloadSkipped(Object count);
 }
 
 class _AppLocalizationsDelegate

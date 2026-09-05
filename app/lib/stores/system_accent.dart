@@ -27,10 +27,11 @@ class SystemAccent {
   static Future<Color?> read() async {
     if (!Platform.isLinux) return null;
     try {
-      final res = await Process.run(
-        'gsettings',
-        ['get', 'org.gnome.desktop.interface', 'accent-color'],
-      );
+      final res = await Process.run('gsettings', [
+        'get',
+        'org.gnome.desktop.interface',
+        'accent-color',
+      ]);
       if (res.exitCode != 0) return null;
       return _parse((res.stdout as String).trim());
     } catch (_) {
@@ -44,14 +45,19 @@ class SystemAccent {
     final mapped = _named[named];
     if (mapped != null) return Color(mapped);
     // 自定义值：`rgb(r, g, b)`（GNOME 48+）
-    final m =
-        RegExp(r'rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)').firstMatch(raw);
+    final m = RegExp(
+      r'rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)',
+    ).firstMatch(raw);
     if (m != null) {
       final r = int.tryParse(m.group(1)!);
       final g = int.tryParse(m.group(2)!);
       final b = int.tryParse(m.group(3)!);
-      if (r != null && g != null && b != null &&
-          r <= 255 && g <= 255 && b <= 255) {
+      if (r != null &&
+          g != null &&
+          b != null &&
+          r <= 255 &&
+          g <= 255 &&
+          b <= 255) {
         return Color.fromARGB(255, r, g, b);
       }
     }

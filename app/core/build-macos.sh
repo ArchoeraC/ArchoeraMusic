@@ -25,6 +25,18 @@ RID="${1:-osx-arm64}"
 # 14.0（与 C 侧一致），cargo（tempo/downloader/transcoder）全部生效。
 export MACOSX_DEPLOYMENT_TARGET=14.0
 
+
+# 自研内核（EraAudio, Zig 静态库）须先于 audio-engine cmake 编译并落 zig-out/
+# （engine CMake 复制 zig-out/lib/libarchoera_kernel.a 链接；kernel 改动后
+#   必须重跑本步，否则陈旧产物会让 EraAudio 行为异常——见 docs/engine-integration-bench.md）
+if command -v zig >/dev/null 2>&1; then
+  echo "[build-macos] ===== audio-engine: zig kernel (ReleaseFast) ====="
+  (cd "$ROOT/audio-engine" && zig build -Doptimize=ReleaseFast) || exit 1
+else
+  echo "[build-macos] 警告: 未检测到 zig，自研内核(EraAudio)不编译（引擎将以 FFmpeg/Stable 运行）；"
+  echo "          安装 Zig 0.16（https://ziglang.org/download）后重跑可启用 EraAudio。"
+fi
+
 echo "[build-macos] ===== audio-engine ====="
 cmake -S "$ROOT/audio-engine" -B "$ROOT/audio-engine/build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$ROOT/audio-engine/build" -j"$JOBS"

@@ -59,6 +59,9 @@ final class EngineConfigC extends Struct {
 
   @Bool()
   external bool tempoPitchSync;
+
+  @Int32()
+  external int engineMode; // 0=Stable(FFmpeg 默认) 1=EraAudio(自研内核,实验性)
 }
 
 typedef _CreateNative =
@@ -84,10 +87,15 @@ typedef _CommandDart = int Function(Pointer<Opaque>, Pointer<Utf8>);
 typedef _PollEventNative =
     Int32 Function(Pointer<Opaque>, Pointer<Uint8>, Int32);
 typedef _PollEventDart = int Function(Pointer<Opaque>, Pointer<Uint8>, int);
+typedef _WaitEventNative =
+    Int32 Function(Pointer<Opaque>, Pointer<Uint8>, Int32, Int32);
+typedef _WaitEventDart = int Function(Pointer<Opaque>, Pointer<Uint8>, int, int);
 typedef _IsDoneNative = Int32 Function(Pointer<Opaque>);
 typedef _IsDoneDart = int Function(Pointer<Opaque>);
 typedef _DestroyNative = Void Function(Pointer<Opaque>);
 typedef _DestroyDart = void Function(Pointer<Opaque>);
+typedef _ListSinksNative = Int32 Function(Pointer<Uint8>, Int32);
+typedef _ListSinksDart = int Function(Pointer<Uint8>, int);
 
 /// 引擎 FFI 绑定（libarchoera_mediaengine.so）。
 ///
@@ -102,8 +110,10 @@ class EngineBindings {
       _instance ??= EngineBindings._(DynamicLibrary.open(_libPath()));
 
   static String _libPath() {
-    return NativeLibPaths.resolveRequired(NativeModule.mediaEngine,
-        hint: '请设置 ARCHOERA_AUDIO_ENGINE 环境变量');
+    return NativeLibPaths.resolveRequired(
+      NativeModule.mediaEngine,
+      hint: '请设置 ARCHOERA_AUDIO_ENGINE 环境变量',
+    );
   }
 
   final DynamicLibrary _lib;
@@ -120,6 +130,10 @@ class EngineBindings {
       .lookupFunction<_PollEventNative, _PollEventDart>(
         'archoera_mediaengine_poll_event',
       );
+  late final _WaitEventDart _waitEvent = _lib
+      .lookupFunction<_WaitEventNative, _WaitEventDart>(
+        'archoera_mediaengine_wait_event',
+      );
   late final _IsDoneDart _isDone = _lib
       .lookupFunction<_IsDoneNative, _IsDoneDart>(
         'archoera_mediaengine_is_done',
@@ -127,6 +141,10 @@ class EngineBindings {
   late final _DestroyDart _destroy = _lib
       .lookupFunction<_DestroyNative, _DestroyDart>(
         'archoera_mediaengine_destroy',
+      );
+  late final _ListSinksDart _listSinks = _lib
+      .lookupFunction<_ListSinksNative, _ListSinksDart>(
+        'archoera_mediaengine_list_sinks',
       );
 
   /// 创建引擎会话（失败抛 [StateError]，错误信息取引擎 errbuf）。
@@ -185,10 +203,42 @@ class EngineBindings {
     return s;
   }
 
+  /// 阻塞等待一条事件（**接收 isolate 事件泵专用**；须在独立 isolate 线程
+  /// 调用，避免阻塞主 isolate）。缓冲由调用方分配/释放。
+  ///
+  /// 返回 >0 事件字节数（已写入 [buf]，'\0' 结尾）；0 超时；-1 已销毁
+  /// （调用方应退出事件泵，勿再对本句柄调用任何函数）。
+  int waitEventInto(
+    Pointer<Opaque> handle,
+    Pointer<Uint8> buf,
+    int cap,
+    int timeoutMs,
+  ) =>
+      _waitEvent(handle, buf, cap, timeoutMs);
+
   /// 引擎线程是否已退出。
   bool isDone(Pointer<Opaque> handle) => _isDone(handle) != 0;
 
   void destroy(Pointer<Opaque> handle) => _destroy(handle);
+
+  /// 枚举系统音频输出设备（**会话无关**：无需 handle，直接 FFI）。
+  ///
+  /// 返回 JSON 数组文本，例如
+  /// `[{"id":"...","name":"...","rate":48000,"channels":2,"default":true,"class":"internal"}]`，
+  /// 其中 `class`（a2dp|hfp|low|hdmi|usb|internal|unknown）为新版引擎可选
+  /// 字段（旧版缺省，Dart 侧按 `unknown` 兼容解析）。空/失败返回 null。
+  /// 调用方须捕获缺库 / 符号未导出等运行时异常（引擎侧符号与 Dart 契约
+  /// 并行收敛，缺失时不可用而非崩溃）。
+  String? listSinks({int cap = 16384}) {
+    final buf = calloc<Uint8>(cap);
+    try {
+      final r = _listSinks(buf, cap);
+      if (r <= 0) return null;
+      return buf.cast<Utf8>().toDartString(length: r);
+    } finally {
+      calloc.free(buf);
+    }
+  }
 }
 
 /// 从 Dart 播放参数分配并填充 EngineConfig（对齐 audio_engine.h）。
@@ -204,6 +254,7 @@ Pointer<EngineConfigC> engineConfigFromParams({
   bool normalization = false,
   double? tempoSpeed,
   double? tempoPitch,
+  int engineMode = 0,
 }) {
   final p = calloc<EngineConfigC>();
   p.ref
@@ -221,7 +272,8 @@ Pointer<EngineConfigC> engineConfigFromParams({
     ..tempoEnabled = tempoSpeed != null || tempoPitch != null
     ..tempoSpeed = tempoSpeed ?? 1.0
     ..tempoPitch = tempoPitch ?? 0.0
-    ..tempoPitchSync = true;
+    ..tempoPitchSync = true
+    ..engineMode = engineMode;
   for (var i = 0; i < 10; i++) {
     p.ref.eqGains[i] = (eqGains != null && i < eqGains.length) ? eqGains[i] : 0;
   }

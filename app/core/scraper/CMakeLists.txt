@@ -96,3 +96,19 @@ endif()
 
 # 安装目标
 install(TARGETS archoera_scraper LIBRARY DESTINATION lib)
+
+# ---------- 单元测试 ----------
+# wait_event 事件驱动契约测试：真实句柄验证阻塞/唤醒/超时/销毁唤醒/
+# 多次 create-destroy（对齐 audio-engine tests/test_mediaengine_wait.c）。
+# 仅 POSIX（测试用 pthread）；链接共享库本体的导出符号。
+enable_testing()
+if(NOT WIN32)
+    enable_language(C)
+    find_package(Threads QUIET)
+    add_executable(test_scraper_wait tests/test_scraper_wait.c)
+    target_link_libraries(test_scraper_wait PRIVATE archoera_scraper)
+    if(TARGET Threads::Threads)
+        target_link_libraries(test_scraper_wait PRIVATE Threads::Threads)
+    endif()
+    add_test(NAME test_scraper_wait COMMAND test_scraper_wait)
+endif()

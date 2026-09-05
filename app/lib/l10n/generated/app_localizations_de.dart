@@ -941,6 +941,38 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nach Herz in der NetEase-App automatisch synchronisiert';
 
   @override
+  String get toastQqLikeSyncFailed =>
+      'Synchronisierung der QQ-Music-Online-Favoriten fehlgeschlagen (experimentelle API); die Herz-Änderung wurde rückgängig gemacht';
+
+  @override
+  String get pageLikedQqHint =>
+      'QQ-Music-Herzen werden lokal gespeichert und sind immer verfügbar; nach der Anmeldung können Online-Favoriten experimentell synchronisiert werden';
+
+  @override
+  String get pageLikedQqEmptyTitle => 'Noch keine QQ-Music-Lieblingstitel';
+
+  @override
+  String get pageLikedQqEmptyHint =>
+      'Markiere ein QQ-Music-Lied in Suche oder Wiedergabe mit »Gefällt mir«, damit es hier erscheint (wird lokal gespeichert)';
+
+  @override
+  String get pageLikedQqLoginSync =>
+      'Bei QQ Music anmelden, um Online-Favoriten zu synchronisieren (experimentell)';
+
+  @override
+  String get pageLikedQqSyncOnline =>
+      'Online-Favoriten synchronisieren (experimentell)';
+
+  @override
+  String pageLikedQqSynced(Object count) {
+    return 'Online-Favoriten synchronisiert: $count neue Titel hinzugefügt';
+  }
+
+  @override
+  String get pageLikedQqSyncedNone =>
+      'Bereits synchronisiert - keine neuen Online-Favoriten';
+
+  @override
   String get pageLikedLoginTitle => 'Anmelden, um Lieblingstitel anzusehen';
 
   @override
@@ -1529,6 +1561,110 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsPassthroughNote =>
       'Passthrough an: Quell-Samplerate; aus: 48kHz-Ausgabe. Gilt nach Neuladen des Titels.';
+
+  @override
+  String get settingsOutputDevice => 'Audioausgabegerät';
+
+  @override
+  String get settingsOutputDeviceSectionNote =>
+      'Audio über ein bestimmtes Gerät ausgeben. Der Wechsel wirkt sofort bzw. ab dem nächsten Titel (kein Neustart nötig) und die Wahl wird gespeichert. Es wird nur bei expliziter Auswahl umgeschaltet; die App leitet niemals selbst um.';
+
+  @override
+  String get settingsOutputDeviceDefault => 'Systemstandard';
+
+  @override
+  String get settingsOutputDeviceDefaultDesc =>
+      'Folgt der aktuellen Systemausgabe (keine automatische Umleitung)';
+
+  @override
+  String settingsOutputDeviceFormat(Object channels, Object rate) {
+    return '$rate Hz · $channels Kanäle';
+  }
+
+  @override
+  String get settingsOutputDeviceDefaultTag => 'Standard';
+
+  @override
+  String get settingsOutputDeviceLoadFailed =>
+      'Audioausgabegeräte konnten nicht aufgelistet werden (Engine nicht verfügbar? Systemstandard bleibt aktiv).';
+
+  @override
+  String get settingsOutputDeviceHfpNote =>
+      'Dieses Gerät läuft gerade in einem niedrigen Qualitätsmodus (z. B. Bluetooth-Freisprechen/HFP, meist 16 kHz mono). Die Engine gibt im nativen Format des Geräts aus, wodurch die Klangqualität eingeschränkt ist.';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideTitle =>
+      'Bluetooth A2DP (hohe Audioqualität) aktivieren';
+
+  @override
+  String get settingsOutputDeviceA2dpGuideDesc =>
+      '1. Trennen Sie die Verbindung zum Bluetooth-Headset und verbinden Sie es erneut.\n2. Stellen Sie das Gerät in den Bluetooth-Systemeinstellungen auf „Audio/A2DP“ (auf manchen Systemen „Media-Audio“ genannt).\n3. Erscheint weiterhin nur Headset/Freisprechen, heben Sie die Kopplung auf und koppeln Sie das Gerät neu.\nDie genauen Menüs unterscheiden sich je nach System.';
+
+  @override
+  String get settingsOutputDeviceCallBadge => 'Anruf / niedrige Qualität';
+
+  @override
+  String get settingsOutputDeviceCallConfirmTitle =>
+      'Musik über ein Anruf-Qualitätsgerät ausgeben?';
+
+  @override
+  String get settingsOutputDeviceCallConfirmDesc =>
+      'Dieses Gerät gibt in Anruf-/Niedrigqualität aus: Musik wird fast zerstört (Freisprech-Audio). Die meisten Kopfhörer nutzen diesen Modus nicht für Musik, manche lehnen ihn bewusst ab — Stille oder Fehlverhalten möglich. Hochwertige Ausgabe (A2DP usw.) wird dringend empfohlen. Die App leitet niemals selbst um; dies gilt nur bei expliziter Auswahl.';
+
+  @override
+  String get settingsOutputDeviceUseQuality =>
+      'Auf hochwertige Ausgabe wechseln';
+
+  @override
+  String get settingsOutputDeviceUseCall => 'Trotzdem verwenden';
+
+  @override
+  String get settingsOutputDeviceDefaultIsCall =>
+      'Die Systemstandard-Ausgabe ist ein Anruf-/Niedrigqualitätsgerät (z. B. Freisprechen HFP). Musik würde fast zerstört; manche Kopfhörer lehnen dieses Profil bewusst ab (ggf. Stille oder Fehlverhalten). Wechseln Sie zu einer hochwertigen Ausgabe.';
+
+  @override
+  String get settingsOutputDeviceDefaultRowCallNote =>
+      'Diese Wahl leitet Musik über den Anruf-/Niedrigqualitäts-Standard — der Klang wird fast zerstört. Nicht empfohlen.';
+
+  @override
+  String settingsSinkChangedFailed(Object err) {
+    return 'Ausgabegerät konnte nicht gewechselt werden: $err';
+  }
+
+  @override
+  String get settingsEngine => 'Dekodierungs-Engine';
+
+  @override
+  String get settingsEngineNote =>
+      'Die Audio-Decode-Engine wird beim App-Start geladen; Änderungen greifen erst nach einem Kaltstart.';
+
+  @override
+  String get settingsEngineStableDesc =>
+      'FFmpeg-Dekodierungskern. Ausgereift und die Standardwahl.';
+
+  @override
+  String get settingsEngineEraAudioDesc =>
+      'Eigener Dekodierungskern. Neu; Leistung und Speicher werden noch benchmarkt.';
+
+  @override
+  String get settingsEngineExperimental => 'Experimentell';
+
+  @override
+  String get settingsEngineEraAudioNote =>
+      'Experimenteller Kern: Leistung und Speicherbedarf werden noch gemessen; einzelne Formate oder Geräte können Probleme bereiten. Bei Problemen hier zurück auf Stable wechseln.';
+
+  @override
+  String get settingsEngineRestartTitle => 'Neustart erforderlich';
+
+  @override
+  String get settingsEngineRestartDesc =>
+      'Die Engine-Wahl ist gespeichert. Die Engine wird beim App-Start geladen; starten Sie die App neu, um die Engine zu wechseln. Bis dahin läuft die aktuelle Engine weiter; Wiedergabe und Downloads werden während des Neustarts unterbrochen.';
+
+  @override
+  String get settingsEngineRestartNow => 'Jetzt neu starten';
+
+  @override
+  String get settingsEngineRestartLater => 'Später';
 
   @override
   String get volumeMute => 'Stummschalten';
@@ -3416,5 +3552,66 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String streamingPlaylistSongs(Object count) {
     return '$count Titel';
+  }
+
+  @override
+  String get brandQqMusic => 'QQ Music';
+
+  @override
+  String get platformQQMusic => 'QQ Music';
+
+  @override
+  String get loginQqQrLogin => 'Mit QQ-Music-QR-Code anmelden';
+
+  @override
+  String get loginQqTypeQq => 'QQ';
+
+  @override
+  String get loginQqTypeWx => 'WeChat';
+
+  @override
+  String get loginQqScanHint => 'Mit der QQ-App scannen, um dich anzumelden';
+
+  @override
+  String get loginQqWxScanHint => 'Mit WeChat scannen, um dich anzumelden';
+
+  @override
+  String navHeaderQqId(String id) {
+    return 'QQ $id';
+  }
+
+  @override
+  String get toastQqNotSupported => 'Für QQ Music nicht unterstützt';
+
+  @override
+  String searchSourceFailed(Object source) {
+    return '$source-Suche ist vorübergehend nicht verfügbar';
+  }
+
+  @override
+  String searchQqRiskDetail(Object code) {
+    return 'QQ Music hat die Anfrage gedrosselt/risikogesperrt (Code $code); automatische Wiederholungen gestoppt, bitte später erneut versuchen';
+  }
+
+  @override
+  String get searchNetworkError =>
+      'Netzwerkfehler oder Zeitüberschreitung, bitte später erneut versuchen';
+
+  @override
+  String searchPlatformError(Object code) {
+    return 'Plattformfehler ($code)';
+  }
+
+  @override
+  String get searchWaitRetry =>
+      'Zu viele Anfragen, bitte kurz warten und erneut versuchen';
+
+  @override
+  String get qqMusicDownloadUnsupported =>
+      'QQ-Musik-Downloads werden derzeit nicht unterstützt (Risikomanagement).';
+
+  @override
+  String qqMusicDownloadSkipped(Object count) {
+    return '$count QQ-Musiktitel übersprungen: Downloads für QQ-Musik nicht unterstützt.';
   }
 }

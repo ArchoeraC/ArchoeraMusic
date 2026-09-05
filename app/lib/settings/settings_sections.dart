@@ -4,8 +4,9 @@
 /// 草稿值 / 私有辅助方法，仅在 build 内从 ref 读取偏好与 l10n。
 library;
 
-import 'dart:convert' show jsonEncode;
-import 'dart:io' show File;
+import 'dart:async' show StreamSubscription;
+import 'dart:convert' show jsonDecode, jsonEncode;
+import 'dart:io' show File, Platform, Process, ProcessStartMode;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -13,8 +14,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../app/app_quit.dart';
 import '../app/theme_provider.dart';
 import '../services/downloader/download_controller.dart';
+import '../services/playback/engine_bindings.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/scraper/scrape_controller.dart';
 import '../stores/app_prefs.dart';
@@ -25,6 +28,92 @@ import '../widgets/dialogs/s_dialog.dart';
 import '../widgets/player/s_controls.dart';
 import 'settings_color_picker.dart';
 import 'settings_widgets.dart';
+
+// ── 输出设备（引擎 list_sinks JSON → Dart 模型）──────────────────────
+
+/// 引擎枚举的单个音频输出设备（`archoera_mediaengine_list_sinks` 结果）。
+class _SinkDevice {
+  const _SinkDevice({
+    required this.id,
+    required this.name,
+    required this.rate,
+    required this.channels,
+    required this.isDefault,
+    required this.cls,
+  });
+
+  final String id;
+  final String name;
+
+  /// 设备原生采样率（Hz）。
+  final int rate;
+
+  /// 设备原生声道数。
+  final int channels;
+
+  /// 是否为系统当前默认输出（引擎标记）。
+  final bool isDefault;
+
+  /// 引擎上报的设备类别（JSON `class`：a2dp|hfp|low|hdmi|usb|internal|unknown）。
+  /// 运行时缺字段/未知值一律解析为 `'unknown'`（按非通话类兼容处理）。
+  final String cls;
+
+  /// 是否通话/低质类（HFP 免提、通话音档、单声道/低采样等）——音乐经其输出
+  /// 接近“毁音质”，部分耳机甚至故意不兼容可能无声/异常。
+  ///
+  /// 分类规则：class 为 `hfp`/`low` 直接判定；或原生格式不达标
+  /// （采样率/声道未知 0 时不算，避免误伤无法枚举规格的设备）。
+  bool get isCall =>
+      cls == 'hfp' ||
+      cls == 'low' ||
+      (rate > 0 && rate < 44100) ||
+      (channels > 0 && channels < 2);
+
+  /// 是否为可正常播放音乐的达标输出（与 [isCall] 互补）。
+  bool get isGood => !isCall;
+}
+
+/// 解析引擎返回的 JSON 设备数组（`list_sinks`）；格式非法返回空列表。
+List<_SinkDevice> _parseSinks(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const [];
+    final out = <_SinkDevice>[];
+    for (final e in decoded) {
+      if (e is! Map<String, dynamic>) continue;
+      final id = e['id'];
+      final name = e['name'];
+      if (id is! String || name is! String || id.isEmpty) continue;
+      out.add(
+        _SinkDevice(
+          id: id,
+          name: name,
+          rate: (e['rate'] as num?)?.toInt() ?? 0,
+          channels: (e['channels'] as num?)?.toInt() ?? 0,
+          isDefault: e['default'] == true,
+          cls: _parseSinkClass(e['class']),
+        ),
+      );
+    }
+    return out;
+  } catch (_) {
+    return const [];
+  }
+}
+
+/// 归一化引擎 `class` 字段：仅接受 a2dp|hfp|low|hdmi|usb|internal，其余
+/// （缺字段/未知/空白）一律视为 `'unknown'`（兼容旧引擎 JSON）。
+String _parseSinkClass(Object? raw) {
+  if (raw is! String) return 'unknown';
+  return switch (raw) {
+    'a2dp' || 'hfp' || 'low' || 'hdmi' || 'usb' || 'internal' => raw,
+    _ => 'unknown',
+  };
+}
+
+/// 通话/低质设备确认弹窗的结果：
+/// [useCall] = 用户仍显式选择该通话/低质设备；[useQuality] = 改用高质量。
+enum _CallSinkChoice { useCall, useQuality }
 
 // ── 外观 ──────────────────────────────────────────────────────────────
 
@@ -384,19 +473,18 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                   subtitle: l10n.settingsWeatherLocateSourceDesc,
                   trailing: SSegmented<String>(
                     options: [
-                      SSegmentedOption('ip', l10n.settingsWeatherLocateSourceIp),
+                      SSegmentedOption(
+                        'ip',
+                        l10n.settingsWeatherLocateSourceIp,
+                      ),
                       SSegmentedOption(
                         'system',
                         l10n.settingsWeatherLocateSourceSystem,
                       ),
                     ],
                     selected: prefs.weatherLocateSource,
-                    onChanged: (v) => _setWeatherLocateSource(
-                      context,
-                      l10n,
-                      notifier,
-                      v,
-                    ),
+                    onChanged: (v) =>
+                        _setWeatherLocateSource(context, l10n, notifier, v),
                   ),
                 ),
               _weatherCityField(scheme, l10n, notifier),
@@ -417,11 +505,11 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
   ) async {
     if (v &&
         !(await _confirmPrivacy(
-      context,
-      l10n,
-      title: l10n.settingsWeatherPrivacyTitle,
-      body: l10n.settingsWeatherPrivacyBody,
-    ))) {
+          context,
+          l10n,
+          title: l10n.settingsWeatherPrivacyTitle,
+          body: l10n.settingsWeatherPrivacyBody,
+        ))) {
       return;
     }
     notifier.setWeatherEnabled(v);
@@ -436,11 +524,11 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
   ) async {
     if (v &&
         !(await _confirmPrivacy(
-      context,
-      l10n,
-      title: l10n.settingsWeatherAutoLocateTitle,
-      body: l10n.settingsWeatherAutoLocateBody,
-    ))) {
+          context,
+          l10n,
+          title: l10n.settingsWeatherAutoLocateTitle,
+          body: l10n.settingsWeatherAutoLocateBody,
+        ))) {
       return;
     }
     notifier.setWeatherAutoLocate(v);
@@ -456,11 +544,11 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
     if (v == 'system' &&
         ref.read(appPrefsProvider).weatherLocateSource != 'system' &&
         !(await _confirmPrivacy(
-      context,
-      l10n,
-      title: l10n.settingsWeatherLocateSystemTitle,
-      body: l10n.settingsWeatherLocateSystemBody,
-    ))) {
+          context,
+          l10n,
+          title: l10n.settingsWeatherLocateSystemTitle,
+          body: l10n.settingsWeatherLocateSystemBody,
+        ))) {
       return;
     }
     notifier.setWeatherLocateSource(v);
@@ -883,6 +971,404 @@ class PlaybackSection extends ConsumerStatefulWidget {
 }
 
 class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
+  /// 解码引擎切换进行中（选项禁用防重入）。
+  bool _engineBusy = false;
+
+  /// 音频输出设备列表（list_sinks 结果；null = 加载中 / 加载失败 / 空）。
+  List<_SinkDevice>? _sinks;
+
+  /// 设备列表读取失败（引擎缺库/符号未就绪等；UI 降级为仅系统默认）。
+  bool _sinksFailed = false;
+
+  /// 输出设备切换进行中（行禁用防重入）。
+  bool _sinkBusy = false;
+
+  /// 引擎会话内 set_sink 失败通知订阅（弹错误 toast）。
+  StreamSubscription<String>? _sinkFailSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSinks();
+    // 当前引擎会话存在时下发 set_sink：引擎以 sink_changed 回执，失败
+    // （设备不可达/非法）经播放控制器转发此处弹 toast；无会话时偏好已
+    // 落盘，下次会话创建自动补发，失败只入播放日志。
+    _sinkFailSub = ref.read(playbackProvider.notifier).sinkFailures.listen((
+      err,
+    ) {
+      if (!mounted) return;
+      toast(context.l10n.settingsSinkChangedFailed(err), type: ToastType.error);
+    });
+  }
+
+  @override
+  void dispose() {
+    _sinkFailSub?.cancel();
+    _sinkFailSub = null;
+    super.dispose();
+  }
+
+  /// 载入系统音频输出设备（会话无关：无 handle 直接 FFI list_sinks）。
+  Future<void> _loadSinks() async {
+    List<_SinkDevice>? sinks;
+    var failed = false;
+    try {
+      final raw = EngineBindings.instance.listSinks();
+      sinks = raw == null ? null : _parseSinks(raw);
+      if (sinks != null && sinks.isEmpty) sinks = null;
+    } catch (_) {
+      failed = true;
+      sinks = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _sinks = sinks;
+      _sinksFailed = failed;
+    });
+  }
+
+  /// 引擎标记的系统默认输出设备（列表中无标记时 null）。
+  _SinkDevice? _defaultDevice(List<_SinkDevice> sinks) {
+    for (final d in sinks) {
+      if (d.isDefault) return d;
+    }
+    return null;
+  }
+
+  /// 按 id 查找设备；id 空串解析到系统默认设备。
+  _SinkDevice? _sinkById(List<_SinkDevice> sinks, String id) {
+    if (id.isEmpty) return _defaultDevice(sinks);
+    for (final d in sinks) {
+      if (d.id == id) return d;
+    }
+    return null;
+  }
+
+  /// 列表中的第一个达标输出设备（good 类，用于「改用高质量输出」）；
+  /// 全部为通话/低质时返回 null。
+  _SinkDevice? _firstGoodDevice(List<_SinkDevice> sinks) {
+    for (final d in sinks) {
+      if (d.isGood) return d;
+    }
+    return null;
+  }
+
+  /// 显式选择输出设备：先持久化偏好，再对当前会话下发 set_sink
+  /// （无会话时忽略，下次会话创建后由引擎会话流程读取 prefs 自动补发）。
+  Future<void> _selectSink(String id) async {
+    if (_sinkBusy) return;
+    if (id == ref.read(appPrefsProvider).sink) return;
+    setState(() => _sinkBusy = true);
+    try {
+      ref.read(appPrefsProvider.notifier).setOutputSink(id);
+      await ref.read(playbackProvider.notifier).applyOutputSink(id);
+    } finally {
+      if (mounted) setState(() => _sinkBusy = false);
+    }
+  }
+
+  /// 用户点选设备行 / 「系统默认」行的入口：
+  ///
+  /// 目标解析后为通话/低质类（class==hfp/low 或原生规格不达标）时先弹
+  /// **显式确认**（含“改用高质量输出”快捷动作），确认或改选高质量后才
+  /// 写入 prefs 并下发 set_sink；拒绝则保持原选择不变。达标设备直接应用。
+  Future<void> _onChooseSink(String id) async {
+    if (_sinkBusy) return;
+    if (id == ref.read(appPrefsProvider).sink) return;
+    final sinks = _sinks ?? const <_SinkDevice>[];
+    final target = _sinkById(sinks, id);
+    if (target != null && target.isCall) {
+      final choice = await _confirmCallSink();
+      if (!mounted) return;
+      switch (choice) {
+        case _CallSinkChoice.useQuality:
+          final good = _firstGoodDevice(sinks);
+          if (good != null) await _selectSink(good.id);
+        case _CallSinkChoice.useCall:
+          await _selectSink(id);
+        case null:
+          break; // 拒绝：不改变选择
+      }
+      return;
+    }
+    await _selectSink(id);
+  }
+
+  /// 「改用高质量输出」快捷动作（设置区顶部提示 / 确认对话框内共用）：
+  /// 直接选中第一个达标设备。属用户显式操作，不违背“不自动改道”。
+  Future<void> _switchToGoodSink() async {
+    final sinks = _sinks;
+    if (sinks == null) return;
+    final good = _firstGoodDevice(sinks);
+    if (good != null) await _selectSink(good.id);
+  }
+
+  /// 通话/低质设备确认弹窗（SDialog）：危险强调 + 「改用高质量」快捷动作。
+  /// 返回 null = 拒绝（保持当前选择）。
+  Future<_CallSinkChoice?> _confirmCallSink() {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final hasGood = (_firstGoodDevice(_sinks ?? const <_SinkDevice>[])) != null;
+    return SDialog.show<_CallSinkChoice>(
+      context,
+      title: l10n.settingsOutputDeviceCallConfirmTitle,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: scheme.error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: scheme.error.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.warning_amber_rounded, size: 18, color: scheme.error),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                l10n.settingsOutputDeviceCallConfirmDesc,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.55,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        SButton(
+          label: l10n.commonCancel,
+          variant: SButtonVariant.ghost,
+          size: SButtonSize.small,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        if (hasGood)
+          SButton(
+            label: l10n.settingsOutputDeviceUseQuality,
+            icon: Icons.high_quality_outlined,
+            variant: SButtonVariant.primary,
+            size: SButtonSize.small,
+            onPressed: () =>
+                Navigator.of(context).pop(_CallSinkChoice.useQuality),
+          ),
+        SButton(
+          label: l10n.settingsOutputDeviceUseCall,
+          icon: Icons.call_outlined,
+          variant: SButtonVariant.error,
+          size: SButtonSize.small,
+          onPressed: () => Navigator.of(context).pop(_CallSinkChoice.useCall),
+        ),
+      ],
+    );
+  }
+
+  /// 通话/低质设备行徽章（错误色 chip），随其他徽章一起渲染。
+  ({String text, Color color}) _callBadge(
+    ColorScheme scheme,
+    AppLocalizations l10n,
+  ) => (text: l10n.settingsOutputDeviceCallBadge, color: scheme.error);
+
+  /// 「输出设备」内容行（SettingSection children）：（可选的顶部警示）+
+  /// 系统默认 + 各设备行（radio 单选，达标设备在前、通话/低质在后）。
+  ///
+  /// - 通话/低质类设备行显示醒目标记，即便它恰是系统默认；
+  /// - “系统默认”行在默认设备为通话/低质类时同样标红提示；
+  /// - 用户从未显式选择、且系统默认本身为通话/低质类时，区顶部给一条
+  ///   非阻断警示 +「改用高质量输出」一键动作；
+  /// - 点选通话/低质目标（含“系统默认”恰为通话类）→ [_onChooseSink]
+  ///   先弹显式确认，绝不静默改道。
+  List<Widget> _buildSinkRows(
+    ColorScheme scheme,
+    AppLocalizations l10n,
+    AppPrefs prefs,
+  ) {
+    final rows = <Widget>[];
+    final sinks = _sinks ?? const <_SinkDevice>[];
+    final defaultDev = _defaultDevice(sinks);
+
+    // 显式选择为空（跟随系统默认）且默认设备为通话/低质类：
+    // 设置区顶部非阻断警示 + 「改用高质量设备」快捷动作。
+    final neverExplicitAndDefaultCall =
+        prefs.sink.isEmpty && defaultDev != null && defaultDev.isCall;
+    if (neverExplicitAndDefaultCall) {
+      rows.add(
+        _SinkDefaultCallBanner(
+          onUseQuality: _firstGoodDevice(sinks) == null
+              ? null
+              : _switchToGoodSink,
+        ),
+      );
+    }
+
+    // 系统默认（空串 id；尊重系统默认输出，不自动改道）
+    rows.add(
+      _EngineOptionTile(
+        icon: Icons.speaker_outlined,
+        title: l10n.settingsOutputDeviceDefault,
+        desc: l10n.settingsOutputDeviceDefaultDesc,
+        badges: defaultDev != null && defaultDev.isCall
+            ? [_callBadge(scheme, l10n)]
+            : const [],
+        selected: prefs.sink.isEmpty,
+        busy: _sinkBusy,
+        onTap: () => _onChooseSink(''),
+      ),
+    );
+    // “系统默认”行恰为通话/低质类且当前并非默认选中：行下简短警示
+    // （选中态时上面的顶部警示卡已覆盖，避免重复）。
+    if (defaultDev != null &&
+        defaultDev.isCall &&
+        !neverExplicitAndDefaultCall) {
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 13, color: scheme.error),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  l10n.settingsOutputDeviceDefaultRowCallNote,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_sinksFailed) {
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 2, 14, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 14,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  l10n.settingsOutputDeviceLoadFailed,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 达标输出排前、通话/低质靠后（组内保持引擎原有顺序），引导优先看到
+    // 高质量设备；“改用高质量输出”取第一个达标设备也源于此。
+    final sorted = [...sinks]
+      ..sort((a, b) {
+        if (a.isCall == b.isCall) return 0;
+        return a.isCall ? 1 : -1;
+      });
+    for (final d in sorted) {
+      rows.add(
+        _EngineOptionTile(
+          icon: d.isCall ? Icons.bluetooth_audio : Icons.speaker_outlined,
+          title: d.name,
+          desc: l10n.settingsOutputDeviceFormat(d.channels, d.rate),
+          badges: [
+            if (d.isDefault)
+              (
+                text: l10n.settingsOutputDeviceDefaultTag,
+                color: scheme.primary,
+              ),
+            if (d.isCall) _callBadge(scheme, l10n),
+          ],
+          selected: prefs.sink == d.id,
+          busy: _sinkBusy,
+          onTap: () => _onChooseSink(d.id),
+        ),
+      );
+      if (prefs.sink == d.id && d.isCall) {
+        // 显式选择为通话/低质设备（跟随系统默认的通话类场景由顶部警示
+        // 卡覆盖，此处不重复）：质量受限说明 + A2DP 引导
+        rows.add(const _SinkHfpNote());
+        rows.add(const _A2dpGuideBlock());
+      }
+    }
+    return rows;
+  }
+
+  /// 切换解码引擎：先持久化偏好（不热替换），再引导冷重启生效。
+  Future<void> _selectEngine(String engine) async {
+    if (_engineBusy || engine == ref.read(appPrefsProvider).engine) return;
+    setState(() => _engineBusy = true);
+    try {
+      ref.read(appPrefsProvider.notifier).setEngine(engine);
+      if (!mounted) return;
+      if (await _promptRestartAfterEngineChange() && mounted) {
+        await _restartApp();
+      }
+    } finally {
+      if (mounted) setState(() => _engineBusy = false);
+    }
+  }
+
+  /// 引擎切换后的冷切引导（对齐 Vault 模式切换流程）：引擎在应用启动时
+  /// 加载，改动需冷启动生效。返回 true = 立即重启。
+  Future<bool> _promptRestartAfterEngineChange() async {
+    final l10n = context.l10n;
+    final res = await SDialog.show<bool>(
+      context,
+      title: l10n.settingsEngineRestartTitle,
+      description: l10n.settingsEngineRestartDesc,
+      child: const SizedBox.shrink(),
+      actions: [
+        SButton(
+          label: l10n.settingsEngineRestartLater,
+          variant: SButtonVariant.secondary,
+          size: SButtonSize.small,
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        SButton(
+          label: l10n.settingsEngineRestartNow,
+          icon: Icons.restart_alt,
+          variant: SButtonVariant.primary,
+          size: SButtonSize.small,
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
+    );
+    return res == true;
+  }
+
+  /// 冷切重启：以相同命令行派生新实例（detached）后统一退出（同
+  /// security_section 的 [_restartApp]，绕开 Flutter Linux GTK teardown 崩溃）。
+  Future<void> _restartApp() async {
+    try {
+      await Process.start(
+        Platform.resolvedExecutable,
+        Platform.executableArguments,
+        mode: ProcessStartMode.detached,
+      );
+    } catch (e) {
+      debugPrint('[engine] 重启应用失败（请手动重启）：$e');
+    }
+    await quitApplication(ref);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -908,6 +1394,66 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 ref.read(playbackProvider.notifier).reload();
               },
             ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // 输出设备：会话无关 list_sinks 枚举系统设备；显式选择持久化并
+        // 即时下发 set_sink（无会话则下次会话创建补发），不自动改道。
+        SettingSection(
+          title: l10n.settingsOutputDevice,
+          note: l10n.settingsOutputDeviceSectionNote,
+          children: _buildSinkRows(scheme, l10n, prefs),
+        ),
+        const SizedBox(height: 20),
+        // 解码引擎：FFmpeg 稳定内核（默认）↔ EraAudio 自研实验性内核。
+        // 引擎在应用启动时加载，切换只持久化偏好 → 引导冷重启（不热替换）。
+        SettingSection(
+          title: l10n.settingsEngine,
+          note: l10n.settingsEngineNote,
+          children: [
+            _EngineOptionTile(
+              icon: Icons.av_timer_outlined,
+              title: 'Stable',
+              desc: l10n.settingsEngineStableDesc,
+              selected: prefs.engine == 'stable',
+              busy: _engineBusy,
+              onTap: () => _selectEngine('stable'),
+            ),
+            _EngineOptionTile(
+              icon: Icons.science_outlined,
+              title: 'EraAudio',
+              desc: l10n.settingsEngineEraAudioDesc,
+              badges: [
+                (text: l10n.settingsEngineExperimental, color: scheme.error),
+              ],
+              selected: prefs.engine == 'eraudio',
+              busy: _engineBusy,
+              onTap: () => _selectEngine('eraudio'),
+            ),
+            // 自研内核选中时：实验性说明（性能/内存仍在基准，可回退）
+            if (prefs.engine == 'eraudio')
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.flaky, size: 14, color: scheme.error),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        l10n.settingsEngineEraAudioNote,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.4,
+                          color: scheme.onSurfaceVariant.withValues(
+                            alpha: 0.75,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 20),
@@ -1076,23 +1622,13 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               subtitle: l10n.settingsSpectrumStyleDesc,
               trailing: SSegmented<String>(
                 options: [
-                  SSegmentedOption(
-                    'bars',
-                    l10n.settingsSpectrumStyleBars,
-                  ),
-                  SSegmentedOption(
-                    'wave',
-                    l10n.settingsSpectrumStyleWave,
-                  ),
-                  SSegmentedOption(
-                    'waveUp',
-                    l10n.settingsSpectrumStyleWaveUp,
-                  ),
+                  SSegmentedOption('bars', l10n.settingsSpectrumStyleBars),
+                  SSegmentedOption('wave', l10n.settingsSpectrumStyleWave),
+                  SSegmentedOption('waveUp', l10n.settingsSpectrumStyleWaveUp),
                 ],
                 selected: prefs.spectrumStyle,
-                onChanged: (v) => ref
-                    .read(appPrefsProvider.notifier)
-                    .setSpectrumStyle(v),
+                onChanged: (v) =>
+                    ref.read(appPrefsProvider.notifier).setSpectrumStyle(v),
               ),
             ),
             // 播放条迷你频谱：与全局「频谱」开关解耦（SpectrumView.enabled
@@ -1168,6 +1704,292 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ),
           ],
         ),
+      ],
+    );
+  }
+}
+
+/// 单选行（解码引擎 / 输出设备共用）：图标 + 标题（可多个小徽章）+ 说明 +
+/// 单选指示。整行可点，[busy] 期间禁用防重入。
+class _EngineOptionTile extends StatelessWidget {
+  const _EngineOptionTile({
+    required this.icon,
+    required this.title,
+    required this.desc,
+    required this.selected,
+    required this.busy,
+    required this.onTap,
+    this.badges = const [],
+  });
+
+  final IconData icon;
+  final String title;
+  final String desc;
+  final bool selected;
+  final bool busy;
+  final VoidCallback onTap;
+
+  /// 标题旁的小徽章（如「默认」「实验性」/ 错误色「通话/低质」）。
+  final List<({String text, Color color})> badges;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fg = selected ? scheme.primary : scheme.onSurface;
+    final textFg = busy
+        ? scheme.onSurface.withValues(alpha: 0.38)
+        : scheme.onSurface;
+    final subFg = busy
+        ? scheme.onSurfaceVariant.withValues(alpha: 0.35)
+        : scheme.onSurfaceVariant.withValues(alpha: 0.75);
+    return MouseRegion(
+      cursor: busy ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: busy ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: fg.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, size: 18, color: fg),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: textFg,
+                            ),
+                          ),
+                        ),
+                        for (var i = 0; i < badges.length; i++) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: badges[i].color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              badges[i].text,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                color: badges[i].color,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      desc,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11.5, color: subFg),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                size: 19,
+                color: selected
+                    ? scheme.primary
+                    : busy
+                    ? scheme.outlineVariant.withValues(alpha: 0.6)
+                    : scheme.outlineVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 「系统默认 = 通话/低质」警示卡：用户从未显式选择设备且系统默认恰好是
+/// 通话/低质类时，置于输出设备区顶部。非阻断、无需持久化关闭状态；若存在
+/// 达标设备则提供「改用高质量输出」一键动作（属用户显式操作）。
+class _SinkDefaultCallBanner extends StatelessWidget {
+  const _SinkDefaultCallBanner({this.onUseQuality});
+
+  /// 点击「改用高质量输出」；null = 全部设备均为通话/低质（不展示按钮）。
+  final VoidCallback? onUseQuality;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    final action = onUseQuality;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: scheme.error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: scheme.error.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 18,
+                  color: scheme.error,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.settingsOutputDeviceDefaultIsCall,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.5,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (action != null) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: SButton(
+                  label: l10n.settingsOutputDeviceUseQuality,
+                  icon: Icons.high_quality_outlined,
+                  variant: SButtonVariant.primary,
+                  size: SButtonSize.small,
+                  onPressed: action,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 通话/低质设备（如蓝牙 HFP 免提/通话 16kHz 单声道）受限说明行：当前所选
+/// 设备的原生格式达不到高音质时，提示引擎会按设备原生格式输出、音质受限。
+class _SinkHfpNote extends StatelessWidget {
+  const _SinkHfpNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 2, 14, 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 14, color: scheme.error),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              l10n.settingsOutputDeviceHfpNote,
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.4,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 「如何启用蓝牙 A2DP」引导块：可展开标题行（点击展开/收起）+ 纯文字
+/// 步骤说明。仅当前所选低质设备行下展示；展开态由本组件自理。
+class _A2dpGuideBlock extends StatefulWidget {
+  const _A2dpGuideBlock();
+
+  @override
+  State<_A2dpGuideBlock> createState() => _A2dpGuideBlockState();
+}
+
+class _A2dpGuideBlockState extends State<_A2dpGuideBlock> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
+            child: Row(
+              children: [
+                Icon(Icons.bluetooth_audio, size: 14, color: scheme.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    l10n.settingsOutputDeviceA2dpGuideTitle,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _open ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: Icon(
+                    Icons.expand_more,
+                    size: 16,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_open)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: Text(
+              l10n.settingsOutputDeviceA2dpGuideDesc,
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.5,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+              ),
+            ),
+          ),
       ],
     );
   }

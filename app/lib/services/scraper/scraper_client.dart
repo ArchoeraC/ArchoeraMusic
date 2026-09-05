@@ -110,6 +110,10 @@ class ScraperController {
   final ScraperBindings _bindings;
   bool _disposed = false;
 
+  /// C 句柄地址（供事件泵把 handle 地址传给独立接收 isolate：接收 isolate
+  /// 以 `Pointer.fromAddress` 重建并阻塞 `scraper_wait_event`）。
+  int get address => _h.address;
+
   /// 创建刮削器（仅解析 config，立即返回；错误抛 StateError）。
   factory ScraperController(ScraperConfig config) {
     final bindings = ScraperBindings.instance;

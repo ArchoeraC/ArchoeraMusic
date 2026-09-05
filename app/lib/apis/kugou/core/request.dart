@@ -19,7 +19,9 @@ Future<Map<String, dynamic>> kgRequest(
     final res = await req.close().timeout(const Duration(seconds: 8));
     if (res.statusCode != 200) throw StateError('KG HTTP ${res.statusCode}');
     final bytes = await res.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
-    final body = jsonDecode(utf8.decode(bytes, allowMalformed: true)) as Map<String, dynamic>;
+    final body =
+        jsonDecode(utf8.decode(bytes, allowMalformed: true))
+            as Map<String, dynamic>;
     // 0 = mobilecdn/songsearch 风格成功码，200 = lyrics.kugou.com 的 HTTP 风格成功码
     final code = body['error_code'] ?? body['errcode'] ?? body['err_code'] ?? 0;
     if (code != 0 && code != 200) throw StateError('KG API error_code=$code');

@@ -12,7 +12,22 @@ import 'dart:typed_data';
 import 'config.dart';
 
 const List<int> _krcKey = [
-  0x40, 0x47, 0x61, 0x77, 0x5e, 0x32, 0x74, 0x47, 0x51, 0x36, 0x31, 0x2d, 0xce, 0xd2, 0x6e, 0x69,
+  0x40,
+  0x47,
+  0x61,
+  0x77,
+  0x5e,
+  0x32,
+  0x74,
+  0x47,
+  0x51,
+  0x36,
+  0x31,
+  0x2d,
+  0xce,
+  0xd2,
+  0x6e,
+  0x69,
 ];
 
 /// base64 → XOR → inflate → 文本
@@ -34,8 +49,9 @@ String _decryptKrc(String base64) {
 // 注意 [id:$00000000] 的值后**直接是** ']'（无冒号），其余元数据行
 // 为 [key:value]（有冒号）——故冒号部分必须可选，否则 id 行残留。
 final RegExp _metaLineReg = RegExp(
-    r'^\[(?:id:\$\w+|ar|ti|al|by|hash|sign|qq|total|offset)(?::[^\]]*)?\](?:\r?\n)?',
-    multiLine: true);
+  r'^\[(?:id:\$\w+|ar|ti|al|by|hash|sign|qq|total|offset)(?::[^\]]*)?\](?:\r?\n)?',
+  multiLine: true,
+);
 final RegExp _languageReg = RegExp(r'\[language:([\w=\\/+]+)\]');
 final RegExp _languageLineReg = RegExp(r'\[language:[\w=\\/+]+\]\n');
 final RegExp _lineTimeReg = RegExp(r'\[((\d+),\d+)\].*', multiLine: true);
@@ -52,7 +68,12 @@ String _msToTimeTag(int ms) {
 }
 
 class KrcParsed {
-  const KrcParsed({required this.lrc, required this.krc, required this.trans, required this.roma});
+  const KrcParsed({
+    required this.lrc,
+    required this.krc,
+    required this.trans,
+    required this.roma,
+  });
 
   final String lrc;
   final String krc;
@@ -72,10 +93,14 @@ KrcParsed _parseKrc(String raw) {
   if (langMatch != null) {
     text = text.replaceFirst(_languageLineReg, '');
     try {
-      final json = jsonDecode(utf8.decode(base64Decode(langMatch.group(1)!))) as Map<String, dynamic>;
+      final json =
+          jsonDecode(utf8.decode(base64Decode(langMatch.group(1)!)))
+              as Map<String, dynamic>;
       for (final item in (json['content'] as List? ?? const [])) {
         final it = item as Map;
-        final lines = (it['lyricContent'] as List).map((arr) => (arr as List).join('')).toList();
+        final lines = (it['lyricContent'] as List)
+            .map((arr) => (arr as List).join(''))
+            .toList();
         if (it['type'] == 0) {
           romaLines = lines;
         } else if (it['type'] == 1) {
@@ -120,4 +145,5 @@ KrcParsed _parseKrc(String raw) {
 }
 
 /// 解密并解析一段 KRC base64 内容
-KrcParsed kgDecodeKrc(String base64Content) => _parseKrc(_decryptKrc(base64Content));
+KrcParsed kgDecodeKrc(String base64Content) =>
+    _parseKrc(_decryptKrc(base64Content));
