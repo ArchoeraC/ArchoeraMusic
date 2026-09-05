@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <stdatomic.h>
+#include "compat/qatomic.h"
 
 /* 单头文件实现仅编译一次（player.c 内） */
 #define MINIAUDIO_IMPLEMENTATION
@@ -70,11 +70,11 @@ struct PlayerCtx {
     /* 线程安全环形缓冲（SPSC）：生产者=引擎线程，消费者=设备音频回调 */
     float *ring;                /* 容量 ring_cap*stream_dev_ch 个 float */
     size_t ring_cap;            /* 帧容量（2 的幂） */
-    _Atomic size_t ring_w;      /* 写帧计数（生产者独占写） */
-    _Atomic size_t ring_r;      /* 读帧计数（设备回调独占写） */
-    _Atomic int  stream_eof;    /* 解码流已结束（喂完最后一块） */
-    _Atomic int  stream_stop;   /* 设备回调置位：EOF 且缓冲空 → 请求停止 */
-    _Atomic unsigned stream_underrun; /* 统计（诊断） */
+    qa_size ring_w;             /* 写帧计数（生产者独占写） */
+    qa_size ring_r;             /* 读帧计数（设备回调独占写） */
+    qa_size  stream_eof;         /* 解码流已结束（喂完最后一块） */
+    qa_size  stream_stop;        /* 设备回调置位：EOF 且缓冲空 → 请求停止 */
+    qa_size stream_underrun;    /* 统计（诊断） */
     /* 播放位置游标：已消费内容时间基（ms）+ 设备已消费帧（非流式文件模式不用） */
     double stream_pos_base_ms;
     ma_uint64 stream_consumed_frames; /* 累计设备消费帧数（本设备） */
@@ -600,8 +600,8 @@ static void stream_data_cb(ma_device *pDevice, void *pOutput, const void *pInput
     float *dst = (float *)pOutput;
     ma_uint32 ch = p->stream_dev_ch;
     const size_t cap = p->ring_cap;
-    const size_t w = atomic_load_explicit(&p->ring_w, memory_order_acquire);
-    const size_t r = atomic_load_explicit(&p->ring_r, memory_order_relaxed);
+    const size_t w = QA_LOAD_ACQ(&p->ring_w);
+    const size_t r = QA_LOAD_RELAXED(&p->ring_r);
     const size_t avail = w - r;
     const size_t n = (avail < (size_t)frameCount) ? avail : (size_t)frameCount;
     const size_t mask = cap - 1;
@@ -616,20 +616,18 @@ static void stream_data_cb(ma_device *pDevice, void *pOutput, const void *pInput
     }
     if (n < (size_t)frameCount) {
         memset(dst + n * ch, 0, ((size_t)frameCount - n) * ch * sizeof(float));
-        atomic_fetch_add_explicit(&p->stream_underrun,
-                                  (unsigned)(frameCount - n),
-                                  memory_order_relaxed);
+        QA_FETCH_ADD_RELAXED(&p->stream_underrun, (unsigned)(frameCount - n));
     }
     float vol = stream_volume_get(p);
     if (vol != 1.0f) {
         for (ma_uint32 i = 0; i < frameCount * ch; i++) dst[i] *= vol;
     }
-    atomic_store_explicit(&p->ring_r, r + n, memory_order_release);
+    QA_STORE_REL(&p->ring_r, r + n);
 
     /* EOF 且缓冲耗尽：请求停止（由 player_poll 停设备并发 ended） */
     if (n == 0 &&
-        atomic_load_explicit(&p->stream_eof, memory_order_acquire)) {
-        atomic_store_explicit(&p->stream_stop, 1, memory_order_release);
+        QA_LOAD_ACQ(&p->stream_eof)) {
+        QA_STORE_REL(&p->stream_stop, 1);
         if (p->stream_debug) {
             fprintf(stderr, "[stream-dbg] cb set stop (frameCount=%u)\n",
                     frameCount);
@@ -674,11 +672,11 @@ static void stream_teardown(PlayerCtx *p)
     p->stream_dev_started = 0;
     stream_free_ring(p);
     p->stream_active = 0;
-    atomic_store_explicit(&p->stream_eof, 0, memory_order_release);
-    atomic_store_explicit(&p->stream_stop, 0, memory_order_release);
-    atomic_store_explicit(&p->stream_underrun, 0, memory_order_relaxed);
-    atomic_store_explicit(&p->ring_w, 0, memory_order_relaxed);
-    atomic_store_explicit(&p->ring_r, 0, memory_order_relaxed);
+    QA_STORE_REL(&p->stream_eof, 0);
+    QA_STORE_REL(&p->stream_stop, 0);
+    QA_STORE_RELAXED(&p->stream_underrun, 0);
+    QA_STORE_RELAXED(&p->ring_w, 0);
+    QA_STORE_RELAXED(&p->ring_r, 0);
 }
 
 PlayerCtx *player_stream_open(const char *sink_id,
@@ -801,11 +799,11 @@ PlayerCtx *player_stream_open(const char *sink_id,
         free(p);
         return NULL;
     }
-    atomic_init(&p->ring_w, 0);
-    atomic_init(&p->ring_r, 0);
-    atomic_init(&p->stream_eof, 0);
-    atomic_init(&p->stream_stop, 0);
-    atomic_init(&p->stream_underrun, 0);
+    QA_INIT(&p->ring_w, 0);
+    QA_INIT(&p->ring_r, 0);
+    QA_INIT(&p->stream_eof, 0);
+    QA_INIT(&p->stream_stop, 0);
+    QA_INIT(&p->stream_underrun, 0);
 
     /* ── feed→设备 重采样（swr；格式相同则 NULL 直通）────────── */
     if (dev_rate != (unsigned)content_rate || dev_ch != (unsigned)content_channels) {
@@ -932,13 +930,13 @@ int player_stream_write(PlayerCtx *p, const float *pcm, int samples)
 
     /* 环形缓冲满则阻塞等待（背压：解码按设备消费推进） */
     for (;;) {
-        const size_t w = atomic_load_explicit(&p->ring_w, memory_order_relaxed);
-        const size_t r = atomic_load_explicit(&p->ring_r, memory_order_acquire);
+        const size_t w = QA_LOAD_RELAXED(&p->ring_w);
+        const size_t r = QA_LOAD_ACQ(&p->ring_r);
         if (cap - (w - r) >= need) break;
         ma_sleep(1); /* 1ms 让步（音频回调线程继续消费） */
     }
     {
-        const size_t w = atomic_load_explicit(&p->ring_w, memory_order_relaxed);
+        const size_t w = QA_LOAD_RELAXED(&p->ring_w);
         const size_t start = w & mask;
         const size_t first = (cap - start) < need ? (cap - start) : need;
         memcpy(&p->ring[start * dch], src, first * dch * sizeof(float));
@@ -946,7 +944,7 @@ int player_stream_write(PlayerCtx *p, const float *pcm, int samples)
             memcpy(&p->ring[0], src + first * dch,
                    (need - first) * dch * sizeof(float));
         }
-        atomic_store_explicit(&p->ring_w, w + need, memory_order_release);
+        QA_STORE_REL(&p->ring_w, w + need);
     }
 
     /* 首包后启动设备（此前可能 start_paused / 等待首数据） */
@@ -962,7 +960,7 @@ int player_stream_write(PlayerCtx *p, const float *pcm, int samples)
 void player_stream_end(PlayerCtx *p)
 {
     if (!p || !p->stream_mode) return;
-    atomic_store_explicit(&p->stream_eof, 1, memory_order_release);
+    QA_STORE_REL(&p->stream_eof, 1);
 }
 
 int player_stream_active(const PlayerCtx *p)
@@ -973,15 +971,15 @@ int player_stream_active(const PlayerCtx *p)
 double player_stream_played_ms(const PlayerCtx *p)
 {
     if (!p || !p->stream_mode) return 0.0;
-    const size_t r = atomic_load_explicit(&p->ring_r, memory_order_relaxed);
+    const size_t r = QA_LOAD_RELAXED(&p->ring_r);
     return p->stream_pos_base_ms + (double)r * 1000.0 / (double)p->stream_dev_rate;
 }
 
 double player_stream_buffered_ms(const PlayerCtx *p)
 {
     if (!p || !p->stream_mode) return 0.0;
-    const size_t w = atomic_load_explicit(&p->ring_w, memory_order_relaxed);
-    const size_t r = atomic_load_explicit(&p->ring_r, memory_order_relaxed);
+    const size_t w = QA_LOAD_RELAXED(&p->ring_w);
+    const size_t r = QA_LOAD_RELAXED(&p->ring_r);
     return (double)(w - r) * 1000.0 / (double)p->stream_dev_rate;
 }
 
@@ -1014,10 +1012,10 @@ void player_stream_seek_reset(PlayerCtx *p)
                                           (int)p->stream_dev_rate,
                                           (int)p->stream_dev_ch);
     }
-    atomic_store_explicit(&p->ring_w, 0, memory_order_release);
-    atomic_store_explicit(&p->ring_r, 0, memory_order_release);
-    atomic_store_explicit(&p->stream_eof, 0, memory_order_release);
-    atomic_store_explicit(&p->stream_stop, 0, memory_order_release);
+    QA_STORE_REL(&p->ring_w, 0);
+    QA_STORE_REL(&p->ring_r, 0);
+    QA_STORE_REL(&p->stream_eof, 0);
+    QA_STORE_REL(&p->stream_stop, 0);
     p->stream_pos_base_ms = 0.0;
     p->stream_active = 0;
     p->ended_reported = 0;
@@ -1121,8 +1119,8 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
     }
 
     /* 清空缓冲：新设备从当前解码点续播 */
-    atomic_store_explicit(&p->ring_w, 0, memory_order_release);
-    atomic_store_explicit(&p->ring_r, 0, memory_order_release);
+    QA_STORE_REL(&p->ring_w, 0);
+    QA_STORE_REL(&p->ring_r, 0);
 
     {
         ma_device_config dcfg = ma_device_config_init(ma_device_type_playback);
@@ -1305,13 +1303,13 @@ int player_poll(PlayerCtx *p)
         }
 
         /* 结束：解码流 EOF 且缓冲耗尽且设备已停止请求 */
-        if (atomic_load_explicit(&p->stream_stop, memory_order_acquire) &&
+        if (QA_LOAD_ACQ(&p->stream_stop) &&
             p->stream_dev_started) {
             stream_device_stop(p);
         }
-        if (atomic_load_explicit(&p->stream_eof, memory_order_acquire)) {
-            size_t w = atomic_load_explicit(&p->ring_w, memory_order_acquire);
-            size_t r = atomic_load_explicit(&p->ring_r, memory_order_acquire);
+        if (QA_LOAD_ACQ(&p->stream_eof)) {
+            size_t w = QA_LOAD_ACQ(&p->ring_w);
+            size_t r = QA_LOAD_ACQ(&p->ring_r);
             if (w == r && !p->stream_dev_started && !p->ended_reported) {
                 p->ended_reported = 1;
                 p->playing = 0;
@@ -1323,12 +1321,12 @@ int player_poll(PlayerCtx *p)
             return 1;
         }
         if (p->stream_debug) {
-            size_t w = atomic_load_explicit(&p->ring_w, memory_order_relaxed);
-            size_t r = atomic_load_explicit(&p->ring_r, memory_order_relaxed);
-            fprintf(stderr, "[stream-dbg] poll eof=%d stop=%d dev_started=%d "
+            size_t w = QA_LOAD_RELAXED(&p->ring_w);
+            size_t r = QA_LOAD_RELAXED(&p->ring_r);
+            fprintf(stderr, "[stream-dbg] poll eof=%zu stop=%zu dev_started=%d "
                             "w=%zu r=%zu play=%.1f\n",
-                    atomic_load_explicit(&p->stream_eof, memory_order_relaxed),
-                    atomic_load_explicit(&p->stream_stop, memory_order_relaxed),
+                    QA_LOAD_RELAXED(&p->stream_eof),
+                    QA_LOAD_RELAXED(&p->stream_stop),
                     p->stream_dev_started, w, r, player_stream_played_ms(p));
         }
         return 0;
