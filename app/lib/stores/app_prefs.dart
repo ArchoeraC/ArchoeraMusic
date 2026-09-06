@@ -332,6 +332,28 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置歌词引擎与 AMLL 歌词墙参数。
+  void setLyricAmll({
+    String? engine,
+    double? alignFraction,
+    double? inactiveAlpha,
+    bool? wordSweep,
+    bool? hidePassed,
+    bool? enableScale,
+    String? springPreset,
+  }) {
+    state = state.copyWithAmll(
+      engine: engine,
+      alignFraction: alignFraction,
+      inactiveAlpha: inactiveAlpha,
+      wordSweep: wordSweep,
+      hidePassed: hidePassed,
+      enableScale: enableScale,
+      springPreset: springPreset,
+    );
+    state.save();
+  }
+
   /// 设置下载配置（根目录 / 并发数 / 分组策略 / 默认音质 / 限速 /
   /// 文件名模板 / 记录上限）。
   void setDownload({

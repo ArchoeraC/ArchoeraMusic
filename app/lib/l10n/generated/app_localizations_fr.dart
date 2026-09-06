@@ -3853,4 +3853,47 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get libraryFullScanDescription => '清空曲库并从扫描目录重建';
+
+  @override
+  String get settingsSectionLyricEngine => '歌词引擎';
+
+  @override
+  String get settingsLyricEngine => '引擎';
+
+  @override
+  String get settingsLyricEngineSimple => '经典';
+
+  @override
+  String get settingsLyricEngineWall => '歌词墙';
+
+  @override
+  String get settingsLyricEngineDesc => '选择渲染引擎，可随时切换';
+
+  @override
+  String get settingsLyricEngineNote =>
+      '仅作用于全屏播放器歌词区；AMLL 为 Apple Music 风整墙滚动，占用略高。';
+
+  @override
+  String get settingsSectionLyricWall => '歌词墙设置';
+
+  @override
+  String get settingsAmllNote => 'Apple Music 风格整墙歌词参数，仅 AMLL 引擎使用。';
+
+  @override
+  String get settingsAmllAlign => '激活行位置';
+
+  @override
+  String get settingsAmllDim => '非激活行透明度';
+
+  @override
+  String get settingsAmllWordSweep => '逐字扫亮';
+
+  @override
+  String get settingsAmllHidePassed => '隐藏已唱行';
+
+  @override
+  String get settingsAmllScale => '非激活行缩放';
+
+  @override
+  String get settingsAmllSpring => '滚动弹簧';
 }

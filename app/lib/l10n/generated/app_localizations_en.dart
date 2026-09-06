@@ -3791,4 +3791,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get libraryFullScanDescription =>
       'Rebuild the library from scan directories';
+
+  @override
+  String get settingsSectionLyricEngine => 'Lyrics Engine';
+
+  @override
+  String get settingsLyricEngine => 'Engine';
+
+  @override
+  String get settingsLyricEngineSimple => 'Classic';
+
+  @override
+  String get settingsLyricEngineWall => 'Wall';
+
+  @override
+  String get settingsLyricEngineDesc =>
+      'Choose the renderer; switchable anytime';
+
+  @override
+  String get settingsLyricEngineNote =>
+      'Applies to the full-player lyric area only; AMLL = Apple Music-style wall scrolling, slightly heavier.';
+
+  @override
+  String get settingsSectionLyricWall => 'Wall Options';
+
+  @override
+  String get settingsAmllNote =>
+      'Apple Music-style wall lyric parameters, used only by the AMLL engine.';
+
+  @override
+  String get settingsAmllAlign => 'Active line position';
+
+  @override
+  String get settingsAmllDim => 'Inactive line dim';
+
+  @override
+  String get settingsAmllWordSweep => 'Word sweep';
+
+  @override
+  String get settingsAmllHidePassed => 'Hide passed lines';
+
+  @override
+  String get settingsAmllScale => 'Shrink inactive lines';
+
+  @override
+  String get settingsAmllSpring => 'Scroll spring';
 }

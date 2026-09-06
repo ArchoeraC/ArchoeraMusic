@@ -1108,5 +1108,19 @@
   "libraryFullScan": "Full Scan",
   "libraryFullScanConfirm": "Run a full scan?",
   "libraryFullScanConfirmDesc": "The library database will be cleared and rebuilt from the scan directories (source files are kept). This cannot be undone and uses significant disk IO while running.",
-  "libraryFullScanDescription": "Rebuild the library from scan directories"
+  "libraryFullScanDescription": "Rebuild the library from scan directories",
+  "settingsSectionLyricEngine": "Lyrics Engine",
+  "settingsLyricEngine": "Engine",
+  "settingsLyricEngineSimple": "Classic",
+  "settingsLyricEngineWall": "Wall",
+  "settingsLyricEngineDesc": "Choose the renderer; switchable anytime",
+  "settingsLyricEngineNote": "Applies to the full-player lyric area only; AMLL = Apple Music-style wall scrolling, slightly heavier.",
+  "settingsSectionLyricWall": "Wall Options",
+  "settingsAmllNote": "Apple Music-style wall lyric parameters, used only by the AMLL engine.",
+  "settingsAmllAlign": "Active line position",
+  "settingsAmllDim": "Inactive line dim",
+  "settingsAmllWordSweep": "Word sweep",
+  "settingsAmllHidePassed": "Hide passed lines",
+  "settingsAmllScale": "Shrink inactive lines",
+  "settingsAmllSpring": "Scroll spring"
 }

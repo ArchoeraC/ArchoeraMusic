@@ -7,6 +7,15 @@ const lyricLineHeightKey = 'lyrics.lineHeight';
 const lyricPlayedColorKey = 'lyrics.playedColor';
 const lyricUnplayedColorKey = 'lyrics.unplayedColor';
 
+// ── AMLL 歌词墙（AMLL 引擎）偏好键 ──────────────────────────────
+const lyricEngineKey = 'lyrics.engine'; // 'simple' | 'amll'
+const amllAlignFractionKey = 'amll.alignFraction';
+const amllInactiveAlphaKey = 'amll.inactiveAlpha';
+const amllWordSweepKey = 'amll.wordSweep';
+const amllHidePassedKey = 'amll.hidePassed';
+const amllEnableScaleKey = 'amll.enableScale';
+const amllSpringPresetKey = 'amll.springPreset';
+
 /// 歌词域偏好：播放器内歌词/字号/行高/已唱与未唱颜色。
 extension LyricsPrefs on AppPrefs {
   /// 播放器内显示歌词（当前行居中高亮 + 点击跳转）。
@@ -48,6 +57,63 @@ extension LyricsPrefs on AppPrefs {
       lyricLineHeightKey: ?lineHeight?.clamp(42, 64),
       lyricPlayedColorKey: ?playedColor,
       lyricUnplayedColorKey: ?unplayedColor,
+    },
+  );
+}
+
+/// AMLL 歌词墙偏好：引擎选择 + 布局/视觉参数。
+extension AmllLyricsPrefs on AppPrefs {
+  /// 歌词引擎：'simple'（旧实现）| 'amll'（Apple Music 风格歌词墙）。
+  String get lyricEngine {
+    final v = data[lyricEngineKey];
+    return v == 'amll' ? 'amll' : 'simple';
+  }
+
+  /// 激活行锚定位置（0~1，占歌词区高度比例，默认 0.35）。
+  double get amllAlignFraction {
+    final v = data[amllAlignFractionKey] as num?;
+    if (v == null) return 0.35;
+    return v.toDouble().clamp(0.15, 0.6);
+  }
+
+  /// 非激活行透明度（0~1，默认 0.25；0.25 为 AMLL 观感默认）。
+  double get amllInactiveAlpha {
+    final v = data[amllInactiveAlphaKey] as num?;
+    if (v == null) return 0.25;
+    return v.toDouble().clamp(0.05, 1.0);
+  }
+
+  /// 逐字扫亮（卡拉 OK 逐字变色）。
+  bool get amllWordSweep => data[amllWordSweepKey] as bool? ?? true;
+
+  /// 已唱过的行淡出隐藏（默认关）。
+  bool get amllHidePassed => data[amllHidePassedKey] as bool? ?? false;
+
+  /// 非激活行缩放（激活 1 / 非激活 0.92，默认开）。
+  bool get amllEnableScale => data[amllEnableScaleKey] as bool? ?? true;
+
+  /// 弹簧预设（'default'|'smooth'|'responsive'|'jello'|'heavy'）。
+  String get amllSpringPreset =>
+      data[amllSpringPresetKey] as String? ?? 'default';
+
+  AppPrefs copyWithAmll({
+    String? engine,
+    double? alignFraction,
+    double? inactiveAlpha,
+    bool? wordSweep,
+    bool? hidePassed,
+    bool? enableScale,
+    String? springPreset,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      lyricEngineKey: ?engine,
+      amllAlignFractionKey: ?alignFraction?.clamp(0.15, 0.6),
+      amllInactiveAlphaKey: ?inactiveAlpha?.clamp(0.05, 1.0),
+      amllWordSweepKey: ?wordSweep,
+      amllHidePassedKey: ?hidePassed,
+      amllEnableScaleKey: ?enableScale,
+      amllSpringPresetKey: ?springPreset,
     },
   );
 }

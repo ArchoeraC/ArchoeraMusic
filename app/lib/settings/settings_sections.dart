@@ -2092,6 +2092,42 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
         ),
         const SizedBox(height: 20),
         SettingSection(
+          title: l10n.settingsSectionLyricEngine,
+          note: l10n.settingsLyricEngineNote,
+          children: [
+            SettingTile(
+              icon: Icons.lyrics_outlined,
+              title: l10n.settingsLyricEngine,
+              subtitle: l10n.settingsLyricEngineDesc,
+              trailing: SegmentedButton<String>(
+                showSelectedIcon: false,
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                ),
+                segments: [
+                  ButtonSegment(
+                    value: 'simple',
+                    label: Text(l10n.settingsLyricEngineSimple),
+                  ),
+                  ButtonSegment(
+                    value: 'amll',
+                    label: Text(l10n.settingsLyricEngineWall),
+                  ),
+                ],
+                selected: {prefs.lyricEngine},
+                onSelectionChanged: (s) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setLyricAmll(engine: s.first),
+              ),
+            ),
+          ],
+        ),
+        if (prefs.lyricEngine == 'amll') ...[
+          const SizedBox(height: 20),
+          _buildAmllWallSection(l10n, scheme, prefs),
+        ],
+        const SizedBox(height: 20),
+        SettingSection(
           title: l10n.settingsSectionLyricStyle,
           note: l10n.settingsLyricsNote,
           children: [
@@ -2155,12 +2191,90 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
     );
   }
 
+  /// AMLL 歌词墙参数（仅 engine=amll 显示）。
+  Widget _buildAmllWallSection(
+    AppLocalizations l10n,
+    ColorScheme scheme,
+    AppPrefs prefs,
+  ) {
+    final notifier = ref.read(appPrefsProvider.notifier);
+    return SettingSection(
+      title: l10n.settingsSectionLyricWall,
+      note: l10n.settingsAmllNote,
+      children: [
+        SettingSliderTile(
+          icon: Icons.center_focus_strong_outlined,
+          title: l10n.settingsAmllAlign,
+          subtitle: '${(prefs.amllAlignFraction * 100).round()}%',
+          value: prefs.amllAlignFraction,
+          min: 0.15,
+          max: 0.6,
+          divisions: 45,
+          onChanged: (v) => notifier.setLyricAmll(alignFraction: v),
+        ),
+        SettingSliderTile(
+          icon: Icons.opacity,
+          title: l10n.settingsAmllDim,
+          subtitle: '${(prefs.amllInactiveAlpha * 100).round()}%',
+          value: prefs.amllInactiveAlpha,
+          min: 0.05,
+          max: 1,
+          divisions: 19,
+          onChanged: (v) => notifier.setLyricAmll(inactiveAlpha: v),
+        ),
+        SettingSwitchTile(
+          icon: Icons.abc,
+          title: l10n.settingsAmllWordSweep,
+          subtitle: '',
+          value: prefs.amllWordSweep,
+          onChanged: (v) => notifier.setLyricAmll(wordSweep: v),
+        ),
+        SettingSwitchTile(
+          icon: Icons.visibility_off_outlined,
+          title: l10n.settingsAmllHidePassed,
+          subtitle: '',
+          value: prefs.amllHidePassed,
+          onChanged: (v) => notifier.setLyricAmll(hidePassed: v),
+        ),
+        SettingSwitchTile(
+          icon: Icons.zoom_out_map_outlined,
+          title: l10n.settingsAmllScale,
+          subtitle: '',
+          value: prefs.amllEnableScale,
+          onChanged: (v) => notifier.setLyricAmll(enableScale: v),
+        ),
+        SettingTile(
+          icon: Icons.animation_outlined,
+          title: l10n.settingsAmllSpring,
+          subtitle: prefs.amllSpringPreset,
+          trailing: DropdownButton<String>(
+            value: prefs.amllSpringPreset,
+            underline: const SizedBox.shrink(),
+            isDense: true,
+            items: [
+              for (final p in const [
+                'default',
+                'smooth',
+                'responsive',
+                'jello',
+                'heavy',
+              ])
+                DropdownMenuItem(value: p, child: Text(p)),
+            ],
+            onChanged: (v) {
+              if (v != null) notifier.setLyricAmll(springPreset: v);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _colorSwatches(
     ColorScheme scheme, {
     required int current,
     required ValueChanged<int> onChanged,
-  }) {
-    return Wrap(
+  }) {    return Wrap(
       spacing: 8,
       runSpacing: 8,
       alignment: WrapAlignment.end,
