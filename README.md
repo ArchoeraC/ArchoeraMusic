@@ -336,9 +336,10 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 #### 2.5 第三方代码的约束
 
 - 任何**第三方引入代码**（PR 合入的外部代码 / 上游移植）必须携带与 AGPL-3.0（及未来 AGPL-4.0）**兼容**的许可证；
-- 严禁引入 GPL-2.0-only（缺少 "or later version"）与 AGPL 不兼容的代码；
-- 严禁引入 **SSPL / BSL / SSPL / 商业源可用但禁止商业使用** 等非 FSF 认可的"伪开源"许可证代码；
-- 所有引入的第三方代码必须在**对应模块**的 `THIRD-PARTY-LICENSES.md` 中逐项列明。
+- 严禁引入 GPL-2.0-only（缺少 "or later version"）等与 AGPL 不兼容的代码；
+- 严禁引入 **SSPL / BSL / SSPL / 商业源可用但禁止商业使用** 以及各类源码可用但非OSI/FSF认可的许可（自定义禁止商业使用协议等）的代码链接进本项目；
+  > 备注：仅作为完全独立外部工具、不构成衍生作品的脚本不在此限制，但原则上也不建议合入主仓库。
+- 所有引入的第三方代码必须在**对应模块**的 `THIRD-PARTY-LICENSES.md` 中逐项列明（包括上游来源、许可证、版权、涉及的模块与文件范围）。
 
 ---
 
