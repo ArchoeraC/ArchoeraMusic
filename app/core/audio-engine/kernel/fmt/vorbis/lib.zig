@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Vorbis 解码器封装（open + VTable + Ogg 流式 pushdata）
 //!
 //! 文档（docs/audio-kernel-zig.md §9.12）：复用自研 Ogg 容器（fmt/ogg.zig 负责

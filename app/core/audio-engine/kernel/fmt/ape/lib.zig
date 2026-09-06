@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! APE（Monkey's Audio）解码器（docs/audio-kernel-zig.md §9.10）
 //!
 //! 以 Zig 实现（不依赖 Monkey's Audio 官方 SDK），参考重构对照

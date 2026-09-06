@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA Voice 位读写器——复刻 FFmpeg GetBitContext / PutBitContext 语义。
 //!
 //! MSB-first（FFmpeg bitstream 序）。读取越过 `size_in_bits` 时按缓冲末尾零

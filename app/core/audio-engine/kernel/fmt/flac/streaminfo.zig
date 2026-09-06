@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! FLAC 元数据解析（可选 ID3v2 前置 + fLaC 头 + 元数据块遍历 + STREAMINFO + SEEKTABLE）
 //!
 //! 文件布局（参考重构，对照 FFmpeg libavformat/flacdec.c 与 libavcodec/flac.c）：

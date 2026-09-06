@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MPEG-4 ALS（Audio Lossless Coding）解码核心 —— 逐位移植 FFmpeg alsdec.c + bgmc.c
 //!
 //! 覆盖（对照 reference/FFmpeg/libavcodec/{alsdec.c,bgmc.c}）：

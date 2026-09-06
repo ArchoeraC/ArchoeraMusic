@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA Lossless（ASF 0x163）解码对照导出工具。
 //!
 //! 用法：zig build-exe kernel/wmalossless_dump.zig -lc -O ReleaseSafe -femit-bin=./wmalossless_dump

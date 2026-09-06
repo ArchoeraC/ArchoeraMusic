@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS Express（DCA-LBR，低码率扩展）解码器
 //!
 //! 逐函数对照 FFmpeg n9.0.1 dca_lbr.c / dcadsp.c（lbr_bank_c / lfe_iir_c）。

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AC-3 / E-AC-3 尾数解包与变换系数（对照 FFmpeg ac3dec.c，float 路径 USE_FIXED=0）
 //!
 //! 移植的函数（以 /tmp/ac3dec.c 为唯一参考源）：

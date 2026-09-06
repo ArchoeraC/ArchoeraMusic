@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! APE 容器解析（docs/audio-kernel-zig.md §9.10）
 //!
 //! 参考重构对照 FFmpeg libavformat/ape.c 的 ape_read_header：MAC 描述符 /

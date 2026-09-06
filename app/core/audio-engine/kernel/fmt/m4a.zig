@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! M4A（ISO-BMFF / MP4）容器解复用 —— 自研 Zig
 //!
 //! 定位（docs/audio-kernel-zig.md §9.8）：MP4 容器内音频解复用，覆盖

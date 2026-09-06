@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 解码会话编排 + C ABI 桥接逻辑（docs/audio-kernel-zig.md §16.1）
 //!
 //! 本模块承载 `zk_*` 的全部实现（`kernel.zig` 只做 `export fn` 薄包装），

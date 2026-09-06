@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Opus Ogg 解复用 + CELT 解码对照工具（P1/P2 阶段）
 //!
 //! 解码 Ogg/Opus 文件：自研 `fmt/ogg.zig` Demux 提取 packets + `fmt/opus/header.zig`

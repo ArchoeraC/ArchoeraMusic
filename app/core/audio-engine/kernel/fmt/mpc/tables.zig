@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Musepack 静态表（自动生成 → 勿手改）。
 //!
 //! 来源与溯源：mpc8data.h / mpc8huff.h / mpc7data.h / mpcdata.h /

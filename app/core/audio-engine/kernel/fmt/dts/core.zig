@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS（DCA Coherent Acoustics）core → PCM 解码（阶段二）
 //!
 //! 主线对照 FFmpeg dca_core.c 的 parse_frame_header / parse_coding_header /

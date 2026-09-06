@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! M4A/MP4 Opus → Ogg 页合成辅助（fmt/m4a 专用，不改动 fmt/ogg）
 //!
 //! m4a 中 Opus 轨每 sample = 一个完整 Opus 包，容器不携带 granule；解码复用

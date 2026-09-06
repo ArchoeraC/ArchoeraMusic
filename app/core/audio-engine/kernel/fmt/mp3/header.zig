@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MPEG Audio 帧头解析（对齐 minimp3 hdr_* 宏语义）。
 //!
 //! 4 字节帧头：[sync 11][version 2][layer 2][protection 1][bitrate 4]

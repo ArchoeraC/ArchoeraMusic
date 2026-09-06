@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! PS（参数立体声）静态表 + 运行时生成表。
 //! 静态数据来自 aacpsdata.c / aacps.c / aacps_tablegen.h；生成逻辑复刻
 //! aacps_tablegen.h ps_tableinit（CONFIG_HARDCODED_TABLES=0 运行时生成路径）。

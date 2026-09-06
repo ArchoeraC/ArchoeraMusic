@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! kissfft.zig（libopus 移植）与 CUSTOM_MODES 浮点 libopus 的 MDCT golden 对比测试。
 //! golden 格式（gold.c 生成）：u32 N2, u32 overlap, f32[N2] in, f32[overlap] window,
 //! f32[N] out, f32[N2] trig（shift 级偏移后）, u16[N4] bitrev, f32[N4] complex twiddles。

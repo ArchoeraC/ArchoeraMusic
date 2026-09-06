@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DCA core 解码对照导出工具（阶段二）：解码 .dts core 帧为原始 PCM。
 //!
 //! 默认输出与 `ffmpeg -flags +bitexact -f s32le` 对齐的 S32LE（24bit<<8，交错，

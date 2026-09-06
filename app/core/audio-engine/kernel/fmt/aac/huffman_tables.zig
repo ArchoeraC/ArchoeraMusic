@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AAC Huffman 码本表（scalefactor VLC + 11 个频谱码本）。
 //! 码表定义来自 ISO/IEC 14496-3 Table 4.6.x，数值与 FFmpeg n9.0.1 aactab.c 核对一致；
 //! _idx 打包格式：低 nibble 序 = 值索引，高字节 = 非零计数/掩码（见各表注释）。

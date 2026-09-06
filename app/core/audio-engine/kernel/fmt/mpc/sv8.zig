@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Musepack SV8 解码 —— FFmpeg n9.0.1 libavcodec/mpc8.c 逐句移植。
 //!
 //! 含容器（MPCK chunk：SH/AP…）与逐帧解码。帧间状态（Q/oldDSCF/合成滤波/噪声

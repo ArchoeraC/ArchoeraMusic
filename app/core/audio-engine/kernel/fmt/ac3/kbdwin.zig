@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AC-3 KBD（Kaiser-Bessel Derived）窗口，256 点，α=5.0。
 //!
 //! 复刻对象：FFmpeg n9.0.1 libavcodec/kbdwin.c `ff_kbd_window_init`（double

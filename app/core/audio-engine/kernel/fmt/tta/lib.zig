@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! TTA (True Audio, .tta) 解码器接入层（fmt/tta）。
 //!
 //! 容器（libavformat/tta.c + tta.c 头解析）：

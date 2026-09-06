@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DSD 解码器（DSF/DFF 容器 + DSD→PCM）
 //!
 //! 文档（docs/audio-kernel-zig.md §9.11）：DSF（`DSD ` 头 + chunk 表）/ DFF

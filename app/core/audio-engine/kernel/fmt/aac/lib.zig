@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AAC-LC 解码器（自研 Zig，ISO/IEC 14496-3；语义与 FFmpeg n9.0.1
 //! libavcodec/aac/aacdec*.c 浮点路径逐位对照（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!

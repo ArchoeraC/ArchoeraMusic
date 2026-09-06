@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA Pro (wmapro) 解码核心——逐函数移植 FFmpeg libavcodec/wmaprodec.c
 //! (n9.0.1) 的 WMAPRO 路径（不含 XMA）。bit reservoir / packet / frame /
 //! subframe / 声道组 / DPCM+runlevel scale factors / 矢量+runlevel 谱系数 /

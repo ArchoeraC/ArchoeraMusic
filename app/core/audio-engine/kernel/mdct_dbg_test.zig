@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 const std = @import("std");
 pub fn main() !void {
     const tmp: f32 = @bitCast(@as(u32, 0x44a64b10));

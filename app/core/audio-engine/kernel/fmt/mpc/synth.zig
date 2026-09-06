@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Musepack 合成核心 —— FFmpeg n9.0.1 定点路径逐句复刻（mpc.c + mpegaudiodsp 固定点）。
 //!
 //! 覆盖：

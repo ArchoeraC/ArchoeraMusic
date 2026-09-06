@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 解码层统一接口（docs/audio-kernel-zig.md §8.1）
 //!
 //! `Decoder` 是格式无关的解码视图：`open` 负责 probe → 工厂分发，

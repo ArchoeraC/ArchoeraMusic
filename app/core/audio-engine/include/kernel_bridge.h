@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * kernel_bridge.h — C 壳 → Zig 内核的唯一入口（解码 / DSP 服务）
  *

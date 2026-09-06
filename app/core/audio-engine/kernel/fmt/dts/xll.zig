@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS-HD MA 无损扩展（XLL）解码
 //!
 //! 逐函数对照 FFmpeg n9.0.1 dca_xll.c / dcadsp.c / dcamath.h 定点路径。

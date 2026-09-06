@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! GSM 06.10 解码（docs/audio-kernel-zig.md §9.1 边界部分）
 //!
 //! 支持两种容器形态（算法一致，位序与块长不同）：

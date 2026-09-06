@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AC-3 解码器（Dolby Digital；参考 FFmpeg ac3dec.c，float 路径）
 //!
 //! 文档：Dolby AC-3（ATSC A/52）。帧 = 同步字 + 头 + 6 个音频块（每块 256 样本）。

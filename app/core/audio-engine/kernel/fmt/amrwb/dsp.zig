@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AMR-WB 解码 DSP（浮点路径复刻 FFmpeg ACELP 族工具函数）
 //!
 //! 对照 FFmpeg libavcodec（LGPL-2.1+）：acelp_filters.c（acelp_interpolatef /

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WavPack 解码器（docs/audio-kernel-zig.md §9.9）
 //!
 //! 参考重构对照 wavpack.c / wavpack.h / wavpackdata.c（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。

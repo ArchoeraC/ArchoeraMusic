@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! APE 位读取（GetBitContext 等价，MSB-first，内存缓冲）
 //!
 //! 供 fileversion < 3900 的熵解码路径使用（decode_array_0000 /

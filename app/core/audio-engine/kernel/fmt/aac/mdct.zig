@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 逆 MDCT（bit-exact 复刻 FFmpeg av_tx 浮点路径，支持 f32/f64）。
 //!
 //! 复刻对象：libavutil/tx_template.c `ff_tx_mdct_inv` + 单块 split-radix

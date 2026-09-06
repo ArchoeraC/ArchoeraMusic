@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Ogg 容器解复用（docs/audio-kernel-zig.md §9.2）
 //!
 //! 自研 Zig：OggS 页解析（页头 / lacing 分段表 / 非反射 CRC-32）+ 跨页 packet

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 校验基础设施（FLAC 帧头 CRC-8 / 整帧与元数据块 CRC-16）
 //!
 //! 与 FFmpeg `libavutil/crc.c` 对齐（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）：

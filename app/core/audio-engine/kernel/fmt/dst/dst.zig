@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DST（Direct Stream Transfer，DST 压缩 DSD）帧解码 —— FFmpeg libavcodec/dstdec.c
 //! 逐句移植。
 //!

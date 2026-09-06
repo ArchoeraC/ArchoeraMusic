@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AMR-WB 解码主路径（浮点，逐句对齐 FFmpeg amrwbdec.c）
 //!
 //! 对照 FFmpeg libavcodec/amrwbdec.c + amr.h（ff_amr_bit_reorder）：

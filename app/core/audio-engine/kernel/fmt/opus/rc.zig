@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Opus 区间解码器（docs/audio-kernel-zig.md §9.2）
 //!
 //! RFC 6716 §4.1 32-bit 区间解码；参考重构对照 FFmpeg `libavcodec/opus/rc.c`

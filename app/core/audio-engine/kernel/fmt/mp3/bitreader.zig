@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MP3 bitstream reader（MSB-first，对齐 minimp3 bs_t）。
 //!
 //! 边界语义与 minimp3 get_bits 完全一致：若读取会越过 limit 返回 0，

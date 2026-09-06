@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WAV / AIFF 内 ADPCM 解码（docs/audio-kernel-zig.md §9.1）
 //!
 //! 支持多种 4-bit ADPCM（输出 s16）：

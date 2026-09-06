@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS-HD（.dtshd 容器 / 裸 DTS core 流）解码对照导出工具
 //!
 //! 容器层解析 DTSHDHDR 块 → STRMDATA 载荷；载荷内以 core sync（0x7FFE8001）

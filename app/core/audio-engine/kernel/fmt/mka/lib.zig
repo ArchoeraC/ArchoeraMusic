@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Matroska 纯音频容器（.mka）解复用 + 接入自研 codec（docs/audio-kernel-zig.md §9.x）
 //!
 //! 内存模型（有界流式，消除整文件 readAll + 全量 spool 的 OOM 风险）：

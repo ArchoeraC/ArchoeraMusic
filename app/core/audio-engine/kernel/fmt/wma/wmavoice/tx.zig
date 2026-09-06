@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA Voice postfilter 变换——复刻 FFmpeg av_tx float RDFT/DCT-I/DST-I 语义
 //! （reference libavutil/tx_template.c n9.0.1）。
 //!

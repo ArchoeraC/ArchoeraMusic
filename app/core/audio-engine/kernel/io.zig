@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 输入抽象（docs/audio-kernel-zig.md §6.1）
 //!
 //! `Reader` 提供统一的只读字节流视图，三种形态：

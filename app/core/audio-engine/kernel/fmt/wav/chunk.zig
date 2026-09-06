@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 容器帧层（docs/audio-kernel-zig.md §9.1 的 RIFF 家族统一 framing）
 //!
 //! 三种（+CAF）容器的 chunk 头布局不同，统一抽象为 `Chunk{id, size}`：

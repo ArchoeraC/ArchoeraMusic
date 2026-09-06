@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Info 审查工具：经 decoder.open（probe → 工厂分发）打印 Info.duration_us /
 //! duration_known 与基本流信息；不写 PCM。用于 duration 覆盖审查。
 //!

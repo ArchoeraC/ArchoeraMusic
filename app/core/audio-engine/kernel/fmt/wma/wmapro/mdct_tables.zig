@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Auto-generated WMA Pro (wmapro) inverse-MDCT tables.
 //! Source: system FFmpeg n9.0.1 av_tx (libavutil) FLOAT MDCT inverse, plain
 //! (non-FULL), per length 1<<b, scale = 1/(1<<(b-1)) / (1<<(bits_per_sample-1)).

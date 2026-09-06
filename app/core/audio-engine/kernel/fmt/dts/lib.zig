@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS core 流帧扫描/统计（阶段一）
 //!
 //! 在整段缓冲上以 sync 定位 + 帧头 frame_size 前进的方式遍历 core 帧：

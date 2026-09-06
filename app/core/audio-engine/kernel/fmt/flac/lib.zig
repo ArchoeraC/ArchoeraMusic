@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! FLAC 解码器封装（open + VTable + 帧循环 + 去相关 + seek + 输出打包）
 //!
 //! 参考重构对照 flacdec.c flac_decode_frame / decode_frame / decorrelate_33bps /

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AMR 解码器（.amr 容器 + OpenCORE AMR-NB 解码）
 //!
 //! 文档（docs/audio-kernel-zig.md §9.13）：`#!AMR\n` 头 + 帧重同步自研（~100 行），

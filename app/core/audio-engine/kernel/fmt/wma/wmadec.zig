@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA v1/v2 解码核心——逐位移植 FFmpeg libavcodec wmadec.c + wma.c（n9.0.1）。
 //!
 //! 覆盖：flags2 仅允许固定块长路径（bit_reservoir=0x2 / use_variable_block_len

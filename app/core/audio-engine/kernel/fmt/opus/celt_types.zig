@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! CELT 共享类型与常量（docs/audio-kernel-zig.md §9.2，P2）
 //!
 //! celt.zig（编排）与 pvq.zig（PVQ）共同引用，避免循环导入。

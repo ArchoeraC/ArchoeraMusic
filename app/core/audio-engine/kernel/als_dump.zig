@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 开发对照 dump：解码 .mp4/.m4a 内 MPEG-4 ALS（mp4als）轨 → s16le，
 //! 可选与 ffmpeg 参考 PCM（`ffmpeg -i x.mp4 -f s16le -`）逐字节比对。
 //! 用法：zig build-exe kernel/als_dump.zig -lc -O ReleaseSafe -femit-bin=./als_dump

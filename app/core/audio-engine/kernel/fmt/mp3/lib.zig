@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MPEG Audio（MP3：Layer I/II/III）解码封装 —— 自研 Zig
 //!
 //! 帧解码由 layer3.zig（含 Layer III 完整管线）与 layer12.zig（Layer I/II）

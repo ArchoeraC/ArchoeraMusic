@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! ALAC bit-exact 对照导出工具：解码一个 M4A（ALAC）文件，按解码器输出契约
 //! （bps≤16 → 16-bit；20/24/32 → 32-bit 左移 32-sample_size；交错小端）写原始
 //! PCM 到 stdout；解码信息摘要打印到 stderr（对照 ffprobe 核对）。

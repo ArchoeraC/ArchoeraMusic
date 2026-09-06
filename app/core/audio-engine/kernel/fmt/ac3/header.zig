@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AC-3 / E-AC-3 帧头解析（对照 FFmpeg ac3_parser.c ff_ac3_parse_header）
 //!
 //! 同步字 0x0B77；预读 29 位取 bitstream_id 区分 AC-3（bsid≤10）与 E-AC-3（16）。

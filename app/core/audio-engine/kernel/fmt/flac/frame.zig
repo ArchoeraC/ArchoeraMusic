@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! FLAC 音频帧头解析（ff_flac_decode_frame_header，参考重构）
 //!
 //! 帧头位排布（32 位后字节对齐）：

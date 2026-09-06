@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! G.711 A-LAW / mu-LAW 解码（docs/audio-kernel-zig.md §9.1：WAV/AIFF 编码扩展）
 //!
 //! 以 ITU-T G.711 定义直接公式展开（不自带 FFmpeg 查表，避免版权依赖，

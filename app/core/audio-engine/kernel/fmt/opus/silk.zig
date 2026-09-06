@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! SILK 解码器（libopus 1.6.1 silk/ 固定点移植）。
 //! 依赖：rc.zig 的 ec_dec（SILK 与 CELT 共用同一 range coder）、silk_tables.zig。
 //! 状态：基础框架 + decode_frame/decode_indices 已完成；decode_pulses/decode_parameters/

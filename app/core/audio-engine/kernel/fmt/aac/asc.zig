@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AAC 配置解析：AudioSpecificConfig（ISO 14496-3 §1.6.2.1）+ ADTS 帧头。
 //!
 //! 语义对齐 FFmpeg n9.0.1 mpeg4audio.c ff_mpeg4audio_get_config_gb 与

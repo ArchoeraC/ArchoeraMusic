@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MLP/TrueHD 表（对照 FFmpeg mlp.c / mlp_parse.c / mlpdec.c / mlp_parse.h）
 
 /// 每表的符号数（表 0/1/2 分别 18/16/15 个）

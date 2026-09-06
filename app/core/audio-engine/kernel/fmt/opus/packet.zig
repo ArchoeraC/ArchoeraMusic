@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Opus packet 解析（docs/audio-kernel-zig.md §9.2）
 //!
 //! RFC 6716 §3：TOC 字节（config 7-3 / stereo 2 / code 1-0）+ 帧计数 + 帧尺寸

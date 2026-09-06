@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! TAK (Tom's lossless Audio Kompressor, .tak, 无损) 解码器接入层（fmt/tak）。
 //!
 //! 容器（libavformat/takdec.c + tak_parser.c + tak.c）：

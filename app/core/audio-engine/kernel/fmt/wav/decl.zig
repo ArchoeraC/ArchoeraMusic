@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 格式声明解析（docs/audio-kernel-zig.md §9.1）
 //!
 //! 解析 WAV `fmt ` chunk（含 WAVEFORMATEXTENSIBLE）与 AIFF `COMM` chunk
