@@ -264,6 +264,36 @@ jobs:
         working-directory: app
         run: flutter build windows --release
 
+      # ─────────────── Windows：NSIS 安装器 + 便携 zip ──────────────
+      - name: Install NSIS (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: choco install nsis -y --no-progress
+
+      - name: Package Windows (NSIS installer + portable zip)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          $ver = (Select-String -Path "app/pubspec.yaml" -Pattern '^version:').Line.Split(' ')[1].Trim()
+          $rel = "app\build\windows\x64\runner\Release"
+          $out = "build\windows-extra"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          # 便携 zip：Release 目录整体（含 native/、data/、插件 dll）
+          Compress-Archive -Path "$rel\*" -DestinationPath "$out\ArchoeraMusic-$ver-windows-x64-portable.zip" -Force
+
+          # NSIS 安装器（优先 PATH 内 makensis，其次 choco 默认安装目录）
+          $mk = Get-Command makensis -ErrorAction SilentlyContinue
+          if ($null -eq $mk) { $mk = "C:\Program Files (x86)\NSIS\makensis.exe" }
+          else { $mk = $mk.Source }
+          & $mk `
+            /DVERSION="$ver" `
+            /DAPP_DIR="$PWD\$rel" `
+            /DOUT_FILE="$PWD\$out\ArchoeraMusic-$ver-windows-x64-setup.exe" `
+            packaging\windows\archoera_music.nsi
+          Get-ChildItem "$out"
+
       # ─────────────── macOS：把原生库拷入 .app（native/ 平铺）──────────
       - name: Bundle native libs into .app (native/ 平铺)
         if: matrix.os == 'macos'
@@ -411,6 +441,14 @@ jobs:
           path: app/build/windows/x64/runner/Release
           if-no-files-found: error
 
+      - name: Upload artifact (Windows NSIS + portable)
+        if: matrix.os == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-windows-extra
+          path: build/windows-extra/*
+          if-no-files-found: error
+
   # =====================================================================
   #  release：仅 push tag v* 触发，汇总三端 artifact 发布 GitHub Release。
   #  needs: build 保证三端全部构建成功才发版（任一端失败 → 不发版）。
@@ -443,10 +481,13 @@ jobs:
           test -d artifacts/ArchoeraMusic-linux-packages  # Linux 安装包集
           test -d artifacts/ArchoeraMusic-macos-arm64     # macOS .app
           test -d artifacts/ArchoeraMusic-windows-x64     # Windows runner Release
+          test -d artifacts/ArchoeraMusic-windows-extra   # Windows NSIS + portable
           mkdir -p assets
           # Linux：多发行版安装包直接作为独立 asset（tar.gz/deb/rpm/AppImage/
           # flatpak/nixos tar.gz/pkg.tar.zst 均已带版本号，名称不冲突）
           cp artifacts/ArchoeraMusic-linux-packages/* assets/
+          # Windows：NSIS 安装器与便携 zip 直接作为独立 asset
+          cp artifacts/ArchoeraMusic-windows-extra/* assets/
           # upload-artifact@v4 打包会丢失可执行位：下载后按 Mach-O/ELF magic
           # 恢复 +x（否则 .app/Contents/MacOS 主二进制与 native/ 子进程解包后无法运行）
           while IFS=: read -r fp _; do
