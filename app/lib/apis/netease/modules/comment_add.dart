@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 发送歌曲评论（对齐 NeteaseCloudMusicApi comment.ts action=add）。
 ///
 /// 需登录（weapi + MUSIC_U）。`threadId` 为 `R_SO_4_<songId>`；成功返回

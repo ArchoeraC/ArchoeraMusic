@@ -1,9 +1,15 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../services/playback/playback_notifier.dart';
+
+part 'app_shortcuts/app_shortcuts_actions.dart';
 
 /// 焦点是否落在文本输入控件上。
 ///
@@ -45,81 +51,8 @@ class AppShortcuts extends ConsumerWidget {
   static const double _volumeStep = 0.05;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Shortcuts(
-      shortcuts: {
-        SingleActivator(LogicalKeyboardKey.space): _PlayPauseIntent(),
-        SingleActivator(LogicalKeyboardKey.arrowLeft): _SeekBackIntent(),
-        SingleActivator(LogicalKeyboardKey.arrowRight): _SeekForwardIntent(),
-        SingleActivator(LogicalKeyboardKey.escape): _BackIntent(),
-        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.arrowUp):
-            _VolumeUpIntent(),
-        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.arrowDown):
-            _VolumeDownIntent(),
-        LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.arrowUp):
-            _VolumeUpIntent(),
-        LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.arrowDown):
-            _VolumeDownIntent(),
-        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyF):
-            _SearchIntent(),
-        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyL):
-            _LibraryIntent(),
-        LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.keyF):
-            _SearchIntent(),
-        LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.keyL):
-            _LibraryIntent(),
-      },
-      child: Actions(
-        actions: {
-          _PlayPauseIntent: _PlayPauseAction(ref),
-          _SeekBackIntent: CallbackAction<_SeekBackIntent>(
-            onInvoke: (_) => _seek(ref, -_seekStep)),
-          _SeekForwardIntent: CallbackAction<_SeekForwardIntent>(
-            onInvoke: (_) => _seek(ref, _seekStep)),
-          _VolumeUpIntent: CallbackAction<_VolumeUpIntent>(
-            onInvoke: (_) {
-              if (_editing) return null;
-              _adjustVolume(ref, _volumeStep);
-              return null;
-            },
-          ),
-          _VolumeDownIntent: CallbackAction<_VolumeDownIntent>(
-            onInvoke: (_) {
-              if (_editing) return null;
-              _adjustVolume(ref, -_volumeStep);
-              return null;
-            },
-          ),
-          _SearchIntent: CallbackAction<_SearchIntent>(
-            onInvoke: (_) {
-              if (_editing) return null;
-              context.go('/search');
-              return null;
-            },
-          ),
-          _LibraryIntent: CallbackAction<_LibraryIntent>(
-            onInvoke: (_) {
-              if (_editing) return null;
-              context.go('/library');
-              return null;
-            },
-          ),
-          _BackIntent: CallbackAction<_BackIntent>(
-            onInvoke: (_) {
-              if (_editing) return null;
-              final navigator = Navigator.of(context);
-              if (navigator.canPop()) navigator.pop();
-              return null;
-            },
-          ),
-        },
-        child: Focus(
-          autofocus: true,
-          child: child,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context, WidgetRef ref) =>
+      _buildAppShortcuts(context, ref);
 
   /// 主焦点是否落在文本输入（导航类快捷键让位，避免输入中被劫持）。
   bool get _editing => _isTextEditing();
@@ -143,37 +76,4 @@ class AppShortcuts extends ConsumerWidget {
     // ignore: discarded_futures
     notifier.setVolume(s.volume + delta);
   }
-}
-
-class _PlayPauseIntent extends Intent {}
-class _SeekBackIntent extends Intent {}
-class _SeekForwardIntent extends Intent {}
-class _VolumeUpIntent extends Intent {}
-class _VolumeDownIntent extends Intent {}
-class _SearchIntent extends Intent {}
-class _LibraryIntent extends Intent {}
-class _BackIntent extends Intent {}
-
-/// 空格播放/暂停的 Action（自定义 [consumesKey]）。
-///
-/// 输入框聚焦时既不触发播放/暂停，也**不消费空格键**——`consumesKey`
-/// 返回 false 使 [KeyEventResult] 为 skipRemainingHandlers，事件继续
-/// 进入平台文本输入通道，空格字符正常输入（若默认 consumesKey=true
-/// 会把按键标记 handled，搜索框里的空格会被本层截走）。
-class _PlayPauseAction extends Action<_PlayPauseIntent> {
-  _PlayPauseAction(this.ref);
-
-  final WidgetRef ref;
-
-  bool get _editing => _isTextEditing();
-
-  @override
-  Object? invoke(_PlayPauseIntent intent) {
-    if (_editing) return null;
-    ref.read(playbackProvider.notifier).toggle();
-    return null;
-  }
-
-  @override
-  bool consumesKey(_PlayPauseIntent intent) => !_editing;
 }

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Netease API 主入口（Dart 移植）——对齐 apis/netease/index.ts。
 ///
 /// 统一入口 [nmCallNetease]：会话注入（内存缓存）→ 响应缓存 → 模块路由 →

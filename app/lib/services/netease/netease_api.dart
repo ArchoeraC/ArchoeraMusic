@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// NT API 传输层：`call(name, params)` 返回NT原始响应体
 /// （`{result: {...}}` / `{data: [...]}`），由 [NeteaseApi] 统一解析。
 ///

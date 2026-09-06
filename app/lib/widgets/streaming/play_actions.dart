@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/playback/playback_notifier.dart';

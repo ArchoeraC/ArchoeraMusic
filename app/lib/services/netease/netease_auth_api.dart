@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 part of 'netease_api.dart';
 
 /// 登录 / 会话域：登录状态、匿名注册、二维码登录、登出。

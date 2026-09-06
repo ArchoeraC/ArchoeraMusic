@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 验证真实在线曲目的封面在快照往返后是否存活（问题排查用，临时测试）。
 library;
 

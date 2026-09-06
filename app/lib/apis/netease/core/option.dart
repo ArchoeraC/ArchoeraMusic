@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 请求 options 工厂——对齐 apis/netease/core/option.ts。
 ///
 /// 从调用方 query 中抽取 crypto / cookie / ua / realIP / e_r / domain 等，

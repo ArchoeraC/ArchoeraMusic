@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 云盘上传 - 文件查重（秒传判定，对齐 cloud_upload_check.ts）
 library;
 

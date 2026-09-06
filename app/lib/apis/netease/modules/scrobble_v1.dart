@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 听歌打卡 - NCBL 加密版（对齐 scrobble_v1.ts）
 library;
 

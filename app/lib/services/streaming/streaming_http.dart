@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 渲染层 HTTP 工具（对齐 src/services/streaming/http.ts）。
 ///
 /// 统一超时、错误抽取、auth 错误识别。

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Netease API 请求层（Dart 直连全量移植）——对齐 apis/netease/core/request.ts。
 ///
 /// 核心职责：根据加密方式（weapi / linuxapi / eapi / api / xeapi）构造 URL、

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM 主进程服务（Dart 移植）——对齐 apis/qqmusic/index.ts。
 ///
 /// 与 netease 不同：匿名 session（uid/sid）内存缓存 1h；登录 cookie 经

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Spring1D 弹簧引擎 + lyrics_v7 布局工具的单元测试。
 ///
 /// 弹簧断言覆盖：临界/过阻尼（含 soft）单调收敛、delayMs 延迟队列

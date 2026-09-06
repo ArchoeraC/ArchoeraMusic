@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 下载任务状态机 + 引擎生命周期管理（UI 唯一入口）。
 ///
 /// 职责边界（戒律 13.2）：本文件**不做** URL 解析 / 路径计算 / 文件写入 /

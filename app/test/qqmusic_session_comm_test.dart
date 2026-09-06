@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM（QM）请求层对齐单测（**不联网**，注入 fake 传输）。
 ///
 /// 覆盖「Android 伪装 + GetSession 引导」的组网正确性：

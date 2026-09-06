@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 云盘上传 - 申请 NOS 上传 token（对齐 cloud_nos_token.ts）
 library;
 

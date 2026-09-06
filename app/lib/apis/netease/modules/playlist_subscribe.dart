@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 订阅 / 取消订阅歌单（对齐 playlist_subscribe.ts，走 eapi）
 library;
 

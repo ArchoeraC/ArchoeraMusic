@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM搜索失败归一 + 请求对齐（**不联网**，注入 fake 传输）。
 ///
 /// 覆盖：

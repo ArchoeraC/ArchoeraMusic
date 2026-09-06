@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 本机 ArchoeraMusic 内置 Subsonic 服务端（发送方）的运行时协商。
 ///
 /// 客户端配置以「主机 + 端口」分开存储，开启 [StreamingServerConfig]

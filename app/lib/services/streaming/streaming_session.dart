@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// PlaySessionId 生成（对齐 src/services/streaming/session.ts）。
 ///
 /// Jellyfin/Emby stream URL 需要带 PlaySessionId 参数，用来在服务器端区分

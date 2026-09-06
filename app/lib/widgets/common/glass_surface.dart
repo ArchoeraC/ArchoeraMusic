@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 图片风格下的玻璃弹层容器（对齐原版 global.css 弹层毛玻璃语义：
 /// `[role="dialog"] backdrop-filter: blur(16px) saturate(1.4)`）。
 ///

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 端到端在线播放验证：直连NT取 URL → C 引擎转码 → WAV 落盘。
 ///
 /// 复现 PlaybackNotifier 链路（不含 libmpv，避免 GUI 依赖）：

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// KG API 加解密层（Dart 移植）
 ///
 /// 对齐 KuGouMusicApi util/{crypto,helper,util}.js：

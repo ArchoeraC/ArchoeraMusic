@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 流媒体状态管理层（UI 单一数据源，对齐 stores/streaming.ts）。
 ///
 /// 职责：

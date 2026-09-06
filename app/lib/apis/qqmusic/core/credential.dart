@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM 凭据工具——对齐 apis/qqmusic/core/credential.ts。
 ///
 /// 负责 cookie → Cookie 请求头、登录凭据 → 持久化会话字段等纯转换。

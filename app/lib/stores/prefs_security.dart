@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import 'app_prefs.dart';
 
 // ── 凭据加密方案（security. 前缀）──────────────────────────────

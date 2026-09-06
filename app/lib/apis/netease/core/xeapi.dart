@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// xeapi 公钥获取与会话状态（Dart 移植）——对齐 apis/netease/core/xeapi.ts。
 ///
 /// 反爬接口（如游客注册）走 xeapi：先向 /api/gorilla/anti/crawler/security/key/get

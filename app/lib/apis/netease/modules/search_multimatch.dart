@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 多类型搜索（一次返回歌曲/歌手/歌单的前几条命中，对齐 search_multimatch.ts）
 library;
 

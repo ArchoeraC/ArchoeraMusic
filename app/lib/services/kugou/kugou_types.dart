@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// KG数据模型（歌词 / 评论 / 登录会话 / 用户曲库分类）。
 ///
 /// 从 `kugou_api.dart` 拆出：与网络请求无关的纯类型定义与解析函数，

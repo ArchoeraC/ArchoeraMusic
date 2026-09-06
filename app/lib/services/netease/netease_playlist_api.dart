@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 part of 'netease_api.dart';
 
 /// 「我喜欢」/ 歌单 / 专辑·歌手收藏域。

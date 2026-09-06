@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 歌词数据模型 + LRC 解析（§10.2 歌词流水线第一步）。
 ///
 /// 数据源：apis 包 lyric 层（纯 Dart 直连，nmGetLyricByQuery 等）取回的原生歌词文本，

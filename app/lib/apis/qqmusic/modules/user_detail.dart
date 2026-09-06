@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM 用户基础资料（对齐 user_detail.ts）。
 ///
 /// 通过 music.UserInfo.userInfoServer / GetLoginUserInfo 获取用户昵称/头像，

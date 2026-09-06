@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +13,9 @@ import '../../l10n/l10n.dart';
 import '../../widgets/dialogs/track_context_menu.dart';
 import '../../widgets/list/song_list.dart';
 import 'detail_scaffold.dart';
+
+part 'playlist_detail/playlist_detail_page_actions.dart';
+part 'playlist_detail/playlist_detail_page_view.dart';
 
 /// 流媒体歌单详情页。
 class StreamingPlaylistDetailPage extends ConsumerStatefulWidget {
@@ -33,88 +40,27 @@ class _StreamingPlaylistDetailPageState
     _load();
   }
 
-  Future<void> _load() async {
+  void _startLoading() {
     setState(() {
       _loading = true;
       _error = null;
     });
-    final cfg = ref.read(streamingProvider).activeServer;
-    if (cfg == null) {
-      setState(() {
-        _loading = false;
-        _error = 'no-server';
-      });
-      return;
-    }
-    try {
-      final songs = await StreamingClient(cfg).getPlaylistSongs(widget.id);
-      if (!mounted) return;
-      setState(() {
-        _songs = songs;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = '$e';
-        _loading = false;
-      });
-    }
+  }
+
+  void _setSongsLoaded(List<Track> songs) {
+    setState(() {
+      _songs = songs;
+      _loading = false;
+    });
+  }
+
+  void _setLoadError(String error) {
+    setState(() {
+      _error = error;
+      _loading = false;
+    });
   }
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    final playback = ref.watch(
-      playbackProvider.select((s) => (trackId: s.trackId, playing: s.playing)),
-    );
-    final playlists = ref.watch(streamingProvider.select((s) => s.playlists));
-    final meta = playlists.where((p) => p.id == widget.id).firstOrNull;
-    final songs = _songs;
-    final notifier = ref.read(playbackProvider.notifier);
-
-    return DetailScaffold(
-      header: DetailHeader(
-        cover: meta?.cover,
-        title: meta?.name ?? '',
-        subtitle: [
-          if (meta?.owner?.isNotEmpty == true) meta!.owner!,
-          if (songs != null) l10n.streamingPlaylistSongs(songs.length),
-        ].join(' · '),
-        onPlayAll: songs == null || songs.isEmpty
-            ? null
-            : () => notifier.playQueue(songs),
-      ),
-      body: DetailBody(
-        loading: _loading,
-        error: _error,
-        l10n: l10n,
-        scheme: scheme,
-        onRetry: _load,
-        child: songs == null
-            ? const SizedBox.shrink()
-            : SongList(
-                items: songs,
-                playingId: playback.trackId,
-                isPlaying: playback.playing,
-                showAlbum: true,
-                onPlay: (t) {
-                  final idx = songs.indexWhere((x) => x.id == t.id);
-                  notifier.playQueue(songs, startIndex: idx < 0 ? 0 : idx);
-                },
-                onContextMenu: (t, pos) => showTrackContextMenu(
-                  context,
-                  ref: ref,
-                  track: t,
-                  position: pos,
-                  onPlay: () {
-                    final idx = songs.indexWhere((x) => x.id == t.id);
-                    notifier.playQueue(songs, startIndex: idx < 0 ? 0 : idx);
-                  },
-                ),
-              ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _buildPlaylistDetailPage(context);
 }

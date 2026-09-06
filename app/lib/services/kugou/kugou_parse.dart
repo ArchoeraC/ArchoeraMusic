@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// KG响应解析（KRC 歌词 + 歌单/榜单/搜索通用条目 → [Track]）。
 ///
 /// 从 `kugou_api.dart` 拆出：纯解析函数，与网络请求/会话解耦，便于

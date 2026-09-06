@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// NT直连调用器（新 apis 包完整移植版）
 ///
 /// 对齐 apis/netease/index.ts 的 callNetease 语义：按 name 路由到对应模块，

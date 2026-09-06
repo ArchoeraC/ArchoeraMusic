@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 引擎会话启动门槛（started=ready）回归测试。
 ///
 /// 背景：引擎改为流式起播后，`done` 事件只在曲尾/内容 EOF 到达（不再于

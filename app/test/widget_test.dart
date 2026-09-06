@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 基础单元测试：EventBus 多路复用通道。
 //
 // 说明：应用启动依赖侧车（Node）与 C 音频引擎，widget 级冒烟测试不适合

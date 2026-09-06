@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// NT API 加解密层（Dart 移植）——对齐 apis/netease/core/crypto.ts。
 ///
 /// - weapi：AES-CBC(PRESET_KEY) → AES-CBC(secretKey) → RSA 裸加密(encSecKey)

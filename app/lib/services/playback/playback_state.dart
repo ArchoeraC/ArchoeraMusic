@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 播放状态模型（UI 层只读）与播放模式常量。
 ///
 /// 从 `playback_notifier.dart` 拆出：纯数据类 + 常量，不依赖引擎与 Riverpod。

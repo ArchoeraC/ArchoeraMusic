@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 「我喜欢」页刷新 → 红心集合权威对账（**不联网**）回归测试。
 ///
 /// 背景 bug：跨设备新增收藏后，本设备刷新「我喜欢」列表能看到歌曲，但

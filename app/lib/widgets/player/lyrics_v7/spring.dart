@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 歌词 v7 一维弹簧引擎（移植自 SPlayer-Next
 /// `src/components/player/Lyrics/engine/spring.ts`；上游同源自 AMLL
 /// `amll-dev/applemusic-like-lyrics`，MIT）。

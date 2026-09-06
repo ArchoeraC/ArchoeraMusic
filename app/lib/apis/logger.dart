@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 日志 shim（Dart 版）——对齐 apis/utils/logger.ts。
 ///
 /// 不落盘、只输出到开发者日志（debug console）；保持 coreLog 同构导出。

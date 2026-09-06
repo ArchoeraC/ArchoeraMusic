@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// NT歌曲评论模型（对齐原项目 `@shared/types/comment` 的
 /// MusicCommentItem / MusicCommentPage 子集）。
 library;

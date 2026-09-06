@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import 'app_prefs.dart';
 
 // ── 强迫症设置键（对齐原项目 preset：Fuck DJ / 解锁脏话 / 标签与副标题）──

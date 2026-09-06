@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Jellyfin / Emby 客户端（对齐 services/streaming/jellyfin.ts + emby.ts）。
 ///
 /// Emby 是 Jellyfin 的变体：请求头用 `X-Emby-Authorization`、流 URL 追加

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 国际化接入层：locale 解析 + 非 Widget 层文案访问 + context 扩展。
 library;
 

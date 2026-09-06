@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// KRC 歌词解密与格式化（Dart 移植）——对齐 apis/kugou/core/krc.ts。
 ///
 /// 加密：base64(content) 去头 4 字节 → 与 16 字节定 key 循环 XOR → zlib inflate → UTF-8 文本。

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// KG 主进程服务（Dart 移植）——对齐 apis/kugou/index.ts。
 ///
 /// 与 netease 不同：无账号体系、无 cookie、无加密 body，纯 HTTP GET。

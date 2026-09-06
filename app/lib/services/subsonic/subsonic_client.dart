@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Subsonic / Navidrome / OpenSubsonic 客户端（接收方）——纯 Dart HTTP。
 ///
 /// 对齐 Web 端 services/streaming/subsonic.ts：

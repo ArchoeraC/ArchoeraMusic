@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// KG API 封装（Dart 直连，对齐 apis/kugou + KuGouMusicApi）。
 ///
 /// - 搜索：mobilecdn.kugou.com（带封面，http）→ 兜底 songsearch.kugou.com

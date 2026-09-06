@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import 'dart:async';
 import 'dart:io' show ProcessInfo;
 
@@ -6,6 +10,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../stores/app_prefs.dart';
+
+part 'fps_monitor/fps_monitor_overlay.dart';
 
 /// Dev 模式性能监控浮层（借鉴 Mineradio app-memory 的系统监控思路）。
 ///
@@ -87,44 +93,10 @@ class _FpsOverlayState extends State<_FpsOverlay> {
     super.dispose();
   }
 
-  Color _fpsColor() {
-    if (_fps >= 55) return const Color(0xFF4CAF50); // 绿：流畅
-    if (_fps >= 30) return const Color(0xFFFFC107); // 黄：可感知卡顿
-    return const Color(0xFFF44336); // 红：明显卡顿
+  void _toggleVisible() {
+    setState(() => _visible = !_visible);
   }
 
   @override
-  Widget build(BuildContext context) {
-    final color = _fpsColor();
-    return Material(
-      color: Colors.black.withValues(alpha: 0.6),
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => setState(() => _visible = !_visible),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: _visible
-              ? Text(
-                  'FPS ${_fps.toStringAsFixed(0)} · '
-                  '${_frameMs.toStringAsFixed(1)}ms · ${_rssMb}MB',
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                )
-              : Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _buildFpsOverlay(context);
 }

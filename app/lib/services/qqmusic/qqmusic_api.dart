@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM（QM）播放音源服务（对齐 kugou/netease 服务形态的轻量封装）。
 ///
 /// - 底层：apis/qqmusic（Dart 直连，musicu.fcg 明文 JSON + UA/comm 伪装）

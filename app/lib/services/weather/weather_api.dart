@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 天气数据服务（Open-Meteo + ipwho.is + BigDataCloud，均免费、无需密钥）。
 ///
 /// 数据链路（仅「天气组件开启」时才发起请求）：

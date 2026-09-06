@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 每日推荐歌曲（每日 30 首，需登录，对齐 recommend_songs.ts）
 library;
 

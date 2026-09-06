@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// AMLL TTML DB 抓取（对齐 apis/common/lyric/ttml.ts）。
 ///
 /// - 用户配置的 URL 模板含 %p（平台目录）和 %s（id），代码替换

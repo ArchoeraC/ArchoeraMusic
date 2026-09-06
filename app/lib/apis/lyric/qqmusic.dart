@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QQMusic 歌词匹配（对齐 apis/common/lyric/qqmusic.ts）。
 ///
 /// 两个入口：
