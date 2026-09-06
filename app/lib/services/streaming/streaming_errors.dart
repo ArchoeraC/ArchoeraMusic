@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 流媒体客户端错误类型（对齐 src/services/streaming/errors.ts）。
 ///
 /// 用具体类替代字符串模式匹配，便于调用方用 `is` 精确判断：

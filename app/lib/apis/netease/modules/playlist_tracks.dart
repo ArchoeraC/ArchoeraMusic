@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 歌单增/删歌曲（对齐 playlist_tracks.ts，默认 eapi）
 ///
 /// 服务端 512 表示重复/受限，按 NCM 现行实现重试时把 trackIds 翻倍以强制写入。

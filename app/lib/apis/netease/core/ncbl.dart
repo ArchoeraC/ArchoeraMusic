@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// NCBL 加密日志上报（Dart 移植）——对齐 apis/netease/core/ncbl.ts。
 ///
 /// 用于 scrobble_v1 听歌打卡：ChaCha20 加密 + RSA 包装会话密钥 + zstd 压缩分帧，

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 获取歌曲播放地址（v1 端点，level 而非裸 br，对齐 song_url.ts）
 library;
 

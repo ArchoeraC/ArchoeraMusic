@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// NT直连验证：真实请求云端，验证 weapi/eapi 加密 + 请求层 + 解析链路。
 ///
 /// 若加密/请求层与 TS 实现不一致，服务端会返回非 200（参数错误），

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Subsonic 服务端数据访问层（Dart 侧，sqlite3 直写用户库 user.db）。
 ///
 /// SPlayer 的 tracks 表是扁平结构（album/artist 以 JSON 嵌在 track 行里），

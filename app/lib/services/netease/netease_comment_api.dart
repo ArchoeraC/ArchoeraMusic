@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 part of 'netease_api.dart';
 
 /// 歌曲评论域：热门/最新评论、发表评论、跨源找评论 id。

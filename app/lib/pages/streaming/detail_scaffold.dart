@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 流媒体详情页共享骨架（专辑 / 歌手 / 歌单三页复用）。
 ///
 /// 结构：返回栏 + [DetailHeader]（封面/标题/副标题/播放全部）+ 分割线 +

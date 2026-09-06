@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 用户收藏计数（歌单/专辑/MV 等，对齐 user_subcount.ts）
 library;
 

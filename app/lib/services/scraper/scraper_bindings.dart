@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// archoera_scraper FFI 绑定。
 ///
 /// 定位、加载 libarchoera_scraper.{so,dylib,dll}（统一走 [NativeLibPaths]，

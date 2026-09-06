@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 敏感数据安全销毁（对齐「不可逆覆盖写入并删除」语义）。
 ///
 /// 提供本机含账号凭据的敏感文件清单与不可逆擦除：

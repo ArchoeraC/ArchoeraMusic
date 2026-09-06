@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 当前播放曲目的歌词（§10.2 歌词流水线 UI 端入口）。
 ///
 /// 数据流：`playback state.track` → 平台 lyric 层（缓存 + 模糊匹配）→

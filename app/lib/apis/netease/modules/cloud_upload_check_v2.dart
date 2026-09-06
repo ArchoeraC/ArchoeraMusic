@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 云盘秒传查重 v2：判断已在曲库的文件能否导入（对齐 cloud_upload_check_v2.ts）
 /// 返回 data[0].upload:0 可导入 / 1 已在云盘 / 2 不可导入
 library;

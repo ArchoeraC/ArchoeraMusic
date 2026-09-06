@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 「我喜欢」收藏列表全局数据源（ChangeNotifier，由 Riverpod provider 持有）。
 ///
 /// **只管列表全量**：KG / NT收藏 Track 一次拉全、缓存秒开。

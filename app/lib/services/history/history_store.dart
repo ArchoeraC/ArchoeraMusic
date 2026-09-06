@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 播放历史本地存储（sqlite3 直连，独立库 history.db，与本地曲库
 /// library.db 分库——历史包含在线媒体与本地媒体，不应混入曲库）。
 ///

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 圆角对话框（对齐 SPlayer-Next SDialog：标题 + 可选描述 + 内容 + 按钮行）。
 library;
 

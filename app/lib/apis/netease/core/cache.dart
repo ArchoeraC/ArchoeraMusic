@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 接口响应内存缓存——对齐 apis/netease/core/cache.ts。
 ///
 /// 默认 2 分钟 TTL；只缓存 status === 200 的响应；

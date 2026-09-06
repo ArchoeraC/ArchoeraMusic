@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 一帧频谱（C 引擎输出的前端契约：128 bins，对数映射 80~2000Hz，归一化 [0,1]，§10.1）。
 class FftFrame {
   const FftFrame({

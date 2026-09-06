@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 全屏播放器歌词区（拆分自 player_page.dart 的 `_buildLyricsBlock`）。
 ///
 /// 当前行居中高亮 + 点击 seek。独立 Consumer 订阅播放位置/歌词/样式

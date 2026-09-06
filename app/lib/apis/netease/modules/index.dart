@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Netease API 模块注册表——对齐 apis/netease/modules/index.ts。
 ///
 /// 每新增一个 module，在对应分组 import 并加入 [modules] Map 即可。

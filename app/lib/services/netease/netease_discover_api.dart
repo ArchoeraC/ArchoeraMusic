@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 part of 'netease_api.dart';
 
 /// 发现 / 推荐域（主页）：推荐歌单、每日推荐、热门歌手、新碟上架。

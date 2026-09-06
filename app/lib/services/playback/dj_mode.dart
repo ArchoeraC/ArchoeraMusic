@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Fuck DJ Mode：DJ 版 / 口水歌识别（对齐原项目 `utils/preset/djMode.ts`）。
 ///
 /// 标题或歌手名包含任一关键词（不区分大小写）即判定为应跳过的曲目。

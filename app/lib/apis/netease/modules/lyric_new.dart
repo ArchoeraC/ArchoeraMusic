@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 歌词（新版，含逐字歌词 yrc，对齐 lyric_new.ts）
 library;
 

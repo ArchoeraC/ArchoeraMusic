@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// KG直连验证：加密/签名单元测试 + 真实链路（搜索 → song_url 音质回退
 /// → 可播 URL / 歌词）。
 ///

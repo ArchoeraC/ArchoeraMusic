@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 红心状态控制器（NT / KG / QM三平台）。
 ///
 /// 对齐 SPlayer-Next `user.ts` 的 likedSongIds + toggleLike 语义：

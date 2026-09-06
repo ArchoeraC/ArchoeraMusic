@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Subsonic 客户端模型（接收方）——对齐 Web 端 services/streaming/transform.ts。
 ///
 /// 原生 Subsonic 响应节点（SubsonicSong/Album/Artist/Playlist）+ 到现有

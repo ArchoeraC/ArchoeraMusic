@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 听歌排行（对齐 user_record.ts；type: 1 最近一周；0 所有时间）
 library;
 

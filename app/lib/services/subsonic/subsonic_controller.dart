@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Subsonic 服务端控制器（发送方）：create/pollEvent/歌词注入/凭据加解密。
 ///
 /// 对应 Go 库 archoera_subsonic_* 导出。典型用法：

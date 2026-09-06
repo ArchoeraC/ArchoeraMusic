@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 刮削器 Dart 封装：ScraperController。
 ///
 /// 非端口化直连 libarchoera_scraper（FFI）：

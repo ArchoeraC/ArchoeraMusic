@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 流媒体统一视图模型 + Jellyfin/Emby 转换（对齐 services/streaming/transform.ts）。
 library;
 

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 聚合搜索「各源独立」的纯逻辑（供 search_page 使用，可离线单测）。
 library;
 

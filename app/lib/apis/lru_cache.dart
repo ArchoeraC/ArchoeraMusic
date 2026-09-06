@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 通用 LRU 内存缓存——对齐 apis/common/cache.ts。
 ///
 /// 基于 Map 的 LRU 淘汰（命中时 re-insert 到末尾），TTL 默认 2 分钟。

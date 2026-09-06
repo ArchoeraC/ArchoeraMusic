@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 云盘导入：把已匹配的歌曲落库到我的云盘（对齐 cloud_song_import.ts）
 library;
 

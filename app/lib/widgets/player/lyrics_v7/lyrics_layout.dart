@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 歌词 v7 可变行高布局工具：行高实测 + 自然中心累计。
 ///
 /// 口径与 amll_wall_v5 一致：每组一行主歌词（单行，过长省略号截断），

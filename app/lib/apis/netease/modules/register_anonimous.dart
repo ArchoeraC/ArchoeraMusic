@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 注册匿名态（获取 MUSIC_A，对齐 register_anonimous.ts）
 ///
 /// - 生成 52 位 hex deviceId

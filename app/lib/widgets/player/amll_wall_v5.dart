@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// AMLL 歌词渲染模块 v6 —— 每行独立 Y 弹簧（级联）+ 可变行高。
 ///
 /// 设计（自研，不复用 DOM 库）：

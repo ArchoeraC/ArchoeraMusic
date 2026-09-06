@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// KG 请求层——对齐 apis/kugou/core/request.ts。
 ///
 /// 发一次 KG GET 请求返回 JSON body；失败直接抛错由上层 fallback 处理。

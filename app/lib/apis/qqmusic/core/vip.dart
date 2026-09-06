@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM 会员归一（对齐 apis/qqmusic/core/vip.ts）。
 ///
 /// 将 vip_login_base 响应归一为播放权限状态（是否具会员 / 会员等级）。

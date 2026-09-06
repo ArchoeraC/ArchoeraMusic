@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 全屏播放器底部控制区（拆分自 player_page.dart 的 `_buildControlsRow`）。
 ///
 /// 左组（红心）- 中组（随机/上一首/播放/下一首/循环）- 右组（音量/
@@ -15,6 +19,8 @@ import '../../../services/playback/playback_notifier.dart';
 import 'ctrl_icon.dart';
 import 'hover_volume_control.dart';
 import 'queue_panel.dart';
+
+part 'player_controls/player_controls_row_sections.dart';
 
 /// 全屏播放器底部控制区（无状态；notifier 由内部读取）。
 class PlayerControlsRow extends ConsumerWidget {
@@ -58,132 +64,37 @@ class PlayerControlsRow extends ConsumerWidget {
     final notifier = ref.read(playbackProvider.notifier);
     return Row(
       children: [
-        // 左组（左对齐）：红心 → 评论（对齐原版 FullPlayer 底栏左组顺序）
         Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              if (canLike)
-                CtrlIcon(
-                  tooltip: liked ? l10n.commonUnlike : l10n.commonLike,
-                  icon: liked ? Icons.favorite : Icons.favorite_border,
-                  size: 24,
-                  color: liked
-                      ? Colors.redAccent
-                      : colorScheme.onSurfaceVariant,
-                  onPressed: () => onToggleLike(current!),
-                ),
-              // 评论区（仅NT/KG源，与红心同条件）
-              if (canLike) ...[
-                const SizedBox(width: 12),
-                CtrlIcon(
-                  tooltip: l10n.menuComment,
-                  icon: Icons.mode_comment_outlined,
-                  size: 24,
-                  onPressed: onShowComments,
-                ),
-              ],
-            ],
+          child: _PlayerControlsLeftGroup(
+            canLike: canLike,
+            liked: liked,
+            current: current,
+            l10n: l10n,
+            colorScheme: colorScheme,
+            onToggleLike: onToggleLike,
+            onShowComments: onShowComments,
           ),
         ),
-        // 中组：控制行 随机 | 上一首 | 播放 | 下一首 | 循环
         SizedBox(
           width: 380,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              CtrlIcon(
-                tooltip: shuffle ? l10n.queueShuffleOff : l10n.queueShuffle,
-                icon: Icons.shuffle,
-                size: 20,
-                color: shuffle
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
-                onPressed: hasContent ? notifier.toggleShuffle : null,
-              ),
-              const SizedBox(width: 12),
-              CtrlIcon(
-                tooltip: l10n.commonPrevious,
-                icon: Icons.skip_previous,
-                size: 26,
-                color: colorScheme.onSurface,
-                onPressed: hasQueue ? notifier.playPrevious : null,
-              ),
-              const SizedBox(width: 14),
-              // 播放/暂停：主轴中心（透明底 + 填充圆 icon）
-              Tooltip(
-                message: buffering
-                    ? l10n.commonLoading
-                    : (playing ? l10n.commonPause : l10n.commonPlay),
-                child: InkResponse(
-                  radius: 28,
-                  onTap: hasContent && !buffering ? notifier.toggle : null,
-                  child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(
-                          playing
-                              ? Icons.pause_circle_filled
-                              : Icons.play_circle_filled,
-                          size: 48,
-                          color: colorScheme.primary.withValues(
-                            alpha: buffering ? 0.35 : 1,
-                          ),
-                        ),
-                        if (buffering)
-                          const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 3),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              CtrlIcon(
-                tooltip: l10n.commonNext,
-                icon: Icons.skip_next,
-                size: 26,
-                color: colorScheme.onSurface,
-                onPressed: hasQueue ? notifier.playNext : null,
-              ),
-              const SizedBox(width: 12),
-              CtrlIcon(
-                tooltip: repeatMode == 'list'
-                    ? l10n.queueRepeatList
-                    : l10n.queueRepeatOne,
-                icon: repeatMode == 'one' ? Icons.repeat_one : Icons.repeat,
-                size: 20,
-                color: colorScheme.primary,
-                onPressed: hasContent ? notifier.cycleRepeatMode : null,
-              ),
-            ],
+          child: _PlayerControlsCenterGroup(
+            hasContent: hasContent,
+            hasQueue: hasQueue,
+            shuffle: shuffle,
+            repeatMode: repeatMode,
+            playing: playing,
+            buffering: buffering,
+            l10n: l10n,
+            colorScheme: colorScheme,
+            notifier: notifier,
           ),
         ),
-        // 右组（右对齐）：音量（滑条 + 静音）→ 播放列表
         Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // 音量：悬浮式控件（hover 800ms 展开滑条，5s 未操作自动
-              // 收起；独立 Consumer 订阅，拖动不重建整页）
-              const HoverVolumeSlider(sliderWidth: 104),
-              CtrlIcon(
-                tooltip: l10n.playerBarPlaylist,
-                icon: Icons.queue_music,
-                size: 24,
-                onPressed: hasQueue
-                    ? () =>
-                          QueuePanel.show(context, style: QueuePanelStyle.slide)
-                    : null,
-              ),
-            ],
+          child: _PlayerControlsRightGroup(
+            hasQueue: hasQueue,
+            l10n: l10n,
+            onShowQueue: () =>
+                QueuePanel.show(context, style: QueuePanelStyle.slide),
           ),
         ),
       ],

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 播放进度条：默认简化细条，悬停展开完整 Slider；buffering 时叠加
 /// 「缓冲流动」动效。
 ///
@@ -22,6 +26,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+part 'playback_slider/playback_slider_state.dart';
+
 class PlaybackSlider extends StatefulWidget {
   const PlaybackSlider({
     super.key,
@@ -43,185 +49,4 @@ class PlaybackSlider extends StatefulWidget {
 
   @override
   State<PlaybackSlider> createState() => _PlaybackSliderState();
-}
-
-class _PlaybackSliderState extends State<PlaybackSlider> {
-  /// 悬停中：显示完整 Slider（可拖动）；否则简化细条。
-  bool _hovered = false;
-
-  /// 拖拽中：保持完整 Slider 不退出（修复「拖出轨道区域即中断」）——
-  /// 鼠标拖到播放条外/远处时悬停态会退出，若此时把 Slider 换回简化细条，
-  /// 其手势识别器被销毁、onChangeEnd 不触发，父级 _dragMs 残留在最后位置，
-  /// 造成后续交互跳转异常（对齐原版 SSlider：pointer capture 期间持续生效）。
-  bool _dragging = false;
-
-  /// 细条直拖中：保持简化细条不切 Slider（触摸无 hover、够不到悬停展开
-  /// 的 Slider，且按下瞬间切树会使手势识别器被销毁、onChangeEnd 不触发）。
-  bool _barDragging = false;
-
-  /// 细条直拖过程中最后上报的进度值（px→ms 映射）；取消/结束时提交 seek。
-  double _barValue = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: SizedBox(
-        // 锁定高度：保证未悬停细条与悬停 Slider 同高，布局不跳动；
-        // 同时约束 Stack 尺寸（防全 Positioned 时撑满可用区域）。
-        height: 48,
-        child: LayoutBuilder(
-          builder: (context, c) {
-            final rect = _trackRect(context, c.maxWidth, c.maxHeight);
-            return (_hovered || _dragging) && !_barDragging
-                ? _buildSlider(scheme, rect)
-                : _buildBar(scheme, rect);
-          },
-        ),
-      ),
-    );
-  }
-
-  /// 轨道矩形（对齐 SliderThemeData.trackShape 的几何）：
-  /// 水平方向按 overlay/thumb 尺寸内缩，垂直居中。
-  Rect _trackRect(BuildContext context, double width, double height) {
-    final st = SliderTheme.of(context);
-    final overlayW =
-        st.overlayShape?.getPreferredSize(true, false).width ??
-        (st.thumbShape?.getPreferredSize(true, false).width ?? 24.0);
-    final trackH = st.trackHeight ?? 4.0;
-    final trackW = (width - overlayW).clamp(0.0, double.infinity);
-    return Rect.fromLTWH(
-      (overlayW - trackH) / 2,
-      (height - trackH) / 2,
-      trackW,
-      trackH,
-    );
-  }
-
-  /// 悬停态：完整 Slider + 缓冲流动层。
-  Widget _buildSlider(ColorScheme scheme, Rect rect) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            // 缓冲时进度轨道降为半透明：让流动动画凸显，不被实心
-            // 进度覆盖（同色叠加会看不出缓冲）。
-            activeTrackColor: widget.buffering
-                ? scheme.primary.withValues(alpha: 0.35)
-                : null,
-          ),
-          child: Slider(
-            value: widget.value,
-            max: widget.max,
-            onChangeStart: (v) => setState(() => _dragging = true),
-            onChangeEnd: (v) {
-              setState(() => _dragging = false);
-              widget.onChangeEnd?.call(v);
-            },
-            onChanged: widget.onChanged,
-          ),
-        ),
-        if (widget.buffering) _bufferLayer(scheme, rect),
-      ],
-    );
-  }
-
-  /// 未悬停态：简化细条（轨道 + 播放进度）+ 缓冲流动层。
-  ///
-  /// 细条本身即可点按/水平拖动 seek（鼠标与触摸通用，映射几何与完整
-  /// Slider 一致）：拖动期间 [_barDragging] 置位使 build 保持细条分支，
-  /// 识别器不被销毁；结束/取消时经 onChangeEnd 提交 seek。
-  Widget _buildBar(ColorScheme scheme, Rect rect) {
-    final max = widget.max <= 0 ? 1.0 : widget.max;
-    final ratio = (widget.value / max).clamp(0.0, 1.0);
-    final trackColor = scheme.onSurface.withValues(alpha: 0.12);
-    final progressColor = widget.buffering
-        ? scheme.primary.withValues(alpha: 0.4)
-        : scheme.primary;
-
-    double valueAt(double dx) {
-      final t = ((dx - rect.left) / rect.width).clamp(0.0, 1.0);
-      return t * max;
-    }
-
-    void endBarDrag(double v) {
-      if (!_barDragging) return;
-      setState(() => _barDragging = false);
-      widget.onChangeEnd?.call(v);
-    }
-
-    final stack = Stack(
-      alignment: Alignment.center,
-      children: [
-        // 轨道（灰底，几何与完整 Slider 一致）
-        Positioned.fromRect(
-          rect: rect,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: ColoredBox(color: trackColor),
-          ),
-        ),
-        // 播放进度（主色；缓冲时半透明，露出流动动画）
-        Positioned.fromRect(
-          rect: Rect.fromLTWH(
-            rect.left,
-            rect.top,
-            rect.width * ratio,
-            rect.height,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: ColoredBox(color: progressColor),
-          ),
-        ),
-        if (widget.buffering) _bufferLayer(scheme, rect),
-      ],
-    );
-    // 无 seek 能力（无播放源）时不挂手势，保持纯展示
-    if (widget.onChanged == null && widget.onChangeEnd == null) return stack;
-    return GestureDetector(
-      // opaque：命中覆盖整条（含轨道两侧留白），细条外触达也可拖
-      behavior: HitTestBehavior.opaque,
-      onTapUp: (d) {
-        final v = valueAt(d.localPosition.dx);
-        widget.onChanged?.call(v);
-        widget.onChangeEnd?.call(v);
-      },
-      onHorizontalDragStart: (d) {
-        _barValue = valueAt(d.localPosition.dx);
-        setState(() => _barDragging = true);
-        widget.onChanged?.call(_barValue);
-      },
-      onHorizontalDragUpdate: (d) {
-        _barValue = valueAt(d.localPosition.dx);
-        widget.onChanged?.call(_barValue);
-      },
-      onHorizontalDragEnd: (d) => endBarDrag(valueAt(d.localPosition.dx)),
-      onHorizontalDragCancel: () => endBarDrag(_barValue),
-      child: stack,
-    );
-  }
-
-  /// 缓冲流动层：Material 自带动画（主色片段往返流动），透明背景，
-  /// 覆盖在轨道/进度之上（后绘制）。IgnorePointer 保证不拦截拖动。
-  Widget _bufferLayer(ColorScheme scheme, Rect rect) {
-    return Positioned.fromRect(
-      rect: rect,
-      child: IgnorePointer(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(2),
-          child: LinearProgressIndicator(
-            minHeight: rect.height,
-            color: scheme.primary,
-            backgroundColor: Colors.transparent,
-          ),
-        ),
-      ),
-    );
-  }
 }

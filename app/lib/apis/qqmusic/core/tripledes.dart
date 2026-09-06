@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Triple DES 实现（Dart 移植）——对齐 apis/qqmusic/core/tripledes.ts。
 ///
 /// 移植自 LDDC 项目（https://github.com/chenmozhijin/LDDC 的

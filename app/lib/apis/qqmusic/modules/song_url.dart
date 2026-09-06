@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM 单曲播放链接解析（对齐 song_url.ts，music.vkey.GetVkey）。
 ///
 /// 支持 QQ 扫码凭据的直链解析及多音质降级；访客（无 cookie，

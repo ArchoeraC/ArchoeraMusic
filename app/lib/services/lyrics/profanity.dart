@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 歌词屏蔽词还原（对齐原项目 `utils/preset/profanity.ts`）。
 ///
 /// 把歌词里被星号遮盖的脏话还原为原词（f**k → fuck 等），

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 刮削控制器：封装 C 侧 [ScraperController]（FFI）为 Riverpod Notifier，
 /// 供媒体库页（简化按钮）与设置页（详细参数）共用同一刮削会话。
 ///

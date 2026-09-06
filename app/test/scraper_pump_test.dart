@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 刮削器事件泵（wait_event push）回归测试。
 ///
 /// 可控事件源：真实 lib + 空目录 → worker 立即产出 `empty`+`done` 终态事件，

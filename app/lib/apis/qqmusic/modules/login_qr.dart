@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM 二维码登录模块（对齐 login_qr.ts + core/credential.ts）。
 ///
 /// 仅支持 QQ 扫码登录：

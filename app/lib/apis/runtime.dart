@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 宿主运行时（依赖注入点）——对齐 apis/runtime.ts。
 ///
 /// 平台 API 库不直接依赖侧车数据库 / 配置系统：会话（cookies）、歌词缓存、

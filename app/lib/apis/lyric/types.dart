@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 歌词候选匹配类型——对齐 shared/types/lyrics.ts 的 LyricMatchResult
 /// 与 apis/common/lyric/utils.ts 的 LyricCandidate。
 library;

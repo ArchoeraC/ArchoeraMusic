@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 设置「媒体源」分类内容：流媒体服务器列表（对齐 StreamingServerList.vue）。
 ///
 /// 顶部说明条 + 添加按钮；服务器卡片列表（名称 / 类型 / 激活状态 /
@@ -17,6 +21,9 @@ import '../theme/app_theme.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/dialogs/s_dialog.dart';
 import '../widgets/common/toast.dart';
+
+part 'streaming_server/streaming_server_list_view.dart';
+part 'streaming_server/streaming_server_form_view.dart';
 
 /// 服务器类型展示名（品牌名不翻译）。
 const streamingTypeLabels = <StreamingServerType, String>{
@@ -59,271 +66,7 @@ class _StreamingServerListState extends ConsumerState<StreamingServerList> {
   String? _switchingId;
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    final state = ref.watch(streamingProvider);
-    final notifier = ref.read(streamingProvider.notifier);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 顶部说明条 + 添加按钮
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: cardDecoration(scheme),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.streamingHint,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      l10n.streamingHintDetail,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              SButton(
-                label: l10n.streamingServerAdd,
-                icon: Icons.add,
-                variant: SButtonVariant.secondary,
-                size: SButtonSize.small,
-                onPressed: () => _showServerForm(context, l10n),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (state.servers.isEmpty)
-          _buildEmpty(scheme, l10n)
-        else
-          ...state.servers.map(
-            (cfg) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildCard(scheme, l10n, cfg, state, notifier),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildEmpty(ColorScheme scheme, AppLocalizations l10n) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 28),
-      decoration: cardDecoration(scheme),
-      child: Column(
-        children: [
-          Icon(
-            Icons.dns_outlined,
-            size: 30,
-            color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            l10n.streamingEmptyNoServer,
-            style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            l10n.streamingEmptyAddHint,
-            style: TextStyle(
-              fontSize: 11.5,
-              color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCard(
-    ColorScheme scheme,
-    AppLocalizations l10n,
-    StreamingServerConfig cfg,
-    StreamingState state,
-    StreamingNotifier notifier,
-  ) {
-    final isActive = state.activeServerId == cfg.id;
-    final isConnected = isActive && state.connected;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: cardDecoration(scheme),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 状态点
-          _buildStatusDot(scheme, state, isActive, isConnected),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        cfg.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                          color: scheme.onSurface,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _TypeTag(
-                      label: streamingTypeLabels[cfg.type] ?? cfg.type.name,
-                    ),
-                    if (isActive) _buildStatusTag(l10n, state, isConnected),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${cfg.username}@${cfg.host}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
-                  ),
-                ),
-                if (cfg.lastConnected != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '${l10n.streamingServerLastConnected}: '
-                    '${_formatDateTime(cfg.lastConnected!)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: scheme.onSurfaceVariant.withValues(alpha: 0.55),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          // 操作按钮
-          _buildActions(context, l10n, cfg, state, notifier),
-        ],
-      ),
-    );
-  }
-
-  /// 状态圆点：连接成功（绿）/ 连接错误（红）/ 未连接（橙）。
-  Widget _buildStatusDot(
-    ColorScheme scheme,
-    StreamingState state,
-    bool isActive,
-    bool isConnected,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 5),
-      child: Container(
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isConnected
-              ? _okGreen
-              : (state.connectionError != null && isActive)
-              ? scheme.error
-              : _warnOrange,
-        ),
-      ),
-    );
-  }
-
-  /// 激活状态标签（连接中 / 已连接 / 已断开）。
-  Widget _buildStatusTag(
-    AppLocalizations l10n,
-    StreamingState state,
-    bool isConnected,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 6),
-      child: _TypeTag(
-        label: isConnected
-            ? l10n.streamingServerConnected
-            : (state.connecting
-                  ? l10n.commonLoading
-                  : l10n.streamingServerDisconnected),
-        color: isConnected ? _okGreen : _warnOrange,
-      ),
-    );
-  }
-
-  /// 卡片右侧操作按钮（连接/断开 + 编辑/删除）。
-  Widget _buildActions(
-    BuildContext context,
-    AppLocalizations l10n,
-    StreamingServerConfig cfg,
-    StreamingState state,
-    StreamingNotifier notifier,
-  ) {
-    final isActive = state.activeServerId == cfg.id;
-    final isConnected = isActive && state.connected;
-    final connecting = isActive && state.connecting;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        if (isActive && isConnected)
-          SButton(
-            label: l10n.streamingServerDisconnect,
-            icon: Icons.link_off,
-            variant: SButtonVariant.secondary,
-            size: SButtonSize.small,
-            onPressed: () => _disconnect(notifier, l10n),
-          )
-        else
-          SButton(
-            label: l10n.streamingServerConnect,
-            icon: Icons.link,
-            variant: SButtonVariant.secondary,
-            size: SButtonSize.small,
-            loading: _switchingId == cfg.id || connecting,
-            onPressed: () => _connect(notifier, l10n, cfg),
-          ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SButton(
-              label: l10n.streamingServerEdit,
-              icon: Icons.edit_outlined,
-              variant: SButtonVariant.ghost,
-              size: SButtonSize.small,
-              onPressed: () => _showServerForm(context, l10n, existing: cfg),
-            ),
-            const SizedBox(width: 6),
-            SButton(
-              label: l10n.commonDelete,
-              icon: Icons.delete_outline,
-              variant: SButtonVariant.ghost,
-              size: SButtonSize.small,
-              onPressed: () => _confirmRemove(context, l10n, cfg, notifier),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => _buildStreamingServerList(context);
 
   /// 发起连接：按钮 loading → 切换活动服务器 → 结果 toast。
   Future<void> _connect(
@@ -525,40 +268,57 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
     password: _passCtrl.text,
   );
 
+  void _setFormError(String? error) {
+    setState(() => _formError = error);
+  }
+
+  void _setTestingState(bool testing, {StreamingPingResult? result}) {
+    setState(() {
+      _testing = testing;
+      _testResult = result;
+    });
+  }
+
+  void _setSubmittingState(bool submitting) {
+    setState(() => _submitting = submitting);
+  }
+
+  void _setLocal(bool value) {
+    setState(() => _isLocal = value);
+  }
+
+  void _setHttps(bool value) {
+    setState(() => _useHttps = value);
+  }
+
+  void _setType(StreamingServerType value) {
+    setState(() => _type = value);
+  }
+
   Future<void> _handleTest(AppLocalizations l10n) async {
     final invalid = _validate(l10n);
     if (invalid != null) {
-      setState(() {
-        _formError = invalid;
-        _testResult = null;
-      });
+      _setFormError(invalid);
+      _setTestingState(false, result: null);
       return;
     }
-    setState(() {
-      _formError = null;
-      _testResult = null;
-      _testing = true;
-    });
+    _setFormError(null);
+    _setTestingState(true, result: null);
     final res = await ref
         .read(streamingProvider.notifier)
         .testConnection(_input);
     if (!mounted) return;
-    setState(() {
-      _testing = false;
-      _testResult = res;
-    });
+    _setTestingState(false, result: res);
   }
 
   Future<void> _handleSubmit(AppLocalizations l10n) async {
     final invalid = _validate(l10n);
     if (invalid != null) {
-      setState(() => _formError = invalid);
+      _setFormError(invalid);
       return;
     }
-    setState(() {
-      _formError = null;
-      _submitting = true;
-    });
+    _setFormError(null);
+    _setSubmittingState(true);
     final notifier = ref.read(streamingProvider.notifier);
     final existing = widget.existing;
     if (existing == null) {
@@ -576,256 +336,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    final testOk = _testResult?.ok ?? false;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _field(scheme, l10n.streamingServerType, child: _typeDropdown(scheme)),
-        _field(
-          scheme,
-          l10n.streamingServerName,
-          child: SInput(
-            controller: _nameCtrl,
-            hintText: l10n.streamingServerNamePlaceholder,
-          ),
-        ),
-        _field(
-          scheme,
-          l10n.streamingServerHost,
-          child: SInput(
-            controller: _hostCtrl,
-            hintText: l10n.streamingServerHostPlaceholder,
-            enabled: !_isLocal,
-          ),
-        ),
-        if (!_isLocal) ...[
-          Row(
-            children: [
-              Expanded(
-                child: _field(
-                  scheme,
-                  l10n.streamingServerPort,
-                  child: SInput(
-                    controller: _portCtrl,
-                    hintText: '443',
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _field(
-                  scheme,
-                  'HTTPS',
-                  child: _SwitchTile(
-                    value: _useHttps,
-                    onChanged: (v) => setState(() => _useHttps = v),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Text(
-              l10n.streamingServerPortNote,
-              style: TextStyle(
-                fontSize: 11,
-                color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
-              ),
-            ),
-          ),
-        ],
-        _field(
-          scheme,
-          l10n.streamingServerLocalTitle,
-          child: _SwitchTile(
-            value: _isLocal,
-            onChanged: (v) => setState(() => _isLocal = v),
-          ),
-        ),
-        if (_isLocal)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Text(
-              l10n.streamingServerLocalDesc,
-              style: TextStyle(
-                fontSize: 11,
-                color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
-              ),
-            ),
-          ),
-        _field(
-          scheme,
-          l10n.streamingServerUsername,
-          child: SInput(controller: _userCtrl),
-        ),
-        _field(
-          scheme,
-          l10n.streamingServerPassword,
-          child: SInput(controller: _passCtrl, obscureText: true),
-        ),
-        // 校验错误
-        if (_formError != null)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: scheme.error.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              _formError!,
-              style: TextStyle(fontSize: 12, color: scheme.error),
-            ),
-          ),
-        // 测试结果
-        if (_testResult != null) _buildTestResult(scheme, l10n, testOk),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            SButton(
-              label: l10n.commonCancel,
-              variant: SButtonVariant.secondary,
-              size: SButtonSize.small,
-              onPressed: _submitting || _testing
-                  ? null
-                  : () => Navigator.of(context).pop(),
-            ),
-            const SizedBox(width: 10),
-            SButton(
-              label: l10n.streamingServerTest,
-              icon: Icons.wifi_tethering,
-              variant: SButtonVariant.secondary,
-              size: SButtonSize.small,
-              loading: _testing,
-              onPressed: _submitting ? null : () => _handleTest(l10n),
-            ),
-            const SizedBox(width: 10),
-            SButton(
-              label: l10n.commonSave,
-              icon: Icons.check,
-              variant: SButtonVariant.primary,
-              size: SButtonSize.small,
-              loading: _submitting,
-              onPressed: _testing ? null : () => _handleSubmit(l10n),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// 测试结果展示区（成功 / 失败）。
-  Widget _buildTestResult(
-    ColorScheme scheme,
-    AppLocalizations l10n,
-    bool testOk,
-  ) {
-    final result = _testResult!;
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: (testOk ? _okGreen : scheme.error).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                testOk ? Icons.check_circle : Icons.error,
-                size: 14,
-                color: testOk ? _okGreen : scheme.error,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  testOk
-                      ? (result.version != null
-                            ? '${l10n.streamingServerTestOk} · v${result.version}'
-                            : l10n.streamingServerTestOk)
-                      : l10n.streamingServerTestFail,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: testOk ? _okGreen : scheme.error,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (result.error != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              result.error!,
-              style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _typeDropdown(ColorScheme scheme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: scheme.onSurface.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(AppRadius.control),
-      ),
-      child: DropdownButton<StreamingServerType>(
-        value: _type,
-        isDense: true,
-        underline: const SizedBox.shrink(),
-        borderRadius: BorderRadius.circular(10),
-        style: TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w600,
-          color: scheme.onSurface,
-        ),
-        icon: Icon(Icons.arrow_drop_down, color: scheme.onSurfaceVariant),
-        onChanged: (v) {
-          if (v != null) setState(() => _type = v);
-        },
-        items: [
-          for (final t in StreamingServerType.values)
-            DropdownMenuItem(
-              value: t,
-              child: Text(streamingTypeLabels[t] ?? t.name),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _field(ColorScheme scheme, String label, {required Widget child}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 6),
-          child,
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _buildServerForm(context);
 }
 
 /// 紧凑开关行。

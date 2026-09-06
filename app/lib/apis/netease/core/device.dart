@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 进程级设备信息——对齐 apis/netease/core/device.ts。
 ///
 /// - deviceId：52 位大写十六进制字符，进程启动时生成一次

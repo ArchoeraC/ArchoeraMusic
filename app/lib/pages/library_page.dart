@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,6 +19,9 @@ import '../widgets/library/library_header.dart';
 import '../widgets/list/song_list.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/common/toast.dart';
+
+part 'library/library_page_actions.dart';
+part 'library/library_page_view.dart';
 
 /// 音乐库页（对齐原项目 Library.vue）：本地曲目列表 + 扫描 +
 /// 目录管理 + 搜索。顶栏（标题/操作行/搜索/统计/刮削）已拆到
@@ -38,165 +45,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
   }
 
-  void _play(Track track) {
-    final l10n = context.l10n;
-    final path = track.localPath;
-    if (path == null || path.isEmpty) {
-      _toast(l10n.toastMissingLocalPath);
-      return;
-    }
-    try {
-      // 队列中已有则跳转，否则建立队列（切歌/播放列表可用）
-      ref.read(playbackProvider.notifier).playTrack(track);
-    } catch (e) {
-      _toast(l10n.toastPlayFailed('$e'));
-    }
-  }
-
-  /// 本地曲目右键菜单（SContextMenu）。
-  void _onTrackMenu(Track track, Offset global) {
-    final l10n = context.l10n;
-    SContextMenu.show(
-      context,
-      position: global,
-      items: [
-        SContextMenuItem(
-          label: l10n.menuPlay,
-          icon: Icons.play_arrow,
-          onTap: () => _play(track),
-        ),
-        SContextMenuItem(
-          label: l10n.menuPlayNext,
-          icon: Icons.skip_next_outlined,
-          onTap: () {
-            ref.read(playbackProvider.notifier).insertToQueue(track);
-            _toast(l10n.toastAddedToQueue);
-          },
-        ),
-        SContextMenuItem.divider(),
-        SContextMenuItem(
-          label: l10n.menuComment,
-          icon: Icons.chat_bubble_outline,
-          onTap: () => showCommentDialog(context, track: track),
-        ),
-        SContextMenuItem(
-          label: l10n.menuLocateFile,
-          icon: Icons.folder_open_outlined,
-          onTap: () => _toast(l10n.menuLocateFileComingSoon),
-        ),
-        SContextMenuItem(
-          label: l10n.menuRemoveFromLibrary,
-          icon: Icons.delete_outline,
-          danger: true,
-          onTap: () async {
-            final ok = await ref
-                .read(libraryStoreProvider.notifier)
-                .removeTrackByPath(track.localPath ?? '');
-            _toast(ok ? l10n.toastRemovedFromLibrary : l10n.toastRemoveFailed);
-          },
-        ),
-      ],
-    );
-  }
-
   void _toast(String msg) {
     if (!mounted) return;
     toast(msg);
   }
 
   @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(libraryStoreProvider);
-    // 选择性订阅（播放位置/FFT 50ms 更新不重建列表）
-    final playingId = ref.watch(playbackProvider.select((s) => s.trackId));
-    final isPlaying = ref.watch(playbackProvider.select((s) => s.playing));
-    final scheme = Theme.of(context).colorScheme;
-    final l10n = context.l10n;
-    final tracks = state.filteredTracks.map(trackFromRow).toList();
-    final notifier = ref.read(libraryStoreProvider.notifier);
-
-    return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const LibraryHeader(),
-          const Divider(height: 1),
-          // ── 曲目列表 / 空状态 ─────────────────────────────────
-          if (state.error != null)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 40,
-                      color: scheme.error.withValues(alpha: 0.6),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      state.error!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (state.initialized && state.tracks.isEmpty)
-            Expanded(
-              child: LibraryEmptyState(
-                hasDirs: state.scanDirs.isNotEmpty,
-                scanning: state.scanning,
-                onAddFolder: () {
-                  if (state.scanDirs.isEmpty) {
-                    // 无目录：弹出目录管理；有目录：直接开始扫描
-                    final l10n = context.l10n;
-                    SDialog.show(
-                      context,
-                      title: l10n.libraryScanDirs,
-                      description: l10n.libraryScanDirsDesc,
-                      child: const FolderManager(),
-                      actions: [
-                        SButton(
-                          label: l10n.commonDone,
-                          variant: SButtonVariant.secondary,
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
-                    );
-                  } else {
-                    notifier.startScan();
-                  }
-                },
-              ),
-            )
-          else if (tracks.isEmpty && state.searchQuery.isNotEmpty)
-            Expanded(
-              child: Center(
-                child: Text(
-                  l10n.libraryNoMatch,
-                  style: TextStyle(fontSize: 13),
-                ),
-              ),
-            )
-          else
-            Expanded(
-              child: SongList(
-                items: tracks,
-                playingId: playingId,
-                isPlaying: isPlaying,
-                showAlbum: true,
-                showDuration: true,
-                onPlay: _play,
-                onContextMenu: _onTrackMenu,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _buildLibraryPage(context);
 }

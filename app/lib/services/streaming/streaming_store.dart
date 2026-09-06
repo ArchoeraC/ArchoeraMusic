@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 流媒体服务器配置持久化（对齐 shared/types/streaming.ts StreamingApi）。
 ///
 /// 配置文件 `streaming_servers.json` 只存**非敏感**字段（host/port/username 等）；

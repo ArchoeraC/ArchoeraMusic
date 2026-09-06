@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// track → 平台匹配指纹（对齐 apis/common/lyric/fingerprint.ts）。
 ///
 /// 用 title + 第一艺术家 + 时长桶 算指纹；时长按 5s 桶归一，

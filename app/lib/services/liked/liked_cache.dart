@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 「我喜欢」收藏列表本地缓存（sqlite3 FFI 直连，独立库 liked.db）。
 ///
 /// 借鉴 SPlayer-Next IndexedDB 缓存语义：进收藏页先读本地缓存「立即

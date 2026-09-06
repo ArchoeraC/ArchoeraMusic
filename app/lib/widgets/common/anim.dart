@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 性能模式动效工具。
 ///
 /// Flutter 3.44 的隐式 Animated* 组件不会自动读取

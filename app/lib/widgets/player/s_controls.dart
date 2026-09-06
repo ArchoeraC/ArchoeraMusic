@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 基础控件（对齐 SPlayer-Next 的 SButton / SInput 语义，自绘观感，
 /// 不依赖 Material 原生按钮外观）。
 library;

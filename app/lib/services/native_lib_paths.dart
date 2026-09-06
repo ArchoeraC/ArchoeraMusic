@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import 'dart:io';
 
 /// FFI 动态库模块标识与文件名/查找路径约定。

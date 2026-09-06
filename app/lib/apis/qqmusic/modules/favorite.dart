@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM「我喜欢」（红心收藏，dirid=201）模块——**实验性**（社区逆向 RPC）。
 ///
 /// QM把「♥ / 我喜欢」实现为一个**特殊目录歌单 dirid=201**（非普通

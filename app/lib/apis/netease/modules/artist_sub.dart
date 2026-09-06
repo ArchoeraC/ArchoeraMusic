@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 收藏 / 取消收藏歌手（对齐 artist_sub.ts）
 /// - t: 1 收藏 / 2 取消，默认 1
 library;

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QM红心收藏（「我喜欢」）**本机持久化数据源**。
 ///
 /// QQ 平台与NT/KG不同：在线收藏接口为**社区逆向实验 RPC**

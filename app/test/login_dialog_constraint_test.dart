@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 回归测试：扫码登录页为全屏毛玻璃形态，不使用 AlertDialog，且长错误
 // 消息不引起布局溢出。
 //

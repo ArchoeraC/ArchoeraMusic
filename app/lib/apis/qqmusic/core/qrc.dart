@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// QRC 歌词解密（Dart 移植）——对齐 apis/qqmusic/core/qrc.ts。
 ///
 /// QRC 解密流程：hex 解码 → Triple DES 解密 → Zlib 解压
