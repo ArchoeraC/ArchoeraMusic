@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! session_probe.rs — vault-3 端到端探针（真实凭据，用户授权）：
 //! ① FFI setter 注入真实登录态（经 MlockSecret 存储路径）
 //! ② NeteaseResolver / KugouResolver 消费该登录态解析 VIP 歌曲 URL

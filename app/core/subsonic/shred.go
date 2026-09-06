@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 安全销毁代理（FFI 导出）：宿主（Dart）销毁敏感文件前的 Go 侧协作。
 //
 // 为什么需要代理：Go 服务端可能持有 user.db（userPool）连接，Windows 下

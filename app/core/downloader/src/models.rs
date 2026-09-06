@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // ============================================================
 // §3.2 / §12 enqueue JSON 协议模型（Dart 纯数据传递 → Rust 唯一真相）
 //

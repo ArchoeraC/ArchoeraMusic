@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Archoera Subsonic 转码器（cdylib）
 // C ABI：archoera_transcode_mp3 —— symphonia 解码 + mp3lame 编码，输出 MP3 到文件
 //

@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // ============================================================
 // §9.6 第 1 层防御：平台业务签名算法自研（对照 Dart 现有实现 1:1 移植）
 // 自研边界（戒律 §9.6 自研边界表）：

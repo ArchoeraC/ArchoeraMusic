@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 namespace Archoera.Vault;
 
 /// 解锁失败退避（credential-vault-plan §3.7「解锁失败退避/速率限制」）。

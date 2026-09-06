@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 运行期配置 + 宿主（Dart）桥接
 //
 // 原为环境变量 + HTTP 回调 TS（Node.js），FFI 化后改为：
