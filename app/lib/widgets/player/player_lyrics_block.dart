@@ -12,7 +12,7 @@ import '../../../services/lyrics/lyric_line.dart';
 import '../../../services/playback/playback_notifier.dart';
 import '../../../stores/app_prefs.dart';
 import '../../../stores/lyrics_provider.dart';
-import 'amll_wall_v5.dart';
+import 'lyrics_v7/lyrics_physics_wall.dart';
 import 'lyrics_view.dart';
 
 /// 全屏播放器歌词区（无状态；位置/歌词/样式由内部 Consumer 订阅）。
@@ -60,10 +60,12 @@ class PlayerLyricsBlock extends ConsumerWidget {
     // 引擎切换：simple（旧实现）/ amll（AMLL 歌词墙）
     final wall =
         prefs.lyricEngine == 'amll'
-            ? AmllWall(
+            ? AmllPhysicsWall(
                 groups: groups,
                 positionMs: pos,
-                fontSize: fontSize,
+                // 歌词墙直接用设置原始 px（不再乘 lyricScale 二次缩放），
+                // 保证“28px 就是 28px”。
+                fontSize: prefs.lyricFontSize,
                 fontFamily: prefs.fontFamily,
                 playedColor: playedColor,
                 unplayedColor: unplayedColor,

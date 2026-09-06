@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/services/lyrics/lyric_line.dart';
-import '../lib/widgets/player/amll_lyric_wall.dart';
+import 'package:archoera_music/services/lyrics/lyric_line.dart';
+import 'package:archoera_music/widgets/player/amll_lyric_wall.dart';
 
 void main() {
   testWidgets('AMLL 歌词墙（Canvas）能构建且无异常', (tester) async {
