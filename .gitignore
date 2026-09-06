@@ -66,8 +66,4 @@ packaging/linux/work/
 
 *.key
 # 内嵌参考仓库（本地保留，不入库/不 submodule；供代码移植参考）
-reference/FFmpeg/
-reference/opus/
-reference/mp3refs/libmad/
-reference/mp3refs/minimp3/
-reference/mp3refs/mpg123/
+reference/
