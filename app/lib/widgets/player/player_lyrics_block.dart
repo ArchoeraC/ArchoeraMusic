@@ -12,7 +12,7 @@ import '../../../services/lyrics/lyric_line.dart';
 import '../../../services/playback/playback_notifier.dart';
 import '../../../stores/app_prefs.dart';
 import '../../../stores/lyrics_provider.dart';
-import 'amll_lyric_wall.dart';
+import 'amll_wall_v5.dart';
 import 'lyrics_view.dart';
 
 /// 全屏播放器歌词区（无状态；位置/歌词/样式由内部 Consumer 订阅）。
@@ -60,11 +60,11 @@ class PlayerLyricsBlock extends ConsumerWidget {
     // 引擎切换：simple（旧实现）/ amll（AMLL 歌词墙）
     final wall =
         prefs.lyricEngine == 'amll'
-            ? AmllLyricWall(
+            ? AmllWall(
                 groups: groups,
                 positionMs: pos,
                 fontSize: fontSize,
-                lineHeight: lineHeight,
+                fontFamily: prefs.fontFamily,
                 playedColor: playedColor,
                 unplayedColor: unplayedColor,
                 showTranslation: showTranslation,
@@ -72,7 +72,6 @@ class PlayerLyricsBlock extends ConsumerWidget {
                 inactiveAlpha: prefs.amllInactiveAlpha,
                 wordSweep: prefs.amllWordSweep,
                 hidePassed: prefs.amllHidePassed,
-                enableScale: prefs.amllEnableScale,
                 springPreset: prefs.amllSpringPreset,
                 animate: !ref.read(appPrefsProvider).performanceMode,
                 onSeek: onSeek ?? (_) {},

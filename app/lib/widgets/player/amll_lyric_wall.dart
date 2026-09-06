@@ -1,10 +1,13 @@
-/// AMLL（Apple Music 风格歌词墙）引擎 —— 稳定实现。
+/// AMLL 歌词墙引擎 —— 稳定实现（行渲染对齐原版 LyricsView 的中文/居中逻辑）。
 ///
-/// 采用 ListView + ScrollController 的框架滚动通道（已验证稳定、可回滚），
-/// 叠加 AMLL 观感层：激活行锚定于可调比例、行切换平滑滚动、非激活行
-/// 按 inactiveAlpha 淡出并缩小、视口上下渐隐、逐字扫亮、翻译副行、点击 seek。
-///
-/// 与旧引擎并存切换（设置 → 歌词 → 引擎）。无第三方依赖。
+/// 滚动通道：ListView + ScrollController（可回滚、无上漂）。当前行默认锚定
+/// 视口 50%（可经 alignFraction 调节）。行渲染照搬原版 _Line：
+///   Container(height=lineHeight, alignment:center) + 居中 Column；
+///   AnimatedDefaultTextStyle：当前行 fontSize+3 / w600 / 主色，非当前行
+///   fontSize / 未唱色×inactiveAlpha；翻译小字 fontSize-4、主色×0.75；
+///   有字级片段 → 卡拉 OK 逐字（已唱实色/未唱主色×0.4），无片段整行文本；
+///   点击行 seek。
+/// 顶部叠加上下渐隐 ShaderMask；性能模式走瞬移。
 library;
 
 import 'dart:math' as math;
@@ -13,7 +16,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/lyrics/lyric_line.dart';
 
-/// AMLL 弹簧预设保留（供后续物理化参数使用）。
+/// AMLL 弹簧预设保留。
 const Map<String, (double, double, double)> amllSpringPresets = {
   'default': (1.0, 24.0, 180.0),
   'smooth': (1.0, 18.0, 110.0),
@@ -33,8 +36,8 @@ class AmllLyricWall extends StatefulWidget {
     this.playedColor = const Color(0xFF4DA3FF),
     this.unplayedColor = const Color(0xFF9AA1B5),
     this.showTranslation = true,
-    this.alignFraction = 0.35,
-    this.inactiveAlpha = 0.25,
+    this.alignFraction = 0.5,
+    this.inactiveAlpha = 0.45,
     this.wordSweep = true,
     this.hidePassed = false,
     this.enableScale = true,
@@ -52,22 +55,22 @@ class AmllLyricWall extends StatefulWidget {
   final Color unplayedColor;
   final bool showTranslation;
 
-  /// 激活行锚定（占歌词区高度比例，0~1）。
+  /// 激活行锚定（0~1，默认 0.5 = 视口居中，同原版）。
   final double alignFraction;
 
-  /// 非激活行透明度（0~1）。
+  /// 非当前行透明度（0~1，默认 0.45，可读性同原版 0.55 档）。
   final double inactiveAlpha;
 
-  /// 逐字扫亮。
+  /// 逐字卡拉 OK。
   final bool wordSweep;
 
   /// 隐藏已唱过的行。
   final bool hidePassed;
 
-  /// 非激活行缩小（0.92）。
+  /// 非当前行缩小（默认 0.97）。
   final bool enableScale;
 
-  /// 弹簧预设（保留字段）。
+  /// 弹簧预设（保留）。
   final String springPreset;
 
   /// false = 性能模式：瞬移。
@@ -83,7 +86,7 @@ class _AmllLyricWallState extends State<AmllLyricWall> {
   double _viewH = 0;
   double _padTop = 0;
   double _padBottom = 0;
-  bool _placed = false;
+  bool _everPlaced = false;
 
   int get _activeIndex => lyricIndexAt(widget.groups, widget.positionMs);
 
@@ -106,23 +109,30 @@ class _AmllLyricWallState extends State<AmllLyricWall> {
     final idx = _activeIndex;
     if (idx != _current || oldWidget.groups != widget.groups) {
       _current = idx;
-      _ensureVisible(idx, snap: !widget.animate || !_placed);
+      _ensureVisible(idx);
     }
   }
 
-  void _ensureVisible(int index, {bool snap = false}) {
+  /// 定位到行：始终走动画（含切歌/断点续播后的首次换行，700ms 生效）；
+  /// 仅在首次挂载或长距离跳转（seek/换歌跨屏）时瞬移，避免飞渡。
+  void _ensureVisible(int index) {
     if (!_controller.hasClients) return;
     final target = (index * widget.lineHeight)
         .clamp(0.0, _controller.position.maxScrollExtent)
         .toDouble();
-    _placed = true;
-    if (snap) {
+    final first = !_everPlaced;
+    _everPlaced = true;
+    final dist = (target - _controller.offset).abs();
+    final viewH = _viewH > 0 ? _viewH : 400.0;
+    final longJump = dist > viewH * 1.2;
+    if (!widget.animate || first || longJump) {
       _controller.jumpTo(target);
     } else {
+      // 换行过渡加长：歌词墙的整屏滚动应有“从容上移”的时长感
       _controller.animateTo(
         target,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeInOutCubic,
       );
     }
   }
@@ -162,79 +172,108 @@ class _AmllLyricWallState extends State<AmllLyricWall> {
               Colors.white,
               Colors.transparent,
             ],
-            stops: const [0.0, 0.1, 0.9, 1.0],
+            stops: const [0.0, 0.15, 0.85, 1.0],
           ).createShader(bounds),
           blendMode: BlendMode.dstIn,
-          child: ListView.builder(
-            controller: _controller,
-            itemExtent: lineH,
-            padding: EdgeInsets.only(top: _padTop, bottom: _padBottom),
-            physics: const BouncingScrollPhysics(),
-            itemCount: groups.length,
-            itemBuilder: (context, i) => _buildRow(groups[i], i, lineH),
+          child: ScrollConfiguration(
+            behavior: _NoScrollbarBehavior(),
+            child: ListView.builder(
+              controller: _controller,
+              itemExtent: lineH,
+              padding: EdgeInsets.only(top: _padTop, bottom: _padBottom),
+              physics: const BouncingScrollPhysics(),
+              itemCount: groups.length,
+              itemBuilder: (context, i) => _buildRow(groups[i], i),
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildRow(LyricGroup group, int index, double lineH) {
-    final active = _current >= 0 ? _current : -1;
-    final isActive = index == active;
-    final isPassed = active >= 0 && index < active;
+  Widget _buildRow(LyricGroup group, int index) {
+    final isCurrent = index == _current;
+    final isPassed = _current >= 0 && index < _current;
     if (widget.hidePassed && isPassed) return const SizedBox.shrink();
 
-    final Widget text;
-    if (isActive) {
-      text = _activeLineText(group);
+    final played = widget.playedColor;
+    // 距离梯度：越靠近当前行越亮、越远越淡（收敛到 inactiveAlpha）
+    final dist = (_current - index).abs().toDouble();
+    final lineAlpha = isCurrent
+        ? 1.0
+        : math.max(
+            widget.inactiveAlpha.clamp(0.0, 1.0),
+            1 - (math.max(0.0, dist - 1) * 0.35),
+          ).clamp(0.0, 1.0);
+    final lineColor = isCurrent
+        ? played
+        : widget.unplayedColor.withValues(alpha: lineAlpha);
+    final rowScale = isCurrent || !widget.enableScale
+        ? 1.0
+        : math.max(0.9, 1 - math.max(0.0, dist - 1) * 0.025);
+
+    final Widget original;
+    if (isCurrent) {
+      original = _currentSpan(group, played);
     } else {
-      text = Text(
+      original = Text(
         group.original.text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: widget.fontSize,
-          fontWeight: FontWeight.w400,
-          color: widget.unplayedColor,
-        ),
       );
     }
 
-    final alpha = isActive ? 1.0 : widget.inactiveAlpha.clamp(0.0, 1.0);
-    final scale = (!isActive && widget.enableScale) ? 0.92 : 1.0;
+    // 翻译：主色半透明小字（与原版一致：fontSize-4 / 主色×0.75）
+    final translation =
+        (isCurrent && widget.showTranslation && group.translation != null &&
+                group.translation!.isNotEmpty)
+            ? Text(
+                group.translation!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: widget.fontSize - 4,
+                  color: played.withValues(alpha: 0.75),
+                ),
+              )
+            : null;
 
-    return Center(
-      child: Transform.scale(
-        scale: scale,
-        child: Opacity(
-          opacity: alpha,
-          child: GestureDetector(
-            behavior: HitTestBehavior.deferToChild,
-            onTap: () => widget.onSeek(group.original.timeMs),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => widget.onSeek(group.original.timeMs),
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          style: isCurrent
+              ? TextStyle(
+                  fontSize: widget.fontSize + 3,
+                  fontWeight: FontWeight.w600,
+                  color: played,
+                )
+              : TextStyle(
+                  fontSize: widget.fontSize,
+                  fontWeight: FontWeight.w400,
+                  color: lineColor,
+                ),
+          child: Container(
+            alignment: Alignment.center,
+            height: widget.lineHeight,
+            child: Transform.scale(
+              scale: rowScale,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  text,
-                  if (isActive &&
-                      widget.showTranslation &&
-                      group.translation != null &&
-                      group.translation!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        group.translation!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: math.max(11, widget.fontSize * 0.5),
-                          color: widget.unplayedColor.withValues(alpha: 0.95),
-                        ),
-                      ),
-                    ),
+                  original,
+                  if (translation != null) ...[
+                    const SizedBox(height: 2),
+                    translation,
+                  ],
                 ],
               ),
             ),
@@ -244,67 +283,59 @@ class _AmllLyricWallState extends State<AmllLyricWall> {
     );
   }
 
-  Widget _activeLineText(LyricGroup group) {
-    final pos = widget.positionMs;
-    final start = group.original.timeMs;
+  /// 当前行原文：有逐字 → 逐字渐变扫亮（未唱 主色×0.4 → 已唱 主色）；
+  /// 无逐字 → 整行文本（普通模式，起唱即主色）。
+  Widget _currentSpan(LyricGroup group, Color played) {
     final frags = group.fragments;
-    final baseStyle = TextStyle(
-      fontSize: widget.fontSize,
-      fontWeight: FontWeight.w600,
-    );
-
     if (!widget.wordSweep || frags == null || frags.isEmpty) {
-      final played = pos >= start;
       return Text(
         group.original.text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.center,
-        style: baseStyle.copyWith(
-          color: played ? widget.playedColor : widget.unplayedColor,
-        ),
       );
     }
-
-    final span = TextSpan(
-      children: [for (final f in frags) _fragmentSpan(f, pos, start)],
-    );
     return Text.rich(
-      span,
+      TextSpan(
+        children: [
+          for (final f in frags) _fragSpan(f, group.original.timeMs, played),
+        ],
+      ),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.center,
-      style: baseStyle,
     );
   }
 
-  TextSpan _fragmentSpan(LyricFragment f, int pos, int lineStart) {
+  TextSpan _fragSpan(LyricFragment f, int lineStart, Color played) {
     final abs = lineStart + f.startMs;
     final dur = (f.durationMs != null && f.durationMs! > 0)
         ? f.durationMs!
         : 500;
-    final style = TextStyle(
-      fontSize: widget.fontSize,
-      fontWeight: FontWeight.w600,
-    );
-    if (pos < abs) {
-      return TextSpan(
-        text: f.text,
-        style: style.copyWith(color: widget.unplayedColor),
-      );
+    final Color c;
+    if (widget.positionMs < abs) {
+      c = played.withValues(alpha: 0.4);
+    } else if (widget.positionMs >= abs + dur) {
+      c = played;
+    } else {
+      c = Color.lerp(
+        played.withValues(alpha: 0.4),
+        played,
+        (widget.positionMs - abs) / dur,
+      )!;
     }
-    if (pos >= abs + dur) {
-      return TextSpan(
-        text: f.text,
-        style: style.copyWith(color: widget.playedColor),
-      );
-    }
-    final t = (pos - abs) / dur;
-    return TextSpan(
-      text: f.text,
-      style: style.copyWith(
-        color: Color.lerp(widget.unplayedColor, widget.playedColor, t),
-      ),
-    );
+    return TextSpan(text: f.text, style: TextStyle(color: c));
   }
 }
+
+/// 隐藏歌词滚动条（对齐原版 LyricsView 的视觉纯净处理）。
+class _NoScrollbarBehavior extends ScrollBehavior {
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) =>
+      child;
+}
+
