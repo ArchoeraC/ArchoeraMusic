@@ -280,21 +280,27 @@ class _FloatActionButton extends StatelessWidget {
                 ),
               ],
             ),
-            child: IconButton(
-              tooltip: tooltip,
-              onPressed: onTap,
-              iconSize: 17,
-              padding: EdgeInsets.zero,
-              // 只让图标核心区域拦截点击：圆盘其余部分不参与命中测试，
-              // 避免浮钮整块挡住下层列表行（长期遮挡问题）。
-              constraints:
-                  const BoxConstraints.tightFor(width: 24, height: 24),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: fg,
-                disabledForegroundColor: fg.withValues(alpha: 0.5),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: IconButton(
+                  tooltip: tooltip,
+                  onPressed: onTap,
+                  iconSize: 18,
+                  padding: EdgeInsets.zero,
+                  // 只让图标核心区域拦截点击：圆盘其余部分不参与命中测试，
+                  // 避免浮钮整块挡住下层列表行（长期遮挡问题）。
+                  constraints:
+                      const BoxConstraints.tightFor(width: 26, height: 26),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: fg,
+                    disabledForegroundColor: fg.withValues(alpha: 0.5),
+                  ),
+                  icon: Icon(icon),
+                ),
               ),
-              icon: Icon(icon),
             ),
           ),
         ),
