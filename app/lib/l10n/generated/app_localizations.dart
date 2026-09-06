@@ -6715,6 +6715,90 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'清空曲库并从扫描目录重建'**
   String get libraryFullScanDescription;
+
+  /// No description provided for @settingsSectionLyricEngine.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词引擎'**
+  String get settingsSectionLyricEngine;
+
+  /// No description provided for @settingsLyricEngine.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'引擎'**
+  String get settingsLyricEngine;
+
+  /// No description provided for @settingsLyricEngineSimple.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'经典'**
+  String get settingsLyricEngineSimple;
+
+  /// No description provided for @settingsLyricEngineWall.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词墙'**
+  String get settingsLyricEngineWall;
+
+  /// No description provided for @settingsLyricEngineDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'选择渲染引擎，可随时切换'**
+  String get settingsLyricEngineDesc;
+
+  /// No description provided for @settingsLyricEngineNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅作用于全屏播放器歌词区；AMLL 为 Apple Music 风整墙滚动，占用略高。'**
+  String get settingsLyricEngineNote;
+
+  /// No description provided for @settingsSectionLyricWall.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词墙设置'**
+  String get settingsSectionLyricWall;
+
+  /// No description provided for @settingsAmllNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Apple Music 风格整墙歌词参数，仅 AMLL 引擎使用。'**
+  String get settingsAmllNote;
+
+  /// No description provided for @settingsAmllAlign.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'激活行位置'**
+  String get settingsAmllAlign;
+
+  /// No description provided for @settingsAmllDim.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'非激活行透明度'**
+  String get settingsAmllDim;
+
+  /// No description provided for @settingsAmllWordSweep.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'逐字扫亮'**
+  String get settingsAmllWordSweep;
+
+  /// No description provided for @settingsAmllHidePassed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'隐藏已唱行'**
+  String get settingsAmllHidePassed;
+
+  /// No description provided for @settingsAmllScale.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'非激活行缩放'**
+  String get settingsAmllScale;
+
+  /// No description provided for @settingsAmllSpring.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'滚动弹簧'**
+  String get settingsAmllSpring;
 }
 
 class _AppLocalizationsDelegate

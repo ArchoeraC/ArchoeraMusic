@@ -39,7 +39,12 @@ class LyricFragment {
 
 /// 一组歌词（原文 + 可选翻译 + 可选逐字片段，按行对齐）。
 class LyricGroup {
-  const LyricGroup({required this.original, this.translation, this.fragments});
+  const LyricGroup({
+    required this.original,
+    this.translation,
+    this.fragments,
+    this.endMs,
+  });
 
   final LyricLine original;
 
@@ -49,6 +54,10 @@ class LyricGroup {
   /// 增强型逐字片段（行内按 [LyricFragment.startMs] 升序；
   /// 普通 LRC 行为 null）。
   final List<LyricFragment>? fragments;
+
+  /// 行结束时间（毫秒，取下一行起始；末行由调用方/引擎用默认时长兜底）。
+  /// 由解析器按有序时间轴后置计算，供 AMLL 引擎做连续滚动与逐字时长。
+  final int? endMs;
 }
 
 /// 解析 LRC 文本 → 时间轴有序行。
@@ -198,7 +207,20 @@ List<LyricGroup> parseLyricGroups({
       fragments: sortedFrags[i],
     ));
   }
-  return groups;
+  // 行结束时间后置计算：下一行起始即本行结束（末行给默认 4s 兜底，
+  // 由引擎可再按实际行宽调整）。供 AMLL 连续滚动/逐字扫亮使用。
+  return List.generate(groups.length, (i) {
+    final g = groups[i];
+    final end = i + 1 < groups.length
+        ? groups[i + 1].original.timeMs
+        : g.original.timeMs + 4000;
+    return LyricGroup(
+      original: g.original,
+      translation: g.translation,
+      fragments: g.fragments,
+      endMs: end,
+    );
+  });
 }
 
 /// 由播放位置（毫秒）取当前歌词组索引；无命中返回 -1。

@@ -1108,5 +1108,19 @@
   "libraryFullScan": "全量扫描",
   "libraryFullScanConfirm": "确认全量扫描？",
   "libraryFullScanConfirmDesc": "将清空当前曲库记录并从扫描目录重建（不删除源文件）。此操作不可撤销，扫描期间会占用较多磁盘 IO。",
-  "libraryFullScanDescription": "清空曲库并从扫描目录重建"
+  "libraryFullScanDescription": "清空曲库并从扫描目录重建",
+  "settingsSectionLyricEngine": "歌词引擎",
+  "settingsLyricEngine": "引擎",
+  "settingsLyricEngineSimple": "经典",
+  "settingsLyricEngineWall": "歌词墙",
+  "settingsLyricEngineDesc": "选择渲染引擎，可随时切换",
+  "settingsLyricEngineNote": "仅作用于全屏播放器歌词区；AMLL 为 Apple Music 风整墙滚动，占用略高。",
+  "settingsSectionLyricWall": "歌词墙设置",
+  "settingsAmllNote": "Apple Music 风格整墙歌词参数，仅 AMLL 引擎使用。",
+  "settingsAmllAlign": "激活行位置",
+  "settingsAmllDim": "非激活行透明度",
+  "settingsAmllWordSweep": "逐字扫亮",
+  "settingsAmllHidePassed": "隐藏已唱行",
+  "settingsAmllScale": "非激活行缩放",
+  "settingsAmllSpring": "滚动弹簧"
 }
