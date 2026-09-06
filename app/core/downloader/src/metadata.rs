@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // ============================================================
 // v2.1 增强：下载引擎自主寻找音乐元数据（标签 / 封面 / 歌词）
 //

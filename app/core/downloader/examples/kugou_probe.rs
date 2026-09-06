@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! kugou_probe.rs — 临时探针：真实调用 register_dev + v5/url，验证各音质档签名。
 //! 不入库，仅用于排查酷狗高音质下载问题。
 use std::collections::BTreeMap;

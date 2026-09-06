@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // ============================================================
 // §8 C ABI 导出 + 任务状态机 + 事件推送（戒律 13.1：严禁 poll_* 拉式接口）
 //

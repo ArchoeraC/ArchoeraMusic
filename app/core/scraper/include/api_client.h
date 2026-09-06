@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #pragma once
 
 /// Archoera 刮削器 —— 多源 API 客户端（header-only）

@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Archoera Subsonic 服务端 FFI 库入口（c-shared）
 //
 // 原为 CLI（main() + 环境变量 + spawn 转码器子进程 + HTTP 回调 Node.js TS）。

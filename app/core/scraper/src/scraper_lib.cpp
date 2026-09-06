@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Archoera 刮削器 FFI 库（C ABI）
 ///
 /// 复用 Archoera 刮削引擎（header-only ScraperEngine），通过事件队列与宿主通信，

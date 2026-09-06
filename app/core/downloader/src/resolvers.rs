@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // ============================================================
 // §9.6 第 3 层防御：PlatformUrlResolver trait 抽象
 //

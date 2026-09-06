@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package endpoints
 
 // 转码器动态库加载与调用见 transcoder_unix.go / transcoder_windows.go
