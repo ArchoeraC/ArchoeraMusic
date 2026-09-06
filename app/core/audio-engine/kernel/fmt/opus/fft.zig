@@ -2,7 +2,7 @@
 //!
 //! 自研混合基 FFT（N = 2^a·3^b·5^c，覆盖 CELT 尺寸 60/120/240/480），
 //! 结构参考重构对照 FFmpeg `libavutil/tx_template.c` 的 AV_TX_FLOAT_MDCT 逆变换
-//! （ff_tx_mdct_inv / ff_tx_mdct_gen_exp）；参考对照非复制（§3.3）。
+//! （ff_tx_mdct_inv / ff_tx_mdct_gen_exp）（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 逆 MDCT（对齐 av_tx 结构，sub_map 取恒等）：
 //!   1. 预旋转：z[i] = {src[n-1-k], src[k]} × exp[i]（k = 恒等索引）；

@@ -2,7 +2,7 @@
 //!
 //! 定位（docs/audio-kernel-zig.md §9.8）：M4A 容器内的无损编解码；
 //! 本模块为**纯帧函数**（每 m4a sample 一帧），容器解复用由 fmt/m4a.zig 承担。
-//! 参考重构对照 FFmpeg libavcodec/alac.c（LGPL-2.1+，参考对照非复制）与
+//! 参考重构对照 FFmpeg libavcodec/alac.c（LGPL-2.1+）与
 //! Apple 参考 alac.c（Apache-2.0，作对照不引入运行时）。
 //!
 //! 帧布局：

@@ -42,9 +42,13 @@
 #include <condition_variable>
 #include <chrono>
 #include <deque>
+#include <filesystem>
 #include <memory>
+#include <system_error>
 #include <unordered_map>
 #include <stdexcept>
+#include <cctype>
+#include <algorithm>
 
 using json = nlohmann::json;
 namespace scraper = archoera::scraper;
@@ -60,11 +64,13 @@ extern "C" {
 /// 事件队列：固定容量环形缓冲（互斥保护）+ 阻塞等待（wait_event 语义）。
 ///
 /// 同步模型对齐音频引擎 mediaengine_lib.c 的 wait_event/condvar/destroy：
-///   - push：事件入队（有容量）后 signal——唤醒阻塞在 wait 的接收线程；
+///   - push：事件入队后 signal——唤醒阻塞在 wait 的接收线程；**队列满时丢最旧
+///     保留最新**（进度事件是幂等的「最新状态」语义，终态 done/empty/error
+///     必在队尾，绝不能因满被丢弃——否则宿主永远等不到终态）；
 ///   - wait：有事件立即 pop；无事件在条件变量上睡眠（事件低频，空闲零唤醒）；
 ///     支持限时（timeout_ms>=0，超时返 0）与永久（<0）等待；
 ///   - destroyed_：destroy 置位并 broadcast——唤醒全部 wait 立即返 -1，
-///     此后 wait 不再交付事件（stop 后的残留事件被丢弃）；
+///     此后 push 不再入队、wait 不再交付事件（stop 后的残留事件被丢弃）；
 ///   - waiters_ / drainCv_：destroy 等在 wait 内的调用方退出（waiters_ 归零）
 ///     后才释放句柄内存——wait_event 与 destroy 可在不同线程并发调用，无 UAF。
 class EventQueue {
@@ -73,7 +79,8 @@ public:
 
     bool push(std::string&& ev) {
         std::lock_guard<std::mutex> lk(mu_);
-        if (q_.size() >= cap_) return false;  // 满则丢弃（宿主应高频消费）
+        if (destroyed_) return false;          // 销毁后不再入队
+        if (q_.size() >= cap_) q_.pop_front(); // 满 → 丢最旧（进度帧），保最新
         q_.push_back(std::move(ev));
         cv_.notify_one();  // 唤醒阻塞中的 wait
         return true;
@@ -160,6 +167,9 @@ struct ScraperHandle {
     std::atomic<bool> done{false};
     std::atomic<bool> running{false};
     bool daemonMode = false;
+    bool organizeMode = false;       // 仅目录整理（不联网、不写标签，按模板移动文件）
+    std::string organizeTargetDir;   // 整理目标目录（空 → error）
+    std::string organizePattern;     // 整理模板（见 runOrganize 默认值）
     int interval = 60;
     std::unordered_map<std::string, json> tracks;      // 队列模式内存曲目表
     EventQueue events{512};
@@ -234,7 +244,10 @@ static bool parseConfig(const char* configJson, ScraperHandle* h) {
 
     std::string mode = parseStr(j, "mode", "once");
     h->daemonMode = (mode == "daemon");
+    h->organizeMode = (mode == "organize");
     h->interval = parseInt(j, "interval", 60);
+    h->organizeTargetDir = parseStr(j, "organizeTargetDir", "");
+    h->organizePattern = parseStr(j, "organizePattern", "");
 
     return true;
 }
@@ -247,6 +260,270 @@ static std::string trackProviderCb(const std::unordered_map<std::string, json>& 
     auto it = tracks.find(trackId);
     if (it == tracks.end()) return "";
     return it->second.dump();
+}
+
+// ---------------------------------------------------------------------------
+// 仅目录整理（organize：不联网、不写标签，按模板把文件移动到目标目录树）
+// 语义对齐 SPlayer-Next server/music/organizer.ts：
+//   - 模板只决定「目录层级」，文件始终保留原始 basename（不改名）；
+//   - 模板末段若形如文件名（含扩展）则视为文件名模板丢弃，仅取目录段；
+//   - 目标已存在冲突追加 " (2)" " (3)"…，极端情况加时间戳；
+//   - 移动失败（跨设备等）回退复制+删除源；不清理源目录。
+// ---------------------------------------------------------------------------
+
+namespace fs = std::filesystem;
+
+/// 整理默认模板（与 SPlayer-Next organizer 一致）。
+static const char* kOrganizeDefaultPattern = "{artist}/{album}/{track}. {title}.{ext}";
+
+/// 清理路径段：去控制字符/非法字符、压缩空白、去首尾空白与点、限长。
+static std::string orgSanitize(std::string s) {
+    s.erase(std::remove_if(s.begin(), s.end(), [](unsigned char c) { return c < 0x20; }),
+            s.end());
+    for (char& c : s) {
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
+            c == '"' || c == '<' || c == '>' || c == '|') {
+            c = '_';
+        }
+    }
+    std::string out;
+    bool lastSpace = false;
+    for (char c : s) {
+        if (std::isspace(static_cast<unsigned char>(c))) {
+            if (!lastSpace && !out.empty()) out += ' ';
+            lastSpace = true;
+        } else {
+            out += c;
+            lastSpace = false;
+        }
+    }
+    while (!out.empty() && out.front() == '.') out.erase(out.begin());
+    while (!out.empty() && out.back() == '.') out.pop_back();
+    if (out.size() > 200) out = out.substr(0, 200);
+    if (out.empty()) out = "Unknown";
+    return out;
+}
+
+/// 编号两位补零（<=0 → 空串，模板中该段被过滤）。
+static std::string orgPad(int n) {
+    if (n <= 0) return "";
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%02d", n);
+    return buf;
+}
+
+/// 由模板 + 标签渲染目标「目录」段列表（末段若像文件名则剥离）。
+static std::vector<std::string> orgBuildDirSegments(const std::string& pattern,
+                                                     const scraper::TrackInfo& t,
+                                                     const std::string& ext) {
+    const std::string artist =
+        orgSanitize(t.albumArtist.empty() ? (t.artist.empty() ? "Unknown Artist" : t.artist)
+                                          : t.albumArtist);
+    const std::string album = orgSanitize(t.album.empty() ? "Unknown Album" : t.album);
+    const std::string genre = orgSanitize(t.genre.empty() ? "Unknown Genre" : t.genre);
+    const std::string year = t.year > 0 ? std::to_string(t.year) : "";
+    const std::string disc = orgPad(t.discNumber);
+    const std::string track = orgPad(t.trackNumber);
+    const std::string title = orgSanitize(t.title.empty() ? "Unknown Title" : t.title);
+
+    std::string result = pattern;
+    const char* kTokens[][2] = {
+        {"{albumArtist}", artist.c_str()}, {"{artist}", artist.c_str()},
+        {"{album}", album.c_str()},        {"{genre}", genre.c_str()},
+        {"{year}", year.c_str()},          {"{disc}", disc.c_str()},
+        {"{track}", track.c_str()},        {"{title}", title.c_str()},
+        {"{ext}", ext.c_str()},
+    };
+    // 先替换长 token（albumArtist）再替换 artist，避免部分匹配。
+    for (const auto& kv : kTokens) {
+        size_t pos = 0;
+        while ((pos = result.find(kv[0], pos)) != std::string::npos) {
+            result.replace(pos, std::strlen(kv[0]), kv[1]);
+            pos += std::strlen(kv[1]);
+        }
+    }
+
+    std::vector<std::string> segments;
+    std::string cur;
+    for (char c : result) {
+        if (c == '/' || c == '\\') {
+            if (!cur.empty()) segments.push_back(cur);
+            cur.clear();
+        } else {
+            cur += c;
+        }
+    }
+    if (!cur.empty()) segments.push_back(cur);
+
+    if (segments.empty()) return segments;
+    // 末段形如文件（含扩展点且扩展部分为字母数字）→ 视为文件名模板段，丢弃。
+    const std::string last = segments.back();
+    const size_t dot = last.find_last_of('.');
+    if (dot != std::string::npos && dot + 1 < last.size()) {
+        bool alnum = true;
+        for (size_t i = dot + 1; i < last.size(); ++i) {
+            if (!std::isalnum(static_cast<unsigned char>(last[i]))) { alnum = false; break; }
+        }
+        if (alnum) segments.pop_back();
+    }
+    return segments;
+}
+
+/// 扩展名（小写、无点；识别不到返回空串）。
+static std::string orgFileExt(const std::string& path) {
+    const size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos || dot + 1 >= path.size()) return "";
+    std::string ext = path.substr(dot + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    return ext;
+}
+
+/// 目标存在冲突则追加序号；返回最终 dest（含目录创建）。
+static std::filesystem::path orgResolveDest(const std::filesystem::path& dest) {
+    std::error_code ec;
+    if (!fs::exists(dest, ec)) return dest;
+    ec.clear();
+    const std::string base = dest.stem().string();
+    const std::string ext = dest.extension().string();
+    for (int i = 2; i <= 999; ++i) {
+        fs::path cand = dest.parent_path() / (base + " (" + std::to_string(i) + ")" + ext);
+        if (!fs::exists(cand, ec)) return cand;
+        ec.clear();
+    }
+    // 极端情况：附加时间戳
+    return dest.parent_path() /
+           (base + "_" + std::to_string(
+                            std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::system_clock::now().time_since_epoch())
+                                .count()) +
+            ext);
+}
+
+/// 执行仅目录整理；事件（progress/done/empty/error）写入 handle 事件队列。
+static void runOrganize(ScraperHandle* h) {
+    const auto& dirs = h->cfg.scrapeDirs;
+    const std::string target = h->organizeTargetDir;
+    std::string pattern = h->organizePattern.empty() ? kOrganizeDefaultPattern
+                                                     : h->organizePattern;
+
+    auto pushEvent = [h](json ev) { h->events.push(ev.dump()); };
+
+    try {
+        if (dirs.empty() || target.empty()) {
+            pushEvent({{"type", "error"},
+                       {"message", "整理目录与目标目录不能为空（config.dirs / organizeTargetDir）"}});
+            return;
+        }
+        std::error_code ec;
+        const fs::path targetRoot = fs::absolute(fs::path(target), ec);
+        if (ec || !fs::is_directory(targetRoot, ec)) {
+            pushEvent({{"type", "error"},
+                       {"message", "整理目标目录不存在或不可访问: " + target}});
+            return;
+        }
+        fs::create_directories(targetRoot, ec);  // 幂等，确保可写
+
+        // 扫描源目录读取标签（含文件名优先回退，忽略 readTags 失败的文件）
+        scraper::FileScanner scanner(h->cfg);
+        auto tracks = scanner.scanDirs(dirs);
+        const int total = static_cast<int>(tracks.size());
+        if (tracks.empty()) {
+            pushEvent({{"type", "empty"}, {"message", "目录中无音频文件"}});
+            pushEvent({{"type", "done"},
+                       {"total", 0}, {"scraped", 0}, {"success", 0}, {"failed", 0},
+                       {"skipped", 0}, {"notFound", 0}, {"canceled", false}});
+            return;
+        }
+
+        pushEvent({{"type", "progress"},
+                   {"total", total}, {"scraped", 0}, {"success", 0}, {"failed", 0},
+                   {"skipped", 0}, {"notFound", 0},
+                   {"current", "准备整理 " + std::to_string(total) + " 个文件"}});
+
+        int moved = 0, skipped = 0, failed = 0;
+        bool canceled = false;
+        json failures = json::array();
+
+        for (int i = 0; i < total; ++i) {
+            if (scraper::cancelFlag().load(std::memory_order_relaxed)) {
+                canceled = true;
+                break;
+            }
+            const scraper::TrackInfo& t = tracks[i];
+            const std::string from = t.filePath;
+            if (from.empty()) { failed++; continue; }
+
+            const std::string ext = orgFileExt(from);
+            auto segs = orgBuildDirSegments(pattern, t, ext);
+            fs::path destDir = targetRoot;
+            for (const auto& seg : segs) destDir /= seg;
+            fs::path dest = destDir / fs::path(from).filename();
+            std::error_code ec2;
+            // 规范化比较：已在目标位置则跳过
+            fs::path canonFrom = fs::absolute(fs::path(from), ec2);
+            fs::path canonTo = fs::absolute(dest, ec2);
+            if (ec2) { failed++; continue; }
+            if (canonFrom == canonTo) { skipped++; }
+            else {
+                dest = orgResolveDest(dest);
+                fs::create_directories(dest.parent_path(), ec2);
+                if (ec2) {
+                    failed++;
+                    failures.push_back({{"file", from},
+                                        {"reason", "创建目录失败: " + ec2.message()}});
+                } else {
+                    std::error_code ec3;
+                    fs::rename(canonFrom, dest, ec3);
+                    if (ec3) {
+                        // 跨设备（EXDEV）等 → 复制 + 删除源
+                        std::error_code ecCopy, ecDel;
+                        fs::copy_file(canonFrom, dest,
+                                      fs::copy_options::overwrite_existing, ecCopy);
+                        if (!ecCopy) {
+                            fs::remove(canonFrom, ecDel);
+                            if (ecDel) {
+                                failed++;
+                                failures.push_back(
+                                    {{"file", from},
+                                     {"reason", "复制后删除源失败: " + ecDel.message()}});
+                            } else {
+                                moved++;
+                            }
+                        } else {
+                            failed++;
+                            failures.push_back({{"file", from},
+                                                {"reason", "移动失败: " + ecCopy.message()}});
+                        }
+                    } else {
+                        moved++;
+                    }
+                }
+            }
+
+            pushEvent({{"type", "progress"},
+                       {"total", total}, {"scraped", i + 1}, {"success", moved},
+                       {"failed", failed}, {"skipped", skipped}, {"notFound", 0},
+                       {"current", fs::path(from).filename().string()}});
+        }
+
+        // 终态 done 事件的 failures 只保留前 100 条，防止整批全失败时事件 JSON
+        // 过大（宿主事件缓冲固定容量，超长终态 JSON 被截断 → 解析失败 = 会话悬挂）。
+        if (failures.size() > 100) {
+            json capped = json::array();
+            for (int k = 0; k < 100; ++k) capped.push_back(failures[k]);
+            failures = std::move(capped);
+        }
+
+        pushEvent({{"type", "done"},
+                   {"total", total}, {"scraped", moved + skipped + failed},
+                   {"success", moved},
+                   {"failed", failed}, {"skipped", skipped}, {"notFound", 0},
+                   {"canceled", canceled}, {"failures", failures}});
+    } catch (const std::exception& e) {
+        pushEvent({{"type", "error"}, {"message", std::string("仅目录整理失败: ") + e.what()}});
+    } catch (...) {
+        pushEvent({{"type", "error"}, {"message", "仅目录整理失败: unknown fatal error"}});
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -305,6 +582,17 @@ ARCHOERA_SCRAPER_API int archoera_scraper_run(void* handle) {
     h->done.store(false);
 
     h->worker = std::thread([h]() {
+        // 上一轮取消可能残留全局取消标志 → 新一轮开始时复位（engine/organize 均依赖）
+        scraper::cancelFlag().store(false, std::memory_order_relaxed);
+
+        if (h->organizeMode) {
+            // 仅目录整理：独立路径，无需构造 ScraperEngine（不需要 scraper-state.db / 网络）
+            runOrganize(h);
+            h->running.store(false);
+            h->done.store(true);
+            return;
+        }
+
         try {
             h->engine.reset(new scraper::ScraperEngine(h->cfg));
 

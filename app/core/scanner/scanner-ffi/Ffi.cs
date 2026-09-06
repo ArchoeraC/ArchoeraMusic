@@ -32,6 +32,67 @@ public static unsafe class ScannerFfi
     /// <summary>进行中的扫描 CTS（scanner_cancel 从任意线程取消）</summary>
     private static CancellationTokenSource? _currentScanCts;
 
+    /// <summary>
+    /// 扫描选项快照（scanner_set_options 下发；0/空 = 引擎默认）。
+    /// 不可变副本 + Interlocked 交换，任意 isolate/线程随时读取无锁。
+    /// </summary>
+    private sealed class ScanOptions
+    {
+        public int MaxFileSizeMb;
+        public int MaxScanFiles;
+        public int MaxScanErrors;
+        public int MaxParallelism;
+        public List<string> ExtraExts = new();
+    }
+
+    private static ScanOptions _scanOptions = new();
+
+    /// <summary>
+    /// 下发扫描选项（进程内全局，对后续 scanner_scan 生效）。
+    /// 兼容旧 Dart 调用方：0 / 空数组 = 引擎默认（500MB / 50000 / 50 / 自适应）。
+    /// </summary>
+    /// <param name="optionsJson">UTF-8 JSON：maxFileSizeMb? maxScanFiles?
+    /// maxScanErrors? parallelism? extraExts?: string[]</param>
+    /// <returns>0 成功 / 1 失败（JSON 非法）</returns>
+    [UnmanagedCallersOnly(EntryPoint = "scanner_set_options")]
+    public static int SetOptions(byte* optionsJson)
+    {
+        var raw = PtrToString(optionsJson);
+        if (raw is null) return 1;
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            var o = new ScanOptions();
+            if (root.TryGetProperty("maxFileSizeMb", out var mf) && mf.ValueKind == JsonValueKind.Number)
+                o.MaxFileSizeMb = mf.GetInt32();
+            if (root.TryGetProperty("maxScanFiles", out var sf) && sf.ValueKind == JsonValueKind.Number)
+                o.MaxScanFiles = sf.GetInt32();
+            if (root.TryGetProperty("maxScanErrors", out var se) && se.ValueKind == JsonValueKind.Number)
+                o.MaxScanErrors = se.GetInt32();
+            if (root.TryGetProperty("parallelism", out var mp) && mp.ValueKind == JsonValueKind.Number)
+                o.MaxParallelism = mp.GetInt32();
+            if (root.TryGetProperty("extraExts", out var ext) && ext.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var e in ext.EnumerateArray())
+                {
+                    if (e.ValueKind != JsonValueKind.String) continue;
+                    var s = e.GetString();
+                    if (string.IsNullOrEmpty(s)) continue;
+                    o.ExtraExts.Add(s.TrimStart('.').ToLowerInvariant());
+                }
+            }
+            Interlocked.Exchange(ref _scanOptions, o);
+            return 0;
+        }
+        catch (Exception)
+        {
+            return 1;
+        }
+    }
+
+    private static ScanOptions CurrentScanOptions() => Volatile.Read(ref _scanOptions);
+
     [UnmanagedCallersOnly(EntryPoint = "scanner_scan")]
     public static int Scan(
         byte* dirsJson,
@@ -61,13 +122,19 @@ public static unsafe class ScannerFfi
 
             var dbDir = Path.GetDirectoryName(dbPathStr) ?? ".";
             using var db = new SqliteDirectWriter(dbPathStr);
+            var opts = CurrentScanOptions();
             var engine = new ScannerEngine(
                 db,
                 coverDirStr ?? Path.Combine(dbDir, "cache", "covers"),
                 quarantineDirStr ?? Path.Combine(dbDir, "quarantine"),
                 batchSize: batch,
                 incremental: incremental != 0,
-                maxParallelism: maxParallelism > 0 ? maxParallelism : null,
+                maxFileSizeBytes: opts.MaxFileSizeMb > 0 ? opts.MaxFileSizeMb * 1024L * 1024L : null,
+                maxScanFiles: opts.MaxScanFiles > 0 ? opts.MaxScanFiles : null,
+                maxScanErrors: opts.MaxScanErrors > 0 ? opts.MaxScanErrors : null,
+                maxParallelism: maxParallelism > 0 ? maxParallelism
+                              : (opts.MaxParallelism > 0 ? opts.MaxParallelism : null),
+                extraExtensions: opts.ExtraExts.Count > 0 ? opts.ExtraExts : null,
                 progressSink: onProgress != null
                     ? (Action<ScanProgress>)(p => FireProgress(onProgress, p))
                     : null);

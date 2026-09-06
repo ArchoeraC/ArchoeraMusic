@@ -3,7 +3,7 @@
 //! 参考重构对照 FFmpeg libavcodec/apedec.c：APERangecoder（§"range decoding
 //! functions"）、update_rice / get_rice_ook / ape_decode_value_3860 / _3900 /
 //! _3990 / decode_array_0000 与各版本 entropy_decode_mono/stereo 编排；
-//! 参考对照非复制（§3.3），逐位复刻以保证 bit-exact。
+//! 逐位复刻以保证 bit-exact；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md。
 //!
 //! 版本分派（对齐 ape_decode_init）：
 //!   < 3860  → decode_array_0000（GetBitContext 位流）

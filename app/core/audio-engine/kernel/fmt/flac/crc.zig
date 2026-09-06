@@ -1,6 +1,6 @@
 //! 校验基础设施（FLAC 帧头 CRC-8 / 整帧与元数据块 CRC-16）
 //!
-//! 与 FFmpeg `libavutil/crc.c` 对齐（参考重构，非复制）：
+//! 与 FFmpeg `libavutil/crc.c` 对齐（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）：
 //!   - CRC-8 ATM（poly 0x07，MSB 优先，init 0，无反射 / 无最终异或）——
 //!     帧头（含 CRC-8 字节本身）校验和应为 0；
 //!   - CRC-16 ANSI（poly 0x8005，MSB 优先，init 0，无反射 / 无最终异或）——

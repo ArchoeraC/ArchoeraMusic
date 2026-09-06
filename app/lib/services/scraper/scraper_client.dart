@@ -43,6 +43,8 @@ class ScraperConfig {
     this.concurrentWorkers,
     this.mode = 'once',
     this.interval = 60,
+    this.organizeTargetDir = '',
+    this.organizePattern = '',
   });
 
   /// scraper-state.db 路径（必需）
@@ -73,9 +75,14 @@ class ScraperConfig {
   /// 并发查询线程数（null → C 侧按硬件自动）
   final int? concurrentWorkers;
 
-  /// 'once' | 'daemon'
+  /// 'once' | 'daemon' | 'organize'
   final String mode;
   final int interval;
+
+  /// 仅目录整理：目标目录（必需）与模板（空 = 默认
+  /// `{artist}/{album}/{track}. {title}.{ext}`）。模板只决定目录层级，不改文件名。
+  final String organizeTargetDir;
+  final String organizePattern;
 
   Map<String, Object> toJson() => {
         'scraperDbPath': scraperDbPath,
@@ -99,6 +106,8 @@ class ScraperConfig {
         'concurrentWorkers': ?concurrentWorkers,
         'mode': mode,
         'interval': interval,
+        'organizeTargetDir': organizeTargetDir,
+        'organizePattern': organizePattern,
       };
 }
 

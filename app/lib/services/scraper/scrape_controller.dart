@@ -26,8 +26,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'scraper_bindings.dart';
 import 'scraper_client.dart';
 
-/// 事件缓冲容量（对齐 C 侧事件行；JSON 事件含 current 等字段，留足余量）。
-const int _scraperEventBufCap = 8192;
+/// 事件缓冲容量（对齐 C 侧事件行；终态 done 可能携带失败明细，留足余量，
+/// 防超长 JSON 被截断成非法 JSON 导致终态丢失 → 会话悬挂）。
+const int _scraperEventBufCap = 65536;
+
+/// 仅目录整理默认模板（对齐 SPlayer-Next organizer；只决定目录层级，不改文件名）。
+const String kOrganizeDefaultPattern = '{artist}/{album}/{track}. {title}.{ext}';
 
 /// 接收 isolate 就绪握手哨兵（主 isolate 收到的首条消息；其后均为事件串）。
 const int _scraperPumpHandshake = 0x53_43_50_21; // 'SCP!'
@@ -36,6 +40,7 @@ const int _scraperPumpHandshake = 0x53_43_50_21; // 'SCP!'
 class ScrapeState {
   const ScrapeState({
     this.scraping = false,
+    this.organize = false,
     this.total = 0,
     this.scraped = 0,
     this.success = 0,
@@ -49,6 +54,9 @@ class ScrapeState {
 
   /// 是否运行中
   final bool scraping;
+
+  /// 当前会话是否为「仅目录整理」（true 时 success=移动数、skipped=跳过数）。
+  final bool organize;
 
   final int total;
   final int scraped;
@@ -73,6 +81,7 @@ class ScrapeState {
 
   ScrapeState copyWith({
     bool? scraping,
+    bool? organize,
     int? total,
     int? scraped,
     int? success,
@@ -85,6 +94,7 @@ class ScrapeState {
   }) =>
       ScrapeState(
         scraping: scraping ?? this.scraping,
+        organize: organize ?? this.organize,
         total: total ?? this.total,
         scraped: scraped ?? this.scraped,
         success: success ?? this.success,
@@ -154,6 +164,9 @@ class ScrapeController extends Notifier<ScrapeState> {
   /// 仅在活动会话内回退轮询；主动收尾的 destroy 唤醒泵自退不触发回退。
   bool _stopped = true;
 
+  /// 本轮是否被用户取消（终态事件丢失时的兜底标记；正常 done 事件自带 canceled）。
+  bool _cancelRequested = false;
+
   /// 事件轮询间隔（仅回退模式使用）。
   static const _pollInterval = Duration(milliseconds: 120);
 
@@ -173,11 +186,19 @@ class ScrapeController extends Notifier<ScrapeState> {
   }
 
   /// 开始一次刮削。[dirs] 为刮削目录；[dbPath] 为 scraper-state.db 路径；
-  /// [sources] 数据源开关。正在运行时忽略。
+  /// [sources] 数据源开关；写入/高级参数对齐偏好（embed*/skipScraped/
+  /// workers/batch/retries）。正在运行时忽略。
   void start({
     required List<String> dirs,
     required String dbPath,
     ScrapeSources sources = const ScrapeSources(),
+    bool embedMetadata = true,
+    bool embedCover = true,
+    bool embedLyrics = true,
+    bool skipScraped = true,
+    int workers = 0,
+    int batchSize = 10,
+    int maxRetries = 5,
   }) {
     if (state.scraping) return;
     final cleanDirs = dirs.map((d) => d.trim()).where((d) => d.isNotEmpty).toList();
@@ -200,8 +221,48 @@ class ScrapeController extends Notifier<ScrapeState> {
       useKuwo: sources.kuwo,
       useMigu: sources.migu,
       useAcoustID: sources.acoustId,
+      embedMetadata: embedMetadata,
+      embedCover: embedCover,
+      embedLyrics: embedLyrics,
+      skipScraped: skipScraped,
+      concurrentWorkers: workers > 0 ? workers : null,
+      batchSize: batchSize > 0 ? batchSize : 10,
+      maxRetries: maxRetries >= 0 ? maxRetries : 5,
     );
+    _launch(config, organize: false);
+  }
 
+  /// 开始一次「仅目录整理」（不联网）：按 [pattern] 把 [dirs] 内文件移动到
+  /// [targetDir] 目录树，保留原文件名。事件与刮削同 schema（success=移动数）。
+  void startOrganize({
+    required List<String> dirs,
+    required String dbPath,
+    required String targetDir,
+    String pattern = kOrganizeDefaultPattern,
+  }) {
+    if (state.scraping) return;
+    final cleanDirs =
+        dirs.map((d) => d.trim()).where((d) => d.isNotEmpty).toList();
+    final target = targetDir.trim();
+    if (cleanDirs.isEmpty || target.isEmpty) {
+      state = state.copyWith(error: 'organize dirs/target empty');
+      return;
+    }
+    if (!_stopped || _scraper != null) _finish();
+    _launch(
+      ScraperConfig(
+        scraperDbPath: dbPath,
+        dirs: cleanDirs,
+        mode: 'organize',
+        organizeTargetDir: target,
+        organizePattern: pattern.isEmpty ? kOrganizeDefaultPattern : pattern,
+      ),
+      organize: true,
+    );
+  }
+
+  /// 通用启动：创建 FFI 句柄 + 事件通道（刮削与仅目录整理共用）。
+  void _launch(ScraperConfig config, {bool organize = false}) {
     final ScraperController scraper;
     try {
       scraper = ScraperController(config);
@@ -212,8 +273,9 @@ class ScrapeController extends Notifier<ScrapeState> {
     _scraper = scraper;
     _handleAddr = scraper.address;
     _stopped = false;
+    _cancelRequested = false;
 
-    state = const ScrapeState(scraping: true);
+    state = ScrapeState(scraping: true, organize: organize);
     if (!scraper.run()) {
       state = state.copyWith(scraping: false, error: 'archoera_scraper_run 失败');
       _finish();
@@ -234,6 +296,7 @@ class ScrapeController extends Notifier<ScrapeState> {
   /// 取消：引擎在下一个文件边界安全退出。
   void cancel() {
     if (!state.scraping) return;
+    _cancelRequested = true;
     _scraper?.cancel();
   }
 
@@ -441,6 +504,19 @@ class ScrapeController extends Notifier<ScrapeState> {
     _scraper = null;
     _handleAddr = null;
     if (s != null) {
+      // 兜底：终态事件（done/empty/error）可能因队列满丢帧 / 超长 JSON 截断 /
+      // 事件泵异常而丢失——dispose 前再排空一次残留事件；若仍拿不到终态
+      // （引擎异常退出、未发终态即 done=true），强制把 UI 从「运行中」复位，
+      // 避免界面永久卡在刮削/整理中。
+      while (true) {
+        final ev = s.pollEvent();
+        if (ev == null) break;
+        _handleEvent(ev);
+      }
+      if (state.scraping) {
+        state = state.copyWith(scraping: false, canceled: _cancelRequested);
+      }
+      _cancelRequested = false;
       s.dispose();
     }
     _teardownEventPump();

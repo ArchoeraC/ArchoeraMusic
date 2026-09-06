@@ -1,7 +1,7 @@
 //! AAC 配置解析：AudioSpecificConfig（ISO 14496-3 §1.6.2.1）+ ADTS 帧头。
 //!
 //! 语义对齐 FFmpeg n9.0.1 mpeg4audio.c ff_mpeg4audio_get_config_gb 与
-//! adts_header.c ff_adts_header_parse（参考对照非复制）：
+//! adts_header.c ff_adts_header_parse（参考对照；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）：
 //!   - get_object_type：5 位；31 (escape) → 32 + 6 位扩展；
 //!   - get_sample_rate：4 位索引（0xF → 24 位显式值）；
 //!   - 隐式 SBR/PS 信令（AOT 5 / 29 前置）与显式信令（sync extension 0x2b7）；

@@ -1,6 +1,6 @@
 //! CELT 解码表（docs/audio-kernel-zig.md §9.2）
 //!
-//! 从 FFmpeg n9.0.1 `libavcodec/opus/tab.c` 提取（参考对照非复制，§3.3）：
+//! 从 FFmpeg n9.0.1 `libavcodec/opus/tab.c` 提取（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）：
 //! 频带布局 / 静态位分配 / 缓存 / PVQ U(N,K) 组合数 / 窗口 / 能量模型。
 //! 数值逐项核对（U(N,K) 满足递推 U(n,k)=U(n,k-1)+U(n-1,k-1)+U(n-1,k)）。
 

@@ -2,7 +2,7 @@
 //!
 //! 对照 FFmpeg：dca_syncwords.h / dca_sample_rate_tab.h / dcadata.c
 //! / dca.c / dca_core.h / dca_core.c（audio_mode_ch_mask 等）。
-//! 参考重构非复制（§3.3）：表值按规范与 FFmpeg 表核对。
+//! 许可登记见 audio-engine/THIRD-PARTY-LICENSES.md：表值按规范与 FFmpeg 表核对。
 
 // ---- dca_syncwords.h ----
 

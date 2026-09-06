@@ -124,12 +124,27 @@ class LibraryHeader extends ConsumerWidget {
                     case 'folders':
                       _openFolders(context);
                       break;
+                    case 'fullScan':
+                      _startFullScan(context, ref, state);
+                      break;
                     case 'stats':
                       _openMediaStats(context, state);
                       break;
                   }
                 },
                 itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'fullScan',
+                    height: 40,
+                    enabled: !state.scanning && state.scanDirs.isNotEmpty,
+                    child: Row(
+                      children: [
+                        Icon(Icons.manage_search, size: 17),
+                        SizedBox(width: 10),
+                        Text(l10n.libraryFullScan),
+                      ],
+                    ),
+                  ),
                   PopupMenuItem(
                     value: 'folders',
                     height: 40,
@@ -273,8 +288,36 @@ class LibraryHeader extends ConsumerWidget {
     _toast(context, l10n.toastScrapeStarted);
   }
 
-  void _openFolders(BuildContext context) {
+  /// 全量扫描：确认后清空曲库重建（删除 DB 记录，不删除源文件）。
+  Future<void> _startFullScan(
+    BuildContext context,
+    WidgetRef ref,
+    LibraryState state,
+  ) async {
     final l10n = context.l10n;
+    if (state.scanning || state.scanDirs.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.libraryFullScanConfirm),
+        content: Text(l10n.libraryFullScanConfirmDesc),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.libraryFullScan),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    ref.read(libraryStoreProvider.notifier).startScan(incremental: false);
+  }
+
+  void _openFolders(BuildContext context) {    final l10n = context.l10n;
     SDialog.show(
       context,
       title: l10n.libraryScanDirs,

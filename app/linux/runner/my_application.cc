@@ -30,78 +30,6 @@ static gchar* resolve_exe_dir() {
   return g_path_get_dirname(buf);
 }
 
-// Resolve the absolute path of the running executable (bundle binary).
-static gchar* resolve_exe_path() {
-  gchar buf[4096];
-  const ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-  if (n <= 0) return nullptr;
-  buf[n] = '\0';
-  return g_strdup(buf);
-}
-
-// 用户级 .desktop 条目路径（~/.local/share/applications/<APPLICATION_ID>.desktop）。
-// 失败（无用户数据目录）返回 nullptr。
-static gchar* desktop_entry_path() {
-  const gchar* data_dir = g_get_user_data_dir();  // $XDG_DATA_HOME | ~/.local/share
-  if (data_dir == nullptr) return nullptr;
-  g_autofree gchar* apps_dir =
-      g_build_filename(data_dir, "applications", nullptr);
-  if (g_mkdir_with_parents(apps_dir, 0755) != 0) return nullptr;
-  return g_build_filename(apps_dir, APPLICATION_ID ".desktop", nullptr);
-}
-
-// 安装用户级 .desktop 条目。
-// 桌面环境（GNOME/KDE，尤其 Wayland 合成器）按窗口 app_id 查找对应 .desktop
-// 来决定任务栏/面板图标，窗口级 gtk_window_set_icon 在 Wayland 下会被忽略，
-// 因此 bundle 直跑（无系统安装）的应用需自建该条目，才能把 Logo 映射到任务栏。
-//
-// 清理策略（暂简化为「启动时写入 + 启动自愈」）：不做退出时的删除管理；
-// 若已有条目 Exec 指向的可执行文件已不存在（bundle 被移动/删除），下次启动时
-// 先移除再重建，避免桌面启动器残留一个打不开的入口。
-static void install_desktop_entry(const gchar* exe_path,
-                                  const gchar* icon_path) {
-  g_autofree gchar* desktop_path = desktop_entry_path();
-  if (desktop_path == nullptr) return;
-
-  // 自愈：清理 Exec 已失效的旧条目（内容有效性优先于内容相等判断）。
-  g_autofree gchar* old = nullptr;
-  GError* read_err = nullptr;
-  g_file_get_contents(desktop_path, &old, nullptr, &read_err);
-  g_clear_error(&read_err);
-  if (old != nullptr) {
-    g_autoptr(GKeyFile) kf = g_key_file_new();
-    if (g_key_file_load_from_data(kf, old, -1, G_KEY_FILE_NONE, nullptr)) {
-      g_autofree gchar* exec =
-          g_key_file_get_string(kf, "Desktop Entry", "Exec", nullptr);
-      if (exec != nullptr) {
-        g_autofree gchar* exec_path = g_shell_unquote(exec, nullptr);
-        if (exec_path != nullptr && !g_file_test(exec_path, G_FILE_TEST_EXISTS)) {
-          g_unlink(desktop_path);
-        }
-      }
-    }
-  }
-
-  // 重新写入（路径可能因 bundle 移动而更新）。
-  g_autofree gchar* content = g_strdup_printf(
-      "[Desktop Entry]\n"
-      "Type=Application\n"
-      "Name=ArchoeraMusic\n"
-      "Comment=Archoera Music Player\n"
-      "Exec=\"%s\"\n"
-      "Icon=%s\n"
-      "Terminal=false\n"
-      "Categories=Audio;Music;Player;\n"
-      "StartupWMClass=%s\n",
-      exe_path, icon_path, APPLICATION_ID);
-  GError* error = nullptr;
-  if (!g_file_set_contents(desktop_path, content, -1, &error)) {
-    g_warning("Failed to write desktop entry %s: %s", desktop_path,
-              error ? error->message : "unknown");
-    g_clear_error(&error);
-  }
-}
-
 // ---- 原生启动画面（静态）------------------------------------------------
 // 按 Flutter 桌面加载逻辑：桌面端没有统一的 Splash API（flutter_native_splash
 // 官方不支持），首帧前 C 层只能显示静态画面。因此 C 层仅做**静态**覆盖——
@@ -194,16 +122,13 @@ static void my_application_activate(GApplication* application) {
   gtk_window_set_default_size(window, 1280, 720);
 
   // 窗口/任务栏图标 + 启动画面 Logo：bundle 内 data/app_icon.png（品牌 Logo）。
+  // 注：不再自建用户级 .desktop 条目——Linux 分发统一走 packaging 各格式，
+  // 由系统安装 .desktop（Wayland 任务栏据此映射图标）；任务栏图标依赖系统条目。
   GdkPixbuf* splash_logo = nullptr;
   g_autofree gchar* exe_dir = resolve_exe_dir();
-  g_autofree gchar* exe_path = resolve_exe_path();
   if (exe_dir != nullptr) {
     g_autofree gchar* icon_path =
         g_build_filename(exe_dir, "data", "app_icon.png", nullptr);
-    // 自建用户级 .desktop 条目（Wayland 任务栏按 app_id 映射图标，见函数注释）。
-    if (exe_path != nullptr) {
-      install_desktop_entry(exe_path, icon_path);
-    }
     g_autoptr(GError) icon_error = nullptr;
     g_autoptr(GdkPixbuf) icon =
         gdk_pixbuf_new_from_file(icon_path, &icon_error);

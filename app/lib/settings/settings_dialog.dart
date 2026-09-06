@@ -21,6 +21,7 @@ import '../widgets/common/glass_surface.dart';
 import '../widgets/common/toast.dart';
 import 'cache_section.dart';
 import 'history_section.dart';
+import 'scans_section.dart';
 import 'security_section.dart';
 import 'settings_categories.dart';
 import 'settings_sections.dart';
@@ -425,6 +426,12 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
         Icons.auto_fix_high,
       ),
       _SearchEntry(
+        SettingsCategory.scanner,
+        l10n.settingsCatScanner,
+        l10n.settingsScannerSubtitle,
+        Icons.manage_search_outlined,
+      ),
+      _SearchEntry(
         SettingsCategory.mediaSource,
         l10n.settingsCatMediaSource,
         l10n.settingsMediaSourceSubtitle,
@@ -738,6 +745,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
                   ],
                 ),
                 SettingsCategory.scrape => const ScrapeSection(),
+                SettingsCategory.scanner => const ScansSection(),
                 SettingsCategory.mediaSource => StreamingServerList(),
                 SettingsCategory.about => AboutSection(
                   version: _version,

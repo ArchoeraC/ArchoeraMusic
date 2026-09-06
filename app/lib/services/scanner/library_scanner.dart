@@ -121,6 +121,9 @@ class LibraryScanner {
   ///
   /// [dbPath] 为空时回退到默认数据目录的 library.db。
   /// [coverDir]/[quarantineDir] 为空时使用 dbPath 同目录下的 cache/covers、quarantine。
+  /// [incremental]=false 为全量重建；[batch]/[maxParallelism] 传 0 = 引擎自适应。
+  /// 其余上限参数（[maxFileSizeMb]/[maxScanFiles]/[maxScanErrors]/[extraExts]）
+  /// 传 0 / 空 = 引擎默认，经 `scanner_set_options` 下发（进程内全局）。
   Future<ScanResult> scan(
     List<String> dirs, {
     String? dbPath,
@@ -129,6 +132,10 @@ class LibraryScanner {
     bool incremental = true,
     int batch = 0,
     int maxParallelism = 0,
+    int maxFileSizeMb = 0,
+    int maxScanFiles = 0,
+    int maxScanErrors = 0,
+    List<String> extraExts = const [],
   }) async {
     if (_scanning) {
       throw StateError('已有扫描在进行中');
@@ -141,6 +148,19 @@ class LibraryScanner {
 
     // 确保 DB 父目录存在（SqliteDirectWriter 只 Open 不建目录）
     File(resolvedDb).parent.createSync(recursive: true);
+
+    // 主 isolate 下发扫描选项（进程内全局，子 isolate 复用）
+    try {
+      _lib.setScanOptions(
+        maxFileSizeMb: maxFileSizeMb,
+        maxScanFiles: maxScanFiles,
+        maxScanErrors: maxScanErrors,
+        parallelism: maxParallelism,
+        extraExts: extraExts,
+      );
+    } catch (_) {
+      // 旧 .so 无导出时静默忽略
+    }
 
     final soPath = _soPath;
     final progressCb = _progressCallable.nativeFunction.cast<Void>();

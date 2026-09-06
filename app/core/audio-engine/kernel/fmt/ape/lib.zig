@@ -1,8 +1,8 @@
 //! APE（Monkey's Audio）解码器（docs/audio-kernel-zig.md §9.10）
 //!
-//! 全自研 Zig（AGPL），不依赖 Monkey's Audio 官方 SDK；参考重构对照
+//! 以 Zig 实现（不依赖 Monkey's Audio 官方 SDK），参考重构对照
 //! FFmpeg libavcodec/apedec.c + libavformat/ape.c（reference/FFmpeg，n9.0.1），
-//! 逐位复刻保证 bit-exact 对照验收（§17.2）；参考对照非复制（§3.3）。
+//! 逐位复刻保证 bit-exact 对照验收（§17.2；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 解码流程（对齐 ape_decode_frame / ape_unpack_* / init_frame_decoder）：
 //!   1. 帧数据 → 4 字节字级 bswap（大端帧数据 → 主机序）+ buf_size 零填充

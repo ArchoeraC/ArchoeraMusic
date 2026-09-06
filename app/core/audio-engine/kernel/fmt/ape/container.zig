@@ -1,7 +1,7 @@
 //! APE 容器解析（docs/audio-kernel-zig.md §9.10）
 //!
 //! 参考重构对照 FFmpeg libavformat/ape.c 的 ape_read_header：MAC 描述符 /
-//! 头部 / seektable / bittable / 帧表推导；参考对照非复制（§3.3）。
+//! 头部 / seektable / bittable / 帧表推导（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 布局（两个版本分支）：
 //!   - version >= 3980：描述符（padding1 u16 / descriptorlength u32 /

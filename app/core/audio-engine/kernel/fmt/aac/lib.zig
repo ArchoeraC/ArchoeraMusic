@@ -1,5 +1,5 @@
 //! AAC-LC 解码器（自研 Zig，ISO/IEC 14496-3；语义与 FFmpeg n9.0.1
-//! libavcodec/aac/aacdec*.c 浮点路径逐位对照，参考非复制）。
+//! libavcodec/aac/aacdec*.c 浮点路径逐位对照（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 范围（Phase C）：
 //!   - AOT 2 (AAC-LC)，无 SBR/PS（HE-AAC → UnsupportedFormat 回退 FFmpeg 主后端 §8.3）；

@@ -3569,4 +3569,221 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get platformQqMusic => 'QM';
+
+  @override
+  String get settingsValueAuto => 'Auto';
+
+  @override
+  String get settingsSectionScrapeWrite => 'Write Options';
+
+  @override
+  String get settingsScrapeWriteDesc =>
+      'Written into audio tags after a successful scrape';
+
+  @override
+  String get settingsScrapeEmbedMetadata => 'Embed metadata';
+
+  @override
+  String get settingsScrapeEmbedCover => 'Embed cover art';
+
+  @override
+  String get settingsScrapeEmbedLyrics => 'Embed lyrics';
+
+  @override
+  String get settingsScrapeSkipScraped => 'Skip scraped files';
+
+  @override
+  String get settingsScrapeSkipScrapedDesc =>
+      'Files that already carry a MusicBrainz ID or ISRC are not scraped again';
+
+  @override
+  String get settingsSectionScrapeAdvanced => 'Advanced';
+
+  @override
+  String get settingsScrapeWorkers => 'Concurrent workers';
+
+  @override
+  String settingsScrapeWorkersDesc(Object value) {
+    return 'Multi-source concurrent lookup threads (0=auto, current $value)';
+  }
+
+  @override
+  String get settingsScrapeBatch => 'Batch size';
+
+  @override
+  String settingsScrapeBatchDesc(Object value) {
+    return 'Files processed per batch (current $value)';
+  }
+
+  @override
+  String get settingsScrapeRetries => 'Max retries';
+
+  @override
+  String settingsScrapeRetriesDesc(Object value) {
+    return 'Files failing more than this are isolated (current $value)';
+  }
+
+  @override
+  String get settingsSectionScrapeOrganize => 'Organize Only';
+
+  @override
+  String get settingsScrapeOrganizeNote =>
+      'Offline. Moves files under directories into a target tree by template, keeping original file names and existing tags. Variables: artist, albumArtist, album, genre, year, disc, track, title, ext; use / to separate directory levels.';
+
+  @override
+  String get settingsScrapeOrganizeTargetDir => 'Organize Target Directory';
+
+  @override
+  String get settingsScrapeOrganizeTargetHint =>
+      'A library scan directory is recommended';
+
+  @override
+  String get settingsScrapeOrganizePattern => 'Organize Pattern';
+
+  @override
+  String get settingsScrapeOrganizePatternHint =>
+      'The pattern only decides directory levels; file names are kept';
+
+  @override
+  String get settingsScrapeOrganizePresetArtistAlbum => 'Artist/Album';
+
+  @override
+  String get settingsScrapeOrganizePresetArtistOnly => 'Artist only';
+
+  @override
+  String get settingsScrapeOrganizePresetGenreArtistAlbum =>
+      'Genre/Artist/Album';
+
+  @override
+  String get settingsScrapeOrganizePresetYearArtistAlbum => 'Year/Artist/Album';
+
+  @override
+  String get settingsScrapeOrganizeStart => 'Start Organizing';
+
+  @override
+  String get settingsOrganizeCancel => 'Cancel Organizing';
+
+  @override
+  String get settingsOrganizeRunning => 'Organizing files…';
+
+  @override
+  String get settingsOrganizeMoved => 'Moved';
+
+  @override
+  String get settingsOrganizeSkipped => 'Skipped';
+
+  @override
+  String get settingsOrganizeFailed => 'Failed';
+
+  @override
+  String settingsOrganizeDone(Object failed, Object moved, Object skipped) {
+    return 'Organize done: moved $moved, skipped $skipped, failed $failed';
+  }
+
+  @override
+  String get settingsOrganizeNoTarget =>
+      'Set an organize target directory first';
+
+  @override
+  String get toastOrganizeNoDirs => 'No directories to organize';
+
+  @override
+  String get toastOrganizeStarted => 'Organizing started';
+
+  @override
+  String get settingsCatScanner => 'Scanning';
+
+  @override
+  String get settingsScannerSubtitle =>
+      'Library scanner · parallelism & safety caps · quarantine';
+
+  @override
+  String get settingsSectionScanRun => 'Runtime';
+
+  @override
+  String get settingsScanParallelism => 'Scan parallelism';
+
+  @override
+  String settingsScanParallelismDesc(Object value) {
+    return 'Files parsed in parallel (0=auto, current $value)';
+  }
+
+  @override
+  String get settingsScanBatch => 'Batch size';
+
+  @override
+  String settingsScanBatchDesc(Object value) {
+    return 'DB batch write cap (0=auto, current $value)';
+  }
+
+  @override
+  String get settingsSectionScanLimits => 'Safety Caps';
+
+  @override
+  String get settingsScanLimitsNote =>
+      'Protective caps for very large libraries; leave empty to use engine defaults';
+
+  @override
+  String get settingsScanNumberDesc => 'Leave empty to use engine defaults';
+
+  @override
+  String get settingsScanMaxFileSizeMb => 'Max file size (MB)';
+
+  @override
+  String get settingsScanMaxScanFiles => 'Max files per scan';
+
+  @override
+  String get settingsScanMaxErrors => 'Consecutive error cap';
+
+  @override
+  String get settingsSectionScanExts => 'Audio Extensions';
+
+  @override
+  String get settingsScanExtraExts => 'Extra extensions';
+
+  @override
+  String get settingsScanExtraExtsNote =>
+      'Extra audio extensions scanned on top of the built-in allowlist';
+
+  @override
+  String get settingsScanExtraExtsHint =>
+      'Space or comma separated, e.g. dsf m4b';
+
+  @override
+  String get settingsSectionScanQuarantine => 'Quarantine';
+
+  @override
+  String settingsScanQuarantineNote(Object dir) {
+    return 'Files failing to parse 3+ times are moved to: $dir';
+  }
+
+  @override
+  String get settingsScanQuarantineEmpty => 'No quarantined files';
+
+  @override
+  String get settingsScanQuarantineDelete => 'Delete this file';
+
+  @override
+  String get settingsScanQuarantineOpenDir => 'Open folder';
+
+  @override
+  String get settingsScanQuarantineClearAll => 'Clear quarantine';
+
+  @override
+  String get settingsScanQuarantineClearAllConfirm =>
+      'Delete every file in the quarantine folder? This cannot be undone.';
+
+  @override
+  String get libraryFullScan => 'Full Scan';
+
+  @override
+  String get libraryFullScanConfirm => 'Run a full scan?';
+
+  @override
+  String get libraryFullScanConfirmDesc =>
+      'The library database will be cleared and rebuilt from the scan directories (source files are kept). This cannot be undone and uses significant disk IO while running.';
+
+  @override
+  String get libraryFullScanDescription =>
+      'Rebuild the library from scan directories';
 }

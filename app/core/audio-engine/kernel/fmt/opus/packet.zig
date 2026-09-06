@@ -2,7 +2,7 @@
 //!
 //! RFC 6716 §3：TOC 字节（config 7-3 / stereo 2 / code 1-0）+ 帧计数 + 帧尺寸
 //! 分割。参考重构对照 FFmpeg `libavcodec/opus/parse.c`（ff_opus_parse_packet，
-//! 非自定界形态）与 RFC 6716 Table 2；参考对照非复制（§3.3）。
+//! 非自定界形态）与 RFC 6716 Table 2（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 语义要点（对齐参考实现，保证 bit-exact）：
 //!   - Table 2：config 0-11 SILK-only（NB/MB/WB，10/20/40/60ms）、
