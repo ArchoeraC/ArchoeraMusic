@@ -30,6 +30,12 @@
 
 ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面为主（Linux / Windows / macOS）」，UI 层采用 Flutter 开发。
 
+> **使用声明（太长不看版）**：本软件面向**个人学习与自用研究**（免费、非商业软件）。
+> 自研代码以 **AGPL-3.0-or-later** 发布，欢迎按 AGPL 使用、学习、改进与反馈；
+> **禁止未经授权即对其或二次修改作商业性使用**（包括但不限于换壳/套壳再分发、内嵌进商业
+> 产品、或用于商业牟利的分发与托管服务）。如有商业 / 再授权需求，请先联系版权方取得书面许可。
+> 本声明体现作者使用意愿与授权边界，法律层面仍以根目录 `LICENSE`（AGPL-3.0-or-later）为准。
+
 - 连接**网易云音乐 / 酷狗音乐 / QQ 音乐**等在线服务
 - 支持本地音乐库扫描与元数据刮削、多平台下载
 - 内置统一 C 音频引擎：EQ / 响度归一化 / 限幅器 / FFT 频谱 / 变速变调 / Opus 转码管线
@@ -146,6 +152,9 @@ ArchoeraMusic/
 
 ### 快速开始
 
+> 面向用户的完整自编译手册（含「太长不看版」速通命令、三端环境、缓存外置与常见问题）：
+> **[docs/user-build-from-source.md](docs/user-build-from-source.md)**。下方为快速副本。
+
 ```bash
 # 1. 拿源码
 git clone https://github.com/BetaStudio2/ArchoeraMusic.git
@@ -250,8 +259,12 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 ## 文档
 
 - [架构设计](docs/architecture.md) —— 进程模型 / 音频管线 / FFI 桥接
+- [用户自编译手册（太长不看版）](docs/user-build-from-source.md) —— 三端从源码构建 / 调试 / 打包 / 缓存外置 / 常见问题
 - [自研解码内核行业基准（EraAudio）](docs/benchmark-industry-2026-09-05.md) —— FFmpeg/libFLAC/LAME/speexdec 横评 + 评分（95.6 A+）
 - [引擎集成与基准（EraAudio vs Stable）](docs/engine-integration-bench.md) —— EOF/错误语义、内存流式化、样本数对齐
+- [音频 Zig 解码内核路线图](docs/audio-kernel-zig.md) —— 内核架构 / 逐格式接管 / 第三方来源登记
+- [下载模块设计规范](docs/download-module.md) —— 下载引擎架构 / 自研边界 / 依赖许可
+- 使用与授权声明见文首；第三方依赖与许可逐项见各模块 `THIRD-PARTY-LICENSES.md`（汇总见「[第三方声明](#第三方声明)」与「[许可证（Licensing）](#许可证licensing)」）
 
 ---
 
@@ -265,7 +278,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 
 - **版权持有者**：BetaStudio2
 - **起始许可版本**：AGPL-3.0（`AGPL-3.0-or-later`，含后续版本弹性条款）
-- **代码归属**：本项目（含所引用的服务端代码）均为本仓库作者进行编写
+- **代码归属**：本项目**自研 / 贡献代码**由本仓库作者与贡献者编写；第三方、移植与参考实现代码按各自来源与许可登记（见各模块 `THIRD-PARTY-LICENSES.md`），本项目不对其主张为自有编写。
 
 #### 各原生模块的声明
 
@@ -279,7 +292,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 | 下载引擎（Rust） | `app/core/downloader/THIRD-PARTY-LICENSES.md` | reqwest / lofty / RustCrypto |
 | Subsonic（Go + Rust） | `app/core/subsonic/THIRD-PARTY-LICENSES.md` | 转码器 / Go 依赖 |
 
-所有第三方依赖均为 **Permissive License（MIT / Apache-2.0 / WTFPL / BSD-3 / ISC / OFL）**，与 AGPL-3.0 完全兼容。
+第三方依赖按各自许可证引入（含 Permissive 与 LGPL-2.1+/MPL-2.0 等 weak-copyleft，逐项见上表各模块 `THIRD-PARTY-LICENSES.md`），并在各自条款下与本项目 AGPL-3.0 代码共存。本声明为项目维护者的合理努力整理，不构成法律意见。
 
 ### 2. 未来许可证升级策略（AGPL-v4 及以后）
 
@@ -287,7 +300,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 
 #### 2.1 原则
 
-1. **当前（2026-08）为 AGPL-3.0-or-later**：所有现有代码、当前发布的二进制、以及当前历史提交，均以 **AGPL-3.0 及任何后续版本** 为准（已包含 "or any later version" 弹性条款）。
+1. **当前（2026-08）为 AGPL-3.0-or-later**：本项目**自研 / 贡献代码**（含当前发布的二进制中对应自研部分与历史提交）以 **AGPL-3.0 及任何后续版本** 为准（已包含 "or any later version" 弹性条款）；第三方、移植与参考实现代码不受本升级策略影响，按各自许可继续适用（见各模块 `THIRD-PARTY-LICENSES.md`）。
 2. **自动升级机制**：由于采用 `AGPL-3.0-or-later`，当 FSF 发布新版 AGPL（如 AGPL-4.0 及以后）时，项目**自动适用**新版本条款，无需逐位贡献者另行授权、也无需版权持有者逐一征询。正式的版本切换按 §2.4 流程执行，以保证透明与可追溯：
    - 切换时以 **BetaStudio2 官方公告 + 仓库根 LICENSE 正文更新 + 提交签名** 为准；
    - 切换后新的 AGPL 版本条款 **立即适用于切换提交及之后所有代码**；
