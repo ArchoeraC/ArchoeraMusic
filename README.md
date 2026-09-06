@@ -370,10 +370,10 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 
 **代码 / 参考实现致谢**（audio-engine 与 Zig 解码内核所依赖、参考或移植的第三方组件，许可证逐项见各模块 `THIRD-PARTY-LICENSES.md`）：
 
-- **[AMLL（Apple Music-like Lyrics）](https://github.com/Steve-xmh/applemusic-like-lyrics)（MIT）** —— Apple Music 风格动态歌词引擎参考（歌词墙整墙滚动、逐字扫光、行级弹簧等观感的原创来源；本项目经 SPlayer-Next 的移植稿为对照，以 Dart 自研实现）
+- **[AMLL（Apple Music-like Lyrics）](https://github.com/Steve-xmh/applemusic-like-lyrics)（MIT）** —— Apple Music 风格动态歌词引擎参考（歌词墙整墙滚动、逐字扫光、行级弹簧等观感的原创来源；本项目经 SPlayer-Next 的移植稿为对照，以 Dart 重实现）
 - **[FFmpeg](https://ffmpeg.org)（LGPL-2.1+）** —— 主解码 / 重采样引擎，多格式移植的参考源
 - **[Opus / libopus](https://opus-codec.org)（BSD-3-Clause，IETF RFC 6716）** —— SILK/CELT 移植与静态模式表参考
-- **[miniaudio](https://github.com/mackron/miniaudio)（MIT-0 / Public Domain）** —— 跨平台音频输出（David Reid）
+- **[miniaudio](https://github.com/mackron/miniaudio)（MIT-0 / Public Domain）** —— 通用跨平台音频输出（David Reid）
 - **[signalsmith-stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch)（MIT）** —— 变速变调核心（Signalsmith Audio）
 - **[minimp3](https://github.com/lieff/minimp3)（CC0-1.0）** —— MP3 Layer III 解码表参考（lieff）
 - **[stb_vorbis](https://github.com/nothings/stb)（Public Domain / MIT-0）** —— Ogg Vorbis 解码（Sean Barrett）
