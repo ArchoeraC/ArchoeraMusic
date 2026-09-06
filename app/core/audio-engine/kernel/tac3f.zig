@@ -6,7 +6,7 @@ const std = @import("std");
 const decoder = @import("decoder.zig");
 extern "c" fn fopen(path: [*:0]const u8, mode: [*:0]const u8) ?*anyopaque;
 extern "c" fn fwrite(ptr: [*]const u8, size: usize, nmemb: usize, f: *anyopaque) usize;
-pub fn main(init: std.process.Init.Minimal) !void {
+pub fn main(_: std.process.Init.Minimal) !void {
     const gpa = std.heap.page_allocator;
     const args = try std.process.argsAlloc(gpa);
     defer std.process.argsFree(gpa, args);
