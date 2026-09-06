@@ -2784,14 +2784,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDeclineText =>
-      'This software (ArchoeraMusic) is a free, open-source desktop music player for personal learning and research purposes, not commercial software. Please read the following declaration before use:\n\n';
+      'This software (ArchoeraMusic) is open source under AGPL-3.0: you may freely use, study, modify and redistribute it, and comply-compliant commercial use is permitted; we do not offer closed-source commercial licensing outside AGPL obligations. Please read the following before use:\n\n';
 
   @override
   String get settingsDecline1Title => '1. Software nature\n';
 
   @override
   String get settingsDecline1Body =>
-      'This software is a third-party client with no affiliation, cooperation or authorization with any music platform or their official clients; it is non-profit and does not accept commercial partnerships, ads or donations. For complete features, please use official clients.\n\n';
+      'This software is a third-party open-source client, not affiliated with, authorized by, or cooperating with any music platform or its official client. The project itself is not run for profit and accepts no commercial partnerships, ads or donations (commercial use of the code remains governed by AGPL-3.0). For richer features, please use the official client.\n\n';
 
   @override
   String get settingsDecline2Title => '2. Content sources & copyright\n';
