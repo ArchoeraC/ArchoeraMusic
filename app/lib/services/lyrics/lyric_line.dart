@@ -209,6 +209,7 @@ List<LyricGroup> parseLyricGroups({
   }
   // 行结束时间后置计算：下一行起始即本行结束（末行给默认 4s 兜底，
   // 由引擎可再按实际行宽调整）。供 AMLL 连续滚动/逐字扫亮使用。
+  // 同步把缺失的逐字时长按「下一字/行尾」补齐（对齐 AMLL 字级推进）。
   return List.generate(groups.length, (i) {
     final g = groups[i];
     final end = i + 1 < groups.length
@@ -217,10 +218,46 @@ List<LyricGroup> parseLyricGroups({
     return LyricGroup(
       original: g.original,
       translation: g.translation,
-      fragments: g.fragments,
+      fragments: _fillFragmentDurations(
+        g.fragments,
+        g.original.timeMs,
+        end,
+      ),
       endMs: end,
     );
   });
+}
+
+/// 补齐逐字片段的缺失时长：以「下一字起始（或行尾）」为当前字结束。
+/// AMLL 逐字推进依赖每个 word 的 endTime；缺失时若整行等分会与源
+/// 逐字时间轴错位，取最近邻更稳。
+List<LyricFragment>? _fillFragmentDurations(
+  List<LyricFragment>? frags,
+  int lineStart,
+  int lineEnd,
+) {
+  if (frags == null || frags.isEmpty) return frags;
+  if (frags.every((f) => f.durationMs != null && f.durationMs! > 0)) {
+    return frags;
+  }
+  final out = <LyricFragment>[];
+  for (var j = 0; j < frags.length; j++) {
+    final f = frags[j];
+    var dur = f.durationMs;
+    if (dur == null || dur <= 0) {
+      final nextStart = j + 1 < frags.length
+          ? frags[j + 1].startMs
+          : (lineEnd - lineStart);
+      dur = nextStart - f.startMs;
+      if (dur <= 0) dur = 400;
+    }
+    out.add(LyricFragment(
+      text: f.text,
+      startMs: f.startMs,
+      durationMs: dur,
+    ));
+  }
+  return out;
 }
 
 /// 由播放位置（毫秒）取当前歌词组索引；无命中返回 -1。

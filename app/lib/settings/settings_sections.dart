@@ -2099,25 +2099,15 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
               icon: Icons.lyrics_outlined,
               title: l10n.settingsLyricEngine,
               subtitle: l10n.settingsLyricEngineDesc,
-              trailing: SegmentedButton<String>(
-                showSelectedIcon: false,
-                style: const ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                ),
-                segments: [
-                  ButtonSegment(
-                    value: 'simple',
-                    label: Text(l10n.settingsLyricEngineSimple),
-                  ),
-                  ButtonSegment(
-                    value: 'amll',
-                    label: Text(l10n.settingsLyricEngineWall),
-                  ),
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption('simple', l10n.settingsLyricEngineSimple),
+                  SSegmentedOption('amll', l10n.settingsLyricEngineWall),
                 ],
-                selected: {prefs.lyricEngine},
-                onSelectionChanged: (s) => ref
+                selected: prefs.lyricEngine,
+                onChanged: (v) => ref
                     .read(appPrefsProvider.notifier)
-                    .setLyricAmll(engine: s.first),
+                    .setLyricAmll(engine: v),
               ),
             ),
           ],
@@ -2145,21 +2135,6 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
               onChanged: (v) => ref
                   .read(appPrefsProvider.notifier)
                   .setLyricStyle(fontSize: v),
-            ),
-            SettingSliderTile(
-              icon: Icons.line_weight,
-              title: l10n.settingsLyricLineHeight,
-              subtitle: l10n.settingsLyricLineHeightDesc(
-                prefs.lyricLineHeight.round(),
-              ),
-              value: prefs.lyricLineHeight,
-              min: 42,
-              max: 64,
-              divisions: 11,
-              label: '${prefs.lyricLineHeight.round()}px',
-              onChanged: (v) => ref
-                  .read(appPrefsProvider.notifier)
-                  .setLyricStyle(lineHeight: v),
             ),
             SettingTile(
               icon: Icons.palette_outlined,

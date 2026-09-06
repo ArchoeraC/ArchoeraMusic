@@ -16,7 +16,13 @@ const amllHidePassedKey = 'amll.hidePassed';
 const amllEnableScaleKey = 'amll.enableScale';
 const amllSpringPresetKey = 'amll.springPreset';
 
-/// 歌词域偏好：播放器内歌词/字号/行高/已唱与未唱颜色。
+/// 由歌词字号自动换算行距（行距不再由用户手调，避免字号/行距组合失衡）。
+/// 经验倍率 3.3（默认字号 18 → 约 59px 行距，歌词墙层次更舒展），
+/// 下限 48 / 上限 110。
+double lyricLineHeightFor(double fontSize) =>
+    (fontSize * 3.3).clamp(48.0, 110.0);
+
+/// 歌词域偏好：播放器内歌词/字号/已唱与未唱颜色（行距自动随字号）。
 extension LyricsPrefs on AppPrefs {
   /// 播放器内显示歌词（当前行居中高亮 + 点击跳转）。
   bool get showLyricsInPlayer => data[showLyricsKey] as bool? ?? true;
@@ -28,12 +34,8 @@ extension LyricsPrefs on AppPrefs {
     return v.toDouble().clamp(14, 28);
   }
 
-  /// 播放器歌词行高（px，42~64，默认 52）。
-  double get lyricLineHeight {
-    final v = data[lyricLineHeightKey] as num?;
-    if (v == null) return 52;
-    return v.toDouble().clamp(42, 64);
-  }
+  /// 播放器歌词行距：由 [lyricFontSize] 自动换算，不独立手调。
+  double get lyricLineHeight => lyricLineHeightFor(lyricFontSize);
 
   /// 已唱行歌词颜色（ARGB；默认主色亮蓝，对齐原版 desktopLyric.playedColor）。
   int get lyricPlayedColor => data[lyricPlayedColorKey] as int? ?? 0xFF4DA3FF;
@@ -69,17 +71,17 @@ extension AmllLyricsPrefs on AppPrefs {
     return v == 'amll' ? 'amll' : 'simple';
   }
 
-  /// 激活行锚定位置（0~1，占歌词区高度比例，默认 0.35）。
+  /// 激活行锚定位置（0~1，占歌词区高度比例，默认 0.5 = 视口居中）。
   double get amllAlignFraction {
     final v = data[amllAlignFractionKey] as num?;
-    if (v == null) return 0.35;
+    if (v == null) return 0.5;
     return v.toDouble().clamp(0.15, 0.6);
   }
 
-  /// 非激活行透明度（0~1，默认 0.25；0.25 为 AMLL 观感默认）。
+  /// 非激活行透明度（0~1，默认 0.45，兼顾 AMLL 层次与原版可读性）。
   double get amllInactiveAlpha {
     final v = data[amllInactiveAlphaKey] as num?;
-    if (v == null) return 0.25;
+    if (v == null) return 0.45;
     return v.toDouble().clamp(0.05, 1.0);
   }
 
