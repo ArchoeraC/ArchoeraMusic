@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MDCT 辅助表——f64 版本（由 f32 表精确提升，f32 值 → f64 表示）。
 //! 由 Python 从 f32 位模式提升生成；蝶形计算用 f64，twiddle 精度保持 f32 源值。
 

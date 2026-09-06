@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AC-3 / E-AC-3 解码共享状态（对照 FFmpeg ac3dec.h AC3DecodeContext）
 //!
 //! 各模块（exponents/mantissa/coupling/rematrix/downmix）以本结构为契约，

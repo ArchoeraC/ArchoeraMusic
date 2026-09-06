@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! ASF 数据包 → WMA superframe 重组（最小 asfdec_f.c 移植：单音频流、无扩展）。
 //!
 //! 语义对齐 FFmpeg libavformat/asfdec_f.c：std-ecc 0x82 00 00 同步包；

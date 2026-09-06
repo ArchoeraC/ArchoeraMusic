@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * player.h — 自写播放器模块（miniaudio，§10.8 替代 libmpv）
  *

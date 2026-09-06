@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS core Huffman（VLC）解码（阶段二）
 //!
 //! FFmpeg dcahuff.c 的码表以 (符号, 码长) 给出，码字由 ff_vlc_init_from_lengths

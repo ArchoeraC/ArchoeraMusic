@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA Lossless (wmalossless, ASF codec_tag 0x163) 整数解码核心。
 //!
 //! 逐函数移植 FFmpeg libavcodec/wmalosslessdec.c（整数 / 无浮点）。结构：

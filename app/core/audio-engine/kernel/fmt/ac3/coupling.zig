@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AC-3 / E-AC-3 耦合（coupling）解码（对照 FFmpeg ac3dec.c）
 //!
 //! 三个函数（float 路径）：

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * tempo.h — 变速变调处理器（基于 Rust signalsmith-stretch）
  *

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * mediaengine_lib.c — 音频引擎 FFI 库实现（Dart 桌面端直连，替代进程 IPC）
  *

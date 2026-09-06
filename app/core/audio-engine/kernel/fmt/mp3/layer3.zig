@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Layer III 解码（对标 minimp3 标量路径，CC0）。
 //! 含 side info、scalefactor、huffman、requant、stereo、reorder、antialias、IMDCT。
 

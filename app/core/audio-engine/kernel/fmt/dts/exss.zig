@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS-HD 扩展子流（EXSS）解析（DTS-HD MA / HRA asset 描述）
 //!
 //! 对照 FFmpeg n9.0.1 dca_exss.c（ff_dca_exss_parse / parse_descriptor /

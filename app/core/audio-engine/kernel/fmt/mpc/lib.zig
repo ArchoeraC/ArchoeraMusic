@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Musepack 解码器接入层（fmt/mpc）—— SV7/SV8 均已 bit-exact（对照 ffmpeg n9.0.1）。
 //!
 //! 容器：SV8 = MPCK chunk 流（SH 头 + AP 音频包），SV7 = MP+ 打包帧。

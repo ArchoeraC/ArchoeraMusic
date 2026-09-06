@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MLP / Dolby TrueHD 无损解码器（对照 FFmpeg mlpdec.c / mlp.c / mlpdsp.c）
 //!
 //! 位流为 LSB-first（FFmpeg GetBitContext 语义）；MLP 无损打包，

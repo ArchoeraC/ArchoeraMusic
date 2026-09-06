@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA（ASF→wmav1/wmav2）解码对照导出工具。
 //!
 //! 用法：zig build-exe kernel/wma_dump.zig -lc -O ReleaseSafe -femit-bin=./wma_dump

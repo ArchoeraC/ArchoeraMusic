@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AAC PS（参数立体声）解码器（bit-exact 移植 FFmpeg n9.0.1 浮点路径）。
 //!
 //! 复刻对象：libavcodec/{aacps.c,aacps_common.c,aacpsdsp_template.c} +

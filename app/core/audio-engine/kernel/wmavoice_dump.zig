@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA Voice 解码器 f32/s16 对照导出工具（复用 fmt/wma/wmavoice/lib.zig）。
 //!
 //! 用法：zig build-exe kernel/wmavoice_dump.zig -O ReleaseSafe -femit-bin=./wmavoice_dump

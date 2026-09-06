@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! SV8 哈夫曼/枚举解码基础 —— 复刻 FFmpeg n9.0.1 的 VLC 与 mpc8 组合码。
 //!
 //! ff_vlc_init_from_lengths 语义：按“符号列表顺序”用增量 code += 1<<(32-len) 分配码字

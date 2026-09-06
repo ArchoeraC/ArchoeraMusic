@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AAC SBR（频谱带复制）解码器（bit-exact 移植 FFmpeg n9.0.1 浮点路径）。
 //!
 //! 复刻对象：libavcodec/{aacsbr_template.c,aacsbr.c,sbrdsp_template.c,sbrdsp.c}

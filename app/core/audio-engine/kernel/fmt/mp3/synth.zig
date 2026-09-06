@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 合成滤波器组（DCT-II + 多相滤波），对标 minimp3 标量路径（CC0）。
 
 const std = @import("std");

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * compat/pthread.h — MSVC 最小 pthread 兼容层（仅 mediaengine_lib.c 用）
  *

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Shorten (.shn, 无损) 解码器接入层（fmt/shn）。
 //!
 //! 容器（libavformat/shortendec.c）：裸流，无封装头；魔数 4 字节 "ajkg"

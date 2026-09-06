@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! TAK (Tom's lossless Audio Kompressor) 静态表 + CRC-24（对齐 FFmpeg n9.0.1）。
 //!
 //! 来源：libavcodec/takdec.c、libavcodec/tak.c、libavutil/crc.c

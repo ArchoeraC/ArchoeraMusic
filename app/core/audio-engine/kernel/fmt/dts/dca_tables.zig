@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS（DCA Coherent Acoustics）core 解码数值表（阶段二）
 //!
 //! 对照 FFmpeg libavcodec dcadata.c / dcahuff.c（n9.0.1）。全部整数表由

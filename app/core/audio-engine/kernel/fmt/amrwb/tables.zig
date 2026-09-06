@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AMR-WB 解码常量与表（自 FFmpeg reference 提取，见文件头溯源）。
 //!
 //! 数据来源：FFmpeg libavcodec/amrwbdata.h（LGPL-2.1+，作者 Marcelo Galvao Povoa，2010）；

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS core 帧头解析（阶段一：16-bit core 子流，BE 或 16-bit 字交换 LE）
 //!
 //! 对照 FFmpeg dca.c ff_dca_parse_core_frame_header / dca_core.c

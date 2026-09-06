@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AC-3 耦合解码独立测试程序（zig build-exe <本文件> 可运行）。
 //!
 //! 与 /tmp/ac3ref.c 的 C 参考实现（FFmpeg ac3dec.c coupling 三函数）交叉校验：

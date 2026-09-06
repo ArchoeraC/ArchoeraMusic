@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 开发对照 dump：解码 .mpc（SV8/SV7）→ s16le 交错，可选与 ffmpeg 参考 PCM 逐样本比对。
 //! 用法：zig build-exe kernel/mpc_dump.zig -lc -O ReleaseSafe -femit-bin=./mpcn
 //!   ./mpcn <file.mpc> [ref.pcm]

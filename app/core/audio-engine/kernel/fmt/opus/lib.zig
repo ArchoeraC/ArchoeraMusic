@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Opus 解码器封装（open + VTable + Ogg 解复用 + SILK/CELT/HYBRID + 重采样 + 输出）
 //!
 //! 输出契约：48kHz、s16、交错 PCM（opus 原生位深 16），与 FFmpeg `-c:a libopus -f s16le`

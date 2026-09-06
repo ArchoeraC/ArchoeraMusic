@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA 逆 MDCT（bit-exact 复刻 FFmpeg av_tx FLOAT_MDCT inv 路径）。
 //!
 //! wmadec.c 以 `av_tx_init(..., AV_TX_FLOAT_MDCT, 1, 1<<(frame_len_bits-i),

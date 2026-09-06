@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA（ASF → wmav1/wmav2/wmapro/wmalossless/wmavoice）解码器正式接入层。
 //!
 //! open：整读 ASF 文件 → 头解析 → Data 包重组 → 按 codec_tag 分派：

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! FLAC 子帧解码（constant / verbatim / fixed 0-4 / LPC + wasted bits）
 //!
 //! 参考重构对照 flacdec.c decode_subframe / *_fixed* / *_lpc* /

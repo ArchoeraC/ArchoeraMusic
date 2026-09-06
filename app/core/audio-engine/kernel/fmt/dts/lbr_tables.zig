@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! LBR（DTS Express / DCA-LBR）解码所需常量表
 //!
 //! 由 reference/FFmpeg/libavcodec 的 dcadata.c（LBR 段）、dca.c、dcahuff.c

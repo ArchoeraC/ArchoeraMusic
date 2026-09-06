@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! ASF（Advanced Systems Format）容器解析——WMA v1/v2 层（阶段 A）。
 //!
 //! 本模块只做：ASF Header 解析（File Properties + 音频 Stream Properties →

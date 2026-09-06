@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MPEG-4 ALS 解码器表（对照 FFmpeg libavcodec/alsdec.c 与 libavcodec/bgmc.c）
 //!
 //! 表值按 ISO/IEC 14496-3 ALS / RM22 参考码流定义；由脚本从

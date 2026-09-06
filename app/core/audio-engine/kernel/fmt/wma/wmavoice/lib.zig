@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WMA Voice (wmavoice, ASF codec_tag 0x000A) 解码接入层。
 //!
 //! 复用 fmt/wma 的 ASF 容器解析与数据包去包（asf.zig / packets.zig）。每个

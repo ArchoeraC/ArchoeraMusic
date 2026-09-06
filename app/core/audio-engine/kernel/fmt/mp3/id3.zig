@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! ID3 标签解析（ID3v2.2 / v2.3 / v2.4 + ID3v1）—— MP3 元数据
 //!
 //! 对齐 FFmpeg av_dict 语义（参考 id3v2.c / id3v1.c）：

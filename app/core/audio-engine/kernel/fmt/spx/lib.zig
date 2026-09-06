@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Ogg-Speex（.spx）解码入口（Ogg 容器 + Speex CELP，mode 0/1/2 = NB/WB/UWB）。
 //!
 //! 对照移植 FFmpeg `libavcodec/speexdec.c`（n9.0.1 native `speex`，浮点路径）+

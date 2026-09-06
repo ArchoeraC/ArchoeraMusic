@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! SBR Huffman 表（aac/aacdec_tab.c sbr_huffman_tab，10 张平铺）。
 //! 表序：t_env_1_5dB, f_env_1_5dB, t_env_bal_1_5dB, f_env_bal_1_5dB, t_env_3_0dB,
 //! f_env_3_0dB, t_env_bal_3_0dB, f_env_bal_3_0dB, t_noise_3_0dB, t_noise_bal_3_0dB

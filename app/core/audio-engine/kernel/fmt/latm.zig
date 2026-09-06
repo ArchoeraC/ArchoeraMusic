@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! LOAS/LATM（AAC 音频传输流，`.latm`/`.loas`）容器：逐 LOAS 帧定位 +
 //! AudioMuxElement/StreamMuxConfig/PayloadLengthInfo 解析，提取 raw AAC
 //! 帧复用 fmt/aac/lib.zig（AAC-LC 自研解码核心），与 ADTS 同一解码核心/同一

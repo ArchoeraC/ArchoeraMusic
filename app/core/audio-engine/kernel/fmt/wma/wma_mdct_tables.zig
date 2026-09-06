@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Auto-generated WMA MDCT tables (FULL_IMDCT len 2048, scale 1/32768)
 //! mdct_exp_2048: [permuted(1024) | raw(1024)] complex interleaved f32 (dump of system av_tx).
 //! mdct_map_2048: fold gather map (un-doubled). fft_tab_1024 computed as ffmpeg init.

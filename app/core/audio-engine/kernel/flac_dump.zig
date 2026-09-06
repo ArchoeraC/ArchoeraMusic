@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! FLAC bit-exact 对照导出工具：解码一个 FLAC 文件，按解码器输出契约
 //! （bps≤16 → 16-bit 左移对齐；bps>16 → 32-bit 左移对齐；交错小端）写原始 PCM 到 stdout；
 //! 元数据 / 全部标签条目 / REPLAYGAIN / 提示点 / PICTURE 封面摘要打印到 stderr

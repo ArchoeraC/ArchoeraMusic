@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! CELT 解码表（docs/audio-kernel-zig.md §9.2）
 //!
 //! 从 FFmpeg n9.0.1 `libavcodec/opus/tab.c` 提取（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）：

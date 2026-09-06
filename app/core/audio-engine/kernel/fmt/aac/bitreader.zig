@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AAC 位流读取（MSB-first）+ Huffman（VLC）解码。
 //!
 //! 与 flac/alac 位读取的区别：

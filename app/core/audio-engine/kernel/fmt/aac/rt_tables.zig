@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AAC 运行时初始化表——由 FFmpeg n9.0.1 同款初始化算法在本机计算后以精确位模式嵌入
 //! （tabdump.c 探针，LGPL 参考对照产物；pow2sf/KBD/sine/cbrt 初始化舍入顺序敏感）。
 

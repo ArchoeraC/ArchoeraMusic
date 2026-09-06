@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AMR-WB 解码导出工具（.awb raw `#!AMR-WB` / 3gp 单轨均可）。
 //!
 //! 用法：zig build-exe kernel/amrwb_dump.zig -lc -O ReleaseSafe -femit-bin=./amrwb_dump

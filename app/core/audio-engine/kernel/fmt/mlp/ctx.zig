@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MLP/TrueHD 解码上下文（对照 FFmpeg mlpdec.c / mlp.h 结构）
 
 const t = @import("tables.zig");

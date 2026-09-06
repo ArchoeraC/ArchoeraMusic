@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! WavPack 帧内位读取（LSB-first，内存缓冲）
 //!
 //! 与 flac/alac bitreader 的区别：

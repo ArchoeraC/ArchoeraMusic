@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MACE（Macintosh Audio Compression/Expansion）3:1 / 6:1 解码器（docs/audio-kernel-zig.md §9.1）
 //!
 //! 镜像 FFmpeg libavcodec/mace.c。AIFC 压缩类型 "MAC3"（3:1）/ "MAC6"（6:1）。

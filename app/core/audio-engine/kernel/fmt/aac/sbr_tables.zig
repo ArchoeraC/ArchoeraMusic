@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! SBR 表：QMF 窗口 + 噪声表（aacsbrdata.h / sbrdsp_template.c 浮点值，位模式嵌入）。
 
 pub const sbr_qmf_window_ds = [320]f32{

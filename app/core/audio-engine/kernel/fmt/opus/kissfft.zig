@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! libopus kiss_fft + clt_mdct_backward 浮点移植（CELT 合成 bit-exact，§9.2）
 //!
 //! 重构对照 libopus `celt/kiss_fft.c`（kf_factor / compute_bitrev_table /

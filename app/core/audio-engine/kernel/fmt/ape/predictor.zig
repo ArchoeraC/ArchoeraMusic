@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! APE 预测解码器 + 长滤波器 + 终级滤波器（docs/audio-kernel-zig.md §9.10）
 //!
 //! 参考重构对照 FFmpeg libavcodec/apedec.c：filter_fast_3320 / filter_3800 /

@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 采样格式转换（docs/audio-kernel-zig.md §10.1）
 //!
 //! 原生交错 PCM（s8/s16/s24/s32/f32/f64 + f16）→ float32 交错。

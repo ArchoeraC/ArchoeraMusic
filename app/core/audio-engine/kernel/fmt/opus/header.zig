@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Opus 头部解析（OpusHead / OpusTags）
 //!
 //! RFC 7845 §5：`OpusHead` 19 字节 + 可选 channel mapping（mapping family ≠ 0）。

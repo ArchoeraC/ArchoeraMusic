@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! ALAC 帧内位读取（MSB-first，内存缓冲）
 //!
 //! 与 flac/bitreader.zig 的区别：

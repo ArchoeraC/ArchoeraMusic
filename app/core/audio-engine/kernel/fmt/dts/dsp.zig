@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! DTS core 定点合成 DSP（阶段二，对照 FFmpeg dcamath.h / dcadct.c / dcadsp.c
 //! / dcaadpcm.c / synth_filter.c 的 fixed（整数）路径）
 //!

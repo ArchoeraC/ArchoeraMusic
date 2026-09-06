@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 格式探测（docs/audio-kernel-zig.md §7）
 //!
 //! 通过魔数嗅探识别容器/编码，返回 `Format`。探测窗口 64 字节；

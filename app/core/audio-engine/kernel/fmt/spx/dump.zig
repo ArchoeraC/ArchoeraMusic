@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Speex 解码 dump/对拍工具：解码 .spx → s16le 写 stdout，stderr 打印 Info 摘要。
 //!
 //! 用法（fmt/spx 内文件不能作独立根上溯 import，须以 kernel/ 为模块根构建，

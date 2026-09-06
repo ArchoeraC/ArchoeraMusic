@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Matroska/EBML 最小解析（内存切片，零分配）
 //!
 //! Matroska 是 EBML 树。本模块只提供解析所需原语：

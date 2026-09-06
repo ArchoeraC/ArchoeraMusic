@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AMR-WB（G.722.2，16kHz ACELP）解码接入（.awb / `#!AMR-WB` 裸流 + 3gp 单轨抽取）
 //!
 //! 解码核心：codec.zig（FFmpeg amrwbdec 浮点路径逐句移植）+ tables.zig + dsp.zig。

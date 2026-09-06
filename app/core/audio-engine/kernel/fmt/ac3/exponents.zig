@@ -1,3 +1,7 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! AC-3 / E-AC-3 指数解码（对照 FFmpeg ac3dec.c decode_exponents）
 //!
 //! §7.1.3 Exponent Decoding。三种策略统一以 7 位组编码 3 个基数 5 的增量码字
