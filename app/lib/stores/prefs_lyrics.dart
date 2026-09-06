@@ -17,21 +17,24 @@ const amllEnableScaleKey = 'amll.enableScale';
 const amllSpringPresetKey = 'amll.springPreset';
 
 /// 由歌词字号自动换算行距（行距不再由用户手调，避免字号/行距组合失衡）。
-/// 经验倍率 3.3（默认字号 18 → 约 59px 行距，歌词墙层次更舒展），
-/// 下限 48 / 上限 110。
+///
+/// 公式取**连续线性**：`行距 = 字号 × 2.0 + 14`（px），随字号单调平滑：
+///   14px → 42px，18px → 50px，38px → 90px。
+/// 这为当前行下方的翻译小字预留了空间，且不随 clamp 造成跳变；
+/// 仅保留一个很宽的上下限（40~120px）防极端值。
 double lyricLineHeightFor(double fontSize) =>
-    (fontSize * 3.3).clamp(48.0, 110.0);
+    (fontSize * 1.6 + 12).clamp(34.0, 100.0);
 
 /// 歌词域偏好：播放器内歌词/字号/已唱与未唱颜色（行距自动随字号）。
 extension LyricsPrefs on AppPrefs {
   /// 播放器内显示歌词（当前行居中高亮 + 点击跳转）。
   bool get showLyricsInPlayer => data[showLyricsKey] as bool? ?? true;
 
-  /// 播放器歌词字号（px，14~28，默认 18）。
+  /// 播放器歌词字号（px，14~38，默认 18）。
   double get lyricFontSize {
     final v = data[lyricFontSizeKey] as num?;
     if (v == null) return 18;
-    return v.toDouble().clamp(14, 28);
+    return v.toDouble().clamp(14, 38);
   }
 
   /// 播放器歌词行距：由 [lyricFontSize] 自动换算，不独立手调。
@@ -55,7 +58,7 @@ extension LyricsPrefs on AppPrefs {
   }) => AppPrefs(
     initialData: {
       ...data,
-      lyricFontSizeKey: ?fontSize?.clamp(14, 28),
+      lyricFontSizeKey: ?fontSize?.clamp(14, 38),
       lyricLineHeightKey: ?lineHeight?.clamp(42, 64),
       lyricPlayedColorKey: ?playedColor,
       lyricUnplayedColorKey: ?unplayedColor,

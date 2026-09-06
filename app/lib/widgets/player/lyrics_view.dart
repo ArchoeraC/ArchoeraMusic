@@ -10,9 +10,12 @@
 /// 偏好传入（对齐原版 desktopLyric 的个性化配置）。
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../services/lyrics/lyric_line.dart';
+import 'lyrics_v7/lyrics_layout.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../common/anim.dart';
 
@@ -186,7 +189,8 @@ class _Line extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: fontSize - 4,
+                  fontSize: math.max(9.0, fontSize * kTranslationFontScale),
+                  height: 1.2,
                   color: lineColor.withValues(alpha: 0.75),
                 ),
               )
@@ -218,7 +222,7 @@ class _Line extends StatelessWidget {
               children: [
                 original,
                 if (translation != null) ...[
-                  const SizedBox(height: 2),
+                  SizedBox(height: math.max(2, fontSize * kMainTranslationGapEm)),
                   translation,
                 ],
               ],
