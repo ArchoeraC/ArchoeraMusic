@@ -3158,7 +3158,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSearchDownloadDirSubtitle =>
-      'Download folder (default ~/Music/ArchoeraMusic)';
+      'Download folder (defaults to media library; falls back to app data dir)';
 
   @override
   String get settingsSearchFilenameSubtitle =>
@@ -3628,14 +3628,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsScrapeOrganizeNote =>
-      'Offline. Moves files under directories into a target tree by template, keeping original file names and existing tags. Variables: artist, albumArtist, album, genre, year, disc, track, title, ext; use / to separate directory levels.';
+      'Offline. Moves files under directories into a target tree by template, keeping original file names and existing tags. Variables: artist, albumArtist, album, genre, year, disc, track, title, ext; use / to separate directory levels. When no target directory is set, the media library\'s default music folder (first scan dir) is used; if no library scan directory is configured yet, add one first.';
 
   @override
   String get settingsScrapeOrganizeTargetDir => 'Organize Target Directory';
 
   @override
   String get settingsScrapeOrganizeTargetHint =>
-      'A library scan directory is recommended';
+      'Leave empty to use the media library\'s default music folder (first scan dir; add a library scan dir first if none is configured)';
 
   @override
   String get settingsScrapeOrganizePattern => 'Organize Pattern';
@@ -3682,7 +3682,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsOrganizeNoTarget =>
-      'Set an organize target directory first';
+      'No media library scan directory is configured, so the default organize target cannot be resolved';
+
+  @override
+  String settingsOrganizeUsingDefault(Object dir) {
+    return 'No target set; using the default music folder: $dir';
+  }
 
   @override
   String get toastOrganizeNoDirs => 'No directories to organize';
