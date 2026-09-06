@@ -20,6 +20,7 @@ class SButton extends StatelessWidget {
     super.key,
     required this.label,
     this.icon,
+    this.iconColor,
     this.variant = SButtonVariant.secondary,
     this.size = SButtonSize.medium,
     this.round = false,
@@ -31,6 +32,10 @@ class SButton extends StatelessWidget {
 
   final String label;
   final IconData? icon;
+
+  /// 图标颜色覆盖（默认跟随 [SButtonVariant] 前景色；供在特殊宿主中显式
+  /// 绑定主题/accent 的调用方传入，避免成为“不随主题的独立个体”）。
+  final Color? iconColor;
   final SButtonVariant variant;
   final SButtonSize size;
   final bool round;
@@ -123,7 +128,12 @@ class SButton extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                   ] else if (icon != null) ...[
-                    Icon(icon, size: _iconSize, color: fg.withValues(alpha: enabled ? 1 : 0.7)),
+                    Icon(
+                      icon,
+                      size: _iconSize,
+                      color:
+                          (iconColor ?? fg).withValues(alpha: enabled ? 1 : 0.7),
+                    ),
                     if (!circle) const SizedBox(width: 6),
                   ],
                   if (!circle)

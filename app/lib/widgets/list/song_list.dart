@@ -366,25 +366,16 @@ class _SongListState extends ConsumerState<SongList> {
           ],
         ),
         // 右下角浮动按钮组（对齐 SongList.vue `absolute right-6 bottom-5`）：
-        // 批量选择模式下整组隐藏（对齐 `!batch.active`）
+        // 批量选择模式/闲置时自动隐藏（不遮挡下方收藏红心等控件）
         Positioned(
           right: 24,
           bottom: 20,
-          child: IgnorePointer(
-            ignoring: _batchActive,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ScrollToTopButton(controller: _scrollCtrl),
-                const SizedBox(height: 12),
-                LocatePlayingButton(
-                  controller: _scrollCtrl,
-                  playingIndex: _playingIndex,
-                  itemExtent: _songRowExtent,
-                  topPadding: _songTopPadding,
-                ),
-              ],
-            ),
+          child: SongListFloatActions(
+            controller: _scrollCtrl,
+            playingIndex: _playingIndex,
+            itemExtent: _songRowExtent,
+            topPadding: _songTopPadding,
+            batchActive: _batchActive,
           ),
         ),
       ],

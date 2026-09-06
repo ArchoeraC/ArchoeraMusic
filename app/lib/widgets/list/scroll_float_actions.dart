@@ -9,10 +9,123 @@
 /// 选择模式下由宿主决定是否隐藏整组（对齐 SPlayer-Next `!batch.active`）。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../l10n/l10n.dart';
-import '../player/s_controls.dart';
+
+/// 右下角浮动操作组（回到顶部 + 定位播放）。
+///
+/// 自动隐藏策略：滚动中 / 鼠标悬停热区时显示；停止滚动约 [hideDelay] 后淡出，
+/// 淡出期间 [IgnorePointer] 放行下方（如收藏红心）点击——避免遮挡底层控件。
+/// 批量选择模式（[batchActive]）下整组隐藏。
+class SongListFloatActions extends StatefulWidget {
+  const SongListFloatActions({
+    super.key,
+    required this.controller,
+    required this.playingIndex,
+    this.itemExtent = 76,
+    this.topPadding = 8,
+    this.threshold = 100,
+    this.batchActive = false,
+    this.hideDelay = const Duration(milliseconds: 1200),
+  });
+
+  final ScrollController controller;
+  final int playingIndex;
+  final double itemExtent;
+  final double topPadding;
+  final double threshold;
+  final bool batchActive;
+  final Duration hideDelay;
+
+  @override
+  State<SongListFloatActions> createState() => _SongListFloatActionsState();
+}
+
+class _SongListFloatActionsState extends State<SongListFloatActions> {
+  bool _active = false; // 滚动中 / 刚触发动作
+  bool _hovered = false; // 鼠标在按钮组上
+  Timer? _hideTimer;
+
+  bool get _visible =>
+      !widget.batchActive && (_active || _hovered);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_poke);
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    widget.controller.removeListener(_poke);
+    super.dispose();
+  }
+
+  /// 任意滚动/程序化滚动触发 → 立即显示并重新计时隐藏。
+  void _poke() {
+    if (!mounted) return;
+    if (!_active) setState(() => _active = true);
+    _armHide();
+  }
+
+  void _armHide() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(widget.hideDelay, () {
+      if (!mounted) return;
+      setState(() {
+        _active = false;
+        _hovered = false;
+      });
+    });
+  }
+
+  void _onHoverEnter() {
+    if (widget.batchActive) return;
+    _hideTimer?.cancel();
+    if (!_hovered) setState(() => _hovered = true);
+  }
+
+  void _onHoverExit() {
+    if (!_hovered) return;
+    setState(() => _hovered = false);
+    if (!_active) _armHide();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => _onHoverEnter(),
+      onExit: (_) => _onHoverExit(),
+      child: IgnorePointer(
+        ignoring: !_visible,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: _visible ? 1 : 0,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ScrollToTopButton(
+                controller: widget.controller,
+                threshold: widget.threshold,
+              ),
+              const SizedBox(height: 12),
+              LocatePlayingButton(
+                controller: widget.controller,
+                playingIndex: widget.playingIndex,
+                itemExtent: widget.itemExtent,
+                topPadding: widget.topPadding,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// 回到顶部浮动按钮：滚动超过阈值自动浮现，点击平滑回顶。
 class ScrollToTopButton extends StatefulWidget {
@@ -122,8 +235,8 @@ class LocatePlayingButton extends StatelessWidget {
   }
 }
 
-/// 浮动圆钮通用外观：毛玻璃圆底 + 主色描边 + 阴影，渐显渐隐
-/// （对齐 SPlayer-Next `rounded-full bg-surface-panel border-primary/10 shadow-lg`）。
+/// 浮动圆钮通用外观：主题化毛玻璃圆底 + 描边 + 阴影，随深浅色重建
+/// （背景/描边/图标颜色全部取自 Theme.colorScheme，避免独立于主题）。
 class _FloatActionButton extends StatelessWidget {
   const _FloatActionButton({
     required this.visible,
@@ -139,7 +252,14 @@ class _FloatActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    // 显式按深浅色二值化，不依赖 scheme 可能被宿主/背景层覆盖的 surface 角色。
+    final bg = dark ? const Color(0xFF262B3A) : const Color(0xFFFFFFFF);
+    final border = dark
+        ? Colors.white.withValues(alpha: 0.14)
+        : Colors.black.withValues(alpha: 0.12);
+    final fg = dark ? const Color(0xFFE6E8EF) : const Color(0xFF1E1F24);
     return IgnorePointer(
       ignoring: !visible,
       child: AnimatedOpacity(
@@ -150,23 +270,31 @@ class _FloatActionButton extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: scheme.surface.withValues(alpha: 0.92),
-              border: Border.all(color: scheme.primary.withValues(alpha: 0.18)),
+              color: bg,
+              border: Border.all(color: border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
+                  color: Colors.black.withValues(alpha: dark ? 0.28 : 0.12),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: SButton(
-              label: tooltip,
-              icon: icon,
-              circle: true,
-              size: SButtonSize.medium,
-              variant: SButtonVariant.ghost,
+            child: IconButton(
+              tooltip: tooltip,
               onPressed: onTap,
+              iconSize: 17,
+              padding: EdgeInsets.zero,
+              // 只让图标核心区域拦截点击：圆盘其余部分不参与命中测试，
+              // 避免浮钮整块挡住下层列表行（长期遮挡问题）。
+              constraints:
+                  const BoxConstraints.tightFor(width: 24, height: 24),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: fg,
+                disabledForegroundColor: fg.withValues(alpha: 0.5),
+              ),
+              icon: Icon(icon),
             ),
           ),
         ),
