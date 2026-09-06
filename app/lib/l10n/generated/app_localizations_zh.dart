@@ -2671,14 +2671,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsDeclineText =>
-      '本软件（ArchoeraMusic）是一款免费、开源的桌面音乐播放器，为个人学习研究用途，非商业软件。使用前请阅读以下声明：\n\n';
+      '本软件（ArchoeraMusic）以 **AGPL-3.0** 开源：遵守其条款即可自由使用、学习、修改与再分发，**合规的开源商业使用同样被许可**；本项目不提供脱离 AGPL 义务的闭源商业授权。使用前请阅读以下声明：\n\n';
 
   @override
   String get settingsDecline1Title => '一、软件性质\n';
 
   @override
   String get settingsDecline1Body =>
-      '本软件为第三方客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；不以营利为目的，不接受任何商业合作、广告或捐赠。如需更完善的功能，请下载官方客户端体验。\n\n';
+      '本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。\n\n';
 
   @override
   String get settingsDecline2Title => '二、内容来源与版权\n';
@@ -6330,14 +6330,14 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsDeclineText =>
-      '本软件（ArchoeraMusic）是一款免费、开源的桌面音乐播放器，为个人学习研究用途，非商业软件。使用前请阅读以下声明：\n\n';
+      '本软件（ArchoeraMusic）以 **AGPL-3.0** 开源：遵守其条款即可自由使用、学习、修改与再分发，**合规的开源商业使用同样被许可**；本项目不提供脱离 AGPL 义务的闭源商业授权。使用前请阅读以下声明：\n\n';
 
   @override
   String get settingsDecline1Title => '一、软件性质\n';
 
   @override
   String get settingsDecline1Body =>
-      '本软件为第三方客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；不以营利为目的，不接受任何商业合作、广告或捐赠。如需更完善的功能，请下载官方客户端体验。\n\n';
+      '本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。\n\n';
 
   @override
   String get settingsDecline2Title => '二、内容来源与版权\n';
