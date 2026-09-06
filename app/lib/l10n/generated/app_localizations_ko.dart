@@ -3513,13 +3513,14 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsScrapeOrganizeNote =>
-      '不联网。按模板把目录中的文件移动到目标目录树，保留原文件名与现有标签。可用变量：artist、albumArtist、album、genre、year、disc、track、title、ext；以 / 分隔目录层级。';
+      '不联网。按模板把目录中的文件移动到目标目录树，保留原文件名与现有标签。可用变量：artist、albumArtist、album、genre、year、disc、track、title、ext；以 / 分隔目录层级。未填写目标目录时使用媒体库默认音乐目录（首个扫描目录）；未配置媒体库时需先添加扫描目录。';
 
   @override
   String get settingsScrapeOrganizeTargetDir => '整理目标目录';
 
   @override
-  String get settingsScrapeOrganizeTargetHint => '建议填写音乐库扫描目录';
+  String get settingsScrapeOrganizeTargetHint =>
+      '留空则使用媒体库默认音乐目录（首个扫描目录；未配置媒体库时需先添加扫描目录）';
 
   @override
   String get settingsScrapeOrganizePattern => '整理模板';
@@ -3563,7 +3564,12 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get settingsOrganizeNoTarget => '请先设置整理目标目录';
+  String get settingsOrganizeNoTarget => '未配置媒体库扫描目录，无法确定默认整理目录';
+
+  @override
+  String settingsOrganizeUsingDefault(Object dir) {
+    return '未设置整理目标目录，使用默认音乐目录：$dir';
+  }
 
   @override
   String get toastOrganizeNoDirs => '没有可整理的目录';

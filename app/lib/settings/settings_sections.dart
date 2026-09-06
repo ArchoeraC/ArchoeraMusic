@@ -3072,7 +3072,10 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
       toast(l10n.toastOrganizeNoDirs);
       return;
     }
-    final target = prefs.scrapeOrganizeTargetDir.trim();
+    // 目标目录未显式设置 → 回退到媒体库默认音乐目录（首个扫描目录）。
+    // 不臆造 ~/Music 等平台路径；无媒体库扫描目录时无可用默认，提示后返回。
+    final customTarget = prefs.scrapeOrganizeTargetDir.trim();
+    final target = customTarget.isEmpty ? defaultMusicDir() : customTarget;
     if (target.isEmpty) {
       toast(l10n.settingsOrganizeNoTarget);
       return;
@@ -3083,7 +3086,11 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
           targetDir: target,
           pattern: prefs.scrapeOrganizePattern,
         );
-    toast(l10n.toastOrganizeStarted);
+    if (customTarget.isEmpty) {
+      toast(l10n.settingsOrganizeUsingDefault(target));
+    } else {
+      toast(l10n.toastOrganizeStarted);
+    }
   }
 
   /// 刮削进度/结果统计区（运行中 → 进度条 + 当前文件；空闲 → 上次结果）。

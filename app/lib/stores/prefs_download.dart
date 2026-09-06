@@ -65,7 +65,8 @@ const downloadQualityLevels = <String>['hi-res', 'lossless', 'hq', 'sq', 'lq'];
 
 /// 下载域偏好：根目录/并发数/分组策略/默认音质/限速/文件名模板/记录上限。
 extension DownloadPrefs on AppPrefs {
-  /// 下载根目录（默认 `~/Music/ArchoeraMusic`，设置页可改）。
+  /// 下载根目录（默认跟随媒体库首个扫描目录；未配置媒体库时回退到应用数据
+  /// 目录 downloads，见 [defaultDownloadRoot]；设置页可改）。
   String get downloadRoot =>
       data[downloadRootKey] as String? ?? defaultDownloadRoot();
 
