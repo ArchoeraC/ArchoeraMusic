@@ -1,7 +1,7 @@
 //! Opus 头部解析（OpusHead / OpusTags）
 //!
 //! RFC 7845 §5：`OpusHead` 19 字节 + 可选 channel mapping（mapping family ≠ 0）。
-//! 参考重构对照 FFmpeg `libavformat/oggparseopus.c`；参考对照非复制（§3.3）。
+//! 参考重构对照 FFmpeg `libavformat/oggparseopus.c`（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;

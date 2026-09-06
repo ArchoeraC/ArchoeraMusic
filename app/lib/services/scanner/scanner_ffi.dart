@@ -69,6 +69,43 @@ class ScannerLibrary {
   late final _FreeDart _free = _lib.lookupFunction<_FreeNative, _FreeDart>(
     'scanner_free',
   );
+  late final _SetOptionsDart _setOptions = _lib
+      .lookupFunction<_SetOptionsNative, _SetOptionsDart>('scanner_set_options');
+
+  /// 下发扫描选项（进程内全局，对后续 [scanBlocking] 生效）。
+  ///
+  /// 选项经单个 JSON 字符串传入，避免扩展 scanner_scan 的 ABI 签名：
+  ///   { maxFileSizeMb?, maxScanFiles?, maxScanErrors?, parallelism?,
+  ///     extraExts?: string[] }
+  /// 0/空 = 引擎默认。符号缺失（旧 .so）时静默忽略，不影响扫描。
+  bool setScanOptions({
+    int maxFileSizeMb = 0,
+    int maxScanFiles = 0,
+    int maxScanErrors = 0,
+    int parallelism = 0,
+    List<String> extraExts = const [],
+  }) {
+    final json = <String, Object>{
+      if (maxFileSizeMb > 0) 'maxFileSizeMb': maxFileSizeMb,
+      if (maxScanFiles > 0) 'maxScanFiles': maxScanFiles,
+      if (maxScanErrors > 0) 'maxScanErrors': maxScanErrors,
+      if (parallelism > 0) 'parallelism': parallelism,
+      if (extraExts.isNotEmpty)
+        'extraExts': extraExts
+            .map((e) => e.trim().toLowerCase().replaceFirst('.', ''))
+            .where((e) => e.isNotEmpty)
+            .toList(),
+    };
+    if (json.isEmpty) return false;
+    final jsonStr = jsonEncode(json).toNativeUtf8();
+    try {
+      return _setOptions(jsonStr) == 0;
+    } catch (_) {
+      return false; // 旧 .so 无该导出 → 忽略
+    } finally {
+      calloc.free(jsonStr);
+    }
+  }
 
   /// 同步阻塞执行扫描（须在子 isolate 调用，避免阻塞 UI 线程）。
   ///
@@ -160,3 +197,6 @@ typedef _CancelDart = int Function();
 
 typedef _FreeNative = Void Function(Pointer<Void>);
 typedef _FreeDart = void Function(Pointer<Void>);
+
+typedef _SetOptionsNative = Int32 Function(Pointer<Utf8> optionsJson);
+typedef _SetOptionsDart = int Function(Pointer<Utf8>);

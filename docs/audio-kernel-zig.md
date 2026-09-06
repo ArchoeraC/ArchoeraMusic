@@ -133,7 +133,7 @@
 | **ALAC 解码** | **自研 Zig**（已实现，~1800 行）；alac.c（Apache-2.0）兜底 | AGPL | 无损可 bit-exact 校验；Apple 参考 alac.c 作对照 |
 | **WavPack 解码** | **自研 Zig**（目标，~2500 行）；libwavpack（BSD）兜底 | AGPL | 无损/混合可 bit-exact 校验；libwavpack 作对照 |
 | DSD→PCM | **自研 Zig**（~400 行） | AGPL | 1-bit 抽取 + 低通，纯信号处理 |
-| **MP3 解码** | **自研 Zig**（`fmt/mp3/`，~3500 行：Layer I/II/III + 合成滤波器 + ID3 标签 + Xing/Info 头，§9.4） | AGPL | Layer III 含 IMDCT/霍夫曼/滤波器组/联合立体声，但**可逐位对照 minimp3（CC0）验收**（§17.2）；minimp3 作参考、非复制；dr_mp3 移除 |
+| **MP3 解码** | **自研 Zig**（`fmt/mp3/`，~3500 行：Layer I/II/III + 合成滤波器 + ID3 标签 + Xing/Info 头，§9.4） | AGPL | Layer III 含 IMDCT/霍夫曼/滤波器组/联合立体声，但**可逐位对照 minimp3（CC0）验收**（§17.2）；minimp3（CC0）作参考对照；dr_mp3 移除 |
 | **Opus 解码** | **自研 Zig**（P2 CELT / P3 SILK，§9.2） | AGPL | 用户决策（2026-08-17）：解码器完全自研，bit-exact 对照 libopus / FFmpeg opusdec / RFC testvector |
 | **Opus 编码** | vendored `libopus` 源码 | BSD-3-Clause | 编码器心理声学模型不自研（§11，`encode/opus_encoder.zig` 封装） |
 | **AAC 解码** | **自研 Zig**（`fmt/aac/`，AAC-LC + SBR + PS） | AGPL | 参考 FFmpeg `aacdec*.c`/`aacsbr_template.c`/`aacps*.c` 对照（§17.2）；**LC/PS 100% bit-exact、SBR 内容帧 bit-exact**（2026-09-01 运算顺序对齐后；整体 corr 0.9996，首尾为探测/flush 对齐假象），LC/5.1 100% 逐位 |
@@ -300,7 +300,7 @@ pub fn open(path: []const u8, info: *Info) !Decoder {
 | **WavPack 解码** | 🟡 自研目标 | 无损 bit-exact + libwavpack（BSD）参考 | libwavpack 兜底 |
 | **变速变调（tempo）** | 🟡 自研目标 | WSOLA 可实现 + 主观/客观对照 | tempo-rs 兜底 |
 | **播放输出层** | 🟡 自研目标 | 平台设备 API 直调（§15） | miniaudio 兜底 |
-| **MP3 解码** | ✅ 自研（已验收） | Layer I/II/III 全链可逐位对照 minimp3（CC0，MIT-0 系）验收；minimp3 作参考、非复制 | minimp3（CC0）参考对照 |
+| **MP3 解码** | ✅ 自研（已验收） | Layer I/II/III 全链可逐位对照 minimp3（CC0，MIT-0 系）验收；minimp3（CC0）作参考对照 | minimp3（CC0）参考对照 |
 | **Opus 解码** | ✅ 自研（已验收） | 确定性解码可 bit-exact 对照 libopus/FFmpeg；CELT/SILK 自研完成（§9.2） | 参考 libopus / FFmpeg `opusdec.c` |
 | **Opus 编码** | 🔴 vendored（不可自研） | 心理声学模型 + 编码器 ~5 万行 | libopus（BSD，源码入库） |
 | **AAC 解码** | 🟡 自研目标（AAC-LC 已验收） | 无损 bit-exact + FFmpeg `aacdec.c` 参考 | HE-AAC（SBR/PS）回退 FFmpeg |
@@ -991,7 +991,7 @@ config 15，均为 20ms 960 样本）。
   - `id3.zig` —— ID3v2.2/2.3/2.4（标准字段 + 通用 tags + TXXX + APIC 封面 + UTF-8/16/Latin-1）、
     ID3v1 文件尾、ReplayGain（TXXX REPLAYGAIN_*）。
 - **参考对照**：minimp3（CC0）标量路径（`MINIMP3_FLOAT_OUTPUT` + `MINIMP3_NO_SIMD`）作逐位参考，
-  非复制；全部 Layer I/II/III 向量（minimp3_test 的 l1-fl* / ILL2* / performance*）与真实样本
+  参考对照、未并入其源码；全部 Layer I/II/III 向量（minimp3_test 的 l1-fl* / ILL2* / performance*）与真实样本
   （mono/stereo、MPEG1/2/2.5、8k-320kbps、CBR/VBR）PCM 精确一致（worst=0，§17.2）；
 - **标签 / 时长**：ID3v2/v1 标签 → `Info.metadata`（含 APIC 封面 → `Info.pictures`、
   ReplayGain → `Info.replay_gain`）；Xing/Info 头 → `duration_known = exact`；
@@ -1871,7 +1871,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
 9. **时长/seek 分级**：exact/estimate/unknown；MP3 首遍索引 + XING；Opus 尾页回填。
 10. **中断**：`Reader.abort()` 原子标志替代 AVIOInterruptCB；Zig error set 统一错误模型。
 11. **许可合规**：新引入仅限 MIT-0/PD/BSD-3/Apache-2.0，逐一登记 `THIRD-PARTY-LICENSES.md`；
-    **APE 解码器全自研（AGPL）**，不依赖 Monkey's Audio 官方 SDK，无许可阻塞。
+    **APE 解码器为自研 Zig 实现**（参考对照 FFmpeg `apedec.c`，许可登记见 `audio-engine/THIRD-PARTY-LICENSES.md`），不依赖 Monkey's Audio 官方 SDK。
 12. **自研扩张原则（2026-08-15，2026-08-16 修订为渐进接管）**：凡"无损可 bit-exact 校验 + 有参考实现"
     的编解码器一律自研（FLAC/APE/ALAC/WavPack）；输出层与变速变调亦自研（device.zig / WSOLA）；
     miniaudio、tempo-rs、dr_flac、alac.c、libwavpack 仅作过渡/兜底，自研验收后移除。

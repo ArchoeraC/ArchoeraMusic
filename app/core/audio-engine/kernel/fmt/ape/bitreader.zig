@@ -2,7 +2,7 @@
 //!
 //! 供 fileversion < 3900 的熵解码路径使用（decode_array_0000 /
 //! ape_decode_value_3860 / init_entropy_decoder 的 32-bit CRC 读取）。
-//! 参考重构对照 FFmpeg get_bits.h 的读取语义；参考对照非复制（§3.3）。
+//! 参考重构对照 FFmpeg get_bits.h 的读取语义（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 语义要点（与 FFmpeg GetBitContext 对齐）：
 //!   - 字节内 **MSB-first**：第一个读出的是字节的 bit7；

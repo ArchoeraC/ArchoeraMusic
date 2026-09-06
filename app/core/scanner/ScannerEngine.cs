@@ -50,6 +50,9 @@ public sealed class ScannerEngine
     private readonly AdaptiveBatchSize _adaptiveBatch;
     private readonly bool _incremental;
 
+    /// <summary>生效的音频扩展名集合（内置白名单 ∪ 用户额外扩展名）。</summary>
+    private readonly HashSet<string> _audioExt;
+
     /// <summary>进度回调（FFI 模式注入；CLI 模式为 null 时走 stdout JSON）</summary>
     private readonly Action<ScanProgress>? _progressSink;
 
@@ -77,6 +80,7 @@ public sealed class ScannerEngine
         int? maxScanFiles = null,
         int? maxScanErrors = null,
         int? maxParallelism = null,
+        IReadOnlyCollection<string>? extraExtensions = null,
         Action<ScanProgress>? progressSink = null)
     {
         _db = db;
@@ -85,6 +89,19 @@ public sealed class ScannerEngine
         _adaptiveBatch = new AdaptiveBatchSize(batchSize); // batchSize = 0 不限，作为用户上限
         _incremental = incremental;
         _progressSink = progressSink;
+
+        // 扩展名白名单：内置 + 用户额外追加（去点、小写、去重由 HashSet 保证）
+        _audioExt = (extraExtensions is { Count: > 0 })
+            ? new HashSet<string>(AudioExt, StringComparer.OrdinalIgnoreCase)
+            : AudioExt;
+        if (extraExtensions is { Count: > 0 })
+        {
+            foreach (var e in extraExtensions)
+            {
+                var ext = e.TrimStart('.').ToLowerInvariant();
+                if (ext.Length > 0) _audioExt.Add(ext);
+            }
+        }
 
         // 安全限制：默认与 C++ 刮削器保持一致
         _maxFileSizeBytes = maxFileSizeBytes ?? (500L * 1024 * 1024);
@@ -470,7 +487,7 @@ public sealed class ScannerEngine
                 else
                 {
                     var ext = Path.GetExtension(full).TrimStart('.').ToLowerInvariant();
-                    if (AudioExt.Contains(ext))
+                    if (_audioExt.Contains(ext))
                     {
                         result.Add(full);
                         // 每发现文件都更新 total，但限制广播频率（每 200ms 最多一次）

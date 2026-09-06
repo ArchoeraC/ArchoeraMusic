@@ -1,7 +1,7 @@
 //! Opus 区间解码器（docs/audio-kernel-zig.md §9.2）
 //!
 //! RFC 6716 §4.1 32-bit 区间解码；参考重构对照 FFmpeg `libavcodec/opus/rc.c`
-//! 与 libopus `entdec.c`；参考对照非复制（§3.3）。
+//! 与 libopus `entdec.c`（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 语义要点（对齐参考实现，保证 bit-exact）：
 //!   - 位流经 GetBitContext 读取（MSB-first），字节取反（`get_bits(8) ^ 0xFF`，

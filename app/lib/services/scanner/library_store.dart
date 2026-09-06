@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'library_scanner.dart';
 import 'tracks_db.dart';
+import '../../stores/app_prefs.dart';
 
 /// 本地音乐库状态。
 class LibraryState {
@@ -228,6 +229,12 @@ class LibraryNotifier extends Notifier<LibraryState> {
       final result = await scanner.scan(
         state.scanDirs,
         incremental: incremental,
+        batch: ref.read(appPrefsProvider).scanBatchSize,
+        maxParallelism: ref.read(appPrefsProvider).scanParallelism,
+        maxFileSizeMb: ref.read(appPrefsProvider).scanMaxFileSizeMb,
+        maxScanFiles: ref.read(appPrefsProvider).scanMaxScanFiles,
+        maxScanErrors: ref.read(appPrefsProvider).scanMaxScanErrors,
+        extraExts: ref.read(appPrefsProvider).scanExtraExts,
       );
       state = state.copyWith(
         scanning: false,

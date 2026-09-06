@@ -14,6 +14,7 @@ import 'prefs_player.dart';
 import 'prefs_power.dart';
 import 'prefs_preset.dart';
 import 'prefs_scrape.dart';
+import 'prefs_scan.dart';
 import 'prefs_search.dart';
 import 'prefs_security.dart';
 
@@ -26,6 +27,7 @@ export 'prefs_player.dart';
 export 'prefs_power.dart';
 export 'prefs_preset.dart';
 export 'prefs_scrape.dart';
+export 'prefs_scan.dart';
 export 'prefs_search.dart';
 export 'prefs_security.dart';
 
@@ -403,7 +405,8 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置刮削配置（目录 + 数据源开关；目录空列表 = 使用媒体库扫描目录）。
+  /// 设置刮削配置（目录 + 数据源开关 + 写入选项 + 高级参数；
+  /// 目录空列表 = 使用媒体库扫描目录）。
   void setScrape({
     List<String>? dirs,
     bool? useMusicBrainz,
@@ -415,6 +418,15 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     bool? useKuwo,
     bool? useMigu,
     bool? useAcoustID,
+    bool? embedMetadata,
+    bool? embedCover,
+    bool? embedLyrics,
+    bool? skipScraped,
+    int? workers,
+    int? batchSize,
+    int? maxRetries,
+    String? organizeTargetDir,
+    String? organizePattern,
   }) {
     state = state.copyWithScrape(
       dirs: dirs,
@@ -427,6 +439,35 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       useKuwo: useKuwo,
       useMigu: useMigu,
       useAcoustID: useAcoustID,
+      embedMetadata: embedMetadata,
+      embedCover: embedCover,
+      embedLyrics: embedLyrics,
+      skipScraped: skipScraped,
+      workers: workers,
+      batchSize: batchSize,
+      maxRetries: maxRetries,
+      organizeTargetDir: organizeTargetDir,
+      organizePattern: organizePattern,
+    );
+    state.save();
+  }
+
+  /// 设置扫描配置（并行度 / 批大小 / 安全上限 / 额外扩展名；0 = 引擎默认）。
+  void setScan({
+    int? parallelism,
+    int? batchSize,
+    int? maxFileSizeMb,
+    int? maxScanFiles,
+    int? maxScanErrors,
+    List<String>? extraExts,
+  }) {
+    state = state.copyWithScan(
+      parallelism: parallelism,
+      batchSize: batchSize,
+      maxFileSizeMb: maxFileSizeMb,
+      maxScanFiles: maxScanFiles,
+      maxScanErrors: maxScanErrors,
+      extraExts: extraExts,
     );
     state.save();
   }

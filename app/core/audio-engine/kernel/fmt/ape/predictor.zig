@@ -4,7 +4,7 @@
 //! long_filter_high_3800 / long_filter_ehigh_3830 / predictor_update_3930 /
 //! predictor_update_filter（64-bit）/ do_apply_filter / do_init_filter，
 //! 逐位复刻（含所有 (unsigned)/uint32/uint64 回绕与算术右移语义）保证 bit-exact；
-//! 参考对照非复制（§3.3）。
+//! 许可登记见 audio-engine/THIRD-PARTY-LICENSES.md。
 //!
 //! 版本分派（对齐 ape_decode_init）：
 //!   < 3930 → 3800 系列（FAST=1000 走 filter_fast_3320；HIGH/EXTRA_HIGH 先做长滤波）

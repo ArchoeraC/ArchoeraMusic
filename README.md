@@ -36,6 +36,30 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面�
 - 桌面端原生模块 **FFI 直连**（`archoera_mediaengine` 共享库）
 - 可选启动 **Subsonic 兼容服务端**（Go），并支持 Subsonic / Jellyfin 流媒体服务器聚合
 
+### 本地曲库：扫描与刮削
+
+音乐库扫描（C# `archoera-scanner`）与元数据刮削 / 目录整理（C++ `archoera-scraper`）均以 **FFI 直连、进程内执行**，不占用本地端口：
+
+**扫描（音乐库）**
+
+- **增量扫描**：进入音乐库页自动刷新（5 分钟去重）或点刷新按钮手动触发；
+  **全量扫描重建**：音乐库页 `⋯` 菜单 →「全量扫描」，确认后清空曲库 DB 并从扫描目录重建（不删除源文件）。
+- **运行设置**：扫描并行度（0=自动，按 CPU/内存自适应）、数据库批量写入上限。
+- **安全上限**：单文件大小、单轮最大文件数、连续解析错误数（可自定义；默认 500MB / 50000 / 50）。
+- **自定义音频扩展名**：在内置白名单（`mp3 flac ogg opus oga m4a aac wav ape wv dsf dsd dff mp4 aiff aif wma mka mpc mpp mp+ mp2 aifc m4b webm`）之上追加自定义扩展名。
+- **坏文件隔离区**：连续解析失败 ≥3 次的文件自动移入 `database/quarantine/`，可在扫描设置中浏览、单删 / 清空或打开目录。
+- 扫描目录管理在音乐库页 `⋯` →「扫描目录」（多目录、路径去重）。
+
+**刮削（元数据补齐）**
+
+- **多源并发刮削**：MusicBrainz（权威 + MBID/ISRC）、Deezer、iTunes、网易云、QQ 音乐、酷狗、酷我、咪咕 8 个在线源，外加 **AcoustID 音频指纹**回退；命中相似度评分、多源字段择优合并，并自动补封面（Cover Art Archive → 各源回退）与歌词（LRCLIB → 中文源）。
+- **写入选项**：元数据 / 封面 / 歌词嵌入开关；**跳过已刮削**（已有 MusicBrainz ID 或 ISRC 的文件不再重复联网）。
+- **高级参数**：并发查询线程数（0=自动）、批大小、失败重试上限（超出后不再重试）。
+- **仅目录整理（不联网）**：按模板把目录内文件移动到目标目录树——可用变量 `artist / albumArtist / album / genre / year / disc / track / title / ext`，以 `/` 分隔目录层级，**始终保留原文件名**；内置 歌手/专辑、仅歌手、风格/歌手/专辑、年份/歌手/专辑 四套预设模板。
+- 刮削成功后把标签写入音频文件（ID3v2 / Xiph / MP4 / RIFF 等），封面写入标签与本地封面缓存；结果经「下次扫描」读取入库。
+
+**UI 入口**：设置 →「刮削」（目录 / 数据源 / 写入选项 / 高级参数 / 仅目录整理）；设置 →「扫描」（并行度、上限、扩展名、隔离区）；音乐库页 `⋯` 菜单（扫描目录 / 全量扫描 / 媒体统计）。
+
 ---
 
 ## 技术架构
@@ -321,7 +345,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 
 ## 特别鸣谢（Acknowledgements）
 
-本项目在架构设计与实现思路上受到了以下开源项目的启发与支持：
+**设计思路借鉴**（本项目在架构设计与实现思路上受到以下开源项目的启发与支持）：
 
 - **[SPlayer-Next](https://github.com/SPlayer-Dev/SPlayer-Next)** —— 混合架构播放器设计、音频引擎管线与在线平台接入的整体思路
 - **[KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi)（MIT）** —— 酷狗平台接口调研与协议思路
@@ -330,7 +354,20 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 - **[MoeKoeMusic](https://github.com/MoeKoeMusic/MoeKoeMusic)** —— 开源高颜值酷狗第三方客户端，桌面端体验与平台接入思路
 - **[Mineradio](https://github.com/XxHuberrr/Mineradio)** —— Windows 桌面沉浸式音乐播放器，歌词舞台与视觉呈现思路
 
-> 特别说明：此处为表达对相关项目思路的认可、采纳与致谢。
+**代码 / 参考实现致谢**（audio-engine 与 Zig 解码内核所依赖、参考或移植的第三方组件，许可证逐项见各模块 `THIRD-PARTY-LICENSES.md`）：
+
+- **[FFmpeg](https://ffmpeg.org)（LGPL-2.1+）** —— 主解码 / 重采样引擎，多格式移植的参考源
+- **[Opus / libopus](https://opus-codec.org)（BSD-3-Clause，IETF RFC 6716）** —— SILK/CELT 移植与静态模式表参考
+- **[miniaudio](https://github.com/mackron/miniaudio)（MIT-0 / Public Domain）** —— 跨平台音频输出（David Reid）
+- **[signalsmith-stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch)（MIT）** —— 变速变调核心（Signalsmith Audio）
+- **[minimp3](https://github.com/lieff/minimp3)（CC0-1.0）** —— MP3 Layer III 解码表参考（lieff）
+- **[stb_vorbis](https://github.com/nothings/stb)（Public Domain / MIT-0）** —— Ogg Vorbis 解码（Sean Barrett）
+- **[kissfft](https://github.com/mborgerding/kissfft)（BSD-3-Clause）** —— Opus CELT FFT/MDCT 参考（Mark Borgerding）
+- **[WavPack](https://www.wavpack.com)（BSD-3-Clause）** —— WavPack 解码参考（David Bryant）
+- **dsd2pcm（BSD）** —— DSD→PCM 算法参考（Sebastian Gesemann，经 FFmpeg `dsd.c` 对照）
+- **[OpenCORE / PV-AMR](https://android.googlesource.com/platform/external/opencore)（Apache-2.0）** —— AMR-NB 解码 vendored 源（Android OpenCORE + OSCL shim）
+
+> 特别说明：以上分别表达对相关项目设计思路的认可、采纳与致谢，以及对所依赖/参考第三方组件作者的感谢；完整的许可义务与声明以仓库及各模块的 `LICENSE` / `THIRD-PARTY-LICENSES.md` 为准。
 
 ---
 

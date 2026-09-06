@@ -2,7 +2,7 @@
 //!
 //! 自研 Zig：OggS 页解析（页头 / lacing 分段表 / 非反射 CRC-32）+ 跨页 packet
 //! 重组 + granule 位置跟踪。参考重构对照 FFmpeg `libavformat/oggdec.c` 与
-//! `libavformat/oggparseopus.c`（RFC 3533 + RFC 7845）；参考对照非复制（§3.3）。
+//! `libavformat/oggparseopus.c`（RFC 3533 + RFC 7845）；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md。
 //!
 //! 语义要点（对齐 FFmpeg ogg 解复用）：
 //!   - 页头 27 字节：`OggS` + version(1) + header_type(1) + granule(8 LE) +

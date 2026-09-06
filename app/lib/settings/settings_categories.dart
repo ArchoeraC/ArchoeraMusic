@@ -11,6 +11,7 @@ enum SettingsCategory {
   download(Icons.download_outlined),
   storage(Icons.storage_outlined),
   scrape(Icons.auto_fix_high),
+  scanner(Icons.manage_search_outlined),
   mediaSource(Icons.dns_outlined),
   about(Icons.info_outline),
 
@@ -29,6 +30,7 @@ enum SettingsCategory {
     download => l10n.settingsCatDownload,
     storage => l10n.settingsCatStorage,
     scrape => l10n.settingsCatScrape,
+    scanner => l10n.settingsCatScanner,
     mediaSource => l10n.settingsCatMediaSource,
     about => l10n.settingsCatAbout,
     developer => l10n.settingsCatDeveloper,
@@ -42,6 +44,7 @@ enum SettingsCategory {
     download => l10n.settingsDownloadSubtitle,
     storage => l10n.settingsStorageSubtitle,
     scrape => l10n.settingsScrapeSubtitle,
+    scanner => l10n.settingsScannerSubtitle,
     mediaSource => l10n.settingsMediaSourceSubtitle,
     about => l10n.settingsAboutSubtitle,
     developer => l10n.settingsDeveloperSubtitle,

@@ -2,7 +2,7 @@
 //!
 //! 参考重构对照 FFmpeg `libavcodec/opus/pvq.c`（pvq_decode_band 全路径 +
 //! celt_cwrsi / celt_alg_unquant / celt_exp_rotation / celt_haar1 /
-//! celt_stereo_merge / 数学原语）；参考对照非复制（§3.3）。
+//! celt_stereo_merge / 数学原语）（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 语义要点（保证 bit-exact）：
 //!   - U(N,K) 组合数表（`ff_celt_pvq_u_row`，满足

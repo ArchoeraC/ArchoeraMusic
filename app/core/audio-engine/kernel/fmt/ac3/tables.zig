@@ -1,6 +1,6 @@
 //! AC-3 / E-AC-3 解码器表（对照 FFmpeg ac3tab.c / ac3.c / ac3dec_data.c / ac3defs.h）
 //!
-//! 参考重构非复制（§3.3）：表值直接取自 ATSC A/52 / A/52:2012 规范与 FFmpeg 表。
+//! 许可登记见 audio-engine/THIRD-PARTY-LICENSES.md：表值直接取自 ATSC A/52 / A/52:2012 规范与 FFmpeg 表。
 
 // ---- ac3defs.h ----
 

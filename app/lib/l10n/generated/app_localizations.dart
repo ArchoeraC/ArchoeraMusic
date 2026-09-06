@@ -6331,6 +6331,384 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'QM'**
   String get platformQqMusic;
+
+  /// No description provided for @settingsValueAuto.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动'**
+  String get settingsValueAuto;
+
+  /// No description provided for @settingsSectionScrapeWrite.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'写入选项'**
+  String get settingsSectionScrapeWrite;
+
+  /// No description provided for @settingsScrapeWriteDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刮削成功后把以下内容写入音频文件标签'**
+  String get settingsScrapeWriteDesc;
+
+  /// No description provided for @settingsScrapeEmbedMetadata.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'嵌入元数据'**
+  String get settingsScrapeEmbedMetadata;
+
+  /// No description provided for @settingsScrapeEmbedCover.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'嵌入封面'**
+  String get settingsScrapeEmbedCover;
+
+  /// No description provided for @settingsScrapeEmbedLyrics.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'嵌入歌词'**
+  String get settingsScrapeEmbedLyrics;
+
+  /// No description provided for @settingsScrapeSkipScraped.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'跳过已刮削文件'**
+  String get settingsScrapeSkipScraped;
+
+  /// No description provided for @settingsScrapeSkipScrapedDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已有 MusicBrainz ID 或 ISRC 的文件不再重复联网刮削'**
+  String get settingsScrapeSkipScrapedDesc;
+
+  /// No description provided for @settingsSectionScrapeAdvanced.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高级参数'**
+  String get settingsSectionScrapeAdvanced;
+
+  /// No description provided for @settingsScrapeWorkers.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'并发查询线程'**
+  String get settingsScrapeWorkers;
+
+  /// No description provided for @settingsScrapeWorkersDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'多源并发查询线程数（0=自动，当前 {value}）'**
+  String settingsScrapeWorkersDesc(Object value);
+
+  /// No description provided for @settingsScrapeBatch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'批大小'**
+  String get settingsScrapeBatch;
+
+  /// No description provided for @settingsScrapeBatchDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'每批处理文件数（当前 {value}）'**
+  String settingsScrapeBatchDesc(Object value);
+
+  /// No description provided for @settingsScrapeRetries.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'失败重试上限'**
+  String get settingsScrapeRetries;
+
+  /// No description provided for @settingsScrapeRetriesDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重试达到该次数后不再重试（当前 {value}）'**
+  String settingsScrapeRetriesDesc(Object value);
+
+  /// No description provided for @settingsSectionScrapeOrganize.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅目录整理'**
+  String get settingsSectionScrapeOrganize;
+
+  /// No description provided for @settingsScrapeOrganizeNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不联网。按模板把目录中的文件移动到目标目录树，保留原文件名与现有标签。可用变量：artist、albumArtist、album、genre、year、disc、track、title、ext；以 / 分隔目录层级。'**
+  String get settingsScrapeOrganizeNote;
+
+  /// No description provided for @settingsScrapeOrganizeTargetDir.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'整理目标目录'**
+  String get settingsScrapeOrganizeTargetDir;
+
+  /// No description provided for @settingsScrapeOrganizeTargetHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'建议填写音乐库扫描目录'**
+  String get settingsScrapeOrganizeTargetHint;
+
+  /// No description provided for @settingsScrapeOrganizePattern.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'整理模板'**
+  String get settingsScrapeOrganizePattern;
+
+  /// No description provided for @settingsScrapeOrganizePatternHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'模板只决定目录层级，不改文件名'**
+  String get settingsScrapeOrganizePatternHint;
+
+  /// No description provided for @settingsScrapeOrganizePresetArtistAlbum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌手/专辑'**
+  String get settingsScrapeOrganizePresetArtistAlbum;
+
+  /// No description provided for @settingsScrapeOrganizePresetArtistOnly.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅歌手'**
+  String get settingsScrapeOrganizePresetArtistOnly;
+
+  /// No description provided for @settingsScrapeOrganizePresetGenreArtistAlbum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'风格/歌手/专辑'**
+  String get settingsScrapeOrganizePresetGenreArtistAlbum;
+
+  /// No description provided for @settingsScrapeOrganizePresetYearArtistAlbum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'年份/歌手/专辑'**
+  String get settingsScrapeOrganizePresetYearArtistAlbum;
+
+  /// No description provided for @settingsScrapeOrganizeStart.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开始整理'**
+  String get settingsScrapeOrganizeStart;
+
+  /// No description provided for @settingsOrganizeCancel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'取消整理'**
+  String get settingsOrganizeCancel;
+
+  /// No description provided for @settingsOrganizeRunning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在整理文件…'**
+  String get settingsOrganizeRunning;
+
+  /// No description provided for @settingsOrganizeMoved.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'移动'**
+  String get settingsOrganizeMoved;
+
+  /// No description provided for @settingsOrganizeSkipped.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'跳过'**
+  String get settingsOrganizeSkipped;
+
+  /// No description provided for @settingsOrganizeFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'失败'**
+  String get settingsOrganizeFailed;
+
+  /// No description provided for @settingsOrganizeDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'整理完成：移动 {moved}，跳过 {skipped}，失败 {failed}'**
+  String settingsOrganizeDone(Object failed, Object moved, Object skipped);
+
+  /// No description provided for @settingsOrganizeNoTarget.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请先设置整理目标目录'**
+  String get settingsOrganizeNoTarget;
+
+  /// No description provided for @toastOrganizeNoDirs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'没有可整理的目录'**
+  String get toastOrganizeNoDirs;
+
+  /// No description provided for @toastOrganizeStarted.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开始整理'**
+  String get toastOrganizeStarted;
+
+  /// No description provided for @settingsCatScanner.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫描'**
+  String get settingsCatScanner;
+
+  /// No description provided for @settingsScannerSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音乐库扫描引擎 · 并行度与安全上限 · 隔离区'**
+  String get settingsScannerSubtitle;
+
+  /// No description provided for @settingsSectionScanRun.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'运行设置'**
+  String get settingsSectionScanRun;
+
+  /// No description provided for @settingsScanParallelism.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫描并行度'**
+  String get settingsScanParallelism;
+
+  /// No description provided for @settingsScanParallelismDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'并行解析文件数（0=自动，当前 {value}）'**
+  String settingsScanParallelismDesc(Object value);
+
+  /// No description provided for @settingsScanBatch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'批大小'**
+  String get settingsScanBatch;
+
+  /// No description provided for @settingsScanBatchDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'数据库批量写入上限（0=自动，当前 {value}）'**
+  String settingsScanBatchDesc(Object value);
+
+  /// No description provided for @settingsSectionScanLimits.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'安全上限'**
+  String get settingsSectionScanLimits;
+
+  /// No description provided for @settingsScanLimitsNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫描大目录的保护性上限；留空使用引擎默认'**
+  String get settingsScanLimitsNote;
+
+  /// No description provided for @settingsScanNumberDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'留空使用引擎默认'**
+  String get settingsScanNumberDesc;
+
+  /// No description provided for @settingsScanMaxFileSizeMb.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'单文件大小上限（MB）'**
+  String get settingsScanMaxFileSizeMb;
+
+  /// No description provided for @settingsScanMaxScanFiles.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'最大扫描文件数'**
+  String get settingsScanMaxScanFiles;
+
+  /// No description provided for @settingsScanMaxErrors.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'连续错误上限'**
+  String get settingsScanMaxErrors;
+
+  /// No description provided for @settingsSectionScanExts.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音频扩展名'**
+  String get settingsSectionScanExts;
+
+  /// No description provided for @settingsScanExtraExts.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'额外扩展名'**
+  String get settingsScanExtraExts;
+
+  /// No description provided for @settingsScanExtraExtsNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在引擎内置白名单之上追加扫描的音频扩展名'**
+  String get settingsScanExtraExtsNote;
+
+  /// No description provided for @settingsScanExtraExtsHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'空格或逗号分隔，如 dsf m4b'**
+  String get settingsScanExtraExtsHint;
+
+  /// No description provided for @settingsSectionScanQuarantine.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'坏文件隔离区'**
+  String get settingsSectionScanQuarantine;
+
+  /// No description provided for @settingsScanQuarantineNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'连续解析失败 ≥3 次的文件会被移入隔离目录：{dir}'**
+  String settingsScanQuarantineNote(Object dir);
+
+  /// No description provided for @settingsScanQuarantineEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂无隔离文件'**
+  String get settingsScanQuarantineEmpty;
+
+  /// No description provided for @settingsScanQuarantineDelete.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除该文件'**
+  String get settingsScanQuarantineDelete;
+
+  /// No description provided for @settingsScanQuarantineOpenDir.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'打开目录'**
+  String get settingsScanQuarantineOpenDir;
+
+  /// No description provided for @settingsScanQuarantineClearAll.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清空隔离区'**
+  String get settingsScanQuarantineClearAll;
+
+  /// No description provided for @settingsScanQuarantineClearAllConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确定删除隔离区中的所有文件吗？该操作不可恢复。'**
+  String get settingsScanQuarantineClearAllConfirm;
+
+  /// No description provided for @libraryFullScan.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'全量扫描'**
+  String get libraryFullScan;
+
+  /// No description provided for @libraryFullScanConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确认全量扫描？'**
+  String get libraryFullScanConfirm;
+
+  /// No description provided for @libraryFullScanConfirmDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将清空当前曲库记录并从扫描目录重建（不删除源文件）。此操作不可撤销，扫描期间会占用较多磁盘 IO。'**
+  String get libraryFullScanConfirmDesc;
+
+  /// No description provided for @libraryFullScanDescription.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清空曲库并从扫描目录重建'**
+  String get libraryFullScanDescription;
 }
 
 class _AppLocalizationsDelegate

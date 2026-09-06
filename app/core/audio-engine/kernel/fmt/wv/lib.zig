@@ -1,6 +1,6 @@
 //! WavPack 解码器（docs/audio-kernel-zig.md §9.9）
 //!
-//! 参考重构对照 wavpack.c / wavpack.h / wavpackdata.c；参考对照非复制（§3.3）。
+//! 参考重构对照 wavpack.c / wavpack.h / wavpackdata.c（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 容器：wvpk 32 字节块头 + 块内 metadata 序列。文件为连续块流：
 //!   一个"包"由 INITIAL_BLOCK 起到 FINAL_BLOCK 止的 1..N 个块组成，

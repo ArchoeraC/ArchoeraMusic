@@ -7,7 +7,7 @@
 //!     extrabits 分支按值决定跳过 k 或 k-1 位），flac 版没有这两个原语；
 //!   - 字节边界与帧边界一致（m4a sample 即完整 ALAC 帧），无需跨帧语义。
 //!
-//! 位读取原语（语义为格式既定行为，参考重构非复制）：
+//! 位读取原语（语义为格式既定行为；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）：
 //!   readBits    —— 读 n 位无符号（MSB-first 组装，n ≤ 32）
 //!   showBits    —— 查看 n 位但不消耗
 //!   skipBits    —— 仅前进 n 位

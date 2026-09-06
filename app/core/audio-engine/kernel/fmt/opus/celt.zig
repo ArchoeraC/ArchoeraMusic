@@ -2,7 +2,7 @@
 //!
 //! 参考重构对照 FFmpeg `libavcodec/opus/celt.c`（ff_celt_bitalloc /
 //! ff_celt_quant_bands）与 `libavcodec/opus/dec_celt.c`（ff_celt_decode_frame /
-//! 能量解码 / tf / 后滤波 / 去加重）+ `dsp.c`；参考对照非复制（§3.3）。
+//! 能量解码 / tf / 后滤波 / 去加重）+ `dsp.c`（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 帧解码流程：静音 → 后滤波参数 → transient → coarse energy → tf_changes →
 //! bitalloc → fine energy → quant_bands（PVQ）→ anticollapse → final energy →

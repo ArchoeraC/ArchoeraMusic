@@ -68,8 +68,20 @@ class PcmAnalyzer {
   late final Float64List _r;
 
   /// 增量扫描文件新追加的 PCM 块（引擎直写中调用也安全）。
+  ///
+  /// 流式播放（§B 边解边播）中 seek 时，引擎会**截断重建** stream.pcm
+  /// （mediaengine_lib.c mediaengine_stream_rebuild 以 "wb" 重开，新块从
+  /// seek 目标位置重新写入）：文件变短即视为会话已重建，旧索引全部失效，
+  /// 必须归零重扫——否则 _fileEnd 越过新文件末尾，新块永不入索引、
+  /// frameAt 按旧偏移读到已不存在的数据 → seek 后频谱永久消失。
   void scan() {
     final total = _raf.lengthSync();
+    if (total < _fileEnd) {
+      _resetIndex();
+    }
+    // 截断后文件重新长过旧 _fileEnd 的竞态兜底（长度探测失效）：索引非空时
+    // 出现「头部非法 / 位置回退」即文件已被重写，允许归零重扫一次。
+    var restarted = false;
     while (_fileEnd + 12 <= total) {
       _raf.setPositionSync(_fileEnd);
       final header = _raf.readSync(12);
@@ -77,9 +89,24 @@ class PcmAnalyzer {
       final posMs = bd.getInt32(0, Endian.little);
       final samples = bd.getInt32(4, Endian.little);
       final channels = bd.getInt32(8, Endian.little);
-      if (samples <= 0 || channels <= 0 || channels > 8) break; // 异常块，停止
+      if (samples <= 0 || channels <= 0 || channels > 8) {
+        if (_offsets.isNotEmpty && !restarted) {
+          restarted = true;
+          _resetIndex();
+          continue;
+        }
+        break; // 异常块，停止
+      }
       final need = samples * channels * 4;
       if (_fileEnd + 12 + need > total) break; // 块未写完，等下次扫描
+      if (_offsets.isNotEmpty && posMs < _offsets.last) {
+        if (!restarted) {
+          restarted = true;
+          _resetIndex();
+          continue;
+        }
+        break; // 重扫后仍位置回退：异常块，停止
+      }
       _offsets.add(posMs);
       _fileOffsets.add(_fileEnd);
       _blockSamples.add(samples);
@@ -87,6 +114,16 @@ class PcmAnalyzer {
       _sampleCount += samples;
       _fileEnd += 12 + need;
     }
+  }
+
+  /// 清空全部索引状态（seek 截断重建 / dispose 时）。
+  void _resetIndex() {
+    _offsets.clear();
+    _fileOffsets.clear();
+    _blockSamples.clear();
+    _sampleStarts.clear();
+    _fileEnd = 0;
+    _sampleCount = 0;
   }
 
   /// 按播放位置取最近一帧（窗口终点 = posMs，向前 fftSize 样本；
@@ -250,9 +287,6 @@ class PcmAnalyzer {
       _raf.closeSync();
     } catch (_) {}
     _fft.dispose();
-    _offsets.clear();
-    _fileOffsets.clear();
-    _blockSamples.clear();
-    _sampleStarts.clear();
+    _resetIndex();
   }
 }

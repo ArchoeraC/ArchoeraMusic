@@ -2,7 +2,7 @@
 //!
 //! 设计要点：
 //!   - 基于 `io.Reader` 的 MSB-first 位读取（FLAC 位流约定），
-//!     对应 FFmpeg `GetBitContext`（参考重构，非复制）；
+//!     对应 FFmpeg `GetBitContext`（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）；
 //!   - **按需最小取字节**：仅当缓存位不足且仍需读取时才取 1 字节，
 //!     保证滚动 CRC 恰好覆盖本帧字节——帧末不会预读下一帧首字节
 //!     （CRC 精确性的关键，见 crc.zig 文件头）；

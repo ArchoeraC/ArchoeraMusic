@@ -2,7 +2,7 @@
 //!
 //! 重构对照 libopus `celt/kiss_fft.c`（kf_factor / compute_bitrev_table /
 //! compute_twiddles / kf_bfly2/3/4/5 / opus_fft_impl）与 `celt/mdct.c`
-//! （clt_mdct_init / clt_mdct_backward_c）；参考对照非复制（§3.3）。
+//! （clt_mdct_init / clt_mdct_backward_c）（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 浮点语义：全部按 libopus FLOAT 构建——S_MUL=普通乘、C_MUL=复数乘、
 //! C_ADD/C_SUB=普通复数加减、HALF_OF=x*0.5、SHL32_ovflw(x,0)=PSHR32_ovflw(x,0)=x

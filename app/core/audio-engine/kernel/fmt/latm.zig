@@ -2,7 +2,7 @@
 //! AudioMuxElement/StreamMuxConfig/PayloadLengthInfo 解析，提取 raw AAC
 //! 帧复用 fmt/aac/lib.zig（AAC-LC 自研解码核心），与 ADTS 同一解码核心/同一
 //! 输出契约（s16 交错小端）。语义对照 FFmpeg n9.0.1 libavformat/loasdec.c +
-//! libavcodec/aac/aacdec_latm.h（参考对照非复制）。
+//! libavcodec/aac/aacdec_latm.h（参考对照；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! LOAS 帧：11-bit 同步字 0x2B7（24-bit 前缀 0x56E000）+ 13-bit
 //! audioMuxLengthBytes（不含 3 字节帧头）；整帧 = 3 + audioMuxLengthBytes。

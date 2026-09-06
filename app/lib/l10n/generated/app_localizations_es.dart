@@ -3636,4 +3636,210 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get platformQqMusic => 'QM';
+
+  @override
+  String get settingsValueAuto => '自动';
+
+  @override
+  String get settingsSectionScrapeWrite => '写入选项';
+
+  @override
+  String get settingsScrapeWriteDesc => '刮削成功后把以下内容写入音频文件标签';
+
+  @override
+  String get settingsScrapeEmbedMetadata => '嵌入元数据';
+
+  @override
+  String get settingsScrapeEmbedCover => '嵌入封面';
+
+  @override
+  String get settingsScrapeEmbedLyrics => '嵌入歌词';
+
+  @override
+  String get settingsScrapeSkipScraped => '跳过已刮削文件';
+
+  @override
+  String get settingsScrapeSkipScrapedDesc =>
+      '已有 MusicBrainz ID 或 ISRC 的文件不再重复联网刮削';
+
+  @override
+  String get settingsSectionScrapeAdvanced => '高级参数';
+
+  @override
+  String get settingsScrapeWorkers => '并发查询线程';
+
+  @override
+  String settingsScrapeWorkersDesc(Object value) {
+    return '多源并发查询线程数（0=自动，当前 $value）';
+  }
+
+  @override
+  String get settingsScrapeBatch => '批大小';
+
+  @override
+  String settingsScrapeBatchDesc(Object value) {
+    return '每批处理文件数（当前 $value）';
+  }
+
+  @override
+  String get settingsScrapeRetries => '失败重试上限';
+
+  @override
+  String settingsScrapeRetriesDesc(Object value) {
+    return '重试达到该次数后不再重试（当前 $value）';
+  }
+
+  @override
+  String get settingsSectionScrapeOrganize => '仅目录整理';
+
+  @override
+  String get settingsScrapeOrganizeNote =>
+      '不联网。按模板把目录中的文件移动到目标目录树，保留原文件名与现有标签。可用变量：artist、albumArtist、album、genre、year、disc、track、title、ext；以 / 分隔目录层级。';
+
+  @override
+  String get settingsScrapeOrganizeTargetDir => '整理目标目录';
+
+  @override
+  String get settingsScrapeOrganizeTargetHint => '建议填写音乐库扫描目录';
+
+  @override
+  String get settingsScrapeOrganizePattern => '整理模板';
+
+  @override
+  String get settingsScrapeOrganizePatternHint => '模板只决定目录层级，不改文件名';
+
+  @override
+  String get settingsScrapeOrganizePresetArtistAlbum => '歌手/专辑';
+
+  @override
+  String get settingsScrapeOrganizePresetArtistOnly => '仅歌手';
+
+  @override
+  String get settingsScrapeOrganizePresetGenreArtistAlbum => '风格/歌手/专辑';
+
+  @override
+  String get settingsScrapeOrganizePresetYearArtistAlbum => '年份/歌手/专辑';
+
+  @override
+  String get settingsScrapeOrganizeStart => '开始整理';
+
+  @override
+  String get settingsOrganizeCancel => '取消整理';
+
+  @override
+  String get settingsOrganizeRunning => '正在整理文件…';
+
+  @override
+  String get settingsOrganizeMoved => '移动';
+
+  @override
+  String get settingsOrganizeSkipped => '跳过';
+
+  @override
+  String get settingsOrganizeFailed => '失败';
+
+  @override
+  String settingsOrganizeDone(Object failed, Object moved, Object skipped) {
+    return '整理完成：移动 $moved，跳过 $skipped，失败 $failed';
+  }
+
+  @override
+  String get settingsOrganizeNoTarget => '请先设置整理目标目录';
+
+  @override
+  String get toastOrganizeNoDirs => '没有可整理的目录';
+
+  @override
+  String get toastOrganizeStarted => '已开始整理';
+
+  @override
+  String get settingsCatScanner => '扫描';
+
+  @override
+  String get settingsScannerSubtitle => '音乐库扫描引擎 · 并行度与安全上限 · 隔离区';
+
+  @override
+  String get settingsSectionScanRun => '运行设置';
+
+  @override
+  String get settingsScanParallelism => '扫描并行度';
+
+  @override
+  String settingsScanParallelismDesc(Object value) {
+    return '并行解析文件数（0=自动，当前 $value）';
+  }
+
+  @override
+  String get settingsScanBatch => '批大小';
+
+  @override
+  String settingsScanBatchDesc(Object value) {
+    return '数据库批量写入上限（0=自动，当前 $value）';
+  }
+
+  @override
+  String get settingsSectionScanLimits => '安全上限';
+
+  @override
+  String get settingsScanLimitsNote => '扫描大目录的保护性上限；留空使用引擎默认';
+
+  @override
+  String get settingsScanNumberDesc => '留空使用引擎默认';
+
+  @override
+  String get settingsScanMaxFileSizeMb => '单文件大小上限（MB）';
+
+  @override
+  String get settingsScanMaxScanFiles => '最大扫描文件数';
+
+  @override
+  String get settingsScanMaxErrors => '连续错误上限';
+
+  @override
+  String get settingsSectionScanExts => '音频扩展名';
+
+  @override
+  String get settingsScanExtraExts => '额外扩展名';
+
+  @override
+  String get settingsScanExtraExtsNote => '在引擎内置白名单之上追加扫描的音频扩展名';
+
+  @override
+  String get settingsScanExtraExtsHint => '空格或逗号分隔，如 dsf m4b';
+
+  @override
+  String get settingsSectionScanQuarantine => '坏文件隔离区';
+
+  @override
+  String settingsScanQuarantineNote(Object dir) {
+    return '连续解析失败 ≥3 次的文件会被移入隔离目录：$dir';
+  }
+
+  @override
+  String get settingsScanQuarantineEmpty => '暂无隔离文件';
+
+  @override
+  String get settingsScanQuarantineDelete => '删除该文件';
+
+  @override
+  String get settingsScanQuarantineOpenDir => '打开目录';
+
+  @override
+  String get settingsScanQuarantineClearAll => '清空隔离区';
+
+  @override
+  String get settingsScanQuarantineClearAllConfirm => '确定删除隔离区中的所有文件吗？该操作不可恢复。';
+
+  @override
+  String get libraryFullScan => '全量扫描';
+
+  @override
+  String get libraryFullScanConfirm => '确认全量扫描？';
+
+  @override
+  String get libraryFullScanConfirmDesc =>
+      '将清空当前曲库记录并从扫描目录重建（不删除源文件）。此操作不可撤销，扫描期间会占用较多磁盘 IO。';
+
+  @override
+  String get libraryFullScanDescription => '清空曲库并从扫描目录重建';
 }
