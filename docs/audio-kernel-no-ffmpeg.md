@@ -65,7 +65,7 @@ FFmpeg 带来的工程问题：
 1. **零 FFmpeg**：`app/core/audio-engine` 不再链接 / 不再依赖任何 FFmpeg 组件（`libav*` / `libsw*`）；
 2. **纯音频内核**：只解码音频，视频轨不处理、不支持、不探测；
 3. **覆盖核心格式**：满足在线平台 + 本地曲库的实际需求（见 §1.3 格式清单）；
-4. **许可证合规**：全部新引入第三方为 Permissive 且与 AGPL-3.0 兼容，不引入 GPL/SSPL/非自由许可；
+4. **许可证约束**：新引入第三方仅限宽松许可（可在其各自条款下与本项目 AGPL-3.0 代码共存），不引入 GPL/SSPL/非自由许可；
 5. **行为不回退**：播放 / seek / FFT / EQ / 变速变调 / 位置事件与现状一致（Dart 侧 `audio_engine_process.dart`
    与 C 侧 `archoera_mediaengine.h` FFI 协议**零改动**）；
 6. **内核自包含**：核心解码/采样逻辑自写或采用单文件库，构建只依赖 C 工具链（+ 可选 libopus）。
@@ -348,7 +348,7 @@ audio_decoder_open(path):
 
 ## 6. 各格式解码方案与许可证分析
 
-> 许可审查前置条件：所有引入组件必须 **Permissive 且与 AGPL-3.0 兼容**，写入 `THIRD-PARTY-LICENSES.md`。
+> 许可审查前置条件：引入组件须为宽松许可、可在其条款下与本项目 AGPL-3.0 代码共存（维护者判定），并写入 `THIRD-PARTY-LICENSES.md`。
 
 ### 6.1 汇总表
 

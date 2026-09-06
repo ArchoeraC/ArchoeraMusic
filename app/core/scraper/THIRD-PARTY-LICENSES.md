@@ -1,7 +1,7 @@
 # 刮削器第三方许可证声明（scraper / C++）
 
 本目录 `app/core/scraper` 为 ArchoeraMusic（源于 SPlayer-Next 服务端）的 C++ 刮削器，
-随本软件以 AGPL-3.0 授权。以下为其经 CMake 链接的系统/第三方库许可证摘要。
+其自研代码随本软件以 AGPL-3.0 授权，第三方组件按各自许可使用（逐项登记见下）。
 
 ## 链接的第三方库
 
@@ -24,11 +24,10 @@ TagLib 动态库替换本程序运行时所加载的 `libtag` 共享对象。
 - TagLib 仓库：https://github.com/taglib/taglib
 - 许可证：LGPL-2.1（完整文本见 https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html）
 
-## 许可兼容性结论
+## 合规评估（非法律意见）
 
-TagLib（LGPL-2.1）与本项目 AGPL-3.0 兼容；libcurl / OpenSSL / SQLite3 /
-nlohmann_json 均为宽松许可证，无 copyleft 冲突。
-本刮削器整体作为 AGPL-3.0 受保护作品的一部分分发，合规。
+TagLib（LGPL-2.1，动态链接，替换/重链说明见上）与 libcurl / OpenSSL / SQLite3 / nlohmann_json 均为宽松许可，在各自条款下可与本项目 AGPL-3.0 代码共存。
+本文档为项目维护者的合理努力评估，不构成法律意见；正式依据以上游官方许可文本为准。
 
 ---
 AGPL-3.0 完整文本见仓库根 `LICENSE`；第三方声明总览见根 `THIRD-PARTY-NOTICES.md`。

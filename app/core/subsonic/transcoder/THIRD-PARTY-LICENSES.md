@@ -1,7 +1,7 @@
 # Subsonic 转码器第三方许可证声明（subsonic-transcoder）
 
-本目录 `server/subsonic/subsonic-transcoder` 为 SPlayer-Next 的服务端 Rust 转码器，
-随本软件以 AGPL-3.0 授权。其将音频解码为 PCM 后以 **LAME** 编码为 MP3。
+本目录 `app/core/subsonic/transcoder` 为 ArchoeraMusic 的 Rust 转码器，
+其自研代码随本软件以 AGPL-3.0 授权，第三方组件按各自许可使用（逐项登记见下）。其将音频解码为 PCM 后以 **LAME** 编码为 MP3。
 
 ## 直接 Rust 依赖
 
@@ -43,10 +43,10 @@
 对其任一被修改源文件的更改，须按 MPL-2.0 以相同许可证公开；
 其余文件不受传染。其完整许可证文本见 https://www.mozilla.org/MPL/2.0/。
 
-## 许可兼容性结论
+## 合规评估（非法律意见）
 
-MPL-2.0 与 LGPL 均为与 AGPL-3.0 兼容的 weak copyleft 许可证，
-本组合作为 AGPL-3.0 受保护作品的一部分分发，合规。
+`symphonia`（MPL-2.0，文件级 weak copyleft）与 LAME（LGPL-2.1+，静态链接，可重链/源码要求见上）在各自条款下可与本模块 AGPL-3.0 代码共存。
+本文档为项目维护者的合理努力评估，不构成法律意见；正式依据以上游官方许可文本为准。
 
 ---
 AGPL-3.0 完整文本见仓库根 `LICENSE`；第三方声明总览见根 `THIRD-PARTY-NOTICES.md`。

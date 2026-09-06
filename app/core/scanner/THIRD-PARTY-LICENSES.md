@@ -1,7 +1,7 @@
 # 曲库扫描器第三方许可证声明（scanner / C#）
 
-本目录 `server/scanner` 为 SPlayer-Next 服务端的 C# / .NET 曲库扫描器，
-随本软件以 AGPL-3.0 授权。
+本目录 `app/core/scanner` 为 ArchoeraMusic 的 C# / .NET 曲库扫描器，
+其自研代码随本软件以 AGPL-3.0 授权，第三方组件按各自许可使用（逐项登记见下）。
 
 ## NuGet 依赖
 
@@ -22,10 +22,10 @@ TagLibSharp 替换/重新链接本程序所引用的该程序集。
 - TagLibSharp 仓库：https://github.com/mono/taglib-sharp
 - 许可证：LGPL-2.1（完整文本见 https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html）
 
-## 许可兼容性结论
+## 合规评估（非法律意见）
 
-`TagLibSharp`（LGPL-2.1）与 `Microsoft.Data.Sqlite`（MIT）均兼容 AGPL-3.0；
-本扫描器整体作为 AGPL-3.0 受保护作品的一部分分发，合规。
+`TagLibSharp`（LGPL-2.1，.NET 程序集引用，替换/重链说明见上）与 `Microsoft.Data.Sqlite`（MIT）在各自许可条款下可与本项目 AGPL-3.0 代码共存。
+本文档为项目维护者的合理努力评估，不构成法律意见；正式依据以上游官方许可文本为准。
 
 ---
 AGPL-3.0 完整文本见仓库根 `LICENSE`；第三方声明总览见根 `THIRD-PARTY-NOTICES.md`。

@@ -514,9 +514,9 @@ strip     = "symbols"
 opt-level = "s"
 ```
 
-**自研化优先 LICENSE 合规结论**：
-1. 默认编译配置下 **0 个第三方平台 SDK 依赖**——所有 Kugou/Netease 签名算法均为本仓库作者自有版权代码（对照本仓库现有 Dart 实现 1:1 重写于 Rust，自研代码在本仓库内完全合法）
-2. 所有底层加密 crate（aes/cbc/md-5/rsa/num-bigint 等）全部 MIT/Apache-2.0，与 AGPL-3.0 完全兼容
+**自研化优先 LICENSE 说明**：
+1. 默认编译配置下 **0 个第三方平台 SDK 依赖**——所有 Kugou/Netease 签名算法均为本仓库自研/贡献代码（对照本仓库现有 Dart 实现 1:1 重写于 Rust，许可证随本仓库 AGPL-3.0）
+2. 所有底层加密 crate（aes/cbc/md-5/rsa/num-bigint 等）均为 MIT/Apache-2.0 宽松许可，一般可与 AGPL-3.0 代码共存（具体兼容性以各上游官方许可文本为准）
 3. `kugou_sdk` / `ncm-api-rs` 保留为 optional feature 备胎：**当自研签名出现 24 小时内修不好的线上故障时**，可一行 feature 切换到第三方 SDK 紧急恢复，再慢慢跟进自研修复
 4. 所有依赖（包括 crypto crate 和可选 SDK）依然走 §9.6 的 `cargo vendor` 固化，crates.io 挂了也能离线编译
 
@@ -611,7 +611,7 @@ Dart 侧 `_handleEvent(ptr)` 收到后：
 
 ### 9.2 第三方 Rust crate LICENSE 兼容性（逐项核查 · 全绿 ✅）
 
-本项目所有直接 / 间接依赖均为 **Permissive License（MIT / Apache-2.0 / WTFPL / BSD-3 / ISC）**—— 全部与 AGPL-3.0 兼容。
+本项目所有直接 / 间接依赖均为 **Permissive License（MIT / Apache-2.0 / WTFPL / BSD-3 / ISC）**，可在各自条款下与 AGPL-3.0 代码共存（本处为维护者逐项核查，不构成法律意见）。
 
 | Crate / SDK | LICENSE | AGPL-v3 兼容性 | 备注 |
 |---|---|---|---|
@@ -823,7 +823,7 @@ Dart 侧 `_handleEvent(ptr)` 收到后：
 
 ### 14.1 HTTP 下载后端（4 种主流方案）
 
-> LICENSE 列的颜色标记：✅ 绿 = 与 AGPL-v3 完全兼容；⚠️ 黄 = 兼容但需在 THIRD-PARTY-LICENSES 列明；❌ 红 = 与 AGPL-v3 不兼容（或 LICENSE 不明，不得用）
+> LICENSE 列的颜色标记（维护者逐项核对的判定，非法律意见）：✅ 绿 = 判定可与 AGPL-3.0 共存；⚠️ 黄 = 可共存但需在 THIRD-PARTY-LICENSES 列明；❌ 红 = 判定不宜并入（或 LICENSE 不明，不得用）
 
 | 方案 | Crate / 工具 | LICENSE | AGPL-v3 兼容 | 进度回调原生支持 | 并发能力 | 打包体积估算 | 优点 | 缺点 | 推荐度（当前默认 ★★★★★） |
 |---|---|---|---|---|---|---|---|---|---|
@@ -844,7 +844,7 @@ Dart 侧 `_handleEvent(ptr)` 收到后：
 
 | 方案 | 项目 | LICENSE | AGPL-v3 兼容 | 控制权级别 | 优势 | 风险 | 推荐度（自研优先模式） |
 |---|---|---|---|---|---|---|---|
-| **A. 自研 weapi 签名实现（默认）** | 对照本仓库现有 Dart `netease/crypto.dart` 1:1 移植 Rust | **自有版权（本仓库作者）+ 底层 aes/cbc/rsa 等 MIT/Apache-2.0 | ✅ 完全兼容 | ⭐⭐⭐⭐⭐ **100% 完全可控** | ① 签名常量/盐值/PEM 均来自本仓库现有 Dart 实现，自研移植 1:1 对齐，平台改签名可同步跟进；② 字节级对拍可 100% 保证同 input→同 output；③ 零第三方 SDK 依赖；④ 签名算法变了当天就能跟进修复 | 多写 ~300 行 weapi 签名代码（含 AES-CBC 双重加密 + RSA encSecKey 拼装） | ⭐⭐⭐⭐⭐ 默认编译实现；所有线上版本跑这个 |
+| **A. 自研 weapi 签名实现（默认）** | 对照本仓库现有 Dart `netease/crypto.dart` 1:1 移植 Rust | **本仓库自研代码（AGPL-3.0）+ 底层 aes/cbc/rsa 等 MIT/Apache-2.0 | ✅ 宽松许可，一般可与 AGPL-3.0 共存 | ⭐⭐⭐⭐⭐ **100% 完全可控** | ① 签名常量/盐值/PEM 均来自本仓库现有 Dart 实现，自研移植 1:1 对齐，平台改签名可同步跟进；② 字节级对拍可 100% 保证同 input→同 output；③ 零第三方 SDK 依赖；④ 签名算法变了当天就能跟进修复 | 多写 ~300 行 weapi 签名代码（含 AES-CBC 双重加密 + RSA encSecKey 拼装） | ⭐⭐⭐⭐⭐ 默认编译实现；所有线上版本跑这个 |
 | **B. 依赖第三方 ncm-api-rs（备胎，紧急切换用）** | [SPlayer-Dev/ncm-api-rs](https://github.com/SPlayer-Dev/ncm-api-rs) | **WTFPL**（Cargo.toml 第 7 行写死 `license = "WTFPL"`） | ✅ WTFPL 等同公有领域，兼容任何 LICENSE | ⭐⭐ 第三方不可控 | ① 第三方维护的 Rust 版本，371 个 endpoint 全覆盖，签名保证和 TS 版对齐；② LICENSE 比 MIT 还宽松；③ 出紧急 bug 时，feature 切换能 10 分钟内恢复服务 | ① 依赖第三方的更新节奏（他人维护，优先级不可控）；② 签名变更了，最终还是要自己改自己的，除非你亲自跟进；③ 平时不编译、不启用，仅在自写签名真的出临时修不好的 bug 时才打开 | ⭐⭐⭐⭐（备胎/紧急切换用，默认 off，v1.1 才接通） |
 
 **结论（自研化优先模式**：网易云签名**默认自研实现**，ncm-api-rs 保留 feature 备胎，用。自研优先的三重对拍：Dart 现有 netease/crypto.dart ↔ Rust 自写 ↔ ncm-api-rs，三方不一致就报错，保证 100% 对齐。

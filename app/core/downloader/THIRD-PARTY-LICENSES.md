@@ -1,11 +1,11 @@
 # Downloader 第三方许可证声明（archoera-downloader）
 
 本目录 `app/core/downloader` 为 ArchoeraMusic 的 Rust 下载引擎（cdylib），
-随本软件以 AGPL-3.0 授权。
+其自研代码随本软件以 AGPL-3.0 授权，第三方组件按各自许可使用（逐项登记见下）。
 
 ## 直接 Rust 依赖（默认 feature：全自研签名）
 
-> 默认编译配置下 0 个第三方平台 SDK 依赖；Kugou/Netease 签名算法为 SPlayer-Dev 自有版权代码（对照现有 Dart 版 1:1 移植），底层加密原语使用 Rust Crypto 官方 MIT/Apache-2.0 crate。
+> 默认编译配置下 0 个第三方平台 SDK 依赖；Kugou/Netease 签名算法为本项目自研/移植代码（对照本仓库现有 Dart 版 1:1 移植，随本项目 AGPL-3.0），底层加密原语使用 Rust Crypto 官方 MIT/Apache-2.0 crate。
 
 | 组件 | 版本 | 许可证 | AGPL-v3 兼容 | 说明 |
 |---|---|---|---|---|
@@ -50,10 +50,10 @@
 | AES/MD5/RSA/PKCS7/BigInt 等加密原语 | ❌ **绝对不自研** | 使用 Rust Crypto 官方维护 crate；自研出 padding oracle / timing attack 漏洞得不偿失 |
 | HTTP chunk download / tmp rename | ⚠️ 半自研 | 默认 `stream-download`；或移植同源 SPlayer-Next `download-engine` AGPL chunk loop |
 
-## 许可兼容性结论
+## 合规评估（非法律意见）
 
-全部直接/间接依赖均为 Permissive License（MIT/Apache-2.0/WTFPL/ISC）——
-FSF 官方认定全部与 AGPL-3.0 兼容。本组合作为 AGPL-3.0 受保护作品的一部分分发，合规。
+默认与可选依赖均为宽松许可（MIT/Apache-2.0/WTFPL/ISC）。此类许可一般可与 AGPL-3.0 代码共存，具体兼容性以 FSF 及各上游官方许可文本、适用法域判定为准。
+本文档为项目维护者的合理努力评估，不构成法律意见。
 
 ---
 AGPL-3.0 完整文本见仓库根 `LICENSE`；第三方声明总览见根 `THIRD-PARTY-NOTICES.md`。
