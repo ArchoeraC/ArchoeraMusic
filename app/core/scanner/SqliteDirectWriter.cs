@@ -49,6 +49,7 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
         // 自建表（幂等）：脱离 sidecar 后 scanner 独立可用；
         // schema 与 sidecar database/index.ts 完全一致，已有表时无副作用
         EnsureTracksTable();
+        EnsureStageTable();
 
         // 初始化写队列 + 后台消费者（有界 4096 + Wait，队列满时 EnqueueWrite 自然阻塞调用者）
         _writeChannel = Channel.CreateBounded<Action>(new BoundedChannelOptions(4096)
@@ -107,14 +108,6 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
     }
 
     /// <summary>
-    /// 入队一个写操作，不等待完成（fire-and-forget）
-    /// </summary>
-    private void EnqueueFireAndForget(Action work)
-    {
-        _writeChannel.Writer.TryWrite(work);
-    }
-
-    /// <summary>
     /// 等待写队列排空（隔离等需要最新持久化数据的阶段前调用）
     /// </summary>
     public async Task FlushAsync(CancellationToken ct = default)
@@ -145,31 +138,30 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
 
     public Task<bool> ShouldSkipErrorFileAsync(string path, long currentMtimeMs, CancellationToken ct = default)
     {
-        // 保留此方法供其他实现使用，当前引擎已改用 LoadErrorSnapshotAsync 内存快照
         return Task.Run(() =>
         {
             EnsureErrorTable();
             using var cmd = _conn.CreateCommand();
-            cmd.CommandText = "SELECT fail_count FROM _scanner_errors WHERE path = @path";
+            cmd.CommandText = "SELECT fail_count, mtime_at_last_fail FROM _scanner_errors WHERE path = @path";
             cmd.Parameters.AddWithValue("@path", path);
             using var reader = cmd.ExecuteReader();
             if (!reader.Read()) return false;
-            return reader.GetInt32(0) >= 3;
+            return reader.GetInt32(0) >= 3 && reader.GetInt64(1) == currentMtimeMs;
         }, ct);
     }
 
-    public Task<HashSet<string>> LoadErrorSnapshotAsync(CancellationToken ct = default)
+    public Task<Dictionary<string, ErrorFileState>> LoadErrorSnapshotAsync(CancellationToken ct = default)
     {
         return Task.Run(() =>
         {
-            var set = new HashSet<string>(StringComparer.Ordinal);
+            var map = new Dictionary<string, ErrorFileState>(StringComparer.Ordinal);
             EnsureErrorTable();
             using var cmd = _conn.CreateCommand();
-            cmd.CommandText = "SELECT path FROM _scanner_errors WHERE fail_count >= 3";
+            cmd.CommandText = "SELECT path, fail_count, mtime_at_last_fail FROM _scanner_errors";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
-                set.Add(reader.GetString(0));
-            return set;
+                map[reader.GetString(0)] = new ErrorFileState(reader.GetInt32(1), reader.GetInt64(2));
+            return map;
         }, ct);
     }
 
@@ -190,10 +182,62 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
 
     // ============ 写操作（入队执行） ============
 
-    public Task UpsertTracksAsync(List<TrackMetadata> tracks, CancellationToken ct = default)
+    public Task StageTracksAsync(List<TrackMetadata> tracks, CancellationToken ct = default)
     {
         if (tracks.Count == 0) return Task.CompletedTask;
-        return EnqueueWrite(() => UpsertTracks(tracks, ct));
+        return EnqueueWrite(() => InsertStageTracks(tracks, ct));
+    }
+
+    public Task ClearStagedTracksAsync(CancellationToken ct = default)
+    {
+        return EnqueueWrite(() =>
+        {
+            using var cmd = _conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM _scanner_stage_tracks";
+            cmd.ExecuteNonQuery();
+        });
+    }
+
+    public Task MergeStagedTracksAsync(CancellationToken ct = default)
+    {
+        return EnqueueWrite(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var tx = _conn.BeginTransaction();
+            using var cmd = _conn.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO tracks
+                    (id, path, title, track, artists, album, duration, cover,
+                     codec, sample_rate, bit_rate, channels, bits_per_sample,
+                     file_size, file_mtime, file_ctime, scanned_at, lyrics)
+                SELECT
+                    id, path, title, track, artists, album, duration, cover,
+                    codec, sample_rate, bit_rate, channels, bits_per_sample,
+                    file_size, file_mtime, file_ctime, scanned_at, lyrics
+                FROM _scanner_stage_tracks
+                ON CONFLICT(id) DO UPDATE SET
+                    path = excluded.path,
+                    title = excluded.title,
+                    track = excluded.track,
+                    artists = excluded.artists,
+                    album = excluded.album,
+                    duration = excluded.duration,
+                    cover = excluded.cover,
+                    codec = excluded.codec,
+                    sample_rate = excluded.sample_rate,
+                    bit_rate = excluded.bit_rate,
+                    channels = excluded.channels,
+                    bits_per_sample = excluded.bits_per_sample,
+                    file_size = excluded.file_size,
+                    file_mtime = excluded.file_mtime,
+                    file_ctime = excluded.file_ctime,
+                    scanned_at = excluded.scanned_at,
+                    lyrics = excluded.lyrics;
+                DELETE FROM _scanner_stage_tracks;
+            ";
+            cmd.ExecuteNonQuery();
+            tx.Commit();
+        });
     }
 
     public Task<int> DeleteTracksByPathsAsync(List<string> paths, CancellationToken ct = default)
@@ -258,40 +302,69 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
     /// <summary>
     /// 记录解析失败（fire-and-forget 入队，不阻塞调用者）
     /// </summary>
-    public Task RecordParseErrorAsync(string path, string errorMessage, CancellationToken ct = default)
+    public Task<int> RecordParseErrorAsync(string path, string errorMessage, CancellationToken ct = default)
     {
         var fi = SafeFileInfo(path);
         long mtime = fi?.Exists == true ? ToUnixMs(fi.LastWriteTimeUtc) : 0;
 
-        EnqueueFireAndForget(() =>
+        return EnqueueWrite(() =>
         {
             EnsureErrorTable();
-            using var cmd = _conn.CreateCommand();
-            cmd.CommandText = @"
+            using var tx = _conn.BeginTransaction();
+            using var select = _conn.CreateCommand();
+            select.CommandText = "SELECT fail_count, mtime_at_last_fail FROM _scanner_errors WHERE path = @path";
+            select.Parameters.AddWithValue("@path", path);
+
+            int nextCount = 1;
+            using (var reader = select.ExecuteReader())
+            {
+                if (reader.Read())
+                {
+                    var prevCount = reader.GetInt32(0);
+                    var prevMtime = reader.GetInt64(1);
+                    nextCount = prevMtime == mtime ? prevCount + 1 : 1;
+                }
+            }
+
+            using var upsert = _conn.CreateCommand();
+            upsert.CommandText = @"
                 INSERT INTO _scanner_errors (path, fail_count, last_fail_time, last_error, mtime_at_last_fail)
-                VALUES (@path, 1, @now, @error, @mtime)
+                VALUES (@path, @count, @now, @error, @mtime)
                 ON CONFLICT(path) DO UPDATE SET
-                    fail_count = fail_count + 1,
+                    fail_count = excluded.fail_count,
                     last_fail_time = excluded.last_fail_time,
                     last_error = excluded.last_error,
                     mtime_at_last_fail = excluded.mtime_at_last_fail
             ";
+            upsert.Parameters.AddWithValue("@path", path);
+            upsert.Parameters.AddWithValue("@count", nextCount);
+            upsert.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            upsert.Parameters.AddWithValue("@error", errorMessage);
+            upsert.Parameters.AddWithValue("@mtime", mtime);
+            upsert.ExecuteNonQuery();
+            tx.Commit();
+            return nextCount;
+        });
+    }
+
+    public Task ClearParseErrorAsync(string path, CancellationToken ct = default)
+    {
+        return EnqueueWrite(() =>
+        {
+            EnsureErrorTable();
+            using var cmd = _conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM _scanner_errors WHERE path = @path";
             cmd.Parameters.AddWithValue("@path", path);
-            cmd.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-            cmd.Parameters.AddWithValue("@error", errorMessage);
-            cmd.Parameters.AddWithValue("@mtime", mtime);
             cmd.ExecuteNonQuery();
         });
-
-        return Task.CompletedTask;
     }
 
     /// <summary>
-    /// 标记待隔离（fire-and-forget 入队，不阻塞调用者）
+    /// 标记待隔离（入队并等待，确保主动隔离链路语义明确）
     /// </summary>
     public Task MarkTrainedAsync(string path, CancellationToken ct = default)
     {
-        EnqueueFireAndForget(() =>
+        return EnqueueWrite(() =>
         {
             EnsureTrainedTable();
             using var cmd = _conn.CreateCommand();
@@ -299,8 +372,18 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
             cmd.Parameters.AddWithValue("@path", path);
             cmd.ExecuteNonQuery();
         });
+    }
 
-        return Task.CompletedTask;
+    public Task UnmarkTrainedAsync(string path, CancellationToken ct = default)
+    {
+        return EnqueueWrite(() =>
+        {
+            EnsureTrainedTable();
+            using var cmd = _conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM _scanner_trained WHERE path = @path";
+            cmd.Parameters.AddWithValue("@path", path);
+            cmd.ExecuteNonQuery();
+        });
     }
 
     // ============ 内部方法 ============
@@ -339,12 +422,40 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
         cmd.ExecuteNonQuery();
     }
 
-    private void UpsertTracks(List<TrackMetadata> tracks, CancellationToken ct)
+    private void EnsureStageTable()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS _scanner_stage_tracks (
+                id TEXT NOT NULL,
+                path TEXT NOT NULL,
+                title TEXT NOT NULL,
+                track INTEGER,
+                artists TEXT NOT NULL DEFAULT '[]',
+                album TEXT,
+                duration INTEGER NOT NULL,
+                cover TEXT,
+                codec TEXT,
+                sample_rate INTEGER,
+                bit_rate INTEGER,
+                channels INTEGER,
+                bits_per_sample INTEGER,
+                file_size INTEGER NOT NULL,
+                file_mtime INTEGER,
+                file_ctime INTEGER,
+                scanned_at INTEGER NOT NULL,
+                lyrics TEXT
+            )
+        ";
+        cmd.ExecuteNonQuery();
+    }
+
+    private void InsertStageTracks(List<TrackMetadata> tracks, CancellationToken ct)
     {
         using var tx = _conn.BeginTransaction();
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = @"
-            INSERT INTO tracks
+            INSERT INTO _scanner_stage_tracks
                 (id, path, title, track, artists, album, duration, cover,
                  codec, sample_rate, bit_rate, channels, bits_per_sample,
                  file_size, file_mtime, file_ctime, scanned_at, lyrics)
@@ -352,24 +463,6 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                 (@id, @path, @title, @track, @artists, @album, @duration, @cover,
                  @codec, @sampleRate, @bitRate, @channels, @bitsPerSample,
                  @fileSize, @fileMtime, @fileCtime, @scannedAt, @lyrics)
-            ON CONFLICT(id) DO UPDATE SET
-                path = excluded.path,
-                title = excluded.title,
-                track = excluded.track,
-                artists = excluded.artists,
-                album = excluded.album,
-                duration = excluded.duration,
-                cover = excluded.cover,
-                codec = excluded.codec,
-                sample_rate = excluded.sample_rate,
-                bit_rate = excluded.bit_rate,
-                channels = excluded.channels,
-                bits_per_sample = excluded.bits_per_sample,
-                file_size = excluded.file_size,
-                file_mtime = excluded.file_mtime,
-                file_ctime = excluded.file_ctime,
-                scanned_at = excluded.scanned_at,
-                lyrics = excluded.lyrics
         ";
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
