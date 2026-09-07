@@ -258,9 +258,12 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
       title: l10n.settingsSectionScrapeOrganize,
       note: l10n.settingsScrapeOrganizeNote,
       children: [
-        if (organizeRunning || organizeDone)
-          _buildOrganizeStatus(scheme, l10n, scrape, organizeRunning)
-        else ...[
+        if (organizeRunning || organizeDone) ...[
+          _buildOrganizeStatus(scheme, l10n, scrape, organizeRunning),
+          const SizedBox(height: 4),
+        ],
+        // 目标/模板表单始终可编辑：完成/运行后不遮挡设置，可改后再次整理
+        ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 2),
             child: Text(
@@ -430,6 +433,17 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
                 size: SButtonSize.small,
                 variant: SButtonVariant.error,
                 onPressed: ref.read(scrapeControllerProvider.notifier).cancel,
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: SButton(
+                label: l10n.commonDone,
+                size: SButtonSize.small,
+                variant: SButtonVariant.ghost,
+                onPressed: ref.read(scrapeControllerProvider.notifier).dismissResult,
               ),
             ),
           ],

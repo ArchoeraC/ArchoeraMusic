@@ -151,6 +151,13 @@ mixin _ScrapeControllerCore on Notifier<ScrapeState> {
     _scraper?.cancel();
   }
 
+  /// 关闭「仅目录整理」完成/结果视图，回到可编辑的空闲态。
+  /// 仅空闲（未运行）时可用：清空 organize/进度/错误，保留引擎会话可再启动。
+  void _dismissResult() {
+    if (state.scraping) return;
+    state = ScrapeState.initial;
+  }
+
   void _finish() {
     if (_stopped &&
         _scraper == null &&
