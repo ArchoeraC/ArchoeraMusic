@@ -1,0 +1,17 @@
+{
+  "name": "eta_mark",
+  "private": true,
+  "type": "module",
+  "description": "ArchoeraMusic 品牌标识(EtaMark)独立字体生成工具：logo-trim.png 转黑白字形→打成独立字体族，供 AppLogo 等品牌位置使用",
+  "scripts": {
+    "step1": "node 1_prepare.mjs",
+    "step2": "node 2_build_font.mjs",
+    "build": "npm run step1 && npm run step2"
+  },
+  "dependencies": {
+    "fontkit": "^2.0.4",
+    "potrace": "^2.1.8",
+    "svgpath": "^2.6.0",
+    "svgtofont": "^6.5.3"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "eta_icons",
+  "private": true,
+  "type": "module",
+  "description": "ArchoeraMusic 自建图标字体生成工具（一次性开发脚本；产物 EtaIcons.ttf 入库，依赖无需随 app 分发）",
+  "scripts": {
+    "step1": "node 1_prepare_svg.mjs",
+    "step2": "node 2_build_font.mjs",
+    "build": "npm run step1 && npm run step2",
+    "gen:dart": "python3 src/0_gen_registry.py && node 3_gen_dart.mjs"
+  },
+  "dependencies": {
+    "paper": "^0.12.18",
+    "paperjs-offset": "^1.0.8",
+    "svgtofont": "^6.5.3"
+  }
+}

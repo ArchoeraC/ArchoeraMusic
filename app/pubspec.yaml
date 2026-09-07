@@ -145,6 +145,17 @@ flutter:
           weight: 500
         - asset: assets/fonts/HarmonyOS_Sans_SC_Bold.ttf
           weight: 700
+    # 自建图标字体（eta.icon 体系，EtaIcons.* 引用）
+    # 单字体族单文件：描边(regular)与实心(filled)以不同 codepoint 区段共存。
+    # 生成与替换映射见 app/eta-tools/eta_icons/（来源 mingcute icons，Apache-2.0 / Tabler MIT）。
+    - family: EtaIcons
+      fonts:
+        - asset: assets/fonts/EtaIcons.ttf
+    # 品牌标识字体（eta.mark 体系，EtaMark.brand 引用）：独立字体族，
+    # 承载「均衡器频谱」品牌标识，不混入通用 EtaIcons。源图与生成见 app/eta-tools/eta_mark/。
+    - family: EtaMark
+      fonts:
+        - asset: assets/fonts/EtaMark.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

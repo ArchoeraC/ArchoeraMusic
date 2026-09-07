@@ -68,5 +68,8 @@ packaging/linux/work/
 # 内嵌参考仓库（本地保留，不入库/不 submodule；供代码移植参考）
 reference/
 
+# 图标素材/候选源（本地提取与对照用；入库的只有 app/eta-tools/eta_icons 定稿集与最终字体）
+Icon化/
+
 # 本地问题截图（仅调试用，不入库）
 issuescreenshot/
