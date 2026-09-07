@@ -308,25 +308,39 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
 
   Future<void> _refreshQuarantine() async {
     _loadingQuarantine = true;
-    final list = await Future(() {
-      try {
-        final dir = Directory(_quarantineDir);
-        if (!dir.existsSync()) return const <File>[];
-        return dir
-            .listSync()
-            .whereType<File>()
-            .where((f) => f.existsSync())
-            .toList();
-      } catch (_) {
-        return const <File>[];
+    try {
+      final raw = await Future(() {
+        try {
+          final dir = Directory(_quarantineDir);
+          if (!dir.existsSync()) return const <File>[];
+          return dir
+              .listSync()
+              .whereType<File>()
+              .where((f) => f.existsSync())
+              .toList();
+        } catch (_) {
+          return const <File>[];
+        }
+      });
+      // const <File>[] 不可变：sort 前统一转可变副本，避免 Unsupported operation
+      final list = raw.toList()..sort((a, b) => b.path.compareTo(a.path));
+      if (!mounted) return;
+      setState(() {
+        _quarantined = list;
+      });
+    } catch (_) {
+      // 目录枚举/排序异常不阻断页面：保持空列表可交互
+      if (!mounted) return;
+      setState(() {
+        _quarantined = const [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingQuarantine = false;
+        });
       }
-    });
-    list.sort((a, b) => b.path.compareTo(a.path));
-    if (!mounted) return;
-    setState(() {
-      _quarantined = list;
-      _loadingQuarantine = false;
-    });
+    }
   }
 
   Future<void> _deleteQuarantined(File f) async {
