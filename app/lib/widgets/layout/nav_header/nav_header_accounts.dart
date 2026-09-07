@@ -54,7 +54,7 @@ class _AccountsMenu extends ConsumerWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.person_outline,
+              EtaIcons.userOutline,
               size: 19,
               color: colorScheme.primary,
             ),
@@ -159,7 +159,7 @@ class _AccountsMenu extends ConsumerWidget {
                   ),
                   const SizedBox(width: 2),
                   Icon(
-                    Icons.arrow_drop_down,
+                    EtaIcons.downSmall,
                     size: 18,
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -191,7 +191,7 @@ class _AccountsMenu extends ConsumerWidget {
           height: 36,
           child: Row(
             children: [
-              const Icon(Icons.qr_code_2, size: 17),
+              const Icon(EtaIcons.qrcode, size: 17),
               const SizedBox(width: 10),
               Text(l10n.navHeaderQrLogin),
             ],
@@ -232,7 +232,7 @@ class _AccountsMenu extends ConsumerWidget {
           height: 36,
           child: Row(
             children: [
-              const Icon(Icons.logout, size: 17),
+              const Icon(EtaIcons.exit, size: 17),
               const SizedBox(width: 10),
               Text(l10n.navHeaderLogout),
             ],

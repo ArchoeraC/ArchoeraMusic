@@ -13,6 +13,7 @@ import '../../l10n/l10n.dart';
 import '../../utils/format.dart';
 import 'cover_image.dart';
 import '../common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'song_row/song_row_view.dart';
 

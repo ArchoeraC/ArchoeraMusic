@@ -128,7 +128,7 @@ extension _PlayerBarSections on _PlayerBarState {
         IconButton(
           tooltip: l10n.commonPrevious,
           onPressed: hasQueue ? notifier.playPrevious : null,
-          icon: const Icon(Icons.skip_previous),
+          icon: const Icon(EtaIcons.skipPrevious),
         ),
         IconButton(
           tooltip: buffering ? l10n.commonLoading : l10n.playerBarPlayPause,
@@ -139,12 +139,12 @@ extension _PlayerBarSections on _PlayerBarState {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Icon(playing ? Icons.pause : Icons.play_arrow),
+              : Icon(playing ? EtaIcons.pause : EtaIcons.play),
         ),
         IconButton(
           tooltip: l10n.commonNext,
           onPressed: hasQueue ? notifier.playNext : null,
-          icon: const Icon(Icons.skip_next),
+          icon: const Icon(EtaIcons.skipForward),
         ),
       ],
     );
@@ -198,7 +198,7 @@ extension _PlayerBarSections on _PlayerBarState {
                         anchor: _anchorOf(btnCtx),
                       )
                     : null,
-                icon: const Icon(Icons.queue_music),
+                icon: const Icon(EtaIcons.playlist),
               ),
             ),
             if (track != null &&

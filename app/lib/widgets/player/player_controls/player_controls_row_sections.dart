@@ -31,7 +31,7 @@ class _PlayerControlsLeftGroup extends StatelessWidget {
         if (canLike)
           CtrlIcon(
             tooltip: liked ? l10n.commonUnlike : l10n.commonLike,
-            icon: liked ? Icons.favorite : Icons.favorite_border,
+            icon: liked ? EtaIcons.heart : EtaIcons.heartOutline,
             size: 24,
             color: liked ? Colors.redAccent : colorScheme.onSurfaceVariant,
             onPressed: () => onToggleLike(current!),
@@ -40,7 +40,7 @@ class _PlayerControlsLeftGroup extends StatelessWidget {
           const SizedBox(width: 12),
           CtrlIcon(
             tooltip: l10n.menuComment,
-            icon: Icons.mode_comment_outlined,
+            icon: EtaIcons.commentOutline,
             size: 24,
             onPressed: onShowComments,
           ),
@@ -81,7 +81,7 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
       children: [
         CtrlIcon(
           tooltip: shuffle ? l10n.queueShuffleOff : l10n.queueShuffle,
-          icon: Icons.shuffle,
+          icon: EtaIcons.shuffle,
           size: 20,
           color: shuffle ? colorScheme.primary : colorScheme.onSurfaceVariant,
           onPressed: hasContent ? notifier.toggleShuffle : null,
@@ -89,7 +89,7 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
         const SizedBox(width: 12),
         CtrlIcon(
           tooltip: l10n.commonPrevious,
-          icon: Icons.skip_previous,
+          icon: EtaIcons.skipPrevious,
           size: 26,
           color: colorScheme.onSurface,
           onPressed: hasQueue ? notifier.playPrevious : null,
@@ -110,8 +110,8 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
                 children: [
                   Icon(
                     playing
-                        ? Icons.pause_circle_filled
-                        : Icons.play_circle_filled,
+                        ? EtaIcons.pauseCircle
+                        : EtaIcons.playCircle,
                     size: 48,
                     color: colorScheme.primary.withValues(
                       alpha: buffering ? 0.35 : 1,
@@ -131,7 +131,7 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
         const SizedBox(width: 14),
         CtrlIcon(
           tooltip: l10n.commonNext,
-          icon: Icons.skip_next,
+          icon: EtaIcons.skipForward,
           size: 26,
           color: colorScheme.onSurface,
           onPressed: hasQueue ? notifier.playNext : null,
@@ -141,7 +141,7 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
           tooltip: repeatMode == 'list'
               ? l10n.queueRepeatList
               : l10n.queueRepeatOne,
-          icon: repeatMode == 'one' ? Icons.repeat_one : Icons.repeat,
+          icon: repeatMode == 'one' ? EtaIcons.repeatOne : EtaIcons.repeat,
           size: 20,
           color: colorScheme.primary,
           onPressed: hasContent ? notifier.cycleRepeatMode : null,
@@ -170,7 +170,7 @@ class _PlayerControlsRightGroup extends StatelessWidget {
         const HoverVolumeSlider(sliderWidth: 104),
         CtrlIcon(
           tooltip: l10n.playerBarPlaylist,
-          icon: Icons.queue_music,
+          icon: EtaIcons.playlist,
           size: 24,
           onPressed: hasQueue ? onShowQueue : null,
         ),

@@ -19,6 +19,7 @@ import '../widgets/library/library_header.dart';
 import '../widgets/list/song_list.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/common/toast.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'library/library_page_actions.dart';
 part 'library/library_page_view.dart';

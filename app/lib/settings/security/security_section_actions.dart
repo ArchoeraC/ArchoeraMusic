@@ -166,7 +166,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
         ),
         SButton(
           label: l10n.settingsDeviceBindEnable,
-          icon: Icons.security_outlined,
+          icon: EtaIcons.shieldOutline,
           variant: SButtonVariant.primary,
           size: SButtonSize.small,
           onPressed: () => Navigator.of(context).pop(true),
@@ -303,7 +303,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
         ),
         SButton(
           label: l10n.settingsSchemeSwitchConfirm,
-          icon: Icons.sync_problem_outlined,
+          icon: EtaIcons.warningOutline,
           variant: SButtonVariant.primary,
           size: SButtonSize.small,
           onPressed: () => Navigator.of(context).pop(true),
@@ -420,7 +420,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
         ),
         SButton(
           label: l10n.commonConfirm,
-          icon: Icons.check,
+          icon: EtaIcons.check,
           variant: SButtonVariant.primary,
           size: SButtonSize.small,
           onPressed: () => Navigator.of(context).pop(true),
@@ -466,7 +466,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
         ),
         SButton(
           label: l10n.settingsVaultRestartNow,
-          icon: Icons.restart_alt,
+          icon: EtaIcons.refreshAnticlockwise,
           variant: SButtonVariant.primary,
           size: SButtonSize.small,
           onPressed: () => Navigator.of(context).pop(true),
@@ -523,7 +523,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
         ),
         SButton(
           label: l10n.settingsDeviceBindRebindConfirm,
-          icon: Icons.sync_lock_outlined,
+          icon: EtaIcons.lockOutline,
           variant: SButtonVariant.primary,
           size: SButtonSize.small,
           onPressed: () => Navigator.of(context).pop(true),
@@ -575,7 +575,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
           ),
           SButton(
             label: l10n.settingsDeviceBindRebindConfirm,
-            icon: Icons.sync_lock_outlined,
+            icon: EtaIcons.lockOutline,
             variant: SButtonVariant.primary,
             size: SButtonSize.small,
             onPressed: () => Navigator.of(context).pop(true),

@@ -12,6 +12,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'netease_login_dialog/netease_login_dialog_view.dart';
 

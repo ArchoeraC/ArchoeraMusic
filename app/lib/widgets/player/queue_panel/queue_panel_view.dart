@@ -229,7 +229,7 @@ class _QueuePanelHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 8, 6, 4),
       child: Row(
         children: [
-          Icon(Icons.queue_music, size: 19, color: scheme.primary),
+          Icon(EtaIcons.playlist, size: 19, color: scheme.primary),
           const SizedBox(width: 8),
           Text(l10n.queueTitle, style: theme.textTheme.titleMedium),
           const SizedBox(width: 8),
@@ -246,7 +246,7 @@ class _QueuePanelHeader extends StatelessWidget {
             onPressed: onToggleShuffle,
             visualDensity: VisualDensity.compact,
             icon: Icon(
-              Icons.shuffle,
+              EtaIcons.shuffle,
               size: 19,
               color: shuffle ? scheme.primary : scheme.onSurfaceVariant,
             ),
@@ -260,7 +260,7 @@ class _QueuePanelHeader extends StatelessWidget {
             onPressed: onCycleRepeat,
             visualDensity: VisualDensity.compact,
             icon: Icon(
-              repeatMode == 'one' ? Icons.repeat_one : Icons.repeat,
+              repeatMode == 'one' ? EtaIcons.repeatOne : EtaIcons.repeat,
               size: 19,
               color: scheme.primary,
             ),
@@ -269,13 +269,13 @@ class _QueuePanelHeader extends StatelessWidget {
             tooltip: l10n.queueClear,
             onPressed: onClear,
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+            icon: const Icon(EtaIcons.deleteOutline, size: 18),
           ),
           IconButton(
             tooltip: l10n.commonClose,
             onPressed: () => Navigator.of(context).pop(),
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(EtaIcons.close, size: 18),
           ),
         ],
       ),
@@ -303,7 +303,7 @@ class _QueuePanelEmpty extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.playlist_play,
+              EtaIcons.playlist,
               size: 44,
               color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
             ),
@@ -367,7 +367,7 @@ class _QueueTile extends StatelessWidget {
         child: Center(
           child: current
               ? Icon(
-                  playing ? Icons.graphic_eq : Icons.play_arrow,
+                  playing ? EtaIcons.soundLine : EtaIcons.play,
                   size: 18,
                   color: scheme.primary,
                 )
@@ -429,7 +429,7 @@ class _QueueTile extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Icon(
-                Icons.drag_indicator,
+                EtaIcons.dotsVertical,
                 size: 18,
                 color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
               ),
@@ -440,7 +440,7 @@ class _QueueTile extends StatelessWidget {
             visualDensity: VisualDensity.compact,
             onPressed: onRemove,
             icon: Icon(
-              Icons.close,
+              EtaIcons.close,
               size: 16,
               color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),

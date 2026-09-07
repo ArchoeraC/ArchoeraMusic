@@ -159,31 +159,31 @@ class _SongListHeader extends StatelessWidget {
             ),
             _SongListIconButton(
               tooltip: l10n.batchInvert,
-              icon: Icons.flip,
+              icon: EtaIcons.flipHorizontal,
               onTap: onInvert,
             ),
             _SongListIconButton(
               tooltip: l10n.batchPlay,
-              icon: Icons.play_arrow,
+              icon: EtaIcons.play,
               enabled: !none,
               onTap: () => onBatchPlay(),
             ),
             _SongListIconButton(
               tooltip: l10n.batchAddQueue,
-              icon: Icons.queue_music,
+              icon: EtaIcons.playlist,
               enabled: !none,
               onTap: onBatchAddQueue,
             ),
             if (developerMode)
               _SongListIconButton(
                 tooltip: l10n.batchDownload,
-                icon: Icons.download_outlined,
+                icon: EtaIcons.downloadOutline,
                 enabled: !none,
                 onTap: () => onBatchDownload(),
               ),
             _SongListIconButton(
               tooltip: l10n.batchExit,
-              icon: Icons.close,
+              icon: EtaIcons.close,
               onTap: onExitBatch,
             ),
           ],
@@ -206,7 +206,7 @@ class _SongListHeader extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: Icon(
-                    Icons.checklist,
+                    EtaIcons.listCheck2,
                     size: 16,
                     color: scheme.onSurfaceVariant,
                   ),

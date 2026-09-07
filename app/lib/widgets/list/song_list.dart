@@ -14,6 +14,7 @@ import '../common/toast.dart';
 import '../dialogs/track_context_menu.dart';
 import 'scroll_float_actions.dart';
 import 'song_row.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'song_list/song_list_actions.dart';
 part 'song_list/song_list_view.dart';

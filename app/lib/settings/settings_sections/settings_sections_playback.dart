@@ -139,7 +139,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.warning_amber_rounded, size: 18, color: scheme.error),
+            Icon(EtaIcons.warning, size: 18, color: scheme.error),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -164,7 +164,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         if (hasGood)
           SButton(
             label: l10n.settingsOutputDeviceUseQuality,
-            icon: Icons.high_quality_outlined,
+            icon: EtaIcons.highQualityOutline,
             variant: SButtonVariant.primary,
             size: SButtonSize.small,
             onPressed: () =>
@@ -172,7 +172,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           ),
         SButton(
           label: l10n.settingsOutputDeviceUseCall,
-          icon: Icons.call_outlined,
+          icon: EtaIcons.phoneCallOutline,
           variant: SButtonVariant.error,
           size: SButtonSize.small,
           onPressed: () => Navigator.of(context).pop(_CallSinkChoice.useCall),
@@ -207,7 +207,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
     }
     rows.add(
       _EngineOptionTile(
-        icon: Icons.speaker_outlined,
+        icon: EtaIcons.speakerOutline,
         title: l10n.settingsOutputDeviceDefault,
         desc: l10n.settingsOutputDeviceDefaultDesc,
         badges: defaultDev != null && defaultDev.isCall
@@ -227,7 +227,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.warning_amber_rounded, size: 13, color: scheme.error),
+              Icon(EtaIcons.warning, size: 13, color: scheme.error),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -252,7 +252,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                Icons.error_outline,
+                EtaIcons.alertOutline,
                 size: 14,
                 color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
               ),
@@ -280,7 +280,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
     for (final d in sorted) {
       rows.add(
         _EngineOptionTile(
-          icon: d.isCall ? Icons.bluetooth_audio : Icons.speaker_outlined,
+          icon: d.isCall ? EtaIcons.bluetooth : EtaIcons.speakerOutline,
           title: d.name,
           desc: l10n.settingsOutputDeviceFormat(d.channels, d.rate),
           badges: [
@@ -334,7 +334,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         ),
         SButton(
           label: l10n.settingsEngineRestartNow,
-          icon: Icons.restart_alt,
+          icon: EtaIcons.refreshAnticlockwise,
           variant: SButtonVariant.primary,
           size: SButtonSize.small,
           onPressed: () => Navigator.of(context).pop(true),
@@ -370,8 +370,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           children: [
             SettingSwitchTile(
               icon: prefs.passthrough
-                  ? Icons.high_quality_outlined
-                  : Icons.transform_rounded,
+                  ? EtaIcons.highQualityOutline
+                  : EtaIcons.transfer,
               title: l10n.settingsPassthrough,
               subtitle: prefs.passthrough
                   ? l10n.settingsPassthroughOn
@@ -396,7 +396,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           note: l10n.settingsEngineNote,
           children: [
             _EngineOptionTile(
-              icon: Icons.av_timer_outlined,
+              icon: EtaIcons.stopwatchOutline,
               title: 'Stable',
               desc: l10n.settingsEngineStableDesc,
               selected: prefs.engine == 'stable',
@@ -404,7 +404,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               onTap: () => _selectEngine('stable'),
             ),
             _EngineOptionTile(
-              icon: Icons.science_outlined,
+              icon: EtaIcons.flaskOutline,
               title: 'EraAudio',
               desc: l10n.settingsEngineEraAudioDesc,
               badges: [
@@ -420,7 +420,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.flaky, size: 14, color: scheme.error),
+                    Icon(EtaIcons.asterisk, size: 14, color: scheme.error),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -445,8 +445,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           children: [
             SettingSwitchTile(
               icon: prefs.sessionMemory
-                  ? Icons.history
-                  : Icons.history_toggle_off,
+                  ? EtaIcons.history
+                  : EtaIcons.history,
               title: l10n.settingsSessionMemory,
               subtitle: prefs.sessionMemory
                   ? l10n.settingsSessionMemoryOn
@@ -457,8 +457,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ),
             SettingSwitchTile(
               icon: prefs.autoPlayOnLaunch
-                  ? Icons.play_circle_outline
-                  : Icons.pause_circle_outline,
+                  ? EtaIcons.playCircleOutline
+                  : EtaIcons.pauseCircleOutline,
               title: l10n.settingsAutoPlay,
               subtitle: !prefs.sessionMemory
                   ? l10n.settingsAutoPlayNeedMemory
@@ -479,7 +479,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           title: l10n.settingsSectionClose,
           children: [
             SettingTile(
-              icon: Icons.power_settings_new_outlined,
+              icon: EtaIcons.powerOutline,
               title: l10n.settingsCloseBehavior,
               subtitle: switch (prefs.closeBehavior) {
                 'background' => l10n.settingsCloseBehaviorBackground,
@@ -497,7 +497,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   color: scheme.onSurface,
                 ),
                 icon: Icon(
-                  Icons.arrow_drop_down,
+                  EtaIcons.downSmall,
                   color: scheme.onSurfaceVariant,
                 ),
                 onChanged: (v) {
@@ -528,8 +528,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           children: [
             SettingSwitchTile(
               icon: prefs.powerSaver
-                  ? Icons.energy_savings_leaf
-                  : Icons.energy_savings_leaf_outlined,
+                  ? EtaIcons.leaf
+                  : EtaIcons.leafOutline,
               title: l10n.settingsPowerSaver,
               subtitle: prefs.powerSaver
                   ? l10n.settingsPowerSaverOn
@@ -540,8 +540,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ),
             SettingSwitchTile(
               icon: prefs.suppressSleep
-                  ? Icons.bedtime_off_outlined
-                  : Icons.bedtime_outlined,
+                  ? EtaIcons.bedtimeOffOutline
+                  : EtaIcons.moonStarsOutline,
               title: l10n.settingsSuppressSleep,
               subtitle: prefs.suppressSleep
                   ? l10n.settingsSuppressSleepOn
@@ -558,8 +558,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           children: [
             SettingSwitchTile(
               icon: prefs.enableSpectrum
-                  ? Icons.graphic_eq
-                  : Icons.graphic_eq_outlined,
+                  ? EtaIcons.soundLine
+                  : EtaIcons.soundLineOutline,
               title: l10n.settingsSpectrum,
               subtitle: prefs.enableSpectrum
                   ? l10n.settingsSpectrumOn
@@ -570,8 +570,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ),
             SettingSwitchTile(
               icon: prefs.coverBeatScale
-                  ? Icons.music_note
-                  : Icons.music_note_outlined,
+                  ? EtaIcons.music
+                  : EtaIcons.musicOutline,
               title: l10n.settingsCoverBeatScale,
               subtitle: prefs.coverBeatScale
                   ? l10n.settingsCoverBeatScaleOn
@@ -581,7 +581,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   ref.read(appPrefsProvider.notifier).setCoverBeatScale(value),
             ),
             SettingSliderTile(
-              icon: Icons.view_column_outlined,
+              icon: EtaIcons.columnsOutline,
               title: l10n.settingsSpectrumBarWidth,
               subtitle: l10n.settingsSpectrumBarWidthDesc(
                 prefs.spectrumBarWidth,
@@ -596,7 +596,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   .setSpectrumBarWidth(v.round()),
             ),
             SettingTile(
-              icon: Icons.blur_circular_outlined,
+              icon: EtaIcons.soundLineOutline,
               title: l10n.settingsSpectrumStyle,
               subtitle: l10n.settingsSpectrumStyleDesc,
               trailing: SSegmented<String>(
@@ -612,8 +612,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ),
             SettingSwitchTile(
               icon: prefs.barSpectrum
-                  ? Icons.bar_chart
-                  : Icons.bar_chart_outlined,
+                  ? EtaIcons.chartBar
+                  : EtaIcons.chartBarOutline,
               title: l10n.settingsBarSpectrum,
               subtitle: prefs.barSpectrum
                   ? l10n.settingsBarSpectrumOn
@@ -630,7 +630,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           title: l10n.settingsTransitionStyle,
           children: [
             SettingTile(
-              icon: Icons.animation_outlined,
+              icon: EtaIcons.magic2Outline,
               title: l10n.settingsTransitionStyle,
               subtitle: l10n.settingsTransitionStyleDesc,
               trailing: SSegmented<String>(
@@ -650,31 +650,31 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           title: l10n.settingsSectionShortcuts,
           children: [
             SettingTile(
-              icon: Icons.space_bar,
+              icon: EtaIcons.space,
               title: l10n.settingsShortcutSpace,
               subtitle: l10n.settingsShortcutSpaceDesc,
               trailing: const SizedBox.shrink(),
             ),
             SettingTile(
-              icon: Icons.swap_horiz,
+              icon: EtaIcons.transferHorizontal,
               title: l10n.settingsShortcutArrows,
               subtitle: l10n.settingsShortcutArrowsDesc,
               trailing: const SizedBox.shrink(),
             ),
             SettingTile(
-              icon: Icons.search,
+              icon: EtaIcons.search2,
               title: l10n.settingsShortcutSearch,
               subtitle: l10n.commonSearch,
               trailing: const SizedBox.shrink(),
             ),
             SettingTile(
-              icon: Icons.library_music_outlined,
+              icon: EtaIcons.music2Outline,
               title: l10n.settingsShortcutLibrary,
               subtitle: l10n.settingsShortcutLibraryDesc,
               trailing: const SizedBox.shrink(),
             ),
             SettingTile(
-              icon: Icons.keyboard_return,
+              icon: EtaIcons.cornerDownLeft,
               title: l10n.settingsShortcutEsc,
               subtitle: l10n.settingsShortcutEscDesc,
               trailing: const SizedBox.shrink(),
@@ -785,7 +785,7 @@ class _EngineOptionTile extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                selected ? EtaIcons.dotCircle : EtaIcons.circleDash,
                 size: 19,
                 color: selected
                     ? scheme.primary
@@ -828,7 +828,7 @@ class _SinkDefaultCallBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.warning_amber_rounded,
+                  EtaIcons.warning,
                   size: 18,
                   color: scheme.error,
                 ),
@@ -851,7 +851,7 @@ class _SinkDefaultCallBanner extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: SButton(
                   label: l10n.settingsOutputDeviceUseQuality,
-                  icon: Icons.high_quality_outlined,
+                  icon: EtaIcons.highQualityOutline,
                   variant: SButtonVariant.primary,
                   size: SButtonSize.small,
                   onPressed: action,
@@ -877,7 +877,7 @@ class _SinkHfpNote extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.warning_amber_rounded, size: 14, color: scheme.error),
+          Icon(EtaIcons.warning, size: 14, color: scheme.error),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -918,7 +918,7 @@ class _A2dpGuideBlockState extends State<_A2dpGuideBlock> {
             padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
             child: Row(
               children: [
-                Icon(Icons.bluetooth_audio, size: 14, color: scheme.primary),
+                Icon(EtaIcons.bluetooth, size: 14, color: scheme.primary),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -934,7 +934,7 @@ class _A2dpGuideBlockState extends State<_A2dpGuideBlock> {
                   turns: _open ? 0.5 : 0,
                   duration: const Duration(milliseconds: 180),
                   child: Icon(
-                    Icons.expand_more,
+                    EtaIcons.downSmall,
                     size: 16,
                     color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
                   ),

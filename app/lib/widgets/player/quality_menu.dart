@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/l10n.dart';
 import '../common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 音质切换菜单（对齐 SPlayer-Next 音质档位 + MoeKoeMusic 品质切换交互）。
 class QualityMenu extends StatelessWidget {
@@ -38,7 +39,7 @@ class QualityMenu extends StatelessWidget {
                 Text(l10nQualityLabel(l10n, l)),
                 const Spacer(),
                 if (l == current)
-                  Icon(Icons.check, size: 16, color: theme.colorScheme.primary),
+                  Icon(EtaIcons.check, size: 16, color: theme.colorScheme.primary),
               ],
             ),
           ),
@@ -49,7 +50,7 @@ class QualityMenu extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.tune,
+              EtaIcons.filter,
               size: 16,
               color: theme.colorScheme.onSurfaceVariant,
             ),

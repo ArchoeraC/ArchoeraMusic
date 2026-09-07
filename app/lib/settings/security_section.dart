@@ -38,6 +38,7 @@ import '../../widgets/common/toast.dart';
 import '../../widgets/dialogs/s_dialog.dart';
 import '../../widgets/player/s_controls.dart';
 import 'settings_widgets.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'security/security_section_actions.dart';
 part 'security/security_section_view.dart';

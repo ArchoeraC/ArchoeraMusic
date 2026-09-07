@@ -21,7 +21,7 @@ extension _FavoritesPageView on _FavoritesPageState {
     final String subtitle;
     final IconData countIcon;
     if (_platform == _Platform.kugou) {
-      countIcon = Icons.library_music_outlined;
+      countIcon = EtaIcons.music2Outline;
       subtitle = switch (_kgTab) {
         _KgTab.created =>
           _kugouLoggedIn
@@ -42,17 +42,17 @@ extension _FavoritesPageView on _FavoritesPageState {
           subtitle = _neteaseLoggedIn
               ? l10n.pageFavPlaylistCount(count)
               : l10n.pageFavPlaylistLoginHint;
-          countIcon = Icons.queue_music;
+          countIcon = EtaIcons.playlist;
         case _FavTab.album:
           subtitle = _neteaseLoggedIn
               ? l10n.pageFavAlbumCount(count)
               : l10n.pageFavAlbumLoginHint;
-          countIcon = Icons.album_outlined;
+          countIcon = EtaIcons.albumOutline;
         case _FavTab.artist:
           subtitle = _neteaseLoggedIn
               ? l10n.pageFavArtistCount(count)
               : l10n.pageFavArtistLoginHint;
-          countIcon = Icons.person_outline;
+          countIcon = EtaIcons.userOutline;
       }
     }
 
@@ -148,13 +148,13 @@ extension _FavoritesPageView on _FavoritesPageState {
           Expanded(
             child: !_loggedIn
                 ? StreamingEmptyState(
-                    icon: Icons.star_outline,
+                    icon: EtaIcons.starOutline,
                     title: l10n.pageFavLoginTitle,
                     subtitle: _platform == _Platform.kugou
                         ? l10n.pageFavKugouLoginDesc
                         : l10n.pageFavLoginDesc,
                     buttonLabel: l10n.navHeaderQrLogin,
-                    buttonIcon: Icons.qr_code_2,
+                    buttonIcon: EtaIcons.qrcode,
                     onButton: _login,
                   )
                 : loading && !_loaded.contains(_cacheKey)
@@ -171,7 +171,7 @@ extension _FavoritesPageView on _FavoritesPageState {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.error_outline,
+                          EtaIcons.alertOutline,
                           size: 48,
                           color: scheme.error,
                         ),
@@ -190,7 +190,7 @@ extension _FavoritesPageView on _FavoritesPageState {
                         const SizedBox(height: 14),
                         SButton(
                           label: l10n.commonRetry,
-                          icon: Icons.refresh,
+                          icon: EtaIcons.refresh,
                           variant: SButtonVariant.secondary,
                           onPressed: _fetch,
                         ),

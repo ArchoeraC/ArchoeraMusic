@@ -114,14 +114,14 @@ extension _TrayIntegrationLogic on _TrayIntegrationState {
               _closeOption(
                 dialogContext,
                 l10n.settingsCloseBehaviorBackground,
-                Icons.headphones_outlined,
+                EtaIcons.headphoneOutline,
                 'background',
               ),
               const SizedBox(height: 8),
               _closeOption(
                 dialogContext,
                 l10n.settingsCloseBehaviorQuit,
-                Icons.power_settings_new_outlined,
+                EtaIcons.powerOutline,
                 'quit',
               ),
               const SizedBox(height: 12),
@@ -206,7 +206,7 @@ extension _TrayIntegrationLogic on _TrayIntegrationState {
                 ),
               ),
               Icon(
-                Icons.chevron_right,
+                EtaIcons.rightSmall,
                 size: 18,
                 color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
               ),

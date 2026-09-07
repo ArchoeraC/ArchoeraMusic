@@ -27,6 +27,7 @@ import '../dialogs/track_list_dialog.dart';
 import '../player/s_controls.dart';
 import '../common/anim.dart';
 import '../common/toast.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'nav_header/nav_header_accounts.dart';
 part 'nav_header/nav_header_search_dropdown.dart';
@@ -422,7 +423,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
             IconButton(
               tooltip: l10n.commonBack,
               onPressed: () => _handleBack(context),
-              icon: const Icon(Icons.chevron_left, size: 22),
+              icon: const Icon(EtaIcons.leftSmall, size: 22),
             ),
             const SizedBox(width: 8),
             _NavHeaderSearchField(

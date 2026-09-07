@@ -17,8 +17,9 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart' show Color, Colors, IconData, Icons;
+import 'package:flutter/material.dart' show Color, Colors, IconData;
 import 'package:geolocator/geolocator.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 当前天气快照。
 class WeatherNow {
@@ -45,19 +46,19 @@ class WeatherNow {
   /// 晴（0）与少云（1-2）分昼夜，阴/雾/雨/雪/雷暴为固定形态。
   IconData get icon {
     final code = wmoCode;
-    if (code == 0) return isDay ? Icons.wb_sunny : Icons.nights_stay;
+    if (code == 0) return isDay ? EtaIcons.sun : EtaIcons.moonStars;
     if (code == 1 || code == 2) {
-      return isDay ? Icons.wb_cloudy : Icons.cloud_queue;
+      return isDay ? EtaIcons.cloud : EtaIcons.cloud;
     }
-    if (code == 3) return Icons.cloud;
-    if (code == 45 || code == 48) return Icons.foggy;
-    if (code >= 51 && code <= 57) return Icons.grain;
-    if (code >= 61 && code <= 67) return Icons.water_drop;
-    if (code >= 71 && code <= 77) return Icons.ac_unit;
-    if (code >= 80 && code <= 82) return Icons.water_drop;
-    if (code >= 85 && code <= 86) return Icons.ac_unit;
-    if (code >= 95) return Icons.thunderstorm;
-    return Icons.cloud_outlined;
+    if (code == 3) return EtaIcons.cloud;
+    if (code == 45 || code == 48) return EtaIcons.fog;
+    if (code >= 51 && code <= 57) return EtaIcons.drizzle;
+    if (code >= 61 && code <= 67) return EtaIcons.drop;
+    if (code >= 71 && code <= 77) return EtaIcons.snowflake;
+    if (code >= 80 && code <= 82) return EtaIcons.drop;
+    if (code >= 85 && code <= 86) return EtaIcons.snowflake;
+    if (code >= 95) return EtaIcons.thunderstorm;
+    return EtaIcons.cloudOutline;
   }
 
   /// 语义色（win10 天气风格：太阳黄 / 云灰 / 雨蓝 / 雪青 / 雷暴紫）。

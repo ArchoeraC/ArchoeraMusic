@@ -103,21 +103,21 @@ class _WeatherMiniState extends ConsumerState<_WeatherMini> {
           '${l10n.weatherRefresh}';
     } else if (w.loading) {
       content = Icon(
-        Icons.cloud_outlined,
+        EtaIcons.cloudOutline,
         size: 18,
         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
       );
       tooltip = '';
     } else if (w.error == weatherNoLocationError) {
       content = Icon(
-        Icons.cloud_off_outlined,
+        EtaIcons.cloudOutline,
         size: 18,
         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
       );
       tooltip = l10n.weatherNoLocation;
     } else {
       content = Icon(
-        Icons.cloud_off_outlined,
+        EtaIcons.cloudOutline,
         size: 18,
         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
       );

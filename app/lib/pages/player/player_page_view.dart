@@ -200,7 +200,7 @@ class _PlayerTopBar extends StatelessWidget {
           IconButton(
             tooltip: l10n.playerBarCollapsePlayer,
             onPressed: onClose,
-            icon: const Icon(Icons.keyboard_arrow_down),
+            icon: const Icon(EtaIcons.downSmall),
             iconSize: 32,
           ),
           const SizedBox(width: 4),
@@ -214,7 +214,7 @@ class _PlayerTopBar extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(8),
                 child: Icon(
-                  Icons.lyrics_outlined,
+                  EtaIcons.fileMusicOutline,
                   size: 26,
                   color:
                       (showLyrics
@@ -239,7 +239,7 @@ class _PlayerTopBar extends StatelessWidget {
             child: IconButton(
               onPressed: onToggleFullscreen,
               icon: Icon(
-                isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                isFullScreen ? EtaIcons.fullscreenExit : EtaIcons.fullscreen,
               ),
             ),
           ),

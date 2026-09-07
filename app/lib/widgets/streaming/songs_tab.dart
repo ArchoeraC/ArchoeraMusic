@@ -12,6 +12,7 @@ import '../../services/streaming/streaming_provider.dart';
 import '../dialogs/track_context_menu.dart';
 import '../list/song_list.dart';
 import '../player/s_controls.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 歌曲 Tab：播放全部 + 本地过滤搜索 + 歌曲列表。
 class StreamingSongsTab extends ConsumerStatefulWidget {
@@ -71,7 +72,7 @@ class _SongsTabState extends ConsumerState<StreamingSongsTab> {
             children: [
               SButton(
                 label: l10n.commonPlayAll,
-                icon: Icons.play_arrow,
+                icon: EtaIcons.play,
                 variant: SButtonVariant.primary,
                 size: SButtonSize.small,
                 onPressed: songs.isEmpty
@@ -84,7 +85,7 @@ class _SongsTabState extends ConsumerState<StreamingSongsTab> {
                 child: SInput(
                   controller: _searchCtrl,
                   hintText: l10n.commonSearch,
-                  prefixIcon: Icons.search,
+                  prefixIcon: EtaIcons.search2,
                   clearable: true,
                   onChanged: (v) => setState(() => _query = v),
                 ),

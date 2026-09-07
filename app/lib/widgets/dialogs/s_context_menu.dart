@@ -11,9 +11,9 @@
 ///   context,
 ///   position: globalPosition,
 ///   items: [
-///     SContextMenuItem(label: '播放', icon: Icons.play_arrow, onTap: ...),
+///     SContextMenuItem(label: '播放', icon: EtaIcons.play, onTap: ...),
 ///     SContextMenuItem.divider(),
-///     SContextMenuItem(label: '删除', icon: Icons.delete, danger: true, onTap: ...),
+///     SContextMenuItem(label: '删除', icon: EtaIcons.delete, danger: true, onTap: ...),
 ///   ],
 /// );
 /// ```
@@ -24,7 +24,6 @@ import 'package:flutter/services.dart';
 
 import '../../theme/app_theme.dart';
 import '../common/anim.dart';
-
 part 's_context_menu/s_context_menu_view.dart';
 
 /// 右键菜单项。

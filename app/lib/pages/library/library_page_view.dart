@@ -28,7 +28,7 @@ extension _LibraryPageView on _LibraryPageState {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.error_outline,
+                      EtaIcons.alertOutline,
                       size: 40,
                       color: scheme.error.withValues(alpha: 0.6),
                     ),

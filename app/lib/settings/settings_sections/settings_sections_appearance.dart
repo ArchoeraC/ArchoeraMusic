@@ -63,7 +63,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
           note: l10n.settingsThemeNote,
           children: [
             SettingTile(
-              icon: Icons.dark_mode_outlined,
+              icon: EtaIcons.moonOutline,
               title: l10n.settingsThemeMode,
               subtitle: l10n.settingsThemeModeDesc,
               trailing: SSegmented<ThemeMode>(
@@ -84,7 +84,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
           title: l10n.settingsSectionAccent,
           children: [
             SettingTile(
-              icon: Icons.color_lens_outlined,
+              icon: EtaIcons.palette2Outline,
               title: l10n.settingsThemeSource,
               subtitle: l10n.settingsThemeSourceDesc,
               trailing: SSegmented<String>(
@@ -105,7 +105,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
           SettingCard(
             children: [
               SettingTile(
-                icon: Icons.palette_outlined,
+                icon: EtaIcons.paletteOutline,
                 title: l10n.settingsAccentTitle,
                 subtitle: l10n.settingsThemeSourceCustomHint,
                 trailing: _accentSwatches(scheme, accent, l10n),
@@ -120,7 +120,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         SettingCard(
           children: [
             SettingSwitchTile(
-              icon: Icons.tonality_outlined,
+              icon: EtaIcons.tonalityOutline,
               title: l10n.settingsGlobalTint,
               subtitle: l10n.settingsGlobalTintDesc,
               value: prefs.globalTint,
@@ -135,7 +135,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
           title: l10n.settingsSectionStyle,
           children: [
             SettingTile(
-              icon: Icons.image_outlined,
+              icon: EtaIcons.picOutline,
               title: l10n.settingsAppearanceStyle,
               subtitle: l10n.settingsAppearanceStyleDesc,
               trailing: SSegmented<String>(
@@ -157,7 +157,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
             SettingCard(
               children: [
                 SettingSliderTile(
-                  icon: Icons.blur_on_outlined,
+                  icon: EtaIcons.blurOnOutline,
                   title: l10n.settingsBackgroundBlur,
                   subtitle: l10n.settingsBackgroundBlurDesc(
                     prefs.backgroundBlur,
@@ -170,7 +170,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                   onChanged: (v) => notifier.setBackground(blur: v.round()),
                 ),
                 SettingSliderTile(
-                  icon: Icons.dark_mode_outlined,
+                  icon: EtaIcons.moonOutline,
                   title: l10n.settingsBackgroundDim,
                   subtitle: l10n.settingsBackgroundDimDesc(prefs.backgroundDim),
                   value: prefs.backgroundDim,
@@ -181,7 +181,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                   onChanged: (v) => notifier.setBackground(dim: v),
                 ),
                 SettingSliderTile(
-                  icon: Icons.zoom_out_map_outlined,
+                  icon: EtaIcons.fullscreenExit2Outline,
                   title: l10n.settingsBackgroundScale,
                   subtitle: l10n.settingsBackgroundScaleDesc(
                     prefs.backgroundScale,
@@ -202,7 +202,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
           title: l10n.settingsSectionLayout,
           children: [
             SettingSwitchTile(
-              icon: Icons.rounded_corner,
+              icon: EtaIcons.miniplayerOutline,
               title: l10n.settingsFloatingBar,
               subtitle: prefs.floatingPlayerBar
                   ? l10n.settingsFloatingBarOn
@@ -212,15 +212,15 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
             ),
             SettingSwitchTile(
               icon: prefs.sidebarCollapsed
-                  ? Icons.menu_open
-                  : Icons.menu_rounded,
+                  ? EtaIcons.menu
+                  : EtaIcons.menu,
               title: l10n.settingsSidebarCollapsed,
               subtitle: l10n.settingsSidebarCollapsedDesc,
               value: prefs.sidebarCollapsed,
               onChanged: (value) => notifier.setSidebar(collapsed: value),
             ),
             SettingTile(
-              icon: Icons.arrow_right_alt,
+              icon: EtaIcons.arrowRight,
               title: l10n.settingsSidebarNavStyle,
               subtitle: l10n.settingsSidebarNavStyleDesc,
               trailing: SSegmented<String>(
@@ -239,7 +239,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
               ),
             ),
             SettingTile(
-              icon: Icons.animation_outlined,
+              icon: EtaIcons.magic2Outline,
               title: l10n.settingsRouteTransition,
               subtitle: l10n.settingsRouteTransitionDesc,
               trailing: SSegmented<String>(
@@ -260,7 +260,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
           title: l10n.settingsSectionFont,
           children: [
             SettingTile(
-              icon: Icons.font_download_outlined,
+              icon: EtaIcons.fontOutline,
               title: l10n.settingsFontTitle,
               subtitle: switch (prefs.fontFamily) {
                 'MiSans' => l10n.settingsFontMiSans,
@@ -287,7 +287,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
           title: l10n.settingsSectionLanguage,
           children: [
             SettingTile(
-              icon: Icons.language_outlined,
+              icon: EtaIcons.translateOutline,
               title: l10n.settingsLanguageTitle,
               subtitle: l10n.settingsLanguageDesc,
               trailing: _languageDropdown(scheme, prefs.locale, l10n),
@@ -299,7 +299,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
           title: l10n.settingsSectionCover,
           children: [
             SettingTile(
-              icon: Icons.crop_square,
+              icon: EtaIcons.square,
               title: l10n.settingsCoverRadius,
               subtitle: prefs.coverRadius == 0
                   ? l10n.settingsCoverRadiusSharp
@@ -322,7 +322,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
           note: l10n.settingsWeatherNote,
           children: [
             SettingSwitchTile(
-              icon: Icons.wb_sunny_outlined,
+              icon: EtaIcons.sunOutline,
               title: l10n.settingsWeather,
               subtitle: l10n.settingsWeatherDesc,
               value: prefs.weatherEnabled,
@@ -330,7 +330,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
             ),
             if (prefs.weatherEnabled) ...[
               SettingSwitchTile(
-                icon: Icons.my_location_outlined,
+                icon: EtaIcons.aimingOutline,
                 title: l10n.settingsWeatherAutoLocate,
                 subtitle: l10n.settingsWeatherAutoLocateDesc,
                 value: prefs.weatherAutoLocate,
@@ -339,7 +339,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
               ),
               if (prefs.weatherAutoLocate)
                 SettingTile(
-                  icon: Icons.gps_fixed_outlined,
+                  icon: EtaIcons.aimingOutline,
                   title: l10n.settingsWeatherLocateSource,
                   subtitle: l10n.settingsWeatherLocateSourceDesc,
                   trailing: SSegmented<String>(
@@ -467,7 +467,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(
-                  Icons.location_city_outlined,
+                  EtaIcons.buildingOutline,
                   size: 18,
                   color: scheme.primary,
                 ),
@@ -541,7 +541,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(
-                  Icons.wallpaper_outlined,
+                  EtaIcons.picOutline,
                   size: 18,
                   color: scheme.primary,
                 ),
@@ -588,7 +588,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                       height: 56,
                       color: scheme.onSurface.withValues(alpha: 0.06),
                       child: Icon(
-                        Icons.broken_image_outlined,
+                        EtaIcons.pic2Outline,
                         size: 20,
                         color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),
@@ -684,7 +684,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
             color: scheme.onSurface,
           ),
           icon: Icon(
-            Icons.arrow_drop_down,
+            EtaIcons.downSmall,
             size: 20,
             color: scheme.onSurfaceVariant,
           ),
@@ -762,7 +762,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
               scheme,
               color: currentColor,
               selected: customSelected,
-              icon: Icons.colorize,
+              icon: EtaIcons.colorPicker,
               iconColor: customSelected
                   ? scheme.primary
                   : currentColor.computeLuminance() > 0.5
@@ -796,7 +796,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
       ),
       child: icon != null
           ? Icon(icon, size: 14, color: iconColor)
-          : (selected ? Icon(Icons.check, size: 14, color: checkColor) : null),
+          : (selected ? Icon(EtaIcons.check, size: 14, color: checkColor) : null),
     );
   }
 

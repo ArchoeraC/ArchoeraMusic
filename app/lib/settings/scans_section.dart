@@ -14,6 +14,7 @@ import '../../l10n/l10n.dart';
 import '../../services/scanner/library_scanner.dart';
 import '../../stores/app_prefs.dart';
 import 'settings_widgets.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 扫描分类：并行度 / 批大小 / 安全上限 / 额外扩展名 / 坏文件隔离管理。
 ///
@@ -79,7 +80,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
           title: l10n.settingsSectionScanRun,
           children: [
             SettingSliderTile(
-              icon: Icons.speed_outlined,
+              icon: EtaIcons.dashboard4Outline,
               title: l10n.settingsScanParallelism,
               subtitle: l10n.settingsScanParallelismDesc(
                 prefs.scanParallelism <= 0
@@ -94,7 +95,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
                   notifier.setScan(parallelism: v.round()),
             ),
             SettingSliderTile(
-              icon: Icons.view_stream_outlined,
+              icon: EtaIcons.menuOutline,
               title: l10n.settingsScanBatch,
               subtitle: l10n.settingsScanBatchDesc(
                 prefs.scanBatchSize <= 0
@@ -117,7 +118,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
             _numberTile(
               scheme,
               l10n,
-              Icons.sd_storage_outlined,
+              EtaIcons.storageOutline,
               l10n.settingsScanMaxFileSizeMb,
               _maxFileSizeCtrl,
               onCommit: (v) => notifier.setScan(maxFileSizeMb: v),
@@ -125,7 +126,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
             _numberTile(
               scheme,
               l10n,
-              Icons.numbers_outlined,
+              EtaIcons.hashtagOutline,
               l10n.settingsScanMaxScanFiles,
               _maxScanFilesCtrl,
               onCommit: (v) => notifier.setScan(maxScanFiles: v),
@@ -133,7 +134,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
             _numberTile(
               scheme,
               l10n,
-              Icons.error_outline,
+              EtaIcons.alertOutline,
               l10n.settingsScanMaxErrors,
               _maxErrorsCtrl,
               onCommit: (v) => notifier.setScan(maxScanErrors: v),
@@ -146,7 +147,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
           note: l10n.settingsScanExtraExtsNote,
           children: [
             SettingPathFieldCard(
-              icon: Icons.extension_outlined,
+              icon: EtaIcons.pluginOutline,
               ctrl: _extraExtsCtrl,
               hint: l10n.settingsScanExtraExtsHint,
               save: (v) {
@@ -194,7 +195,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
                         padding: const EdgeInsets.symmetric(vertical: 3),
                         child: Row(
                           children: [
-                            const Icon(Icons.insert_drive_file_outlined,
+                            const Icon(EtaIcons.fileOutline,
                                 size: 15),
                             const SizedBox(width: 8),
                             Expanded(
@@ -218,7 +219,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
                             IconButton(
                               iconSize: 16,
                               visualDensity: VisualDensity.compact,
-                              icon: const Icon(Icons.delete_outline),
+                              icon: const Icon(EtaIcons.deleteOutline),
                               tooltip: l10n.settingsScanQuarantineDelete,
                               onPressed: () => _deleteQuarantined(f),
                             ),
@@ -238,7 +239,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
                                 visualDensity: VisualDensity.compact,
                               ),
                               onPressed: _openQuarantineDir,
-                              icon: const Icon(Icons.folder_open, size: 15),
+                              icon: const Icon(EtaIcons.folderOpen, size: 15),
                               label: Text(
                                 l10n.settingsScanQuarantineOpenDir,
                                 style: const TextStyle(fontSize: 12),
@@ -252,7 +253,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
                                 visualDensity: VisualDensity.compact,
                               ),
                               onPressed: _clearQuarantine,
-                              icon: const Icon(Icons.delete_forever_outlined,
+                              icon: const Icon(EtaIcons.wastebasketOutline,
                                   size: 15),
                               label: Text(
                                 l10n.settingsScanQuarantineClearAll,

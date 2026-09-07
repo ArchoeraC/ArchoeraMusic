@@ -32,6 +32,7 @@ import '../widgets/dialogs/s_dialog.dart';
 import '../widgets/player/s_controls.dart';
 import 'settings_color_picker.dart';
 import 'settings_widgets.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'settings_sections/settings_sections_appearance.dart';
 part 'settings_sections/settings_sections_playback.dart';

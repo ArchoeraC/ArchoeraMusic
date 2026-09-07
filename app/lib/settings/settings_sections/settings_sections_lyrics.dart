@@ -38,8 +38,8 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
           children: [
             SettingSwitchTile(
               icon: prefs.showLyricsInPlayer
-                  ? Icons.lyrics_outlined
-                  : Icons.lyrics,
+                  ? EtaIcons.fileMusicOutline
+                  : EtaIcons.fileMusic,
               title: l10n.settingsPlayerLyrics,
               subtitle: prefs.showLyricsInPlayer
                   ? l10n.settingsPlayerLyricsOn
@@ -51,8 +51,8 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
             ),
             SettingSwitchTile(
               icon: prefs.barLyrics
-                  ? Icons.menu_book_outlined
-                  : Icons.menu_book,
+                  ? EtaIcons.bookOutline
+                  : EtaIcons.book,
               title: l10n.settingsBarLyrics,
               subtitle: prefs.barLyrics
                   ? l10n.settingsBarLyricsOn
@@ -64,8 +64,8 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
             ),
             SettingSwitchTile(
               icon: prefs.barEnhancedLyrics
-                  ? Icons.mic_external_on_outlined
-                  : Icons.mic_external_on,
+                  ? EtaIcons.micOutline
+                  : EtaIcons.mic,
               title: l10n.settingsBarEnhancedLyrics,
               subtitle: prefs.barEnhancedLyrics
                   ? l10n.settingsBarEnhancedLyricsOn
@@ -82,8 +82,8 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
             ),
             SettingSwitchTile(
               icon: prefs.showTranslation
-                  ? Icons.translate
-                  : Icons.translate_outlined,
+                  ? EtaIcons.translate
+                  : EtaIcons.translateOutline,
               title: l10n.settingsShowTranslation,
               subtitle: prefs.showTranslation
                   ? l10n.settingsShowTranslationOn
@@ -101,7 +101,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
           note: l10n.settingsLyricEngineNote,
           children: [
             SettingTile(
-              icon: Icons.lyrics_outlined,
+              icon: EtaIcons.fileMusicOutline,
               title: l10n.settingsLyricEngine,
               subtitle: l10n.settingsLyricEngineDesc,
               trailing: SSegmented<String>(
@@ -126,7 +126,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
           note: l10n.settingsLyricsNote,
           children: [
             SettingSliderTile(
-              icon: Icons.format_size,
+              icon: EtaIcons.fontSize,
               title: l10n.settingsLyricFontSize,
               subtitle: l10n.settingsLyricFontSizeDesc(
                 prefs.lyricFontSize.round(),
@@ -141,7 +141,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
                   .setLyricStyle(fontSize: v),
             ),
             SettingTile(
-              icon: Icons.palette_outlined,
+              icon: EtaIcons.paletteOutline,
               title: l10n.settingsLyricPlayedColor,
               subtitle: l10n.settingsLyricPlayedColorDesc,
               trailing: _colorSwatches(
@@ -153,7 +153,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
               ),
             ),
             SettingTile(
-              icon: Icons.palette_outlined,
+              icon: EtaIcons.paletteOutline,
               title: l10n.settingsLyricUnplayedColor,
               subtitle: l10n.settingsLyricUnplayedColorDesc,
               trailing: _colorSwatches(
@@ -181,7 +181,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
       note: l10n.settingsAmllNote,
       children: [
         SettingSliderTile(
-          icon: Icons.center_focus_strong_outlined,
+          icon: EtaIcons.aimingOutline,
           title: l10n.settingsAmllAlign,
           subtitle: '${(prefs.amllAlignFraction * 100).round()}%',
           value: prefs.amllAlignFraction,
@@ -191,7 +191,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
           onChanged: (v) => notifier.setLyricAmll(alignFraction: v),
         ),
         SettingSliderTile(
-          icon: Icons.opacity,
+          icon: EtaIcons.drop,
           title: l10n.settingsAmllDim,
           subtitle: '${(prefs.amllInactiveAlpha * 100).round()}%',
           value: prefs.amllInactiveAlpha,
@@ -201,28 +201,28 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
           onChanged: (v) => notifier.setLyricAmll(inactiveAlpha: v),
         ),
         SettingSwitchTile(
-          icon: Icons.abc,
+          icon: EtaIcons.abcOutline,
           title: l10n.settingsAmllWordSweep,
           subtitle: '',
           value: prefs.amllWordSweep,
           onChanged: (v) => notifier.setLyricAmll(wordSweep: v),
         ),
         SettingSwitchTile(
-          icon: Icons.visibility_off_outlined,
+          icon: EtaIcons.eyeCloseOutline,
           title: l10n.settingsAmllHidePassed,
           subtitle: '',
           value: prefs.amllHidePassed,
           onChanged: (v) => notifier.setLyricAmll(hidePassed: v),
         ),
         SettingSwitchTile(
-          icon: Icons.zoom_out_map_outlined,
+          icon: EtaIcons.fullscreenExit2Outline,
           title: l10n.settingsAmllScale,
           subtitle: '',
           value: prefs.amllEnableScale,
           onChanged: (v) => notifier.setLyricAmll(enableScale: v),
         ),
         SettingTile(
-          icon: Icons.animation_outlined,
+          icon: EtaIcons.magic2Outline,
           title: l10n.settingsAmllSpring,
           subtitle: prefs.amllSpringPreset,
           trailing: DropdownButton<String>(
@@ -279,7 +279,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
                 ),
                 child: current == v
                     ? Icon(
-                        Icons.check,
+                        EtaIcons.check,
                         size: 12,
                         color: Color(v).computeLuminance() > 0.5
                             ? Colors.black

@@ -12,6 +12,7 @@ import '../../l10n/l10n.dart';
 import '../../services/downloader/download_controller.dart';
 import '../common/toast.dart';
 import '../common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'download_task_tile/download_task_tile_view.dart';
 
@@ -40,15 +41,15 @@ class DownloadTaskTile extends ConsumerWidget {
 
   Widget _statusIcon() {
     final (icon, color) = switch (task.status) {
-      'queued' => (Icons.hourglass_top, scheme.onSurfaceVariant),
-      'resolving' => (Icons.travel_explore, scheme.onSurfaceVariant),
-      'running' => (Icons.downloading, scheme.primary),
-      'paused' => (Icons.pause_circle_outline, scheme.onSurfaceVariant),
-      'failed' => (Icons.error_outline, scheme.error),
-      'canceled' => (Icons.cancel_outlined, scheme.onSurfaceVariant),
-      'done' => (Icons.check_circle_outline, const Color(0xFF4DDB9B)),
-      'already' => (Icons.check_circle_outline, scheme.tertiary),
-      _ => (Icons.circle_outlined, scheme.onSurfaceVariant),
+      'queued' => (EtaIcons.sandglass, scheme.onSurfaceVariant),
+      'resolving' => (EtaIcons.earth, scheme.onSurfaceVariant),
+      'running' => (EtaIcons.download, scheme.primary),
+      'paused' => (EtaIcons.pauseCircleOutline, scheme.onSurfaceVariant),
+      'failed' => (EtaIcons.alertOutline, scheme.error),
+      'canceled' => (EtaIcons.closeCircleOutline, scheme.onSurfaceVariant),
+      'done' => (EtaIcons.checkCircleOutline, const Color(0xFF4DDB9B)),
+      'already' => (EtaIcons.checkCircleOutline, scheme.tertiary),
+      _ => (EtaIcons.roundOutline, scheme.onSurfaceVariant),
     };
     return Icon(icon, size: 22, color: color);
   }

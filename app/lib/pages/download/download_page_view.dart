@@ -47,7 +47,7 @@ extension _DownloadPageView on _DownloadPageState {
           TextButton.icon(
             onPressed: () => _toggleSelectAll(state),
             icon: Icon(
-              _allSelected ? Icons.deselect : Icons.select_all,
+              _allSelected ? EtaIcons.deselectOutline : EtaIcons.multiselect,
               size: 16,
             ),
             label: Text(
@@ -56,13 +56,13 @@ extension _DownloadPageView on _DownloadPageState {
           ),
           _headerIcon(
             scheme,
-            icon: Icons.pause_circle_outline,
+            icon: EtaIcons.pauseCircleOutline,
             tooltip: l10n.downloadPauseAll,
             onPressed: state.activeCount > 0 ? _pauseAll : null,
           ),
           _headerIcon(
             scheme,
-            icon: Icons.play_circle_outline,
+            icon: EtaIcons.playCircleOutline,
             tooltip: l10n.downloadResumeAll,
             onPressed: state.tasks.any((t) => t.isPaused || t.isFailed)
                 ? _resumeAll
@@ -70,7 +70,7 @@ extension _DownloadPageView on _DownloadPageState {
           ),
           _headerIcon(
             scheme,
-            icon: Icons.delete_outline,
+            icon: EtaIcons.deleteOutline,
             tooltip: l10n.downloadDeleteSelected,
             color: scheme.error,
             onPressed: _selected.isEmpty ? null : _confirmBatchDelete,
@@ -79,7 +79,7 @@ extension _DownloadPageView on _DownloadPageState {
             tooltip: l10n.downloadExitSelect,
             visualDensity: VisualDensity.compact,
             onPressed: _exitSelectMode,
-            icon: Icon(Icons.close, size: 18, color: scheme.onSurfaceVariant),
+            icon: Icon(EtaIcons.close, size: 18, color: scheme.onSurfaceVariant),
           ),
         ],
       );
@@ -98,37 +98,37 @@ extension _DownloadPageView on _DownloadPageState {
         const SizedBox(width: 16),
         _statChip(
           scheme,
-          Icons.downloading,
+          EtaIcons.download,
           l10n.downloadActiveCount(state.activeCount),
         ),
         const SizedBox(width: 8),
         _statChip(
           scheme,
-          Icons.check_circle_outline,
+          EtaIcons.checkCircleOutline,
           l10n.downloadDoneCount(state.doneCount),
         ),
         const Spacer(),
         if (state.tasks.isNotEmpty)
           TextButton.icon(
             onPressed: () => _openRoot(context),
-            icon: const Icon(Icons.folder_open_outlined, size: 16),
+            icon: const Icon(EtaIcons.folderOpenOutline, size: 16),
             label: Text(l10n.downloadOpenDir),
           ),
         TextButton.icon(
           onPressed: state.tasks.isEmpty ? null : _enterSelectMode,
-          icon: const Icon(Icons.checklist, size: 16),
+          icon: const Icon(EtaIcons.listCheck2, size: 16),
           label: Text(l10n.downloadSelectMode),
         ),
         if (state.tasks.any((t) => t.isActive))
           TextButton.icon(
             onPressed: _pauseAll,
-            icon: const Icon(Icons.pause_rounded, size: 16),
+            icon: const Icon(EtaIcons.pause, size: 16),
             label: Text(l10n.downloadPauseAll),
           ),
         if (state.tasks.any((t) => t.isPaused || t.isFailed))
           TextButton.icon(
             onPressed: _resumeAll,
-            icon: const Icon(Icons.play_arrow_rounded, size: 16),
+            icon: const Icon(EtaIcons.play, size: 16),
             label: Text(l10n.downloadResumeAll),
           ),
         if (state.tasks.isNotEmpty)
@@ -136,7 +136,7 @@ extension _DownloadPageView on _DownloadPageState {
             onPressed: () => _confirmClearAll(context),
             style: TextButton.styleFrom(foregroundColor: scheme.error),
             icon: Icon(
-              Icons.delete_sweep_outlined,
+              EtaIcons.deleteOutline,
               size: 16,
               color: scheme.error,
             ),
@@ -197,7 +197,7 @@ extension _DownloadPageView on _DownloadPageState {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.error_outline,
+              EtaIcons.alertOutline,
               size: 48,
               color: scheme.error.withValues(alpha: 0.6),
             ),
@@ -217,7 +217,7 @@ extension _DownloadPageView on _DownloadPageState {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.download_outlined,
+              EtaIcons.downloadOutline,
               size: 56,
               color: scheme.onSurfaceVariant.withValues(alpha: 0.4),
             ),

@@ -101,7 +101,7 @@ extension _HistoryPageActions on _HistoryPageState {
       extra: [
         SContextMenuItem(
           label: context.l10n.pageHistoryRemove,
-          icon: Icons.delete_outline,
+          icon: EtaIcons.deleteOutline,
           onTap: () => _removeEntry(track),
         ),
       ],

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/streaming/streaming_provider.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 服务器下拉（切换激活服务器）。
 class StreamingServerDropdown extends ConsumerWidget {
@@ -33,7 +34,7 @@ class StreamingServerDropdown extends ConsumerWidget {
             fontWeight: FontWeight.w600,
             color: scheme.onSurface,
           ),
-          icon: Icon(Icons.arrow_drop_down, color: scheme.onSurfaceVariant),
+          icon: Icon(EtaIcons.downSmall, color: scheme.onSurfaceVariant),
           onChanged: state.connecting
               ? null
               : (id) {

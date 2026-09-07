@@ -58,7 +58,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
               : l10n.settingsScrapeDirsNote(dirs.join(' ; ')),
           children: [
             SettingPathFieldCard(
-              icon: Icons.folder_outlined,
+              icon: EtaIcons.folderOutline,
               ctrl: _scrapeDirsCtrl,
               hint: l10n.settingsScrapeDirsHint,
               save: (v) => _saveScrapeDirs(v, l10n),
@@ -71,63 +71,63 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
           title: l10n.settingsSectionScrapeSources,
           children: [
             SettingSwitchTile(
-              icon: Icons.public,
+              icon: EtaIcons.earth,
               title: l10n.settingsScrapeSourceMusicBrainz,
               subtitle: l10n.settingsScrapeSourceDesc,
               value: prefs.scrapeUseMusicBrainz,
               onChanged: (v) => notifier.setScrape(useMusicBrainz: v),
             ),
             SettingSwitchTile(
-              icon: Icons.queue_music,
+              icon: EtaIcons.playlist,
               title: l10n.settingsScrapeSourceDeezer,
               subtitle: l10n.settingsScrapeSourceDesc,
               value: prefs.scrapeUseDeezer,
               onChanged: (v) => notifier.setScrape(useDeezer: v),
             ),
             SettingSwitchTile(
-              icon: Icons.storefront_outlined,
+              icon: EtaIcons.storeOutline,
               title: l10n.settingsScrapeSourceItunes,
               subtitle: l10n.settingsScrapeSourceDesc,
               value: prefs.scrapeUseItunes,
               onChanged: (v) => notifier.setScrape(useItunes: v),
             ),
             SettingSwitchTile(
-              icon: Icons.music_note_outlined,
+              icon: EtaIcons.musicOutline,
               title: l10n.settingsScrapeSourceNetease,
               subtitle: l10n.settingsScrapeSourceDesc,
               value: prefs.scrapeUseNetease,
               onChanged: (v) => notifier.setScrape(useNetease: v),
             ),
             SettingSwitchTile(
-              icon: Icons.library_music_outlined,
+              icon: EtaIcons.music2Outline,
               title: l10n.settingsScrapeSourceQQMusic,
               subtitle: l10n.settingsScrapeSourceDesc,
               value: prefs.scrapeUseQQMusic,
               onChanged: (v) => notifier.setScrape(useQQMusic: v),
             ),
             SettingSwitchTile(
-              icon: Icons.headphones_outlined,
+              icon: EtaIcons.headphoneOutline,
               title: l10n.settingsScrapeSourceKugou,
               subtitle: l10n.settingsScrapeSourceDesc,
               value: prefs.scrapeUseKugou,
               onChanged: (v) => notifier.setScrape(useKugou: v),
             ),
             SettingSwitchTile(
-              icon: Icons.graphic_eq_outlined,
+              icon: EtaIcons.soundLineOutline,
               title: l10n.settingsScrapeSourceKuwo,
               subtitle: l10n.settingsScrapeSourceDesc,
               value: prefs.scrapeUseKuwo,
               onChanged: (v) => notifier.setScrape(useKuwo: v),
             ),
             SettingSwitchTile(
-              icon: Icons.mobile_screen_share_outlined,
+              icon: EtaIcons.shareForwardOutline,
               title: l10n.settingsScrapeSourceMigu,
               subtitle: l10n.settingsScrapeSourceDesc,
               value: prefs.scrapeUseMigu,
               onChanged: (v) => notifier.setScrape(useMigu: v),
             ),
             SettingSwitchTile(
-              icon: Icons.fingerprint,
+              icon: EtaIcons.fingerprint,
               title: l10n.settingsScrapeSourceAcoustID,
               subtitle: l10n.settingsScrapeSourceDesc,
               value: prefs.scrapeUseAcoustID,
@@ -140,28 +140,28 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
           title: l10n.settingsSectionScrapeWrite,
           children: [
             SettingSwitchTile(
-              icon: Icons.notes_outlined,
+              icon: EtaIcons.musicOutline,
               title: l10n.settingsScrapeEmbedMetadata,
               subtitle: l10n.settingsScrapeWriteDesc,
               value: prefs.scrapeEmbedMetadata,
               onChanged: (v) => notifier.setScrape(embedMetadata: v),
             ),
             SettingSwitchTile(
-              icon: Icons.image_outlined,
+              icon: EtaIcons.picOutline,
               title: l10n.settingsScrapeEmbedCover,
               subtitle: l10n.settingsScrapeWriteDesc,
               value: prefs.scrapeEmbedCover,
               onChanged: (v) => notifier.setScrape(embedCover: v),
             ),
             SettingSwitchTile(
-              icon: Icons.lyrics_outlined,
+              icon: EtaIcons.fileMusicOutline,
               title: l10n.settingsScrapeEmbedLyrics,
               subtitle: l10n.settingsScrapeWriteDesc,
               value: prefs.scrapeEmbedLyrics,
               onChanged: (v) => notifier.setScrape(embedLyrics: v),
             ),
             SettingSwitchTile(
-              icon: Icons.checklist_outlined,
+              icon: EtaIcons.listCheck3Outline,
               title: l10n.settingsScrapeSkipScraped,
               subtitle: l10n.settingsScrapeSkipScrapedDesc,
               value: prefs.scrapeSkipScraped,
@@ -174,7 +174,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
           title: l10n.settingsSectionScrapeAdvanced,
           children: [
             SettingSliderTile(
-              icon: Icons.memory_outlined,
+              icon: EtaIcons.chipOutline,
               title: l10n.settingsScrapeWorkers,
               subtitle: l10n.settingsScrapeWorkersDesc(
                 prefs.scrapeWorkers <= 0
@@ -188,7 +188,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
               onChanged: (v) => notifier.setScrape(workers: v.round()),
             ),
             SettingSliderTile(
-              icon: Icons.view_stream_outlined,
+              icon: EtaIcons.menuOutline,
               title: l10n.settingsScrapeBatch,
               subtitle: l10n.settingsScrapeBatchDesc(
                 '${prefs.scrapeBatchSize}',
@@ -200,7 +200,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
               onChanged: (v) => notifier.setScrape(batchSize: v.round()),
             ),
             SettingSliderTile(
-              icon: Icons.autorenew,
+              icon: EtaIcons.refresh,
               title: l10n.settingsScrapeRetries,
               subtitle: l10n.settingsScrapeRetriesDesc(
                 '${prefs.scrapeMaxRetries}',
@@ -226,13 +226,13 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
                 child: scrape.scraping
                     ? SButton(
                         label: l10n.settingsScrapeCancel,
-                        icon: Icons.stop,
+                        icon: EtaIcons.stop,
                         variant: SButtonVariant.error,
                         onPressed: scraper.cancel,
                       )
                     : SButton(
                         label: l10n.settingsScrapeStart,
-                        icon: Icons.auto_fix_high,
+                        icon: EtaIcons.magic3,
                         variant: SButtonVariant.primary,
                         onPressed: _startScrape,
                       ),
@@ -273,7 +273,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
             ),
           ),
           SettingPathFieldCard(
-            icon: Icons.folder_copy_outlined,
+            icon: EtaIcons.foldersOutline,
             ctrl: _organizeTargetCtrl,
             hint: l10n.settingsScrapeOrganizeTargetHint,
             save: (v) => notifier.setScrape(organizeTargetDir: v.trim()),
@@ -291,7 +291,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
             ),
           ),
           SettingPathFieldCard(
-            icon: Icons.account_tree_outlined,
+            icon: EtaIcons.sitemapOutline,
             ctrl: _organizePatternCtrl,
             hint: l10n.settingsScrapeOrganizePatternHint,
             save: (v) => notifier.setScrape(organizePattern: v.trim()),
@@ -302,7 +302,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
             padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
             child: SButton(
               label: l10n.settingsScrapeOrganizeStart,
-              icon: Icons.drive_file_move_outlined,
+              icon: EtaIcons.fileImportOutline,
               variant: SButtonVariant.secondary,
               onPressed: () => _startOrganize(l10n),
             ),
@@ -426,7 +426,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
               alignment: Alignment.centerRight,
               child: SButton(
                 label: l10n.settingsOrganizeCancel,
-                icon: Icons.stop,
+                icon: EtaIcons.stop,
                 size: SButtonSize.small,
                 variant: SButtonVariant.error,
                 onPressed: ref.read(scrapeControllerProvider.notifier).cancel,

@@ -51,7 +51,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
           title: l10n.settingsSectionDir,
           children: [
             SettingPathFieldCard(
-              icon: Icons.folder_outlined,
+              icon: EtaIcons.folderOutline,
               ctrl: _downloadRootCtrl,
               hint: l10n.settingsDownloadRootHint,
               save: (v) => _saveDownloadRoot(v, l10n),
@@ -65,7 +65,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
           note: l10n.settingsDownloadTemplateNote,
           children: [
             SettingPathFieldCard(
-              icon: Icons.text_fields_outlined,
+              icon: EtaIcons.fontSizeOutline,
               ctrl: _downloadTemplateCtrl,
               hint: l10n.settingsDownloadTemplateHint,
               save: (v) => _saveDownloadTemplate(v, l10n),
@@ -79,7 +79,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
           note: l10n.settingsDownloadQualityNote,
           children: [
             SettingTile(
-              icon: Icons.high_quality_outlined,
+              icon: EtaIcons.highQualityOutline,
               title: l10n.settingsDownloadQuality,
               subtitle: l10n.settingsDownloadQualityDesc(
                 l10nQualityLabel(l10n, prefs.downloadQuality),
@@ -101,7 +101,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
           title: l10n.settingsSectionConcurrent,
           children: [
             SettingSliderTile(
-              icon: Icons.speed_outlined,
+              icon: EtaIcons.dashboard4Outline,
               title: l10n.settingsDownloadConcurrent,
               subtitle: l10n.settingsDownloadConcurrentDesc(
                 prefs.downloadMaxConcurrent,
@@ -124,7 +124,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
               },
             ),
             SettingTile(
-              icon: Icons.folder_copy_outlined,
+              icon: EtaIcons.foldersOutline,
               title: l10n.settingsDownloadGrouping,
               subtitle: switch (prefs.downloadSubdirStrategy) {
                 0 => l10n.settingsGroupingFlat,
@@ -151,7 +151,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
           note: l10n.settingsSpeedNote,
           children: [
             SettingSliderTile(
-              icon: Icons.speed_outlined,
+              icon: EtaIcons.dashboard4Outline,
               title: l10n.settingsDownloadSpeedLimit,
               subtitle: prefs.downloadSpeedLimit <= 0
                   ? l10n.settingsSpeedUnlimited
@@ -188,7 +188,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
           note: l10n.settingsDownloadHistoryNote,
           children: [
             SettingSliderTile(
-              icon: Icons.history_outlined,
+              icon: EtaIcons.historyOutline,
               title: l10n.settingsDownloadHistoryLimit,
               subtitle: l10n.settingsDownloadHistoryDesc(
                 prefs.downloadHistoryLimit,
@@ -221,7 +221,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
           note: l10n.settingsFingerprintNote,
           children: [
             SettingSwitchTile(
-              icon: Icons.published_with_changes_outlined,
+              icon: EtaIcons.publishedWithChangesOutline,
               title: l10n.settingsDownloadDynamicFingerprint,
               subtitle: l10n.settingsDownloadDynamicFingerprintDesc,
               value: prefs.downloadDynamicFingerprint,
@@ -233,14 +233,14 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
               },
             ),
             SettingTile(
-              icon: Icons.fingerprint_outlined,
+              icon: EtaIcons.fingerprintOutline,
               title: l10n.settingsResetFingerprint,
               subtitle: l10n.settingsResetFingerprintDesc,
               trailing: IconButton(
                 tooltip: l10n.settingsResetFingerprint,
                 iconSize: 18,
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.refresh_outlined),
+                icon: const Icon(EtaIcons.refreshOutline),
                 onPressed: prefs.downloadDynamicFingerprint
                     ? null
                     : () => _resetFingerprint(context, l10n),

@@ -24,6 +24,7 @@ import '../common/glass_surface.dart';
 import 'netease_login_dialog.dart';
 import '../player/s_controls.dart';
 import '../common/toast.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'comment_dialog/comment_dialog_actions.dart';
 part 'comment_dialog/comment_dialog_view.dart';

@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 按钮样式。
 enum SButtonVariant { primary, secondary, ghost, error }
@@ -250,7 +251,7 @@ class _SInputState extends State<SInput> {
                               _controller.clear();
                               widget.onChanged?.call('');
                             },
-                      icon: Icon(Icons.close, color: scheme.onSurfaceVariant),
+                      icon: Icon(EtaIcons.close, color: scheme.onSurfaceVariant),
                     ),
                   ),
                 )

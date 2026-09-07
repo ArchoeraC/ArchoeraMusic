@@ -15,6 +15,7 @@ import '../../widgets/common/toast.dart';
 import '../../widgets/dialogs/s_dialog.dart';
 import '../../widgets/player/s_controls.dart';
 import 'settings_widgets.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 播放历史条数上限滑块的取值范围与步长（100 ~ 5000，每档 100）。
 const int historyLimitMin = 100;
@@ -147,7 +148,7 @@ class _HistorySectionState extends ConsumerState<HistorySection> {
           children: [
             // 记录开关
             SettingSwitchTile(
-              icon: enabled ? Icons.history : Icons.history_outlined,
+              icon: enabled ? EtaIcons.history : EtaIcons.historyOutline,
               title: l10n.settingsHistoryEnabled,
               subtitle: enabled
                   ? l10n.settingsHistoryEnabledOn
@@ -158,7 +159,7 @@ class _HistorySectionState extends ConsumerState<HistorySection> {
             if (enabled) ...[
               // 条数上限开关（关闭 = 不限制，弹窗确认）
               SettingSwitchTile(
-                icon: Icons.tune,
+                icon: EtaIcons.filter,
                 title: l10n.settingsHistoryLimit,
                 subtitle: limit == null
                     ? l10n.settingsHistoryLimitUnlimited
@@ -177,7 +178,7 @@ class _HistorySectionState extends ConsumerState<HistorySection> {
               ),
               if (limit != null)
                 SettingSliderTile(
-                  icon: Icons.storage_outlined,
+                  icon: EtaIcons.storageOutline,
                   title: l10n.settingsHistoryLimit,
                   subtitle: l10n.settingsHistoryLimitOn(limit),
                   value: limit.toDouble().clamp(
@@ -202,7 +203,7 @@ class _HistorySectionState extends ConsumerState<HistorySection> {
                 ),
               // 统计 + 清空
               SettingTile(
-                icon: Icons.cleaning_services_outlined,
+                icon: EtaIcons.broomOutline,
                 title: l10n.settingsHistoryStats,
                 subtitle:
                     '${l10n.settingsCacheEntries(_count)} · ${_formatBytes(_bytes)}',
@@ -212,7 +213,7 @@ class _HistorySectionState extends ConsumerState<HistorySection> {
                   visualDensity: VisualDensity.compact,
                   onPressed: _count > 0 ? _clear : null,
                   icon: Icon(
-                    Icons.delete_outline,
+                    EtaIcons.deleteOutline,
                     color: _count > 0
                         ? scheme.error
                         : scheme.onSurface.withValues(alpha: 0.25),

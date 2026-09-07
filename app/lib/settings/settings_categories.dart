@@ -2,26 +2,27 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'package:flutter/material.dart' show IconData, Icons;
+import 'package:flutter/material.dart' show IconData;
 
 import '../../l10n/generated/app_localizations.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 设置分类（公开：流媒体页「前往设置」需指定媒体源分类）。
 enum SettingsCategory {
-  appearance(Icons.palette_outlined),
-  playback(Icons.play_circle_outline),
-  lyrics(Icons.lyrics_outlined),
-  preset(Icons.healing_outlined),
-  download(Icons.download_outlined),
-  storage(Icons.storage_outlined),
-  scrape(Icons.auto_fix_high),
-  scanner(Icons.manage_search_outlined),
-  mediaSource(Icons.dns_outlined),
-  about(Icons.info_outline),
+  appearance(EtaIcons.paletteOutline),
+  playback(EtaIcons.playCircleOutline),
+  lyrics(EtaIcons.fileMusicOutline),
+  preset(EtaIcons.firstAidKitOutline),
+  download(EtaIcons.downloadOutline),
+  storage(EtaIcons.storageOutline),
+  scrape(EtaIcons.magic3),
+  scanner(EtaIcons.search3Outline),
+  mediaSource(EtaIcons.serverOutline),
+  about(EtaIcons.informationOutline),
 
   /// 开发者（隐藏分类：仅开启开发者模式后可见；开启方式为关于页
   /// 长按「版本」10 秒）。
-  developer(Icons.engineering_outlined);
+  developer(EtaIcons.toolOutline);
 
   const SettingsCategory(this.icon);
   final IconData icon;

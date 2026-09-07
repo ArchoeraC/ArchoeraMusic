@@ -24,6 +24,7 @@ import 'package:flutter/scheduler.dart' show Ticker;
 import '../../../services/lyrics/lyric_line.dart';
 import 'lyrics_layout.dart';
 import 'spring.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'lyrics_physics_wall/lyrics_physics_wall_state.dart';
 part 'lyrics_physics_wall/lyrics_physics_wall_painter.dart';

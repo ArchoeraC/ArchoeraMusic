@@ -21,6 +21,7 @@ import '../theme/app_theme.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/dialogs/s_dialog.dart';
 import '../widgets/common/toast.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'streaming_server/streaming_server_list_view.dart';
 part 'streaming_server/streaming_server_form_view.dart';
@@ -125,7 +126,7 @@ class _StreamingServerListState extends ConsumerState<StreamingServerList> {
         ),
         SButton(
           label: l10n.commonConfirm,
-          icon: Icons.delete_outline,
+          icon: EtaIcons.deleteOutline,
           variant: SButtonVariant.error,
           size: SButtonSize.small,
           onPressed: () => Navigator.of(context).pop(true),

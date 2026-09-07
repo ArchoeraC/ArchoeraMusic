@@ -129,7 +129,7 @@ class _RecoveryPasswordFieldState extends State<_RecoveryPasswordField> {
                 autofocus: true,
                 obscureText: _obscure,
                 hintText: widget.hint,
-                prefixIcon: Icons.password_outlined,
+                prefixIcon: EtaIcons.keyOutline,
                 clearable: true,
                 textInputAction: TextInputAction.done,
                 onSubmitted: widget.optional
@@ -146,8 +146,8 @@ class _RecoveryPasswordFieldState extends State<_RecoveryPasswordField> {
               onPressed: () => setState(() => _obscure = !_obscure),
               icon: Icon(
                 _obscure
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
+                    ? EtaIcons.eyeCloseOutline
+                    : EtaIcons.eyeOutline,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
@@ -175,7 +175,7 @@ class _RecoveryPasswordFieldState extends State<_RecoveryPasswordField> {
             const SizedBox(width: 10),
             SButton(
               label: widget.confirmLabel,
-              icon: Icons.check,
+              icon: EtaIcons.check,
               variant: SButtonVariant.primary,
               size: SButtonSize.small,
               onPressed: widget.optional
@@ -256,7 +256,7 @@ class _SchemeCard extends StatelessWidget {
                     ),
                   ),
                   if (isSelected)
-                    Icon(Icons.check_circle, size: 16, color: badgeColor),
+                    Icon(EtaIcons.checkCircle, size: 16, color: badgeColor),
                 ],
               ),
               const SizedBox(height: 6),
@@ -385,7 +385,7 @@ class _ModeCards extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               if (isSelected)
-                Icon(Icons.check_circle, size: 18, color: scheme.primary),
+                Icon(EtaIcons.checkCircle, size: 18, color: scheme.primary),
             ],
           ),
         ),
@@ -440,7 +440,7 @@ class _NewPasswordFieldState extends State<_NewPasswordField> {
           autofocus: true,
           obscureText: _obscure,
           hintText: widget.newHint,
-          prefixIcon: Icons.password_outlined,
+          prefixIcon: EtaIcons.keyOutline,
           clearable: true,
           textInputAction: TextInputAction.next,
           onChanged: (_) => setState(() {}),
@@ -457,7 +457,7 @@ class _NewPasswordFieldState extends State<_NewPasswordField> {
                     controller: _confirm,
                     obscureText: _obscure,
                     hintText: widget.confirmHint,
-                    prefixIcon: Icons.verified_outlined,
+                    prefixIcon: EtaIcons.safetyCertificateOutline,
                     clearable: true,
                     textInputAction: TextInputAction.done,
                     onChanged: (_) => setState(() {}),
@@ -481,8 +481,8 @@ class _NewPasswordFieldState extends State<_NewPasswordField> {
               onPressed: () => setState(() => _obscure = !_obscure),
               icon: Icon(
                 _obscure
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
+                    ? EtaIcons.eyeCloseOutline
+                    : EtaIcons.eyeOutline,
                 color: scheme.onSurfaceVariant,
               ),
             ),
@@ -501,7 +501,7 @@ class _NewPasswordFieldState extends State<_NewPasswordField> {
             const SizedBox(width: 10),
             SButton(
               label: l10n.commonConfirm,
-              icon: Icons.check,
+              icon: EtaIcons.check,
               variant: SButtonVariant.primary,
               size: SButtonSize.small,
               onPressed: _matched ? _submit : null,

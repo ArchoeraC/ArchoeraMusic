@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/l10n.dart';
 import '../player/s_controls.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 搜索页错误态（带重试）。
 class SearchErrorState extends StatelessWidget {
@@ -28,7 +29,7 @@ class SearchErrorState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 56, color: theme.colorScheme.error),
+            Icon(EtaIcons.alertOutline, size: 56, color: theme.colorScheme.error),
             const SizedBox(height: 12),
             Text(l10n.pageSearchFailed, style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
@@ -42,7 +43,7 @@ class SearchErrorState extends StatelessWidget {
             const SizedBox(height: 16),
             SButton(
               label: l10n.commonRetry,
-              icon: Icons.refresh,
+              icon: EtaIcons.refresh,
               variant: SButtonVariant.secondary,
               onPressed: onRetry,
             ),

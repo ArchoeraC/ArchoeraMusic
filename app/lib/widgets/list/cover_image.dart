@@ -5,6 +5,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 网络封面浏览器 UA（NT封面 CDN `p1.music.126.net` 对 Dart 默认 UA 403）。
 ///
@@ -18,7 +19,7 @@ const coverUserAgent =
 /// 封面图（网络图 / `file://` 本地文件 / 磁盘路径；失败回退音符占位）。
 ///
 /// 供歌曲列表、播放栏、全屏播放器等处复用：[cover] 为空、路径不可解析
-/// 或加载失败时显示 [Icons.music_note] 占位（[primaryContainer] 底）。
+/// 或加载失败时显示 [EtaIcons.music] 占位（[primaryContainer] 底）。
 class CoverImage extends StatelessWidget {
   const CoverImage({
     super.key,
@@ -51,7 +52,7 @@ class CoverImage extends StatelessWidget {
         color: scheme.primaryContainer.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(radius),
       ),
-      child: Icon(Icons.music_note, size: iconSize, color: scheme.primary),
+      child: Icon(EtaIcons.music, size: iconSize, color: scheme.primary),
     );
 
     final c = cover;

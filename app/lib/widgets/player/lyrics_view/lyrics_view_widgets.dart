@@ -188,7 +188,7 @@ class _EmptyLyrics extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.lyrics_outlined,
+            EtaIcons.fileMusicOutline,
             size: 42,
             color: scheme.onSurfaceVariant.withValues(alpha: 0.3),
           ),

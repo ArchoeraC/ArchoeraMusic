@@ -33,7 +33,7 @@ class _DeveloperSectionState extends ConsumerState<DeveloperSection> {
           title: l10n.settingsDeveloperTitle,
           children: [
             SettingTile(
-              icon: Icons.engineering_outlined,
+              icon: EtaIcons.toolOutline,
               title: l10n.settingsDeveloperMode,
               subtitle: devMode
                   ? l10n.settingsDeveloperModeOn
@@ -55,7 +55,7 @@ class _DeveloperSectionState extends ConsumerState<DeveloperSection> {
             // 开发者组件独立开关（默认全关；关闭开发者模式时一并复位，
             // 见 AppPrefsNotifier.setDeveloperMode 的全量关闭原则）
             SettingTile(
-              icon: Icons.monitor_heart_outlined,
+              icon: EtaIcons.heartbeatOutline,
               title: l10n.settingsDevFpsMonitor,
               subtitle: l10n.settingsDevFpsMonitorDesc,
               trailing: Switch(
@@ -65,7 +65,7 @@ class _DeveloperSectionState extends ConsumerState<DeveloperSection> {
               ),
             ),
             SettingTile(
-              icon: Icons.download_outlined,
+              icon: EtaIcons.downloadOutline,
               title: l10n.settingsDeveloperDownloadModule,
               subtitle: l10n.settingsDeveloperDownloadModuleDesc,
               trailing: const SizedBox.shrink(),

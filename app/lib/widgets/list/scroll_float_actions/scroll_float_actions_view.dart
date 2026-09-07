@@ -41,7 +41,7 @@ extension _ScrollToTopButtonView on _ScrollToTopButtonState {
     return _FloatActionButton(
       visible: _visible,
       tooltip: context.l10n.songListScrollTop,
-      icon: Icons.keyboard_arrow_up,
+      icon: EtaIcons.upSmall,
       onTap: _toTop,
     );
   }
@@ -52,7 +52,7 @@ extension _LocatePlayingButtonView on LocatePlayingButton {
     return _FloatActionButton(
       visible: _visible,
       tooltip: context.l10n.songListLocatePlaying,
-      icon: Icons.my_location,
+      icon: EtaIcons.aiming,
       onTap: _locate,
     );
   }

@@ -18,6 +18,7 @@ import '../../l10n/l10n.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/download/delete_dialog.dart';
 import '../widgets/download/download_task_tile.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'download/download_page_view.dart';
 

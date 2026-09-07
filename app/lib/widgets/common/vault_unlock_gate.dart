@@ -11,6 +11,7 @@ import '../../services/downloader/download_controller.dart';
 import '../../services/streaming/streaming_store.dart';
 import '../../stores/providers.dart';
 import '../../stores/vault_session_store.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'vault_unlock_gate/vault_unlock_gate_view.dart';
 

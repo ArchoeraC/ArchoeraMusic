@@ -18,6 +18,7 @@ import '../../../stores/app_prefs.dart';
 import '../../../stores/lyrics_provider.dart';
 import 'lyrics_v7/lyrics_physics_wall.dart';
 import 'lyrics_view.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 全屏播放器歌词区（无状态；位置/歌词/样式由内部 Consumer 订阅）。
 class PlayerLyricsBlock extends ConsumerWidget {
@@ -43,7 +44,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
     if (!hasLyrics) {
       return Center(
         child: Icon(
-          Icons.lyrics_outlined,
+          EtaIcons.fileMusicOutline,
           size: 64,
           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
         ),

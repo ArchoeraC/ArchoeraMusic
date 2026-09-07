@@ -98,7 +98,7 @@ extension _DownloadTaskTileView on DownloadTaskTile {
             const SizedBox(width: 12),
             if (selectMode)
               Icon(
-                selected ? Icons.check_circle : Icons.circle_outlined,
+                selected ? EtaIcons.checkCircle : EtaIcons.roundOutline,
                 size: 18,
                 color: selected ? scheme.primary : scheme.onSurfaceVariant,
               )
@@ -106,7 +106,7 @@ extension _DownloadTaskTileView on DownloadTaskTile {
               if (active) ...[
                 _iconAction(
                   tooltip: l10n.commonPause,
-                  icon: Icons.pause_rounded,
+                  icon: EtaIcons.pause,
                   onTap: () {
                     ref
                         .read(downloadControllerProvider.notifier)
@@ -117,7 +117,7 @@ extension _DownloadTaskTileView on DownloadTaskTile {
                 // 取消 = 直接删除任务项并清空 .tmp 缓存
                 _iconAction(
                   tooltip: l10n.downloadCancelTooltip,
-                  icon: Icons.close,
+                  icon: EtaIcons.close,
                   onTap: () {
                     ref
                         .read(downloadControllerProvider.notifier)
@@ -129,7 +129,7 @@ extension _DownloadTaskTileView on DownloadTaskTile {
               if (paused)
                 _iconAction(
                   tooltip: l10n.downloadResume,
-                  icon: Icons.play_arrow_rounded,
+                  icon: EtaIcons.play,
                   onTap: () {
                     ref
                         .read(downloadControllerProvider.notifier)
@@ -140,7 +140,7 @@ extension _DownloadTaskTileView on DownloadTaskTile {
               if (failed)
                 _iconAction(
                   tooltip: l10n.commonRetry,
-                  icon: Icons.refresh,
+                  icon: EtaIcons.refresh,
                   onTap: () {
                     ref
                         .read(downloadControllerProvider.notifier)
@@ -151,7 +151,7 @@ extension _DownloadTaskTileView on DownloadTaskTile {
               if (done && task.filePath != null)
                 _iconAction(
                   tooltip: l10n.downloadOpenDirTask,
-                  icon: Icons.folder_open_outlined,
+                  icon: EtaIcons.folderOpenOutline,
                   onTap: () => _launchDir(File(task.filePath!).parent.path),
                 ),
               _buildMoreMenu(context, ref, l10n),
@@ -174,7 +174,7 @@ extension _DownloadTaskTileView on DownloadTaskTile {
     final done = task.isDone;
     return PopupMenuButton<String>(
       tooltip: l10n.commonMore,
-      icon: Icon(Icons.more_vert, size: 17, color: scheme.onSurfaceVariant),
+      icon: Icon(EtaIcons.dotsVertical, size: 17, color: scheme.onSurfaceVariant),
       padding: EdgeInsets.zero,
       // 性能模式：菜单直出，无淡入/弹出动效
       popUpAnimationStyle: noAnim(context) ? AnimationStyle.noAnimation : null,

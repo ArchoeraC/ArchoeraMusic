@@ -7,5 +7,6 @@ import 'package:flutter/material.dart';
 import '../../services/netease/netease_api.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'cover_grid/cover_grid_widgets.dart';

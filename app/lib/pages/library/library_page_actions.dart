@@ -29,12 +29,12 @@ extension _LibraryPageActions on _LibraryPageState {
       items: [
         SContextMenuItem(
           label: l10n.menuPlay,
-          icon: Icons.play_arrow,
+          icon: EtaIcons.play,
           onTap: () => _play(track),
         ),
         SContextMenuItem(
           label: l10n.menuPlayNext,
-          icon: Icons.skip_next_outlined,
+          icon: EtaIcons.skipForwardOutline,
           onTap: () {
             ref.read(playbackProvider.notifier).insertToQueue(track);
             _toast(l10n.toastAddedToQueue);
@@ -43,17 +43,17 @@ extension _LibraryPageActions on _LibraryPageState {
         SContextMenuItem.divider(),
         SContextMenuItem(
           label: l10n.menuComment,
-          icon: Icons.chat_bubble_outline,
+          icon: EtaIcons.chatOutline,
           onTap: () => showCommentDialog(context, track: track),
         ),
         SContextMenuItem(
           label: l10n.menuLocateFile,
-          icon: Icons.folder_open_outlined,
+          icon: EtaIcons.folderOpenOutline,
           onTap: () => _toast(l10n.menuLocateFileComingSoon),
         ),
         SContextMenuItem(
           label: l10n.menuRemoveFromLibrary,
-          icon: Icons.delete_outline,
+          icon: EtaIcons.deleteOutline,
           danger: true,
           onTap: () async {
             final ok = await ref

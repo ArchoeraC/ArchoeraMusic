@@ -141,13 +141,13 @@ extension _LikedPageView on _LikedPageState {
     }
     if (!_loggedIn) {
       return StreamingEmptyState(
-        icon: Icons.favorite_outline,
+        icon: EtaIcons.heartOutline,
         title: l10n.pageLikedLoginTitle,
         subtitle: _platform == 'kugou'
             ? l10n.pageLikedKugouLoginDesc
             : l10n.pageLikedNeteaseLoginDesc,
         buttonLabel: l10n.navHeaderQrLogin,
-        buttonIcon: Icons.qr_code_2,
+        buttonIcon: EtaIcons.qrcode,
         onButton: () async {
           if (_platform == 'kugou') {
             await showDialog<bool>(
@@ -272,7 +272,7 @@ class _LikedHeader extends StatelessWidget {
                         store!.tracks(platform).isNotEmpty)) ...[
             SButton(
               label: l10n.commonPlayAll,
-              icon: Icons.play_arrow_rounded,
+              icon: EtaIcons.play,
               variant: SButtonVariant.primary,
               loading: resolving,
               onPressed: onPlayAll,
@@ -296,7 +296,7 @@ class _LikedHeader extends StatelessWidget {
                         store!.tracks(platform).isNotEmpty))
             SButton(
               label: qq ? l10n.pageLikedQqSyncOnline : l10n.commonRefresh,
-              icon: Icons.sync,
+              icon: EtaIcons.refresh,
               variant: SButtonVariant.secondary,
               onPressed: onRefresh,
             ),
@@ -330,7 +330,7 @@ class _QqEmptyState extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.favorite_border,
+            EtaIcons.heartOutline,
             size: 48,
             color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
           ),
@@ -351,14 +351,14 @@ class _QqEmptyState extends StatelessWidget {
           if (!loggedIn)
             SButton(
               label: l10n.pageLikedQqLoginSync,
-              icon: Icons.qr_code_2,
+              icon: EtaIcons.qrcode,
               variant: SButtonVariant.secondary,
               onPressed: onLogin,
             )
           else
             SButton(
               label: l10n.pageLikedQqSyncOnline,
-              icon: Icons.sync,
+              icon: EtaIcons.refresh,
               variant: SButtonVariant.secondary,
               onPressed: onSync,
             ),
@@ -382,7 +382,7 @@ class _LikedErrorState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 48, color: scheme.error),
+          Icon(EtaIcons.alertOutline, size: 48, color: scheme.error),
           const SizedBox(height: 10),
           Text(
             message,
@@ -393,7 +393,7 @@ class _LikedErrorState extends StatelessWidget {
           const SizedBox(height: 14),
           SButton(
             label: context.l10n.commonRetry,
-            icon: Icons.refresh,
+            icon: EtaIcons.refresh,
             variant: SButtonVariant.secondary,
             onPressed: onRetry,
           ),
@@ -424,7 +424,7 @@ class _LikedErrorCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 48, color: scheme.error),
+          Icon(EtaIcons.alertOutline, size: 48, color: scheme.error),
           const SizedBox(height: 10),
           Text(title, style: theme.textTheme.bodyMedium),
           const SizedBox(height: 4),
@@ -437,7 +437,7 @@ class _LikedErrorCard extends StatelessWidget {
           const SizedBox(height: 14),
           SButton(
             label: context.l10n.commonRetry,
-            icon: Icons.refresh,
+            icon: EtaIcons.refresh,
             variant: SButtonVariant.secondary,
             onPressed: onRetry,
           ),
@@ -467,7 +467,7 @@ class _LikedEmptyState extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.favorite_border,
+            EtaIcons.heartOutline,
             size: 48,
             color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
           ),

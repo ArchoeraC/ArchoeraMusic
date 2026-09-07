@@ -18,6 +18,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../l10n/l10n.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'scroll_float_actions/scroll_float_actions_view.dart';
 

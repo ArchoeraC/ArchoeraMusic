@@ -11,6 +11,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import 'app_logo.dart';
 import '../common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'side_bar/side_bar_view.dart';
 
@@ -74,14 +75,14 @@ class _SideBarState extends ConsumerState<SideBar> {
       (
         l10n.sidebarGroupMusic,
         [
-          _NavItem(0, l10n.sidebarHome, Icons.home_outlined, Icons.home),
+          _NavItem(0, l10n.sidebarHome, EtaIcons.homeOutline, EtaIcons.home),
           _NavItem(
             1,
             l10n.sidebarLibrary,
-            Icons.library_music_outlined,
-            Icons.library_music,
+            EtaIcons.music2Outline,
+            EtaIcons.music2,
           ),
-          _NavItem(7, l10n.sidebarStreaming, Icons.dns_outlined, Icons.dns),
+          _NavItem(7, l10n.sidebarStreaming, EtaIcons.serverOutline, EtaIcons.server),
         ],
       ),
       (
@@ -90,17 +91,17 @@ class _SideBarState extends ConsumerState<SideBar> {
           _NavItem(
             2,
             l10n.sidebarLiked,
-            Icons.favorite_outline,
-            Icons.favorite,
+            EtaIcons.heartOutline,
+            EtaIcons.heart,
           ),
-          _NavItem(3, l10n.sidebarFavorites, Icons.star_outline, Icons.star),
-          _NavItem(4, l10n.sidebarHistory, Icons.history, Icons.history),
+          _NavItem(3, l10n.sidebarFavorites, EtaIcons.starOutline, EtaIcons.star),
+          _NavItem(4, l10n.sidebarHistory, EtaIcons.history, EtaIcons.history),
           if (devMode)
             _NavItem(
               5,
               l10n.sidebarDownload,
-              Icons.download_outlined,
-              Icons.download,
+              EtaIcons.downloadOutline,
+              EtaIcons.download,
             ),
         ],
       ),

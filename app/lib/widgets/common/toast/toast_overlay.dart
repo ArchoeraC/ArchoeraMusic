@@ -152,10 +152,10 @@ class _ToastItemViewState extends State<_ToastItemView>
   static const Color _warnColor = Color(0xFF6B4A1F);
 
   IconData get _typeIcon => switch (widget.item.type) {
-    ToastType.success => Icons.check_circle_outline,
-    ToastType.error => Icons.error_outline,
-    ToastType.warning => Icons.warning_amber_outlined,
-    ToastType.default_ || ToastType.info => Icons.info_outline,
+    ToastType.success => EtaIcons.checkCircleOutline,
+    ToastType.error => EtaIcons.alertOutline,
+    ToastType.warning => EtaIcons.warningOutline,
+    ToastType.default_ || ToastType.info => EtaIcons.informationOutline,
   };
 
   Color get _iconColor {

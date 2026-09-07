@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/l10n.dart';
 import '../../services/security/vault_process.dart';
 import '../../stores/data_dir.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 凭据模块崩溃警告门（credential-vault-plan §3.7 fail-closed）：
 /// 启动时若上次会话异常退出（`vault.marker` = crash），首帧弹显著警告——
@@ -42,7 +43,7 @@ class _VaultCrashGateState extends State<VaultCrashGate> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.warning_amber_rounded),
+        icon: const Icon(EtaIcons.warning),
         title: Text(l10n.vaultCrashTitle),
         content: Text(l10n.vaultCrashDesc),
         actions: [
