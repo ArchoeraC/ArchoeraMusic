@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:flutter/animation.dart';
+import 'package:flutter/widgets.dart' show Curves;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../netease/track.dart';
@@ -23,16 +23,11 @@ import 'playback_state.dart';
 
 export 'fft_frame.dart' show FftFrame;
 
-/// 播放控制器（Notifier）：应用层单一播放状态源（架构文档 §5.3）。
-///
-/// 组合：AudioEngineProcess（直连 C 引擎：FFI create + 命令/事件 FIFO，
-/// 流式起播：边解码边出声，PCM 同时落盘 WAV/PCM）+ 引擎内置 miniaudio
-/// 播放（§10.8，替代 libmpv）。
-/// 会话启动门槛 = ready（见 [AudioEngineProcess.started]，done 在流式下只在
-/// 曲尾到达）；完整时长（ready/playing 事件回填）、seek 走引擎本地 seek
-/// （不重启引擎重转码）、位置/播放状态经引擎事件推送。无声设备回退旧路径：
-/// 全速完整转码落盘 WAV 后再自播。
-class PlaybackNotifier extends Notifier<PlaybackState> {
+part 'playback_notifier/playback_notifier_queue.dart';
+part 'playback_notifier/playback_notifier_loading.dart';
+part 'playback_notifier/playback_notifier_session.dart';
+
+abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   final List<StreamSubscription<EngineEvent>> _engineSubs = [];
 
   AudioEngineProcess? _engine;
@@ -88,6 +83,105 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   /// 不能再 `ref.read(appPrefsProvider)`，见 [build] 的 onDispose）。
   bool _sessionMemoryEnabled = true;
 
+  /// 退出确认弹窗 duck 前保存的用户音量（null = 非 duck 中）。
+  ///
+  /// duck（降半）不写 prefs：弹窗出现期间引擎音量临时减半，
+  /// [restoreVolume] 恢复该基值，保证「其他时间保持在原音量」。
+  double? _duckBaseVolume;
+
+  /// 音量滑条拖动合并定时器：拖动中引擎命令 80ms 合并一次（只发最新值），
+  /// 避免高频 FFI 命令风暴打扰引擎线程；prefs 仅在确定操作时落盘。
+  Timer? _volumeApplyTimer;
+
+  /// FFT 拉模式（§10.1，事件驱动无轮询）：引擎每 50ms 音频发一条
+  /// EnginePosition 事件 → 更新 position 后立即按当前位置从本地 PCM
+  /// 分析器缓冲取一帧。暂停/seek 时位置事件天然对齐，无独立 Timer。
+  bool _fftActive = false;
+
+  /// 诊断计数：无帧可取时周期性打印 PCM 状态。
+  int _diagCounter = 0;
+
+  /// 最近一次取帧位置（毫秒）：取帧节流基准（性能优化）。
+  ///
+  /// 引擎位置事件 ~50ms 一条，但频谱取帧含同步磁盘 IO + 下混 + FFT，
+  /// 按 [_fftPollIntervalMs] 节流后 UI 线程负担减半；插值/平滑由
+  /// _SpectrumPainter 承担，10Hz 推送下视觉依旧流畅（原 Web 端也是
+  /// 50ms 推送 + 帧间插值消除阶梯）。初始 -1000 保证首帧立即取。
+  int _lastSpectrumAtMs = -1000;
+
+  /// 频谱取帧节流间隔（ms）：默认 100ms 基线；节能模式开 → 300ms
+  /// 进一步降帧省电（见 _syncFftActive，随偏好实时更新）。
+  int _fftPollIntervalMs = 100;
+
+  /// 引擎当前实际生效的位置事件间隔（ms，降频协商回执 event_interval 更新；
+  /// 默认 50 = normal 档）。_fftPollIntervalMs 取帧节流跟随该档位。
+  int _engineIntervalMs = 50;
+
+  /// 串行播放队列（见 [load]）。
+  Future<void> _loadChain = Future<void>.value();
+
+  /// 加载代际号：每次 [load] 递增。旧代际会话（创建中/转码中）发现被取代后
+  /// 立即停掉自身引擎，不再等待转码完成——缓冲中切歌不再排队干等旧转码。
+  int _loadGen = 0;
+
+  /// 连续加载失败计数（成功播放时归零；对齐 SPlayer-Next consecutiveFailures）。
+  int _consecutiveFailures = 0;
+
+  /// 当前会话历史是否已记录（真正开始播放时置位，避免重复记录；
+  /// [load] 开新会话时复位）。
+  bool _historyRecorded = false;
+
+  /// 本失败序列中已尝试过平台换源的曲目内容键（规范化标题|歌手，见
+  /// [_tryFallbackSource]）：防止网/狗同曲互切死循环；播放成功时清空。
+  final Set<String> _fallbackAttempted = {};
+
+  /// 原始队列（关闭随机时恢复顺序用）。
+  List<Track>? _originalQueue;
+
+  Future<void> load(
+    String source, {
+    int bitrate = 128000,
+    String? title,
+    String? subtitle,
+    String? trackId,
+    Track? track,
+    String quality = 'hq',
+    int offsetMs = 0,
+  });
+
+  Future<void> stop();
+
+  Future<void> _startSession(
+    String source, {
+    required int offsetMs,
+    required int bitrate,
+    bool passthrough = true,
+    int gen = 0,
+  });
+
+  Future<void> _stopEngine();
+
+  void _pollSpectrum();
+
+  void _syncFftActive();
+
+  void _log(String line);
+}
+
+/// 播放控制器（Notifier）：应用层单一播放状态源（架构文档 §5.3）。
+///
+/// 组合：AudioEngineProcess（直连 C 引擎：FFI create + 命令/事件 FIFO，
+/// 流式起播：边解码边出声，PCM 同时落盘 WAV/PCM）+ 引擎内置 miniaudio
+/// 播放（§10.8，替代 libmpv）。
+/// 会话启动门槛 = ready（见 [AudioEngineProcess.started]，done 在流式下只在
+/// 曲尾到达）；完整时长（ready/playing 事件回填）、seek 走引擎本地 seek
+/// （不重启引擎重转码）、位置/播放状态经引擎事件推送。无声设备回退旧路径：
+/// 全速完整转码落盘 WAV 后再自播。
+class PlaybackNotifier extends _PlaybackNotifierBase
+    with
+        _PlaybackNotifierQueue,
+        _PlaybackNotifierLoading,
+        _PlaybackNotifierSession {
   @override
   PlaybackState build() {
     ref.onDispose(() {
@@ -139,16 +233,6 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     // 初始音量 = 用户偏好（后续 setVolume 同步 prefs 与引擎）。
     return PlaybackState(volume: ref.read(appPrefsProvider).volume);
   }
-
-  /// 退出确认弹窗 duck 前保存的用户音量（null = 非 duck 中）。
-  ///
-  /// duck（降半）不写 prefs：弹窗出现期间引擎音量临时减半，
-  /// [restoreVolume] 恢复该基值，保证「其他时间保持在原音量」。
-  double? _duckBaseVolume;
-
-  /// 音量滑条拖动合并定时器：拖动中引擎命令 80ms 合并一次（只发最新值），
-  /// 避免高频 FFI 命令风暴打扰引擎线程；prefs 仅在确定操作时落盘。
-  Timer? _volumeApplyTimer;
 
   /// 设置播放音量（0~1 收敛）：立即同步引擎（当前会话）与偏好（落盘）。
   ///
@@ -229,30 +313,7 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     await engine.sendCommand('set_sink', {'id': sinkId});
   }
 
-  /// FFT 拉模式（§10.1，事件驱动无轮询）：引擎每 50ms 音频发一条
-  /// EnginePosition 事件 → 更新 position 后立即按当前位置从本地 PCM
-  /// 分析器缓冲取一帧。暂停/seek 时位置事件天然对齐，无独立 Timer。
-  bool _fftActive = false;
-
-  /// 诊断计数：无帧可取时周期性打印 PCM 状态。
-  int _diagCounter = 0;
-
-  /// 最近一次取帧位置（毫秒）：取帧节流基准（性能优化）。
-  ///
-  /// 引擎位置事件 ~50ms 一条，但频谱取帧含同步磁盘 IO + 下混 + FFT，
-  /// 按 [_fftPollIntervalMs] 节流后 UI 线程负担减半；插值/平滑由
-  /// _SpectrumPainter 承担，10Hz 推送下视觉依旧流畅（原 Web 端也是
-  /// 50ms 推送 + 帧间插值消除阶梯）。初始 -1000 保证首帧立即取。
-  int _lastSpectrumAtMs = -1000;
-
-  /// 频谱取帧节流间隔（ms）：默认 100ms 基线；节能模式开 → 300ms
-  /// 进一步降帧省电（见 _syncFftActive，随偏好实时更新）。
-  int _fftPollIntervalMs = 100;
-
-  /// 引擎当前实际生效的位置事件间隔（ms，降频协商回执 event_interval 更新；
-  /// 默认 50 = normal 档）。_fftPollIntervalMs 取帧节流跟随该档位。
-  int _engineIntervalMs = 50;
-
+  @override
   void _pollSpectrum() {
     if (!_fftActive) return;
     final posMs = state.position.inMilliseconds;
@@ -285,863 +346,6 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   }
 
   // ── 会话记忆（关闭前最后一次现场：队列 + 位置 + 模式）───────────────
-
-  /// 启动恢复：读取关闭前最后一次快照，恢复队列/模式/当前曲，按需续播。
-  ///
-  /// 关闭前在播放 → 自动续播（从保存位置开始）；关闭前暂停 → 仅恢复现场
-  /// （播放条显示队列与位置，点播放从保存位置继续）。
-  Future<void> restore() async {
-    // 「会话记忆」关闭时不恢复任何现场（默认开）；顺带清掉可能残留的旧快照
-    // （偏好文件被外部改为关闭等场景），保证关闭记忆期间磁盘零现场数据
-    if (!_sessionMemoryEnabled) {
-      const PlaybackSessionStore().clear();
-      return;
-    }
-    final snapshot = const PlaybackSessionStore().load();
-    if (snapshot == null) return;
-    final queue = snapshot.queue;
-    if (queue.isEmpty && snapshot.track == null) return;
-    final track = snapshot.currentTrack;
-    if (track == null) return;
-    var idx = snapshot.queueIndex;
-    if (idx < -1 || idx >= queue.length) idx = -1;
-    // 恢复位置（毫秒）。尾部记忆边界：停点已越过/到达曲尾（当前曲目带完整
-    // 时长信息时）视为从头续播——否则从 duration 处起播会立即 EOF 自然切歌，
-    // 表现成「上次停在尾部却跳下一首/闪断」，不符合恢复现场的产品语义。
-    var posMs = snapshot.positionMs;
-    final durMs = track.duration;
-    if (durMs > 0 && posMs >= durMs) posMs = 0;
-    // 自动续播意图：仅「关闭前在播放」且偏好「启动时自动播放」开启（默认关）。
-    final autoPlay =
-        snapshot.playing && ref.read(appPrefsProvider).autoPlayOnLaunch;
-    _originalQueue = List.of(queue);
-    // 续播尝试期间：暂停态中间落盘一律改写回该可续播快照，防止把磁盘上
-    // `playing=true` 的可续播快照覆盖成 paused（见 [_autoResumeInFlight]）——
-    // 若本次续播因冷启动瞬时原因失败，下次冷启动仍可自动续播。
-    _autoResumeInFlight = autoPlay;
-    _retryableSnapshot = autoPlay ? snapshot : null;
-    state = state.copyWith(
-      queue: List.of(queue),
-      queueIndex: idx,
-      repeatMode: snapshot.repeatMode,
-      shuffle: snapshot.shuffle,
-      quality: snapshot.quality,
-      title: snapshot.title,
-      subtitle: snapshot.subtitle,
-      trackId: snapshot.trackId,
-      track: snapshot.track,
-      playing: false,
-      buffering: false,
-      position: Duration(milliseconds: posMs),
-    );
-    _log(
-      '恢复会话: ${queue.length} 首 @${posMs}ms '
-      '${autoPlay ? '自动续播' : '暂停'}',
-    );
-    if (!autoPlay) return;
-    await _resumeFrom(
-      track,
-      offsetMs: posMs,
-      quality: snapshot.quality,
-    );
-    // flush 恢复期 state 变更触发的落盘回调（此刻仍在保护期内 → 写回可续播
-    // 快照而非降级 paused）。
-    await Future<void>.delayed(Duration.zero);
-    // 引擎从未创建即失败的终态（源解析失败等，无引擎事件会来解除保护）：
-    // 解除保护，磁盘此刻保留的仍是可续播快照，下次冷启动可重试。
-    if (!state.playing && _engine == null) {
-      _autoResumeInFlight = false;
-      _retryableSnapshot = null;
-    }
-  }
-
-  /// 从指定位置续播 [track]（恢复会话 / 暂停态点播放共用）。
-  Future<void> _resumeFrom(
-    Track track, {
-    required int offsetMs,
-    String? quality,
-  }) async {
-    final q = quality ?? state.quality;
-    try {
-      final url = await _resolveSource(track, quality: q);
-      if (url == null || url.isEmpty) {
-        _log('恢复播放失败：无法解析播放源 ${track.title}');
-        return;
-      }
-      // 失败/成功均由 restore() 终态统一收敛保护（见 restore），此处不解除——
-      // 直接解除会早于恢复期 state 变更的回调落盘（降级写盘逃过保护）。
-      await _playTrackMeta(url, track, quality: q, offsetMs: offsetMs);
-    } catch (e) {
-      // 解析/加载异常不打断启动流程：启动恢复与登录态初始化并行，此刻
-      // 网络/登录态可能未就绪导致偶发失败。现场保留暂停态，点播放可重试。
-      _log('恢复播放异常: ${track.title}: $e');
-    }
-  }
-
-  /// 退出前显式落盘播放现场（同步写）。正常退出由 dispose 调用
-  /// [_persistSession]；Linux 退出走 exit(0)（绕开 GTK teardown 崩溃，
-  /// 不触发 dispose），需在退出前主动调用。
-  ///
-  /// 自动续播保护未解除（续播尝试中/失败未重试）时，本方法也写回可续播
-  /// 快照，保证「启动即退出」不丢自动续播现场。
-  void persistNow() => _persistSession();
-
-  /// 落盘单个 [PlaybackSnapshot]（同步写）。
-  void _writeSession(PlaybackSnapshot snapshot) {
-    const PlaybackSessionStore().save(snapshot);
-    _lastPersistPosMs = snapshot.positionMs;
-  }
-
-  /// 落盘当前播放现场（同步写；无任何现场时跳过）。
-  void _persistSession() {
-    // 自动续播保护期：禁止把 paused 写盘覆盖「可续播」快照。有可续播快照时
-    // 暂停态写盘改写回它（磁盘恒为 playing=true@位置，进程随时被杀都保得住）；
-    // 无可续播快照（尚未设置）则直接抑制写盘，等待终态解除保护。
-    if (_autoResumeInFlight && !state.playing) {
-      final retry = _retryableSnapshot;
-      if (retry != null) _writeSession(retry);
-      return;
-    }
-    // 「会话记忆」关闭时不落盘（默认开）
-    if (!_sessionMemoryEnabled) return;
-    final s = state;
-    if (s.queue.isEmpty && s.track == null && s.source == null) return;
-    _writeSession(
-      PlaybackSnapshot.fromState(
-        queue: s.queue,
-        queueIndex: s.queueIndex,
-        position: s.position,
-        repeatMode: s.repeatMode,
-        shuffle: s.shuffle,
-        quality: s.quality,
-        playing: s.playing,
-        title: s.title,
-        subtitle: s.subtitle,
-        trackId: s.trackId,
-        track: s.track,
-        source: s.source,
-      ),
-    );
-  }
-
-  /// 加载并播放（直连 C 引擎，AUTOPLAY 场景见 home_page）。
-  ///
-  /// [title]/[subtitle]/[trackId] 为展示信息（缺省回退 source / 不传），
-  /// [track] 为当前曲目（音质切换需要平台/品质信息；本地文件不传），
-  /// [quality] 为音质档位（决定转码 bitrate）。UI 层播放条/播放器/列表
-  /// 高亮使用。连续调用串行排队执行（后一个先停掉前一个引擎，避免并发
-  /// 转码竞态）。
-  Future<void> load(
-    String source, {
-    int bitrate = 128000,
-    String? title,
-    String? subtitle,
-    String? trackId,
-    Track? track,
-    String quality = 'hq',
-    int offsetMs = 0,
-  }) {
-    final gen = ++_loadGen;
-    // 抢占式切歌：立即停掉当前引擎（stop 放行其 pending started/done，旧 load
-    // 任务快速收尾），新任务无需排队等旧会话就绪/曲终即可启动——缓冲中可切歌。
-    // ignore: discarded_futures
-    unawaited(_stopEngine());
-    final task = _loadChain.then((_) async {
-      // 就绪（ready）前即可展示标题（_startSession 内部 copyWith 保留之）
-      state = state.copyWith(
-        title: title,
-        subtitle: subtitle,
-        trackId: trackId,
-        track: track,
-        quality: quality,
-        buffering: true,
-      );
-      // 新会话：历史记录标记复位（真正开始播放时记录一次）
-      _historyRecorded = false;
-      try {
-        final useBitrate = track != null
-            ? (qualityBitrate[quality] ?? bitrate)
-            : bitrate;
-        final passthrough = ref.read(appPrefsProvider).passthrough;
-        await _startSession(
-          source,
-          offsetMs: offsetMs,
-          bitrate: useBitrate,
-          passthrough: passthrough,
-          gen: gen,
-        );
-        if (gen != _loadGen) {
-          // 已被更新的 load 取代：放弃收尾（历史记录由新会话负责）
-          _log('load 被新会话取代: $source');
-          return;
-        }
-        _log('load ok: $source');
-        // 播放成功：重置连续失败计数与换源保护（对齐 SPlayer-Next
-        // 成功时 consecutiveFailures = 0）
-        _consecutiveFailures = 0;
-        _fallbackAttempted.clear();
-      } catch (e, s) {
-        _log('load 失败: $e\n$s');
-        state = state.copyWith(buffering: false);
-        rethrow;
-      }
-    });
-    _loadChain = task.catchError((_) {});
-    return task;
-  }
-
-  /// 设置变更后重载当前曲目（转码开关切换即时生效）。
-  Future<void> reload() async {
-    final s = state;
-    final src = s.source;
-    if (src == null) return;
-    _log('设置变更，重载当前曲目: ${s.title ?? src}');
-    await load(
-      src,
-      bitrate: qualityBitrate[s.quality] ?? 128000,
-      title: s.title,
-      subtitle: s.subtitle,
-      trackId: s.trackId,
-      track: s.track,
-      quality: s.quality,
-    );
-  }
-
-  /// 音质切换：按当前曲目平台重新解析播放源并重载引擎。
-  ///
-  /// [quality] 为 SPlayer-Next 档位（lq/sq/hq/lossless/hi-res）。
-  /// 解析失败保持原音质播放，仅记录日志。
-  Future<void> setQuality(String quality) async {
-    final track = state.track;
-    if (track == null || state.source == null) return;
-    if (quality == state.quality) return;
-    _log('切换音质 → ${qualityLabels[quality] ?? quality}');
-    try {
-      final String? url;
-      if (track.source == 'kugou' && track.kugou != null) {
-        url = await ref
-            .read(kugouApiProvider)
-            .resolvePlayUrl(track.kugou!, quality: quality);
-      } else if (track.source == 'netease') {
-        url = await ref
-            .read(neteaseApiProvider)
-            .resolvePlayUrl(track.id, quality: quality);
-      } else if (track.source == 'qqmusic') {
-        url = await ref
-            .read(qqMusicApiProvider)
-            .resolvePlayUrl(track, quality: quality);
-      } else {
-        url = null;
-      }
-      if (url == null || url.isEmpty) {
-        _log('音质切换失败：无可用播放源（可能为 VIP / 版权限制）');
-        return;
-      }
-      await load(
-        url,
-        bitrate: qualityBitrate[quality] ?? 128000,
-        title: track.title,
-        subtitle: track.artistNames,
-        trackId: track.id,
-        track: track,
-        quality: quality,
-      );
-    } catch (e) {
-      _log('音质切换失败: $e');
-    }
-  }
-
-  /// 串行播放队列（见 [load]）。
-  Future<void> _loadChain = Future<void>.value();
-
-  /// 加载代际号：每次 [load] 递增。旧代际会话（创建中/转码中）发现被取代后
-  /// 立即停掉自身引擎，不再等待转码完成——缓冲中切歌不再排队干等旧转码。
-  int _loadGen = 0;
-
-  /// 连续加载失败计数（成功播放时归零；对齐 SPlayer-Next consecutiveFailures）。
-  int _consecutiveFailures = 0;
-
-  /// 当前会话历史是否已记录（真正开始播放时置位，避免重复记录；
-  /// [load] 开新会话时复位）。
-  bool _historyRecorded = false;
-
-  /// 连续失败硬上限（对齐 SPlayer-Next MAX_CONSECUTIVE_FAILURES）。
-  static const _maxConsecutiveFailures = 5;
-
-  /// 本失败序列中已尝试过平台换源的曲目内容键（规范化标题|歌手，见
-  /// [_tryFallbackSource]）：防止网/狗同曲互切死循环；播放成功时清空。
-  final Set<String> _fallbackAttempted = {};
-
-  // ── 播放队列 / 切歌（对齐原项目 core/player 语义）───────────────────
-
-  /// 统一解析曲目播放源。
-  ///
-  /// local → 本地文件路径；kugou / netease → 对应平台 API 解析播放 URL
-  /// （音质档跟随 [quality]，缺省取当前档位）；streaming 等暂未接入返回 null。
-  Future<String?> _resolveSource(Track track, {String? quality}) async {
-    final q = quality ?? state.quality;
-    if (track.source == 'local') {
-      final p = track.localPath;
-      if (p == null || p.isEmpty) {
-        _log('缺少本地文件路径: ${track.title}');
-        return null;
-      }
-      return p;
-    }
-    if (track.source == 'kugou' && track.kugou != null) {
-      return ref
-          .read(kugouApiProvider)
-          .resolvePlayUrl(track.kugou!, quality: q);
-    }
-    if (track.source == 'netease') {
-      return ref.read(neteaseApiProvider).resolvePlayUrl(track.id, quality: q);
-    }
-    if (track.source == 'qqmusic') {
-      return ref.read(qqMusicApiProvider).resolvePlayUrl(track, quality: q);
-    }
-    if (track.source == 'streaming') {
-      final serverId = track.serverId;
-      final originalId = track.originalId;
-      if (serverId == null || originalId == null || originalId.isEmpty) {
-        _log('流媒体曲目缺少 serverId/originalId: ${track.title}');
-        return null;
-      }
-      final cfg = ref
-          .read(streamingProvider.notifier)
-          .serverConfigById(serverId);
-      if (cfg == null) {
-        _log('流媒体服务器不存在: $serverId（${track.title}）');
-        return null;
-      }
-      return StreamingClient(
-        cfg,
-      ).getStreamUrl(originalId, playSessionId: sessionIdForTrack(track.id));
-    }
-    _log('暂不支持的播放源: ${track.source}（${track.title}）');
-    return null;
-  }
-
-  /// 按元信息加载并播放（队列切歌统一入口；失败记录日志返回 false）。
-  Future<bool> _playTrackMeta(
-    String url,
-    Track track, {
-    String? quality,
-    int offsetMs = 0,
-  }) async {
-    final q = quality ?? state.quality;
-    try {
-      var playUrl = url;
-      // 歌曲磁盘缓存：命中 → 直接播放本地缓存文件（省流量/加速/断网可播）；
-      // 未命中 → 播放照常走在线 URL，同时后台下载整曲入缓存供下次重播
-      // （对齐 SPlayer-Next songCache 异步模型，不增加播放延迟）。
-      final prefs = ref.read(appPrefsProvider);
-      if (prefs.songCacheEnabled &&
-          url.isNotEmpty &&
-          (track.source == 'kugou' || track.source == 'netease')) {
-        final id = track.source == 'kugou'
-            ? (track.kugou?.hash ?? track.id)
-            : track.id;
-        final key = SongCache.shared.cacheKeyFor(track.source, id, q);
-        final cached = SongCache.shared.lookup(key);
-        if (cached != null) {
-          playUrl = cached;
-        } else {
-          final referer = track.source == 'kugou'
-              ? 'https://www.kugou.com/'
-              : 'https://music.163.com/';
-          unawaited(
-            SongCache.shared
-                .storeAsync(key, url, referer: referer)
-                .then((_) => SongCache.shared.trim(prefs.songCacheLimitMiB)),
-          );
-        }
-      }
-      await load(
-        playUrl,
-        bitrate: qualityBitrate[q] ?? 128000,
-        title: track.title,
-        subtitle: track.subtitle,
-        trackId: track.id,
-        track: track,
-        quality: q,
-        offsetMs: offsetMs,
-      );
-      return true;
-    } catch (e) {
-      _log('播放失败: ${track.title}: $e');
-      return false;
-    }
-  }
-
-  /// 播放队列中当前索引曲目。
-  ///
-  /// 解析/加载失败不打断播放流程：先尝试 [多源自动切换]（_tryFallbackSource），
-  /// 无替代版本则自动跳过到下一首（_skipOnFailure，对齐 SPlayer-Next
-  /// skipOnFailure：连续失败达上限或队列长度时停播）。
-  Future<void> _playCurrent() async {
-    // Fuck DJ Mode：加载 DJ 版曲目前自动跳到下一首（对齐原项目 loadTrack；
-    // guard 上限 = 队列长度，防整队都是 DJ 时死循环）
-    if (ref.read(appPrefsProvider).fuckDjMode) {
-      var guard = 0;
-      final len = state.queue.length;
-      while (guard < len) {
-        final cur = state.currentQueueTrack;
-        if (cur == null || !shouldSkipDjTrack(cur)) break;
-        _advanceNext();
-        guard++;
-      }
-      if (guard >= len) {
-        _log('Fuck DJ Mode：队列全为 DJ 曲目，跳过逻辑放弃');
-      }
-    }
-    final q = state.queue;
-    final idx = state.queueIndex;
-    if (idx < 0 || idx >= q.length) return;
-    final track = q[idx];
-    final String? url;
-    try {
-      url = await _resolveSource(track, quality: state.quality);
-    } catch (e) {
-      _log('解析播放源异常: ${track.title}: $e');
-      return _handleTrackFailure(track, '解析播放源异常');
-    }
-    if (url == null || url.isEmpty) {
-      _log('无法解析播放源: ${track.title}');
-      await _handleTrackFailure(track, '无可用播放源');
-      return;
-    }
-    final ok = await _playTrackMeta(url, track);
-    if (!ok) {
-      await _handleTrackFailure(track, '播放加载失败');
-    }
-  }
-
-  /// 单曲失败兜底：先尝试其他平台同名版本自动换源（[多源切换]，对齐
-  /// Mineradio provider-fallback），换源未接管则自动跳过下一首；达到连续
-  /// 失败上限/队列长度时停播（对齐 SPlayer-Next skipOnFailure）。
-  Future<void> _handleTrackFailure(Track track, String reason) async {
-    _log('播放失败: ${track.title}（$reason）');
-    if (await _tryFallbackSource(track)) return;
-    await _skipOnFailure('${track.title}：$reason');
-  }
-
-  /// 连续失败保护：递增失败计数，达上限或队列长度则停播，否则跳下一首。
-  ///
-  /// 对齐 SPlayer-Next `skipOnFailure`：`consecutiveFailures++`，
-  /// 达到 `MAX_CONSECUTIVE_FAILURES(5)` 或 `queue.queueLength` 交
-  /// `onQueueEnded` 停下，否则 nextTrack。
-  Future<void> _skipOnFailure(String reason) async {
-    _log('自动跳过无法播放的曲目: $reason');
-    _consecutiveFailures++;
-    if (_consecutiveFailures >= _maxConsecutiveFailures ||
-        _consecutiveFailures >= state.queue.length) {
-      _consecutiveFailures = 0;
-      _log('连续失败达上限，停止播放');
-      await stop();
-      return;
-    }
-    _advanceNext();
-    await _playCurrent();
-  }
-
-  /// 多源自动切换（对齐 Mineradio `provider-fallback`）：当前平台无源/
-  /// 无法播放时，用「标题 + 歌手」在其他平台搜索同名版本；命中且可解析
-  /// 播放 URL 则替换队列条目并播放。返回是否成功接管（未接管时由调用方
-  /// 决定跳过）。
-  ///
-  /// 防死循环：本失败序列中同一内容（规范化标题|歌手）只尝试一次换源，
-  /// 防止网/狗同曲互切（netease → kugou 失败 → 又搜回 netease）。
-  Future<bool> _tryFallbackSource(Track track) async {
-    // 本地/流媒体曲目无平台搜索语义，直接放弃换源
-    if (track.source == 'local' || track.source == 'streaming') return false;
-    final title = track.title.trim();
-    if (title.isEmpty) return false;
-    // 同一内容在本次失败序列中已尝试过换源 → 直接跳过（防互切死循环）
-    final contentKey = _trackContentKey(track);
-    if (_fallbackAttempted.contains(contentKey)) return false;
-    _fallbackAttempted.add(contentKey);
-
-    final artist = track.artistNames.trim();
-    final keyword = [title, if (artist.isNotEmpty) artist].join(' ');
-    final candidates = <Track>[];
-    try {
-      if (track.source == 'netease') {
-        candidates.addAll(
-          (await ref.read(kugouApiProvider).searchSongs(keyword, limit: 20))
-              .items,
-        );
-      } else {
-        candidates.addAll(
-          (await ref.read(neteaseApiProvider).searchSongs(keyword, limit: 20))
-              .items,
-        );
-      }
-    } catch (e) {
-      _log('换源搜索失败: $e');
-      return false;
-    }
-    for (final cand in candidates) {
-      if (cand.source == track.source) continue;
-      if (!_isSameTitleArtist(track, cand)) continue;
-      final url = await _resolveSource(cand, quality: state.quality);
-      if (url == null || url.isEmpty) continue;
-      _log('自动换源: ${track.title} → ${cand.source} 版本（${cand.title}）');
-      final q = List.of(state.queue);
-      if (state.queueIndex < 0 || state.queueIndex >= q.length) return false;
-      q[state.queueIndex] = cand;
-      state = state.copyWith(queue: q);
-      // 同步原始队列（关闭随机时恢复顺序用）
-      final orig = _originalQueue;
-      if (orig != null && state.queueIndex < orig.length) {
-        orig[state.queueIndex] = cand;
-      }
-      final ok = await _playTrackMeta(url, cand);
-      return ok;
-    }
-    return false;
-  }
-
-  /// 曲目内容键（规范化标题|歌手，用于换源去重，对齐 Mineradio
-  /// `sourceFallbackRecoveryContentKey`）。
-  static String _trackContentKey(Track track) {
-    final artists =
-        track.artists
-            .map((a) => _normText(a.name))
-            .where((s) => s.isNotEmpty)
-            .toList()
-          ..sort();
-    final title = _normText(track.title);
-    return '$title|${artists.join(',')}';
-  }
-
-  /// 规范化匹配文本：去除括号副题（live/remix 等）与分隔符，对齐
-  /// Mineradio `normalizeMatchText`。
-  static String _normText(String s) => s
-      .replaceAll(RegExp(r'[（(【\[].*?[）)】\]]'), '')
-      .replaceAll(RegExp(r'''[\s·・\-—_.,，。:："'‘’/\\|]+'''), '')
-      .toLowerCase();
-
-  /// 标题 + 歌手（任一歌手重叠）匹配，对齐 Mineradio `isSameTitleArtist`。
-  static bool _isSameTitleArtist(Track a, Track b) {
-    if (_normText(a.title) != _normText(b.title)) return false;
-    final aa = a.artists
-        .map((x) => _normText(x.name))
-        .where((s) => s.isNotEmpty);
-    final ba = b.artists
-        .map((x) => _normText(x.name))
-        .where((s) => s.isNotEmpty);
-    if (aa.isEmpty || ba.isEmpty) return false;
-    return aa.any(ba.contains);
-  }
-
-  /// 前进到下一首：末尾回绕；随机模式末尾重新洗牌（当前曲置顶、新队列 index=1）。
-  void _advanceNext() {
-    final q = state.queue;
-    if (q.isEmpty) return;
-    final len = q.length;
-    final idx = state.queueIndex;
-    if (idx >= len - 1) {
-      if (state.shuffle && len > 1) {
-        state = state.copyWith(
-          queue: _shuffledWithCurrentFirst(),
-          queueIndex: 1,
-        );
-        _log('随机模式：已重新洗牌队列');
-      } else {
-        state = state.copyWith(queueIndex: 0);
-      }
-    } else {
-      state = state.copyWith(queueIndex: idx + 1);
-    }
-  }
-
-  /// 设置播放队列并从 [startIndex] 开始播放（对齐原项目 playFrom）。
-  ///
-  /// 随机模式开启时自动洗牌（当前曲置顶）。队列替换式语义：先停当前
-  /// 引擎，再从起始曲目加载。
-  Future<void> playQueue(List<Track> tracks, {int startIndex = 0}) async {
-    if (tracks.isEmpty) return;
-    final idx = startIndex.clamp(0, tracks.length - 1);
-    _originalQueue = List.of(tracks);
-    if (state.shuffle) {
-      final q = List.of(tracks);
-      final current = q.removeAt(idx);
-      q.shuffle(math.Random());
-      q.insert(0, current);
-      state = state.copyWith(queue: q, queueIndex: 0);
-      _log('随机模式：已洗牌队列（${q.length} 首）');
-    } else {
-      state = state.copyWith(queue: List.of(tracks), queueIndex: idx);
-    }
-    await _playCurrent();
-  }
-
-  /// 播放/接入单曲：队列中已有则跳转，否则建立单曲队列（保证切歌可用）。
-  Future<void> playTrack(Track track) async {
-    if (state.queue.isNotEmpty) {
-      final idx = _indexOfTrack(state.queue, track);
-      if (idx != -1) {
-        await playAtIndex(idx);
-        return;
-      }
-    }
-    await playQueue([track]);
-  }
-
-  /// 立即播放 [track]（对齐原项目 playNow）：队列已有则跳转，否则插入到
-  /// 当前曲目之后并播放。[resolvedUrl] 已由调用方解析时直接使用（在线曲目
-  /// 避免重复请求）。
-  Future<void> playNow(Track track, {String? resolvedUrl}) async {
-    final q = state.queue;
-    if (q.isEmpty) {
-      final url = resolvedUrl ?? await _resolveSource(track);
-      if (url == null || url.isEmpty) {
-        _log('无法解析播放源: ${track.title}');
-        await _handleTrackFailure(track, '无可用播放源');
-        return;
-      }
-      state = state.copyWith(queue: [track], queueIndex: 0);
-      _originalQueue = List.of(state.queue);
-      final ok = await _playTrackMeta(url, track);
-      if (!ok) await _handleTrackFailure(track, '播放加载失败');
-      return;
-    }
-    final existing = _indexOfTrack(q, track);
-    if (existing != -1) {
-      await playAtIndex(existing);
-      return;
-    }
-    final at = state.queueIndex + 1;
-    final nq = List.of(q)..insert(at, track);
-    state = state.copyWith(queue: nq, queueIndex: at);
-    _originalQueue?.insert(at, track);
-    final url = resolvedUrl ?? await _resolveSource(track);
-    if (url == null || url.isEmpty) {
-      _log('无法解析播放源: ${track.title}');
-      await _handleTrackFailure(track, '无可用播放源');
-      return;
-    }
-    final ok = await _playTrackMeta(url, track);
-    if (!ok) await _handleTrackFailure(track, '播放加载失败');
-  }
-
-  /// 播放上一首（首位回绕到末尾，对齐原项目 prevTrack）。
-  Future<void> playPrevious() async {
-    final q = state.queue;
-    if (q.isEmpty) return;
-    final idx = state.queueIndex > 0 ? state.queueIndex - 1 : q.length - 1;
-    state = state.copyWith(queueIndex: idx);
-    await _playCurrent();
-  }
-
-  /// 播放下一首（末尾回绕；随机模式末尾重新洗牌，对齐原项目 nextTrack）。
-  Future<void> playNext() async {
-    if (state.queue.isEmpty) return;
-    _advanceNext();
-    await _playCurrent();
-  }
-
-  /// 跳转队列指定位置（同曲仅恢复播放，对齐原项目 playAtIndex）。
-  Future<void> playAtIndex(int index) async {
-    final q = state.queue;
-    if (index < 0 || index >= q.length) return;
-    if (index == state.queueIndex) {
-      final engine = _engine;
-      if (engine != null && !state.playing) {
-        engine.play();
-        state = state.copyWith(playing: true);
-        _syncFftActive();
-      }
-      return;
-    }
-    state = state.copyWith(queueIndex: index);
-    await _playCurrent();
-  }
-
-  /// 设置播放模式（'list' 列表循环 / 'one' 单曲循环）。
-  void setRepeatMode(String mode) {
-    if (!repeatModeCycle.contains(mode)) return;
-    if (state.repeatMode == mode) return;
-    state = state.copyWith(repeatMode: mode);
-    _log('播放模式 → ${repeatModeLabels[mode] ?? mode}');
-  }
-
-  /// 循环切换播放模式：list → one → list（对齐原项目 cycleRepeatMode）。
-  void cycleRepeatMode() {
-    final cycle = repeatModeCycle;
-    final next = cycle[(cycle.indexOf(state.repeatMode) + 1) % cycle.length];
-    setRepeatMode(next);
-  }
-
-  /// 切换随机模式：开启洗牌（当前曲置顶）；关闭恢复原始顺序定位当前曲。
-  void setShuffle(bool on) {
-    if (state.shuffle == on) return;
-    if (on) {
-      state = state.copyWith(
-        shuffle: true,
-        queue: _shuffledWithCurrentFirst(),
-        queueIndex: 0,
-      );
-      _log('随机播放已开启');
-    } else {
-      final original = _originalQueue;
-      final q = state.queue;
-      final currentId = state.currentQueueTrack?.id;
-      List<Track> restored;
-      int idx;
-      if (original != null && original.isNotEmpty) {
-        restored = List.of(original);
-        idx = currentId != null
-            ? restored.indexWhere((t) => t.id == currentId)
-            : 0;
-        if (idx < 0) {
-          restored = List.of(q);
-          idx = state.queueIndex;
-        }
-      } else {
-        restored = List.of(q);
-        idx = state.queueIndex;
-      }
-      state = state.copyWith(shuffle: false, queue: restored, queueIndex: idx);
-      _log('随机播放已关闭');
-    }
-  }
-
-  void toggleShuffle() => setShuffle(!state.shuffle);
-
-  /// 从队列移除指定位置（当前曲被移除时自动播下一首/停止）。
-  Future<void> removeFromQueue(int index) async {
-    final q = List.of(state.queue);
-    if (index < 0 || index >= q.length) return;
-    final isCurrent = index == state.queueIndex;
-    q.removeAt(index);
-    _originalQueue?.removeAt(index);
-    if (isCurrent) {
-      if (q.isEmpty) {
-        state = state.copyWith(queue: const [], queueIndex: -1);
-        _originalQueue = null;
-        await stop();
-        return;
-      }
-      var qi = state.queueIndex;
-      if (qi >= q.length) qi = 0;
-      state = state.copyWith(queue: q, queueIndex: qi);
-      await _playCurrent();
-      return;
-    }
-    var qi = state.queueIndex;
-    if (index < qi) qi--;
-    state = state.copyWith(queue: q, queueIndex: qi);
-  }
-
-  /// 把 [track] 插入到当前曲目之后（「下一首播放」）；已在队列则移动过去。
-  ///
-  /// 返回曲目在队列中的位置。
-  int insertToQueue(Track track) {
-    final q = List.of(state.queue);
-    final qi = state.queueIndex;
-    if (q.isEmpty) {
-      q.add(track);
-      state = state.copyWith(queue: q, queueIndex: 0);
-      _originalQueue = List.of(q);
-      return 0;
-    }
-    final existing = _indexOfTrack(q, track);
-    if (existing != -1) {
-      if (existing != qi + 1) moveInQueue(existing, qi + 1);
-      return qi + 1;
-    }
-    final at = qi + 1;
-    q.insert(at, track);
-    state = state.copyWith(queue: q);
-    _originalQueue?.insert(at, track);
-    return at;
-  }
-
-  /// 移动队列中曲目位置（含 queueIndex 修正，对齐原项目 moveInQueue）。
-  void moveInQueue(int from, int to) {
-    final q = List.of(state.queue);
-    if (from == to ||
-        from < 0 ||
-        from >= q.length ||
-        to < 0 ||
-        to >= q.length) {
-      return;
-    }
-    final item = q.removeAt(from);
-    q.insert(to, item);
-    var qi = state.queueIndex;
-    if (qi == from) {
-      qi = to;
-    } else if (from < qi && to >= qi) {
-      qi--;
-    } else if (from > qi && to <= qi) {
-      qi++;
-    }
-    state = state.copyWith(queue: q, queueIndex: qi);
-    final orig = _originalQueue;
-    if (orig != null && from < orig.length && to < orig.length) {
-      final oi = orig.removeAt(from);
-      orig.insert(to, oi);
-    }
-  }
-
-  /// 清空播放队列（并停止当前播放，播放条随之自动收缩隐藏）。
-  Future<void> clearQueue() async {
-    state = state.copyWith(queue: const [], queueIndex: -1);
-    _originalQueue = null;
-    if (state.source != null) {
-      await stop();
-    }
-  }
-
-  /// 原始队列（关闭随机时恢复顺序用）。
-  List<Track>? _originalQueue;
-
-  /// 洗牌当前队列，当前曲置顶 index 0（对齐原项目 queue.shuffleQueue）。
-  List<Track> _shuffledWithCurrentFirst() {
-    final q = List.of(state.queue);
-    if (q.length <= 1) return q;
-    var cur = state.queueIndex;
-    if (cur < 0 || cur >= q.length) cur = 0;
-    final current = q.removeAt(cur);
-    q.shuffle(math.Random());
-    q.insert(0, current);
-    return q;
-  }
-
-  /// 在队列中定位 track（按 source + id 匹配，避免跨平台同 id 撞车）。
-  static int _indexOfTrack(List<Track> q, Track track) {
-    for (var i = 0; i < q.length; i++) {
-      final t = q[i];
-      if (t.id == track.id && t.source == track.source) return i;
-    }
-    return -1;
-  }
-
-  /// 队列自然播完（miniaudio EOF）：单曲循环重载当前曲从头播放，
-  /// 否则下一首。EOF 后引擎可能已退出，seek+play 不可靠，故单曲循环
-  /// 走重新加载（等价且健壮）。
-  Future<void> _onTrackEnded() async {
-    final q = state.queue;
-    if (q.isEmpty) return;
-    if (state.repeatMode == 'one') {
-      final idx = state.queueIndex;
-      if (idx < 0 || idx >= q.length) return;
-      final track = q[idx];
-      final url = await _resolveSource(track, quality: state.quality);
-      if (url == null || url.isEmpty) {
-        _log('单曲循环无法解析播放源: ${track.title}');
-        await _handleTrackFailure(track, '单曲循环无可用播放源');
-        return;
-      }
-      _log('单曲循环: ${track.title}');
-      final ok = await _playTrackMeta(url, track);
-      if (!ok) await _handleTrackFailure(track, '单曲循环播放失败');
-      return;
-    }
-    await playNext();
-  }
 
   /// seek：miniaudio 本地 seek（完整 WAV 已就绪，无需重启引擎重转码）。
   ///
@@ -1188,6 +392,7 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
   }
 
   /// 停止（停引擎；播放器随引擎终止）。
+  @override
   Future<void> stop() async {
     _fftActive = false;
     _sessionOffsetMs = 0;
@@ -1211,264 +416,11 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     _log('已停止');
   }
 
-  /// 启动引擎会话（流式优先：边解码边出声，首块 PCM 即 playing；无声设备
-  /// 回退全速转码落盘 WAV 后自播）。
-  ///
-  /// 启动门槛 = 引擎 `ready`（[AudioEngineProcess.started]）：ready 后曲目
-  /// 已可出声（playing 紧跟其后），[load] 即可收敛。done 在流式下只在曲尾
-  /// EOF 到达，不能作为「会话已启动」的等待点——否则 playAll/切曲等 await
-  /// load 的流程会挂到整曲播完（卡死 loading、期间无法切换曲目）。
-  ///
-  /// [passthrough] 原音质直通（来自设置开关）：true = 引擎保持源采样率；
-  /// false = 统一 48kHz 转码管线。
-  ///
-  /// [gen] 为发起方捕获的加载代际号（见 [load]）；0 表示不参与抢占检查
-  /// （seek 回退重启会话等内部路径）。创建中/就绪前被更新的 load 取代时
-  /// 立即停掉自身引擎，不再等待——缓冲中切歌的落点。
-  Future<void> _startSession(
-    String source, {
-    required int offsetMs,
-    required int bitrate,
-    bool passthrough = true,
-    int gen = 0,
-  }) async {
-    await _stopEngine();
-    final engine = await AudioEngineProcess.start(
-      source: source,
-      offsetMs: offsetMs,
-      bitrate: bitrate,
-      passthrough: passthrough,
-    );
-    // 创建期间被更新的 load 取代：丢弃刚创建的引擎（不播放、不监听）
-    if (gen != 0 && gen != _loadGen) {
-      _log('会话被新 load 取代，丢弃刚创建的引擎');
-      await engine.stop();
-      return;
-    }
-    _engine = engine;
-    _sessionOffsetMs = offsetMs;
-    _engineSubs.add(engine.events.listen(_onEngineEvent));
-    _fftStarted = false;
-    // 输出设备偏好：会话创建后立即下发 set_sink（引擎为 FFI 进程内会话，
-    // env ARCHOERA_AUDIO_SINK 只在进程启动时读取；此处以 Dart 偏好显式
-    // 覆盖，'无选择 = 空串' 则不动引擎、尊重系统默认）。显式选择 → 即时/
-    // 下一曲生效，无需冷重启；偏好已持久化，重启后新会话同样命中此分支。
-    final sinkId = ref.read(appPrefsProvider).sink;
-    if (sinkId.isNotEmpty) {
-      // ignore: discarded_futures
-      unawaited(engine.sendCommand('set_sink', {'id': sinkId}));
-    }
-    // 新会话重置取帧节流基准：位置从新会话起点（可能回退）重新前进，
-    // 若不重置，首帧会被上一会话的 _lastSpectrumAtMs 节流拦截（FFT 冻结）
-    _lastSpectrumAtMs = -1000;
-    // 新会话应用当前音量（引擎进程新起，默认 1.0）
-    // ignore: discarded_futures
-    unawaited(engine.setVolume(state.volume));
-    state = state.copyWith(
-      source: source,
-      sessionId: engine.sessionId,
-      playing: false,
-      // 恢复续播：进度条/歌词直接展示保存位置（引擎 WAV 内游标为相对值，
-      // 但尚未产生位置事件前，先以绝对偏移填充，避免显示 0:00）。
-      position: Duration(milliseconds: offsetMs),
-      duration: Duration.zero, // 待 ready 事件回填完整时长
-      fft: null,
-    );
-    // 取帧由 _syncFftActive 门控：进入播放（EnginePlaying）才启用事件驱动取帧
-    // 等待会话就绪（ready）→ 引擎自播（流式：首块 PCM 即出声；回退路径：
-    // 全速转码完成后再自播 WAV）。
-    //
-    // 注意：**不**再 `await engine.done`。done 在流式起播下只在曲尾/内容 EOF
-    // 才到达，若以它作启动门槛，会话会一直处于 buffering/loading、playAll 等
-    // 等待启动的调用挂到整曲播完（表现为「播放全部」卡死、期间无法切曲）。
-    // ready（其后紧跟 playing）才是「会话已可出声」的收敛点。
-    //
-    // 就绪等待设上限（30s）：引擎就绪迟迟不来（如网络开流/异常源把引擎线程
-    // 卡在阻塞 open）时不再无限 buffering/挂等 seek 的重启会话——超时即停掉
-    // 该引擎并按失败收敛（seek 在等待 started 期间不挂死）。
-    var startedInTime = false;
-    try {
-      await engine.started.timeout(const Duration(seconds: 30));
-      startedInTime = true;
-    } on TimeoutException {
-      _log('引擎就绪等待超时（30s），放弃该会话（seek/load 不挂死）');
-      startedInTime = false;
-    }
-    if (!startedInTime) {
-      // 等待期间被更新的 load 取代：让新会话继续，不抛错打扰
-      if (gen != 0 && gen != _loadGen) return;
-      if (!identical(_engine, engine)) return;
-      state = state.copyWith(buffering: false);
-      // ignore: discarded_futures
-      unawaited(engine.stop());
-      throw StateError('引擎启动超时（30s），已停止该会话');
-    }
-    // 就绪前/就绪期间被更新的 load 取代（stop 已放行 started）：不进入后续
-    // 收尾，引擎已被新会话停掉，此处仅结束本代任务
-    if (gen != 0 && gen != _loadGen) {
-      _log('会话被新 load 取代（就绪前/就绪时）');
-      return;
-    }
-    // 启动等待期间被 stop()/clearQueue 主动放弃（非 load 取代，gen 未变但
-    // _engine 已被置空/换新）：同样不进入成功收尾（load 对调用方仍正常返回，
-    // 但不再把本次当成「播放成功」清空失败计数）。
-    if (!identical(_engine, engine)) {
-      _log('会话已放弃（就绪等待期间被 stop）');
-      return;
-    }
-    _log('引擎会话就绪，开始播放');
-  }
-
-  /// 记入播放历史（真正开始播放时调用，一次/会话）。
-  ///
-  /// 判定对齐 SPlayer-Next：`playbackStatus === 'playing'` 才记录，即引擎
-  /// 缓冲完成、miniaudio 真正出声后才落库——加载成功但随后失败/被秒切的
-  /// 曲目不记。写入为 UI 线程同步 sqlite（写量小，微秒级），失败内部
-  /// 记日志静默，不影响播放。
-  void _recordHistoryOnce() {
-    if (_historyRecorded) return;
-    final current = state.track;
-    if (current == null) return;
-    final prefs = ref.read(appPrefsProvider);
-    if (!prefs.historyEnabled) return;
-    _historyRecorded = true;
-    ref.read(historyStoreProvider).record(current, limit: prefs.historyLimit);
-  }
-
-  void _onEngineEvent(EngineEvent event) {
-    switch (event) {
-      case EngineReady():
-        _log(
-          '引擎就绪: v${event.version} ${event.durationMs}ms @${event.sampleRate}Hz/${event.channels}ch',
-        );
-        // 完整时长（原 SPlayer-Next 行为：前端拿到完整时长，转码中即可显示）
-        if (event.durationMs > 0) {
-          state = state.copyWith(
-            duration: Duration(milliseconds: event.durationMs),
-          );
-        }
-      case EngineStatus():
-        if (event.playing != null) {
-          state = state.copyWith(playing: event.playing!);
-          _syncFftActive();
-        }
-        // 位置为 WAV 相对值，转绝对（含会话偏移）
-        if (event.positionMs > 0) {
-          state = state.copyWith(
-            position: Duration(
-              milliseconds: event.positionMs + _sessionOffsetMs,
-            ),
-          );
-        }
-      case EngineDone():
-        _log('引擎转码完成');
-      case EnginePlaying():
-        // 播放器就绪（miniaudio 已加载 WAV）：回填完整时长 + 进入播放。
-        // 引擎上报为 WAV 时长（= 全量 - offset），换算回全量绝对时长。
-        // 自动续播已真正进入播放：解除快照保护（此处 state 已/即将置 playing，
-        // 后续中间态可正常落盘）。
-        _autoResumeInFlight = false;
-        _retryableSnapshot = null;
-        final durMs = event.durationMs > 0
-            ? event.durationMs + _sessionOffsetMs
-            : 0;
-        if (durMs > 0) {
-          state = state.copyWith(duration: Duration(milliseconds: durMs));
-        }
-        if (_pendingPauseAfterReady) {
-          // seek 回退重启会话且原为暂停态：miniaudio 加载即自动开播，
-          // 立即暂停保持原暂停语义（不闪播）
-          _pendingPauseAfterReady = false;
-          // ignore: discarded_futures
-          unawaited(_engine?.pause());
-          state = state.copyWith(playing: false, buffering: false);
-          _syncFftActive();
-          _log('播放器就绪: miniaudio 已加载（保持暂停）');
-          return;
-        }
-        state = state.copyWith(playing: true, buffering: false);
-        _syncFftActive();
-        _log('播放器就绪: miniaudio 播放 WAV');
-        // 真正开始播放（miniaudio 加载 WAV 成功）→ 记入历史（一次/会话）
-        _recordHistoryOnce();
-      case EnginePosition():
-        // 引擎游标为 WAV 相对位置，转绝对（含会话偏移）供进度条/歌词/FFT 使用
-        final absMs = event.positionMs + _sessionOffsetMs;
-        state = state.copyWith(position: Duration(milliseconds: absMs));
-        // 事件驱动取帧（无轮询）：位置每前进 50ms 即按当前绝对位置取一帧
-        // FFT（含脉冲强度），暂停/seek 时与播放位置天然对齐
-        _pollSpectrum();
-        // 诊断（AUTOPLAY）：每 5s 打印一次播放位置，验证引擎播放推进
-        if (Platform.environment['ARCHOERA_AUTOPLAY'] == '1' &&
-            absMs > 0 &&
-            (_lastPosLogMs == null || absMs - _lastPosLogMs! >= 5000)) {
-          _lastPosLogMs = absMs;
-          _log('播放位置: ${absMs}ms / ${state.duration.inMilliseconds}ms');
-        }
-      case EngineEventInterval():
-        // 降频协商回执：记录 C 侧实际生效间隔，_fftPollIntervalMs 取帧节流
-        // 跟随档位（见 _syncFftActive）。以回执为准，双方节奏对齐
-        _engineIntervalMs = event.intervalMs;
-        _syncFftActive();
-        _log('事件间隔已协商: ${event.intervalMs}ms');
-      case EnginePlayerEnded():
-        state = state.copyWith(playing: false, buffering: false);
-        _syncFftActive();
-        _log('播放完成（miniaudio EOF）');
-        // 队列播完自动切歌：单曲循环 seek 回开头，否则下一首
-        unawaited(_onTrackEnded());
-      case EngineError():
-        // 续播尝试失败收敛（ready 前错误）：解除保护并把磁盘收敛为可续播
-        // 快照（此前暂停态写盘已被改写为它，此处兜底一次），下次冷启动重试。
-        if (_autoResumeInFlight) {
-          final retry = _retryableSnapshot;
-          _autoResumeInFlight = false;
-          _retryableSnapshot = null;
-          if (retry != null) _writeSession(retry);
-        }
-        _log('引擎错误: ${event.message}');
-        state = state.copyWith(buffering: false);
-      case EngineSinkChanged():
-        if (event.ok) {
-          _log('输出设备已切换');
-        } else {
-          final err = event.err;
-          _log('切换输出设备失败: ${err ?? '未知错误'}');
-          if (err != null && err.isNotEmpty && !_sinkFailureCtrl.isClosed) {
-            _sinkFailureCtrl.add(err);
-          }
-        }
-      case EngineExited():
-        if (_engine != null) {
-          if (_autoResumeInFlight) {
-            final retry = _retryableSnapshot;
-            _autoResumeInFlight = false;
-            _retryableSnapshot = null;
-            if (retry != null) _writeSession(retry);
-          }
-          _log('引擎退出 code=${event.code}');
-          state = state.copyWith(buffering: false);
-        }
-    }
-  }
-
-  Future<void> _stopEngine() async {
-    _fftActive = false;
-    for (final s in _engineSubs) {
-      s.cancel();
-    }
-    _engineSubs.clear();
-    final engine = _engine;
-    _engine = null;
-    if (engine != null) {
-      await engine.stop();
-    }
-  }
-
   /// 同步 FFT 拉取开关（事件驱动，无 Timer）：仅在引擎存在、播放中且
   /// 非性能模式时允许按 EnginePosition 事件取帧；暂停/停播即停（节能）。
   /// 取帧节流间隔 = 基线（100ms / 节能 300ms）与引擎事件间隔的较大者——
   /// 降频档位下 position 事件本身变稀，FFT 取帧跟随（engine-event-push-plan）。
+  @override
   void _syncFftActive() {
     final prefs = ref.read(appPrefsProvider);
     _fftPollIntervalMs = math.max(
@@ -1515,6 +467,7 @@ class PlaybackNotifier extends Notifier<PlaybackState> {
     _syncFftActive();
   }
 
+  @override
   void _log(String line) {
     final ts = DateTime.now().toString().substring(11, 19);
     final logs = ['$ts $line', ...state.logs];
