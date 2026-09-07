@@ -1,0 +1,2637 @@
+{
+ "regular_base": 57600,
+ "filled_base": 59136,
+ "glyphs": {
+  "abcOutline": {
+   "const": "abcOutline",
+   "kind": "added",
+   "glyph": "abc",
+   "style": "regular",
+   "src": "added",
+   "materials": [
+    "abc"
+   ],
+   "codepoint": 57600
+  },
+  "bedtimeOffOutline": {
+   "const": "bedtimeOffOutline",
+   "kind": "added",
+   "glyph": "bedtime_off_outlined",
+   "style": "regular",
+   "src": "added",
+   "materials": [
+    "bedtime_off_outlined"
+   ],
+   "codepoint": 57611
+  },
+  "blurOnOutline": {
+   "const": "blurOnOutline",
+   "kind": "added",
+   "glyph": "blur_on_outlined",
+   "style": "regular",
+   "src": "added",
+   "materials": [
+    "blur_on_outlined"
+   ],
+   "codepoint": 57613
+  },
+  "deselectOutline": {
+   "const": "deselectOutline",
+   "kind": "added",
+   "glyph": "deselect",
+   "style": "regular",
+   "src": "added",
+   "materials": [
+    "deselect"
+   ],
+   "codepoint": 57645
+  },
+  "highQualityOutline": {
+   "const": "highQualityOutline",
+   "kind": "added",
+   "glyph": "high_quality_outlined",
+   "style": "regular",
+   "src": "added",
+   "materials": [
+    "high_quality_outlined"
+   ],
+   "codepoint": 57693
+  },
+  "publishedWithChangesOutline": {
+   "const": "publishedWithChangesOutline",
+   "kind": "added",
+   "glyph": "published_with_changes_outlined",
+   "style": "regular",
+   "src": "added",
+   "materials": [
+    "published_with_changes_outlined"
+   ],
+   "codepoint": 57747
+  },
+  "tonalityOutline": {
+   "const": "tonalityOutline",
+   "kind": "added",
+   "glyph": "tonality_outlined",
+   "style": "regular",
+   "src": "added",
+   "materials": [
+    "tonality_outlined"
+   ],
+   "codepoint": 57792
+  },
+  "add": {
+   "const": "add",
+   "kind": "mc",
+   "glyph": "add",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "add"
+   ],
+   "codepoint": 59137
+  },
+  "aiming": {
+   "const": "aiming",
+   "kind": "mc",
+   "glyph": "aiming",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "my_location"
+   ],
+   "codepoint": 59138
+  },
+  "aimingOutline": {
+   "const": "aimingOutline",
+   "kind": "mc",
+   "glyph": "aiming",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "center_focus_strong_outlined",
+    "gps_fixed_outlined",
+    "my_location_outlined"
+   ],
+   "codepoint": 57603
+  },
+  "albumOutline": {
+   "const": "albumOutline",
+   "kind": "mc",
+   "glyph": "album",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "album_outlined"
+   ],
+   "codepoint": 57605
+  },
+  "album2Outline": {
+   "const": "album2Outline",
+   "kind": "mc",
+   "glyph": "album_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "photo_library_outlined"
+   ],
+   "codepoint": 57604
+  },
+  "alert": {
+   "const": "alert",
+   "kind": "mc",
+   "glyph": "alert",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "error"
+   ],
+   "codepoint": 59142
+  },
+  "alertOutline": {
+   "const": "alertOutline",
+   "kind": "mc",
+   "glyph": "alert",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "error_outline"
+   ],
+   "codepoint": 57607
+  },
+  "arrowLeft": {
+   "const": "arrowLeft",
+   "kind": "mc",
+   "glyph": "arrow_left",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "arrow_back"
+   ],
+   "codepoint": 59144
+  },
+  "arrowRight": {
+   "const": "arrowRight",
+   "kind": "mc",
+   "glyph": "arrow_right",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "arrow_right_alt"
+   ],
+   "codepoint": 59145
+  },
+  "asterisk": {
+   "const": "asterisk",
+   "kind": "mc",
+   "glyph": "asterisk_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "flaky"
+   ],
+   "codepoint": 59146
+  },
+  "bluetooth": {
+   "const": "bluetooth",
+   "kind": "mc",
+   "glyph": "bluetooth",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "bluetooth_audio"
+   ],
+   "codepoint": 59148
+  },
+  "book": {
+   "const": "book",
+   "kind": "mc",
+   "glyph": "book_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "menu_book"
+   ],
+   "codepoint": 59150
+  },
+  "bookOutline": {
+   "const": "bookOutline",
+   "kind": "mc",
+   "glyph": "book_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "menu_book_outlined"
+   ],
+   "codepoint": 57615
+  },
+  "borderRadius": {
+   "const": "borderRadius",
+   "kind": "mc",
+   "glyph": "border_radius",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "rounded_corner"
+   ],
+   "codepoint": 59152
+  },
+  "brightnessOutline": {
+   "const": "brightnessOutline",
+   "kind": "mc",
+   "glyph": "brightness",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "brightness_auto_outlined"
+   ],
+   "codepoint": 57617
+  },
+  "broomOutline": {
+   "const": "broomOutline",
+   "kind": "mc",
+   "glyph": "broom",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "cleaning_services_outlined"
+   ],
+   "codepoint": 57618
+  },
+  "buildingOutline": {
+   "const": "buildingOutline",
+   "kind": "mc",
+   "glyph": "building_1",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "location_city_outlined"
+   ],
+   "codepoint": 57619
+  },
+  "chartBar": {
+   "const": "chartBar",
+   "kind": "mc",
+   "glyph": "chart_bar",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "bar_chart"
+   ],
+   "codepoint": 59156
+  },
+  "chartBarOutline": {
+   "const": "chartBarOutline",
+   "kind": "mc",
+   "glyph": "chart_bar",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "bar_chart_outlined"
+   ],
+   "codepoint": 57621
+  },
+  "chartLine": {
+   "const": "chartLine",
+   "kind": "mc",
+   "glyph": "chart_line",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "multiline_chart"
+   ],
+   "codepoint": 59158
+  },
+  "chartPieOutline": {
+   "const": "chartPieOutline",
+   "kind": "mc",
+   "glyph": "chart_pie",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "data_usage_outlined",
+    "pie_chart_outline"
+   ],
+   "codepoint": 57623
+  },
+  "chartVerticalOutline": {
+   "const": "chartVerticalOutline",
+   "kind": "mc",
+   "glyph": "chart_vertical",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "analytics_outlined",
+    "leaderboard_outlined"
+   ],
+   "codepoint": 57624
+  },
+  "chatOutline": {
+   "const": "chatOutline",
+   "kind": "mc",
+   "glyph": "chat_1",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "chat_bubble_outline"
+   ],
+   "codepoint": 57625
+  },
+  "check": {
+   "const": "check",
+   "kind": "mc",
+   "glyph": "check",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "check"
+   ],
+   "codepoint": 59162
+  },
+  "checkCircle": {
+   "const": "checkCircle",
+   "kind": "mc",
+   "glyph": "check_circle",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "check_circle"
+   ],
+   "codepoint": 59163
+  },
+  "checkCircleOutline": {
+   "const": "checkCircleOutline",
+   "kind": "mc",
+   "glyph": "check_circle",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "check_circle_outline"
+   ],
+   "codepoint": 57628
+  },
+  "chipOutline": {
+   "const": "chipOutline",
+   "kind": "mc",
+   "glyph": "chip",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "memory_outlined"
+   ],
+   "codepoint": 57629
+  },
+  "circleDash": {
+   "const": "circleDash",
+   "kind": "mc",
+   "glyph": "circle_dash",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "radio_button_off"
+   ],
+   "codepoint": 59166
+  },
+  "clock": {
+   "const": "clock",
+   "kind": "mc",
+   "glyph": "clock",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "schedule"
+   ],
+   "codepoint": 59167
+  },
+  "close": {
+   "const": "close",
+   "kind": "mc",
+   "glyph": "close",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "close"
+   ],
+   "codepoint": 59168
+  },
+  "closeCircleOutline": {
+   "const": "closeCircleOutline",
+   "kind": "mc",
+   "glyph": "close_circle",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "cancel_outlined"
+   ],
+   "codepoint": 57633
+  },
+  "cloud": {
+   "const": "cloud",
+   "kind": "mc",
+   "glyph": "cloud",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "cloud",
+    "cloud_queue",
+    "wb_cloudy"
+   ],
+   "codepoint": 59170
+  },
+  "cloudOutline": {
+   "const": "cloudOutline",
+   "kind": "mc",
+   "glyph": "cloud",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "cloud_off_outlined",
+    "cloud_outlined"
+   ],
+   "codepoint": 57635
+  },
+  "colorPicker": {
+   "const": "colorPicker",
+   "kind": "mc",
+   "glyph": "color_picker",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "colorize"
+   ],
+   "codepoint": 59172
+  },
+  "columnsOutline": {
+   "const": "columnsOutline",
+   "kind": "mc",
+   "glyph": "columns_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "view_column_outlined"
+   ],
+   "codepoint": 57637
+  },
+  "commentOutline": {
+   "const": "commentOutline",
+   "kind": "mc",
+   "glyph": "comment",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "mode_comment_outlined"
+   ],
+   "codepoint": 57638
+  },
+  "cornerDownLeft": {
+   "const": "cornerDownLeft",
+   "kind": "mc",
+   "glyph": "corner_down_left",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "keyboard_return"
+   ],
+   "codepoint": 59175
+  },
+  "cornerUpLeft": {
+   "const": "cornerUpLeft",
+   "kind": "mc",
+   "glyph": "corner_up_left",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "north_west"
+   ],
+   "codepoint": 59176
+  },
+  "dashboard3": {
+   "const": "dashboard3",
+   "kind": "mc",
+   "glyph": "dashboard_3",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "speed"
+   ],
+   "codepoint": 59177
+  },
+  "dashboard4Outline": {
+   "const": "dashboard4Outline",
+   "kind": "mc",
+   "glyph": "dashboard_4",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "speed_outlined"
+   ],
+   "codepoint": 57642
+  },
+  "delete": {
+   "const": "delete",
+   "kind": "mc",
+   "glyph": "delete_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "delete"
+   ],
+   "codepoint": 59179
+  },
+  "deleteOutline": {
+   "const": "deleteOutline",
+   "kind": "mc",
+   "glyph": "delete_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "delete_outline",
+    "delete_sweep_outlined"
+   ],
+   "codepoint": 57644
+  },
+  "deviceOutline": {
+   "const": "deviceOutline",
+   "kind": "mc",
+   "glyph": "device",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "devices_outlined"
+   ],
+   "codepoint": 57646
+  },
+  "docmentOutline": {
+   "const": "docmentOutline",
+   "kind": "mc",
+   "glyph": "docment",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "text_snippet_outlined"
+   ],
+   "codepoint": 57647
+  },
+  "dotCircle": {
+   "const": "dotCircle",
+   "kind": "mc",
+   "glyph": "dot_circle",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "radio_button_checked"
+   ],
+   "codepoint": 59184
+  },
+  "dotCircleOutline": {
+   "const": "dotCircleOutline",
+   "kind": "mc",
+   "glyph": "dot_circle",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "blur_circular_outlined"
+   ],
+   "codepoint": 57649
+  },
+  "dots": {
+   "const": "dots",
+   "kind": "mc",
+   "glyph": "dots",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "more_horiz"
+   ],
+   "codepoint": 59186
+  },
+  "dotsVertical": {
+   "const": "dotsVertical",
+   "kind": "mc",
+   "glyph": "dots_vertical",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "drag_indicator",
+    "more_vert"
+   ],
+   "codepoint": 59187
+  },
+  "downSmall": {
+   "const": "downSmall",
+   "kind": "mc",
+   "glyph": "down_small",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "arrow_drop_down",
+    "expand_more",
+    "keyboard_arrow_down"
+   ],
+   "codepoint": 59188
+  },
+  "download": {
+   "const": "download",
+   "kind": "mc",
+   "glyph": "download",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "download",
+    "downloading"
+   ],
+   "codepoint": 59189
+  },
+  "downloadOutline": {
+   "const": "downloadOutline",
+   "kind": "mc",
+   "glyph": "download",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "download_outlined"
+   ],
+   "codepoint": 57654
+  },
+  "drizzle": {
+   "const": "drizzle",
+   "kind": "mc",
+   "glyph": "drizzle",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "grain"
+   ],
+   "codepoint": 59191
+  },
+  "drop": {
+   "const": "drop",
+   "kind": "mc",
+   "glyph": "drop",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "opacity",
+    "water_drop"
+   ],
+   "codepoint": 59192
+  },
+  "earth": {
+   "const": "earth",
+   "kind": "mc",
+   "glyph": "earth",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "public",
+    "travel_explore"
+   ],
+   "codepoint": 59193
+  },
+  "editOutline": {
+   "const": "editOutline",
+   "kind": "mc",
+   "glyph": "edit_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "edit_outlined"
+   ],
+   "codepoint": 57658
+  },
+  "entrance": {
+   "const": "entrance",
+   "kind": "mc",
+   "glyph": "entrance",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "login"
+   ],
+   "codepoint": 59195
+  },
+  "exit": {
+   "const": "exit",
+   "kind": "mc",
+   "glyph": "exit",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "logout"
+   ],
+   "codepoint": 59196
+  },
+  "exitOutline": {
+   "const": "exitOutline",
+   "kind": "mc",
+   "glyph": "exit",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "exit_to_app_outlined"
+   ],
+   "codepoint": 57661
+  },
+  "eyeOutline": {
+   "const": "eyeOutline",
+   "kind": "mc",
+   "glyph": "eye_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "visibility_outlined"
+   ],
+   "codepoint": 57663
+  },
+  "eyeCloseOutline": {
+   "const": "eyeCloseOutline",
+   "kind": "mc",
+   "glyph": "eye_close",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "visibility_off_outlined"
+   ],
+   "codepoint": 57662
+  },
+  "fileOutline": {
+   "const": "fileOutline",
+   "kind": "mc",
+   "glyph": "file",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "insert_drive_file_outlined"
+   ],
+   "codepoint": 57667
+  },
+  "fileImportOutline": {
+   "const": "fileImportOutline",
+   "kind": "mc",
+   "glyph": "file_import",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "drive_file_move_outlined"
+   ],
+   "codepoint": 57664
+  },
+  "fileMusic": {
+   "const": "fileMusic",
+   "kind": "mc",
+   "glyph": "file_music",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "lyrics"
+   ],
+   "codepoint": 59201
+  },
+  "fileMusicOutline": {
+   "const": "fileMusicOutline",
+   "kind": "mc",
+   "glyph": "file_music",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "lyrics_outlined"
+   ],
+   "codepoint": 57666
+  },
+  "filter": {
+   "const": "filter",
+   "kind": "mc",
+   "glyph": "filter",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "tune"
+   ],
+   "codepoint": 59204
+  },
+  "fingerprint": {
+   "const": "fingerprint",
+   "kind": "mc",
+   "glyph": "fingerprint",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "fingerprint"
+   ],
+   "codepoint": 59205
+  },
+  "fingerprintOutline": {
+   "const": "fingerprintOutline",
+   "kind": "mc",
+   "glyph": "fingerprint",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "fingerprint_outlined"
+   ],
+   "codepoint": 57670
+  },
+  "fireOutline": {
+   "const": "fireOutline",
+   "kind": "mc",
+   "glyph": "fire",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "local_fire_department_outlined"
+   ],
+   "codepoint": 57671
+  },
+  "firstAidKitOutline": {
+   "const": "firstAidKitOutline",
+   "kind": "mc",
+   "glyph": "first_aid_kit",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "healing_outlined"
+   ],
+   "codepoint": 57672
+  },
+  "flash": {
+   "const": "flash",
+   "kind": "mc",
+   "glyph": "flash",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "bolt"
+   ],
+   "codepoint": 59209
+  },
+  "flashOutline": {
+   "const": "flashOutline",
+   "kind": "mc",
+   "glyph": "flash",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "bolt_outlined"
+   ],
+   "codepoint": 57674
+  },
+  "flaskOutline": {
+   "const": "flaskOutline",
+   "kind": "mc",
+   "glyph": "flask",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "science_outlined"
+   ],
+   "codepoint": 57675
+  },
+  "flipHorizontal": {
+   "const": "flipHorizontal",
+   "kind": "mc",
+   "glyph": "flip_horizontal",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "flip"
+   ],
+   "codepoint": 59212
+  },
+  "fog": {
+   "const": "fog",
+   "kind": "mc",
+   "glyph": "fog",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "foggy"
+   ],
+   "codepoint": 59213
+  },
+  "folderOutline": {
+   "const": "folderOutline",
+   "kind": "mc",
+   "glyph": "folder",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "folder_outlined"
+   ],
+   "codepoint": 57680
+  },
+  "folderOpen": {
+   "const": "folderOpen",
+   "kind": "mc",
+   "glyph": "folder_open",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "folder_open"
+   ],
+   "codepoint": 59214
+  },
+  "folderOpenOutline": {
+   "const": "folderOpenOutline",
+   "kind": "mc",
+   "glyph": "folder_open",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "folder_open_outlined"
+   ],
+   "codepoint": 57679
+  },
+  "foldersOutline": {
+   "const": "foldersOutline",
+   "kind": "mc",
+   "glyph": "folders",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "folder_copy_outlined"
+   ],
+   "codepoint": 57681
+  },
+  "fontOutline": {
+   "const": "fontOutline",
+   "kind": "mc",
+   "glyph": "font",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "font_download_outlined"
+   ],
+   "codepoint": 57682
+  },
+  "fontSize": {
+   "const": "fontSize",
+   "kind": "mc",
+   "glyph": "font_size",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "format_size"
+   ],
+   "codepoint": 59219
+  },
+  "fontSizeOutline": {
+   "const": "fontSizeOutline",
+   "kind": "mc",
+   "glyph": "font_size",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "text_fields_outlined"
+   ],
+   "codepoint": 57684
+  },
+  "fullscreen": {
+   "const": "fullscreen",
+   "kind": "mc",
+   "glyph": "fullscreen",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "fullscreen"
+   ],
+   "codepoint": 59221
+  },
+  "fullscreenExit": {
+   "const": "fullscreenExit",
+   "kind": "mc",
+   "glyph": "fullscreen_exit",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "fullscreen_exit"
+   ],
+   "codepoint": 59222
+  },
+  "fullscreenExit2Outline": {
+   "const": "fullscreenExit2Outline",
+   "kind": "mc",
+   "glyph": "fullscreen_exit_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "zoom_out_map_outlined"
+   ],
+   "codepoint": 57687
+  },
+  "hashtagOutline": {
+   "const": "hashtagOutline",
+   "kind": "mc",
+   "glyph": "hashtag",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "numbers_outlined"
+   ],
+   "codepoint": 57688
+  },
+  "headphoneOutline": {
+   "const": "headphoneOutline",
+   "kind": "mc",
+   "glyph": "headphone",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "headphones_outlined"
+   ],
+   "codepoint": 57689
+  },
+  "heart": {
+   "const": "heart",
+   "kind": "mc",
+   "glyph": "heart",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "favorite"
+   ],
+   "codepoint": 59226
+  },
+  "heartOutline": {
+   "const": "heartOutline",
+   "kind": "mc",
+   "glyph": "heart",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "favorite_border",
+    "favorite_outline"
+   ],
+   "codepoint": 57691
+  },
+  "heartbeatOutline": {
+   "const": "heartbeatOutline",
+   "kind": "mc",
+   "glyph": "heartbeat_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "monitor_heart_outlined"
+   ],
+   "codepoint": 57692
+  },
+  "history": {
+   "const": "history",
+   "kind": "mc",
+   "glyph": "history",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "history",
+    "history_toggle_off"
+   ],
+   "codepoint": 59230
+  },
+  "historyOutline": {
+   "const": "historyOutline",
+   "kind": "mc",
+   "glyph": "history",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "history_outlined"
+   ],
+   "codepoint": 57695
+  },
+  "home": {
+   "const": "home",
+   "kind": "mc",
+   "glyph": "home_1",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "home"
+   ],
+   "codepoint": 59232
+  },
+  "homeOutline": {
+   "const": "homeOutline",
+   "kind": "mc",
+   "glyph": "home_1",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "home_outlined"
+   ],
+   "codepoint": 57697
+  },
+  "informationOutline": {
+   "const": "informationOutline",
+   "kind": "mc",
+   "glyph": "information",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "info_outline"
+   ],
+   "codepoint": 57698
+  },
+  "keyOutline": {
+   "const": "keyOutline",
+   "kind": "mc",
+   "glyph": "key_1",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "key_outlined",
+    "password_outlined",
+    "vpn_key_outlined"
+   ],
+   "codepoint": 57699
+  },
+  "leaf": {
+   "const": "leaf",
+   "kind": "mc",
+   "glyph": "leaf",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "energy_savings_leaf"
+   ],
+   "codepoint": 59236
+  },
+  "leafOutline": {
+   "const": "leafOutline",
+   "kind": "mc",
+   "glyph": "leaf",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "energy_savings_leaf_outlined"
+   ],
+   "codepoint": 57701
+  },
+  "leftSmall": {
+   "const": "leftSmall",
+   "kind": "mc",
+   "glyph": "left_small",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "chevron_left"
+   ],
+   "codepoint": 59238
+  },
+  "lineHeight": {
+   "const": "lineHeight",
+   "kind": "mc",
+   "glyph": "line_height",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "line_weight"
+   ],
+   "codepoint": 59239
+  },
+  "link": {
+   "const": "link",
+   "kind": "mc",
+   "glyph": "link",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "link"
+   ],
+   "codepoint": 59240
+  },
+  "listCheck2": {
+   "const": "listCheck2",
+   "kind": "mc",
+   "glyph": "list_check_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "checklist"
+   ],
+   "codepoint": 59241
+  },
+  "listCheck3Outline": {
+   "const": "listCheck3Outline",
+   "kind": "mc",
+   "glyph": "list_check_3",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "checklist_outlined"
+   ],
+   "codepoint": 57706
+  },
+  "lockOutline": {
+   "const": "lockOutline",
+   "kind": "mc",
+   "glyph": "lock",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "lock_outline",
+    "sync_lock_outlined"
+   ],
+   "codepoint": 57707
+  },
+  "magic2": {
+   "const": "magic2",
+   "kind": "mc",
+   "glyph": "magic_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "auto_fix_normal"
+   ],
+   "codepoint": 59244
+  },
+  "magic2Outline": {
+   "const": "magic2Outline",
+   "kind": "mc",
+   "glyph": "magic_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "animation_outlined",
+    "auto_fix_normal_outlined"
+   ],
+   "codepoint": 57709
+  },
+  "magic3": {
+   "const": "magic3",
+   "kind": "mc",
+   "glyph": "magic_3",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "auto_fix_high"
+   ],
+   "codepoint": 59246
+  },
+  "magic3Outline": {
+   "const": "magic3Outline",
+   "kind": "mc",
+   "glyph": "magic_3",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "auto_fix_high_outlined"
+   ],
+   "codepoint": 57711
+  },
+  "medalOutline": {
+   "const": "medalOutline",
+   "kind": "mc",
+   "glyph": "medal",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "workspace_premium_outlined"
+   ],
+   "codepoint": 57712
+  },
+  "menu": {
+   "const": "menu",
+   "kind": "mc",
+   "glyph": "menu",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "menu_open",
+    "menu_rounded"
+   ],
+   "codepoint": 59249
+  },
+  "menuOutline": {
+   "const": "menuOutline",
+   "kind": "mc",
+   "glyph": "menu",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "view_stream_outlined"
+   ],
+   "codepoint": 57714
+  },
+  "messageOutline": {
+   "const": "messageOutline",
+   "kind": "mc",
+   "glyph": "message_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "forum_outlined"
+   ],
+   "codepoint": 57715
+  },
+  "mic": {
+   "const": "mic",
+   "kind": "mc",
+   "glyph": "mic",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "mic_external_on"
+   ],
+   "codepoint": 59252
+  },
+  "micOutline": {
+   "const": "micOutline",
+   "kind": "mc",
+   "glyph": "mic",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "mic_external_on_outlined"
+   ],
+   "codepoint": 57717
+  },
+  "monitorOutline": {
+   "const": "monitorOutline",
+   "kind": "mc",
+   "glyph": "monitor",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "desktop_windows_outlined"
+   ],
+   "codepoint": 57720
+  },
+  "moonOutline": {
+   "const": "moonOutline",
+   "kind": "mc",
+   "glyph": "moon",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "dark_mode_outlined"
+   ],
+   "codepoint": 57721
+  },
+  "moonStars": {
+   "const": "moonStars",
+   "kind": "mc",
+   "glyph": "moon_stars",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "nights_stay"
+   ],
+   "codepoint": 59258
+  },
+  "moonStarsOutline": {
+   "const": "moonStarsOutline",
+   "kind": "mc",
+   "glyph": "moon_stars",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "bedtime_outlined"
+   ],
+   "codepoint": 57723
+  },
+  "multiselect": {
+   "const": "multiselect",
+   "kind": "mc",
+   "glyph": "multiselect",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "select_all"
+   ],
+   "codepoint": 59260
+  },
+  "music": {
+   "const": "music",
+   "kind": "mc",
+   "glyph": "music",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "music_note"
+   ],
+   "codepoint": 59261
+  },
+  "musicOutline": {
+   "const": "musicOutline",
+   "kind": "mc",
+   "glyph": "music",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "audiotrack_outlined",
+    "music_note_outlined",
+    "notes_outlined"
+   ],
+   "codepoint": 57728
+  },
+  "music2": {
+   "const": "music2",
+   "kind": "mc",
+   "glyph": "music_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "library_music"
+   ],
+   "codepoint": 59262
+  },
+  "music2Outline": {
+   "const": "music2Outline",
+   "kind": "mc",
+   "glyph": "music_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "library_music_outlined"
+   ],
+   "codepoint": 57727
+  },
+  "newFolderOutline": {
+   "const": "newFolderOutline",
+   "kind": "mc",
+   "glyph": "new_folder",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "create_new_folder_outlined"
+   ],
+   "codepoint": 57729
+  },
+  "paletteOutline": {
+   "const": "paletteOutline",
+   "kind": "mc",
+   "glyph": "palette",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "palette_outlined"
+   ],
+   "codepoint": 57731
+  },
+  "palette2Outline": {
+   "const": "palette2Outline",
+   "kind": "mc",
+   "glyph": "palette_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "color_lens_outlined"
+   ],
+   "codepoint": 57730
+  },
+  "pause": {
+   "const": "pause",
+   "kind": "mc",
+   "glyph": "pause",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "pause",
+    "pause_rounded"
+   ],
+   "codepoint": 59268
+  },
+  "pauseCircle": {
+   "const": "pauseCircle",
+   "kind": "mc",
+   "glyph": "pause_circle",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "pause_circle_filled"
+   ],
+   "codepoint": 59269
+  },
+  "pauseCircleOutline": {
+   "const": "pauseCircleOutline",
+   "kind": "mc",
+   "glyph": "pause_circle",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "pause_circle_outline"
+   ],
+   "codepoint": 57734
+  },
+  "phoneCallOutline": {
+   "const": "phoneCallOutline",
+   "kind": "mc",
+   "glyph": "phone_call",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "call_outlined"
+   ],
+   "codepoint": 57735
+  },
+  "picOutline": {
+   "const": "picOutline",
+   "kind": "mc",
+   "glyph": "pic",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "image_outlined",
+    "wallpaper_outlined"
+   ],
+   "codepoint": 57737
+  },
+  "pic2Outline": {
+   "const": "pic2Outline",
+   "kind": "mc",
+   "glyph": "pic_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "broken_image_outlined"
+   ],
+   "codepoint": 57736
+  },
+  "pin": {
+   "const": "pin",
+   "kind": "mc",
+   "glyph": "pin_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "offline_pin"
+   ],
+   "codepoint": 59274
+  },
+  "pinOutline": {
+   "const": "pinOutline",
+   "kind": "mc",
+   "glyph": "pin_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "offline_pin_outlined"
+   ],
+   "codepoint": 57739
+  },
+  "play": {
+   "const": "play",
+   "kind": "mc",
+   "glyph": "play",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "play_arrow",
+    "play_arrow_rounded"
+   ],
+   "codepoint": 59276
+  },
+  "playCircle": {
+   "const": "playCircle",
+   "kind": "mc",
+   "glyph": "play_circle",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "play_circle_filled"
+   ],
+   "codepoint": 59277
+  },
+  "playCircleOutline": {
+   "const": "playCircleOutline",
+   "kind": "mc",
+   "glyph": "play_circle",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "play_circle_outline"
+   ],
+   "codepoint": 57742
+  },
+  "playlist": {
+   "const": "playlist",
+   "kind": "mc",
+   "glyph": "playlist",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "playlist_play",
+    "queue_music"
+   ],
+   "codepoint": 59279
+  },
+  "playlistOutline": {
+   "const": "playlistOutline",
+   "kind": "mc",
+   "glyph": "playlist",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "queue_music_outlined"
+   ],
+   "codepoint": 57744
+  },
+  "pluginOutline": {
+   "const": "pluginOutline",
+   "kind": "mc",
+   "glyph": "plugin",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "extension_outlined"
+   ],
+   "codepoint": 57745
+  },
+  "powerOutline": {
+   "const": "powerOutline",
+   "kind": "mc",
+   "glyph": "power",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "power_settings_new_outlined"
+   ],
+   "codepoint": 57746
+  },
+  "qrcode": {
+   "const": "qrcode",
+   "kind": "mc",
+   "glyph": "qrcode_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "qr_code_2"
+   ],
+   "codepoint": 59284
+  },
+  "refresh": {
+   "const": "refresh",
+   "kind": "mc",
+   "glyph": "refresh_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "autorenew",
+    "refresh",
+    "sync"
+   ],
+   "codepoint": 59285
+  },
+  "refreshOutline": {
+   "const": "refreshOutline",
+   "kind": "mc",
+   "glyph": "refresh_2",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "refresh_outlined"
+   ],
+   "codepoint": 57751
+  },
+  "refreshAnticlockwise": {
+   "const": "refreshAnticlockwise",
+   "kind": "mc",
+   "glyph": "refresh_anticlockwise_1",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "restart_alt"
+   ],
+   "codepoint": 59286
+  },
+  "repeat": {
+   "const": "repeat",
+   "kind": "mc",
+   "glyph": "repeat",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "repeat"
+   ],
+   "codepoint": 59288
+  },
+  "repeatOne": {
+   "const": "repeatOne",
+   "kind": "mc",
+   "glyph": "repeat_one",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "repeat_one"
+   ],
+   "codepoint": 59289
+  },
+  "rightSmall": {
+   "const": "rightSmall",
+   "kind": "mc",
+   "glyph": "right_small",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "chevron_right"
+   ],
+   "codepoint": 59290
+  },
+  "roundOutline": {
+   "const": "roundOutline",
+   "kind": "mc",
+   "glyph": "round",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "circle_outlined"
+   ],
+   "codepoint": 57755
+  },
+  "safetyCertificateOutline": {
+   "const": "safetyCertificateOutline",
+   "kind": "mc",
+   "glyph": "safety_certificate",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "verified_outlined"
+   ],
+   "codepoint": 57756
+  },
+  "sandglass": {
+   "const": "sandglass",
+   "kind": "mc",
+   "glyph": "sandglass",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "hourglass_top"
+   ],
+   "codepoint": 59293
+  },
+  "search2": {
+   "const": "search2",
+   "kind": "mc",
+   "glyph": "search_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "search"
+   ],
+   "codepoint": 59294
+  },
+  "search2None": {
+   "const": "search2None",
+   "kind": "mc",
+   "glyph": "search_2_none",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "search_off"
+   ],
+   "codepoint": 59295
+  },
+  "search3": {
+   "const": "search3",
+   "kind": "mc",
+   "glyph": "search_3",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "manage_search"
+   ],
+   "codepoint": 59296
+  },
+  "search3Outline": {
+   "const": "search3Outline",
+   "kind": "mc",
+   "glyph": "search_3",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "manage_search_outlined"
+   ],
+   "codepoint": 57761
+  },
+  "sendPlane": {
+   "const": "sendPlane",
+   "kind": "mc",
+   "glyph": "send_plane",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "send"
+   ],
+   "codepoint": 59298
+  },
+  "server": {
+   "const": "server",
+   "kind": "mc",
+   "glyph": "server",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "dns"
+   ],
+   "codepoint": 59299
+  },
+  "serverOutline": {
+   "const": "serverOutline",
+   "kind": "mc",
+   "glyph": "server",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "dns_outlined"
+   ],
+   "codepoint": 57764
+  },
+  "settingsOutline": {
+   "const": "settingsOutline",
+   "kind": "mc",
+   "glyph": "settings_1",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "settings_outlined"
+   ],
+   "codepoint": 57765
+  },
+  "shareForwardOutline": {
+   "const": "shareForwardOutline",
+   "kind": "mc",
+   "glyph": "share_forward",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "mobile_screen_share_outlined"
+   ],
+   "codepoint": 57766
+  },
+  "shieldOutline": {
+   "const": "shieldOutline",
+   "kind": "mc",
+   "glyph": "shield",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "gpp_bad_outlined",
+    "security_outlined",
+    "shield_outlined"
+   ],
+   "codepoint": 57767
+  },
+  "shuffle": {
+   "const": "shuffle",
+   "kind": "mc",
+   "glyph": "shuffle",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "shuffle"
+   ],
+   "codepoint": 59304
+  },
+  "sitemapOutline": {
+   "const": "sitemapOutline",
+   "kind": "mc",
+   "glyph": "sitemap",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "account_tree_outlined"
+   ],
+   "codepoint": 57769
+  },
+  "skipForward": {
+   "const": "skipForward",
+   "kind": "mc",
+   "glyph": "skip_forward",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "skip_next"
+   ],
+   "codepoint": 59306
+  },
+  "skipForwardOutline": {
+   "const": "skipForwardOutline",
+   "kind": "mc",
+   "glyph": "skip_forward",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "skip_next_outlined"
+   ],
+   "codepoint": 57771
+  },
+  "skipPrevious": {
+   "const": "skipPrevious",
+   "kind": "mc",
+   "glyph": "skip_previous",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "skip_previous"
+   ],
+   "codepoint": 59308
+  },
+  "snowflake": {
+   "const": "snowflake",
+   "kind": "mc",
+   "glyph": "snowflake",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "ac_unit"
+   ],
+   "codepoint": 59309
+  },
+  "soundLine": {
+   "const": "soundLine",
+   "kind": "mc",
+   "glyph": "sound_line",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "graphic_eq"
+   ],
+   "codepoint": 59310
+  },
+  "soundLineOutline": {
+   "const": "soundLineOutline",
+   "kind": "mc",
+   "glyph": "sound_line",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "graphic_eq_outlined"
+   ],
+   "codepoint": 57775
+  },
+  "space": {
+   "const": "space",
+   "kind": "mc",
+   "glyph": "space",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "space_bar"
+   ],
+   "codepoint": 59312
+  },
+  "speaker": {
+   "const": "speaker",
+   "kind": "mc",
+   "glyph": "speaker",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "speaker"
+   ],
+   "codepoint": 59313
+  },
+  "speakerOutline": {
+   "const": "speakerOutline",
+   "kind": "mc",
+   "glyph": "speaker",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "speaker_outlined"
+   ],
+   "codepoint": 57778
+  },
+  "square": {
+   "const": "square",
+   "kind": "mc",
+   "glyph": "square",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "crop_square"
+   ],
+   "codepoint": 59315
+  },
+  "star": {
+   "const": "star",
+   "kind": "mc",
+   "glyph": "star",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "star"
+   ],
+   "codepoint": 59316
+  },
+  "starOutline": {
+   "const": "starOutline",
+   "kind": "mc",
+   "glyph": "star",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "star_outline"
+   ],
+   "codepoint": 57781
+  },
+  "stop": {
+   "const": "stop",
+   "kind": "mc",
+   "glyph": "stop",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "stop"
+   ],
+   "codepoint": 59318
+  },
+  "stopwatchOutline": {
+   "const": "stopwatchOutline",
+   "kind": "mc",
+   "glyph": "stopwatch",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "av_timer_outlined"
+   ],
+   "codepoint": 57783
+  },
+  "storageOutline": {
+   "const": "storageOutline",
+   "kind": "mc",
+   "glyph": "storage",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "sd_storage_outlined",
+    "storage_outlined"
+   ],
+   "codepoint": 57784
+  },
+  "storeOutline": {
+   "const": "storeOutline",
+   "kind": "mc",
+   "glyph": "store",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "storefront_outlined"
+   ],
+   "codepoint": 57785
+  },
+  "subtitle": {
+   "const": "subtitle",
+   "kind": "mc",
+   "glyph": "subtitle",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "subtitles"
+   ],
+   "codepoint": 59322
+  },
+  "subtitleOutline": {
+   "const": "subtitleOutline",
+   "kind": "mc",
+   "glyph": "subtitle",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "subtitles_off_outlined",
+    "subtitles_outlined"
+   ],
+   "codepoint": 57787
+  },
+  "sun": {
+   "const": "sun",
+   "kind": "mc",
+   "glyph": "sun",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "wb_sunny"
+   ],
+   "codepoint": 59324
+  },
+  "sunOutline": {
+   "const": "sunOutline",
+   "kind": "mc",
+   "glyph": "sun",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "light_mode_outlined",
+    "wb_sunny_outlined"
+   ],
+   "codepoint": 57789
+  },
+  "thumbUpOutline": {
+   "const": "thumbUpOutline",
+   "kind": "mc",
+   "glyph": "thumb_up",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "thumb_up_alt_outlined"
+   ],
+   "codepoint": 57790
+  },
+  "thunderstorm": {
+   "const": "thunderstorm",
+   "kind": "mc",
+   "glyph": "thunderstorm",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "thunderstorm"
+   ],
+   "codepoint": 59327
+  },
+  "toolOutline": {
+   "const": "toolOutline",
+   "kind": "mc",
+   "glyph": "tool",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "engineering_outlined"
+   ],
+   "codepoint": 57793
+  },
+  "transfer": {
+   "const": "transfer",
+   "kind": "mc",
+   "glyph": "transfer_2",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "transform_rounded"
+   ],
+   "codepoint": 59330
+  },
+  "transferHorizontal": {
+   "const": "transferHorizontal",
+   "kind": "mc",
+   "glyph": "transfer_horizontal",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "swap_horiz"
+   ],
+   "codepoint": 59331
+  },
+  "transferVerticalOutline": {
+   "const": "transferVerticalOutline",
+   "kind": "mc",
+   "glyph": "transfer_vertical",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "compare_arrows_outlined"
+   ],
+   "codepoint": 57796
+  },
+  "translate": {
+   "const": "translate",
+   "kind": "mc",
+   "glyph": "translate",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "translate"
+   ],
+   "codepoint": 59333
+  },
+  "translateOutline": {
+   "const": "translateOutline",
+   "kind": "mc",
+   "glyph": "translate",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "language_outlined",
+    "translate_outlined"
+   ],
+   "codepoint": 57798
+  },
+  "unlink": {
+   "const": "unlink",
+   "kind": "mc",
+   "glyph": "unlink",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "link_off"
+   ],
+   "codepoint": 59335
+  },
+  "unlinkOutline": {
+   "const": "unlinkOutline",
+   "kind": "mc",
+   "glyph": "unlink",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "link_off_outlined"
+   ],
+   "codepoint": 57800
+  },
+  "unlockOutline": {
+   "const": "unlockOutline",
+   "kind": "mc",
+   "glyph": "unlock",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "lock_open_outlined"
+   ],
+   "codepoint": 57801
+  },
+  "upSmall": {
+   "const": "upSmall",
+   "kind": "mc",
+   "glyph": "up_small",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "keyboard_arrow_up"
+   ],
+   "codepoint": 59338
+  },
+  "user": {
+   "const": "user",
+   "kind": "mc",
+   "glyph": "user_1",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "person"
+   ],
+   "codepoint": 59339
+  },
+  "userOutline": {
+   "const": "userOutline",
+   "kind": "mc",
+   "glyph": "user_1",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "account_circle_outlined",
+    "person_outline"
+   ],
+   "codepoint": 57804
+  },
+  "volume": {
+   "const": "volume",
+   "kind": "mc",
+   "glyph": "volume",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "volume_up"
+   ],
+   "codepoint": 59341
+  },
+  "volumeMute": {
+   "const": "volumeMute",
+   "kind": "mc",
+   "glyph": "volume_mute",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "volume_down"
+   ],
+   "codepoint": 59342
+  },
+  "volumeOff": {
+   "const": "volumeOff",
+   "kind": "mc",
+   "glyph": "volume_off",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "volume_off"
+   ],
+   "codepoint": 59343
+  },
+  "volumeOffOutline": {
+   "const": "volumeOffOutline",
+   "kind": "mc",
+   "glyph": "volume_off",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "music_off_outlined"
+   ],
+   "codepoint": 57808
+  },
+  "warning": {
+   "const": "warning",
+   "kind": "mc",
+   "glyph": "warning",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "warning_amber_rounded"
+   ],
+   "codepoint": 59345
+  },
+  "warningOutline": {
+   "const": "warningOutline",
+   "kind": "mc",
+   "glyph": "warning",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "sync_problem_outlined",
+    "warning_amber_outlined"
+   ],
+   "codepoint": 57810
+  },
+  "wastebasketOutline": {
+   "const": "wastebasketOutline",
+   "kind": "mc",
+   "glyph": "wastebasket",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "delete_forever_outlined"
+   ],
+   "codepoint": 57811
+  },
+  "wifi": {
+   "const": "wifi",
+   "kind": "mc",
+   "glyph": "wifi",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "wifi_tethering"
+   ],
+   "codepoint": 59348
+  },
+  "miniplayer": {
+   "const": "miniplayer",
+   "kind": "extra",
+   "glyph": "miniplayer",
+   "style": "filled",
+   "src": "filled",
+   "materials": [
+    "(extra:miniplayer)"
+   ],
+   "codepoint": 59254
+  },
+  "miniplayerOutline": {
+   "const": "miniplayerOutline",
+   "kind": "extra",
+   "glyph": "miniplayer",
+   "style": "regular",
+   "src": "regular",
+   "materials": [
+    "(extra:miniplayer)"
+   ],
+   "codepoint": 57719
+  }
+ },
+ "material": {
+  "abc": "abcOutline",
+  "ac_unit": "snowflake",
+  "account_circle_outlined": "userOutline",
+  "account_tree_outlined": "sitemapOutline",
+  "add": "add",
+  "album_outlined": "albumOutline",
+  "analytics_outlined": "chartVerticalOutline",
+  "animation_outlined": "magic2Outline",
+  "arrow_back": "arrowLeft",
+  "arrow_drop_down": "downSmall",
+  "arrow_right_alt": "arrowRight",
+  "audiotrack_outlined": "musicOutline",
+  "auto_fix_high": "magic3",
+  "auto_fix_high_outlined": "magic3Outline",
+  "auto_fix_normal": "magic2",
+  "auto_fix_normal_outlined": "magic2Outline",
+  "autorenew": "refresh",
+  "av_timer_outlined": "stopwatchOutline",
+  "bar_chart": "chartBar",
+  "bar_chart_outlined": "chartBarOutline",
+  "bedtime_off_outlined": "bedtimeOffOutline",
+  "bedtime_outlined": "moonStarsOutline",
+  "bluetooth_audio": "bluetooth",
+  "blur_circular_outlined": "dotCircleOutline",
+  "blur_on_outlined": "blurOnOutline",
+  "bolt": "flash",
+  "bolt_outlined": "flashOutline",
+  "brightness_auto_outlined": "brightnessOutline",
+  "broken_image_outlined": "pic2Outline",
+  "call_outlined": "phoneCallOutline",
+  "cancel_outlined": "closeCircleOutline",
+  "center_focus_strong_outlined": "aimingOutline",
+  "chat_bubble_outline": "chatOutline",
+  "check": "check",
+  "check_circle": "checkCircle",
+  "check_circle_outline": "checkCircleOutline",
+  "checklist": "listCheck2",
+  "checklist_outlined": "listCheck3Outline",
+  "chevron_left": "leftSmall",
+  "chevron_right": "rightSmall",
+  "circle_outlined": "roundOutline",
+  "cleaning_services_outlined": "broomOutline",
+  "close": "close",
+  "cloud": "cloud",
+  "cloud_off_outlined": "cloudOutline",
+  "cloud_outlined": "cloudOutline",
+  "cloud_queue": "cloud",
+  "color_lens_outlined": "palette2Outline",
+  "colorize": "colorPicker",
+  "compare_arrows_outlined": "transferVerticalOutline",
+  "create_new_folder_outlined": "newFolderOutline",
+  "crop_square": "square",
+  "dark_mode_outlined": "moonOutline",
+  "data_usage_outlined": "chartPieOutline",
+  "delete": "delete",
+  "delete_forever_outlined": "wastebasketOutline",
+  "delete_outline": "deleteOutline",
+  "delete_sweep_outlined": "deleteOutline",
+  "deselect": "deselectOutline",
+  "desktop_windows_outlined": "monitorOutline",
+  "devices_outlined": "deviceOutline",
+  "dns": "server",
+  "dns_outlined": "serverOutline",
+  "download": "download",
+  "download_outlined": "downloadOutline",
+  "downloading": "download",
+  "drag_indicator": "dotsVertical",
+  "drive_file_move_outlined": "fileImportOutline",
+  "edit_outlined": "editOutline",
+  "energy_savings_leaf": "leaf",
+  "energy_savings_leaf_outlined": "leafOutline",
+  "engineering_outlined": "toolOutline",
+  "error": "alert",
+  "error_outline": "alertOutline",
+  "exit_to_app_outlined": "exitOutline",
+  "expand_more": "downSmall",
+  "extension_outlined": "pluginOutline",
+  "favorite": "heart",
+  "favorite_border": "heartOutline",
+  "favorite_outline": "heartOutline",
+  "fingerprint": "fingerprint",
+  "fingerprint_outlined": "fingerprintOutline",
+  "flaky": "asterisk",
+  "flip": "flipHorizontal",
+  "foggy": "fog",
+  "folder_copy_outlined": "foldersOutline",
+  "folder_open": "folderOpen",
+  "folder_open_outlined": "folderOpenOutline",
+  "folder_outlined": "folderOutline",
+  "font_download_outlined": "fontOutline",
+  "format_size": "fontSize",
+  "forum_outlined": "messageOutline",
+  "fullscreen": "fullscreen",
+  "fullscreen_exit": "fullscreenExit",
+  "gpp_bad_outlined": "shieldOutline",
+  "gps_fixed_outlined": "aimingOutline",
+  "grain": "drizzle",
+  "graphic_eq": "soundLine",
+  "graphic_eq_outlined": "soundLineOutline",
+  "headphones_outlined": "headphoneOutline",
+  "healing_outlined": "firstAidKitOutline",
+  "high_quality_outlined": "highQualityOutline",
+  "history": "history",
+  "history_outlined": "historyOutline",
+  "history_toggle_off": "history",
+  "home": "home",
+  "home_outlined": "homeOutline",
+  "hourglass_top": "sandglass",
+  "image_outlined": "picOutline",
+  "info_outline": "informationOutline",
+  "insert_drive_file_outlined": "fileOutline",
+  "key_outlined": "keyOutline",
+  "keyboard_arrow_down": "downSmall",
+  "keyboard_arrow_up": "upSmall",
+  "keyboard_return": "cornerDownLeft",
+  "language_outlined": "translateOutline",
+  "leaderboard_outlined": "chartVerticalOutline",
+  "library_music": "music2",
+  "library_music_outlined": "music2Outline",
+  "light_mode_outlined": "sunOutline",
+  "line_weight": "lineHeight",
+  "link": "link",
+  "link_off": "unlink",
+  "link_off_outlined": "unlinkOutline",
+  "local_fire_department_outlined": "fireOutline",
+  "location_city_outlined": "buildingOutline",
+  "lock_open_outlined": "unlockOutline",
+  "lock_outline": "lockOutline",
+  "login": "entrance",
+  "logout": "exit",
+  "lyrics": "fileMusic",
+  "lyrics_outlined": "fileMusicOutline",
+  "manage_search": "search3",
+  "manage_search_outlined": "search3Outline",
+  "memory_outlined": "chipOutline",
+  "menu_book": "book",
+  "menu_book_outlined": "bookOutline",
+  "menu_open": "menu",
+  "menu_rounded": "menu",
+  "mic_external_on": "mic",
+  "mic_external_on_outlined": "micOutline",
+  "mobile_screen_share_outlined": "shareForwardOutline",
+  "mode_comment_outlined": "commentOutline",
+  "monitor_heart_outlined": "heartbeatOutline",
+  "more_horiz": "dots",
+  "more_vert": "dotsVertical",
+  "multiline_chart": "chartLine",
+  "music_note": "music",
+  "music_note_outlined": "musicOutline",
+  "music_off_outlined": "volumeOffOutline",
+  "my_location": "aiming",
+  "my_location_outlined": "aimingOutline",
+  "nights_stay": "moonStars",
+  "north_west": "cornerUpLeft",
+  "notes_outlined": "musicOutline",
+  "numbers_outlined": "hashtagOutline",
+  "offline_pin": "pin",
+  "offline_pin_outlined": "pinOutline",
+  "opacity": "drop",
+  "palette_outlined": "paletteOutline",
+  "password_outlined": "keyOutline",
+  "pause": "pause",
+  "pause_circle_filled": "pauseCircle",
+  "pause_circle_outline": "pauseCircleOutline",
+  "pause_rounded": "pause",
+  "person": "user",
+  "person_outline": "userOutline",
+  "photo_library_outlined": "album2Outline",
+  "pie_chart_outline": "chartPieOutline",
+  "play_arrow": "play",
+  "play_arrow_rounded": "play",
+  "play_circle_filled": "playCircle",
+  "play_circle_outline": "playCircleOutline",
+  "playlist_play": "playlist",
+  "power_settings_new_outlined": "powerOutline",
+  "public": "earth",
+  "published_with_changes_outlined": "publishedWithChangesOutline",
+  "qr_code_2": "qrcode",
+  "queue_music": "playlist",
+  "queue_music_outlined": "playlistOutline",
+  "radio_button_checked": "dotCircle",
+  "radio_button_off": "circleDash",
+  "refresh": "refresh",
+  "refresh_outlined": "refreshOutline",
+  "repeat": "repeat",
+  "repeat_one": "repeatOne",
+  "restart_alt": "refreshAnticlockwise",
+  "rounded_corner": "borderRadius",
+  "schedule": "clock",
+  "science_outlined": "flaskOutline",
+  "sd_storage_outlined": "storageOutline",
+  "search": "search2",
+  "search_off": "search2None",
+  "security_outlined": "shieldOutline",
+  "select_all": "multiselect",
+  "send": "sendPlane",
+  "settings_outlined": "settingsOutline",
+  "shield_outlined": "shieldOutline",
+  "shuffle": "shuffle",
+  "skip_next": "skipForward",
+  "skip_next_outlined": "skipForwardOutline",
+  "skip_previous": "skipPrevious",
+  "space_bar": "space",
+  "speaker": "speaker",
+  "speaker_outlined": "speakerOutline",
+  "speed": "dashboard3",
+  "speed_outlined": "dashboard4Outline",
+  "star": "star",
+  "star_outline": "starOutline",
+  "stop": "stop",
+  "storage_outlined": "storageOutline",
+  "storefront_outlined": "storeOutline",
+  "subtitles": "subtitle",
+  "subtitles_off_outlined": "subtitleOutline",
+  "subtitles_outlined": "subtitleOutline",
+  "swap_horiz": "transferHorizontal",
+  "sync": "refresh",
+  "sync_lock_outlined": "lockOutline",
+  "sync_problem_outlined": "warningOutline",
+  "text_fields_outlined": "fontSizeOutline",
+  "text_snippet_outlined": "docmentOutline",
+  "thumb_up_alt_outlined": "thumbUpOutline",
+  "thunderstorm": "thunderstorm",
+  "tonality_outlined": "tonalityOutline",
+  "transform_rounded": "transfer",
+  "translate": "translate",
+  "translate_outlined": "translateOutline",
+  "travel_explore": "earth",
+  "tune": "filter",
+  "verified_outlined": "safetyCertificateOutline",
+  "view_column_outlined": "columnsOutline",
+  "view_stream_outlined": "menuOutline",
+  "visibility_off_outlined": "eyeCloseOutline",
+  "visibility_outlined": "eyeOutline",
+  "volume_down": "volumeMute",
+  "volume_off": "volumeOff",
+  "volume_up": "volume",
+  "vpn_key_outlined": "keyOutline",
+  "wallpaper_outlined": "picOutline",
+  "warning_amber_outlined": "warningOutline",
+  "warning_amber_rounded": "warning",
+  "water_drop": "drop",
+  "wb_cloudy": "cloud",
+  "wb_sunny": "sun",
+  "wb_sunny_outlined": "sunOutline",
+  "wifi_tethering": "wifi",
+  "workspace_premium_outlined": "medalOutline",
+  "zoom_out_map_outlined": "fullscreenExit2Outline"
+ },
+ "usage_total": 585
+}
