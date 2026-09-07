@@ -215,6 +215,7 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                     codec, sample_rate, bit_rate, channels, bits_per_sample,
                     file_size, file_mtime, file_ctime, scanned_at, lyrics
                 FROM _scanner_stage_tracks
+                WHERE true
                 ON CONFLICT(id) DO UPDATE SET
                     path = excluded.path,
                     title = excluded.title,
