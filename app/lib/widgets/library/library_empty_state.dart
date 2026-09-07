@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/l10n.dart';
 import '../player/s_controls.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 空库状态：无目录 → 引导添加；有目录未扫描 → 引导扫描。
 class LibraryEmptyState extends StatelessWidget {
@@ -36,7 +37,7 @@ class LibraryEmptyState extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
-              Icons.library_music_outlined,
+              EtaIcons.music2Outline,
               size: 34,
               color: scheme.primary,
             ),
@@ -57,7 +58,7 @@ class LibraryEmptyState extends StatelessWidget {
           const SizedBox(height: 20),
           SButton(
             label: hasDirs ? l10n.libraryScanNow : l10n.libraryAddFolder,
-            icon: hasDirs ? Icons.refresh : Icons.create_new_folder_outlined,
+            icon: hasDirs ? EtaIcons.refresh : EtaIcons.newFolderOutline,
             variant: SButtonVariant.primary,
             loading: scanning,
             onPressed: scanning ? null : onAddFolder,

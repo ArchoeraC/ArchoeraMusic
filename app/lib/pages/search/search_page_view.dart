@@ -54,7 +54,7 @@ extension _SearchPageView on _SearchPageState {
   }) {
     if (_query.isEmpty) {
       return SearchEmptyState(
-        icon: Icons.travel_explore,
+        icon: EtaIcons.earth,
         title: l10n.pageSearchInputHint,
         subtitle: l10n.pageSearchInputSubtitle,
       );
@@ -64,13 +64,13 @@ extension _SearchPageView on _SearchPageState {
     }
     if (_initialLoading) {
       return SearchEmptyState(
-        icon: Icons.hourglass_top,
+        icon: EtaIcons.sandglass,
         title: l10n.pageSearching,
       );
     }
     if (_emptyResult) {
       return SearchEmptyState(
-        icon: Icons.search_off,
+        icon: EtaIcons.search2None,
         title: l10n.pageSearchEmpty,
         subtitle: l10n.pageSearchEmptyHint,
       );
@@ -244,7 +244,7 @@ class _SearchAggFailureBanner extends StatelessWidget {
           children: [
             const Padding(
               padding: EdgeInsets.only(top: 1),
-              child: Icon(Icons.cloud_off_outlined, size: 18),
+              child: Icon(EtaIcons.cloudOutline, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(

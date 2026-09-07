@@ -46,7 +46,7 @@ class _NavHeaderSearchField extends StatelessWidget {
             controller: searchCtrl,
             focusNode: searchFocus,
             hintText: hintText,
-            prefixIcon: Icons.search,
+            prefixIcon: EtaIcons.search2,
             clearable: true,
             textInputAction: TextInputAction.search,
             onChanged: onChanged,
@@ -62,9 +62,9 @@ class _NavHeaderActionsMenu extends ConsumerWidget {
   const _NavHeaderActionsMenu();
 
   IconData _themeIcon(ThemeMode mode) => switch (mode) {
-    ThemeMode.light => Icons.light_mode_outlined,
-    ThemeMode.dark => Icons.dark_mode_outlined,
-    ThemeMode.system => Icons.brightness_auto_outlined,
+    ThemeMode.light => EtaIcons.sunOutline,
+    ThemeMode.dark => EtaIcons.moonOutline,
+    ThemeMode.system => EtaIcons.brightnessOutline,
   };
 
   String _themeLabel(AppLocalizations l10n, ThemeMode mode) => switch (mode) {
@@ -106,7 +106,7 @@ class _NavHeaderActionsMenu extends ConsumerWidget {
           height: 40,
           child: Row(
             children: [
-              const Icon(Icons.settings_outlined, size: 17),
+              const Icon(EtaIcons.settingsOutline, size: 17),
               const SizedBox(width: 10),
               Text(l10n.commonSettings),
             ],
@@ -116,7 +116,7 @@ class _NavHeaderActionsMenu extends ConsumerWidget {
       child: const SizedBox(
         width: 40,
         height: 40,
-        child: Center(child: Icon(Icons.more_vert, size: 20)),
+        child: Center(child: Icon(EtaIcons.dotsVertical, size: 20)),
       ),
     );
   }

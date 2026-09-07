@@ -58,7 +58,7 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       SettingTile(
-                        icon: Icons.music_note_outlined,
+                        icon: EtaIcons.musicOutline,
                         title: l10n.settingsVersion,
                         subtitle: widget.version.isEmpty
                             ? l10n.settingsVersionUnknown
@@ -85,13 +85,13 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
               ),
             ),
             SettingTile(
-              icon: Icons.memory_outlined,
+              icon: EtaIcons.chipOutline,
               title: l10n.settingsAudioEngine,
               subtitle: l10n.settingsAudioEngineDesc,
               trailing: const SizedBox.shrink(),
             ),
             SettingTile(
-              icon: Icons.dns_outlined,
+              icon: EtaIcons.serverOutline,
               title: l10n.settingsSubsonicServer,
               subtitle: l10n.settingsSubsonicDesc,
               trailing: const SizedBox.shrink(),

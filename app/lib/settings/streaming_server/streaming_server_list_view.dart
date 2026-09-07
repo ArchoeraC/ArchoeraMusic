@@ -45,7 +45,7 @@ extension _StreamingServerListView on _StreamingServerListState {
               const SizedBox(width: 12),
               SButton(
                 label: l10n.streamingServerAdd,
-                icon: Icons.add,
+                icon: EtaIcons.add,
                 variant: SButtonVariant.secondary,
                 size: SButtonSize.small,
                 onPressed: () => _showServerForm(context, l10n),
@@ -81,7 +81,7 @@ extension _StreamingServerListView on _StreamingServerListState {
       child: Column(
         children: [
           Icon(
-            Icons.dns_outlined,
+            EtaIcons.serverOutline,
             size: 30,
             color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
           ),
@@ -235,7 +235,7 @@ extension _StreamingServerListView on _StreamingServerListState {
         if (isActive && isConnected)
           SButton(
             label: l10n.streamingServerDisconnect,
-            icon: Icons.link_off,
+            icon: EtaIcons.unlink,
             variant: SButtonVariant.secondary,
             size: SButtonSize.small,
             onPressed: () => _disconnect(notifier, l10n),
@@ -243,7 +243,7 @@ extension _StreamingServerListView on _StreamingServerListState {
         else
           SButton(
             label: l10n.streamingServerConnect,
-            icon: Icons.link,
+            icon: EtaIcons.link,
             variant: SButtonVariant.secondary,
             size: SButtonSize.small,
             loading: _switchingId == cfg.id || connecting,
@@ -255,7 +255,7 @@ extension _StreamingServerListView on _StreamingServerListState {
           children: [
             SButton(
               label: l10n.streamingServerEdit,
-              icon: Icons.edit_outlined,
+              icon: EtaIcons.editOutline,
               variant: SButtonVariant.ghost,
               size: SButtonSize.small,
               onPressed: () => _showServerForm(context, l10n, existing: cfg),
@@ -263,7 +263,7 @@ extension _StreamingServerListView on _StreamingServerListState {
             const SizedBox(width: 6),
             SButton(
               label: l10n.commonDelete,
-              icon: Icons.delete_outline,
+              icon: EtaIcons.deleteOutline,
               variant: SButtonVariant.ghost,
               size: SButtonSize.small,
               onPressed: () => _confirmRemove(context, l10n, cfg, notifier),

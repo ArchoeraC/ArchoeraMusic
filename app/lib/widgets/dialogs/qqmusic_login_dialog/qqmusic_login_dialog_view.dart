@@ -87,7 +87,7 @@ extension _QqMusicLoginDialogView on _QqMusicLoginDialogState {
                                             child: FilledButton.icon(
                                               onPressed: _createQr,
                                               icon: const Icon(
-                                                Icons.refresh,
+                                                EtaIcons.refresh,
                                                 size: 18,
                                               ),
                                               label: Text(l10n.loginRefreshQr),
@@ -106,7 +106,7 @@ extension _QqMusicLoginDialogView on _QqMusicLoginDialogState {
                                                   BorderRadius.circular(12),
                                             ),
                                             child: const Icon(
-                                              Icons.check_circle,
+                                              EtaIcons.checkCircle,
                                               size: 48,
                                               color: Colors.white,
                                             ),
@@ -148,7 +148,7 @@ extension _QqMusicLoginDialogView on _QqMusicLoginDialogState {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.error_outline, size: 48, color: scheme.error),
+        Icon(EtaIcons.alertOutline, size: 48, color: scheme.error),
         const SizedBox(height: 12),
         Text(
           _error,
@@ -160,7 +160,7 @@ extension _QqMusicLoginDialogView on _QqMusicLoginDialogState {
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: _createQr,
-          icon: const Icon(Icons.refresh, size: 18),
+          icon: const Icon(EtaIcons.refresh, size: 18),
           label: Text(l10n.commonRetry),
         ),
       ],

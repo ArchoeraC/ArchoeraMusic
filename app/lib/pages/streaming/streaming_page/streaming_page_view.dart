@@ -53,7 +53,7 @@ extension _StreamingPageView on _StreamingPageState {
                 const SizedBox(width: 8),
                 SButton(
                   label: '',
-                  icon: Icons.refresh,
+                  icon: EtaIcons.refresh,
                   variant: SButtonVariant.secondary,
                   size: SButtonSize.medium,
                   circle: true,
@@ -65,7 +65,7 @@ extension _StreamingPageView on _StreamingPageState {
                 const SizedBox(width: 8),
                 SButton(
                   label: '',
-                  icon: Icons.settings_outlined,
+                  icon: EtaIcons.settingsOutline,
                   variant: SButtonVariant.secondary,
                   size: SButtonSize.medium,
                   circle: true,
@@ -107,7 +107,7 @@ extension _StreamingPageView on _StreamingPageState {
     // 未配置任何服务器
     if (state.servers.isEmpty) {
       return StreamingEmptyState(
-        icon: Icons.dns_outlined,
+        icon: EtaIcons.serverOutline,
         title: l10n.streamingEmptyNoServer,
         subtitle: l10n.streamingEmptyAddHint,
         buttonLabel: l10n.streamingEmptyGoToSettings,
@@ -117,7 +117,7 @@ extension _StreamingPageView on _StreamingPageState {
     // 已配置但未连接
     if (!state.connected) {
       return StreamingEmptyState(
-        icon: Icons.link_off,
+        icon: EtaIcons.unlink,
         title: l10n.streamingEmptyNotConnected,
         subtitle:
             state.connectionError ??

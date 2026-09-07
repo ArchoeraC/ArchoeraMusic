@@ -56,14 +56,14 @@ extension _HistoryPageView on _HistoryPageState {
                 if (hasHistory) ...[
                   SButton(
                     label: l10n.commonPlayAll,
-                    icon: Icons.play_arrow,
+                    icon: EtaIcons.play,
                     variant: SButtonVariant.primary,
                     onPressed: _playAll,
                   ),
                   const SizedBox(width: 10),
                   SButton(
                     label: l10n.commonClear,
-                    icon: Icons.delete_outline,
+                    icon: EtaIcons.deleteOutline,
                     variant: SButtonVariant.secondary,
                     onPressed: _confirmClear,
                   ),
@@ -89,7 +89,7 @@ extension _HistoryPageView on _HistoryPageState {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.history,
+                          EtaIcons.history,
                           size: 48,
                           color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
                         ),

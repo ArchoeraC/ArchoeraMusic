@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import '../player/s_controls.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 首页每日推荐横幅（渐变背景 + 大按钮）。
 class HomeDailyHero extends StatelessWidget {
@@ -55,7 +56,7 @@ class HomeDailyHero extends StatelessWidget {
             right: 28,
             top: 8,
             child: Icon(
-              Icons.music_note,
+              EtaIcons.music,
               size: 96,
               color: scheme.primary.withValues(alpha: 0.08),
             ),
@@ -83,8 +84,8 @@ class HomeDailyHero extends StatelessWidget {
                 SButton(
                   label: loggedIn ? playLabel : loginLabel,
                   icon: loggedIn
-                      ? Icons.play_arrow_rounded
-                      : Icons.login,
+                      ? EtaIcons.play
+                      : EtaIcons.entrance,
                   variant: SButtonVariant.primary,
                   onPressed: onPlay,
                 ),

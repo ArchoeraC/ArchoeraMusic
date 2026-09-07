@@ -26,6 +26,7 @@ import '../../widgets/streaming/server_dropdown.dart';
 import '../../widgets/streaming/songs_tab.dart';
 import '../../widgets/streaming/status_dot.dart';
 import '../../services/streaming/streaming_provider.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'streaming_page/streaming_page_actions.dart';
 part 'streaming_page/streaming_page_view.dart';

@@ -14,6 +14,7 @@ import '../widgets/dialogs/kugou_login_button.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/streaming/empty_state.dart';
 import '../widgets/dialogs/track_list_dialog.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'favorites/favorites_page_actions.dart';
 part 'favorites/favorites_page_view.dart';

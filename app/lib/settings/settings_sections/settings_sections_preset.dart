@@ -29,8 +29,8 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
           children: [
             SettingSwitchTile(
               icon: prefs.energySavingMode
-                  ? Icons.energy_savings_leaf
-                  : Icons.energy_savings_leaf_outlined,
+                  ? EtaIcons.leaf
+                  : EtaIcons.leafOutline,
               title: l10n.settingsEnergySaving,
               subtitle: prefs.energySavingMode
                   ? l10n.settingsEnergySavingOn
@@ -45,7 +45,7 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
           title: l10n.settingsPerformanceMode,
           children: [
             SettingSwitchTile(
-              icon: prefs.performanceMode ? Icons.bolt : Icons.bolt_outlined,
+              icon: prefs.performanceMode ? EtaIcons.flash : EtaIcons.flashOutline,
               title: l10n.settingsPerformanceMode,
               subtitle: prefs.performanceMode
                   ? l10n.settingsPerformanceModeOn
@@ -61,8 +61,8 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
           children: [
             SettingSwitchTile(
               icon: prefs.fuckDjMode
-                  ? Icons.auto_fix_high
-                  : Icons.auto_fix_high_outlined,
+                  ? EtaIcons.magic3
+                  : EtaIcons.magic3Outline,
               title: l10n.settingsDjMode,
               subtitle: prefs.fuckDjMode
                   ? l10n.settingsDjModeOn
@@ -78,8 +78,8 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
           children: [
             SettingSwitchTile(
               icon: prefs.uncensorProfanity
-                  ? Icons.auto_fix_normal
-                  : Icons.auto_fix_normal_outlined,
+                  ? EtaIcons.magic2
+                  : EtaIcons.magic2Outline,
               title: l10n.settingsUncensor,
               subtitle: prefs.uncensorProfanity
                   ? l10n.settingsUncensorOn
@@ -94,7 +94,7 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
           title: l10n.settingsSectionListDisplay,
           children: [
             SettingSwitchTile(
-              icon: Icons.workspace_premium_outlined,
+              icon: EtaIcons.medalOutline,
               title: l10n.settingsHideVip,
               subtitle: prefs.hideVipTag
                   ? l10n.settingsHideVipOn
@@ -103,7 +103,7 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
               onChanged: (v) => notifier.setPreset(hideVipTag: v),
             ),
             SettingSwitchTile(
-              icon: Icons.high_quality_outlined,
+              icon: EtaIcons.highQualityOutline,
               title: l10n.settingsHideQuality,
               subtitle: prefs.hideQualityTag
                   ? l10n.settingsHideQualityOn
@@ -113,8 +113,8 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
             ),
             SettingSwitchTile(
               icon: prefs.showSubtitle
-                  ? Icons.subtitles
-                  : Icons.subtitles_off_outlined,
+                  ? EtaIcons.subtitle
+                  : EtaIcons.subtitleOutline,
               title: l10n.settingsShowSubtitle,
               subtitle: prefs.showSubtitle
                   ? l10n.settingsShowSubtitleOn

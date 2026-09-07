@@ -65,7 +65,7 @@ extension _CommentDialogView on _CommentDialogState {
     if (_songId == null) {
       if (_failed) {
         return _EmptyHint(
-          icon: Icons.cloud_off_outlined,
+          icon: EtaIcons.cloudOutline,
           text: l10n.commentNotFound(
             _isKugou ? l10n.brandKugou : l10n.brandNetease,
           ),
@@ -76,7 +76,7 @@ extension _CommentDialogView on _CommentDialogState {
     if (list.isEmpty) {
       return _loading
           ? const _CommentSpinner()
-          : _EmptyHint(icon: Icons.forum_outlined, text: l10n.commentEmpty);
+          : _EmptyHint(icon: EtaIcons.messageOutline, text: l10n.commentEmpty);
     }
     return ListView.separated(
       controller: _scroll,
@@ -147,7 +147,7 @@ class _CommentDialogHeader extends StatelessWidget {
           ),
           IconButton(
             tooltip: l10n.commonClose,
-            icon: const Icon(Icons.close, size: 20),
+            icon: const Icon(EtaIcons.close, size: 20),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -217,7 +217,7 @@ class _CommentInputBar extends StatelessWidget {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.send, size: 18),
+                : const Icon(EtaIcons.sendPlane, size: 18),
           ),
         ],
       ),
@@ -298,7 +298,7 @@ class _CommentTile extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.thumb_up_alt_outlined,
+                            EtaIcons.thumbUpOutline,
                             size: 13,
                             color: scheme.onSurfaceVariant,
                           ),

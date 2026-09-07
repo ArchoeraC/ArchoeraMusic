@@ -137,7 +137,7 @@ class _SearchDropdown extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(12, 10, 4, 2),
           child: Row(
             children: [
-              Icon(Icons.history, size: 15, color: scheme.onSurfaceVariant),
+              Icon(EtaIcons.history, size: 15, color: scheme.onSurfaceVariant),
               const SizedBox(width: 6),
               Text(
                 l10n.searchHistory,
@@ -189,7 +189,7 @@ class _SearchDropdown extends ConsumerWidget {
       children.add(
         _sectionTitle(
           context,
-          Icons.local_fire_department_outlined,
+          EtaIcons.fireOutline,
           l10n.searchHot,
           bottom: 10,
         ),
@@ -208,7 +208,7 @@ class _SearchDropdown extends ConsumerWidget {
       children.add(
         _sectionTitle(
           context,
-          Icons.local_fire_department_outlined,
+          EtaIcons.fireOutline,
           l10n.searchHot,
           bottom: 2,
         ),
@@ -224,7 +224,7 @@ class _SearchDropdown extends ConsumerWidget {
       children.add(
         _sectionTitle(
           context,
-          Icons.local_fire_department_outlined,
+          EtaIcons.fireOutline,
           kugouHotTitle,
           bottom: 10,
         ),
@@ -243,7 +243,7 @@ class _SearchDropdown extends ConsumerWidget {
       children.add(
         _sectionTitle(
           context,
-          Icons.local_fire_department_outlined,
+          EtaIcons.fireOutline,
           kugouHotTitle,
           bottom: 2,
         ),
@@ -260,7 +260,7 @@ class _SearchDropdown extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           child: Row(
             children: [
-              Icon(Icons.history, size: 15, color: scheme.onSurfaceVariant),
+              Icon(EtaIcons.history, size: 15, color: scheme.onSurfaceVariant),
               const SizedBox(width: 6),
               Text(
                 l10n.searchHistoryEmpty,
@@ -335,7 +335,7 @@ class _SearchDropdown extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              Icon(Icons.search, size: 16, color: scheme.primary),
+              Icon(EtaIcons.search2, size: 16, color: scheme.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -345,7 +345,7 @@ class _SearchDropdown extends ConsumerWidget {
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
-              Icon(Icons.north_west, size: 14, color: scheme.onSurfaceVariant),
+              Icon(EtaIcons.cornerUpLeft, size: 14, color: scheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -378,7 +378,7 @@ class _SearchDropdown extends ConsumerWidget {
     } else {
       if (suggest.songs.isNotEmpty) {
         children.add(
-          _sectionTitle(context, Icons.music_note_outlined, l10n.commonSongs),
+          _sectionTitle(context, EtaIcons.musicOutline, l10n.commonSongs),
         );
         for (final song in suggest.songs) {
           children.add(_suggestSongRow(scheme, song));
@@ -386,31 +386,31 @@ class _SearchDropdown extends ConsumerWidget {
       }
       if (suggest.artists.isNotEmpty) {
         children.add(
-          _sectionTitle(context, Icons.person_outline, l10n.commonArtists),
+          _sectionTitle(context, EtaIcons.userOutline, l10n.commonArtists),
         );
         for (final artist in suggest.artists) {
-          children.add(_suggestSimpleRow(scheme, artist, Icons.person_outline));
+          children.add(_suggestSimpleRow(scheme, artist, EtaIcons.userOutline));
         }
       }
       if (suggest.albums.isNotEmpty) {
         children.add(
-          _sectionTitle(context, Icons.album_outlined, l10n.commonAlbums),
+          _sectionTitle(context, EtaIcons.albumOutline, l10n.commonAlbums),
         );
         for (final album in suggest.albums) {
-          children.add(_suggestSimpleRow(scheme, album, Icons.album_outlined));
+          children.add(_suggestSimpleRow(scheme, album, EtaIcons.albumOutline));
         }
       }
       if (suggest.playlists.isNotEmpty) {
         children.add(
           _sectionTitle(
             context,
-            Icons.queue_music_outlined,
+            EtaIcons.playlistOutline,
             l10n.commonPlaylists,
           ),
         );
         for (final playlist in suggest.playlists) {
           children.add(
-            _suggestSimpleRow(scheme, playlist, Icons.queue_music_outlined),
+            _suggestSimpleRow(scheme, playlist, EtaIcons.playlistOutline),
           );
         }
       }
@@ -473,7 +473,7 @@ class _SearchDropdown extends ConsumerWidget {
         child: Row(
           children: [
             Icon(
-              Icons.music_note,
+              EtaIcons.music,
               size: 14,
               color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
@@ -525,9 +525,9 @@ class _SearchDropdown extends ConsumerWidget {
     return InkWell(
       onTap: () {
         switch (icon) {
-          case Icons.person_outline:
+          case EtaIcons.userOutline:
             onPickArtist(item);
-          case Icons.album_outlined:
+          case EtaIcons.albumOutline:
             onPickAlbum(item);
           default:
             onPickPlaylist(item);
@@ -647,7 +647,7 @@ class _HistoryChip extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
               child: Icon(
-                Icons.close,
+                EtaIcons.close,
                 size: 12,
                 color: scheme.onSurfaceVariant,
               ),

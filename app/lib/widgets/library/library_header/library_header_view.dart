@@ -42,7 +42,7 @@ extension _LibraryHeaderView on LibraryHeader {
             children: [
               SButton(
                 label: l10n.commonPlayAll,
-                icon: Icons.play_arrow_rounded,
+                icon: EtaIcons.play,
                 variant: SButtonVariant.primary,
                 onPressed: tracks.isEmpty
                     ? null
@@ -63,7 +63,7 @@ extension _LibraryHeaderView on LibraryHeader {
                   child: SButton(
                     label: '',
                     circle: true,
-                    icon: Icons.refresh,
+                    icon: EtaIcons.refresh,
                     variant: SButtonVariant.secondary,
                     onPressed: state.scanning
                         ? notifier.cancelScan
@@ -82,7 +82,7 @@ extension _LibraryHeaderView on LibraryHeader {
                 child: SButton(
                   label: '',
                   circle: true,
-                  icon: scrape.scraping ? Icons.stop : Icons.auto_fix_high,
+                  icon: scrape.scraping ? EtaIcons.stop : EtaIcons.magic3,
                   variant: scrape.scraping
                       ? SButtonVariant.error
                       : SButtonVariant.secondary,
@@ -95,7 +95,7 @@ extension _LibraryHeaderView on LibraryHeader {
               SInput(
                 width: 190,
                 hintText: l10n.librarySearchHint,
-                prefixIcon: Icons.search,
+                prefixIcon: EtaIcons.search2,
                 clearable: true,
                 onChanged: (q) => notifier.setSearchQuery(q),
               ),
@@ -192,7 +192,7 @@ extension _LibraryHeaderView on LibraryHeader {
           enabled: !state.scanning && state.scanDirs.isNotEmpty,
           child: Row(
             children: [
-              const Icon(Icons.manage_search, size: 17),
+              const Icon(EtaIcons.search3, size: 17),
               const SizedBox(width: 10),
               Text(l10n.libraryFullScan),
             ],
@@ -203,7 +203,7 @@ extension _LibraryHeaderView on LibraryHeader {
           height: 40,
           child: Row(
             children: [
-              const Icon(Icons.folder_outlined, size: 17),
+              const Icon(EtaIcons.folderOutline, size: 17),
               const SizedBox(width: 10),
               Text(l10n.libraryScanDirs),
             ],
@@ -214,7 +214,7 @@ extension _LibraryHeaderView on LibraryHeader {
           height: 40,
           child: Row(
             children: [
-              const Icon(Icons.pie_chart_outline, size: 17),
+              const Icon(EtaIcons.chartPieOutline, size: 17),
               const SizedBox(width: 10),
               Text(l10n.libraryMediaStats),
             ],
@@ -224,7 +224,7 @@ extension _LibraryHeaderView on LibraryHeader {
       child: const SizedBox(
         width: 36,
         height: 36,
-        child: Center(child: Icon(Icons.more_horiz, size: 20)),
+        child: Center(child: Icon(EtaIcons.dots, size: 20)),
       ),
     );
   }

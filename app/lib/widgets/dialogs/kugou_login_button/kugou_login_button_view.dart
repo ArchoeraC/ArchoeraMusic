@@ -42,7 +42,7 @@ extension _KugouLoginButtonView on _KugouLoginButtonState {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  session == null ? Icons.person_outline : Icons.person,
+                  session == null ? EtaIcons.userOutline : EtaIcons.user,
                   size: 20,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -164,7 +164,7 @@ extension _KgQrLoginDialogView on _KgQrLoginDialogState {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.error_outline, size: 48, color: scheme.error),
+        Icon(EtaIcons.alertOutline, size: 48, color: scheme.error),
         const SizedBox(height: 12),
         Text(
           _error,
@@ -177,7 +177,7 @@ extension _KgQrLoginDialogView on _KgQrLoginDialogState {
         const SizedBox(height: 16),
         FilledButton.tonalIcon(
           onPressed: _initQr,
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(EtaIcons.refresh),
           label: Text(l10n.loginRegenerate),
         ),
       ],

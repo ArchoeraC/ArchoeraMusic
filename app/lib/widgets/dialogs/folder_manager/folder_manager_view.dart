@@ -46,14 +46,14 @@ extension _FolderManagerView on _FolderManagerState {
             const SizedBox(width: 8),
             SButton(
               label: l10n.folderBrowse,
-              icon: Icons.folder_open,
+              icon: EtaIcons.folderOpen,
               variant: SButtonVariant.secondary,
               onPressed: _pickDirectory,
             ),
             const SizedBox(width: 8),
             SButton(
               label: l10n.folderAdd,
-              icon: Icons.add,
+              icon: EtaIcons.add,
               variant: SButtonVariant.primary,
               onPressed: _addManual,
             ),
@@ -74,7 +74,7 @@ extension _FolderManagerView on _FolderManagerState {
       ),
       child: Row(
         children: [
-          Icon(Icons.folder_outlined, size: 17, color: scheme.onSurfaceVariant),
+          Icon(EtaIcons.folderOutline, size: 17, color: scheme.onSurfaceVariant),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -102,7 +102,7 @@ extension _FolderManagerView on _FolderManagerState {
             tooltip: l10n.folderRemove,
             iconSize: 16,
             onPressed: () => _confirmRemove(dir),
-            icon: Icon(Icons.delete_outline, color: scheme.onSurfaceVariant),
+            icon: Icon(EtaIcons.deleteOutline, color: scheme.onSurfaceVariant),
           ),
         ],
       ),

@@ -25,12 +25,12 @@ void showTrackContextMenu(
     items: [
       SContextMenuItem(
         label: l10n.menuPlay,
-        icon: Icons.play_arrow,
+        icon: EtaIcons.play,
         onTap: onPlay,
       ),
       SContextMenuItem(
         label: l10n.menuPlayNext,
-        icon: Icons.skip_next_outlined,
+        icon: EtaIcons.skipForwardOutline,
         onTap: () {
           ref.read(playbackProvider.notifier).insertToQueue(track);
           toast(l10n.toastAddedToQueue);
@@ -40,18 +40,18 @@ void showTrackContextMenu(
         SContextMenuItem.divider(),
         SContextMenuItem(
           label: liked ? l10n.menuUnlike : l10n.menuLike,
-          icon: liked ? Icons.favorite : Icons.favorite_outline,
+          icon: liked ? EtaIcons.heart : EtaIcons.heartOutline,
           onTap: () => toggle(track),
         ),
         SContextMenuItem(
           label: l10n.menuComment,
-          icon: Icons.chat_bubble_outline,
+          icon: EtaIcons.chatOutline,
           onTap: () => showCommentDialog(context, track: track),
         ),
         if (ref.read(appPrefsProvider).developerMode)
           SContextMenuItem(
             label: l10n.menuDownload,
-            icon: Icons.download_outlined,
+            icon: EtaIcons.downloadOutline,
             onTap: () => _startDownload(context, ref, track),
           ),
         SContextMenuItem.divider(),
@@ -60,7 +60,7 @@ void showTrackContextMenu(
             track.artists.first.id != null)
           SContextMenuItem(
             label: l10n.menuViewArtist,
-            icon: Icons.person_outline,
+            icon: EtaIcons.userOutline,
             onTap: () {
               final artist = track.artists.first;
               showNeteaseArtistDialog(
@@ -75,7 +75,7 @@ void showTrackContextMenu(
           ),
         SContextMenuItem(
           label: l10n.menuTrackDetail,
-          icon: Icons.info_outline,
+          icon: EtaIcons.informationOutline,
           onTap: () => showTrackDetailDialog(context, track: track),
         ),
       ],

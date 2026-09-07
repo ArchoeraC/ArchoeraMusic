@@ -19,6 +19,7 @@ import '../widgets/dialogs/track_list_dialog.dart';
 import '../widgets/home/action_card.dart';
 import '../widgets/home/daily_hero.dart';
 import '../widgets/home/section_title.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'home/home_page_actions.dart';
 part 'home/home_page_view.dart';

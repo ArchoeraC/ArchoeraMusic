@@ -16,6 +16,7 @@ import '../../l10n/l10n.dart';
 import '../../app/app_quit.dart';
 import '../../app/router.dart';
 import '../dialogs/s_dialog.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'tray_integration/tray_integration_logic.dart';
 

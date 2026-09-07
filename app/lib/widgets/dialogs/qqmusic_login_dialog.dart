@@ -21,6 +21,7 @@ import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/toast.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'qqmusic_login_dialog/qqmusic_login_dialog_view.dart';
 

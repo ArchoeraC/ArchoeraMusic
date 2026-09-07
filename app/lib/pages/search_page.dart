@@ -26,6 +26,7 @@ import '../widgets/dialogs/track_list_dialog.dart';
 import '../widgets/search/search_empty_state.dart';
 import '../widgets/search/search_error_state.dart';
 import '../widgets/search/search_source_state.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'search/search_page_actions.dart';
 part 'search/search_page_fetch.dart';

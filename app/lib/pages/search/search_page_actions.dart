@@ -177,7 +177,7 @@ extension _SearchPageActions on _SearchPageState {
       extra: [
         SContextMenuItem(
           label: context.l10n.menuViewArtist,
-          icon: Icons.person_outline,
+          icon: EtaIcons.userOutline,
           onTap: () => _toast(context.l10n.pageSearchArtistComingSoon),
         ),
       ],

@@ -180,7 +180,7 @@ class CoverCard extends StatelessWidget {
     final placeholder = Container(
       color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
       child: Icon(
-        artist ? Icons.person : Icons.music_note,
+        artist ? EtaIcons.user : EtaIcons.music,
         size: 40,
         color: theme.colorScheme.primary,
       ),
@@ -284,7 +284,7 @@ class CoverCard extends StatelessWidget {
             Positioned.fill(
               child: _HoverOverlay(
                 visible: artist,
-                icon: artist ? Icons.person : Icons.play_arrow_rounded,
+                icon: artist ? EtaIcons.user : EtaIcons.play,
                 color: theme.colorScheme.primary,
                 childColor: Colors.white,
                 onPlay: artist ? null : onPlay,

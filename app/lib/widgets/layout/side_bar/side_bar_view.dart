@@ -160,7 +160,7 @@ extension _SideBarView on _SideBarState {
                   .read(appPrefsProvider.notifier)
                   .setSidebar(collapsed: !collapsed),
               icon: Icon(
-                collapsed ? Icons.menu_open : Icons.menu_rounded,
+                collapsed ? EtaIcons.menu : EtaIcons.menu,
                 size: 20,
                 color: colorScheme.onSurfaceVariant,
               ),

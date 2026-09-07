@@ -19,7 +19,7 @@ extension _VaultUnlockGateView on _VaultUnlockGateState {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.lock_outline, size: 56, color: scheme.primary),
+                Icon(EtaIcons.lockOutline, size: 56, color: scheme.primary),
                 const SizedBox(height: 20),
                 Text(
                   l10n.vaultUnlockTitle,
@@ -48,7 +48,7 @@ extension _VaultUnlockGateView on _VaultUnlockGateState {
                   style: const TextStyle(fontSize: 14),
                   decoration: InputDecoration(
                     hintText: l10n.vaultUnlockHint,
-                    prefixIcon: const Icon(Icons.password_outlined),
+                    prefixIcon: const Icon(EtaIcons.keyOutline),
                     isDense: true,
                     errorText: _error,
                     border: OutlineInputBorder(
@@ -60,8 +60,8 @@ extension _VaultUnlockGateView on _VaultUnlockGateState {
                       onPressed: _toggleObscure,
                       icon: Icon(
                         _obscure
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
+                            ? EtaIcons.eyeCloseOutline
+                            : EtaIcons.eyeOutline,
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
@@ -76,7 +76,7 @@ extension _VaultUnlockGateView on _VaultUnlockGateState {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.lock_open_outlined, size: 18),
+                      : const Icon(EtaIcons.unlockOutline, size: 18),
                   label: Text(l10n.vaultUnlockConfirm),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),

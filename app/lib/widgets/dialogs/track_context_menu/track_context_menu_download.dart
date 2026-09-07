@@ -116,7 +116,7 @@ Future<bool> _showLoginPrompt(BuildContext context, String platform) async {
                   Row(
                     children: [
                       Icon(
-                        Icons.lock_outline,
+                        EtaIcons.lockOutline,
                         size: 20,
                         color: scheme.onSurfaceVariant,
                       ),
@@ -189,8 +189,8 @@ Future<String?> _pickDownloadQuality(
             dense: true,
             leading: Icon(
               l == 'hi-res' || l == 'lossless'
-                  ? Icons.high_quality_outlined
-                  : Icons.music_note_outlined,
+                  ? EtaIcons.highQualityOutline
+                  : EtaIcons.musicOutline,
               size: 18,
               color: scheme.onSurfaceVariant,
             ),

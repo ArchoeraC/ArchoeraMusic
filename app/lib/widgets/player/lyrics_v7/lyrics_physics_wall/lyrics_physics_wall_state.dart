@@ -263,7 +263,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     if (groups.isEmpty) {
       return Center(
         child: Icon(
-          Icons.lyrics_outlined,
+          EtaIcons.fileMusicOutline,
           size: 64,
           color: Theme.of(
             context,

@@ -253,7 +253,7 @@ class _LikeButton extends StatelessWidget {
             transitionBuilder: (child, animation) =>
                 ScaleTransition(scale: animation, child: child),
             child: Icon(
-              liked ? Icons.favorite : Icons.favorite_border,
+              liked ? EtaIcons.heart : EtaIcons.heartOutline,
               key: ValueKey(liked),
               size: 17,
               color: liked
@@ -290,7 +290,7 @@ class _IndexCell extends StatelessWidget {
     final Widget base;
     if (isPlaying) {
       base = Icon(
-        playingNow ? Icons.graphic_eq : Icons.music_note,
+        playingNow ? EtaIcons.soundLine : EtaIcons.music,
         size: 18,
         color: primary,
       );
@@ -320,7 +320,7 @@ class _IndexCell extends StatelessWidget {
           duration: animDuration(context, const Duration(milliseconds: 150)),
           opacity: hover ? 1 : 0,
           child: Icon(
-            isPlaying && playingNow ? Icons.pause : Icons.play_arrow,
+            isPlaying && playingNow ? EtaIcons.pause : EtaIcons.play,
             size: 18,
             color: primary,
           ),
@@ -370,7 +370,7 @@ class _SelectCell extends StatelessWidget {
               ),
             ),
             child: selected
-                ? Icon(Icons.check, size: 12, color: scheme.onPrimary)
+                ? Icon(EtaIcons.check, size: 12, color: scheme.onPrimary)
                 : null,
           ),
         ),

@@ -26,7 +26,7 @@ class _StorageSectionState extends ConsumerState<StorageSection> {
           title: l10n.settingsSectionFileLocation,
           children: [
             SettingTile(
-              icon: Icons.folder_outlined,
+              icon: EtaIcons.folderOutline,
               title: l10n.settingsDataDir,
               subtitle: dataDir,
               trailing: SettingCopyButton(
@@ -35,7 +35,7 @@ class _StorageSectionState extends ConsumerState<StorageSection> {
               ),
             ),
             SettingTile(
-              icon: Icons.album_outlined,
+              icon: EtaIcons.albumOutline,
               title: l10n.settingsLibraryDb,
               subtitle: '$dataDir/database/library.db',
               trailing: SettingCopyButton(
@@ -44,7 +44,7 @@ class _StorageSectionState extends ConsumerState<StorageSection> {
               ),
             ),
             SettingTile(
-              icon: Icons.key_outlined,
+              icon: EtaIcons.keyOutline,
               title: l10n.settingsUserDb,
               subtitle: '$dataDir/database/user.db',
               trailing: SettingCopyButton(
@@ -53,7 +53,7 @@ class _StorageSectionState extends ConsumerState<StorageSection> {
               ),
             ),
             SettingTile(
-              icon: Icons.history,
+              icon: EtaIcons.history,
               title: l10n.settingsHistoryDb,
               subtitle: '$dataDir/database/history.db',
               trailing: SettingCopyButton(

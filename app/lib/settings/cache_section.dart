@@ -17,6 +17,7 @@ import '../../widgets/common/toast.dart';
 import '../../widgets/dialogs/s_dialog.dart';
 import '../../widgets/player/s_controls.dart';
 import 'settings_widgets.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 存储分类下的缓存管理面板（对齐 SPlayer-Next 缓存管理：按介质分组、
 /// 逐项清除 + 一键清空，破坏性操作均二次确认）。
@@ -188,7 +189,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
         visualDensity: VisualDensity.compact,
         onPressed: enabled ? onClear : null,
         icon: Icon(
-          Icons.delete_outline,
+          EtaIcons.deleteOutline,
           color: enabled
               ? scheme.error
               : scheme.onSurface.withValues(alpha: 0.25),
@@ -213,8 +214,8 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
           children: [
             SettingSwitchTile(
               icon: prefs.songCacheEnabled
-                  ? Icons.offline_pin
-                  : Icons.offline_pin_outlined,
+                  ? EtaIcons.pin
+                  : EtaIcons.pinOutline,
               title: l10n.settingsSongCache,
               subtitle: prefs.songCacheEnabled
                   ? l10n.settingsSongCacheOn
@@ -224,7 +225,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
             ),
             if (prefs.songCacheEnabled)
               SettingSliderTile(
-                icon: Icons.storage_outlined,
+                icon: EtaIcons.storageOutline,
                 title: l10n.settingsSongCacheLimitTitle,
                 subtitle:
                     '${prefs.songCacheLimitMiB} MiB · ${_formatBytes(prefs.songCacheLimitMiB * 1024 * 1024)}',
@@ -239,7 +240,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               ),
             _cacheRow(
               context,
-              icon: Icons.audiotrack_outlined,
+              icon: EtaIcons.musicOutline,
               title: l10n.settingsSongCache,
               info:
                   '${_formatBytes(_songBytes)} · ${l10n.settingsCacheSongs(_songFiles)}',
@@ -268,7 +269,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
                 children: [
                   SButton(
                     label: l10n.settingsCacheRefresh,
-                    icon: Icons.refresh,
+                    icon: EtaIcons.refresh,
                     variant: SButtonVariant.ghost,
                     size: SButtonSize.small,
                     onPressed: _refresh,
@@ -276,7 +277,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
                   const Spacer(),
                   SButton(
                     label: l10n.settingsCacheClearAll,
-                    icon: Icons.delete_sweep_outlined,
+                    icon: EtaIcons.deleteOutline,
                     variant: SButtonVariant.error,
                     size: SButtonSize.small,
                     onPressed: _hasAny
@@ -301,7 +302,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
           children: [
             _cacheRow(
               context,
-              icon: Icons.favorite_outline,
+              icon: EtaIcons.heartOutline,
               title: l10n.settingsCacheLiked,
               info:
                   '$likedPath\n${_formatBytes(_likedBytes)} · ${l10n.settingsCacheEntries(_likedRows)}',
@@ -325,7 +326,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
           children: [
             // 歌词缓存上限（默认最小值开启；关闭 = 无上限，弹窗警告）
             SettingSwitchTile(
-              icon: Icons.data_usage_outlined,
+              icon: EtaIcons.chartPieOutline,
               title: l10n.settingsCacheLimitLyric,
               subtitle: prefs.lyricCacheLimitMiB == null
                   ? l10n.settingsCacheLimitUnlimited
@@ -341,7 +342,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
             ),
             if (prefs.lyricCacheLimitMiB != null)
               SettingSliderTile(
-                icon: Icons.tune,
+                icon: EtaIcons.filter,
                 title: l10n.settingsCacheLimitLyric,
                 subtitle: '${prefs.lyricCacheLimitMiB} MiB',
                 value: prefs.lyricCacheLimitMiB!.toDouble(),
@@ -353,7 +354,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               ),
             // 封面图片缓存上限（默认最小值开启；关闭 = 无上限，弹窗警告）
             SettingSwitchTile(
-              icon: Icons.photo_library_outlined,
+              icon: EtaIcons.album2Outline,
               title: l10n.settingsCacheLimitCover,
               subtitle: prefs.imageCacheLimitMiB == null
                   ? l10n.settingsCacheLimitUnlimited
@@ -369,7 +370,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
             ),
             if (prefs.imageCacheLimitMiB != null)
               SettingSliderTile(
-                icon: Icons.tune,
+                icon: EtaIcons.filter,
                 title: l10n.settingsCacheLimitCover,
                 subtitle: '${prefs.imageCacheLimitMiB} MiB',
                 value: prefs.imageCacheLimitMiB!.toDouble(),
@@ -383,7 +384,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               ),
             _cacheRow(
               context,
-              icon: Icons.lyrics_outlined,
+              icon: EtaIcons.fileMusicOutline,
               title: l10n.settingsCacheLyric,
               info: l10n.settingsCacheEntries(_lyricCount),
               enabled: _lyricCount > 0,
@@ -400,7 +401,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
             ),
             _cacheRow(
               context,
-              icon: Icons.compare_arrows_outlined,
+              icon: EtaIcons.transferVerticalOutline,
               title: l10n.settingsCacheLyricMatch,
               info: l10n.settingsCacheEntries(_matchCount),
               enabled: _matchCount > 0,
@@ -417,7 +418,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
             ),
             _cacheRow(
               context,
-              icon: Icons.text_snippet_outlined,
+              icon: EtaIcons.docmentOutline,
               title: l10n.settingsCacheLyricTtml,
               info: l10n.settingsCacheEntries(_ttmlCount),
               enabled: _ttmlCount > 0,
@@ -434,7 +435,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
             ),
             _cacheRow(
               context,
-              icon: Icons.image_outlined,
+              icon: EtaIcons.picOutline,
               title: l10n.settingsCacheCover,
               info:
                   '${_formatBytes(_imageBytes)} · ${l10n.settingsCacheImages(_imageLive)}',

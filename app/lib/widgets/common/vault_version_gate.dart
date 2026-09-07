@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/l10n.dart';
 import '../../services/security/vault_process.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// vault 版本异常门（fail-closed）：握手时发现 vault 二进制非官方生产构建
 /// （TEST 标记/缺失 marker）→ 副本已删除、解密已拒绝——本门显示全屏警告，
@@ -59,7 +60,7 @@ class _VaultVersionGateState extends State<VaultVersionGate> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.gpp_bad_outlined, size: 64, color: scheme.error),
+                Icon(EtaIcons.shieldOutline, size: 64, color: scheme.error),
                 const SizedBox(height: 20),
                 Text(
                   l10n.vaultVersionTitle,
@@ -98,7 +99,7 @@ class _VaultVersionGateState extends State<VaultVersionGate> {
                 const SizedBox(height: 24),
                 FilledButton.icon(
                   onPressed: () => exit(0),
-                  icon: const Icon(Icons.exit_to_app_outlined, size: 18),
+                  icon: const Icon(EtaIcons.exitOutline, size: 18),
                   label: Text(l10n.vaultVersionExit),
                   style: FilledButton.styleFrom(
                     backgroundColor: scheme.error,

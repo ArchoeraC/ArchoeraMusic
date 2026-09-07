@@ -16,6 +16,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../widgets/list/cover_image.dart';
 import '../../widgets/player/s_controls.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 详情页骨架：返回栏 + 头部 + 内容。
 class DetailScaffold extends StatelessWidget {
@@ -40,7 +41,7 @@ class DetailScaffold extends StatelessWidget {
               iconSize: 20,
               visualDensity: VisualDensity.compact,
               onPressed: () => context.pop(),
-              icon: Icon(Icons.arrow_back, color: scheme.onSurface),
+              icon: Icon(EtaIcons.arrowLeft, color: scheme.onSurface),
             ),
           ),
         ),
@@ -118,7 +119,7 @@ class DetailHeader extends StatelessWidget {
                 const SizedBox(height: 12),
                 SButton(
                   label: l10n.commonPlayAll,
-                  icon: Icons.play_arrow,
+                  icon: EtaIcons.play,
                   variant: SButtonVariant.primary,
                   size: SButtonSize.small,
                   onPressed: onPlayAll,
@@ -162,7 +163,7 @@ class DetailBody extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.error_outline,
+              EtaIcons.alertOutline,
               size: 36,
               color: scheme.onSurfaceVariant.withValues(alpha: 0.4),
             ),
@@ -178,7 +179,7 @@ class DetailBody extends StatelessWidget {
             const SizedBox(height: 12),
             SButton(
               label: l10n.commonRetry,
-              icon: Icons.refresh,
+              icon: EtaIcons.refresh,
               variant: SButtonVariant.secondary,
               size: SButtonSize.small,
               onPressed: onRetry,

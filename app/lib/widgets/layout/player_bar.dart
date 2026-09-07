@@ -25,6 +25,7 @@ import '../player/queue_panel.dart';
 import '../player/spectrum_view.dart';
 import '../common/toast.dart';
 import '../common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'player_bar/player_bar_view.dart';
 part 'player_bar/player_bar_sections.dart';

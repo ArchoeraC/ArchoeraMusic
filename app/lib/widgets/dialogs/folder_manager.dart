@@ -11,6 +11,7 @@ import '../../l10n/l10n.dart';
 import '../player/s_controls.dart';
 import 's_dialog.dart';
 import '../common/toast.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'folder_manager/folder_manager_view.dart';
 

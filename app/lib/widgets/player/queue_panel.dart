@@ -12,6 +12,7 @@ import '../../services/playback/playback_notifier.dart';
 import '../../l10n/l10n.dart';
 import '../../utils/format.dart';
 import '../list/cover_image.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'queue_panel/queue_panel_view.dart';
 

@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import '../player/s_controls.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 空态 / 错误态通用组件。
 class StreamingEmptyState extends StatelessWidget {
@@ -15,7 +16,7 @@ class StreamingEmptyState extends StatelessWidget {
     this.subtitle,
     this.subtitleError = false,
     this.buttonLabel,
-    this.buttonIcon = Icons.link,
+    this.buttonIcon = EtaIcons.link,
     this.buttonLoading = false,
     this.onButton,
   });

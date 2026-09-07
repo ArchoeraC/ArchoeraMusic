@@ -71,8 +71,8 @@ class _HoverVolumeSliderState extends ConsumerState<HoverVolumeSlider> {
           CtrlIcon(
             tooltip: muted ? l10n.volumeUnmute : l10n.volumeMute,
             icon: muted
-                ? Icons.volume_off
-                : (vol < 0.5 ? Icons.volume_down : Icons.volume_up),
+                ? EtaIcons.volumeOff
+                : (vol < 0.5 ? EtaIcons.volumeMute : EtaIcons.volume),
             size: 22,
             onPressed: _toggleMute,
           ),

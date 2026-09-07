@@ -125,7 +125,7 @@ extension _StreamingServerFormView on _ServerFormState {
             const SizedBox(width: 10),
             SButton(
               label: l10n.streamingServerTest,
-              icon: Icons.wifi_tethering,
+              icon: EtaIcons.wifi,
               variant: SButtonVariant.secondary,
               size: SButtonSize.small,
               loading: _testing,
@@ -134,7 +134,7 @@ extension _StreamingServerFormView on _ServerFormState {
             const SizedBox(width: 10),
             SButton(
               label: l10n.commonSave,
-              icon: Icons.check,
+              icon: EtaIcons.check,
               variant: SButtonVariant.primary,
               size: SButtonSize.small,
               loading: _submitting,
@@ -165,7 +165,7 @@ extension _StreamingServerFormView on _ServerFormState {
           Row(
             children: [
               Icon(
-                testOk ? Icons.check_circle : Icons.error,
+                testOk ? EtaIcons.checkCircle : EtaIcons.alert,
                 size: 14,
                 color: testOk ? _okGreen : scheme.error,
               ),
@@ -215,7 +215,7 @@ extension _StreamingServerFormView on _ServerFormState {
           fontWeight: FontWeight.w600,
           color: scheme.onSurface,
         ),
-        icon: Icon(Icons.arrow_drop_down, color: scheme.onSurfaceVariant),
+        icon: Icon(EtaIcons.downSmall, color: scheme.onSurfaceVariant),
         onChanged: (v) {
           if (v != null) _setType(v);
         },

@@ -123,7 +123,7 @@ extension _BrowseDialogView on _KugouBrowseDialogState {
                       tooltip: l10n.commonClose,
                       visualDensity: VisualDensity.compact,
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close, size: 18),
+                      icon: const Icon(EtaIcons.close, size: 18),
                     ),
                   ],
                 ),
@@ -232,7 +232,7 @@ class _TrackListHeader extends StatelessWidget {
                     if (snapshot.hasData && snapshot.data!.isNotEmpty) {
                       return SButton(
                         label: l10n.trackListPlayAll,
-                        icon: Icons.play_arrow_rounded,
+                        icon: EtaIcons.play,
                         variant: SButtonVariant.primary,
                         onPressed: () => onPlayAll(snapshot.data!),
                       );
@@ -247,7 +247,7 @@ class _TrackListHeader extends StatelessWidget {
             tooltip: l10n.commonClose,
             visualDensity: VisualDensity.compact,
             onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(EtaIcons.close, size: 18),
           ),
         ],
       ),
@@ -265,7 +265,7 @@ class _HeaderCover extends StatelessWidget {
     final theme = Theme.of(context);
     final placeholder = Container(
       color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-      child: Icon(Icons.music_note, size: 40, color: theme.colorScheme.primary),
+      child: Icon(EtaIcons.music, size: 40, color: theme.colorScheme.primary),
     );
     final c = cover;
     if (c == null || c.isEmpty) {
@@ -304,7 +304,7 @@ class _TrackListEmpty extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.music_off_outlined,
+            EtaIcons.volumeOffOutline,
             size: 42,
             color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
           ),
@@ -350,13 +350,13 @@ class _DialogErrorView extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 42, color: theme.colorScheme.error),
+          Icon(EtaIcons.alertOutline, size: 42, color: theme.colorScheme.error),
           const SizedBox(height: 10),
           Text(message, style: theme.textTheme.bodySmall),
           const SizedBox(height: 14),
           SButton(
             label: l10n.commonRetry,
-            icon: Icons.refresh,
+            icon: EtaIcons.refresh,
             variant: SButtonVariant.secondary,
             onPressed: onRetry,
           ),

@@ -17,6 +17,7 @@ import '../../l10n/l10n.dart';
 import '../../utils/format.dart';
 import '../list/cover_image.dart';
 import 's_dialog.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'track_detail_dialog/track_detail_dialog_view.dart';
 

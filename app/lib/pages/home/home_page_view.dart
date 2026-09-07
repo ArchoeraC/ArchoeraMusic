@@ -150,25 +150,25 @@ class _HomeQuickActions extends StatelessWidget {
       childAspectRatio: 2.3,
       children: [
         HomeActionCard(
-          icon: Icons.wb_sunny_outlined,
+          icon: EtaIcons.sunOutline,
           title: l10n.pageHomeDaily,
           subtitle: l10n.trackListDailyRecommendSubtitle,
           onTap: onOpenDaily,
         ),
         HomeActionCard(
-          icon: Icons.leaderboard_outlined,
+          icon: EtaIcons.chartVerticalOutline,
           title: l10n.pageHomeRankTitle,
           subtitle: l10n.pageHomeRankSubtitle,
           onTap: onOpenRank,
         ),
         HomeActionCard(
-          icon: Icons.queue_music_outlined,
+          icon: EtaIcons.playlistOutline,
           title: l10n.pageHomePlaylistSquare,
           subtitle: l10n.pageHomePlaylistSquareSubtitle,
           onTap: onOpenPlaylistSquare,
         ),
         HomeActionCard(
-          icon: Icons.mic_external_on_outlined,
+          icon: EtaIcons.micOutline,
           title: l10n.commonArtists,
           subtitle: l10n.pageHomeArtistSubtitle,
           onTap: onOpenArtists,
@@ -217,7 +217,7 @@ class _HomeError extends StatelessWidget {
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.cloud_off_outlined, size: 44, color: scheme.error),
+            Icon(EtaIcons.cloudOutline, size: 44, color: scheme.error),
             const SizedBox(height: 10),
             Text(l10n.pageHomeLoadFailed, style: theme.textTheme.bodyMedium),
             const SizedBox(height: 4),
@@ -230,7 +230,7 @@ class _HomeError extends StatelessWidget {
             const SizedBox(height: 14),
             SButton(
               label: l10n.commonRetry,
-              icon: Icons.refresh,
+              icon: EtaIcons.refresh,
               variant: SButtonVariant.secondary,
               onPressed: onRetry,
             ),

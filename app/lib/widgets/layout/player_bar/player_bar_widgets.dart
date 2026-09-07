@@ -48,7 +48,7 @@ class _BarCoverState extends State<_BarCover> {
                   color: Colors.black.withValues(alpha: 0.4),
                   child: const Center(
                     child: Icon(
-                      Icons.keyboard_arrow_up,
+                      EtaIcons.upSmall,
                       color: Colors.white,
                       size: 24,
                     ),
@@ -99,7 +99,7 @@ class _BarLikeButtonState extends ConsumerState<_BarLikeButton> {
       tooltip: liked ? context.l10n.commonUnlike : context.l10n.commonLike,
       onPressed: _toggle,
       icon: Icon(
-        liked ? Icons.favorite : Icons.favorite_border,
+        liked ? EtaIcons.heart : EtaIcons.heartOutline,
         color: liked ? Colors.redAccent : null,
       ),
     );

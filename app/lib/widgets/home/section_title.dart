@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:flutter/material.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 首页区块标题（标题 + 副标题 + 「更多」链接）。
 class HomeSectionTitle extends StatelessWidget {
@@ -68,7 +69,7 @@ class HomeSectionTitle extends StatelessWidget {
                   ),
                   const SizedBox(width: 2),
                   Icon(
-                    Icons.chevron_right,
+                    EtaIcons.rightSmall,
                     size: 18,
                     color: scheme.onSurfaceVariant,
                   ),

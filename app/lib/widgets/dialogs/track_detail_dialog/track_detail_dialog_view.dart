@@ -31,7 +31,7 @@ class _TrackDetailBody extends StatelessWidget {
         const SizedBox(height: 8),
         _TrackDetailField(
           scheme: scheme,
-          icon: Icons.album_outlined,
+          icon: EtaIcons.albumOutline,
           label: l10n.trackDetailAlbum,
           value: t.album?.name.isNotEmpty == true
               ? t.album!.name
@@ -39,20 +39,20 @@ class _TrackDetailBody extends StatelessWidget {
         ),
         _TrackDetailField(
           scheme: scheme,
-          icon: Icons.schedule,
+          icon: EtaIcons.clock,
           label: l10n.trackDetailDuration,
           value: formatMs(t.duration).isEmpty ? '-' : formatMs(t.duration),
         ),
         _TrackDetailField(
           scheme: scheme,
-          icon: Icons.cloud_outlined,
+          icon: EtaIcons.cloudOutline,
           label: l10n.trackDetailSource,
           value: _sourceLabel(l10n, t),
         ),
         if (kugouQuality != null)
           _TrackDetailField(
             scheme: scheme,
-            icon: Icons.high_quality_outlined,
+            icon: EtaIcons.highQualityOutline,
             label: l10n.trackDetailQuality,
             value: kugouQuality,
           ),
@@ -60,34 +60,34 @@ class _TrackDetailBody extends StatelessWidget {
           if (q.codec.isNotEmpty)
             _TrackDetailField(
               scheme: scheme,
-              icon: Icons.tune,
+              icon: EtaIcons.filter,
               label: l10n.trackDetailCodec,
               value: q.codec,
             ),
           if (q.sampleRate > 0)
             _TrackDetailField(
               scheme: scheme,
-              icon: Icons.multiline_chart,
+              icon: EtaIcons.chartLine,
               label: l10n.trackDetailSampleRate,
               value: '${q.sampleRate} Hz',
             ),
           if (q.bitsPerSample > 0)
             _TrackDetailField(
               scheme: scheme,
-              icon: Icons.analytics_outlined,
+              icon: EtaIcons.chartVerticalOutline,
               label: l10n.trackDetailBitDepth,
               value: '${q.bitsPerSample} bit',
             ),
           if (q.bitRate > 0)
             _TrackDetailField(
               scheme: scheme,
-              icon: Icons.speed,
+              icon: EtaIcons.dashboard3,
               label: l10n.trackDetailBitrate,
               value: '${q.bitRate} kbps',
             ),
           _TrackDetailField(
             scheme: scheme,
-            icon: Icons.speaker,
+            icon: EtaIcons.speaker,
             label: l10n.trackDetailChannels,
             value: '${q.channels}',
           ),
@@ -95,14 +95,14 @@ class _TrackDetailBody extends StatelessWidget {
         if (fileSize != null && fileSize > 0)
           _TrackDetailField(
             scheme: scheme,
-            icon: Icons.insert_drive_file_outlined,
+            icon: EtaIcons.fileOutline,
             label: l10n.trackDetailFileSize,
             value: _formatBytes(fileSize),
           ),
         if (localPath != null && localPath.isNotEmpty)
           _TrackDetailField(
             scheme: scheme,
-            icon: Icons.folder_outlined,
+            icon: EtaIcons.folderOutline,
             label: l10n.trackDetailPath,
             value: localPath,
           ),

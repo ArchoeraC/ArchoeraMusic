@@ -26,6 +26,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/toast.dart';
 import '../common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'kugou_login_button/kugou_login_button_view.dart';
 

@@ -27,6 +27,7 @@ import '../widgets/player/quality_menu.dart';
 import '../widgets/player/spectrum_view.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'player/player_page_view.dart';
 

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/router.dart';
 import '../../l10n/l10n.dart';
 import '../../stores/app_prefs.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 首次启动「凭据加密方案」介绍门（一次性）：
 /// 提醒默认启用 LEGACY（推荐、稳定），Vault（实验性）可在
@@ -49,7 +50,7 @@ class _SchemeIntroGateState extends ConsumerState<SchemeIntroGate> {
       context: navContext,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.security_outlined),
+        icon: const Icon(EtaIcons.shieldOutline),
         title: Text(l10n.settingsSchemeIntroTitle),
         content: Text(
           l10n.settingsSchemeIntroDesc,

@@ -22,7 +22,7 @@ extension _SecuritySectionView on _SecuritySectionState {
                 children: [
                   SButton(
                     label: l10n.settingsCacheRefresh,
-                    icon: Icons.refresh,
+                    icon: EtaIcons.refresh,
                     variant: SButtonVariant.ghost,
                     size: SButtonSize.small,
                     onPressed: _refresh,
@@ -30,7 +30,7 @@ extension _SecuritySectionView on _SecuritySectionState {
                   const Spacer(),
                   SButton(
                     label: l10n.settingsSecurityDestroyAll,
-                    icon: Icons.delete_sweep_outlined,
+                    icon: EtaIcons.deleteOutline,
                     variant: SButtonVariant.error,
                     size: SButtonSize.small,
                     onPressed: hasAny ? _destroyAll : null,
@@ -40,7 +40,7 @@ extension _SecuritySectionView on _SecuritySectionState {
             ),
             _buildDestroyRow(
               context,
-              icon: Icons.dns_outlined,
+              icon: EtaIcons.serverOutline,
               title: l10n.settingsSecurityStreaming,
               info:
                   '${streamingServersPath()}\n${_formatBytes(_streamingBytes)} · ${l10n.settingsSecurityStreamingCount(_streamingCount)} · ${l10n.settingsSecurityStreamingDesc}',
@@ -49,7 +49,7 @@ extension _SecuritySectionView on _SecuritySectionState {
             ),
             _buildDestroyRow(
               context,
-              icon: Icons.account_circle_outlined,
+              icon: EtaIcons.userOutline,
               title: l10n.settingsSecuritySession,
               info:
                   '${vaultFilePath()}\n${_formatBytes(_sessionBytes)} · ${l10n.settingsSecuritySessionDesc}'
@@ -59,7 +59,7 @@ extension _SecuritySectionView on _SecuritySectionState {
             ),
             _buildDestroyRow(
               context,
-              icon: Icons.storage_outlined,
+              icon: EtaIcons.storageOutline,
               title: l10n.settingsSecurityUserDb,
               info:
                   '${userDbPath()}\n${_formatBytes(_userDbBytes)} · ${l10n.settingsSecurityUserDbDesc}',
@@ -93,7 +93,7 @@ extension _SecuritySectionView on _SecuritySectionState {
         visualDensity: VisualDensity.compact,
         onPressed: enabled ? onDestroy : null,
         icon: Icon(
-          Icons.delete_forever_outlined,
+          EtaIcons.wastebasketOutline,
           color: enabled
               ? scheme.error
               : scheme.onSurface.withValues(alpha: 0.25),
@@ -110,7 +110,7 @@ extension _SecuritySectionView on _SecuritySectionState {
         if (_needsRecovery)
           _SecurityBanner(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-            icon: Icons.lock_outline,
+            icon: EtaIcons.lockOutline,
             text: l10n.settingsDeviceBindRecoveryBanner,
             scheme: scheme,
             button: SButton(
@@ -123,7 +123,7 @@ extension _SecuritySectionView on _SecuritySectionState {
         if (_shareBroken)
           _SecurityBanner(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-            icon: Icons.broken_image_outlined,
+            icon: EtaIcons.pic2Outline,
             text: l10n.settingsVaultShareBrokenBanner,
             scheme: scheme,
             button: SButton(
@@ -151,7 +151,7 @@ extension _SecuritySectionView on _SecuritySectionState {
                         badge: l10n.settingsSchemeCryptoBadge,
                         badgeColor: scheme.primary,
                         desc: l10n.settingsSchemeCryptoDesc,
-                        icon: Icons.vpn_key_outlined,
+                        icon: EtaIcons.keyOutline,
                         onTap: _onSchemeSelected,
                       ),
                     ),
@@ -165,7 +165,7 @@ extension _SecuritySectionView on _SecuritySectionState {
                         badge: l10n.settingsSchemeFileBadge,
                         badgeColor: scheme.tertiary,
                         desc: l10n.settingsSchemeFileDesc,
-                        icon: Icons.key_outlined,
+                        icon: EtaIcons.keyOutline,
                         onTap: _onSchemeSelected,
                       ),
                     ),
@@ -181,7 +181,7 @@ extension _SecuritySectionView on _SecuritySectionState {
                 badge: l10n.settingsSchemeVaultBadge,
                 badgeColor: scheme.error,
                 desc: l10n.settingsSchemeVaultDesc,
-                icon: Icons.shield_outlined,
+                icon: EtaIcons.shieldOutline,
                 onTap: _onSchemeSelected,
               ),
             ],
@@ -193,7 +193,7 @@ extension _SecuritySectionView on _SecuritySectionState {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                Icons.info_outline,
+                EtaIcons.informationOutline,
                 size: 14,
                 color: scheme.onSurfaceVariant,
               ),
@@ -227,9 +227,9 @@ extension _SecuritySectionView on _SecuritySectionState {
                 l10n.settingsVaultModeDescMultiseal,
               ],
               icons: const [
-                Icons.security_outlined,
-                Icons.password_outlined,
-                Icons.devices_outlined,
+                EtaIcons.shieldOutline,
+                EtaIcons.keyOutline,
+                EtaIcons.deviceOutline,
               ],
               selected: _vaultMode,
               disabledValues: _disabledModes,
@@ -239,21 +239,21 @@ extension _SecuritySectionView on _SecuritySectionState {
           if (_isDeviceBound) ...[
             _buildChevronTile(
               context,
-              icon: Icons.password_outlined,
+              icon: EtaIcons.keyOutline,
               title: l10n.settingsDeviceBindChangeRecovery,
               subtitle: l10n.settingsDeviceBindChangeRecoveryDesc,
               onPressed: _deviceBusy ? null : _changeRecoveryPassword,
             ),
             _buildChevronTile(
               context,
-              icon: Icons.sync_lock_outlined,
+              icon: EtaIcons.lockOutline,
               title: l10n.settingsDeviceBindRebind,
               subtitle: l10n.settingsDeviceBindRebindDesc,
               onPressed: _deviceBusy ? null : _rebindDevice,
             ),
             _buildChevronTile(
               context,
-              icon: Icons.link_off_outlined,
+              icon: EtaIcons.unlinkOutline,
               title: l10n.settingsDeviceBindClose,
               subtitle: l10n.settingsDeviceBindCloseDesc,
               onPressed: _deviceBusy ? null : _disableDeviceBind,
@@ -281,7 +281,7 @@ extension _SecuritySectionView on _SecuritySectionState {
         iconSize: 18,
         visualDensity: VisualDensity.compact,
         onPressed: onPressed,
-        icon: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+        icon: Icon(EtaIcons.rightSmall, color: scheme.onSurfaceVariant),
       ),
     );
   }

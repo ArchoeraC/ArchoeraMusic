@@ -22,6 +22,7 @@ import '../../services/lyrics/lyric_line.dart';
 import 'lyrics_v7/lyrics_layout.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../common/anim.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'lyrics_view/lyrics_view_widgets.dart';
 
