@@ -214,32 +214,70 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
           ],
         ),
         const SizedBox(height: 20),
-        _buildOrganizeSection(scheme, l10n, prefs, notifier, scrape),
-        if (!scrape.organize) ...[
-          const SizedBox(height: 20),
-          SettingSection(
-            title: l10n.settingsSectionScrapeProgress,
-            children: [
-              _buildScrapeStatus(scheme, l10n, scrape, dirs.isNotEmpty),
+        _buildOrganizeSection(scheme, l10n, prefs, notifier),
+        const SizedBox(height: 20),
+        // 统一进度区：刮削与「仅整理」共用同一处展示进度/结果与操作
+        // （organize 完成或运行时，配置区不被覆盖，仍可改目录后再次整理）
+        SettingSection(
+          title: l10n.settingsSectionScrapeProgress,
+          children: [
+            if (scrape.scraping)
+              scrape.organize
+                  ? _buildOrganizeStatus(scheme, l10n, scrape)
+                  : _buildScrapeStatus(scheme, l10n, scrape, dirs.isNotEmpty)
+            else if (scrape.hasActivity)
+              scrape.organize
+                  ? _buildOrganizeStatus(scheme, l10n, scrape)
+                  : _buildScrapeStatus(scheme, l10n, scrape, dirs.isNotEmpty)
+            else
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                child: scrape.scraping
-                    ? SButton(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                child: Text(
+                  dirs.isNotEmpty
+                      ? l10n.settingsScrapeIdle
+                      : l10n.settingsScrapeNoDirs,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: scrape.scraping
+                  ? Align(
+                      alignment: Alignment.centerRight,
+                      child: SButton(
                         label: l10n.settingsScrapeCancel,
                         icon: EtaIcons.stop,
+                        size: SButtonSize.small,
                         variant: SButtonVariant.error,
                         onPressed: scraper.cancel,
-                      )
-                    : SButton(
-                        label: l10n.settingsScrapeStart,
-                        icon: EtaIcons.magic3,
-                        variant: SButtonVariant.primary,
-                        onPressed: _startScrape,
                       ),
-              ),
-            ],
-          ),
-        ],
+                    )
+                  : Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        SButton(
+                          label: l10n.settingsScrapeStart,
+                          icon: EtaIcons.magic3,
+                          size: SButtonSize.small,
+                          variant: SButtonVariant.secondary,
+                          onPressed: _startScrape,
+                        ),
+                        SButton(
+                          label: l10n.settingsScrapeOrganizeStart,
+                          icon: EtaIcons.fileImportOutline,
+                          size: SButtonSize.small,
+                          variant: SButtonVariant.secondary,
+                          onPressed: () => _startOrganize(l10n),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -249,68 +287,48 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
     AppLocalizations l10n,
     AppPrefs prefs,
     AppPrefsNotifier notifier,
-    ScrapeState scrape,
   ) {
-    final organizeRunning = scrape.organize && scrape.scraping;
-    final organizeDone =
-        scrape.organize && !scrape.scraping && scrape.hasActivity;
     return SettingSection(
       title: l10n.settingsSectionScrapeOrganize,
       note: l10n.settingsScrapeOrganizeNote,
       children: [
-        if (organizeRunning || organizeDone) ...[
-          _buildOrganizeStatus(scheme, l10n, scrape, organizeRunning),
-          const SizedBox(height: 4),
-        ],
-        // 目标/模板表单始终可编辑：完成/运行后不遮挡设置，可改后再次整理
-        ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 2),
-            child: Text(
-              l10n.settingsScrapeOrganizeTargetDir,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: scheme.onSurface,
-              ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 2),
+          child: Text(
+            l10n.settingsScrapeOrganizeTargetDir,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurface,
             ),
           ),
-          SettingPathFieldCard(
-            icon: EtaIcons.foldersOutline,
-            ctrl: _organizeTargetCtrl,
-            hint: l10n.settingsScrapeOrganizeTargetHint,
-            save: (v) => notifier.setScrape(organizeTargetDir: v.trim()),
-            restoreDefault: () => '',
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 2),
-            child: Text(
-              l10n.settingsScrapeOrganizePattern,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: scheme.onSurface,
-              ),
+        ),
+        SettingPathFieldCard(
+          icon: EtaIcons.foldersOutline,
+          ctrl: _organizeTargetCtrl,
+          hint: l10n.settingsScrapeOrganizeTargetHint,
+          save: (v) => notifier.setScrape(organizeTargetDir: v.trim()),
+          restoreDefault: () => '',
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 2),
+          child: Text(
+            l10n.settingsScrapeOrganizePattern,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurface,
             ),
           ),
-          SettingPathFieldCard(
-            icon: EtaIcons.sitemapOutline,
-            ctrl: _organizePatternCtrl,
-            hint: l10n.settingsScrapeOrganizePatternHint,
-            save: (v) => notifier.setScrape(organizePattern: v.trim()),
-            restoreDefault: () => kScrapeOrganizePatternDefault,
-          ),
-          _buildOrganizePresets(l10n, notifier),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
-            child: SButton(
-              label: l10n.settingsScrapeOrganizeStart,
-              icon: EtaIcons.fileImportOutline,
-              variant: SButtonVariant.secondary,
-              onPressed: () => _startOrganize(l10n),
-            ),
-          ),
-        ],
+        ),
+        SettingPathFieldCard(
+          icon: EtaIcons.sitemapOutline,
+          ctrl: _organizePatternCtrl,
+          hint: l10n.settingsScrapeOrganizePatternHint,
+          save: (v) => notifier.setScrape(organizePattern: v.trim()),
+          restoreDefault: () => kScrapeOrganizePatternDefault,
+        ),
+        _buildOrganizePresets(l10n, notifier),
       ],
     );
   }
@@ -358,10 +376,10 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
     ColorScheme scheme,
     AppLocalizations l10n,
     ScrapeState scrape,
-    bool running,
   ) {
+    final running = scrape.scraping;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -386,6 +404,8 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
             Text(
               scrape.error != null
                   ? scrape.error!
+                  : scrape.canceled
+                  ? l10n.settingsScrapeCanceled
                   : l10n.settingsOrganizeDone(
                       scrape.success,
                       scrape.skipped,
@@ -423,30 +443,6 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
               ),
             ],
           ),
-          if (running) ...[
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerRight,
-              child: SButton(
-                label: l10n.settingsOrganizeCancel,
-                icon: EtaIcons.stop,
-                size: SButtonSize.small,
-                variant: SButtonVariant.error,
-                onPressed: ref.read(scrapeControllerProvider.notifier).cancel,
-              ),
-            ),
-          ] else ...[
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerRight,
-              child: SButton(
-                label: l10n.commonDone,
-                size: SButtonSize.small,
-                variant: SButtonVariant.ghost,
-                onPressed: ref.read(scrapeControllerProvider.notifier).dismissResult,
-              ),
-            ),
-          ],
         ],
       ),
     );
