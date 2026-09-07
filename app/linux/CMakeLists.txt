@@ -203,6 +203,11 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
+  # Release(AOT) 下 flutter_assets/kernel_blob.bin 是 JIT 残留冗余（数十 MB）；
+  # libapp.so 已含 AOT 快照，删除以缩减安装体积。Debug 需要 kernel，保留。
+  install(CODE "
+    file(REMOVE \"${INSTALL_BUNDLE_DATA_DIR}/${FLUTTER_ASSET_DIR_NAME}/kernel_blob.bin\")
+    " COMPONENT Runtime)
 endif()
 
 # === ArchoeraMusic 原生产物打包（FFI 直连，降低运行时依赖）===
