@@ -88,5 +88,13 @@ void main() {
       }
     }
     expect(moved, isNotEmpty, reason: '整理后目标目录应有文件');
+
+    // dismissResult：完成后可关闭结果视图回到空闲态（表单可再编辑）
+    c.read(scrapeControllerProvider.notifier).dismissResult();
+    final after = c.read(scrapeControllerProvider);
+    expect(after.scraping, isFalse);
+    expect(after.organize, isFalse, reason: 'dismiss 后 organize 标志复位');
+    expect(after.hasActivity, isFalse, reason: 'dismiss 后结果快照清空');
+    expect(after.error, isNull);
   });
 }
