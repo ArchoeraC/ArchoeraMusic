@@ -71,6 +71,8 @@ public sealed class AlbumRef
     public string? Artist { get; set; }
 }
 
+public readonly record struct ErrorFileState(int FailCount, long MtimeAtLastFail);
+
 /// <summary>
 /// 扫描进度（通过 stdout JSON 输出给 TS 层）
 /// </summary>
