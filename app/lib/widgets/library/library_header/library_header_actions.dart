@@ -50,6 +50,42 @@ extension _LibraryHeaderActions on LibraryHeader {
     _toast(context, l10n.toastScrapeStarted);
   }
 
+  /// 「仅整理」简化入口（不联网，按模板整理目录）：运行中不可重复触发。
+  /// 目录取偏好配置，留空跟随媒体库扫描目录；目标/模板沿用设置 → 刮削 的
+  /// 组织整理配置（organizeTargetDir / organizePattern），未设目标回退媒体库目录。
+  void _startOrganizeFromHeader(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final scrape = ref.read(scrapeControllerProvider);
+    if (scrape.scraping) return; // 菜单已禁用运行中触发，此处兜底
+    final prefs = ref.read(appPrefsProvider);
+    var dirs = prefs.scrapeDirs;
+    if (dirs.isEmpty) dirs = scanDirs();
+    if (dirs.isEmpty) {
+      _toast(context, l10n.toastOrganizeNoDirs);
+      return;
+    }
+    final customTarget = prefs.scrapeOrganizeTargetDir.trim();
+    final target = customTarget.isEmpty ? defaultMusicDir() : customTarget;
+    if (target.isEmpty) {
+      _toast(context, l10n.settingsOrganizeNoTarget);
+      return;
+    }
+    ref
+        .read(scrapeControllerProvider.notifier)
+        .startOrganize(
+          dirs: dirs,
+          dbPath: '${resolveDataDir()}/scraper-state.db',
+          targetDir: target,
+          pattern: prefs.scrapeOrganizePattern,
+        );
+    _toast(
+      context,
+      customTarget.isEmpty
+          ? l10n.settingsOrganizeUsingDefault(target)
+          : l10n.toastOrganizeStarted,
+    );
+  }
+
   /// 全量扫描：确认后清空曲库重建（删除 DB 记录，不删除源文件）。
   Future<void> _startFullScan(
     BuildContext context,

@@ -90,7 +90,7 @@ extension _LibraryHeaderView on LibraryHeader {
                 ),
               ),
               const SizedBox(width: 8),
-              _buildMoreMenu(context, ref, state, l10n),
+              _buildMoreMenu(context, ref, state, scrape.scraping, l10n),
               const Spacer(),
               SInput(
                 width: 190,
@@ -164,6 +164,7 @@ extension _LibraryHeaderView on LibraryHeader {
     BuildContext context,
     WidgetRef ref,
     LibraryState state,
+    bool scrapeBusy,
     AppLocalizations l10n,
   ) {
     return PopupMenuButton<String>(
@@ -180,6 +181,9 @@ extension _LibraryHeaderView on LibraryHeader {
           case 'fullScan':
             _startFullScan(context, ref, state);
             break;
+          case 'organize':
+            _startOrganizeFromHeader(context, ref);
+            break;
           case 'stats':
             _openMediaStats(context, state);
             break;
@@ -195,6 +199,18 @@ extension _LibraryHeaderView on LibraryHeader {
               const Icon(EtaIcons.search3, size: 17),
               const SizedBox(width: 10),
               Text(l10n.libraryFullScan),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'organize',
+          height: 40,
+          enabled: !scrapeBusy,
+          child: Row(
+            children: [
+              const Icon(EtaIcons.fileImportOutline, size: 17),
+              const SizedBox(width: 10),
+              Text(l10n.settingsScrapeOrganizeStart),
             ],
           ),
         ),
