@@ -387,20 +387,22 @@ static std::filesystem::path orgResolveDest(const std::filesystem::path& dest) {
     std::error_code ec;
     if (!fs::exists(dest, ec)) return dest;
     ec.clear();
-    const std::string base = dest.stem().string();
-    const std::string ext = dest.extension().string();
+    const std::string base = scraper::pathToUtf8(dest.stem());
+    const std::string ext = scraper::pathToUtf8(dest.extension());
     for (int i = 2; i <= 999; ++i) {
-        fs::path cand = dest.parent_path() / (base + " (" + std::to_string(i) + ")" + ext);
+        fs::path cand = dest.parent_path() /
+                        scraper::utf8ToPath(base + " (" + std::to_string(i) + ")" + ext);
         if (!fs::exists(cand, ec)) return cand;
         ec.clear();
     }
     // 极端情况：附加时间戳
     return dest.parent_path() /
-           (base + "_" + std::to_string(
-                            std::chrono::duration_cast<std::chrono::milliseconds>(
-                                std::chrono::system_clock::now().time_since_epoch())
-                                .count()) +
-            ext);
+           scraper::utf8ToPath(
+               base + "_" + std::to_string(
+                                std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::system_clock::now().time_since_epoch())
+                                    .count()) +
+               ext);
 }
 
 /// 执行仅目录整理；事件（progress/done/empty/error）写入 handle 事件队列。
@@ -419,7 +421,7 @@ static void runOrganize(ScraperHandle* h) {
             return;
         }
         std::error_code ec;
-        const fs::path targetRoot = fs::absolute(fs::path(target), ec);
+        const fs::path targetRoot = fs::absolute(scraper::utf8ToPath(target), ec);
         if (ec || !fs::is_directory(targetRoot, ec)) {
             pushEvent({{"type", "error"},
                        {"message", "整理目标目录不存在或不可访问: " + target}});
@@ -459,12 +461,13 @@ static void runOrganize(ScraperHandle* h) {
 
             const std::string ext = orgFileExt(from);
             auto segs = orgBuildDirSegments(pattern, t, ext);
+            const fs::path fromPath = scraper::utf8ToPath(from);
             fs::path destDir = targetRoot;
-            for (const auto& seg : segs) destDir /= seg;
-            fs::path dest = destDir / fs::path(from).filename();
+            for (const auto& seg : segs) destDir /= scraper::utf8ToPath(seg);
+            fs::path dest = destDir / fromPath.filename();
             std::error_code ec2;
             // 规范化比较：已在目标位置则跳过
-            fs::path canonFrom = fs::absolute(fs::path(from), ec2);
+            fs::path canonFrom = fs::absolute(fromPath, ec2);
             fs::path canonTo = fs::absolute(dest, ec2);
             if (ec2) { failed++; continue; }
             if (canonFrom == canonTo) { skipped++; }
@@ -507,7 +510,7 @@ static void runOrganize(ScraperHandle* h) {
             pushEvent({{"type", "progress"},
                        {"total", total}, {"scraped", i + 1}, {"success", moved},
                        {"failed", failed}, {"skipped", skipped}, {"notFound", 0},
-                       {"current", fs::path(from).filename().string()}});
+                       {"current", scraper::pathToUtf8(fromPath.filename())}});
         }
 
         // 终态 done 事件的 failures 只保留前 100 条，防止整批全失败时事件 JSON

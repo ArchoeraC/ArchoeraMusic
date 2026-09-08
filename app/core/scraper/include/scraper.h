@@ -11,6 +11,7 @@
 #include <optional>
 #include <cstdint>
 #include <fstream>
+#include <filesystem>
 #include <algorithm>
 #include <cstdlib>
 #ifdef _WIN32
@@ -27,6 +28,47 @@
 #endif
 
 namespace archoera::scraper {
+
+/// UTF-8 窄字符串 → std::filesystem::path。
+///
+/// 内部字符串一律为 UTF-8（Dart FFI、TagLib UTF8 读写、JSON），但 Windows 下
+/// MSVC 把 `char*` 路径一律按线程 ANSI 代码页解释——UTF-8 中文字节在非 UTF-8
+/// 代码页（如 CP1252）上不可映射，会抛
+/// "No mapping for the Unicode character exists in the target multi-byte code
+/// page"（ERROR_NO_UNICODE_TRANSLATION / 1113）。
+/// 因此所有进出 std::filesystem 的窄路径必须在边界显式做 UTF-8 ↔ UTF-16 转换。
+inline std::filesystem::path utf8ToPath(const std::string& utf8) {
+#ifdef _WIN32
+    if (utf8.empty()) return std::filesystem::path();
+    const int wlen = ::MultiByteToWideChar(CP_UTF8, 0, utf8.data(),
+                                           static_cast<int>(utf8.size()),
+                                           nullptr, 0);
+    std::wstring wide(static_cast<size_t>(wlen), L'\0');
+    ::MultiByteToWideChar(CP_UTF8, 0, utf8.data(),
+                          static_cast<int>(utf8.size()), wide.data(), wlen);
+    return std::filesystem::path(std::move(wide));
+#else
+    return std::filesystem::path(utf8);
+#endif
+}
+
+/// std::filesystem::path → UTF-8 窄字符串（.string() 的 Windows 安全替代）。
+inline std::string pathToUtf8(const std::filesystem::path& p) {
+#ifdef _WIN32
+    const std::wstring& wide = p.native();
+    if (wide.empty()) return std::string();
+    const int n = ::WideCharToMultiByte(CP_UTF8, 0, wide.data(),
+                                        static_cast<int>(wide.size()),
+                                        nullptr, 0, nullptr, nullptr);
+    std::string out(static_cast<size_t>(n), '\0');
+    ::WideCharToMultiByte(CP_UTF8, 0, wide.data(),
+                          static_cast<int>(wide.size()), out.data(), n,
+                          nullptr, nullptr);
+    return out;
+#else
+    return p.string();
+#endif
+}
 
 /// 根据设备硬件质量自动检测合理的并行度
 ///

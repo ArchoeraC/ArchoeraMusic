@@ -2102,19 +2102,73 @@ public:
         outDurationSec = 0;
         // fpcalc -json -length 120 <file>
         // -length 120 表示只分析前 120 秒（足够识别，节省时间）
-        // 重定向空设备：POSIX /dev/null，Windows NUL
-#ifdef _WIN32
-        std::string cmd = "fpcalc -json -length 120 \"" + filePath + "\" 2>NUL";
-#else
+        // 重定向空设备：POSIX /dev/null；Windows 用句柄指向 NUL。
+        int rc = 0;
+        std::string output;
+#ifndef _WIN32
+        // POSIX：路径即 UTF-8 字节，popen 原样传递，无需额外转换
         std::string cmd = "fpcalc -json -length 120 \"" + filePath + "\" 2>/dev/null";
-#endif
         FILE* pipe = popen(cmd.c_str(), "r");
         if (!pipe) return "";
-
-        std::string output;
         char buf[4096];
         while (fgets(buf, sizeof(buf), pipe)) output += buf;
-        int rc = pclose(pipe);
+        rc = pclose(pipe);
+#else
+        // Windows：popen→cmd 会按系统 ANSI/OEM 代码页解析命令行，UTF-8 中文路径
+        // 直接乱码（与 fs 边界同一根因）。改用 CreateProcessW（UTF-16 命令行，
+        // 不经 cmd）+ 匿名管道捕获 stdout、stderr 丢弃——路径逐字符保真。
+        {
+            const std::string narrow = "fpcalc -json -length 120 \"" + filePath + "\"";
+            std::wstring wcmd;
+            const int wlen = ::MultiByteToWideChar(CP_UTF8, 0, narrow.data(),
+                                                   static_cast<int>(narrow.size()),
+                                                   nullptr, 0);
+            if (wlen <= 0) return "";
+            wcmd.resize(static_cast<size_t>(wlen));
+            ::MultiByteToWideChar(CP_UTF8, 0, narrow.data(),
+                                  static_cast<int>(narrow.size()), wcmd.data(), wlen);
+
+            SECURITY_ATTRIBUTES sa{};
+            sa.nLength = sizeof(sa);
+            sa.bInheritHandle = TRUE;
+            HANDLE hOutRead = nullptr, hOutWrite = nullptr;
+            if (!::CreatePipe(&hOutRead, &hOutWrite, &sa, 0)) return "";
+            // stderr 丢弃（等价旧 2>NUL）；打开失败时回退与 stdout 共用写端
+            HANDLE hErrWrite = ::CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_WRITE,
+                                             &sa, OPEN_EXISTING, 0, nullptr);
+            HANDLE hErrUse = (hErrWrite != INVALID_HANDLE_VALUE) ? hErrWrite : hOutWrite;
+
+            STARTUPINFOW si{};
+            si.cb = sizeof(si);
+            si.dwFlags = STARTF_USESTDHANDLES;
+            si.hStdOutput = hOutWrite;
+            si.hStdError = hErrUse;
+            PROCESS_INFORMATION pi{};
+            const BOOL created = ::CreateProcessW(nullptr, wcmd.data(), nullptr,
+                                                  nullptr, TRUE, CREATE_NO_WINDOW,
+                                                  nullptr, nullptr, &si, &pi);
+            ::CloseHandle(hOutWrite);
+            if (hErrWrite != INVALID_HANDLE_VALUE) ::CloseHandle(hErrWrite);
+            if (!created) {
+                ::CloseHandle(hOutRead);
+                return "";
+            }
+            ::CloseHandle(pi.hThread);
+
+            char buf[4096];
+            DWORD n = 0;
+            while (::ReadFile(hOutRead, buf, sizeof(buf), &n, nullptr) && n > 0) {
+                output.append(buf, n);
+            }
+            ::CloseHandle(hOutRead);
+
+            ::WaitForSingleObject(pi.hProcess, INFINITE);
+            DWORD code = 0;
+            ::GetExitCodeProcess(pi.hProcess, &code);
+            ::CloseHandle(pi.hProcess);
+            rc = static_cast<int>(code);
+        }
+#endif
         if (rc != 0 || output.empty()) return "";
 
         try {

@@ -63,7 +63,7 @@ inline bool isAudioFile(const std::string& filePath) {
 /// 跳过过大/过小/无法访问的文件
 inline bool isFileProcessable(const std::string& filePath, int maxSizeMb) {
     std::error_code ec;
-    auto sz = std::filesystem::file_size(filePath, ec);
+    auto sz = std::filesystem::file_size(utf8ToPath(filePath), ec);
     if (ec) return false;           // 无法访问
     if (sz == 0) return false;      // 空文件
     uint64_t maxBytes = static_cast<uint64_t>(maxSizeMb) * 1024ULL * 1024ULL;
@@ -92,11 +92,12 @@ public:
         std::unordered_set<std::string> seenPaths;
 
         for (const auto& dir : dirs) {
-            if (!std::filesystem::exists(dir)) {
+            const auto dirPath = utf8ToPath(dir);
+            if (!std::filesystem::exists(dirPath)) {
                 std::cerr << "[scanner] 目录不存在: " << dir << std::endl;
                 continue;
             }
-            if (!std::filesystem::is_directory(dir)) {
+            if (!std::filesystem::is_directory(dirPath)) {
                 std::cerr << "[scanner] 不是目录: " << dir << std::endl;
                 continue;
             }
@@ -106,11 +107,11 @@ public:
             try {
                 if (recursive) {
                     for (const auto& entry : std::filesystem::recursive_directory_iterator(
-                             dir, std::filesystem::directory_options::skip_permission_denied)) {
+                             dirPath, std::filesystem::directory_options::skip_permission_denied)) {
                         if (scanned >= maxFiles) break;
                         if (errors >= maxErrors) break;
                         if (!entry.is_regular_file()) continue;
-                        auto path = entry.path().string();
+                        auto path = pathToUtf8(entry.path());
                         if (!isAudioFile(path)) continue;
                         if (!isFileProcessable(path, maxSizeMb)) { skipped++; continue; }
                         // 去重：跳过已在其他目录下处理过的文件
@@ -122,11 +123,11 @@ public:
                     }
                 } else {
                     for (const auto& entry : std::filesystem::directory_iterator(
-                             dir, std::filesystem::directory_options::skip_permission_denied)) {
+                             dirPath, std::filesystem::directory_options::skip_permission_denied)) {
                         if (scanned >= maxFiles) break;
                         if (errors >= maxErrors) break;
                         if (!entry.is_regular_file()) continue;
-                        auto path = entry.path().string();
+                        auto path = pathToUtf8(entry.path());
                         if (!isAudioFile(path)) continue;
                         if (!isFileProcessable(path, maxSizeMb)) { skipped++; continue; }
                         // 去重：跳过已在其他目录下处理过的文件
@@ -160,7 +161,8 @@ public:
                 return std::nullopt;
             }
 
-            TagLib::FileRef f(filePath.c_str());
+            const auto taglibPath = utf8ToPath(filePath);
+            TagLib::FileRef f(taglibPath.c_str());
             if (f.isNull() || !f.file()) {
                 lastError_ = "无法打开文件: " + filePath;
                 return std::nullopt;
@@ -352,7 +354,7 @@ private:
     /// 原因：网络下载的音频文件标签常常损坏/错误/无意义，
     /// 而文件名"歌手 - 标题"格式更接近用户原始意图，检索命中率更高。
     static void applyFilenameSearch(const std::string& filePath, TrackInfo& info) {
-        std::string stem = std::filesystem::path(filePath).stem().string();
+        std::string stem = pathToUtf8(utf8ToPath(filePath).stem());
         stem = trim(stem);
         if (stem.empty()) return;
 
