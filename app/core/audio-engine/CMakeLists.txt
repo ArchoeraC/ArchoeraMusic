@@ -153,6 +153,7 @@ set(AUDIO_ENGINE_SOURCES
     src/pipeline.c
     src/pcm_uds.c
     src/player.c
+    src/segstore.c
 )
 
 set(AUDIO_ENGINE_EXTRA_SOURCES

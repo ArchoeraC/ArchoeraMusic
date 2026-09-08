@@ -91,6 +91,11 @@ typedef struct ArchoeraMediaEngine {
     char *wav_file;
     char *pcm_file;
 
+    /* store 内存源（docs/audio-memory-source.md §7/M2）：非空 → 引擎线程用
+     * pipeline_create_store 从 SegStore 解码（source 置空）。所有权归调用方
+     * （Dart 会话持有）；destroy 不释放 store，由调用方在 destroy 后释放。 */
+    SegStore *store;
+
     pthread_t thread;
     int thread_created;
     volatile int stop_requested;
@@ -894,8 +899,12 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
     AudioPipeline *np;
 
     cfg2.start_offset_ms = abs_start_ms;
-    /* 1) 先建新管线（含解码 seek；native 失败内部已回退 FFmpeg）——旧会话不动 */
-    np = pipeline_create(e->source, &cfg2, dummy_output, NULL);
+    /* 1) 先建新管线（含解码 seek；native 失败内部已回退 FFmpeg）——旧会话不动。
+       磁盘源走 pipeline_create；store 会话（整曲驻留可 seek）经 AVIO-mem 重建，
+       游标从目标偏移继续从同一 store 解码。 */
+    np = e->store
+        ? pipeline_create_store(e->store, &cfg2, dummy_output, NULL)
+        : pipeline_create(e->source, &cfg2, dummy_output, NULL);
     if (!np) return -1;
     pipeline_set_playback_streaming(np, true);
 
@@ -1092,15 +1101,23 @@ static void *engine_thread(void *arg)
 {
     ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)arg;
 
-    /* pipeline_create 在引擎线程执行：avformat_open_input 对网络源是阻塞 IO，
-       在 Dart isolate 线程执行会被 VM 中断信号打断（poll/recv 返回 EINTR，
-       FFmpeg 网络层直接失败）。pthread 线程不接收 Dart VM 信号，安全。 */
-    e->p = pipeline_create(e->source, &e->cfg, dummy_output, NULL);
+    /* pipeline_create / pipeline_create_store 在引擎线程执行：avformat_open_input
+       对网络源是阻塞 IO，在 Dart isolate 线程执行会被 VM 中断信号打断（poll/recv
+       返回 EINTR，FFmpeg 网络层直接失败）。pthread 线程不接收 Dart VM 信号，安全。
+       store 会话（整曲已驻留内存）经 pipeline_create_store → AVIO-mem 解码。 */
+    e->p = e->store
+        ? pipeline_create_store(e->store, &e->cfg, dummy_output, NULL)
+        : pipeline_create(e->source, &e->cfg, dummy_output, NULL);
     if (!e->p) {
         char err[320];
-        snprintf(err, sizeof(err),
-            "{\"type\":\"error\",\"message\":\"pipeline create failed: %s\"}",
-            e->source);
+        if (e->store) {
+            snprintf(err, sizeof(err),
+                "{\"type\":\"error\",\"message\":\"pipeline create_store failed\"}");
+        } else {
+            snprintf(err, sizeof(err),
+                "{\"type\":\"error\",\"message\":\"pipeline create failed: %s\"}",
+                e->source);
+        }
         ev_enqueue(e, err);
         ev_enqueue(e, "{\"type\":\"exited\",\"code\":-1}");
         e->done = 1;
@@ -1284,18 +1301,22 @@ mem_exit:
 
 /* ── 公开 API ────────────────────────────────────────────────── */
 
-ArchoeraMediaEngine *archoera_mediaengine_create(const char *source,
+/* create / create_store 共用实现：store 非空 → 内存源会话（source 置空，引擎
+ * 线程 pipeline_create_store 解码）；store 空 → 磁盘/URL 源会话（create）。 */
+static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
+                                     SegStore *store,
                                      const EngineConfig *cfg,
                                      const char *player_file,
                                      const char *session_dir,
                                      char *errbuf, int errbuf_size)
 {
-    if (!source || !session_dir) return NULL;
+    if ((!source && !store) || !session_dir) return NULL;
 
     ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)calloc(1, sizeof(ArchoeraMediaEngine));
     if (!e) return NULL;
 
-    e->source = strdup(source);
+    e->store = store; /* 非空 = store 内存源会话；生命周期归调用方，destroy 不释放 */
+    e->source = source ? strdup(source) : NULL;
     if (player_file) e->player_file = strdup(player_file);
     e->session_dir = strdup(session_dir);
     e->cfg = cfg ? *cfg : ENGINE_CONFIG_DEFAULT;
@@ -1362,6 +1383,26 @@ ArchoeraMediaEngine *archoera_mediaengine_create(const char *source,
     }
     e->thread_created = 1;
     return e;
+}
+
+ArchoeraMediaEngine *archoera_mediaengine_create(const char *source,
+                                     const EngineConfig *cfg,
+                                     const char *player_file,
+                                     const char *session_dir,
+                                     char *errbuf, int errbuf_size)
+{
+    return mediaengine_create_impl(source, NULL, cfg, player_file, session_dir,
+                                   errbuf, errbuf_size);
+}
+
+ArchoeraMediaEngine *archoera_mediaengine_create_store(SegStore *store,
+                                     const EngineConfig *cfg,
+                                     const char *player_file,
+                                     const char *session_dir,
+                                     char *errbuf, int errbuf_size)
+{
+    return mediaengine_create_impl(NULL, store, cfg, player_file, session_dir,
+                                   errbuf, errbuf_size);
 }
 
 int archoera_mediaengine_command(ArchoeraMediaEngine *e, const char *json_line)

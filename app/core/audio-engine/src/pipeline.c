@@ -31,6 +31,7 @@
 #include "tempo.h"
 
 #include <libavutil/samplefmt.h>
+#include <libavutil/mem.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -48,6 +49,14 @@
 /* 原生路径单次读取帧数（读入 float 交错 chunk 后整体重采样） */
 #define NATIVE_CHUNK_FRAMES 2048
 
+/* store 内存源 AVIO 读缓冲字节数（av_malloc 分配，随 avio_context_free 释放） */
+#define STORE_AVIO_BUF_SIZE 32768
+
+/* segstore 已并入 audio_engine_static 主库（audio-memory-source.md M2）：store 模式
+ * 对 segstore 为强链接（不再是弱符号守卫）。SegStore 不透明类型由 audio_engine.h
+ * 提供（与 segstore.h 同一 struct 标签）；store 生命周期归调用方。 */
+#include "segstore.h"
+
 struct AudioPipeline {
     Decoder     *dec;           /* FFmpeg 后端（native_active == false 时使用） */
     NativeDecoder *native;      /* 自研 Zig 内核（engine_mode==EraAudio 且接管成功）；
@@ -59,6 +68,14 @@ struct AudioPipeline {
     int          native_buf_frames; /* native_buf 帧容量 */
     Resampler   *resampler;
     Encoder     *encoder;
+
+    /* store 内存源模式（pipeline_create_store，docs/audio-memory-source.md §7）：
+     * decoder 经 decoder_open_mem 解码（不接管 avio），pipeline_destroy 在
+     * decoder_close 之后 avio_context_free。store 句柄所有权归调用方。 */
+    AVIOContext *store_avio;   /* 为 store 构造的自定义 IO（空 = 非 store 模式） */
+    SegStore    *store;        /* 内存源（整曲已驻留，可 seek） */
+    int64_t      store_pos;    /* 内存源读游标 */
+    int64_t      store_total;  /* 内存源逻辑总长（AVSEEK_SIZE / seek END） */
 
     /* 音频处理模块 */
     Equalizer   *equalizer;
@@ -88,12 +105,65 @@ struct AudioPipeline {
     bool         flushed;    /* 编码器已 flush */
 };
 
-AudioPipeline* pipeline_create(const char *source,
-                                const EngineConfig *cfg,
-                                OutputCallback output,
-                                void *user)
+/* —— store 内存源 AVIO 回调（语义复刻 tests/test_store_decode.c）——
+ * opaque = AudioPipeline*（store/游标/总长即所在字段）。
+ * 注意（FFmpeg 9）：read 到 EOF 必须返回 AVERROR_EOF（返回 0 会被
+ * fill_buffer 当作“未填满”反复重读 → 空转）。 */
+static int store_avio_read(void *opaque, uint8_t *buf, int size)
 {
-    if (!source || !cfg || !output) return NULL;
+    AudioPipeline *p = (AudioPipeline *)opaque;
+    intptr_t n = segstore_pread(p->store, buf, (size_t)size, (uint64_t)p->store_pos);
+    if (n < 0) return AVERROR(EIO);
+    if (n == 0) return AVERROR_EOF;
+    p->store_pos += n;
+    return (int)n;
+}
+
+static int64_t store_avio_seek(void *opaque, int64_t offset, int whence)
+{
+    AudioPipeline *p = (AudioPipeline *)opaque;
+    if (whence == AVSEEK_SIZE) return p->store_total;
+    int64_t base;
+    switch (whence) {
+    case SEEK_SET: base = 0; break;
+    case SEEK_CUR: base = p->store_pos; break;
+    case SEEK_END: base = p->store_total; break;
+    default: return -1;
+    }
+    p->store_pos = base + offset;
+    if (p->store_pos < 0) p->store_pos = 0;
+    if (p->store_pos > p->store_total) p->store_pos = p->store_total;
+    return p->store_pos;
+}
+
+/* 为 store 构造 AVIOContext（av_malloc 读缓冲，avio 接管其释放）并存入 p。
+ * @return 0 成功，-1 失败 */
+static int pipeline_store_avio_open(AudioPipeline *p, SegStore *store)
+{
+    p->store = store;
+    p->store_pos = 0;
+    p->store_total = (int64_t)segstore_head(store); /* 整曲已驻留 → head == 总长 */
+
+    unsigned char *buf = (unsigned char *)av_malloc(STORE_AVIO_BUF_SIZE);
+    if (!buf) return -1;
+    AVIOContext *avio = avio_alloc_context(buf, STORE_AVIO_BUF_SIZE, 0, p,
+                                           store_avio_read, NULL, store_avio_seek);
+    if (!avio) { av_free(buf); return -1; }
+    p->store_avio = avio;
+    return 0;
+}
+
+/* pipeline_create / pipeline_create_store 共用实现：store 非空 → SegStore
+ * 内存源（整曲已驻留，可 seek），经 AVIO + decoder_open_mem 解码；store 为空
+ * → 磁盘/URL 源，完全走现状（engine_mode==EraAudio 优先自研内核，回退 FFmpeg）。 */
+static AudioPipeline* pipeline_create_impl(const char *source,
+                                            SegStore *store,
+                                            const EngineConfig *cfg,
+                                            OutputCallback output,
+                                            void *user)
+{
+    if (!cfg || !output) return NULL;
+    if (!store && !source) return NULL;
 
     AudioPipeline *p = calloc(1, sizeof(*p));
     if (!p) return NULL;
@@ -101,9 +171,15 @@ AudioPipeline* pipeline_create(const char *source,
     p->cfg = *cfg;
     p->max_frames_per_call = 64;
 
-    /* 1. 打开解码器：engine_mode==EraAudio 优先自研内核（原生优先），
+    /* 1. 打开解码器：store 内存源（engine_mode 任意）跳过自研内核、直接用
+     *    FFmpeg-mem；磁盘源 engine_mode==EraAudio 优先自研内核（原生优先），
      *    未接管 / 打不开 / 内核未链接 → 回退 FFmpeg（Stable 行为零回退） */
-    if (cfg->engine_mode == ENGINE_MODE_ERAUDIO) {
+    if (store) {
+        if (pipeline_store_avio_open(p, store) != 0) {
+            fprintf(stderr, "%s SegStore 内存源 AVIO 构造失败\n", LOG_TAG);
+            goto fail;
+        }
+    } else if (cfg->engine_mode == ENGINE_MODE_ERAUDIO) {
         NativeInfo ninfo;
         int st = 1; /* 默认 unsupported */
         p->native = native_decoder_open(source, &ninfo, &st,
@@ -135,6 +211,12 @@ AudioPipeline* pipeline_create(const char *source,
         p->native_buf = malloc((size_t)p->native_buf_frames *
                                (size_t)src_ch * sizeof(float));
         if (!p->native_buf) goto fail;
+    } else if (store) {
+        p->dec = decoder_open_mem(p->store_avio); /* decoder 不接管 avio */
+        if (!p->dec) {
+            fprintf(stderr, "%s 无法从 SegStore 内存源打开解码器\n", LOG_TAG);
+            goto fail;
+        }
     } else {
         p->dec = decoder_open(source);
         if (!p->dec) {
@@ -298,6 +380,25 @@ AudioPipeline* pipeline_create(const char *source,
 fail:
     pipeline_destroy(p);
     return NULL;
+}
+
+/* 磁盘/URL 源（现状路径，store == NULL） */
+AudioPipeline* pipeline_create(const char *source,
+                                const EngineConfig *cfg,
+                                OutputCallback output,
+                                void *user)
+{
+    return pipeline_create_impl(source, NULL, cfg, output, user);
+}
+
+/* SegStore 内存源（docs/audio-memory-source.md §7）：整曲已在 store、可 seek；
+ * 语义对齐 pipeline_create，仅解码源改为 store → AVIO → decoder_open_mem。 */
+AudioPipeline* pipeline_create_store(SegStore *store,
+                                      const EngineConfig *cfg,
+                                      OutputCallback output,
+                                      void *user)
+{
+    return pipeline_create_impl(NULL, store, cfg, output, user);
 }
 
 /* DSP 处理链：重采样后的 float 交错 PCM → eq → loudness → limiter → tempo → fft
@@ -691,6 +792,8 @@ void pipeline_destroy(AudioPipeline *p)
         p->flushed = true;
     }
     if (p->dec) decoder_close(p->dec);
+    /* store 内存源 AVIO：decoder 不接管（AVFMT_FLAG_CUSTOM_IO），须在其后释放 */
+    if (p->store_avio) avio_context_free(&p->store_avio);
     if (p->native) native_decoder_close(p->native);
     if (p->resampler) resampler_destroy(p->resampler);
     if (p->encoder) encoder_destroy(p->encoder);

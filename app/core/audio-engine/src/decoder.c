@@ -155,6 +155,78 @@ fail:
     return NULL;
 }
 
+Decoder* decoder_open_mem(AVIOContext *avio)
+{
+    if (!avio) return NULL;
+
+    Decoder *d = calloc(1, sizeof(*d));
+    if (!d) return NULL;
+
+    d->stream_index = -1;
+    d->pkt = av_packet_alloc();
+    d->frame = av_frame_alloc();
+    if (!d->pkt || !d->frame) goto fail;
+
+    av_log_set_callback(decoder_log_callback);
+
+    /* 自定义 IO：CUSTOM_IO 使 avformat_close_input 不释放我们的 pb/avio */
+    d->fmt_ctx = avformat_alloc_context();
+    if (!d->fmt_ctx) goto fail;
+    avio->seekable = AVIO_SEEKABLE_NORMAL;
+    d->fmt_ctx->pb = avio;
+    d->fmt_ctx->flags |= AVFMT_FLAG_CUSTOM_IO;
+
+    AVDictionary *fmt_opts = NULL;
+    av_dict_set(&fmt_opts, "probesize", "1048576", 0);
+    av_dict_set(&fmt_opts, "analyzeduration", "500000", 0);
+    int ret = avformat_open_input(&d->fmt_ctx, "", NULL, &fmt_opts);
+    av_dict_free(&fmt_opts);
+    if (ret < 0) {
+        fprintf(stderr, "%s avformat_open_input(自定义IO) 失败: %s\n",
+                LOG_TAG, av_err2str(ret));
+        goto fail;
+    }
+
+    d->fmt_ctx->interrupt_callback.callback = interrupt_callback;
+    d->fmt_ctx->interrupt_callback.opaque = NULL;
+
+    ret = avformat_find_stream_info(d->fmt_ctx, NULL);
+    if (ret < 0) goto fail;
+
+    ret = av_find_best_stream(d->fmt_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+    if (ret < 0) goto fail;
+    d->stream_index = ret;
+
+    const AVCodec *codec = avcodec_find_decoder(
+        d->fmt_ctx->streams[d->stream_index]->codecpar->codec_id);
+    if (!codec) goto fail;
+    d->dec_ctx = avcodec_alloc_context3(codec);
+    if (!d->dec_ctx) goto fail;
+    ret = avcodec_parameters_to_context(d->dec_ctx,
+            d->fmt_ctx->streams[d->stream_index]->codecpar);
+    if (ret < 0) goto fail;
+
+    AVDictionary *opts = NULL;
+    av_dict_set(&opts, "strict_std_compliance", "-2", 0);
+    ret = avcodec_open2(d->dec_ctx, codec, &opts);
+    av_dict_free(&opts);
+    if (ret < 0) goto fail;
+
+    d->duration_us = d->fmt_ctx->duration;
+    if (d->duration_us <= 0 && d->fmt_ctx->streams[d->stream_index]->duration > 0) {
+        d->duration_us = av_rescale_q(
+            d->fmt_ctx->streams[d->stream_index]->duration,
+            d->fmt_ctx->streams[d->stream_index]->time_base,
+            (AVRational){1, AV_TIME_BASE});
+    }
+
+    return d;
+
+fail:
+    decoder_close(d);
+    return NULL;
+}
+
 int decoder_read_frame(Decoder *d, AVFrame **out_frame)
 {
     if (!d || !out_frame) return -1;

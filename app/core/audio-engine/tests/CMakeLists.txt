@@ -83,5 +83,73 @@ add_test(NAME test_memory_mode COMMAND test_memory_mode)
 set_tests_properties(test_memory_mode PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# SegmentStore（在线纯内存源，M1，docs/audio-memory-source.md）：单调填充 +
+# 阻塞 pread 对照 / 随机读 / EOF / abort 唤醒。编译 segstore.c 本体。
+find_package(Threads QUIET)
+add_executable(test_segstore test_segstore.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/segstore.c
+)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_segstore PRIVATE Threads::Threads)
+endif()
+target_include_directories(test_segstore PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_segstore COMMAND test_segstore)
+set_tests_properties(test_segstore PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# store→decoder 接线冒烟（M1，多格式矩阵）：对每个传入样本，SegStore 整曲
+# 预填 → AVIO → decoder_open_mem，与磁盘 decoder_open 对拍帧数/采样率/声道/时长。
+# fixture = 各封装/编码格式样本（flac/wav+mp3/opus/ogg）。
+# segstore.c 已并入 audio_engine_static 主库（M2），测试不再单独编译。
+add_executable(test_store_decode test_store_decode.c
+)
+target_link_libraries(test_store_decode PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_store_decode PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_store_decode PRIVATE m)
+endif()
+target_include_directories(test_store_decode PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_store_decode
+         COMMAND test_store_decode
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../samples/aac/t48_m.wav
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/mp3/samples/noxing.mp3
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/opus/samples/tiny.opus
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/vorbis/tiny.ogg)
+set_tests_properties(test_store_decode PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# store→pipeline 冒烟（M1.5，docs/audio-memory-source.md §7）：同 fixture 预填
+# SegStore → pipeline_create_store 走完整 DSP 链，与磁盘 pipeline_create 对拍
+# pcm 流出帧数/采样率/声道。tempo.c 以无 HAS_TEMPO 的 stub 链接（pipeline 拉 tempo
+# 符号，与 test_native_seek 同法）；segstore.c 来自 audio_engine_static 主库（M2）。
+add_executable(test_store_pipeline test_store_pipeline.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tempo.c
+)
+target_link_libraries(test_store_pipeline PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_store_pipeline PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_store_pipeline PRIVATE m)
+endif()
+target_include_directories(test_store_pipeline PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_store_pipeline
+         COMMAND test_store_pipeline
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac)
+set_tests_properties(test_store_pipeline PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # 集成测试（需要输入文件的跳过 CTEST，仅通过手动运行）
 # add_engine_test(test_pipeline test_pipeline.c)
