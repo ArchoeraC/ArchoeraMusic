@@ -58,7 +58,7 @@ void main() {
         final pcmFile = File(engine.pcmFilePath);
         expect(pcmFile.existsSync(), isTrue, reason: 'PCM 块文件应存在');
         expect(pcmFile.lengthSync(), greaterThan(0), reason: 'PCM 应有内容');
-        PcmAnalyzer? analyzer;
+        PcmFftSource? analyzer;
         final deadline = DateTime.now().add(const Duration(seconds: 10));
         while (analyzer == null && DateTime.now().isBefore(deadline)) {
           analyzer = engine.pcm;
