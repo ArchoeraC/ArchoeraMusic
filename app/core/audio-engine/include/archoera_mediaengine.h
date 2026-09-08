@@ -179,6 +179,12 @@ ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_pcm_epoch(
     ArchoeraMediaEngine *e);
 
 /**
+ * M3（docs/audio-memory-source.md §6.1/§6.2）：当前可用内存（MB），供 Dart
+ * 预算管理器计算 auto ceiling / requiredCeiling。失败返回 -1（回落保守下限）。
+ */
+ARCHOERA_MEDIAENGINE_API long long archoera_mediaengine_mem_available_mb(void);
+
+/**
  * 停止并销毁（请求退出 → join 引擎线程 → 释放资源）。
  * 可重复调用/传 NULL。
  */

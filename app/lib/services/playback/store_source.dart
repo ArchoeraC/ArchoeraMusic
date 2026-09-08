@@ -38,23 +38,58 @@ const int kMemorySourceWholeTrackLimit = 64 << 20; // 64 MiB
 /// minFloor 会话基线简化值（§6.1，≈32 MiB），用于 env 压低内存时从 ceiling 扣减。
 const int kMemoryFloorBaselineBytes = 32 << 20;
 
-/// 观测/压测用：内存上限 env 覆盖（§6.1/§6.2 门禁）。
+/// auto ceiling 硬上限（§6.2/§3.3，0.8 GiB）。
+const int kAutoCeilingBytes = 858993459;
+
+/// M3 预算策略（§6.1/§6.2）：由当前可用内存（MB）给出“整首可驻留”缓存上限。
+/// cache = max(0, min(avail×0.1, 0.8GiB) − floor)；avail 未知/不可得 → 回落
+/// 默认 [kMemorySourceWholeTrackLimit]（测试/无引擎环境的保守常量）。
+@visibleForTesting
+int memoryPolicyCacheLimitBytes({required int availMb, int floorMb = 32}) {
+  if (availMb <= 0) return kMemorySourceWholeTrackLimit;
+  final floor = floorMb << 20;
+  final ratioBytes = (availMb * 0.1 * (1 << 20)).round();
+  var cache = ratioBytes - floor;
+  final maxCache = kAutoCeilingBytes - floor;
+  if (cache > maxCache) cache = maxCache;
+  if (cache < 0) cache = 0;
+  return cache;
+}
+
+int? _engineAvailMb() {
+  try {
+    final mb = EngineBindings.instance.memAvailableMb();
+    return mb > 0 ? mb : null;
+  } catch (_) {
+    return null; // 无引擎 .so（单元/CI）或加载失败
+  }
+}
+
+/// 观测/压测用：内存上限（§6.1/§6.2 门禁）。
 ///
 /// - `ARCHOERA_MEMORY_CEIL_MB`：总 ceiling（MB）；低于它（减 floor 后）不足以整首
 ///   驻留 → 直接判定不可用（日志见决策、调用方回退 URL 路径，可故意压内存观察动作）。
 /// - `ARCHOERA_MEMORY_FLOOR_MB`：覆盖 minFloor（默认 [kMemoryFloorBaselineBytes]）。
-/// 均不设置时保持默认 [kMemorySourceWholeTrackLimit]（行为不变）。
+/// - 两者均不设置（[env] == null，真实运行）：auto——询问引擎可用内存按
+///   [memoryPolicyCacheLimitBytes] 计算；无引擎（测试传入非空 env 或不含 .so）回落
+///   默认 [kMemorySourceWholeTrackLimit]。
 @visibleForTesting
 int memoryWholeTrackLimitBytes({Map<String, String>? env}) {
   final e = env ?? Platform.environment;
   final ceilMb = int.tryParse(e['ARCHOERA_MEMORY_CEIL_MB'] ?? '');
   final floorMb = int.tryParse(e['ARCHOERA_MEMORY_FLOOR_MB'] ?? '');
-  final floorBytes = (floorMb != null && floorMb > 0)
-      ? floorMb << 20
-      : kMemoryFloorBaselineBytes;
+  final baseFloor = (floorMb != null && floorMb > 0)
+      ? floorMb
+      : kMemoryFloorBaselineBytes >> 20;
   if (ceilMb != null && ceilMb > 0) {
-    final cache = (ceilMb << 20) - floorBytes;
+    final cache = (ceilMb << 20) - (baseFloor << 20);
     return cache > 0 ? cache : 0; // ≤0 → 任何在线曲目都不可整首驻留
+  }
+  if (env == null) {
+    final avail = _engineAvailMb();
+    if (avail != null) {
+      return memoryPolicyCacheLimitBytes(availMb: avail, floorMb: baseFloor);
+    }
   }
   return kMemorySourceWholeTrackLimit;
 }

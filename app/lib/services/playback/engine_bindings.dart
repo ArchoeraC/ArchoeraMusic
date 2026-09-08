@@ -117,6 +117,10 @@ typedef _PcmWindowDart =
 typedef _PcmEpochNative = Int32 Function(Pointer<Opaque>);
 typedef _PcmEpochDart = int Function(Pointer<Opaque>);
 
+// 可用内存（MB）：archoera_mediaengine_mem_available_mb（M3 预算管理器）
+typedef _MemAvailNative = Int64 Function();
+typedef _MemAvailDart = int Function();
+
 // SegStore 内存源（M2，docs/audio-memory-source.md）：Dart 整曲/分段拉流 fill →
 // 引擎 AVIO-mem 解码。segstore_new/fill/set_total/destroy 由 Dart 会话持有并
 // 调用；archoera_mediaengine_create_store 把句柄交给引擎（引擎不释放，destroy
@@ -209,6 +213,10 @@ class EngineBindings {
   late final _PcmEpochDart _pcmEpochFfi = _lib
       .lookupFunction<_PcmEpochNative, _PcmEpochDart>(
         'archoera_mediaengine_pcm_epoch',
+      );
+  late final _MemAvailDart _memAvailFfi = _lib
+      .lookupFunction<_MemAvailNative, _MemAvailDart>(
+        'archoera_mediaengine_mem_available_mb',
       );
   late final _SegstoreNewDart _segstoreNew = _lib
       .lookupFunction<_SegstoreNewNative, _SegstoreNewDart>('segstore_new');
@@ -369,6 +377,9 @@ class EngineBindings {
 
   /// 内存播放模式会话重建计数（seek 后 +1，Dart 丢旧帧索引）；非内存模式 -1。
   int pcmEpoch(Pointer<Opaque> handle) => _pcmEpochFfi(handle);
+
+  /// M3：当前可用内存（MB）；<0 = 不可得（调用方回落保守下限）。
+  int memAvailableMb() => _memAvailFfi();
 
   /// 新建 SegStore（docs/audio-memory-source.md §4）。返回句柄地址；引擎 destroy
   /// 后由 [segstoreDestroy] 释放。0 = 失败（OOM）。
