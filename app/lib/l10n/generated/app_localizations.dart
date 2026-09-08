@@ -3008,6 +3008,102 @@ abstract class AppLocalizations {
   /// **'稍后重启'**
   String get settingsEngineRestartLater;
 
+  /// No description provided for @settingsMemoryPlaySection.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放内存'**
+  String get settingsMemoryPlaySection;
+
+  /// No description provided for @settingsMemoryPlayTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内存播放（不写盘解码缓存）'**
+  String get settingsMemoryPlayTitle;
+
+  /// No description provided for @settingsMemoryPlayOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'解码 PCM 驻留内存，不写 stream.wav/.pcm'**
+  String get settingsMemoryPlayOn;
+
+  /// No description provided for @settingsMemoryPlayOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'文件模式：解码 PCM 写盘（旧行为）'**
+  String get settingsMemoryPlayOff;
+
+  /// No description provided for @settingsMemoryFileModeNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭 = 引擎写 stream.wav/.pcm（文件模式）；对下一首生效。'**
+  String get settingsMemoryFileModeNote;
+
+  /// No description provided for @settingsMemoryPolicyAuto.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动（按可用内存均衡）'**
+  String get settingsMemoryPolicyAuto;
+
+  /// No description provided for @settingsMemoryPolicyAutoSub.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'0.8 GiB 硬上限，随空闲内存自适应'**
+  String get settingsMemoryPolicyAutoSub;
+
+  /// No description provided for @settingsMemoryPolicyLimit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义上限'**
+  String get settingsMemoryPolicyLimit;
+
+  /// No description provided for @settingsMemoryPolicyUnlimited.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无上限'**
+  String get settingsMemoryPolicyUnlimited;
+
+  /// No description provided for @settingsMemoryPolicyUnlimitedSub.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'整曲解码常驻内存；选择时需显式确认警告'**
+  String get settingsMemoryPolicyUnlimitedSub;
+
+  /// No description provided for @settingsMemoryLimitTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'解码 PCM 内存上限'**
+  String get settingsMemoryLimitTitle;
+
+  /// No description provided for @settingsMemoryLimitHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'MB（48kHz 立体声 ≈ 0.38 MB/秒）'**
+  String get settingsMemoryLimitHint;
+
+  /// No description provided for @settingsMemoryConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确定'**
+  String get settingsMemoryConfirm;
+
+  /// No description provided for @settingsMemoryCancel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'取消'**
+  String get settingsMemoryCancel;
+
+  /// No description provided for @settingsMemoryUnlimitedWarnTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'整曲解码常驻内存？'**
+  String get settingsMemoryUnlimitedWarnTitle;
+
+  /// No description provided for @settingsMemoryUnlimitedWarnBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'长曲目可累积数百 MB~GB 内存（48kHz 立体声 ≈ 0.38 MB/秒）：可能拖慢整机、内存压力下应用被系统回收，极端下系统不稳定。继续？'**
+  String get settingsMemoryUnlimitedWarnBody;
+
   /// No description provided for @volumeMute.
   ///
   /// In zh_CN, this message translates to:

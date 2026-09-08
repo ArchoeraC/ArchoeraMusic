@@ -1670,6 +1670,56 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsEngineRestartLater => 'Plus tard';
 
   @override
+  String get settingsMemoryPlaySection => '播放内存';
+
+  @override
+  String get settingsMemoryPlayTitle => '内存播放（不写盘解码缓存）';
+
+  @override
+  String get settingsMemoryPlayOn => '解码 PCM 驻留内存，不写 stream.wav/.pcm';
+
+  @override
+  String get settingsMemoryPlayOff => '文件模式：解码 PCM 写盘（旧行为）';
+
+  @override
+  String get settingsMemoryFileModeNote =>
+      '关闭 = 引擎写 stream.wav/.pcm（文件模式）；对下一首生效。';
+
+  @override
+  String get settingsMemoryPolicyAuto => '自动（按可用内存均衡）';
+
+  @override
+  String get settingsMemoryPolicyAutoSub => '0.8 GiB 硬上限，随空闲内存自适应';
+
+  @override
+  String get settingsMemoryPolicyLimit => '自定义上限';
+
+  @override
+  String get settingsMemoryPolicyUnlimited => '无上限';
+
+  @override
+  String get settingsMemoryPolicyUnlimitedSub => '整曲解码常驻内存；选择时需显式确认警告';
+
+  @override
+  String get settingsMemoryLimitTitle => '解码 PCM 内存上限';
+
+  @override
+  String get settingsMemoryLimitHint => 'MB（48kHz 立体声 ≈ 0.38 MB/秒）';
+
+  @override
+  String get settingsMemoryConfirm => '确定';
+
+  @override
+  String get settingsMemoryCancel => '取消';
+
+  @override
+  String get settingsMemoryUnlimitedWarnTitle => '整曲解码常驻内存？';
+
+  @override
+  String get settingsMemoryUnlimitedWarnBody =>
+      '长曲目可累积数百 MB~GB 内存（48kHz 立体声 ≈ 0.38 MB/秒）：可能拖慢整机、内存压力下应用被系统回收，极端下系统不稳定。继续？';
+
+  @override
   String get volumeMute => 'Couper le son';
 
   @override

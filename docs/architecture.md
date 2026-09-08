@@ -14,6 +14,12 @@
 > **引擎路线（2026-08-16）**：音频主引擎 = **FFmpeg 默认主引擎 + Zig 内核逐格式渐进替换 + C 壳保留
 > （FFI/CLI）**（详见 `docs/audio-kernel-zig.md`）；Dart/FFI 契约不变，行为零回归。
 >
+> **播放输出（2026-09-08）**：桌面播放新增「**内存播放（不落盘）模式**」（默认开启，独立于
+> Stable/EraAudio 引擎选择与 SongCache）；解码 PCM 驻留进程内块列表，频谱经 `pcm_window` FFI
+> 拉取，不写 `stream.wav/.pcm`。本文 §5/§9/§10.1 中「PCM 落盘 `stream.wav` + miniaudio 自播」
+> 等描述均指**文件模式**（显式开关 / env `ARCHOERA_ENGINE_FILE_MODE=1` 保留）。详见
+> `docs/audio-memory-playback.md`。
+>
 > 定位：独立开发的 Flutter 混合架构音乐播放器（桌面为主），以 AGPL-3.0 开源
 >
 > **核心原则：Flutter 承载 UI 与业务层，后端与原生工具链整体自行编写（C 音频引擎 / C# 扫描 / C++ 刮削 / Rust 下载 / Go Subsonic）。**
@@ -111,6 +117,11 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
 > **引擎路线（2026-08-16 决策）**：主引擎采用 **FFmpeg 默认主 + Zig 内核渐进替换 + C 壳（FFI/CLI
 > 保留）**（详见 `docs/audio-kernel-zig.md`）；本节描述为 C 引擎现状，迁移过程中默认仍 FFmpeg
 > （零回归），Zig 逐格式验收后接管（Dart/FFI 契约不变）。
+
+> **播放输出（2026-09-08 变更）**：桌面播放**默认内存模式**（不写 `stream.wav/.pcm`，独立开关，
+> 与 Stable/EraAudio 及 SongCache 均独立）；本小节及 §9/§10.1 的「PCM 落盘 + miniaudio 自播」
+> 描述在实现后仅适用于**文件模式**（设置关 / env `ARCHOERA_ENGINE_FILE_MODE=1`）。规格与验收见
+> `docs/audio-memory-playback.md`（S1 引擎 / S2 Dart 已实现，S3 基准收尾待办）。
 
 ### 5.1 链路总览（桌面端 FFI 直连引擎，2026-08-07 落地，取代 08-06 spawn+UDS 链路）
 
@@ -592,3 +603,4 @@ ArchoeraMusic/
 18. Flutter 原生能力直接用：i18n 走 `flutter_localizations` + `intl`/`gen_l10n`（ARB，非自研）；Dart 侧 `EventBus` 作为应用层统一事件通道（引擎事件 + 本地事件），UI 不直连传输层
 19. **桌面端 FFI 直连引擎（2026-08-07，取代 08-06 spawn+UDS 与更早侧车播放链路）**：Dart 加载 `libarchoera_mediaengine`，库内线程**全速完整转码 PCM 落盘 `stream.wav` → miniaudio 自播**（player 模式 `skip_encoder=true`，不再 Opus 编码）——「完整时长 + 任意 seek」语义；seek 走 miniaudio 即时 seek（不重启引擎、不重转码）；事件 FIFO 50ms 轮询 `pollEvent`（position 只留最新，`set_event_interval` 降频协商）；FFT 为拉模式（按播放位置从本地 PCM 索引读帧 + FFI libfft.so）
 20. ~~sidecar 播放路径收窄~~（已随 2026-09-06 去侧车化整体废弃）
+21. **内存播放（不落盘）模式（2026-09-08 决策；S1 引擎 C / S2 Dart 接线与设置已实现，S3 基准收尾待办）**：桌面播放**默认内存模式**（独立开关，与 Stable/EraAudio、SongCache 均独立）；解码 PCM 驻留进程内「全量块列表」（与 `stream.pcm` 文件块同构，达 cap 才滚动淘汰），频谱经新 FFI `archoera_mediaengine_pcm_window`/`_epoch` 拉窗，不写 `stream.wav/.pcm`；无设备 + 内存模式 → error（不文件回退）；`cap`：auto（按可用内存均衡，**0.8 GiB 硬上限**，查询故障回落、append 后记账强制淘汰、绝不越过用户设限）/ 自定义 / 无上限（须显式警告内存过载后果）。文件模式（设置关 / `ARCHOERA_ENGINE_FILE_MODE=1`）保留现状字节级行为。规格与验收：`docs/audio-memory-playback.md`。
