@@ -100,6 +100,23 @@ add_test(NAME test_segstore COMMAND test_segstore)
 set_tests_properties(test_segstore PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# M2.3 进程级段池：开启后 destroy→新会话复用旧段（跨会话免 malloc 碎片）。
+add_executable(test_segpool test_segpool.c)
+target_link_libraries(test_segpool PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_segpool PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_segpool PRIVATE m)
+endif()
+target_include_directories(test_segpool PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_segpool COMMAND test_segpool)
+set_tests_properties(test_segpool PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # store→decoder 接线冒烟（M1，多格式矩阵）：对每个传入样本，SegStore 整曲
 # 预填 → AVIO → decoder_open_mem，与磁盘 decoder_open 对拍帧数/采样率/声道/时长。
 # fixture = 各封装/编码格式样本（flac/wav+mp3/opus/ogg）。

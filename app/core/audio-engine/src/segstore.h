@@ -106,6 +106,11 @@ SEGSTORE_API uint64_t segstore_required_ceiling(uint64_t min_floor, uint64_t req
 SEGSTORE_API void segstore_abort(SegStore *s);
 SEGSTORE_API void segstore_destroy(SegStore *s);
 
+/* M2.3 进程级段池（跨会话复用；默认关闭）。启用后 destroy/release 释放的段缓冲
+ * 优先归还进程池，供后续会话复用（免逐次 malloc/free 碎片）。 */
+SEGSTORE_API void segstore_pool_set_cap(uint64_t bytes);  /* 0 = 关闭并清空池 */
+SEGSTORE_API uint64_t segstore_pool_reuses(void);         /* 观测：进程池复用累计 */
+
 #ifdef __cplusplus
 }
 #endif

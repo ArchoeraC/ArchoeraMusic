@@ -75,6 +75,8 @@ static uint8_t *freelist_pop(SegStore *s)
     return s->freelist[--s->free_len];
 }
 
+static uint8_t *pool_get(size_t size); /* M2.3 进程池（定义见文件后部） */
+
 SegStore *segstore_new(uint64_t total_hint, size_t seg_size, uint64_t budget)
 {
     SegStore *s = (SegStore *)calloc(1, sizeof(*s));
@@ -111,10 +113,13 @@ int segstore_fill(SegStore *s, uint64_t off, const void *data, size_t len)
             if (buf) {
                 s->reuse_count++;
             } else {
-                buf = (uint8_t *)malloc(s->seg_size);
+                buf = pool_get(s->seg_size); /* M2.3：先查进程池，再 malloc */
                 if (!buf) {
-                    pthread_mutex_unlock(&s->mu);
-                    return SEGSTORE_ERR_IO;
+                    buf = (uint8_t *)malloc(s->seg_size);
+                    if (!buf) {
+                        pthread_mutex_unlock(&s->mu);
+                        return SEGSTORE_ERR_IO;
+                    }
                 }
             }
             s->segs[seg] = buf;
@@ -299,6 +304,84 @@ void segstore_abort(SegStore *s)
     pthread_mutex_unlock(&s->mu);
 }
 
+/* ── M2.3 进程级段池（跨会话复用，默认关）────────────────────────── */
+typedef struct PoolSeg {
+    uint8_t *buf;
+    size_t size;
+} PoolSeg;
+
+static pthread_mutex_t g_pool_mu = PTHREAD_MUTEX_INITIALIZER;
+static PoolSeg *g_pool = NULL;
+static size_t g_pool_n = 0, g_pool_cap = 0;
+static uint64_t g_pool_bytes = 0, g_pool_limit = 0, g_pool_reuses = 0;
+
+static int pool_put(uint8_t *buf, size_t size)
+{
+    pthread_mutex_lock(&g_pool_mu);
+    if (g_pool_limit == 0 || g_pool_bytes + size > g_pool_limit) {
+        pthread_mutex_unlock(&g_pool_mu);
+        return 0; /* 池关闭/超限 → 调用方 free */
+    }
+    if (g_pool_n == g_pool_cap) {
+        size_t cap = g_pool_cap ? g_pool_cap * 2 : 16;
+        PoolSeg *np = (PoolSeg *)realloc(g_pool, cap * sizeof(*np));
+        if (!np) {
+            pthread_mutex_unlock(&g_pool_mu);
+            return 0;
+        }
+        g_pool = np;
+        g_pool_cap = cap;
+    }
+    g_pool[g_pool_n].buf = buf;
+    g_pool[g_pool_n].size = size;
+    g_pool_n++;
+    g_pool_bytes += size;
+    pthread_mutex_unlock(&g_pool_mu);
+    return 1;
+}
+
+static uint8_t *pool_get(size_t size)
+{
+    pthread_mutex_lock(&g_pool_mu);
+    uint8_t *buf = NULL;
+    for (size_t i = 0; i < g_pool_n; i++) {
+        if (g_pool[i].size == size) {
+            buf = g_pool[i].buf;
+            g_pool[i] = g_pool[--g_pool_n];
+            g_pool_bytes -= size;
+            g_pool_reuses++;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_pool_mu);
+    return buf;
+}
+
+void segstore_pool_set_cap(uint64_t bytes)
+{
+    pthread_mutex_lock(&g_pool_mu);
+    g_pool_limit = bytes;
+    if (bytes == 0) { /* 关闭并清空 */
+        for (size_t i = 0; i < g_pool_n; i++) free(g_pool[i].buf);
+        g_pool_n = 0;
+        g_pool_bytes = 0;
+    }
+    pthread_mutex_unlock(&g_pool_mu);
+    if (bytes == 0) {
+        free(g_pool);
+        g_pool = NULL;
+        g_pool_cap = 0;
+    }
+}
+
+uint64_t segstore_pool_reuses(void)
+{
+    pthread_mutex_lock(&g_pool_mu);
+    uint64_t r = g_pool_reuses;
+    pthread_mutex_unlock(&g_pool_mu);
+    return r;
+}
+
 void segstore_destroy(SegStore *s)
 {
     if (!s) return;
@@ -306,9 +389,17 @@ void segstore_destroy(SegStore *s)
     s->aborted = 1;
     pthread_cond_broadcast(&s->cv);
     pthread_mutex_unlock(&s->mu);
-    for (size_t i = 0; i < s->segs_cap; i++) free(s->segs[i]);
+    /* 段与 freelist 缓冲：优先归还进程池（cap 内），否则直接 free */
+    for (size_t i = 0; i < s->segs_cap; i++) {
+        if (s->segs[i]) {
+            if (!pool_put(s->segs[i], s->seg_size)) free(s->segs[i]);
+            s->segs[i] = NULL;
+        }
+    }
+    for (size_t i = 0; i < s->free_len; i++) {
+        if (!pool_put(s->freelist[i], s->seg_size)) free(s->freelist[i]);
+    }
     free(s->segs);
-    for (size_t i = 0; i < s->free_len; i++) free(s->freelist[i]);
     free(s->freelist);
     pthread_mutex_destroy(&s->mu);
     pthread_cond_destroy(&s->cv);
