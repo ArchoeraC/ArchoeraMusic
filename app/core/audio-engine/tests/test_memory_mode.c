@@ -20,6 +20,7 @@
  */
 #define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE 700
+#define _DARWIN_C_SOURCE 1 /* macOS：_XOPEN_SOURCE 700 会抑制 BSD 扩展（mkdtemp 等）声明 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
