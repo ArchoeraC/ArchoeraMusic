@@ -96,7 +96,8 @@ private:
     /// 直接写入 MP3 文件（ID3v2）
     bool writeMp3(const std::string& filePath, const ScrapeResult& result,
                   const ScraperConfig& cfg) {
-        TagLib::MPEG::File f(filePath.c_str());
+        const auto fileP = utf8ToPath(filePath);
+        TagLib::MPEG::File f(fileP.c_str());
         if (!f.isValid()) {
             lastError_ = "无法打开 MP3 文件: " + filePath;
             return false;
@@ -135,7 +136,8 @@ private:
     /// 直接写入 FLAC 文件
     bool writeFlac(const std::string& filePath, const ScrapeResult& result,
                    const ScraperConfig& cfg) {
-        TagLib::FLAC::File f(filePath.c_str());
+        const auto fileP = utf8ToPath(filePath);
+        TagLib::FLAC::File f(fileP.c_str());
         if (!f.isValid()) {
             lastError_ = "无法打开 FLAC 文件: " + filePath;
             return false;
@@ -179,11 +181,12 @@ private:
         
         bool isOpus = (ext == "opus");
         TagLib::File* filePtr = nullptr;
+        const auto fileP = utf8ToPath(filePath);
         
         if (isOpus) {
-            filePtr = new TagLib::Ogg::Opus::File(filePath.c_str());
+            filePtr = new TagLib::Ogg::Opus::File(fileP.c_str());
         } else {
-            filePtr = new TagLib::Ogg::Vorbis::File(filePath.c_str());
+            filePtr = new TagLib::Ogg::Vorbis::File(fileP.c_str());
         }
         
         if (!filePtr || !filePtr->isValid()) {
@@ -228,7 +231,8 @@ private:
     /// 直接写入 WAV 文件（ID3v2 chunk）
     bool writeWav(const std::string& filePath, const ScrapeResult& result,
                   const ScraperConfig& cfg) {
-        TagLib::RIFF::WAV::File f(filePath.c_str());
+        const auto fileP = utf8ToPath(filePath);
+        TagLib::RIFF::WAV::File f(fileP.c_str());
         if (!f.isValid()) {
             lastError_ = "无法打开 WAV 文件: " + filePath;
             return false;
@@ -261,7 +265,8 @@ private:
     /// 直接写入 AIFF 文件（ID3v2 chunk）
     bool writeAiff(const std::string& filePath, const ScrapeResult& result,
                    const ScraperConfig& cfg) {
-        TagLib::RIFF::AIFF::File f(filePath.c_str());
+        const auto fileP = utf8ToPath(filePath);
+        TagLib::RIFF::AIFF::File f(fileP.c_str());
         if (!f.isValid()) {
             lastError_ = "无法打开 AIFF 文件: " + filePath;
             return false;
@@ -294,7 +299,8 @@ private:
     /// 直接写入 MP4/M4A/AAC 文件
     bool writeMp4(const std::string& filePath, const ScrapeResult& result,
                   const ScraperConfig& cfg) {
-        TagLib::MP4::File f(filePath.c_str());
+        const auto fileP = utf8ToPath(filePath);
+        TagLib::MP4::File f(fileP.c_str());
         if (!f.isValid()) {
             lastError_ = "无法打开 MP4/M4A 文件: " + filePath;
             return false;
@@ -335,7 +341,8 @@ private:
     /// 通用写入方法（回退方案）
     bool writeGeneric(const std::string& filePath, const ScrapeResult& result,
                       const ScraperConfig& cfg) {
-        TagLib::FileRef f(filePath.c_str());
+        const auto fileP = utf8ToPath(filePath);
+        TagLib::FileRef f(fileP.c_str());
         if (f.isNull() || !f.file()) {
             lastError_ = "无法打开文件: " + filePath;
             return false;

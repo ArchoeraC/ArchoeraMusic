@@ -17,7 +17,22 @@ package endpoints
 #include <windows.h>
 #include <stdlib.h>
 typedef int (*archoera_transcode_fn)(const char*, const char*, int, int, int, int);
-static void* archoera_dlopen(const char* path) { return (void*)LoadLibraryA(path); }
+// path 为 UTF-8 字节（Go C.CString）。LoadLibraryA 按 ANSI 代码页解释，非 ASCII
+// 目录（如 AppData 中文用户名下）会加载失败 → 转 UTF-16 用 LoadLibraryW。
+static void* archoera_dlopen(const char* path) {
+    wchar_t* wpath;
+    void* h;
+    int n;
+    if (!path) return NULL;
+    n = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
+    if (n <= 0) return NULL;
+    wpath = (wchar_t*)malloc((size_t)n * sizeof(wchar_t));
+    if (!wpath) return NULL;
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, n);
+    h = (void*)LoadLibraryW(wpath);
+    free(wpath);
+    return h;
+}
 static int archoera_dlclose(void* h) { return FreeLibrary((HMODULE)h) ? 0 : -1; }
 static int archoera_call_transcode(void* h, const char* in, const char* out, int br, int sr, int ch, int skip) {
     archoera_transcode_fn fn = (archoera_transcode_fn)(void*)GetProcAddress((HMODULE)h, "archoera_transcode_mp3");

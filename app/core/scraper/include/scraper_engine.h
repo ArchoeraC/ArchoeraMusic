@@ -483,16 +483,19 @@ private:
     void writeCoverCache(const std::string& trackId, const std::vector<uint8_t>& coverData) {
         if (trackId.empty() || coverData.empty() || cfg_.coverCacheDir.empty()) return;
         try {
-            std::filesystem::create_directories(cfg_.coverCacheDir);
-            std::string coverPath = cfg_.coverCacheDir + "/" + trackId + ".img";
-            std::ofstream ofs(coverPath, std::ios::binary);
+            const auto cacheDir = utf8ToPath(cfg_.coverCacheDir);
+            std::filesystem::create_directories(cacheDir);
+            std::filesystem::path coverFile = cacheDir / (trackId + ".img");
+            std::ofstream ofs(coverFile, std::ios::binary);
             if (ofs) {
                 ofs.write(reinterpret_cast<const char*>(coverData.data()),
                           static_cast<std::streamsize>(coverData.size()));
                 ofs.close();
-                std::cerr << "[scraper]   ✓ 封面缓存写入: " << coverPath << std::endl;
+                std::cerr << "[scraper]   ✓ 封面缓存写入: "
+                          << pathToUtf8(coverFile) << std::endl;
             } else {
-                std::cerr << "[scraper]   ⚠ 无法写入封面缓存: " << coverPath << std::endl;
+                std::cerr << "[scraper]   ⚠ 无法写入封面缓存: "
+                          << pathToUtf8(coverFile) << std::endl;
             }
         } catch (const std::exception& e) {
             std::cerr << "[scraper]   ⚠ 封面缓存写入异常: " << e.what() << std::endl;

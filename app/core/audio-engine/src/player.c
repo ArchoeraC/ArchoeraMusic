@@ -27,6 +27,10 @@
 #include <math.h>
 #include "compat/qatomic.h"
 
+#ifdef _WIN32
+#include <stddef.h>   /* wchar_t */
+#endif
+
 /* 单头文件实现仅编译一次（player.c 内） */
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
@@ -504,9 +508,35 @@ PlayerCtx *player_start_opts(const char *ogg_path,
             dev_rate, dev_ch, reason);
     }
 
-    /* 全解码模式：seek 即时；无需实时解码线程 */
+    /* 全解码模式：seek 即时；无需实时解码线程。
+       Windows：文件路径来自 Dart 为 UTF-8，miniaudio 窄接口按 ACP 打开会乱码
+       （同 scraper 根因），转 UTF-16 走 ma_sound_init_from_file_w 宽接口。 */
+#ifdef _WIN32
+    {
+        wchar_t *wpath;
+        int nw;
+        wpath = NULL;
+        nw = MultiByteToWideChar(CP_UTF8, 0, ogg_path, -1, NULL, 0);
+        if (nw > 0) {
+            wpath = (wchar_t *)malloc((size_t)nw * sizeof(wchar_t));
+            if (wpath)
+                MultiByteToWideChar(CP_UTF8, 0, ogg_path, -1, wpath, nw);
+        }
+        if (wpath) {
+            r = ma_sound_init_from_file_w(&p->engine, wpath,
+                                          MA_SOUND_FLAG_DECODE, NULL, NULL,
+                                          &p->sound);
+            free(wpath);
+        } else {
+            r = ma_sound_init_from_file(&p->engine, ogg_path,
+                                        MA_SOUND_FLAG_DECODE, NULL, NULL,
+                                        &p->sound);
+        }
+    }
+#else
     r = ma_sound_init_from_file(&p->engine, ogg_path,
                                 MA_SOUND_FLAG_DECODE, NULL, NULL, &p->sound);
+#endif
     if (r != MA_SUCCESS) {
         fprintf(stderr, "[player] 加载 %s 失败: %d\n", ogg_path, (int)r);
         ma_engine_uninit(&p->engine);
