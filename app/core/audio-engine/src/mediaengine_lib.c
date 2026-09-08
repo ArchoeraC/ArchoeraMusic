@@ -1529,6 +1529,13 @@ int archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e)
     return e ? e->mem_epoch : -1;
 }
 
+/* M3（§6.2/§6.1）：当前可用内存（MB），供 Dart 预算管理器算 auto ceiling/
+ * requiredCeiling。失败返回 -1（调用方回落保守下限）。 */
+long long archoera_mediaengine_mem_available_mb(void)
+{
+    return mem_avail_mb();
+}
+
 void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
 {
     if (!e) return;

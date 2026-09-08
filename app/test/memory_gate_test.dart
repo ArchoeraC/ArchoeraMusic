@@ -45,4 +45,23 @@ void main() {
     };
     expect(memoryWholeTrackLimitBytes(env: env), 63 << 20);
   });
+
+  test('M3 auto（引擎可用内存策略）：4GiB 可用 → cache≈avail×0.1−floor(32)', () {
+    final cache = memoryPolicyCacheLimitBytes(availMb: 4096);
+    expect(cache, greaterThan(377 << 20));
+    expect(cache, lessThan(378 << 20));
+  });
+
+  test('M3 auto：超大可用 → cache 钳到 0.8GiB−floor(32)', () {
+    final cache = memoryPolicyCacheLimitBytes(availMb: 20000);
+    expect(cache, kAutoCeilingBytes - (32 << 20));
+  });
+
+  test('M3 auto：avail×0.1 < floor → cache=0（拒绝纯内存）', () {
+    expect(memoryPolicyCacheLimitBytes(availMb: 100), 0);
+  });
+
+  test('M3 auto：avail 不可得 → 回落默认 64MiB', () {
+    expect(memoryPolicyCacheLimitBytes(availMb: 0), kMemorySourceWholeTrackLimit);
+  });
 }
