@@ -155,7 +155,8 @@ EtaIcons 化时幂等跳过；历史 Material 迁移时使用）。
 
 ## 9. 许可与致谢义务
 
-- 图标字形源：**MingCute Icons**（Apache-2.0）、缺口补入 **Tabler Icons**（MIT）。
+- 图标字形源：**MingCute Icons**（Apache-2.0）、缺口补入 **Tabler Icons**（MIT）、
+  **Lucide**（ISC，如 `memoryStickOutline`）。
 - 对源图标做了**改作**（描边 SVG → 描边转轮廓 → 重打包字体），属许可允许的衍生改作，
   但需保留来源与修改声明 —— 已在仓库根 `README.md`「第三方声明 / 特别鸣谢」登记。
 - 详细逐项见 `app/eta-tools/eta_icons/source/LICENSE-*`；品牌标识 EtaMark 为项目自建字形。
