@@ -9,20 +9,37 @@ mixin _PlaybackNotifierSession
     required int bitrate,
     bool passthrough = true,
     int gen = 0,
+    SegStoreHandle store = 0,
+    bool memoryStore = false,
   }) async {
     await _stopEngine();
-    final engine = await AudioEngineProcess.start(
-      source: source,
-      offsetMs: offsetMs,
-      bitrate: bitrate,
-      passthrough: passthrough,
-    );
+    final AudioEngineProcess engine;
+    try {
+      engine = await AudioEngineProcess.start(
+        source: source,
+        store: store,
+        memoryStore: memoryStore,
+        offsetMs: offsetMs,
+        bitrate: bitrate,
+        passthrough: passthrough,
+      );
+    } catch (e) {
+      // store 会话引擎创建失败：句柄尚未交给 _engine/_engineStore，就地释放后
+      // 上抛，由 load 决定回退 URL 路径或按 load 失败处理。
+      _log('引擎创建失败（${memoryStore ? 'store 内存源' : 'URL 源'}）: $e');
+      _destroyStore(store);
+      rethrow;
+    }
     if (gen != 0 && gen != _loadGen) {
       _log('会话被新 load 取代，丢弃刚创建的引擎');
       await engine.stop();
+      _destroyStore(store);
       return;
     }
     _engine = engine;
+    // store 所有权交给 _engineStore：此后由 _stopEngine（engine.stop join 之后）
+    // 负责 destroy，本方法其余失败出口不再触碰（避免同句柄重复释放）。
+    _engineStore = store;
     _sessionOffsetMs = offsetMs;
     _engineSubs.add(engine.events.listen(_onEngineEvent));
     _fftStarted = false;
@@ -52,7 +69,9 @@ mixin _PlaybackNotifierSession
       if (gen != 0 && gen != _loadGen) return;
       if (!identical(_engine, engine)) return;
       state = state.copyWith(buffering: false);
-      unawaited(engine.stop());
+      // 超时放弃当前会话：_stopEngine 负责 engine.stop（join）+ destroy 关联
+      // store；随后 load 决定回退 URL 路径或按失败处理。
+      await _stopEngine();
       throw StateError('引擎启动超时（30s），已停止该会话');
     }
     if (gen != 0 && gen != _loadGen) {
@@ -63,7 +82,7 @@ mixin _PlaybackNotifierSession
       _log('会话已放弃（就绪等待期间被 stop）');
       return;
     }
-    _log('引擎会话就绪，开始播放');
+    _log(memoryStore ? '引擎 store 内存源会话就绪，开始播放' : '引擎会话就绪，开始播放');
   }
 
   void _recordHistoryOnce() {
@@ -183,8 +202,13 @@ mixin _PlaybackNotifierSession
     _engineSubs.clear();
     final engine = _engine;
     _engine = null;
+    final store = _engineStore;
+    _engineStore = 0;
     if (engine != null) {
       await engine.stop();
     }
+    // store 释放点（docs/audio-memory-source.md §12）：紧跟引擎 destroy（已 join
+    // 解码线程）之后 destroy SegStore，释放驻留字节；同句柄只经本处释放一次。
+    _destroyStore(store);
   }
 }

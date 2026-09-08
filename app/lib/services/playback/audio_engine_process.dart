@@ -266,8 +266,15 @@ class AudioEngineProcess {
   ///
   /// 参数覆盖架构文档 §5.6：bitrate/EQ/preamp/normalization/tempo/offset。
   /// [passthrough] 原音质直通：true = 引擎保持源采样率（默认）；false = 统一 48kHz。
+  ///
+  /// store 内存源（M2，docs/audio-memory-source.md）：[store] 非 0 时走
+  /// `archoera_mediaengine_create_store`（source 忽略，引擎 AVIO-mem 解码）；
+  /// 为 0 时走 [source] 的 `create`（现状）。[memoryStore] 标记 store 会话为
+  /// 纯内存源（PCM 走 MemoryPcmAnalyzer）；EngineConfig.noDisk 仍由 prefs 注入。
   static Future<AudioEngineProcess> start({
     required String source,
+    SegStoreHandle store = 0,
+    bool memoryStore = false,
     int offsetMs = 0,
     int bitrate = 128000,
     bool passthrough = true,
@@ -320,12 +327,19 @@ class AudioEngineProcess {
         pcmMemCapKb: memCapKb,
       );
       try {
-        final h = EngineBindings.instance.create(
-          source: source,
-          sessionDir: sockDir.path,
-          playerFile: playerFile,
-          config: cfg,
-        );
+        final h = store != 0
+            ? EngineBindings.instance.createStore(
+                store: store,
+                sessionDir: sockDir.path,
+                playerFile: playerFile,
+                config: cfg,
+              )
+            : EngineBindings.instance.create(
+                source: source,
+                sessionDir: sockDir.path,
+                playerFile: playerFile,
+                config: cfg,
+              );
         return h.address;
       } finally {
         calloc.free(cfg);
@@ -336,7 +350,7 @@ class AudioEngineProcess {
       handle: handleAddr,
       sockDir: sockDir,
       outSampleRate: passthrough ? 0 : 48000,
-      memoryMode: memoryOn,
+      memoryMode: memoryOn || memoryStore,
     );
     // 事件泵就绪（接收 isolate 已进入阻塞等待）：返回前确认事件通道可用，
     // 失败自动回退 50ms 轮询。引擎事件在 C FIFO 中排队，晚几 ms 不丢失。

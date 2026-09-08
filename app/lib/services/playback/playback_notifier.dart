@@ -18,8 +18,11 @@ import '../streaming/streaming_provider.dart';
 import '../streaming/streaming_session.dart';
 import 'audio_engine_process.dart';
 import 'dj_mode.dart';
+import '../../widgets/dialogs/memory_alert.dart';
+import 'engine_bindings.dart';
 import 'playback_session.dart';
 import 'playback_state.dart';
+import 'store_source.dart';
 
 export 'fft_frame.dart' show FftFrame;
 
@@ -31,6 +34,12 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   final List<StreamSubscription<EngineEvent>> _engineSubs = [];
 
   AudioEngineProcess? _engine;
+
+  /// 当前引擎会话关联的 SegStore 内存源句柄（0 = 无；在线纯内存会话，
+  /// docs/audio-memory-source.md §2/§12）。与 [_engine] 同生命周期：会话被
+  /// stop / 被新会话取代 / 播放自然结束后，由 [_stopEngine] 在
+  /// engine.stop()（join 解码线程）之后 segstore_destroy，避免同句柄重复释放。
+  SegStoreHandle _engineStore = 0;
 
   /// 输出设备切换失败通知（set_sink 回执 !ok）：设置页订阅后弹错误 toast。
   ///
@@ -157,9 +166,26 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
     required int bitrate,
     bool passthrough = true,
     int gen = 0,
+    SegStoreHandle store = 0,
+    bool memoryStore = false,
   });
 
   Future<void> _stopEngine();
+
+  /// 释放 SegStore 句柄（幂等：0 / 重复调用安全，见 engine_bindings）。
+  ///
+  /// 仅在引擎会话已 destroy（join 完成）后调用（docs/audio-memory-source.md
+  /// §12 释放顺序 = 唤醒 → join → free，杜绝 use-after-free）。释放失败静默
+  /// 忽略：不中断播放主流程，且本方法可能在 provider dispose 收尾期被调用
+  /// （届时不能触碰 state/_log）。
+  void _destroyStore(SegStoreHandle store) {
+    if (store == 0) return;
+    try {
+      EngineBindings.instance.segstoreDestroy(store);
+    } catch (_) {
+      // 罕见；静默（dispose 收尾期不可记日志）
+    }
+  }
 
   void _pollSpectrum();
 
@@ -343,8 +369,10 @@ class PlaybackNotifier extends _PlaybackNotifierBase
     }
     if (!_fftStarted) {
       _fftStarted = true;
-      _log('FFT 频谱已启动: 本地 ${pcm.blockCount} 块，epoch=${pcm.epoch}，'
-          '位置事件驱动拉模式');
+      _log(
+        'FFT 频谱已启动: 本地 ${pcm.blockCount} 块，epoch=${pcm.epoch}，'
+        '位置事件驱动拉模式',
+      );
     }
     state = state.copyWith(fft: frame);
   }
@@ -398,6 +426,9 @@ class PlaybackNotifier extends _PlaybackNotifierBase
   /// 停止（停引擎；播放器随引擎终止）。
   @override
   Future<void> stop() async {
+    // 作废排队/在途的 load（含内存源整首下载完成后不再续播；见 loading.load 的
+    // gen 校验）。注意 stop 后仍会经用户再触发 load，gen 单调递增无副作用。
+    _loadGen++;
     _fftActive = false;
     _sessionOffsetMs = 0;
     _pendingPauseAfterReady = false;

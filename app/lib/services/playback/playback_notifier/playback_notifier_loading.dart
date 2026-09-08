@@ -116,6 +116,10 @@ mixin _PlaybackNotifierLoading
     final gen = ++_loadGen;
     unawaited(_stopEngine());
     final task = _loadChain.then((_) async {
+      if (gen != _loadGen) {
+        _log('load 被新会话取代（排队中）: $source');
+        return;
+      }
       state = state.copyWith(
         title: title,
         subtitle: subtitle,
@@ -130,18 +134,77 @@ mixin _PlaybackNotifierLoading
             ? (qualityBitrate[quality] ?? bitrate)
             : bitrate;
         final passthrough = ref.read(appPrefsProvider).passthrough;
-        await _startSession(
-          source,
-          offsetMs: offsetMs,
-          bitrate: useBitrate,
-          passthrough: passthrough,
-          gen: gen,
-        );
+        // M2.2 在线纯内存源（docs/audio-memory-source.md §2/§6.1/§6.2）：
+        // 内存播放开且 source 是 http(s) 在线 URL → Dart 整首下载进 SegStore 再
+        // createStore 会话；下载失败/超 64 MiB/store 失败 → 回退 URL 直连引擎。
+        var store = 0;
+        var memoryTried = false;
+        if (_memorySourceEligible(source)) {
+          memoryTried = true;
+          try {
+            final r = await prepareWholeTrackStore(source);
+            store = r.store;
+            if (r.ok) {
+              _log('内存源整首下载完成，驻留 ${r.bytes} 字节（SegStore）');
+            } else {
+              // M3（§13）：纯内存不可用时用红色 scrim 确认框（非 toast）。
+              // true=在线直连回退（仍可播）；false=停止本次播放。
+              final reason = r.error ?? '未知';
+              final proceed = await confirmMemoryFallback(reason);
+              _log(
+                '内存源不可用（$reason）→ '
+                '${proceed ? '在线直连回退' : '停止播放'}',
+              );
+              if (!proceed) {
+                state = state.copyWith(buffering: false);
+                _destroyStore(store); // store==0 时为空操作
+                return;
+              }
+            }
+          } catch (e) {
+            _log('内存源整首下载异常，回退 URL 直连: $e');
+          }
+          // TODO(M2.3)：会话被取代时取消在途下载。当前每次下载为独立 store、
+          // 无并发写同一句柄；被取代的下载完成后经下方 gen 校验销毁（浪费一次
+          // 拉取，不影响正确性）。
+          if (store != 0 && gen != _loadGen) {
+            _log('内存源下载期间被新 load 取代，丢弃 store');
+            _destroyStore(store);
+            return;
+          }
+        }
+        try {
+          await _startSession(
+            source,
+            offsetMs: offsetMs,
+            bitrate: useBitrate,
+            passthrough: passthrough,
+            gen: gen,
+            store: store,
+            memoryStore: store != 0,
+          );
+        } catch (e) {
+          if (memoryTried && store != 0 && gen == _loadGen) {
+            // store 会话启动失败 → 记日志并按旧路径（URL 直接给引擎）重试一次，
+            // 不弹窗（内存门禁弹窗属后续 M3/§13 UI）。失败引擎与关联 store 的
+            // 清理由重试 _startSession 入口的 _stopEngine 完成。
+            _log('内存源会话启动失败，回退 URL 直连重试一次: $e');
+            await _startSession(
+              source,
+              offsetMs: offsetMs,
+              bitrate: useBitrate,
+              passthrough: passthrough,
+              gen: gen,
+            );
+          } else {
+            rethrow;
+          }
+        }
         if (gen != _loadGen) {
           _log('load 被新会话取代: $source');
           return;
         }
-        _log('load ok: $source');
+        _log('load ok: ${store != 0 ? 'store 内存源' : source}');
         _consecutiveFailures = 0;
         _fallbackAttempted.clear();
       } catch (e, s) {
@@ -152,6 +215,15 @@ mixin _PlaybackNotifierLoading
     });
     _loadChain = task.catchError((_) {});
     return task;
+  }
+
+  /// M2.2 内存源门禁（docs/audio-memory-source.md §2 三态）：仅当
+  /// `engineMemoryPlay`（内存播放偏好）开且 [source] 为 http(s) 在线 URL
+  /// （非本地文件 / SongCache 命中路径）时才尝试 Dart 下载 → SegStore 纯内存会话。
+  bool _memorySourceEligible(String source) {
+    if (source.isEmpty) return false;
+    if (!ref.read(appPrefsProvider).engineMemoryPlay) return false;
+    return source.startsWith('http://') || source.startsWith('https://');
   }
 
   Future<void> reload() async {
