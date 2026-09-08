@@ -117,6 +117,42 @@ typedef _PcmWindowDart =
 typedef _PcmEpochNative = Int32 Function(Pointer<Opaque>);
 typedef _PcmEpochDart = int Function(Pointer<Opaque>);
 
+// SegStore 内存源（M2，docs/audio-memory-source.md）：Dart 整曲/分段拉流 fill →
+// 引擎 AVIO-mem 解码。segstore_new/fill/set_total/destroy 由 Dart 会话持有并
+// 调用；archoera_mediaengine_create_store 把句柄交给引擎（引擎不释放，destroy
+// 后由 Dart 侧 segstore_destroy）。
+typedef _SegstoreNewNative =
+    Pointer<Opaque> Function(Uint64, Uint64, Uint64);
+typedef _SegstoreNewDart = Pointer<Opaque> Function(int, int, int);
+typedef _SegstoreFillNative =
+    Int32 Function(Pointer<Opaque>, Uint64, Pointer<Uint8>, Uint64);
+typedef _SegstoreFillDart = int Function(Pointer<Opaque>, int, Pointer<Uint8>, int);
+typedef _SegstoreSetTotalNative = Void Function(Pointer<Opaque>, Uint64);
+typedef _SegstoreSetTotalDart = void Function(Pointer<Opaque>, int);
+typedef _SegstoreDestroyNative = Void Function(Pointer<Opaque>);
+typedef _SegstoreDestroyDart = void Function(Pointer<Opaque>);
+typedef _CreateStoreNative =
+    Pointer<Opaque> Function(
+      Pointer<Opaque>,
+      Pointer<EngineConfigC>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Int32,
+    );
+typedef _CreateStoreDart =
+    Pointer<Opaque> Function(
+      Pointer<Opaque>,
+      Pointer<EngineConfigC>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      int,
+    );
+
+/// C 侧 `SegStore*` 句柄（引擎地址；仅 Dart 会话持有，随引擎 destroy 后释放）。
+typedef SegStoreHandle = int;
+
 /// 引擎 FFI 绑定（libarchoera_mediaengine.so）。
 ///
 /// 全部调用为短调用（引擎在库内自有线程转码/播放），不阻塞 Dart isolate。
@@ -174,6 +210,22 @@ class EngineBindings {
       .lookupFunction<_PcmEpochNative, _PcmEpochDart>(
         'archoera_mediaengine_pcm_epoch',
       );
+  late final _SegstoreNewDart _segstoreNew = _lib
+      .lookupFunction<_SegstoreNewNative, _SegstoreNewDart>('segstore_new');
+  late final _SegstoreFillDart _segstoreFill = _lib
+      .lookupFunction<_SegstoreFillNative, _SegstoreFillDart>('segstore_fill');
+  late final _SegstoreSetTotalDart _segstoreSetTotal = _lib
+      .lookupFunction<_SegstoreSetTotalNative, _SegstoreSetTotalDart>(
+        'segstore_set_total',
+      );
+  late final _SegstoreDestroyDart _segstoreDestroy = _lib
+      .lookupFunction<_SegstoreDestroyNative, _SegstoreDestroyDart>(
+        'segstore_destroy',
+      );
+  late final _CreateStoreDart _createStore = _lib
+      .lookupFunction<_CreateStoreNative, _CreateStoreDart>(
+        'archoera_mediaengine_create_store',
+      );
 
   /// 创建引擎会话（失败抛 [StateError]，错误信息取引擎 errbuf）。
   ///
@@ -206,6 +258,41 @@ class EngineBindings {
     calloc.free(errBuf);
     if (h == nullptr) {
       throw StateError('引擎创建失败: $errMsg');
+    }
+    return h;
+  }
+
+  /// 从 SegStore 内存源创建引擎会话（store 会话，source 置空；语义 ≈ [create]，
+  /// 引擎线程经 `pipeline_create_store` AVIO-mem 解码，docs/audio-memory-source.md）。
+  ///
+  /// [store] 为 C 侧 `SegStore*` 地址，由本库 [segstoreNew] 创建、Dart 会话持有。
+  /// 引擎 destroy **不释放** store——调用方须在 [destroy] 之后 [segstoreDestroy]。
+  /// [config] 同 [create]，本调用不负责释放。
+  Pointer<Opaque> createStore({
+    required SegStoreHandle store,
+    required String sessionDir,
+    String? playerFile,
+    required Pointer<EngineConfigC> config,
+  }) {
+    final dir = sessionDir.toNativeUtf8();
+    final pf = (playerFile ?? '').toNativeUtf8();
+    final errBuf = calloc<Uint8>(128);
+    final h = _createStore(
+      Pointer<Opaque>.fromAddress(store),
+      config,
+      playerFile == null ? nullptr : pf,
+      dir,
+      errBuf.cast(),
+      128,
+    );
+    final errMsg = h == nullptr
+        ? errBuf.cast<Utf8>().toDartString().trim()
+        : '';
+    calloc.free(dir);
+    calloc.free(pf);
+    calloc.free(errBuf);
+    if (h == nullptr) {
+      throw StateError('引擎创建失败（store）: $errMsg');
     }
     return h;
   }
@@ -282,6 +369,34 @@ class EngineBindings {
 
   /// 内存播放模式会话重建计数（seek 后 +1，Dart 丢旧帧索引）；非内存模式 -1。
   int pcmEpoch(Pointer<Opaque> handle) => _pcmEpochFfi(handle);
+
+  /// 新建 SegStore（docs/audio-memory-source.md §4）。返回句柄地址；引擎 destroy
+  /// 后由 [segstoreDestroy] 释放。0 = 失败（OOM）。
+  ///
+  /// [totalHint] 已知总长（Content-Length），0 = 未知（随后 [segstoreSetTotal]）；
+  /// [segSize] 定长段字节，0 = 默认 256 KiB；[budget] 预算，0 = 无上限。
+  SegStoreHandle segstoreNew({
+    int totalHint = 0,
+    int segSize = 0,
+    int budget = 0,
+  }) {
+    final p = _segstoreNew(totalHint, segSize, budget);
+    return p.address;
+  }
+
+  /// 顺序填充（必须 offset == 当前 head）。返回 0 成功 / <0 错误（对齐 C 契约）。
+  int segstoreFill(SegStoreHandle store, int offset, Pointer<Uint8> data, int length) =>
+      _segstoreFill(Pointer<Opaque>.fromAddress(store), offset, data, length);
+
+  /// 补充/修正已知总长（Content-Length 到达时调用；唤醒等待 EOF 的 pread）。
+  void segstoreSetTotal(SegStoreHandle store, int total) =>
+      _segstoreSetTotal(Pointer<Opaque>.fromAddress(store), total);
+
+  /// 释放 SegStore（须在引擎 destroy 之后调用；可重复/传 0）。
+  void segstoreDestroy(SegStoreHandle store) {
+    if (store == 0) return;
+    _segstoreDestroy(Pointer<Opaque>.fromAddress(store));
+  }
 }
 
 /// 从 Dart 播放参数分配并填充 EngineConfig（对齐 audio_engine.h）。
