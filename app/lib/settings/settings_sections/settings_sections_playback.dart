@@ -510,7 +510,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               : l10n.settingsMemoryFileModeNote,
           children: [
             SettingSwitchTile(
-              icon: EtaIcons.chipOutline,
+              icon: EtaIcons.memoryStickOutline,
               title: l10n.settingsMemoryPlayTitle,
               subtitle: prefs.engineMemoryPlay
                   ? l10n.settingsMemoryPlayOn
@@ -1093,8 +1093,8 @@ class _MemoryPolicyTile extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              selected ? EtaIcons.checkCircle : EtaIcons.checkCircleOutline,
-              size: 18,
+              selected ? EtaIcons.dotCircle : EtaIcons.circleDash,
+              size: 19,
               color: fg,
             ),
             const SizedBox(width: 10),

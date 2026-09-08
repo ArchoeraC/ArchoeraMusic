@@ -85,7 +85,7 @@ Icon(EtaMark.brand, size: 18, color: scheme.onPrimaryContainer);
 - **glyph 概念名** = mingcute 图标名去尾序数与风格后缀：`refresh_2 → refresh`、
   `user_1 → user`；同概念多款（`magic_2/magic_3`）才保留序数。
 - **裸名 = 实心**，**裸名 + `Outline` = 描边**（依据源 Material 名的 `_outlined/_border` 判定）。
-- 外部补入图标（Tabler，`added/`，如 `abc`、`highQuality`）仅有描边，无实心孪生。
+- 外部补入图标（Tabler / Lucide，`added/`，如 `abc`、`highQuality`、`memoryStickOutline`）仅有描边，无实心孪生。
 
 > 想确认某个 `EtaIcons.xxx` 是否存在、或「我该写 `xx` 还是 `xxOutline`」：
 > 在 `app/lib/eta/icon/eta_icons.dart` 搜名字，或查 `eta-tools/eta_icons/src/eta_icons.csv` 的
