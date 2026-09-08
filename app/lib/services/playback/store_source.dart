@@ -21,8 +21,9 @@ import 'engine_bindings.dart';
 /// `AudioEngineProcess.start(store:…)` → `createStore` 建立纯内存源会话。
 ///
 /// 保守门禁：仅当整曲可完整驻留（≤ [kMemorySourceWholeTrackLimit]）才走纯内存；
-/// 下载失败 / 超阈值 / store 建失败一律返回不可用，由调用方回退旧 URL 路径
-/// （引擎 FFmpeg 联网），不弹窗（内存不足弹窗属后续 M3 / §13 预算管理器 UI）。
+/// 下载失败 / 超阈值 / store 建失败一律返回不可用（失败带结构化
+/// [MemorySourceFailDetail]，弹窗按类别 l10n 渲染），由调用方决定回退旧 URL 路径
+/// （引擎 FFmpeg 联网）或停止（§13 红色弹窗）。
 ///
 /// 平台请求说明：用通用 `dart:io` HttpClient（不处理 qqmusic 等平台的专属
 /// referer/UA——需要的源失败即回退 URL 路径，与改造前引擎自联网行为一致）。
@@ -111,13 +112,80 @@ const Duration _downloadTimeout = Duration(seconds: 30);
 /// 通用 UA（多数在线直链无鉴权；个别平台校验 UA 的源失败即回退，见文件头）。
 const String _userAgent = 'ArchoeraMusic/0.9';
 
+/// 内存源失败的结构化类别（供弹窗 l10n 渲染；`.error` raw 串仅供日志/测试）。
+enum MemorySourceFailKind {
+  /// 非 http(s) 源（不尝试拉流）。
+  notHttpSource,
+
+  /// 内存源 worker isolate 启动失败。
+  isolateSpawn,
+
+  /// HTTP 状态非 200（code/status 见详情）。
+  httpStatus,
+
+  /// Content-Length 已知且超整首驻留上限（content=实际内容，limit=上限）。
+  overWholeCeiling,
+
+  /// 下载中途累计超过上限（got=已下载，limit=上限）。
+  grewOverCeiling,
+
+  /// 内容为空（0 字节）。
+  emptyContent,
+
+  /// segstore_new 分配失败（OOM）。
+  segstoreNewOom,
+
+  /// segstore_fill 返回错误。
+  segstoreFillError,
+
+  /// store 填充异常（error=异常文本）。
+  segstoreFillException,
+
+  /// 网络/下载失败（error=异常文本）。
+  downloadFailed,
+}
+
+/// 结构化失败详情（纯数据；供弹窗把失败原因本地化渲染）。
+class MemorySourceFailDetail {
+  const MemorySourceFailDetail(
+    this.kind, {
+    this.httpCode,
+    this.httpStatus,
+    this.content,
+    this.limit,
+    this.got,
+    this.error,
+  });
+
+  final MemorySourceFailKind kind;
+
+  /// [kind] == httpStatus 时的状态码。
+  final int? httpCode;
+
+  /// [kind] == httpStatus 时的原因短语。
+  final String? httpStatus;
+
+  /// 内容/期望字节（overWholeCeiling / grewOverCeiling 用）。
+  final int? content;
+
+  /// 整首驻留上限字节（overWholeCeiling / grewOverCeiling 用）。
+  final int? limit;
+
+  /// 已下载字节（grewOverCeiling 用）。
+  final int? got;
+
+  /// 底层异常文本（isolateSpawn / segstoreFillException / downloadFailed 用）。
+  final String? error;
+}
+
 /// 整首下载 → SegStore 准备结果。
 class WholeTrackPrepareResult {
   WholeTrackPrepareResult.ok({required this.store, required this.bytes})
     : error = null,
-      cancelled = false;
+      cancelled = false,
+      fail = null;
 
-  WholeTrackPrepareResult.fail(String this.error)
+  WholeTrackPrepareResult.fail(String this.error, {this.fail})
     : store = 0,
       bytes = 0,
       cancelled = false;
@@ -127,7 +195,8 @@ class WholeTrackPrepareResult {
     : store = 0,
       bytes = 0,
       error = null,
-      cancelled = true;
+      cancelled = true,
+      fail = null;
 
   /// SegStore 句柄（非 0 即成功；成功调用方接管所有权，负责最终 destroy）。
   final SegStoreHandle store;
@@ -135,8 +204,11 @@ class WholeTrackPrepareResult {
   /// 实际下载/填充的字节数（成功时有效）。
   final int bytes;
 
-  /// 失败原因（成功/取消时 null）。
+  /// 失败原因 raw 串（供日志/测试；弹窗渲染用 [fail] 结构化详情本地化）。
   final String? error;
+
+  /// 结构化失败详情（成功/取消时 null；弹窗按类别本地化渲染）。
+  final MemorySourceFailDetail? fail;
 
   /// 是否因会话被取代而被调用方主动取消。
   final bool cancelled;
@@ -207,7 +279,12 @@ WholeTrackFetch prepareWholeTrackStore(
     }
   });
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    completer.complete(WholeTrackPrepareResult.fail('非 http(s) 源'));
+    completer.complete(
+      WholeTrackPrepareResult.fail(
+        '非 http(s) 源',
+        fail: const MemorySourceFailDetail(MemorySourceFailKind.notHttpSource),
+      ),
+    );
     reply.close();
   } else {
     // Isolate.spawn 为异步：失败以 fail 收尾（不悬挂）。
@@ -218,7 +295,15 @@ WholeTrackFetch prepareWholeTrackStore(
       (_) {},
       onError: (Object e) {
         if (!completer.isCompleted) {
-          completer.complete(WholeTrackPrepareResult.fail('内存源 isolate 启动失败: $e'));
+          completer.complete(
+            WholeTrackPrepareResult.fail(
+              '内存源 isolate 启动失败: $e',
+              fail: MemorySourceFailDetail(
+                MemorySourceFailKind.isolateSpawn,
+                error: '$e',
+              ),
+            ),
+          );
         }
       },
     );
@@ -246,6 +331,11 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
     if (resp.statusCode != HttpStatus.ok) {
       return WholeTrackPrepareResult.fail(
         'HTTP ${resp.statusCode} ${resp.reasonPhrase}',
+        fail: MemorySourceFailDetail(
+          MemorySourceFailKind.httpStatus,
+          httpCode: resp.statusCode,
+          httpStatus: resp.reasonPhrase,
+        ),
       );
     }
     // Content-Length 已知：用（可被 env 压低的）整首驻留上限判定，不下载（§6.2）。
@@ -254,6 +344,11 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
     if (known > limit) {
       return WholeTrackPrepareResult.fail(
         memoryGateExplain(known, env: gateEnv),
+        fail: MemorySourceFailDetail(
+          MemorySourceFailKind.overWholeCeiling,
+          content: known,
+          limit: limit,
+        ),
       );
     }
     final b = BytesBuilder(copy: false);
@@ -266,18 +361,33 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
       if (got > limit) {
         return WholeTrackPrepareResult.fail(
           '下载超过纯内存整首驻留上限（$got > $limit），中止（回退 URL 路径）',
+          fail: MemorySourceFailDetail(
+            MemorySourceFailKind.grewOverCeiling,
+            got: got,
+            limit: limit,
+          ),
         );
       }
       b.add(chunk);
     }
     final bytes = b.takeBytes();
     if (bytes.isEmpty) {
-      return WholeTrackPrepareResult.fail('空内容（0 字节）');
+      return WholeTrackPrepareResult.fail(
+        '空内容（0 字节）',
+        fail: const MemorySourceFailDetail(
+          MemorySourceFailKind.emptyContent,
+        ),
+      );
     }
     final bindings = EngineBindings.instance;
     final store = bindings.segstoreNew(totalHint: bytes.length);
     if (store == 0) {
-      return WholeTrackPrepareResult.fail('segstore_new 分配失败（OOM）');
+      return WholeTrackPrepareResult.fail(
+        'segstore_new 分配失败（OOM）',
+        fail: const MemorySourceFailDetail(
+          MemorySourceFailKind.segstoreNewOom,
+        ),
+      );
     }
     try {
       bindings.segstoreSetTotal(store, bytes.length);
@@ -286,7 +396,12 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
         ptr.asTypedList(bytes.length).setAll(0, bytes);
         if (bindings.segstoreFill(store, 0, ptr, bytes.length) != 0) {
           bindings.segstoreDestroy(store);
-          return WholeTrackPrepareResult.fail('segstore_fill 返回错误');
+          return WholeTrackPrepareResult.fail(
+            'segstore_fill 返回错误',
+            fail: const MemorySourceFailDetail(
+              MemorySourceFailKind.segstoreFillError,
+            ),
+          );
         }
       } finally {
         calloc.free(ptr);
@@ -294,9 +409,21 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
       return WholeTrackPrepareResult.ok(store: store, bytes: bytes.length);
     } catch (e) {
       bindings.segstoreDestroy(store);
-      return WholeTrackPrepareResult.fail('store 填充异常: $e');
+      return WholeTrackPrepareResult.fail(
+        'store 填充异常: $e',
+        fail: MemorySourceFailDetail(
+          MemorySourceFailKind.segstoreFillException,
+          error: '$e',
+        ),
+      );
     }
   } catch (e) {
-    return WholeTrackPrepareResult.fail('下载失败: $e');
+    return WholeTrackPrepareResult.fail(
+      '下载失败: $e',
+      fail: MemorySourceFailDetail(
+        MemorySourceFailKind.downloadFailed,
+        error: '$e',
+      ),
+    );
   }
 }

@@ -3104,6 +3104,96 @@ abstract class AppLocalizations {
   /// **'长曲目可累积数百 MB~GB 内存（48kHz 立体声 ≈ 0.38 MB/秒）：可能拖慢整机、内存压力下应用被系统回收，极端下系统不稳定。继续？'**
   String get settingsMemoryUnlimitedWarnBody;
 
+  /// No description provided for @memoryAlertTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内存不足 · 纯内存播放不可用'**
+  String get memoryAlertTitle;
+
+  /// No description provided for @memoryAlertActionStop.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'停止'**
+  String get memoryAlertActionStop;
+
+  /// No description provided for @memoryAlertActionOnlineDirect.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在线直连播放'**
+  String get memoryAlertActionOnlineDirect;
+
+  /// No description provided for @memoryAlertOnlineDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'继续将使用在线直连（引擎联网）播放；或停止本次播放。'**
+  String get memoryAlertOnlineDesc;
+
+  /// No description provided for @memorySourceFailNotHttp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在线源不是 http(s) 直链'**
+  String get memorySourceFailNotHttp;
+
+  /// No description provided for @memorySourceFailIsolateSpawn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内存源 worker 启动失败：{error}'**
+  String memorySourceFailIsolateSpawn(Object error);
+
+  /// No description provided for @memorySourceFailHttpStatus.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'HTTP {code} {status}'**
+  String memorySourceFailHttpStatus(Object code, Object status);
+
+  /// No description provided for @memorySourceFailOverWholeCeiling.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'整首内容 {content} 超过纯内存整首驻留上限 {limit}'**
+  String memorySourceFailOverWholeCeiling(Object content, Object limit);
+
+  /// No description provided for @memorySourceFailGrewCeiling.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下载中途超过纯内存整首驻留上限（{got} > {limit}）'**
+  String memorySourceFailGrewCeiling(Object got, Object limit);
+
+  /// No description provided for @memorySourceFailEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内容为空（0 字节）'**
+  String get memorySourceFailEmpty;
+
+  /// No description provided for @memorySourceFailSegOom.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内存源分配失败（内存不足）'**
+  String get memorySourceFailSegOom;
+
+  /// No description provided for @memorySourceFailSegFill.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内存源写入失败'**
+  String get memorySourceFailSegFill;
+
+  /// No description provided for @memorySourceFailSegFillEx.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内存源写入异常：{error}'**
+  String memorySourceFailSegFillEx(Object error);
+
+  /// No description provided for @memorySourceFailDownload.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下载失败：{error}'**
+  String memorySourceFailDownload(Object error);
+
+  /// No description provided for @memorySourceFailUnknown.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未知原因'**
+  String get memorySourceFailUnknown;
+
   /// No description provided for @volumeMute.
   ///
   /// In zh_CN, this message translates to:
