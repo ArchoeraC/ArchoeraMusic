@@ -356,7 +356,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 | Noto Sans CJK SC | `NotoSC-*.otf` | **SIL OFL 1.1** | 开源字体，可自由使用、修改、分发 |
 | MiSans | `MiSans-*.ttf` | 小米《[MiSans 字体知识产权许可协议](https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E6%9D%83%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf)》（**非 OFL**） | 免费商用；须在软件中注明使用 MiSans；禁止改编/二次开发字体；禁止单独分发字体文件 |
 | HarmonyOS Sans SC | `HarmonyOS_Sans_SC_*.ttf` | 华为《[HarmonyOS Sans 字体许可协议](https://gitcode.com/openharmony/global_system_resources/blob/master/LICENSE_Fonts)》（**非 OFL**） | 免费商用；须突出显示使用 HarmonyOS Sans；禁止修改字体；禁止单独分发字体 |
-| EtaIcons（自建图标字体） | `EtaIcons.ttf` | 字形来源 **mingcute icons（Apache-2.0）** 为主、**Tabler Icons（MIT）** 补入（`added/`） | 对源图标做**改作**：描边(stroke)SVG 经描边转轮廓后重打包为字体；来源与修改说明见下方「特别鸣谢」及 `app/eta-tools/eta_icons/` |
+| EtaIcons（自建图标字体） | `EtaIcons.ttf` | 字形来源 **mingcute icons（Apache-2.0）** 为主、**Tabler Icons（MIT）** / **Lucide（ISC）** 补入（`added/`） | 对源图标做**改作**：描边(stroke)SVG 经描边转轮廓后重打包为字体；来源与修改说明见下方「特别鸣谢」及 `app/eta-tools/eta_icons/` |
 | EtaMark（自建品牌标识字体） | `EtaMark.ttf` | 字形源自项目自有品牌标识（logo-trim.png 转黑白矢量） | 自建字形，无第三方字体许可义务；源图与生成见 `app/eta-tools/eta_mark/` |
 
 ---
@@ -392,9 +392,10 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 
 - **[MingCute Icons](https://github.com/mingcute-design/mingcute-icons)（Apache-2.0）** —— 本项目界面图标的**主体字形来源**（regular / filled 双风格）。本项目将所需图标自源 SVG 中挑选并按「Material 语义」映射后，对描边风格 SVG 做**描边转轮廓（stroke→outline）改作**，与实心字形一同重打包为自建字体 `EtaIcons`；定稿子集、映射表与生成脚本见 `app/eta-tools/eta_icons/`
 - **[Tabler Icons](https://tabler.io/icons)（MIT）** —— 少量 mingcute 缺失语义图标的补入来源（`EtaIcons` 内 `abc / highQuality / deselect` 等 7 项，见 `app/eta-tools/eta_icons/source/added/`），同按 24×24 / 2px 描边规格归一化
+- **[Lucide](https://lucide.dev)（ISC）** —— 少量 mingcute/Tabler 均缺失语义图标的补入来源（`EtaIcons` 内 `memoryStickOutline` 等，见 `app/eta-tools/eta_icons/source/added/`），同按 24×24 / 2px 描边规格归一化
 - **[line-md（Line MD icons）](https://github.com/cyberalien/line-md)（MIT，Copyright 2020 Vjacheslav Trushkin）** —— 播放器动画字形（play↔pause、downloading/loading 等）的离线设计参考；**未打包进字体**，动画在 Dart 侧以原生实现复刻
 
-> 上述图标的再分发/改作均依据各自许可条款执行；mingcute Apache-2.0 与 Tabler/line-md MIT 均允许随本项目（AGPL-3.0）以二进制字体形式分发并保留本声明。
+> 上述图标的再分发/改作均依据各自许可条款执行；mingcute Apache-2.0 与 Tabler/line-md MIT、Lucide ISC 均允许随本项目（AGPL-3.0）以二进制字体形式分发并保留本声明。
 
 ---
 

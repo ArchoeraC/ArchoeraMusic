@@ -274,6 +274,9 @@ abstract final class EtaIcons {
   /// verified_outlined (描边)
   static const IconData safetyCertificateOutline = IconData(0xE19C, fontFamily: _family);
 
+  /// memory_stick (描边)
+  static const IconData memoryStickOutline = IconData(0xE1A0, fontFamily: _family);
+
   /// manage_search_outlined (描边)
   static const IconData search3Outline = IconData(0xE1A1, fontFamily: _family);
 
