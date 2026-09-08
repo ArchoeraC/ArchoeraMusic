@@ -1662,6 +1662,63 @@ class AppLocalizationsKo extends AppLocalizations {
       '长曲目可累积数百 MB~GB 内存（48kHz 立体声 ≈ 0.38 MB/秒）：可能拖慢整机、内存压力下应用被系统回收，极端下系统不稳定。继续？';
 
   @override
+  String get memoryAlertTitle => '内存不足 · 纯内存播放不可用';
+
+  @override
+  String get memoryAlertActionStop => '停止';
+
+  @override
+  String get memoryAlertActionOnlineDirect => '在线直连播放';
+
+  @override
+  String get memoryAlertOnlineDesc => '继续将使用在线直连（引擎联网）播放；或停止本次播放。';
+
+  @override
+  String get memorySourceFailNotHttp => '在线源不是 http(s) 直链';
+
+  @override
+  String memorySourceFailIsolateSpawn(Object error) {
+    return '内存源 worker 启动失败：$error';
+  }
+
+  @override
+  String memorySourceFailHttpStatus(Object code, Object status) {
+    return 'HTTP $code $status';
+  }
+
+  @override
+  String memorySourceFailOverWholeCeiling(Object content, Object limit) {
+    return '整首内容 $content 超过纯内存整首驻留上限 $limit';
+  }
+
+  @override
+  String memorySourceFailGrewCeiling(Object got, Object limit) {
+    return '下载中途超过纯内存整首驻留上限（$got > $limit）';
+  }
+
+  @override
+  String get memorySourceFailEmpty => '内容为空（0 字节）';
+
+  @override
+  String get memorySourceFailSegOom => '内存源分配失败（内存不足）';
+
+  @override
+  String get memorySourceFailSegFill => '内存源写入失败';
+
+  @override
+  String memorySourceFailSegFillEx(Object error) {
+    return '内存源写入异常：$error';
+  }
+
+  @override
+  String memorySourceFailDownload(Object error) {
+    return '下载失败：$error';
+  }
+
+  @override
+  String get memorySourceFailUnknown => '未知原因';
+
+  @override
   String get volumeMute => '음소거';
 
   @override

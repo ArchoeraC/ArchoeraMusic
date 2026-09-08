@@ -379,7 +379,9 @@ requiredCeiling = minFloor + requiredCache
    Windows toast、macOS UNUserNotification）需通知插件/平台通道与权限，未实现。
 3. **§14 OS 内存压力事件**：Linux cgroup v2/PSI、macOS memory pressure、Windows
    CreateMemoryResourceNotification 的原生监听未实现（本机无运行环境，不宜盲写）。
-4. **弹窗文案 l10n**：§13 弹窗当前为硬编码中文，未接 gen_l10n。
+4. **弹窗文案 l10n**：§13 弹窗已接 gen_l10n——标题/正文/按钮走 l10n 键；store_source 失败
+   原因改为**结构化 `MemorySourceFailDetail`（kind+参数）+ `.error` raw 串**：弹窗按类别用 l10n
+   渲染，raw 串仅供日志/测试。✅ 已完成
 5. **requiredCeiling 全量预算管理器**：现用简化门禁（默认 64 MiB / env 压低 /
    auto=引擎可用内存策略 + memoryPolicyCacheLimitBytes 纯函数）；§6.1/§6.2 的完整
    ceiling/requiredCeiling 与预算域记账尚未做成独立管理器。

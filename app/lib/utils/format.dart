@@ -22,3 +22,16 @@ String formatMs(int ms) {
   String pad(int n) => n.toString().padLeft(2, '0');
   return h > 0 ? '$h:${pad(m)}:${pad(s)}' : '$m:${pad(s)}';
 }
+
+/// 字节数人类可读（B / KB / MB / GB / TB；<=0 返回 "0 B"）。
+String formatBytes(int bytes) {
+  if (bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  var v = bytes.toDouble();
+  var i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return '${v.toStringAsFixed(v >= 100 ? 0 : 1)} ${units[i]}';
+}

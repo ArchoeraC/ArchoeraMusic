@@ -161,10 +161,12 @@ mixin _PlaybackNotifierLoading
             } else {
               // M3（§13）：纯内存不可用时用红色 scrim 确认框（非 toast）。
               // true=在线直连回退（仍可播）；false=停止本次播放。
-              final reason = r.error ?? '未知';
-              final proceed = await confirmMemoryFallback(reason);
+              final proceed = await confirmMemoryFallback(
+                r.fail,
+                rawReason: r.error,
+              );
               _log(
-                '内存源不可用（$reason）→ '
+                '内存源不可用（${r.error ?? r.fail?.kind}）→ '
                 '${proceed ? '在线直连回退' : '停止播放'}',
               );
               if (!proceed) {

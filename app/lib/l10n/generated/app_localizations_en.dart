@@ -1705,6 +1705,67 @@ class AppLocalizationsEn extends AppLocalizations {
       'Long tracks can accumulate hundreds of MB to several GB in RAM (≈0.38 MB/s at 48 kHz stereo), which may slow the whole machine, cause the app to be reclaimed by the OS under memory pressure, or make the system unstable. Continue?';
 
   @override
+  String get memoryAlertTitle =>
+      'Out of memory · pure in-memory playback unavailable';
+
+  @override
+  String get memoryAlertActionStop => 'Stop';
+
+  @override
+  String get memoryAlertActionOnlineDirect => 'Play via online direct';
+
+  @override
+  String get memoryAlertOnlineDesc =>
+      'Continuing will play via online direct (engine network). Otherwise, stop this playback.';
+
+  @override
+  String get memorySourceFailNotHttp =>
+      'Online source is not an http(s) direct link';
+
+  @override
+  String memorySourceFailIsolateSpawn(Object error) {
+    return 'In-memory source worker failed to start: $error';
+  }
+
+  @override
+  String memorySourceFailHttpStatus(Object code, Object status) {
+    return 'HTTP $code $status';
+  }
+
+  @override
+  String memorySourceFailOverWholeCeiling(Object content, Object limit) {
+    return 'Whole-track content ($content) exceeds the pure-memory whole-track limit ($limit)';
+  }
+
+  @override
+  String memorySourceFailGrewCeiling(Object got, Object limit) {
+    return 'Download exceeded the pure-memory whole-track limit mid-way ($got > $limit)';
+  }
+
+  @override
+  String get memorySourceFailEmpty => 'Content is empty (0 bytes)';
+
+  @override
+  String get memorySourceFailSegOom =>
+      'In-memory source allocation failed (out of memory)';
+
+  @override
+  String get memorySourceFailSegFill => 'In-memory source write failed';
+
+  @override
+  String memorySourceFailSegFillEx(Object error) {
+    return 'In-memory source write exception: $error';
+  }
+
+  @override
+  String memorySourceFailDownload(Object error) {
+    return 'Download failed: $error';
+  }
+
+  @override
+  String get memorySourceFailUnknown => 'Unknown reason';
+
+  @override
   String get volumeMute => 'Mute';
 
   @override
