@@ -109,6 +109,17 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置内存播放（不落盘）：开关 / PCM 保留策略（'auto'|'limit'|'unlimited'）/
+  /// 自定义上限 MB（'limit' 生效）。会话级生效（下一首）。
+  void setEngineMemory({bool? enabled, String? policy, int? limitMb}) {
+    state = state.copyWithEngineMemory(
+      enabled: enabled,
+      policy: policy,
+      limitMb: limitMb,
+    );
+    state.save();
+  }
+
   /// 设置输出设备（'' = 系统默认；其余为引擎 list_sinks 返回的设备 id）。
   ///
   /// 只持久化偏好；是否即时下发由调用方决定（当前会话存在 → 发 set_sink，

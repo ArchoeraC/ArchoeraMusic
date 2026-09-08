@@ -8,6 +8,9 @@ import 'app_prefs.dart';
 const passthroughKey = 'audio.passthrough';
 const engineKey = 'audio.engine';
 const sinkKey = 'audio.sink';
+const engineMemoryKey = 'audio.engineMemory';
+const pcmMemPolicyKey = 'audio.pcmMemPolicy';
+const pcmMemLimitMbKey = 'audio.pcmMemLimitMb';
 const autoPlayOnLaunchKey = 'player.autoPlayOnLaunch';
 const sessionMemoryKey = 'player.sessionMemory';
 const enableSpectrumKey = 'player.enableSpectrum';
@@ -31,6 +34,18 @@ const bool defaultPassthrough = true;
 /// 引擎在应用启动时加载，切换仅持久化偏好，需冷启动后由引擎会话读取生效。
 const String defaultEngine = 'stable';
 const Set<String> engineModes = {'stable', 'eraudio'};
+
+/// 内存播放（不落盘）：默认开启。PCM 驻留进程内内存（引擎块列表），
+/// 不写 stream.wav/.pcm；频谱经 pcm_window FFI。见 docs/audio-memory-playback.md。
+const bool defaultEngineMemory = true;
+
+/// PCM 内存保留策略：'auto'（按可用内存均衡，0.8 GiB 硬上限）/
+/// 'limit'（用户指定 MB 上限）/ 'unlimited'（无上限，须显式警告）。默认 auto。
+const String defaultPcmMemPolicy = 'auto';
+const Set<String> pcmMemPolicies = {'auto', 'limit', 'unlimited'};
+
+/// 'limit' 策略的默认保留上限（MB）。
+const int defaultPcmMemLimitMb = 512;
 
 /// 输出设备偏好（'' = 系统默认，遵循系统默认输出、不自动改道）。
 ///
@@ -73,6 +88,22 @@ extension PlayerPrefs on AppPrefs {
 
   /// 输出设备（'' = 系统默认；其余为引擎 list_sinks 返回的设备 id）。
   String get sink => data[sinkKey] as String? ?? defaultSink;
+
+  /// 内存播放（不落盘）开关（默认开；会话级生效）。
+  bool get engineMemoryPlay =>
+      data[engineMemoryKey] as bool? ?? defaultEngineMemory;
+
+  /// PCM 内存保留策略（'auto' / 'limit' / 'unlimited'；非法值回退 auto）。
+  String get pcmMemPolicy {
+    final v = data[pcmMemPolicyKey];
+    if (pcmMemPolicies.contains(v)) return v as String;
+    return defaultPcmMemPolicy;
+  }
+
+  /// 'limit' 策略的保留上限（MB；1 ~ 262144 收敛）。
+  int get pcmMemLimitMb =>
+      ((data[pcmMemLimitMbKey] as num?)?.toInt() ?? defaultPcmMemLimitMb)
+          .clamp(1, 1 << 18);
 
   /// 启动时自动播放（恢复会话时自动续播）。
   bool get autoPlayOnLaunch =>
@@ -142,6 +173,22 @@ extension PlayerPrefs on AppPrefs {
   /// 设置输出设备 id（'' = 系统默认；不校验，值仅来自引擎 list_sinks）。
   AppPrefs copyWithSink(String value) =>
       AppPrefs(initialData: {...data, sinkKey: value});
+
+  /// 设置内存播放（不落盘）：开关 / PCM 保留策略（'auto'|'limit'|'unlimited'）/
+  /// 自定义上限 MB（'limit' 生效；非法策略不写入，getter 回退 auto）。
+  AppPrefs copyWithEngineMemory({
+    bool? enabled,
+    String? policy,
+    int? limitMb,
+  }) =>
+      AppPrefs(
+        initialData: {
+          ...data,
+          engineMemoryKey: ?enabled,
+          if (pcmMemPolicies.contains(policy)) pcmMemPolicyKey: policy,
+          pcmMemLimitMbKey: ?limitMb?.clamp(1, 1 << 18),
+        },
+      );
 
   AppPrefs copyWithAutoPlay(bool value) =>
       AppPrefs(initialData: {...data, autoPlayOnLaunchKey: value});

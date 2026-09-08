@@ -60,7 +60,7 @@
 | **P2** | **自研优先（最小外部依赖）** | 内核核心（IO / 探测 / 解复用 / 采样转换 / DSP / 封装 / **播放输出层**）**全部自研 Zig**；只有"数学复杂度确实无法自研"的编解码器才引入外部实现，且必须是 **Permissive 单文件或可 vendored 源码**（源码入库，零二进制依赖、零构建期网络下载）。见 §3.3 裁决规则与 §3.7 最终裁决表 |
 | **P3** | **FFmpeg 默认主引擎，Zig 渐进替换** | **默认构建启用 FFmpeg 解码**（`-Duse-ffmpeg` 默认开启，链接 `libav*` / `libsw*`，行为同现状零回归）；Zig 内核逐格式成熟并验收后**按格式接管**（格式级开关如 `-Dzig-flac=true`）；未接管格式始终由 FFmpeg 提供；全部 T0/T1 验收后 Zig 可升为主（`-Dzig-main=true`，可选），FFmpeg 仍保留为主引擎选项（§8.3） |
 | **P4** | **纯音频、无视频** | 视频轨不处理、不支持、不探测；容器只解析音频轨 |
-| **P5** | **行为兼容（迁移护栏）** | `archoera_mediaengine.h` FFI 导出符号、事件/命令 JSON 协议、`libfft.so` 的 Dart ABI、`stream.wav` / `stream.pcm` 落盘格式**全部不变**；Dart 侧仅新增"在线源预下载"一步 |
+| **P5** | **行为兼容（迁移护栏）** | `archoera_mediaengine.h` FFI 导出符号、事件/命令 JSON 协议、`libfft.so` 的 Dart ABI、`stream.wav` / `stream.pcm` 落盘格式**全部不变**；Dart 侧仅新增"在线源预下载"一步（本条为**文件模式基线**的不变量；2026-09-08 起桌面播放默认改「内存播放（不落盘）模式」——新增能力不破坏本护栏，见 `docs/audio-memory-playback.md`） |
 | **P6** | **格式广度（本地播放器兼容面）** | 作为本地播放器，应兼容尽可能多的音频类型（含 Hi-Res/无损收藏：FLAC/APE/WavPack/DSD/ALAC/AIFF 等）。通过**格式插件化**（comptime 特性开关）实现：默认构建只含核心格式保持轻量，需要时逐格式开启；每个格式模块独立实现/独立许可审查，互不拖累 |
 
 > **P2 与 P6 的调和**：P2 约束"依赖形态"（必须 Permissive 单文件 / vendored 源码、源码入库、零构建期下载），
@@ -413,9 +413,16 @@ source（本地文件 / Dart 预下载临时文件）
 
 1. `archoera_mediaengine.h` 导出符号与语义不变（`create/command/poll_event/session_dir/is_done/destroy`）；
 2. `audio_engine.h` 的 `EngineConfig` 字段与 `pipeline_*` 公开 API 语义不变；
-3. 桌面输出：float32 WAV + `stream.pcm`（`[pos_ms|samples|channels]+float`）不变；
+3. 桌面输出：float32 WAV + `stream.pcm`（`[pos_ms|samples|channels]+float`）不变（指**文件模式**基线；
+   内存模式输出形态见下 §4.3.6）；
 4. 采样率语义：player 模式 `output_sample_rate<=0` 跟随源（Hi-Res 直通）；
 5. DSP 顺序不变。
+
+> 6.（2026-09-08 新增）**内存播放（不落盘）模式**：桌面播放默认开启，解码 PCM 驻留进程内
+>    「全量块列表」（达 cap 才滚动淘汰），频谱经新 FFI `archoera_mediaengine_pcm_window` 拉窗，
+>    不写 `stream.wav`/`stream.pcm`；无设备 + 内存模式直接 error（不文件回退）。该能力为
+>    **新增可选输出形态**，不破坏上述文件模式基线不变量；完整规格/验收见
+>    `docs/audio-memory-playback.md`。
 
 ---
 
@@ -1513,7 +1520,9 @@ void        zk_dsp_destroy(ZkDspChain *d);
 - `archoera_mediaengine_*` 6 个导出符号（`create/command/poll_event/session_dir/is_done/destroy`）
   **原样保留**，Dart `engine_bindings.dart` / `audio_engine_process.dart` **零改动**；
 - `create` 内部：解析 `EngineConfig` → 构造 `ZkDspChain`（如启用）→ 引擎线程内 `zk_decoder_open` +
-  `zk_decoder_read` 循环 → DSP → 落盘 `stream.wav`（player 模式）/ `stream.pcm`（FFT 拉模式）；
+  `zk_decoder_read` 循环 → DSP → 落盘 `stream.wav`（player 模式）/ `stream.pcm`（FFT 拉模式）
+  （此落盘描述为**文件模式**基线；内存播放模式下解码产物驻留进程内内存块列表，频谱经
+  `archoera_mediaengine_pcm_window` FFI 拉取，见 `docs/audio-memory-playback.md`）；
 - 默认构建（`-Duse-ffmpeg` 默认开）时：`zk_decoder_open` 返回不可恢复错误（`UnsupportedFormat` /
   持续失败）→ C 壳切 `decoder_ffmpeg.c` 后端（默认主，§8.3），事件带 `backend` 字段；已接管格式
   优先 Zig，失败回退 FFmpeg；
@@ -1891,3 +1900,11 @@ void        zk_dsp_destroy(ZkDspChain *d);
     §17.2），系统 ffmpeg 99.99%+（残留 ±1 LSB 构建差异）。接线：`probe.formats.aac`、
     decoder 工厂、**M4A 内 AAC 轨**（mp4a+esds → ASC → 逐 sample 喂包）全部接入。
     ADTS/M4A seek 为整帧对齐（帧级精度，同现状 FFmpeg AVSEEK_FLAG_BACKWARD）。
+15. **内存播放（不落盘）模式（2026-09-08 决策）**：桌面播放**默认内存模式**（独立开关，
+    与 Stable/EraAudio、SongCache 均独立）。解码 PCM 驻留进程内**全量块列表**（与 stream.pcm
+    文件块同构；达 cap 才滚动淘汰），频谱经新 FFI `archoera_mediaengine_pcm_window` / `_epoch`
+    拉窗，**不写 `stream.wav/.pcm`**；无设备 + 内存模式 → error（不文件回退）；`cap`：
+    auto（按可用内存均衡，**0.8 GiB 硬上限**：查询故障回落、append 后记账强制淘汰、绝不越过
+    用户设限）/ 自定义上限 / 无上限（须显式警告内存过载后果）。
+    文件模式（设置关 / `ARCHOERA_ENGINE_FILE_MODE=1`）保留现状字节级行为（PARITY 基准在
+    文件模式下执行；内存模式按窗口比对）。规格与验收：`docs/audio-memory-playback.md`。

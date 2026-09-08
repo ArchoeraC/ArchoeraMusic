@@ -66,6 +66,12 @@ final class EngineConfigC extends Struct {
 
   @Int32()
   external int engineMode; // 0=Stable(FFmpeg 默认) 1=EraAudio(自研内核,实验性)
+
+  @Int32()
+  external int noDiskCache; // 1 = 内存播放模式（不写 stream.wav/.pcm）
+
+  @Int64()
+  external int pcmMemCapKb; // 0=auto / >0=用户上限(KB) / -1=无上限
 }
 
 typedef _CreateNative =
@@ -100,6 +106,16 @@ typedef _DestroyNative = Void Function(Pointer<Opaque>);
 typedef _DestroyDart = void Function(Pointer<Opaque>);
 typedef _ListSinksNative = Int32 Function(Pointer<Uint8>, Int32);
 typedef _ListSinksDart = int Function(Pointer<Uint8>, int);
+
+// 内存播放模式（no_disk_cache）频谱拉取：archoera_mediaengine_pcm_window
+typedef _PcmWindowNative =
+    Int32 Function(Pointer<Opaque>, Int32, Int32, Pointer<Float>, Pointer<Float>);
+typedef _PcmWindowDart =
+    int Function(Pointer<Opaque>, int, int, Pointer<Float>, Pointer<Float>);
+
+// 会话重建计数：archoera_mediaengine_pcm_epoch
+typedef _PcmEpochNative = Int32 Function(Pointer<Opaque>);
+typedef _PcmEpochDart = int Function(Pointer<Opaque>);
 
 /// 引擎 FFI 绑定（libarchoera_mediaengine.so）。
 ///
@@ -149,6 +165,14 @@ class EngineBindings {
   late final _ListSinksDart _listSinks = _lib
       .lookupFunction<_ListSinksNative, _ListSinksDart>(
         'archoera_mediaengine_list_sinks',
+      );
+  late final _PcmWindowDart _pcmWindowFfi = _lib
+      .lookupFunction<_PcmWindowNative, _PcmWindowDart>(
+        'archoera_mediaengine_pcm_window',
+      );
+  late final _PcmEpochDart _pcmEpochFfi = _lib
+      .lookupFunction<_PcmEpochNative, _PcmEpochDart>(
+        'archoera_mediaengine_pcm_epoch',
       );
 
   /// 创建引擎会话（失败抛 [StateError]，错误信息取引擎 errbuf）。
@@ -243,6 +267,21 @@ class EngineBindings {
       calloc.free(buf);
     }
   }
+
+  /// 内存播放模式频谱拉取：以 [endPosMs] 为终点取最近 [frames] 样本写
+  /// [outL]/[outR]（各 frames 个 float）。返回 0 命中 / -1 越出保留窗或未解码 /
+  /// -2 参数错或非内存模式会话。
+  int pcmWindow(
+    Pointer<Opaque> handle,
+    int endPosMs,
+    int frames,
+    Pointer<Float> outL,
+    Pointer<Float> outR,
+  ) =>
+      _pcmWindowFfi(handle, endPosMs, frames, outL, outR);
+
+  /// 内存播放模式会话重建计数（seek 后 +1，Dart 丢旧帧索引）；非内存模式 -1。
+  int pcmEpoch(Pointer<Opaque> handle) => _pcmEpochFfi(handle);
 }
 
 /// 从 Dart 播放参数分配并填充 EngineConfig（对齐 audio_engine.h）。
@@ -259,6 +298,8 @@ Pointer<EngineConfigC> engineConfigFromParams({
   double? tempoSpeed,
   double? tempoPitch,
   int engineMode = 0,
+  int noDiskCache = 0,
+  int pcmMemCapKb = 0,
 }) {
   final p = calloc<EngineConfigC>();
   p.ref
@@ -277,7 +318,9 @@ Pointer<EngineConfigC> engineConfigFromParams({
     ..tempoSpeed = tempoSpeed ?? 1.0
     ..tempoPitch = tempoPitch ?? 0.0
     ..tempoPitchSync = true
-    ..engineMode = engineMode;
+    ..engineMode = engineMode
+    ..noDiskCache = noDiskCache
+    ..pcmMemCapKb = pcmMemCapKb;
   for (var i = 0; i < 10; i++) {
     p.ref.eqGains[i] = (eqGains != null && i < eqGains.length) ? eqGains[i] : 0;
   }

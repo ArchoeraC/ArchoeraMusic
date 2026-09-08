@@ -171,12 +171,15 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
 /// 播放控制器（Notifier）：应用层单一播放状态源（架构文档 §5.3）。
 ///
 /// 组合：AudioEngineProcess（直连 C 引擎：FFI create + 命令/事件 FIFO，
-/// 流式起播：边解码边出声，PCM 同时落盘 WAV/PCM）+ 引擎内置 miniaudio
-/// 播放（§10.8，替代 libmpv）。
+/// 流式起播：边解码边出声）+ 引擎内置播放/出声。
+/// 输出形态（2026-09-08 起）：**默认内存播放模式**——解码 PCM 驻留引擎内存块列表、
+/// 频谱走 pcm_window FFI，不写 stream.wav/.pcm；**文件模式**（设置「内存播放」关 /
+/// env `ARCHOERA_ENGINE_FILE_MODE=1`）保留「PCM 落盘 WAV + 文件拉模式 FFT」旧路径
+/// （详见 docs/audio-memory-playback.md）。
 /// 会话启动门槛 = ready（见 [AudioEngineProcess.started]，done 在流式下只在
 /// 曲尾到达）；完整时长（ready/playing 事件回填）、seek 走引擎本地 seek
-/// （不重启引擎重转码）、位置/播放状态经引擎事件推送。无声设备回退旧路径：
-/// 全速完整转码落盘 WAV 后再自播。
+/// （不重启引擎重转码）、位置/播放状态经引擎事件推送。文件模式无声设备回退旧路径：
+/// 全速完整转码落盘 WAV 后再自播；内存模式无设备直接 error（不文件回退）。
 class PlaybackNotifier extends _PlaybackNotifierBase
     with
         _PlaybackNotifierQueue,
@@ -333,14 +336,15 @@ class PlaybackNotifier extends _PlaybackNotifierBase
       if (_diagCounter % 40 == 0) {
         _log(
           'FFT 诊断: pos=${state.position.inMilliseconds}ms '
-          '块=${pcm.blockCount} 字节=${pcm.bytesIn}',
+          '块=${pcm.blockCount} 字节=${pcm.bytesIn} epoch=${pcm.epoch}',
         );
       }
       return;
     }
     if (!_fftStarted) {
       _fftStarted = true;
-      _log('FFT 频谱已启动: 本地 ${pcm.blockCount} 块，位置事件驱动拉模式');
+      _log('FFT 频谱已启动: 本地 ${pcm.blockCount} 块，epoch=${pcm.epoch}，'
+          '位置事件驱动拉模式');
     }
     state = state.copyWith(fft: frame);
   }

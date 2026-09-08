@@ -1650,6 +1650,61 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsEngineRestartLater => 'Later';
 
   @override
+  String get settingsMemoryPlaySection => 'Playback memory';
+
+  @override
+  String get settingsMemoryPlayTitle => 'Memory playback (no disk decode)';
+
+  @override
+  String get settingsMemoryPlayOn =>
+      'Decoded PCM stays in memory; no stream.wav/stream.pcm written';
+
+  @override
+  String get settingsMemoryPlayOff =>
+      'File mode: decoded PCM written to disk (legacy)';
+
+  @override
+  String get settingsMemoryFileModeNote =>
+      'Off = engine writes stream.wav/stream.pcm (file mode). Takes effect from the next track.';
+
+  @override
+  String get settingsMemoryPolicyAuto => 'Auto (balance with available memory)';
+
+  @override
+  String get settingsMemoryPolicyAutoSub =>
+      '0.8 GiB hard cap; adapts to free RAM';
+
+  @override
+  String get settingsMemoryPolicyLimit => 'Custom limit';
+
+  @override
+  String get settingsMemoryPolicyUnlimited => 'Unlimited';
+
+  @override
+  String get settingsMemoryPolicyUnlimitedSub =>
+      'Keep the entire decoded track in RAM; shown with an explicit warning';
+
+  @override
+  String get settingsMemoryLimitTitle => 'Decoded PCM memory limit';
+
+  @override
+  String get settingsMemoryLimitHint => 'MB (48 kHz stereo ≈ 0.38 MB/s)';
+
+  @override
+  String get settingsMemoryConfirm => 'Confirm';
+
+  @override
+  String get settingsMemoryCancel => 'Cancel';
+
+  @override
+  String get settingsMemoryUnlimitedWarnTitle =>
+      'Keep all decoded PCM in memory?';
+
+  @override
+  String get settingsMemoryUnlimitedWarnBody =>
+      'Long tracks can accumulate hundreds of MB to several GB in RAM (≈0.38 MB/s at 48 kHz stereo), which may slow the whole machine, cause the app to be reclaimed by the OS under memory pressure, or make the system unstable. Continue?';
+
+  @override
   String get volumeMute => 'Mute';
 
   @override

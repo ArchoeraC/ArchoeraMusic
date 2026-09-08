@@ -54,7 +54,7 @@ class EngineStatus extends EngineEvent {
   final bool? playing;
 }
 
-/// 内容完整解码到 EOF（引擎发 done；播放模式下 WAV 已落盘完整）。
+/// 内容完整解码到 EOF（引擎发 done；内存模式 = 块列表收全，文件模式 = WAV/PCM 完整）。
 ///
 /// 流式起播下此事件在曲目末尾才到达，**不是**「播放已开始」信号——启动
 /// 收敛请用 [AudioEngineProcess.started]（ready）。
@@ -62,7 +62,8 @@ class EngineDone extends EngineEvent {
   const EngineDone();
 }
 
-/// 播放器就绪（miniaudio 已加载 WAV，开始播放；duration_ms 为完整时长）。
+/// 播放已开始（声音输出已建立；文件模式指 miniaudio 加载 WAV 后开始播放，
+/// duration_ms 为完整时长）。
 class EnginePlaying extends EngineEvent {
   const EnginePlaying({required this.durationMs});
 
@@ -120,8 +121,8 @@ class EngineExited extends EngineEvent {
 ///   - [started]：`ready` 事件（管线建立）到达即完成——**会话启动门槛**。
 ///     流式起播下首块 PCM 即出声（playing 紧跟 ready），done 只在曲尾 EOF
 ///     才到达，因此启动收敛必须以 ready 为准，不能等 done；
-///   - [done]：内容完整解码到 EOF（WAV/PCM 完整）。流式下 ≈ 曲目末尾，仅作
-///     「整曲转码完成」标记，不再作为启动门槛。
+///   - [done]：内容完整解码到 EOF（内存块列表收全 / 文件模式下 WAV/PCM 完整）。
+///     流式下 ≈ 曲目末尾，仅作「整曲解码完成」标记，不再作为启动门槛。
 ///
 /// 通信模型（2026-08-07 用户决策，摆脱 AF_UNIX/TCP 兼容问题；事件推送
 /// 2026-09-05 落地，取代 50ms 轮询）：
@@ -129,7 +130,10 @@ class EngineExited extends EngineEvent {
 ///   - 事件经线程安全 FIFO，Dart 侧用**独立接收 isolate 阻塞等待**
 ///     `wait_event(..., -1)` 推送到主 isolate（空闲零唤醒/零轮询开销）；
 ///   - 控制命令（play/pause/seek/...）经 [sendCommand] 入命令 FIFO；
-///   - PCM 由引擎直写 `stream.pcm`，[PcmAnalyzer] 按需读文件做 FFT。
+///   - PCM 取用（2026-09-08）：默认**内存播放模式**——引擎内存块列表经
+///     `pcm_window` FFI（[MemoryPcmAnalyzer]）；文件模式下引擎直写
+///     `stream.pcm`，[PcmAnalyzer] 按需读文件。见 [memoryMode] 与
+///     `docs/audio-memory-playback.md`。
 ///
 /// 事件驱动失败/调试可用 `ARCHOERA_EVENT_POLL_FALLBACK=1` 切回旧的 50ms
 /// `pollEvent` 轮询（[AudioEngineProcess.start] 时读取，需冷启动生效）。
@@ -138,6 +142,7 @@ class AudioEngineProcess {
     required this.handle,
     required this.sockDir,
     required this.outSampleRate,
+    this.memoryMode = false,
     bool startPoller = true,
   }) {
     _eventsCtrl = StreamController<EngineEvent>.broadcast();
@@ -180,8 +185,12 @@ class AudioEngineProcess {
   /// 管线实际输出采样率（ready 事件回填前为 0/48000 兜底）。
   final int outSampleRate;
 
+  /// 内存播放模式（EngineConfig.no_disk_cache=1）：PCM 驻留引擎内存块列表，
+  /// 频谱走 [MemoryPcmAnalyzer]（`pcm_window` FFI），不写 stream.wav/.pcm。
+  final bool memoryMode;
+
   late final StreamController<EngineEvent> _eventsCtrl;
-  PcmAnalyzer? _pcm;
+  PcmFftSource? _pcm;
   Timer? _pollTimer;
   bool _stopped = false;
 
@@ -213,13 +222,16 @@ class AudioEngineProcess {
   /// 引擎控制事件流（ready/status/done/playing/position/player:ended/error/exited）。
   Stream<EngineEvent> get events => _eventsCtrl.stream;
 
-  /// PCM 分析器（引擎直写文件 + 增量索引 + 按需 FFT，UI 拉模式取帧）。
-  PcmAnalyzer? get pcm => _pcm;
+  /// PCM 拉模式源（文件版 [PcmAnalyzer] 读 stream.pcm / 内存版
+  /// [MemoryPcmAnalyzer] 走引擎 pcm_window FFI；UI 拉模式取帧）。
+  PcmFftSource? get pcm => _pcm;
 
-  /// 播放器 WAV 文件（引擎转码 PCM 落盘，miniaudio 播放）。
+  /// 播放器 WAV 文件路径（**仅文件模式**使用；内存模式下引擎不写盘，
+  /// 此值仅为会话目录占位，见 [memoryMode] / audio-memory-playback.md）。
   String get wavFilePath => '${sockDir.path}/stream.wav';
 
-  /// 原始 PCM 文件（块格式，引擎直写，供 [PcmAnalyzer.frameAt] 按需读取）。
+  /// 原始 PCM 文件路径（**仅文件模式**：引擎直写、[PcmAnalyzer.frameAt] 按需读取；
+  /// 内存模式无此文件）。
   String get pcmFilePath => '${sockDir.path}/stream.pcm';
 
   /// 内容完整解码到 EOF（引擎发 done；WAV/PCM 文件完整）。
@@ -265,12 +277,28 @@ class AudioEngineProcess {
     double? tempoSpeed,
     double? tempoPitch,
   }) async {
-    // 会话目录统一走系统临时目录（Windows %TEMP% / POSIX /tmp），
-    // 引擎 WAV/PCM 落盘 + miniaudio 播放 + PcmAnalyzer 按需读取均在此。
+    // 会话目录统一走系统临时目录（Windows %TEMP% / POSIX /tmp）。
+    // 文件模式：引擎 WAV/PCM 落盘 + PcmAnalyzer 按需读取在此；
+    // 内存模式：仅作会话句柄目录（引擎不落盘，PCM 走 pcm_window FFI）。
     final sockDir = Directory(
       '${Directory.systemTemp.path}/archoera-${Platform.localHostname}-$pid-${DateTime.now().millisecondsSinceEpoch}',
     )..createSync(recursive: true);
     final playerFile = '${sockDir.path}/stream.wav';
+
+    // 内存播放偏好（每次新会话读取，对下一首生效；文档 audio-memory-playback.md）：
+    //   engineMemoryPlay=true → no_disk=1；cap：auto=0 / 用户 limit=MB×1024 / unlimited=-1。
+    final mp = AppPrefs.load();
+    final memoryOn = mp.engineMemoryPlay;
+    final int memCapKb;
+    if (!memoryOn) {
+      memCapKb = 0;
+    } else if (mp.pcmMemPolicy == 'unlimited') {
+      memCapKb = -1;
+    } else if (mp.pcmMemPolicy == 'limit') {
+      memCapKb = mp.pcmMemLimitMb.clamp(1, 1 << 18) * 1024; // KB
+    } else {
+      memCapKb = 0; // auto
+    }
 
     // FFI create 在后台 isolate 执行：pipeline_create 打开解码器/网络 IO 可能
     // 耗时数百 ms，避免阻塞 UI isolate。config 参数以标量值跨 isolate 传递。
@@ -288,6 +316,8 @@ class AudioEngineProcess {
         tempoSpeed: tempoSpeed,
         tempoPitch: tempoPitch,
         engineMode: engineMode,
+        noDiskCache: memoryOn ? 1 : 0,
+        pcmMemCapKb: memCapKb,
       );
       try {
         final h = EngineBindings.instance.create(
@@ -306,6 +336,7 @@ class AudioEngineProcess {
       handle: handleAddr,
       sockDir: sockDir,
       outSampleRate: passthrough ? 0 : 48000,
+      memoryMode: memoryOn,
     );
     // 事件泵就绪（接收 isolate 已进入阻塞等待）：返回前确认事件通道可用，
     // 失败自动回退 50ms 轮询。引擎事件在 C FIFO 中排队，晚几 ms 不丢失。
@@ -546,14 +577,20 @@ class AudioEngineProcess {
     }
   }
 
-  /// 打开 PCM 文件读取器（ready 后调用；引擎直写，scan 增量补索引）。
+  /// 打开 PCM 拉模式源（ready 后调用）：
+  ///   内存模式 → MemoryPcmAnalyzer（引擎 pcm_window，无文件）；
+  ///   文件模式 → PcmAnalyzer（读 stream.pcm，scan 增量补索引）。
   Future<void> _openPcm(int sampleRate) async {
     if (_pcm != null) return;
     final rate = sampleRate > 0 ? sampleRate : 48000;
     try {
-      _pcm = await PcmAnalyzer.open(pcmFilePath, sampleRate: rate);
+      if (memoryMode) {
+        _pcm = MemoryPcmAnalyzer(handle: handle, sampleRate: rate);
+      } else {
+        _pcm = await PcmAnalyzer.open(pcmFilePath, sampleRate: rate);
+      }
     } catch (e) {
-      // PCM 文件不可读：频谱不可用，不影响播放。记录根因便于排查
+      // PCM 源不可用：频谱不可用，不影响播放。记录根因便于排查
       // （如 libfft.so 缺失/符号隐藏导致的 FftAnalyzer 构造失败）。
       // ignore: avoid_print
       print('[audio-engine] PCM 分析器打开失败（频谱不可用）: $e');

@@ -203,9 +203,11 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
   5.34s→1.35s（≈148×）；bit-exact 逐位（校验和一致）。596/596、ctest 4/4。
 - 流式起播：不再“整段解码完才播”。raw ma_device + SPSC 无锁 ring（2.7s 容量，满则背压≈实时），
   pcm_out（EQ/响度/限幅/tempo 后）经 ring 喂设备；非 48k/2ch 目标（如 HFP 16k/1ch）用 swr 原生适配。
-  CLI(--player-file)与 mediaengine FFI 均接入：首块 PCM 出声≈会话 30ms（旧路径要等全解码完成）；
-  内容仍同步写 stream.wav/.pcm（SHA 与旧路径逐字节一致，Stable/EraAudio 双路径 PARITY）；seek=重建+跳转、
-  暂停冻结、EOF 排空自然结束。旧文件播放路径保留作回退/`ARCHOERA_STREAM_DISABLE=1` 调试。
+   CLI(--player-file)与 mediaengine FFI 均接入：首块 PCM 出声≈会话 30ms（旧路径要等全解码完成）；
+   内容仍同步写 stream.wav/.pcm（SHA 与旧路径逐字节一致，Stable/EraAudio 双路径 PARITY）；seek=重建+跳转、
+   暂停冻结、EOF 排空自然结束。旧文件播放路径保留作回退/`ARCHOERA_STREAM_DISABLE=1` 调试。
+   （2026-09-08 起桌面默认改为**内存播放模式**，本句「仍同步写 stream.wav/.pcm」的 PARITY SHA 语义
+   仅适用于**文件模式**：设置「内存播放」关闭或 env `ARCHOERA_ENGINE_FILE_MODE=1`，见 §20。）
 - 简约进度触摸：进度细条（hover 才显 Slider）对触摸无 hover → 完全不可 seek。修复：细条自身挂
   横向点按/拖动（触摸+鼠标），onChanged 跟随/onChangeEnd seek；点击跳转；命中区高 22→44px；
   不与竖直手势冲突；悬停/Slider 路径不变。
@@ -313,3 +315,43 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
 - 验证：zk ABI r=3→0（30/60/120/200s）；FFI 双引擎×多格式多次 seek/offset 起播全部即时；zig 597/597、ctest 6/6、
   dart analyze 0；新增 flac seektable 回归 + test_native_seek（无头）。注意：真机默认 sink 若漂到蓝牙 HFP 会饿死回调
   （与本次无关），验证可 ARCHOERA_AUDIO_SINK 钉内置。
+
+
+## 20. 2026-09-08 内存播放（不落盘）模式：基准与双模式 PARITY 定稿
+
+> 规格：`docs/audio-memory-playback.md`（S1 引擎 C / S2 Dart 接线+设置 已实现；S3 本文定稿）。
+> 用户开关「内存播放」（`audio.engineMemory`，默认**开**）；策略 `audio.pcmMemPolicy`
+> （auto / limit / unlimited，无上限须显式警告）。PCM 驻留进程内块列表（0.8 GiB 硬上限 /
+> 用户上限优先 / 查询故障回落 / append 记账强制淘汰），频谱经 `pcm_window` FFI 拉窗，
+> 不再写 `stream.wav/.pcm`；无设备 + 内存模式 → error（不文件回退）。
+
+### 20.1 双模式 PARITY 语义
+
+| 模式 | 触发 | PCM 输出形态 | PARITY/验证基线 |
+|---|---|---|---|
+| **内存模式**（默认） | `engineMemoryPlay=true` | 内存块列表（与 stream.pcm 同构） | 以同源解码的**内存窗口比对**：`pcm_window(pos)` 窗口与参考解码 ≤1e-4（`test_memory_mode`）；不产生会话文件 |
+| **文件模式**（legacy） | 设置关 / `ARCHOERA_ENGINE_FILE_MODE=1` | `stream.wav` + `stream.pcm` 落盘 | 现状字节级行为不变：Stable/EraAudio 双路径 SHA PARITY、FFT 文件拉模式全部原样 |
+
+- Stable/EraAudio 的解码后端差异只在 pipeline 内部（Zig vs FFmpeg），与「写文件 or 内存」正交；
+  §10「内容仍同步写 stream.wav/.pcm（SHA …双路径 PARITY）」在**文件模式**下保持，内存模式下
+  改按 20.2 的窗口比对执行，字节 SHA 不再适用（无文件可 SHA）。
+- 回归：引擎 ctest 7/7（新增 `test_memory_mode`：不落盘 / 窗口一致 / cap=-1 全量可回访 /
+  cap=1MiB 滚动淘汰 / -2 参数错误）。`dart analyze lib` 0 issues。
+
+### 20.2 内存窗口比对约定（取代文件 SHA 的校验路径）
+
+```
+同一输入同一 cfg（skip_encoder，DSP 默认一致）：
+  A. 文件模式（ARCHOERA_ENGINE_FILE_MODE=1）会话 → stream.pcm 作真值（SHA 基线保留）；
+  B. 内存模式会话 → pcm_window(end_pos_ms, fftSize, l, r)；
+  断言 max|A_window - B_window| ≤ 1e-4（float），窗口语义 = PcmAnalyzer.frameAt（块内取整 /
+  前缀补零 / 越出保留窗或未解码 → null/-1）。
+```
+headless 驱动：引擎内存模式 `ARCHOERA_MEMORY_HEADLESS=1` 走「无设备解码到内存」分支，
+供无声 CI 完整跑通（生产路径不设置该 env，无设备即 error）。
+
+### 20.3 基准口径
+
+- `tests/bench/run_bench.py`（CLI/pipeline 解码基准）不涉及 player 落盘/内存形态，无需改动；
+- 需要回放路径内存形态的指标（会话 RSS / 长播内存有界性）见 `docs/audio-memory-playback.md` §8
+  验收：auto 模式 RSS 增量 ≈ cap（不整曲驻留、≤0.8 GiB），`cap=-1` 用户显式知悉（含警告）。

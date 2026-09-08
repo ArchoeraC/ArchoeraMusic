@@ -357,6 +357,69 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
     await quitApplication(ref);
   }
 
+  Future<void> _pickMemoryLimitMb(int currentMb) async {
+    final ctrl = TextEditingController(text: '$currentMb');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final l10n = ctx.l10n;
+        return AlertDialog(
+          title: Text(l10n.settingsMemoryLimitTitle),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(hintText: l10n.settingsMemoryLimitHint),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.settingsMemoryCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.settingsMemoryConfirm),
+            ),
+          ],
+        );
+      },
+    );
+    final v = int.tryParse(ctrl.text.trim());
+    if (ok == true && v != null && v >= 1) {
+      ref.read(appPrefsProvider.notifier).setEngineMemory(
+            policy: 'limit',
+            limitMb: v.clamp(1, 1 << 18).toInt(),
+          );
+    }
+  }
+
+  /// 选择「无上限」：先弹显式内存过载警告，确认后才生效。
+  Future<void> _pickMemoryUnlimited() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final l10n = ctx.l10n;
+        return AlertDialog(
+          title: Text(l10n.settingsMemoryUnlimitedWarnTitle),
+          content: Text(l10n.settingsMemoryUnlimitedWarnBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.settingsMemoryCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.settingsMemoryConfirm),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok == true) {
+      ref.read(appPrefsProvider.notifier).setEngineMemory(policy: 'unlimited');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -437,6 +500,48 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   ],
                 ),
               ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SettingSection(
+          title: l10n.settingsMemoryPlaySection,
+          note: prefs.engineMemoryPlay
+              ? null
+              : l10n.settingsMemoryFileModeNote,
+          children: [
+            SettingSwitchTile(
+              icon: EtaIcons.chipOutline,
+              title: l10n.settingsMemoryPlayTitle,
+              subtitle: prefs.engineMemoryPlay
+                  ? l10n.settingsMemoryPlayOn
+                  : l10n.settingsMemoryPlayOff,
+              value: prefs.engineMemoryPlay,
+              onChanged: (value) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setEngineMemory(enabled: value),
+            ),
+            if (prefs.engineMemoryPlay) ...[
+              _MemoryPolicyTile(
+                label: l10n.settingsMemoryPolicyAuto,
+                subtitle: l10n.settingsMemoryPolicyAutoSub,
+                selected: prefs.pcmMemPolicy == 'auto',
+                onTap: () =>
+                    ref.read(appPrefsProvider.notifier).setEngineMemory(policy: 'auto'),
+              ),
+              _MemoryPolicyTile(
+                label: l10n.settingsMemoryPolicyLimit,
+                subtitle: '${prefs.pcmMemLimitMb} MB · '
+                    '${l10n.settingsMemoryLimitHint}',
+                selected: prefs.pcmMemPolicy == 'limit',
+                onTap: () => _pickMemoryLimitMb(prefs.pcmMemLimitMb),
+              ),
+              _MemoryPolicyTile(
+                label: l10n.settingsMemoryPolicyUnlimited,
+                subtitle: l10n.settingsMemoryPolicyUnlimitedSub,
+                selected: prefs.pcmMemPolicy == 'unlimited',
+                onTap: _pickMemoryUnlimited,
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 20),
@@ -956,6 +1061,69 @@ class _A2dpGuideBlockState extends State<_A2dpGuideBlock> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// PCM 内存保留策略选择行（radio-like；selected 高亮）。
+class _MemoryPolicyTile extends StatelessWidget {
+  const _MemoryPolicyTile({
+    required this.label,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fg = selected ? scheme.primary : scheme.onSurfaceVariant;
+    final textFg = scheme.onSurface;
+    final subFg = scheme.onSurfaceVariant.withValues(alpha: 0.75);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Row(
+          children: [
+            Icon(
+              selected ? EtaIcons.checkCircle : EtaIcons.checkCircleOutline,
+              size: 18,
+              color: fg,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: textFg,
+                    ),
+                  ),
+                  if (subtitle.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 11.5, color: subFg),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
