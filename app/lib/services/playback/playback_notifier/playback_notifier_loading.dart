@@ -114,6 +114,9 @@ mixin _PlaybackNotifierLoading
     int offsetMs = 0,
   }) {
     final gen = ++_loadGen;
+    // M2.3b：新 load 取代旧 → 取消上一在途整首下载（避免浪费拉流）。
+    _storeFetch?.cancel();
+    _storeFetch = null;
     unawaited(_stopEngine());
     final task = _loadChain.then((_) async {
       if (gen != _loadGen) {
@@ -142,8 +145,17 @@ mixin _PlaybackNotifierLoading
         if (_memorySourceEligible(source)) {
           memoryTried = true;
           try {
-            final r = await prepareWholeTrackStore(source);
+            final fetch = prepareWholeTrackStore(source);
+            _storeFetch = fetch;
+            final r = await fetch.done;
+            if (_storeFetch == fetch) _storeFetch = null;
             store = r.store;
+            if (r.cancelled) {
+              // M2.3b：会话被取代（新 load 已取消本下载）→ 放弃本次，不启动/不回退。
+              _log('内存源下载已取消（会话被取代），放弃本次加载');
+              state = state.copyWith(buffering: false);
+              return;
+            }
             if (r.ok) {
               _log('内存源整首下载完成，驻留 ${r.bytes} 字节（SegStore）');
             } else {
