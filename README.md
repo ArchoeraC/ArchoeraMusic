@@ -264,6 +264,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 - [自研解码内核行业基准（EraAudio）](docs/benchmark-industry-2026-09-05.md) —— FFmpeg/libFLAC/LAME/speexdec 横评 + 评分（95.6 A+）
 - [引擎集成与基准（EraAudio vs Stable）](docs/engine-integration-bench.md) —— EOF/错误语义、内存流式化、样本数对齐
 - [音频 Zig 解码内核路线图](docs/audio-kernel-zig.md) —— 内核架构 / 逐格式接管 / 第三方来源登记
+- [平台能力外观层](docs/platform-capability-facade.md) —— 防休眠 / 媒体会话与蓝牙耳机控制 / 系统定位的能力接口 + 每平台实现
 - [下载模块设计规范](docs/download-module.md) —— 下载引擎架构 / 自研边界 / 依赖许可
 - 使用与授权声明见文首；第三方依赖与许可逐项见各模块 `THIRD-PARTY-LICENSES.md`（汇总见「[第三方声明](#第三方声明)」与「[许可证（Licensing）](#许可证licensing)」）
 
