@@ -34,6 +34,26 @@ typedef HANDLE pthread_t;
 typedef CRITICAL_SECTION pthread_mutex_t;
 typedef CONDITION_VARIABLE pthread_cond_t;
 
+/* ── once（一次性初始化；CRITICAL_SECTION 无法静态初始化，进程级锁须
+      经 pthread_once 惰性初始化，见 segstore.c 进程池）────────────── */
+typedef INIT_ONCE pthread_once_t;
+#define PTHREAD_ONCE_INIT INIT_ONCE_STATIC_INIT
+
+static BOOL CALLBACK _compat_once_thunk(PINIT_ONCE once, PVOID param,
+                                        PVOID *ctx)
+{
+    (void)once;
+    (void)ctx;
+    void (*fn)(void) = (void (*)(void))param;
+    fn();
+    return TRUE;
+}
+
+static void pthread_once(pthread_once_t *once, void (*fn)(void))
+{
+    (void)InitOnceExecuteOnce(once, _compat_once_thunk, (PVOID)fn, NULL);
+}
+
 /* ── mutex ─────────────────────────────────────────────────── */
 #define pthread_mutex_init(m, a) (InitializeCriticalSection((m)), 0)
 #define pthread_mutex_destroy(m) (DeleteCriticalSection((m)), 0)

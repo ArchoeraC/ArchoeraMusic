@@ -310,14 +310,29 @@ typedef struct PoolSeg {
     size_t size;
 } PoolSeg;
 
-static pthread_mutex_t g_pool_mu = PTHREAD_MUTEX_INITIALIZER;
+/* 进程池锁惰性初始化（CRITICAL_SECTION/POSIX mutex 均不支持可靠静态
+ * 初始化；经 pthread_once 保证一次 init，MSVC 走 compat/pthread.h）。 */
+static pthread_mutex_t g_pool_mu;
+static pthread_once_t g_pool_once = PTHREAD_ONCE_INIT;
+static void pool_mu_init(void)
+{
+    pthread_mutex_init(&g_pool_mu, NULL);
+}
+
+/* 进程池访问统一入口：惰性 init（一次）后加锁。 */
+static void pool_lock(void)
+{
+    pthread_once(&g_pool_once, pool_mu_init);
+    pthread_mutex_lock(&g_pool_mu);
+}
+
 static PoolSeg *g_pool = NULL;
 static size_t g_pool_n = 0, g_pool_cap = 0;
 static uint64_t g_pool_bytes = 0, g_pool_limit = 0, g_pool_reuses = 0;
 
 static int pool_put(uint8_t *buf, size_t size)
 {
-    pthread_mutex_lock(&g_pool_mu);
+    pool_lock();
     if (g_pool_limit == 0 || g_pool_bytes + size > g_pool_limit) {
         pthread_mutex_unlock(&g_pool_mu);
         return 0; /* 池关闭/超限 → 调用方 free */
@@ -342,7 +357,7 @@ static int pool_put(uint8_t *buf, size_t size)
 
 static uint8_t *pool_get(size_t size)
 {
-    pthread_mutex_lock(&g_pool_mu);
+    pool_lock();
     uint8_t *buf = NULL;
     for (size_t i = 0; i < g_pool_n; i++) {
         if (g_pool[i].size == size) {
@@ -359,7 +374,7 @@ static uint8_t *pool_get(size_t size)
 
 void segstore_pool_set_cap(uint64_t bytes)
 {
-    pthread_mutex_lock(&g_pool_mu);
+    pool_lock();
     g_pool_limit = bytes;
     if (bytes == 0) { /* 关闭并清空 */
         for (size_t i = 0; i < g_pool_n; i++) free(g_pool[i].buf);
@@ -376,7 +391,7 @@ void segstore_pool_set_cap(uint64_t bytes)
 
 uint64_t segstore_pool_reuses(void)
 {
-    pthread_mutex_lock(&g_pool_mu);
+    pool_lock();
     uint64_t r = g_pool_reuses;
     pthread_mutex_unlock(&g_pool_mu);
     return r;
