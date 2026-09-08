@@ -366,3 +366,21 @@ requiredCeiling = minFloor + requiredCache
 - 动作：收到压力事件 → 触发 §6.3 全量丢弃缓存 → 仍不足再停播 + §13.1 通知/弹窗。
 - 约束：无轮询（事件推送）；实现带平台原生小模块并注册，可后期以“可选模块”加载；
   设计核心（预算/门禁/停播）不依赖它——系统事件只是“提前量”的增强信号。
+
+---
+
+## 附：未完成清单（如实标注，待真机/后续实现）
+
+以下为设计定稿中**尚未落地**的点，均非阻塞主链路（已实现面见正文/提交）：
+
+1. **预取下一首（M2.3c）**：对队列下一曲提前拉流/建 store、切歌即复用——需结合 queue/loading
+   生命周期与释放竞争，留真机联调。
+2. **§13.1 后台态系统通知**：前台红色弹窗已实现；后台/最小化推送（Linux libnotify、
+   Windows toast、macOS UNUserNotification）需通知插件/平台通道与权限，未实现。
+3. **§14 OS 内存压力事件**：Linux cgroup v2/PSI、macOS memory pressure、Windows
+   CreateMemoryResourceNotification 的原生监听未实现（本机无运行环境，不宜盲写）。
+4. **弹窗文案 l10n**：§13 弹窗当前为硬编码中文，未接 gen_l10n。
+5. **requiredCeiling 全量预算管理器**：现用简化门禁（默认 64 MiB / env 压低 /
+   auto=引擎可用内存策略 + memoryPolicyCacheLimitBytes 纯函数）；§6.1/§6.2 的完整
+   ceiling/requiredCeiling 与预算域记账尚未做成独立管理器。
+6. **真机手测**：需含 segstore 的引擎 .so 构建后跑 store 会话真解与在线手测清单。
