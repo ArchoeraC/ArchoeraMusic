@@ -60,6 +60,12 @@ typedef struct {
     bool  tempo_pitch_sync;   /**< 保音调模式，默认 true */
 
     int   engine_mode;        /**< 0=Stable(FFmpeg 默认) 1=EraAudio(自研内核,实验性) */
+    int   no_disk_cache;      /**< 1 = 内存播放模式（不写 stream.wav/.pcm）；
+                                   默认由 Dart「内存播放」开关注入（0 = 文件模式） */
+    int64_t pcm_mem_cap_kb;   /**< 解码 PCM 内存保留上限（KB）：
+                                   0 = auto（按可用内存均衡，0.8 GiB 硬上限，查询故障回落）
+                                   >0 = 用户上限（引擎绝不越过用户设定）
+                                   -1 = 无上限（整曲可回访；设置须显式警告） */
 } EngineConfig;
 
 /** 默认配置宏 */
@@ -83,6 +89,8 @@ typedef struct {
     .tempo_pitch = 0.0f, \
     .tempo_pitch_sync = true, \
     .engine_mode = 0, \
+    .no_disk_cache = 0, \
+    .pcm_mem_cap_kb = 0, \
 })
 
 /** 管线实例（不透明指针） */

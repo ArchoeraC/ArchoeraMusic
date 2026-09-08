@@ -138,6 +138,24 @@ ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_is_done(
     ArchoeraMediaEngine *e);
 
 /**
+ * 内存播放模式（EngineConfig.no_disk_cache=1）的频谱拉取：以 end_pos_ms 为终点
+ * 取最近 frames 样本，L/R 各写 frames 个 float（引擎输出恒 2ch 下混）。
+ *
+ * 语义对齐 Dart PcmAnalyzer.frameAt：终点样本 = 定位块内 (位置偏移×采样率) 取整；
+ * 头部仍在时前缀补零；seek 重建后旧缓冲失效（配合 archoera_mediaengine_pcm_epoch
+ * 丢弃旧帧索引）；被淘汰（达内存 cap 滚动丢弃）或尚未解码返回 -1。
+ *
+ * @return 0 命中；-1 越出保留窗 / 尚未解码；-2 参数错误或非内存模式会话。
+ */
+ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_pcm_window(
+    ArchoeraMediaEngine *e, int end_pos_ms, int frames,
+    float *out_l, float *out_r);
+
+/** seek 重建后的会话 epoch（重建即 +1，用于丢弃旧帧索引）；非内存模式返回 -1。 */
+ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_pcm_epoch(
+    ArchoeraMediaEngine *e);
+
+/**
  * 停止并销毁（请求退出 → join 引擎线程 → 释放资源）。
  * 可重复调用/传 NULL。
  */
