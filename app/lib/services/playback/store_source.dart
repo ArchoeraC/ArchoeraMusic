@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
@@ -113,9 +114,20 @@ const String _userAgent = 'ArchoeraMusic/0.9';
 /// 整首下载 → SegStore 准备结果。
 class WholeTrackPrepareResult {
   WholeTrackPrepareResult.ok({required this.store, required this.bytes})
-    : error = null;
+    : error = null,
+      cancelled = false;
 
-  WholeTrackPrepareResult.fail(String this.error) : store = 0, bytes = 0;
+  WholeTrackPrepareResult.fail(String this.error)
+    : store = 0,
+      bytes = 0,
+      cancelled = false;
+
+  /// 会话被取代而主动取消（无 fallback/弹窗语义，调用方按“放弃本次”处理）。
+  WholeTrackPrepareResult.cancelled()
+    : store = 0,
+      bytes = 0,
+      error = null,
+      cancelled = true;
 
   /// SegStore 句柄（非 0 即成功；成功调用方接管所有权，负责最终 destroy）。
   final SegStoreHandle store;
@@ -123,36 +135,98 @@ class WholeTrackPrepareResult {
   /// 实际下载/填充的字节数（成功时有效）。
   final int bytes;
 
-  /// 失败原因（成功时 null）。
+  /// 失败原因（成功/取消时 null）。
   final String? error;
+
+  /// 是否因会话被取代而被调用方主动取消。
+  final bool cancelled;
 
   bool get ok => store != 0;
 }
 
-/// 下载整首并填充到新 SegStore（在后台 isolate 执行，UI 不阻塞）。
+/// 可取消的在途整首下载（会话被取代时中止拉流，避免浪费）。
+class WholeTrackFetch {
+  WholeTrackFetch._(this._cancelFn, this._done);
+
+  final void Function()? _cancelFn;
+  final Future<WholeTrackPrepareResult> _done;
+
+  /// 完成结果（成功/fail/cancelled）。
+  Future<WholeTrackPrepareResult> get done => _done;
+
+  /// 请求中止当前下载（幂等；worker 收到后在最近分块边界返回 cancelled）。
+  void cancel() => _cancelFn?.call();
+}
+
+class _DownloadReq {
+  _DownloadReq(this.url, this.gateEnv, this.reply);
+  final String url;
+  final Map<String, String>? gateEnv;
+  final SendPort reply;
+}
+
+/// worker 入口：收到控制消息（'cancel'）→ 置取消标志；下载/填充完成后结果回主 isolate。
+void _downloadEntry(_DownloadReq req) async {
+  final ctrl = ReceivePort();
+  req.reply.send(ctrl.sendPort);
+  var cancelled = false;
+  ctrl.listen((msg) {
+    if (msg == 'cancel') cancelled = true;
+  });
+  final client = HttpClient()..connectionTimeout = _downloadTimeout;
+  try {
+    final result =
+        await _downloadIntoStore(client, req.url, req.gateEnv, () => cancelled);
+    req.reply.send(result);
+  } finally {
+    client.close(force: true);
+    ctrl.close();
+  }
+}
+
+/// 下载整首并填充到新 SegStore（在后台 isolate 执行，UI 不阻塞；可取消）。
 ///
 /// 每个调用新建独立 store，下载/填充串行于同一 isolate——不存在两个调用
-/// 并发写同一句柄；若会话在下载期间被取代，store 由调用方在 gen 校验处销毁。
+/// 并发写同一句柄；若会话在下载期间被取代，调用方 [WholeTrackFetch.cancel]
+/// 中止拉流，结果将以 cancelled 返回（不触发 fallback/弹窗）。
 ///
 /// [gateEnv]：内存门禁 env（测试/观测用，缺省读进程 env；§6.1/§6.2）。
-///
-/// 返回 [WholeTrackPrepareResult]；不可用/失败时 store == 0（调用方回退 URL）。
-Future<WholeTrackPrepareResult> prepareWholeTrackStore(
+WholeTrackFetch prepareWholeTrackStore(
   String url, {
   Map<String, String>? gateEnv,
-}) async {
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    return WholeTrackPrepareResult.fail('非 http(s) 源');
-  }
-  final result = await Isolate.run<WholeTrackPrepareResult>(() async {
-    final client = HttpClient()..connectionTimeout = _downloadTimeout;
-    try {
-      return await _downloadIntoStore(client, url, gateEnv);
-    } finally {
-      client.close(force: true);
+}) {
+  final reply = ReceivePort();
+  final completer = Completer<WholeTrackPrepareResult>();
+  SendPort? ctrl;
+  reply.listen((msg) {
+    if (msg is SendPort) {
+      ctrl = msg;
+    } else if (msg is WholeTrackPrepareResult) {
+      if (!completer.isCompleted) completer.complete(msg);
+      reply.close();
     }
   });
-  return result;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    completer.complete(WholeTrackPrepareResult.fail('非 http(s) 源'));
+    reply.close();
+  } else {
+    // Isolate.spawn 为异步：失败以 fail 收尾（不悬挂）。
+    Isolate.spawn(
+      _downloadEntry,
+      _DownloadReq(url, gateEnv, reply.sendPort),
+    ).then(
+      (_) {},
+      onError: (Object e) {
+        if (!completer.isCompleted) {
+          completer.complete(WholeTrackPrepareResult.fail('内存源 isolate 启动失败: $e'));
+        }
+      },
+    );
+  }
+  return WholeTrackFetch._(
+    () => ctrl?.send('cancel'),
+    completer.future,
+  );
 }
 
 /// 下载并在 C 侧 SegStore 落地（隔离线程执行体；引擎侧内存源解码，
@@ -161,6 +235,7 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
   HttpClient client,
   String url, [
   Map<String, String>? gateEnv,
+  bool Function()? isCancelled,
 ]) async {
   try {
     final req = await client.getUrl(Uri.parse(url)).timeout(_downloadTimeout);
@@ -184,6 +259,9 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
     final b = BytesBuilder(copy: false);
     var got = 0;
     await for (final chunk in resp) {
+      if (isCancelled?.call() ?? false) {
+        return WholeTrackPrepareResult.cancelled();
+      }
       got += chunk.length;
       if (got > limit) {
         return WholeTrackPrepareResult.fail(

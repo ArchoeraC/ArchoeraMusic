@@ -41,6 +41,9 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// engine.stop()（join 解码线程）之后 segstore_destroy，避免同句柄重复释放。
   SegStoreHandle _engineStore = 0;
 
+  /// M2.3b：在途整首下载（新 load 取代时 cancel，避免浪费拉流）。
+  WholeTrackFetch? _storeFetch;
+
   /// 输出设备切换失败通知（set_sink 回执 !ok）：设置页订阅后弹错误 toast。
   ///
   /// 仅通知当前引擎会话存在的失败；无会话时偏好已落盘，下次会话由引擎
