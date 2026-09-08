@@ -61,6 +61,29 @@ ARCHOERA_MEDIAENGINE_API ArchoeraMediaEngine *archoera_mediaengine_create(
                                      char *errbuf, int errbuf_size);
 
 /**
+ * 从 SegStore 内存源创建引擎会话（docs/audio-memory-source.md M2：Dart 整曲
+ * 拉流预填 → 引擎经 AVIO-mem 从同一 store 解码，source 置空）。
+ *
+ * 语义 ≈ archoera_mediaengine_create，仅引擎线程改走
+ * pipeline_create_store(store, cfg, …)：engine_mode 任意（store 模式恒 FFmpeg-mem），
+ * mem_mode/no_disk_cache 等现有配置语义不变。
+ *
+ * @param store       内存源句柄（整曲已预填、可 seek）。**生命周期归调用方**：
+ *                    引擎 destroy 不释放 store（也不释放其段缓冲）；调用方须在
+ *                    destroy 引擎后自行 segstore_destroy / release_all。
+ * @param cfg         引擎配置（同 create）
+ * @param player_file / session_dir / errbuf 同 archoera_mediaengine_create
+ * @return 引擎句柄；失败返回 NULL（store 为空 / session_dir 为空 / 管线打开失败
+ *         经 error 事件上报，同 create）
+ */
+ARCHOERA_MEDIAENGINE_API ArchoeraMediaEngine *archoera_mediaengine_create_store(
+                                     SegStore *store,
+                                     const EngineConfig *cfg,
+                                     const char *player_file,
+                                     const char *session_dir,
+                                     char *errbuf, int errbuf_size);
+
+/**
  * 枚举系统音频输出设备（**会话无关**：无需句柄，内部自建/拆除 pulse→alsa
  * context；桌面端切换输出设备前调用）。
  *

@@ -96,6 +96,9 @@ typedef struct {
 /** 管线实例（不透明指针） */
 typedef struct AudioPipeline AudioPipeline;
 
+/** 内存源句柄（与 segstore.h 的 SegStore 为同一不透明类型） */
+typedef struct SegStore SegStore;
+
 /** 输出回调：写入封装后的 OGG 字节流 */
 typedef int (*OutputCallback)(const uint8_t *data, size_t size, void *user_data);
 
@@ -127,6 +130,27 @@ AudioPipeline* pipeline_create(const char *source,
                                 const EngineConfig *cfg,
                                 OutputCallback output,
                                 void *user);
+
+/**
+ * 从 SegStore 内存源（整首已在 store，可 seek）创建管线实例
+ *
+ * 语义对齐 pipeline_create，仅解码源不同：store 非空时为其构造一个
+ * AVIOContext（read/seek 回调语义复刻 tests/test_store_decode.c：EOF 返回
+ * AVERROR_EOF、AVSEEK_SIZE 返 total、seek SET/CUR/END；av_malloc 读缓冲），
+ * 经 decoder_open_mem 解码（docs/audio-memory-source.md §7）。engine_mode
+ * 任意：store 模式始终走 FFmpeg-mem，跳过自研内核。
+ *
+ * @param store  内存源句柄（整曲已预填、可 seek；生命周期由调用方持有，
+ *               pipeline_destroy 不释放 store，也不释放其段缓冲）
+ * @param cfg    引擎配置
+ * @param output 输出回调（封装后的 OGG 数据写入此处）
+ * @param user   传给 output 的 user_data
+ * @return 管线实例指针，失败返回 NULL
+ */
+AudioPipeline* pipeline_create_store(SegStore *store,
+                                      const EngineConfig *cfg,
+                                      OutputCallback output,
+                                      void *user);
 
 /**
  * 驱动管线：解码 → 重采样 → EQ → 响度 → 限幅 → FFT → 编码 → 封装 → 输出

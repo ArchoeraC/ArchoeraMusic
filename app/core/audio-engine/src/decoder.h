@@ -24,6 +24,12 @@ typedef struct Decoder Decoder;
 Decoder* decoder_open(const char *url);
 
 /**
+ * 从自定义 AVIO（如内存源 SegStore 的 avio_alloc_context）打开解码器。
+ * 不接管 avio 生命周期：调用方在 decoder_close 后自行释放 avio 与底层源。
+ */
+Decoder* decoder_open_mem(AVIOContext *avio);
+
+/**
  * 读取下一帧解码后的 PCM
  *
  * @param frame  调用者提供的 AVFrame*（由 decoder 内部填充）

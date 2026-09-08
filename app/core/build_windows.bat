@@ -94,6 +94,13 @@ rem .def 导出表（Dart FFI lookup 符号）
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_session_dir
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_is_done
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_destroy
+rem M2 内存源（Dart→SegStore→引擎）：create_store FFI 入口 + segstore 句柄函数
+rem （Dart DynamicLibrary lookup；segstore.c 源见下，.so 内 segstore 函数经此导出）
+>> build\archoera_mediaengine.def echo     archoera_mediaengine_create_store
+>> build\archoera_mediaengine.def echo     segstore_new
+>> build\archoera_mediaengine.def echo     segstore_fill
+>> build\archoera_mediaengine.def echo     segstore_set_total
+>> build\archoera_mediaengine.def echo     segstore_destroy
 > build\fft.def echo EXPORTS
 >> build\fft.def echo     fft_create
 >> build\fft.def echo     fft_set_enabled
@@ -131,6 +138,7 @@ cl /nologo /O2 /std:c11 /MD /LD /I include /I src /I include\compat /I "%VCPKG_P
     src\mediaengine_lib.c src\tempo.c src\decoder.c src\resampler.c ^
     src\encoder.c src\equalizer.c src\loudness.c src\limiter.c ^
     src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
+    src\segstore.c ^
     "%VCPKG_PREFIX%\lib\avformat.lib" "%VCPKG_PREFIX%\lib\avcodec.lib" ^
     "%VCPKG_PREFIX%\lib\avutil.lib" "%VCPKG_PREFIX%\lib\swresample.lib" ^
     build\libaudio_tempo.lib %KERNEL_FLAG% %KERNEL_LIB% ntdll.lib ^

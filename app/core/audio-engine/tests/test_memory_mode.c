@@ -10,7 +10,9 @@
  *  2. pcm_window 与参考解码（测试内另建 pipeline + 同构捕获）窗口一致（≤1e-4）；
  *  3. cap 语义：-1（无上限）整曲可回访；>0 达 cap 滚动淘汰（旧视窗 -1、近尾仍 0，
  *     且近尾窗口与无上限会话一致——记账淘汰未篡改保留数据）；
- *  4. 参数错误返回 -2（NULL 句柄 / frames<=0）。
+ *  4. 参数错误返回 -2（NULL 句柄 / frames<=0）；
+ *  5. store 内存源会话（M2：整曲预填 SegStore → archoera_mediaengine_create_store
+ *     → AVIO-mem 解码）产出与参考一致且不落盘；引擎 destroy 不释放 store。
  *
  * 驱动方式：引擎会话以 ARCHOERA_MEMORY_HEADLESS=1 走「无设备解码到内存」分支
  * （mediaengine_lib.c engine_thread），不初始化音频设备，可在无声 CI 上运行。
@@ -32,6 +34,7 @@
 
 #include "audio_engine.h"
 #include "archoera_mediaengine.h"
+#include "segstore.h"
 
 static int g_fail = 0;
 #define CHECK(cond, msg)                                                     \
@@ -244,6 +247,70 @@ static ArchoeraMediaEngine *run_mem_session(const char *src, const char *sdir,
     return e;
 }
 
+/* 跑一个「store 内存源」引擎会话（M2 链路：Dart 整曲预填 → SegStore →
+ * archoera_mediaengine_create_store → 引擎 AVIO-mem 解码，headless 无设备）。
+ * store 指针经 store_out 归还：所有权归调用方，须在 archoera_mediaengine_destroy
+ * 之后 segstore_destroy。 */
+static ArchoeraMediaEngine *run_store_session(const char *path, const char *sdir,
+                                              long long cap_kb, SegStore **store_out,
+                                              char *errbuf, int errcap)
+{
+    FILE *f;
+    long flen;
+    unsigned char *bytes;
+    EngineConfig cfg = ENGINE_CONFIG_DEFAULT;
+    ArchoeraMediaEngine *e;
+    SegStore *st;
+    char wav[1024];
+    int waited = 0;
+
+    if (store_out) *store_out = NULL;
+    f = fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    flen = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (flen <= 0) { fclose(f); return NULL; }
+    bytes = (unsigned char *)malloc((size_t)flen);
+    if (!bytes || fread(bytes, 1, (size_t)flen, f) != (size_t)flen) {
+        free(bytes);
+        fclose(f);
+        return NULL;
+    }
+    fclose(f);
+
+    st = segstore_new((uint64_t)flen, 0, 0);
+    if (!st || segstore_fill(st, 0, bytes, (size_t)flen) != 0) {
+        fprintf(stderr, "store 整曲预填失败\n");
+        if (st) segstore_destroy(st);
+        free(bytes);
+        return NULL;
+    }
+    free(bytes);
+
+    snprintf(wav, sizeof(wav), "%s/stream.wav", sdir);
+    cfg.no_disk_cache = 1;
+    cfg.pcm_mem_cap_kb = cap_kb;
+    e = archoera_mediaengine_create_store(st, &cfg, wav, sdir, errbuf, errcap);
+    if (!e) {
+        fprintf(stderr, "create_store failed: %s\n", errbuf);
+        segstore_destroy(st);
+        return NULL;
+    }
+    if (store_out) *store_out = st; /* destroy 引擎后由调用方释放 */
+
+    while (!archoera_mediaengine_is_done(e) && waited < 20000) {
+        struct timespec ts = {0, 5 * 1000000L};
+        nanosleep(&ts, NULL);
+        waited += 5;
+    }
+    if (waited >= 20000) {
+        fprintf(stderr, "store 引擎 not done within 20s\n");
+        g_fail = 1;
+    }
+    return e;
+}
+
 static int max_diff(const float *a, const float *b, int n, double *out)
 {
     double m = 0.0;
@@ -261,11 +328,12 @@ int main(void)
     const int frames = 1024;
     const double dur_sec = 8.0;
     char base[] = "/tmp/archoera-mem-test-XXXXXX";
-    char wav_path[512], dir_full[512], dir_ev[512];
+    char wav_path[512], dir_full[512], dir_ev[512], dir_st[512];
     char errbuf[256];
     EngineConfig rcfg = ENGINE_CONFIG_DEFAULT;
     AudioPipeline *rp;
-    ArchoeraMediaEngine *efull = NULL, *eev = NULL;
+    ArchoeraMediaEngine *efull = NULL, *eev = NULL, *est = NULL;
+    SegStore *st = NULL;
     float *l, *r, *l2, *r2;
     int sr;
     long total_ms;
@@ -278,8 +346,10 @@ int main(void)
     snprintf(wav_path, sizeof(wav_path), "%s/src.wav", base);
     snprintf(dir_full, sizeof(dir_full), "%s/full", base);
     snprintf(dir_ev, sizeof(dir_ev), "%s/ev", base);
+    snprintf(dir_st, sizeof(dir_st), "%s/store", base);
     mkdir(dir_full, 0700);
     mkdir(dir_ev, 0700);
+    mkdir(dir_st, 0700);
 
     sr = write_sine_wav(wav_path, dur_sec);
     CHECK(sr == 44100, "生成确定性 44.1k 立体声测试源");
@@ -359,13 +429,43 @@ int main(void)
         }
     }
 
+    /* 3) store 内存源会话（M2 最小链路：Dart 整曲预填 → SegStore → create_store
+       → AVIO-mem 解码，headless）：ready/done 解码产出与参考一致 + 不落盘；
+       destroy 引擎后再 segstore_destroy（store 归调用方，引擎不释放）。 */
+    est = run_store_session(wav_path, dir_st, -1, &st, errbuf, sizeof(errbuf));
+    CHECK(est != NULL, "store 内存源会话可创建");
+    if (est) {
+        ok = 1;
+        const long probes[4] = { 200, 1500, 5000, total_ms - 60 };
+        CHECK(!dir_has_stream_files(dir_st),
+              "store 会话不落盘（无 stream.wav/.pcm）");
+        for (int i = 0; i < 4; i++) {
+            double md;
+            if (archoera_mediaengine_pcm_window(est, (int)probes[i], frames,
+                                                l, r) != 0 ||
+                ref_window(sr, (int)probes[i], frames, l2, r2) != 0) {
+                ok = 0;
+                break;
+            }
+            max_diff(l, l2, frames, &md);
+            if (md > 1e-4) ok = 0;
+            max_diff(r, r2, frames, &md);
+            if (md > 1e-4) ok = 0;
+        }
+        CHECK(ok, "store 会话 pcm_window 与参考一致（4 处，≤1e-4）");
+        CHECK(archoera_mediaengine_pcm_epoch(est) >= 0, "store 会话 pcm_epoch 可用");
+    }
+
     if (efull) archoera_mediaengine_destroy(efull);
     if (eev) archoera_mediaengine_destroy(eev);
+    if (est) archoera_mediaengine_destroy(est);
+    if (st) segstore_destroy(st); /* 引擎 destroy 后由调用方释放 */
     ref_reset();
 
     unlink(wav_path);
     rmdir(dir_full);
     rmdir(dir_ev);
+    rmdir(dir_st);
     rmdir(base);
     free(l); free(r); free(l2); free(r2);
 
