@@ -24,11 +24,64 @@
 #include "player.h"
 #include "archoera_mediaengine.h"
 
+/* ── UTF-8 安全 fopen（Windows 宽字符边界）──────────────────────
+   会话目录 / 临时文件路径由 Dart 以 UTF-8 传入（%TEMP% 可能含中文用户名）。
+   MSVC CRT fopen 把窄路径按 ANSI 代码页解释 → 非 ASCII 乱码/失败（同
+   scraper 根因），这里统一转 UTF-16 用 _wfopen 打开。 */
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <wchar.h>
+#undef NOMINMAX
+#undef min
+#undef max
+
+static FILE *fopen_utf8(const char *path, const char *mode) {
+    FILE *f;
+    wchar_t *wp;
+    wchar_t *wm;
+    int nw;
+    int nm;
+    if (!path || !mode) return NULL;
+    nw = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
+    nm = MultiByteToWideChar(CP_UTF8, 0, mode, -1, NULL, 0);
+    if (nw <= 0 || nm <= 0) return NULL;
+    wp = (wchar_t *)malloc((size_t)nw * sizeof(wchar_t));
+    wm = (wchar_t *)malloc((size_t)nm * sizeof(wchar_t));
+    if (!wp || !wm) {
+        free(wp);
+        free(wm);
+        return NULL;
+    }
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, wp, nw);
+    MultiByteToWideChar(CP_UTF8, 0, mode, -1, wm, nm);
+    f = _wfopen(wp, wm);
+    free(wp);
+    free(wm);
+    return f;
+}
+#else
+static FILE *fopen_utf8(const char *path, const char *mode) {
+    return fopen(path, mode);
+}
+#endif
+
 /* ── 队列容量 ────────────────────────────────────────────────── */
 #define EV_CAP 512      /* 事件队列条数 */
 #define EV_LINE 511     /* 事件行上限 */
 #define CMD_CAP 256     /* 命令队列条数 */
 #define CMD_LINE 4095   /* 命令行上限 */
+
+/* ── 内存播放模式：PCM 块列表（与 stream.pcm 文件块同构）────────── */
+typedef struct PcmMemBlock {
+    int32_t pos_ms;     /* 块起始音频时间（ms，与文件块头一致） */
+    int32_t frames;     /* 每声道帧数 */
+    int32_t channels;   /* 交织声道数 */
+    int64_t start;      /* 全局样本起点（跨块累积） */
+    float  *data;       /* frames*channels 个交织 float（malloc） */
+} PcmMemBlock;
 
 typedef struct ArchoeraMediaEngine {
     char *source;
@@ -93,7 +146,262 @@ typedef struct ArchoeraMediaEngine {
     /* ── 流式播放（§B：边解码边出声，raw 设备 + 环形缓冲）────── */
     int player_stream_mode;   /* 当前播放器为流式（player_stream_open 成功） */
     int64_t session_offset_ms;/* 会话起始偏移（初始 cfg.start_offset；事件 rel 基准） */
+
+    /* ── 内存播放模式（不落盘，cfg.no_disk_cache=1 且 player 会话）── */
+    int     mem_mode;          /* 本会话为内存播放模式 */
+    int     mem_sr;            /* 输出采样率（pcm_window 换算） */
+    int     mem_epoch;         /* 会话重建计数（seek 重建 +1；Dart 凭此丢旧帧） */
+    int64_t mem_cap_bytes;     /* 保留上限字节；INT64_MAX = 无上限 */
+    int64_t mem_bytes;         /* 当前驻留字节（cap 判定用，净 PCM+块头） */
+    PcmMemBlock *mem_blocks;   /* 块数组（下标 0 最早，队尾最新） */
+    int     mem_block_cap;
+    int     mem_block_count;
 } ArchoeraMediaEngine;
+
+/* ── 内存播放模式：cap / append / 保留 / 窗口（对齐 pcm_analyzer 语义）──
+   规格见 docs/audio-memory-playback.md：0.8 GiB 硬上限 + 用户上限优先 + 查询
+   故障回落 + append 后记账强制淘汰（绝不越过 cap）。 */
+
+/* 可用内存（MB）。失败返回 -1（调用方回落保守下限）。 */
+static long long mem_avail_mb(void)
+{
+#ifdef _WIN32
+    MEMORYSTATUSEX ms;
+    ms.dwLength = sizeof(ms);
+    if (GlobalMemoryStatusEx(&ms))
+        return (long long)(ms.ullAvailPhys / (1024ULL * 1024ULL));
+    return -1;
+#elif defined(__linux__)
+    FILE *f = fopen("/proc/meminfo", "r");
+    char line[256];
+    long long mem_kb = -1;
+    if (!f) return -1;
+    while (fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "MemAvailable:", 13) == 0) {
+            mem_kb = atoll(line + 13);
+            break;
+        }
+    }
+    fclose(f);
+    return (mem_kb < 0) ? -1 : (mem_kb / 1024);
+#else
+    return -1;
+#endif
+}
+
+/* 解析内存保留上限（字节）。pcm_mem_cap_kb 语义见 audio_engine.h：
+   0=auto（0.8 GiB 硬上限，查询故障回落下限）；>0=用户上限（绝不越过）；
+   <0=无上限。 */
+static int64_t mem_resolve_cap(ArchoeraMediaEngine *e)
+{
+    const int64_t floor_bytes = 32LL * 1024LL * 1024LL; /* 32 MiB 下限 */
+    const int64_t hard_bytes  = 858993459LL;            /* 0.8 GiB 硬上限 */
+    if (e->cfg.pcm_mem_cap_kb < 0) return INT64_MAX;            /* 无上限 */
+    if (e->cfg.pcm_mem_cap_kb > 0) return e->cfg.pcm_mem_cap_kb * 1024LL; /* 用户 */
+    {
+        long long avail_mb = mem_avail_mb();
+        long long bytes;
+        if (avail_mb > 0) {
+            long long cap_mb = avail_mb / 10; /* 可用内存 × 0.1 */
+            bytes = cap_mb * (1024LL * 1024LL);
+            if (bytes < floor_bytes) bytes = floor_bytes;
+        } else {
+            bytes = floor_bytes; /* 计算故障 → 保守下限，绝不放大 */
+        }
+        if (bytes > hard_bytes) bytes = hard_bytes; /* 硬封顶（≤0.8 GiB） */
+        return bytes;
+    }
+}
+
+/* append 后记账：超过 cap 即自队头逐最旧淘汰，直至 ≤ cap（音频超量也不越过）。 */
+static void mem_enforce_cap(ArchoeraMediaEngine *e)
+{
+    if (e->mem_cap_bytes == INT64_MAX) return;
+    while (e->mem_block_count > 0 && e->mem_bytes > e->mem_cap_bytes) {
+        PcmMemBlock *h = &e->mem_blocks[0];
+        int64_t sz = (int64_t)h->frames * h->channels * 4 + 16;
+        free(h->data);
+        memmove(&e->mem_blocks[0], &e->mem_blocks[1],
+                (size_t)(e->mem_block_count - 1) * sizeof(*h));
+        e->mem_block_count--;
+        e->mem_bytes -= sz;
+    }
+}
+
+/* 追加一块解码 PCM（内存播放模式取代 fwrite）；OOM 丢弃本块并返回 -1。 */
+static int mem_append(ArchoeraMediaEngine *e, const float *pcm,
+                      int samples, int channels, double pos_ms)
+{
+    PcmMemBlock *b;
+    if (samples <= 0 || channels <= 0 || !pcm) return 0;
+    if (e->mem_block_count == e->mem_block_cap) {
+        int ncap = e->mem_block_cap ? e->mem_block_cap * 2 : 64;
+        PcmMemBlock *nb = (PcmMemBlock *)realloc(
+            e->mem_blocks, (size_t)ncap * sizeof(*nb));
+        if (!nb) return -1; /* OOM：丢弃本块（解码继续，仅频谱可能缺块） */
+        e->mem_blocks = nb;
+        e->mem_block_cap = ncap;
+    }
+    b = &e->mem_blocks[e->mem_block_count];
+    b->data = (float *)malloc((size_t)samples * (size_t)channels * sizeof(float));
+    if (!b->data) return -1;
+    memcpy(b->data, pcm,
+           (size_t)samples * (size_t)channels * sizeof(float));
+    b->pos_ms = (int32_t)pos_ms;
+    b->frames = samples;
+    b->channels = channels;
+    b->start = (e->mem_block_count > 0)
+        ? e->mem_blocks[e->mem_block_count - 1].start
+              + e->mem_blocks[e->mem_block_count - 1].frames
+        : 0;
+    e->mem_block_count++;
+    e->mem_bytes += (int64_t)samples * channels * 4 + 16;
+    mem_enforce_cap(e);
+    return 0;
+}
+
+/* seek 重建：整表清空（对齐文件「截断重建 stream.pcm」）+ epoch++ */
+static void mem_reset(ArchoeraMediaEngine *e)
+{
+    int i;
+    for (i = 0; i < e->mem_block_count; i++) free(e->mem_blocks[i].data);
+    e->mem_block_count = 0;
+    e->mem_bytes = 0;
+    e->mem_epoch++;
+}
+
+/* 会话结束：释放块数组（destroy 调；epoch 不再递增无妨） */
+static void mem_free(ArchoeraMediaEngine *e)
+{
+    mem_reset(e);
+    free(e->mem_blocks);
+    e->mem_blocks = NULL;
+    e->mem_block_cap = 0;
+}
+
+/* 单样本下混 L/R（对齐 pcm_analyzer BS.775；1~6ch，超出退化取前两声道） */
+static void mem_downmix_sample(const float *d, int si, int channels,
+                               float *l, float *r)
+{
+    const float inv = 0.70710678f;
+    switch (channels) {
+    case 1:
+        *l = d[si]; *r = d[si]; break;
+    case 2:
+        *l = d[2 * si]; *r = d[2 * si + 1]; break;
+    case 3:
+        *l = d[3 * si] + inv * d[3 * si + 2];
+        *r = d[3 * si + 1] + inv * d[3 * si + 2];
+        break;
+    case 4:
+        *l = d[4 * si] + inv * d[4 * si + 2];
+        *r = d[4 * si + 1] + inv * d[4 * si + 3];
+        break;
+    case 5:
+        *l = d[5 * si] + inv * d[5 * si + 2] + inv * d[5 * si + 3];
+        *r = d[5 * si + 1] + inv * d[5 * si + 2] + inv * d[5 * si + 4];
+        break;
+    case 6:
+        *l = d[6 * si] + inv * d[6 * si + 2] + inv * d[6 * si + 4];
+        *r = d[6 * si + 1] + inv * d[6 * si + 2] + inv * d[6 * si + 5];
+        break;
+    default:
+        *l = d[channels * si];
+        *r = (channels >= 2) ? d[channels * si + 1] : d[channels * si];
+        break;
+    }
+}
+
+/* 最后一个 pos_ms <= end_ms 的块下标（块按 pos_ms 升序）；无返回 -1 */
+static int mem_last_block_le(ArchoeraMediaEngine *e, int end_ms)
+{
+    int lo = 0, hi = e->mem_block_count;
+    while (lo < hi) {
+        int mid = (lo + hi) / 2;
+        if (e->mem_blocks[mid].pos_ms <= end_ms) lo = mid + 1;
+        else hi = mid;
+    }
+    return lo - 1;
+}
+
+/* 含全局样本 s 的块下标；越界返回 -1 / count */
+static int mem_block_of_sample(ArchoeraMediaEngine *e, int64_t s)
+{
+    int lo = 0, hi = e->mem_block_count;
+    if (s < 0 || hi == 0) return -1;
+    while (lo < hi) {
+        int mid = (lo + hi) / 2;
+        if (e->mem_blocks[mid].start <= s) lo = mid + 1;
+        else hi = mid;
+    }
+    return lo - 1;
+}
+
+/* pcm_window 实现：以 end_pos_ms 为终点取最近 frames 样本（L/R），语义对齐
+   PcmAnalyzer.frameAt：终点样本 = 定位块内 (posMs 偏移×采样率) 取整；前缀不足
+   补零（仅当头部仍在）；被淘汰/未解码 → -1。返回 0 命中 / -1 / -2。 */
+static int mem_window(ArchoeraMediaEngine *e, int end_pos_ms, int frames,
+                      float *out_l, float *out_r)
+{
+    int sr, bi, bi2, in_block, fill, c;
+    int64_t end_sample, start_sample, head_start, si;
+    PcmMemBlock *b;
+
+    if (!e || !out_l || !out_r || frames <= 0) return -2;
+    if (!e->mem_mode || e->mem_block_count <= 0) return -2;
+    sr = e->mem_sr;
+    if (sr <= 0) return -2;
+
+    bi = mem_last_block_le(e, end_pos_ms);
+    if (bi < 0) return -1;
+    b = &e->mem_blocks[bi];
+
+    /* 终点样本 = 块起点 + 块内 (end-pos) 毫秒 × 采样率（round） */
+    {
+        int64_t off_ms = (int64_t)end_pos_ms - b->pos_ms;
+        if (off_ms < 0) off_ms = 0;
+        in_block = (int)((off_ms * (int64_t)sr + 500) / 1000);
+        if (in_block >= b->frames) in_block = b->frames - 1;
+    }
+    end_sample = b->start + in_block;
+    start_sample = end_sample - (int64_t)frames + 1;
+    head_start = e->mem_blocks[0].start;
+    if (start_sample < head_start && head_start != 0) return -1; /* 被淘汰 */
+
+    memset(out_l, 0, (size_t)frames * sizeof(float));
+    memset(out_r, 0, (size_t)frames * sizeof(float));
+
+    fill = 0;
+    si = start_sample;
+    if (si < 0) {
+        fill = (int)(-si); /* 前缀补零（数组已清零） */
+        si = 0;
+    }
+    bi2 = (si <= end_sample) ? mem_block_of_sample(e, si)
+                             : e->mem_block_count;
+    while (fill < frames && bi2 >= 0 && bi2 < e->mem_block_count) {
+        PcmMemBlock *bb = &e->mem_blocks[bi2];
+        int64_t bStart = si - bb->start;
+        int avail, take;
+        if (bStart < 0) { bi2++; continue; }
+        if (bStart >= bb->frames) { bi2++; continue; }
+        avail = (int)(bb->frames - bStart);
+        if (avail <= 0) { bi2++; continue; }
+        take = frames - fill;
+        if (take > avail) take = avail;
+        for (c = 0; c < take; c++) {
+            float l, r;
+            mem_downmix_sample(bb->data, (int)bStart + c, bb->channels, &l, &r);
+            out_l[fill + c] = l;
+            out_r[fill + c] = r;
+        }
+        fill += take;
+        si += take;
+        bi2++;
+    }
+    if (fill <= 0) return -1;
+    return 0;
+}
 
 /* ── 事件/命令队列 ───────────────────────────────────────────── */
 
@@ -230,7 +538,7 @@ static int json_get_float_array(const char *json, const char *key,
 
 static void wav_begin(ArchoeraMediaEngine *e)
 {
-    e->wav = fopen(e->wav_file, "wb");
+    e->wav = fopen_utf8(e->wav_file, "wb");
     if (!e->wav) return;
 
     int sample_rate = pipeline_get_output_sample_rate(e->p);
@@ -272,24 +580,28 @@ static void wav_finalize(ArchoeraMediaEngine *e)
     e->wav = NULL;
 }
 
-/* PCM 流出回调：WAV 落盘 + PCM 块格式落盘（[pos_ms|samples|channels]+float）
- * +（流式播放时）喂入 raw 设备环形缓冲（背压 → 解码 ≈ 实时）。 */
+/* PCM 流出回调：文件模式写 WAV/PCM；内存模式 append 块列表；
+ *（两种模式）流式播放时喂入 raw 设备环形缓冲（背压 → 解码 ≈ 实时）。 */
 static void on_pcm_out(const float *pcm, int samples, int channels,
                        double position_ms, void *user_data)
 {
     ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)user_data;
     if (samples <= 0 || channels <= 0) return;
 
-    if (e->wav) {
-        fwrite(pcm, sizeof(float), (size_t)samples * (size_t)channels, e->wav);
-    }
-    if (e->pcm) {
-        int32_t header[3];
-        header[0] = (int32_t)position_ms;
-        header[1] = (int32_t)samples;
-        header[2] = (int32_t)channels;
-        fwrite(header, sizeof(header), 1, e->pcm);
-        fwrite(pcm, sizeof(float), (size_t)samples * (size_t)channels, e->pcm);
+    if (e->mem_mode) {
+        mem_append(e, pcm, samples, channels, position_ms);
+    } else {
+        if (e->wav) {
+            fwrite(pcm, sizeof(float), (size_t)samples * (size_t)channels, e->wav);
+        }
+        if (e->pcm) {
+            int32_t header[3];
+            header[0] = (int32_t)position_ms;
+            header[1] = (int32_t)samples;
+            header[2] = (int32_t)channels;
+            fwrite(header, sizeof(header), 1, e->pcm);
+            fwrite(pcm, sizeof(float), (size_t)samples * (size_t)channels, e->pcm);
+        }
     }
     if (e->player && e->player_stream_mode) {
         player_stream_write(e->player, pcm, samples);
@@ -594,15 +906,20 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
     if (e->p) { pipeline_destroy(e->p); e->p = NULL; }
     if (e->wav) { fclose(e->wav); e->wav = NULL; }
     if (e->pcm) { fclose(e->pcm); e->pcm = NULL; }
+    if (e->mem_mode) mem_reset(e); /* 内存模式：清块列表 + epoch++（对齐文件截断） */
 
     e->p = np;
-    if (e->player_file) {
-        wav_begin(e); /* 截断重建 stream.wav */
-        pipeline_set_playback_streaming(e->p, true);
-    }
-    e->pcm = fopen(e->pcm_file, "wb"); /* 截断重建 stream.pcm */
-    if (e->wav || e->pcm) {
+    if (e->mem_mode) {
         pipeline_set_pcm_out_cb(e->p, on_pcm_out, e);
+    } else {
+        if (e->player_file) {
+            wav_begin(e); /* 截断重建 stream.wav */
+            pipeline_set_playback_streaming(e->p, true);
+        }
+        e->pcm = fopen_utf8(e->pcm_file, "wb"); /* 截断重建 stream.pcm */
+        if (e->wav || e->pcm) {
+            pipeline_set_pcm_out_cb(e->p, on_pcm_out, e);
+        }
     }
     if (e->player && e->player_stream_mode) {
         player_stream_set_pos_base(e->player, pos_base);
@@ -790,12 +1107,19 @@ static void *engine_thread(void *arg)
         return NULL;
     }
 
-    if (e->player_file) {
-        wav_begin(e);
-    }
-    e->pcm = fopen(e->pcm_file, "wb");
-    if (e->wav || e->pcm) {
+    if (e->mem_mode) {
+        /* 内存播放模式：不开 stream.wav / stream.pcm（PCM 入内存块列表） */
+        e->mem_sr = pipeline_get_output_sample_rate(e->p);
+        if (e->mem_sr <= 0) e->mem_sr = pipeline_get_source_sample_rate(e->p);
         pipeline_set_pcm_out_cb(e->p, on_pcm_out, e);
+    } else {
+        if (e->player_file) {
+            wav_begin(e);
+        }
+        e->pcm = fopen_utf8(e->pcm_file, "wb");
+        if (e->wav || e->pcm) {
+            pipeline_set_pcm_out_cb(e->p, on_pcm_out, e);
+        }
     }
 
     /* ready 事件 */
@@ -812,6 +1136,56 @@ static void *engine_thread(void *arg)
 
     int code = 0;
     int streaming = 0;
+
+    if (e->mem_mode) {
+        /* 内存播放模式（不落盘）：无设备不可回退（不写 stream.wav，无文件播放器可用）。
+           - ARCHOERA_MEMORY_HEADLESS=1：测试/无声环境专用——不触碰设备，全速解码至
+             EOF，PCM 仅入内存块列表（pcm_window 可验证内容），不落盘、不播放；
+           - 否则先尝试 raw 设备流；失败直接 error（不做文件回退）。 */
+        if (getenv("ARCHOERA_MEMORY_HEADLESS")) {
+            fprintf(stderr,
+                "[mediaengine] 内存播放模式 headless（无设备，解码入内存块列表）\n");
+            for (;;) {
+                if (e->stop_requested) break;
+                ssize_t n = pipeline_process(e->p);
+                if (n < 0) {
+                    char err[160];
+                    snprintf(err, sizeof(err),
+                        "{\"type\":\"error\",\"message\":\"pipeline error %zd\"}", (size_t)n);
+                    ev_enqueue(e, err);
+                    code = (int)n;
+                    break;
+                }
+                if (n == 0) break; /* EOF */
+                char line[CMD_LINE + 1];
+                while (cmd_dequeue(e, line, sizeof(line))) {
+                    handle_command(e, line);
+                }
+            }
+            if (!e->stop_requested) {
+                int ret = pipeline_run(e->p); /* flush 残留 */
+                if (ret < 0) {
+                    char err[160];
+                    snprintf(err, sizeof(err),
+                        "{\"type\":\"error\",\"message\":\"flush %d\"}", ret);
+                    ev_enqueue(e, err);
+                    code = ret;
+                } else {
+                    ev_enqueue(e, "{\"type\":\"done\"}");
+                }
+            }
+        } else {
+            streaming = mediaengine_stream_begin(e);
+            if (!streaming) {
+                ev_enqueue(e,
+                    "{\"type\":\"error\",\"message\":\"内存播放模式无可用输出设备\"}");
+                code = -1;
+            } else {
+                code = mediaengine_stream_run(e);
+            }
+        }
+        goto mem_exit;
+    }
 
     /* 流式优先：player 模式先尝试 raw 设备流（首块 PCM 即出声）；失败回退旧路径。
      * ARCHOERA_STREAM_DISABLE=1：调试/对拍用，强制走旧路径（全速解码→文件播放）。 */
@@ -899,6 +1273,7 @@ static void *engine_thread(void *arg)
     if (e->pcm) { fclose(e->pcm); e->pcm = NULL; }
     if (e->p) { pipeline_destroy(e->p); e->p = NULL; }
 
+mem_exit:
     char exited[64];
     snprintf(exited, sizeof(exited), "{\"type\":\"exited\",\"code\":%d}", code);
     ev_enqueue(e, exited);
@@ -928,6 +1303,17 @@ ArchoeraMediaEngine *archoera_mediaengine_create(const char *source,
         e->cfg.skip_encoder = true; /* 播放模式：仅 PCM 落盘，无 Opus 编码 */
     }
     e->session_offset_ms = e->cfg.start_offset_ms;
+
+    /* 内存播放模式：cfg.no_disk_cache=1 且为 player 会话 → mem_mode。
+       cap 按配置解析：auto（0.8 GiB 硬上限）/ 用户上限 / 无上限（见 mem_resolve_cap）。 */
+    if (e->player_file && e->cfg.no_disk_cache) {
+        e->mem_mode = 1;
+        e->mem_cap_bytes = mem_resolve_cap(e);
+        fprintf(stderr,
+                "[mediaengine] 内存播放模式（不落盘）：cap=%lld bytes (cfg=%lld KB)\n",
+                (long long)e->mem_cap_bytes,
+                (long long)e->cfg.pcm_mem_cap_kb);
+    }
 
     size_t dl = strlen(session_dir);
     e->wav_file = (char *)malloc(dl + 16);
@@ -1086,6 +1472,22 @@ int archoera_mediaengine_is_done(ArchoeraMediaEngine *e)
     return e ? e->done : 1;
 }
 
+/* 内存播放模式：以 end_pos_ms 为终点取最近 frames 样本（L/R）写 out_l/out_r。
+ * 返回 0 命中；-1 越出保留窗 / 尚未解码；-2 参数错或非内存模式会话。
+ * 语义对齐 PcmAnalyzer.frameAt（前缀补零仅在头部仍在时；被淘汰返回 -1）。 */
+int archoera_mediaengine_pcm_window(ArchoeraMediaEngine *e, int end_pos_ms,
+                                    int frames, float *out_l, float *out_r)
+{
+    if (!e) return -2;
+    return mem_window(e, end_pos_ms, frames, out_l, out_r);
+}
+
+/* 会话重建计数（seek 重建即 +1）：Dart 凭此丢弃旧帧索引（对齐文件截断语义）。 */
+int archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e)
+{
+    return e ? e->mem_epoch : -1;
+}
+
 void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
 {
     if (!e) return;
@@ -1126,6 +1528,8 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
         }
     }
     pthread_mutex_unlock(&e->ev_mutex);
+
+    mem_free(e); /* 内存播放模式的块列表 */
 
     free(e->source);
     free(e->player_file);

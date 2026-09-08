@@ -62,5 +62,26 @@ add_test(NAME test_native_seek
 set_tests_properties(test_native_seek PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# 内存播放（不落盘）模式回归（headless：不依赖音频设备；ARCHOERA_MEMORY_HEADLESS）。
+# 直接编译 mediaengine_lib.c + tempo.c stub（与 test_mediaengine_wait 同法）。
+add_executable(test_memory_mode test_memory_mode.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/mediaengine_lib.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tempo.c
+)
+target_link_libraries(test_memory_mode PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_memory_mode PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_memory_mode PRIVATE m)
+endif()
+target_include_directories(test_memory_mode PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_memory_mode COMMAND test_memory_mode)
+set_tests_properties(test_memory_mode PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # 集成测试（需要输入文件的跳过 CTEST，仅通过手动运行）
 # add_engine_test(test_pipeline test_pipeline.c)
