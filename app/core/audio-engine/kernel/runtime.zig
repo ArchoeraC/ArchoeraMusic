@@ -38,6 +38,18 @@
 //! 兜底 tick（`respawnRetired`）与 `appendWorker` 复用扫描中把该槽**重新拉起**：新线程覆写
 //! 已 detach 句柄（**绝不 join**）、复位 reg/stalled/exited/started_ns，池恢复满编；真正卡死
 //! （永不退出）的槽仍退役。公开 `busyCount()` 记账在役（reg busy）worker 数。
+//! F1（hybrid 纯事件回落，2026-09-09）：worker 完工把 `inflight` 减到 0（排空）后向 Master
+//! 发回收事件（唯一回收触发，正确性不依赖定时器）。Master `maybeReclaim` 只在此刻评估：
+//! 目标容量 `target = max(min_workers, min(本波并发达峰, max_workers))`——**并发达峰**而非
+//! 队列深度（波次真实需要的并行度；微小任务风暴即使排起长队，同时 busy 的 worker 峰值也低
+//! → 排空后回落；真需要 N 路并行才保留 N）。盈余（服役数 > target）→ 对高 id 的**空闲**
+//! worker 置 `retire[id]` 并广播唤醒；worker 在空闲边界执行 Master 命令：二次确认队列仍空
+//! 后置 `retiring`/`exited` 即退（不自杀）。**防 churn**：被 retire 标记的 worker 若因新队列
+//! 转忙则自清 retire（重新有用），Master 只在下个排空事件重估；退役只在排空（无任务在途）
+//! 后发起 → 波次中途绝无退出→再扩容抖动。退役槽复用：`retire && exited` 锁外 join 后覆写
+//! 句柄（绝不持锁 join）；`stalled && exited` 已 detach 绝不 join。`active`（原子）记账
+//! 「可服役」worker 数（非 `workers.items.len`——该表从不收缩，含退役/停滞槽），submit 增长
+//! 与回收判断都按它读一致容量；stall_timeout_ns==0 且无退役场景时行为与既往字节一致。
 
 const std = @import("std");
 const Thread = std.Thread;
@@ -88,6 +100,9 @@ pub const Runtime = struct {
     shutdown_requested: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     /// 请 Master 补建 worker（submit 在积压 > 现 worker 数时置位）
     need_worker: bool = false,
+    /// 请 Master 评估回收（worker 完工把 inflight 减到 0 = 排空事件时置位；唯一回收触发）。
+    /// 与 need_worker 同受 master_mutex 保护、由 Master 消费清零。
+    need_reclaim: bool = false,
     /// Master 驱动 worker 退出（置位后 worker 收尾返回）
     worker_shutdown: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
 
@@ -111,8 +126,31 @@ pub const Runtime = struct {
     /// `shutdown` 据此有界等待停滞 worker 退出，避免 deinit 后其返回路径碰已释放内存。
     /// F3：Master 据此确认旧线程已离开后方可复用该槽（置位后该槽 reg/stalled 才能复位）。
     exited: []std.atomic.Value(bool) = &.{},
+    // ---- F1 hybrid 回收簿记（容量 = cfg.max_workers，init 定容）----
+    /// 退役标记：Master 在排空事件后对「盈余空闲」worker 置位，worker 在空闲边界执行
+    /// （队列仍空则置 exiting 退出；期间来了任务则转忙并**自清**本标记——防 churn）。
+    /// 写：Master（maybeReclaim）/ worker（转忙自清 / 退出清），均持 mutex；
+    /// 读：worker（持 mutex 空闲谓词）/ appendWorker 复用扫描 / shutdown join 前判 ex/stall。
+    /// 槽复用（`retire && exited`，正常退役）或停滞复用（`respawnInto`）时复位。
+    retire: []bool = &.{},
+    /// 可服役（在役）worker 计数：线程活着且未停滞/未 exited（含已标 retire 但尚未退出的
+    /// worker——它们仍是真实容量，新队列来了会留下服役）。退役 -1（worker 实际退出）、
+    /// 复用/新建 +1（Master）；停滞 detach -1、停滞槽 respawn +1。submit 增长与 maybeReclaim
+    /// 都按它判断容量（`workers.items.len` 从不收缩，含退役/停滞槽，不能用）。
+    active: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+    /// 当前并发在跑任务数（worker 开工 +1 / 完工 -1；== 服役中 busy worker 数，run-to-completion）。
+    /// 与 `inflight`（排队+在途）互补；全在 mutex 内维护。停滞 abandon 也 -1。
+    running: usize = 0,
+    /// 本波并发达峰：worker 开工时 `running > busy_peak` 则更新；排空后 maybeReclaim 读后清零
+    /// （新波次开始）。target 的容量依据（用户定 2026-09-09：峰值=实际并发度，非队列深度）。
+    busy_peak: usize = 0,
     /// 停滞放弃计数（测试/可观测）。
     stall_count: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+    /// spawn/respawn 失败计数（测试/可观测；真失败（OOM/线程配额/cap）才允许出现，且不得风暴）。
+    spawn_failed_count: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+    /// 累计成功创建的 worker 线程数（append 新格 + 复用槽 respawn）。压测里若远超「首波
+    /// 扩容 + 复用」的量级 → churn（波波重建）复现，据此断言有界。
+    spawn_count: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
     /// Master 带超时兜底唤醒 latch（§5.1：`waitTimeout` + set/reset）。仅
     /// `stall_timeout_ns>0` 时被等待；只有 Master 线程 wait/reset。
     master_event: Io.Event = .unset,
@@ -137,6 +175,7 @@ pub const Runtime = struct {
             allocator.free(self.started_ns);
             allocator.free(self.stalled);
             allocator.free(self.exited);
+            allocator.free(self.retire);
             if (self.master) |m| m.join();
             allocator.destroy(self);
         }
@@ -147,6 +186,8 @@ pub const Runtime = struct {
         @memset(self.stalled, false);
         self.exited = try allocator.alloc(std.atomic.Value(bool), cfg.max_workers);
         @memset(self.exited, std.atomic.Value(bool).init(false));
+        self.retire = try allocator.alloc(bool, cfg.max_workers);
+        @memset(self.retire, false);
 
         // Master 先建（此后线程生命周期归它）
         self.master = try Thread.spawn(.{
@@ -164,38 +205,71 @@ pub const Runtime = struct {
     }
 
     /// 由 Master 事件线程执行的 worker 创建（§3.1：spawn 执行者 = Master async）。
-    /// F3 复用扫描：先找可复用槽（停滞且旧线程已确认自退 exited）——以新线程覆写其已
-    /// detach 句柄（**绝不 join**）、复位簿记（`respawnInto`）后返回；无复用槽才追加新格。
+    /// F1/F3 统一复用扫描，两类退役槽都能重新拉起（扫描在 mutex 下完成——stalled/retire 为
+    /// 普通内存、与 worker 写互斥）：
+    ///   - `stalled[id] && exited[id]`：旧线程已 **detach**（停滞）→ **绝不 join**，直接以新
+    ///     线程句柄覆写（`respawnInto`）；
+    ///   - `retire[id] && exited[id]`（正常退役）：旧线程已返回（exited 保证已离开 workerMain）
+    ///     → **锁外 join** 后覆写（绝不持锁 join——死锁根因）；
+    /// 无复用槽且未达 cap 才追加新格；满 cap 且无复用槽返回 `error.NoCapacity`（Master 静默
+    /// 跳过——任务由服役 worker 自取消化，不是可上报的 spawn 失败）。
     fn appendWorker(self: *Runtime) !void {
+        self.mutex.lockUncancelable(self.io);
+        var reuse_id: ?usize = null;
+        var must_join = false;
         for (self.workers.items, 0..) |_, id| {
             if (self.stalled[id] and self.exited[id].load(.acquire)) {
-                try self.respawnInto(id);
-                return;
+                reuse_id = id; // 停滞复用：detach 句柄，绝不 join
+                must_join = false;
+                break;
             }
         }
-        if (self.workers.items.len >= self.cfg.max_workers) return error.OutOfMemory;
+        if (reuse_id == null) {
+            for (self.workers.items, 0..) |_, id| {
+                if (self.retire[id] and self.exited[id].load(.acquire)) {
+                    reuse_id = id; // 正常退役复用：须锁外 join
+                    must_join = true;
+                    break;
+                }
+            }
+        }
+        self.mutex.unlock(self.io);
+
+        if (reuse_id) |id| {
+            if (must_join) self.workers.items[id].join(); // 锁外 join（旧线程已返回，立即返回）
+            try self.respawnInto(id);
+            return;
+        }
+        if (self.workers.items.len >= self.cfg.max_workers) return error.NoCapacity;
         const id = self.workers.items.len;
         const w = try Thread.spawn(.{
             .allocator = self.allocator,
             .stack_size = self.cfg.stack_size,
         }, workerMain, .{ self, id });
         try self.workers.append(self.allocator, w);
+        _ = self.active.fetchAdd(1, .monotonic); // 新增在役 worker
+        _ = self.spawn_count.fetchAdd(1, .monotonic);
     }
 
-    /// F3：把已退役槽（停滞且旧线程已 exited）重新拉起为服役 worker。旧线程已确认不再
-    /// 触碰共享簿记，其句柄早已 detach——**绝不 join**，直接以新线程句柄覆写 `workers.items[id]`。
-    /// 先持 mutex 复位槽簿记、后 spawn（新 worker 进场即读写自身槽格，须见复位态）；
-    /// spawn 失败回滚为仍退役（stalled/exited 复原），留待下轮 tick 重试。
+    /// F1/F3：把已退役/停滞槽（旧线程已 exited 确认离开）重新拉起为服役 worker。旧线程
+    /// 已不再触碰共享簿记：停滞槽句柄早已 detach（**绝不 join**），正常退役槽由 appendWorker
+    /// 在锁外 join 后才进入本函数——本函数只以新线程句柄覆写 `workers.items[id]`。
+    /// 先持 mutex 复位槽簿记（reg/retire/stalled/exited/started），后 spawn（新 worker 进场即
+    /// 读写自身槽格，须见复位态）；spawn 失败回滚为仍退役/停滞，留待下轮 tick/扩容重试。
     fn respawnInto(self: *Runtime, id: usize) !void {
         self.mutex.lockUncancelable(self.io);
+        const was_stalled = self.stalled[id]; // 失败回滚按原退役类型还原（停滞/正常退役）
+        const was_retire = self.retire[id];
         self.reg.entries[id] = .{}; // 复位为默认 idle（reclaimable / elastic）
         self.started_ns[id].store(0, .monotonic);
         self.exited[id].store(false, .release);
         self.stalled[id] = false;
+        self.retire[id] = false;
         self.mutex.unlock(self.io);
         errdefer {
             self.mutex.lockUncancelable(self.io);
-            self.stalled[id] = true;
+            self.stalled[id] = was_stalled; // 回滚为原退役态（复用失败不虚增容量）
+            self.retire[id] = was_retire;
             self.exited[id].store(true, .release);
             self.mutex.unlock(self.io);
         }
@@ -204,6 +278,8 @@ pub const Runtime = struct {
             .stack_size = self.cfg.stack_size,
         }, workerMain, .{ self, id });
         self.workers.items[id] = w;
+        _ = self.active.fetchAdd(1, .monotonic); // 槽复活为在役 worker
+        _ = self.spawn_count.fetchAdd(1, .monotonic);
     }
 
     /// F3：Master 超时兜底 tick 里逐槽恢复——停滞且旧线程已 exited 的槽重新拉起
@@ -215,11 +291,35 @@ pub const Runtime = struct {
         for (0..n) |id| {
             if (self.stalled[id] and self.exited[id].load(.acquire)) {
                 self.respawnInto(id) catch {
+                    _ = self.spawn_failed_count.fetchAdd(1, .monotonic);
                     std.debug.print("runtime: worker respawn failed (OOM/线程配额/cap)\n", .{});
                 };
                 return; // 低频逐个恢复
             }
         }
+    }
+
+    /// 是否还存在可复用退役槽（停滞已自退 / 正常退役已退出）。**调用方须已持 mutex**——
+    /// stalled/retire 为普通内存、仅 mutex 下写读（本函数读 exited 原子）。未到 cap 时追加
+    /// 新格即可；已满 cap 时只有复用槽存在才可能补 worker，据此避免「满 cap 还反复请求
+    /// spawn → spawn-failed 风暴」（症状 A）。
+    fn hasReusableSlotLocked(self: *const Runtime) bool {
+        for (self.workers.items, 0..) |_, id| {
+            if (self.exited[id].load(.acquire) and (self.stalled[id] or self.retire[id])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// 还有没有补 worker 的空间（cap 未满或有可复用退役槽）。可持 master_mutex 调用（未满
+    /// 时只近似读 items.len，与既有 submit/masterMain 风格一致；已满才持 mutex 精确扫描）。
+    fn canSpawn(self: *Runtime) bool {
+        if (self.workers.items.len < self.cfg.max_workers) return true;
+        self.mutex.lockUncancelable(self.io);
+        const reusable = self.hasReusableSlotLocked();
+        self.mutex.unlock(self.io);
+        return reusable;
     }
 
     /// 提交任务（非阻塞；OOM 返回 false）。worker 被唤醒自取（完成即领，§5.1）。
@@ -242,15 +342,20 @@ pub const Runtime = struct {
             self.queue_head = node;
         }
         self.queue_tail = node;
+        // 新波次边界：上一波已排空（inflight==0）后的首个 submit 重开一「波」——并发达峰
+        // 重新起算。否则两波紧邻（排空→回收尚未跑、新任务已入队）会合并成一个峰、永不回落。
+        if (self.inflight == 0) self.busy_peak = 0;
         self.inflight += 1;
         const queued_est = self.inflight; // 排队+在途 ≈ backlog 压力
         self.mutex.unlock(self.io);
 
-        // 扩容提示（§5.5 骨架）：未停机且积压 > 现 worker 数且未达上限 → 请 Master 补建
+        // 扩容提示（F1：容量按 `active` 可服役数，不是从不收缩的 workers.items.len）：
+        // 积压 > 可服役数 且还有可建容量（未达 cap 或存在可复用退役槽）→ 请 Master 补建。
+        // 先判 backlog（纯原子读），真有积压才查容量（满 cap 时需持 mutex 扫描复用槽）。
         self.master_mutex.lockUncancelable(self.io);
         const grow = !self.shutdown_requested.load(.acquire) and
-            self.workers.items.len < self.cfg.max_workers and
-            queued_est > self.workers.items.len;
+            queued_est > self.active.load(.acquire) and
+            self.canSpawn();
         if (grow) self.need_worker = true;
         self.master_mutex.unlock(self.io);
         if (grow) {
@@ -322,6 +427,7 @@ pub const Runtime = struct {
         self.allocator.free(self.started_ns);
         self.allocator.free(self.stalled);
         self.allocator.free(self.exited);
+        self.allocator.free(self.retire);
         self.allocator.destroy(self);
     }
 
@@ -329,11 +435,11 @@ pub const Runtime = struct {
 
     fn masterMain(self: *Runtime) void {
         while (true) {
-            // —— 等待「补 worker」/停机；`stall_timeout_ns>0` 时退居带超时 wait（§5.1/
-            // §5.2 层2）：超时到点做停滞扫描；否则保持纯事件、零定时器（行为不变）——
+            // —— 等待「补 worker」/「评估回收」/停机；`stall_timeout_ns>0` 时退居带超时
+            // wait（§5.1/§5.2 层2）：超时到点做停滞扫描；否则保持纯事件、零定时器——
             var stall_tick = false;
             self.master_mutex.lockUncancelable(self.io);
-            while (!self.shutdown_requested.load(.acquire) and !self.need_worker) {
+            while (!self.shutdown_requested.load(.acquire) and !self.need_worker and !self.need_reclaim) {
                 if (self.cfg.stall_timeout_ns == 0) {
                     Io.Condition.waitUncancelable(&self.master_cv, self.io, &self.master_mutex);
                 } else {
@@ -343,46 +449,64 @@ pub const Runtime = struct {
                     self.master_mutex.lockUncancelable(self.io);
                     if (woke) {
                         Io.Event.reset(&self.master_event); // 消费 latch（仅 Master wait/reset）
-                        continue; // 真实事件（submit 扩容 / 停机）→ 重查标志
+                        continue; // 真实事件（submit 扩容 / 排空回收 / 停机）→ 重查标志
                     }
                     stall_tick = true; // 纯超时到点（或罕见虚假唤醒）→ 本轮做停滞扫描
                     break;
                 }
             }
             const shutting_down = self.shutdown_requested.load(.acquire);
-            if (!shutting_down and !stall_tick) self.need_worker = false; // 消费 grow 请求
+            var do_grow = false;
+            var do_reclaim = false;
+            if (!shutting_down and !stall_tick) {
+                do_grow = self.need_worker; // 消费 grow / reclaim 请求（两者可同时置位）
+                self.need_worker = false;
+                do_reclaim = self.need_reclaim;
+                self.need_reclaim = false;
+            }
             self.master_mutex.unlock(self.io);
 
             if (shutting_down) break; // 停机优先
 
             if (stall_tick) {
                 // 无待办工作且超时到点：§5.2 层2 停滞兜底扫描（低频，非周期热扫）。
-                // 注意：此路径不清 need_worker——竞态 submit 可能刚置位（其 Event.set 在超时
-                // 判定后才落），留到下一轮由主谓词消费，避免丢扩容请求。
+                // 注意：此路径不清 need_worker/need_reclaim——竞态 submit/排空可能刚置位
+                //（其 Event.set 在超时判定后才落），留到下一轮由主谓词消费，避免丢请求。
                 self.scanStalled();
                 self.respawnRetired(); // F3：自返停滞线程的槽重新拉起，池恢复满编
+                self.maybeReclaim(); // 排空后也收敛容量（停滞放弃可能把 inflight 降到 0）
                 continue;
             }
-            // 至此非停即需补 worker（!shutting_down && !stall_tick → need_worker 已被清）
 
-            // 补建 worker（§3.1 能力 A：spawn 执行者 = Master；§5.5：积压 > 现 worker 则扩）。
-            // spawn 失败不 panic（§5.4）：记日志即可，任务继续排队，下次 submit 再请求。
-            self.appendWorker() catch {
-                std.debug.print("runtime: worker spawn failed (OOM/线程配额/cap)\n", .{});
-                continue;
-            };
-            // 仍积压且未达 cap → 再补一个（循环至 backlog 消化或到 max_workers）
-            self.master_mutex.lockUncancelable(self.io);
-            const still_backlogged = blk: {
-                self.mutex.lockUncancelable(self.io);
-                const more = self.inflight > self.workers.items.len;
-                self.mutex.unlock(self.io);
-                break :blk more;
-            };
-            if (still_backlogged and self.workers.items.len < self.cfg.max_workers) {
-                self.need_worker = true;
+            // 非停非超时：处理排空回收事件（先收后扩——同轮两者并存时以此刻状态为准）。
+            if (do_reclaim) self.maybeReclaim();
+
+            if (do_grow) {
+                // 补建 worker（§3.1 能力 A：spawn 执行者 = Master；容量 = active 可服役数）。
+                // submit 只发「提示」，Master 在此实时判容量循环补建（过期/重叠请求不会在
+                // cap 上空转）：无容量（满 cap 且无复用槽）静默跳过——任务由服役 worker 自取
+                // 消化，不是可上报失败；真 spawn 失败（线程配额等）才计数 + 日志。
+                while (self.canSpawn()) {
+                    self.appendWorker() catch |e| switch (e) {
+                        error.NoCapacity => break, // 竞态中被并发回收/复用耗尽 → 下轮再评估
+                        else => {
+                            _ = self.spawn_failed_count.fetchAdd(1, .monotonic);
+                            std.debug.print("runtime: worker spawn failed (OOM/线程配额)\n", .{});
+                            break;
+                        },
+                    };
+                    // 仍积压（inflight > 可服役数）→ 步长循环至 backlog 消化或容量耗尽
+                    self.master_mutex.lockUncancelable(self.io);
+                    const still_backlogged = blk: {
+                        self.mutex.lockUncancelable(self.io);
+                        const more = self.inflight > self.active.load(.monotonic);
+                        self.mutex.unlock(self.io);
+                        break :blk more;
+                    };
+                    self.master_mutex.unlock(self.io);
+                    if (!still_backlogged) break;
+                }
             }
-            self.master_mutex.unlock(self.io);
         }
         // Master 决定停机：置 worker_shutdown 并广播（worker 收尾返回，不自杀）
         self.worker_shutdown.store(true, .release);
@@ -395,7 +519,12 @@ pub const Runtime = struct {
         const me = &self.reg.entries[id];
         while (true) {
             self.mutex.lockUncancelable(self.io);
-            while (self.queue_head == null and !self.worker_shutdown.load(.acquire)) {
+            // 空闲阻塞：队列空 且 未停机 且 未被 Master 标记退役 才睡。醒因三类：
+            // 有新任务（自领）/ worker_shutdown / retire[id]（Master 排空后发的退役命令）。
+            while (self.queue_head == null and
+                !self.worker_shutdown.load(.acquire) and
+                !self.retire[id])
+            {
                 Io.Condition.waitUncancelable(&self.jobs_avail, self.io, &self.mutex);
             }
             if (self.queue_head) |head| {
@@ -404,17 +533,20 @@ pub const Runtime = struct {
                 if (self.queue_head == null) self.queue_tail = null;
                 me.markBusy(); // 状态先行（§5.1）：开工前自写 busy（持锁，Master 读同锁串行化）
                 self.started_ns[id].store(self.nowNs(), .monotonic); // 停滞判定基准（§5.2 层2）
+                self.retire[id] = false; // 防 churn：转忙即清退役标记（重新有用，Master 下个排空重估）
+                self.running += 1;
+                if (self.running > self.busy_peak) self.busy_peak = self.running;
                 self.mutex.unlock(self.io);
 
                 head.job.run(head.job.ctx);
 
-                // 收尾（持锁写 reg/inflight，Master 读同锁串行化）
+                // 收尾（持锁写 reg/running/inflight，Master 读同锁串行化）
                 self.mutex.lockUncancelable(self.io);
                 if (self.stalled[id]) {
                     // §5.2 层2：本 worker 已被 Master 判停滞并 detach——放弃本任务时 Master
-                    // 已代为复位 reg/started/inflight。任务若自返（如 stop 标志任务），不得
-                    // 再写任何共享簿记：只销毁自取节点、置 exited 即退（exited 是最后一条
-                    // 触碰 runtime 的操作，shutdown 据此有界等待）。
+                    // 已代为复位 reg/started/running/inflight。任务若自返（如 stop 标志任务），
+                    // 不得再写任何共享簿记：只销毁自取节点、置 exited 即退（exited 是最后
+                    // 一条触碰 runtime 的操作，shutdown 据此有界等待）。
                     self.mutex.unlock(self.io);
                     self.allocator.destroy(head);
                     self.exited[id].store(true, .release);
@@ -422,14 +554,26 @@ pub const Runtime = struct {
                 }
                 self.started_ns[id].store(0, .monotonic);
                 me.beginIdle(0); // idle_since 时钟源由接线层提供；此处仅维护状态
+                self.running -= 1;
                 self.inflight -= 1;
+                const drained = (self.inflight == 0); // 排空事件 → 唯一回收触发
                 self.mutex.unlock(self.io);
                 Io.Condition.broadcast(&self.idle_cv, self.io);
 
                 self.allocator.destroy(head);
+                if (drained) self.requestReclaim(); // 排空后唤醒 Master 评估回收
                 continue;
             }
-            // 队列空且 worker_shutdown → 收尾返回（不自建不自杀；由 Master join）
+            // 队列空：shutdown 或 retire 命令。退出前二次确认在**同锁**内完成（queue_head==null
+            // 已证——期间来了任务必被取走并转 busy 自清 retire，此处不会误退丢任务）。
+            // 决定退出：置 retiring（Master 只读状态可见收尾中）、exited（最后触碰）、
+            // active -1（槽退役）。不自建不自杀——这是执行 Master 的命令。
+            // 注意：**不**清 retire[id]——退役槽必须保留标记到复用（appendWorker 凭
+            // `retire && exited` 识别可复用槽，锁外 join 后覆写）；槽复活由 respawnInto 复位。
+            me.beginRetiring();
+            self.started_ns[id].store(0, .monotonic);
+            self.exited[id].store(true, .release);
+            _ = self.active.fetchSub(1, .monotonic);
             self.mutex.unlock(self.io);
             return;
         }
@@ -438,6 +582,59 @@ pub const Runtime = struct {
     /// 单调纳秒（worker 开工时刻 / 停滞扫描用；同源同钟，差即有界）。
     fn nowNs(self: *const Runtime) u64 {
         return @intCast(Io.Timestamp.now(self.io, .awake).nanoseconds);
+    }
+
+    /// F1：排空事件后的容量收敛（Master 唯一回收触发，纯事件、零定时器依赖）。
+    /// 目标 = max(min_workers, min(本波并发达峰 busy_peak, max_workers))——并发峰值是真实
+    /// 需要的并行度：微小任务风暴即使排起长队、同时 busy 峰值也低 → 排空后可回落；真需要
+    /// N 路并行才保留 N。盈余（可服役 > target）→ 对**高 id 的空闲** worker 置 retire 并
+    /// 广播唤醒（worker 空闲边界自退；期间来了任务则转忙自清，绝不中途误退）。
+    fn maybeReclaim(self: *Runtime) void {
+        self.mutex.lockUncancelable(self.io);
+        if (self.inflight != 0) {
+            // 排空请求到达时已有新任务入队 → 波次未真正结束：保留峰，下个真排空再评估
+            self.mutex.unlock(self.io);
+            return;
+        }
+        const peak = self.busy_peak;
+        self.busy_peak = 0; // 读后清零：此后为下一波次的并发达峰
+        const target = @max(
+            @as(usize, self.cfg.min_workers),
+            @min(peak, @as(usize, self.cfg.max_workers)),
+        );
+        const serving = self.active.load(.monotonic); // 同锁下与 worker 退出互斥
+        self.mutex.unlock(self.io);
+
+        if (serving <= target) return;
+        var over = serving - target;
+
+        // 标 high-id 的空闲在役 worker（reg idle、非 stalled/exited/已在 retire）。
+        // 锁内判写（与 worker 忙/闲、退出、转忙自清互斥）；busy worker 永不入候选。
+        var marked = false;
+        self.mutex.lockUncancelable(self.io);
+        var i = self.workers.items.len;
+        while (i > 0 and over > 0) {
+            i -= 1;
+            if (self.stalled[i]) continue;
+            if (self.exited[i].load(.acquire)) continue;
+            if (self.retire[i]) continue; // 已在退役序列，不重复标
+            if (self.reg.entries[i].state != tables.WState.idle) continue;
+            self.retire[i] = true;
+            over -= 1;
+            marked = true;
+        }
+        self.mutex.unlock(self.io);
+        if (marked) Io.Condition.broadcast(&self.jobs_avail, self.io); // 唤醒被标记者收尾
+    }
+
+    /// F1：worker 完工把 `inflight` 减到 0（排空事件）后、锁外请求 Master 评估回收。
+    /// 唯一回收触发——正确性不依赖定时器（stall_timeout_ns==0 的纯事件模式同样收敛）。
+    fn requestReclaim(self: *Runtime) void {
+        self.master_mutex.lockUncancelable(self.io);
+        if (!self.shutdown_requested.load(.acquire)) self.need_reclaim = true;
+        self.master_mutex.unlock(self.io);
+        Io.Condition.broadcast(&self.master_cv, self.io);
+        if (self.cfg.stall_timeout_ns > 0) Io.Event.set(&self.master_event, self.io); // timed 兜底模式
     }
 
     /// Master 带超时等待时长：stall_timeout_ns（下限 1ms，防病态小值高频空扫）。
@@ -469,6 +666,8 @@ pub const Runtime = struct {
             e.beginIdle(0);
             self.started_ns[id].store(0, .monotonic);
             if (self.inflight > 0) self.inflight -= 1; // 放弃任务视作已收尾
+            if (self.running > 0) self.running -= 1; // 该 worker 的在跑任务同样放弃
+            _ = self.active.fetchSub(1, .monotonic); // 槽退役（不复活前不计入可服役数）
             self.workers.items[id].detach(); // detach 后绝不 join
             _ = self.stall_count.fetchAdd(1, .monotonic);
             abandoned = true;
@@ -1126,7 +1325,6 @@ test "pool: 畸形输入走 error（不 panic），池随后仍健康解码" {
     try testing.expectEqual(task_mod.Outcome.done, h2.task.outcome);
 }
 
-
 // ---- 零 panic 纪律 fuzz-lite：截断扫描（只 error，绝不 panic/挂起）----
 
 const SweepCtx = struct {
@@ -1302,4 +1500,181 @@ test "pool: 128 路混合格式并发解码（mka/FLAC + LATM/AAC）实例隔离
     try testing.expectEqual(total / 2, mka_done);
     try testing.expect(latm_ok >= total / 4);
     try testing.expect(latm_got > 0);
+}
+
+// ---- F1 hybrid 纯事件回收：排空事件回落（用户定 2026-09-09：目标 = max(min, min(并发达峰, max))）----
+
+/// 有界轮询 `rt.active == want`（在役可服役 worker 数；want=0 亦精确匹配）。
+fn pollActive(rt: *Runtime, want: usize, iter: usize, ms: u64) bool {
+    var i: usize = 0;
+    while (i < iter) : (i += 1) {
+        if (rt.active.load(.acquire) == want) return true;
+        tSleepMs(ms);
+    }
+    return rt.active.load(.acquire) == want;
+}
+
+fn nsNow() i96 {
+    return Io.Timestamp.now(Io.Threaded.global_single_threaded.io(), .awake).nanoseconds;
+}
+
+test "runtime: F1 shrink——大并发波撑满后，小并发波排空回落至 min_workers" {
+    // 波形设计（确定性，不依赖本机速度）：先用 12 个 30ms 占用任务把池撑到真 8 路并发
+    //（并发达峰=8 → 排空后保留 8），再用单任务波（并发达峰=1）把容量回落回 min_workers=1。
+    var done = std.atomic.Value(u32).init(0);
+    var jobs: [12]SleepJob = undefined;
+    for (&jobs) |*j| j.* = .{ .ms = 30, .done = &done };
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 8 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+
+    // 波 1：12 路 30ms 并发 → Master 扩容至 max_workers，8 路真并行
+    for (&jobs) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    var reached_max = false;
+    for (0..300) |_| {
+        if (rt.workers.items.len == 8 and done.load(.acquire) == 12) {
+            reached_max = true;
+            break;
+        }
+        tSleepMs(10);
+    }
+    try testing.expect(reached_max); // 确曾用到满编并行（否则无从回落）
+    rt.waitIdle();
+    // 排空后保留本波并发达峰（8），不回落（背靠背大波不再重建 → 防 churn）
+    var grown_kept = false;
+    for (0..300) |_| {
+        if (rt.active.load(.acquire) >= 6) { // Master 可能已把 8 保留为 8；≥6 即保留大容量
+            grown_kept = true;
+            break;
+        }
+        tSleepMs(10);
+    }
+    try testing.expect(grown_kept);
+
+    // 波 2：单任务（并发达峰=1）排空 → maybeReclaim 回落至 min_workers=1
+    var one: [1]SleepJob = undefined;
+    one[0] = .{ .ms = 5, .done = &done };
+    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &one[0] }));
+    rt.waitIdle();
+    try testing.expect(pollActive(rt, 1, 300, 10));
+    // 全程无 spawn 失败、计数精确（12 + 1）
+    try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
+    try testing.expectEqual(@as(u32, 13), done.load(.acquire));
+}
+
+test "runtime: F1 100×500 同尺寸波——容量有界、无 spawn 失败风暴、计数精确" {
+    var ctx = TestCtx{};
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 8 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    const waves: usize = 100;
+    const per_wave: usize = 500;
+    const t0 = nsNow();
+    var accepted: usize = 0;
+    for (0..waves) |_| {
+        var i: usize = 0;
+        while (i < per_wave) : (i += 1) {
+            if (rt.submit(.{ .run = TestCtx.bump, .ctx = &ctx })) accepted += 1;
+        }
+        rt.waitIdle();
+    }
+    const dt_ms = @divTrunc(@as(i64, @intCast(nsNow() - t0)), std.time.ns_per_ms);
+    std.debug.print("f1: 100x500 waves done in {d}ms len={d} active={d} spawns={d} spawnfail={d}\n", .{
+        dt_ms,                         rt.workers.items.len,                 rt.active.load(.acquire),
+        rt.spawn_count.load(.acquire), rt.spawn_failed_count.load(.acquire),
+    });
+    try testing.expectEqual(per_wave * waves, accepted); // 计数精确
+    try testing.expectEqual(@as(u32, @intCast(accepted)), ctx.counter.load(.acquire)); // 已执行 == 已提交
+    try testing.expect(rt.workers.items.len <= 8); // 容量有界 ≤ max_workers
+    try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire)); // 无 spawn 失败风暴
+}
+
+test "runtime: F1 lazy min_workers=0——大并发波保留容量、小波回落后可再扩容无死锁" {
+    // 纯事件语义：池按「上一波真实并发需求」保留容量（min_workers=0 也不在干活时撤到 0）。
+    // 大波（12×25ms）真并发 → 撑满；随后单任务小波把容量收敛回 1；再次大波可复用扩容。
+    var done = std.atomic.Value(u32).init(0);
+    var big: [12]SleepJob = undefined;
+    for (&big) |*j| j.* = .{ .ms = 25, .done = &done };
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 0, .max_workers = 8 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    try testing.expectEqual(@as(usize, 0), rt.workers.items.len); // 懒就绪：引导期零 worker
+
+    // 波 1（大）：懒就绪首任务触发 spawn → 真并发撑满
+    for (&big) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    var grew = false;
+    for (0..300) |_| {
+        if (rt.active.load(.acquire) >= 4 and done.load(.acquire) == 12) {
+            grew = true;
+            break;
+        }
+        tSleepMs(10);
+    }
+    try testing.expect(grew);
+    rt.waitIdle();
+    try testing.expectEqual(@as(u32, 12), done.load(.acquire));
+
+    // 波 2（小）：单任务 → 并发达峰=1 → 排空后容量收敛（回落），不残留满编空闲
+    var small: [1]SleepJob = undefined;
+    small[0] = .{ .ms = 5, .done = &done };
+    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &small[0] }));
+    rt.waitIdle();
+    try testing.expect(pollActive(rt, 1, 300, 10));
+
+    // 波 3（再大）：复用退役槽扩容（无 deadlock、无 spawn 失败、计数精确）
+    var done2 = std.atomic.Value(u32).init(0);
+    var big2: [8]SleepJob = undefined;
+    for (&big2) |*j| j.* = .{ .ms = 20, .done = &done2 };
+    for (&big2) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    rt.waitIdle();
+    try testing.expectEqual(@as(u32, 8), done2.load(.acquire));
+    try testing.expectEqual(@as(u32, 13), done.load(.acquire)); // 前两波计数不丢
+    try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
+    try testing.expect(rt.workers.items.len <= 8);
+}
+
+test "runtime: F1 400 波(每波 1000 + 每 5 波追加 8 小)——快速终止、计数精确、spawn-failed≈0" {
+    // 曾复现 churn/挂起的确切波形：大批波次后接小任务。要求快速终止（无挂起/无 churn 抖动）、
+    // 已执行 == 已提交、spawn 失败≈0。
+    var ctx = TestCtx{};
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 8 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    const waves: usize = 400;
+    const per_wave: usize = 1000;
+    const extra: usize = 8; // 每 5 波在排空前追加
+    const expected_extra = (waves / 5) * extra;
+    const t0 = nsNow();
+    var accepted: usize = 0;
+    var wi: usize = 0;
+    while (wi < waves) : (wi += 1) {
+        var i: usize = 0;
+        while (i < per_wave) : (i += 1) {
+            if (rt.submit(.{ .run = TestCtx.bump, .ctx = &ctx })) accepted += 1;
+        }
+        if (wi % 5 == 0) {
+            var j: usize = 0;
+            while (j < extra) : (j += 1) {
+                if (rt.submit(.{ .run = TestCtx.bump, .ctx = &ctx })) accepted += 1;
+            }
+        }
+        rt.waitIdle();
+    }
+    const dt_ms = @divTrunc(@as(i64, @intCast(nsNow() - t0)), std.time.ns_per_ms);
+    std.debug.print("f1: 400x1000(+8/5) waves done in {d}ms accepted={d} spawns={d} spawnfail={d}\n", .{
+        dt_ms, accepted, rt.spawn_count.load(.acquire), rt.spawn_failed_count.load(.acquire),
+    });
+    try testing.expectEqual(waves * per_wave + expected_extra, accepted);
+    try testing.expectEqual(@as(u32, @intCast(accepted)), ctx.counter.load(.acquire)); // 已执行 == 已提交
+    try testing.expect(rt.workers.items.len <= 8);
+    try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
+    try testing.expect(dt_ms < 120_000); // 快速终止（非挂起量级）；数值仅作报告口径
 }

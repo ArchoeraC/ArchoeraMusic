@@ -816,11 +816,10 @@ per-context 思路一致（**EraAudio 相对 FFmpeg 的对称**）；async 主�
 >    next tick，纯事件为快路径；=0 保持原纯事件行为）。
 > 5. ✖ §5.5 完整回收/调节器 deferred（§9④ hybrid，接线期；持锁 join 教训已记录）。
 > 6. △ §5.2 停滞检测最小已落（B-2）+ 槽位容量恢复（B-3）；黑名单/难度预留仍未做。
-> 5. ✖ §5.5 完整回收（F1 hybrid）仍开放——原型三次竞态未收敛（churn/偶发挂起）。
->    已定位两因：持锁 join 死锁（修复）；retire 标记在 worker 转忙后未清 → 每波中途退出
->    再扩容 = churn（防法：worker 因新队列转忙时清自身 retire，Master 下个排空再评估；
->    退出前同锁二次确认队列空）。建议干净会话/子代理修复后专用压测（400 波大+每 5 波小
->    须 spawn-failed≈0、零丢任务）。
+> 5. ✔ §5.5 纯事件 hybrid 回收已落地（F1，kernel 631）：排空事件唯一触发 + wave 峰值保留
+>    target=max(min,min(peak,max))；worker 转忙清 retire（防 churn）+ 退出前同锁二次确认队列空；
+>    两类槽复用（stalled 不 join / retire 锁外 join）；400×1000(+8/5) 压测 348ms、spawnfail=0、
+>    零丢任务；631 全绿×6 seed，ctest 13/13（默认开/关均过）。
 > 7. ✖ §3 冷/热启动 wall 基准落表 vs FFmpeg（Benchmark 部分，另行）。
 > 8. △ §7/§9③⑤/FFI：接入已开第一刀——`zk_engine_init/shutdown/decode_once` +
 >    流式 `zk_engine_open/read/seek_ms/position_ms/close`（kernel_bridge.h，加法式，C 侧对照
