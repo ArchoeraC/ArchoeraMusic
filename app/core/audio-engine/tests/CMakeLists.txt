@@ -216,3 +216,17 @@ add_test(NAME test_pool_pipeline
                  ${CMAKE_CURRENT_SOURCE_DIR}/fallback_pcm.mov)
 set_tests_properties(test_pool_pipeline PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# C-Bench 工具：常驻内核池并发/首帧基准（headless；不入 ctest，手动运行）
+add_executable(bench_era_pool bench/bench_era_pool.c)
+target_link_libraries(bench_era_pool PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(bench_era_pool PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(bench_era_pool PRIVATE m)
+endif()
+target_include_directories(bench_era_pool PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
