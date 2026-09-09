@@ -24,6 +24,12 @@ const std = @import("std");
 pub const err = @import("error.zig");
 pub const io = @import("io.zig");
 pub const probe = @import("probe.zig");
+pub const registry = @import("registry.zig");
+pub const tables = @import("tables.zig");
+pub const task = @import("task.zig");
+pub const session = @import("session.zig");
+pub const khost = @import("khost.zig");
+pub const runtime = @import("runtime.zig");
 pub const decoder = @import("decoder.zig");
 pub const gsm = @import("fmt/wav/gsm.zig");
 pub const mace = @import("fmt/wav/mace.zig");
@@ -78,11 +84,285 @@ export fn zk_decoder_close(d: ?*engine.Engine) void {
     if (d) |e| engine.zkClose(e);
 }
 
+// ---------------------------------------------------------------------------
+// 常驻内核接入 seam（§7 async 主干；加法式：不改 zk_decoder_* / C 壳现有会话）
+//
+// 表面同步、内里异步：C 壳阻塞调用 → 内核 Host 池并行解码 → 完工事件回程。
+// 与现有引擎路径（mediaengine_lib/pipeline/player/纯内存源）完全隔离。
+// ---------------------------------------------------------------------------
+
+/// 一次性解码（池内执行）的载体
+const DecOnce = struct {
+    task: task.Task = .{ .run = run },
+    path: []const u8,
+    out: [*]f32,
+    cap_frames: usize,
+    info_out: ?*engine.ZkInfo = null,
+    frames: isize = 0,
+    ch: u8 = 0,
+
+    fn run(t: *task.Task) void {
+        const d: *DecOnce = @fieldParentPtr("task", t);
+        var zinfo: decoder.Info = undefined;
+        var dec = decoder.open(std.heap.c_allocator, d.path, &zinfo) catch |e| {
+            d.frames = -@as(isize, @intFromEnum(err.statusOf(e)));
+            return;
+        };
+        defer dec.deinit();
+
+        if (d.info_out) |zi| fillZkInfoMinimal(zi, zinfo);
+
+        const ch = zinfo.channels;
+        const bytes_per = @as(usize, zinfo.bits_per_sample) / 8;
+        d.ch = ch;
+        if (ch == 0 or bytes_per == 0) {
+            d.frames = -@as(isize, @intFromEnum(err.Status.corrupt));
+            return;
+        }
+        const frame_bytes: usize = @as(usize, ch) * bytes_per;
+        var raw: [65536]u8 = undefined;
+        var produced: usize = 0;
+        while (produced < d.cap_frames) {
+            const room_frames = raw.len / frame_bytes;
+            const chunk = @min(@min(room_frames, d.cap_frames - produced), @as(usize, 4096));
+            if (chunk == 0) break;
+            var c: u8 = 0;
+            const n = dec.read(raw[0 .. chunk * frame_bytes], chunk, &c) catch |e| {
+                d.frames = -@as(isize, @intFromEnum(err.statusOf(e)));
+                return;
+            };
+            if (n == 0) break;
+            const samples = n * @as(usize, c);
+            _ = convert.toFloat(
+                d.out[produced * @as(usize, ch) ..][0..samples],
+                raw[0 .. n * frame_bytes],
+                zinfo.bits_per_sample,
+                zinfo.is_float,
+                endianOfCodec(zinfo.codec_name),
+            );
+            produced += n;
+            if (n < chunk) break; // EOF
+        }
+        d.frames = @intCast(produced);
+    }
+};
+
+/// 由 codec_name（如 "pcm_s16be"）推断原生字节序（与 engine.endianOf 同语义）
+fn endianOfCodec(codec_name: []const u8) std.builtin.Endian {
+    if (codec_name.len >= 2 and std.mem.eql(u8, codec_name[codec_name.len - 2 ..], "be")) return .big;
+    return .little;
+}
+
+/// 最小 ZkInfo 填充（decode_once 用；codec/format 为静态字面量，metadata 置空）
+fn fillZkInfoMinimal(zi: *engine.ZkInfo, zinfo: decoder.Info) void {
+    zi.* = .{
+        .sample_rate = @intCast(zinfo.sample_rate),
+        .channels = @intCast(zinfo.channels),
+        .bits_per_sample = @intCast(zinfo.bits_per_sample),
+        .duration_us = zinfo.duration_us,
+        .duration_known = switch (zinfo.duration_known) {
+            .exact => 0,
+            .estimate => 1,
+            .unknown => 2,
+        },
+        .codec_name = zinfo.codec_name.ptr,
+        .format_name = zinfo.format_name.ptr,
+        .title = null,
+        .artist = null,
+        .album = null,
+        .date = null,
+        .genre = null,
+        .comment = null,
+    };
+}
+
+/// 初始化常驻内核（Host：池 + 定容任务槽）。返回不透明句柄；失败返回 null。
+export fn zk_engine_init(min_workers: c_int, max_workers: c_int, cap_tasks: c_int) ?*khost.Host {
+    if (min_workers < 0 or max_workers < 0 or cap_tasks < 0) return null;
+    const cfg = khost.Cfg{
+        .min_workers = @intCast(@max(min_workers, 1)),
+        .max_workers = @intCast(@max(max_workers, 1)),
+        .cap_tasks = @intCast(@max(cap_tasks, 1)),
+    };
+    return khost.Host.init(std.heap.c_allocator, cfg) catch null;
+}
+
+/// 停机并释放常驻内核；h 为 NULL 时空操作。
+export fn zk_engine_shutdown(h: ?*khost.Host) void {
+    if (h) |x| {
+        x.shutdown();
+        x.deinit();
+    }
+}
+
+/// 池内一次性解码到 out（float32 交错，最多 max_frames 帧）。
+/// 表面同步：本调用阻塞至完工（内核池并行内部）。返回 >=0 实际帧数（0=EOF）；
+/// <0 = -ZkStatus；out_channels 输出实际声道数。调用方保证 out 可容纳
+/// max_frames × 最大声道（内核契约 ≤8）。
+export fn zk_engine_decode_once(
+    h: ?*khost.Host,
+    path: [*:0]const u8,
+    out: [*]f32,
+    max_frames: usize,
+    out_channels: *c_int,
+    info: ?*engine.ZkInfo,
+) isize {
+    const host = h orelse return -@as(isize, @intFromEnum(err.Status.io_error));
+    const holder = std.heap.c_allocator.create(DecOnce) catch
+        return -@as(isize, @intFromEnum(err.Status.out_of_memory));
+    holder.* = .{
+        .path = std.mem.span(path),
+        .out = out,
+        .cap_frames = max_frames,
+        .info_out = info,
+    };
+    if (host.submit(&holder.task) == null) {
+        std.heap.c_allocator.destroy(holder);
+        return -@as(isize, @intFromEnum(err.Status.io_error));
+    }
+    task.wait(&holder.task);
+    const frames = holder.frames;
+    out_channels.* = @intCast(holder.ch);
+    std.heap.c_allocator.destroy(holder);
+    return frames;
+}
+
+// ---------------------------------------------------------------------------
+// 流式会话 FFI（§6.3 朝播放迁池：句柄常驻、逐块拉取、池内执行、表面同步）
+// ---------------------------------------------------------------------------
+
+/// 流式会话句柄（host + 会话壳）
+const Stream = struct {
+    host: *khost.Host,
+    s: *session.Session,
+};
+
+fn fillErrStatus(buf: [*]u8, buf_size: usize, status: c_int) void {
+    if (buf_size < 4) return;
+    std.mem.writeInt(c_int, @ptrCast(buf[0..4]), status, .little);
+}
+
+/// 打开流式会话（在池 worker 上 probe+open 一次）。失败返回 NULL 并写 errbuf。
+export fn zk_engine_open(
+    h: ?*khost.Host,
+    path: [*:0]const u8,
+    info: ?*engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: usize,
+) ?*Stream {
+    const host = h orelse return null;
+    const sess = session.Session.create(std.heap.c_allocator, std.mem.span(path)) catch return null;
+    const st = std.heap.c_allocator.create(Stream) catch {
+        std.heap.c_allocator.destroy(sess);
+        return null;
+    };
+    st.* = .{ .host = host, .s = sess };
+    if (!sess.start(host.rt)) {
+        std.heap.c_allocator.destroy(sess);
+        std.heap.c_allocator.destroy(st);
+        return null;
+    }
+    task.wait(&sess.step);
+    if (sess.state != session.SessState.playing) {
+        if (info) |zi| {
+            zi.* = std.mem.zeroes(engine.ZkInfo);
+        }
+        fillErrStatus(errbuf, errbuf_size, @intFromEnum(err.statusOf(sess.step.err orelse error.DecodeFailed)));
+        std.heap.c_allocator.destroy(sess);
+        std.heap.c_allocator.destroy(st);
+        return null;
+    }
+    if (info) |zi| fillZkInfoMinimal(zi, sess.info);
+    return st;
+}
+
+/// 逐步拉块解码到 out（float32 交错，最多 max_frames 帧）。返回 >=0 帧数（0=EOF）；
+/// <0 = -ZkStatus。
+export fn zk_engine_read(
+    h: ?*Stream,
+    out: [*]f32,
+    max_frames: usize,
+    out_channels: *c_int,
+) isize {
+    const st = h orelse return -@as(isize, @intFromEnum(err.Status.io_error));
+    const sess = st.s;
+    const ch = sess.info.channels;
+    out_channels.* = @intCast(ch);
+    const bytes_per = @as(usize, sess.info.bits_per_sample) / 8;
+    if (ch == 0 or bytes_per == 0) return -@as(isize, @intFromEnum(err.Status.corrupt));
+    const frame_bytes: usize = @as(usize, ch) * bytes_per;
+
+    var raw: [65536]u8 = undefined;
+    var produced: usize = 0;
+    while (produced < max_frames) {
+        const room = raw.len / frame_bytes;
+        const chunk = @min(@min(room, max_frames - produced), @as(usize, 4096));
+        if (chunk == 0) break;
+        if (!sess.read(st.host.rt, raw[0 .. chunk * frame_bytes], chunk)) {
+            return -@as(isize, @intFromEnum(err.Status.io_error));
+        }
+        task.wait(&sess.step);
+        if (sess.state != session.SessState.playing) {
+            const code = @intFromEnum(err.statusOf(sess.step.err orelse error.DecodeFailed));
+            return -@as(isize, code);
+        }
+        const n = sess.got_frames;
+        if (n == 0) break;
+        const samples = n * @as(usize, ch);
+        _ = convert.toFloat(
+            out[produced * @as(usize, ch) ..][0..samples],
+            raw[0 .. n * frame_bytes],
+            sess.info.bits_per_sample,
+            sess.info.is_float,
+            endianOfCodec(sess.info.codec_name),
+        );
+        produced += n;
+        if (n < chunk) break; // EOF
+    }
+    return @intCast(produced);
+}
+
+/// 跳到毫秒位置；0 = 成功，非 0 = ZkStatus。
+export fn zk_engine_seek_ms(st: ?*Stream, ms: i64) c_int {
+    const s = (st orelse return @intFromEnum(err.Status.io_error));
+    const sess = s.s;
+    if (!sess.seekMs(s.host.rt, ms)) return @intFromEnum(err.Status.io_error);
+    task.wait(&sess.step);
+    if (sess.state != session.SessState.playing) {
+        return @intFromEnum(err.statusOf(sess.step.err orelse error.DecodeFailed));
+    }
+    return 0;
+}
+
+/// 当前播放位置（毫秒）。
+export fn zk_engine_position_ms(st: ?*Stream) i64 {
+    const s = st orelse return 0;
+    if (s.s.dec) |*d| return d.positionMs();
+    return 0;
+}
+
+/// 关闭会话（池内释放实例并 join 收尾）；st 为 NULL 时空操作。
+export fn zk_engine_close(st: ?*Stream) void {
+    const s = st orelse return;
+    if (s.s.state == session.SessState.playing or s.s.state == session.SessState.new) {
+        _ = s.s.close(s.host.rt);
+        task.wait(&s.s.step);
+    }
+    s.s.deinit(); // Session.deinit 自释放会话壳
+    std.heap.c_allocator.destroy(s);
+}
+
 test {
     // 聚合本文件与全部子模块的测试（decoder/fmt 随 e3 引入）
     std.testing.refAllDecls(@This());
     _ = @import("error.zig");
     _ = @import("io.zig");
+    _ = @import("registry.zig");
+    _ = @import("tables.zig");
+    _ = @import("task.zig");
+    _ = @import("session.zig");
+    _ = @import("khost.zig");
+    _ = @import("runtime.zig");
     _ = @import("probe.zig");
     _ = @import("decoder.zig");
     _ = @import("fmt/wav/gsm.zig");
