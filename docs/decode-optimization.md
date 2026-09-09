@@ -100,6 +100,13 @@ perf report  # 定位热循环 → 对照 §4 候选
 - 先取 era 与 Stable（mode 0）同文件的 user CPU calltree 对照，确认差距落在**哪段**
   （公共层 vs 具体 codec 函数）；
 - 一次只动一个对象，动完即跑 §5 门。
+- 工具可用性（2026-09-10）：本机暂缺 `perf`/`valgrind`——先 `sudo pacman -S perf`（cachyos：
+  `linux-tools`）或装 `valgrind`；不可用则退化为**探针式热循环定位**（对 §4 候选函数做
+  `std.time`/`Io.Clock.awake` 计时打桩跑真实曲目，输出耗时占比定位瓶颈，见文末补充）。
+- 关联（2026-09-10）：并发/混杂/资源基准与 scorecard 口径见
+  `benchmark-industry-2026-09-05.md`「2026-09-10 更新」与
+  `app/core/audio-engine/tests/bench/REPORT_ERA_POOL_SCORE_2026-09-10.md`（FFmpeg=100、5 轮
+  去极值、wall/CPU/RSS 入分）；动刀后可用同口径复测并发与单流。
 
 ## 7. 与当前工作的关系 / 排期
 
