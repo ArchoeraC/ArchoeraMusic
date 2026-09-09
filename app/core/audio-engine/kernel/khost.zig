@@ -23,6 +23,9 @@ pub const Cfg = struct {
     max_workers: u16 = 64,
     /// 任务槽上限（并发实例上限 S；满即拒 InstanceLimit，§5.4）
     cap_tasks: u16 = 128,
+    /// 流式会话并发上限（§6.3 max_streams 硬计数）。**与 cap_tasks 分开记账**：流各持一个
+    /// session，不经任务槽复用（worker 亲和/ring 直推属 C 壳接线期，未在本层实现）。
+    max_streams: u16 = 8,
     stack_size: usize = 16 * 1024 * 1024,
 
     pub fn rtCfg(self: Cfg) runtime.Cfg {
@@ -56,16 +59,24 @@ const NodeCtx = struct {
 
 pub const Host = struct {
     allocator: std.mem.Allocator,
+    cfg: Cfg,
     rt: *runtime.Runtime,
     cap: usize,
     entries: []?*task.Task = &.{},
     nodes: []NodeCtx = &.{},
     mutex: std.Io.Mutex = .init,
+    /// 当前已开的流式会话数（§6.3 max_streams 硬计数；Host.mutex 保护，独立于任务槽）
+    stream_count: usize = 0,
 
     pub fn init(allocator: std.mem.Allocator, cfg: Cfg) !*Host {
         const h = try allocator.create(Host);
         errdefer allocator.destroy(h);
-        h.* = .{ .allocator = allocator, .rt = undefined, .cap = cfg.cap_tasks };
+        h.* = .{
+            .allocator = allocator,
+            .cfg = cfg,
+            .rt = undefined,
+            .cap = cfg.cap_tasks,
+        };
         h.rt = try runtime.Runtime.init(allocator, cfg.rtCfg());
         errdefer {
             h.rt.shutdown();
@@ -117,6 +128,27 @@ pub const Host = struct {
         }
         self.mutex.unlock(io);
         return n;
+    }
+
+    /// §6.3 max_streams 硬计数（F9）：尝试登记一个流式会话。达到上限 → false（拒绝，
+    /// 语义 = InstanceLimit）；成功 → stream_count+1 并返回 true。与 cap_tasks 槽
+    /// **分开记账**——流各持一个 session，不占/不复用任务槽。Host.mutex 保护。
+    pub fn streamOpen(self: *Host) bool {
+        const io = std.Io.Threaded.global_single_threaded.io();
+        self.mutex.lockUncancelable(io);
+        const ok = self.stream_count < self.cfg.max_streams;
+        if (ok) self.stream_count += 1;
+        self.mutex.unlock(io);
+        return ok;
+    }
+
+    /// §6.3 流式会话关闭记账：stream_count-1。必须在对应 `streamOpen` 成功后调用一次。
+    pub fn streamClose(self: *Host) void {
+        const io = std.Io.Threaded.global_single_threaded.io();
+        self.mutex.lockUncancelable(io);
+        std.debug.assert(self.stream_count > 0);
+        self.stream_count -= 1;
+        self.mutex.unlock(io);
     }
 
     pub fn shutdown(self: *Host) void {
@@ -192,4 +224,33 @@ test "khost: 128 任务（cap 128）全部排空；active 回落 0" {
     for (&holders) |*x| task.wait(&x.task);
     try testing.expectEqual(@as(usize, 0), h.active());
     try testing.expectEqual(@as(u32, 128), counter.load(.acquire));
+}
+
+test "khost: F9 max_streams 硬计数——超限拒开（streamOpen false），关闭后恢复" {
+    const h = try Host.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 2, .cap_tasks = 8, .max_streams = 2 });
+    defer {
+        h.shutdown();
+        h.deinit();
+    }
+
+    try testing.expectEqual(@as(usize, 0), h.stream_count);
+    // 上限 2：两个流成功，第三个被拒
+    try testing.expect(h.streamOpen());
+    try testing.expect(h.streamOpen());
+    try testing.expect(!h.streamOpen());
+    try testing.expectEqual(@as(usize, 2), h.stream_count);
+
+    // 关一个 → 可再开一个（容量恢复）；流计数与任务槽互不干扰
+    h.streamClose();
+    try testing.expect(h.streamOpen());
+    try testing.expectEqual(@as(usize, 2), h.stream_count);
+    h.streamClose();
+    h.streamClose();
+    try testing.expectEqual(@as(usize, 0), h.stream_count);
+    // 流记账不占任务槽：cap_tasks=8 的任务仍可正常提交（active 由 entries 独立计数）
+    var counter = std.atomic.Value(u32).init(0);
+    var holder = Holder{ .task = .{ .run = Holder.bump }, .counter = &counter };
+    try testing.expect(h.submit(&holder.task) != null);
+    task.wait(&holder.task);
+    try testing.expectEqual(@as(u32, 1), counter.load(.acquire));
 }

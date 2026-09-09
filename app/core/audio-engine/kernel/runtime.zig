@@ -29,11 +29,15 @@
 //!   - worker 开工写 `started_ns[id]`（单调 ns），完工清零；
 //!   - Master 空闲改为带超时 wait（`master_event` + `waitTimeout`，§5.1「零轮询」），超时到点
 //!     做停滞扫描：busy 且开工超时的 worker → 判停滞 → **detach 线程句柄**（停机跳过其 join，
-//!     绝不 join 卡死线程）+ 复位其 reg/started/inflight + `stall_count` 计数；停滞槽永不复用
-//!     （卡死线程可能仍在跑，遗留 OS 线程数 = detach 数，单次可接受并文档化）。
+//!     绝不 join 卡死线程）+ 复位其 reg/started/inflight + `stall_count` 计数；卡死（永不返）
+//!     的槽持续退役（遗留 OS 线程数 = detach 数，单次可接受并文档化）。
 //!   - 被放弃 worker 若任务自返（如 stop 标志任务）：走 workerMain 停滞分支，只销毁自取节点、
 //!     置 exited 即退，**不再写任何共享簿记**（Master 已代为收尾）；`shutdown` 对停滞 worker
 //!     有界等待其退出，真卡死（永不返）不阻塞、留给宿主 `kernel_shutdown_force` 兜底。
+//! F3（槽位容量恢复，2026-09-09）：停滞线程若随后自返（置 `exited[id]`），Master 在超时
+//! 兜底 tick（`respawnRetired`）与 `appendWorker` 复用扫描中把该槽**重新拉起**：新线程覆写
+//! 已 detach 句柄（**绝不 join**）、复位 reg/stalled/exited/started_ns，池恢复满编；真正卡死
+//! （永不退出）的槽仍退役。公开 `busyCount()` 记账在役（reg busy）worker 数。
 
 const std = @import("std");
 const Thread = std.Thread;
@@ -97,11 +101,15 @@ pub const Runtime = struct {
     // ---- §5.2 层2 停滞兜底簿记（容量 = cfg.max_workers，init 定容）----
     /// 每 worker 开工时刻（单调 ns；0 = 空闲/未开工）。worker 自写（持锁），Master 扫描读。
     started_ns: []std.atomic.Value(u64) = &.{},
-    /// 已被判停滞并 detach 的槽。**永不复用**（卡死线程可能仍在跑）；停机跳过其 join。
-    /// 写：Master（scanStalled，持 mutex）；读：worker（持 mutex）/ shutdown（join 后）。
+    /// 已被判停滞并 detach 的槽。停机跳过其 join（已 detach 绝不 join）；旧线程自退
+    /// （exited）后该槽可复用（F3：Master respawnInto 复位本标志并覆写句柄）。卡死
+    /// （永不退出）槽持续退役，遗留 OS 线程数 = detach 数。
+    /// 写：Master（scanStalled / respawnInto，均持 mutex）；读：worker（持 mutex）/
+    /// shutdown（join 后）/ busyCount（持 mutex）。
     stalled: []bool = &.{},
     /// worker 自退标记：停滞 worker 返回前置位（最后一条触碰 runtime 的操作）；
     /// `shutdown` 据此有界等待停滞 worker 退出，避免 deinit 后其返回路径碰已释放内存。
+    /// F3：Master 据此确认旧线程已离开后方可复用该槽（置位后该槽 reg/stalled 才能复位）。
     exited: []std.atomic.Value(bool) = &.{},
     /// 停滞放弃计数（测试/可观测）。
     stall_count: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
@@ -155,8 +163,16 @@ pub const Runtime = struct {
         return self;
     }
 
-    /// 由 Master 事件线程执行的 worker 创建（§3.1：spawn 执行者 = Master async）
+    /// 由 Master 事件线程执行的 worker 创建（§3.1：spawn 执行者 = Master async）。
+    /// F3 复用扫描：先找可复用槽（停滞且旧线程已确认自退 exited）——以新线程覆写其已
+    /// detach 句柄（**绝不 join**）、复位簿记（`respawnInto`）后返回；无复用槽才追加新格。
     fn appendWorker(self: *Runtime) !void {
+        for (self.workers.items, 0..) |_, id| {
+            if (self.stalled[id] and self.exited[id].load(.acquire)) {
+                try self.respawnInto(id);
+                return;
+            }
+        }
         if (self.workers.items.len >= self.cfg.max_workers) return error.OutOfMemory;
         const id = self.workers.items.len;
         const w = try Thread.spawn(.{
@@ -164,6 +180,46 @@ pub const Runtime = struct {
             .stack_size = self.cfg.stack_size,
         }, workerMain, .{ self, id });
         try self.workers.append(self.allocator, w);
+    }
+
+    /// F3：把已退役槽（停滞且旧线程已 exited）重新拉起为服役 worker。旧线程已确认不再
+    /// 触碰共享簿记，其句柄早已 detach——**绝不 join**，直接以新线程句柄覆写 `workers.items[id]`。
+    /// 先持 mutex 复位槽簿记、后 spawn（新 worker 进场即读写自身槽格，须见复位态）；
+    /// spawn 失败回滚为仍退役（stalled/exited 复原），留待下轮 tick 重试。
+    fn respawnInto(self: *Runtime, id: usize) !void {
+        self.mutex.lockUncancelable(self.io);
+        self.reg.entries[id] = .{}; // 复位为默认 idle（reclaimable / elastic）
+        self.started_ns[id].store(0, .monotonic);
+        self.exited[id].store(false, .release);
+        self.stalled[id] = false;
+        self.mutex.unlock(self.io);
+        errdefer {
+            self.mutex.lockUncancelable(self.io);
+            self.stalled[id] = true;
+            self.exited[id].store(true, .release);
+            self.mutex.unlock(self.io);
+        }
+        const w = try Thread.spawn(.{
+            .allocator = self.allocator,
+            .stack_size = self.cfg.stack_size,
+        }, workerMain, .{ self, id });
+        self.workers.items[id] = w;
+    }
+
+    /// F3：Master 超时兜底 tick 里逐槽恢复——停滞且旧线程已 exited 的槽重新拉起
+    /// （自返任务释放后池可恢复满编；无停滞/无退出槽为空操作）。每 tick 至多恢复一个，
+    /// 低频不引发 spawn 风暴；调用者须在 `stall_timeout_ns>0` 路径内。
+    fn respawnRetired(self: *Runtime) void {
+        if (self.cfg.stall_timeout_ns == 0) return;
+        const n = self.workers.items.len;
+        for (0..n) |id| {
+            if (self.stalled[id] and self.exited[id].load(.acquire)) {
+                self.respawnInto(id) catch {
+                    std.debug.print("runtime: worker respawn failed (OOM/线程配额/cap)\n", .{});
+                };
+                return; // 低频逐个恢复
+            }
+        }
     }
 
     /// 提交任务（非阻塞；OOM 返回 false）。worker 被唤醒自取（完成即领，§5.1）。
@@ -215,6 +271,22 @@ pub const Runtime = struct {
             Io.Condition.waitUncancelable(&self.idle_cv, self.io, &self.mutex);
         }
         self.mutex.unlock(self.io);
+    }
+
+    /// F3 in-use 记账：服役中 worker 数（reg 状态 == busy，且槽未停滞/未自退）。
+    /// 停滞（detach 退役）与已退出（exited）槽不计；未启用的定容后缀格恒 idle 亦不计。
+    /// 与在途**运行中**任务数一致（排队任务不算）。持 mutex 读——reg/stalled 的写都在
+    /// 该锁下（respawnInto/scanStalled/workerMain），exited 为原子。
+    pub fn busyCount(self: *Runtime) usize {
+        self.mutex.lockUncancelable(self.io);
+        var n: usize = 0;
+        for (self.reg.entries, 0..) |*e, id| {
+            if (self.stalled[id]) continue;
+            if (self.exited[id].load(.acquire)) continue;
+            if (e.state == tables.WState.busy) n += 1;
+        }
+        self.mutex.unlock(self.io);
+        return n;
     }
 
     /// 停机：请求 → join Master → join 全部可 join worker。
@@ -288,6 +360,7 @@ pub const Runtime = struct {
                 // 注意：此路径不清 need_worker——竞态 submit 可能刚置位（其 Event.set 在超时
                 // 判定后才落），留到下一轮由主谓词消费，避免丢扩容请求。
                 self.scanStalled();
+                self.respawnRetired(); // F3：自返停滞线程的槽重新拉起，池恢复满编
                 continue;
             }
             // 至此非停即需补 worker（!shutting_down && !stall_tick → need_worker 已被清）
@@ -374,8 +447,9 @@ pub const Runtime = struct {
 
     /// §5.2 层2 停滞扫描（Master 带超时 wait 兜底，低频）。判定：busy worker 开工超过
     /// stall_timeout_ns 未完工 → 停滞。处理：detach 线程句柄（停机跳过 join）、复位
-    /// reg/started/inflight、计 stall_count。停滞槽**永不复用**（卡死线程可能仍在跑，遗留
-    /// OS 线程数 = detach 数，单次可接受、文档化）。锁内完成全部判写（与 worker 簿记互斥）。
+    /// reg/started/inflight、计 stall_count。卡死（永不退出）槽退役（遗留 OS 线程 =
+    /// detach 数）；任务若自返（置 exited），槽由 F3 `respawnRetired`/`appendWorker` 复用
+    /// 恢复（见上）。锁内完成全部判写（与 worker 簿记互斥）。
     fn scanStalled(self: *Runtime) void {
         if (self.cfg.stall_timeout_ns == 0) return;
         const n = self.workers.items.len;
@@ -728,6 +802,149 @@ test "runtime: stall 启用但无卡死任务 → 不误杀、stall_count 保持
     try testing.expectEqual(@as(u32, @intCast(submitted)), ctx.counter.load(.acquire));
     try testing.expectEqual(@as(usize, 0), rt.stall_count.load(.acquire));
     rt.shutdown();
+}
+
+// ---- F3：停滞槽复用 + in-use 记账（detach 后池可恢复满编）----
+
+/// 短占用任务体：睡 `ms` 毫秒保持 worker busy（可观测），随后计数 +1。
+/// 时长须 < stall_timeout，避免被停滞扫描误杀（Master 只在空闲超时 tick 扫）。
+const SleepJob = struct {
+    ms: u32,
+    done: *std.atomic.Value(u32),
+
+    fn run(ctx: *anyopaque) void {
+        const sj: *SleepJob = @ptrCast(@alignCast(ctx));
+        tSleepMs(sj.ms);
+        _ = sj.done.fetchAdd(1, .monotonic);
+    }
+};
+
+/// 有界轮询 `rt.busyCount() == want`（want=0 亦精确匹配）；超时返回 false（防挂死）。
+fn pollBusy(rt: *Runtime, want: usize, iter: usize, ms: u64) bool {
+    var i: usize = 0;
+    while (i < iter) : (i += 1) {
+        if (rt.busyCount() == want) return true;
+        tSleepMs(ms);
+    }
+    return rt.busyCount() == want;
+}
+
+/// 有界轮询：`done` 计数达 want 且池已空（busyCount==0）；超时返回 false。
+fn pollDrained(rt: *Runtime, done: *const std.atomic.Value(u32), want: u32, iter: usize, ms: u64) bool {
+    var i: usize = 0;
+    while (i < iter) : (i += 1) {
+        if (done.load(.acquire) == want and rt.busyCount() == 0) return true;
+        tSleepMs(ms);
+    }
+    return done.load(.acquire) == want and rt.busyCount() == 0;
+}
+
+test "runtime: F3 in-use 记账——停滞 detach 后 busyCount 只算服役 worker，不误计已放弃格" {
+    var probe = StallJob{ .budget_ns = 60 * std.time.ns_per_s };
+    const rt = try Runtime.init(std.heap.c_allocator, .{
+        .min_workers = 1,
+        .max_workers = 4,
+        .stall_timeout_ns = 120 * std.time.ns_per_ms,
+    });
+    defer {
+        probe.stop.store(true, .release);
+        rt.shutdown();
+        rt.deinit();
+    }
+
+    // id0（唯一引导 worker）先占住长转任务 → 将被判停滞并 detach
+    try testing.expect(rt.submit(.{ .run = StallJob.run, .ctx = &probe }));
+    // 首波短任务压出 backlog → Master 扩到 max_workers=4（id0 wedged，1..3 服役）
+    var done0 = std.atomic.Value(u32).init(0);
+    var w0: [5]SleepJob = undefined;
+    for (&w0) |*j| j.* = .{ .ms = 40, .done = &done0 };
+    for (&w0) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+
+    // 停滞检出 + 池长到 4 + 首波排空
+    var ready = false;
+    for (0..600) |_| {
+        if (rt.stall_count.load(.acquire) >= 1 and rt.workers.items.len == 4 and done0.load(.acquire) == 5) {
+            ready = true;
+            break;
+        }
+        tSleepMs(10);
+    }
+    try testing.expect(ready);
+    try testing.expectEqual(@as(usize, 1), rt.stall_count.load(.acquire));
+    try testing.expect(rt.stalled[0]);
+    try testing.expect(!rt.exited[0].load(.acquire)); // wedged：尚未自退
+    // 首波排空后无在役任务（busyCount 回落 0；done0 领先 reg 置 idle 一拍，故轮询）
+    try testing.expect(pollBusy(rt, 0, 100, 5));
+
+    // 在役记账：3 个短占用任务 → 恰 3 个服役 worker busy（已放弃的 id0 不计入）
+    var doneA = std.atomic.Value(u32).init(0);
+    var wa: [3]SleepJob = undefined;
+    for (&wa) |*j| j.* = .{ .ms = 40, .done = &doneA };
+    for (&wa) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    try testing.expect(pollBusy(rt, 3, 200, 3));
+    try testing.expect(pollDrained(rt, &doneA, 3, 300, 10));
+}
+
+test "runtime: F3 槽位容量恢复——停滞自返后槽复用，二次突发可再达 max_workers 满编" {
+    var probe = StallJob{ .budget_ns = 60 * std.time.ns_per_s };
+    const rt = try Runtime.init(std.heap.c_allocator, .{
+        .min_workers = 1,
+        .max_workers = 4,
+        .stall_timeout_ns = 100 * std.time.ns_per_ms,
+    });
+    defer {
+        probe.stop.store(true, .release);
+        rt.shutdown();
+        rt.deinit();
+    }
+
+    // 与上一测试相同的前戏：id0 wedged → detach，池扩到 4（3 服役 + 1 退役）
+    try testing.expect(rt.submit(.{ .run = StallJob.run, .ctx = &probe }));
+    var done0 = std.atomic.Value(u32).init(0);
+    var w0: [5]SleepJob = undefined;
+    for (&w0) |*j| j.* = .{ .ms = 40, .done = &done0 };
+    for (&w0) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    var stalled = false;
+    for (0..600) |_| {
+        if (rt.stall_count.load(.acquire) >= 1 and rt.workers.items.len == 4) {
+            stalled = true;
+            break;
+        }
+        tSleepMs(10);
+    }
+    try testing.expect(stalled);
+    try testing.expect(rt.stalled[0]);
+
+    // 满编但仅 3 服役：4 路并发无法全忙（此时忙得上限 = 3，容量已损失 1）
+    var doneB = std.atomic.Value(u32).init(0);
+    var wb: [4]SleepJob = undefined;
+    for (&wb) |*j| j.* = .{ .ms = 40, .done = &doneB };
+    for (&wb) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    try testing.expect(pollBusy(rt, 3, 200, 3));
+    try testing.expect(pollDrained(rt, &doneB, 4, 300, 10));
+
+    // 放停靠标志 → wedged 线程自返（置 exited[0]）→ Master 超时 tick 复用槽（respawnInto）。
+    // 注：exited[0] 中间态可能极短（下一 tick 即被复用复位），只轮询稳定的终态——复用后
+    // stalled/exited 均为 false（复用是清这两个标志的唯一路径，此前 stalled[0] 已确认为 true）。
+    probe.stop.store(true, .release);
+    var respawned = false;
+    for (0..600) |_| {
+        if (!rt.stalled[0] and !rt.exited[0].load(.acquire)) {
+            respawned = true;
+            break;
+        }
+        tSleepMs(20);
+    }
+    try testing.expect(respawned);
+
+    // 容量恢复：4 个短占用任务 → 4 路全忙（busyCount == 4 = max_workers），停机干净
+    var doneC = std.atomic.Value(u32).init(0);
+    var wc: [4]SleepJob = undefined;
+    for (&wc) |*j| j.* = .{ .ms = 40, .done = &doneC };
+    for (&wc) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    try testing.expect(pollBusy(rt, 4, 200, 3));
+    try testing.expect(pollDrained(rt, &doneC, 4, 300, 10));
+    // defer 的 shutdown：复用后的新线程照常 join——干净返回即证明无悬挂
 }
 
 // ---- 并发解码验证（registry→池 worker；decode 首次跑在真实多线程上，不接生产线）----

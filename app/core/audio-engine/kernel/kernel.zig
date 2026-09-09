@@ -178,11 +178,29 @@ fn fillZkInfoMinimal(zi: *engine.ZkInfo, zinfo: decoder.Info) void {
 
 /// 初始化常驻内核（Host：池 + 定容任务槽）。返回不透明句柄；失败返回 null。
 export fn zk_engine_init(min_workers: c_int, max_workers: c_int, cap_tasks: c_int) ?*khost.Host {
+    return zkEngineInit(max_streams_default, min_workers, max_workers, cap_tasks);
+}
+
+/// 同 zk_engine_init，另指定流式会话并发上限 max_streams（§6.3 硬计数；缺省
+/// zk_engine_init 用 khost.Cfg 默认 = 8）。测试/宿主显式约束流并发时用。
+export fn zk_engine_init_streams(
+    min_workers: c_int,
+    max_workers: c_int,
+    cap_tasks: c_int,
+    max_streams: c_int,
+) ?*khost.Host {
+    return zkEngineInit(@intCast(@max(max_streams, 1)), min_workers, max_workers, cap_tasks);
+}
+
+const max_streams_default: u16 = 8;
+
+fn zkEngineInit(max_streams: u16, min_workers: c_int, max_workers: c_int, cap_tasks: c_int) ?*khost.Host {
     if (min_workers < 0 or max_workers < 0 or cap_tasks < 0) return null;
     const cfg = khost.Cfg{
         .min_workers = @intCast(@max(min_workers, 1)),
         .max_workers = @intCast(@max(max_workers, 1)),
         .cap_tasks = @intCast(@max(cap_tasks, 1)),
+        .max_streams = max_streams,
     };
     return khost.Host.init(std.heap.c_allocator, cfg) catch null;
 }
@@ -243,6 +261,11 @@ fn fillErrStatus(buf: [*]u8, buf_size: usize, status: c_int) void {
 }
 
 /// 打开流式会话（在池 worker 上 probe+open 一次）。失败返回 NULL 并写 errbuf。
+/// F9：先经 `host.streamOpen()` 做 §6.3 max_streams 硬计数——已达上限直接返回 NULL
+/// （不改 errbuf；语义等同 InstanceLimit）。此后任一失败路径都会 `streamClose()` 回补；
+/// 成功返回的 Stream 持有一个计数，须由 `zk_engine_close` 归还。
+/// worker 亲和（1 流 pinned 1 worker）与 ring 直推仍属 C 壳接线期（§6.3），此处为
+/// 分块串行会话 + 硬计数簿记。
 export fn zk_engine_open(
     h: ?*khost.Host,
     path: [*:0]const u8,
@@ -251,15 +274,21 @@ export fn zk_engine_open(
     errbuf_size: usize,
 ) ?*Stream {
     const host = h orelse return null;
-    const sess = session.Session.create(std.heap.c_allocator, std.mem.span(path)) catch return null;
+    if (!host.streamOpen()) return null; // max_streams 满 → InstanceLimit（errbuf 语义不变）
+    const sess = session.Session.create(std.heap.c_allocator, std.mem.span(path)) catch {
+        host.streamClose();
+        return null;
+    };
     const st = std.heap.c_allocator.create(Stream) catch {
         std.heap.c_allocator.destroy(sess);
+        host.streamClose();
         return null;
     };
     st.* = .{ .host = host, .s = sess };
     if (!sess.start(host.rt)) {
         std.heap.c_allocator.destroy(sess);
         std.heap.c_allocator.destroy(st);
+        host.streamClose();
         return null;
     }
     task.wait(&sess.step);
@@ -270,6 +299,7 @@ export fn zk_engine_open(
         fillErrStatus(errbuf, errbuf_size, @intFromEnum(err.statusOf(sess.step.err orelse error.DecodeFailed)));
         std.heap.c_allocator.destroy(sess);
         std.heap.c_allocator.destroy(st);
+        host.streamClose();
         return null;
     }
     if (info) |zi| fillZkInfoMinimal(zi, sess.info);
@@ -342,6 +372,7 @@ export fn zk_engine_position_ms(st: ?*Stream) i64 {
 }
 
 /// 关闭会话（池内释放实例并 join 收尾）；st 为 NULL 时空操作。
+/// F9：归还打开时占用的流计数（`host.streamClose()`），须在销毁 Stream 前调用。
 export fn zk_engine_close(st: ?*Stream) void {
     const s = st orelse return;
     if (s.s.state == session.SessState.playing or s.s.state == session.SessState.new) {
@@ -349,6 +380,7 @@ export fn zk_engine_close(st: ?*Stream) void {
         task.wait(&s.s.step);
     }
     s.s.deinit(); // Session.deinit 自释放会话壳
+    s.host.streamClose();
     std.heap.c_allocator.destroy(s);
 }
 
