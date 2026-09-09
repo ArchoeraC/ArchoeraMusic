@@ -24,6 +24,16 @@
 //! 边界（留接线期，见 §9 ③④/§5.5 完整调节器）：空闲**回收降容**（backlog 消退后扩出的
 //! worker 回落 min_floor）涉及 retiring 协议 + Master join，须与 wait_event/会话接线一并落，
 //! 避免本骨架引入稀发竞态。
+//!
+//! §5.2 层2 停滞兜底（`cfg.stall_timeout_ns > 0` 才启用，默认关 = 行为与纯事件版完全一致）：
+//!   - worker 开工写 `started_ns[id]`（单调 ns），完工清零；
+//!   - Master 空闲改为带超时 wait（`master_event` + `waitTimeout`，§5.1「零轮询」），超时到点
+//!     做停滞扫描：busy 且开工超时的 worker → 判停滞 → **detach 线程句柄**（停机跳过其 join，
+//!     绝不 join 卡死线程）+ 复位其 reg/started/inflight + `stall_count` 计数；停滞槽永不复用
+//!     （卡死线程可能仍在跑，遗留 OS 线程数 = detach 数，单次可接受并文档化）。
+//!   - 被放弃 worker 若任务自返（如 stop 标志任务）：走 workerMain 停滞分支，只销毁自取节点、
+//!     置 exited 即退，**不再写任何共享簿记**（Master 已代为收尾）；`shutdown` 对停滞 worker
+//!     有界等待其退出，真卡死（永不返）不阻塞、留给宿主 `kernel_shutdown_force` 兜底。
 
 const std = @import("std");
 const Thread = std.Thread;
@@ -38,6 +48,9 @@ pub const Cfg = struct {
     max_workers: u16 = 64,
     /// 每 worker 栈大小（显式设——m4a Debug 曾有约 60MB 栈帧史，勿信默认值）
     stack_size: usize = 16 * 1024 * 1024,
+    /// 停滞判定阈值（§5.2 层2）：busy worker 开工超过该时长未完工 → 判停滞并 detach。
+    /// 0 = 关闭（默认）：Master 保持纯事件 Condition 等待、零定时器，行为与既往完全一致。
+    stall_timeout_ns: u64 = 0,
 };
 
 /// 任务（phase ② 通用可执行体；Task/句柄层见 kernel/task.zig，测试与批任务用）
@@ -81,6 +94,21 @@ pub const Runtime = struct {
     /// 容量 = cfg.max_workers，init 定容预分配（§5.4 no-alloc）。
     reg: tables.WorkerTable = .{ .entries = &.{} },
 
+    // ---- §5.2 层2 停滞兜底簿记（容量 = cfg.max_workers，init 定容）----
+    /// 每 worker 开工时刻（单调 ns；0 = 空闲/未开工）。worker 自写（持锁），Master 扫描读。
+    started_ns: []std.atomic.Value(u64) = &.{},
+    /// 已被判停滞并 detach 的槽。**永不复用**（卡死线程可能仍在跑）；停机跳过其 join。
+    /// 写：Master（scanStalled，持 mutex）；读：worker（持 mutex）/ shutdown（join 后）。
+    stalled: []bool = &.{},
+    /// worker 自退标记：停滞 worker 返回前置位（最后一条触碰 runtime 的操作）；
+    /// `shutdown` 据此有界等待停滞 worker 退出，避免 deinit 后其返回路径碰已释放内存。
+    exited: []std.atomic.Value(bool) = &.{},
+    /// 停滞放弃计数（测试/可观测）。
+    stall_count: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+    /// Master 带超时兜底唤醒 latch（§5.1：`waitTimeout` + set/reset）。仅
+    /// `stall_timeout_ns>0` 时被等待；只有 Master 线程 wait/reset。
+    master_event: Io.Event = .unset,
+
     /// 引导阶段（bootstrap）：建 Master；`cfg.min_workers>0` 时同步建同质 worker。
     pub fn init(allocator: std.mem.Allocator, cfg: Cfg) !*Runtime {
         if (cfg.min_workers > cfg.max_workers) return error.InvalidCfg; // 接线不匹配提前拒
@@ -98,10 +126,19 @@ pub const Runtime = struct {
             for (self.workers.items) |w| w.join();
             self.workers.deinit(allocator);
             self.reg.deinit(allocator);
+            allocator.free(self.started_ns);
+            allocator.free(self.stalled);
+            allocator.free(self.exited);
             if (self.master) |m| m.join();
             allocator.destroy(self);
         }
         self.reg = try tables.WorkerTable.init(allocator, cfg.max_workers);
+        self.started_ns = try allocator.alloc(std.atomic.Value(u64), cfg.max_workers);
+        @memset(self.started_ns, std.atomic.Value(u64).init(0));
+        self.stalled = try allocator.alloc(bool, cfg.max_workers);
+        @memset(self.stalled, false);
+        self.exited = try allocator.alloc(std.atomic.Value(bool), cfg.max_workers);
+        @memset(self.exited, std.atomic.Value(bool).init(false));
 
         // Master 先建（此后线程生命周期归它）
         self.master = try Thread.spawn(.{
@@ -160,7 +197,11 @@ pub const Runtime = struct {
             queued_est > self.workers.items.len;
         if (grow) self.need_worker = true;
         self.master_mutex.unlock(self.io);
-        if (grow) Io.Condition.broadcast(&self.master_cv, self.io);
+        if (grow) {
+            Io.Condition.broadcast(&self.master_cv, self.io);
+            // timed 兜底模式（stall_timeout_ns>0）：Master 睡在 master_event 上而非 cv
+            Io.Event.set(&self.master_event, self.io);
+        }
 
         Io.Condition.signal(&self.jobs_avail, self.io);
         return true;
@@ -178,17 +219,25 @@ pub const Runtime = struct {
 
     /// 停机：请求 → join Master → join 全部可 join worker。
     /// 停机期可阻塞 join（事件线程已无服务对象；§3.1 能力 A）。已提交任务先排空完成。
+    /// §5.2 层2：停滞（已 detach）worker 跳过 join——绝不 join 卡死线程；先有界等待其自退
+    /// （stop 标志任务会很快返回并置 exited），真卡死（永不返回）不阻塞、留给宿主
+    /// `kernel_shutdown_force` / 进程退出兜底（文档化遗留 OS 线程）。
     pub fn shutdown(self: *Runtime) void {
         if (self.master == null) return;
         self.master_mutex.lockUncancelable(self.io);
         self.shutdown_requested.store(true, .release);
         self.master_mutex.unlock(self.io);
         Io.Condition.broadcast(&self.master_cv, self.io);
+        Io.Event.set(&self.master_event, self.io); // timed 兜底模式下唤醒睡在 event 上的 Master
         if (self.master) |m| {
             m.join();
             self.master = null;
         }
-        for (self.workers.items) |w| w.join();
+        self.waitStalledExits();
+        for (self.workers.items, 0..) |w, id| {
+            if (self.stalled[id]) continue; // 已 detach：绝不 join
+            w.join();
+        }
         self.workers.deinit(self.allocator);
         self.workers = .empty; // ArrayList.deinit 不清 items.len，显式复位
     }
@@ -198,6 +247,9 @@ pub const Runtime = struct {
         std.debug.assert(self.master == null);
         std.debug.assert(self.workers.items.len == 0);
         self.reg.deinit(self.allocator);
+        self.allocator.free(self.started_ns);
+        self.allocator.free(self.stalled);
+        self.allocator.free(self.exited);
         self.allocator.destroy(self);
     }
 
@@ -205,15 +257,40 @@ pub const Runtime = struct {
 
     fn masterMain(self: *Runtime) void {
         while (true) {
+            // —— 等待「补 worker」/停机；`stall_timeout_ns>0` 时退居带超时 wait（§5.1/
+            // §5.2 层2）：超时到点做停滞扫描；否则保持纯事件、零定时器（行为不变）——
+            var stall_tick = false;
             self.master_mutex.lockUncancelable(self.io);
             while (!self.shutdown_requested.load(.acquire) and !self.need_worker) {
-                Io.Condition.waitUncancelable(&self.master_cv, self.io, &self.master_mutex);
+                if (self.cfg.stall_timeout_ns == 0) {
+                    Io.Condition.waitUncancelable(&self.master_cv, self.io, &self.master_mutex);
+                } else {
+                    // 带超时兜底：不得持 master_mutex 睡 Event → 先放锁再 wait
+                    self.master_mutex.unlock(self.io);
+                    const woke = waitEventTimeout(&self.master_event, self.io, self.scanPeriodNs());
+                    self.master_mutex.lockUncancelable(self.io);
+                    if (woke) {
+                        Io.Event.reset(&self.master_event); // 消费 latch（仅 Master wait/reset）
+                        continue; // 真实事件（submit 扩容 / 停机）→ 重查标志
+                    }
+                    stall_tick = true; // 纯超时到点（或罕见虚假唤醒）→ 本轮做停滞扫描
+                    break;
+                }
             }
             const shutting_down = self.shutdown_requested.load(.acquire);
-            self.need_worker = false;
+            if (!shutting_down and !stall_tick) self.need_worker = false; // 消费 grow 请求
             self.master_mutex.unlock(self.io);
 
-            if (shutting_down) break;
+            if (shutting_down) break; // 停机优先
+
+            if (stall_tick) {
+                // 无待办工作且超时到点：§5.2 层2 停滞兜底扫描（低频，非周期热扫）。
+                // 注意：此路径不清 need_worker——竞态 submit 可能刚置位（其 Event.set 在超时
+                // 判定后才落），留到下一轮由主谓词消费，避免丢扩容请求。
+                self.scanStalled();
+                continue;
+            }
+            // 至此非停即需补 worker（!shutting_down && !stall_tick → need_worker 已被清）
 
             // 补建 worker（§3.1 能力 A：spawn 执行者 = Master；§5.5：积压 > 现 worker 则扩）。
             // spawn 失败不 panic（§5.4）：记日志即可，任务继续排队，下次 submit 再请求。
@@ -253,12 +330,24 @@ pub const Runtime = struct {
                 self.queue_head = head.next;
                 if (self.queue_head == null) self.queue_tail = null;
                 me.markBusy(); // 状态先行（§5.1）：开工前自写 busy（持锁，Master 读同锁串行化）
+                self.started_ns[id].store(self.nowNs(), .monotonic); // 停滞判定基准（§5.2 层2）
                 self.mutex.unlock(self.io);
 
                 head.job.run(head.job.ctx);
 
                 // 收尾（持锁写 reg/inflight，Master 读同锁串行化）
                 self.mutex.lockUncancelable(self.io);
+                if (self.stalled[id]) {
+                    // §5.2 层2：本 worker 已被 Master 判停滞并 detach——放弃本任务时 Master
+                    // 已代为复位 reg/started/inflight。任务若自返（如 stop 标志任务），不得
+                    // 再写任何共享簿记：只销毁自取节点、置 exited 即退（exited 是最后一条
+                    // 触碰 runtime 的操作，shutdown 据此有界等待）。
+                    self.mutex.unlock(self.io);
+                    self.allocator.destroy(head);
+                    self.exited[id].store(true, .release);
+                    return;
+                }
+                self.started_ns[id].store(0, .monotonic);
                 me.beginIdle(0); // idle_since 时钟源由接线层提供；此处仅维护状态
                 self.inflight -= 1;
                 self.mutex.unlock(self.io);
@@ -273,12 +362,111 @@ pub const Runtime = struct {
         }
     }
 
+    /// 单调纳秒（worker 开工时刻 / 停滞扫描用；同源同钟，差即有界）。
+    fn nowNs(self: *const Runtime) u64 {
+        return @intCast(Io.Timestamp.now(self.io, .awake).nanoseconds);
+    }
+
+    /// Master 带超时等待时长：stall_timeout_ns（下限 1ms，防病态小值高频空扫）。
+    fn scanPeriodNs(self: *const Runtime) u64 {
+        return @max(self.cfg.stall_timeout_ns, std.time.ns_per_ms);
+    }
+
+    /// §5.2 层2 停滞扫描（Master 带超时 wait 兜底，低频）。判定：busy worker 开工超过
+    /// stall_timeout_ns 未完工 → 停滞。处理：detach 线程句柄（停机跳过 join）、复位
+    /// reg/started/inflight、计 stall_count。停滞槽**永不复用**（卡死线程可能仍在跑，遗留
+    /// OS 线程数 = detach 数，单次可接受、文档化）。锁内完成全部判写（与 worker 簿记互斥）。
+    fn scanStalled(self: *Runtime) void {
+        if (self.cfg.stall_timeout_ns == 0) return;
+        const n = self.workers.items.len;
+        if (n == 0) return;
+        const now = self.nowNs();
+        var abandoned = false;
+        self.mutex.lockUncancelable(self.io);
+        for (self.reg.entries[0..n], 0..n) |*e, id| {
+            if (self.stalled[id]) continue;
+            if (e.state != tables.WState.busy) continue;
+            const started = self.started_ns[id].load(.monotonic);
+            if (started == 0) continue;
+            if (now -| started <= self.cfg.stall_timeout_ns) continue;
+            // 停滞：放弃该 worker 与其在途任务（任务体若自返走 workerMain 停滞分支，只销毁
+            // 自取节点即退，不再写任何共享簿记——此处已代为收尾）。
+            self.stalled[id] = true;
+            e.beginIdle(0);
+            self.started_ns[id].store(0, .monotonic);
+            if (self.inflight > 0) self.inflight -= 1; // 放弃任务视作已收尾
+            self.workers.items[id].detach(); // detach 后绝不 join
+            _ = self.stall_count.fetchAdd(1, .monotonic);
+            abandoned = true;
+        }
+        self.mutex.unlock(self.io);
+        if (abandoned) Io.Condition.broadcast(&self.idle_cv, self.io); // waitIdle 等待者据此复查
+    }
+
+    /// 有界等待停滞（已 detach）worker 自退：给 stop-标志任务退出窗口，避免 deinit 后其
+    /// 返回路径触碰已释放 runtime。真卡死（永不返）在预算内不阻塞、直接放行（宿主/进程兜底）。
+    fn waitStalledExits(self: *Runtime) void {
+        const timeout = self.cfg.stall_timeout_ns;
+        if (timeout == 0) return; // 无停滞可能
+        var has_stalled = false;
+        for (self.workers.items, 0..) |_, id| {
+            if (self.stalled[id]) {
+                has_stalled = true;
+                break;
+            }
+        }
+        if (!has_stalled) return;
+        const budget = @min(@max(@as(u64, 20) * std.time.ns_per_ms, timeout), @as(u64, 200) * std.time.ns_per_ms);
+        const step = 2 * std.time.ns_per_ms;
+        const deadline = self.nowNs() + budget;
+        while (true) {
+            var all_done = true;
+            for (self.workers.items, 0..) |_, id| {
+                if (self.stalled[id] and !self.exited[id].load(.acquire)) {
+                    all_done = false;
+                    break;
+                }
+            }
+            if (all_done) return;
+            const now = self.nowNs();
+            if (now >= deadline) return; // 真卡死：不悬挂，留给进程级兜底
+            ioSleep(self.io, @min(step, deadline - now));
+        }
+    }
+
     fn ioLockedBroadcastWorkers(self: *Runtime) void {
         self.mutex.lockUncancelable(self.io);
         Io.Condition.broadcast(&self.jobs_avail, self.io);
         self.mutex.unlock(self.io);
     }
 };
+
+// ---------------------------------------------------------------------------
+// Master 带超时兜底原语（§5.1/§5.2 层2；与 kernel/task.zig `waitEventTimeout` 同型）
+// ---------------------------------------------------------------------------
+
+/// 保证可用的带超时等待（Master 空闲兜底 / 低频扫描用；热路径不用）。
+/// 事件在超时内被 set → true；超时/虚假唤醒 → false。
+fn waitEventTimeout(event: *Io.Event, io: Io, timeout_ns: u64) bool {
+    const dur = std.Io.Clock.Duration{
+        .raw = .{ .nanoseconds = timeout_ns },
+        .clock = .awake, // Linux CLOCK_MONOTONIC（单调，不含挂起）
+    };
+    Io.Event.waitTimeout(event, io, .{ .duration = dur }) catch |e| switch (e) {
+        error.Timeout => return false,
+        error.Canceled => return false,
+    };
+    return true;
+}
+
+/// 单调时长睡眠（shutdown 有界等待停滞 worker 自退用）。
+fn ioSleep(io: Io, ns: u64) void {
+    const dur = std.Io.Clock.Duration{
+        .raw = .{ .nanoseconds = ns },
+        .clock = .awake,
+    };
+    Io.Timeout.sleep(.{ .duration = dur }, io) catch {};
+}
 
 // ---------------------------------------------------------------------------
 // 测试
@@ -398,6 +586,147 @@ test "runtime: 弹性扩容——积压大时 Master 补建至 cap，max 界住�
     try testing.expect(grew > 1); // 确曾扩容
     try testing.expect(grew <= 8); // 未越 cap
     try testing.expectEqual(@as(u32, @intCast(submitted)), ctx.counter.load(.acquire));
+    rt.shutdown();
+}
+
+// ---- §5.2 层2：停滞检测（cfg.stall_timeout_ns>0 才启用；默认关 = 与既有行为一致）----
+
+/// 停滞测试长转任务体：自旋 yield 并查 `stop` 标志（设为 true 即快速自返）；`budget_ns`
+/// 为最迟自退预算（防检测失效时把测试挂死——届时仅断言失败而非悬挂）。
+const StallJob = struct {
+    stop: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    budget_ns: u64 = 0,
+
+    fn run(ctx: *anyopaque) void {
+        const s: *StallJob = @ptrCast(@alignCast(ctx));
+        const ioinst = Io.Threaded.global_single_threaded.io();
+        const deadline: i96 = if (s.budget_ns > 0)
+            Io.Timestamp.now(ioinst, .awake).nanoseconds + @as(i96, @intCast(s.budget_ns))
+        else
+            0;
+        while (!s.stop.load(.acquire)) {
+            if (s.budget_ns > 0 and Io.Timestamp.now(ioinst, .awake).nanoseconds >= deadline) break;
+            std.Thread.yield() catch {};
+        }
+    }
+};
+
+fn tSleepMs(ms: u64) void {
+    const dur = std.Io.Clock.Duration{
+        .raw = .{ .nanoseconds = ms * std.time.ns_per_ms },
+        .clock = .awake,
+    };
+    Io.Timeout.sleep(.{ .duration = dur }, Io.Threaded.global_single_threaded.io()) catch {};
+}
+
+test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用、停机干净" {
+    var probe = StallJob{ .budget_ns = 3 * std.time.ns_per_s };
+    var normal = TestCtx{};
+    const rt = try Runtime.init(std.heap.c_allocator, .{
+        .min_workers = 2,
+        .max_workers = 4,
+        .stall_timeout_ns = 50 * std.time.ns_per_ms,
+    });
+    defer {
+        probe.stop.store(true, .release); // 无论走到哪都先放停靠标志，防滞留
+        rt.shutdown();
+        rt.deinit();
+    }
+
+    // 一个蓄意长转任务占住一个 worker（远大于 stall_timeout）
+    try testing.expect(rt.submit(.{ .run = StallJob.run, .ctx = &probe }));
+    // 若干正常任务由其余 worker 完成
+    const n_normal: usize = 12;
+    var submitted: usize = 0;
+    for (0..n_normal) |_| {
+        if (rt.submit(.{ .run = TestCtx.bump, .ctx = &normal })) submitted += 1;
+    }
+    try testing.expectEqual(n_normal, submitted);
+
+    // 并发 waitIdle 等待者：随停滞任务被放弃（scan 代为 inflight-1 + broadcast idle_cv）
+    // 而返回——验证等待者不被悬挂
+    const Waiter = struct {
+        rt: *Runtime,
+        done: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+        fn run(self: *@This()) void {
+            self.rt.waitIdle();
+            self.done.store(true, .release);
+        }
+    };
+    var waiter = Waiter{ .rt = rt };
+    const wth = try std.Thread.spawn(.{ .allocator = std.heap.c_allocator }, Waiter.run, .{&waiter});
+
+    // 有界轮询：停滞被检出（长转 worker 被 detach 并放弃其任务）
+    var seen_stall = false;
+    for (0..120) |_| {
+        if (rt.stall_count.load(.acquire) >= 1) {
+            seen_stall = true;
+            break;
+        }
+        tSleepMs(5);
+    }
+    try testing.expect(seen_stall);
+
+    // 正常任务全部完成（不能 waitIdle 阻塞：长转任务已被放弃、由 scan 计回 inflight）
+    var done = false;
+    for (0..120) |_| {
+        if (normal.counter.load(.acquire) == @as(u32, @intCast(submitted))) {
+            done = true;
+            break;
+        }
+        tSleepMs(5);
+    }
+    try testing.expect(done);
+
+    // waitIdle 等待者也已返回（停滞放弃触发 inflight→0 + idle_cv 广播）
+    done = false;
+    for (0..120) |_| {
+        if (waiter.done.load(.acquire)) {
+            done = true;
+            break;
+        }
+        tSleepMs(5);
+    }
+    try testing.expect(done);
+    wth.join();
+
+    // 停掉长转任务 → 其自行退场（停滞分支：销毁自取节点、置 exited，不写任何簿记）；
+    // 池仍可接受并完成新任务（shutdown 的停滞有界等待保证 deinit 前其已真正退出）
+    probe.stop.store(true, .release);
+    var after = TestCtx{};
+    try testing.expect(rt.submit(.{ .run = TestCtx.bump, .ctx = &after }));
+    done = false;
+    for (0..120) |_| {
+        if (after.counter.load(.acquire) == 1) {
+            done = true;
+            break;
+        }
+        tSleepMs(5);
+    }
+    try testing.expect(done);
+    // defer 的 shutdown：跳过已 detach 停滞 worker 的 join，干净返回即证明无悬挂
+}
+
+test "runtime: stall 启用但无卡死任务 → 不误杀、stall_count 保持 0、停机干净" {
+    var ctx = TestCtx{};
+    const rt = try Runtime.init(std.heap.c_allocator, .{
+        .min_workers = 2,
+        .max_workers = 4,
+        .stall_timeout_ns = 200 * std.time.ns_per_ms,
+    });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    const n = 300;
+    var submitted: usize = 0;
+    for (0..n) |_| {
+        if (rt.submit(.{ .run = TestCtx.bump, .ctx = &ctx })) submitted += 1;
+    }
+    try testing.expectEqual(n, submitted);
+    rt.waitIdle(); // 短任务全部瞬时完成，不应触发任何停滞判定
+    try testing.expectEqual(@as(u32, @intCast(submitted)), ctx.counter.load(.acquire));
+    try testing.expectEqual(@as(usize, 0), rt.stall_count.load(.acquire));
     rt.shutdown();
 }
 
