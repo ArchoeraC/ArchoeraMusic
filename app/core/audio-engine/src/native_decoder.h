@@ -76,6 +76,27 @@ const char *native_decoder_codec_name(const NativeDecoder *d);
 /** 关闭并释放（d 为 NULL 时为空操作） */
 void native_decoder_close(NativeDecoder *d);
 
+/* ── 常驻内核池接入（S1，opt-in：mediaengine_lib 引擎线程在
+ *   engine_mode==EraAudio 且 getenv("ARCHOERA_ERA_POOL") 时调用；池启用后
+ *   native_decoder_open 改走 zk_engine_open 流式 seam，否则沿用 zk_decoder_*）── */
+
+/**
+ * 启动常驻内核池（zk_engine_init；幂等：已启用直接返回 0）。
+ * @return 0 成功；-1 失败（调用方继续旧路径——g_pool 保持 NULL）。
+ */
+int native_decoder_pool_begin(int min_workers, int max_workers, int cap_tasks);
+
+/** 停机并释放常驻内核池（zk_engine_shutdown + 置空；未启用时空操作）。
+ *  调用方须保证池上已无打开会话（open 的流经 native_decoder_close 已关闭）。 */
+void native_decoder_pool_end(void);
+
+/** 测试访问器：池是否已启用（g_pool 非 NULL）。 */
+int native_decoder_pool_active(void);
+
+/** 测试访问器：进程内累计走 stream seam 的 open 次数（池启用的 open 命中即 +1，
+ *  一直累加不回落；供测试证明 gated 引擎路径确实执行、env 关闭时不增加）。 */
+long long native_decoder_stream_opens(void);
+
 #ifdef __cplusplus
 }
 #endif

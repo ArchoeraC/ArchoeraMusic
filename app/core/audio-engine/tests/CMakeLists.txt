@@ -189,3 +189,30 @@ target_include_directories(test_engine_pool PRIVATE
 add_test(NAME test_engine_pool COMMAND test_engine_pool)
 set_tests_properties(test_engine_pool PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# S1 常驻内核池（zk_engine 流式 seam）接线回归（headless）：同一 fixture 跑两遍
+# headless 内存模式引擎（ARCHOERA_MEMORY_HEADLESS、engine_mode=1、无设备）——
+# 一遍 ARCHOERA_ERA_POOL=1（池路径）、一遍不设（默认 zk_decoder 参照），断言
+# 整曲 PCM 逐位一致 + 池 gating 确实执行（stream_opens 计数）。同 test_memory_mode：
+# 直接编译 mediaengine_lib.c + tempo.c stub。
+add_executable(test_pool_pipeline test_pool_pipeline.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/mediaengine_lib.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tempo.c
+)
+target_link_libraries(test_pool_pipeline PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_pool_pipeline PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_pool_pipeline PRIVATE m)
+endif()
+target_include_directories(test_pool_pipeline PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_pool_pipeline
+         COMMAND test_pool_pipeline
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fallback_pcm.mov)
+set_tests_properties(test_pool_pipeline PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")

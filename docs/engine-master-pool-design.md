@@ -820,9 +820,17 @@ per-context 思路一致（**EraAudio 相对 FFmpeg 的对称**）；async 主�
 > 7. ✖ §3 冷/热启动 wall 基准落表 vs FFmpeg（Benchmark 部分，另行）。
 > 8. △ §7/§9③⑤/FFI：接入已开第一刀——`zk_engine_init/shutdown/decode_once` +
 >    流式 `zk_engine_open/read/seek_ms/position_ms/close`（kernel_bridge.h，加法式，C 侧对照
->    测试 test_engine_pool == sync 逐样本）；播放迁池替 C 壳 / scanner 128/tag 仍属后续接入；
->    Windows/MSVC 链接验证归 Windows CI。
+>    测试 test_engine_pool == sync 逐样本）；播放迁池 S1（native_decoder 解码源换流式
+>    seam，ARCHOERA_ERA_POOL 门控默认关，headless A/B == 逐位 + 失败语义对齐
+>    sync==stream==decode_once）已落；scanner 128/tag 仍属后续接入；Windows/MSVC
+>    链接验证归 Windows CI。
 
+> 进度（2026-09-09）：接入 S1 已落——`zk_engine_*` seam（decode_once + 流式会话）加
+>   kernel_bridge.h；C 壳 `native_decoder.c` 解码源可在 `ARCHOERA_ERA_POOL` 下切到流式
+>   seam（headless A/B 逐位一致 + 失败语义 sync==stream==once==decode_once；SegStore 会话
+>   排除）；**A1 默认开启已本地评估**（默认 pool-on 与 ARCHOERA_ERA_POOL=0 全 ctest 绿）；
+>   **A3 FFmpeg 回退端到端**：pool-on 下 .mov(PCM) Zig 不接管 → 回退 FFmpeg 成功且未走池；
+>   A2 scanner/zk_metadata 仍未做；本文件 §9①-②/内部能力/加固均已绿。
 > 进度（2026-09-09）：① 完成（registry.zig + decoder 表驱动 + panic 审计，622 测试全绿）；
 > ②/内部打磨（均不接生产线）完成：runtime.zig（Master 停机/懒就绪协调 + 同质 worker +
 > 完成即领 + 大 batch 排空）、**worker 状态注册表接入 runtime**（每 worker 开工 busy/完工

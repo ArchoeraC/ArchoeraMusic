@@ -30,10 +30,43 @@
 
 #include "../include/kernel_bridge.h"
 
+/* S1 常驻内核池（opt-in）：mediaengine_lib 引擎线程在 ARCHOERA_ERA_POOL 时经
+ * native_decoder_pool_begin/end 托管；g_pool 非 NULL 时 native_decoder_open 改走
+ * zk_engine_open 流式 seam（同一 ZkInfo/errbuf 契约），否则沿用 zk_decoder_*。 */
+static ZkEngine *g_pool;
+static long long g_stream_opens; /* 池路径 open 累计（测试访问器，单调递增） */
+
 struct NativeDecoder {
     ZkDecoder *zk;
     ZkInfo info;
+    ZkEngineStream *stream; /* 池 stream seam 句柄（is_stream 时使用） */
+    int is_stream;
 };
+
+int native_decoder_pool_begin(int min_w, int max_w, int cap)
+{
+    if (g_pool) return 0; /* 幂等 */
+    g_pool = zk_engine_init(min_w, max_w, cap);
+    return g_pool ? 0 : -1;
+}
+
+void native_decoder_pool_end(void)
+{
+    if (g_pool) {
+        zk_engine_shutdown(g_pool);
+        g_pool = NULL;
+    }
+}
+
+int native_decoder_pool_active(void)
+{
+    return g_pool ? 1 : 0;
+}
+
+long long native_decoder_stream_opens(void)
+{
+    return g_stream_opens;
+}
 
 bool native_decoder_available(void)
 {
@@ -54,20 +87,39 @@ NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
     if (!path) return NULL;
 
     ZkInfo zinfo;
-    memset(&zinfo, 0, sizeof(zinfo));
     char eb[512];
-    ZkDecoder *zk = zk_decoder_open(path, &zinfo, eb, (int)sizeof(eb));
-    if (!zk) {
-        if (status_out) *status_out = read_le32_status(eb);
-        if (errbuf && errbuf_size > 0) {
-            snprintf(errbuf, errbuf_size, "%s", eb + 4);
+    ZkDecoder *zk = NULL;
+    ZkEngineStream *st = NULL;
+    NativeDecoder *d;
+    memset(&zinfo, 0, sizeof(zinfo));
+    memset(eb, 0, sizeof(eb));
+
+    if (g_pool) {
+        /* S1 池路径：流式 seam（同一 errbuf 契约：errbuf[0..4] LE int32 状态码） */
+        st = zk_engine_open(g_pool, path, &zinfo, eb, sizeof(eb));
+        if (!st) {
+            if (status_out) *status_out = read_le32_status(eb);
+            if (errbuf && errbuf_size > 0) {
+                snprintf(errbuf, errbuf_size, "%s", eb + 4);
+            }
+            return NULL;
         }
-        return NULL;
+        g_stream_opens++;
+    } else {
+        zk = zk_decoder_open(path, &zinfo, eb, (int)sizeof(eb));
+        if (!zk) {
+            if (status_out) *status_out = read_le32_status(eb);
+            if (errbuf && errbuf_size > 0) {
+                snprintf(errbuf, errbuf_size, "%s", eb + 4);
+            }
+            return NULL;
+        }
     }
 
-    NativeDecoder *d = (NativeDecoder *)calloc(1, sizeof(*d));
+    d = (NativeDecoder *)calloc(1, sizeof(*d));
     if (!d) {
-        zk_decoder_close(zk);
+        if (zk) zk_decoder_close(zk);
+        if (st) zk_engine_close(st);
         if (status_out) *status_out = 7; /* ZK_OUT_OF_MEMORY */
         if (errbuf && errbuf_size > 0) {
             snprintf(errbuf, errbuf_size, "out of memory");
@@ -75,6 +127,8 @@ NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
         return NULL;
     }
     d->zk = zk;
+    d->stream = st;
+    d->is_stream = (st != NULL);
     d->info = zinfo;
 
     if (status_out) *status_out = 0;
@@ -95,10 +149,15 @@ int native_decoder_read(NativeDecoder *d, float *out, int max_frames,
 {
     if (!d || !out || !out_channels || max_frames <= 0) return -1;
     int oc = 0;
-    /* zk_decoder_read：>=0 为帧数（0=EOF），<0 为错误（负 ZkStatus 状态码）。
+    /* zk_*_read：>=0 为帧数（0=EOF），<0 为错误（负 ZkStatus 状态码）。
      * 错误经负值上报（zk 不再把解码错误吞成 0），C 壳据此让 pipeline 报错，
      * 而非把坏帧静默当 EOF 截断。 */
-    long long frames = zk_decoder_read(d->zk, out, (size_t)max_frames, &oc);
+    long long frames;
+    if (d->is_stream) {
+        frames = zk_engine_read(d->stream, out, (size_t)max_frames, &oc);
+    } else {
+        frames = zk_decoder_read(d->zk, out, (size_t)max_frames, &oc);
+    }
     *out_channels = oc;
     if (frames < 0) return (int)frames; /* <0：解码错误（-ZkStatus），与 EOF 区分 */
     return (int)frames;
@@ -107,6 +166,9 @@ int native_decoder_read(NativeDecoder *d, float *out, int max_frames,
 int native_decoder_seek_ms(NativeDecoder *d, int64_t ms)
 {
     if (!d) return -1;
+    if (d->is_stream) {
+        return zk_engine_seek_ms(d->stream, (long long)ms) == 0 ? 0 : -1;
+    }
     return zk_decoder_seek_ms(d->zk, (long long)ms) == 0 ? 0 : -1;
 }
 
@@ -134,13 +196,37 @@ const char *native_decoder_codec_name(const NativeDecoder *d)
 void native_decoder_close(NativeDecoder *d)
 {
     if (!d) return;
-    if (d->zk) zk_decoder_close(d->zk);
+    if (d->is_stream) {
+        if (d->stream) zk_engine_close(d->stream);
+    } else if (d->zk) {
+        zk_decoder_close(d->zk);
+    }
     free(d);
 }
 
 #else /* !HAS_ARCHOERA_KERNEL：内核未链接，编译期空实现（保持可编过） */
 
 struct NativeDecoder { int _unused; };
+
+int native_decoder_pool_begin(int min_w, int max_w, int cap)
+{
+    (void)min_w; (void)max_w; (void)cap;
+    return -1; /* 无内核：池不可用，调用方沿用旧路径 */
+}
+
+void native_decoder_pool_end(void)
+{
+}
+
+int native_decoder_pool_active(void)
+{
+    return 0;
+}
+
+long long native_decoder_stream_opens(void)
+{
+    return 0;
+}
 
 bool native_decoder_available(void)
 {

@@ -23,6 +23,7 @@
 #include "audio_engine.h"
 #include "player.h"
 #include "archoera_mediaengine.h"
+#include "native_decoder.h"
 
 /* ── UTF-8 安全 fopen（Windows 宽字符边界）──────────────────────
    会话目录 / 临时文件路径由 Dart 以 UTF-8 传入（%TEMP% 可能含中文用户名）。
@@ -1100,6 +1101,24 @@ static int mediaengine_stream_run(ArchoeraMediaEngine *e)
 static void *engine_thread(void *arg)
 {
     ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)arg;
+    int pool_on = 0;
+
+    /* S1 常驻内核池（默认开启）：EraAudio 原生（engine_mode==1）且源为磁盘文件
+     * （非 SegStore 会话）时走 zk_engine 流式 seam；ARCHOERA_ERA_POOL=0 可关闭
+     * （A/B 回退）；失败（含内核未链接）继续旧 zk_decoder 路径，回退语义完全不变。 */
+    if (e->cfg.engine_mode == 1 && !e->store && e->source) {
+        const char *pool_env = getenv("ARCHOERA_ERA_POOL");
+        if (pool_env == NULL || pool_env[0] != '0') {
+            if (native_decoder_pool_begin(1, 2, 16) == 0) {
+                pool_on = 1;
+                fprintf(stderr,
+                    "[mediaengine] EraAudio 常驻内核池已启用 (ARCHOERA_ERA_POOL)\n");
+            } else {
+                fprintf(stderr,
+                    "[mediaengine] EraAudio 常驻内核池启用失败 → 沿用旧 zk_decoder 路径\n");
+            }
+        }
+    }
 
     /* pipeline_create / pipeline_create_store 在引擎线程执行：avformat_open_input
        对网络源是阻塞 IO，在 Dart isolate 线程执行会被 VM 中断信号打断（poll/recv
@@ -1121,6 +1140,7 @@ static void *engine_thread(void *arg)
         ev_enqueue(e, err);
         ev_enqueue(e, "{\"type\":\"exited\",\"code\":-1}");
         e->done = 1;
+        if (pool_on) native_decoder_pool_end(); /* 无流打开，可直接停池 */
         return NULL;
     }
 
@@ -1291,9 +1311,15 @@ static void *engine_thread(void *arg)
     if (e->p) { pipeline_destroy(e->p); e->p = NULL; }
 
 mem_exit:
+    /* 汇合点统一收尾。S1 池会话须先关流再停池：内存播放模式路径以 goto 直达此
+     * 处、其上未销毁管线（非池会话保持既有行为不动），池会话在此补销毁，保证
+     * native_decoder_close（→zk_engine_close）先于 native_decoder_pool_end
+     * （→zk_engine_shutdown）。非池会话此处 e->p 已在上方销毁，恒为空操作。 */
+    if (pool_on && e->p) { pipeline_destroy(e->p); e->p = NULL; }
     char exited[64];
     snprintf(exited, sizeof(exited), "{\"type\":\"exited\",\"code\":%d}", code);
     ev_enqueue(e, exited);
+    if (pool_on) native_decoder_pool_end();
 
     e->done = 1;
     return NULL;
