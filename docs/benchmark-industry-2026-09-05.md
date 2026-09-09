@@ -248,3 +248,21 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng \
 - FLAC io 前瞻缓存修复后重跑 scorecard（`tests/bench/SCORE_2026-09-06.md` / data/SCORE_2026-09-06.csv，语料标准集）：
   flac 由 97.9(A+，speed 欠分) → **100.0(A+)**；EraAudio 平均总分 **95.6 → 95.7**（相对 Stable/FFmpeg 97.6 = **98.1%**，Δ-1.9）。
 - 短板的“flac 直解慢”已消除（见 docs/engine-integration-bench.md §10）；本报告主表为 2026-09-05 快照，重跑命令见 §4/scorecard.py。
+
+
+## 2026-09-10 更新（常驻内核池 score 口径扩测：并发/混杂/资源入分）
+
+- 定位：面向「常驻内核池（Master+worker）生产形态」的**并发/混杂/首帧/资源**基准，与上表
+  单流 ×RT 口径互补；报告产物见 `app/core/audio-engine/tests/bench/`：
+  - `REPORT_ERA_POOL_2026-09-10.md`（首刀：单流/并发伸缩/均布混杂/冷热首帧；headless 静音）
+  - `REPORT_ERA_POOL_SCORE_2026-09-10.md`（scorecard 口径：**FFmpeg=100**，
+    score=100·speed^0.6·(0.5cpu+0.5mem)^0.4；每项 5 轮去一最高一最低取平均）
+- 工具（可复现）：`run_era_pool_bench.py` / `run_era_pool_score.py` / `_reswrap.py` /
+  `bench_era_pool.c`（C，headless 经 zk_engine seam）；并发上限 **24**（本机内存受限）。
+- 要点结果：单格式平均 132.1（opus/ac3≈105–108，wav≈218 最优）；并发 N=24 总分 334.8
+  （era wall ≈44ms vs ffmpeg 91ms，era CPU 0.13s vs 1.54s，RSS ~37 vs ~53.5MB）；
+  混杂 N=24 = 321.5。
+- 口径/诚实：**机器无真实录音** → score 语料采用可复现「音乐结构仿真」曲目（和声/旋律/颤音/
+  低噪，6/9/12s，44.1k 立体声），非版权；跨机请比 ×RT/加速比/分差方向而非毫秒。
+- 说明：ffmpeg 测量为 N 进程并发、含进程启动；era 为单进程常驻池。与上表（scorecard 200s
+  噪声语料、单流 50×RT 封顶）是两套口径，不可直接互换。
