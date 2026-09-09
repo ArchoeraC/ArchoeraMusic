@@ -102,6 +102,13 @@ typedef struct ZkEngine ZkEngine;
  */
 ZkEngine *zk_engine_init(int min_workers, int max_workers, int cap_tasks);
 
+/**
+ * 同 zk_engine_init，另指定流式会话并发上限 max_streams（§6.3 硬计数；缺省
+ * zk_engine_init 用默认 8）。流计数与 cap_tasks 任务槽分开记账。
+ */
+ZkEngine *zk_engine_init_streams(int min_workers, int max_workers,
+                                 int cap_tasks, int max_streams);
+
 /** 停机并释放常驻内核；h 为 NULL 时空操作（停机排空并 join 全部线程）。 */
 void zk_engine_shutdown(ZkEngine *h);
 

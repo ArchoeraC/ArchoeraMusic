@@ -122,6 +122,38 @@ int main(int argc, char **argv) {
     if (err_n >= 0) { fprintf(stderr, "expected negative on missing file, got %lld\n", err_n); return 1; }
     printf("missing file → status %lld OK\n", -err_n);
 
+    /* 3b) 失败语义对齐：不可解码文件两路一致（决定 pipeline FFmpeg 回退判定的输入）
+     *     zk_decoder_open == NULL / zk_engine_open == NULL 且状态码同为 ZK_UNSUPPORTED；
+     *     decode_once 返回同号负码。 */
+    {
+        const char *bad = "zkpool_bad.txt";
+        FILE *f = fopen(bad, "wb");
+        if (!f) return 1;
+        fputs("not-an-audio-file-at-all", f);
+        fclose(f);
+        char eb1[64], eb2[64];
+        ZkInfo bi;
+        memset(&bi, 0, sizeof bi);
+        ZkDecoder *sd = zk_decoder_open(bad, &bi, eb1, sizeof eb1);
+        int s1 = (sd == NULL) ? (int)((unsigned char)eb1[0] | ((unsigned char)eb1[1] << 8) |
+                                     ((unsigned char)eb1[2] << 16) | ((unsigned char)eb1[3] << 24)) : 0;
+        ZkEngineStream *ss2 = zk_engine_open(h, bad, NULL, eb2, sizeof eb2);
+        int s2 = (ss2 == NULL) ? (int)((unsigned char)eb2[0] | ((unsigned char)eb2[1] << 8) |
+                                       ((unsigned char)eb2[2] << 16) | ((unsigned char)eb2[3] << 24)) : 0;
+        long long once = zk_engine_decode_once(h, bad, tmp, 8, &tmp_ch, NULL);
+        if (sd != NULL || ss2 != NULL) { fprintf(stderr, "unsupported file should fail open\n"); return 1; }
+        if (s1 != ZK_UNSUPPORTED || s2 != ZK_UNSUPPORTED || s1 != s2) {
+            fprintf(stderr, "failure-status mismatch sync=%d stream=%d\n", s1, s2);
+            return 1;
+        }
+        if (once != -((long long)ZK_UNSUPPORTED)) {
+            fprintf(stderr, "decode_once unsupported code mismatch: %lld\n", once);
+            return 1;
+        }
+        printf("failure alignment sync==stream==decode_once (status %d) OK\n", s1);
+        remove(bad);
+    }
+
     /* 4) 并发 2 线程 decode_once */
     pthread_t t1, t2;
     if (pthread_create(&t1, NULL, worker_dec, (void *)path) != 0) return 1;
@@ -135,8 +167,7 @@ int main(int argc, char **argv) {
     /* 5) 流式会话：逐块拉取 == sync 参考；seek 后继续可读 */
     ZkInfo s_info;
     char ebuf[64];
-    ZkEngineStream *ss = zk_engine_open(h, path, &s_info, ebuf, sizeof ebuf);
-    if (!ss) { fprintf(stderr, "zk_engine_open failed\n"); return 1; }
+    ZkEngineStream *ss = zk_engine_open(h, path, &s_info, ebuf, sizeof ebuf);    if (!ss) { fprintf(stderr, "zk_engine_open failed\n"); return 1; }
     if (s_info.sample_rate != SR) { fprintf(stderr, "stream info sr=%d\n", s_info.sample_rate); return 1; }
     {
         float chunk[16];
@@ -169,6 +200,27 @@ int main(int argc, char **argv) {
         printf("stream seek→read OK\n");
     }
     zk_engine_close(ss);
+
+    /* 6) F9 max_streams 硬计数：独立引擎（上限 2）开两个流 ok，第三个返回 NULL
+     *    （streamOpen false），关一个后第三个再开成功；流计数与任务槽分开记账。 */
+    {
+        ZkEngine *hs = zk_engine_init_streams(1, 2, 8, 2);
+        if (!hs) { fprintf(stderr, "zk_engine_init_streams failed\n"); return 1; }
+        ZkInfo si1, si2, si3;
+        char se[64];
+        ZkEngineStream *s1 = zk_engine_open(hs, path, &si1, se, sizeof se);
+        ZkEngineStream *s2 = zk_engine_open(hs, path, &si2, se, sizeof se);
+        ZkEngineStream *s3 = zk_engine_open(hs, path, &si3, se, sizeof se);
+        if (!s1 || !s2) { fprintf(stderr, "stream open within max_streams failed\n"); return 1; }
+        if (s3 != NULL) { fprintf(stderr, "3rd stream should be rejected at max_streams=2\n"); return 1; }
+        zk_engine_close(s1);
+        ZkEngineStream *s3b = zk_engine_open(hs, path, &si3, se, sizeof se);
+        if (!s3b) { fprintf(stderr, "reopen after close should succeed\n"); return 1; }
+        zk_engine_close(s2);
+        zk_engine_close(s3b);
+        zk_engine_shutdown(hs);
+        printf("max_streams=2 hard count (2 open → 3rd NULL → close → reopen OK) OK\n");
+    }
 
     zk_engine_shutdown(h);
     free(pool);
