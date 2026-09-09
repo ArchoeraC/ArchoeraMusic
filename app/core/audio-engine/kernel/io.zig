@@ -70,9 +70,9 @@ pub const Reader = struct {
     /// 缓存中有效字节数（0 = 无效）
     file_cache_len: usize = 0,
 
-    /// 打开本地文件（file 形态）
-    pub fn openPath(path: []const u8) Error!Reader {
-        const io = std.Io.Threaded.global_single_threaded.io();
+    /// 打开本地文件（file 形态；用调用方传入的 Io——sync 直通/测试给全局实例，
+    /// task 接线时 Pool worker 可传自己的每线程 Io）
+    pub fn openPathWith(io: std.Io, path: []const u8) Error!Reader {
         const file = std.Io.Dir.openFile(.cwd(), io, path, .{}) catch return error.OpenFailed;
         return .{
             .kind = .file,
@@ -80,6 +80,11 @@ pub const Reader = struct {
             .io = io,
             .size_hint = std.Io.File.length(file, io) catch 0,
         };
+    }
+
+    /// 打开本地文件（file 形态；便捷入口，使用进程全局单线程 Io 实例）
+    pub fn openPath(path: []const u8) Error!Reader {
+        return openPathWith(std.Io.Threaded.global_single_threaded.io(), path);
     }
 
     /// 以内存切片构造（零拷贝、零分配）

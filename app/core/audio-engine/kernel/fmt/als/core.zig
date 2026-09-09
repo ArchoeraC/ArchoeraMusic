@@ -357,6 +357,12 @@ pub const Decoder = struct {
         const frame_length: u32 = br.readBits(16) + 1;
         const ra_distance: u32 = br.readBits(8);
         const ra_flag: u32 = br.readBits(2);
+        const ra_flag_e: RaFlag = switch (ra_flag) {
+            0 => .none,
+            1 => .frames,
+            2 => .header,
+            else => return error.Corrupt, // 保留值 3（§5.2 层1：输入可达必须走 error）
+        };
         const adapt_order = br.readBit() != 0;
         const coef_table: u32 = br.readBits(2);
         const ltp = br.readBit() != 0;
@@ -383,7 +389,7 @@ pub const Decoder = struct {
             .msb_first = msb_first,
             .frame_length = frame_length,
             .ra_distance = @intCast(ra_distance),
-            .ra_flag = @enumFromInt(ra_flag),
+            .ra_flag = ra_flag_e,
             .adapt_order = adapt_order,
             .coef_table = @intCast(coef_table),
             .long_term_prediction = ltp,

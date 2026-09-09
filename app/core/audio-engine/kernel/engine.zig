@@ -7,8 +7,10 @@
 //! 本模块承载 `zk_*` 的全部实现（`kernel.zig` 只做 `export fn` 薄包装），
 //! 管线：`decoder.open`（probe → 工厂）→ `pcm/convert.zig`（原生 → float32 交错）。
 //!
-//! 线程模型（§16.1）：本模块**不持线程**，纯函数式被 C 壳（mediaengine_lib.c
-//! 引擎线程）调用；`Engine` 即 C 侧不透明指针 `ZkDecoder`。
+//! 线程模型（§16.1，修订 2026-09-09）：本模块承载 `zk_*` **sync 直通**——**本身不持线程**，
+//! 纯 Sync 被调用线程驱动（C 壳 mediaengine_lib.c 引擎线程，作回归/调试基线，engine-master-
+//! pool-design.md §7）；内核整体的线程（Master 事件线程 + Pool worker）由 kernel_init 自持，
+//! 见 docs/engine-master-pool-design.md §2.1/§3.1。`Engine` 即 C 侧不透明指针 `ZkDecoder`。
 //!
 //! 内存：统一使用 `std.heap.c_allocator`（宿主 CRT 的 malloc/free），静态库
 //! 被 C 壳链接时符号由最终链接器解析，跨 CRT 安全（§16.2）。
@@ -109,33 +111,47 @@ fn metaPtr(s: ?[:0]const u8) ?[*:0]const u8 {
 ///     （如 -@intFromEnum(Status.corrupt) = -3），调用方应报错而非按 EOF 处理。
 /// `out_channels` 输出本帧实际声道数（任何返回值下都有效）。
 pub fn zkRead(d: *Engine, out: [*]f32, max_frames: usize, out_channels: *c_int) isize {
-    const frame_bytes = @as(usize, d.info.channels) * (@as(usize, d.info.bits_per_sample) / 8);
-    out_channels.* = @intCast(d.info.channels);
+    // 位深护栏（§5.2 层1：convert 只接受 8/16/24/32/64，违约位深在 FFI 面拦下，
+    // 不让任何 codec 契约外位深触达 pcm/convert 的 else 分支）
+    switch (d.info.bits_per_sample) {
+        8, 16, 24, 32, 64 => {},
+        else => return -@as(isize, @intFromEnum(err.Status.corrupt)),
+    }
+    const channels = d.info.channels;
+    const bytes_per = @as(usize, d.info.bits_per_sample) / 8;
+    const frame_bytes = @as(usize, channels) * bytes_per; // u8×8 定界，无溢出
+    out_channels.* = @intCast(channels);
     if (max_frames == 0 or frame_bytes == 0) return 0;
 
-    const want = max_frames * frame_bytes;
+    // 单次解码上限 + checked 乘法：防 FFI 传入畸形 max_frames/channels 造成溢出或
+    // 巨量分配（接线不匹配不 panic/不内存打爆；正常播放块远小于该上限）
+    const frames_cap: usize = 1 << 20;
+    const frames = @min(max_frames, frames_cap);
+    const want = std.math.mul(usize, frames, frame_bytes) catch
+        return -@as(isize, @intFromEnum(err.Status.io_error));
+
     if (d.raw.len < want) {
         d.raw = d.allocator.realloc(d.raw, want) catch {
             return -@as(isize, @intFromEnum(err.Status.out_of_memory));
         };
     }
     var ch: u8 = 0;
-    const frames = d.dec.read(d.raw[0..want], max_frames, &ch) catch |e| {
+    const n = d.dec.read(d.raw[0..want], frames, &ch) catch |e| {
         // 解码错误必须与 EOF 区分：错误经负状态码上报（EOF 是 read 返回 0 帧）。
         // 此前把错误吞成 0 = EOF，导致坏帧/损坏文件被静默截断输出。
         return -@as(isize, @intFromEnum(err.statusOf(e)));
     };
     out_channels.* = @intCast(ch);
-    if (frames == 0) return 0;
-    const samples = frames * ch;
+    if (n == 0) return 0;
+    const samples = @as(usize, n) * ch; // n ≤ 1<<20 × u8，定界安全
     _ = convert.toFloat(
         out[0..samples],
-        d.raw[0 .. frames * frame_bytes],
+        d.raw[0 .. n * frame_bytes],
         d.info.bits_per_sample,
         d.info.is_float,
         endianOf(d.info),
     );
-    return @intCast(frames);
+    return @intCast(n);
 }
 
 /// 跳转到指定毫秒位置；返回 0 = 成功，非 0 = 稳定状态码（err.Status）

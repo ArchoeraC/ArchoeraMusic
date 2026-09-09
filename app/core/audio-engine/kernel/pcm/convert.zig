@@ -20,6 +20,7 @@
 //! 返回实际转换的样本数（不足一整个样本的尾部忽略）。
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 /// 将原生交错 PCM 转换为 float32 交错，返回写入 `out` 的样本数。
 /// 调用方保证 `out.len >= src.len / (bits/8)`。
@@ -89,7 +90,12 @@ pub fn toFloat(
                 }
             }
         },
-        else => unreachable, // fmt 校验层（validateFormat）已排除其它位深
+        else => {
+            // 契约外位深：测试/安全检查档抓到违约（unreachable），ReleaseFast 绝不 panic
+            // （生产由 zkRead 位深护栏/调用方拦截先行；此处兜底为不转换）。
+            if (comptime builtin.mode == .Debug or builtin.mode == .ReleaseSafe) unreachable;
+            return 0;
+        },
     }
     return n;
 }

@@ -91,6 +91,54 @@ long long zk_decoder_position_ms(ZkDecoder *d);
 /** 释放解码会话（含底层文件句柄与全部缓冲）；d 为 NULL 时为空操作 */
 void zk_decoder_close(ZkDecoder *d);
 
+/* ---- 常驻内核接入 seam（§7 async 主干；加法式，不改动既有路径）---- */
+
+/** 常驻内核句柄（不透明；内核池 + 定容任务槽，见 docs/engine-master-pool-design.md） */
+typedef struct ZkEngine ZkEngine;
+
+/**
+ * 初始化常驻内核（池 min_workers..max_workers + cap_tasks 任务槽）。
+ * @return 句柄；失败（非法参数 / 启动失败）返回 NULL。
+ */
+ZkEngine *zk_engine_init(int min_workers, int max_workers, int cap_tasks);
+
+/** 停机并释放常驻内核；h 为 NULL 时空操作（停机排空并 join 全部线程）。 */
+void zk_engine_shutdown(ZkEngine *h);
+
+/**
+ * 池内一次性解码到 out（float32 交错，最多 max_frames 帧）。
+ * 表面同步、内里异步：阻塞至完工，内部由内核池并行执行。
+ * @return >=0 实际帧数（0=EOF）；<0 = -（enum ZkStatus）。
+ *         out_channels 输出实际声道数；info 非空则填充解码源信息（最小字段）。
+ *         调用方保证 out 可容纳 max_frames × 最大声道（契约 ≤8）。
+ */
+long long zk_engine_decode_once(ZkEngine *h, const char *path,
+                                float *out, size_t max_frames,
+                                int *out_channels, ZkInfo *info);
+
+/** 流式会话句柄（句柄常驻、逐块拉取、池内执行；朝播放迁池 §6.3） */
+typedef struct ZkEngineStream ZkEngineStream;
+
+/** 打开流式会话（池 worker 上 probe+open 一次）。失败返回 NULL 并写 errbuf 状态码。 */
+ZkEngineStream *zk_engine_open(ZkEngine *h, const char *path,
+                               ZkInfo *info, char *errbuf, size_t errbuf_size);
+
+/**
+ * 逐步拉块解码到 out（float32 交错，最多 max_frames 帧）。
+ * @return >=0 帧数（0=EOF）；<0 = -ZkStatus。out_channels 输出声道数。
+ */
+long long zk_engine_read(ZkEngineStream *s, float *out,
+                         size_t max_frames, int *out_channels);
+
+/** 跳转毫秒；0 = 成功，非 0 = ZkStatus */
+int zk_engine_seek_ms(ZkEngineStream *s, long long ms);
+
+/** 当前播放位置（毫秒） */
+long long zk_engine_position_ms(ZkEngineStream *s);
+
+/** 关闭会话（池内释放实例）；s 为 NULL 时空操作 */
+void zk_engine_close(ZkEngineStream *s);
+
 #ifdef __cplusplus
 }
 #endif

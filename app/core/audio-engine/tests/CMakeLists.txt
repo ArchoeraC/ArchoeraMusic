@@ -170,3 +170,22 @@ set_tests_properties(test_store_pipeline PROPERTIES
 
 # 集成测试（需要输入文件的跳过 CTEST，仅通过手动运行）
 # add_engine_test(test_pipeline test_pipeline.c)
+
+# 常驻内核接入 seam（zk_engine_*，§7 async 主干）对照回归：加法式，不触碰
+# mediaengine_lib/pipeline/player/纯内存路径。池内解码 == sync zk_decoder 逐样本。
+find_package(Threads QUIET)
+add_executable(test_engine_pool test_engine_pool.c)
+target_link_libraries(test_engine_pool PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_engine_pool PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_engine_pool PRIVATE m)
+endif()
+target_include_directories(test_engine_pool PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_engine_pool COMMAND test_engine_pool)
+set_tests_properties(test_engine_pool PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")

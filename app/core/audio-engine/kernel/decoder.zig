@@ -16,30 +16,7 @@ const std = @import("std");
 const Error = @import("error.zig").Error;
 const io = @import("io.zig");
 const probe = @import("probe.zig");
-const wav = @import("fmt/wav/lib.zig");
-const flac = @import("fmt/flac/lib.zig");
-const m4a = @import("fmt/m4a.zig");
-const mp3 = @import("fmt/mp3/lib.zig");
-const wv = @import("fmt/wv/lib.zig");
-const ape = @import("fmt/ape/lib.zig");
-const adts = @import("fmt/adts.zig");
-const latm = @import("fmt/latm.zig");
-const opus = @import("fmt/opus/lib.zig");
-const vorbis = @import("fmt/vorbis/lib.zig");
-const oggflac = @import("fmt/oggflac.zig");
-const dsd = @import("fmt/dsd.zig");
-const amr = @import("fmt/amr.zig");
-const amrwb = @import("fmt/amrwb/lib.zig");
-const ac3 = @import("fmt/ac3/lib.zig");
-const mlp = @import("fmt/mlp/lib.zig");
-const wma = @import("fmt/wma/lib.zig");
-const dts = @import("fmt/dts/lib.zig");
-const mka = @import("fmt/mka/lib.zig");
-const mpc = @import("fmt/mpc/lib.zig");
-const spx = @import("fmt/spx/lib.zig");
-const shn = @import("fmt/shn/lib.zig");
-const tak = @import("fmt/tak/lib.zig");
-const tta = @import("fmt/tta/lib.zig");
+const registry = @import("registry.zig");
 
 /// 时长精确度（§8.1）
 pub const DurationKnown = enum { exact, estimate, unknown };
@@ -182,46 +159,21 @@ pub const Decoder = struct {
     }
 };
 
-/// 打开解码器：probe 嗅探 → 格式工厂分发（§8.2）。
+/// 打开解码器：probe 嗅探 → Registry 分派（§8.2；格式工厂登记于 registry.zig）。
 /// 未接管 / 未开启的格式 → error.UnsupportedFormat（引擎回退 FFmpeg，§8.3）。
 ///
 /// `allocator` 供各格式模块分配上下文（当前 wav 为无分配路径，后续
 /// flac/ogg 等经此传入，见 §8.1「allocator：engine.zig 传入」）。
 pub fn open(allocator: std.mem.Allocator, path: []const u8, info: *Info) Error!Decoder {
-    var reader = try io.Reader.openPath(path);
+    return openWithIo(std.Io.Threaded.global_single_threaded.io(), allocator, path, info);
+}
+
+/// 带显式 Io 的 open（Pool worker 用各自每线程 Io 打开文件，见 §3 Zig 0.16 原语修订）
+pub fn openWithIo(io_inst: std.Io, allocator: std.mem.Allocator, path: []const u8, info: *Info) Error!Decoder {
+    var reader = try io.Reader.openPathWith(io_inst, path);
     errdefer reader.deinit();
     const fmt = try probe.probe(&reader);
-    return switch (fmt) {
-        .wav => wav.open(allocator, &reader, info),
-        .flac => flac.open(allocator, &reader, info),
-        .m4a => m4a.open(allocator, &reader, info),
-        .mp3 => mp3.open(allocator, &reader, info),
-        .wv => wv.open(allocator, &reader, info),
-        .ape => ape.open(allocator, &reader, info),
-        .ogg_opus => opus.open(allocator, &reader, info),
-        .ogg_vorbis => vorbis.open(allocator, &reader, info),
-        .ogg_flac => oggflac.open(allocator, &reader, info),
-        .dsd => dsd.open(allocator, &reader, info),
-        .amr => amr.open(allocator, &reader, info),
-        .amrwb => amrwb.open(allocator, &reader, info),
-        .ac3 => ac3.open(allocator, &reader, info),
-        .mlp => mlp.open(allocator, &reader, info),
-        .truehd => mlp.open(allocator, &reader, info),
-        .aac => adts.open(allocator, &reader, info),
-        .latm => latm.open(allocator, &reader, info),
-        .wma => wma.open(allocator, &reader, info),
-        .dts => dts.open(allocator, &reader, info),
-        .mka => mka.open(allocator, &reader, info),
-        .mpc => mpc.open(allocator, &reader, info),
-        .ogg_speex => spx.open(allocator, &reader, info),
-        .shn => shn.open(allocator, &reader, info),
-        .tak => tak.open(allocator, &reader, info),
-        .tta => tta.open(allocator, &reader, info),
-        // DTS：阶段一仅 probe/帧头解析（formats.dts 默认关，probe 已判
-        // unsupported）；即便开启也回退，直到阶段二完成 PCM 解码。
-        // 其余格式：probe 已按 §3.6 开关判定 unsupported，此处为编译期安全兜底
-        else => error.UnsupportedFormat,
-    };
+    return registry.dispatch(fmt, allocator, &reader, info);
 }
 
 // ---------------- 集成测试 ----------------

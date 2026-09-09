@@ -3,7 +3,9 @@
 > 2026-09-05 · 实验性定位 · 配套 `app/core/audio-engine/tests/bench/scorecard.py`
 > （一次跑完整矩阵 → CSV + 评分表 + 汇总 md）。
 > 关联：[engine-integration-bench.md](engine-integration-bench.md)（EOF/错误语义、内存流式化、
-> 样本数对齐、Opus「漂移」定档）、[format-support-matrix.md](format-support-matrix.md)（支持面）。
+> 样本数对齐、Opus「漂移」定档）、[format-support-matrix.md](format-support-matrix.md)（支持面）、
+> [decode-optimization.md](decode-optimization.md)（2026-09-09：逐格式 ×RT 差距分析与提速专项，
+> 本报告总表被 50× 实时封顶掩盖，看差距请以其逐格式口径为准）。
 
 本文不评判任何库的「好/坏」绝对优劣，只做**同一语料、同机、可复现**的行业横评，
 全部阈值与权重在文内写明，可原样重跑复核。文中数值 = 当前快照
