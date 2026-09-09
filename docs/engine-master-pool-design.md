@@ -812,11 +812,12 @@ per-context 思路一致（**EraAudio 相对 FFmpeg 的对称**）；async 主�
 >    无 kill）→ 线程替换/卡死重派无触发面，随 §5.2 停滞-detach（接线）引入。
 > 3. △ §6.3 kernel/session.zig 已落（分块串行长流 + seek + 会话 error/fatal）；ring 直推 /
 >    worker 亲和 / max_streams / waiting 停滞排除 = 播放接线面（✖，见 §5.2/§6.3）。
-> 4. △ §5.1 Master 当前纯事件（无 timed wait、无轮询）；「最早可回收点」定时兜底随 §5.5
->    回收专项（接线）接入。
+> 4. △ §5.1 定时兜底已落（stall_timeout_ns>0 时 Master 以 Io.Event.waitTimeout 睡到
+>    next tick，纯事件为快路径；=0 保持原纯事件行为）。
 > 5. ✖ §5.5 完整回收/调节器 deferred（§9④ hybrid，接线期；持锁 join 教训已记录）。
-> 6. ✖ §5.2 停滞检测（last_activity/stall_timeout）、detach、黑名单/难度预留 = 会话/看门狗
->    接线面（层1 纪律 + fuzz-lite 已立）。
+> 6. △ §5.2 停滞检测最小已落（runtime cfg.stall_timeout_ns>0 开启：Master 定时兜底扫描，
+>    长转 worker detach + 槽退役 + inflight 放弃，池继续可用；0=关字节一致）；黑名单/难度
+>    预留仍未做。
 > 7. ✖ §3 冷/热启动 wall 基准落表 vs FFmpeg（Benchmark 部分，另行）。
 > 8. △ §7/§9③⑤/FFI：接入已开第一刀——`zk_engine_init/shutdown/decode_once` +
 >    流式 `zk_engine_open/read/seek_ms/position_ms/close`（kernel_bridge.h，加法式，C 侧对照
