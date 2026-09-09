@@ -179,15 +179,30 @@ const Holder = struct {
     }
 };
 
+/// 阻塞到 `stop` 才完工的任务体：完工前槽必不释放 → cap/释放的时序断言与机器速度解耦。
+const BlockingHolder = struct {
+    task: task.Task,
+    stop: *std.atomic.Value(bool),
+    counter: *std.atomic.Value(u32),
+
+    fn blocked(t: *task.Task) void {
+        const bh: *BlockingHolder = @fieldParentPtr("task", t);
+        while (!bh.stop.load(.acquire)) std.Thread.yield() catch {};
+        _ = bh.counter.fetchAdd(1, .monotonic);
+    }
+};
+
 test "khost: cap 满即拒（InstanceLimit），完工自动释放槽后可再提交" {
     const h = try Host.init(std.heap.c_allocator, .{ .min_workers = 2, .max_workers = 4, .cap_tasks = 4 });
+    var gate = std.atomic.Value(bool).init(false);
+    var counter = std.atomic.Value(u32).init(0);
+    var holders: [4]BlockingHolder = undefined;
+    for (&holders) |*x| x.* = .{ .task = .{ .run = BlockingHolder.blocked }, .stop = &gate, .counter = &counter };
     defer {
+        gate.store(true, .release); // 无论走到哪先放行（防阻塞任务把 wait/shutdown 卡死）
         h.shutdown();
         h.deinit();
     }
-    var counter = std.atomic.Value(u32).init(0);
-    var holders: [4]Holder = undefined;
-    for (&holders) |*x| x.* = .{ .task = .{ .run = Holder.bump }, .counter = &counter };
 
     var ok: usize = 0;
     for (&holders) |*x| {
@@ -196,11 +211,14 @@ test "khost: cap 满即拒（InstanceLimit），完工自动释放槽后可再�
     try testing.expectEqual(@as(usize, 4), ok);
     try testing.expect(h.active() <= 4);
 
-    // 第 5 个 → InstanceLimit（null）
-    var extra = Holder{ .task = .{ .run = Holder.bump }, .counter = &counter };
+    // 第 5 个 → InstanceLimit（null）。4 个任务全阻塞、绝无槽提前释放 → 断言与时序无关。
+    var extra = BlockingHolder{ .task = .{ .run = BlockingHolder.blocked }, .stop = &gate, .counter = &counter };
     try testing.expect(h.submit(&extra.task) == null);
 
+    // 放行 → 4 槽自动释放 → 可再提交（cap 满即拒面与完工释放面都验证到）
+    gate.store(true, .release);
     for (&holders) |*x| task.wait(&x.task);
+    try testing.expectEqual(@as(usize, 0), h.active());
     try testing.expect(h.submit(&extra.task) != null); // 槽已自动释放
     task.wait(&extra.task);
     try testing.expectEqual(@as(u32, @intCast(ok + 1)), counter.load(.acquire));
