@@ -107,6 +107,14 @@ perf report  # 定位热循环 → 对照 §4 候选
   `benchmark-industry-2026-09-05.md`「2026-09-10 更新」与
   `app/core/audio-engine/tests/bench/REPORT_ERA_POOL_SCORE_2026-09-10.md`（FFmpeg=100、5 轮
   去极值、wall/CPU/RSS 入分）；动刀后可用同口径复测并发与单流。
+- **perf 结果（2026-09-10）**：`tests/bench/PERF_HOT_2026-09-10.md`——era 指令=Stable
+  2.1–3.4×（CPI 更低 0.26–0.31 vs 0.42–0.48 ⇒ 非低效而是**指令多**）。热区（自占比）：
+  flac `readBits` ~34% + `io.Reader.read` ~20%（位流≈50%）；aac `decodeIcs` ~39%（谱/
+  Huffman/去量化域，MDCT 系 ~11%）；mp3 `synthGranule` ~20% + `readImpl` ~19% + `imdct36`
+  ~7%（IMDCT+合成 ≈28%）；公共 `pcm.convert` 仅 ~2%（修正 §3.1 猜测）。Stable libavcodec
+  stripped 缺符号，仅总量对照。
+  建议动刀序（一次一个，§5 纪律）：①flac 位读批量取位/宽缓冲 → ②公共 Reader 大块预读 →
+  ③mp3 IMDCT/多相快速化 → ④aac 谱/Huffman/去量化查表 → ⑤aac MDCT 专用化。
 
 ## 7. 与当前工作的关系 / 排期
 
