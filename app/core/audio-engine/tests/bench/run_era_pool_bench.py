@@ -54,7 +54,7 @@ def main():
     A("")
     A("> 日期：%s · 方法：EraAudio = 单进程 `zk_engine` Host（worker 数=并发上限）；" % datetime.date.today().isoformat())
     A("> 基线 = 同 N 个 `ffmpeg -threads 1 -f null -` 并发解码（静音、不输出设备）。")
-    A("> 语料：sine 440Hz 3s 44.1k 立体声 × flac/m4a(aac)/mp3；内存受限 → 最高 %d 并发。" % args.maxN)
+    A("> 语料：sine 44.1k 立体声——3s × flac/m4a(aac)/mp3（§1-2）+ 0.25–6s × flac/m4a/mp3/ogg(opu/s)（§3b）；内存受限 → 最高 %d 并发。" % args.maxN)
     A("> 指标：墙钟 ms、合实时倍数 ×RT = 源总时长/墙钟；首帧 ms（冷含引擎 init / 热复用池）。")
     A("")
     dur = args.durations
@@ -102,6 +102,38 @@ def main():
         ew = float(el.split("wall_ms=")[1])
         fw = ffmpeg_parallel_wall(sel)
         A("| %d | %s | %.2f | %.1f× | %.2f | %.1f× |" % (n, comp[:40], ew, dur * n / max(ew, 1e-6) * 1000, fw, dur * n / max(fw, 1e-6) * 1000))
+    A("")
+
+    # 3b) 混杂：多格式 × 多时长（长/短交错，覆盖完成即领与弹性）
+    A("## 3b. 混杂并发：多格式 × 多时长（0.25–6s，长/短交错）")
+    A("")
+    A("| N | era wall ms | era ×RT(合计) | ffmpeg wall ms | ffmpeg ×RT(合计) |")
+    A("|---|---|---|---|---|")
+    # 从 corpus 取 d<ms>_<fmt> 文件，按时长/格式构建交错顺序
+    names = sorted(os.listdir(cor))
+    durs = {}
+    pool = []
+    for n in names:
+        if not n.startswith("d") or "_" not in n:
+            continue
+        ms = int(n[1:n.index("_")])
+        pool.append(os.path.join(cor, n))
+        durs[os.path.join(cor, n)] = ms / 1000.0
+    pool.sort(key=lambda x: durs[x])
+    # 构造"每轮时长递增再回绕"的交错序列，确保任意 N 前缀都含多时长多格式
+    seq = []
+    for start in range(0, len(pool)):
+        seq.append(pool[(start) % len(pool)])
+    for n in (8, 16, 24):
+        if n > args.maxN:
+            continue
+        sel = seq[:n]
+        tot = sum(durs[x] for x in sel)
+        el, _ = era_concurrency(sel, n)
+        ew = float(el.split("wall_ms=")[1])
+        fw = ffmpeg_parallel_wall(sel)
+        A("| %d | %.2f | %.1f× | %.2f | %.1f× |" %
+          (n, ew, tot / max(ew, 1e-6) * 1000, fw, tot / max(fw, 1e-6) * 1000))
     A("")
 
     # 4) 首帧（冷/热）：era（含/不含引擎 init）vs ffmpeg 会话级代理
