@@ -146,9 +146,8 @@ public static unsafe class ScannerFfi
             Interlocked.Exchange(ref _currentScanCts, cts);
             try
             {
-                // UnmanagedCallersOnly 不能 async；在后台线程执行异步引擎并阻塞等待
-                var result = Task.Run(() => engine.ScanAsync(dirs, cts.Token), cts.Token)
-                    .GetAwaiter().GetResult();
+                // 同步引擎入口（内部 Parallel.For + 专用写线程）；UnmanagedCallersOnly 直接调用
+                var result = engine.Scan(dirs, cts.Token);
                 SetUtf8(outResult, outLen,
                     ScannerJson.Result(result));
                 return 0;

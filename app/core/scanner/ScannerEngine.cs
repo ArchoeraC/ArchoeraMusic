@@ -7,7 +7,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Channels;
 using TagLibFile = TagLib.File;
 
 namespace Archoera.Scanner;
@@ -19,7 +18,7 @@ namespace Archoera.Scanner;
 /// 1. 递归收集目录下的音频文件（带安全限制，自动去重）
 /// 2. 全量/增量分流：全量清空重建，增量加载快照到内存
 /// 3. 用 TagLibSharp 并行解析元数据 + 提取封面 + 提取歌词
-/// 4. Channel 批量写入 SQLite（直写）
+/// 4. 有界队列批量写入 SQLite（直写）
 /// 5. 快照残留清理（已从磁盘删除的曲目）
 /// 6. trained 文件统一移入 quarantine 目录
 /// 7. 通过 stdout 输出 JSON 进度（TS 层监听）
@@ -132,7 +131,7 @@ public sealed class ScannerEngine
     ///   5. 快照残留 = 磁盘已删除 → 清理 DB 记录
     ///   6. trained 文件统一移入 quarantine 目录并清理 DB 记录
     /// </summary>
-    public async Task<ScanResult> ScanAsync(List<string> dirs, CancellationToken ct = default)
+    public ScanResult Scan(List<string> dirs, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
         var result = new ScanResult();
@@ -141,7 +140,7 @@ public sealed class ScannerEngine
 
         // 1. 收集文件（自动去重，防止重叠目录导致同一文件被处理两次）
         LogInfo($"开始扫描 (incremental={_incremental}, parallelism={_maxParallelism}): {string.Join(", ", dirs)}");
-        var files = await CollectFilesAsync(dirs, progress, ct);
+        var files = CollectFiles(dirs, progress, ct);
         if (files.Count > _maxScanFiles)
         {
             LogWarn($"文件数量 {files.Count} 超过上限 {_maxScanFiles}，将截断处理");
@@ -173,13 +172,11 @@ public sealed class ScannerEngine
             catch (Exception ex) { LogWarn($"清空 staging 失败: {ex.Message}"); }
         }
 
-        // 4. 并行解析 + Channel 批量写入（有界 + Wait 背压，写入跟不上时自然阻塞解析线程）
-        var channel = Channel.CreateBounded<TrackMetadata>(new BoundedChannelOptions(1024)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleWriter = false,
-        });
-        var writer = Task.Run(async () => await ChannelWriterAsync(channel.Reader, counters, ct), ct);
+        // 4. 并行解析 + 有界队列批量写入（BlockingCollection，满则背压阻塞解析线程）
+        var queue = new BlockingCollection<TrackMetadata>(new ConcurrentQueue<TrackMetadata>(), 1024);
+        var writerThread = new Thread(() => WriterLoop(queue, counters, ct))
+        { IsBackground = true, Name = "scanner-writer" };
+        writerThread.Start();
 
         // 2.5 一次性加载错误路径快照到内存（全量模式已清空，增量模式加载 fail_count >= 3 的路径）
         //     避免并行循环中每文件查 DB 导致的锁竞争串行化
@@ -266,7 +263,7 @@ public sealed class ScannerEngine
                         catch (Exception ex) { LogWarn($"清理 trained 标记失败 {file}: {ex.Message}"); }
                     }
                     Interlocked.Exchange(ref counters.ConsecutiveErrors, 0);
-                    channel.Writer.WriteAsync(track, ct).AsTask().GetAwaiter().GetResult();
+                    queue.Add(track, ct);
                     Interlocked.Increment(ref counters.Upserted);
                 }
                 else
@@ -314,10 +311,10 @@ public sealed class ScannerEngine
         }
         finally
         {
-            channel.Writer.Complete();
+            queue.CompleteAdding();
         }
 
-        await writer;
+        writerThread.Join();
         result.Scanned = Volatile.Read(ref counters.Scanned);
         result.Upserted = Volatile.Read(ref counters.Upserted);
         result.Errors = Volatile.Read(ref counters.Errors);
@@ -362,7 +359,7 @@ public sealed class ScannerEngine
         // 6. 统一处理隔离文件：移入 quarantine 目录并清理数据库记录
         if (!ct.IsCancellationRequested)
         {
-            try { await QuarantineTrainedFilesAsync(ct); }
+            try { QuarantineTrainedFiles(ct); }
             catch (Exception ex) { LogError($"隔离处理异常: {ex.Message}"); }
         }
 
@@ -381,7 +378,7 @@ public sealed class ScannerEngine
     /// 4. 从 _scanner_errors 表删除对应错误记录
     /// 5. 清空 _scanner_trained 表
     /// </summary>
-    private async Task QuarantineTrainedFilesAsync(CancellationToken ct)
+    private void QuarantineTrainedFiles(CancellationToken ct)
     {
         var paths = _db.GetTrainedPathsAsync(ct).GetAwaiter().GetResult();
         if (paths.Count == 0) return;
@@ -452,21 +449,21 @@ public sealed class ScannerEngine
     }
 
     /// <summary>
-    /// Channel 消费者：攒批写入 SQLite，根据写入耗时 + 系统内存动态调整批量大小。
+    /// 写线程：从有界队列攒批写入 SQLite，根据写入耗时 + 系统内存动态调整批量大小。
     /// 目标每批写入 ~300ms，快则加量、慢则减量，每批都评估。
     /// </summary>
-    private async Task ChannelWriterAsync(ChannelReader<TrackMetadata> reader, ScanCounters counters, CancellationToken ct)
+    private void WriterLoop(BlockingCollection<TrackMetadata> queue, ScanCounters counters, CancellationToken ct)
     {
         var dynamicBatchSize = _adaptiveBatch.Initial();
         LogInfo($"写入线程启动，初始批量大小: {dynamicBatchSize}");
         var batch = new List<TrackMetadata>(dynamicBatchSize);
 
-        await foreach (var track in reader.ReadAllAsync(ct))
+        foreach (var track in queue.GetConsumingEnumerable())
         {
             batch.Add(track);
             if (batch.Count >= dynamicBatchSize)
             {
-                var elapsedMs = await FlushBatchAsync(batch, counters, ct);
+                var elapsedMs = FlushBatch(batch, counters, ct);
                 var previous = dynamicBatchSize;
                 dynamicBatchSize = _adaptiveBatch.Adjust(previous, elapsedMs);
                 if (dynamicBatchSize != previous)
@@ -474,10 +471,10 @@ public sealed class ScannerEngine
             }
         }
         if (batch.Count > 0)
-            await FlushBatchAsync(batch, counters, ct);
+            FlushBatch(batch, counters, ct);
     }
 
-    private async Task<double> FlushBatchAsync(List<TrackMetadata> batch, ScanCounters counters, CancellationToken ct)
+    private double FlushBatch(List<TrackMetadata> batch, ScanCounters counters, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         try
@@ -499,7 +496,7 @@ public sealed class ScannerEngine
     /// <summary>
     /// 递归收集音频文件，枚举过程中周期性上报进度
     /// </summary>
-    private Task<List<string>> CollectFilesAsync(List<string> dirs, ScanProgress progress, CancellationToken ct)
+    private List<string> CollectFiles(List<string> dirs, ScanProgress progress, CancellationToken ct)
     {
         var result = new List<string>();
         var lastEmit = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -509,7 +506,7 @@ public sealed class ScannerEngine
             WalkAsync(dir, result, progress, ref lastEmit, ct);
             if (result.Count >= _maxScanFiles) break;
         }
-        return Task.FromResult(result);
+        return result;
     }
 
     private void WalkAsync(string dir, List<string> result, ScanProgress progress, ref long lastEmit, CancellationToken ct)
