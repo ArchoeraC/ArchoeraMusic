@@ -351,7 +351,7 @@ fn writePropValue(w: *message.Writer, iface: []const u8, name: []const u8) messa
         if (std.mem.eql(u8, name, "CanRaise")) return w.putBool(true);
         if (std.mem.eql(u8, name, "HasTrackList")) return w.putBool(false);
         if (std.mem.eql(u8, name, "Identity")) return w.putString("ArchoeraMusic");
-        if (std.mem.eql(u8, name, "DesktopEntry")) return w.putString("archoera-music");
+        if (std.mem.eql(u8, name, "DesktopEntry")) return w.putString("awa.archoera.betastudio2.archoera_music");
         if (std.mem.eql(u8, name, "SupportedUriSchemes") or std.mem.eql(u8, name, "SupportedMimeTypes")) {
             const m = try w.beginArray(4);
             return w.endArray(m);
