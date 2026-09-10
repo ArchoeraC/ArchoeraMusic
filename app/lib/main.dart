@@ -9,7 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'apis/runtime.dart';
+import 'eta/icon/eta_icons.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'theme/app_theme.dart';
 import 'services/platform/platform_capabilities.dart';
 import 'services/power/frame_governor.dart';
 import 'services/scanner/sqlite_preload.dart';
@@ -27,13 +29,19 @@ import 'widgets/common/tray_integration.dart';
 /// + 窗口/托盘后台常驻。播放链路由 C 引擎内置 miniaudio 承担
 /// （无 libmpv/media_kit 依赖）。
 Future<void> main() async {
-  // 单实例守卫（经 Zig 平台桥接文件锁，禁止多开）：已有实例则系统提示后退出。
+  // 单实例守卫（经 Zig 平台桥接文件锁，禁止多开）：已有实例则用应用自身对话框
+  // 提示后退出（第二实例的 Flutter 引擎已由原生 runner 起好，直接 runApp 最小页）。
   final platformCaps = PlatformCapabilities.instance();
   if (!platformCaps.acquireSingleInstance()) {
     final parts = Platform.localeName.replaceAll('-', '_').split('_');
     final locale = parts.length >= 2 ? Locale(parts[0], parts[1]) : Locale(parts[0]);
-    platformCaps.notify('ArchoeraMusic', lookupAppLocalizations(locale).instanceAlreadyRunning);
-    exit(0);
+    // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。
+    await windowManager.ensureInitialized();
+    await windowManager.show();
+    runApp(_AlreadyRunningApp(
+        message: lookupAppLocalizations(locale).instanceAlreadyRunning,
+        locale: locale));
+    return;
   }
   // 预加载内置 SQLite（libe_sqlite3）：dart sqlite3 包经 hooks 配置
   // source: system 按名 dlopen("libe_sqlite3.so")，这里先按绝对路径加载，
@@ -82,5 +90,42 @@ class _BrowserUserAgentOverrides extends HttpOverrides {
     final client = super.createHttpClient(context);
     client.userAgent = coverUserAgent;
     return client;
+  }
+}
+
+/// 二次启动提示页：复用 Vault 警告弹窗样式（警告图标 + 应用主题），
+/// 点“知道了”后退出，不进入主应用。
+class _AlreadyRunningApp extends StatelessWidget {
+  const _AlreadyRunningApp({required this.message, required this.locale});
+
+  final String message;
+  final Locale locale;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildAppTheme(AppPalette.dark, Brightness.dark),
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      home: Scaffold(
+        body: Center(
+          child: Builder(
+            builder: (ctx) => AlertDialog(
+              icon: const Icon(EtaIcons.warning),
+              title: const Text('ArchoeraMusic'),
+              content: Text(message),
+              actions: [
+                FilledButton(
+                  onPressed: () => exit(0),
+                  child: Text(AppLocalizations.of(ctx).vaultCrashDismiss),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
