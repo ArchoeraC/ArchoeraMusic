@@ -125,6 +125,9 @@ install(FILES "${ENGINE_SRC_DIR}/fft.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/scanner-ffi.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# 自研内核元数据桥（scanner-ffi 同目录解析；缺失回退 TagLibSharp）
+install(FILES "${SCANNER_SRC_DIR}/archoera_kernel.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/e_sqlite3.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCRAPER_SRC_DIR}/archoera_scraper.dll"

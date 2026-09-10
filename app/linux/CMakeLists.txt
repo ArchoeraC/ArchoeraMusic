@@ -240,6 +240,10 @@ install(DIRECTORY "${ENGINE_SRC_DIR}/ffmpeg/"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/scanner-ffi.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# 自研内核元数据桥动态库：scanner-ffi 经 $ORIGIN 加载（zk_metadata_* 无 JSON）；
+# 缺失则 scanner 回退 TagLibSharp（功能正确但非内核直桥）。
+install(FILES "${SCANNER_SRC_DIR}/libarchoera_kernel.so"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/libe_sqlite3.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCRAPER_SRC_DIR}/libarchoera_scraper.so"
