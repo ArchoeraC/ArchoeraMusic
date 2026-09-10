@@ -438,7 +438,7 @@ pub fn appInstanceAcquire() i32 {
 // ── 系统提示（osascript 弹窗）──────────────────────────────────────
 pub fn notify(title: []const u8, body: []const u8) i32 {
     const script = std.fmt.allocPrint(alloc,
-        "display dialog \"{s}\" with title \"{s}\" buttons {{\"OK\"}} default button \"OK\"",
+        "display notification \"{s}\" with title \"{s}\"",
         .{ body, title }) catch return core.ERR_BACKEND;
     defer alloc.free(script);
     const argv = [_][]const u8{ "osascript", "-e", script };
