@@ -6,6 +6,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../services/platform/platform_capabilities.dart';
+
 /// 读取系统（GNOME/Wayland）主题色，作为应用主色种子来源。
 ///
 /// 实现：`gsettings get org.gnome.desktop.interface accent-color`
@@ -27,8 +29,14 @@ class SystemAccent {
     'slate': 0xFF6A7A8F,
   };
 
-  /// 当前系统主题色；无法读取（非 Linux / 未安装 gsettings / 未设置）返回 null。
+  /// 当前系统主题色；优先经 Zig 平台桥接（KDE/GNOME 跨 DE），失败回退 gsettings。
   static Future<Color?> read() async {
+    // 1) 平台桥接（DE accent，跨平台/跨桌面）
+    try {
+      final c = PlatformCapabilities.instance().systemAccent();
+      if (c != null) return c;
+    } catch (_) {}
+    // 2) 回退：GNOME gsettings
     if (!Platform.isLinux) return null;
     try {
       final res = await Process.run('gsettings', [

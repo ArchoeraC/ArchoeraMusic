@@ -50,3 +50,7 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
     _ = title; _ = body;
     return core.OK;
 }
+
+pub fn systemAccent() ?[3]u8 {
+    return null;
+}

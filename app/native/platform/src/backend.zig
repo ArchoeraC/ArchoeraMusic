@@ -66,6 +66,11 @@ pub fn appInstanceAcquire() i32 {
     return Active.appInstanceAcquire();
 }
 
+/// 系统主题色（DE accent）→ ?[3]u8 RGB；不支持/不可得返回 null。
+pub fn systemAccent() ?[3]u8 {
+    return Active.systemAccent();
+}
+
 pub fn notify(title: []const u8, body: []const u8) i32 {
     return Active.notify(title, body);
 }

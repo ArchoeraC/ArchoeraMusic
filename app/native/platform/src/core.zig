@@ -20,6 +20,7 @@ pub const CAP_MEDIA_SEEK: u32 = 1 << 3;
 pub const CAP_MEDIA_ARTWORK: u32 = 1 << 4;
 pub const CAP_WINDOW_STATE: u32 = 1 << 5;
 pub const CAP_APP_INSTANCE: u32 = 1 << 6;
+pub const CAP_SYSTEM_ACCENT: u32 = 1 << 7;
 
 // ── 事件类型 / 命令 ───────────────────────────────────────────────
 pub const EVENT_MEDIA_COMMAND: i32 = 1;
