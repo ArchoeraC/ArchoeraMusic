@@ -208,7 +208,7 @@ fn unsubclassWindow() void {
 
 pub fn caps() u32 {
     return core.CAP_POWER_INHIBIT | core.CAP_POWER_SCREEN_STATE | core.CAP_WINDOW_STATE |
-        core.CAP_MEDIA_SESSION;
+        core.CAP_MEDIA_SESSION | core.CAP_APP_INSTANCE;
 }
 
 pub fn init() i32 {
