@@ -74,10 +74,6 @@ class PowerSaverService with WindowListener {
   StreamSubscription<PlatformCapabilityFailure>? _failSub;
   StreamSubscription<SystemWindowState>? _windowSub;
 
-  /// 节流期自愈看门狗：仅当处于非前台节流档位时运行（低频复查真实窗口状态），
-  /// 防止锁屏/解锁、失焦/回焦等**事件丢失**导致永久卡在低帧率（重启才恢复）。
-  Timer? _watchdog;
-
   static const Map<PowerSaverReason, Duration> _intervalByReason = {
     PowerSaverReason.minimized: Duration(milliseconds: 200), // 5 FPS
     PowerSaverReason.unfocused: Duration(seconds: 1), // 1 FPS
@@ -117,6 +113,9 @@ class PowerSaverService with WindowListener {
     _windowSub = _window.state.listen((s) {
       _minimized = s.minimized;
       _focused = s.focused;
+      // 重新聚焦窗口 ⇒ **强制重建**：屏幕必然点亮/未锁屏。修正解锁后丢失的
+      // 熄屏复位（否则残留 screenOff → 永久 1 FPS，重启才恢复）。
+      if (s.focused && !s.minimized) _screenOff = false;
       _apply();
     });
   }
@@ -235,12 +234,6 @@ class PowerSaverService with WindowListener {
     if (binding is! PowerSavingFrameBinding) return;
     final reason = _reason;
     binding.setFrameInterval(_intervalByReason[reason] ?? Duration.zero);
-    // 非前台节流档位启动自愈看门狗；回到 none 即停止（不轮询、仅节流期低频）
-    if (reason == PowerSaverReason.none) {
-      _stopWatchdog();
-    } else {
-      _startWatchdog();
-    }
     // 降频协商（engine-event-push-plan §4.1）：档位变化时向引擎请求位置事件
     // 间隔——事件源头减量，Dart 侧无需在降频期高频消费 position。引擎未
     // 就绪时由 PlaybackNotifier 忽略（转码期协商被 C 侧记录，播放器启动即
@@ -254,46 +247,6 @@ class PowerSaverService with WindowListener {
     }
   }
 
-  /// 启动/停止自愈看门狗（幂等）。
-  void _startWatchdog() {
-    _watchdog ??= Timer.periodic(const Duration(seconds: 5), (_) {
-      unawaited(_recheck());
-    });
-  }
-
-  void _stopWatchdog() {
-    _watchdog?.cancel();
-    _watchdog = null;
-  }
-
-  /// 低频复查真实窗口状态（window_manager 为权威来源）：若窗口实际可见且聚焦，
-  /// 说明屏幕点亮、未最小化——修正因事件丢失而残留的失焦/熄屏档位。
-  Future<void> _recheck() async {
-    if (!_enabled) return;
-    try {
-      final minimized = await windowManager.isMinimized();
-      final focused = await windowManager.isFocused();
-      final visible = await windowManager.isVisible();
-      final effFocused = focused && visible && !minimized;
-      var changed = false;
-      if (_minimized != minimized) {
-        _minimized = minimized;
-        changed = true;
-      }
-      if (_focused != effFocused) {
-        _focused = effFocused;
-        changed = true;
-      }
-      if (effFocused && _screenOff) {
-        _screenOff = false; // 窗口聚焦 ⇒ 屏幕点亮
-        changed = true;
-      }
-      if (changed) _apply();
-    } catch (_) {
-      // 查询失败保持现状，下个周期再试
-    }
-  }
-
   /// 强制按当前档位重新协商（新引擎会话建立后调用）：
   /// 降频期切歌时新引擎默认 50ms，需立即应用当前档位避免高频事件。
   void resync() {
@@ -303,7 +256,6 @@ class PowerSaverService with WindowListener {
 
   Future<void> dispose() async {
     windowManager.removeListener(this);
-    _stopWatchdog();
     await _screenSub?.cancel();
     await _failSub?.cancel();
     await _windowSub?.cancel();
