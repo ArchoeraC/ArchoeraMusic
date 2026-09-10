@@ -4008,5 +4008,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'La sesión multimedia del sistema se desconectó';
 
   @override
-  String get instanceAlreadyRunning => 'ArchoeraMusic ya se está ejecutando.';
+  String get instanceAlreadyRunning =>
+      'Busque la ventana en ejecución en la bandeja del sistema o la barra de tareas.';
+
+  @override
+  String get instanceAlreadyRunningTitle =>
+      'ArchoeraMusic ya se está ejecutando';
 }

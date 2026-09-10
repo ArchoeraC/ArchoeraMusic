@@ -1047,5 +1047,6 @@
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "System-Standby konnte nicht verhindert werden",
   "toastMediaSessionLost": "System-Medien-Sitzung getrennt",
-  "instanceAlreadyRunning": "ArchoeraMusic läuft bereits."
+  "instanceAlreadyRunning": "Finden Sie das laufende Fenster im Infobereich oder in der Taskleiste.",
+  "instanceAlreadyRunningTitle": "ArchoeraMusic wird bereits ausgeführt"
 }

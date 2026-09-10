@@ -4013,5 +4013,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get instanceAlreadyRunning =>
-      'ArchoeraMusic est déjà en cours d\'exécution.';
+      'Trouvez la fenêtre en cours d’exécution dans la zone de notification ou la barre des tâches.';
+
+  @override
+  String get instanceAlreadyRunningTitle =>
+      'ArchoeraMusic est déjà en cours d\'exécution';
 }

@@ -1156,5 +1156,6 @@
   "settingsAmllSpring": "Scroll spring",
   "toastSleepInhibitFailed": "Failed to keep the system awake",
   "toastMediaSessionLost": "System media session disconnected",
-  "instanceAlreadyRunning": "ArchoeraMusic is already running."
+  "instanceAlreadyRunning": "Find the running window in the system tray or taskbar.",
+  "instanceAlreadyRunningTitle": "ArchoeraMusic is already running"
 }

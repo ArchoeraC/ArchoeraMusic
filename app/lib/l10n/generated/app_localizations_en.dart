@@ -3960,5 +3960,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toastMediaSessionLost => 'System media session disconnected';
 
   @override
-  String get instanceAlreadyRunning => 'ArchoeraMusic is already running.';
+  String get instanceAlreadyRunning =>
+      'Find the running window in the system tray or taskbar.';
+
+  @override
+  String get instanceAlreadyRunningTitle => 'ArchoeraMusic is already running';
 }

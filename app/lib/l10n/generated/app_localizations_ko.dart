@@ -3825,5 +3825,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toastMediaSessionLost => '시스템 미디어 세션이 끊어졌습니다';
 
   @override
-  String get instanceAlreadyRunning => 'ArchoeraMusic이(가) 이미 실행 중입니다.';
+  String get instanceAlreadyRunning => '시스템 트레이 또는 작업 표시줄에서 실행 중인 창을 찾아주세요.';
+
+  @override
+  String get instanceAlreadyRunningTitle => 'ArchoeraMusic이(가) 이미 실행 중입니다';
 }

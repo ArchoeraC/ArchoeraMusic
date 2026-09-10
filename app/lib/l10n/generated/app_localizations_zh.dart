@@ -3776,7 +3776,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastMediaSessionLost => '系统媒体会话已断开';
 
   @override
-  String get instanceAlreadyRunning => 'ArchoeraMusic 已在运行';
+  String get instanceAlreadyRunning => '请在系统托盘或任务栏中找到正在运行的窗口。';
+
+  @override
+  String get instanceAlreadyRunningTitle => 'ArchoeraMusic 已有一个实例在运行';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -7551,7 +7554,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get toastMediaSessionLost => '系统媒体会话已断开';
 
   @override
-  String get instanceAlreadyRunning => 'ArchoeraMusic 已在运行';
+  String get instanceAlreadyRunning => '请在系统托盘或任务栏中找到正在运行的窗口。';
+
+  @override
+  String get instanceAlreadyRunningTitle => 'ArchoeraMusic 已有一个实例在运行';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -10965,5 +10971,8 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get toastMediaSessionLost => '系統媒體工作階段已中斷';
 
   @override
-  String get instanceAlreadyRunning => 'ArchoeraMusic 已在執行';
+  String get instanceAlreadyRunning => '請在系統匣或工作列中找到正在執行的視窗。';
+
+  @override
+  String get instanceAlreadyRunningTitle => 'ArchoeraMusic 已有一個實例在執行';
 }

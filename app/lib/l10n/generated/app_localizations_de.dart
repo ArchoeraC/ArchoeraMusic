@@ -3979,5 +3979,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get toastMediaSessionLost => 'System-Medien-Sitzung getrennt';
 
   @override
-  String get instanceAlreadyRunning => 'ArchoeraMusic läuft bereits.';
+  String get instanceAlreadyRunning =>
+      'Finden Sie das laufende Fenster im Infobereich oder in der Taskleiste.';
+
+  @override
+  String get instanceAlreadyRunningTitle =>
+      'ArchoeraMusic wird bereits ausgeführt';
 }

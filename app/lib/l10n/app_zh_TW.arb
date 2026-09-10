@@ -1047,5 +1047,6 @@
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "停用系統休眠失敗",
   "toastMediaSessionLost": "系統媒體工作階段已中斷",
-  "instanceAlreadyRunning": "ArchoeraMusic 已在執行"
+  "instanceAlreadyRunning": "請在系統匣或工作列中找到正在執行的視窗。",
+  "instanceAlreadyRunningTitle": "ArchoeraMusic 已有一個實例在執行"
 }

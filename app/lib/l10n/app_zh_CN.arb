@@ -1156,5 +1156,6 @@
   "settingsAmllSpring": "滚动弹簧",
   "toastSleepInhibitFailed": "禁用系统休眠失败",
   "toastMediaSessionLost": "系统媒体会话已断开",
-  "instanceAlreadyRunning": "ArchoeraMusic 已在运行"
+  "instanceAlreadyRunning": "请在系统托盘或任务栏中找到正在运行的窗口。",
+  "instanceAlreadyRunningTitle": "ArchoeraMusic 已有一个实例在运行"
 }

@@ -7001,8 +7001,14 @@ abstract class AppLocalizations {
   /// No description provided for @instanceAlreadyRunning.
   ///
   /// In zh_CN, this message translates to:
-  /// **'ArchoeraMusic 已在运行'**
+  /// **'请在系统托盘或任务栏中找到正在运行的窗口。'**
   String get instanceAlreadyRunning;
+
+  /// No description provided for @instanceAlreadyRunningTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'ArchoeraMusic 已有一个实例在运行'**
+  String get instanceAlreadyRunningTitle;
 }
 
 class _AppLocalizationsDelegate
