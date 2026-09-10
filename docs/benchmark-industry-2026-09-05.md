@@ -266,3 +266,13 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng \
   低噪，6/9/12s，44.1k 立体声），非版权；跨机请比 ×RT/加速比/分差方向而非毫秒。
 - 说明：ffmpeg 测量为 N 进程并发、含进程启动；era 为单进程常驻池。与上表（scorecard 200s
   噪声语料、单流 50×RT 封顶）是两套口径，不可直接互换。
+
+### 2026-09-10 · 解码 A 档提速（perf 指令口径）
+
+> 依据 `PERF_HOT_2026-09-10.md`（era 指令=Stable 2.1–3.4×、CPI 更低 ⇒ 指令多非访存），
+> 按 `decode-optimization.md` §4.2 **只做 A 档（零新增缓冲、精度中性、逐位一致）**：
+> ① flac 位流取数（`Reader.readByte` 快路径 + `readBits` 快路径/comptime 掩码表 + `readBit`
+> 直取）→ **flac 指令 600M→462M（−23%）**；② flac Rice 前缀 `readUnary1` 缓存批量数零
+> （小）；④ aac Huffman `Vlc` 规范表 O(1)/长度查表 → **m4a 指令 455M→419M（−8%）**；
+> flac LPC 滑动窗口 zip（合成语料中性，代码更简）。均 `zig build test` 622 逐位全绿、
+> ctest 13/13。B 档（mp3 synth/imdct、aac MDCT 浮点重排）列为独立专项（需授权+corr 门禁）。

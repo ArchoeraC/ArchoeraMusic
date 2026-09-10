@@ -95,6 +95,7 @@ SCORE 计分 `speed = 40·min(1, R/50)`：**达到 50× 实时即满分**，之�
 | ③ | **mp3 `synthGranule` ~20% + `imdct36` ~7%** ⛔B 档 | 预计算/`@Vector` 属浮点重排（B 档）；按只做 A 档策略暂缓 | — |
 | ④ | **aac `decodeIcs` ~39%（谱/Huffman/去量化）** ✅(Huffman 部分) | 已做：Vlc 规范表 O(1)/长度查表（去每长度二分）；去量化查表待评估 | aac 逐位 ✔；m4a 指令 455M→418.7M（−8%） |
 | ⑤ | **aac MDCT/FFT ~11%** ⛔B 档 | f32/预计算/SIMD 属浮点（B 档）；按策略暂缓 | — |
+| — | **flac LPC 重建内层** | 已做：滑动窗口切片 zip + i32 环绕 `+%=`（A 档） | 逐位 ✔；合成语料中性 |
 | — | 公共 `pcm.convert` ~2% | 低优先（收益小） | — |
 | — | mp3 Huffman | 已是 FFmpeg 式直接查表（`codebook[hufPeek]`），无 A 档空间 | — |
 
