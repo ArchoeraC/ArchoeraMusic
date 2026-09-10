@@ -176,9 +176,6 @@ target_include_directories(audio_engine_static PUBLIC
     ${FFMPEG_INCLUDE_DIRS}
 )
 target_link_libraries(audio_engine_static PUBLIC ${FFMPEG_LIBRARIES})
-if(MATH_LIBRARY)
-    target_link_libraries(audio_engine_static PUBLIC ${MATH_LIBRARY})
-endif()
 target_link_directories(audio_engine_static PUBLIC ${FFMPEG_LIBRARY_DIRS})
 target_compile_options(audio_engine_static PUBLIC ${FFMPEG_CFLAGS_OTHER})
 
@@ -189,6 +186,15 @@ if(HAS_ARCHOERA_KERNEL)
     # 需在最终链接阶段解析 zk_* 符号；archoera_kernel_lib 先行构建保证产物存在）
     add_dependencies(audio_engine_static archoera_kernel_lib)
     target_link_libraries(audio_engine_static PUBLIC ${ZK_LIB})
+endif()
+
+# ── 数学库（必须排在内核静态库之后）──────────────────────────────
+# 内核库引用 cos/exp2/log10f/sincos/... 等 libm 符号；Ubuntu 的 gcc 默认
+# 传 --as-needed，若 -lm 出现在内核库之前，扫描时尚未出现未定义符号 → libm
+# 被丢弃，随后内核库才引入这些符号 → undefined reference（Arch 默认无
+# --as-needed，故本机不复现）。置于内核库之后可确保符号被解析。
+if(MATH_LIBRARY)
+    target_link_libraries(audio_engine_static PUBLIC ${MATH_LIBRARY})
 endif()
 
 # ── FFT 共享库（Dart FFI 客户端频谱分析；EnginePaths.libfftPath）──────────
