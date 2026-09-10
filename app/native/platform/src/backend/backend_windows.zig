@@ -212,7 +212,16 @@ pub fn caps() u32 {
 }
 
 pub fn init() i32 {
+    setAppUserModelId();
     return core.OK;
+}
+
+/// 设置显式 AppUserModelID（Win11 媒体浮出/任务栏分组更稳；失败忽略）。
+fn setAppUserModelId() void {
+    const h = win.LoadLibraryA("shell32.dll") orelse return;
+    const p = win.GetProcAddress(h, "SetCurrentProcessExplicitAppUserModelID") orelse return;
+    const f: *const fn ([*:0]const u16) callconv(.winapi) i32 = @ptrCast(@alignCast(p));
+    _ = f(std.unicode.utf8ToUtf16LeStringLiteral("Archoera.ArchoeraMusic"));
 }
 
 pub fn shutdown() i32 {

@@ -99,8 +99,10 @@ fn ensureConn() ?*transport.Connection {
     conn.handler = &handler;
     pickScreensaver(&conn);
     addScreenMatch(&conn);
-    _ = mpris.init(&conn); // P2：MPRIS 服务名（失败不影响 Power）
+    // 先落全局（稳定地址），再让 mpris 持有其指针——否则 mpris 存的是局部
+    // `conn` 的栈地址，ensureConn 返回后悬垂 → Metadata/PlaybackStatus 推送失效。
     g_conn = conn;
+    _ = mpris.init(&g_conn.?); // P2：MPRIS 服务名（失败不影响 Power）
 
     if (!g_running.swap(true, .acquire)) {
         g_thread = std.Thread.spawn(.{}, pumpLoop, .{}) catch {
