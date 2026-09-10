@@ -350,7 +350,21 @@ pub fn appInstanceAcquire() i32 {
 }
 
 
-// ── 系统提示（kdialog/zenity/notify-send 依次尝试）──────────────────
+// ── 系统提示（kdialog/zenity/xmessage/yad/notify-send 依次尝试）──────
+// 用 libc system() 启动（桥接上下文的 std.Io 不支持 process spawn）。
+extern "c" fn system(command: [*:0]const u8) c_int;
+fn shellQuote(buf: *std.ArrayList(u8), s: []const u8) void {
+    buf.append(alloc, '\'') catch {};
+    for (s) |ch| {
+        if (ch == '\'') {
+            buf.appendSlice(alloc, "'\\''") catch {};
+        } else {
+            buf.append(alloc, ch) catch {};
+        }
+    }
+    buf.append(alloc, '\'') catch {};
+}
+
 pub fn notify(title: []const u8, body: []const u8) i32 {
     const attempts = [_][]const []const u8{
         &.{ "kdialog", "--title", title, "--msgbox", body },
@@ -359,12 +373,24 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
         &.{ "yad", "--title", title, "--text", body, "--button=OK:0" },
         &.{ "notify-send", title, body },
     };
-    const io = std.Io.Threaded.global_single_threaded.io();
+    std.debug.print("[platform] notify title={s} body={s}\n", .{ title, body });
     for (attempts) |argv| {
-        const r = std.process.run(alloc, io, .{ .argv = argv }) catch continue;
-        alloc.free(r.stdout);
-        alloc.free(r.stderr);
-        return core.OK;
+        var buf = std.ArrayList(u8).empty;
+        defer buf.deinit(alloc);
+        for (argv, 0..) |a, i| {
+            if (i > 0) buf.append(alloc, ' ') catch {};
+            shellQuote(&buf, a);
+        }
+        const cmd = buf.toOwnedSliceSentinel(alloc, 0) catch return core.ERR_BACKEND;
+        defer alloc.free(cmd);
+        const rc = system(cmd);
+        const code: u32 = @intCast((rc >> 8) & 0xff); // WEXITSTATUS
+        if (rc != -1 and code != 127) { // 127 = 命令不存在 → 试下一个
+            std.debug.print("[platform] notify via {s} rc={d}\n", .{ argv[0], rc });
+            return core.OK;
+        }
+        std.debug.print("[platform] notify {s} skip (rc={d})\n", .{ argv[0], rc });
     }
+    std.debug.print("[platform] notify: all attempts failed\n", .{});
     return core.ERR_BACKEND;
 }
