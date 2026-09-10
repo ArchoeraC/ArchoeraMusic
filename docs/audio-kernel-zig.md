@@ -863,6 +863,13 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > TagLib 38ms（含进程启动，基本持平——当前实现仍走 `decoder.open` 构造解码器 ctx，
 > **probe-only 不建解码器状态**为后续打磨项，见 #4 与 §8.4.2 子项 #1 原文）。
 > C 侧回归 `tests/test_metadata_abi.c`（ctest 14/14）。
+>
+> **probe-only 推进（2026-09-10）**：机制落地——`decoder.MetadataSession` +
+> `registry.Module.meta` / `dispatchMeta`：有 `meta` 工厂的格式走 **probe-only**
+> （只解析容器头/标签、持有其分配，**不构造解码器状态**），无则回退完整 `open`。
+> 首批实现 **flac**（`flac.openMeta`：解析 STREAMINFO+元数据块、不分配解码缓冲）。
+> 其余格式（mp3/wav/m4a/ogg/opus 等）暂回退完整 open，可逐格式补齐 `meta` 工厂。
+> scanner 1000 文件语料：**167ms vs TagLib 201ms（−17%，含进程启动）**。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
