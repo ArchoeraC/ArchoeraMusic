@@ -94,8 +94,6 @@ abstract final class EtaIcons {
   /// text_snippet_outlined (描边)
   static const IconData docmentOutline = IconData(0xE12F, fontFamily: _family);
 
-  /// blur_circular_outlined (描边)
-  static const IconData dotCircleOutline = IconData(0xE131, fontFamily: _family);
 
   /// download_outlined (描边)
   static const IconData downloadOutline = IconData(0xE136, fontFamily: _family);
@@ -379,8 +377,6 @@ abstract final class EtaIcons {
   /// menu_book (实心)
   static const IconData book = IconData(0xE70E, fontFamily: _family);
 
-  /// rounded_corner (实心)
-  static const IconData borderRadius = IconData(0xE710, fontFamily: _family);
 
   /// bar_chart (实心)
   static const IconData chartBar = IconData(0xE714, fontFamily: _family);
@@ -517,8 +513,6 @@ abstract final class EtaIcons {
   /// mic_external_on (实心)
   static const IconData mic = IconData(0xE774, fontFamily: _family);
 
-  /// (extra:miniplayer) (实心)
-  static const IconData miniplayer = IconData(0xE776, fontFamily: _family);
 
   /// nights_stay (实心)
   static const IconData moonStars = IconData(0xE77A, fontFamily: _family);
