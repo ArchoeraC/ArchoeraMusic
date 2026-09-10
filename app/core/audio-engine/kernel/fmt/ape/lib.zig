@@ -37,6 +37,7 @@ const bitreader = @import("bitreader.zig");
 const rangecoder = @import("rangecoder.zig");
 const predictor = @import("predictor.zig");
 const container = @import("container.zig");
+const apev2 = @import("../apev2.zig");
 
 const BitReader = bitreader.BitReader;
 const RangeCtx = rangecoder.Ctx;
@@ -433,7 +434,7 @@ fn deinitImpl(ctx: *anyopaque) void {
     a.allocator.destroy(a);
 }
 
-fn buildInfo(a: *ApeCtx) decoder.Info {
+fn buildInfo(a: anytype) decoder.Info {
     var duration_us: i64 = 0;
     var known: decoder.DurationKnown = .unknown;
     if (a.header.total_samples > 0 and a.header.samplerate > 0) {
@@ -508,9 +509,59 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     return .{ .vtable = &vtable, .ctx = @ptrCast(ctx) };
 }
 
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）：解析容器头 + 尾部 APEv2 标签，
+// 不分配解码缓冲、不初始化预测器滤波器。
+// ---------------------------------------------------------------------------
+
+const MetaCtx = struct {
+    allocator: std.mem.Allocator,
+    reader: io.Reader,
+    header: container.Header,
+    out_bps: u8,
+    tags: apev2.Tags = .{},
+};
+
+fn metaDeinit(p: *anyopaque) void {
+    const ctx: *MetaCtx = @ptrCast(@alignCast(p));
+    ctx.tags.deinit(ctx.allocator);
+    ctx.allocator.free(ctx.header.frames);
+    ctx.reader.deinit();
+    ctx.allocator.destroy(ctx);
+}
+
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const header = try container.parse(allocator, reader);
+    errdefer allocator.free(header.frames);
+
+    if (header.bps != 8 and header.bps != 16 and header.bps != 24) return error.UnsupportedFormat;
+    if (header.channels == 0 or header.channels > 2) return error.UnsupportedFormat;
+    const cl = header.compression_level;
+    if (cl % 1000 != 0 or cl > predictor.COMPRESSION_LEVEL_INSANE or cl == 0) return error.UnsupportedFormat;
+    if (header.fileversion < 3930 and cl == predictor.COMPRESSION_LEVEL_INSANE) return error.UnsupportedFormat;
+
+    const ctx = try allocator.create(MetaCtx);
+    errdefer allocator.destroy(ctx);
+    ctx.* = .{
+        .allocator = allocator,
+        .reader = reader.*,
+        .header = header,
+        .out_bps = if (header.bps == 24) 32 else @intCast(header.bps),
+    };
+    errdefer {
+        ctx.tags.deinit(allocator);
+        allocator.free(ctx.header.frames);
+    }
+
+    const fsize = try reader.size();
+    ctx.tags = apev2.parse(allocator, reader, fsize) catch .{};
+    info.* = buildInfo(ctx);
+    info.metadata = ctx.tags.meta;
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
+
 /// 释放 ctx 缓冲（open 错误路径与 deinit 共用；filters 单独处理）
-fn deinitCtxBuffers(ctx: *ApeCtx) void {
-    if (ctx.decoded0.len > 0) ctx.allocator.free(ctx.decoded0);
+fn deinitCtxBuffers(ctx: *ApeCtx) void {    if (ctx.decoded0.len > 0) ctx.allocator.free(ctx.decoded0);
     if (ctx.decoded1.len > 0) ctx.allocator.free(ctx.decoded1);
     if (ctx.interim0.len > 0) ctx.allocator.free(ctx.interim0);
     if (ctx.interim1.len > 0) ctx.allocator.free(ctx.interim1);
