@@ -9,8 +9,8 @@
 //! 窗口状态（子类化 Flutter 顶层 WndProc）。
 //! P3b（待做）：WinRT SMTC（COM vtable 直调）—— 本机无法真机验收，独立推进。
 //!
-//! 本文件仅在 `builtin.os.tag == .windows` 时被 backend.zig 引用（惰性分析）；
-//! 其余目标不解析 @cImport(windows.h)。
+//! 本文件仅在 `builtin.os.tag == .windows` 时被 backend.zig 引用（惰性分析）。
+//! Win32 声明全部手动（win_common.zig），不依赖 @cImport/Windows SDK 头。
 
 const std = @import("std");
 const core = @import("../core.zig");
