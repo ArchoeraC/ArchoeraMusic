@@ -833,7 +833,10 @@ per-context 思路一致（**EraAudio 相对 FFmpeg 的对称**）；async 主�
 >   seam（headless A/B 逐位一致 + 失败语义 sync==stream==once==decode_once；SegStore 会话
 >   排除）；**A1 默认开启已本地评估**（默认 pool-on 与 ARCHOERA_ERA_POOL=0 全 ctest 绿）；
 >   **A3 FFmpeg 回退端到端**：pool-on 下 .mov(PCM) Zig 不接管 → 回退 FFmpeg 成功且未走池；
->   A2 scanner/zk_metadata 仍未做；本文件 §9①-②/内部能力/加固均已绿。
+>   A2 元数据快路径（`zk_metadata_*`）**已落地并直桥 scanner**：结构化 C ABI（无 JSON）+
+>   scanner `KernelMetadata.cs` P/Invoke，按 `AdaptiveConcurrency` 指标协商并发；内核
+>   probe-only 覆盖全部可解析标签格式（flac/mp3/wav/m4a/ape/wv/mpc/dsd/tta/wma/mka/tak
+>   + Ogg 全家，见 `audio-kernel-zig.md` §8.4.2①）；本文件 §9①-②/内部能力/加固均已绿。
 > 进度（2026-09-09）：① 完成（registry.zig + decoder 表驱动 + panic 审计，622 测试全绿）；
 > ②/内部打磨（均不接生产线）完成：runtime.zig（Master 停机/懒就绪协调 + 同质 worker +
 > 完成即领 + 大 batch 排空）、**worker 状态注册表接入 runtime**（每 worker 开工 busy/完工
@@ -867,8 +870,10 @@ per-context 思路一致（**EraAudio 相对 FFmpeg 的对称**）；async 主�
 4. hybrid：**§5.5 目标容量调节器**（elastic 伸缩 + min_floor 总量下限 + 双水位 +
    步长 + 滞后死区；定容 S = max_streams + max_cap_elastic）+ worker 状态注册表 +
    空闲回收 + 动态新建（= §5.1 短临界区；每事件唤醒即时裁决，超时兜底）。
-5. 接入 scanner 批量 tag（§8.4.2 ① metadata 快路径先行）验证 128 路；随后做
-   **播放 + 批量混杂压测**（pinned 不被批量干扰、批量风暴不引入播放抖动）。
+5. ~~接入 scanner 批量 tag（§8.4.2 ① metadata 快路径先行）~~ **已完成**（A2：内核
+   `zk_metadata_*` 直桥 scanner，probe-only 覆盖全部可解析标签格式；并发按 scanner
+   指标协商）。**待办**：128 路批量 tag 压测 + **播放 + 批量混杂压测**（pinned 不被
+   批量干扰、批量风暴不引入播放抖动）。
    （§5.3 黑名单 / 危险等级 / 难度预留为 post-MVP，移出本批目标。）
 
 > 每步均需 `zig build test`（ReleaseFast 全量）+ 引擎 ctest 无回归后进下一阶段。
