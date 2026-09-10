@@ -244,5 +244,31 @@ if not exist "build\archoera-vault.exe" (
 )
 popd
 
+rem =====================================================================
+rem  8. platform bridge：Zig 平台能力桥接（app/native/platform）
+rem     产物 zig-out\bin\archoera_platform.dll，由 app/windows/CMakeLists
+rem     install 引用。未编译时 Dart 侧自动 Noop 降级（休眠抑制/媒体会话等）。
+rem =====================================================================
+echo [build_windows] ===== platform bridge =====
+where zig >nul 2>nul
+if not %errorlevel%==0 goto platform_no_zig
+set "PLATFORM_CXXRT="
+rem 可选原生 C++/WinRT Toast：仅当 CPPWINRT_INCLUDE 指向有效 winrt 头时启用
+rem （未启用时 Zig 弱符号兜底，notify 走 PowerShell 调 WinRT）。
+if defined CPPWINRT_INCLUDE if exist "%CPPWINRT_INCLUDE%\winrt\Windows.UI.Notifications.h" set "PLATFORM_CXXRT=-Dcppwinrt-include=%CPPWINRT_INCLUDE%"
+if defined PLATFORM_CXXRT echo [build_windows] C++/WinRT Toast 启用: %CPPWINRT_INCLUDE%
+pushd "%ROOT%..\native\platform"
+zig build -Dtarget=x86_64-windows-msvc -Doptimize=ReleaseFast %PLATFORM_CXXRT%
+if errorlevel 1 goto platform_fail
+popd
+goto platform_done
+:platform_fail
+popd
+echo [build_windows] ERROR: 平台桥接构建失败
+exit /b 1
+:platform_no_zig
+echo [build_windows] 警告: 未检测到 zig，平台桥接不编译（Dart 侧 Noop 降级）
+:platform_done
+
 echo [build_windows] 全部模块构建完成
 exit /b 0

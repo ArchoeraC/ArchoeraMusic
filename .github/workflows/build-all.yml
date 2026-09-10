@@ -121,6 +121,18 @@ jobs:
         env:
           VCPKG_ROOT: C:\vcpkg
 
+      # 可选：C++/WinRT 投影头（原生 Toast 用）。失败不致命——build_windows.bat
+      # 仅在头存在时才启用 win_toast.cpp；否则 Zig 弱符号兜底走 PowerShell 调 WinRT。
+      # classic 模式（从 runner.temp 运行，避免 manifest 模式拒绝单包参数）。
+      - name: Install C++/WinRT headers (Windows, 可选：原生 Toast)
+        if: matrix.os == 'windows'
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        continue-on-error: true
+        run: vcpkg install cppwinrt --triplet x64-windows-release
+        env:
+          VCPKG_ROOT: C:\vcpkg
+
       # save-always 已弃用（job 失败时不生效），改为显式 save：
       # vcpkg install 成功后立即落缓存，此后任意步骤失败均不影响复用
       - name: Cache vcpkg installed (保存，供下次 run 秒级恢复)
@@ -211,6 +223,8 @@ jobs:
         # 与 CI 共用同一入口，逻辑改动只落一处。
         env:
           VCPKG_TARGET_TRIPLET: x64-windows-release
+          # 可选原生 Toast：build_windows.bat 检测该目录含 winrt 头时才启用
+          CPPWINRT_INCLUDE: C:\vcpkg\installed\x64-windows-release\include
         working-directory: app/core
         run: build_windows.bat
 
