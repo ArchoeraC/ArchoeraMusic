@@ -118,7 +118,7 @@ public static class Program
 
         try
         {
-            var result = await engine.ScanAsync(dirList, cts.Token);
+            var result = engine.Scan(dirList, cts.Token);
             Console.WriteLine(ScannerJson.Result(result));
             return result.Canceled ? 2 : 0;
         }
@@ -138,7 +138,7 @@ public static class Program
         }
 
         var file = args[0];
-        var track = await Task.Run(() => ParseSingleFile(file, coverCacheDir));
+        var track = ParseSingleFile(file, coverCacheDir);
         if (track != null)
         {
             Console.WriteLine(ScannerJson.Track(track));
