@@ -217,6 +217,21 @@ add_test(NAME test_pool_pipeline
 set_tests_properties(test_pool_pipeline PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# 元数据快路径 C ABI（zk_metadata_*，§8.4.2①；无 JSON 直桥 scanner）：
+# probe+open 一次取回标量/全量 tags/首张封面（不解码 PCM），句柄释放后指针失效。
+# fixture = 带 PICTURE + 标签的 FLAC。
+add_executable(test_metadata_abi test_metadata_abi.c)
+target_link_libraries(test_metadata_abi PRIVATE audio_engine_static)
+target_include_directories(test_metadata_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_metadata_abi
+         COMMAND test_metadata_abi
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tagged_fixture.flac)
+set_tests_properties(test_metadata_abi PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # C-Bench 工具：常驻内核池并发/首帧基准（headless；不入 ctest，手动运行）
 add_executable(bench_era_pool bench/bench_era_pool.c)
 target_link_libraries(bench_era_pool PRIVATE audio_engine_static)
