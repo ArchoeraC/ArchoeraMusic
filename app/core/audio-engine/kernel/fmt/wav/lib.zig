@@ -117,6 +117,25 @@ const max_chunks: u32 = 512;
 /// 从已打开的 Reader 解析 WAV（decoder.open 与测试共用入口）。
 /// 成功时 Decoder 接管 `reader` 的所有权（deinit 时关闭）。
 pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.Decoder {
+    const ctx = try parseAlloc(allocator, reader, info);
+    return .{ .vtable = &vtable, .ctx = @ptrCast(ctx) };
+}
+
+/// 元数据专用入口（probe-only，§8.4.2①）：复用同一容器/chunk 解析，但不构造
+/// 解码器状态；解码缓冲（dec_buf/blk_buf）本就惰性分配，故此处零 PCM 缓冲。
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const ctx = try parseAlloc(allocator, reader, info);
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
+
+fn metaDeinit(p: *anyopaque) void {
+    const w: *WavCtx = @ptrCast(@alignCast(p));
+    destroyCtx(w);
+    w.allocator.destroy(w);
+}
+
+/// 解析容器头/chunk 并填充 `info`，返回已接管 reader 的 `WavCtx`（所有权交调用方）。
+fn parseAlloc(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!*WavCtx {
     // ---- 容器探测（peek 不消费，64 字节窗口覆盖 riff GUID）----
     var window: [64]u8 = undefined;
     const n = try reader.peek(&window);
@@ -159,8 +178,14 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
 
     // ---- CAF / AU：独立容器解析（其余 RIFF 家族走统一 chunk 扫描）----
     switch (container) {
-        .caf => return openCaf(ctx, reader, info),
-        .au => return openAu(ctx, reader, info),
+        .caf => {
+            try openCaf(ctx, reader, info);
+            return ctx;
+        },
+        .au => {
+            try openAu(ctx, reader, info);
+            return ctx;
+        },
         else => {},
     }
 
@@ -356,7 +381,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     // ---- Info ----
     info.* = buildInfo(ctx);
 
-    return .{ .vtable = &vtable, .ctx = @ptrCast(ctx) };
+    return ctx;
 }
 
 /// 容器探测：返回 (容器, 样本字节序, is_aifc)。
@@ -451,7 +476,7 @@ fn openCaf(
     ctx: *WavCtx,
     reader: *io.Reader,
     info: *decoder.Info,
-) Error!decoder.Decoder {
+) Error!void {
     var fh: [8]u8 = undefined;
     if (!try readExact(reader, &fh)) return error.Corrupt;
     if (!std.mem.eql(u8, fh[0..4], "caff")) return error.Corrupt;
@@ -514,7 +539,7 @@ fn openAu(
     ctx: *WavCtx,
     reader: *io.Reader,
     info: *decoder.Info,
-) Error!decoder.Decoder {
+) Error!void {
     var hdr: [24]u8 = undefined;
     if (!try readExact(reader, &hdr)) return error.Corrupt;
     if (!std.mem.eql(u8, hdr[0..4], ".snd")) return error.Corrupt;
@@ -558,7 +583,7 @@ fn finishPcm(
     fmt: decl.WavFmt,
     data_found: bool,
     info: *decoder.Info,
-) Error!decoder.Decoder {
+) Error!void {
     ctx.codec = fmt.codec;
     ctx.channels = @intCast(fmt.channels);
     ctx.sample_rate = fmt.sample_rate;
@@ -579,7 +604,6 @@ fn finishPcm(
 
     ctx.reader = reader.*;
     info.* = buildInfo(ctx);
-    return .{ .vtable = &vtable, .ctx = @ptrCast(ctx) };
 }
 
 /// 追加数据段（size == 0 忽略）
@@ -1209,13 +1233,18 @@ fn positionMsImpl(ctx: *anyopaque) i64 {
 
 fn deinitImpl(ctx: *anyopaque) void {
     const w: *WavCtx = @ptrCast(@alignCast(ctx));
+    destroyCtx(w);
+    w.allocator.destroy(w);
+}
+
+/// 释放 WavCtx 持有的资源（不 destroy 结构体本身；open 错误路径/解码器/meta 共用）
+fn destroyCtx(w: *WavCtx) void {
     if (w.dec_buf.len > 0) w.allocator.free(w.dec_buf);
     if (w.blk_buf.len > 0) w.allocator.free(w.blk_buf);
     freeMeta(w.allocator, &w.meta);
     freeLoops(w.allocator, &w.loops, &w.cue_points);
     w.data.deinit(w.allocator);
     w.reader.deinit();
-    w.allocator.destroy(w);
 }
 
 // ---- 标签元数据（LIST/INFO、AIFF NAME/AUTH/ANNO）----

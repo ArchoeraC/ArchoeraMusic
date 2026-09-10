@@ -81,9 +81,9 @@ fn mlpOpen(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info
 
 /// 模块登记表（single source of truth，取代 decoder.open 巨型 switch）
 pub const modules = [_]Module{
-    .{ .fmt = .wav,       .open = wav.open },
+    .{ .fmt = .wav,       .open = wav.open, .meta = wav.openMeta },
     .{ .fmt = .flac,      .open = flac.open, .meta = flac.openMeta },
-    .{ .fmt = .m4a,       .open = m4a.open },
+    .{ .fmt = .m4a,       .open = m4a.open, .meta = m4a.openMeta },
     .{ .fmt = .mp3,       .open = mp3.open, .meta = mp3.openMeta },
     .{ .fmt = .wv,        .open = wv.open },
     .{ .fmt = .ape,       .open = ape.open },

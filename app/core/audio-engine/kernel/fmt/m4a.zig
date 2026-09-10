@@ -993,6 +993,115 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
 }
 
 // ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）
+// ---------------------------------------------------------------------------
+
+/// 元数据专用轻量上下文：只保留构建 Info 所需字段，**不含** M4aCtx 内嵌的
+/// ~9MB AAC/ALAC 解码状态与帧缓冲。
+const MetaCtx = struct {
+    allocator: Allocator,
+    reader: io.Reader,
+    codec: CodecCfg,
+    channels: u8,
+    out_bps: u8,
+    meta: decoder.Metadata,
+};
+
+/// 委托 codec（fLaC/Opus/ac-3/ec-3/.mp3/ALS）回退完整 open 的包装句柄。
+const DecHolder = struct {
+    allocator: Allocator,
+    dec: decoder.Decoder,
+};
+
+fn decHolderDeinit(p: *anyopaque) void {
+    const h: *DecHolder = @ptrCast(@alignCast(p));
+    h.dec.deinit();
+    h.allocator.destroy(h);
+}
+
+fn wrapDecoder(allocator: Allocator, dec: decoder.Decoder) Error!decoder.MetadataSession {
+    const h = try allocator.create(DecHolder);
+    h.* = .{ .allocator = allocator, .dec = dec };
+    return .{ .ctx = @ptrCast(h), .deinit_fn = decHolderDeinit };
+}
+
+fn metaDeinit(p: *anyopaque) void {
+    const ctx: *MetaCtx = @ptrCast(@alignCast(p));
+    freeMeta(ctx.allocator, &ctx.meta);
+    ctx.allocator.destroy(ctx);
+}
+
+/// 元数据专用入口：只解析 moov→trak（样本表仅用于时长）与 udta 标签，
+/// 不初始化解码器状态。委托 codec 与 chan_config=0（声道待首帧确定）回退完整 open。
+pub fn openMeta(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const moov = try findTopBox(reader, "moov");
+    const moov_end = moov.start + moov.size;
+
+    var parsed: ?Parsed = null;
+    var has_audio = false;
+    var off = moov.data;
+    while (off + 8 <= moov_end) {
+        const trak = (try parseBox(reader, off, moov_end)) orelse break;
+        if (std.mem.eql(u8, "trak", &trak.type)) {
+            if (try parseTrak(reader, trak, allocator, &has_audio)) |p| {
+                parsed = p;
+                break;
+            }
+        }
+        if (trak.size == 0) break;
+        off += trak.size;
+    }
+    var p = parsed orelse return if (has_audio) error.UnsupportedFormat else error.Corrupt;
+
+    // 委托 codec / 声道待定：回退完整 open（正确性优先；仍由本会话持有释放）
+    const fallback = switch (p.codec) {
+        .alac => false,
+        .aac => |cfg| cfg.channels == 0,
+        else => true,
+    };
+    if (fallback) {
+        allocator.free(p.samples);
+        allocator.free(p.frame_offsets);
+        return wrapDecoder(allocator, try open(allocator, reader, info));
+    }
+    errdefer {
+        allocator.free(p.samples);
+        allocator.free(p.frame_offsets);
+    }
+
+    const total_samples = p.frame_offsets[p.samples.len];
+    const duration_known: decoder.DurationKnown = if (p.stts_total > 0) .exact else .estimate;
+
+    const ctx = try allocator.create(MetaCtx);
+    errdefer allocator.destroy(ctx);
+    ctx.allocator = allocator;
+    ctx.reader = undefined;
+    ctx.codec = p.codec;
+    ctx.channels = switch (p.codec) {
+        .alac => |cfg| cfg.channels,
+        .aac => |cfg| cfg.channels,
+        else => 0,
+    };
+    ctx.out_bps = switch (p.codec) {
+        .alac => |cfg| cfg.out_bps,
+        else => 16,
+    };
+    ctx.meta = try parseMetadata(allocator, reader, moov);
+    errdefer freeMeta(allocator, &ctx.meta);
+
+    // 样本表仅用于时长，释放（不持有解码帧定位）
+    allocator.free(p.samples);
+    allocator.free(p.frame_offsets);
+    p.samples = &.{};
+    p.frame_offsets = &.{};
+
+    ctx.reader = reader.*;
+    info.* = buildInfo(ctx, total_samples, duration_known);
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
+
+
+// ---------------------------------------------------------------------------
 // 委托 codec 初始化（flac/opus/ac3/eac3/mp3）：合成可解码流 + inner open
 // ---------------------------------------------------------------------------
 
@@ -1364,7 +1473,7 @@ fn parseMetadata(
 
 // ---- Info ----
 
-fn buildInfo(ctx: *M4aCtx, total_samples: u64, duration_known: decoder.DurationKnown) decoder.Info {
+fn buildInfo(ctx: anytype, total_samples: u64, duration_known: decoder.DurationKnown) decoder.Info {
     const sample_rate: u32 = switch (ctx.codec) {
         .alac => |cfg| cfg.sample_rate,
         .aac => |cfg| if (cfg.ext_sample_rate > 0) cfg.ext_sample_rate else cfg.sample_rate,
