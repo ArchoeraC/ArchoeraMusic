@@ -350,9 +350,39 @@ pub fn appInstanceAcquire() i32 {
 }
 
 
-// ── 系统提示（kdialog/zenity/xmessage/yad/notify-send 依次尝试）──────
-// 用 libc system() 启动（桥接上下文的 std.Io 不支持 process spawn）。
+// ── 系统提示 ──────────────────────────────────────────────────────
+// 优先桌面通知服务本身：freedesktop `org.freedesktop.Notifications.Notify`
+// （跨 DE：KDE/GNOME/XFCE/sway…，非模态气泡、不抢焦点）；失败再回退命令工具。
+
+fn notifyViaDbus(title: []const u8, body: []const u8) bool {
+    const conn = ensureConn() orelse return false;
+    var bw = message.Writer.init(alloc);
+    defer bw.deinit();
+    bw.putString("ArchoeraMusic") catch return false; // app_name
+    bw.putU32(0) catch return false; // replaces_id
+    bw.putString("") catch return false; // app_icon
+    bw.putString(title) catch return false; // summary
+    bw.putString(body) catch return false; // body
+    const am = bw.beginArray(4) catch return false; // actions: as
+    bw.endArray(am) catch return false;
+    const hm = bw.beginArray(8) catch return false; // hints: a{sv}
+    bw.endArray(hm) catch return false;
+    bw.putI32(-1) catch return false; // expire_timeout: 默认
+    const r = conn.callRaw(
+        "org.freedesktop.Notifications",
+        "/org/freedesktop/Notifications",
+        "org.freedesktop.Notifications",
+        "Notify",
+        "susssasa{sv}i",
+        bw.slice(),
+        3_000,
+    ) catch return false;
+    defer r.deinit();
+    return r.ok;
+}
+
 extern "c" fn system(command: [*:0]const u8) c_int;
+
 fn shellQuote(buf: *std.ArrayList(u8), s: []const u8) void {
     buf.append(alloc, '\'') catch {};
     for (s) |ch| {
@@ -366,8 +396,8 @@ fn shellQuote(buf: *std.ArrayList(u8), s: []const u8) void {
 }
 
 pub fn notify(title: []const u8, body: []const u8) i32 {
-    // 优先桌面环境「气泡通知」（org.freedesktop.Notifications，非模态、不抢焦点）；
-    // 无通知服务时回退模态对话框工具。
+    if (notifyViaDbus(title, body)) return core.OK;
+    // 回退：命令工具（notify-send 气泡优先，模态工具兜底）
     const attempts = [_][]const []const u8{
         &.{ "notify-send", "-a", "ArchoeraMusic", title, body },
         &.{ "kdialog", "--title", title, "--msgbox", body },
@@ -375,7 +405,6 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
         &.{ "xmessage", "-center", "-title", title, body },
         &.{ "yad", "--title", title, "--text", body, "--button=OK:0" },
     };
-    std.debug.print("[platform] notify title={s} body={s}\n", .{ title, body });
     for (attempts) |argv| {
         var buf = std.ArrayList(u8).empty;
         defer buf.deinit(alloc);
@@ -386,13 +415,8 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
         const cmd = buf.toOwnedSliceSentinel(alloc, 0) catch return core.ERR_BACKEND;
         defer alloc.free(cmd);
         const rc = system(cmd);
-        const code: u32 = @intCast((rc >> 8) & 0xff); // WEXITSTATUS
-        if (rc != -1 and code != 127) { // 127 = 命令不存在 → 试下一个
-            std.debug.print("[platform] notify via {s} rc={d}\n", .{ argv[0], rc });
-            return core.OK;
-        }
-        std.debug.print("[platform] notify {s} skip (rc={d})\n", .{ argv[0], rc });
+        const code: u32 = @intCast((rc >> 8) & 0xff);
+        if (rc != -1 and code != 127) return core.OK;
     }
-    std.debug.print("[platform] notify: all attempts failed\n", .{});
     return core.ERR_BACKEND;
 }
