@@ -1047,5 +1047,6 @@
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "システムのスリープ防止に失敗しました",
   "toastMediaSessionLost": "システムメディアセッションが切断されました",
-  "instanceAlreadyRunning": "ArchoeraMusic は既に実行中です。"
+  "instanceAlreadyRunning": "システムトレイまたはタスクバーで実行中のウィンドウを探してください。",
+  "instanceAlreadyRunningTitle": "ArchoeraMusic は既に起動しています"
 }

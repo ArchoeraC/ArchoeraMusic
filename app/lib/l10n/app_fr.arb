@@ -1047,5 +1047,6 @@
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "Échec de la prévention de la mise en veille du système",
   "toastMediaSessionLost": "Session multimédia système déconnectée",
-  "instanceAlreadyRunning": "ArchoeraMusic est déjà en cours d'exécution."
+  "instanceAlreadyRunning": "Trouvez la fenêtre en cours d’exécution dans la zone de notification ou la barre des tâches.",
+  "instanceAlreadyRunningTitle": "ArchoeraMusic est déjà en cours d'exécution"
 }

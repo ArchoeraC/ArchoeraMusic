@@ -1047,5 +1047,6 @@
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "No se pudo evitar que el sistema se suspenda",
   "toastMediaSessionLost": "La sesión multimedia del sistema se desconectó",
-  "instanceAlreadyRunning": "ArchoeraMusic ya se está ejecutando."
+  "instanceAlreadyRunning": "Busque la ventana en ejecución en la bandeja del sistema o la barra de tareas.",
+  "instanceAlreadyRunningTitle": "ArchoeraMusic ya se está ejecutando"
 }

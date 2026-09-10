@@ -44,6 +44,7 @@ Future<void> main() async {
     await windowManager.show();
     final l10n = lookupAppLocalizations(locale);
     runApp(_AlreadyRunningApp(
+        title: l10n.instanceAlreadyRunningTitle,
         message: l10n.instanceAlreadyRunning,
         okLabel: l10n.vaultCrashDismiss,
         locale: locale));
@@ -100,8 +101,12 @@ class _BrowserUserAgentOverrides extends HttpOverrides {
 /// 二次启动提示：自绘对话框卡片（无页面包裹感），窗口已缩为对话框尺寸。
 class _AlreadyRunningApp extends StatelessWidget {
   const _AlreadyRunningApp(
-      {required this.message, required this.okLabel, required this.locale});
+      {required this.title,
+      required this.message,
+      required this.okLabel,
+      required this.locale});
 
+  final String title;
   final String message;
   final String okLabel;
   final Locale locale;
@@ -114,14 +119,16 @@ class _AlreadyRunningApp extends StatelessWidget {
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      home: _AlreadyRunningCard(message: message, okLabel: okLabel),
+      home: _AlreadyRunningCard(title: title, message: message, okLabel: okLabel),
     );
   }
 }
 
 class _AlreadyRunningCard extends StatelessWidget {
-  const _AlreadyRunningCard({required this.message, required this.okLabel});
+  const _AlreadyRunningCard(
+      {required this.title, required this.message, required this.okLabel});
 
+  final String title;
   final String message;
   final String okLabel;
 
@@ -153,7 +160,8 @@ class _AlreadyRunningCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Center(
-                child: Text('ArchoeraMusic',
+                child: Text(title,
+                    textAlign: TextAlign.center,
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.w600)),
               ),
