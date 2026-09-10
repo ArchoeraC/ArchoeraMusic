@@ -252,8 +252,10 @@ Dart 侧映射（`platform_bindings.dart`）：`MediaCommandEvent` / `MediaSeekE
   → `ISystemMediaTransportControlsInterop::GetForWindow(hwnd)`；元数据
   `SystemMediaTransportControlsDisplayUpdater`（title/artist/album/thumbnail）；
   进度 `UpdateTimelineProperties`；按钮事件 `ButtonPressed` → 事件回调。
-  COM 调用全部手写 vtable（无 cppwinrt 依赖）；thumbnail：http URL 走
-  `RandomAccessStreamReference::CreateFromUri`，本地路径走 `CreateFromFile`。
+  COM 调用全部手写 vtable（无 cppwinrt 依赖）。**封面/时间轴（已实现）**：
+  `RandomAccessStreamReference.CreateFromUri`（http URL → `Windows.Foundation.Uri`
+  → `put_Thumbnail`）+ `ISystemMediaTransportControls2.UpdateTimelineProperties`
+  （进度条）。IID 由本机 winmd 解析（已按 ECMA 1-based 行号修正关联并实测校验）。
 - **HWND 获取**：`windows/runner/main.cpp` 增一行导出 `int64_t get_flutter_window()`
   （类比 audio-engine C 壳哲学，改动 <5 行）；Dart 启动时 FFI 取得并传入
   `apl_media_set_window`。兜底：未接通时 `GetForegroundWindow()` 于窗口创建后取一次。
@@ -275,9 +277,10 @@ Dart 侧映射（`platform_bindings.dart`）：`MediaCommandEvent` / `MediaSeekE
 - **窗口状态**：Flutter 主 `NSWindow`（runner 导出句柄）的
   `NSWindowDidMiniaturizeNotification` / `NSWindowDidBecomeKeyNotification` /
   `NSWindowDidResignKeyNotification` 观察者 → `APL_EVENT_WINDOW_STATE`。
-- **媒体会话**：`MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo`（字典：title/
-  artist/album/duration/elapsedTime/rate）+ `MPRemoteCommandCenter`（play/pause/
-  toggle/next/prev/changePlaybackPosition → addTarget handler → 事件回调）。
+- **媒体会话**：`MPNowPlayingInfoCenter`（字典：title/artist/album/duration/
+  elapsedTime/rate/**artwork**，封面经 `NSImage`+`MPMediaItemArtwork`）+
+  `MPRemoteCommandCenter`（play/pause/toggle/next/prev/stop/**changePlaybackPosition**
+  → addTarget:action: → 事件回调；seek 读 `positionTime`）。
   全部经 `dlopen` frameworks + `objc_msgSend` 函数指针直调，不引入 ObjC 源文件；
   所有 ObjC 调用经 `dispatch_async(main_queue)` 汇聚到主线程（媒体会话 API 要求）。
 
@@ -344,8 +347,8 @@ Dart 侧映射（`platform_bindings.dart`）：`MediaCommandEvent` / `MediaSeekE
 | **P1 Linux Power** | ✅ 2026-09-10 | 自研 D-Bus（`dbus/message.zig` 编组↔解组往返 9 例 + `dbus/transport.zig` 地址解析/AUTH EXTERNAL/Hello/读取权认领）；`backend_linux.zig` ScreenSaver Inhibit/UnInhibit + ActiveChanged 订阅 + 泵线程 + BACKEND_STATE；`zig build test` **19/19**（含真实会话总线 Hello、两连接信号端到端）；Dart `SystemPower` 接线 + 失败 toast（l10n ×9）；工厂 FFI/兜底分流 |
 | P2 Linux MPRIS | ✅ 2026-09-10 | `dbus/mpris.zig`：`org.mpris.MediaPlayer2[.archoera]` 名称申请 + Root/Player/Properties/Introspectable 方法分发 + 属性 Get/GetAll/Set + `PropertiesChanged` 推送 + 位置单调外推；`backend_linux` 能力位图扩 `MEDIA_SESSION\|MEDIA_SEEK\|MEDIA_ARTWORK`；Dart `MediaSessionHost` 接线（元数据/播放态同步、命令→`playbackNotifier`、断连 toast）。`zig build test` **22/22**（含真实总线 GetAll + Play 端到端）；`caps=31` |
 | P3a Windows Power/窗口 | ✅ 2026-09-10（**WSL interop 真机验证**） | `backend_windows.zig`：SetThreadExecutionState（`CreateThread` 专用常驻线程抑制）+ PowerSettingRegisterNotification(GUID_CONSOLE_DISPLAY_STATE, DEVICE_NOTIFY_CALLBACK) 熄屏 + `FindWindowW` 发现 Flutter 顶层窗口 + WndProc 子类化窗口状态；`build.zig` 链 user32/powrprof。真机冒烟（`zig build win-smoke`，WSL 直跑 exe）：`caps=0x23`、抑制 on/off=OK、熄屏注册=OK、无 Flutter 窗口时 window_events 优雅返回 -2、shutdown 干净。Dart `power_saver` 按 caps 接入 `SystemWindow` |
-| P3b Windows SMTC | ✅ 2026-09-10（**WSL interop 真机验证**） | `win_smtc.zig`：WinRT COM vtable 直调。**权威来源**：本机 `Windows.Media.winmd`（ECMA-335）解析出方法声明顺序（vtable 槽位）+ `[Guid]`（IID `ISystemMediaTransportControls`=99FA3FF4-…），interop IID 取自 mingw 头。`RoInitialize/RoGetActivationFactory/WindowsCreateString` 经 `LoadLibrary("combase.dll")` 运行时解析（无 x86_64 导入库）；事件委托手写 COM（`add_ButtonPressed` → `get_Button` → apl 命令）。真机冒烟：`set_track/set_playback=0`、**读回 PlaybackStatus=Playing(3)/IsEnabled=1 校验槽位**、窗口事件触发。未做：时间轴（ISystemMediaTransportControls2）、缩略图 |
-| P4 macOS | ✅ 2026-09-10（**交叉编译验证**，待真机） | `backend_macos.zig`：无 SDK 头 → 全程 `dlopen`+`objc_msgSend` 运行时直调（不 `@cImport` 框架头、不链框架，仅 libSystem dlopen/dlsym）；观察者/远程命令目标用运行时 ObjC 类（`objc_allocateClassPair`+`class_addMethod`）。覆盖 NSProcessInfo beginActivity 抑制、NSWorkspace 熄屏通知、NSWindow 窗口状态通知、MPNowPlayingInfoCenter + MPRemoteCommandCenter（play/pause/toggle/next/prev/stop）。aarch64/x86_64-macos 交叉编译通过 |
+| P3b Windows SMTC | ✅ 2026-09-10（**WSL interop 真机验证**；含封面缩略图 + 时间轴） | `win_smtc.zig`：WinRT COM vtable 直调。**权威来源**：本机 `Windows.Media.winmd`（ECMA-335）解析出方法声明顺序（vtable 槽位）+ `[Guid]`（IID `ISystemMediaTransportControls`=99FA3FF4-…），interop IID 取自 mingw 头。`RoInitialize/RoGetActivationFactory/WindowsCreateString` 经 `LoadLibrary("combase.dll")` 运行时解析（无 x86_64 导入库）；事件委托手写 COM（`add_ButtonPressed` → `get_Button` → apl 命令）。真机冒烟：`set_track/set_playback=0`、**读回 PlaybackStatus=Playing(3)/IsEnabled=1 校验槽位**、窗口事件触发。未做：时间轴（ISystemMediaTransportControls2）、缩略图 |
+| P4 macOS | ✅ 2026-09-10（**交叉编译验证**，待真机；含封面 + changePlaybackPosition） | `backend_macos.zig`：无 SDK 头 → 全程 `dlopen`+`objc_msgSend` 运行时直调（不 `@cImport` 框架头、不链框架，仅 libSystem dlopen/dlsym）；观察者/远程命令目标用运行时 ObjC 类（`objc_allocateClassPair`+`class_addMethod`）。覆盖 NSProcessInfo beginActivity 抑制、NSWorkspace 熄屏通知、NSWindow 窗口状态通知、MPNowPlayingInfoCenter + MPRemoteCommandCenter（play/pause/toggle/next/prev/stop）。aarch64/x86_64-macos 交叉编译通过 |
 | P5 Linux 窗口状态 | ✅ 2026-09-10（编译验证，待真机） | **会话检测 + GTK/GDK 统一模式**：`linux_window.zig` 经 `dlopen` libgtk-3/libgdk-3/libglib-2.0 取应用自身 GtkWindow，`g_main_context_invoke` 汇入 GTK 主线程 + `g_timeout_add(500ms)` 轻轮询 `gtk_window_is_active`/`gdk_window_get_state(ICONIFIED)`；**同时覆盖 X11 与 Wayland**（GDK 已抽象），消除 Wayland 回退 window_manager。`detectSession()`（WAYLAND_DISPLAY/DISPLAY）用于能力门控与日志 |
 
 **过渡兜底（P3/P4 前不回归）**：桥接未置 Power 能力位时，工厂注入

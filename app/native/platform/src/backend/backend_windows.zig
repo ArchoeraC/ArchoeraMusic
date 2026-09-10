@@ -272,17 +272,17 @@ pub fn windowSetEvents(on: i32) i32 {
 pub fn mediaSetTrack(meta: ?*const core.TrackMeta) i32 {
     if (smtc.init(&findFlutterWindow) != core.OK) return core.ERR_BACKEND;
     if (meta) |m| {
-        smtc.setTrack(m.title.slice(), m.artist.slice());
+        smtc.setTrack(m.title.slice(), m.artist.slice(), m.art_url.slice(), m.duration_ms);
     } else {
-        smtc.setTrack(null, null);
+        smtc.setTrack(null, null, null, -1);
     }
     return core.OK;
 }
 
 pub fn mediaSetPlayback(state: i32, position_ms: i64, speed: f64, volume: f64, loop: i32, shuffle: i32) i32 {
-    _ = .{ position_ms, speed, volume, loop, shuffle };
+    _ = .{ speed, volume, loop, shuffle };
     if (smtc.init(&findFlutterWindow) != core.OK) return core.ERR_BACKEND;
-    smtc.setPlayback(state);
+    smtc.setPlayback(state, position_ms);
     return core.OK;
 }
 

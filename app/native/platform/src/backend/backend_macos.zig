@@ -70,6 +70,10 @@ fn mOpt(t: Id, s: Sel, opts: u64, a: Id) Id {
     const f: *const fn (Id, Sel, u64, Id) callconv(.c) Id = @ptrCast(@alignCast(g_msgSend.?));
     return f(t, s, opts, a);
 }
+fn mD0(t: Id, s: Sel) f64 {
+    const f: *const fn (Id, Sel) callconv(.c) f64 = @ptrCast(@alignCast(g_msgSend.?));
+    return f(t, s);
+}
 fn mD(t: Id, s: Sel, d: f64) Id {
     const f: *const fn (Id, Sel, f64) callconv(.c) Id = @ptrCast(@alignCast(g_msgSend.?));
     return f(t, s, d);
@@ -176,6 +180,14 @@ fn onStop(_: Id, _: Sel, _: Id) callconv(.c) c_long {
     mediaCmd(core.CMD_STOP);
     return 0;
 }
+fn onSeek(_: Id, _: Sel, ev: Id) callconv(.c) c_long {
+    if (ev != null) {
+        const secs = mD0(ev, sel("positionTime"));
+        const ms: i64 = @intFromFloat(secs * 1000.0);
+        core.dispatch(.{ .type = core.EVENT_MEDIA_SEEK, .u = .{ .seek = .{ .rel_ms = 0, .abs_ms = ms } } });
+    }
+    return 0;
+}
 
 fn addMethod(c: Class, name: [*:0]const u8, imp: *const anyopaque, types: [*:0]const u8) void {
     _ = g_addMethod.?(c, sel(name), imp, types);
@@ -197,6 +209,7 @@ fn ensureObserver() Id {
     addMethod(c, "onNext:", @ptrCast(&onNext), "q@:@");
     addMethod(c, "onPrev:", @ptrCast(&onPrev), "q@:@");
     addMethod(c, "onStop:", @ptrCast(&onStop), "q@:@");
+    addMethod(c, "onSeek:", @ptrCast(&onSeek), "q@:@");
     g_registerPair.?(c);
     g_observer_cls = c;
     g_observer = m0(c, sel("new"));
@@ -290,6 +303,15 @@ pub fn mediaSetTrack(meta: ?*const core.TrackMeta) i32 {
     if (m.album.slice()) |al| {
         v2(dict, sel("setObject:forKey:"), nsstrC(al), nsConst(g_media, "MPMediaItemPropertyAlbumTitle"));
     }
+    if (m.art_url.slice()) |u| {
+        const img = loadImage(u);
+        if (img != null) {
+            const art = m1(m0(cls("MPMediaItemArtwork"), sel("alloc")), sel("initWithImage:"), img);
+            if (art != null) {
+                v2(dict, sel("setObject:forKey:"), art, nsConst(g_media, "MPMediaItemPropertyArtwork"));
+            }
+        }
+    }
     if (m.duration_ms > 0) {
         v2(dict, sel("setObject:forKey:"), nsnum(@as(f64, @floatFromInt(m.duration_ms)) / 1000.0), nsConst(g_media, "MPMediaItemPropertyPlaybackDuration"));
     }
@@ -332,11 +354,27 @@ fn ensureRemoteCommands() void {
         .{ .cmd = "nextTrackCommand", .handler = "onNext:" },
         .{ .cmd = "previousTrackCommand", .handler = "onPrev:" },
         .{ .cmd = "stopCommand", .handler = "onStop:" },
+        .{ .cmd = "changePlaybackPositionCommand", .handler = "onSeek:" },
     };
     for (pairs) |p| {
         const command = m0(cc, sel(p.cmd));
         if (command != null) _ = m2(command, sel("addTarget:action:"), obs, sel(p.handler));
     }
+}
+
+/// 从 http(s) URL 或本地路径加载 NSImage（失败返回 null）。
+fn loadImage(url: []const u8) Id {
+    var buf: [1024]u8 = undefined;
+    const n = @min(url.len, buf.len - 1);
+    @memcpy(buf[0..n], url[0..n]);
+    buf[n] = 0;
+    const z: [*:0]const u8 = @ptrCast(&buf);
+    const nsurl = if (std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://"))
+        m1(cls("NSURL"), sel("URLWithString:"), nsstr(z))
+    else
+        m1(cls("NSURL"), sel("fileURLWithPath:"), nsstr(z));
+    if (nsurl == null) return null;
+    return m1(m0(cls("NSImage"), sel("alloc")), sel("initWithContentsOfURL:"), nsurl);
 }
 
 fn nsstrC(s: []const u8) Id {
