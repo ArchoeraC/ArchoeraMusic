@@ -122,7 +122,6 @@ typedef _AplMediaPlaybackC = Int32 Function(
 typedef _AplMediaWindowC = Int32 Function(Int64 window);
 typedef _SetEventCallbackC = Int32 Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
-typedef _AplPollEventC = Int32 Function(Pointer<AplEventFfi> out);
 
 typedef AplEventCallbackC = Void Function(
     Pointer<AplEventFfi> event, Pointer<Void> userData);
@@ -141,7 +140,6 @@ typedef _AplMediaPlaybackD = int Function(
 typedef _AplMediaWindowD = int Function(int window);
 typedef _SetEventCallbackD = int Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
-typedef _AplPollEventD = int Function(Pointer<AplEventFfi> out);
 
 // ── 绑定 ───────────────────────────────────────────────────────────
 
@@ -199,9 +197,7 @@ class PlatformBindings {
         _mediaWindow =
             lib.lookupFunction<_AplMediaWindowC, _AplMediaWindowD>('apl_media_set_window'),
         _setCallback = lib
-            .lookupFunction<_SetEventCallbackC, _SetEventCallbackD>('apl_set_event_callback'),
-        _pollEvent = lib
-            .lookupFunction<_AplPollEventC, _AplPollEventD>('apl_poll_event') {
+            .lookupFunction<_SetEventCallbackC, _SetEventCallbackD>('apl_set_event_callback') {
     // 事件回调：listener 可从任意 OS 线程触发，事件按到达序进入 Dart 端口
     _eventCallable = NativeCallable<AplEventCallbackC>.listener(_onNativeEvent);
     _setCallback(_eventCallable.nativeFunction, nullptr);
@@ -223,8 +219,6 @@ class PlatformBindings {
   final _AplMediaPlaybackD _mediaPlayback;
   final _AplMediaWindowD _mediaWindow;
   final _SetEventCallbackD _setCallback;
-  final _AplPollEventD _pollEvent;
-  final Pointer<AplEventFfi> _evtBuf = calloc<AplEventFfi>();
 
   // 四类事件广播流（ffi_* 实现订阅转译）
   final _commandCtrl = StreamController<MediaCommandEvent>.broadcast();
@@ -273,30 +267,25 @@ class PlatformBindings {
   Stream<AplWindowEvent> get windowEvents => _windowCtrl.stream;
   Stream<AplBackendEvent> get backendEvents => _backendCtrl.stream;
 
-  /// 原生回调仅作「唤醒」；事件数据经 `apl_poll_event` 拉取副本，避免
-  /// 异步 listener 读到已失效的栈上指针（曾导致事件随机丢失）。
+  /// 栈上指针仅在回调期间有效——同步取值后立即投递。
   static void _onNativeEvent(Pointer<AplEventFfi> event, Pointer<Void> userData) {
-    _instance?._drainEvents();
-  }
-
-  void _drainEvents() {
-    while (_pollEvent(_evtBuf) != 0) {
-      final ref = _evtBuf.ref;
-      switch (ref.type) {
-        case aplEventMediaCommand:
-          _commandCtrl.add(MediaCommandEvent(_commandFromNative(ref.u.command)));
-        case aplEventMediaSeek:
-          _seekCtrl.add(AplSeekEvent(relMs: ref.u.seek.relMs, absMs: ref.u.seek.absMs));
-        case aplEventScreenState:
-          _screenCtrl.add(AplScreenEvent(ref.u.active != 0));
-        case aplEventWindowState:
-          _windowCtrl.add(AplWindowEvent(
-            minimized: ref.u.window.minimized != 0,
-            focused: ref.u.window.focused != 0,
-          ));
-        case aplEventBackendState:
-          _backendCtrl.add(AplBackendEvent(ref.u.backendLost != 0));
-      }
+    final b = _instance;
+    if (b == null || event == nullptr) return;
+    final ref = event.ref;
+    switch (ref.type) {
+      case aplEventMediaCommand:
+        b._commandCtrl.add(MediaCommandEvent(_commandFromNative(ref.u.command)));
+      case aplEventMediaSeek:
+        b._seekCtrl.add(AplSeekEvent(relMs: ref.u.seek.relMs, absMs: ref.u.seek.absMs));
+      case aplEventScreenState:
+        b._screenCtrl.add(AplScreenEvent(ref.u.active != 0));
+      case aplEventWindowState:
+        b._windowCtrl.add(AplWindowEvent(
+          minimized: ref.u.window.minimized != 0,
+          focused: ref.u.window.focused != 0,
+        ));
+      case aplEventBackendState:
+        b._backendCtrl.add(AplBackendEvent(ref.u.backendLost != 0));
     }
   }
 
