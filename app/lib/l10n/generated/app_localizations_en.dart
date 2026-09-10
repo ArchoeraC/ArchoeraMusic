@@ -3965,4 +3965,140 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get instanceAlreadyRunningTitle => 'ArchoeraMusic is already running';
+
+  @override
+  String get settingsCatShortcuts => 'Shortcuts';
+
+  @override
+  String get settingsShortcutsSubtitle => 'Custom key bindings';
+
+  @override
+  String get shortcutNote =>
+      'Click a binding to record a new shortcut; press the key combination in the dialog.';
+
+  @override
+  String get shortcutResetAll => 'Reset all';
+
+  @override
+  String get shortcutUnbound => 'Unbound';
+
+  @override
+  String get shortcutHintEdit => 'Click to edit';
+
+  @override
+  String get shortcutConflict => 'Conflicts with another action';
+
+  @override
+  String get shortcutCaptureTitle => 'Record shortcut';
+
+  @override
+  String get shortcutPressKeys => 'Press keys…';
+
+  @override
+  String get shortcutCategoryPlayback => 'Playback';
+
+  @override
+  String get shortcutCategorySeek => 'Seek';
+
+  @override
+  String get shortcutCategoryVolume => 'Volume';
+
+  @override
+  String get shortcutCategoryQueue => 'Queue';
+
+  @override
+  String get shortcutCategoryNavigation => 'Navigation';
+
+  @override
+  String get shortcutActionPlayPause => 'Play / Pause';
+
+  @override
+  String get shortcutActionPlay => 'Play';
+
+  @override
+  String get shortcutActionPause => 'Pause';
+
+  @override
+  String get shortcutActionStop => 'Stop';
+
+  @override
+  String get shortcutActionNext => 'Next track';
+
+  @override
+  String get shortcutActionPrevious => 'Previous track';
+
+  @override
+  String get shortcutActionLikeToggle => 'Like / Unlike';
+
+  @override
+  String get shortcutActionShuffleToggle => 'Toggle shuffle';
+
+  @override
+  String get shortcutActionRepeatCycle => 'Cycle repeat mode';
+
+  @override
+  String get shortcutActionReload => 'Reload current track';
+
+  @override
+  String get shortcutActionSeekBackward => 'Seek back 10s';
+
+  @override
+  String get shortcutActionSeekForward => 'Seek forward 10s';
+
+  @override
+  String get shortcutActionSeekBackwardLong => 'Seek back 30s';
+
+  @override
+  String get shortcutActionSeekForwardLong => 'Seek forward 30s';
+
+  @override
+  String get shortcutActionVolumeUp => 'Volume up';
+
+  @override
+  String get shortcutActionVolumeDown => 'Volume down';
+
+  @override
+  String get shortcutActionMuteToggle => 'Mute / Unmute';
+
+  @override
+  String get shortcutActionJumpToFirst => 'Jump to first in queue';
+
+  @override
+  String get shortcutActionJumpToLast => 'Jump to last in queue';
+
+  @override
+  String get shortcutActionClearQueue => 'Clear queue';
+
+  @override
+  String get shortcutActionGoHome => 'Go to Home';
+
+  @override
+  String get shortcutActionGoLibrary => 'Go to Library';
+
+  @override
+  String get shortcutActionGoSearch => 'Go to Search';
+
+  @override
+  String get shortcutActionGoLiked => 'Go to Liked';
+
+  @override
+  String get shortcutActionGoFavorites => 'Go to Favorites';
+
+  @override
+  String get shortcutActionGoHistory => 'Go to History';
+
+  @override
+  String get shortcutActionGoDownload => 'Go to Downloads';
+
+  @override
+  String get shortcutActionGoStreaming => 'Go to Streaming';
+
+  @override
+  String get shortcutActionOpenPlayer => 'Open player';
+
+  @override
+  String get shortcutActionOpenSettings => 'Open settings';
+
+  @override
+  String get shortcutActionBack => 'Back';
 }

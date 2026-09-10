@@ -21,6 +21,7 @@ import 'prefs_scrape.dart';
 import 'prefs_scan.dart';
 import 'prefs_search.dart';
 import 'prefs_security.dart';
+import 'prefs_shortcuts.dart';
 
 export 'prefs_app.dart';
 export 'prefs_appearance.dart';
@@ -34,6 +35,7 @@ export 'prefs_scrape.dart';
 export 'prefs_scan.dart';
 export 'prefs_search.dart';
 export 'prefs_security.dart';
+export 'prefs_shortcuts.dart';
 
 /// 应用偏好（轻量 JSON 文件持久化，存数据目录 `prefs.json`）。
 ///
@@ -620,6 +622,26 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置「禁用系统休眠」。
   void setSuppressSleep(bool value) {
     state = state.copyWithPower(suppressSleep: value);
+    state.save();
+  }
+
+  // ── 快捷键 ────────────────────────────────────────────────────
+
+  /// 设置某动作的快捷键绑定（空串 = 清除覆盖回默认）。
+  void setShortcut(String id, String binding) {
+    state = state.copyWithShortcut(id, binding);
+    state.save();
+  }
+
+  /// 清除某动作覆盖（恢复默认绑定）。
+  void resetShortcut(String id) {
+    state = state.copyWithShortcut(id, null);
+    state.save();
+  }
+
+  /// 清除全部覆盖（恢复所有默认绑定）。
+  void resetAllShortcuts() {
+    state = state.copyWithShortcutsCleared();
     state.save();
   }
 }
