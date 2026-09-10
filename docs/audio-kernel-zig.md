@@ -931,6 +931,13 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > **probe-only 覆盖**：flac/mp3/wav/m4a/ape/wv/mpc/dsd/tta/wma + Ogg 全家。剩余
 > amr/awb/aac/ac3/dts/mka/shn/tak 内核 metadata 为空，保持 TagLib（mka 需 Matroska
 > Tags 解析，改动较大）。
+>
+> **第十一批（2026-09-10）**：**Matroska（mka）** 落地——`mka.openMeta` 只扫 Segment
+> 顶层 Info/Tracks/Tags 小段（不建解码器/不读 Cluster）；Tags 解析 `Tag`/`SimpleTag`
+> （`TagName`/`TagString`，含嵌套）映射 TITLE/ARTIST/ALBUM/DATE_RELEASED|RECORDED/
+> GENRE/COMMENT。scanner `KernelExts` 补 `mka`。**probe-only 覆盖**：flac/mp3/wav/m4a/
+> ape/wv/mpc/dsd/tta/wma/mka + Ogg 全家。剩余 amr/awb/aac/ac3/dts/shn/tak 内核
+> metadata 为空且少有标签，保持 TagLib。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
