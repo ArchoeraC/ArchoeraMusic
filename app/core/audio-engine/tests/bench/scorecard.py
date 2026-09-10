@@ -68,6 +68,7 @@ import resource
 import statistics
 import subprocess
 import sys
+import shutil
 import tempfile
 import threading
 import time
@@ -337,10 +338,15 @@ def rss_sampler(pid, stop, out_peak, interval_s=0.002):
     out_peak.append(peak)
 
 
+PIN = ""
+
+
 def run_measured(argv, timeout_s=180.0, err_path=None):
     """执行一次解码并测量 wall/user/sys/peakRSS。返回 dict。"""
     if err_path is None:
         err_path = argv[-1] + ".stderr"
+    if PIN and shutil.which("taskset"):
+        argv = ["taskset", "-c", PIN] + list(argv)
     ru0 = resource.getrusage(resource.RUSAGE_CHILDREN)
     t0 = time.monotonic()
     proc = subprocess.Popen(argv, stdout=subprocess.DEVNULL,
@@ -380,6 +386,25 @@ def measure_adaptive(argv, timeout_s=180.0, short_s=0.6, max_reps=3, err_path=No
     best = dict(best)
     best["peak_rss_kb"] = max(r["peak_rss_kb"] for r in reps)
     return best
+
+
+def measure_reps(argv, reps, timeout_s=180.0, err_path=None):
+    """reps 次采样：wall/cpu 去一个最高与最低后取均值；RSS 取跨次峰值。"""
+    rs = [run_measured(argv, timeout_s, err_path=err_path) for _ in range(max(1, reps))]
+    ok = [r for r in rs if r["rc"] == 0] or rs
+
+    def trim(vals):
+        v = sorted(vals)
+        if len(v) >= 3:
+            v = v[1:-1]
+        return sum(v) / len(v)
+
+    bad = next((r["rc"] for r in rs if r["rc"] != 0), 0)
+    return {"rc": bad, "timeout": False,
+            "wall_s": round(trim([r["wall_s"] for r in ok]), 4),
+            "user_s": round(trim([r["user_s"] for r in ok]), 4),
+            "sys_s": round(trim([r["sys_s"] for r in ok]), 4),
+            "peak_rss_kb": max(r["peak_rss_kb"] for r in rs)}
 
 
 def probe(path):
@@ -575,12 +600,16 @@ def main():
     ap.add_argument("--csv", default=os.path.join(HERE, "data", "SCORE_results.csv"))
     ap.add_argument("--md", default=os.path.join(HERE, "SCORE_results.md"))
     ap.add_argument("--workdir", default=os.path.join(HERE, ".tmp_scorecard_wd"))
-    ap.add_argument("--reps", type=int, default=1)
+    ap.add_argument("--reps", type=int, default=1,
+                    help="每项采样次数；>1 时去极值取均值（更稳，更慢）")
+    ap.add_argument("--pin", default="", help="taskset CPU 列表（如 0-15 固定 P 核降噪）")
     ap.add_argument("--timeout-s", type=float, default=180.0)
     ap.add_argument("--no-gen", action="store_true", help="不自动生成缺失语料")
     ap.add_argument("--build-tag", default="")
     a = ap.parse_args()
 
+    global PIN
+    PIN = a.pin
     engine = os.path.abspath(a.engine)
     if not os.path.isfile(engine):
         print(f"错误：引擎不存在 {engine}", file=sys.stderr)
@@ -632,13 +661,15 @@ def main():
             outp = os.path.join(run_dir, f"pcm_{fmt['key'].replace('/', '_')}_{eng}")
             argv, kind, outfile = build_cmd(eng, path, outp, engine)
             errf = outfile + ".stderr"
-            res = measure_adaptive(argv, a.timeout_s, err_path=errf)
+            res = (measure_reps(argv, a.reps, a.timeout_s, err_path=errf)
+                   if a.reps > 1 else measure_adaptive(argv, a.timeout_s, err_path=errf))
             # 需要额外一次 ffmpeg -f f32le 辅助路由（lossless 逐位证据），并入同一 engine 行
             extra_f32 = None
             if res["rc"] == 0 and fmt["cls"] == "lossless" and eng in ("ffmpeg", "era", "stable"):
                 if eng == "ffmpeg":
                     argv2, k2, o2 = build_cmd("ffmpeg-f32", path, outp + ".f32", engine)
-                    r2 = measure_adaptive(argv2, a.timeout_s, err_path=o2 + ".stderr")
+                    r2 = (measure_reps(argv2, a.reps, a.timeout_s, err_path=o2 + ".stderr")
+                          if a.reps > 1 else measure_adaptive(argv2, a.timeout_s, err_path=o2 + ".stderr"))
                     extra_f32 = (r2, o2)
                 else:
                     extra_f32 = (res, outfile)  # f32wav 本身即 f32

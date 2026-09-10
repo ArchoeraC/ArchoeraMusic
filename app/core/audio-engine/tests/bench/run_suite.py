@@ -86,7 +86,8 @@ def sec_scorecard(reps):
     corpus = f"{TMP}/sc"
     cmd = ["python3", os.path.join(HERE, "scorecard.py"), "--corpus", corpus,
            "--engine", os.path.join(ENG, "build", "archoera-audio-engine"),
-           "--csv", csv, "--md", md, "--reps", str(reps), "--build-tag", f"suite-{DATE}"]
+           "--csv", csv, "--md", md, "--reps", str(reps), "--pin", "0-15",
+           "--build-tag", f"suite-{DATE}"]
     rc, out, dt = sh(cmd, timeout=3600)
     rows = []
     if os.path.isfile(csv):
@@ -186,7 +187,7 @@ def sec_scanner():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--build", action="store_true")
-    ap.add_argument("--reps", type=int, default=2)
+    ap.add_argument("--reps", type=int, default=5, help="scorecard 每项采样次数（去极值）")
     ap.add_argument("--skip", default="")
     a = ap.parse_args()
     skip = set(x.strip().upper() for x in a.skip.split(",") if x.strip())
@@ -231,8 +232,9 @@ def main():
         av = res["score"].get("avg", {})
         A.append(f"- 总体均分：**era {av.get('era','?')} vs stable {av.get('stable','?')} "
                  f"vs ffmpeg {av.get('ffmpeg','?')}**（FFmpeg 归一=100）")
-        A.append("- 公平性提示：speed=40·min(1,R/50)，本语料所有引擎 ≥50×RT → speed 恒 40/40，"
-                 "总分差异实际来自 memory 与 correctness；无损要求 era==stable==ffmpeg 逐位。")
+        A.append("- 公平性：speed=40·min(1,R/50) 在本语料饱和（≥50×RT），总分差异实际来自 "
+                 "memory/correctness；无损要求 era==stable==ffmpeg 逐位；每项 "
+                 f"reps={a.reps} 去极值，核心 pin P 核（taskset 0-15）。")
         A.append("")
     if "pool" in res and res["pool"].get("rows"):
         A += ["## D. 内核池并发压力（bench_era_pool，流上限=并发）", "",
