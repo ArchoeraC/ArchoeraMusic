@@ -9,7 +9,7 @@
 
 本文不评判任何库的「好/坏」绝对优劣，只做**同一语料、同机、可复现**的行业横评，
 全部阈值与权重在文内写明，可原样重跑复核。文中数值 = 当前快照
-`app/core/audio-engine/tests/bench/SCORE_2026-09-05.md` / `data/SCORE_2026-09-05.csv`；
+`docs/benchmark-2026-09-10.md` / `docs/benchmark-2026-09-10.md`；
 RSS/墙钟为采样值，贴近阈值（≤+3MB、R=50×）的行与总分跨轮有 ±0.5–4 分抖动，
 多次运行实测 EraAudio 总分区间 **95.0–95.6**、Stable **97.6–98.1**、相对 FFmpeg
 **97.0%–97.9%**（见 §7）——请以「区间 + 分差方向」判档。
@@ -115,8 +115,8 @@ B≥80 / C≥70 / D<70。
 
 ---
 
-## 5. 每格式 × 每引擎 得分表（完整数据见 `app/core/audio-engine/tests/bench/SCORE_2026-09-05.md`
-与 `app/core/audio-engine/tests/bench/data/SCORE_2026-09-05.csv`）
+## 5. 每格式 × 每引擎 得分表（完整数据见 `docs/benchmark-2026-09-10.md`
+与 `docs/benchmark-2026-09-10.md`）
 
 综合得分（speed40 + memory30 + correctness20 + coverage10；— = 该引擎不覆盖此格式）：
 
@@ -245,7 +245,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng \
 
 ## 2026-09-06 更新（FLAC 提速后）
 
-- FLAC io 前瞻缓存修复后重跑 scorecard（`tests/bench/SCORE_2026-09-06.md` / data/SCORE_2026-09-06.csv，语料标准集）：
+- FLAC io 前瞻缓存修复后重跑 scorecard（`docs/benchmark-2026-09-10.md` / docs/benchmark-2026-09-10.md，语料标准集）：
   flac 由 97.9(A+，speed 欠分) → **100.0(A+)**；EraAudio 平均总分 **95.6 → 95.7**（相对 Stable/FFmpeg 97.6 = **98.1%**，Δ-1.9）。
 - 短板的“flac 直解慢”已消除（见 docs/engine-integration-bench.md §10）；本报告主表为 2026-09-05 快照，重跑命令见 §4/scorecard.py。
 
@@ -254,8 +254,8 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng \
 
 - 定位：面向「常驻内核池（Master+worker）生产形态」的**并发/混杂/首帧/资源**基准，与上表
   单流 ×RT 口径互补；报告产物见 `app/core/audio-engine/tests/bench/`：
-  - `REPORT_ERA_POOL_2026-09-10.md`（首刀：单流/并发伸缩/均布混杂/冷热首帧；headless 静音）
-  - `REPORT_ERA_POOL_SCORE_2026-09-10.md`（scorecard 口径：**FFmpeg=100**，
+  - `docs/benchmark-2026-09-10.md`（首刀：单流/并发伸缩/均布混杂/冷热首帧；headless 静音）
+  - `docs/benchmark-2026-09-10.md`（scorecard 口径：**FFmpeg=100**，
     score=100·speed^0.6·(0.5cpu+0.5mem)^0.4；每项 5 轮去一最高一最低取平均）
 - 工具（可复现）：`run_era_pool_bench.py` / `run_era_pool_score.py` / `_reswrap.py` /
   `bench_era_pool.c`（C，headless 经 zk_engine seam）；并发上限 **24**（本机内存受限）。
@@ -269,7 +269,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng \
 
 ### 2026-09-10 · 解码 A 档提速（perf 指令口径）
 
-> 依据 `PERF_HOT_2026-09-10.md`（era 指令=Stable 2.1–3.4×、CPI 更低 ⇒ 指令多非访存），
+> 依据 `docs/benchmark-2026-09-10.md`（era 指令=Stable 2.1–3.4×、CPI 更低 ⇒ 指令多非访存），
 > 按 `decode-optimization.md` §4.2 **只做 A 档（零新增缓冲、精度中性、逐位一致）**：
 > ① flac 位流取数（`Reader.readByte` 快路径 + `readBits` 快路径/comptime 掩码表 + `readBit`
 > 直取）→ **flac 指令 600M→462M（−23%）**；② flac Rice 前缀 `readUnary1` 缓存批量数零
