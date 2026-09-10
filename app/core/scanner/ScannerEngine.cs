@@ -48,6 +48,8 @@ public sealed class ScannerEngine
         "spx",
         // 2026-09-10：TTA（内核 probe-only 元数据 + ID3v2/v1）
         "tta",
+        // 2026-09-10：TAK（内核 probe-only 元数据 + APEv2）
+        "tak",
     };
 
     private readonly IScannerDatabase _db;
