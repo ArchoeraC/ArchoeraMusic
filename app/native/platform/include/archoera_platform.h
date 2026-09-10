@@ -112,6 +112,9 @@ typedef void (*AplEventCallback)(const AplEvent *event, void *user_data);
 
 int32_t apl_set_event_callback(AplEventCallback cb, void *user_data);
 
+/* 取出一条待处理事件（副本）；1=有，0=空。回调仅作唤醒，数据经此拉取。 */
+int32_t apl_poll_event(AplEvent *out);
+
 #ifdef __cplusplus
 }
 #endif

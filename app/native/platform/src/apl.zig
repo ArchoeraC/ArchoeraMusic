@@ -39,6 +39,12 @@ export fn apl_set_event_callback(cb: ?core.Callback, user_data: ?*anyopaque) cal
     return core.OK;
 }
 
+/// 取出一条待处理事件（副本）；1=有，0=空。回调仅作唤醒，数据经此拉取。
+export fn apl_poll_event(out: ?*core.Event) callconv(.c) i32 {
+    const o = out orelse return 0;
+    return if (core.pollEvent(o)) 1 else 0;
+}
+
 // ── SystemPower ───────────────────────────────────────────────────
 
 export fn apl_power_set_sleep_inhibit(on: i32) callconv(.c) i32 {

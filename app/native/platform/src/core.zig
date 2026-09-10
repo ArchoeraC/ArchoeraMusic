@@ -103,14 +103,41 @@ pub fn setEventCallback(cb: ?Callback, user_data: ?*anyopaque) void {
 
 /// 把事件投递给 Dart 回调（任意线程可调；回调期间不持锁）。
 /// 无回调 / 未注册时静默丢弃（Noop 语义）。
+/// 事件环：dispatch 入队后仅用回调「唤醒」Dart，Dart 经 pollEvent 取走副本。
+/// （不能把栈上 Event 指针交给异步 NativeCallable.listener——Dart 稍后读取时
+///  栈已被覆盖 → 事件随机丢失。）
+var g_ring: [64]Event = undefined;
+var g_ring_len: usize = 0;
+var g_ring_pos: usize = 0;
+
 pub fn dispatch(event: Event) void {
     lock();
+    if (g_ring_len == g_ring.len) { // 满：丢最旧
+        g_ring_pos = (g_ring_pos + 1) % g_ring.len;
+        g_ring_len -= 1;
+    }
+    g_ring[(g_ring_pos + g_ring_len) % g_ring.len] = event;
+    g_ring_len += 1;
     const cb_raw = g_callback.load(.acquire);
     const user = g_user_data.load(.acquire);
     unlock();
     if (cb_raw == 0) return;
     const cb: Callback = @ptrFromInt(cb_raw);
-    cb(&event, @ptrFromInt(user));
+    cb(&g_ring[0], @ptrFromInt(user)); // 指针仅为唤醒占位，Dart 忽略其内容
+}
+
+/// 取出一条事件（副本）。true=有事件，false=空。线程安全。
+pub fn pollEvent(out: *Event) bool {
+    lock();
+    if (g_ring_len == 0) {
+        unlock();
+        return false;
+    }
+    out.* = g_ring[g_ring_pos];
+    g_ring_pos = (g_ring_pos + 1) % g_ring.len;
+    g_ring_len -= 1;
+    unlock();
+    return true;
 }
 
 // ── 测试 ──────────────────────────────────────────────────────────
