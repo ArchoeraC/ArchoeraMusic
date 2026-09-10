@@ -219,7 +219,7 @@ tta/dts 两行抬高到 55/85MB。相比 engine-integration-bench §3/§4 结论
 - 独立 CLI 缺失：**opusdec / oggdec / wvunpack / tta / dca / ac3 专用工具**未安装 → 对应格式
   以 ffmpeg 内嵌库为参考并如实注明（scorecard md §4）。
 - RSS 只测单尺寸（200s）→ tta/dts「整缓冲 vs 固定大缓冲」未能判别，需 multi-size（建议复用
-  make_report.py 的 spread 判定思路）。
+  run_suite.py 的 spread 判定思路）。
 - speed 用 wall（含 PCM 落盘 IO，双方一致）；user CPU 同 CSV 可查，结论同向。
 - 温度/睿频未锁定：跨机请比**倍率与分差**，不比秒。
 
@@ -257,7 +257,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng \
   - `docs/benchmark-2026-09-10.md`（首刀：单流/并发伸缩/均布混杂/冷热首帧；headless 静音）
   - `docs/benchmark-2026-09-10.md`（scorecard 口径：**FFmpeg=100**，
     score=100·speed^0.6·(0.5cpu+0.5mem)^0.4；每项 5 轮去一最高一最低取平均）
-- 工具（可复现）：`run_era_pool_bench.py` / `run_era_pool_score.py` / `_reswrap.py` /
+- 工具（可复现）：`run_suite.py`（合并入口）
   `bench_era_pool.c`（C，headless 经 zk_engine seam）；并发上限 **24**（本机内存受限）。
 - 要点结果：单格式平均 132.1（opus/ac3≈105–108，wav≈218 最优）；并发 N=24 总分 334.8
   （era wall ≈44ms vs ffmpeg 91ms，era CPU 0.13s vs 1.54s，RSS ~37 vs ~53.5MB）；
