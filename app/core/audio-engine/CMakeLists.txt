@@ -268,6 +268,11 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_link_options(archoera-audio-engine PRIVATE "-Wl,-rpath,'$ORIGIN'")
   target_link_options(archoera_mediaengine PRIVATE "-Wl,-rpath,'$ORIGIN'")
+  # -Bsymbolic-functions：mediaengine 内嵌 Zig 内核（zk_* 符号）与同目录动态
+  # libarchoera_kernel.so（scanner-ffi 加载）**同名**；若后者被全局加载，mediaengine
+  # 内部对 zk_* 的引用可能被抢占到另一份内核（全局态不同）→ Host/Stream 状态错位
+  # 崩溃（实测 rt 变为无效小值）。绑定本地引用，杜绝符号抢占。
+  target_link_options(archoera_mediaengine PRIVATE "-Wl,-Bsymbolic")
 endif()
 
 # ── 测试 ────────────────────────────────────────────────────

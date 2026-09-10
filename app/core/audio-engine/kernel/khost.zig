@@ -67,6 +67,10 @@ pub const Host = struct {
     mutex: std.Io.Mutex = .init,
     /// 当前已开的流式会话数（§6.3 max_streams 硬计数；Host.mutex 保护，独立于任务槽）
     stream_count: usize = 0,
+    /// 是否已请求停机（read/seek 据此优雅拒绝，避免访问已停机的 rt）
+    stopping: std.atomic.Value(bool),
+    /// 停机时仍有未关闭的流 → 延迟释放，待最后一个 streamClose 收尾
+    destroy_pending: bool = false,
 
     pub fn init(allocator: std.mem.Allocator, cfg: Cfg) !*Host {
         const h = try allocator.create(Host);
@@ -76,6 +80,7 @@ pub const Host = struct {
             .cfg = cfg,
             .rt = undefined,
             .cap = cfg.cap_tasks,
+            .stopping = std.atomic.Value(bool).init(false),
         };
         h.rt = try runtime.Runtime.init(allocator, cfg.rtCfg());
         errdefer {
@@ -148,14 +153,35 @@ pub const Host = struct {
         self.mutex.lockUncancelable(io);
         std.debug.assert(self.stream_count > 0);
         self.stream_count -= 1;
+        const reap = self.destroy_pending and self.stream_count == 0;
         self.mutex.unlock(io);
+        if (reap) self.destroyNow();
+    }
+
+    pub fn isStopping(self: *Host) bool {
+        return self.stopping.load(.acquire);
     }
 
     pub fn shutdown(self: *Host) void {
+        // 先置停机位：并发 read/seek 观察到后返回 io_error，不再触碰 rt。
+        self.stopping.store(true, .release);
         self.rt.shutdown();
     }
 
     pub fn deinit(self: *Host) void {
+        const io = std.Io.Threaded.global_single_threaded.io();
+        self.mutex.lockUncancelable(io);
+        if (self.stream_count > 0) {
+            // 仍有流未关：延迟到最后一个 streamClose 释放（否则 host/rt 悬垂 → 崩溃）
+            self.destroy_pending = true;
+            self.mutex.unlock(io);
+            return;
+        }
+        self.mutex.unlock(io);
+        self.destroyNow();
+    }
+
+    fn destroyNow(self: *Host) void {
         self.allocator.free(self.entries);
         self.allocator.free(self.nodes);
         self.rt.deinit();
