@@ -39,7 +39,16 @@ static ZkEngine *g_pool;
  * 任一实例 pool_end 不得在其它实例仍持有时 shutdown，否则其流读会因 rt 停机失败
  * （概率性「自研内核解码错误」/崩溃）。仅当计数归零才真正 shutdown。 */
 static int g_pool_refs;
-static pthread_mutex_t g_pool_mu = PTHREAD_MUTEX_INITIALIZER;
+/* 进程池锁惰性初始化：CRITICAL_SECTION(MSVC compat) 不支持静态初始化，
+ * POSIX 亦经 pthread_once 统一一次 init（见 segstore.c 同法）。 */
+static pthread_mutex_t g_pool_mu;
+static pthread_once_t g_pool_once = PTHREAD_ONCE_INIT;
+static void pool_mu_init(void) { pthread_mutex_init(&g_pool_mu, NULL); }
+static void pool_lock(void) {
+    pthread_once(&g_pool_once, pool_mu_init);
+    pthread_mutex_lock(&g_pool_mu);
+}
+static void pool_unlock(void) { pthread_mutex_unlock(&g_pool_mu); }
 static long long g_stream_opens; /* 池路径 open 累计（测试访问器，单调递增） */
 
 struct NativeDecoder {
@@ -51,27 +60,27 @@ struct NativeDecoder {
 
 int native_decoder_pool_begin(int min_w, int max_w, int cap)
 {
-    pthread_mutex_lock(&g_pool_mu);
+    pool_lock();
     if (g_pool) { /* 已存在：共享，仅增引用 */
         g_pool_refs++;
-        pthread_mutex_unlock(&g_pool_mu);
+        pool_unlock();
         return 0;
     }
     g_pool = zk_engine_init(min_w, max_w, cap);
     if (!g_pool) {
-        pthread_mutex_unlock(&g_pool_mu);
+        pool_unlock();
         return -1;
     }
     g_pool_refs = 1;
-    pthread_mutex_unlock(&g_pool_mu);
+    pool_unlock();
     return 0;
 }
 
 void native_decoder_pool_end(void)
 {
-    pthread_mutex_lock(&g_pool_mu);
+    pool_lock();
     if (!g_pool || g_pool_refs <= 0) {
-        pthread_mutex_unlock(&g_pool_mu);
+        pool_unlock();
         return;
     }
     g_pool_refs--;
@@ -79,7 +88,7 @@ void native_decoder_pool_end(void)
         zk_engine_shutdown(g_pool);
         g_pool = NULL;
     }
-    pthread_mutex_unlock(&g_pool_mu);
+    pool_unlock();
 }
 
 int native_decoder_pool_active(void)
