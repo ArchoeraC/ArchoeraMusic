@@ -145,6 +145,11 @@ install(PROGRAMS "${VAULT_SRC_DIR}/archoera-vault.exe"
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../core/downloader/target/release/archoera_downloader.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
 
+# platform bridge（平台能力桥接，Zig 独立模块 app/native/platform；
+# Windows DLL 产物装在 zig-out/bin）。
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../native/platform/zig-out/bin/archoera_platform.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+
 # === vcpkg 运行时 DLL（FFmpeg 等动态依赖）===
 # audio-engine（archoera_mediaengine.dll / scraper）经 vcpkg import libs 动态链接
 # ffmpeg/taglib/curl 等（triplet x64-windows-release 为动态构建）；运行时必须把

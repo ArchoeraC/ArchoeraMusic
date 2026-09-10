@@ -1044,5 +1044,7 @@
   "searchWaitRetry": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요",
   "qqMusicDownloadUnsupported": "QM 다운로드는 현재 미지원입니다(리스크 관리).",
   "qqMusicDownloadSkipped": "QM {count}곡 건너뜀(다운로드 미지원).",
-  "platformQqMusic": "QM"
+  "platformQqMusic": "QM",
+  "toastSleepInhibitFailed": "시스템 절전 방지에 실패했습니다",
+  "toastMediaSessionLost": "시스템 미디어 세션이 끊어졌습니다"
 }

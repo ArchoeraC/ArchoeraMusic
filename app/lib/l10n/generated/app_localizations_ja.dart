@@ -3808,4 +3808,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsAmllSpring => '滚动弹簧';
+
+  @override
+  String get toastSleepInhibitFailed => 'システムのスリープ防止に失敗しました';
+
+  @override
+  String get toastMediaSessionLost => 'システムメディアセッションが切断されました';
 }

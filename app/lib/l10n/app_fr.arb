@@ -1044,5 +1044,7 @@
   "searchWaitRetry": "Trop de requêtes, veuillez patienter puis réessayer",
   "qqMusicDownloadUnsupported": "Téléchargements QM non pris en charge pour l’instant (contrôle des risques).",
   "qqMusicDownloadSkipped": "{count} titre(s) QM ignoré(s) : téléchargement non pris en charge.",
-  "platformQqMusic": "QM"
+  "platformQqMusic": "QM",
+  "toastSleepInhibitFailed": "Échec de la prévention de la mise en veille du système",
+  "toastMediaSessionLost": "Session multimédia système déconnectée"
 }

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../apis/runtime.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/l10n.dart';
+import '../services/platform/media_session.dart';
 import '../services/power/power_saver.dart';
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
@@ -75,65 +76,69 @@ class ArchoeraMusicApp extends ConsumerWidget {
     lyricMatchCacheLimitBytes = lyricLimitBytes;
     lyricTtmlCacheLimitBytes = lyricLimitBytes;
     return PowerSaverHost(
-      child: AuthBootstrap(
-        child: MaterialApp.router(
-          title: 'ArchoeraMusic',
-          // 国际化：locale 跟随设置/系统；Material 内建文案（菜单/日期等）自动本地化
-          locale: locale,
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          theme: buildAppTheme(
-            AppPalette.light,
-            Brightness.light,
-            accentSeed: accent,
-            fontFamily: fontFamily,
-            globalTint: globalTint,
-            solid: prefs.themeSource == 'solid',
-            imageBackground: imageStyle,
-            performanceMode: performanceMode,
-          ),
-          darkTheme: buildAppTheme(
-            AppPalette.dark,
-            Brightness.dark,
-            accentSeed: accent,
-            fontFamily: fontFamily,
-            globalTint: globalTint,
-            solid: prefs.themeSource == 'solid',
-            imageBackground: imageStyle,
-            performanceMode: performanceMode,
-          ),
-          themeMode: effectiveThemeMode,
-          routerConfig: appRouter,
-          builder: (context, child) {
-            // 性能模式：在应用子树外加一层 MediaQuery.disableAnimations——
-            // MaterialApp 自身的 MediaQuery 位于本 builder 之上，此处覆盖
-            // 影响 SplashGate 及以下（Navigator/路由/浮层），隐式 Animated*
-            // 组件会自动按 disableAnimations 退化为 0 时长（Flutter 内建支持）。
-            var appChild = child ?? const SizedBox.shrink();
-            Widget gate = SplashGate(
-              child: SchemeIntroGate(
-                child: AppShortcuts(child: ToastOverlay(child: appChild)),
-              ),
-            );
-            // v2 口令模式启动解锁门：vault 待口令解锁时全屏拦截，
-            // 解锁成功后放行（登录态恢复见解锁门内部）。无 vault 时直通。
-            gate = VaultUnlockGate(child: gate);
-            // vault 版本异常门（fail-closed）：握手发现非官方构建 → 副本已删、
-            // 解密已拒，全屏仅允许退出（置于最外层，任何状态都先过本门）。
-            gate = VaultVersionGate(child: gate);
-            // vault 崩溃警告门：置于 MaterialApp.builder 内（MaterialApp 之下），
-            // 保证 Localizations/Navigator/ScaffoldMessenger 上下文可用。
-            // 此前置于 MaterialApp 之上 → context.l10n 空引用崩溃
-            // （2026-08-15 修复实录）。
-            gate = VaultCrashGate(child: gate);
-            if (performanceMode) {
-              gate = MediaQuery(
-                data: MediaQuery.of(context).copyWith(disableAnimations: true),
-                child: gate,
+      child: MediaSessionHost(
+        child: AuthBootstrap(
+          child: MaterialApp.router(
+            title: 'ArchoeraMusic',
+            // 国际化：locale 跟随设置/系统；Material 内建文案（菜单/日期等）自动本地化
+            locale: locale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            theme: buildAppTheme(
+              AppPalette.light,
+              Brightness.light,
+              accentSeed: accent,
+              fontFamily: fontFamily,
+              globalTint: globalTint,
+              solid: prefs.themeSource == 'solid',
+              imageBackground: imageStyle,
+              performanceMode: performanceMode,
+            ),
+            darkTheme: buildAppTheme(
+              AppPalette.dark,
+              Brightness.dark,
+              accentSeed: accent,
+              fontFamily: fontFamily,
+              globalTint: globalTint,
+              solid: prefs.themeSource == 'solid',
+              imageBackground: imageStyle,
+              performanceMode: performanceMode,
+            ),
+            themeMode: effectiveThemeMode,
+            routerConfig: appRouter,
+            builder: (context, child) {
+              // 性能模式：在应用子树外加一层 MediaQuery.disableAnimations——
+              // MaterialApp 自身的 MediaQuery 位于本 builder 之上，此处覆盖
+              // 影响 SplashGate 及以下（Navigator/路由/浮层），隐式 Animated*
+              // 组件会自动按 disableAnimations 退化为 0 时长（Flutter 内建支持）。
+              var appChild = child ?? const SizedBox.shrink();
+              Widget gate = SplashGate(
+                child: SchemeIntroGate(
+                  child: AppShortcuts(child: ToastOverlay(child: appChild)),
+                ),
               );
-            }
-            return gate;
-          },
+              // v2 口令模式启动解锁门：vault 待口令解锁时全屏拦截，
+              // 解锁成功后放行（登录态恢复见解锁门内部）。无 vault 时直通。
+              gate = VaultUnlockGate(child: gate);
+              // vault 版本异常门（fail-closed）：握手发现非官方构建 → 副本已删、
+              // 解密已拒，全屏仅允许退出（置于最外层，任何状态都先过本门）。
+              gate = VaultVersionGate(child: gate);
+              // vault 崩溃警告门：置于 MaterialApp.builder 内（MaterialApp 之下），
+              // 保证 Localizations/Navigator/ScaffoldMessenger 上下文可用。
+              // 此前置于 MaterialApp 之上 → context.l10n 空引用崩溃
+              // （2026-08-15 修复实录）。
+              gate = VaultCrashGate(child: gate);
+              if (performanceMode) {
+                gate = MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(disableAnimations: true),
+                  child: gate,
+                );
+              }
+              return gate;
+            },
+          ),
         ),
       ),
     );
