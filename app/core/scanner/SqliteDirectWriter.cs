@@ -23,7 +23,7 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
 {
     private readonly SqliteConnection _conn;      // 仅写线程使用
     private readonly SqliteConnection _readConn;  // 仅读方法使用
-    private readonly object _readLock = new();
+    private readonly System.Threading.Lock _readLock = new();
     /// <summary>写队列：有界，满时入队阻塞（背压）</summary>
     private readonly BlockingCollection<Action> _queue = new(new ConcurrentQueue<Action>(), 4096);
     /// <summary>专用写线程</summary>
