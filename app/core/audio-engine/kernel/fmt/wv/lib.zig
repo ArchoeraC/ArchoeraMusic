@@ -35,6 +35,7 @@ const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");
 const decoder = @import("../../decoder.zig");
 const bitreader = @import("bitreader.zig");
+const apev2 = @import("../apev2.zig");
 
 const BitReader = bitreader.BitReader;
 const VTable = decoder.Decoder.VTable;
@@ -1292,9 +1293,119 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     return .{ .vtable = &vtable, .ctx = @ptrCast(ctx) };
 }
 
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）：读首包各块头解析声道/采样率/位深，
+// 不展开音频平面、不交错 PCM；尾部 APEv2 标签。
+// ---------------------------------------------------------------------------
+
+const MetaCtx = struct {
+    allocator: std.mem.Allocator,
+    reader: io.Reader,
+    sample_rate: u32,
+    channels: u8,
+    total_samples: u64,
+    out_bps: u8,
+    is_float: bool,
+    tags: apev2.Tags = .{},
+};
+
+fn metaDeinit(p: *anyopaque) void {
+    const ctx: *MetaCtx = @ptrCast(@alignCast(p));
+    ctx.tags.deinit(ctx.allocator);
+    ctx.reader.deinit();
+    ctx.allocator.destroy(ctx);
+}
+
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    var head: [header_size]u8 = undefined;
+    const n = try reader.peek(&head);
+    if (n < header_size) return error.Corrupt;
+    if (!std.mem.eql(u8, head[0..4], "wvpk")) return error.UnsupportedFormat;
+    const version: u16 = std.mem.readInt(u16, head[8..10], .little);
+    if (version < 0x402 or version > 0x410) return error.UnsupportedFormat;
+    const flags0: u32 = std.mem.readInt(u32, head[24..28], .little);
+    if ((flags0 & F_DSD_DATA) != 0) return error.UnsupportedFormat;
+    const total_samples: u32 = std.mem.readInt(u32, head[12..16], .little);
+
+    var wv = WvCtx{
+        .allocator = allocator,
+        .reader = reader.*,
+        .sample_rate = 0,
+        .channels = 0,
+        .total_samples = if (total_samples == 0xFFFFFFFF) 0 else total_samples,
+        .out_bps = 16,
+        .is_float = false,
+        .block_buf = &.{},
+        .planes = &.{},
+        .pkt = &.{},
+        .pkt_samples = 0,
+        .pkt_block_index = 0,
+        .cursor = 0,
+        .samples_done = 0,
+    };
+    errdefer deinitCtxBuffers(&wv);
+
+    var channels: usize = 0;
+    var block_no: usize = 0;
+    while (true) {
+        const bh = (try readBlock(&wv)) orelse return error.Corrupt;
+        var b = std.mem.zeroes(BlockCtx);
+        try parseBlock(&b, wv.block_buf[0..bh.total]);
+        if (block_no == 0) {
+            wv.sample_rate = b.sample_rate;
+            const fl = (b.frame_flags & F_FLOAT_DATA) != 0;
+            const s16 = !fl and (b.frame_flags & 0x03) <= 1;
+            wv.out_bps = if (s16) 16 else 32;
+            wv.is_float = fl;
+        }
+        channels += 1 + @as(usize, @intFromBool(b.stereo));
+        if (channels > MAX_CHANNELS) return error.Corrupt;
+        if ((bh.flags & F_FINAL_BLOCK) != 0) break;
+        block_no += 1;
+        if (block_no >= max_blocks_per_packet) return error.Corrupt;
+    }
+    if (channels == 0 or wv.sample_rate == 0) return error.Corrupt;
+    wv.channels = @intCast(channels);
+
+    const ctx = try allocator.create(MetaCtx);
+    errdefer allocator.destroy(ctx);
+    ctx.* = .{
+        .allocator = allocator,
+        .reader = reader.*,
+        .sample_rate = wv.sample_rate,
+        .channels = wv.channels,
+        .total_samples = wv.total_samples,
+        .out_bps = wv.out_bps,
+        .is_float = wv.is_float,
+    };
+    errdefer ctx.tags.deinit(allocator);
+
+    const fsize = try reader.size();
+    ctx.tags = apev2.parse(allocator, reader, fsize) catch .{};
+
+    var duration_us: i64 = 0;
+    var known: decoder.DurationKnown = .unknown;
+    if (ctx.total_samples > 0 and ctx.sample_rate > 0) {
+        duration_us = @intCast((@as(u128, ctx.total_samples) * 1_000_000) / ctx.sample_rate);
+        known = .exact;
+    }
+    info.* = .{
+        .sample_rate = ctx.sample_rate,
+        .channels = ctx.channels,
+        .bits_per_sample = ctx.out_bps,
+        .is_float = ctx.is_float,
+        .duration_us = duration_us,
+        .duration_known = known,
+        .codec_name = "wavpack",
+        .format_name = "wv",
+        .metadata = ctx.tags.meta,
+    };
+    deinitCtxBuffers(&wv);
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
+
 /// 释放 ctx 缓冲（open 错误路径与 deinit 共用）
-fn deinitCtxBuffers(ctx: *WvCtx) void {
-    if (ctx.block_buf.len > 0) ctx.allocator.free(ctx.block_buf);
+fn deinitCtxBuffers(ctx: *WvCtx) void {    if (ctx.block_buf.len > 0) ctx.allocator.free(ctx.block_buf);
     if (ctx.planes.len > 0) ctx.allocator.free(ctx.planes);
     if (ctx.pkt.len > 0) ctx.allocator.free(ctx.pkt);
 }
