@@ -102,6 +102,7 @@ int main(int argc, char **argv)
     int iters = argc > 2 ? atoi(argv[2]) : 200;
     unsigned seed = argc > 3 ? (unsigned)strtoul(argv[3], NULL, 10) : 12345u;
     long long warmup = argc > 4 ? atoll(argv[4]) : 0; /* seek 后允许跳过的 transient 样本 */
+    int global_search = (argc > 5 && strcmp(argv[5], "global") == 0); /* 全局对齐诊断 */
 
     int rch = 0;
     long long rframes = 0;
@@ -121,7 +122,7 @@ int main(int argc, char **argv)
     const int ch = info.channels;
     const int sr = info.sample_rate;
     const long long dur_ms = info.duration_us / 1000;
-    const int window = sr / 5 + 8; /* ±200ms：覆盖帧边界对齐（mp3 帧≈26ms） */
+    const int window = sr / 10 + 8; /* ±100ms：覆盖 seek 帧边界（mp3 帧≈26ms，最多差 2 帧） */
 
     float *got = (float *)malloc(4096 * (size_t)ch * sizeof(float));
 
@@ -183,19 +184,29 @@ int main(int argc, char **argv)
         if (n < 0) { g_fail = 1; fprintf(stderr, "read rc=%lld @pos=%lld\n", n, pos); continue; }
         if (n == 0) continue; /* 越界/末尾 → EOF 合理 */
 
-        /* 对齐：先粗（步长 16）后细（步长 1）搜索最大 corr（±window） */
+        /* 对齐：常规 ±window（粗→细）；global 模式扫描整段参考 */
         long long base = (long long)((double)pos * sr / 1000.0);
         double best = -1.0;
         long long best_off = 0;
-        for (long long d = -window; d <= window; d += 16) {
-            double cc = corr_window(ref, rframes, ch, base + d, got, n, 0);
-            if (cc > best) { best = cc; best_off = d; }
+        if (global_search) {
+            for (long long d = -base; d <= rframes - n; d += 64) {
+                double cc = corr_window(ref, rframes, ch, base + d, got, n, 0);
+                if (cc > best) { best = cc; best_off = d; }
+            }
+            long long lo = best_off - 64, hi = best_off + 64;
+            for (long long d = lo; d <= hi; d++) {
+                double cc = corr_window(ref, rframes, ch, base + d, got, n, 0);
+                if (cc > best) { best = cc; best_off = d; }
+            }
+        } else {
+            for (long long d = -window; d <= window; d++) {
+                double cc = corr_window(ref, rframes, ch, base + d, got, n, 0);
+                if (cc > best) { best = cc; best_off = d; }
+            }
         }
-        long long lo = best_off - 16, hi = best_off + 16;
-        for (long long d = lo; d <= hi; d++) {
-            double cc = corr_window(ref, rframes, ch, base + d, got, n, 0);
-            if (cc > best) { best = cc; best_off = d; }
-        }
+        if (global_search)
+            fprintf(stderr, "  target=%lldms pos=%lldms base=%lld off=%lld actual=%lld corr=%.5f n=%lld\n",
+                    target, pos, base, best_off, base + best_off, best, n);
         if (best < min_corr) min_corr = best;
         compared++;
         if (best < 0.999) {
