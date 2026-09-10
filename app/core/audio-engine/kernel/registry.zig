@@ -105,7 +105,7 @@ pub const modules = [_]Module{
     .{ .fmt = .mpc,       .open = mpc.open, .meta = mpc.openMeta },
     .{ .fmt = .shn,       .open = shn.open },
     .{ .fmt = .tak,       .open = tak.open },
-    .{ .fmt = .tta,       .open = tta.open },
+    .{ .fmt = .tta,       .open = tta.open, .meta = tta.openMeta },
 };
 
 /// 按 probe 结果查表分派到模块 open；未登记标签 → unsupported（当前仅 .unknown）。

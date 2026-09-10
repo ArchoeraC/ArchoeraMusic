@@ -23,6 +23,7 @@ const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");
 const decoder = @import("../../decoder.zig");
 const core = @import("core.zig");
+const id3 = @import("../mp3/id3.zig");
 
 const Header = struct {
     format: u16,
@@ -267,6 +268,95 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
         .metadata = .{},
     };
     return .{ .vtable = &vtable, .ctx = ctx };
+}
+
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）：整读后仅 parseHeader+parseFrames
+// （seek 表，不解帧），音频终点定位尾部 ID3v2 + 末 128B ID3v1；不建 FrameDecoder。
+// ---------------------------------------------------------------------------
+
+const MetaCtx = struct {
+    allocator: std.mem.Allocator,
+    reader: io.Reader,
+    data: []u8,
+    offsets: []u64,
+    meta: decoder.Metadata,
+    pics: []decoder.Picture,
+};
+
+fn metaDeinit(p: *anyopaque) void {
+    const ctx: *MetaCtx = @ptrCast(@alignCast(p));
+    id3.freeMeta(ctx.allocator, &ctx.meta);
+    id3.freePictures(ctx.allocator, &ctx.pics);
+    ctx.allocator.free(ctx.offsets);
+    ctx.allocator.free(ctx.data);
+    ctx.reader.deinit();
+    ctx.allocator.destroy(ctx);
+}
+
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const fsize = try reader.size();
+    if (fsize < 22) return error.Corrupt;
+    const data = try allocator.alloc(u8, @intCast(fsize));
+    errdefer allocator.free(data);
+    var got: usize = 0;
+    while (got < fsize) {
+        const n = reader.read(data[got..]) catch |e| switch (e) {
+            error.Aborted => return error.Aborted,
+            else => return error.IoError,
+        };
+        if (n == 0) break;
+        got += n;
+    }
+    if (got < fsize) return error.Corrupt;
+
+    const hdr = try parseHeader(data);
+    if (hdr.format != 1) return error.UnsupportedFormat;
+    const frames = parseFrames(allocator, data, &hdr) catch |e| switch (e) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return error.Corrupt,
+    };
+    errdefer allocator.free(frames.offsets);
+
+    var meta: decoder.Metadata = .{};
+    var pics: []decoder.Picture = &.{};
+    var rg: decoder.ReplayGain = .{};
+    errdefer {
+        id3.freeMeta(allocator, &meta);
+        id3.freePictures(allocator, &pics);
+    }
+
+    // 音频终点 = 末帧之后；其处若为 ID3v2（TTA 规范：尾置）则解析
+    const audio_end = frames.offsets[frames.nframes];
+    if (audio_end + 10 <= data.len and std.mem.eql(u8, data[@intCast(audio_end)..][0..3], "ID3")) {
+        _ = id3.parseV2(reader, allocator, audio_end, &meta, &pics, &rg) catch {};
+    }
+    id3.parseV1(reader, allocator, fsize, &meta) catch {};
+
+    const ctx = try allocator.create(MetaCtx);
+    ctx.* = .{
+        .allocator = allocator,
+        .reader = reader.*,
+        .data = data,
+        .offsets = frames.offsets,
+        .meta = meta,
+        .pics = pics,
+    };
+
+    info.* = .{
+        .sample_rate = hdr.sample_rate,
+        .channels = @intCast(hdr.channels),
+        .bits_per_sample = if (hdr.bits_per_sample <= 16) @intCast(hdr.bits_per_sample) else 32,
+        .is_float = false,
+        .duration_us = @intCast(@divTrunc(@as(u128, @intCast(hdr.data_length)) * 1_000_000, hdr.sample_rate)),
+        .duration_known = .exact,
+        .codec_name = "tta",
+        .format_name = "tta",
+        .metadata = meta,
+        .pictures = pics,
+        .replay_gain = rg,
+    };
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
 }
 
 // ---------------------------------------------------------------------------
