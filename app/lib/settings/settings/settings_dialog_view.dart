@@ -532,6 +532,7 @@ extension _SettingsDialogView on _SettingsDialogState {
               child: switch (_category) {
                 SettingsCategory.appearance => const AppearanceSection(),
                 SettingsCategory.playback => const PlaybackSection(),
+                SettingsCategory.shortcuts => const ShortcutsSection(),
                 SettingsCategory.lyrics => const LyricsSection(),
                 SettingsCategory.preset => const PresetSection(),
                 SettingsCategory.download => const DownloadSection(),

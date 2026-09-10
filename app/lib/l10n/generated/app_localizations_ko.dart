@@ -3829,4 +3829,139 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get instanceAlreadyRunningTitle => 'ArchoeraMusic이(가) 이미 실행 중입니다';
+
+  @override
+  String get settingsCatShortcuts => '단축키';
+
+  @override
+  String get settingsShortcutsSubtitle => '키 바인딩 사용자 지정';
+
+  @override
+  String get shortcutNote => '바인딩을 클릭해 새 단축키를 기록하세요. 대화상자에서 키 조합을 누르세요.';
+
+  @override
+  String get shortcutResetAll => '모두 초기화';
+
+  @override
+  String get shortcutUnbound => '할당 안 됨';
+
+  @override
+  String get shortcutHintEdit => '클릭하여 편집';
+
+  @override
+  String get shortcutConflict => '다른 동작과 충돌합니다';
+
+  @override
+  String get shortcutCaptureTitle => '단축키 기록';
+
+  @override
+  String get shortcutPressKeys => '키를 누르세요…';
+
+  @override
+  String get shortcutCategoryPlayback => '재생';
+
+  @override
+  String get shortcutCategorySeek => '탐색';
+
+  @override
+  String get shortcutCategoryVolume => '볼륨';
+
+  @override
+  String get shortcutCategoryQueue => '대기열';
+
+  @override
+  String get shortcutCategoryNavigation => '탐색';
+
+  @override
+  String get shortcutActionPlayPause => '재생 / 일시정지';
+
+  @override
+  String get shortcutActionPlay => '재생';
+
+  @override
+  String get shortcutActionPause => '일시정지';
+
+  @override
+  String get shortcutActionStop => '정지';
+
+  @override
+  String get shortcutActionNext => '다음 곡';
+
+  @override
+  String get shortcutActionPrevious => '이전 곡';
+
+  @override
+  String get shortcutActionLikeToggle => '좋아요 전환';
+
+  @override
+  String get shortcutActionShuffleToggle => '셔플 전환';
+
+  @override
+  String get shortcutActionRepeatCycle => '반복 모드 전환';
+
+  @override
+  String get shortcutActionReload => '현재 곡 다시 로드';
+
+  @override
+  String get shortcutActionSeekBackward => '10초 뒤로';
+
+  @override
+  String get shortcutActionSeekForward => '10초 앞으로';
+
+  @override
+  String get shortcutActionSeekBackwardLong => '30초 뒤로';
+
+  @override
+  String get shortcutActionSeekForwardLong => '30초 앞으로';
+
+  @override
+  String get shortcutActionVolumeUp => '볼륨 올리기';
+
+  @override
+  String get shortcutActionVolumeDown => '볼륨 내리기';
+
+  @override
+  String get shortcutActionMuteToggle => '음소거 전환';
+
+  @override
+  String get shortcutActionJumpToFirst => '대기열 첫 곡으로';
+
+  @override
+  String get shortcutActionJumpToLast => '대기열 마지막 곡으로';
+
+  @override
+  String get shortcutActionClearQueue => '대기열 비우기';
+
+  @override
+  String get shortcutActionGoHome => '홈으로';
+
+  @override
+  String get shortcutActionGoLibrary => '라이브러리로';
+
+  @override
+  String get shortcutActionGoSearch => '검색으로';
+
+  @override
+  String get shortcutActionGoLiked => '좋아요로';
+
+  @override
+  String get shortcutActionGoFavorites => '즐겨찾기로';
+
+  @override
+  String get shortcutActionGoHistory => '기록으로';
+
+  @override
+  String get shortcutActionGoDownload => '다운로드로';
+
+  @override
+  String get shortcutActionGoStreaming => '스트리밍으로';
+
+  @override
+  String get shortcutActionOpenPlayer => '플레이어 열기';
+
+  @override
+  String get shortcutActionOpenSettings => '설정 열기';
+
+  @override
+  String get shortcutActionBack => '뒤로';
 }

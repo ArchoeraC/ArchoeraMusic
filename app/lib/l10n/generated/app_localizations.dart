@@ -7009,6 +7009,276 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'ArchoeraMusic 已有一个实例在运行'**
   String get instanceAlreadyRunningTitle;
+
+  /// No description provided for @settingsCatShortcuts.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'快捷键'**
+  String get settingsCatShortcuts;
+
+  /// No description provided for @settingsShortcutsSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义按键绑定'**
+  String get settingsShortcutsSubtitle;
+
+  /// No description provided for @shortcutNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'点击绑定即可录制新快捷键；在弹窗中按下组合键。'**
+  String get shortcutNote;
+
+  /// No description provided for @shortcutResetAll.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'全部恢复默认'**
+  String get shortcutResetAll;
+
+  /// No description provided for @shortcutUnbound.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未绑定'**
+  String get shortcutUnbound;
+
+  /// No description provided for @shortcutHintEdit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'点击编辑'**
+  String get shortcutHintEdit;
+
+  /// No description provided for @shortcutConflict.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'与其它动作冲突'**
+  String get shortcutConflict;
+
+  /// No description provided for @shortcutCaptureTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'录制快捷键'**
+  String get shortcutCaptureTitle;
+
+  /// No description provided for @shortcutPressKeys.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请按下组合键…'**
+  String get shortcutPressKeys;
+
+  /// No description provided for @shortcutCategoryPlayback.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放控制'**
+  String get shortcutCategoryPlayback;
+
+  /// No description provided for @shortcutCategorySeek.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'快进快退'**
+  String get shortcutCategorySeek;
+
+  /// No description provided for @shortcutCategoryVolume.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音量'**
+  String get shortcutCategoryVolume;
+
+  /// No description provided for @shortcutCategoryQueue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放队列'**
+  String get shortcutCategoryQueue;
+
+  /// No description provided for @shortcutCategoryNavigation.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'导航'**
+  String get shortcutCategoryNavigation;
+
+  /// No description provided for @shortcutActionPlayPause.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放 / 暂停'**
+  String get shortcutActionPlayPause;
+
+  /// No description provided for @shortcutActionPlay.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放'**
+  String get shortcutActionPlay;
+
+  /// No description provided for @shortcutActionPause.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂停'**
+  String get shortcutActionPause;
+
+  /// No description provided for @shortcutActionStop.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'停止'**
+  String get shortcutActionStop;
+
+  /// No description provided for @shortcutActionNext.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下一首'**
+  String get shortcutActionNext;
+
+  /// No description provided for @shortcutActionPrevious.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'上一首'**
+  String get shortcutActionPrevious;
+
+  /// No description provided for @shortcutActionLikeToggle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'收藏 / 取消收藏'**
+  String get shortcutActionLikeToggle;
+
+  /// No description provided for @shortcutActionShuffleToggle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'随机播放开关'**
+  String get shortcutActionShuffleToggle;
+
+  /// No description provided for @shortcutActionRepeatCycle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'循环模式切换'**
+  String get shortcutActionRepeatCycle;
+
+  /// No description provided for @shortcutActionReload.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重新加载当前曲目'**
+  String get shortcutActionReload;
+
+  /// No description provided for @shortcutActionSeekBackward.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'后退 10 秒'**
+  String get shortcutActionSeekBackward;
+
+  /// No description provided for @shortcutActionSeekForward.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前进 10 秒'**
+  String get shortcutActionSeekForward;
+
+  /// No description provided for @shortcutActionSeekBackwardLong.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'后退 30 秒'**
+  String get shortcutActionSeekBackwardLong;
+
+  /// No description provided for @shortcutActionSeekForwardLong.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前进 30 秒'**
+  String get shortcutActionSeekForwardLong;
+
+  /// No description provided for @shortcutActionVolumeUp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音量 +'**
+  String get shortcutActionVolumeUp;
+
+  /// No description provided for @shortcutActionVolumeDown.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音量 −'**
+  String get shortcutActionVolumeDown;
+
+  /// No description provided for @shortcutActionMuteToggle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'静音 / 取消静音'**
+  String get shortcutActionMuteToggle;
+
+  /// No description provided for @shortcutActionJumpToFirst.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'跳到队列第一首'**
+  String get shortcutActionJumpToFirst;
+
+  /// No description provided for @shortcutActionJumpToLast.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'跳到队列最后一首'**
+  String get shortcutActionJumpToLast;
+
+  /// No description provided for @shortcutActionClearQueue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清空队列'**
+  String get shortcutActionClearQueue;
+
+  /// No description provided for @shortcutActionGoHome.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前往主页'**
+  String get shortcutActionGoHome;
+
+  /// No description provided for @shortcutActionGoLibrary.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前往音乐库'**
+  String get shortcutActionGoLibrary;
+
+  /// No description provided for @shortcutActionGoSearch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前往搜索'**
+  String get shortcutActionGoSearch;
+
+  /// No description provided for @shortcutActionGoLiked.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前往我喜欢'**
+  String get shortcutActionGoLiked;
+
+  /// No description provided for @shortcutActionGoFavorites.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前往收藏'**
+  String get shortcutActionGoFavorites;
+
+  /// No description provided for @shortcutActionGoHistory.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前往历史'**
+  String get shortcutActionGoHistory;
+
+  /// No description provided for @shortcutActionGoDownload.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前往下载'**
+  String get shortcutActionGoDownload;
+
+  /// No description provided for @shortcutActionGoStreaming.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'前往流媒体'**
+  String get shortcutActionGoStreaming;
+
+  /// No description provided for @shortcutActionOpenPlayer.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'打开播放页'**
+  String get shortcutActionOpenPlayer;
+
+  /// No description provided for @shortcutActionOpenSettings.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'打开设置'**
+  String get shortcutActionOpenSettings;
+
+  /// No description provided for @shortcutActionBack.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'返回'**
+  String get shortcutActionBack;
 }
 
 class _AppLocalizationsDelegate

@@ -750,42 +750,6 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ),
           ],
         ),
-        const SizedBox(height: 20),
-        SettingSection(
-          title: l10n.settingsSectionShortcuts,
-          children: [
-            SettingTile(
-              icon: EtaIcons.space,
-              title: l10n.settingsShortcutSpace,
-              subtitle: l10n.settingsShortcutSpaceDesc,
-              trailing: const SizedBox.shrink(),
-            ),
-            SettingTile(
-              icon: EtaIcons.transferHorizontal,
-              title: l10n.settingsShortcutArrows,
-              subtitle: l10n.settingsShortcutArrowsDesc,
-              trailing: const SizedBox.shrink(),
-            ),
-            SettingTile(
-              icon: EtaIcons.search2,
-              title: l10n.settingsShortcutSearch,
-              subtitle: l10n.commonSearch,
-              trailing: const SizedBox.shrink(),
-            ),
-            SettingTile(
-              icon: EtaIcons.music2Outline,
-              title: l10n.settingsShortcutLibrary,
-              subtitle: l10n.settingsShortcutLibraryDesc,
-              trailing: const SizedBox.shrink(),
-            ),
-            SettingTile(
-              icon: EtaIcons.cornerDownLeft,
-              title: l10n.settingsShortcutEsc,
-              subtitle: l10n.settingsShortcutEscDesc,
-              trailing: const SizedBox.shrink(),
-            ),
-          ],
-        ),
       ],
     );
   }

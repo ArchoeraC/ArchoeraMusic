@@ -3780,6 +3780,141 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get instanceAlreadyRunningTitle => 'ArchoeraMusic 已有一个实例在运行';
+
+  @override
+  String get settingsCatShortcuts => '快捷键';
+
+  @override
+  String get settingsShortcutsSubtitle => '自定义按键绑定';
+
+  @override
+  String get shortcutNote => '点击绑定即可录制新快捷键；在弹窗中按下组合键。';
+
+  @override
+  String get shortcutResetAll => '全部恢复默认';
+
+  @override
+  String get shortcutUnbound => '未绑定';
+
+  @override
+  String get shortcutHintEdit => '点击编辑';
+
+  @override
+  String get shortcutConflict => '与其它动作冲突';
+
+  @override
+  String get shortcutCaptureTitle => '录制快捷键';
+
+  @override
+  String get shortcutPressKeys => '请按下组合键…';
+
+  @override
+  String get shortcutCategoryPlayback => '播放控制';
+
+  @override
+  String get shortcutCategorySeek => '快进快退';
+
+  @override
+  String get shortcutCategoryVolume => '音量';
+
+  @override
+  String get shortcutCategoryQueue => '播放队列';
+
+  @override
+  String get shortcutCategoryNavigation => '导航';
+
+  @override
+  String get shortcutActionPlayPause => '播放 / 暂停';
+
+  @override
+  String get shortcutActionPlay => '播放';
+
+  @override
+  String get shortcutActionPause => '暂停';
+
+  @override
+  String get shortcutActionStop => '停止';
+
+  @override
+  String get shortcutActionNext => '下一首';
+
+  @override
+  String get shortcutActionPrevious => '上一首';
+
+  @override
+  String get shortcutActionLikeToggle => '收藏 / 取消收藏';
+
+  @override
+  String get shortcutActionShuffleToggle => '随机播放开关';
+
+  @override
+  String get shortcutActionRepeatCycle => '循环模式切换';
+
+  @override
+  String get shortcutActionReload => '重新加载当前曲目';
+
+  @override
+  String get shortcutActionSeekBackward => '后退 10 秒';
+
+  @override
+  String get shortcutActionSeekForward => '前进 10 秒';
+
+  @override
+  String get shortcutActionSeekBackwardLong => '后退 30 秒';
+
+  @override
+  String get shortcutActionSeekForwardLong => '前进 30 秒';
+
+  @override
+  String get shortcutActionVolumeUp => '音量 +';
+
+  @override
+  String get shortcutActionVolumeDown => '音量 −';
+
+  @override
+  String get shortcutActionMuteToggle => '静音 / 取消静音';
+
+  @override
+  String get shortcutActionJumpToFirst => '跳到队列第一首';
+
+  @override
+  String get shortcutActionJumpToLast => '跳到队列最后一首';
+
+  @override
+  String get shortcutActionClearQueue => '清空队列';
+
+  @override
+  String get shortcutActionGoHome => '前往主页';
+
+  @override
+  String get shortcutActionGoLibrary => '前往音乐库';
+
+  @override
+  String get shortcutActionGoSearch => '前往搜索';
+
+  @override
+  String get shortcutActionGoLiked => '前往我喜欢';
+
+  @override
+  String get shortcutActionGoFavorites => '前往收藏';
+
+  @override
+  String get shortcutActionGoHistory => '前往历史';
+
+  @override
+  String get shortcutActionGoDownload => '前往下载';
+
+  @override
+  String get shortcutActionGoStreaming => '前往流媒体';
+
+  @override
+  String get shortcutActionOpenPlayer => '打开播放页';
+
+  @override
+  String get shortcutActionOpenSettings => '打开设置';
+
+  @override
+  String get shortcutActionBack => '返回';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -7558,6 +7693,141 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get instanceAlreadyRunningTitle => 'ArchoeraMusic 已有一个实例在运行';
+
+  @override
+  String get settingsCatShortcuts => '快捷键';
+
+  @override
+  String get settingsShortcutsSubtitle => '自定义按键绑定';
+
+  @override
+  String get shortcutNote => '点击绑定即可录制新快捷键；在弹窗中按下组合键。';
+
+  @override
+  String get shortcutResetAll => '全部恢复默认';
+
+  @override
+  String get shortcutUnbound => '未绑定';
+
+  @override
+  String get shortcutHintEdit => '点击编辑';
+
+  @override
+  String get shortcutConflict => '与其它动作冲突';
+
+  @override
+  String get shortcutCaptureTitle => '录制快捷键';
+
+  @override
+  String get shortcutPressKeys => '请按下组合键…';
+
+  @override
+  String get shortcutCategoryPlayback => '播放控制';
+
+  @override
+  String get shortcutCategorySeek => '快进快退';
+
+  @override
+  String get shortcutCategoryVolume => '音量';
+
+  @override
+  String get shortcutCategoryQueue => '播放队列';
+
+  @override
+  String get shortcutCategoryNavigation => '导航';
+
+  @override
+  String get shortcutActionPlayPause => '播放 / 暂停';
+
+  @override
+  String get shortcutActionPlay => '播放';
+
+  @override
+  String get shortcutActionPause => '暂停';
+
+  @override
+  String get shortcutActionStop => '停止';
+
+  @override
+  String get shortcutActionNext => '下一首';
+
+  @override
+  String get shortcutActionPrevious => '上一首';
+
+  @override
+  String get shortcutActionLikeToggle => '收藏 / 取消收藏';
+
+  @override
+  String get shortcutActionShuffleToggle => '随机播放开关';
+
+  @override
+  String get shortcutActionRepeatCycle => '循环模式切换';
+
+  @override
+  String get shortcutActionReload => '重新加载当前曲目';
+
+  @override
+  String get shortcutActionSeekBackward => '后退 10 秒';
+
+  @override
+  String get shortcutActionSeekForward => '前进 10 秒';
+
+  @override
+  String get shortcutActionSeekBackwardLong => '后退 30 秒';
+
+  @override
+  String get shortcutActionSeekForwardLong => '前进 30 秒';
+
+  @override
+  String get shortcutActionVolumeUp => '音量 +';
+
+  @override
+  String get shortcutActionVolumeDown => '音量 −';
+
+  @override
+  String get shortcutActionMuteToggle => '静音 / 取消静音';
+
+  @override
+  String get shortcutActionJumpToFirst => '跳到队列第一首';
+
+  @override
+  String get shortcutActionJumpToLast => '跳到队列最后一首';
+
+  @override
+  String get shortcutActionClearQueue => '清空队列';
+
+  @override
+  String get shortcutActionGoHome => '前往主页';
+
+  @override
+  String get shortcutActionGoLibrary => '前往音乐库';
+
+  @override
+  String get shortcutActionGoSearch => '前往搜索';
+
+  @override
+  String get shortcutActionGoLiked => '前往我喜欢';
+
+  @override
+  String get shortcutActionGoFavorites => '前往收藏';
+
+  @override
+  String get shortcutActionGoHistory => '前往历史';
+
+  @override
+  String get shortcutActionGoDownload => '前往下载';
+
+  @override
+  String get shortcutActionGoStreaming => '前往流媒体';
+
+  @override
+  String get shortcutActionOpenPlayer => '打开播放页';
+
+  @override
+  String get shortcutActionOpenSettings => '打开设置';
+
+  @override
+  String get shortcutActionBack => '返回';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -10975,4 +11245,139 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get instanceAlreadyRunningTitle => 'ArchoeraMusic 已有一個實例在執行';
+
+  @override
+  String get settingsCatShortcuts => '快速鍵';
+
+  @override
+  String get settingsShortcutsSubtitle => '自訂按鍵綁定';
+
+  @override
+  String get shortcutNote => '點擊綁定即可錄製新快速鍵；在彈窗中按下組合鍵。';
+
+  @override
+  String get shortcutResetAll => '全部恢復預設';
+
+  @override
+  String get shortcutUnbound => '未綁定';
+
+  @override
+  String get shortcutHintEdit => '點擊編輯';
+
+  @override
+  String get shortcutConflict => '與其它動作衝突';
+
+  @override
+  String get shortcutCaptureTitle => '錄製快速鍵';
+
+  @override
+  String get shortcutPressKeys => '請按下組合鍵…';
+
+  @override
+  String get shortcutCategoryPlayback => '播放控制';
+
+  @override
+  String get shortcutCategorySeek => '快進快退';
+
+  @override
+  String get shortcutCategoryVolume => '音量';
+
+  @override
+  String get shortcutCategoryQueue => '播放佇列';
+
+  @override
+  String get shortcutCategoryNavigation => '導覽';
+
+  @override
+  String get shortcutActionPlayPause => '播放 / 暫停';
+
+  @override
+  String get shortcutActionPlay => '播放';
+
+  @override
+  String get shortcutActionPause => '暫停';
+
+  @override
+  String get shortcutActionStop => '停止';
+
+  @override
+  String get shortcutActionNext => '下一首';
+
+  @override
+  String get shortcutActionPrevious => '上一首';
+
+  @override
+  String get shortcutActionLikeToggle => '收藏 / 取消收藏';
+
+  @override
+  String get shortcutActionShuffleToggle => '隨機播放開關';
+
+  @override
+  String get shortcutActionRepeatCycle => '循環模式切換';
+
+  @override
+  String get shortcutActionReload => '重新載入目前曲目';
+
+  @override
+  String get shortcutActionSeekBackward => '後退 10 秒';
+
+  @override
+  String get shortcutActionSeekForward => '前進 10 秒';
+
+  @override
+  String get shortcutActionSeekBackwardLong => '後退 30 秒';
+
+  @override
+  String get shortcutActionSeekForwardLong => '前進 30 秒';
+
+  @override
+  String get shortcutActionVolumeUp => '音量 +';
+
+  @override
+  String get shortcutActionVolumeDown => '音量 −';
+
+  @override
+  String get shortcutActionMuteToggle => '靜音 / 取消靜音';
+
+  @override
+  String get shortcutActionJumpToFirst => '跳到佇列第一首';
+
+  @override
+  String get shortcutActionJumpToLast => '跳到佇列最後一首';
+
+  @override
+  String get shortcutActionClearQueue => '清空佇列';
+
+  @override
+  String get shortcutActionGoHome => '前往首頁';
+
+  @override
+  String get shortcutActionGoLibrary => '前往音樂庫';
+
+  @override
+  String get shortcutActionGoSearch => '前往搜尋';
+
+  @override
+  String get shortcutActionGoLiked => '前往我喜歡';
+
+  @override
+  String get shortcutActionGoFavorites => '前往收藏';
+
+  @override
+  String get shortcutActionGoHistory => '前往歷史';
+
+  @override
+  String get shortcutActionGoDownload => '前往下載';
+
+  @override
+  String get shortcutActionGoStreaming => '前往串流';
+
+  @override
+  String get shortcutActionOpenPlayer => '開啟播放頁';
+
+  @override
+  String get shortcutActionOpenSettings => '開啟設定';
+
+  @override
+  String get shortcutActionBack => '返回';
 }

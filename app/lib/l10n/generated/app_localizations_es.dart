@@ -4014,4 +4014,140 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get instanceAlreadyRunningTitle =>
       'ArchoeraMusic ya se está ejecutando';
+
+  @override
+  String get settingsCatShortcuts => 'Atajos';
+
+  @override
+  String get settingsShortcutsSubtitle => 'Enlaces de teclado personalizados';
+
+  @override
+  String get shortcutNote =>
+      'Haz clic en un enlace para grabar un nuevo atajo; pulsa la combinación en el diálogo.';
+
+  @override
+  String get shortcutResetAll => 'Restablecer todo';
+
+  @override
+  String get shortcutUnbound => 'Sin asignar';
+
+  @override
+  String get shortcutHintEdit => 'Haz clic para editar';
+
+  @override
+  String get shortcutConflict => 'Entra en conflicto con otra acción';
+
+  @override
+  String get shortcutCaptureTitle => 'Grabar atajo';
+
+  @override
+  String get shortcutPressKeys => 'Pulsa las teclas…';
+
+  @override
+  String get shortcutCategoryPlayback => 'Reproducción';
+
+  @override
+  String get shortcutCategorySeek => 'Avance';
+
+  @override
+  String get shortcutCategoryVolume => 'Volumen';
+
+  @override
+  String get shortcutCategoryQueue => 'Cola';
+
+  @override
+  String get shortcutCategoryNavigation => 'Navegación';
+
+  @override
+  String get shortcutActionPlayPause => 'Reproducir / Pausar';
+
+  @override
+  String get shortcutActionPlay => 'Reproducir';
+
+  @override
+  String get shortcutActionPause => 'Pausar';
+
+  @override
+  String get shortcutActionStop => 'Detener';
+
+  @override
+  String get shortcutActionNext => 'Siguiente pista';
+
+  @override
+  String get shortcutActionPrevious => 'Pista anterior';
+
+  @override
+  String get shortcutActionLikeToggle => 'Me gusta / Quitar';
+
+  @override
+  String get shortcutActionShuffleToggle => 'Alternar aleatorio';
+
+  @override
+  String get shortcutActionRepeatCycle => 'Cambiar modo de repetición';
+
+  @override
+  String get shortcutActionReload => 'Recargar pista actual';
+
+  @override
+  String get shortcutActionSeekBackward => 'Retroceder 10 s';
+
+  @override
+  String get shortcutActionSeekForward => 'Avanzar 10 s';
+
+  @override
+  String get shortcutActionSeekBackwardLong => 'Retroceder 30 s';
+
+  @override
+  String get shortcutActionSeekForwardLong => 'Avanzar 30 s';
+
+  @override
+  String get shortcutActionVolumeUp => 'Subir volumen';
+
+  @override
+  String get shortcutActionVolumeDown => 'Bajar volumen';
+
+  @override
+  String get shortcutActionMuteToggle => 'Silenciar / Activar';
+
+  @override
+  String get shortcutActionJumpToFirst => 'Ir al primero de la cola';
+
+  @override
+  String get shortcutActionJumpToLast => 'Ir al último de la cola';
+
+  @override
+  String get shortcutActionClearQueue => 'Vaciar cola';
+
+  @override
+  String get shortcutActionGoHome => 'Ir a Inicio';
+
+  @override
+  String get shortcutActionGoLibrary => 'Ir a Biblioteca';
+
+  @override
+  String get shortcutActionGoSearch => 'Ir a Buscar';
+
+  @override
+  String get shortcutActionGoLiked => 'Ir a Me gusta';
+
+  @override
+  String get shortcutActionGoFavorites => 'Ir a Favoritos';
+
+  @override
+  String get shortcutActionGoHistory => 'Ir a Historial';
+
+  @override
+  String get shortcutActionGoDownload => 'Ir a Descargas';
+
+  @override
+  String get shortcutActionGoStreaming => 'Ir a Streaming';
+
+  @override
+  String get shortcutActionOpenPlayer => 'Abrir reproductor';
+
+  @override
+  String get shortcutActionOpenSettings => 'Abrir ajustes';
+
+  @override
+  String get shortcutActionBack => 'Atrás';
 }

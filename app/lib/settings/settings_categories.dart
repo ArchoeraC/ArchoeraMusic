@@ -11,6 +11,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 enum SettingsCategory {
   appearance(EtaIcons.paletteOutline),
   playback(EtaIcons.playCircleOutline),
+  shortcuts(EtaIcons.space),
   lyrics(EtaIcons.fileMusicOutline),
   preset(EtaIcons.firstAidKitOutline),
   download(EtaIcons.downloadOutline),
@@ -30,6 +31,7 @@ enum SettingsCategory {
   String label(AppLocalizations l10n) => switch (this) {
     appearance => l10n.settingsCatAppearance,
     playback => l10n.settingsCatPlayback,
+    shortcuts => l10n.settingsCatShortcuts,
     lyrics => l10n.settingsCatLyrics,
     preset => l10n.settingsCatPreset,
     download => l10n.settingsCatDownload,
@@ -44,6 +46,7 @@ enum SettingsCategory {
   String subtitle(AppLocalizations l10n) => switch (this) {
     appearance => l10n.settingsAppearanceSubtitle,
     playback => l10n.settingsPlaybackSubtitle,
+    shortcuts => l10n.settingsShortcutsSubtitle,
     lyrics => l10n.settingsLyricsSubtitle,
     preset => l10n.settingsPresetSubtitle,
     download => l10n.settingsDownloadSubtitle,

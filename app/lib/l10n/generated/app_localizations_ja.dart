@@ -3820,4 +3820,140 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get instanceAlreadyRunningTitle => 'ArchoeraMusic は既に起動しています';
+
+  @override
+  String get settingsCatShortcuts => 'ショートカット';
+
+  @override
+  String get settingsShortcutsSubtitle => 'キー割り当てをカスタマイズ';
+
+  @override
+  String get shortcutNote =>
+      '割り当てをクリックして新しいショートカットを記録します。ダイアログでキーの組み合わせを押してください。';
+
+  @override
+  String get shortcutResetAll => 'すべてリセット';
+
+  @override
+  String get shortcutUnbound => '未割り当て';
+
+  @override
+  String get shortcutHintEdit => 'クリックして編集';
+
+  @override
+  String get shortcutConflict => '他の操作と競合しています';
+
+  @override
+  String get shortcutCaptureTitle => 'ショートカットを記録';
+
+  @override
+  String get shortcutPressKeys => 'キーを押してください…';
+
+  @override
+  String get shortcutCategoryPlayback => '再生';
+
+  @override
+  String get shortcutCategorySeek => 'シーク';
+
+  @override
+  String get shortcutCategoryVolume => '音量';
+
+  @override
+  String get shortcutCategoryQueue => 'キュー';
+
+  @override
+  String get shortcutCategoryNavigation => 'ナビゲーション';
+
+  @override
+  String get shortcutActionPlayPause => '再生 / 一時停止';
+
+  @override
+  String get shortcutActionPlay => '再生';
+
+  @override
+  String get shortcutActionPause => '一時停止';
+
+  @override
+  String get shortcutActionStop => '停止';
+
+  @override
+  String get shortcutActionNext => '次の曲';
+
+  @override
+  String get shortcutActionPrevious => '前の曲';
+
+  @override
+  String get shortcutActionLikeToggle => 'お気に入り切替';
+
+  @override
+  String get shortcutActionShuffleToggle => 'シャッフル切替';
+
+  @override
+  String get shortcutActionRepeatCycle => 'リピートモード切替';
+
+  @override
+  String get shortcutActionReload => '現在の曲を再読み込み';
+
+  @override
+  String get shortcutActionSeekBackward => '10秒戻る';
+
+  @override
+  String get shortcutActionSeekForward => '10秒進む';
+
+  @override
+  String get shortcutActionSeekBackwardLong => '30秒戻る';
+
+  @override
+  String get shortcutActionSeekForwardLong => '30秒進む';
+
+  @override
+  String get shortcutActionVolumeUp => '音量を上げる';
+
+  @override
+  String get shortcutActionVolumeDown => '音量を下げる';
+
+  @override
+  String get shortcutActionMuteToggle => 'ミュート切替';
+
+  @override
+  String get shortcutActionJumpToFirst => 'キューの先頭へ';
+
+  @override
+  String get shortcutActionJumpToLast => 'キューの末尾へ';
+
+  @override
+  String get shortcutActionClearQueue => 'キューを空にする';
+
+  @override
+  String get shortcutActionGoHome => 'ホームへ';
+
+  @override
+  String get shortcutActionGoLibrary => 'ライブラリへ';
+
+  @override
+  String get shortcutActionGoSearch => '検索へ';
+
+  @override
+  String get shortcutActionGoLiked => 'お気に入りへ';
+
+  @override
+  String get shortcutActionGoFavorites => 'コレクションへ';
+
+  @override
+  String get shortcutActionGoHistory => '履歴へ';
+
+  @override
+  String get shortcutActionGoDownload => 'ダウンロードへ';
+
+  @override
+  String get shortcutActionGoStreaming => 'ストリーミングへ';
+
+  @override
+  String get shortcutActionOpenPlayer => 'プレイヤーを開く';
+
+  @override
+  String get shortcutActionOpenSettings => '設定を開く';
+
+  @override
+  String get shortcutActionBack => '戻る';
 }

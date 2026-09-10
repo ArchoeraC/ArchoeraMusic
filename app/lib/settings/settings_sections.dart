@@ -14,6 +14,7 @@ import 'dart:io' show File, Platform, Process, ProcessStartMode;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
@@ -24,6 +25,8 @@ import '../services/downloader/download_controller.dart';
 import '../services/playback/engine_bindings.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/scraper/scrape_controller.dart';
+import '../services/shortcuts/shortcut_action.dart';
+import '../services/shortcuts/shortcut_binding.dart';
 import '../stores/app_prefs.dart';
 import '../stores/data_dir.dart';
 import '../theme/app_theme.dart';
@@ -36,6 +39,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'settings_sections/settings_sections_appearance.dart';
 part 'settings_sections/settings_sections_playback.dart';
+part 'settings_sections/settings_sections_shortcuts.dart';
 part 'settings_sections/settings_sections_lyrics.dart';
 part 'settings_sections/settings_sections_preset.dart';
 part 'settings_sections/settings_sections_download.dart';
