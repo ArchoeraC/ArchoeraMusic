@@ -4003,4 +4003,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsAmllSpring => '滚动弹簧';
+
+  @override
+  String get toastSleepInhibitFailed =>
+      'Échec de la prévention de la mise en veille du système';
+
+  @override
+  String get toastMediaSessionLost => 'Session multimédia système déconnectée';
 }

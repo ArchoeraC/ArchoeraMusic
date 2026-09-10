@@ -3,16 +3,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:io' show Platform;
 
-import 'package:dbus/dbus.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../l10n/l10n.dart';
 import '../../stores/app_prefs.dart';
+import '../platform/platform_capabilities.dart';
+import '../platform/platform_failure.dart';
+import '../platform/system_power.dart';
+import '../platform/system_window.dart';
 import '../playback/playback_notifier.dart';
+import '../../widgets/common/toast.dart';
 import 'frame_governor.dart';
 
 /// 节能原因（决定目标帧率上限）。
@@ -34,16 +37,22 @@ enum PowerSaverReason {
 ///
 /// - 窗口最小化 / 失焦 / 屏幕关闭时，通过 [PowerSavingFrameBinding] 自动
 ///   降低渲染帧率（最小化 5 FPS，失焦 / 熄屏 1 FPS）；
-/// - 「禁用系统休眠」仅**在媒体播放中**通过 wakelock_plus 保持系统唤醒，
-///   暂停 / 停止时立即释放，后台播放不中断。
+/// - 「禁用系统休眠」仅**在媒体播放中**通过平台能力外观（原生桥接）保持系统
+///   唤醒，暂停 / 停止时立即释放，后台播放不中断。
 ///
 /// 全程事件驱动：window_manager 窗口事件 + D-Bus 信号订阅 + Timer 帧合并，
 /// 不使用轮询。窗口隐藏 / 屏幕关闭时若引擎已内建停帧（GTK 无 vsync、
 /// 显示器关闭等），以引擎内建节能为准，本服务设置的帧率上限只是兜底。
 class PowerSaverService with WindowListener {
-  PowerSaverService(this._ref);
+  PowerSaverService(this._ref, this._power, this._window);
 
   final Ref _ref;
+
+  /// 平台能力外观（原生桥接）：熄屏订阅 + 休眠抑制（facade §7.2）。
+  final SystemPower _power;
+
+  /// 平台能力外观：窗口最小化/失焦事件（桥接可用时优先，否则 window_manager）。
+  final SystemWindow _window;
 
   /// 节能模式总开关（设置持久化，默认开）。
   bool _enabled = true;
@@ -58,12 +67,12 @@ class PowerSaverService with WindowListener {
   /// 「禁用系统休眠」设置（默认关，持久化）。
   bool _suppressSleep = false;
 
-  /// 唤醒锁当前实际持有状态（避免对插件重复调用）。
+  /// 唤醒锁当前实际持有状态（避免重复调用）。
   bool _sleepActive = false;
 
-  StreamSubscription<DBusSignal>? _screenSub;
-  DBusClient? _dbusClient;
-  bool _dbusAttached = false;
+  StreamSubscription<bool>? _screenSub;
+  StreamSubscription<PlatformCapabilityFailure>? _failSub;
+  StreamSubscription<SystemWindowState>? _windowSub;
 
   static const Map<PowerSaverReason, Duration> _intervalByReason = {
     PowerSaverReason.minimized: Duration(milliseconds: 200), // 5 FPS
@@ -84,65 +93,45 @@ class PowerSaverService with WindowListener {
   /// 最近一次已发送的引擎事件间隔（避免每个窗口事件都重复刷命令）。
   int? _lastEngineIntervalMs;
 
-  /// 开始监听窗口状态（并异步探测 Linux 屏幕状态信号）。
+  /// 开始监听窗口状态（并异步订阅平台熄屏/窗口状态）。
+  /// window_manager 监听保留：托盘 hide/show 事件 + 桥接未覆盖时的兜底。
   void attach() {
     windowManager.addListener(this);
+    unawaited(_attachWindowWatcher());
     unawaited(_attachScreenWatcher());
   }
 
-  /// Linux：订阅桌面环境 screensaver 服务的 `ActiveChanged` 信号
-  /// （事件驱动，非轮询）。服务不可用时静默忽略该场景。
-  Future<void> _attachScreenWatcher() async {
-    if (!Platform.isLinux || _dbusAttached) return;
-    _dbusAttached = true;
-    try {
-      // DBusClient.session() 为同步工厂（惰性连接），后续调用即发起连接
-      final client = DBusClient.session();
-      final name = await _pickScreensaverService(client);
-      if (name == null) {
-        await client.close();
-        return;
-      }
-      final path = name == 'org.gnome.ScreenSaver'
-          ? DBusObjectPath('/org/gnome/ScreenSaver')
-          : DBusObjectPath('/org/freedesktop/ScreenSaver');
-      final obj = DBusRemoteObject(client, name: name, path: path);
-      final stream = DBusRemoteObjectSignalStream(
-        object: obj,
-        interface: name,
-        name: 'ActiveChanged',
-      );
-      _dbusClient = client;
-      _screenSub = stream.listen(
-        (signal) {
-          final active =
-              signal.values.isNotEmpty && signal.values[0].asBoolean();
-          _screenOff = active;
-          _apply();
-        },
-        onError: (Object e) {
-          debugPrint('[power] 屏幕状态信号异常: $e');
-        },
-      );
-    } catch (e) {
-      debugPrint('[power] 屏幕状态监听不可用（忽略熄屏场景）: $e');
-      await _dbusClient?.close();
-      _dbusClient = null;
+  /// 经平台能力外观订阅窗口最小化/失焦（桥接 WINDOW_STATE 能力位存在时）。
+  /// 失败/缺能力静默回落 window_manager 监听（后台优化类，不打断用户）。
+  Future<void> _attachWindowWatcher() async {
+    if (_windowSub != null) return;
+    final ok = await _window.setEvents(true);
+    if (!ok) {
+      debugPrint('[power] 桥接窗口状态不可用（回退 window_manager）');
+      return;
     }
+    _windowSub = _window.state.listen((s) {
+      _minimized = s.minimized;
+      _focused = s.focused;
+      _apply();
+    });
   }
 
-  Future<String?> _pickScreensaverService(DBusClient client) async {
-    for (final name in [
-      'org.freedesktop.ScreenSaver',
-      'org.gnome.ScreenSaver',
-    ]) {
-      try {
-        if (await client.nameHasOwner(name)) return name;
-      } catch (_) {
-        // 探测失败尝试下一个
-      }
+  /// 经平台能力外观订阅熄屏状态（原生桥接事件驱动，非轮询）。
+  /// 订阅失败 / 能力缺失仅 debug 回落（后台优化类，不打断用户）。
+  Future<void> _attachScreenWatcher() async {
+    if (_screenSub != null) return;
+    final ok = await _power.setScreenEvents(true);
+    if (!ok) {
+      debugPrint('[power] 熄屏状态订阅不可用（忽略熄屏场景）');
     }
-    return null;
+    _screenSub = _power.screenState.listen((active) {
+      _screenOff = active;
+      _apply();
+    });
+    _failSub = _power.failures.listen((f) {
+      debugPrint('[power] 平台能力失败: $f');
+    });
   }
 
   /// 节能模式总开关（设置页切换，立即生效）。
@@ -168,20 +157,22 @@ class PowerSaverService with WindowListener {
     unawaited(_applySleep());
   }
 
-  /// 按「设置 + 播放中」双条件决定唤醒锁；状态未变化时不重复调用插件。
+  /// 按「设置 + 播放中」双条件决定休眠抑制；状态未变化时不重复调用。
   ///
-  /// wakelock_plus 跨平台实现：Linux 走 XDG Desktop Portal（Inhibit）、
-  /// Windows/macOS 用原生 API、Android/iOS/Web 各走平台通道；平台不可用
-  /// （如无 portal 的环境）时 try-catch 静默降级并回滚状态，不影响播放。
+  /// 经平台能力外观（原生桥接）执行：失败时**显式 toast 告警**并回滚状态
+  /// （facade §5 降级两档；能力缺失由 Noop 静默降级，不进此路径）。
   Future<void> _applySleep() async {
     final want = _suppressSleep && _playing;
     if (want == _sleepActive) return;
     _sleepActive = want;
-    try {
-      await WakelockPlus.toggle(enable: want);
-    } catch (e) {
+    final ok = await _power.setSleepInhibit(want);
+    if (!ok) {
       _sleepActive = !want;
-      debugPrint('[power] 禁用系统休眠切换失败: $e');
+      debugPrint('[power] 禁用系统休眠切换失败');
+      if (want) {
+        toast(_ref.read(l10nProvider).toastSleepInhibitFailed,
+            type: ToastType.warning);
+      }
     }
   }
 
@@ -260,16 +251,14 @@ class PowerSaverService with WindowListener {
   Future<void> dispose() async {
     windowManager.removeListener(this);
     await _screenSub?.cancel();
-    await _dbusClient?.close();
-    _dbusClient = null;
-    // 退出前释放唤醒锁（防止残留导致系统保持唤醒）
+    await _failSub?.cancel();
+    await _windowSub?.cancel();
+    unawaited(_power.setScreenEvents(false));
+    unawaited(_window.setEvents(false));
+    // 退出前释放休眠抑制（防止残留导致系统保持唤醒）
     if (_sleepActive) {
       _sleepActive = false;
-      try {
-        await WakelockPlus.disable();
-      } catch (_) {
-        // 平台不可用时忽略
-      }
+      unawaited(_power.setSleepInhibit(false));
     }
     // 兜底恢复满帧
     final binding = WidgetsBinding.instance;
@@ -281,7 +270,8 @@ class PowerSaverService with WindowListener {
 
 /// 节能模式服务（应用级单例；随 ProviderScope 释放）。
 final powerSaverProvider = Provider<PowerSaverService>((ref) {
-  final svc = PowerSaverService(ref);
+  final caps = ref.read(platformCapabilitiesProvider);
+  final svc = PowerSaverService(ref, caps.power, caps.window);
   ref.onDispose(svc.dispose);
   return svc;
 });

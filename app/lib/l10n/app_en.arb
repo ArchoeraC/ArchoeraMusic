@@ -1153,5 +1153,7 @@
   "settingsAmllWordSweep": "Word sweep",
   "settingsAmllHidePassed": "Hide passed lines",
   "settingsAmllScale": "Shrink inactive lines",
-  "settingsAmllSpring": "Scroll spring"
+  "settingsAmllSpring": "Scroll spring",
+  "toastSleepInhibitFailed": "Failed to keep the system awake",
+  "toastMediaSessionLost": "System media session disconnected"
 }
