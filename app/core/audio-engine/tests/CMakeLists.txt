@@ -257,6 +257,28 @@ add_test(NAME test_random_seek_mp3
 set_tests_properties(test_random_seek_mp3 PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# 损坏文件 / 恶意越界 健壮性：截断、错误魔数、头部 fuzz-lite、恶意 seek
+# （INT64 极值/负值/远超时长）——只允许返回错误/EOF，不得崩溃/挂起。
+add_executable(test_malformed test_malformed.c)
+target_link_libraries(test_malformed PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_malformed PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_malformed PRIVATE m)
+endif()
+target_include_directories(test_malformed PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_malformed
+         COMMAND test_malformed
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/mp3/samples/noxing.mp3
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../samples/aac/t48_m.m4a)
+set_tests_properties(test_malformed PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # C-Bench 工具：常驻内核池并发/首帧基准（headless；不入 ctest，手动运行）
 add_executable(bench_era_pool bench/bench_era_pool.c)
 target_link_libraries(bench_era_pool PRIVATE audio_engine_static)
