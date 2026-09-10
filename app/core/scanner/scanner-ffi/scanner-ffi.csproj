@@ -15,6 +15,10 @@
     <!-- TagLibSharp 经 TrimmerRootAssembly 完整保留，不会实际 trim；
          IL2104（Assembly produced trim warnings）属分析期汇总提示，抑制之 -->
     <NoWarn>$(NoWarn);IL2104</NoWarn>
+    <!-- 启用 .NET 自带分析器 + AOT/trim 分析（与 IDE 一致，构建期即暴露警告） -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
