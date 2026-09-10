@@ -157,19 +157,19 @@ public sealed class ScannerEngine
         if (!_incremental)
         {
             LogInfo("全量扫描模式：清空所有曲目记录 + 错误记录");
-            try { await _db.ClearAllTracksAsync(ct); }
+            try { _db.ClearAllTracksAsync(ct).GetAwaiter().GetResult(); }
             catch (Exception ex) { LogWarn($"清空曲目失败: {ex.Message}"); }
-            try { await _db.ClearParseErrorsAsync(ct); }
+            try { _db.ClearParseErrorsAsync(ct).GetAwaiter().GetResult(); }
             catch (Exception ex) { LogWarn($"清空错误记录失败: {ex.Message}"); }
-            try { await _db.ClearStagedTracksAsync(ct); }
+            try { _db.ClearStagedTracksAsync(ct).GetAwaiter().GetResult(); }
             catch (Exception ex) { LogWarn($"清空 staging 失败: {ex.Message}"); }
         }
         else
         {
             LogInfo("增量扫描模式：加载已有曲目快照...");
-            try { trackSnapshot = await _db.LoadTrackSnapshotAsync(ct); }
+            try { trackSnapshot = _db.LoadTrackSnapshotAsync(ct).GetAwaiter().GetResult(); }
             catch (Exception ex) { LogWarn($"加载快照失败，将退化到全量扫描: {ex.Message}"); }
-            try { await _db.ClearStagedTracksAsync(ct); }
+            try { _db.ClearStagedTracksAsync(ct).GetAwaiter().GetResult(); }
             catch (Exception ex) { LogWarn($"清空 staging 失败: {ex.Message}"); }
         }
 
@@ -188,7 +188,7 @@ public sealed class ScannerEngine
         {
             try
             {
-                errorSnapshot = await _db.LoadErrorSnapshotAsync(ct);
+                errorSnapshot = _db.LoadErrorSnapshotAsync(ct).GetAwaiter().GetResult();
                 LogInfo($"加载错误快照: {errorSnapshot.Count} 个异常路径状态");
             }
             catch (Exception ex) { LogWarn($"加载错误快照失败: {ex.Message}"); }
@@ -208,9 +208,10 @@ public sealed class ScannerEngine
 
         try
         {
-            await Parallel.ForEachAsync(files, parserOptions, async (file, itemCt) =>
+            Parallel.For(0, files.Count, parserOptions, i =>
             {
-                itemCt.ThrowIfCancellationRequested();
+                var file = files[i];
+                ct.ThrowIfCancellationRequested();
 
                 // 防止重复处理：同一路径只处理一次
                 if (!seenPaths.TryAdd(file, 0))
@@ -246,7 +247,7 @@ public sealed class ScannerEngine
                     errorState.MtimeAtLastFail == currentMtime)
                 {
                     LogWarn($"标记损坏文件（待隔离 trained）: {file}");
-                    try { await _db.MarkTrainedAsync(file, itemCt); }
+                    try { _db.MarkTrainedAsync(file, ct).GetAwaiter().GetResult(); }
                     catch (Exception ex) { LogWarn($"标记隔离失败 {file}: {ex.Message}"); }
                     Interlocked.Increment(ref counters.Trained);
                     Interlocked.Increment(ref counters.Scanned);
@@ -259,13 +260,13 @@ public sealed class ScannerEngine
                 {
                     if (errorSnapshot.ContainsKey(file))
                     {
-                        try { await _db.ClearParseErrorAsync(file, itemCt); }
+                        try { _db.ClearParseErrorAsync(file, ct).GetAwaiter().GetResult(); }
                         catch (Exception ex) { LogWarn($"清理异常记录失败 {file}: {ex.Message}"); }
-                        try { await _db.UnmarkTrainedAsync(file, itemCt); }
+                        try { _db.UnmarkTrainedAsync(file, ct).GetAwaiter().GetResult(); }
                         catch (Exception ex) { LogWarn($"清理 trained 标记失败 {file}: {ex.Message}"); }
                     }
                     Interlocked.Exchange(ref counters.ConsecutiveErrors, 0);
-                    await channel.Writer.WriteAsync(track, itemCt);
+                    channel.Writer.WriteAsync(track, ct).AsTask().GetAwaiter().GetResult();
                     Interlocked.Increment(ref counters.Upserted);
                 }
                 else
@@ -275,11 +276,11 @@ public sealed class ScannerEngine
                     // 记录解析失败到 _scanner_errors 表（含具体原因）
                     try
                     {
-                        var fileFailCount = await _db.RecordParseErrorAsync(file, "parse_failed", itemCt);
+                        var fileFailCount = _db.RecordParseErrorAsync(file, "parse_failed", ct).GetAwaiter().GetResult();
                         if (fileFailCount >= 3)
                         {
                             LogWarn($"异常文件达到隔离阈值，加入 trained: {file}");
-                            await _db.MarkTrainedAsync(file, itemCt);
+                            _db.MarkTrainedAsync(file, ct).GetAwaiter().GetResult();
                             Interlocked.Increment(ref counters.Trained);
                         }
                     }
@@ -302,6 +303,10 @@ public sealed class ScannerEngine
         {
             // 正常取消，不记为错误
         }
+        catch (AggregateException ae) when (ae.InnerExceptions.All(e => e is OperationCanceledException))
+        {
+            // Parallel.For 取消时可能包装为 AggregateException(OCE) —— 视为正常取消
+        }
         catch (Exception ex)
         {
             LogError($"扫描异常: {ex.Message}");
@@ -322,7 +327,7 @@ public sealed class ScannerEngine
         {
             try
             {
-                await _db.MergeStagedTracksAsync(ct);
+                _db.MergeStagedTracksAsync(ct).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -337,7 +342,7 @@ public sealed class ScannerEngine
             var stale = trackSnapshot.Keys.ToList();
             try
             {
-                var deleted = await _db.DeleteTracksByPathsAsync(stale, ct);
+                var deleted = _db.DeleteTracksByPathsAsync(stale, ct).GetAwaiter().GetResult();
                 if (deleted > 0)
                 {
                     result.Deleted = deleted;
@@ -351,7 +356,7 @@ public sealed class ScannerEngine
         }
 
         // 5. 排空写队列，确保所有 trained 标记和错误记录已持久化
-        try { await _db.FlushAsync(ct); }
+        try { _db.FlushAsync(ct).GetAwaiter().GetResult(); }
         catch (Exception ex) { LogWarn($"drain 写队列失败: {ex.Message}"); }
 
         // 6. 统一处理隔离文件：移入 quarantine 目录并清理数据库记录
@@ -378,7 +383,7 @@ public sealed class ScannerEngine
     /// </summary>
     private async Task QuarantineTrainedFilesAsync(CancellationToken ct)
     {
-        var paths = await _db.GetTrainedPathsAsync(ct);
+        var paths = _db.GetTrainedPathsAsync(ct).GetAwaiter().GetResult();
         if (paths.Count == 0) return;
 
         LogInfo($"开始隔离 {paths.Count} 个损坏文件 → {_quarantineDir}");
@@ -426,19 +431,19 @@ public sealed class ScannerEngine
         // 清理 tracks 和 errors 中所有已标记 trained 的记录
         try
         {
-            var delTracks = await _db.DeleteTracksByPathsAsync(paths, ct);
+            var delTracks = _db.DeleteTracksByPathsAsync(paths, ct).GetAwaiter().GetResult();
             if (delTracks > 0) LogInfo($"隔离后清理 {delTracks} 条曲目记录");
         }
         catch (Exception ex) { LogWarn($"清理隔离曲目记录失败: {ex.Message}"); }
 
         try
         {
-            var delErrors = await _db.DeleteParseErrorsByPathsAsync(paths, ct);
+            var delErrors = _db.DeleteParseErrorsByPathsAsync(paths, ct).GetAwaiter().GetResult();
             if (delErrors > 0) LogInfo($"隔离后清理 {delErrors} 条错误记录");
         }
         catch (Exception ex) { LogWarn($"清理隔离错误记录失败: {ex.Message}"); }
 
-        await _db.ClearTrainedAsync(ct);
+        _db.ClearTrainedAsync(ct).GetAwaiter().GetResult();
 
         if (failedMove.Count > 0)
             LogWarn($"隔离完成: {moved}/{paths.Count} 成功, {failedMove.Count} 移动失败（记录已清理）");
@@ -477,7 +482,7 @@ public sealed class ScannerEngine
         var sw = Stopwatch.StartNew();
         try
         {
-            await _db.StageTracksAsync(batch, ct);
+            _db.StageTracksAsync(batch, ct).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
