@@ -44,6 +44,8 @@ public sealed class ScannerEngine
         "wma", "mka", "mpc", "mpp", "mp+", "mp2", "aifc",
         // 2026-09-04 追加：m4b（音频书=mp4 容器）/ webm（音频，内核 matroska 已认）
         "m4b", "webm",
+        // 2026-09-10：Speex（Ogg 容器，内核可解；probe-only 元数据）
+        "spx",
     };
 
     private readonly IScannerDatabase _db;

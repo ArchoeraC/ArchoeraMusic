@@ -455,8 +455,188 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     return .{ .vtable = &vtable, .ctx = f };
 }
 
-fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
-    const f: *SpeexCtx = @ptrCast(@alignCast(ctx));
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）
+// ---------------------------------------------------------------------------
+
+/// 元数据专用轻量上下文：只含 Ogg demux + SpeexHeader + 标签，**不含** Speex
+/// 解码器状态与 PCM 缓冲。所有分配登记于 `strings`，统一释放（不重复释放 meta 字段）。
+const MetaCtx = struct {
+    allocator: Allocator,
+    demux: ogg.Demux,
+    hdr: SpeexHeader,
+    meta: decoder.Metadata = .{},
+    tags: std.ArrayList(decoder.Tag) = .empty,
+    strings: std.ArrayList([]u8) = .empty,
+};
+
+fn freeMetaCtx(f: *MetaCtx) void {
+    for (f.strings.items) |s| f.allocator.free(s);
+    f.strings.deinit(f.allocator);
+    f.tags.deinit(f.allocator);
+    f.meta = .{};
+}
+
+/// 解析 Speex comment 头包（Vorbis comment 布局）到 MetaCtx；分配登记于 strings。
+fn parseSpeexComment(f: *MetaCtx, data: []const u8) void {
+    if (data.len < 8) return;
+    var pos: usize = 0;
+    const vlen: usize = @intCast(std.mem.readInt(u32, data[0..4], .little));
+    pos = 4;
+    if (pos + vlen > data.len) return;
+    pos += vlen;
+    if (pos + 4 > data.len) return;
+    const count = std.mem.readInt(u32, data[pos..][0..4], .little);
+    pos += 4;
+
+    const map = std.StaticStringMap(usize).initComptime(.{
+        .{ "TITLE", 0 },
+        .{ "ARTIST", 1 },
+        .{ "ALBUM", 2 },
+        .{ "DATE", 3 },
+        .{ "GENRE", 4 },
+        .{ "COMMENT", 5 },
+        .{ "DESCRIPTION", 5 },
+    });
+
+    var n: usize = 0;
+    while (n < count and n < 256) : (n += 1) {
+        if (pos + 4 > data.len) return;
+        const l = std.mem.readInt(u32, data[pos..][0..4], .little);
+        pos += 4;
+        if (l > data.len - pos) return;
+        const entry = data[pos .. pos + l];
+        pos += l;
+        const eq = std.mem.indexOfScalar(u8, entry, '=') orelse continue;
+        const key = entry[0..eq];
+        const value = std.mem.trim(u8, entry[eq + 1 ..], " \t");
+
+        const kbuf = f.allocator.dupe(u8, key) catch return;
+        f.strings.append(f.allocator, kbuf) catch {
+            f.allocator.free(kbuf);
+            return;
+        };
+        const vbuf = f.allocator.dupe(u8, value) catch return;
+        f.strings.append(f.allocator, vbuf) catch {
+            f.allocator.free(vbuf);
+            return;
+        };
+        f.tags.append(f.allocator, .{ .key = kbuf, .value = vbuf }) catch return;
+
+        if (map.get(kbuf)) |slot| {
+            const dup = f.allocator.dupeZ(u8, vbuf) catch return;
+            f.strings.append(f.allocator, dup[0..dup.len]) catch {
+                f.allocator.free(dup);
+                return;
+            };
+            switch (slot) {
+                0 => f.meta.title = dup,
+                1 => f.meta.artist = dup,
+                2 => f.meta.album = dup,
+                3 => f.meta.date = dup,
+                4 => f.meta.genre = dup,
+                else => f.meta.comment = dup,
+            }
+        }
+    }
+    f.meta.tags = f.tags.items;
+}
+
+fn metaDeinit(p: *anyopaque) void {
+    const f: *MetaCtx = @ptrCast(@alignCast(p));
+    freeMetaCtx(f);
+    f.demux.deinit();
+    f.allocator.destroy(f);
+}
+
+pub fn openMeta(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    var demux: ogg.Demux = .{ .allocator = allocator, .reader = reader.* };
+    errdefer demux.deinit();
+
+    const head_pkt = (try demux.nextPacket()) orelse return error.Corrupt;
+    if (head_pkt.continued) return error.Corrupt;
+    const hdr = try parseHeader(head_pkt.data);
+
+    const ctx = try allocator.create(MetaCtx);
+    errdefer allocator.destroy(ctx);
+    ctx.* = .{ .allocator = allocator, .demux = undefined, .hdr = hdr };
+    errdefer freeMetaCtx(ctx);
+
+    if (try demux.nextPacket()) |cmt| parseSpeexComment(ctx, cmt.data);
+    var extra: i32 = hdr.extra_headers;
+    while (extra > 0) : (extra -= 1) {
+        _ = (try demux.nextPacket()) orelse return error.Corrupt;
+    }
+
+    // first_pts（对照 open）：首音频包页 granule − packet_size × 页内包数
+    var first_pts: ?i64 = null;
+    if (try demux.nextPacket()) |pkt| {
+        if (!pkt.continued) {
+            if (demux.page) |pg| {
+                if (pg.granule > 0) {
+                    const packet_size: i64 = @as(i64, hdr.frame_size) * hdr.frames_per_packet;
+                    var npkts: i64 = 0;
+                    for (pg.segments) |seg| {
+                        if (seg < 255) npkts += 1;
+                    }
+                    first_pts = pg.granule - packet_size * npkts;
+                }
+            }
+        }
+    }
+    try demux.reset();
+
+    var last_granule: i64 = 0;
+    var eos_found = false;
+    var granule_known = false;
+    if ((ogg.scanTailPage(&demux.reader, demux.serial) catch null)) |tail| {
+        if (tail.granule > 0) {
+            last_granule = tail.granule;
+            eos_found = tail.eos;
+            granule_known = true;
+        }
+    }
+    if (!granule_known) {
+        var scanned = false;
+        while (true) {
+            const p = demux.nextPacket() catch break orelse break;
+            _ = p;
+            scanned = true;
+        }
+        if (scanned and demux.final_granule > 0) {
+            last_granule = demux.final_granule;
+            eos_found = demux.eos;
+            granule_known = true;
+        }
+    }
+
+    var duration_us: i64 = 0;
+    var duration_known: decoder.DurationKnown = .unknown;
+    if (granule_known) {
+        const samples: i64 = if (first_pts) |fp| last_granule - fp else last_granule;
+        const granule_max: i64 = @as(i64, @intCast(hdr.rate)) * 12 * 3600;
+        if (samples > 0 and samples < granule_max) {
+            duration_us = @intCast(@divTrunc(@as(i128, samples) * 1_000_000, hdr.rate));
+            duration_known = if (eos_found) .exact else .estimate;
+        }
+    }
+
+    ctx.demux = demux;
+    info.* = .{
+        .sample_rate = @intCast(hdr.rate),
+        .channels = @intCast(hdr.nb_channels),
+        .bits_per_sample = 16,
+        .is_float = false,
+        .duration_us = duration_us,
+        .duration_known = duration_known,
+        .codec_name = "speex",
+        .format_name = "ogg",
+        .metadata = ctx.meta,
+    };
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
+
+fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {    const f: *SpeexCtx = @ptrCast(@alignCast(ctx));
     out_channels.* = @intCast(f.hdr.nb_channels);
     if (max_samples == 0 or out.len == 0) return 0;
 
