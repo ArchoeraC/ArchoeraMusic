@@ -89,7 +89,7 @@ pub const modules = [_]Module{
     .{ .fmt = .ape,       .open = ape.open },
     .{ .fmt = .ogg_opus,  .open = opus.open, .meta = opus.openMeta },
     .{ .fmt = .ogg_vorbis,.open = vorbis.open, .meta = vorbis.openMeta },
-    .{ .fmt = .ogg_flac,  .open = oggflac.open },
+    .{ .fmt = .ogg_flac,  .open = oggflac.open, .meta = oggflac.openMeta },
     .{ .fmt = .ogg_speex, .open = spx.open },
     .{ .fmt = .dsd,       .open = dsd.open },
     .{ .fmt = .amr,       .open = amr.open },
