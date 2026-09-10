@@ -49,40 +49,59 @@ pub const BitReader = struct {
     }
 
     /// 从底层取 1 字节并累加滚动 CRC。EOF 视为截断 → error.Corrupt。
+    /// 走 `Reader.readByte()` 单字节快路径（无新增缓冲，语义与 read(1) 一致）。
     fn fetchByte(self: *BitReader) Error!u8 {
-        var byte: [1]u8 = undefined;
-        const n = try self.reader.read(&byte);
-        if (n == 0) return error.Corrupt;
-        self.crc8 = crc.crc8Update(self.crc8, byte[0]);
-        self.crc16 = crc.crc16Update(self.crc16, byte[0]);
-        return byte[0];
+        const b = (try self.reader.readByte()) orelse return error.Corrupt;
+        self.crc8 = crc.crc8Update(self.crc8, b);
+        self.crc16 = crc.crc16Update(self.crc16, b);
+        return b;
     }
+
+    /// (1<<n)-1 掩码表（comptime，替代每轮移位构造；n∈0..32）
+    const MASKS: [33]u64 = blk: {
+        var m: [33]u64 = undefined;
+        for (0..33) |i| m[i] = (@as(u64, 1) << @intCast(i)) - 1;
+        break :blk m;
+    };
 
     /// 读取 n 位（0..=32），MSB-first 组装为无符号整数。
     /// 流截断（不足 n 位）→ error.Corrupt。
+    ///
+    /// 指令削减（A 档、无缓冲、逐位一致）：缓存位足够时走单次提取快路径；
+    /// 慢路径用 comptime 掩码表，去掉每轮两次 `(1<<x)-1` 与 cache 清零。
     pub fn readBits(self: *BitReader, n: u6) Error!u32 {
+        if (n == 0) return 0;
         if (n > 32) return error.Corrupt;
-        var out: u32 = 0;
-        var need: u6 = n;
+
+        // 快路径：当前缓存位足够（小位宽读取的绝对多数）
+        if (n <= self.bits_avail) {
+            self.bits_avail -= n;
+            return @intCast((self.cache >> self.bits_avail) & MASKS[n]);
+        }
+
+        // 慢路径：跨字节组装（缓存保留高位残余，不清零）
+        var out: u32 = @intCast((self.cache) & MASKS[self.bits_avail]);
+        var need: u6 = n - self.bits_avail;
         while (need > 0) {
-            if (self.bits_avail == 0) {
-                self.cache = try self.fetchByte();
-                self.bits_avail = 8;
-            }
-            const take: u6 = @intCast(@min(@as(u6, need), self.bits_avail));
-            const shift: u6 = self.bits_avail - take;
-            const v: u32 = @intCast((self.cache >> shift) & ((@as(u64, 1) << take) - 1));
-            out = (out << @as(u5, @intCast(take))) | v;
+            self.cache = try self.fetchByte();
+            self.bits_avail = 8;
+            const take: u6 = if (need < 8) need else 8;
             self.bits_avail -= take;
-            self.cache &= (@as(u64, 1) << self.bits_avail) - 1;
+            out = (out << @as(u5, @intCast(take))) |
+                @as(u32, @intCast((self.cache >> self.bits_avail) & MASKS[take]));
             need -= take;
         }
         return out;
     }
 
-    /// 读取 1 位
+    /// 读取 1 位（Huffman / unary 高频路径：无循环、无掩码表索引）
     pub fn readBit(self: *BitReader) Error!u1 {
-        return @intCast(try self.readBits(1));
+        if (self.bits_avail == 0) {
+            self.cache = try self.fetchByte();
+            self.bits_avail = 8;
+        }
+        self.bits_avail -= 1;
+        return @intCast((self.cache >> self.bits_avail) & 1);
     }
 
     /// 读取 n 位（1..=32）并符号扩展为 i32（warm-up / LPC 系数用）
