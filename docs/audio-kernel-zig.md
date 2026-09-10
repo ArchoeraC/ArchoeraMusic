@@ -903,6 +903,13 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > `KernelExts` 补 `ape`。**WavPack/Musepack** 的声道/采样率来自首块/帧解析，需另写
 > header-only 解析（APEv2 解析器已可复用），列为后续。另修正 `KernelExts` 误含
 > `wma/asf/amr/awb/aac`（内核 metadata 为空）导致的标签丢失，改回 TagLib。
+>
+> **第七批（2026-09-10）**：**WavPack + Musepack** probe-only——wv 读首包各块头
+> （`readBlock`+`parseBlock`，不展开音频平面）得声道/采样率/位深/时长；mpc 整读后
+> 仅调 sv7/sv8 `parse`（头+帧表/AP 列表，不构造 VLC/合成器）得信息。两者尾部
+> APEv2 标签复用 `apev2.zig`。**probe-only 覆盖**：flac/mp3/wav/m4a/ape/wv/mpc +
+> Ogg 全家。剩余 wma/amr/ac3/dts/dsd/mka/shn/tak/tta 内核 metadata 为空，保持
+> TagLib（需先补各自标签解析器方可纳入）。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
