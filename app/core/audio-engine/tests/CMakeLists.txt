@@ -222,6 +222,9 @@ set_tests_properties(test_pool_pipeline PROPERTIES
 # fixture = 带 PICTURE + 标签的 FLAC。
 add_executable(test_metadata_abi test_metadata_abi.c)
 target_link_libraries(test_metadata_abi PRIVATE audio_engine_static)
+if(UNIX)
+    target_link_libraries(test_metadata_abi PRIVATE m)
+endif()
 target_include_directories(test_metadata_abi PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
