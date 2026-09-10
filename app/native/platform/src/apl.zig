@@ -83,6 +83,16 @@ export fn apl_instance_acquire() callconv(.c) i32 {
     return backend.appInstanceAcquire();
 }
 
+/// 系统主题色（DE accent）：0=成功并写 r/g/b；<0=不可得/错误。
+export fn apl_system_accent(r: ?*i32, g: ?*i32, b: ?*i32) callconv(.c) i32 {
+    if (!core.isInitialized()) return core.ERR_STATE;
+    const rgb = backend.systemAccent() orelse return core.ERR_BACKEND;
+    if (r) |p| p.* = rgb[0];
+    if (g) |p| p.* = rgb[1];
+    if (b) |p| p.* = rgb[2];
+    return core.OK;
+}
+
 /// 系统提示（UTF-8）。用于“已有实例”等无需 UI 框架的场景。
 export fn apl_notify(title: ?[*:0]const u8, body: ?[*:0]const u8) callconv(.c) i32 {
     if (!core.isInitialized()) return core.ERR_STATE;

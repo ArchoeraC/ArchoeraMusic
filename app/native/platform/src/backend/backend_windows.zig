@@ -386,3 +386,7 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
     _ = user32.MessageBoxW(null, b.ptr, t.ptr, 0x40); // MB_ICONINFORMATION
     return core.OK;
 }
+
+pub fn systemAccent() ?[3]u8 {
+    return null;
+}

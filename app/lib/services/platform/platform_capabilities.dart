@@ -11,6 +11,8 @@
 /// 主程序只依赖 [power]/[media]/[window] 三个接口，不感知 FFI 细节。
 library;
 
+import 'dart:ui' show Color;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'ffi_system_media.dart';
@@ -44,6 +46,7 @@ class PlatformCapabilities {
   bool get mediaSessionAvailable => caps & aplCapMediaSession != 0;
   bool get windowStateAvailable => caps & aplCapWindowState != 0;
   bool get appInstanceAvailable => caps & aplCapAppInstance != 0;
+  bool get systemAccentAvailable => caps & aplCapSystemAccent != 0;
   bool get bridgeLoaded => _bindings != null;
 
   /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
@@ -52,6 +55,13 @@ class PlatformCapabilities {
     final b = _bindings;
     if (b == null || caps & aplCapAppInstance == 0) return true;
     return b.acquireInstance() == 1;
+  }
+
+  /// 系统主题色（DE accent）；桥接不可用/无该能力返回 null。
+  Color? systemAccent() {
+    final b = _bindings;
+    if (b == null || caps & aplCapSystemAccent == 0) return null;
+    return b.systemAccent();
   }
 
   /// 系统提示（桥接不可用时返回错误码）。返回 0=成功。

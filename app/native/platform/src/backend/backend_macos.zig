@@ -448,3 +448,7 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
     alloc.free(r.stderr);
     return core.OK;
 }
+
+pub fn systemAccent() ?[3]u8 {
+    return null;
+}

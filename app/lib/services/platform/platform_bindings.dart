@@ -14,6 +14,7 @@ library;
 
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:ui' show Color;
 
 import 'package:ffi/ffi.dart';
 
@@ -34,6 +35,7 @@ const int aplCapMediaSeek = 1 << 3;
 const int aplCapMediaArtwork = 1 << 4;
 const int aplCapWindowState = 1 << 5;
 const int aplCapAppInstance = 1 << 6;
+const int aplCapSystemAccent = 1 << 7;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -116,6 +118,7 @@ typedef _AplPowerScreenC = Int32 Function(Int32 on);
 typedef _AplWindowEventsC = Int32 Function(Int32 on);
 typedef _AplInstanceAcquireC = Int32 Function();
 typedef _AplNotifyC = Int32 Function(Pointer<Utf8> title, Pointer<Utf8> body);
+typedef _AplSystemAccentC = Int32 Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplMediaTrackC = Int32 Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackC = Int32 Function(
     Int32 state, Int64 positionMs, Double speed, Double volume, Int32 loop, Int32 shuffle);
@@ -134,6 +137,7 @@ typedef _AplPowerScreenD = int Function(int on);
 typedef _AplWindowEventsD = int Function(int on);
 typedef _AplInstanceAcquireD = int Function();
 typedef _AplNotifyD = int Function(Pointer<Utf8> title, Pointer<Utf8> body);
+typedef _AplSystemAccentD = int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplMediaTrackD = int Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackD = int Function(
     int state, int positionMs, double speed, double volume, int loop, int shuffle);
@@ -190,6 +194,8 @@ class PlatformBindings {
         _instanceAcquire =
             lib.lookupFunction<_AplInstanceAcquireC, _AplInstanceAcquireD>('apl_instance_acquire'),
         _notify = lib.lookupFunction<_AplNotifyC, _AplNotifyD>('apl_notify'),
+        _systemAccent = lib
+            .lookupFunction<_AplSystemAccentC, _AplSystemAccentD>('apl_system_accent'),
         _mediaTrack =
             lib.lookupFunction<_AplMediaTrackC, _AplMediaTrackD>('apl_media_set_track'),
         _mediaPlayback =
@@ -215,6 +221,7 @@ class PlatformBindings {
   final _AplWindowEventsD _windowEvents;
   final _AplInstanceAcquireD _instanceAcquire;
   final _AplNotifyD _notify;
+  final _AplSystemAccentD _systemAccent;
   final _AplMediaTrackD _mediaTrack;
   final _AplMediaPlaybackD _mediaPlayback;
   final _AplMediaWindowD _mediaWindow;
@@ -229,6 +236,21 @@ class PlatformBindings {
 
   /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
   int acquireInstance() => _instanceAcquire();
+
+  /// 系统主题色（DE accent）；不可得返回 null。
+  Color? systemAccent() {
+    final r = calloc<Int32>();
+    final g = calloc<Int32>();
+    final b = calloc<Int32>();
+    try {
+      if (_systemAccent(r, g, b) != aplOk) return null;
+      return Color.fromARGB(255, r.value, g.value, b.value);
+    } finally {
+      calloc.free(r);
+      calloc.free(g);
+      calloc.free(b);
+    }
+  }
 
   /// 系统提示（UTF-8）。用于“已有实例”等无 UI 框架场景。
   int notify(String title, String body) {

@@ -420,3 +420,70 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
     }
     return core.ERR_BACKEND;
 }
+
+
+// ── 系统主题色（DE accent）────────────────────────────────────────
+// KDE：kdeglobals [General] AccentColor（kreadconfig6/5）；GNOME：gsettings。
+// 支持 "r,g,b" / "#rrggbb" / 命名色。
+
+extern "c" fn popen(command: [*:0]const u8, mode: [*:0]const u8) ?*anyopaque;
+extern "c" fn pclose(stream: *anyopaque) c_int;
+extern "c" fn fgets(s: [*]u8, n: c_int, stream: *anyopaque) ?[*]u8;
+
+fn runCapture(cmd: [*:0]const u8) ?[]u8 {
+    const f = popen(cmd, "r") orelse return null;
+    defer _ = pclose(f);
+    var buf: [256]u8 = undefined;
+    if (fgets(&buf, @intCast(buf.len), f) == null) return null;
+    const s = std.mem.span(@as([*:0]const u8, @ptrCast(&buf)));
+    return alloc.dupe(u8, std.mem.trim(u8, s, " \t\r\n")) catch null;
+}
+
+const named_accent = std.StaticStringMap([3]u8).initComptime(.{
+    .{ "blue", .{ 0x35, 0x84, 0xE4 } },
+    .{ "teal", .{ 0x21, 0x90, 0xA0 } },
+    .{ "green", .{ 0x3A, 0x94, 0x4A } },
+    .{ "yellow", .{ 0xC8, 0x88, 0x00 } },
+    .{ "orange", .{ 0xDB, 0x7A, 0x2E } },
+    .{ "red", .{ 0xED, 0x33, 0x3B } },
+    .{ "pink", .{ 0xE9, 0x3D, 0x6C } },
+    .{ "purple", .{ 0x91, 0x41, 0xAC } },
+    .{ "slate", .{ 0x6A, 0x7A, 0x8F } },
+});
+
+fn parseAccent(s: []const u8) ?[3]u8 {
+    const t = std.mem.trim(u8, s, " \t\r\n'\"");
+    if (t.len == 0) return null;
+    if (t[0] == '#') {
+        if (t.len < 7) return null;
+        const r = std.fmt.parseInt(u8, t[1..3], 16) catch return null;
+        const g = std.fmt.parseInt(u8, t[3..5], 16) catch return null;
+        const b = std.fmt.parseInt(u8, t[5..7], 16) catch return null;
+        return .{ r, g, b };
+    }
+    if (std.mem.indexOfScalar(u8, t, ',') != null) {
+        var it = std.mem.splitScalar(u8, t, ',');
+        const r = std.fmt.parseInt(u8, std.mem.trim(u8, it.next() orelse return null, " "), 10) catch return null;
+        const g = std.fmt.parseInt(u8, std.mem.trim(u8, it.next() orelse return null, " "), 10) catch return null;
+        const b = std.fmt.parseInt(u8, std.mem.trim(u8, it.next() orelse return null, " "), 10) catch return null;
+        return .{ r, g, b };
+    }
+    if (named_accent.get(t)) |v| return v;
+    return null;
+}
+
+pub fn systemAccent() ?[3]u8 {
+    const cmds = [_][]const u8{
+        "kreadconfig6 --file kdeglobals --group General --key AccentColor",
+        "kreadconfig5 --file kdeglobals --group General --key AccentColor",
+        "gsettings get org.gnome.desktop.interface accent-color",
+    };
+    for (cmds) |c| {
+        const z = alloc.dupeZ(u8, c) catch continue;
+        defer alloc.free(z);
+        const out = runCapture(z) orelse continue;
+        defer alloc.free(out);
+        if (parseAccent(out)) |rgb| return rgb;
+    }
+    return null;
+}
