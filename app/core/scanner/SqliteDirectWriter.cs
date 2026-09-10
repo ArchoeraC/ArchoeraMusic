@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Collections.Concurrent;
-using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Data.Sqlite;
 
@@ -478,9 +477,9 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
             cmd.Parameters.AddWithValue("@title", t.Title);
             cmd.Parameters.AddWithValue("@track", (object?)t.Track ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@artists",
-                JsonSerializer.Serialize(t.Artists, ScannerJsonContext.Default.ListArtistRef));
+                ScannerJson.ArtistRefs(t.Artists));
             cmd.Parameters.AddWithValue("@album", t.Album != null
-                ? JsonSerializer.Serialize(t.Album, ScannerJsonContext.Default.AlbumRef)
+                ? ScannerJson.Album(t.Album!)
                 : DBNull.Value);
             cmd.Parameters.AddWithValue("@duration", t.Duration);
             cmd.Parameters.AddWithValue("@cover", (object?)t.Cover ?? DBNull.Value);

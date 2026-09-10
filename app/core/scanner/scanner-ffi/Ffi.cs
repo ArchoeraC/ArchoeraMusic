@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -151,7 +150,7 @@ public static unsafe class ScannerFfi
                 var result = Task.Run(() => engine.ScanAsync(dirs, cts.Token), cts.Token)
                     .GetAwaiter().GetResult();
                 SetUtf8(outResult, outLen,
-                    JsonSerializer.Serialize(result, ScannerJsonContext.Default.ScanResult));
+                    ScannerJson.Result(result));
                 return 0;
             }
             finally
@@ -190,7 +189,7 @@ public static unsafe class ScannerFfi
 
     private static void FireProgress(delegate* unmanaged[Cdecl]<byte*, void> cb, ScanProgress p)
     {
-        var json = JsonSerializer.Serialize(p, ScannerJsonContext.Default.ScanProgress);
+        var json = ScannerJson.Progress(p);
         var bytes = Encoding.UTF8.GetBytes(json);
         var ptr = (byte*)NativeMemory.Alloc((nuint)bytes.Length + 1);
         Marshal.Copy(bytes, 0, (IntPtr)ptr, bytes.Length);
@@ -204,7 +203,7 @@ public static unsafe class ScannerFfi
         var text = new string((sbyte*)json);
         try
         {
-            var arr = JsonSerializer.Deserialize(text, ScannerJsonContext.Default.StringArray);
+            var arr = ScannerJson.ParseStringArray(text);
             return arr == null ? new List<string>() : arr.ToList();
         }
         catch

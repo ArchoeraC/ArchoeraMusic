@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.IO;
-using System.Text.Json;
 using TagLibFile = TagLib.File;
 
 namespace Archoera.Scanner;
@@ -120,7 +119,7 @@ public static class Program
         try
         {
             var result = await engine.ScanAsync(dirList, cts.Token);
-            Console.WriteLine(JsonSerializer.Serialize(result, ScannerJsonContext.Default.ScanResult));
+            Console.WriteLine(ScannerJson.Result(result));
             return result.Canceled ? 2 : 0;
         }
         catch (Exception ex)
@@ -142,7 +141,7 @@ public static class Program
         var track = await Task.Run(() => ParseSingleFile(file, coverCacheDir));
         if (track != null)
         {
-            Console.WriteLine(JsonSerializer.Serialize(track, ScannerJsonContext.Default.TrackMetadata));
+            Console.WriteLine(ScannerJson.Track(track));
             return 0;
         }
         Console.Error.WriteLine($"[scanner] 解析失败: {file}");
