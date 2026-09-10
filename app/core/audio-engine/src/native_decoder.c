@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #define LOG_TAG "[audio-engine:native-decoder]"
 
@@ -34,6 +35,11 @@
  * native_decoder_pool_begin/end 托管；g_pool 非 NULL 时 native_decoder_open 改走
  * zk_engine_open 流式 seam（同一 ZkInfo/errbuf 契约），否则沿用 zk_decoder_*。 */
 static ZkEngine *g_pool;
+/* 进程级池可被多个 mediaengine 实例共享（同一 .so 内全局）。用引用计数 + 互斥：
+ * 任一实例 pool_end 不得在其它实例仍持有时 shutdown，否则其流读会因 rt 停机失败
+ * （概率性「自研内核解码错误」/崩溃）。仅当计数归零才真正 shutdown。 */
+static int g_pool_refs;
+static pthread_mutex_t g_pool_mu = PTHREAD_MUTEX_INITIALIZER;
 static long long g_stream_opens; /* 池路径 open 累计（测试访问器，单调递增） */
 
 struct NativeDecoder {
@@ -45,17 +51,35 @@ struct NativeDecoder {
 
 int native_decoder_pool_begin(int min_w, int max_w, int cap)
 {
-    if (g_pool) return 0; /* 幂等 */
+    pthread_mutex_lock(&g_pool_mu);
+    if (g_pool) { /* 已存在：共享，仅增引用 */
+        g_pool_refs++;
+        pthread_mutex_unlock(&g_pool_mu);
+        return 0;
+    }
     g_pool = zk_engine_init(min_w, max_w, cap);
-    return g_pool ? 0 : -1;
+    if (!g_pool) {
+        pthread_mutex_unlock(&g_pool_mu);
+        return -1;
+    }
+    g_pool_refs = 1;
+    pthread_mutex_unlock(&g_pool_mu);
+    return 0;
 }
 
 void native_decoder_pool_end(void)
 {
-    if (g_pool) {
+    pthread_mutex_lock(&g_pool_mu);
+    if (!g_pool || g_pool_refs <= 0) {
+        pthread_mutex_unlock(&g_pool_mu);
+        return;
+    }
+    g_pool_refs--;
+    if (g_pool_refs == 0) { /* 最后一个持有者：真正停池 */
         zk_engine_shutdown(g_pool);
         g_pool = NULL;
     }
+    pthread_mutex_unlock(&g_pool_mu);
 }
 
 int native_decoder_pool_active(void)

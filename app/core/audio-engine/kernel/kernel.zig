@@ -418,6 +418,7 @@ export fn zk_engine_read(
     out_channels: *c_int,
 ) isize {
     const st = h orelse return -@as(isize, @intFromEnum(err.Status.io_error));
+    if (st.host.isStopping()) return -@as(isize, @intFromEnum(err.Status.io_error));
     const sess = st.s;
     const ch = sess.info.channels;
     out_channels.* = @intCast(ch);
@@ -458,6 +459,7 @@ export fn zk_engine_read(
 /// 跳到毫秒位置；0 = 成功，非 0 = ZkStatus。
 export fn zk_engine_seek_ms(st: ?*Stream, ms: i64) c_int {
     const s = (st orelse return @intFromEnum(err.Status.io_error));
+    if (s.host.isStopping()) return @intFromEnum(err.Status.io_error);
     const sess = s.s;
     if (!sess.seekMs(s.host.rt, ms)) return @intFromEnum(err.Status.io_error);
     task.wait(&sess.step);
@@ -478,12 +480,17 @@ export fn zk_engine_position_ms(st: ?*Stream) i64 {
 /// F9：归还打开时占用的流计数（`host.streamClose()`），须在销毁 Stream 前调用。
 export fn zk_engine_close(st: ?*Stream) void {
     const s = st orelse return;
-    if (s.s.state == session.SessState.playing or s.s.state == session.SessState.new) {
+    if (s.host.isStopping()) {
+        // 停机后 rt 已不可提交任务：直接释放解码器与会话壳（不再走池任务）
+        if (s.s.dec) |*d| d.deinit();
+        s.s.dec = null;
+        s.s.state = .closed;
+    } else if (s.s.state == session.SessState.playing or s.s.state == session.SessState.new) {
         _ = s.s.close(s.host.rt);
         task.wait(&s.s.step);
     }
     s.s.deinit(); // Session.deinit 自释放会话壳
-    s.host.streamClose();
+    s.host.streamClose(); // 最后一个流关闭时若停机待收尾 → 释放 host/rt
     std.heap.c_allocator.destroy(s);
 }
 
