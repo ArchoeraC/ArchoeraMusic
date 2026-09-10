@@ -7,7 +7,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Channels;
 using TagLibFile = TagLib.File;
 
@@ -495,7 +494,7 @@ public sealed class ScannerEngine
     /// <summary>
     /// 递归收集音频文件，枚举过程中周期性上报进度
     /// </summary>
-    private async Task<List<string>> CollectFilesAsync(List<string> dirs, ScanProgress progress, CancellationToken ct)
+    private Task<List<string>> CollectFilesAsync(List<string> dirs, ScanProgress progress, CancellationToken ct)
     {
         var result = new List<string>();
         var lastEmit = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -505,7 +504,7 @@ public sealed class ScannerEngine
             WalkAsync(dir, result, progress, ref lastEmit, ct);
             if (result.Count >= _maxScanFiles) break;
         }
-        return result;
+        return Task.FromResult(result);
     }
 
     private void WalkAsync(string dir, List<string> result, ScanProgress progress, ref long lastEmit, CancellationToken ct)
@@ -709,7 +708,7 @@ public sealed class ScannerEngine
             return;
         }
         // CLI 模式：stdout 输出 JSON（TS 层监听）
-        Console.WriteLine(JsonSerializer.Serialize(p, ScannerJsonContext.Default.ScanProgress));
+        Console.WriteLine(ScannerJson.Progress(p));
     }
 
     private static void LogInfo(string msg) => Console.Error.WriteLine($"[scanner] {msg}");
