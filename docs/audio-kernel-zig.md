@@ -922,6 +922,15 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > `mp3/id3.zig`。**probe-only 覆盖**：flac/mp3/wav/m4a/ape/wv/mpc/dsd/tta + Ogg 全家。
 > 剩余 wma/asf/amr/awb/aac/ac3/dts/mka/shn/tak 内核 metadata 为空，保持 TagLib
 > （纳入需先补 ASF/Matroska/等标签解析器）。
+>
+> **第十批（2026-09-10）**：**WMA（ASF）** 落地——新增 `asf.parseTags`（Content
+> Description + Extended Content Description，含 Header Extension 嵌套；UTF-16LE→
+> UTF-8；映射 WM/AlbumTitle|AlbumArtist|Year|Genre|Composer），`wma.openMeta` 仅解析
+> ASF 头+标签、不解音频包；位深按 codec_tag（wmalossless=32，其余 16），时长
+> container(exact)→内容估算→play_time。scanner `KernelExts` 补 `wma/asf`。
+> **probe-only 覆盖**：flac/mp3/wav/m4a/ape/wv/mpc/dsd/tta/wma + Ogg 全家。剩余
+> amr/awb/aac/ac3/dts/mka/shn/tak 内核 metadata 为空，保持 TagLib（mka 需 Matroska
+> Tags 解析，改动较大）。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
