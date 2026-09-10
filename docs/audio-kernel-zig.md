@@ -854,6 +854,16 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 **落地顺序建议**：#1（元数据快路径）→ #2（接管门控）→ #3（基准量化）→ #4（按基准结果打磨）；
 #5 放入 Phase F 顺手完成。
 
+> **#1 落地（2026-09-10，A2）**：`zk_metadata_open/close`（结构化 `ZkMetaInfo`/`ZkTag`，
+> **无 JSON**）+ `zk_metadata_set/get_concurrency`（scanner 按 `AdaptiveConcurrency`
+> 的 CPU/内存指标协商并行度）。内核新增动态库 `libarchoera_kernel.so`；scanner 侧
+> `KernelMetadata.cs` 经 P/Invoke 直桥，`ScannerEngine.ParseFile` 内核优先、TagLib 兜底，
+> 映射标量/标签/封面/歌词/年份，封面统一写 `${id}.img`。验收：flac 全字段+封面、
+> mp3 无标签兜底、内核缺失回退 TagLib 均通过；1000 文件语料内核路径 37ms vs
+> TagLib 38ms（含进程启动，基本持平——当前实现仍走 `decoder.open` 构造解码器 ctx，
+> **probe-only 不建解码器状态**为后续打磨项，见 #4 与 §8.4.2 子项 #1 原文）。
+> C 侧回归 `tests/test_metadata_abi.c`（ctest 14/14）。
+
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
 > 逐格式 ×RT 差距、公共 PCM/convert 地板、MDCT/Huffman 等候选与 `perf` 定位流程，
