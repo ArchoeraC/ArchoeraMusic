@@ -84,7 +84,7 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
 
 ## 4. 基准（tests/bench/，2026-09-05 EOF/错误语义修复后重跑）
 - 最新产物：`docs/benchmark-2026-09-10.md` + 自动报告 `docs/benchmark-2026-09-10.md`
-  （`make_report.py` 生成）。
+  （`run_suite.py` 生成）。
 - 全格式矩阵 CPU×RT：Era native 全时长解码后首次可测（此前 EOF bug 使 native 秒退不可测）。
   代表性摘录（墙钟/源时长）：
 

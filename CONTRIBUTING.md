@@ -311,7 +311,7 @@ cd app && flutter run -d linux      # 本地调试
 | vault 端到端 | CI 内置；本地 `app/core/vault/` 测试脚本 | 改动 vault / 会话存储时 |
 | 三端构建 | `.github/workflows/build-all.yml`（tag `v*` 或手动触发） | 合入主干后由维护者触发 |
 | 手动回归 | 播放 / seek / 切歌 / 登录 / 下载 / 扫描 / 刮削核心路径 | 涉及播放链路与数据面改动时 |
-| 基准 / 性能 | `app/core/audio-engine/tests/bench/`（`scorecard.py` 等）+ 内存基线对比 | 触及解码 / DSP / 播放 / 内存 / 缓存链路时 |
+| 基准 / 性能 | `app/core/audio-engine/tests/bench/run_suite.py`（内核单测 + ctest + 逐格式 scorecard + 池并发 + scanner）+ 内存基线对比 | 触及解码 / DSP / 播放 / 内存 / 缓存链路时 |
 
 要求：
 
