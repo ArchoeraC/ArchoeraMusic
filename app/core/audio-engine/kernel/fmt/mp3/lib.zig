@@ -559,6 +559,21 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
     if (audio_bytes == 0 or f.frame_bytes == 0 or f.frame_samples == 0) return;
     const frames_total: u128 = if (f.total_frames > 0) f.total_frames else audio_bytes / f.frame_bytes;
     const total_samples: u128 = frames_total * f.frame_samples;
+    // 越界 seek：目标样本 ≥ 总输出样本 → 直接置流尾（避免病态扫描/挂起）
+    const total_out: u128 = if (f.out_limit != std.math.maxInt(u64))
+        f.out_limit
+    else
+        total_samples;
+    if (target_sample >= total_out) {
+        f.dec = .{};
+        f.next_offset = f.file_size;
+        f.samples_done = target_sample;
+        f.drop_rem = 0;
+        f.eof = false;
+        f.tail_frames = 0;
+        f.tail_off = 0;
+        return;
+    }
     var est_rel: u128 = 0;
     if (total_samples > 0) {
         est_rel = @as(u128, audio_bytes) * target_sample / total_samples;
