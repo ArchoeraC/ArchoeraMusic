@@ -101,7 +101,7 @@ pub const modules = [_]Module{
     .{ .fmt = .latm,      .open = latm.open },
     .{ .fmt = .wma,       .open = wma.open, .meta = wma.openMeta },
     .{ .fmt = .dts,       .open = dts.open },
-    .{ .fmt = .mka,       .open = mka.open },
+    .{ .fmt = .mka,       .open = mka.open, .meta = mka.openMeta },
     .{ .fmt = .mpc,       .open = mpc.open, .meta = mpc.openMeta },
     .{ .fmt = .shn,       .open = shn.open },
     .{ .fmt = .tak,       .open = tak.open },
