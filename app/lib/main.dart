@@ -38,8 +38,10 @@ Future<void> main() async {
     // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。
     await windowManager.ensureInitialized();
     await windowManager.show();
+    final l10n = lookupAppLocalizations(locale);
     runApp(_AlreadyRunningApp(
-        message: lookupAppLocalizations(locale).instanceAlreadyRunning,
+        message: l10n.instanceAlreadyRunning,
+        okLabel: l10n.vaultCrashDismiss,
         locale: locale));
     return;
   }
@@ -96,9 +98,11 @@ class _BrowserUserAgentOverrides extends HttpOverrides {
 /// 二次启动提示页：复用 Vault 警告弹窗样式（警告图标 + 应用主题），
 /// 点“知道了”后退出，不进入主应用。
 class _AlreadyRunningApp extends StatelessWidget {
-  const _AlreadyRunningApp({required this.message, required this.locale});
+  const _AlreadyRunningApp(
+      {required this.message, required this.okLabel, required this.locale});
 
   final String message;
+  final String okLabel;
   final Locale locale;
 
   @override
@@ -110,19 +114,18 @@ class _AlreadyRunningApp extends StatelessWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: Scaffold(
+        backgroundColor: AppPalette.dark.surface,
         body: Center(
-          child: Builder(
-            builder: (ctx) => AlertDialog(
-              icon: const Icon(EtaIcons.warning),
-              title: const Text('ArchoeraMusic'),
-              content: Text(message),
-              actions: [
-                FilledButton(
-                  onPressed: () => exit(0),
-                  child: Text(AppLocalizations.of(ctx).vaultCrashDismiss),
-                ),
-              ],
-            ),
+          child: AlertDialog(
+            icon: const Icon(EtaIcons.warning),
+            title: const Text('ArchoeraMusic'),
+            content: Text(message),
+            actions: [
+              FilledButton(
+                onPressed: () => exit(0),
+                child: Text(okLabel),
+              ),
+            ],
           ),
         ),
       ),
