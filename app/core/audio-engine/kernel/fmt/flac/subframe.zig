@@ -177,13 +177,14 @@ fn decodeLpc(
 
     try residual.decodeResiduals(br, out, order, blocksize);
 
-    // i64 累加重建（与 lpc32 一致；对有效流与 lpc16 结果等价）
+    // i64 累加重建（与 lpc32 一致；对有效流与 lpc16 结果等价）。
+    // A 档微优化：滑动窗口切片 zip 遍历（免每轮下标算术）、i32 环绕直接 +%=。
     var i: usize = order;
     while (i < blocksize) : (i += 1) {
+        const hist = out[i - order ..][0..order];
         var sum: i64 = 0;
-        for (0..order) |j| sum += @as(i64, coeffs[j]) * @as(i64, out[i - order + j]);
-        const pred: i32 = @intCast(sum >> qlevel);
-        out[i] = @bitCast(@as(u32, @bitCast(out[i])) +% @as(u32, @bitCast(pred)));
+        for (coeffs[0..order], hist) |c, smp| sum += @as(i64, c) * @as(i64, smp);
+        out[i] +%= @intCast(sum >> qlevel);
     }
 
     // FFmpeg：走 lpc32（而非 lpc16）且流位深 ≤ 16 时重调制，
@@ -315,11 +316,13 @@ fn decodeLpcWide(
     defer allocator.free(rbuf);
     try residual.decodeResiduals(br, rbuf, order, blocksize);
 
-    // flac_lpc_33_c：sum += coeffs[j] * (uint64)decoded[j]；环绕乘法模拟无符号语义
+    // flac_lpc_33_c：sum += coeffs[j] * (uint64)decoded[j]；环绕乘法模拟无符号语义。
+    // A 档微优化：滑动窗口切片 zip 遍历（免每轮下标算术）。
     var i: usize = order;
     while (i < blocksize) : (i += 1) {
+        const hist = out[i - order ..][0..order];
         var sum: i64 = 0;
-        for (0..order) |j| sum +%= @as(i64, coeffs[j]) *% out[i - order + j];
+        for (coeffs[0..order], hist) |c, smp| sum +%= c *% smp;
         // (uint64)residual[i] + (uint64)(sum >> qlevel)，u64 环绕，按位存回 i64
         const ru: u64 = @bitCast(@as(i64, rbuf[i]));
         const pred: u64 = @bitCast(sum >> qlevel);
