@@ -159,6 +159,25 @@ pub const Decoder = struct {
     }
 };
 
+/// 元数据专用会话（probe-only，§8.4.2①）：只解析容器头/标签并持有其分配，
+/// **不构造解码器状态**（无 PCM/帧缓冲）。`info` 指向的内存归本会话所有，
+/// 生命周期与会话一致；`deinit` 释放全部。
+pub const MetadataSession = struct {
+    ctx: *anyopaque,
+    deinit_fn: *const fn (*anyopaque) void,
+
+    pub inline fn deinit(self: MetadataSession) void {
+        self.deinit_fn(self.ctx);
+    }
+};
+
+/// 元数据工厂签名（可选；未提供者由 registry 回退完整 `open`）。
+pub const MetaFn = *const fn (
+    allocator: std.mem.Allocator,
+    reader: *io.Reader,
+    info: *Info,
+) Error!MetadataSession;
+
 /// 打开解码器：probe 嗅探 → Registry 分派（§8.2；格式工厂登记于 registry.zig）。
 /// 未接管 / 未开启的格式 → error.UnsupportedFormat（引擎回退 FFmpeg，§8.3）。
 ///
@@ -174,6 +193,34 @@ pub fn openWithIo(io_inst: std.Io, allocator: std.mem.Allocator, path: []const u
     errdefer reader.deinit();
     const fmt = try probe.probe(&reader);
     return registry.dispatch(fmt, allocator, &reader, info);
+}
+
+/// 元数据打开结果：优先 probe-only 会话（§8.4.2①），无 `meta` 工厂的格式回退完整
+/// 解码器。两者均持有 `info` 指向内存；`deinit` 释放。
+pub const OpenedMeta = struct {
+    session: ?MetadataSession = null,
+    dec: ?Decoder = null,
+
+    pub fn deinit(self: *OpenedMeta) void {
+        if (self.session) |s| s.deinit();
+        if (self.dec) |*d| d.deinit();
+    }
+};
+
+/// 元数据专用 open（sync 直通；不构造解码器状态，除非该格式未提供 `meta` 工厂）。
+pub fn openMeta(allocator: std.mem.Allocator, path: []const u8, info: *Info) Error!OpenedMeta {
+    return openMetaWithIo(std.Io.Threaded.global_single_threaded.io(), allocator, path, info);
+}
+
+pub fn openMetaWithIo(io_inst: std.Io, allocator: std.mem.Allocator, path: []const u8, info: *Info) Error!OpenedMeta {
+    var reader = try io.Reader.openPathWith(io_inst, path);
+    errdefer reader.deinit();
+    const fmt = try probe.probe(&reader);
+    const r = try registry.dispatchMeta(fmt, allocator, &reader, info);
+    return switch (r) {
+        .session => |s| .{ .session = s },
+        .decoder => |d| .{ .dec = d },
+    };
 }
 
 // ---------------- 集成测试 ----------------

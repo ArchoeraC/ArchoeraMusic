@@ -132,6 +132,12 @@ pub fn zkOpen(path: [*:0]const u8, info: *ZkInfo, errbuf: [*]u8, errbuf_size: c_
     return eng;
 }
 
+/// 元数据专用打开（probe-only 优先，§8.4.2①；供 `zk_metadata_open`）。
+/// 返回会话/回退解码器句柄，调用方须 `deinit`。
+pub fn openMetadata(path: []const u8, info: *decoder.Info) !decoder.OpenedMeta {
+    return decoder.openMeta(std.heap.c_allocator, path, info);
+}
+
 /// 可空 NUL 终止切片 → C 指针（null 直传）
 fn metaPtr(s: ?[:0]const u8) ?[*:0]const u8 {
     return if (s) |v| v.ptr else null;
@@ -220,7 +226,7 @@ fn endianOf(info: decoder.Info) std.builtin.Endian {
 
 /// 填充 errbuf（见文件头布局说明）。边界完整：任意 errbuf_size 下不越界、
 /// 消息尽量保证 NUL 终止，诊断可读。
-fn fillErrBuf(buf: [*]u8, buf_size: c_int, e: anyerror) void {
+pub fn fillErrBuf(buf: [*]u8, buf_size: c_int, e: anyerror) void {
     if (buf_size <= 0) return;
     const size: usize = @intCast(buf_size);
     const status: c_int = @intFromEnum(err.statusOf(e));

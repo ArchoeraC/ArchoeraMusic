@@ -68,6 +68,9 @@ pub const Module = struct {
     fmt: probe.Format,
     /// 工厂：构造该格式实例（实例私有，ctx 归各 fmt 持有）
     open: OpenFn,
+    /// 元数据专用工厂（probe-only，§8.4.2①；null = 回退完整 `open`）。
+    /// 只解析容器头/标签并持有其分配，不构造解码器状态。
+    meta: ?decoder.MetaFn = null,
 };
 
 /// mlp.open 声明为推断错误集（未引 error.zig），在此以薄适配器收敛到内核 Error。
@@ -79,7 +82,7 @@ fn mlpOpen(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info
 /// 模块登记表（single source of truth，取代 decoder.open 巨型 switch）
 pub const modules = [_]Module{
     .{ .fmt = .wav,       .open = wav.open },
-    .{ .fmt = .flac,      .open = flac.open },
+    .{ .fmt = .flac,      .open = flac.open, .meta = flac.openMeta },
     .{ .fmt = .m4a,       .open = m4a.open },
     .{ .fmt = .mp3,       .open = mp3.open },
     .{ .fmt = .wv,        .open = wv.open },
@@ -115,6 +118,37 @@ pub fn dispatch(
 ) Error!decoder.Decoder {
     inline for (modules) |m| {
         if (fmt == m.fmt) return m.open(allocator, reader, info);
+    }
+    return error.UnsupportedFormat;
+}
+
+/// 元数据分派结果：probe-only 会话（有 `meta` 工厂）或回退的完整解码器。
+/// 两者均持有 `info` 所指内存；`deinit` 释放。
+pub const MetaResult = union(enum) {
+    session: decoder.MetadataSession,
+    decoder: decoder.Decoder,
+
+    pub fn deinit(self: *MetaResult) void {
+        switch (self.*) {
+            .session => |s| s.deinit(),
+            .decoder => |*d| d.deinit(),
+        }
+    }
+};
+
+/// 元数据专用分派（§8.4.2①）：有 `meta` 工厂走 probe-only；否则回退完整
+/// `open`（行为与 `dispatch` 一致，调用方立即释放）。
+pub fn dispatchMeta(
+    fmt: probe.Format,
+    allocator: std.mem.Allocator,
+    reader: *io.Reader,
+    info: *decoder.Info,
+) Error!MetaResult {
+    inline for (modules) |m| {
+        if (fmt == m.fmt) {
+            if (m.meta) |mf| return .{ .session = try mf(allocator, reader, info) };
+            return .{ .decoder = try m.open(allocator, reader, info) };
+        }
     }
     return error.UnsupportedFormat;
 }
