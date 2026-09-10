@@ -45,7 +45,12 @@ int main(int argc, char **argv) {
     int latency = 0;
     int host_max = 1;
     int base = 1;
+    int max_streams = 0; /* 0 = 跟随 host_max（压测用） */
     if (argc > 1 && strcmp(argv[1], "-latency") == 0) { latency = 1; base = 2; }
+    if (argc > base && strcmp(argv[base], "-streams") == 0 && argc > base + 1) {
+        max_streams = atoi(argv[base + 1]);
+        base += 2;
+    }
     if (argc > base && argv[base][0] >= '0' && argv[base][0] <= '9') {
         host_max = atoi(argv[base]);
         base++;
@@ -81,7 +86,8 @@ int main(int argc, char **argv) {
     }
 
     /* 并发解码：FILE 数即并发线程数 */
-    ZkEngine *h = zk_engine_init(1, host_max, 256);
+    if (max_streams <= 0) max_streams = host_max;
+    ZkEngine *h = zk_engine_init_streams(1, host_max, 256, max_streams);
     if (!h) return 1;
     g_host = h;
     int nf = argc - base;

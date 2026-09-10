@@ -83,7 +83,7 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
   改前 big300≈98MB、big600≈163MB（≈2×容器）。
 
 ## 4. 基准（tests/bench/，2026-09-05 EOF/错误语义修复后重跑）
-- 最新产物：`tests/bench/data/BENCH_2026-09-05.csv` + 自动报告 `tests/bench/BENCH_2026-09-05.md`
+- 最新产物：`docs/benchmark-2026-09-10.md` + 自动报告 `docs/benchmark-2026-09-10.md`
   （`make_report.py` 生成）。
 - 全格式矩阵 CPU×RT：Era native 全时长解码后首次可测（此前 EOF bug 使 native 秒退不可测）。
   代表性摘录（墙钟/源时长）：
@@ -101,7 +101,7 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
   结论：有损类与 mka 与 Stable 同量级（×RT 0.005–0.008，≈130–200× 实时）；
   直解 `.flac`（大/高熵内容）native 相对最慢 ×RT≈0.022（≈45× 实时，仍实时余量大），
   CPU 差异主要在自研 flac 帧解码器，待专项优化；pcm/wv 等无损 native ≤ Stable。
-- RSS 平台值与趋势（重出，`BENCH_2026-09-05.md` §2/§3）：
+- RSS 平台值与趋势（重出，`docs/benchmark-2026-09-10.md` §2/§3）：
   - **mka 流式平台值 ~35MB**（big300 35.5 / big600 35.2，不随体积涨）✓；
   - flac/wv/mp3/vorbis/opus/wav/tta/ac3/ec3 Era 恒定 ~34–36MB（流式，big900/74MB 不涨）；
   - m4a/AAC 固定高缓冲 ~51–61MB（非整读；aac_st/big300/big900 均 ~60MB 恒定，待裁 allocator
