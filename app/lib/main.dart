@@ -142,11 +142,6 @@ class _AlreadyRunningCard extends StatelessWidget {
         child: Container(
           width: 360,
           padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
-          decoration: BoxDecoration(
-            color: AppPalette.dark.surfacePanel,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppPalette.dark.surfaceBright),
-          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,8 +166,7 @@ class _AlreadyRunningCard extends StatelessWidget {
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(color: scheme.onSurfaceVariant)),
               const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
+              Center(
                 child: FilledButton(
                   onPressed: () => exit(0),
                   child: Text(okLabel),
