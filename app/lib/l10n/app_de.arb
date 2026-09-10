@@ -1044,5 +1044,7 @@
   "searchWaitRetry": "Zu viele Anfragen, bitte kurz warten und erneut versuchen",
   "qqMusicDownloadUnsupported": "QQ-Musik-Downloads werden derzeit nicht unterstützt (Risikomanagement).",
   "qqMusicDownloadSkipped": "{count} QQ-Musiktitel übersprungen: Downloads für QQ-Musik nicht unterstützt.",
-  "platformQqMusic": "QM"
+  "platformQqMusic": "QM",
+  "toastSleepInhibitFailed": "System-Standby konnte nicht verhindert werden",
+  "toastMediaSessionLost": "System-Medien-Sitzung getrennt"
 }

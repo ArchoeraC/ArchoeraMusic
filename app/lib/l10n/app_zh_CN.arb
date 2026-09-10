@@ -1153,5 +1153,7 @@
   "settingsAmllWordSweep": "逐字扫亮",
   "settingsAmllHidePassed": "隐藏已唱行",
   "settingsAmllScale": "非激活行缩放",
-  "settingsAmllSpring": "滚动弹簧"
+  "settingsAmllSpring": "滚动弹簧",
+  "toastSleepInhibitFailed": "禁用系统休眠失败",
+  "toastMediaSessionLost": "系统媒体会话已断开"
 }

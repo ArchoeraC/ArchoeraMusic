@@ -6985,6 +6985,18 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'滚动弹簧'**
   String get settingsAmllSpring;
+
+  /// No description provided for @toastSleepInhibitFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'禁用系统休眠失败'**
+  String get toastSleepInhibitFailed;
+
+  /// No description provided for @toastMediaSessionLost.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统媒体会话已断开'**
+  String get toastMediaSessionLost;
 }
 
 class _AppLocalizationsDelegate

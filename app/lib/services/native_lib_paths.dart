@@ -61,6 +61,18 @@ enum NativeModule {
       'core/downloader/target/release',
       'core/downloader/target/debug',
     ],
+  ),
+
+  /// 平台能力桥接库（libarchoera_platform.{so,dylib} / archoera_platform.dll，
+  /// Zig 模块 app/native/platform；Windows DLL 装在 zig-out/bin）。
+  platformBridge(
+    'archoera_platform',
+    envName: 'ARCHOERA_PLATFORM_BRIDGE',
+    candidates: [
+      'native',
+      'native/platform/zig-out/lib',
+      'native/platform/zig-out/bin',
+    ],
   );
 
   const NativeModule(

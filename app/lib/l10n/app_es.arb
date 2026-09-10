@@ -1044,5 +1044,7 @@
   "searchWaitRetry": "Demasiadas solicitudes, espera un momento e inténtalo de nuevo",
   "qqMusicDownloadUnsupported": "Descargas de QM no compatibles por ahora (control de riesgos).",
   "qqMusicDownloadSkipped": "Se omitieron {count} temas de QM: descargas no disponibles.",
-  "platformQqMusic": "QM"
+  "platformQqMusic": "QM",
+  "toastSleepInhibitFailed": "No se pudo evitar que el sistema se suspenda",
+  "toastMediaSessionLost": "La sesión multimedia del sistema se desconectó"
 }

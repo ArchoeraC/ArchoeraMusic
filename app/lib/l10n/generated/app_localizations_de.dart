@@ -3970,4 +3970,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAmllSpring => '滚动弹簧';
+
+  @override
+  String get toastSleepInhibitFailed =>
+      'System-Standby konnte nicht verhindert werden';
+
+  @override
+  String get toastMediaSessionLost => 'System-Medien-Sitzung getrennt';
 }

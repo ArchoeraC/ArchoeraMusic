@@ -3817,4 +3817,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsAmllSpring => '滚动弹簧';
+
+  @override
+  String get toastSleepInhibitFailed => '시스템 절전 방지에 실패했습니다';
+
+  @override
+  String get toastMediaSessionLost => '시스템 미디어 세션이 끊어졌습니다';
 }
