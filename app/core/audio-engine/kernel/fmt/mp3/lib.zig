@@ -570,14 +570,33 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
     var pos = (try findFrameSync(&f.reader, scan_from, f.file_size)) orelse f.audio_start;
     // 不早于流起点（Xing 帧整体跳过，其中不含可听的已 trim 样本）
     pos = @max(pos, f.stream_start);
-    f.dec = .{}; // 重置解码状态（帧间 bit reservoir 作废）
-    f.next_offset = pos;
-    // 位置语义：seek 目标即当前近似位置；后续 read 解码会以实际帧数累加
+    // bit reservoir：MP3 帧的 main_data_begin 指向之前最多 511 字节的主数据。
+    // 若直接从目标帧解码，reservoir 为空 → 目标帧（及随后若干帧）损坏。
+    // 修复：回退 K 帧到更早的帧边界解码（其主数据字节仍取自真实文件），
+    // 丢弃到目标位置的样本；K 帧足以覆盖最大 reservoir（≈2 帧）。
+    // bit reservoir：MP3 帧的 main_data_begin 指向之前最多 511 字节主数据；
+    // 直接解目标帧会因 reservoir 为空而损坏。回退 K 帧到更早帧边界解码，
+    // 其主数据取自真实文件，丢弃到目标；K 帧覆盖最大 reservoir（≈2 帧）。
+    const reservoir_frames: u64 = 3;
+    const back_bytes = @min(f.frame_bytes * reservoir_frames, pos - f.stream_start);
+    var back = pos;
+    if (back_bytes > 0) {
+        back = (try findFrameSync(&f.reader, pos - back_bytes, f.file_size)) orelse pos;
+        if (back < f.stream_start) back = f.stream_start;
+        if (back > pos) back = pos;
+    }
+    f.dec = .{}; // 重置解码状态（帧间 bit reservoir 从回退点重建）
+    f.next_offset = back;
+    // 位置语义：seek 目标即当前位置；回退段样本经 drop_rem 丢弃（不计入输出）
+    const back_samples: u64 = if (f.frame_bytes > 0)
+        ((pos - back) / f.frame_bytes) * f.frame_samples
+    else
+        0;
     f.samples_done = target_sample;
+    f.drop_rem = back_samples;
     f.eof = false;
     f.tail_frames = 0;
     f.tail_off = 0;
-    f.drop_rem = 0;
 }
 
 fn positionMsImpl(ctx: *anyopaque) i64 {
