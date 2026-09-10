@@ -366,12 +366,14 @@ fn shellQuote(buf: *std.ArrayList(u8), s: []const u8) void {
 }
 
 pub fn notify(title: []const u8, body: []const u8) i32 {
+    // 优先桌面环境「气泡通知」（org.freedesktop.Notifications，非模态、不抢焦点）；
+    // 无通知服务时回退模态对话框工具。
     const attempts = [_][]const []const u8{
+        &.{ "notify-send", "-a", "ArchoeraMusic", title, body },
         &.{ "kdialog", "--title", title, "--msgbox", body },
         &.{ "zenity", "--info", "--title", title, "--text", body },
         &.{ "xmessage", "-center", "-title", title, body },
         &.{ "yad", "--title", title, "--text", body, "--button=OK:0" },
-        &.{ "notify-send", title, body },
     };
     std.debug.print("[platform] notify title={s} body={s}\n", .{ title, body });
     for (attempts) |argv| {
