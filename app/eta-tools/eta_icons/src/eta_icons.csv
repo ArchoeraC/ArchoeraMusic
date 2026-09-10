@@ -22,7 +22,6 @@ bar_chart_outlined,1,chartBarOutline,chart_bar,regular,regular
 bedtime_off_outlined,1,bedtimeOffOutline,bedtime_off_outlined,regular,added
 bedtime_outlined,1,moonStarsOutline,moon_stars,regular,regular
 bluetooth_audio,2,bluetooth,bluetooth,filled,filled
-blur_circular_outlined,1,dotCircleOutline,dot_circle,regular,regular
 blur_on_outlined,1,blurOnOutline,blur_on_outlined,regular,added
 bolt,1,flash,flash,filled,filled
 bolt_outlined,2,flashOutline,flash,regular,regular
@@ -186,7 +185,6 @@ refresh_outlined,1,refreshOutline,refresh_2,regular,regular
 repeat,2,repeat,repeat,filled,filled
 repeat_one,2,repeatOne,repeat_one,filled,filled
 restart_alt,2,refreshAnticlockwise,refresh_anticlockwise_1,filled,filled
-rounded_corner,2,borderRadius,border_radius,filled,filled
 schedule,1,clock,clock,filled,filled
 science_outlined,1,flaskOutline,flask,regular,regular
 sd_storage_outlined,1,storageOutline,storage,regular,regular
