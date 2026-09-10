@@ -884,6 +884,12 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > + udta 标签，委托 codec 与 chan_config=0 回退完整 open。**至此 flac/mp3/wav/m4a
 > 四大类走 probe-only**；ogg/vorbis/opus 等仍回退。scanner 1000 文件语料：
 > **184ms vs TagLib 248ms（min，−26%，含进程启动）**。
+>
+> **第四批（2026-09-10）**：**opus / vorbis / ogg-flac** 落地——opus 用 `MetaCtx`
+> （Ogg demux+OpusHead+标签，不含 SILK/CELT/重采样器）；vorbis 不再经 stb_vorbis，
+> 改用 `ogg.Demux` 取识别头(0x01)/comment 头(0x03) 自解析；ogg-flac 收集 metadata
+> packet 后经内存 reader 调 `flac.openMeta`。**probe-only 覆盖**：flac/mp3/wav/m4a/
+> ogg(vorbis)/opus/ogg-flac；仅 speex 等少数格式仍回退完整 open。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
