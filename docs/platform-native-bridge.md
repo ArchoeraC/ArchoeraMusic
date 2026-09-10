@@ -254,8 +254,10 @@ Dart 侧映射（`platform_bindings.dart`）：`MediaCommandEvent` / `MediaSeekE
   进度 `UpdateTimelineProperties`；按钮事件 `ButtonPressed` → 事件回调。
   COM 调用全部手写 vtable（无 cppwinrt 依赖）。**封面/时间轴（已实现）**：
   `RandomAccessStreamReference.CreateFromUri`（http URL → `Windows.Foundation.Uri`
-  → `put_Thumbnail`）+ `ISystemMediaTransportControls2.UpdateTimelineProperties`
-  （进度条）。IID 由本机 winmd 解析（已按 ECMA 1-based 行号修正关联并实测校验）。
+  → `put_Thumbnail`；**本地路径** → `StorageFile.GetFileFromPathAsync` 轮询等待
+  → `CreateFromFile`）+ `ISystemMediaTransportControls2.UpdateTimelineProperties`
+  （进度条）+ `put_PlaybackRate`（1.0/0.0 供系统外推进度）。IID 由本机 winmd 解析
+  （已按 ECMA 1-based 行号修正关联并实测校验）。
 - **HWND 获取**：`windows/runner/main.cpp` 增一行导出 `int64_t get_flutter_window()`
   （类比 audio-engine C 壳哲学，改动 <5 行）；Dart 启动时 FFI 取得并传入
   `apl_media_set_window`。兜底：未接通时 `GetForegroundWindow()` 于窗口创建后取一次。
