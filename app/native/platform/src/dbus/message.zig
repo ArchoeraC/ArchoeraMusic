@@ -62,6 +62,11 @@ pub const Writer = struct {
         try w.buf.appendSlice(w.alloc, &std.mem.toBytes(v));
     }
 
+    pub fn putI32(w: *Writer, v: i32) Error!void {
+        try w.alignTo(4);
+        try w.buf.appendSlice(w.alloc, &std.mem.toBytes(v));
+    }
+
     pub fn putI64(w: *Writer, v: i64) Error!void {
         try w.alignTo(8);
         try w.buf.appendSlice(w.alloc, &std.mem.toBytes(v));
