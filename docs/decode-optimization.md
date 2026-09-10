@@ -126,8 +126,19 @@ SCORE 计分 `speed = 40·min(1, R/50)`：**达到 50× 实时即满分**，之�
 缓存 PCM。禁止把预计算放到与解码**不同**的线程（跨线程搬表=反开销）；即"派发时**要求**
 worker 先 prepare"，不是另开线程算。
 
+**启动/开销硬约束（2026-09-10 用户定）**：**即使做了预计算，启动与常驻开销仍必须优于
+FFmpeg**（engine-master-pool-design.md §3 启动预算：冷/热首帧 wall 均压 FFmpeg）。
+落地要求：
+- **comptime 表零运行期成本**（编译期生成、只读数据段）——首选手段，不占启动/内存增长；
+- **实例 `prepare` 必须 O(小)、open 时一次、与解码同 worker**，其耗时计入首帧预算；
+  预计算后首帧/单流 wall 不得回退到 FFmpeg 基线之上，否则该优化**拒绝**；
+- **派发 hint 省 probe**（`format_hint`）是启动净收益，优先；
+- 每次优化后复测**冷/热首帧**（`REPORT_ERA_POOL_2026-09-10.md` 口径：冷含引擎 init、
+  热复用池）与单流 wall；启动回退即回退该改动。
+
 **验收（每步）**：无损逐位 / 有损 corr≥0.999 且 ±≤1 LSB 不回退；`taskset -c 12 perf stat
--e instructions,cycles` 指令数下降（主指标）；任一项不过即回退。
+-e instructions,cycles` 指令数下降（主指标）；**且冷/热首帧与常驻开销不劣于 FFmpeg
+基线**；任一项不过即回退。
 
 ## 5. 纪律（验收门，scorecard 已内建）
 
