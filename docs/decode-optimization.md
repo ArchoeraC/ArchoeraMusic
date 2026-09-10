@@ -91,11 +91,12 @@ SCORE 计分 `speed = 40·min(1, R/50)`：**达到 50× 实时即满分**，之�
 | 序 | 对象（perf 热区） | 纯计算手段（无缓冲） | 验收 |
 |---|---|---|---|
 | ① | **flac 位流 `readBits` ~34% + `io.Reader.read` ~20%** ✅ | 已做：`Reader.readByte()` 单字节快路径（无新缓冲）+ `readBits` 缓存足够快路径 + comptime 掩码表 + `readBit` 直取 | 逐位一致 ✔；perf 指令 **600M→462M（−23%）** |
-| ② | **flac 残差/Rice/CRC 内层 ~12%** | 循环不变量外提、分支消除、查表、去 f64 | 逐位一致 |
-| ③ | **mp3 `synthGranule` ~20% + `imdct36` ~7%** | 预计算窗/系数表、f32 化、展开、`@Vector` | `|corr|≥0.999`/±≤1 LSB |
-| ④ | **aac `decodeIcs` ~39%（谱/Huffman/去量化）** | Huffman 单查表、去量化查表替代 pow/逐步、scalefactor 路径精简 | corr/±1 LSB 不劣化 |
-| ⑤ | **aac MDCT/FFT ~11%** | 专用化 f32、预计算、SIMD | corr 不劣化 |
+| ② | **flac 残差/Rice 内层 ~12%** ✅ | 已做：`readUnary1` 缓存内批量数零替换逐位 readBit | 逐位一致 ✔；合成语料指令 461.9M→460.7M（前缀短，收益小） |
+| ③ | **mp3 `synthGranule` ~20% + `imdct36` ~7%** ⛔B 档 | 预计算/`@Vector` 属浮点重排（B 档）；按只做 A 档策略暂缓 | — |
+| ④ | **aac `decodeIcs` ~39%（谱/Huffman/去量化）** ✅(Huffman 部分) | 已做：Vlc 规范表 O(1)/长度查表（去每长度二分）；去量化查表待评估 | aac 逐位 ✔；m4a 指令 455M→418.7M（−8%） |
+| ⑤ | **aac MDCT/FFT ~11%** ⛔B 档 | f32/预计算/SIMD 属浮点（B 档）；按策略暂缓 | — |
 | — | 公共 `pcm.convert` ~2% | 低优先（收益小） | — |
+| — | mp3 Huffman | 已是 FFmpeg 式直接查表（`codebook[hufPeek]`），无 A 档空间 | — |
 
 **边界澄清（待确认）**：局部寄存器/`u64` 位累加器、SIMD 寄存器、只读常量查表视为
 **纯计算**（非"缓冲"）；持久缓冲区/额外预读/缓存层视为禁止项。若"位累加器"亦属禁用，
