@@ -85,6 +85,12 @@ const IID_RASR_STATICS = win.GUID{
     .Data3 = 0x4E7D,
     .Data4 = .{ 0x98, 0x6F, 0xEF, 0x3B, 0x1A, 0x07, 0xA9, 0x64 },
 };
+const IID_STORAGE_FILE_STATICS = win.GUID{
+    .Data1 = 0x5984C710,
+    .Data2 = 0xDAF2,
+    .Data3 = 0x43C8,
+    .Data4 = .{ 0x8B, 0xB4, 0xA4, 0xD3, 0xEA, 0xCF, 0xD0, 0x3F },
+};
 
 // 枚举（Windows.Media 标准值）
 const PlaybackStatus = struct {
@@ -241,6 +247,30 @@ const RasrStaticsVtbl = extern struct {
     CreateFromStream: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
 };
 
+/// IStorageFileStatics（winmd 6 方法；仅用 GetFileFromPathAsync）。
+const StorageFileStaticsVtbl = extern struct {
+    base: Inspectable,
+    GetFileFromPathAsync: *const fn (*anyopaque, HSTRING, *?*anyopaque) callconv(.c) HRESULT,
+    GetFileFromApplicationUriAsync: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+    CreateStreamedFileAsync: *const fn (*anyopaque, HSTRING, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
+    ReplaceWithStreamedFileAsync: *const fn (*anyopaque, ?*anyopaque, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
+    CreateStreamedFileFromUriAsync: *const fn (*anyopaque, HSTRING, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
+    ReplaceWithStreamedFileFromUriAsync: *const fn (*anyopaque, ?*anyopaque, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
+};
+
+/// IAsyncInfo（5）+ IAsyncOperation`1（3）合并布局；GetResults 取 IStorageFile。
+const AsyncOpVtbl = extern struct {
+    base: Inspectable,
+    get_Id: *const fn (*anyopaque, *u32) callconv(.c) HRESULT,
+    get_Status: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
+    get_ErrorCode: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
+    Cancel: *const fn (*anyopaque) callconv(.c) HRESULT,
+    Close: *const fn (*anyopaque) callconv(.c) HRESULT,
+    put_Completed: *const fn (*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
+    get_Completed: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+    GetResults: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+};
+
 fn vtbl(comptime T: type, obj: *anyopaque) *const T {
     const pp: *const *const T = @ptrCast(@alignCast(obj));
     return pp.*;
@@ -382,34 +412,71 @@ pub fn init(findWindow: *const fn () ?win.HWND) i32 {
     return core.OK;
 }
 
-/// 设置封面缩略图（仅 http(s) URL；本地路径走 CreateFromFile 需 IStorageFile，暂缓）。
+/// 设置封面缩略图（http(s) URL 走 CreateFromUri；本地路径走 CreateFromFile）。
 fn setArtwork(url: []const u8) void {
     if (g_display == null) return;
-    if (!std.mem.startsWith(u8, url, "http://") and !std.mem.startsWith(u8, url, "https://")) return;
+    const is_http = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
+    const ref = if (is_http) refFromUri(url) else refFromFile(url);
+    if (ref == null) return;
+    defer release(ref);
+    _ = vtbl(DisplayVtbl, g_display.?).put_Thumbnail(g_display.?, ref);
+}
 
-    const cls_uri = makeHString("Windows.Foundation.Uri") orelse return;
+fn rasrStatics() ?*anyopaque {
+    const cls = makeHString("Windows.Storage.Streams.RandomAccessStreamReference") orelse return null;
+    defer _ = p_WindowsDeleteString.?(cls);
+    var statics: ?*anyopaque = null;
+    if (p_RoGetActivationFactory.?(cls, &IID_RASR_STATICS, &statics) != S_OK or statics == null) return null;
+    return statics;
+}
+
+fn refFromUri(url: []const u8) ?*anyopaque {
+    const cls_uri = makeHString("Windows.Foundation.Uri") orelse return null;
     defer _ = p_WindowsDeleteString.?(cls_uri);
     var factory: ?*anyopaque = null;
-    if (p_RoGetActivationFactory.?(cls_uri, &IID_URI_FACTORY, &factory) != S_OK or factory == null) return;
+    if (p_RoGetActivationFactory.?(cls_uri, &IID_URI_FACTORY, &factory) != S_OK or factory == null) return null;
     defer release(factory);
-
-    const hs_url = makeHString(url) orelse return;
+    const hs_url = makeHString(url) orelse return null;
     defer _ = p_WindowsDeleteString.?(hs_url);
     var uri: ?*anyopaque = null;
-    if (vtbl(UriFactoryVtbl, factory.?).CreateUri(factory.?, hs_url, &uri) != S_OK or uri == null) return;
+    if (vtbl(UriFactoryVtbl, factory.?).CreateUri(factory.?, hs_url, &uri) != S_OK or uri == null) return null;
     defer release(uri);
-
-    const cls_rasr = makeHString("Windows.Storage.Streams.RandomAccessStreamReference") orelse return;
-    defer _ = p_WindowsDeleteString.?(cls_rasr);
-    var statics: ?*anyopaque = null;
-    if (p_RoGetActivationFactory.?(cls_rasr, &IID_RASR_STATICS, &statics) != S_OK or statics == null) return;
+    const statics = rasrStatics() orelse return null;
     defer release(statics);
-
     var ref: ?*anyopaque = null;
-    if (vtbl(RasrStaticsVtbl, statics.?).CreateFromUri(statics.?, uri, &ref) != S_OK or ref == null) return;
-    defer release(ref);
+    if (vtbl(RasrStaticsVtbl, statics).CreateFromUri(statics, uri, &ref) != S_OK) return null;
+    return ref;
+}
 
-    _ = vtbl(DisplayVtbl, g_display.?).put_Thumbnail(g_display.?, ref);
+fn refFromFile(path: []const u8) ?*anyopaque {
+    const cls = makeHString("Windows.Storage.StorageFile") orelse return null;
+    defer _ = p_WindowsDeleteString.?(cls);
+    var statics: ?*anyopaque = null;
+    if (p_RoGetActivationFactory.?(cls, &IID_STORAGE_FILE_STATICS, &statics) != S_OK or statics == null) return null;
+    defer release(statics);
+    const hs_path = makeHString(path) orelse return null;
+    defer _ = p_WindowsDeleteString.?(hs_path);
+    var op: ?*anyopaque = null;
+    if (vtbl(StorageFileStaticsVtbl, statics.?).GetFileFromPathAsync(statics.?, hs_path, &op) != S_OK or op == null) return null;
+    defer release(op);
+    // 轮询等待 IAsyncOperation 完成（最多 ~2s；避免委托回调复杂度）
+    const ov = vtbl(AsyncOpVtbl, op.?);
+    var i: u32 = 0;
+    while (i < 100) : (i += 1) {
+        var status: i32 = 0;
+        if (ov.get_Status(op.?, &status) != S_OK) return null;
+        if (status == 1) break; // Completed
+        if (status == 2 or status == 3) return null; // Canceled / Error
+        win.Sleep(20);
+    }
+    var file: ?*anyopaque = null;
+    if (ov.GetResults(op.?, &file) != S_OK or file == null) return null;
+    defer release(file);
+    const rs = rasrStatics() orelse return null;
+    defer release(rs);
+    var ref: ?*anyopaque = null;
+    if (vtbl(RasrStaticsVtbl, rs).CreateFromFile(rs, file, &ref) != S_OK) return null;
+    return ref;
 }
 
 /// QI 出 ISystemMediaTransportControls2（时间轴/速率用）。
@@ -463,6 +530,10 @@ pub fn setPlayback(state: i32, position_ms: i64) void {
     };
     _ = vtbl(SmtcVtbl, smtc).put_PlaybackStatus(smtc, st);
     updateTimeline(position_ms);
+    // 播放速率（1.0 播放 / 0.0 暂停）让系统自行外推进度
+    if (ensureSmtc2()) |s2| {
+        _ = vtbl(Smtc2Vtbl, s2).put_PlaybackRate(s2, if (state == 1) 1.0 else 0.0);
+    }
 }
 
 pub fn deinit() void {
