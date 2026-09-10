@@ -104,7 +104,7 @@ pub const modules = [_]Module{
     .{ .fmt = .mka,       .open = mka.open, .meta = mka.openMeta },
     .{ .fmt = .mpc,       .open = mpc.open, .meta = mpc.openMeta },
     .{ .fmt = .shn,       .open = shn.open },
-    .{ .fmt = .tak,       .open = tak.open },
+    .{ .fmt = .tak,       .open = tak.open, .meta = tak.openMeta },
     .{ .fmt = .tta,       .open = tta.open, .meta = tta.openMeta },
 };
 

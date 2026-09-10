@@ -38,6 +38,7 @@ const io = @import("../../io.zig");
 const decoder = @import("../../decoder.zig");
 const core = @import("core.zig");
 const T = @import("tables.zig");
+const apev2 = @import("../apev2.zig");
 
 const StreamInfo = core.StreamInfo;
 
@@ -383,6 +384,81 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
         .metadata = .{},
     };
     return .{ .vtable = &vtable, .ctx = ctx };
+}
+
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）：整读后仅 parseMetadata+scanFrames
+// （帧表，不解码），尾部 APEv2 标签；不建 Decoder/队列。
+// ---------------------------------------------------------------------------
+
+const MetaCtx = struct {
+    allocator: std.mem.Allocator,
+    reader: io.Reader,
+    data: []u8,
+    tags: apev2.Tags,
+};
+
+fn metaDeinit(ctx: *anyopaque) void {
+    const self: *MetaCtx = @ptrCast(@alignCast(ctx));
+    self.tags.deinit(self.allocator);
+    self.allocator.free(self.data);
+    self.reader.deinit();
+    self.allocator.destroy(self);
+}
+
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const fsize = try reader.size();
+    if (fsize < 4) return error.Corrupt;
+    const data = try allocator.alloc(u8, @intCast(fsize));
+    errdefer allocator.free(data);
+    var got: usize = 0;
+    while (got < fsize) {
+        const n = reader.read(data[got..]) catch |e| switch (e) {
+            error.Aborted => return error.Aborted,
+            else => return error.IoError,
+        };
+        if (n == 0) break;
+        got += n;
+    }
+    if (got < fsize) return error.Corrupt;
+
+    const meta = try parseMetadata(data);
+    var ti = meta.streaminfo;
+    const frames = scanFrames(allocator, data, meta.data_start, meta.data_end, &ti) catch |e| switch (e) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return error.Corrupt,
+    };
+    defer {
+        allocator.free(frames.starts);
+        allocator.free(frames.ends);
+        allocator.free(frames.ns);
+    }
+
+    if (ti.channels == 0 or ti.channels > 6 or ti.sample_rate == 0 or ti.bps == 0)
+        return error.Corrupt;
+    if (ti.codec != T.TAK_CODEC_MONO_STEREO and ti.codec != T.TAK_CODEC_MULTICHANNEL)
+        return error.UnsupportedFormat;
+    if (ti.data_type != 0) return error.UnsupportedFormat;
+    if (ti.bps != 8 and ti.bps != 16 and ti.bps != 24) return error.UnsupportedFormat;
+
+    var tags = apev2.parse(allocator, reader, fsize) catch apev2.Tags{};
+    errdefer tags.deinit(allocator);
+
+    const ctx = try allocator.create(MetaCtx);
+    ctx.* = .{ .allocator = allocator, .reader = reader.*, .data = data, .tags = tags };
+
+    info.* = .{
+        .sample_rate = ti.sample_rate,
+        .channels = @intCast(ti.channels),
+        .bits_per_sample = if (ti.bps <= 16) @intCast(ti.bps) else 32,
+        .is_float = false,
+        .duration_us = @intCast(@divTrunc(@as(u128, @intCast(frames.total_samples)) * 1_000_000, ti.sample_rate)),
+        .duration_known = .exact,
+        .codec_name = "tak",
+        .format_name = "tak",
+        .metadata = tags.meta,
+    };
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
 }
 
 // ---------------------------------------------------------------------------

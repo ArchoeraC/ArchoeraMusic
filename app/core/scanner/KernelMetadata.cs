@@ -79,7 +79,7 @@ public static class KernelMetadata
     {
         "flac", "mp3", "mp2", "mp1", "wav", "wave", "ogg", "oga", "opus",
         "m4a", "m4b", "mp4", "spx", "ape", "wv", "mpc", "mpp", "mp+",
-        "dsf", "dff", "dsd", "tta", "wma", "asf", "mka",
+        "dsf", "dff", "dsd", "tta", "wma", "asf", "mka", "tak",
     };
 
     /// <summary>一次性 DllImportResolver 注册（定位随包分发的 libarchoera_kernel.so）。</summary>
