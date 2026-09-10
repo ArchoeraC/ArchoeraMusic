@@ -19,6 +19,7 @@ const decoder = @import("../../decoder.zig");
 
 const sv7 = @import("sv7.zig");
 const sv8 = @import("sv8.zig");
+const apev2 = @import("../apev2.zig");
 
 /// 每音频帧每声道样本数（MPC_FRAME_SIZE，36 子带时间 × 32）
 const SAMPLES_PER_FRAME = 1152;
@@ -144,6 +145,111 @@ const vtable = VTable{
     .position_ms = positionMsImpl,
     .deinit = deinitImpl,
 };
+
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）：整读文件后仅调 sv7/sv8 `parse`
+// （头 + 帧表/AP 列表，不解音频），尾部 APEv2 标签；不构造 VLC/合成器状态。
+// ---------------------------------------------------------------------------
+
+const Parsed = union(enum) {
+    v7: sv7.Parsed,
+    v8: sv8.Parsed,
+
+    fn deinit(self: *Parsed) void {
+        switch (self.*) {
+            .v7 => |*p| p.deinit(),
+            .v8 => |*p| p.deinit(),
+        }
+    }
+};
+
+const MetaCtx = struct {
+    allocator: std.mem.Allocator,
+    reader: io.Reader,
+    data: []u8,
+    parsed: Parsed,
+    tags: apev2.Tags = .{},
+};
+
+fn metaDeinit(p: *anyopaque) void {
+    const ctx: *MetaCtx = @ptrCast(@alignCast(p));
+    ctx.tags.deinit(ctx.allocator);
+    ctx.parsed.deinit();
+    ctx.allocator.free(ctx.data);
+    ctx.reader.deinit();
+    ctx.allocator.destroy(ctx);
+}
+
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const fsize: usize = @intCast(try reader.size());
+    if (fsize < 8) return error.Corrupt;
+    const data = try allocator.alloc(u8, fsize);
+    errdefer allocator.free(data);
+    var got: usize = 0;
+    while (got < fsize) {
+        const n = reader.read(data[got..]) catch return error.IoError;
+        if (n == 0) break;
+        got += n;
+    }
+    if (got < fsize) return error.Corrupt;
+
+    var sample_rate: u32 = 0;
+    var channels: u8 = 0;
+    var codec_name: [:0]const u8 = "";
+    var duration_us: i64 = 0;
+    var duration_known: decoder.DurationKnown = .exact;
+    var parsed: Parsed = undefined;
+
+    if (std.mem.eql(u8, data[0..4], "MPCK")) {
+        var p8 = try sv8.parse(data, allocator);
+        errdefer p8.deinit();
+        sample_rate = p8.cfg.sample_rate;
+        channels = p8.cfg.channels;
+        codec_name = "mpc8";
+        if (p8.cfg.total_samples > 0 and sample_rate > 0) {
+            duration_us = @intCast((@as(u128, @intCast(p8.cfg.total_samples)) * 1_000_000) / sample_rate);
+        } else {
+            duration_known = .unknown;
+        }
+        parsed = .{ .v8 = p8 };
+    } else if (std.mem.eql(u8, data[0..3], "MP+")) {
+        var p7 = try sv7.parse(data, allocator);
+        errdefer p7.deinit();
+        sample_rate = p7.cfg.sample_rate;
+        channels = 2; // SV7 恒立体声
+        codec_name = "mpc7";
+        const total_frames: u64 = p7.frames.len;
+        if (sample_rate > 0) {
+            duration_us = @intCast((total_frames * SAMPLES_PER_FRAME * 1_000_000) / sample_rate);
+        } else {
+            duration_known = .unknown;
+        }
+        parsed = .{ .v7 = p7 };
+    } else {
+        return error.Corrupt;
+    }
+
+    const ctx = try allocator.create(MetaCtx);
+    errdefer allocator.destroy(ctx);
+    ctx.* = .{ .allocator = allocator, .reader = reader.*, .data = data, .parsed = parsed };
+    errdefer ctx.tags.deinit(allocator);
+
+    const fsize64 = try reader.size();
+    ctx.tags = apev2.parse(allocator, reader, fsize64) catch .{};
+
+    info.* = .{
+        .sample_rate = sample_rate,
+        .channels = channels,
+        .bits_per_sample = 16,
+        .is_float = false,
+        .duration_us = duration_us,
+        .duration_known = duration_known,
+        .codec_name = codec_name,
+        .format_name = codec_name,
+        .metadata = ctx.tags.meta,
+    };
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
 
 fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
     const f: *DecoderCtx = @ptrCast(@alignCast(ctx));
