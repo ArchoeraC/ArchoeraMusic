@@ -301,12 +301,63 @@ pub fn appInstanceAcquire() i32 {
 }
 
 
-// ── 系统提示（MessageBoxW）────────────────────────────────────────
+// ── 系统提示：优先 WinRT Toast（Windows.UI.Notifications），兜底 MessageBoxW ──
+// WinRT Toast 直接经 Windows Runtime 通知 API 弹出（Win10+ 原生横幅，非模态）。
+// 以 PowerShell -EncodedCommand 调用（免 C++/WinRT 构建依赖；PowerShell 5.1 内置）。
+
+extern "c" fn system(command: [*:0]const u8) c_int;
+
+fn psQuote(buf: *std.ArrayList(u8), s: []const u8) void {
+    buf.append(alloc, '\'') catch {};
+    for (s) |ch| {
+        if (ch == '\'') {
+            buf.appendSlice(alloc, "''") catch {};
+        } else {
+            buf.append(alloc, ch) catch {};
+        }
+    }
+    buf.append(alloc, '\'') catch {};
+}
+
+fn toastWinRT(title: []const u8, body: []const u8) bool {
+    var ps = std.ArrayList(u8).empty;
+    defer ps.deinit(alloc);
+    const pre = "$ErrorActionPreference='Stop';" ++
+        "[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null;" ++
+        "$t=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent(" ++
+        "[Windows.UI.Notifications.ToastTemplateType]::ToastText02);" ++
+        "$x=$t.GetElementsByTagName('text');$x.Item(0).AppendChild($t.CreateTextNode(";
+    const mid = "))|Out-Null;$x.Item(1).AppendChild($t.CreateTextNode(";
+    const post = "))|Out-Null;" ++
+        "$n=[Windows.UI.Notifications.ToastNotification]::new($t);" ++
+        "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('ArchoeraMusic').Show($n);";
+    ps.appendSlice(alloc, pre) catch return false;
+    psQuote(&ps, title);
+    ps.appendSlice(alloc, mid) catch return false;
+    psQuote(&ps, body);
+    ps.appendSlice(alloc, post) catch return false;
+
+    const wstr = std.unicode.utf8ToUtf16LeAlloc(alloc, ps.items) catch return false;
+    defer alloc.free(wstr);
+    const bytes = std.mem.sliceAsBytes(wstr);
+    const enc = std.base64.standard.Encoder;
+    const out = alloc.alloc(u8, enc.calcSize(bytes.len)) catch return false;
+    defer alloc.free(out);
+    const b64 = enc.encode(out, bytes);
+    const cmd = std.fmt.allocPrintSentinel(alloc,
+        "powershell -NoProfile -NonInteractive -EncodedCommand {s}", .{b64}, 0) catch
+        return false;
+    defer alloc.free(cmd);
+    return system(cmd) == 0;
+}
+
 const user32 = struct {
     extern "user32" fn MessageBoxW(hwnd: ?*anyopaque, text: [*:0]const u16, caption: [*:0]const u16, flags: u32) callconv(.winapi) c_int;
 };
 
 pub fn notify(title: []const u8, body: []const u8) i32 {
+    if (toastWinRT(title, body)) return core.OK;
+    // 兜底：模态 MessageBox
     const t = std.unicode.utf8ToUtf16LeAllocZ(alloc, title) catch return core.ERR_BACKEND;
     defer alloc.free(t);
     const b = std.unicode.utf8ToUtf16LeAllocZ(alloc, body) catch return core.ERR_BACKEND;
