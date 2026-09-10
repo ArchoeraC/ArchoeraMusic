@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! archoera_platform 构建脚本（Zig 0.16.0 build API）
 //!
 //! 产物：libarchoera_platform.{so,dylib} / archoera_platform.dll

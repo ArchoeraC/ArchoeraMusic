@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! 流式会话能力（docs/engine-master-pool-design.md §6.3 的池内内部形态，不接 C 壳）
 //!

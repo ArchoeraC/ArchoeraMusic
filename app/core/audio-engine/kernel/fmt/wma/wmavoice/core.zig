@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! WMA Voice（wmavoice，ASF codec_tag 0x000A）解码核心——逐函数移植 FFmpeg
 //! libavcodec/wmavoice.c（reference n9.0.1，LGPL v2.1+）。

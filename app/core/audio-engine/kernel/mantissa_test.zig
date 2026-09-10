@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! AC-3 尾数解包 + 变换系数独立测试程序（zig build-exe <本文件> 可运行）。
 //!

@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! MLP/TrueHD 表（对照 FFmpeg mlp.c / mlp_parse.c / mlpdec.c / mlp_parse.h）
 

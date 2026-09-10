@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! ADTS 裸流容器（AAC ADTS，ISO 14496-3 §1.8.2）：帧同步定位 + 头解析，
 //! 载荷逐帧喂给 fmt/aac/lib.zig（AAC-LC 自研解码核心）。

@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! APE bit-exact 对照导出工具：解码一个 .ape 文件，按解码器输出契约
 //! （bps 8 → u8；16 → s16；24 → s32 顶对齐；交错小端）写原始 PCM 到 stdout；

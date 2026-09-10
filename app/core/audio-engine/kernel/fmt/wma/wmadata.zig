@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! WMA 解码静态表——由脚本自 wmadata.h / wmadec.c / wma_freqs.c 逐字抽取。
 //! 浮点以 f32 位模式内嵌（十进制→double→float 与 C 编译一致）。

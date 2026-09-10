@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! Opus 完整解码 dump：走 decoder.open → lib.zig VTable（SILK/CELT/HYBRID 全模式）。
 //! 输出：s16 交错 PCM 到 stdout（可选 --f32 输出 float32）。

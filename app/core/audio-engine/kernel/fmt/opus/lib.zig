@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! Opus 解码器封装（open + VTable + Ogg 解复用 + SILK/CELT/HYBRID + 重采样 + 输出）
 //!

@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Windows SMTC（SystemMediaTransportControls）——WinRT COM vtable 直调（P3b）。
 //!
 //! **权威来源**：vtable 方法顺序由本机 `Windows.Media.winmd`（ECMA-335 元数据）

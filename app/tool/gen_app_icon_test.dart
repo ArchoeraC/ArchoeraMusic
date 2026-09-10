@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 生成应用图标 PNG（品牌 Logo：圆角方块底 + 均衡器频谱条）。
 //
 // 运行：flutter test tool/gen_app_icon_test.dart

@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 part of '../streaming_provider.dart';
 
 mixin _StreamingNotifierCore on Notifier<StreamingState> {

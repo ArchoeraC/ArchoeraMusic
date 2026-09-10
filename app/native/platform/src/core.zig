@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 平台能力桥接 core：错误码 / 事件结构 / 回调注册与分发。
 //!
 //! 线程模型（docs/platform-native-bridge.md §5）：后端可在任意 OS 线程调

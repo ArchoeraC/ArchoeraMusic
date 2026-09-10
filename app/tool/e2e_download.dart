@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 真实下载联调工具（纯 Dart，无 flutter 依赖）。
 ///
 /// 验证 Rust 下载内核在真实网络环境下的端到端链路：

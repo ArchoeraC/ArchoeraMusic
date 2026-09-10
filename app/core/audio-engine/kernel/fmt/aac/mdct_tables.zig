@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! MDCT 辅助表——由 FFmpeg n9.0.1 同款公式（tx_template.c ff_tx_mdct_gen_exp /
 //! tx.c split_radix_permutation / twiddle tab）在本机以 double 精度计算后

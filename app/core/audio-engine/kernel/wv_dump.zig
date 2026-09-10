@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! WavPack bit-exact 对照导出工具：解码一个 .wv 文件，按解码器输出契约
 //! （s16 → 16-bit；s32 → 32-bit；float → 32-bit IEEE；交错小端）写原始

@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 后端选择：按编译目标平台启用对应实现（backend.zig 统一接口面）。
 //!
 //! 每个平台后端必须提供（P0 骨架阶段均为 stub，随 P1–P5 逐项落地）：

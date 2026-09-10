@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! Opus 长流对照 dump：直接驱动 fmt/opus/lib.zig（不经 decoder.zig 全格式工厂），
 //! 输出 s16 交错 PCM 到 stdout。便于长样本 mine vs ffmpeg 逐段对拍。

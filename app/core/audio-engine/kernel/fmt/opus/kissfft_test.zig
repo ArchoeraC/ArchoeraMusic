@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! kissfft.zig（libopus 移植）与 CUSTOM_MODES 浮点 libopus 的 MDCT golden 对比测试。
 //! golden 格式（gold.c 生成）：u32 N2, u32 overlap, f32[N2] in, f32[overlap] window,

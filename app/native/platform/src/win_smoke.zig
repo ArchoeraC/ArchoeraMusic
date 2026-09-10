@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Windows 后端真机冒烟（仅 x86_64-windows-gnu；WSL 下经 interop 运行）。
 //!
 //! 验证：能力位图、休眠抑制、熄屏注册、窗口子类化、SMTC（创建真实窗口 →

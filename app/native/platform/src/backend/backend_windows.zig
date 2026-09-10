@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Windows 后端（P3，docs/platform-native-bridge.md §4.2）。
 //!
 //! P3a（本文件当前）：防休眠抑制（SetThreadExecutionState，专用常驻线程）+

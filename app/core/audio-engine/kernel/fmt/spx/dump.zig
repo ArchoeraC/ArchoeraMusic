@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! Speex 解码 dump/对拍工具：解码 .spx → s16le 写 stdout，stderr 打印 Info 摘要。
 //!

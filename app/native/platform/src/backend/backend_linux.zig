@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Linux 后端：自研 D-Bus 承载 SystemPower（P1）与 MPRIS（P2，待落地）。
 //!
 //! 能力位图恒置位 POWER_INHIBIT | POWER_SCREEN_STATE（bridge §3.3）；运行期

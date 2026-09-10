@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! Linux 窗口状态（P5）：经 GTK/GDK 探测最小化/失焦。
 //!
 //! 为何用 GTK 而非纯 X11：Flutter Linux 嵌入层本身是 GTK，GDK 已抽象

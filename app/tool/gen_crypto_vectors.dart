@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 生成 downloader 对拍基准向量（Dart 真实实现 → Rust 单测硬编码期望值）。
 ///
 /// 用法（在 app/ 目录下；"Running build hooks..." 是 build.dart 钩子输出，

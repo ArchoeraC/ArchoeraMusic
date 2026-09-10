@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 临时冒烟测试：验证 archoera_scraper FFI 生命周期（create/run/poll/done/dispose）。
 // 用空目录触发 empty+done 事件，全程无网络请求。
 // 用法：dart run tool/scraper_smoke.dart

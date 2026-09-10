@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 冒烟测试：Subsonic 服务端（Go FFI）+ 客户端（纯 Dart）闭环。
 // 链路：
 //   1. 构造临时曲库（tracks + subsonic 6 表）+ 测试 WAV
