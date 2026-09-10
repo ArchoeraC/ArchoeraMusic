@@ -876,6 +876,14 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > 至此 flac+mp3 走 probe-only（覆盖扫描常见格式）；**wav/m4a/ogg/opus 仍回退完整
 > open**——wav open 与 ADPCM/G.711 解码状态初始化交织（~200 行），m4a 需拆 isom+AAC
 > 上下文，留待逐格式推进。scanner 语料：**174ms vs TagLib 200ms（min，−13%）**。
+>
+> **第三批（2026-09-10）**：**wav + m4a** 落地——wav 把 open 主体抽成 `parseAlloc`
+> （`open`/`openMeta` 共用，`openCaf`/`openAu`/`finishPcm` 改返回 void，`destroyCtx`
+> 抽出复用；解码缓冲本就惰性分配）；m4a 新增 `MetaCtx`（仅 codec/channels/out_bps/
+> meta，**不含 ~9MB AAC/ALAC 解码状态**），只解析 moov→trak（样本表仅算时长后释放）
+> + udta 标签，委托 codec 与 chan_config=0 回退完整 open。**至此 flac/mp3/wav/m4a
+> 四大类走 probe-only**；ogg/vorbis/opus 等仍回退。scanner 1000 文件语料：
+> **184ms vs TagLib 248ms（min，−26%，含进程启动）**。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
