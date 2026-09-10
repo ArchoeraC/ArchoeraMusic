@@ -390,7 +390,7 @@ fn nsstrC(s: []const u8) Id {
 
 pub fn caps() u32 {
     return core.CAP_POWER_INHIBIT | core.CAP_POWER_SCREEN_STATE | core.CAP_WINDOW_STATE |
-        core.CAP_MEDIA_SESSION | core.CAP_APP_INSTANCE;
+        core.CAP_MEDIA_SESSION | core.CAP_APP_INSTANCE | core.CAP_SYSTEM_ACCENT;
 }
 
 pub fn init() i32 {
@@ -449,6 +449,34 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
     return core.OK;
 }
 
+// ── 系统主题色：NSColor.controlAccentColor（10.14+）→ sRGB 分量 ──
+// 经运行时 objc_msgSend 直调（无 SDK 头）；非 RGB 色彩空间先转 sRGB。
 pub fn systemAccent() ?[3]u8 {
-    return null;
+    if (!load() or g_appkit == null) return null;
+    const NSColor = cls("NSColor");
+    if (NSColor == null) return null;
+    const cs = sel("controlAccentColor");
+    {
+        const responds: *const fn (Id, Sel, Sel) callconv(.c) i8 = @ptrCast(@alignCast(g_msgSend.?));
+        if (responds(NSColor, sel("respondsToSelector:"), cs) == 0) return null;
+    }
+    const color = m0(NSColor, cs);
+    if (color == null) return null;
+    const srgb = m1(color, sel("colorUsingColorSpace:"), m0(cls("NSColorSpace"), sel("sRGBColorSpace")));
+    const use = if (srgb != null) srgb else color;
+    var r: f64 = 0;
+    var g: f64 = 0;
+    var b: f64 = 0;
+    var a: f64 = 0;
+    const f: *const fn (Id, Sel, *f64, *f64, *f64, *f64) callconv(.c) void = @ptrCast(@alignCast(g_msgSend.?));
+    f(use, sel("getRed:green:blue:alpha:"), &r, &g, &b, &a);
+    if (a <= 0.0 and r == 0.0 and g == 0.0 and b == 0.0) return null;
+    return .{ toU8(r), toU8(g), toU8(b) };
+}
+
+fn toU8(x: f64) u8 {
+    const v = x * 255.0 + 0.5;
+    if (v <= 0.0) return 0;
+    if (v >= 255.0) return 255;
+    return @intFromFloat(v);
 }

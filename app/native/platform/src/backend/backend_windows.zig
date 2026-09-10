@@ -208,7 +208,7 @@ fn unsubclassWindow() void {
 
 pub fn caps() u32 {
     return core.CAP_POWER_INHIBIT | core.CAP_POWER_SCREEN_STATE | core.CAP_WINDOW_STATE |
-        core.CAP_MEDIA_SESSION | core.CAP_APP_INSTANCE;
+        core.CAP_MEDIA_SESSION | core.CAP_APP_INSTANCE | core.CAP_SYSTEM_ACCENT;
 }
 
 pub fn init() i32 {
@@ -387,6 +387,40 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
     return core.OK;
 }
 
+// ── 系统主题色：HKCU\...\DWM\AccentColor（ABGR DWORD）→ DwmGetColorizationColor ──
+// 不依赖 C++/WinRT：仅 advapi32 + dwmapi（系统自带）。
+extern "advapi32" fn RegGetValueW(
+    hkey: ?*anyopaque,
+    subkey: [*:0]const u16,
+    value: [*:0]const u16,
+    flags: u32,
+    ptype: ?*u32,
+    pvdata: ?*anyopaque,
+    pcbdata: ?*u32,
+) callconv(.winapi) c_int;
+extern "dwmapi" fn DwmGetColorizationColor(pcr: *u32, opaque_blend: *i32) callconv(.winapi) c_int;
+
+const HKEY_CURRENT_USER: ?*anyopaque = @ptrFromInt(0x80000001);
+const RRF_RT_REG_DWORD: u32 = 0x00000010;
+
+fn readDwmDword(value: [*:0]const u16) ?u32 {
+    var v: u32 = 0;
+    var sz: u32 = @sizeOf(u32);
+    const key = std.unicode.utf8ToUtf16LeStringLiteral("Software\\Microsoft\\Windows\\DWM");
+    if (RegGetValueW(HKEY_CURRENT_USER, key, value, RRF_RT_REG_DWORD, null, &v, &sz) != 0) return null;
+    return v;
+}
+
 pub fn systemAccent() ?[3]u8 {
+    // 1) DWM\AccentColor：DWORD 按 ABGR 存（0xAABBGGRR）→ R=低字节
+    if (readDwmDword(std.unicode.utf8ToUtf16LeStringLiteral("AccentColor"))) |v| {
+        return .{ @intCast(v & 0xFF), @intCast((v >> 8) & 0xFF), @intCast((v >> 16) & 0xFF) };
+    }
+    // 2) 回退：DWM 着色色（0xAARRGGBB）
+    var c: u32 = 0;
+    var blend: i32 = 0;
+    if (DwmGetColorizationColor(&c, &blend) == 0 and c != 0) {
+        return .{ @intCast((c >> 16) & 0xFF), @intCast((c >> 8) & 0xFF), @intCast(c & 0xFF) };
+    }
     return null;
 }
