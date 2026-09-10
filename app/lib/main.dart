@@ -9,7 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'apis/runtime.dart';
-import 'eta/icon/eta_icons.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'theme/app_theme.dart';
 import 'services/platform/platform_capabilities.dart';
@@ -40,6 +39,8 @@ Future<void> main() async {
     final locale = parts.length >= 2 ? Locale(parts[0], parts[1]) : Locale(parts[0]);
     // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。
     await windowManager.ensureInitialized();
+    await windowManager.setSize(const Size(420, 260));
+    await windowManager.center();
     await windowManager.show();
     final l10n = lookupAppLocalizations(locale);
     runApp(_AlreadyRunningApp(
@@ -96,8 +97,7 @@ class _BrowserUserAgentOverrides extends HttpOverrides {
   }
 }
 
-/// 二次启动提示：MaterialApp（应用主题）下用子组件 context 弹模态框，
-/// 与 Vault 警告一致（警告图标 + 主题 + FilledButton），点“知道了”退出。
+/// 二次启动提示：自绘对话框卡片（无页面包裹感），窗口已缩为对话框尺寸。
 class _AlreadyRunningApp extends StatelessWidget {
   const _AlreadyRunningApp(
       {required this.message, required this.okLabel, required this.locale});
@@ -114,47 +114,99 @@ class _AlreadyRunningApp extends StatelessWidget {
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      home: _DialogShower(message: message, okLabel: okLabel),
+      home: _AlreadyRunningCard(message: message, okLabel: okLabel),
     );
   }
 }
 
-class _DialogShower extends StatefulWidget {
-  const _DialogShower({required this.message, required this.okLabel});
+class _AlreadyRunningCard extends StatelessWidget {
+  const _AlreadyRunningCard({required this.message, required this.okLabel});
 
   final String message;
   final String okLabel;
 
   @override
-  State<_DialogShower> createState() => _DialogShowerState();
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Scaffold(
+      backgroundColor: AppPalette.dark.surface,
+      body: Center(
+        child: Container(
+          width: 360,
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+          decoration: BoxDecoration(
+            color: AppPalette.dark.surfacePanel,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppPalette.dark.surfaceBright),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: SizedBox(
+                  width: 46,
+                  height: 46,
+                  child: CustomPaint(painter: _WarnPainter()),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Text('ArchoeraMusic',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 8),
+              Text(message,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: scheme.onSurfaceVariant)),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: () => exit(0),
+                  child: Text(okLabel),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _DialogShowerState extends State<_DialogShower> {
+/// 自绘警告图标：琥珀色三角 + 感叹号（不依赖字体图标，跨字体稳定）。
+class _WarnPainter extends CustomPainter {
+  const _WarnPainter();
+
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      // 此处 context 位于 MaterialApp/Navigator 之下，showDialog 可用。
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          icon: const Icon(EtaIcons.warning),
-          title: const Text('ArchoeraMusic'),
-          content: Text(widget.message),
-          actions: [
-            FilledButton(
-              onPressed: () => exit(0),
-              child: Text(widget.okLabel),
-            ),
-          ],
-        ),
-      );
-    });
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final tri = Path()
+      ..moveTo(w / 2, h * 0.06)
+      ..lineTo(w * 0.96, h * 0.92)
+      ..lineTo(w * 0.04, h * 0.92)
+      ..close();
+    canvas.drawPath(
+      tri,
+      Paint()
+        ..color = const Color(0xFFFFB300)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4
+        ..strokeJoin = StrokeJoin.round,
+    );
+    final mark = Paint()
+      ..color = const Color(0xFFFFB300)
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(w / 2, h * 0.40), Offset(w / 2, h * 0.64), mark);
+    canvas.drawCircle(Offset(w / 2, h * 0.75), 1.6,
+        Paint()..color = const Color(0xFFFFB300));
   }
 
   @override
-  Widget build(BuildContext context) =>
-      const Scaffold(backgroundColor: Color(0x00000000));
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
