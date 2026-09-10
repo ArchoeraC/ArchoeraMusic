@@ -916,6 +916,12 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > 覆盖**：flac/mp3/wav/m4a/ape/wv/mpc/dsd + Ogg 全家。**TTA** 的 ID3v2 位于文件尾且
 > 无指针，需按音频终点定位（或启发式尾扫），列为后续；wma/asf/amr/ac3/dts/mka/shn/tak
 > 内核 metadata 为空，保持 TagLib。
+>
+> **第九批（2026-09-10）**：**TTA** 落地——整读后仅 parseHeader+parseFrames（seek
+> 表，不解帧），按音频终点 `offsets[nframes]` 定位尾部 ID3v2 + 末 128B ID3v1；复用
+> `mp3/id3.zig`。**probe-only 覆盖**：flac/mp3/wav/m4a/ape/wv/mpc/dsd/tta + Ogg 全家。
+> 剩余 wma/asf/amr/awb/aac/ac3/dts/mka/shn/tak 内核 metadata 为空，保持 TagLib
+> （纳入需先补 ASF/Matroska/等标签解析器）。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
