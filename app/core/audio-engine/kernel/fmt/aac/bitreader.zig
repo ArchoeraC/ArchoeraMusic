@@ -87,6 +87,9 @@ pub const Vlc = struct {
     /// start[len]/count[len]：长度为 len 的码在 entries 中的区间（len 0 未用）
     start: [20]u16 = [_]u16{0} ** 20,
     count: [20]u16 = [_]u16{0} ** 20,
+    /// 规范 Huffman 每长度首码（canonical first code）；canonical=true 时用于 O(1)/长度解码
+    first_code: [20]u32 = [_]u32{0} ** 20,
+    canonical: bool = false,
     max_len: u8 = 0,
     size: u16 = 0,
 
@@ -138,10 +141,47 @@ pub const Vlc = struct {
             self.start[len] = acc;
             acc += self.count[len];
         }
+
+        // 规范首码 + 判定：若每长度码值连续且满足 canonical 递推，则可用 O(1)/长度解码
+        @memset(&self.first_code, 0);
+        var expected: u32 = 0;
+        var is_canon = true;
+        len = 1;
+        while (len <= 19) : (len += 1) {
+            self.first_code[len] = expected;
+            const cnt = self.count[len];
+            if (cnt != 0) {
+                const s = self.start[len];
+                if (self.entries[s].code != expected or
+                    self.entries[s + cnt - 1].code != expected + cnt - 1)
+                {
+                    is_canon = false;
+                }
+            }
+            expected = (expected + cnt) << 1;
+        }
+        self.canonical = is_canon;
     }
 
     /// 解码一个符号。无匹配/越界 → error.Corrupt。
+    /// 规范表走 O(1)/长度查表（first_code + 区间判定），非规范表退回二分（语义一致）。
     pub fn decode(self: *const Vlc, br: *BitReader) Error!u16 {
+        if (self.canonical) {
+            var acc: u32 = 0;
+            var len: usize = 1;
+            while (len <= self.max_len) : (len += 1) {
+                acc = (acc << 1) | try br.readBits(1);
+                const cnt = self.count[len];
+                if (cnt != 0) {
+                    const fc = self.first_code[len];
+                    if (acc >= fc and acc < fc + cnt) {
+                        return self.entries[self.start[len] + @as(u16, @intCast(acc - fc))].sym;
+                    }
+                }
+            }
+            return error.Corrupt;
+        }
+        // 非规范表兜底（保留原二分实现）
         var acc: u32 = 0;
         var len: usize = 1;
         while (len <= self.max_len) : (len += 1) {
