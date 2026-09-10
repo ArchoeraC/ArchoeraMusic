@@ -1,0 +1,42 @@
+name: 功能请求
+description: 提出新功能或改进建议
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        架构级提案请先读 docs/architecture.md 的决策记录，避免重复已否决方案（如侧车、libmpv 直连）。
+        行为约束见 CONTRIBUTING §2（红线）与 §2.4（社区行为）。
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 想解决什么问题，为什么现有能力不够
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望方案
+      description: 期望的行为 / 交互，如有可能给出方案要点
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 三端范围预期
+      options:
+        - 三端一致
+        - 存在平台硬性限制（须附依据，红线 §2.2）
+        - 不确定
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认
+      options:
+        - label: 未要求任何广告 / 付费 / 联网验证 / 账户体系能力（红线 §2.1 / §2.5）
+        - label: 已读 CONTRIBUTING 与相关决策记录
+    validations:
+      required: true

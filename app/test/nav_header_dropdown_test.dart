@@ -67,6 +67,42 @@ void main() {
     await tester.pumpAndSettle();
     _expectAligned(tester, textField, panel);
   });
+
+  testWidgets('聚焦后搜索框宽度伸展至 420，失焦后收回 280', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPrefsProvider.overrideWith(_NoSideEffectsPrefsNotifier.new),
+        ],
+        child: MaterialApp.router(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: GoRouter(
+            initialLocation: '/',
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (_, _) => const Scaffold(body: NavHeader()),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final textField = find.byType(TextField);
+    expect(tester.getSize(textField).width, closeTo(280, 0.5));
+
+    // 聚焦 → 宽度动画 280→420（修复前父级不随动画重建，输入框宽度卡死 280）
+    await tester.tap(textField);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(textField).width, closeTo(420, 0.5));
+
+    // 点击外部收起 → 宽度收回 280（修复前展开后无法收缩）
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(textField).width, closeTo(280, 0.5));
+  });
 }
 
 /// 断言面板顶边贴搜索框底边、左对齐、宽度一致且位于搜索框下方。

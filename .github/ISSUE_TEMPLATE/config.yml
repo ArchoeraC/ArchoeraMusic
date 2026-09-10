@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞（私密上报）
+    url: https://github.com/BetaStudio2/ArchoeraMusic/security/advisories/new
+    about: 请勿以公开 Issue 报告漏洞，见 SECURITY.md
+  - name: 开发规范 / 贡献条款
+    url: https://github.com/BetaStudio2/ArchoeraMusic/blob/main/CONTRIBUTING.md
+    about: 提交前请完整阅读，含红线（§2）与贡献者授权（§1）

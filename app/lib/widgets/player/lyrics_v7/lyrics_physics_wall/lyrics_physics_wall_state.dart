@@ -271,6 +271,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         ),
       );
     }
+    // 首帧同步：_c.groups 平时由 didUpdateWidget 维护，但首次挂载时
+    // LayoutBuilder/_rebuildMetrics 已按 widget.groups 算好 _c.y/_c.heights，
+    // 若不同步这里，painter 会在 _c.groups 仍为空时按 _c.y.length 索引越界。
+    _c.groups = groups;
     return LayoutBuilder(
       builder: (context, constraints) {
         final rawW = constraints.maxWidth;

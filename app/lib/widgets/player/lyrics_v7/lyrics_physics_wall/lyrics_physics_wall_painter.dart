@@ -10,7 +10,12 @@ class _Painter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final n = c.y.length;
+    // 防御性取交集：y/heights/groups 任一失配（如换歌瞬间）都按最短绘制，
+    // 避免越界崩溃。正常路径三者长度一致。
+    final n = math.min(
+      c.y.length,
+      math.min(c.groups.length, c.heights.length),
+    );
     if (n == 0) return;
     final viewH = c.h > 0 ? c.h : size.height;
     for (var i = 0; i < n; i++) {

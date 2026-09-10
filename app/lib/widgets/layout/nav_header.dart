@@ -429,7 +429,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
             _NavHeaderSearchField(
               layerLink: _searchLayerLink,
               widthAnimation: _widthCtrl,
-              width: _searchWidth,
+              collapsedWidth: _searchCollapsedWidth,
+              expandedWidth: _searchExpandedWidth,
               searchFocus: _searchFocus,
               searchCtrl: _searchCtrl,
               hintText: l10n.navHeaderSearchHint,

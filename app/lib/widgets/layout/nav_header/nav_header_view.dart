@@ -8,7 +8,8 @@ class _NavHeaderSearchField extends StatelessWidget {
   const _NavHeaderSearchField({
     required this.layerLink,
     required this.widthAnimation,
-    required this.width,
+    required this.collapsedWidth,
+    required this.expandedWidth,
     required this.searchFocus,
     required this.searchCtrl,
     required this.hintText,
@@ -18,7 +19,8 @@ class _NavHeaderSearchField extends StatelessWidget {
 
   final LayerLink layerLink;
   final Animation<double> widthAnimation;
-  final double width;
+  final double collapsedWidth;
+  final double expandedWidth;
   final FocusNode searchFocus;
   final TextEditingController searchCtrl;
   final String hintText;
@@ -41,7 +43,13 @@ class _NavHeaderSearchField extends StatelessWidget {
         link: layerLink,
         child: AnimatedBuilder(
           animation: widthAnimation,
-          builder: (_, child) => SizedBox(width: width, child: child),
+          builder: (_, child) => SizedBox(
+            // 宽度每帧按动画进度实时计算（不能用父级最后一次 build
+            // 捕获的静态值：父级不会随聚焦/动画逐帧重建）
+            width: collapsedWidth +
+                (expandedWidth - collapsedWidth) * widthAnimation.value,
+            child: child,
+          ),
           child: SInput(
             controller: searchCtrl,
             focusNode: searchFocus,
