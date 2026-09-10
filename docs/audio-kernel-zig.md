@@ -896,6 +896,13 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > （vorbis/opus/ogg-flac/speex）全部 probe-only**；flac/mp3/wav/m4a + 全部 Ogg
 > 走快路径，仅 wma/ape/wv/dsd/amr/ac3/dts/mka/mpc/shn/tak/tta 等仍回退完整 open。
 > scanner 侧同步把 `spx` 纳入扩展名白名单与内核直桥格式集。
+>
+> **第六批（2026-09-10）**：新增共享 **APEv2 解析器**（`fmt/apev2.zig`：尾部
+> footer/header flags、文本项映射标准字段 + 全量 tags，含单测）→ **APE** probe-only
+> 落地（`ape.openMeta`：容器头 + APEv2，不分配解码缓冲/不初始化预测器）。scanner
+> `KernelExts` 补 `ape`。**WavPack/Musepack** 的声道/采样率来自首块/帧解析，需另写
+> header-only 解析（APEv2 解析器已可复用），列为后续。另修正 `KernelExts` 误含
+> `wma/asf/amr/awb/aac`（内核 metadata 为空）导致的标签丢失，改回 TagLib。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
