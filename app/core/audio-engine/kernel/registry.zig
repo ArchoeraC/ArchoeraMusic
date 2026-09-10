@@ -99,7 +99,7 @@ pub const modules = [_]Module{
     .{ .fmt = .truehd,    .open = mlpOpen },
     .{ .fmt = .aac,       .open = adts.open }, // ADTS 容器 → fmt/adts
     .{ .fmt = .latm,      .open = latm.open },
-    .{ .fmt = .wma,       .open = wma.open },
+    .{ .fmt = .wma,       .open = wma.open, .meta = wma.openMeta },
     .{ .fmt = .dts,       .open = dts.open },
     .{ .fmt = .mka,       .open = mka.open },
     .{ .fmt = .mpc,       .open = mpc.open, .meta = mpc.openMeta },

@@ -94,8 +94,7 @@ fn deinit(ctx: *anyopaque) void {
 }
 
 /// 解码 .wma（ASF）整文件；成功时 Decoder 接管 `reader` 所有权（deinit 关闭）。
-pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.Decoder {
-    const sz = reader.size() catch return error.Corrupt;
+pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.Decoder {    const sz = reader.size() catch return error.Corrupt;
     if (sz <= 0 or sz > 256 * 1024 * 1024) return error.UnsupportedFormat;
     const file_data = try allocator.alloc(u8, @intCast(sz));
     errdefer allocator.free(file_data);
@@ -209,4 +208,90 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     };
 
     return .{ .vtable = &vtable, .ctx = ctx };
+}
+
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）：仅 ASF 头 + 标签，不解码音频包。
+// ---------------------------------------------------------------------------
+
+const MetaCtx = struct {
+    allocator: std.mem.Allocator,
+    reader: io.Reader,
+    file_data: []u8,
+    tags: asf.Tags,
+};
+
+fn metaDeinit(ctx: *anyopaque) void {
+    const self: *MetaCtx = @ptrCast(@alignCast(ctx));
+    self.tags.deinit(self.allocator);
+    self.allocator.free(self.file_data);
+    self.reader.deinit();
+    self.allocator.destroy(self);
+}
+
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const sz = reader.size() catch return error.Corrupt;
+    if (sz <= 0 or sz > 256 * 1024 * 1024) return error.UnsupportedFormat;
+    const file_data = try allocator.alloc(u8, @intCast(sz));
+    errdefer allocator.free(file_data);
+    var got: usize = 0;
+    while (got < file_data.len) {
+        const n = try reader.read(file_data[got..]);
+        if (n == 0) break;
+        got += n;
+    }
+    const data: []const u8 = file_data[0..got];
+    const hdr = try asf.parseHeader(data);
+    const audio = hdr.audio.?;
+
+    var tags = try asf.parseTags(allocator, data);
+    errdefer tags.deinit(allocator);
+
+    const codec_name: [:0]const u8 = switch (audio.codec_tag) {
+        0x0160 => "wmav1",
+        0x0161 => "wmav2",
+        0x0162 => "wmapro",
+        0x0163 => "wmalossless",
+        0x000A => "wmavoice",
+        else => "wma",
+    };
+    const container_us = asf.containerDurationUs(data, &hdr);
+    const play_us = asf.playDurationUs(&hdr);
+    const est_us: ?i64 = if (container_us == null and play_us == null and audio.avg_bytes > 0 and data.len > hdr.data_offset)
+        @intCast(@divTrunc(@as(i128, @intCast(data.len - hdr.data_offset)) * 1_000_000, @as(i128, audio.avg_bytes)))
+    else
+        null;
+    const duration_us: i64 = container_us orelse est_us orelse play_us orelse 0;
+    const duration_known: decoder.DurationKnown = if (container_us != null)
+        .exact
+    else if (est_us != null or play_us != null)
+        .estimate
+    else
+        .unknown;
+
+    const out_bps: c_int = switch (audio.codec_tag) {
+        0x0163 => 32, // wmalossless：24bit<<8 s32
+        else => 16,
+    };
+
+    const ctx = try allocator.create(MetaCtx);
+    ctx.* = .{
+        .allocator = allocator,
+        .reader = reader.*,
+        .file_data = file_data,
+        .tags = tags,
+    };
+
+    info.* = .{
+        .sample_rate = audio.sample_rate,
+        .channels = audio.channels,
+        .bits_per_sample = @intCast(out_bps),
+        .is_float = false,
+        .duration_us = duration_us,
+        .duration_known = duration_known,
+        .codec_name = codec_name,
+        .format_name = "asf",
+        .metadata = tags.meta,
+    };
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
 }
