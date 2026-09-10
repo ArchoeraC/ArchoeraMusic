@@ -136,6 +136,31 @@ pub const BitReader = struct {
         return count;
     }
 
+    /// 批量数一元前缀（stop=1）：在**已取入的缓存位**内一次数零，只有缓存耗尽才取下一字节
+    /// （取字节与 CRC 语义不变，无新增缓冲、逐位一致）。返回首个 1 之前的 0 个数；
+    /// 超过 `max` 时返回 >max 的计数（由调用方判 Corrupt）。Rice 残差热路径专用。
+    pub fn readUnary1(self: *BitReader, max: u32) Error!u32 {
+        var count: u32 = 0;
+        while (true) {
+            if (self.bits_avail == 0) {
+                self.cache = try self.fetchByte();
+                self.bits_avail = 8;
+            }
+            const avail: u6 = self.bits_avail;
+            const bits: u32 = @intCast(self.cache & MASKS[avail]);
+            if (bits == 0) {
+                count += avail;
+                self.bits_avail = 0;
+                if (count > max) return count;
+                continue;
+            }
+            const hb: u6 = @intCast(31 - @clz(bits)); // 缓存内最低位起：首个 1 的位索引
+            count += @as(u32, avail) - 1 - hb; // 该 1 之前的 0 个数
+            self.bits_avail = hb; // 消费掉 0…0 + 停止位 1，剩余 hb 位
+            return count;
+        }
+    }
+
     /// FLAC 帧号 / 样本号 UTF-8 变长整数（RFC 3629）。
     /// 非法首字节（0xFE/0xFF 开头）或非法续字节 → error.Corrupt。
     pub fn readUtf8(self: *BitReader) Error!u64 {
