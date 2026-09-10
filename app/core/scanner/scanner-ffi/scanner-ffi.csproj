@@ -18,8 +18,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 共享 scanner 源码（与 CLI 同源，仅排除 Program.cs 入口与 Ffi.cs 自身） -->
-    <Compile Include="../*.cs" Exclude="../Program.cs;Ffi.cs" />
+    <!-- 共享 scanner 源码（与 CLI 同源；显式 Link 而非通配 "../*.cs"：
+         通配链接项目目录外的文件时，部分 IDE/设计时构建不会把其纳入编译与
+         System.Text.Json 源生成，导致 ScannerJsonContext 未生成（缺 Default /
+         未实现抽象成员）的假错。逐文件显式列出并 Link 可稳定解决。 -->
+    <Compile Include="../Models.cs" Link="Models.cs" />
+    <Compile Include="../IScannerDatabase.cs" Link="IScannerDatabase.cs" />
+    <Compile Include="../ScannerEngine.cs" Link="ScannerEngine.cs" />
+    <Compile Include="../SqliteDirectWriter.cs" Link="SqliteDirectWriter.cs" />
+    <Compile Include="../AdaptiveBatchSize.cs" Link="AdaptiveBatchSize.cs" />
+    <Compile Include="../AdaptiveConcurrency.cs" Link="AdaptiveConcurrency.cs" />
+    <Compile Include="../SystemMemoryInfo.cs" Link="SystemMemoryInfo.cs" />
   </ItemGroup>
 
   <ItemGroup>
