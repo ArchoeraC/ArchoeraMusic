@@ -7001,7 +7001,7 @@ abstract class AppLocalizations {
   /// No description provided for @instanceAlreadyRunning.
   ///
   /// In zh_CN, this message translates to:
-  /// **'请在系统托盘或任务栏中找到正在运行的窗口。'**
+  /// **'要不……你自己找找呢(?)'**
   String get instanceAlreadyRunning;
 
   /// No description provided for @instanceAlreadyRunningTitle.
