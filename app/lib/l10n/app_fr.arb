@@ -1046,5 +1046,6 @@
   "qqMusicDownloadSkipped": "{count} titre(s) QM ignoré(s) : téléchargement non pris en charge.",
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "Échec de la prévention de la mise en veille du système",
-  "toastMediaSessionLost": "Session multimédia système déconnectée"
+  "toastMediaSessionLost": "Session multimédia système déconnectée",
+  "instanceAlreadyRunning": "ArchoeraMusic est déjà en cours d'exécution."
 }

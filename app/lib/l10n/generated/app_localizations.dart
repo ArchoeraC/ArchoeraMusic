@@ -6997,6 +6997,12 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'系统媒体会话已断开'**
   String get toastMediaSessionLost;
+
+  /// No description provided for @instanceAlreadyRunning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'ArchoeraMusic 已在运行'**
+  String get instanceAlreadyRunning;
 }
 
 class _AppLocalizationsDelegate

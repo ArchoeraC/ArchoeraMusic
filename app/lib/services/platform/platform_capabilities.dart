@@ -43,7 +43,21 @@ class PlatformCapabilities {
   bool get screenStateAvailable => caps & aplCapPowerScreenState != 0;
   bool get mediaSessionAvailable => caps & aplCapMediaSession != 0;
   bool get windowStateAvailable => caps & aplCapWindowState != 0;
+  bool get appInstanceAvailable => caps & aplCapAppInstance != 0;
   bool get bridgeLoaded => _bindings != null;
+
+  /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
+  /// 桥接不可用/无该能力 → true（不阻断启动，降级为允许多开）。
+  bool acquireSingleInstance() {
+    final b = _bindings;
+    if (b == null || caps & aplCapAppInstance == 0) return true;
+    return b.acquireInstance() == 1;
+  }
+
+  /// 系统提示（桥接不可用时静默忽略）。
+  void notify(String title, String body) {
+    _bindings?.notify(title, body);
+  }
 
   static PlatformCapabilities? _instance;
 

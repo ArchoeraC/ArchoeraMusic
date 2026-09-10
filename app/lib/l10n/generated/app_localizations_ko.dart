@@ -3823,4 +3823,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get toastMediaSessionLost => '시스템 미디어 세션이 끊어졌습니다';
+
+  @override
+  String get instanceAlreadyRunning => 'ArchoeraMusic이(가) 이미 실행 중입니다.';
 }

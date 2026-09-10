@@ -4010,4 +4010,8 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get toastMediaSessionLost => 'Session multimédia système déconnectée';
+
+  @override
+  String get instanceAlreadyRunning =>
+      'ArchoeraMusic est déjà en cours d\'exécution.';
 }

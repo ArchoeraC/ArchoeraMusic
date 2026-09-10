@@ -9,6 +9,7 @@
 //! **仅交叉编译验证**（本机非 macOS，待真机验收）。
 
 const std = @import("std");
+const alloc = std.heap.c_allocator;
 const core = @import("../core.zig");
 
 const Id = ?*anyopaque;
@@ -406,5 +407,44 @@ pub fn shutdown() i32 {
     }
     g_screen_events.store(false, .release);
     g_window_events.store(false, .release);
+    return core.OK;
+}
+
+
+// ── 单实例（文件锁）────────────────────────────────────────────────
+
+var g_instance_fd: std.posix.fd_t = -1;
+
+/// 1=首实例（持有锁至进程退出）；0=已有实例；<0=错误。
+pub fn appInstanceAcquire() i32 {
+    if (g_instance_fd >= 0) return 1; // 幂等
+    const dir = if (std.c.getenv("XDG_RUNTIME_DIR")) |p| std.mem.span(p) else "/tmp";
+    var buf: [512]u8 = undefined;
+    const path = std.fmt.bufPrintZ(&buf, "{s}/archoera_music.lock", .{dir}) catch
+        return core.ERR_BACKEND;
+    const flags = std.posix.O{ .ACCMODE = .RDWR, .CREAT = true, .CLOEXEC = true };
+    const fd = std.posix.openatZ(std.posix.AT.FDCWD, path, flags, 0o600) catch
+        return core.ERR_BACKEND;
+    const rc = std.c.flock(fd, 2 | 4); // LOCK_EX | LOCK_NB
+    if (rc != 0) {
+        _ = std.c.close(fd);
+        return 0; // 已被其它实例持有
+    }
+    g_instance_fd = fd;
+    return 1;
+}
+
+
+// ── 系统提示（osascript 弹窗）──────────────────────────────────────
+pub fn notify(title: []const u8, body: []const u8) i32 {
+    const script = std.fmt.allocPrint(alloc,
+        "display dialog \"{s}\" with title \"{s}\" buttons {{\"OK\"}} default button \"OK\"",
+        .{ body, title }) catch return core.ERR_BACKEND;
+    defer alloc.free(script);
+    const argv = [_][]const u8{ "osascript", "-e", script };
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const r = std.process.run(alloc, io, .{ .argv = &argv }) catch return core.ERR_BACKEND;
+    alloc.free(r.stdout);
+    alloc.free(r.stderr);
     return core.OK;
 }

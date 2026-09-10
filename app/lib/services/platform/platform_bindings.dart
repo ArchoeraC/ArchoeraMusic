@@ -33,6 +33,7 @@ const int aplCapMediaSession = 1 << 2;
 const int aplCapMediaSeek = 1 << 3;
 const int aplCapMediaArtwork = 1 << 4;
 const int aplCapWindowState = 1 << 5;
+const int aplCapAppInstance = 1 << 6;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -113,6 +114,8 @@ typedef _AplCapsC = Uint32 Function();
 typedef _AplPowerInhibitC = Int32 Function(Int32 on);
 typedef _AplPowerScreenC = Int32 Function(Int32 on);
 typedef _AplWindowEventsC = Int32 Function(Int32 on);
+typedef _AplInstanceAcquireC = Int32 Function();
+typedef _AplNotifyC = Int32 Function(Pointer<Utf8> title, Pointer<Utf8> body);
 typedef _AplMediaTrackC = Int32 Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackC = Int32 Function(
     Int32 state, Int64 positionMs, Double speed, Double volume, Int32 loop, Int32 shuffle);
@@ -129,6 +132,8 @@ typedef _AplCapsD = int Function();
 typedef _AplPowerInhibitD = int Function(int on);
 typedef _AplPowerScreenD = int Function(int on);
 typedef _AplWindowEventsD = int Function(int on);
+typedef _AplInstanceAcquireD = int Function();
+typedef _AplNotifyD = int Function(Pointer<Utf8> title, Pointer<Utf8> body);
 typedef _AplMediaTrackD = int Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackD = int Function(
     int state, int positionMs, double speed, double volume, int loop, int shuffle);
@@ -182,6 +187,9 @@ class PlatformBindings {
             lib.lookupFunction<_AplPowerScreenC, _AplPowerScreenD>('apl_power_set_screen_events'),
         _windowEvents =
             lib.lookupFunction<_AplWindowEventsC, _AplWindowEventsD>('apl_window_set_events'),
+        _instanceAcquire =
+            lib.lookupFunction<_AplInstanceAcquireC, _AplInstanceAcquireD>('apl_instance_acquire'),
+        _notify = lib.lookupFunction<_AplNotifyC, _AplNotifyD>('apl_notify'),
         _mediaTrack =
             lib.lookupFunction<_AplMediaTrackC, _AplMediaTrackD>('apl_media_set_track'),
         _mediaPlayback =
@@ -205,6 +213,8 @@ class PlatformBindings {
   final _AplPowerInhibitD _powerInhibit;
   final _AplPowerScreenD _powerScreen;
   final _AplWindowEventsD _windowEvents;
+  final _AplInstanceAcquireD _instanceAcquire;
+  final _AplNotifyD _notify;
   final _AplMediaTrackD _mediaTrack;
   final _AplMediaPlaybackD _mediaPlayback;
   final _AplMediaWindowD _mediaWindow;
@@ -216,6 +226,21 @@ class PlatformBindings {
   final _screenCtrl = StreamController<AplScreenEvent>.broadcast();
   final _windowCtrl = StreamController<AplWindowEvent>.broadcast();
   final _backendCtrl = StreamController<AplBackendEvent>.broadcast();
+
+  /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
+  int acquireInstance() => _instanceAcquire();
+
+  /// 系统提示（UTF-8）。用于“已有实例”等无 UI 框架场景。
+  int notify(String title, String body) {
+    final t = title.toNativeUtf8();
+    final b = body.toNativeUtf8();
+    try {
+      return _notify(t, b);
+    } finally {
+      malloc.free(t);
+      malloc.free(b);
+    }
+  }
 
   /// 尝试加载并 init；任何一步失败返回 null（Dart 侧走 Noop）。
   static PlatformBindings? tryLoad() {

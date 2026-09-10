@@ -60,3 +60,12 @@ pub fn mediaSetPlayback(state: i32, position_ms: i64, speed: f64, volume: f64, l
 pub fn mediaSetWindow(win: i64) i32 {
     return Active.mediaSetWindow(win);
 }
+
+/// 单实例仲裁：1=首实例；0=已有实例（调用方退出）；<0=错误。
+pub fn appInstanceAcquire() i32 {
+    return Active.appInstanceAcquire();
+}
+
+pub fn notify(title: []const u8, body: []const u8) i32 {
+    return Active.notify(title, body);
+}

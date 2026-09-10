@@ -1155,5 +1155,6 @@
   "settingsAmllScale": "Shrink inactive lines",
   "settingsAmllSpring": "Scroll spring",
   "toastSleepInhibitFailed": "Failed to keep the system awake",
-  "toastMediaSessionLost": "System media session disconnected"
+  "toastMediaSessionLost": "System media session disconnected",
+  "instanceAlreadyRunning": "ArchoeraMusic is already running."
 }

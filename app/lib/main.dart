@@ -9,7 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'apis/runtime.dart';
-import 'services/app_single_instance.dart';
+import 'l10n/generated/app_localizations.dart';
+import 'services/platform/platform_capabilities.dart';
 import 'services/power/frame_governor.dart';
 import 'services/scanner/sqlite_preload.dart';
 import 'services/streaming/streaming_store.dart';
@@ -26,8 +27,12 @@ import 'widgets/common/tray_integration.dart';
 /// + 窗口/托盘后台常驻。播放链路由 C 引擎内置 miniaudio 承担
 /// （无 libmpv/media_kit 依赖）。
 Future<void> main() async {
-  // 单实例守卫（禁止多开）：已有实例则激活其窗口并退出。必须最先执行。
-  if (!await SingleInstance.acquire()) {
+  // 单实例守卫（经 Zig 平台桥接文件锁，禁止多开）：已有实例则系统提示后退出。
+  final platformCaps = PlatformCapabilities.instance();
+  if (!platformCaps.acquireSingleInstance()) {
+    final parts = Platform.localeName.replaceAll('-', '_').split('_');
+    final locale = parts.length >= 2 ? Locale(parts[0], parts[1]) : Locale(parts[0]);
+    platformCaps.notify('ArchoeraMusic', lookupAppLocalizations(locale).instanceAlreadyRunning);
     exit(0);
   }
   // 预加载内置 SQLite（libe_sqlite3）：dart sqlite3 包经 hooks 配置
@@ -63,11 +68,6 @@ Future<void> main() async {
   PaintingBinding.instance.imageCache.maximumSize = 1000;
   // 窗口管理（后台常驻：关闭到托盘需拦截窗口关闭事件）
   await windowManager.ensureInitialized();
-  // 二次启动激活既有窗口（单实例）
-  SingleInstance.onActivate = () async {
-    await windowManager.show();
-    await windowManager.focus();
-  };
   runApp(
     const ProviderScope(child: TrayIntegration(child: ArchoeraMusicApp())),
   );

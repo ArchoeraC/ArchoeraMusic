@@ -3774,6 +3774,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toastMediaSessionLost => '系统媒体会话已断开';
+
+  @override
+  String get instanceAlreadyRunning => 'ArchoeraMusic 已在运行';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -7546,6 +7549,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get toastMediaSessionLost => '系统媒体会话已断开';
+
+  @override
+  String get instanceAlreadyRunning => 'ArchoeraMusic 已在运行';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -10957,4 +10963,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get toastMediaSessionLost => '系統媒體工作階段已中斷';
+
+  @override
+  String get instanceAlreadyRunning => 'ArchoeraMusic 已在執行';
 }

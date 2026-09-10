@@ -4006,4 +4006,7 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get toastMediaSessionLost =>
       'La sesión multimedia del sistema se desconectó';
+
+  @override
+  String get instanceAlreadyRunning => 'ArchoeraMusic ya se está ejecutando.';
 }

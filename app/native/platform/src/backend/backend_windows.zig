@@ -292,3 +292,25 @@ pub fn mediaSetWindow(win_: i64) i32 {
     _ = win_;
     return core.OK;
 }
+
+// ── 单实例（Windows：命名互斥体待接）────────────────────────────────
+// TODO: CreateMutexW("Global\\ArchoeraMusic") + ERROR_ALREADY_EXISTS → 0。
+// 当前返回 1（不阻断启动）；Dart 侧另有单实例守卫兜底。
+pub fn appInstanceAcquire() i32 {
+    return 1;
+}
+
+
+// ── 系统提示（MessageBoxW）────────────────────────────────────────
+const user32 = struct {
+    extern "user32" fn MessageBoxW(hwnd: ?*anyopaque, text: [*:0]const u16, caption: [*:0]const u16, flags: u32) callconv(.winapi) c_int;
+};
+
+pub fn notify(title: []const u8, body: []const u8) i32 {
+    const t = std.unicode.utf8ToUtf16LeAllocZ(alloc, title) catch return core.ERR_BACKEND;
+    defer alloc.free(t);
+    const b = std.unicode.utf8ToUtf16LeAllocZ(alloc, body) catch return core.ERR_BACKEND;
+    defer alloc.free(b);
+    _ = user32.MessageBoxW(null, b.ptr, t.ptr, 0x40); // MB_ICONINFORMATION
+    return core.OK;
+}
