@@ -207,6 +207,10 @@ cd app && flutter run -d linux      # 本地调试
 
 - **构建顺序敏感**：改了 Zig 内核（`app/core/audio-engine/kernel/`）必须先
   `zig build -Doptimize=ReleaseFast` 再 CMake 构建 audio-engine，否则链接陈旧产物。
+- **CMake 复用旧内核库陷阱**：audio-engine 的 CMake 仅在 `build/libarchoera_kernel.a`
+  **不存在**时才从 `zig-out/lib/` 拷贝（"复用预构建"）。改了内核后**必须**
+  `rm -f app/core/audio-engine/build/libarchoera_kernel.a` 再 `cmake --build build`，
+  否则测试/引擎仍用旧内核，结果失真（曾导致随机跳转测试排查走偏）。
 - Windows 用 `app/core/build_windows.bat`（vcpkg + MSVC 一站式）；macOS 用
   `bash app/core/build-macos.sh osx-arm64`。
 - 三端行为一致性是验收标准：涉及 FFI / 平台壳 / 路径解析的改动应尽量**三端验证**（理想三端全验），
