@@ -96,9 +96,9 @@ class _BrowserUserAgentOverrides extends HttpOverrides {
   }
 }
 
-/// 二次启动提示页：与 Vault 警告一致的**模态对话框**（首帧 showDialog，
-/// 无页面包裹），警告图标 + 应用主题；点“知道了”退出。
-class _AlreadyRunningApp extends StatefulWidget {
+/// 二次启动提示：MaterialApp（应用主题）下用子组件 context 弹模态框，
+/// 与 Vault 警告一致（警告图标 + 主题 + FilledButton），点“知道了”退出。
+class _AlreadyRunningApp extends StatelessWidget {
   const _AlreadyRunningApp(
       {required this.message, required this.okLabel, required this.locale});
 
@@ -107,15 +107,35 @@ class _AlreadyRunningApp extends StatefulWidget {
   final Locale locale;
 
   @override
-  State<_AlreadyRunningApp> createState() => _AlreadyRunningAppState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildAppTheme(AppPalette.dark, Brightness.dark),
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      home: _DialogShower(message: message, okLabel: okLabel),
+    );
+  }
 }
 
-class _AlreadyRunningAppState extends State<_AlreadyRunningApp> {
+class _DialogShower extends StatefulWidget {
+  const _DialogShower({required this.message, required this.okLabel});
+
+  final String message;
+  final String okLabel;
+
+  @override
+  State<_DialogShower> createState() => _DialogShowerState();
+}
+
+class _DialogShowerState extends State<_DialogShower> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // 此处 context 位于 MaterialApp/Navigator 之下，showDialog 可用。
       showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -135,14 +155,6 @@ class _AlreadyRunningAppState extends State<_AlreadyRunningApp> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(AppPalette.dark, Brightness.dark),
-      locale: widget.locale,
-      supportedLocales: AppLocalizations.supportedLocales,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      home: const Scaffold(backgroundColor: Color(0x00000000)),
-    );
-  }
+  Widget build(BuildContext context) =>
+      const Scaffold(backgroundColor: Color(0x00000000));
 }
