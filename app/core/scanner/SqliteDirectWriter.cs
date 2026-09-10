@@ -3,36 +3,31 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Collections.Concurrent;
-using System.Threading.Channels;
 using Microsoft.Data.Sqlite;
 
 namespace Archoera.Scanner;
 
 /// <summary>
-/// SQLite 直写器
+/// SQLite 直写器（同步写者模型）
 ///
-/// 扫描器直接打开 SQLite 写入，数据不经过 Node.js / V8 堆。
-/// 使用 WAL 模式与 Node.js better-sqlite3 共享同一个 DB 文件。
+/// 扫描器直接打开 SQLite 写入，数据不经过 Node.js / V8 堆；WAL 与 Node 侧共享 DB。
 ///
-/// 并发模型：
-///   - 写队列（Channel<Action>）+ 单后台消费者线程，所有写操作串行化执行
-///   - 并行循环线程入队后立即返回，不被写操作阻塞
-///   - 读操作直接执行（SQLite WAL 支持并发读）
-///
-/// 增量扫描策略（无需 _scanner_blueprint 表）：
-///   1. LoadTrackSnapshotAsync → 从 tracks 表加载全量 path→(mtime,size) 到内存
-///   2. 引擎逐文件 TryRemove，不变跳过，变更/新增解析写入
-///   3. 引擎遍历完后调 DeleteTracksByPathsAsync 删除内存快照残留（= 已删除的文件）
-///   4. _scanner_errors 表提供持久化错误追踪，crash 后重启扫描仍可跳过已知坏文件
-///   5. _scanner_trained 表记录待隔离文件，扫描完成后引擎统一移入 quarantine 目录
+/// 并发模型（2026-09-10 去 async 化）：
+///   - 写：`BlockingCollection<Action>`（有界）+ **专用写线程**串行执行；入队即返回
+///     （队列满则阻塞=背压），**不做每批 TCS/async 状态机**；
+///   - 读：独立**读连接** + 锁，在调用线程同步执行（SQLite WAL 支持读写并发）；
+///   - 结果型写（需返回计数）用事件同步等待，非热路径；
+///   - `Flush` 同步等待写队列排空。
 /// </summary>
 public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
 {
-    private readonly SqliteConnection _conn;
-    /// <summary>写队列：所有 SQLite 写操作排队在此，单消费者串行执行</summary>
-    private readonly Channel<Action> _writeChannel;
-    /// <summary>后台写消费者任务</summary>
-    private readonly Task _writeLoop;
+    private readonly SqliteConnection _conn;      // 仅写线程使用
+    private readonly SqliteConnection _readConn;  // 仅读方法使用
+    private readonly object _readLock = new();
+    /// <summary>写队列：有界，满时入队阻塞（背压）</summary>
+    private readonly BlockingCollection<Action> _queue = new(new ConcurrentQueue<Action>(), 4096);
+    /// <summary>专用写线程</summary>
+    private readonly Thread _writer;
     /// <summary>是否已释放</summary>
     private bool _disposed;
 
@@ -41,160 +36,172 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
         _conn = new SqliteConnection($"Data Source={dbPath}");
         _conn.Open();
 
-        using var pragma = _conn.CreateCommand();
-        pragma.CommandText = "PRAGMA journal_mode = WAL";
-        pragma.ExecuteNonQuery();
+        using (var pragma = _conn.CreateCommand())
+        {
+            pragma.CommandText = "PRAGMA journal_mode = WAL";
+            pragma.ExecuteNonQuery();
+        }
+        using (var sync = _conn.CreateCommand())
+        {
+            sync.CommandText = "PRAGMA synchronous = NORMAL";
+            sync.ExecuteNonQuery();
+        }
 
         // 自建表（幂等）：脱离 sidecar 后 scanner 独立可用；
         // schema 与 sidecar database/index.ts 完全一致，已有表时无副作用
         EnsureTracksTable();
         EnsureStageTable();
 
-        // 初始化写队列 + 后台消费者（有界 4096 + Wait，队列满时 EnqueueWrite 自然阻塞调用者）
-        _writeChannel = Channel.CreateBounded<Action>(new BoundedChannelOptions(4096)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleWriter = false,
-        });
-        _writeLoop = Task.Run(WriteLoop);
-    }
+        // 读连接（WAL 下可并发读）
+        _readConn = new SqliteConnection($"Data Source={dbPath}");
+        _readConn.Open();
 
-    /// <summary>
-    /// 后台写循环：单消费者，从 Channel 串行取出执行
-    /// 此线程是唯一写入 SQLite 的线程，无需额外锁
-    /// </summary>
-    private async Task WriteLoop()
-    {
-        try
+        // 专用写线程：串行消费队列（单写者，免锁）
+        _writer = new Thread(() =>
         {
-            while (await _writeChannel.Reader.WaitToReadAsync().ConfigureAwait(false))
+            try
             {
-                while (_writeChannel.Reader.TryRead(out var work))
+                foreach (var work in _queue.GetConsumingEnumerable())
                 {
-                    work();
+                    try { work(); }
+                    catch { /* 单个写失败不终止写线程 */ }
                 }
             }
-        }
-        catch (ChannelClosedException) { }
+            catch (ObjectDisposedException) { }
+        })
+        { IsBackground = true, Name = "scanner-sqlite-writer" };
+        _writer.Start();
     }
 
-    /// <summary>
-    /// 入队一个写操作并等待完成（通道满时阻塞，形成背压）
-    /// </summary>
-    private async Task EnqueueWrite(Action work)
+    /// <summary>入队一个写操作（队列满则阻塞=背压）；不等待完成</summary>
+    private void Enqueue(Action work)
     {
-        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await _writeChannel.Writer.WriteAsync(() =>
+        try { _queue.Add(work); }
+        catch (InvalidOperationException) { /* 已 CompleteAdding（释放中） */ }
+    }
+
+    /// <summary>入队并等待完成（结果型写；非热路径）</summary>
+    private void EnqueueAndWait(Action work)
+    {
+        using var done = new ManualResetEventSlim(false);
+        Enqueue(() =>
         {
-            try { work(); tcs.TrySetResult(); }
-            catch (Exception ex) { tcs.TrySetException(ex); }
-        }).ConfigureAwait(false);
-        await tcs.Task.ConfigureAwait(false);
+            try { work(); }
+            finally { done.Set(); }
+        });
+        done.Wait();
+    }
+
+    /// <summary>fire-and-forget 写（返回已完成 Task，兼容既有 await 调用点；无每批 TCS）</summary>
+    private Task EnqueueWrite(Action work)
+    {
+        Enqueue(work);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>结果型写：同步等待写线程执行完毕并返回结果（非热路径）</summary>
+    private Task<T> EnqueueWrite<T>(Func<T> work)
+    {
+        T result = default!;
+        EnqueueAndWait(() => result = work());
+        return Task.FromResult(result);
     }
 
     /// <summary>
-    /// 入队一个有返回值的写操作并等待完成（通道满时阻塞，形成背压）
+    /// 等待写队列排空（隔离等需要最新持久化数据的阶段前调用；同步）
     /// </summary>
-    private async Task<T> EnqueueWrite<T>(Func<T> work)
+    public Task FlushAsync(CancellationToken ct = default)
     {
-        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await _writeChannel.Writer.WriteAsync(() =>
-        {
-            try { tcs.TrySetResult(work()); }
-            catch (Exception ex) { tcs.TrySetException(ex); }
-        }).ConfigureAwait(false);
-        return await tcs.Task.ConfigureAwait(false);
+        using var done = new ManualResetEventSlim(false);
+        Enqueue(() => done.Set());
+        done.Wait();
+        return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// 等待写队列排空（隔离等需要最新持久化数据的阶段前调用）
-    /// </summary>
-    public async Task FlushAsync(CancellationToken ct = default)
-    {
-        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await _writeChannel.Writer.WriteAsync(() => tcs.TrySetResult()).ConfigureAwait(false);
-        await tcs.Task.ConfigureAwait(false);
-    }
-
-    // ============ 读操作（直接同步执行，无需队列） ============
+    // ============ 读操作（独立读连接 + 锁，调用线程同步执行） ============
 
     public Task<ConcurrentDictionary<string, (long Mtime, long Size)>> LoadTrackSnapshotAsync(CancellationToken ct = default)
     {
-        return Task.Run(() =>
+        ct.ThrowIfCancellationRequested();
+        var dict = new ConcurrentDictionary<string, (long, long)>(StringComparer.Ordinal);
+        lock (_readLock)
         {
-            ct.ThrowIfCancellationRequested();
-            var dict = new ConcurrentDictionary<string, (long, long)>(StringComparer.Ordinal);
-            using var cmd = _conn.CreateCommand();
+            using var cmd = _readConn.CreateCommand();
             cmd.CommandText = "SELECT path, COALESCE(file_mtime, 0), COALESCE(file_size, 0) FROM tracks";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
                 dict[reader.GetString(0)] = (reader.GetInt64(1), reader.GetInt64(2));
             }
-            return dict;
-        }, ct);
+        }
+        return Task.FromResult(dict);
     }
 
     public Task<bool> ShouldSkipErrorFileAsync(string path, long currentMtimeMs, CancellationToken ct = default)
     {
-        return Task.Run(() =>
+        ct.ThrowIfCancellationRequested();
+        lock (_readLock)
         {
-            EnsureErrorTable();
-            using var cmd = _conn.CreateCommand();
+            EnsureErrorTableOn(_readConn);
+            using var cmd = _readConn.CreateCommand();
             cmd.CommandText = "SELECT fail_count, mtime_at_last_fail FROM _scanner_errors WHERE path = @path";
             cmd.Parameters.AddWithValue("@path", path);
             using var reader = cmd.ExecuteReader();
-            if (!reader.Read()) return false;
-            return reader.GetInt32(0) >= 3 && reader.GetInt64(1) == currentMtimeMs;
-        }, ct);
+            if (!reader.Read()) return Task.FromResult(false);
+            return Task.FromResult(reader.GetInt32(0) >= 3 && reader.GetInt64(1) == currentMtimeMs);
+        }
     }
 
     public Task<Dictionary<string, ErrorFileState>> LoadErrorSnapshotAsync(CancellationToken ct = default)
     {
-        return Task.Run(() =>
+        ct.ThrowIfCancellationRequested();
+        var map = new Dictionary<string, ErrorFileState>(StringComparer.Ordinal);
+        lock (_readLock)
         {
-            var map = new Dictionary<string, ErrorFileState>(StringComparer.Ordinal);
-            EnsureErrorTable();
-            using var cmd = _conn.CreateCommand();
+            EnsureErrorTableOn(_readConn);
+            using var cmd = _readConn.CreateCommand();
             cmd.CommandText = "SELECT path, fail_count, mtime_at_last_fail FROM _scanner_errors";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
                 map[reader.GetString(0)] = new ErrorFileState(reader.GetInt32(1), reader.GetInt64(2));
-            return map;
-        }, ct);
+        }
+        return Task.FromResult(map);
     }
 
     public Task<List<string>> GetTrainedPathsAsync(CancellationToken ct = default)
     {
-        return Task.Run(() =>
+        ct.ThrowIfCancellationRequested();
+        var list = new List<string>();
+        lock (_readLock)
         {
-            var list = new List<string>();
-            EnsureTrainedTable();
-            using var cmd = _conn.CreateCommand();
+            EnsureTrainedTableOn(_readConn);
+            using var cmd = _readConn.CreateCommand();
             cmd.CommandText = "SELECT path FROM _scanner_trained";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
                 list.Add(reader.GetString(0));
-            return list;
-        }, ct);
+        }
+        return Task.FromResult(list);
     }
 
-    // ============ 写操作（入队执行） ============
+    // ============ 写操作（入队执行；fire-and-forget，队列满即背压） ============
 
     public Task StageTracksAsync(List<TrackMetadata> tracks, CancellationToken ct = default)
     {
         if (tracks.Count == 0) return Task.CompletedTask;
-        return EnqueueWrite(() => InsertStageTracks(tracks, ct));
+        Enqueue(() => InsertStageTracks(tracks, ct));
+        return Task.CompletedTask;
     }
 
     public Task ClearStagedTracksAsync(CancellationToken ct = default)
     {
-        return EnqueueWrite(() =>
+        Enqueue(() =>
         {
             using var cmd = _conn.CreateCommand();
             cmd.CommandText = "DELETE FROM _scanner_stage_tracks";
             cmd.ExecuteNonQuery();
         });
+        return Task.CompletedTask;
     }
 
     public Task MergeStagedTracksAsync(CancellationToken ct = default)
@@ -517,9 +524,11 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
         return count;
     }
 
-    private void EnsureErrorTable()
+    private void EnsureErrorTable() => EnsureErrorTableOn(_conn);
+
+    private static void EnsureErrorTableOn(SqliteConnection c)
     {
-        using var cmd = _conn.CreateCommand();
+        using var cmd = c.CreateCommand();
         cmd.CommandText = @"
             CREATE TABLE IF NOT EXISTS _scanner_errors (
                 path TEXT PRIMARY KEY,
@@ -531,9 +540,11 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
         cmd.ExecuteNonQuery();
     }
 
-    private void EnsureTrainedTable()
+    private void EnsureTrainedTable() => EnsureTrainedTableOn(_conn);
+
+    private static void EnsureTrainedTableOn(SqliteConnection c)
     {
-        using var cmd = _conn.CreateCommand();
+        using var cmd = c.CreateCommand();
         cmd.CommandText = @"
             CREATE TABLE IF NOT EXISTS _scanner_trained (
                 path TEXT PRIMARY KEY
@@ -557,14 +568,14 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        // 关闭写队列，等待消费者完成
-        _writeChannel.Writer.TryComplete();
-        try { _writeLoop.Wait(TimeSpan.FromSeconds(5)); }
-        catch { /* 超时忽略 */ }
+        // 关闭写队列，等待写线程完成
+        try { _queue.CompleteAdding(); } catch { }
+        try { _writer.Join(TimeSpan.FromSeconds(5)); } catch { }
 
-        if (_conn == null) return;
-        try { _conn.Close(); }
-        catch { }
+        try { _conn.Close(); } catch { }
         _conn.Dispose();
+        try { _readConn.Close(); } catch { }
+        _readConn.Dispose();
+        _queue.Dispose();
     }
 }
