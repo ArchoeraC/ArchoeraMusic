@@ -1046,5 +1046,6 @@
   "qqMusicDownloadSkipped": "已略過 {count} 首 QQ 音樂（暫不支援下載）。",
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "停用系統休眠失敗",
-  "toastMediaSessionLost": "系統媒體工作階段已中斷"
+  "toastMediaSessionLost": "系統媒體工作階段已中斷",
+  "instanceAlreadyRunning": "ArchoeraMusic 已在執行"
 }

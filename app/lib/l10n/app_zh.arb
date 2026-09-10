@@ -1155,5 +1155,6 @@
   "settingsAmllScale": "非激活行缩放",
   "settingsAmllSpring": "滚动弹簧",
   "toastSleepInhibitFailed": "禁用系统休眠失败",
-  "toastMediaSessionLost": "系统媒体会话已断开"
+  "toastMediaSessionLost": "系统媒体会话已断开",
+  "instanceAlreadyRunning": "ArchoeraMusic 已在运行"
 }

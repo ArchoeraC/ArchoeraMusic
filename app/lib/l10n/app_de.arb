@@ -1046,5 +1046,6 @@
   "qqMusicDownloadSkipped": "{count} QQ-Musiktitel übersprungen: Downloads für QQ-Musik nicht unterstützt.",
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "System-Standby konnte nicht verhindert werden",
-  "toastMediaSessionLost": "System-Medien-Sitzung getrennt"
+  "toastMediaSessionLost": "System-Medien-Sitzung getrennt",
+  "instanceAlreadyRunning": "ArchoeraMusic läuft bereits."
 }

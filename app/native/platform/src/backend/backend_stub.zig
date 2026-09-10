@@ -40,3 +40,13 @@ pub const Backend = struct {
         return core.OK;
     }
 };
+
+pub fn appInstanceAcquire() i32 {
+    return 1; // 无平台：不阻断
+}
+
+
+pub fn notify(title: []const u8, body: []const u8) i32 {
+    _ = title; _ = body;
+    return core.OK;
+}

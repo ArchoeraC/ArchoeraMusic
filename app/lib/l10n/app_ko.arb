@@ -1046,5 +1046,6 @@
   "qqMusicDownloadSkipped": "QM {count}곡 건너뜀(다운로드 미지원).",
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "시스템 절전 방지에 실패했습니다",
-  "toastMediaSessionLost": "시스템 미디어 세션이 끊어졌습니다"
+  "toastMediaSessionLost": "시스템 미디어 세션이 끊어졌습니다",
+  "instanceAlreadyRunning": "ArchoeraMusic이(가) 이미 실행 중입니다."
 }

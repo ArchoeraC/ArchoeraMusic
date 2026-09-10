@@ -35,6 +35,7 @@ extern "C" {
 #define APL_CAP_MEDIA_SEEK         (1u << 3) /* 系统 UI 可拖进度条 */
 #define APL_CAP_MEDIA_ARTWORK      (1u << 4) /* 封面图可展示 */
 #define APL_CAP_WINDOW_STATE       (1u << 5) /* 窗口最小化/失焦事件 */
+#define APL_CAP_APP_INSTANCE       (1u << 6) /* 单实例仲裁（文件锁） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 int32_t apl_abi_version(void);   /* 契约版本 */
@@ -71,6 +72,12 @@ int32_t apl_media_set_playback(int32_t state,   /* 0=stopped 1=playing 2=paused 
                                int32_t loop,    /* 0=list 1=one */
                                int32_t shuffle);
 int32_t apl_media_set_window(int64_t window);   /* HWND/NSWindow*；非桌面忽略 */
+
+/* 单实例：1=首实例；0=已有实例（调用方应退出）；<0=错误。进程内幂等。 */
+int32_t apl_instance_acquire(void);
+
+/* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
+int32_t apl_notify(const char *title, const char *body);
 
 /* ── 反向事件（OS → Dart）──────────────────────────────────────── */
 typedef enum {

@@ -75,6 +75,22 @@ export fn apl_media_set_window(win: i64) callconv(.c) i32 {
     return backend.mediaSetWindow(win);
 }
 
+// ── 单实例 ────────────────────────────────────────────────────────
+
+/// 单实例仲裁（进程级）：1=首实例（继续）；0=已有实例（调用方应退出）。
+export fn apl_instance_acquire() callconv(.c) i32 {
+    if (!core.isInitialized()) return core.ERR_STATE;
+    return backend.appInstanceAcquire();
+}
+
+/// 系统提示（UTF-8）。用于“已有实例”等无需 UI 框架的场景。
+export fn apl_notify(title: ?[*:0]const u8, body: ?[*:0]const u8) callconv(.c) i32 {
+    if (!core.isInitialized()) return core.ERR_STATE;
+    const t = std.mem.span(title orelse return core.ERR_BACKEND);
+    const b = std.mem.span(body orelse "");
+    return backend.notify(t, b);
+}
+
 // ── 测试 ──────────────────────────────────────────────────────────
 
 test "abi version and lifecycle" {

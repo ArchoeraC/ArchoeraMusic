@@ -3977,4 +3977,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get toastMediaSessionLost => 'System-Medien-Sitzung getrennt';
+
+  @override
+  String get instanceAlreadyRunning => 'ArchoeraMusic läuft bereits.';
 }

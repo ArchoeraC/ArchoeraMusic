@@ -1046,5 +1046,6 @@
   "qqMusicDownloadSkipped": "Se omitieron {count} temas de QM: descargas no disponibles.",
   "platformQqMusic": "QM",
   "toastSleepInhibitFailed": "No se pudo evitar que el sistema se suspenda",
-  "toastMediaSessionLost": "La sesión multimedia del sistema se desconectó"
+  "toastMediaSessionLost": "La sesión multimedia del sistema se desconectó",
+  "instanceAlreadyRunning": "ArchoeraMusic ya se está ejecutando."
 }
