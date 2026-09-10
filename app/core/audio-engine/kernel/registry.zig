@@ -86,7 +86,7 @@ pub const modules = [_]Module{
     .{ .fmt = .m4a,       .open = m4a.open, .meta = m4a.openMeta },
     .{ .fmt = .mp3,       .open = mp3.open, .meta = mp3.openMeta },
     .{ .fmt = .wv,        .open = wv.open },
-    .{ .fmt = .ape,       .open = ape.open },
+    .{ .fmt = .ape,       .open = ape.open, .meta = ape.openMeta },
     .{ .fmt = .ogg_opus,  .open = opus.open, .meta = opus.openMeta },
     .{ .fmt = .ogg_vorbis,.open = vorbis.open, .meta = vorbis.openMeta },
     .{ .fmt = .ogg_flac,  .open = oggflac.open, .meta = oggflac.openMeta },
