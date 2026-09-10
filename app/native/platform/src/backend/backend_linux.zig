@@ -230,7 +230,7 @@ fn pumpLoop() void {
 pub fn caps() u32 {
     var c: u32 = core.CAP_POWER_INHIBIT | core.CAP_POWER_SCREEN_STATE |
         core.CAP_MEDIA_SESSION | core.CAP_MEDIA_SEEK | core.CAP_MEDIA_ARTWORK |
-        core.CAP_APP_INSTANCE;
+        core.CAP_APP_INSTANCE | core.CAP_SYSTEM_ACCENT;
     // 有显示会话且 GTK 可用 → 窗口状态（X11/Wayland 统一 GTK 模式）
     if (detectSession() != .unknown and linux_window.available()) {
         c |= core.CAP_WINDOW_STATE;

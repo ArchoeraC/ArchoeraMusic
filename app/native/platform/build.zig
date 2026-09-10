@@ -28,6 +28,8 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag == .windows) {
         lib.root_module.linkSystemLibrary("user32", .{});
         lib.root_module.linkSystemLibrary("powrprof", .{});
+        lib.root_module.linkSystemLibrary("advapi32", .{});
+        lib.root_module.linkSystemLibrary("dwmapi", .{});
         // 可选：原生 C++/WinRT Toast（win_toast.cpp）。需 C++/WinRT 头路径：
         //   -Dcppwinrt-include=<dir> 或环境变量 CPPWINRT_INCLUDE（vcpkg `cppwinrt`）。
         // 未提供则跳过；Zig 侧 apl_win_toast 弱符号兜底（PowerShell 调 WinRT）。
