@@ -232,6 +232,30 @@ add_test(NAME test_metadata_abi
 set_tests_properties(test_metadata_abi PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# 音频流「随机跳转」回归：池化流式会话播放中反复随机 seek，输出与整曲解码
+# 参考对拍（corr≥0.999，无损逐位）。headless，无设备。
+add_executable(test_random_seek test_random_seek.c)
+target_link_libraries(test_random_seek PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_random_seek PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_random_seek PRIVATE m)
+endif()
+target_include_directories(test_random_seek PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_random_seek
+         COMMAND test_random_seek
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac 300 12345 0)
+set_tests_properties(test_random_seek PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+# 注：MP3 随机跳转当前为**已知限制**（seek 重置解码状态后，bit reservoir +
+# QMF 合成记忆在有限帧内无法完全重建，post-seek 输出与整曲解码 corr≈0.9–0.97）。
+# 手动诊断：./build/tests/test_random_seek <mp3> 300 777 6000
+# 修复方向：reservoir-aware seek（回退到 main_data_begin==0 的自洽帧）。
+
 # C-Bench 工具：常驻内核池并发/首帧基准（headless；不入 ctest，手动运行）
 add_executable(bench_era_pool bench/bench_era_pool.c)
 target_link_libraries(bench_era_pool PRIVATE audio_engine_static)
