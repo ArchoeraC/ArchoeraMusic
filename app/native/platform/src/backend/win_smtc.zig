@@ -21,12 +21,14 @@ const S_OK: HRESULT = 0;
 // 注：x86_64 上 .c 与 .winapi 同 ABI；用 .c 规避「winapi 禁 [*c] 参数」限制
 const RoInitializeFn = *const fn (u32) callconv(.c) HRESULT;
 const RoGetActivationFactoryFn = *const fn (HSTRING, *const win.GUID, *?*anyopaque) callconv(.c) HRESULT;
+const RoActivateInstanceFn = *const fn (HSTRING, *?*anyopaque) callconv(.c) HRESULT;
 const WindowsCreateStringFn = *const fn ([*]const u16, u32, *HSTRING) callconv(.c) HRESULT;
 const WindowsDeleteStringFn = *const fn (HSTRING) callconv(.c) HRESULT;
 
 var g_combase: win.HMODULE = null;
 var p_RoInitialize: ?RoInitializeFn = null;
 var p_RoGetActivationFactory: ?RoGetActivationFactoryFn = null;
+var p_RoActivateInstance: ?RoActivateInstanceFn = null;
 var p_WindowsCreateString: ?WindowsCreateStringFn = null;
 var p_WindowsDeleteString: ?WindowsDeleteStringFn = null;
 
@@ -36,10 +38,16 @@ fn loadCombase() bool {
     g_combase = h;
     p_RoInitialize = @ptrCast(win.GetProcAddress(h, "RoInitialize"));
     p_RoGetActivationFactory = @ptrCast(win.GetProcAddress(h, "RoGetActivationFactory"));
+    p_RoActivateInstance = @ptrCast(win.GetProcAddress(h, "RoActivateInstance"));
     p_WindowsCreateString = @ptrCast(win.GetProcAddress(h, "WindowsCreateString"));
     p_WindowsDeleteString = @ptrCast(win.GetProcAddress(h, "WindowsDeleteString"));
     return p_RoInitialize != null and p_RoGetActivationFactory != null and
-        p_WindowsCreateString != null and p_WindowsDeleteString != null;
+        p_RoActivateInstance != null and p_WindowsCreateString != null and
+        p_WindowsDeleteString != null;
+}
+
+fn release(obj: ?*anyopaque) void {
+    if (obj) |o| _ = vtbl(Inspectable, o).Release(o);
 }
 const boolean = u8; // WinRT ABI boolean（x64 寄存器传参，宽度不敏感）
 const HSTRING = ?*anyopaque; // 用不透明指针规避 x86_64_win 禁 [*c] 参数
@@ -57,6 +65,25 @@ const IID_SMTC = win.GUID{
     .Data2 = 0x1742,
     .Data3 = 0x42A6,
     .Data4 = .{ 0x90, 0x2E, 0x08, 0x7D, 0x41, 0xF9, 0x65, 0xEC },
+};
+// 以下 IID 由本机 Windows.Media/Storage/Foundation.winmd 解析（winmd2.py，已校验）
+const IID_SMTC2 = win.GUID{
+    .Data1 = 0xEA98D2F6,
+    .Data2 = 0x7F3C,
+    .Data3 = 0x4AF2,
+    .Data4 = .{ 0xA5, 0x86, 0x72, 0x88, 0x98, 0x08, 0xEF, 0xB1 },
+};
+const IID_URI_FACTORY = win.GUID{
+    .Data1 = 0x44A9796F,
+    .Data2 = 0x723E,
+    .Data3 = 0x4FDF,
+    .Data4 = .{ 0xA2, 0x18, 0x03, 0x3E, 0x75, 0xB0, 0xC0, 0x84 },
+};
+const IID_RASR_STATICS = win.GUID{
+    .Data1 = 0x857309DC,
+    .Data2 = 0x3FBF,
+    .Data3 = 0x4E7D,
+    .Data4 = .{ 0x98, 0x6F, 0xEF, 0x3B, 0x1A, 0x07, 0xA9, 0x64 },
 };
 
 // 枚举（Windows.Media 标准值）
@@ -164,6 +191,56 @@ const ArgsVtbl = extern struct {
     get_Button: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
 };
 
+/// ISystemMediaTransportControls2（winmd 15 方法；仅用 UpdateTimelineProperties）。
+const Smtc2Vtbl = extern struct {
+    base: Inspectable,
+    get_AutoRepeatMode: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
+    put_AutoRepeatMode: *const fn (*anyopaque, i32) callconv(.c) HRESULT,
+    get_ShuffleEnabled: *const fn (*anyopaque, *boolean) callconv(.c) HRESULT,
+    put_ShuffleEnabled: *const fn (*anyopaque, boolean) callconv(.c) HRESULT,
+    get_PlaybackRate: *const fn (*anyopaque, *f64) callconv(.c) HRESULT,
+    put_PlaybackRate: *const fn (*anyopaque, f64) callconv(.c) HRESULT,
+    UpdateTimelineProperties: *const fn (*anyopaque, *anyopaque) callconv(.c) HRESULT,
+    add_PlaybackPositionChangeRequested: *const fn (*anyopaque, ?*anyopaque, *EventRegistrationToken) callconv(.c) HRESULT,
+    remove_PlaybackPositionChangeRequested: *const fn (*anyopaque, EventRegistrationToken) callconv(.c) HRESULT,
+    add_PlaybackRateChangeRequested: *const fn (*anyopaque, ?*anyopaque, *EventRegistrationToken) callconv(.c) HRESULT,
+    remove_PlaybackRateChangeRequested: *const fn (*anyopaque, EventRegistrationToken) callconv(.c) HRESULT,
+    add_ShuffleEnabledChangeRequested: *const fn (*anyopaque, ?*anyopaque, *EventRegistrationToken) callconv(.c) HRESULT,
+    remove_ShuffleEnabledChangeRequested: *const fn (*anyopaque, EventRegistrationToken) callconv(.c) HRESULT,
+    add_AutoRepeatModeChangeRequested: *const fn (*anyopaque, ?*anyopaque, *EventRegistrationToken) callconv(.c) HRESULT,
+    remove_AutoRepeatModeChangeRequested: *const fn (*anyopaque, EventRegistrationToken) callconv(.c) HRESULT,
+};
+
+/// ISystemMediaTransportControlsTimelineProperties（winmd 10 方法，TimeSpan=i64 100ns）。
+const TimelineVtbl = extern struct {
+    base: Inspectable,
+    get_StartTime: *const fn (*anyopaque, *i64) callconv(.c) HRESULT,
+    put_StartTime: *const fn (*anyopaque, i64) callconv(.c) HRESULT,
+    get_EndTime: *const fn (*anyopaque, *i64) callconv(.c) HRESULT,
+    put_EndTime: *const fn (*anyopaque, i64) callconv(.c) HRESULT,
+    get_MinSeekTime: *const fn (*anyopaque, *i64) callconv(.c) HRESULT,
+    put_MinSeekTime: *const fn (*anyopaque, i64) callconv(.c) HRESULT,
+    get_MaxSeekTime: *const fn (*anyopaque, *i64) callconv(.c) HRESULT,
+    put_MaxSeekTime: *const fn (*anyopaque, i64) callconv(.c) HRESULT,
+    get_Position: *const fn (*anyopaque, *i64) callconv(.c) HRESULT,
+    put_Position: *const fn (*anyopaque, i64) callconv(.c) HRESULT,
+};
+
+/// IUriRuntimeClassFactory（winmd 2 方法）。
+const UriFactoryVtbl = extern struct {
+    base: Inspectable,
+    CreateUri: *const fn (*anyopaque, HSTRING, *?*anyopaque) callconv(.c) HRESULT,
+    CreateWithRelativeUri: *const fn (*anyopaque, HSTRING, HSTRING, *?*anyopaque) callconv(.c) HRESULT,
+};
+
+/// IRandomAccessStreamReferenceStatics（winmd 3 方法）。
+const RasrStaticsVtbl = extern struct {
+    base: Inspectable,
+    CreateFromFile: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+    CreateFromUri: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+    CreateFromStream: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+};
+
 fn vtbl(comptime T: type, obj: *anyopaque) *const T {
     const pp: *const *const T = @ptrCast(@alignCast(obj));
     return pp.*;
@@ -176,6 +253,8 @@ var g_display: ?*anyopaque = null;
 var g_music: ?*anyopaque = null;
 var g_button_token: EventRegistrationToken = .{ .value = 0 };
 var g_button_registered = false;
+var g_smtc2: ?*anyopaque = null;
+var g_duration_ms: i64 = -1;
 
 // ── 事件委托（TypedEventHandler 的 COM 实现）─────────────────────
 
@@ -303,17 +382,79 @@ pub fn init(findWindow: *const fn () ?win.HWND) i32 {
     return core.OK;
 }
 
-pub fn setTrack(title: ?[]const u8, artist: ?[]const u8) void {
+/// 设置封面缩略图（仅 http(s) URL；本地路径走 CreateFromFile 需 IStorageFile，暂缓）。
+fn setArtwork(url: []const u8) void {
+    if (g_display == null) return;
+    if (!std.mem.startsWith(u8, url, "http://") and !std.mem.startsWith(u8, url, "https://")) return;
+
+    const cls_uri = makeHString("Windows.Foundation.Uri") orelse return;
+    defer _ = p_WindowsDeleteString.?(cls_uri);
+    var factory: ?*anyopaque = null;
+    if (p_RoGetActivationFactory.?(cls_uri, &IID_URI_FACTORY, &factory) != S_OK or factory == null) return;
+    defer release(factory);
+
+    const hs_url = makeHString(url) orelse return;
+    defer _ = p_WindowsDeleteString.?(hs_url);
+    var uri: ?*anyopaque = null;
+    if (vtbl(UriFactoryVtbl, factory.?).CreateUri(factory.?, hs_url, &uri) != S_OK or uri == null) return;
+    defer release(uri);
+
+    const cls_rasr = makeHString("Windows.Storage.Streams.RandomAccessStreamReference") orelse return;
+    defer _ = p_WindowsDeleteString.?(cls_rasr);
+    var statics: ?*anyopaque = null;
+    if (p_RoGetActivationFactory.?(cls_rasr, &IID_RASR_STATICS, &statics) != S_OK or statics == null) return;
+    defer release(statics);
+
+    var ref: ?*anyopaque = null;
+    if (vtbl(RasrStaticsVtbl, statics.?).CreateFromUri(statics.?, uri, &ref) != S_OK or ref == null) return;
+    defer release(ref);
+
+    _ = vtbl(DisplayVtbl, g_display.?).put_Thumbnail(g_display.?, ref);
+}
+
+/// QI 出 ISystemMediaTransportControls2（时间轴/速率用）。
+fn ensureSmtc2() ?*anyopaque {
+    if (g_smtc2 != null) return g_smtc2;
+    const smtc = g_smtc orelse return null;
+    var out: ?*anyopaque = null;
+    if (vtbl(SmtcVtbl, smtc).base.QueryInterface(smtc, &IID_SMTC2, &out) != S_OK) return null;
+    if (out == null) return null;
+    g_smtc2 = out;
+    return out;
+}
+
+/// 更新系统进度条（TimeSpan = 100ns）。
+fn updateTimeline(position_ms: i64) void {
+    const s2 = ensureSmtc2() orelse return;
+    const cls = makeHString("Windows.Media.SystemMediaTransportControlsTimelineProperties") orelse return;
+    defer _ = p_WindowsDeleteString.?(cls);
+    var obj: ?*anyopaque = null;
+    if (p_RoActivateInstance.?(cls, &obj) != S_OK or obj == null) return;
+    defer release(obj);
+    const tv = vtbl(TimelineVtbl, obj.?);
+    const end: i64 = if (g_duration_ms > 0) g_duration_ms * 10_000 else 0;
+    const pos: i64 = position_ms * 10_000;
+    _ = tv.put_StartTime(obj.?, 0);
+    _ = tv.put_EndTime(obj.?, end);
+    _ = tv.put_MinSeekTime(obj.?, 0);
+    _ = tv.put_MaxSeekTime(obj.?, end);
+    _ = tv.put_Position(obj.?, pos);
+    _ = vtbl(Smtc2Vtbl, s2).UpdateTimelineProperties(s2, obj.?);
+}
+
+pub fn setTrack(title: ?[]const u8, artist: ?[]const u8, art_url: ?[]const u8, duration_ms: i64) void {
+    g_duration_ms = duration_ms;
     if (g_music == null) return;
     if (title) |t| setMusicProp(.title, t);
     if (artist) |a| {
         setMusicProp(.artist, a);
         setMusicProp(.album_artist, a);
     }
+    if (art_url) |u| setArtwork(u);
     if (g_display) |d| _ = vtbl(DisplayVtbl, d).Update(d);
 }
 
-pub fn setPlayback(state: i32) void {
+pub fn setPlayback(state: i32, position_ms: i64) void {
     const smtc = g_smtc orelse return;
     const st: i32 = switch (state) {
         0 => PlaybackStatus.stopped,
@@ -321,6 +462,7 @@ pub fn setPlayback(state: i32) void {
         else => PlaybackStatus.paused,
     };
     _ = vtbl(SmtcVtbl, smtc).put_PlaybackStatus(smtc, st);
+    updateTimeline(position_ms);
 }
 
 pub fn deinit() void {
@@ -330,6 +472,8 @@ pub fn deinit() void {
         _ = sv.base.Release(s);
         g_smtc = null;
     }
+    release(g_smtc2);
+    g_smtc2 = null;
     g_display = null;
     g_music = null;
     g_button_registered = false;
