@@ -64,14 +64,23 @@ fn onSignal(ctx: *anyopaque, conn: *transport.Connection, h: *const message.Head
     _ = conn;
     if (!g_screen_events.load(.acquire)) return;
     const member = h.member orelse return;
-    if (!std.mem.eql(u8, member, "ActiveChanged")) return;
-    const vals = message.readBody(alloc, "b", body) catch return;
-    defer alloc.free(vals);
-    if (vals.len != 1) return;
-    core.dispatch(.{
-        .type = core.EVENT_SCREEN_STATE,
-        .u = .{ .active = @intFromBool(vals[0].boolean) },
-    });
+    if (std.mem.eql(u8, member, "ActiveChanged")) {
+        const vals = message.readBody(alloc, "b", body) catch return;
+        defer alloc.free(vals);
+        if (vals.len != 1) return;
+        core.dispatch(.{
+            .type = core.EVENT_SCREEN_STATE,
+            .u = .{ .active = @intFromBool(vals[0].boolean) },
+        });
+        return;
+    }
+    // systemd-logind 会话锁屏/解锁（LockedHint 的简单信号形态，无参数）：
+    // 作为 ScreenSaver.ActiveChanged 之外的**第二来源**，降低解锁复位丢失概率。
+    if (std.mem.eql(u8, member, "Lock")) {
+        core.dispatch(.{ .type = core.EVENT_SCREEN_STATE, .u = .{ .active = 1 } });
+    } else if (std.mem.eql(u8, member, "Unlock")) {
+        core.dispatch(.{ .type = core.EVENT_SCREEN_STATE, .u = .{ .active = 0 } });
+    }
 }
 
 fn onMethodCall(ctx: *anyopaque, conn: *transport.Connection, h: *const message.Header, body: []const u8) void {
@@ -140,7 +149,8 @@ fn pickScreensaver(conn: *transport.Connection) void {
     }
 }
 
-/// 订阅两套 ScreenSaver 的 ActiveChanged（match 规则不要求服务存在）。
+/// 订阅两套 ScreenSaver 的 ActiveChanged + systemd-logind 的 Lock/Unlock
+/// （match 规则不要求服务存在，缺失时无信号、无副作用）。
 fn addScreenMatch(conn: *transport.Connection) void {
     for ([_][]const u8{ SS_FREEDESKTOP, SS_GNOME }) |svc| {
         var rule_buf: [160]u8 = undefined;
@@ -148,6 +158,25 @@ fn addScreenMatch(conn: *transport.Connection) void {
             &rule_buf,
             "type='signal',interface='{s}',member='ActiveChanged'",
             .{svc},
+        ) catch continue;
+        const args = [_]message.Value{.{ .string = rule }};
+        _ = conn.call(
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus",
+            "AddMatch",
+            "s",
+            &args,
+            3_000,
+        ) catch continue;
+    }
+    // logind 会话锁屏/解锁（第二来源；非 systemd 环境无此信号，忽略）
+    for ([_][]const u8{ "Lock", "Unlock" }) |m| {
+        var rule_buf: [160]u8 = undefined;
+        const rule = std.fmt.bufPrint(
+            &rule_buf,
+            "type='signal',interface='org.freedesktop.login1.Session',member='{s}'",
+            .{m},
         ) catch continue;
         const args = [_]message.Value{.{ .string = rule }};
         _ = conn.call(
@@ -186,6 +215,11 @@ fn pumpLoop() void {
             }
             transport.sleepMs(30);
         } else {
+            // 断连重连：仍需要信号（熄屏订阅）或抑制时，按退避重建连接并重订阅
+            // （否则锁屏/解锁事件永久丢失 → Dart 侧卡在低帧率）。
+            if (g_screen_events.load(.acquire) or g_inhibit_on) {
+                _ = ensureConn();
+            }
             transport.sleepMs(300);
         }
     }
