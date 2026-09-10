@@ -1,0 +1,79 @@
+name: 缺陷报告
+description: 报告一个可复现的问题（安全漏洞请勿在此提交，见 SECURITY.md）
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        **正常缺陷请正常提交本表单**（UI Bug / 调用 bug / 模块间通讯异常 / 非正常程序崩溃等）。
+        **安全漏洞请走私密渠道**（见 SECURITY.md），不要公开提交。
+        行为约束见 CONTRIBUTING §2.4：只谈事实、数据与复现步骤，不评价人与其他项目。
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - Linux
+        - Windows
+        - macOS
+        - 多平台
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 应用版本
+      description: 设置 → 关于，或 bundle 内版本号
+      placeholder: 如 0.9.14+5
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: 引擎模式（涉及播放时）
+      options:
+        - Stable（FFmpeg）
+        - EraAudio（Zig 内核）
+        - 未确认 / 不适用
+    validations:
+      required: true
+  - type: dropdown
+    id: playback-mode
+    attributes:
+      label: 播放模式（涉及播放时）
+      options:
+        - 内存播放（不落盘）
+        - 文件模式
+        - 不适用
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤（最小化）
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为与实际行为
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志片段（已脱敏）
+      description: logs/ 下相关片段；请去除 cookie / token / vault 报文等敏感信息
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认
+      options:
+        - label: 日志与截图已脱敏，不含任何个人数据（红线 §2.5）
+        - label: 已搜索现有 Issue，无重复
+        - label: 引用 EraAudio 基准时附口径与局限声明（§2.4，如适用）
+    validations:
+      required: true

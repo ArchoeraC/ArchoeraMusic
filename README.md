@@ -223,6 +223,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 ## 安全说明（凭据保险库）
 
 > 凭据保险库（`app/core/vault`）对登录会话与流媒体服务器密码做 2-of-2 加密存储。以下说明对**测试后门**与**发布产物边界**作出声明，请勿在生产环境启用任何测试开关。
+> **安全漏洞请走私密渠道报告**（[SECURITY.md](SECURITY.md)），禁止公开 Issue / PR / Discussion 讨论漏洞细节。
 
 ### 测试明文存储（仅限调试，后期删除）
 
@@ -403,4 +404,4 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 
 - 仓库：<https://github.com/BetaStudio2/ArchoeraMusic>
 
-贡献前请阅读 [docs/architecture.md](docs/architecture.md) 中的实施路线与技术戒律。PR 合入前需要通过签名或显式确认接受上文「贡献者授权」条款。
+贡献前请阅读 **[CONTRIBUTING.md](CONTRIBUTING.md)（开发规范）** 与 [docs/architecture.md](docs/architecture.md) 中的实施路线与技术戒律。PR 合入前需要通过签名或显式确认接受上文「贡献者授权」条款。
