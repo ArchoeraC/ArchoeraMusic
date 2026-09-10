@@ -100,6 +100,25 @@ const vtable = VTable{
     .deinit = deinitImpl,
 };
 
+/// 元数据专用轻量上下文（probe-only，§8.4.2①）：只保留解析头部/标签所需字段，
+/// **不含**解码器状态（`dec: layer3.DecoderState`）、帧/PCM 缓冲。
+const MetaCtx = struct {
+    allocator: Allocator,
+    reader: Reader,
+    meta: decoder.Metadata = .{},
+    pictures: []decoder.Picture = &.{},
+    replay_gain: decoder.ReplayGain = .{},
+    channels: u8 = 0,
+    sample_rate: u32 = 0,
+    audio_start: u64 = 0,
+    file_size: u64 = 0,
+    frame_bytes: usize = 0,
+    frame_samples: usize = 0,
+    total_frames: u64 = 0,
+    stream_start: u64 = 0,
+    out_limit: u64 = std.math.maxInt(u64),
+};
+
 /// 从 off 处读取 4 字节帧头。不足 → null。
 fn readHdr(reader: *Reader, off: u64) Error!?[4]u8 {
     try reader.seek(@intCast(off), .start);
@@ -282,7 +301,72 @@ pub fn open(allocator: Allocator, reader: *Reader, info: *decoder.Info) Error!de
     return .{ .vtable = &vtable, .ctx = ctx };
 }
 
-fn buildInfo(ctx: *Ctx) decoder.Info {
+/// 元数据专用入口（probe-only，§8.4.2①）：解析 ID3v2/v1 + 首帧 + Xing（时长），
+/// 持有标签/图片分配，**不构造 layer3 解码状态、不分配帧/PCM 缓冲**。
+pub fn openMeta(allocator: Allocator, reader: *Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const file_size = try reader.size();
+    const ctx = try allocator.create(MetaCtx);
+    errdefer allocator.destroy(ctx);
+    ctx.* = .{ .allocator = allocator, .reader = reader.*, .file_size = file_size };
+
+    ctx.audio_start = id3.parseV2(&ctx.reader, allocator, 0, &ctx.meta, &ctx.pictures, &ctx.replay_gain) catch blk: {
+        id3.freeMeta(allocator, &ctx.meta);
+        id3.freePictures(allocator, &ctx.pictures);
+        break :blk 0;
+    };
+    if (ctx.audio_start == 0) ctx.audio_start = 0;
+    errdefer destroyMetaCtx(ctx);
+
+    const first = (try findFrameSync(&ctx.reader, ctx.audio_start, file_size)) orelse {
+        destroyMetaCtx(ctx);
+        return error.Corrupt;
+    };
+    const h = (try readHdr(&ctx.reader, first)) orelse {
+        destroyMetaCtx(ctx);
+        return error.Corrupt;
+    };
+    if (!header.hdrValid(&h)) {
+        destroyMetaCtx(ctx);
+        return error.Corrupt;
+    }
+
+    ctx.channels = if (header.hdrIsMono(&h)) 1 else 2;
+    ctx.sample_rate = @intCast(header.hdrSampleRateHz(&h));
+    ctx.frame_bytes = header.hdrFrameBytes(&h, 0) + header.hdrPadding(&h);
+    ctx.frame_samples = header.hdrFrameSamples(&h);
+    if (ctx.frame_bytes > 0) {
+        if (try parseXing(&ctx.reader, first, &h, ctx.frame_bytes)) |xg| {
+            ctx.total_frames = xg.frames;
+            ctx.stream_start = first + @as(u64, @intCast(ctx.frame_bytes));
+            if (xg.has_enc and ctx.total_frames > 0 and ctx.frame_samples > 0) {
+                const raw = @as(u128, ctx.total_frames) * ctx.frame_samples;
+                const trim = @as(u128, xg.delay) + xg.padding;
+                ctx.out_limit = if (raw > trim) @intCast(raw - trim) else std.math.maxInt(u64);
+            }
+        }
+    }
+    if (ctx.stream_start == 0) ctx.stream_start = first;
+
+    if (file_size >= 128) {
+        id3.parseV1(&ctx.reader, allocator, file_size, &ctx.meta) catch {};
+    }
+
+    info.* = buildInfo(ctx);
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
+
+fn destroyMetaCtx(ctx: *MetaCtx) void {
+    id3.freeMeta(ctx.allocator, &ctx.meta);
+    id3.freePictures(ctx.allocator, &ctx.pictures);
+}
+
+fn metaDeinit(p: *anyopaque) void {
+    const ctx: *MetaCtx = @ptrCast(@alignCast(p));
+    destroyMetaCtx(ctx);
+    ctx.allocator.destroy(ctx);
+}
+
+fn buildInfo(ctx: anytype) decoder.Info {
     var duration_us: i64 = 0;
     var known: decoder.DurationKnown = .estimate;
     if (ctx.sample_rate > 0 and ctx.frame_samples > 0) {
