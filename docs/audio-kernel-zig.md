@@ -870,6 +870,12 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > 首批实现 **flac**（`flac.openMeta`：解析 STREAMINFO+元数据块、不分配解码缓冲）。
 > 其余格式（mp3/wav/m4a/ogg/opus 等）暂回退完整 open，可逐格式补齐 `meta` 工厂。
 > scanner 1000 文件语料：**167ms vs TagLib 201ms（−17%，含进程启动）**。
+>
+> **第二批（2026-09-10）**：**mp3**（`mp3.MetaCtx`/`openMeta`：解析 ID3v2/v1+首帧+
+> Xing 时长，不含 `layer3.DecoderState` 与帧/PCM 缓冲；`buildInfo` 泛型化共用）。
+> 至此 flac+mp3 走 probe-only（覆盖扫描常见格式）；**wav/m4a/ogg/opus 仍回退完整
+> open**——wav open 与 ADPCM/G.711 解码状态初始化交织（~200 行），m4a 需拆 isom+AAC
+> 上下文，留待逐格式推进。scanner 语料：**174ms vs TagLib 200ms（min，−13%）**。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
