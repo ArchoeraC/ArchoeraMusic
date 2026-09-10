@@ -1044,5 +1044,7 @@
   "searchWaitRetry": "請求過於頻繁，請稍候再試",
   "qqMusicDownloadUnsupported": "QQ 音樂暫不支援下載（風控）。",
   "qqMusicDownloadSkipped": "已略過 {count} 首 QQ 音樂（暫不支援下載）。",
-  "platformQqMusic": "QM"
+  "platformQqMusic": "QM",
+  "toastSleepInhibitFailed": "停用系統休眠失敗",
+  "toastMediaSessionLost": "系統媒體工作階段已中斷"
 }

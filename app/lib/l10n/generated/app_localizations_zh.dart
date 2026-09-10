@@ -3768,6 +3768,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsAmllSpring => '滚动弹簧';
+
+  @override
+  String get toastSleepInhibitFailed => '禁用系统休眠失败';
+
+  @override
+  String get toastMediaSessionLost => '系统媒体会话已断开';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -7534,6 +7540,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsAmllSpring => '滚动弹簧';
+
+  @override
+  String get toastSleepInhibitFailed => '禁用系统休眠失败';
+
+  @override
+  String get toastMediaSessionLost => '系统媒体会话已断开';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -10939,4 +10951,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get platformQqMusic => 'QM';
+
+  @override
+  String get toastSleepInhibitFailed => '停用系統休眠失敗';
+
+  @override
+  String get toastMediaSessionLost => '系統媒體工作階段已中斷';
 }

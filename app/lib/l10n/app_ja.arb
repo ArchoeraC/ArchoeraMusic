@@ -1044,5 +1044,7 @@
   "searchWaitRetry": "リクエストが多すぎます。しばらくしてから再試行してください",
   "qqMusicDownloadUnsupported": "QM のダウンロードは現在未対応です（リスク管理）。",
   "qqMusicDownloadSkipped": "QM の {count} 曲はスキップ（ダウンロード非対応）。",
-  "platformQqMusic": "QM"
+  "platformQqMusic": "QM",
+  "toastSleepInhibitFailed": "システムのスリープ防止に失敗しました",
+  "toastMediaSessionLost": "システムメディアセッションが切断されました"
 }

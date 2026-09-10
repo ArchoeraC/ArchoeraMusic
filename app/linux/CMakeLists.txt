@@ -262,3 +262,9 @@ install(FILES "${DOWNLOADER_TARGET_DIR}/${DOWNLOADER_LIB_NAME}"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native"
   COMPONENT Runtime)
 
+# platform bridge（平台能力桥接，Zig 独立模块 app/native/platform，
+# `zig build` 产出 zig-out/lib；NativeLibPaths 祖先链优先查 native/）。
+set(PLATFORM_BRIDGE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../native/platform/zig-out/lib")
+install(FILES "${PLATFORM_BRIDGE_SRC_DIR}/libarchoera_platform.so"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+

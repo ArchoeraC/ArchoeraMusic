@@ -3998,4 +3998,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsAmllSpring => '滚动弹簧';
+
+  @override
+  String get toastSleepInhibitFailed =>
+      'No se pudo evitar que el sistema se suspenda';
+
+  @override
+  String get toastMediaSessionLost =>
+      'La sesión multimedia del sistema se desconectó';
 }

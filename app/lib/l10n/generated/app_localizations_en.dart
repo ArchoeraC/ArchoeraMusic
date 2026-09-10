@@ -3952,4 +3952,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAmllSpring => 'Scroll spring';
+
+  @override
+  String get toastSleepInhibitFailed => 'Failed to keep the system awake';
+
+  @override
+  String get toastMediaSessionLost => 'System media session disconnected';
 }

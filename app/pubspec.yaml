@@ -53,10 +53,6 @@ dependencies:
   file_selector: ^1.1.0
   tray_manager: ^0.5.3
   window_manager: ^0.5.2
-  # 防止系统休眠（保持播放不中断；Linux 走 XDG Desktop Portal）
-  wakelock_plus: ^1.7.0
-  # Linux 屏幕状态事件订阅（org.freedesktop.ScreenSaver.ActiveChanged，节能模式）
-  dbus: ^0.7.14
   geolocator: ^14.0.3
 dev_dependencies:
   flutter_test:

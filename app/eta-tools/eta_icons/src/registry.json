@@ -294,17 +294,6 @@
       ],
       "codepoint": 57647
     },
-    "dotCircleOutline": {
-      "const": "dotCircleOutline",
-      "kind": "mc",
-      "glyph": "dot_circle",
-      "style": "regular",
-      "src": "regular",
-      "materials": [
-        "blur_circular_outlined"
-      ],
-      "codepoint": 57649
-    },
     "downloadOutline": {
       "const": "downloadOutline",
       "kind": "mc",
@@ -1355,17 +1344,6 @@
       ],
       "codepoint": 59150
     },
-    "borderRadius": {
-      "const": "borderRadius",
-      "kind": "mc",
-      "glyph": "border_radius",
-      "style": "filled",
-      "src": "filled",
-      "materials": [
-        "rounded_corner"
-      ],
-      "codepoint": 59152
-    },
     "chartBar": {
       "const": "chartBar",
       "kind": "mc",
@@ -1870,17 +1848,6 @@
         "mic_external_on"
       ],
       "codepoint": 59252
-    },
-    "miniplayer": {
-      "const": "miniplayer",
-      "kind": "extra",
-      "glyph": "miniplayer",
-      "style": "filled",
-      "src": "filled",
-      "materials": [
-        "(extra:miniplayer)"
-      ],
-      "codepoint": 59254
     },
     "moonStars": {
       "const": "moonStars",
