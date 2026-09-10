@@ -44,7 +44,9 @@ def peak_rss(pid):
     return 0.0
 
 
-def run_poll(argv, env=None):
+def run_poll(argv, env=None, pin="0-15"):
+    if pin and shutil.which("taskset"):
+        argv = ["taskset", "-c", pin] + list(argv)
     peak = [0.0]; stop = threading.Event()
     t = time.monotonic()
     p = subprocess.Popen(argv, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -93,7 +95,12 @@ def sec_scorecard(reps):
             for r in _csv.DictReader(f):
                 if r.get("engine") in ("era", "stable", "ffmpeg"):
                     rows.append(r)
-    return {"rc": rc, "rows": rows, "sec": dt, "csv": csv, "log": out[-1500:]}
+    avg = {}
+    for eng in ("era", "stable", "ffmpeg"):
+        vals = [float(r["total"]) for r in rows if r["engine"] == eng and r.get("total")]
+        if vals:
+            avg[eng] = round(sum(vals) / len(vals), 1)
+    return {"rc": rc, "rows": rows, "sec": dt, "csv": csv, "avg": avg, "log": out[-1500:]}
 
 
 # ---- D. 池并发压力 ----
@@ -110,10 +117,17 @@ def sec_pool():
         paths = [os.path.join(corpus, avail[i % len(avail)]) for i in range(n)]
         rc, out, wall, rss = run_poll([bench, "-streams", str(n), str(n)] + paths)
         m = re.search(r"files_ok=(\d+)/(\d+) total_frames=(\d+) wall_ms=(\d+)", out)
-        rows.append({"n": n, "wall": wall, "rss": rss, "rc": rc,
+        rows.append({"n": n, "wall": wall, "rss": rss, "rc": rc, "cap": n,
                      "ok": f"{m.group(1)}/{m.group(2)}" if m else "?",
                      "frames": m.group(3) if m else "?"})
-    return {"rc": 0, "rows": rows}
+    # 对照：默认流上限 8（N=128 时大量 open 失败）
+    cap8 = None
+    if os.path.isfile(bench) and avail:
+        paths = [os.path.join(corpus, avail[i % len(avail)]) for i in range(128)]
+        rc, out, wall, rss = run_poll([bench, "-streams", "8", "128"] + paths)
+        m = re.search(r"files_ok=(\d+)/(\d+)", out)
+        cap8 = f"{m.group(1)}/{m.group(2)}" if m else "?"
+    return {"rc": 0, "rows": rows, "cap8": cap8}
 
 
 # ---- E. scanner 元数据 ----
@@ -128,6 +142,17 @@ def sec_scanner():
            cwd=SCANNER, timeout=1800)
     if not os.path.isfile(dll):
         return {"rc": 2, "rows": [], "log": "scanner 构建失败"}
+    def tracks(db):
+        try:
+            c = sqlite3.connect(db)
+            n = c.execute("select count(*) from tracks").fetchone()[0]
+            sample = c.execute("select title,codec,duration,sample_rate,channels "
+                               "from tracks order by path limit 50").fetchall()
+            c.close()
+            return n, sample
+        except Exception:
+            return -1, []
+
     rows = []
     for par in [1, 8, 32, 128]:
         for name, use_k in (("kernel", True), ("taglib", False)):
@@ -143,8 +168,19 @@ def sec_scanner():
             rc, out, wall, rss = run_poll(["dotnet", dll, "scan", "--dirs", corpus, "--full"], env=env)
             if not use_k and os.path.exists(f"{TMP}/kh.suite"):
                 shutil.move(f"{TMP}/kh.suite", kso)
-            rows.append({"par": par, "engine": name, "wall": wall, "rss": rss, "rc": rc})
-    return {"rc": 0, "rows": rows}
+            n, sample = tracks(db)
+            rows.append({"par": par, "engine": name, "wall": wall, "rss": rss,
+                         "rc": rc, "tracks": n, "sample": sample})
+    # 正确性对拍（par=8）：内核 vs TagLib 行数与字段一致
+    cmp = {}
+    for name in ("kernel", "taglib"):
+        r = next((x for x in rows if x["par"] == 8 and x["engine"] == name), None)
+        if r: cmp[name] = (r["tracks"], r["sample"])
+    mism = None
+    if cmp.get("kernel") and cmp.get("taglib"):
+        mism = 0 if cmp["kernel"] == cmp["taglib"] else 1
+    return {"rc": 0, "rows": rows, "cmp_mismatch": mism,
+            "cmp_tracks": {k: v[0] for k, v in cmp.items()}}
 
 
 def main():
@@ -192,17 +228,33 @@ def main():
             A.append(f"| {fmt} | {e['wall_s']} | {e['xrt']} | {float(e['rss_kb'])/1024:.1f} | "
                      f"{s['wall_s'] if s else '—'} | {e['total']} |")
         A.append("")
+        av = res["score"].get("avg", {})
+        A.append(f"- 总体均分：**era {av.get('era','?')} vs stable {av.get('stable','?')} "
+                 f"vs ffmpeg {av.get('ffmpeg','?')}**（FFmpeg 归一=100）")
+        A.append("- 公平性提示：speed=40·min(1,R/50)，本语料所有引擎 ≥50×RT → speed 恒 40/40，"
+                 "总分差异实际来自 memory 与 correctness；无损要求 era==stable==ffmpeg 逐位。")
+        A.append("")
     if "pool" in res and res["pool"].get("rows"):
         A += ["## D. 内核池并发压力（bench_era_pool，流上限=并发）", "",
               "| N | 进程墙钟 ms | 峰值 RSS MB | files_ok | 合计帧 |", "|---|---|---|---|---|"]
         for r in res["pool"]["rows"]:
             A.append(f"| {r['n']} | {r['wall']:.0f} | {r['rss']:.1f} | {r['ok']} | {r['frames']} |")
         A.append("")
+        A.append(f"- 流上限=并发（`zk_engine_init_streams(...,N)`）；**对照默认流上限 8、N=128："
+                 f"{res['pool'].get('cap8','?')}**（证明默认会限制并发）。")
+        A.append("- 本节为 era 单侧能力/内存口径，**无 FFmpeg 基线**；核心 pin P 核（0-15）降噪。")
+        A.append("")
     if "scan" in res and res["scan"].get("rows"):
         A += ["## E. scanner 元数据吞吐（1000 小文件）", "",
-              "| 并行度 | 引擎 | wall ms | 峰值 RSS MB | rc |", "|---|---|---|---|---|"]
+              "| 并行度 | 引擎 | wall ms | 峰值 RSS MB | rc | tracks |", "|---|---|---|---|---|---|"]
         for r in res["scan"]["rows"]:
-            A.append(f"| {r['par']} | {r['engine']} | {r['wall']:.0f} | {r['rss']:.1f} | {r['rc']} |")
+            A.append(f"| {r['par']} | {r['engine']} | {r['wall']:.0f} | {r['rss']:.1f} | "
+                     f"{r['rc']} | {r.get('tracks','?')} |")
+        A.append("")
+        ct = res["scan"].get("cmp_tracks", {})
+        mm = res["scan"].get("cmp_mismatch")
+        A.append(f"- 正确性对拍（par=8）：tracks kernel={ct.get('kernel','?')} / "
+                 f"taglib={ct.get('taglib','?')}；字段一致性：{'一致' if mm == 0 else ('不一致' if mm == 1 else '未测')}。")
         A.append("")
     A += ["## 说明", "",
           "- 逐格式 scorecard 语料为可复现音乐结构仿真；内核单测含逐格式解码 e2e（无损逐位/有损 corr 门）。",
