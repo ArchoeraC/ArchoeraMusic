@@ -46,6 +46,8 @@ public sealed class ScannerEngine
         "m4b", "webm",
         // 2026-09-10：Speex（Ogg 容器，内核可解；probe-only 元数据）
         "spx",
+        // 2026-09-10：TTA（内核 probe-only 元数据 + ID3v2/v1）
+        "tta",
     };
 
     private readonly IScannerDatabase _db;
