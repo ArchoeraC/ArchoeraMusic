@@ -186,6 +186,7 @@ typedef enum {
     APL_EVENT_SCREEN_STATE  = 3,  /* u.screen：active */
     APL_EVENT_WINDOW_STATE  = 4,  /* u.window：minimized / focused（即时布尔快照） */
     APL_EVENT_BACKEND_STATE = 5,  /* u.backend：lost（后端断连，Dart 显式告警 + Noop 回落） */
+    APL_EVENT_SYSTEM_ACCENT = 6,  /* 主题色变更（无载荷；收到后重读 apl_system_accent 去重） */
 } AplEventType;
 
 typedef enum { APL_CMD_PLAY=0, APL_CMD_PAUSE, APL_CMD_TOGGLE, APL_CMD_STOP,
@@ -214,6 +215,25 @@ int32_t apl_set_event_callback(AplEventCallback cb, void* user_data);
 Dart 侧映射（`platform_bindings.dart`）：`MediaCommandEvent` / `MediaSeekEvent` /
 `screenState` 流，与 `system_media.dart` / `system_power.dart` 契约一一对应——
 **契约层与主程序完全不感知 FFI 细节**。
+
+### 3.7 SystemAccent（系统主题色）
+
+```c
+/* 读取 DE 主题色：0=成功并写 *r/*g/*b(0-255)；<0=不可得。
+   Linux : kreadconfig6/5(kdeglobals [General] AccentColor) → gsettings 兜底
+   Windows: HKCU\...\DWM\AccentColor(ABGR DWORD) → DwmGetColorizationColor
+   macOS : NSColor.controlAccentColor(10.14+) → sRGB */
+int32_t apl_system_accent(int32_t *r, int32_t *g, int32_t *b);
+
+/* 订阅/取消变更事件：变更时回调 APL_EVENT_SYSTEM_ACCENT（无载荷）。
+   Linux : XDG portal SettingChanged / KDE KGlobalSettings.notifyChange
+   Windows: RegNotifyChangeKeyValue(DWM 键，后台线程)
+   macOS : NSDistributedNotificationCenter + NSSystemColorsDidChangeNotification */
+int32_t apl_system_accent_set_events(int32_t on);
+```
+
+能力位 `APL_CAP_SYSTEM_ACCENT`（1<<7）。事件只表示“可能已变”，Dart
+（`systemAccentProvider`，StreamProvider）收到后重读并**按颜色去重**。
 
 ## 4. 各平台实现要点
 
