@@ -301,9 +301,23 @@ pub fn appInstanceAcquire() i32 {
 }
 
 
-// ── 系统提示：优先 WinRT Toast（Windows.UI.Notifications），兜底 MessageBoxW ──
-// WinRT Toast 直接经 Windows Runtime 通知 API 弹出（Win10+ 原生横幅，非模态）。
-// 以 PowerShell -EncodedCommand 调用（免 C++/WinRT 构建依赖；PowerShell 5.1 内置）。
+// ── 系统提示：优先 C++/WinRT 原生 Toast，其次 PowerShell 调 WinRT，兜底 MessageBoxW ──
+// 1) apl_win_toast（win_toast.cpp，Windows.UI.Notifications，原生横幅）；
+//    未编译该文件时由本文件弱符号兜底返回 -1。
+// 2) PowerShell -EncodedCommand 调 WinRT Toast（免 C++/WinRT 构建依赖）。
+// 3) MessageBoxW（模态兜底）。
+
+extern "c" fn apl_win_toast(title: ?[*:0]const u8, body: ?[*:0]const u8) c_int;
+
+/// 未编译 win_toast.cpp 时的弱兜底（强符号存在时被覆盖）。
+fn winToastFallback(title: ?[*:0]const u8, body: ?[*:0]const u8) callconv(.c) c_int {
+    _ = title;
+    _ = body;
+    return -1;
+}
+comptime {
+    @export(&winToastFallback, .{ .name = "apl_win_toast", .linkage = .weak });
+}
 
 extern "c" fn system(command: [*:0]const u8) c_int;
 
@@ -356,6 +370,13 @@ const user32 = struct {
 };
 
 pub fn notify(title: []const u8, body: []const u8) i32 {
+    // 1) 原生 C++/WinRT Toast（win_toast.cpp）
+    const tz = alloc.dupeZ(u8, title) catch return core.ERR_BACKEND;
+    defer alloc.free(tz);
+    const bz = alloc.dupeZ(u8, body) catch return core.ERR_BACKEND;
+    defer alloc.free(bz);
+    if (apl_win_toast(tz.ptr, bz.ptr) == 0) return core.OK;
+    // 2) PowerShell 调 WinRT
     if (toastWinRT(title, body)) return core.OK;
     // 兜底：模态 MessageBox
     const t = std.unicode.utf8ToUtf16LeAllocZ(alloc, title) catch return core.ERR_BACKEND;
