@@ -221,8 +221,82 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     return .{ .vtable = &vtable, .ctx = ctx };
 }
 
-fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
-    const f: *OggFlacCtx = @ptrCast(@alignCast(ctx));
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）：收集 Ogg-FLAC metadata packet →
+// 内存 reader 调 flac.openMeta（不构造 FLAC 帧解码器）。
+// ---------------------------------------------------------------------------
+
+const MetaCtx = struct {
+    allocator: Allocator,
+    demux: ogg.Demux,
+    /// 合成的 "fLaC"+metadata blocks（供内层 flac 会话解析）
+    first: []u8,
+    flac: decoder.MetadataSession,
+};
+
+fn metaDeinit(p: *anyopaque) void {
+    const f: *MetaCtx = @ptrCast(@alignCast(p));
+    f.flac.deinit();
+    f.allocator.free(f.first);
+    f.demux.deinit();
+    f.allocator.destroy(f);
+}
+
+pub fn openMeta(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    var demux: ogg.Demux = .{ .allocator = allocator, .reader = reader.* };
+    errdefer demux.deinit();
+
+    const head_pkt = (try demux.nextPacket()) orelse return error.Corrupt;
+    if (head_pkt.data.len < 8) return error.Corrupt;
+    if (head_pkt.data[0] != 0x7F or !std.mem.eql(u8, head_pkt.data[1..5], "FLAC")) return error.Corrupt;
+    const flac_magic_idx = std.mem.indexOf(u8, head_pkt.data, "fLaC") orelse return error.Corrupt;
+
+    var first_buf = std.ArrayList(u8).empty;
+    defer first_buf.deinit(allocator);
+    try first_buf.appendSlice(allocator, head_pkt.data[flac_magic_idx..]);
+    var last_block = false;
+    {
+        var off: usize = 0;
+        while (off + 4 <= first_buf.items.len) {
+            const h = first_buf.items[off];
+            const ln: usize = (@as(usize, first_buf.items[off + 1]) << 16) |
+                (@as(usize, first_buf.items[off + 2]) << 8) | first_buf.items[off + 3];
+            off += 4 + ln;
+            if (h & 0x80 != 0) last_block = true;
+        }
+    }
+    while (!last_block) {
+        const p = try demux.nextPacket() orelse break;
+        if (p.data.len < 4 or p.data[0] == 0xFF) break;
+        try first_buf.appendSlice(allocator, p.data);
+        if (p.data[0] & 0x80 != 0) last_block = true;
+    }
+    const first = try first_buf.toOwnedSlice(allocator);
+    errdefer allocator.free(first);
+
+    var mem = io.Reader.openMem(first);
+    const sess = try flac.openMeta(allocator, &mem, info);
+    errdefer sess.deinit();
+
+    // 时长补齐：STREAMINFO total_samples 常为 0 → 尾页 granule（同完整 open）
+    if (info.duration_known != .exact) {
+        if ((ogg.scanTailPage(&demux.reader, demux.serial) catch null)) |tail| {
+            const rate = info.sample_rate;
+            const granule_max: i64 = @as(i64, @intCast(rate)) * 12 * 3600;
+            if (tail.granule > 0 and rate > 0 and tail.granule < granule_max) {
+                info.duration_us = @intCast((@as(u128, @intCast(tail.granule)) * 1_000_000) / rate);
+                info.duration_known = if (tail.eos) .exact else .estimate;
+            }
+        }
+    }
+    info.format_name = "ogg-flac";
+
+    const ctx = try allocator.create(MetaCtx);
+    ctx.* = .{ .allocator = allocator, .demux = demux, .first = first, .flac = sess };
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
+
+fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {    const f: *OggFlacCtx = @ptrCast(@alignCast(ctx));
     const r = f.flac.read(out, max_samples, out_channels) catch |err| {
         // Ogg-FLAC 流末尾：packet 耗尽后 FLAC 解码器无法定位下一帧（Corrupt/SeekFailed）。
         // 当底层流已 EOF → 视为正常结束（返回 0），否则透传。
