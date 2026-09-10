@@ -424,3 +424,47 @@ pub fn systemAccent() ?[3]u8 {
     }
     return null;
 }
+
+// ── 系统主题色变更：注册表 DWM 键 RegNotifyChangeKeyValue（后台线程）──
+var g_accent_on = std.atomic.Value(bool).init(false);
+var g_accent_thread: ?std.Thread = null;
+
+extern "advapi32" fn RegOpenKeyExW(hkey: ?*anyopaque, subkey: [*:0]const u16, opt: u32, sam: u32, phk: *?*anyopaque) callconv(.winapi) c_int;
+extern "advapi32" fn RegNotifyChangeKeyValue(hkey: ?*anyopaque, subtree: i32, filter: u32, event: ?*anyopaque, async: i32) callconv(.winapi) c_int;
+extern "advapi32" fn RegCloseKey(hkey: ?*anyopaque) callconv(.winapi) c_int;
+extern "kernel32" fn CreateEventW(attr: ?*anyopaque, manual: i32, init: i32, name: ?[*:0]const u16) callconv(.winapi) ?*anyopaque;
+extern "kernel32" fn WaitForSingleObject(h: ?*anyopaque, ms: u32) callconv(.winapi) u32;
+extern "kernel32" fn CloseHandle(h: ?*anyopaque) callconv(.winapi) c_int;
+
+const KEY_NOTIFY: u32 = 0x0010;
+const REG_NOTIFY_CHANGE_LAST_SET: u32 = 0x00000004;
+const WAIT_OBJECT_0: u32 = 0;
+
+fn accentThread() void {
+    const key = std.unicode.utf8ToUtf16LeStringLiteral("Software\\Microsoft\\Windows\\DWM");
+    var hkey: ?*anyopaque = null;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, key, 0, KEY_NOTIFY, &hkey) != 0) return;
+    defer _ = RegCloseKey(hkey);
+    const ev = CreateEventW(null, 0, 0, null);
+    if (ev == null) return;
+    defer _ = CloseHandle(ev);
+    while (g_accent_on.load(.acquire)) {
+        if (RegNotifyChangeKeyValue(hkey, 0, REG_NOTIFY_CHANGE_LAST_SET, ev, 1) != 0) break;
+        // 500ms 轮询退出标志（RegNotifyChangeKeyValue 阻塞不可取消）
+        if (WaitForSingleObject(ev, 500) == WAIT_OBJECT_0 and g_accent_on.load(.acquire)) {
+            core.dispatch(.{ .type = core.EVENT_SYSTEM_ACCENT, .u = .{ .active = 1 } });
+        }
+    }
+}
+
+pub fn systemAccentSetEvents(on: i32) i32 {
+    const want = on != 0;
+    const was = g_accent_on.swap(want, .acquire);
+    if (want and !was) {
+        g_accent_thread = std.Thread.spawn(.{}, accentThread, .{}) catch {
+            g_accent_on.store(false, .release);
+            return core.ERR_BACKEND;
+        };
+    }
+    return core.OK;
+}

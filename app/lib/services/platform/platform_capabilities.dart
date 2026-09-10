@@ -11,6 +11,7 @@
 /// 主程序只依赖 [power]/[media]/[window] 三个接口，不感知 FFI 细节。
 library;
 
+import 'dart:async';
 import 'dart:ui' show Color;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,6 +64,16 @@ class PlatformCapabilities {
     if (b == null || caps & aplCapSystemAccent == 0) return null;
     return b.systemAccent();
   }
+
+  /// 订阅/取消系统主题色变更事件；返回 0=成功，负=不可用。
+  int setAccentEvents(bool on) {
+    final b = _bindings;
+    if (b == null || caps & aplCapSystemAccent == 0) return aplErrUnsupported;
+    return b.setAccentEvents(on);
+  }
+
+  /// 系统主题色变更流（桥接不可用为空流）。
+  Stream<void> get accentEvents => _bindings?.accentEvents ?? const Stream.empty();
 
   /// 系统提示（桥接不可用时返回错误码）。返回 0=成功。
   int notify(String title, String body) {

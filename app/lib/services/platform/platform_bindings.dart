@@ -42,6 +42,7 @@ const int aplEventMediaSeek = 2;
 const int aplEventScreenState = 3;
 const int aplEventWindowState = 4;
 const int aplEventBackendState = 5;
+const int aplEventSystemAccent = 6;
 
 const int aplAbiVersion = 1;
 
@@ -119,6 +120,7 @@ typedef _AplWindowEventsC = Int32 Function(Int32 on);
 typedef _AplInstanceAcquireC = Int32 Function();
 typedef _AplNotifyC = Int32 Function(Pointer<Utf8> title, Pointer<Utf8> body);
 typedef _AplSystemAccentC = Int32 Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
+typedef _AplSystemAccentSetEventsC = Int32 Function(Int32 on);
 typedef _AplMediaTrackC = Int32 Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackC = Int32 Function(
     Int32 state, Int64 positionMs, Double speed, Double volume, Int32 loop, Int32 shuffle);
@@ -138,6 +140,7 @@ typedef _AplWindowEventsD = int Function(int on);
 typedef _AplInstanceAcquireD = int Function();
 typedef _AplNotifyD = int Function(Pointer<Utf8> title, Pointer<Utf8> body);
 typedef _AplSystemAccentD = int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
+typedef _AplSystemAccentSetEventsD = int Function(int on);
 typedef _AplMediaTrackD = int Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackD = int Function(
     int state, int positionMs, double speed, double volume, int loop, int shuffle);
@@ -196,6 +199,8 @@ class PlatformBindings {
         _notify = lib.lookupFunction<_AplNotifyC, _AplNotifyD>('apl_notify'),
         _systemAccent = lib
             .lookupFunction<_AplSystemAccentC, _AplSystemAccentD>('apl_system_accent'),
+        _systemAccentSetEvents = lib.lookupFunction<_AplSystemAccentSetEventsC,
+            _AplSystemAccentSetEventsD>('apl_system_accent_set_events'),
         _mediaTrack =
             lib.lookupFunction<_AplMediaTrackC, _AplMediaTrackD>('apl_media_set_track'),
         _mediaPlayback =
@@ -222,6 +227,7 @@ class PlatformBindings {
   final _AplInstanceAcquireD _instanceAcquire;
   final _AplNotifyD _notify;
   final _AplSystemAccentD _systemAccent;
+  final _AplSystemAccentSetEventsD _systemAccentSetEvents;
   final _AplMediaTrackD _mediaTrack;
   final _AplMediaPlaybackD _mediaPlayback;
   final _AplMediaWindowD _mediaWindow;
@@ -233,9 +239,13 @@ class PlatformBindings {
   final _screenCtrl = StreamController<AplScreenEvent>.broadcast();
   final _windowCtrl = StreamController<AplWindowEvent>.broadcast();
   final _backendCtrl = StreamController<AplBackendEvent>.broadcast();
+  final _accentCtrl = StreamController<void>.broadcast();
 
   /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
   int acquireInstance() => _instanceAcquire();
+
+  /// 订阅系统主题色变更事件（变更时 accentEvents 推事件）。
+  int setAccentEvents(bool on) => _systemAccentSetEvents(on ? 1 : 0);
 
   /// 系统主题色（DE accent）；不可得返回 null。
   Color? systemAccent() {
@@ -288,6 +298,7 @@ class PlatformBindings {
   Stream<AplScreenEvent> get screenEvents => _screenCtrl.stream;
   Stream<AplWindowEvent> get windowEvents => _windowCtrl.stream;
   Stream<AplBackendEvent> get backendEvents => _backendCtrl.stream;
+  Stream<void> get accentEvents => _accentCtrl.stream;
 
   /// 栈上指针仅在回调期间有效——同步取值后立即投递。
   static void _onNativeEvent(Pointer<AplEventFfi> event, Pointer<Void> userData) {
@@ -308,6 +319,8 @@ class PlatformBindings {
         ));
       case aplEventBackendState:
         b._backendCtrl.add(AplBackendEvent(ref.u.backendLost != 0));
+      case aplEventSystemAccent:
+        b._accentCtrl.add(null);
     }
   }
 

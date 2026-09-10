@@ -111,6 +111,7 @@ fn nsConst(handle: Id, name: [*:0]const u8) Id {
 
 var g_screen_events = std.atomic.Value(bool).init(false);
 var g_window_events = std.atomic.Value(bool).init(false);
+var g_accent_events = std.atomic.Value(bool).init(false);
 var g_minimized = std.atomic.Value(bool).init(false);
 var g_focused = std.atomic.Value(bool).init(true);
 var g_observer_cls: Class = null;
@@ -129,6 +130,11 @@ fn emitWindow() void {
 fn emitScreen(active: bool) void {
     if (!g_screen_events.load(.acquire)) return;
     core.dispatch(.{ .type = core.EVENT_SCREEN_STATE, .u = .{ .active = @intFromBool(active) } });
+}
+
+fn onAccent(_: Id, _: Sel, _: Id) callconv(.c) void {
+    if (!g_accent_events.load(.acquire)) return;
+    core.dispatch(.{ .type = core.EVENT_SYSTEM_ACCENT, .u = .{ .active = 1 } });
 }
 
 fn onScreensSleep(_: Id, _: Sel, _: Id) callconv(.c) void {
@@ -211,6 +217,7 @@ fn ensureObserver() Id {
     addMethod(c, "onPrev:", @ptrCast(&onPrev), "q@:@");
     addMethod(c, "onStop:", @ptrCast(&onStop), "q@:@");
     addMethod(c, "onSeek:", @ptrCast(&onSeek), "q@:@");
+    addMethod(c, "onAccent:", @ptrCast(&onAccent), "v@:@");
     g_registerPair.?(c);
     g_observer_cls = c;
     g_observer = m0(c, sel("new"));
@@ -479,4 +486,20 @@ fn toU8(x: f64) u8 {
     if (v <= 0.0) return 0;
     if (v >= 255.0) return 255;
     return @intFromFloat(v);
+}
+
+pub fn systemAccentSetEvents(on: i32) i32 {
+    if (!load()) return core.ERR_BACKEND;
+    if (on != 0) {
+        g_accent_events.store(true, .release);
+        // 分布式通知：外观/强调色偏好变更（跨进程）
+        const dnc = m0(cls("NSDistributedNotificationCenter"), sel("defaultCenter"));
+        observe(dnc, nsstr("AppleColorPreferencesChangedNotification"), "onAccent:");
+        // 本地：系统颜色变更（强调色）
+        const nc = m0(cls("NSNotificationCenter"), sel("defaultCenter"));
+        observe(nc, nsConst(g_appkit, "NSSystemColorsDidChangeNotification"), "onAccent:");
+    } else {
+        g_accent_events.store(false, .release);
+    }
+    return core.OK;
 }

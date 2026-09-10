@@ -28,6 +28,7 @@ pub const EVENT_MEDIA_SEEK: i32 = 2;
 pub const EVENT_SCREEN_STATE: i32 = 3;
 pub const EVENT_WINDOW_STATE: i32 = 4;
 pub const EVENT_BACKEND_STATE: i32 = 5;
+pub const EVENT_SYSTEM_ACCENT: i32 = 6;
 
 pub const CMD_PLAY: i32 = 0;
 pub const CMD_PAUSE: i32 = 1;

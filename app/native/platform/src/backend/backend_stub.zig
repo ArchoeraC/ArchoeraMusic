@@ -39,6 +39,20 @@ pub const Backend = struct {
         _ = win;
         return core.OK;
     }
+    pub fn appInstanceAcquire() i32 {
+        return 1;
+    }
+    pub fn notify(title: []const u8, body: []const u8) i32 {
+        _ = .{ title, body };
+        return core.OK;
+    }
+    pub fn systemAccent() ?[3]u8 {
+        return null;
+    }
+    pub fn systemAccentSetEvents(on: i32) i32 {
+        _ = on;
+        return core.ERR_UNSUPPORTED;
+    }
 };
 
 pub fn appInstanceAcquire() i32 {
