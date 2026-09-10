@@ -30,7 +30,7 @@ namespace Archoera.Scanner;
 /// </summary>
 public static class Program
 {
-    public static async Task<int> Main(string[] args)
+    public static int Main(string[] args)
     {
         var dataDir = Environment.GetEnvironmentVariable("ARCHOERA_DATA_DIR")
             ?? Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "data"));
@@ -55,14 +55,14 @@ public static class Program
         var command = args[0].ToLowerInvariant();
         return command switch
         {
-            "scan" => await RunScan(args[1..], defaultMusicDir, coverCacheDir, quarantineDir, maxFileSizeMb, maxScanFiles, maxScanErrors, maxParallelism),
-            "parse" => await RunParse(args[1..], coverCacheDir),
+            "scan" => RunScan(args[1..], defaultMusicDir, coverCacheDir, quarantineDir, maxFileSizeMb, maxScanFiles, maxScanErrors, maxParallelism),
+            "parse" => RunParse(args[1..], coverCacheDir),
             "-h" or "--help" or "help" => PrintUsage(),
             _ => UnknownCommand(command),
         };
     }
 
-    private static async Task<int> RunScan(
+    private static int RunScan(
         string[] args, string defaultMusicDir, string coverCacheDir, string quarantineDir,
         int maxFileSizeMb, int maxScanFiles, int maxScanErrors, int maxParallelism)
     {
@@ -93,9 +93,9 @@ public static class Program
             }
         }
 
-        var dirList = string.IsNullOrEmpty(dirs)
-            ? new List<string> { defaultMusicDir }
-            : dirs.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        List<string> dirList = string.IsNullOrEmpty(dirs)
+            ? [defaultMusicDir]
+            : [.. dirs.Split([','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 
         var dbPath = Environment.GetEnvironmentVariable("ARCHOERA_DB_PATH");
         if (string.IsNullOrEmpty(dbPath))
@@ -129,7 +129,7 @@ public static class Program
         }
     }
 
-    private static async Task<int> RunParse(string[] args, string coverCacheDir)
+    private static int RunParse(string[] args, string coverCacheDir)
     {
         if (args.Length == 0 || args[0].StartsWith('-'))
         {
@@ -214,7 +214,7 @@ public static class Program
             .Select(n => new ArtistRef { Name = n })
             .ToList();
         if (artists == null || artists.Count == 0)
-            artists = new List<ArtistRef> { new() { Name = "未知歌手" } };
+            artists = [new() { Name = "未知歌手" }];
 
         AlbumRef? album = null;
         if (!string.IsNullOrWhiteSpace(tag.Tag.Album))
