@@ -109,6 +109,11 @@ const ID_INFO = [_]u8{ 0x15, 0x49, 0xA9, 0x66 };
 const ID_TIMESTAMP_SCALE = [_]u8{ 0x2A, 0xD7, 0xB1 };
 const ID_DURATION = [_]u8{ 0x44, 0x89 };
 const ID_TRACKS = [_]u8{ 0x16, 0x54, 0xAE, 0x6B };
+const ID_TAGS = [_]u8{ 0x12, 0x54, 0xC3, 0x67 };
+const ID_TAG = [_]u8{ 0x73, 0x73 };
+const ID_SIMPLE_TAG = [_]u8{ 0x67, 0xC8 };
+const ID_TAG_NAME = [_]u8{ 0x45, 0xA3 };
+const ID_TAG_STRING = [_]u8{ 0x44, 0x87 };
 const ID_TRACK_ENTRY = [_]u8{0xAE};
 const ID_TRACK_NUMBER = [_]u8{0xD7};
 const ID_TRACK_TYPE = [_]u8{0x83};
@@ -836,6 +841,216 @@ fn makeInfo(ctx: *Ctx, codec: Codec, duration_us: i64, has_duration: bool) decod
         inf.duration_known = .exact;
     }
     return inf;
+}
+
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）：只扫 Segment 顶层 Info/Tracks/Tags
+// 小段，不建解码器/不读 Cluster；标签取 Matroska Tags/SimpleTag。
+// ---------------------------------------------------------------------------
+
+fn mkvField(name: []const u8) ?usize {
+    if (std.ascii.eqlIgnoreCase(name, "TITLE")) return 0;
+    if (std.ascii.eqlIgnoreCase(name, "ARTIST")) return 1;
+    if (std.ascii.eqlIgnoreCase(name, "ALBUM")) return 2;
+    if (std.ascii.eqlIgnoreCase(name, "DATE_RELEASED")) return 3;
+    if (std.ascii.eqlIgnoreCase(name, "DATE_RECORDED")) return 3;
+    if (std.ascii.eqlIgnoreCase(name, "GENRE")) return 4;
+    if (std.ascii.eqlIgnoreCase(name, "COMMENT")) return 5;
+    if (std.ascii.eqlIgnoreCase(name, "DESCRIPTION")) return 5;
+    return null;
+}
+
+fn mkvAddTag(allocator: Allocator, list: *std.ArrayList(decoder.Tag), name: []const u8, value: []const u8) void {
+    if (name.len == 0 or value.len == 0) return;
+    const k = allocator.dupe(u8, name) catch return;
+    const v = allocator.dupe(u8, value) catch {
+        allocator.free(k);
+        return;
+    };
+    list.append(allocator, .{ .key = k, .value = v }) catch {
+        allocator.free(k);
+        allocator.free(v);
+    };
+}
+
+fn mkvMapField(allocator: Allocator, meta: *decoder.Metadata, name: []const u8, value: []const u8) void {
+    const slot = mkvField(name) orelse return;
+    const z = allocator.dupeZ(u8, value) catch return;
+    switch (slot) {
+        0 => if (meta.title == null) {
+            meta.title = z;
+        } else allocator.free(z),
+        1 => if (meta.artist == null) {
+            meta.artist = z;
+        } else allocator.free(z),
+        2 => if (meta.album == null) {
+            meta.album = z;
+        } else allocator.free(z),
+        3 => if (meta.date == null) {
+            meta.date = z;
+        } else allocator.free(z),
+        4 => if (meta.genre == null) {
+            meta.genre = z;
+        } else allocator.free(z),
+        else => if (meta.comment == null) {
+            meta.comment = z;
+        } else allocator.free(z),
+    }
+}
+
+fn mkvParseSimple(allocator: Allocator, data: []const u8, meta: *decoder.Metadata, list: *std.ArrayList(decoder.Tag)) void {
+    var name: ?[]const u8 = null;
+    var value: ?[]const u8 = null;
+    var o: usize = 0;
+    while (ebml.elem(data, o, data.len)) |el| : (o = el.next) {
+        if (el.is(&ID_TAG_NAME)) {
+            name = el.payload;
+        } else if (el.is(&ID_TAG_STRING)) {
+            value = el.payload;
+        } else if (el.is(&ID_SIMPLE_TAG)) {
+            mkvParseSimple(allocator, el.payload, meta, list);
+        }
+    }
+    if (name != null and value != null) {
+        mkvAddTag(allocator, list, name.?, value.?);
+        mkvMapField(allocator, meta, name.?, value.?);
+    }
+}
+
+fn mkvParseTags(allocator: Allocator, data: []const u8, meta: *decoder.Metadata, list: *std.ArrayList(decoder.Tag)) void {
+    var o: usize = 0;
+    while (ebml.elem(data, o, data.len)) |el| : (o = el.next) {
+        if (!el.is(&ID_TAG)) continue;
+        var p: usize = 0;
+        while (ebml.elem(el.payload, p, el.payload.len)) |st| : (p = st.next) {
+            if (st.is(&ID_SIMPLE_TAG)) mkvParseSimple(allocator, st.payload, meta, list);
+        }
+    }
+}
+
+const MetaCtx = struct {
+    allocator: Allocator,
+    reader: io.Reader,
+    meta: decoder.Metadata,
+    tags: []decoder.Tag,
+};
+
+fn metaDeinit(ctx: *anyopaque) void {
+    const self: *MetaCtx = @ptrCast(@alignCast(ctx));
+    inline for (.{ &self.meta.title, &self.meta.artist, &self.meta.album, &self.meta.date, &self.meta.genre, &self.meta.comment }) |f| {
+        if (f.*) |sv| self.allocator.free(sv);
+    }
+    for (self.tags) |t| {
+        self.allocator.free(t.key);
+        self.allocator.free(t.value);
+    }
+    if (self.tags.len > 0) self.allocator.free(self.tags);
+    self.reader.deinit();
+    self.allocator.destroy(self);
+}
+
+pub fn openMeta(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    var src = reader.*;
+    errdefer src.deinit();
+    const fsize = try src.size();
+
+    var e0 = (try readElemHead(&src)) orelse return error.UnsupportedFormat;
+    if (!e0.is(&ID_EBML)) return error.UnsupportedFormat;
+    var head_buf = std.ArrayList(u8).empty;
+    defer head_buf.deinit(allocator);
+    {
+        const eb_off = src.pos;
+        try readPayloadAt(&head_buf, allocator, &src, eb_off, e0.size, max_head_payload);
+        if (!checkDocType(head_buf.items)) return error.UnsupportedFormat;
+    }
+
+    var s0 = (try readElemHead(&src)) orelse return error.Corrupt;
+    if (!s0.is(&ID_SEGMENT)) return error.Corrupt;
+    const seg_pay_off = src.pos;
+    const seg_end: u64 = if (s0.size_unknown) fsize else @min(seg_pay_off + s0.size, fsize);
+    if (seg_pay_off >= seg_end) return error.Corrupt;
+
+    var timestamp_scale_ns: u64 = 1_000_000;
+    var duration_us: i64 = 0;
+    var has_duration = false;
+    var track: Track = .{};
+    var found_track = false;
+    var meta: decoder.Metadata = .{};
+    var list: std.ArrayList(decoder.Tag) = .empty;
+    errdefer {
+        for (list.items) |t| {
+            allocator.free(t.key);
+            allocator.free(t.value);
+        }
+        list.deinit(allocator);
+    }
+
+    var scan: u64 = seg_pay_off;
+    var elem_buf = std.ArrayList(u8).empty;
+    defer elem_buf.deinit(allocator);
+    while (scan < seg_end) {
+        try src.seek(@intCast(scan), .start);
+        const h = (try readElemHead(&src)) orelse break;
+        const po = src.pos;
+        const pe: u64 = if (h.size_unknown) seg_end else @min(po + h.size, seg_end);
+        if (h.is(&ID_INFO)) {
+            try readPayloadAt(&elem_buf, allocator, &src, po, pe -| po, max_head_payload);
+            var o2: usize = 0;
+            while (ebml.elem(elem_buf.items, o2, elem_buf.items.len)) |ch| : (o2 = ch.next) {
+                if (ch.is(&ID_CRC32)) continue;
+                if (ch.is(&ID_TIMESTAMP_SCALE)) {
+                    const v = uintOf(ch.payload);
+                    if (v > 0) timestamp_scale_ns = v;
+                } else if (ch.is(&ID_DURATION)) {
+                    const ticks = floatOf(ch.payload);
+                    if (ticks > 0 and ticks < 1e12) {
+                        duration_us = @intCast(@divTrunc(@as(i128, @intFromFloat(ticks * @as(f64, @floatFromInt(timestamp_scale_ns)))), 1000));
+                        has_duration = true;
+                    }
+                }
+            }
+        } else if (h.is(&ID_TRACKS)) {
+            try readPayloadAt(&elem_buf, allocator, &src, po, pe -| po, max_tracks_payload);
+            var o2: usize = 0;
+            while (ebml.elem(elem_buf.items, o2, elem_buf.items.len)) |entry| : (o2 = entry.next) {
+                if (entry.is(&ID_CRC32)) continue;
+                if (!entry.is(&ID_TRACK_ENTRY)) continue;
+                var t: Track = .{};
+                parseTrackEntry(entry.payload, &t);
+                if (!found_track and t.track_type == 2 and t.codec != null) {
+                    track = t;
+                    found_track = true;
+                }
+            }
+        } else if (h.is(&ID_TAGS)) {
+            try readPayloadAt(&elem_buf, allocator, &src, po, pe -| po, max_head_payload);
+            mkvParseTags(allocator, elem_buf.items, &meta, &list);
+        }
+        if (pe <= scan) break;
+        scan = pe;
+    }
+    if (!found_track) return error.UnsupportedFormat;
+    const codec = track.codec.?;
+
+    var tags: []decoder.Tag = &.{};
+    tags = list.toOwnedSlice(allocator) catch tags;
+    meta.tags = tags;
+
+    const ctx = try allocator.create(MetaCtx);
+    ctx.* = .{ .allocator = allocator, .reader = reader.*, .meta = meta, .tags = tags };
+
+    info.* = .{
+        .sample_rate = track.sample_rate,
+        .channels = track.channels,
+        .bits_per_sample = if (track.bit_depth > 0) track.bit_depth else 16,
+        .is_float = false,
+        .duration_us = if (has_duration) duration_us else -1,
+        .duration_known = if (has_duration) .exact else .unknown,
+        .codec_name = codec.name(),
+        .format_name = "matroska",
+        .metadata = meta,
+    };
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
 }
 
 // ---------------------------------------------------------------------------
