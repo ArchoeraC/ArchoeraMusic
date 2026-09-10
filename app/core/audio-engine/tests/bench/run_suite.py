@@ -12,7 +12,7 @@
 #   E. scanner 元数据吞吐（内核 probe-only vs TagLib）
 #
 # 产物：docs/test-suite-<date>.md（汇总报告）+ /tmp/opencode/suite_*.csv（原始数据）
-import argparse, os, re, subprocess, sys, time, threading, shutil, sqlite3
+import argparse, os, re, resource, subprocess, sys, time, threading, shutil, sqlite3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", "..", "..", ".."))  # repo root
@@ -31,6 +31,11 @@ def sh(cmd, cwd=None, env=None, timeout=3600):
     p = subprocess.run(cmd, cwd=cwd, env=e, stdout=subprocess.PIPE,
                        stderr=subprocess.STDOUT, timeout=timeout)
     return p.returncode, p.stdout.decode(errors="replace"), time.monotonic() - t
+
+
+def child_cpu():
+    r = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return r.ru_utime + r.ru_stime
 
 
 def peak_rss(pid):
@@ -116,9 +121,11 @@ def sec_pool():
     rows = []
     for n in [1, 2, 4, 8, 16, 32, 64, 128]:
         paths = [os.path.join(corpus, avail[i % len(avail)]) for i in range(n)]
+        c0 = child_cpu()
         rc, out, wall, rss = run_poll([bench, "-streams", str(n), str(n)] + paths)
+        cpu = child_cpu() - c0
         m = re.search(r"files_ok=(\d+)/(\d+) total_frames=(\d+) wall_ms=(\d+)", out)
-        rows.append({"n": n, "wall": wall, "rss": rss, "rc": rc, "cap": n,
+        rows.append({"n": n, "wall": wall, "rss": rss, "cpu": cpu, "rc": rc, "cap": n,
                      "ok": f"{m.group(1)}/{m.group(2)}" if m else "?",
                      "frames": m.group(3) if m else "?"})
     # 对照：默认流上限 8（N=128 时大量 open 失败）
@@ -166,12 +173,14 @@ def sec_scanner():
             env = dict(os.environ, ARCHOERA_DB_PATH=db,
                        ARCHOERA_DATA_DIR=f"{TMP}/suite_sd_{name}_{par}",
                        SCANNER_MAX_PARALLELISM=str(par))
+            c0 = child_cpu()
             rc, out, wall, rss = run_poll(["dotnet", dll, "scan", "--dirs", corpus, "--full"], env=env)
+            cpu = child_cpu() - c0
             if not use_k and os.path.exists(f"{TMP}/kh.suite"):
                 shutil.move(f"{TMP}/kh.suite", kso)
             n, sample = tracks(db)
             rows.append({"par": par, "engine": name, "wall": wall, "rss": rss,
-                         "rc": rc, "tracks": n, "sample": sample})
+                         "cpu": cpu, "rc": rc, "tracks": n, "sample": sample})
     # 正确性对拍（par=8）：内核 vs TagLib 行数与字段一致
     cmp = {}
     for name in ("kernel", "taglib"):
@@ -218,16 +227,30 @@ def main():
               f"- 用例：{', '.join(c['names'])}", ""]
     if "score" in res and res["score"].get("rows"):
         A += ["## C. 逐格式解码 scorecard（FFmpeg=100）", "",
-              "| 格式 | era wall(s) | era ×RT | era RSS(MB) | Stable wall(s) | era 得分 |",
-              "|---|---|---|---|---|---|"]
+              "| 格式 | era wall(s) | era CPU(s) | era RSS(MB) | stable wall(s) | stable CPU(s) | stable RSS(MB) | wall era/stable | era 得分 |",
+              "|---|---|---|---|---|---|---|---|---|"]
+        def cpu(r):
+            try:
+                return round(float(r.get("user_s", 0)) + float(r.get("sys_s", 0)), 3)
+            except Exception:
+                return "—"
         by = {}
         for r in res["score"]["rows"]:
             by.setdefault(r["format"], {})[r["engine"]] = r
         for fmt, d in by.items():
-            e = d.get("era"); s = d.get("stable")
+            e = d.get("era"); st = d.get("stable")
             if not e: continue
-            A.append(f"| {fmt} | {e['wall_s']} | {e['xrt']} | {float(e['rss_kb'])/1024:.1f} | "
-                     f"{s['wall_s'] if s else '—'} | {e['total']} |")
+            ratio = "—"
+            st_wall = st_cpu = st_rss = "—"
+            if st:
+                st_wall = st["wall_s"]; st_cpu = cpu(st)
+                st_rss = f"{float(st['rss_kb'])/1024:.1f}"
+                try:
+                    ratio = f"{float(e['wall_s'])/float(st['wall_s']):.2f}"
+                except Exception:
+                    pass
+            A.append(f"| {fmt} | {e['wall_s']} | {cpu(e)} | {float(e['rss_kb'])/1024:.1f} | "
+                     f"{st_wall} | {st_cpu} | {st_rss} | {ratio} | {e['total']} |")
         A.append("")
         av = res["score"].get("avg", {})
         A.append(f"- 总体均分：**era {av.get('era','?')} vs stable {av.get('stable','?')} "
@@ -238,9 +261,9 @@ def main():
         A.append("")
     if "pool" in res and res["pool"].get("rows"):
         A += ["## D. 内核池并发压力（bench_era_pool，流上限=并发）", "",
-              "| N | 进程墙钟 ms | 峰值 RSS MB | files_ok | 合计帧 |", "|---|---|---|---|---|"]
+              "| N | 进程墙钟 ms | CPU(s) | 峰值 RSS MB | files_ok | 合计帧 |", "|---|---|---|---|---|---|"]
         for r in res["pool"]["rows"]:
-            A.append(f"| {r['n']} | {r['wall']:.0f} | {r['rss']:.1f} | {r['ok']} | {r['frames']} |")
+            A.append(f"| {r['n']} | {r['wall']:.0f} | {r.get('cpu',0):.3f} | {r['rss']:.1f} | {r['ok']} | {r['frames']} |")
         A.append("")
         A.append(f"- 流上限=并发（`zk_engine_init_streams(...,N)`）；**对照默认流上限 8、N=128："
                  f"{res['pool'].get('cap8','?')}**（证明默认会限制并发）。")
@@ -248,10 +271,10 @@ def main():
         A.append("")
     if "scan" in res and res["scan"].get("rows"):
         A += ["## E. scanner 元数据吞吐（1000 小文件）", "",
-              "| 并行度 | 引擎 | wall ms | 峰值 RSS MB | rc | tracks |", "|---|---|---|---|---|---|"]
+              "| 并行度 | 引擎 | wall ms | CPU(s) | 峰值 RSS MB | rc | tracks |", "|---|---|---|---|---|---|---|"]
         for r in res["scan"]["rows"]:
-            A.append(f"| {r['par']} | {r['engine']} | {r['wall']:.0f} | {r['rss']:.1f} | "
-                     f"{r['rc']} | {r.get('tracks','?')} |")
+            A.append(f"| {r['par']} | {r['engine']} | {r['wall']:.0f} | {r.get('cpu',0):.3f} | "
+                     f"{r['rss']:.1f} | {r['rc']} | {r.get('tracks','?')} |")
         A.append("")
         ct = res["scan"].get("cmp_tracks", {})
         mm = res["scan"].get("cmp_mismatch")

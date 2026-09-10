@@ -222,6 +222,8 @@ fn findFrameSync(reader: *Reader, off: u64, limit: u64) Error!?u64 {
             const h = span[i .. i + 4];
             if (header.hdrValid(h)) return pos + @as(u64, i);
         }
+        // 尾部不足 4 字节：不可能再有帧头 → 结束（否则 span.len-3 可能为 0 → 死循环）
+        if (span.len < 4) break;
         // 无命中：前进到跨度末尾 - 3（保留重叠）
         pos += span.len - 3;
     }
@@ -231,7 +233,6 @@ fn findFrameSync(reader: *Reader, off: u64, limit: u64) Error!?u64 {
 pub fn open(allocator: Allocator, reader: *Reader, info: *decoder.Info) Error!decoder.Decoder {
     const file_size = try reader.size();
     const ctx = try allocator.create(Ctx);
-    errdefer allocator.destroy(ctx);
     ctx.* = .{ .allocator = allocator, .reader = reader.*, .file_size = file_size };
 
     // 解析 ID3v2 标签（若存在）→ 元数据 + 图片 + 增益；返回音频起点
@@ -248,18 +249,10 @@ pub fn open(allocator: Allocator, reader: *Reader, info: *decoder.Info) Error!de
     errdefer destroyCtx(ctx);
 
     // 扫描首个有效帧
-    const first = (try findFrameSync(&ctx.reader, ctx.audio_start, file_size)) orelse {
-        destroyCtx(ctx);
+    const first = (try findFrameSync(&ctx.reader, ctx.audio_start, file_size)) orelse
         return error.Corrupt;
-    };
-    const h = (try readHdr(&ctx.reader, first)) orelse {
-        destroyCtx(ctx);
-        return error.Corrupt;
-    };
-    if (!header.hdrValid(&h)) {
-        destroyCtx(ctx);
-        return error.Corrupt;
-    }
+    const h = (try readHdr(&ctx.reader, first)) orelse return error.Corrupt;
+    if (!header.hdrValid(&h)) return error.Corrupt;
 
     ctx.channels = if (header.hdrIsMono(&h)) 1 else 2;
     ctx.sample_rate = @intCast(header.hdrSampleRateHz(&h));
@@ -317,18 +310,10 @@ pub fn openMeta(allocator: Allocator, reader: *Reader, info: *decoder.Info) Erro
     if (ctx.audio_start == 0) ctx.audio_start = 0;
     errdefer destroyMetaCtx(ctx);
 
-    const first = (try findFrameSync(&ctx.reader, ctx.audio_start, file_size)) orelse {
-        destroyMetaCtx(ctx);
+    const first = (try findFrameSync(&ctx.reader, ctx.audio_start, file_size)) orelse
         return error.Corrupt;
-    };
-    const h = (try readHdr(&ctx.reader, first)) orelse {
-        destroyMetaCtx(ctx);
-        return error.Corrupt;
-    };
-    if (!header.hdrValid(&h)) {
-        destroyMetaCtx(ctx);
-        return error.Corrupt;
-    }
+    const h = (try readHdr(&ctx.reader, first)) orelse return error.Corrupt;
+    if (!header.hdrValid(&h)) return error.Corrupt;
 
     ctx.channels = if (header.hdrIsMono(&h)) 1 else 2;
     ctx.sample_rate = @intCast(header.hdrSampleRateHz(&h));
