@@ -146,6 +146,55 @@ long long zk_engine_position_ms(ZkEngineStream *s);
 /** 关闭会话（池内释放实例）；s 为 NULL 时空操作 */
 void zk_engine_close(ZkEngineStream *s);
 
+/* ---- 元数据快路径（§8.4.2①；结构化 ABI，无 JSON，供 scanner 直桥）---- */
+
+/** 标签键值（指针 + 显式长度；生命周期与 metadata 句柄一致，只读不释放） */
+typedef struct ZkTag {
+    const char *key;   int key_len;
+    const char *value; int value_len;
+} ZkTag;
+
+/** 元数据信息（标量 + 标准字段 + 全量 tags + 首张封面；指针生命周期同句柄） */
+typedef struct ZkMetaInfo {
+    int         sample_rate;
+    int         channels;
+    int         bits_per_sample;
+    long long   duration_us;
+    int         duration_known;   /**< 0=exact 1=estimate 2=unknown */
+    const char *codec_name;
+    const char *format_name;
+    const char *profile;          /**< 可空 */
+    const char *title;            /**< 以下可空 */
+    const char *artist;
+    const char *album;
+    const char *date;
+    const char *genre;
+    const char *comment;
+    const ZkTag *tags;            /**< 全量标签；无则 NULL */
+    int         tags_count;
+    const char *cover_mime;  int cover_mime_len;
+    const unsigned char *cover_data; int cover_size;
+} ZkMetaInfo;
+
+/** 元数据句柄（不透明；持有解码器 ctx 与 tags 数组生命周期） */
+typedef struct ZkMetaHandle ZkMetaHandle;
+
+/**
+ * 打开元数据句柄（probe+open，不解码 PCM）。成功填 *out 并返回句柄；
+ * 失败返回 NULL 并写 errbuf[0..4] = LE ZkStatus。
+ */
+ZkMetaHandle *zk_metadata_open(const char *path, ZkMetaInfo *out,
+                               char *errbuf, int errbuf_size);
+
+/** 释放元数据句柄（含 tags 数组与底层 ctx）。NULL 空操作。 */
+void zk_metadata_close(ZkMetaHandle *h);
+
+/** scanner 按自身指标协商并发提示（0 = 自动）；内核 metadata 池/限流参考。 */
+void zk_metadata_set_concurrency(int n);
+
+/** 回读当前并发提示。 */
+int zk_metadata_get_concurrency(void);
+
 #ifdef __cplusplus
 }
 #endif

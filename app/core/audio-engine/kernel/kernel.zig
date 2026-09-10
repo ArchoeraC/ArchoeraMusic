@@ -246,6 +246,106 @@ export fn zk_engine_decode_once(
 }
 
 // ---------------------------------------------------------------------------
+// 元数据快路径 FFI（docs/audio-kernel-zig.md §8.4.2①；结构化 C ABI，无 JSON）
+// 直接桥接 scanner：probe+open（不触发 PCM 解码），一次性取标量/标签/封面。
+// ---------------------------------------------------------------------------
+
+/// metadata 句柄：Engine（持有 Info 与解码器 ctx 生命周期）+ tags 数组
+const MetaHandle = struct {
+    eng: *engine.Engine,
+    tags: []engine.ZkTag,
+};
+
+/// scanner 依据自身指标（AdaptiveConcurrency/内存）协商的并发提示；
+/// 供内核后续 metadata 池/限流使用（当前仅存储与回读，不改变单调用语义）。
+var g_meta_concurrency: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
+
+/// 由 decoder.Info 填充 ZkMetaInfo（tags/封面指针指向句柄生命周期内存）
+fn fillMetaInfo(info: decoder.Info, tags: []engine.ZkTag) engine.ZkMetaInfo {
+    const m = info.metadata;
+    const cover = if (info.pictures.len > 0) info.pictures[0] else null;
+    return .{
+        .sample_rate = @intCast(info.sample_rate),
+        .channels = @intCast(info.channels),
+        .bits_per_sample = @intCast(info.bits_per_sample),
+        .duration_us = info.duration_us,
+        .duration_known = switch (info.duration_known) {
+            .exact => 0,
+            .estimate => 1,
+            .unknown => 2,
+        },
+        .codec_name = info.codec_name.ptr,
+        .format_name = info.format_name.ptr,
+        .profile = if (info.profile) |p| p.ptr else null,
+        .title = if (m.title) |s| s.ptr else null,
+        .artist = if (m.artist) |s| s.ptr else null,
+        .album = if (m.album) |s| s.ptr else null,
+        .date = if (m.date) |s| s.ptr else null,
+        .genre = if (m.genre) |s| s.ptr else null,
+        .comment = if (m.comment) |s| s.ptr else null,
+        .tags = if (tags.len > 0) tags.ptr else null,
+        .tags_count = @intCast(tags.len),
+        .cover_mime = if (cover) |c| (if (c.mime.len > 0) c.mime.ptr else null) else null,
+        .cover_mime_len = if (cover) |c| @intCast(c.mime.len) else 0,
+        .cover_data = if (cover) |c| (if (c.data.len > 0) c.data.ptr else null) else null,
+        .cover_size = if (cover) |c| @intCast(c.data.len) else 0,
+    };
+}
+
+/// 打开元数据句柄（probe+open，不解码 PCM）。失败返回 null 并写 errbuf 状态码。
+export fn zk_metadata_open(
+    path: [*:0]const u8,
+    out: *engine.ZkMetaInfo,
+    errbuf: [*]u8,
+    errbuf_size: c_int,
+) ?*MetaHandle {
+    const gpa = std.heap.c_allocator;
+    var zinfo: engine.ZkInfo = undefined;
+    const eng = engine.zkOpen(path, &zinfo, errbuf, errbuf_size) orelse return null;
+    errdefer engine.zkClose(eng);
+
+    const src = eng.info.metadata.tags;
+    const tags = gpa.alloc(engine.ZkTag, src.len) catch {
+        fillErrStatus(errbuf, if (errbuf_size > 0) @intCast(errbuf_size) else 0, @intFromEnum(err.Status.out_of_memory));
+        return null;
+    };
+    for (tags, src) |*zt, t| {
+        zt.* = .{
+            .key = if (t.key.len > 0) t.key.ptr else null,
+            .key_len = @intCast(t.key.len),
+            .value = if (t.value.len > 0) t.value.ptr else null,
+            .value_len = @intCast(t.value.len),
+        };
+    }
+
+    const h = gpa.create(MetaHandle) catch {
+        gpa.free(tags);
+        return null;
+    };
+    h.* = .{ .eng = eng, .tags = tags };
+    out.* = fillMetaInfo(eng.info, tags);
+    return h;
+}
+
+/// 释放元数据句柄（含 Engine 与 tags 数组）。
+export fn zk_metadata_close(h: ?*MetaHandle) void {
+    const x = h orelse return;
+    if (x.tags.len > 0) std.heap.c_allocator.free(x.tags);
+    engine.zkClose(x.eng);
+    std.heap.c_allocator.destroy(x);
+}
+
+/// scanner 按自身指标协商并发提示（0 = 未设/自动）。
+export fn zk_metadata_set_concurrency(n: c_int) void {
+    g_meta_concurrency.store(if (n < 0) 0 else @intCast(n), .release);
+}
+
+/// 回读当前并发提示（scanner 校验/内核调试用）。
+export fn zk_metadata_get_concurrency() c_int {
+    return @intCast(g_meta_concurrency.load(.acquire));
+}
+
+// ---------------------------------------------------------------------------
 // 流式会话 FFI（§6.3 朝播放迁池：句柄常驻、逐块拉取、池内执行、表面同步）
 // ---------------------------------------------------------------------------
 

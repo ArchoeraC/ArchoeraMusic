@@ -162,6 +162,35 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(kernel);
 
+    // ---- 内核动态库（scanner NativeAOT P/Invoke：zk_metadata_* 结构化 ABI，无 JSON）----
+    // 与静态库同源同配置；scanner 侧 DllImport("archoera_kernel")，随包分发 .so。
+    const kernel_shared = b.addLibrary(.{
+        .name = "archoera_kernel",
+        .linkage = .dynamic,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("kernel/kernel.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    kernel_shared.root_module.addCSourceFile(.{
+        .file = b.path("kernel/c/stb_vorbis.c"),
+        .flags = &.{ "-O3", "-fno-sanitize=undefined" },
+    });
+    kernel_shared.root_module.addIncludePath(b.path("kernel/c"));
+    kernel_shared.root_module.addIncludePath(b.path("kernel/c/amr"));
+    kernel_shared.root_module.addIncludePath(b.path("kernel/c/amr/amr_nb/dec/src"));
+    kernel_shared.root_module.addIncludePath(b.path("kernel/c/amr/amr_nb/dec/include"));
+    kernel_shared.root_module.addIncludePath(b.path("kernel/c/amr/amr_nb/common/include"));
+    kernel_shared.root_module.addIncludePath(b.path("kernel/c/amr/amr_nb/common/src"));
+    kernel_shared.root_module.addIncludePath(b.path("kernel/c/amr/common/dec/include"));
+    kernel_shared.root_module.addCSourceFiles(.{
+        .files = &amr_sources,
+        .flags = &amr_flags,
+    });
+    b.installArtifact(kernel_shared);
+
     // ---- 内核单元测试 ----
     const kernel_tests = b.addTest(.{
         .name = "archoera-kernel-tests",

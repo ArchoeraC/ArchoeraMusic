@@ -41,6 +41,39 @@ pub const ZkInfo = extern struct {
     comment: ?[*:0]const u8,
 };
 
+/// C ABI 标签键值（指针 + 显式长度；生命周期与 metadata 句柄一致，只读不释放）
+pub const ZkTag = extern struct {
+    key: ?[*]const u8,
+    key_len: c_int,
+    value: ?[*]const u8,
+    value_len: c_int,
+};
+
+/// C ABI 元数据信息（docs/audio-kernel-zig.md §8.4.2① metadata 快路径）。
+/// 标量 + 标准字段 + 全量 tags + 首张封面；所有指针生命周期与 metadata 句柄一致。
+pub const ZkMetaInfo = extern struct {
+    sample_rate: c_int,
+    channels: c_int,
+    bits_per_sample: c_int,
+    duration_us: c_longlong,
+    duration_known: c_int, // 0=exact 1=estimate 2=unknown
+    codec_name: ?[*:0]const u8,
+    format_name: ?[*:0]const u8,
+    profile: ?[*:0]const u8,
+    title: ?[*:0]const u8,
+    artist: ?[*:0]const u8,
+    album: ?[*:0]const u8,
+    date: ?[*:0]const u8,
+    genre: ?[*:0]const u8,
+    comment: ?[*:0]const u8,
+    tags: ?[*]const ZkTag,
+    tags_count: c_int,
+    cover_mime: ?[*]const u8,
+    cover_mime_len: c_int,
+    cover_data: ?[*]const u8,
+    cover_size: c_int,
+};
+
 /// 解码会话（`zk_decoder_open` 成功返回 `*Engine`，即 C 侧 `ZkDecoder`）
 pub const Engine = struct {
     allocator: Allocator,
