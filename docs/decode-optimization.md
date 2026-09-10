@@ -90,7 +90,7 @@ SCORE 计分 `speed = 40·min(1, R/50)`：**达到 50× 实时即满分**，之�
 
 | 序 | 对象（perf 热区） | 纯计算手段（无缓冲） | 验收 |
 |---|---|---|---|
-| ① | **flac 位流 `readBits` ~34% + `io.Reader.read` ~20%** | 位取数**算术/分支**精简（局部寄存器取位、去掉逐位循环/重复边界判断/冗余调用）；**不动 Reader、不加宽缓冲** | 逐位一致 + `perf stat` 指令↓ |
+| ① | **flac 位流 `readBits` ~34% + `io.Reader.read` ~20%** ✅ | 已做：`Reader.readByte()` 单字节快路径（无新缓冲）+ `readBits` 缓存足够快路径 + comptime 掩码表 + `readBit` 直取 | 逐位一致 ✔；perf 指令 **600M→462M（−23%）** |
 | ② | **flac 残差/Rice/CRC 内层 ~12%** | 循环不变量外提、分支消除、查表、去 f64 | 逐位一致 |
 | ③ | **mp3 `synthGranule` ~20% + `imdct36` ~7%** | 预计算窗/系数表、f32 化、展开、`@Vector` | `|corr|≥0.999`/±≤1 LSB |
 | ④ | **aac `decodeIcs` ~39%（谱/Huffman/去量化）** | Huffman 单查表、去量化查表替代 pow/逐步、scalefactor 路径精简 | corr/±1 LSB 不劣化 |

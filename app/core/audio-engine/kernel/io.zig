@@ -112,6 +112,47 @@ pub const Reader = struct {
         };
     }
 
+    /// 单字节读取快路径（位级解码器逐字节取数专用；无新增缓冲）。
+    /// 语义与 `read(&one)` 完全一致（含 abort/EOF），但省去通用 read 的切片/循环开销：
+    ///   - memory：直接索引，零调用；
+    ///   - file：命中前瞻缓存直接取，未命中走既有 readFile（其内部预读块，非新增缓冲）；
+    ///   - callback：命中既有 peek 缓冲直接取，未命中走既有 readBuffered。
+    /// 返回 null = EOF（与 read 返回 0 等价）。
+    pub fn readByte(self: *Reader) Error!?u8 {
+        if (self.aborted.load(.acquire)) return error.Aborted;
+        switch (self.kind) {
+            .memory => {
+                const data = self.data.?;
+                const p = self.pos;
+                if (p >= data.len) return null;
+                self.pos = p + 1;
+                return data[p];
+            },
+            .file => {
+                const p = self.pos;
+                if (p >= self.file_cache_start and p < self.file_cache_start + self.file_cache_len) {
+                    self.pos = p + 1;
+                    return self.file_cache[p - self.file_cache_start];
+                }
+                var one: [1]u8 = undefined;
+                const n = try self.readFile(&one);
+                return if (n == 0) null else one[0];
+            },
+            .callback => {
+                if (self.buf_pos >= self.buf_len) {
+                    const n = self.on_read.?(self.ctx.?, self.buffer);
+                    self.buf_pos = 0;
+                    self.buf_len = n;
+                    if (n == 0) return null;
+                }
+                const b = self.buffer[self.buf_pos];
+                self.buf_pos += 1;
+                self.pos += 1;
+                return b;
+            },
+        }
+    }
+
     /// 定位。file/memory 形态纯偏移运算；callback 形态委托回调。
     pub fn seek(self: *Reader, off: i64, whence: SeekOrigin) Error!void {
         if (self.aborted.load(.acquire)) return error.Aborted;
