@@ -118,6 +118,13 @@ public sealed class ScannerEngine
         else
             _maxParallelism = AdaptiveConcurrency.ForIOBound();
         if (_maxParallelism < 1) _maxParallelism = AdaptiveConcurrency.ForIOBound();
+
+        // 内核并发协商：把 scanner 依自身指标（AdaptiveConcurrency/内存/可用内存）
+        // 算出的并行度下发给自研内核（metadata 池/限流参考）。内核不可用时静默跳过。
+        KernelMetadata.SetConcurrency(_maxParallelism);
+        LogInfo(KernelMetadata.Available
+            ? $"内核元数据直桥: 可用（结构化 ABI，无 JSON），协商并发={_maxParallelism}"
+            : "内核元数据直桥: 不可用，元数据回退 TagLibSharp");
     }
 
     /// <summary>
@@ -564,6 +571,20 @@ public sealed class ScannerEngine
             return null;
         }
 
+        var id = Md5Hex(filePath);
+
+        // 优先自研内核元数据快路径（结构化 C ABI，无 JSON，不解码 PCM）；
+        // 内核不可用 / 不支持该格式 / 打开失败 → 回退 TagLibSharp。
+        if (KernelMetadata.Supported(filePath))
+        {
+            var km = KernelMetadata.TryOpen(filePath);
+            if (km != null)
+            {
+                var built = FromKernel(km, filePath, info, id);
+                if (built != null) return built;
+            }
+        }
+
         TagLibFile tag;
         try
         {
@@ -575,7 +596,6 @@ public sealed class ScannerEngine
             return null;
         }
 
-        var id = Md5Hex(filePath);
         var props = tag.Properties;
         var audioProps = props.AudioSampleRate > 0 ? props : null;
 
@@ -611,20 +631,7 @@ public sealed class ScannerEngine
         string? cover = null;
         var pictures = tag.Tag.Pictures;
         if (pictures != null && pictures.Length > 0)
-        {
-            try
-            {
-                Directory.CreateDirectory(_coverCacheDir);
-                var coverPath = Path.Combine(_coverCacheDir, $"{id}.img");
-                var pic = pictures[0];
-                File.WriteAllBytes(coverPath, pic.Data.Data);
-                cover = $"/api/music/cover/{id}";
-            }
-            catch (Exception ex)
-            {
-                LogWarn($"封面写入失败 {filePath}: {ex.Message}");
-            }
-        }
+            cover = TryWriteCover(pictures[0].Data.Data, id);
 
         // 歌词（TagLibSharp 2.3.0 中 Tag.Lyrics 是 string，不是 string[]）
         var lyricsRaw = tag.Tag.Lyrics;
@@ -662,6 +669,109 @@ public sealed class ScannerEngine
     /* ------------------------------------------------------------------ */
     /* 工具                                                                */
     /* ------------------------------------------------------------------ */
+
+    /// <summary>
+    /// 由自研内核元数据（zk_metadata_*，无 JSON）构造 TrackMetadata。
+    /// 标准字段缺失时用同名标签兜底；与 TagLib 路径产出语义对齐。
+    /// </summary>
+    private TrackMetadata? FromKernel(KernelMetadata.Meta m, string filePath,
+                                      FileInfo info, string id)
+    {
+        var title = string.IsNullOrWhiteSpace(m.Title)
+            ? Path.GetFileNameWithoutExtension(filePath)
+            : m.Title;
+
+        var artistName = !string.IsNullOrWhiteSpace(m.Artist)
+            ? m.Artist
+            : FirstNonEmpty(m.Tag("artist"), m.Tag("albumartist"));
+        var artists = new List<ArtistRef>();
+        if (!string.IsNullOrWhiteSpace(artistName))
+        {
+            foreach (var n in artistName!.Split(
+                         new[] { ';', '/', '\u3001' },
+                         StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                artists.Add(new ArtistRef { Name = n });
+            }
+        }
+        if (artists.Count == 0) artists.Add(new ArtistRef { Name = "未知歌手" });
+
+        AlbumRef? album = null;
+        if (!string.IsNullOrWhiteSpace(m.Album))
+        {
+            album = new AlbumRef
+            {
+                Name = m.Album!,
+                Year = ParseYear(m.Date) ?? ParseYear(m.Tag("date")),
+                Artist = artists[0].Name,
+            };
+        }
+
+        var duration = m.DurationUs > 0 ? (long)Math.Round(m.DurationUs / 1000.0) : 0;
+
+        var cover = m.Cover is { Length: > 0 } ? TryWriteCover(m.Cover, id) : null;
+
+        var lyrics = FirstNonEmpty(m.Tag("lyrics"), m.Tag("unsyncedlyrics"),
+                                   m.Tag("unsynchronisedlyrics"));
+        if (!string.IsNullOrWhiteSpace(lyrics)) lyrics = lyrics!.Trim();
+
+        return new TrackMetadata
+        {
+            Id = id,
+            Path = filePath,
+            Title = title!,
+            Track = ParseInt(m.Tag("tracknumber")) ?? ParseInt(m.Tag("track")),
+            Artists = artists,
+            Album = album,
+            Duration = duration,
+            Cover = cover,
+            Codec = m.Codec,
+            SampleRate = m.SampleRate > 0 ? m.SampleRate : null,
+            BitRate = null,
+            Channels = m.Channels > 0 ? m.Channels : null,
+            BitsPerSample = m.BitsPerSample > 0 ? m.BitsPerSample : null,
+            FileSize = info.Length,
+            Mtime = ToUnixMs(info.LastWriteTimeUtc),
+            Ctime = ToUnixMs(info.CreationTimeUtc),
+            Lyrics = lyrics,
+        };
+    }
+
+    /// <summary>封面统一写 ${id}.img（与 TS 层 serveTrackCover 读取路径一致）。</summary>
+    private string? TryWriteCover(byte[] data, string id)
+    {
+        try
+        {
+            Directory.CreateDirectory(_coverCacheDir);
+            var coverPath = Path.Combine(_coverCacheDir, $"{id}.img");
+            File.WriteAllBytes(coverPath, data);
+            return $"/api/music/cover/{id}";
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"封面写入失败 {id}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        foreach (var v in values)
+        {
+            if (!string.IsNullOrWhiteSpace(v)) return v;
+        }
+        return null;
+    }
+
+    private static int? ParseInt(string? s)
+        => int.TryParse(s?.Trim(), out var v) && v > 0 ? v : null;
+
+    private static int? ParseYear(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        var t = s.Trim();
+        return t.Length >= 4 && int.TryParse(t.AsSpan(0, 4), out var y) && y > 0 ? y : null;
+    }
 
     private static FileInfo? SafeFileInfo(string path)
     {

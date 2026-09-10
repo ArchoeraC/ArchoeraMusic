@@ -34,4 +34,18 @@
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 自研内核元数据快路径动态库（audio-engine zig-out 产物；存在则随 CLI 输出分发）。
+         KernelMetadata 以结构化 C ABI（无 JSON）直桥，缺失时回退 TagLibSharp。 -->
+    <None Include="../audio-engine/zig-out/lib/libarchoera_kernel.so"
+          Link="libarchoera_kernel.so" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('../audio-engine/zig-out/lib/libarchoera_kernel.so')" />
+    <None Include="../audio-engine/zig-out/lib/libarchoera_kernel.dylib"
+          Link="libarchoera_kernel.dylib" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('../audio-engine/zig-out/lib/libarchoera_kernel.dylib')" />
+    <None Include="../audio-engine/zig-out/lib/archoera_kernel.dll"
+          Link="archoera_kernel.dll" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('../audio-engine/zig-out/lib/archoera_kernel.dll')" />
+  </ItemGroup>
+
 </Project>

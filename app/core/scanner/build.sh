@@ -22,6 +22,13 @@ esac
 
 mkdir -p build
 
+# 自研内核动态库（元数据快路径 zk_metadata_*；scanner 直桥，无 JSON）。
+# 与 FFI 同目录分发，NativeAOT 侧按 $ORIGIN / DllImportResolver 解析。
+if [ -d ../audio-engine ]; then
+  echo "==> 构建内核动态库 (audio-engine)"
+  ( cd ../audio-engine && zig build -Doptimize=ReleaseFast --prefix ./zig-out )
+fi
+
 # 用 -o 固定 publish 输出目录（不依赖 bin/Release/<tfm>/<rid> 路径，
 # Windows 的 AOT 输出还带 x64 前缀，随 TFM 升级会漂移）。
 dotnet publish scanner-ffi/scanner-ffi.csproj \
