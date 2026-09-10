@@ -144,6 +144,126 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
 }
 
 // ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）
+// ---------------------------------------------------------------------------
+
+/// 元数据专用轻量上下文：只保留 Ogg demux + 识别头字段 + 标签，
+/// **不含** stb_vorbis 解码器（codebook/残差状态）。
+const MetaCtx = struct {
+    allocator: std.mem.Allocator,
+    demux: ogg.Demux,
+    sample_rate: u32 = 0,
+    channels: u8 = 0,
+    meta: decoder.Metadata = .{},
+};
+
+fn metaDeinit(p: *anyopaque) void {
+    const f: *MetaCtx = @ptrCast(@alignCast(p));
+    freeMeta(f.allocator, &f.meta);
+    f.demux.deinit();
+    f.allocator.destroy(f);
+}
+
+/// 解析 Vorbis comment 头包（type 0x03 + "vorbis" + vendor + N×"KEY=value"）。
+/// 与 OpusTags 同布局（RFC 7845 §5.2 / Vorbis I §5）。
+fn parseVorbisComment(meta: *decoder.Metadata, allocator: std.mem.Allocator, data: []const u8) Error!void {
+    if (data.len < 7 or data[0] != 0x03 or !std.mem.eql(u8, data[1..7], "vorbis")) return;
+    var pos: usize = 7;
+    if (pos + 4 > data.len) return;
+    const vendor_len: usize = std.mem.readInt(u32, data[pos..][0..4], .little);
+    pos += 4;
+    pos += @min(vendor_len, data.len -| pos);
+    if (pos + 4 > data.len) return;
+    const list_len: u32 = std.mem.readInt(u32, data[pos..][0..4], .little);
+    pos += 4;
+
+    var tags: std.ArrayList(decoder.Tag) = .empty;
+    errdefer {
+        for (tags.items) |t| {
+            allocator.free(t.key);
+            allocator.free(t.value);
+        }
+        tags.deinit(allocator);
+    }
+    var i: u32 = 0;
+    while (i < list_len) : (i += 1) {
+        if (pos + 4 > data.len) break;
+        const slen: usize = std.mem.readInt(u32, data[pos..][0..4], .little);
+        pos += 4;
+        if (slen > data.len -| pos) break;
+        const entry = data[pos .. pos + slen];
+        pos += slen;
+        const eq = std.mem.indexOfScalar(u8, entry, '=') orelse continue;
+        if (eq == 0) continue;
+        const key = entry[0..eq];
+        const value = std.mem.trim(u8, entry[eq + 1 ..], " \t\r\n\x00");
+        if (value.len == 0) continue;
+
+        const k = try allocator.dupe(u8, key);
+        errdefer allocator.free(k);
+        const v = try allocator.dupe(u8, value);
+        errdefer allocator.free(v);
+        try tags.append(allocator, .{ .key = k, .value = v });
+
+        const field = commentFieldOf(key) orelse continue;
+        const s = try allocator.dupeZ(u8, value);
+        if (!setMetaField(meta, field, s)) allocator.free(s);
+    }
+    meta.tags = try tags.toOwnedSlice(allocator);
+}
+
+/// 元数据专用入口：只解 Vorbis 识别头 + comment 头 + 尾页 granule（时长），
+/// 不构造 stb_vorbis 解码器。
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const f = try allocator.create(MetaCtx);
+    errdefer allocator.destroy(f);
+    f.* = .{ .allocator = allocator, .demux = undefined };
+    f.demux = .{ .allocator = allocator, .reader = reader.* };
+    errdefer f.demux.deinit();
+
+    // 识别头：type 0x01 + "vorbis" + version(4) + channels(1) + sample_rate(4)…
+    const id_pkt = (try f.demux.nextPacket()) orelse return error.Corrupt;
+    if (id_pkt.continued) return error.Corrupt;
+    const id = id_pkt.data;
+    if (id.len < 16 or id[0] != 0x01 or !std.mem.eql(u8, id[1..7], "vorbis")) return error.Corrupt;
+    f.channels = id[11];
+    f.sample_rate = std.mem.readInt(u32, id[12..16], .little);
+    if (f.channels == 0 or f.sample_rate == 0) return error.Corrupt;
+
+    if (try f.demux.nextPacket()) |c_pkt| {
+        parseVorbisComment(&f.meta, allocator, c_pkt.data) catch {};
+    }
+    errdefer freeMeta(allocator, &f.meta);
+
+    var total_samples: u64 = 0;
+    var duration_known: decoder.DurationKnown = .unknown;
+    if ((ogg.scanTailPage(&f.demux.reader, f.demux.serial) catch null)) |tail| {
+        const granule_max: i64 = @as(i64, @intCast(f.sample_rate)) * 12 * 3600;
+        if (tail.granule > 0 and tail.granule < granule_max) {
+            total_samples = @intCast(tail.granule);
+            duration_known = if (tail.eos) .exact else .estimate;
+        }
+    }
+
+    info.* = .{
+        .sample_rate = f.sample_rate,
+        .channels = f.channels,
+        .bits_per_sample = 16,
+        .is_float = false,
+        .duration_us = if (total_samples > 0)
+            @intCast((@as(u128, total_samples) * 1_000_000) / f.sample_rate)
+        else
+            0,
+        .duration_known = duration_known,
+        .codec_name = "vorbis",
+        .format_name = "ogg",
+        .metadata = f.meta,
+    };
+    return .{ .ctx = @ptrCast(f), .deinit_fn = metaDeinit };
+}
+
+
+// ---------------------------------------------------------------------------
 // 标签（Vorbis comment：vendor + N × "KEY=value"）
 // ---------------------------------------------------------------------------
 
