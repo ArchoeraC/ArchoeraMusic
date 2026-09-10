@@ -70,10 +70,15 @@ public static class KernelMetadata
     private const string LibName = "archoera_kernel";
 
     /// <summary>内核可解析格式（扩展名，不含点）；其余回退 TagLibSharp。</summary>
+    /// <remarks>
+    /// 仅登记**内核确实解析标签**的格式（vorbis comment / ID3 / LIST-INFO / udta）。
+    /// wma/asf/amr/awb/aac(ADTS) 内核 metadata 为空，登记会丢失 TagLib 标签 →
+    /// 明确排除，走 TagLib。新增格式前先确认内核 Info.metadata 非空。
+    /// </remarks>
     private static readonly HashSet<string> KernelExts = new(StringComparer.OrdinalIgnoreCase)
     {
         "flac", "mp3", "mp2", "mp1", "wav", "wave", "ogg", "oga", "opus",
-        "m4a", "m4b", "mp4", "aac", "wma", "asf", "amr", "awb", "spx",
+        "m4a", "m4b", "mp4", "spx",
     };
 
     /// <summary>一次性 DllImportResolver 注册（定位随包分发的 libarchoera_kernel.so）。</summary>
