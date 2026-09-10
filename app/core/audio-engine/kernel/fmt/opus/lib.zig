@@ -122,7 +122,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     f.head = try opus_header.parseHead(head_pkt.data);
     // OpusTags（RFC 7845 §5.2：vendor + N×"KEY=value"，Vorbis comment 布局）
     if (try f.demux.nextPacket()) |tags_pkt| {
-        parseOpusTags(f, allocator, tags_pkt.data) catch {};
+        parseOpusTags(&f.meta, allocator, tags_pkt.data) catch {};
     }
 
     for (0..2) |i| _ = silk.resamplerInit(&f.rsm[i], 16000, 48000);
@@ -172,6 +172,67 @@ const vtable = VTable{
     .position_ms = positionMsImpl,
     .deinit = deinitImpl,
 };
+
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）
+// ---------------------------------------------------------------------------
+
+/// 元数据专用轻量上下文：只保留 Ogg demux + OpusHead + 标签，**不含** SILK/CELT
+/// 解码状态与重采样器。
+const MetaCtx = struct {
+    allocator: std.mem.Allocator,
+    demux: ogg.Demux,
+    head: opus_header.Head,
+    meta: decoder.Metadata = .{},
+};
+
+fn metaDeinit(p: *anyopaque) void {
+    const f: *MetaCtx = @ptrCast(@alignCast(p));
+    freeMeta(f.allocator, &f.meta);
+    f.demux.deinit();
+    f.allocator.destroy(f);
+}
+
+/// 元数据专用入口：只解 OpusHead + OpusTags + 尾页 granule（时长），
+/// 不初始化解码器/重采样器。
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const f = try allocator.create(MetaCtx);
+    errdefer allocator.destroy(f);
+    f.* = .{ .allocator = allocator, .demux = undefined, .head = undefined };
+    f.demux = .{ .allocator = allocator, .reader = reader.* };
+    errdefer f.demux.deinit();
+
+    const head_pkt = (try f.demux.nextPacket()) orelse return error.Corrupt;
+    if (head_pkt.continued) return error.Corrupt;
+    f.head = try opus_header.parseHead(head_pkt.data);
+    if (try f.demux.nextPacket()) |tags_pkt| {
+        parseOpusTags(&f.meta, allocator, tags_pkt.data) catch {};
+    }
+    errdefer freeMeta(allocator, &f.meta);
+
+    var duration_us: i64 = 0;
+    var duration_known: decoder.DurationKnown = .unknown;
+    if ((ogg.scanTailPage(&f.demux.reader, f.demux.serial) catch null)) |tail| {
+        if (tail.granule > 0 and tail.granule < 48000 * 12 * 3600) {
+            const g: u64 = @intCast(tail.granule);
+            duration_us = @intCast((@as(u128, g) * 1_000_000) / 48000);
+            duration_known = if (tail.eos) .exact else .estimate;
+        }
+    }
+
+    info.* = .{
+        .sample_rate = 48000,
+        .channels = f.head.channels,
+        .bits_per_sample = 16,
+        .is_float = false,
+        .duration_us = duration_us,
+        .duration_known = duration_known,
+        .codec_name = "opus",
+        .format_name = "ogg",
+        .metadata = f.meta,
+    };
+    return .{ .ctx = @ptrCast(f), .deinit_fn = metaDeinit };
+}
 
 // ---- VTable 实现 ----
 
@@ -674,7 +735,7 @@ fn freeMeta(allocator: std.mem.Allocator, meta: *decoder.Metadata) void {
 }
 
 /// 解析 OpusTags 包（容错：越界/畸形 → 保留已解析部分，不报 Corrupt）。
-fn parseOpusTags(f: *OpusCtx, allocator: std.mem.Allocator, data: []const u8) Error!void {
+fn parseOpusTags(meta: *decoder.Metadata, allocator: std.mem.Allocator, data: []const u8) Error!void {
     if (data.len < 8 or !std.mem.eql(u8, data[0..8], "OpusTags")) return;
     var pos: usize = 8;
     if (pos + 4 > data.len) return;
@@ -715,9 +776,9 @@ fn parseOpusTags(f: *OpusCtx, allocator: std.mem.Allocator, data: []const u8) Er
 
         const field = commentFieldOf(key) orelse continue;
         const s = try allocator.dupeZ(u8, value);
-        if (!setMetaField(&f.meta, field, s)) allocator.free(s);
+        if (!setMetaField(meta, field, s)) allocator.free(s);
     }
-    f.meta.tags = try tags.toOwnedSlice(allocator);
+    meta.tags = try tags.toOwnedSlice(allocator);
 }
 
 /// CELT end band（hybrid config 12-15 与 CELT-only 16-31 共用映射）
