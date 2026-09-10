@@ -30,6 +30,7 @@ const Error = @import("../error.zig").Error;
 const io = @import("../io.zig");
 const decoder = @import("../decoder.zig");
 const dstcodec = @import("dst/dst.zig");
+const id3 = @import("mp3/id3.zig");
 
 // ---- dsd2pcm 常量（FFmpeg dsd.c / Gesemann BSD dsd2pcm） ----
 
@@ -257,8 +258,109 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     return .{ .vtable = &vtable, .ctx = f };
 }
 
-fn parseContainer(f: *Ctx) Error!void {
-    var hdr: [12]u8 = undefined;
+// ---------------------------------------------------------------------------
+// 元数据专用快路径（probe-only，§8.4.2①）：容器头 + 尾部/内嵌 ID3v2，不建解码状态。
+// ---------------------------------------------------------------------------
+
+const MetaCtx = struct {
+    allocator: std.mem.Allocator,
+    f: *Ctx,
+    meta: decoder.Metadata,
+    pics: []decoder.Picture,
+};
+
+fn metaDeinit(p: *anyopaque) void {
+    const ctx: *MetaCtx = @ptrCast(@alignCast(p));
+    id3.freeMeta(ctx.allocator, &ctx.meta);
+    id3.freePictures(ctx.allocator, &ctx.pics);
+    freeState(ctx.f);
+    ctx.allocator.destroy(ctx.f);
+    ctx.allocator.destroy(ctx);
+}
+
+/// DSF：头偏移 20 处 u64 LE = ID3v2 标签起点（0 = 无）。
+/// DFF：chunk 流中 `ID3 ` chunk 内即 ID3v2。
+fn parseDsdTags(
+    f: *Ctx,
+    allocator: std.mem.Allocator,
+    meta: *decoder.Metadata,
+    pics: *[]decoder.Picture,
+    rg: *decoder.ReplayGain,
+) Error!void {
+    if (f.is_dff) {
+        var h: [16]u8 = undefined;
+        try f.reader.seek(0, .start);
+        const n = try f.reader.read(&h);
+        if (n < 16) return;
+        const frm_size = std.mem.readInt(u64, h[4..12], .big);
+        const frm_end = 12 + frm_size;
+        var off: u64 = 16;
+        while (off + 12 <= frm_end) {
+            var ch: [12]u8 = undefined;
+            try f.reader.seek(@intCast(off), .start);
+            const m = try f.reader.read(&ch);
+            if (m < 12) break;
+            const size = std.mem.readInt(u64, ch[4..12], .big);
+            if (std.mem.eql(u8, ch[0..4], "ID3 ")) {
+                _ = try id3.parseV2(&f.reader, allocator, off + 12, meta, pics, rg);
+                break;
+            }
+            off += 12 + size + (size & 1);
+        }
+        return;
+    }
+    // DSF
+    try f.reader.seek(20, .start);
+    var b: [8]u8 = undefined;
+    const n = try f.reader.read(&b);
+    if (n < 8) return;
+    const off = std.mem.readInt(u64, b[0..8], .little);
+    if (off == 0) return;
+    const fsize = f.reader.size() catch return;
+    if (off >= fsize) return;
+    _ = try id3.parseV2(&f.reader, allocator, off, meta, pics, rg);
+}
+
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    const f = try allocator.create(Ctx);
+    errdefer allocator.destroy(f);
+    f.* = .{ .allocator = allocator, .reader = reader.* };
+    errdefer f.reader.deinit();
+    errdefer freeState(f);
+    try parseContainer(f);
+
+    var meta: decoder.Metadata = .{};
+    var pics: []decoder.Picture = &.{};
+    var rg: decoder.ReplayGain = .{};
+    errdefer {
+        id3.freeMeta(allocator, &meta);
+        id3.freePictures(allocator, &pics);
+    }
+    parseDsdTags(f, allocator, &meta, &pics, &rg) catch {};
+
+    const ctx = try allocator.create(MetaCtx);
+    ctx.* = .{ .allocator = allocator, .f = f, .meta = meta, .pics = pics };
+
+    info.* = .{
+        .sample_rate = f.out_rate,
+        .channels = f.channels,
+        .bits_per_sample = 16,
+        .is_float = false,
+        .duration_us = if (f.out_rate > 0)
+            @intCast((@as(u128, f.ch_bytes * 8) * 1_000_000 + f.dsd_rate / 2) / f.dsd_rate)
+        else
+            0,
+        .duration_known = if (f.out_rate > 0) .exact else .unknown,
+        .codec_name = "dsd",
+        .format_name = if (f.is_dff) "dff" else "dsf",
+        .metadata = meta,
+        .pictures = pics,
+        .replay_gain = rg,
+    };
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
+
+fn parseContainer(f: *Ctx) Error!void {    var hdr: [12]u8 = undefined;
     const n = try f.reader.peek(&hdr);
     if (n < 12) return error.Corrupt;
     if (std.mem.eql(u8, hdr[0..4], "DSD ")) {
