@@ -310,7 +310,6 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
 
   Future<void> playPrevious() async {
     final q = state.queue;
-    _log('[queue] playPrevious len=${q.length} idx=${state.queueIndex}');
     if (q.isEmpty) return;
     final idx = state.queueIndex > 0 ? state.queueIndex - 1 : q.length - 1;
     state = state.copyWith(queueIndex: idx);
@@ -318,7 +317,6 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
   }
 
   Future<void> playNext() async {
-    _log('[queue] playNext len=${state.queue.length} idx=${state.queueIndex}');
     if (state.queue.isEmpty) return;
     _advanceNext();
     await _playCurrent();
