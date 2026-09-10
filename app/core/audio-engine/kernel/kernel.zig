@@ -250,9 +250,9 @@ export fn zk_engine_decode_once(
 // 直接桥接 scanner：probe+open（不触发 PCM 解码），一次性取标量/标签/封面。
 // ---------------------------------------------------------------------------
 
-/// metadata 句柄：Engine（持有 Info 与解码器 ctx 生命周期）+ tags 数组
+/// metadata 句柄：probe-only 会话或回退解码器（§8.4.2①）+ tags 数组
 const MetaHandle = struct {
-    eng: *engine.Engine,
+    opened: decoder.OpenedMeta,
     tags: []engine.ZkTag,
 };
 
@@ -300,11 +300,14 @@ export fn zk_metadata_open(
     errbuf_size: c_int,
 ) ?*MetaHandle {
     const gpa = std.heap.c_allocator;
-    var zinfo: engine.ZkInfo = undefined;
-    const eng = engine.zkOpen(path, &zinfo, errbuf, errbuf_size) orelse return null;
-    errdefer engine.zkClose(eng);
+    var info: decoder.Info = undefined;
+    var opened = engine.openMetadata(std.mem.span(path), &info) catch |e| {
+        engine.fillErrBuf(errbuf, errbuf_size, e);
+        return null;
+    };
+    errdefer opened.deinit();
 
-    const src = eng.info.metadata.tags;
+    const src = info.metadata.tags;
     const tags = gpa.alloc(engine.ZkTag, src.len) catch {
         fillErrStatus(errbuf, if (errbuf_size > 0) @intCast(errbuf_size) else 0, @intFromEnum(err.Status.out_of_memory));
         return null;
@@ -322,16 +325,16 @@ export fn zk_metadata_open(
         gpa.free(tags);
         return null;
     };
-    h.* = .{ .eng = eng, .tags = tags };
-    out.* = fillMetaInfo(eng.info, tags);
+    h.* = .{ .opened = opened, .tags = tags };
+    out.* = fillMetaInfo(info, tags);
     return h;
 }
 
-/// 释放元数据句柄（含 Engine 与 tags 数组）。
+/// 释放元数据句柄（含 probe-only 会话/回退解码器与 tags 数组）。
 export fn zk_metadata_close(h: ?*MetaHandle) void {
     const x = h orelse return;
     if (x.tags.len > 0) std.heap.c_allocator.free(x.tags);
-    engine.zkClose(x.eng);
+    x.opened.deinit();
     std.heap.c_allocator.destroy(x);
 }
 

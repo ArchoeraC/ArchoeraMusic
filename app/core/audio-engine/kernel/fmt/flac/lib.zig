@@ -156,9 +156,60 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     return .{ .vtable = &vtable, .ctx = @ptrCast(ctx) };
 }
 
+/// 元数据专用入口（probe-only，§8.4.2①）：解析 STREAMINFO + 元数据块并持有其分配，
+/// **不分配解码缓冲**（decoded_buf/decoded33_buf 为零长），故无 PCM 状态。
+pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
+    var parsed = try streaminfo.parse(reader, allocator);
+    errdefer parsed.deinit();
+    const si = parsed.info;
+    const audio_start = reader.pos;
+
+    const ctx = try allocator.create(FlacCtx);
+    errdefer allocator.destroy(ctx);
+    ctx.* = .{
+        .allocator = allocator,
+        .reader = undefined,
+        .stream_info = si,
+        .seektable = parsed.seektable, // 转移所有权
+        .meta = parsed.meta, // 转移所有权
+        .cue_points = parsed.cue_points, // 转移所有权
+        .pictures = parsed.pictures, // 转移所有权
+        .replay_gain = parsed.replay_gain,
+        .audio_start = audio_start,
+        .channels = si.channels,
+        .sample_rate = si.sample_rate,
+        .out_bps = if (si.bits_per_sample <= 16) 16 else 32,
+        .out_shift = if (si.bits_per_sample <= 16)
+            @intCast(16 - si.bits_per_sample)
+        else
+            @intCast(32 - si.bits_per_sample),
+        .decoded_buf = &.{},
+        .decoded33_buf = &.{},
+        .decoded = undefined,
+        .decoded33 = undefined,
+        .buf_len = 0,
+        .frame_cursor = 0,
+        .cur_blocksize = 0,
+        .samples_done = 0,
+    };
+    parsed.seektable = .empty; // 所有权已转移，防 errdefer 重复释放
+    parsed.meta = .{};
+    parsed.cue_points = &.{};
+    parsed.pictures = &.{};
+
+    info.* = buildInfo(ctx);
+    ctx.reader = reader.*;
+    return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
+}
+
+fn metaDeinit(p: *anyopaque) void {
+    const ctx: *FlacCtx = @ptrCast(@alignCast(p));
+    destroyCtx(ctx);
+    ctx.allocator.destroy(ctx);
+}
+
 /// 释放 ctx 内已持有资源（open 错误路径与 deinit 共用；缓冲长度字段判定是否已分配）
-fn destroyCtx(ctx: *FlacCtx) void {
-    if (ctx.decoded_buf.len > 0) ctx.allocator.free(ctx.decoded_buf);
+fn destroyCtx(ctx: *FlacCtx) void {    if (ctx.decoded_buf.len > 0) ctx.allocator.free(ctx.decoded_buf);
     if (ctx.decoded33_buf.len > 0) ctx.allocator.free(ctx.decoded33_buf);
     ctx.seektable.deinit(ctx.allocator);
     streaminfo.freeMeta(ctx.allocator, &ctx.meta);
