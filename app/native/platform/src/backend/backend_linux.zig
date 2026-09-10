@@ -355,6 +355,8 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
     const attempts = [_][]const []const u8{
         &.{ "kdialog", "--title", title, "--msgbox", body },
         &.{ "zenity", "--info", "--title", title, "--text", body },
+        &.{ "xmessage", "-center", "-title", title, body },
+        &.{ "yad", "--title", title, "--text", body, "--button=OK:0" },
         &.{ "notify-send", title, body },
     };
     const io = std.Io.Threaded.global_single_threaded.io();
