@@ -30,14 +30,9 @@ const BitReader = bitreader.BitReader;
 /// 解码单个 FLAC Rice 码（有符号）。
 /// k ∈ 0..30（rice_esc 已在外层排除）。
 pub fn readGolombFlac(br: *BitReader, k: u8) Error!i32 {
-    // 前缀：i 个 0 后跟 1 停止位
-    var i: u32 = 0;
-    while (true) {
-        if (try br.readBit() == 1) break;
-        i += 1;
-        // 真实编码器残差前缀远小于此；防止恶意输入引发巨量循环
-        if (i > 63) return error.Corrupt;
-    }
+    // 前缀：i 个 0 后跟 1 停止位（缓存内批量数零；逐位一致）
+    const i: u32 = try br.readUnary1(63);
+    if (i > 63) return error.Corrupt; // 恶意长前缀上限
     const kk: u5 = @intCast(k); // k ≤ 30（rice_esc 已排除）
     var value: u32 = 0;
     if (k > 0) value = try br.readBits(kk);
