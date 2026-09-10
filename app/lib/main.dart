@@ -29,6 +29,9 @@ import 'widgets/common/tray_integration.dart';
 /// + 窗口/托盘后台常驻。播放链路由 C 引擎内置 miniaudio 承担
 /// （无 libmpv/media_kit 依赖）。
 Future<void> main() async {
+  // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化——既是 Flutter
+  // binding，也让后续 windowManager（MethodChannel）可用（单实例分支要用）。
+  PowerSavingFrameBinding.ensureInitialized();
   // 单实例守卫（经 Zig 平台桥接文件锁，禁止多开）：已有实例则用应用自身对话框
   // 提示后退出（第二实例的 Flutter 引擎已由原生 runner 起好，直接 runApp 最小页）。
   final platformCaps = PlatformCapabilities.instance();
@@ -50,8 +53,6 @@ Future<void> main() async {
   // 使 dart sqlite3 与 scanner-ffi 共享同一 SQLite 实例（同版本），避免
   // 双版本并行写同一 WAL 库导致删除写入丢失。必须在任何 sqlite3.open 前。
   preloadBundledSqlite();
-  // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化，替代默认 binding
-  PowerSavingFrameBinding.ensureInitialized();
   // NT封面 CDN 拒绝 Dart 默认 UA（403）；Image.network 经 NetworkImage
   // 以 add 语义追加自定义头，传 UA 会与默认 Dart UA 叠加成双头被拒收。
   // 改全局 HttpClient 默认 UA 为浏览器 UA，天然保证单头。
