@@ -86,8 +86,10 @@ class _MediaSessionHostState extends ConsumerState<MediaSessionHost> {
           case MediaCommand.stop:
             unawaited(n.stop());
           case MediaCommand.next:
+            debugPrint('[media] cmd next (queue=${s.queue.length} idx=${s.queueIndex})');
             unawaited(n.playNext());
           case MediaCommand.previous:
+            debugPrint('[media] cmd previous (queue=${s.queue.length} idx=${s.queueIndex})');
             unawaited(n.playPrevious());
         }
       case MediaSeekEvent(:final offsetMs):
