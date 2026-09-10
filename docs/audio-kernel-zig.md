@@ -910,6 +910,12 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > APEv2 标签复用 `apev2.zig`。**probe-only 覆盖**：flac/mp3/wav/m4a/ape/wv/mpc +
 > Ogg 全家。剩余 wma/amr/ac3/dts/dsd/mka/shn/tak/tta 内核 metadata 为空，保持
 > TagLib（需先补各自标签解析器方可纳入）。
+>
+> **第八批（2026-09-10）**：**DSD（DSF/DFF）** probe-only + ID3v2 标签——DSF 读头
+> 偏移 20 的 u64 指针、DFF 扫 `ID3 ` chunk，复用 `mp3/id3.zig` 的 parseV2。**probe-only
+> 覆盖**：flac/mp3/wav/m4a/ape/wv/mpc/dsd + Ogg 全家。**TTA** 的 ID3v2 位于文件尾且
+> 无指针，需按音频终点定位（或启发式尾扫），列为后续；wma/asf/amr/ac3/dts/mka/shn/tak
+> 内核 metadata 为空，保持 TagLib。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
