@@ -6,16 +6,23 @@
 //! 与 mingw `systemmediatransportcontrolsinterop.h`（interop IID）提供。
 //!
 //! 仅 Linux 之外的 Windows 目标编入（backend_windows 引用）。
-//! 未实现：时间轴（需 ISystemMediaTransportControls2 + TimelineProperties）与
-//! 缩略图（artwork）。
+//! 覆盖：元数据 + 播放状态 + 按钮事件 + 封面缩略图（http/本地）+ 时间轴/速率。
+//! 诊断：关键路径经 `OutputDebugStringA` 输出（DebugView 可见），便于排查不显示。
 
 const std = @import("std");
 const core = @import("../core.zig");
 
 const win = @import("win_common.zig").c;
 
+const alloc = std.heap.c_allocator;
+
 const HRESULT = i32;
 const S_OK: HRESULT = 0;
+
+/// 诊断日志（DebugView / DbgView 可见；无输出不影响功能）。
+fn log(msg: [*:0]const u8) void {
+    win.OutputDebugStringA(msg);
+}
 
 // combase.dll 无 x86_64 导入库 → 运行时解析（kernel32 LoadLibrary/GetProcAddress）
 // 注：x86_64 上 .c 与 .winapi 同 ABI；用 .c 规避「winapi 禁 [*c] 参数」限制
@@ -371,8 +378,14 @@ fn setMusicProp(sig: enum { title, artist, album_artist }, value: []const u8) vo
 
 pub fn init(findWindow: *const fn () ?win.HWND) i32 {
     if (g_smtc != null) return core.OK;
-    if (!loadCombase()) return core.ERR_BACKEND;
-    const hwnd = findWindow() orelse return core.ERR_BACKEND;
+    if (!loadCombase()) {
+        log("apl/smtc: loadCombase failed");
+        return core.ERR_BACKEND;
+    }
+    const hwnd = findWindow() orelse {
+        log("apl/smtc: flutter window not found");
+        return core.ERR_BACKEND;
+    };
 
     _ = p_RoInitialize.?(1); // RO_INIT_MULTITHREADED
 
@@ -380,13 +393,17 @@ pub fn init(findWindow: *const fn () ?win.HWND) i32 {
     defer _ = p_WindowsDeleteString.?(cls);
 
     var factory: ?*anyopaque = null;
-    if (p_RoGetActivationFactory.?(cls, &IID_INTEROP, &factory) != S_OK) return core.ERR_BACKEND;
-    if (factory == null) return core.ERR_BACKEND;
+    if (p_RoGetActivationFactory.?(cls, &IID_INTEROP, &factory) != S_OK or factory == null) {
+        log("apl/smtc: RoGetActivationFactory failed");
+        return core.ERR_BACKEND;
+    }
     defer _ = vtbl(InteropVtbl, factory.?).base.Release(factory.?);
 
     var smtc: ?*anyopaque = null;
-    if (vtbl(InteropVtbl, factory.?).GetForWindow(factory.?, hwnd, &IID_SMTC, &smtc) != S_OK) return core.ERR_BACKEND;
-    if (smtc == null) return core.ERR_BACKEND;
+    if (vtbl(InteropVtbl, factory.?).GetForWindow(factory.?, hwnd, &IID_SMTC, &smtc) != S_OK or smtc == null) {
+        log("apl/smtc: GetForWindow failed");
+        return core.ERR_BACKEND;
+    }
     g_smtc = smtc;
 
     const sv = vtbl(SmtcVtbl, smtc.?);
@@ -409,17 +426,51 @@ pub fn init(findWindow: *const fn () ?win.HWND) i32 {
     if (sv.add_ButtonPressed(smtc.?, @ptrCast(&g_handler_obj), &g_button_token) == S_OK) {
         g_button_registered = true;
     }
+    log("apl/smtc: ready");
     return core.OK;
+}
+
+const ArtworkJob = struct { url: []u8 };
+
+fn artworkEntry(ctx: ?*anyopaque) callconv(.winapi) win.DWORD {
+    const job: *ArtworkJob = @ptrCast(@alignCast(ctx.?));
+    if (p_RoInitialize != null) _ = p_RoInitialize.?(1);
+    setArtwork(job.url);
+    alloc.free(job.url);
+    alloc.destroy(job);
+    return 0;
+}
+
+/// 后台线程解析封面（本地文件 GetFileFromPathAsync 可能耗时，避免阻塞 setNowPlaying）。
+fn spawnArtwork(url: []const u8) void {
+    const copy = alloc.dupe(u8, url) catch return;
+    const job = alloc.create(ArtworkJob) catch {
+        alloc.free(copy);
+        return;
+    };
+    job.* = .{ .url = copy };
+    if (win.CreateThread(null, 0, artworkEntry, @ptrCast(job), 0, null) == null) {
+        alloc.free(copy);
+        alloc.destroy(job);
+    }
 }
 
 /// 设置封面缩略图（http(s) URL 走 CreateFromUri；本地路径走 CreateFromFile）。
 fn setArtwork(url: []const u8) void {
     if (g_display == null) return;
     const is_http = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
+    log(if (is_http) "apl/smtc: artwork http" else "apl/smtc: artwork local");
     const ref = if (is_http) refFromUri(url) else refFromFile(url);
-    if (ref == null) return;
+    if (ref == null) {
+        log("apl/smtc: artwork ref failed");
+        return;
+    }
     defer release(ref);
-    _ = vtbl(DisplayVtbl, g_display.?).put_Thumbnail(g_display.?, ref);
+    if (vtbl(DisplayVtbl, g_display.?).put_Thumbnail(g_display.?, ref) == S_OK) {
+        log("apl/smtc: thumbnail set");
+    } else {
+        log("apl/smtc: put_Thumbnail failed");
+    }
 }
 
 fn rasrStatics() ?*anyopaque {
@@ -511,14 +562,18 @@ fn updateTimeline(position_ms: i64) void {
 
 pub fn setTrack(title: ?[]const u8, artist: ?[]const u8, art_url: ?[]const u8, duration_ms: i64) void {
     g_duration_ms = duration_ms;
-    if (g_music == null) return;
+    if (g_music == null) {
+        log("apl/smtc: setTrack but music props unavailable");
+        return;
+    }
     if (title) |t| setMusicProp(.title, t);
     if (artist) |a| {
         setMusicProp(.artist, a);
         setMusicProp(.album_artist, a);
     }
-    if (art_url) |u| setArtwork(u);
     if (g_display) |d| _ = vtbl(DisplayVtbl, d).Update(d);
+    if (art_url) |u| spawnArtwork(u);
+    log("apl/smtc: setTrack done");
 }
 
 pub fn setPlayback(state: i32, position_ms: i64) void {
@@ -530,6 +585,7 @@ pub fn setPlayback(state: i32, position_ms: i64) void {
     };
     _ = vtbl(SmtcVtbl, smtc).put_PlaybackStatus(smtc, st);
     updateTimeline(position_ms);
+    log("apl/smtc: setPlayback done");
     // 播放速率（1.0 播放 / 0.0 暂停）让系统自行外推进度
     if (ensureSmtc2()) |s2| {
         _ = vtbl(Smtc2Vtbl, s2).put_PlaybackRate(s2, if (state == 1) 1.0 else 0.0);

@@ -257,7 +257,10 @@ Dart 侧映射（`platform_bindings.dart`）：`MediaCommandEvent` / `MediaSeekE
   → `put_Thumbnail`；**本地路径** → `StorageFile.GetFileFromPathAsync` 轮询等待
   → `CreateFromFile`）+ `ISystemMediaTransportControls2.UpdateTimelineProperties`
   （进度条）+ `put_PlaybackRate`（1.0/0.0 供系统外推进度）。IID 由本机 winmd 解析
-  （已按 ECMA 1-based 行号修正关联并实测校验）。
+  （已按 ECMA 1-based 行号修正关联并实测校验）。封面解析在**后台线程**执行
+  （本地 `GetFileFromPathAsync` 可能耗时，避免阻塞 `setNowPlaying`）；关键路径
+  经 `OutputDebugStringA` 输出（DebugView 可见：`apl/smtc: ...`），便于排查
+  「面板不显示」。
 - **HWND 获取**：`windows/runner/main.cpp` 增一行导出 `int64_t get_flutter_window()`
   （类比 audio-engine C 壳哲学，改动 <5 行）；Dart 启动时 FFI 取得并传入
   `apl_media_set_window`。兜底：未接通时 `GetForegroundWindow()` 于窗口创建后取一次。
