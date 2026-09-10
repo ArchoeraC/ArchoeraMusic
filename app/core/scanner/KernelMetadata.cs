@@ -73,7 +73,7 @@ public static class KernelMetadata
     private static readonly HashSet<string> KernelExts = new(StringComparer.OrdinalIgnoreCase)
     {
         "flac", "mp3", "mp2", "mp1", "wav", "wave", "ogg", "oga", "opus",
-        "m4a", "m4b", "mp4", "aac", "wma", "asf", "amr", "awb",
+        "m4a", "m4b", "mp4", "aac", "wma", "asf", "amr", "awb", "spx",
     };
 
     /// <summary>一次性 DllImportResolver 注册（定位随包分发的 libarchoera_kernel.so）。</summary>
