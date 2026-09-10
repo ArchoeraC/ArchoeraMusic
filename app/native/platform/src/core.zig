@@ -103,14 +103,20 @@ pub fn setEventCallback(cb: ?Callback, user_data: ?*anyopaque) void {
 
 /// 把事件投递给 Dart 回调（任意线程可调；回调期间不持锁）。
 /// 无回调 / 未注册时静默丢弃（Noop 语义）。
+/// 事件槽：回调可能是异步 NativeCallable.listener，Dart 稍后读取指针——
+/// 若指向栈内存届时已失效（事件随机丢失），故写入**进程级静态槽**再传其地址。
+/// 事件低速率，覆盖竞争可接受（至多读到更新的一条，绝不读垃圾）。
+var g_event_slot: Event = undefined;
+
 pub fn dispatch(event: Event) void {
     lock();
+    g_event_slot = event;
     const cb_raw = g_callback.load(.acquire);
     const user = g_user_data.load(.acquire);
     unlock();
     if (cb_raw == 0) return;
     const cb: Callback = @ptrFromInt(cb_raw);
-    cb(&event, @ptrFromInt(user));
+    cb(&g_event_slot, @ptrFromInt(user));
 }
 
 // ── 测试 ──────────────────────────────────────────────────────────

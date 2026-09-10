@@ -54,9 +54,11 @@ class PlatformCapabilities {
     return b.acquireInstance() == 1;
   }
 
-  /// 系统提示（桥接不可用时静默忽略）。
-  void notify(String title, String body) {
-    _bindings?.notify(title, body);
+  /// 系统提示（桥接不可用时返回错误码）。返回 0=成功。
+  int notify(String title, String body) {
+    final b = _bindings;
+    if (b == null) return aplErrBackend;
+    return b.notify(title, body);
   }
 
   static PlatformCapabilities? _instance;
