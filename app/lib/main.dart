@@ -96,9 +96,9 @@ class _BrowserUserAgentOverrides extends HttpOverrides {
   }
 }
 
-/// 二次启动提示页：复用 Vault 警告弹窗样式（警告图标 + 应用主题），
-/// 点“知道了”后退出，不进入主应用。
-class _AlreadyRunningApp extends StatelessWidget {
+/// 二次启动提示页：与 Vault 警告一致的**模态对话框**（首帧 showDialog，
+/// 无页面包裹），警告图标 + 应用主题；点“知道了”退出。
+class _AlreadyRunningApp extends StatefulWidget {
   const _AlreadyRunningApp(
       {required this.message, required this.okLabel, required this.locale});
 
@@ -107,29 +107,42 @@ class _AlreadyRunningApp extends StatelessWidget {
   final Locale locale;
 
   @override
+  State<_AlreadyRunningApp> createState() => _AlreadyRunningAppState();
+}
+
+class _AlreadyRunningAppState extends State<_AlreadyRunningApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(EtaIcons.warning),
+          title: const Text('ArchoeraMusic'),
+          content: Text(widget.message),
+          actions: [
+            FilledButton(
+              onPressed: () => exit(0),
+              child: Text(widget.okLabel),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(AppPalette.dark, Brightness.dark),
-      locale: locale,
+      locale: widget.locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      home: Scaffold(
-        backgroundColor: AppPalette.dark.surface,
-        body: Center(
-          child: AlertDialog(
-            icon: const Icon(EtaIcons.warning),
-            title: const Text('ArchoeraMusic'),
-            content: Text(message),
-            actions: [
-              FilledButton(
-                onPressed: () => exit(0),
-                child: Text(okLabel),
-              ),
-            ],
-          ),
-        ),
-      ),
+      home: const Scaffold(backgroundColor: Color(0x00000000)),
     );
   }
 }
