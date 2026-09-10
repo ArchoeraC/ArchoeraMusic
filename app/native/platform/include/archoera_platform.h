@@ -83,6 +83,9 @@ int32_t apl_notify(const char *title, const char *body);
 /* 系统主题色（DE accent）：0=成功并写 *r/*g/*b(0-255)；<0=不可得。 */
 int32_t apl_system_accent(int32_t *r, int32_t *g, int32_t *b);
 
+/* 订阅系统主题色变更：变更时回调事件 APL_EVENT_SYSTEM_ACCENT（无载荷）。 */
+int32_t apl_system_accent_set_events(int32_t on);
+
 /* ── 反向事件（OS → Dart）──────────────────────────────────────── */
 typedef enum {
     APL_EVENT_MEDIA_COMMAND = 1,
@@ -90,6 +93,7 @@ typedef enum {
     APL_EVENT_SCREEN_STATE  = 3,
     APL_EVENT_WINDOW_STATE  = 4,
     APL_EVENT_BACKEND_STATE = 5, /* u.backend_lost：1=后端断连 */
+    APL_EVENT_SYSTEM_ACCENT = 6, /* 系统主题色变更（无载荷，重读 apl_system_accent） */
 } AplEventType;
 
 typedef enum {

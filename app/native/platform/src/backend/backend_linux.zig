@@ -46,6 +46,7 @@ var g_inhibit_on: bool = false;
 // 原子量：信号处理器（泵线程）据此过滤，且不得取 g_lock——否则与
 // ensureConn 持锁期间的同步 D-Bus 调用互锁。
 var g_screen_events = std.atomic.Value(bool).init(false);
+var g_accent_events = std.atomic.Value(bool).init(false);
 
 fn lock() void {
     while (g_lock.swap(true, .acquire)) std.atomic.spinLoopHint();
@@ -62,24 +63,34 @@ var handler_ctx: u8 = 0;
 fn onSignal(ctx: *anyopaque, conn: *transport.Connection, h: *const message.Header, body: []const u8) void {
     _ = ctx;
     _ = conn;
-    if (!g_screen_events.load(.acquire)) return;
     const member = h.member orelse return;
-    if (std.mem.eql(u8, member, "ActiveChanged")) {
-        const vals = message.readBody(alloc, "b", body) catch return;
-        defer alloc.free(vals);
-        if (vals.len != 1) return;
-        core.dispatch(.{
-            .type = core.EVENT_SCREEN_STATE,
-            .u = .{ .active = @intFromBool(vals[0].boolean) },
-        });
-        return;
+    if (g_screen_events.load(.acquire)) {
+        if (std.mem.eql(u8, member, "ActiveChanged")) {
+            const vals = message.readBody(alloc, "b", body) catch return;
+            defer alloc.free(vals);
+            if (vals.len != 1) return;
+            core.dispatch(.{
+                .type = core.EVENT_SCREEN_STATE,
+                .u = .{ .active = @intFromBool(vals[0].boolean) },
+            });
+            return;
+        }
+        // systemd-logind 会话锁屏/解锁（LockedHint 的简单信号形态，无参数）：
+        // 作为 ScreenSaver.ActiveChanged 之外的**第二来源**，降低解锁复位丢失概率。
+        if (std.mem.eql(u8, member, "Lock")) {
+            core.dispatch(.{ .type = core.EVENT_SCREEN_STATE, .u = .{ .active = 1 } });
+            return;
+        } else if (std.mem.eql(u8, member, "Unlock")) {
+            core.dispatch(.{ .type = core.EVENT_SCREEN_STATE, .u = .{ .active = 0 } });
+            return;
+        }
     }
-    // systemd-logind 会话锁屏/解锁（LockedHint 的简单信号形态，无参数）：
-    // 作为 ScreenSaver.ActiveChanged 之外的**第二来源**，降低解锁复位丢失概率。
-    if (std.mem.eql(u8, member, "Lock")) {
-        core.dispatch(.{ .type = core.EVENT_SCREEN_STATE, .u = .{ .active = 1 } });
-    } else if (std.mem.eql(u8, member, "Unlock")) {
-        core.dispatch(.{ .type = core.EVENT_SCREEN_STATE, .u = .{ .active = 0 } });
+    // 系统主题色变更：portal SettingChanged（跨 DE）或 KDE KGlobalSettings.notifyChange。
+    // 载荷各异且无需解析——只作“可能已变”通知，Dart 重读并去重。
+    if (g_accent_events.load(.acquire) and
+        (std.mem.eql(u8, member, "SettingChanged") or std.mem.eql(u8, member, "notifyChange")))
+    {
+        core.dispatch(.{ .type = core.EVENT_SYSTEM_ACCENT, .u = .{ .active = 1 } });
     }
 }
 
@@ -108,6 +119,7 @@ fn ensureConn() ?*transport.Connection {
     conn.handler = &handler;
     pickScreensaver(&conn);
     addScreenMatch(&conn);
+    addAccentMatch(&conn);
     // 先落全局（稳定地址），再让 mpris 持有其指针——否则 mpris 存的是局部
     // `conn` 的栈地址，ensureConn 返回后悬垂 → Metadata/PlaybackStatus 推送失效。
     g_conn = conn;
@@ -178,6 +190,27 @@ fn addScreenMatch(conn: *transport.Connection) void {
             "type='signal',interface='org.freedesktop.login1.Session',member='{s}'",
             .{m},
         ) catch continue;
+        const args = [_]message.Value{.{ .string = rule }};
+        _ = conn.call(
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus",
+            "AddMatch",
+            "s",
+            &args,
+            3_000,
+        ) catch continue;
+    }
+}
+
+/// 订阅系统主题色变更信号：XDG portal（跨 DE）+ KDE KGlobalSettings。
+/// match 规则不要求服务存在，缺失时无信号、无副作用。
+fn addAccentMatch(conn: *transport.Connection) void {
+    const rules = [_][]const u8{
+        "type='signal',interface='org.freedesktop.portal.Settings',member='SettingChanged'",
+        "type='signal',interface='org.kde.KGlobalSettings',member='notifyChange'",
+    };
+    for (rules) |rule| {
         const args = [_]message.Value{.{ .string = rule }};
         _ = conn.call(
             "org.freedesktop.DBus",
@@ -303,6 +336,12 @@ pub fn powerSetSleepInhibit(on: i32) i32 {
 pub fn powerSetScreenEvents(on: i32) i32 {
     _ = ensureConn() orelse return core.ERR_BACKEND;
     g_screen_events.store(on != 0, .release);
+    return core.OK;
+}
+
+pub fn systemAccentSetEvents(on: i32) i32 {
+    g_accent_events.store(on != 0, .release);
+    if (on != 0) _ = ensureConn();
     return core.OK;
 }
 

@@ -14,6 +14,7 @@ import '../services/liked/liked_cache.dart';
 import '../services/liked/liked_loader.dart';
 import '../services/netease/apis_netease_caller.dart';
 import '../services/netease/netease_api.dart';
+import '../services/platform/platform_capabilities.dart';
 import '../services/qqmusic/qq_liked_store.dart';
 import '../services/qqmusic/qqmusic_api.dart';
 import '../services/weather/weather_notifier.dart';
@@ -132,9 +133,19 @@ final qqLikedStoreProvider = ChangeNotifierProvider<QqLikedStore>(
 
 /// 系统主题色（主题色来源 = default「跟随系统」时作为主色种子）。
 ///
-/// 实时读取系统（GNOME accent-color）；非 Linux / 无法读取返回 null，
-/// 调用方回退设计体系默认亮蓝（对齐原版 themeSource=default 的
-/// DEFAULT_PRIMARY 语义）。
-final systemAccentProvider = FutureProvider<Color?>((ref) {
-  return SystemAccent.read();
+/// 事件驱动：先读一次，再订阅平台桥接的主题色变更事件（KDE/GNOME/Windows/
+/// macOS），变更时重读；无法读取返回 null，调用方回退默认亮蓝。
+final systemAccentProvider = StreamProvider<Color?>((ref) async* {
+  final caps = PlatformCapabilities.instance();
+  var last = await SystemAccent.read();
+  yield last;
+  if (!caps.systemAccentAvailable) return;
+  if (caps.setAccentEvents(true) != 0) return;
+  ref.onDispose(() => caps.setAccentEvents(false));
+  await for (final _ in caps.accentEvents) {
+    final next = await SystemAccent.read();
+    if (next == last) continue; // 事件可能重复/其它设置变更 → 去重
+    last = next;
+    yield next;
+  }
 });

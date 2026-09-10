@@ -93,6 +93,13 @@ export fn apl_system_accent(r: ?*i32, g: ?*i32, b: ?*i32) callconv(.c) i32 {
     return core.OK;
 }
 
+/// 订阅系统主题色变更（0=关）。变更时回调 EVENT_SYSTEM_ACCENT（无载荷，
+/// 收到后重读 apl_system_accent 并自行去重）。
+export fn apl_system_accent_set_events(on: i32) callconv(.c) i32 {
+    if (!core.isInitialized()) return core.ERR_STATE;
+    return backend.systemAccentSetEvents(on != 0);
+}
+
 /// 系统提示（UTF-8）。用于“已有实例”等无需 UI 框架的场景。
 export fn apl_notify(title: ?[*:0]const u8, body: ?[*:0]const u8) callconv(.c) i32 {
     if (!core.isInitialized()) return core.ERR_STATE;

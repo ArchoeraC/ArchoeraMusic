@@ -71,6 +71,11 @@ pub fn systemAccent() ?[3]u8 {
     return Active.systemAccent();
 }
 
+/// 订阅/取消系统主题色变更事件（EVENT_SYSTEM_ACCENT）。
+pub fn systemAccentSetEvents(on: bool) i32 {
+    return Active.systemAccentSetEvents(@intFromBool(on));
+}
+
 pub fn notify(title: []const u8, body: []const u8) i32 {
     return Active.notify(title, body);
 }
