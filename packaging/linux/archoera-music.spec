@@ -34,10 +34,10 @@ ln -s /opt/archoera-music/archoera_music %{buildroot}/usr/bin/archoera_music
 # 桌面条目 + metainfo + 图标（文件名 = 应用 ID，保证 Wayland 任务栏图标映射）
 mkdir -p %{buildroot}/usr/share/applications
 install -m 644 %{stage_path}/archoera-music.desktop \
-  %{buildroot}/usr/share/applications/com.archoera.archoera_music.desktop
+  %{buildroot}/usr/share/applications/awa.archoera.betastudio2.archoera_music.desktop
 mkdir -p %{buildroot}/usr/share/metainfo
-install -m 644 %{stage_path}/com.archoera.archoera_music.metainfo.xml \
-  %{buildroot}/usr/share/metainfo/com.archoera.archoera_music.metainfo.xml
+install -m 644 %{stage_path}/awa.archoera.betastudio2.archoera_music.metainfo.xml \
+  %{buildroot}/usr/share/metainfo/awa.archoera.betastudio2.archoera_music.metainfo.xml
 # 先建 icons 目录再 cp -a：否则 hicolor 层级会被吞掉（icons 直接落在 icons/ 下，
 # 导致 %files 的 hicolor/*/apps/*.png 通配匹配不到——CI 曾因此失败）
 mkdir -p %{buildroot}/usr/share/icons
@@ -46,6 +46,6 @@ cp -a %{stage_path}/icons/hicolor %{buildroot}/usr/share/icons/
 %files
 /opt/archoera-music
 /usr/bin/archoera_music
-/usr/share/applications/com.archoera.archoera_music.desktop
-/usr/share/metainfo/com.archoera.archoera_music.metainfo.xml
-/usr/share/icons/hicolor/*/apps/com.archoera.archoera_music.png
+/usr/share/applications/awa.archoera.betastudio2.archoera_music.desktop
+/usr/share/metainfo/awa.archoera.betastudio2.archoera_music.metainfo.xml
+/usr/share/icons/hicolor/*/apps/awa.archoera.betastudio2.archoera_music.png

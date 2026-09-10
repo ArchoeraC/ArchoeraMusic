@@ -11,7 +11,7 @@
 set -euo pipefail
 
 APP_NAME="ArchoeraMusic"
-APP_ID="com.archoera.archoera_music"
+APP_ID="awa.archoera.betastudio2.archoera_music"
 BIN="archoera_music"
 RUNTIME="org.freedesktop.Platform//24.08"
 
@@ -55,7 +55,7 @@ chmod +x "$appdir/files/bin/$BIN"
 sed "s|@EXEC@|/app/bin/$BIN %U|g" "$HERE/archoera-music.desktop.in" \
   > "$appdir/files/share/applications/$APP_ID.desktop"
 sed "s|@VERSION@|$version|g" \
-  "$HERE/com.archoera.archoera_music.metainfo.xml.in" \
+  "$HERE/awa.archoera.betastudio2.archoera_music.metainfo.xml.in" \
   > "$appdir/files/share/metainfo/$APP_ID.metainfo.xml"
 for size in 32 48 64 128 256 512; do
   icon="$ROOT/app/linux/runner/resources/app_icon_${size}.png"
