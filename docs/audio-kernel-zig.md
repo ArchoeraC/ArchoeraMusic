@@ -890,6 +890,12 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > 改用 `ogg.Demux` 取识别头(0x01)/comment 头(0x03) 自解析；ogg-flac 收集 metadata
 > packet 后经内存 reader 调 `flac.openMeta`。**probe-only 覆盖**：flac/mp3/wav/m4a/
 > ogg(vorbis)/opus/ogg-flac；仅 speex 等少数格式仍回退完整 open。
+>
+> **第五批（2026-09-10）**：**speex** 落地（`spx.MetaCtx`：Ogg demux+SpeexHeader+
+> 标签，不含 Speex 解码器状态/PCM 缓冲；分配登记统一释放）。**至此 Ogg 家族
+> （vorbis/opus/ogg-flac/speex）全部 probe-only**；flac/mp3/wav/m4a + 全部 Ogg
+> 走快路径，仅 wma/ape/wv/dsd/amr/ac3/dts/mka/mpc/shn/tak/tta 等仍回退完整 open。
+> scanner 侧同步把 `spx` 纳入扩展名白名单与内核直桥格式集。
 
 > 关联（2026-09-09）：逐格式**解码效率**专项（非并发/生命周期侧）单列
 > `docs/decode-optimization.md`——SCORE 总表被 50× 实时封顶掩盖的 era vs FFmpeg
