@@ -64,7 +64,11 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                 foreach (var work in _queue.GetConsumingEnumerable())
                 {
                     try { work(); }
-                    catch { /* 单个写失败不终止写线程 */ }
+                    catch (Exception ex)
+                    {
+                        // 写失败不可静默（否则数据丢失无感知）：输出到 stderr，继续处理后续
+                        Console.Error.WriteLine($"[scanner][sqlite] 写操作失败: {ex}");
+                    }
                 }
             }
             catch (ObjectDisposedException) { }
@@ -189,7 +193,9 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
     public Task StageTracksAsync(List<TrackMetadata> tracks, CancellationToken ct = default)
     {
         if (tracks.Count == 0) return Task.CompletedTask;
-        Enqueue(() => InsertStageTracks(tracks, ct));
+        // 快照：调用方（引擎）在入队后会立即 Clear 复用 batch，不能捕获原引用
+        var snapshot = new List<TrackMetadata>(tracks);
+        Enqueue(() => InsertStageTracks(snapshot, ct));
         return Task.CompletedTask;
     }
 
