@@ -56,7 +56,7 @@ src_install() {
 		GenericName=Music Player
 		Comment=An open-source music player
 		Exec=/usr/bin/archoera_music %U
-		Icon=com.archoera.archoera_music
+		Icon=awa.archoera.betastudio2.archoera_music
 		Terminal=false
 		Categories=Audio;Music;AudioVideo;
 		StartupWMClass=archoera_music

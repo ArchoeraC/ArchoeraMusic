@@ -1,7 +1,7 @@
 # ArchoeraMusic NixOS 打包定义（消费预构建 bundle，等价 Arch PKGBUILD）。
 #
 # 由 package.sh nix 预置：本文件与 bundle/、archoera-music.desktop、
-# com.archoera.archoera_music.png 同目录，版本号经 sed 注入下方
+# awa.archoera.betastudio2.archoera_music.png 同目录，版本号经 sed 注入下方
 # version（占位 @VERSION@ 由 package.sh 替换为实际版本）。
 #
 # 二进制为 Release 预 strip 产物（Flutter/Rust/Go/NativeAOT/C 全无调试符号），
@@ -99,9 +99,9 @@ stdenv.mkDerivation (finalAttrs: {
     ln -s $out/lib/archoera-music/archoera_music $out/bin/archoera_music
     # 桌面条目 + 图标（文件名 = 应用 ID，保证 Wayland 任务栏图标映射）
     install -Dm644 ${./archoera-music.desktop} \
-      $out/share/applications/com.archoera.archoera_music.desktop
-    install -Dm644 ${./com.archoera.archoera_music.png} \
-      $out/share/icons/hicolor/512x512/apps/com.archoera.archoera_music.png
+      $out/share/applications/awa.archoera.betastudio2.archoera_music.desktop
+    install -Dm644 ${./awa.archoera.betastudio2.archoera_music.png} \
+      $out/share/icons/hicolor/512x512/apps/awa.archoera.betastudio2.archoera_music.png
     runHook postInstall
   '';
 

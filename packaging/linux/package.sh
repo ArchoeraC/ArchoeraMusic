@@ -17,7 +17,7 @@
 set -euo pipefail
 
 APP_NAME="ArchoeraMusic"
-APP_ID="com.archoera.archoera_music"
+APP_ID="awa.archoera.betastudio2.archoera_music"
 BIN="archoera_music"
 DEST_PREFIX="/opt/archoera-music"
 REPO_URL="https://github.com/BetaStudio2/ArchoeraMusic"
@@ -49,8 +49,8 @@ cp -a "$bundle" "$stage/bundle"
 sed "s|@EXEC@|/usr/bin/$BIN %U|g" "$HERE/archoera-music.desktop.in" \
   > "$stage/archoera-music.desktop"
 sed "s|@VERSION@|$version|g" \
-  "$HERE/com.archoera.archoera_music.metainfo.xml.in" \
-  > "$stage/com.archoera.archoera_music.metainfo.xml"
+  "$HERE/awa.archoera.betastudio2.archoera_music.metainfo.xml.in" \
+  > "$stage/awa.archoera.betastudio2.archoera_music.metainfo.xml"
 
 for size in 32 48 64 128 256 512; do
   icon="$ROOT/app/linux/runner/resources/app_icon_${size}.png"
@@ -61,7 +61,7 @@ done
 
 stage_bundle="$stage/bundle"
 stage_desktop="$stage/archoera-music.desktop"
-stage_metainfo="$stage/com.archoera.archoera_music.metainfo.xml"
+stage_metainfo="$stage/awa.archoera.betastudio2.archoera_music.metainfo.xml"
 stage_icons="$stage/icons"
 
 # ── tar.gz：纯二进制（保留 bundle 原结构，解压即用）───────────────────
@@ -152,7 +152,7 @@ EOF
   chmod +x "$appdir/AppRun"
   sed "s|@EXEC@|AppRun %U|g" "$HERE/archoera-music.desktop.in" \
     > "$appdir/ArchoeraMusic.desktop"
-  sed -i "s|Icon=com.archoera.archoera_music|Icon=ArchoeraMusic|" \
+  sed -i "s|Icon=awa.archoera.betastudio2.archoera_music|Icon=ArchoeraMusic|" \
     "$appdir/ArchoeraMusic.desktop"
   cp "$stage_icons/hicolor/512x512/apps/$APP_ID.png" "$appdir/ArchoeraMusic.png"
   cp -a "$stage_icons/hicolor" "$appdir/usr/share/icons/hicolor"
@@ -195,7 +195,7 @@ pkg_nix() {
   cp -a "$stage_bundle" "$nix_dir/bundle"
   cp "$stage_desktop" "$nix_dir/archoera-music.desktop"
   cp "$stage_icons/hicolor/512x512/apps/$APP_ID.png" \
-    "$nix_dir/com.archoera.archoera_music.png"
+    "$nix_dir/awa.archoera.betastudio2.archoera_music.png"
   echo "→ $nix_dir （docker: nixos/nix 容器内运行 nix build .#default）"
 }
 
