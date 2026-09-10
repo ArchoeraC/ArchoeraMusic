@@ -3,13 +3,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // M3 内存不足提示（docs/audio-memory-source.md §13）：模态 + 红色全局变暗
-// （区别于普通黑色 dim）；后台态用系统通知属后续增强。
+// （区别于普通黑色 dim）；**后台态改发系统原生通知**（经 Zig 平台桥接 apl_notify），
+// 避免后台弹窗抢焦点/无 UI context 时静默。
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../app/router.dart';
 import '../../eta/icon/eta_icons.dart';
-import '../../l10n/l10n.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../services/platform/platform_capabilities.dart';
 import '../../services/playback/store_source.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/format.dart';
@@ -65,12 +68,26 @@ Future<bool> confirmMemoryFallback(
 }) async {
   final ctx = rootNavigatorKey.currentContext;
   final raw = rawReason ?? '${fail?.kind}';
-  if (ctx == null) {
-    debugPrint('[M3] 无 UI context，自动在线直连回退（$raw）');
+
+  // 后台/无 UI：发系统原生通知（桥接），并按保守策略自动在线直连回退。
+  final lifecycle = WidgetsBinding.instance.lifecycleState;
+  final background = ctx == null ||
+      lifecycle == AppLifecycleState.paused ||
+      lifecycle == AppLifecycleState.hidden ||
+      lifecycle == AppLifecycleState.detached;
+  final parts = Platform.localeName.replaceAll('-', '_').split('_');
+  final locale =
+      parts.length >= 2 ? Locale(parts[0], parts[1]) : Locale(parts[0]);
+  final l10n = lookupAppLocalizations(locale);
+  final reason = fail == null ? l10n.memorySourceFailUnknown : _failText(l10n, fail);
+  if (background) {
+    PlatformCapabilities.instance().notify(
+      l10n.memoryAlertTitle,
+      '$reason\n${l10n.memoryAlertOnlineDesc}',
+    );
+    debugPrint('[M3] 后台内存不足 → 系统通知并自动在线直连回退（$raw）');
     return true;
   }
-  final l10n = ctx.l10n;
-  final reason = fail == null ? l10n.memorySourceFailUnknown : _failText(l10n, fail);
   final proceed = await showDialog<bool>(
     context: ctx,
     barrierColor: kMemoryAlertBarrier,
