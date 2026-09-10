@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! D-Bus 会话总线传输：地址解析、unix 连接、SASL EXTERNAL 认证、Hello、
 //! 消息帧读取与同步方法调用。
 //!

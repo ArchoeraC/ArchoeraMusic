@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! 常驻内核 Host（进程入口面；docs/engine-master-pool-design.md §3 宿主 → kernel_init/submit）
 //!

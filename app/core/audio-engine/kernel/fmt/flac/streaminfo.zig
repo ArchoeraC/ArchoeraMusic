@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! FLAC 元数据解析（可选 ID3v2 前置 + fLaC 头 + 元数据块遍历 + STREAMINFO + SEEKTABLE）
 //!

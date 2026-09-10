@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! 变速 / 变调 — signalsmith-stretch C FFI 封装
 //!
 //! 为 archoera-audio-engine C 管线提供 tempo 处理能力。

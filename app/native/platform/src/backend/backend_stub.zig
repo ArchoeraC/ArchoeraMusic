@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! P0 通用 stub 后端：能力位图恒 0，一切调用返回 UNSUPPORTED。
 //!
 //! P1–P5 逐平台落地后（见 docs/platform-native-bridge.md §7），各平台后端

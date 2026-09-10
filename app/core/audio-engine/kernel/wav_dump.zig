@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! WAV bit-exact 对照导出工具：解码一个 .wav 文件，按解码器输出契约
 //! （PCM 原生位深 / ADPCM s16，交错小端）写原始 PCM 到 stdout；

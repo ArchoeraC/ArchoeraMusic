@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! MPRIS2 服务端（Linux 媒体会话，P2）：把 OS 媒体键 / 蓝牙耳机 AVRCP /
 //! 桌面媒体面板的请求转成 apl 事件交 Dart（bridge §4.1）。
 //!

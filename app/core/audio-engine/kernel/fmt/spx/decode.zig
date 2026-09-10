@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! Speex CELP 核心解码（对照移植 FFmpeg `libavcodec/speexdec.c`，n9.0.1 native
 //! speex 解码器，浮点路径：全程 f32 与系统 ffmpeg 默认 native `speex` 一致）。

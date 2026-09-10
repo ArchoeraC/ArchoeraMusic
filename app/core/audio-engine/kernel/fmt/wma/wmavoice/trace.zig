@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! 对拍插桩工具（env 门控）：WMAVOICE_TRACE=<路径> 时按
 //! [u32 tag][u32 count][u32 is_double][payload] 记录与 reference C 侧

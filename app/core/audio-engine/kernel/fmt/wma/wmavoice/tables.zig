@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! WMA Voice (wmavoice) 静态解码表——自动自 reference/FFmpeg/libavcodec/wmavoice_data.h 抽取。
 //! 生成：gen_tables_zig.py（十进制 → 精确位模式 hex float；u8 原值）。

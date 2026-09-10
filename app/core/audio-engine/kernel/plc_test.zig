@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! PLC 局部测试：`opus.open` + 指定包号丢包 → s16 交错 PCM 到 stdout。
 //! 用法：./plc_test <file.ogg> <lost_packet_number> [lost_count] > out.pcm

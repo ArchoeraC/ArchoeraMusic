@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! PS Huffman 表（aacpsdata.c aacps_huff_tabs，10 张平铺）。
 //! 表序：iid_df1, iid_dt1, iid_df0, iid_dt0, icc_df, icc_dt, ipd_df, ipd_dt, opd_df, opd_dt

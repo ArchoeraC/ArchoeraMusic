@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 临时冒烟测试：验证 apis 纯 Dart 直连三平台核心链路。
 // 用法：dart run tool/apis_smoke.dart
 // ignore_for_file: avoid_print

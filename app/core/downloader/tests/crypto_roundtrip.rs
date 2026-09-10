@@ -1,3 +1,7 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // ============================================================
 // §10 MVP0 对拍单测：Kugou/Netease 签名 Rust ↔ Dart 字节级一致
 //

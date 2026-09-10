@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! DTS core 帧解析验证工具（阶段一）：逐帧打印 core 帧参数并统计，
 //! 与系统 ffmpeg `-f dts`/ffprobe 对照（采样率/声道/位率/帧数/时长）。

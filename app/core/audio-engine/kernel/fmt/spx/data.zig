@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! Speex 解码码本/系数表（自 reference/FFmpeg/libavcodec/speexdata.h 逐值转录，
 //! 溯源 libspeex 1.2.x 同名表；f32 以 IEEE-754 位模式 @bitCast 给出，保证逐位一致）。

@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! 开发对照 dump：解码 .tta → 原生位深交错 PCM，可选与 ffmpeg 参考 PCM 逐样本比对。
 //! 用法：zig build-exe kernel/tta_dump.zig -lc -O ReleaseSafe -femit-bin=./tta_dump

@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! TTA (True Audio, .tta) 帧解码核心（逐句对齐 FFmpeg n9.0.1 libavcodec/tta.c）。
 //!

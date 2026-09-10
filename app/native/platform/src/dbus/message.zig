@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! D-Bus 线格式：编组（Writer/MessageBuilder）与解组（parseHeader/readBody）。
 //!
 //! 仅覆盖本桥接所需子面（bridge §4.1）：端序 'l'（LE）、协议版本 1、消息类型

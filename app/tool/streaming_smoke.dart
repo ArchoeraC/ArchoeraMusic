@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // 冒烟测试：streaming 包（兼容性流媒体方案，纯 Dart 无网络）。
 // 覆盖：JellyItem 解析 → 转换（Track 全字段）/ strip/refresh cover auth /
 // sessionIdForTrack / StreamingServerConfig 序列化 / StreamingStore 持久化。

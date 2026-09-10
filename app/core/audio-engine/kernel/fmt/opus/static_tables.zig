@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! 自动生成：libopus 1.6.1 static_modes_float.h 静态 48k/960 模式表（权威参考）。
 //! 注意：与运行时 clt_mdct_init/kiss_fft_alloc 计算值差 ≤1 ULP，opus_demo 实际使用本静态表。

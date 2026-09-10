@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! LOAS/LATM（AAC LATM）解码对照导出工具：probe 识别（.latm → fmt/latm）
 //! + 解码，按解码器输出契约（16-bit 交错小端 s16）写原始 PCM 到 stdout；

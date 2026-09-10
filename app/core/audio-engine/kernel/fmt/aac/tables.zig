@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! AAC 静态结构表（采样率 / 声道 / swb 偏移 / TNS 上限）。
 //! 数值取自 ISO/IEC 14496-3 规范表，与 FFmpeg n9.0.1 aactab.c/mpeg4audio.c 数值交叉核对。

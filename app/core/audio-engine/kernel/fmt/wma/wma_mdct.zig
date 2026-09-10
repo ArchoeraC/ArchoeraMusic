@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! WMA 逆 MDCT（bit-exact 复刻 FFmpeg av_tx FLOAT_MDCT inv 路径）。
 //!

@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! macOS 后端（P4，docs/platform-native-bridge.md §4.3）。
 //!
 //! 无 macOS SDK 头 → 全程 `dlopen` + `objc_msgSend` 运行时直调（不 @cImport

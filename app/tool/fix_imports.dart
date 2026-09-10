@@ -1,3 +1,7 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// 一次性工具：全量重构后重写 lib/ 下的相对 import。
 ///
 /// 三种路径逐一尝试（命中即停）：

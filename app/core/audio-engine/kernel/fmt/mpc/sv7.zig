@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! Musepack SV7 解码 —— FFmpeg n9.0.1 libavcodec/mpc7.c + libavformat/mpc.c
 //! （SV7 分支）逐句移植。

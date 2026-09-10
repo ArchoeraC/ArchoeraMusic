@@ -1,6 +1,7 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
 
 //! Ogg-Speex（.spx）解码入口（Ogg 容器 + Speex CELP，mode 0/1/2 = NB/WB/UWB）。
 //!

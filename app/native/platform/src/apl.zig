@@ -1,3 +1,7 @@
+// ArchoeraMusic 平台能力原生桥接
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 //! archoera_platform —— C ABI 导出根（apl_*，契约见 include/archoera_platform.h）
 //!
 //! Dart（app/lib/services/platform/）仅依赖本 ABI；平台探测、转发、事件回传

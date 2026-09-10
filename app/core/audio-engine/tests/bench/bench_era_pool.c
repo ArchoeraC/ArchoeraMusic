@@ -1,3 +1,8 @@
+// ArchoeraMusic Audio Framework
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// EraSync — ArchoeraMusic 自研音频内核
+
 // ArchoeraMusic Audio Framework · bench_era_pool.c
 // 常驻内核池（ZkEngine）并发解码基准（headless：静音、无设备）。
 // 用法：
