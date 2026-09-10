@@ -208,6 +208,7 @@ pub fn handleMethodCall(conn: *transport.Connection, h: *const message.Header, b
 }
 
 fn playerMethod(conn: *transport.Connection, h: *const message.Header, body: []const u8, member: []const u8) void {
+    std.debug.print("[mpris] recv {s}\n", .{member});
     if (std.mem.eql(u8, member, "Play")) return cmd(conn, h, core.CMD_PLAY);
     if (std.mem.eql(u8, member, "Pause")) return cmd(conn, h, core.CMD_PAUSE);
     if (std.mem.eql(u8, member, "PlayPause")) return cmd(conn, h, core.CMD_TOGGLE);
