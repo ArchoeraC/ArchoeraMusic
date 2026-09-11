@@ -380,7 +380,13 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
       );
     }
     final bindings = EngineBindings.instance;
-    final store = bindings.segstoreNew(totalHint: bytes.length);
+    // segSize = 整曲长度：整首驻留场景下让 Store 成为**单一连续段**，使
+    // EraAudio 自研内核可经 segstore_base 直接对连续内存解码（docs/audio-memory-source.md
+    // §7）；FFmpeg-mem 路径按段读取，行为不变。超上限曲本就不会走到这里。
+    final store = bindings.segstoreNew(
+      totalHint: bytes.length,
+      segSize: bytes.length,
+    );
     if (store == 0) {
       return WholeTrackPrepareResult.fail(
         'segstore_new 分配失败（OOM）',

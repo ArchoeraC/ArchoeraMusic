@@ -59,7 +59,10 @@ class PlayerLyricsBlock extends ConsumerWidget {
     final prefs = ref.watch(appPrefsProvider);
     final fontSize = prefs.lyricFontSize * lyricScale;
     final lineHeight = prefs.lyricLineHeight * lyricScale;
-    final playedColor = Color(prefs.lyricPlayedColor);
+    // 高亮颜色：可选跟随软件全局主题色（colorScheme.primary）。
+    final playedColor = prefs.lyricFollowAccent
+        ? colorScheme.primary
+        : Color(prefs.lyricPlayedColor);
     final unplayedColor = Color(prefs.lyricUnplayedColor);
     final showTranslation = prefs.showTranslation;
     // 引擎切换：simple（旧实现）/ amll（AMLL 歌词墙）

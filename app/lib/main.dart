@@ -18,6 +18,7 @@ import 'services/streaming/streaming_store.dart';
 import 'stores/app_prefs.dart';
 import 'stores/vault_session_store.dart';
 import 'app/app.dart';
+import 'app/watermark.dart';
 import 'widgets/list/cover_image.dart';
 import 'widgets/common/tray_integration.dart';
 
@@ -31,6 +32,9 @@ Future<void> main() async {
   // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化——既是 Flutter
   // binding，也让后续 windowManager（MethodChannel）可用（单实例分支要用）。
   PowerSavingFrameBinding.ensureInitialized();
+  // 防伪锚点：把 'ARCHOERA DESIGNED' 编译进内核/AOT 快照字符串表
+  // （见 app/watermark.dart；勿删，反编译识别非官方重新打包）。
+  archoeraWatermarkAnchor();
   // 单实例守卫（经 Zig 平台桥接文件锁/命名互斥体，禁止多开）：已有实例则用应用
   // 自身对话框提示后退出（第二实例的 Flutter 引擎已由原生 runner 起好，直接
   // runApp 最小页）。桥接缺失时不再静默放行（旧 Dart 兜底不可靠）——显式失败。

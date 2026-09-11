@@ -120,23 +120,24 @@ class Spring1D {
 
   /// 推进弹簧状态。[elapsedSec] 为距上次调用经过的秒数（帧间隔）。
   ///
-  /// 延迟队列未到期时返回当前值（原值）；到期或直接目标时按闭式解求值。
+  /// 延迟队列未到期时，弹簧继续按当前目标求值（与上游 Spring 一致：延迟
+  /// 只推迟“新目标生效”，不冻结动画）；到期后从当前位姿向新目标过渡。
   /// 到达稳定后会把 [current] 精确吸附到 [targetPosition] 并置 [velocity] 0。
   double update(double elapsedSec) {
     if (_settled) return current;
     if (_pending != null) {
       delayMs -= elapsedSec * 1000;
-      if (delayMs > 0) return current;
-      final to = _pending!;
-      _pending = null;
-      delayMs = 0;
-      _restart(to);
-      if (_settled) return current;
+      if (delayMs <= 0) {
+        final to = _pending!;
+        _pending = null;
+        delayMs = 0;
+        _restart(to);
+      }
     }
     _time += elapsedSec;
     current = _pos(_time);
     velocity = _vel(_time);
-    if (_atRest()) {
+    if (_pending == null && _atRest()) {
       current = targetPosition;
       velocity = 0;
       _settled = true;

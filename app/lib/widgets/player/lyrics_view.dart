@@ -85,18 +85,14 @@ class _LyricsViewState extends State<LyricsView> {
   @override
   Widget build(BuildContext context) => _buildLyricsView(context);
 
-  void _scrollToIndex(int index) {
-    // index < 0：播放位置早于第一句歌词（循环回放 / 前奏阶段）——
-    // 也滚回首行，否则循环重新播放时歌词停留在上一轮最后位置
-    final targetIndex = index < 0 ? 0 : index;
+  /// 按实测行高算出的目标偏移滚动（长行换行后行高可变，不能再按
+  /// 「索引 × 固定行高」换算；偏移由 [_LyricsViewBuild._offsetFor] 给出）。
+  void _scrollToOffset(double offset) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      // 第 index 行中心滚到视口中心：滚动量恰为 index × 行高
-      // （顶部对称留白 half - lineHeight/2 已把偏移抵消）
+      if (!mounted || !_controller.hasClients) return;
       final max = _controller.position.maxScrollExtent;
-      final target = (targetIndex * widget.lineHeight).clamp(0.0, max);
       _controller.animateTo(
-        target,
+        offset.clamp(0.0, max),
         duration: animDuration(context, const Duration(milliseconds: 280)),
         curve: Curves.easeOutCubic,
       );

@@ -172,6 +172,27 @@ void main() {
       expect(centers[1], closeTo(20 + gap + 17, 1e-9)); // h0 + gap + h1/2
     });
 
+    test('长行自动换行并按多行计入行高（不再单行省略）', () {
+      // Ahem 测试字体每字 1em：字号 20、可用宽 100 → 每行 5 字。
+      const fs = 20.0;
+      const maxW = 100.0;
+      final long = <LyricGroup>[
+        const LyricGroup(
+          original: LyricLine(timeMs: 0, text: '一二三四五六七八九十'),
+        ),
+      ];
+      final h = computeLineHeights(long, fontSize: fs, maxWidth: maxW);
+      expect(h.single, greaterThan(fs * 1.5), reason: '10 字 / 每行 5 字 = 2 行');
+      expect(h.single, closeTo(fs * 2, 1.0));
+
+      // 短行仍是单行高。
+      final short = <LyricGroup>[
+        const LyricGroup(original: LyricLine(timeMs: 0, text: '你好')),
+      ];
+      final hs = computeLineHeights(short, fontSize: fs, maxWidth: maxW);
+      expect(hs.single, closeTo(fs, 0.01));
+    });
+
     test('空输入返回空列表', () {
       expect(
         computeLineHeights(const [], fontSize: 20, maxWidth: 400),

@@ -140,10 +140,20 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
                   .read(appPrefsProvider.notifier)
                   .setLyricStyle(fontSize: v),
             ),
+            SettingSwitchTile(
+              icon: EtaIcons.paletteOutline,
+              title: l10n.settingsLyricFollowAccent,
+              subtitle: l10n.settingsLyricFollowAccentDesc,
+              value: prefs.lyricFollowAccent,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setLyricStyle(followAccent: v),
+            ),
             SettingTile(
               icon: EtaIcons.paletteOutline,
               title: l10n.settingsLyricPlayedColor,
               subtitle: l10n.settingsLyricPlayedColorDesc,
+              enabled: !prefs.lyricFollowAccent,
               trailing: _colorSwatches(
                 scheme,
                 current: prefs.lyricPlayedColor,

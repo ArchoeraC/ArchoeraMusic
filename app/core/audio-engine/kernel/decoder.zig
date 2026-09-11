@@ -196,6 +196,15 @@ pub fn openWithIo(io_inst: std.Io, allocator: std.mem.Allocator, path: []const u
     return registry.dispatch(fmt, allocator, &reader, info);
 }
 
+/// 从**内存字节切片**打开解码器（纯内存源；docs/audio-memory-source.md §7）。
+/// 与 [open] 同语义：probe 嗅探 → Registry 分派；未接管格式 → error.UnsupportedFormat
+/// （引擎回退 FFmpeg）。字节所有权归调用方，解码器只读不释放，生命周期须覆盖解码器。
+pub fn openMem(allocator: std.mem.Allocator, data: []const u8, info: *Info) Error!Decoder {
+    var reader = io.Reader.openMem(data);
+    const fmt = try probe.probe(&reader);
+    return registry.dispatch(fmt, allocator, &reader, info);
+}
+
 /// 元数据打开结果：优先 probe-only 会话（§8.4.2①），无 `meta` 工厂的格式回退完整
 /// 解码器。两者均持有 `info` 指向内存；`deinit` 释放。
 pub const OpenedMeta = struct {

@@ -16,11 +16,11 @@ import '../stores/app_prefs.dart';
 import '../stores/lyrics_provider.dart';
 import '../stores/providers.dart';
 import '../../l10n/l10n.dart';
-import '../theme/app_theme.dart';
 import '../widgets/dialogs/comment_dialog.dart';
 import '../widgets/player/cover_switcher.dart';
 import '../widgets/player/playback_progress_slider.dart';
 import '../widgets/player/player_controls_row.dart';
+import '../widgets/player/player_background.dart';
 import '../widgets/player/player_cover.dart';
 import '../widgets/player/player_lyrics_block.dart';
 import '../widgets/player/quality_menu.dart';
@@ -74,8 +74,25 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   /// 完整全屏切换（对齐原版 FullPlayer 顶栏 Maximize/Minimize 按钮，
   /// 由 useWindowControls → Electron setFullScreen 实现，这里走
   /// window_manager.setFullScreen）。
-  Future<void> _toggleFullscreen() =>
-      windowManager.setFullScreen(!_isFullScreen);
+  ///
+  /// Windows 下 window_manager 不保证派发 enter/leave fullscreen 窗口事件，
+  /// 若只靠 [onWindowEvent] 同步，按钮图标会停在旧态（必须关掉再打开播放页
+  /// 才会经 initState 查询刷新）。这里改为：乐观置位 → 调用 → 以窗口管理器
+  /// 实际状态校准，三端一致即时刷新。
+  Future<void> _toggleFullscreen() async {
+    final target = !_isFullScreen;
+    if (mounted) setState(() => _isFullScreen = target);
+    await windowManager.setFullScreen(target);
+    await _syncFullScreen();
+  }
+
+  /// 以窗口管理器真实全屏状态校准本地标记（系统级全屏 / 平台事件缺失兜底）。
+  Future<void> _syncFullScreen() async {
+    final v = await windowManager.isFullScreen();
+    if (mounted && v != _isFullScreen) {
+      setState(() => _isFullScreen = v);
+    }
+  }
 
   @override
   void onWindowEvent(String eventName) {
@@ -105,11 +122,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     );
     // 全屏按钮初始状态 + 监听窗口事件（进入/退出全屏时图标同步）
     windowManager.addListener(this);
-    windowManager.isFullScreen().then((v) {
-      if (mounted && v != _isFullScreen) {
-        setState(() => _isFullScreen = v);
-      }
-    });
+    // 初始全屏状态校准：Windows 平台事件可能缺失，改为主动查询真实状态。
+    unawaited(_syncFullScreen());
   }
 
   @override

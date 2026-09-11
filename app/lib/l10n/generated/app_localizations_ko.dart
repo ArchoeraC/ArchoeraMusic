@@ -1814,6 +1814,32 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsTransitionStyleSlide => '슬라이드';
 
   @override
+  String get settingsPlayerBackground => '플레이어 배경';
+
+  @override
+  String get settingsPlayerBackgroundDesc => '전체 화면 플레이어 배경 스타일';
+
+  @override
+  String get settingsPlayerBgGradient => '그라데이션';
+
+  @override
+  String get settingsPlayerBgBlur => '블러';
+
+  @override
+  String get settingsPlayerBgSolid => '단색';
+
+  @override
+  String get settingsPlayerBgRipple => '물결';
+
+  @override
+  String get settingsPlayerBgRippleSpeed => '물결 속도';
+
+  @override
+  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+    return '흐름 속도 $speed';
+  }
+
+  @override
   String get settingsSectionShortcuts => '단축키';
 
   @override
@@ -1898,6 +1924,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsLyricPlayedColorDesc => '현재 가사 줄 하이라이트 색상';
+
+  @override
+  String get settingsLyricFollowAccent => '강조 색상 따르기';
+
+  @override
+  String get settingsLyricFollowAccentDesc => '현재 가사 줄 하이라이트에 앱 강조 색상 사용';
 
   @override
   String get settingsLyricUnplayedColor => '재생 전 색상';

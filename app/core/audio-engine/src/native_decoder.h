@@ -14,6 +14,7 @@
 #define NATIVE_DECODER_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -49,6 +50,15 @@ bool native_decoder_available(void);
 NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
                                    int *status_out,
                                    char *errbuf, int errbuf_size);
+
+/**
+ * 从内存字节切片打开自研内核解码器（纯内存源；docs/audio-memory-source.md §7）。
+ * 契约同 [native_decoder_open]；`data` 所有权归调用方，须覆盖解码器生命周期。
+ * 走直连 decoder 路径（非池）；未接管格式返回 NULL（调用方回退 FFmpeg-mem）。
+ */
+NativeDecoder *native_decoder_open_mem(const void *data, size_t len, NativeInfo *info,
+                                       int *status_out,
+                                       char *errbuf, int errbuf_size);
 
 /**
  * 解码最多 max_frames 帧 float32 交错 PCM。

@@ -133,6 +133,48 @@ pub fn zkOpen(path: [*:0]const u8, info: *ZkInfo, errbuf: [*]u8, errbuf_size: c_
     return eng;
 }
 
+/// 从**内存字节切片**打开解码器（纯内存源；对齐 [zkOpen] 契约与 ZkInfo 填充）。
+/// 字节所有权归调用方，解码器只读不释放，生命周期须覆盖返回的 Engine。
+pub fn zkOpenMem(data: [*]const u8, len: usize, info: *ZkInfo, errbuf: [*]u8, errbuf_size: c_int) ?*Engine {
+    const gpa = std.heap.c_allocator;
+    var zinfo: decoder.Info = undefined;
+    var dec = decoder.openMem(gpa, data[0..len], &zinfo) catch |e| {
+        fillErrBuf(errbuf, errbuf_size, e);
+        return null;
+    };
+    const eng = gpa.create(Engine) catch {
+        dec.deinit();
+        fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
+        return null;
+    };
+    eng.* = .{
+        .allocator = gpa,
+        .dec = dec,
+        .info = zinfo,
+        .raw = &.{},
+    };
+    info.* = .{
+        .sample_rate = @intCast(zinfo.sample_rate),
+        .channels = @intCast(zinfo.channels),
+        .bits_per_sample = @intCast(zinfo.bits_per_sample),
+        .duration_us = zinfo.duration_us,
+        .duration_known = switch (zinfo.duration_known) {
+            .exact => 0,
+            .estimate => 1,
+            .unknown => 2,
+        },
+        .codec_name = zinfo.codec_name.ptr,
+        .format_name = zinfo.format_name.ptr,
+        .title = metaPtr(zinfo.metadata.title),
+        .artist = metaPtr(zinfo.metadata.artist),
+        .album = metaPtr(zinfo.metadata.album),
+        .date = metaPtr(zinfo.metadata.date),
+        .genre = metaPtr(zinfo.metadata.genre),
+        .comment = metaPtr(zinfo.metadata.comment),
+    };
+    return eng;
+}
+
 /// 元数据专用打开（probe-only 优先，§8.4.2①；供 `zk_metadata_open`）。
 /// 返回会话/回退解码器句柄，调用方须 `deinit`。
 pub fn openMetadata(path: []const u8, info: *decoder.Info) !decoder.OpenedMeta {

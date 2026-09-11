@@ -1811,6 +1811,32 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsTransitionStyleSlide => 'スライド';
 
   @override
+  String get settingsPlayerBackground => 'プレイヤー背景';
+
+  @override
+  String get settingsPlayerBackgroundDesc => '全画面プレイヤーの背景スタイル';
+
+  @override
+  String get settingsPlayerBgGradient => 'グラデーション';
+
+  @override
+  String get settingsPlayerBgBlur => 'ぼかし';
+
+  @override
+  String get settingsPlayerBgSolid => '単色';
+
+  @override
+  String get settingsPlayerBgRipple => '水面の波紋';
+
+  @override
+  String get settingsPlayerBgRippleSpeed => '波紋の速度';
+
+  @override
+  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+    return '流れる速さ $speed';
+  }
+
+  @override
   String get settingsSectionShortcuts => 'ショートカット';
 
   @override
@@ -1894,6 +1920,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsLyricPlayedColorDesc => '現在の歌詞行のハイライト色';
+
+  @override
+  String get settingsLyricFollowAccent => 'アクセントカラーに追従';
+
+  @override
+  String get settingsLyricFollowAccentDesc => '現在の行のハイライトにアプリのアクセントカラーを使用';
 
   @override
   String get settingsLyricUnplayedColor => '未再生色';

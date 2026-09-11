@@ -1792,6 +1792,32 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsTransitionStyleSlide => '侧边滑动';
 
   @override
+  String get settingsPlayerBackground => '播放页背景';
+
+  @override
+  String get settingsPlayerBackgroundDesc => '全屏播放器背景样式';
+
+  @override
+  String get settingsPlayerBgGradient => '渐变';
+
+  @override
+  String get settingsPlayerBgBlur => '模糊';
+
+  @override
+  String get settingsPlayerBgSolid => '纯色';
+
+  @override
+  String get settingsPlayerBgRipple => '水纹';
+
+  @override
+  String get settingsPlayerBgRippleSpeed => '水纹速度';
+
+  @override
+  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+    return '流动速度 $speed';
+  }
+
+  @override
   String get settingsSectionShortcuts => '快捷键';
 
   @override
@@ -1875,6 +1901,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsLyricPlayedColorDesc => '当前行歌词高亮色';
+
+  @override
+  String get settingsLyricFollowAccent => '高亮跟随主题色';
+
+  @override
+  String get settingsLyricFollowAccentDesc => '当前行高亮使用软件全局主题色';
 
   @override
   String get settingsLyricUnplayedColor => '未唱颜色';
@@ -5705,6 +5737,32 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsTransitionStyleSlide => '侧边滑动';
 
   @override
+  String get settingsPlayerBackground => '播放页背景';
+
+  @override
+  String get settingsPlayerBackgroundDesc => '全屏播放器背景样式';
+
+  @override
+  String get settingsPlayerBgGradient => '渐变';
+
+  @override
+  String get settingsPlayerBgBlur => '模糊';
+
+  @override
+  String get settingsPlayerBgSolid => '纯色';
+
+  @override
+  String get settingsPlayerBgRipple => '水纹';
+
+  @override
+  String get settingsPlayerBgRippleSpeed => '水纹速度';
+
+  @override
+  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+    return '流动速度 $speed';
+  }
+
+  @override
   String get settingsSectionShortcuts => '快捷键';
 
   @override
@@ -5788,6 +5846,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsLyricPlayedColorDesc => '当前行歌词高亮色';
+
+  @override
+  String get settingsLyricFollowAccent => '高亮跟随主题色';
+
+  @override
+  String get settingsLyricFollowAccentDesc => '当前行高亮使用软件全局主题色';
 
   @override
   String get settingsLyricUnplayedColor => '未唱颜色';
@@ -9511,6 +9575,32 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsTransitionStyleSlide => '側邊滑動';
 
   @override
+  String get settingsPlayerBackground => '播放頁背景';
+
+  @override
+  String get settingsPlayerBackgroundDesc => '全螢幕播放器背景樣式';
+
+  @override
+  String get settingsPlayerBgGradient => '漸層';
+
+  @override
+  String get settingsPlayerBgBlur => '模糊';
+
+  @override
+  String get settingsPlayerBgSolid => '純色';
+
+  @override
+  String get settingsPlayerBgRipple => '水紋';
+
+  @override
+  String get settingsPlayerBgRippleSpeed => '水紋速度';
+
+  @override
+  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+    return '流動速度 $speed';
+  }
+
+  @override
   String get settingsSectionShortcuts => '快速鍵';
 
   @override
@@ -9594,6 +9684,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsLyricPlayedColorDesc => '目前行歌詞高亮色';
+
+  @override
+  String get settingsLyricFollowAccent => '高亮跟隨主題色';
+
+  @override
+  String get settingsLyricFollowAccentDesc => '目前行高亮使用軟體全域主題色';
 
   @override
   String get settingsLyricUnplayedColor => '未唱顏色';

@@ -4,9 +4,10 @@
 
 /// 歌词 v7 可变行高布局工具：行高实测 + 自然中心累计。
 ///
-/// 口径与 amll_wall_v5 一致：每组一行主歌词（单行，过长省略号截断），
-/// 开启翻译且该组带翻译时，再在主行下方叠一行小字号译文并计入行高；
-/// 由各组的自然高度推得每行的自然中心（中心间距 = 前后半高 + 行间隙）。
+/// 对齐 AMLL：每组主歌词在可用宽度内**自动换行**（不再单行省略号截断），
+/// 开启翻译且该组带翻译时，再在主行下方叠一行小字号译文（同样可换行）
+/// 并计入行高；由各组的自然高度推得每行的自然中心
+/// （中心间距 = 前后半高 + 行间隙）。
 ///
 /// 纯 Dart/Flutter，仅依赖 [TextPainter]，不依赖 Riverpod 等状态库。
 library;
@@ -53,7 +54,15 @@ double _measureGroup(
   double maxWidth,
   bool showTranslation,
 ) {
-  var h = _textHeight(g.original.text, fontSize, fontFamily, maxWidth);
+  // 主行按激活态字重（w600）保守测量：长行换行后的行数不会因激活加粗
+  // 而变多导致溢出；非激活行即使略窄也只会多留一点行距。
+  var h = _textHeight(
+    g.original.text,
+    fontSize,
+    fontFamily,
+    maxWidth,
+    fontWeight: FontWeight.w600,
+  );
   if (showTranslation && (g.translation?.isNotEmpty ?? false)) {
     final gap = fontSize * kMainTranslationGapEm;
     h +=
@@ -68,22 +77,26 @@ double _measureGroup(
   return h;
 }
 
-/// 单行文本排版实测高。TextPainter 按约定传入 [fontFamily]（可为 null，
-/// 走默认字体）与 ltr 方向；过长时以省略号截断，不影响行高。
+/// 单段文本排版实测高。TextPainter 按约定传入 [fontFamily]（可为 null，
+/// 走默认字体）与 ltr 方向；超过 [maxWidth] 时自动换行，返回多行总高。
 double _textHeight(
   String text,
   double fs,
   String? fontFamily,
-  double maxWidth,
-) {
+  double maxWidth, {
+  FontWeight fontWeight = FontWeight.w400,
+}) {
   final tp = TextPainter(
     text: TextSpan(
       text: text,
-      style: TextStyle(fontFamily: fontFamily, fontSize: fs),
+      style: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: fs,
+        fontWeight: fontWeight,
+      ),
     ),
     textDirection: TextDirection.ltr,
-    maxLines: 1,
-    ellipsis: '…',
+    textAlign: TextAlign.center,
   )..layout(maxWidth: maxWidth);
   return tp.height;
 }

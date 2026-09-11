@@ -3380,6 +3380,54 @@ abstract class AppLocalizations {
   /// **'侧边滑动'**
   String get settingsTransitionStyleSlide;
 
+  /// No description provided for @settingsPlayerBackground.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放页背景'**
+  String get settingsPlayerBackground;
+
+  /// No description provided for @settingsPlayerBackgroundDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'全屏播放器背景样式'**
+  String get settingsPlayerBackgroundDesc;
+
+  /// No description provided for @settingsPlayerBgGradient.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'渐变'**
+  String get settingsPlayerBgGradient;
+
+  /// No description provided for @settingsPlayerBgBlur.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'模糊'**
+  String get settingsPlayerBgBlur;
+
+  /// No description provided for @settingsPlayerBgSolid.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'纯色'**
+  String get settingsPlayerBgSolid;
+
+  /// No description provided for @settingsPlayerBgRipple.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'水纹'**
+  String get settingsPlayerBgRipple;
+
+  /// No description provided for @settingsPlayerBgRippleSpeed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'水纹速度'**
+  String get settingsPlayerBgRippleSpeed;
+
+  /// No description provided for @settingsPlayerBgRippleSpeedDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流动速度 {speed}'**
+  String settingsPlayerBgRippleSpeedDesc(Object speed);
+
   /// No description provided for @settingsSectionShortcuts.
   ///
   /// In zh_CN, this message translates to:
@@ -3541,6 +3589,18 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'当前行歌词高亮色'**
   String get settingsLyricPlayedColorDesc;
+
+  /// No description provided for @settingsLyricFollowAccent.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高亮跟随主题色'**
+  String get settingsLyricFollowAccent;
+
+  /// No description provided for @settingsLyricFollowAccentDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前行高亮使用软件全局主题色'**
+  String get settingsLyricFollowAccentDesc;
 
   /// No description provided for @settingsLyricUnplayedColor.
   ///

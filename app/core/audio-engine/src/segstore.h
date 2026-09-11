@@ -82,6 +82,11 @@ SEGSTORE_API uint64_t segstore_used(const SegStore *s);
 /* 当前已填充逻辑长度（head）。 */
 SEGSTORE_API uint64_t segstore_head(const SegStore *s);
 
+/* 连续视图：仅当整个已填充内容落在单段（seg_size 覆盖全长）时，返回段基址并写
+ * *out_len = head；否则返回 NULL（分段存储，调用方走逐段 pread 路径）。
+ * 指针生命周期与 store 一致，调用方只读不释放。纯内存源 EraAudio 解码用。 */
+SEGSTORE_API const uint8_t *segstore_base(const SegStore *s, uint64_t *out_len);
+
 /* 整段起始 < boundary 的驻留段交还 freelist 并精确回退 used（前缀丢弃）。 */
 SEGSTORE_API void segstore_discard_before(SegStore *s, uint64_t boundary);
 
