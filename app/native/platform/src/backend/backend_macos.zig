@@ -29,6 +29,7 @@ const RTLD_NOW: c_int = 2;
 var g_objc: Id = null;
 var g_appkit: Id = null;
 var g_media: Id = null;
+var g_foundation: Id = null;
 
 var g_msgSend: ?*anyopaque = null;
 var g_getClass: ?*const fn ([*:0]const u8) Class = null;
@@ -42,6 +43,7 @@ fn load() bool {
     g_objc = dlopen("/usr/lib/libobjc.A.dylib", RTLD_NOW) orelse return false;
     g_appkit = dlopen("/System/Library/Frameworks/AppKit.framework/AppKit", RTLD_NOW);
     g_media = dlopen("/System/Library/Frameworks/MediaPlayer.framework/MediaPlayer", RTLD_NOW);
+    g_foundation = dlopen("/System/Library/Frameworks/Foundation.framework/Foundation", RTLD_NOW);
     g_msgSend = dlsym(g_objc, "objc_msgSend");
     g_getClass = @ptrCast(@alignCast(dlsym(g_objc, "objc_getClass")));
     g_sel = @ptrCast(@alignCast(dlsym(g_objc, "sel_registerName")));
@@ -82,6 +84,10 @@ fn mD0(t: Id, s: Sel) f64 {
 fn mD(t: Id, s: Sel, d: f64) Id {
     const f: *const fn (Id, Sel, f64) callconv(.c) Id = @ptrCast(@alignCast(g_msgSend.?));
     return f(t, s, d);
+}
+fn v0(t: Id, s: Sel) void {
+    const f: *const fn (Id, Sel) callconv(.c) void = @ptrCast(@alignCast(g_msgSend.?));
+    f(t, s);
 }
 fn v1(t: Id, s: Sel, a: Id) void {
     const f: *const fn (Id, Sel, Id) callconv(.c) void = @ptrCast(@alignCast(g_msgSend.?));
@@ -446,17 +452,24 @@ pub fn appInstanceAcquire() i32 {
 }
 
 
-// ── 系统提示（osascript 弹窗）──────────────────────────────────────
+// ── 系统提示（NSUserNotificationCenter，对齐 Chromium；不再 spawn osascript）──
 pub fn notify(title: []const u8, body: []const u8) i32 {
-    const script = std.fmt.allocPrint(alloc,
-        "display notification \"{s}\" with title \"{s}\"",
-        .{ body, title }) catch return core.ERR_BACKEND;
-    defer alloc.free(script);
-    const argv = [_][]const u8{ "osascript", "-e", script };
-    const io = std.Io.Threaded.global_single_threaded.io();
-    const r = std.process.run(alloc, io, .{ .argv = &argv }) catch return core.ERR_BACKEND;
-    alloc.free(r.stdout);
-    alloc.free(r.stderr);
+    if (!load()) return core.ERR_BACKEND;
+    const tz = alloc.dupeZ(u8, title) catch return core.ERR_BACKEND;
+    defer alloc.free(tz);
+    const bz = alloc.dupeZ(u8, body) catch return core.ERR_BACKEND;
+    defer alloc.free(bz);
+    const NSUserNotification = cls("NSUserNotification");
+    const NSUserNotificationCenter = cls("NSUserNotificationCenter");
+    if (NSUserNotification == null or NSUserNotificationCenter == null) return core.ERR_BACKEND;
+    const notif = m0(m0(NSUserNotification, sel("alloc")), sel("init"));
+    if (notif == null) return core.ERR_BACKEND;
+    defer v0(notif, sel("release"));
+    v1(notif, sel("setTitle:"), nsstr(tz.ptr));
+    v1(notif, sel("setInformativeText:"), nsstr(bz.ptr));
+    const center = m0(NSUserNotificationCenter, sel("defaultUserNotificationCenter"));
+    if (center == null) return core.ERR_BACKEND;
+    v1(center, sel("deliverNotification:"), notif);
     return core.OK;
 }
 
