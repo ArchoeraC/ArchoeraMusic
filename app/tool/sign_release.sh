@@ -23,7 +23,11 @@ KEYDIR="${ARCHOERA_WM_KEYDIR:-$HOME/.config/archoera}"
 K1="${ARCHOERA_WM_KEY1_FILE:-$KEYDIR/watermark_ec_priv.pem}"
 K2="${ARCHOERA_WM_KEY2_FILE:-$KEYDIR/watermark2_ec_priv.pem}"
 TMP1=""; TMP2=""
-cleanup() { [ -n "$TMP1" ] && rm -f "$TMP1"; [ -n "$TMP2" ] && rm -f "$TMP2"; }
+cleanup() {
+  [ -n "$TMP1" ] && rm -f "$TMP1"
+  [ -n "$TMP2" ] && rm -f "$TMP2"
+  return 0
+}
 trap cleanup EXIT
 if [ -n "${ARCHOERA_WM_KEY1_PEM:-}" ]; then
   TMP1="$(mktemp)"; printf '%s\n' "$ARCHOERA_WM_KEY1_PEM" > "$TMP1"; chmod 600 "$TMP1"; K1="$TMP1"
