@@ -750,6 +750,72 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ),
           ],
         ),
+        const SizedBox(height: 20),
+        SettingSection(
+          title: l10n.settingsPlayerBackground,
+          children: [
+            SettingTile(
+              icon: EtaIcons.drop,
+              title: l10n.settingsPlayerBackground,
+              subtitle: l10n.settingsPlayerBackgroundDesc,
+              trailing: DropdownButton<String>(
+                value: prefs.playerBgType,
+                isDense: true,
+                underline: const SizedBox.shrink(),
+                borderRadius: BorderRadius.circular(10),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
+                icon: Icon(
+                  EtaIcons.downSmall,
+                  color: scheme.onSurfaceVariant,
+                ),
+                onChanged: (v) {
+                  if (v == null) return;
+                  ref
+                      .read(appPrefsProvider.notifier)
+                      .setPlayerBackground(type: v);
+                },
+                items: [
+                  DropdownMenuItem(
+                    value: 'gradient',
+                    child: Text(l10n.settingsPlayerBgGradient),
+                  ),
+                  DropdownMenuItem(
+                    value: 'blur',
+                    child: Text(l10n.settingsPlayerBgBlur),
+                  ),
+                  DropdownMenuItem(
+                    value: 'solid',
+                    child: Text(l10n.settingsPlayerBgSolid),
+                  ),
+                  DropdownMenuItem(
+                    value: 'ripple',
+                    child: Text(l10n.settingsPlayerBgRipple),
+                  ),
+                ],
+              ),
+            ),
+            if (prefs.playerBgType == 'ripple')
+              SettingSliderTile(
+                icon: EtaIcons.drop,
+                title: l10n.settingsPlayerBgRippleSpeed,
+                subtitle: l10n.settingsPlayerBgRippleSpeedDesc(
+                  prefs.playerBgRippleSpeed.toStringAsFixed(1),
+                ),
+                value: prefs.playerBgRippleSpeed,
+                min: 1,
+                max: 6,
+                divisions: 10,
+                label: prefs.playerBgRippleSpeed.toStringAsFixed(1),
+                onChanged: (v) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setPlayerBackground(rippleSpeed: v),
+              ),
+          ],
+        ),
       ],
     );
   }

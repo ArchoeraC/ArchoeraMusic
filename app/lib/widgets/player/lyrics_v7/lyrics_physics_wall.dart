@@ -4,11 +4,14 @@
 
 /// AMLL v7 物理歌词墙：忠实移植 SPlayer-Next 自研物理歌词引擎的 Flutter 版。
 ///
-/// - 布局：每行高度由 [computeLineHeights] 实测（主行+翻译），
-///   [computeCenters] 累计自然中心；
-/// - 定位：激活行中心锚定 `align*viewH`，其余行按自然中心平移；
-///   每行独立 [Spring1D]（默认 0.9/15/90，轻微过冲），换行时按距激活行
-///   距离设置延迟（级联），速度继承连续；首次/seek 跨屏直接 [hardSet]。
+/// - 布局：每行高度由 [computeLineHeights] 实测（主行+翻译，长行自动换行、
+///   多行计入行高），[computeCenters] 累计自然中心；
+/// - 定位：布局锚点（anchor）中心锚定 `align*viewH`，其余行按自然中心平移；
+///   每行独立 [Spring1D]（默认 0.9/15/90，轻微过冲）。换行时按距锚点
+///   距离设置延迟（级联），速度继承连续；首次/seek/跨屏跳转对所有行
+///   同步下发目标（无级联），保证整墙一起位移、行距不塌陷。
+/// - 锚点与高亮分离：无行覆盖播放位置（前奏/间奏空隙/末尾）时保持上一个
+///   锚点，绝不回退到首行；仅当 seek 跨出歌词范围才定位到最近边界行。
 /// - 绘制：CustomPainter 可见行裁剪，距离渐淡/缩放、逐字渐变、翻译小字、
 ///   上下边缘渐隐；点击 seek、拖拽浏览松手回弹、可隐藏已唱行。
 /// 纯 Dart/Flutter，无第三方依赖、无 FFI。
@@ -103,5 +106,4 @@ class _PaintCtx {
   Color played = const Color(0xFF4DA3FF);
   Color unplayed = const Color(0xFF9AA1B5);
   double drag = 0;
-  double shift = 0; // 远跳统一平移（近换行为 0）
 }

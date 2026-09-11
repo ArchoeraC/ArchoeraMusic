@@ -19,6 +19,10 @@ const spectrumBarWidthKey = 'player.spectrumBarWidth';
 const spectrumStyleKey = 'player.spectrumStyle';
 const transitionStyleKey = 'player.transitionStyle';
 
+// ── 播放页背景（对齐 SPlayer-Next player.playerBg*）─────────────
+const playerBgTypeKey = 'player.bgType';
+const playerBgRippleSpeedKey = 'player.bgRippleSpeed';
+
 // ── 音量与播放条显示（对齐 SPlayer-Next 音量体系）─────────────
 const volumeKey = 'player.volume';
 const barLyricsKey = 'player.barLyrics';
@@ -74,6 +78,14 @@ const int defaultSpectrumBarWidth = 4;
 /// 默认 bars）。三种为独立渲染效果，复用同一 FFT 数据缓冲，资源开销等同。
 const String defaultSpectrumStyle = 'bars';
 const Set<String> spectrumStyles = {'bars', 'wave', 'waveUp'};
+
+/// 播放页背景样式（'gradient' 渐变 / 'blur' 模糊封面 / 'solid' 纯色 /
+/// 'ripple' 水纹；默认 'gradient'，保持原主题渐变观感）。
+const String defaultPlayerBgType = 'gradient';
+const Set<String> playerBgTypes = {'gradient', 'blur', 'solid', 'ripple'};
+
+/// 水纹流动速度（1~6，默认 3，对齐 SPlayer-Next player.playerBgRippleSpeed）。
+const double defaultPlayerBgRippleSpeed = 3;
 
 /// 播放器域偏好：直通/自动播放/会话记忆/频谱/封面动效/切歌动效/音量/播放条。
 extension PlayerPrefs on AppPrefs {
@@ -140,6 +152,21 @@ extension PlayerPrefs on AppPrefs {
     final v = data[transitionStyleKey];
     if (v == 'scale' || v == 'slide') return v as String;
     return 'scale';
+  }
+
+  /// 播放页背景样式（'gradient' 渐变 / 'blur' 模糊封面 / 'solid' 纯色 /
+  /// 'ripple' 水纹；非法值回退默认 'gradient'）。
+  String get playerBgType {
+    final v = data[playerBgTypeKey];
+    if (playerBgTypes.contains(v)) return v as String;
+    return defaultPlayerBgType;
+  }
+
+  /// 水纹流动速度（1~6，默认 3）。
+  double get playerBgRippleSpeed {
+    final v = data[playerBgRippleSpeedKey] as num?;
+    if (v == null) return defaultPlayerBgRippleSpeed;
+    return v.toDouble().clamp(1.0, 6.0);
   }
 
   /// 播放音量（0~1，默认 1.0，对齐 SPlayer-Next status.volume）。
@@ -243,4 +270,14 @@ extension PlayerPrefs on AppPrefs {
 
   AppPrefs copyWithShowTranslation(bool value) =>
       AppPrefs(initialData: {...data, showTranslationKey: value});
+
+  /// 设置播放页背景样式 / 水纹速度（非法样式不写入，getter 回退默认）。
+  AppPrefs copyWithPlayerBackground({String? type, double? rippleSpeed}) =>
+      AppPrefs(
+        initialData: {
+          ...data,
+          if (playerBgTypes.contains(type)) playerBgTypeKey: type,
+          playerBgRippleSpeedKey: ?rippleSpeed?.clamp(1.0, 6.0),
+        },
+      );
 }

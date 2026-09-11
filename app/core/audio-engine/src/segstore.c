@@ -209,6 +209,26 @@ uint64_t segstore_head(const SegStore *s)
     return s ? s->head : 0;
 }
 
+const uint8_t *segstore_base(const SegStore *s, uint64_t *out_len)
+{
+    if (out_len) *out_len = 0;
+    if (!s || !s->segs || !s->segs[0]) return NULL;
+    pthread_mutex_lock((pthread_mutex_t *)&s->mu);
+    uint64_t head = s->head;
+    if (s->total > 0 && head > s->total) head = s->total;
+    /* 仅当整个已填充内容落在段 0（seg_size 覆盖全长）且无其它段时，才是连续视图。 */
+    const uint8_t *base = NULL;
+    if (head > 0 && head <= s->seg_size) {
+        base = s->segs[0];
+        for (size_t i = 1; i < s->segs_cap; i++) {
+            if (s->segs[i]) { base = NULL; break; }
+        }
+    }
+    if (base) *out_len = head;
+    pthread_mutex_unlock((pthread_mutex_t *)&s->mu);
+    return base;
+}
+
 void segstore_discard_before(SegStore *s, uint64_t boundary)
 {
     if (!s) return;

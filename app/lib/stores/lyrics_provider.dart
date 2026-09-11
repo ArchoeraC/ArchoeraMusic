@@ -114,6 +114,9 @@ List<LyricGroup> _uncensorGroups(List<LyricGroup> groups) {
                     durationMs: f.durationMs,
                   ),
               ],
+        // 必须保留行结束时间：AMLL 引擎用 endMs 判定严格覆盖范围，
+        // 丢失会让“无行覆盖”的间隙/末尾判定失效。
+        endMs: g.endMs,
       ),
   ];
 }

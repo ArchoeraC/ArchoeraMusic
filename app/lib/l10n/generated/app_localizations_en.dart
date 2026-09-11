@@ -1868,6 +1868,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTransitionStyleSlide => 'Slide';
 
   @override
+  String get settingsPlayerBackground => 'Player Background';
+
+  @override
+  String get settingsPlayerBackgroundDesc =>
+      'Full-screen player background style';
+
+  @override
+  String get settingsPlayerBgGradient => 'Gradient';
+
+  @override
+  String get settingsPlayerBgBlur => 'Blur';
+
+  @override
+  String get settingsPlayerBgSolid => 'Solid';
+
+  @override
+  String get settingsPlayerBgRipple => 'Water Ripple';
+
+  @override
+  String get settingsPlayerBgRippleSpeed => 'Ripple Speed';
+
+  @override
+  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+    return 'Flow speed $speed';
+  }
+
+  @override
   String get settingsSectionShortcuts => 'Shortcuts';
 
   @override
@@ -1956,6 +1983,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsLyricPlayedColorDesc =>
       'Highlight color for current lyric line';
+
+  @override
+  String get settingsLyricFollowAccent => 'Follow Accent Color';
+
+  @override
+  String get settingsLyricFollowAccentDesc =>
+      'Use the app accent color for the current line highlight';
 
   @override
   String get settingsLyricUnplayedColor => 'Unplayed color';

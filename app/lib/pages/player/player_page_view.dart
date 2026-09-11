@@ -65,21 +65,7 @@ extension _PlayerPageView on _PlayerPageState {
         child: Stack(
           children: [
             Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      colorScheme.primary.withValues(alpha: 0.28),
-                      Theme.of(
-                            context,
-                          ).extension<AppChromeColors>()?.playerBackground ??
-                          colorScheme.surface,
-                    ],
-                  ),
-                ),
-              ),
+              child: PlayerBackground(cover: current?.cover, playing: playing),
             ),
             SafeArea(
               child: Padding(

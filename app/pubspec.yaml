@@ -48,6 +48,8 @@ dependencies:
   # 直连网易云 weapi/eapi 加密（AES/RSA/md5）
   pointycastle: ^4.0.0
   crypto: ^3.0.6
+  # 封面主色提取（QuantizerCelebi 量化 + HCT 感知色彩空间，对齐 SPlayer-Next）
+  material_color_utilities: ^0.13.0
   qr_flutter: ^4.1.0
   sqlite3: ^3.5.1
   file_selector: ^1.1.0

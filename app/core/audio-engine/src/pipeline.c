@@ -171,11 +171,40 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     p->cfg = *cfg;
     p->max_frames_per_call = 64;
 
-    /* 1. 打开解码器：store 内存源（engine_mode 任意）跳过自研内核、直接用
-     *    FFmpeg-mem；磁盘源 engine_mode==EraAudio 优先自研内核（原生优先），
-     *    未接管 / 打不开 / 内核未链接 → 回退 FFmpeg（Stable 行为零回退） */
+    /* 1. 打开解码器：
+     *    - store 内存源：engine_mode==EraAudio 且 Store 连续时优先自研内核内存解码
+     *      （纯内存，docs/audio-memory-source.md §7）；分段/未接管/内核未链接 → FFmpeg-mem；
+     *    - 磁盘源：engine_mode==EraAudio 优先自研内核（原生优先），
+     *      未接管 / 打不开 / 内核未链接 → 回退 FFmpeg（Stable 行为零回退）。 */
     if (store) {
-        if (pipeline_store_avio_open(p, store) != 0) {
+        if (cfg->engine_mode == ENGINE_MODE_ERAUDIO) {
+            uint64_t blen = 0;
+            const uint8_t *base = segstore_base(store, &blen);
+            if (base && blen > 0) {
+                NativeInfo ninfo;
+                int st = 1; /* 默认 unsupported */
+                p->native = native_decoder_open_mem(base, (size_t)blen, &ninfo, &st,
+                                                    p->native_err, sizeof(p->native_err));
+                p->native_status = st;
+                if (p->native) {
+                    p->native_active = true;
+                    fprintf(stderr,
+                            "%s EraAudio: 自研内核接管内存源（%llu 字节）— codec=%s / fmt=%s\n",
+                            LOG_TAG, (unsigned long long)blen,
+                            ninfo.codec_name ? ninfo.codec_name : "?",
+                            ninfo.format_name ? ninfo.format_name : "?");
+                } else {
+                    fprintf(stderr,
+                            "%s EraAudio: 内存源自研内核未接管 (status=%d %s)"
+                            " → 回退 FFmpeg-mem\n",
+                            LOG_TAG, st, p->native_err[0] ? p->native_err : "");
+                }
+            } else {
+                fprintf(stderr,
+                        "%s EraAudio: 内存源非连续（分段）→ 回退 FFmpeg-mem\n", LOG_TAG);
+            }
+        }
+        if (!p->native_active && pipeline_store_avio_open(p, store) != 0) {
             fprintf(stderr, "%s SegStore 内存源 AVIO 构造失败\n", LOG_TAG);
             goto fail;
         }

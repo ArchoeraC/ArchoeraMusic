@@ -19,7 +19,7 @@ class _Painter extends CustomPainter {
     if (n == 0) return;
     final viewH = c.h > 0 ? c.h : size.height;
     for (var i = 0; i < n; i++) {
-      final cy = c.y[i] + c.shift;
+      final cy = c.y[i];
       final half = c.heights[i] / 2;
       if (cy + half < 0 || cy - half > viewH) continue;
       final g = c.groups[i];
@@ -82,8 +82,6 @@ class _Painter extends CustomPainter {
         ),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
-        maxLines: 1,
-        ellipsis: '…',
       )..layout(maxWidth: math.max(40, c.w - 24));
       sub.paint(
         canvas,
@@ -114,9 +112,8 @@ class _Painter extends CustomPainter {
                 ),
             ],
           ),
+          textAlign: TextAlign.center,
           textDirection: TextDirection.ltr,
-          maxLines: 1,
-          ellipsis: '…',
         );
       }
     }
@@ -133,9 +130,8 @@ class _Painter extends CustomPainter {
           color: color,
         ),
       ),
+      textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
-      maxLines: 1,
-      ellipsis: '…',
     );
   }
 

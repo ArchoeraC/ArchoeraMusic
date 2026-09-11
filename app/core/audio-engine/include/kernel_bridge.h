@@ -74,6 +74,17 @@ typedef struct ZkInfo {
 ZkDecoder *zk_decoder_open(const char *path, ZkInfo *info, char *errbuf, int errbuf_size);
 
 /**
+ * 从内存字节切片打开解码器（纯内存源，docs/audio-memory-source.md §7）。
+ * 契约与 [zk_decoder_open] 完全一致（info/errbuf/返回语义）；`data` 所有权归调用方，
+ * 必须保持有效直至 [zk_decoder_close]。未接管格式同样返回 NULL + ZK_UNSUPPORTED。
+ *
+ * @param data        内存起始地址（至少 len 字节）
+ * @param len         字节数
+ */
+ZkDecoder *zk_decoder_open_mem(const unsigned char *data, size_t len,
+                               ZkInfo *info, char *errbuf, int errbuf_size);
+
+/**
  * 解码最多 max_frames 帧 float32 交错 PCM。
  * @return >=0：实际输出帧数（0 = EOF，正常文件尾）；
  *         <0：解码错误，返回值 = -（enum ZkStatus 状态码），

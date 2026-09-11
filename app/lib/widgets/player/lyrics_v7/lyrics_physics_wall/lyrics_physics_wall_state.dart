@@ -8,12 +8,13 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     with SingleTickerProviderStateMixin {
   final _PaintCtx _c = _PaintCtx();
   late final Ticker _ticker;
-  late final Spring1D _shift;
   final _Repaint _repaint = _Repaint();
   int _lastUs = 0;
   List<Spring1D> _y = const [];
   bool _metricsDirty = true;
-  int _prevActive = -2;
+
+  /// 当前布局锚点（激活行；无行覆盖时保持上一个锚点）。
+  int _anchorIdx = -1;
   bool _ever = false;
   int? _lastPosMs;
   bool _seekSnap = false;
@@ -33,7 +34,6 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   void initState() {
     super.initState();
     _ticker = createTicker(_tick);
-    _shift = Spring1D();
     _syncStyle();
   }
 
@@ -66,7 +66,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _c.positionMs = widget.positionMs;
     if (groupsChanged) {
       _seekSnap = true;
-      _prevActive = -2;
+      _anchorIdx = -1;
       _metricsDirty = true;
     } else {
       final last = _lastPosMs ?? widget.positionMs;
@@ -82,6 +82,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _repaint.notify();
   }
 
+  /// 播放位置严格覆盖的行索引（`start <= pos < end`）。
+  ///
+  /// 无行覆盖（前奏 / 行间空隙 / 末尾）时返回 -1，交由布局锚点单独处理：
+  /// 普通推进保持上一锚点，仅 seek 越界才定位到最近边界行。
   int get _activeIdx {
     final g = _c.groups;
     if (g.isEmpty) return -1;
@@ -90,9 +94,28 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     for (var i = 0; i < g.length; i++) {
       if (pos < g[i].original.timeMs) break;
       final end = g[i].endMs;
-      if (i == g.length - 1 || end == null || pos < end) res = i;
+      if (end == null || pos < end) res = i;
     }
     return res;
+  }
+
+  /// 解析布局锚点：激活行优先；无行覆盖时保持上一个锚点，仅 seek 越界
+  /// 才定位到最近边界行（对齐 AMLL/SPlayer 的 handleSeek 行为）。
+  int _resolveAnchor(int active, bool seekSnap) {
+    final n = _c.centers.length;
+    if (n == 0) return -1;
+    if (active >= 0) return math.min(active, n - 1);
+    if (!seekSnap && _anchorIdx >= 0 && _anchorIdx < n) return _anchorIdx;
+    return math.min(_futureIndex(widget.positionMs), n - 1);
+  }
+
+  /// 第一个起始时间 >= pos 的行；pos 在全部歌词之后则取末行。
+  int _futureIndex(int pos) {
+    final g = widget.groups;
+    for (var i = 0; i < g.length; i++) {
+      if (g[i].original.timeMs >= pos) return i;
+    }
+    return g.isEmpty ? 0 : g.length - 1;
   }
 
   void _rebuildMetrics() {
@@ -135,59 +158,74 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     final seekSnap = _seekSnap;
     _seekSnap = false;
     final active = _activeIdx;
-    _c.active = active;
-    final anchor = active < 0
-        ? 0
-        : math.min(active, math.max(0, _c.centers.length - 1));
-    final oldAnchor = (_prevActive >= 0 && _prevActive < _c.centers.length)
-        ? _prevActive
-        : anchor;
-    final changed = active != _prevActive;
-    _prevActive = active;
-    if (_c.centers.isEmpty) return;
-    if (!changed && !force) return;
-    final far = seekSnap || _bigChange(anchor);
-    final snap = far || !_ever || !widget.animate;
-    final first = !_ever;
-    _ever = true;
-    // 远跳：每行先落到“新布局最终位置”，再由统一平移弹簧把整墙从旧位置
-    // 平滑过渡到新位置（避免超长距离下逐行级联产生的“炸动画”）。
-    final farShift = _c.centers[anchor] - _c.centers[oldAnchor];
-    if (snap) {
-      if (far && !first && widget.animate && oldAnchor != anchor) {
-        _shift.hardSet(farShift);
-        _shift.setTarget(0);
-        _shift.params = _params;
-      } else {
-        _shift.hardSet(0);
-      }
-    } else {
-      _shift.hardSet(0);
+    _c.active = active; // 高亮：严格覆盖播放位置
+    if (_c.centers.isEmpty) {
+      _repaint.notify();
+      return;
     }
-    for (var i = 0; i < _y.length; i++) {
-      final target = _targetFor(i, anchor);
+    final anchor = _resolveAnchor(active, seekSnap);
+    if (anchor < 0) {
+      _repaint.notify();
+      return;
+    }
+    final oldAnchor = (_anchorIdx >= 0 && _anchorIdx < _c.centers.length)
+        ? _anchorIdx
+        : anchor;
+    final changed = anchor != _anchorIdx || !_ever;
+    _anchorIdx = anchor;
+    if (!changed && !force) {
+      _repaint.notify();
+      return;
+    }
+    // 锚点位移超过一屏视作跨屏跳转：所有行同步位移（无级联），
+    // 保证行距不塌陷、不产生“炸动画”或重叠伪影。仅首次/尺寸重排/
+    // 关闭动画时直接瞬移。
+    final shift = (_c.centers[anchor] - _c.centers[oldAnchor]).abs();
+    final snap = force || !_ever || !widget.animate;
+    final noCascade = oldAnchor != anchor && shift > _c.h;
+    _ever = true;
+    final n = _y.length;
+    final targets = [for (var i = 0; i < n; i++) _targetFor(i, anchor)];
+    if (snap) {
+      for (var i = 0; i < n; i++) {
+        final spring = _y[i];
+        spring.params = _params;
+        spring.hardSet(targets[i]);
+        _c.y[i] = spring.current;
+      }
+      _repaint.notify();
+      return;
+    }
+    // 级联延迟自“进入视口顶部的第一行”向下累积（对齐 AMLL
+    // calculateLayout）：上方行先动、下方行按 1.05 衰减依次跟进。
+    // 若按“距激活行距离”给延迟，快速换行时上方行会滞后堆叠。
+    var moving = false;
+    var cascadeDelay = 0.0;
+    var baseDelay = noCascade ? 0.0 : kCascadeStepMs;
+    for (var i = 0; i < n; i++) {
       final spring = _y[i];
       spring.params = _params;
-      if (snap) {
-        spring.hardSet(target);
-      } else {
-        final d = (i - anchor).abs().toDouble();
-        final delay = d <= 1 ? 0.0 : (d - 1) * kCascadeStepMs;
-        spring.setTarget(target, delayMs: delay);
-      }
+      spring.setTarget(targets[i], delayMs: cascadeDelay);
       _c.y[i] = spring.current;
+      if (!spring.arrived()) moving = true;
+      if (i + 1 < n) {
+        final nextTop = targets[i + 1] - _c.heights[i + 1] / 2;
+        if (nextTop >= 0) {
+          cascadeDelay += baseDelay;
+          if (i >= anchor) baseDelay /= 1.05;
+        }
+      }
     }
-    if (!snap || !_shift.arrived()) _ensureTicker();
+    if (moving) _ensureTicker();
     _repaint.notify();
   }
 
   /// 把用户浏览偏移并入各行弹簧目标（跟随手指/滚轮，无级联延迟）。
   void _pushUserTargets() {
-    if (_c.centers.isEmpty) return;
-    final active = _activeIdx;
-    final anchor = active < 0
-        ? 0
-        : math.min(active, math.max(0, _c.centers.length - 1));
+    if (_c.centers.isEmpty || _y.isEmpty) return;
+    final anchor = (_anchorIdx >= 0 && _anchorIdx < _c.centers.length)
+        ? _anchorIdx
+        : 0;
     for (var i = 0; i < _y.length; i++) {
       final spring = _y[i];
       spring.params = _params;
@@ -212,13 +250,6 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       _dragging = false;
       _pushUserTargets();
     });
-  }
-
-  bool _bigChange(int anchor) {
-    if (_c.h <= 0 || _y.isEmpty) return false;
-    final cur = _y[math.min(anchor, _y.length - 1)].current;
-    final tgt = _targetFor(math.min(anchor, _y.length - 1), anchor);
-    return (cur - tgt).abs() > _c.h * 0.6;
   }
 
   void _ensureTicker() {
@@ -246,12 +277,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         moving = true;
       }
     }
-    if (!_shift.arrived()) {
-      _c.shift = _shift.update(dt);
-      moving = true;
-    }
     if (!moving) {
-      _c.shift = 0;
       _ticker.stop();
     }
     _repaint.notify();
@@ -285,7 +311,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
           _c.w = w;
           _c.h = h;
           _rebuildMetrics();
-          _prevActive = -2;
+          _anchorIdx = -1;
           _maybeRetarget(force: true);
         }
         _c.positionMs = widget.positionMs;
@@ -337,13 +363,35 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     );
   }
 
+  // ---- 测试探针（仅用于回归测试，不参与运行逻辑）----
+
+  /// 当前布局锚点索引。
+  @visibleForTesting
+  int debugAnchor() => _anchorIdx;
+
+  /// 当前高亮行索引（无覆盖为 -1）。
+  @visibleForTesting
+  int debugActive() => _c.active;
+
+  /// 每行当前屏幕中心。
+  @visibleForTesting
+  List<double> debugY() => List.of(_c.y);
+
+  /// 每行自然中心。
+  @visibleForTesting
+  List<double> debugCenters() => List.of(_c.centers);
+
+  /// 每行高度。
+  @visibleForTesting
+  List<double> debugHeights() => List.of(_c.heights);
+
   void _seekAt(double y) {
     final n = _c.y.length;
     if (n == 0) return;
     var best = 0;
     var bd = double.infinity;
     for (var i = 0; i < n; i++) {
-      final d = (y - (_c.y[i] + _c.shift)).abs();
+      final d = (y - _c.y[i]).abs();
       if (d < bd) {
         bd = d;
         best = i;

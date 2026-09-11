@@ -168,6 +168,27 @@ add_test(NAME test_store_pipeline
 set_tests_properties(test_store_pipeline PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# EraAudio 纯内存源解码冒烟（docs/audio-memory-source.md §7）：fixture 连续内存 →
+# native_decoder_open_mem → 与路径后端对拍帧数/采样率/声道。证明自研内核已接入
+# 「纯内存源」，不再一律回退 FFmpeg。
+add_executable(test_era_mem test_era_mem.c)
+target_link_libraries(test_era_mem PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_era_mem PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_era_mem PRIVATE m)
+endif()
+target_include_directories(test_era_mem PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_era_mem
+         COMMAND test_era_mem
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac)
+set_tests_properties(test_era_mem PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # 集成测试（需要输入文件的跳过 CTEST，仅通过手动运行）
 # add_engine_test(test_pipeline test_pipeline.c)
 

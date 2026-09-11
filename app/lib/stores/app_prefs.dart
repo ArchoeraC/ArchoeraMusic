@@ -231,6 +231,15 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置播放页背景样式（gradient / solid / ripple）与水纹速度（1~6）。
+  void setPlayerBackground({String? type, double? rippleSpeed}) {
+    state = state.copyWithPlayerBackground(
+      type: type,
+      rippleSpeed: rippleSpeed,
+    );
+    state.save();
+  }
+
   /// 设置自定义主色（null = 恢复默认亮蓝）。
   void setAccent(int? accent) {
     state = state.copyWithAccent(accent);
@@ -339,12 +348,14 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     double? lineHeight,
     int? playedColor,
     int? unplayedColor,
+    bool? followAccent,
   }) {
     state = state.copyWithLyricStyle(
       fontSize: fontSize,
       lineHeight: lineHeight,
       playedColor: playedColor,
       unplayedColor: unplayedColor,
+      followAccent: followAccent,
     );
     state.save();
   }

@@ -10,6 +10,7 @@ const lyricFontSizeKey = 'lyrics.fontSize';
 const lyricLineHeightKey = 'lyrics.lineHeight';
 const lyricPlayedColorKey = 'lyrics.playedColor';
 const lyricUnplayedColorKey = 'lyrics.unplayedColor';
+const lyricFollowAccentKey = 'lyrics.followAccent';
 
 // ── AMLL 歌词墙（AMLL 引擎）偏好键 ──────────────────────────────
 const lyricEngineKey = 'lyrics.engine'; // 'simple' | 'amll'
@@ -51,6 +52,9 @@ extension LyricsPrefs on AppPrefs {
   int get lyricUnplayedColor =>
       data[lyricUnplayedColorKey] as int? ?? 0xFF9AA1B5;
 
+  /// 已唱/高亮颜色跟随软件全局主题色（默认关；开则忽略 [lyricPlayedColor]）。
+  bool get lyricFollowAccent => data[lyricFollowAccentKey] as bool? ?? false;
+
   AppPrefs copyWithLyrics({bool? showInPlayer}) =>
       AppPrefs(initialData: {...data, showLyricsKey: ?showInPlayer});
 
@@ -59,6 +63,7 @@ extension LyricsPrefs on AppPrefs {
     double? lineHeight,
     int? playedColor,
     int? unplayedColor,
+    bool? followAccent,
   }) => AppPrefs(
     initialData: {
       ...data,
@@ -66,6 +71,7 @@ extension LyricsPrefs on AppPrefs {
       lyricLineHeightKey: ?lineHeight?.clamp(42, 64),
       lyricPlayedColorKey: ?playedColor,
       lyricUnplayedColorKey: ?unplayedColor,
+      lyricFollowAccentKey: ?followAccent,
     },
   );
 }

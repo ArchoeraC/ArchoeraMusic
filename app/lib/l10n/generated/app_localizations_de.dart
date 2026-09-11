@@ -1878,6 +1878,33 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsTransitionStyleSlide => 'Schieben';
 
   @override
+  String get settingsPlayerBackground => 'Player-Hintergrund';
+
+  @override
+  String get settingsPlayerBackgroundDesc =>
+      'Hintergrundstil des Vollbild-Players';
+
+  @override
+  String get settingsPlayerBgGradient => 'Verlauf';
+
+  @override
+  String get settingsPlayerBgBlur => 'Weichzeichnen';
+
+  @override
+  String get settingsPlayerBgSolid => 'Einfarbig';
+
+  @override
+  String get settingsPlayerBgRipple => 'Wasserwelle';
+
+  @override
+  String get settingsPlayerBgRippleSpeed => 'Wellengeschwindigkeit';
+
+  @override
+  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+    return 'Fließgeschwindigkeit $speed';
+  }
+
+  @override
   String get settingsSectionShortcuts => 'Tastenkürzel';
 
   @override
@@ -1966,6 +1993,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsLyricPlayedColorDesc =>
       'Hervorhebungsfarbe für aktuelle Songtextzeile';
+
+  @override
+  String get settingsLyricFollowAccent => 'Akzentfarbe folgen';
+
+  @override
+  String get settingsLyricFollowAccentDesc =>
+      'Akzentfarbe der App für die Hervorhebung der aktuellen Zeile verwenden';
 
   @override
   String get settingsLyricUnplayedColor => 'Nicht abgespielte Farbe';

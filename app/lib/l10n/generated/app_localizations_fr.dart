@@ -1884,6 +1884,33 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsTransitionStyleSlide => 'Glissement';
 
   @override
+  String get settingsPlayerBackground => 'Arrière-plan du lecteur';
+
+  @override
+  String get settingsPlayerBackgroundDesc =>
+      'Style d\'arrière-plan du lecteur plein écran';
+
+  @override
+  String get settingsPlayerBgGradient => 'Dégradé';
+
+  @override
+  String get settingsPlayerBgBlur => 'Flou';
+
+  @override
+  String get settingsPlayerBgSolid => 'Uni';
+
+  @override
+  String get settingsPlayerBgRipple => 'Ondulations';
+
+  @override
+  String get settingsPlayerBgRippleSpeed => 'Vitesse des ondulations';
+
+  @override
+  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+    return 'Vitesse d\'écoulement $speed';
+  }
+
+  @override
   String get settingsSectionShortcuts => 'Raccourcis';
 
   @override
@@ -1974,6 +2001,13 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsLyricPlayedColorDesc =>
       'Couleur de surbrillance pour la ligne de paroles actuelle';
+
+  @override
+  String get settingsLyricFollowAccent => 'Suivre la couleur d\'accent';
+
+  @override
+  String get settingsLyricFollowAccentDesc =>
+      'Utiliser la couleur d\'accent de l\'application pour la surbrillance de la ligne actuelle';
 
   @override
   String get settingsLyricUnplayedColor => 'Couleur non lue';

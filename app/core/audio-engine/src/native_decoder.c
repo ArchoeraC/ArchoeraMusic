@@ -177,6 +177,56 @@ NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
     return d;
 }
 
+NativeDecoder *native_decoder_open_mem(const void *data, size_t len, NativeInfo *info,
+                                       int *status_out,
+                                       char *errbuf, int errbuf_size)
+{
+    if (!data || len == 0) return NULL;
+
+    ZkInfo zinfo;
+    char eb[512];
+    NativeDecoder *d;
+    memset(&zinfo, 0, sizeof(zinfo));
+    memset(eb, 0, sizeof(eb));
+
+    /* 纯内存源走直连 decoder（非池；池 stream seam 为路径输入）。 */
+    ZkDecoder *zk = zk_decoder_open_mem((const unsigned char *)data, len,
+                                        &zinfo, eb, (int)sizeof(eb));
+    if (!zk) {
+        if (status_out) *status_out = read_le32_status(eb);
+        if (errbuf && errbuf_size > 0) {
+            snprintf(errbuf, errbuf_size, "%s", eb + 4);
+        }
+        return NULL;
+    }
+
+    d = (NativeDecoder *)calloc(1, sizeof(*d));
+    if (!d) {
+        zk_decoder_close(zk);
+        if (status_out) *status_out = 7; /* ZK_OUT_OF_MEMORY */
+        if (errbuf && errbuf_size > 0) {
+            snprintf(errbuf, errbuf_size, "out of memory");
+        }
+        return NULL;
+    }
+    d->zk = zk;
+    d->stream = NULL;
+    d->is_stream = 0;
+    d->info = zinfo;
+
+    if (status_out) *status_out = 0;
+    if (info) {
+        info->sample_rate = zinfo.sample_rate;
+        info->channels = zinfo.channels;
+        info->bits_per_sample = zinfo.bits_per_sample;
+        info->duration_us = zinfo.duration_us;
+        info->duration_known = zinfo.duration_known;
+        info->codec_name = zinfo.codec_name;
+        info->format_name = zinfo.format_name;
+    }
+    return d;
+}
+
 int native_decoder_read(NativeDecoder *d, float *out, int max_frames,
                         int *out_channels)
 {
@@ -271,6 +321,18 @@ NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
                                    char *errbuf, int errbuf_size)
 {
     (void)path; (void)info;
+    if (status_out) *status_out = 1; /* ZK_UNSUPPORTED */
+    if (errbuf && errbuf_size > 0) {
+        snprintf(errbuf, errbuf_size, "archoera_kernel 未链接（构建时无 zig）");
+    }
+    return NULL;
+}
+
+NativeDecoder *native_decoder_open_mem(const void *data, size_t len, NativeInfo *info,
+                                       int *status_out,
+                                       char *errbuf, int errbuf_size)
+{
+    (void)data; (void)len; (void)info;
     if (status_out) *status_out = 1; /* ZK_UNSUPPORTED */
     if (errbuf && errbuf_size > 0) {
         snprintf(errbuf, errbuf_size, "archoera_kernel 未链接（构建时无 zig）");

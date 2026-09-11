@@ -59,6 +59,18 @@ export fn zk_decoder_open(
     return engine.zkOpen(path, info, errbuf, errbuf_size);
 }
 
+/// 从内存字节切片打开解码器（纯内存源，docs/audio-memory-source.md §7）。
+/// 契约同 [zk_decoder_open]；`data` 所有权归调用方，须覆盖解码会话生命周期。
+export fn zk_decoder_open_mem(
+    data: [*]const u8,
+    len: usize,
+    info: *engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: c_int,
+) ?*engine.Engine {
+    return engine.zkOpenMem(data, len, info, errbuf, errbuf_size);
+}
+
 /// 解码最多 max_frames 帧 float32 交错到 out。
 /// 返回 >=0 帧数（0 = EOF）；错误返回负值（-err.Status，见 include/kernel_bridge.h）。
 export fn zk_decoder_read(
