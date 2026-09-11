@@ -38,18 +38,26 @@ cd build && ctest
 4. 两把签名齐全且验签通过，才算「官方发布」。
 
 ### 维护者本地补签 key2（每次 Release 必做）
+**推荐低流量**：只下 `SHA256SUMS`（~1KB），据其哈希签 `.sig2`，**无需下载大包**：
 ```bash
-TAG=v0.9.15
-mkdir -p /tmp/rel && gh release download "$TAG" -D /tmp/rel --clobber
-# 仅用 key2 签（ARCHOERA_WM_KEYS=2；默认文件 ~/.config/archoera/watermark2_ec_priv.pem）
-ARCHOERA_WM_KEYS=2 bash app/tool/sign_release.sh /tmp/rel
+TAG=v0.9.15+7
+mkdir -p /tmp/rel && gh release download "$TAG" -p SHA256SUMS -D /tmp/rel --clobber
+ARCHOERA_WM_KEYS=2 bash app/tool/sign_release_hashes.sh /tmp/rel
 gh release upload "$TAG" /tmp/rel/*.sig2 --clobber
+# 验 SHA256SUMS.sig2：
+openssl dgst -sha256 -verify app/tool/watermark_pub2.pem \
+  -signature /tmp/rel/SHA256SUMS.sig2 /tmp/rel/SHA256SUMS
 ```
-Windows/无 shell 环境可用跨平台 Dart 版：
-```powershell
-$env:ARCHOERA_WM_KEYS="2"; $env:ARCHOERA_WM_PRIVKEY2_D="<key2标量hex>"
-dart run tool/sign_release.dart sign C:\path\to\rel
-```
+原理：ECDSA 签的是**摘要**；`sign_release_hashes.sh` 把 SHA256SUMS 里的 SHA-256 直接
+喂给 `openssl pkeyutl -sign -pkeyopt digest:sha256`，等价于对整包签名——用户仍可用标准
+`openssl dgst -sha256 -verify watermark_pub2.pem -signature <asset>.sig2 <asset>` 验签。
+CI 的 SHA256SUMS 已被 key1 的 `.sig1` 签名，故「CI 哈希 → 本地 sig2」链条可信。
+
+有产物文件时也可直接：`ARCHOERA_WM_KEYS=2 bash app/tool/sign_release.sh <dir>`。
+Windows/无 shell 用跨平台 Dart 版：`ARCHOERA_WM_KEYS=2` + `ARCHOERA_WM_PRIVKEY2_D` →
+`dart run tool/sign_release.dart sign <dir>`。
+
+> 网络受限时给 `gh` 设代理：`HTTPS_PROXY=http://<proxy> gh release download ...`。
 
 ### 验签（任何人）
 ```bash
