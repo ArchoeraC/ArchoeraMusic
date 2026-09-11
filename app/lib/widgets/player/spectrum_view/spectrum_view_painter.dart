@@ -109,7 +109,9 @@ class _SpectrumPainter extends CustomPainter {
     final numBars = (size.width / slotWidth).floor();
     if (numBars <= 0) return;
 
-    final paint = Paint()..color = color;
+    // 单 Path 批量提交（替代 N 次 drawRRect）；横向渐隐由画笔 shader 承担，
+    // 不再需要 widget 侧 ShaderMask 离屏层。
+    final path = Path();
     for (var i = 0; i < numBars; i++) {
       final startBin = (i * usableLen / numBars).floor();
       final endBin = ((i + 1) * usableLen / numBars).floor();
@@ -122,7 +124,7 @@ class _SpectrumPainter extends CustomPainter {
       final v = sum / (hi - lo);
       final barHeight = v * size.height;
       if (barHeight <= _minBarHeight) continue;
-      canvas.drawRRect(
+      path.addRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(
             i * slotWidth,
@@ -132,9 +134,26 @@ class _SpectrumPainter extends CustomPainter {
           ),
           Radius.circular(radius),
         ),
-        paint,
       );
     }
+    if (path.getBounds().isEmpty) return;
+    canvas.drawPath(
+      path,
+      Paint()..shader = _fadeShader(size, color),
+    );
+  }
+
+  /// 横向渐隐 shader（对齐原 ShaderMask 的 [0,0.05,0.12,0.88,0.95,1] 停点，
+  /// 0x99/255≈0.6）。直接作为画笔 shader → 免去 ShaderMask 的离屏合成。
+  static Shader _fadeShader(Size size, Color base) {
+    const stops = [0.0, 0.05, 0.12, 0.88, 0.95, 1.0];
+    const alphas = [0.0, 0.6, 1.0, 1.0, 0.6, 0.0];
+    return LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [for (final a in alphas) base.withValues(alpha: a)],
+      stops: stops,
+    ).createShader(Offset.zero & size);
   }
 
   void _paintWave(
@@ -176,7 +195,7 @@ class _SpectrumPainter extends CustomPainter {
     }
 
     final paint = Paint()
-      ..color = color
+      ..shader = _fadeShader(size, color)
       ..style = PaintingStyle.stroke
       ..strokeWidth = math.max(1.5, math.min(3.0, barWidth))
       ..strokeCap = StrokeCap.round
