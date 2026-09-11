@@ -310,9 +310,9 @@ pub fn windowSetEvents(on: i32) i32 {
 pub fn mediaSetTrack(meta: ?*const core.TrackMeta) i32 {
     if (smtc.init(&findFlutterWindow) != core.OK) return core.ERR_BACKEND;
     if (meta) |m| {
-        smtc.setTrack(m.title.slice(), m.artist.slice(), m.art_url.slice(), m.duration_ms);
+        smtc.setTrack(m.title.slice(), m.artist.slice(), m.art_url.slice(), m.duration_ms, m.art_bytes.slice());
     } else {
-        smtc.setTrack(null, null, null, -1);
+        smtc.setTrack(null, null, null, -1, null);
     }
     return core.OK;
 }
