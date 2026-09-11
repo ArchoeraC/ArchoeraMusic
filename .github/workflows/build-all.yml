@@ -404,6 +404,7 @@ jobs:
           bash packaging/linux/package.sh nix app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
           docker run --rm -v "$PWD":/workspace \
             -e PKG_VER="${{ steps.version.outputs.version }}" \
+            -e GH_TOKEN="${{ github.token }}" \
             nixos/nix:latest bash -c '
               # /workspace 是 git 仓库且归宿主 runner 所有；nix 对 git 仓库
               # 输入走 libgit2 且拒绝"非当前用户所有"（容器 root vs 宿主 1001）。
@@ -412,7 +413,11 @@ jobs:
               mkdir -p /tmp/nixbuild
               cp -a /workspace/packaging/linux/work/nix/. /tmp/nixbuild/
               cd /tmp/nixbuild
-              nix --extra-experimental-features "nix-command flakes" build .#default --no-sandbox || exit 1
+              # 传 token：nixos-unstable 未锁，每次解析会打 GitHub API；无认证
+              # 会被限流（HTTP 403）导致打包失败。access-tokens 带认证后正常。
+              nix --extra-experimental-features "nix-command flakes" \
+                --option access-tokens "github.com=${GH_TOKEN}" \
+                build .#default --no-sandbox || exit 1
               # result 指向容器 /nix/store，readlink 后打包完整 store 产物
               tar -C "$(readlink -f result)" -czf \
                 "/workspace/dist/linux/ArchoeraMusic-v${PKG_VER}-nixos-x86_64.tar.gz" .
