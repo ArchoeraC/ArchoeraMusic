@@ -46,8 +46,6 @@ const RoActivateInstanceFn = *const fn (HSTRING, *?*anyopaque) callconv(.c) HRES
 const WindowsCreateStringFn = *const fn ([*]const u16, u32, *HSTRING) callconv(.c) HRESULT;
 const WindowsDeleteStringFn = *const fn (HSTRING) callconv(.c) HRESULT;
 const CoCreateFreeThreadedMarshalerFn = *const fn (?*anyopaque, *?*anyopaque) callconv(.c) HRESULT;
-const SHCreateMemStreamFn = *const fn (?[*]const u8, u32) callconv(.c) ?*anyopaque;
-const CreateRandomAccessStreamOverStreamFn = *const fn (?*anyopaque, u32, *const win.GUID, *?*anyopaque) callconv(.c) HRESULT;
 
 var g_combase: win.HMODULE = null;
 var p_RoInitialize: ?RoInitializeFn = null;
@@ -56,8 +54,6 @@ var p_RoActivateInstance: ?RoActivateInstanceFn = null;
 var p_WindowsCreateString: ?WindowsCreateStringFn = null;
 var p_WindowsDeleteString: ?WindowsDeleteStringFn = null;
 var p_CoCreateFreeThreadedMarshaler: ?CoCreateFreeThreadedMarshalerFn = null;
-var p_SHCreateMemStream: ?SHCreateMemStreamFn = null;
-var p_CreateRandomAccessStreamOverStream: ?CreateRandomAccessStreamOverStreamFn = null;
 
 fn loadCombase() bool {
     if (g_combase != null) return true;
@@ -71,13 +67,6 @@ fn loadCombase() bool {
     // CoCreateFreeThreadedMarshaler：委托封送（IMarshal）用；ole32 提供。
     if (win.LoadLibraryA("ole32.dll")) |ho| {
         p_CoCreateFreeThreadedMarshaler = @ptrCast(win.GetProcAddress(ho, "CoCreateFreeThreadedMarshaler"));
-    }
-    // 本地封面内存流：SHCreateMemStream（shlwapi）+ CreateRandomAccessStreamOverStream（shcore）。
-    if (win.LoadLibraryA("shlwapi.dll")) |hs| {
-        p_SHCreateMemStream = @ptrCast(win.GetProcAddress(hs, "SHCreateMemStream"));
-    }
-    if (win.LoadLibraryA("shcore.dll")) |hc| {
-        p_CreateRandomAccessStreamOverStream = @ptrCast(win.GetProcAddress(hc, "CreateRandomAccessStreamOverStream"));
     }
     return p_RoInitialize != null and p_RoGetActivationFactory != null and
         p_RoActivateInstance != null and p_WindowsCreateString != null and
@@ -117,12 +106,19 @@ const IID_RASR_STATICS = win.GUID{
     .Data3 = 0x4E7D,
     .Data4 = .{ 0x98, 0x6F, 0xEF, 0x3B, 0x1A, 0x07, 0xA9, 0x64 },
 };
-// IRandomAccessStream {905a0fe1-bc53-11df-8c49-001e4fc686da}（本地封面内存流用）。
-const IID_IRANDOMACCESSSTREAM = win.GUID{
-    .Data1 = 0x905a0fe1,
+// IOutputStream {905a0fe6-bc53-11df-8c49-001e4fc686da}
+const IID_IOUTPUTSTREAM = win.GUID{
+    .Data1 = 0x905a0fe6,
     .Data2 = 0xbc53,
     .Data3 = 0x11df,
     .Data4 = .{ 0x8c, 0x49, 0x00, 0x1e, 0x4f, 0xc6, 0x86, 0xda },
+};
+// IDataWriterFactory {338c67c2-8b84-4c2b-9c50-7b8767847a1f}
+const IID_IDATAWRITERFACTORY = win.GUID{
+    .Data1 = 0x338c67c2,
+    .Data2 = 0x8b84,
+    .Data3 = 0x4c2b,
+    .Data4 = .{ 0x9c, 0x50, 0x7b, 0x87, 0x67, 0x84, 0x7a, 0x1f },
 };
 
 // 事件委托 QI 策略：本对象只实现了 IUnknown + Invoke（WinRT 委托的 ABI 布局，
@@ -305,6 +301,57 @@ const RasrStaticsVtbl = extern struct {
     CreateFromStream: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
 };
 
+/// IDataWriterFactory（winmd 1 方法）。
+const DataWriterFactoryVtbl = extern struct {
+    base: Inspectable,
+    CreateDataWriter: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+};
+
+/// IDataWriter（槽位顺序 = wine `windows.storage.streams.h`；仅用 WriteBytes / StoreAsync）。
+const DataWriterVtbl = extern struct {
+    base: Inspectable,
+    get_UnstoredBufferLength: *const fn (*anyopaque, *u32) callconv(.c) HRESULT,
+    get_UnicodeEncoding: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
+    put_UnicodeEncoding: *const fn (*anyopaque, i32) callconv(.c) HRESULT,
+    get_ByteOrder: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
+    put_ByteOrder: *const fn (*anyopaque, i32) callconv(.c) HRESULT,
+    WriteByte: *const fn (*anyopaque, u8) callconv(.c) HRESULT,
+    WriteBytes: *const fn (*anyopaque, u32, [*]const u8) callconv(.c) HRESULT,
+    WriteBuffer: *const fn (*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
+    WriteBufferRange: *const fn (*anyopaque, ?*anyopaque, u32, u32) callconv(.c) HRESULT,
+    WriteBoolean: *const fn (*anyopaque, boolean) callconv(.c) HRESULT,
+    WriteGuid: *const fn (*anyopaque, win.GUID) callconv(.c) HRESULT,
+    WriteInt16: *const fn (*anyopaque, i16) callconv(.c) HRESULT,
+    WriteInt32: *const fn (*anyopaque, i32) callconv(.c) HRESULT,
+    WriteInt64: *const fn (*anyopaque, i64) callconv(.c) HRESULT,
+    WriteUInt16: *const fn (*anyopaque, u16) callconv(.c) HRESULT,
+    WriteUInt32: *const fn (*anyopaque, u32) callconv(.c) HRESULT,
+    WriteUInt64: *const fn (*anyopaque, u64) callconv(.c) HRESULT,
+    WriteSingle: *const fn (*anyopaque, f32) callconv(.c) HRESULT,
+    WriteDouble: *const fn (*anyopaque, f64) callconv(.c) HRESULT,
+    WriteDateTime: *const fn (*anyopaque, i64) callconv(.c) HRESULT,
+    WriteTimeSpan: *const fn (*anyopaque, i64) callconv(.c) HRESULT,
+    WriteString: *const fn (*anyopaque, HSTRING, *u32) callconv(.c) HRESULT,
+    MeasureString: *const fn (*anyopaque, HSTRING, *u32) callconv(.c) HRESULT,
+    StoreAsync: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+    FlushAsync: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+    DetachBuffer: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+    DetachStream: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+};
+
+/// IAsyncOperation<UINT32>（IAsyncInfo 5 + put/get_Completed + GetResults）。
+const AsyncOpU32Vtbl = extern struct {
+    base: Inspectable,
+    get_Id: *const fn (*anyopaque, *u32) callconv(.c) HRESULT,
+    get_Status: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
+    get_ErrorCode: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
+    Cancel: *const fn (*anyopaque) callconv(.c) HRESULT,
+    Close: *const fn (*anyopaque) callconv(.c) HRESULT,
+    put_Completed: *const fn (*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
+    get_Completed: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+    GetResults: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
+};
+
 fn vtbl(comptime T: type, obj: *anyopaque) *const T {
     const pp: *const *const T = @ptrCast(@alignCast(obj));
     return pp.*;
@@ -329,6 +376,14 @@ const HandlerVtbl = extern struct {
     AddRef: *const fn (*anyopaque) callconv(.c) u32,
     Release: *const fn (*anyopaque) callconv(.c) u32,
     Invoke: *const fn (*anyopaque, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
+};
+
+/// IAsyncOperationCompletedHandler<UINT32> 的委托布局（第 3 参为枚举 AsyncStatus=i32）。
+const ThumbHandlerVtbl = extern struct {
+    QueryInterface: *const fn (*anyopaque, *const win.GUID, *?*anyopaque) callconv(.c) HRESULT,
+    AddRef: *const fn (*anyopaque) callconv(.c) u32,
+    Release: *const fn (*anyopaque) callconv(.c) u32,
+    Invoke: *const fn (*anyopaque, ?*anyopaque, i32) callconv(.c) HRESULT,
 };
 
 fn guidEq(a: win.GUID, b: *const win.GUID) bool {
@@ -412,6 +467,38 @@ const HANDLER_VTBL = HandlerVtbl{
     .Invoke = handlerInvoke,
 };
 var g_handler_obj = HandlerObj{ .vtbl = &HANDLER_VTBL, .ref = 1 };
+
+// ── 封面缩略图：Chromium 方案（InMemoryRandomAccessStream + DataWriter +
+//    StoreAsync 完成回调 → CreateFromStream → put_Thumbnail → Update）──
+// 流/writer/op 持有到回调完成（对齐 Chromium 的成员变量，防异步完成前析构）。
+var g_thumb_stream: ?*anyopaque = null;
+var g_thumb_writer: ?*anyopaque = null;
+var g_thumb_op: ?*anyopaque = null;
+
+fn thumbInvoke(this: *anyopaque, async_info: ?*anyopaque, status: i32) callconv(.c) HRESULT {
+    _ = this;
+    _ = async_info;
+    _ = status;
+    const stream = g_thumb_stream orelse return S_OK;
+    if (g_display == null) return S_OK;
+    const rs = rasrStatics() orelse return S_OK;
+    defer release(rs);
+    var ref: ?*anyopaque = null;
+    if (vtbl(RasrStaticsVtbl, rs).CreateFromStream(rs, stream, &ref) != S_OK or ref == null) return S_OK;
+    defer release(ref);
+    _ = vtbl(DisplayVtbl, g_display.?).put_Thumbnail(g_display.?, ref);
+    _ = vtbl(DisplayVtbl, g_display.?).Update(g_display.?);
+    log("apl/smtc: thumbnail set (mem async)");
+    return S_OK;
+}
+
+const THUMB_HANDLER_VTBL = ThumbHandlerVtbl{
+    .QueryInterface = handlerQI,
+    .AddRef = handlerAddRef,
+    .Release = handlerRelease,
+    .Invoke = thumbInvoke,
+};
+var g_thumb_handler_obj = HandlerObj{ .vtbl = @ptrCast(&THUMB_HANDLER_VTBL), .ref = 1 };
 
 // ── IMarshal 包装（委托封送；对齐 windows-rs imp/marshaler.rs）──────────
 //
@@ -612,30 +699,25 @@ pub fn init(findWindow: *const fn () ?win.HWND) i32 {
 /// combase.dll 访问冲突（0xC0000005）——故此处同步执行、不再 spawn 线程。
 fn setArtwork(url: []const u8, bytes: ?[]const u8) void {
     if (g_display == null) return;
-    var ref: ?*anyopaque = null;
+    // 本地封面：内存流 + 异步 store（完成回调里 put_Thumbnail + Update）。
     if (bytes) |b| {
         if (b.len > 0) {
-            log("apl/smtc: artwork mem");
-            ref = refFromMemory(b);
+            setArtworkFromMemory(b);
+            return;
         }
     }
-    if (ref == null) {
-        const is_http = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
-        if (is_http) {
-            log("apl/smtc: artwork http");
-            ref = refFromUri(url);
-        }
-    }
-    if (ref == null) {
+    // http 封面：Uri → CreateFromUri（同步）。
+    const is_http = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
+    if (!is_http) return;
+    log("apl/smtc: artwork http");
+    const ref = refFromUri(url) orelse {
         log("apl/smtc: artwork ref failed");
         return;
-    }
+    };
     defer release(ref);
-    if (vtbl(DisplayVtbl, g_display.?).put_Thumbnail(g_display.?, ref) == S_OK) {
-        log("apl/smtc: thumbnail set");
-    } else {
-        log("apl/smtc: put_Thumbnail failed");
-    }
+    _ = vtbl(DisplayVtbl, g_display.?).put_Thumbnail(g_display.?, ref);
+    _ = vtbl(DisplayVtbl, g_display.?).Update(g_display.?);
+    log("apl/smtc: thumbnail set (uri)");
 }
 
 fn rasrStatics() ?*anyopaque {
@@ -664,23 +746,53 @@ fn refFromUri(url: []const u8) ?*anyopaque {
     return ref;
 }
 
-/// 由内存字节构造 RandomAccessStreamReference（**同步**，无 WinRT 异步/等待）：
-/// SHCreateMemStream → CreateRandomAccessStreamOverStream → CreateFromStream。
-/// 本地封面走此路径，彻底避开 StorageFile.GetFileFromPathAsync 的异步/封送问题。
-fn refFromMemory(bytes: []const u8) ?*anyopaque {
-    const create = p_SHCreateMemStream orelse return null;
-    const wrap = p_CreateRandomAccessStreamOverStream orelse return null;
-    if (bytes.len == 0) return null;
-    const stream = create(bytes.ptr, @intCast(bytes.len)) orelse return null;
-    defer release(stream);
-    var ras: ?*anyopaque = null;
-    if (wrap(stream, 0, &IID_IRANDOMACCESSSTREAM, &ras) != S_OK or ras == null) return null;
-    defer release(ras);
-    const rs = rasrStatics() orelse return null;
-    defer release(rs);
-    var ref: ?*anyopaque = null;
-    if (vtbl(RasrStaticsVtbl, rs).CreateFromStream(rs, ras, &ref) != S_OK) return null;
-    return ref;
+/// 本地封面：Chromium 方案——`InMemoryRandomAccessStream` → `DataWriter.WriteBytes`
+/// → `StoreAsync`（完成回调里 `CreateFromStream` → `put_Thumbnail` → `Update`）。
+/// 全程 WinRT 原生内存流：无文件、无 StorageFile、无同步等待/轮询。
+fn setArtworkFromMemory(bytes: []const u8) void {
+    if (g_display == null or bytes.len == 0) return;
+    const cls = makeHString("Windows.Storage.Streams.InMemoryRandomAccessStream") orelse return;
+    defer _ = p_WindowsDeleteString.?(cls);
+    var stream: ?*anyopaque = null;
+    if (p_RoActivateInstance.?(cls, &stream) != S_OK or stream == null) return;
+    var out: ?*anyopaque = null;
+    if (vtbl(Inspectable, stream.?).QueryInterface(stream.?, &IID_IOUTPUTSTREAM, &out) != S_OK or out == null) {
+        release(stream);
+        return;
+    }
+    defer release(out);
+    const wcls = makeHString("Windows.Storage.Streams.DataWriter") orelse {
+        release(stream);
+        return;
+    };
+    defer _ = p_WindowsDeleteString.?(wcls);
+    var factory: ?*anyopaque = null;
+    if (p_RoGetActivationFactory.?(wcls, &IID_IDATAWRITERFACTORY, &factory) != S_OK or factory == null) {
+        release(stream);
+        return;
+    }
+    defer release(factory);
+    var writer: ?*anyopaque = null;
+    if (vtbl(DataWriterFactoryVtbl, factory.?).CreateDataWriter(factory.?, out, &writer) != S_OK or writer == null) {
+        release(stream);
+        return;
+    }
+    _ = vtbl(DataWriterVtbl, writer.?).WriteBytes(writer.?, @intCast(bytes.len), bytes.ptr);
+    var op: ?*anyopaque = null;
+    if (vtbl(DataWriterVtbl, writer.?).StoreAsync(writer.?, &op) != S_OK or op == null) {
+        release(writer.?);
+        release(stream);
+        return;
+    }
+    // 持有流/writer/op 到回调完成（对齐 Chromium 成员变量）；释放上一组。
+    release(g_thumb_op);
+    release(g_thumb_writer);
+    release(g_thumb_stream);
+    g_thumb_stream = stream;
+    g_thumb_writer = writer.?;
+    g_thumb_op = op.?;
+    _ = vtbl(AsyncOpU32Vtbl, op.?).put_Completed(op.?, @ptrCast(&g_thumb_handler_obj));
+    log("apl/smtc: artwork mem (async store)");
 }
 
 pub fn setTrack(title: ?[]const u8, artist: ?[]const u8, art_url: ?[]const u8, duration_ms: i64, art_bytes: ?[]const u8) void {
@@ -726,6 +838,12 @@ pub fn deinit() void {
         _ = sv.base.Release(s);
         g_smtc = null;
     }
+    release(g_thumb_op);
+    release(g_thumb_writer);
+    release(g_thumb_stream);
+    g_thumb_op = null;
+    g_thumb_writer = null;
+    g_thumb_stream = null;
     g_display = null;
     g_music = null;
     g_button_registered = false;
