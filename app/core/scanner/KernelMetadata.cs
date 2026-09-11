@@ -135,15 +135,18 @@ public static class KernelMetadata
             : "libarchoera_kernel.so";
 
         var env = Environment.GetEnvironmentVariable("ARCHOERA_KERNEL_LIB");
+        // Windows 的 DLL 产物在 zig-out/bin（lib/ 下同名文件是 import lib，不是 DLL）；
+        // Linux/macOS 的动态库在 zig-out/lib。
+        var subdir = OperatingSystem.IsWindows() ? "bin" : "lib";
         var candidates = new List<string?>
         {
             env,
             Path.Combine(AppContext.BaseDirectory, fileName),
-            // 开发树：scanner/ → audio-engine/zig-out/lib/
+            // 开发树：scanner/ → audio-engine/zig-out/{bin,lib}/
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..",
-                "..", "audio-engine", "zig-out", "lib", fileName)),
+                "..", "audio-engine", "zig-out", subdir, fileName)),
             Path.Combine(Directory.GetCurrentDirectory(), "..", "audio-engine",
-                "zig-out", "lib", fileName),
+                "zig-out", subdir, fileName),
         };
 
         foreach (var c in candidates)

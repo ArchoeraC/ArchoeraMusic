@@ -403,6 +403,59 @@ vtable 槽位正确（写读回一致）。
   （`borderRadius`/`dotCircleOutline`/`miniplayer`），`source = registry = dart = 引用 = 211`。
   字体暂含 3 个孤儿字形（无 node_modules 未重生成，无害；下次全量重生成自然收敛）。
 
+### 7.4 Windows 平台修复（2026-09-11，待真机验证）
+
+针对「Windows 下可多开实例」「蓝牙耳机 / 媒体面板按键全无响应（但面板能显示曲目）」
+「系统主题色恒读不到」：
+
+- **单实例（native）**：`backend_windows.zig` 用命名互斥体
+  `CreateMutexW("Local\\ArchoeraMusic.SingleInstance")` + `ERROR_ALREADY_EXISTS`
+  实现（此前恒返回 1 放行）。`Local\` 会话命名空间 = 每登录会话一个实例，语义对齐
+  Linux `XDG_RUNTIME_DIR` 文件锁 / macOS 文件锁；句柄持有至进程退出，`apl_shutdown` 关闭。
+- **单实例（移除 Dart 兜底）**：`platform_capabilities.dart` 的
+  `acquireSingleInstance()` 不再在桥接缺失时返回 `true`（旧兜底会掩盖桥接损坏并
+  放任多开）；改为抛 `StateError`，`main.dart` 捕获后写 stderr 并 `exit(1)`——
+  缺桥接时显式失败，绝不静默多开。
+- **SMTC 按钮**：`win_smtc.zig` 事件委托 `QueryInterface` 修正——旧实现对所有 IID
+  一律回 `S_OK`，会让 WinRT 误以为委托实现了 `IInspectable` / `IMarshal` 并按错位
+  vtable 槽调用（`Invoke` 被当成 `GetIids` / `GetUnmarshalClass`），导致
+  `add_ButtonPressed` 看似成功但 `ButtonPressed` 永不回调。现明确对
+  `IInspectable` / `IMarshal` 返回 `E_NOINTERFACE`，其余（含 WinRT 运行期生成的
+  委托 IID）应答并正确 `AddRef`。另注：Flutter 默认 UI 线程与平台线程合并，
+  平台线程 `CoInitializeEx(APARTMENTTHREADED)` 为 STA → 委托须应答
+  `IAgileObject`（QI 未拒绝即应答）。
+- **媒体键兜底**：`backend_windows.zig` 子类化 WndProc 处理 `WM_APPCOMMAND`
+  （`APPCOMMAND_MEDIA_*` → 统一命令），覆盖 SMTC 非当前会话时系统退化的旧通路。
+- **系统主题色**：`backend_windows.zig` 预定义句柄 `HKEY_CURRENT_USER` 修正为 64 位
+  符号扩展值 `0xFFFFFFFF80000001`（`(HKEY)(ULONG_PTR)((LONG)0x80000001)`；旧写
+  `0x80000001` 在 64 位下非法）——此前 `RegGetValueW` / `RegOpenKeyExW` 全失败，
+  `apl_system_accent` 恒返回 null，主题色与「颜色变更事件」双双失效。
+- **诊断**：`apl/smtc:` 前缀经 `OutputDebugStringA` 输出 `RoInitialize` /
+  `add_ButtonPressed` 的 HRESULT、QI 被拒 IID、`ButtonPressed` 到达；`win-smoke`
+  增印 `instance_acquire` / `button_registered`。真机验收用 DebugView 观察。
+- 附：修复 `win-smoke` 编译（补齐 `win_common.zig` 的 `WNDCLASSW` /
+  `RegisterClassW` / `CreateWindowExW` / `DefWindowProcW` / `DestroyWindow` /
+  `GetModuleHandleW` 声明，此前自 `@cImport` 移除后即失配）。
+
+### 7.5 EraSync 内核 Windows 部署修复（2026-09-11，待真机验证）
+
+现象：Windows 任意文件播放闪退；Linux 正常。根因是**打包缺陷而非内核运行时缺陷**：
+
+- `app/core/audio-engine/build.zig` 同时安装静态库与动态库，Windows 下二者基名相同
+  （`archoera_kernel.lib`）；动态库 install 在后，其 **DLL import lib 覆盖了静态库**。
+- `build_windows.bat` 正是链接该 `zig-out\lib\archoera_kernel.lib`（import lib）→
+  `archoera_mediaengine.dll` 产生对 `archoera_kernel.dll` 的**加载期硬依赖**。
+- 而 Zig 把 DLL 装在 `zig-out\bin\archoera_kernel.dll`，scanner csproj / CMake 却按
+  `lib/` 找 → DLL 从未进入 bundle → 播放首帧 `DynamicLibrary.open(mediaengine)`
+  失败即闪退（与具体文件无关）。
+
+修复：`build_windows.bat` 从 `zig-out\bin` 拷 DLL 到引擎 `build\`；`app/windows/
+CMakeLists.txt` 将其装到 **exe 根**（Windows 加载器按 exe 目录解析依赖，scanner
+`KernelMetadata` 亦按 `AppContext.BaseDirectory` 查找）；scanner 两个 csproj 的
+Windows DLL 源路径 `lib`→`bin`；`KernelMetadata.LocateLibrary` 开发树回退路径按平台
+取 `bin`/`lib`。注：Windows 静态库当前不含 compiler-rt（`___chkstk_ms` 等），故
+Windows 走 DLL 而非静态链接。
+
 ## 8. 风险与对策
 
 | 风险 | 对策 |

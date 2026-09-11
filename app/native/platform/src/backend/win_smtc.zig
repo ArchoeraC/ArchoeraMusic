@@ -22,10 +22,18 @@ const alloc = std.heap.c_allocator;
 
 const HRESULT = i32;
 const S_OK: HRESULT = 0;
+const E_NOINTERFACE: HRESULT = @bitCast(@as(u32, 0x80004002));
 
 /// 诊断日志（DebugView / DbgView 可见；无输出不影响功能）。
 fn log(msg: [*:0]const u8) void {
     win.OutputDebugStringA(msg);
+}
+
+/// 带 HRESULT 的诊断日志（0x%08x）。
+fn logHr(comptime prefix: []const u8, hr: HRESULT) void {
+    var buf: [128]u8 = undefined;
+    const s = std.fmt.bufPrintZ(&buf, prefix ++ " hr=0x{x:0>8}", .{@as(u32, @bitCast(hr))}) catch return;
+    win.OutputDebugStringA(s.ptr);
 }
 
 // combase.dll 无 x86_64 导入库 → 运行时解析（kernel32 LoadLibrary/GetProcAddress）
@@ -101,6 +109,24 @@ const IID_STORAGE_FILE_STATICS = win.GUID{
     .Data2 = 0xDAF2,
     .Data3 = 0x43C8,
     .Data4 = .{ 0x8B, 0xB4, 0xA4, 0xD3, 0xEA, 0xCF, 0xD0, 0x3F },
+};
+
+// 事件委托 QI 策略：以下接口本对象并未实现，绝不能应答 S_OK——否则调用方会
+// 按错位 vtable 槽使用（如把 Invoke 当成 IInspectable::GetIids / IMarshal::
+// GetUnmarshalClass），导致 add_ButtonPressed 看似成功但事件永不回调。
+// IInspectable {AF86E2E0-B12D-4C6A-9C5A-D7AA65101E90}
+const IID_IINSPECTABLE = win.GUID{
+    .Data1 = 0xAF86E2E0,
+    .Data2 = 0xB12D,
+    .Data3 = 0x4C6A,
+    .Data4 = .{ 0x9C, 0x5A, 0xD7, 0xAA, 0x65, 0x10, 0x1E, 0x90 },
+};
+// IMarshal {00000003-0000-0000-C000-000000000046}
+const IID_IMARSHAL = win.GUID{
+    .Data1 = 0x00000003,
+    .Data2 = 0x0000,
+    .Data3 = 0x0000,
+    .Data4 = .{ 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 },
 };
 
 // 枚举（Windows.Media 标准值）
@@ -310,10 +336,35 @@ const HandlerVtbl = extern struct {
     Invoke: *const fn (*anyopaque, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
 };
 
+fn guidEq(a: win.GUID, b: *const win.GUID) bool {
+    return a.Data1 == b.Data1 and a.Data2 == b.Data2 and a.Data3 == b.Data3 and
+        std.mem.eql(u8, &a.Data4, &b.Data4);
+}
+
+fn logQi(riid: *const win.GUID) void {
+    var buf: [96]u8 = undefined;
+    const s = std.fmt.bufPrintZ(&buf, "apl/smtc: QI {x:0>8}-{x:0>4}-{x:0>4}", .{
+        riid.Data1, riid.Data2, riid.Data3,
+    }) catch return;
+    win.OutputDebugStringA(s.ptr);
+}
+
+/// 委托 QI：除 IInspectable / IMarshal 外一律应答 S_OK 并 AddRef（涵盖
+/// IUnknown、IAgileObject、WinRT 运行期生成的委托 IID）。这两个接口本对象并未
+/// 实现，错误应答（旧实现对所有 IID 一律 S_OK）会让 WinRT 按错位 vtable 槽调用
+/// ——Invoke 被当成 GetIids / GetUnmarshalClass → add_ButtonPressed 看似成功但
+/// ButtonPressed 永不回调（「面板显示曲目、按键全无响应」）。
+/// 注：函数声明顺序在 Zig 容器内不敏感，无需前置声明。
 fn handlerQI(this: *anyopaque, riid: *const win.GUID, out: *?*anyopaque) callconv(.c) HRESULT {
-    _ = riid;
-    out.* = this; // 宽松：委托仅被事件系统 QI（delegate/IAgileObject）
-    return S_OK;
+    const denied = guidEq(IID_IINSPECTABLE, riid) or guidEq(IID_IMARSHAL, riid);
+    if (!denied) {
+        _ = handlerAddRef(this);
+        out.* = this;
+        return S_OK;
+    }
+    logQi(riid);
+    out.* = null;
+    return E_NOINTERFACE;
 }
 fn handlerAddRef(this: *anyopaque) callconv(.c) u32 {
     const o: *HandlerObj = @ptrCast(@alignCast(this));
@@ -332,6 +383,7 @@ fn handlerInvoke(this: *anyopaque, sender: ?*anyopaque, args: ?*anyopaque) callc
         const av = vtbl(ArgsVtbl, a);
         var button: i32 = -1;
         if (av.get_Button(a, &button) == S_OK) {
+            log("apl/smtc: ButtonPressed");
             const cmd: i32 = switch (button) {
                 Button.play => core.CMD_PLAY,
                 Button.pause => core.CMD_PAUSE,
@@ -391,7 +443,11 @@ pub fn init(findWindow: *const fn () ?win.HWND) i32 {
         return core.ERR_BACKEND;
     };
 
-    _ = p_RoInitialize.?(1); // RO_INIT_MULTITHREADED
+    const hr_init = p_RoInitialize.?(1); // RO_INIT_MULTITHREADED
+    logHr("apl/smtc: RoInitialize", hr_init);
+    // 0x80010106 RPC_E_CHANGED_MODE = 线程已是 STA（Flutter 平台线程
+    // CoInitializeEx(APARTMENTTHREADED)）；此时委托须应答 IAgileObject（见
+    // handlerQI），否则 WinRT 跨 apartment 无法回调 ButtonPressed。
 
     const cls = makeHString("Windows.Media.SystemMediaTransportControls") orelse return core.ERR_BACKEND;
     defer _ = p_WindowsDeleteString.?(cls);
@@ -427,7 +483,9 @@ pub fn init(findWindow: *const fn () ?win.HWND) i32 {
         if (dv.get_MusicProperties(disp.?, &music) == S_OK and music != null) g_music = music;
     }
 
-    if (sv.add_ButtonPressed(smtc.?, @ptrCast(&g_handler_obj), &g_button_token) == S_OK) {
+    const hr_add = sv.add_ButtonPressed(smtc.?, @ptrCast(&g_handler_obj), &g_button_token);
+    logHr("apl/smtc: add_ButtonPressed", hr_add);
+    if (hr_add == S_OK) {
         g_button_registered = true;
     }
     log("apl/smtc: ready");
@@ -623,4 +681,9 @@ pub fn debugGetIsEnabled() i32 {
     var b: boolean = 0;
     if (vtbl(SmtcVtbl, smtc).get_IsEnabled(smtc, &b) != S_OK) return -1;
     return b;
+}
+
+/// 冒烟自检：ButtonPressed 委托是否注册成功（add_ButtonPressed == S_OK）。
+pub fn debugIsButtonRegistered() bool {
+    return g_button_registered;
 }
