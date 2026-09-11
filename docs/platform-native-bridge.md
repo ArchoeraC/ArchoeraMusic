@@ -516,17 +516,20 @@ COWAIT_DISPATCH_WINDOW_MESSAGES)` 泵消息，不再 `Sleep`。交叉编译通�
 不该依赖：**WinRT 惯例是事件驱动**（`put_Completed` 挂委托，完成时由消息泵回调），
 不应在 STA 上同步阻塞等待异步操作。
 
-最终方案：**Dart 读本地封面字节 → 原生建内存流**，全程同步、无等待、无消息泵、
-无封送：
+最终方案：**Dart 读本地封面字节 → 原生按 Chromium 方案建内存流**（对齐
+`components/system_media_controls/win/system_media_controls_win.cc` 的
+`SetThumbnail`）：
 
 - Dart（`platform_bindings.dart`）：`TrackMeta` 增 `art_bytes` 字段；本地封面
   （`file://`/本地路径）用 `readAsBytesSync` 读入，http(s) 仍只传 `art_url`。
-- 原生（`win_smtc.zig`）：`SHCreateMemStream`（shlwapi）→
-  `CreateRandomAccessStreamOverStream`（shcore，`IID_IRandomAccessStream` =
-  `905a0fe1-bc53-11df-8c49-001e4fc686da`）→
-  `IRandomAccessStreamReferenceStatics::CreateFromStream`。
-- `CreateFromUri` 文档只支持 http/https/ms-appx/ms-appdata，故 http 走它；
-  `refFromFile`（`GetFileFromPathAsync` + 泵消息）保留为无字节时的兜底。
+- 原生（`win_smtc.zig`）：`RoActivateInstance("Windows.Storage.Streams.InMemoryRandomAccessStream")`
+  → QI `IOutputStream` → `IDataWriterFactory.CreateDataWriter` → `WriteBytes`
+  → `StoreAsync`（`put_Completed` 完成回调里 `CreateFromStream` → `put_Thumbnail`
+  → `Update`）。流/writer/op 持有到回调完成（对齐 Chromium 成员变量，防异步
+  完成前析构）。
+- http 封面：`Windows.Foundation.Uri` → `CreateFromUri`（同步；文档只支持
+  http/https/ms-appx/ms-appdata，故本地不能走 Uri）。
+- `refFromFile`（`GetFileFromPathAsync` + 泵消息）已删除。
 
 ## 8. 风险与对策
 
