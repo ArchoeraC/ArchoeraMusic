@@ -26,10 +26,6 @@ const E_NOINTERFACE: HRESULT = @bitCast(@as(u32, 0x80004002));
 const E_OUTOFMEMORY: HRESULT = @bitCast(@as(u32, 0x8007000E));
 const E_FAIL: HRESULT = @bitCast(@as(u32, 0x80004005));
 
-// CoWaitForMultipleHandles 标志（STA 上等待时泵消息）。
-const COWAIT_DISPATCH_CALLS: u32 = 0x8;
-const COWAIT_DISPATCH_WINDOW_MESSAGES: u32 = 0x10;
-
 /// 诊断日志（DebugView / DbgView 可见；无输出不影响功能）。
 fn log(msg: [*:0]const u8) void {
     win.OutputDebugStringA(msg);
@@ -50,7 +46,6 @@ const RoActivateInstanceFn = *const fn (HSTRING, *?*anyopaque) callconv(.c) HRES
 const WindowsCreateStringFn = *const fn ([*]const u16, u32, *HSTRING) callconv(.c) HRESULT;
 const WindowsDeleteStringFn = *const fn (HSTRING) callconv(.c) HRESULT;
 const CoCreateFreeThreadedMarshalerFn = *const fn (?*anyopaque, *?*anyopaque) callconv(.c) HRESULT;
-const CoWaitForMultipleHandlesFn = *const fn (u32, u32, u32, ?[*]win.HANDLE, *u32) callconv(.c) HRESULT;
 const SHCreateMemStreamFn = *const fn (?[*]const u8, u32) callconv(.c) ?*anyopaque;
 const CreateRandomAccessStreamOverStreamFn = *const fn (?*anyopaque, u32, *const win.GUID, *?*anyopaque) callconv(.c) HRESULT;
 
@@ -61,7 +56,6 @@ var p_RoActivateInstance: ?RoActivateInstanceFn = null;
 var p_WindowsCreateString: ?WindowsCreateStringFn = null;
 var p_WindowsDeleteString: ?WindowsDeleteStringFn = null;
 var p_CoCreateFreeThreadedMarshaler: ?CoCreateFreeThreadedMarshalerFn = null;
-var p_CoWaitForMultipleHandles: ?CoWaitForMultipleHandlesFn = null;
 var p_SHCreateMemStream: ?SHCreateMemStreamFn = null;
 var p_CreateRandomAccessStreamOverStream: ?CreateRandomAccessStreamOverStreamFn = null;
 
@@ -77,7 +71,6 @@ fn loadCombase() bool {
     // CoCreateFreeThreadedMarshaler：委托封送（IMarshal）用；ole32 提供。
     if (win.LoadLibraryA("ole32.dll")) |ho| {
         p_CoCreateFreeThreadedMarshaler = @ptrCast(win.GetProcAddress(ho, "CoCreateFreeThreadedMarshaler"));
-        p_CoWaitForMultipleHandles = @ptrCast(win.GetProcAddress(ho, "CoWaitForMultipleHandles"));
     }
     // 本地封面内存流：SHCreateMemStream（shlwapi）+ CreateRandomAccessStreamOverStream（shcore）。
     if (win.LoadLibraryA("shlwapi.dll")) |hs| {
@@ -129,12 +122,6 @@ const IID_RASR_STATICS = win.GUID{
     .Data2 = 0x3FBF,
     .Data3 = 0x4E7D,
     .Data4 = .{ 0x98, 0x6F, 0xEF, 0x3B, 0x1A, 0x07, 0xA9, 0x64 },
-};
-const IID_STORAGE_FILE_STATICS = win.GUID{
-    .Data1 = 0x5984C710,
-    .Data2 = 0xDAF2,
-    .Data3 = 0x43C8,
-    .Data4 = .{ 0x8B, 0xB4, 0xA4, 0xD3, 0xEA, 0xCF, 0xD0, 0x3F },
 };
 // IRandomAccessStream {905a0fe1-bc53-11df-8c49-001e4fc686da}（本地封面内存流用）。
 const IID_IRANDOMACCESSSTREAM = win.GUID{
@@ -357,30 +344,6 @@ const RasrStaticsVtbl = extern struct {
     CreateFromFile: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
     CreateFromUri: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
     CreateFromStream: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
-};
-
-/// IStorageFileStatics（winmd 6 方法；仅用 GetFileFromPathAsync）。
-const StorageFileStaticsVtbl = extern struct {
-    base: Inspectable,
-    GetFileFromPathAsync: *const fn (*anyopaque, HSTRING, *?*anyopaque) callconv(.c) HRESULT,
-    GetFileFromApplicationUriAsync: *const fn (*anyopaque, ?*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
-    CreateStreamedFileAsync: *const fn (*anyopaque, HSTRING, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
-    ReplaceWithStreamedFileAsync: *const fn (*anyopaque, ?*anyopaque, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
-    CreateStreamedFileFromUriAsync: *const fn (*anyopaque, HSTRING, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
-    ReplaceWithStreamedFileFromUriAsync: *const fn (*anyopaque, ?*anyopaque, ?*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
-};
-
-/// IAsyncInfo（5）+ IAsyncOperation`1（3）合并布局；GetResults 取 IStorageFile。
-const AsyncOpVtbl = extern struct {
-    base: Inspectable,
-    get_Id: *const fn (*anyopaque, *u32) callconv(.c) HRESULT,
-    get_Status: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
-    get_ErrorCode: *const fn (*anyopaque, *i32) callconv(.c) HRESULT,
-    Cancel: *const fn (*anyopaque) callconv(.c) HRESULT,
-    Close: *const fn (*anyopaque) callconv(.c) HRESULT,
-    put_Completed: *const fn (*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
-    get_Completed: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
-    GetResults: *const fn (*anyopaque, *?*anyopaque) callconv(.c) HRESULT,
 };
 
 fn vtbl(comptime T: type, obj: *anyopaque) *const T {
@@ -702,8 +665,10 @@ fn setArtwork(url: []const u8, bytes: ?[]const u8) void {
     }
     if (ref == null) {
         const is_http = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
-        log(if (is_http) "apl/smtc: artwork http" else "apl/smtc: artwork local");
-        ref = if (is_http) refFromUri(url) else refFromFile(url);
+        if (is_http) {
+            log("apl/smtc: artwork http");
+            ref = refFromUri(url);
+        }
     }
     if (ref == null) {
         log("apl/smtc: artwork ref failed");
@@ -759,48 +724,6 @@ fn refFromMemory(bytes: []const u8) ?*anyopaque {
     defer release(rs);
     var ref: ?*anyopaque = null;
     if (vtbl(RasrStaticsVtbl, rs).CreateFromStream(rs, ras, &ref) != S_OK) return null;
-    return ref;
-}
-
-fn refFromFile(path_in: []const u8) ?*anyopaque {
-    // 接受 file://C:\...（Dart `file.absolute.path` 拼出）或 file:///C:/...；剥成纯路径。
-    var path = path_in;
-    if (std.mem.startsWith(u8, path, "file://")) path = path[7..];
-    if (path.len >= 3 and path[0] == '/' and path[2] == ':') path = path[1..];
-    const cls = makeHString("Windows.Storage.StorageFile") orelse return null;
-    defer _ = p_WindowsDeleteString.?(cls);
-    var statics: ?*anyopaque = null;
-    if (p_RoGetActivationFactory.?(cls, &IID_STORAGE_FILE_STATICS, &statics) != S_OK or statics == null) return null;
-    defer release(statics);
-    const hs_path = makeHString(path) orelse return null;
-    defer _ = p_WindowsDeleteString.?(hs_path);
-    var op: ?*anyopaque = null;
-    if (vtbl(StorageFileStaticsVtbl, statics.?).GetFileFromPathAsync(statics.?, hs_path, &op) != S_OK or op == null) return null;
-    defer release(op);
-    // 等待 IAsyncOperation 完成（最多 ~2s）。STA 上必须**泵消息**：
-    // 直接 Sleep 会阻塞公寓消息泵，combase 无法投递完成回调 → 0xC0000005/死锁
-    // （本地封面独有路径；在线封面走 CreateFromUri 无此问题）。
-    const ov = vtbl(AsyncOpVtbl, op.?);
-    var i: u32 = 0;
-    while (i < 100) : (i += 1) {
-        var status: i32 = 0;
-        if (ov.get_Status(op.?, &status) != S_OK) return null;
-        if (status == 1) break; // Completed
-        if (status == 2 or status == 3) return null; // Canceled / Error
-        if (p_CoWaitForMultipleHandles) |w| {
-            var idx: u32 = 0;
-            _ = w(COWAIT_DISPATCH_CALLS | COWAIT_DISPATCH_WINDOW_MESSAGES, 20, 0, null, &idx);
-        } else {
-            win.Sleep(20);
-        }
-    }
-    var file: ?*anyopaque = null;
-    if (ov.GetResults(op.?, &file) != S_OK or file == null) return null;
-    defer release(file);
-    const rs = rasrStatics() orelse return null;
-    defer release(rs);
-    var ref: ?*anyopaque = null;
-    if (vtbl(RasrStaticsVtbl, rs).CreateFromFile(rs, file, &ref) != S_OK) return null;
     return ref;
 }
 
