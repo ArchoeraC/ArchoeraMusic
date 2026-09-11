@@ -46,6 +46,12 @@ rm -rf "$WORK"; mkdir -p "$stage"
 # ── 公共暂存：bundle + 桌面条目 + metainfo + 多尺寸图标 ──────────────
 cp -a "$bundle" "$stage/bundle"
 
+# 防伪：把**公开公钥**随包分发（供用户验签；私钥绝不出现在包内）。
+# 公钥同时已编译进 app（lib/app/watermark.dart），此处放置一份便于人读/离线验签。
+if [[ -f "$ROOT/app/tool/watermark_pub.pem" ]]; then
+  cp "$ROOT/app/tool/watermark_pub.pem" "$stage/bundle/ARCHOERA_PUBKEY.pem"
+fi
+
 sed "s|@EXEC@|/usr/bin/$BIN %U|g" "$HERE/archoera-music.desktop.in" \
   > "$stage/archoera-music.desktop"
 sed "s|@VERSION@|$version|g" \

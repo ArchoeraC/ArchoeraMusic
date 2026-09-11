@@ -65,6 +65,9 @@ packaging/linux/work/
 *.log
 
 *.key
+# 防伪签名私钥（绝不入库；公钥 watermark_pub*.pem 需跟踪）
+*_priv.pem
+*_priv.key
 # 内嵌参考仓库（本地保留，不入库/不 submodule；供代码移植参考）
 reference/
 
