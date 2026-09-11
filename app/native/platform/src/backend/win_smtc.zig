@@ -492,32 +492,10 @@ pub fn init(findWindow: *const fn () ?win.HWND) i32 {
     return core.OK;
 }
 
-const ArtworkJob = struct { url: []u8 };
-
-fn artworkEntry(ctx: ?*anyopaque) callconv(.winapi) win.DWORD {
-    const job: *ArtworkJob = @ptrCast(@alignCast(ctx.?));
-    if (p_RoInitialize != null) _ = p_RoInitialize.?(1);
-    setArtwork(job.url);
-    alloc.free(job.url);
-    alloc.destroy(job);
-    return 0;
-}
-
-/// 后台线程解析封面（本地文件 GetFileFromPathAsync 可能耗时，避免阻塞 setNowPlaying）。
-fn spawnArtwork(url: []const u8) void {
-    const copy = alloc.dupe(u8, url) catch return;
-    const job = alloc.create(ArtworkJob) catch {
-        alloc.free(copy);
-        return;
-    };
-    job.* = .{ .url = copy };
-    if (win.CreateThread(null, 0, artworkEntry, @ptrCast(job), 0, null) == null) {
-        alloc.free(copy);
-        alloc.destroy(job);
-    }
-}
-
 /// 设置封面缩略图（http(s) URL 走 CreateFromUri；本地路径走 CreateFromFile）。
+/// 注意：`g_display` 是在 SMTC 所属 apartment（Flutter 平台线程，多为 STA）上
+/// 取得的同单元接口，**必须**在该线程调用；另起线程（MTA）直接使用会触发
+/// combase.dll 访问冲突（0xC0000005）——故此处同步执行、不再 spawn 线程。
 fn setArtwork(url: []const u8) void {
     if (g_display == null) return;
     const is_http = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
@@ -634,7 +612,7 @@ pub fn setTrack(title: ?[]const u8, artist: ?[]const u8, art_url: ?[]const u8, d
         setMusicProp(.album_artist, a);
     }
     if (g_display) |d| _ = vtbl(DisplayVtbl, d).Update(d);
-    if (art_url) |u| spawnArtwork(u);
+    if (art_url) |u| setArtwork(u);
     log("apl/smtc: setTrack done");
 }
 
