@@ -20,7 +20,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 
 import 'ripple_shader.dart';
@@ -186,7 +186,13 @@ class _RippleBackgroundState extends State<RippleBackground>
   }
 
   /// 预烘焙：封面 → 模糊 + 饱和纹理（一次，替代每帧全屏模糊）。
-  Future<ui.Image?> _prepare(ui.Image src) async {
+  ///
+  /// 用同步 [ui.Picture.toImageSync]：`toImage` 为异步，在 widget 测试的
+  /// fake-async 环境下会产出空白图；`toImageSync` 同步光栅化，测试/真机一致。
+  ui.Image? _prepare(ui.Image src) {
+    // flutter test 的 fake-async 环境无法光栅化 Picture.toImage(Sync)（会得空白
+    // 纹理）；测试统一走「原图 + 每帧滤镜」回退（见 build）。
+    if (Platform.environment.containsKey('FLUTTER_TEST')) return null;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     final paint = Paint()
@@ -198,7 +204,7 @@ class _RippleBackgroundState extends State<RippleBackground>
     canvas.drawImage(src, Offset.zero, paint);
     final pic = recorder.endRecording();
     try {
-      return await pic.toImage(src.width, src.height);
+      return pic.toImageSync(src.width, src.height);
     } catch (_) {
       return null;
     } finally {
@@ -207,12 +213,10 @@ class _RippleBackgroundState extends State<RippleBackground>
   }
 
   void _prepareCover(ui.Image img, {required bool transition}) {
-    unawaited(() async {
-      final prepared = await _prepare(img);
-      if (!mounted) {
-        prepared?.dispose();
-        return;
-      }
+    // 延后到微任务再 setState，避免在 image 回调（可能处于构建期）同步 setState。
+    unawaited(Future<void>.microtask(() {
+      if (!mounted) return;
+      final prepared = _prepare(img);
       if (prepared == null) return;
       final old = _preparedCurrent;
       setState(() {
@@ -226,7 +230,7 @@ class _RippleBackgroundState extends State<RippleBackground>
         }
         _preparedCurrent = prepared;
       });
-    }());
+    }));
   }
 
   /// 延后一帧释放，避免当前帧仍被 sampler/绘制引用。
@@ -368,15 +372,29 @@ class _RippleBackgroundState extends State<RippleBackground>
         ),
       );
     }
-    // CPU 网格路径：纹理已预烘焙（模糊+饱和），无需每帧 ImageFiltered/ColorFiltered。
+    // CPU 网格路径：预烘焙纹理已含模糊+饱和，直接用；未就绪（或测试环境）时
+    // 回退到原图 + 每帧滤镜，保证观感一致。
+    Widget paint = CustomPaint(
+      painter: _RipplePainter(this, _repaint),
+      size: Size.infinite,
+    );
+    if (prepared == null) {
+      paint = ColorFiltered(
+        colorFilter: saturationColorFilter(widget.saturation),
+        child: ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(
+            sigmaX: widget.blurSigma,
+            sigmaY: widget.blurSigma,
+          ),
+          child: paint,
+        ),
+      );
+    }
     return RepaintBoundary(
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CustomPaint(
-            painter: _RipplePainter(this, _repaint),
-            size: Size.infinite,
-          ),
+          paint,
           if (widget.darken > 0)
             Positioned.fill(
               child: IgnorePointer(

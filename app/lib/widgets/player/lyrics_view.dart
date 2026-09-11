@@ -16,7 +16,7 @@ library;
 
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../services/lyrics/lyric_line.dart';
 import 'lyrics_v7/lyrics_layout.dart';

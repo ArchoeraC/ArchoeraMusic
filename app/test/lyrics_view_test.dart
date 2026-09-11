@@ -5,7 +5,7 @@
 /// 简易歌词引擎（LyricsView）回归测试：长行自动换行 + 可变行高滚动定位。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/services/lyrics/lyric_line.dart';

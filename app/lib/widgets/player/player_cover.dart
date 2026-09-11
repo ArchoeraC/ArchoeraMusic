@@ -10,7 +10,7 @@
 ///   峰值随 [beatStrength] 区分——鼓点越猛缩放越明显）。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../services/netease/track.dart';

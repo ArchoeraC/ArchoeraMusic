@@ -5,7 +5,7 @@
 /// 圆角对话框（对齐 SPlayer-Next SDialog：标题 + 可选描述 + 内容 + 按钮行）。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../theme/app_theme.dart';
 import '../common/glass_surface.dart';

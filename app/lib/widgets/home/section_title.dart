@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 首页区块标题（标题 + 副标题 + 「更多」链接）。

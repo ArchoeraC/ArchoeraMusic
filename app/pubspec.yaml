@@ -44,6 +44,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   ffi: ^2.2.0
   go_router: ^18.0.1
+  # 官方 Material UI 拆分包（原 package:flutter/material.dart 独立化）
+  material_ui: ^1.2.0
   flutter_riverpod: ^3.4.2
   # 直连网易云 weapi/eapi 加密（AES/RSA/md5）
   pointycastle: ^4.0.0

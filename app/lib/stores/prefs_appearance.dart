@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'package:flutter/material.dart' show Color;
+import 'package:material_ui/material_ui.dart' show Color;
 
 import 'app_prefs.dart';
 

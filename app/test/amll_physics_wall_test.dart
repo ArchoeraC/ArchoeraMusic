@@ -10,7 +10,7 @@
 /// - seek 过程中再次换行打断整墙位移造成瞬移。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/services/lyrics/lyric_line.dart';

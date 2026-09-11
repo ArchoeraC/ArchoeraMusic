@@ -4,7 +4,7 @@
 // 回归：隔离区列表首次无记录时（quarantine 目录不存在）应正常显示「空」，
 // 不因 const 列表 sort 异常卡在加载态（Cannot modify an unmodifiable list）。
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

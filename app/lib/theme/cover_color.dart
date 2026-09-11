@@ -7,7 +7,7 @@ import 'dart:math' as math;
 import 'dart:typed_data' show ByteData, Uint8List;
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
 

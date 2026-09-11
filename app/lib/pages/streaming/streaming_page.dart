@@ -10,7 +10,7 @@
 /// 已连接 → 四个 Tab 内容（歌曲列表 / 封面网格）。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
