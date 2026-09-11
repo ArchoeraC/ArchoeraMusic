@@ -63,7 +63,15 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
                         subtitle: widget.version.isEmpty
                             ? l10n.settingsVersionUnknown
                             : l10n.settingsVersionFormat(widget.version),
-                        trailing: const SizedBox.shrink(),
+                        // 官方构建徽标：二进制内水印验签通过才显示该图标；
+                        // 失败/缺失则不显示（无文字、无悬浮提示）。
+                        trailing: ref.watch(archoeraOfficialBuildProvider)
+                            ? Icon(
+                                EtaIcons.safetyCertificateOutline,
+                                size: 18,
+                                color: scheme.primary,
+                              )
+                            : const SizedBox.shrink(),
                       ),
                       if (widget.devHolding)
                         Padding(

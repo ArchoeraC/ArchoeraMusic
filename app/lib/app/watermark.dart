@@ -30,6 +30,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pointycastle/export.dart';
 
 /// 防伪标语（反编译可见的独立字符串）。
@@ -57,6 +58,12 @@ String archoeraWatermarkEntry() => archoeraWatermark;
 /// 启动锚点（`main()` 调用一次；仅为确保快照包含，无副作用）。
 @pragma('vm:entry-point')
 String archoeraWatermarkAnchor() => archoeraWatermarkEntry();
+
+/// 官方构建徽标数据源：二进制内水印签名校验结果（纯计算、只读一次）。
+/// 关于页据此显示「官方构建」图标；失败返回 false（不显示、不提示）。
+final archoeraOfficialBuildProvider = Provider<bool>(
+  (ref) => verifyArchoeraWatermark(),
+);
 
 /// 校验编译进本二进制的负载签名是否由官方私钥签发。
 ///
