@@ -97,6 +97,7 @@ dependency_overrides:
   meta: 1.19.0
   hooks: 2.2.0
   record_use: 1.1.1
+  material_color_utilities: 0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
