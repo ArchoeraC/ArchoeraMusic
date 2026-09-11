@@ -42,16 +42,11 @@ echo "  archoeraWatermarkPayload  = '$PAYLOAD'"
 echo "  archoeraWatermarkPubKeyHex = '$PUBHEX'"
 echo "  archoeraWatermarkSigDerHex = '$SIGHEX'"
 
-# CI / 发布签名用的私钥（切勿公开、切勿入库）。推荐存成 GitHub Secret：
-#   ARCHOERA_WM_PRIVKEY_PEM = 整个 PEM 文件内容（POSIX/openssl 路径用）
-# 另附私钥标量 hex，供跨平台 Dart 版（tool/sign_release.dart）经
-#   ARCHOERA_WM_PRIVKEY_D 使用。
-DHEX="$(openssl ec -in "$PRIV" -text -noout 2>/dev/null \
-  | awk '/priv:/{f=1;next} /pub:/{f=0} f' | tr -d ' :\n')"
+# CI 发布签名用的私钥（切勿公开、切勿入库）。推荐存成 GitHub Environment Secret：
+#   ARCHOERA_WM_KEY1_PEM = 整个 PEM 文件内容
 echo
-echo "⚠ 以下为私钥材料（仅用于配置 CI Secret，勿打印到公共日志）："
-echo "  ARCHOERA_WM_PRIVKEY_PEM = <$PRIV 的完整内容>"
-echo "  ARCHOERA_WM_PRIVKEY_D   = $DHEX"
+echo "⚠ 私钥材料（仅用于配置 CI Environment secret，勿打印到公共日志）："
+echo "  ARCHOERA_WM_KEY1_PEM = <$PRIV 的完整内容>"
 echo
 echo -n "openssl 自检: "
 openssl dgst -sha256 -verify <(openssl ec -in "$PRIV" -pubout 2>/dev/null) \

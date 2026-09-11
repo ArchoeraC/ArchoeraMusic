@@ -522,22 +522,19 @@ jobs:
           echo "── release assets ──"
           ls -la assets
 
-      # 双控签名 —— CI 只签 key1（.sig1）：私钥来自受保护 `release` Environment
-      # （需人工批准），Windows runner 不参与。key2（.sig2）由维护者**本地**签好
-      # 后上传进 Release，key2 绝不进入 CI。两把公钥随发布分发。
-      - name: CI 侧签名（key1 → .sig1；key2 本地签不入 CI）
+      # 发布签名 —— CI 用 key1 签 `.sig1`：私钥来自受保护 `release` Environment
+      # （需人工批准），Windows runner 不参与。公钥随发布分发。未配置则不签、不阻断。
+      - name: 签名发布资产（key1 → .sig1）
         shell: bash
         env:
-          ARCHOERA_WM_KEYS: "1"
           ARCHOERA_WM_KEY1_PEM: ${{ secrets.ARCHOERA_WM_KEY1_PEM }}
         run: |
           set -euo pipefail
-          cp app/tool/watermark_pub.pem  assets/ARCHOERA_PUBKEY.pem
-          cp app/tool/watermark_pub2.pem assets/ARCHOERA_PUBKEY2.pem
+          cp app/tool/watermark_pub.pem assets/ARCHOERA_PUBKEY.pem
           if [ -n "${ARCHOERA_WM_KEY1_PEM:-}" ]; then
             bash app/tool/sign_release.sh assets
           else
-            echo "未配置 ARCHOERA_WM_KEY1_PEM，跳过 key1 签名（不影响出包）"
+            echo "未配置 ARCHOERA_WM_KEY1_PEM，跳过签名（不影响出包）"
           fi
           echo "── final assets ──"
           ls -la assets
