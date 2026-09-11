@@ -2,22 +2,19 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 全屏播放器「水纹」背景（自绘引擎，移植 SPlayer-Next `BackgroundRipple.vue`）。
+/// 全屏播放器「水纹」背景（自绘引擎 + GPU 着色器，移植 SPlayer-Next `BackgroundRipple.vue`）。
 ///
 /// 上游为 WebGPU/WebGL 片元着色器：对封面做多涟漪折射位移 + 波峰高光/波谷压暗。
-/// Flutter 端以纯 Dart 自绘等价实现：
-/// - 在画布上铺一层自适应网格顶点（`ui.Vertices.raw`），逐顶点按同一套涟漪场
-///   公式计算折射位移，位移后的纹理坐标交给 `ImageShader`，由 `drawVertices`
-///   对封面做多三角形折射扭曲（GPU 光栅化，CPU 只算顶点）；
-/// - 波峰/波谷用第二、第三个顶点色网格以 `plus` / 黑色 `srcOver` 叠加；
-/// - 切歌时旧封面与新封面按 700ms 交叉淡入；
-/// - 画布整体再做 blur + saturate（对齐上游 `filter: blur(10px) saturate(1.3)`），
-///   并由 [darken] 压暗，保证叠加歌词/控件可读；
+/// Flutter 端两条路径（渲染器优先，见 docs/player-render-optimization.md）：
+/// - **GPU（主路径，P2）**：`shaders/ripple.frag` 单 pass 完成折射 + 饱和 + 高光/
+///   压暗 + 压暗；封面模糊/饱和在 Dart 侧**预烘焙一次**（不再每帧全屏模糊）。
+///   涟漪参数以 uniform 传入，CPU 侧只更新 uniforms。
+/// - **CPU（仅着色器不可用时兜底）**：网格顶点折射 + `ImageShader`（见 [_RipplePainter]）。
 ///
-/// 无第三方依赖、不依赖着色器资源文件；涟漪随机数、生命周期、速度、间距等
-/// 参数与上游一致。性能模式下 [animate]=false 时停表并直接呈现当前帧。
+/// 切歌时旧封面与新封面按 700ms 交叉淡入（GPU 路径在着色器内 `mix` 两纹理）。
 library;
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -25,6 +22,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
+
+import 'ripple_shader.dart';
 
 /// 同时存活的涟漪上限（对齐上游 MAX_RIPPLES）。
 const int _kMaxRipples = 48;
@@ -124,6 +123,13 @@ class _RippleBackgroundState extends State<RippleBackground>
   ImageStream? _stream;
   ImageStreamListener? _listener;
 
+  /// GPU 路径：着色器实例（着色器加载成功后非空）。
+  ui.FragmentShader? _shader;
+
+  /// GPU 路径：预烘焙（模糊+饱和）的封面纹理（当前 / 交叉淡入的旧封面）。
+  ui.Image? _preparedCurrent;
+  ui.Image? _preparedOld;
+
   @override
   void initState() {
     super.initState();
@@ -131,6 +137,7 @@ class _RippleBackgroundState extends State<RippleBackground>
     _resetRipples();
     _resolveCover();
     if (widget.animate) _ensureTicker();
+    if (kEnableRippleShader) _loadShader();
   }
 
   @override
@@ -144,6 +151,12 @@ class _RippleBackgroundState extends State<RippleBackground>
         _ticker.stop();
       }
     }
+    // 模糊/饱和度变化 → 预烘焙封面需重做（仅 GPU 路径用）。
+    if (old.blurSigma != widget.blurSigma ||
+        old.saturation != widget.saturation) {
+      final cur = _current;
+      if (cur != null) _prepareCover(cur, transition: false);
+    }
     _repaint.notify();
   }
 
@@ -152,6 +165,9 @@ class _RippleBackgroundState extends State<RippleBackground>
     _stream?.removeListener(_listener!);
     _ticker.dispose();
     _repaint.dispose();
+    _shader?.dispose();
+    _preparedCurrent?.dispose();
+    _preparedOld?.dispose();
     super.dispose();
   }
 
@@ -159,6 +175,64 @@ class _RippleBackgroundState extends State<RippleBackground>
     if (!widget.animate || _ticker.isActive) return;
     _lastUs = 0;
     _ticker.start();
+  }
+
+  // ── GPU 着色器 ───────────────────────────────────────────────────────
+
+  Future<void> _loadShader() async {
+    final program = await RippleShaderLoader.load();
+    if (!mounted || program == null) return;
+    setState(() => _shader = program.fragmentShader());
+  }
+
+  /// 预烘焙：封面 → 模糊 + 饱和纹理（一次，替代每帧全屏模糊）。
+  Future<ui.Image?> _prepare(ui.Image src) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final paint = Paint()
+      ..imageFilter = ui.ImageFilter.blur(
+        sigmaX: widget.blurSigma,
+        sigmaY: widget.blurSigma,
+      )
+      ..colorFilter = saturationColorFilter(widget.saturation);
+    canvas.drawImage(src, Offset.zero, paint);
+    final pic = recorder.endRecording();
+    try {
+      return await pic.toImage(src.width, src.height);
+    } catch (_) {
+      return null;
+    } finally {
+      pic.dispose();
+    }
+  }
+
+  void _prepareCover(ui.Image img, {required bool transition}) {
+    unawaited(() async {
+      final prepared = await _prepare(img);
+      if (!mounted) {
+        prepared?.dispose();
+        return;
+      }
+      if (prepared == null) return;
+      final old = _preparedCurrent;
+      setState(() {
+        if (transition && old != null) {
+          _disposeLater(_preparedOld);
+          _preparedOld = old; // 转移所有权给旧槽
+        } else {
+          _disposeLater(_preparedOld);
+          _preparedOld = null;
+          _disposeLater(old);
+        }
+        _preparedCurrent = prepared;
+      });
+    }());
+  }
+
+  /// 延后一帧释放，避免当前帧仍被 sampler/绘制引用。
+  void _disposeLater(ui.Image? img) {
+    if (img == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => img.dispose());
   }
 
   // ── 封面解析 ─────────────────────────────────────────────────────────
@@ -189,17 +263,18 @@ class _RippleBackgroundState extends State<RippleBackground>
       (info, _) {
         if (!mounted) return;
         final img = info.image;
+        if (identical(_current, img) && _preparedCurrent != null) return;
+        var transition = false;
         if (!widget.animate) {
           _old = null;
-          _current = img;
           _mix = 1;
         } else if (_current != null && !identical(_current, img)) {
           _old = _current;
           _beginTransition();
-          _current = img;
-        } else {
-          _current = img;
+          transition = true;
         }
+        _current = img;
+        _prepareCover(img, transition: transition);
         _repaint.notify();
       },
       onError: (_, _) {},
@@ -267,7 +342,12 @@ class _RippleBackgroundState extends State<RippleBackground>
     if (_transitioning) {
       _transitionProgress += dt;
       _mix = (_transitionProgress / (_kTransitionMs / 1000)).clamp(0.0, 1.0);
-      if (_mix >= 1) _transitioning = false;
+      if (_mix >= 1) {
+        _transitioning = false;
+        // 交叉淡入结束：旧封面纹理可释放。
+        _disposeLater(_preparedOld);
+        _preparedOld = null;
+      }
     }
     _repaint.notify();
   }
@@ -275,26 +355,27 @@ class _RippleBackgroundState extends State<RippleBackground>
   /// 无封面时底色（供 painter 读取，避免跨类访问 protected 的 widget）。
   Color get fallbackColor => widget.fallbackColor;
 
-  ColorFilter get _saturationFilter => saturationColorFilter(widget.saturation);
-
   @override
   Widget build(BuildContext context) {
+    final shader = _shader;
+    final prepared = _preparedCurrent;
+    // GPU 主路径（默认关闭，见 kEnableRippleShader）。
+    if (kEnableRippleShader && shader != null && prepared != null) {
+      return RepaintBoundary(
+        child: CustomPaint(
+          painter: _RippleShaderPainter(this, _repaint, shader),
+          size: Size.infinite,
+        ),
+      );
+    }
+    // CPU 网格路径：纹理已预烘焙（模糊+饱和），无需每帧 ImageFiltered/ColorFiltered。
     return RepaintBoundary(
       child: Stack(
         fit: StackFit.expand,
         children: [
-          ColorFiltered(
-            colorFilter: _saturationFilter,
-            child: ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(
-                sigmaX: widget.blurSigma,
-                sigmaY: widget.blurSigma,
-              ),
-              child: CustomPaint(
-                painter: _RipplePainter(this, _repaint),
-                size: Size.infinite,
-              ),
-            ),
+          CustomPaint(
+            painter: _RipplePainter(this, _repaint),
+            size: Size.infinite,
           ),
           if (widget.darken > 0)
             Positioned.fill(
@@ -310,11 +391,63 @@ class _RippleBackgroundState extends State<RippleBackground>
   }
 }
 
+/// GPU 着色器绘制：单 pass 折射 + 饱和 + 高光/压暗 + 压暗。
+class _RippleShaderPainter extends CustomPainter {
+  _RippleShaderPainter(this.s, Listenable repaint, this.shader)
+    : super(repaint: repaint);
+
+  final _RippleBackgroundState s;
+  final ui.FragmentShader shader;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final to = s._preparedCurrent;
+    if (w <= 0 || h <= 0 || to == null) return;
+    final from = s._preparedOld ?? to;
+    final mix = s._preparedOld != null ? s._mix : 1.0;
+
+    shader.setFloat(RippleUniforms.size, w);
+    shader.setFloat(RippleUniforms.size + 1, h);
+    shader.setFloat(RippleUniforms.darken, s.widget.darken);
+    shader.setFloat(RippleUniforms.saturation, s.widget.saturation);
+    shader.setFloat(RippleUniforms.imgAspect, to.width / to.height);
+    shader.setFloat(RippleUniforms.mix, mix);
+
+    final time = s._simTime;
+    var n = 0;
+    for (final rp in s._ripples) {
+      final age = time - rp.birth;
+      if (age <= 0 || age > _kRippleLifetime) continue;
+      final base = RippleUniforms.ripples + n * 4;
+      shader.setFloat(base, rp.x);
+      shader.setFloat(base + 1, rp.y);
+      shader.setFloat(base + 2, age * rp.speed); // radius
+      final st = (age / 0.12).clamp(0.0, 1.0);
+      final env = math.exp(-age * 0.75) * (st * st * (3 - 2 * st));
+      shader.setFloat(base + 3, env * rp.strength); // amp
+      shader.setFloat(RippleUniforms.seeds + n, rp.seed);
+      n++;
+      if (n >= kRippleShaderMaxRipples) break;
+    }
+    // 着色器以 `i < uCount` 掩码，超出槽位不参与；无需清零。
+    shader.setFloat(RippleUniforms.count, n.toDouble());
+
+    shader.setImageSampler(RippleUniforms.samplerFrom, from);
+    shader.setImageSampler(RippleUniforms.samplerTo, to);
+    canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
+  }
+
+  @override
+  bool shouldRepaint(_RippleShaderPainter old) => false;
+}
+
 class _Repaint extends ChangeNotifier {
   void notify() => notifyListeners();
 }
 
-/// 自绘引擎：网格顶点折射 + 顶点色高光/压暗。
+/// CPU 兜底引擎：网格顶点折射 + 顶点色高光/压暗。
 class _RipplePainter extends CustomPainter {
   _RipplePainter(this.s, Listenable repaint) : super(repaint: repaint);
 
@@ -373,12 +506,38 @@ class _RipplePainter extends CustomPainter {
 
   /// 逐顶点计算涟漪折射位移 / 高光，写入 [_texCoords] / [_lightColors] /
   /// [_darkColors]（公式与上游 WGSL/GLSL 一致）。
+  ///
+  /// 优化（P2）：① 每帧按涟漪预计算 amp（age/env/smoothstep 与顶点无关）；
+  /// ② 逐顶点用 `|dw|<=0.5` 裁剪——`exp(-|dw|*48)` 在 |dw|>0.5 时≈0，跳过
+  /// exp/sin。使网格路径对集显/低端 CPU 也可负担（避免全屏逐像素着色器压死核显）。
   void _computeField(double w, double h, ui.Image img) {
     final aspect = w / h;
     final imgAspect = img.width / img.height;
     final ripples = s._ripples;
     final time = s._simTime;
-    final ca = w / h;
+    final n = ripples.length;
+
+    final rx = Float64List(n);
+    final ry = Float64List(n);
+    final rRadius = Float64List(n);
+    final rAmp = Float64List(n);
+    final rSeed = Float64List(n);
+    var active = 0;
+    for (var r = 0; r < n; r++) {
+      final rp = ripples[r];
+      final age = time - rp.birth;
+      if (age <= 0 || age > _kRippleLifetime) continue;
+      final st = (age / 0.12).clamp(0.0, 1.0);
+      final env = math.exp(-age * 0.75) * (st * st * (3 - 2 * st));
+      rx[active] = rp.x;
+      ry[active] = rp.y;
+      rRadius[active] = age * rp.speed;
+      rAmp[active] = env * rp.strength;
+      rSeed[active] = rp.seed;
+      active++;
+    }
+
+    const bandCut = 0.5; // |dw|>0.5 → exp(-24)≈4e-11，可忽略
     var vi = 0;
     var k = 0;
     for (var j = 0; j <= _rows; j++) {
@@ -388,31 +547,27 @@ class _RipplePainter extends CustomPainter {
         var ox = 0.0;
         var oy = 0.0;
         var light = 0.0;
-        for (var r = 0; r < ripples.length; r++) {
-          final rp = ripples[r];
-          final age = time - rp.birth;
-          if (age <= 0 || age > _kRippleLifetime) continue;
-          final dx = (u - rp.x) * aspect;
-          final dy = (v - rp.y);
+        for (var r = 0; r < active; r++) {
+          final dx = (u - rx[r]) * aspect;
+          final dy = v - ry[r];
           final dc = math.sqrt(dx * dx + dy * dy);
-          final dw = dc - age * rp.speed;
+          final dw = dc - rRadius[r];
+          if (dw > bandCut || dw < -bandCut) continue;
           final band = math.exp(-dw.abs() * 48);
-          final st = (age / 0.12).clamp(0.0, 1.0);
-          final env = math.exp(-age * 0.75) * (st * st * (3 - 2 * st));
-          final wave = math.sin(dw * 115 + rp.seed) * band * env * rp.strength;
+          final wave = math.sin(dw * 115 + rSeed[r]) * band * rAmp[r];
           final ex = dx + 0.0001;
           final ey = dy + 0.0001;
-          final len = math.sqrt(ex * ex + ey * ey);
-          ox += ex / len * wave * 0.015;
-          oy += ey / len * wave * 0.015;
+          final inv = 1 / math.sqrt(ex * ex + ey * ey);
+          ox += ex * inv * wave * 0.015;
+          oy += ey * inv * wave * 0.015;
           light += wave;
         }
         var tu = u + ox;
         var tv = v + oy;
-        if (ca > imgAspect) {
-          tv = (tv - 0.5) * (imgAspect / ca) + 0.5;
+        if (aspect > imgAspect) {
+          tv = (tv - 0.5) * (imgAspect / aspect) + 0.5;
         } else {
-          tu = (tu - 0.5) * (ca / imgAspect) + 0.5;
+          tu = (tu - 0.5) * (aspect / imgAspect) + 0.5;
         }
         _texCoords[k] = tu.clamp(0.001, 0.999);
         _texCoords[k + 1] = tv.clamp(0.001, 0.999);
@@ -461,7 +616,8 @@ class _RipplePainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
     if (w <= 0 || h <= 0) return;
-    final img = s._current;
+    // 优先用预烘焙（模糊+饱和）纹理；未就绪时暂用原图。
+    final img = s._preparedCurrent ?? s._current;
     if (img == null) {
       canvas.drawRect(
         Offset.zero & size,
@@ -479,7 +635,7 @@ class _RipplePainter extends CustomPainter {
       indices: _indices,
     );
     final rect = Offset.zero & size;
-    final old = s._old;
+    final old = s._preparedOld ?? s._old;
     if (old != null && s._mix < 0.999) {
       _drawImage(canvas, rect, verts, old, 1);
       _drawImage(canvas, rect, verts, img, s._mix);

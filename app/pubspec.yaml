@@ -114,6 +114,10 @@ flutter:
     - pubspec.yaml
     - assets/icons/
 
+  # GLSL 片元着色器（P2：播放页水纹背景，见 docs/player-render-optimization.md）
+  shaders:
+    - shaders/ripple.frag
+
   # 自带字体（统一中英混排度量，消除系统兜底字体的错位）：
   #   Noto Sans SC（主字体，Google 开源 OFL，从系统 NotoSansCJK SC face 提取）——
   #     字形度量最标准，全局观感统一；
