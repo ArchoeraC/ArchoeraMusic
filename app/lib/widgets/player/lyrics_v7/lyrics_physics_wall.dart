@@ -19,6 +19,7 @@ library;
 
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart' show PointerScrollEvent;
 import 'package:flutter/material.dart';
@@ -26,6 +27,7 @@ import 'package:flutter/scheduler.dart' show Ticker;
 
 import '../../../services/lyrics/lyric_line.dart';
 import 'lyrics_layout.dart';
+import 'lyrics_paragraph_cache.dart';
 import 'spring.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
@@ -106,4 +108,7 @@ class _PaintCtx {
   Color played = const Color(0xFF4DA3FF);
   Color unplayed = const Color(0xFF9AA1B5);
   double drag = 0;
+
+  /// 已排版段落缓存（可见窗口，P1）。见 [LyricsParagraphCache]。
+  final LyricsParagraphCache cache = LyricsParagraphCache();
 }

@@ -122,6 +122,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     final groups = widget.groups;
     final w = _c.w;
     if (w <= 0) return;
+    // 切歌 / 字号 / 字体 / 宽度变化 → 段落缓存整体失效。
+    _c.cache.clear();
     final heights = computeLineHeights(
       groups,
       fontSize: widget.fontSize,
@@ -384,6 +386,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 每行高度。
   @visibleForTesting
   List<double> debugHeights() => List.of(_c.heights);
+
+  /// 当前段落缓存条目数（应随可见窗口有界，不随歌长增长）。
+  @visibleForTesting
+  int debugCacheEntries() => _c.cache.entryCount;
 
   void _seekAt(double y) {
     final n = _c.y.length;
