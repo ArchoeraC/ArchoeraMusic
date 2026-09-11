@@ -212,6 +212,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('段落缓存随视口有界（不随歌长增长）', (tester) async {
+    final groups = buildGroups(600);
+    await tester.pumpWidget(buildWall(groups, 300 * 1000));
+    await settle(tester);
+    dynamic s = stateOf(tester);
+    final entries = s.debugCacheEntries() as int;
+    // 视口 500 高、行高约 50 → 可见约 12~16 行；只缓存可见窗口。
+    expect(entries, greaterThan(0));
+    expect(entries, lessThan(60));
+
+    // 大跳后仍不增长（内存 O(视口)，与歌长无关）。
+    await tester.pumpWidget(buildWall(groups, 550 * 1000));
+    await settle(tester);
+    s = stateOf(tester);
+    expect(s.debugCacheEntries() as int, lessThan(60));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('逐字扫亮活跃行渲染无异常（不缓存路径）', (tester) async {
+    final groups = [
+      LyricGroup(
+        original: const LyricLine(timeMs: 0, text: '逐字高亮'),
+        endMs: 5000,
+        fragments: const [
+          LyricFragment(text: '逐', startMs: 0, durationMs: 1000),
+          LyricFragment(text: '字', startMs: 1000, durationMs: 1000),
+          LyricFragment(text: '高', startMs: 2000, durationMs: 1000),
+          LyricFragment(text: '亮', startMs: 3000, durationMs: 1000),
+        ],
+      ),
+      LyricGroup(
+        original: const LyricLine(timeMs: 5000, text: '下一行'),
+        endMs: 9000,
+      ),
+    ];
+    await tester.pumpWidget(buildWall(groups, 500));
+    await settle(tester);
+    expect(tester.takeException(), isNull);
+  });
+
   group('Spring1D 延迟语义', () {
     test('延迟期间继续朝当前目标运动，不冻结', () {
       final s = Spring1D();
