@@ -7,7 +7,7 @@ import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import '../common/qr_image_view.dart';
 
 import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';

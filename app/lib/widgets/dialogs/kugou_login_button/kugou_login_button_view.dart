@@ -128,7 +128,6 @@ extension _KgQrLoginDialogView on _KgQrLoginDialogState {
                                   : _key != null
                                   ? QrImageView(
                                       data: '$kgQrLoginPage?qrcode=$_key',
-                                      version: QrVersions.auto,
                                       size: 260,
                                     )
                                   : _buildQrError(scheme, l10n),
