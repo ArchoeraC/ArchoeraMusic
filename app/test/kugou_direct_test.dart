@@ -16,6 +16,7 @@ import 'dart:typed_data';
 
 import 'package:archoera_music/services/kugou/kugou_api.dart';
 import 'package:archoera_music/services/kugou/kugou_crypto.dart';
+import 'package:archoera_music/services/netease/netease_api.dart' show CoverItem;
 import 'package:archoera_music/services/netease/track.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -192,6 +193,29 @@ void main() {
     // ignore: avoid_print
     print('[KG] 歌词首行: ${lyric.lrc.split('\n').first}');
   }, timeout: const Timeout(Duration(seconds: 30)));
+
+  test('分类搜索：歌手/歌单/专辑（真实请求，字段解析）', () async {
+    final api = KugouApi();
+    final artists = await api.searchByType('周杰伦', type: 'author', pagesize: 5);
+    final aItems = artists.items.whereType<CoverItem>().toList();
+    expect(aItems, isNotEmpty, reason: '歌手搜索应解析出 CoverItem（AuthorId 字段）');
+    expect(aItems.first.title, isNotEmpty);
+    // ignore: avoid_print
+    print('[KG] 歌手: ${aItems.first.title} id=${aItems.first.id}');
+
+    final playlists = await api.searchByType(
+      '周杰伦',
+      type: 'special',
+      pagesize: 5,
+    );
+    final pItems = playlists.items.whereType<CoverItem>().toList();
+    expect(pItems, isNotEmpty, reason: '歌单搜索应解析出 CoverItem（specialid 字段）');
+    // ignore: avoid_print
+    print('[KG] 歌单: ${pItems.first.title} id=${pItems.first.id}');
+
+    final albums = await api.searchByType('周杰伦', type: 'album', pagesize: 5);
+    expect(albums.items.whereType<CoverItem>(), isNotEmpty, reason: '专辑搜索应有结果');
+  }, timeout: const Timeout(Duration(seconds: 60)));
 
   test('登录态注入：session 保存 + 带 token 请求链路正常', () async {
     final api = KugouApi();
