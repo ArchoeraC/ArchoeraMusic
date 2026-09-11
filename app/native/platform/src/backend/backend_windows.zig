@@ -152,6 +152,33 @@ fn emitWindow() void {
     });
 }
 
+// ── 媒体键兜底（WM_APPCOMMAND）────────────────────────────────────
+// 现代 Windows 把媒体键（含蓝牙 AVRCP）经 SMTC 派发；但当 SMTC 非当前会话 /
+// 仅前台时，系统退化为 WM_APPCOMMAND（GET_APPCOMMAND_LPARAM = HIWORD & 0x0FFF）。
+// 二者通常互斥（SMTC 已消费则不再发 APPCOMMAND），故并列处理不产生双触发。
+const APPCOMMAND_MEDIA_NEXTTRACK: u16 = 11;
+const APPCOMMAND_MEDIA_PREVIOUSTRACK: u16 = 12;
+const APPCOMMAND_MEDIA_STOP: u16 = 13;
+const APPCOMMAND_MEDIA_PLAY_PAUSE: u16 = 14;
+const APPCOMMAND_MEDIA_PLAY: u16 = 46;
+const APPCOMMAND_MEDIA_PAUSE: u16 = 47;
+
+fn dispatchAppCommand(lparam: win.LPARAM) bool {
+    const raw: usize = @bitCast(lparam);
+    const app: u16 = @intCast((raw >> 16) & 0x0FFF);
+    const cmd: i32 = switch (app) {
+        APPCOMMAND_MEDIA_NEXTTRACK => core.CMD_NEXT,
+        APPCOMMAND_MEDIA_PREVIOUSTRACK => core.CMD_PREV,
+        APPCOMMAND_MEDIA_STOP => core.CMD_STOP,
+        APPCOMMAND_MEDIA_PLAY_PAUSE => core.CMD_TOGGLE,
+        APPCOMMAND_MEDIA_PLAY => core.CMD_PLAY,
+        APPCOMMAND_MEDIA_PAUSE => core.CMD_PAUSE,
+        else => return false,
+    };
+    core.dispatch(.{ .type = core.EVENT_MEDIA_COMMAND, .u = .{ .command = cmd } });
+    return true;
+}
+
 fn wndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) callconv(.winapi) win.LRESULT {
     switch (msg) {
         win.WM_SIZE => {
@@ -166,6 +193,9 @@ fn wndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM
         win.WM_CLOSE => {
             g_minimized.store(true, .release);
             emitWindow();
+        },
+        win.WM_APPCOMMAND => {
+            if (dispatchAppCommand(lparam)) return 1; // 已消费，不再下传
         },
         else => {},
     }
@@ -239,6 +269,10 @@ pub fn shutdown() i32 {
     unregisterScreen();
     unsubclassWindow();
     smtc.deinit();
+    if (g_instance_mutex) |h| {
+        _ = win.CloseHandle(h);
+        g_instance_mutex = null;
+    }
     g_screen_events.store(false, .release);
     g_window_events.store(false, .release);
     return core.OK;
@@ -297,10 +331,23 @@ pub fn mediaSetWindow(win_: i64) i32 {
     return core.OK;
 }
 
-// ── 单实例（Windows：命名互斥体待接）────────────────────────────────
-// TODO: CreateMutexW("Global\\ArchoeraMusic") + ERROR_ALREADY_EXISTS → 0。
-// 当前返回 1（不阻断启动）；Dart 侧另有单实例守卫兜底。
+// ── 单实例（Windows：命名互斥体）──────────────────────────────────
+// 进程级命名互斥体（Local\ 会话命名空间 = 每登录会话一个实例，与 Linux
+// XDG_RUNTIME_DIR / macOS 文件锁语义对齐）。CreateMutexW 不会因已存在而失败：
+// 返回句柄 + ERROR_ALREADY_EXISTS 表示已有实例；此时关闭本地句柄返回 0。
+// 句柄须持有至进程退出（关闭即释放单实例）。
+var g_instance_mutex: win.HANDLE = null;
+
 pub fn appInstanceAcquire() i32 {
+    if (g_instance_mutex != null) return 1; // 幂等
+    const name = std.unicode.utf8ToUtf16LeStringLiteral("Local\\ArchoeraMusic.SingleInstance");
+    const h = win.CreateMutexW(null, 0, name);
+    if (h == null) return core.ERR_BACKEND;
+    if (win.GetLastError() == win.ERROR_ALREADY_EXISTS) {
+        _ = win.CloseHandle(h);
+        return 0; // 已有实例持有
+    }
+    g_instance_mutex = h;
     return 1;
 }
 
@@ -404,7 +451,10 @@ extern "advapi32" fn RegGetValueW(
 ) callconv(.winapi) c_int;
 extern "dwmapi" fn DwmGetColorizationColor(pcr: *u32, opaque_blend: *i32) callconv(.winapi) c_int;
 
-const HKEY_CURRENT_USER: ?*anyopaque = @ptrFromInt(0x80000001);
+// 预定义注册表句柄：64 位 Windows 上 HKEY_CURRENT_USER = 0xFFFFFFFF80000001
+// （C 宏 (HKEY)(ULONG_PTR)((LONG)0x80000001) 的符号扩展）。此前写成 0x80000001，
+// 在 64 位下是非法句柄 → RegGetValueW/RegOpenKeyExW 全失败 → 主题色恒读不到。
+const HKEY_CURRENT_USER: ?*anyopaque = @ptrFromInt(@as(usize, @bitCast(@as(isize, -0x7FFFFFFF))));
 const RRF_RT_REG_DWORD: u32 = 0x00000010;
 
 fn readDwmDword(value: [*:0]const u16) ?u32 {

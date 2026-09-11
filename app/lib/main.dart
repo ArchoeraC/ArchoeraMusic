@@ -31,10 +31,18 @@ Future<void> main() async {
   // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化——既是 Flutter
   // binding，也让后续 windowManager（MethodChannel）可用（单实例分支要用）。
   PowerSavingFrameBinding.ensureInitialized();
-  // 单实例守卫（经 Zig 平台桥接文件锁，禁止多开）：已有实例则用应用自身对话框
-  // 提示后退出（第二实例的 Flutter 引擎已由原生 runner 起好，直接 runApp 最小页）。
+  // 单实例守卫（经 Zig 平台桥接文件锁/命名互斥体，禁止多开）：已有实例则用应用
+  // 自身对话框提示后退出（第二实例的 Flutter 引擎已由原生 runner 起好，直接
+  // runApp 最小页）。桥接缺失时不再静默放行（旧 Dart 兜底不可靠）——显式失败。
   final platformCaps = PlatformCapabilities.instance();
-  if (!platformCaps.acquireSingleInstance()) {
+  var firstInstance = false;
+  try {
+    firstInstance = platformCaps.acquireSingleInstance();
+  } on StateError catch (e) {
+    stderr.writeln('[single-instance] $e');
+    exit(1);
+  }
+  if (!firstInstance) {
     final parts = Platform.localeName.replaceAll('-', '_').split('_');
     final locale = parts.length >= 2 ? Locale(parts[0], parts[1]) : Locale(parts[0]);
     // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。

@@ -63,6 +63,8 @@ pub fn main() void {
     _ = backend.init();
     core.setEventCallback(onEvent, null);
 
+    std.debug.print("instance_acquire={d}\n", .{backend.appInstanceAcquire()});
+
     const inh_on = backend.powerSetSleepInhibit(1);
     const inh_off = backend.powerSetSleepInhibit(0);
     std.debug.print("inhibit on={d} off={d}\n", .{ inh_on, inh_off });
@@ -94,6 +96,7 @@ pub fn main() void {
         smtc.debugGetPlaybackStatus(),
         smtc.debugGetIsEnabled(),
     });
+    std.debug.print("button_registered={}\n", .{smtc.debugIsButtonRegistered()});
 
     _ = backend.windowSetEvents(0);
     _ = backend.shutdown();

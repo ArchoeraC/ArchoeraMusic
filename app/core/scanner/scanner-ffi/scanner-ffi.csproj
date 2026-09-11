@@ -83,7 +83,7 @@
       <!-- 自研内核元数据快路径动态库（随 FFI 同目录分发，$ORIGIN 解析） -->
       <ScannerArtifacts Include="$(MSBuildProjectDirectory)/../../audio-engine/zig-out/lib/libarchoera_kernel.so" Condition="Exists('$(MSBuildProjectDirectory)/../../audio-engine/zig-out/lib/libarchoera_kernel.so')" />
       <ScannerArtifacts Include="$(MSBuildProjectDirectory)/../../audio-engine/zig-out/lib/libarchoera_kernel.dylib" Condition="Exists('$(MSBuildProjectDirectory)/../../audio-engine/zig-out/lib/libarchoera_kernel.dylib')" />
-      <ScannerArtifacts Include="$(MSBuildProjectDirectory)/../../audio-engine/zig-out/lib/archoera_kernel.dll" Condition="Exists('$(MSBuildProjectDirectory)/../../audio-engine/zig-out/lib/archoera_kernel.dll')" />
+      <ScannerArtifacts Include="$(MSBuildProjectDirectory)/../../audio-engine/zig-out/bin/archoera_kernel.dll" Condition="Exists('$(MSBuildProjectDirectory)/../../audio-engine/zig-out/bin/archoera_kernel.dll')" />
     </ItemGroup>
     <Copy SourceFiles="@(ScannerArtifacts)"
           DestinationFolder="$(MSBuildProjectDirectory)/../build/"

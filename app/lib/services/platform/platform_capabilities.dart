@@ -51,10 +51,17 @@ class PlatformCapabilities {
   bool get bridgeLoaded => _bindings != null;
 
   /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
-  /// 桥接不可用/无该能力 → true（不阻断启动，降级为允许多开）。
+  /// 桥接不可用 / 无该能力 → 抛 [StateError]：**不再静默放行多开**
+  /// （旧 Dart 兜底在桥接缺失时返回 true，会掩盖桥接损坏并放任多开）。
+  /// 调用方（main）须显式处理，不得当作「首实例」继续。
   bool acquireSingleInstance() {
     final b = _bindings;
-    if (b == null || caps & aplCapAppInstance == 0) return true;
+    if (b == null || caps & aplCapAppInstance == 0) {
+      throw StateError(
+        'platform bridge / app-instance capability unavailable: '
+        'refusing to start without single-instance arbitration',
+      );
+    }
     return b.acquireInstance() == 1;
   }
 

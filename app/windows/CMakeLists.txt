@@ -125,9 +125,12 @@ install(FILES "${ENGINE_SRC_DIR}/fft.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/scanner-ffi.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
-# 自研内核元数据桥（scanner-ffi 同目录解析；缺失回退 TagLibSharp）
-install(FILES "${SCANNER_SRC_DIR}/archoera_kernel.dll"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# 自研内核动态库（EraSync，archoera_kernel.dll）：archoera_mediaengine.dll 链接的是
+# 它的 import lib → 加载期硬依赖该 DLL；Windows 加载器按 exe 目录解析依赖，且
+# scanner 的 KernelMetadata 按 AppContext.BaseDirectory（exe 根）查找 → 必须装到
+# exe 根，而非 native/。源取引擎 build/（build_windows.bat 已从 zig-out\bin 拷入）。
+install(FILES "${ENGINE_SRC_DIR}/archoera_kernel.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/e_sqlite3.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCRAPER_SRC_DIR}/archoera_scraper.dll"

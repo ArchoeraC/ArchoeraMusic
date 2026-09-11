@@ -43,9 +43,9 @@
     <None Include="../audio-engine/zig-out/lib/libarchoera_kernel.dylib"
           Link="libarchoera_kernel.dylib" CopyToOutputDirectory="PreserveNewest"
           Condition="Exists('../audio-engine/zig-out/lib/libarchoera_kernel.dylib')" />
-    <None Include="../audio-engine/zig-out/lib/archoera_kernel.dll"
+    <None Include="../audio-engine/zig-out/bin/archoera_kernel.dll"
           Link="archoera_kernel.dll" CopyToOutputDirectory="PreserveNewest"
-          Condition="Exists('../audio-engine/zig-out/lib/archoera_kernel.dll')" />
+          Condition="Exists('../audio-engine/zig-out/bin/archoera_kernel.dll')" />
   </ItemGroup>
 
 </Project>
