@@ -20,7 +20,7 @@ extension _AppShortcutsView on AppShortcuts {
     return Shortcuts(
       shortcuts: shortcuts,
       child: Actions(
-        actions: {_ShortcutIntent: _ShortcutAction(ref, context)},
+        actions: {_ShortcutIntent: _ShortcutAction(ref)},
         child: Focus(autofocus: true, child: child),
       ),
     );
@@ -35,10 +35,9 @@ class _ShortcutIntent extends Intent {
 
 /// 统一动作处理器：按 [ShortcutAction] 分发（播放/导航/队列）。
 class _ShortcutAction extends Action<_ShortcutIntent> {
-  _ShortcutAction(this.ref, this.context);
+  _ShortcutAction(this.ref);
 
   final WidgetRef ref;
-  final BuildContext context;
 
   /// 静音前的音量（用于恢复）。
   double? _muteMemory;
@@ -130,13 +129,18 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
         pb.clearQueue();
 
       // ── 导航 ──
+      // 注意：AppShortcuts 位于 MaterialApp.router 的 builder 内，其 context 在
+      // Router/Navigator 之上，`context.go/push` 会抛「No GoRouter found in
+      // context」。故一律用全局 appRouter / rootNavigatorKey 导航。
       case ShortcutAction.openPlayer:
-        context.push('/player');
+        // ignore: discarded_futures
+        appRouter.push('/player');
       case ShortcutAction.openSettings:
-        showSettingsDialog(context);
+        final ctx = rootNavigatorKey.currentContext;
+        if (ctx != null) showSettingsDialog(ctx);
       case ShortcutAction.back:
-        final navigator = Navigator.of(context);
-        if (navigator.canPop()) navigator.pop();
+        final navigator = rootNavigatorKey.currentState;
+        if (navigator != null && navigator.canPop()) navigator.pop();
       case ShortcutAction.goHome:
       case ShortcutAction.goLibrary:
       case ShortcutAction.goSearch:
@@ -146,7 +150,10 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
       case ShortcutAction.goDownload:
       case ShortcutAction.goStreaming:
         final route = action.route;
-        if (route != null) context.go(route);
+        if (route != null) {
+          // ignore: discarded_futures
+          appRouter.go(route);
+        }
     }
   }
 }
