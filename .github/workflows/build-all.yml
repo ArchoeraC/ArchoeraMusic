@@ -477,10 +477,16 @@ jobs:
     needs: build
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    # 受保护 Environment：需 Required reviewers 手动批准后才运行；
+    # 两把签名私钥作为 Environment secret 存放（仅本作业可见，非仓库级缓存）。
+    environment: release
     permissions:
       contents: write
       actions: read
     steps:
+      - name: Checkout (签名工具 + 公钥)
+        uses: actions/checkout@v4
+
       - name: Download all platform build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -514,6 +520,26 @@ jobs:
             -C artifacts/ArchoeraMusic-windows-x64 .
           # Linux 原始 bundle 与 package.sh tar 纯二进制内容一致，不再重复出包
           echo "── release assets ──"
+          ls -la assets
+
+      # 双控签名 —— CI 只签 key1（.sig1）：私钥来自受保护 `release` Environment
+      # （需人工批准），Windows runner 不参与。key2（.sig2）由维护者**本地**签好
+      # 后上传进 Release，key2 绝不进入 CI。两把公钥随发布分发。
+      - name: CI 侧签名（key1 → .sig1；key2 本地签不入 CI）
+        shell: bash
+        env:
+          ARCHOERA_WM_KEYS: "1"
+          ARCHOERA_WM_KEY1_PEM: ${{ secrets.ARCHOERA_WM_KEY1_PEM }}
+        run: |
+          set -euo pipefail
+          cp app/tool/watermark_pub.pem  assets/ARCHOERA_PUBKEY.pem
+          cp app/tool/watermark_pub2.pem assets/ARCHOERA_PUBKEY2.pem
+          if [ -n "${ARCHOERA_WM_KEY1_PEM:-}" ]; then
+            bash app/tool/sign_release.sh assets
+          else
+            echo "未配置 ARCHOERA_WM_KEY1_PEM，跳过 key1 签名（不影响出包）"
+          fi
+          echo "── final assets ──"
           ls -la assets
 
       - name: Create GitHub Release (tag v*)

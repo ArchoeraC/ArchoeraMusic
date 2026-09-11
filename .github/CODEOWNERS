@@ -1,0 +1,17 @@
+# ArchoeraMusic CODEOWNERS
+#
+# 关键路径（发布/签名/打包/CI）必须由维护者审阅，防止供应链篡改。
+# 语法：<path> <owner...>（GitHub 取最后一个匹配规则）。
+
+*                       @BetaStudio2
+
+# CI 与发布流程
+/.github/               @BetaStudio2
+/.github/workflows/     @BetaStudio2
+
+# 防伪/签名工具与公钥
+/app/tool/              @BetaStudio2
+/app/lib/app/watermark.dart @BetaStudio2
+
+# 打包脚本
+/packaging/             @BetaStudio2
