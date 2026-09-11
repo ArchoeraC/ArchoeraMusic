@@ -494,6 +494,22 @@ IMarshal 也拒了 → combase 退回标准封送 → 仍按 `IMarshal` 的 9 �
 
 验证：`x86_64-windows-gnu` 交叉编译通过；真机待 Windows 复测。
 
+### 7.8 本地封面 refFromFile 致 combase 0xC0000005（2026-09-11）
+
+现象：**仅本地音乐**（点曲即崩）触发 combase 0xC0000005；在线音乐正常。
+
+根因：SMTC 封面有两条路径——在线 http → `RandomAccessStreamReference.CreateFromUri`
+（正常）；**本地** → `refFromFile`（`StorageFile.GetFileFromPathAsync` + 轮询
+`IAsyncOperation`）。后者两个问题：① Dart 侧 `local_track.dart` 拼出的是
+`file://C:\...`（既非标准 URI 也非纯路径），被原样丢给 `GetFileFromPathAsync`；
+② 在 **STA 平台线程**用 `Sleep(20)` 轮询异步操作，**阻塞公寓消息泵**，combase 无法
+投递完成回调 → 崩溃/死锁。`CreateFromUri` 文档明确只支持 http/https/ms-appx/
+ms-appdata，故本地必须走 `StorageFile`（不能改走 Uri）。
+
+修复：`refFromFile` 剥离 `file://` 前缀（含 `file:///C:/` 的前导 `/`）得到纯路径；
+等待改用 `CoWaitForMultipleHandles(COWAIT_DISPATCH_CALLS |
+COWAIT_DISPATCH_WINDOW_MESSAGES)` 泵消息，不再 `Sleep`。交叉编译通过，真机待复测。
+
 ## 8. 风险与对策
 
 | 风险 | 对策 |
