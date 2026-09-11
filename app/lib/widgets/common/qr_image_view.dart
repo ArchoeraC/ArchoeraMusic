@@ -92,7 +92,12 @@ class _QrImageViewState extends State<QrImageView> {
             ? const SizedBox.expand()
             : CustomPaint(
                 size: Size.square(widget.size),
-                painter: _QrPainter(image, widget.color, widget.padding),
+                painter: _QrPainter(
+                  image,
+                  widget.color,
+                  widget.padding,
+                  MediaQuery.devicePixelRatioOf(context),
+                ),
               ),
       ),
     );
@@ -100,11 +105,12 @@ class _QrImageViewState extends State<QrImageView> {
 }
 
 class _QrPainter extends CustomPainter {
-  _QrPainter(this.image, this.color, this.padding);
+  _QrPainter(this.image, this.color, this.padding, this.devicePixelRatio);
 
   final QrImage image;
   final Color color;
   final double padding;
+  final double devicePixelRatio;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -112,25 +118,27 @@ class _QrPainter extends CustomPainter {
     final inner = size.shortestSide - padding * 2;
     if (n <= 0 || inner <= 0) return;
     final cell = inner / n;
-    final paint = Paint()..color = color;
+    // 关抗锯齿 + 模块边界对齐设备像素：相邻模块共享同一对齐边界，边缘锐利且无缝。
+    final paint = Paint()
+      ..color = color
+      ..isAntiAlias = false;
+    double px(double v) => (v * devicePixelRatio).round() / devicePixelRatio;
     for (var r = 0; r < n; r++) {
+      final top = px(padding + r * cell);
+      final bottom = px(padding + (r + 1) * cell);
       for (var c = 0; c < n; c++) {
         if (!image.isDark(r, c)) continue;
-        // +0.5 覆盖栅格化缝隙（对齐旧 gapless 行为）。
-        canvas.drawRect(
-          Rect.fromLTWH(
-            padding + c * cell,
-            padding + r * cell,
-            cell + 0.5,
-            cell + 0.5,
-          ),
-          paint,
-        );
+        final left = px(padding + c * cell);
+        final right = px(padding + (c + 1) * cell);
+        canvas.drawRect(Rect.fromLTRB(left, top, right, bottom), paint);
       }
     }
   }
 
   @override
   bool shouldRepaint(_QrPainter old) =>
-      old.image != image || old.color != color || old.padding != padding;
+      old.image != image ||
+      old.color != color ||
+      old.padding != padding ||
+      old.devicePixelRatio != devicePixelRatio;
 }
