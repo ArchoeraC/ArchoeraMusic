@@ -266,6 +266,11 @@ jobs:
         working-directory: app
         run: flutter build linux --release
 
+      - name: Embed public key into Linux bundle (防伪)
+        if: matrix.os == 'linux'
+        # 公钥随包分发，供用户离线验签（私钥绝不入库/入包）
+        run: cp app/tool/watermark_pub.pem app/build/linux/x64/release/bundle/ARCHOERA_PUBKEY.pem
+
       - name: Build Flutter macOS
         if: matrix.os == 'macos'
         working-directory: app
@@ -293,6 +298,9 @@ jobs:
           $rel = "app\build\windows\x64\runner\Release"
           $out = "build\windows-extra"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          # 防伪公钥随包分发（供用户离线验签；私钥绝不入库/入包）
+          Copy-Item "app\tool\watermark_pub.pem" "$rel\ARCHOERA_PUBKEY.pem" -Force
 
           # 便携 zip：Release 目录整体（含 native/、data/、插件 dll）
           Compress-Archive -Path "$rel\*" -DestinationPath "$out\ArchoeraMusic-$ver-windows-x64-portable.zip" -Force
@@ -326,6 +334,9 @@ jobs:
           cp app/core/subsonic/build/*.dylib "$NATIVE/"
           cp app/core/downloader/target/release/libarchoera_downloader.dylib "$NATIVE/"
           cp app/core/vault/build/archoera-vault "$NATIVE/"
+          # 防伪公钥随包分发（供用户离线验签；私钥绝不入库/入包）
+          mkdir -p "$APP/Contents/Resources"
+          cp app/tool/watermark_pub.pem "$APP/Contents/Resources/ARCHOERA_PUBKEY.pem"
           echo "native/ 内容:"
           ls -la "$NATIVE"
 
