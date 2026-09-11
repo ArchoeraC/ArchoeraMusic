@@ -4,7 +4,7 @@
 
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 网络封面浏览器 UA（NT封面 CDN `p1.music.126.net` 对 Dart 默认 UA 403）。

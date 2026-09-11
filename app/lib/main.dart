@@ -4,7 +4,7 @@
 
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -130,7 +130,10 @@ class _AlreadyRunningApp extends StatelessWidget {
       theme: buildAppTheme(AppPalette.dark, Brightness.dark),
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        ...GlobalMaterialLocalizations.delegates,
+      ],
       home: _AlreadyRunningCard(title: title, message: message, okLabel: okLabel),
     );
   }

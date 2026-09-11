@@ -7,7 +7,7 @@
 // 避免后台弹窗抢焦点/无 UI context 时静默。
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../app/router.dart';
 import '../../eta/icon/eta_icons.dart';

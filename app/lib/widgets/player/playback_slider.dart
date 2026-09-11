@@ -24,7 +24,7 @@
 /// 主体/控制区挤出屏幕。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 part 'playback_slider/playback_slider_state.dart';
 

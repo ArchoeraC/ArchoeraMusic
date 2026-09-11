@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 搜索页空态 / 加载态（图标 + 标题 + 可选副标题）。
 class SearchEmptyState extends StatelessWidget {

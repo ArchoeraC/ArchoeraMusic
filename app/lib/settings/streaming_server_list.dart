@@ -10,7 +10,7 @@
 /// 本机服务端 / 用户名 / 密码 + 测试连接），删除有确认弹窗。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/streaming/streaming_provider.dart';

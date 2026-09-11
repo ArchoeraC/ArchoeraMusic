@@ -10,7 +10,7 @@
 /// KG源直接用歌曲 hash 拉KG评论（无 Tab）。触底自动加载下一页。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/kugou/kugou_api.dart';

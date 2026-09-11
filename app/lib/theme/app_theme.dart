@@ -12,7 +12,7 @@
 ///    填充式无边框输入框、悬浮式圆角按钮。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 应用调色板（单一来源）。
 class AppPalette {

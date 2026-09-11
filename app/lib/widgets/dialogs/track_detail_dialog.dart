@@ -9,7 +9,7 @@
 /// 来源平台、KG音质档、音频技术信息（流媒体服务器返回）与本地路径/大小。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../services/netease/track.dart';
 import '../../l10n/generated/app_localizations.dart';

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../apis/runtime.dart';
@@ -83,7 +83,10 @@ class ArchoeraMusicApp extends ConsumerWidget {
             // 国际化：locale 跟随设置/系统；Material 内建文案（菜单/日期等）自动本地化
             locale: locale,
             supportedLocales: AppLocalizations.supportedLocales,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
+            ],
             theme: buildAppTheme(
               AppPalette.light,
               Brightness.light,

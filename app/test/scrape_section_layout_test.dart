@@ -4,7 +4,7 @@
 // 设置 → 刮削 布局回归：空闲态应同时展示「开始刮削」与「开始整理」入口，
 // 且「仅整理」配置（目标/模板）不被进度区覆盖。
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

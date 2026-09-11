@@ -17,8 +17,7 @@
 // 二维码立即失败 → 错误分支渲染长文本），断言：无 AlertDialog、全屏层
 // 填满视口（800×600）、错误提示可见、无布局溢出。
 
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -63,9 +62,7 @@ void main() {
         child: MaterialApp(
           localizationsDelegates: const [
             AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
           locale: const Locale('zh'),

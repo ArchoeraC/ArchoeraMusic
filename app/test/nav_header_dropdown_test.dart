@@ -9,7 +9,7 @@
 // 其余 provider（theme/netease）无文件副作用，保持真实实现（聚焦触发的
 // 热搜请求在 flutter_test 中被 HttpOverrides 拦截返回 400 → 静默失败）。
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
