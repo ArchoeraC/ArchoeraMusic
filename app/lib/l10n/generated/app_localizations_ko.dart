@@ -1612,73 +1612,76 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsEngineRestartLater => '나중에';
 
   @override
-  String get settingsMemoryPlaySection => '播放内存';
+  String get settingsMemoryPlaySection => '재생 메모리';
 
   @override
-  String get settingsMemoryPlayTitle => '内存播放（不写盘解码缓存）';
+  String get settingsMemoryPlayTitle => '메모리 재생(디스크 디코딩 캐시 없음)';
 
   @override
-  String get settingsMemoryPlayOn => '解码 PCM 驻留内存，不写 stream.wav/.pcm';
+  String get settingsMemoryPlayOn =>
+      '디코딩한 PCM을 메모리에 상주, stream.wav/stream.pcm을 쓰지 않음';
 
   @override
-  String get settingsMemoryPlayOff => '文件模式：解码 PCM 写盘（旧行为）';
+  String get settingsMemoryPlayOff => '파일 모드: 디코딩한 PCM을 디스크에 기록(기존 동작)';
 
   @override
   String get settingsMemoryFileModeNote =>
-      '关闭 = 引擎写 stream.wav/.pcm（文件模式）；对下一首生效。';
+      '끄면 엔진이 stream.wav/stream.pcm을 기록합니다(파일 모드). 다음 곡부터 적용됩니다.';
 
   @override
-  String get settingsMemoryPolicyAuto => '自动（按可用内存均衡）';
+  String get settingsMemoryPolicyAuto => '자동(사용 가능한 메모리에 맞춰 조정)';
 
   @override
-  String get settingsMemoryPolicyAutoSub => '0.8 GiB 硬上限，随空闲内存自适应';
+  String get settingsMemoryPolicyAutoSub => '0.8 GiB 하드 상한, 여유 RAM에 맞춰 자동 조정';
 
   @override
-  String get settingsMemoryPolicyLimit => '自定义上限';
+  String get settingsMemoryPolicyLimit => '사용자 지정 상한';
 
   @override
-  String get settingsMemoryPolicyUnlimited => '无上限';
+  String get settingsMemoryPolicyUnlimited => '무제한';
 
   @override
-  String get settingsMemoryPolicyUnlimitedSub => '整曲解码常驻内存；选择时需显式确认警告';
+  String get settingsMemoryPolicyUnlimitedSub =>
+      '곡 전체 디코딩을 메모리에 상주, 선택 시 명시적 확인 필요';
 
   @override
-  String get settingsMemoryLimitTitle => '解码 PCM 内存上限';
+  String get settingsMemoryLimitTitle => '디코딩 PCM 메모리 상한';
 
   @override
-  String get settingsMemoryLimitHint => 'MB（48kHz 立体声 ≈ 0.38 MB/秒）';
+  String get settingsMemoryLimitHint => 'MB(48kHz 스테레오 ≈ 0.38 MB/초)';
 
   @override
-  String get settingsMemoryConfirm => '确定';
+  String get settingsMemoryConfirm => '확인';
 
   @override
-  String get settingsMemoryCancel => '取消';
+  String get settingsMemoryCancel => '취소';
 
   @override
-  String get settingsMemoryUnlimitedWarnTitle => '整曲解码常驻内存？';
+  String get settingsMemoryUnlimitedWarnTitle => '디코딩한 PCM을 모두 메모리에 상주시킬까요?';
 
   @override
   String get settingsMemoryUnlimitedWarnBody =>
-      '长曲目可累积数百 MB~GB 内存（48kHz 立体声 ≈ 0.38 MB/秒）：可能拖慢整机、内存压力下应用被系统回收，极端下系统不稳定。继续？';
+      '긴 곡은 수백 MB~수 GB의 RAM을 차지할 수 있습니다(48kHz 스테레오 ≈ 0.38 MB/초). 컴퓨터 전체가 느려지거나, 메모리 부족으로 OS가 앱을 종료시키거나, 최악의 경우 시스템이 불안정해질 수 있습니다. 계속할까요?';
 
   @override
-  String get memoryAlertTitle => '内存不足 · 纯内存播放不可用';
+  String get memoryAlertTitle => '메모리 부족 · 순수 메모리 재생을 사용할 수 없음';
 
   @override
-  String get memoryAlertActionStop => '停止';
+  String get memoryAlertActionStop => '중지';
 
   @override
-  String get memoryAlertActionOnlineDirect => '在线直连播放';
+  String get memoryAlertActionOnlineDirect => '온라인 직결 재생';
 
   @override
-  String get memoryAlertOnlineDesc => '继续将使用在线直连（引擎联网）播放；或停止本次播放。';
+  String get memoryAlertOnlineDesc =>
+      '계속하면 온라인 직결(엔진 네트워크)로 재생합니다. 그렇지 않으면 이번 재생을 중지합니다.';
 
   @override
-  String get memorySourceFailNotHttp => '在线源不是 http(s) 直链';
+  String get memorySourceFailNotHttp => '온라인 소스가 http(s) 직링크가 아닙니다';
 
   @override
   String memorySourceFailIsolateSpawn(Object error) {
-    return '内存源 worker 启动失败：$error';
+    return '메모리 소스 워커 시작 실패: $error';
   }
 
   @override
@@ -1688,35 +1691,35 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String memorySourceFailOverWholeCeiling(Object content, Object limit) {
-    return '整首内容 $content 超过纯内存整首驻留上限 $limit';
+    return '곡 전체 내용 $content이(가) 순수 메모리 곡 전체 상한 $limit을 초과합니다';
   }
 
   @override
   String memorySourceFailGrewCeiling(Object got, Object limit) {
-    return '下载中途超过纯内存整首驻留上限（$got > $limit）';
+    return '다운로드 중 순수 메모리 곡 전체 상한을 초과했습니다($got > $limit)';
   }
 
   @override
-  String get memorySourceFailEmpty => '内容为空（0 字节）';
+  String get memorySourceFailEmpty => '내용이 비어 있습니다(0바이트)';
 
   @override
-  String get memorySourceFailSegOom => '内存源分配失败（内存不足）';
+  String get memorySourceFailSegOom => '메모리 소스 할당 실패(메모리 부족)';
 
   @override
-  String get memorySourceFailSegFill => '内存源写入失败';
+  String get memorySourceFailSegFill => '메모리 소스 쓰기 실패';
 
   @override
   String memorySourceFailSegFillEx(Object error) {
-    return '内存源写入异常：$error';
+    return '메모리 소스 쓰기 예외: $error';
   }
 
   @override
   String memorySourceFailDownload(Object error) {
-    return '下载失败：$error';
+    return '다운로드 실패: $error';
   }
 
   @override
-  String get memorySourceFailUnknown => '未知原因';
+  String get memorySourceFailUnknown => '알 수 없는 이유';
 
   @override
   String get volumeMute => '음소거';
@@ -3596,259 +3599,262 @@ class AppLocalizationsKo extends AppLocalizations {
   String get platformQqMusic => 'QM';
 
   @override
-  String get settingsValueAuto => '自动';
+  String get settingsValueAuto => '자동';
 
   @override
-  String get settingsSectionScrapeWrite => '写入选项';
+  String get settingsSectionScrapeWrite => '쓰기 옵션';
 
   @override
-  String get settingsScrapeWriteDesc => '刮削成功后把以下内容写入音频文件标签';
+  String get settingsScrapeWriteDesc => '스크래핑 성공 후 오디오 태그에 기록';
 
   @override
-  String get settingsScrapeEmbedMetadata => '嵌入元数据';
+  String get settingsScrapeEmbedMetadata => '메타데이터 삽입';
 
   @override
-  String get settingsScrapeEmbedCover => '嵌入封面';
+  String get settingsScrapeEmbedCover => '커버 아트 삽입';
 
   @override
-  String get settingsScrapeEmbedLyrics => '嵌入歌词';
+  String get settingsScrapeEmbedLyrics => '가사 삽입';
 
   @override
-  String get settingsScrapeSkipScraped => '跳过已刮削文件';
+  String get settingsScrapeSkipScraped => '스크래핑된 파일 건너뛰기';
 
   @override
   String get settingsScrapeSkipScrapedDesc =>
-      '已有 MusicBrainz ID 或 ISRC 的文件不再重复联网刮削';
+      'MusicBrainz ID 또는 ISRC가 있는 파일은 다시 스크래핑하지 않음';
 
   @override
-  String get settingsSectionScrapeAdvanced => '高级参数';
+  String get settingsSectionScrapeAdvanced => '고급';
 
   @override
-  String get settingsScrapeWorkers => '并发查询线程';
+  String get settingsScrapeWorkers => '동시 워커';
 
   @override
   String settingsScrapeWorkersDesc(Object value) {
-    return '多源并发查询线程数（0=自动，当前 $value）';
+    return '다중 소스 동시 조회 스레드(0=자동, 현재 $value)';
   }
 
   @override
-  String get settingsScrapeBatch => '批大小';
+  String get settingsScrapeBatch => '배치 크기';
 
   @override
   String settingsScrapeBatchDesc(Object value) {
-    return '每批处理文件数（当前 $value）';
+    return '배치당 처리 파일 수(현재 $value)';
   }
 
   @override
-  String get settingsScrapeRetries => '失败重试上限';
+  String get settingsScrapeRetries => '최대 재시도';
 
   @override
   String settingsScrapeRetriesDesc(Object value) {
-    return '重试达到该次数后不再重试（当前 $value）';
+    return '이보다 더 실패한 파일은 격리됩니다(현재 $value)';
   }
 
   @override
-  String get settingsSectionScrapeOrganize => '仅目录整理';
+  String get settingsSectionScrapeOrganize => '디렉터리 정리만';
 
   @override
   String get settingsScrapeOrganizeNote =>
-      '不联网。按模板把目录中的文件移动到目标目录树，保留原文件名与现有标签。可用变量：artist、albumArtist、album、genre、year、disc、track、title、ext；以 / 分隔目录层级。未填写目标目录时使用媒体库默认音乐目录（首个扫描目录）；未配置媒体库时需先添加扫描目录。';
+      '오프라인. 템플릿에 따라 디렉터리의 파일을 대상 트리로 이동하며 원래 파일명과 기존 태그를 유지합니다. 변수: artist, albumArtist, album, genre, year, disc, track, title, ext; 디렉터리 계층은 /로 구분합니다. 대상 디렉터리가 없으면 미디어 라이브러리의 기본 음악 폴더(첫 번째 스캔 디렉터리)를 사용합니다. 미디어 라이브러리가 아직 없으면 먼저 스캔 디렉터리를 추가하세요.';
 
   @override
-  String get settingsScrapeOrganizeTargetDir => '整理目标目录';
+  String get settingsScrapeOrganizeTargetDir => '정리 대상 디렉터리';
 
   @override
   String get settingsScrapeOrganizeTargetHint =>
-      '留空则使用媒体库默认音乐目录（首个扫描目录；未配置媒体库时需先添加扫描目录）';
+      '비워 두면 미디어 라이브러리의 기본 음악 폴더(첫 번째 스캔 디렉터리)를 사용합니다. 설정된 것이 없으면 먼저 스캔 디렉터리를 추가하세요';
 
   @override
-  String get settingsScrapeOrganizePattern => '整理模板';
+  String get settingsScrapeOrganizePattern => '정리 템플릿';
 
   @override
-  String get settingsScrapeOrganizePatternHint => '模板只决定目录层级，不改文件名';
+  String get settingsScrapeOrganizePatternHint =>
+      '템플릿은 디렉터리 계층만 결정하며 파일명은 유지됩니다';
 
   @override
-  String get settingsScrapeOrganizePresetArtistAlbum => '歌手/专辑';
+  String get settingsScrapeOrganizePresetArtistAlbum => '아티스트/앨범';
 
   @override
-  String get settingsScrapeOrganizePresetArtistOnly => '仅歌手';
+  String get settingsScrapeOrganizePresetArtistOnly => '아티스트만';
 
   @override
-  String get settingsScrapeOrganizePresetGenreArtistAlbum => '风格/歌手/专辑';
+  String get settingsScrapeOrganizePresetGenreArtistAlbum => '장르/아티스트/앨범';
 
   @override
-  String get settingsScrapeOrganizePresetYearArtistAlbum => '年份/歌手/专辑';
+  String get settingsScrapeOrganizePresetYearArtistAlbum => '연도/아티스트/앨범';
 
   @override
-  String get settingsScrapeOrganizeStart => '开始整理';
+  String get settingsScrapeOrganizeStart => '정리 시작';
 
   @override
-  String get settingsOrganizeCancel => '取消整理';
+  String get settingsOrganizeCancel => '정리 취소';
 
   @override
-  String get settingsOrganizeRunning => '正在整理文件…';
+  String get settingsOrganizeRunning => '파일 정리 중…';
 
   @override
-  String get settingsOrganizeMoved => '移动';
+  String get settingsOrganizeMoved => '이동';
 
   @override
-  String get settingsOrganizeSkipped => '跳过';
+  String get settingsOrganizeSkipped => '건너뜀';
 
   @override
-  String get settingsOrganizeFailed => '失败';
+  String get settingsOrganizeFailed => '실패';
 
   @override
   String settingsOrganizeDone(Object failed, Object moved, Object skipped) {
-    return '整理完成：移动 $moved，跳过 $skipped，失败 $failed';
+    return '정리 완료: 이동 $moved, 건너뜀 $skipped, 실패 $failed';
   }
 
   @override
-  String get settingsOrganizeNoTarget => '未配置媒体库扫描目录，无法确定默认整理目录';
+  String get settingsOrganizeNoTarget =>
+      '미디어 라이브러리 스캔 디렉터리가 설정되지 않아 기본 정리 대상을 확인할 수 없습니다';
 
   @override
   String settingsOrganizeUsingDefault(Object dir) {
-    return '未设置整理目标目录，使用默认音乐目录：$dir';
+    return '정리 대상이 없어 기본 음악 폴더를 사용합니다: $dir';
   }
 
   @override
-  String get toastOrganizeNoDirs => '没有可整理的目录';
+  String get toastOrganizeNoDirs => '정리할 디렉터리가 없습니다';
 
   @override
-  String get toastOrganizeStarted => '已开始整理';
+  String get toastOrganizeStarted => '정리를 시작했습니다';
 
   @override
-  String get settingsCatScanner => '扫描';
+  String get settingsCatScanner => '스캔';
 
   @override
-  String get settingsScannerSubtitle => '音乐库扫描引擎 · 并行度与安全上限 · 隔离区';
+  String get settingsScannerSubtitle => '미디어 라이브러리 스캐너 · 병렬성 및 안전 상한 · 격리';
 
   @override
-  String get settingsSectionScanRun => '运行设置';
+  String get settingsSectionScanRun => '실행 설정';
 
   @override
-  String get settingsScanParallelism => '扫描并行度';
+  String get settingsScanParallelism => '스캔 병렬성';
 
   @override
   String settingsScanParallelismDesc(Object value) {
-    return '并行解析文件数（0=自动，当前 $value）';
+    return '병렬로 파싱하는 파일 수(0=자동, 현재 $value)';
   }
 
   @override
-  String get settingsScanBatch => '批大小';
+  String get settingsScanBatch => '배치 크기';
 
   @override
   String settingsScanBatchDesc(Object value) {
-    return '数据库批量写入上限（0=自动，当前 $value）';
+    return 'DB 일괄 쓰기 상한(0=자동, 현재 $value)';
   }
 
   @override
-  String get settingsSectionScanLimits => '安全上限';
+  String get settingsSectionScanLimits => '안전 상한';
 
   @override
-  String get settingsScanLimitsNote => '扫描大目录的保护性上限；留空使用引擎默认';
+  String get settingsScanLimitsNote => '대규모 라이브러리를 위한 보호 상한. 비워 두면 엔진 기본값 사용';
 
   @override
-  String get settingsScanNumberDesc => '留空使用引擎默认';
+  String get settingsScanNumberDesc => '비워 두면 엔진 기본값 사용';
 
   @override
-  String get settingsScanMaxFileSizeMb => '单文件大小上限（MB）';
+  String get settingsScanMaxFileSizeMb => '파일 최대 크기(MB)';
 
   @override
-  String get settingsScanMaxScanFiles => '最大扫描文件数';
+  String get settingsScanMaxScanFiles => '스캔 최대 파일 수';
 
   @override
-  String get settingsScanMaxErrors => '连续错误上限';
+  String get settingsScanMaxErrors => '연속 오류 상한';
 
   @override
-  String get settingsSectionScanExts => '音频扩展名';
+  String get settingsSectionScanExts => '오디오 확장자';
 
   @override
-  String get settingsScanExtraExts => '额外扩展名';
+  String get settingsScanExtraExts => '추가 확장자';
 
   @override
-  String get settingsScanExtraExtsNote => '在引擎内置白名单之上追加扫描的音频扩展名';
+  String get settingsScanExtraExtsNote => '엔진 내장 허용 목록에 추가로 스캔할 오디오 확장자';
 
   @override
-  String get settingsScanExtraExtsHint => '空格或逗号分隔，如 dsf m4b';
+  String get settingsScanExtraExtsHint => '공백 또는 쉼표로 구분, 예: dsf m4b';
 
   @override
-  String get settingsSectionScanQuarantine => '坏文件隔离区';
+  String get settingsSectionScanQuarantine => '격리';
 
   @override
   String settingsScanQuarantineNote(Object dir) {
-    return '连续解析失败 ≥3 次的文件会被移入隔离目录：$dir';
+    return '3회 이상 파싱에 실패한 파일은 다음으로 이동됩니다: $dir';
   }
 
   @override
-  String get settingsScanQuarantineEmpty => '暂无隔离文件';
+  String get settingsScanQuarantineEmpty => '격리된 파일이 없습니다';
 
   @override
-  String get settingsScanQuarantineDelete => '删除该文件';
+  String get settingsScanQuarantineDelete => '이 파일 삭제';
 
   @override
-  String get settingsScanQuarantineOpenDir => '打开目录';
+  String get settingsScanQuarantineOpenDir => '폴더 열기';
 
   @override
-  String get settingsScanQuarantineClearAll => '清空隔离区';
+  String get settingsScanQuarantineClearAll => '격리 비우기';
 
   @override
-  String get settingsScanQuarantineClearAllConfirm => '确定删除隔离区中的所有文件吗？该操作不可恢复。';
+  String get settingsScanQuarantineClearAllConfirm =>
+      '격리 폴더의 모든 파일을 삭제할까요? 이 작업은 되돌릴 수 없습니다.';
 
   @override
-  String get libraryFullScan => '全量扫描';
+  String get libraryFullScan => '전체 스캔';
 
   @override
-  String get libraryFullScanConfirm => '确认全量扫描？';
+  String get libraryFullScanConfirm => '전체 스캔을 실행할까요?';
 
   @override
   String get libraryFullScanConfirmDesc =>
-      '将清空当前曲库记录并从扫描目录重建（不删除源文件）。此操作不可撤销，扫描期间会占用较多磁盘 IO。';
+      '라이브러리 데이터베이스를 비우고 스캔 디렉터리에서 다시 구축합니다(원본 파일은 유지). 되돌릴 수 없으며 실행 중 디스크 I/O를 많이 사용합니다.';
 
   @override
-  String get libraryFullScanDescription => '清空曲库并从扫描目录重建';
+  String get libraryFullScanDescription => '스캔 디렉터리에서 라이브러리 재구축';
 
   @override
-  String get settingsSectionLyricEngine => '歌词引擎';
+  String get settingsSectionLyricEngine => '가사 엔진';
 
   @override
-  String get settingsLyricEngine => '引擎';
+  String get settingsLyricEngine => '엔진';
 
   @override
-  String get settingsLyricEngineSimple => '经典';
+  String get settingsLyricEngineSimple => '클래식';
 
   @override
-  String get settingsLyricEngineWall => '歌词墙';
+  String get settingsLyricEngineWall => '가사 월';
 
   @override
-  String get settingsLyricEngineDesc => '选择渲染引擎，可随时切换';
+  String get settingsLyricEngineDesc => '렌더러를 선택하세요. 언제든 전환 가능';
 
   @override
   String get settingsLyricEngineNote =>
-      '仅作用于全屏播放器歌词区；AMLL 为 Apple Music 风整墙滚动，占用略高。';
+      '전체 화면 플레이어 가사 영역에만 적용됩니다. AMLL = Apple Music 스타일 월 스크롤로 약간 더 무겁습니다.';
 
   @override
-  String get settingsSectionLyricWall => '歌词墙设置';
+  String get settingsSectionLyricWall => '월 설정';
 
   @override
-  String get settingsAmllNote => 'Apple Music 风格整墙歌词参数，仅 AMLL 引擎使用。';
+  String get settingsAmllNote => 'Apple Music 스타일 월 가사 매개변수로 AMLL 엔진에서만 사용합니다.';
 
   @override
-  String get settingsAmllAlign => '激活行位置';
+  String get settingsAmllAlign => '활성 행 위치';
 
   @override
-  String get settingsAmllDim => '非激活行透明度';
+  String get settingsAmllDim => '비활성 행 투명도';
 
   @override
-  String get settingsAmllWordSweep => '逐字扫亮';
+  String get settingsAmllWordSweep => '단어 스윕';
 
   @override
-  String get settingsAmllHidePassed => '隐藏已唱行';
+  String get settingsAmllHidePassed => '지난 행 숨기기';
 
   @override
-  String get settingsAmllScale => '非激活行缩放';
+  String get settingsAmllScale => '비활성 행 축소';
 
   @override
-  String get settingsAmllSpring => '滚动弹簧';
+  String get settingsAmllSpring => '스크롤 스프링';
 
   @override
   String get toastSleepInhibitFailed => '시스템 절전 방지에 실패했습니다';

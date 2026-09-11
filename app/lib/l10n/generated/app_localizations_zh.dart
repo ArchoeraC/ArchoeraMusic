@@ -9480,6 +9480,113 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsEngineRestartLater => '稍後重新啟動';
 
   @override
+  String get settingsMemoryPlaySection => '播放記憶體';
+
+  @override
+  String get settingsMemoryPlayTitle => '記憶體播放（不寫盤解碼快取）';
+
+  @override
+  String get settingsMemoryPlayOn => '解碼 PCM 駐留記憶體，不寫 stream.wav/.pcm';
+
+  @override
+  String get settingsMemoryPlayOff => '檔案模式：解碼 PCM 寫盤（舊行為）';
+
+  @override
+  String get settingsMemoryFileModeNote =>
+      '關閉 = 引擎寫 stream.wav/.pcm（檔案模式）；對下一首生效。';
+
+  @override
+  String get settingsMemoryPolicyAuto => '自動（依可用記憶體均衡）';
+
+  @override
+  String get settingsMemoryPolicyAutoSub => '0.8 GiB 硬上限，隨閒置記憶體自動調整';
+
+  @override
+  String get settingsMemoryPolicyLimit => '自訂上限';
+
+  @override
+  String get settingsMemoryPolicyUnlimited => '無上限';
+
+  @override
+  String get settingsMemoryPolicyUnlimitedSub => '整曲解碼常駐記憶體；選擇時需明確確認警告';
+
+  @override
+  String get settingsMemoryLimitTitle => '解碼 PCM 記憶體上限';
+
+  @override
+  String get settingsMemoryLimitHint => 'MB（48kHz 立體聲 ≈ 0.38 MB/秒）';
+
+  @override
+  String get settingsMemoryConfirm => '確定';
+
+  @override
+  String get settingsMemoryCancel => '取消';
+
+  @override
+  String get settingsMemoryUnlimitedWarnTitle => '整曲解碼常駐記憶體？';
+
+  @override
+  String get settingsMemoryUnlimitedWarnBody =>
+      '長曲目可累積數百 MB～GB 記憶體（48kHz 立體聲 ≈ 0.38 MB/秒）：可能拖慢整機、記憶體壓力下應用程式被系統回收，極端情況下系統不穩定。繼續？';
+
+  @override
+  String get memoryAlertTitle => '記憶體不足 · 純記憶體播放不可用';
+
+  @override
+  String get memoryAlertActionStop => '停止';
+
+  @override
+  String get memoryAlertActionOnlineDirect => '線上直連播放';
+
+  @override
+  String get memoryAlertOnlineDesc => '繼續將使用線上直連（引擎連網）播放；或停止本次播放。';
+
+  @override
+  String get memorySourceFailNotHttp => '線上來源不是 http(s) 直鏈';
+
+  @override
+  String memorySourceFailIsolateSpawn(Object error) {
+    return '記憶體來源 worker 啟動失敗：$error';
+  }
+
+  @override
+  String memorySourceFailHttpStatus(Object code, Object status) {
+    return 'HTTP $code $status';
+  }
+
+  @override
+  String memorySourceFailOverWholeCeiling(Object content, Object limit) {
+    return '整首內容 $content 超過純記憶體整首駐留上限 $limit';
+  }
+
+  @override
+  String memorySourceFailGrewCeiling(Object got, Object limit) {
+    return '下載中途超過純記憶體整首駐留上限（$got > $limit）';
+  }
+
+  @override
+  String get memorySourceFailEmpty => '內容為空（0 位元組）';
+
+  @override
+  String get memorySourceFailSegOom => '記憶體來源配置失敗（記憶體不足）';
+
+  @override
+  String get memorySourceFailSegFill => '記憶體來源寫入失敗';
+
+  @override
+  String memorySourceFailSegFillEx(Object error) {
+    return '記憶體來源寫入異常：$error';
+  }
+
+  @override
+  String memorySourceFailDownload(Object error) {
+    return '下載失敗：$error';
+  }
+
+  @override
+  String get memorySourceFailUnknown => '未知原因';
+
+  @override
   String get volumeMute => '靜音';
 
   @override
@@ -11329,6 +11436,261 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get platformQqMusic => 'QM';
+
+  @override
+  String get settingsValueAuto => '自動';
+
+  @override
+  String get settingsSectionScrapeWrite => '寫入選項';
+
+  @override
+  String get settingsScrapeWriteDesc => '刮削成功後將以下內容寫入音訊檔案標籤';
+
+  @override
+  String get settingsScrapeEmbedMetadata => '嵌入中繼資料';
+
+  @override
+  String get settingsScrapeEmbedCover => '嵌入封面';
+
+  @override
+  String get settingsScrapeEmbedLyrics => '嵌入歌詞';
+
+  @override
+  String get settingsScrapeSkipScraped => '略過已刮削檔案';
+
+  @override
+  String get settingsScrapeSkipScrapedDesc =>
+      '已有 MusicBrainz ID 或 ISRC 的檔案不再重複連網刮削';
+
+  @override
+  String get settingsSectionScrapeAdvanced => '進階參數';
+
+  @override
+  String get settingsScrapeWorkers => '並行查詢執行緒';
+
+  @override
+  String settingsScrapeWorkersDesc(Object value) {
+    return '多來源並行查詢執行緒數（0=自動，目前 $value）';
+  }
+
+  @override
+  String get settingsScrapeBatch => '批次大小';
+
+  @override
+  String settingsScrapeBatchDesc(Object value) {
+    return '每批處理檔案數（目前 $value）';
+  }
+
+  @override
+  String get settingsScrapeRetries => '失敗重試上限';
+
+  @override
+  String settingsScrapeRetriesDesc(Object value) {
+    return '重試達到該次數後不再重試（目前 $value）';
+  }
+
+  @override
+  String get settingsSectionScrapeOrganize => '僅目錄整理';
+
+  @override
+  String get settingsScrapeOrganizeNote =>
+      '不連網。依範本把目錄中的檔案移動到目標目錄樹，保留原檔名與現有標籤。可用變數：artist、albumArtist、album、genre、year、disc、track、title、ext；以 / 分隔目錄層級。未填寫目標目錄時使用媒體庫預設音樂目錄（首個掃描目錄）；未設定媒體庫時需先新增掃描目錄。';
+
+  @override
+  String get settingsScrapeOrganizeTargetDir => '整理目標目錄';
+
+  @override
+  String get settingsScrapeOrganizeTargetHint =>
+      '留空則使用媒體庫預設音樂目錄（首個掃描目錄；未設定媒體庫時需先新增掃描目錄）';
+
+  @override
+  String get settingsScrapeOrganizePattern => '整理範本';
+
+  @override
+  String get settingsScrapeOrganizePatternHint => '範本只決定目錄層級，不改檔名';
+
+  @override
+  String get settingsScrapeOrganizePresetArtistAlbum => '歌手/專輯';
+
+  @override
+  String get settingsScrapeOrganizePresetArtistOnly => '僅歌手';
+
+  @override
+  String get settingsScrapeOrganizePresetGenreArtistAlbum => '風格/歌手/專輯';
+
+  @override
+  String get settingsScrapeOrganizePresetYearArtistAlbum => '年份/歌手/專輯';
+
+  @override
+  String get settingsScrapeOrganizeStart => '開始整理';
+
+  @override
+  String get settingsOrganizeCancel => '取消整理';
+
+  @override
+  String get settingsOrganizeRunning => '正在整理檔案…';
+
+  @override
+  String get settingsOrganizeMoved => '移動';
+
+  @override
+  String get settingsOrganizeSkipped => '略過';
+
+  @override
+  String get settingsOrganizeFailed => '失敗';
+
+  @override
+  String settingsOrganizeDone(Object failed, Object moved, Object skipped) {
+    return '整理完成：移動 $moved，略過 $skipped，失敗 $failed';
+  }
+
+  @override
+  String get settingsOrganizeNoTarget => '未設定媒體庫掃描目錄，無法確定預設整理目錄';
+
+  @override
+  String settingsOrganizeUsingDefault(Object dir) {
+    return '未設定整理目標目錄，使用預設音樂目錄：$dir';
+  }
+
+  @override
+  String get toastOrganizeNoDirs => '沒有可整理的目錄';
+
+  @override
+  String get toastOrganizeStarted => '已開始整理';
+
+  @override
+  String get settingsCatScanner => '掃描';
+
+  @override
+  String get settingsScannerSubtitle => '媒體庫掃描引擎 · 並行度與安全上限 · 隔離區';
+
+  @override
+  String get settingsSectionScanRun => '執行設定';
+
+  @override
+  String get settingsScanParallelism => '掃描並行度';
+
+  @override
+  String settingsScanParallelismDesc(Object value) {
+    return '並行解析檔案數（0=自動，目前 $value）';
+  }
+
+  @override
+  String get settingsScanBatch => '批次大小';
+
+  @override
+  String settingsScanBatchDesc(Object value) {
+    return '資料庫批次寫入上限（0=自動，目前 $value）';
+  }
+
+  @override
+  String get settingsSectionScanLimits => '安全上限';
+
+  @override
+  String get settingsScanLimitsNote => '掃描大目錄的保護性上限；留空使用引擎預設';
+
+  @override
+  String get settingsScanNumberDesc => '留空使用引擎預設';
+
+  @override
+  String get settingsScanMaxFileSizeMb => '單檔大小上限（MB）';
+
+  @override
+  String get settingsScanMaxScanFiles => '最大掃描檔案數';
+
+  @override
+  String get settingsScanMaxErrors => '連續錯誤上限';
+
+  @override
+  String get settingsSectionScanExts => '音訊副檔名';
+
+  @override
+  String get settingsScanExtraExts => '額外副檔名';
+
+  @override
+  String get settingsScanExtraExtsNote => '在引擎內建白名單之上追加掃描的音訊副檔名';
+
+  @override
+  String get settingsScanExtraExtsHint => '空格或逗號分隔，如 dsf m4b';
+
+  @override
+  String get settingsSectionScanQuarantine => '壞檔隔離區';
+
+  @override
+  String settingsScanQuarantineNote(Object dir) {
+    return '連續解析失敗 ≥3 次的檔案會被移入隔離目錄：$dir';
+  }
+
+  @override
+  String get settingsScanQuarantineEmpty => '暫無隔離檔案';
+
+  @override
+  String get settingsScanQuarantineDelete => '刪除該檔案';
+
+  @override
+  String get settingsScanQuarantineOpenDir => '開啟目錄';
+
+  @override
+  String get settingsScanQuarantineClearAll => '清空隔離區';
+
+  @override
+  String get settingsScanQuarantineClearAllConfirm => '確定刪除隔離區中的所有檔案嗎？此操作無法復原。';
+
+  @override
+  String get libraryFullScan => '全量掃描';
+
+  @override
+  String get libraryFullScanConfirm => '確認全量掃描？';
+
+  @override
+  String get libraryFullScanConfirmDesc =>
+      '將清空目前曲庫紀錄並從掃描目錄重建（不刪除來源檔案）。此操作無法撤銷，掃描期間會占用較多磁碟 IO。';
+
+  @override
+  String get libraryFullScanDescription => '清空曲庫並從掃描目錄重建';
+
+  @override
+  String get settingsSectionLyricEngine => '歌詞引擎';
+
+  @override
+  String get settingsLyricEngine => '引擎';
+
+  @override
+  String get settingsLyricEngineSimple => '經典';
+
+  @override
+  String get settingsLyricEngineWall => '歌詞牆';
+
+  @override
+  String get settingsLyricEngineDesc => '選擇渲染引擎，可隨時切換';
+
+  @override
+  String get settingsLyricEngineNote =>
+      '僅作用於全螢幕播放器歌詞區；AMLL 為 Apple Music 風整牆捲動，占用略高。';
+
+  @override
+  String get settingsSectionLyricWall => '歌詞牆設定';
+
+  @override
+  String get settingsAmllNote => 'Apple Music 風格整牆歌詞參數，僅 AMLL 引擎使用。';
+
+  @override
+  String get settingsAmllAlign => '啟用行位置';
+
+  @override
+  String get settingsAmllDim => '非啟用行透明度';
+
+  @override
+  String get settingsAmllWordSweep => '逐字掃亮';
+
+  @override
+  String get settingsAmllHidePassed => '隱藏已唱行';
+
+  @override
+  String get settingsAmllScale => '非啟用行縮放';
+
+  @override
+  String get settingsAmllSpring => '捲動彈簧';
 
   @override
   String get toastSleepInhibitFailed => '停用系統休眠失敗';
