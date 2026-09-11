@@ -127,11 +127,17 @@ if errorlevel 1 exit /b 1
 if exist "zig-out\lib\archoera_kernel.lib" set "KERNEL_LIB=zig-out\lib\archoera_kernel.lib"
 if not defined KERNEL_LIB if exist "zig-out\lib\libarchoera_kernel.a" set "KERNEL_LIB=zig-out\lib\libarchoera_kernel.a"
 if defined KERNEL_LIB set "KERNEL_FLAG=/DHAS_ARCHOERA_KERNEL=1"
+echo [build_windows] KERNEL_LIB=%KERNEL_LIB% KERNEL_FLAG=%KERNEL_FLAG%
 rem 内核 DLL 必须随 mediaengine 分发：archoera_mediaengine.dll 链接的是
 rem archoera_kernel.lib（DLL import lib）→ 加载期硬依赖 archoera_kernel.dll。
 rem Zig 把 DLL 装在 zig-out\bin\（lib\ 下同名文件是 import lib，勿当 DLL 拷）。
 rem 缺此 DLL 时播放首帧 DynamicLibrary.open(mediaengine) 即失败 → 闪退。
 if defined KERNEL_LIB if exist "zig-out\bin\archoera_kernel.dll" copy /y "zig-out\bin\archoera_kernel.dll" "build\" >nul
+if defined KERNEL_LIB if not exist "build\archoera_kernel.dll" (
+  echo [build_windows] ERROR: 已链接 EraSync 内核，但 build\archoera_kernel.dll 未就绪
+  echo                 （缺 zig-out\bin\archoera_kernel.dll）→ 运行期加载 mediaengine 会失败/闪退
+  exit /b 1
+)
 goto zig_done
 :no_zig
 echo [build_windows] 警告: 未检测到 zig，EraAudio 内核不编译（引擎以 FFmpeg/Stable 运行）

@@ -316,6 +316,15 @@ jobs:
             packaging\windows\archoera_music.nsi
           Get-ChildItem "$out"
 
+      - name: Verify EraSync kernel bundled (Windows)
+        if: matrix.os == 'windows'
+        # 硬校验：EraSync 内核 DLL 必须在 Release 目录（否则运行期加载 mediaengine 失败/闪退）
+        shell: pwsh
+        run: |
+          $p = "app\build\windows\x64\runner\Release\archoera_kernel.dll"
+          if (!(Test-Path $p)) { throw "archoera_kernel.dll 未打入 Windows 包（EraSync 内核缺失）" }
+          Write-Host "OK: $p"
+
       # ─────────────── macOS：把原生库拷入 .app（native/ 平铺）──────────
       - name: Bundle native libs into .app (native/ 平铺)
         if: matrix.os == 'macos'
