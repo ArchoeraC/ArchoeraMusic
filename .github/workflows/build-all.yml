@@ -121,7 +121,13 @@ jobs:
         # 环境变量影响，不要手动覆盖以免与 CMake toolchain 的定位不一致。
         # 此处显式 install 仅为 vcpkg_installed 缓存加速；build_windows.bat 内含
         # headers 缺失时自动 install 的幂等兜底，本地开发无需手动预装。
-        run: vcpkg install --triplet x64-windows-release
+        # 输出重定向到文件、只回显尾部：vcpkg 编译 ffmpeg 会打印海量 `\r` 进度行，
+        # 直接进 Actions 日志会让网页日志查看器卡死（表现为「步骤点不开」）。
+        run: |
+          vcpkg install --triplet x64-windows-release > vcpkg-install.log 2>&1 || {
+            echo "::error::vcpkg install 失败，尾部日志："; tail -200 vcpkg-install.log; exit 1;
+          }
+          echo "vcpkg install 完成"; tail -20 vcpkg-install.log
         env:
           VCPKG_ROOT: C:\vcpkg
 
@@ -232,7 +238,24 @@ jobs:
           # 可选原生 Toast：build_windows.bat 检测该目录含 winrt 头时才启用
           CPPWINRT_INCLUDE: C:\vcpkg\installed\x64-windows-release\include
         working-directory: app/core
-        run: build_windows.bat
+        # 输出重定向到文件、只回显尾部（同 vcpkg：避免海量 `\r` 进度行卡死网页
+        # 日志查看器）；完整日志经下方 artifact 上传，失败时 tail 可见。
+        run: |
+          call build_windows.bat > build_windows.log 2>&1
+          set RC=%ERRORLEVEL%
+          echo "==== build_windows.log (tail 150) ===="
+          powershell -NoProfile -Command "Get-Content -Tail 150 build_windows.log"
+          if not "%RC%"=="0" (echo "::error::build_windows.bat 失败 rc=%RC%" & exit /b %RC%)
+
+      - name: Upload Windows build logs (排查用)
+        if: matrix.os == 'windows' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-logs
+          path: |
+            app/vcpkg-install.log
+            app/core/build_windows.log
+          if-no-files-found: ignore
 
       # ────────────────── Zig kernel 测试（仅 Linux，解码回归）─────────
       - name: Zig kernel tests (EraAudio 解码回归)
