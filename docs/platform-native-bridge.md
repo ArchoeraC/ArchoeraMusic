@@ -456,6 +456,25 @@ Windows DLL 源路径 `lib`→`bin`；`KernelMetadata.LocateLibrary` 开发树�
 取 `bin`/`lib`。注：Windows 静态库当前不含 compiler-rt（`___chkstk_ms` 等），故
 Windows 走 DLL 而非静态链接。
 
+### 7.6 SMTC 委托 QI 误应答致 combase 0xC0000005（2026-09-11，已复现验证）
+
+现象：真 Windows 上 `combase.dll` 0xC0000005；Wine 不崩（SMTC 为 stub，不做
+COM 封送）。上一轮「封面后台线程跨 apartment」修复（d6b9d68）后仍复现。
+
+根因：SMTC 的 ButtonPressed 事件委托只实现 IUnknown + Invoke（WinRT 委托 ABI：
+QueryInterface/AddRef/Release/Invoke 共 4 槽，**不**继承 IInspectable）。其
+`QueryInterface` 旧策略为「除 IInspectable/IMarshal 外一律 S_OK」。真 Windows
+标准封送时 combase 依次查询 `IMarshal`（拒绝）→ `IStdMarshalInfo`（旧策略误应答
+S_OK）→ 调用 `GetClassForHandler`（槽 3）→ 实为委托的 `Invoke` → 把
+`pvDestContext` 当事件参数解引用 → 访问冲突。Wine 的 `CoMarshalInterface` 亦
+复现同一错位调用（`IStdMarshalInfo` / `IExternalConnection`）。
+
+修复：`win_smtc.zig` 的 `handlerQI` 改为**白名单**——仅放行 `IUnknown`、
+`IAgileObject` 与运行期生成的委托 IID（非 COM 保留段且非 IInspectable /
+ICallFactory），其余一律 `E_NOINTERFACE`。`isReservedComIid` 识别保留段
+`{000000xx-0000-0000-C000-000000000046}`。已用最小 C 复现程序在 Wine 验证：
+旧逻辑 `CoMarshalInterface` 会错调 Invoke，新逻辑不再触发。
+
 ## 8. 风险与对策
 
 | 风险 | 对策 |

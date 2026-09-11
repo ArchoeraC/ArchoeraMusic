@@ -111,23 +111,54 @@ const IID_STORAGE_FILE_STATICS = win.GUID{
     .Data4 = .{ 0x8B, 0xB4, 0xA4, 0xD3, 0xEA, 0xCF, 0xD0, 0x3F },
 };
 
-// 事件委托 QI 策略：以下接口本对象并未实现，绝不能应答 S_OK——否则调用方会
-// 按错位 vtable 槽使用（如把 Invoke 当成 IInspectable::GetIids / IMarshal::
-// GetUnmarshalClass），导致 add_ButtonPressed 看似成功但事件永不回调。
-// IInspectable {AF86E2E0-B12D-4C6A-9C5A-D7AA65101E90}
+// 事件委托 QI 策略：本对象只实现了 IUnknown + Invoke（WinRT 委托的 ABI 布局，
+// 见 mingw `windows.foundation.h` 的 `*CompletedHandler` vtable：QueryInterface/
+// AddRef/Release/Invoke 共 4 槽，**不**继承 IInspectable）。任何其它接口都绝不
+// 能应答 S_OK——combase 会按该接口的 vtable 槽调用，而本对象只有 4 槽，会读到
+// 越界/错位的函数指针。真 Windows 上标准封送会依次查询：
+//   IMarshal（拒绝）→ IStdMarshalInfo::GetClassForHandler（槽 3）→ 被当成 Invoke
+//   → 拿 pvDestContext 当事件参数解引用 → combase.dll 0xC0000005。
+// Wine 的 SMTC 是 stub、不做封送，故不崩（只在真机复现）。
+// IUnknown {00000000-0000-0000-C000-000000000046}
+const IID_IUNKNOWN = win.GUID{
+    .Data1 = 0x00000000,
+    .Data2 = 0x0000,
+    .Data3 = 0x0000,
+    .Data4 = .{ 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 },
+};
+// IAgileObject {94EA2B94-E9CC-49E0-C0FF-EE64CA8F5B90}（委托必须应答，事件才能
+// 跨 apartment 直接回调；见 init 注释）
+const IID_IAGILEOBJECT = win.GUID{
+    .Data1 = 0x94EA2B94,
+    .Data2 = 0xE9CC,
+    .Data3 = 0x49E0,
+    .Data4 = .{ 0xC0, 0xFF, 0xEE, 0x64, 0xCA, 0x8F, 0x5B, 0x90 },
+};
+// IInspectable {AF86E2E0-B12D-4C6A-9C5A-D7AA65101E90}（非保留段，单独拒绝）
 const IID_IINSPECTABLE = win.GUID{
     .Data1 = 0xAF86E2E0,
     .Data2 = 0xB12D,
     .Data3 = 0x4C6A,
     .Data4 = .{ 0x9C, 0x5A, 0xD7, 0xAA, 0x65, 0x10, 0x1E, 0x90 },
 };
-// IMarshal {00000003-0000-0000-C000-000000000046}
-const IID_IMARSHAL = win.GUID{
-    .Data1 = 0x00000003,
-    .Data2 = 0x0000,
-    .Data3 = 0x0000,
-    .Data4 = .{ 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 },
+// ICallFactory {1C733A30-2A1C-11CE-ADE5-00AA0044773D}（非保留段，单独拒绝）
+const IID_ICALLFACTORY = win.GUID{
+    .Data1 = 0x1C733A30,
+    .Data2 = 0x2A1C,
+    .Data3 = 0x11CE,
+    .Data4 = .{ 0xAD, 0xE5, 0x00, 0xAA, 0x00, 0x44, 0x77, 0x3D },
 };
+
+/// 标准 COM 保留 IID 段 {000000xx-0000-0000-C000-000000000046}（含 IMarshal /
+/// IStdMarshalInfo / IWeakReferenceSource / INoMarshal 等）。IUnknown 也落在
+/// 本段，故调用方须先单独放行 IUnknown。这些接口本对象均未实现，标准封送期间
+/// 若误应答 S_OK 即触发上文所述的错位槽调用崩溃。
+fn isReservedComIid(riid: *const win.GUID) bool {
+    return riid.Data2 == 0 and riid.Data3 == 0 and
+        riid.Data4[0] == 0xC0 and riid.Data4[1] == 0x00 and riid.Data4[2] == 0x00 and
+        riid.Data4[3] == 0x00 and riid.Data4[4] == 0x00 and riid.Data4[5] == 0x00 and
+        riid.Data4[6] == 0x00 and riid.Data4[7] == 0x46;
+}
 
 // 枚举（Windows.Media 标准值）
 const PlaybackStatus = struct {
@@ -146,7 +177,9 @@ const Button = struct {
     const next: i32 = 6;
     const previous: i32 = 7;
 };
-const PlaybackType = struct { const music: i32 = 1; };
+const PlaybackType = struct {
+    const music: i32 = 1;
+};
 
 // ── vtable（槽位顺序 = winmd 声明顺序）────────────────────────────
 
@@ -349,15 +382,18 @@ fn logQi(riid: *const win.GUID) void {
     win.OutputDebugStringA(s.ptr);
 }
 
-/// 委托 QI：除 IInspectable / IMarshal 外一律应答 S_OK 并 AddRef（涵盖
-/// IUnknown、IAgileObject、WinRT 运行期生成的委托 IID）。这两个接口本对象并未
-/// 实现，错误应答（旧实现对所有 IID 一律 S_OK）会让 WinRT 按错位 vtable 槽调用
-/// ——Invoke 被当成 GetIids / GetUnmarshalClass → add_ButtonPressed 看似成功但
-/// ButtonPressed 永不回调（「面板显示曲目、按键全无响应」）。
+/// 委托 QI：只放行 IUnknown / IAgileObject / 运行期生成的委托 IID（非保留段且
+/// 非 IInspectable / ICallFactory），其余（IMarshal、IStdMarshalInfo、IWeakReference
+/// Source、IInspectable、ICallFactory…）一律 E_NOINTERFACE。
+/// 旧实现对未实现接口一律应答 S_OK，combase 标准封送时会按错位 vtable 槽调用
+/// （Invoke 被当成 GetClassForHandler / GetIids / GetUnmarshalClass）→
+/// combase.dll 访问冲突（0xC0000005）。
 /// 注：函数声明顺序在 Zig 容器内不敏感，无需前置声明。
 fn handlerQI(this: *anyopaque, riid: *const win.GUID, out: *?*anyopaque) callconv(.c) HRESULT {
-    const denied = guidEq(IID_IINSPECTABLE, riid) or guidEq(IID_IMARSHAL, riid);
-    if (!denied) {
+    const supported = guidEq(IID_IUNKNOWN, riid) or guidEq(IID_IAGILEOBJECT, riid) or
+        (!isReservedComIid(riid) and !guidEq(IID_IINSPECTABLE, riid) and
+            !guidEq(IID_ICALLFACTORY, riid));
+    if (supported) {
         _ = handlerAddRef(this);
         out.* = this;
         return S_OK;
