@@ -43,7 +43,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   ffi: ^2.2.0
-  go_router: ^17.4.0
+  go_router: ^18.0.1
   flutter_riverpod: ^3.4.2
   # 直连网易云 weapi/eapi 加密（AES/RSA/md5）
   pointycastle: ^4.0.0
