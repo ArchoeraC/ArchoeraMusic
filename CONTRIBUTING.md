@@ -332,7 +332,9 @@ cd app && flutter run -d linux      # 本地调试
 
 ### 7.1 Commit message
 
-遵循 **Conventional Commits**，描述用中文，格式 `type(scope): 摘要`（对齐仓库现有历史）：
+遵循 **Conventional Commits**，描述需详细，格式 `type(scope): 摘要`（对齐仓库现有历史）：
+
+>请不要以其他任何语言进行具有明显意义的攻击性描述，“作者与其他开发者呆并不代表傻”
 
 | type | 用途 |
 |---|---|
