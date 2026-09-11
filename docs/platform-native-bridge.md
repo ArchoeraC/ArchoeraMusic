@@ -510,6 +510,24 @@ ms-appdata，故本地必须走 `StorageFile`（不能改走 Uri）。
 等待改用 `CoWaitForMultipleHandles(COWAIT_DISPATCH_CALLS |
 COWAIT_DISPATCH_WINDOW_MESSAGES)` 泵消息，不再 `Sleep`。交叉编译通过，真机待复测。
 
+### 7.9 本地封面改内存流（7.8 的最终方案，2026-09-11）
+
+7.8 的 `CoWaitForMultipleHandles` 仍属「用经典 COM 等待去套 WinRT 异步」，别扭且
+不该依赖：**WinRT 惯例是事件驱动**（`put_Completed` 挂委托，完成时由消息泵回调），
+不应在 STA 上同步阻塞等待异步操作。
+
+最终方案：**Dart 读本地封面字节 → 原生建内存流**，全程同步、无等待、无消息泵、
+无封送：
+
+- Dart（`platform_bindings.dart`）：`TrackMeta` 增 `art_bytes` 字段；本地封面
+  （`file://`/本地路径）用 `readAsBytesSync` 读入，http(s) 仍只传 `art_url`。
+- 原生（`win_smtc.zig`）：`SHCreateMemStream`（shlwapi）→
+  `CreateRandomAccessStreamOverStream`（shcore，`IID_IRandomAccessStream` =
+  `905a0fe1-bc53-11df-8c49-001e4fc686da`）→
+  `IRandomAccessStreamReferenceStatics::CreateFromStream`。
+- `CreateFromUri` 文档只支持 http/https/ms-appx/ms-appdata，故 http 走它；
+  `refFromFile`（`GetFileFromPathAsync` + 泵消息）保留为无字节时的兜底。
+
 ## 8. 风险与对策
 
 | 风险 | 对策 |
