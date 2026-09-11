@@ -165,12 +165,11 @@ pub fn build(b: *std.Build) void {
         .files = &amr_sources,
         .flags = &amr_flags,
     });
-    // Windows：静态库与动态 import 库同名（archoera_kernel.lib）→ 互相覆盖，
-    // 会静默丢失静态库 / 造成链接歧义。Windows 只用动态 DLL（mediaengine 走
-    // import lib、scanner 走 DllImport），故仅非 Windows 安装静态库。
-    if (target.result.os.tag != .windows) {
-        b.installArtifact(kernel);
-    }
+    // 注意：Windows 下静态库与动态 import 库同名（archoera_kernel.lib）。mediaengine
+    // 依赖该文件，且实测必须落在**静态库**（Zig 静态库带 .drectve，为 MSVC 链接补齐
+    // UCRT/CRT 默认库）；若只剩 import lib，链接会报 82 个 CRT 未解析符号。故此处保持
+    // 无条件安装，勿改为 Windows 跳过（见 e82c524 的回退）。
+    b.installArtifact(kernel);
     // ---- 内核动态库（scanner NativeAOT P/Invoke：zk_metadata_* 结构化 ABI，无 JSON）----
     // 与静态库同源同配置；scanner 侧 DllImport("archoera_kernel")，随包分发 .so。
     const kernel_shared = b.addLibrary(.{
