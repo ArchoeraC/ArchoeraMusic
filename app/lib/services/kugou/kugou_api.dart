@@ -1595,7 +1595,7 @@ class KugouApi extends ChangeNotifier {
       baseUrl: 'https://complexsearch.kugou.com',
     );
     final data = resp is Map ? resp['data'] : null;
-    final lists = data is Map ? data['lists'] : null;
+    final lists = data is Map ? (data['lists'] ?? data['info']) : null;
     final total = data is Map ? data['total'] : null;
     final totalNum = total is num ? total.toInt() : int.tryParse('$total') ?? 0;
     if (lists is! List) {
@@ -1636,11 +1636,16 @@ class KugouApi extends ChangeNotifier {
       }
     } else {
       for (final c in lists.whereType<Map<String, dynamic>>()) {
+        // 字段为 camelCase（对齐 KuGouMusicApi）：歌手 AuthorId/AuthorName/Avatar，
+        // 歌单 specialid/specialname/img/nickname，专辑 albumid/albumname/img。
         final id =
-            (c['SpecialID'] ??
-                    c['AlbumID'] ??
-                    c['AuthorID'] ??
+            (c['specialid'] ??
+                    c['SpecialID'] ??
+                    c['gid'] ??
                     c['albumid'] ??
+                    c['AlbumID'] ??
+                    c['AuthorId'] ??
+                    c['AuthorID'] ??
                     c['authorid'])
                 ?.toString() ??
             '';
@@ -1648,13 +1653,14 @@ class KugouApi extends ChangeNotifier {
         final title =
             (c['specialname'] ??
                     c['albumname'] ??
+                    c['AlbumName'] ??
                     c['authorname'] ??
-                    c['AuthorName'] ??
-                    c['AlbumName'])
+                    c['AuthorName'])
                 ?.toString() ??
             '';
-        final coverTpl = (c['img'] ?? c['imgurl'] ?? c['Avatar'] ?? c['ImgUrl'])
-            ?.toString();
+        final coverTpl =
+            (c['img'] ?? c['imgurl'] ?? c['ImgUrl'] ?? c['Avatar'] ?? c['FirstFrameImage'])
+                ?.toString();
         items.add(
           CoverItem(
             id: id,
