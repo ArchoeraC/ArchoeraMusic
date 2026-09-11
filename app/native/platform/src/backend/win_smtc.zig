@@ -26,6 +26,10 @@ const E_NOINTERFACE: HRESULT = @bitCast(@as(u32, 0x80004002));
 const E_OUTOFMEMORY: HRESULT = @bitCast(@as(u32, 0x8007000E));
 const E_FAIL: HRESULT = @bitCast(@as(u32, 0x80004005));
 
+// CoWaitForMultipleHandles 标志（STA 上等待时泵消息）。
+const COWAIT_DISPATCH_CALLS: u32 = 0x8;
+const COWAIT_DISPATCH_WINDOW_MESSAGES: u32 = 0x10;
+
 /// 诊断日志（DebugView / DbgView 可见；无输出不影响功能）。
 fn log(msg: [*:0]const u8) void {
     win.OutputDebugStringA(msg);
@@ -46,6 +50,7 @@ const RoActivateInstanceFn = *const fn (HSTRING, *?*anyopaque) callconv(.c) HRES
 const WindowsCreateStringFn = *const fn ([*]const u16, u32, *HSTRING) callconv(.c) HRESULT;
 const WindowsDeleteStringFn = *const fn (HSTRING) callconv(.c) HRESULT;
 const CoCreateFreeThreadedMarshalerFn = *const fn (?*anyopaque, *?*anyopaque) callconv(.c) HRESULT;
+const CoWaitForMultipleHandlesFn = *const fn (u32, u32, u32, ?[*]win.HANDLE, *u32) callconv(.c) HRESULT;
 
 var g_combase: win.HMODULE = null;
 var p_RoInitialize: ?RoInitializeFn = null;
@@ -54,6 +59,7 @@ var p_RoActivateInstance: ?RoActivateInstanceFn = null;
 var p_WindowsCreateString: ?WindowsCreateStringFn = null;
 var p_WindowsDeleteString: ?WindowsDeleteStringFn = null;
 var p_CoCreateFreeThreadedMarshaler: ?CoCreateFreeThreadedMarshalerFn = null;
+var p_CoWaitForMultipleHandles: ?CoWaitForMultipleHandlesFn = null;
 
 fn loadCombase() bool {
     if (g_combase != null) return true;
@@ -67,6 +73,7 @@ fn loadCombase() bool {
     // CoCreateFreeThreadedMarshaler：委托封送（IMarshal）用；ole32 提供。
     if (win.LoadLibraryA("ole32.dll")) |ho| {
         p_CoCreateFreeThreadedMarshaler = @ptrCast(win.GetProcAddress(ho, "CoCreateFreeThreadedMarshaler"));
+        p_CoWaitForMultipleHandles = @ptrCast(win.GetProcAddress(ho, "CoWaitForMultipleHandles"));
     }
     return p_RoInitialize != null and p_RoGetActivationFactory != null and
         p_RoActivateInstance != null and p_WindowsCreateString != null and
@@ -709,7 +716,11 @@ fn refFromUri(url: []const u8) ?*anyopaque {
     return ref;
 }
 
-fn refFromFile(path: []const u8) ?*anyopaque {
+fn refFromFile(path_in: []const u8) ?*anyopaque {
+    // 接受 file://C:\...（Dart `file.absolute.path` 拼出）或 file:///C:/...；剥成纯路径。
+    var path = path_in;
+    if (std.mem.startsWith(u8, path, "file://")) path = path[7..];
+    if (path.len >= 3 and path[0] == '/' and path[2] == ':') path = path[1..];
     const cls = makeHString("Windows.Storage.StorageFile") orelse return null;
     defer _ = p_WindowsDeleteString.?(cls);
     var statics: ?*anyopaque = null;
@@ -720,7 +731,9 @@ fn refFromFile(path: []const u8) ?*anyopaque {
     var op: ?*anyopaque = null;
     if (vtbl(StorageFileStaticsVtbl, statics.?).GetFileFromPathAsync(statics.?, hs_path, &op) != S_OK or op == null) return null;
     defer release(op);
-    // 轮询等待 IAsyncOperation 完成（最多 ~2s；避免委托回调复杂度）
+    // 等待 IAsyncOperation 完成（最多 ~2s）。STA 上必须**泵消息**：
+    // 直接 Sleep 会阻塞公寓消息泵，combase 无法投递完成回调 → 0xC0000005/死锁
+    // （本地封面独有路径；在线封面走 CreateFromUri 无此问题）。
     const ov = vtbl(AsyncOpVtbl, op.?);
     var i: u32 = 0;
     while (i < 100) : (i += 1) {
@@ -728,7 +741,12 @@ fn refFromFile(path: []const u8) ?*anyopaque {
         if (ov.get_Status(op.?, &status) != S_OK) return null;
         if (status == 1) break; // Completed
         if (status == 2 or status == 3) return null; // Canceled / Error
-        win.Sleep(20);
+        if (p_CoWaitForMultipleHandles) |w| {
+            var idx: u32 = 0;
+            _ = w(COWAIT_DISPATCH_CALLS | COWAIT_DISPATCH_WINDOW_MESSAGES, 20, 0, null, &idx);
+        } else {
+            win.Sleep(20);
+        }
     }
     var file: ?*anyopaque = null;
     if (ov.GetResults(op.?, &file) != S_OK or file == null) return null;
