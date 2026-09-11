@@ -18,73 +18,35 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j
 cd build && ctest
 ```
 
-## 发布与双签名（双控）
+## 发布与签名
 
-发布产物采用**两把独立密钥各签一次**的双控方案（单把私钥泄露不足以伪造）：
-
-| 签名 | 私钥 | 执行者 | 产物 | 是否进 CI |
-|---|---|---|---|---|
-| key1 | `watermark_ec_priv.pem` | CI（`release` Environment，人工审批） | `<asset>.sig1` | 是（受保护 Environment secret） |
-| key2 | `watermark2_ec_priv.pem` | **维护者本地** | `<asset>.sig2` | **否** |
-
-公钥：`app/tool/watermark_pub.pem`（key1）、`app/tool/watermark_pub2.pem`（key2），
-随 Release 分发（`ARCHOERA_PUBKEY.pem` / `ARCHOERA_PUBKEY2.pem`）。私钥**绝不入库/入包**。
+发布产物用**一把密钥（key1）**做 ECDSA P-256 / SHA-256 分离签名（`<asset>.sig1`），
+由 CI 在受保护 `release` Environment（人工审批）执行；公钥随发布分发
+（`ARCHOERA_PUBKEY.pem`）。私钥**绝不入库/入包**。
 
 ### 发布流程
 1. 打 tag（`v*`）→ CI 构建三端产物。
 2. `release` 作业进入 **Environment 审批**：人工批准后，CI 用 key1 对全部资产签 `.sig1`，
-   复制两把公钥，创建/更新 GitHub Release。
-3. **维护者本地**用 key2 签 `.sig2` 并上传到该 Release（见下）。
-4. 两把签名齐全且验签通过，才算「官方发布」。
-
-### 维护者本地补签 key2（每次 Release 必做）
-**推荐低流量**：只下 `SHA256SUMS`（~1KB），据其哈希签 `.sig2`，**无需下载大包**：
-```bash
-TAG=v0.9.15+7
-mkdir -p /tmp/rel && gh release download "$TAG" -p SHA256SUMS -D /tmp/rel --clobber
-ARCHOERA_WM_KEYS=2 bash app/tool/sign_release_hashes.sh /tmp/rel
-gh release upload "$TAG" /tmp/rel/*.sig2 --clobber
-# 验 SHA256SUMS.sig2：
-openssl dgst -sha256 -verify app/tool/watermark_pub2.pem \
-  -signature /tmp/rel/SHA256SUMS.sig2 /tmp/rel/SHA256SUMS
-```
-原理：ECDSA 签的是**摘要**；`sign_release_hashes.sh` 把 SHA256SUMS 里的 SHA-256 直接
-喂给 `openssl pkeyutl -sign -pkeyopt digest:sha256`，等价于对整包签名——用户仍可用标准
-`openssl dgst -sha256 -verify watermark_pub2.pem -signature <asset>.sig2 <asset>` 验签。
-CI 的 SHA256SUMS 已被 key1 的 `.sig1` 签名，故「CI 哈希 → 本地 sig2」链条可信。
-
-有产物文件时也可直接：`ARCHOERA_WM_KEYS=2 bash app/tool/sign_release.sh <dir>`。
-Windows/无 shell 用跨平台 Dart 版：`ARCHOERA_WM_KEYS=2` + `ARCHOERA_WM_PRIVKEY2_D` →
-`dart run tool/sign_release.dart sign <dir>`。
-
-> 网络受限时给 `gh` 设代理：`HTTPS_PROXY=http://<proxy> gh release download ...`。
+   复制公钥，创建/更新 GitHub Release。
 
 ### 验签（任何人）
 ```bash
 bash app/tool/verify_release.sh /tmp/rel
 # 或逐文件：
-openssl dgst -sha256 -verify app/tool/watermark_pub.pem  -signature x.sig1 x
-openssl dgst -sha256 -verify app/tool/watermark_pub2.pem -signature x.sig2 x
+openssl dgst -sha256 -verify app/tool/watermark_pub.pem -signature x.sig1 x
 ```
-`verify_release.sh` 为**双控**：`x.sig1` 与 `x.sig2` **都**必须存在且有效。
 
 ### 密钥生成 / 轮换
 ```bash
 # key1（同时用于二进制内水印，常量写入 app/lib/app/watermark.dart）
 bash app/tool/sign_watermark.sh          # 本地运行；CI 环境会拒绝执行
-# key2（仅发布签名）
-openssl ecparam -name prime256v1 -genkey -noout -out ~/.config/archoera/watermark2_ec_priv.pem
-chmod 600 ~/.config/archoera/watermark2_ec_priv.pem
-openssl ec -in ~/.config/archoera/watermark2_ec_priv.pem -pubout -out app/tool/watermark_pub2.pem
 ```
-轮换后需同步更新：`watermark.dart` 常量、`sign_release.dart` 内公钥 hex、
-`watermark_pub*.pem`、以及 CI 的 Environment secret。旧发布保留旧公钥以便历史验签。
+轮换后需同步更新：`watermark.dart` 常量、`watermark_pub.pem`、CI 的 Environment secret。
+旧发布保留旧公钥以便历史验签。
 
 ### 私钥材料（切勿提交/打印）
 - key1：`~/.config/archoera/watermark_ec_priv.pem`
-- key2：`~/.config/archoera/watermark2_ec_priv.pem`
 - CI secret（**Environment `release`**，非仓库级）：`ARCHOERA_WM_KEY1_PEM`（key1 PEM）。
-- key2 **不进 CI**；其 PEM/标量仅本地持有。
 
 ## 仓库保护（已在 GitHub 配置）
 - **Environment `release`**：Required reviewers = 维护者；部署仅允许 tag `v*`；
@@ -102,12 +64,10 @@ openssl ec -in ~/.config/archoera/watermark2_ec_priv.pem -pubout -out app/tool/w
 3. **打 tag 并推**：`git tag v<version> && git push origin v<version>`
    （`v*` 匹配部署策略；**tag 一旦推送不可删改**）。
 4. **审批**：Actions → 该 run 的 release 作业停在 **Waiting for review** → Approve。
-   CI 用 key1 签 `<asset>.sig1`、复制两把公钥、创建 Release。
-5. **本地补签 key2**：见上「维护者本地补签 key2」→ 上传 `.sig2`。
-6. 双签齐全 → 官方发布完成。
+   CI 用 key1 签 `<asset>.sig1`、复制公钥、创建 Release → 官方发布完成。
 
 ## 红线
 - 禁止提交任何私钥/凭据（`.gitignore` 已忽略 `*.key`、`*_priv.pem`；公钥 `watermark_pub*.pem` 需跟踪）。
 - 禁止在 CI 运行 `sign_watermark.sh`（会打印私钥材料；脚本已加 `CI` 环境拒绝）。
-- 签名步骤不要开 `set -x`；`ARCHOERA_WM_KEYS` 控制本次签哪把（`1` / `2` / `1,2`）。
+- 签名步骤不要开 `set -x`。
 
