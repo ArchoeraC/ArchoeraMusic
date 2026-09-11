@@ -87,25 +87,11 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
         opacity: targetOpacity,
         duration: animDuration(context, const Duration(milliseconds: 300)),
         curve: Curves.easeOut,
-        child: ShaderMask(
-          shaderCallback: (rect) => const LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [
-              Color(0x00000000),
-              Color(0x99FFFFFF),
-              Color(0xFFFFFFFF),
-              Color(0xFFFFFFFF),
-              Color(0x99FFFFFF),
-              Color(0x00000000),
-            ],
-            stops: [0.0, 0.05, 0.12, 0.88, 0.95, 1.0],
-          ).createShader(rect),
-          blendMode: BlendMode.dstIn,
-          child: CustomPaint(
-            size: Size(double.infinity, widget.height),
-            painter: _painter,
-          ),
+        // 横向渐隐已并入 painter 的画笔 shader（_fadeShader），不再用
+        // ShaderMask 离屏层（P3：减少一次合成 pass）。
+        child: CustomPaint(
+          size: Size(double.infinity, widget.height),
+          painter: _painter,
         ),
       ),
     );
