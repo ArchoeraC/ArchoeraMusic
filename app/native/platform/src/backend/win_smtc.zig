@@ -23,6 +23,8 @@ const alloc = std.heap.c_allocator;
 const HRESULT = i32;
 const S_OK: HRESULT = 0;
 const E_NOINTERFACE: HRESULT = @bitCast(@as(u32, 0x80004002));
+const E_OUTOFMEMORY: HRESULT = @bitCast(@as(u32, 0x8007000E));
+const E_FAIL: HRESULT = @bitCast(@as(u32, 0x80004005));
 
 /// 诊断日志（DebugView / DbgView 可见；无输出不影响功能）。
 fn log(msg: [*:0]const u8) void {
@@ -43,6 +45,7 @@ const RoGetActivationFactoryFn = *const fn (HSTRING, *const win.GUID, *?*anyopaq
 const RoActivateInstanceFn = *const fn (HSTRING, *?*anyopaque) callconv(.c) HRESULT;
 const WindowsCreateStringFn = *const fn ([*]const u16, u32, *HSTRING) callconv(.c) HRESULT;
 const WindowsDeleteStringFn = *const fn (HSTRING) callconv(.c) HRESULT;
+const CoCreateFreeThreadedMarshalerFn = *const fn (?*anyopaque, *?*anyopaque) callconv(.c) HRESULT;
 
 var g_combase: win.HMODULE = null;
 var p_RoInitialize: ?RoInitializeFn = null;
@@ -50,6 +53,7 @@ var p_RoGetActivationFactory: ?RoGetActivationFactoryFn = null;
 var p_RoActivateInstance: ?RoActivateInstanceFn = null;
 var p_WindowsCreateString: ?WindowsCreateStringFn = null;
 var p_WindowsDeleteString: ?WindowsDeleteStringFn = null;
+var p_CoCreateFreeThreadedMarshaler: ?CoCreateFreeThreadedMarshalerFn = null;
 
 fn loadCombase() bool {
     if (g_combase != null) return true;
@@ -60,6 +64,10 @@ fn loadCombase() bool {
     p_RoActivateInstance = @ptrCast(win.GetProcAddress(h, "RoActivateInstance"));
     p_WindowsCreateString = @ptrCast(win.GetProcAddress(h, "WindowsCreateString"));
     p_WindowsDeleteString = @ptrCast(win.GetProcAddress(h, "WindowsDeleteString"));
+    // CoCreateFreeThreadedMarshaler：委托封送（IMarshal）用；ole32 提供。
+    if (win.LoadLibraryA("ole32.dll")) |ho| {
+        p_CoCreateFreeThreadedMarshaler = @ptrCast(win.GetProcAddress(ho, "CoCreateFreeThreadedMarshaler"));
+    }
     return p_RoInitialize != null and p_RoGetActivationFactory != null and
         p_RoActivateInstance != null and p_WindowsCreateString != null and
         p_WindowsDeleteString != null;
@@ -147,6 +155,15 @@ const IID_ICALLFACTORY = win.GUID{
     .Data2 = 0x2A1C,
     .Data3 = 0x11CE,
     .Data4 = .{ 0xAD, 0xE5, 0x00, 0xAA, 0x00, 0x44, 0x77, 0x3D },
+};
+// IMarshal {00000003-0000-0000-C000-000000000046}（经典 COM）。委托封送时 combase
+// 会 QI 它；**必须应答**，但返回的不能是本对象（只有 4 槽），而是
+// CoCreateFreeThreadedMarshaler 的包装（对齐 windows-rs DelegateBox::QueryInterface）。
+const IID_IMARSHAL = win.GUID{
+    .Data1 = 0x00000003,
+    .Data2 = 0x0000,
+    .Data3 = 0x0000,
+    .Data4 = .{ 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 },
 };
 
 /// 标准 COM 保留 IID 段 {000000xx-0000-0000-C000-000000000046}（含 IMarshal /
@@ -382,14 +399,21 @@ fn logQi(riid: *const win.GUID) void {
     win.OutputDebugStringA(s.ptr);
 }
 
-/// 委托 QI：只放行 IUnknown / IAgileObject / 运行期生成的委托 IID（非保留段且
-/// 非 IInspectable / ICallFactory），其余（IMarshal、IStdMarshalInfo、IWeakReference
-/// Source、IInspectable、ICallFactory…）一律 E_NOINTERFACE。
-/// 旧实现对未实现接口一律应答 S_OK，combase 标准封送时会按错位 vtable 槽调用
-/// （Invoke 被当成 GetClassForHandler / GetIids / GetUnmarshalClass）→
-/// combase.dll 访问冲突（0xC0000005）。
+/// 委托 QI：放行 IUnknown / IAgileObject / 运行期生成的委托 IID（非保留段且
+/// 非 IInspectable / ICallFactory）；**IMarshal 特殊**——返回自由线程封送器包装
+/// （见 [createMarshaler]），不能返回本对象；其余（IStdMarshalInfo /
+/// IWeakReferenceSource / IInspectable / ICallFactory…）一律 E_NOINTERFACE。
+///
+/// 历史：旧实现对未实现接口一律应答 S_OK，combase 标准封送会按错位 vtable 槽调用
+/// （Invoke 被当成 GetClassForHandler / GetIids / GetUnmarshalClass）→ 0xC0000005。
+/// 后改为「拒绝 IMarshal」，仍崩——因为 combase 封送委托**必须**拿到 IMarshal，
+/// 拒绝后走标准封送同样错调。正解对齐 windows-rs `DelegateBox::QueryInterface`：
+/// 对 IMarshal 返回 `CoCreateFreeThreadedMarshaler` 包装。
 /// 注：函数声明顺序在 Zig 容器内不敏感，无需前置声明。
 fn handlerQI(this: *anyopaque, riid: *const win.GUID, out: *?*anyopaque) callconv(.c) HRESULT {
+    // IMarshal：combase 封送委托时必查。返回自由线程封送器包装（不能返回本对象，
+    // 否则按 9 槽 IMarshal 错调 4 槽本对象 → 崩溃）。
+    if (guidEq(IID_IMARSHAL, riid)) return createMarshaler(this, out);
     const supported = guidEq(IID_IUNKNOWN, riid) or guidEq(IID_IAGILEOBJECT, riid) or
         (!isReservedComIid(riid) and !guidEq(IID_IINSPECTABLE, riid) and
             !guidEq(IID_ICALLFACTORY, riid));
@@ -443,6 +467,116 @@ const HANDLER_VTBL = HandlerVtbl{
     .Invoke = handlerInvoke,
 };
 var g_handler_obj = HandlerObj{ .vtbl = &HANDLER_VTBL, .ref = 1 };
+
+// ── IMarshal 包装（委托封送；对齐 windows-rs imp/marshaler.rs）──────────
+//
+// combase 跨 apartment 封送委托时会 QI IMarshal。本对象只有 4 槽，不能把自己当
+// IMarshal 返回（会按 9 槽错调 → combase 0xC0000005）。故用
+// CoCreateFreeThreadedMarshaler 建自由线程封送器，再包一层：QI(IMarshal) 返回
+// 包装自身，其余 IID 转发给委托对象；6 个 IMarshal 方法转发给自由线程封送器。
+
+const UnknownVtbl = extern struct {
+    QueryInterface: *const fn (*anyopaque, *const win.GUID, *?*anyopaque) callconv(.c) HRESULT,
+    AddRef: *const fn (*anyopaque) callconv(.c) u32,
+    Release: *const fn (*anyopaque) callconv(.c) u32,
+};
+
+const IMarshalVtbl = extern struct {
+    base: UnknownVtbl,
+    GetUnmarshalClass: *const fn (*anyopaque, *const win.GUID, ?*const anyopaque, u32, ?*const anyopaque, u32, *win.GUID) callconv(.c) HRESULT,
+    GetMarshalSizeMax: *const fn (*anyopaque, *const win.GUID, ?*const anyopaque, u32, ?*const anyopaque, u32, *u32) callconv(.c) HRESULT,
+    MarshalInterface: *const fn (*anyopaque, ?*anyopaque, *const win.GUID, ?*const anyopaque, u32, ?*const anyopaque, u32) callconv(.c) HRESULT,
+    UnmarshalInterface: *const fn (*anyopaque, ?*anyopaque, *const win.GUID, *?*anyopaque) callconv(.c) HRESULT,
+    ReleaseMarshalData: *const fn (*anyopaque, ?*anyopaque) callconv(.c) HRESULT,
+    DisconnectObject: *const fn (*anyopaque, u32) callconv(.c) HRESULT,
+};
+
+const MarshalerObj = extern struct {
+    vtbl: *const IMarshalVtbl,
+    outer: *anyopaque,
+    marshaler: *anyopaque,
+    ref: u32,
+};
+
+fn marshalerQI(this: *anyopaque, riid: *const win.GUID, out: *?*anyopaque) callconv(.c) HRESULT {
+    const o: *MarshalerObj = @ptrCast(@alignCast(this));
+    if (guidEq(IID_IMARSHAL, riid)) {
+        o.ref += 1;
+        out.* = this;
+        return S_OK;
+    }
+    return handlerQI(o.outer, riid, out);
+}
+fn marshalerAddRef(this: *anyopaque) callconv(.c) u32 {
+    const o: *MarshalerObj = @ptrCast(@alignCast(this));
+    o.ref += 1;
+    return o.ref;
+}
+fn marshalerRelease(this: *anyopaque) callconv(.c) u32 {
+    const o: *MarshalerObj = @ptrCast(@alignCast(this));
+    o.ref -%= 1;
+    if (o.ref == 0) {
+        _ = vtbl(UnknownVtbl, o.marshaler).Release(o.marshaler);
+        alloc.destroy(o);
+    }
+    return o.ref;
+}
+fn marshalerGetUnmarshalClass(this: *anyopaque, riid: *const win.GUID, pv: ?*const anyopaque, ctx: u32, pvctx: ?*const anyopaque, flags: u32, pcid: *win.GUID) callconv(.c) HRESULT {
+    const o: *MarshalerObj = @ptrCast(@alignCast(this));
+    return vtbl(IMarshalVtbl, o.marshaler).GetUnmarshalClass(o.marshaler, riid, pv, ctx, pvctx, flags, pcid);
+}
+fn marshalerGetMarshalSizeMax(this: *anyopaque, riid: *const win.GUID, pv: ?*const anyopaque, ctx: u32, pvctx: ?*const anyopaque, flags: u32, psize: *u32) callconv(.c) HRESULT {
+    const o: *MarshalerObj = @ptrCast(@alignCast(this));
+    return vtbl(IMarshalVtbl, o.marshaler).GetMarshalSizeMax(o.marshaler, riid, pv, ctx, pvctx, flags, psize);
+}
+fn marshalerMarshalInterface(this: *anyopaque, stm: ?*anyopaque, riid: *const win.GUID, pv: ?*const anyopaque, ctx: u32, pvctx: ?*const anyopaque, flags: u32) callconv(.c) HRESULT {
+    const o: *MarshalerObj = @ptrCast(@alignCast(this));
+    return vtbl(IMarshalVtbl, o.marshaler).MarshalInterface(o.marshaler, stm, riid, pv, ctx, pvctx, flags);
+}
+fn marshalerUnmarshalInterface(this: *anyopaque, stm: ?*anyopaque, riid: *const win.GUID, ppv: *?*anyopaque) callconv(.c) HRESULT {
+    const o: *MarshalerObj = @ptrCast(@alignCast(this));
+    return vtbl(IMarshalVtbl, o.marshaler).UnmarshalInterface(o.marshaler, stm, riid, ppv);
+}
+fn marshalerReleaseMarshalData(this: *anyopaque, stm: ?*anyopaque) callconv(.c) HRESULT {
+    const o: *MarshalerObj = @ptrCast(@alignCast(this));
+    return vtbl(IMarshalVtbl, o.marshaler).ReleaseMarshalData(o.marshaler, stm);
+}
+fn marshalerDisconnectObject(this: *anyopaque, reserved: u32) callconv(.c) HRESULT {
+    const o: *MarshalerObj = @ptrCast(@alignCast(this));
+    return vtbl(IMarshalVtbl, o.marshaler).DisconnectObject(o.marshaler, reserved);
+}
+
+const MARSHALER_VTBL = IMarshalVtbl{
+    .base = .{
+        .QueryInterface = marshalerQI,
+        .AddRef = marshalerAddRef,
+        .Release = marshalerRelease,
+    },
+    .GetUnmarshalClass = marshalerGetUnmarshalClass,
+    .GetMarshalSizeMax = marshalerGetMarshalSizeMax,
+    .MarshalInterface = marshalerMarshalInterface,
+    .UnmarshalInterface = marshalerUnmarshalInterface,
+    .ReleaseMarshalData = marshalerReleaseMarshalData,
+    .DisconnectObject = marshalerDisconnectObject,
+};
+
+/// 为委托对象 [outer] 构造 IMarshal 包装（对齐 windows-rs `marshaler()`）。
+fn createMarshaler(outer: *anyopaque, out: *?*anyopaque) HRESULT {
+    const f = p_CoCreateFreeThreadedMarshaler orelse return E_NOINTERFACE;
+    var ft: ?*anyopaque = null;
+    if (f(null, &ft) != S_OK or ft == null) return E_NOINTERFACE;
+    var m: ?*anyopaque = null;
+    const hr = vtbl(UnknownVtbl, ft.?).QueryInterface(ft.?, &IID_IMARSHAL, &m);
+    _ = vtbl(UnknownVtbl, ft.?).Release(ft.?); // 丢弃初始 IUnknown 引用
+    if (hr != S_OK or m == null) return E_NOINTERFACE;
+    const o = alloc.create(MarshalerObj) catch {
+        _ = vtbl(UnknownVtbl, m.?).Release(m.?);
+        return E_OUTOFMEMORY;
+    };
+    o.* = .{ .vtbl = &MARSHALER_VTBL, .outer = outer, .marshaler = m.?, .ref = 1 };
+    out.* = @ptrCast(o);
+    return S_OK;
+}
 
 // ── HSTRING ───────────────────────────────────────────────────────
 

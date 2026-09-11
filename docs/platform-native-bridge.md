@@ -475,6 +475,25 @@ ICallFactory），其余一律 `E_NOINTERFACE`。`isReservedComIid` 识别保留
 `{000000xx-0000-0000-C000-000000000046}`。已用最小 C 复现程序在 Wine 验证：
 旧逻辑 `CoMarshalInterface` 会错调 Invoke，新逻辑不再触发。
 
+### 7.7 SMTC 委托封送必须应答 IMarshal（2026-09-11，7.6 的后续）
+
+现象：7.6 的白名单（**拒绝** IMarshal）上线后，真 Windows 仍 `combase.dll`
+0xC0000005（WER `61da1eb4-8474-4762-bce8-9b419dc24d46`）。
+
+根因：combase 跨 apartment 封送 WinRT 委托时**必须**能 QI 到 `IMarshal`。7.6 把
+IMarshal 也拒了 → combase 退回标准封送 → 仍按 `IMarshal` 的 9 槽布局调用本对象
+（只有 4 槽）→ 错调 `Invoke` → 访问冲突。即「误应答 IMarshal」与「拒绝 IMarshal」
+**都会崩**，正解是**返回一个真正的 IMarshal**。
+
+修复（对齐 `windows-rs`：`crates/libs/core/src/imp/delegate_box.rs` 的
+`QueryInterface` + `marshaler.rs`）：`handlerQI` 对 `IMarshal` 调
+`CoCreateFreeThreadedMarshaler`（ole32）建自由线程封送器，再包一层 `MarshalerObj`
+——`QI(IMarshal)` 返回包装自身、其余 IID 转发给委托对象；6 个 IMarshal 方法全部
+转发给自由线程封送器。参考实现确认：`windows` crate 的委托对象也是
+**4 槽（IUnknown + Invoke）**，与本实现一致。
+
+验证：`x86_64-windows-gnu` 交叉编译通过；真机待 Windows 复测。
+
 ## 8. 风险与对策
 
 | 风险 | 对策 |
