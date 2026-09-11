@@ -56,6 +56,7 @@ typedef struct AplTrackMeta {
     AplString album;
     int64_t duration_ms;   /* <0 = 未知 */
     AplString art_url;     /* http(s) URL 或本地绝对路径；NULL = 无封面 */
+    AplString art_bytes;   /* 本地封面字节（Dart 读文件后传入）；Windows 走内存流，其余忽略 */
 } AplTrackMeta;
 
 /* ── SystemPower ───────────────────────────────────────────────── */

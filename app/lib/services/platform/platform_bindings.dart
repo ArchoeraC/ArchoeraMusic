@@ -14,6 +14,7 @@ library;
 
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:io' show File;
 import 'dart:ui' show Color;
 
 import 'package:ffi/ffi.dart';
@@ -66,6 +67,9 @@ final class AplTrackMetaFfi extends Struct {
   external int durationMs;
 
   external AplStringFfi artUrl;
+
+  /// 本地封面字节（Windows 走内存流；其它平台忽略）。见 `setTrack`。
+  external AplStringFfi artBytes;
 }
 
 final class AplSeekPayload extends Struct {
@@ -359,6 +363,7 @@ class PlatformBindings {
       _fillString(meta.ref.album, album, pointers);
       meta.ref.durationMs = durationMs ?? -1;
       _fillString(meta.ref.artUrl, artUrl, pointers);
+      _fillArtBytes(meta.ref.artBytes, artUrl, pointers);
       return _mediaTrack(meta);
     } finally {
       for (final p in pointers) {
@@ -380,6 +385,29 @@ class PlatformBindings {
     sink.add(native.cast<Uint8>());
     view.data = native.cast<Uint8>();
     view.len = native.length;
+  }
+
+  /// 本地封面（file:// 或本地路径）→ 读文件字节填入 [view]（供原生内存流）；
+  /// http(s) / 空 / 读取失败则置空（原生按 artUrl 处理）。
+  void _fillArtBytes(AplStringFfi view, String? artUrl, List<Pointer<Uint8>> sink) {
+    view.data = nullptr;
+    view.len = 0;
+    if (artUrl == null || artUrl.isEmpty) return;
+    if (artUrl.startsWith('http://') || artUrl.startsWith('https://')) return;
+    final path = artUrl.startsWith('file://') ? artUrl.substring(7) : artUrl;
+    try {
+      final f = File(path);
+      if (!f.existsSync()) return;
+      final bytes = f.readAsBytesSync();
+      if (bytes.isEmpty) return;
+      final buf = malloc.allocate<Uint8>(bytes.length);
+      buf.asTypedList(bytes.length).setAll(0, bytes);
+      sink.add(buf);
+      view.data = buf;
+      view.len = bytes.length;
+    } catch (_) {
+      // 读取失败：交给原生按 artUrl 处理
+    }
   }
 
   /// 释放事件回调（isolate 退出前调用）；幂等。

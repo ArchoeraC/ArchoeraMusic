@@ -51,6 +51,8 @@ const WindowsCreateStringFn = *const fn ([*]const u16, u32, *HSTRING) callconv(.
 const WindowsDeleteStringFn = *const fn (HSTRING) callconv(.c) HRESULT;
 const CoCreateFreeThreadedMarshalerFn = *const fn (?*anyopaque, *?*anyopaque) callconv(.c) HRESULT;
 const CoWaitForMultipleHandlesFn = *const fn (u32, u32, u32, ?[*]win.HANDLE, *u32) callconv(.c) HRESULT;
+const SHCreateMemStreamFn = *const fn (?[*]const u8, u32) callconv(.c) ?*anyopaque;
+const CreateRandomAccessStreamOverStreamFn = *const fn (?*anyopaque, u32, *const win.GUID, *?*anyopaque) callconv(.c) HRESULT;
 
 var g_combase: win.HMODULE = null;
 var p_RoInitialize: ?RoInitializeFn = null;
@@ -60,6 +62,8 @@ var p_WindowsCreateString: ?WindowsCreateStringFn = null;
 var p_WindowsDeleteString: ?WindowsDeleteStringFn = null;
 var p_CoCreateFreeThreadedMarshaler: ?CoCreateFreeThreadedMarshalerFn = null;
 var p_CoWaitForMultipleHandles: ?CoWaitForMultipleHandlesFn = null;
+var p_SHCreateMemStream: ?SHCreateMemStreamFn = null;
+var p_CreateRandomAccessStreamOverStream: ?CreateRandomAccessStreamOverStreamFn = null;
 
 fn loadCombase() bool {
     if (g_combase != null) return true;
@@ -74,6 +78,13 @@ fn loadCombase() bool {
     if (win.LoadLibraryA("ole32.dll")) |ho| {
         p_CoCreateFreeThreadedMarshaler = @ptrCast(win.GetProcAddress(ho, "CoCreateFreeThreadedMarshaler"));
         p_CoWaitForMultipleHandles = @ptrCast(win.GetProcAddress(ho, "CoWaitForMultipleHandles"));
+    }
+    // 本地封面内存流：SHCreateMemStream（shlwapi）+ CreateRandomAccessStreamOverStream（shcore）。
+    if (win.LoadLibraryA("shlwapi.dll")) |hs| {
+        p_SHCreateMemStream = @ptrCast(win.GetProcAddress(hs, "SHCreateMemStream"));
+    }
+    if (win.LoadLibraryA("shcore.dll")) |hc| {
+        p_CreateRandomAccessStreamOverStream = @ptrCast(win.GetProcAddress(hc, "CreateRandomAccessStreamOverStream"));
     }
     return p_RoInitialize != null and p_RoGetActivationFactory != null and
         p_RoActivateInstance != null and p_WindowsCreateString != null and
@@ -124,6 +135,13 @@ const IID_STORAGE_FILE_STATICS = win.GUID{
     .Data2 = 0xDAF2,
     .Data3 = 0x43C8,
     .Data4 = .{ 0x8B, 0xB4, 0xA4, 0xD3, 0xEA, 0xCF, 0xD0, 0x3F },
+};
+// IRandomAccessStream {905a0fe1-bc53-11df-8c49-001e4fc686da}（本地封面内存流用）。
+const IID_IRANDOMACCESSSTREAM = win.GUID{
+    .Data1 = 0x905a0fe1,
+    .Data2 = 0xbc53,
+    .Data3 = 0x11df,
+    .Data4 = .{ 0x8c, 0x49, 0x00, 0x1e, 0x4f, 0xc6, 0x86, 0xda },
 };
 
 // 事件委托 QI 策略：本对象只实现了 IUnknown + Invoke（WinRT 委托的 ABI 布局，
@@ -673,11 +691,20 @@ pub fn init(findWindow: *const fn () ?win.HWND) i32 {
 /// 注意：`g_display` 是在 SMTC 所属 apartment（Flutter 平台线程，多为 STA）上
 /// 取得的同单元接口，**必须**在该线程调用；另起线程（MTA）直接使用会触发
 /// combase.dll 访问冲突（0xC0000005）——故此处同步执行、不再 spawn 线程。
-fn setArtwork(url: []const u8) void {
+fn setArtwork(url: []const u8, bytes: ?[]const u8) void {
     if (g_display == null) return;
-    const is_http = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
-    log(if (is_http) "apl/smtc: artwork http" else "apl/smtc: artwork local");
-    const ref = if (is_http) refFromUri(url) else refFromFile(url);
+    var ref: ?*anyopaque = null;
+    if (bytes) |b| {
+        if (b.len > 0) {
+            log("apl/smtc: artwork mem");
+            ref = refFromMemory(b);
+        }
+    }
+    if (ref == null) {
+        const is_http = std.mem.startsWith(u8, url, "http://") or std.mem.startsWith(u8, url, "https://");
+        log(if (is_http) "apl/smtc: artwork http" else "apl/smtc: artwork local");
+        ref = if (is_http) refFromUri(url) else refFromFile(url);
+    }
     if (ref == null) {
         log("apl/smtc: artwork ref failed");
         return;
@@ -713,6 +740,25 @@ fn refFromUri(url: []const u8) ?*anyopaque {
     defer release(statics);
     var ref: ?*anyopaque = null;
     if (vtbl(RasrStaticsVtbl, statics).CreateFromUri(statics, uri, &ref) != S_OK) return null;
+    return ref;
+}
+
+/// 由内存字节构造 RandomAccessStreamReference（**同步**，无 WinRT 异步/等待）：
+/// SHCreateMemStream → CreateRandomAccessStreamOverStream → CreateFromStream。
+/// 本地封面走此路径，彻底避开 StorageFile.GetFileFromPathAsync 的异步/封送问题。
+fn refFromMemory(bytes: []const u8) ?*anyopaque {
+    const create = p_SHCreateMemStream orelse return null;
+    const wrap = p_CreateRandomAccessStreamOverStream orelse return null;
+    if (bytes.len == 0) return null;
+    const stream = create(bytes.ptr, @intCast(bytes.len)) orelse return null;
+    defer release(stream);
+    var ras: ?*anyopaque = null;
+    if (wrap(stream, 0, &IID_IRANDOMACCESSSTREAM, &ras) != S_OK or ras == null) return null;
+    defer release(ras);
+    const rs = rasrStatics() orelse return null;
+    defer release(rs);
+    var ref: ?*anyopaque = null;
+    if (vtbl(RasrStaticsVtbl, rs).CreateFromStream(rs, ras, &ref) != S_OK) return null;
     return ref;
 }
 
@@ -788,7 +834,7 @@ fn updateTimeline(position_ms: i64) void {
     _ = vtbl(Smtc2Vtbl, s2).UpdateTimelineProperties(s2, obj.?);
 }
 
-pub fn setTrack(title: ?[]const u8, artist: ?[]const u8, art_url: ?[]const u8, duration_ms: i64) void {
+pub fn setTrack(title: ?[]const u8, artist: ?[]const u8, art_url: ?[]const u8, duration_ms: i64, art_bytes: ?[]const u8) void {
     g_duration_ms = duration_ms;
     if (g_music == null) {
         log("apl/smtc: setTrack but music props unavailable");
@@ -800,7 +846,15 @@ pub fn setTrack(title: ?[]const u8, artist: ?[]const u8, art_url: ?[]const u8, d
         setMusicProp(.album_artist, a);
     }
     if (g_display) |d| _ = vtbl(DisplayVtbl, d).Update(d);
-    if (art_url) |u| setArtwork(u);
+    if (art_bytes) |b| {
+        if (b.len > 0) {
+            setArtwork(art_url orelse "", b);
+        } else if (art_url) |u| {
+            setArtwork(u, null);
+        }
+    } else if (art_url) |u| {
+        setArtwork(u, null);
+    }
     log("apl/smtc: setTrack done");
 }
 

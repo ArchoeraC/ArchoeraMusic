@@ -59,6 +59,10 @@ pub const TrackMeta = extern struct {
     album: AplString,
     duration_ms: i64,
     art_url: AplString,
+    /// 封面字节（Dart 读本地文件后传入）。非空时 Windows 走内存流
+    /// （SHCreateMemStream → CreateRandomAccessStreamOverStream），
+    /// 避开 StorageFile 的异步/封送问题；空则按 art_url 处理。
+    art_bytes: AplString,
 };
 
 pub const Event = extern struct {
