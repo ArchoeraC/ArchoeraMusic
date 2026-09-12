@@ -30,6 +30,7 @@
 #include <winrt/Windows.Storage.Streams.h>
 
 #include <cstdint>
+#include <cstdio>
 #include <string_view>
 #include <vector>
 
@@ -86,6 +87,15 @@ winrt::hstring H(const char* data, int32_t len) {
     return winrt::to_hstring(std::string_view(data, static_cast<size_t>(len)));
 }
 
+// 诊断日志（DebugView 可见）；HRESULT 以 0x%08X 输出。
+void log(const char* msg) { ::OutputDebugStringA(msg); }
+void logHr(const char* prefix, int32_t hr) {
+    char buf[160];
+    std::snprintf(buf, sizeof(buf), "%s hr=0x%08X", prefix,
+                  static_cast<unsigned>(hr));
+    ::OutputDebugStringA(buf);
+}
+
 void SetThumbnailFromBytes(const uint8_t* bytes, int32_t len) {
     auto& s = state();
     if (!s.updater || bytes == nullptr || len <= 0) return;
@@ -131,27 +141,37 @@ void SetThumbnailFromUri(winrt::hstring const& url) {
 extern "C" int32_t apl_smtc_win_init(void* hwnd) {
     auto& s = state();
     if (s.initialized) return 0;
-    if (hwnd == nullptr) return -1;
+    if (hwnd == nullptr) {
+        log("apl/smtc: init hwnd=null");
+        return -1;
+    }
+    log("apl/smtc: init begin");
     try {
         // 线程多已由 runner 初始化为 STA（main.cpp CoInitializeEx）；重复/冲突
         // 初始化忽略即可，沿用当前 apartment。C++/WinRT 委托在 STA 上正确封送。
         try {
             winrt::init_apartment(winrt::apartment_type::single_threaded);
+        } catch (winrt::hresult_error const& e) {
+            logHr("apl/smtc: init_apartment", e.code());
         } catch (...) {
+            log("apl/smtc: init_apartment unknown");
         }
 
         auto interop = winrt::get_activation_factory<ISystemMediaTransportControlsInterop>(
             L"Windows.Media.SystemMediaTransportControls");
+        log("apl/smtc: interop ok");
         SystemMediaTransportControls controls{nullptr};
         winrt::check_hresult(interop->GetForWindow(
             reinterpret_cast<HWND>(hwnd),
             winrt::guid_of<SystemMediaTransportControls>(),
             winrt::put_abi(controls)));
+        log("apl/smtc: GetForWindow ok");
         s.controls = controls;
 
         s.updater = controls.DisplayUpdater();
         s.updater.Type(MediaPlaybackType::Music);
         s.music = s.updater.MusicProperties();
+        log("apl/smtc: display updater ok");
 
         // 按钮事件：C++/WinRT 委托（agile；跨 apartment 由投影正确封送）。
         s.button_token = controls.ButtonPressed(
@@ -177,9 +197,11 @@ extern "C" int32_t apl_smtc_win_init(void* hwnd) {
                     default:
                         return;
                 }
+                log("apl/smtc: ButtonPressed");
                 apl_smtc_on_button(button);
             });
         s.button_registered = true;
+        log("apl/smtc: ButtonPressed registered");
 
         controls.IsEnabled(true);
         controls.IsPlayEnabled(true);
@@ -189,8 +211,13 @@ extern "C" int32_t apl_smtc_win_init(void* hwnd) {
         controls.IsStopEnabled(true);
 
         s.initialized = true;
+        log("apl/smtc: ready");
         return 0;
+    } catch (winrt::hresult_error const& e) {
+        logHr("apl/smtc: init failed", e.code());
+        return -1;
     } catch (...) {
+        log("apl/smtc: init failed unknown");
         return -1;
     }
 }
@@ -203,7 +230,10 @@ extern "C" void apl_smtc_win_set_track(
     const char* art_url, int32_t art_url_len,
     const uint8_t* art_bytes, int32_t art_bytes_len) {
     auto& s = state();
-    if (!s.initialized || !s.updater) return;
+    if (!s.initialized || !s.updater) {
+        log("apl/smtc: set_track but not initialized");
+        return;
+    }
     try {
         auto h_title = H(title, title_len);
         if (h_title.empty()) {
@@ -228,14 +258,21 @@ extern "C" void apl_smtc_win_set_track(
         } else {
             SetThumbnailFromUri(H(art_url, art_url_len));
         }
+        log("apl/smtc: set_track done");
+    } catch (winrt::hresult_error const& e) {
+        logHr("apl/smtc: set_track failed", e.code());
     } catch (...) {
+        log("apl/smtc: set_track failed unknown");
     }
 }
 
 extern "C" void apl_smtc_win_set_playback(int32_t playback_state,
                                           int64_t position_ms, double speed) {
     auto& s = state();
-    if (!s.initialized || !s.controls) return;
+    if (!s.initialized || !s.controls) {
+        log("apl/smtc: set_playback but not initialized");
+        return;
+    }
     try {
         MediaPlaybackStatus st = MediaPlaybackStatus::Paused;
         switch (playback_state) {
@@ -265,7 +302,11 @@ extern "C" void apl_smtc_win_set_playback(int32_t playback_state,
             controls2.UpdateTimelineProperties(timeline);
             controls2.PlaybackRate(speed);
         }
+        log("apl/smtc: set_playback done");
+    } catch (winrt::hresult_error const& e) {
+        logHr("apl/smtc: set_playback failed", e.code());
     } catch (...) {
+        log("apl/smtc: set_playback failed unknown");
     }
 }
 
