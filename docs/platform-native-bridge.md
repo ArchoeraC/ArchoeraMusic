@@ -1,9 +1,15 @@
 # 平台能力原生桥接（Platform Native Bridge）设计
 
-> 状态：设计稿 · 2026-09-10
+> 状态：设计稿 · 2026-09-10（**2026-09-12 后端迁移：Zig → 平台原生 C++/ObjC++/CMake**）
 > 定位：`docs/platform-capability-facade.md` §7.3/§7.4 修订的落地形态——**平台能力统一化**由
-> 独立 Zig 原生模块承载：Dart 只调用统一接口（`SystemPower` / `SystemMedia`），**全部平台
-> 转发、系统请求与事件回传都在 Zig 内完成**，Dart 侧不出现任何平台原语。
+> 独立原生模块承载：Dart 只调用统一接口（`SystemPower` / `SystemMedia`），**全部平台
+> 转发、系统请求与事件回传都在桥接库内完成**，Dart 侧不出现任何平台原语。
+>
+> **后端语言（2026-09-12 迁移）**：原 Zig 桥接（自研 D-Bus / `@cImport` 规避 / 弱符号兜底）
+> 已**整体替换**为各平台官方工具链的 C++/ObjC++ 实现，构建改用 CMake：
+> Windows → MSVC C++/WinRT；Linux → C++ + libdbus + dlopen GTK；macOS → ObjC++ + AppKit/
+> MediaPlayer。C ABI（`apl_*`）**不变**，Dart 侧零改动。迁移动因：Zig-clang 编 C++/WinRT
+> 在真机 `GetForWindow` 崩溃且难以排查；改用 MSVC 官方工具链后编译/链接/运行行为可控。
 >
 > 硬性约束（用户决策 2026-09-10）：
 > 1. **零 JSON**：ABI 全部 extern struct + 定长字段 / UTF-8 指针+长度（对齐
@@ -24,56 +30,52 @@ Dart（app/lib/services/platform/）
   platform_bindings.dart                    ← dart:ffi 绑定（apl_* 符号 + NativeCallable.listener）
         │  DynamicLibrary.open('libarchoera_platform')   同进程，无子进程、无 JSON
         ▼
-Zig 原生模块（app/native/platform/ → libarchoera_platform.*）
-  core.zig        生命周期 / 能力位图 / 事件汇聚线程 → Dart 回调
-  backend_linux.zig     自研 D-Bus（传输+编组）→ ScreenSaver + MPRIS
-  backend_windows.zig   SetThreadExecutionState + SMTC（win_smtc.cpp，C++/WinRT）
-  backend_macos.zig     NSProcessInfo + MPRemoteCommandCenter / MPNowPlayingInfoCenter
-        │  （ObjC runtime / dispatch_async 经 dlopen libSystem）
+原生桥接库（app/native/platform/ → libarchoera_platform.{so,dylib} / archoera_platform.dll）
+  core.cpp        生命周期 / 能力位图 / 事件槽 → Dart 回调（C++，共享）
+  apl.cpp         apl_* C ABI 导出（C++，共享）
+  backend_windows.cpp   Win32（SetThreadExecutionState/窗口子类化/单实例/主题色）+
+                        WinRT SMTC/Toast（C++/WinRT，MSVC）
+  backend_linux.cpp     libdbus MPRIS2 + ScreenSaver.Inhibit + 熄屏/锁屏信号 + dlopen GTK 窗口
+  backend_macos.mm      NSProcessInfo + NSWorkspace/NSWindow + MPRemoteCommandCenter /
+                        MPNowPlayingInfoCenter（ObjC++）
         ▼
 OS：D-Bus 会话总线 / WinRT 媒体会话 / macOS Now Playing
 ```
 
 - **正向**（Dart → OS）：`apl_power_*` / `apl_media_*` 同步调用，返回错误码；
-- **反向**（OS → Dart）：媒体键 / 蓝牙 AVRCP / 熄屏事件，由 Zig 在 OS 回调线程接住，
+- **反向**（OS → Dart）：媒体键 / 蓝牙 AVRCP / 熄屏事件，由桥接在 OS 回调线程接住，
   经 `AplEvent`（POD 结构体）→ 注册的 `AplEventCallback` → Dart `NativeCallable.listener`
   直接派发（Dart 3.1+ 支持任意原生线程回调 Dart，事件按到达序串行进入 Dart 端口队列，
-  无需 Zig 侧再排队、无需轮询）。
+  无需桥接侧再排队、无需轮询）。
 
 ## 2. 目录结构与产物
 
 ```
 app/native/platform/
-├── build.zig                    # Zig 0.16；单产物：libarchoera_platform.so/.dll/.dylib
-├── include/archoera_platform.h  # C ABI 契约（唯一头文件，Dart 绑定与 Zig 实现共同依据）
+├── CMakeLists.txt               # CMake（按平台选后端；产物统一 build/out/）
+├── include/archoera_platform.h  # C ABI 契约（唯一头文件，Dart 绑定与各后端共同依据）
 ├── src/
-│   ├── core.zig                 # apl_* 导出、能力位图、事件线程与回调管理
-│   ├── dbus/                    # 自研 D-Bus（仅 Linux 编入）
-│   │   ├── transport.zig        # unix socket + SASL EXTERNAL + Hello + AddMatch/RequestName
-│   │   ├── message.zig          # D-Bus 编组/解组（header + body，LE）
-│   │   └── mpris.zig            # MPRIS2 服务实现（属性缓存 + Seeked 信号 + 方法分发）
-│   └── backend/
-│       ├── backend_linux.zig    # ScreenSaver.Inhibit + ActiveChanged + MPRIS 导出
-│       ├── backend_windows.zig  # SetThreadExecutionState + SMTC（RoGetActivationFactory
-│       │                        #   + SystemMediaTransportControlsInterop::GetForWindow）
-│       └── backend_macos.zig    # NSProcessInfo beginActivity + MPNowPlayingInfoCenter +
-│                               #   MPRemoteCommandCenter（objc_msgSend + dispatch main）
-└── test/                        # zig build test（编组往返 / 能力位图 / 事件结构）
-
-app/lib/services/platform/
-├── system_power.dart / system_media.dart   # 契约（已建）
-├── platform_capabilities.dart              # 工厂：加载成功且有对应能力 → FFI 实现；否则 Noop
-└── platform_bindings.dart                  # FFI 绑定（加载路径对齐 native_lib_paths.dart）
+│   ├── core.h / core.cpp        # 事件结构、能力位图、回调注册与分发（共享）
+│   ├── backend.h                # 后端契约（各平台实现同一组函数）
+│   ├── apl.cpp                  # apl_* C ABI 导出根（共享）
+│   ├── backend_windows.cpp      # MSVC C++：Win32 + WinRT(SMTC/Toast)
+│   ├── backend_linux.cpp        # C++ + libdbus：MPRIS2/Inhibit/熄屏/主题色 + dlopen GTK
+│   ├── backend_macos.mm         # ObjC++：AppKit/MediaPlayer
+│   └── backend_stub.cpp         # 未覆盖平台兜底（能力位图 0）
+└── （无 test/：C ABI 由 Dart 侧 platform_bindings 与冒烟程序验证）
 ```
 
 | 平台 | 产物 | 打包 |
 |---|---|---|
-| Linux | `libarchoera_platform.so` | 随 `native/` 布局（同 mediaengine，见 `ffi-libs-layout-plan.md`，打包脚本增补拷贝项） |
+| Linux | `libarchoera_platform.so` | 随 `native/` 布局（同 mediaengine，见 `ffi-libs-layout-plan.md`） |
 | Windows | `archoera_platform.dll` | 同上 |
 | macOS | `libarchoera_platform.dylib` | 同上 |
 
-构建顺序与 audio-engine 一致：`zig build -Doptimize=ReleaseFast` 纯交叉编译三平台，
-不引入 CMake / 三平台脚本。
+构建：`cmake -S app/native/platform -B app/native/platform/build -DCMAKE_BUILD_TYPE=Release
+&& cmake --build app/native/platform/build`，产物落 `build/out/`；各 app 构建脚本
+（`build-linux.sh` / `build-macos.sh` / Flutter 的 windows/linux CMake 内嵌 target）
+在打包前调用。Windows 需 C++/WinRT 头（`-DCPPWINRT_INCLUDE=` 或 vcpkg cppwinrt），
+缺失时自动降级（SMTC 禁用、Toast 走 MessageBox）。
 
 ## 3. C ABI（`include/archoera_platform.h` 草案）
 

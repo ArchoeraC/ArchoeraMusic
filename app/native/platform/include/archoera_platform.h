@@ -9,14 +9,29 @@
  * 约定：
  *  - 全部 extern struct / C ABI / 整型错误码，零 JSON、零子进程；
  *  - AplString.data 允许 NULL（= 字段缺失），UTF-8，仅调用期间有效，
- *    Zig 需要留存时自行拷贝；Zig 永不向 Dart 返回需释放的内存；
+ *    实现需要留存时自行拷贝；实现永不向 Dart 返回需释放的内存；
  *  - AplEvent 仅在回调期间有效（栈上），Dart 侧必须立即取值。
+ *
+ * 导出：Windows 上 `extern "C"` 不会自动导出符号，故用 APL_API 显式
+ * `__declspec(dllexport)`；构建桥接库时须定义 ARCHOERA_PLATFORM_BUILD。
  */
 #ifndef ARCHOERA_PLATFORM_H
 #define ARCHOERA_PLATFORM_H
 
 #include <stddef.h>
 #include <stdint.h>
+
+#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(ARCHOERA_PLATFORM_BUILD)
+#define APL_API __declspec(dllexport)
+#else
+#define APL_API __declspec(dllimport)
+#endif
+#elif defined(__GNUC__) && __GNUC__ >= 4
+#define APL_API __attribute__((visibility("default")))
+#else
+#define APL_API
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,10 +54,10 @@ extern "C" {
 #define APL_CAP_SYSTEM_ACCENT      (1u << 7) /* 系统主题色（DE accent） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
-int32_t apl_abi_version(void);   /* 契约版本 */
-int32_t apl_init(void);          /* 进程级一次；重复调用幂等 */
-int32_t apl_shutdown(void);      /* join 线程、释放抑制、注销媒体会话；幂等 */
-uint32_t apl_capabilities(void); /* 能力位图；未 init 亦可查询 */
+APL_API int32_t apl_abi_version(void);   /* 契约版本 */
+APL_API int32_t apl_init(void);          /* 进程级一次；重复调用幂等 */
+APL_API int32_t apl_shutdown(void);      /* join 线程、释放抑制、注销媒体会话；幂等 */
+APL_API uint32_t apl_capabilities(void); /* 能力位图；未 init 亦可查询 */
 
 /* ── 字符串与曲目元数据（零 JSON）───────────────────────────────── */
 typedef struct AplString {
@@ -60,32 +75,32 @@ typedef struct AplTrackMeta {
 } AplTrackMeta;
 
 /* ── SystemPower ───────────────────────────────────────────────── */
-int32_t apl_power_set_sleep_inhibit(int32_t on);
-int32_t apl_power_set_screen_events(int32_t on);
+APL_API int32_t apl_power_set_sleep_inhibit(int32_t on);
+APL_API int32_t apl_power_set_screen_events(int32_t on);
 
 /* ── SystemWindow ──────────────────────────────────────────────── */
-int32_t apl_window_set_events(int32_t on);
+APL_API int32_t apl_window_set_events(int32_t on);
 
 /* ── SystemMedia ───────────────────────────────────────────────── */
-int32_t apl_media_set_track(const AplTrackMeta *track); /* NULL = 清除 */
-int32_t apl_media_set_playback(int32_t state,   /* 0=stopped 1=playing 2=paused */
-                               int64_t position_ms,
-                               double speed, double volume,
-                               int32_t loop,    /* 0=list 1=one */
-                               int32_t shuffle);
-int32_t apl_media_set_window(int64_t window);   /* HWND/NSWindow*；非桌面忽略 */
+APL_API int32_t apl_media_set_track(const AplTrackMeta *track); /* NULL = 清除 */
+APL_API int32_t apl_media_set_playback(int32_t state,   /* 0=stopped 1=playing 2=paused */
+                                       int64_t position_ms,
+                                       double speed, double volume,
+                                       int32_t loop,    /* 0=list 1=one */
+                                       int32_t shuffle);
+APL_API int32_t apl_media_set_window(int64_t window);   /* HWND/NSWindow*；非桌面忽略 */
 
 /* 单实例：1=首实例；0=已有实例（调用方应退出）；<0=错误。进程内幂等。 */
-int32_t apl_instance_acquire(void);
+APL_API int32_t apl_instance_acquire(void);
 
 /* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
-int32_t apl_notify(const char *title, const char *body);
+APL_API int32_t apl_notify(const char *title, const char *body);
 
 /* 系统主题色（DE accent）：0=成功并写 *r/*g/*b(0-255)；<0=不可得。 */
-int32_t apl_system_accent(int32_t *r, int32_t *g, int32_t *b);
+APL_API int32_t apl_system_accent(int32_t *r, int32_t *g, int32_t *b);
 
 /* 订阅系统主题色变更：变更时回调事件 APL_EVENT_SYSTEM_ACCENT（无载荷）。 */
-int32_t apl_system_accent_set_events(int32_t on);
+APL_API int32_t apl_system_accent_set_events(int32_t on);
 
 /* ── 反向事件（OS → Dart）──────────────────────────────────────── */
 typedef enum {
@@ -119,7 +134,7 @@ typedef struct AplEvent {
  * cb = NULL 注销（线程安全，置位后生效）。 */
 typedef void (*AplEventCallback)(const AplEvent *event, void *user_data);
 
-int32_t apl_set_event_callback(AplEventCallback cb, void *user_data);
+APL_API int32_t apl_set_event_callback(AplEventCallback cb, void *user_data);
 
 #ifdef __cplusplus
 }

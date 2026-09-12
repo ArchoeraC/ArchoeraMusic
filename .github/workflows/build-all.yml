@@ -77,7 +77,7 @@ jobs:
             libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
-            libayatana-appindicator3-dev
+            libdbus-1-dev libayatana-appindicator3-dev
 
       # ───────────────────────── macOS（Homebrew 依赖）────────────────
       - name: Install Homebrew deps
@@ -310,6 +310,10 @@ jobs:
       - name: Build Flutter Windows
         if: matrix.os == 'windows'
         working-directory: app
+        # platform bridge（MSVC C++）经 CMake 内嵌构建，WinRT(SMTC/Toast) 需
+        # cppwinrt 头；缺头时 backend_windows.cpp 自动降级（SMTC 禁用）。
+        env:
+          CPPWINRT_INCLUDE: C:\vcpkg\installed\x64-windows-release\include
         run: flutter build windows --release
 
       # ─────────────── Windows：NSIS 安装器 + 便携 zip ──────────────

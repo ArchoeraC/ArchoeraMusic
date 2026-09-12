@@ -10,6 +10,7 @@
 #    4. vault        : dotnet publish (NativeAOT 凭据保险库)
 #    5. downloader   : cargo build --release (cdylib)
 #    6. subsonic     : cargo transcoder + go c-shared + go standalone
+#    7. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
 #
 #  依赖（Homebrew FFmpeg/taglib/openssl、CMake、Rust、Go、.NET）由 CI
 #  workflow 提前安装或由本地开发环境提供，本脚本只做编译引导（幂等）。
@@ -66,5 +67,11 @@ cargo build --release --manifest-path "$ROOT/downloader/Cargo.toml"
 
 echo "[build-macos] ===== subsonic (Go + Rust transcoder) ====="
 bash "$ROOT/subsonic/build.sh"
+
+# 平台能力桥接（SystemPower/SystemMedia/SystemWindow，apl_* C ABI，Dart FFI 直连）。
+# CMake 构建（ObjC++ + AppKit/MediaPlayer/Foundation），产物落 build/out/。
+echo "[build-macos] ===== platform bridge (CMake ObjC++) ====="
+cmake -S "$ROOT/../native/platform" -B "$ROOT/../native/platform/build" -DCMAKE_BUILD_TYPE=Release
+cmake --build "$ROOT/../native/platform/build" -j"$JOBS"
 
 echo "[build-macos] 全部模块构建完成"
