@@ -63,11 +63,22 @@ SectionEnd
 
 Section "Uninstall"
   SetRegView 64
+  ; 快捷方式：桌面 + 开始菜单目录内 + 应用自建的 AUMID 快捷方式（Toast 用）
   Delete "$DESKTOP\${APP_NAME}.lnk"
   Delete "$SMPROGRAMS\${APP_REG}\${APP_NAME}.lnk"
+  Delete "$SMPROGRAMS\${APP_NAME}.lnk"
   RMDir "$SMPROGRAMS\${APP_REG}"
 
+  ; 注册表：卸载项
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_REG}"
+
+  ; 用户数据（%LOCALAPPDATA%\ArchoeraMusic：设置/缓存/下载索引）：
+  ; **默认删除**，用户可选保留（默认按钮 = 是）。
+  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1 \
+    "是否删除用户数据（设置、缓存、下载索引）？$\r$\n$\r$\n$LOCALAPPDATA\ArchoeraMusic" \
+    IDNO keep_userdata
+  RMDir /r "$LOCALAPPDATA\ArchoeraMusic"
+  keep_userdata:
 
   RMDir /r "$INSTDIR"
 SectionEnd
