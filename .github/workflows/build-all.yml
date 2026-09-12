@@ -507,27 +507,30 @@ jobs:
   # 要求的地板）上从源码构建，产出单独的 .deb（DISTRO_TAG=deepin）。若仍无法在
   # Deepin 运行且不可解决，则放弃该 job 与 Deepin 支持。
   linux-deepin:
-    name: Linux deb (Deepin, 老基线)
+    name: Linux deb (Deepin 23)
     runs-on: ubuntu-24.04
-    container: ubuntu:20.04
+    # 在真·Deepin 23 容器内构建（官方 linuxdeepin/beige，Debian bookworm 系，
+    # glibc 2.35）：产物覆盖 Deepin 23/25。不用 Ubuntu 24.04 包硬塞——其
+    # GLIBC_2.36 需求超过 Deepin 23 的 2.35，会加载失败。
+    container: linuxdeepin/beige
     env:
-      BUILD_BASE: ubuntu-20.04
+      BUILD_BASE: deepin-23
     steps:
       - name: Install system dependencies
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential ninja-build pkg-config clang sudo \
+            ca-certificates build-essential cmake ninja-build pkg-config clang sudo \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev \
             libdbus-1-dev libayatana-appindicator3-dev \
-            patchelf nasm git curl wget xz-utils unzip zip jq file ca-certificates
+            patchelf nasm git curl wget xz-utils unzip zip jq file
       - uses: actions/checkout@v5
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
       - uses: ./.github/actions/build-linux
         with:
-          cache_key_suffix: ubuntu2004
+          cache_key_suffix: deepin23
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
