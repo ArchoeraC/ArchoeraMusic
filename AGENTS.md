@@ -48,6 +48,11 @@ cmake --build app/native/platform/build -j
   不要在 Dart 主 isolate 做逐像素或重计算。
 - 重计算/阻塞 IO 下沉到后台 isolate 或原生层；UI 线程只做轻量调度。
 - 新增/修改功能同样先问"能不能 GPU 化 / 下沉原生"，再考虑 Dart 侧实现。
+- **范例：播放页水纹背景**（`app/shaders/ripple.frag` +
+  `app/lib/widgets/player/ripple_shader.dart` / `ripple_background.dart`）——
+  单 pass 着色器完成折射/饱和/波峰高光/压暗，封面模糊与饱和在 Dart 侧**预烘焙一次**
+  （不每帧全屏模糊），每帧只更新 uniform；**着色器不可用时才回退 CPU 网格自绘**。
+  设计/性能预算见 `docs/player-render-optimization.md`。
 
 ## 发布与签名
 
