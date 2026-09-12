@@ -41,6 +41,7 @@ extern "c" fn apl_smtc_win_deinit() void;
 extern "c" fn apl_smtc_win_debug_playback_status() c_int;
 extern "c" fn apl_smtc_win_debug_is_enabled() c_int;
 extern "c" fn apl_smtc_win_debug_button_registered() c_int;
+extern "c" fn apl_smtc_win_probe() void;
 
 // ── 弱符号兜底（未编译 win_smtc.cpp 时）──────────────────────────
 
@@ -76,6 +77,7 @@ fn debugEnabledFallback() callconv(.c) c_int {
 fn debugButtonFallback() callconv(.c) c_int {
     return 0;
 }
+fn probeFallback() callconv(.c) void {}
 comptime {
     @export(&initFallback, .{ .name = "apl_smtc_win_init", .linkage = .weak });
     @export(&setTrackFallback, .{ .name = "apl_smtc_win_set_track", .linkage = .weak });
@@ -84,6 +86,7 @@ comptime {
     @export(&debugStatusFallback, .{ .name = "apl_smtc_win_debug_playback_status", .linkage = .weak });
     @export(&debugEnabledFallback, .{ .name = "apl_smtc_win_debug_is_enabled", .linkage = .weak });
     @export(&debugButtonFallback, .{ .name = "apl_smtc_win_debug_button_registered", .linkage = .weak });
+    @export(&probeFallback, .{ .name = "apl_smtc_win_probe", .linkage = .weak });
 }
 
 // ── 反向：C++ 按钮回调 → Zig → Dart ────────────────────────────────
@@ -103,6 +106,11 @@ export fn apl_smtc_on_button(button: i32) callconv(.c) void {
 }
 
 // ── 正向：Zig → C++ ───────────────────────────────────────────────
+
+/// 加载探针：桥接初始化时调用一次，确认 DLL 已加载、C++ 代码在跑（写日志）。
+pub fn probe() void {
+    apl_smtc_win_probe();
+}
 
 pub fn init(findWindow: *const fn () ?win.HWND) i32 {
     const hwnd = findWindow() orelse return core.ERR_BACKEND;
