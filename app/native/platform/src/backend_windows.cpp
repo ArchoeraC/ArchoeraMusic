@@ -43,6 +43,8 @@
 #include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Media.h>
+#include <winrt/Windows.Media.Core.h>
+#include <winrt/Windows.Media.Playback.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.UI.Notifications.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
@@ -363,84 +365,19 @@ namespace winrt_smtc {
 
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Media;
+using namespace winrt::Windows::Media::Playback;
 using namespace winrt::Windows::Storage::Streams;
 
-// ISystemMediaTransportControlsInterop
-// {ddb0472d-c911-4a1f-86d9-dc3d71a95f5a}
-MIDL_INTERFACE("ddb0472d-c911-4a1f-86d9-dc3d71a95f5a")
-ISystemMediaTransportControlsInterop : public ::IUnknown {
-   public:
-    virtual HRESULT STDMETHODCALLTYPE GetForWindow(HWND app_window, REFIID riid,
-                                                   void** ppv) = 0;
-};
-
-// ISystemMediaTransportControls {99FA3FF4-1742-42A6-902E-087D41F965EC}
-constexpr GUID kIidSmtc = {
-    0x99FA3FF4,
-    0x1742,
-    0x42A6,
-    {0x90, 0x2E, 0x08, 0x7D, 0x41, 0xF9, 0x65, 0xEC}};
-
-// SMTC 需与顶层窗口关联（GetForWindow）。**关键**：GetForWindow 要求目标窗口的
-// 所属线程会泵消息（内部向窗口线程投递并等待）——若窗口建在调用线程上，而该
-// 线程正阻塞在此调用中（Dart FFI 线程）→ 真机死锁（日志停在 hwnd=... 后不再前进）。
-// 故把隐藏窗口放到**专用消息泵线程**（对齐 Chromium gfx::SingletonHwnd：窗口与
-// SMTC 调用可分属不同线程，只要窗口线程在泵消息）。HWND 为 POD，无静态析构。
-struct HiddenWndState {
-    std::atomic<HWND> hwnd{nullptr};
-    std::atomic<bool> quit{false};
-    std::thread* thread = nullptr;
-    DWORD thread_id = 0;
-};
-HiddenWndState g_hidden;
-
-void hiddenWndThreadMain() {
-    ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    constexpr wchar_t kClass[] = L"ArchoeraMusicSmtcHiddenWnd";
-    WNDCLASSW wc = {};
-    wc.lpfnWndProc = ::DefWindowProcW;
-    wc.hInstance = ::GetModuleHandleW(nullptr);
-    wc.lpszClassName = kClass;
-    ::RegisterClassW(&wc);
-    HWND hwnd = ::CreateWindowExW(0, kClass, L"", WS_OVERLAPPED, 0, 0, 0, 0,
-                                  nullptr, nullptr, wc.hInstance, nullptr);
-    g_hidden.thread_id = ::GetCurrentThreadId();
-    g_hidden.hwnd.store(hwnd, std::memory_order_release);
-    MSG msg;
-    while (!g_hidden.quit.load(std::memory_order_acquire) &&
-           ::GetMessageW(&msg, nullptr, 0, 0) > 0) {
-        ::TranslateMessage(&msg);
-        ::DispatchMessageW(&msg);
-    }
-    ::CoUninitialize();
-}
-
-HWND hiddenWindow() {
-    HWND existing = g_hidden.hwnd.load(std::memory_order_acquire);
-    if (existing != nullptr) return existing;
-    g_hidden.thread = new std::thread(hiddenWndThreadMain);
-    for (int i = 0; i < 500; i++) {
-        HWND h = g_hidden.hwnd.load(std::memory_order_acquire);
-        if (h != nullptr) return h;
-        ::Sleep(10);
-    }
-    log("apl/smtc: hidden window thread timeout");
-    return nullptr;
-}
-
-void destroyHiddenWindow() {
-    if (g_hidden.thread == nullptr) return;
-    g_hidden.quit.store(true, std::memory_order_release);
-    if (g_hidden.thread_id != 0) {
-        ::PostThreadMessageW(g_hidden.thread_id, WM_QUIT, 0, 0);
-    }
-    if (g_hidden.thread->joinable()) g_hidden.thread->join();
-    delete g_hidden.thread;
-    g_hidden.thread = nullptr;
-    g_hidden.hwnd.store(nullptr, std::memory_order_release);
-}
+// SMTC 走 `MediaPlayer` 自带的 SystemMediaTransportControls（见 init()）：
+// - 不再用 ISystemMediaTransportControlsInterop::GetForWindow + 自建隐藏窗口。
+//   GetForWindow 要求目标窗口所属线程泵消息（内部投递并等待），真机曾死锁；
+// - MediaPlayer 由系统内部创建并持有一个 SMTC，无需窗口、无需消息泵，
+//   也就没有"隐藏窗口 + 泵消息"的可疑特征（对齐用户决策）。
 
 struct State {
+    // 仅为承载 SMTC 而创建的 MediaPlayer（不喂 Source、不播放）。系统为每个
+    // MediaPlayer 实例内部创建一个 SystemMediaTransportControls，故无需窗口。
+    MediaPlayer player{nullptr};
     SystemMediaTransportControls controls{nullptr};
     SystemMediaTransportControlsDisplayUpdater updater{nullptr};
     MusicDisplayProperties music{nullptr};
@@ -518,11 +455,6 @@ int32_t init() {
     auto& s = state();
     if (s.initialized) return OK;
     logReset();
-    HWND hwnd = findFlutterWindow();
-    if (hwnd == nullptr) {
-        log("apl/smtc: init hwnd=null");
-        return ERR_BACKEND;
-    }
     log("apl/smtc: init begin");
     try {
         try {
@@ -533,29 +465,29 @@ int32_t init() {
             log("apl/smtc: init_apartment unknown");
         }
 
-        auto interop = winrt::get_activation_factory<ISystemMediaTransportControlsInterop>(
-            L"Windows.Media.SystemMediaTransportControls");
-        log("apl/smtc: interop ok");
-        HWND target = hiddenWindow();
-        if (target == nullptr) target = hwnd;
-        {
-            char hb[160];
-            std::snprintf(hb, sizeof(hb), "apl/smtc: hwnd=%p target=%p", hwnd,
-                          target);
-            logRaw(hb);
+        // 创建 MediaPlayer 只为拿它内部的 SMTC（不喂 Source、不播放）。关掉
+        // CommandManager，避免它自动接管媒体键——我们自己在 ButtonPressed 里处理。
+        s.player = MediaPlayer();
+        log("apl/smtc: MediaPlayer created");
+        auto command_manager = s.player.CommandManager();
+        if (command_manager != nullptr) {
+            command_manager.IsEnabled(false);
+            log("apl/smtc: CommandManager disabled");
         }
-        SystemMediaTransportControls controls{nullptr};
-        winrt::check_hresult(
-            interop->GetForWindow(target, kIidSmtc, winrt::put_abi(controls)));
-        log("apl/smtc: GetForWindow ok");
-        s.controls = controls;
 
-        s.updater = controls.DisplayUpdater();
+        s.controls = s.player.SystemMediaTransportControls();
+        if (s.controls == nullptr) {
+            log("apl/smtc: SMTC null");
+            return ERR_BACKEND;
+        }
+        log("apl/smtc: SMTC acquired");
+
+        s.updater = s.controls.DisplayUpdater();
         s.updater.Type(MediaPlaybackType::Music);
         s.music = s.updater.MusicProperties();
         log("apl/smtc: display updater ok");
 
-        s.button_token = controls.ButtonPressed(
+        s.button_token = s.controls.ButtonPressed(
             [](SystemMediaTransportControls const&,
                SystemMediaTransportControlsButtonPressedEventArgs const& args) {
                 int32_t cmd = -1;
@@ -584,12 +516,12 @@ int32_t init() {
         s.button_registered = true;
         log("apl/smtc: ButtonPressed registered");
 
-        controls.IsEnabled(true);
-        controls.IsPlayEnabled(true);
-        controls.IsPauseEnabled(true);
-        controls.IsNextEnabled(true);
-        controls.IsPreviousEnabled(true);
-        controls.IsStopEnabled(true);
+        s.controls.IsEnabled(true);
+        s.controls.IsPlayEnabled(true);
+        s.controls.IsPauseEnabled(true);
+        s.controls.IsNextEnabled(true);
+        s.controls.IsPreviousEnabled(true);
+        s.controls.IsStopEnabled(true);
 
         s.initialized = true;
         log("apl/smtc: ready");
@@ -707,11 +639,11 @@ void deinit() {
     s.music = nullptr;
     s.updater = nullptr;
     s.controls = nullptr;
+    s.player = nullptr;
     s.duration_ms = 0;
     s.initialized = false;
     delete sp;
     sp = nullptr;
-    destroyHiddenWindow();
 }
 
 }  // namespace winrt_smtc
