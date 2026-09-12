@@ -16,6 +16,14 @@
 #include <windows.h>
 #include <unknwn.h>
 
+// cppwinrt 2.x 的 `com_array::detach_abi` 以 `#ifdef _MSC_VER` 选 memset 分支，而
+// Zig 的 clang 在 windows-msvc 目标下也定义 `_MSC_VER` → 触发 `-Wnontrivial-memcall`
+// （CI 的 vcpkg cppwinrt 为 2.0.250303.1；3.x 已加 `!defined(__clang__)` 修复）。
+// 在包含 WinRT 头之前屏蔽该警告，避免其被当作错误。
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wnontrivial-memcall"
+#endif
+
 #include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Media.h>
@@ -59,9 +67,11 @@ struct State {
 };
 
 State& state() {
-    // 故意泄漏：避免进程退出时静态析构 WinRT 对象（晚于 COM uninit）崩溃。
-    static State* s = new State();
-    return *s;
+    // 不泄漏：正常退出路径会先经 apl_smtc_win_deinit() 清空全部 WinRT 成员
+    // （见 backend.shutdown ← apl_shutdown），故进程退出时的静态析构为平凡操作，
+    // 不会晚于 COM uninit 去 Release WinRT 对象。
+    static State s;
+    return s;
 }
 
 winrt::hstring H(const char* data, int32_t len) {
@@ -212,13 +222,13 @@ extern "C" void apl_smtc_win_set_track(
     }
 }
 
-extern "C" void apl_smtc_win_set_playback(int32_t state, int64_t position_ms,
-                                          double speed) {
+extern "C" void apl_smtc_win_set_playback(int32_t playback_state,
+                                          int64_t position_ms, double speed) {
     auto& s = state();
     if (!s.initialized || !s.controls) return;
     try {
         MediaPlaybackStatus st = MediaPlaybackStatus::Paused;
-        switch (state) {
+        switch (playback_state) {
             case 0:
                 st = MediaPlaybackStatus::Stopped;
                 break;
