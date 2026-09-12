@@ -120,7 +120,7 @@ runs:
     # 产物不再依赖目标发行版的 soname（防系统库差异/升级导致加载断裂）。
     - name: Bundle self-contained runtime libs
       shell: bash
-      run: bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle/native
+      run: bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle
 
     # LGPL 合规：随包附 FFmpeg / TagLib 许可文本 + 聚合声明（见根 THIRD-PARTY-NOTICES.md）
     - name: Bundle third-party licenses (LGPL 合规)

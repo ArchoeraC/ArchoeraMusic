@@ -95,7 +95,7 @@ flutter build linux --release
 - `archoera_music`（可执行文件）
 - `data/`（Flutter assets + icudtl）
 - `native/`：上表全部原生产物平铺（CMake 在构建时自动从各模块 `build/` 拷入）。发布构建另用
-  `bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle/native` 把 FFmpeg/TagLib 的
+  `bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle` 把 FFmpeg/TagLib 的
   传递依赖闭包收进此处并加 `RUNPATH=$ORIGIN`，使产物不依赖目标发行版 soname；包内 `BUILD-INFO.txt`
   记录构建目标/基线/最低 glibc。
 
