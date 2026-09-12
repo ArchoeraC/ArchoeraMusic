@@ -25,9 +25,19 @@ cd build && ctest
 （`ARCHOERA_PUBKEY.pem`）。私钥**绝不入库/入包**。
 
 ### 发布流程
-1. 打 tag（`v*`）→ CI 构建三端产物。
-2. `release` 作业进入 **Environment 审批**：人工批准后，CI 用 key1 对全部资产签 `.sig1`，
-   复制公钥，创建/更新 GitHub Release。
+1. 升版本 + **更新 `CHANGELOG.md`**（见下节）。
+2. 打 tag（`v*`）→ CI 构建三端产物。
+3. `release` 作业进入 **Environment 审批**：人工批准后，CI 用 key1 对全部资产签 `.sig1`，
+   复制公钥，按 tag 从 `CHANGELOG.md` 抽取说明创建/更新 GitHub Release。
+
+### 更新日志（CHANGELOG.md）
+- 根目录 `CHANGELOG.md` 是各版本 **GitHub Release 说明的唯一来源**：release 作业按 tag
+  抽取对应 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
+- **文风**：新增条目须**沿用当前作者的风格**（口语化、「喵」、编号列表等），
+  不要改成正式 Keep-a-Changelog 腔调。
+- **每次发版必须更新**：在 `CHANGELOG.md` 顶部加一段
+  `## [<version>] - <YYYY-MM-DD>`（与 `pubspec.yaml` 的 `version:`、git tag 一致）。
+  缺段落时 Release 回退到通用文案。
 
 ### 验签（任何人）
 ```bash
@@ -58,13 +68,15 @@ bash app/tool/sign_watermark.sh          # 本地运行；CI 环境会拒绝执�
 - **CODEOWNERS**：`.github/CODEOWNERS` 把 CI/工具/打包/水印等关键路径指向维护者。
 
 ## 触发一次 Release（端到端）
-1. **升版本**：改 `app/pubspec.yaml` 的 `version:`（如 `0.9.15+5`）。
-2. **提交**：因 `protect-main` 禁直推，走 PR：`git switch -c chore/release-x` →
+1. **升版本**：改 `app/pubspec.yaml` 的 `version:`（如 `0.9.15+8`）。
+2. **更新 `CHANGELOG.md`**：顶部加 `## [<version>] - <YYYY-MM-DD>` 段，沿用作者文风。
+3. **提交**：因 `protect-main` 禁直推，走 PR：`git switch -c chore/release-x` →
    commit → push → `gh pr create` → 自合并（0 approvals 即可）。
-3. **打 tag 并推**：`git tag v<version> && git push origin v<version>`
+4. **打 tag 并推**：`git tag v<version> && git push origin v<version>`
    （`v*` 匹配部署策略；**tag 一旦推送不可删改**）。
-4. **审批**：Actions → 该 run 的 release 作业停在 **Waiting for review** → Approve。
-   CI 用 key1 签 `<asset>.sig1`、复制公钥、创建 Release → 官方发布完成。
+5. **审批**：Actions → 该 run 的 release 作业停在 **Waiting for review** → Approve。
+   CI 用 key1 签 `<asset>.sig1`、复制公钥、按 tag 抽取 `CHANGELOG.md` 段落作为
+   Release 正文 → 官方发布完成。
 
 ## 红线
 - 禁止提交任何私钥/凭据（`.gitignore` 已忽略 `*.key`、`*_priv.pem`；公钥 `watermark_pub*.pem` 需跟踪）。
