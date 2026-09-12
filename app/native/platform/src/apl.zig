@@ -22,6 +22,14 @@ export fn apl_abi_version() callconv(.c) i32 {
 
 export fn apl_init() callconv(.c) i32 {
     core.setInitialized(true);
+    // 平台后端初始化：Windows 设 AppUserModelID（媒体键/任务栏分组）；
+    // macOS 注册 MPRemoteCommand 媒体键；Linux 懒连接。此前从未调用 →
+    // macOS/Windows 的媒体键注册实际从未生效。
+    const rc = backend.init();
+    if (rc != core.OK) {
+        core.setInitialized(false);
+        return rc;
+    }
     return core.OK;
 }
 

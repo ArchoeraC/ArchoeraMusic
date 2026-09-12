@@ -87,6 +87,7 @@ pub fn main() void {
         .album = s(al),
         .duration_ms = 1000,
         .art_url = s("https://p1.music.126.net/cover.jpg"),
+        .art_bytes = .{ .data = null, .len = 0 },
     };
     std.debug.print("set_track={d}\n", .{backend.mediaSetTrack(&meta)});
     std.debug.print("set_playback={d}\n", .{backend.mediaSetPlayback(1, 0, 1.0, 1.0, 0, 0)});

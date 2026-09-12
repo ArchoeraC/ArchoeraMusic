@@ -34,13 +34,19 @@ pub fn build(b: *std.Build) void {
         lib.root_module.linkSystemLibrary("powrprof", .{});
         lib.root_module.linkSystemLibrary("advapi32", .{});
         lib.root_module.linkSystemLibrary("dwmapi", .{});
-        // 可选：原生 C++/WinRT Toast（win_toast.cpp）。需 C++/WinRT 头路径：
+        // 可选：原生 C++/WinRT 实现。需 C++/WinRT 头路径：
         //   -Dcppwinrt-include=<dir> 或环境变量 CPPWINRT_INCLUDE（vcpkg `cppwinrt`）。
-        // 未提供则跳过；Zig 侧 apl_win_toast 弱符号兜底（PowerShell 调 WinRT）。
-        const inc_opt = b.option([]const u8, "cppwinrt-include", "C++/WinRT include dir (win_toast.cpp)");
+        //   - win_toast.cpp：原生 Toast（Windows.UI.Notifications）。
+        //   - win_smtc.cpp ：SMTC 媒体会话/按钮事件（C++/WinRT 标准委托，见该文件）。
+        // 未提供则跳过两个 .cpp；Zig 侧弱符号兜底（Toast 走 PowerShell，SMTC 禁用）。
+        const inc_opt = b.option([]const u8, "cppwinrt-include", "C++/WinRT include dir (win_toast.cpp / win_smtc.cpp)");
         if (inc_opt) |inc| {
             lib.root_module.addCSourceFile(.{
                 .file = b.path("src/backend/win_toast.cpp"),
+                .flags = &.{ "-std=c++20" },
+            });
+            lib.root_module.addCSourceFile(.{
+                .file = b.path("src/backend/win_smtc.cpp"),
                 .flags = &.{ "-std=c++20" },
             });
             lib.root_module.addIncludePath(.{ .cwd_relative = inc });
