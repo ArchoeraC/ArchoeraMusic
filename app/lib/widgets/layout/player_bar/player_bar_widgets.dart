@@ -112,9 +112,13 @@ class _BarLikeButtonState extends ConsumerState<_BarLikeButton> {
 
 Widget _glass(bool imageMode, {required Widget child}) {
   if (!imageMode) return child;
-  return BackdropFilter(
-    filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-    child: child,
+  // ClipRect 把 BackdropFilter 的模糊限制在本控件范围内——否则模糊会作用到
+  // 整个 backdrop 层（图片背景模式下会糊住上方全部主界面）。
+  return ClipRect(
+    child: BackdropFilter(
+      filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+      child: child,
+    ),
   );
 }
 
