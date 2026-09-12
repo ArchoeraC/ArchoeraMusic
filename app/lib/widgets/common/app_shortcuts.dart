@@ -41,7 +41,7 @@ class AppShortcuts extends ConsumerWidget {
   static const seekStep = Duration(seconds: 10);
   static const seekLongStep = Duration(seconds: 30);
 
-  /// 音量步进（对齐 SPlayer-Next VOLUME_STEP = 0.05）。
+  /// 音量步进（0.05）。
   static const volumeStep = 0.05;
 
   @override

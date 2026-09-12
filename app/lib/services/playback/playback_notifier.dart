@@ -136,7 +136,7 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// 立即停掉自身引擎，不再等待转码完成——缓冲中切歌不再排队干等旧转码。
   int _loadGen = 0;
 
-  /// 连续加载失败计数（成功播放时归零；对齐 SPlayer-Next consecutiveFailures）。
+  /// 连续加载失败计数（成功播放时归零）。
   int _consecutiveFailures = 0;
 
   /// 当前会话历史是否已记录（真正开始播放时置位，避免重复记录；

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 全屏播放器「水纹」背景（自绘引擎 + GPU 着色器，移植 SPlayer-Next `BackgroundRipple.vue`）。
+/// 全屏播放器「水纹」背景（自绘引擎 + GPU 着色器）。
 ///
 /// 上游为 WebGPU/WebGL 片元着色器：对封面做多涟漪折射位移 + 波峰高光/波谷压暗。
 /// Flutter 端两条路径（渲染器优先，见 docs/player-render-optimization.md）：

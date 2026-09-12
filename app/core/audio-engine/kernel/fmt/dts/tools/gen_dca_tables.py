@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """Extract numeric const arrays from FFmpeg dcadata.c / dcahuff.c -> Zig."""
-import re, sys
+import os, re, sys
+from pathlib import Path
 
-SRC = "/home/betastudio2/文档/SPlayer-Next/ArchoeraMusic/reference/FFmpeg/libavcodec"
+# 仓库根下的 reference/FFmpeg（可用 ARCHOERA_FFMPEG_SRC 覆盖）
+_REPO = Path(__file__).resolve().parents[7]
+SRC = os.environ.get(
+    "ARCHOERA_FFMPEG_SRC", str(_REPO / "reference" / "FFmpeg" / "libavcodec")
+)
 
 def strip_comment_block(text):
     # remove /* ... */ comments

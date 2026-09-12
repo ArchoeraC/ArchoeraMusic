@@ -94,7 +94,7 @@ internal static class SecretKeyScope
     public static string Scoped(string dataDir, string key) => $"{key}|{dataDir}";
 }
 
-/// 文件密钥后端（LEGACY 兼容方案，对应原 SPlayer-Next 服务端加密形态）：
+/// 文件密钥后端（LEGACY 兼容方案，对应服务端加密形态）：
 /// 主密钥 K 整体落盘 <dataDir>/secret.key（0600 原子写入），**无 OS 钥匙串依赖**，
 /// 适用于无 Secret Service 的 headless Linux / Docker 等场景。
 ///   - `ARCHOERA_VAULT_SECRET_KEY`（hex 64 = 32B）覆盖 K（对应原项目

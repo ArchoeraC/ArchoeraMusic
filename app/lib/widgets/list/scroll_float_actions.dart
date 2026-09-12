@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 歌曲列表浮动操作小组件（对齐 SPlayer-Next SongList 右下角浮动按钮组）：
+/// 歌曲列表浮动操作小组件（右下角浮动按钮组）：
 ///
 /// - [ScrollToTopButton]：回到顶部。滚动超过 [threshold] 时浮现，
 ///   点击平滑滚动回列表顶部。
@@ -10,7 +10,7 @@
 ///   （[playingIndex] >= 0）时浮现，点击平滑滚动到该行。
 ///
 /// 两个组件均依赖宿主传入的 [ScrollController]（同一滚动容器）；批量
-/// 选择模式下由宿主决定是否隐藏整组（对齐 SPlayer-Next `!batch.active`）。
+/// 选择模式下由宿主决定是否隐藏整组。
 library;
 
 import 'dart:async';
@@ -116,7 +116,7 @@ class ScrollToTopButton extends StatefulWidget {
   /// 承载列表的滚动控制器（由宿主创建并传给 ListView）。
   final ScrollController controller;
 
-  /// 滚动超过该像素值才显示（对齐 SPlayer-Next `scrollTop > 100`）。
+  /// 滚动超过该像素值才显示。
   final double threshold;
 
   @override

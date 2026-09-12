@@ -5,8 +5,7 @@
 /**
  * archoera_mediaengine.h — 音频引擎 FFI 库（Dart 桌面端直连，替代进程 IPC）
  *
- * 命名（2026-08-07 用户决策）：本项目自研代码，命名不沿用上游 SPlayer-Next
- * 的 splayer_* 前缀，统一为 archoera_mediaengine。
+ * 命名（2026-08-07 用户决策）：本项目自研代码，统一为 archoera_mediaengine。
  *
  * 动机：桌面端从「子进程 spawn + AF_UNIX 三路 UDS」迁移到 FFI 直连，
  * 摆脱 AF_UNIX（Windows 无此机制）与 TCP 回退的兼容性问题。

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 全屏播放器背景（对齐 SPlayer-Next `PlayerBackground.vue`）。
+/// 全屏播放器背景。
 ///
 /// 支持四种样式（设置 → 播放 → 播放页背景）：
 /// - `gradient`：主题主色 → 播放器底色的对角渐变（默认，兜底）；

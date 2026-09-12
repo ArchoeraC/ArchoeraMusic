@@ -413,6 +413,14 @@ bool readDwmDword(const wchar_t* value, DWORD* out) {
 std::atomic<bool> g_accent_on{false};
 std::thread* g_accent_thread = nullptr;
 
+// 前置声明（定义见文件后部）：读取当前系统强调色。
+bool systemAccent(int32_t* r, int32_t* g, int32_t* b);
+
+void pushAccent() {
+    int32_t r = 0, g = 0, b = 0;
+    if (systemAccent(&r, &g, &b)) dispatch(makeSystemAccent(r, g, b));
+}
+
 void accentThread() {
     HKEY hkey = nullptr;
     if (::RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\DWM",
@@ -424,6 +432,8 @@ void accentThread() {
         ::RegCloseKey(hkey);
         return;
     }
+    // 订阅即推送一次当前值（平台推送模型）。
+    pushAccent();
     while (g_accent_on.load(std::memory_order_acquire)) {
         if (::RegNotifyChangeKeyValue(hkey, FALSE, REG_NOTIFY_CHANGE_LAST_SET, ev,
                                       TRUE) != ERROR_SUCCESS) {
@@ -432,11 +442,68 @@ void accentThread() {
         // 500ms 轮询退出标志（RegNotifyChangeKeyValue 阻塞不可取消）
         if (::WaitForSingleObject(ev, 500) == WAIT_OBJECT_0 &&
             g_accent_on.load(std::memory_order_acquire)) {
-            dispatch(makeSystemAccent());
+            pushAccent();
         }
     }
     ::CloseHandle(ev);
     ::RegCloseKey(hkey);
+}
+
+// ── 系统深浅色：HKCU\...\Themes\Personalize\AppsUseLightTheme（1=浅 0=深）──
+std::atomic<bool> g_theme_on{false};
+std::thread* g_theme_thread = nullptr;
+
+bool readThemeDark() {
+    DWORD v = 0;
+    DWORD sz = sizeof(v);
+    const LSTATUS rc = ::RegGetValueW(
+        HKEY_CURRENT_USER,
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        L"AppsUseLightTheme", kRrfRtRegDword, nullptr, &v, &sz);
+    if (rc != ERROR_SUCCESS) return false;  // 缺省浅色
+    return v == 0;                          // 0=深色
+}
+
+void themeThread() {
+    HKEY hkey = nullptr;
+    if (::RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            0, KEY_NOTIFY, &hkey) != ERROR_SUCCESS) {
+        return;
+    }
+    HANDLE ev = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (ev == nullptr) {
+        ::RegCloseKey(hkey);
+        return;
+    }
+    // 订阅即推送当前值（平台推送模型）。
+    dispatch(makeSystemTheme(readThemeDark()));
+    while (g_theme_on.load(std::memory_order_acquire)) {
+        if (::RegNotifyChangeKeyValue(hkey, FALSE, REG_NOTIFY_CHANGE_LAST_SET, ev,
+                                      TRUE) != ERROR_SUCCESS) {
+            break;
+        }
+        if (::WaitForSingleObject(ev, 500) == WAIT_OBJECT_0 &&
+            g_theme_on.load(std::memory_order_acquire)) {
+            dispatch(makeSystemTheme(readThemeDark()));
+        }
+    }
+    ::CloseHandle(ev);
+    ::RegCloseKey(hkey);
+}
+
+int32_t systemThemeSetEvents(bool on) {
+    const bool was = g_theme_on.exchange(on, std::memory_order_acq_rel);
+    if (on && !was) {
+        try {
+            g_theme_thread = new std::thread(themeThread);
+        } catch (...) {
+            g_theme_on.store(false, std::memory_order_release);
+            return ERR_BACKEND;
+        }
+    }
+    return OK;
 }
 
 // ── WinRT：SMTC + Toast ───────────────────────────────────────────
@@ -772,7 +839,8 @@ void messageBox(const char* title, const char* body) {
 
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
-           CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT;
+           CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
+           CAP_SYSTEM_THEME;
 }
 
 int32_t init() {

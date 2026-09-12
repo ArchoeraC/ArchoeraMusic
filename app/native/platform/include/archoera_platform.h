@@ -52,6 +52,7 @@ extern "C" {
 #define APL_CAP_WINDOW_STATE       (1u << 5) /* 窗口最小化/失焦事件 */
 #define APL_CAP_APP_INSTANCE       (1u << 6) /* 单实例仲裁（文件锁） */
 #define APL_CAP_SYSTEM_ACCENT      (1u << 7) /* 系统主题色（DE accent） */
+#define APL_CAP_SYSTEM_THEME       (1u << 8) /* 系统深浅色（light/dark） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -96,11 +97,22 @@ APL_API int32_t apl_instance_acquire(void);
 /* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
 APL_API int32_t apl_notify(const char *title, const char *body);
 
-/* 系统主题色（DE accent）：0=成功并写 r/g/b（0-255）；<0=不可得。 */
+/* 一次性读取系统主题色（0=成功并写 r/g/b，0-255；<0=不可得）。
+ * 注：应用层不应主动轮询/查询系统色；正常路径是 apl_system_accent_set_events
+ * 订阅后由平台**推送**（订阅时立即推当前值，之后推变化）。本函数仅作备用。 */
 APL_API int32_t apl_system_accent(int32_t *r, int32_t *g, int32_t *b);
 
-/* 订阅系统主题色变更：变更时回调事件 APL_EVENT_SYSTEM_ACCENT（无载荷）。 */
+/* 订阅系统主题色：平台**推送**（OS → Dart）——
+ *   - 订阅成功时立即推送一次当前色；
+ *   - 之后系统色变化时推送。
+ * 事件 APL_EVENT_SYSTEM_ACCENT 携带 u.accent（r/g/b，0-255），Dart 无需再查询。 */
 APL_API int32_t apl_system_accent_set_events(int32_t on);
+
+/* 订阅系统深浅色：平台**推送**（OS → Dart）——
+ *   - 订阅成功时立即推送一次当前值；
+ *   - 之后系统深浅色变化时推送。
+ * 事件 APL_EVENT_SYSTEM_THEME 携带 u.theme.dark（1=深色，0=浅色）。 */
+APL_API int32_t apl_system_theme_set_events(int32_t on);
 
 /* ── 反向事件（OS → Dart）──────────────────────────────────────── */
 typedef enum {
@@ -109,7 +121,8 @@ typedef enum {
     APL_EVENT_SCREEN_STATE  = 3,
     APL_EVENT_WINDOW_STATE  = 4,
     APL_EVENT_BACKEND_STATE = 5, /* u.backend_lost：1=后端断连 */
-    APL_EVENT_SYSTEM_ACCENT = 6, /* 系统主题色变更（无载荷，重读 apl_system_accent） */
+    APL_EVENT_SYSTEM_ACCENT = 6, /* 系统主题色（u.accent：r/g/b 0-255，平台推送） */
+    APL_EVENT_SYSTEM_THEME  = 7, /* 系统深浅色（u.theme.dark：1=深色，平台推送） */
 } AplEventType;
 
 typedef enum {
@@ -126,6 +139,8 @@ typedef struct AplEvent {
         int32_t active;    /* SCREEN_STATE：1=熄屏/屏保激活 */
         struct { int32_t minimized; int32_t focused; } window; /* WINDOW_STATE */
         int32_t backend_lost; /* BACKEND_STATE */
+        struct { int32_t r; int32_t g; int32_t b; } accent; /* SYSTEM_ACCENT：0-255 */
+        struct { int32_t dark; } theme; /* SYSTEM_THEME：1=深色 0=浅色 */
     } u;
 } AplEvent;
 

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// AMLL v7 物理歌词墙：忠实移植 SPlayer-Next 自研物理歌词引擎的 Flutter 版。
+/// AMLL v7 物理歌词墙（物理歌词引擎的 Flutter 版）。
 ///
 /// - 布局：每行高度由 [computeLineHeights] 实测（主行+翻译，长行自动换行、
 ///   多行计入行高），[computeCenters] 累计自然中心；

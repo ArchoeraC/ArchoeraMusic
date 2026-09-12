@@ -686,7 +686,7 @@ fn level_to_key(level: &str) -> String {
 ///
 /// 网易云 `download/url`（客户端下载接口）对未登录 / 无下载权限的歌曲经常
 /// 返回 url=null（尤其无损档），而 `player/url`（播放接口）对免费曲仍能返回
-/// 完整无损 URL。原版 SPlayer-Next 的顺序是 download → 失败回落 player，
+/// 完整无损 URL。顺序为 download → 失败回落 player，
 /// 本函数即该回落：data 为数组取首项，**freeTrialInfo（试听片段）视为不可用**。
 async fn nm_player_url(
     client: &reqwest::Client,

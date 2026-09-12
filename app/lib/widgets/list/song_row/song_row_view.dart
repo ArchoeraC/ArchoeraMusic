@@ -145,7 +145,7 @@ extension _SongRowView on _SongRowState {
                                       ),
                                     ),
                                   // 音质角标（KG hash 链 / NT quality；
-                                  // 无损档琥珀色高亮，对齐 SPlayer-Next）
+                                  // 无损档琥珀色高亮）
                                   if (!prefs.hideQualityTag &&
                                       bestQuality != null)
                                     Padding(
@@ -379,7 +379,7 @@ class _SelectCell extends StatelessWidget {
   }
 }
 
-/// 来源平台小徽标（对齐 SPlayer-Next 列表的平台角标；聚合搜索时区分来源）。
+/// 来源平台小徽标（聚合搜索时区分来源）。
 class _SourceBadge extends StatelessWidget {
   const _SourceBadge({required this.source});
 
@@ -419,7 +419,7 @@ class _SourceBadge extends StatelessWidget {
 
 /// 可用最高音质标签（label + 是否无损档）：
 /// - KG：按 hash 链判断（Hi-Res/无损/HQ/SQ/LQ，见 KugouTrackInfo）；
-/// - NT：由 [Track.quality] 反推等级（对齐 SPlayer-Next quality.ts）。
+/// - NT：由 [Track.quality] 反推等级。
 /// 返回 null 表示无可用信息（列表不显示音质标签）。
 ({String label, bool lossless})? _bestQuality(Track t, AppLocalizations l10n) {
   final k = t.kugou;
@@ -436,8 +436,7 @@ class _SourceBadge extends StatelessWidget {
   return _qualityLevel(t.quality, l10n);
 }
 
-/// 由 [TrackQuality] 反推等级短码（对齐 SPlayer-Next quality.ts 的
-/// getQualityLevel/getQualityLabel）：无损编解码器 → Hi-Res（sr≥96k 且
+/// 由 [TrackQuality] 反推等级短码：无损编解码器 → Hi-Res（sr≥96k 且
 /// 24bit）/ 无损；否则按 bitrate 分档（≥320k HQ / ≥192k SQ / LQ）。
 ({String label, bool lossless})? _qualityLevel(
   TrackQuality? q,

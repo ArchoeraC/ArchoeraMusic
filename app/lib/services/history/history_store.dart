@@ -5,7 +5,6 @@
 /// 播放历史本地存储（sqlite3 直连，独立库 history.db，与本地曲库
 /// library.db 分库——历史包含在线媒体与本地媒体，不应混入曲库）。
 ///
-/// 对齐 SPlayer-Next `src/stores/history.ts` 语义：
 /// - 同源同 id 去重（key = `source:track_id`），重复播放刷新时间置顶；
 /// - 条数上限可配置（[record]/[trim] 的 limit 参数，null = 不限制；
 ///   默认 [defaultLimit] 500），超出按时间倒序裁掉最旧；
@@ -59,7 +58,7 @@ class HistoryStore {
   /// 历史页 / 设置页订阅即时刷新；写入方无需感知 UI。
   static final EventBus changes = EventBus(sync: false);
 
-  /// 默认历史条数上限（对齐 SPlayer-Next MAX_HISTORY）。
+  /// 默认历史条数上限。
   static const int defaultLimit = 500;
 
   /// 历史库默认路径（独立于曲库 library.db）。

@@ -9,7 +9,7 @@
 /// （NT likelist / KG likedHashSet 只取 hash），不经过这里，
 /// 避免启动同步触发全量拉取（与收藏页并行双拉、被进程退出/写失败干扰）。
 ///
-/// 缓存策略（对齐 SPlayer-Next 库加载）：进收藏页先读 SQLite 缓存
+/// 缓存策略：进收藏页先读 SQLite 缓存
 /// 「秒开」，后台 SWR 全量拉取替换上屏并回写缓存——回写在后台 isolate
 /// （LikedCacheStore 内部 [Isolate.run]），不阻塞 UI。
 /// 无分页：列表一次持有全量 Track（元数据轻量，千级仅数 MB）。

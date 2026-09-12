@@ -9,6 +9,7 @@ import 'app_prefs.dart';
 // ── 外观域键（appearance. 前缀）────────────────────────────────
 const accentKey = 'appearance.accent';
 const themeSourceKey = 'appearance.themeSource';
+const themeModeKey = 'appearance.themeMode';
 const globalTintKey = 'appearance.globalTint';
 const appearanceStyleKey = 'appearance.appearanceStyle';
 const backgroundImageKey = 'appearance.backgroundImage';
@@ -42,6 +43,14 @@ extension AppearancePrefs on AppPrefs {
     final v = data[themeSourceKey];
     if (v == 'custom' || v == 'cover' || v == 'solid') return v as String;
     return 'default';
+  }
+
+  /// 主题模式（light / dark / system；默认 dark，对齐原项目 appearance.themeMode）。
+  /// 持久化，重启后保持。
+  String get themeMode {
+    final v = data[themeModeKey];
+    if (v == 'light' || v == 'system') return v as String;
+    return 'dark';
   }
 
   /// 全局着色（对齐原版 appearance.globalTint）：将主题色轻微应用到
@@ -152,6 +161,15 @@ extension AppearancePrefs on AppPrefs {
           value == 'cover' ||
           value == 'solid')
         themeSourceKey: value,
+    },
+  );
+
+  /// 设置主题模式（light/dark/system；非法值不写入，getter 回退 dark）。
+  AppPrefs copyWithThemeMode(String value) => AppPrefs(
+    initialData: {
+      ...data,
+      if (value == 'light' || value == 'dark' || value == 'system')
+        themeModeKey: value,
     },
   );
 

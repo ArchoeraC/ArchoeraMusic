@@ -55,7 +55,7 @@ class PlaybackState {
   /// 当前曲目（音质切换等需要平台/品质信息；本地文件时为 null）。
   final Track? track;
 
-  /// 当前音质档位（lq/sq/hq/lossless/hi-res，对齐 SPlayer-Next）。
+  /// 当前音质档位（lq/sq/hq/lossless/hi-res）。
   final String quality;
 
   final String? sessionId;
@@ -82,7 +82,7 @@ class PlaybackState {
   /// 缓冲/加载中（引擎转码、音源解析期间为 true，进入播放后置 false）。
   final bool buffering;
 
-  /// 播放音量（0~1，对齐 SPlayer-Next status.volume；用户音量落
+  /// 播放音量（0~1；用户音量落
   /// AppPrefs，退出确认弹窗的 duck 为临时值，关闭弹窗即恢复）。
   final double volume;
 

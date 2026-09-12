@@ -6,7 +6,7 @@ import 'dart:io';
 
 import '../../stores/data_dir.dart';
 
-/// 歌曲磁盘缓存（流媒体歌曲文件级缓存，对齐 SPlayer-Next songCache 异步模型）。
+/// 歌曲磁盘缓存（流媒体歌曲文件级缓存，异步模型）。
 ///
 /// - 播放时照常走在线 URL（不增加播放延迟），同时后台把整曲下载入缓存；
 /// - 下次播放同曲目（source + id + quality 相同）命中缓存 → 直接 load 本地文件；

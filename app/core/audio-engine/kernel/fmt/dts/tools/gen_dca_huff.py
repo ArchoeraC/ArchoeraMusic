@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 import re
-SRC = "/home/betastudio2/文档/SPlayer-Next/ArchoeraMusic/reference/FFmpeg/libavcodec"
+from pathlib import Path
+
+# 仓库根下的 reference/FFmpeg（可用 ARCHOERA_FFMPEG_SRC 覆盖）
+_REPO = Path(__file__).resolve().parents[7]
+SRC = str(_REPO / "reference" / "FFmpeg" / "libavcodec")
 
 def strip_comments(text):
     return re.sub(r'/\*.*?\*/', ' ', text, flags=re.S)

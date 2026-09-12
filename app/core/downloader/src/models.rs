@@ -27,7 +27,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-/// 音质档位（对齐 SPlayer-Next 档位命名 lq/sq/hq/lossless/hi-res）
+/// 音质档位（lq/sq/hq/lossless/hi-res）
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Quality {

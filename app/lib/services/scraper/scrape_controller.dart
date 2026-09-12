@@ -38,7 +38,7 @@ part 'scrape_controller/scrape_controller_pump.dart';
 /// 防超长 JSON 被截断成非法 JSON 导致终态丢失 → 会话悬挂）。
 const int _scraperEventBufCap = 65536;
 
-/// 仅目录整理默认模板（对齐 SPlayer-Next organizer；只决定目录层级，不改文件名）。
+/// 仅目录整理默认模板（只决定目录层级，不改文件名）。
 const String kOrganizeDefaultPattern =
     '{artist}/{album}/{track}. {title}.{ext}';
 
@@ -117,7 +117,7 @@ class ScrapeState {
   static const initial = ScrapeState();
 }
 
-/// 数据源开关（默认全开，对齐 SPlayer-Next 刮削器默认）。
+/// 数据源开关（默认全开）。
 class ScrapeSources {
   const ScrapeSources({
     this.musicBrainz = true,

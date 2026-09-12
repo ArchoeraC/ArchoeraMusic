@@ -165,7 +165,7 @@ const qualityBitrate = <String, int>{
   'lq': 64000,
 };
 
-/// 音质档位短码文案（对齐 SPlayer-Next QUALITY_LABELS）。
+/// 音质档位短码文案。
 const qualityLabels = <String, String>{
   'hi-res': 'Hi-Res',
   'lossless': '无损',
@@ -443,8 +443,7 @@ class Track {
     );
   }
 
-  /// 由 song 的 `hr`/`sq`/`h`/`m`/`l` 字段选择最佳音质（对齐
-  /// SPlayer-Next `utils/format/netease.ts` 的 pickQuality）：
+  /// 由 song 的 `hr`/`sq`/`h`/`m`/`l` 字段选择最佳音质：
   /// 优先 Hi-Res（flac 24bit，采样率按 96kHz 起步）→ 无损（flac 16bit）
   /// → 最高 MP3 档（h=320k / m=192k / l=128k）。搜索/歌单接口不返回
   /// hr/sq 时安全回退为 null（列表不显示音质标签）。

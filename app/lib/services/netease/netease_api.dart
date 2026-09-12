@@ -125,7 +125,7 @@ class NeteaseApi extends NeteaseApiBase
   /// [quality] 为档位键（lq/sq/hq/lossless/hi-res），默认 hq（对齐原项目
   /// 默认 songLevel）。按用户偏好从高到低**自动降级**（如 lossless 失败 →
   /// hq → sq → lq），并**拒绝试听片段**（freeTrialInfo 非空 = 60s 试听，
-  /// 对齐 SPlayer-Next fetchNeteasePlaySource 的 freeTrialInfo 过滤）。
+  /// 直接过滤掉）。
   /// 全部档位失败 / VIP / 无版权时返回 null。
   Future<String?> resolvePlayUrl(String id, {String quality = 'hq'}) async {
     // 音质档位序（低 → 高）；从用户偏好档位开始向下降级尝试

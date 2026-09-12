@@ -305,6 +305,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置主题模式（light/dark/system）。
+  void setThemeMode(String value) {
+    state = state.copyWithThemeMode(value);
+    state.save();
+  }
+
   /// 设置界面字体（内置字体族名）。
   void setFontFamily(String family) {
     state = state.copyWithAppearance(fontFamily: family);

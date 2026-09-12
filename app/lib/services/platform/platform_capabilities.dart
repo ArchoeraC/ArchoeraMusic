@@ -79,8 +79,24 @@ class PlatformCapabilities {
     return b.setAccentEvents(on);
   }
 
-  /// 系统主题色变更流（桥接不可用为空流）。
-  Stream<void> get accentEvents => _bindings?.accentEvents ?? const Stream.empty();
+  /// 系统主题色**推送**流：桥接在订阅时立即推当前值，之后推变化
+  /// （Dart 不主动查询）。桥接不可用时为空流。
+  Stream<Color> get accentEvents =>
+      (_bindings?.accentEvents ?? const Stream.empty())
+          .map((e) => Color.fromARGB(255, e.r, e.g, e.b));
+
+  bool get systemThemeAvailable => caps & aplCapSystemTheme != 0;
+
+  /// 订阅系统深浅色（平台推送：订阅即推当前值，之后推变化）。
+  int setSystemThemeEvents(bool on) {
+    final b = _bindings;
+    if (b == null || caps & aplCapSystemTheme == 0) return aplErrUnsupported;
+    return b.setThemeEvents(on);
+  }
+
+  /// 系统深浅色推送流（dark=true 深色）；桥接不可用为空流。
+  Stream<bool> get systemThemeEvents =>
+      (_bindings?.themeEvents ?? const Stream.empty()).map((e) => e.dark);
 
   /// 系统提示（桥接不可用时返回错误码）。返回 0=成功。
   int notify(String title, String body) {

@@ -31,6 +31,13 @@
 #include <vector>
 
 namespace archoera {
+
+// 异步刷新系统强调色缓存（定义见文件后部）；供 DBus 信号过滤器调用。
+void requestAccent();
+
+// 异步查询系统深浅色并推送（定义见文件后部）；供 DBus 信号过滤器调用。
+void requestTheme();
+
 namespace {
 
 // ── 常量 ──────────────────────────────────────────────────────────
@@ -89,8 +96,27 @@ int64_t g_duration_ms = -1;
 uint32_t g_cookie = 0;
 bool g_inhibit_on = false;
 
+// 防休眠注册/释放的异步请求：Dart/主线程只登记目标状态，实际阻塞式 DBus
+// 调用由泵线程执行，避免播放时主线程同步等待导致 UI「未响应」。
+std::atomic<bool> g_inhibit_want{false};
+std::atomic<bool> g_inhibit_pending{false};
+
 std::atomic<bool> g_screen_events{false};
 std::atomic<bool> g_accent_events{false};
+// 订阅时请求泵线程立即推送一次当前强调色（连接就绪后消费）。
+std::atomic<bool> g_accent_pending{false};
+
+// 系统深浅色（light/dark）事件订阅 + 推送缓存。
+std::atomic<bool> g_theme_events{false};
+std::atomic<bool> g_theme_pending{false};
+std::atomic<bool> g_theme_dark{false};
+std::atomic<bool> g_theme_valid{false};
+
+// 系统强调色缓存（异步查询结果）：apl_system_accent 立即返回缓存，避免在
+// Dart/主线程同步等待 XDG portal（切回应用时会重读，同步调用会卡住 UI）。
+std::mutex g_accent_mtx;
+int32_t g_accent_r = 0, g_accent_g = 0, g_accent_b = 0;
+bool g_accent_valid = false;
 
 // ── 小工具 ────────────────────────────────────────────────────────
 DBusConnection* conn() {
@@ -321,8 +347,11 @@ const char* const kRootProps[] = {
 // ── 回复助手 ──────────────────────────────────────────────────────
 void send(DBusConnection* c, DBusMessage* reply) {
     if (reply == nullptr) return;
+    // 只入队，不在此处 flush：dbus_connection_flush 会同步等待 socket 可写，
+    // 在 Dart/主线程上调用会阻塞 UI（播放时推送 MPRIS PropertiesChanged 即触发
+    // 「应用未响应」）。泵线程的 dbus_connection_read_write_dispatch 会持续把
+    // 发送队列写出，无需调用方阻塞 flush。
     dbus_connection_send(c, reply, nullptr);
-    dbus_connection_flush(c);
     dbus_message_unref(reply);
 }
 
@@ -582,10 +611,11 @@ DBusHandlerResult filter(DBusConnection* c, DBusMessage* msg, void*) {
                 return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
             }
         }
-        if (g_accent_events.load(std::memory_order_acquire) &&
-            (std::strcmp(member, "SettingChanged") == 0 ||
-             std::strcmp(member, "notifyChange") == 0)) {
-            dispatch(makeSystemAccent());
+        if (std::strcmp(member, "SettingChanged") == 0 ||
+            std::strcmp(member, "notifyChange") == 0) {
+            // 异步重查并缓存；值变化时由各自 reply 回调发事件通知 Dart。
+            if (g_accent_events.load(std::memory_order_acquire)) requestAccent();
+            if (g_theme_events.load(std::memory_order_acquire)) requestTheme();
         }
     }
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -686,6 +716,8 @@ DBusConnection* ensureConn() {
     return c;
 }
 
+void applyInhibit(DBusConnection* c);
+
 void pumpLoop() {
     while (g_running.load(std::memory_order_acquire)) {
         DBusConnection* c = nullptr;
@@ -693,12 +725,29 @@ void pumpLoop() {
             std::lock_guard<std::mutex> lock(g_mtx);
             c = g_conn;
         }
+        if (c == nullptr) {
+            if (g_screen_events.load(std::memory_order_acquire) ||
+                g_accent_events.load(std::memory_order_acquire) ||
+                g_theme_events.load(std::memory_order_acquire) ||
+                g_inhibit_pending.load(std::memory_order_acquire) ||
+                g_inhibit_on) {
+                c = ensureConn();
+            }
+        }
         if (c != nullptr) {
+            // 防休眠注册/释放：阻塞式 DBus 调用只在泵线程执行。
+            if (g_inhibit_pending.exchange(false, std::memory_order_acq_rel)) {
+                applyInhibit(c);
+            }
+            // 订阅强调色/深浅色：连接就绪后立即异步推送一次当前值。
+            if (g_accent_pending.exchange(false, std::memory_order_acq_rel)) {
+                requestAccent();
+            }
+            if (g_theme_pending.exchange(false, std::memory_order_acq_rel)) {
+                requestTheme();
+            }
             dbus_connection_read_write_dispatch(c, 50);
         } else {
-            if (g_screen_events.load(std::memory_order_acquire) || g_inhibit_on) {
-                ensureConn();
-            }
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
         }
     }
@@ -731,6 +780,44 @@ DBusMessage* inhibitCall(DBusConnection* c, const char* method,
     return reply;
 }
 
+// 在泵线程按 g_inhibit_want 执行 Inhibit/UnInhibit（阻塞式 DBus 调用）。
+void applyInhibit(DBusConnection* c) {
+    const bool want = g_inhibit_want.load(std::memory_order_acquire);
+    bool on;
+    {
+        std::lock_guard<std::mutex> lock(g_mtx);
+        on = g_inhibit_on;
+    }
+    if (want == on) return;
+    if (want) {
+        DBusMessage* reply =
+            inhibitCall(c, "Inhibit", "ArchoeraMusic", "playback", 0);
+        if (reply == nullptr) return;
+        uint32_t cookie = 0;
+        const bool ok = dbus_message_get_args(reply, nullptr, DBUS_TYPE_UINT32,
+                                              &cookie, DBUS_TYPE_INVALID);
+        dbus_message_unref(reply);
+        if (!ok || cookie == 0) return;
+        std::lock_guard<std::mutex> lock(g_mtx);
+        g_cookie = cookie;
+        g_inhibit_on = true;
+    } else {
+        uint32_t cookie;
+        {
+            std::lock_guard<std::mutex> lock(g_mtx);
+            cookie = g_cookie;
+        }
+        if (cookie != 0) {
+            DBusMessage* reply =
+                inhibitCall(c, "UnInhibit", nullptr, nullptr, cookie);
+            if (reply != nullptr) dbus_message_unref(reply);
+        }
+        std::lock_guard<std::mutex> lock(g_mtx);
+        g_cookie = 0;
+        g_inhibit_on = false;
+    }
+}
+
 // ── 单实例（文件锁）───────────────────────────────────────────────
 int g_instance_fd = -1;
 
@@ -742,13 +829,20 @@ constexpr int kGdkStateIconified = 1 << 1;
 void* g_gtk = nullptr;
 void* g_gdk = nullptr;
 void* g_glib = nullptr;
+void* g_gio = nullptr;
 bool g_loaded = false;
 
-void* (*g_main_context_default)() = nullptr;
-void (*g_main_context_invoke)(void*, void (*)(void*), void*) = nullptr;
+// 用 g_idle_add 延后到主循环空闲执行：g_main_context_invoke 会同步调用，
+// 在 Dart FFI / Flutter 派发过程中重入 GTK，实测导致 GTK 内部类型检查死循环、
+// 主线程 100% CPU 卡死。延后到空闲即避开重入。
+unsigned (*g_idle_add)(int (*)(void*), void*) = nullptr;
 unsigned (*g_timeout_add)(unsigned, int (*)(void*), void*) = nullptr;
 int (*g_source_remove)(unsigned) = nullptr;
-void* (*gtk_window_list_toplevels)() = nullptr;
+// 取窗口：优先应用自身窗口列表（gtk_application_get_windows，官方 API，列表归
+// application 所有、无需释放）；避免 gtk_window_list_toplevels() 遍历全局顶层
+// 窗口列表（实测会陷入无上限遍历，导致主线程 100% CPU + 内存暴涨卡死）。
+void* (*g_application_get_default)() = nullptr;
+void* (*gtk_application_get_windows)(void*) = nullptr;
 int (*gtk_widget_get_visible)(void*) = nullptr;
 int (*gtk_window_is_active)(void*) = nullptr;
 void* (*gtk_widget_get_window)(void*) = nullptr;
@@ -773,15 +867,17 @@ bool load() {
     if (g_gdk == nullptr) g_gdk = g_gtk;
     g_glib = dlopen("libglib-2.0.so.0", RTLD_NOW);
     if (g_glib == nullptr) g_glib = g_gtk;
+    g_gio = dlopen("libgio-2.0.so.0", RTLD_NOW);
+    if (g_gio == nullptr) g_gio = dlopen(nullptr, RTLD_NOW);
+    if (g_gio == nullptr) g_gio = g_gtk;
     if (g_gtk == nullptr || g_glib == nullptr) return false;
-    g_main_context_default = sym<decltype(g_main_context_default)>(
-        g_glib, "g_main_context_default");
-    g_main_context_invoke = sym<decltype(g_main_context_invoke)>(
-        g_glib, "g_main_context_invoke");
+    g_idle_add = sym<decltype(g_idle_add)>(g_glib, "g_idle_add");
     g_timeout_add = sym<decltype(g_timeout_add)>(g_glib, "g_timeout_add");
     g_source_remove = sym<decltype(g_source_remove)>(g_glib, "g_source_remove");
-    gtk_window_list_toplevels = sym<decltype(gtk_window_list_toplevels)>(
-        g_gtk, "gtk_window_list_toplevels");
+    g_application_get_default = sym<decltype(g_application_get_default)>(
+        g_gio, "g_application_get_default");
+    gtk_application_get_windows = sym<decltype(gtk_application_get_windows)>(
+        g_gtk, "gtk_application_get_windows");
     gtk_widget_get_visible = sym<decltype(gtk_widget_get_visible)>(
         g_gtk, "gtk_widget_get_visible");
     gtk_window_is_active = sym<decltype(gtk_window_is_active)>(
@@ -790,10 +886,10 @@ bool load() {
         g_gtk, "gtk_widget_get_window");
     gdk_window_get_state = sym<decltype(gdk_window_get_state)>(
         g_gdk, "gdk_window_get_state");
-    g_loaded = g_main_context_default != nullptr &&
-               g_main_context_invoke != nullptr && g_timeout_add != nullptr &&
+    g_loaded = g_idle_add != nullptr && g_timeout_add != nullptr &&
                g_source_remove != nullptr &&
-               gtk_window_list_toplevels != nullptr &&
+               g_application_get_default != nullptr &&
+               gtk_application_get_windows != nullptr &&
                gtk_widget_get_visible != nullptr &&
                gtk_window_is_active != nullptr &&
                gtk_widget_get_window != nullptr &&
@@ -826,32 +922,40 @@ int poll(void*) {
     return 1;
 }
 
-void setupOnMainThread(void*) {
+int setupOnMainThread(void*) {
     struct GList {
         void* data;
         GList* next;
         GList* prev;
     };
-    auto* it = static_cast<GList*>(gtk_window_list_toplevels());
-    while (it != nullptr) {
-        void* win = it->data;
-        if (win != nullptr && gtk_widget_get_visible(win) != 0) {
-            g_win = win;
-            break;
+    void* app = g_application_get_default != nullptr
+                    ? g_application_get_default()
+                    : nullptr;
+    if (app != nullptr) {
+        // 应用自身窗口列表（按最近聚焦排序，首元素为当前聚焦窗口）；列表归
+        // application 所有，只读、不可修改/释放。
+        auto* it = static_cast<GList*>(gtk_application_get_windows(app));
+        while (it != nullptr) {
+            void* win = it->data;
+            if (win != nullptr && gtk_widget_get_visible(win) != 0) {
+                g_win = win;
+                break;
+            }
+            it = it->next;
         }
-        it = it->next;
     }
-    if (g_win == nullptr) return;
+    if (g_win == nullptr) return 0;  // G_SOURCE_REMOVE
     poll(nullptr);
     if (g_timer == 0) g_timer = g_timeout_add(500, poll, nullptr);
+    return 0;  // G_SOURCE_REMOVE
 }
 
 int32_t setEvents(bool on) {
     if (!load()) return ERR_UNSUPPORTED;
     if (on) {
         g_enabled.store(true, std::memory_order_release);
-        g_main_context_invoke(g_main_context_default(), setupOnMainThread,
-                              nullptr);
+        // 延后到主循环空闲执行（非同步重入 GTK）；见 g_idle_add 声明处说明。
+        g_idle_add(setupOnMainThread, nullptr);
         return OK;
     }
     g_enabled.store(false, std::memory_order_release);
@@ -866,7 +970,7 @@ int32_t setEvents(bool on) {
 
 // ── 系统提示 ──────────────────────────────────────────────────────
 bool notifyViaDbus(const char* title, const char* body) {
-    DBusConnection* c = ensureConn();
+    DBusConnection* c = conn();
     if (c == nullptr) return false;
     DBusMessage* msg = dbus_message_new_method_call(
         "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
@@ -906,7 +1010,7 @@ bool notifyViaDbus(const char* title, const char* body) {
 uint32_t caps() {
     uint32_t c = CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_MEDIA_SESSION |
                  CAP_MEDIA_SEEK | CAP_MEDIA_ARTWORK | CAP_APP_INSTANCE |
-                 CAP_SYSTEM_ACCENT;
+                 CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME;
     const bool hasDisplay = std::getenv("WAYLAND_DISPLAY") != nullptr ||
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
@@ -942,42 +1046,15 @@ int32_t shutdown() {
 }
 
 int32_t powerSetSleepInhibit(int32_t on) {
-    if (on != 0) {
-        if (g_inhibit_on) return OK;
-        DBusConnection* c = ensureConn();
-        if (c == nullptr) return ERR_BACKEND;
-        DBusMessage* reply = inhibitCall(c, "Inhibit", "ArchoeraMusic",
-                                         "playback", 0);
-        if (reply == nullptr) return ERR_BACKEND;
-        uint32_t cookie = 0;
-        const bool ok = dbus_message_get_args(reply, nullptr, DBUS_TYPE_UINT32,
-                                              &cookie, DBUS_TYPE_INVALID);
-        dbus_message_unref(reply);
-        if (!ok || cookie == 0) return ERR_BACKEND;
-        std::lock_guard<std::mutex> lock(g_mtx);
-        g_cookie = cookie;
-        g_inhibit_on = true;
-        return OK;
-    }
-    if (!g_inhibit_on || g_cookie == 0) return OK;
-    DBusConnection* c = ensureConn();
-    if (c == nullptr) return ERR_BACKEND;
-    uint32_t cookie;
-    {
-        std::lock_guard<std::mutex> lock(g_mtx);
-        cookie = g_cookie;
-    }
-    DBusMessage* reply = inhibitCall(c, "UnInhibit", nullptr, nullptr, cookie);
-    if (reply == nullptr) return ERR_BACKEND;
-    dbus_message_unref(reply);
-    std::lock_guard<std::mutex> lock(g_mtx);
-    g_cookie = 0;
-    g_inhibit_on = false;
+    // 只登记目标状态并立即返回：实际 Inhibit/UnInhibit 是阻塞式 DBus 调用，
+    // 由泵线程异步执行（见 applyInhibit），避免在 Dart/主线程同步等待而卡住 UI。
+    g_inhibit_want.store(on != 0, std::memory_order_release);
+    g_inhibit_pending.store(true, std::memory_order_release);
     return OK;
 }
 
 int32_t powerSetScreenEvents(int32_t on) {
-    if (ensureConn() == nullptr) return ERR_BACKEND;
+    // 只登记标志：连接由泵线程建立（见 pumpLoop），避免主线程启动期同步建连。
     g_screen_events.store(on != 0, std::memory_order_release);
     return OK;
 }
@@ -985,7 +1062,7 @@ int32_t powerSetScreenEvents(int32_t on) {
 int32_t windowSetEvents(int32_t on) { return gtkwin::setEvents(on != 0); }
 
 int32_t mediaSetTrack(const AplTrackMeta* meta) {
-    DBusConnection* c = ensureConn();
+    DBusConnection* c = conn();
     {
         std::lock_guard<std::mutex> lock(g_mtx);
         g_title.clear();
@@ -1015,7 +1092,7 @@ int32_t mediaSetTrack(const AplTrackMeta* meta) {
 
 int32_t mediaSetPlayback(int32_t state, int64_t position_ms, double speed,
                          double volume, int32_t loop, int32_t shuffle) {
-    DBusConnection* c = ensureConn();
+    DBusConnection* c = conn();
     bool state_changed;
     {
         std::lock_guard<std::mutex> lock(g_mtx);
@@ -1056,68 +1133,160 @@ int32_t appInstanceAcquire() {
     return 1;
 }
 
-// 系统主题色（DE accent）：优先 **XDG Desktop Portal**（跨 DE 标准）：
+// 系统主题色（DE accent）：XDG Desktop Portal（跨 DE 标准）：
 //   org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop
 //   org.freedesktop.portal.Settings.ReadOne("org.freedesktop.appearance","accent-color")
-//   → v 内含 (ddd)（sRGB，[0,1]）。失败回退 KDE/GNOME 命令（旧环境）。
-bool accentViaPortal(int32_t* r, int32_t* g, int32_t* b) {
-    DBusConnection* c = ensureConn();
-    if (c == nullptr) return false;
-    DBusMessage* msg = dbus_message_new_method_call(
-        "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
-        "org.freedesktop.portal.Settings", "ReadOne");
-    if (msg == nullptr) return false;
-    const char* ns = "org.freedesktop.appearance";
-    const char* key = "accent-color";
-    dbus_message_append_args(msg, DBUS_TYPE_STRING, &ns, DBUS_TYPE_STRING, &key,
-                             DBUS_TYPE_INVALID);
-    DBusError err;
-    dbus_error_init(&err);
-    DBusMessage* reply =
-        dbus_connection_send_with_reply_and_block(c, msg, 3000, &err);
-    dbus_message_unref(msg);
+//   → v 内含 (ddd)（sRGB，[0,1]）。
+//
+// 关键：查询走**异步** DBus（send_with_reply + notify），绝不在 Dart/主线程
+// 同步等待——切回应用会重读强调色，同步 send_with_reply_and_block 会阻塞 UI。
+// 结果缓存；就绪/变化时发 SYSTEM_ACCENT 事件通知 Dart 重读。
+void onAccentReply(DBusPendingCall* pending, void*) {
+    DBusMessage* reply = dbus_pending_call_steal_reply(pending);
+    if (reply == nullptr) return;
     bool ok = false;
     double rr = 0, gg = 0, bb = 0;
-    if (reply != nullptr) {
-        DBusMessageIter it, var, st;
-        if (dbus_message_iter_init(reply, &it) &&
-            dbus_message_iter_get_arg_type(&it) == DBUS_TYPE_VARIANT) {
-            dbus_message_iter_recurse(&it, &var);
-            if (dbus_message_iter_get_arg_type(&var) == DBUS_TYPE_STRUCT) {
-                dbus_message_iter_recurse(&var, &st);
-                if (dbus_message_iter_get_arg_type(&st) == DBUS_TYPE_DOUBLE) {
-                    dbus_message_iter_get_basic(&st, &rr);
-                    dbus_message_iter_next(&st);
-                    dbus_message_iter_get_basic(&st, &gg);
-                    dbus_message_iter_next(&st);
-                    dbus_message_iter_get_basic(&st, &bb);
-                    ok = true;
-                }
+    DBusMessageIter it, var, st;
+    if (dbus_message_iter_init(reply, &it) &&
+        dbus_message_iter_get_arg_type(&it) == DBUS_TYPE_VARIANT) {
+        dbus_message_iter_recurse(&it, &var);
+        if (dbus_message_iter_get_arg_type(&var) == DBUS_TYPE_STRUCT) {
+            dbus_message_iter_recurse(&var, &st);
+            if (dbus_message_iter_get_arg_type(&st) == DBUS_TYPE_DOUBLE) {
+                dbus_message_iter_get_basic(&st, &rr);
+                dbus_message_iter_next(&st);
+                dbus_message_iter_get_basic(&st, &gg);
+                dbus_message_iter_next(&st);
+                dbus_message_iter_get_basic(&st, &bb);
+                ok = true;
             }
         }
-        dbus_message_unref(reply);
     }
-    dbus_error_free(&err);
-    if (!ok) return false;
+    dbus_message_unref(reply);
+    if (!ok) return;
     auto toU8 = [](double v) -> int32_t {
         if (v <= 0.0) return 0;
         if (v >= 1.0) return 255;
         return static_cast<int32_t>(v * 255.0 + 0.5);
     };
-    if (r != nullptr) *r = toU8(rr);
-    if (g != nullptr) *g = toU8(gg);
-    if (b != nullptr) *b = toU8(bb);
-    return true;
+    const int32_t r8 = toU8(rr), g8 = toU8(gg), b8 = toU8(bb);
+    bool changed;
+    {
+        std::lock_guard<std::mutex> lock(g_accent_mtx);
+        changed = !g_accent_valid || g_accent_r != r8 || g_accent_g != g8 ||
+                  g_accent_b != b8;
+        g_accent_r = r8;
+        g_accent_g = g8;
+        g_accent_b = b8;
+        g_accent_valid = true;
+    }
+    if (changed) dispatch(makeSystemAccent(r8, g8, b8));
+}
+
+// 触发一次异步强调色查询（非阻塞）；结果由 onAccentReply 缓存并发事件。
+void requestAccent() {
+    DBusConnection* c = conn();
+    if (c == nullptr) return;
+    DBusMessage* msg = dbus_message_new_method_call(
+        "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+        "org.freedesktop.portal.Settings", "ReadOne");
+    if (msg == nullptr) return;
+    const char* ns = "org.freedesktop.appearance";
+    const char* key = "accent-color";
+    dbus_message_append_args(msg, DBUS_TYPE_STRING, &ns, DBUS_TYPE_STRING, &key,
+                             DBUS_TYPE_INVALID);
+    DBusPendingCall* pending = nullptr;
+    if (dbus_connection_send_with_reply(c, msg, &pending, 3000) &&
+        pending != nullptr) {
+        dbus_pending_call_set_notify(pending, onAccentReply, nullptr, nullptr);
+        dbus_pending_call_unref(pending);
+    }
+    dbus_message_unref(msg);
+}
+
+// 系统深浅色：解析 portal color-scheme（0=未指定 1=深色 2=浅色）并推送。
+void onThemeReply(DBusPendingCall* pending, void*) {
+    DBusMessage* reply = dbus_pending_call_steal_reply(pending);
+    if (reply == nullptr) return;
+    bool ok = false;
+    uint32_t v = 0;
+    DBusMessageIter it, var;
+    if (dbus_message_iter_init(reply, &it) &&
+        dbus_message_iter_get_arg_type(&it) == DBUS_TYPE_VARIANT) {
+        dbus_message_iter_recurse(&it, &var);
+        if (dbus_message_iter_get_arg_type(&var) == DBUS_TYPE_UINT32) {
+            dbus_message_iter_get_basic(&var, &v);
+            ok = true;
+        }
+    }
+    dbus_message_unref(reply);
+    if (!ok) return;
+    const bool dark = (v == 1);
+    const bool first = !g_theme_valid.exchange(true, std::memory_order_acq_rel);
+    const bool changed =
+        dark != g_theme_dark.exchange(dark, std::memory_order_acq_rel);
+    if (first || changed) dispatch(makeSystemTheme(dark));
+}
+
+// 触发一次异步深浅色查询（非阻塞）。
+void requestTheme() {
+    DBusConnection* c = conn();
+    if (c == nullptr) return;
+    DBusMessage* msg = dbus_message_new_method_call(
+        "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+        "org.freedesktop.portal.Settings", "ReadOne");
+    if (msg == nullptr) return;
+    const char* ns = "org.freedesktop.appearance";
+    const char* key = "color-scheme";
+    dbus_message_append_args(msg, DBUS_TYPE_STRING, &ns, DBUS_TYPE_STRING, &key,
+                             DBUS_TYPE_INVALID);
+    DBusPendingCall* pending = nullptr;
+    if (dbus_connection_send_with_reply(c, msg, &pending, 3000) &&
+        pending != nullptr) {
+        dbus_pending_call_set_notify(pending, onThemeReply, nullptr, nullptr);
+        dbus_pending_call_unref(pending);
+    }
+    dbus_message_unref(msg);
 }
 
 bool systemAccent(int32_t* r, int32_t* g, int32_t* b) {
-    // 仅走 XDG Desktop Portal（零子进程）；无 portal / 无 accent-color 时返回 false。
-    return accentViaPortal(r, g, b);
+    // 立即返回缓存（不阻塞）；无缓存时触发一次异步查询并返回 false（Dart
+    // 回退默认色，待事件到达后重读）。
+    int32_t rr, gg, bb;
+    bool valid;
+    {
+        std::lock_guard<std::mutex> lock(g_accent_mtx);
+        valid = g_accent_valid;
+        rr = g_accent_r;
+        gg = g_accent_g;
+        bb = g_accent_b;
+    }
+    if (valid) {
+        if (r != nullptr) *r = rr;
+        if (g != nullptr) *g = gg;
+        if (b != nullptr) *b = bb;
+        return true;
+    }
+    requestAccent();
+    return false;
 }
 
 int32_t systemAccentSetEvents(bool on) {
+    // 只登记标志：连接由泵线程建立（见 pumpLoop），避免主线程同步建连。
     g_accent_events.store(on, std::memory_order_release);
-    if (on) ensureConn();
+    if (on) {
+        // 订阅即推送当前值（泵线程连接就绪后异步查询并发 SYSTEM_ACCENT 事件）。
+        g_accent_pending.store(true, std::memory_order_release);
+    }
+    return OK;
+}
+
+int32_t systemThemeSetEvents(bool on) {
+    g_theme_events.store(on, std::memory_order_release);
+    if (on) {
+        // 订阅即推送当前值（泵线程连接就绪后异步查询并发 SYSTEM_THEME 事件）。
+        g_theme_pending.store(true, std::memory_order_release);
+    }
     return OK;
 }
 

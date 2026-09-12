@@ -20,7 +20,7 @@ part 'hover_volume/hover_volume_control_state.dart';
 /// - 光标悬浮在整个音量组件上超过 800ms → 滑条展开
 /// - 展开后鼠标移出且 5s 未操作 → 自动隐藏（期间重新悬浮则取消隐藏）
 /// - 拖动中仅预览（引擎命令 80ms 合并、prefs 不落盘），松开落盘最终值
-/// - 静音切换内置音量记忆（对齐 SPlayer-Next lastVolume；无记忆回退 0.7）
+/// - 静音切换内置音量记忆（无记忆回退 0.7）
 class HoverVolumeSlider extends ConsumerStatefulWidget {
   const HoverVolumeSlider({super.key, this.sliderWidth = 96});
 

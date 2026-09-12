@@ -228,7 +228,7 @@ tta/dts 两行抬高到 55/85MB。相比 engine-integration-bench §3/§4 结论
 ## 8. 复现（重跑命令）
 
 ```bash
-cd /home/betastudio2/文档/SPlayer-Next/ArchoeraMusic/app/core/audio-engine
+cd app/core/audio-engine   # 于仓库根目录执行
 zig build -Doptimize=ReleaseFast && cmake --build build          # 先更新 ReleaseFast kernel
 python3 tests/bench/scorecard.py --corpus /tmp/eng \
     --csv tests/bench/data/SCORE_$(date +%F).csv \

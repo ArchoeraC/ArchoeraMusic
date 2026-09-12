@@ -10,7 +10,7 @@
 /// - 歌词：lyrics.kugou.com 两步走（search → download），krc 用
 ///   XOR+zlib 解码（对齐 lx-music 的 KRC 逻辑）
 ///
-/// 音质切换：按 SPlayer-Next 档位（lq/sq/hq/lossless/hi-res）映射 KG 品质
+/// 音质切换：按档位（lq/sq/hq/lossless/hi-res）映射 KG 品质
 /// 链（128k/320k/flac/flac24bit），命中档位缺 hash 或请求失败时自动降级。
 library;
 
@@ -458,7 +458,7 @@ class KugouApi extends ChangeNotifier {
 
   /// 解析可播放 URL（gateway.kugou.com/v5/url）。
   ///
-  /// [quality] 为 SPlayer-Next 档位（lq/sq/hq/lossless/hi-res），按
+  /// [quality] 为音质档位（lq/sq/hq/lossless/hi-res），按
   /// KugouTrackInfo 品质链降级尝试；全部失败或无资源返回 null。
   Future<String?> resolvePlayUrl(
     KugouTrackInfo info, {

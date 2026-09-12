@@ -122,4 +122,5 @@ bash app/tool/sign_watermark.sh          # 本地运行；CI 环境会拒绝执�
 - 禁止提交任何私钥/凭据（`.gitignore` 已忽略 `*.key`、`*_priv.pem`；公钥 `watermark_pub*.pem` 需跟踪）。
 - 禁止在 CI 运行 `sign_watermark.sh`（会打印私钥材料；脚本已加 `CI` 环境拒绝）。
 - 签名步骤不要开 `set -x`。
+- "Hmm"等可能会导致死循环，尽可能不要触及
 

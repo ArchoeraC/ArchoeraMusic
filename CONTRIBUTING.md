@@ -110,7 +110,7 @@
 
 ### 2.4 对外言论与社区行为红线
 
-- **禁止「踩一捧一」**：不得以贬低任何其他项目（FFmpeg、SPlayer-Next、KuGouMusicApi、
+- **禁止「踩一捧一」**：不得以贬低任何其他项目（FFmpeg、KuGouMusicApi、
   NeteaseCloudMusicApi 等上游 / 参考 / 同类项目）的方式抬高本项目；宣传与对比必须基于事实与可复现数据。
 - **禁止不公平比对**：所有对外比较必须方法对等、口径透明、优劣并陈、标注局限。**特别约束
   FFmpeg vs EraAudio**：比较口径以仓库内基准文档为准（`docs/benchmark-industry-2026-09-05.md` 等），

@@ -2,14 +2,14 @@
 
 > 状态：规划稿 v3 · 2026-08-05（2026-09-06 修订）
 >
-> **去侧车化（2026-09-06）**：早期规划的 **Node 侧车（复用 SPlayer-Next `server/` 方案）已整体砍掉**，
+> **去侧车化（2026-09-06）**：早期规划的 **Node 侧车方案已整体砍掉**，
 > 仓库不保留任何侧车代码；桌面端为 **Flutter UI + 纯 Dart 业务层（平台 API 纯 Dart 直连）+ 多语言
 > 原生工具链 FFI 直连**（C 引擎 / C# 扫描 / C++ 刮削 / Rust 下载 / Go Subsonic 均进程内 FFI，
 > 子进程仅余 `archoera-vault` 凭据保险库），**无 Node 进程、无本地监听端口**。
 > 本文涉及侧车 / stdio RPC / Web 兼容路径的章节均已压缩为简注（§2/§4/§12.0）。
 >
 > **代码归属（2026-08-09）**：所引用的服务端代码（Go Subsonic、C 音频引擎、C# 扫描、C++ 刮削、
-> Rust 下载引擎等）均由本仓库作者**自行编写**，不在 SPlayer / SPlayer-Next 主仓库内，本项目不包含其代码。
+> Rust 下载引擎等）均由本仓库作者**自行编写**，不在任何上游主仓库内，本项目不包含其代码。
 >
 > **引擎路线（2026-08-16）**：音频主引擎 = **FFmpeg 默认主引擎 + Zig 内核逐格式渐进替换 + C 壳保留
 > （FFI/CLI）**（详见 `docs/audio-kernel-zig.md`）；Dart/FFI 契约不变，行为零回归。
@@ -37,7 +37,7 @@
 | 名称 | ArchoeraMusic |
 | 形态 | Flutter 桌面音乐播放器（Windows / macOS / Linux），**桌面为主** |
 | 架构 | 混合架构：Flutter UI + **纯 Dart 业务层（平台 API 纯 Dart 直连）** + 多语言原生工具链（**FFI 直连**）；原 Node 侧车方案已废弃（§4 简注） |
-| 代码归属 | 全部自行编写（含所引用的服务端代码），不在 SPlayer / SPlayer-Next 主仓库内 |
+| 代码归属 | 全部自行编写（含所引用的服务端代码），不在任何上游主仓库内 |
 | 开源 | 以 AGPL-3.0（`AGPL-3.0-or-later`，含后续版本弹性条款）发布（仓库根 LICENSE 已提供） |
 | 第三方依赖 | KuGouMusicApi（MIT）、NeteaseCloudMusicApi 相关实现（MIT）、TagLibSharp、FFmpeg 等——保留第三方声明 |
 
@@ -55,7 +55,7 @@
 > **音频架构要点**：桌面端与 Web 端共用**同一条 C 引擎管线**（`archoera-audio-engine`），
 > 全部 DSP（EQ/响度/FFT/变速变调）在 C 引擎内完成；桌面端经 **FFI 直连**
 > `libarchoera_mediaengine`（库内线程转码 PCM 落盘 + miniaudio 自播，2026-08-07）。
-> Rust `native/audio-engine`（napi 直出）**不在 ArchoeraMusic 引入**，仅留在 SPlayer-Next 桌面端使用。
+> Rust `native/audio-engine`（napi 直出）**不在 ArchoeraMusic 引入**，仅留在上游桌面端使用。
 
 **核心处理逻辑技术选型原则**
 - **原生优先**：平台协议 / 数据层由纯 Dart 承接；重型处理由原生工具链 FFI 直连（C 音频引擎、C# 扫描、C++ 刮削、Rust 下载）。
@@ -67,7 +67,7 @@
 
 ## 2. 链路落地形态（原「server 方案 → ArchoeraMusic 复用映射」简记）
 
-早期曾规划复用 SPlayer-Next `server/` 作为 Node 侧车后端（Hono + better-sqlite3 + 子进程调度，
+早期曾规划 Node 侧车后端（Hono + better-sqlite3 + 子进程调度，
 SQLite 写入经 `/api/db/*` 代理串行化），2026-09-06 随去侧车化整体废弃，未保留代码。
 各链路实际落地形态：
 
@@ -117,7 +117,7 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
 > EQ/响度/限幅/FFT/变速变调全部在 C 引擎内完成。桌面端 Flutter **FFI 直连**引擎库
 > （`libarchoera_mediaengine`，库内线程转码 PCM 落盘 + miniaudio 自播，2026-08-07 起，
 > §5.1）。（原 Web 兼容 OGG 流播放路径已随侧车方案移除。）
-> Rust `native/audio-engine`（napi 直出）**不引入** ArchoeraMusic（仍留在 SPlayer-Next 桌面端维护）。
+> Rust `native/audio-engine`（napi 直出）**不引入** ArchoeraMusic（仍留在上游桌面端维护）。
 > **引擎路线（2026-08-16 决策）**：主引擎采用 **FFmpeg 默认主 + Zig 内核渐进替换 + C 壳（FFI/CLI
 > 保留）**（详见 `docs/audio-kernel-zig.md`）；本节描述为 C 引擎现状，迁移过程中默认仍 FFmpeg
 > （零回归），Zig 逐格式验收后接管（Dart/FFI 契约不变）。
@@ -188,7 +188,7 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
 - 量级：Opus 192kbps ≈ 24KB/s（2Mbps 的 ~10%）；即使音源 FLAC ~1Mbps 也仅占 2Mbps 的一半
 - 播放与网络解耦：桌面端全速转码落盘后本地播放，源下载抖动仅影响转码完成时间，不影响已就绪播放
 
-### 5.5 播放控制语义（对齐 SPlayer-Next，桌面端 FFI 直连）
+### 5.5 播放控制语义（桌面端 FFI 直连）
 ```
 load(track) → Dart FFI 创建引擎实例（EngineBindings.create，player 模式）→ 库内线程完整转码
              → done（stream.wav 就绪）→ miniaudio 加载播放（EnginePlaying）
@@ -538,7 +538,7 @@ ArchoeraMusic/
 | **Phase 0** 骨架 ✅ | Flutter 三端骨架 + C 引擎构建打通（2026-08-05；原「spawn 侧车 + HTTP/WS 打通」路径已废弃，见 §12.0） | App 可启动、引擎可用 |
 | **Phase 1** Netease + 播放 ✅ | **桌面 FFI 直连引擎播放**（完整转码 PCM 落盘 + miniaudio 自播 + seek 即时 + FFT 拉模式，2026-08-07）；平台 API 纯 Dart 直连；Flutter 搜索页、播放页（歌词 + 频谱）、二维码登录、队列 | 可登录、搜索、播放，歌词/频谱同步，任意 seek |
 | **Phase 2** KuGou | 移植 kugou 模块（song_url/榜单/歌单）为纯 Dart（`app/lib/core/apis/kugou/`）；Flutter 接入酷狗搜索播放 | 可搜索播放酷狗歌曲 |
-| **Phase 3** 补全 | QQ 音乐接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一管线（PCM 落盘 + miniaudio 自播，§5.4）；下载（Rust CLI）；桌面歌词窗口；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）| 核心功能对齐 SPlayer-Next 子集 |
+| **Phase 3** 补全 | QQ 音乐接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一管线（PCM 落盘 + miniaudio 自播，§5.4）；下载（Rust CLI）；桌面歌词窗口；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）| 核心功能达成规划子集 |
 | **Phase 4** 优化 | C 引擎增强：进程内 seek、预加载/无缝切换；性能/内存基线（沿用原项目 memory discipline）；缓存与并发策略 | 播放体验优化，桌面集成完备 |
 
 ### 12.0 历史落地记录（简记）

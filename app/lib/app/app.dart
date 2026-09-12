@@ -55,7 +55,16 @@ class ArchoeraMusicApp extends ConsumerWidget {
     final imageStyle =
         prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
     final globalTint = prefs.globalTint || imageStyle;
-    final effectiveThemeMode = imageStyle ? ThemeMode.dark : themeMode;
+    // 深浅色「跟随系统」由平台桥接**推送**（被知道）；桥接未推/不可用时
+    // 回退引擎的 ThemeMode.system。
+    final systemDark = ref.watch(systemThemeProvider).value;
+    final effectiveThemeMode = imageStyle
+        ? ThemeMode.dark
+        : themeMode == ThemeMode.system
+        ? (systemDark == null
+              ? ThemeMode.system
+              : (systemDark ? ThemeMode.dark : ThemeMode.light))
+        : themeMode;
     final fontFamily = prefs.fontFamily;
     // 性能模式：全局关闭动效（隐式 Animated* 系列自动 0 时长）+ 频谱关闭。
     final performanceMode = prefs.performanceMode;

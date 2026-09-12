@@ -12,7 +12,7 @@
 //      token/userid 尝试解锁 VIP 歌词）+ lyrics 两步走（fmt=lrc 直接解码，
 //      fmt=krc 逐字歌词按非完全加密态解密：XOR + zlib inflate）；Netease →
 //      weapi song/detail + song/lyric（复用现有加密与登录 cookie）；
-//   ③ 兜底源（对齐 SPlayer-Next 刮削器多源思路）：平台/内嵌均缺标题或歌手
+//   ③ 兜底源（多源思路）：平台/内嵌均缺标题或歌手
 //      （西方歌曲平台常匹配失败）→ MusicBrainz recording 搜索取权威元数据；
 //      平台歌词失败 → LRCLIB；平台封面缺失 → Cover Art Archive（按 MB
 //      release MBID）。MusicBrainz / CAA 共享 1 req/s 限速，全局节流。
@@ -362,8 +362,7 @@ async fn kugou_lyrics(client: &reqwest::Client, request: &EnqueueRequest) -> Opt
 }
 
 // ============================================================
-// KRC 歌词解密与解析（对齐 SPlayer-Next electron/main/apis/kugou/core/krc.ts
-// 与 Dart apis/kugou/core/krc.dart，输出主 LRC / 翻译 / 罗马音三份）
+// KRC 歌词解密与解析（与 Dart apis/kugou/core/krc.dart 一致，输出主 LRC / 翻译 / 罗马音三份）
 //
 // 加密：base64(content) 去头 4 字节 → 与 16 字节定 key 循环 XOR → zlib inflate
 // → UTF-8 文本。文本格式示例：[285,3800]<0,120,0>字<120,200,0>字...
@@ -678,7 +677,7 @@ pub async fn download_cover(
 
 // ============================================================
 // 兜底源：MusicBrainz（权威元数据 + CAA 封面）/ LRCLIB（歌词）
-// 对齐 SPlayer-Next 刮削器多源思路，用于平台 API 命中差的场景
+// 多源思路，用于平台 API 命中差的场景
 // （尤其西方音乐）。MusicBrainz API 要求 UA 且限速 1 req/s
 // （CAA 同域同限），两处共用全局节流。
 // ============================================================
@@ -711,7 +710,7 @@ struct MusicBrainzHit {
 }
 
 /// MusicBrainz recording 搜索（按 artist + title 精确查询）→ 权威元数据。
-/// score < 70 视为不匹配（参考 SPlayer-Next 的相似度校验阈值）。
+/// score < 70 视为不匹配（相似度校验阈值）。
 async fn fetch_musicbrainz(
     client: &reqwest::Client,
     request: &EnqueueRequest,

@@ -5,7 +5,7 @@
 part of '../playback_notifier.dart';
 
 mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
-  /// 连续失败硬上限（对齐 SPlayer-Next MAX_CONSECUTIVE_FAILURES）。
+  /// 连续失败硬上限。
   static const _maxConsecutiveFailures = 5;
 
   Future<String?> _resolveSource(Track track, {String? quality}) async {
