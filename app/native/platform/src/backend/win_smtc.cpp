@@ -189,6 +189,11 @@ void SetThumbnailFromUri(winrt::hstring const& url) {
 
 }  // namespace
 
+// 加载探针：桥接 init 时由 Zig 调用一次，确认「这个 DLL 被载入且 C++ 代码在跑」。
+extern "C" void apl_smtc_win_probe(void) {
+    log("apl/smtc: dll loaded (probe)");
+}
+
 extern "C" int32_t apl_smtc_win_init(void* hwnd) {
     auto& s = state();
     if (s.initialized) return 0;

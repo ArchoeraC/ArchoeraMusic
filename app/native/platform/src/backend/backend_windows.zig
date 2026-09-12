@@ -248,6 +248,7 @@ pub fn caps() u32 {
 
 pub fn init() i32 {
     setAppUserModelId();
+    smtc.probe(); // 确认平台桥接 DLL 已加载（写日志，便于排查）
     return core.OK;
 }
 
