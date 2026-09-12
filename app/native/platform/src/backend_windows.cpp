@@ -152,15 +152,22 @@ void setAumid() {
     }
 }
 
+// 是否"安装版"：NSIS 安装器在 HKLM\...\Uninstall\ArchoeraMusic 写了卸载项
+// （与安装目录无关——用户可在安装器里自选路径）。便携版无此项 → 不创建快捷
+// 方式（无痕）。HKLM 读取普通用户即可，无需提权。
+bool isInstalled() {
+    HKEY key = nullptr;
+    const LSTATUS rc = ::RegOpenKeyExW(
+        HKEY_LOCAL_MACHINE,
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ArchoeraMusic",
+        0, KEY_READ, &key);
+    if (rc != ERROR_SUCCESS) return false;
+    ::RegCloseKey(key);
+    return true;
+}
+
 void ensureToastShortcut() {
-    wchar_t exe[MAX_PATH] = {0};
-    if (::GetModuleFileNameW(nullptr, exe, MAX_PATH) == 0) return;
-    // 仅"安装版"创建快捷方式：便携版（任意目录）**不落任何痕迹**，尊重用户不愿
-    // 安装的意愿。安装器把程序装到 %ProgramFiles%\ArchoeraMusic，据此判定。
-    wchar_t pf[MAX_PATH] = {0};
-    if (::GetEnvironmentVariableW(L"ProgramFiles", pf, MAX_PATH) == 0) return;
-    const size_t pf_len = std::wcslen(pf);
-    if (pf_len == 0 || _wcsnicmp(exe, pf, pf_len) != 0) return;
+    if (!isInstalled()) return;  // 便携版不落任何痕迹
 
     wchar_t appdata[MAX_PATH] = {0};
     if (::GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH) == 0) return;
@@ -172,6 +179,8 @@ void ensureToastShortcut() {
         return;
     }
     if (::GetFileAttributesW(lnk) != INVALID_FILE_ATTRIBUTES) return;  // 已存在
+    wchar_t exe[MAX_PATH] = {0};
+    if (::GetModuleFileNameW(nullptr, exe, MAX_PATH) == 0) return;
 
     ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);  // 冲突/重复初始化忽略
     IShellLinkW* link = nullptr;
