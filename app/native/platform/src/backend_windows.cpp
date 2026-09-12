@@ -32,6 +32,7 @@
 
 #include <atomic>
 #include <cstdio>
+#include <cstring>
 #include <cwchar>
 #include <string>
 #include <string_view>
@@ -152,6 +153,15 @@ void setAumid() {
 }
 
 void ensureToastShortcut() {
+    wchar_t exe[MAX_PATH] = {0};
+    if (::GetModuleFileNameW(nullptr, exe, MAX_PATH) == 0) return;
+    // 仅"安装版"创建快捷方式：便携版（任意目录）**不落任何痕迹**，尊重用户不愿
+    // 安装的意愿。安装器把程序装到 %ProgramFiles%\ArchoeraMusic，据此判定。
+    wchar_t pf[MAX_PATH] = {0};
+    if (::GetEnvironmentVariableW(L"ProgramFiles", pf, MAX_PATH) == 0) return;
+    const size_t pf_len = std::wcslen(pf);
+    if (pf_len == 0 || _wcsnicmp(exe, pf, pf_len) != 0) return;
+
     wchar_t appdata[MAX_PATH] = {0};
     if (::GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH) == 0) return;
     wchar_t lnk[MAX_PATH];
@@ -162,8 +172,6 @@ void ensureToastShortcut() {
         return;
     }
     if (::GetFileAttributesW(lnk) != INVALID_FILE_ATTRIBUTES) return;  // 已存在
-    wchar_t exe[MAX_PATH] = {0};
-    if (::GetModuleFileNameW(nullptr, exe, MAX_PATH) == 0) return;
 
     ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);  // 冲突/重复初始化忽略
     IShellLinkW* link = nullptr;
