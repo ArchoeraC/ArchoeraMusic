@@ -604,8 +604,10 @@ jobs:
     steps:
       - name: Install system dependencies
         run: |
+          # makepkg 需要：awk bsdtar(libarchive) bzip2 coreutils fakeroot file
+          # find(findutils) gettext gpg grep gzip sed tput(ncurses) xz —— 显式列全
           pacman -Sy --noconfirm --needed \
-            base-devel fakeroot debugedit \
+            base-devel fakeroot debugedit bzip2 gettext gnupg ncurses \
             git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
             cmake ninja clang pkgconf patchelf nasm \
             taglib curl openssl sqlite nlohmann-json \
