@@ -17,6 +17,37 @@ zig build -Doptimize=ReleaseFast
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j
 cd build && ctest
 ```
+改动平台桥接（`app/native/platform`）时另跑：
+```bash
+cmake -S app/native/platform -B app/native/platform/build -DCMAKE_BUILD_TYPE=Release
+cmake --build app/native/platform/build -j
+```
+
+## 架构约定（务必遵守）
+
+### 系统调用统一走 C++ 桥接器
+- **所有平台/系统能力**（媒体会话、电源/防休眠、窗口状态、系统主题色、通知、单实例、
+  以及未来任何系统集成）**一律在 `app/native/platform`（C++/ObjC++）实现**；
+  Dart 只通过 `apl_*` C ABI（`dart:ffi`）调用。
+- **禁止 Dart 直接调平台 API**：不得用 MethodChannel/平台插件、不得 `Process.run` 起系统命令/子进程、
+  不得在 Dart 侧解析平台数据（坚持零 JSON、零子进程、同进程动态链接）。
+- **新增能力流程**：`include/archoera_platform.h` 扩 ABI → `core.*` / `backend.h` 加契约 →
+  三端后端各实现（`backend_windows.cpp` / `backend_linux.cpp` / `backend_macos.mm`；
+  未覆盖平台落 `backend_stub.cpp`）→ Dart 绑定（`app/lib/services/platform/`）→
+  各平台构建脚本/打包依赖同步（详见 `docs/platform-native-bridge.md`）。
+- 桥接器**按平台官方工具链原生编译**：Windows MSVC C++/WinRT、Linux C++ + libdbus + dlopen GTK、
+  macOS ObjC++；**不要再引入 Zig 承载桥接**。
+
+### 模块化
+- 按职责拆文件、单一职责，避免巨型文件（桥接器即范例：`core` / `backend` / `apl` + 每平台一个后端文件）。
+- 跨平台共享逻辑放共享层（`core.*` / `backend.h`），平台特有逻辑放各平台文件；新增平台只加一个后端文件。
+- 新增/修改功能时同样适用：先想清楚归属与拆分，再落代码。
+
+### 渲染与性能
+- **高渲染压力优先 GPU**：着色器/滤镜/合成走 GPU（Flutter `FragmentProgram`/shader、Skia/Impeller），
+  不要在 Dart 主 isolate 做逐像素或重计算。
+- 重计算/阻塞 IO 下沉到后台 isolate 或原生层；UI 线程只做轻量调度。
+- 新增/修改功能同样先问"能不能 GPU 化 / 下沉原生"，再考虑 Dart 侧实现。
 
 ## 发布与签名
 
