@@ -65,7 +65,8 @@ endif()
 
 if(WIN32)
   target_link_libraries(archoera_platform PRIVATE
-    user32 powrprof advapi32 dwmapi windowsapp)
+    user32 powrprof advapi32 dwmapi windowsapp
+    shell32 shlwapi propsys ole32 uuid)
   # C++/WinRT 头：优先 CMake 变量/缓存 -DCPPWINRT_INCLUDE=<dir>，其次 vcpkg 的
   # cppwinrt CONFIG 包。未提供时 backend_windows.cpp 自动降级（__has_include）。
   if(NOT CPPWINRT_INCLUDE)
@@ -82,6 +83,7 @@ elseif(APPLE)
     "-framework Foundation"
     "-framework AppKit"
     "-framework MediaPlayer"
+    "-framework UserNotifications"
     "-framework CoreFoundation")
 elseif(UNIX)
   find_package(PkgConfig REQUIRED)

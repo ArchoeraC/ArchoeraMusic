@@ -11,6 +11,7 @@
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
 #import <MediaPlayer/MediaPlayer.h>
+#import <UserNotifications/UserNotifications.h>
 
 #include "backend.h"
 
@@ -399,18 +400,33 @@ int32_t systemAccentSetEvents(bool on) {
 }
 
 int32_t notify(const char* title, const char* body) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    NSUserNotification* notif = [[NSUserNotification alloc] init];
-    if (notif == nil) return ERR_BACKEND;
-    notif.title = nsstr(title, title != nullptr ? strlen(title) : 0);
-    notif.informativeText =
-        nsstr(body, body != nullptr ? strlen(body) : 0);
-    NSUserNotificationCenter* center =
-        [NSUserNotificationCenter defaultUserNotificationCenter];
+    // NSUserNotification 自 macOS 11 起废弃且现代系统上不再投递 → 改用
+    // UserNotifications.framework 的 UNUserNotificationCenter（10.14+）。
+    // 需应用为带 bundle id 的 .app 且（新系统）代码签名，否则投递会失败。
+    UNUserNotificationCenter* center =
+        [UNUserNotificationCenter currentNotificationCenter];
     if (center == nil) return ERR_BACKEND;
-    [center deliverNotification:notif];
-#pragma clang diagnostic pop
+    [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert |
+                                             UNAuthorizationOptionSound)
+                          completionHandler:^(BOOL granted, NSError* error) {
+                            (void)granted;
+                            (void)error;
+                          }];
+    UNMutableNotificationContent* content =
+        [[UNMutableNotificationContent alloc] init];
+    content.title = nsstr(title, title != nullptr ? strlen(title) : 0);
+    content.body = nsstr(body, body != nullptr ? strlen(body) : 0);
+    NSString* ident = [NSString
+        stringWithFormat:@"archoera-%lld",
+                         (long long)([NSDate date].timeIntervalSince1970 * 1000)];
+    UNNotificationRequest* request =
+        [UNNotificationRequest requestWithIdentifier:ident
+                                             content:content
+                                             trigger:nil];
+    [center addNotificationRequest:request
+             withCompletionHandler:^(NSError* error) {
+               (void)error;
+             }];
     return OK;
 }
 
