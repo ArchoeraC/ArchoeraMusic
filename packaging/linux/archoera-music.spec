@@ -14,7 +14,7 @@ Group:          Applications/Multimedia
 AutoReqProv:    no
 # ffmpeg-libs：bundle 内嵌 FFmpeg 库的编解码传递依赖（libx264 等）供应者；
 # 引擎链接自带 soname，系统 ffmpeg-libs 升级不破坏应用（仅提供依赖库）。
-Requires:       glibc, libstdc++, zlib, gtk3, libayatana-appindicator, libdbusmenu-glib, libepoxy, fontconfig, fribidi, libX11, libXi, at-spi2-atk, libcloudproviders, ffmpeg-libs, taglib, libcurl, openssl-libs, sqlite-libs, xz-libs
+Requires:       glibc, libstdc++, zlib, gtk3, libayatana-appindicator, libdbusmenu-glib, dbus-libs, libepoxy, fontconfig, fribidi, libX11, libXi, at-spi2-atk, libcloudproviders, ffmpeg-libs, taglib, libcurl, openssl-libs, sqlite-libs, xz-libs
 
 %description
 ArchoeraMusic is an open-source music player that connects to alternative

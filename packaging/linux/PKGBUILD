@@ -20,6 +20,8 @@ depends=(
   'gtk3'
   'libayatana-appindicator'
   'libdbusmenu-glib'
+  # platform bridge（native/libarchoera_platform.so）链接 libdbus-1.so.3
+  'dbus'
   'libepoxy'
   'fontconfig'
   'fribidi'

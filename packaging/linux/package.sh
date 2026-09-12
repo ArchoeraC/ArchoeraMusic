@@ -104,7 +104,7 @@ Priority: optional
 Architecture: amd64
 Maintainer: BetaStudio2 (ArchoeraMusic) <noreply@github.com>
 Homepage: $REPO_URL
-Depends: libc6, libstdc++6, zlib1g, libgtk-3-0 | libgtk-3-0t64, libayatana-appindicator3-1, libdbusmenu-glib4, libepoxy0, libfontconfig1, libfribidi0, libx11-6, libxi6, libatk-bridge2.0-0, libcloudproviders0, ffmpeg, libtag1v5, libcurl4, libssl3, libsqlite3-0, liblzma5
+Depends: libc6, libstdc++6, zlib1g, libgtk-3-0 | libgtk-3-0t64, libayatana-appindicator3-1, libdbusmenu-glib4, libdbus-1-3, libepoxy0, libfontconfig1, libfribidi0, libx11-6, libxi6, libatk-bridge2.0-0, libcloudproviders0, ffmpeg, libtag1v5, libcurl4, libssl3, libsqlite3-0, liblzma5
 Description: An open-source music player
  Connect to alternative music services, support offline playback, local
  library scanning and a built-in subsonic-compatible server.
