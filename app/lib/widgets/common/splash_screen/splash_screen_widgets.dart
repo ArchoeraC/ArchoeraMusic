@@ -13,7 +13,6 @@ extension _SplashScreenBuild on _SplashScreenState {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 背景：主色径向光晕（静态，入场淡入）。
           FadeTransition(
             opacity: Tween<double>(begin: 0, end: 1).animate(
               CurvedAnimation(
@@ -36,86 +35,76 @@ extension _SplashScreenBuild on _SplashScreenState {
               ),
             ),
           ),
-          // 居中：涟漪环 + Logo + 品牌名。
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    _RippleRings(animation: _ripple, color: scheme.primary),
-                    _buildLogo(scheme),
-                  ],
-                ),
-                const SizedBox(height: 30),
+                _buildLogo(),
+                const SizedBox(height: 24),
                 _buildBrand(
                   TextStyle(
-                    fontSize: 30,
+                    fontSize: 24,
                     fontWeight: FontWeight.w700,
                     color: scheme.onSurface,
                   ),
                 ),
-              ],
-            ),
-          ),
-          // 底部 64px：加载圆点。
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 64,
-            child: FadeTransition(
-              opacity: Tween<double>(begin: 0, end: 1).animate(
-                CurvedAnimation(
-                  parent: _intro,
-                  curve: const Interval(0.55, 0.95, curve: Curves.easeOut),
+                const SizedBox(height: 10),
+                FadeTransition(
+                  opacity: Tween<double>(begin: 0, end: 1).animate(
+                    CurvedAnimation(
+                      parent: _intro,
+                      curve: const Interval(0.55, 0.95, curve: Curves.easeOut),
+                    ),
+                  ),
+                  child: SlideTransition(
+                    position:
+                        Tween<Offset>(
+                          begin: const Offset(0, 0.06),
+                          end: Offset.zero,
+                        ).animate(
+                          CurvedAnimation(
+                            parent: _intro,
+                            curve: const Interval(
+                              0.55,
+                              0.95,
+                              curve: Curves.easeOut,
+                            ),
+                          ),
+                        ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'ArchoeraMusic © BetaStudio2',
+                          style: TextStyle(
+                            fontSize: 12,
+                            letterSpacing: 3,
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Powered By Flutter',
+                          style: TextStyle(
+                            fontSize: 12,
+                            letterSpacing: 3,
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              child: Center(
-                child: _LoadingDots(
+                const SizedBox(height: 18),
+                _LoadingDots(
                   animation: _pulse,
                   color: scheme.primary.withValues(alpha: 0.9),
                 ),
-              ),
-            ),
-          ),
-          // 最底 28px：小字（版权 + Powered By）——放在窗口底部。
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 28,
-            child: FadeTransition(
-              opacity: Tween<double>(begin: 0, end: 0.5).animate(
-                CurvedAnimation(
-                  parent: _intro,
-                  curve: const Interval(0.6, 1.0, curve: Curves.easeOut),
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'ArchoeraMusic © BetaStudio2',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      letterSpacing: 3,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Powered By Flutter',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      letterSpacing: 3,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
         ],
@@ -123,8 +112,7 @@ extension _SplashScreenBuild on _SplashScreenState {
     );
   }
 
-  /// Logo：主色辉光 + 弹出（淡入 / 上滑 / `easeOutBack` 过冲放大）。
-  Widget _buildLogo(ColorScheme scheme) {
+  Widget _buildLogo() {
     return FadeTransition(
       opacity: Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(
@@ -147,19 +135,7 @@ extension _SplashScreenBuild on _SplashScreenState {
               curve: const Interval(0, 0.62, curve: Curves.easeOutBack),
             ),
           ),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(54 * 0.3),
-              boxShadow: [
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: 0.45),
-                  blurRadius: 28,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: const AppLogo(size: 54),
-          ),
+          child: const AppLogo(size: 54),
         ),
       ),
     );
@@ -179,56 +155,6 @@ extension _SplashScreenBuild on _SplashScreenState {
           ),
         );
       },
-    );
-  }
-}
-
-/// 涟漪环：从 Logo 中心扩散 3 圈、循环淡出（呼应播放页水纹背景）。
-class _RippleRings extends StatelessWidget {
-  const _RippleRings({required this.animation, required this.color});
-
-  final Animation<double> animation;
-  final Color color;
-
-  static const int _count = 3;
-  static const double _base = 60;
-  static const double _spread = 84;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, _) {
-          return SizedBox(
-            width: _base + _spread,
-            height: _base + _spread,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                for (var i = 0; i < _count; i++)
-                  _ring((animation.value + i / _count) % 1.0),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _ring(double t) {
-    final size = _base + t * _spread;
-    final opacity = (1 - t) * 0.35;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: color.withValues(alpha: opacity),
-          width: 1.5,
-        ),
-      ),
     );
   }
 }
