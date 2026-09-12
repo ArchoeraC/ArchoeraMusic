@@ -26,13 +26,22 @@ RID="${1:-osx-arm64}"
 # 14.0（与 C 侧一致），cargo（tempo/downloader/transcoder）全部生效。
 export MACOSX_DEPLOYMENT_TARGET=14.0
 
+# Zig 内核同样对齐 14.0：Zig 默认按构建机 SDK 的 min-version 编静态库，会导致
+# 链接期报 "object file ... was built for newer 'macOS' version (15.x) than being
+# linked (14.0)"。按 RID 显式传含 min-version 的 target。
+case "$RID" in
+  osx-arm64) ZIG_KERNEL_TARGET="aarch64-macos.14.0" ;;
+  osx-x64)   ZIG_KERNEL_TARGET="x86_64-macos.14.0" ;;
+  *)         ZIG_KERNEL_TARGET="" ;;
+esac
+
 
 # 自研内核（EraAudio, Zig 静态库）须先于 audio-engine cmake 编译并落 zig-out/
 # （engine CMake 复制 zig-out/lib/libarchoera_kernel.a 链接；kernel 改动后
 #   必须重跑本步，否则陈旧产物会让 EraAudio 行为异常——见 docs/engine-integration-bench.md）
 if command -v zig >/dev/null 2>&1; then
   echo "[build-macos] ===== audio-engine: zig kernel (ReleaseFast) ====="
-  (cd "$ROOT/audio-engine" && zig build -Doptimize=ReleaseFast) || exit 1
+  (cd "$ROOT/audio-engine" && zig build -Doptimize=ReleaseFast ${ZIG_KERNEL_TARGET:+-Dtarget=$ZIG_KERNEL_TARGET}) || exit 1
 else
   echo "[build-macos] 警告: 未检测到 zig，自研内核(EraAudio)不编译（引擎将以 FFmpeg/Stable 运行）；"
   echo "          安装 Zig 0.16（https://ziglang.org/download）后重跑可启用 EraAudio。"
