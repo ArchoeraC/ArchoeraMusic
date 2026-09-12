@@ -31,6 +31,10 @@ cmake --build app/native/platform/build -j
   Dart 只通过 `apl_*` C ABI（`dart:ffi`）调用。
 - **禁止 Dart 直接调平台 API**：不得用 MethodChannel/平台插件、不得 `Process.run` 起系统命令/子进程、
   不得在 Dart 侧解析平台数据（坚持零 JSON、零子进程、同进程动态链接）。
+- **最小权限（普通用户可完成）**：所有系统调用必须能在**普通用户**权限下完成——
+  程序**不得要求管理员/root 权限**：不请求 UAC 提权、不写 `HKLM`/系统目录/需提权的位置、
+  不安装服务或驱动、不注册需提权的系统资源。需要提权才能实现的能力**放弃或降级**，
+  不做"请以管理员身份运行"的设计（否则一律视为不符合规范）。
 - **新增能力流程**：`include/archoera_platform.h` 扩 ABI → `core.*` / `backend.h` 加契约 →
   三端后端各实现（`backend_windows.cpp` / `backend_linux.cpp` / `backend_macos.mm`；
   未覆盖平台落 `backend_stub.cpp`）→ Dart 绑定（`app/lib/services/platform/`）→
