@@ -26,9 +26,13 @@
 #include <unknwn.h>
 
 #include <dwmapi.h>
+#include <propkey.h>
+#include <propvarutil.h>
+#include <shlobj.h>
 
 #include <atomic>
 #include <cstdio>
+#include <cwchar>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -128,6 +132,63 @@ void logReset() {
         FILE* f = nullptr;
         if (fopen_s(&f, g_log_paths[i], "w") == 0 && f != nullptr) std::fclose(f);
     }
+}
+
+// ── AppUserModelID + Toast 快捷方式 ──────────────────────────────
+// Windows Toast 前提（官方文档 enable-desktop-toast-with-appusermodelid）：
+//   1) 进程设显式 AUMID；
+//   2) 开始菜单/All Programs 有一个带 `System.AppUserModel.ID` 的快捷方式，
+//      其值与 CreateToastNotifier(appId) 一致——否则桌面应用**无法弹 Toast**。
+// 安装器通常负责；便携版/首次运行由这里补齐（COM IShellLink 方案）。
+constexpr wchar_t kAumid[] = L"Archoera.ArchoeraMusic";
+
+void setAumid() {
+    if (HMODULE shell = ::LoadLibraryA("shell32.dll")) {
+        using Fn = HRESULT(WINAPI*)(PCWSTR);
+        auto fn = reinterpret_cast<Fn>(
+            ::GetProcAddress(shell, "SetCurrentProcessExplicitAppUserModelID"));
+        if (fn != nullptr) fn(kAumid);
+    }
+}
+
+void ensureToastShortcut() {
+    wchar_t appdata[MAX_PATH] = {0};
+    if (::GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH) == 0) return;
+    wchar_t lnk[MAX_PATH];
+    if (std::swprintf(
+            lnk, MAX_PATH,
+            L"%s\\Microsoft\\Windows\\Start Menu\\Programs\\ArchoeraMusic.lnk",
+            appdata) <= 0) {
+        return;
+    }
+    if (::GetFileAttributesW(lnk) != INVALID_FILE_ATTRIBUTES) return;  // 已存在
+    wchar_t exe[MAX_PATH] = {0};
+    if (::GetModuleFileNameW(nullptr, exe, MAX_PATH) == 0) return;
+
+    ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);  // 冲突/重复初始化忽略
+    IShellLinkW* link = nullptr;
+    if (FAILED(::CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
+                                  IID_PPV_ARGS(&link)))) {
+        return;
+    }
+    link->SetPath(exe);
+    link->SetArguments(L"");
+    IPropertyStore* store = nullptr;
+    if (SUCCEEDED(link->QueryInterface(IID_PPV_ARGS(&store)))) {
+        PROPVARIANT pv;
+        ::InitPropVariantFromString(kAumid, &pv);
+        store->SetValue(PKEY_AppUserModel_ID, pv);
+        store->Commit();
+        ::PropVariantClear(&pv);
+        store->Release();
+    }
+    IPersistFile* file = nullptr;
+    if (SUCCEEDED(link->QueryInterface(IID_PPV_ARGS(&file)))) {
+        file->Save(lnk, TRUE);
+        file->Release();
+    }
+    link->Release();
+    log("apl/smtc: toast shortcut ensured");
 }
 
 // ── 窗口发现（Flutter Windows 顶层窗口）───────────────────────────
@@ -668,7 +729,7 @@ bool toastNative(const char* title, const char* body) {
         auto texts = tmpl.GetElementsByTagName(L"text");
         texts.Item(0).AppendChild(tmpl.CreateTextNode(winrt::to_hstring(t)));
         texts.Item(1).AppendChild(tmpl.CreateTextNode(winrt::to_hstring(b)));
-        ToastNotificationManager::CreateToastNotifier(L"ArchoeraMusic")
+        ToastNotificationManager::CreateToastNotifier(winrt::hstring(kAumid))
             .Show(ToastNotification(tmpl));
         return true;
     } catch (...) {
@@ -698,13 +759,8 @@ uint32_t caps() {
 }
 
 int32_t init() {
-    // 显式 AppUserModelID（Win11 媒体浮出/任务栏分组更稳；失败忽略）。
-    if (HMODULE shell = ::LoadLibraryA("shell32.dll")) {
-        using SetAumidFn = HRESULT(WINAPI*)(PCWSTR);
-        auto fn = reinterpret_cast<SetAumidFn>(
-            ::GetProcAddress(shell, "SetCurrentProcessExplicitAppUserModelID"));
-        if (fn != nullptr) fn(L"Archoera.ArchoeraMusic");
-    }
+    setAumid();             // 显式 AUMID（媒体浮出/任务栏分组 + Toast 身份）
+    ensureToastShortcut();  // Toast 前提：开始菜单快捷方式带同一 AUMID
 #ifdef ARCHOERA_WINRT
     winrt_smtc::probe();  // 确认 DLL 已加载（写日志，便于排查）
 #endif
