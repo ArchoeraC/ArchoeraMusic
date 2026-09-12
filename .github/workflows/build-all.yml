@@ -521,7 +521,7 @@ jobs:
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev \
             libdbus-1-dev libayatana-appindicator3-dev \
-            patchelf nasm git curl wget xz-utils unzip zip ca-certificates
+            patchelf nasm git curl wget xz-utils unzip zip jq file ca-certificates
       - uses: actions/checkout@v5
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
@@ -556,7 +556,7 @@ jobs:
       - name: Install system dependencies
         run: |
           dnf install -y --setopt=install_weak_deps=False \
-            git curl wget tar xz which findutils gzip unzip \
+            git curl wget tar xz which findutils gzip unzip zip jq file \
             gcc gcc-c++ clang cmake ninja-build pkgconf-pkg-config make \
             patchelf nasm \
             taglib-devel libcurl-devel openssl-devel sqlite-devel \
@@ -598,7 +598,7 @@ jobs:
       - name: Install system dependencies
         run: |
           pacman -Sy --noconfirm --needed \
-            base-devel git curl wget tar xz which findutils unzip zstd libarchive \
+            base-devel git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
             cmake ninja clang pkgconf patchelf nasm \
             taglib curl openssl sqlite nlohmann-json \
             gtk3 dbus libayatana-appindicator
