@@ -2,9 +2,10 @@
 # =====================================================================
 #  ArchoeraMusic 平台桥接 —— Windows 端本地编译验证（Linux 主机）
 #
-#  用 msvc-wine（MSVC cl.exe + Wine）编译 Windows 后端
-#  （src/backend_windows.cpp），确认可通过 MSVC 编译。仅编译（/c），
-#  不链接；CI 仍在 Windows runner 原生构建。
+#  用 msvc-wine（MSVC cl.exe + Wine）编译并链接 Windows 桥接
+#  （core.cpp / apl.cpp / backend_windows.cpp → archoera_platform.dll），
+#  确认可通过 MSVC 编译与链接（能发现 LNK2019 之类的符号缺失）。
+#  CI 仍在 Windows runner 原生构建。
 #
 #  依赖：
 #    - msvc-wine：默认 /opt/msvc（可用 MSVC_INSTALL_DIR 指定）
@@ -52,20 +53,23 @@ incs=(-I "$PLATFORM_DIR/include" -I "$PLATFORM_DIR/src")
 if [ -n "$CPPWINRT_INCLUDE" ]; then incs+=("-I$CPPWINRT_INCLUDE"); fi
 
 set +e
-cl /nologo /c /std:c++20 /EHsc /O2 /W3 /permissive- /Zc:__cplusplus /utf-8 \
+cl /nologo /std:c++20 /EHsc /O2 /W3 /permissive- /Zc:__cplusplus /utf-8 \
    /DARCHOERA_PLATFORM_BUILD "${incs[@]}" \
+   /LD \
    "$PLATFORM_DIR/src/core.cpp" \
    "$PLATFORM_DIR/src/apl.cpp" \
    "$PLATFORM_DIR/src/backend_windows.cpp" \
-   "/Fo$BUILD_DIR/"
+   "/Fe$BUILD_DIR/archoera_platform.dll" \
+   /link user32.lib powrprof.lib advapi32.lib dwmapi.lib windowsapp.lib \
+         shell32.lib shlwapi.lib propsys.lib ole32.lib uuid.lib
 rc=$?
 set -e
 
 echo
 if [ $rc -eq 0 ]; then
-  echo "✅ Windows 端编译通过"
-  ls -l "$BUILD_DIR"/*.obj
+  echo "✅ Windows 端编译+链接通过"
+  ls -l "$BUILD_DIR"/archoera_platform.*
 else
-  echo "❌ Windows 端编译失败" >&2
+  echo "❌ Windows 端编译/链接失败" >&2
 fi
 exit $rc

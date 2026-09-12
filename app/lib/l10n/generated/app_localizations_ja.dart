@@ -1952,6 +1952,19 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsDjModeOff => 'DJ版の曲を検出したら自動で次の曲へ';
 
   @override
+  String get settingsDjEnhanced => '拡張フィルタ';
+
+  @override
+  String get settingsDjEnhancedDesc =>
+      '基本キーワード（DJ / 抖音 / 0.8 / 0.9 …）に加え、Remix / Nightcore / 速度変更 / メドレー などもスキップ';
+
+  @override
+  String get settingsDjCustom => 'カスタム除外キーワード';
+
+  @override
+  String get settingsDjCustomHint => 'カンマまたは改行区切り（例：カバー, カラオケ）';
+
+  @override
   String get settingsSectionLyricsFilter => '歌詞';
 
   @override

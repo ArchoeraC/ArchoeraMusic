@@ -2014,6 +2014,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDjModeOff => 'Auto-skip to next track on DJ versions';
 
   @override
+  String get settingsDjEnhanced => 'Enhanced filtering';
+
+  @override
+  String get settingsDjEnhancedDesc =>
+      'Also skip Remix / Nightcore / sped-up / slowed / mashup etc. beyond the basic keywords';
+
+  @override
+  String get settingsDjCustom => 'Custom skip keywords';
+
+  @override
+  String get settingsDjCustomHint =>
+      'Comma or newline separated, e.g. cover, karaoke';
+
+  @override
   String get settingsSectionLyricsFilter => 'Lyrics';
 
   @override

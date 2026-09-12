@@ -1930,6 +1930,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDjModeOff => '哎嘿嘿(ˉ﹃ˉ)';
 
   @override
+  String get settingsDjEnhanced => '增强筛除';
+
+  @override
+  String get settingsDjEnhancedDesc =>
+      '在基础词（DJ / 抖音 / 0.8 / 0.9 …）之外，再跳过 Remix / Nightcore / 变速 / 串烧 等';
+
+  @override
+  String get settingsDjCustom => '自定义跳过关键词';
+
+  @override
+  String get settingsDjCustomHint => '逗号或换行分隔，例如：翻唱, 伴奏';
+
+  @override
   String get settingsSectionLyricsFilter => '歌词';
 
   @override
@@ -5875,6 +5888,19 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsDjModeOff => '哎嘿嘿(ˉ﹃ˉ)';
 
   @override
+  String get settingsDjEnhanced => '增强筛除';
+
+  @override
+  String get settingsDjEnhancedDesc =>
+      '在基础词（DJ / 抖音 / 0.8 / 0.9 …）之外，再跳过 Remix / Nightcore / 变速 / 串烧 等';
+
+  @override
+  String get settingsDjCustom => '自定义跳过关键词';
+
+  @override
+  String get settingsDjCustomHint => '逗号或换行分隔，例如：翻唱, 伴奏';
+
+  @override
   String get settingsSectionLyricsFilter => '歌词';
 
   @override
@@ -9818,6 +9844,19 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsDjModeOff => '哎嘿嘿(ˉ﹃ˉ)';
+
+  @override
+  String get settingsDjEnhanced => '增強篩除';
+
+  @override
+  String get settingsDjEnhancedDesc =>
+      '在基礎詞（DJ / 抖音 / 0.8 / 0.9 …）之外，再跳過 Remix / Nightcore / 變速 / 串燒 等';
+
+  @override
+  String get settingsDjCustom => '自訂跳過關鍵詞';
+
+  @override
+  String get settingsDjCustomHint => '逗號或換行分隔，例如：翻唱, 伴奏';
 
   @override
   String get settingsSectionLyricsFilter => '歌詞';

@@ -413,9 +413,7 @@ bool readDwmDword(const wchar_t* value, DWORD* out) {
 std::atomic<bool> g_accent_on{false};
 std::thread* g_accent_thread = nullptr;
 
-// 前置声明（定义见文件后部）：读取当前系统强调色。
-bool systemAccent(int32_t* r, int32_t* g, int32_t* b);
-
+// systemAccent 由 backend.h 在 archoera 命名空间声明（定义见文件后部）。
 void pushAccent() {
     int32_t r = 0, g = 0, b = 0;
     if (systemAccent(&r, &g, &b)) dispatch(makeSystemAccent(r, g, b));
@@ -491,19 +489,6 @@ void themeThread() {
     }
     ::CloseHandle(ev);
     ::RegCloseKey(hkey);
-}
-
-int32_t systemThemeSetEvents(bool on) {
-    const bool was = g_theme_on.exchange(on, std::memory_order_acq_rel);
-    if (on && !was) {
-        try {
-            g_theme_thread = new std::thread(themeThread);
-        } catch (...) {
-            g_theme_on.store(false, std::memory_order_release);
-            return ERR_BACKEND;
-        }
-    }
-    return OK;
 }
 
 // ── WinRT：SMTC + Toast ───────────────────────────────────────────
@@ -1006,6 +991,19 @@ int32_t systemAccentSetEvents(bool on) {
             g_accent_thread = new std::thread(accentThread);
         } catch (...) {
             g_accent_on.store(false, std::memory_order_release);
+            return ERR_BACKEND;
+        }
+    }
+    return OK;
+}
+
+int32_t systemThemeSetEvents(bool on) {
+    const bool was = g_theme_on.exchange(on, std::memory_order_acq_rel);
+    if (on && !was) {
+        try {
+            g_theme_thread = new std::thread(themeThread);
+        } catch (...) {
+            g_theme_on.store(false, std::memory_order_release);
             return ERR_BACKEND;
         }
     }

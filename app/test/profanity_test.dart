@@ -68,4 +68,27 @@ void main() {
       expect(unmaskProfanity(unmaskProfanity('What the f**k')), 'What the fuck');
     });
   });
+
+  group('unmaskProfanity 增强：遮盖符与词典', () {
+    test('全角 / 异体遮盖符', () {
+      expect(unmaskProfanity('f＊＊k'), 'fuck');
+      expect(unmaskProfanity('s＊＊t'), 'shit');
+      expect(unmaskProfanity('f××k'), 'fuck');
+      expect(unmaskProfanity('b＊＊＊h'), 'bitch');
+      expect(unmaskProfanity('f∗∗k'), 'fuck'); // U+2217
+      expect(unmaskProfanity('f✱✱k'), 'fuck'); // U+2731
+    });
+
+    test('全角英数字归一化', () {
+      expect(unmaskProfanity('ｆ＊ｃｋ'), 'fuck');
+      expect(unmaskProfanity('Ｆ＊＊Ｋ'), 'FUCK');
+    });
+
+    test('扩充词典', () {
+      expect(unmaskProfanity('b*llocks'), 'bollocks');
+      expect(unmaskProfanity('t*sser'), 'tosser');
+      expect(unmaskProfanity('w*nker'), 'wanker');
+      expect(unmaskProfanity('n*ghtcore'), 'n*ghtcore'); // 非脏话保持原样
+    });
+  });
 }

@@ -532,6 +532,8 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   void setPreset({
     bool? performanceMode,
     bool? fuckDjMode,
+    bool? djEnhanced,
+    String? djCustomKeywords,
     bool? uncensorProfanity,
     bool? hideVipTag,
     bool? hideQualityTag,
@@ -540,6 +542,8 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state = state.copyWithPreset(
       performanceMode: performanceMode,
       fuckDjMode: fuckDjMode,
+      djEnhanced: djEnhanced,
+      djCustomKeywords: djCustomKeywords,
       uncensorProfanity: uncensorProfanity,
       hideVipTag: hideVipTag,
       hideQualityTag: hideQualityTag,

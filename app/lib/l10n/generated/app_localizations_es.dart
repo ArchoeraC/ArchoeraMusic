@@ -2051,6 +2051,20 @@ class AppLocalizationsEs extends AppLocalizations {
       'Saltar a la siguiente al detectar versión DJ';
 
   @override
+  String get settingsDjEnhanced => 'Filtrado avanzado';
+
+  @override
+  String get settingsDjEnhancedDesc =>
+      'También omite Remix / Nightcore / acelerado / ralentizado / mashup, etc.';
+
+  @override
+  String get settingsDjCustom => 'Palabras clave de omisión personalizadas';
+
+  @override
+  String get settingsDjCustomHint =>
+      'Separadas por comas o saltos de línea, p. ej. cover, karaoke';
+
+  @override
   String get settingsSectionLyricsFilter => 'Letras';
 
   @override
