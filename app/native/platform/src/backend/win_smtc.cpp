@@ -63,6 +63,23 @@ constexpr GUID kIID_SMTC = {
     {0x90, 0x2E, 0x08, 0x7D, 0x41, 0xF9, 0x65, 0xEC},
 };
 
+// SMTC 需与顶层窗口关联（GetForWindow）。用调用线程自建的**隐藏窗口**（对齐
+// Chromium `gfx::SingletonHwnd`），避免与 Flutter 主窗口及其子类化 WndProc 交互
+// 触发 MediaControl.dll 0xC0000005。HWND 是 POD，无静态析构（不牵连 CRT 终止符号）。
+HWND hiddenWindow() {
+    static HWND s_hwnd = nullptr;
+    if (s_hwnd != nullptr) return s_hwnd;
+    const wchar_t kClass[] = L"ArchoeraMusicSmtcHiddenWnd";
+    WNDCLASSW wc = {};
+    wc.lpfnWndProc = ::DefWindowProcW;
+    wc.hInstance = ::GetModuleHandleW(nullptr);
+    wc.lpszClassName = kClass;
+    ::RegisterClassW(&wc);
+    s_hwnd = ::CreateWindowExW(0, kClass, L"", WS_OVERLAPPED, 0, 0, 0, 0,
+                               nullptr, nullptr, wc.hInstance, nullptr);
+    return s_hwnd;
+}
+
 struct State {
     SystemMediaTransportControls controls{nullptr};
     SystemMediaTransportControlsDisplayUpdater updater{nullptr};
@@ -252,14 +269,16 @@ extern "C" int32_t apl_smtc_win_init(void* hwnd) {
         auto interop = winrt::get_activation_factory<ISystemMediaTransportControlsInterop>(
             L"Windows.Media.SystemMediaTransportControls");
         log("apl/smtc: interop ok");
+        HWND target = hiddenWindow();
+        if (target == nullptr) target = reinterpret_cast<HWND>(hwnd);
         {
-            char hb[128];
-            std::snprintf(hb, sizeof(hb), "apl/smtc: hwnd=%p", hwnd);
+            char hb[160];
+            std::snprintf(hb, sizeof(hb), "apl/smtc: hwnd=%p target=%p", hwnd, target);
             logRaw(hb);
         }
         SystemMediaTransportControls controls{nullptr};
         winrt::check_hresult(interop->GetForWindow(
-            reinterpret_cast<HWND>(hwnd),
+            target,
             kIID_SMTC,
             winrt::put_abi(controls)));
         log("apl/smtc: GetForWindow ok");
