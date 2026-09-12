@@ -39,10 +39,12 @@ version_deb="$version"                    # deb 允许 . + -
 version_rpm="${version//[+-]/_}"          # rpm 不允许 '+' 与 '-'（- 分隔 version-release）
 version_arch="${version//[+-]/_}"         # arch pkgver 只允许 [A-Za-z0-9.]
 
-# 产物文件名里的发行版标识与构建基线（CI 按 job 传入，如 ubuntu24.04 / deepin / fedora / arch）。
+# 产物文件名里的发行版标识与构建基线（CI 按 job 传入，如 ubuntu24.04 / deepin25 / fedora / arch）。
 # 用于让用户一眼看出「这个包给谁用」，而不是只能靠后缀猜。
 DISTRO_TAG="${DISTRO_TAG:-linux}"
 BUILD_BASE="${BUILD_BASE:-$DISTRO_TAG}"
+# 可选的适用性说明（如「仅 Deepin 25」）：写入 BUILD-INFO 与 deb control 描述。
+DISTRO_NOTE="${DISTRO_NOTE:-}"
 
 mkdir -p "$DIST"
 stage="$WORK/stage"
@@ -89,6 +91,7 @@ write_build_info() {
 ArchoeraMusic $version
 构建目标   : $DISTRO_TAG
 构建基线   : $BUILD_BASE
+适用系统   : ${DISTRO_NOTE:-通用（见最低 glibc）}
 最低 glibc : ${glibc_max:-未知}
 构建时间   : $(date -u +%Y-%m-%dT%H:%M:%SZ)
 提交       : ${GITHUB_SHA:-$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)}
@@ -137,6 +140,10 @@ Description: An open-source music player
  Connect to alternative music services, support offline playback, local
  library scanning and a built-in subsonic-compatible server.
 EOF
+  # 发行版专属适用性说明（如「仅 Deepin 25」），作为 Description 的续行
+  if [[ -n "$DISTRO_NOTE" ]]; then
+    printf ' 适用系统: %s\n' "$DISTRO_NOTE" >> "$root/DEBIAN/control"
+  fi
   cat > "$root/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -e
