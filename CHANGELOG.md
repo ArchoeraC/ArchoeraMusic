@@ -4,6 +4,19 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [0.9.16+6] - 2026-09-13
+
+你好喵～
+这次主要是**打包**的爆破：
+
+1、Linux 改成**按发行版分开编译打包**（Ubuntu / Deepin / Fedora / Arch 各自从源码编），不再拿一份包硬塞所有发行版
+2、引擎改用**自建最小纯 LGPL FFmpeg**，FFmpeg/TagLib 连传递依赖一起内嵌（`RUNPATH=$ORIGIN`），产物不再受系统 soname 影响——终于能在别的发行版上正常启动了喵
+3、修好**许可证**：macOS 不再用 Homebrew，三端都随包附 FFmpeg/TagLib 许可文本（`licenses/`）
+4、产物文件名带发行版标识（如 `-ubuntu24.04-`、`-arch-`、`-fedora-`），包内还有 `BUILD-INFO.txt` 写明构建目标 / 基线 / 最低 glibc
+5、Deepin 单独开包
+
+真得睡了qwq……
+
 ## [0.9.16+5] - 2026-09-13
 
 1、修复了一些已知问题

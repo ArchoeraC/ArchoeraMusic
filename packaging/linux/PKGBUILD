@@ -29,9 +29,9 @@ depends=(
   'libxi'
   'at-spi2-atk'
   'libcloudproviders'
-  # ffmpeg：bundle 内嵌 FFmpeg 库的编解码传递依赖（libx264 等）供应者；
-  # 引擎链接自带 soname，系统 ffmpeg 升级不破坏应用（仅提供依赖库）。
-  'ffmpeg'
+  # 引擎/ scraper 的运行库已随 bundle 内嵌并带 RUNPATH=$ORIGIN：引擎用自建
+  # 最小 FFmpeg（不依赖系统 ffmpeg），scraper 的 TagLib 也一并内嵌；taglib
+  # 保留作兜底（其自身依赖 zlib/gcc-libs 已在列表中）。
   'taglib'
   'curl'
   'openssl'

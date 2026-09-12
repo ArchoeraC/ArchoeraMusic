@@ -8,8 +8,9 @@
 # autoPatchelfHook 负责两件 NixOS 必需的事：
 #   ① 可执行文件 --set-interpreter（NixOS 无 /lib64/ld-linux-x86-64.so.2）；
 #   ② 为 $out 下所有 ELF 追加 buildInputs 的 nix store 路径 RUNPATH
-#      （NixOS 无 /usr/lib，GTK/FFmpeg/taglib/openssl/curl/sqlite 等
-#      系统库只能从 store 解析）。
+#      （NixOS 无 /usr/lib，GTK/openssl/curl/sqlite 等系统库只能从 store 解析）。
+# FFmpeg（自建最小纯 LGPL）与 TagLib 随 bundle 内嵌于 native/ 且带 RUNPATH=$ORIGIN，
+# 只依赖 libc/libm/libz，无需 store 提供（见 autoPatchelfIgnoreMissingDeps）。
 # bundle 内相对定位（$ORIGIN / 相对可执行文件路径）保持原样，不改布局。
 
 { lib
@@ -31,17 +32,10 @@
 , libXi
 , at-spi2-atk
 , libcloudproviders
-  # mediaengine 链接的 FFmpeg soname 取决于构建机：CI（ubuntu-24.04
-  # FFmpeg 6.1）→ libavformat.so.60；本地较新 FFmpeg → .62/.63。
-  # 多版本并存，autoPatchelfHook 按各 ELF 的 NEEDED 自动匹配。
-  # 注：bundle 内嵌 FFmpeg 库（native/libav*.so）在 NixOS 上不适用——其
-  # 编解码传递依赖（libx264 等）为构建机打包版本，Nix store 不提供；
-  # 本包 installPhase 移除内嵌库，统一走 store ffmpeg（nixpkgs 版本由
-  # flake 锁定，天然免疫「突然性 major 升级」），autoPatchelfHook 补 RUNPATH。
-, ffmpeg_6 # libavformat.so.60 / libavcodec.so.60（CI 构建产物 NEEDED）
-, ffmpeg_7 # libavformat.so.61 / libavcodec.so.61
-, ffmpeg_8 # libavformat.so.62 / libavcodec.so.62
-, taglib_1 # libtag.so.1（scraper；CI ubuntu-24.04 taglib 1.13。nixpkgs 新版 taglib 2.x 为 libtag.so.2 不匹配）
+  # 运行库自包含：FFmpeg（自建最小纯 LGPL）与 TagLib 已随 bundle 内嵌于 native/
+  # 并带 RUNPATH=$ORIGIN，只依赖 libc/libm/libz（store 提供）。故不再需要
+  # ffmpeg/taglib 的 buildInputs；这些内嵌 soname 由 $ORIGIN 解析，
+  # autoPatchelfHook 对「store 里找不到」忽略即可（见 autoPatchelfIgnoreMissingDeps）。
 , curl # libcurl.so.4（scraper）
 , openssl_3 # libcrypto.so.3（scraper）
 , sqlite # libsqlite3.so.0（scraper）
@@ -71,10 +65,6 @@ stdenv.mkDerivation (finalAttrs: {
     libXi
     at-spi2-atk
     libcloudproviders
-    ffmpeg_6
-    ffmpeg_7
-    ffmpeg_8
-    taglib_1
     curl
     openssl_3
     sqlite
@@ -83,19 +73,25 @@ stdenv.mkDerivation (finalAttrs: {
     glibc
   ];
 
+  # 内嵌运行库（native/ 下的 libav* / libtag）由 RUNPATH=$ORIGIN 解析，store 中
+  # 没有对应 soname；显式忽略，避免 autoPatchelfHook 报「找不到依赖」而失败。
+  # 这些 soname 跟随内嵌的 FFmpeg 7.1.1 / TagLib 版本（升级时同步更新）。
+  autoPatchelfIgnoreMissingDeps = [
+    "libavformat.so.61"
+    "libavcodec.so.61"
+    "libavutil.so.59"
+    "libswresample.so.5"
+    "libtag.so.1"
+    "libtag.so.2"
+  ];
+
   installPhase = ''
     runHook preInstall
     mkdir -p $out/lib/archoera-music $out/bin
     cp -a $src/. $out/lib/archoera-music/
-    # cp -a 保留 bundle 的只读权限（native/ 目录 0555），先恢复可写，
-    # 否则下方 rm 无目录写权限（Nix 沙箱内 owner 亦无法删除）。
+    # 保留内嵌 FFmpeg/TagLib（自包含，$ORIGIN 解析）；autoPatchelfHook 只需补
+    # 解释器与 libc/libm/libz 的 store RUNPATH（见 buildInputs）。
     chmod -R u+w $out/lib/archoera-music
-    # NixOS 上移除内嵌 FFmpeg 库（见上方 ffmpeg_7/ffmpeg_8 注释），
-    # 引擎 NEEDED 由 store ffmpeg 经 autoPatchelfHook 补充 RUNPATH 满足。
-    rm -f $out/lib/archoera-music/native/libavformat.so.* \
-          $out/lib/archoera-music/native/libavcodec.so.* \
-          $out/lib/archoera-music/native/libavutil.so.* \
-          $out/lib/archoera-music/native/libswresample.so.*
     ln -s $out/lib/archoera-music/archoera_music $out/bin/archoera_music
     # 桌面条目 + 图标（文件名 = 应用 ID，保证 Wayland 任务栏图标映射）
     install -Dm644 ${./archoera-music.desktop} \

@@ -198,6 +198,20 @@ if(VCPKG_RUNTIME_DLLS)
     COMPONENT Runtime)
 endif()
 
+# LGPL 合规：随包附 FFmpeg / TagLib 许可文本（vcpkg 的 copyright 文件）。
+# vcpkg 的 ffmpeg 默认不开 gpl/nonfree 特性 → 纯 LGPL-2.1+，与 AGPL-3.0
+# 聚合分发兼容（见 app/core/audio-engine/THIRD-PARTY-LICENSES.md）。
+set(VCPKG_SHARE_DIR
+  "${CMAKE_CURRENT_SOURCE_DIR}/../vcpkg_installed/${VCPKG_TARGET_TRIPLET}/share")
+foreach(_dep IN ITEMS ffmpeg taglib)
+  if(EXISTS "${VCPKG_SHARE_DIR}/${_dep}/copyright")
+    install(FILES "${VCPKG_SHARE_DIR}/${_dep}/copyright"
+      DESTINATION "${CMAKE_INSTALL_PREFIX}/licenses"
+      RENAME "${_dep}-LICENSE.txt"
+      COMPONENT Runtime)
+  endif()
+endforeach()
+
 # === mingw 运行时 DLL（subsonic Go c-shared 依赖）===
 # libarchoera_subsonic.dll 由 mingw（gcc，cgo 必需）编译，动态依赖
 # libgcc_s_seh-1.dll / libwinpthread-1.dll；scraper 内嵌的 mingw DLL

@@ -3,7 +3,7 @@
 #
 # 用法：
 #   package-flatpak.sh <bundle> <版本>
-# 产物：dist/linux/ArchoeraMusic-v<版本>-linux-x86_64.flatpak
+# 产物：dist/linux/ArchoeraMusic-v<版本>-flatpak-x86_64.flatpak
 #
 # 前置：flatpak 已安装，且已配置 flathub remote（脚本自动安装 Platform 运行时）。
 # 说明：bundle 整体放入 /app（files/），以保留 FFI/引擎子进程的相对路径；
@@ -75,5 +75,5 @@ flatpak build-finish \
 # 5) 导出 + 打包为单文件 .flatpak
 flatpak build-export --no-update-summary "$repo" "$appdir"
 flatpak build-bundle "$repo" \
-  "$DIST/$APP_NAME-v$version-linux-x86_64.flatpak" "$APP_ID"
-echo "→ $DIST/$APP_NAME-v$version-linux-x86_64.flatpak"
+  "$DIST/$APP_NAME-v$version-flatpak-x86_64.flatpak" "$APP_ID"
+echo "→ $DIST/$APP_NAME-v$version-flatpak-x86_64.flatpak"
