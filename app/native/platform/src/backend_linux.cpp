@@ -1137,7 +1137,62 @@ int32_t appInstanceAcquire() {
     return 1;
 }
 
+// 系统主题色（DE accent）：优先 **XDG Desktop Portal**（跨 DE 标准）：
+//   org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop
+//   org.freedesktop.portal.Settings.ReadOne("org.freedesktop.appearance","accent-color")
+//   → v 内含 (ddd)（sRGB，[0,1]）。失败回退 KDE/GNOME 命令（旧环境）。
+bool accentViaPortal(int32_t* r, int32_t* g, int32_t* b) {
+    DBusConnection* c = ensureConn();
+    if (c == nullptr) return false;
+    DBusMessage* msg = dbus_message_new_method_call(
+        "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+        "org.freedesktop.portal.Settings", "ReadOne");
+    if (msg == nullptr) return false;
+    const char* ns = "org.freedesktop.appearance";
+    const char* key = "accent-color";
+    dbus_message_append_args(msg, DBUS_TYPE_STRING, &ns, DBUS_TYPE_STRING, &key,
+                             DBUS_TYPE_INVALID);
+    DBusError err;
+    dbus_error_init(&err);
+    DBusMessage* reply =
+        dbus_connection_send_with_reply_and_block(c, msg, 3000, &err);
+    dbus_message_unref(msg);
+    bool ok = false;
+    double rr = 0, gg = 0, bb = 0;
+    if (reply != nullptr) {
+        DBusMessageIter it, var, st;
+        if (dbus_message_iter_init(reply, &it) &&
+            dbus_message_iter_get_arg_type(&it) == DBUS_TYPE_VARIANT) {
+            dbus_message_iter_recurse(&it, &var);
+            if (dbus_message_iter_get_arg_type(&var) == DBUS_TYPE_STRUCT) {
+                dbus_message_iter_recurse(&var, &st);
+                if (dbus_message_iter_get_arg_type(&st) == DBUS_TYPE_DOUBLE) {
+                    dbus_message_iter_get_basic(&st, &rr);
+                    dbus_message_iter_next(&st);
+                    dbus_message_iter_get_basic(&st, &gg);
+                    dbus_message_iter_next(&st);
+                    dbus_message_iter_get_basic(&st, &bb);
+                    ok = true;
+                }
+            }
+        }
+        dbus_message_unref(reply);
+    }
+    dbus_error_free(&err);
+    if (!ok) return false;
+    auto toU8 = [](double v) -> int32_t {
+        if (v <= 0.0) return 0;
+        if (v >= 1.0) return 255;
+        return static_cast<int32_t>(v * 255.0 + 0.5);
+    };
+    if (r != nullptr) *r = toU8(rr);
+    if (g != nullptr) *g = toU8(gg);
+    if (b != nullptr) *b = toU8(bb);
+    return true;
+}
+
 bool systemAccent(int32_t* r, int32_t* g, int32_t* b) {
+    if (accentViaPortal(r, g, b)) return true;
     const char* cmds[] = {
         "kreadconfig6 --file kdeglobals --group General --key AccentColor",
         "kreadconfig5 --file kdeglobals --group General --key AccentColor",
