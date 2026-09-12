@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../apis/runtime.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/platform/platform_capabilities.dart';
 import '../stores/vault_session_store.dart';
 
 /// 退出应用（所有退出路径统一走此入口）。
@@ -35,6 +36,10 @@ Future<void> quitApplication(WidgetRef ref) async {
   if (store is VaultSessionStore) {
     await store.flush();
   }
+  // 平台桥接收尾：停 inhibit 线程 / 关单实例互斥体 / SMTC(WinRT) deinit。
+  // 必须在 exit(0) 前（此时 COM 仍初始化），否则 WinRT 对象会在进程退出时
+  // 晚于 COM uninit 释放 → 崩溃；同时避免内存泄漏。
+  await ref.read(platformCapabilitiesProvider).dispose();
   // 给引擎 FFI / 后台 isolate 短暂收尾后退出
   await Future<void>.delayed(const Duration(milliseconds: 200));
   exit(0);

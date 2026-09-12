@@ -117,6 +117,7 @@ final class AplEventFfi extends Struct {
 
 typedef _AplVersionC = Int32 Function();
 typedef _AplInitC = Int32 Function();
+typedef _AplShutdownC = Int32 Function();
 typedef _AplCapsC = Uint32 Function();
 typedef _AplPowerInhibitC = Int32 Function(Int32 on);
 typedef _AplPowerScreenC = Int32 Function(Int32 on);
@@ -137,6 +138,7 @@ typedef AplEventCallbackC = Void Function(
 
 typedef _AplVersionD = int Function();
 typedef _AplInitD = int Function();
+typedef _AplShutdownD = int Function();
 typedef _AplCapsD = int Function();
 typedef _AplPowerInhibitD = int Function(int on);
 typedef _AplPowerScreenD = int Function(int on);
@@ -191,6 +193,7 @@ class PlatformBindings {
   PlatformBindings._(DynamicLibrary lib)
       : _version = lib.lookupFunction<_AplVersionC, _AplVersionD>('apl_abi_version'),
         _init = lib.lookupFunction<_AplInitC, _AplInitD>('apl_init'),
+        _shutdown = lib.lookupFunction<_AplShutdownC, _AplShutdownD>('apl_shutdown'),
         _caps = lib.lookupFunction<_AplCapsC, _AplCapsD>('apl_capabilities'),
         _powerInhibit =
             lib.lookupFunction<_AplPowerInhibitC, _AplPowerInhibitD>('apl_power_set_sleep_inhibit'),
@@ -222,8 +225,11 @@ class PlatformBindings {
 
   late final NativeCallable<AplEventCallbackC> _eventCallable;
 
+  bool _disposed = false;
+
   final _AplVersionD _version;
   final _AplInitD _init;
+  final _AplShutdownD _shutdown;
   final _AplCapsD _caps;
   final _AplPowerInhibitD _powerInhibit;
   final _AplPowerScreenD _powerScreen;
@@ -410,8 +416,12 @@ class PlatformBindings {
     }
   }
 
-  /// 释放事件回调（isolate 退出前调用）；幂等。
+  /// 释放事件回调 + 关闭原生后端（停 inhibit 线程 / 关单实例互斥体 /
+  /// SMTC deinit 释放 WinRT 对象）；幂等。须在进程退出前调用（COM 仍初始化）。
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _shutdown();
     _setCallback(nullptr, nullptr);
     _eventCallable.close();
     _commandCtrl.close();
@@ -419,5 +429,6 @@ class PlatformBindings {
     _screenCtrl.close();
     _windowCtrl.close();
     _backendCtrl.close();
+    _instance = null;
   }
 }

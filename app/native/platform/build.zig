@@ -41,13 +41,21 @@ pub fn build(b: *std.Build) void {
         // 未提供则跳过两个 .cpp；Zig 侧弱符号兜底（Toast 走 PowerShell，SMTC 禁用）。
         const inc_opt = b.option([]const u8, "cppwinrt-include", "C++/WinRT include dir (win_toast.cpp / win_smtc.cpp)");
         if (inc_opt) |inc| {
+            // cppwinrt 2.x 与 Zig clang 的兼容告警（详见 win_smtc.cpp 顶部注释）：
+            // -Wnontrivial-memcall（com_array memset 分支）、-Wno-unused-command-line-argument
+            // （-nostdinc++ driver 警告）。
+            const cxx_flags = &.{
+                "-std=c++20",
+                "-Wno-nontrivial-memcall",
+                "-Wno-unused-command-line-argument",
+            };
             lib.root_module.addCSourceFile(.{
                 .file = b.path("src/backend/win_toast.cpp"),
-                .flags = &.{ "-std=c++20" },
+                .flags = cxx_flags,
             });
             lib.root_module.addCSourceFile(.{
                 .file = b.path("src/backend/win_smtc.cpp"),
-                .flags = &.{ "-std=c++20" },
+                .flags = cxx_flags,
             });
             lib.root_module.addIncludePath(.{ .cwd_relative = inc });
             lib.root_module.linkSystemLibrary("windowsapp", .{});
