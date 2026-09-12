@@ -62,6 +62,16 @@ pub fn build(b: *std.Build) void {
             // C++/WinRT 的 C++ 运行时初始化（__vcrt_*/__acrt_*）：Zig 的 `-lc`
             // 只链 msvcrt，不链 vcruntime/ucrt → 含 C++ 静态初始化/异常处理的
             // 目标会报 CRT 初始化符号未解析（见 win_smtc.cpp）。
+            //
+            // 且 Zig 内置的 windows-msvc 系统库搜索路径只含 VC Lib 与 SDK
+            // `um\x64`，**不含 SDK `ucrt\x64`** → `-lucrt` 找不到。把 vcvars 的
+            // `LIB` 目录全部加入搜索路径（与 cl.exe 一致）。
+            if (b.graph.environ_map.get("LIB")) |lib_paths| {
+                var it = std.mem.tokenizeAny(u8, lib_paths, ";");
+                while (it.next()) |dir| {
+                    if (dir.len > 0) lib.root_module.addLibraryPath(.{ .cwd_relative = dir });
+                }
+            }
             lib.root_module.linkSystemLibrary("vcruntime", .{});
             lib.root_module.linkSystemLibrary("ucrt", .{});
         }
