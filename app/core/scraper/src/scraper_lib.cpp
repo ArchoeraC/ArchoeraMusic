@@ -268,7 +268,7 @@ static std::string trackProviderCb(const std::unordered_map<std::string, json>& 
 
 // ---------------------------------------------------------------------------
 // 仅目录整理（organize：不联网、不写标签，按模板把文件移动到目标目录树）
-// 语义对齐 SPlayer-Next server/music/organizer.ts：
+// 语义：
 //   - 模板只决定「目录层级」，文件始终保留原始 basename（不改名）；
 //   - 模板末段若形如文件名（含扩展）则视为文件名模板丢弃，仅取目录段；
 //   - 目标已存在冲突追加 " (2)" " (3)"…，极端情况加时间戳；
@@ -277,7 +277,7 @@ static std::string trackProviderCb(const std::unordered_map<std::string, json>& 
 
 namespace fs = std::filesystem;
 
-/// 整理默认模板（与 SPlayer-Next organizer 一致）。
+/// 整理默认模板。
 static const char* kOrganizeDefaultPattern = "{artist}/{album}/{track}. {title}.{ext}";
 
 /// 清理路径段：去控制字符/非法字符、压缩空白、去首尾空白与点、限长。

@@ -20,7 +20,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # （Dart 版本号语法不允许 '.' 分段预发布/构建号；运行时按 0.8.3.pre.2.rev.3 风格显示）
 # 注意：+ 后构建号必须为数字（Windows 构建号注入 FLUTTER_VERSION_BUILD，非数字
 # 会告警并归 0；rev.1 这类非数字标签不可用）
-version: 0.9.16+2
+version: 0.9.16+3
 
 environment:
   sdk: ^3.12.2
@@ -50,7 +50,7 @@ dependencies:
   # 直连网易云 weapi/eapi 加密（AES/RSA/md5）
   pointycastle: ^4.0.0
   crypto: ^3.0.6
-  # 封面主色提取（QuantizerCelebi 量化 + HCT 感知色彩空间，对齐 SPlayer-Next）
+  # 封面主色提取（QuantizerCelebi 量化 + HCT 感知色彩空间）
   material_color_utilities: ^0.13.0
   # 二维码生成（自绘 QrImageView，替代停维护的 qr_flutter）
   qr: ^4.0.0
@@ -162,6 +162,12 @@ flutter:
     - family: EtaMark
       fonts:
         - asset: assets/fonts/EtaMark.ttf
+    # 启动页品牌字标专用显示字体（Manrope，OFL-1.1，可变字重）：
+    # 现代几何、内敛不浮夸，仅用于 Splash 的「ArchoeraMusic」字标，
+    # 不参与全局界面字体（后者仍走设置项 MiSans/Noto/HarmonyOS）。
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

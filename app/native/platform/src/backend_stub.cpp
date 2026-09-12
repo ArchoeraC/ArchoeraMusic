@@ -31,6 +31,7 @@ int32_t appInstanceAcquire() { return 1; }
 
 bool systemAccent(int32_t*, int32_t*, int32_t*) { return false; }
 int32_t systemAccentSetEvents(bool) { return ERR_UNSUPPORTED; }
+int32_t systemThemeSetEvents(bool) { return ERR_UNSUPPORTED; }
 
 int32_t notify(const char*, const char*) { return ERR_UNSUPPORTED; }
 

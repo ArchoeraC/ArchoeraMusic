@@ -87,9 +87,19 @@ AplEvent makeBackendLost(bool lost) {
     return e;
 }
 
-AplEvent makeSystemAccent() {
+AplEvent makeSystemAccent(int32_t r, int32_t g, int32_t b) {
     AplEvent e{};
     e.type = APL_EVENT_SYSTEM_ACCENT;
+    e.u.accent.r = r;
+    e.u.accent.g = g;
+    e.u.accent.b = b;
+    return e;
+}
+
+AplEvent makeSystemTheme(bool dark) {
+    AplEvent e{};
+    e.type = APL_EVENT_SYSTEM_THEME;
+    e.u.theme.dark = dark ? 1 : 0;
     return e;
 }
 

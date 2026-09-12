@@ -2,8 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 基础控件（对齐 SPlayer-Next 的 SButton / SInput 语义，自绘观感，
-/// 不依赖 Material 原生按钮外观）。
+/// 基础控件（自绘观感，不依赖 Material 原生按钮外观）。
 library;
 
 import 'package:material_ui/material_ui.dart';
@@ -164,7 +163,7 @@ class SButton extends StatelessWidget {
   }
 }
 
-/// 圆角填充式输入框（对齐 SPlayer-Next SInput）。
+/// 圆角填充式输入框。
 class SInput extends StatefulWidget {
   const SInput({
     super.key,
@@ -271,8 +270,7 @@ class SSegmentedOption<T> {
   final String label;
 }
 
-/// 自绘分段控件（对齐 SPlayer-Next SRadioGroup 的 pill 分段观感，
-/// 替代 Material SegmentedButton）。
+/// 自绘分段控件（pill 分段观感，替代 Material SegmentedButton）。
 ///
 /// 外观：外层 `onSurface 6%` 圆角 pill，选中项 `primary 12%` 背景 +
 /// 主色文字（AnimatedContainer 平滑过渡），每项等宽、悬浮可点击。

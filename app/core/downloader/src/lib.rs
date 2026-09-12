@@ -9,7 +9,7 @@
 // 无任何事件队列/轮询。Dart `_handleEvent` 收到 ptr 后立即 free。
 //
 // 下载核心：reqwest bytes_stream chunk loop + tmp 文件 + fsync + 原子 rename
-// （实现思路参考 SPlayer-Next download-engine，代码为本仓库自行编写）。
+// （代码为本仓库自行编写）。
 // ============================================================
 
 pub mod crypto;

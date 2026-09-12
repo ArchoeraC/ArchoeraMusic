@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// ArchoeraMusic 独立设计体系（对齐 SPlayer-Next 的自定义主题思路，
+/// ArchoeraMusic 独立设计体系（自定义主题思路，
 /// 但采用本项目的独立色板，不做 Google Material 原生观感）。
 ///
 /// 设计语言：

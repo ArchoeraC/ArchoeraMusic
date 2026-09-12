@@ -5,7 +5,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// 与上游 SPlayer-Next BackgroundRipple 的 WGSL/WebGL 场公式一致；单 pass 完成
+// 与 WGSL/WebGL 场公式一致；单 pass 完成
 // 「折射 + 饱和 + 波峰高光/波谷压暗 + 压暗」，封面模糊由 Dart 侧预烘焙（不在
 // 每帧重复）。uniform 的浮点索引按下方声明顺序（忽略 sampler）：
 //   0,1 uSize | 2 uDarken | 3 uSaturation | 4 uImgAspect | 5 uMix

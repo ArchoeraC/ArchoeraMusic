@@ -33,7 +33,7 @@ const double _neutralChroma = 6;
 /// （对齐原版 MIN_COLORFUL_POPULATION_RATIO=0.12）。
 const double _minColorfulRatio = 0.12;
 
-/// 从封面提取代表主色（对齐 SPlayer-Next `utils/color.ts`）：
+/// 从封面提取代表主色：
 /// 解码缩放到 64×64 → 中心区域加权取样 → **Material 色度量化（QuantizerCelebi）**
 /// → 用 **HCT 感知色彩空间**（色度/色调）过滤与评分选代表色 → 约束到适合作为
 /// 背景基色的范围。

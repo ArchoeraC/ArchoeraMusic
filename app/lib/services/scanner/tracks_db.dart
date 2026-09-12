@@ -8,7 +8,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 import 'library_scanner.dart';
 
-/// 本地曲目行（对应 tracks 表 schema，与 SPlayer-Next 对齐）。
+/// 本地曲目行（对应 tracks 表 schema）。
 class TrackRow {
   const TrackRow({
     required this.id,

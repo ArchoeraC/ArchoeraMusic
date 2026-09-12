@@ -18,9 +18,9 @@ import '../services/platform/platform_capabilities.dart';
 import '../services/qqmusic/qq_liked_store.dart';
 import '../services/qqmusic/qqmusic_api.dart';
 import '../services/weather/weather_notifier.dart';
+import 'app_prefs.dart';
 import 'event_bus.dart';
 import 'like_controller.dart';
-import 'system_accent.dart';
 
 // ── 直连NT API ──────────────────────────────────────────────
 
@@ -136,16 +136,27 @@ final qqLikedStoreProvider = ChangeNotifierProvider<QqLikedStore>(
 /// 事件驱动：先读一次，再订阅平台桥接的主题色变更事件（KDE/GNOME/Windows/
 /// macOS），变更时重读；无法读取返回 null，调用方回退默认亮蓝。
 final systemAccentProvider = StreamProvider<Color?>((ref) async* {
+  // 仅在「主题色来源 = 跟随系统」时订阅系统强调色；custom/cover/solid 下完全
+  // 不接触系统色（不查询、不订阅）。
+  final source = ref.watch(appPrefsProvider.select((p) => p.themeSource));
+  if (source != 'default') return;
   final caps = PlatformCapabilities.instance();
-  var last = await SystemAccent.read();
-  yield last;
   if (!caps.systemAccentAvailable) return;
+  // 平台**推送**模型：订阅时桥接立即推当前值，之后推变化——Dart 不主动查询。
   if (caps.setAccentEvents(true) != 0) return;
   ref.onDispose(() => caps.setAccentEvents(false));
-  await for (final _ in caps.accentEvents) {
-    final next = await SystemAccent.read();
-    if (next == last) continue; // 事件可能重复/其它设置变更 → 去重
-    last = next;
-    yield next;
-  }
+  yield* caps.accentEvents;
+});
+
+/// 系统深浅色（平台推送；dark=true 深色）。仅在主题模式为 `system` 时订阅，
+/// 驱动 `ThemeMode.system` 的解析（见 `app.dart`）。桥接不可用时不产出。
+final systemThemeProvider = StreamProvider<bool>((ref) async* {
+  final mode = ref.watch(appPrefsProvider.select((p) => p.themeMode));
+  if (mode != 'system') return;
+  final caps = PlatformCapabilities.instance();
+  if (!caps.systemThemeAvailable) return;
+  // 平台**推送**模型：订阅即收当前值，之后收变化——Dart 不主动查询。
+  if (caps.setSystemThemeEvents(true) != 0) return;
+  ref.onDispose(() => caps.setSystemThemeEvents(false));
+  yield* caps.systemThemeEvents;
 });

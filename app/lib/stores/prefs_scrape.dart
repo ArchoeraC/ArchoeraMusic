@@ -4,7 +4,7 @@
 
 import 'app_prefs.dart';
 
-// ── 刮削设置键（对齐 SPlayer-Next 刮削器多源方案）──
+// ── 刮削设置键（多源方案）──
 // 目录留空 = 使用媒体库扫描目录；数据源开关默认全开。
 const scrapeDirsKey = 'scrape.dirs';
 const scrapeUseMusicBrainzKey = 'scrape.useMusicBrainz';
@@ -39,7 +39,7 @@ extension ScrapePrefs on AppPrefs {
       .where((d) => d.isNotEmpty)
       .toList();
 
-  /// 数据源开关（默认全开，对齐 SPlayer-Next 刮削器默认）。
+  /// 数据源开关（默认全开）。
   bool get scrapeUseMusicBrainz =>
       data[scrapeUseMusicBrainzKey] as bool? ?? true;
   bool get scrapeUseDeezer => data[scrapeUseDeezerKey] as bool? ?? true;

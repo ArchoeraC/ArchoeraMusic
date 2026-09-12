@@ -27,11 +27,21 @@
 #include <string>
 
 namespace archoera {
+
+// 推送一次当前系统强调色（定义见文件后部）；平台推送模型，Dart 不查询。
+void pushAccent();
+
+// 推送一次当前系统深浅色（定义见文件后部）；平台推送模型，Dart 不查询。
+void pushTheme();
+
 namespace {
 
 std::atomic<bool> g_screen_events{false};
 std::atomic<bool> g_window_events{false};
 std::atomic<bool> g_accent_events{false};
+std::atomic<bool> g_theme_events{false};
+std::atomic<bool> g_theme_dark{false};
+std::atomic<bool> g_theme_valid{false};
 std::atomic<bool> g_minimized{false};
 std::atomic<bool> g_focused{true};
 
@@ -94,7 +104,14 @@ void emitWindow() {
 - (void)onAccent:(NSNotification*)note {
     (void)note;
     if (archoera::g_accent_events.load(std::memory_order_acquire)) {
-        archoera::dispatch(archoera::makeSystemAccent());
+        archoera::pushAccent();
+    }
+}
+
+- (void)onTheme:(NSNotification*)note {
+    (void)note;
+    if (archoera::g_theme_events.load(std::memory_order_acquire)) {
+        archoera::pushTheme();
     }
 }
 
@@ -218,7 +235,8 @@ void ensureRemoteCommands() {
 // ── 后端接口 ──────────────────────────────────────────────────────
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
-           CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT;
+           CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
+           CAP_SYSTEM_THEME;
 }
 
 int32_t init() {
@@ -384,9 +402,16 @@ bool systemAccent(int32_t* r, int32_t* g, int32_t* b) {
     return true;
 }
 
+void pushAccent() {
+    int32_t r = 0, g = 0, b = 0;
+    if (systemAccent(&r, &g, &b)) dispatch(makeSystemAccent(r, g, b));
+}
+
 int32_t systemAccentSetEvents(bool on) {
     if (on) {
         g_accent_events.store(true, std::memory_order_release);
+        // 订阅即推送一次当前值（平台推送模型）。
+        pushAccent();
         NSDistributedNotificationCenter* dnc =
             [NSDistributedNotificationCenter defaultCenter];
         observe(dnc, @"AppleColorPreferencesChangedNotification",
@@ -395,6 +420,35 @@ int32_t systemAccentSetEvents(bool on) {
         observe(nc, NSSystemColorsDidChangeNotification, @selector(onAccent:));
     } else {
         g_accent_events.store(false, std::memory_order_release);
+    }
+    return OK;
+}
+
+// 系统深浅色：读 NSApp.effectiveAppearance 是否 DarkAqua 并推送。
+void pushTheme() {
+    NSApplication* app = [NSApplication sharedApplication];
+    NSAppearance* appearance = app != nil ? app.effectiveAppearance : nil;
+    bool dark = false;
+    if (appearance != nil) {
+        dark = [appearance.name isEqualToString:NSAppearanceNameDarkAqua];
+    }
+    const bool first = !g_theme_valid.exchange(true, std::memory_order_acq_rel);
+    const bool changed =
+        dark != g_theme_dark.exchange(dark, std::memory_order_acq_rel);
+    if (first || changed) dispatch(makeSystemTheme(dark));
+}
+
+int32_t systemThemeSetEvents(bool on) {
+    if (on) {
+        g_theme_events.store(true, std::memory_order_release);
+        // 订阅即推送一次当前值（平台推送模型）。
+        pushTheme();
+        NSDistributedNotificationCenter* dnc =
+            [NSDistributedNotificationCenter defaultCenter];
+        observe(dnc, @"AppleInterfaceThemeChangedNotification",
+                @selector(onTheme:));
+    } else {
+        g_theme_events.store(false, std::memory_order_release);
     }
     return OK;
 }

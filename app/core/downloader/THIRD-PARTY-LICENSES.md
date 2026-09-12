@@ -48,7 +48,7 @@
 |---|---|---|
 | Kugou 6 签名函数 + Netease weapi | ✅ **自研（默认）** | 业务签名逻辑，100% 可控；签名变了当天跟进 |
 | AES/MD5/RSA/PKCS7/BigInt 等加密原语 | ❌ **绝对不自研** | 使用 Rust Crypto 官方维护 crate；自研出 padding oracle / timing attack 漏洞得不偿失 |
-| HTTP chunk download / tmp rename | ⚠️ 半自研 | 默认 `stream-download`；或移植同源 SPlayer-Next `download-engine` AGPL chunk loop |
+| HTTP chunk download / tmp rename | ⚠️ 半自研 | 默认 `stream-download`；或自研 AGPL chunk loop |
 
 ## 合规评估（非法律意见）
 

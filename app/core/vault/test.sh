@@ -949,7 +949,7 @@ run status "$DATA10" | grep -q '"initialized":false' || fail "destroy 后应未�
 pass "crypto 后端不配对（SHARE_BACKEND_MISMATCH）+ destroy 全量销毁"
 
 # ── 20. 文件密钥模式（LEGACY 兼容方案）：K 落盘 secret.key，免 OS 钥匙串 ──
-#     headless/Docker 等无 Secret Service 场景；对应原 SPlayer-Next 服务端加密形态。
+#     headless/Docker 等无 Secret Service 场景；对应服务端加密形态。
 DATA12="$(mktemp -d)"
 DATA13="$(mktemp -d)"
 trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9" "$DATA10" "$DATA11" "$DATA12" "$DATA13"' EXIT

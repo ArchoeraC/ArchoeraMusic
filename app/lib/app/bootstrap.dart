@@ -40,7 +40,7 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
         // 恢复失败时现场保留暂停态，用户点播放即可重试。
         debugPrint('[bootstrap] 初始化异常: $e\n$s');
       }
-      // 启动同步红心集合（对齐 SPlayer-Next 启动时 fetchLikelist 预载）：
+      // 启动同步红心集合：
       // KG会话在 KugouApi 构造函数同步恢复（userid 首帧已就位），下方
       // ref.listen 变更监听收不到「恢复」事件 → 不显式同步则KG红心恒为空。
       // NT init 完成的 state 变更会触发监听器再同步一次，sync 的

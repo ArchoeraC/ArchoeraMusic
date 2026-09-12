@@ -33,6 +33,9 @@ int32_t appInstanceAcquire();
 bool systemAccent(int32_t* r, int32_t* g, int32_t* b);
 int32_t systemAccentSetEvents(bool on);
 
+// 订阅系统深浅色（平台推送：订阅即推当前值，之后推变化）。
+int32_t systemThemeSetEvents(bool on);
+
 int32_t notify(const char* title, const char* body);
 
 }  // namespace archoera

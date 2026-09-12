@@ -19,7 +19,7 @@ import '../../widgets/player/s_controls.dart';
 import 'settings_widgets.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
-/// 存储分类下的缓存管理面板（对齐 SPlayer-Next 缓存管理：按介质分组、
+/// 存储分类下的缓存管理面板（按介质分组、
 /// 逐项清除 + 一键清空，破坏性操作均二次确认）。
 ///
 /// 本项目实际可管理的缓存：
@@ -84,7 +84,7 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
       _imageBytes > 0 ||
       _songFiles > 0;
 
-  /// 二次确认后执行清除（对齐 SPlayer-Next：破坏性操作一律确认）。
+  /// 二次确认后执行清除（破坏性操作一律确认）。
   Future<void> _confirmClear(
     BuildContext context, {
     required String title,

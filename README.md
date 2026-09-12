@@ -366,7 +366,6 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 
 **设计思路借鉴**（本项目在架构设计与实现思路上受到以下开源项目的启发与支持）：
 
-- **[SPlayer-Next](https://github.com/SPlayer-Dev/SPlayer-Next)** —— 混合架构播放器设计、音频引擎管线与在线平台接入的整体思路
 - **[KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi)（MIT）** —— 酷狗平台接口调研与协议思路
 - **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)（MIT）** —— 网易云平台接口流程思路
 - **[ncm-api-rs](https://github.com/SPlayer-Dev/ncm-api-rs)（WTFPL）** —— Rust 化签名实现方案
@@ -375,7 +374,7 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 
 **代码 / 参考实现致谢**（audio-engine 与 Zig 解码内核所依赖、参考或移植的第三方组件，许可证逐项见各模块 `THIRD-PARTY-LICENSES.md`）：
 
-- **[AMLL（Apple Music-like Lyrics）](https://github.com/Steve-xmh/applemusic-like-lyrics)（MIT）** —— Apple Music 风格动态歌词引擎参考（歌词墙整墙滚动、逐字扫光、行级弹簧等观感的原创来源；本项目经 SPlayer-Next 的移植稿为对照，以 Dart 重实现）
+- **[AMLL（Apple Music-like Lyrics）](https://github.com/Steve-xmh/applemusic-like-lyrics)（MIT）** —— Apple Music 风格动态歌词引擎参考（歌词墙整墙滚动、逐字扫光、行级弹簧等观感的原创来源；本项目以 Dart 重实现）
 - **[FFmpeg](https://ffmpeg.org)（LGPL-2.1+）** —— 主解码 / 重采样引擎，多格式移植的参考源
 - **[Opus / libopus](https://opus-codec.org)（BSD-3-Clause，IETF RFC 6716）** —— SILK/CELT 移植与静态模式表参考
 - **[miniaudio](https://github.com/mackron/miniaudio)（MIT-0 / Public Domain）** —— 通用跨平台音频输出（David Reid）

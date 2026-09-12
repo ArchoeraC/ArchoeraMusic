@@ -1,6 +1,6 @@
 # 刮削器第三方许可证声明（scraper / C++）
 
-本目录 `app/core/scraper` 为 ArchoeraMusic（源于 SPlayer-Next 服务端）的 C++ 刮削器，
+本目录 `app/core/scraper` 为 ArchoeraMusic 的 C++ 刮削器，
 其自研代码随本软件以 AGPL-3.0 授权，第三方组件按各自许可使用（逐项登记见下）。
 
 ## 链接的第三方库

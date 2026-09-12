@@ -615,3 +615,13 @@ COWAIT_DISPATCH_WINDOW_MESSAGES)` 泵消息，不再 `Sleep`。交叉编译通�
    （会话检测 + 统一模式，X11/Wayland 皆覆盖）；
 9. **MPRIS `CanGoNext/CanSeek` 首期恒真**（2026-09-10，建议采纳）：命令落空由 Dart
    忽略，省队列状态推送。
+
+## 本地交叉验证（Linux 主机）
+
+改完桥接后可在 Linux 主机快速验证 Windows / macOS 后端能否**编译/链接**（无需真机，
+不改动仓库产物）：
+
+- Windows：`bash app/tool/verify_windows.sh`（msvc-wine + MSVC `cl`）
+- macOS：`bash app/tool/verify_macos.sh [--download]`（clang 交叉 + macOS SDK）
+
+详见 `docs/native-bridge-local-verify.md`。

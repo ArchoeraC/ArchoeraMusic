@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 流媒体主页（对齐 SPlayer-Next Streaming/Index.vue）。
+/// 流媒体主页。
 ///
 /// 顶栏：标题 + 数量统计；右侧状态点 / 服务器下拉 / 刷新 / 设置。
 /// Tab：歌曲 / 专辑 / 歌手 / 歌单（懒加载缓存，切换 Tab 拉取）。

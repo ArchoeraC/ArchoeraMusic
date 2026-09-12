@@ -91,6 +91,11 @@ int32_t apl_system_accent_set_events(int32_t on) {
     return archoera::systemAccentSetEvents(on != 0);
 }
 
+int32_t apl_system_theme_set_events(int32_t on) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::systemThemeSetEvents(on != 0);
+}
+
 int32_t apl_notify(const char* title, const char* body) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     if (title == nullptr) return archoera::ERR_BACKEND;

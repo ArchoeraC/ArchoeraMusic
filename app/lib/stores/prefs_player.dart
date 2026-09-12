@@ -19,11 +19,11 @@ const spectrumBarWidthKey = 'player.spectrumBarWidth';
 const spectrumStyleKey = 'player.spectrumStyle';
 const transitionStyleKey = 'player.transitionStyle';
 
-// ── 播放页背景（对齐 SPlayer-Next player.playerBg*）─────────────
+// ── 播放页背景 ─────────────
 const playerBgTypeKey = 'player.bgType';
 const playerBgRippleSpeedKey = 'player.bgRippleSpeed';
 
-// ── 音量与播放条显示（对齐 SPlayer-Next 音量体系）─────────────
+// ── 音量与播放条显示 ─────────────
 const volumeKey = 'player.volume';
 const barLyricsKey = 'player.barLyrics';
 const barSpectrumKey = 'player.barSpectrum';
@@ -84,7 +84,7 @@ const Set<String> spectrumStyles = {'bars', 'wave', 'waveUp'};
 const String defaultPlayerBgType = 'gradient';
 const Set<String> playerBgTypes = {'gradient', 'blur', 'solid', 'ripple'};
 
-/// 水纹流动速度（1~6，默认 3，对齐 SPlayer-Next player.playerBgRippleSpeed）。
+/// 水纹流动速度（1~6，默认 3）。
 const double defaultPlayerBgRippleSpeed = 3;
 
 /// 播放器域偏好：直通/自动播放/会话记忆/频谱/封面动效/切歌动效/音量/播放条。
@@ -169,7 +169,7 @@ extension PlayerPrefs on AppPrefs {
     return v.toDouble().clamp(1.0, 6.0);
   }
 
-  /// 播放音量（0~1，默认 1.0，对齐 SPlayer-Next status.volume）。
+  /// 播放音量（0~1，默认 1.0）。
   ///
   /// 退出确认弹窗临时降半（duck）不落盘：此处始终是用户设定的音量，
   /// 弹窗关闭后 [duckVolume]/[restoreVolume] 回到该值。

@@ -29,9 +29,10 @@ void main() {
       markTestSkipped('libarchoera_scraper 未构建，跳过');
       return;
     }
-    // 找一份真实音频样本
+    // 找一份真实音频样本（用户音乐目录优先，回退 /tmp）
+    final home = Platform.environment['HOME'];
     final seeds = <String>[];
-    for (final base in ['/home/betastudio2/音乐', '/tmp']) {
+    for (final base in [if (home != null) '$home/音乐', '/tmp']) {
       final d = Directory(base);
       if (!d.existsSync()) continue;
       await for (final e in d.list(recursive: true, followLinks: false)) {

@@ -2,8 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 自绘右键菜单（对齐 SPlayer-Next SContextMenu 语义，替代 Material
-/// 系统菜单观感）。
+/// 自绘右键菜单（替代 Material 系统菜单观感）。
 ///
 /// 用法：
 /// ```dart

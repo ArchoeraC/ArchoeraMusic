@@ -12,9 +12,9 @@ name      = "archoera_downloader"
 crate-type= ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-# ====== 下载核心（自研方案：reqwest chunk loop，对齐 SPlayer-Next download-engine 参考实现）======
+# ====== 下载核心（自研方案：reqwest chunk loop）======
 # 说明：不使用 stream-download / 第三方平台 SDK / SPlayer 下载驱动（避免 GitHub 链接影响编译），
-# 下载核心采用 reqwest 流式 chunk 循环 + tmp 原子 rename，与 SPlayer-Next download-engine 同源思路。
+# 下载核心采用 reqwest 流式 chunk 循环 + tmp 原子 rename。
 reqwest           = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
 tokio             = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-util", "sync", "time"] }
 futures           = "0.3"

@@ -4,7 +4,6 @@
 
 /// 红心状态控制器（NT / KG / QM三平台）。
 ///
-/// 对齐 SPlayer-Next `user.ts` 的 likedSongIds + toggleLike 语义：
 /// - 持有各平台已喜欢 id 集合，任意 UI 通过 [isLiked] 查询；
 /// - [toggle] 乐观更新 + 失败回滚（失败返回 false 由调用方提示）；
 /// - [sync] 按当前登录态刷新集合（登录/退出后调用）。
@@ -270,7 +269,7 @@ class LikeController extends ChangeNotifier {
       ..addAll(local);
   }
 
-  /// 切换红心：乐观更新 + 失败回滚（对齐 SPlayer-Next toggleLike）。
+  /// 切换红心：乐观更新 + 失败回滚。
   /// 成功返回 true；失败回滚并返回 false（调用方负责提示）。
   Future<bool> toggle(Track track) async {
     final wasLiked = isLiked(track);

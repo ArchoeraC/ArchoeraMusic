@@ -13,148 +13,111 @@ extension _SplashScreenBuild on _SplashScreenState {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          FadeTransition(
-            opacity: Tween<double>(begin: 0, end: 1).animate(
-              CurvedAnimation(
-                parent: _intro,
-                curve: const Interval(0, 0.55, curve: Curves.easeOut),
-              ),
-            ),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(-0.7, -0.8),
-                  radius: 1.1,
-                  colors: [
-                    scheme.primary.withValues(alpha: 0.20),
-                    scheme.primary.withValues(alpha: 0.05),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
-                ),
-              ),
-            ),
-          ),
+          _buildGlow(scheme),
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildLogo(),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 _buildBrand(
                   TextStyle(
-                    fontSize: 24,
+                    // 启动页字标专用显示字体（可变字重，见 pubspec「Manrope」）。
+                    fontFamily: 'Manrope',
+                    fontVariations: const [FontVariation('wght', 700)],
+                    fontSize: 34,
                     fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
                     color: scheme.onSurface,
                   ),
-                ),
-                const SizedBox(height: 10),
-                FadeTransition(
-                  opacity: Tween<double>(begin: 0, end: 1).animate(
-                    CurvedAnimation(
-                      parent: _intro,
-                      curve: const Interval(0.55, 0.95, curve: Curves.easeOut),
-                    ),
-                  ),
-                  child: SlideTransition(
-                    position:
-                        Tween<Offset>(
-                          begin: const Offset(0, 0.06),
-                          end: Offset.zero,
-                        ).animate(
-                          CurvedAnimation(
-                            parent: _intro,
-                            curve: const Interval(
-                              0.55,
-                              0.95,
-                              curve: Curves.easeOut,
-                            ),
-                          ),
-                        ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'ArchoeraMusic © BetaStudio2',
-                          style: TextStyle(
-                            fontSize: 12,
-                            letterSpacing: 3,
-                            color: scheme.onSurfaceVariant.withValues(
-                              alpha: 0.6,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Powered By Flutter',
-                          style: TextStyle(
-                            fontSize: 12,
-                            letterSpacing: 3,
-                            color: scheme.onSurfaceVariant.withValues(
-                              alpha: 0.6,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                _LoadingDots(
-                  animation: _pulse,
-                  color: scheme.primary.withValues(alpha: 0.9),
                 ),
               ],
             ),
           ),
+          _buildFooter(scheme),
         ],
       ),
     );
   }
 
-  Widget _buildLogo() {
+  /// 背景径向光晕（主色，静态，随入场淡入）。
+  Widget _buildGlow(ColorScheme scheme) {
     return FadeTransition(
       opacity: Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(
           parent: _intro,
-          curve: const Interval(0, 0.4, curve: Curves.easeOut),
+          curve: const Interval(0, 0.55, curve: Curves.easeOut),
         ),
       ),
-      child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 0.18), end: Offset.zero)
-            .animate(
-              CurvedAnimation(
-                parent: _intro,
-                curve: const Interval(0, 0.5, curve: Curves.easeOutCubic),
-              ),
-            ),
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.72, end: 1).animate(
-            CurvedAnimation(
-              parent: _intro,
-              curve: const Interval(0, 0.62, curve: Curves.easeOutBack),
-            ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: const Alignment(-0.7, -0.8),
+            radius: 1.1,
+            colors: [
+              scheme.primary.withValues(alpha: 0.20),
+              scheme.primary.withValues(alpha: 0.05),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.5, 1.0],
           ),
-          child: const AppLogo(size: 54),
         ),
       ),
     );
   }
 
+  Widget _buildLogo() {
+    final rise = CurvedAnimation(
+      parent: _intro,
+      curve: const Interval(0, 0.5, curve: Curves.easeOutExpo),
+    );
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0, end: 1).animate(rise),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.16),
+          end: Offset.zero,
+        ).animate(rise),
+        child: const AppLogo(size: 72),
+      ),
+    );
+  }
+
   Widget _buildBrand(TextStyle style) {
-    return AnimatedBuilder(
-      animation: _float,
-      builder: (context, _) {
-        final dy = math.sin(_float.value * 2 * math.pi) * 3;
-        return Transform.translate(
-          offset: Offset(0, dy),
-          child: _StaggeredText(
-            text: 'ArchoeraMusic',
-            style: style,
-            intro: _intro,
+    return _StaggeredText(text: 'ArchoeraMusic', style: style, intro: _intro);
+  }
+
+  /// 底部小字：固定贴窗口最底（32px），延迟上滑渐显，终态约 0.4 透明度。
+  Widget _buildFooter(ColorScheme scheme) {
+    final fade = CurvedAnimation(
+      parent: _intro,
+      curve: const Interval(0.35, 0.85, curve: Curves.easeOut),
+    );
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 32,
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 0, end: 0.4).animate(fade),
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 0.6), end: Offset.zero)
+              .animate(
+                CurvedAnimation(
+                  parent: _intro,
+                  curve: const Interval(0.35, 0.85, curve: Curves.easeOutExpo),
+                ),
+              ),
+          child: Text(
+            'ArchoeraMusic © BetaStudio2 · Powered by Flutter',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              letterSpacing: 2,
+              color: scheme.onSurfaceVariant,
+            ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -217,57 +180,6 @@ class _StaggeredChar extends StatelessWidget {
             offset: Offset(0, 18 * (1 - t)),
             child: Text(char, style: style),
           ),
-        );
-      },
-    );
-  }
-}
-
-class _LoadingDots extends StatelessWidget {
-  const _LoadingDots({required this.animation, required this.color});
-
-  final Animation<double> animation;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, _) {
-        final t = animation.value;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (i) {
-            final phase = (t - i * 0.14) % 1.0;
-            final double opacity;
-            final double dy;
-            if (phase < 0.35) {
-              final p = phase / 0.35;
-              opacity = 0.2 + 0.8 * Curves.easeOut.transform(p);
-              dy = -3.0 * Curves.easeOut.transform(p);
-            } else if (phase < 0.70) {
-              final p = (phase - 0.35) / 0.35;
-              opacity = 1.0 - 0.8 * Curves.easeIn.transform(p);
-              dy = -3.0 * (1.0 - Curves.easeIn.transform(p));
-            } else {
-              opacity = 0.2;
-              dy = 0.0;
-            }
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 3.5),
-              width: 5,
-              height: 5,
-              child: Transform.translate(
-                offset: Offset(0, dy),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: color.withValues(alpha: opacity),
-                  ),
-                ),
-              ),
-            );
-          }),
         );
       },
     );

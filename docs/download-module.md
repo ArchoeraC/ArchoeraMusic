@@ -40,7 +40,7 @@
 
 ### 目标（Goals）
 
-- ✅ **戒律 1：自第一行代码起，永久禁用轮询**。Dart `Timer.periodic` / Rust `Mutex<VecDeque<u8>>` 轮询缓冲 / `archoera_downloader_poll_event` 系列函数，一律不允许出现在下载模块的任何提交中。事件机制唯一解：`NativeCallable.listener` 注入回调指针（对齐 [library_scanner.dart](file:///home/betastudio2/文档/SPlayer-Next/ArchoeraMusic/app/lib/core/scanner/library_scanner.dart#L102-L103)）
+- ✅ **戒律 1：自第一行代码起，永久禁用轮询**。Dart `Timer.periodic` / Rust `Mutex<VecDeque<u8>>` 轮询缓冲 / `archoera_downloader_poll_event` 系列函数，一律不允许出现在下载模块的任何提交中。事件机制唯一解：`NativeCallable.listener` 注入回调指针（对齐 [library_scanner.dart](../app/lib/core/scanner/library_scanner.dart#L102-L103)）
 - ✅ **戒律 2：下载模块完全 FFI 化**。URL 解析 + 下载执行 + 调度 + 事件生成全在 Rust cdylib 内完成，与 audio-engine / subsonic / scanner 架构对齐，Dart 不介入任何业务逻辑
 - ✅ **真正事件驱动**：进度节流在 Rust 内部做（throttleMs=500），Dart 侧零空转、零 CPU 浪费
 - 支持 **Netease / Kugou** 多平台下载（后续可扩展 QQMusic）
@@ -277,7 +277,7 @@ Step 4  Rust download Future（tokio runtime 中执行，stream-download crate�
 
 ### 3.6 进度回调到 Dart（NativeCallable.listener 线程模型）
 
-这里**完全复用 library_scanner 的写法**（见 [library_scanner.dart#L193-L205](file:///home/betastudio2/文档/SPlayer-Next/ArchoeraMusic/app/lib/core/scanner/library_scanner.dart#L193-L205)）：
+这里**完全复用 library_scanner 的写法**（见 [library_scanner.dart#L193-L205](../app/lib/core/scanner/library_scanner.dart#L193-L205)）：
 
 ```dart
 // Dart 侧，_handleEvent 是 NativeCallable.listener 的回调函数
@@ -421,7 +421,7 @@ flowchart TB
 
 ### 6.1 Kugou（酷狗签名算法：MD5 + AES-CBC + RSA-PKCS1v1.5）
 
-Dart 现有实现（见 [kugou_crypto.dart](file:///home/betastudio2/文档/SPlayer-Next/ArchoeraMusic/app/lib/core/kugou/direct/kugou_crypto.dart)）里的算法，对应 Rust 全部有成熟 MIT/Apache 2.0 依赖：
+Dart 现有实现（见 [kugou_crypto.dart](../app/lib/core/kugou/direct/kugou_crypto.dart)）里的算法，对应 Rust 全部有成熟 MIT/Apache 2.0 依赖：
 
 | Dart 方法 | 算法 | Rust 对应 crate | 说明 |
 |---|---|---|---|
@@ -596,11 +596,11 @@ Dart 侧 `_handleEvent(ptr)` 收到后：
 
 ## 9. LICENSE 合规策略（项目整体 AGPL-3.0 · 代码均为本仓库自行编写）
 
-> **重大架构前提**：本项目（ArchoeraMusic）全部代码（含所引用的服务端代码）由本仓库作者自行编写，**不在 SPlayer / SPlayer-Next 主仓库内**，与 SPlayer / SPlayer-Next **无代码归属关系**，因此不存在「复用 SPlayer-Next 源码」的问题。项目整体以 **AGPL-3.0**（`AGPL-3.0-or-later`，含后续版本弹性条款）发布；仓库根 [LICENSE](../LICENSE)（AGPL-3.0 官方正文）已随仓库提供，各子模块 `THIRD-PARTY-LICENSES.md` 声明与之一致。
+> **重大架构前提**：本项目（ArchoeraMusic）全部代码（含所引用的服务端代码）由本仓库作者自行编写，**不在任何上游主仓库内**，**无第三方代码归属关系**，因此不存在「复用第三方源码」的问题。项目整体以 **AGPL-3.0**（`AGPL-3.0-or-later`，含后续版本弹性条款）发布；仓库根 [LICENSE](../LICENSE)（AGPL-3.0 官方正文）已随仓库提供，各子模块 `THIRD-PARTY-LICENSES.md` 声明与之一致。
 
 ### 9.1 代码归属与自研声明
 
-本项目**不包含、不引用、不移植 SPlayer / SPlayer-Next 的任何代码**。以下下载模块核心组件均为本仓库自行编写：
+本项目**不包含、不引用、不移植任何第三方代码**。以下下载模块核心组件均为本仓库自行编写：
 
 | 组件 | 实现方式 | 说明 |
 |---|---|---|
@@ -635,7 +635,7 @@ Dart 侧 `_handleEvent(ptr)` 收到后：
 ### 9.4 需要产出的合规文件（跟着下载模块 crate 一起建）
 
 1. `app/core/downloader/THIRD-PARTY-LICENSES.md`：按照 subsonic/scanner/audio-engine **同格式**，列出全部直接依赖 + 间接依赖 LICENSE；末尾加一句「整体随本软件以 AGPL-3.0 授权」
-2. 仓库根 [LICENSE](../LICENSE)：已随仓库提供（AGPL-3.0 官方正文）✅ —— 本项目自行发布的许可证，与 SPlayer / SPlayer-Next 无关联
+2. 仓库根 [LICENSE](../LICENSE)：已随仓库提供（AGPL-3.0 官方正文）✅ —— 本项目自行发布的许可证，与任何第三方项目无关联
 3. 仓库根补 `THIRD-PARTY-NOTICES.md`：汇总 5 个子模块（scanner/subsonic/scraper/audio-engine/downloader）的第三方依赖声明
 4. 未来若切到 openssl-sys：加 `app/core/downloader/LICENSING_EXCEPTIONS.md` 写入 OpenSSL linking exception 文本（Deluge 模板）
 
@@ -943,7 +943,7 @@ opt-level = "s"
 | 类别 | 组件 | LICENSE | AGPL-v3 兼容 | 自研化级别 | 结论（自研优先模式） |
 |---|---|---|---|---|---|
 | 本项目整体 | ArchoeraMusic（本仓库作者） | **AGPL-3.0-or-later**（仓库根 LICENSE 已提供） | - | - | - |
-| SPlayer / SPlayer-Next | 第三方项目（与本项目无代码归属关系） | — | — | — | ❌ **不引用、不移植其任何代码**（本项目代码均为自行编写） |
+| 其他第三方上游项目 | 外部项目（与本项目无代码归属关系） | — | — | — | ❌ **不引用、不移植其任何代码**（本项目代码均为自行编写） |
 | Kugou 平台签名（业务核心） | KugouSelfWrittenResolver（Dart kugou_crypto.dart 1:1 移植） | 自有版权 + MIT/Apache 底层 | ✅ | ⭐⭐⭐⭐⭐ 完全自研 | ✅ 默认实现 |
 | Netease 平台签名（业务核心） | NeteaseSelfWrittenResolver（Dart netease/crypto.dart 1:1 移植） | 自有版权 + MIT/Apache 底层 | ✅ | ⭐⭐⭐⭐⭐ 完全自研 | ✅ 默认实现 |
 | Kugou SDK 备胎 | kugou_sdk v0.2.9 | MIT | ✅ | ⭐⭐ 第三方 | ⚠️ 默认 off，feature 紧急切换备胎，v1.1 才接通 |

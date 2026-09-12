@@ -270,7 +270,7 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
 
 
 ## 16. 2026-09-05 QQMusic 完整可播接入
-- 参照新版上游 SPlayer-Dev/SPlayer-Next（/tmp/spx）QQ 实现，扩展 lib/apis/qqmusic：core 对齐（cookie/uin
+- 参照新版上游 QQ 实现（/tmp/spx），扩展 lib/apis/qqmusic：core 对齐（cookie/uin
   经 sessionStore 持久化、UA/comm 伪装、config android 伪装、credential/vip、qrlogin QQ/微信）、模块新增
   song_url(GetVkey 多音质/访客可播免费曲)、user_detail、login_qr、album/artist/comment；search 四分类等对齐。
 - 新增 lib/services/qqmusic/qqmusic_api.dart（结果映射到 netease Track/Cover 层 + resolvePlayUrl + QR 登录/登出）。
@@ -293,11 +293,11 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
 
 ## 18. 2026-09-05 QQ 搜索风控诊断与处理
 - 根因：QQ 搜索失败为 **IP 级配额/风控 inner=2001**（HTTP200、request.code=2001、meta.is_filter=-12、间歇+分钟级配额），
-  请求形态与 SPlayer-Next 零差异；旧代码自动重试 2 次→风暴加剧。
+  请求形态与上游零差异；旧代码自动重试 2 次→风暴加剧。
 - 修复：风险码(2001)不自动重试；网络瞬时退避(300/600ms)；单发+20s 冷却+手动重试门禁（防连打）；
   聚合 all 逐源独立 try/catch——QQ 失败只横幅「{平台}暂不可用+详情+重试」，其它源照常；单 QQ 平台给可读内码文案。
   另修真实参数 bug：QQ 歌手搜索单页硬上限 30（其余 50）静默空结果——模块层夹紧 + 分页除数修正。
-- 上游对照：SPlayer-Next 对非零码一律退避重试 2 次（不区分风控）、无聚合；MineRadio 一族为本地/可视化播放器无 QQ
+- 上游对照：上游实现对非零码一律退避重试 2 次（不区分风控）、无聚合；MineRadio 一族为本地/可视化播放器无 QQ
   在线源（GitHub 检索 clone 需鉴权，未得代码，按其“分开获取+聚合、单源容错”理念本端实现）。
 - 验证：dart analyze 0；新增 failure/state 测试 11 项（2001→risk 1 次、transient 重试、单源降级、冷却门禁）；bundle 393M。
 - 策略：不硬猜/不绕付费；IP 仍 2001 时应用单发+可读提示；建议住宅/真机 IP 验证（形态与上游一致）。

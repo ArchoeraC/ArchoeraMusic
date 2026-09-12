@@ -24,7 +24,7 @@ mixin NeteasePlaylistApi on NeteaseApiBase {
 
   /// 「我喜欢的音乐」歌单全量 trackIds（保序，轻量：仅 id 列表）。
   ///
-  /// 顺序即收藏先后（最新在前，对齐 SPlayer-Next ensureLikedPlaylist）。
+  /// 顺序即收藏先后（最新在前）。
   /// 分页加载先取此 id 列表，再按需分批补 song_detail 详情。
   Future<List<String>> likedTrackIds(String uid) async {
     final playlists = await userPlaylists(uid, limit: 1);
@@ -43,7 +43,7 @@ mixin NeteasePlaylistApi on NeteaseApiBase {
 
   /// 用户喜欢的歌曲（「我喜欢的音乐」歌单全量，需登录）。
   ///
-  /// 对齐 SPlayer-Next `user.ts` ensureLikedPlaylist：不直接用 likelist
+  /// 不直接用 likelist
   /// （ids 顺序不保证按收藏时间），而是拉取用户第一个自建歌单「我喜欢的
   /// 音乐」——歌单 trackIds 顺序即收藏先后（最新在前），经 [_songsByIds]
   /// 保序补全曲目详情。
@@ -75,7 +75,7 @@ mixin NeteasePlaylistApi on NeteaseApiBase {
   /// 避免每页重新请求歌单详情。
   Future<List<Track>> songsDetailByIds(List<String> ids) => _songsByIds(ids);
 
-  /// 红心 / 取消红心（对齐 SPlayer-Next like.ts：`trackId/like/time:3`）。
+  /// 红心 / 取消红心（`trackId/like/time:3`）。
   /// 成功返回；失败（未登录/接口异常）抛 [NeteaseApiError]。
   Future<void> like(String id, {required bool like}) async {
     final body = await _call('like', {'id': id, 'like': like});
