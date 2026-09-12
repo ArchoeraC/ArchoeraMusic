@@ -87,48 +87,68 @@ winrt::hstring H(const char* data, int32_t len) {
     return winrt::to_hstring(std::string_view(data, static_cast<size_t>(len)));
 }
 
-// 诊断日志：同时写 OutputDebugStringA（DebugView）与日志文件（免工具）。
-// 文件优先 exe 同级 `archoera_smtc.log`（易找），不可写则退回 %TEMP%。
-// 注意：路径用 POD `char[]` 全局，**不用 std::string / 函数局部静态**——后者的
+// 诊断日志：同时写 OutputDebugStringA（DebugView）与**多个**日志文件，便于查找：
+//   <exe 同级>\archoera_smtc.log / %TEMP%\archoera_smtc.log /
+//   %USERPROFILE%\archoera_smtc.log / C:\archoera_smtc.log
+// 注意：路径用 POD `char[][]` 全局，**不用 std::string / 函数局部静态**——后者的
 // 非平凡析构会注册 __cxa_atexit，牵连 CRT 终止符号（__vcrt_*/__acrt_*）链接失败。
-char g_log_path[MAX_PATH] = {0};
+#define LOG_MAX_PATHS 4
+char g_log_paths[LOG_MAX_PATHS][MAX_PATH] = {};
+int g_log_path_count = 0;
+
+void tryAddLogPath(const char* full) {
+    if (g_log_path_count >= LOG_MAX_PATHS) return;
+    FILE* f = nullptr;
+    if (::fopen_s(&f, full, "a") == 0 && f != nullptr) {
+        std::fclose(f);
+        std::snprintf(g_log_paths[g_log_path_count], MAX_PATH, "%s", full);
+        g_log_path_count++;
+    }
+}
 
 void initLogPath() {
-    if (g_log_path[0] != 0) return;
-    char exe[MAX_PATH];
-    if (::GetModuleFileNameA(nullptr, exe, MAX_PATH) > 0) {
+    if (g_log_path_count > 0) return;
+    char buf[MAX_PATH];
+    // 1) exe 同级
+    if (::GetModuleFileNameA(nullptr, buf, MAX_PATH) > 0) {
         char* slash = nullptr;
-        for (char* p = exe; *p; ++p) {
+        for (char* p = buf; *p; ++p) {
             if (*p == '\\' || *p == '/') slash = p;
         }
-        if (slash != nullptr) {
-            *slash = 0;
-            std::snprintf(g_log_path, MAX_PATH, "%s\\archoera_smtc.log", exe);
-            FILE* f = nullptr;
-            if (::fopen_s(&f, g_log_path, "a") == 0 && f != nullptr) {
-                std::fclose(f);
-                return;
-            }
-        }
+        if (slash != nullptr) *slash = 0;
+        char p2[MAX_PATH];
+        std::snprintf(p2, MAX_PATH, "%s\\archoera_smtc.log", buf);
+        tryAddLogPath(p2);
     }
-    char tmp[MAX_PATH];
-    const DWORD n = ::GetTempPathA(MAX_PATH, tmp);
+    // 2) %TEMP%
+    if (::GetTempPathA(MAX_PATH, buf) > 0) {
+        char p2[MAX_PATH];
+        std::snprintf(p2, MAX_PATH, "%sarchoera_smtc.log", buf);
+        tryAddLogPath(p2);
+    }
+    // 3) %USERPROFILE%
+    const DWORD n = ::GetEnvironmentVariableA("USERPROFILE", buf, MAX_PATH);
     if (n > 0 && n < MAX_PATH) {
-        std::snprintf(g_log_path, MAX_PATH, "%sarchoera_smtc.log", tmp);
+        char p2[MAX_PATH];
+        std::snprintf(p2, MAX_PATH, "%s\\archoera_smtc.log", buf);
+        tryAddLogPath(p2);
     }
+    // 4) C:\（管理员可写，最易找）
+    tryAddLogPath("C:\\archoera_smtc.log");
 }
 
 void logRaw(const char* line) {
     ::OutputDebugStringA(line);
-    if (g_log_path[0] == 0) initLogPath();
-    if (g_log_path[0] == 0) return;
-    FILE* f = nullptr;
-    if (::fopen_s(&f, g_log_path, "a") != 0 || f == nullptr) return;
+    if (g_log_path_count == 0) initLogPath();
     SYSTEMTIME st;
     ::GetLocalTime(&st);
-    std::fprintf(f, "[%02d:%02d:%02d.%03d] %s\n", st.wHour, st.wMinute,
-                 st.wSecond, st.wMilliseconds, line);
-    std::fclose(f);
+    for (int i = 0; i < g_log_path_count; i++) {
+        FILE* f = nullptr;
+        if (::fopen_s(&f, g_log_paths[i], "a") != 0 || f == nullptr) continue;
+        std::fprintf(f, "[%02d:%02d:%02d.%03d] %s\n", st.wHour, st.wMinute,
+                     st.wSecond, st.wMilliseconds, line);
+        std::fclose(f);
+    }
 }
 
 void log(const char* msg) { logRaw(msg); }
@@ -142,9 +162,10 @@ void logHr(const char* prefix, int32_t hr) {
 // 每次 init 清空日志（只保留本次会话）。
 void logReset() {
     initLogPath();
-    if (g_log_path[0] == 0) return;
-    FILE* f = nullptr;
-    if (::fopen_s(&f, g_log_path, "w") == 0 && f != nullptr) std::fclose(f);
+    for (int i = 0; i < g_log_path_count; i++) {
+        FILE* f = nullptr;
+        if (::fopen_s(&f, g_log_paths[i], "w") == 0 && f != nullptr) std::fclose(f);
+    }
 }
 
 void SetThumbnailFromBytes(const uint8_t* bytes, int32_t len) {
@@ -191,7 +212,11 @@ void SetThumbnailFromUri(winrt::hstring const& url) {
 
 // 加载探针：桥接 init 时由 Zig 调用一次，确认「这个 DLL 被载入且 C++ 代码在跑」。
 extern "C" void apl_smtc_win_probe(void) {
-    log("apl/smtc: dll loaded (probe)");
+    char exe[MAX_PATH] = {0};
+    ::GetModuleFileNameA(nullptr, exe, MAX_PATH);
+    char buf[MAX_PATH + 64];
+    std::snprintf(buf, sizeof(buf), "apl/smtc: dll loaded (probe) exe=%s", exe);
+    logRaw(buf);
 }
 
 extern "C" int32_t apl_smtc_win_init(void* hwnd) {
