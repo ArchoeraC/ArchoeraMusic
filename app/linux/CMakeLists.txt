@@ -266,9 +266,21 @@ install(FILES "${DOWNLOADER_TARGET_DIR}/${DOWNLOADER_LIB_NAME}"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native"
   COMPONENT Runtime)
 
-# platform bridge（平台能力桥接，Zig 独立模块 app/native/platform，
-# `zig build` 产出 zig-out/lib；NativeLibPaths 祖先链优先查 native/）。
-set(PLATFORM_BRIDGE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../native/platform/zig-out/lib")
-install(FILES "${PLATFORM_BRIDGE_SRC_DIR}/libarchoera_platform.so"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# === ArchoeraMusic platform bridge：内嵌 CMake 构建链（一键构建）===
+# flutter build / flutter run 时自动调用 cmake 产出 libarchoera_platform.so 到
+# app/native/platform/build/，无需手动 cmake 预构建；cmake 自身增量编译。
+set(PLATFORM_BRIDGE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../native/platform")
+set(PLATFORM_BRIDGE_BUILD_DIR "${PLATFORM_BRIDGE_DIR}/build")
+add_custom_target(platform_bridge_cmake ALL
+  COMMAND ${CMAKE_COMMAND} -S "${PLATFORM_BRIDGE_DIR}" -B "${PLATFORM_BRIDGE_BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
+  COMMAND ${CMAKE_COMMAND} --build "${PLATFORM_BRIDGE_BUILD_DIR}" -j
+  COMMENT "cmake build archoera_platform bridge"
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} platform_bridge_cmake)
+
+# platform bridge（平台能力桥接，CMake 独立模块 app/native/platform，
+# 产物镜像进 bundle/native/；NativeLibPaths 祖先链优先查 native/）。
+install(FILES "${PLATFORM_BRIDGE_BUILD_DIR}/out/libarchoera_platform.so"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
 

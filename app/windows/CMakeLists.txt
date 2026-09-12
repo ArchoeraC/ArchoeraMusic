@@ -151,10 +151,27 @@ install(PROGRAMS "${VAULT_SRC_DIR}/archoera-vault.exe"
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../core/downloader/target/release/archoera_downloader.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
 
-# platform bridge（平台能力桥接，Zig 独立模块 app/native/platform；
-# Windows DLL 产物装在 zig-out/bin）。
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../native/platform/zig-out/bin/archoera_platform.dll"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# === ArchoeraMusic platform bridge：内嵌 CMake 构建链（一键构建，MSVC C++）===
+# 产出 archoera_platform.dll 到 app/native/platform/build/out/；WinRT(SMTC/Toast)
+# 需 cppwinrt 头：CMake 变量 CPPWINRT_INCLUDE 或 vcpkg cppwinrt CONFIG 包；
+# 均缺失时 backend_windows.cpp 自动降级（SMTC 禁用、Toast 走 MessageBox）。
+set(PLATFORM_BRIDGE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../native/platform")
+set(PLATFORM_BRIDGE_BUILD_DIR "${PLATFORM_BRIDGE_DIR}/build")
+set(PLATFORM_BRIDGE_CMAKE_ARGS
+  -S "${PLATFORM_BRIDGE_DIR}" -B "${PLATFORM_BRIDGE_BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release)
+if(DEFINED CPPWINRT_INCLUDE AND NOT CPPWINRT_INCLUDE STREQUAL "")
+  list(APPEND PLATFORM_BRIDGE_CMAKE_ARGS -DCPPWINRT_INCLUDE=${CPPWINRT_INCLUDE})
+endif()
+add_custom_target(platform_bridge_cmake ALL
+  COMMAND ${CMAKE_COMMAND} ${PLATFORM_BRIDGE_CMAKE_ARGS}
+  COMMAND ${CMAKE_COMMAND} --build "${PLATFORM_BRIDGE_BUILD_DIR}" --config Release -j
+  COMMENT "cmake build archoera_platform bridge (MSVC C++)"
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} platform_bridge_cmake)
+
+install(FILES "${PLATFORM_BRIDGE_BUILD_DIR}/out/archoera_platform.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
 
 # === vcpkg 运行时 DLL（FFmpeg 等动态依赖）===
 # audio-engine（archoera_mediaengine.dll / scraper）经 vcpkg import libs 动态链接

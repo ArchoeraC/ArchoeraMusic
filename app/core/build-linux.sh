@@ -9,7 +9,7 @@
 #    4. vault        : dotnet publish (NativeAOT 凭据保险库)
 #    5. downloader   : cargo build --release (cdylib)
 #    6. subsonic     : cargo transcoder + go c-shared + go standalone
-#    7. platform     : zig build（平台能力桥接 libarchoera_platform，app/native/platform）
+#    7. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
 #
 #  依赖（FFmpeg 开发包 / CMake / Rust / Go / .NET / Clang）由 CI workflow
 #  提前安装或由本地开发环境提供，本脚本只做编译引导（幂等，可重复执行）。
@@ -52,12 +52,9 @@ echo "[build-linux] ===== subsonic (Go + Rust transcoder) ====="
 bash "$ROOT/subsonic/build.sh"
 
 # 平台能力桥接（SystemPower/SystemMedia/SystemWindow，apl_* C ABI，Dart FFI 直连；
-# 见 docs/platform-native-bridge.md）。产物缺失时 Dart 侧自动 Noop 降级，非致命。
-if command -v zig >/dev/null 2>&1; then
-  echo "[build-linux] ===== platform bridge (Zig dylib) ====="
-  (cd "$ROOT/../native/platform" && zig build -Doptimize=ReleaseFast) || exit 1
-else
-  echo "[build-linux] 警告: 未检测到 zig，平台能力桥接不编译（休眠抑制/媒体会话将降级）。"
-fi
+# 见 docs/platform-native-bridge.md）。CMake 构建（C++ + libdbus + dlopen GTK）。
+echo "[build-linux] ===== platform bridge (CMake C++) ====="
+cmake -S "$ROOT/../native/platform" -B "$ROOT/../native/platform/build" -DCMAKE_BUILD_TYPE=Release
+cmake --build "$ROOT/../native/platform/build" -j"$JOBS"
 
 echo "[build-linux] 全部模块构建完成"

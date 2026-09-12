@@ -31,6 +31,9 @@ app/core/audio-engine/build/
 app/core/audio-engine/tempo-target/
 app/core/audio-engine/tempo-rs/target/
 
+# 平台能力桥接（app/native/platform/build/ 由 cmake 产出）
+app/native/platform/build/
+
 # C 音频引擎（本地测试产物：kernel/*.zig 编译出的可执行文件 + 解码输出的媒体数据）
 app/core/audio-engine/*_dump
 app/core/audio-engine/*_probe
