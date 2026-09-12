@@ -360,17 +360,19 @@ pub fn appInstanceAcquire() i32 {
 // 2) PowerShell -EncodedCommand 调 WinRT Toast（免 C++/WinRT 构建依赖）。
 // 3) MessageBoxW（模态兜底）。
 
-extern "c" fn apl_win_toast(title: ?[*:0]const u8, body: ?[*:0]const u8) c_int;
+// C++/WinRT 原生 Toast 或 Zig 兜底（同 win_smtc.zig：编译期二选一，不用弱符号——
+// Zig 会内联同名弱兜底，导致 C++ 强符号永不生效）。
+const use_cpp = @import("build_options").win_cpp;
 
-/// 未编译 win_toast.cpp 时的弱兜底（强符号存在时被覆盖）。
-fn winToastFallback(title: ?[*:0]const u8, body: ?[*:0]const u8) callconv(.c) c_int {
-    _ = title;
-    _ = body;
-    return -1;
-}
-comptime {
-    @export(&winToastFallback, .{ .name = "apl_win_toast", .linkage = .weak });
-}
+const WinToast = if (use_cpp) struct {
+    extern "c" fn apl_win_toast(title: ?[*:0]const u8, body: ?[*:0]const u8) c_int;
+} else struct {
+    fn apl_win_toast(title: ?[*:0]const u8, body: ?[*:0]const u8) callconv(.c) c_int {
+        _ = title;
+        _ = body;
+        return -1;
+    }
+};
 
 extern "c" fn system(command: [*:0]const u8) c_int;
 
@@ -428,7 +430,7 @@ pub fn notify(title: []const u8, body: []const u8) i32 {
     defer alloc.free(tz);
     const bz = alloc.dupeZ(u8, body) catch return core.ERR_BACKEND;
     defer alloc.free(bz);
-    if (apl_win_toast(tz.ptr, bz.ptr) == 0) return core.OK;
+    if (WinToast.apl_win_toast(tz.ptr, bz.ptr) == 0) return core.OK;
     // 2) PowerShell 调 WinRT
     if (toastWinRT(title, body)) return core.OK;
     // 兜底：模态 MessageBox

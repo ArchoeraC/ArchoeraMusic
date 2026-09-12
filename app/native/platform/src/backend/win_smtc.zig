@@ -10,84 +10,80 @@
 //! IMarshal 在真机上「`add_ButtonPressed` 成功但事件永不回调」的问题。
 //!
 //! 本文件只做两件事：
-//!   1. 正向：把 `init/setTrack/setPlayback/deinit` 转发给 `apl_smtc_win_*`；
+//!   1. 正向：把 `init/setTrack/setPlayback/deinit` 转发给 C++（`apl_smtc_win_*`）；
 //!   2. 反向：导出 `apl_smtc_on_button`，把 C++ 回调的按钮事件经 `core.dispatch`
 //!      转发给 Dart（保持「Flutter 桥接层 + Zig 转发」架构）。
 //!
-//! 未编译 C++（缺 cppwinrt 头）时，本文件导出弱符号兜底 → SMTC 静默禁用、不崩。
+//! **编译期二选一**（`build_options.win_cpp`）：有 cppwinrt → 调用 C++ 符号；
+//! 否则 → Zig 兜底（SMTC 静默禁用）。
+//!
+//! ⚠️ 历史坑：曾用「同名弱符号兜底（`@export` weak）+ `extern` 调用」——实测
+//! **Zig 会把弱兜底内联**，导致 C++ 强符号永远不被调用（SMTC 永不初始化、
+//! 控件消失）。故这里不再用弱符号，改编译期开关。
 
 const std = @import("std");
 const core = @import("../core.zig");
 const win = @import("win_common.zig").c;
+const use_cpp = @import("build_options").win_cpp;
 
-// ── C++/WinRT 实现（win_smtc.cpp）──────────────────────────────────
+// ── C++/WinRT 实现（win_smtc.cpp）或 Zig 兜底 ──────────────────────
 
-extern "c" fn apl_smtc_win_init(hwnd: ?*anyopaque) c_int;
-extern "c" fn apl_smtc_win_set_track(
-    title: ?[*]const u8,
-    title_len: i32,
-    artist: ?[*]const u8,
-    artist_len: i32,
-    album: ?[*]const u8,
-    album_len: i32,
-    duration_ms: i64,
-    art_url: ?[*]const u8,
-    art_url_len: i32,
-    art_bytes: ?[*]const u8,
-    art_bytes_len: i32,
-) void;
-extern "c" fn apl_smtc_win_set_playback(state: i32, position_ms: i64, speed: f64) void;
-extern "c" fn apl_smtc_win_deinit() void;
-extern "c" fn apl_smtc_win_debug_playback_status() c_int;
-extern "c" fn apl_smtc_win_debug_is_enabled() c_int;
-extern "c" fn apl_smtc_win_debug_button_registered() c_int;
-extern "c" fn apl_smtc_win_probe() void;
-
-// ── 弱符号兜底（未编译 win_smtc.cpp 时）──────────────────────────
-
-fn initFallback(hwnd: ?*anyopaque) callconv(.c) c_int {
-    _ = hwnd;
-    return -1;
-}
-fn setTrackFallback(
-    title: ?[*]const u8,
-    title_len: i32,
-    artist: ?[*]const u8,
-    artist_len: i32,
-    album: ?[*]const u8,
-    album_len: i32,
-    duration_ms: i64,
-    art_url: ?[*]const u8,
-    art_url_len: i32,
-    art_bytes: ?[*]const u8,
-    art_bytes_len: i32,
-) callconv(.c) void {
-    _ = .{ title, title_len, artist, artist_len, album, album_len, duration_ms, art_url, art_url_len, art_bytes, art_bytes_len };
-}
-fn setPlaybackFallback(state: i32, position_ms: i64, speed: f64) callconv(.c) void {
-    _ = .{ state, position_ms, speed };
-}
-fn deinitFallback() callconv(.c) void {}
-fn debugStatusFallback() callconv(.c) c_int {
-    return -1;
-}
-fn debugEnabledFallback() callconv(.c) c_int {
-    return -1;
-}
-fn debugButtonFallback() callconv(.c) c_int {
-    return 0;
-}
-fn probeFallback() callconv(.c) void {}
-comptime {
-    @export(&initFallback, .{ .name = "apl_smtc_win_init", .linkage = .weak });
-    @export(&setTrackFallback, .{ .name = "apl_smtc_win_set_track", .linkage = .weak });
-    @export(&setPlaybackFallback, .{ .name = "apl_smtc_win_set_playback", .linkage = .weak });
-    @export(&deinitFallback, .{ .name = "apl_smtc_win_deinit", .linkage = .weak });
-    @export(&debugStatusFallback, .{ .name = "apl_smtc_win_debug_playback_status", .linkage = .weak });
-    @export(&debugEnabledFallback, .{ .name = "apl_smtc_win_debug_is_enabled", .linkage = .weak });
-    @export(&debugButtonFallback, .{ .name = "apl_smtc_win_debug_button_registered", .linkage = .weak });
-    @export(&probeFallback, .{ .name = "apl_smtc_win_probe", .linkage = .weak });
-}
+const Cpp = if (use_cpp) struct {
+    extern "c" fn apl_smtc_win_init(hwnd: ?*anyopaque) c_int;
+    extern "c" fn apl_smtc_win_set_track(
+        title: ?[*]const u8,
+        title_len: i32,
+        artist: ?[*]const u8,
+        artist_len: i32,
+        album: ?[*]const u8,
+        album_len: i32,
+        duration_ms: i64,
+        art_url: ?[*]const u8,
+        art_url_len: i32,
+        art_bytes: ?[*]const u8,
+        art_bytes_len: i32,
+    ) void;
+    extern "c" fn apl_smtc_win_set_playback(state: i32, position_ms: i64, speed: f64) void;
+    extern "c" fn apl_smtc_win_deinit() void;
+    extern "c" fn apl_smtc_win_debug_playback_status() c_int;
+    extern "c" fn apl_smtc_win_debug_is_enabled() c_int;
+    extern "c" fn apl_smtc_win_debug_button_registered() c_int;
+    extern "c" fn apl_smtc_win_probe() void;
+} else struct {
+    fn apl_smtc_win_init(hwnd: ?*anyopaque) callconv(.c) c_int {
+        _ = hwnd;
+        return -1;
+    }
+    fn apl_smtc_win_set_track(
+        title: ?[*]const u8,
+        title_len: i32,
+        artist: ?[*]const u8,
+        artist_len: i32,
+        album: ?[*]const u8,
+        album_len: i32,
+        duration_ms: i64,
+        art_url: ?[*]const u8,
+        art_url_len: i32,
+        art_bytes: ?[*]const u8,
+        art_bytes_len: i32,
+    ) callconv(.c) void {
+        _ = .{ title, title_len, artist, artist_len, album, album_len, duration_ms, art_url, art_url_len, art_bytes, art_bytes_len };
+    }
+    fn apl_smtc_win_set_playback(state: i32, position_ms: i64, speed: f64) callconv(.c) void {
+        _ = .{ state, position_ms, speed };
+    }
+    fn apl_smtc_win_deinit() callconv(.c) void {}
+    fn apl_smtc_win_debug_playback_status() callconv(.c) c_int {
+        return -1;
+    }
+    fn apl_smtc_win_debug_is_enabled() callconv(.c) c_int {
+        return -1;
+    }
+    fn apl_smtc_win_debug_button_registered() callconv(.c) c_int {
+        return 0;
+    }
+    fn apl_smtc_win_probe() callconv(.c) void {}
+};
 
 // ── 反向：C++ 按钮回调 → Zig → Dart ────────────────────────────────
 
@@ -109,12 +105,12 @@ export fn apl_smtc_on_button(button: i32) callconv(.c) void {
 
 /// 加载探针：桥接初始化时调用一次，确认 DLL 已加载、C++ 代码在跑（写日志）。
 pub fn probe() void {
-    apl_smtc_win_probe();
+    Cpp.apl_smtc_win_probe();
 }
 
 pub fn init(findWindow: *const fn () ?win.HWND) i32 {
     const hwnd = findWindow() orelse return core.ERR_BACKEND;
-    if (apl_smtc_win_init(hwnd) != 0) return core.ERR_BACKEND;
+    if (Cpp.apl_smtc_win_init(hwnd) != 0) return core.ERR_BACKEND;
     return core.OK;
 }
 
@@ -140,7 +136,7 @@ pub fn setTrack(
     const al = strArg(album);
     const u = strArg(art_url);
     const b = strArg(art_bytes);
-    apl_smtc_win_set_track(
+    Cpp.apl_smtc_win_set_track(
         t.ptr,
         t.len,
         a.ptr,
@@ -156,23 +152,23 @@ pub fn setTrack(
 }
 
 pub fn setPlayback(state: i32, position_ms: i64) void {
-    apl_smtc_win_set_playback(state, position_ms, if (state == 1) 1.0 else 0.0);
+    Cpp.apl_smtc_win_set_playback(state, position_ms, if (state == 1) 1.0 else 0.0);
 }
 
 pub fn deinit() void {
-    apl_smtc_win_deinit();
+    Cpp.apl_smtc_win_deinit();
 }
 
 // ── 诊断（win_smoke 读回校验）─────────────────────────────────────
 
 pub fn debugGetPlaybackStatus() i32 {
-    return apl_smtc_win_debug_playback_status();
+    return Cpp.apl_smtc_win_debug_playback_status();
 }
 
 pub fn debugGetIsEnabled() i32 {
-    return apl_smtc_win_debug_is_enabled();
+    return Cpp.apl_smtc_win_debug_is_enabled();
 }
 
 pub fn debugIsButtonRegistered() bool {
-    return apl_smtc_win_debug_button_registered() != 0;
+    return Cpp.apl_smtc_win_debug_button_registered() != 0;
 }

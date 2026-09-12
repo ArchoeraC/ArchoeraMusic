@@ -16,6 +16,17 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // 可选：原生 C++/WinRT 实现。需 C++/WinRT 头路径：
+    //   -Dcppwinrt-include=<dir> 或环境变量 CPPWINRT_INCLUDE（vcpkg `cppwinrt`）。
+    //   - win_toast.cpp：原生 Toast（Windows.UI.Notifications）。
+    //   - win_smtc.cpp ：SMTC 媒体会话/按钮事件（C++/WinRT 标准委托）。
+    // ⚠️ Zig 会把「同名弱符号兜底」内联，导致 C++ 强符号永不生效——故 Zig 侧
+    // 用 build_options.win_cpp 编译期二选一（C++ extern / Zig 兜底），不再用弱符号。
+    const inc_opt = b.option([]const u8, "cppwinrt-include", "C++/WinRT include dir (win_toast.cpp / win_smtc.cpp)");
+    const win_cpp = target.result.os.tag == .windows and inc_opt != null;
+    const build_options = b.addOptions();
+    build_options.addOption(bool, "win_cpp", win_cpp);
+
     const lib = b.addLibrary(.{
         .name = "archoera_platform",
         .linkage = .dynamic,
@@ -27,6 +38,7 @@ pub fn build(b: *std.Build) void {
     });
     // libc：std.c.getenv（DBUS_SESSION_BUS_ADDRESS）+ c_allocator
     lib.root_module.link_libc = true;
+    lib.root_module.addOptions("build_options", build_options);
     // Windows：user32（WndProc/EnumWindows/SetThreadExecutionState）+
     // powrprof（PowerSettingRegisterNotification）
     if (target.result.os.tag == .windows) {
@@ -34,12 +46,6 @@ pub fn build(b: *std.Build) void {
         lib.root_module.linkSystemLibrary("powrprof", .{});
         lib.root_module.linkSystemLibrary("advapi32", .{});
         lib.root_module.linkSystemLibrary("dwmapi", .{});
-        // 可选：原生 C++/WinRT 实现。需 C++/WinRT 头路径：
-        //   -Dcppwinrt-include=<dir> 或环境变量 CPPWINRT_INCLUDE（vcpkg `cppwinrt`）。
-        //   - win_toast.cpp：原生 Toast（Windows.UI.Notifications）。
-        //   - win_smtc.cpp ：SMTC 媒体会话/按钮事件（C++/WinRT 标准委托，见该文件）。
-        // 未提供则跳过两个 .cpp；Zig 侧弱符号兜底（Toast 走 PowerShell，SMTC 禁用）。
-        const inc_opt = b.option([]const u8, "cppwinrt-include", "C++/WinRT include dir (win_toast.cpp / win_smtc.cpp)");
         if (inc_opt) |inc| {
             // cppwinrt 2.x 与 Zig clang 的兼容告警（详见 win_smtc.cpp 顶部注释）：
             // -Wnontrivial-memcall（com_array memset 分支）、-Wno-unused-command-line-argument
@@ -84,6 +90,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     }) });
     tests.root_module.link_libc = true;
+    tests.root_module.addOptions("build_options", build_options);
     if (target.result.os.tag == .windows) {
         tests.root_module.linkSystemLibrary("user32", .{});
         tests.root_module.linkSystemLibrary("powrprof", .{});
@@ -103,6 +110,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         smoke.root_module.link_libc = true;
+        smoke.root_module.addOptions("build_options", build_options);
         smoke.root_module.linkSystemLibrary("user32", .{});
         smoke.root_module.linkSystemLibrary("powrprof", .{});
         const install_smoke = b.addInstallArtifact(smoke, .{});
