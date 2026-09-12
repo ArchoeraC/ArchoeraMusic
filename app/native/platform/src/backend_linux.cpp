@@ -734,74 +734,6 @@ DBusMessage* inhibitCall(DBusConnection* c, const char* method,
 // ── 单实例（文件锁）───────────────────────────────────────────────
 int g_instance_fd = -1;
 
-// ── 系统主题色 ────────────────────────────────────────────────────
-std::string runCapture(const char* cmd) {
-    FILE* f = popen(cmd, "r");
-    if (f == nullptr) return {};
-    char buf[256] = {0};
-    std::string out;
-    if (std::fgets(buf, sizeof(buf), f) != nullptr) out = buf;
-    pclose(f);
-    while (!out.empty() && (out.back() == '\n' || out.back() == '\r' ||
-                            out.back() == ' ' || out.back() == '\t')) {
-        out.pop_back();
-    }
-    size_t start = 0;
-    while (start < out.size() && (out[start] == ' ' || out[start] == '\t')) {
-        start++;
-    }
-    out.erase(0, start);
-    if (!out.empty() && (out.front() == '\'' || out.front() == '"')) {
-        out.erase(0, 1);
-        if (!out.empty() && (out.back() == '\'' || out.back() == '"')) {
-            out.pop_back();
-        }
-    }
-    return out;
-}
-
-bool parseAccent(const std::string& s, int32_t* r, int32_t* g, int32_t* b) {
-    if (s.empty()) return false;
-    if (s[0] == '#') {
-        if (s.size() < 7) return false;
-        unsigned rv, gv, bv;
-        if (std::sscanf(s.c_str() + 1, "%2x%2x%2x", &rv, &gv, &bv) != 3) {
-            return false;
-        }
-        if (r) *r = static_cast<int32_t>(rv);
-        if (g) *g = static_cast<int32_t>(gv);
-        if (b) *b = static_cast<int32_t>(bv);
-        return true;
-    }
-    if (s.find(',') != std::string::npos) {
-        int rv, gv, bv;
-        if (std::sscanf(s.c_str(), "%d,%d,%d", &rv, &gv, &bv) != 3) return false;
-        if (r) *r = rv;
-        if (g) *g = gv;
-        if (b) *b = bv;
-        return true;
-    }
-    const struct {
-        const char* name;
-        int32_t rgb[3];
-    } named[] = {
-        {"blue", {0x35, 0x84, 0xE4}},   {"teal", {0x21, 0x90, 0xA0}},
-        {"green", {0x3A, 0x94, 0x4A}},  {"yellow", {0xC8, 0x88, 0x00}},
-        {"orange", {0xDB, 0x7A, 0x2E}}, {"red", {0xED, 0x33, 0x3B}},
-        {"pink", {0xE9, 0x3D, 0x6C}},   {"purple", {0x91, 0x41, 0xAC}},
-        {"slate", {0x6A, 0x7A, 0x8F}},
-    };
-    for (const auto& n : named) {
-        if (s == n.name) {
-            if (r) *r = n.rgb[0];
-            if (g) *g = n.rgb[1];
-            if (b) *b = n.rgb[2];
-            return true;
-        }
-    }
-    return false;
-}
-
 // ── 窗口状态（dlopen GTK/GDK 轻轮询）──────────────────────────────
 namespace gtkwin {
 
@@ -966,19 +898,6 @@ bool notifyViaDbus(const char* title, const char* body) {
     if (reply != nullptr) dbus_message_unref(reply);
     dbus_error_free(&err);
     return ok;
-}
-
-std::string shellQuote(const char* s) {
-    std::string out = "'";
-    for (const char* p = s; *p != '\0'; p++) {
-        if (*p == '\'') {
-            out += "'\\''";
-        } else {
-            out += *p;
-        }
-    }
-    out += "'";
-    return out;
 }
 
 }  // namespace
@@ -1192,17 +1111,8 @@ bool accentViaPortal(int32_t* r, int32_t* g, int32_t* b) {
 }
 
 bool systemAccent(int32_t* r, int32_t* g, int32_t* b) {
-    if (accentViaPortal(r, g, b)) return true;
-    const char* cmds[] = {
-        "kreadconfig6 --file kdeglobals --group General --key AccentColor",
-        "kreadconfig5 --file kdeglobals --group General --key AccentColor",
-        "gsettings get org.gnome.desktop.interface accent-color",
-    };
-    for (const char* cmd : cmds) {
-        std::string out = runCapture(cmd);
-        if (parseAccent(out, r, g, b)) return true;
-    }
-    return false;
+    // 仅走 XDG Desktop Portal（零子进程）；无 portal / 无 accent-color 时返回 false。
+    return accentViaPortal(r, g, b);
 }
 
 int32_t systemAccentSetEvents(bool on) {
@@ -1212,21 +1122,8 @@ int32_t systemAccentSetEvents(bool on) {
 }
 
 int32_t notify(const char* title, const char* body) {
-    if (notifyViaDbus(title, body)) return OK;
-    const char* tools[][7] = {
-        {"notify-send", "-a", "ArchoeraMusic", title, body, nullptr},
-        {"kdialog", "--title", title, "--msgbox", body, nullptr},
-        {"zenity", "--info", "--title", title, "--text", body, nullptr},
-    };
-    for (const auto& argv : tools) {
-        std::string cmd;
-        for (int i = 0; argv[i] != nullptr; i++) {
-            if (i > 0) cmd += ' ';
-            cmd += shellQuote(argv[i]);
-        }
-        if (std::system(cmd.c_str()) == 0) return OK;
-    }
-    return ERR_BACKEND;
+    // 仅走 D-Bus org.freedesktop.Notifications（零子进程）。
+    return notifyViaDbus(title, body) ? OK : ERR_BACKEND;
 }
 
 }  // namespace archoera
