@@ -7,7 +7,7 @@
 
 | 组件 | 链接方式 | 许可证 | 说明 |
 |---|---|---|---|
-| **TagLib** | `find_package(Taglib ...)`，动态链接系统 `libtag`（Fedora `dnf install taglib` 提供 `.so`） | **LGPL-2.1** | 音频元数据标签读写 |
+| **TagLib** | `find_package(Taglib ...)`，动态链接；发布产物**随包内嵌** `libtag`（Linux 由 `app/core/bundle-linux-runtime.sh` 收拢、macOS 由 `dylibbundler`、Windows 由 vcpkg DLL 拷贝） | **LGPL-2.1**（或 MPL-1.1，双许可） | 音频元数据标签读写 |
 | `libcurl` | 动态链接（系统） | curl License（MIT/X 派生） | HTTP 客户端 |
 | `OpenSSL`（`OpenSSL::Crypto`） | 动态链接（系统） | Apache-2.0（含 OpenSSL 例外） | HTTPS / SHA1 |
 | `SQLite3` | 动态链接（系统） | Public Domain / SQLite blessing | 刮削状态库直写 |
@@ -15,9 +15,12 @@
 
 ## TagLib（LGPL-2.1）声明
 
-本刮削器经 `target_link_libraries(... Taglib::tag)` 以**动态链接**方式使用 TagLib。
-依据 LGPL-2.1，使用者有权：(a) 获得 TagLib 对应源代码；(b) 以修改后的
-TagLib 动态库替换本程序运行时所加载的 `libtag` 共享对象。
+本刮削器经 `target_link_libraries(... Taglib::tag)` 以**动态链接**方式使用 TagLib；
+发布产物把 `libtag` 一并内嵌（Linux `native/`、macOS `Contents/native/`、Windows
+exe 根目录），故运行期不依赖目标系统的 TagLib 版本。依据 LGPL-2.1，使用者有权：
+(a) 获得 TagLib 对应源代码；(b) 以修改后的 TagLib 动态库替换本程序运行时所加载的
+`libtag` 共享对象。发布产物 `licenses/` 目录随附 TagLib 许可文本
+（见根 `THIRD-PARTY-NOTICES.md`）。
 
 ### 源代码获取
 

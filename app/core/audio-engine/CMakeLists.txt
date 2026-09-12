@@ -272,8 +272,11 @@ endif()
 #    FFmpeg 库（独立构建链产物被 app/linux 以 install(FILES) 直接拷贝，
 #    不经 CMake 安装后处理，故需链接期显式写入；引号防 shell 展开）。
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  target_link_options(archoera-audio-engine PRIVATE "-Wl,-rpath,'$ORIGIN'")
-  target_link_options(archoera_mediaengine PRIVATE "-Wl,-rpath,'$ORIGIN'")
+  # -z,origin：置 ELF 的 DF_ORIGIN 标志。缺该标志时加载器会忽略 $ORIGIN
+  # RUNPATH（安全策略），引擎就找不到同目录内嵌的 FFmpeg 库——系统 FFmpeg
+  # 版本与内嵌不一致时直接加载失败（如发行版系统 FFmpeg 升级后 soname 不符）。
+  target_link_options(archoera-audio-engine PRIVATE "-Wl,-z,origin" "-Wl,-rpath,'$ORIGIN'")
+  target_link_options(archoera_mediaengine PRIVATE "-Wl,-z,origin" "-Wl,-rpath,'$ORIGIN'")
   # -Bsymbolic-functions：mediaengine 内嵌 Zig 内核（zk_* 符号）与同目录动态
   # libarchoera_kernel.so（scanner-ffi 加载）**同名**；若后者被全局加载，mediaengine
   # 内部对 zk_* 的引用可能被抢占到另一份内核（全局态不同）→ Host/Stream 状态错位

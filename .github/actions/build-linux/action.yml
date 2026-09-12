@@ -1,0 +1,132 @@
+name: Build ArchoeraMusic (Linux)
+description: >-
+  各发行版共用的 Linux 构建：安装工具链（Rust/Go/.NET/Flutter/Zig）→
+  编译全部原生模块 → Zig 内核回归 → Flutter analyze/test → flutter build linux。
+  发行版专属的系统依赖安装与打包步骤由调用方 job 负责（复合 action 在调用方
+  job 的容器/runner 内执行，因此天然复用各发行版的本地库）。
+inputs:
+  zig_archive:
+    description: Zig 官方归档后缀（如 x86_64-linux）
+    required: false
+    default: x86_64-linux
+  cache_key_suffix:
+    description: >-
+      最小 FFmpeg 缓存键后缀。必须按构建基线区分（如 ubuntu2404/ubuntu2004/fedora/arch），
+      否则老基线 job（如 ubuntu:20.04）会复用新基线构建的 FFmpeg（glibc 更高），
+      反而抬高产物 glibc 需求。
+    required: false
+    default: linux
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@stable
+
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.23'
+        cache-dependency-path: app/core/subsonic/go.sum
+
+    - uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '10.0.x'
+
+    - uses: subosito/flutter-action@v2
+      with:
+        channel: stable
+        cache: true
+
+    # Zig 0.16（EraAudio kernel）。归档名按 0.15.1+ 新规则 zig-<arch>-<os>；
+    # GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
+    - name: Install Zig 0.16 (EraAudio kernel)
+      shell: bash
+      run: |
+        set -euo pipefail
+        VER=0.16.0
+        ZA="${{ inputs.zig_archive }}"
+        ZD="$HOME/.local/zig-$VER"
+        if [ ! -x "$ZD/zig" ]; then
+          mkdir -p "$HOME/.local"
+          curl -fsSL "https://ziglang.org/download/$VER/zig-$ZA-$VER.tar.xz" -o /tmp/zig.tar.xz
+          tar -C "$HOME/.local" -xf /tmp/zig.tar.xz
+          mv "$HOME/.local/zig-$ZA-$VER" "$ZD"
+        fi
+        echo "$ZD" >> "$GITHUB_PATH"
+        "$ZD/zig" version
+
+    # 最小自包含 FFmpeg（内部编解码器 + 共享库 + RUNPATH=$ORIGIN）。发行版自带
+    # 的 FFmpeg 链接大量外部视频/图像库（内嵌闭包 +236MB），音乐播放用不到；
+    # 自建最小版只依赖 libc/libm/libz，内嵌约 10MB 且 soname 固定。
+    - name: Cache minimal FFmpeg
+      id: ffmpeg-cache
+      uses: actions/cache@v5
+      with:
+        path: ~/.local/ffmpeg-minimal
+        key: ffmpeg-minimal-7.1.1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_key_suffix }}
+
+    - name: Build minimal FFmpeg
+      if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash app/core/build-ffmpeg-minimal.sh
+
+    - name: Point build at minimal FFmpeg
+      shell: bash
+      run: |
+        PREFIX="$HOME/.local/ffmpeg-minimal"
+        echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
+        echo "LD_LIBRARY_PATH=$PREFIX/lib" >> "$GITHUB_ENV"
+
+    # 原生模块一站式入口（audio-engine / scraper / scanner / vault /
+    # downloader / subsonic / platform），逻辑只落一处，对齐 build_windows.bat。
+    - name: Build native modules
+      shell: bash
+      run: bash app/core/build-linux.sh
+
+    - name: Zig kernel tests (EraAudio 解码回归)
+      shell: bash
+      run: cd app/core/audio-engine && zig build test
+
+    - name: Flutter pub get
+      shell: bash
+      working-directory: app
+      run: flutter pub get
+
+    - name: Analyze
+      shell: bash
+      working-directory: app
+      run: dart analyze lib
+
+    - name: Test (unit smoke)
+      shell: bash
+      working-directory: app
+      run: flutter test test/widget_test.dart
+
+    - name: Test vault 会话存储（凭据保险库端到端）
+      shell: bash
+      working-directory: app
+      run: |
+        # headless runner 无 D-Bus Secret Service：构建测试二进制（VAULT_TESTING
+        # 条件编译，含测试明文存储；生产 build.sh 产物不含该逻辑，绝不用于测试）
+        bash core/vault/build-test.sh linux-x64
+        ARCHOERA_VAULT_BIN=$PWD/core/vault/build/archoera-vault-test \
+        ARCHOERA_VAULT_INSECURE_FILE_STORE=1 \
+          flutter test test/vault_session_store_test.dart
+
+    - name: Build Flutter Linux (release)
+      shell: bash
+      working-directory: app
+      run: flutter build linux --release
+
+    # 自包含运行库：把 FFmpeg/TagLib 的传递依赖闭包收进 native/ 并加 RUNPATH=$ORIGIN，
+    # 产物不再依赖目标发行版的 soname（防系统库差异/升级导致加载断裂）。
+    - name: Bundle self-contained runtime libs
+      shell: bash
+      run: bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle/native
+
+    # LGPL 合规：随包附 FFmpeg / TagLib 许可文本 + 聚合声明（见根 THIRD-PARTY-NOTICES.md）
+    - name: Bundle third-party licenses (LGPL 合规)
+      shell: bash
+      run: bash app/core/bundle-licenses.sh app/build/linux/x64/release/bundle
+
+    - name: Embed public key into Linux bundle (防伪)
+      shell: bash
+      run: cp app/tool/watermark_pub.pem app/build/linux/x64/release/bundle/ARCHOERA_PUBKEY.pem

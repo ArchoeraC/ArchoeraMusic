@@ -1,40 +1,36 @@
 # =====================================================================
-#  三端合并 matrix workflow：Linux / macOS / Windows 并行构建 + tag(v*) Release
+#  按发行版/平台分开构建 + tag(v*) Release。
 #
-#  由原三份独立 workflow 合并而来（build-linux.yml / build-macos.yml /
-#  build-windows.yml 已删除，避免同一 tag 推送触发三份重复跑）：
+#  Linux 为何不共用一份产物：引擎链接 FFmpeg、scraper 链接 TagLib，二者
+#  soname 跨发行版会 bump（libavformat.so.60→.63、libtag.so.1→.2）。在单一
+#  发行版（Ubuntu）上构建再重打包，会在别的发行版上因 soname 不匹配而无法
+#  加载（实测 Arch 上引擎与 scraper 均加载失败）。故每个发行版在自己的容器
+#  内从源码构建，链接并使用该发行版自身的 FFmpeg/TagLib。
 #
-#  ┌─ build  job ──────────────────────────────────────────────────────
-#  │  strategy.matrix.os ∈ {linux, macos, windows}，runner 由
-#  │  matrix.include 注入。三端并行，fail-fast: false（与原三份独立
-#  │  workflow 并行语义一致：一端失败不影响另两端上传诊断产物）。
-#  │  平台专属步骤一律用 `if: matrix.os == '...'` 收敛，只在对应用户
-#  │  runner 上执行；Windows 需要 pwsh/cmd 的步骤显式保留原 shell。
-#  │
-#  │  每端步骤顺序/依赖逐条保留自原 workflow（含已修复项）：
-#  │   Linux   : apt 系统依赖 → 工具链(rust/go/dotnet/flutter) →
-#  │              Zig 0.16 → build-linux.sh → zig build test →
-#  │              pub get/analyze/test → vault 端到端测试 →
-#  │              flutter build linux → Resolve version → 多发行版打包
-#  │              (tar→deb→rpm→AppImage→flatpak→nixos→arch，顺序不变)
-#  │              → upload bundle + packages
-#  │   macOS   : brew 依赖 → 工具链 → Zig 0.16 → build-macos.sh osx-arm64 →
-#  │              pub get/analyze/test → flutter build macos →
-#  │              native libs 拷入 .app/Contents/native/ → upload .app
-#  │   Windows : choco mingw(cgo) → vcpkg 缓存恢复/安装(x64-windows-release
-#  │              triplet)/显式 save → 工具链 → Zig 0.16(pwsh) →
-#  │              build_windows.bat(cmd, MSVC + vcpkg toolchain) →
-#  │              pub get/analyze/test → flutter build windows → upload
-#  │
-#  │  Zig 0.16 安装沿用已修复逻辑（f99266b / 7116dfc）：归档名按
-#  │  0.15.1+ 新规则 zig-<arch>-<os>；GITHUB_PATH 对当前步骤不生效，
-#  │  同步骤内用绝对路径验证。
-#  └──────────────────────────────────────────────────────────────────
+#  ┌─ linux-deb    (ubuntu-24.04 runner) : ubuntu24.04.deb + linux tar.gz + AppImage
+#  │                                      + flatpak + NixOS
+#  ├─ linux-deepin (ubuntu:20.04 容器)    : deepin.deb（老 glibc 基线；失败即放弃）
+#  ├─ linux-rpm    (fedora 容器)          : fedora.rpm
+#  ├─ linux-arch   (archlinux 容器)       : arch.pkg.tar.zst
+#  ├─ build        (matrix macos/windows) : .app / NSIS+portable zip
+#  └─ release      (needs 全部；tag v* 触发)
+#
+#  产物文件名带发行版标识（如 ArchoeraMusic-v<ver>-ubuntu24.04-x86_64.deb、
+#  -fedora-x86_64.rpm、-arch-x86_64.pkg.tar.zst），且包内 BUILD-INFO.txt 写明
+#  构建目标 / 基线 / 最低 glibc / 提交，用户无需靠后缀猜适用性。
+#
+#  三个 Linux job 共用 .github/actions/build-linux（复合 action）：工具链
+#  (rust/go/dotnet/flutter) → Zig 0.16 → build-linux.sh → zig build test →
+#  pub get/analyze/test → vault 端到端 → flutter build linux。发行版专属的
+#  系统依赖安装与打包由各 job 负责。
+#
+#  Zig 0.16 安装沿用已修复逻辑（f99266b / 7116dfc）：归档名按 0.15.1+ 新规则
+#  zig-<arch>-<os>；GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
 #
 #  ┌─ release job ─────────────────────────────────────────────────────
-#  │  needs: build；仅 push tag v* 触发；下载三端 artifact 后聚合为
-#  │  GitHub Release。release 需要 contents: write，故在 job 级覆盖
-#  │  顶层 permissions。tag 名即版本（沿用仓库现有 v* 标签）。
+#  │  needs: [build, linux-deb, linux-rpm, linux-arch]；仅 push tag v* 触发；
+#  │  下载全部 artifact 后聚合为 GitHub Release。release 需要 contents: write，
+#  │  故在 job 级覆盖顶层 permissions。tag 名即版本（沿用仓库现有 v* 标签）。
 #  └──────────────────────────────────────────────────────────────────
 name: Build all platforms & release
 
@@ -53,9 +49,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: linux
-            runner: ubuntu-latest
-            zig_archive: x86_64-linux
           - os: macos
             runner: macos-15
             zig_archive: aarch64-macos
@@ -67,18 +60,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # ───────────────────────── Linux（apt 系统依赖）─────────────────
-      - name: Install system dependencies
-        if: matrix.os == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential ninja-build pkg-config clang \
-            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
-            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
-            nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
-            libdbus-1-dev libayatana-appindicator3-dev
-
       # ───────────────────────── macOS（Homebrew 依赖）────────────────
       - name: Install Homebrew deps
         if: matrix.os == 'macos'
@@ -86,8 +67,12 @@ jobs:
         # 缺少 libswift_Builtin_float 等 stub，NativeAOT Swift autolink 报 8 个
         # __swift_FORCE_LOAD_$_swift_* 未定义（dotnet/runtime#125858 官方答复
         # 要求 Xcode 16+，googleads-ios-unity#3760）。Xcode 16 SDK 含完整 stubs。
+        # 不装 brew 的 ffmpeg：它默认 --enable-gpl（GPL-3.0），破坏本项目
+        # THIRD-PARTY-LICENSES 的「GPL 防火墙」；改用自建纯 LGPL 最小 FFmpeg
+        # （见 build-ffmpeg-minimal.sh）。dylibbundler 用于把 FFmpeg/TagLib
+        # dylib 收进 .app 并改写 install_name（自包含）。
         run: |
-          brew install ffmpeg taglib curl openssl sqlite nlohmann-json pkg-config
+          brew install taglib curl openssl sqlite nlohmann-json pkg-config dylibbundler
 
       # ───────────────────────── Windows（mingw / vcpkg）───────────────
       - name: Install mingw (cgo C 编译器，go -buildmode=c-shared 需要)
@@ -173,7 +158,7 @@ jobs:
 
       # ──────────────────── Zig 0.16（EraAudio kernel）────────────────
       - name: Install Zig 0.16 (EraAudio kernel)
-        if: matrix.os == 'linux' || matrix.os == 'macos'
+        if: matrix.os == 'macos'
         run: |
           set -euo pipefail
           VER=0.16.0
@@ -205,15 +190,28 @@ jobs:
           Add-Content $env:GITHUB_PATH $zd
           & (Join-Path $zd 'zig.exe') version
 
-      # ──────────────────── 原生模块编译（各自一站式入口）──────────────
-      - name: Build native modules (Linux 一站式脚本)
-        if: matrix.os == 'linux'
-        # 统一入口 app/core/build-linux.sh，收敛 audio-engine / scraper /
-        # scanner / vault / downloader / subsonic 全部原生模块编译：
-        # 本地开发与 CI 共用同一入口，逻辑改动只落一处（对齐 build_windows.bat）。
-        # 依赖由上方步骤提前安装，脚本只做编译引导。
-        run: bash app/core/build-linux.sh
+      # ─────────── macOS：自建纯 LGPL 最小 FFmpeg（自包含 + 许可证）───────────
+      # 不用 brew 的 ffmpeg（GPL），改为自建；见 build-ffmpeg-minimal.sh。
+      - name: Cache minimal FFmpeg (macOS)
+        if: matrix.os == 'macos'
+        id: ffmpeg-cache-macos
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/ffmpeg-minimal
+          key: ffmpeg-minimal-7.1.1-${{ runner.os }}-${{ runner.arch }}
 
+      - name: Build minimal FFmpeg (macOS, LGPL)
+        if: matrix.os == 'macos' && steps.ffmpeg-cache-macos.outputs.cache-hit != 'true'
+        run: bash app/core/build-ffmpeg-minimal.sh
+
+      - name: Point build at minimal FFmpeg (macOS)
+        if: matrix.os == 'macos'
+        run: |
+          PREFIX="$HOME/.local/ffmpeg-minimal"
+          echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$PREFIX/lib" >> "$GITHUB_ENV"
+
+      # ──────────────────── 原生模块编译（各自一站式入口）──────────────
       - name: Build native modules (macOS 一站式脚本)
         if: matrix.os == 'macos'
         # 统一入口 app/core/build-macos.sh，收敛 audio-engine / scraper /
@@ -257,11 +255,6 @@ jobs:
             app/core/build_windows.log
           if-no-files-found: ignore
 
-      # ────────────────── Zig kernel 测试（仅 Linux，解码回归）─────────
-      - name: Zig kernel tests (EraAudio 解码回归)
-        if: matrix.os == 'linux'
-        run: cd app/core/audio-engine && zig build test
-
       # ───────────── Flutter pub get / analyze / test（统一在 app/）─────
       - name: Flutter pub get
         working-directory: app
@@ -275,31 +268,7 @@ jobs:
         working-directory: app
         run: flutter test test/widget_test.dart
 
-      - name: Test vault 会话存储（凭据保险库端到端）
-        if: matrix.os == 'linux'
-        working-directory: app
-        run: |
-          # headless runner 无 D-Bus Secret Service：构建测试二进制（VAULT_TESTING
-          # 条件编译，含测试明文存储；生产 build.sh 产物不含该逻辑，绝不用于测试）
-          bash core/vault/build-test.sh linux-x64
-          # 测试二进制需同时设置明文存储 env（显式 opt-in；生产二进制无此分支，
-          # 且 VaultProcess 默认路径校验 PROD 标记拒绝测试二进制，仅显式
-          # ARCHOERA_VAULT_BIN + 本 env 组合仅供测试）
-          ARCHOERA_VAULT_BIN=$PWD/core/vault/build/archoera-vault-test \
-          ARCHOERA_VAULT_INSECURE_FILE_STORE=1 \
-            flutter test test/vault_session_store_test.dart
-
       # ──────────────────────── Flutter 端构建（分平台）─────────────────
-      - name: Build Flutter Linux
-        if: matrix.os == 'linux'
-        working-directory: app
-        run: flutter build linux --release
-
-      - name: Embed public key into Linux bundle (防伪)
-        if: matrix.os == 'linux'
-        # 公钥随包分发，供用户离线验签（私钥绝不入库/入包）
-        run: cp app/tool/watermark_pub.pem app/build/linux/x64/release/bundle/ARCHOERA_PUBKEY.pem
-
       - name: Build Flutter macOS
         if: matrix.os == 'macos'
         working-directory: app
@@ -376,58 +345,121 @@ jobs:
           cp app/core/subsonic/build/*.dylib "$NATIVE/"
           cp app/core/downloader/target/release/libarchoera_downloader.dylib "$NATIVE/"
           cp app/core/vault/build/archoera-vault "$NATIVE/"
+
+          # 自包含运行库：把引擎(FFmpeg)/scraper(TagLib) 的 dylib 依赖收进 native/
+          # 并把 install_name 改写为 @loader_path，运行期不再依赖构建机 brew 路径
+          # （否则用户机无 brew 时加载失败）。
+          for lib in libarchoera_mediaengine.dylib libarchoera_scraper.dylib; do
+            [[ -f "$NATIVE/$lib" ]] || continue
+            dylibbundler -of -b -x "$NATIVE/$lib" -d "$NATIVE" -p @loader_path
+          done
+
+          # LGPL 合规：随包附 FFmpeg / TagLib 许可文本 + 聚合声明
+          bash app/core/bundle-licenses.sh "$APP/Contents"
+
           # 防伪公钥随包分发（供用户离线验签；私钥绝不入库/入包）
           mkdir -p "$APP/Contents/Resources"
           cp app/tool/watermark_pub.pem "$APP/Contents/Resources/ARCHOERA_PUBKEY.pem"
+
+          # 新增/改写 dylib 会使原 ad-hoc 签名失效（Apple Silicon 拒载未签名 dylib）→ 重签整包
+          codesign --force --deep --sign - "$APP"
+
           echo "native/ 内容:"
           ls -la "$NATIVE"
 
-      # ────────────────────── Linux：多发行版打包链 ────────────────────
+      - name: Upload artifact (macOS .app)
+        if: matrix.os == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-macos-arm64
+          path: app/build/macos/Build/Products/Release/archoera_music.app
+          if-no-files-found: error
+
+      - name: Upload artifact (Windows runner Release)
+        if: matrix.os == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-windows-x64
+          path: app/build/windows/x64/runner/Release
+          if-no-files-found: error
+
+      - name: Upload artifact (Windows NSIS + portable)
+        if: matrix.os == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-windows-extra
+          path: build/windows-extra/*
+          if-no-files-found: error
+
+  # =====================================================================
+  #  Linux 按发行版分开构建：每个发行版在自己的容器内从源码编译，链接并使用
+  #  该发行版自身的 FFmpeg / TagLib。原因：二者 soname 跨发行版会 bump
+  #  （libavformat.so.60→.63、libtag.so.1→.2），在 Ubuntu 上构建再重打包到
+  #  Arch 会因 soname 不匹配而加载失败（引擎与 scraper 均实测失败）。
+  #  公共构建逻辑收敛在 .github/actions/build-linux（复合 action）。
+  # =====================================================================
+
+  # ── Debian/Ubuntu：.deb + tar.gz + AppImage + flatpak + NixOS ─────────
+  linux-deb:
+    name: Linux deb (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    env:
+      BUILD_BASE: ubuntu-24.04
+    steps:
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
+          sudo apt-get install -y \
+            build-essential ninja-build pkg-config clang \
+            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libdbus-1-dev libayatana-appindicator3-dev \
+            patchelf nasm
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/build-linux
+        with:
+          cache_key_suffix: ubuntu2404
       - name: Resolve version (from pubspec.yaml)
-        if: matrix.os == 'linux'
         id: version
         run: |
-          # 版本号一律以 app/pubspec.yaml 为唯一来源；发布 tag 应 push v$version。
           VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
-
       - name: Install packaging tools
-        if: matrix.os == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm flatpak
+          # rpm 在 fedora job 构建，此处只需 flatpak（AppImage 工具另行下载）
+          sudo apt-get install -y flatpak
           # appimagetool（CI 无 FUSE，运行时用 --appimage-extract-and-run）
           wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage
           chmod +x /tmp/appimagetool.AppImage
           sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
           # type2 runtime 预下载（appimagetool 打包时不再联网下载，规避网络抖动）
           wget -q https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 -O /tmp/type2-runtime
-
+          # linuxdeploy：AppImage 装配时收拢 GTK/FFmpeg/TagLib 等动态依赖
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O /tmp/linuxdeploy.AppImage
+          chmod +x /tmp/linuxdeploy.AppImage
       - name: Package tar.gz (纯二进制)
-        if: matrix.os == 'linux'
         run: bash packaging/linux/package.sh tar app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-
-      - name: Package .deb (Debian/Ubuntu)
-        if: matrix.os == 'linux'
+        env:
+          DISTRO_TAG: linux
+      - name: Package .deb (Ubuntu 24.04)
         run: bash packaging/linux/package.sh deb app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-
-      - name: Package .rpm (Fedora/RHEL/openSUSE)
-        if: matrix.os == 'linux'
-        run: bash packaging/linux/package.sh rpm app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-
+        env:
+          DISTRO_TAG: ubuntu24.04
       - name: Package AppImage (通用)
-        if: matrix.os == 'linux'
         run: bash packaging/linux/package.sh appimage app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
         env:
+          DISTRO_TAG: linux
           APPIMAGE_RUNTIME_FILE: /tmp/type2-runtime
-
+          LINUXDEPLOY: /tmp/linuxdeploy.AppImage
+          APPIMAGE_EXTRACT_AND_RUN: '1'
       - name: Package Flatpak (通用)
-        if: matrix.os == 'linux'
         run: bash packaging/linux/package-flatpak.sh app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-
+        env:
+          DISTRO_TAG: flatpak
       - name: Package NixOS flake (nixos/nix container, autoPatchelf)
-        if: matrix.os == 'linux'
         # bundle 为 Release 预 strip 产物，autoPatchelfHook 在容器内补
         # interpreter（NixOS 无 /lib64/ld-linux-x86-64.so.2）并追加 buildInputs
         # store 路径 RUNPATH（NixOS 无 /usr/lib）。产物仅供 CI 验证构建链路 +
@@ -456,74 +488,157 @@ jobs:
                 "/workspace/dist/linux/ArchoeraMusic-v${PKG_VER}-nixos-x86_64.tar.gz" .
             '
           ls -la dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz
-
-      - name: Package Arch pkg.tar.zst (makepkg in archlinux container, 最后打包)
-        if: matrix.os == 'linux'
-        # AUR 打包放 pipeline 末尾：makepkg 以 nobody 运行，残留文件所有权
-        # 复杂（nobody/root），即使有残留也不影响前面各打包步骤；upload 前
-        # 仍执行清理归还 runner，保持工作区权限卫生。
-        run: |
-          bash packaging/linux/package.sh arch app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-          docker run --rm -v "$PWD":/workspace -w /workspace/packaging/linux/work/arch \
-            archlinux:latest bash -c '
-              pacman -Sy --noconfirm --needed base-devel >/dev/null 2>&1 || exit 1
-              chown -R nobody:nobody .
-              # 新版 archlinux 镜像给 nobody 设了账户过期，su 会报 "account has expired"，先清除
-              chage -E -1 nobody
-              # 预构建产物打包：--nodeps 跳过运行时依赖检查（depends 仍写入
-              # .PKGINFO 供安装端使用），避免容器内安装整套依赖拖慢 CI
-              su nobody -s /bin/bash -c "HOME=/tmp makepkg -f --skipinteg --nocheck --nodeps" || exit 1
-              # root 删 makepkg 中间目录 + 所有权归还 runner（挂载卷宿主 owner）
-              rm -rf pkg src
-              chown -R "$(stat -c %u:%g /workspace)" .
-            '
-          cp packaging/linux/work/arch/*.pkg.tar.zst dist/linux/
-          echo "→ dist/linux/$(ls dist/linux/ | grep '\.pkg\.tar\.zst$')"
-
-      # ──────────────────────── 产物上传（仅成功时）────────────────────
       - name: Upload bundle artifact (原始 bundle)
-        if: matrix.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: ArchoeraMusic-linux-x64
           path: app/build/linux/x64/release/bundle
           if-no-files-found: error
-
       - name: Upload packages artifact
-        if: matrix.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: ArchoeraMusic-linux-packages
+          name: ArchoeraMusic-linux-deb
           path: dist/linux/*
           if-no-files-found: error
 
-      - name: Upload artifact (macOS .app)
-        if: matrix.os == 'macos'
+  # ── Deepin：单独开包（老基线 glibc）────────────────────────────────────
+  # Deepin 基于 Debian，系统库较旧：Ubuntu 24.04 产物（glibc 2.39）在 Deepin 上
+  # 起不来。此 job 在**最老的可行基线**（Ubuntu 20.04 / glibc 2.31，即 Flutter
+  # 要求的地板）上从源码构建，产出单独的 .deb（DISTRO_TAG=deepin）。若仍无法在
+  # Deepin 运行且不可解决，则放弃该 job 与 Deepin 支持。
+  linux-deepin:
+    name: Linux deb (Deepin, 老基线)
+    runs-on: ubuntu-24.04
+    container: ubuntu:20.04
+    env:
+      BUILD_BASE: ubuntu-20.04
+    steps:
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential ninja-build pkg-config clang sudo \
+            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            nlohmann-json3-dev libgtk-3-dev liblzma-dev \
+            libdbus-1-dev libayatana-appindicator3-dev \
+            patchelf nasm git curl wget xz-utils unzip zip ca-certificates
+      - uses: actions/checkout@v5
+      - name: Git safe directory (容器属主)
+        run: git config --global --add safe.directory '*'
+      - uses: ./.github/actions/build-linux
+        with:
+          cache_key_suffix: ubuntu2004
+      - name: Resolve version (from pubspec.yaml)
+        id: version
+        run: |
+          VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "resolved version: ${VER}"
+      - name: Package .deb (Deepin)
+        run: bash packaging/linux/package.sh deb app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+        env:
+          DISTRO_TAG: deepin
+      - name: Upload packages artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArchoeraMusic-macos-arm64
-          path: app/build/macos/Build/Products/Release/archoera_music.app
+          name: ArchoeraMusic-linux-deepin
+          path: dist/linux/*
           if-no-files-found: error
 
-      - name: Upload artifact (Windows runner Release)
-        if: matrix.os == 'windows'
+  # ── Fedora/RHEL：.rpm（fedora 容器内从源码构建）───────────────────────
+  linux-rpm:
+    name: Linux rpm (Fedora)
+    runs-on: ubuntu-24.04
+    container: fedora:latest
+    env:
+      BUILD_BASE: fedora
+    steps:
+      - name: Install system dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            git curl wget tar xz which findutils gzip unzip \
+            gcc gcc-c++ clang cmake ninja-build pkgconf-pkg-config make \
+            patchelf nasm \
+            taglib-devel libcurl-devel openssl-devel sqlite-devel \
+            json-devel gtk3-devel dbus-devel libstdc++-devel libicu \
+            rpm-build zstd libarchive \
+            libayatana-appindicator-gtk3-devel
+          # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
+      - uses: actions/checkout@v5
+      - name: Git safe directory (容器属主)
+        run: git config --global --add safe.directory '*'
+      - uses: ./.github/actions/build-linux
+        with:
+          cache_key_suffix: fedora
+      - name: Resolve version (from pubspec.yaml)
+        id: version
+        run: |
+          VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "resolved version: ${VER}"
+      - name: Package .rpm (Fedora/RHEL/openSUSE)
+        run: bash packaging/linux/package.sh rpm app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+        env:
+          DISTRO_TAG: fedora
+      - name: Upload packages artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArchoeraMusic-windows-x64
-          path: app/build/windows/x64/runner/Release
+          name: ArchoeraMusic-linux-rpm
+          path: dist/linux/*
           if-no-files-found: error
 
-      - name: Upload artifact (Windows NSIS + portable)
-        if: matrix.os == 'windows'
+  # ── Arch Linux：.pkg.tar.zst（archlinux 容器内从源码构建）─────────────
+  linux-arch:
+    name: Linux pkg.tar.zst (Arch)
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    env:
+      BUILD_BASE: archlinux
+    steps:
+      - name: Install system dependencies
+        run: |
+          pacman -Sy --noconfirm --needed \
+            base-devel git curl wget tar xz which findutils unzip zstd libarchive \
+            cmake ninja clang pkgconf patchelf nasm \
+            taglib curl openssl sqlite nlohmann-json \
+            gtk3 dbus libayatana-appindicator
+          # 不装系统 ffmpeg：引擎改用自建最小 FFmpeg（见 build-linux action）
+      - uses: actions/checkout@v5
+      - name: Git safe directory (容器属主)
+        run: git config --global --add safe.directory '*'
+      - uses: ./.github/actions/build-linux
+        with:
+          cache_key_suffix: arch
+      - name: Resolve version (from pubspec.yaml)
+        id: version
+        run: |
+          VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "resolved version: ${VER}"
+      - name: Package Arch pkg.tar.zst (makepkg as nobody)
+        env:
+          DISTRO_TAG: arch
+        run: |
+          bash packaging/linux/package.sh arch app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
+          # makepkg 拒绝 root 运行；nobody 需先解除镜像预设的账户过期
+          chown -R nobody:nobody packaging/linux/work/arch
+          chage -E -1 nobody
+          su nobody -s /bin/bash -c \
+            'cd packaging/linux/work/arch && HOME=/tmp makepkg -f --skipinteg --nocheck --nodeps'
+          # 统一命名为显著标识发行版的文件名（pkg 内部元数据不变）
+          cp packaging/linux/work/arch/*.pkg.tar.zst \
+            "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-arch-x86_64.pkg.tar.zst"
+          echo "→ dist/linux/$(ls dist/linux/ | grep '\.pkg\.tar\.zst$')"
+      - name: Upload packages artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ArchoeraMusic-windows-extra
-          path: build/windows-extra/*
+          name: ArchoeraMusic-linux-arch
+          path: dist/linux/*
           if-no-files-found: error
 
   # =====================================================================
-  #  release：仅 push tag v* 触发，汇总三端 artifact 发布 GitHub Release。
-  #  needs: build 保证三端全部构建成功才发版（任一端失败 → 不发版）。
+  #  release：仅 push tag v* 触发，汇总全部平台 artifact 发布 GitHub Release。
+  #  needs 保证所有平台全部构建成功才发版（任一端失败 → 不发版）。
   #  方案选 gh CLI（ubuntu runner 预装，免引第三方 action，且可按 assets/*
   #  精确控制多文件上传；软props/action-gh-release@v2 对目录型产物
   #  （macOS .app / Windows Release 目录）需要逐个 glob，不便聚合成单 asset）。
@@ -532,7 +647,7 @@ jobs:
   # =====================================================================
   release:
     name: Release ${{ github.ref_name }}
-    needs: build
+    needs: [build, linux-deb, linux-rpm, linux-arch, linux-deepin]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     # 受保护 Environment：需 Required reviewers 手动批准后才运行；
@@ -555,15 +670,21 @@ jobs:
         run: |
           set -euo pipefail
           VER="${GITHUB_REF_NAME#v}"
-          test -d artifacts/ArchoeraMusic-linux-x64       # Linux 原始 bundle
-          test -d artifacts/ArchoeraMusic-linux-packages  # Linux 安装包集
+          test -d artifacts/ArchoeraMusic-linux-x64       # Linux 原始 bundle (Ubuntu)
+          test -d artifacts/ArchoeraMusic-linux-deb       # Linux deb 包集 (Ubuntu)
+          test -d artifacts/ArchoeraMusic-linux-deepin    # Linux deb 包集 (Deepin)
+          test -d artifacts/ArchoeraMusic-linux-rpm       # Linux rpm 包集
+          test -d artifacts/ArchoeraMusic-linux-arch      # Linux pkg.tar.zst
           test -d artifacts/ArchoeraMusic-macos-arm64     # macOS .app
           test -d artifacts/ArchoeraMusic-windows-x64     # Windows runner Release
           test -d artifacts/ArchoeraMusic-windows-extra   # Windows NSIS + portable
           mkdir -p assets
-          # Linux：多发行版安装包直接作为独立 asset（tar.gz/deb/rpm/AppImage/
-          # flatpak/nixos tar.gz/pkg.tar.zst 均已带版本号，名称不冲突）
-          cp artifacts/ArchoeraMusic-linux-packages/* assets/
+          # Linux：各发行版安装包直接作为独立 asset（tar.gz/deb/AppImage/flatpak/
+          # nixos/rpm/pkg.tar.zst 均已带版本号，名称不冲突）
+          cp artifacts/ArchoeraMusic-linux-deb/* assets/
+          cp artifacts/ArchoeraMusic-linux-deepin/* assets/
+          cp artifacts/ArchoeraMusic-linux-rpm/* assets/
+          cp artifacts/ArchoeraMusic-linux-arch/* assets/
           # Windows：NSIS 安装器与便携 zip 直接作为独立 asset
           cp artifacts/ArchoeraMusic-windows-extra/* assets/
           # upload-artifact@v4 打包会丢失可执行位：下载后按 Mach-O/ELF magic

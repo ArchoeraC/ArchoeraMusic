@@ -11,7 +11,7 @@ inherit eutils
 
 DESCRIPTION="An open-source music player, connect to alternative music service, support offline playback"
 HOMEPAGE="https://github.com/BetaStudio2/ArchoeraMusic"
-SRC_URI="https://github.com/BetaStudio2/ArchoeraMusic/releases/download/v${PV}/ArchoeraMusic-v${PV}-linux-x64.tar.gz"
+SRC_URI="https://github.com/BetaStudio2/ArchoeraMusic/releases/download/v${PV}/ArchoeraMusic-v${PV}-linux-x86_64.tar.gz"
 
 LICENSE="AGPL-3"
 SLOT="0"
@@ -28,8 +28,6 @@ RDEPEND="
 	media-libs/fribidi
 	x11-libs/libX11
 	x11-libs/libXi
-	media-video/ffmpeg
-	media-libs/taglib
 	net-misc/curl
 	dev-libs/openssl
 	dev-db/sqlite
@@ -37,7 +35,9 @@ RDEPEND="
 	sys-libs/zlib
 "
 
-S="${WORKDIR}/ArchoeraMusic-linux-x64"
+# FFmpeg（自建最小纯 LGPL）与 TagLib 已随包内嵌于 native/（RUNPATH=$ORIGIN），
+# 运行期不依赖系统 media-video/ffmpeg、media-libs/taglib。
+S="${WORKDIR}/ArchoeraMusic-linux-x86_64"
 
 src_install() {
 	# 整个 bundle 装到 /opt/archoera-music（FFI/引擎子进程相对可执行文件定位）

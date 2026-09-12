@@ -39,6 +39,11 @@ version_deb="$version"                    # deb 允许 . + -
 version_rpm="${version//[+-]/_}"          # rpm 不允许 '+' 与 '-'（- 分隔 version-release）
 version_arch="${version//[+-]/_}"         # arch pkgver 只允许 [A-Za-z0-9.]
 
+# 产物文件名里的发行版标识与构建基线（CI 按 job 传入，如 ubuntu24.04 / deepin / fedora / arch）。
+# 用于让用户一眼看出「这个包给谁用」，而不是只能靠后缀猜。
+DISTRO_TAG="${DISTRO_TAG:-linux}"
+BUILD_BASE="${BUILD_BASE:-$DISTRO_TAG}"
+
 mkdir -p "$DIST"
 stage="$WORK/stage"
 rm -rf "$WORK"; mkdir -p "$stage"
@@ -70,15 +75,38 @@ stage_desktop="$stage/archoera-music.desktop"
 stage_metainfo="$stage/awa.archoera.betastudio2.archoera_music.metainfo.xml"
 stage_icons="$stage/icons"
 
+# ── BUILD-INFO.txt：产物内显著标识（发行版 / 基线 / glibc 最低要求）──────
+# 随每个包分发（进 bundle 根），让用户无需靠文件名后缀猜适用性。
+write_build_info() {
+  local glibc_max=""
+  if command -v objdump >/dev/null 2>&1; then
+    glibc_max="$(find "$stage_bundle" -type f \
+        \( -name '*.so*' -o -perm -u+x \) -print0 2>/dev/null \
+      | xargs -0 -r objdump -T 2>/dev/null \
+      | grep -o 'GLIBC_[0-9.]*' | sort -V | uniq | tail -1 || true)"
+  fi
+  cat > "$stage_bundle/BUILD-INFO.txt" <<EOF
+ArchoeraMusic $version
+构建目标   : $DISTRO_TAG
+构建基线   : $BUILD_BASE
+最低 glibc : ${glibc_max:-未知}
+构建时间   : $(date -u +%Y-%m-%dT%H:%M:%SZ)
+提交       : ${GITHUB_SHA:-$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)}
+运行库     : FFmpeg 7.1.1（自建最小纯 LGPL）、TagLib 已内嵌于 native/（RUNPATH=\$ORIGIN）
+许可       : AGPL-3.0（见 LICENSE）；第三方许可见 licenses/
+EOF
+}
+write_build_info
+
 # ── tar.gz：纯二进制（保留 bundle 原结构，解压即用）───────────────────
 pkg_tar() {
-  local dir="$stage/tar/ArchoeraMusic-linux-x64"
+  local dir="$stage/tar/ArchoeraMusic-linux-x86_64"
   mkdir -p "$stage/tar"
   cp -a "$stage_bundle" "$dir"
   tar -C "$stage/tar" -czf \
-    "$DIST/$APP_NAME-v$version-linux-x64.tar.gz" \
+    "$DIST/$APP_NAME-v$version-linux-x86_64.tar.gz" \
     "$(basename "$dir")"
-  echo "→ $DIST/$APP_NAME-v$version-linux-x64.tar.gz"
+  echo "→ $DIST/$APP_NAME-v$version-linux-x86_64.tar.gz"
 }
 
 # ── deb：Debian/Ubuntu 系 ─────────────────────────────────────────────
@@ -104,7 +132,7 @@ Priority: optional
 Architecture: amd64
 Maintainer: BetaStudio2 (ArchoeraMusic) <noreply@github.com>
 Homepage: $REPO_URL
-Depends: libc6, libstdc++6, zlib1g, libgtk-3-0 | libgtk-3-0t64, libayatana-appindicator3-1, libdbusmenu-glib4, libdbus-1-3, libepoxy0, libfontconfig1, libfribidi0, libx11-6, libxi6, libatk-bridge2.0-0, libcloudproviders0, ffmpeg, libtag1v5, libcurl4, libssl3, libsqlite3-0, liblzma5
+Depends: libc6, libstdc++6, zlib1g, libgtk-3-0 | libgtk-3-0t64, libayatana-appindicator3-1, libdbusmenu-glib4, libdbus-1-3, libepoxy0, libfontconfig1, libfribidi0, libx11-6, libxi6, libatk-bridge2.0-0, libcloudproviders0, libcurl4, libssl3, libsqlite3-0, liblzma5
 Description: An open-source music player
  Connect to alternative music services, support offline playback, local
  library scanning and a built-in subsonic-compatible server.
@@ -124,8 +152,8 @@ EOF
   cp "$root/DEBIAN/postinst" "$root/DEBIAN/postrm"
 
   dpkg-deb --root-owner-group --build "$root" \
-    "$DIST/$APP_NAME-v$version_deb-linux-x64.deb" >/dev/null
-  echo "→ $DIST/$APP_NAME-v$version_deb-linux-x64.deb"
+    "$DIST/$APP_NAME-v$version_deb-${DISTRO_TAG}-x86_64.deb" >/dev/null
+  echo "→ $DIST/$APP_NAME-v$version_deb-${DISTRO_TAG}-x86_64.deb"
 }
 
 # ── rpm：Fedora / RHEL / openSUSE 系 ──────────────────────────────────
@@ -140,30 +168,54 @@ pkg_rpm() {
     -bb "$topdir/SPECS/archoera-music.spec"
   # _rpmfilename 被 --define 重写后 rpm 将包输出到 RPMS/ 根目录（而非按 arch 分目录），
   # 用 find 兜底定位，避免路径假设（CI 曾因硬编码 RPMS/x86_64/ 失败）。
-  find "$topdir/RPMS" -name '*.rpm' -exec cp {} "$DIST/" \;
-  echo "→ $DIST/$(ls "$DIST" | grep '\.rpm$' | tail -1)"
+  # 统一命名为 <App>-v<ver>-<发行版>-x86_64.rpm（显著标识发行版；rpm 内部元数据不变）。
+  local src
+  src="$(find "$topdir/RPMS" -name '*.rpm' | head -1)"
+  cp "$src" "$DIST/$APP_NAME-v$version-${DISTRO_TAG}-x86_64.rpm"
+  echo "→ $DIST/$APP_NAME-v$version-${DISTRO_TAG}-x86_64.rpm"
 }
 
 # ── AppImage：通用便携 ────────────────────────────────────────────────
+# 关键：AppImage 要跨发行版运行，必须把构建机的动态依赖（GTK / FFmpeg /
+# TagLib 等）一并收拢进镜像。仅拷贝 bundle 时，引擎（FFmpeg）与 scraper
+# （TagLib）在 soname 不同的发行版上会加载失败。故用 linuxdeploy 收集依赖
+# 进 usr/lib 并改写 RUNPATH（构建机为 Ubuntu，故收拢的是 Ubuntu 库，任意
+# 发行版均可加载）。
 pkg_appimage() {
   local appdir="$stage/appimage/ArchoeraMusic.AppDir"
-  mkdir -p "$appdir/usr/lib/archoera-music" "$appdir/usr/share/metainfo" \
-    "$appdir/usr/share/icons"
-  cp -a "$stage_bundle/." "$appdir/usr/lib/archoera-music/"
-  # AppRun 在 AppDir 内启动真实二进制（/proc/self/exe 相对路径保持正确）
-  cat > "$appdir/AppRun" <<EOF
-#!/bin/sh
-exec "\$APPDIR/usr/lib/archoera-music/$BIN" "\$@"
-EOF
-  chmod +x "$appdir/AppRun"
-  sed "s|@EXEC@|AppRun %U|g" "$HERE/archoera-music.desktop.in" \
-    > "$appdir/ArchoeraMusic.desktop"
-  sed -i "s|Icon=awa.archoera.betastudio2.archoera_music|Icon=ArchoeraMusic|" \
-    "$appdir/ArchoeraMusic.desktop"
-  cp "$stage_icons/hicolor/512x512/apps/$APP_ID.png" "$appdir/ArchoeraMusic.png"
-  cp -a "$stage_icons/hicolor" "$appdir/usr/share/icons/hicolor"
+  mkdir -p "$appdir/usr/bin" "$appdir/usr/share/applications" \
+    "$appdir/usr/share/metainfo" \
+    "$appdir/usr/share/icons/hicolor/512x512/apps"
+  # 应用本体整份入 usr/bin（exe 相对定位 data/、native/ 不变）
+  cp -a "$stage_bundle/." "$appdir/usr/bin/"
+  chmod +x "$appdir/usr/bin/$BIN"
+
+  sed "s|@EXEC@|$BIN %U|g" "$HERE/archoera-music.desktop.in" \
+    > "$appdir/usr/share/applications/archoera-music.desktop"
+  cp "$stage_icons/hicolor/512x512/apps/$APP_ID.png" \
+    "$appdir/usr/share/icons/hicolor/512x512/apps/$APP_ID.png"
   install -m644 "$stage_metainfo" \
     "$appdir/usr/share/metainfo/$APP_ID.metainfo.xml"
+
+  # linuxdeploy 装配：收拢可执行文件与发行版敏感库的动态依赖，生成 AppRun。
+  # LINUXDEPLOY 由 CI 传入（linuxdeploy-x86_64.AppImage）；缺失时退化为纯拷贝
+  # （产物仅在构建机同系发行版可用，并打印告警）。
+  local ld="${LINUXDEPLOY:-}"
+  if [[ -n "$ld" && -x "$ld" ]]; then
+    local lib_args=()
+    for lib in libarchoera_mediaengine.so libarchoera_scraper.so; do
+      [[ -f "$appdir/usr/bin/native/$lib" ]] && \
+        lib_args+=(--library "$appdir/usr/bin/native/$lib")
+    done
+    "$ld" --appdir "$appdir" \
+      --executable "$appdir/usr/bin/$BIN" \
+      "${lib_args[@]}" \
+      --desktop-file "$appdir/usr/share/applications/archoera-music.desktop" \
+      --icon-file "$appdir/usr/share/icons/hicolor/512x512/apps/$APP_ID.png"
+  else
+    echo "警告: 未提供 LINUXDEPLOY，AppImage 不收拢依赖（仅构建机同系发行版可用）" >&2
+  fi
+
   # CI 无 FUSE：用 --appimage-extract-and-run 运行 appimagetool 本体。
   # type2 runtime 经 APPIMAGE_RUNTIME_FILE 预下载传入，避免每次打包联网
   # 下载（CI 网络抖动时 appimagetool 内置 libcurl 易 TLS 失败）。

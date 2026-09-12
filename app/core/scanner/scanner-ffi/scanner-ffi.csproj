@@ -59,6 +59,8 @@
        （flutter 测试、真机 bundle）加载 scanner-ffi 时均能在同目录解析
        libe_sqlite3。Windows 默认按模块目录解析，无需处理。 -->
   <ItemGroup>
+    <LinkerArg Include="-Wl,-z,origin"
+               Condition="$(RuntimeIdentifier.StartsWith('linux'))" />
     <LinkerArg Include="-Wl,-rpath,'$ORIGIN'"
                Condition="$(RuntimeIdentifier.StartsWith('linux'))" />
     <LinkerArg Include="-Wl,-rpath,@loader_path"

@@ -44,10 +44,15 @@
 - **Go 1.23+**：subsonic 服务端
 - **.NET SDK 10**：scanner / vault 的 NativeAOT publish
 - **FFmpeg 开发库**（`libavcodec`/`libavformat`/`libavutil`/`libswresample`）：
-  - Debian/Ubuntu：`sudo apt install ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev`
-  - Arch/EndeavourOS：`sudo pacman -S ffmpeg`（含开发头文件）
-  - Fedora：`sudo dnf install ffmpeg-devel`
-  - macOS：`brew install ffmpeg`
+  - 本地开发可直接用系统 FFmpeg：
+    - Debian/Ubuntu：`sudo apt install ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev`
+    - Arch/EndeavourOS：`sudo pacman -S ffmpeg`（含开发头文件）
+    - Fedora：`sudo dnf install ffmpeg-devel`
+    - macOS：`brew install ffmpeg`
+  - **发布/自包含构建（推荐，与 CI 一致）**：改用 `bash app/core/build-ffmpeg-minimal.sh`
+    自建**最小纯 LGPL** FFmpeg，再 `export PKG_CONFIG_PATH=$HOME/.local/ffmpeg-minimal/lib/pkgconfig`。
+    引擎只链自建库（内嵌后仅依赖 libc/libm/libz），跨发行版可运行，且满足 LGPL 合规。
+    ⚠️ **不要用 Homebrew 的 ffmpeg**（默认 `--enable-gpl`，违反 `THIRD-PARTY-LICENSES.md` 的 GPL 防火墙）。
   - Windows：依赖由 `app/vcpkg.json` 经 vcpkg（manifest 模式）安装，`build_windows.bat` 里缺头文件会自动
     install（`VCPKG_TARGET_TRIPLET=x64-windows-release`）
 
@@ -89,8 +94,10 @@ flutter build linux --release
 **产物位置**：`app/build/linux/x64/release/bundle/`
 - `archoera_music`（可执行文件）
 - `data/`（Flutter assets + icudtl）
-- `native/`：上表全部原生产物平铺（CMake 在构建时自动从各模块 `build/` 拷入，`libav*.so*` 也内嵌于此，
-  RUNPATH=$ORIGIN 优先解析，系统 FFmpeg 升级不影响）
+- `native/`：上表全部原生产物平铺（CMake 在构建时自动从各模块 `build/` 拷入）。发布构建另用
+  `bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle/native` 把 FFmpeg/TagLib 的
+  传递依赖闭包收进此处并加 `RUNPATH=$ORIGIN`，使产物不依赖目标发行版 soname；包内 `BUILD-INFO.txt`
+  记录构建目标/基线/最低 glibc。
 
 直接跑：
 ```bash
@@ -171,8 +178,9 @@ makepkg -f --skipinteg --nocheck --nodeps                      # 产出 *.pkg.ta
   排查可设 `ARCHOERA_NATIVE_DIR` 指向库目录。
 - **EraAudio 未启用**：`command -v zig` 为空或版本非 0.16 → 装好 0.16 后重跑
   `app/core/build-linux.sh`（它会先编译 Zig 内核）。
-- **audio-engine CMake 找不到 FFmpeg**：确认系统 FFmpeg 开发库已安装（`pkg-config` 能查到
-  `libavcodec` 等）。构建时会把所用 FFmpeg 运行库拷进 `audio-engine/build/ffmpeg/`。
+- **audio-engine CMake 找不到 FFmpeg**：确认 `pkg-config --modversion libavcodec` 能查到——用系统
+  FFmpeg 时装其开发库；用自建最小 FFmpeg 时确认已 `export PKG_CONFIG_PATH=$HOME/.local/ffmpeg-minimal/lib/pkgconfig`。
+  构建时会把所用 FFmpeg 运行库拷进 `audio-engine/build/ffmpeg/`（发布构建再由 `bundle-linux-runtime.sh` 收拢闭包）。
 - **scanner / vault NativeAOT 慢**：正常（全量 publish 需数分钟）；改 C# 后可用
   `dotnet build` 快速验证语法再跑 `build.sh`。
 - **Rust 首次编译慢 / 网络差**：依赖已进本地 `~/.cargo` registry；如需离线可对相应 crate 目录

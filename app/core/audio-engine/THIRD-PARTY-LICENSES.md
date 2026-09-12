@@ -30,7 +30,7 @@ miniaudio 播放 + Rust tempo + Zig 解码内核）。其**自研代码**随本�
 
 | 组件 | 版本 | 许可证 | 说明 |
 |---|---|---|---|
-| **FFmpeg**（libavformat/libavcodec/libavutil/libswresample） | 构建时锁定（Linux 内嵌运行库） | LGPL-2.1+（纯 LGPL 构建，无 GPL/nonfree） | 解码 / 重采样（`swr_convert`）。Linux/macOS 经 pkg-config 动态链接，运行库内嵌 `build/ffmpeg/`（RUNPATH=$ORIGIN 解耦系统 major bump）；Windows 经 vcpkg 由 `build_windows.bat` 构建 |
+| **FFmpeg**（libavformat/libavcodec/libavutil/libswresample） | 7.1.1（自建，`app/core/build-ffmpeg-minimal.sh`） | LGPL-2.1+（纯 LGPL 构建，无 GPL/nonfree） | 解码 / 重采样（`swr_convert`）。Linux/macOS 用自建**最小纯 LGPL** FFmpeg（`--disable-gpl --disable-nonfree --disable-autodetect`）动态链接，运行库随包内嵌（`RUNPATH=$ORIGIN`；macOS `@loader_path`），与系统 FFmpeg 解耦；Windows 经 vcpkg（默认无 gpl 特性）由 `build_windows.bat` 构建，DLL 随包分发 |
 | `miniaudio` | v0.11.25 | MIT-0 / 公有领域（Public Domain）双许可 | 跨平台音频输出（ALSA/PulseAudio/PipeWire/WASAPI/CoreAudio），`include/miniaudio.h` 单头文件 |
 | `signalsmith-stretch` | 0.1.3 | MIT | 变速变调（经 `tempo-rs` Rust staticlib `libaudio_tempo.a` 封装） |
 
@@ -43,15 +43,25 @@ miniaudio 播放 + Rust tempo + Zig 解码内核）。其**自研代码**随本�
 
 ## FFmpeg 特别声明（LGPL，动态链接）
 
-FFmpeg 以**动态库**形式链接（未静态合并），经构建配置确认所用为**纯 LGPL 构建**
+FFmpeg 以**动态库**形式链接（未静态合并），所用为**纯 LGPL 构建**
 （`CONFIG_GPL=0`、`CONFIG_NONFREE=0`），未启用任何 GPL/nonfree 外部编解码库。
+
+- **Linux / macOS**：不用系统 / Homebrew 的 FFmpeg（后者默认 `--enable-gpl`，
+  会破坏 AGPL-3.0 的「GPL 防火墙」），而是用 `app/core/build-ffmpeg-minimal.sh`
+  自建**最小纯 LGPL** 构建（`--disable-gpl --disable-nonfree --disable-autodetect`，
+  仅内部编解码器，只依赖 libc/libm/libz）；共享库随包内嵌并带 `RUNPATH=$ORIGIN`
+  （macOS 为 `@loader_path`），与系统 FFmpeg 版本完全解耦。
+- **Windows**：经 vcpkg 构建（默认特性不含 gpl/nonfree），运行时 DLL 随包分发到 exe 根。
 
 依据 LGPL-2.1，使用者享有以下权利：
 
-1. 获得 FFmpeg 对应源代码的自由（官方：https://ffmpeg.org/ ）；
-2. 以修改后的 FFmpeg 库替换运行时内嵌库（`native/` 下的 `libav*`）重新分发。
+1. 获得 FFmpeg 对应源代码的自由（官方：https://ffmpeg.org/ ；本仓库构建脚本
+   `app/core/build-ffmpeg-minimal.sh` 给出确切版本与配置）；
+2. 以修改后的 FFmpeg 库替换运行时内嵌库（Linux `native/`、macOS `Contents/native/`、
+   Windows exe 根下的 `libav*` / `av*`）重新分发。
 
-本仓库已随源码提供 FFmpeg 的使用/构建配置（`CMakeLists.txt`、`build_windows.bat`），
+本仓库随源码提供 FFmpeg 的使用/构建配置（`app/core/build-ffmpeg-minimal.sh`、
+`CMakeLists.txt`、`build_windows.bat`），并随包附许可文本（`licenses/`），
 满足 LGPL「可替换/可重链」要求。
 
 ## 自写播放器（miniaudio）
