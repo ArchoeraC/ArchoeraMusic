@@ -46,7 +46,9 @@
 #include <winrt/Windows.Media.Core.h>
 #include <winrt/Windows.Media.Playback.h>
 #include <winrt/Windows.Storage.Streams.h>
+#include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Notifications.h>
+#include <winrt/Windows.UI.ViewManagement.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 #endif
 
@@ -817,7 +819,26 @@ int32_t appInstanceAcquire() {
 }
 
 bool systemAccent(int32_t* r, int32_t* g, int32_t* b) {
-    // 1) DWM\AccentColor：DWORD 按 ABGR 存（0xAABBGGRR）→ R=低字节
+#ifdef ARCHOERA_WINRT
+    // 1) 官方 API：UISettings.GetColorValue(UIColorType::Accent)（返回 Windows.UI.Color）
+    try {
+        try {
+            winrt::init_apartment(winrt::apartment_type::multi_threaded);
+        } catch (...) {
+        }
+        winrt::Windows::UI::ViewManagement::UISettings settings;
+        const auto color = settings.GetColorValue(
+            winrt::Windows::UI::ViewManagement::UIColorType::Accent);
+        if (color.A != 0 || color.R != 0 || color.G != 0 || color.B != 0) {
+            if (r != nullptr) *r = static_cast<int32_t>(color.R);
+            if (g != nullptr) *g = static_cast<int32_t>(color.G);
+            if (b != nullptr) *b = static_cast<int32_t>(color.B);
+            return true;
+        }
+    } catch (...) {
+    }
+#endif
+    // 2) 注册表 DWM\AccentColor：DWORD 按 ABGR 存（0xAABBGGRR）→ R=低字节
     DWORD v = 0;
     if (readDwmDword(L"AccentColor", &v)) {
         if (r != nullptr) *r = static_cast<int32_t>(v & 0xFF);
@@ -825,7 +846,7 @@ bool systemAccent(int32_t* r, int32_t* g, int32_t* b) {
         if (b != nullptr) *b = static_cast<int32_t>((v >> 16) & 0xFF);
         return true;
     }
-    // 2) 回退：DWM 着色色（0xAARRGGBB）
+    // 3) 回退：DWM 着色色（0xAARRGGBB）
     DWORD c = 0;
     BOOL blend = FALSE;
     if (::DwmGetColorizationColor(&c, &blend) == S_OK && c != 0) {
