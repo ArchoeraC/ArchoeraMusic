@@ -605,7 +605,8 @@ jobs:
       - name: Install system dependencies
         run: |
           pacman -Sy --noconfirm --needed \
-            base-devel git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
+            base-devel fakeroot debugedit \
+            git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
             cmake ninja clang pkgconf patchelf nasm \
             taglib curl openssl sqlite nlohmann-json \
             gtk3 dbus libayatana-appindicator
