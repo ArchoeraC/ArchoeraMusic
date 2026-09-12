@@ -507,23 +507,21 @@ jobs:
   # 要求的地板）上从源码构建，产出单独的 .deb（DISTRO_TAG=deepin）。若仍无法在
   # Deepin 运行且不可解决，则放弃该 job 与 Deepin 支持。
   linux-deepin:
-    name: Linux deb (Deepin 23)
+    name: Linux deb (Deepin 25)
     runs-on: ubuntu-24.04
-    # 在真·Deepin 23 容器内构建（官方 linuxdeepin/beige，Debian bookworm 系，
-    # glibc 2.35）：产物覆盖 Deepin 23/25。不用 Ubuntu 24.04 包硬塞——其
-    # GLIBC_2.36 需求超过 Deepin 23 的 2.35，会加载失败。
-    container: linuxdeepin/beige
+    # 在官方 Deepin 25 容器内构建（linuxdeepin/deepin:25，merged-/usr，glibc 2.38）。
+    # 注意：Deepin 的 beige(23)/crimson(25) 仓库现在都发 glibc 2.38，故本产物
+    # 最低 glibc=2.38，**仅适用 Deepin 25 及更新系统**——文件名/包描述/BUILD-INFO
+    # 均明确标注。旧 Deepin 23（glibc 2.35）需另用低基线（如 debian:11）构建。
+    container: linuxdeepin/deepin:25
     env:
-      BUILD_BASE: deepin-23
+      BUILD_BASE: deepin-25
     steps:
       - name: Install system dependencies
         run: |
-          # 镜像（2023 Deepin 23 rootfs）非 merged-/usr，而仓库 libc6 已升到 2.38，
-          # dpkg 解包会以「unsupported, install usrmerge」拒绝 → 先合并 /usr。
-          # 仓库指向本镜像对应的 beige(23) 而非默认的 crimson(25)。
-          echo "deb https://community-packages.deepin.com/beige/ beige main commercial community" > /etc/apt/sources.list
+          # 该镜像未预置 apt 源；指向 Deepin 25(crimson) 仓库后安装构建依赖。
+          echo "deb https://community-packages.deepin.com/beige/ crimson main commercial community" > /etc/apt/sources.list
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y usrmerge
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates build-essential cmake ninja-build pkg-config clang sudo \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
@@ -535,17 +533,18 @@ jobs:
         run: git config --global --add safe.directory '*'
       - uses: ./.github/actions/build-linux
         with:
-          cache_key_suffix: deepin23
+          cache_key_suffix: deepin25
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
           VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
-      - name: Package .deb (Deepin)
+      - name: Package .deb (Deepin 25)
         run: bash packaging/linux/package.sh deb app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
         env:
-          DISTRO_TAG: deepin
+          DISTRO_TAG: deepin25
+          DISTRO_NOTE: 仅 Deepin 25（glibc 2.38）；其它发行版请安装对应包
       - name: Upload packages artifact
         uses: actions/upload-artifact@v4
         with:
