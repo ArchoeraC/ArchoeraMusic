@@ -15,6 +15,7 @@
 4、修了封面配色：偏白 / 近中性的封面不再被系统调色盘放大成奇怪的颜色，纯灰封面也能保留本色
 5、macOS 的媒体键暂时还没真机验证（我没 Mac 嘛 qwq），开了个 issue 长期跟踪（#1），有 Mac 的朋友欢迎帮忙喵
 6、系统强调色改用各平台官方接口（Linux 走 XDG Desktop Portal、Windows 走 `UISettings`、macOS 走 `controlAccentColor`），跨桌面环境更稳啦
+7、修好了系统通知：**安装版**会在开始菜单建带 AppUserModelID 的快捷方式（Windows Toast 的前提，以前根本发不出来），macOS 换用新的 `UNUserNotificationCenter`（旧的 `NSUserNotification` 已废弃）；**便携版不建任何快捷方式**，保持无痕
 
 嗯……搬完家让我躺一会……
 
