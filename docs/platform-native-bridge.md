@@ -77,6 +77,20 @@ app/native/platform/
 在打包前调用。Windows 需 C++/WinRT 头（`-DCPPWINRT_INCLUDE=` 或 vcpkg cppwinrt），
 缺失时自动降级（SMTC 禁用、Toast 走 MessageBox）。
 
+### 平台与架构支持（2026-09-12 决策）
+
+| 平台 | 支持架构 | 说明 |
+|---|---|---|
+| Windows | **x64 / Arm64** | Flutter 官方仅 x64/Arm64，**不支持 32 位 x86** → 不提供 |
+| Linux | x64 / Arm64 | |
+| macOS | **arm64**（默认） | 主二进制为 universal（x86_64+arm64），但 `native/` FFI 库仅 arm64 |
+
+- **Windows 32 位（x86）**：Flutter 平台限制（无 32 位构建），**放弃**。
+- **macOS Intel（x86_64）**：Flutter 仍支持且 app 主二进制已 universal，但原生模块需
+  universal 化（CMake 加 `CMAKE_OSX_ARCHITECTURES`、Rust/Go 用 `lipo`、.NET NativeAOT
+  单架构需分别 publish 再合）；叠加 Apple/Flutter 正在弃用 Intel，**暂时放弃**
+  （如需支持单开专项）。
+
 ## 3. C ABI（`include/archoera_platform.h` 草案）
 
 ### 3.1 基础约定
