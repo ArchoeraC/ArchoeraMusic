@@ -87,13 +87,64 @@ winrt::hstring H(const char* data, int32_t len) {
     return winrt::to_hstring(std::string_view(data, static_cast<size_t>(len)));
 }
 
-// 诊断日志（DebugView 可见）；HRESULT 以 0x%08X 输出。
-void log(const char* msg) { ::OutputDebugStringA(msg); }
+// 诊断日志：同时写 OutputDebugStringA（DebugView）与日志文件（免工具）。
+// 文件优先 exe 同级 `archoera_smtc.log`（易找），不可写则退回 %TEMP%。
+// 注意：路径用 POD `char[]` 全局，**不用 std::string / 函数局部静态**——后者的
+// 非平凡析构会注册 __cxa_atexit，牵连 CRT 终止符号（__vcrt_*/__acrt_*）链接失败。
+char g_log_path[MAX_PATH] = {0};
+
+void initLogPath() {
+    if (g_log_path[0] != 0) return;
+    char exe[MAX_PATH];
+    if (::GetModuleFileNameA(nullptr, exe, MAX_PATH) > 0) {
+        char* slash = nullptr;
+        for (char* p = exe; *p; ++p) {
+            if (*p == '\\' || *p == '/') slash = p;
+        }
+        if (slash != nullptr) {
+            *slash = 0;
+            std::snprintf(g_log_path, MAX_PATH, "%s\\archoera_smtc.log", exe);
+            FILE* f = nullptr;
+            if (::fopen_s(&f, g_log_path, "a") == 0 && f != nullptr) {
+                std::fclose(f);
+                return;
+            }
+        }
+    }
+    char tmp[MAX_PATH];
+    const DWORD n = ::GetTempPathA(MAX_PATH, tmp);
+    if (n > 0 && n < MAX_PATH) {
+        std::snprintf(g_log_path, MAX_PATH, "%sarchoera_smtc.log", tmp);
+    }
+}
+
+void logRaw(const char* line) {
+    ::OutputDebugStringA(line);
+    if (g_log_path[0] == 0) initLogPath();
+    if (g_log_path[0] == 0) return;
+    FILE* f = nullptr;
+    if (::fopen_s(&f, g_log_path, "a") != 0 || f == nullptr) return;
+    SYSTEMTIME st;
+    ::GetLocalTime(&st);
+    std::fprintf(f, "[%02d:%02d:%02d.%03d] %s\n", st.wHour, st.wMinute,
+                 st.wSecond, st.wMilliseconds, line);
+    std::fclose(f);
+}
+
+void log(const char* msg) { logRaw(msg); }
 void logHr(const char* prefix, int32_t hr) {
     char buf[160];
     std::snprintf(buf, sizeof(buf), "%s hr=0x%08X", prefix,
                   static_cast<unsigned>(hr));
-    ::OutputDebugStringA(buf);
+    logRaw(buf);
+}
+
+// 每次 init 清空日志（只保留本次会话）。
+void logReset() {
+    initLogPath();
+    if (g_log_path[0] == 0) return;
+    FILE* f = nullptr;
+    if (::fopen_s(&f, g_log_path, "w") == 0 && f != nullptr) std::fclose(f);
 }
 
 void SetThumbnailFromBytes(const uint8_t* bytes, int32_t len) {
@@ -141,6 +192,7 @@ void SetThumbnailFromUri(winrt::hstring const& url) {
 extern "C" int32_t apl_smtc_win_init(void* hwnd) {
     auto& s = state();
     if (s.initialized) return 0;
+    logReset();
     if (hwnd == nullptr) {
         log("apl/smtc: init hwnd=null");
         return -1;
