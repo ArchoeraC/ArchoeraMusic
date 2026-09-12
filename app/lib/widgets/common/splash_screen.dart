@@ -12,14 +12,13 @@ part 'splash_screen/splash_screen_widgets.dart';
 
 /// 启动动画（品牌 Splash）。
 ///
-/// 布局参照 SPlayer-Next（`index.html` 的 splash）：
-/// - **居中**：Logo（主色辉光，弹出式淡入/上滑/`easeOutBack` 放大）+ 品牌名；
-/// - **底部 64px**：3 颗脉冲加载圆点；
-/// - **最底 28px**：小字（版权 + Powered By）——放在**窗口底部**。
-///
-/// 自有元素：Logo 周围扩散的**涟漪环**（呼应播放页水纹背景）、品牌名逐字浮现。
-/// 由外层 [SplashGate] 控制淡出；性能模式（`disableAnimations`）下全部动画
-/// 停掉、呈现静态画面（省 CPU/电量）。
+/// 动效：
+/// - Logo（[AppLogo]）：**弹出式**——淡入 + 上滑 + `easeOutBack` 放大过冲；
+/// - 品牌名：**文字上下特效**——逐字从下方浮现（错开节奏），
+///   显示后整行缓慢上下浮动（呼吸）；
+/// - 副标语延迟上滑渐显；3 颗脉冲加载圆点（loading 指示）。
+/// 背景为深色氛围 + 主色径向光晕（静态）。由外层 [SplashGate] 控制淡出；
+/// 引擎加载期的静态覆盖见 `linux/runner/my_application.cc`。
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -47,12 +46,6 @@ class _SplashScreenState extends State<SplashScreen>
     duration: const Duration(milliseconds: 2600),
   );
 
-  /// Logo 涟漪环扩散（2.4s 循环）。
-  late final AnimationController _ripple = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2400),
-  );
-
   /// 动画是否已启动（build 中一次性启动）。
   ///
   /// 性能模式判断（MediaQuery.maybeDisableAnimationsOf）属于依赖查询，
@@ -70,7 +63,6 @@ class _SplashScreenState extends State<SplashScreen>
       _pulse.repeat();
       _intro.forward();
       _float.repeat(reverse: true);
-      _ripple.repeat();
     }
   }
 
@@ -79,7 +71,6 @@ class _SplashScreenState extends State<SplashScreen>
     _pulse.dispose();
     _intro.dispose();
     _float.dispose();
-    _ripple.dispose();
     super.dispose();
   }
 
