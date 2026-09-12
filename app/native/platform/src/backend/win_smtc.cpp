@@ -53,6 +53,16 @@ ISystemMediaTransportControlsInterop : public ::IUnknown {
                                                    void** ppv) = 0;
 };
 
+// ISystemMediaTransportControls {99FA3FF4-1742-42A6-902E-087D41F965EC}。
+// GetForWindow 的 riid 用**显式 IID**（与旧 Zig 实现一致），不依赖 guid_of 的
+// 默认接口推断——后者在真机上曾于 MediaControl.dll 内 0xC0000005。
+constexpr GUID kIID_SMTC = {
+    0x99FA3FF4,
+    0x1742,
+    0x42A6,
+    {0x90, 0x2E, 0x08, 0x7D, 0x41, 0xF9, 0x65, 0xEC},
+};
+
 struct State {
     SystemMediaTransportControls controls{nullptr};
     SystemMediaTransportControlsDisplayUpdater updater{nullptr};
@@ -242,10 +252,15 @@ extern "C" int32_t apl_smtc_win_init(void* hwnd) {
         auto interop = winrt::get_activation_factory<ISystemMediaTransportControlsInterop>(
             L"Windows.Media.SystemMediaTransportControls");
         log("apl/smtc: interop ok");
+        {
+            char hb[128];
+            std::snprintf(hb, sizeof(hb), "apl/smtc: hwnd=%p", hwnd);
+            logRaw(hb);
+        }
         SystemMediaTransportControls controls{nullptr};
         winrt::check_hresult(interop->GetForWindow(
             reinterpret_cast<HWND>(hwnd),
-            winrt::guid_of<SystemMediaTransportControls>(),
+            kIID_SMTC,
             winrt::put_abi(controls)));
         log("apl/smtc: GetForWindow ok");
         s.controls = controls;
