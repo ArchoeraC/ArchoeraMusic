@@ -66,12 +66,19 @@ struct State {
     IAsyncOperation<uint32_t> icon_op{nullptr};
 };
 
-State& state() {
-    // 不泄漏：正常退出路径会先经 apl_smtc_win_deinit() 清空全部 WinRT 成员
-    // （见 backend.shutdown ← apl_shutdown），故进程退出时的静态析构为平凡操作，
-    // 不会晚于 COM uninit 去 Release WinRT 对象。
-    static State s;
+// 指针静态（平凡析构）：**刻意不用函数局部 `static State`**——其非平凡析构会
+// 注册 `__cxa_atexit`，进而引入 CRT 终止符号（`__vcrt_*` / `__acrt_*`），而
+// Zig 的 windows-msvc C++ 链接不提供这些库 → LNK 未解析。实例由 init 惰性分配、
+// deinit 显式 `delete`：主动清理、不泄漏，也不触发静态析构注册。
+State*& state_slot() {
+    static State* s = nullptr;
     return s;
+}
+
+State& state() {
+    State*& s = state_slot();
+    if (s == nullptr) s = new State();
+    return *s;
 }
 
 winrt::hstring H(const char* data, int32_t len) {
@@ -92,12 +99,15 @@ void SetThumbnailFromBytes(const uint8_t* bytes, int32_t len) {
         s.icon_stream = stream;
         s.icon_writer = writer;
         s.icon_op = op;
-        op.Completed([&s, stream](IAsyncOperation<uint32_t> const&, AsyncStatus status) {
-            if (status != AsyncStatus::Completed || !s.updater) return;
+        op.Completed([stream](IAsyncOperation<uint32_t> const&, AsyncStatus status) {
+            if (status != AsyncStatus::Completed) return;
+            // 完成时经 state_slot() 取当前实例：deinit 后为 null，避免悬垂引用。
+            State*& sp = state_slot();
+            if (sp == nullptr || !sp->updater) return;
             try {
                 auto ref = RandomAccessStreamReference::CreateFromStream(stream);
-                s.updater.Thumbnail(ref);
-                s.updater.Update();
+                sp->updater.Thumbnail(ref);
+                sp->updater.Update();
             } catch (...) {
             }
         });
@@ -260,8 +270,9 @@ extern "C" void apl_smtc_win_set_playback(int32_t playback_state,
 }
 
 extern "C" void apl_smtc_win_deinit() {
-    auto& s = state();
-    if (!s.initialized) return;
+    State*& sp = state_slot();
+    if (sp == nullptr || !sp->initialized) return;
+    State& s = *sp;
     try {
         if (s.button_registered && s.controls) {
             s.controls.ButtonPressed(s.button_token);
@@ -279,29 +290,33 @@ extern "C" void apl_smtc_win_deinit() {
     s.controls = nullptr;
     s.duration_ms = 0;
     s.initialized = false;
+    // 主动释放实例（不泄漏）；下次 init 重新分配。
+    delete sp;
+    sp = nullptr;
 }
 
 // 诊断（win_smoke / 真机读回校验）。
 extern "C" int32_t apl_smtc_win_debug_playback_status() {
-    auto& s = state();
-    if (!s.controls) return -1;
+    State*& sp = state_slot();
+    if (sp == nullptr || !sp->controls) return -1;
     try {
-        return static_cast<int32_t>(s.controls.PlaybackStatus());
+        return static_cast<int32_t>(sp->controls.PlaybackStatus());
     } catch (...) {
         return -1;
     }
 }
 
 extern "C" int32_t apl_smtc_win_debug_is_enabled() {
-    auto& s = state();
-    if (!s.controls) return -1;
+    State*& sp = state_slot();
+    if (sp == nullptr || !sp->controls) return -1;
     try {
-        return s.controls.IsEnabled() ? 1 : 0;
+        return sp->controls.IsEnabled() ? 1 : 0;
     } catch (...) {
         return -1;
     }
 }
 
 extern "C" int32_t apl_smtc_win_debug_button_registered() {
-    return state().button_registered ? 1 : 0;
+    State*& sp = state_slot();
+    return (sp != nullptr && sp->button_registered) ? 1 : 0;
 }

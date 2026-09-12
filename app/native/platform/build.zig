@@ -59,6 +59,11 @@ pub fn build(b: *std.Build) void {
             });
             lib.root_module.addIncludePath(.{ .cwd_relative = inc });
             lib.root_module.linkSystemLibrary("windowsapp", .{});
+            // C++/WinRT 的 C++ 运行时初始化（__vcrt_*/__acrt_*）：Zig 的 `-lc`
+            // 只链 msvcrt，不链 vcruntime/ucrt → 含 C++ 静态初始化/异常处理的
+            // 目标会报 CRT 初始化符号未解析（见 win_smtc.cpp）。
+            lib.root_module.linkSystemLibrary("vcruntime", .{});
+            lib.root_module.linkSystemLibrary("ucrt", .{});
         }
     }
     b.installArtifact(lib);
