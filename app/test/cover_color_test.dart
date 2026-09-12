@@ -82,7 +82,7 @@ void main() {
     expect(color!.toARGB32() & 0xFFFFFF, isNot(0), reason: '非黑');
   });
 
-  testWidgets('单调灰封面返回 null（回退默认色）', (tester) async {
+  testWidgets('单调灰封面保持近中性（不再判无效）', (tester) async {
     late final String path;
     await tester.runAsync(() async {
       path = await _writeCover((x, y) => 0xFF808080);
@@ -90,6 +90,23 @@ void main() {
     final color = await tester.runAsync(
       () => extractDominantColor('file://$path'),
     );
-    expect(color, isNull);
+    expect(color, isNotNull, reason: '纯灰封面也应出基色（近中性），不判无效');
+    final hct = Hct.fromInt(color!.toARGB32());
+    expect(hct.chroma, lessThan(2), reason: '纯灰保持近中性');
+    expect(hct.tone, inInclusiveRange(28, 72));
+  });
+
+  testWidgets('偏色灰封面采用其色相（低色度门槛 _minChroma=2）', (tester) async {
+    late final String path;
+    await tester.runAsync(() async {
+      path = await _writeCover((x, y) => 0xFF807C88); // 略偏紫的灰
+    });
+    final color = await tester.runAsync(
+      () => extractDominantColor('file://$path'),
+    );
+    expect(color, isNotNull);
+    final hct = Hct.fromInt(color!.toARGB32());
+    expect(hct.chroma, greaterThanOrEqualTo(2), reason: '偏色灰应保留色相并抬到可用色度');
+    expect(hct.tone, inInclusiveRange(28, 72));
   });
 }

@@ -20,8 +20,14 @@ const int _sampleSize = 64;
 /// 封面边缘留白（跳过四周装饰/边框干扰）。
 const int _edgeMargin = 3;
 
-/// 候选桶最低色度（HCT chroma，对齐原版 MIN_COVER_CHROMA=8）。
-const double _minChroma = 8;
+/// 候选桶最低色度（HCT chroma）。取 2：封面只要有一点点偏色（偏暖/偏冷的灰）
+/// 就采用其色相；真正无色相（chroma≈0）时才保持近中性。
+const double _minChroma = 2;
+
+/// 「近中性/噪声」色度阈值：低于此值视为量化/HCT 噪声（如偏白封面的轻微冷色），
+/// 基色**中性化**（chroma 0）。否则 `ColorScheme.fromSeed` 会把这点噪声色度
+/// 放大成突兀的彩色方案（偏白封面出青色）。真实偏色（≥ 此值）才保留。
+const double _neutralChroma = 6;
 
 /// 彩色区域至少覆盖该比例，避免少量点缀色覆盖大面积中性色
 /// （对齐原版 MIN_COLORFUL_POPULATION_RATIO=0.12）。
@@ -140,7 +146,9 @@ int? _pickFromQuantized(Map<int, int> colorToCount) {
     }
   }
   if (colorful.isEmpty || colorfulCount / total < _minColorfulRatio) {
-    return null;
+    // 没有足够彩色（纯灰/近灰，或彩色仅少量点缀）：**不再判无效**，
+    // 回退到最多数色——保留封面本色（多为中性 → 近中性基色）。
+    return _mostPopulous(colorToCount);
   }
   final maxCount = colorful.values.reduce(math.max);
   int? best;
@@ -160,13 +168,28 @@ int? _pickFromQuantized(Map<int, int> colorToCount) {
   return best;
 }
 
+/// 最多数色（保底：无彩色候选时用，保留封面主色调）。
+int _mostPopulous(Map<int, int> colorToCount) {
+  var best = colorToCount.keys.first;
+  var bestCount = -1;
+  for (final e in colorToCount.entries) {
+    if (e.value > bestCount) {
+      bestCount = e.value;
+      best = e.key;
+    }
+  }
+  return best;
+}
+
 /// 把代表色约束到适合作为背景基色的范围（对齐原版 toCoverBaseColor）：
-/// 在 HCT 空间把色调收敛到 [28,72]、色度收敛到 [12,64]，保持色相不变。
-/// 浅色封面（高 tone）会被压到 72 以内，深色封面抬到 28，均得到可读基色。
+/// 在 HCT 空间保持色相，色调收敛到 [28,72]。
+/// 色度：低于 [_neutralChroma] 视为噪声 → **中性化**（0），避免 fromSeed 放大成
+/// 突兀彩色；否则保留本色度（上限 64），不额外放大。
 Color _toCoverBaseColor(int argb) {
   final hct = Hct.fromInt(argb);
   final tone = hct.tone.clamp(28.0, 72.0).toDouble();
-  final chroma = hct.chroma.clamp(12.0, 64.0).toDouble();
+  final chroma =
+      hct.chroma < _neutralChroma ? 0.0 : math.min(hct.chroma, 64.0);
   final out = Hct.from(hct.hue, chroma, tone).toInt();
   return Color(0xFF000000 | (out & 0xFFFFFF));
 }
