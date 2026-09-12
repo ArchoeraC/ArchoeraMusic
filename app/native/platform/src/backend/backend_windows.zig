@@ -7,7 +7,8 @@
 //! P3a（本文件当前）：防休眠抑制（SetThreadExecutionState，专用常驻线程）+
 //! 熄屏检测（PowerSettingRegisterNotification DEVICE_NOTIFY_CALLBACK）+
 //! 窗口状态（子类化 Flutter 顶层 WndProc）。
-//! P3b（待做）：WinRT SMTC（COM vtable 直调）—— 本机无法真机验收，独立推进。
+//! P3b（已落地）：WinRT SMTC（`win_smtc.cpp`，C++/WinRT 标准委托；`win_smtc.zig`
+//! 薄转发 + `core.dispatch` → Dart）。
 //!
 //! 本文件仅在 `builtin.os.tag == .windows` 时被 backend.zig 引用（惰性分析）。
 //! Win32 声明全部手动（win_common.zig），不依赖 @cImport/Windows SDK 头。
@@ -310,9 +311,9 @@ pub fn windowSetEvents(on: i32) i32 {
 pub fn mediaSetTrack(meta: ?*const core.TrackMeta) i32 {
     if (smtc.init(&findFlutterWindow) != core.OK) return core.ERR_BACKEND;
     if (meta) |m| {
-        smtc.setTrack(m.title.slice(), m.artist.slice(), m.art_url.slice(), m.duration_ms, m.art_bytes.slice());
+        smtc.setTrack(m.title.slice(), m.artist.slice(), m.album.slice(), m.art_url.slice(), m.duration_ms, m.art_bytes.slice());
     } else {
-        smtc.setTrack(null, null, null, -1, null);
+        smtc.setTrack(null, null, null, null, -1, null);
     }
     return core.OK;
 }

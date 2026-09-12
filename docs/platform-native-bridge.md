@@ -27,7 +27,7 @@ Dart（app/lib/services/platform/）
 Zig 原生模块（app/native/platform/ → libarchoera_platform.*）
   core.zig        生命周期 / 能力位图 / 事件汇聚线程 → Dart 回调
   backend_linux.zig     自研 D-Bus（传输+编组）→ ScreenSaver + MPRIS
-  backend_windows.zig   SetThreadExecutionState + WinRT SMTC（COM vtable 直调）
+  backend_windows.zig   SetThreadExecutionState + SMTC（win_smtc.cpp，C++/WinRT）
   backend_macos.zig     NSProcessInfo + MPRemoteCommandCenter / MPNowPlayingInfoCenter
         │  （ObjC runtime / dispatch_async 经 dlopen libSystem）
         ▼
@@ -530,6 +530,37 @@ COWAIT_DISPATCH_WINDOW_MESSAGES)` 泵消息，不再 `Sleep`。交叉编译通�
 - http 封面：`Windows.Foundation.Uri` → `CreateFromUri`（同步；文档只支持
   http/https/ms-appx/ms-appdata，故本地不能走 Uri）。
 - `refFromFile`（`GetFileFromPathAsync` + 泵消息）已删除。
+
+### 7.10 Windows SMTC 改 C++/WinRT 标准委托 + AppUserModelID（2026-09-12）
+
+现象：Windows 媒体浮出面板能显示曲目/封面，但播放/上下首/停止与蓝牙耳机 AVRCP
+按键全无响应。
+
+根因（两条，均在 7.4/7.6/7.7 手写 COM 委托之外残留）：
+
+- `apl_init()` **从未调用 `backend.init()`** → `SetCurrentProcessExplicitAppUserModelID`
+  与 macOS `MPRemoteCommand` 注册实际从未执行；AUMID 缺失使媒体键路由/会话识别不稳。
+- `ButtonPressed` 用 Zig 手写 4 槽 COM 委托 + 自研 `IMarshal` 包装。即便 QI 策略修对，
+  真机上 `add_ButtonPressed` 返回 `S_OK` 但事件仍不回调（事件源跨 apartment 封送）。
+
+修复（对齐 Chromium `components/system_media_controls/win/system_media_controls_win.cc`）：
+
+- 新增 `app/native/platform/src/backend/win_smtc.cpp`：C++/WinRT 标准委托投影
+  （`SystemMediaTransportControls.ButtonPressed(TypedEventHandler<…>)`）注册按钮事件，
+  并实现 `GetForWindow` + `DisplayUpdater` + `ISystemMediaTransportControls2`
+  时间轴/`PlaybackRate` + 内存流缩略图（对齐 Chromium `SetThumbnail`）。仅在
+  `-Dcppwinrt-include` 提供时编译（与 `win_toast.cpp` 同一开关）。
+- `win_smtc.zig` 改为**薄转发层**：正向 `init/setTrack/setPlayback/deinit` →
+  `apl_smtc_win_*`；反向导出 `apl_smtc_on_button`，把 C++ 按钮回调经 `core.dispatch`
+  转发 Dart（保持「Flutter 桥接层 + Zig 转发」架构）。未编译 C++ 时弱符号兜底
+  （SMTC 静默禁用、不崩）。
+- `apl_init()` 调 `backend.init()`：Windows 设 AUMID、macOS 注册远程命令。
+- `windows/runner/main.cpp` 在建窗**之前**设 `SetCurrentProcessExplicitAppUserModelID`
+  （任务栏分组/媒体键路由需早于首个窗口）。
+- 按钮映射：Windows `Play/Pause/Stop/Next/Previous` → `core.CMD_*`；时间轴 +
+  `PlaybackRate` 让系统把本会话视为**活动会话**（蓝牙 AVRCP/媒体键按活动会话路由）。
+- 兜底保留：`backend_windows.zig` 的 `WM_APPCOMMAND` 子类化（SMTC 非活动会话时的
+  前台退化通路）。
 
 ## 8. 风险与对策
 

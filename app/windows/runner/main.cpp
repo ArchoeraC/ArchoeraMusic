@@ -5,6 +5,9 @@
 #include "flutter_window.h"
 #include "utils.h"
 
+// SetCurrentProcessExplicitAppUserModelID（shell32；shobjidl_core.h 声明）。
+extern "C" HRESULT __stdcall SetCurrentProcessExplicitAppUserModelID(PCWSTR app_id);
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
   // Attach to console when present (e.g., 'flutter run') or create a
@@ -12,6 +15,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
     CreateAndAttachConsole();
   }
+
+  // 显式 AppUserModelID：Win11 媒体浮出/任务栏分组/媒体键（含蓝牙 AVRCP）
+  // 路由更稳。须在创建任何窗口前设置。
+  ::SetCurrentProcessExplicitAppUserModelID(L"Archoera.ArchoeraMusic");
 
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
