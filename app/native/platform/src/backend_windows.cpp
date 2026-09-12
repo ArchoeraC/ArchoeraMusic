@@ -381,20 +381,63 @@ constexpr GUID kIidSmtc = {
     0x42A6,
     {0x90, 0x2E, 0x08, 0x7D, 0x41, 0xF9, 0x65, 0xEC}};
 
-// SMTC 需与顶层窗口关联（GetForWindow）。用调用线程自建的隐藏窗口（对齐
-// Chromium gfx::SingletonHwnd），避免与 Flutter 主窗口及其子类化 WndProc 交互。
-HWND hiddenWindow() {
-    static HWND s_hwnd = nullptr;
-    if (s_hwnd != nullptr) return s_hwnd;
+// SMTC 需与顶层窗口关联（GetForWindow）。**关键**：GetForWindow 要求目标窗口的
+// 所属线程会泵消息（内部向窗口线程投递并等待）——若窗口建在调用线程上，而该
+// 线程正阻塞在此调用中（Dart FFI 线程）→ 真机死锁（日志停在 hwnd=... 后不再前进）。
+// 故把隐藏窗口放到**专用消息泵线程**（对齐 Chromium gfx::SingletonHwnd：窗口与
+// SMTC 调用可分属不同线程，只要窗口线程在泵消息）。HWND 为 POD，无静态析构。
+struct HiddenWndState {
+    std::atomic<HWND> hwnd{nullptr};
+    std::atomic<bool> quit{false};
+    std::thread* thread = nullptr;
+    DWORD thread_id = 0;
+};
+HiddenWndState g_hidden;
+
+void hiddenWndThreadMain() {
+    ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     constexpr wchar_t kClass[] = L"ArchoeraMusicSmtcHiddenWnd";
     WNDCLASSW wc = {};
     wc.lpfnWndProc = ::DefWindowProcW;
     wc.hInstance = ::GetModuleHandleW(nullptr);
     wc.lpszClassName = kClass;
     ::RegisterClassW(&wc);
-    s_hwnd = ::CreateWindowExW(0, kClass, L"", WS_OVERLAPPED, 0, 0, 0, 0,
-                               nullptr, nullptr, wc.hInstance, nullptr);
-    return s_hwnd;
+    HWND hwnd = ::CreateWindowExW(0, kClass, L"", WS_OVERLAPPED, 0, 0, 0, 0,
+                                  nullptr, nullptr, wc.hInstance, nullptr);
+    g_hidden.thread_id = ::GetCurrentThreadId();
+    g_hidden.hwnd.store(hwnd, std::memory_order_release);
+    MSG msg;
+    while (!g_hidden.quit.load(std::memory_order_acquire) &&
+           ::GetMessageW(&msg, nullptr, 0, 0) > 0) {
+        ::TranslateMessage(&msg);
+        ::DispatchMessageW(&msg);
+    }
+    ::CoUninitialize();
+}
+
+HWND hiddenWindow() {
+    HWND existing = g_hidden.hwnd.load(std::memory_order_acquire);
+    if (existing != nullptr) return existing;
+    g_hidden.thread = new std::thread(hiddenWndThreadMain);
+    for (int i = 0; i < 500; i++) {
+        HWND h = g_hidden.hwnd.load(std::memory_order_acquire);
+        if (h != nullptr) return h;
+        ::Sleep(10);
+    }
+    log("apl/smtc: hidden window thread timeout");
+    return nullptr;
+}
+
+void destroyHiddenWindow() {
+    if (g_hidden.thread == nullptr) return;
+    g_hidden.quit.store(true, std::memory_order_release);
+    if (g_hidden.thread_id != 0) {
+        ::PostThreadMessageW(g_hidden.thread_id, WM_QUIT, 0, 0);
+    }
+    if (g_hidden.thread->joinable()) g_hidden.thread->join();
+    delete g_hidden.thread;
+    g_hidden.thread = nullptr;
+    g_hidden.hwnd.store(nullptr, std::memory_order_release);
 }
 
 struct State {
@@ -668,6 +711,7 @@ void deinit() {
     s.initialized = false;
     delete sp;
     sp = nullptr;
+    destroyHiddenWindow();
 }
 
 }  // namespace winrt_smtc
