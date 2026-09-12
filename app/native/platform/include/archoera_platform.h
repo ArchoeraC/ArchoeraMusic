@@ -96,7 +96,7 @@ APL_API int32_t apl_instance_acquire(void);
 /* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
 APL_API int32_t apl_notify(const char *title, const char *body);
 
-/* 系统主题色（DE accent）：0=成功并写 *r/*g/*b(0-255)；<0=不可得。 */
+/* 系统主题色（DE accent）：0=成功并写 r/g/b（0-255）；<0=不可得。 */
 APL_API int32_t apl_system_accent(int32_t *r, int32_t *g, int32_t *b);
 
 /* 订阅系统主题色变更：变更时回调事件 APL_EVENT_SYSTEM_ACCENT（无载荷）。 */

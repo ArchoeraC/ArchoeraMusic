@@ -179,7 +179,7 @@ NSImage* loadImage(const std::string& url) {
     NSString* s = nsstr(url.data(), url.size());
     if (s.length == 0) return nil;
     NSURL* nsurl = nil;
-    if ([url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0]) {
+    if (url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0) {
         nsurl = [NSURL URLWithString:s];
     } else {
         nsurl = [NSURL fileURLWithPath:s];
@@ -312,8 +312,13 @@ int32_t mediaSetTrack(const AplTrackMeta* meta) {
     if (!art.empty()) {
         NSImage* image = loadImage(art);
         if (image != nil) {
-            dict[MPMediaItemPropertyArtwork] =
-                [[MPMediaItemArtwork alloc] initWithImage:image];
+            // macOS 的 MPMediaItemArtwork 无 initWithImage:（那是 iOS）；用
+            // initWithBoundsSize:requestHandler:（10.12.2+），按请求尺寸返回原图。
+            dict[MPMediaItemPropertyArtwork] = [[MPMediaItemArtwork alloc]
+                initWithBoundsSize:image.size
+                    requestHandler:^NSImage*(CGSize) {
+                      return image;
+                    }];
         }
     }
     if (meta->duration_ms > 0) {
