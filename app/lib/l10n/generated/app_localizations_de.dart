@@ -2038,6 +2038,20 @@ class AppLocalizationsDe extends AppLocalizations {
       'Bei DJ-Version automatisch zum nächsten Titel springen';
 
   @override
+  String get settingsDjEnhanced => 'Erweiterte Filterung';
+
+  @override
+  String get settingsDjEnhancedDesc =>
+      'Überspringt zusätzlich Remix / Nightcore / sped up / slowed / Mashup usw.';
+
+  @override
+  String get settingsDjCustom => 'Eigene Skip-Schlüsselwörter';
+
+  @override
+  String get settingsDjCustomHint =>
+      'Durch Komma oder Zeilenumbruch getrennt, z. B. Cover, Karaoke';
+
+  @override
   String get settingsSectionLyricsFilter => 'Songtexte';
 
   @override

@@ -15,6 +15,22 @@ class PresetSection extends ConsumerStatefulWidget {
 }
 
 class _PresetSectionState extends ConsumerState<PresetSection> {
+  late final TextEditingController _djCustomCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _djCustomCtrl = TextEditingController(
+      text: ref.read(appPrefsProvider).djCustomKeywords,
+    );
+  }
+
+  @override
+  void dispose() {
+    _djCustomCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -69,6 +85,33 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
                   : l10n.settingsDjModeOff,
               value: prefs.fuckDjMode,
               onChanged: (v) => notifier.setPreset(fuckDjMode: v),
+            ),
+            SettingSwitchTile(
+              icon: prefs.djEnhanced
+                  ? EtaIcons.magic3
+                  : EtaIcons.magic3Outline,
+              title: l10n.settingsDjEnhanced,
+              subtitle: l10n.settingsDjEnhancedDesc,
+              value: prefs.djEnhanced,
+              onChanged: (v) => notifier.setPreset(djEnhanced: v),
+            ),
+            SettingTile(
+              icon: EtaIcons.hashtagOutline,
+              title: l10n.settingsDjCustom,
+              subtitle: l10n.settingsDjCustomHint,
+              trailing: SizedBox(
+                width: 160,
+                child: TextField(
+                  controller: _djCustomCtrl,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                  ),
+                  onSubmitted: (v) =>
+                      notifier.setPreset(djCustomKeywords: v),
+                ),
+              ),
             ),
           ],
         ),

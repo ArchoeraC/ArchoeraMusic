@@ -1956,6 +1956,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsDjModeOff => 'DJ 버전 감지시 자동으로 다음 곡으로 건너뛰기';
 
   @override
+  String get settingsDjEnhanced => '확장 필터';
+
+  @override
+  String get settingsDjEnhancedDesc =>
+      '기본 키워드(DJ / 抖音 / 0.8 / 0.9 …) 외에 Remix / Nightcore / 배속 / 메들리 등도 건너뜁니다';
+
+  @override
+  String get settingsDjCustom => '사용자 지정 제외 키워드';
+
+  @override
+  String get settingsDjCustomHint => '쉼표 또는 줄바꿈으로 구분 (예: 커버, 반주)';
+
+  @override
   String get settingsSectionLyricsFilter => '가사';
 
   @override

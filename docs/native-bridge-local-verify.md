@@ -11,7 +11,7 @@ runner）。本页说明如何在 **Linux 主机**上快速验证 Windows / macO
 
 | 脚本 | 目标 | 依赖 |
 |---|---|---|
-| `app/tool/verify_windows.sh` | 用 msvc-wine 以 MSVC 编译 `backend_windows.cpp`（`/c`，不链接） | `/opt/msvc`（msvc-wine）、`wine` |
+| `app/tool/verify_windows.sh` | 用 msvc-wine 以 MSVC 编译**并链接**三源为 `archoera_platform.dll`（能发现 LNK2019 等符号缺失） | `/opt/msvc`（msvc-wine）、`wine` |
 | `app/tool/verify_macos.sh` | 用 clang 交叉编译 + 链接 `backend_macos.mm`（arm64 / x86_64 dylib） | `clang++`、`ld64.lld`、macOS SDK |
 | Linux 端 | 直接原生构建（无需脚本） | `flutter build linux` / cmake，见 `AGENTS.md` |
 

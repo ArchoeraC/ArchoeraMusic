@@ -3644,6 +3644,30 @@ abstract class AppLocalizations {
   /// **'哎嘿嘿(ˉ﹃ˉ)'**
   String get settingsDjModeOff;
 
+  /// No description provided for @settingsDjEnhanced.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'增强筛除'**
+  String get settingsDjEnhanced;
+
+  /// No description provided for @settingsDjEnhancedDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在基础词（DJ / 抖音 / 0.8 / 0.9 …）之外，再跳过 Remix / Nightcore / 变速 / 串烧 等'**
+  String get settingsDjEnhancedDesc;
+
+  /// No description provided for @settingsDjCustom.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义跳过关键词'**
+  String get settingsDjCustom;
+
+  /// No description provided for @settingsDjCustomHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'逗号或换行分隔，例如：翻唱, 伴奏'**
+  String get settingsDjCustomHint;
+
   /// No description provided for @settingsSectionLyricsFilter.
   ///
   /// In zh_CN, this message translates to:

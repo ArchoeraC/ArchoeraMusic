@@ -100,12 +100,20 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
   }
 
   Future<void> _playCurrent() async {
-    if (ref.read(appPrefsProvider).fuckDjMode) {
+    final djPrefs = ref.read(appPrefsProvider);
+    if (djPrefs.fuckDjMode) {
       var guard = 0;
       final len = state.queue.length;
       while (guard < len) {
         final cur = state.currentQueueTrack;
-        if (cur == null || !shouldSkipDjTrack(cur)) break;
+        if (cur == null ||
+            !shouldSkipDjTrack(
+              cur,
+              enhanced: djPrefs.djEnhanced,
+              custom: djPrefs.djCustomKeywords,
+            )) {
+          break;
+        }
         _advanceNext();
         guard++;
       }

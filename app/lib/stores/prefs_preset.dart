@@ -6,6 +6,8 @@ import 'app_prefs.dart';
 
 // ── 强迫症设置键（对齐原项目 preset：Fuck DJ / 解锁脏话 / 标签与副标题）──
 const fuckDjModeKey = 'preset.fuckDjMode';
+const djEnhancedKey = 'preset.djEnhanced';
+const djCustomKeywordsKey = 'preset.djCustomKeywords';
 const uncensorProfanityKey = 'preset.uncensorProfanity';
 const hideVipTagKey = 'preset.hideVipTag';
 const hideQualityTagKey = 'preset.hideQualityTag';
@@ -41,6 +43,13 @@ const imageCacheLimitStepMiB = 8;
 extension PresetPrefs on AppPrefs {
   /// Fuck DJ Mode：播放时自动跳过 DJ 混音 / 口水歌（默认关）。
   bool get fuckDjMode => data[fuckDjModeKey] as bool? ?? false;
+
+  /// DJ 增强筛除：在基础词之外启用扩展关键词（Remix / Nightcore / 变速 /
+  /// 串烧 / 喊麦 …；默认关，避免误伤同名正常歌）。
+  bool get djEnhanced => data[djEnhancedKey] as bool? ?? false;
+
+  /// 自定义 DJ 跳过关键词（逗号 / 换行 / 分号分隔；默认空，始终生效）。
+  String get djCustomKeywords => data[djCustomKeywordsKey] as String? ?? '';
 
   /// 解锁脏话：还原歌词中「f**k」等被星号遮盖的词（默认关）。
   bool get uncensorProfanity => data[uncensorProfanityKey] as bool? ?? false;
@@ -109,24 +118,38 @@ extension PresetPrefs on AppPrefs {
     int? lyricCacheLimitMiB,
     int? imageCacheLimitMiB,
     bool? fuckDjMode,
+    bool? djEnhanced,
+    String? djCustomKeywords,
     bool? uncensorProfanity,
     bool? hideVipTag,
     bool? hideQualityTag,
     bool? showSubtitle,
-  }) => AppPrefs(
-    initialData: {
-      ...data,
-      performanceModeKey: ?performanceMode,
-      energySavingModeKey: ?energySavingMode,
-      songCacheEnabledKey: ?songCacheEnabled,
-      songCacheLimitMiBKey: ?songCacheLimitMiB,
-      lyricCacheLimitMiBKey: ?lyricCacheLimitMiB,
-      imageCacheLimitMiBKey: ?imageCacheLimitMiB,
-      fuckDjModeKey: ?fuckDjMode,
-      uncensorProfanityKey: ?uncensorProfanity,
-      hideVipTagKey: ?hideVipTag,
-      hideQualityTagKey: ?hideQualityTag,
-      showSubtitleKey: ?showSubtitle,
-    },
-  );
+  }) {
+    final d = Map<String, dynamic>.of(data);
+    if (djCustomKeywords != null) {
+      final t = djCustomKeywords.trim();
+      if (t.isEmpty) {
+        d.remove(djCustomKeywordsKey);
+      } else {
+        d[djCustomKeywordsKey] = t;
+      }
+    }
+    return AppPrefs(
+      initialData: {
+        ...d,
+        performanceModeKey: ?performanceMode,
+        energySavingModeKey: ?energySavingMode,
+        songCacheEnabledKey: ?songCacheEnabled,
+        songCacheLimitMiBKey: ?songCacheLimitMiB,
+        lyricCacheLimitMiBKey: ?lyricCacheLimitMiB,
+        imageCacheLimitMiBKey: ?imageCacheLimitMiB,
+        fuckDjModeKey: ?fuckDjMode,
+        djEnhancedKey: ?djEnhanced,
+        uncensorProfanityKey: ?uncensorProfanity,
+        hideVipTagKey: ?hideVipTag,
+        hideQualityTagKey: ?hideQualityTag,
+        showSubtitleKey: ?showSubtitle,
+      },
+    );
+  }
 }
