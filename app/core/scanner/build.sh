@@ -20,13 +20,21 @@ case "$RID" in
   *) EXT="so"; SQLITE_NAME="libe_sqlite3.so" ;;
 esac
 
+# Zig 内核按与 C 侧一致的 macOS 最低版本编译（否则 ld 报
+# "object file ... was built for newer 'macOS' version than being linked"）。
+case "$RID" in
+  osx-arm64) ZIG_TARGET="aarch64-macos.14.0" ;;
+  osx-x64)   ZIG_TARGET="x86_64-macos.14.0" ;;
+  *)         ZIG_TARGET="" ;;
+esac
+
 mkdir -p build
 
 # 自研内核动态库（元数据快路径 zk_metadata_*；scanner 直桥，无 JSON）。
 # 与 FFI 同目录分发，NativeAOT 侧按 $ORIGIN / DllImportResolver 解析。
 if [ -d ../audio-engine ]; then
   echo "==> 构建内核动态库 (audio-engine)"
-  ( cd ../audio-engine && zig build -Doptimize=ReleaseFast --prefix ./zig-out )
+  ( cd ../audio-engine && zig build -Doptimize=ReleaseFast --prefix ./zig-out ${ZIG_TARGET:+-Dtarget=$ZIG_TARGET} )
 fi
 
 # 用 -o 固定 publish 输出目录（不依赖 bin/Release/<tfm>/<rid> 路径，
