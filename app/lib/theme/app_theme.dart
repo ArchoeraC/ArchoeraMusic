@@ -13,6 +13,12 @@
 library;
 
 import 'package:material_ui/material_ui.dart';
+import 'package:material_color_utilities/material_color_utilities.dart' show Hct;
+
+/// 近中性种子色度阈值：低于此值视为「无有效色相」，用 [DynamicSchemeVariant.content]
+/// 生成近中性方案。否则 `tonalSpot` 会从灰种子的任意色相重建出突兀的高彩度色
+/// （偏白封面 → 青色）。与 cover_color.dart 的 `_neutralChroma` 对齐。
+const double _neutralSeedChroma = 6;
 
 /// 应用调色板（单一来源）。
 class AppPalette {
@@ -228,6 +234,13 @@ ThemeData buildAppTheme(
     final generated = ColorScheme.fromSeed(
       seedColor: accentSeed ?? c.primary,
       brightness: brightness,
+      // 近中性种子（低色度）→ content：忠实种子本色、近中性；
+      // 有彩种子 → tonalSpot（默认，鲜艳）。
+      dynamicSchemeVariant:
+          (accentSeed != null &&
+              Hct.fromInt(accentSeed.toARGB32()).chroma < _neutralSeedChroma)
+          ? DynamicSchemeVariant.content
+          : DynamicSchemeVariant.tonalSpot,
     );
     primary = custom ? generated.primary : c.primary;
     onPrimary = custom ? generated.onPrimary : c.onPrimary;
