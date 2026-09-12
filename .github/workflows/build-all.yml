@@ -518,7 +518,12 @@ jobs:
     steps:
       - name: Install system dependencies
         run: |
+          # 镜像（2023 Deepin 23 rootfs）非 merged-/usr，而仓库 libc6 已升到 2.38，
+          # dpkg 解包会以「unsupported, install usrmerge」拒绝 → 先合并 /usr。
+          # 仓库指向本镜像对应的 beige(23) 而非默认的 crimson(25)。
+          echo "deb https://community-packages.deepin.com/beige/ beige main commercial community" > /etc/apt/sources.list
           apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y usrmerge
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates build-essential cmake ninja-build pkg-config clang sudo \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
