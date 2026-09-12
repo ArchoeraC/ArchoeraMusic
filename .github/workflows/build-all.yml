@@ -601,12 +601,33 @@ jobs:
           set -euo pipefail
           TAG="${{ github.ref_name }}"
           VER="${TAG#v}"
+
+          # 从 CHANGELOG.md 抽取本 tag 对应段落作为 Release 正文
+          # （标题形如 `## [0.9.15+8] - 2026-09-12`）。用 index() 字面匹配，
+          # 避免版本号里的 `+` 被当正则量词；抽到下一个 `## [` 为止。
+          NOTES=release_notes.md
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VER" '
+              /^## \[/ { if (in_sec) exit; if (index($0, "[" ver "]") > 0) { in_sec=1; next } }
+              in_sec { print }
+            ' CHANGELOG.md > "$NOTES"
+          fi
+
+          if [ -s "$NOTES" ]; then
+            echo "── Release 正文（来自 CHANGELOG.md，$VER）──"
+            cat "$NOTES"
+          else
+            echo "CHANGELOG.md 未找到 $VER 段落，回退通用文案"
+            printf '三端 matrix 构建产物：Linux 多发行版安装包 / macOS arm64 / Windows x64。\n' > "$NOTES"
+          fi
+
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG 已存在，补传/覆盖资产（幂等重跑）"
+            echo "Release $TAG 已存在，更新说明 + 补传/覆盖资产（幂等重跑）"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES"
             gh release upload "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --clobber
           else
             gh release create "$TAG" assets/* \
               --repo "$GITHUB_REPOSITORY" \
               --title "ArchoeraMusic ${VER}" \
-              --notes "三端 matrix 构建产物：Linux 多发行版安装包 / macOS arm64 / Windows x64。"
+              --notes-file "$NOTES"
           fi
