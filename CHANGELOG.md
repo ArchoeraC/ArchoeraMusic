@@ -14,6 +14,10 @@
 3、修好**许可证**：macOS 不再用 Homebrew，三端都随包附 FFmpeg/TagLib 许可文本（`licenses/`）
 4、产物文件名带发行版标识（如 `-ubuntu24.04-`、`-arch-`、`-fedora-`），包内还有 `BUILD-INFO.txt` 写明构建目标 / 基线 / 最低 glibc
 5、Deepin 单独开包
+6、FFmpeg 升到 **9.0.1**，并且只编**音频**部分——视频解码器 / 编码器 / 滤镜全部砍掉，内嵌库从 22MB 瘦到 6MB；Opus 编码改用 **libopus**
+7、修了个大坑：引擎的 `RUNPATH` 之前是字面量 `'$ORIGIN'`（引号被链接器当值了），害它偷偷去加载**系统 FFmpeg**，打包时把系统那一整套视频依赖（x264 / x265 / vpx / aom / jxl / icu…）全塞进包里，deb 直接肿到 **500MiB**；修好后 deb 只剩 **110MB** 喵
+8、CI 把 **AppImage / Flatpak / NixOS** 拆成独立 job，不再跟 deb 挤一个锅里
+9、关于页的**软件声明**补了「登录与账号 / 隐私与本地数据 / 第三方服务」几段，并把 **de / es / fr / ja / ko** 翻译补齐（之前只有中英喵）
 
 真得睡了qwq……
 
