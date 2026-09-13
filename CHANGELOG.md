@@ -4,6 +4,16 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [0.9.16+12] - 2026-09-13
+
+启动页加个小彩蛋喵：
+
+1、用自研内核（**EraAudio**）启动时，启动页品牌名下方会显示「**Powered by EraSync**」+ 新画的 **EraSync 标识**（圆角方 + 负形波形），像 Android 那个 Powered by 一样喵
+2、EraSync 标识做成 **EtaMark 字体新字形**（`0xE102`），和 AppLogo 的均衡器标识同一个字体族；顺手修了品牌字形工具链的**洞填充**问题（potrace 用 evenodd、字体按 nonzero 绕向判洞，之前带洞的图形会被填实）
+3、Stable（FFmpeg）引擎启动时保持原样，不显示喵
+
+谢谢喵！
+
 ## [0.9.16+11] - 2026-09-13
 
 把关于页补全喵：

@@ -125,6 +125,7 @@ class ArchoeraMusicApp extends ConsumerWidget {
               // 组件会自动按 disableAnimations 退化为 0 时长（Flutter 内建支持）。
               var appChild = child ?? const SizedBox.shrink();
               Widget gate = SplashGate(
+                engine: prefs.engine,
                 child: SchemeIntroGate(
                   child: AppShortcuts(child: ToastOverlay(child: appChild)),
                 ),
