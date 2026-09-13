@@ -3018,6 +3018,18 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 소프트웨어는 다음 오픈 소스 프로젝트를 사용·의존·참고합니다(전체 목록은 THIRD-PARTY-NOTICES.md 및 각 모듈의 THIRD-PARTY-LICENSES.md 참조):\n\n· 설계 참고: KuGouMusicApi(MIT), NeteaseCloudMusicApi(MIT), ncm-api-rs(WTFPL), MoeKoeMusic, Mineradio\n· 핵심 구성 요소: Flutter, FFmpeg(LGPL-2.1+), libopus(BSD-3-Clause), TagLib(LGPL-2.1+/MPL-1.1), miniaudio(MIT-0/퍼블릭 도메인), signalsmith-stretch(MIT), SQLite(퍼블릭 도메인), libcurl, OpenSSL(Apache-2.0), nlohmann/json(MIT)\n· 디코더 참고: minimp3(CC0-1.0), stb_vorbis(퍼블릭 도메인/MIT-0), kissfft(BSD-3-Clause), WavPack(BSD-3-Clause), dsd2pcm(BSD), OpenCORE/PV-AMR(Apache-2.0)\n· 아이콘: MingCute Icons(Apache-2.0), Tabler Icons(MIT), Lucide(ISC), line-md(MIT)\n\n위 프로젝트의 저자에게 감사드립니다.';
 
   @override
+  String get settingsThanksDesign => '설계 참고';
+
+  @override
+  String get settingsThanksCore => '핵심 구성 요소';
+
+  @override
+  String get settingsThanksDecoder => '디코더 참고';
+
+  @override
+  String get settingsThanksIcons => '아이콘';
+
+  @override
   String get settingsSectionFontCredits => '글꼴 저작권 고지';
 
   @override
