@@ -155,21 +155,19 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
           ],
         ),
         const SizedBox(height: 12),
-        // ── 特别致谢（使用 / 参考的开源项目，齐全列出）───────────────
+        // ── 特别致谢（按类别分组列出使用 / 参考的开源项目；点条目复制链接）──
         SettingSection(
           title: l10n.settingsSectionThanks,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Text(
-                l10n.settingsThanksText,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.6,
-                  color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
-                ),
-              ),
-            ),
+            for (final group in <(String, List<_ThanksItem>)>[
+              (l10n.settingsThanksDesign, _kThanksDesign),
+              (l10n.settingsThanksCore, _kThanksCore),
+              (l10n.settingsThanksDecoder, _kThanksDecoder),
+              (l10n.settingsThanksIcons, _kThanksIcons),
+            ]) ...[
+              _thanksGroupLabel(group.$1, scheme),
+              for (final item in group.$2) _thanksRow(item, scheme),
+            ],
           ],
         ),
         const SizedBox(height: 12),
@@ -298,4 +296,119 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
         '${l10n.settingsEnvRuntime}: Dart '
         '${Platform.version.split(' ').first}';
   }
+
+  /// 特别致谢分组小标题（按类别，带主题色）。
+  Widget _thanksGroupLabel(String label, ColorScheme scheme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 2),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: scheme.primary,
+        ),
+      ),
+    );
+  }
+
+  /// 特别致谢条目：名称 + 许可证；点击复制该项目的链接（不打开网页）。
+  Widget _thanksRow(_ThanksItem item, ColorScheme scheme) {
+    return InkWell(
+      onTap: () async {
+        await Clipboard.setData(ClipboardData(text: item.url));
+        if (!mounted) return;
+        toast(
+          context.l10n.toastCopied(item.name),
+          type: ToastType.success,
+          duration: const Duration(milliseconds: 1200),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: item.name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (item.license.isNotEmpty)
+                      TextSpan(
+                        text: '  ${item.license}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              EtaIcons.link,
+              size: 15,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+/// 特别致谢条目（名称 / 许可证 / 链接；点条目复制链接，不打开网页）。
+class _ThanksItem {
+  const _ThanksItem(this.name, this.license, this.url);
+
+  final String name;
+  final String license;
+  final String url;
+}
+
+const List<_ThanksItem> _kThanksDesign = [
+  _ThanksItem('KuGouMusicApi', 'MIT', 'https://github.com/MakcRe/KuGouMusicApi'),
+  _ThanksItem('NeteaseCloudMusicApi', 'MIT', 'https://github.com/Binaryify/NeteaseCloudMusicApi'),
+  _ThanksItem('ncm-api-rs', 'WTFPL', 'https://github.com/SPlayer-Dev/ncm-api-rs'),
+  _ThanksItem('MoeKoeMusic', '', 'https://github.com/MoeKoeMusic/MoeKoeMusic'),
+  _ThanksItem('Mineradio', '', 'https://github.com/XxHuberrr/Mineradio'),
+  _ThanksItem('AMLL (Apple Music-like Lyrics)', 'MIT', 'https://github.com/Steve-xmh/applemusic-like-lyrics'),
+];
+
+const List<_ThanksItem> _kThanksCore = [
+  _ThanksItem('Flutter', 'BSD-3-Clause', 'https://flutter.dev'),
+  _ThanksItem('FFmpeg', 'LGPL-2.1+', 'https://ffmpeg.org'),
+  _ThanksItem('libopus', 'BSD-3-Clause', 'https://opus-codec.org'),
+  _ThanksItem('TagLib', 'LGPL-2.1+ / MPL-1.1', 'https://taglib.org'),
+  _ThanksItem('miniaudio', 'MIT-0 / Public Domain', 'https://github.com/mackron/miniaudio'),
+  _ThanksItem('signalsmith-stretch', 'MIT', 'https://github.com/Signalsmith-Audio/signalsmith-stretch'),
+  _ThanksItem('SQLite', 'Public Domain', 'https://sqlite.org'),
+  _ThanksItem('libcurl', '', 'https://curl.se/libcurl/'),
+  _ThanksItem('OpenSSL', 'Apache-2.0', 'https://www.openssl.org'),
+  _ThanksItem('nlohmann/json', 'MIT', 'https://github.com/nlohmann/json'),
+];
+
+const List<_ThanksItem> _kThanksDecoder = [
+  _ThanksItem('minimp3', 'CC0-1.0', 'https://github.com/lieff/minimp3'),
+  _ThanksItem('stb_vorbis', 'Public Domain / MIT-0', 'https://github.com/nothings/stb'),
+  _ThanksItem('kissfft', 'BSD-3-Clause', 'https://github.com/mborgerding/kissfft'),
+  _ThanksItem('WavPack', 'BSD-3-Clause', 'https://www.wavpack.com'),
+  _ThanksItem('dsd2pcm', 'BSD', 'https://github.com/Sacred-Cow/dsd2pcm'),
+  _ThanksItem('OpenCORE / PV-AMR', 'Apache-2.0', 'https://android.googlesource.com/platform/external/opencore'),
+];
+
+const List<_ThanksItem> _kThanksIcons = [
+  _ThanksItem('MingCute Icons', 'Apache-2.0', 'https://github.com/mingcute-design/mingcute-icons'),
+  _ThanksItem('Tabler Icons', 'MIT', 'https://tabler.io/icons'),
+  _ThanksItem('Lucide', 'ISC', 'https://lucide.dev'),
+  _ThanksItem('line-md', 'MIT', 'https://github.com/cyberalien/line-md'),
+];

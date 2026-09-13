@@ -3102,6 +3102,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'This software uses, depends on, or references the following open-source projects (see THIRD-PARTY-NOTICES.md and each module\'s THIRD-PARTY-LICENSES.md for the full list):\n\n- Design inspiration: KuGouMusicApi (MIT), NeteaseCloudMusicApi (MIT), ncm-api-rs (WTFPL), MoeKoeMusic, Mineradio\n- Core components: Flutter, FFmpeg (LGPL-2.1+), libopus (BSD-3-Clause), TagLib (LGPL-2.1+/MPL-1.1), miniaudio (MIT-0/Public Domain), signalsmith-stretch (MIT), SQLite (Public Domain), libcurl, OpenSSL (Apache-2.0), nlohmann/json (MIT)\n- Decoder references: minimp3 (CC0-1.0), stb_vorbis (Public Domain/MIT-0), kissfft (BSD-3-Clause), WavPack (BSD-3-Clause), dsd2pcm (BSD), OpenCORE/PV-AMR (Apache-2.0)\n- Icons: MingCute Icons (Apache-2.0), Tabler Icons (MIT), Lucide (ISC), line-md (MIT)\n\nThanks to the authors of the above projects.';
 
   @override
+  String get settingsThanksDesign => 'Design inspiration';
+
+  @override
+  String get settingsThanksCore => 'Core components';
+
+  @override
+  String get settingsThanksDecoder => 'Decoder references';
+
+  @override
+  String get settingsThanksIcons => 'Icons';
+
+  @override
   String get settingsSectionFontCredits => 'Font Credits';
 
   @override

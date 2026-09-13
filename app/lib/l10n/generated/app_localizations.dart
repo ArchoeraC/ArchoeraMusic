@@ -5516,6 +5516,30 @@ abstract class AppLocalizations {
   /// **'本软件使用、依赖或参考了以下开源项目（完整许可清单见仓库 THIRD-PARTY-NOTICES.md 及各模块 THIRD-PARTY-LICENSES.md）：\n\n· 设计思路借鉴：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 核心组件：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/公有领域）、signalsmith-stretch（MIT）、SQLite（公有领域）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· 解码参考：minimp3（CC0-1.0）、stb_vorbis（公有领域/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· 图标：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n感谢以上项目的作者。'**
   String get settingsThanksText;
 
+  /// No description provided for @settingsThanksDesign.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设计思路借鉴'**
+  String get settingsThanksDesign;
+
+  /// No description provided for @settingsThanksCore.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'核心组件'**
+  String get settingsThanksCore;
+
+  /// No description provided for @settingsThanksDecoder.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'解码参考'**
+  String get settingsThanksDecoder;
+
+  /// No description provided for @settingsThanksIcons.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'图标'**
+  String get settingsThanksIcons;
+
   /// No description provided for @settingsSectionFontCredits.
   ///
   /// In zh_CN, this message translates to:
