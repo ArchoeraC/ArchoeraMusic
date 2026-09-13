@@ -109,11 +109,29 @@ extension _KgQrLoginDialogView on _KgQrLoginDialogState {
                           const SizedBox(height: 16),
                           _tabBar(scheme, l10n),
                           const SizedBox(height: 20),
-                          switch (_tab) {
-                            0 => _qrTab(theme, scheme, l10n),
-                            1 => _phoneTab(theme, scheme, l10n),
-                            _ => _emailTab(theme, scheme, l10n),
-                          },
+                          // 切换方式：淡出 → 卡片高度平滑过渡 → 淡入
+                          // （对齐 WebWord 登录窗：AnimatedSize 动画高度 +
+                          //  AnimatedSwitcher 交叉淡入淡出，避免生硬跳变）。
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeInOutCubic,
+                            alignment: Alignment.topCenter,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(opacity: animation, child: child),
+                              child: KeyedSubtree(
+                                key: ValueKey<int>(_tab),
+                                child: switch (_tab) {
+                                  0 => _qrTab(theme, scheme, l10n),
+                                  1 => _phoneTab(theme, scheme, l10n),
+                                  _ => _emailTab(theme, scheme, l10n),
+                                },
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
