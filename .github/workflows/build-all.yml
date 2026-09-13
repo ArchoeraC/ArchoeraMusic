@@ -7,19 +7,21 @@
 #  加载（实测 Arch 上引擎与 scraper 均加载失败）。故每个发行版在自己的容器
 #  内从源码构建，链接并使用该发行版自身的 FFmpeg/TagLib。
 #
-#  ┌─ linux-deb    (ubuntu-24.04 runner) : ubuntu24.04.deb + linux tar.gz + AppImage
-#  │                                      + flatpak + NixOS
-#  ├─ linux-deepin (ubuntu:20.04 容器)    : deepin.deb（老 glibc 基线；失败即放弃）
-#  ├─ linux-rpm    (fedora 容器)          : fedora.rpm
-#  ├─ linux-arch   (archlinux 容器)       : arch.pkg.tar.zst
-#  ├─ build        (matrix macos/windows) : .app / NSIS+portable zip
-#  └─ release      (needs 全部；tag v* 触发)
+#  ┌─ linux-deb     (ubuntu-24.04 runner) : ubuntu24.04.deb + linux tar.gz（并上传原始 bundle）
+#  ├─ linux-deepin  (Deepin 25 容器)      : deepin25.deb（老 glibc 基线；失败即放弃）
+#  ├─ linux-rpm     (fedora 容器)         : fedora.rpm
+#  ├─ linux-arch    (archlinux 容器)      : arch.pkg.tar.zst
+#  ├─ linux-appimage(needs linux-deb)     : AppImage（linuxdeploy 收拢动态依赖）
+#  ├─ linux-flatpak (needs linux-deb)     : .flatpak（包装预构建 bundle）
+#  ├─ linux-nix     (needs linux-deb)     : NixOS flake 产物 tar.gz（nixos/nix 容器）
+#  ├─ build         (matrix macos/windows): .app / NSIS+portable zip
+#  └─ release       (needs 全部；tag v* 触发)
 #
 #  产物文件名带发行版标识（如 ArchoeraMusic-v<ver>-ubuntu24.04-x86_64.deb、
 #  -fedora-x86_64.rpm、-arch-x86_64.pkg.tar.zst），且包内 BUILD-INFO.txt 写明
 #  构建目标 / 基线 / 最低 glibc / 提交，用户无需靠后缀猜适用性。
 #
-#  三个 Linux job 共用 .github/actions/build-linux（复合 action）：工具链
+#  各发行版 Linux job 共用 .github/actions/build-linux（复合 action）：工具链
 #  (rust/go/dotnet/flutter) → Zig 0.16 → build-linux.sh → zig build test →
 #  pub get/analyze/test → vault 端到端 → flutter build linux。发行版专属的
 #  系统依赖安装与打包由各 job 负责。
@@ -28,7 +30,8 @@
 #  zig-<arch>-<os>；GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
 #
 #  ┌─ release job ─────────────────────────────────────────────────────
-#  │  needs: [build, linux-deb, linux-rpm, linux-arch]；仅 push tag v* 触发；
+#  │  needs: [build, linux-deb, linux-rpm, linux-arch, linux-deepin,
+#  │          linux-appimage, linux-flatpak, linux-nix]；仅 push tag v* 触发；
 #  │  下载全部 artifact 后聚合为 GitHub Release。release 需要 contents: write，
 #  │  故在 job 级覆盖顶层 permissions。tag 名即版本（沿用仓库现有 v* 标签）。
 #  └──────────────────────────────────────────────────────────────────
@@ -72,7 +75,7 @@ jobs:
         # （见 build-ffmpeg-minimal.sh）。dylibbundler 用于把 FFmpeg/TagLib
         # dylib 收进 .app 并改写 install_name（自包含）。
         run: |
-          brew install taglib curl openssl sqlite nlohmann-json pkg-config dylibbundler
+          brew install taglib curl openssl sqlite nlohmann-json pkg-config dylibbundler opus
 
       # ───────────────────────── Windows（mingw / vcpkg）───────────────
       - name: Install mingw (cgo C 编译器，go -buildmode=c-shared 需要)
@@ -198,7 +201,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.local/ffmpeg-minimal
-          key: ffmpeg-minimal-7.1.1-${{ runner.os }}-${{ runner.arch }}
+          key: ffmpeg-minimal-9.0.1-${{ runner.os }}-${{ runner.arch }}
 
       - name: Build minimal FFmpeg (macOS, LGPL)
         if: matrix.os == 'macos' && steps.ffmpeg-cache-macos.outputs.cache-hit != 'true'
@@ -399,7 +402,7 @@ jobs:
   #  公共构建逻辑收敛在 .github/actions/build-linux（复合 action）。
   # =====================================================================
 
-  # ── Debian/Ubuntu：.deb + tar.gz + AppImage + flatpak + NixOS ─────────
+  # ── Debian/Ubuntu：.deb + tar.gz（并上传原始 bundle 供 AppImage/Flatpak/Nix）──
   linux-deb:
     name: Linux deb (Ubuntu 24.04)
     runs-on: ubuntu-24.04
@@ -414,7 +417,7 @@ jobs:
             build-essential ninja-build pkg-config clang \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
-            libdbus-1-dev libayatana-appindicator3-dev \
+            libdbus-1-dev libayatana-appindicator3-dev libopus-dev \
             patchelf nasm
       - uses: actions/checkout@v5
       - uses: ./.github/actions/build-linux
@@ -426,20 +429,6 @@ jobs:
           VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
-      - name: Install packaging tools
-        run: |
-          sudo apt-get update
-          # rpm 在 fedora job 构建，此处只需 flatpak（AppImage 工具另行下载）
-          sudo apt-get install -y flatpak
-          # appimagetool（CI 无 FUSE，运行时用 --appimage-extract-and-run）
-          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage
-          chmod +x /tmp/appimagetool.AppImage
-          sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
-          # type2 runtime 预下载（appimagetool 打包时不再联网下载，规避网络抖动）
-          wget -q https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 -O /tmp/type2-runtime
-          # linuxdeploy：AppImage 装配时收拢 GTK/FFmpeg/TagLib 等动态依赖
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O /tmp/linuxdeploy.AppImage
-          chmod +x /tmp/linuxdeploy.AppImage
       - name: Package tar.gz (纯二进制)
         run: bash packaging/linux/package.sh tar app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
         env:
@@ -448,46 +437,6 @@ jobs:
         run: bash packaging/linux/package.sh deb app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
         env:
           DISTRO_TAG: ubuntu24.04
-      - name: Package AppImage (通用)
-        run: bash packaging/linux/package.sh appimage app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-        env:
-          DISTRO_TAG: linux
-          APPIMAGE_RUNTIME_FILE: /tmp/type2-runtime
-          LINUXDEPLOY: /tmp/linuxdeploy.AppImage
-          APPIMAGE_EXTRACT_AND_RUN: '1'
-      - name: Package Flatpak (通用)
-        run: bash packaging/linux/package-flatpak.sh app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-        env:
-          DISTRO_TAG: flatpak
-      - name: Package NixOS flake (nixos/nix container, autoPatchelf)
-        # bundle 为 Release 预 strip 产物，autoPatchelfHook 在容器内补
-        # interpreter（NixOS 无 /lib64/ld-linux-x86-64.so.2）并追加 buildInputs
-        # store 路径 RUNPATH（NixOS 无 /usr/lib）。产物仅供 CI 验证构建链路 +
-        # 交付 portable 源包；用户机器上正规安装方式是跑 package.sh nix 后
-        # 在本机 nix build（store 路径与 nixpkgs 版本强绑定）。
-        run: |
-          bash packaging/linux/package.sh nix app/build/linux/x64/release/bundle "${{ steps.version.outputs.version }}"
-          docker run --rm -v "$PWD":/workspace \
-            -e PKG_VER="${{ steps.version.outputs.version }}" \
-            -e GH_TOKEN="${{ github.token }}" \
-            nixos/nix:latest bash -c '
-              # /workspace 是 git 仓库且归宿主 runner 所有；nix 对 git 仓库
-              # 输入走 libgit2 且拒绝"非当前用户所有"（容器 root vs 宿主 1001）。
-              # 复制到容器内非 git 目录按 plain path（path:）输入构建，绕开
-              # libgit2 所有权检查（nix 仍把目录复制进 store 保证可复现）。
-              mkdir -p /tmp/nixbuild
-              cp -a /workspace/packaging/linux/work/nix/. /tmp/nixbuild/
-              cd /tmp/nixbuild
-              # 传 token：nixos-unstable 未锁，每次解析会打 GitHub API；无认证
-              # 会被限流（HTTP 403）导致打包失败。access-tokens 带认证后正常。
-              nix --extra-experimental-features "nix-command flakes" \
-                --option access-tokens "github.com=${GH_TOKEN}" \
-                build .#default --no-sandbox || exit 1
-              # result 指向容器 /nix/store，readlink 后打包完整 store 产物
-              tar -C "$(readlink -f result)" -czf \
-                "/workspace/dist/linux/ArchoeraMusic-v${PKG_VER}-nixos-x86_64.tar.gz" .
-            '
-          ls -la dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz
       - name: Upload bundle artifact (原始 bundle)
         uses: actions/upload-artifact@v4
         with:
@@ -525,7 +474,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates build-essential cmake ninja-build pkg-config clang sudo \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
-            nlohmann-json3-dev libgtk-3-dev liblzma-dev \
+            nlohmann-json3-dev libgtk-3-dev liblzma-dev libopus-dev \
             libdbus-1-dev libayatana-appindicator3-dev \
             patchelf nasm git curl wget xz-utils unzip zip jq file
       - uses: actions/checkout@v5
@@ -568,6 +517,7 @@ jobs:
             patchelf nasm \
             taglib-devel libcurl-devel openssl-devel sqlite-devel \
             json-devel gtk3-devel dbus-devel libstdc++-devel libicu \
+            opus-devel \
             rpm-build zstd libarchive \
             libayatana-appindicator-gtk3-devel
           # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
@@ -610,7 +560,7 @@ jobs:
             base-devel fakeroot debugedit bzip2 gettext gnupg ncurses \
             git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
             cmake ninja clang pkgconf patchelf nasm \
-            taglib curl openssl sqlite nlohmann-json \
+            taglib curl openssl sqlite nlohmann-json opus \
             gtk3 dbus libayatana-appindicator
           # 不装系统 ffmpeg：引擎改用自建最小 FFmpeg（见 build-linux action）
       - uses: actions/checkout@v5
@@ -638,12 +588,169 @@ jobs:
           # 统一命名为显著标识发行版的文件名（pkg 内部元数据不变）
           cp packaging/linux/work/arch/*.pkg.tar.zst \
             "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-arch-x86_64.pkg.tar.zst"
-          echo "→ dist/linux/$(ls dist/linux/ | grep '\.pkg\.tar\.zst$')"
+          echo "→ dist/linux/"*.pkg.tar.zst
       - name: Upload packages artifact
         uses: actions/upload-artifact@v4
         with:
           name: ArchoeraMusic-linux-arch
           path: dist/linux/*
+          if-no-files-found: error
+
+  # ── AppImage：消费 linux-deb 的原始 bundle，linuxdeploy 收拢依赖后装配 ──
+  # 与发行版包分开：AppImage 需在「构建机同系」环境用 linuxdeploy 把 GTK /
+  # FFmpeg / TagLib 等动态依赖收进镜像并改写 RUNPATH，才能跨发行版运行。
+  linux-appimage:
+    name: Linux AppImage (通用)
+    needs: linux-deb
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resolve version (from pubspec.yaml)
+        id: version
+        run: |
+          VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "resolved version: ${VER}"
+      - name: Download bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ArchoeraMusic-linux-x64
+          path: bundle
+      - name: Install AppImage tooling
+        run: |
+          sudo apt-get update
+          # binutils：package.sh 的 BUILD-INFO 用 objdump 探测最低 glibc
+          sudo apt-get install -y binutils file libgtk-3-dev
+          # appimagetool（CI 无 FUSE，运行时用 --appimage-extract-and-run）
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage
+          chmod +x /tmp/appimagetool.AppImage
+          sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
+          # type2 runtime 预下载（appimagetool 打包时不再联网下载，规避网络抖动）
+          wget -q https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 -O /tmp/type2-runtime
+          # linuxdeploy：AppImage 装配时收拢 GTK/FFmpeg/TagLib 等动态依赖
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O /tmp/linuxdeploy.AppImage
+          chmod +x /tmp/linuxdeploy.AppImage
+      - name: Restore executable bits (artifact 上传丢失权限)
+        # upload-artifact@v4 不保留权限（文件统一 644）：解包后按 ELF 可执行文件
+        # 恢复 +x，否则产物内主程序 archoera_music 与引擎/保险库子进程无法执行。
+        run: |
+          find bundle -type f -exec file {} + \
+            | grep -i 'ELF.*executable' | cut -d: -f1 | xargs -r chmod +x
+      - name: Package AppImage (通用)
+        run: bash packaging/linux/package.sh appimage "$PWD/bundle" "${{ steps.version.outputs.version }}"
+        env:
+          DISTRO_TAG: linux
+          APPIMAGE_RUNTIME_FILE: /tmp/type2-runtime
+          LINUXDEPLOY: /tmp/linuxdeploy.AppImage
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-linux-appimage
+          path: dist/linux/*.AppImage
+          if-no-files-found: error
+
+  # ── Flatpak：消费 linux-deb 的原始 bundle（包装预构建方式，无需 flatpak-builder）──
+  linux-flatpak:
+    name: Linux Flatpak (通用)
+    needs: linux-deb
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resolve version (from pubspec.yaml)
+        id: version
+        run: |
+          VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "resolved version: ${VER}"
+      - name: Download bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ArchoeraMusic-linux-x64
+          path: bundle
+      - name: Install flatpak
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak file
+      - name: Restore executable bits (artifact 上传丢失权限)
+        # upload-artifact@v4 不保留权限（文件统一 644）：解包后按 ELF 可执行文件
+        # 恢复 +x，否则 Flatpak 内主程序与引擎子进程无法执行。
+        run: |
+          find bundle -type f -exec file {} + \
+            | grep -i 'ELF.*executable' | cut -d: -f1 | xargs -r chmod +x
+      - name: Package Flatpak (通用)
+        run: bash packaging/linux/package-flatpak.sh "$PWD/bundle" "${{ steps.version.outputs.version }}"
+        env:
+          DISTRO_TAG: flatpak
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-linux-flatpak
+          path: dist/linux/*.flatpak
+          if-no-files-found: error
+
+  # ── NixOS：消费 linux-deb 的原始 bundle，nixos/nix 容器内 autoPatchelf ──
+  linux-nix:
+    name: Linux NixOS (flake)
+    needs: linux-deb
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resolve version (from pubspec.yaml)
+        id: version
+        run: |
+          VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "resolved version: ${VER}"
+      - name: Download bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ArchoeraMusic-linux-x64
+          path: bundle
+      - name: Install binutils (BUILD-INFO glibc 探测)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils file
+      - name: Restore executable bits (artifact 上传丢失权限)
+        # upload-artifact@v4 不保留权限（文件统一 644）：解包后按 ELF 可执行文件
+        # 恢复 +x，否则 Nix 产物内主程序与引擎子进程无法执行。
+        run: |
+          find bundle -type f -exec file {} + \
+            | grep -i 'ELF.*executable' | cut -d: -f1 | xargs -r chmod +x
+      - name: Package NixOS flake (nixos/nix container, autoPatchelf)
+        # bundle 为 Release 预 strip 产物，autoPatchelfHook 在容器内补
+        # interpreter（NixOS 无 /lib64/ld-linux-x86-64.so.2）并追加 buildInputs
+        # store 路径 RUNPATH（NixOS 无 /usr/lib）。产物仅供 CI 验证构建链路 +
+        # 交付 portable 源包；用户机器上正规安装方式是跑 package.sh nix 后
+        # 在本机 nix build（store 路径与 nixpkgs 版本强绑定）。
+        run: |
+          bash packaging/linux/package.sh nix "$PWD/bundle" "${{ steps.version.outputs.version }}"
+          docker run --rm -v "$PWD":/workspace \
+            -e PKG_VER="${{ steps.version.outputs.version }}" \
+            -e GH_TOKEN="${{ github.token }}" \
+            nixos/nix:latest bash -c '
+              # /workspace 是 git 仓库且归宿主 runner 所有；nix 对 git 仓库
+              # 输入走 libgit2 且拒绝"非当前用户所有"（容器 root vs 宿主 1001）。
+              # 复制到容器内非 git 目录按 plain path（path:）输入构建，绕开
+              # libgit2 所有权检查（nix 仍把目录复制进 store 保证可复现）。
+              mkdir -p /tmp/nixbuild
+              cp -a /workspace/packaging/linux/work/nix/. /tmp/nixbuild/
+              cd /tmp/nixbuild
+              # 传 token：nixos-unstable 未锁，每次解析会打 GitHub API；无认证
+              # 会被限流（HTTP 403）导致打包失败。access-tokens 带认证后正常。
+              nix --extra-experimental-features "nix-command flakes" \
+                --option access-tokens "github.com=${GH_TOKEN}" \
+                build .#default --no-sandbox || exit 1
+              # result 指向容器 /nix/store，readlink 后打包完整 store 产物
+              tar -C "$(readlink -f result)" -czf \
+                "/workspace/dist/linux/ArchoeraMusic-v${PKG_VER}-nixos-x86_64.tar.gz" .
+            '
+          ls -la dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArchoeraMusic-linux-nix
+          path: dist/linux/*nixos*.tar.gz
           if-no-files-found: error
 
   # =====================================================================
@@ -657,7 +764,7 @@ jobs:
   # =====================================================================
   release:
     name: Release ${{ github.ref_name }}
-    needs: [build, linux-deb, linux-rpm, linux-arch, linux-deepin]
+    needs: [build, linux-deb, linux-rpm, linux-arch, linux-deepin, linux-appimage, linux-flatpak, linux-nix]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     # 受保护 Environment：需 Required reviewers 手动批准后才运行；
@@ -685,6 +792,9 @@ jobs:
           test -d artifacts/ArchoeraMusic-linux-deepin    # Linux deb 包集 (Deepin)
           test -d artifacts/ArchoeraMusic-linux-rpm       # Linux rpm 包集
           test -d artifacts/ArchoeraMusic-linux-arch      # Linux pkg.tar.zst
+          test -d artifacts/ArchoeraMusic-linux-appimage  # Linux AppImage
+          test -d artifacts/ArchoeraMusic-linux-flatpak   # Linux .flatpak
+          test -d artifacts/ArchoeraMusic-linux-nix       # Linux NixOS tar.gz
           test -d artifacts/ArchoeraMusic-macos-arm64     # macOS .app
           test -d artifacts/ArchoeraMusic-windows-x64     # Windows runner Release
           test -d artifacts/ArchoeraMusic-windows-extra   # Windows NSIS + portable
@@ -695,6 +805,9 @@ jobs:
           cp artifacts/ArchoeraMusic-linux-deepin/* assets/
           cp artifacts/ArchoeraMusic-linux-rpm/* assets/
           cp artifacts/ArchoeraMusic-linux-arch/* assets/
+          cp artifacts/ArchoeraMusic-linux-appimage/* assets/
+          cp artifacts/ArchoeraMusic-linux-flatpak/* assets/
+          cp artifacts/ArchoeraMusic-linux-nix/* assets/
           # Windows：NSIS 安装器与便携 zip 直接作为独立 asset
           cp artifacts/ArchoeraMusic-windows-extra/* assets/
           # upload-artifact@v4 打包会丢失可执行位：下载后按 Mach-O/ELF magic

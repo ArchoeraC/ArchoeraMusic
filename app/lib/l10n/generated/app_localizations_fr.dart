@@ -3044,11 +3044,33 @@ class AppLocalizationsFr extends AppLocalizations {
       'Ne pas utiliser pour des activités commerciales, le scraping en masse ou la revente ; ne pas utiliser en violation des lois locales ou des conditions de service.\n\n';
 
   @override
-  String get settingsDecline5Title => '5. Clause de non-responsabilité\n';
+  String get settingsDeclineLoginTitle => '5. Connexion et compte\n';
+
+  @override
+  String get settingsDeclineLoginBody =>
+      'Ce logiciel propose la connexion par code QR (scannez le code QR affiché par ce logiciel avec l\'application officielle de la plateforme concernée) et la connexion par identifiants, afin de synchroniser les favoris et les playlists et de débloquer des fonctions. Veuillez noter :\n· Le code QR est généré par l\'interface officielle de la plateforme concernée ; ce logiciel ne collecte, n\'analyse ni ne transmet votre code QR de connexion, votre compte, votre mot de passe ou votre code de vérification SMS à un tiers ;\n· Les identifiants de session obtenus après la connexion (cookies / jetons, etc.) sont stockés uniquement sur votre appareil (chiffrés dans le coffre d\'identifiants) et ne sont jamais envoyés au développeur ni à un serveur non lié à la plateforme ;\n· La connexion par QR signifie que vous autorisez ce logiciel à accéder à la plateforme avec votre compte ; les actions telles que l\'ajout aux favoris, la lecture et les commentaires affecteront réellement votre compte ;\n· Sécurisez votre appareil et votre compte système ; après une connexion sur un appareil public ou partagé, déconnectez-vous et effacez les identifiants rapidement ;\n· La plateforme peut appliquer un contrôle des risques, des restrictions ou des bannissements aux connexions de clients tiers ; les anomalies de compte ou fonctions restreintes qui en découlent sont à votre charge.\n\n';
+
+  @override
+  String get settingsDeclinePrivacyTitle =>
+      '6. Confidentialité et données locales\n';
+
+  @override
+  String get settingsDeclinePrivacyBody =>
+      'Ce logiciel n\'a pas de serveur développeur et ne collecte ni ne transmet vos informations personnelles, votre comportement d\'utilisation, le contenu de votre bibliothèque ou vos identifiants de connexion ; votre bibliothèque, votre historique, vos favoris, vos téléchargements, vos réglages et votre état de connexion sont stockés dans le répertoire de données local et peuvent être supprimés en désinstallant ou via la fonction de suppression sous « Sécurité » ; lors d\'interactions avec des plateformes en ligne, les requêtes sont envoyées directement depuis votre appareil vers la plateforme concernée et relèvent de la politique de confidentialité et des conditions de service de cette plateforme.\n\n';
+
+  @override
+  String get settingsDeclineThirdPartyTitle => '7. Services tiers et risques\n';
+
+  @override
+  String get settingsDeclineThirdPartyBody =>
+      'Les interfaces, les méthodes d\'authentification et la disponibilité des plateformes de musique en ligne sont déterminées uniquement par les plateformes et peuvent changer, être restreintes ou fermées à tout moment, entraînant des échecs de connexion, des fonctions indisponibles ou des données non synchronisées ; ce logiciel est fourni tel quel et n\'offre aucune garantie quant à la disponibilité continue, la stabilité ou l\'intégrité des données des services tiers.\n\n';
+
+  @override
+  String get settingsDecline5Title => '8. Clause de non-responsabilité\n';
 
   @override
   String get settingsDecline5Body =>
-      'Ce logiciel est fourni「tel quel」sans garanties expresses ou implicites.\n\n';
+      'Ce logiciel est fourni「tel quel」sans garanties expresses ou implicites. Toute perte directe ou indirecte résultant de l\'utilisation ou de l\'impossibilité d\'utilisation, ou de changements d\'interfaces de plateformes en ligne, de restrictions de compte, d\'identifiants de connexion expirés, de contrôles des risques ou de bannissements de compte, ou de défaillances de fonctions, sera à la charge de l\'utilisateur.\n\n';
 
   @override
   String get settingsDeclineFooter =>

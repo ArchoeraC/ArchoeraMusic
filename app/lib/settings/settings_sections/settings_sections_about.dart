@@ -155,6 +155,18 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
                       l10n.settingsDecline4Body,
                     ),
                     _dense(
+                      l10n.settingsDeclineLoginTitle,
+                      l10n.settingsDeclineLoginBody,
+                    ),
+                    _dense(
+                      l10n.settingsDeclinePrivacyTitle,
+                      l10n.settingsDeclinePrivacyBody,
+                    ),
+                    _dense(
+                      l10n.settingsDeclineThirdPartyTitle,
+                      l10n.settingsDeclineThirdPartyBody,
+                    ),
+                    _dense(
                       l10n.settingsDecline5Title,
                       l10n.settingsDecline5Body,
                     ),

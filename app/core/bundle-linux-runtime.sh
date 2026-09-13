@@ -47,8 +47,13 @@ fi
 
 collect_deps() {
   local f
-  for f in "$@"; do ldd "$f" 2>/dev/null || true; done \
-    | awk '/=>/ && $3 ~ /^\// {print $3}'
+  # LD_LIBRARY_PATH 指向 native/：优先解析 bundle 内**已内嵌**的库（尤其是自建
+  # 最小 FFmpeg）。否则 ldd 会命中系统 FFmpeg，把其整套视频/图像依赖闭包
+  # （libx264/x265/vpx/aom/jxl/rsvg/icu…，实测 +126MB）拖进来一并内嵌。
+  for f in "$@"; do
+    LD_LIBRARY_PATH="$native${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+      ldd "$f" 2>/dev/null || true
+  done | awk '/=>/ && $3 ~ /^\// {print $3}'
 }
 
 # 迭代到不动点（ldd 已含传递闭包，多轮仅作保险）

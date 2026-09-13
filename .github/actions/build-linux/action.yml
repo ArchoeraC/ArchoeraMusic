@@ -61,7 +61,7 @@ runs:
       uses: actions/cache@v5
       with:
         path: ~/.local/ffmpeg-minimal
-        key: ffmpeg-minimal-7.1.1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_key_suffix }}
+        key: ffmpeg-minimal-9.0.1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_key_suffix }}
 
     - name: Build minimal FFmpeg
       if: steps.ffmpeg-cache.outputs.cache-hit != 'true'

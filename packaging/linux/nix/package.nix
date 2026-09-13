@@ -75,12 +75,13 @@ stdenv.mkDerivation (finalAttrs: {
 
   # 内嵌运行库（native/ 下的 libav* / libtag）由 RUNPATH=$ORIGIN 解析，store 中
   # 没有对应 soname；显式忽略，避免 autoPatchelfHook 报「找不到依赖」而失败。
-  # 这些 soname 跟随内嵌的 FFmpeg 7.1.1 / TagLib 版本（升级时同步更新）。
+  # 这些 soname 跟随内嵌的 FFmpeg 9.0.1 / libopus / TagLib 版本（升级时同步更新）。
   autoPatchelfIgnoreMissingDeps = [
-    "libavformat.so.61"
-    "libavcodec.so.61"
-    "libavutil.so.59"
-    "libswresample.so.5"
+    "libavformat.so.63"
+    "libavcodec.so.63"
+    "libavutil.so.61"
+    "libswresample.so.7"
+    "libopus.so.0"
     "libtag.so.1"
     "libtag.so.2"
   ];

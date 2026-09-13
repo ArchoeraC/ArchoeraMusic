@@ -3015,11 +3015,32 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nicht für kommerzielle Aktivitäten, Massen-Scraping oder Wiederverkauf verwenden; nicht unter Verstoß gegen lokale Gesetze oder Nutzungsbedingungen verwenden.\n\n';
 
   @override
-  String get settingsDecline5Title => '5. Haftungsausschluss\n';
+  String get settingsDeclineLoginTitle => '5. Anmeldung & Konto\n';
+
+  @override
+  String get settingsDeclineLoginBody =>
+      'Diese Software bietet QR-Code-Anmeldung (scannen Sie den von dieser Software angezeigten QR-Code mit der offiziellen App der jeweiligen Plattform) und Anmeldung mit Zugangsdaten, um Favoriten und Wiedergabelisten zu synchronisieren und Funktionen freizuschalten. Bitte beachten Sie:\n· Der QR-Code wird von der offiziellen Schnittstelle der jeweiligen Plattform erzeugt; diese Software erfasst, analysiert oder übermittelt Ihren Anmelde-QR-Code, Ihr Konto, Ihr Passwort oder Ihren SMS-Bestätigungscode nicht an Dritte;\n· Nach der Anmeldung erhaltene Sitzungsnachweise (Cookies / Token usw.) werden nur lokal gespeichert (verschlüsselt im Anmeldedaten-Tresor) und niemals an den Entwickler oder einen Nicht-Plattform-Server hochgeladen;\n· Die QR-Anmeldung bedeutet, dass Sie dieser Software erlauben, mit Ihrem Konto auf die Plattform zuzugreifen; Aktionen wie Favorisieren, Abspielen und Kommentieren wirken sich tatsächlich auf Ihr Konto aus;\n· Bewahren Sie Gerät und Systemkonto sicher auf; melden Sie sich auf öffentlichen oder gemeinsam genutzten Geräten anschließend umgehend ab und löschen Sie die Anmeldedaten;\n· Die Plattform kann gegenüber Anmeldungen von Drittanbieter-Clients Risikokontrollen, Einschränkungen oder Sperren verhängen; daraus entstehende Kontoanomalien oder eingeschränkte Funktionen liegen in Ihrer Verantwortung.\n\n';
+
+  @override
+  String get settingsDeclinePrivacyTitle => '6. Datenschutz & lokale Daten\n';
+
+  @override
+  String get settingsDeclinePrivacyBody =>
+      'Diese Software betreibt keinen Entwicklerserver und erfasst oder übermittelt keine personenbezogenen Daten, kein Nutzungsverhalten, keine Bibliotheksinhalte und keine Anmeldedaten; Ihre Bibliothek, Ihr Verlauf, Ihre Favoriten, Downloads, Einstellungen und Anmeldestatus werden im lokalen Datenverzeichnis gespeichert und können durch Deinstallation oder die Löschfunktion unter „Sicherheit“ entfernt werden; bei der Interaktion mit Online-Plattformen werden Anfragen direkt von Ihrem Gerät an die jeweilige Plattform gesendet und unterliegen deren Datenschutzrichtlinie und Nutzungsbedingungen.\n\n';
+
+  @override
+  String get settingsDeclineThirdPartyTitle => '7. Dienste Dritter & Risiken\n';
+
+  @override
+  String get settingsDeclineThirdPartyBody =>
+      'Die Schnittstellen, Authentifizierungsmethoden und die Verfügbarkeit von Online-Musikplattformen werden allein von den Plattformen bestimmt und können sich jederzeit ändern, eingeschränkt oder eingestellt werden, was zu Anmeldefehlern, nicht verfügbaren Funktionen oder nicht synchronisierten Daten führen kann; diese Software wird wie besehen bereitgestellt und übernimmt keine Zusicherung hinsichtlich der fortgesetzten Verfügbarkeit, Stabilität oder Datenintegrität von Diensten Dritter.\n\n';
+
+  @override
+  String get settingsDecline5Title => '8. Haftungsausschluss\n';
 
   @override
   String get settingsDecline5Body =>
-      'Diese Software wird「wie besehen」ohne ausdrückliche oder stillschweigende Garantien bereitgestellt.\n\n';
+      'Diese Software wird「wie besehen」ohne ausdrückliche oder stillschweigende Garantien bereitgestellt. Alle direkten oder indirekten Verluste, die durch die Nutzung oder Unmöglichkeit der Nutzung oder durch Änderungen der Online-Plattform-Schnittstellen, Kontoeinschränkungen, abgelaufene Anmeldenachweise, Risikokontrollen oder Sperren von Konten oder Funktionsausfälle entstehen, trägt der Nutzer.\n\n';
 
   @override
   String get settingsDeclineFooter =>

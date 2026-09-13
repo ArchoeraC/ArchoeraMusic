@@ -30,7 +30,8 @@ miniaudio 播放 + Rust tempo + Zig 解码内核）。其**自研代码**随本�
 
 | 组件 | 版本 | 许可证 | 说明 |
 |---|---|---|---|
-| **FFmpeg**（libavformat/libavcodec/libavutil/libswresample） | 7.1.1（自建，`app/core/build-ffmpeg-minimal.sh`） | LGPL-2.1+（纯 LGPL 构建，无 GPL/nonfree） | 解码 / 重采样（`swr_convert`）。Linux/macOS 用自建**最小纯 LGPL** FFmpeg（`--disable-gpl --disable-nonfree --disable-autodetect`）动态链接，运行库随包内嵌（`RUNPATH=$ORIGIN`；macOS `@loader_path`），与系统 FFmpeg 解耦；Windows 经 vcpkg（默认无 gpl 特性）由 `build_windows.bat` 构建，DLL 随包分发 |
+| **FFmpeg**（libavformat/libavcodec/libavutil/libswresample） | 9.0.1（自建，`app/core/build-ffmpeg-minimal.sh`） | LGPL-2.1+（纯 LGPL · 仅音频构建，无 GPL/nonfree） | 解码 / 重采样（`swr_convert`）。Linux/macOS 用自建**最小纯 LGPL · 仅音频** FFmpeg（`--disable-gpl --disable-nonfree --disable-autodetect --disable-everything` 后仅启用音频组件）动态链接，运行库随包内嵌（`RUNPATH=$ORIGIN`；macOS `@loader_path`），与系统 FFmpeg 解耦；Windows 经 vcpkg（默认无 gpl 特性）由 `build_windows.bat` 构建，DLL 随包分发 |
+| **libopus** | 1.5+（系统/vcpkg） | BSD-3-Clause | Opus 编码（FFmpeg `libopus` 编码器，`src/encoder.c` 输出 OGG/Opus）。FFmpeg 自带 `opus` 编码器为 experimental 且仅支持 planar fltp，故改用外部 libopus；Linux/macOS 经 pkg-config 引入、Windows 经 vcpkg `opus` 特性，DLL/dylib 随包内嵌 |
 | `miniaudio` | v0.11.25 | MIT-0 / 公有领域（Public Domain）双许可 | 跨平台音频输出（ALSA/PulseAudio/PipeWire/WASAPI/CoreAudio），`include/miniaudio.h` 单头文件 |
 | `signalsmith-stretch` | 0.1.3 | MIT | 变速变调（经 `tempo-rs` Rust staticlib `libaudio_tempo.a` 封装） |
 
