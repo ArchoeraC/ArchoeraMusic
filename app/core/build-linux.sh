@@ -25,7 +25,10 @@ JOBS="$(nproc)"
 #   必须重跑本步，否则陈旧产物会让 EraAudio 行为异常——见 docs/engine-integration-bench.md）
 if command -v zig >/dev/null 2>&1; then
   echo "[build-linux] ===== audio-engine: zig kernel (ReleaseFast) ====="
-  (cd "$ROOT/audio-engine" && zig build -Doptimize=ReleaseFast) || exit 1
+  # -Dcpu=baseline：内核必须按 x86-64 基线指令集编译。否则 Zig 默认按**构建机
+  # 原生 CPU**（CI runner 常带 AVX-512）生成 EVEX/AVX512VL 指令，在普通用户
+  # CPU（如 Raptor Lake，无 AVX-512）上直接 SIGILL（非法指令）。
+  (cd "$ROOT/audio-engine" && zig build -Doptimize=ReleaseFast -Dcpu=baseline) || exit 1
 else
   echo "[build-linux] 警告: 未检测到 zig，自研内核(EraAudio)不编译（引擎将以 FFmpeg/Stable 运行）；"
   echo "          安装 Zig 0.16（https://ziglang.org/download）后重跑可启用 EraAudio。"
