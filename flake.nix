@@ -506,13 +506,16 @@ NUGETCFG
           install -Dm644 app/linux/runner/resources/app_icon_512.png \
             $out/share/icons/hicolor/512x512/apps/$APP_ID.png
 
-          # 去掉构建期 RPATH（/tmp/nix-build-*），保留 $ORIGIN 与 store 路径；
-          # 否则 Nix fixup 的 forbidden-RPATH 校验直接失败。
+          # 去掉构建期 RPATH（构建目录，CI 为 /nix/var/nix/builds/nix-*，本地为
+          # /tmp/nix-build-*），保留 $ORIGIN 与 store 路径；否则 Nix fixup 的
+          # forbidden-RPATH 校验直接失败。
           find $out -type f -print0 2>/dev/null | while IFS= read -r -d ''' f; do
             cur=$(patchelf --print-rpath "$f" 2>/dev/null) || continue
-            case "$cur" in *nix-build*) ;; *) continue ;; esac
+            [ -z "$cur" ] && continue
             new=$(printf '%s' "$cur" | tr ':' '\n' \
-              | grep -v "^$TMPDIR" | grep -v '^/tmp/nix-build' | paste -sd: -)
+              | grep -vF "$NIX_BUILD_TOP" | grep -vF "/nix/var/nix/builds" \
+              | grep -vF "/tmp/nix-build" | paste -sd: -)
+            [ "$new" = "$cur" ] && continue
             [ -z "$new" ] && new='$ORIGIN'
             patchelf --set-rpath "$new" "$f" 2>/dev/null || true
           done

@@ -4,6 +4,14 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [0.9.16+9] - 2026-09-13
+
+补一个小修喵：
+
+1、修 NixOS 构建在 CI 上的 **forbidden-RPATH** 失败：CI 的构建目录是 `/nix/var/nix/builds/nix-*`（不是本地的 `/tmp/nix-build-*`），打包清理 RPATH 时没覆盖到，Nix fixup 校验直接报错；现在统一按 `$NIX_BUILD_TOP` + `/nix/var/nix/builds` 清理构建期 RPATH，本地与 CI 都能过喵
+
+（0.9.16+8 因为这个问题没发出去，直接以 +9 顶上）
+
 ## [0.9.16+8] - 2026-09-13
 
 你好喵
