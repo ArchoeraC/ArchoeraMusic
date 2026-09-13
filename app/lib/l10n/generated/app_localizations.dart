@@ -5294,16 +5294,52 @@ abstract class AppLocalizations {
   /// **'请勿利用本软件从事商业行为、批量抓取、爬取或转售内容；请勿在违反当地法律法规或相关平台服务条款的情况下使用本软件；请勿绕过在线平台的技术保护措施、访问控制或服务条款。\n\n'**
   String get settingsDecline4Body;
 
+  /// No description provided for @settingsDeclineLoginTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'五、登录与账号\n'**
+  String get settingsDeclineLoginTitle;
+
+  /// No description provided for @settingsDeclineLoginBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本软件提供扫码登录（用各音乐平台官方 App 扫描本软件展示的二维码）与账号凭据登录，用于同步收藏、歌单并解锁相应功能。请注意：\n· 二维码由对应平台官方接口生成，本软件不收集、不解析、不向任何第三方发送您的登录二维码、账号、密码或短信验证码；\n· 登录成功后获得的会话凭据（Cookie / Token 等）仅保存在本机（凭据保险库加密存储），不会上传至开发者或任何非平台服务器；\n· 扫码登录等同于您授权本软件以您的账号访问对应平台，收藏、播放、评论等操作会真实作用于您的账号；\n· 请妥善保管设备与系统账户，在公共或共享设备上登录后请及时退出登录并清理凭据；\n· 平台可能对第三方客户端登录进行风控、限制或封禁，由此产生的账号异常、功能受限等风险由您自行承担。\n\n'**
+  String get settingsDeclineLoginBody;
+
+  /// No description provided for @settingsDeclinePrivacyTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'六、隐私与本地数据\n'**
+  String get settingsDeclinePrivacyTitle;
+
+  /// No description provided for @settingsDeclinePrivacyBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本软件不设开发者服务器，不收集、不上传您的个人信息、使用行为、曲库内容或登录凭据；您的曲库、历史、收藏、下载、设置与登录态均保存在本机数据目录，卸载或使用「安全」中的删除功能可清除；与在线平台交互时，请求由您的设备直接发往对应平台，受该平台隐私政策与服务条款约束。\n\n'**
+  String get settingsDeclinePrivacyBody;
+
+  /// No description provided for @settingsDeclineThirdPartyTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'七、第三方服务与风险\n'**
+  String get settingsDeclineThirdPartyTitle;
+
+  /// No description provided for @settingsDeclineThirdPartyBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'各在线音乐平台的接口、鉴权方式与可用性由平台单方决定，可能随时变更、限制或关闭，导致登录失效、功能不可用或数据无法同步；本软件按现状提供，不对第三方服务的持续可用性、稳定性或数据完整性作出任何承诺。\n\n'**
+  String get settingsDeclineThirdPartyBody;
+
   /// No description provided for @settingsDecline5Title.
   ///
   /// In zh_CN, this message translates to:
-  /// **'五、免责声明\n'**
+  /// **'八、免责声明\n'**
   String get settingsDecline5Title;
 
   /// No description provided for @settingsDecline5Body.
   ///
   /// In zh_CN, this message translates to:
-  /// **'本软件按「现状」提供，不对其作出任何明示或默示的保证。因使用或无法使用本软件，或因在线平台接口变更、账号限制、功能失效等产生的任何直接或间接损失，均由使用者自行承担。\n\n'**
+  /// **'本软件按「现状」提供，不对其作出任何明示或默示的保证。因使用或无法使用本软件，或因在线平台接口变更、账号限制、登录凭据失效、账号被风控或封禁、功能失效等产生的任何直接或间接损失，均由使用者自行承担。\n\n'**
   String get settingsDecline5Body;
 
   /// No description provided for @settingsDeclineFooter.

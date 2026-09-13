@@ -95,7 +95,7 @@ ArchoeraMusic $version
 最低 glibc : ${glibc_max:-未知}
 构建时间   : $(date -u +%Y-%m-%dT%H:%M:%SZ)
 提交       : ${GITHUB_SHA:-$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)}
-运行库     : FFmpeg 7.1.1（自建最小纯 LGPL）、TagLib 已内嵌于 native/（RUNPATH=\$ORIGIN）
+运行库     : FFmpeg 9.0.1（自建最小纯 LGPL·仅音频）、libopus、TagLib 已内嵌于 native/（RUNPATH=\$ORIGIN）
 许可       : AGPL-3.0（见 LICENSE）；第三方许可见 licenses/
 EOF
 }

@@ -3043,11 +3043,33 @@ class AppLocalizationsEs extends AppLocalizations {
       'No usar para actividades comerciales, scraping masivo o reventa; no usar en violación de leyes locales o términos de servicio.\n\n';
 
   @override
-  String get settingsDecline5Title => '5. Descargo de responsabilidad\n';
+  String get settingsDeclineLoginTitle => '5. Inicio de sesión y cuenta\n';
+
+  @override
+  String get settingsDeclineLoginBody =>
+      'Este software ofrece inicio de sesión por código QR (escanee el código QR que muestra este software con la app oficial de la plataforma correspondiente) e inicio de sesión con credenciales, para sincronizar favoritos y listas de reproducción y desbloquear funciones. Tenga en cuenta:\n· El código QR lo genera la interfaz oficial de la plataforma correspondiente; este software no recopila, analiza ni envía su código QR de inicio de sesión, cuenta, contraseña o código de verificación SMS a ningún tercero;\n· Las credenciales de sesión obtenidas tras el inicio de sesión (cookies / tokens, etc.) se guardan solo en su dispositivo (cifradas en la bóveda de credenciales) y nunca se suben al desarrollador ni a ningún servidor ajeno a la plataforma;\n· El inicio de sesión por QR significa que usted autoriza a este software a acceder a la plataforma con su cuenta; acciones como marcar favoritos, reproducir y comentar afectarán realmente a su cuenta;\n· Mantenga seguros su dispositivo y su cuenta del sistema; tras iniciar sesión en un dispositivo público o compartido, cierre la sesión y borre las credenciales de inmediato;\n· La plataforma puede aplicar control de riesgos, restricciones o bloqueos a los inicios de sesión de clientes de terceros; las anomalías de cuenta o funciones restringidas que se deriven de ello son responsabilidad suya.\n\n';
+
+  @override
+  String get settingsDeclinePrivacyTitle => '6. Privacidad y datos locales\n';
+
+  @override
+  String get settingsDeclinePrivacyBody =>
+      'Este software no tiene servidor del desarrollador y no recopila ni sube su información personal, comportamiento de uso, contenido de la biblioteca o credenciales de inicio de sesión; su biblioteca, historial, favoritos, descargas, ajustes y estado de inicio de sesión se guardan en el directorio de datos local y pueden eliminarse desinstalando o usando la función de borrado en «Seguridad»; al interactuar con plataformas en línea, las solicitudes se envían directamente desde su dispositivo a la plataforma correspondiente y se rigen por la política de privacidad y los términos de servicio de esa plataforma.\n\n';
+
+  @override
+  String get settingsDeclineThirdPartyTitle =>
+      '7. Servicios de terceros y riesgos\n';
+
+  @override
+  String get settingsDeclineThirdPartyBody =>
+      'Las interfaces, los métodos de autenticación y la disponibilidad de las plataformas de música en línea los determina únicamente la plataforma y pueden cambiar, restringirse o cerrarse en cualquier momento, provocando fallos de inicio de sesión, funciones no disponibles o datos sin sincronizar; este software se proporciona tal cual y no ofrece ninguna garantía sobre la disponibilidad continua, la estabilidad o la integridad de los datos de servicios de terceros.\n\n';
+
+  @override
+  String get settingsDecline5Title => '8. Descargo de responsabilidad\n';
 
   @override
   String get settingsDecline5Body =>
-      'Este software se proporciona「tal cual」sin garantías expresas o implícitas.\n\n';
+      'Este software se proporciona「tal cual」sin garantías expresas o implícitas. Cualquier pérdida directa o indirecta derivada del uso o la imposibilidad de uso, o de cambios en las interfaces de plataformas en línea, restricciones de cuenta, credenciales de inicio de sesión caducadas, controles de riesgo o bloqueos de cuenta, o fallos de funciones, correrá a cargo del usuario.\n\n';
 
   @override
   String get settingsDeclineFooter =>

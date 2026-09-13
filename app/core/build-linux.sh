@@ -31,6 +31,20 @@ else
   echo "          安装 Zig 0.16（https://ziglang.org/download）后重跑可启用 EraAudio。"
 fi
 
+# ── FFmpeg：使用自建「最小纯 LGPL·仅音频」版本（与 CI 一致）──────────
+# 未构建则先构建，并把 pkg-config / 运行时库路径指过去，确保引擎链接内嵌的
+# 最小 FFmpeg 而非系统 FFmpeg。系统 FFmpeg 链接整套视频/图像库（libx264/
+# x265/vpx/aom/jxl/rsvg/icu…），bundle-linux-runtime.sh 会把其依赖闭包整体
+# 内嵌进 native/（实测 +126MB，deb 膨胀到数百 MB），必须避免。
+FFMPEG_PREFIX="${FFMPEG_PREFIX:-$HOME/.local/ffmpeg-minimal}"
+if [[ ! -f "$FFMPEG_PREFIX/lib/libavformat.so" ]]; then
+  echo "[build-linux] ===== 构建最小 FFmpeg（纯 LGPL·仅音频）====="
+  bash "$ROOT/build-ffmpeg-minimal.sh"
+fi
+export PKG_CONFIG_PATH="$FFMPEG_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+export LD_LIBRARY_PATH="$FFMPEG_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+echo "[build-linux] 使用自建 FFmpeg: $FFMPEG_PREFIX"
+
 echo "[build-linux] ===== audio-engine ====="
 cmake -S "$ROOT/audio-engine" -B "$ROOT/audio-engine/build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$ROOT/audio-engine/build" -j"$JOBS"

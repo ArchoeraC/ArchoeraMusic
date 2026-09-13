@@ -2854,11 +2854,32 @@ class AppLocalizationsZh extends AppLocalizations {
       '请勿利用本软件从事商业行为、批量抓取、爬取或转售内容；请勿在违反当地法律法规或相关平台服务条款的情况下使用本软件；请勿绕过在线平台的技术保护措施、访问控制或服务条款。\n\n';
 
   @override
-  String get settingsDecline5Title => '五、免责声明\n';
+  String get settingsDeclineLoginTitle => '五、登录与账号\n';
+
+  @override
+  String get settingsDeclineLoginBody =>
+      '本软件提供扫码登录（用各音乐平台官方 App 扫描本软件展示的二维码）与账号凭据登录，用于同步收藏、歌单并解锁相应功能。请注意：\n· 二维码由对应平台官方接口生成，本软件不收集、不解析、不向任何第三方发送您的登录二维码、账号、密码或短信验证码；\n· 登录成功后获得的会话凭据（Cookie / Token 等）仅保存在本机（凭据保险库加密存储），不会上传至开发者或任何非平台服务器；\n· 扫码登录等同于您授权本软件以您的账号访问对应平台，收藏、播放、评论等操作会真实作用于您的账号；\n· 请妥善保管设备与系统账户，在公共或共享设备上登录后请及时退出登录并清理凭据；\n· 平台可能对第三方客户端登录进行风控、限制或封禁，由此产生的账号异常、功能受限等风险由您自行承担。\n\n';
+
+  @override
+  String get settingsDeclinePrivacyTitle => '六、隐私与本地数据\n';
+
+  @override
+  String get settingsDeclinePrivacyBody =>
+      '本软件不设开发者服务器，不收集、不上传您的个人信息、使用行为、曲库内容或登录凭据；您的曲库、历史、收藏、下载、设置与登录态均保存在本机数据目录，卸载或使用「安全」中的删除功能可清除；与在线平台交互时，请求由您的设备直接发往对应平台，受该平台隐私政策与服务条款约束。\n\n';
+
+  @override
+  String get settingsDeclineThirdPartyTitle => '七、第三方服务与风险\n';
+
+  @override
+  String get settingsDeclineThirdPartyBody =>
+      '各在线音乐平台的接口、鉴权方式与可用性由平台单方决定，可能随时变更、限制或关闭，导致登录失效、功能不可用或数据无法同步；本软件按现状提供，不对第三方服务的持续可用性、稳定性或数据完整性作出任何承诺。\n\n';
+
+  @override
+  String get settingsDecline5Title => '八、免责声明\n';
 
   @override
   String get settingsDecline5Body =>
-      '本软件按「现状」提供，不对其作出任何明示或默示的保证。因使用或无法使用本软件，或因在线平台接口变更、账号限制、功能失效等产生的任何直接或间接损失，均由使用者自行承担。\n\n';
+      '本软件按「现状」提供，不对其作出任何明示或默示的保证。因使用或无法使用本软件，或因在线平台接口变更、账号限制、登录凭据失效、账号被风控或封禁、功能失效等产生的任何直接或间接损失，均由使用者自行承担。\n\n';
 
   @override
   String get settingsDeclineFooter =>
@@ -6812,11 +6833,32 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       '请勿利用本软件从事商业行为、批量抓取、爬取或转售内容；请勿在违反当地法律法规或相关平台服务条款的情况下使用本软件；请勿绕过在线平台的技术保护措施、访问控制或服务条款。\n\n';
 
   @override
-  String get settingsDecline5Title => '五、免责声明\n';
+  String get settingsDeclineLoginTitle => '五、登录与账号\n';
+
+  @override
+  String get settingsDeclineLoginBody =>
+      '本软件提供扫码登录（用各音乐平台官方 App 扫描本软件展示的二维码）与账号凭据登录，用于同步收藏、歌单并解锁相应功能。请注意：\n· 二维码由对应平台官方接口生成，本软件不收集、不解析、不向任何第三方发送您的登录二维码、账号、密码或短信验证码；\n· 登录成功后获得的会话凭据（Cookie / Token 等）仅保存在本机（凭据保险库加密存储），不会上传至开发者或任何非平台服务器；\n· 扫码登录等同于您授权本软件以您的账号访问对应平台，收藏、播放、评论等操作会真实作用于您的账号；\n· 请妥善保管设备与系统账户，在公共或共享设备上登录后请及时退出登录并清理凭据；\n· 平台可能对第三方客户端登录进行风控、限制或封禁，由此产生的账号异常、功能受限等风险由您自行承担。\n\n';
+
+  @override
+  String get settingsDeclinePrivacyTitle => '六、隐私与本地数据\n';
+
+  @override
+  String get settingsDeclinePrivacyBody =>
+      '本软件不设开发者服务器，不收集、不上传您的个人信息、使用行为、曲库内容或登录凭据；您的曲库、历史、收藏、下载、设置与登录态均保存在本机数据目录，卸载或使用「安全」中的删除功能可清除；与在线平台交互时，请求由您的设备直接发往对应平台，受该平台隐私政策与服务条款约束。\n\n';
+
+  @override
+  String get settingsDeclineThirdPartyTitle => '七、第三方服务与风险\n';
+
+  @override
+  String get settingsDeclineThirdPartyBody =>
+      '各在线音乐平台的接口、鉴权方式与可用性由平台单方决定，可能随时变更、限制或关闭，导致登录失效、功能不可用或数据无法同步；本软件按现状提供，不对第三方服务的持续可用性、稳定性或数据完整性作出任何承诺。\n\n';
+
+  @override
+  String get settingsDecline5Title => '八、免责声明\n';
 
   @override
   String get settingsDecline5Body =>
-      '本软件按「现状」提供，不对其作出任何明示或默示的保证。因使用或无法使用本软件，或因在线平台接口变更、账号限制、功能失效等产生的任何直接或间接损失，均由使用者自行承担。\n\n';
+      '本软件按「现状」提供，不对其作出任何明示或默示的保证。因使用或无法使用本软件，或因在线平台接口变更、账号限制、登录凭据失效、账号被风控或封禁、功能失效等产生的任何直接或间接损失，均由使用者自行承担。\n\n';
 
   @override
   String get settingsDeclineFooter =>
@@ -10771,11 +10813,32 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '請勿利用本軟體從事商業行為、批量抓取、爬取或轉售內容；請勿在違反當地法律法規或相關平台服務條款的情況下使用本軟體；請勿繞過線上平台的技術保護措施、存取控制或服務條款。\n\n';
 
   @override
-  String get settingsDecline5Title => '五、免責聲明\n';
+  String get settingsDeclineLoginTitle => '五、登入與帳號\n';
+
+  @override
+  String get settingsDeclineLoginBody =>
+      '本軟體提供掃碼登入（以各音樂平台官方 App 掃描本軟體顯示的 QR Code）與帳號憑證登入，用於同步收藏、歌單並解鎖相應功能。請注意：\n· QR Code 由對應平台官方介面產生，本軟體不收集、不解析、不向任何第三方傳送您的登入 QR Code、帳號、密碼或簡訊驗證碼；\n· 登入成功後取得的會話憑證（Cookie / Token 等）僅保存在本機（憑證保險庫加密儲存），不會上傳至開發者或任何非平台伺服器；\n· 掃碼登入等同於您授權本軟體以您的帳號存取對應平台，收藏、播放、評論等操作會實際作用於您的帳號；\n· 請妥善保管裝置與系統帳戶，在公共或共用裝置上登入後請及時登出並清除憑證；\n· 平台可能對第三方用戶端登入進行風控、限制或封禁，由此產生的帳號異常、功能受限等風險由您自行承擔。\n\n';
+
+  @override
+  String get settingsDeclinePrivacyTitle => '六、隱私與本機資料\n';
+
+  @override
+  String get settingsDeclinePrivacyBody =>
+      '本軟體不設開發者伺服器，不收集、不上傳您的個人資訊、使用行為、曲庫內容或登入憑證；您的曲庫、歷史、收藏、下載、設定與登入狀態均保存在本機資料目錄，解除安裝或使用「安全」中的刪除功能可清除；與線上平台互動時，請求由您的裝置直接發往對應平台，受該平台隱私政策與服務條款約束。\n\n';
+
+  @override
+  String get settingsDeclineThirdPartyTitle => '七、第三方服務與風險\n';
+
+  @override
+  String get settingsDeclineThirdPartyBody =>
+      '各線上音樂平台的介面、驗證方式與可用性由平台單方決定，可能隨時變更、限制或關閉，導致登入失效、功能無法使用或資料無法同步；本軟體按現狀提供，不對第三方服務的持續可用性、穩定性或資料完整性作出任何承諾。\n\n';
+
+  @override
+  String get settingsDecline5Title => '八、免責聲明\n';
 
   @override
   String get settingsDecline5Body =>
-      '本軟體按「現狀」提供，不對其作出任何明示或默示的保證。因使用或無法使用本軟體，或因線上平台介面變更、帳號限制、功能失效等產生的任何直接或間接損失，均由使用者自行承擔。\n\n';
+      '本軟體按「現狀」提供，不對其作出任何明示或默示的保證。因使用或無法使用本軟體，或因線上平台介面變更、帳號限制、登入憑證失效、帳號被風控或封禁、功能失效等產生的任何直接或間接損失，均由使用者自行承擔。\n\n';
 
   @override
   String get settingsDeclineFooter =>

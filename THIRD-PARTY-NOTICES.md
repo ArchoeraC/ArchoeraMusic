@@ -9,17 +9,27 @@
 
 ## 随包内嵌的运行库
 
-### FFmpeg 7.1.1（libavformat / libavcodec / libavutil / libswresample）
+### FFmpeg 9.0.1（libavformat / libavcodec / libavutil / libswresample）
 
-- **许可**：LGPL-2.1-or-later（**纯 LGPL 构建**：`--disable-gpl --disable-nonfree
-  --disable-autodetect`，未启用任何 GPL/nonfree 组件）。
+- **许可**：LGPL-2.1-or-later（**纯 LGPL · 仅音频构建**：`--disable-gpl --disable-nonfree
+  --disable-autodetect --disable-everything` 后仅启用音频解码/解复用/解析与 Opus
+  编码，未启用任何 GPL/nonfree 组件，也未编译任何视频/图像解码器）。
 - **链接方式**：动态链接（未静态合并）。
-- **源码**：https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz
+- **源码**：https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz
   （构建脚本与确切配置见 `app/core/build-ffmpeg-minimal.sh`）。
 - **许可文本**：同目录 `COPYING.LGPLv2.1`、`LICENSE.md`。
 - **替换权**：依 LGPL-2.1，你可获得对应源码，并以修改后的 FFmpeg 动态库替换本程序
   运行时所加载的内嵌库（Linux `native/libav*`、macOS `Contents/native/libav*`、
   Windows exe 根目录的 `av*.dll`）。
+
+### libopus（libopus.so.0 / libopus.dylib / opus.dll）
+
+- **许可**：BSD-3-Clause（Xiph.Org / Jean-Marc Valin 等）。
+- **用途**：Opus 编码（FFmpeg 的 `libopus` 编码器，OGG/Opus 转码输出）。
+- **链接方式**：动态链接（未静态合并），随包内嵌（Linux `native/libopus.so.0`、
+  macOS `Contents/native/libopus*.dylib`、Windows exe 根目录 `opus.dll`）。
+- **源码**：https://opus-codec.org/downloads/ ｜ https://github.com/xiph/opus
+- **许可文本**：同目录 `opus-COPYING`（或见 `app/core/audio-engine/THIRD-PARTY-LICENSES.md`）。
 
 ### TagLib（libtag）
 
