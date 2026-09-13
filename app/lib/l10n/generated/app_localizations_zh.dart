@@ -584,6 +584,66 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginRegenerate => '重新生成';
 
   @override
+  String get loginRiskTitle => '登录风险提示';
+
+  @override
+  String get loginRiskBody =>
+      '登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。';
+
+  @override
+  String get loginRiskAgree => '我已知晓，继续登录';
+
+  @override
+  String get loginTabQr => '扫码';
+
+  @override
+  String get loginTabPhone => '手机号';
+
+  @override
+  String get loginTabEmail => '邮箱';
+
+  @override
+  String loginTitleBrand(String platform) {
+    return '$platform登录';
+  }
+
+  @override
+  String get loginPhoneHint => '手机号';
+
+  @override
+  String get loginCodeHint => '短信验证码';
+
+  @override
+  String get loginSendCode => '发送验证码';
+
+  @override
+  String get loginEmailHint => '邮箱';
+
+  @override
+  String get loginPasswordHint => '密码';
+
+  @override
+  String get loginSubmit => '登录';
+
+  @override
+  String get loginPhoneRequired => '请输入手机号';
+
+  @override
+  String get loginCodeRequired => '请输入验证码';
+
+  @override
+  String get loginEmailRequired => '请输入邮箱';
+
+  @override
+  String get loginPasswordRequired => '请输入密码';
+
+  @override
+  String get loginCodeSendFailed => '验证码发送失败';
+
+  @override
+  String get loginFailed => '登录失败';
+
+  @override
   String get loginSuccess => '登录成功';
 
   @override
@@ -4563,6 +4623,66 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginRegenerate => '重新生成';
 
   @override
+  String get loginRiskTitle => '登录风险提示';
+
+  @override
+  String get loginRiskBody =>
+      '登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。';
+
+  @override
+  String get loginRiskAgree => '我已知晓，继续登录';
+
+  @override
+  String get loginTabQr => '扫码';
+
+  @override
+  String get loginTabPhone => '手机号';
+
+  @override
+  String get loginTabEmail => '邮箱';
+
+  @override
+  String loginTitleBrand(String platform) {
+    return '$platform登录';
+  }
+
+  @override
+  String get loginPhoneHint => '手机号';
+
+  @override
+  String get loginCodeHint => '短信验证码';
+
+  @override
+  String get loginSendCode => '发送验证码';
+
+  @override
+  String get loginEmailHint => '邮箱';
+
+  @override
+  String get loginPasswordHint => '密码';
+
+  @override
+  String get loginSubmit => '登录';
+
+  @override
+  String get loginPhoneRequired => '请输入手机号';
+
+  @override
+  String get loginCodeRequired => '请输入验证码';
+
+  @override
+  String get loginEmailRequired => '请输入邮箱';
+
+  @override
+  String get loginPasswordRequired => '请输入密码';
+
+  @override
+  String get loginCodeSendFailed => '验证码发送失败';
+
+  @override
+  String get loginFailed => '登录失败';
+
+  @override
   String get loginSuccess => '登录成功';
 
   @override
@@ -8540,6 +8660,66 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get loginRegenerate => '重新產生';
+
+  @override
+  String get loginRiskTitle => '登入風險提示';
+
+  @override
+  String get loginRiskBody =>
+      '登入第三方用戶端存在以下風險，請確認後繼續：\n\n· 平台可能對第三方用戶端登入進行風控、限制或封禁，可能導致帳號異常、功能受限；\n· 掃碼 / 帳號登入等同於授權本軟體以您的帳號存取對應平台，收藏、播放、評論等操作會實際作用於您的帳號；\n· 登入憑證（Cookie / Token 等）僅保存在本機並加密儲存，不會上傳至開發者或任何非平台伺服器；\n· 請遵守對應平台的服務條款，因使用本軟體產生的一切後果由您自行承擔。\n\n繼續登入即表示您已閱讀並同意上述風險。';
+
+  @override
+  String get loginRiskAgree => '我已知曉，繼續登入';
+
+  @override
+  String get loginTabQr => '掃碼';
+
+  @override
+  String get loginTabPhone => '手機號';
+
+  @override
+  String get loginTabEmail => '信箱';
+
+  @override
+  String loginTitleBrand(String platform) {
+    return '$platform登入';
+  }
+
+  @override
+  String get loginPhoneHint => '手機號';
+
+  @override
+  String get loginCodeHint => '簡訊驗證碼';
+
+  @override
+  String get loginSendCode => '發送驗證碼';
+
+  @override
+  String get loginEmailHint => '信箱';
+
+  @override
+  String get loginPasswordHint => '密碼';
+
+  @override
+  String get loginSubmit => '登入';
+
+  @override
+  String get loginPhoneRequired => '請輸入手機號';
+
+  @override
+  String get loginCodeRequired => '請輸入驗證碼';
+
+  @override
+  String get loginEmailRequired => '請輸入信箱';
+
+  @override
+  String get loginPasswordRequired => '請輸入密碼';
+
+  @override
+  String get loginCodeSendFailed => '驗證碼發送失敗';
+
+  @override
+  String get loginFailed => '登入失敗';
 
   @override
   String get loginSuccess => '登入成功';

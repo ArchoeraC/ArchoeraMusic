@@ -12,16 +12,22 @@ import '../common/qr_image_view.dart';
 import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import 'login_risk_notice.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'netease_login_dialog/netease_login_dialog_view.dart';
 
-/// NT扫码登录（全屏毛玻璃页，QR 居中放大：unikey → qrurl → 2s 轮询
-/// loginQrCheck）。
+/// NT 登录（全屏毛玻璃页，三种方式 tab：扫码 / 手机号 / 邮箱）。
 ///
-/// 803 确认成功后刷新 [neteaseAuthProvider] 并自动关闭；800 过期后显示
-/// 「刷新二维码」按钮；点击二维码以外任意处（含 Esc）关闭，无关闭键。
-Future<void> showNeteaseLoginDialog(BuildContext context) {
+/// - 扫码：unikey → qrurl → 2s 轮询 loginQrCheck，803 成功；
+/// - 手机号：captcha_sent 发验证码 → login_cellphone；
+/// - 邮箱：login（邮箱 + 密码）。
+///
+/// 登录成功后刷新 [neteaseAuthProvider] 并自动关闭；点击面板以外任意处
+/// （含 Esc）关闭，无关闭键。进入前先弹「登录风险提示」。
+Future<void> showNeteaseLoginDialog(BuildContext context) async {
+  if (!await showLoginRiskNotice(context)) return;
+  if (!context.mounted) return;
   return showDialog<void>(
     context: context,
     barrierColor: Colors.transparent,
@@ -39,6 +45,10 @@ class _NeteaseLoginDialog extends ConsumerStatefulWidget {
 }
 
 class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
+  /// 当前 tab：0=扫码 / 1=手机号 / 2=邮箱。
+  int _tab = 0;
+
+  // ── 扫码 ──────────────────────────────────────────────────────────
   Timer? _poll;
   String _qrUrl = '';
   String _unikey = '';
@@ -47,6 +57,20 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
   bool _confirmed = false;
   String _status = '';
   String _error = '';
+
+  // ── 手机号 ────────────────────────────────────────────────────────
+  final _phoneCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
+  bool _phoneBusy = false;
+  int _codeCountdown = 0;
+  Timer? _codeTimer;
+  String _phoneError = '';
+
+  // ── 邮箱 ──────────────────────────────────────────────────────────
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  bool _emailBusy = false;
+  String _emailError = '';
 
   @override
   void initState() {
@@ -57,9 +81,20 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
   @override
   void dispose() {
     _poll?.cancel();
+    _codeTimer?.cancel();
+    _phoneCtrl.dispose();
+    _codeCtrl.dispose();
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
     super.dispose();
   }
 
+  void _switchTab(int tab) {
+    if (_tab == tab) return;
+    setState(() => _tab = tab);
+  }
+
+  // ── 扫码 ──────────────────────────────────────────────────────────
   Future<void> _createQr() async {
     setState(() {
       _loading = true;
@@ -97,9 +132,7 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
       if (status.confirmed) {
         _poll?.cancel();
         setState(() => _confirmed = true);
-        await ref.read(neteaseAuthProvider.notifier).refresh();
-        if (!mounted) return;
-        Navigator.of(context).pop();
+        await _onLoginSuccess();
       } else if (status.expired) {
         _poll?.cancel();
         setState(() => _expired = true);
@@ -114,6 +147,133 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
     } catch (_) {
       // 轮询失败静默，下一轮自动重试
     }
+  }
+
+  // ── 手机号 ────────────────────────────────────────────────────────
+  Future<void> _sendCode() async {
+    final l10n = context.l10n;
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isEmpty) {
+      setState(() => _phoneError = l10n.loginPhoneRequired);
+      return;
+    }
+    setState(() {
+      _phoneBusy = true;
+      _phoneError = '';
+    });
+    try {
+      final body = await ref
+          .read(neteaseApiProvider)
+          .captchaSent(phone: phone);
+      if (!mounted) return;
+      if ((body?['code'] as num?)?.toInt() == 200) {
+        _startCodeCountdown();
+      } else {
+        setState(
+          () => _phoneError =
+              body?['message']?.toString() ?? l10n.loginCodeSendFailed,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _phoneError = '$e');
+    } finally {
+      if (mounted) setState(() => _phoneBusy = false);
+    }
+  }
+
+  void _startCodeCountdown() {
+    _codeTimer?.cancel();
+    setState(() => _codeCountdown = 60);
+    _codeTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        _codeCountdown--;
+        if (_codeCountdown <= 0) t.cancel();
+      });
+    });
+  }
+
+  Future<void> _phoneLogin() async {
+    final l10n = context.l10n;
+    final phone = _phoneCtrl.text.trim();
+    final code = _codeCtrl.text.trim();
+    if (phone.isEmpty) {
+      setState(() => _phoneError = l10n.loginPhoneRequired);
+      return;
+    }
+    if (code.isEmpty) {
+      setState(() => _phoneError = l10n.loginCodeRequired);
+      return;
+    }
+    setState(() {
+      _phoneBusy = true;
+      _phoneError = '';
+    });
+    try {
+      final body = await ref
+          .read(neteaseApiProvider)
+          .loginCellphone(phone: phone, captcha: code);
+      if (!mounted) return;
+      if ((body?['code'] as num?)?.toInt() == 200) {
+        await _onLoginSuccess();
+      } else {
+        setState(
+          () => _phoneError = body?['message']?.toString() ?? l10n.loginFailed,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _phoneError = '$e');
+    } finally {
+      if (mounted) setState(() => _phoneBusy = false);
+    }
+  }
+
+  // ── 邮箱 ──────────────────────────────────────────────────────────
+  Future<void> _emailLogin() async {
+    final l10n = context.l10n;
+    final email = _emailCtrl.text.trim();
+    final pass = _passCtrl.text;
+    if (email.isEmpty) {
+      setState(() => _emailError = l10n.loginEmailRequired);
+      return;
+    }
+    if (pass.isEmpty) {
+      setState(() => _emailError = l10n.loginPasswordRequired);
+      return;
+    }
+    setState(() {
+      _emailBusy = true;
+      _emailError = '';
+    });
+    try {
+      final body = await ref
+          .read(neteaseApiProvider)
+          .loginEmail(email: email, password: pass);
+      if (!mounted) return;
+      if ((body?['code'] as num?)?.toInt() == 200) {
+        await _onLoginSuccess();
+      } else {
+        setState(
+          () => _emailError = body?['message']?.toString() ?? l10n.loginFailed,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _emailError = '$e');
+    } finally {
+      if (mounted) setState(() => _emailBusy = false);
+    }
+  }
+
+  Future<void> _onLoginSuccess() async {
+    await ref.read(neteaseAuthProvider.notifier).refresh();
+    if (!mounted) return;
+    Navigator.of(context).pop();
   }
 
   @override

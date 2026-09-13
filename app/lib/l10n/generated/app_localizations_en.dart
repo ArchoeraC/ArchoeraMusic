@@ -598,6 +598,66 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginRegenerate => 'Regenerate';
 
   @override
+  String get loginRiskTitle => 'Login risk notice';
+
+  @override
+  String get loginRiskBody =>
+      'Logging into a third-party client involves the following risks. Please confirm before continuing:\n\n- The platform may apply risk control, restrictions or bans to third-party client logins, which may cause account anomalies or limited features;\n- QR / credential login authorizes this software to access the platform with your account; actions such as favoriting, playing and commenting will genuinely affect your account;\n- Login credentials (cookies / tokens, etc.) are stored only on this device, encrypted, and are never uploaded to the developer or any non-platform server;\n- Please comply with the platform\'s terms of service; you bear all consequences of using this software.\n\nContinuing to log in means you have read and accepted the above risks.';
+
+  @override
+  String get loginRiskAgree => 'I understand, continue';
+
+  @override
+  String get loginTabQr => 'QR code';
+
+  @override
+  String get loginTabPhone => 'Phone';
+
+  @override
+  String get loginTabEmail => 'Email';
+
+  @override
+  String loginTitleBrand(String platform) {
+    return 'Sign in to $platform';
+  }
+
+  @override
+  String get loginPhoneHint => 'Phone number';
+
+  @override
+  String get loginCodeHint => 'SMS code';
+
+  @override
+  String get loginSendCode => 'Send code';
+
+  @override
+  String get loginEmailHint => 'Email';
+
+  @override
+  String get loginPasswordHint => 'Password';
+
+  @override
+  String get loginSubmit => 'Sign in';
+
+  @override
+  String get loginPhoneRequired => 'Please enter your phone number';
+
+  @override
+  String get loginCodeRequired => 'Please enter the verification code';
+
+  @override
+  String get loginEmailRequired => 'Please enter your email';
+
+  @override
+  String get loginPasswordRequired => 'Please enter your password';
+
+  @override
+  String get loginCodeSendFailed => 'Failed to send the verification code';
+
+  @override
+  String get loginFailed => 'Login failed';
+
+  @override
   String get loginSuccess => 'Logged in successfully';
 
   @override

@@ -284,6 +284,201 @@ Future<Map<String, dynamic>> kgGetMyInfo({
   return data;
 }
 
+// ─── 账号登录（对齐 KuGouMusicApi module/login*.js，lite 平台）───────────
+
+Map<String, String> _kgLoginHeaders(String mid, int ts, {String? router}) => {
+  'User-Agent': kgAndroidUa,
+  'dfid': '-',
+  'clienttime': '$ts',
+  'mid': mid,
+  'kg-rc': '1',
+  'kg-thash': '5d816a0',
+  'kg-rec': '1',
+  'kg-rf': 'B9EDA08A64250DEFFBCADDEE00F8F25F',
+  'Content-Type': 'application/json',
+  'x-router': ?router,
+};
+
+/// 从登录响应中解出 `secu_params`（AES-256，用本次请求的临时 key 解密），
+/// 合并回 data。返回 (token, userid, nickname, avatar) 供上层存会话。
+Map<String, dynamic> _kgDecodeLoginData(
+  Map<String, dynamic> resp,
+  String tempKey,
+) {
+  final data = resp['data'];
+  if (data is! Map) return resp;
+  final merged = data.cast<String, dynamic>();
+  final secu = data['secu_params'];
+  if (secu is String && secu.isNotEmpty) {
+    try {
+      final dec = kgAesDecryptHex256(secu, tempKey);
+      try {
+        final obj = jsonDecode(dec);
+        if (obj is Map) merged.addAll(obj.cast<String, dynamic>());
+      } catch (_) {
+        merged['token'] = dec;
+      }
+    } catch (_) {
+      // 解密失败：保留原 data，由上层按缺 token 处理
+    }
+  }
+  resp['data'] = merged;
+  return resp;
+}
+
+/// 手机验证码发送（对齐 module/captcha_sent.js）。
+Future<void> kgCaptchaSent({required String mobile, String? mid}) async {
+  mid ??= kgCalcMid(kgRandomString(16));
+  final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  final body = jsonEncode({'businessid': 5, 'mobile': mobile, 'plat': 3});
+  final q = <String, dynamic>{
+    'dfid': '-',
+    'mid': mid,
+    'uuid': '-',
+    'appid': kgLiteAppid,
+    'clientver': kgLiteClientver,
+    'clienttime': ts,
+  };
+  q['signature'] = kgSignature(q, data: body, salt: kgLiteSignSalt);
+  final uri = Uri.parse(
+    'http://login.user.kugou.com/v7/send_mobile_code?${kgQueryString(q)}',
+  );
+  final bytes = await kgPost(
+    uri,
+    body: body,
+    headers: _kgLoginHeaders(mid, ts),
+  );
+  final resp = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+  if (resp is! Map || (resp['status'] as num?)?.toInt() != 1) {
+    final err = resp is Map
+        ? (resp['error'] ?? resp['errmsg'] ?? resp['status'])
+        : resp;
+    throw KgApiException('验证码发送失败：$err');
+  }
+}
+
+/// 账号密码登录（对齐 module/login.js：v9/login_by_pwd）。
+Future<Map<String, dynamic>> kgLoginByPwd({
+  required String username,
+  required String password,
+  String? mid,
+}) async {
+  mid ??= kgCalcMid(kgRandomString(16));
+  final tsMs = DateTime.now().millisecondsSinceEpoch;
+  final ts = tsMs ~/ 1000;
+  final tempKey = kgRandomString(16).toLowerCase();
+  final paramsEnc = kgAesEncryptHex256(
+    jsonEncode({'pwd': password, 'code': '', 'clienttime_ms': tsMs}),
+    tempKey,
+  );
+  final pk = kgRsaRawEncryptHex(
+    jsonEncode({'clienttime_ms': tsMs, 'key': tempKey}),
+  ).toUpperCase();
+  final dataMap = <String, dynamic>{
+    'plat': 1,
+    'support_multi': 1,
+    'clienttime_ms': tsMs,
+    't1':
+        '562a6f12a6e803453647d16a08f5f0c2ff7eee692cba2ab74cc4c8ab47fc467561a7c6b586ce7dc46a63613b246737c03a1dc8f8d162d8ce1d2c71893d19f1d4b797685a4c6d3d81341cbde65e488c4829a9b4d42ef2df470eb102979fa5adcdd9b4eecfea8b909ff7599abeb49867640f10c3c70fc444effca9d15db44a9a6c907731e2bb0f22cd9b3536380169995693e5f0e2424e3378097d3813186e3fe96bbe7023808a0981b4e2b6135a76faac',
+    't2':
+        '31c4daf4cf480169ccea1cb7d4a209295865a9d2b788510301694db229b87807469ea0d41b4d4b9173c2151da7294aeebfc9738df154bbdf11a4e117bb5dff6a3af8ce5ce333e681c1f29a44038f27567d58992eb81283e080778ac77db1400fdf49b7cf7e26be2e5af4da7830cc3be4',
+    't3': 'MCwwLDAsMCwwLDAsMCwwLDA=',
+    'username': username,
+    'params': paramsEnc,
+    'pk': pk,
+  };
+  final body = jsonEncode(dataMap);
+  final q = <String, dynamic>{
+    'dfid': '-',
+    'mid': mid,
+    'uuid': '-',
+    'appid': kgLiteAppid,
+    'clientver': kgLiteClientver,
+    'clienttime': ts,
+  };
+  q['signature'] = kgSignature(q, data: body, salt: kgLiteSignSalt);
+  final uri = Uri.parse(
+    'https://login-user.kugou.com/v9/login_by_pwd?${kgQueryString(q)}',
+  );
+  final bytes = await kgPost(
+    uri,
+    body: body,
+    headers: _kgLoginHeaders(mid, ts, router: 'login.user.kugou.com'),
+  );
+  final resp = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+  if (resp is! Map<String, dynamic>) throw KgApiException('登录响应异常');
+  if ((resp['status'] as num?)?.toInt() != 1) {
+    throw KgApiException(
+      (resp['error'] ?? resp['errmsg'] ?? '账号或密码错误').toString(),
+    );
+  }
+  return _kgDecodeLoginData(resp, tempKey);
+}
+
+/// 手机验证码登录（对齐 module/login_cellphone.js：v7/login_by_verifycode）。
+Future<Map<String, dynamic>> kgLoginByVerifyCode({
+  required String mobile,
+  required String code,
+  String? mid,
+}) async {
+  mid ??= kgCalcMid(kgRandomString(16));
+  final tsMs = DateTime.now().millisecondsSinceEpoch;
+  final ts = tsMs ~/ 1000;
+  final tempKey = kgRandomString(16).toLowerCase();
+  final paramsEnc = kgAesEncryptHex256(
+    jsonEncode({'mobile': mobile, 'code': code}),
+    tempKey,
+  );
+  final masked = mobile.length >= 11
+      ? '${mobile.substring(0, 2)}*****${mobile.substring(10, 11)}'
+      : mobile;
+  final pk = kgRsaRawEncryptHex(
+    jsonEncode({'clienttime_ms': tsMs, 'key': tempKey}),
+  ).toUpperCase();
+  final dataMap = <String, dynamic>{
+    'plat': 1,
+    'support_multi': 1,
+    't1': 0,
+    't2': 0,
+    'clienttime_ms': tsMs,
+    'mobile': masked,
+    'key': kgSignParamsKey('$tsMs'),
+    'pk': pk,
+    'params': paramsEnc,
+    't3': 'MCwwLDAsMCwwLDAsMCwwLDA=',
+  };
+  final body = jsonEncode(dataMap);
+  final q = <String, dynamic>{
+    'dfid': '-',
+    'mid': mid,
+    'uuid': '-',
+    'appid': kgLiteAppid,
+    'clientver': kgLiteClientver,
+    'clienttime': ts,
+  };
+  q['signature'] = kgSignature(q, data: body, salt: kgLiteSignSalt);
+  final uri = Uri.parse(
+    'https://loginserviceretry.kugou.com/v7/login_by_verifycode?${kgQueryString(q)}',
+  );
+  final bytes = await kgPost(
+    uri,
+    body: body,
+    headers: {
+      ..._kgLoginHeaders(mid, ts),
+      'support-calm': '1',
+      'User-Agent': 'Android16-1070-11440-130-0-LOGIN-wifi',
+    },
+  );
+  final resp = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+  if (resp is! Map<String, dynamic>) throw KgApiException('登录响应异常');
+  if ((resp['status'] as num?)?.toInt() != 1) {
+    throw KgApiException(
+      (resp['error'] ?? resp['errmsg'] ?? '验证码错误').toString(),
+    );
+  }
+  return _kgDecodeLoginData(resp, tempKey);
+}
+
 /// 通用 kg-* 请求头（对齐 KuGouMusicApi request.js，无 x-router）
 Map<String, String> _kgBaseHeaders(String mid, int ts) => {
   'User-Agent': kgAndroidUa,

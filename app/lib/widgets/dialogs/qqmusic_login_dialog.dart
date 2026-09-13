@@ -21,12 +21,15 @@ import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/toast.dart';
+import 'login_risk_notice.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'qqmusic_login_dialog/qqmusic_login_dialog_view.dart';
 
-/// 打开 QM扫码登录弹窗。
-Future<bool?> showQqMusicLoginDialog(BuildContext context) {
+/// 打开 QM扫码登录弹窗（先弹登录风险提示，确认后才继续）。
+Future<bool?> showQqMusicLoginDialog(BuildContext context) async {
+  if (!await showLoginRiskNotice(context)) return false;
+  if (!context.mounted) return false;
   return showDialog<bool?>(
     context: context,
     barrierColor: Colors.transparent,
