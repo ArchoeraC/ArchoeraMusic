@@ -4,6 +4,7 @@
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../eta/mark/eta_mark.dart';
 import '../layout/app_logo.dart';
 
 part 'splash_screen/splash_screen_widgets.dart';
@@ -16,8 +17,14 @@ part 'splash_screen/splash_screen_widgets.dart';
 /// - 底部小字：固定于窗口最底部，延迟上滑渐显（终态约 0.4 透明度）。
 /// 背景为深色氛围 + 主色径向光晕（静态）。由外层 [SplashGate] 控制淡出；
 /// 引擎加载期的静态覆盖见 `linux/runner/my_application.cc`。
+///
+/// 当 [engine] 为 `eraudio`（自研内核 EraAudioSync）时，品牌名下方额外展示
+/// 「Powered by EraSync」品牌行（[EtaMark.erasync] 标识 + 文案）。
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({super.key, this.engine = 'stable'});
+
+  /// 解码引擎偏好（`stable` / `eraudio`）；`eraudio` 时展示 EraSync 品牌行。
+  final String engine;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();

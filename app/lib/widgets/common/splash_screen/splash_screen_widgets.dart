@@ -31,6 +31,10 @@ extension _SplashScreenBuild on _SplashScreenState {
                     color: scheme.onSurface,
                   ),
                 ),
+                if (widget.engine == 'eraudio') ...[
+                  const SizedBox(height: 18),
+                  _buildEngineBadge(scheme),
+                ],
               ],
             ),
           ),
@@ -85,6 +89,44 @@ extension _SplashScreenBuild on _SplashScreenState {
 
   Widget _buildBrand(TextStyle style) {
     return _StaggeredText(text: 'ArchoeraMusic', style: style, intro: _intro);
+  }
+
+  /// 引擎品牌行：自研内核（EraAudioSync）时展示「Powered by EraSync」。
+  ///
+  /// 与 Logo / 品牌名错开浮现（延迟入场），风格对齐底部小字（克制、大字距）；
+  /// 标识为 [EtaMark.erasync]（圆角方 + 负形波形），随主题色着色。
+  Widget _buildEngineBadge(ColorScheme scheme) {
+    final appear = CurvedAnimation(
+      parent: _intro,
+      curve: const Interval(0.5, 0.95, curve: Curves.easeOut),
+    );
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0, end: 0.8).animate(appear),
+      child: SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero)
+            .animate(
+              CurvedAnimation(
+                parent: _intro,
+                curve: const Interval(0.5, 0.95, curve: Curves.easeOutExpo),
+              ),
+            ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(EtaMark.erasync, size: 20, color: scheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Text(
+              'Powered by EraSync',
+              style: TextStyle(
+                fontSize: 13,
+                letterSpacing: 1.5,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 底部小字：固定贴窗口最底（32px），延迟上滑渐显，终态约 0.4 透明度。

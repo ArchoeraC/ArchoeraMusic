@@ -104,9 +104,13 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
 /// 启动过渡门：品牌 Splash 覆盖整个应用，1.9s 后 550ms 淡出（轻微上移缩放）
 /// 过渡到主界面，动画结束才从树中移除。
 class SplashGate extends StatefulWidget {
-  const SplashGate({super.key, required this.child});
+  const SplashGate({super.key, required this.child, this.engine = 'stable'});
 
   final Widget child;
+
+  /// 解码引擎偏好（`stable` / `eraudio`）。`eraudio` 时启动页展示
+  /// 「Powered by EraSync」品牌行（见 [SplashScreen]）。
+  final String engine;
 
   @override
   State<SplashGate> createState() => _SplashGateState();
@@ -180,7 +184,7 @@ class _SplashGateState extends State<SplashGate>
                           curve: Curves.easeInCubic,
                         ),
                       ),
-                  child: const SplashScreen(),
+                  child: SplashScreen(engine: widget.engine),
                 ),
               ),
             ),
