@@ -193,6 +193,7 @@
   "loginSendCode": "Code senden",
   "loginEmailHint": "E-Mail",
   "loginPasswordHint": "Passwort",
+  "loginEmailRiskHint": "Hinweis: Hat das Konto eine gebundene Telefonnummer, kann die Plattform bei der E-Mail-Anmeldung eine SMS-Verifizierung senden (Sicherheitsmaßnahme der Plattform, unabhängig von dieser Software).",
   "loginSubmit": "Anmelden",
   "loginPhoneRequired": "Bitte Telefonnummer eingeben",
   "loginCodeRequired": "Bitte Bestätigungscode eingeben",

@@ -623,6 +623,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginPasswordHint => '密码';
 
   @override
+  String get loginEmailRiskHint =>
+      '提示：若账号已绑定手机，平台可能在邮箱登录时下发短信验证（平台安全策略，与本软件无关）。';
+
+  @override
   String get loginSubmit => '登录';
 
   @override
@@ -4662,6 +4666,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginPasswordHint => '密码';
 
   @override
+  String get loginEmailRiskHint =>
+      '提示：若账号已绑定手机，平台可能在邮箱登录时下发短信验证（平台安全策略，与本软件无关）。';
+
+  @override
   String get loginSubmit => '登录';
 
   @override
@@ -8699,6 +8707,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get loginPasswordHint => '密碼';
+
+  @override
+  String get loginEmailRiskHint =>
+      '提示：若帳號已綁定手機，平台可能在信箱登入時下發簡訊驗證（平台安全策略，與本軟體無關）。';
 
   @override
   String get loginSubmit => '登入';

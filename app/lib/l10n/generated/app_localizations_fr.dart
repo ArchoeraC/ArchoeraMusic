@@ -642,6 +642,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get loginPasswordHint => 'Mot de passe';
 
   @override
+  String get loginEmailRiskHint =>
+      'Remarque : si le compte a un numéro de téléphone associé, la plateforme peut envoyer une vérification par SMS lors de la connexion par e-mail (mesure de sécurité de la plateforme, indépendante de ce logiciel).';
+
+  @override
   String get loginSubmit => 'Se connecter';
 
   @override

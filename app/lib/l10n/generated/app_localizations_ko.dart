@@ -628,6 +628,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get loginPasswordHint => '비밀번호';
 
   @override
+  String get loginEmailRiskHint =>
+      '안내: 계정에 휴대폰 번호가 연결되어 있으면 이메일 로그인 시 플랫폼이 SMS 인증을 보낼 수 있습니다(플랫폼의 보안 조치이며 이 소프트웨어와 무관합니다).';
+
+  @override
   String get loginSubmit => '로그인';
 
   @override

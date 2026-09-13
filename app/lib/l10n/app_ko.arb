@@ -193,6 +193,7 @@
   "loginSendCode": "코드 전송",
   "loginEmailHint": "이메일",
   "loginPasswordHint": "비밀번호",
+  "loginEmailRiskHint": "안내: 계정에 휴대폰 번호가 연결되어 있으면 이메일 로그인 시 플랫폼이 SMS 인증을 보낼 수 있습니다(플랫폼의 보안 조치이며 이 소프트웨어와 무관합니다).",
   "loginSubmit": "로그인",
   "loginPhoneRequired": "휴대폰 번호를 입력하세요",
   "loginCodeRequired": "인증 코드를 입력하세요",

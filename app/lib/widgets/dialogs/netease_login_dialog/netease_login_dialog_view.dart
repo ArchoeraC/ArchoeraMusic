@@ -305,6 +305,29 @@ extension _NeteaseLoginDialogView on _NeteaseLoginDialogState {
           ),
         ),
         if (_emailError.isNotEmpty) _errorText(_emailError, scheme),
+        const SizedBox(height: 10),
+        // 说明：平台可能在邮箱登录时下发短信验证（服务端安全策略）
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              EtaIcons.informationOutline,
+              size: 14,
+              color: scheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                l10n.loginEmailRiskHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,

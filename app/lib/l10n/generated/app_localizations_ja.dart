@@ -627,6 +627,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get loginPasswordHint => 'パスワード';
 
   @override
+  String get loginEmailRiskHint =>
+      'ヒント：アカウントに電話番号が紐付いている場合、メールログイン時にプラットフォームが SMS 認証を送信することがあります（プラットフォームのセキュリティ対策であり、本ソフトウェアとは無関係です）。';
+
+  @override
   String get loginSubmit => 'ログイン';
 
   @override

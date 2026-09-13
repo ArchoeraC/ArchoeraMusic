@@ -193,6 +193,7 @@
   "loginSendCode": "Envoyer le code",
   "loginEmailHint": "E-mail",
   "loginPasswordHint": "Mot de passe",
+  "loginEmailRiskHint": "Remarque : si le compte a un numéro de téléphone associé, la plateforme peut envoyer une vérification par SMS lors de la connexion par e-mail (mesure de sécurité de la plateforme, indépendante de ce logiciel).",
   "loginSubmit": "Se connecter",
   "loginPhoneRequired": "Veuillez saisir le numéro de téléphone",
   "loginCodeRequired": "Veuillez saisir le code de vérification",

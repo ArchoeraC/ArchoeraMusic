@@ -193,6 +193,7 @@
   "loginSendCode": "发送验证码",
   "loginEmailHint": "邮箱",
   "loginPasswordHint": "密码",
+  "loginEmailRiskHint": "提示：若账号已绑定手机，平台可能在邮箱登录时下发短信验证（平台安全策略，与本软件无关）。",
   "loginSubmit": "登录",
   "loginPhoneRequired": "请输入手机号",
   "loginCodeRequired": "请输入验证码",
