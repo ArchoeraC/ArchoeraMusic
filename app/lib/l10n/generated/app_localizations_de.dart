@@ -642,6 +642,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loginPasswordHint => 'Passwort';
 
   @override
+  String get loginEmailRiskHint =>
+      'Hinweis: Hat das Konto eine gebundene Telefonnummer, kann die Plattform bei der E-Mail-Anmeldung eine SMS-Verifizierung senden (Sicherheitsmaßnahme der Plattform, unabhängig von dieser Software).';
+
+  @override
   String get loginSubmit => 'Anmelden';
 
   @override

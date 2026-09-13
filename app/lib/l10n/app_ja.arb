@@ -193,6 +193,7 @@
   "loginSendCode": "コードを送信",
   "loginEmailHint": "メール",
   "loginPasswordHint": "パスワード",
+  "loginEmailRiskHint": "ヒント：アカウントに電話番号が紐付いている場合、メールログイン時にプラットフォームが SMS 認証を送信することがあります（プラットフォームのセキュリティ対策であり、本ソフトウェアとは無関係です）。",
   "loginSubmit": "ログイン",
   "loginPhoneRequired": "電話番号を入力してください",
   "loginCodeRequired": "認証コードを入力してください",

@@ -641,6 +641,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get loginPasswordHint => 'Contraseña';
 
   @override
+  String get loginEmailRiskHint =>
+      'Nota: si la cuenta tiene un teléfono vinculado, la plataforma puede enviar una verificación por SMS al iniciar sesión con el correo (medida de seguridad de la plataforma, ajena a este software).';
+
+  @override
   String get loginSubmit => 'Iniciar sesión';
 
   @override

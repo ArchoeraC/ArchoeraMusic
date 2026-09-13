@@ -637,6 +637,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginPasswordHint => 'Password';
 
   @override
+  String get loginEmailRiskHint =>
+      'Note: if the account has a bound phone number, the platform may send an SMS verification on email login (a platform security measure, unrelated to this software).';
+
+  @override
   String get loginSubmit => 'Sign in';
 
   @override

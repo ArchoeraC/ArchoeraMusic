@@ -193,6 +193,7 @@
   "loginSendCode": "Send code",
   "loginEmailHint": "Email",
   "loginPasswordHint": "Password",
+  "loginEmailRiskHint": "Note: if the account has a bound phone number, the platform may send an SMS verification on email login (a platform security measure, unrelated to this software).",
   "loginSubmit": "Sign in",
   "loginPhoneRequired": "Please enter your phone number",
   "loginCodeRequired": "Please enter the verification code",

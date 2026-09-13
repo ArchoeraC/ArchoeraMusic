@@ -193,6 +193,7 @@
   "loginSendCode": "發送驗證碼",
   "loginEmailHint": "信箱",
   "loginPasswordHint": "密碼",
+  "loginEmailRiskHint": "提示：若帳號已綁定手機，平台可能在信箱登入時下發簡訊驗證（平台安全策略，與本軟體無關）。",
   "loginSubmit": "登入",
   "loginPhoneRequired": "請輸入手機號",
   "loginCodeRequired": "請輸入驗證碼",

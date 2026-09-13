@@ -1238,6 +1238,12 @@ abstract class AppLocalizations {
   /// **'密码'**
   String get loginPasswordHint;
 
+  /// No description provided for @loginEmailRiskHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'提示：若账号已绑定手机，平台可能在邮箱登录时下发短信验证（平台安全策略，与本软件无关）。'**
+  String get loginEmailRiskHint;
+
   /// No description provided for @loginSubmit.
   ///
   /// In zh_CN, this message translates to:
