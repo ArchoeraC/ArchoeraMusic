@@ -2986,6 +2986,31 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsDeclineFooter => 'このソフトウェアは技術的な探求と研究のみを目的としています。';
 
   @override
+  String get settingsSectionEnvInfo => '環境情報';
+
+  @override
+  String get settingsEnvVersion => 'バージョン';
+
+  @override
+  String get settingsEnvPlatform => 'プラットフォーム';
+
+  @override
+  String get settingsEnvRuntime => 'ランタイム';
+
+  @override
+  String get settingsSectionCommunity => 'コミュニティ';
+
+  @override
+  String get settingsCommunityRepo => 'GitHub リポジトリ';
+
+  @override
+  String get settingsSectionThanks => '特別な謝辞';
+
+  @override
+  String get settingsThanksText =>
+      '本ソフトウェアは以下のオープンソースプロジェクトを使用・依存・参考にしています（完全な一覧は THIRD-PARTY-NOTICES.md および各モジュールの THIRD-PARTY-LICENSES.md）：\n\n· 設計の参考：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 主要コンポーネント：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/パブリックドメイン）、signalsmith-stretch（MIT）、SQLite（パブリックドメイン）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· デコーダ参考：minimp3（CC0-1.0）、stb_vorbis（パブリックドメイン/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· アイコン：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n上記プロジェクトの作者に感謝します。';
+
+  @override
   String get settingsSectionFontCredits => 'フォントクレジット';
 
   @override
