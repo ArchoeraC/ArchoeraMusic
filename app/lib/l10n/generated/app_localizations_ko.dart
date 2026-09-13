@@ -589,64 +589,64 @@ class AppLocalizationsKo extends AppLocalizations {
   String get loginRegenerate => '다시 생성';
 
   @override
-  String get loginRiskTitle => '登录风险提示';
+  String get loginRiskTitle => '로그인 위험 안내';
 
   @override
   String get loginRiskBody =>
-      '登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。';
+      '서드파티 클라이언트 로그인에는 다음과 같은 위험이 있습니다. 확인 후 계속하십시오:\n\n· 플랫폼은 서드파티 클라이언트 로그인에 대해 위험 관리·제한·차단을 적용할 수 있으며, 이로 인해 계정 이상이나 기능 제한이 발생할 수 있습니다;\n· QR / 자격 증명 로그인은 귀하의 계정으로 이 소프트웨어가 플랫폼에 접근하도록 허가하는 것을 의미하며, 즐겨찾기·재생·댓글 등의 작업은 실제로 귀하의 계정에 반영됩니다;\n· 로그인 자격 증명(Cookie / 토큰 등)은 이 기기에만 암호화되어 저장되며, 개발자나 플랫폼 이외의 서버로 업로드되지 않습니다;\n· 각 플랫폼의 서비스 약관을 준수하십시오. 이 소프트웨어 사용으로 인한 모든 결과는 귀하가 부담합니다.\n\n로그인을 계속하면 위 위험을 읽고 동의한 것으로 간주됩니다.';
 
   @override
-  String get loginRiskAgree => '我已知晓，继续登录';
+  String get loginRiskAgree => '이해했습니다, 계속';
 
   @override
-  String get loginTabQr => '扫码';
+  String get loginTabQr => 'QR 코드';
 
   @override
-  String get loginTabPhone => '手机号';
+  String get loginTabPhone => '휴대폰';
 
   @override
-  String get loginTabEmail => '邮箱';
+  String get loginTabEmail => '이메일';
 
   @override
   String loginTitleBrand(String platform) {
-    return '$platform登录';
+    return '$platform 로그인';
   }
 
   @override
-  String get loginPhoneHint => '手机号';
+  String get loginPhoneHint => '휴대폰 번호';
 
   @override
-  String get loginCodeHint => '短信验证码';
+  String get loginCodeHint => 'SMS 인증 코드';
 
   @override
-  String get loginSendCode => '发送验证码';
+  String get loginSendCode => '코드 전송';
 
   @override
-  String get loginEmailHint => '邮箱';
+  String get loginEmailHint => '이메일';
 
   @override
-  String get loginPasswordHint => '密码';
+  String get loginPasswordHint => '비밀번호';
 
   @override
-  String get loginSubmit => '登录';
+  String get loginSubmit => '로그인';
 
   @override
-  String get loginPhoneRequired => '请输入手机号';
+  String get loginPhoneRequired => '휴대폰 번호를 입력하세요';
 
   @override
-  String get loginCodeRequired => '请输入验证码';
+  String get loginCodeRequired => '인증 코드를 입력하세요';
 
   @override
-  String get loginEmailRequired => '请输入邮箱';
+  String get loginEmailRequired => '이메일을 입력하세요';
 
   @override
-  String get loginPasswordRequired => '请输入密码';
+  String get loginPasswordRequired => '비밀번호를 입력하세요';
 
   @override
-  String get loginCodeSendFailed => '验证码发送失败';
+  String get loginCodeSendFailed => '인증 코드 전송 실패';
 
   @override
-  String get loginFailed => '登录失败';
+  String get loginFailed => '로그인 실패';
 
   @override
   String get loginSuccess => '로그인 성공';

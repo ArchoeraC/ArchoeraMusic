@@ -603,64 +603,64 @@ class AppLocalizationsFr extends AppLocalizations {
   String get loginRegenerate => 'Régénérer';
 
   @override
-  String get loginRiskTitle => '登录风险提示';
+  String get loginRiskTitle => 'Avertissement de risque de connexion';
 
   @override
   String get loginRiskBody =>
-      '登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。';
+      'La connexion via un client tiers présente les risques suivants. Veuillez confirmer avant de continuer :\n\n· La plateforme peut appliquer un contrôle des risques, des restrictions ou des bannissements aux connexions de clients tiers, ce qui peut entraîner des anomalies de compte ou des fonctions limitées ;\n· La connexion par QR / identifiants autorise ce logiciel à accéder à la plateforme avec votre compte ; les actions telles que l\'ajout aux favoris, la lecture et les commentaires affecteront réellement votre compte ;\n· Les identifiants de connexion (cookies / jetons, etc.) sont stockés uniquement sur cet appareil, chiffrés, et ne sont jamais envoyés au développeur ni à un serveur non lié à la plateforme ;\n· Respectez les conditions de service de la plateforme ; vous assumez toutes les conséquences de l\'utilisation de ce logiciel.\n\nContinuer la connexion signifie que vous avez lu et accepté les risques ci-dessus.';
 
   @override
-  String get loginRiskAgree => '我已知晓，继续登录';
+  String get loginRiskAgree => 'Compris, continuer';
 
   @override
-  String get loginTabQr => '扫码';
+  String get loginTabQr => 'Code QR';
 
   @override
-  String get loginTabPhone => '手机号';
+  String get loginTabPhone => 'Téléphone';
 
   @override
-  String get loginTabEmail => '邮箱';
+  String get loginTabEmail => 'E-mail';
 
   @override
   String loginTitleBrand(String platform) {
-    return '$platform登录';
+    return 'Connexion à $platform';
   }
 
   @override
-  String get loginPhoneHint => '手机号';
+  String get loginPhoneHint => 'Numéro de téléphone';
 
   @override
-  String get loginCodeHint => '短信验证码';
+  String get loginCodeHint => 'Code SMS';
 
   @override
-  String get loginSendCode => '发送验证码';
+  String get loginSendCode => 'Envoyer le code';
 
   @override
-  String get loginEmailHint => '邮箱';
+  String get loginEmailHint => 'E-mail';
 
   @override
-  String get loginPasswordHint => '密码';
+  String get loginPasswordHint => 'Mot de passe';
 
   @override
-  String get loginSubmit => '登录';
+  String get loginSubmit => 'Se connecter';
 
   @override
-  String get loginPhoneRequired => '请输入手机号';
+  String get loginPhoneRequired => 'Veuillez saisir le numéro de téléphone';
 
   @override
-  String get loginCodeRequired => '请输入验证码';
+  String get loginCodeRequired => 'Veuillez saisir le code de vérification';
 
   @override
-  String get loginEmailRequired => '请输入邮箱';
+  String get loginEmailRequired => 'Veuillez saisir l\'e-mail';
 
   @override
-  String get loginPasswordRequired => '请输入密码';
+  String get loginPasswordRequired => 'Veuillez saisir le mot de passe';
 
   @override
-  String get loginCodeSendFailed => '验证码发送失败';
+  String get loginCodeSendFailed => 'Échec de l\'envoi du code de vérification';
 
   @override
-  String get loginFailed => '登录失败';
+  String get loginFailed => 'Échec de la connexion';
 
   @override
   String get loginSuccess => 'Connexion réussie';
