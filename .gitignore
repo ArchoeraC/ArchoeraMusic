@@ -79,3 +79,7 @@ Icon化/
 
 # 本地问题截图（仅调试用，不入库）
 issuescreenshot/
+
+# Nix build result symlink
+/result
+/result-*

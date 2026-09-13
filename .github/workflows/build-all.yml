@@ -13,7 +13,7 @@
 #  ├─ linux-arch    (archlinux 容器)      : arch.pkg.tar.zst
 #  ├─ linux-appimage(needs linux-deb)     : AppImage（linuxdeploy 收拢动态依赖）
 #  ├─ linux-flatpak (needs linux-deb)     : .flatpak（包装预构建 bundle）
-#  ├─ linux-nix     (needs linux-deb)     : NixOS flake 产物 tar.gz（nixos/nix 容器）
+#  ├─ linux-nix     (独立源构建)          : NixOS flake 产物 tar.gz（nixpkgs 工具链）
 #  ├─ build         (matrix macos/windows): .app / NSIS+portable zip
 #  └─ release       (needs 全部；tag v* 触发)
 #
@@ -694,63 +694,33 @@ jobs:
           path: dist/linux/*.flatpak
           if-no-files-found: error
 
-  # ── NixOS：消费 linux-deb 的原始 bundle，nixos/nix 容器内 autoPatchelf ──
+  # ── NixOS：独立源构建 flake（nixpkgs 工具链，脱离 Ubuntu 预构建 bundle）──
+  # 用仓库根 flake.nix 从源码编译 FFmpeg(自建最小纯 LGPL·仅音频) + 全部原生
+  # 模块 + Flutter；产物为纯 Nix store 依赖，不依赖宿主发行版（真正脱离 Ubuntu）。
+  # 构建需联网（pub / NuGet / crates.io / go modules / FFmpeg 源码），故关沙箱。
   linux-nix:
-    name: Linux NixOS (flake)
-    needs: linux-deb
+    name: Linux NixOS (source flake)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - uses: DeterminateSystems/nix-installer-action@v16
+        with:
+          extra-conf: |
+            sandbox = false
+            substituters = https://cache.nixos.org
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
           VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}')"
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
-      - name: Download bundle artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ArchoeraMusic-linux-x64
-          path: bundle
-      - name: Install binutils (BUILD-INFO glibc 探测)
+      - name: Build NixOS (source flake)
+        run: nix build .#default --option sandbox false --print-build-logs
+      - name: Package result
         run: |
-          sudo apt-get update
-          sudo apt-get install -y binutils file
-      - name: Restore executable bits (artifact 上传丢失权限)
-        # upload-artifact@v4 不保留权限（文件统一 644）：解包后按 ELF 可执行文件
-        # 恢复 +x，否则 Nix 产物内主程序与引擎子进程无法执行。
-        run: |
-          find bundle -type f -exec file {} + \
-            | grep -i 'ELF.*executable' | cut -d: -f1 | xargs -r chmod +x
-      - name: Package NixOS flake (nixos/nix container, autoPatchelf)
-        # bundle 为 Release 预 strip 产物，autoPatchelfHook 在容器内补
-        # interpreter（NixOS 无 /lib64/ld-linux-x86-64.so.2）并追加 buildInputs
-        # store 路径 RUNPATH（NixOS 无 /usr/lib）。产物仅供 CI 验证构建链路 +
-        # 交付 portable 源包；用户机器上正规安装方式是跑 package.sh nix 后
-        # 在本机 nix build（store 路径与 nixpkgs 版本强绑定）。
-        run: |
-          bash packaging/linux/package.sh nix "$PWD/bundle" "${{ steps.version.outputs.version }}"
-          docker run --rm -v "$PWD":/workspace \
-            -e PKG_VER="${{ steps.version.outputs.version }}" \
-            -e GH_TOKEN="${{ github.token }}" \
-            nixos/nix:latest bash -c '
-              # /workspace 是 git 仓库且归宿主 runner 所有；nix 对 git 仓库
-              # 输入走 libgit2 且拒绝"非当前用户所有"（容器 root vs 宿主 1001）。
-              # 复制到容器内非 git 目录按 plain path（path:）输入构建，绕开
-              # libgit2 所有权检查（nix 仍把目录复制进 store 保证可复现）。
-              mkdir -p /tmp/nixbuild
-              cp -a /workspace/packaging/linux/work/nix/. /tmp/nixbuild/
-              cd /tmp/nixbuild
-              # 传 token：nixos-unstable 未锁，每次解析会打 GitHub API；无认证
-              # 会被限流（HTTP 403）导致打包失败。access-tokens 带认证后正常。
-              nix --extra-experimental-features "nix-command flakes" \
-                --option access-tokens "github.com=${GH_TOKEN}" \
-                build .#default --no-sandbox || exit 1
-              # result 指向容器 /nix/store，readlink 后打包完整 store 产物
-              tar -C "$(readlink -f result)" -czf \
-                "/workspace/dist/linux/ArchoeraMusic-v${PKG_VER}-nixos-x86_64.tar.gz" .
-            '
-          ls -la dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz
+          mkdir -p dist/linux
+          tar -czf "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz" -C result .
+          ls -la dist/linux/*nixos*.tar.gz
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
