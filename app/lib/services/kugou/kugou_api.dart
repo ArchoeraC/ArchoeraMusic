@@ -142,6 +142,48 @@ class KugouApi extends ChangeNotifier {
   /// 0=过期 / 1=等待 / 2=待确认 / 4=成功（成功后调用 [saveSession]）。
   Future<Map<String, dynamic>> qrCheck(String key) => kgQrCheck(key, mid: _mid);
 
+  /// 账号密码登录（v9/login_by_pwd）；成功后写入会话并拉取资料。
+  Future<void> loginByPwd({
+    required String username,
+    required String password,
+  }) async {
+    final resp = await kgLoginByPwd(
+      username: username,
+      password: password,
+      mid: _mid,
+    );
+    await _applyLogin(resp);
+  }
+
+  /// 发送手机短信验证码（v7/send_mobile_code）。
+  Future<void> captchaSent({required String mobile}) =>
+      kgCaptchaSent(mobile: mobile, mid: _mid);
+
+  /// 手机验证码登录（v7/login_by_verifycode）；成功后写入会话并拉取资料。
+  Future<void> loginByVerifyCode({
+    required String mobile,
+    required String code,
+  }) async {
+    final resp = await kgLoginByVerifyCode(
+      mobile: mobile,
+      code: code,
+      mid: _mid,
+    );
+    await _applyLogin(resp);
+  }
+
+  Future<void> _applyLogin(Map<String, dynamic> resp) async {
+    final data = resp['data'];
+    final map = data is Map ? data.cast<String, dynamic>() : const {};
+    final token = map['token']?.toString() ?? '';
+    final userid = map['userid']?.toString() ?? '';
+    if (token.isEmpty || userid.isEmpty) {
+      throw KgApiException('登录响应缺少 token/userid');
+    }
+    saveSession(token, userid, nickname: map['nickname']?.toString());
+    await refreshUserInfo();
+  }
+
   // ─── 搜索 ─────────────────────────────────────────────────────────
 
   /// 搜索歌曲（mobilecdn → 兜底 songsearch）。

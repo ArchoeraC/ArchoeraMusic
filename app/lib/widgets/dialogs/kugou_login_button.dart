@@ -26,9 +26,24 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/toast.dart';
 import '../common/anim.dart';
+import 'login_risk_notice.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'kugou_login_button/kugou_login_button_view.dart';
+
+/// 打开 KG 登录对话框（先弹登录风险提示，用户确认后才进入扫码登录）。
+/// 返回 true 表示登录成功。
+Future<bool> showKugouLoginDialog(BuildContext context) async {
+  if (!await showLoginRiskNotice(context)) return false;
+  if (!context.mounted) return false;
+  final ok = await showDialog<bool>(
+    context: context,
+    barrierColor: Colors.transparent,
+    barrierDismissible: true,
+    builder: (_) => const KgQrLoginDialog(),
+  );
+  return ok == true;
+}
 
 /// 顶栏登录入口（未登录 → 「扫码登录」；已登录 → 昵称 + 「退出登录」）。
 class KugouLoginButton extends ConsumerStatefulWidget {
@@ -42,14 +57,8 @@ class _KugouLoginButtonState extends ConsumerState<KugouLoginButton> {
   KugouApi get _api => ref.read(kugouApiProvider);
 
   Future<void> _openLogin() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.transparent,
-      // 空白点击由登录页全屏层处理；true 额外支持 Esc 关闭
-      barrierDismissible: true,
-      builder: (_) => const KgQrLoginDialog(),
-    );
-    if (ok == true && mounted) {
+    final ok = await showKugouLoginDialog(context);
+    if (ok && mounted) {
       setState(() {});
       _toast(context.l10n.loginKugouSuccessVip(context.l10n.brandKugou));
     }
@@ -76,11 +85,29 @@ class KgQrLoginDialog extends ConsumerStatefulWidget {
 }
 
 class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
+  /// 当前 tab：0=扫码 / 1=手机号 / 2=邮箱。
+  int _tab = 0;
+
+  // 扫码
   String? _key;
   String _error = '';
   bool _loadingKey = true;
   int _status = 1;
   Timer? _timer;
+
+  // 手机号
+  final _phoneCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
+  bool _phoneBusy = false;
+  int _codeCountdown = 0;
+  Timer? _codeTimer;
+  String _phoneError = '';
+
+  // 邮箱
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  bool _emailBusy = false;
+  String _emailError = '';
 
   KugouApi get _api => ref.read(kugouApiProvider);
 
@@ -93,7 +120,107 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
   @override
   void dispose() {
     _timer?.cancel();
+    _codeTimer?.cancel();
+    _phoneCtrl.dispose();
+    _codeCtrl.dispose();
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
     super.dispose();
+  }
+
+  void _switchTab(int tab) {
+    if (_tab == tab) return;
+    setState(() => _tab = tab);
+  }
+
+  Future<void> _sendCode() async {
+    final l10n = context.l10n;
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isEmpty) {
+      setState(() => _phoneError = l10n.loginPhoneRequired);
+      return;
+    }
+    setState(() {
+      _phoneBusy = true;
+      _phoneError = '';
+    });
+    try {
+      await _api.captchaSent(mobile: phone);
+      if (!mounted) return;
+      _codeTimer?.cancel();
+      setState(() => _codeCountdown = 60);
+      _codeTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+        if (!mounted) {
+          t.cancel();
+          return;
+        }
+        setState(() {
+          _codeCountdown--;
+          if (_codeCountdown <= 0) t.cancel();
+        });
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _phoneError = '$e');
+    } finally {
+      if (mounted) setState(() => _phoneBusy = false);
+    }
+  }
+
+  Future<void> _phoneLogin() async {
+    final l10n = context.l10n;
+    final phone = _phoneCtrl.text.trim();
+    final code = _codeCtrl.text.trim();
+    if (phone.isEmpty) {
+      setState(() => _phoneError = l10n.loginPhoneRequired);
+      return;
+    }
+    if (code.isEmpty) {
+      setState(() => _phoneError = l10n.loginCodeRequired);
+      return;
+    }
+    setState(() {
+      _phoneBusy = true;
+      _phoneError = '';
+    });
+    try {
+      await _api.loginByVerifyCode(mobile: phone, code: code);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _phoneError = '$e');
+    } finally {
+      if (mounted) setState(() => _phoneBusy = false);
+    }
+  }
+
+  Future<void> _emailLogin() async {
+    final l10n = context.l10n;
+    final email = _emailCtrl.text.trim();
+    final pass = _passCtrl.text;
+    if (email.isEmpty) {
+      setState(() => _emailError = l10n.loginEmailRequired);
+      return;
+    }
+    if (pass.isEmpty) {
+      setState(() => _emailError = l10n.loginPasswordRequired);
+      return;
+    }
+    setState(() {
+      _emailBusy = true;
+      _emailError = '';
+    });
+    try {
+      await _api.loginByPwd(username: email, password: pass);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _emailError = '$e');
+    } finally {
+      if (mounted) setState(() => _emailBusy = false);
+    }
   }
 
   Future<void> _initQr() async {

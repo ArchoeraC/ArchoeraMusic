@@ -56,6 +56,37 @@ mixin NeteaseAuthApi on NeteaseApiBase {
     );
   }
 
+  /// 发送手机短信验证码（captcha_sent）。
+  Future<Map<String, dynamic>?> captchaSent({
+    required String phone,
+    String countrycode = '86',
+  }) {
+    return _call('captcha_sent', {'phone': phone, 'ctcode': countrycode});
+  }
+
+  /// 手机号登录（login_cellphone）：[captcha] 短信验证码或 [password] 密码二选一。
+  Future<Map<String, dynamic>?> loginCellphone({
+    required String phone,
+    String countrycode = '86',
+    String? captcha,
+    String? password,
+  }) {
+    return _call('login_cellphone', {
+      'phone': phone,
+      'countrycode': countrycode,
+      if (captcha != null && captcha.isNotEmpty) 'captcha': captcha,
+      if (password != null && password.isNotEmpty) 'password': password,
+    });
+  }
+
+  /// 邮箱登录（login）。
+  Future<Map<String, dynamic>?> loginEmail({
+    required String email,
+    required String password,
+  }) {
+    return _call('login', {'email': email, 'password': password});
+  }
+
   /// 登出（logout，清空会话 cookie）。
   Future<void> logout() async {
     await _call('logout', const {});

@@ -117,6 +117,57 @@ String kgAesDecryptString(String cipherB64, String secretKey) {
   return (digest.substring(0, 16), digest.substring(16, 32));
 }
 
+// ─── AES-256-CBC（cryptoAesEncrypt / cryptoAesDecrypt，登录接口用）────────
+// 与上面 playlistAes 的区别：key = md5(tempKey) **全 32 个 hex 字符**的 UTF-8
+// 字节（AES-256），iv = key 后 16 字符；密文输出/输入为 hex（非 base64）。
+
+(String, String) _kgAes256KeyIv(String tempKey) {
+  final digest = kgMd5(tempKey);
+  return (digest, digest.substring(16, 32));
+}
+
+/// AES-256-CBC 加密 → 小写 hex。对齐 KuGouMusicApi `cryptoAesEncrypt`
+/// （用于 v9/login_by_pwd 等登录接口的 `params` 字段）。
+String kgAesEncryptHex256(String plain, String tempKey) {
+  final (key, iv) = _kgAes256KeyIv(tempKey);
+  final block = CBCBlockCipher(AESEngine()) as BlockCipher;
+  final cipher = PaddedBlockCipherImpl(PKCS7Padding(), block);
+  cipher.init(
+    true,
+    PaddedBlockCipherParameters<CipherParameters, CipherParameters>(
+      ParametersWithIV<CipherParameters>(
+        KeyParameter(utf8.encode(key)),
+        utf8.encode(iv),
+      ),
+      null,
+    ),
+  );
+  final out = cipher.process(utf8.encode(plain));
+  return out.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+}
+
+/// AES-256-CBC 解密（hex 密文 → utf8 文本）。对齐 `cryptoAesDecrypt`。
+String kgAesDecryptHex256(String cipherHex, String tempKey) {
+  final (key, iv) = _kgAes256KeyIv(tempKey);
+  final block = CBCBlockCipher(AESEngine()) as BlockCipher;
+  final cipher = PaddedBlockCipherImpl(PKCS7Padding(), block);
+  cipher.init(
+    false,
+    PaddedBlockCipherParameters<CipherParameters, CipherParameters>(
+      ParametersWithIV<CipherParameters>(
+        KeyParameter(utf8.encode(key)),
+        utf8.encode(iv),
+      ),
+      null,
+    ),
+  );
+  final bytes = Uint8List.fromList([
+    for (var i = 0; i + 1 < cipherHex.length; i += 2)
+      int.parse(cipherHex.substring(i, i + 2), radix: 16),
+  ]);
+  return utf8.decode(cipher.process(bytes));
+}
+
 // ─── RSA-PKCS1v1.5（rsaEncrypt2） ──────────────────────────────────────
 
 /// 简易 DER 游标（SPKI/RSAPublicKey 结构足够用）

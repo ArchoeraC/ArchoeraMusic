@@ -1166,6 +1166,120 @@ abstract class AppLocalizations {
   /// **'重新生成'**
   String get loginRegenerate;
 
+  /// No description provided for @loginRiskTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录风险提示'**
+  String get loginRiskTitle;
+
+  /// No description provided for @loginRiskBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。'**
+  String get loginRiskBody;
+
+  /// No description provided for @loginRiskAgree.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我已知晓，继续登录'**
+  String get loginRiskAgree;
+
+  /// No description provided for @loginTabQr.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫码'**
+  String get loginTabQr;
+
+  /// No description provided for @loginTabPhone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'手机号'**
+  String get loginTabPhone;
+
+  /// No description provided for @loginTabEmail.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'邮箱'**
+  String get loginTabEmail;
+
+  /// No description provided for @loginTitleBrand.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{platform}登录'**
+  String loginTitleBrand(String platform);
+
+  /// No description provided for @loginPhoneHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'手机号'**
+  String get loginPhoneHint;
+
+  /// No description provided for @loginCodeHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'短信验证码'**
+  String get loginCodeHint;
+
+  /// No description provided for @loginSendCode.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'发送验证码'**
+  String get loginSendCode;
+
+  /// No description provided for @loginEmailHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'邮箱'**
+  String get loginEmailHint;
+
+  /// No description provided for @loginPasswordHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'密码'**
+  String get loginPasswordHint;
+
+  /// No description provided for @loginSubmit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录'**
+  String get loginSubmit;
+
+  /// No description provided for @loginPhoneRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入手机号'**
+  String get loginPhoneRequired;
+
+  /// No description provided for @loginCodeRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入验证码'**
+  String get loginCodeRequired;
+
+  /// No description provided for @loginEmailRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入邮箱'**
+  String get loginEmailRequired;
+
+  /// No description provided for @loginPasswordRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入密码'**
+  String get loginPasswordRequired;
+
+  /// No description provided for @loginCodeSendFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'验证码发送失败'**
+  String get loginCodeSendFailed;
+
+  /// No description provided for @loginFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录失败'**
+  String get loginFailed;
+
   /// No description provided for @loginSuccess.
   ///
   /// In zh_CN, this message translates to:

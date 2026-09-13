@@ -77,12 +77,7 @@ class _AccountsMenu extends ConsumerWidget {
               case 'logout_netease':
                 await ref.read(neteaseAuthProvider.notifier).logout();
               case 'login_kugou':
-                showDialog<bool>(
-                  context: context,
-                  barrierColor: Colors.black.withValues(alpha: 0.5),
-                  barrierDismissible: false,
-                  builder: (_) => const KgQrLoginDialog(),
-                );
+                showKugouLoginDialog(context);
               case 'logout_kugou':
                 ref.read(kugouApiProvider).clearSession();
               case 'login_qq':

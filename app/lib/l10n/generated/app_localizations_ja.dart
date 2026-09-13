@@ -588,6 +588,66 @@ class AppLocalizationsJa extends AppLocalizations {
   String get loginRegenerate => '再生成';
 
   @override
+  String get loginRiskTitle => '登录风险提示';
+
+  @override
+  String get loginRiskBody =>
+      '登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。';
+
+  @override
+  String get loginRiskAgree => '我已知晓，继续登录';
+
+  @override
+  String get loginTabQr => '扫码';
+
+  @override
+  String get loginTabPhone => '手机号';
+
+  @override
+  String get loginTabEmail => '邮箱';
+
+  @override
+  String loginTitleBrand(String platform) {
+    return '$platform登录';
+  }
+
+  @override
+  String get loginPhoneHint => '手机号';
+
+  @override
+  String get loginCodeHint => '短信验证码';
+
+  @override
+  String get loginSendCode => '发送验证码';
+
+  @override
+  String get loginEmailHint => '邮箱';
+
+  @override
+  String get loginPasswordHint => '密码';
+
+  @override
+  String get loginSubmit => '登录';
+
+  @override
+  String get loginPhoneRequired => '请输入手机号';
+
+  @override
+  String get loginCodeRequired => '请输入验证码';
+
+  @override
+  String get loginEmailRequired => '请输入邮箱';
+
+  @override
+  String get loginPasswordRequired => '请输入密码';
+
+  @override
+  String get loginCodeSendFailed => '验证码发送失败';
+
+  @override
+  String get loginFailed => '登录失败';
+
+  @override
   String get loginSuccess => 'ログインしました';
 
   @override
