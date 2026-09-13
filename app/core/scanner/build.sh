@@ -28,13 +28,21 @@ case "$RID" in
   *)         ZIG_TARGET="" ;;
 esac
 
+# Zig CPU 基线：显式 -Dtarget 时 Zig 已用该 target 的 baseline；但 Linux 未传
+# target（native），会按**构建机原生 CPU**（CI runner 常带 AVX-512）生成
+# EVEX/AVX512VL 指令，在普通用户 CPU 上 SIGILL。故 Linux 强制 baseline。
+ZIG_CPU=""
+case "$RID" in
+  linux-*) ZIG_CPU="baseline" ;;
+esac
+
 mkdir -p build
 
 # 自研内核动态库（元数据快路径 zk_metadata_*；scanner 直桥，无 JSON）。
 # 与 FFI 同目录分发，NativeAOT 侧按 $ORIGIN / DllImportResolver 解析。
 if [ -d ../audio-engine ]; then
   echo "==> 构建内核动态库 (audio-engine)"
-  ( cd ../audio-engine && zig build -Doptimize=ReleaseFast --prefix ./zig-out ${ZIG_TARGET:+-Dtarget=$ZIG_TARGET} )
+  ( cd ../audio-engine && zig build -Doptimize=ReleaseFast --prefix ./zig-out ${ZIG_TARGET:+-Dtarget=$ZIG_TARGET} ${ZIG_CPU:+-Dcpu=$ZIG_CPU} )
 fi
 
 # 用 -o 固定 publish 输出目录（不依赖 bin/Release/<tfm>/<rid> 路径，
