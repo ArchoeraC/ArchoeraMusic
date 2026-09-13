@@ -45,8 +45,14 @@ class _NeteaseLoginDialog extends ConsumerStatefulWidget {
 }
 
 class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
-  /// 当前 tab：0=扫码 / 1=手机号 / 2=邮箱。
+  /// 当前选中 tab：0=扫码 / 1=手机号 / 2=邮箱（tab 栏高亮，立即切换）。
   int _tab = 0;
+
+  /// 当前实际渲染的 tab（延后于 [_tab]：旧内容先淡出，再换内容淡入）。
+  int _displayTab = 0;
+
+  /// 切换中（旧内容淡出阶段，透明度 0）。
+  bool _switching = false;
 
   // ── 扫码 ──────────────────────────────────────────────────────────
   Timer? _poll;
@@ -89,9 +95,20 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
     super.dispose();
   }
 
-  void _switchTab(int tab) {
-    if (_tab == tab) return;
-    setState(() => _tab = tab);
+  /// 切换方式：**全部隐藏再显示**（对齐 WebWord 登录窗）——
+  /// 旧内容先整体淡出（180ms）→ 换内容并平滑动画卡片高度 → 新内容淡入。
+  Future<void> _switchTab(int tab) async {
+    if (_tab == tab || _switching) return;
+    setState(() {
+      _tab = tab; // tab 栏高亮立即切换
+      _switching = true; // 旧内容开始淡出
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (!mounted) return;
+    setState(() => _displayTab = tab); // 换内容（此刻不可见）
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    if (!mounted) return;
+    setState(() => _switching = false); // 新内容淡入
   }
 
   // ── 扫码 ──────────────────────────────────────────────────────────
