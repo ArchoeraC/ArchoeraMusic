@@ -2950,6 +2950,31 @@ class AppLocalizationsZh extends AppLocalizations {
       '本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。';
 
   @override
+  String get settingsSectionEnvInfo => '环境信息';
+
+  @override
+  String get settingsEnvVersion => '版本';
+
+  @override
+  String get settingsEnvPlatform => '平台';
+
+  @override
+  String get settingsEnvRuntime => '运行时';
+
+  @override
+  String get settingsSectionCommunity => '社区与资讯';
+
+  @override
+  String get settingsCommunityRepo => 'GitHub 仓库';
+
+  @override
+  String get settingsSectionThanks => '特别致谢';
+
+  @override
+  String get settingsThanksText =>
+      '本软件使用、依赖或参考了以下开源项目（完整许可清单见仓库 THIRD-PARTY-NOTICES.md 及各模块 THIRD-PARTY-LICENSES.md）：\n\n· 设计思路借鉴：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 核心组件：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/公有领域）、signalsmith-stretch（MIT）、SQLite（公有领域）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· 解码参考：minimp3（CC0-1.0）、stb_vorbis（公有领域/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· 图标：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n感谢以上项目的作者。';
+
+  @override
   String get settingsSectionFontCredits => '字体署名';
 
   @override
@@ -6991,6 +7016,31 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   @override
   String get settingsDeclineFooter =>
       '本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。';
+
+  @override
+  String get settingsSectionEnvInfo => '环境信息';
+
+  @override
+  String get settingsEnvVersion => '版本';
+
+  @override
+  String get settingsEnvPlatform => '平台';
+
+  @override
+  String get settingsEnvRuntime => '运行时';
+
+  @override
+  String get settingsSectionCommunity => '社区与资讯';
+
+  @override
+  String get settingsCommunityRepo => 'GitHub 仓库';
+
+  @override
+  String get settingsSectionThanks => '特别致谢';
+
+  @override
+  String get settingsThanksText =>
+      '本软件使用、依赖或参考了以下开源项目（完整许可清单见仓库 THIRD-PARTY-NOTICES.md 及各模块 THIRD-PARTY-LICENSES.md）：\n\n· 设计思路借鉴：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 核心组件：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/公有领域）、signalsmith-stretch（MIT）、SQLite（公有领域）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· 解码参考：minimp3（CC0-1.0）、stb_vorbis（公有领域/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· 图标：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n感谢以上项目的作者。';
 
   @override
   String get settingsSectionFontCredits => '字体署名';
@@ -11035,6 +11085,31 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get settingsDeclineFooter =>
       '本軟體僅用於技術探索與研究。如相關平台認為本軟體不妥，可隨時聯繫開發者進行調整或移除。';
+
+  @override
+  String get settingsSectionEnvInfo => '環境資訊';
+
+  @override
+  String get settingsEnvVersion => '版本';
+
+  @override
+  String get settingsEnvPlatform => '平台';
+
+  @override
+  String get settingsEnvRuntime => '執行階段';
+
+  @override
+  String get settingsSectionCommunity => '社群與資訊';
+
+  @override
+  String get settingsCommunityRepo => 'GitHub 倉庫';
+
+  @override
+  String get settingsSectionThanks => '特別致謝';
+
+  @override
+  String get settingsThanksText =>
+      '本軟體使用、依賴或參考了以下開源專案（完整授權清單見倉庫 THIRD-PARTY-NOTICES.md 及各模組 THIRD-PARTY-LICENSES.md）：\n\n· 設計思路借鏡：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 核心元件：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/公有領域）、signalsmith-stretch（MIT）、SQLite（公有領域）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· 解碼參考：minimp3（CC0-1.0）、stb_vorbis（公有領域/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· 圖示：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n感謝以上專案的作者。';
 
   @override
   String get settingsSectionFontCredits => '字體署名';

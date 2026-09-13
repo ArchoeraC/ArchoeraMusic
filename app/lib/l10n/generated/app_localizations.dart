@@ -5468,6 +5468,54 @@ abstract class AppLocalizations {
   /// **'本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。'**
   String get settingsDeclineFooter;
 
+  /// No description provided for @settingsSectionEnvInfo.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'环境信息'**
+  String get settingsSectionEnvInfo;
+
+  /// No description provided for @settingsEnvVersion.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'版本'**
+  String get settingsEnvVersion;
+
+  /// No description provided for @settingsEnvPlatform.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'平台'**
+  String get settingsEnvPlatform;
+
+  /// No description provided for @settingsEnvRuntime.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'运行时'**
+  String get settingsEnvRuntime;
+
+  /// No description provided for @settingsSectionCommunity.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'社区与资讯'**
+  String get settingsSectionCommunity;
+
+  /// No description provided for @settingsCommunityRepo.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'GitHub 仓库'**
+  String get settingsCommunityRepo;
+
+  /// No description provided for @settingsSectionThanks.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'特别致谢'**
+  String get settingsSectionThanks;
+
+  /// No description provided for @settingsThanksText.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本软件使用、依赖或参考了以下开源项目（完整许可清单见仓库 THIRD-PARTY-NOTICES.md 及各模块 THIRD-PARTY-LICENSES.md）：\n\n· 设计思路借鉴：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 核心组件：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/公有领域）、signalsmith-stretch（MIT）、SQLite（公有领域）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· 解码参考：minimp3（CC0-1.0）、stb_vorbis（公有领域/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· 图标：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n感谢以上项目的作者。'**
+  String get settingsThanksText;
+
   /// No description provided for @settingsSectionFontCredits.
   ///
   /// In zh_CN, this message translates to:

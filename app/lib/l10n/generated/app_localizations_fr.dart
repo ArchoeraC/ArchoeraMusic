@@ -3141,6 +3141,31 @@ class AppLocalizationsFr extends AppLocalizations {
       'Ce logiciel est uniquement pour l\'exploration et la recherche techniques.';
 
   @override
+  String get settingsSectionEnvInfo => 'Environnement';
+
+  @override
+  String get settingsEnvVersion => 'Version';
+
+  @override
+  String get settingsEnvPlatform => 'Plateforme';
+
+  @override
+  String get settingsEnvRuntime => 'Environnement d\'exécution';
+
+  @override
+  String get settingsSectionCommunity => 'Communauté';
+
+  @override
+  String get settingsCommunityRepo => 'Dépôt GitHub';
+
+  @override
+  String get settingsSectionThanks => 'Remerciements';
+
+  @override
+  String get settingsThanksText =>
+      'Ce logiciel utilise, dépend de ou référence les projets open source suivants (liste complète dans THIRD-PARTY-NOTICES.md et les THIRD-PARTY-LICENSES.md de chaque module) :\n\n· Inspiration de conception : KuGouMusicApi (MIT), NeteaseCloudMusicApi (MIT), ncm-api-rs (WTFPL), MoeKoeMusic, Mineradio\n· Composants principaux : Flutter, FFmpeg (LGPL-2.1+), libopus (BSD-3-Clause), TagLib (LGPL-2.1+/MPL-1.1), miniaudio (MIT-0/Domaine public), signalsmith-stretch (MIT), SQLite (Domaine public), libcurl, OpenSSL (Apache-2.0), nlohmann/json (MIT)\n· Références de décodeurs : minimp3 (CC0-1.0), stb_vorbis (Domaine public/MIT-0), kissfft (BSD-3-Clause), WavPack (BSD-3-Clause), dsd2pcm (BSD), OpenCORE/PV-AMR (Apache-2.0)\n· Icônes : MingCute Icons (Apache-2.0), Tabler Icons (MIT), Lucide (ISC), line-md (MIT)\n\nMerci aux auteurs des projets ci-dessus.';
+
+  @override
   String get settingsSectionFontCredits => 'Crédits des polices';
 
   @override

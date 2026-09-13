@@ -107,6 +107,72 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
           ],
         ),
         const SizedBox(height: 12),
+        // ── 环境信息（版本 / 平台 / 运行时，可一键复制）──────────────
+        SettingSection(
+          title: l10n.settingsSectionEnvInfo,
+          children: [
+            _envRow(
+              l10n.settingsEnvVersion,
+              widget.version.isEmpty
+                  ? l10n.settingsVersionUnknown
+                  : widget.version,
+            ),
+            _envRow(
+              l10n.settingsEnvPlatform,
+              '${Platform.operatingSystem} '
+              '${Platform.operatingSystemVersion}',
+            ),
+            _envRow(
+              l10n.settingsEnvRuntime,
+              'Dart ${Platform.version.split(' ').first}',
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SettingCopyButton(
+                  value: _envText(l10n),
+                  label: l10n.settingsSectionEnvInfo,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // ── 社区与资讯（仅 GitHub 仓库地址，可复制）──────────────────
+        SettingSection(
+          title: l10n.settingsSectionCommunity,
+          children: [
+            SettingTile(
+              icon: EtaIcons.serverOutline,
+              title: l10n.settingsCommunityRepo,
+              subtitle: _kRepoUrl,
+              trailing: SettingCopyButton(
+                value: _kRepoUrl,
+                label: l10n.settingsCommunityRepo,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // ── 特别致谢（使用 / 参考的开源项目，齐全列出）───────────────
+        SettingSection(
+          title: l10n.settingsSectionThanks,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Text(
+                l10n.settingsThanksText,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.6,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         SettingSection(
           title: l10n.settingsSectionFontCredits,
           children: [
@@ -191,5 +257,45 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
         TextSpan(text: body),
       ],
     );
+  }
+
+  /// 项目 GitHub 仓库地址（仅展示 / 复制，不打开链接）。
+  static const String _kRepoUrl =
+      'https://github.com/BetaStudio2/ArchoeraMusic';
+
+  Widget _envRow(String label, String value) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 76,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: const TextStyle(fontSize: 13, height: 1.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _envText(AppLocalizations l10n) {
+    final v = widget.version.isEmpty
+        ? l10n.settingsVersionUnknown
+        : widget.version;
+    return '${l10n.settingsEnvVersion}: $v\n'
+        '${l10n.settingsEnvPlatform}: ${Platform.operatingSystem} '
+        '${Platform.operatingSystemVersion}\n'
+        '${l10n.settingsEnvRuntime}: Dart '
+        '${Platform.version.split(' ').first}';
   }
 }
