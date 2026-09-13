@@ -4,6 +4,17 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [0.9.16+8] - 2026-09-13
+
+你好喵
+
+1、NixOS 改成**独立源构建**：新增根 `flake.nix`，用 nixpkgs 工具链（flutter / zig / rust / go / .NET / clang）从**源码**编 FFmpeg（自建最小纯 LGPL·仅音频）+ 全部原生模块 + Flutter，产物是纯 Nix store 依赖——**彻底脱离 Ubuntu 预构建包**，不再拿 Ubuntu 的 bundle 套壳 autoPatchelf 了喵
+2、flake 按模块拆成多个 derivation（ffmpeg / kernel / audio-engine / scraper / scanner / vault / downloader / subsonic / platform / app），Nix 按内容哈希缓存，改一处只重编下游，不再每次全量重编
+3、CI 的 `linux-nix` job 改成 `nix build .#default`，不再 `needs: linux-deb`
+4、`.gitignore` 忽略本地临时测试脚本，消除 Nix 的「git tree is dirty」告警
+
+灌注塔菲喵！灌注塔菲谢谢喵！
+
 ## [0.9.16+7] - 2026-09-13
 
 呜，紧急修个致命 bug 喵……
@@ -11,7 +22,7 @@
 1、修了**非法指令（SIGILL）闪退**：Zig 自研内核之前按**构建机原生 CPU** 编译——CI runner 带 AVX-512 时，内核就被编成 EVEX / AVX-512 指令，普通用户 CPU（比如 12/13 代酷睿，没有 AVX-512）一播放就「非法指令（核心已转储）」
 2、现在内核固定按 **x86-64 基线指令集**编译（`zig build -Dcpu=baseline`），不管什么 CPU 都能跑
 
-（0.9.16+6 因为这个问题没发出去，直接以 +7 顶上喵）
+中国人会飞！
 
 ## [0.9.16+6] - 2026-09-13
 
