@@ -83,3 +83,6 @@ issuescreenshot/
 # Nix build result symlink
 /result
 /result-*
+
+# 本地临时测试（封面取色对照预览等，作者标注不入库）
+app/test/*_manual_test.dart

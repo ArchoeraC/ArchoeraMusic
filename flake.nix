@@ -59,9 +59,9 @@
         export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
         # signalsmith-stretch 的 bindgen 需要 libclang（用 Nix 的，勿命中宿主）
         export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
-        # Go 模块：`|` 分隔（任一错误即回退下一个）。goproxy.cn 放最前，避免
-        # proxy.golang.org 在国内网络下长时间卡住（modernc.org/libc 等大包）。
-        export GOPROXY="https://goproxy.cn|https://proxy.golang.org|direct"
+        # Go 模块：默认走官方 proxy.golang.org（CI/GitHub 友好，勿硬编码国内源，
+        # 否则 GitHub 上可能失败）。`|` 分隔表示任一错误即回退下一个。
+        export GOPROXY="https://proxy.golang.org|direct"
         export GOSUMDB=off
         export GOTOOLCHAIN=local
         export GOFLAGS="-mod=mod"
