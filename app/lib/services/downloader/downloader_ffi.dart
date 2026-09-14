@@ -58,6 +58,10 @@ class DownloaderLibrary {
   late final _RetryDart _retry = _lib.lookupFunction<_RetryNative, _RetryDart>(
     'archoera_downloader_retry',
   );
+  late final _RetryWithUrlDart _retryWithUrl = _lib
+      .lookupFunction<_RetryWithUrlNative, _RetryWithUrlDart>(
+        'archoera_downloader_retry_with_url',
+      );
   late final _PauseDart _pause = _lib.lookupFunction<_PauseNative, _PauseDart>(
     'archoera_downloader_pause',
   );
@@ -178,6 +182,23 @@ class DownloaderLibrary {
       return _retry(p);
     } finally {
       calloc.free(p);
+    }
+  }
+
+  /// §12.1 下载回退：把播放管线预解析的 URL 注入指定任务并重试（复用原 taskId）。
+  ///
+  /// [resolvedJson] 结构（camelCase）：
+  /// `{ "url": "...", "qualityKey": "flac", "fileExt": "flac",
+  ///    "size": 123, "headers": [["Referer","..."],["Cookie","..."]] }`。
+  /// 仅允许对 failed/canceled/paused 任务调用（与 [retry] 一致）。
+  int retryWithUrl(String taskId, Map<String, dynamic> resolvedJson) {
+    final t = taskId.toNativeUtf8();
+    final r = jsonEncode(resolvedJson).toNativeUtf8();
+    try {
+      return _retryWithUrl(t, r);
+    } finally {
+      calloc.free(t);
+      calloc.free(r);
     }
   }
 
@@ -309,6 +330,10 @@ typedef _CancelDart = int Function(Pointer<Utf8>);
 
 typedef _RetryNative = Int32 Function(Pointer<Utf8> taskId);
 typedef _RetryDart = int Function(Pointer<Utf8>);
+
+typedef _RetryWithUrlNative =
+    Int32 Function(Pointer<Utf8> taskId, Pointer<Utf8> resolvedJson);
+typedef _RetryWithUrlDart = int Function(Pointer<Utf8>, Pointer<Utf8>);
 
 typedef _PauseNative = Int32 Function(Pointer<Utf8> taskId);
 typedef _PauseDart = int Function(Pointer<Utf8>);

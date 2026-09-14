@@ -123,6 +123,15 @@ class DownloaderEngine {
     return _lib.retry(taskId);
   }
 
+  /// §12.1 下载回退：Rust 解析失败后，把播放管线预解析的 URL 注入任务并重试。
+  ///
+  /// 复用原 taskId；[resolvedJson] 见 [DownloaderLibrary.retryWithUrl]。
+  /// 仅对 failed/canceled/paused 任务有效。
+  int retryWithUrl(String taskId, Map<String, dynamic> resolvedJson) {
+    _ensureInit();
+    return _lib.retryWithUrl(taskId, resolvedJson);
+  }
+
   /// 暂停任务（v2）：保留 .tmp 供恢复续传；恢复走 [retry]。
   int pause(String taskId) {
     _ensureInit();
