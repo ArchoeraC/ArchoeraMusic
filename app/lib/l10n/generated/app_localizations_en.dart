@@ -669,6 +669,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Scanned, please confirm the login on your phone';
 
   @override
+  String get loginConfirmCheck => 'I\'ve confirmed, check login';
+
+  @override
+  String get loginChecking => 'Checking…';
+
+  @override
+  String get loginScanThenConfirm =>
+      'After scanning and confirming on your phone, tap the button below';
+
+  @override
+  String get loginScannedThenConfirm =>
+      'Scanned. Confirm on your phone, then tap again';
+
+  @override
   String get trackListArtistHotSongs => 'Artist hot songs';
 
   @override
@@ -1496,13 +1510,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Follow system accent (fallback to custom if read fails)';
 
   @override
-  String get settingsAccentDefault => 'Default bright blue (design system)';
+  String get settingsAccentDefault => 'Default gray (design system)';
 
   @override
   String get settingsAccentCustom => 'Custom (palette generated from seed)';
 
   @override
-  String get settingsAccentDefaultTooltip => 'Default blue';
+  String get settingsAccentDefaultTooltip => 'Default gray';
 
   @override
   String get settingsAccentSystemTooltip => 'Follow system accent';
@@ -3807,9 +3821,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get platformQQMusic => 'QM';
-
-  @override
-  String get platformSoda => 'Soda';
 
   @override
   String get loginQqQrLogin => 'Sign in with QM QR code';

@@ -654,6 +654,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginWaitingConfirm => '已扫码，请在手机上确认登录';
 
   @override
+  String get loginConfirmCheck => '我已確認，檢查登入';
+
+  @override
+  String get loginChecking => '檢查中…';
+
+  @override
+  String get loginScanThenConfirm => '掃碼並在手機確認後，點下方按鈕';
+
+  @override
+  String get loginScannedThenConfirm => '已掃碼，請在手機點擊確認，再點一次';
+
+  @override
   String get trackListArtistHotSongs => '艺人热门歌曲';
 
   @override
@@ -1447,13 +1459,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAccentSystemFallback => '跟随系统主题色（读取失败，回退自定义）';
 
   @override
-  String get settingsAccentDefault => '默认亮蓝（设计体系）';
+  String get settingsAccentDefault => '默认灰（设计体系）';
 
   @override
   String get settingsAccentCustom => '自定义（按种子动态生成配色）';
 
   @override
-  String get settingsAccentDefaultTooltip => '默认亮蓝';
+  String get settingsAccentDefaultTooltip => '默认灰';
 
   @override
   String get settingsAccentSystemTooltip => '跟随系统主题色';
@@ -3636,9 +3648,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get platformQQMusic => 'QM';
 
   @override
-  String get platformSoda => '汽水';
-
-  @override
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';
 
   @override
@@ -4737,6 +4746,18 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginWaitingConfirm => '已扫码，请在手机上确认登录';
 
   @override
+  String get loginConfirmCheck => '我已确认，检查登录';
+
+  @override
+  String get loginChecking => '检查中…';
+
+  @override
+  String get loginScanThenConfirm => '扫码并在手机确认后，点下方按钮';
+
+  @override
+  String get loginScannedThenConfirm => '已扫码，请在手机点击确认，再点一次';
+
+  @override
   String get trackListArtistHotSongs => '艺人热门歌曲';
 
   @override
@@ -5530,13 +5551,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsAccentSystemFallback => '跟随系统主题色（读取失败，回退自定义）';
 
   @override
-  String get settingsAccentDefault => '默认亮蓝（设计体系）';
+  String get settingsAccentDefault => '默认灰（设计体系）';
 
   @override
   String get settingsAccentCustom => '自定义（按种子动态生成配色）';
 
   @override
-  String get settingsAccentDefaultTooltip => '默认亮蓝';
+  String get settingsAccentDefaultTooltip => '默认灰';
 
   @override
   String get settingsAccentSystemTooltip => '跟随系统主题色';
@@ -7719,9 +7740,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get platformQQMusic => 'QM';
 
   @override
-  String get platformSoda => '汽水';
-
-  @override
   String get loginQqQrLogin => 'QM扫码登录';
 
   @override
@@ -8820,6 +8838,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get loginWaitingConfirm => '已掃碼，請在手機上確認登入';
 
   @override
+  String get loginConfirmCheck => '我已確認，檢查登入';
+
+  @override
+  String get loginChecking => '檢查中…';
+
+  @override
+  String get loginScanThenConfirm => '掃碼並在手機確認後，點下方按鈕';
+
+  @override
+  String get loginScannedThenConfirm => '已掃碼，請在手機點擊確認，再點一次';
+
+  @override
   String get trackListArtistHotSongs => '藝人熱門歌曲';
 
   @override
@@ -9613,13 +9643,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsAccentSystemFallback => '跟隨系統主題色（讀取失敗，回退自訂）';
 
   @override
-  String get settingsAccentDefault => '預設亮藍（設計體系）';
+  String get settingsAccentDefault => '預設灰（設計體系）';
 
   @override
   String get settingsAccentCustom => '自訂（依種子動態生成配色）';
 
   @override
-  String get settingsAccentDefaultTooltip => '預設亮藍';
+  String get settingsAccentDefaultTooltip => '預設灰';
 
   @override
   String get settingsAccentSystemTooltip => '跟隨系統主題色';
@@ -11801,9 +11831,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get platformQQMusic => 'QQ 音樂';
-
-  @override
-  String get platformSoda => '汽水';
 
   @override
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';

@@ -1298,6 +1298,30 @@ abstract class AppLocalizations {
   /// **'已扫码，请在手机上确认登录'**
   String get loginWaitingConfirm;
 
+  /// No description provided for @loginConfirmCheck.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我已确认，检查登录'**
+  String get loginConfirmCheck;
+
+  /// No description provided for @loginChecking.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'检查中…'**
+  String get loginChecking;
+
+  /// No description provided for @loginScanThenConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫码并在手机确认后，点下方按钮'**
+  String get loginScanThenConfirm;
+
+  /// No description provided for @loginScannedThenConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已扫码，请在手机点击确认，再点一次'**
+  String get loginScannedThenConfirm;
+
   /// No description provided for @trackListArtistHotSongs.
   ///
   /// In zh_CN, this message translates to:
@@ -2747,7 +2771,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsAccentDefault.
   ///
   /// In zh_CN, this message translates to:
-  /// **'默认亮蓝（设计体系）'**
+  /// **'默认灰（设计体系）'**
   String get settingsAccentDefault;
 
   /// No description provided for @settingsAccentCustom.
@@ -2759,7 +2783,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsAccentDefaultTooltip.
   ///
   /// In zh_CN, this message translates to:
-  /// **'默认亮蓝'**
+  /// **'默认灰'**
   String get settingsAccentDefaultTooltip;
 
   /// No description provided for @settingsAccentSystemTooltip.
@@ -6757,12 +6781,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'QM'**
   String get platformQQMusic;
-
-  /// No description provided for @platformSoda.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'汽水'**
-  String get platformSoda;
 
   /// No description provided for @loginQqQrLogin.
   ///

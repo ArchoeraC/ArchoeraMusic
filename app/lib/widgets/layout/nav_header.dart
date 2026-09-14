@@ -23,7 +23,6 @@ import '../../l10n/l10n.dart';
 import '../dialogs/kugou_login_button.dart';
 import '../dialogs/netease_login_dialog.dart';
 import '../dialogs/qqmusic_login_dialog.dart';
-import '../dialogs/soda_login_dialog.dart';
 import '../dialogs/track_list_dialog.dart';
 import '../player/s_controls.dart';
 import '../common/anim.dart';

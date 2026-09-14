@@ -45,8 +45,8 @@ extension LyricsPrefs on AppPrefs {
   /// 播放器歌词行距：由 [lyricFontSize] 自动换算，不独立手调。
   double get lyricLineHeight => lyricLineHeightFor(lyricFontSize);
 
-  /// 已唱行歌词颜色（ARGB；默认主色亮蓝，对齐原版 desktopLyric.playedColor）。
-  int get lyricPlayedColor => data[lyricPlayedColorKey] as int? ?? 0xFF4DA3FF;
+  /// 已唱行歌词颜色（ARGB；默认主色灰，对齐原版 desktopLyric.playedColor）。
+  int get lyricPlayedColor => data[lyricPlayedColorKey] as int? ?? 0xFFD0D3DA;
 
   /// 未唱行歌词颜色（ARGB；默认次级前景，对齐原版 desktopLyric.unplayedColor）。
   int get lyricUnplayedColor =>

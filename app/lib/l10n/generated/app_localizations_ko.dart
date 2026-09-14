@@ -659,6 +659,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get loginWaitingConfirm => '스캔되었습니다. 휴대폰에서 로그인을 확인해 주세요';
 
   @override
+  String get loginConfirmCheck => '확인했습니다, 로그인 확인';
+
+  @override
+  String get loginChecking => '확인 중…';
+
+  @override
+  String get loginScanThenConfirm => '휴대폰으로 스캔 후 확인하고 아래 버튼을 누르세요';
+
+  @override
+  String get loginScannedThenConfirm => '스캔됨. 휴대폰에서 확인한 뒤 다시 누르세요';
+
+  @override
   String get trackListArtistHotSongs => '아티스트 인기곡';
 
   @override
@@ -1466,13 +1478,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsAccentSystemFallback => '시스템 강조 색상 따르기（감지되지 않음, 커스텀로 폴백）';
 
   @override
-  String get settingsAccentDefault => '기본 밝은 파랑（디자인 시스템）';
+  String get settingsAccentDefault => '기본 회색（디자인 시스템）';
 
   @override
   String get settingsAccentCustom => '커스텀（시드에서 primary/secondary 동적 생성）';
 
   @override
-  String get settingsAccentDefaultTooltip => '기본 파랑';
+  String get settingsAccentDefaultTooltip => '기본 회색';
 
   @override
   String get settingsAccentSystemTooltip => '시스템 강조 색상 따르기';
@@ -3686,9 +3698,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get platformQQMusic => 'QQ 뮤직';
-
-  @override
-  String get platformSoda => 'Soda';
 
   @override
   String get loginQqQrLogin => 'QQ 뮤직 QR 코드로 로그인';

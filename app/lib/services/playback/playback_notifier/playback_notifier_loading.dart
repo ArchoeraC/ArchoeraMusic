@@ -279,9 +279,6 @@ mixin _PlaybackNotifierLoading
         url = await ref
             .read(qqMusicApiProvider)
             .resolvePlayUrl(track, quality: quality);
-      } else if (track.source == 'soda') {
-        // 汽水暂不区分档位（SEO PlayInfo 取最高码率）。
-        url = await ref.read(sodaApiProvider).resolvePlayUrl(track, quality: quality);
       } else {
         url = null;
       }

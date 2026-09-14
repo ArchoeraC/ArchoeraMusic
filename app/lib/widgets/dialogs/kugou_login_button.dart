@@ -9,7 +9,8 @@
 ///（内存；持久化后续接 drift）。
 ///
 /// 流程：qrKey() 拿 key → 拼 `$kgQrLoginPage?qrcode=$key` 本地渲染二维码
-/// → 1s 轮询 qrCheck() → status=4 时 saveSession(token, userid)。
+/// → 用户扫码并在手机确认后点「我已确认」触发一次 qrCheck() →
+/// status=4 时 saveSession(token, userid)。
 library;
 
 import 'dart:async';
@@ -247,6 +248,7 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
       _key = null;
       _status = 1;
     });
+    _timer?.cancel();
     try {
       final key = await _api.qrKey();
       if (!mounted) return;
@@ -286,7 +288,6 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
             userid,
             nickname: state['nickname']?.toString(),
           );
-          // 拉取头像/昵称（失败静默，头像回退昵称首字）
           unawaited(_api.refreshUserInfo());
           Navigator.of(context).pop(true);
         } else if (status == 0) {
@@ -298,8 +299,9 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
         } else {
           setState(() => _status = status);
         }
-      } catch (_) {
-        // 轮询偶发网络错误忽略，等下一轮
+      } catch (e) {
+        debugPrint('[kugou] 检查登录异常: $e');
+        if (mounted) setState(() => _error = '$e');
       }
     });
   }

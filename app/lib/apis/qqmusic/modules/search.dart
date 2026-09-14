@@ -187,7 +187,7 @@ Map<String, dynamic> _mapSong(Map song) {
   final payMonth = (payMap['pay_month'] as num?)?.toInt() ?? 0;
   final albumMid = albumMap['mid'] ?? '';
   final albumPmid = albumMap['pmid'] ?? '';
-  final pictureMid = (albumMid ?? albumPmid ?? '').toString();
+  final pictureMid = albumMid.isNotEmpty ? albumMid : albumPmid;
   final sizeNew = fileMap['size_new'];
   final sizeHires = _numOf(fileMap['size_hires']);
   final sizeHiRes = sizeHires > 0

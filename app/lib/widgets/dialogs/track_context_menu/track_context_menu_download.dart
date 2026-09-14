@@ -9,18 +9,17 @@ Future<void> downloadTracks(
   WidgetRef ref,
   List<Track> tracks,
 ) async {
-  // 支持的下载来源：KG/NT（Rust 自研解析）+ QQMusic/汽水（Dart 播放管线回退）。
+  // 支持的下载来源：KG/NT（Rust 自研解析）+ QQMusic（Dart 播放管线回退）。
   final online = tracks
       .where(
         (t) =>
             t.source == 'netease' ||
             t.source == 'kugou' ||
-            t.source == 'qqmusic' ||
-            t.source == 'soda',
+            t.source == 'qqmusic',
       )
       .toList();
   if (online.isEmpty) return;
-  // 仅 KG/NT 强制登录（QQ/汽水免费曲免登录；VIP 曲解析失败由任务错误呈现）。
+  // 仅 KG/NT 强制登录（QQ 免费曲免登录；VIP 曲解析失败由任务错误呈现）。
   for (final src in const ['kugou', 'netease']) {
     if (online.any((t) => t.source == src)) {
       if (!await _ensureLoggedIn(context, ref, src)) return;

@@ -72,9 +72,7 @@ class QqMusicProfile {
 
 /// 搜索请求统一入口（QM模块协议）。
 class QqMusicApi extends ChangeNotifier {
-  QqMusicApi() {
-    _loadProfileSilently();
-  }
+  QqMusicApi();
 
   /// 当前登录资料（null = 访客）；启动/登录后异步补齐。
   QqMusicProfile? _profile;
@@ -89,7 +87,8 @@ class QqMusicApi extends ChangeNotifier {
   String get uin => qmGetQQMusicUin();
 
   /// 启动恢复：从持久化 cookie 拉取昵称/头像/会员（失败静默）。
-  Future<void> _loadProfileSilently() async {
+  /// 由 `AuthBootstrap` 在每次启动时显式调用一次（资料不持久化）。
+  Future<void> loadProfileSilently() async {
     if (_profileLoading) return;
     _profileLoading = true;
     try {
@@ -346,21 +345,72 @@ class QqMusicApi extends ChangeNotifier {
   // ── 实验性在线收藏「我喜欢」（dirid=201 社区逆向 RPC）──────────────
 
   /// 读「我喜欢」列表单页（favorite_list，dirid=201，登录态）。
+  ///
+  /// 社区 RPC 失败时回退 fcg `profile_order_songs`（纯 GET，见
+  /// `modules/user_playlist.dart`），提升可用性。
   Future<Map<String, dynamic>> _favoritePage(int page, int num) async {
-    final body = await qmCall('favorite_list', {'page': page, 'num': num});
-    if (body is! Map) throw QqApiException('QM：收藏列表响应异常');
-    final map = Map<String, dynamic>.from(body);
-    final code = map['code'];
-    if (code == 301 || map['loggedIn'] == false) {
+    try {
+      final body = await qmCall('favorite_list', {'page': page, 'num': num});
+      if (body is! Map) throw QqApiException('QM：收藏列表响应异常');
+      final map = Map<String, dynamic>.from(body);
+      final code = map['code'];
+      if (code == 301 || map['loggedIn'] == false) {
+        throw QqApiException('需要登录 QM账号');
+      }
+      if (code != 200) {
+        final msg = map['message']?.toString();
+        throw QqApiException(
+          msg?.isNotEmpty == true ? 'QM收藏：$msg' : 'QM收藏：读取失败 code=$code',
+        );
+      }
+      return map;
+    } on QqApiException catch (e) {
+      if (e.message.contains('需要登录')) rethrow;
+      return _favoritePageViaFcg(page, num);
+    }
+  }
+
+  /// fcg 回退：`profile_order_songs`（reqtype=1）→ 归一到 `favorite_list` 形状。
+  Future<Map<String, dynamic>> _favoritePageViaFcg(int page, int num) async {
+    final body = await _guard(
+      () => qmCall('profile_order_songs', {'page': page, 'num': num}),
+    );
+    final raw = body is Map
+        ? Map<String, dynamic>.from(body)
+        : const <String, dynamic>{};
+    final code = raw['code'];
+    if (code == 301 || raw['loggedIn'] == false) {
       throw QqApiException('需要登录 QM账号');
     }
     if (code != 200) {
-      final msg = map['message']?.toString();
-      throw QqApiException(msg?.isNotEmpty == true
-          ? 'QM收藏：$msg'
-          : 'QM收藏：读取失败 code=$code');
+      final msg = raw['message']?.toString();
+      throw QqApiException(
+        msg?.isNotEmpty == true ? 'QM收藏：$msg' : 'QM收藏：读取失败 code=$code',
+      );
     }
-    return map;
+    final songs = (raw['songs'] as List?) ?? const [];
+    final mapped = songs.whereType<Map>().map((s) {
+      final artists = (s['artists'] as List?) ?? const [];
+      return <String, dynamic>{
+        'mid': s['mid'],
+        'id': s['id'],
+        'name': s['name'],
+        'artists': artists.map((n) => {'name': '$n'}).toList(),
+        'album': s['album'],
+        'albumMid': s['albumMid'],
+        'duration': s['duration'],
+        'size128': s['size128'],
+        'size320': s['size320'],
+        'sizeFlac': s['sizeFlac'],
+      };
+    }).toList();
+    return {
+      'code': 200,
+      'loggedIn': true,
+      'songs': mapped,
+      'total': raw['total'],
+      'hasMore': raw['hasMore'],
+    };
   }
 
   /// 循环翻页收集全部收藏歌曲。
@@ -393,6 +443,45 @@ class QqMusicApi extends ChangeNotifier {
       page++;
     }
     return mids;
+  }
+
+  /// 用户歌单库（自建歌单 + 收藏歌单 + 我喜欢总数），供收藏页展示。
+  ///
+  /// 走 `fcgi` GET（见 `modules/user_playlist.dart`）；未登录返回空。
+  Future<({List<CoverItem> created, List<CoverItem> collected, int likedTotal})>
+  userLibrary() async {
+    final created = await _playlistList('user_created_diss');
+    final collected = await _playlistList('profile_order_playlists');
+    final likedRaw = await _guard(
+      () => qmCall('profile_order_songs', {'num': 1}),
+    );
+    final liked = likedRaw is Map
+        ? Map<String, dynamic>.from(likedRaw)
+        : const <String, dynamic>{};
+    final total = (liked['total'] as num?)?.toInt() ?? 0;
+    return (created: created, collected: collected, likedTotal: total);
+  }
+
+  Future<List<CoverItem>> _playlistList(String module) async {
+    final bodyRaw = await _guard(() => qmCall(module, {'limit': 100}));
+    final body = bodyRaw is Map
+        ? Map<String, dynamic>.from(bodyRaw)
+        : const <String, dynamic>{};
+    final raw = body['playlists'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map(
+          (m) => CoverItem(
+            id: '${m['id'] ?? ''}',
+            title: '${m['name'] ?? ''}',
+            cover: m['cover']?.toString(),
+            subtitle: '${m['creator'] ?? ''}',
+            trackCount: (m['trackCount'] as num?)?.toInt() ?? 0,
+            source: 'qqmusic',
+          ),
+        )
+        .toList();
   }
 
   /// 红心 / 取消红心（登录态，社区逆向 dirid=201 写接口，**实验性**）。

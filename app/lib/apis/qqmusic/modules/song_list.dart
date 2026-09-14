@@ -42,6 +42,7 @@ QmModule qmSongList = (params) async {
       final singer = it['singer'] as List?;
       final pay = it['pay'];
       final payMap = pay is Map ? pay : const <String, dynamic>{};
+      final albumMid = it['albummid'] ?? it['albumMid'] ?? '';
       return <String, dynamic>{
         'id': '${it['songid'] ?? ''}',
         'mid': it['songmid'] ?? '',
@@ -49,7 +50,13 @@ QmModule qmSongList = (params) async {
         'artist': qmFormatSingerName(singer),
         'artists': singer ?? const [],
         'album': it['albumname'] ?? '',
-        'albumMid': it['albummid'] ?? '',
+        'albumMid': albumMid,
+        'cover': albumMid.toString().isEmpty
+            ? ''
+            : 'https://y.gtimg.cn/music/photo_new/T002R300x300M000$albumMid.jpg',
+        'coverOriginal': albumMid.toString().isEmpty
+            ? ''
+            : 'https://y.gtimg.cn/music/photo_new/T002R800x800M000$albumMid.jpg',
         'duration': ((it['interval'] as num?) ?? 0) * 1000,
         'mediaMid': it['strMediaMid'] ?? '',
         'pay': payMap,

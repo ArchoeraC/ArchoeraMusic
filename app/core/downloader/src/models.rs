@@ -77,7 +77,6 @@ pub enum SourcePlatform {
     Kugou,
     Netease,
     Qqmusic,
-    Soda,
 }
 
 impl SourcePlatform {
@@ -86,7 +85,6 @@ impl SourcePlatform {
             SourcePlatform::Kugou => "kugou",
             SourcePlatform::Netease => "netease",
             SourcePlatform::Qqmusic => "qqmusic",
-            SourcePlatform::Soda => "soda",
         }
     }
 }

@@ -180,6 +180,82 @@ Future<Map<String, dynamic>> qmPostRaw(
   return qmHttpTransport(body, extraHeaders: extraHeaders, url: url);
 }
 
+/// 可注入的 GET 传输（默认直连；测试注入 fake）。
+typedef QmHttpGetTransport = Future<Map<String, dynamic>> Function(
+  Uri uri, {
+  Map<String, String>? extraHeaders,
+});
+
+/// 当前 GET 传输实现（默认直连；测试注入 fake）。
+QmHttpGetTransport qmHttpGetTransport = _defaultGetTransport;
+
+/// 直接发起一次 fcg GET（自动注入 Cookie）——用于 `c.y.qq.com` 的 fcgi 端点
+/// （用户歌单 / 我喜欢等，纯 GET、无需签名）。
+Future<Map<String, dynamic>> qmGetRaw(
+  Uri uri, {
+  Map<String, String>? extraHeaders,
+}) {
+  return qmHttpGetTransport(uri, extraHeaders: extraHeaders);
+}
+
+/// 默认 GET 传输：dart:io HttpClient 直连 fcgi。
+Future<Map<String, dynamic>> _defaultGetTransport(
+  Uri uri, {
+  Map<String, String>? extraHeaders,
+}) async {
+  final cookies = qmGetQQMusicCookies();
+  final cookieStr = qmSessionToCookieHeader(cookies);
+  final headers = <String, String>{
+    'Accept': 'application/json, text/plain, */*',
+    'User-Agent': qmHeaders['User-Agent']!,
+    'Referer': 'https://y.qq.com/',
+    'Cookie': ?cookieStr,
+    ...?extraHeaders,
+  };
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+  try {
+    final req = await client.getUrl(uri);
+    headers.forEach((k, v) => req.headers.set(k, v));
+    final res = await req.close().timeout(const Duration(seconds: 8));
+    final status = res.statusCode;
+    final bytes = await res.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
+    if (status < 200 || status >= 300) {
+      throw QmRequestException(
+        'QM HTTP $status',
+        kind: QmErrorKind.transient,
+        retryable: true,
+      );
+    }
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+    } catch (_) {
+      throw QmRequestException(
+        'QM 响应不是合法 JSON（HTTP $status）',
+        kind: QmErrorKind.transient,
+        retryable: true,
+      );
+    }
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    throw QmRequestException(
+      'QM 响应结构异常（HTTP $status）',
+      kind: QmErrorKind.transient,
+      retryable: true,
+    );
+  } on QmRequestException {
+    rethrow;
+  } catch (err) {
+    throw QmRequestException(
+      'QM 网络请求失败: $err',
+      kind: QmErrorKind.transient,
+      retryable: true,
+    );
+  } finally {
+    client.close();
+  }
+}
+
 /// 默认传输：dart:io HttpClient 直连 musicu.fcg。
 Future<Map<String, dynamic>> _defaultTransport(
   Map<String, dynamic> body, {

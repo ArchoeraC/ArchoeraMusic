@@ -11,6 +11,7 @@ import '../../l10n/l10n.dart';
 import '../widgets/list/cover_grid.dart';
 import '../widgets/dialogs/netease_login_dialog.dart';
 import '../widgets/dialogs/kugou_login_button.dart';
+import '../widgets/dialogs/qqmusic_login_dialog.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/streaming/empty_state.dart';
 import '../widgets/dialogs/track_list_dialog.dart';
@@ -21,9 +22,10 @@ part 'favorites/favorites_page_view.dart';
 
 /// 收藏页（对齐原项目 Favorites.vue）。
 ///
-/// 平台切换（NT / KG）：NT三 tab（歌单 / 专辑 / 歌手）保持原逻辑；
+/// 平台切换（NT / KG / QM）：NT三 tab（歌单 / 专辑 / 歌手）保持原逻辑；
 /// KG按 MoeKoeMusic Library.vue 对 `/v7/get_all_list` 的分类拆成
-/// 「创建的歌单 / 收藏的歌单 / 收藏的专辑」三 tab。未登录对应平台显示登录引导。
+/// 「创建的歌单 / 收藏的歌单 / 收藏的专辑」三 tab；QM拆成
+/// 「创建的歌单 / 收藏的歌单 / 我喜欢」。未登录对应平台显示登录引导。
 class FavoritesPage extends ConsumerStatefulWidget {
   const FavoritesPage({super.key});
 
@@ -31,7 +33,7 @@ class FavoritesPage extends ConsumerStatefulWidget {
   ConsumerState<FavoritesPage> createState() => _FavoritesPageState();
 }
 
-enum _Platform { netease, kugou }
+enum _Platform { netease, kugou, qqmusic }
 
 /// NT收藏 tab。
 enum _FavTab { playlist, album, artist }
@@ -39,10 +41,14 @@ enum _FavTab { playlist, album, artist }
 /// KG曲库 tab（对齐 MoeKoeMusic Library.vue 分类）。
 enum _KgTab { created, collectedPlaylist, collectedAlbum }
 
+/// QM收藏 tab（自建歌单 / 收藏歌单 / 我喜欢）。
+enum _QqTab { created, collectedPlaylist, liked }
+
 class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   _Platform _platform = _Platform.netease;
   _FavTab _tab = _FavTab.playlist;
   _KgTab _kgTab = _KgTab.created;
+  _QqTab _qqTab = _QqTab.created;
 
   /// 各 tab 缓存数据（key：'netease.playlist' / 'kugou.created' 等；切换保留，
   /// 登录态变化时清空）。
@@ -53,20 +59,36 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
 
   bool get _neteaseLoggedIn => ref.read(neteaseAuthProvider) != null;
   bool get _kugouLoggedIn => ref.read(kugouApiProvider).session != null;
+  bool get _qqLoggedIn => ref.read(qqMusicApiProvider).isLoggedIn;
 
   /// 当前平台是否已登录（内容区据此显示数据或登录引导）。
-  bool get _loggedIn =>
-      _platform == _Platform.kugou ? _kugouLoggedIn : _neteaseLoggedIn;
+  bool get _loggedIn => switch (_platform) {
+    _Platform.kugou => _kugouLoggedIn,
+    _Platform.qqmusic => _qqLoggedIn,
+    _Platform.netease => _neteaseLoggedIn,
+  };
 
-  String get _cacheKey =>
-      '${_platform.name}.'
-      '${_platform == _Platform.kugou ? _kgTab.name : _tab.name}';
+  String get _cacheKey {
+    final tab = switch (_platform) {
+      _Platform.kugou => _kgTab.name,
+      _Platform.qqmusic => _qqTab.name,
+      _Platform.netease => _tab.name,
+    };
+    return '${_platform.name}.$tab';
+  }
 
   /// KG三个 tab 的 key（一次 `/v7/get_all_list` 拉全部分类）。
   static const _kgKeys = [
     'kugou.created',
     'kugou.collectedPlaylist',
     'kugou.collectedAlbum',
+  ];
+
+  /// QM三个 tab 的 key（一次 `userLibrary()` 拉全部分类）。
+  static const _qqKeys = [
+    'qqmusic.created',
+    'qqmusic.collectedPlaylist',
+    'qqmusic.liked',
   ];
 
   @override
@@ -94,6 +116,10 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
     setState(() => _kgTab = tab);
   }
 
+  void _setQqTab(_QqTab tab) {
+    setState(() => _qqTab = tab);
+  }
+
   void _markLoading(String key) {
     setState(() {
       _loading.add(key);
@@ -104,7 +130,11 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   void _finishFetchSuccess(String key) {
     setState(() {
       _loading.remove(key);
-      _loaded.addAll(_platform == _Platform.kugou ? _kgKeys : [key]);
+      _loaded.addAll(switch (_platform) {
+        _Platform.kugou => _kgKeys,
+        _Platform.qqmusic => _qqKeys,
+        _Platform.netease => [key],
+      });
     });
   }
 
