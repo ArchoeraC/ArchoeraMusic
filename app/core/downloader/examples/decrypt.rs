@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::process::exit;
 
 fn usage() -> ! {
-    eprintln!("usage: decrypt <input> <output> [--qmc-ekey <k>] [--cenc-auth <a>]");
+    eprintln!("usage: decrypt <input> <output> [--qmc-ekey <k>]");
     exit(2);
 }
 
@@ -19,16 +19,11 @@ fn main() {
     let input = &args[1];
     let output = &args[2];
     let mut qmc_ekey: Option<String> = None;
-    let mut cenc_auth: Option<String> = None;
     let mut i = 3;
     while i < args.len() {
         match args[i].as_str() {
             "--qmc-ekey" if i + 1 < args.len() => {
                 qmc_ekey = Some(args[i + 1].clone());
-                i += 2;
-            }
-            "--cenc-auth" if i + 1 < args.len() => {
-                cenc_auth = Some(args[i + 1].clone());
                 i += 2;
             }
             _ => usage(),
@@ -64,7 +59,7 @@ fn main() {
         let ext = std::path::Path::new(input)
             .extension()
             .and_then(|e| e.to_str());
-        archoera_downloader::decrypt::decrypt_container(&data, ext, cenc_auth.as_deref())
+        archoera_downloader::decrypt::decrypt_container(&data, ext)
     };
 
     match result {

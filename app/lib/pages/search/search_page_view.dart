@@ -179,8 +179,14 @@ class _SearchPageHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              _PlatformSwitcher(
-                platform: platform,
+              SSegmented<String>(
+                options: [
+                  SSegmentedOption('netease', l10n.platformNetease),
+                  SSegmentedOption('kugou', l10n.platformKugou),
+                  SSegmentedOption('qqmusic', l10n.platformQQMusic),
+                  SSegmentedOption('all', l10n.platformAll),
+                ],
+                selected: platform,
                 onChanged: onPlatformChanged,
               ),
             ],
@@ -205,68 +211,8 @@ class _SearchPageHeader extends StatelessWidget {
   }
 }
 
-/// 搜索来源切换器：紧凑 pill + 下拉菜单（来源变多也不挤占标题栏空间）。
-class _PlatformSwitcher extends StatelessWidget {
-  const _PlatformSwitcher({required this.platform, required this.onChanged});
-
-  final String platform;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final l10n = context.l10n;
-    final options = <SSegmentedOption<String>>[
-      SSegmentedOption('netease', l10n.platformNetease),
-      SSegmentedOption('kugou', l10n.platformKugou),
-      SSegmentedOption('qqmusic', l10n.platformQQMusic),
-      SSegmentedOption('soda', l10n.platformSoda),
-      SSegmentedOption('all', l10n.platformAll),
-    ];
-    final current = options.firstWhere(
-      (o) => o.value == platform,
-      orElse: () => options.first,
-    );
-    return PopupMenuButton<String>(
-      position: PopupMenuPosition.under,
-      offset: const Offset(0, 6),
-      tooltip: '',
-      onSelected: onChanged,
-      itemBuilder: (_) => [
-        for (final o in options)
-          CheckedPopupMenuItem<String>(
-            value: o.value,
-            checked: o.value == platform,
-            child: Text(o.label),
-          ),
-      ],
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: scheme.onSurface.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              current.label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: scheme.primary,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Icon(EtaIcons.downSmall, size: 18, color: scheme.onSurfaceVariant),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchAggFailureBanner extends StatelessWidget {  const _SearchAggFailureBanner({
+class _SearchAggFailureBanner extends StatelessWidget {
+  const _SearchAggFailureBanner({
     required this.visible,
     required this.failed,
     required this.platformLabel,

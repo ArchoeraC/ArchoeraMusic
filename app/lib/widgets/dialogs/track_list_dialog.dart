@@ -102,36 +102,6 @@ Future<void> showQqArtistDetailDialog(BuildContext context, CoverItem artist) {
   );
 }
 
-/// 汽水歌单详情弹窗（PC 歌单详情曲目）。
-Future<void> showSodaPlaylistDetailDialog(
-  BuildContext context,
-  CoverItem playlist,
-) {
-  return showQqTracksDialog(
-    context,
-    title: playlist.title,
-    subtitle: playlist.subtitle,
-    cover: playlist.cover,
-    loadTracks: (ref) async {
-      final page = await ref
-          .read(sodaApiProvider)
-          .playlistTracks(playlist.id);
-      return page.songs;
-    },
-  );
-}
-
-/// 汽水专辑详情弹窗（PC 专辑曲目）。
-Future<void> showSodaAlbumDetailDialog(BuildContext context, CoverItem album) {
-  return showQqTracksDialog(
-    context,
-    title: album.title,
-    subtitle: album.subtitle,
-    cover: album.cover,
-    loadTracks: (ref) => ref.read(sodaApiProvider).albumTracks(album.id),
-  );
-}
-
 /// KG歌单详情弹窗（公开歌单全量曲目）。
 Future<void> showKugouPlaylistDetailDialog(
   BuildContext context,

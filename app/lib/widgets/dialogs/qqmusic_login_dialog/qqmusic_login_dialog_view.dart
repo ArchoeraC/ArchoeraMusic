@@ -130,6 +130,18 @@ extension _QqMusicLoginDialogView on _QqMusicLoginDialogState {
                               ),
                             ),
                           ),
+                          if (!_loading &&
+                              !_confirmed &&
+                              !_expired &&
+                              _qrBytes != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: OutlinedButton.icon(
+                                onPressed: _createQr,
+                                icon: const Icon(EtaIcons.refresh, size: 18),
+                                label: Text(l10n.loginRefreshQr),
+                              ),
+                            ),
                         ],
                       ),
                     ),

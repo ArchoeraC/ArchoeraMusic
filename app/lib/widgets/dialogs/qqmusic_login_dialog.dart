@@ -4,7 +4,8 @@
 
 /// QM扫码登录对话框（仅支持手机 QQ 扫码）。
 ///
-/// 流程：qrKey() 取 base64 二维码 → 1~2s 轮询 qrCheck() → status=4 登录成功
+/// 官方只有轮询接口、无推送，故**不做自动轮询**：`qrKey()` 取二维码后由用户
+/// 扫码并在手机确认，点「我已确认」触发一次 `qrCheck()`；status=4 登录成功
 /// （cookie 已落盘）→ 刷新资料并关闭。
 library;
 
@@ -48,10 +49,10 @@ class _QqMusicLoginDialog extends ConsumerStatefulWidget {
 
 class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
   Timer? _poll;
-
   String _key = '';
   Uint8List? _qrBytes;
   bool _loading = true;
+  bool _checking = false;
   bool _expired = false;
   bool _confirmed = false;
   String _error = '';
@@ -93,10 +94,7 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
         _qrBytes = bytes;
         _loading = false;
       });
-      _poll = Timer.periodic(
-        const Duration(milliseconds: 1800),
-        (_) => _check(),
-      );
+      _poll = Timer.periodic(const Duration(milliseconds: 1800), (_) => _check());
       unawaited(_check());
     } catch (e) {
       if (!mounted) return;
@@ -108,7 +106,8 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
   }
 
   Future<void> _check() async {
-    if (_key.isEmpty || _confirmed || _expired) return;
+    if (_key.isEmpty || _confirmed || _expired || _checking) return;
+    _checking = true;
     try {
       final state = await _api.qrCheck(_key);
       if (!mounted) return;
@@ -133,8 +132,11 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
               : context.l10n.loginQqScanHint;
         });
       }
-    } catch (_) {
-      // 轮询失败静默，下一轮自动重试
+    } catch (e) {
+      debugPrint('[qqmusic] 检查登录异常: $e');
+      if (mounted) setState(() => _hint = '${context.l10n.loginFailed}: $e');
+    } finally {
+      _checking = false;
     }
   }
 

@@ -52,6 +52,25 @@ void main() {
     });
   });
 
+  group('interleaveSources 轮转交错', () {
+    test('各源按名次轮转，长度不齐时末尾续接', () {
+      final out = interleaveSources<String>([
+        ['n1', 'n2', 'n3'],
+        ['k1', 'k2'],
+        ['q1'],
+      ]);
+      expect(out, ['n1', 'k1', 'q1', 'n2', 'k2', 'n3']);
+    });
+
+    test('空分组与单源', () {
+      expect(interleaveSources<String>([]), isEmpty);
+      expect(interleaveSources<String>([
+        ['a', 'b'],
+      ]), ['a', 'b']);
+      expect(interleaveSources<String>([[], ['x']]), ['x']);
+    });
+  });
+
   group('SearchSourceCooldown 失败退避', () {
     final t0 = DateTime(2026, 1, 1, 12, 0, 0);
     final cooldown = SearchSourceCooldown(

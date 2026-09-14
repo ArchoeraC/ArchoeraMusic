@@ -69,8 +69,6 @@ extension _CommentDialogView on _CommentDialogState {
           text: l10n.commentNotFound(
             _isKugou
                 ? l10n.brandKugou
-                : _isSoda
-                ? l10n.platformSoda
                 : _isQq
                 ? l10n.platformQQMusic
                 : l10n.brandNetease,

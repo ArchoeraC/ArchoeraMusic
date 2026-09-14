@@ -6,8 +6,8 @@ part of '../download_controller.dart';
 
 /// 支持「播放管线回退解析」的来源：
 /// - kugou/netease：Rust 自研解析，失败后回退；
-/// - qqmusic/soda：Rust 无自研解析（enqueue 后即失败）→ 直接走 Dart 播放管线。
-const _downloadFallbackSources = {'kugou', 'netease', 'qqmusic', 'soda'};
+/// - qqmusic：Rust 无自研解析（enqueue 后即失败）→ 直接走 Dart 播放管线。
+const _downloadFallbackSources = {'kugou', 'netease', 'qqmusic'};
 
 mixin _DownloadControllerCore on Notifier<DownloadState> {
   DownloaderEngine? get _engine;
@@ -184,8 +184,8 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
 
   /// Rust 在 resolving 阶段解析失败 → 调度一次播放管线回退解析。
   ///
-  /// kugou/netease：Rust 自研解析失败后回退；qqmusic/soda：Rust 无解析，
-  /// 直接由 Dart 播放管线解析（含 QQ 登录态 / 汽水 SEO 取流）。
+  /// kugou/netease：Rust 自研解析失败后回退；qqmusic：Rust 无解析，
+  /// 直接由 Dart 播放管线解析（含 QQ 登录态取流）。
   void _scheduleFallback(String taskId) {
     final track = _tracks[taskId];
     if (track == null) return;
@@ -250,10 +250,9 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
     String url,
     String quality,
   ) {
-    final ext = track.source == 'soda'
-        ? 'm4a'
-        : (_extFromUrl(url) ??
-              ((quality == 'lossless' || quality == 'hi-res') ? 'flac' : 'mp3'));
+    final ext =
+        _extFromUrl(url) ??
+        ((quality == 'lossless' || quality == 'hi-res') ? 'flac' : 'mp3');
     final headers = <List<String>>[];
     if (track.source == 'netease') {
       // 网易 CDN 通常需 Referer/UA；带登录态时补 Cookie（对齐 Rust resolver）。
@@ -275,20 +274,6 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
       headers.add(const ['User-Agent', 'QQMusic 14090008(android 15)']);
       headers.add(const ['Referer', 'https://y.qq.com']);
       final cookies = getRuntime().sessionStore.get('qqmusic');
-      if (cookies.isNotEmpty) {
-        headers.add([
-          'Cookie',
-          cookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
-        ]);
-      }
-    } else if (track.source == 'soda') {
-      // 汽水官方 VOD/CDN 需 UA（对齐 SEO 取流 UA）。
-      headers.add(const [
-        'User-Agent',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-            '(KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
-      ]);
-      final cookies = getRuntime().sessionStore.get('soda');
       if (cookies.isNotEmpty) {
         headers.add([
           'Cookie',

@@ -53,9 +53,6 @@ Future<String?> resolvePlaySource(
     }
     return ref.read(qqMusicApiProvider).resolvePlayUrl(track, quality: quality);
   }
-  if (track.source == 'soda') {
-    return ref.read(sodaApiProvider).resolvePlayUrl(track, quality: quality);
-  }
   if (track.source == 'streaming') {
     final serverId = track.serverId;
     final originalId = track.originalId;

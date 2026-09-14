@@ -127,11 +127,6 @@ extension _SearchPageFetch on _SearchPageState {
           .read(qqMusicApiProvider)
           .searchSongs(_query, page: page, limit: _SearchPageState._pageSize);
     }
-    if (platform == 'soda') {
-      return ref
-          .read(sodaApiProvider)
-          .searchSongs(_query, page: page, limit: _SearchPageState._pageSize);
-    }
     return ref
         .read(neteaseApiProvider)
         .searchSongs(
@@ -165,7 +160,7 @@ extension _SearchPageFetch on _SearchPageState {
       (p) => _searchSongsFrom(p, append: append, loaded: _songAgg[p]!.loaded),
     );
     if (!mounted) return;
-    final okItems = <Track>[];
+    final okGroups = <List<Track>>[];
     var anyOk = false;
     for (final a in attempts) {
       final st = _songAgg[a.source]!;
@@ -180,7 +175,7 @@ extension _SearchPageFetch on _SearchPageState {
         st.loaded = append
             ? st.loaded + a.result!.items.length
             : a.result!.items.length;
-        okItems.addAll(a.result!.items);
+        okGroups.add(a.result!.items);
         if (a.source == 'qqmusic') _sourceCooldown.clear('qqmusic');
       } else {
         st
@@ -193,7 +188,7 @@ extension _SearchPageFetch on _SearchPageState {
     }
     final ordered = sortByRelevance(
       _query,
-      okItems,
+      interleaveSources(okGroups),
       (t) => searchRelevanceScore(_query, t.title, t.artistNames, t.album?.name),
     );
     final merged = _boundedAppend(_songs.items, ordered);
@@ -336,25 +331,6 @@ extension _SearchPageFetch on _SearchPageState {
         _ => api.searchPlaylists(_query, page: page, limit: requestSize),
       };
     }
-    if (platform == 'soda') {
-      final api = ref.read(sodaApiProvider);
-      return switch (tab) {
-        _SearchTab.albums => api.searchAlbums(
-          _query,
-          page: page,
-          limit: requestSize,
-        ),
-        _SearchTab.playlists => api.searchPlaylists(
-          _query,
-          page: page,
-          limit: requestSize,
-        ),
-        // 汽水无歌手搜索：返回空而非失败（不请求）。
-        _ => Future<SearchResult<CoverItem>>.value(
-          const SearchResult<CoverItem>(items: [], total: 0, hasMore: false),
-        ),
-      };
-    }
     final api = ref.read(neteaseApiProvider);
     final offset = append ? loaded : 0;
     return switch (tab) {
@@ -408,7 +384,7 @@ extension _SearchPageFetch on _SearchPageState {
     if (!mounted) return;
     final current = _coverOf(tab);
     if (current == null) return;
-    final okItems = <CoverItem>[];
+    final okGroups = <List<CoverItem>>[];
     var anyOk = false;
     for (final a in attempts) {
       final st = states[a.source]!;
@@ -423,7 +399,7 @@ extension _SearchPageFetch on _SearchPageState {
         st.loaded = append
             ? st.loaded + a.result!.items.length
             : a.result!.items.length;
-        okItems.addAll(a.result!.items);
+        okGroups.add(a.result!.items);
         if (a.source == 'qqmusic') _sourceCooldown.clear('qqmusic');
       } else {
         st
@@ -436,7 +412,7 @@ extension _SearchPageFetch on _SearchPageState {
     }
     final ordered = sortByRelevance(
       _query,
-      okItems,
+      interleaveSources(okGroups),
       (c) => searchRelevanceScore(_query, c.title, c.subtitle),
     );
     final merged = _boundedAppend(current.items, ordered);

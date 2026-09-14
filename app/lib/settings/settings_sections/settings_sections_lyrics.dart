@@ -16,7 +16,7 @@ class LyricsSection extends ConsumerStatefulWidget {
 
 class _LyricsSectionState extends ConsumerState<LyricsSection> {
   static const _lyricColorPresets = <int>[
-    0xFF4DA3FF,
+    0xFFD0D3DA,
     0xFFE8EAF2,
     0xFFFF6B9D,
     0xFFFFB84D,

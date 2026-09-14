@@ -175,6 +175,15 @@ extension _NeteaseLoginDialogView on _NeteaseLoginDialogState {
             ),
           ),
         ),
+        if (!_loading && _error.isEmpty && !_expired && !_confirmed)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: OutlinedButton.icon(
+              onPressed: _createQr,
+              icon: const Icon(EtaIcons.refresh, size: 18),
+              label: Text(l10n.loginRefreshQr),
+            ),
+          ),
       ],
     );
   }

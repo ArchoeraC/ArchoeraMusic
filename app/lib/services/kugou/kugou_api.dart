@@ -45,10 +45,6 @@ const _kugouSessionPlatform = 'kugou';
 class KugouApi extends ChangeNotifier {
   KugouApi() {
     session = _restoreSession();
-    // 启动恢复会话时异步补齐头像/昵称（旧会话可能未存 avatarUrl）
-    if (session != null) {
-      unawaited(refreshUserInfo());
-    }
   }
 
   /// 进程级设备标识（register_dev 返回；v5/url 前置条件，随机 dfid

@@ -11,6 +11,7 @@ extension _FavoritesPageView on _FavoritesPageState {
     final l10n = context.l10n;
     ref.listen(neteaseAuthProvider, (_, next) => _onAuthChanged());
     ref.listen(kugouApiProvider, (_, next) => _onAuthChanged());
+    ref.listen(qqMusicApiProvider, (_, next) => _onAuthChanged());
 
     final items = _cache[_cacheKey] ?? const <CoverItem>[];
     final loading = _loading.contains(_cacheKey);
@@ -33,6 +34,22 @@ extension _FavoritesPageView on _FavoritesPageState {
               : l10n.pageFavKgCollectedPlaylistLoginHint,
         _KgTab.collectedAlbum =>
           _kugouLoggedIn
+              ? l10n.pageFavKgCollectedAlbumCount(count)
+              : l10n.pageFavKgCollectedAlbumLoginHint,
+      };
+    } else if (_platform == _Platform.qqmusic) {
+      countIcon = EtaIcons.music2Outline;
+      subtitle = switch (_qqTab) {
+        _QqTab.created =>
+          _qqLoggedIn
+              ? l10n.pageFavKgCreatedCount(count)
+              : l10n.pageFavKgCreatedLoginHint,
+        _QqTab.collectedPlaylist =>
+          _qqLoggedIn
+              ? l10n.pageFavKgCollectedPlaylistCount(count)
+              : l10n.pageFavKgCollectedPlaylistLoginHint,
+        _QqTab.liked =>
+          _qqLoggedIn
               ? l10n.pageFavKgCollectedAlbumCount(count)
               : l10n.pageFavKgCollectedAlbumLoginHint,
       };
@@ -97,6 +114,7 @@ extension _FavoritesPageView on _FavoritesPageState {
                   options: [
                     SSegmentedOption(_Platform.netease, l10n.platformNetease),
                     SSegmentedOption(_Platform.kugou, l10n.platformKugou),
+                    SSegmentedOption(_Platform.qqmusic, l10n.platformQQMusic),
                   ],
                   selected: _platform,
                   onChanged: _switchPlatform,
@@ -111,32 +129,45 @@ extension _FavoritesPageView on _FavoritesPageState {
             child: Align(
               alignment: Alignment.centerLeft,
               child: SSegmented<Object>(
-                options: _platform == _Platform.kugou
-                    ? [
-                        SSegmentedOption(_KgTab.created, l10n.pageFavKgCreated),
-                        SSegmentedOption(
-                          _KgTab.collectedPlaylist,
-                          l10n.pageFavKgCollectedPlaylist,
-                        ),
-                        SSegmentedOption(
-                          _KgTab.collectedAlbum,
-                          l10n.pageFavKgCollectedAlbum,
-                        ),
-                      ]
-                    : [
-                        SSegmentedOption(
-                          _FavTab.playlist,
-                          l10n.commonPlaylists,
-                        ),
-                        SSegmentedOption(_FavTab.album, l10n.commonAlbums),
-                        SSegmentedOption(_FavTab.artist, l10n.commonArtists),
-                      ],
-                selected: _platform == _Platform.kugou ? _kgTab : _tab,
+                options: switch (_platform) {
+                  _Platform.kugou => [
+                    SSegmentedOption(_KgTab.created, l10n.pageFavKgCreated),
+                    SSegmentedOption(
+                      _KgTab.collectedPlaylist,
+                      l10n.pageFavKgCollectedPlaylist,
+                    ),
+                    SSegmentedOption(
+                      _KgTab.collectedAlbum,
+                      l10n.pageFavKgCollectedAlbum,
+                    ),
+                  ],
+                  _Platform.qqmusic => [
+                    SSegmentedOption(_QqTab.created, l10n.pageFavKgCreated),
+                    SSegmentedOption(
+                      _QqTab.collectedPlaylist,
+                      l10n.pageFavKgCollectedPlaylist,
+                    ),
+                    SSegmentedOption(_QqTab.liked, l10n.sidebarLiked),
+                  ],
+                  _Platform.netease => [
+                    SSegmentedOption(_FavTab.playlist, l10n.commonPlaylists),
+                    SSegmentedOption(_FavTab.album, l10n.commonAlbums),
+                    SSegmentedOption(_FavTab.artist, l10n.commonArtists),
+                  ],
+                },
+                selected: switch (_platform) {
+                  _Platform.kugou => _kgTab,
+                  _Platform.qqmusic => _qqTab,
+                  _Platform.netease => _tab,
+                },
                 onChanged: (v) {
-                  if (_platform == _Platform.kugou) {
-                    _switchKgTab(v as _KgTab);
-                  } else {
-                    _switchTab(v as _FavTab);
+                  switch (_platform) {
+                    case _Platform.kugou:
+                      _switchKgTab(v as _KgTab);
+                    case _Platform.qqmusic:
+                      _switchQqTab(v as _QqTab);
+                    case _Platform.netease:
+                      _switchTab(v as _FavTab);
                   }
                 },
               ),

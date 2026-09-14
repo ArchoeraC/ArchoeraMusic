@@ -6,8 +6,8 @@
 /// 但采用本项目的独立色板，不做 Google Material 原生观感）。
 ///
 /// 设计语言：
-///  - 深色为主基调（近黑偏蓝），surface 多层微差层级；
-///  - 主色亮蓝 `primary`，次色紫蓝 `secondary`；
+///  - 深色为主基调（近纯黑），surface 多层微差层级；
+///  - 主色中性灰 `primary`，次色灰蓝 `secondary`；
 ///  - 全局统一圆角（控件 10 / 卡片 12 / 弹窗 16）、细滚动条、
 ///    填充式无边框输入框、悬浮式圆角按钮。
 library;
@@ -66,48 +66,48 @@ class AppPalette {
   final Color errorContainer;
   final Color onErrorContainer;
 
-  /// 暗色（默认主题）。
+  /// 暗色（默认主题）：近纯黑背景 + 中性灰主色。
   static const dark = AppPalette(
-    surface: Color(0xFF0E1117),
-    surfaceAlt: Color(0xFF141824),
-    surfacePanel: Color(0xFF1A1F2E),
-    surfaceBright: Color(0xFF232A3D),
-    field: Color(0xFF1D2333),
-    onSurface: Color(0xFFE8EAF2),
-    onSurfaceVariant: Color(0xFF9AA1B5),
-    outline: Color(0xFF3A4155),
-    primary: Color(0xFF4DA3FF),
-    onPrimary: Color(0xFF0A1420),
-    primaryContainer: Color(0xFF1A3A5E),
-    onPrimaryContainer: Color(0xFFC9E2FF),
-    secondary: Color(0xFF9B8CFF),
-    onSecondary: Color(0xFF151028),
-    secondaryContainer: Color(0xFF332E52),
-    onSecondaryContainer: Color(0xFFE0DBFF),
+    surface: Color(0xFF000000),
+    surfaceAlt: Color(0xFF0A0A0A),
+    surfacePanel: Color(0xFF121212),
+    surfaceBright: Color(0xFF1C1C1C),
+    field: Color(0xFF161616),
+    onSurface: Color(0xFFECECEC),
+    onSurfaceVariant: Color(0xFF9E9E9E),
+    outline: Color(0xFF2E2E2E),
+    primary: Color(0xFFD0D3DA),
+    onPrimary: Color(0xFF1A1A1A),
+    primaryContainer: Color(0xFF2A2A2A),
+    onPrimaryContainer: Color(0xFFE4E4E4),
+    secondary: Color(0xFF9AA0A8),
+    onSecondary: Color(0xFF121212),
+    secondaryContainer: Color(0xFF262626),
+    onSecondaryContainer: Color(0xFFDCDCDC),
     error: Color(0xFFFF6B61),
     onError: Color(0xFF2A0806),
     errorContainer: Color(0xFF5C211D),
     onErrorContainer: Color(0xFFFFDAD6),
   );
 
-  /// 亮色（浅色主题）。
+  /// 亮色（浅色主题）：中性灰主色。
   static const light = AppPalette(
-    surface: Color(0xFFF5F6FA),
-    surfaceAlt: Color(0xFFEDEFF6),
+    surface: Color(0xFFF7F7F8),
+    surfaceAlt: Color(0xFFEFEFEF),
     surfacePanel: Color(0xFFFFFFFF),
     surfaceBright: Color(0xFFFFFFFF),
-    field: Color(0xFFEDF0F7),
-    onSurface: Color(0xFF1A1D26),
-    onSurfaceVariant: Color(0xFF5B6273),
-    outline: Color(0xFFD2D7E4),
-    primary: Color(0xFF2E7CF6),
+    field: Color(0xFFEFEFEF),
+    onSurface: Color(0xFF1A1A1A),
+    onSurfaceVariant: Color(0xFF5E5E5E),
+    outline: Color(0xFFD4D4D4),
+    primary: Color(0xFF4A4D54),
     onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFD8E7FF),
-    onPrimaryContainer: Color(0xFF0A2E63),
-    secondary: Color(0xFF6C5CE7),
+    primaryContainer: Color(0xFFE4E4E6),
+    onPrimaryContainer: Color(0xFF2A2A2A),
+    secondary: Color(0xFF5E5E5E),
     onSecondary: Color(0xFFFFFFFF),
-    secondaryContainer: Color(0xFFE4E0FF),
-    onSecondaryContainer: Color(0xFF1E1650),
+    secondaryContainer: Color(0xFFE6E6E6),
+    onSecondaryContainer: Color(0xFF2A2A2A),
     error: Color(0xFFD94438),
     onError: Color(0xFFFFFFFF),
     errorContainer: Color(0xFFFFDAD6),
