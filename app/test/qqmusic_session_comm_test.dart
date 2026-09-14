@@ -6,11 +6,11 @@
 ///
 /// 覆盖「Android 伪装 + GetSession 引导」的组网正确性：
 /// - 配置：UA/Referer/comm 与上游 /tmp/spx config.ts 逐字段一致；
-/// - session:false 接口（search 等）**不**先打 GetSession、不注入 uid/sid/userip；
+/// - session:false 接口（comment 等）**不**先打 GetSession、不注入 uid/sid/userip；
 /// - session:true 接口（leaderboard 等）先引导 GetSession（1 次），并把
 ///   uid/sid/userip 注入后续业务请求；1h 内并发去重（第二次调用不再 GetSession）；
-/// - 已登录（cookie 带 musickey/uin/tmeLoginType）时 comm 注入
-///   uin/qq/authst/tmeLoginType=2（QQ 扫码）。
+/// - 已登录（cookie 带 musickey/uin）时 comm 注入 uin/qq/authst/tmeLoginType=2
+///   （QQ 扫码），对 `qmRequest` 接口与桌面签名搜索（search）均生效。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -72,6 +72,30 @@ Map<String, dynamic> _searchOk() => {
   },
 };
 
+/// 桌面签名搜索 body（comm + SearchCgiService 节点，无 request 包装）。
+class _DesktopReq {
+  _DesktopReq(this.body);
+
+  final Map<String, dynamic> body;
+
+  Map<String, dynamic> get comm =>
+      (body['comm'] as Map).cast<String, dynamic>();
+}
+
+/// 桌面签名搜索空结果（供 search 模块归一）。
+Map<String, dynamic> _desktopSearchOk() => {
+  'code': 0,
+  'music.search.SearchCgiService': {
+    'code': 0,
+    'data': {
+      'meta': {'is_filter': 0, 'sum': 0},
+      'body': {
+        'song': {'list': <Object>[]},
+      },
+    },
+  },
+};
+
 void main() {
   late QmHttpTransport original;
 
@@ -112,17 +136,17 @@ void main() {
   });
 
   group('session 引导与 comm 组装', () {
-    test('search 走 session:false：不打 GetSession、不注入 uid/sid/userip', () async {
+    test('session:false 接口（comment）不打 GetSession、不注入 uid/sid/userip', () async {
       final calls = <Map<String, dynamic>>[];
       qmHttpTransport = (body, {extraHeaders, url}) async {
         calls.add(body);
         return _searchOk();
       };
 
-      await qmCall('search', {'keywords': '晴天', 'type': 0});
+      await qmCall('comment', {'id': '123'});
       expect(calls, hasLength(1), reason: 'session:false 不应先引导 GetSession');
       final r = _Req(calls.first);
-      expect(r.module, 'music.search.SearchCgiService');
+      expect(r.module, 'music.globalComment.CommentRead');
       expect(r.comm.containsKey('uid'), isFalse);
       expect(r.comm.containsKey('sid'), isFalse);
       expect(r.comm.containsKey('userip'), isFalse);
@@ -194,13 +218,13 @@ void main() {
         return _searchOk();
       };
 
-      await qmCall('search', {'keywords': '周杰伦', 'type': 0});
+      await qmCall('comment', {'id': '123'});
       final r = _Req(calls.single);
       expect(r.comm['uin'], '123456');
       expect(r.comm['qq'], '123456');
       expect(r.comm['authst'], 'key_abc');
       expect(r.comm['tmeLoginType'], 2);
-      expect(r.comm.containsKey('uid'), isFalse, reason: 'search 为 session:false');
+      expect(r.comm.containsKey('uid'), isFalse, reason: 'comment 为 session:false');
       expect(r.comm.containsKey('sid'), isFalse);
     });
 
@@ -215,9 +239,29 @@ void main() {
         return _searchOk();
       };
 
-      await qmCall('search', {'keywords': '晴天', 'type': 0});
+      await qmCall('comment', {'id': '123'});
       final r = _Req(calls.single);
       expect(r.comm['uin'], '888888');
+      expect(r.comm['authst'], 'key_abc');
+      expect(r.comm['tmeLoginType'], 2);
+    });
+
+    test('桌面签名搜索：已登录 comm 注入 uin/qq/authst/tmeLoginType=2', () async {
+      qmMergeQQMusicCookies({
+        'qm_str_musicid': '888888',
+        'qm_keyst': 'key_abc',
+      });
+      final calls = <Map<String, dynamic>>[];
+      qmHttpTransport = (body, {extraHeaders, url}) async {
+        calls.add(body);
+        return _desktopSearchOk();
+      };
+
+      await qmCall('search', {'keywords': '晴天', 'type': 0});
+      final r = _DesktopReq(calls.single);
+      expect(r.comm['ct'], '19');
+      expect(r.comm['uin'], '888888');
+      expect(r.comm['qq'], '888888');
       expect(r.comm['authst'], 'key_abc');
       expect(r.comm['tmeLoginType'], 2);
     });

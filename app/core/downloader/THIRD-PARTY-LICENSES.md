@@ -50,6 +50,27 @@
 | AES/MD5/RSA/PKCS7/BigInt 等加密原语 | ❌ **绝对不自研** | 使用 Rust Crypto 官方维护 crate；自研出 padding oracle / timing attack 漏洞得不偿失 |
 | HTTP chunk download / tmp rename | ⚠️ 半自研 | 默认 `stream-download`；或自研 AGPL chunk loop |
 
+## 原生解密算法参考（NCM / QMC / CENC）
+
+`src/decrypt.rs` 的加密容器解密（网易 NCM、QQ QMC 静态掩码、汽水 CENC/AES-CTR +
+Spade PlayAuth 派生 key）由本项目**自行在 Rust 重写**，参考 `music-lib`
+（`github.com/guohuiyuan/music-lib`，**AGPL-3.0**）的 Go 实现
+（`netease/crypto.go` / `qq/crypto.go` / `soda/crypto.go`）。**未复制**任何
+无许可证项目（baka-plugins）的代码；加密原语仍由 Rust Crypto 官方 crate 提供。
+仅用于格式互操作（解密用户本机已获得的容器），不绕过付费墙/会员。
+
+`src/qmc.rs` 的 QMC（QQ 音乐）**完整流密码解密**（`QTag` / legacy / `musicex`
+footer、`deriveKey`/`deriveKeyV2`（TEA-CBC）、`Static`/`Map`/`RC4` 密码）参考：
+
+| 参考 | 许可证 | 说明 |
+|---|---|---|
+| `lantianhcgp/unlock-music`（`algo/qmc`） | **MIT** | Go 实现；`musicex` footer、`QTag`、key 派生、三种流密码 |
+| `pushbox/qmc2`（Jixun） | **MIT** | C++ QMC2 key 派生 / RC4 近似对照 |
+
+`tests/data/qmc/*.bin` 测试向量取自 `lantianhcgp/unlock-music`（**MIT**）。
+以上仅为**参考重写**，代码为自研；`musicex` 文件不含密钥（密钥由 QQ 客户端
+本地 MMKV 库提供），本项目不内置任何平台密钥。
+
 ## 合规评估（非法律意见）
 
 默认与可选依赖均为宽松许可（MIT/Apache-2.0/WTFPL/ISC）。此类许可一般可与 AGPL-3.0 代码共存，具体兼容性以 FSF 及各上游官方许可文本、适用法域判定为准。

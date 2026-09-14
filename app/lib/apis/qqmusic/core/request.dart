@@ -86,8 +86,8 @@ const _maxRetry = 2;
 const _retryBackoffMs = 300;
 
 /// 风控 / 限流内码（实测 search 被拦时 `request.code=2001`，
-/// `data.meta.is_filter=-12`、结果体为空）。
-const int _qmRiskInnerCode = 2001;
+/// `data.meta.is_filter=-12`、结果体为空）。供桌面等异构响应归一复用。
+const int qmRiskInnerCode = 2001;
 
 /// 探测「额外验证 / 风控过滤」响应：外层/内层 code 均为 0，但
 /// `data.meta.is_filter` 为负（实测 -2 需额外验证 / -12 风控限流）且结果体被
@@ -339,20 +339,20 @@ Future<T> qmRequest<T>(
         final filterValue = _isFilterValueOf(reqData);
         if (filterValue != null) {
           // 服务端以 code 0 放行的「额外验证 / 风控过滤」响应（搜索/浏览类
-          // 接口带 meta.is_filter）。归一到 _qmRiskInnerCode 同一风控族，
+          // 接口带 meta.is_filter）。归一到 qmRiskInnerCode 同一风控族，
           // 让 UI 冷却与「停止自动重试」逻辑一致；真实原因保留在 message。
           throw QmRequestException(
             'QM接口触发额外验证/风控过滤'
             '（meta.is_filter=$filterValue，结果被过滤为空），已停止自动重试',
             kind: QmErrorKind.risk,
             outer: outerCode,
-            inner: _qmRiskInnerCode,
+            inner: qmRiskInnerCode,
           );
         }
         return reqData as T;
       }
       final risk =
-          outerCode == _qmRiskInnerCode || innerCode == _qmRiskInnerCode;
+          outerCode == qmRiskInnerCode || innerCode == qmRiskInnerCode;
       if (risk) {
         throw QmRequestException(
           'QM接口拦截：请求过于频繁或触发风控'

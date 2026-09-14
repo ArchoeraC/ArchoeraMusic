@@ -193,6 +193,7 @@ pub async fn fetch_platform_info(
     match request.source {
         SourcePlatform::Kugou => kugou_info(client, request).await,
         SourcePlatform::Netease => netease_info(client, request).await,
+        SourcePlatform::Qqmusic | SourcePlatform::Soda => TrackMetadata::default(),
     }
 }
 
@@ -204,6 +205,7 @@ pub async fn fetch_platform_lyrics(
     match request.source {
         SourcePlatform::Kugou => kugou_lyrics(client, request).await,
         SourcePlatform::Netease => netease_lyrics(client, request).await,
+        SourcePlatform::Qqmusic | SourcePlatform::Soda => None,
     }
 }
 

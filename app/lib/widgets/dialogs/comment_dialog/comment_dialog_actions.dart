@@ -13,6 +13,46 @@ extension _CommentDialogActions on _CommentDialogState {
       _failed = false;
     });
     try {
+      if (_isQq) {
+        final mid = widget.track.qqmusic?.mid.isNotEmpty == true
+            ? widget.track.qqmusic!.mid
+            : widget.track.id;
+        if (mid.isEmpty) {
+          setState(() {
+            _loading = false;
+            _failed = true;
+          });
+          return;
+        }
+        if (!ref.read(qqMusicApiProvider).isLoggedIn) {
+          final ok = await showQqMusicLoginDialog(context);
+          if (!mounted) return;
+          if (ok != true) {
+            setState(() {
+              _loading = false;
+              _failed = true;
+            });
+            return;
+          }
+        }
+        if (!mounted) return;
+        setState(() => _songId = mid);
+        await _load(reset: true);
+        return;
+      }
+      if (_isSoda) {
+        if (widget.track.id.isEmpty) {
+          setState(() {
+            _loading = false;
+            _failed = true;
+          });
+          return;
+        }
+        if (!mounted) return;
+        setState(() => _songId = widget.track.id);
+        await _load(reset: true);
+        return;
+      }
       if (_isKugou) {
         final hash = widget.track.kugou?.hash;
         if (hash == null || hash.isEmpty) {
@@ -60,7 +100,11 @@ extension _CommentDialogActions on _CommentDialogState {
       _failed = false;
     });
     try {
-      final page = _isKugou
+      final page = _isQq
+          ? await _loadQq(id, page: nextPage)
+          : _isSoda
+          ? await _loadSoda(id, page: nextPage)
+          : _isKugou
           ? await _loadKg(id, page: nextPage)
           : _hot
           ? await _api.songHotComments(id, page: nextPage)
@@ -87,6 +131,14 @@ extension _CommentDialogActions on _CommentDialogState {
       page: kp.page,
       limit: kp.limit,
     );
+  }
+
+  Future<NeteaseCommentPage> _loadSoda(String id, {required int page}) {
+    return ref.read(sodaApiProvider).songComments(id, page: page, hot: _hot);
+  }
+
+  Future<NeteaseCommentPage> _loadQq(String mid, {required int page}) {
+    return ref.read(qqMusicApiProvider).songComments(mid, page: page, hot: _hot);
   }
 
   NeteaseCommentPage _mergePage(NeteaseCommentPage next, int page) {
@@ -119,11 +171,41 @@ extension _CommentDialogActions on _CommentDialogState {
 
   Future<void> _send() async {
     final id = _songId;
-    if (id == null || _isKugou || _sending) return;
+    if (id == null || !_canSend || _sending) return;
     final content = _input.text.trim();
     final l10n = context.l10n;
     if (content.isEmpty) {
       toast(l10n.commentInputEmpty);
+      return;
+    }
+    if (_isSoda) {
+      if (!ref.read(sodaAuthProvider).isLoggedIn) {
+        toast(l10n.commentLoginRequired(l10n.platformSoda));
+        showSodaLoginDialog(context);
+        return;
+      }
+      setState(() => _sending = true);
+      try {
+        await ref.read(sodaApiProvider).sendComment(id, content);
+        if (!mounted) return;
+        _input.clear();
+        toast(l10n.commentPublished, type: ToastType.success);
+        if (_hot) {
+          _switchTab(false);
+        } else {
+          await _load(reset: true);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        if (e is SodaApiException && e.code == sodaErrSessionExpired) {
+          toast(l10n.commentLoginRequired(l10n.platformSoda));
+          showSodaLoginDialog(context);
+        } else {
+          toast(l10n.commentSendFailed('$e'));
+        }
+      } finally {
+        if (mounted) setState(() => _sending = false);
+      }
       return;
     }
     final account = ref.read(neteaseAuthProvider);

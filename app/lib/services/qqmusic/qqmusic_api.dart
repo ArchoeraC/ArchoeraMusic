@@ -18,6 +18,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../apis/qqmusic/api.dart';
 import '../../apis/qqmusic/core/request.dart';
+import '../netease/comment.dart';
 import '../netease/netease_api.dart' show CoverItem, SearchResult;
 import '../netease/track.dart';
 
@@ -174,7 +175,10 @@ class QqMusicApi extends ChangeNotifier {
 
   // ── 搜索（对齐 Search.vue 四分类）────────────────────────────────────
 
-  /// 搜索单曲。
+  /// 搜索单曲（桌面签名协议，`musics.fcg` + `zzcSign`）。
+  ///
+  /// `comm.ct=19` 下发完整音质字段（`size_hires`/`size_new`/`size_dolby`/
+  /// `size_dts`/`hires_*`），归一为 [Track]。
   Future<SearchResult<Track>> searchSongs(
     String keyword, {
     int page = 1,
@@ -201,7 +205,7 @@ class QqMusicApi extends ChangeNotifier {
     });
   }
 
-  /// 搜索专辑。
+  /// 搜索专辑（桌面签名协议，type=2）。
   Future<SearchResult<CoverItem>> searchAlbums(
     String keyword, {
     int page = 1,
@@ -212,7 +216,7 @@ class QqMusicApi extends ChangeNotifier {
         'keywords': keyword,
         'page': page,
         'limit': limit,
-        'type': 8,
+        'type': 2,
       });
       final raw = _extractList(body, 'albums');
       final total = _extractTotal(body);
@@ -224,9 +228,9 @@ class QqMusicApi extends ChangeNotifier {
     });
   }
 
-  /// 搜索歌手。
+  /// 搜索歌手（桌面签名协议，type=1）。
   ///
-  /// QQ 歌手搜索单页上限为 30（>30 直接返回空，见 search.dart _capPerPage）；
+  /// 歌手单页上限较严（`num_per_page>40` 服务端返回空，见 search.dart），
   /// 这里同步收敛请求量，避免收到服务端空页。
   Future<SearchResult<CoverItem>> searchArtists(
     String keyword, {
@@ -239,7 +243,7 @@ class QqMusicApi extends ChangeNotifier {
         'keywords': keyword,
         'page': page,
         'limit': requestLimit,
-        'type': 9,
+        'type': 1,
       });
       final raw = _extractList(body, 'artists');
       final total = _extractTotal(body);
@@ -262,7 +266,7 @@ class QqMusicApi extends ChangeNotifier {
     });
   }
 
-  /// 搜索歌单。
+  /// 搜索歌单（桌面签名协议，type=3）。
   Future<SearchResult<CoverItem>> searchPlaylists(
     String keyword, {
     int page = 1,
@@ -273,7 +277,7 @@ class QqMusicApi extends ChangeNotifier {
         'keywords': keyword,
         'page': page,
         'limit': limit,
-        'type': 2,
+        'type': 3,
       });
       final raw = _extractList(body, 'playlists');
       final total = _extractTotal(body);
@@ -465,6 +469,65 @@ class QqMusicApi extends ChangeNotifier {
       }
     }
     throw QqApiException('QM：未能获取可播放链接（可能需要登录/VIP 或无版权）');
+  }
+
+  // ── 评论 ────────────────────────────────────────────────────────────
+
+  /// QQ 歌曲评论（`music.globalComment.CommentRead`）。
+  ///
+  /// 官方接口**读取需登录态**（访客返回 `request.code=10000` 空列表），
+  /// 未登录由调用方先引导登录。[hot] 热门 / 最新两 Tab。
+  Future<NeteaseCommentPage> songComments(
+    String mid, {
+    int page = 1,
+    int limit = 20,
+    bool hot = false,
+  }) async {
+    if (mid.isEmpty) {
+      return NeteaseCommentPage(
+        list: const [],
+        total: 0,
+        page: page,
+        limit: limit,
+      );
+    }
+    return _guard(() async {
+      final body = await qmCall('comment', {
+        'id': mid,
+        'type': hot ? 'hot' : 'new',
+        'page': page,
+        'limit': limit,
+      });
+      final raw = _extractList(body, 'comments');
+      return NeteaseCommentPage(
+        list: raw.map(_toComment).toList(),
+        total: _extractTotal(body),
+        page: page,
+        limit: limit,
+      );
+    });
+  }
+
+  /// QQ 评论项 → [NeteaseComment]（`CmId/Nick/Avatar/Content/PraiseNum/PubTime/SubComments`）。
+  static NeteaseComment _toComment(Map<String, dynamic> c) {
+    final avatar = c['Avatar']?.toString() ?? '';
+    final pubTime = int.tryParse('${c['PubTime'] ?? ''}') ?? 0;
+    final subs = c['SubComments'];
+    return NeteaseComment(
+      id: c['CmId']?.toString() ?? '',
+      userName: c['Nick']?.toString() ?? '',
+      avatar: avatar.isEmpty ? null : avatar,
+      text: c['Content']?.toString() ?? '',
+      likedCount: (c['PraiseNum'] as num?)?.toInt() ?? 0,
+      time: pubTime > 0 ? pubTime * 1000 : null,
+      replyTotal: subs is List ? subs.length : 0,
+      reply: subs is List
+          ? subs
+                .whereType<Map>()
+                .map((m) => _toComment(Map<String, dynamic>.from(m)))
+                .toList()
+          : const [],
+    );
   }
 
   // ── 解析辅助 ─────────────────────────────────────────────────────────

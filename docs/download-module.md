@@ -164,7 +164,8 @@ Step 1  用户点击下载 / 批量下载
 > **§12.1 回退例外**：正常 enqueue 绝不带 URL。仅当 Rust 在 resolving 阶段解析失败
 > （error 事件 `stage:"resolving"`）时，Dart 复用播放管线解析 URL，经
 > `archoera_downloader_retry_with_url` 注入该任务并重试——该路径才会给 Rust 传
-> pre-resolved URL。仅支持 kugou/netease；**QQMusic 下载器明确不支持**（回退同样拒绝）。
+> pre-resolved URL。支持 kugou/netease（Rust 自研解析失败后回退）与
+> **QQMusic / 汽水**（Rust 无自研解析，enqueue 后即走本回退，由 Dart 播放管线解析）。
 
 ### 3.3 Rust 内部：去重 + 并发槽 + 路径策略（原 v1 Step 3-5，全 Rust 实现）
 
@@ -803,9 +804,10 @@ URL 兜底下载，提升可用性。
 **编排（Dart `DownloadController`）**：
 
 1. 收到 error 事件且 `stage == "resolving"`、`retryable == true`（非取消）；
-2. 任务源为 `kugou` / `netease`（**QQMusic 明确不支持**，回退直接跳过）；
-3. 调播放管线共用解析器 `resolvePlaySource(ref, track, quality, allowQqMusic: false)`
-   拿到 URL；
+2. 任务源为 `kugou` / `netease` / `qqmusic` / `soda`：KG/NT 为 Rust 自研解析失败后回退；
+   **QQMusic / 汽水 Rust 侧无自研解析，enqueue 后即失败并直接走本条回退**（播放管线解析）；
+3. 调播放管线共用解析器 `resolvePlaySource(ref, track, quality, allowQqMusic: true)`
+   拿到 URL；QQ 带 Cookie/UA/Referer，汽水带 UA（VIP/CENC 的 `#auth=` 流跳过）；
 4. 组装 `resolvedJson` 调 `archoera_downloader_retry_with_url(taskId, resolvedJson)`；
    成功返回 0，任务复用原 taskId 走 `resolving → running`。
 
@@ -823,7 +825,7 @@ URL 兜底下载，提升可用性。
 
 **约束与安全**：
 
-- 回退仅 kugou/netease；解析器 `allowQqMusic:false` 会拒绝 QQMusic。
+- 回退支持 kugou/netease/qqmusic/soda；`allowQqMusic:true`（QQ 自研解析由 Dart 播放管线承担）。
 - 每个任务只自动回退一次（`_fallbackTried` 去重）；下载阶段失败不触发回退（避免循环）。
 - 回退 URL 及其 headers **绝不落盘**：`persist_history` 写盘前 `without_pre_resolved()`
   剥离，重启恢复时重新解析。
@@ -850,7 +852,7 @@ URL 兜底下载，提升可用性。
 | ❌ 不允许写的代码 | 理由 | ✅ 替代方案 |
 |---|---|---|
 | Dart 侧自己算 `destPath` / `tmpPath` / 做非法字符替换 / 做去重检查 | 违反"全栈 FFI 化"戒律 2，业务逻辑被拆到两地，后续改目录策略要改两处 | 全部交给 Rust `enqueue()`，Dart 只管传 title/artist/quality |
-| Dart 侧调现有 `KugouApi.resolvePlayUrl` 或 `Netease song_download_url` 拿 URL，再传给 Rust 下载 | 平台签名代码在两地，修改签名要改 Dart 又改 Rust，且后续 LICENSE 不清不楚 | Rust 内部**自写签名实现**（KugouSelfWrittenResolver / NeteaseSelfWrittenResolver，默认 feature），Dart 只传 Track 基本信息；可选 feature 切第三方 SDK 备胎（非默认）。**唯一例外**：Rust resolving 失败后的回退路径（§12.1）允许 Dart 复用播放管线解析 URL，经 `retry_with_url` 注入，仅 kugou/netease、每任务一次、不落盘 |
+| Dart 侧调现有 `KugouApi.resolvePlayUrl` 或 `Netease song_download_url` 拿 URL，再传给 Rust 下载 | 平台签名代码在两地，修改签名要改 Dart 又改 Rust，且后续 LICENSE 不清不楚 | Rust 内部**自写签名实现**（KugouSelfWrittenResolver / NeteaseSelfWrittenResolver，默认 feature），Dart 只传 Track 基本信息；可选 feature 切第三方 SDK 备胎（非默认）。**唯一例外**：Rust resolving 失败后的回退路径（§12.1）允许 Dart 复用播放管线解析 URL，经 `retry_with_url` 注入，kugou/netease + QQMusic/汽水（后者 Rust 无解析，依赖此回退）、每任务一次、不落盘 |
 | Rust 端下载写 Dart 文件（用 `dart:io` 打开文件） | 跨 FFI 内存/FD 所有权风险极高 | 所有文件 I/O 全在 Rust，完成后只把路径字符串推回来 |
 | Kugou/Netease 登录态在 Dart 和 Rust 各自存一份不同步 | 会出现"Dart 认为登录了但 Rust 拿 URL 说未登录"的诡异问题 | Dart 登录成功后必须**立即**调用 `set_kugou_session` / `set_netease_cookie` 注入 Rust，Rust 内部永远只以自己的状态为准 |
 

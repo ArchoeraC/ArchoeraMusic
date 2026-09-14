@@ -3679,6 +3679,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get platformQQMusic => 'QQ ミュージック';
 
   @override
+  String get platformSoda => 'Soda';
+
+  @override
   String get loginQqQrLogin => 'QQ ミュージック QR コードでログイン';
 
   @override

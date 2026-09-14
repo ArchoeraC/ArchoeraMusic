@@ -56,5 +56,5 @@ class _AggState {
   DateTime? failedAt;
 }
 
-/// 参与聚合搜索的平台（netease 用 offset / kugou·qqmusic 用 page 游标）。
-const _aggPlatforms = ['netease', 'kugou', 'qqmusic'];
+/// 参与聚合搜索的平台（netease 用 offset / kugou·qqmusic·soda 用 page 游标）。
+const _aggPlatforms = ['netease', 'kugou', 'qqmusic', 'soda'];

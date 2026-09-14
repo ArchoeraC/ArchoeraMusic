@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../apis/qqmusic/core/request.dart' show QmErrorKind;
 import '../services/netease/netease_api.dart';
 import '../services/netease/track.dart';
+import '../utils/search_relevance.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/qqmusic/qqmusic_api.dart' show QqApiException;
 import '../stores/app_prefs.dart';
