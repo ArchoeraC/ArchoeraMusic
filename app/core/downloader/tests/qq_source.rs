@@ -2,13 +2,13 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! QQMusic / 汽水 下载来源接入：`SourcePlatform` 新增变体的反序列化与
-//! 回退协议兼容（Rust 侧无自研解析，解析失败后由 Dart 播放管线注入 URL）。
+//! QQMusic 下载来源接入：`SourcePlatform` 变体的反序列化与回退协议兼容
+//! （Rust 侧无自研解析，解析失败后由 Dart 播放管线注入 URL）。
 
 use archoera_downloader::models::{EnqueueRequest, SourcePlatform};
 
 #[test]
-fn qqmusic_and_soda_sources_deserialize() {
+fn qqmusic_source_deserializes() {
     let qq = r#"{
         "trackId": "97773",
         "source": "qqmusic",
@@ -21,19 +21,6 @@ fn qqmusic_and_soda_sources_deserialize() {
     let req: EnqueueRequest = serde_json::from_str(qq).expect("qqmusic 反序列化失败");
     assert_eq!(req.source, SourcePlatform::Qqmusic);
     assert_eq!(req.source.as_str(), "qqmusic");
-    assert!(req.pre_resolved_url.is_none());
-
-    let soda = r#"{
-        "trackId": "7678897838486882344",
-        "source": "soda",
-        "platformId": "7678897838486882344",
-        "quality": "lossless",
-        "title": "晴天（杰伦）",
-        "artist": "哇欣"
-    }"#;
-    let req: EnqueueRequest = serde_json::from_str(soda).expect("soda 反序列化失败");
-    assert_eq!(req.source, SourcePlatform::Soda);
-    assert_eq!(req.source.as_str(), "soda");
     assert!(req.pre_resolved_url.is_none());
 }
 

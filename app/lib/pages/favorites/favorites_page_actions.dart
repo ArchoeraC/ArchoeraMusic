@@ -29,6 +29,12 @@ extension _FavoritesPageActions on _FavoritesPageState {
     if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
   }
 
+  void _switchQqTab(_QqTab tab) {
+    if (tab == _qqTab) return;
+    _setQqTab(tab);
+    if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
+  }
+
   Future<void> _fetch() async {
     final key = _cacheKey;
     if (_loading.contains(key)) return;
@@ -46,6 +52,21 @@ extension _FavoritesPageActions on _FavoritesPageState {
         _cache['kugou.collectedAlbum'] = lib.collectedAlbums
             .map((i) => i.toCoverItem())
             .toList();
+      } else if (_platform == _Platform.qqmusic) {
+        final lib = await ref.read(qqMusicApiProvider).userLibrary();
+        // 一次拉取填充全部分类（切换 tab 不再重复请求）
+        _cache['qqmusic.created'] = lib.created;
+        _cache['qqmusic.collectedPlaylist'] = lib.collected;
+        _cache['qqmusic.liked'] = lib.likedTotal <= 0
+            ? const []
+            : [
+                CoverItem(
+                  id: 'profile:favorites',
+                  title: '我喜欢',
+                  trackCount: lib.likedTotal,
+                  source: 'qqmusic',
+                ),
+              ];
       } else {
         final account = ref.read(neteaseAuthProvider);
         final api = ref.read(neteaseApiProvider);
@@ -97,6 +118,19 @@ extension _FavoritesPageActions on _FavoritesPageState {
       showKugouPlaylistDetailDialog(context, item);
       return;
     }
+    if (_platform == _Platform.qqmusic) {
+      if (_qqTab == _QqTab.liked) {
+        showQqTracksDialog(
+          context,
+          title: item.title,
+          subtitle: context.l10n.trackListArtistHotSongs,
+          loadTracks: (ref) => ref.read(qqMusicApiProvider).likedSongs(),
+        );
+        return;
+      }
+      showQqPlaylistDetailDialog(context, item);
+      return;
+    }
     switch (_tab) {
       case _FavTab.playlist:
         showPlaylistDetailDialog(context, item);
@@ -115,6 +149,8 @@ extension _FavoritesPageActions on _FavoritesPageState {
         barrierDismissible: false,
         builder: (_) => const KgQrLoginDialog(),
       );
+    } else if (_platform == _Platform.qqmusic) {
+      showQqMusicLoginDialog(context);
     } else {
       showNeteaseLoginDialog(context);
     }

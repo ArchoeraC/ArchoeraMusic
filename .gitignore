@@ -86,3 +86,10 @@ issuescreenshot/
 
 # 本地临时测试（封面取色对照预览等，作者标注不入库）
 app/test/*_manual_test.dart
+
+# 编辑器临时文件（Kate swap / vim swap / 备份）
+*.kate-swp
+*.swp
+*.swo
+*~
+*.bak

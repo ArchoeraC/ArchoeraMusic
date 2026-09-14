@@ -40,6 +40,10 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
         // 恢复失败时现场保留暂停态，用户点播放即可重试。
         debugPrint('[bootstrap] 初始化异常: $e\n$s');
       }
+      // 各平台昵称/头像不持久化（只持久化凭据）：启动恢复登录态后
+      // 显式拉取一次，保证头部账号资料每次启动都刷新（失败静默）。
+      unawaited(ref.read(kugouApiProvider).refreshUserInfo());
+      unawaited(ref.read(qqMusicApiProvider).loadProfileSilently());
       // 启动同步红心集合：
       // KG会话在 KugouApi 构造函数同步恢复（userid 首帧已就位），下方
       // ref.listen 变更监听收不到「恢复」事件 → 不显式同步则KG红心恒为空。

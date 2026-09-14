@@ -19,7 +19,7 @@ part 'netease_login_dialog/netease_login_dialog_view.dart';
 
 /// NT 登录（全屏毛玻璃页，三种方式 tab：扫码 / 手机号 / 邮箱）。
 ///
-/// - 扫码：unikey → qrurl → 2s 轮询 loginQrCheck，803 成功；
+/// - 扫码：unikey → qrurl → 用户扫码并在手机确认后手动触发 loginQrCheck，803 成功；
 /// - 手机号：captcha_sent 发验证码 → login_cellphone；
 /// - 邮箱：login（邮箱 + 密码）。
 ///
@@ -59,6 +59,7 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
   String _qrUrl = '';
   String _unikey = '';
   bool _loading = true;
+  bool _checking = false;
   bool _expired = false;
   bool _confirmed = false;
   String _status = '';
@@ -142,7 +143,8 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
   }
 
   Future<void> _check() async {
-    if (_unikey.isEmpty || _confirmed || _expired) return;
+    if (_unikey.isEmpty || _confirmed || _expired || _checking) return;
+    _checking = true;
     try {
       final status = await ref.read(neteaseApiProvider).loginQrCheck(_unikey);
       if (!mounted) return;
@@ -161,8 +163,11 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
               : l10n.loginNeteaseScanHint(l10n.brandNetease);
         });
       }
-    } catch (_) {
-      // 轮询失败静默，下一轮自动重试
+    } catch (e) {
+      debugPrint('[netease] 检查登录异常: $e');
+      if (mounted) setState(() => _status = '${context.l10n.loginFailed}: $e');
+    } finally {
+      _checking = false;
     }
   }
 

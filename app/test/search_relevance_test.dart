@@ -26,6 +26,16 @@ void main() {
     expect(withArtist, greaterThan(otherArtist));
   });
 
+  test('原唱优先：版本/翻唱降权（Live/伴奏/翻唱）', () {
+    final original = searchRelevanceScore('晴天', '晴天', '周杰伦');
+    final live = searchRelevanceScore('晴天', '晴天 (Live)', '周杰伦');
+    final cover = searchRelevanceScore('晴天', '晴天 (翻唱)', '张三');
+    final inst = searchRelevanceScore('晴天', '晴天 (伴奏)', '周杰伦');
+    expect(original, greaterThan(live));
+    expect(original, greaterThan(cover));
+    expect(original, greaterThan(inst));
+  });
+
   test('空查询 → 0', () {
     expect(searchRelevanceScore('', '晴天', '周杰伦'), 0);
     expect(searchRelevanceScore('   ', '晴天', '周杰伦'), 0);
@@ -36,7 +46,7 @@ void main() {
     final items = [
       ('kugou', '晴天', '周杰伦'),
       ('netease', '晴天', '周杰伦'),
-      ('soda', '阴天', '莫文蔚'),
+      ('kugou', '阴天', '莫文蔚'),
       ('qqmusic', '晴天 (Live)', '周杰伦'),
     ];
     final sorted = sortByRelevance(
@@ -53,5 +63,28 @@ void main() {
     final items = ['b', 'a', 'c'];
     final sorted = sortByRelevance<String>('q', items, (_) => 1);
     expect(sorted, items);
+  });
+
+  test('歌名查询：不因歌手名更长而把原唱降权（回归）', () {
+    // 三拜红尘凉：原唱尹昔眠（3 字）vs 翻唱黄龄/酒禾（2 字），歌名全等时
+    // 三者相关度应一致，不得让短歌手名压过原唱。
+    final original = searchRelevanceScore('三拜红尘凉', '三拜红尘凉', '尹昔眠');
+    final cover = searchRelevanceScore('三拜红尘凉', '三拜红尘凉', '黄龄');
+    expect(original, equals(cover));
+  });
+
+  test('歌名查询：同分下保留各源原生名次（原唱在各源首位则仍居首）', () {
+    final items = [
+      ('netease', '三拜红尘凉', '尹昔眠'),
+      ('netease', '三拜红尘凉', '黄龄'),
+      ('kugou', '三拜红尘凉', '尹昔眠'),
+      ('qqmusic', '三拜红尘凉', '酒禾'),
+    ];
+    final sorted = sortByRelevance(
+      '三拜红尘凉',
+      items,
+      (e) => searchRelevanceScore('三拜红尘凉', e.$2, e.$3),
+    );
+    expect(sorted.first.$3, '尹昔眠');
   });
 }

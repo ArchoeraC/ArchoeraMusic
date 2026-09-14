@@ -21,7 +21,11 @@ import 'data_dir.dart';
 /// 降级语义（不静默写明文）：vault 不可用（二进制缺失 / OS 安全存储
 /// 缺失 / 数据损坏）→ 仅内存保留（登录态重启即失），[main] 打印警告。
 class VaultSessionStore implements SessionStore {
-  static const List<String> knownPlatforms = ['kugou', 'netease'];
+  static const List<String> knownPlatforms = [
+    'netease',
+    'kugou',
+    'qqmusic',
+  ];
   static const String _uidPrefix = 'session:';
 
   final Map<String, Map<String, String>> _cache = {};

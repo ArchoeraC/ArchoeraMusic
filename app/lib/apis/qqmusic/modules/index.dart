@@ -21,6 +21,7 @@ import 'song_info.dart';
 import 'song_list.dart';
 import 'song_url.dart';
 import 'user_detail.dart';
+import 'user_playlist.dart';
 
 /// 模块注册表：key 与 TS index.ts 完全一致
 final Map<String, QmModule> qmModules = {
@@ -42,5 +43,9 @@ final Map<String, QmModule> qmModules = {
   'favorite_list': qmFavoriteList,
   'favorite_add': qmFavoriteAdd,
   'favorite_remove': qmFavoriteRemove,
+  // 用户歌单 / 收藏（fcgi GET，见 user_playlist.dart）
+  'user_created_diss': qmUserCreatedDiss,
+  'profile_order_playlists': qmProfileOrderPlaylists,
+  'profile_order_songs': qmProfileOrderSongs,
 };
 

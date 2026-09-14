@@ -37,6 +37,30 @@ Future<List<SourceAttempt<T>>> fetchSourcesIndependently<T>(
   );
 }
 
+/// 按「轮转交错」合并各源结果：先取每源第 1 条，再取每源第 2 条……
+///
+/// 聚合排序前先交错，可避免某一源整段占满列表；配合稳定排序（同分保留原
+/// 顺序），各平台原生名次——原唱通常在各源首位——会被尽量保留在前。
+List<T> interleaveSources<T>(List<List<T>> groups) {
+  if (groups.length <= 1) {
+    return groups.isEmpty ? <T>[] : List<T>.of(groups.first);
+  }
+  final out = <T>[];
+  var i = 0;
+  var more = true;
+  while (more) {
+    more = false;
+    for (final g in groups) {
+      if (i < g.length) {
+        out.add(g[i]);
+        more = true;
+      }
+    }
+    i++;
+  }
+  return out;
+}
+
 /// 失败后的防抖 / 退避闸门：来源失败后的一段时间内不自动也不允许反复手动
 /// 重试，避免连打把平台风控阈值刷得更高（QQ 实测风险内码 2001）。
 class SearchSourceCooldown {
