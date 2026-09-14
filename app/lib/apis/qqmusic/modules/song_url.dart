@@ -27,8 +27,15 @@ class _QualityCandidate {
 }
 
 /// 音质顺位（高 → 低）
+///
+/// 前缀对照：`RS01` 臻品音质（Hi-Res 24bit）、`AI00` 臻品母带、`Q001`/`Q000`
+/// 全景声（Atmos 5.1/2.0）、`F000` 无损 FLAC、`M800` 320k、`M500` 128k、`C400` m4a。
+/// 高解析多前缀依次降级（服务端对无权档位返回空 purl，自动跳到下一档）。
 const _qqQualityTemplates = <_QualityCandidate>[
+  _QualityCandidate('RS01', '.flac', 'hi-res'),
   _QualityCandidate('AI00', '.flac', 'hi-res'),
+  _QualityCandidate('Q001', '.flac', 'hi-res'),
+  _QualityCandidate('Q000', '.flac', 'hi-res'),
   _QualityCandidate('F000', '.flac', 'lossless'),
   _QualityCandidate('M800', '.mp3', 'hq'),
   _QualityCandidate('M500', '.mp3', 'sq'),

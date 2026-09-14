@@ -3636,6 +3636,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get platformQQMusic => 'QM';
 
   @override
+  String get platformSoda => '汽水';
+
+  @override
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';
 
   @override
@@ -7714,6 +7717,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get platformQQMusic => 'QM';
+
+  @override
+  String get platformSoda => '汽水';
 
   @override
   String get loginQqQrLogin => 'QM扫码登录';
@@ -11795,6 +11801,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get platformQQMusic => 'QQ 音樂';
+
+  @override
+  String get platformSoda => '汽水';
 
   @override
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';

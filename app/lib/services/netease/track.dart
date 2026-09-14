@@ -648,6 +648,7 @@ class Track {
       '320': 'size320',
       'flac': 'sizeFlac',
       'ogg': 'sizeOgg',
+      'hires': 'sizeHiRes',
     };
     sizeMap.forEach((key, field) {
       final v = song[field];

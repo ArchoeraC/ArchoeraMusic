@@ -15,6 +15,9 @@ void showTrackContextMenu(
   List<SContextMenuItem> extra = const [],
 }) {
   final isOnline = track.source == 'netease' || track.source == 'kugou';
+  // 可下载来源：KG/NT（Rust 自研）+ QQMusic/汽水（Dart 播放管线回退）。
+  final canDownload =
+      isOnline || track.source == 'qqmusic' || track.source == 'soda';
   final liked = ref.read(likeControllerProvider).isLiked(track);
   final toggle = onToggleLike ?? (t) => _defaultToggleLike(context, ref, t);
   final l10n = context.l10n;
@@ -48,12 +51,6 @@ void showTrackContextMenu(
           icon: EtaIcons.chatOutline,
           onTap: () => showCommentDialog(context, track: track),
         ),
-        if (ref.read(appPrefsProvider).developerMode)
-          SContextMenuItem(
-            label: l10n.menuDownload,
-            icon: EtaIcons.downloadOutline,
-            onTap: () => _startDownload(context, ref, track),
-          ),
         SContextMenuItem.divider(),
         if (track.source == 'netease' &&
             track.artists.isNotEmpty &&
@@ -79,6 +76,12 @@ void showTrackContextMenu(
           onTap: () => showTrackDetailDialog(context, track: track),
         ),
       ],
+      if (canDownload && ref.read(appPrefsProvider).developerMode)
+        SContextMenuItem(
+          label: l10n.menuDownload,
+          icon: EtaIcons.downloadOutline,
+          onTap: () => _startDownload(context, ref, track),
+        ),
       ...extra,
     ],
   );
@@ -109,10 +112,6 @@ Future<void> _startDownload(
   WidgetRef ref,
   Track track,
 ) async {
-  if (track.source == 'qqmusic') {
-    toast(context.l10n.qqMusicDownloadUnsupported);
-    return;
-  }
   if (track.source == 'kugou' && track.kugou == null) {
     toast(context.l10n.toastNoQualityInfo);
     return;

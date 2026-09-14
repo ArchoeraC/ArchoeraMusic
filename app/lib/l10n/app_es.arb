@@ -1082,6 +1082,7 @@
   "settingsVaultCloseV3PasswordDesc": "No se estableció una contraseña de recuperación al activar la vinculación (sin contraseña en este dispositivo). Al desactivarla se pasa a la protección por contraseña (v2): establezca una nueva contraseña de desbloqueo. La clave maestra y los datos existentes se conservan; esta contraseña se requiere en cada inicio.",
   "brandQqMusic": "QM",
   "platformQQMusic": "QM",
+  "platformSoda": "Soda",
   "loginQqQrLogin": "Iniciar sesión con el código QR de QM",
   "loginQqScanHint": "Escanea con la app de QQ para iniciar sesión",
   "navHeaderQqId": "QQ {id}",
