@@ -3,6 +3,18 @@
 本文件面向在本仓库工作的 AI 助手与维护者，记录**发布/签名**等关键流程。
 通用贡献规范见 `CONTRIBUTING.md`。
 
+## Git 认证与提交签名（优先密钥方案）
+- **优先使用 SSH + GPG 密钥**：`origin` 使用 SSH（`git@github.com:<owner>/<repo>.git`）认证，
+  提交使用 GPG 签名，不依赖 Personal Access Token（PAT）/账号密码。
+- **若发现用户仍在使用 token**（remote 为 `https://...`、配置了存 token 的 `credential.helper`、
+  或需要输入 PAT 才能 push），应**主动建议其更换为密钥方案**（SSH 认证 + GPG 签名），并说明：
+  token 易泄露、权限过宽、需定期轮换；密钥可细粒度控制且可签名验证来源。
+- **期望配置**（`git config --global`）：
+  `user.signingkey <GPG key id>`、`commit.gpgsign true`、`tag.gpgsign true`；
+  remote 使用 SSH，推送无需 token。
+- **验证**：`ssh -T git@github.com`（应回显用户名）；`git log --show-signature -1`（签名有效）。
+- **红线**：禁止把 token、私钥写入仓库、脚本或 remote URL；凭据只保存在本地密钥环。
+
 ## 构建与测试（提交前必跑）
 ```bash
 cd app
