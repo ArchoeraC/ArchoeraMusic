@@ -17,11 +17,14 @@ import '../../services/kugou/kugou_api.dart';
 import '../../services/netease/comment.dart';
 import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
+import '../../services/soda/soda_api.dart';
 import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/glass_surface.dart';
 import 'netease_login_dialog.dart';
+import 'qqmusic_login_dialog.dart';
+import 'soda_login_dialog.dart';
 import '../player/s_controls.dart';
 import '../common/toast.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -77,7 +80,7 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   bool _failed = false;
   final ScrollController _scroll = ScrollController();
 
-  /// 发送评论输入框（仅NT源显示；KG发送接口需签名鉴权，未接入）。
+  /// 发送评论输入框（NT / 汽水源显示；KG 与 QQ 未接入发送）。
   final TextEditingController _input = TextEditingController();
   bool _sending = false;
 
@@ -85,6 +88,15 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
 
   /// 是否KG源（直接按歌曲 hash 拉KG评论，无 Tab、无需登录）。
   bool get _isKugou => widget.track.source == 'kugou';
+
+  /// 是否汽水源（按 track id 拉汽水评论；读取免登录，发布需登录）。
+  bool get _isSoda => widget.track.source == 'soda';
+
+  /// 是否 QQ 音乐源（按 songmid 拉评论；官方读取需登录态）。
+  bool get _isQq => widget.track.source == 'qqmusic';
+
+  /// 是否支持发布评论（NT / 汽水；KG 与 QQ 未接入发送）。
+  bool get _canSend => !_isKugou && !_isQq;
 
   @override
   void initState() {

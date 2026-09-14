@@ -1082,6 +1082,7 @@
   "settingsVaultCloseV3PasswordDesc": "Bei Aktivierung der Gerätebindung wurde kein Wiederherstellungspasswort festgelegt (auf diesem Gerät passwortlos). Beim Deaktivieren wird auf Passwortschutz (v2) umgestellt: Legen Sie ein neues Entsperrungspasswort fest. Hauptschlüssel und vorhandene Daten bleiben erhalten; dieses Passwort ist bei jedem Start erforderlich.",
   "brandQqMusic": "QM",
   "platformQQMusic": "QM",
+  "platformSoda": "Soda",
   "loginQqQrLogin": "Mit QQ-Music-QR-Code anmelden",
   "loginQqScanHint": "Mit der QQ-App scannen, um dich anzumelden",
   "navHeaderQqId": "QQ {id}",

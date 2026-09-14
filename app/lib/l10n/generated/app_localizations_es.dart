@@ -3882,6 +3882,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get platformQQMusic => 'QM';
 
   @override
+  String get platformSoda => 'Soda';
+
+  @override
   String get loginQqQrLogin => 'Iniciar sesión con el código QR de QM';
 
   @override

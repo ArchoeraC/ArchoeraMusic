@@ -393,6 +393,8 @@ class _SourceBadge extends StatelessWidget {
       'kugou' => ('酷', const Color(0xFF00A7E0)),
       // QM徽标（品牌绿）
       'qqmusic' => ('Q', const Color(0xFF31C27C)),
+      // 汽水徽标
+      'soda' => ('汽', const Color(0xFF7B61FF)),
       _ => ('', Colors.transparent),
     };
     if (label.isEmpty) return const SizedBox.shrink();
@@ -431,6 +433,17 @@ class _SourceBadge extends StatelessWidget {
     if (k.hashFor('hq') != null) return (label: 'HQ', lossless: false);
     if (k.hashFor('sq') != null) return (label: 'SQ', lossless: false);
     if (k.hashFor('lq') != null) return (label: 'LQ', lossless: false);
+    return null;
+  }
+  // QM：由搜索/专辑等返回的各档文件大小推断（hires/flac/320/128）。
+  final q = t.qqmusic;
+  if (q != null && q.sizes.isNotEmpty) {
+    if ((q.sizes['hires'] ?? 0) > 0) return (label: 'Hi-Res', lossless: true);
+    if ((q.sizes['flac'] ?? 0) > 0) {
+      return (label: l10n.commonLossless, lossless: true);
+    }
+    if ((q.sizes['320'] ?? 0) > 0) return (label: 'HQ', lossless: false);
+    if ((q.sizes['128'] ?? 0) > 0) return (label: 'SQ', lossless: false);
     return null;
   }
   return _qualityLevel(t.quality, l10n);

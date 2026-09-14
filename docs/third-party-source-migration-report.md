@@ -30,10 +30,14 @@
    - **P2（新增，性价比最高）**：**酷我 kuwo**、**咪咕 migu**（baka 有完整可读 JS，go-music-dl 有 Go 对照）。
    - **P3**：Bilibili、千千、5sing、Jamendo、JOOX、Apple（小众/受限，按需）。
    - **P4（官方路径可做）**：汽水（soda/qishui）。业务/内容请求本就全走官方域名
-     （`api.qishui.com`、`beta-luna.douyin.com`、`music.douyin.com`、`api5-lf.qishui.com`）；
-     唯一非官方域名是 X-Headers 签名服务 `api.music.qishui.vsaa.cn`。按硬约束（第 7 条）
-     **该签名服务不接入**：只走**纯官方 PC API + SEO/`luna/player`** 路径，暂不提供无损/逐字歌词；
-     除非日后**本地实现签名**直连官方。详见 §7-P4 / §8.1。
+     （`api.qishui.com`、`beta-luna.douyin.com`、`music.douyin.com`、`api5-lf.qishui.com`）。
+     两处非「汽水官方」域名：X-Headers 签名服务 `api.music.qishui.vsaa.cn`（**个人第三方**），
+     以及 `api-vehicle.volcengine.com`（字节火山引擎内容接口，**字节官方云但非汽水官方**）。
+     按硬约束（第 7 条）**两者均不接入**：只走**纯官方 PC API + SEO** 路径，暂不提供**无损/空间音频**
+     （**逐字歌词不受影响**：官方 SEO 实测返回 KRC，见 §7-P4）；除非日后**本地实现签名**直连官方。
+     **完整登录（扫码 + 短信 MFA）实测可纯 Dart HTTP 完成**——按 `music-lib/soda/login.go`
+     的参数，`get_qrcode`/`check_qrconnect` **免 `a_bogus`/`msToken`/浏览器**即通
+     （不引 WebView / JS 运行时；滑块/人脸不可，见 §7-P4）。详见 §7-P4 / §8.1。
    - **P5（后期 R&D）**：**本地签名 + 下载增强**（解密/标签内嵌）——彻底去第三方，
      补齐全量官方能力。先做算法明确的（Bilibili WBI、千千、酷我、咪咕），
      ByteDance `x-gorgon` 等高风险项按需投入。详见 §7-P5。
@@ -47,7 +51,8 @@
    仅作官方取流的参数对照，**按硬约束一律不接入**。
 7. **硬约束（本次确认）**：**任何数据都不得经过官方平台以外的第三方**。因此——
    - baka 的第三方音源网关（ikun/linglan/cihedai/changqing/quandouyao/hyw）**一律不接入**；
-   - 汽水签名服务 `vsaa.cn` **不得出现在请求链路上**（只能走纯官方路径，见 §7-P4）；
+   - 汽水签名服务 `vsaa.cn`（个人第三方）与 `api-vehicle.volcengine.com`（字节云，非汽水官方）
+     **不得出现在请求链路上**（只能走纯官方路径，见 §7-P4）；
    - 两项目**只作为「官方协议实现」的参考**；新增平台的解析能力必须**直连官方**（见 §8.1 映射表）。
 8. **按需加载 / 即时卸载（§6.5）**：平台变多后**不能启动即构造全部 facade**；注册表用
    「工厂懒构造 + 租约引用计数 + 空闲 TTL 卸载 + 任务互斥」，并解除 `bootstrap` 的全量实例化。
@@ -285,7 +290,7 @@ Bilibili `bvid|cid`、5sing `songid|songtype`），`Extra` 必须端到端保留
 | 歌词（含逐字） | ✅ LRC/YRC/KRC/QRC/TTML | ✅ 含 MRC/QRC 转换 | ✅ 含 QRC/KRC/YRC | 新增源需补 MRC、酷我 `<start,dur>` |
 | 歌单详情/导入 | 部分 | ✅ 分页契约完善 | ✅ | P1/P2 补齐 |
 | 专辑/歌手 | 部分 | ✅ | ✅ | P2/P3 |
-| 评论 | 部分（NT/KG） | ✅ | ❌ | 参考 baka |
+| 评论 | 部分（NT/KG/汽水/QQ，QQ 仅读） | ✅ | ❌ | 参考 baka |
 | MV | ❌ | ✅ | ❌ | 可选（baka 参考） |
 | 榜单/推荐标签 | 部分 | ✅ | ✅ | P2/P3 |
 | 登录/QR | NT/KG/QQ | Cookie 变量 | NT/QQ/QQ_WX/KG/Bili | 新源按需 |
@@ -422,7 +427,11 @@ Dart 机制说明（避免误用）：
       确保重构后全绿；`dart analyze lib` 0 issue。
 
 ### P1 现有三源补强（参考两个项目）
-- [ ] QQ：桌面签名搜索 `zzcSign`、`ct=19` 全量 size、专辑分页（baka `qq.js:315/179/869`）、榜单/评论。
+- [x] QQ：**搜索已重写为签名桌面协议**（`zzcSign` + `musics.fcg` `DoSearchForQQMusicDesktop`，
+      `ct=19` 全量 size），单曲/歌手/专辑/歌单四类统一（`search_type` 0/1/2/3）；**移动搜索已移除**。
+      **评论已接入**（`music.globalComment.CommentRead` `GetHotCommentList`/`GetNewCommentList`，
+      读取需登录；`QqMusicApi.songComments` + 评论弹窗 hot/new 两 Tab，仅读不发）。
+      仍待补：专辑分页、榜单增强（baka `qq.js:179/869`）。
 - [ ] 酷狗：全局收藏歌单 `get_other_list_file_nofilt`、酷狗码解析、分享歌单（baka `kg.js:1356/1682/1625`）。
 - [ ] 网易云：eapi 歌词、YRC→QRC、批量音质、`trackIds` 本地缓存（baka `wy.js:880/553/317/430`）。
 - [ ] 自动换源升级：多候选源 + 相似度打分 + 时长校验 + Range 可播性探测（go-music-dl `music.go:1321`、`service.go:895/873/766`）。
@@ -456,7 +465,22 @@ Dart 机制说明（避免误用）：
 | 分享页 | `https://music.douyin.com/qishui/share/*` | `qishui.js:23/186` |
 | 图片 | `https://p3-luna.douyinpic.com/img/` | `qishui.js:22` |
 | 榜单兜底 | `https://api5-lf.qishui.com/luna/charts/` | `qishui.js:2431` |
-| 内容查询 | `https://api-vehicle.volcengine.com/v2/custom/contents`（字节自家云，无 cookie） | `qishui.js:1862/1913` |
+| 内容查询 | `https://api-vehicle.volcengine.com/v2/{custom/contents,search/type}`（字节火山引擎，无 cookie；归属核查见下） | `qishui.js:1862/1913` |
+
+**域名归属核查（2026-09-14，实测）**：
+
+- **`api-vehicle.volcengine.com` = 字节火山引擎（ByteDance 官方云），但非汽水 App 官方 API**：
+  TLS 证书 `CN=*.volcengine.com`（DigiCert/RapidSSL 签发）；响应头 `Server: Tengine` +
+  `X-Tt-Logid` / `x-tt-trace-id` / `EagleId`（字节 TT 基础设施特征）；`volcengine.com` 官网即
+  「火山引擎 / 字节跳动」；接口无需凭据即返回 `"source":"qishui","from_app":"qishui"` 内容。
+  即它是**字节官方的内容聚合 / 车机接口**（`/v2/search/type`、`/v2/custom/contents`），
+  会把**搜索词与歌曲 ID** 发往该云服务（**不含账号凭据**）。Mineradio `qishui-api.js:18-19`
+  与 baka `qishui.js:1862/1913` 均使用它；music-lib `soda/` **未使用**。
+- **`api.music.qishui.vsaa.cn` = 真第三方（个人），必须排除**：
+  `vsaa.cn` WHOIS 注册人为**个人**（`Registrant: 程亮`，邮箱 `603212202@qq.com`，
+  注册商「成都垦派科技有限公司」，**注册时间 2025-10-17**，不足一年）；HTTP 80 实测 502。
+  它**能读到 `sessionid`**。Mineradio 自检脚本已明令禁止该域名
+  （`scripts/quick-check.js:1668`：命中 `vsaa.cn` 即判失败）。
 
 **唯一非官方域名**：`http://api.music.qishui.vsaa.cn/qm/api.php`（第三方 X-Headers 签名服务，`qishui.js:37`），
 **仅在 Android `track_v2`（无损 / 逐字歌词路径）调用**（`signQishuiAndroidRequest`，`qishui.js:451`）。
@@ -468,15 +492,149 @@ Dart 机制说明（避免误用）：
 
 **决策（受 §8.1 零第三方硬约束约束）：只走纯官方路径**，签名服务 `vsaa.cn` **不接入**：
 
-- [ ] **官方路径**：PC API（`/luna/pc`）+ SEO（`beta-luna.douyin.com`）/`luna/player` 取流，
-      **完全不调用 `vsaa.cn`**；代价：暂不提供 Android `track_v2` 的无损音质与逐字歌词。
-- [ ] **禁止**使用 `vsaa.cn` 签名服务（无论用公共默认还是个人 sessionid）——它属官方以外的第三方，
+- [ ] **官方路径**：PC API（`/luna/pc`）+ SEO（`beta-luna.douyin.com`）取流，
+      **完全不调用 `vsaa.cn`**；代价：暂不提供 Android `track_v2` 的**无损/空间音频**；
+      **逐字歌词不受影响**（实测 SEO `seo_track.lyric.type=krc`，可直接接入现有 KRC 逐字管线）。
+- [ ] **禁止**使用 `vsaa.cn` 签名服务（无论用公共默认还是个人 sessionid）——它是**个人第三方**，
       违反「任何数据不得经过第三方」。
+- [ ] **不使用 `api-vehicle.volcengine.com`**（字节火山引擎内容接口）：虽属字节官方云，但**非汽水
+      官方客户端域名**，且会把搜索词 / 歌曲 ID 出站；主项目已有纯 `qishui.com` 官方搜索 / 取流路径
+      （music-lib `soda/` 全程未用它），故**不纳入白名单**。
 - [ ] 实现 `lib/apis/soda/` + `lib/services/soda/`：搜索、PC/SEO 取流、`play_auth`（Spade/CENC，
       `qishui.js:291`）、歌词（KRC→QRC，`qishui.js:1082`）、歌单、榜单、评论；
       参考 go-music-dl `music-lib/soda`（含 CENC `DecryptAudio`）。
-- [ ] 若要无损/逐字歌词：**必须先在本地实现 `x-gorgon/x-argus` 等签名**，直连官方后再启用；
-      在本地签名落地前，该能力不提供。
+- [x] 若要**无损/空间/母带**：**无需本地签名**——PC `seo_track` 的 `track_player.video_model`
+      （JSON 串）`video_list[]` 已含多档直链；**带会员 cookie 即出现 `lossless`/`spatial`/`hi_res`**
+      （免签名、免 `x-gorgon`）。仅在需要 Android `track_v2`/受保护接口（PC `search/track`、
+      `users/{id}`、`media-player`）时才需要签名；本项目搜索走 Android、播放走 SEO，故不依赖签名。
+
+**官方零第三方路径能力实测（2026-09-14，免凭据单次探测）**：
+
+| 能力 | 端点 | 免登录 | 免签名 | 结论 |
+|---|---|---|---|---|
+| 单曲元数据/封面/时长 | SEO `beta-luna.douyin.com/luna/h5/seo_track` | ✅ | ✅ | ✅ 可用 |
+| **逐字歌词（KRC）** | 同上 `lyric`（`type=krc`；`[行start,dur]<字start,dur,?>字…`） | ✅ | ✅ | ✅ 可用（接入现有 KRC→逐字管线） |
+| **免费曲完整播放** | 同上 `track_player.url_player_info` → `PlayInfoList`（明文 m4a，无 `PlayAuth`） | ✅ | ✅ | ✅ 可用（`medium`/`higher`/`highest`） |
+| VIP 曲播放 | 同上（`preview.duration < duration` 时返回 30/60s 试听流） | ✅ | ✅ | ⚠️ 仅试听；完整需登录 + 会员 |
+| 无损/空间/母带 | PC `seo_track` → `track_player.video_model.video_list`（**会员 cookie** 即出 `lossless`/`spatial`/`hi_res`） | ✅（免登录仅 medium/higher/highest） | ✅ | ✅ 可用（会员 cookie 解锁高解析，免签名） |
+| 专辑详情 + 曲目 | PC `/luna/pc/albums/{id}` | ✅ | ✅ | ✅ 可用 |
+| 歌手作品 | PC `/luna/pc/artists/{id}/{albums,tracks}` | ✅ | ✅ | ✅ 可用 |
+| 歌单详情 + 曲目 | PC `/luna/pc/playlist/detail` | ✅ | ✅ | ✅ 可用 |
+| 榜单 | PC `/luna/pc/charts/{id}`、`api5-lf.qishui.com/luna/charts/{id}` | ✅ | ✅ | ✅ 可用 |
+| 评论 | PC `/luna/pc/comments`（读 `group_id`+`cursor`+`count`+`group_type`(0最新/1热门)+`image_strategy=2`；发 `/luna/pc/comments/create`） | ✅ 读取免登录 | ✅ | ✅ 已接入（`apis/soda/modules/comment.dart`；发布需登录 cookie） |
+| 搜索 | PC `/luna/pc/search/track` | ❌ 需登录 | ✅ | ⚠️ 未登录官方搜索为空（Mineradio 用被排除的 volcengine 兜底） |
+| 用户歌单 / 红心 | PC `/luna/pc/me/*` | ❌ 需登录 | ✅ | ⚠️ 需登录 |
+| 扫码登录 | Passport Web QR（`api.qishui.com/passport/*` + `bff-pc.qishui.com/scan_login` + `auth/verify.zijieapi.com`） | — | 需 ByteDance 安全 SDK（`bdms.js`） | ⚠️ 复杂（Mineradio 已移植） |
+| 下载 | URL + Spade CEK（`PlayAuth`）+ CENC AES-CTR 解密 | — | ✅ 纯算法 | ✅ 已实现（`decrypt.rs`，接入下载器） |
+
+> 官方质量档位（`label_info.quality_map`）：`medium`(≈65k) / `higher`(≈130k) / `highest`(≈258k) /
+> `lossless` / `spatial` / `hi_res`；免费曲可播 `medium~highest`，`lossless`/`spatial`/`hi_res` 需 VIP。
+> 关键实测：非 VIP 曲的 SEO `PlayInfoList` 返回**全曲时长**（如 `dur=205s` 返回 ≈205s 流）；
+> VIP 曲返回 30/60s 试听——**判据是 `label_info.only_vip_playable`，而非 `preview` 字段**。
+
+**完整登录方案（本次确认，2026-09-14）：纯 Dart HTTP 复刻（实测免 `a_bogus`），不引 WebView / JS 运行时。**
+
+> 决策：汽水**完整登录**（扫码 + 会话 + 短信 MFA）**纯 Dart HTTP 复刻**——不引入 WebView、
+> 不内置 `bdms.js`/`sdk-glue.js`、不起 JS 运行时（守住 §2.2 零大运行时）。
+> **主参考改为 go-music-dl `music-lib/soda/login.go`（纯 Go `net/http`，无浏览器、无 `a_bogus`）**；
+> Mineradio `qishui-auth-v6.js` 仅作**浏览器路径的对照**，其 Chromium 方案**不需要**。
+
+**实测（2026-09-14，按 `music-lib/soda/login.go` 参数复现）**：
+
+- `GET /passport/web/get_qrcode/` → `error_code:0` + `token` + `qrcode_index_url` + base64 二维码 +
+  `passport_csrf_token` cookie；
+- `POST /passport/web/check_qrconnect/` → `error_code:0`、`status:"new"`、`message:"success"`；
+- **两步均无需 `a_bogus` / `msToken` / `bd-ticket-guard` / JS SDK / 浏览器**（仅 UA + passport 公共参数
+  + `get_qrcode` 下发的 csrf cookie）。
+- 结论：`a_bogus` **非登录必需**（保留为「若日后接口收紧」的兜底）；登录主链路可 100% 纯 Dart HTTP。
+
+登录端点与实现要点（主参考 `music-lib/soda/login.go`）：
+
+| 步骤 | 请求 | 关键参数 / 头 | 参考 |
+|---|---|---|---|
+| 取二维码 | `GET api.qishui.com/passport/web/get_qrcode/` | passport 公共参数 + `next/need_logo/need_short_url/is_frontier`；下发 `passport_csrf_token` | `soda/login.go:130/908` |
+| 轮询扫码 | `POST /passport/web/check_qrconnect/` | `token` + `is_new_login/next`；带 csrf cookie；2046 时解析 `encrypt_uid`/`verify_params` | `:312/921` |
+| 二维码内容 | `bff-pc.qishui.com/light/invoke/scan_login?token=…&os=Windows&computer_name=…` | 无 | `:1000` |
+| 短信发码 | `POST /passport/web/send_code/` | `encrypt_uid` + `std_verify_way=mobile_sms_verify` + `type=3737` 等 | `:524` |
+| 短信校验 | `POST /passport/web/validate_code/` | 同上 + `code` → `data.ticket` | `:681` |
+| 上行短信 | `POST /passport/upsms/verify/` | `std_verify_way=mobile_up_sms_verify` | `:607` |
+| 二次验证(2046) | 回填服务端下发的 `verify_params` 后再轮询 `check_qrconnect` | 服务端下发 `encrypt_uid`/`verify_params`，客户端原样回填 | `:458` |
+
+需在 `lib/apis/soda/core/` 复刻（**纯 Dart，无新依赖**）：
+
+- passport 公共参数（必需）：`passport_jssdk_version=2.4.13`、`aid=386088`、
+  `device_id`/`install_id`/`did`/`iid`、`is_from_ttaccountsdk=1`、`account_sdk_source=web`、
+  `p_js_v/p_js_t/p_zt/p_ver/p_bd` 等（`login.go:948-998`）。
+- `msToken`（可选）：本地随机 `base64url(88B)+==`；**实测非必需**。
+- `account_sdk_source_info`（可选）：指纹 JSON 的 XOR5-hex（`security_host.html:76`）；**实测非必需**。
+- `a_bogus`（可选兜底）：ByteDance web 签名；**实测 QR 两步非必需**，留待接口收紧时再评估。
+- `x-ss-stub`（可选）：`md5(body).toUpperCase()`。
+- `bd-ticket-guard-*`（可选）：`login.go:780-784` 的静态头；**实测非必需**。
+
+**风险与边界（必须记录）**：
+
+- **MFA 短信可纯 Dart**（`send_code`/`validate_code`/`upsms/verify`，服务端下发 `verify_params` 回填）；
+  **滑块 / 拼图 / 人脸不可**（见下「MFA 判定」）。
+- 接口收紧时可能重新要求 `a_bogus` / `account_sdk_source_info` → 保留兜底实现与降级。
+- **不复制** Mineradio `bdms.js` / `sdk-glue.js` 任何代码；仅作协议参考。
+- 落地：`lib/apis/soda/core/{passport_params,ms_token,fingerprint,sign}.dart` + `modules/login_qr.dart`
+  + `lib/services/soda/soda_auth.dart`；会话 cookie 入 vault（平台键 `soda`）。
+
+**自研边界与 MFA 判定（2026-09-14）**：
+
+- **music-lib 范式（主参考，已实测）**：`music-lib/soda/login.go` 用**纯 Go `net/http`**完成
+  二维码创建/轮询 + 短信 MFA（`send_code`/`validate_code`/`upsms`），**全程无 `a_bogus`、无浏览器**；
+  主项目已按其参数**实测复现** `get_qrcode` / `check_qrconnect` 成功。→ 汽水完整登录可**纯 Dart HTTP**。
+- **NetEase 范式（同类先例）**：主项目 `apis/netease/core/crypto.dart` 已用**纯 Dart**
+  实现 weapi / eapi / linuxapi / **xeapi（X25519+HKDF+AES-GCM）**，以及二维码登录
+  （`unikey` + 轮询 `client/login`，`modules/login_qr_*.dart`）——**零 WebView、零插件**。
+  说明「复杂签名纯 Dart」在本项目已是既有能力，作为 `a_bogus` 兜底实现的能力背书。
+- **Mineradio 的登录机制（明确不复用）**：它在 **Electron 的 Chromium 渲染进程**里加载本地壳页
+  + 官方 `sdk-glue.js`/`bdms.js`（`qishui-auth-v6.js:250-298`），请求经 `window.__qishuiRequest`
+  （浏览器内 XHR）发出，由官方 JS 现场注入 `a_bogus`/`msToken`；MFA 再加载官方
+  `ucWebSecondVerify`/`rmc-captcha`。即**依赖完整浏览器 + 官方 JS**——正是 §2.2 要避免的大运行时，
+  **不移植**（这也解释了为何它「能完整登录」：它把浏览器一起搬进来了）。
+- **MFA 可行性判定**：
+  - **短信分支（可纯 Dart）**：`api.qishui.com/passport/web/send_code/` → `validate_code/`
+    （或上行短信 `upsms/verify/`）→ 回填 `verify_params` 再轮询 `check_qrconnect`；
+    流程与参数见 `music-lib/soda/login.go:524-758`。
+    （Mineradio 浏览器版走 `verify.zijieapi.com/notify/sms/web/*`，是同一短信能力的另一实现，**不需要**。）
+  - **滑块 / 拼图**（`rmc-captcha`，`lf-cdn-tos.bytescm.com/.../rmc-captcha/@latest/captcha.js`，810KB）：
+    **AES-GCM 加密拖拽轨迹 + `__vc_detect__` 设备 / 自动化检测**，服务端只认其 `verify_data`；
+    「自研」等于逆向风控 → **判定不做**（对抗性质、易失效、且非算法而是反机器人机制）。
+  - **人脸 / 实名**：官方组件 → **放弃**。
+- **降级策略**：纯 Dart 覆盖「常规登录 + 短信 MFA」；持久化 `deviceId`/`installId`/`verifyPortraitId`/
+  `msToken` 降低 MFA 触发率；真触发滑块 / 人脸时，提示「请在官方汽水 App 完成安全验证后重试」，
+  **不静默失败**。
+
+**登录请求流（抓包还原，2026-09-14；来源 `music-lib/soda/login.go` + `login_test.go`）**：
+
+1. **取二维码** `GET /passport/web/get_qrcode/?<normal query>`（UA + Accept）→
+   `{data:{token,qrcode(base64),qrcode_index_url,expire_time}}` + `Set-Cookie: passport_csrf_token`；
+   二维码内容取 `qrcode_index_url`（`bff-pc.qishui.com/ucenter_web/app/sdk-next?…&token=…`）。
+2. **轮询** `POST /passport/web/check_qrconnect/?<normal query>`（带 csrf cookie；body
+   `need_logo/need_short_url/is_frontier/token/is_new_login/next`）→ 状态 `new→scanned→confirmed`，
+   成功下发 `sessionid/sessionid_ss/sid_tt/sid_guard`；`error_code=7` 限流冷却 60s。
+3. **2046 MFA**（真实抓包）：
+   ```json
+   {"data":{"account_flow":"verify","encrypt_uid":"fXk7…","error_code":2046,
+     "biz_params":{"passport_mfa_retry_tag":"1","std_verify_flow_id":"…login",
+       "std_verify_scene":"account_login","std_verify_template":"ato",
+       "std_verify_token":"…_lq","std_verify_type":"MFA","std_verify_way":""},
+     "verify_ways":[
+       {"act_type":"22","mobile":"159******49","verify_way":"mobile_sms_verify"},
+       {"channel_mobile":"9515211003","mobile":"159******49","sms_content":"YZ","verify_way":"mobile_up_sms_verify"}]},
+    "message":"error"}
+   ```
+   + `Set-Cookie: passport_mfa_token`。**该抓包只给短信方式，无滑块**。
+4. **短信**：`send_code`（`std_verify_way=mobile_sms_verify`）→ `validate_code`
+   （`code` = 数字 ASCII 的 hex，如 `661701→363631373031`）→ 回填 `biz_params` 再轮询；
+   或上行短信 `upsms/verify`（把 `sms_content` 发到 `channel_mobile`）。
+   MFA 接口用 **lite query**（`passport_jssdk_version=5.1.2`、`passport_jssdk_type=lite`、
+   `new_authn_sdk_version=1.0.0.404-web`）。
+
+> 要点：MFA 的 `encrypt_uid`/`biz_params`/`verify_ways` **全部服务端下发、客户端原样回填**；
+> 是否弹滑块取决于账号风控（本抓包走短信）。
 
 ### P5 本地签名与下载增强（后期 R&D，彻底去第三方）
 
@@ -492,17 +650,30 @@ Dart 机制说明（避免误用）：
 | 千千 qianqian | `md5(sorted(k=v) + Secret)` | 低 | `music-lib/qianqian` |
 | 酷我 kuwo | `yeelion` XOR + base64、官方 `convert_url_with_sign` | 低 | baka `kw.js:656` |
 | 咪咕 migu | MD5 签名、策略响应解密、MRC TEA | 中 | baka `mg.js:463/89/589` |
-| QQ | 桌面搜索 `zzcSign`、`ct=19` 全量 size | 中（主项目已有 song_url/GetVkey） | baka `qq.js:315/179` |
-| 汽水 soda | `x-khronos`(时间戳)、`x-ss-stub`(body MD5) 可自研；`x-gorgon/x-argus/x-ladon/x-helios` 需逆向 ByteDance 风控 | 高（混淆/VM、易变） | baka `qishui.js`（黑盒服务，仅研究） |
+| QQ | 搜索结果签名已落地（`core/sign.dart` `qmZzcSign` + `musics.fcg`，四类）；`song_url`/GetVkey 已具备 | — | 主项目 `apis/qqmusic/core/sign.dart` |
+| 汽水 soda | **登录**：纯 Dart HTTP 即可（passport 公共参数 + csrf cookie；**实测免 `a_bogus`**，见 §7-P4）；**短信 MFA**：`send_code`/`validate_code`/`upsms` 纯 Dart；`a_bogus`/`account_sdk_source_info`/`x-ss-stub` 作可选兜底；`x-gorgon/x-argus`（Android `track_v2`）需逆向 ByteDance 风控 | 中（登录/短信）；高（`track_v2`） | `music-lib/soda/login.go`（主）、Mineradio `qishui-auth-v6.js`（对照） |
 | 网易云/酷狗 | 已具备（weapi/eapi/xeapi、酷狗签名/KRC） | — | 主项目现有 |
 
 **B. 下载端增强（与现有 Rust `archoera-downloader` / C++ scraper 协同）**
 
+- [x] **QQMusic / 汽水下载接入**（2026-09-14）：Rust `SourcePlatform` 增加 `Qqmusic`/`Soda`，
+      二者无自研解析 → 解析阶段返回可重试错误，由 **Dart 播放管线回退**（§12.1
+      `resolvePlaySource` + `retry_with_url`）注入 URL；Dart 回退门控/预解析 headers 扩展
+      （QQ 带 Cookie/UA/Referer、汽水带 UA，VIP `#auth=` 跳过）；下载 UI 放开 QQ/汽水入口。
+      Rust 单测 + Dart 请求单测 + `cargo build --release` 通过。
+- [x] **加密容器解密（原生 Rust，2026-09-14）**：`app/core/downloader/src/decrypt.rs` 自研重写
+      网易 **NCM**（含 `ncm_metadata` 标题/歌手/专辑/封面提取）、QQ **QMC**（静态掩码 58 + 首块掩码
+      探测）、汽水 **CENC/AES-CTR**（`senc` 逐样本 IV + Spade `PlayAuth` 派生 key，`enca`→`mp4a`）；
+      通用入口 `decrypt_container`（按魔数/扩展名分派），**已接入下载器**（下载落盘后自动识别解密
+      → 扩展名归正 → 再写标签；CENC 经预解析 URL 片段 `#auth=` 携带 PlayAuth）。参考 `music-lib`
+      （AGPL-3.0）Go 实现，**未复制**无许可证项目代码。单测：NCM/QMC 往返 + NCM 元数据 + Spade key +
+      合成 MP4 全链路往返 + 分派。**QMC 完整流密码（2026-09-14 续）**：`src/qmc.rs` 另实现
+      `QTag`/legacy/`musicex` footer 解析、`deriveKey`/`deriveKeyV2`（TEA-CBC）、`Static`/`Map`/`RC4`
+      密码（参考 MIT 的 `lantianhcgp/unlock-music` + `pushbox/qmc2`，随附其测试向量对拍全绿）。
+      **注意**：新版 PC 缓存 **`musicex` 文件不含密钥**——需 QQ 客户端本地 MMKV key 库按
+      `MediaFileName` 查得；本项目只做算法、不内置密钥。**待补**：客户端 MMKV key 导入、NCM 扫描入库链路。
 - [ ] **扩展名魔数探测**（wma/flac/ID3/ogg/ftyp…）——参考 go-music-dl `service.go:807/814/836`。
 - [ ] **Range 并行下载**（首块 32KB，后续 256KB，多并发 + 重试）——参考 `service.go:1324`。
-- [ ] **加密容器解密**：网易 NCM、QQ QMC/BKC、汽水 CENC/AES-CTR + `ekey`
-      ——参考 go-music-dl `crypto/crypto.go`、`music-lib/soda/crypto.go`、`netease` 的 `DecryptNCM`。
-      （解密放原生层更稳：可并入 Rust downloader 或 C 引擎，注意内存安全与 FFI 契约零回归。）
 - [ ] **标签内嵌**：ID3v2.3 / Xiph / MP4 / RIFF——主项目已有 C++ TagLib 刮削，优先复用；
       纯 Dart/Go 参考 go-music-dl `service.go:1589`。
 
@@ -513,6 +684,52 @@ Dart 机制说明（避免误用）：
 - 出站域名断言：新增平台只允许官方域名（可在 `app/test/` 注入式 transport 中断言）。
 - 优先级：先做「算法明确」的（Bilibili WBI、千千、酷我、咪咕），
   ByteDance `x-gorgon` 等高风险项**仅在必要时投入**。
+
+### 实施状态与起步计划（2026-09-14）
+
+**已实测（本机，免凭据）**：
+
+- **QQ**：`zzcSign` + `POST u.y.qq.com/cgi-bin/musics.fcg?sign=…`（`ct=19`）→ `code:0`、
+  `meta.sum:999`、`file` 含 `size_hires` / `size_new[14]` / `size_dolby` / `size_dts` /
+  `hires_sample` / `hires_bitdepth`。算法索引越界（`hash[40]`）按 JS `join` 语义**丢弃为空**。
+- **汽水**：`get_qrcode` / `check_qrconnect` 免 `a_bogus`（§7-P4）；SEO `seo_track` 返回
+  KRC 逐字歌词 + 免费曲全曲流；PC `albums` / `playlist/detail` / `charts` 免登录可用。
+
+**起步计划（两刀，各自可独立验证；不引新依赖、不碰原生层）**：
+
+- **刀 1 — QQ P1（✅ 已完成，2026-09-14）**：
+  - [x] `core/sign.dart`：`qmZzcSign`（SHA1 大写 + 索引取字 XOR 混淆 + 去填充 base64；越界下标按
+        JS `join` 语义丢弃）。
+  - [x] `modules/search.dart`：**整体重写为签名桌面协议**——`musics.fcg` + `?sign=`、
+        `DoSearchForQQMusicDesktop`、`ct=19`／`cv=2151`／`searchid`／`remoteplace=txt.newclient.top`；
+        单曲/歌手/专辑/歌单（`search_type` 0/1/2/3）统一，响应分列
+        `body.{song,singer,album,songlist}.list`。**移动端 `DoSearchForQQMusicMobile` 已删除**
+        （原分页上限、`item_*` 字段、hires 缺失等脆弱点一并去除）。
+  - [x] `services/qqmusic/qqmusic_api.dart`：四类搜索改走桌面协议（type 0/1/2/3，原移动 8/9/2 修正）；
+        歌手单页收敛 30；错误归一（风控 `2001`/`meta.is_filter<0` 不重试、瞬时退避重试、
+        已登录 comm 注入 `uin/qq/authst/tmeLoginType=2`）。
+  - [x] 验证：`dart analyze lib` 0 issue；`qqmusic_search_failure_test.dart` /
+        `qqmusic_session_comm_test.dart` 全绿；`qqmusic_direct_test.dart` 真实联网 8/8。
+- **刀 2 — 汽水（新建 `lib/apis/soda/` + `lib/services/soda/`）**：
+  - [x] 免登录 **API 层**（`lib/apis/soda/`）：Android 搜索（`/luna/search/{track,album,playlist}`）、
+        SEO `seo_track`（元数据 + KRC 逐字歌词 + `url_player_info`）、`play_info`（官方 VOD
+        `vod-luna.douyin.com` 取流）、PC 专辑 `/luna/pc/albums/{id}`、PC 歌单 `/luna/pc/playlist/detail`；
+        **官方域名硬校验**（`core/request.dart`，非白名单拒绝发起）。实测免登录可用；
+        `soda_official_only_test.dart` + `soda_direct_test.dart`（真实联网）通过。
+  - [x] 免登录 **service 门面 + UI 接入**：`lib/services/soda/soda_api.dart`（搜索/取流/歌词/
+        歌单/专辑归一为 `Track`/`CoverItem`）；`sodaApiProvider`；搜索页新增「汽水」平台
+        （`l10n.platformSoda`）、四类 fetch、专辑/歌单详情弹窗；播放源解析（`play_source_resolver`
+        / `setQuality` / 搜索页 `_playTrack`）与歌词（`apis/lyric/soda.dart`，KRC）接入；
+        汽水红心暂返回不支持。
+  - [x] **登录**（纯 Dart HTTP，无 `a_bogus`/WebView）：`apis/soda/core/passport.dart`（公共参数 +
+        固定字段顺序编码 + MFA 回填收集）、`apis/soda/modules/login_qr.dart`（`get_qrcode` /
+        `check_qrconnect` / `send_code` / `validate_code` / `upsms`）、`services/soda/soda_auth.dart`
+        （编排 + 会话入 vault 键 `soda`）、`widgets/dialogs/soda_login_dialog.dart`（扫码 + 短信 MFA UI）。
+        实测 `get_qrcode` / `check_qrconnect` 免签名可用；`soda_login_test.dart` + `soda_login_direct_test.dart` 通过。
+  - [ ] 待补：歌手 / 榜单端点（PC `/luna/pc/artists`·`charts` 待定位）；VIP 曲 CENC 解密（P5）。
+  - [ ] 验证：`dart analyze lib` + 注入式 transport 断言出站域名只含官方。
+
+**待真实账号验证（新会话需注意）**：汽水扫码后的 2046 短信 MFA 与会话下发；QQ 登录态音质 / 下载。
 
 ---
 
@@ -558,13 +775,14 @@ Dart 机制说明（避免误用）：
 | Jamendo | 官方 `www.jamendo.com/api/*` | `music-lib/jamendo` | 无 |
 | JOOX | 官方 `api.joox.com` / `www.joox.com` 页面数据 | `music-lib/joox` | 无 |
 | Apple | 官方 `amp-api.music.apple.com`（仅试听） | `music-lib/apple` | 无 |
-| 汽水 soda | **仅官方**：PC API `api.qishui.com/luna/pc` + SEO `beta-luna.douyin.com` / `luna/player`；**放弃** Android `track_v2` | baka `qishui.js`（仅取官方部分）、`music-lib/soda` | `api.music.qishui.vsaa.cn` |
+| 汽水 soda | **仅官方**：PC API `api.qishui.com/luna/pc` + SEO `api.qishui.com/luna/h5/seo_track`（`video_model` 多档直链，会员 cookie 出 lossless/spatial/hi_res）+ VOD `*.douyinvod.com`；**放弃** Android `track_v2` | baka `qishui.js`（仅取官方部分）、`music-lib/soda` | `api.music.qishui.vsaa.cn`（个人第三方）、`api-vehicle.volcengine.com`（字节云但非汽水官方，不纳入） |
 
 补充：
 
 - QQ / 网易云 / 酷狗：baka 的 `requestMusicUrl` 第三方网关**不移植**，只用其**官方协议**部分
   （搜索/歌词/歌单/专辑/评论）与官方 `song_url`。
-- 汽水若要无损/逐字歌词：**只能本地实现签名后直连官方**，绝不经 `vsaa.cn`。
+- 汽水若要**无损/空间音频**：**只能本地实现签名后直连官方**，绝不经 `vsaa.cn`
+  （逐字歌词不在此列，官方 SEO 已可得）。
 - 落地验收：新增平台的出站域名白名单必须只含该平台官方域名（可在测试中断言，
   参考 `app/test/` 现有注入式 transport 测试）。
 
@@ -604,7 +822,7 @@ Dart 机制说明（避免误用）：
 | `kw.js` | ✅ 官方 `*.kuwo.cn` | ⚠️ `requestMusicUrl('kw')`（`kw.js:853`） | 音源聚合服务 |
 | `mg.js`（咪咕） | ✅ 官方 `*.migu.cn` | ✅ 自带 `requestMusicUrl`，全走官方咪咕（`mg.js:178/1366`） | 无 |
 | `bilibili.js` | ✅ 官方 `api.bilibili.com` / `www.bilibili.com` / `s1.hdslb.com` | ✅ 自解析官方 DASH（`getMediaSource`） | 无 |
-| `qishui.js`（汽水） | ✅ 官方（见 §7-P4） | ⚠️ Android `track_v2` 经第三方签名服务（`send:false`） | 签名服务 `api.music.qishui.vsaa.cn` |
+| `qishui.js`（汽水） | ✅ 官方 `api.qishui.com` / `beta-luna.douyin.com`；另有 `api-vehicle.volcengine.com`（字节火山引擎，非汽水官方，见 §7-P4） | ⚠️ Android `track_v2` 经第三方签名服务（`send:false`） | 签名服务 `api.music.qishui.vsaa.cn`（个人第三方） |
 
 第三方音源聚合服务清单（`functions/source-config.js`）：
 `c.wwwweb.top`(ikun)、`source.shiqianjiang.cn`(linglan)、`music-api.gdstudio.xyz`(cihedai)、
@@ -627,7 +845,8 @@ Dart 机制说明（避免误用）：
    咪咕官方 `listenSong.do`），**不引入 `requestMusicUrl` 聚合层**。
 3. **第三方一律隔离（硬约束，见 §8.1）**：
    - baka 源插件的音源聚合服务（`source-config.js`）——**不接入**。
-   - 汽水签名服务 `vsaa.cn`——**不接入**，只走纯官方路径（§7-P4）。
+   - 汽水签名服务 `vsaa.cn`（个人第三方）——**不接入**，只走纯官方路径（§7-P4）。
+   - 字节火山引擎 `api-vehicle.volcengine.com`——非汽水官方域名，**不纳入白名单**（§7-P4）。
    - `share.duanx.cn`（`wy.js` 字段）——不移植。
 4. **平台接入本身无合规红线问题**：审计显示业务请求均直达官方；两个项目仅作为**官方协议实现**的
    参考。落地时须保证新增平台出站域名**只含官方域名**。
@@ -696,13 +915,13 @@ Dart 机制说明（避免误用）：
 - 范式：`app/lib/services/streaming/streaming_client.dart`、`app/lib/apis/runtime.dart`
 - 分发点：`playback_notifier_queue.dart:11`、`lyrics_provider.dart:40`、`like_controller.dart`
 
-**baka-plugins（本地，`/home/betastudio2/文档/SPlayer-Next/baka-plugins`）**
+**baka-plugins（`https://github.com/Zencok/baka-plugins`）**
 - 契约/分发：`functions/plugin.js`、`functions/source-config.js`、`functions/subscription.js`
 - 分页契约：`docs/playlist-import-pagination.md`
 - 平台：`plugins/{wy,qq,kg,kw,mg,bilibili,qishui}.js`
 
-**go-music-dl（本地，`/home/betastudio2/文档/SPlayer-Next/go-music-dl`）**
+**go-music-dl（`https://github.com/guohuiyuan/go-music-dl`）**
 - 编排/源清单：`core/service.go`（`:148` 起工厂、`:1005` 源清单、`:895` 相似度、`:1324` Range）
 - 下载/元数据：`core/download.go`、`core/service.go:1589`
 - 自动换源：`internal/web/music.go:1321`
-- 协议实现：外部 `github.com/guohuiyuan/music-lib`（**需另行拉取**）
+- 协议实现：外部 `github.com/guohuiyuan/music-lib`（`https://github.com/guohuiyuan/music-lib`）

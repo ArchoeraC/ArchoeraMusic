@@ -17,6 +17,8 @@ import '../services/netease/netease_api.dart';
 import '../services/platform/platform_capabilities.dart';
 import '../services/qqmusic/qq_liked_store.dart';
 import '../services/qqmusic/qqmusic_api.dart';
+import '../services/soda/soda_api.dart';
+import '../services/soda/soda_auth.dart';
 import '../services/weather/weather_notifier.dart';
 import 'app_prefs.dart';
 import 'event_bus.dart';
@@ -91,6 +93,14 @@ final kugouApiProvider = ChangeNotifierProvider<KugouApi>((ref) => KugouApi());
 final qqMusicApiProvider = ChangeNotifierProvider<QqMusicApi>(
   (ref) => QqMusicApi(),
 );
+
+// ── 直连汽水 API ───────────────────────────────────────────────
+
+/// 直连汽水（apis/soda Dart 移植：官方免登录 + 域名硬校验）。
+final sodaApiProvider = Provider<SodaApi>((ref) => SodaApi());
+
+/// 汽水登录态（扫码 + 短信 MFA；会话 cookie 落 vault 键 'soda'）。
+final sodaAuthProvider = ChangeNotifierProvider<SodaAuth>((ref) => SodaAuth());
 
 // ── 顶栏微型天气 ────────────────────────────────────────────────
 

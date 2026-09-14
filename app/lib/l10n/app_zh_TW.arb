@@ -1082,6 +1082,7 @@
   "streamingPlaylistSongs": "{count} 首歌曲",
   "brandQqMusic": "QM",
   "platformQQMusic": "QQ 音樂",
+  "platformSoda": "汽水",
   "loginQqQrLogin": "QQ 音樂掃碼登入",
   "loginQqScanHint": "請使用手機 QQ 掃一掃登入",
   "navHeaderQqId": "QQ {id}",

@@ -63,6 +63,7 @@ extension _SearchPageActions on _SearchPageState {
       'netease' => l.platformNetease,
       'kugou' => l.platformKugou,
       'qqmusic' => l.platformQQMusic,
+      'soda' => l.platformSoda,
       _ => source,
     };
   }
@@ -79,6 +80,8 @@ extension _SearchPageActions on _SearchPageState {
         url = await ref.read(neteaseApiProvider).resolvePlayUrl(track.id);
       } else if (track.source == 'qqmusic') {
         url = await ref.read(qqMusicApiProvider).resolvePlayUrl(track);
+      } else if (track.source == 'soda') {
+        url = await ref.read(sodaApiProvider).resolvePlayUrl(track);
       } else {
         url = null;
       }
@@ -124,6 +127,10 @@ extension _SearchPageActions on _SearchPageState {
       _openQqCover(item);
       return;
     }
+    if (src == 'soda') {
+      _openSodaCover(item);
+      return;
+    }
     _openNeteaseCover(item);
   }
 
@@ -166,6 +173,18 @@ extension _SearchPageActions on _SearchPageState {
     }
   }
 
+  /// 汽水：专辑 / 歌单详情（暂无歌手搜索）。
+  void _openSodaCover(CoverItem item) {
+    switch (_tab) {
+      case _SearchTab.playlists:
+        showSodaPlaylistDetailDialog(context, item);
+      case _SearchTab.albums:
+        showSodaAlbumDetailDialog(context, item);
+      default:
+        break;
+    }
+  }
+
   /// 歌曲右键菜单（通用在线曲目菜单 + 页内歌手占位）。
   void _onTrackMenu(Track track, Offset global) {
     showTrackContextMenu(
@@ -190,6 +209,7 @@ extension _SearchPageActions on _SearchPageState {
     return switch (source) {
       'kugou' => l10n.toastLoginRequiredKugou,
       'qqmusic' => l10n.toastQqLikeSyncFailed,
+      'soda' => l10n.navHeaderComingSoon,
       _ => l10n.toastLoginRequiredNetease,
     };
   }

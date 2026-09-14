@@ -1082,6 +1082,7 @@
   "settingsVaultCloseV3PasswordDesc": "Aucun mot de passe de récupération n'a été défini lors de l'activation de la liaison (sans mot de passe sur cet appareil). La désactiver passe en protection par mot de passe (v2) : définissez un nouveau mot de passe de déverrouillage. La clé maîtresse et les données existantes sont conservées ; ce mot de passe est requis à chaque lancement.",
   "brandQqMusic": "QM",
   "platformQQMusic": "QM",
+  "platformSoda": "Soda",
   "loginQqQrLogin": "Se connecter avec le QR code QM",
   "loginQqScanHint": "Scannez avec l’application QQ pour vous connecter",
   "navHeaderQqId": "QQ {id}",

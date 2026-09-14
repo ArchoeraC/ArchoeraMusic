@@ -1113,6 +1113,7 @@
   "streamingPlaylistSongs": "{count} songs",
   "brandQqMusic": "QM",
   "platformQQMusic": "QM",
+  "platformSoda": "Soda",
   "loginQqQrLogin": "Sign in with QM QR code",
   "loginQqScanHint": "Scan with the QQ app to sign in",
   "navHeaderQqId": "QQ {id}",

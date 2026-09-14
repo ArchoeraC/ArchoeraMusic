@@ -1082,6 +1082,7 @@
   "settingsVaultCloseV3PasswordDesc": "기기 바인딩 활성화 시 복구 비밀번호를 설정하지 않았다면(이 기기 비밀번호 없음), 끄면 비밀번호 보호(v2)로 전환됩니다: 새 잠금 해제 비밀번호를 설정하세요. 마스터 키와 기존 데이터는 유지되며 이 비밀번호는 매번 시작 시 입력해야 합니다.",
   "brandQqMusic": "QM",
   "platformQQMusic": "QQ 뮤직",
+  "platformSoda": "Soda",
   "loginQqQrLogin": "QQ 뮤직 QR 코드로 로그인",
   "loginQqScanHint": "QQ 앱으로 스캔하여 로그인하세요",
   "navHeaderQqId": "QQ {id}",

@@ -272,6 +272,9 @@ class LikeController extends ChangeNotifier {
   /// 切换红心：乐观更新 + 失败回滚。
   /// 成功返回 true；失败回滚并返回 false（调用方负责提示）。
   Future<bool> toggle(Track track) async {
+    // 汽水暂无红心接口（免登录阶段）；直接返回失败，避免误走网易云分支。
+    if (track.source == 'soda') return false;
+
     final wasLiked = isLiked(track);
     final target = !wasLiked;
 
