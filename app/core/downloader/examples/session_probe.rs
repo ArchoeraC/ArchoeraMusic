@@ -106,6 +106,7 @@ async fn main() -> anyhow::Result<()> {
             artist: "周杰伦".into(),
             album: None,
             extra: TrackExtra::default(),
+            ..Default::default()
         };
         match NeteaseResolver.resolve_play_url(&nm_req, &cancel).await {
             Ok(r) => println!(
@@ -134,6 +135,7 @@ async fn main() -> anyhow::Result<()> {
         artist: "西憂花".into(),
         album: None,
         extra: TrackExtra { hashes, sizes: HashMap::new() },
+        ..Default::default()
     };
     match KugouResolver.resolve_play_url(&kg_req, &cancel).await {
         Ok(r) => println!(
@@ -156,6 +158,7 @@ async fn main() -> anyhow::Result<()> {
         artist: "周杰伦".into(),
         album: None,
         extra: TrackExtra::default(),
+        ..Default::default()
     };
     match NeteaseResolver.resolve_play_url(&anon_req, &cancel).await {
         Ok(r) => println!("! 匿名也能拿屋顶 URL（意外）：{r:?}"),

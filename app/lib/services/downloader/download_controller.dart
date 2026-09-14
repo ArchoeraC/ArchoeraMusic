@@ -12,7 +12,9 @@
 ///      任务状态机的更新（queued / resolving / running / failed /
 ///      canceled / done / already）；
 ///   ③ 向引擎注入登录态（Kugou session / Netease cookie），登录/登出后
-///      由外部调 [syncSessions] 重新注入。
+///      由外部调 [syncSessions] 重新注入；
+///   ④ §12.1 下载回退：Rust resolving 解析失败时，复用播放管线解析 URL
+///      （`resolvePlaySource`，仅 kugou/netease）并经 `retry_with_url` 注入重试。
 library;
 
 import 'dart:async';
@@ -23,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../apis/runtime.dart';
 import '../netease/track.dart';
+import '../playback/play_source_resolver.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/data_dir.dart';
 import '../../stores/providers.dart';
@@ -192,6 +195,12 @@ class DownloadTask {
     int? fileSize,
     String? actualQuality,
     int? speed,
+
+    /// true = 清空上一轮进度残留（received=0 / total=null / speed=0）。
+    ///
+    /// 用于「失败/取消后重试」进入新一轮解析时，避免旧的确定进度条在
+    /// resolving 阶段残留（`total` 无法用 null 覆盖，故需显式开关）。
+    bool resetProgress = false,
   }) => DownloadTask(
     taskId: taskId,
     trackId: trackId ?? this.trackId,
@@ -205,12 +214,12 @@ class DownloadTask {
     error: error ?? this.error,
     retryable: retryable ?? this.retryable,
     stage: stage ?? this.stage,
-    received: received ?? this.received,
-    total: total ?? this.total,
+    received: resetProgress ? 0 : (received ?? this.received),
+    total: resetProgress ? null : (total ?? this.total),
     filePath: filePath ?? this.filePath,
     fileSize: fileSize ?? this.fileSize,
     actualQuality: actualQuality ?? this.actualQuality,
-    speed: speed ?? this.speed,
+    speed: resetProgress ? 0 : (speed ?? this.speed),
   );
 }
 
@@ -272,6 +281,15 @@ class DownloadController extends Notifier<DownloadState>
   /// 避免 remove/clear 后任务「复活」。
   @override
   final Set<String> _removedIds = {};
+
+  /// enqueue 时的完整 Track（taskId → Track）。回退解析需要 kugou hashes 等
+  /// 元数据，任务元数据不足以还原，故单独留存；任务终结/移除时清理。
+  @override
+  final Map<String, Track> _tracks = {};
+
+  /// 已触发过播放管线回退解析的任务 id（防回退循环；手动重试时重置）。
+  @override
+  final Set<String> _fallbackTried = {};
 
   @override
   DownloadState build() => _buildState();

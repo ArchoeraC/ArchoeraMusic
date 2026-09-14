@@ -311,7 +311,8 @@ fn persist_history() {
             })
             .map(|(id, t)| HistoryEntry {
                 task_id: id.clone(),
-                request: t.request.clone(),
+                // 回退路径的预解析 URL 及其 headers（可能含 Cookie）不入盘
+                request: t.request.clone().without_pre_resolved(),
                 tmp_path: t.tmp_path.to_string_lossy().into_owned(),
             })
             .collect();
@@ -668,22 +669,53 @@ async fn run_task(
     set_phase(task_id, TaskPhase::Resolving);
 
     let client = http_client();
-    let resolver: Box<dyn PlatformUrlResolver> = match request.source {
-        SourcePlatform::Kugou => Box::new(KugouResolver),
-        SourcePlatform::Netease => Box::new(NeteaseResolver),
-    };
 
-    let resolved = match resolver.resolve_play_url(&request, &cancel).await {
-        Ok(r) => r,
-        Err(e) => {
-            set_phase(task_id, TaskPhase::Failed);
-            if cancel.load(Ordering::Relaxed) {
-                push_error(task_id, "已取消", false, "resolving");
-            } else {
-                push_error(task_id, &e.to_string(), true, "resolving");
+    // §12.1 下载回退：Dart 播放管线已预解析 URL（Rust 解析失败的兜底）时直接使用，
+    // 跳过平台解析器；否则走 Rust 内部自研解析（正常路径，戒律 13.2）。
+    let resolved = if let Some(url) = request
+        .pre_resolved_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+    {
+        log::debug!(
+            "回退路径：使用播放管线预解析 URL 下载 quality_key={:?} ext={:?} url={}...",
+            request.pre_resolved_quality_key,
+            request.pre_resolved_ext,
+            url.chars().take(90).collect::<String>()
+        );
+        ResolvedUrl {
+            url: url.to_string(),
+            quality_key: request
+                .pre_resolved_quality_key
+                .clone()
+                .filter(|k| !k.is_empty())
+                .unwrap_or_else(|| request.quality.quality_chain()[0].to_string()),
+            file_ext: request
+                .pre_resolved_ext
+                .clone()
+                .filter(|e| !e.is_empty())
+                .unwrap_or_else(|| request.quality.guess_ext().to_string()),
+            file_size: request.pre_resolved_size,
+            extra_headers: request.pre_resolved_headers.clone(),
+        }
+    } else {
+        let resolver: Box<dyn PlatformUrlResolver> = match request.source {
+            SourcePlatform::Kugou => Box::new(KugouResolver),
+            SourcePlatform::Netease => Box::new(NeteaseResolver),
+        };
+        match resolver.resolve_play_url(&request, &cancel).await {
+            Ok(r) => r,
+            Err(e) => {
+                set_phase(task_id, TaskPhase::Failed);
+                if cancel.load(Ordering::Relaxed) {
+                    push_error(task_id, "已取消", false, "resolving");
+                } else {
+                    push_error(task_id, &e.to_string(), true, "resolving");
+                }
+                persist_history();
+                return;
             }
-            persist_history();
-            return;
         }
     };
     if cancel.load(Ordering::Relaxed) {
@@ -1239,6 +1271,60 @@ fn retry_internal(tid: &str) -> std::result::Result<(), c_int> {
     Ok(())
 }
 
+/// §12.1 下载回退：把 Dart 播放管线预解析的 URL 注入指定任务并重试。
+///
+/// 复用原 taskId（UI 任务状态机依赖稳定），仅允许对 Failed/Canceled/Paused
+/// 任务调用（与 [archoera_downloader_retry] 一致）。[resolved_json] 为
+/// [`PreResolvedUrl`] 的 JSON。成功返回 0。
+#[no_mangle]
+pub extern "C" fn archoera_downloader_retry_with_url(
+    task_id: *const c_char,
+    resolved_json: *const c_char,
+) -> c_int {
+    if task_id.is_null() || resolved_json.is_null() {
+        return -1;
+    }
+    let tid = match unsafe { CStr::from_ptr(task_id) }.to_str() {
+        Ok(s) => s.to_string(),
+        Err(_) => return -2,
+    };
+    let rstr = match unsafe { CStr::from_ptr(resolved_json) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+    let pre: PreResolvedUrl = match serde_json::from_str(rstr) {
+        Ok(p) => p,
+        Err(_) => return -10,
+    };
+    if pre.url.trim().is_empty() {
+        return -11;
+    }
+    {
+        let mut g = GLOBAL.lock().unwrap();
+        let Some(t) = g.tasks.get_mut(&tid) else {
+            return -20;
+        };
+        if !matches!(
+            t.phase,
+            TaskPhase::Failed | TaskPhase::Canceled | TaskPhase::Paused
+        ) {
+            return -21;
+        }
+        t.request.pre_resolved_url = Some(pre.url);
+        t.request.pre_resolved_quality_key = pre.quality_key;
+        t.request.pre_resolved_ext = pre.file_ext;
+        t.request.pre_resolved_size = pre.size;
+        t.request.pre_resolved_headers = pre.headers;
+    }
+    match retry_internal(&tid) {
+        Ok(()) => {
+            persist_history();
+            0
+        }
+        Err(code) => code,
+    }
+}
+
 /// 移除下载任务：立即从任务表删除（running/resolving 同时置取消标志，
 /// 下载循环在下一个检查点退出）；删除其 .tmp 缓存；[delete_file] 为 true 时
 /// **精确**删除该任务记录的目标文件（仅 dest_path 本身，不做模糊匹配/目录扫描）。
@@ -1474,7 +1560,8 @@ pub extern "C" fn archoera_downloader_resume_from_history() -> c_int {
         g.tasks.insert(
             entry.task_id.clone(),
             TaskEntry {
-                request: entry.request,
+                // 历史里的 request 已剥离预解析字段（防御性再剥一次）
+                request: entry.request.without_pre_resolved(),
                 dest_path: dest,
                 tmp_path: tmp,
                 cancel: Arc::new(AtomicBool::new(false)),

@@ -65,4 +65,18 @@ void main() {
 
     lib.destroy();
   });
+
+  test('retryWithUrl 导出符号可解析（未知 taskId 返回负值）', () {
+    final lib = DownloaderLibrary.load(soPath: soPath);
+    // 不存在的 taskId：Rust 返回 -20（任务不存在），证明新 ABI 已导出且可调用。
+    final code = lib.retryWithUrl('no-such-task-id', {
+      'url': 'https://example.invalid/a.flac',
+      'qualityKey': 'flac',
+      'fileExt': 'flac',
+      'headers': [
+        ['Referer', 'https://music.163.com/'],
+      ],
+    });
+    expect(code, isNot(0));
+  });
 }
