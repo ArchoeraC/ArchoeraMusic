@@ -17,6 +17,7 @@ mixin _DownloadControllerActions
       buildDownloadRequest(track, quality: q),
     );
     if (code != 0 || taskId.isEmpty) return null;
+    _rememberTrack(taskId, track);
     _applyTask(
       taskId,
       (t) => (t ?? DownloadTask(taskId: taskId)).copyWith(
@@ -49,6 +50,11 @@ mixin _DownloadControllerActions
   void _retry(String taskId) {
     final engine = _engine;
     if (engine == null || !engine.isInitialized) return;
+    // 回退任务失败后重试：重新解析 URL（预解析 URL 可能已过期）。
+    final task = _taskById(taskId);
+    if (task != null && task.status == 'failed' && _retryViaFallback(taskId)) {
+      return;
+    }
     engine.retry(taskId);
   }
 
@@ -67,6 +73,7 @@ mixin _DownloadControllerActions
 
   void _removeTask(String taskId, {bool deleteFile = false}) {
     _removedIds.add(taskId);
+    _forgetTracks([taskId]);
     final engine = _engine;
     if (engine != null && engine.isInitialized) {
       engine.remove(taskId, deleteFile: deleteFile);
@@ -81,7 +88,9 @@ mixin _DownloadControllerActions
     if (engine != null && engine.isInitialized) {
       engine.clear(deleteFiles: deleteFiles);
     }
-    _removedIds.addAll(state.tasks.map((t) => t.taskId));
+    final ids = state.tasks.map((t) => t.taskId).toList();
+    _removedIds.addAll(ids);
+    _forgetTracks(ids);
     state = state.copyWith(tasks: const []);
   }
 
@@ -105,6 +114,7 @@ mixin _DownloadControllerActions
     final ids = taskIds.toSet();
     if (ids.isEmpty) return;
     _removedIds.addAll(ids);
+    _forgetTracks(ids);
     final engine = _engine;
     if (engine != null && engine.isInitialized) {
       for (final id in ids) {

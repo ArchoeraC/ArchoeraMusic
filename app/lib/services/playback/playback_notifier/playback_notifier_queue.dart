@@ -8,47 +8,13 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
   /// 连续失败硬上限。
   static const _maxConsecutiveFailures = 5;
 
-  Future<String?> _resolveSource(Track track, {String? quality}) async {
-    final q = quality ?? state.quality;
-    if (track.source == 'local') {
-      final p = track.localPath;
-      if (p == null || p.isEmpty) {
-        _log('缺少本地文件路径: ${track.title}');
-        return null;
-      }
-      return p;
-    }
-    if (track.source == 'kugou' && track.kugou != null) {
-      return ref
-          .read(kugouApiProvider)
-          .resolvePlayUrl(track.kugou!, quality: q);
-    }
-    if (track.source == 'netease') {
-      return ref.read(neteaseApiProvider).resolvePlayUrl(track.id, quality: q);
-    }
-    if (track.source == 'qqmusic') {
-      return ref.read(qqMusicApiProvider).resolvePlayUrl(track, quality: q);
-    }
-    if (track.source == 'streaming') {
-      final serverId = track.serverId;
-      final originalId = track.originalId;
-      if (serverId == null || originalId == null || originalId.isEmpty) {
-        _log('流媒体曲目缺少 serverId/originalId: ${track.title}');
-        return null;
-      }
-      final cfg = ref
-          .read(streamingProvider.notifier)
-          .serverConfigById(serverId);
-      if (cfg == null) {
-        _log('流媒体服务器不存在: $serverId（${track.title}）');
-        return null;
-      }
-      return StreamingClient(
-        cfg,
-      ).getStreamUrl(originalId, playSessionId: sessionIdForTrack(track.id));
-    }
-    _log('暂不支持的播放源: ${track.source}（${track.title}）');
-    return null;
+  Future<String?> _resolveSource(Track track, {String? quality}) {
+    return resolvePlaySource(
+      ref,
+      track,
+      quality: quality ?? state.quality,
+      log: _log,
+    );
   }
 
   Future<bool> _playTrackMeta(

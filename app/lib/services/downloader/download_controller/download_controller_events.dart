@@ -14,10 +14,17 @@ mixin _DownloadControllerEvents
     switch (evt['type'] as String?) {
       case 'state':
         final to = evt['to'] as String? ?? 'queued';
+        final from = evt['from'] as String? ?? '';
+        // 失败/取消后重试进入新一轮（queued/resolving）：清空上一轮进度残留，
+        // 避免旧确定进度条在解析阶段残留。暂停→恢复（from='paused'）保留已收字节。
+        final restarted =
+            (to == 'queued' || to == 'resolving') &&
+            (from == 'failed' || from == 'canceled');
         _applyTask(
           taskId,
           (t) => (t ?? DownloadTask(taskId: taskId)).copyWith(
             status: to,
+            resetProgress: restarted,
             speed:
                 (to == 'paused' ||
                     to == 'done' ||
@@ -52,6 +59,7 @@ mixin _DownloadControllerEvents
             album: enrAlbum.isNotEmpty ? enrAlbum : null,
           );
         });
+        _forgetTracks([taskId]);
       case 'error':
         final msg = evt['error'] as String? ?? '未知错误';
         final canceled = msg == '已取消';
@@ -64,6 +72,12 @@ mixin _DownloadControllerEvents
             stage: evt['stage'] as String?,
           ),
         );
+        // §12.1 解析失败 → 复用播放管线解析 URL 后回退下载（仅 kugou/netease）。
+        if (!canceled &&
+            evt['stage'] == 'resolving' &&
+            (evt['retryable'] as bool? ?? false)) {
+          _scheduleFallback(taskId);
+        }
       case 'already':
         _applyTask(
           taskId,
@@ -72,6 +86,7 @@ mixin _DownloadControllerEvents
             filePath: evt['filePath'] as String?,
           ),
         );
+        _forgetTracks([taskId]);
     }
     _pruneHistory();
   }

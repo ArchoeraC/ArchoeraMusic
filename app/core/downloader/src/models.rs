@@ -28,11 +28,12 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 音质档位（lq/sq/hq/lossless/hi-res）
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum Quality {
     Lq,
     Sq,
+    #[default]
     Hq,
     Lossless,
     HiRes,
@@ -69,9 +70,10 @@ impl Quality {
 }
 
 /// 平台来源
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SourcePlatform {
+    #[default]
     Kugou,
     Netease,
 }
@@ -95,7 +97,7 @@ pub struct TrackExtra {
 }
 
 /// enqueue 请求（§12 协议）
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct EnqueueRequest {
     pub track_id: String,
@@ -108,6 +110,55 @@ pub struct EnqueueRequest {
     pub album: Option<String>,
     #[serde(default)]
     pub extra: TrackExtra,
+
+    // ---- §12.1 下载回退：Dart 播放管线预解析 URL（正常路径全为 None）----
+    /// 正常路径为 None，URL 由 Rust 内部解析（戒律 13.2）。
+    /// 仅当 Rust 解析失败后，Dart 复用播放管线解析出 URL，经
+    /// `archoera_downloader_retry_with_url` 注入本字段（回退路径）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pre_resolved_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pre_resolved_quality_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pre_resolved_ext: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pre_resolved_size: Option<u64>,
+    /// 下载请求附加头（网易 CDN 需 Referer/Cookie/UA；酷狗通常为空）。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pre_resolved_headers: Vec<(String, String)>,
+}
+
+impl EnqueueRequest {
+    /// 剥离回退路径注入的预解析 URL 及其 headers（可能含 Cookie）。
+    ///
+    /// 历史持久化 / 重启恢复用：避免把带凭据的临时 URL 落盘，也避免重启后
+    /// 复用已失效的 URL（恢复时重新走 Rust 解析 / Dart 回退）。
+    pub fn without_pre_resolved(mut self) -> Self {
+        self.pre_resolved_url = None;
+        self.pre_resolved_quality_key = None;
+        self.pre_resolved_ext = None;
+        self.pre_resolved_size = None;
+        self.pre_resolved_headers.clear();
+        self
+    }
+}
+
+/// 下载回退：Dart 播放管线预解析出的 URL（§12.1）。
+///
+/// 由 `archoera_downloader_retry_with_url` 解析后写入任务 request 的
+/// `pre_resolved_*` 字段。headers 为 `[["k","v"], ...]`。
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreResolvedUrl {
+    pub url: String,
+    #[serde(default)]
+    pub quality_key: Option<String>,
+    #[serde(default)]
+    pub file_ext: Option<String>,
+    #[serde(default)]
+    pub size: Option<u64>,
+    #[serde(default)]
+    pub headers: Vec<(String, String)>,
 }
 
 /// URL 解析结果（resolver 产出 → 下载阶段消费）
