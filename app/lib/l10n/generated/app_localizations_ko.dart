@@ -3688,6 +3688,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get platformQQMusic => 'QQ 뮤직';
 
   @override
+  String get platformSoda => 'Soda';
+
+  @override
   String get loginQqQrLogin => 'QQ 뮤직 QR 코드로 로그인';
 
   @override

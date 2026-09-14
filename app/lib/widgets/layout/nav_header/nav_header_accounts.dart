@@ -14,18 +14,23 @@ class _AccountsMenu extends ConsumerWidget {
     final netease = ref.watch(neteaseAuthProvider);
     final kugouApi = ref.read(kugouApiProvider);
     final qqApi = ref.read(qqMusicApiProvider);
+    final sodaAuth = ref.read(sodaAuthProvider);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([kugouApi, qqApi]),
+      listenable: Listenable.merge([kugouApi, qqApi, sodaAuth]),
       builder: (context, _) {
         final kugou = kugouApi.session;
         final qqProfile = qqApi.profile;
         final qqLogged = qqApi.isLoggedIn;
+        final sodaLogged = sodaAuth.isLoggedIn;
 
         final primaryNetease = netease != null;
         final primaryKugou = !primaryNetease && kugou != null;
         final primaryQq = !primaryNetease && !primaryKugou && qqLogged;
-        final anyLoggedIn = primaryNetease || primaryKugou || primaryQq;
+        final primarySoda =
+            !primaryNetease && !primaryKugou && !primaryQq && sodaLogged;
+        final anyLoggedIn =
+            primaryNetease || primaryKugou || primaryQq || primarySoda;
 
         final avatarUrl = netease?.avatarUrl?.trim();
         final neteaseNick = netease?.nickname.trim() ?? '';
@@ -45,6 +50,8 @@ class _AccountsMenu extends ConsumerWidget {
             avatarUrl: qqProfile?.avatarUrl,
             nickname: qqNick.isEmpty ? qqApi.uin : qqNick,
           );
+        } else if (primarySoda) {
+          primary = _AccountAvatar(nickname: l10n.platformSoda);
         } else {
           primary = Container(
             width: 34,
@@ -85,6 +92,11 @@ class _AccountsMenu extends ConsumerWidget {
               case 'logout_qq':
                 ref.read(qqMusicApiProvider).logout();
                 toast(context.l10n.loginLoggedOut(context.l10n.brandQqMusic));
+              case 'login_soda':
+                showSodaLoginDialog(context);
+              case 'logout_soda':
+                ref.read(sodaAuthProvider).logout();
+                toast(context.l10n.loginLoggedOut(context.l10n.platformSoda));
             }
           },
           itemBuilder: (_) => [
@@ -127,6 +139,16 @@ class _AccountsMenu extends ConsumerWidget {
                   ? l10n.navHeaderQqId(qqApi.uin)
                   : qqNick,
             ),
+            ..._platformSection(
+              l10n: l10n,
+              title: l10n.platformSoda,
+              loggedIn: sodaLogged,
+              loginValue: 'login_soda',
+              logoutValue: 'logout_soda',
+              nameValue: 'name_soda',
+              avatarName: l10n.platformSoda,
+              displayName: l10n.platformSoda,
+            ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -143,7 +165,9 @@ class _AccountsMenu extends ConsumerWidget {
                           ? neteaseNick
                           : primaryKugou
                           ? (kugouNick.isEmpty ? l10n.brandKugou : kugouNick)
-                          : (qqNick.isEmpty ? l10n.brandQqMusic : qqNick),
+                          : primaryQq
+                          ? (qqNick.isEmpty ? l10n.brandQqMusic : qqNick)
+                          : l10n.platformSoda,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

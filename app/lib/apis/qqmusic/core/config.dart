@@ -8,6 +8,10 @@ library;
 /// 统一接口入口（移动端 musicu）
 const qmApiUrl = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
 
+/// 桌面端接口入口（musics.fcg）——需 `?sign=`（见 core/sign.dart `qmZzcSign`）。
+/// 配合 `comm.ct=19` 下发完整音质字段（`size_hires`/`size_new`/`size_dolby` 等）。
+const qmDesktopApiUrl = 'https://u.y.qq.com/cgi-bin/musics.fcg';
+
 /// 模拟移动端的默认 headers
 final Map<String, String> qmHeaders = {
   'Content-Type': 'application/json',

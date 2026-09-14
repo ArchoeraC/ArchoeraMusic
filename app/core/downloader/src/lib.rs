@@ -13,9 +13,11 @@
 // ============================================================
 
 pub mod crypto;
+pub mod decrypt;
 pub mod memsec;
 pub mod metadata;
 pub mod models;
+pub mod qmc;
 pub mod resolvers;
 pub mod tag;
 
@@ -700,11 +702,14 @@ async fn run_task(
             extra_headers: request.pre_resolved_headers.clone(),
         }
     } else {
-        let resolver: Box<dyn PlatformUrlResolver> = match request.source {
-            SourcePlatform::Kugou => Box::new(KugouResolver),
-            SourcePlatform::Netease => Box::new(NeteaseResolver),
+        let resolved_result = match request.source {
+            SourcePlatform::Kugou => KugouResolver.resolve_play_url(&request, &cancel).await,
+            SourcePlatform::Netease => NeteaseResolver.resolve_play_url(&request, &cancel).await,
+            SourcePlatform::Qqmusic | SourcePlatform::Soda => {
+                Err(anyhow::anyhow!("执行部分操作时发生错误"))
+            }
         };
-        match resolver.resolve_play_url(&request, &cancel).await {
+        match resolved_result {
             Ok(r) => r,
             Err(e) => {
                 set_phase(task_id, TaskPhase::Failed);
@@ -735,7 +740,7 @@ async fn run_task(
 
     // 实际命中档位与请求档位不同（音质降级）时，扩展名跟随实际内容，
     // 避免「无损」降级后 .flac 文件里是 mp3（原版由 declaredFormat 保证一致）。
-    let (dest, tmp) = if resolved.file_ext.eq_ignore_ascii_case(
+    let (mut dest, tmp) = if resolved.file_ext.eq_ignore_ascii_case(
         &dest
             .extension()
             .map(|e| e.to_string_lossy().into_owned())
@@ -761,6 +766,13 @@ async fn run_task(
 
     match download_to_file(&client, &resolved, &dest, &tmp, &cancel, &paused, task_id).await {
         Ok(size) => {
+            let auth = url_fragment_param(&resolved.url, "auth");
+            let ext_hint = dest.extension().and_then(|e| e.to_str()).map(str::to_owned);
+            match decrypt_container_file(&dest, ext_hint.as_deref(), auth.as_deref()) {
+                Ok(Some(new_path)) => dest = new_path,
+                Ok(None) => {}
+                Err(e) => log::warn!("处理失败: {} err={e}", dest.display()),
+            }
             // v2.1：下载完成后自主寻找元数据（内嵌标签 + 平台 API）并写完整标签
             // （标签/封面/歌词），best-effort 不阻断下载。enrich 在 rename 落盘后
             // 执行，保证读到的即最终文件。
@@ -1699,6 +1711,70 @@ pub extern "C" fn archoera_downloader_destroy() {
     g.root_dir = None;
     g.client = None;
     g.runtime = None; // Drop Runtime：取消所有在途任务
+}
+
+fn url_fragment_param(url: &str, key: &str) -> Option<String> {
+    let frag = url.split_once('#')?.1;
+    for pair in frag.split('&') {
+        if let Some((k, v)) = pair.split_once('=') {
+            if k == key {
+                return Some(percent_decode(v));
+            }
+        }
+    }
+    None
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hi = (bytes[i + 1] as char).to_digit(16);
+            let lo = (bytes[i + 2] as char).to_digit(16);
+            if let (Some(h), Some(l)) = (hi, lo) {
+                out.push((h * 16 + l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn decrypt_container_file(
+    path: &std::path::Path,
+    ext_hint: Option<&str>,
+    play_auth: Option<&str>,
+) -> anyhow::Result<Option<PathBuf>> {
+    let data = std::fs::read(path)?;
+    let looks_encrypted = decrypt::is_ncm(&data)
+        || ext_hint.map(decrypt::is_qmc_ext).unwrap_or(false)
+        || (play_auth.is_some() && decrypt::is_cenc(&data));
+    if !looks_encrypted {
+        return Ok(None);
+    }
+    let (plain, ext) = decrypt::decrypt_container(&data, ext_hint, play_auth)?;
+    let final_path = if ext.is_empty() || path.extension().and_then(|e| e.to_str()) == Some(&ext) {
+        std::fs::write(path, &plain)?;
+        path.to_path_buf()
+    } else {
+        let new_path = path.with_extension(&ext);
+        std::fs::write(&new_path, &plain)?;
+        let _ = std::fs::remove_file(path);
+        new_path
+    };
+    log::info!(
+        "处理完成: {} → {} ({} → {} bytes)",
+        path.display(),
+        final_path.display(),
+        data.len(),
+        plain.len()
+    );
+    Ok(Some(final_path))
 }
 
 #[cfg(test)]

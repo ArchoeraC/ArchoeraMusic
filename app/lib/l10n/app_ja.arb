@@ -1082,6 +1082,7 @@
   "settingsVaultCloseV3PasswordDesc": "デバイスバインド有効時に復旧パスワード未設定（本機パスワード不要）の場合、無効化するとパスワード保護（v2）に移行します：新しいロック解除パスワードを設定してください。マスターキーと既存データは保持され、このパスワードは起動のたびに入力が必要です。",
   "brandQqMusic": "QM",
   "platformQQMusic": "QQ ミュージック",
+  "platformSoda": "Soda",
   "loginQqQrLogin": "QQ ミュージック QR コードでログイン",
   "loginQqScanHint": "QQ アプリでスキャンしてログインしてください",
   "navHeaderQqId": "QQ {id}",

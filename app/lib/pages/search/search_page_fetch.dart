@@ -127,6 +127,11 @@ extension _SearchPageFetch on _SearchPageState {
           .read(qqMusicApiProvider)
           .searchSongs(_query, page: page, limit: _SearchPageState._pageSize);
     }
+    if (platform == 'soda') {
+      return ref
+          .read(sodaApiProvider)
+          .searchSongs(_query, page: page, limit: _SearchPageState._pageSize);
+    }
     return ref
         .read(neteaseApiProvider)
         .searchSongs(
@@ -186,7 +191,12 @@ extension _SearchPageFetch on _SearchPageState {
         if (a.source == 'qqmusic') _sourceCooldown.markFailed('qqmusic');
       }
     }
-    final merged = _boundedAppend(_songs.items, okItems);
+    final ordered = sortByRelevance(
+      _query,
+      okItems,
+      (t) => searchRelevanceScore(_query, t.title, t.artistNames, t.album?.name),
+    );
+    final merged = _boundedAppend(_songs.items, ordered);
     setState(() {
       final showError = !anyOk && merged.isEmpty && !append;
       if (showError) {
@@ -326,6 +336,25 @@ extension _SearchPageFetch on _SearchPageState {
         _ => api.searchPlaylists(_query, page: page, limit: requestSize),
       };
     }
+    if (platform == 'soda') {
+      final api = ref.read(sodaApiProvider);
+      return switch (tab) {
+        _SearchTab.albums => api.searchAlbums(
+          _query,
+          page: page,
+          limit: requestSize,
+        ),
+        _SearchTab.playlists => api.searchPlaylists(
+          _query,
+          page: page,
+          limit: requestSize,
+        ),
+        // 汽水无歌手搜索：返回空而非失败（不请求）。
+        _ => Future<SearchResult<CoverItem>>.value(
+          const SearchResult<CoverItem>(items: [], total: 0, hasMore: false),
+        ),
+      };
+    }
     final api = ref.read(neteaseApiProvider);
     final offset = append ? loaded : 0;
     return switch (tab) {
@@ -405,7 +434,12 @@ extension _SearchPageFetch on _SearchPageState {
         if (a.source == 'qqmusic') _sourceCooldown.markFailed('qqmusic');
       }
     }
-    final merged = _boundedAppend(current.items, okItems);
+    final ordered = sortByRelevance(
+      _query,
+      okItems,
+      (c) => searchRelevanceScore(_query, c.title, c.subtitle),
+    );
+    final merged = _boundedAppend(current.items, ordered);
     setState(() {
       final showError = !anyOk && merged.isEmpty && !append;
       if (showError) {

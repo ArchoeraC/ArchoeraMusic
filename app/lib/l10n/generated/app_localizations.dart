@@ -6758,6 +6758,12 @@ abstract class AppLocalizations {
   /// **'QM'**
   String get platformQQMusic;
 
+  /// No description provided for @platformSoda.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'汽水'**
+  String get platformSoda;
+
   /// No description provided for @loginQqQrLogin.
   ///
   /// In zh_CN, this message translates to:

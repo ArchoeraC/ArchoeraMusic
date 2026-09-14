@@ -2,13 +2,26 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// QM 四分类搜索（对齐 search.ts）
+/// QM 搜索（签名桌面协议）——`musics.fcg` + `zzcSign`，覆盖四类。
+///
+/// 统一走 `music.search.SearchCgiService / DoSearchForQQMusicDesktop`：
+/// - `comm.ct=19` 下发完整音质字段（`size_hires`/`size_new`/`size_dolby`/
+///   `size_dts`/`hires_*`），供上层精确档位；
+/// - `search_type`：0 单曲 / 1 歌手 / 2 专辑 / 3 歌单；
+/// - 响应体按类分列（`body.{song,singer,album,songlist}.list`）。
+///
+/// 单页硬上限：`num_per_page>50` 服务端直接返回空（实测），歌手更严（>40 空）。
+/// 签名只覆盖请求体，调用方需保证签名串与实际发送字节一致（见 core/sign.dart）。
+///
+/// 来源：协议事实参考 baka-plugins `plugins/qq.js`（无许可证，未复制其表达）。
 library;
 
+import 'dart:convert';
 import 'dart:math';
 
 import '../core/config.dart';
 import '../core/request.dart';
+import '../core/sign.dart';
 import '../core/types.dart';
 
 String _secureUrl(String? url) =>
@@ -17,16 +30,149 @@ String _secureUrl(String? url) =>
 String _stripHighlight(String? text) =>
     (text ?? '').replaceAll(RegExp(r'</?em>'), '');
 
-/// 移动端随机 search_id（对齐 TS：group ∈ [1,20]，r ∈ [0,4194304]）。
-String _genSearchId() =>
-    '${((Random().nextInt(20) + 1) * 18014398509481984) + (Random().nextInt(4194305) * 4294967296) + (DateTime.now().millisecondsSinceEpoch % 86400000)}';
+int _numOf(dynamic v) =>
+    v is num ? v.toInt() : (v != null ? int.tryParse('$v') ?? 0 : 0);
 
-/// 服务端单页硬上限：超过会被静默当作非法返回空（实测 num_per_page>50 直接
-/// 空结果）；歌手搜索（search_type=1）上限更严（>30 即空，见上游 SPlayer
-/// search.ts 的换算注释）。
-int _capPerPage(int searchType, int limit) => searchType == 1
-    ? limit.clamp(1, 30)
-    : limit.clamp(1, 50);
+/// 桌面 comm：`ct=19` 取全量音质；`guid`/`wid` 为公开客户端常量。
+///
+/// 已登录时注入 `uin/qq/authst/tmeLoginType=2`（对齐 core/request.dart 的
+/// 移动 comm 组装；未登录为访客 `uin=0`/`tmeLoginType=0`）。
+Map<String, dynamic> _desktopComm() {
+  final cookies = qmGetQQMusicCookies();
+  final uin = qmGetQQMusicUin();
+  final musicKey = cookies['qm_keyst'] ?? cookies['qqmusic_key'];
+  final loggedIn = uin != '0' && musicKey != null && musicKey.isNotEmpty;
+  return <String, dynamic>{
+    '_channelid': '0',
+    '_os_version': '6.2.9200-2',
+    'ct': '19',
+    'cv': '2151',
+    'guid': '1F70E520B2EAA7D25E11760783C53CA9',
+    'patch': '118',
+    'psrf_access_token_expiresAt': 0,
+    'psrf_qqaccess_token': '',
+    'psrf_qqopenid': '',
+    'psrf_qqunionid': '',
+    'tmeAppID': 'qqmusic',
+    'tmeLoginType': loggedIn ? 2 : 0,
+    'uin': loggedIn ? uin : '0',
+    'wid': '7223299733393904640',
+    if (loggedIn) ...<String, dynamic>{'qq': uin, 'authst': musicKey},
+  };
+}
+
+/// 桌面 searchid：32 位随机 hex（大写）+ 5 位随机数字（对齐 `qq.js:327`）。
+String _genSearchId() {
+  const hex = '0123456789abcdef';
+  final rnd = Random();
+  final buf = StringBuffer();
+  for (var i = 0; i < 32; i++) {
+    buf.write(hex[rnd.nextInt(16)]);
+  }
+  return '${buf.toString().toUpperCase()}'
+      '${rnd.nextInt(100000).toString().padLeft(5, '0')}';
+}
+
+/// 瞬时错误重试次数与退避（对齐 core/request.dart；风控不重试）。
+const int _maxRetry = 2;
+const int _retryBackoffMs = 300;
+
+Future<void> _delay(int ms) => Future.delayed(Duration(milliseconds: ms));
+
+/// 发起一次签名桌面搜索，返回 `SearchCgiService.data`（含 `body`/`meta`）。
+///
+/// 非零外层/内层码按 `core/request.dart` 语义归一：`2001` 归风控 [QmErrorKind.risk]，
+/// 其余归 [QmErrorKind.code]；`meta.is_filter<0`（额外验证过滤为空）亦归风控。
+Future<Map<String, dynamic>> _desktopSearch(
+  String keywords,
+  int page,
+  int limit,
+  int searchType,
+) async {
+  final body = <String, dynamic>{
+    'comm': _desktopComm(),
+    'music.search.SearchCgiService': <String, dynamic>{
+      'module': 'music.search.SearchCgiService',
+      'method': 'DoSearchForQQMusicDesktop',
+      'param': <String, dynamic>{
+        'grp': 1,
+        'num_per_page': limit.clamp(1, 50),
+        'page_num': page,
+        'query': keywords,
+        'remoteplace': 'txt.newclient.top',
+        'search_type': searchType,
+        'searchid': _genSearchId(),
+      },
+    },
+  };
+  final sign = qmZzcSign(jsonEncode(body));
+  final url = '$qmDesktopApiUrl?sign=$sign';
+
+  // 瞬时错误自动重试（带退避）；风控（2001 / is_filter<0）**不重试**，
+  // 其余非零业务码退避重试后再抛（对齐 core/request.dart 语义）。
+  Object? lastErr;
+  for (var attempt = 0; attempt <= _maxRetry; attempt++) {
+    try {
+      final data = await qmPostRaw(
+        body,
+        url: url,
+        extraHeaders: const {'User-Agent': 'QQMusic 14090508(android 12)'},
+      );
+      final node = data['music.search.SearchCgiService'];
+      final nodeMap = node is Map ? node : const <String, dynamic>{};
+      final outer = _numOf(data['code']);
+      final inner = _numOf(nodeMap['code']);
+      if (outer == 0 && inner == 0) {
+        final nodeData = nodeMap['data'];
+        final dataMap = nodeData is Map
+            ? Map<String, dynamic>.from(nodeData)
+            : const <String, dynamic>{};
+        final metaRaw = dataMap['meta'];
+        final metaMap = metaRaw is Map ? metaRaw : const <String, dynamic>{};
+        final filter = metaMap['is_filter'];
+        if (filter is num && filter.toInt() < 0) {
+          throw QmRequestException(
+            'QM搜索触发额外验证/风控过滤（meta.is_filter=$filter），已停止自动重试',
+            kind: QmErrorKind.risk,
+            outer: outer,
+            inner: qmRiskInnerCode,
+          );
+        }
+        return dataMap;
+      }
+      final risk = outer == qmRiskInnerCode || inner == qmRiskInnerCode;
+      throw QmRequestException(
+        risk
+            ? 'QM搜索被拦截：请求过于频繁或触发风控（outer=$outer inner=$inner）'
+            : 'QM搜索失败（outer=$outer inner=$inner）',
+        kind: risk ? QmErrorKind.risk : QmErrorKind.code,
+        outer: outer,
+        inner: inner,
+      );
+    } on QmRequestException catch (e) {
+      // risk 立即抛（不重试）；code 耗尽重试后抛。
+      if (e.kind == QmErrorKind.risk || attempt >= _maxRetry) rethrow;
+      lastErr = e;
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= _maxRetry) break;
+    }
+    await _delay(_retryBackoffMs * (attempt + 1));
+  }
+  throw QmRequestException(
+    'QM搜索网络请求失败: $lastErr',
+    kind: QmErrorKind.transient,
+    retryable: false,
+  );
+}
+
+/// 取分列节点（`body.<key>.list`）为可写 Map 列表。
+List<Map<String, dynamic>> _listOf(Object? node) {
+  if (node is! Map) return const [];
+  final list = node['list'];
+  if (list is! List) return const [];
+  return list.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+}
 
 Map<String, dynamic> _mapSong(Map song) {
   final singer = song['singer'] as List?;
@@ -42,6 +188,11 @@ Map<String, dynamic> _mapSong(Map song) {
   final albumMid = albumMap['mid'] ?? '';
   final albumPmid = albumMap['pmid'] ?? '';
   final pictureMid = (albumMid ?? albumPmid ?? '').toString();
+  final sizeNew = fileMap['size_new'];
+  final sizeHires = _numOf(fileMap['size_hires']);
+  final sizeHiRes = sizeHires > 0
+      ? sizeHires
+      : (sizeNew is List && sizeNew.isNotEmpty ? _numOf(sizeNew.first) : 0);
 
   final artists = singer ?? const [];
   return <String, dynamic>{
@@ -63,10 +214,7 @@ Map<String, dynamic> _mapSong(Map song) {
     'sizeApe': _numOf(fileMap['size_ape']),
     'sizeFlac': _numOf(fileMap['size_flac']),
     'sizeOgg': _numOf(fileMap['size_192ogg']),
-    'sizeHiRes': (fileMap['size_new'] is List &&
-            (fileMap['size_new'] as List).isNotEmpty)
-        ? _numOf((fileMap['size_new'] as List).first)
-        : 0,
+    'sizeHiRes': sizeHiRes,
     'hiResSampleRate': _numOf(fileMap['hires_sample']),
     'hiResBitDepth': _numOf(fileMap['hires_bitdepth']),
     'cover': pictureMid.isEmpty
@@ -78,112 +226,40 @@ Map<String, dynamic> _mapSong(Map song) {
   };
 }
 
-int _numOf(dynamic v) => v is num ? v.toInt() : (v != null ? int.tryParse('$v') ?? 0 : 0);
-
 Map<String, dynamic> _mapAlbum(Map album) {
   final singerList = album['singer_list'] as List?;
   return <String, dynamic>{
-    'id': album['albummid'] ?? '${album['id'] ?? ''}',
-    'name': album['name'] ?? '',
-    'cover': _secureUrl(album['pic']?.toString()),
-    'artist': album['singer'] ?? qmFormatSingerName(singerList),
-    'artistMid': singerList != null && singerList.isNotEmpty
-        ? (singerList.first as Map)['mid'] ?? ''
-        : '',
-    'trackCount': _numOf(album['song_num']),
+    'id': '${album['albumID'] ?? album['albumMID'] ?? ''}',
+    'name': album['albumName'] ?? '',
+    'cover': _secureUrl(album['albumPic']?.toString()),
+    'artist': album['singerName'] ?? qmFormatSingerName(singerList),
+    'artistMid': album['singerMID'] ?? '',
+    'trackCount': _numOf(album['song_count']),
   };
 }
 
 Map<String, dynamic> _mapArtist(Map artist) => <String, dynamic>{
   'id': artist['singerMID'] ?? '${artist['singerID'] ?? ''}',
-  'name': artist['singerName'] ?? '',
-  'cover': _secureUrl((artist['singerPic'] ?? artist['iconurl'])?.toString()),
+  'name': _stripHighlight(artist['singerName']?.toString()),
+  'cover': _secureUrl(artist['singerPic']?.toString()),
   'albumCount': _numOf(artist['albumNum']),
   'songCount': _numOf(artist['songNum']),
 };
 
-Map<String, dynamic> _mapPlaylist(Map playlist) => <String, dynamic>{
-  'id': playlist['dissid'] ?? '',
-  'name': _stripHighlight(playlist['dissname']?.toString()),
-  'cover': _secureUrl((playlist['logo'] ?? playlist['layer_url'])?.toString()),
-  'creator': playlist['nickname'] ?? '',
-  'trackCount': _numOf(playlist['songnum']),
-  'playCount': _numOf(playlist['listennum']),
-};
-
-Future<Map<String, dynamic>> _searchMobile(
-  String keywords,
-  int page,
-  int limit,
-  int searchType,
-) async {
-  final data = await qmRequest<Map<String, dynamic>>(
-    'music.search.SearchCgiService',
-    'DoSearchForQQMusicMobile',
-    {
-      'searchid': _genSearchId(),
-      'query': keywords,
-      'page_num': page,
-      'num_per_page': _capPerPage(searchType, limit),
-      'search_type': searchType,
-      'highlight': true,
-      'grp': 1,
-      'selectors': <String, dynamic>{},
-      'vec_selectors': <dynamic>[],
-    },
-    session: false,
-  );
-  final body = data['body'];
-  final meta = data['meta'];
-  final metaMap = meta is Map ? meta : const <String, dynamic>{};
-  return <String, dynamic>{'body': body is Map ? body : const {}, 'sum': metaMap['sum']};
-}
-
-Future<Map<String, dynamic>> _searchSongs(
-    String keywords, int page, int limit) async {
-  final resp = await _searchMobile(keywords, page, limit, 0);
-  final body = resp['body'] as Map;
-  final items = (body['item_song'] as List?) ?? const [];
-  final songs = items.whereType<Map>().map(_mapSong).toList();
-  return {'code': 200, 'total': resp['sum'] ?? songs.length, 'songs': songs};
-}
-
-Future<Map<String, dynamic>> _searchAlbums(
-    String keywords, int page, int limit) async {
-  final resp = await _searchMobile(keywords, page, limit, 2);
-  final body = resp['body'] as Map;
-  final items = (body['item_album'] as List?) ?? const [];
-  final albums = items.whereType<Map>().map(_mapAlbum).toList();
-  return {'code': 200, 'total': resp['sum'] ?? albums.length, 'albums': albums};
-}
-
-Future<Map<String, dynamic>> _searchArtists(
-    String keywords, int page, int limit) async {
-  final resp = await _searchMobile(keywords, page, limit, 1);
-  final body = resp['body'] as Map;
-  final items = (body['singer'] as List?) ?? const [];
-  final artists = items.whereType<Map>().map(_mapArtist).toList();
-  return {
-    'code': 200,
-    'total': resp['sum'] ?? artists.length,
-    'artists': artists,
+Map<String, dynamic> _mapPlaylist(Map playlist) {
+  final creator = playlist['creator'];
+  final creatorMap = creator is Map ? creator : const <String, dynamic>{};
+  return <String, dynamic>{
+    'id': '${playlist['dissid'] ?? ''}',
+    'name': _stripHighlight(playlist['dissname']?.toString()),
+    'cover': _secureUrl(playlist['imgurl']?.toString()),
+    'creator': creatorMap['name'] ?? '',
+    'trackCount': _numOf(playlist['song_count']),
+    'playCount': _numOf(playlist['listennum']),
   };
 }
 
-Future<Map<String, dynamic>> _searchPlaylists(
-    String keywords, int page, int limit) async {
-  final resp = await _searchMobile(keywords, page, limit, 3);
-  final body = resp['body'] as Map;
-  final items = (body['item_songlist'] as List?) ?? const [];
-  final playlists = items.whereType<Map>().map(_mapPlaylist).toList();
-  return {
-    'code': 200,
-    'total': resp['sum'] ?? playlists.length,
-    'playlists': playlists,
-  };
-}
-
-/// 类型码：0 单曲 / 8 专辑 / 9 歌手 / 2 歌单（对齐 TS search.ts）。
+/// 类型码（桌面协议）：0 单曲 / 1 歌手 / 2 专辑 / 3 歌单。
 QmModule qmSearch = (params) async {
   final keywords = params['keywords'] as String?;
   final page = (params['page'] as num?)?.toInt() ?? 1;
@@ -193,17 +269,44 @@ QmModule qmSearch = (params) async {
   if (keywords == null || keywords.isEmpty) {
     return {'code': 400, 'total': 0, 'message': 'keywords required'};
   }
+
+  final data = await _desktopSearch(keywords, page, limit, type);
+  final meta = data['meta'];
+  final metaMap = meta is Map ? meta : const <String, dynamic>{};
+  final body = data['body'];
+  final bodyMap = body is Map ? body : const <String, dynamic>{};
+  final total = _numOf(metaMap['sum'] ?? metaMap['estimate_sum']);
+
   switch (type) {
     case 0:
-      return _searchSongs(keywords, page, limit);
-    case 8:
-      return _searchAlbums(keywords, page, limit);
-    case 9:
-      return _searchArtists(keywords, page, limit);
+      return {
+        'code': 200,
+        'total': total,
+        'songs': _listOf(bodyMap['song']).map(_mapSong).toList(),
+      };
+    case 1:
+      return {
+        'code': 200,
+        'total': total,
+        'artists': _listOf(bodyMap['singer']).map(_mapArtist).toList(),
+      };
     case 2:
-      return _searchPlaylists(keywords, page, limit);
+      return {
+        'code': 200,
+        'total': total,
+        'albums': _listOf(bodyMap['album']).map(_mapAlbum).toList(),
+      };
+    case 3:
+      return {
+        'code': 200,
+        'total': total,
+        'playlists': _listOf(bodyMap['songlist']).map(_mapPlaylist).toList(),
+      };
     default:
-      return {'code': 400, 'total': 0, 'message': 'unsupported search type: $type'};
+      return {
+        'code': 400,
+        'total': 0,
+        'message': 'unsupported search type: $type',
+      };
   }
 };
-

@@ -41,7 +41,7 @@ extension _CommentDialogView on _CommentDialogState {
               const SizedBox(height: 8),
               const Divider(height: 1),
               Expanded(child: _buildListArea(scheme, l10n)),
-              if (!_isKugou && _songId != null)
+              if (_canSend && _songId != null)
                 _CommentInputBar(
                   controller: _input,
                   sending: _sending,
@@ -67,7 +67,13 @@ extension _CommentDialogView on _CommentDialogState {
         return _EmptyHint(
           icon: EtaIcons.cloudOutline,
           text: l10n.commentNotFound(
-            _isKugou ? l10n.brandKugou : l10n.brandNetease,
+            _isKugou
+                ? l10n.brandKugou
+                : _isSoda
+                ? l10n.platformSoda
+                : _isQq
+                ? l10n.platformQQMusic
+                : l10n.brandNetease,
           ),
         );
       }
