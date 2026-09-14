@@ -17,7 +17,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../apis/lyric/kugou.dart';
 import '../apis/lyric/netease.dart';
 import '../apis/lyric/qqmusic.dart';
-import '../apis/lyric/soda.dart';
 import '../services/lyrics/lyric_line.dart';
 import '../services/lyrics/profanity.dart';
 import '../services/playback/playback_notifier.dart';
@@ -69,19 +68,6 @@ Future<List<LyricGroup>> _fetchGroups(Ref ref) async {
       final match = (trackId != null && trackId.isNotEmpty)
           ? await qmGetLyricByPlatformId(trackId, track.qqmusic?.mid)
           : await qmGetLyricByQuery(track);
-      if (match == null) return const [];
-      return parseLyricGroups(
-        content: match.content,
-        format: match.format,
-        translation: match.translation,
-      );
-
-    case 'soda':
-      // 优先按汽水 track id 直取（SEO 返回 KRC 逐字），
-      // 无 id 时走「歌名+歌手 → 搜索 → 最佳候选」模糊链路。
-      final match = (trackId != null && trackId.isNotEmpty)
-          ? await sodaGetLyricByPlatformId(trackId)
-          : await sodaGetLyricByQuery(track);
       if (match == null) return const [];
       return parseLyricGroups(
         content: match.content,

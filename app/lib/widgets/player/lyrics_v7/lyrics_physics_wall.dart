@@ -58,7 +58,7 @@ class AmllPhysicsWall extends StatefulWidget {
     required this.onSeek,
     this.fontSize = 18,
     this.fontFamily,
-    this.playedColor = const Color(0xFF4DA3FF),
+    this.playedColor = const Color(0xFFD0D3DA),
     this.unplayedColor = const Color(0xFF9AA1B5),
     this.showTranslation = true,
     this.alignFraction = 0.5,
@@ -105,7 +105,7 @@ class _PaintCtx {
   bool wordSweep = true;
   bool hidePassed = false;
   bool showTranslation = true;
-  Color played = const Color(0xFF4DA3FF);
+  Color played = const Color(0xFFD0D3DA);
   Color unplayed = const Color(0xFF9AA1B5);
   double drag = 0;
 

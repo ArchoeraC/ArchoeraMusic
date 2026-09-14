@@ -675,6 +675,20 @@ class AppLocalizationsDe extends AppLocalizations {
       'Gescannt, bitte bestätigen Sie die Anmeldung auf Ihrem Telefon';
 
   @override
+  String get loginConfirmCheck => 'Ich habe bestätigt, Anmeldung prüfen';
+
+  @override
+  String get loginChecking => 'Prüfe…';
+
+  @override
+  String get loginScanThenConfirm =>
+      'Nach dem Scannen und Bestätigen am Handy unten tippen';
+
+  @override
+  String get loginScannedThenConfirm =>
+      'Gescannt. Am Handy bestätigen und erneut tippen';
+
+  @override
   String get trackListArtistHotSongs => 'Beliebte Songs des Künstlers';
 
   @override
@@ -1512,14 +1526,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Systemakzent folgen（Lesen fehlgeschlagen, Fallback benutzerdefiniert）';
 
   @override
-  String get settingsAccentDefault => 'Standard-Hellblau（Design-System）';
+  String get settingsAccentDefault => 'Standard-Grau（Design-System）';
 
   @override
   String get settingsAccentCustom =>
       'Benutzerdefiniert（Farben dynamisch aus Seed generiert）';
 
   @override
-  String get settingsAccentDefaultTooltip => 'Standard-Blau';
+  String get settingsAccentDefaultTooltip => 'Standard-Grau';
 
   @override
   String get settingsAccentSystemTooltip => 'Systemakzent folgen';
@@ -3848,9 +3862,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get platformQQMusic => 'QM';
-
-  @override
-  String get platformSoda => 'Soda';
 
   @override
   String get loginQqQrLogin => 'Mit QQ-Music-QR-Code anmelden';

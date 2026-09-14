@@ -658,6 +658,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get loginWaitingConfirm => 'スキャンしました。スマートフォンでログインを確認してください';
 
   @override
+  String get loginConfirmCheck => '確認しました、ログインを確認';
+
+  @override
+  String get loginChecking => '確認中…';
+
+  @override
+  String get loginScanThenConfirm => 'スマホでスキャンして確認後、下のボタンを押してください';
+
+  @override
+  String get loginScannedThenConfirm => 'スキャン済み。スマホで確認してからもう一度押してください';
+
+  @override
   String get trackListArtistHotSongs => 'アーティストの人気曲';
 
   @override
@@ -1461,13 +1473,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAccentSystemFallback => 'システムアクセントに従う（読込失敗時はカスタムにフォールバック）';
 
   @override
-  String get settingsAccentDefault => 'デフォルトの明るい青（デザインシステム）';
+  String get settingsAccentDefault => 'デフォルトのグレー（デザインシステム）';
 
   @override
   String get settingsAccentCustom => 'カスタム（シードから配色を動的生成）';
 
   @override
-  String get settingsAccentDefaultTooltip => 'デフォルトの青';
+  String get settingsAccentDefaultTooltip => 'デフォルトのグレー';
 
   @override
   String get settingsAccentSystemTooltip => 'システムアクセントに従う';
@@ -3677,9 +3689,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get platformQQMusic => 'QQ ミュージック';
-
-  @override
-  String get platformSoda => 'Soda';
 
   @override
   String get loginQqQrLogin => 'QQ ミュージック QR コードでログイン';

@@ -393,8 +393,6 @@ class _SourceBadge extends StatelessWidget {
       'kugou' => ('酷', const Color(0xFF00A7E0)),
       // QM徽标（品牌绿）
       'qqmusic' => ('Q', const Color(0xFF31C27C)),
-      // 汽水徽标
-      'soda' => ('汽', const Color(0xFF7B61FF)),
       _ => ('', Colors.transparent),
     };
     if (label.isEmpty) return const SizedBox.shrink();

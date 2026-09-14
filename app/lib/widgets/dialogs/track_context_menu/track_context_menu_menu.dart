@@ -15,9 +15,8 @@ void showTrackContextMenu(
   List<SContextMenuItem> extra = const [],
 }) {
   final isOnline = track.source == 'netease' || track.source == 'kugou';
-  // 可下载来源：KG/NT（Rust 自研）+ QQMusic/汽水（Dart 播放管线回退）。
-  final canDownload =
-      isOnline || track.source == 'qqmusic' || track.source == 'soda';
+  // 可下载来源：KG/NT（Rust 自研）+ QQMusic（Dart 播放管线回退）。
+  final canDownload = isOnline || track.source == 'qqmusic';
   final liked = ref.read(likeControllerProvider).isLiked(track);
   final toggle = onToggleLike ?? (t) => _defaultToggleLike(context, ref, t);
   final l10n = context.l10n;

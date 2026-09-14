@@ -203,6 +203,15 @@ extension _KgQrLoginDialogView on _KgQrLoginDialogState {
             ),
           ),
         ),
+        if (!_loadingKey && _key != null && _status != 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: OutlinedButton.icon(
+              onPressed: _initQr,
+              icon: const Icon(EtaIcons.refresh, size: 18),
+              label: Text(l10n.loginRegenerate),
+            ),
+          ),
       ],
     );
   }

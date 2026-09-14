@@ -59,6 +59,9 @@ Map<String, dynamic> _mapSong(Map<String, dynamic> song) {
   final payMap = pay is Map ? Map<String, dynamic>.from(pay) : const {};
   final priceAlbum = (payMap['price_album'] as num?)?.toInt() ?? 0;
   final payMonth = (payMap['pay_month'] as num?)?.toInt() ?? 0;
+  final albumMid =
+      albumMap['mid'] ?? song['albummid'] ?? song['albumMid'] ?? '';
+  final pictureMid = albumMid.isNotEmpty ? albumMid : (albumMap['pmid'] ?? '');
   return <String, dynamic>{
     'id': '${song['id'] ?? ''}',
     'mid': song['mid'] ?? song['songmid'] ?? '',
@@ -66,7 +69,13 @@ Map<String, dynamic> _mapSong(Map<String, dynamic> song) {
     'artist': qmFormatSingerName(singer),
     'artists': singer ?? const [],
     'album': albumMap['name'] ?? albumMap['title'] ?? '',
-    'albumMid': albumMap['mid'] ?? song['albummid'] ?? song['albumMid'] ?? '',
+    'albumMid': albumMid,
+    'cover': pictureMid.isEmpty
+        ? ''
+        : 'https://y.gtimg.cn/music/photo_new/T002R300x300M000$pictureMid.jpg',
+    'coverOriginal': pictureMid.isEmpty
+        ? ''
+        : 'https://y.gtimg.cn/music/photo_new/T002R800x800M000$pictureMid.jpg',
     'duration': ((song['interval'] as num?) ?? 0) * 1000,
     'mediaMid': fileMap['media_mid'] ?? song['strMediaMid'] ?? '',
     'pay': {

@@ -608,9 +608,12 @@ class Track {
     final mediaMid = song['mediaMid']?.toString() ?? '';
     final mid = song['mid']?.toString() ?? '';
     final albumName = song['album']?.toString() ?? '';
+    // 封面优先级：显式 cover 参数 > 归一结果里的 `cover` 字段（可能已含
+    // `pmid` 回退）> 由 `albumMid` 现算。
+    final coverField = song['cover']?.toString() ?? '';
     final pic = (cover != null && cover.isNotEmpty)
         ? cover
-        : qqCover(albumMid);
+        : (coverField.isNotEmpty ? coverField : qqCover(albumMid));
     final pay = song['pay'];
     final payMap = pay is Map ? Map<String, dynamic>.from(pay) : const {};
     final payalbum = (payMap['payalbum'] as num?)?.toInt() ?? 0;

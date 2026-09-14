@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 下载请求构造：QQMusic / 汽水来源接入（离线）。
+/// 下载请求构造：QQMusic 来源接入（离线）。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -25,18 +25,6 @@ void main() {
     expect(req['quality'], 'lossless');
     expect(req['title'], '晴天');
     expect(req['artist'], '周杰伦');
-    expect(req['extra'], isEmpty);
-  });
-
-  test('汽水：source 透传，extra 为空', () {
-    const track = Track(
-      id: '7678897838486882344',
-      title: '晴天（杰伦）',
-      source: 'soda',
-    );
-    final req = buildDownloadRequest(track);
-    expect(req['source'], 'soda');
-    expect(req['platformId'], '7678897838486882344');
     expect(req['extra'], isEmpty);
   });
 
