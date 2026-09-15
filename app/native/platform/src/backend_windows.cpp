@@ -153,7 +153,8 @@ void setAumid() {
 }
 
 // 是否"安装版"（与安装目录无关，用户可自定义）：
-//   - Inno Setup（现行，per-user）在 HKCU\Software\ArchoeraMusic 写 InstallPath；
+//   - Inno Setup（现行）在安装模式对应的 hive 写 Software\ArchoeraMusic（HKA：
+//     per-user → HKCU，per-machine → HKLM）；
 //   - 旧 NSIS（HKLM\...\Uninstall\ArchoeraMusic）、旧 per-user 卸载项（HKCU 同名）。
 // 便携版无任何标记 → 不创建快捷方式（无痕）。读取 HKCU/HKLM 普通用户即可。
 bool regKeyExists(HKEY root, const wchar_t* sub) {
@@ -164,20 +165,26 @@ bool regKeyExists(HKEY root, const wchar_t* sub) {
     return true;
 }
 
-bool isInstalled() {
-    constexpr wchar_t kUninstall[] =
-        L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ArchoeraMusic";
-    return regKeyExists(HKEY_CURRENT_USER, L"Software\\ArchoeraMusic") ||
-           regKeyExists(HKEY_CURRENT_USER, kUninstall) ||
-           regKeyExists(HKEY_LOCAL_MACHINE, kUninstall);
+constexpr wchar_t kUninstallSubkey[] =
+    L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ArchoeraMusic";
+
+// per-machine（为所有用户安装）：卸载项在 HKLM（Inno 在 admin 模式写 HKLM）。
+// per-user 只在 HKCU；便携版两者皆无。
+bool isAdminInstall() {
+    return regKeyExists(HKEY_LOCAL_MACHINE, L"Software\\ArchoeraMusic") ||
+           regKeyExists(HKEY_LOCAL_MACHINE, kUninstallSubkey);
 }
 
-// 安装器按用户在向导里的选择写入的开始菜单快捷方式偏好（1=创建，0=不创建）。
-// 缺省/旧版安装无此值 → 按创建处理。用户禁用时不得为 Toast 悄悄重建。
-bool startMenuShortcutDisabled() {
+bool isInstalled() {
+    return isAdminInstall() ||
+           regKeyExists(HKEY_CURRENT_USER, L"Software\\ArchoeraMusic") ||
+           regKeyExists(HKEY_CURRENT_USER, kUninstallSubkey);
+}
+
+bool shortcutDisabledAt(HKEY root) {
     HKEY key = nullptr;
-    if (::RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\ArchoeraMusic", 0, KEY_READ,
-                        &key) != ERROR_SUCCESS) {
+    if (::RegOpenKeyExW(root, L"Software\\ArchoeraMusic", 0, KEY_READ, &key) !=
+        ERROR_SUCCESS) {
         return false;
     }
     DWORD value = 1;
@@ -190,19 +197,31 @@ bool startMenuShortcutDisabled() {
     return rc == ERROR_SUCCESS && type == REG_DWORD && value == 0;
 }
 
+// 安装器按用户在向导里的选择写入的开始菜单快捷方式偏好（1=创建，0=不创建）。
+// 偏好写在安装模式对应的 hive（HKA）；缺省/旧版无此值 → 按创建处理。
+// 用户禁用时不得为 Toast 悄悄重建。
+bool startMenuShortcutDisabled() {
+    return shortcutDisabledAt(isAdminInstall() ? HKEY_LOCAL_MACHINE
+                                               : HKEY_CURRENT_USER);
+}
+
 // Toast 快捷方式必须与安装器建在**同一路径**，否则开始菜单会出现两份
-// （安装器一份、这里一份）。安装器建的那份不带 AUMID，这里就地升级它。
+// （安装器一份、这里一份）。安装器现已直接写 AUMID（见 [Icons] AppUserModelID），
+// 这里仅作兜底：路径按安装模式取（per-machine → All Users 开始菜单），
+// 若已带正确 AUMID 则不动；无写权限时保存失败即放弃（不产生第二份用户级快捷方式）。
 void ensureToastShortcut() {
     if (!isInstalled()) return;              // 便携版不落任何痕迹
     if (startMenuShortcutDisabled()) return;  // 用户未选择开始菜单快捷方式
 
-    wchar_t appdata[MAX_PATH] = {0};
-    if (::GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH) == 0) return;
+    // per-machine 用 %PROGRAMDATA%（All Users 开始菜单），per-user 用 %APPDATA%。
+    const wchar_t* baseEnv = isAdminInstall() ? L"PROGRAMDATA" : L"APPDATA";
+    wchar_t base[MAX_PATH] = {0};
+    if (::GetEnvironmentVariableW(baseEnv, base, MAX_PATH) == 0) return;
     wchar_t dir[MAX_PATH];
     if (std::swprintf(
             dir, MAX_PATH,
             L"%s\\Microsoft\\Windows\\Start Menu\\Programs\\ArchoeraMusic",
-            appdata) <= 0) {
+            base) <= 0) {
         return;
     }
     wchar_t lnk[MAX_PATH];
@@ -263,7 +282,9 @@ void ensureToastShortcut() {
         store->Release();
     }
     if (SUCCEEDED(link->QueryInterface(IID_PPV_ARGS(&file)))) {
-        file->Save(lnk, TRUE);
+        if (FAILED(file->Save(lnk, TRUE))) {
+            log("apl/smtc: toast shortcut save failed (no write access?)");
+        }
         file->Release();
     }
     link->Release();
