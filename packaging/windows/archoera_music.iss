@@ -31,7 +31,8 @@ AppPublisher=BetaStudio2
 PrivilegesRequired=lowest
 DefaultDirName={localappdata}\Programs\{#AppName}
 DefaultGroupName={#AppName}
-WizardStyle=modern
+; 现代 Windows 11 外观，并随系统浅色/深色自动切换（Inno 6.3+ dynamic 模式）。
+WizardStyle=modern windows11 dynamic
 ; 安装位置页始终显示，用户无需先选「自定义安装」即可改路径。
 DisableDirPage=no
 ; 开始菜单文件夹固定为 DefaultGroupName；是否创建交由「附加任务」勾选。
