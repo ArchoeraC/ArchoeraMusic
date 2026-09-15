@@ -426,7 +426,7 @@ class _SourceBadge extends StatelessWidget {
   if (k != null) {
     if (k.hashFor('hi-res') != null) return (label: 'Hi-Res', lossless: true);
     if (k.hashFor('lossless') != null) {
-      return (label: l10n.commonLossless, lossless: true);
+      return (label: 'Lossless', lossless: true);
     }
     if (k.hashFor('hq') != null) return (label: 'HQ', lossless: false);
     if (k.hashFor('sq') != null) return (label: 'SQ', lossless: false);
@@ -438,7 +438,7 @@ class _SourceBadge extends StatelessWidget {
   if (q != null && q.sizes.isNotEmpty) {
     if ((q.sizes['hires'] ?? 0) > 0) return (label: 'Hi-Res', lossless: true);
     if ((q.sizes['flac'] ?? 0) > 0) {
-      return (label: l10n.commonLossless, lossless: true);
+      return (label: 'Lossless', lossless: true);
     }
     if ((q.sizes['320'] ?? 0) > 0) return (label: 'HQ', lossless: false);
     if ((q.sizes['128'] ?? 0) > 0) return (label: 'SQ', lossless: false);
@@ -467,7 +467,7 @@ class _SourceBadge extends StatelessWidget {
     if (q.sampleRate >= 96000 && q.bitsPerSample >= 24) {
       return (label: 'Hi-Res', lossless: true);
     }
-    return (label: l10n.commonLossless, lossless: true);
+    return (label: 'Lossless', lossless: true);
   }
   final kbps = q.bitRate / 1000;
   if (kbps >= 320) return (label: 'HQ', lossless: false);
