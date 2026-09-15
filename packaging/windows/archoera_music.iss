@@ -178,11 +178,12 @@ Type: dirifempty; Name: "{autoprograms}\{#AppName}"
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(AppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-; ⚠️ 编码红线：Inno 把编译后的 [Code] 以 AnsiString 交给卸载程序的 Pascal Script
-; 引擎（Setup.Uninstall.pas 的 ExtractCompiledCodeText），**非 ASCII 字符串字面量
-; 在卸载程序里会乱码**（已实测）。因此 [Code] 内：
-;   - 字符串字面量只写 ASCII；
-;   - 一切本地化文案走 [Messages] / [CustomMessages] + CustomMessage()/ExpandConstant('{cm:…}')。
+// ⚠️ 编码红线：Inno 把编译后的 [Code] 以 AnsiString 交给卸载程序的 Pascal Script
+// 引擎（Setup.Uninstall.pas 的 ExtractCompiledCodeText），**非 ASCII 字符串字面量
+// 在卸载程序里会乱码**（已实测）。因此 [Code] 内：
+//   - 字符串字面量只写 ASCII；
+//   - 一切本地化文案走 [Messages] / [CustomMessages] + CustomMessage()/ExpandConstant('{cm:…}')。
+// 注意：[Code] 内只能用 Pascal 注释（// 或 { }），不能用 `;`。
 const
   AnimFrameCount = 24;
   AnimIntervalMs = 80;
