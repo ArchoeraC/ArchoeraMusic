@@ -142,10 +142,12 @@ Name: "menuicon"; Description: "{cm:CreateStartMenuIcon}"; GroupDescription: "{c
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
 
 [Files]
+; ⚠️ 顺序红线：dontcopy 的运行时提取文件必须排在**最前**。固态压缩（SolidCompression）
+; 下 ExtractTemporaryFiles 需先解压其前面的所有文件；若排在主负载之后，每次提取都会
+; 解压整包（~130MB）→ 安装卡死、UI 无响应。帧仅运行时提取，不落盘。
+Source: "brand\anim\*.png"; Flags: dontcopy noencryption
 ; 整个 Release 目录递归装入（exe / data / native / 插件 dll）
 Source: "{#AppDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
-; 安装页动态背景帧（aurora，浅/深两套；仅运行时 ExtractTemporaryFile 使用，不落盘）
-Source: "brand\anim\*.png"; Flags: dontcopy noencryption
 
 [Icons]
 ; 开始菜单目录内与桌面均为可选项（安装向导「附加任务」页勾选）。
@@ -339,11 +341,12 @@ var
   I: Integer;
   Name: String;
 begin
+  // 一次性提取全部帧（勿逐个 ExtractTemporaryFile：固态压缩下会重复解压）。
+  ExtractTemporaryFiles('*.png');
   SetLength(AnimFrames, AnimFrameCount);
   for I := 0 to AnimFrameCount - 1 do
   begin
     Name := Prefix + Format('%.2d.png', [I]);
-    ExtractTemporaryFile(Name);
     AnimFrames[I] := TPngImage.Create;
     AnimFrames[I].LoadFromFile(ExpandConstant('{tmp}\') + Name);
   end;
