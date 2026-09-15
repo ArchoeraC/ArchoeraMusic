@@ -152,35 +152,61 @@ void setAumid() {
     }
 }
 
-// 是否"安装版"：NSIS 安装器在 HKLM\...\Uninstall\ArchoeraMusic 写了卸载项
-// （与安装目录无关——用户可在安装器里自选路径）。便携版无此项 → 不创建快捷
-// 方式（无痕）。HKLM 读取普通用户即可，无需提权。
-bool isInstalled() {
+// 是否"安装版"（与安装目录无关，用户可自定义）：
+//   - Inno Setup（现行，per-user）在 HKCU\Software\ArchoeraMusic 写 InstallPath；
+//   - 旧 NSIS（HKLM\...\Uninstall\ArchoeraMusic）、旧 per-user 卸载项（HKCU 同名）。
+// 便携版无任何标记 → 不创建快捷方式（无痕）。读取 HKCU/HKLM 普通用户即可。
+bool regKeyExists(HKEY root, const wchar_t* sub) {
     HKEY key = nullptr;
-    const LSTATUS rc = ::RegOpenKeyExW(
-        HKEY_LOCAL_MACHINE,
-        L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ArchoeraMusic",
-        0, KEY_READ, &key);
+    const LSTATUS rc = ::RegOpenKeyExW(root, sub, 0, KEY_READ, &key);
     if (rc != ERROR_SUCCESS) return false;
     ::RegCloseKey(key);
     return true;
 }
 
+bool isInstalled() {
+    constexpr wchar_t kUninstall[] =
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ArchoeraMusic";
+    return regKeyExists(HKEY_CURRENT_USER, L"Software\\ArchoeraMusic") ||
+           regKeyExists(HKEY_CURRENT_USER, kUninstall) ||
+           regKeyExists(HKEY_LOCAL_MACHINE, kUninstall);
+}
+
+// 安装器按用户在向导里的选择写入的开始菜单快捷方式偏好（1=创建，0=不创建）。
+// 缺省/旧版安装无此值 → 按创建处理。用户禁用时不得为 Toast 悄悄重建。
+bool startMenuShortcutDisabled() {
+    HKEY key = nullptr;
+    if (::RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\ArchoeraMusic", 0, KEY_READ,
+                        &key) != ERROR_SUCCESS) {
+        return false;
+    }
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+    DWORD type = 0;
+    const LSTATUS rc = ::RegQueryValueExW(
+        key, L"StartMenuShortcut", nullptr, &type,
+        reinterpret_cast<LPBYTE>(&value), &size);
+    ::RegCloseKey(key);
+    return rc == ERROR_SUCCESS && type == REG_DWORD && value == 0;
+}
+
+// Toast 快捷方式必须与安装器建在**同一路径**，否则开始菜单会出现两份
+// （安装器一份、这里一份）。安装器建的那份不带 AUMID，这里就地升级它。
 void ensureToastShortcut() {
-    if (!isInstalled()) return;  // 便携版不落任何痕迹
+    if (!isInstalled()) return;              // 便携版不落任何痕迹
+    if (startMenuShortcutDisabled()) return;  // 用户未选择开始菜单快捷方式
 
     wchar_t appdata[MAX_PATH] = {0};
     if (::GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH) == 0) return;
-    wchar_t lnk[MAX_PATH];
+    wchar_t dir[MAX_PATH];
     if (std::swprintf(
-            lnk, MAX_PATH,
-            L"%s\\Microsoft\\Windows\\Start Menu\\Programs\\ArchoeraMusic.lnk",
+            dir, MAX_PATH,
+            L"%s\\Microsoft\\Windows\\Start Menu\\Programs\\ArchoeraMusic",
             appdata) <= 0) {
         return;
     }
-    if (::GetFileAttributesW(lnk) != INVALID_FILE_ATTRIBUTES) return;  // 已存在
-    wchar_t exe[MAX_PATH] = {0};
-    if (::GetModuleFileNameW(nullptr, exe, MAX_PATH) == 0) return;
+    wchar_t lnk[MAX_PATH];
+    if (std::swprintf(lnk, MAX_PATH, L"%s\\ArchoeraMusic.lnk", dir) <= 0) return;
 
     ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);  // 冲突/重复初始化忽略
     IShellLinkW* link = nullptr;
@@ -188,7 +214,44 @@ void ensureToastShortcut() {
                                   IID_PPV_ARGS(&link)))) {
         return;
     }
+
+    // 已存在且 AUMID 正确 → 不重写（避免每次启动触碰 .lnk）
+    IPersistFile* file = nullptr;
+    if (SUCCEEDED(link->QueryInterface(IID_PPV_ARGS(&file)))) {
+        if (SUCCEEDED(file->Load(lnk, STGM_READ))) {
+            IPropertyStore* store = nullptr;
+            if (SUCCEEDED(link->QueryInterface(IID_PPV_ARGS(&store)))) {
+                PROPVARIANT pv;
+                ::PropVariantInit(&pv);
+                const bool same =
+                    SUCCEEDED(store->GetValue(PKEY_AppUserModel_ID, &pv)) &&
+                    pv.vt == VT_LPWSTR && std::wcscmp(pv.pwszVal, kAumid) == 0;
+                ::PropVariantClear(&pv);
+                store->Release();
+                if (same) {
+                    file->Release();
+                    link->Release();
+                    return;
+                }
+            }
+        }
+        file->Release();
+    }
+
+    wchar_t exe[MAX_PATH] = {0};
+    if (::GetModuleFileNameW(nullptr, exe, MAX_PATH) == 0) {
+        link->Release();
+        return;
+    }
+
+    ::CreateDirectoryW(dir, nullptr);  // 安装器已建；缺了则补建
     link->SetPath(exe);
+    // 与安装器（Inno）默认一致：工作目录 = exe 所在目录
+    wchar_t workdir[MAX_PATH] = {0};
+    if (std::swprintf(workdir, MAX_PATH, L"%s", exe) > 0) {
+        if (wchar_t* slash = std::wcsrchr(workdir, L'\\')) *slash = L'\0';
+    }
+    link->SetWorkingDirectory(workdir);
     link->SetArguments(L"");
     IPropertyStore* store = nullptr;
     if (SUCCEEDED(link->QueryInterface(IID_PPV_ARGS(&store)))) {
@@ -199,7 +262,6 @@ void ensureToastShortcut() {
         ::PropVariantClear(&pv);
         store->Release();
     }
-    IPersistFile* file = nullptr;
     if (SUCCEEDED(link->QueryInterface(IID_PPV_ARGS(&file)))) {
         file->Save(lnk, TRUE);
         file->Release();
