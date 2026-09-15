@@ -63,6 +63,7 @@ extension _FavoritesPageActions on _FavoritesPageState {
                 CoverItem(
                   id: 'profile:favorites',
                   title: '我喜欢',
+                  cover: lib.likedCover.isEmpty ? null : lib.likedCover,
                   trackCount: lib.likedTotal,
                   source: 'qqmusic',
                 ),
