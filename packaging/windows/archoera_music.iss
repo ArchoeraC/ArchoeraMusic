@@ -55,9 +55,6 @@ WizardImageBackColorDynamicDark=#141218
 ; 右上角小图 = 应用图标（多尺寸适配 DPI）
 WizardSmallImageFile=brand\wizard-small-64.png,brand\wizard-small-128.png,brand\wizard-small-256.png
 WizardSmallImageFileDynamicDark=brand\wizard-small-64.png,brand\wizard-small-128.png,brand\wizard-small-256.png
-; 运行时换帧（WizardSetBackImage）需先激活自定义背景；透明底图本身不可见。
-WizardBackImageFile=brand\back-transparent.png
-WizardBackImageFileDynamicDark=brand\back-transparent.png
 
 ; ── 输出与压缩 ──
 OutputDir={#OutputDir}
@@ -142,10 +139,6 @@ Name: "menuicon"; Description: "{cm:CreateStartMenuIcon}"; GroupDescription: "{c
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
 
 [Files]
-; ⚠️ 顺序红线：dontcopy 的运行时提取文件必须排在**最前**。固态压缩（SolidCompression）
-; 下 ExtractTemporaryFiles 需先解压其前面的所有文件；若排在主负载之后，每次提取都会
-; 解压整包（~130MB）→ 安装卡死、UI 无响应。帧仅运行时提取，不落盘。
-Source: "brand\anim\*.png"; Flags: dontcopy noencryption
 ; 整个 Release 目录递归装入（exe / data / native / 插件 dll）
 Source: "{#AppDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
@@ -186,24 +179,8 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(
 //   - 字符串字面量只写 ASCII；
 //   - 一切本地化文案走 [Messages] / [CustomMessages] + CustomMessage()/ExpandConstant('{cm:…}')。
 // 注意：[Code] 内只能用 Pascal 注释（// 或 { }），不能用 `;`。
-const
-  AnimFrameCount = 90;
-  AnimIntervalMs = 42;
-
 var
   DiskFreeLabel: TNewStaticText;
-  AnimFrames: TArrayOfGraphic;
-  AnimFrameIndex: Integer;
-  AnimOne: TArrayOfGraphic;
-  AnimTimerID: Longword;
-  AnimCallback: Longword;
-
-{ SetTimer/KillTimer：Inno 的 [Code] 无内置定时器，用 user32 定时器 + CreateCallback
-  实现「时间驱动」的平滑动画（对齐 Inno 6.7 官方 Examples/CodeDll.iss，用 Longword）。 }
-function SetTimer(hWnd, nIDEvent, uElapse, lpTimerFunc: Longword): Longword;
-external 'SetTimer@user32.dll stdcall';
-function KillTimer(hWnd, nIDEvent: Longword): Bool;
-external 'KillTimer@user32.dll stdcall';
 
 function FormatSizeMB(const MB: Cardinal): String;
 begin
@@ -310,86 +287,6 @@ end;
 procedure CancelButtonClick(CurPageID: Integer; var Cancel, Confirm: Boolean);
 begin
   Confirm := True;
-end;
-
-{ ── 安装页动态背景（时间驱动换帧，似 QQ 安装器）──────────────────────
-  用 WizardSetBackImage 每 AnimIntervalMs 毫秒切换一帧（90 帧全幅 aurora，
-  约 3.8s 循环，≈24FPS）——整窗覆盖。
-  注：曾试过 TBitmapImage 叠加（只重绘该控件）但更糟——TGraphicControl 无缓冲
-  反而更闪、且只盖住 Installing 页（不全屏）、每帧 Assign 大图挤占安装 I/O；
-  故回退到 SetBackImage + 24FPS。 }
-procedure AnimTimerProc(Arg1, Arg2, Arg3, Arg4: Longword);
-begin
-  if Length(AnimFrames) = 0 then Exit;
-  AnimFrameIndex := (AnimFrameIndex + 1) mod Length(AnimFrames);
-  AnimOne[0] := AnimFrames[AnimFrameIndex];
-  WizardSetBackImage(AnimOne, True, True, 255);
-end;
-
-procedure AnimLoadFrames(const Prefix: String);
-var
-  I: Integer;
-  Name: String;
-begin
-  // 一次性提取全部帧（勿逐个 ExtractTemporaryFile：固态压缩下会重复解压）。
-  ExtractTemporaryFiles('*.png');
-  SetLength(AnimFrames, AnimFrameCount);
-  for I := 0 to AnimFrameCount - 1 do
-  begin
-    Name := Prefix + Format('%.2d.png', [I]);
-    AnimFrames[I] := TPngImage.Create;
-    AnimFrames[I].LoadFromFile(ExpandConstant('{tmp}\') + Name);
-  end;
-end;
-
-procedure AnimStart;
-begin
-  if WizardSilent then Exit;  // 静默安装无向导，跳过
-  // 浅/深两套 aurora 帧，按当前安装模式选择（动态深色在启动时已确定）。
-  if IsDarkInstallMode then
-    AnimLoadFrames('dark_')
-  else
-    AnimLoadFrames('light_');
-  SetLength(AnimOne, 1);
-  AnimFrameIndex := 0;
-  AnimOne[0] := AnimFrames[0];
-  WizardSetBackImage(AnimOne, True, True, 255);
-  AnimCallback := CreateCallback(@AnimTimerProc);
-  AnimTimerID := SetTimer(0, 0, AnimIntervalMs, AnimCallback);
-end;
-
-procedure AnimStop;
-var
-  I: Integer;
-begin
-  if AnimTimerID <> 0 then
-  begin
-    KillTimer(0, AnimTimerID);
-    AnimTimerID := 0;
-  end;
-  for I := 0 to Length(AnimFrames) - 1 do
-    if AnimFrames[I] <> nil then
-      AnimFrames[I].Free;
-  SetLength(AnimFrames, 0);
-  SetLength(AnimOne, 0);
-  AnimFrameIndex := -1;
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if CurStep = ssInstall then
-    AnimStart
-  else if CurStep = ssPostInstall then
-  begin
-    AnimStop;
-    if not WizardSilent then
-      WizardSetBackImage([], True, True, 255);
-  end;
-end;
-
-procedure DeinitializeSetup;
-begin
-  AnimStop;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
