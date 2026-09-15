@@ -57,8 +57,10 @@ ArchitecturesInstallIn64BitMode=x64compatible
 LicenseFile=EULA.txt
 
 [Languages]
+; 简体中文 .isl 随仓库分发（Inno Setup 6.4+ 官方安装包不再自带翻译文件）；
+; 相对路径按脚本所在目录解析（见 [Languages] MessagesFile 文档）。
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
 
 [CustomMessages]
 english.CreateStartMenuIcon=Create a &Start Menu shortcut
