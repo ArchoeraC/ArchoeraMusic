@@ -33,6 +33,8 @@ DefaultDirName={localappdata}\Programs\{#AppName}
 DefaultGroupName={#AppName}
 ; 现代 Windows 11 外观，并随系统浅色/深色自动切换（Inno 6.3+ dynamic 模式）。
 WizardStyle=modern windows11 dynamic
+; 显示品牌欢迎页（左侧品牌横幅）
+DisableWelcomePage=no
 ; 安装位置页始终显示，用户无需先选「自定义安装」即可改路径。
 DisableDirPage=no
 ; 开始菜单文件夹固定为 DefaultGroupName；是否创建交由「附加任务」勾选。
@@ -41,10 +43,18 @@ DisableProgramGroupPage=yes
 ; （Inno 的 native rollback；见 Setup.Install.pas「Rolling back changes」）。
 AllowCancelDuringInstall=yes
 
-; ── 外观 ──
+; ── 品牌外观 ──
 SetupIconFile=..\..\app\windows\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName}
+; 品牌横幅（欢迎页 / 完成页；浅 / 深两套，2x 供高 DPI）
+WizardImageFile=brand\wizard-large-light.png,brand\wizard-large-light@2x.png
+WizardImageFileDynamicDark=brand\wizard-large-dark.png,brand\wizard-large-dark@2x.png
+WizardImageBackColor=#F7F2FA
+WizardImageBackColorDynamicDark=#141218
+; 右上角小图 = 应用图标（多尺寸适配 DPI）
+WizardSmallImageFile=brand\wizard-small-64.png,brand\wizard-small-128.png,brand\wizard-small-256.png
+WizardSmallImageFileDynamicDark=brand\wizard-small-64.png,brand\wizard-small-128.png,brand\wizard-small-256.png
 
 ; ── 输出与压缩 ──
 OutputDir={#OutputDir}
@@ -62,6 +72,12 @@ LicenseFile=EULA.txt
 ; 相对路径按脚本所在目录解析（见 [Languages] MessagesFile 文档）。
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
+
+[Messages]
+english.WelcomeLabel1=Welcome to [name] Setup
+english.WelcomeLabel2=This will install [name/ver] on your computer.%n%nIt is recommended that you close all other applications before continuing.
+chinesesimp.WelcomeLabel1=欢迎安装 [name]
+chinesesimp.WelcomeLabel2=即将在你的电脑上安装 [name/ver]。%n%n建议先关闭其他正在运行的程序，然后继续。
 
 [CustomMessages]
 english.CreateStartMenuIcon=Create a &Start Menu shortcut
