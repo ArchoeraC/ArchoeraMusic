@@ -47,6 +47,13 @@ cmake --build app/native/platform/build -j
   程序**不得要求管理员/root 权限**：不请求 UAC 提权、不写 `HKLM`/系统目录/需提权的位置、
   不安装服务或驱动、不注册需提权的系统资源。需要提权才能实现的能力**放弃或降级**，
   不做"请以管理员身份运行"的设计（否则一律视为不符合规范）。
+  - **唯一例外：Windows 安装向导（`packaging/windows/archoera_music.iss`）的可选
+    per-machine 模式**。向导可提供「仅为我安装（默认 `%LOCALAPPDATA%\Programs`，全程免提权）」
+    与「为所有用户安装（默认 `Program Files`，需用户在向导内显式选择并经 UAC 提权）」两种模式，
+    **默认必须是 per-user 免提权**。提权只允许发生在安装/卸载向导内且由用户显式确认；
+    更新旧版时必须沿用其原有安装模式，模式不一致时以失败退出。
+  - 上述例外**不适用于应用运行时**：`app/` 与 `app/native/platform` 仍一律不得请求提权，
+    也不得写 `HKLM`/系统目录（per-machine 的 `HKLM` 写入只能由向导在提权后完成）。
 - **新增能力流程**：`include/archoera_platform.h` 扩 ABI → `core.*` / `backend.h` 加契约 →
   三端后端各实现（`backend_windows.cpp` / `backend_linux.cpp` / `backend_macos.mm`；
   未覆盖平台落 `backend_stub.cpp`）→ Dart 绑定（`app/lib/services/platform/`）→
