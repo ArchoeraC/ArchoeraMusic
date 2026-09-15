@@ -4,6 +4,16 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [0.9.17+3] - 2026-09-15
+
+再补一个小修喵：
+
+1、修 CI：GitHub 把 Node 20 的 action 强制跑在 Node 24 上，`actions/download-artifact@v4` 直接 403（Failed to ListArtifacts），Flatpak 与 Release 作业全挂；现在上传 / 下载 artifact 的 action 升到原生 Node 24 版本（upload v6 / download v7），不再被强转喵
+
+（0.9.17+1 / +2 因为打包问题没发出去，直接以 +3 顶上；用户可见内容同 +1——Windows 安装器改用 Inno Setup、开始菜单 / 桌面快捷方式可选、安装前显示用户协议与磁盘总览）
+
+我喜欢你！
+
 ## [0.9.17+2] - 2026-09-15
 
 补一个小修喵：
