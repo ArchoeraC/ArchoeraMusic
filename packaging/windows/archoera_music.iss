@@ -193,14 +193,14 @@ var
   AnimFrames: TArrayOfGraphic;
   AnimFrameIndex: Integer;
   AnimOne: TArrayOfGraphic;
-  AnimTimerID: UINT_PTR;
-  AnimCallback: NativeInt;
+  AnimTimerID: Longword;
+  AnimCallback: Longword;
 
 { SetTimer/KillTimer：Inno 的 [Code] 无内置定时器，用 user32 定时器 + CreateCallback
-  实现「时间驱动」的平滑动画（对齐 Inno 官方 Examples/CodeDll.iss）。 }
-function SetTimer(hWnd: HWND; nIDEvent: UINT_PTR; uElapse: UINT; lpTimerFunc: NativeInt): UINT_PTR;
+  实现「时间驱动」的平滑动画（对齐 Inno 6.7 官方 Examples/CodeDll.iss，用 Longword）。 }
+function SetTimer(hWnd, nIDEvent, uElapse, lpTimerFunc: Longword): Longword;
 external 'SetTimer@user32.dll stdcall';
-function KillTimer(hWnd: HWND; nIDEvent: UINT_PTR): BOOL;
+function KillTimer(hWnd, nIDEvent: Longword): Bool;
 external 'KillTimer@user32.dll stdcall';
 
 function FormatSizeMB(const MB: Cardinal): String;
@@ -313,7 +313,7 @@ end;
 { ── 安装页动态背景（时间驱动换帧，似 QQ 安装器）──────────────────────
   用 SetTimer 每 AnimIntervalMs 毫秒切换一帧（24 帧透明 PNG 循环），比「按
   安装进度换帧」平滑得多，且与提取速度无关；帧为透明 PNG，叠在页面背景上。 }
-procedure AnimTimerProc(Arg1: HWND; Arg2: UINT; Arg3: UINT_PTR; Arg4: DWORD);
+procedure AnimTimerProc(Arg1, Arg2, Arg3, Arg4: Longword);
 begin
   if Length(AnimFrames) = 0 then Exit;
   AnimFrameIndex := (AnimFrameIndex + 1) mod Length(AnimFrames);
