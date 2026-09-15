@@ -250,7 +250,7 @@ jobs:
 
       - name: Upload Windows build logs (排查用)
         if: matrix.os == 'windows' && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-build-logs
           path: |
@@ -372,7 +372,7 @@ jobs:
 
       - name: Upload artifact (macOS .app)
         if: matrix.os == 'macos'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-macos-arm64
           path: app/build/macos/Build/Products/Release/archoera_music.app
@@ -380,7 +380,7 @@ jobs:
 
       - name: Upload artifact (Windows runner Release)
         if: matrix.os == 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-windows-x64
           path: app/build/windows/x64/runner/Release
@@ -388,7 +388,7 @@ jobs:
 
       - name: Upload artifact (Windows installer + portable)
         if: matrix.os == 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-windows-extra
           path: build/windows-extra/*
@@ -438,13 +438,13 @@ jobs:
         env:
           DISTRO_TAG: ubuntu24.04
       - name: Upload bundle artifact (原始 bundle)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-x64
           path: app/build/linux/x64/release/bundle
           if-no-files-found: error
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-deb
           path: dist/linux/*
@@ -495,7 +495,7 @@ jobs:
           DISTRO_TAG: deepin25
           DISTRO_NOTE: 仅 Deepin 25（glibc 2.38）；其它发行版请安装对应包
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-deepin
           path: dist/linux/*
@@ -538,7 +538,7 @@ jobs:
         env:
           DISTRO_TAG: fedora
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-rpm
           path: dist/linux/*
@@ -590,7 +590,7 @@ jobs:
             "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-arch-x86_64.pkg.tar.zst"
           echo "→ dist/linux/"*.pkg.tar.zst
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-arch
           path: dist/linux/*
@@ -612,7 +612,7 @@ jobs:
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
       - name: Download bundle artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ArchoeraMusic-linux-x64
           path: bundle
@@ -649,7 +649,7 @@ jobs:
           LINUXDEPLOY: /tmp/linuxdeploy.AppImage
           APPIMAGE_EXTRACT_AND_RUN: '1'
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-appimage
           path: dist/linux/*.AppImage
@@ -669,7 +669,7 @@ jobs:
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
       - name: Download bundle artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ArchoeraMusic-linux-x64
           path: bundle
@@ -688,7 +688,7 @@ jobs:
         env:
           DISTRO_TAG: flatpak
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-flatpak
           path: dist/linux/*.flatpak
@@ -722,7 +722,7 @@ jobs:
           tar -czf "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz" -C result .
           ls -la dist/linux/*nixos*.tar.gz
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-nix
           path: dist/linux/*nixos*.tar.gz
@@ -750,10 +750,10 @@ jobs:
       actions: read
     steps:
       - name: Checkout (签名工具 + 公钥)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download all platform build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
 
