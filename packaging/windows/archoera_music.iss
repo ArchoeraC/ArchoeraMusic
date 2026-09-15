@@ -192,7 +192,7 @@ var
   DiskFreeLabel: TNewStaticText;
   AnimFrames: TArrayOfGraphic;
   AnimFrameIndex: Integer;
-  AnimOne: TArrayOfGraphic;
+  AnimImage: TBitmapImage;
   AnimTimerID: Longword;
   AnimCallback: Longword;
 
@@ -269,6 +269,13 @@ begin
   DiskFreeLabel.AutoSize := True;
   DiskFreeLabel.Caption := '';
   WizardForm.DirEdit.OnChange := @DirEditChanged;
+
+  // 安装页动态背景控件（垫底、铺满 Installing 页；帧在 ssInstall 时载入）
+  AnimImage := TBitmapImage.Create(WizardForm);
+  AnimImage.Parent := WizardForm.InstallingPage;
+  AnimImage.Stretch := True;
+  AnimImage.Visible := False;
+  AnimImage.SendToBack;
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
@@ -310,15 +317,21 @@ begin
   Confirm := True;
 end;
 
-{ ── 安装页动态背景（时间驱动换帧，似 QQ 安装器）──────────────────────
-  用 SetTimer 每 AnimIntervalMs 毫秒切换一帧（90 帧全幅 aurora，约 3s 循环），
-  与提取速度无关；浅/深两套整帧铺满页面（不透明渐变 + 光晕）。 }
+{ ── 安装页动态背景（控件叠加 + 时间驱动换帧，似 QQ 安装器）──────────────
+  在 Installing 页放一个铺满的 TBitmapImage（SendToBack 垫底），定时器每
+  AnimIntervalMs 毫秒 Assign 下一帧（90 帧全幅 aurora，约 3s 循环）。
+  相比 WizardSetBackImage（内部 RDW_ERASE|RDW_ALLCHILDREN 会整窗擦除并重绘
+  所有子控件 → 切帧闪烁），控件叠加只重绘该控件本身，闪烁明显更少。 }
 procedure AnimTimerProc(Arg1, Arg2, Arg3, Arg4: Longword);
 begin
-  if Length(AnimFrames) = 0 then Exit;
-  AnimFrameIndex := (AnimFrameIndex + 1) mod Length(AnimFrames);
-  AnimOne[0] := AnimFrames[AnimFrameIndex];
-  WizardSetBackImage(AnimOne, True, True, 255);
+  try
+    if Length(AnimFrames) = 0 then Exit;
+    AnimFrameIndex := (AnimFrameIndex + 1) mod Length(AnimFrames);
+    AnimImage.PngImage.Assign(AnimFrames[AnimFrameIndex]);
+    AnimImage.Invalidate;
+  except
+    { 回调内异常不得冒泡打断安装 }
+  end;
 end;
 
 procedure AnimLoadFrames(const Prefix: String);
@@ -344,10 +357,15 @@ begin
     AnimLoadFrames('dark_')
   else
     AnimLoadFrames('light_');
-  SetLength(AnimOne, 1);
   AnimFrameIndex := 0;
-  AnimOne[0] := AnimFrames[0];
-  WizardSetBackImage(AnimOne, True, True, 255);
+  AnimImage.Left := 0;
+  AnimImage.Top := 0;
+  AnimImage.Width := WizardForm.InstallingPage.Width;
+  AnimImage.Height := WizardForm.InstallingPage.Height;
+  AnimImage.PngImage.Assign(AnimFrames[0]);
+  AnimImage.Invalidate;
+  AnimImage.SendToBack;
+  AnimImage.Visible := True;
   AnimCallback := CreateCallback(@AnimTimerProc);
   AnimTimerID := SetTimer(0, 0, AnimIntervalMs, AnimCallback);
 end;
@@ -361,11 +379,12 @@ begin
     KillTimer(0, AnimTimerID);
     AnimTimerID := 0;
   end;
+  if AnimImage <> nil then
+    AnimImage.Visible := False;
   for I := 0 to Length(AnimFrames) - 1 do
     if AnimFrames[I] <> nil then
       AnimFrames[I].Free;
   SetLength(AnimFrames, 0);
-  SetLength(AnimOne, 0);
   AnimFrameIndex := -1;
 end;
 
@@ -374,11 +393,7 @@ begin
   if CurStep = ssInstall then
     AnimStart
   else if CurStep = ssPostInstall then
-  begin
     AnimStop;
-    if not WizardSilent then
-      WizardSetBackImage([], True, True, 255);
-  end;
 end;
 
 procedure DeinitializeSetup;
