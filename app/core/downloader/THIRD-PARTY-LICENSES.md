@@ -50,12 +50,11 @@
 | AES/MD5/RSA/PKCS7/BigInt 等加密原语 | ❌ **绝对不自研** | 使用 Rust Crypto 官方维护 crate；自研出 padding oracle / timing attack 漏洞得不偿失 |
 | HTTP chunk download / tmp rename | ⚠️ 半自研 | 默认 `stream-download`；或自研 AGPL chunk loop |
 
-## 原生解密算法参考（NCM / QMC / CENC）
+## 原生解密算法参考（NCM / QMC）
 
-`src/decrypt.rs` 的加密容器解密（网易 NCM、QQ QMC 静态掩码、汽水 CENC/AES-CTR +
-Spade PlayAuth 派生 key）由本项目**自行在 Rust 重写**，参考 `music-lib`
-（`github.com/guohuiyuan/music-lib`，**AGPL-3.0**）的 Go 实现
-（`netease/crypto.go` / `qq/crypto.go` / `soda/crypto.go`）。**未复制**任何
+`src/decrypt.rs` 的加密容器解密（网易 NCM、QQ QMC 静态掩码）由本项目**自行在 Rust 重写**，
+参考 `music-lib`（`github.com/guohuiyuan/music-lib`，**AGPL-3.0**）的 Go 实现
+（`netease/crypto.go` / `qq/crypto.go`）。**未复制**任何
 无许可证项目（baka-plugins）的代码；加密原语仍由 Rust Crypto 官方 crate 提供。
 仅用于格式互操作（解密用户本机已获得的容器），不绕过付费墙/会员。
 
