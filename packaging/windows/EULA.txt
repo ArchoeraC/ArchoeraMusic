@@ -33,8 +33,6 @@
 
 本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。
 
-----------------------------------------------------------------------
-
 English Notice
 
 ArchoeraMusic is free software licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). It is a third-party, open-source client with no affiliation, cooperation or authorization relationship with any music platform. It neither provides, stores nor distributes any music content; all content comes from your local files or public platform interfaces and remains the property of the respective rights holders.
