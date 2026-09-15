@@ -47,8 +47,7 @@ QmModule qmLeaderboard = (params) async {
     'title': data['title'] ?? '',
     'subTitle': data['titleDetail'] ?? '',
     'updateTime': data['updateTime'] ?? '',
-    'cover': data['headPicUrl'] ?? '',
+    'cover': qmNormalizeCover(data['headPicUrl']?.toString()),
     'songs': songs,
   };
 };
-
