@@ -55,8 +55,10 @@ class CoverImage extends StatelessWidget {
       child: Icon(EtaIcons.music, size: iconSize, color: scheme.primary),
     );
 
-    final c = cover;
+    var c = cover;
     if (c == null || c.isEmpty) return placeholder;
+    // 协议相对 URL（QQ 等 CDN 常见）补 https，避免被下方判成“本地文件”而显示占位。
+    if (c.startsWith('//')) c = 'https:$c';
 
     // 解码降采样：按显示尺寸 × dpr 解码，避免大图整幅解码后缩小的内存浪费
     // （封面原图常为 500~1000px，小尺寸展示时解码开销可降 90%+）。

@@ -55,6 +55,9 @@ WizardImageBackColorDynamicDark=#141218
 ; 右上角小图 = 应用图标（多尺寸适配 DPI）
 WizardSmallImageFile=brand\wizard-small-64.png,brand\wizard-small-128.png,brand\wizard-small-256.png
 WizardSmallImageFileDynamicDark=brand\wizard-small-64.png,brand\wizard-small-128.png,brand\wizard-small-256.png
+; 运行时换帧（WizardSetBackImage）需先激活自定义背景；透明底图本身不可见。
+WizardBackImageFile=brand\back-transparent.png
+WizardBackImageFileDynamicDark=brand\back-transparent.png
 
 ; ── 输出与压缩 ──
 OutputDir={#OutputDir}
@@ -68,24 +71,71 @@ ArchitecturesInstallIn64BitMode=x64compatible
 LicenseFile=EULA.txt
 
 [Languages]
-; 简体中文 .isl 随仓库分发（Inno Setup 6.4+ 官方安装包不再自带翻译文件）；
+; Inno Setup 6.4+ 官方安装包不再自带翻译文件，各语言 .isl 随仓库分发；
 ; 相对路径按脚本所在目录解析（见 [Languages] MessagesFile 文档）。
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
+Name: "chinesetrad"; MessagesFile: "ChineseTraditional.isl"
+Name: "german"; MessagesFile: "German.isl"
+Name: "spanish"; MessagesFile: "Spanish.isl"
+Name: "french"; MessagesFile: "French.isl"
+Name: "japanese"; MessagesFile: "Japanese.isl"
+Name: "korean"; MessagesFile: "Korean.isl"
 
 [Messages]
 english.WelcomeLabel1=Welcome to [name] Setup
 english.WelcomeLabel2=This will install [name/ver] on your computer.%n%nIt is recommended that you close all other applications before continuing.
 chinesesimp.WelcomeLabel1=欢迎安装 [name]
 chinesesimp.WelcomeLabel2=即将在你的电脑上安装 [name/ver]。%n%n建议先关闭其他正在运行的程序，然后继续。
+chinesetrad.WelcomeLabel1=歡迎安裝 [name]
+chinesetrad.WelcomeLabel2=即將在您的電腦上安裝 [name/ver]。%n%n建議先關閉其他正在執行的程式，然後繼續。
+german.WelcomeLabel1=Willkommen beim Setup von [name]
+german.WelcomeLabel2=Auf Ihrem Computer wird jetzt [name/ver] installiert.%n%nBitte schließen Sie alle anderen Anwendungen, bevor Sie fortfahren.
+spanish.WelcomeLabel1=Bienvenido a la instalación de [name]
+spanish.WelcomeLabel2=Se instalará [name/ver] en su equipo.%n%nSe recomienda cerrar el resto de aplicaciones antes de continuar.
+french.WelcomeLabel1=Bienvenue dans l'installation de [name]
+french.WelcomeLabel2=Cette installation va installer [name/ver] sur votre ordinateur.%n%nIl est recommandé de fermer les autres applications avant de continuer.
+japanese.WelcomeLabel1=[name] セットアップへようこそ
+japanese.WelcomeLabel2=[name/ver] をコンピューターにインストールします。%n%n続行する前に、他のアプリケーションをすべて終了することをお勧めします。
+korean.WelcomeLabel1=[name] 설치에 오신 것을 환영합니다
+korean.WelcomeLabel2=컴퓨터에 [name/ver]을(를) 설치합니다.%n%n계속하기 전에 다른 모든 응용 프로그램을 닫는 것이 좋습니다.
 
 [CustomMessages]
 english.CreateStartMenuIcon=Create a &Start Menu shortcut
 chinesesimp.CreateStartMenuIcon=创建开始菜单快捷方式
+chinesetrad.CreateStartMenuIcon=建立開始功能表捷徑
+german.CreateStartMenuIcon=Eine &Startmenü-Verknüpfung erstellen
+spanish.CreateStartMenuIcon=Crear un acceso directo en el &menú Inicio
+french.CreateStartMenuIcon=Créer un raccourci dans le &menu Démarrer
+japanese.CreateStartMenuIcon=スタートメニューのショートカットを作成(&S)
+korean.CreateStartMenuIcon=시작 메뉴 바로 가기 만들기(&S)
+
 english.DiskSpaceHeader=Disk space
 chinesesimp.DiskSpaceHeader=磁盘空间
+chinesetrad.DiskSpaceHeader=磁碟空間
+german.DiskSpaceHeader=Speicherplatz
+spanish.DiskSpaceHeader=Espacio en disco
+french.DiskSpaceHeader=Espace disque
+japanese.DiskSpaceHeader=ディスク容量
+korean.DiskSpaceHeader=디스크 공간
+
 english.DiskSpaceFree=Available at destination: %1
 chinesesimp.DiskSpaceFree=目标位置可用：%1
+chinesetrad.DiskSpaceFree=目標位置可用：%1
+german.DiskSpaceFree=Verfügbar am Zielort: %1
+spanish.DiskSpaceFree=Disponible en el destino: %1
+french.DiskSpaceFree=Disponible à destination : %1
+japanese.DiskSpaceFree=インストール先の空き容量: %1
+korean.DiskSpaceFree=설치 위치의 사용 가능 공간: %1
+
+english.UninstallDeleteUserData=Delete user data (settings, cache, download index)?%n%n%1
+chinesesimp.UninstallDeleteUserData=是否删除用户数据（设置、缓存、下载索引）？%n%n%1
+chinesetrad.UninstallDeleteUserData=是否刪除使用者資料（設定、快取、下載索引）？%n%n%1
+german.UninstallDeleteUserData=Benutzerdaten löschen (Einstellungen, Cache, Download-Index)?%n%n%1
+spanish.UninstallDeleteUserData=¿Eliminar los datos de usuario (ajustes, caché, índice de descargas)?%n%n%1
+french.UninstallDeleteUserData=Supprimer les données utilisateur (paramètres, cache, index de téléchargement) ?%n%n%1
+japanese.UninstallDeleteUserData=ユーザーデータ（設定・キャッシュ・ダウンロード索引）を削除しますか？%n%n%1
+korean.UninstallDeleteUserData=사용자 데이터(설정, 캐시, 다운로드 인덱스)를 삭제할까요?%n%n%1
 
 [Tasks]
 Name: "menuicon"; Description: "{cm:CreateStartMenuIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
@@ -94,6 +144,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 ; 整个 Release 目录递归装入（exe / data / native / 插件 dll）
 Source: "{#AppDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; 安装页动态背景帧（aurora，浅/深两套；仅运行时 ExtractTemporaryFile 使用，不落盘）
+Source: "brand\anim\*.png"; Flags: dontcopy noencryption
 
 [Icons]
 ; 开始菜单目录内与桌面均为可选项（安装向导「附加任务」页勾选）。
@@ -113,12 +165,42 @@ Root: HKCU; Subkey: "Software\{#AppName}"; ValueType: dword; ValueName: "StartMe
 ; 旧版在开始菜单 Programs 根下留的散装快捷方式（与新的目录内快捷方式重复），清理掉。
 Type: files; Name: "{autoprograms}\{#AppName}.lnk"
 
+[UninstallDelete]
+; 快捷方式兜底：应用会就地重写开始菜单 .lnk（补 AUMID），可能不在 Inno 的
+; [Icons] 记录里，故卸载时按固定路径再清一遍（桌面 + 开始菜单目录内）。
+; （散装 `{autoprograms}\ArchoeraMusic.lnk` 已在安装时由 [InstallDelete] 清理，
+;   新版安装器不再产生，无需在卸载阶段处理。）
+Type: files; Name: "{autoprograms}\{#AppName}\{#AppName}.lnk"
+Type: files; Name: "{autodesktop}\{#AppName}.lnk"
+Type: dirifempty; Name: "{autoprograms}\{#AppName}"
+
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(AppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+; ⚠️ 编码红线：Inno 把编译后的 [Code] 以 AnsiString 交给卸载程序的 Pascal Script
+; 引擎（Setup.Uninstall.pas 的 ExtractCompiledCodeText），**非 ASCII 字符串字面量
+; 在卸载程序里会乱码**（已实测）。因此 [Code] 内：
+;   - 字符串字面量只写 ASCII；
+;   - 一切本地化文案走 [Messages] / [CustomMessages] + CustomMessage()/ExpandConstant('{cm:…}')。
+const
+  AnimFrameCount = 24;
+  AnimIntervalMs = 80;
+
 var
   DiskFreeLabel: TNewStaticText;
+  AnimFrames: TArrayOfGraphic;
+  AnimFrameIndex: Integer;
+  AnimOne: TArrayOfGraphic;
+  AnimTimerID: UINT_PTR;
+  AnimCallback: NativeInt;
+
+{ SetTimer/KillTimer：Inno 的 [Code] 无内置定时器，用 user32 定时器 + CreateCallback
+  实现「时间驱动」的平滑动画（对齐 Inno 官方 Examples/CodeDll.iss）。 }
+function SetTimer(hWnd: HWND; nIDEvent: UINT_PTR; uElapse: UINT; lpTimerFunc: NativeInt): UINT_PTR;
+external 'SetTimer@user32.dll stdcall';
+function KillTimer(hWnd: HWND; nIDEvent: UINT_PTR): BOOL;
+external 'KillTimer@user32.dll stdcall';
 
 function FormatSizeMB(const MB: Cardinal): String;
 begin
@@ -227,16 +309,96 @@ begin
   Confirm := True;
 end;
 
+{ ── 安装页动态背景（时间驱动换帧，似 QQ 安装器）──────────────────────
+  用 SetTimer 每 AnimIntervalMs 毫秒切换一帧（24 帧透明 PNG 循环），比「按
+  安装进度换帧」平滑得多，且与提取速度无关；帧为透明 PNG，叠在页面背景上。 }
+procedure AnimTimerProc(Arg1: HWND; Arg2: UINT; Arg3: UINT_PTR; Arg4: DWORD);
+begin
+  if Length(AnimFrames) = 0 then Exit;
+  AnimFrameIndex := (AnimFrameIndex + 1) mod Length(AnimFrames);
+  AnimOne[0] := AnimFrames[AnimFrameIndex];
+  WizardSetBackImage(AnimOne, True, True, 255);
+end;
+
+procedure AnimLoadFrames(const Prefix: String);
+var
+  I: Integer;
+  Name: String;
+begin
+  SetLength(AnimFrames, AnimFrameCount);
+  for I := 0 to AnimFrameCount - 1 do
+  begin
+    Name := Prefix + Format('%.2d.png', [I]);
+    ExtractTemporaryFile(Name);
+    AnimFrames[I] := TPngImage.Create;
+    AnimFrames[I].LoadFromFile(ExpandConstant('{tmp}\') + Name);
+  end;
+end;
+
+procedure AnimStart;
+begin
+  if WizardSilent then Exit;  // 静默安装无向导，跳过
+  // 浅/深两套 aurora 帧，按当前安装模式选择（动态深色在启动时已确定）。
+  if IsDarkInstallMode then
+    AnimLoadFrames('dark_')
+  else
+    AnimLoadFrames('light_');
+  SetLength(AnimOne, 1);
+  AnimFrameIndex := 0;
+  AnimOne[0] := AnimFrames[0];
+  WizardSetBackImage(AnimOne, True, True, 255);
+  AnimCallback := CreateCallback(@AnimTimerProc);
+  AnimTimerID := SetTimer(0, 0, AnimIntervalMs, AnimCallback);
+end;
+
+procedure AnimStop;
+var
+  I: Integer;
+begin
+  if AnimTimerID <> 0 then
+  begin
+    KillTimer(0, AnimTimerID);
+    AnimTimerID := 0;
+  end;
+  for I := 0 to Length(AnimFrames) - 1 do
+    if AnimFrames[I] <> nil then
+      AnimFrames[I].Free;
+  SetLength(AnimFrames, 0);
+  SetLength(AnimOne, 0);
+  AnimFrameIndex := -1;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+    AnimStart
+  else if CurStep = ssPostInstall then
+  begin
+    AnimStop;
+    if not WizardSilent then
+      WizardSetBackImage([], True, True, 255);
+  end;
+end;
+
+procedure DeinitializeSetup;
+begin
+  AnimStop;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   DataDir: String;
+  Prompt: String;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
+    { 用户数据目录：%LOCALAPPDATA%\ArchoeraMusic（与 app 的 data_dir 一致）}
     DataDir := ExpandConstant('{localappdata}\{#AppName}');
     if DirExists(DataDir) then
-      if MsgBox('是否删除用户数据（设置、缓存、下载索引）？' + #13#10 + #13#10 + DataDir,
-                mbConfirmation, MB_YESNO or MB_DEFBUTTON1) = IDYES then
+    begin
+      Prompt := FmtMessage(CustomMessage('UninstallDeleteUserData'), [DataDir]);
+      if MsgBox(Prompt, mbConfirmation, MB_YESNO or MB_DEFBUTTON1) = IDYES then
         DelTree(DataDir, True, True, True);
+    end;
   end;
 end;
