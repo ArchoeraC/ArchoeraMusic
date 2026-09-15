@@ -185,8 +185,8 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(
 //   - 一切本地化文案走 [Messages] / [CustomMessages] + CustomMessage()/ExpandConstant('{cm:…}')。
 // 注意：[Code] 内只能用 Pascal 注释（// 或 { }），不能用 `;`。
 const
-  AnimFrameCount = 24;
-  AnimIntervalMs = 80;
+  AnimFrameCount = 90;
+  AnimIntervalMs = 33;
 
 var
   DiskFreeLabel: TNewStaticText;
@@ -311,8 +311,8 @@ begin
 end;
 
 { ── 安装页动态背景（时间驱动换帧，似 QQ 安装器）──────────────────────
-  用 SetTimer 每 AnimIntervalMs 毫秒切换一帧（24 帧透明 PNG 循环），比「按
-  安装进度换帧」平滑得多，且与提取速度无关；帧为透明 PNG，叠在页面背景上。 }
+  用 SetTimer 每 AnimIntervalMs 毫秒切换一帧（90 帧全幅 aurora，约 3s 循环），
+  与提取速度无关；浅/深两套整帧铺满页面（不透明渐变 + 光晕）。 }
 procedure AnimTimerProc(Arg1, Arg2, Arg3, Arg4: Longword);
 begin
   if Length(AnimFrames) = 0 then Exit;
