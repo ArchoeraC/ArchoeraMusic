@@ -71,6 +71,9 @@
 >   `git clone --depth 1 --filter=blob:none --sparse https://github.com/google/skia.git && git -C skia sparse-checkout set src include`；
 >   WebRender 从 `raw.githubusercontent.com/mozilla-firefox/firefox/main/gfx/wr/webrender/` 按文件拉取。
 >   （Firefox/Chromium 全量仓库过大，故用 sparse/定向拉取。）
+>
+> **注意**：以上仅作**机制参考**——我们的实现边界只有「Dart」与「既有 FFI 桥接」两处，
+> 见 §4.0；不引入这些框架的运行时，也不改 Impeller/Skia/引擎。
 
 ### 3.1 Chromium / Electron（`cc` 合成器，源码精读）
 
@@ -382,6 +385,47 @@
 
 ## 4. 我们的方案
 
+### 4.0 实现边界与模块归属（硬约束）
+
+> **约束（用户 2026-09-16）**：UI 是 Dart 写的——**所有优化必须在 Dart 或既有 FFI 桥接层实现**，
+> 并**保证架构模块化**。§3 的跨框架机制只作**参考**，不引入其运行时/依赖。
+
+**可落点（只有两处）**
+1. **Dart 层**：Flutter widget / `CustomPainter` / `dart:ui`（`Picture`、`Image`、`ImageFilter`、
+   `FragmentProgram`、`Canvas`）/ Riverpod / `SchedulerBinding`。
+2. **既有 FFI 桥接**：`app/native/platform`（`include/archoera_platform.h` 的 `apl_*` C ABI，
+   三端后端 + `backend_stub.cpp`）。**仅**用于「系统能力」类需求（如 GPU/显示器信息、窗口状态），
+   且按 `AGENTS.md` 流程扩 ABI；**不得**在 Dart 直调平台 API、不得 `Process.run`/MethodChannel。
+
+**机制 → 实现层映射（对照 §3，避免「抄了个跑不起来」）**
+
+| §3 机制 | 能否在 Dart 实现 | 实现手段 |
+|---|---|---|
+| 图层隔离 / 缓存 | ✅ | `RepaintBoundary`、`TickerMode`、`Offstage`、`Visibility` |
+| 静态层预烘焙（模糊封面+压暗） | ✅ | `PictureRecorder` + `Picture.toImageSync` / `ImageFilter` / `ColorFilter` → `ui.Image` |
+| 动态层低分辨率离屏 + 放大 | ✅ | 小尺寸 `PictureRecorder` → `toImageSync` → `Canvas.drawImageRect` |
+| 折射 / 高光 / 压暗逐像素 | ✅ | `FragmentProgram`（`app/shaders/*.frag`）+ `CustomPainter` |
+| 缓存预算 / LRU 驱逐 | ✅ | `PaintingBinding.instance.imageCache`（`maximumSizeBytes`）+ 自研有界 LRU |
+| 自适应画质档位 | ✅ | `SchedulerBinding.addTimingsCallback` 滑窗 → 档位（复用 `FrameGovernor`） |
+| 页面/模块生命周期 | ✅ | go_router 分支 + Riverpod；原生模块走既有注册表规划 |
+| **驱动 Impeller/Skia 的 pass 合并 / 渲染目标部分更新 / tile 栅格** | ❌ | 无公开 API——只能用**层隔离 + 局部绘制**近似 |
+| **多进程 GPU 模型 / 自写 GPU 后端 / fork 引擎** | ❌ | 明确放弃（见 §7） |
+
+**模块化（单一职责、避免巨型文件）**
+- `app/lib/widgets/player/background/`：拆 `player_background.dart`（档位选择）、
+  `blurred_cover.dart`、`ripple_static_layer.dart`、`ripple_dynamic_layer.dart`、`ripple_shader.dart`
+  （现 `ripple_background.dart` 单文件 687 行，应拆）。
+- `app/lib/services/render/`：`layer_budget.dart`（图片/层缓存上限）、
+  `quality_governor.dart`（帧时间→档位）、`damage_region.dart`（纯 Dart 脏区聚合）。
+- `app/lib/services/lifecycle/`：`branch_lifecycle.dart`（分支卸载/重建）。
+- `app/lib/services/native_module_registry.dart`：沿用 `module-on-demand-load-plan.md`。
+- **共享 vs 平台**：跨平台逻辑放 Dart 共享层；平台特有逻辑放桥接各后端文件；
+  桥接仍按官方工具链原生编译（不引入 Zig 承载）。
+
+**验收（架构向）**：`dart analyze lib` 0 issue；**本方案新增代码**不引入 MethodChannel /
+`Process.run`（既有 `window_manager` 等按桥接迁移路线另行收敛）；新增效果逻辑可单测
+（纯 Dart 脏区/预算/档位算法）；单文件职责清晰、可独立测试与回退。
+
 ### 4.1 GPU 主线 — 背景（最高优先）
 
 **目标形态：静态/动态分离 + 损伤区绘制 + 降分辨率。**
@@ -482,16 +526,18 @@
 
 ## 5. 分期（可验收）
 
-| 阶段 | 内容 | 验收 |
-|---|---|---|
-| **R0** | profile 基线：全屏 2K/4K，记录 UI/raster 帧时间 + GPU 占用（iGPU 与 llvmpipe） | 基线与瓶颈归属报告 |
-| **R1** | 背景**静态层缓存** + **动态层损伤区** + 降分辨率（§4.1） | iGPU 全屏达帧预算；视觉与上游一致；软渲染可回退 |
-| **R2** | 图层纪律 + 生命周期（§4.2/§4.4）：稳定层隔离、去无谓裁剪、分支卸载、downloader 解除常驻 | RSS 可控、启动时间不退化；切页/切歌后可回收 |
-| **R3** | 文本/几何批处理（§4.3，按 R1/R2 后剩余瓶颈定） | 歌词区 UI 帧时间≈常数；频谱无离屏 |
-| **R4** | 自适应画质（§4.5） | 目标机稳定在帧预算内，无独显依赖 |
+| 阶段 | 内容 | 实现层 / 模块（§4.0） | 验收 |
+|---|---|---|---|
+| **R0** | profile 基线：全屏 2K/4K，记录 UI/raster 帧时间 + GPU 占用（iGPU 与 llvmpipe） | Dart（`addTimingsCallback`）｜`services/render/quality_governor.dart` | 基线与瓶颈归属报告 |
+| **R1** | 背景**静态层缓存** + **动态层损伤区** + 降分辨率（§4.1） | Dart｜`widgets/player/background/*`、`services/render/damage_region.dart` | iGPU 全屏达帧预算；视觉与上游一致；软渲染可回退 |
+| **R2** | 图层纪律 + 生命周期（§4.2/§4.4）：稳定层隔离、去无谓裁剪、分支卸载、downloader 解除常驻 | Dart + FFI（模块注册表）｜`services/lifecycle/branch_lifecycle.dart`、`services/native_module_registry.dart` | RSS 可控、启动时间不退化；切页/切歌后可回收 |
+| **R3** | 文本/几何批处理（§4.3，按 R1/R2 后剩余瓶颈定） | Dart｜`widgets/player/lyrics_v7/*`、`widgets/player/spectrum_view/*` | 歌词区 UI 帧时间≈常数；频谱无离屏 |
+| **R4** | 自适应画质（§4.5） | Dart｜`services/render/quality_governor.dart` | 目标机稳定在帧预算内，无独显依赖 |
 
 > 与专项文档的关系：`player-render-optimization.md` 的 **P0–P5** 仍有效；本方案的 **R1**
 > 细化并**取代**其中「P2b 半分辨率」的单一手段，改为「静态层 + 损伤区 + 降采样」组合。
+> **所有阶段均在 Dart 层实现**；除非确需系统能力（届时按 `AGENTS.md` 扩 `apl_*` ABI），
+> 否则不触碰桥接与引擎。
 
 ---
 
@@ -510,7 +556,10 @@
 
 - **不引入 Chromium/Electron 的多进程模型**（GPU/渲染进程）：与 `AGENTS.md`
   「不新增进程承载图形/桥接、普通用户权限、同进程动态链接」冲突。
-- 不自写跨平台 GPU 后端 / 不 fork Impeller；不改 Flutter 引擎。
+- **不引入外部渲染运行时**：不嵌入 WebView/Chromium/Qt、不依赖其源码/二进制；
+  §3 的框架只作机制参考（实现边界见 §4.0）。
+- 不自写跨平台 GPU 后端 / 不 fork Impeller；不改 Flutter 引擎；不驱动引擎内部 pass 合并。
+- **不在 Dart 直调平台 API**（禁 MethodChannel / `Process.run`）；系统能力只能经 `apl_*` 桥接。
 - 不以独显为前提、不为「高级效果」牺牲 iGPU 可用性。
 - 不做无度量的「感觉优化」：每期必须以 R0 指标对照。
 
