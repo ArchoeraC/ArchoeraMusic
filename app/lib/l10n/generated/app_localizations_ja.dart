@@ -1916,6 +1916,15 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get settingsAdaptiveRenderQuality => '適応レンダリング品質';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn => 'フレームが遅いときにプレイヤー背景の解像度を下げる';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff => 'プレイヤー背景は常にフル解像度で描画';
+
+  @override
   String get settingsSectionShortcuts => 'ショートカット';
 
   @override

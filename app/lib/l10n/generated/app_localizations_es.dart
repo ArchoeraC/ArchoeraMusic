@@ -2005,6 +2005,18 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get settingsAdaptiveRenderQuality =>
+      'Calidad de renderizado adaptativa';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn =>
+      'Reduce la resolución del fondo del reproductor cuando los fotogramas van lentos';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff =>
+      'El fondo del reproductor siempre se renderiza a resolución completa';
+
+  @override
   String get settingsSectionShortcuts => 'Atajos';
 
   @override

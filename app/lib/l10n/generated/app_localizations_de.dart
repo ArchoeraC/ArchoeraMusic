@@ -1995,6 +1995,17 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get settingsAdaptiveRenderQuality => 'Adaptive Renderqualität';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn =>
+      'Player-Hintergrund-Auflösung bei langsamen Frames verringern';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff =>
+      'Player-Hintergrund wird immer in voller Auflösung gerendert';
+
+  @override
   String get settingsSectionShortcuts => 'Tastenkürzel';
 
   @override

@@ -1894,6 +1894,15 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsAdaptiveRenderQuality => '自适应画质';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn => '帧时间升高时自动降低播放页水纹分辨率';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff => '播放页背景始终满分辨率渲染';
+
+  @override
   String get settingsSectionShortcuts => '快捷键';
 
   @override
@@ -5986,6 +5995,15 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
+  String get settingsAdaptiveRenderQuality => '自适应画质';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn => '帧时间升高时自动降低播放页水纹分辨率';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff => '播放页背景始终满分辨率渲染';
+
+  @override
   String get settingsSectionShortcuts => '快捷键';
 
   @override
@@ -10076,6 +10094,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String settingsPlayerBgRippleSpeedDesc(Object speed) {
     return '流動速度 $speed';
   }
+
+  @override
+  String get settingsAdaptiveRenderQuality => '自適應畫質';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn => '影格時間升高時自動降低播放頁水紋解析度';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff => '播放頁背景始終以滿解析度渲染';
 
   @override
   String get settingsSectionShortcuts => '快速鍵';
