@@ -37,8 +37,8 @@ class DamageRegion {
     var bestGrowth = double.infinity;
     for (var i = 0; i < _rects.length; i++) {
       final merged = _rects[i].expandToInclude(rect);
-      final growth = merged.width * merged.height -
-          _rects[i].width * _rects[i].height;
+      final growth =
+          merged.width * merged.height - _rects[i].width * _rects[i].height;
       if (growth < bestGrowth) {
         bestGrowth = growth;
         bestIndex = i;
