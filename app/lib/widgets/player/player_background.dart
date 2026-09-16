@@ -8,7 +8,8 @@
 /// - `gradient`：主题主色 → 播放器底色的对角渐变（默认，兜底）；
 /// - `blur`：封面重度模糊背景（`blur(45px) saturate(1.2)` + 放大 + 压暗）；
 /// - `solid`：深色纯色；
-/// - `ripple`：封面水纹折射（[RippleBackground] 自绘引擎，内含模糊封面）。
+/// - `ripple`：模糊封面（[_BlurredCover]）+ 水纹折射（[RippleBackground] 叠加其上，
+///   对齐上游 `.bg-blur-wrap` + ripple canvas 的分层结构）。
 ///
 /// 无封面时 blur / ripple 均回退渐变。
 library;
@@ -61,11 +62,14 @@ class PlayerBackground extends ConsumerWidget {
           fit: StackFit.expand,
           children: [
             gradient,
+            // 模糊封面背景（与 blur 档共用）；水纹纹理未就绪/失败时透出。
+            _BlurredCover(cover: cover!),
             RippleBackground(
               cover: cover,
               playing: playing,
               speed: prefs.playerBgRippleSpeed,
               animate: !prefs.performanceMode,
+              fallbackColor: Colors.transparent,
             ),
           ],
         );
