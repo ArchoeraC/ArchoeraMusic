@@ -57,10 +57,7 @@ class RippleStaticLayer {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     final paint = Paint()
-      ..imageFilter = ui.ImageFilter.blur(
-        sigmaX: blurSigma,
-        sigmaY: blurSigma,
-      )
+      ..imageFilter = ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma)
       ..colorFilter = saturationColorFilter(saturation);
     canvas.drawImage(src, Offset.zero, paint);
     final pic = recorder.endRecording();
@@ -76,23 +73,25 @@ class RippleStaticLayer {
   /// 从源封面生成预烘焙纹理并换入当前槽（[transition] 时保留旧纹理做交叉淡入）。
   void prepareCover(ui.Image img, {required bool transition}) {
     // 延后到微任务再 setState，避免在 image 回调（可能处于构建期）同步 setState。
-    unawaited(Future<void>.microtask(() {
-      if (!isMounted()) return;
-      final prepared = prepare(img, blurSigma, saturation);
-      if (prepared == null) return;
-      final old = _current;
-      rebuild(() {
-        if (transition && old != null) {
-          disposeLater(_old);
-          _old = old; // 转移所有权给旧槽
-        } else {
-          disposeLater(_old);
-          _old = null;
-          disposeLater(old);
-        }
-        _current = prepared;
-      });
-    }));
+    unawaited(
+      Future<void>.microtask(() {
+        if (!isMounted()) return;
+        final prepared = prepare(img, blurSigma, saturation);
+        if (prepared == null) return;
+        final old = _current;
+        rebuild(() {
+          if (transition && old != null) {
+            disposeLater(_old);
+            _old = old; // 转移所有权给旧槽
+          } else {
+            disposeLater(_old);
+            _old = null;
+            disposeLater(old);
+          }
+          _current = prepared;
+        });
+      }),
+    );
   }
 
   /// 交叉淡入结束：旧纹理可释放。
@@ -112,10 +111,7 @@ class RippleStaticLayer {
     return ColorFiltered(
       colorFilter: saturationColorFilter(saturation),
       child: ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(
-          sigmaX: blurSigma,
-          sigmaY: blurSigma,
-        ),
+        imageFilter: ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
         child: child,
       ),
     );

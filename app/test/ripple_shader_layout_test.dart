@@ -65,7 +65,9 @@ void main() {
     expect(samplerOffsets['uCoverTo'], RippleUniforms.samplerTo);
 
     // 涟漪上限与着色器数组长度一致。
-    final mRipples = RegExp(r'uniform\s+vec4\s+uRipples\s*\[(\d+)\]').firstMatch(src);
+    final mRipples = RegExp(
+      r'uniform\s+vec4\s+uRipples\s*\[(\d+)\]',
+    ).firstMatch(src);
     expect(mRipples, isNotNull);
     expect(int.parse(mRipples!.group(1)!), kRippleShaderMaxRipples);
   });

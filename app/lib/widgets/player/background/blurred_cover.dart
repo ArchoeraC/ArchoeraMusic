@@ -17,10 +17,26 @@ ColorFilter saturationColorFilter(double saturation) {
   final inv = 1 - s;
   const lr = 0.2126, lg = 0.7152, lb = 0.0722;
   return ColorFilter.matrix(<double>[
-    inv * lr + s, inv * lg, inv * lb, 0, 0,
-    inv * lr, inv * lg + s, inv * lb, 0, 0,
-    inv * lr, inv * lg, inv * lb + s, 0, 0,
-    0, 0, 0, 1, 0,
+    inv * lr + s,
+    inv * lg,
+    inv * lb,
+    0,
+    0,
+    inv * lr,
+    inv * lg + s,
+    inv * lb,
+    0,
+    0,
+    inv * lr,
+    inv * lg,
+    inv * lb + s,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
   ]);
 }
 

@@ -42,12 +42,11 @@ extension _SongListView on _SongListState {
                   itemCount: widget.items.length + 1,
                   // 固定行高虚拟化：每行按 O(index) 定位，免去逐子项测量。
                   // 歌曲行恒为 _songRowExtent；尾项为空列表时 0，否则高度。
-                  itemExtentBuilder: (index, _) =>
-                      index == widget.items.length
-                          ? (widget.items.isEmpty
-                                ? 0.0
-                                : _SongListState._songFooterExtent)
-                          : _SongListState._songRowExtent,
+                  itemExtentBuilder: (index, _) => index == widget.items.length
+                      ? (widget.items.isEmpty
+                            ? 0.0
+                            : _SongListState._songFooterExtent)
+                      : _SongListState._songRowExtent,
                   itemBuilder: (context, index) {
                     if (index == widget.items.length) {
                       return _SongListFooter(
