@@ -13,7 +13,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:archoera_music/widgets/player/ripple_shader.dart';
+import 'package:archoera_music/widgets/player/background/ripple_shader.dart';
 
 const Map<String, int> _typeFloats = {
   'float': 1,

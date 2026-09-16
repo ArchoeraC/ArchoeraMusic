@@ -13,7 +13,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:archoera_music/widgets/player/ripple_background.dart';
+import 'package:archoera_music/widgets/player/background/ripple_background.dart';
 
 /// 生成一张 64×64 渐变 PNG 作为测试封面。
 Future<String> _writeTempCover() async {
