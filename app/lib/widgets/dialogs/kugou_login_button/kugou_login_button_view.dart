@@ -73,8 +73,8 @@ extension _KgQrLoginDialogView on _KgQrLoginDialogState {
       behavior: HitTestBehavior.opaque,
       onTap: () => Navigator.of(context).pop(false),
       child: ClipRect(
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: GlassBlur(
+          sigma: 16,
           child: ColoredBox(
             color: scheme.surfaceContainerHigh.withValues(alpha: 0.8),
             child: SafeArea(
