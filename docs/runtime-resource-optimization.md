@@ -58,11 +58,19 @@
 ## 3. 跨框架机制调研（源码级，提炼可迁移项）
 
 > **调研基线（2026-09-16 本地浅克隆）**：
-> - Qt：`qtdeclarative` commit `3027a40c`（dev，Qt 6.x）— 下文路径省略前缀 `src/quick/scenegraph/`
+> - Qt：`qtdeclarative` commit `3027a40c`（dev，Qt 6.x）— 路径省略前缀 `src/quick/scenegraph/`
 >   （item 层为 `src/quick/items/`）。
-> - Chromium：`chromium/src` commit `823ae20f`（main）— 下文路径省略前缀 `cc/`。
-> - 复现：`git clone --depth 1 https://github.com/qt/qtdeclarative`；
->   `git clone --depth 1 --filter=blob:none --sparse https://chromium.googlesource.com/chromium/src && git -C src sparse-checkout set cc`。
+> - Chromium：`chromium/src` commit `823ae20f`（main）— 路径省略前缀 `cc/`。
+> - WebRender：`mozilla-firefox/firefox`（main）`gfx/wr/webrender/` — 路径省略前缀 `src/`。
+> - Impeller：`flutter/engine` commit `ae5c3603`（main）— 路径省略前缀 `impeller/`。
+> - Skia：`google/skia` commit `9875bb59`（main）— 路径含 `src/`。
+> - 复现（GitHub 经本机代理 `127.0.0.1:7897`）：
+>   `git clone --depth 1 https://github.com/qt/qtdeclarative`；
+>   `git clone --depth 1 --filter=blob:none --sparse https://chromium.googlesource.com/chromium/src && git -C src sparse-checkout set cc`；
+>   `git clone --depth 1 --filter=blob:none --sparse https://github.com/flutter/engine.git && git -C engine sparse-checkout set impeller display_list`；
+>   `git clone --depth 1 --filter=blob:none --sparse https://github.com/google/skia.git && git -C skia sparse-checkout set src include`；
+>   WebRender 从 `raw.githubusercontent.com/mozilla-firefox/firefox/main/gfx/wr/webrender/` 按文件拉取。
+>   （Firefox/Chromium 全量仓库过大，故用 sparse/定向拉取。）
 
 ### 3.1 Chromium / Electron（`cc` 合成器，源码精读）
 
@@ -188,39 +196,186 @@
 - vsync 驱动动画、坏 vsync 检测（20 样本）：`:1124-1138,1583-1607`；`QSG_NO_VSYNC`：
   `qsgdefaultcontext.cpp:191-205`。
 
-### 3.3 WebRender（Servo / Firefox，文档级，未拉源码）
+### 3.3 WebRender（Firefox，源码精读）
 
-- **保留式显示列表（display list）** + **picture caching**：把「内容切片」缓存为纹理，
-  仅滚动/变换时不重录。
-- **clip / scroll 节点**与**内容无关的合成**；GPU 批次 + **纹理图集（atlas）**。
-- （源码精读留待需要时再补：`webrender/src/`。）
+**Picture caching（静态画面缓存，与我们「背景静态层」同构）**
+- **tile 即缓存面**：默认 **1024×512**（滚动条 1024×32 / 32×1024）；有效 tile 不重栅格、只重新合成；
+  每 tile 记 `device_dirty_rect` / `device_valid_rect` / `surface`：`tile_cache/mod.rs:73-91,254-283`。
+- **失效原因枚举**（决定何时重做）：背景色、surface opacity 变化、无纹理/无面、prim 数量、
+  内容、合成器类型、valid-rect、scale、underlay 取消：`invalidation/mod.rs:91-114`；
+  `invalidate(rect, reason)` 置 `is_valid=false` 并并入脏矩形：`invalidation/cached_surface.rs:296-315`。
+- **只在脏时挂纹理 + 建 `PictureCache` 任务**：`picture.rs:1784-1789,1858-1888`。
+- **tile 回收**：上一帧未请求的 tile 过期（`last_access.frame_id < now-1`），
+  GC 只保留 `ceil(allocated*0.25)` 空闲纹理、最旧先放：`picture_textures.rs:254-274,296-327`。
+- **纹理池按尺寸复用**：`picture_textures.rs:135-197`；切片上限 `MAX_CACHE_SLICES=16`
+  （超出压成单一原子缓存以约束显存）：`tile_cache/slice_builder.rs:33,82-87`。
+- **廉价 tile 路径**：单个不透明 prim 的 tile 变成 `TileSurface::Color`（**不分配纹理**）；
+  空 prim/空 valid-rect 的 tile 直接剔除并释放面：`tile_cache/mod.rs:570-591,472-485`。
 
-### 3.4 Flutter / Impeller 与 Skia（我们的运行层）
+**四叉树脏区（per-tile damage）**
+- 叶子维持 `dirty_tracker: u64`（最近 64 帧）与 `frames_since_modified`；
+  **分裂条件**：`level<3` 且 `frames_since_modified>64` 且近 64 帧脏 >50%：
+  `invalidation/quadtree.rs:27-46,213-236`。
+- **合并条件**：4 子节点全静态（脏帧=0）或全脏（=64）：`:238-268`；脏区输出为
+  **单个并集矩形**（多处脏暂时不拆多矩形，TODO `tile_cache/mod.rs:261-262`）：`:394-434`。
+- **部分更新需要平台能力**：静态 `gpu_supports_render_target_partial_update` 或
+  `max_update_rects>0`，否则脏矩形强制等于整 tile：`tile_cache/mod.rs:533-563`。
+- **顶点量化** `VERT_QUANTIZE_SCALE=4.0`（1/4 设备像素）用于内容比较：`invalidation/vert_buffer.rs:17`。
 
-- **Impeller**：单 RenderPass 合并、tile memory、绘制批处理、clip coverage；
-  但**逐像素着色器成本不变**——`FragmentProgram` 仍是每像素执行。
-- **`RepaintBoundary`**：Flutter 的「图层缓存」入口（配合 raster cache）。稳定内容应包起来，
-  避免每帧全量重光栅；但**不能滥用**（层过多 → 合成/显存上升，且 Impeller 层缓存有上限）。
-- **`ImageFilter.shader` 仅 Impeller 可用**（`painting.dart:4461`，否则 `UnsupportedError`），
-  不适合作为**跨三端**方案的主路径。
-- **Skia 可借鉴**：`Canvas.drawAtlas`/`drawRawAtlas`（批量贴图）、`Paragraph` 缓存。
-- **`BackdropFilter` / `ImageFiltered` / `saveLayer`** = Qt 的 `ShaderEffectSource`：
-  都是**多一遍离屏**，全屏使用是红线级开销（现有 render 文档 §3.2.6 已述）。
+**遮挡裁剪**
+- tile 遮挡：`Occluders{z_id, device_rect}` 用 y 轴扫描线比对**精确非重叠面积**，
+  被完全覆盖则跳过栅格 + 合成 + 面分配：`composite.rs:1824-1963`、查询 `picture.rs:1724-1761`。
+- 合成层前→后矩形遮挡：`FrontToBackBuilder` 把被遮挡矩形拆成最多 4 个子矩形：
+  `rectangle_occlusion.rs:73-143,147-207`。
 
-### 3.5 可迁移机制清单（附源码出处）
+**合批**
+- `BatchKey{kind, blend_mode, textures, readback}` 全等才可合并：`batch.rs:211-236`；
+  不透明/透明分表：`:713-735`；向后查找合并直到边界重叠，`BATCH_LOOKBACK_COUNT=10`：
+  `renderer/init.rs:236`、`batch.rs:356-423`。
+- **大遮挡物阈值**：面积 > **屏幕/4** 的批次插到表首、不与更早批次合并：`batch.rs:464-495`。
+- **跨任务合批**：`can_merge = !needs_scissor_rect` 时把 AlphaBatchContainer 并入
+  同 render target 容器：`render_task.rs:480`、`render_target.rs:250,260-264`。
+- 段溢出回退：`MAX_SEGMENTS=64` 时对整体包围盒只发 1 个带 mask 的段，避免病态切分；
+  edge-flag 抗锯齿只处理暴露边：`segment.rs:13,482-495,501-518`。
+
+**渲染任务图 / pass 合并**
+- pass 数 = 任务依赖深度（拓扑分层），**不是固定几遍**：`render_task_graph.rs:443-491`；
+  一个 `RenderTargetList` 可含多张纹理，使上一遍结果一次采样完，最大化合批：
+  `render_target.rs:64-88`。
+- 面生命周期：`assign_free_pass` 在最后一个消费者后归还纹理池、可被后续 pass 复用：
+  `render_task_graph.rs:749-756,1002-1035`。
+- 共享面：多任务打包进一张 `max_shared_surface_size=2048` 纹理（Guillotine），
+  超出按 256 取整：`render_task_graph.rs:38,544-590`。
+- **缓存任务**：`render_task_cache.rs` 键控复用；纹理句柄失效或 **10 帧**未用即失效，
+  `MAX_CACHE_TASK_SIZE=4096`：`render_task_cache.rs:26,107-156,274-339`。
+
+**纹理缓存 / 图集 / 上传**
+- 共享区域 `TEXTURE_REGION_DIMENSIONS=512`，超 512 走独立纹理：`texture_cache.rs:44,1395-1399`。
+- **7 个独立预算**（避免不同负载互相驱逐）：`texture_cache.rs:255-299`；
+  独立纹理 **8 MiB**、共享「理想利用率」`bytes/3`（字形 `×2/3`）、
+  **每帧最多 32 次驱逐**、年龄阈值随压力 400→…→1：`:1119-1219`；前一帧用过的绝不驱逐：`:1237-1245`。
+- 上传合批：单 `TextureUploader` + `BATCH_UPLOAD_TEXTURE_SIZE=512×512`，PBO 批量：
+  `renderer/upload.rs:8-14,44-45,81-85`；Guillotine：`NUM_BINS=3`、
+  `MIN_RECT_AXIS_SIZES=[1,16,32]`、请求按 8 对齐：`texture_pack/guillotine.rs:10-13,184-206`。
+
+### 3.4 Flutter / Impeller（源码精读，**我们的主运行层**）
+
+**pass 创建与「合并」行为**
+- `Canvas` 持 `render_passes_` 栈（每层一个 `EntityPassTarget` + `InlinePassContext`）：
+  `display_list/canvas.h:94-113`；`InlinePassContext::GetRenderPass()` **懒创建并复用同一
+  command buffer + RenderPass，直到 `EndPass()`**：`entity/inline_pass_context.cc:74-151`。
+- load/store 在创建时定死：首 pass `kClear`，后续 `kLoad`（MSAA 时 `kDontCare`）：
+  `inline_pass_context.cc:106-140`；空 draw 被 `AddCommand` 丢弃：`renderer/render_pass.cc:62-76`。
+- **强制新 pass / 离屏的事件**：`SaveLayer`（`canvas.cc:1146-1152`）、子 pass `Restore` 合成
+  （`:1213-1293`）、**无 framebuffer fetch 的高级混合**（`:1261-1289,1487-1520`）、
+  backdrop filter（`:1078,1546-1659`）、readback（`:877-897`）、onscreen blit（`:1661-1714`）。
+  **仅换混合模式不破 pass**；pass **不会回并**。整个 DL 在 CPU 上**派发两遍**：
+  `dl_dispatcher.cc:1266-1279`。
+- **结论**：Impeller 的「合并」= 同一层内多次 draw 进同一 pass；真正贵的是
+  **saveLayer / 高级混合 / backdrop / filter / readback**（每个都 = 新 pass + 离屏纹理 + 全量采样）。
+
+**批处理 / 不透明快路径**
+- 跨 entity **不做 run 合并**；批处理只在「已含多图元」的 op 内（文本一次 vertex buffer：
+  `entity/contents/text_contents.cc:162-166,279-283`；图集/顶点：
+  `atlas_contents.cc:71-87`、`vertices_contents.cc:133-185`）。
+- **不透明强制** `kSourceOver→kSource`（可深度写/重排）：`canvas.cc:1450-1453`；
+  **纯色铺满被吸收进 clear color**，不发 draw：`canvas.cc:1455-1475`、
+  `solid_color_contents.cc:72-79`。
+- 管线键为 64-bit `ContentContextOptions::ToKey()`：`content_context.h:339-358`。
+
+**裁剪**
+- 深度裁剪，每个真实 clip 发 **2 次 draw**（stencil 预备 + 覆盖）：
+  `entity/contents/clip_contents.cc:69-146`；`kDepthEpsilon=1/262144`、`kMaxDepth=1<<24`：
+  `entity/entity.h:25`、`display_list/canvas.h:117`。
+- **廉价路径**：轴对齐、边距整数 < `threshold=0.124`（或非 AA）的相交 clip
+  **完全跳过 stencil、只更新 scissor**：`entity/entity_pass_clip_stack.cc:149-172`；
+  scissor 仅在 clip 状态变化时更新：`canvas.cc:604-609`。
+
+**离屏 / 滤镜（最大填充率来源）**
+- `Contents::RenderToSnapshot` 分配离屏 subpass，coverage 外扩 **1px**、按 `ceil` 定尺：
+  `entity/contents/contents.cc:56-119`。
+- 高斯模糊**最多 4 pass / 3 个 command buffer**（downsample + H + V 乒乓），
+  `kMaxSigma=500`、kernel 上限 50→内部 100、radius≥3 丢 2 采样、downsample 分支 0.5/0.125/0.0625：
+  `entity/contents/filters/gaussian_blur_filter_contents.cc:700-847,27`、`.h:17`。
+- `saveLayer` 离屏尺寸按 coverage 取整并夹到最大附件尺寸：`canvas.cc:985-1029`；
+  **opacity peephole**（alpha 可分配时直接跳过子 pass）：`canvas.cc:973-979`、
+  `dl_dispatcher.cc:319-325`；backdrop filter 按 `backdrop_id` 复用同一快照：`canvas.cc:1046-1138`。
+- 离屏 MSAA 为 `kCount4` 且 resolve 纹理标记 **`CompressionType::kLossy`**：
+  `renderer/render_target.cc:398-457`。
+
+**几何 / 缓存 / 分配**
+- 凸填充走三角扇；**非凸不做正确剖分**，改 `kNonZero/kEvenOdd` + stencil-then-cover（2 次 draw）：
+  `entity/geometry/fill_path_geometry.cc:41-75`、`color_source_contents.h:142-205`；
+  描边 `kPreventOverdraw`：`color_source_contents.h:231-267`。
+- `Tessellator` 跨调用保留 point/index 缓冲并缓存三角 `kCachedTrigCount=300`：
+  `tessellator/tessellator.h:314-324`。
+- `ContentContext::Variants` 为**按 64-bit key 线性扫描、无驱逐**的 vector：
+  `content_context.h:796-857`；`RenderTargetCache` 按 `{size,mips,msaa,depth}` 配置复用、
+  保活若干帧：`entity/render_target_cache.cc:11-139`。
+
+### 3.5 Skia（源码精读，Flutter 非 Impeller 后端 / `dart:ui` 底层）
+
+**字形 / 文本缓存（对歌词最直接）**
+- 字形 strike：`SkDescriptor → SkStrike`，CPU 默认预算 **2 MiB / 2048 项**：
+  `src/core/SkStrikeCache.h:31-37`；purge 目标 `max(超限, 25%)`，尾部逐出、跳过 pinned：
+  `src/core/SkStrikeCache.cpp:216-275`。
+- **亚像素相位 4×4**（`SkPackedGlyphID`，`kSubpixelRound=0.125`）：`src/core/SkGlyph.h:46-70`；
+  mask 格式 `BW/A8/LCD16/SDF`：`src/core/SkMask.h:23-33`；LCD 在 >**48px** 关闭：
+  `src/core/SkScalerContext.cpp:1158-1176`。
+- GPU 侧 strike 独立预算同样 2 MiB/2048：`src/text/gpu/StrikeCache.h:24-30`；
+  **GPU text-blob 复用缓存 4 MiB LRU**：`src/text/gpu/TextBlobRedrawCoordinator.h:34-40`。
+- SDF：magnitude 4 / pad 4，SDF 适用于 ≥18px、>**384**（macOS 256 / Android 324）转路径：
+  `src/core/SkDistanceFieldGen.h:18-30`、`src/text/gpu/SubRunControl.cpp:30-35`。
+- 图集字形尺寸上限 `kSkSideTooBigForAtlas=256`（最小 plot 256×256）：`src/core/SkGlyph.h:333`。
+
+**Ganesh 合批**
+- op 回插合并：向后线扫，遇**绘制序冲突（包围盒重叠）停止**，
+  `kMaxOpChainDistance=10` / `kMaxOpMergeDistance=10`：`src/gpu/ganesh/ops/OpsTask.cpp:54-55,1090-1120,215-286`。
+- 合批破坏条件：`classID`、`GrAppliedClip`、`requiresNonOverlappingDraws`、`requiresDstTexture`、
+  dst proxy 不同：`:279-296`；文本 op 还对 DF/掩码/局部坐标/颜色/gamma 等差异拒绝合并：
+  `src/gpu/ganesh/ops/AtlasTextOp.cpp:689-749`。
+- flush 上限 `kMaxRenderPassesBeforeFlush=100`：`src/gpu/ganesh/GrDrawingManager.cpp:288`。
+
+**图集 / 资源缓存**
+- 三种掩码图集、`kMaxAtlasDim=2048`：`src/gpu/ganesh/GrDrawOpAtlas.h:286-291`；
+  plot 256、`kMaxPlots=32`、多纹理页 ≤4：`src/gpu/ganesh/GrAtlasTypes.h:119-120`；
+  32 个 flush 未用可驱逐、整页 128：`GrDrawOpAtlas.cpp:216-268`；ARGB 尺寸-预算表：`:580-611`。
+- `SkCanvas::drawAtlas`：`src/core/SkDraw_atlas.cpp:73-89`、`ops/DrawAtlasOp.cpp:307-333`。
+- 预算：Ganesh `GrResourceCache` **256 MiB**（LRU purge）：`GrResourceCache.h:89`、
+  `GrResourceCache.cpp:472-515`；CPU `SkResourceCache` 图片 **32 MiB**：`SkResourceCache.cpp:50-51`；
+  图片滤镜缓存 **128 MiB**（transient 32 MiB）：`SkImageFilterCache.cpp:24-26`。
+
+**Graphite（新后端）**
+- **排序后合并**：128-bit `SortKey`（颜色/深度序、stencil、render step、管线、uniform、纹理绑定）
+  排序以减少切换，相邻等价管线合并成更少更大的 draw：`src/gpu/graphite/DrawList.h:49-63,191-204`；
+  snap 时仅在 key 变化时发状态命令：`DrawList.cpp:160-235`。
+- `kMaxRenderSteps=4`/`4096`：`Renderer.h:344`、`DrawListBase.h:49`；
+  本次 checkout 仍 `passes.size()==1`（**尚未做 subpass 合并**）：`task/RenderPassTask.cpp:75-76`；
+  预算 256 MiB：`include/gpu/graphite/ContextOptions.h:123`。
+
+**滤镜 / saveLayer**
+- `saveLayer` 分配真实离屏 `SkDevice`（按层边界定尺）：`src/core/SkCanvas.cpp:1007-1078`；
+  `trivialRestore` 可避免：`:926-934`；`kMaxFiltersPerLayer=16`：`src/core/SkCanvas.cpp:906`。
+- **多遍降采样**：`downscale_step_count=ceil(log2(1/netScale))`，大 blur 走逐级 ½ 缓冲：
+  `src/core/SkImageFilterTypes.cpp:1479-1497`；sigma 上限 532（CPU 135）：
+  `src/effects/imagefilters/SkBlurImageFilter.cpp:151,201`。
+
+### 3.6 可迁移机制清单（附源码出处）
 
 | 机制 | 源码出处 | 我们对应的落点 |
 |---|---|---|
-| 图层缓存 / FBO 复用（脏标志驱动） | Qt `qsgrhilayer.cpp:68-81,411-414`；`cc` `effect_node.h:224-226` | 背景**静态层**、播放条、侧边栏包 `RepaintBoundary` |
-| 只更新损伤区 | `cc` `picture_layer_tiling.cc:278-328`、`tile_manager.cc:1509-1516`；Qt `qsgbatchrenderer.cpp:1632-1682` | 水纹**动态层**只画活动涟漪 |
-| 降分辨率 / LOD | `cc` `tile_size_calculator.cc:67-85`；Qt `qsgcurveglyphatlas.cpp:120-142` | 动态层低分辨率离屏、静态层 1/2~1/4 预烘焙 |
-| 内存上限 + 优先级回收 | `cc` `tile_manager.cc:912-1092,495-517`；`layer_tree_settings.cc:22-24` | 图片/图层缓存上限、空闲回收 |
-| 遮挡裁剪 / 不可见即停 | `cc` `occlusion_tracker.cc:129-226`；Qt `qsgnode.cpp:1329`、`qsgbatchrenderer.cpp:1533` | `Offstage`/`Visibility` + `TickerMode`（已有，扩展） |
-| 批处理 / 图集 | Qt `qsgbatchrenderer.cpp:1800-1946`、`qsgrhiatlastexture.cpp`；Skia `drawAtlas` | 频谱单 Path（已 P3）→ 评估 `drawAtlas`；歌词字形缓存 |
-| 裁剪的代价（scissor > stencil，且破坏合批） | Qt `qsgbatchrenderer.cpp:2440-2479,1800` | 减少 `Clip*`/`saveLayer`，列表 delegate 内禁止 |
-| 不透明快路径 | `cc` `layer.cc:894-900`、`raster_source.cc:87-102`；Qt `qsgbatchrenderer.cpp:1545-1549` | 避免无谓半透明/模糊叠层 |
-| 图片按显示尺寸解码 + 解码缓存上限 | `cc` `image_decode_cache_utils.cc:20-38`、`software_image_decode_cache.cc:118-140` | 沿用 `CoverImage` `cacheWidth/Height` + `ImageCache` 上限 |
-| 生命周期 / Loader | Qt `Loader`+`destroy()`（文档）；`cc` discardable | 页面分支卸载、模块注册表、图片缓存上限 |
+| 图层缓存 / FBO 复用（脏标志驱动） | Qt `qsgrhilayer.cpp:68-81`；WR `tile_cache/mod.rs:254-283`；`cc` `effect_node.h:224-226` | 背景**静态层**、播放条、侧边栏包 `RepaintBoundary` |
+| 只更新损伤区（需平台能力） | WR `invalidation/quadtree.rs:394-434`、`tile_cache/mod.rs:533-563`；`cc` `tile_manager.cc:1509-1516` | 水纹**动态层**只画活动涟漪（Flutter 无 RT partial-update API，只能层隔离近似） |
+| 降分辨率 / LOD | `cc` `tile_size_calculator.cc:67-85`；Skia `SkImageFilterTypes.cpp:1479-1497` | 动态层低分辨率离屏、静态层 1/2~1/4 预烘焙 |
+| 内存上限 + 优先级/空闲回收 | WR `texture_cache.rs:1119-1219`、`picture_textures.rs:296-327`；Skia `GrResourceCache.h:89`；`cc` `tile_manager.cc:912-1092` | 图片/图层缓存上限、空闲回收 |
+| 遮挡裁剪 / 不可见即停 | WR `composite.rs:1824-1963`、`rectangle_occlusion.rs:73-143`；`cc` `occlusion_tracker.cc:129-226`；Qt `qsgnode.cpp:1329` | `Offstage`/`Visibility` + `TickerMode`（已有，扩展） |
+| 合批（键相等 / 序冲突即断） | Impeller `text_contents.cc:162`；Skia `OpsTask.cpp:54-55,279-296`；Qt `qsgbatchrenderer.cpp:1800-1946`；WR `batch.rs:211-236` | 频谱单 Path（已 P3）→ 评估 `drawAtlas`；歌词字形缓存 |
+| 裁剪代价（轴对齐整数 clip 才走 scissor） | Impeller `entity_pass_clip_stack.cc:149-172`；Qt `qsgbatchrenderer.cpp:2440-2479` | 减少 `ClipRRect`/AA 圆角/`saveLayer`，列表 delegate 内禁止 |
+| 离屏 pass 是最大开销（不合并回） | Impeller `canvas.cc:1146-1520`、`contents.cc:56-119`；Skia `SkCanvas.cpp:1007-1078` | 禁全屏 `BackdropFilter`/`ImageFiltered`；滤镜限小层 |
+| 不透明快路径 | Impeller `canvas.cc:1450-1475`；`cc` `layer.cc:894-900`；Qt `qsgbatchrenderer.cpp:1545-1549` | 避免无谓半透明/模糊叠层 |
+| 字形缓存很小会抖 | Skia `SkStrikeCache.h:31-37`（2 MiB）、`TextBlobRedrawCoordinator.h:34-40`（4 MiB）；Qt SDF 图集 LRU | 我们的 Paragraph 缓存用有界 LRU，避免无界增长 |
+| 图片按显示尺寸解码 + 解码缓存上限 | `cc` `image_decode_cache_utils.cc:20-38`；Skia `SkResourceCache.cpp:50-51` | 沿用 `CoverImage` `cacheWidth/Height` + `ImageCache` 上限 |
+| 生命周期 / Loader | Qt `Loader`+`destroy()`；WR `picture_textures.rs:254-274` | 页面分支卸载、模块注册表、图片缓存上限 |
 | 后台节流（连 ticker 一起停） | `cc` `scheduler_state_machine.cc:1481-1503`；Qt `qsgthreadedrenderloop.cpp:993-998` | `power_saver.dart` + `FrameGovernor` |
 
 ---
@@ -247,6 +402,13 @@
 - 「降分辨率」在 `cc` 是**视口/4** 的瓦片（`tile_size_calculator.cc:67-85`），并非全屏半分辨率；
   我们不一定要固定 1/2，可按设备帧时间**自适应**（§4.5）。
 - 小层可**不分块**（< 512²，`layer_tree_settings.cc:17-18`）——对应我们的「频谱/歌词区不解锁额外层」。
+- **静态层的「失效原因集」可照抄 WR**：只有背景色、surface opacity、scale、valid-rect、
+  纹理被逐出这几类才使 tile 失效（`invalidation/mod.rs:91-114`、`cached_surface.rs:283-315`）。
+  对我们即：静态层仅在**切歌 / 尺寸变化**时重建，其余帧直接复用（`picture.rs:1784-1789`）。
+- WR 回收：上一帧未请求的 tile 过期、GC 仅保留 25% 空闲（`picture_textures.rs:254-274,296-327`）
+  ——对应「切歌即释放旧静态层/旧封面」。
+- WR「单个不透明 prim 的 tile 不分配纹理」（`tile_cache/mod.rs:570-591`）——对应我们的
+  纯色/渐变兜底层可完全不入纹理/离屏。
 
 **动态层的实现选型（待实测，见 §8）**：
 - A. **局部几何**：按涟漪波带生成环带/局部网格，用 `FragmentProgram` 或 `drawVertices` 绘制。
@@ -263,11 +425,20 @@
 
 - **稳定层**：背景静态层、顶栏、侧边栏、底部播放条、歌词区、频谱各自 `RepaintBoundary`，
   把「每帧变化的层」与「几乎不变的层」隔离（避免全屏重光栅）。
-- **去离屏 pass**：清理无谓 `ClipRRect`/`ClipRect`/`saveLayer`/`BackdropFilter`；
-  列表 delegate 内**禁止**裁剪（Qt：clip 破坏批处理）。已有 `ShaderMask` 渐隐并入画笔（P3）为先例。
-- **裁剪优先矩形（scissor 而非 stencil）**：能用轴对齐矩形裁剪就别用圆角/旋转裁剪——
-  Qt 对矩形 clip 走 scissor、非矩形才落到 stencil（`qsgbatchrenderer.cpp:2440-2479` vs `:2480-2642`），
-  且 **clipList 不同即无法合批**（`:1800,1917`）。Flutter 侧 `ClipRect` 比 `ClipRRect` 更易合批。
+- **去离屏 pass（最高优先）**：Impeller 里 `saveLayer` / 高级混合 / backdrop / filter / readback
+  **每个都新开 pass + 离屏纹理 + 全量采样，且 pass 不回并**（`canvas.cc:1146-1520`、
+  `contents.cc:56-119`）；高斯模糊可达 **4 pass / 3 command buffer**
+  （`gaussian_blur_filter_contents.cc:700-847`）。故清理无谓
+  `ClipRRect`/`ClipRect`/`saveLayer`/`BackdropFilter`；列表 delegate 内**禁止**裁剪；
+  已有 `ShaderMask` 渐隐并入画笔（P3）为先例。
+- **裁剪优先「轴对齐、非 AA」矩形**：Impeller 对轴对齐、边距整数 < **0.124** 的相交 clip
+  **跳过 stencil，只更新 scissor**（`entity_pass_clip_stack.cc:149-172`）；每个真实 clip
+  则要 **2 次 draw**（`clip_contents.cc:69-146`）。Qt 同理：矩形走 scissor、非矩形才 stencil，
+  且 **clipList 不同即无法合批**（`qsgbatchrenderer.cpp:2440-2479,1800`）。
+  Flutter 侧优先 `ClipRect` 而非 `ClipRRect`，并尽量整数对齐。
+- **正视 Flutter 的能力边界**：`dart:ui`/Impeller **未暴露「渲染目标部分更新」**
+  （WR 也有 `max_update_rects>0` 的门槛，`tile_cache/mod.rs:533-563`）——所以我们的
+  「损伤区」只能用**图层隔离（`RepaintBoundary`）+ 局部绘制**近似，不可能像 `cc` 那样真·脏矩形重栅。
 - **不透明快路径**：`cc` 对不透明层免整层 clear、只清边距（`raster_source.cc:87-102`）；
   Flutter 侧表现为「避免无谓 `saveLayer`/半透明叠层」，让不透明子树可被合批/裁剪。
 - **避免大层上的 opacity/filter/backdrop 动画**：这些会把层提升为独立 render surface/FBO
@@ -367,12 +538,11 @@
   [test-suite-2026-09-10.md](test-suite-2026-09-10.md)
 - 上游实现：`SPlayer-Next/src/components/player/FullPlayer/PlayerBackground.vue`、
   `.../BackgroundRipple.vue`
-- 外部机制参考：
-  - **源码级（本地克隆精读，§3.1–3.2）**：Qt `qtdeclarative@3027a40c`（dev）、
-    Chromium `chromium/src@823ae20f`（main，仅 `cc/`）；克隆命令见 §3 引言。
-  - Qt Quick Scene Graph / Performance 文档：`doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html`、
-    `doc.qt.io/qt-6/qtquick-performance.html`（batching、preprocess/LOD、`QSGLayer`、
-    「clip 不是优化」、不可见即不画、`sourceSize`、Loader/destroy、粒子不可见即停）。
-  - WebRender（文档级）：保留显示列表 + picture caching + atlas。
-  - Flutter/Impeller：`RepaintBoundary` 层缓存、`FragmentProgram`、
-    `ImageFilter.shader`（仅 Impeller，`painting.dart:4461`）、Skia `drawAtlas`。
+- 外部机制参考（**源码级，§3.1–3.5**；克隆命令见 §3 引言）：
+  - Qt `qtdeclarative@3027a40c`（dev）、Chromium `chromium/src@823ae20f`（main，仅 `cc/`）、
+    Mozilla WebRender（`mozilla-firefox/firefox` main，`gfx/wr/webrender/`）、
+    Flutter Impeller（`flutter/engine@ae5c3603`，`impeller/`）、Skia（`google/skia@9875bb59`）。
+  - 文档补充：Qt Quick Scene Graph / Performance
+    （`doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html`、`.../qtquick-performance.html`）；
+    Flutter `dart:ui`：`RepaintBoundary` 层缓存、`FragmentProgram`、
+    `ImageFilter.shader`（仅 Impeller，`painting.dart:4461`）、`Canvas.drawAtlas`。
