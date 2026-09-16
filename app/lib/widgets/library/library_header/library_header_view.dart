@@ -11,7 +11,6 @@ extension _LibraryHeaderView on LibraryHeader {
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
     final notifier = ref.read(libraryStoreProvider.notifier);
-    final tracks = state.filteredTracks.map(trackFromRow).toList();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
@@ -44,9 +43,9 @@ extension _LibraryHeaderView on LibraryHeader {
                 label: l10n.commonPlayAll,
                 icon: EtaIcons.play,
                 variant: SButtonVariant.primary,
-                onPressed: tracks.isEmpty
+                onPressed: state.totalCount == 0
                     ? null
-                    : () => _playAll(context, ref, tracks),
+                    : () => _playAll(context, ref),
               ),
               const SizedBox(width: 8),
               // 扫描（旋转动画）
@@ -139,11 +138,11 @@ extension _LibraryHeaderView on LibraryHeader {
           ),
         ],
       );
-    } else if (state.initialized && state.tracks.isNotEmpty) {
+    } else if (state.initialized && state.totalCount > 0) {
       final size = _formatSize(state.totalSizeBytes);
       child = Text(
         l10n.libraryTrackCount(
-          state.tracks.length,
+          state.totalCount,
           size.isEmpty ? '' : ' · $size',
         ),
         style: TextStyle(

@@ -9,6 +9,31 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
+  String get settingsCatRender => '성능 / 렌더링';
+
+  @override
+  String get settingsRenderSubtitle => 'GPU 가속 및 렌더링 비용(실험적)';
+
+  @override
+  String get settingsRippleShader => '물결 GPU 셰이더';
+
+  @override
+  String get settingsRippleShaderDesc => '프래그먼트 셰이더로 플레이어 물결 그리기(끄면 CPU 메시)';
+
+  @override
+  String get settingsRippleLowRes => '동적 레이어 절반 해상도';
+
+  @override
+  String get settingsRippleLowResDesc =>
+      '물결 동적 레이어를 절반 해상도로 그린 뒤 확대; CPU 대체 경로 전용';
+
+  @override
+  String get settingsRippleDamageClip => '손상 영역 클리핑';
+
+  @override
+  String get settingsRippleDamageClipDesc => '활성 물결 띠만 다시 그리기; CPU 대체 경로 전용';
+
+  @override
   String get menuTrackDetail => '미디어 상세';
 
   @override
@@ -1426,10 +1451,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsDeveloperDisabled => '개발자 모드가 비활성화되었습니다';
 
   @override
-  String get settingsDeveloperHoldHint =>
-      '개발자 모드를 켜려면 10초 동안 길게 누르세요 (마우스: 누른 채 유지)';
-
-  @override
   String get settingsSearchHint => '설정 검색…';
 
   @override
@@ -1917,6 +1938,15 @@ class AppLocalizationsKo extends AppLocalizations {
   String settingsPlayerBgRippleSpeedDesc(Object speed) {
     return '흐름 속도 $speed';
   }
+
+  @override
+  String get settingsAdaptiveRenderQuality => '적응형 렌더링 품질';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn => '프레임이 느릴 때 플레이어 배경 해상도 낮추기';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff => '플레이어 배경은 항상 전체 해상도로 렌더링';
 
   @override
   String get settingsSectionShortcuts => '단축키';

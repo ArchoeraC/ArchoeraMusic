@@ -798,7 +798,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 ],
               ),
             ),
-            if (prefs.playerBgType == 'ripple')
+            if (prefs.playerBgType == 'ripple') ...[
               SettingSliderTile(
                 icon: EtaIcons.drop,
                 title: l10n.settingsPlayerBgRippleSpeed,
@@ -814,6 +814,20 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                     .read(appPrefsProvider.notifier)
                     .setPlayerBackground(rippleSpeed: v),
               ),
+              SettingSwitchTile(
+                icon: prefs.adaptiveRenderQuality
+                    ? EtaIcons.dashboard4Outline
+                    : EtaIcons.dashboard3,
+                title: l10n.settingsAdaptiveRenderQuality,
+                subtitle: prefs.adaptiveRenderQuality
+                    ? l10n.settingsAdaptiveRenderQualityOn
+                    : l10n.settingsAdaptiveRenderQualityOff,
+                value: prefs.adaptiveRenderQuality,
+                onChanged: (value) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setAdaptiveRenderQuality(value),
+              ),
+            ],
           ],
         ),
       ],

@@ -9,6 +9,34 @@ class AppLocalizationsDe extends AppLocalizations {
   AppLocalizationsDe([String locale = 'de']) : super(locale);
 
   @override
+  String get settingsCatRender => 'Leistung & Rendering';
+
+  @override
+  String get settingsRenderSubtitle =>
+      'GPU-Beschleunigung und Rendering-Kosten (experimentell)';
+
+  @override
+  String get settingsRippleShader => 'Ripple-GPU-Shader';
+
+  @override
+  String get settingsRippleShaderDesc =>
+      'Player-Ripple mit Fragment-Shader zeichnen (aus = CPU-Mesh-Fallback)';
+
+  @override
+  String get settingsRippleLowRes => 'Dynamische Ebene in halber Auflösung';
+
+  @override
+  String get settingsRippleLowResDesc =>
+      'Ripple-Ebene in halber Auflösung rendern und hochskalieren; nur CPU-Fallback';
+
+  @override
+  String get settingsRippleDamageClip => 'Schadensbereich-Clipping';
+
+  @override
+  String get settingsRippleDamageClipDesc =>
+      'Nur aktive Ripple-Bänder neu zeichnen; nur CPU-Fallback';
+
+  @override
   String get menuTrackDetail => 'Mediadetails';
 
   @override
@@ -1472,10 +1500,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDeveloperDisabled => 'Entwicklermodus deaktiviert';
 
   @override
-  String get settingsDeveloperHoldHint =>
-      '10 Sekunden gedrückt halten, um den Entwicklermodus zu aktivieren (Maus: gedrückt halten)';
-
-  @override
   String get settingsSearchHint => 'Einstellungen suchen…';
 
   @override
@@ -1993,6 +2017,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String settingsPlayerBgRippleSpeedDesc(Object speed) {
     return 'Fließgeschwindigkeit $speed';
   }
+
+  @override
+  String get settingsAdaptiveRenderQuality => 'Adaptive Renderqualität';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn =>
+      'Player-Hintergrund-Auflösung bei langsamen Frames verringern';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff =>
+      'Player-Hintergrund wird immer in voller Auflösung gerendert';
 
   @override
   String get settingsSectionShortcuts => 'Tastenkürzel';

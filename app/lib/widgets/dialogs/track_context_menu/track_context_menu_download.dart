@@ -31,6 +31,9 @@ Future<void> downloadTracks(
   final quality = await _pickDownloadQuality(context, defaultQuality);
   if (quality == null || !context.mounted) return;
   final controller = ref.read(downloadControllerProvider.notifier);
+  // 引擎按需加载：入队前确保引擎就绪（首次入队可能尚未加载）。
+  await controller.ensureEngine();
+  if (!context.mounted) return;
   var ok = 0;
   for (final t in online) {
     if (!context.mounted) return;

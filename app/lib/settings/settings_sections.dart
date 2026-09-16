@@ -43,6 +43,7 @@ part 'settings_sections/settings_sections_playback.dart';
 part 'settings_sections/settings_sections_shortcuts.dart';
 part 'settings_sections/settings_sections_lyrics.dart';
 part 'settings_sections/settings_sections_preset.dart';
+part 'settings_sections/settings_sections_render.dart';
 part 'settings_sections/settings_sections_download.dart';
 part 'settings_sections/settings_sections_scrape.dart';
 part 'settings_sections/settings_sections_storage.dart';

@@ -9,6 +9,34 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get settingsCatRender => 'Rendimiento y renderizado';
+
+  @override
+  String get settingsRenderSubtitle =>
+      'Aceleración por GPU y coste de renderizado (experimental)';
+
+  @override
+  String get settingsRippleShader => 'Shader GPU de ondas';
+
+  @override
+  String get settingsRippleShaderDesc =>
+      'Dibujar las ondas del reproductor con un fragment shader (desactivado = malla CPU)';
+
+  @override
+  String get settingsRippleLowRes => 'Capa dinámica a media resolución';
+
+  @override
+  String get settingsRippleLowResDesc =>
+      'Renderizar la capa dinámica de ondas a media resolución y escalar; solo ruta CPU';
+
+  @override
+  String get settingsRippleDamageClip => 'Recorte por región de daño';
+
+  @override
+  String get settingsRippleDamageClipDesc =>
+      'Redibujar solo las bandas de ondas activas; solo ruta CPU';
+
+  @override
   String get menuTrackDetail => 'Detalles del medio';
 
   @override
@@ -1477,10 +1505,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsDeveloperDisabled => 'Modo desarrollador desactivado';
 
   @override
-  String get settingsDeveloperHoldHint =>
-      'Mantén pulsado 10 segundos para activar el modo desarrollador (ratón: mantener pulsado)';
-
-  @override
   String get settingsSearchHint => 'Buscar ajustes…';
 
   @override
@@ -2003,6 +2027,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String settingsPlayerBgRippleSpeedDesc(Object speed) {
     return 'Velocidad de flujo $speed';
   }
+
+  @override
+  String get settingsAdaptiveRenderQuality =>
+      'Calidad de renderizado adaptativa';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn =>
+      'Reduce la resolución del fondo del reproductor cuando los fotogramas van lentos';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff =>
+      'El fondo del reproductor siempre se renderiza a resolución completa';
 
   @override
   String get settingsSectionShortcuts => 'Atajos';

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:async' show Timer, unawaited;
-import 'dart:ui' show ImageFilter;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -26,6 +25,7 @@ import '../dialogs/qqmusic_login_dialog.dart';
 import '../dialogs/track_list_dialog.dart';
 import '../player/s_controls.dart';
 import '../common/anim.dart';
+import '../common/glass_blur.dart';
 import '../common/toast.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 

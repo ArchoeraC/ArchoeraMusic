@@ -31,6 +31,15 @@ class _FakePlayback extends PlaybackNotifier {
   PlaybackState build() => _s;
 }
 
+/// 可变播放态（用于验证「暂停即停表」）。
+class _MutablePlayback extends PlaybackNotifier {
+  _MutablePlayback(this._s);
+  PlaybackState _s;
+  @override
+  PlaybackState build() => _s;
+  void set(PlaybackState s) => state = s;
+}
+
 FftFrame _frame() {
   final l = List<double>.generate(128, (i) => (i % 16) / 16);
   return FftFrame(ldata: l, rdata: l);
@@ -69,4 +78,37 @@ void main() {
       expect(find.byType(ShaderMask), findsNothing);
     });
   }
+
+  testWidgets('暂停时频谱停表（不再持续出帧）', (tester) async {
+    final fake = _MutablePlayback(
+      PlaybackState(playing: true, fft: _frame()),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPrefsProvider.overrideWith(_NoSideEffectsPrefsNotifier.new),
+          playbackProvider.overrideWith(() => fake),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 600,
+                height: 90,
+                child: SpectrumView(height: 80, enabled: true),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(tester.hasRunningAnimations, isTrue, reason: '播放中应持续 tick');
+
+    fake.set(PlaybackState(playing: false, fft: _frame()));
+    // 越过 AnimatedOpacity 的 300ms 过渡后应无任何常驻动画。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(tester.hasRunningAnimations, isFalse, reason: '暂停后应停表');
+  });
 }

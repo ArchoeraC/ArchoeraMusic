@@ -127,33 +127,31 @@ final appRouter = GoRouter(
       path: '/player',
       pageBuilder: (context, state) => CustomTransitionPage(
         key: state.pageKey,
-        transitionDuration: const Duration(milliseconds: 320),
-        reverseTransitionDuration: const Duration(milliseconds: 260),
-        transitionsBuilder:
-            (context, animation, secondaryAnimation, child) {
+        // 非不透明：过渡期间 Overlay 仍绘制下方主页，才能看到主页同步收缩
+        // （不透明路由会立刻把下方路由 offstage）。展开动画结束后壳内容已被
+        // ShellExpandTransition 卸载为轻量占位，背后绘制开销可忽略。
+        opaque: false,
+        transitionDuration: const Duration(milliseconds: 500),
+        reverseTransitionDuration: const Duration(milliseconds: 500),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
           // 性能模式（MediaQuery.disableAnimations）：播放页直切，无展开动效
           if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
             return child;
           }
-          // 底部展开 + 轻微放大 + 淡入（对齐原版 FullPlayer 从底部
-          // 展开的覆盖层语义；easeOutQuart 收尾更柔顺，避免生硬）
+          // 纯垂直上滑（对齐原版 FullPlayer：enter/leave 均
+          // `translate-y-full → 0`，500ms cubic-bezier(0.7,0,0.3,1)）。
+          // 壳层由壳路由的 secondaryAnimation 驱动同一节奏，天然同步。
           final curved = CurvedAnimation(
             parent: animation,
-            curve: Curves.easeOutQuart,
-            reverseCurve: Curves.easeInQuart,
+            curve: const Cubic(0.7, 0, 0.3, 1),
+            reverseCurve: const Cubic(0.7, 0, 0.3, 1),
           );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.08),
-                end: Offset.zero,
-              ).animate(curved),
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
-                child: child,
-              ),
-            ),
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
           );
         },
         child: const PlayerPage(),

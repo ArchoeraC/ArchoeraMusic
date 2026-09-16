@@ -109,6 +109,7 @@ extension _HistoryPageView on _HistoryPageState {
                     ),
                   )
                 : SongList(
+                    key: const PageStorageKey('page.history'),
                     items: _tracks,
                     playingId: playingId,
                     isPlaying: isPlaying,

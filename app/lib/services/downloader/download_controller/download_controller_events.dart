@@ -89,6 +89,8 @@ mixin _DownloadControllerEvents
         _forgetTracks([taskId]);
     }
     _pruneHistory();
+    // 任务态变化后重估空闲释放（页面不可见且无在途任务时延时销毁引擎）。
+    _scheduleIdleSuspend();
   }
 
   void _applyTask(String taskId, DownloadTask Function(DownloadTask?) update) {

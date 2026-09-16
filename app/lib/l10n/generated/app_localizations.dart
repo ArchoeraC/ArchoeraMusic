@@ -110,6 +110,54 @@ abstract class AppLocalizations {
     Locale('zh', 'TW'),
   ];
 
+  /// No description provided for @settingsCatRender.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'性能 / 渲染'**
+  String get settingsCatRender;
+
+  /// No description provided for @settingsRenderSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'GPU 加速与渲染开销（实验）'**
+  String get settingsRenderSubtitle;
+
+  /// No description provided for @settingsRippleShader.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'水纹 GPU 着色器'**
+  String get settingsRippleShader;
+
+  /// No description provided for @settingsRippleShaderDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用片元着色器绘制播放页水纹（关闭则回退 CPU 网格）'**
+  String get settingsRippleShaderDesc;
+
+  /// No description provided for @settingsRippleLowRes.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'动态层半分辨率'**
+  String get settingsRippleLowRes;
+
+  /// No description provided for @settingsRippleLowResDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'水纹动态层半分辨率绘制再放大；仅 CPU 回退路径生效'**
+  String get settingsRippleLowResDesc;
+
+  /// No description provided for @settingsRippleDamageClip.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'损伤区裁剪'**
+  String get settingsRippleDamageClip;
+
+  /// No description provided for @settingsRippleDamageClipDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'只重绘活动涟漪波带；仅 CPU 回退路径生效'**
+  String get settingsRippleDamageClipDesc;
+
   /// No description provided for @menuTrackDetail.
   ///
   /// In zh_CN, this message translates to:
@@ -2678,12 +2726,6 @@ abstract class AppLocalizations {
   /// **'开发者模式已关闭'**
   String get settingsDeveloperDisabled;
 
-  /// No description provided for @settingsDeveloperHoldHint.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'长按 10 秒开启开发者模式（鼠标：按住不放）'**
-  String get settingsDeveloperHoldHint;
-
   /// No description provided for @settingsSearchHint.
   ///
   /// In zh_CN, this message translates to:
@@ -3571,6 +3613,24 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'流动速度 {speed}'**
   String settingsPlayerBgRippleSpeedDesc(Object speed);
+
+  /// No description provided for @settingsAdaptiveRenderQuality.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自适应画质'**
+  String get settingsAdaptiveRenderQuality;
+
+  /// No description provided for @settingsAdaptiveRenderQualityOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'帧时间升高时自动降低播放页水纹分辨率'**
+  String get settingsAdaptiveRenderQualityOn;
+
+  /// No description provided for @settingsAdaptiveRenderQualityOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放页背景始终满分辨率渲染'**
+  String get settingsAdaptiveRenderQualityOff;
 
   /// No description provided for @settingsSectionShortcuts.
   ///

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:io' show File;
-import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,10 +11,14 @@ import 'package:go_router/go_router.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/scanner/library_store.dart';
 import '../stores/app_prefs.dart';
+import '../stores/player_route_animation.dart';
+import '../widgets/common/anim.dart';
+import '../widgets/common/baked_image_background.dart';
 import '../widgets/common/fps_monitor.dart';
 import '../widgets/layout/nav_header.dart';
 import '../widgets/layout/player_bar.dart';
 import '../widgets/layout/side_bar.dart';
+import 'shell_expand_transition.dart';
 
 /// 应用壳（对齐原项目 MainLayout.vue）：
 /// 左侧 SideBar（可折叠分组导航）+ 右侧（顶部 NavHeader + 页面区）
@@ -40,6 +43,15 @@ class AppShell extends ConsumerWidget {
         prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
     final floating = prefs.floatingPlayerBar;
     final collapsed = prefs.sidebarCollapsed;
+    // 全屏播放器展开时，主壳内容（侧边栏 + 页面区）缩放淡出并忽略指针
+    // （对齐原版 MainLayout：scale-95 opacity-0 pointer-events-none）。
+    //
+    // 用**播放页路由自身的动画**驱动（经 provider 传入）：该动画由播放页的
+    // Ticker 逐帧推进，与播放页进出同帧同步；壳层无需自建 Ticker，避免下方
+    // 路由被 offstage 时动画停摆（0=折叠，1=完全展开）。
+    final playerRouteAnim =
+        ref.watch(playerRouteAnimationProvider) ??
+        const AlwaysStoppedAnimation<double>(0);
     // 播放条可见时，停靠模式给内容底部留白（对齐原版 mb-20），
     // 防止被全宽停靠条遮挡；悬浮模式占满全高（侧边栏可到底）。
     final showBar = ref.watch(
@@ -81,7 +93,15 @@ class AppShell extends ConsumerWidget {
           Positioned.fill(
             child: Padding(
               padding: EdgeInsets.only(bottom: !floating && showBar ? 82 : 0),
-              child: content,
+              child: ShellExpandTransition(
+                animation: playerRouteAnim,
+                disableAnimations: noAnim(context),
+                // 完全展开后壳内容卸载，仅保留一层纯色背景（无列表/图片）。
+                placeholder: ColoredBox(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                ),
+                child: content,
+              ),
             ),
           ),
           // 底部播放条（悬浮层，不占布局空间——对齐原版 MainLayout 的
@@ -118,35 +138,18 @@ class _AppBackground extends StatelessWidget {
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final decodeW = (screen.width * dpr).round().clamp(1, 2560);
     final decodeH = (screen.height * dpr).round().clamp(1, 2560);
-    Widget image = Image.file(
-      File(path),
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      cacheWidth: decodeW,
-      cacheHeight: decodeH,
-      // 文件被移动/删除时静默回退纯色背景（不崩溃）
-      errorBuilder: (_, _, _) => const SizedBox.shrink(),
-    );
-    if (prefs.backgroundBlur > 0) {
-      final sigma = prefs.backgroundBlur.toDouble();
-      image = ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-        child: image,
-      );
-    }
-    if (prefs.backgroundScale != 1) {
-      image = Transform.scale(scale: prefs.backgroundScale, child: image);
-    }
     return ClipRect(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          image,
-          ColoredBox(
-            color: Colors.black.withValues(alpha: prefs.backgroundDim),
-          ),
-        ],
+      // 一次性烘焙成静态纹理：避免实时 `ImageFiltered` 在每帧重算全屏模糊
+      // （Impeller 无图层光栅缓存，见 [BakedImageBackground]）。
+      child: BakedImageBackground(
+        provider: ResizeImage.resizeIfNeeded(
+          decodeW,
+          decodeH,
+          FileImage(File(path)),
+        ),
+        blurSigma: prefs.backgroundBlur.toDouble(),
+        scale: prefs.backgroundScale,
+        dim: prefs.backgroundDim,
       ),
     );
   }

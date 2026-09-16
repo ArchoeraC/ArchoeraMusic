@@ -2,8 +2,6 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'dart:ui' as ui;
-
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,6 +23,7 @@ import '../player/queue_panel.dart';
 import '../player/spectrum_view.dart';
 import '../common/toast.dart';
 import '../common/anim.dart';
+import '../common/glass_blur.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'player_bar/player_bar_view.dart';
