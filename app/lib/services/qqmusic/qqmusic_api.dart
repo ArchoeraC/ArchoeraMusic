@@ -17,6 +17,7 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../../apis/qqmusic/api.dart';
+import '../../apis/qqmusic/core/config.dart';
 import '../../apis/qqmusic/core/request.dart';
 import '../netease/comment.dart';
 import '../netease/netease_api.dart' show CoverItem, SearchResult;
@@ -147,7 +148,9 @@ class QqMusicApi extends ChangeNotifier {
     final body = await qmCall('login_qr_key', {'type': 'qq'});
     if (body is! Map) throw QqApiException('获取二维码失败');
     final code = body['code'];
-    if (code != 200) throw QqApiException('获取二维码失败: ${body['message'] ?? code}');
+    if (code != 200) {
+      throw QqApiException('获取二维码失败: ${body['message'] ?? code}');
+    }
     final key = body['key']?.toString() ?? '';
     final content = body['content']?.toString() ?? '';
     if (key.isEmpty || content.isEmpty) {
@@ -248,16 +251,18 @@ class QqMusicApi extends ChangeNotifier {
       final total = _extractTotal(body);
       return SearchResult<CoverItem>(
         items: raw
-            .map((a) => CoverItem(
-                  id: a['id']?.toString() ?? '',
-                  title: a['name']?.toString() ?? '',
-                  cover: a['cover']?.toString(),
-                  subtitle: a['songCount'] != null && a['albumCount'] != null
-                      ? '${a['songCount']} 首 / ${a['albumCount']} 专辑'
-                      : '',
-                  trackCount: (a['songCount'] as num?)?.toInt() ?? 0,
-                  source: 'qqmusic',
-                ))
+            .map(
+              (a) => CoverItem(
+                id: a['id']?.toString() ?? '',
+                title: a['name']?.toString() ?? '',
+                cover: a['cover']?.toString(),
+                subtitle: a['songCount'] != null && a['albumCount'] != null
+                    ? '${a['songCount']} 首 / ${a['albumCount']} 专辑'
+                    : '',
+                trackCount: (a['songCount'] as num?)?.toInt() ?? 0,
+                source: 'qqmusic',
+              ),
+            )
             .toList(),
         total: total,
         hasMore: (page - 1) * requestLimit + raw.length < total,
@@ -282,14 +287,16 @@ class QqMusicApi extends ChangeNotifier {
       final total = _extractTotal(body);
       return SearchResult<CoverItem>(
         items: raw
-            .map((p) => CoverItem(
-                  id: p['id']?.toString() ?? '',
-                  title: p['name']?.toString() ?? '',
-                  cover: p['cover']?.toString(),
-                  subtitle: p['creator']?.toString() ?? '',
-                  trackCount: (p['trackCount'] as num?)?.toInt() ?? 0,
-                  source: 'qqmusic',
-                ))
+            .map(
+              (p) => CoverItem(
+                id: p['id']?.toString() ?? '',
+                title: p['name']?.toString() ?? '',
+                cover: p['cover']?.toString(),
+                subtitle: p['creator']?.toString() ?? '',
+                trackCount: (p['trackCount'] as num?)?.toInt() ?? 0,
+                source: 'qqmusic',
+              ),
+            )
             .toList(),
         total: total,
         hasMore: page * limit < total,
@@ -332,10 +339,7 @@ class QqMusicApi extends ChangeNotifier {
   ];
 
   /// 榜单曲目（leaderboard，musicToplist.ToplistInfoServer）。
-  Future<List<Track>> leaderboardTracks(
-    String topid, {
-    int limit = 50,
-  }) async {
+  Future<List<Track>> leaderboardTracks(String topid, {int limit = 50}) async {
     final body = await qmCall('leaderboard', {'topid': topid, 'limit': limit});
     if (body is! Map) return const [];
     final raw = _extractList(body, 'songs');
@@ -366,6 +370,10 @@ class QqMusicApi extends ChangeNotifier {
       return map;
     } on QqApiException catch (e) {
       if (e.message.contains('需要登录')) rethrow;
+      return _favoritePageViaFcg(page, num);
+    } catch (_) {
+      // 传输 / 超时 / 非 JSON 等异常也回退 fcg 稳定 GET（此前只捕获
+      // QqApiException，导致网络类失败不会走上回退，与注释声明不符）。
       return _favoritePageViaFcg(page, num);
     }
   }
@@ -398,6 +406,9 @@ class QqMusicApi extends ChangeNotifier {
         'artists': artists.map((n) => {'name': '$n'}).toList(),
         'album': s['album'],
         'albumMid': s['albumMid'],
+        'cover': s['cover'],
+        'coverOriginal': s['coverOriginal'],
+        'mediaMid': s['mediaMid'],
         'duration': s['duration'],
         'size128': s['size128'],
         'size320': s['size320'],
@@ -448,7 +459,14 @@ class QqMusicApi extends ChangeNotifier {
   /// 用户歌单库（自建歌单 + 收藏歌单 + 我喜欢总数），供收藏页展示。
   ///
   /// 走 `fcgi` GET（见 `modules/user_playlist.dart`）；未登录返回空。
-  Future<({List<CoverItem> created, List<CoverItem> collected, int likedTotal})>
+  Future<
+    ({
+      List<CoverItem> created,
+      List<CoverItem> collected,
+      int likedTotal,
+      String likedCover,
+    })
+  >
   userLibrary() async {
     final created = await _playlistList('user_created_diss');
     final collected = await _playlistList('profile_order_playlists');
@@ -459,7 +477,21 @@ class QqMusicApi extends ChangeNotifier {
         ? Map<String, dynamic>.from(likedRaw)
         : const <String, dynamic>{};
     final total = (liked['total'] as num?)?.toInt() ?? 0;
-    return (created: created, collected: collected, likedTotal: total);
+    // 「我喜欢」无独立封面：取第一首收藏曲的专辑封面（对齐 music-lib/qq 的
+    // fetchFavoriteSongsPlaylistSummary：cover = songs[0].Cover）。
+    var likedCover = '';
+    final likedSongs = liked['songs'];
+    if (likedSongs is List &&
+        likedSongs.isNotEmpty &&
+        likedSongs.first is Map) {
+      likedCover = (likedSongs.first as Map)['cover']?.toString() ?? '';
+    }
+    return (
+      created: created,
+      collected: collected,
+      likedTotal: total,
+      likedCover: likedCover,
+    );
   }
 
   Future<List<CoverItem>> _playlistList(String module) async {
@@ -490,11 +522,7 @@ class QqMusicApi extends ChangeNotifier {
   /// - [songId]：QQ 歌曲数字 id（`Track.id`）。写接口按 songid 操作，
   ///   缺失时抛可读错误（不猜测、不静默跳过）。
   /// - 失败抛 [QqApiException]（message 可展示；由红心控制器回滚本地）。
-  Future<void> like(
-    String mid, {
-    required bool like,
-    String? songId,
-  }) async {
+  Future<void> like(String mid, {required bool like, String? songId}) async {
     if (mid.trim().isEmpty) {
       throw QqApiException('QM：缺少 songmid，无法收藏');
     }
@@ -513,9 +541,9 @@ class QqMusicApi extends ChangeNotifier {
     }
     if (code != 200 || body['ok'] != true) {
       final msg = body['message']?.toString();
-      throw QqApiException(msg?.isNotEmpty == true
-          ? 'QM收藏失败：$msg'
-          : 'QM收藏失败（实验接口未确认）');
+      throw QqApiException(
+        msg?.isNotEmpty == true ? 'QM收藏失败：$msg' : 'QM收藏失败（实验接口未确认）',
+      );
     }
   }
 
@@ -526,10 +554,7 @@ class QqMusicApi extends ChangeNotifier {
   /// [quality] 为档位（lq/sq/hq/lossless/hi-res），缺省 hq；解析内部按
   /// 高→低顺位自动降级。访客可播免费曲；VIP/无版权按接口语义抛
   /// [QqApiException]（message 走既有 error 呈现，明确"需登录/会员"）。
-  Future<String?> resolvePlayUrl(
-    Track track, {
-    String quality = 'hq',
-  }) async {
+  Future<String?> resolvePlayUrl(Track track, {String quality = 'hq'}) async {
     final q = track.qqmusic;
     final mid = q?.mid.isNotEmpty == true
         ? q!.mid
@@ -545,9 +570,9 @@ class QqMusicApi extends ChangeNotifier {
     if (body is! Map) throw QqApiException('QM：播放链接解析失败');
     if (body['code'] != 200) {
       final msg = body['message']?.toString();
-      throw QqApiException(msg?.isNotEmpty == true
-          ? 'QM：$msg'
-          : 'QM：未能获取可播放链接');
+      throw QqApiException(
+        msg?.isNotEmpty == true ? 'QM：$msg' : 'QM：未能获取可播放链接',
+      );
     }
     final data = body['data'];
     if (data is List && data.isNotEmpty) {
@@ -645,9 +670,17 @@ class QqMusicApi extends ChangeNotifier {
     }
   }
 
-  /// 归一歌曲 map → [Track]。
-  Track _toTrack(Map<String, dynamic> song, {String? cover}) =>
-      Track.fromQqMusicSong(song, cover: cover);
+  /// 归一歌曲 map → [Track]（封面统一升级 https，避免 `//`/`http://` 显示不出）。
+  Track _toTrack(Map<String, dynamic> song, {String? cover}) {
+    final coverField = song['cover'];
+    final coverOriginal = song['coverOriginal'];
+    return Track.fromQqMusicSong(<String, dynamic>{
+      ...song,
+      if (coverField != null) 'cover': qmNormalizeCover(coverField.toString()),
+      if (coverOriginal != null)
+        'coverOriginal': qmNormalizeCover(coverOriginal.toString()),
+    }, cover: cover == null ? null : qmNormalizeCover(cover));
+  }
 
   /// QQ 搜索条目 → [CoverItem]（专辑）。
   CoverItem _coverFromQq(Map<String, dynamic> a) => CoverItem(
@@ -663,7 +696,10 @@ class QqMusicApi extends ChangeNotifier {
     if (body is! Map) return const [];
     final raw = body[key];
     if (raw is! List) return const [];
-    return raw.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+    return raw
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
   }
 
   static int _extractTotal(Object? body) {

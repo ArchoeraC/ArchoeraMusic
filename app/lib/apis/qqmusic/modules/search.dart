@@ -24,8 +24,7 @@ import '../core/request.dart';
 import '../core/sign.dart';
 import '../core/types.dart';
 
-String _secureUrl(String? url) =>
-    (url ?? '').replaceFirst(RegExp('^http:'), 'https:');
+String _secureUrl(String? url) => qmNormalizeCover(url);
 
 String _stripHighlight(String? text) =>
     (text ?? '').replaceAll(RegExp(r'</?em>'), '');
@@ -171,7 +170,10 @@ List<Map<String, dynamic>> _listOf(Object? node) {
   if (node is! Map) return const [];
   final list = node['list'];
   if (list is! List) return const [];
-  return list.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+  return list
+      .whereType<Map>()
+      .map((m) => Map<String, dynamic>.from(m))
+      .toList();
 }
 
 Map<String, dynamic> _mapSong(Map song) {

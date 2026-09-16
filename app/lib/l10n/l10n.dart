@@ -37,7 +37,8 @@ extension AppLocalizationsContext on BuildContext {
 String l10nQualityLabel(AppLocalizations l10n, String quality) {
   switch (quality) {
     case 'lossless':
-      return l10n.qualityLossless;
+      // 与 Hi-Res / HQ / SQ / LQ 保持一致：音质档位标签统一用英文术语。
+      return 'Lossless';
     case 'hi-res':
       return 'Hi-Res';
     case 'hq':

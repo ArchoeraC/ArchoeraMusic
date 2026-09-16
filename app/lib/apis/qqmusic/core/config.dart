@@ -43,6 +43,24 @@ const qmSessionTtl = 60 * 60 * 1000;
 const qmWebUa =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
+/// 归一 QQ 封面 / 头像 URL。
+///
+/// QQ 各 CDN（`y.gtimg.cn`、`qpic.y.qq.com`、`q.qlogo.cn` 等）会返回三种形态：
+/// - `https://...`（保持）；
+/// - `http://...`（明文，桌面端可能加载失败 / 移动端被拦截）；
+/// - 协议相对 `//host/...`（**无 scheme**，会被 `CoverImage` 误判为本地文件，
+///   直接显示占位图）。
+///
+/// 统一升级为 `https://`；空值返回 `''`。收藏歌单封面（`logo`）此前正是因
+/// `//` 未归一而显示不出来。
+String qmNormalizeCover(String? url) {
+  final u = url?.trim() ?? '';
+  if (u.isEmpty) return '';
+  if (u.startsWith('//')) return 'https:$u';
+  if (u.startsWith('http://')) return 'https://${u.substring(7)}';
+  return u;
+}
+
 /// 歌手数组格式化工具：`[{name:'A'},{name:'B'}]` → `A / B`
 String qmFormatSingerName(
   List<dynamic>? singers, {

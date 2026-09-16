@@ -8,6 +8,7 @@
 /// VipLogin.VipLoginInter / vip_login_base 获取会员权限。未登录返回 code 301。
 library;
 
+import '../core/config.dart';
 import '../core/request.dart';
 import '../core/types.dart';
 import '../core/vip.dart';
@@ -21,7 +22,8 @@ Future<Map<String, dynamic>?> _fetchProfile() async {
     );
     final info = data['info'];
     if (info is Map) {
-      final nick = (info['nick'] ?? info['nickname'] ?? info['name']) as dynamic;
+      final nick =
+          (info['nick'] ?? info['nickname'] ?? info['name']) as dynamic;
       final logo = info['logo'];
       if ((nick != null && '$nick'.isNotEmpty) ||
           (logo != null && '$logo'.isNotEmpty)) {
@@ -50,7 +52,8 @@ QmModule qmUserDetail = (_) async {
   final uin = qmGetQQMusicUin();
   final cookies = qmGetQQMusicCookies();
 
-  final hasKey = (cookies['qm_keyst']?.isNotEmpty == true ||
+  final hasKey =
+      (cookies['qm_keyst']?.isNotEmpty == true ||
       cookies['qqmusic_key']?.isNotEmpty == true ||
       cookies['pskey']?.isNotEmpty == true ||
       cookies['p_skey']?.isNotEmpty == true ||
@@ -67,8 +70,12 @@ QmModule qmUserDetail = (_) async {
   final profileFuture = _fetchProfile();
   final vipFuture = _fetchVipStatus();
   final results = await Future.wait([profileFuture, vipFuture]);
-  final creator = results[0] is Map ? Map<String, dynamic>.from(results[0] as Map) : null;
-  final vipData = results[1] is Map ? Map<String, dynamic>.from(results[1] as Map) : null;
+  final creator = results[0] is Map
+      ? Map<String, dynamic>.from(results[0] as Map)
+      : null;
+  final vipData = results[1] is Map
+      ? Map<String, dynamic>.from(results[1] as Map)
+      : null;
 
   final avatar = creator?['headpic']?.toString() ?? '';
   final vip = qmNormalizeQQMusicVip(vipData);
@@ -78,10 +85,9 @@ QmModule qmUserDetail = (_) async {
     'profile': <String, dynamic>{
       'userId': uin,
       'nickname': creator?['nick'] ?? '',
-      'avatarUrl': avatar.replaceFirst(RegExp('^http://'), 'https://'),
+      'avatarUrl': qmNormalizeCover(avatar),
       'isVip': vip.isVip,
       'vipLevel': vip.vipLevel,
     },
   };
 };
-
