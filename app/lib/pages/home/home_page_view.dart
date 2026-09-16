@@ -19,6 +19,7 @@ extension _HomePageView on _HomePageState {
 
     return Scaffold(
       body: SingleChildScrollView(
+        key: const PageStorageKey('page.home'),
         padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
         child: Center(
           child: ConstrainedBox(

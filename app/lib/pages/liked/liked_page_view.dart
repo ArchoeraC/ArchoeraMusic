@@ -130,6 +130,7 @@ extension _LikedPageView on _LikedPageState {
         );
       }
       return SongList(
+        key: const PageStorageKey('page.liked'),
         items: qqTracks,
         playingId: playingId,
         isPlaying: isPlaying,
@@ -191,6 +192,7 @@ extension _LikedPageView on _LikedPageState {
       );
     }
     return SongList(
+      key: const PageStorageKey('page.liked'),
       items: store.tracks(_platform),
       playingId: playingId,
       isPlaying: isPlaying,

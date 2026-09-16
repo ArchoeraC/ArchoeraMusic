@@ -25,6 +25,31 @@ Widget _host({required bool expanded, bool disableAnimations = false}) {
   );
 }
 
+/// 与 [_host] 类似，但 child 换成带 [PageStorageKey] 的可滚动列表，用于验证
+/// 卸载/重挂载后滚动位置的保留。每次重挂载由调用方传入全新的
+/// [ScrollController]，从而排除 controller 自身记忆 offset 的可能，确保恢复
+/// 只能来自 [ShellExpandTransition] 持有的 [PageStorageBucket]。
+Widget _scrollHost({
+  required bool expanded,
+  required ScrollController controller,
+}) {
+  return MaterialApp(
+    home: Scaffold(
+      body: ShellExpandTransition(
+        expanded: expanded,
+        duration: const Duration(milliseconds: 100),
+        placeholder: const Text('placeholder'),
+        child: ListView.builder(
+          key: const PageStorageKey<String>('test.list'),
+          controller: controller,
+          itemCount: 200,
+          itemBuilder: (_, i) => SizedBox(height: 50, child: Text('item$i')),
+        ),
+      ),
+    ),
+  );
+}
+
 void main() {
   group('ShellExpandTransition', () {
     testWidgets('折叠态显示 child、隐藏 placeholder', (tester) async {
@@ -65,6 +90,29 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('child'), findsOneWidget);
       expect(find.text('placeholder'), findsNothing);
+    });
+
+    testWidgets('卸载/重挂载后 PageStorage 恢复滚动位置', (tester) async {
+      final first = ScrollController();
+      await tester.pumpWidget(_scrollHost(expanded: false, controller: first));
+      first.jumpTo(1200);
+      await tester.pump();
+      expect(first.offset, 1200);
+
+      // 展开：动画结束切 placeholder，child 与列表真正卸载。
+      await tester.pumpWidget(_scrollHost(expanded: true, controller: first));
+      await tester.pumpAndSettle();
+      expect(find.text('placeholder'), findsOneWidget);
+      expect(find.byType(ListView), findsNothing);
+
+      // 重挂载时用全新 controller：offset 只能来自 PageStorage 恢复。
+      final second = ScrollController();
+      await tester.pumpWidget(_scrollHost(expanded: false, controller: second));
+      await tester.pump();
+      expect(second.offset, 1200);
+
+      first.dispose();
+      second.dispose();
     });
 
     testWidgets('disableAnimations：展开/折叠均直切', (tester) async {

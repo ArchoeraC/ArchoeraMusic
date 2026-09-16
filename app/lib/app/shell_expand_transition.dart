@@ -77,6 +77,16 @@ class _ShellExpandTransitionState extends State<ShellExpandTransition>
   /// 已从树上移除）。
   bool _placeholder = false;
 
+  /// 壳内容卸载/重挂载期间保留 [PageStorage] 状态（典型：各页滚动位置）。
+  /// 本 state 跨 child 生命周期常驻，bucket 因此得以存活；child 重新挂载
+  /// 时其 [PageStorageKey] 标记的滚动位置会被自动恢复。
+  final PageStorageBucket _bucket = PageStorageBucket();
+
+  /// 将壳内容包在持久 bucket 的 [PageStorage] 中（placeholder 不参与：
+  /// 它本就是轻量占位，无滚动状态需要保留）。
+  Widget _withStorage(Widget child) =>
+      PageStorage(bucket: _bucket, child: child);
+
   @override
   void initState() {
     super.initState();
@@ -128,14 +138,17 @@ class _ShellExpandTransitionState extends State<ShellExpandTransition>
   @override
   Widget build(BuildContext context) {
     if (widget.disableAnimations) {
-      return widget.expanded ? widget.placeholder : widget.child;
+      return widget.expanded ? widget.placeholder : _withStorage(widget.child);
     }
     if (_placeholder) return widget.placeholder;
-    // 折叠静止态不加任何包裹，保持与未使用本组件时一致。
-    if (_ctrl.value == 0) return widget.child;
+    // 折叠静止态不加任何动效包裹，保持与未使用本组件时逐帧一致。
+    if (_ctrl.value == 0) return _withStorage(widget.child);
     Widget result = ScaleTransition(
       scale: _scale,
-      child: FadeTransition(opacity: _opacity, child: widget.child),
+      child: FadeTransition(
+        opacity: _opacity,
+        child: _withStorage(widget.child),
+      ),
     );
     if (widget.expanded) result = IgnorePointer(child: result);
     return result;

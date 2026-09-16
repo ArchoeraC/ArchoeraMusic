@@ -256,6 +256,7 @@ extension _FavoritesPageView on _FavoritesPageState {
                     ),
                   )
                 : CoverGrid(
+                    key: const PageStorageKey('page.favorites'),
                     items: items,
                     onTap: _onCoverTap,
                     maxCrossAxisExtent:
