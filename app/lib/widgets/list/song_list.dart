@@ -89,6 +89,9 @@ class _SongListState extends ConsumerState<SongList> {
   static const double _songRowExtent = 76.0;
   static const double _songTopPadding = 8.0;
 
+  /// 尾项（加载中 / 已到底提示）固定高度；列表为空时尾项收为 0。
+  static const double _songFooterExtent = 48.0;
+
   /// 批量选择模式（表头切换为批量操作栏，行内序号变勾选框）。
   bool _batchActive = false;
 
