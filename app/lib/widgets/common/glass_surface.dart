@@ -10,12 +10,11 @@
 /// 可读性对齐非图片风格）；非图片风格直接实底，两模式视觉一致且无 blur 开销。
 library;
 
-import 'dart:ui' as ui;
-
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../stores/app_prefs.dart';
+import 'glass_blur.dart';
 
 class GlassDialogSurface extends ConsumerWidget {
   const GlassDialogSurface({
@@ -49,8 +48,8 @@ class GlassDialogSurface extends ConsumerWidget {
     }
     return ClipRRect(
       borderRadius: radius,
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+      child: GlassBlur(
+        sigma: 16,
         child: ColoredBox(color: color, child: child),
       ),
     );

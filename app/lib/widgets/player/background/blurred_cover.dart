@@ -1,0 +1,129 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+/// 模糊封面背景与水纹共用的颜色滤镜。
+library;
+
+import 'dart:ui' as ui;
+
+import 'package:material_ui/material_ui.dart';
+
+import '../../list/cover_image.dart';
+
+/// 饱和度颜色滤镜（对齐上游 `saturate`），供水纹与模糊背景共用。
+ColorFilter saturationColorFilter(double saturation) {
+  final s = saturation;
+  final inv = 1 - s;
+  const lr = 0.2126, lg = 0.7152, lb = 0.0722;
+  return ColorFilter.matrix(<double>[
+    inv * lr + s,
+    inv * lg,
+    inv * lb,
+    0,
+    0,
+    inv * lr,
+    inv * lg + s,
+    inv * lb,
+    0,
+    0,
+    inv * lr,
+    inv * lg,
+    inv * lb + s,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ]);
+}
+
+/// 模糊封面背景（对齐上游 `.bg-blur-wrap`：`blur(45px) saturate(1.2)`
+/// + `scale(1.5)` + 50% 压暗）。
+///
+/// 切歌时按上游双缓冲做法**交叉淡入**（两层模糊图叠加、`ease-in-out`），
+/// 避免封面硬切换；压暗层独立叠在最上方，保证过渡期不会叠加变暗。
+class BlurredCover extends StatelessWidget {
+  const BlurredCover({
+    super.key,
+    required this.cover,
+    this.duration = const Duration(milliseconds: 500),
+  });
+
+  final String cover;
+
+  /// 交叉淡入时长（对齐上游 `transition: opacity 0.5s ease-in-out`）。
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth.isFinite ? constraints.maxWidth : 800.0;
+        final h = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : 800.0;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            // 双缓冲交叉淡入：旧图淡出、新图淡入同时进行。
+            AnimatedSwitcher(
+              duration: duration,
+              switchInCurve: Curves.easeInOut,
+              switchOutCurve: Curves.easeInOut,
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                fit: StackFit.expand,
+                children: [...previousChildren, ?currentChild],
+              ),
+              child: KeyedSubtree(
+                key: ValueKey<String>(cover),
+                child: _BlurLayer(cover: cover, width: w, height: h),
+              ),
+            ),
+            // 压暗层：置于交叉淡入之外，避免过渡期两层叠加导致过暗。
+            ColoredBox(color: Colors.black.withValues(alpha: 0.5)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// 单层模糊封面（模糊 + 饱和 + 放大）。
+class _BlurLayer extends StatelessWidget {
+  const _BlurLayer({
+    required this.cover,
+    required this.width,
+    required this.height,
+  });
+
+  final String cover;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColorFiltered(
+      colorFilter: saturationColorFilter(1.2),
+      child: ImageFiltered(
+        imageFilter: ui.ImageFilter.blur(
+          sigmaX: 45,
+          sigmaY: 45,
+          tileMode: TileMode.clamp,
+        ),
+        child: Transform.scale(
+          scale: 1.5,
+          child: CoverImage(
+            cover: cover,
+            width: width,
+            height: height,
+            radius: 0,
+            iconSize: 0,
+          ),
+        ),
+      ),
+    );
+  }
+}

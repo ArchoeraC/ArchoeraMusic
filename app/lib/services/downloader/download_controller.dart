@@ -19,6 +19,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -251,9 +252,12 @@ class DownloadState {
     bool? initializing,
     String? initError,
     List<DownloadTask>? tasks,
+
+    /// true = 清除既有 initError（`initError ?? this.initError` 无法置空）。
+    bool clearInitError = false,
   }) => DownloadState(
     initializing: initializing ?? this.initializing,
-    initError: initError ?? this.initError,
+    initError: clearInitError ? null : (initError ?? this.initError),
     tasks: tasks ?? this.tasks,
   );
 }
@@ -276,6 +280,23 @@ class DownloadController extends Notifier<DownloadState>
   /// 引擎重建代际：配置变更触发重建时，旧 init 的异步结果必须丢弃。
   @override
   int _gen = 0;
+
+  /// 引擎是否被请求（按需加载）：下载页可见 / 有待恢复任务 / 入队前为 true；
+  /// 空闲释放后置 false。驱动 [DownloadController.build] 与空闲 suspend。
+  @override
+  bool _engineDesired = false;
+
+  /// 下载页是否可见：不可见且空闲时才允许释放引擎。
+  @override
+  bool _pageVisible = false;
+
+  /// 进行中的 ensureEngine Future（并发调用共享，避免重复 init）。
+  @override
+  Future<void>? _engineReady;
+
+  /// 空闲释放延时器（一次性；非周期轮询）。
+  @override
+  Timer? _idleTimer;
 
   /// 已删除/已清空的任务 id：Rust 异步退出的残留事件一律忽略，
   /// 避免 remove/clear 后任务「复活」。

@@ -38,6 +38,7 @@ extension _StreamingPlaylistDetailPageView
         child: songs == null
             ? const SizedBox.shrink()
             : SongList(
+                key: PageStorageKey('page.streaming.playlist.${widget.id}'),
                 items: songs,
                 playingId: playback.trackId,
                 isPlaying: playback.playing,

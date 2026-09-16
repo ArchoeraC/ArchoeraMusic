@@ -38,5 +38,15 @@ void main() {
       final low = AppPrefs().copyWithPlayerBackground(rippleSpeed: -3);
       expect(low.playerBgRippleSpeed, 1);
     });
+
+    test('自适应画质默认关，copyWith 读写', () {
+      final prefs = AppPrefs();
+      expect(prefs.adaptiveRenderQuality, defaultAdaptiveRenderQuality);
+      expect(prefs.adaptiveRenderQuality, isFalse);
+      expect(
+        AppPrefs().copyWithAdaptiveRenderQuality(true).adaptiveRenderQuality,
+        isTrue,
+      );
+    });
   });
 }

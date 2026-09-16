@@ -6,6 +6,7 @@ part of '../fps_monitor.dart';
 
 extension _FpsOverlayView on _FpsOverlayState {
   Color _fpsColor() {
+    if (_idle) return const Color(0xFF90A4AE);
     if (_fps >= 55) return const Color(0xFF4CAF50);
     if (_fps >= 30) return const Color(0xFFFFC107);
     return const Color(0xFFF44336);
@@ -23,8 +24,10 @@ extension _FpsOverlayView on _FpsOverlayState {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: _visible
               ? Text(
-                  'FPS ${_fps.toStringAsFixed(0)} · '
-                  '${_frameMs.toStringAsFixed(1)}ms · ${_rssMb}MB',
+                  _idle
+                      ? 'idle · ${_rssMb}MB'
+                      : 'FPS ${_fps.toStringAsFixed(0)} · '
+                            '${_frameMs.toStringAsFixed(1)}ms · ${_rssMb}MB',
                   style: TextStyle(
                     color: color,
                     fontSize: 11,

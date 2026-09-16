@@ -178,8 +178,8 @@ extension _QueuePanelView on QueuePanel {
     final scheme = Theme.of(context).colorScheme;
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+      child: GlassBlur(
+        sigma: 24,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: scheme.surface.withValues(alpha: 0.66),

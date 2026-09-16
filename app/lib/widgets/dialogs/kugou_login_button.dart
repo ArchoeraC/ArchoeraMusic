@@ -14,10 +14,10 @@
 library;
 
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../common/glass_blur.dart';
 import '../common/qr_image_view.dart';
 
 import '../../services/kugou/kugou_api.dart';

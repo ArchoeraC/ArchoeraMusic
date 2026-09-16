@@ -13,18 +13,17 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:archoera_music/widgets/player/ripple_background.dart';
+import 'package:archoera_music/widgets/player/background/ripple_background.dart';
 
 /// 生成一张 64×64 渐变 PNG 作为测试封面。
 Future<String> _writeTempCover() async {
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
   final paint = Paint()
-    ..shader = ui.Gradient.linear(
-      Offset.zero,
-      const Offset(64, 64),
-      const [Color(0xFFFF3B30), Color(0xFF0088FF)],
-    );
+    ..shader = ui.Gradient.linear(Offset.zero, const Offset(64, 64), const [
+      Color(0xFFFF3B30),
+      Color(0xFF0088FF),
+    ]);
   canvas.drawRect(const Rect.fromLTWH(0, 0, 64, 64), paint);
   final img = await recorder.endRecording().toImage(64, 64);
   final data = await img.toByteData(format: ui.ImageByteFormat.png);
@@ -33,8 +32,9 @@ Future<String> _writeTempCover() async {
   return file.path;
 }
 
-Widget _wrap(Widget child) =>
-    MaterialApp(home: Scaffold(body: SizedBox(width: 400, height: 300, child: child)));
+Widget _wrap(Widget child) => MaterialApp(
+  home: Scaffold(body: SizedBox(width: 400, height: 300, child: child)),
+);
 
 void main() {
   testWidgets('有水纹封面时渲染无异常并持续动画', (tester) async {
@@ -49,9 +49,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      _wrap(
-        RippleBackground(cover: 'file://$path', playing: true, speed: 3),
-      ),
+      _wrap(RippleBackground(cover: 'file://$path', playing: true, speed: 3)),
     );
     // 首帧 + 图片监听回调 + 若干动画帧。
     for (var i = 0; i < 20; i++) {
@@ -75,9 +73,7 @@ void main() {
       path = await _writeTempCover();
     });
     await tester.pumpWidget(
-      _wrap(
-        RippleBackground(cover: 'file://$path', animate: false),
-      ),
+      _wrap(RippleBackground(cover: 'file://$path', animate: false)),
     );
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 16));
@@ -132,5 +128,62 @@ void main() {
     }
     expect(maxR - minR, greaterThan(15), reason: '封面应被绘制（红→蓝渐变）');
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renderScale<1 低分辨率离屏路径（测试环境回退直绘）无异常', (tester) async {
+    late final String path;
+    await tester.runAsync(() async {
+      path = await _writeTempCover();
+      // 预热进 imageCache，使组件解析同步命中。
+      final stream = FileImage(File(path)).resolve(ImageConfiguration.empty);
+      final c = Completer<void>();
+      stream.addListener(ImageStreamListener((_, _) => c.complete()));
+      await c.future;
+    });
+
+    await tester.pumpWidget(
+      _wrap(
+        RippleBackground(
+          cover: 'file://$path',
+          playing: true,
+          speed: 3,
+          renderScale: 0.5,
+        ),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(tester.takeException(), isNull);
+    expect(find.byType(RippleBackground), findsOneWidget);
+  });
+
+  testWidgets('damageClippedDynamic 损伤区裁剪路径（测试环境回退）无异常', (tester) async {
+    late final String path;
+    await tester.runAsync(() async {
+      path = await _writeTempCover();
+      // 预热进 imageCache，使组件解析同步命中。
+      final stream = FileImage(File(path)).resolve(ImageConfiguration.empty);
+      final c = Completer<void>();
+      stream.addListener(ImageStreamListener((_, _) => c.complete()));
+      await c.future;
+    });
+
+    await tester.pumpWidget(
+      _wrap(
+        RippleBackground(
+          cover: 'file://$path',
+          playing: true,
+          speed: 3,
+          damageClippedDynamic: true,
+        ),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(tester.takeException(), isNull);
+    expect(find.byType(RippleBackground), findsOneWidget);
+    expect(find.byType(CustomPaint), findsWidgets);
   });
 }

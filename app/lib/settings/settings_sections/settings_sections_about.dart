@@ -6,8 +6,8 @@ part of '../settings_sections.dart';
 
 // ── 关于 ──────────────────────────────────────────────────────────────
 
-/// 关于分类：版本（长按 10 秒开启开发者模式）+ 引擎/服务端说明 +
-/// 字体声明 + 免责声明。
+/// 关于分类：版本（长按 10s 开启开发者模式，前 1.5s 不显示进度）+ 引擎/服务端
+/// 说明 + 字体声明 + 免责声明。
 ///
 /// 开发者长按逻辑（Timer/Stopwatch 计时与分类切换）由设置弹窗主 state
 /// 持有，本组件通过回调接入并按需展示按住进度。
@@ -44,52 +44,47 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
           note: l10n.settingsAboutDesc,
           children: [
             // 长按「版本」10 秒开启开发者模式（隐藏下载接口的入口）。
-            // Listener 对鼠标按住 / 触摸长按通用；悬浮弹提示 + 进度条反馈。
+            // Listener 对鼠标按住 / 触摸长按通用；`opaque` 保证整块区域可命中
+            // （触摸不漏）。前 1.5s 不显示进度，之后才反馈；无悬停提示、无光标变化。
             Listener(
+              behavior: HitTestBehavior.opaque,
               onPointerDown: (_) => widget.onDevHoldStart(),
               onPointerUp: (_) => widget.onDevHoldCancel(),
               onPointerCancel: (_) => widget.onDevHoldCancel(),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: Tooltip(
-                  message: l10n.settingsDeveloperHoldHint,
-                  waitDuration: const Duration(seconds: 1),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SettingTile(
-                        icon: EtaIcons.musicOutline,
-                        title: l10n.settingsVersion,
-                        subtitle: widget.version.isEmpty
-                            ? l10n.settingsVersionUnknown
-                            : l10n.settingsVersionFormat(widget.version),
-                        // 官方构建徽标：二进制内水印验签通过才显示该图标；
-                        // 失败/缺失则不显示（无文字、无悬浮提示）。
-                        trailing: ref.watch(archoeraOfficialBuildProvider)
-                            ? Icon(
-                                EtaIcons.safetyCertificateOutline,
-                                size: 18,
-                                color: scheme.primary,
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                      if (widget.devHolding)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: LinearProgressIndicator(
-                              value: widget.devHoldProgress,
-                              minHeight: 3,
-                              backgroundColor: scheme.primary.withValues(
-                                alpha: 0.12,
-                              ),
-                            ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SettingTile(
+                    icon: EtaIcons.musicOutline,
+                    title: l10n.settingsVersion,
+                    subtitle: widget.version.isEmpty
+                        ? l10n.settingsVersionUnknown
+                        : l10n.settingsVersionFormat(widget.version),
+                    // 官方构建徽标：二进制内水印验签通过才显示该图标；
+                    // 失败/缺失则不显示（无文字、无悬浮提示）。
+                    trailing: ref.watch(archoeraOfficialBuildProvider)
+                        ? Icon(
+                            EtaIcons.safetyCertificateOutline,
+                            size: 18,
+                            color: scheme.primary,
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                  if (widget.devHolding)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LinearProgressIndicator(
+                          value: widget.devHoldProgress,
+                          minHeight: 3,
+                          backgroundColor: scheme.primary.withValues(
+                            alpha: 0.12,
                           ),
                         ),
-                    ],
-                  ),
-                ),
+                      ),
+                    ),
+                ],
               ),
             ),
             SettingTile(
@@ -376,12 +371,28 @@ class _ThanksItem {
 }
 
 const List<_ThanksItem> _kThanksDesign = [
-  _ThanksItem('KuGouMusicApi', 'MIT', 'https://github.com/MakcRe/KuGouMusicApi'),
-  _ThanksItem('NeteaseCloudMusicApi', 'MIT', 'https://github.com/Binaryify/NeteaseCloudMusicApi'),
-  _ThanksItem('ncm-api-rs', 'WTFPL', 'https://github.com/SPlayer-Dev/ncm-api-rs'),
+  _ThanksItem(
+    'KuGouMusicApi',
+    'MIT',
+    'https://github.com/MakcRe/KuGouMusicApi',
+  ),
+  _ThanksItem(
+    'NeteaseCloudMusicApi',
+    'MIT',
+    'https://github.com/Binaryify/NeteaseCloudMusicApi',
+  ),
+  _ThanksItem(
+    'ncm-api-rs',
+    'WTFPL',
+    'https://github.com/SPlayer-Dev/ncm-api-rs',
+  ),
   _ThanksItem('MoeKoeMusic', '', 'https://github.com/MoeKoeMusic/MoeKoeMusic'),
   _ThanksItem('Mineradio', '', 'https://github.com/XxHuberrr/Mineradio'),
-  _ThanksItem('AMLL (Apple Music-like Lyrics)', 'MIT', 'https://github.com/Steve-xmh/applemusic-like-lyrics'),
+  _ThanksItem(
+    'AMLL (Apple Music-like Lyrics)',
+    'MIT',
+    'https://github.com/Steve-xmh/applemusic-like-lyrics',
+  ),
 ];
 
 const List<_ThanksItem> _kThanksCore = [
@@ -389,8 +400,16 @@ const List<_ThanksItem> _kThanksCore = [
   _ThanksItem('FFmpeg', 'LGPL-2.1+', 'https://ffmpeg.org'),
   _ThanksItem('libopus', 'BSD-3-Clause', 'https://opus-codec.org'),
   _ThanksItem('TagLib', 'LGPL-2.1+ / MPL-1.1', 'https://taglib.org'),
-  _ThanksItem('miniaudio', 'MIT-0 / Public Domain', 'https://github.com/mackron/miniaudio'),
-  _ThanksItem('signalsmith-stretch', 'MIT', 'https://github.com/Signalsmith-Audio/signalsmith-stretch'),
+  _ThanksItem(
+    'miniaudio',
+    'MIT-0 / Public Domain',
+    'https://github.com/mackron/miniaudio',
+  ),
+  _ThanksItem(
+    'signalsmith-stretch',
+    'MIT',
+    'https://github.com/Signalsmith-Audio/signalsmith-stretch',
+  ),
   _ThanksItem('SQLite', 'Public Domain', 'https://sqlite.org'),
   _ThanksItem('libcurl', '', 'https://curl.se/libcurl/'),
   _ThanksItem('OpenSSL', 'Apache-2.0', 'https://www.openssl.org'),
@@ -399,15 +418,31 @@ const List<_ThanksItem> _kThanksCore = [
 
 const List<_ThanksItem> _kThanksDecoder = [
   _ThanksItem('minimp3', 'CC0-1.0', 'https://github.com/lieff/minimp3'),
-  _ThanksItem('stb_vorbis', 'Public Domain / MIT-0', 'https://github.com/nothings/stb'),
-  _ThanksItem('kissfft', 'BSD-3-Clause', 'https://github.com/mborgerding/kissfft'),
+  _ThanksItem(
+    'stb_vorbis',
+    'Public Domain / MIT-0',
+    'https://github.com/nothings/stb',
+  ),
+  _ThanksItem(
+    'kissfft',
+    'BSD-3-Clause',
+    'https://github.com/mborgerding/kissfft',
+  ),
   _ThanksItem('WavPack', 'BSD-3-Clause', 'https://www.wavpack.com'),
   _ThanksItem('dsd2pcm', 'BSD', 'https://github.com/Sacred-Cow/dsd2pcm'),
-  _ThanksItem('OpenCORE / PV-AMR', 'Apache-2.0', 'https://android.googlesource.com/platform/external/opencore'),
+  _ThanksItem(
+    'OpenCORE / PV-AMR',
+    'Apache-2.0',
+    'https://android.googlesource.com/platform/external/opencore',
+  ),
 ];
 
 const List<_ThanksItem> _kThanksIcons = [
-  _ThanksItem('MingCute Icons', 'Apache-2.0', 'https://github.com/mingcute-design/mingcute-icons'),
+  _ThanksItem(
+    'MingCute Icons',
+    'Apache-2.0',
+    'https://github.com/mingcute-design/mingcute-icons',
+  ),
   _ThanksItem('Tabler Icons', 'MIT', 'https://tabler.io/icons'),
   _ThanksItem('Lucide', 'ISC', 'https://lucide.dev'),
   _ThanksItem('line-md', 'MIT', 'https://github.com/cyberalien/line-md'),

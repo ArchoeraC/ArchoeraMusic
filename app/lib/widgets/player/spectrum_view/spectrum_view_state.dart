@@ -32,7 +32,9 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
   }
 
   void _onTick(Duration elapsed) {
-    _clockMs += elapsed.inMilliseconds;
+    // elapsed 是「自 ticker 启动以来的累计时长」，直接赋值即为单调时钟；
+    // 累加会让 nowMs 二次增长、帧间插值恒饱和（t=1）而失效。
+    _clockMs = elapsed.inMilliseconds;
     _painter.nowMs = _clockMs;
     _repaint.value++;
   }
@@ -42,6 +44,9 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
     final fft = ref.watch(playbackProvider.select((s) => s.fft));
     final playing = ref.watch(playbackProvider.select((s) => s.playing));
     final prefs = ref.watch(appPrefsProvider);
+    // 可见性（Offstage/TickerMode 关闭）：不可见时不 tick。否则 Consumer 仍会
+    // 因播放态/位置变化重建，把 ticker 重新解除静音，白白持续出帧。
+    final visible = TickerMode.valuesOf(context).enabled;
 
     final enabled =
         (widget.enabled ?? prefs.enableSpectrum) && !prefs.performanceMode;
@@ -68,7 +73,7 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
     final targetOpacity = playing
         ? widget.opacity
         : widget.opacity * (0.15 / 0.65);
-    _ticker.muted = !playing;
+    _ticker.muted = !(playing && visible);
 
     if (fft == null) {
       if (_lastPushed != null) {

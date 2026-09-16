@@ -79,6 +79,8 @@ extension _SettingsDialogView on _SettingsDialogState {
                           children: [
                             ListView(
                               padding: EdgeInsets.zero,
+                              // 每项恒为 40 高 + 上下各 1.5 的 padding。
+                              itemExtent: 43,
                               children: [
                                 for (final cat in SettingsCategory.values)
                                   if (cat.visible(devMode))
@@ -320,6 +322,24 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.subtitleOutline,
       ),
       _SearchEntry(
+        SettingsCategory.render,
+        l10n.settingsRippleShader,
+        l10n.settingsRippleShaderDesc,
+        EtaIcons.dashboard4Outline,
+      ),
+      _SearchEntry(
+        SettingsCategory.render,
+        l10n.settingsRippleLowRes,
+        l10n.settingsRippleLowResDesc,
+        EtaIcons.magic2Outline,
+      ),
+      _SearchEntry(
+        SettingsCategory.render,
+        l10n.settingsRippleDamageClip,
+        l10n.settingsRippleDamageClipDesc,
+        EtaIcons.flashOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.download,
         l10n.settingsDataDir,
         l10n.settingsSearchDownloadDirSubtitle,
@@ -535,6 +555,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                 SettingsCategory.shortcuts => const ShortcutsSection(),
                 SettingsCategory.lyrics => const LyricsSection(),
                 SettingsCategory.preset => const PresetSection(),
+                SettingsCategory.render => const RenderSection(),
                 SettingsCategory.download => const DownloadSection(),
                 SettingsCategory.storage => const Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

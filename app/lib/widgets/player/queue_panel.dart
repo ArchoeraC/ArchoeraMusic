@@ -2,8 +2,6 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'dart:ui' show ImageFilter;
-
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,6 +10,7 @@ import '../../services/playback/playback_notifier.dart';
 import '../../l10n/l10n.dart';
 import '../../utils/format.dart';
 import '../list/cover_image.dart';
+import '../common/glass_blur.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'queue_panel/queue_panel_view.dart';

@@ -5,9 +5,14 @@
 part of '../library_header.dart';
 
 extension _LibraryHeaderActions on LibraryHeader {
-  void _playAll(BuildContext context, WidgetRef ref, List<Track> tracks) {
+  /// 「播放全部」：列表只驻留当前分页窗口，故此处按当前搜索条件向 DB 取
+  /// 全量（不含 lyrics）一次性建队列（队列本就需要全量）。
+  Future<void> _playAll(BuildContext context, WidgetRef ref) async {
     final l10n = context.l10n;
-    if (tracks.isEmpty) return;
+    final rows = await ref.read(libraryStoreProvider.notifier).allTracks();
+    if (rows.isEmpty) return;
+    final tracks = rows.map(trackFromRow).toList();
+    if (!context.mounted) return;
     try {
       ref.read(playbackProvider.notifier).playQueue(tracks);
     } catch (e) {
@@ -144,15 +149,12 @@ extension _LibraryHeaderActions on LibraryHeader {
           _buildLibraryHeaderStatRow(
             context,
             l10n.libraryStatTracks,
-            l10n.libraryStatTrackCount(state.tracks.length),
+            l10n.libraryStatTrackCount(state.totalCount),
           ),
           _buildLibraryHeaderStatRow(
             context,
             l10n.libraryStatDuration,
-            _formatDuration(
-              state.tracks.fold(0, (sum, t) => sum + t.durationMs),
-              l10n,
-            ),
+            _formatDuration(state.totalDurationMs, l10n),
           ),
           _buildLibraryHeaderStatRow(
             context,

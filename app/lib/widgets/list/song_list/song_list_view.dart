@@ -23,8 +23,9 @@ extension _SongListView on _SongListState {
               developerMode: ref.watch(appPrefsProvider).developerMode,
               l10n: l10n,
               scheme: theme.colorScheme,
+              allSelected: _allSelected,
               onEnterBatch: _enterBatch,
-              onSelectAll: _selectAll,
+              onSelectAll: () => unawaited(_selectAll()),
               onClearAll: _clearAll,
               onInvert: _invertSelection,
               onBatchPlay: _batchPlay,
@@ -40,6 +41,13 @@ extension _SongListView on _SongListState {
                   controller: _scrollCtrl,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: widget.items.length + 1,
+                  // 固定行高虚拟化：每行按 O(index) 定位，免去逐子项测量。
+                  // 歌曲行恒为 _songRowExtent；尾项为空列表时 0，否则高度。
+                  itemExtentBuilder: (index, _) => index == widget.items.length
+                      ? (widget.items.isEmpty
+                            ? 0.0
+                            : _SongListState._songFooterExtent)
+                      : _SongListState._songRowExtent,
                   itemBuilder: (context, index) {
                     if (index == widget.items.length) {
                       return _SongListFooter(
@@ -95,6 +103,7 @@ class _SongListHeader extends StatelessWidget {
     required this.items,
     required this.selected,
     required this.selectedCount,
+    required this.allSelected,
     required this.showIndex,
     required this.showAlbum,
     required this.showDuration,
@@ -115,6 +124,7 @@ class _SongListHeader extends StatelessWidget {
   final List<Track> items;
   final Set<String> selected;
   final int selectedCount;
+  final bool allSelected;
   final bool showIndex;
   final bool showAlbum;
   final bool showDuration;
@@ -133,7 +143,7 @@ class _SongListHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (batchActive) {
-      final all = items.isNotEmpty && selectedCount == items.length;
+      final all = allSelected;
       final none = selectedCount == 0;
       return Container(
         height: 40,
@@ -290,7 +300,7 @@ class _SongListFooter extends StatelessWidget {
     final theme = Theme.of(context);
     if (!visible) return const SizedBox.shrink();
     return SizedBox(
-      height: 48,
+      height: _SongListState._songFooterExtent,
       child: Center(
         child: loadingMore
             ? const SizedBox(

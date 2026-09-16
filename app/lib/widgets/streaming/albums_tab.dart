@@ -35,6 +35,7 @@ class StreamingAlbumsTab extends ConsumerWidget {
       );
     }
     return CoverGrid(
+      key: const PageStorageKey('page.streaming.albums'),
       items: [
         for (final a in albums)
           CoverItem(

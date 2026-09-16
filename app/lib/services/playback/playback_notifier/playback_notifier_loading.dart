@@ -182,7 +182,7 @@ mixin _PlaybackNotifierLoading
           } catch (e) {
             _log('内存源整首下载异常，回退 URL 直连: $e');
           }
-          // TODO(M2.3)：会话被取代时取消在途下载。当前每次下载为独立 store、
+          // COMPLETE：会话被取代时取消在途下载。当前每次下载为独立 store、
           // 无并发写同一句柄；被取代的下载完成后经下方 gen 校验销毁（浪费一次
           // 拉取，不影响正确性）。
           if (store != 0 && gen != _loadGen) {

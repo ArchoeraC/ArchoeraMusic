@@ -9,6 +9,34 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get settingsCatRender => 'Performance & Rendering';
+
+  @override
+  String get settingsRenderSubtitle =>
+      'GPU acceleration and rendering cost (experimental)';
+
+  @override
+  String get settingsRippleShader => 'Ripple GPU shader';
+
+  @override
+  String get settingsRippleShaderDesc =>
+      'Draw the player ripple with a fragment shader (off = CPU mesh fallback)';
+
+  @override
+  String get settingsRippleLowRes => 'Half-resolution dynamic layer';
+
+  @override
+  String get settingsRippleLowResDesc =>
+      'Render the ripple dynamic layer at half resolution then upscale; CPU fallback path only';
+
+  @override
+  String get settingsRippleDamageClip => 'Damage-region clipping';
+
+  @override
+  String get settingsRippleDamageClipDesc =>
+      'Redraw only active ripple bands; CPU fallback path only';
+
+  @override
   String get menuTrackDetail => 'Media details';
 
   @override
@@ -1456,10 +1484,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDeveloperDisabled => 'Developer Mode disabled';
 
   @override
-  String get settingsDeveloperHoldHint =>
-      'Hold for 10 seconds to enable Developer Mode (mouse: press and hold)';
-
-  @override
   String get settingsSearchHint => 'Search settings…';
 
   @override
@@ -1971,6 +1995,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsPlayerBgRippleSpeedDesc(Object speed) {
     return 'Flow speed $speed';
   }
+
+  @override
+  String get settingsAdaptiveRenderQuality => 'Adaptive Render Quality';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn =>
+      'Lower the player background resolution when frames run slow';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff =>
+      'Player background always renders at full resolution';
 
   @override
   String get settingsSectionShortcuts => 'Shortcuts';

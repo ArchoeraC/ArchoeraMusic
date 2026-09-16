@@ -37,6 +37,23 @@ class _DownloadPageState extends ConsumerState<DownloadPage> {
   /// 批量模式下选中的任务 id。
   final Set<String> _selected = {};
 
+  /// 页面可见性（非活动分支被 go_router 包在 TickerMode(enabled:false) 内）。
+  bool? _visible;
+
+  /// 可见性变化：可见即按需初始化下载引擎，不可见则允许空闲释放。
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final visible = TickerMode.valuesOf(context).enabled;
+    if (visible == _visible) return;
+    _visible = visible;
+    final notifier = ref.read(downloadControllerProvider.notifier);
+    // 避免在 build 阶段修改 provider 状态：帧后回调设置。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) notifier.setPageVisible(visible);
+    });
+  }
+
   bool get _allSelected {
     final tasks = ref.read(downloadControllerProvider).tasks;
     return tasks.isNotEmpty && _selected.length == tasks.length;

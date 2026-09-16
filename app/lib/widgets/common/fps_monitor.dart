@@ -43,17 +43,23 @@ class _FpsOverlay extends StatefulWidget {
 }
 
 class _FpsOverlayState extends State<_FpsOverlay> {
-  /// 统计窗口：每秒汇总一次帧耗时样本。
+  /// 统计窗口：每秒汇总一次。
   static const _windowMs = 1000;
-
-  /// 本窗口内各帧的总耗时（build+layout+paint）。
-  final List<Duration> _frames = [];
 
   Timer? _timer;
   double _fps = 0;
   double _frameMs = 0;
   int _rssMb = 0;
   bool _visible = true;
+
+  /// 本窗口内的帧数（`addTimingsCallback` 批次长度之和）。
+  int _frameCount = 0;
+
+  /// 本窗口内各帧总耗时（用于平均帧时间）。
+  Duration _frameSum = Duration.zero;
+
+  /// 是否空闲（本窗口没有实际渲染帧）。
+  bool _idle = true;
 
   @override
   void initState() {
@@ -67,23 +73,35 @@ class _FpsOverlayState extends State<_FpsOverlay> {
 
   void _onTimings(List<FrameTiming> timings) {
     if (!_visible) return;
-    _frames.addAll(timings.map((t) => t.totalSpan));
+    _frameCount += timings.length;
+    for (final t in timings) {
+      _frameSum += t.totalSpan;
+    }
   }
 
   void _tick() {
     if (!mounted) return;
-    final frames = _frames;
-    _frames.clear();
-    if (frames.isNotEmpty) {
-      final total = frames.fold<Duration>(Duration.zero, (a, b) => a + b);
-      final avgMs = total.inMicroseconds / frames.length / 1000;
-      setState(() {
-        _frameMs = avgMs;
-        _fps = 1000 / avgMs;
-      });
+    if (!_visible) {
+      // 收起态不采集（_onTimings 已提前返回）：只更新内存，保留上次 FPS/空闲态
+      // 供圆点着色。
+      setState(() => _rssMb = ProcessInfo.currentRss ~/ (1024 * 1024));
+      return;
     }
-    // 进程常驻内存（dart:io，桌面平台可用）
-    setState(() => _rssMb = ProcessInfo.currentRss ~/ (1024 * 1024));
+    final count = _frameCount;
+    final sum = _frameSum;
+    _frameCount = 0;
+    _frameSum = Duration.zero;
+    setState(() {
+      // 减去本监控自身每秒 setState 触发的那一帧；空闲时即为 0 → 显示 idle。
+      final fps = count > 0 ? count - 1 : 0;
+      _idle = fps == 0;
+      if (!_idle) {
+        _fps = fps.toDouble();
+        _frameMs = count > 0 ? sum.inMicroseconds / count / 1000 : 0;
+      }
+      // 进程常驻内存（dart:io，桌面平台可用）
+      _rssMb = ProcessInfo.currentRss ~/ (1024 * 1024);
+    });
   }
 
   @override

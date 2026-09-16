@@ -13,7 +13,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:archoera_music/widgets/player/ripple_shader.dart';
+import 'package:archoera_music/widgets/player/background/ripple_shader.dart';
 
 const Map<String, int> _typeFloats = {
   'float': 1,
@@ -54,7 +54,7 @@ void main() {
     expect(floatOffsets['uImgAspect'], RippleUniforms.imgAspect);
     expect(floatOffsets['uMix'], RippleUniforms.mix);
     expect(floatOffsets['uRipples'], RippleUniforms.ripples);
-    expect(floatOffsets['uSeeds'], RippleUniforms.seeds);
+    expect(floatOffsets['uBand'], RippleUniforms.band);
     expect(floatOffsets['uCount'], RippleUniforms.count);
 
     // 浮点总数与常量推导一致（count 为最后一槽）。
@@ -65,7 +65,9 @@ void main() {
     expect(samplerOffsets['uCoverTo'], RippleUniforms.samplerTo);
 
     // 涟漪上限与着色器数组长度一致。
-    final mRipples = RegExp(r'uniform\s+vec4\s+uRipples\s*\[(\d+)\]').firstMatch(src);
+    final mRipples = RegExp(
+      r'uniform\s+vec4\s+uRipples\s*\[(\d+)\]',
+    ).firstMatch(src);
     expect(mRipples, isNotNull);
     expect(int.parse(mRipples!.group(1)!), kRippleShaderMaxRipples);
   });
