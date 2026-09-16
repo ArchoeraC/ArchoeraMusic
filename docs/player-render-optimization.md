@@ -1,13 +1,15 @@
 # 播放页渲染优化专项（Player Render Optimization）
 
-> 状态：**进行中（2026-09-11）**——P1（歌词缓存）、P3（频谱批处理）**已实现**；
-> P2 背景：封面预烘焙 + CPU 网格已优化并生效，**全分辨率 GLSL 因集显扛不住默认关闭**
-> （待 P2b 低分辨率离屏后重开）；P4 字形图集 / P5 自适应画质规划中。
+> 状态：**进行中（2026-09-11；2026-09-16 调整）**——P1（歌词缓存）、P3（频谱批处理）**已实现**；
+> P2 背景：封面预烘焙 + CPU 网格已优化并生效，**全分辨率 GLSL 因集显扛不住默认关闭**；
+> **P2b 由 `runtime-resource-optimization.md` R1 细化并取代**（不是单一半分辨率，
+> 而是「静态层缓存 + 损伤区动态层 + 降采样」组合）；P4 字形图集 / P5 自适应画质规划中。
 > 目标：消除**全屏播放页**在高刷新率 / 大面积渲染下的卡顿，并以
 > **集成显卡（iGPU）为基线**（独显只作上限，不作前提）。
 > 范围：播放页三块渲染重件——**高级歌词 / 背景 / 频谱**；不含列表页、设置页。
 > 关联：
 > [architecture.md](architecture.md)、
+> [runtime-resource-optimization.md](runtime-resource-optimization.md)（跨框架机制 + 全局长效方案）、
 > [CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md](CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md)。
 
 ---
@@ -158,8 +160,10 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
   **故默认关闭着色器路径**（`kEnableRippleShader = false`），改走优化后的 CPU 网格：
   - 封面模糊/饱和**预烘焙一次**（已去掉每帧全屏 `ImageFiltered`）；
   - 涟漪场**逐顶点 `|dw|>0.5` 裁剪 + 每涟漪预计算 amp**，把 CPU 代价压到可负担。
-- **P2b（重开着色器的前提）**：必须先做**低分辨率（1/2~1/6）离屏降采样**再放大，
-  否则集显扛不住；届时再评估是否重开 `kEnableRippleShader`。
+- **P2b（→ 由 R1 取代）**：原本设为「低分辨率（1/2~1/6）离屏降采样」；现**升级**为
+  `runtime-resource-optimization.md` §4.1 的 **R1**——「静态层缓存一次 + 动态层只画损伤区
+  （活动涟漪波带）+ 降采样」三段组合，并给出 A/B/C 三种实现选型（§8.1）与回退阶梯。
+  重开 `kEnableRippleShader` 不再是前提，而由 R1 实测决定。
 
 ### 4.2 高级歌词 → 字形引擎（不上 GLSL 做排版）
 
@@ -258,8 +262,9 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
 
 ## 8. 开放问题（待定）
 
-1. 是否新增 `player.effectQuality` 偏好（性能/均衡/画质/自动），还是复用 `performanceMode` 二档？
-2. 背景 `blur` 档是否统一并入 ripple shader 的单 pass，还是保留独立实现？
+1. ~~是否新增 `player.effectQuality` 偏好~~ → 移交 [runtime-resource-optimization.md](runtime-resource-optimization.md) §8.4。
+2. ~~背景 `blur` 档是否并入 ripple~~ → **已定**：`ripple` 叠在模糊封面（`_BlurredCover`）之上，
+   与 `blur` 档共用基座（`player_background.dart`，2026-09-16）。
 3. 歌词后处理（glow/blur）是否在 P4 之后才评估？
-4. iGPU 目标基线机型/分辨率/刷新率清单（用于 P0 基线）。
-5. 是否把「帧时间自适应降级」做成全局服务，供列表页等复用。
+4. iGPU 目标基线机型/分辨率/刷新率清单（用于 P0/R0 基线）。
+5. ~~帧时间自适应降级是否做成全局服务~~ → 移交 [runtime-resource-optimization.md](runtime-resource-optimization.md) §4.5。
