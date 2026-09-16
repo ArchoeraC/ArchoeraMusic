@@ -1919,6 +1919,15 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get settingsAdaptiveRenderQuality => '적응형 렌더링 품질';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn => '프레임이 느릴 때 플레이어 배경 해상도 낮추기';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff => '플레이어 배경은 항상 전체 해상도로 렌더링';
+
+  @override
   String get settingsSectionShortcuts => '단축키';
 
   @override

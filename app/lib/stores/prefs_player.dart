@@ -23,6 +23,9 @@ const transitionStyleKey = 'player.transitionStyle';
 const playerBgTypeKey = 'player.bgType';
 const playerBgRippleSpeedKey = 'player.bgRippleSpeed';
 
+/// 自适应画质（依帧时间自动调整水纹渲染分辨率；默认关）。
+const adaptiveRenderQualityKey = 'player.adaptiveRenderQuality';
+
 // ── 音量与播放条显示 ─────────────
 const volumeKey = 'player.volume';
 const barLyricsKey = 'player.barLyrics';
@@ -86,6 +89,11 @@ const Set<String> playerBgTypes = {'gradient', 'blur', 'solid', 'ripple'};
 
 /// 水纹流动速度（1~6，默认 3）。
 const double defaultPlayerBgRippleSpeed = 3;
+
+/// 自适应画质（默认关，保持旧行为）。开启后 [RenderQualityService] 依据
+/// `FrameTiming` 在 full/balanced/performance 档位间切换，作为播放页水纹
+/// 背景的 `renderScale`（见 docs/runtime-resource-optimization.md §4.5 / R4）。
+const bool defaultAdaptiveRenderQuality = false;
 
 /// 播放器域偏好：直通/自动播放/会话记忆/频谱/封面动效/切歌动效/音量/播放条。
 extension PlayerPrefs on AppPrefs {
@@ -168,6 +176,10 @@ extension PlayerPrefs on AppPrefs {
     if (v == null) return defaultPlayerBgRippleSpeed;
     return v.toDouble().clamp(1.0, 6.0);
   }
+
+  /// 自适应画质（默认关）：开启后按帧时间自动调整水纹渲染分辨率。
+  bool get adaptiveRenderQuality =>
+      data[adaptiveRenderQualityKey] as bool? ?? defaultAdaptiveRenderQuality;
 
   /// 播放音量（0~1，默认 1.0）。
   ///
@@ -280,4 +292,8 @@ extension PlayerPrefs on AppPrefs {
           playerBgRippleSpeedKey: ?rippleSpeed?.clamp(1.0, 6.0),
         },
       );
+
+  /// 设置自适应画质开关（默认关）。
+  AppPrefs copyWithAdaptiveRenderQuality(bool value) =>
+      AppPrefs(initialData: {...data, adaptiveRenderQualityKey: value});
 }

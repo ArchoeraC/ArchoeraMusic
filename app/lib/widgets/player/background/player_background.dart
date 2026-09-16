@@ -17,6 +17,8 @@ library;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../services/render/quality_governor.dart';
+import '../../../services/render/render_quality_service.dart';
 import '../../../stores/app_prefs.dart';
 import '../../../theme/app_theme.dart';
 import 'blurred_cover.dart';
@@ -32,6 +34,13 @@ class PlayerBackground extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(appPrefsProvider);
+    // 自适应画质仅在偏好开启且 Governor 已降档时生效；否则 renderScale=1.0
+    // 与省略该参数逐字节一致（见 RippleBackground.renderScale）。
+    final qualityTier = ref.watch(renderQualityProvider);
+    final renderScale =
+        prefs.adaptiveRenderQuality && qualityTier != RenderQualityTier.full
+        ? renderScaleForTier(qualityTier)
+        : 1.0;
     final scheme = Theme.of(context).colorScheme;
     final chrome = Theme.of(context).extension<AppChromeColors>();
     final gradient = DecoratedBox(
@@ -67,6 +76,7 @@ class PlayerBackground extends ConsumerWidget {
               playing: playing,
               speed: prefs.playerBgRippleSpeed,
               animate: !prefs.performanceMode,
+              renderScale: renderScale,
               fallbackColor: Colors.transparent,
             ),
           ],

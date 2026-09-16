@@ -2001,6 +2001,17 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get settingsAdaptiveRenderQuality => 'Qualité de rendu adaptative';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn =>
+      'Réduire la résolution de l\'arrière-plan du lecteur quand les images ralentissent';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff =>
+      'L\'arrière-plan du lecteur est toujours rendu en pleine résolution';
+
+  @override
   String get settingsSectionShortcuts => 'Raccourcis';
 
   @override

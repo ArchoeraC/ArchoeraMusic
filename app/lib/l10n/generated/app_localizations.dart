@@ -3572,6 +3572,24 @@ abstract class AppLocalizations {
   /// **'流动速度 {speed}'**
   String settingsPlayerBgRippleSpeedDesc(Object speed);
 
+  /// No description provided for @settingsAdaptiveRenderQuality.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自适应画质'**
+  String get settingsAdaptiveRenderQuality;
+
+  /// No description provided for @settingsAdaptiveRenderQualityOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'帧时间升高时自动降低播放页水纹分辨率'**
+  String get settingsAdaptiveRenderQualityOn;
+
+  /// No description provided for @settingsAdaptiveRenderQualityOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放页背景始终满分辨率渲染'**
+  String get settingsAdaptiveRenderQualityOff;
+
   /// No description provided for @settingsSectionShortcuts.
   ///
   /// In zh_CN, this message translates to:

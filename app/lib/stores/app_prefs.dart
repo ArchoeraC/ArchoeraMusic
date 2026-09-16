@@ -240,6 +240,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置自适应画质（按帧时间自动调整水纹渲染分辨率；默认关）。
+  void setAdaptiveRenderQuality(bool value) {
+    state = state.copyWithAdaptiveRenderQuality(value);
+    state.save();
+  }
+
   /// 设置自定义主色（null = 恢复默认亮蓝）。
   void setAccent(int? accent) {
     state = state.copyWithAccent(accent);

@@ -1973,6 +1973,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsAdaptiveRenderQuality => 'Adaptive Render Quality';
+
+  @override
+  String get settingsAdaptiveRenderQualityOn =>
+      'Lower the player background resolution when frames run slow';
+
+  @override
+  String get settingsAdaptiveRenderQualityOff =>
+      'Player background always renders at full resolution';
+
+  @override
   String get settingsSectionShortcuts => 'Shortcuts';
 
   @override
