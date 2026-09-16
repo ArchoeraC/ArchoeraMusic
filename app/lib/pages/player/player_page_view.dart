@@ -60,99 +60,111 @@ extension _PlayerPageView on _PlayerPageState {
         .watch(currentLyricsProvider)
         .maybeWhen(data: (l) => l.isNotEmpty, orElse: () => false);
 
+    // 播放页常驻不透明底色：重内容（背景）延迟挂载期间也保证整页不透明，
+    // 避免透出下方壳层（进入动画那 500ms 出现白/黑空档）。
+    final playerBg =
+        theme.extension<AppChromeColors>()?.playerBackground ??
+        colorScheme.surface;
     return Scaffold(
-      body: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerHover: (_) => _pokeControls(),
-        onPointerDown: (_) => _pokeControls(),
-        onPointerSignal: (_) => _pokeControls(),
-        child: Stack(
-          children: [
-            if (contentMounted)
-              Positioned.fill(
-                child: PlayerBackground(
-                  cover: current?.cover,
-                  playing: playing,
+      backgroundColor: playerBg,
+      // 硬裁切到播放页范围（对齐原版 FullPlayer 根节点 `overflow-hidden`）：
+      // 封面背景经 blur/scale 后的绘制不会溢出到播放页之外。
+      body: ClipRect(
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerHover: (_) => _pokeControls(),
+          onPointerDown: (_) => _pokeControls(),
+          onPointerSignal: (_) => _pokeControls(),
+          child: Stack(
+            children: [
+              Positioned.fill(child: ColoredBox(color: playerBg)),
+              if (contentMounted)
+                Positioned.fill(
+                  child: PlayerBackground(
+                    cover: current?.cover,
+                    playing: playing,
+                  ),
                 ),
-              ),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  children: [
-                    _PlayerTopBar(
-                      l10n: l10n,
-                      showLyrics: showLyrics,
-                      hasLyrics: hasLyrics,
-                      colorScheme: colorScheme,
-                      current: current,
-                      quality: quality,
-                      isFullScreen: _isFullScreen,
-                      onClose: () => context.pop(),
-                      onToggleLyrics: hasLyrics
-                          ? () => ref
-                                .read(appPrefsProvider.notifier)
-                                .setShowLyricsInPlayer(!showLyrics)
-                          : null,
-                      onSelectQuality: notifier.setQuality,
-                      onToggleFullscreen: _toggleFullscreen,
-                    ),
-                    Expanded(
-                      child: _PlayerMainBody(
-                        source: source,
-                        current: current,
-                        title: title,
-                        subtitle: subtitle,
-                        playing: playing,
-                        hasContent: hasContent,
-                        hasLyrics: hasLyrics,
-                        hasSource: hasSource,
-                        showLyrics: showLyrics,
-                        contentMounted: contentMounted,
-                        transitionStyle: transitionStyle,
-                        slideNext: _slideNext,
-                        coverPulse: _coverPulse,
-                        beatStrength: _lastBeatStrength,
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    children: [
+                      _PlayerTopBar(
                         l10n: l10n,
-                        onSeekLyric: hasSource
-                            ? (ms) => notifier.seek(Duration(milliseconds: ms))
+                        showLyrics: showLyrics,
+                        hasLyrics: hasLyrics,
+                        colorScheme: colorScheme,
+                        current: current,
+                        quality: quality,
+                        isFullScreen: _isFullScreen,
+                        onClose: () => context.pop(),
+                        onToggleLyrics: hasLyrics
+                            ? () => ref
+                                  .read(appPrefsProvider.notifier)
+                                  .setShowLyricsInPlayer(!showLyrics)
                             : null,
+                        onSelectQuality: notifier.setQuality,
+                        onToggleFullscreen: _toggleFullscreen,
                       ),
-                    ),
-                    Text(
-                      !hasContent
-                          ? l10n.playerPageLoadHint
-                          : (buffering ? l10n.playerBarBuffering : ''),
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    _PlayerBottomOverlay(
-                      controlsVisible: _controlsVisible,
-                      theme: theme,
-                      dragMs: _dragMs,
-                      buffering: buffering,
-                      hasSource: hasSource,
-                      hasContent: hasContent,
-                      hasQueue: hasQueue,
-                      canLike: canLike,
-                      liked: liked,
-                      current: current,
-                      shuffle: shuffle,
-                      repeatMode: repeatMode,
-                      playing: playing,
-                      onDragChanged: (v) => setState(() => _dragMs = v),
-                      onSeekEnd: (_) => setState(() => _dragMs = null),
-                      onToggleLike: _toggleLike,
-                      onShowComments: () {
-                        if (current != null) {
-                          showCommentDialog(context, track: current);
-                        }
-                      },
-                    ),
-                  ],
+                      Expanded(
+                        child: _PlayerMainBody(
+                          source: source,
+                          current: current,
+                          title: title,
+                          subtitle: subtitle,
+                          playing: playing,
+                          hasContent: hasContent,
+                          hasLyrics: hasLyrics,
+                          hasSource: hasSource,
+                          showLyrics: showLyrics,
+                          contentMounted: contentMounted,
+                          transitionStyle: transitionStyle,
+                          slideNext: _slideNext,
+                          coverPulse: _coverPulse,
+                          beatStrength: _lastBeatStrength,
+                          l10n: l10n,
+                          onSeekLyric: hasSource
+                              ? (ms) =>
+                                    notifier.seek(Duration(milliseconds: ms))
+                              : null,
+                        ),
+                      ),
+                      Text(
+                        !hasContent
+                            ? l10n.playerPageLoadHint
+                            : (buffering ? l10n.playerBarBuffering : ''),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      _PlayerBottomOverlay(
+                        controlsVisible: _controlsVisible,
+                        theme: theme,
+                        dragMs: _dragMs,
+                        buffering: buffering,
+                        hasSource: hasSource,
+                        hasContent: hasContent,
+                        hasQueue: hasQueue,
+                        canLike: canLike,
+                        liked: liked,
+                        current: current,
+                        shuffle: shuffle,
+                        repeatMode: repeatMode,
+                        playing: playing,
+                        onDragChanged: (v) => setState(() => _dragMs = v),
+                        onSeekEnd: (_) => setState(() => _dragMs = null),
+                        onToggleLike: _toggleLike,
+                        onShowComments: () {
+                          if (current != null) {
+                            showCommentDialog(context, track: current);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

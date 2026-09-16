@@ -359,8 +359,13 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
             emitWindow();
             break;
         }
-        case WM_CLOSE:
-            g_minimized.store(true, std::memory_order_release);
+        case WM_SHOWWINDOW:
+            // 显示/隐藏（关闭到托盘 / 托盘还原）：隐藏同样视为不可见 → 降频；
+            // 显示即复位。**不能**用 WM_CLOSE 判定——关闭是否真的隐藏由
+            // window_manager 的 preventClose + Dart 侧决策（退出/隐藏/询问）
+            // 决定：用户取消关闭确认框、或还原窗口后，WM_CLOSE 会让状态永久
+            // 停在「已最小化」而误降频。
+            g_minimized.store(wparam == 0, std::memory_order_release);
             emitWindow();
             break;
         case WM_APPCOMMAND:

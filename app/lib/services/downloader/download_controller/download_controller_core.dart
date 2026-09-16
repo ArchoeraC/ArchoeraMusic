@@ -19,6 +19,18 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
   int get _gen;
   set _gen(int value);
 
+  bool get _engineDesired;
+  set _engineDesired(bool value);
+
+  bool get _pageVisible;
+  set _pageVisible(bool value);
+
+  Future<void>? get _engineReady;
+  set _engineReady(Future<void>? value);
+
+  Timer? get _idleTimer;
+  set _idleTimer(Timer? value);
+
   Set<String> get _removedIds;
 
   /// enqueue 时留存的完整 Track（taskId → Track），供回退解析使用。
@@ -34,16 +46,19 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
   DownloadState _buildState() {
     final prefs = ref.watch(downloadPrefsProvider);
     _gen += 1;
-    final gen = _gen;
-    _initEngine(
-      rootDir: prefs.rootDir,
-      subdirStrategy: prefs.subdirStrategy,
-      maxConcurrent: prefs.maxConcurrent,
-      speedLimit: ref.read(downloadSpeedLimitProvider),
-      filenameTemplate: ref.read(downloadFilenameTemplateProvider),
-      historyLimit: ref.read(downloadHistoryLimitProvider),
-      gen: gen,
-    );
+    // 引擎按需：启动不再无条件常驻。仅在「已被请求」（下载页可见 / 有待恢复
+    // 任务 / 已入队）时初始化；配置变更重建时若引擎在用，则用新配置重启。
+    if (_engineDesired) {
+      _initEngine(
+        rootDir: prefs.rootDir,
+        subdirStrategy: prefs.subdirStrategy,
+        maxConcurrent: prefs.maxConcurrent,
+        speedLimit: ref.read(downloadSpeedLimitProvider),
+        filenameTemplate: ref.read(downloadFilenameTemplateProvider),
+        historyLimit: ref.read(downloadHistoryLimitProvider),
+        gen: _gen,
+      );
+    }
     ref.listen(downloadSpeedLimitProvider, (_, next) => _setMaxSpeed(next));
     ref.listen(downloadFilenameTemplateProvider, (_, next) {
       final engine = _engine;
@@ -59,11 +74,13 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
       _pruneHistory();
     });
     ref.onDispose(_teardown);
-    return const DownloadState();
+    return DownloadState(initializing: _engineDesired);
   }
 
   void _teardown() {
     _gen += 1;
+    _idleTimer?.cancel();
+    _idleTimer = null;
     _eventsSub?.cancel();
     _eventsSub = null;
     final engine = _engine;
@@ -73,6 +90,90 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
         engine.dispose();
       } catch (_) {}
     }
+  }
+
+  // ── 按需生命周期 ─────────────────────────────────────────────
+
+  /// 按需初始化引擎（幂等，可并发安全）：下载页可见 / 有待恢复任务 /
+  /// 入队前调用。已初始化则直接返回；进行中则复用同一 Future。
+  Future<void> ensureEngine() {
+    _engineDesired = true;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    final current = _engine;
+    if (current != null && current.isInitialized) return Future<void>.value();
+    final pending = _engineReady;
+    if (pending != null) return pending;
+    state = state.copyWith(initializing: true, clearInitError: true);
+    final future = _startEngine();
+    _engineReady = future;
+    return future.whenComplete(() {
+      if (identical(_engineReady, future)) _engineReady = null;
+    });
+  }
+
+  /// 下载页可见性：可见即确保引擎；不可见则尝试空闲释放。
+  void setPageVisible(bool visible) {
+    if (_pageVisible == visible) return;
+    _pageVisible = visible;
+    if (visible) {
+      unawaited(ensureEngine());
+    } else {
+      _scheduleIdleSuspend();
+    }
+  }
+
+  /// 启动时仅在历史存在未完成任务时初始化引擎续传，否则保持引擎未加载。
+  Future<void> resumePendingAtStartup() async {
+    if (_engineDesired || (_engine?.isInitialized ?? false)) return;
+    var pending = false;
+    try {
+      final f = File('${resolveDataDir()}/download_history.json');
+      if (f.existsSync()) {
+        final decoded = jsonDecode(f.readAsStringSync());
+        pending =
+            decoded is Map &&
+            decoded['tasks'] is List &&
+            (decoded['tasks'] as List).isNotEmpty;
+      }
+    } catch (_) {}
+    if (pending) await ensureEngine();
+  }
+
+  Future<void> _startEngine() async {
+    final prefs = ref.read(downloadPrefsProvider);
+    final gen = ++_gen;
+    await _initEngine(
+      rootDir: prefs.rootDir,
+      subdirStrategy: prefs.subdirStrategy,
+      maxConcurrent: prefs.maxConcurrent,
+      speedLimit: ref.read(downloadSpeedLimitProvider),
+      filenameTemplate: ref.read(downloadFilenameTemplateProvider),
+      historyLimit: ref.read(downloadHistoryLimitProvider),
+      gen: gen,
+    );
+  }
+
+  /// 空闲释放：非页面可见、无在途任务、无暂停任务时，延时销毁 Rust 引擎
+  /// （释放 Rust 运行时/任务态堆内存）；下次 ensureEngine 重新 init。
+  void _scheduleIdleSuspend() {
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    if (!_engineDesired || _pageVisible) return;
+    _idleTimer = Timer(const Duration(seconds: 3), () {
+      _idleTimer = null;
+      if (_pageVisible || !_engineDesired) return;
+      if (state.activeCount > 0) return;
+      if (state.tasks.any((t) => t.isPaused)) return;
+      _suspendEngine();
+    });
+  }
+
+  void _suspendEngine() {
+    if (_engine == null && !_engineDesired) return;
+    _engineDesired = false;
+    _teardown();
+    state = state.copyWith(initializing: false, clearInitError: true);
   }
 
   Future<void> _initEngine({
@@ -121,7 +222,7 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
     engine.setHistoryLimit(historyLimit);
     _injectIdentity();
     _injectSessions();
-    state = state.copyWith(initializing: false, initError: null);
+    state = state.copyWith(initializing: false, clearInitError: true);
   }
 
   void _syncSessions() {

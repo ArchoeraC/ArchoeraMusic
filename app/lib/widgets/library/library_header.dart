@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
-import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/scanner/library_store.dart';
 import '../../services/scanner/local_track.dart';

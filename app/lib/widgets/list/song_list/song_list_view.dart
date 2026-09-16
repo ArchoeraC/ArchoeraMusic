@@ -23,8 +23,9 @@ extension _SongListView on _SongListState {
               developerMode: ref.watch(appPrefsProvider).developerMode,
               l10n: l10n,
               scheme: theme.colorScheme,
+              allSelected: _allSelected,
               onEnterBatch: _enterBatch,
-              onSelectAll: _selectAll,
+              onSelectAll: () => unawaited(_selectAll()),
               onClearAll: _clearAll,
               onInvert: _invertSelection,
               onBatchPlay: _batchPlay,
@@ -102,6 +103,7 @@ class _SongListHeader extends StatelessWidget {
     required this.items,
     required this.selected,
     required this.selectedCount,
+    required this.allSelected,
     required this.showIndex,
     required this.showAlbum,
     required this.showDuration,
@@ -122,6 +124,7 @@ class _SongListHeader extends StatelessWidget {
   final List<Track> items;
   final Set<String> selected;
   final int selectedCount;
+  final bool allSelected;
   final bool showIndex;
   final bool showAlbum;
   final bool showDuration;
@@ -140,7 +143,7 @@ class _SongListHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (batchActive) {
-      final all = items.isNotEmpty && selectedCount == items.length;
+      final all = allSelected;
       final none = selectedCount == 0;
       return Container(
         height: 40,

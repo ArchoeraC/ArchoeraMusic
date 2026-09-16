@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,12 +46,20 @@ class SongList extends ConsumerStatefulWidget {
     this.onContextMenu,
     this.likedIds,
     this.onToggleLike,
+    this.loadAllItems,
   });
 
   final List<Track> items;
   final VoidCallback? onReachBottom;
   final bool hasMore;
   final bool loadingMore;
+
+  /// 可选：批量模式「全选」时加载**全量**匹配曲目（分页列表场景）。
+  ///
+  /// 为 null 时「全选」仅选择当前 [items]（已加载窗口）；非 null 时按返回值
+  /// 选择全部匹配曲目（如整库 / 整个搜索结果），UI 仍只渲染窗口——兼顾
+  /// 「全选 = 全库」语义与虚拟化的内存收益。全量仅在批量模式期间驻留。
+  final Future<List<Track>> Function()? loadAllItems;
 
   /// 当前播放歌曲 id（高亮）。
   final String? playingId;
@@ -98,6 +108,14 @@ class _SongListState extends ConsumerState<SongList> {
   /// 已选曲目 id 集合（键与 [songLikeKey] 一致：KG hash / NT id）。
   final Set<String> _selected = {};
 
+  /// 「全选」覆盖全量（经 [SongList.loadAllItems] 载入）而非仅窗口。
+  bool _selectAllActive = false;
+
+  /// 全选模式下缓存的全部匹配曲目（退出批量 / 物化选择后释放）。
+  List<Track>? _allItems;
+
+
+
   @override
   void dispose() {
     _scrollCtrl.dispose();
@@ -118,13 +136,29 @@ class _SongListState extends ConsumerState<SongList> {
     return false;
   }
 
-  /// 当前列表中处于选中状态的曲目（按列表顺序）。
-  List<Track> get _selectedTracks => [
-    for (final t in widget.items)
-      if (_selected.contains(songLikeKey(t))) t,
-  ];
+  /// 当前选中的曲目（按源顺序）。
+  ///
+  /// - 全选进行中（全量未就绪）：空，避免误触批量操作；
+  /// - 全选模式：全量；
+  /// - 显式集合：在 [SongList.loadAllItems] 缓存的全量（若已载入）或窗口内命中项。
+  List<Track> get _selectedTracks {
+    if (_selectAllActive && _allItems == null) return const [];
+    final source = _allItems ?? widget.items;
+    return [
+      for (final t in source)
+        if (_selectAllActive || _selected.contains(songLikeKey(t))) t,
+    ];
+  }
 
+  /// 已选数量。
   int get _selectedCount => _selectedTracks.length;
+
+  /// 表头全选态：全量已选，或当前比对范围内全部命中。
+  bool get _allSelected {
+    if (_selectAllActive) return _allItems != null;
+    final total = _allItems?.length ?? widget.items.length;
+    return total > 0 && _selectedCount == total;
+  }
 
   @override
   Widget build(BuildContext context) => _buildSongList(context);

@@ -36,6 +36,11 @@ part 'ripple_dynamic_layer.dart';
 /// 同时存活的涟漪上限（对齐上游 MAX_RIPPLES）。
 const int _kMaxRipples = 48;
 
+/// 波带截断半径：`|dw| > 0.5` 时 `exp(-|dw|*48) <= exp(-24) ≈ 4e-11`，对 8bit
+/// 颜色为 0。CPU 网格顶点裁剪（[_RipplePainter]）、GPU uniform 打包
+/// （`_RippleShaderPainter`）与 `shaders/ripple.frag` 的 `kBandCut` 三处须一致。
+const double _kBandCut = 0.5;
+
 /// 单个涟漪存活时长（秒，对齐上游 RIPPLE_LIFETIME）。
 const double _kRippleLifetime = 6.0;
 
@@ -53,6 +58,7 @@ class RippleBackground extends StatefulWidget {
     this.playing = true,
     this.speed = 3,
     this.animate = true,
+    this.useShader = true,
     this.blurSigma = 14,
     this.saturation = 1.3,
     this.darken = 0.5,
@@ -72,6 +78,13 @@ class RippleBackground extends StatefulWidget {
 
   /// 是否运行动画（性能模式下置 false，停表呈现静态帧）。
   final bool animate;
+
+  /// 是否使用 GPU 片元着色器路径（设置 → 性能/渲染 → 水纹 GPU 着色器）。
+  ///
+  /// 关闭时走 CPU 网格回退（[_RipplePainter]）。环境变量
+  /// `ARCHOERA_RIPPLE_SHADER=0` 可全局强制回退（优先级更高，见
+  /// [kEnableRippleShader]）；着色器加载失败/测试环境亦自动回退。
+  final bool useShader;
 
   /// 整体模糊半径（px，对齐上游 blur(10px)）。
   final double blurSigma;
@@ -159,13 +172,20 @@ class _RippleBackgroundState extends State<RippleBackground>
     _resetRipples();
     _resolveCover();
     if (widget.animate) _ensureTicker();
-    if (kEnableRippleShader) _loadShader();
+    if (widget.useShader && kEnableRippleShader) _loadShader();
   }
 
   @override
   void didUpdateWidget(RippleBackground old) {
     super.didUpdateWidget(old);
     if (old.cover != widget.cover) _resolveCover();
+    // 开关打开且尚未加载 → 懒加载着色器（关闭时无需释放，下次直接复用）。
+    if (old.useShader != widget.useShader &&
+        widget.useShader &&
+        kEnableRippleShader &&
+        _shader == null) {
+      _loadShader();
+    }
     if (old.animate != widget.animate) {
       if (widget.animate) {
         _ensureTicker();
@@ -333,8 +353,11 @@ class _RippleBackgroundState extends State<RippleBackground>
   Widget build(BuildContext context) {
     final shader = _shader;
     final prepared = _static.current;
-    // GPU 主路径（默认关闭，见 kEnableRippleShader）。
-    if (kEnableRippleShader && shader != null && prepared != null) {
+    // GPU 主路径（着色器开关 + 环境变量 + 程序可用三者皆满足）。
+    if (widget.useShader &&
+        kEnableRippleShader &&
+        shader != null &&
+        prepared != null) {
       return RepaintBoundary(
         child: CustomPaint(
           painter: _RippleShaderPainter(this, _repaint, shader),

@@ -54,7 +54,7 @@ void main() {
     expect(floatOffsets['uImgAspect'], RippleUniforms.imgAspect);
     expect(floatOffsets['uMix'], RippleUniforms.mix);
     expect(floatOffsets['uRipples'], RippleUniforms.ripples);
-    expect(floatOffsets['uSeeds'], RippleUniforms.seeds);
+    expect(floatOffsets['uBand'], RippleUniforms.band);
     expect(floatOffsets['uCount'], RippleUniforms.count);
 
     // 浮点总数与常量推导一致（count 为最后一槽）。

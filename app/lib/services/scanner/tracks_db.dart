@@ -48,7 +48,10 @@ class TrackRow {
   final int fileMtime;
   final String? lyrics;
 
-  factory TrackRow.fromRow(Row row) {
+  /// 从查询行构造。列表/查询路径**默认不读 `lyrics`**（内嵌歌词文本可能是
+  /// 每曲数 KB 的大字符串），仅按需经 [TracksDb.lyricsById] / [TracksDb.lyricsByPath]
+  /// 懒加载；需要时经 [lyrics] 显式传入。
+  factory TrackRow.fromRow(Row row, {String? lyrics}) {
     final artistsJson = row['artists'] as String? ?? '[]';
     final albumJson = row['album'] as String?;
     List<String> artistNames;
@@ -86,7 +89,7 @@ class TrackRow {
       bitsPerSample: row['bits_per_sample'] as int?,
       fileSize: row['file_size'] as int? ?? 0,
       fileMtime: row['file_mtime'] as int? ?? 0,
-      lyrics: row['lyrics'] as String?,
+      lyrics: lyrics,
     );
   }
 }
@@ -109,9 +112,31 @@ class TracksDb {
     return TracksDb._(db);
   }
 
+  /// 列表查询显式列（**不含 `lyrics`**）：避免把每曲数 KB 的内嵌歌词
+  /// 随全量/分页结果一起读入内存。歌词按需经 [lyricsById] / [lyricsByPath] 懒查。
+  static const String _trackColumns =
+      'id, path, title, track, artists, album, duration, cover, codec, '
+      'sample_rate, bit_rate, channels, bits_per_sample, file_size, file_mtime';
+
+  /// 搜索条件（与 UI 的 title/artist/album 过滤语义一致）。
+  static const String _searchWhere =
+      'title LIKE ?1 OR artists LIKE ?1 OR album LIKE ?1';
+
   /// 曲目总数。
   int count() {
     final res = _db.select('SELECT COUNT(*) AS c FROM tracks');
+    return res.first['c'] as int? ?? 0;
+  }
+
+  /// 匹配关键字（title/artist/album）的曲目数；无关键字时等于总数。
+  int countTracks({String? query}) {
+    final hasQuery = query != null && query.isNotEmpty;
+    final sql = hasQuery
+        ? 'SELECT COUNT(*) AS c FROM tracks WHERE $_searchWhere'
+        : 'SELECT COUNT(*) AS c FROM tracks';
+    final res = hasQuery
+        ? _db.select(sql, ['%$query%'])
+        : _db.select(sql);
     return res.first['c'] as int? ?? 0;
   }
 
@@ -123,24 +148,47 @@ class TracksDb {
   }) {
     final hasQuery = query != null && query.isNotEmpty;
     final sql = hasQuery
-        ? 'SELECT * FROM tracks WHERE title LIKE ?1 OR path LIKE ?1 '
+        ? 'SELECT $_trackColumns FROM tracks WHERE $_searchWhere '
             'ORDER BY title LIMIT ?2 OFFSET ?3'
-        : 'SELECT * FROM tracks ORDER BY title LIMIT ?1 OFFSET ?2';
+        : 'SELECT $_trackColumns FROM tracks ORDER BY title LIMIT ?1 OFFSET ?2';
     final params = hasQuery ? <Object?>['%$query%', limit, offset] : <Object?>[limit, offset];
     return _db.select(sql, params).map(TrackRow.fromRow).toList();
   }
 
-  /// 按路径查单曲（watcher/播放定位用）。
+  /// 全量曲目（**不含 lyrics**，供「播放全部」建队列一次性取全）。
+  List<TrackRow> allTracks({String? query}) {
+    final hasQuery = query != null && query.isNotEmpty;
+    final sql = hasQuery
+        ? 'SELECT $_trackColumns FROM tracks WHERE $_searchWhere ORDER BY title'
+        : 'SELECT $_trackColumns FROM tracks ORDER BY title';
+    final rows = hasQuery ? _db.select(sql, ['%$query%']) : _db.select(sql);
+    return rows.map(TrackRow.fromRow).toList();
+  }
+
+  /// 按路径查单曲（watcher/播放定位用，不含 lyrics）。
   TrackRow? trackByPath(String path) {
     final rows =
-        _db.select('SELECT * FROM tracks WHERE path = ?', [path]);
+        _db.select('SELECT $_trackColumns FROM tracks WHERE path = ?', [path]);
     return rows.isEmpty ? null : TrackRow.fromRow(rows.first);
   }
 
-  /// 按 id 查单曲。
+  /// 按 id 查单曲（不含 lyrics）。
   TrackRow? trackById(String id) {
-    final rows = _db.select('SELECT * FROM tracks WHERE id = ?', [id]);
+    final rows =
+        _db.select('SELECT $_trackColumns FROM tracks WHERE id = ?', [id]);
     return rows.isEmpty ? null : TrackRow.fromRow(rows.first);
+  }
+
+  /// 按 id 懒查内嵌歌词（列表查询不再携带；仅在需要歌词时调用）。
+  String? lyricsById(String id) {
+    final rows = _db.select('SELECT lyrics FROM tracks WHERE id = ?', [id]);
+    return rows.isEmpty ? null : rows.first['lyrics'] as String?;
+  }
+
+  /// 按路径懒查内嵌歌词。
+  String? lyricsByPath(String path) {
+    final rows = _db.select('SELECT lyrics FROM tracks WHERE path = ?', [path]);
+    return rows.isEmpty ? null : rows.first['lyrics'] as String?;
   }
 
   /// 从曲库移除曲目（按路径；仅删库记录，不删源文件；返回是否命中）。

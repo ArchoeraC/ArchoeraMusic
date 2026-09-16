@@ -10,23 +10,59 @@ extension _SongListActions on _SongListState {
   void _toggleSelect(Track t) {
     final key = songLikeKey(t);
     setState(() {
+      if (_selectAllActive) {
+        // 物化全量选择为显式集合，再按行切换（保持「全库 - 取消项」语义）。
+        // 保留 _allItems 作为命中项解析源（键可能不在窗口内）。
+        _selected
+          ..clear()
+          ..addAll((_allItems ?? const <Track>[]).map(songLikeKey));
+        _selectAllActive = false;
+      }
       if (!_selected.remove(key)) {
         _selected.add(key);
       }
     });
   }
 
-  void _selectAll() => setState(() {
-    _selected
-      ..clear()
-      ..addAll(widget.items.map(songLikeKey));
+  /// 全选：有 [SongList.loadAllItems] 时载入全量（整库/整个搜索结果），
+  /// 否则仅选择当前窗口。
+  Future<void> _selectAll() async {
+    final loader = widget.loadAllItems;
+    if (loader == null) {
+      setState(() {
+        _selected
+          ..clear()
+          ..addAll(widget.items.map(songLikeKey));
+      });
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _selectAllActive = true);
+    try {
+      final all = await loader();
+      if (!mounted) return;
+      setState(() => _allItems = all);
+    } catch (_) {
+      if (mounted) setState(() => _selectAllActive = false);
+    }
+  }
+
+  void _clearAll() => setState(() {
+    _selectAllActive = false;
+    _allItems = null;
+    _selected.clear();
   });
 
-  void _clearAll() => setState(_selected.clear);
-
   void _invertSelection() => setState(() {
+    // 全量全选的反选 = 全部取消。
+    if (_selectAllActive) {
+      _selectAllActive = false;
+      _selected.clear();
+      return;
+    }
+    final source = _allItems ?? widget.items;
     final inverted = {
-      for (final t in widget.items)
+      for (final t in source)
         if (!_selected.contains(songLikeKey(t))) songLikeKey(t),
     };
     _selected
@@ -39,6 +75,8 @@ extension _SongListActions on _SongListState {
   void _exitBatch() => setState(() {
     _batchActive = false;
     _selected.clear();
+    _selectAllActive = false;
+    _allItems = null;
   });
 
   Future<void> _batchPlay() async {

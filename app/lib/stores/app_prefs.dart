@@ -17,6 +17,7 @@ import 'prefs_lyrics.dart';
 import 'prefs_player.dart';
 import 'prefs_power.dart';
 import 'prefs_preset.dart';
+import 'prefs_render.dart';
 import 'prefs_scrape.dart';
 import 'prefs_scan.dart';
 import 'prefs_search.dart';
@@ -31,6 +32,7 @@ export 'prefs_lyrics.dart';
 export 'prefs_player.dart';
 export 'prefs_power.dart';
 export 'prefs_preset.dart';
+export 'prefs_render.dart';
 export 'prefs_scrape.dart';
 export 'prefs_scan.dart';
 export 'prefs_search.dart';
@@ -243,6 +245,17 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置自适应画质（按帧时间自动调整水纹渲染分辨率；默认关）。
   void setAdaptiveRenderQuality(bool value) {
     state = state.copyWithAdaptiveRenderQuality(value);
+    state.save();
+  }
+
+  /// 设置「性能 / 渲染」开关：水纹 GPU 着色器 / 动态层降分辨率 / 损伤区裁剪。
+  /// 后两者仅 CPU 网格回退路径生效（见 [RenderPrefs]）。
+  void setRippleRender({bool? shader, bool? lowRes, bool? damageClip}) {
+    state = state.copyWithRippleRender(
+      shader: shader,
+      lowRes: lowRes,
+      damageClip: damageClip,
+    );
     state.save();
   }
 

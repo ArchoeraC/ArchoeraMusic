@@ -52,9 +52,12 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       // 注：搜索结果红心不亮的主因是KG hash 大小写（mobilecdn 小写 vs
       // 歌单大写），已在 songLikeKey/_collectHashes/removeFromLike 统一小写。
       ref.read(likeControllerProvider).sync();
-      // 下载引擎初始化（触发 build → init 注册回调 + 注入已持久化会话）。
-      // 放在登录态恢复之后：注入 Rust 的 session/cookie 始终取最新状态。
-      ref.read(downloadControllerProvider);
+      // 下载引擎按需加载：仅当历史存在未完成任务时初始化引擎续传，
+      // 否则保持 Rust 引擎未加载（不启动即常驻）。放在登录态恢复之后：
+      // 注入 Rust 的 session/cookie 始终取最新状态。
+      unawaited(
+        ref.read(downloadControllerProvider.notifier).resumePendingAtStartup(),
+      );
     });
   }
 

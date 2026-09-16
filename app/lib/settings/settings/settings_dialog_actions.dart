@@ -4,6 +4,12 @@
 
 part of '../settings_dialog.dart';
 
+/// 开发者模式长按反馈门槛：前这么久不显示进度条（防误触）。
+const Duration _kDevHoldGate = Duration(milliseconds: 1500);
+
+/// 开发者模式长按总时长（从按下即开始计时）。
+const Duration _kDevHoldDuration = Duration(seconds: 10);
+
 extension _SettingsDialogActions on _SettingsDialogState {
   Future<void> _loadVersion() async {
     try {
@@ -25,11 +31,12 @@ extension _SettingsDialogActions on _SettingsDialogState {
   // ── 开发者模式：长按「版本」10 秒开启 ──────────────────────────
   //
   // 鼠标与触摸屏通用：Listener 的 pointer down/up 对两类指针一视同仁
-  // （鼠标按住左键不松 / 手指长按均可触发）；MouseRegion 悬浮 1s 后
-  // 弹提示，进度条实时反馈剩余时间。
+  // （鼠标按住左键不松 / 手指长按均可触发），且不参与手势竞技场，
+  // 因此按住时仍可被外层滚动视图正常处理、不会互相抢占。
+  // **计时从按下即开始（共 10s）**；为防误触，前 [_kDevHoldGate] 不显示
+  // 进度条，之后才反馈进度。无悬停提示、无光标变化（保持隐藏手势）。
   void _startDevHold() {
     if (_devHolding) return;
-    _setDevHoldActive(true);
     _devHoldTimer?.cancel();
     final sw = Stopwatch()..start();
     _devHoldTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
@@ -37,10 +44,17 @@ extension _SettingsDialogActions on _SettingsDialogState {
         t.cancel();
         return;
       }
-      final p = sw.elapsedMilliseconds / 10000;
+      final elapsed = sw.elapsedMilliseconds;
+      final p = elapsed / _kDevHoldDuration.inMilliseconds;
       if (p >= 1) {
         t.cancel();
         _completeDevHold();
+        return;
+      }
+      // 门槛未过：不显示进度（但计时仍在走，总时长保持 10s）。
+      if (elapsed < _kDevHoldGate.inMilliseconds) return;
+      if (!_devHolding) {
+        _setDevHoldActive(true, progress: p);
       } else {
         _setDevHoldProgress(p);
       }

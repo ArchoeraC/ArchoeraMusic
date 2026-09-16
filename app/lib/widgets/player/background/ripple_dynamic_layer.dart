@@ -35,18 +35,34 @@ class _RippleShaderPainter extends CustomPainter {
     shader.setFloat(RippleUniforms.mix, mix);
 
     final time = s._simTime;
+    final aspect = w / h;
     var n = 0;
     for (final rp in s._ripples) {
       final age = time - rp.birth;
       if (age <= 0 || age > _kRippleLifetime) continue;
+      final radius = age * rp.speed;
+      final inner = radius - _kBandCut;
+      // 精确剔除：在「以涟漪中心为原点、aspect 校正」的局部坐标系里，屏幕
+      // 矩形恒包含原点（涟漪中心在屏内），故最近距离为 0；最远角距离 maxDist。
+      // `inner > maxDist` ⇒ 整个波带 `dc ∈ [inner, radius+_kBandCut]` 都在屏幕
+      // 之外 ⇒ 对任意屏幕像素贡献恒为 0（`|dw| > _kBandCut`）。不改变输出。
+      final ax = math.max(rp.x, 1 - rp.x) * aspect;
+      final ay = math.max(rp.y, 1 - rp.y);
+      if (inner > math.sqrt(ax * ax + ay * ay)) continue;
       final base = RippleUniforms.ripples + n * 4;
       shader.setFloat(base, rp.x);
       shader.setFloat(base + 1, rp.y);
-      shader.setFloat(base + 2, age * rp.speed); // radius
+      shader.setFloat(base + 2, radius); // radius
       final st = (age / 0.12).clamp(0.0, 1.0);
       final env = math.exp(-age * 0.75) * (st * st * (3 - 2 * st));
       shader.setFloat(base + 3, env * rp.strength); // amp
-      shader.setFloat(RippleUniforms.seeds + n, rp.seed);
+      // 波带边界预计算（outer², inner², seed, 0）：shader 每像素只需 2 次比较。
+      final outer = radius + _kBandCut;
+      final bandBase = RippleUniforms.band + n * 4;
+      shader.setFloat(bandBase, outer * outer);
+      shader.setFloat(bandBase + 1, inner > 0 ? inner * inner : 0.0);
+      shader.setFloat(bandBase + 2, rp.seed);
+      shader.setFloat(bandBase + 3, 0.0);
       n++;
       if (n >= kRippleShaderMaxRipples) break;
     }
@@ -93,7 +109,7 @@ class _RipplePainter extends CustomPainter {
   static const double _cellPx = 12;
 
   /// 波带截断半径：`|dw| > _bandCut` 的顶点贡献视为 0（见 [_computeField]）。
-  static const double _bandCut = 0.5;
+  static const double _bandCut = _kBandCut;
 
   void _ensureMesh(double w, double h) {
     if (_cols > 0 && _w == w && _h == h) return;

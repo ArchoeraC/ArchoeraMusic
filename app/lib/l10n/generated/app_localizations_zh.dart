@@ -9,6 +9,30 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get settingsCatRender => '性能 / 渲染';
+
+  @override
+  String get settingsRenderSubtitle => 'GPU 加速与渲染开销（实验）';
+
+  @override
+  String get settingsRippleShader => '水纹 GPU 着色器';
+
+  @override
+  String get settingsRippleShaderDesc => '用片元着色器绘制播放页水纹（关闭则回退 CPU 网格）';
+
+  @override
+  String get settingsRippleLowRes => '动态层半分辨率';
+
+  @override
+  String get settingsRippleLowResDesc => '水纹动态层半分辨率绘制再放大；仅 CPU 回退路径生效';
+
+  @override
+  String get settingsRippleDamageClip => '损伤区裁剪';
+
+  @override
+  String get settingsRippleDamageClipDesc => '只重绘活动涟漪波带；仅 CPU 回退路径生效';
+
+  @override
   String get menuTrackDetail => '媒体详细信息';
 
   @override
@@ -1406,9 +1430,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsDeveloperDisabled => '开发者模式已关闭';
-
-  @override
-  String get settingsDeveloperHoldHint => '长按 10 秒开启开发者模式（鼠标：按住不放）';
 
   @override
   String get settingsSearchHint => '搜索设置…';
@@ -4110,6 +4131,30 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   AppLocalizationsZhCn() : super('zh_CN');
 
   @override
+  String get settingsCatRender => '性能 / 渲染';
+
+  @override
+  String get settingsRenderSubtitle => 'GPU 加速与渲染开销（实验）';
+
+  @override
+  String get settingsRippleShader => '水纹 GPU 着色器';
+
+  @override
+  String get settingsRippleShaderDesc => '用片元着色器绘制播放页水纹（关闭则回退 CPU 网格）';
+
+  @override
+  String get settingsRippleLowRes => '动态层半分辨率';
+
+  @override
+  String get settingsRippleLowResDesc => '水纹动态层半分辨率绘制再放大；仅 CPU 回退路径生效';
+
+  @override
+  String get settingsRippleDamageClip => '损伤区裁剪';
+
+  @override
+  String get settingsRippleDamageClipDesc => '只重绘活动涟漪波带；仅 CPU 回退路径生效';
+
+  @override
   String get menuTrackDetail => '媒体详细信息';
 
   @override
@@ -5507,9 +5552,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsDeveloperDisabled => '开发者模式已关闭';
-
-  @override
-  String get settingsDeveloperHoldHint => '长按 10 秒开启开发者模式（鼠标：按住不放）';
 
   @override
   String get settingsSearchHint => '搜索设置…';
@@ -8211,6 +8253,30 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   AppLocalizationsZhTw() : super('zh_TW');
 
   @override
+  String get settingsCatRender => '效能 / 渲染';
+
+  @override
+  String get settingsRenderSubtitle => 'GPU 加速與渲染開銷（實驗）';
+
+  @override
+  String get settingsRippleShader => '水紋 GPU 著色器';
+
+  @override
+  String get settingsRippleShaderDesc => '用片元著色器繪製播放頁水紋（關閉則回退 CPU 網格）';
+
+  @override
+  String get settingsRippleLowRes => '動態層半解析度';
+
+  @override
+  String get settingsRippleLowResDesc => '水紋動態層半解析度繪製再放大；僅 CPU 回退路徑生效';
+
+  @override
+  String get settingsRippleDamageClip => '損傷區裁剪';
+
+  @override
+  String get settingsRippleDamageClipDesc => '只重繪活動漣漪波帶；僅 CPU 回退路徑生效';
+
+  @override
   String get menuTrackDetail => '媒體詳細資訊';
 
   @override
@@ -9608,9 +9674,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsDeveloperDisabled => '開發者模式已關閉';
-
-  @override
-  String get settingsDeveloperHoldHint => '長按 10 秒開啟開發者模式（滑鼠：按住不放）';
 
   @override
   String get settingsSearchHint => '搜尋設定…';

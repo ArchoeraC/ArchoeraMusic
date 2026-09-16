@@ -127,6 +127,10 @@ final appRouter = GoRouter(
       path: '/player',
       pageBuilder: (context, state) => CustomTransitionPage(
         key: state.pageKey,
+        // 非不透明：过渡期间 Overlay 仍绘制下方主页，才能看到主页同步收缩
+        // （不透明路由会立刻把下方路由 offstage）。展开动画结束后壳内容已被
+        // ShellExpandTransition 卸载为轻量占位，背后绘制开销可忽略。
+        opaque: false,
         transitionDuration: const Duration(milliseconds: 500),
         reverseTransitionDuration: const Duration(milliseconds: 500),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -136,6 +140,7 @@ final appRouter = GoRouter(
           }
           // 纯垂直上滑（对齐原版 FullPlayer：enter/leave 均
           // `translate-y-full → 0`，500ms cubic-bezier(0.7,0,0.3,1)）。
+          // 壳层由壳路由的 secondaryAnimation 驱动同一节奏，天然同步。
           final curved = CurvedAnimation(
             parent: animation,
             curve: const Cubic(0.7, 0, 0.3, 1),
