@@ -117,11 +117,19 @@ class CoverRail extends StatelessWidget {
     }
     return SizedBox(
       height: height,
-      child: ListView.separated(
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: items.length + (loading ? 1 : 0),
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        // 固定宽度虚拟化：卡片槽宽恒为 cardWidth + 14（尾项无间隔），
+        // 走带按 O(index) 定位，仅构建可见卡片；间隔并入槽内右侧留白，
+        // 与原先 separated 的 14 间隔几何一致。
+        itemExtentBuilder: (index, _) {
+          if (index == items.length) return 40;
+          return index == items.length - 1 && !loading
+              ? cardWidth
+              : cardWidth + 14;
+        },
         itemBuilder: (context, index) {
           if (index == items.length) {
             return const SizedBox(
@@ -136,7 +144,7 @@ class CoverRail extends StatelessWidget {
             );
           }
           final item = items[index];
-          return SizedBox(
+          final card = SizedBox(
             width: cardWidth,
             child: CoverCard(
               item: item,
@@ -145,6 +153,11 @@ class CoverRail extends StatelessWidget {
               onTap: () => onTap(item),
               onPlay: onPlay == null ? null : () => onPlay!(item),
             ),
+          );
+          if (index == items.length - 1 && !loading) return card;
+          return Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: card,
           );
         },
       ),
