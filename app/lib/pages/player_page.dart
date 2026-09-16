@@ -20,7 +20,7 @@ import '../widgets/dialogs/comment_dialog.dart';
 import '../widgets/player/cover_switcher.dart';
 import '../widgets/player/playback_progress_slider.dart';
 import '../widgets/player/player_controls_row.dart';
-import '../widgets/player/player_background.dart';
+import '../widgets/player/background/player_background.dart';
 import '../widgets/player/player_cover.dart';
 import '../widgets/player/player_lyrics_block.dart';
 import '../widgets/player/quality_menu.dart';
