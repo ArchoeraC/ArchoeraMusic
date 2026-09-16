@@ -129,7 +129,10 @@ class _RipplePainter extends CustomPainter {
   ///
   /// 优化（P2）：① 每帧按涟漪预计算 amp（age/env/smoothstep 与顶点无关）；
   /// ② 逐顶点用 `|dw|<=0.5` 裁剪——`exp(-|dw|*48)` 在 |dw|>0.5 时≈0，跳过
-  /// exp/sin。使网格路径对集显/低端 CPU 也可负担（避免全屏逐像素着色器压死核显）。
+  /// exp/sin；③ 每帧按涟漪预计算外盘 AABB，顶点不在任何 AABB 内时整段跳过
+  /// 逐涟漪循环（**数学上精确**：AABB 之外必有 `dc>radius+0.5`，即
+  /// `|dw|>bandCut`，贡献为 0，故输出逐位不变）。使网格路径对集显/低端 CPU
+  /// 也可负担（避免全屏逐像素着色器压死核显）。
   void _computeField(double w, double h, ui.Image img) {
     final aspect = w / h;
     final imgAspect = img.width / img.height;
@@ -137,11 +140,19 @@ class _RipplePainter extends CustomPainter {
     final time = s._simTime;
     final n = ripples.length;
 
+    const bandCut = 0.5; // |dw|>0.5 → exp(-24)≈4e-11，可忽略
     final rx = Float64List(n);
     final ry = Float64List(n);
     final rRadius = Float64List(n);
     final rAmp = Float64List(n);
     final rSeed = Float64List(n);
+    // 每个活动涟漪外盘（dc<=radius+bandCut）在 `(u,v)` 空间的轴对齐包围盒，
+    // 用于顶点级快速剔除（见下方 `inAnyBox`）。`dx=(u-rx)*aspect`，故 u 方向
+    // 半宽为 `outer/aspect`、v 方向半宽为 `outer`。
+    final rUMin = Float64List(n);
+    final rUMax = Float64List(n);
+    final rVMin = Float64List(n);
+    final rVMax = Float64List(n);
     var active = 0;
     for (var r = 0; r < n; r++) {
       final rp = ripples[r];
@@ -149,15 +160,19 @@ class _RipplePainter extends CustomPainter {
       if (age <= 0 || age > _kRippleLifetime) continue;
       final st = (age / 0.12).clamp(0.0, 1.0);
       final env = math.exp(-age * 0.75) * (st * st * (3 - 2 * st));
+      final radius = age * rp.speed;
+      final outer = radius + bandCut;
       rx[active] = rp.x;
       ry[active] = rp.y;
-      rRadius[active] = age * rp.speed;
+      rRadius[active] = radius;
       rAmp[active] = env * rp.strength;
       rSeed[active] = rp.seed;
+      rUMin[active] = rp.x - outer / aspect;
+      rUMax[active] = rp.x + outer / aspect;
+      rVMin[active] = rp.y - outer;
+      rVMax[active] = rp.y + outer;
       active++;
     }
-
-    const bandCut = 0.5; // |dw|>0.5 → exp(-24)≈4e-11，可忽略
     var vi = 0;
     var k = 0;
     for (var j = 0; j <= _rows; j++) {
@@ -167,20 +182,36 @@ class _RipplePainter extends CustomPainter {
         var ox = 0.0;
         var oy = 0.0;
         var light = 0.0;
+        // 快速剔除：顶点落在**所有**涟漪外接 AABB 之外 ⇒ 对每个涟漪均有
+        // `dc > radius+bandCut` ⇒ `|dw| > bandCut` ⇒ 贡献恒为 0，可整段跳过逐
+        // 涟漪循环。AABB 是外盘的**包围盒**（非外盘本身），命中只表示「可能非零」，
+        // 仍走原循环并用其 `|dw|>bandCut` 判据兜底——故输出与优化前逐位一致。
+        var inAnyBox = false;
         for (var r = 0; r < active; r++) {
-          final dx = (u - rx[r]) * aspect;
-          final dy = v - ry[r];
-          final dc = math.sqrt(dx * dx + dy * dy);
-          final dw = dc - rRadius[r];
-          if (dw > bandCut || dw < -bandCut) continue;
-          final band = math.exp(-dw.abs() * 48);
-          final wave = math.sin(dw * 115 + rSeed[r]) * band * rAmp[r];
-          final ex = dx + 0.0001;
-          final ey = dy + 0.0001;
-          final inv = 1 / math.sqrt(ex * ex + ey * ey);
-          ox += ex * inv * wave * 0.015;
-          oy += ey * inv * wave * 0.015;
-          light += wave;
+          if (u >= rUMin[r] &&
+              u <= rUMax[r] &&
+              v >= rVMin[r] &&
+              v <= rVMax[r]) {
+            inAnyBox = true;
+            break;
+          }
+        }
+        if (inAnyBox) {
+          for (var r = 0; r < active; r++) {
+            final dx = (u - rx[r]) * aspect;
+            final dy = v - ry[r];
+            final dc = math.sqrt(dx * dx + dy * dy);
+            final dw = dc - rRadius[r];
+            if (dw > bandCut || dw < -bandCut) continue;
+            final band = math.exp(-dw.abs() * 48);
+            final wave = math.sin(dw * 115 + rSeed[r]) * band * rAmp[r];
+            final ex = dx + 0.0001;
+            final ey = dy + 0.0001;
+            final inv = 1 / math.sqrt(ex * ex + ey * ey);
+            ox += ex * inv * wave * 0.015;
+            oy += ey * inv * wave * 0.015;
+            light += wave;
+          }
         }
         var tu = u + ox;
         var tv = v + oy;
