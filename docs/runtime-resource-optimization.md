@@ -754,9 +754,15 @@
 - 全屏背景图走 §4.1 的静态层 + 降采样。
 
 **毛玻璃 / 弹窗**（`widgets/common/glass_surface.dart`、登录/队列面板等）
-- `BackdropFilter` 在 Impeller 下是**新 pass + 离屏纹理 + 全量采样**（§3.4）：限制 clip 范围、
-  避免全屏；单控件过滤优先 `ImageFiltered`（`widgets/image_filter.dart:98-108`，§3.7）。
-- 能不用模糊就不用——不透明/纯色优先（§3.4 `canvas.cc:1450-1475`）。
+- **策略（用户 2026-09-16）**：**模糊本身保留**——部分模糊是**有意为之**的设计，
+  **普通模式不得移除**；**只有性能模式**才降级为「无模糊」（`GlassBlur` 共用包装，
+  `app/lib/widgets/common/glass_blur.dart`）。
+- 降级口径：性能模式去掉 `BackdropFilter` 的**离屏 pass**，用同色半透明底填充，
+  布局/圆角/边框/颜色/动画不变（`performanceMode` 已由用户显式开启）。
+- 普通模式仍须遵守：`BackdropFilter` 在 Impeller 下是**新 pass + 离屏纹理 + 全量采样**
+  （§3.4），故**限制 clip 范围、避免全屏**；单控件过滤优先 `ImageFiltered`
+  （`widgets/image_filter.dart:98-108`，§3.7）。
+- 新增/修改模糊时：若属设计意图，**不要顺手删除**；仅在性能模式路径接入 `GlassBlur`。
 
 **转场 / 动画 / 常驻部件**
 - 避免大范围 `Clip`、分数 `Opacity`、`ShaderMask` 动画：会触发合成提升与离屏
