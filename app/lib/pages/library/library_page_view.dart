@@ -12,7 +12,7 @@ extension _LibraryPageView on _LibraryPageState {
     final isPlaying = ref.watch(playbackProvider.select((s) => s.playing));
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
-    final tracks = state.filteredTracks.map(trackFromRow).toList();
+    final tracks = state.tracks.map(trackFromRow).toList();
 
     return Scaffold(
       body: Column(
@@ -45,7 +45,9 @@ extension _LibraryPageView on _LibraryPageState {
                 ),
               ),
             )
-          else if (state.initialized && state.tracks.isEmpty)
+          else if (state.initialized &&
+              state.totalCount == 0 &&
+              state.searchQuery.isEmpty)
             Expanded(
               child: LibraryEmptyState(
                 hasDirs: state.scanDirs.isNotEmpty,
@@ -73,6 +75,18 @@ extension _LibraryPageView on _LibraryPageState {
                 showDuration: true,
                 onPlay: _play,
                 onContextMenu: _onTrackMenu,
+                onReachBottom: () =>
+                    ref.read(libraryStoreProvider.notifier).loadMore(),
+                hasMore: state.hasMore,
+                loadingMore: state.loadingMore,
+                // 「全选」= 全库（当前搜索条件），批量操作按全量执行；
+                // UI 仍只渲染分页窗口，全量仅在批量模式期间驻留。
+                loadAllItems: () async {
+                  final rows = await ref
+                      .read(libraryStoreProvider.notifier)
+                      .allTracks();
+                  return rows.map(trackFromRow).toList();
+                },
               ),
             ),
         ],

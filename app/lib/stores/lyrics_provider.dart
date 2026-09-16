@@ -19,7 +19,9 @@ import '../apis/lyric/netease.dart';
 import '../apis/lyric/qqmusic.dart';
 import '../services/lyrics/lyric_line.dart';
 import '../services/lyrics/profanity.dart';
+import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/scanner/tracks_db.dart';
 import 'app_prefs.dart';
 
 /// 按当前播放曲目解析出的歌词组；曲目变化时自动重新拉取。
@@ -77,9 +79,13 @@ Future<List<LyricGroup>> _fetchGroups(Ref ref) async {
 
     default:
       // 本地曲目：scanner 直写 library.db 的内嵌歌词元数据。
+      // 列表查询不再携带 lyrics（省内存），此处按 track 懒查 DB。
       // 标准 LRC 直接解析；无时间标签的纯文本降级为整段显示
       // （LyricGroup.original.timeMs 置 0，静态歌词全文展示）。
-      final raw = track.lyrics;
+      var raw = track.lyrics;
+      if (raw == null || raw.trim().isEmpty) {
+        raw = await _loadLocalLyrics(track);
+      }
       if (raw == null || raw.trim().isEmpty) return const [];
       final groups = parseLyricGroups(content: raw, format: 'lrc');
       if (groups.isNotEmpty) return groups;
@@ -89,6 +95,27 @@ Future<List<LyricGroup>> _fetchGroups(Ref ref) async {
           .where((l) => l.isNotEmpty)
           .map((l) => LyricGroup(original: LyricLine(timeMs: 0, text: l)))
           .toList();
+  }
+}
+
+/// 本地曲目懒查内嵌歌词：优先按 id，回退按本地路径。
+///
+/// 列表查询已不携带 lyrics（见 `tracks_db.dart` 的显式列），仅在需要歌词时
+/// 打开 library.db 单行查询；非本地曲目 / 查询失败返回 null。
+Future<String?> _loadLocalLyrics(Track track) async {
+  if (track.source != 'local' && (track.localPath ?? '').isEmpty) return null;
+  TracksDb? db;
+  try {
+    db = TracksDb.open();
+    final byId = track.id.isNotEmpty ? db.lyricsById(track.id) : null;
+    if (byId != null && byId.trim().isNotEmpty) return byId;
+    final path = track.localPath;
+    if (path != null && path.isNotEmpty) return db.lyricsByPath(path);
+    return byId;
+  } catch (_) {
+    return null;
+  } finally {
+    db?.close();
   }
 }
 

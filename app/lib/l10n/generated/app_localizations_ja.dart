@@ -9,6 +9,32 @@ class AppLocalizationsJa extends AppLocalizations {
   AppLocalizationsJa([String locale = 'ja']) : super(locale);
 
   @override
+  String get settingsCatRender => 'パフォーマンス / レンダリング';
+
+  @override
+  String get settingsRenderSubtitle => 'GPU アクセラレーションとレンダリング負荷（実験的）';
+
+  @override
+  String get settingsRippleShader => '波紋 GPU シェーダー';
+
+  @override
+  String get settingsRippleShaderDesc =>
+      'フラグメントシェーダーで再生画面の波紋を描画（オフ = CPU メッシュ）';
+
+  @override
+  String get settingsRippleLowRes => '動的レイヤーの半解像度化';
+
+  @override
+  String get settingsRippleLowResDesc =>
+      '波紋の動的レイヤーを半解像度で描画して拡大；CPU フォールバック時のみ有効';
+
+  @override
+  String get settingsRippleDamageClip => 'ダメージ領域クリッピング';
+
+  @override
+  String get settingsRippleDamageClipDesc => 'アクティブな波紋帯のみ再描画；CPU フォールバック時のみ有効';
+
+  @override
   String get menuTrackDetail => 'メディア詳細';
 
   @override
@@ -1420,9 +1446,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsDeveloperDisabled => '開発者モードを無効にしました';
-
-  @override
-  String get settingsDeveloperHoldHint => '10秒長押しで開発者モードを有効化（マウス：押し続ける）';
 
   @override
   String get settingsSearchHint => '設定を検索…';

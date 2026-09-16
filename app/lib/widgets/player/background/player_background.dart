@@ -14,6 +14,8 @@
 /// 无封面时 blur / ripple 均回退渐变。
 library;
 
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -37,10 +39,14 @@ class PlayerBackground extends ConsumerWidget {
     // 自适应画质仅在偏好开启且 Governor 已降档时生效；否则 renderScale=1.0
     // 与省略该参数逐字节一致（见 RippleBackground.renderScale）。
     final qualityTier = ref.watch(renderQualityProvider);
-    final renderScale =
+    final adaptiveScale =
         prefs.adaptiveRenderQuality && qualityTier != RenderQualityTier.full
         ? renderScaleForTier(qualityTier)
         : 1.0;
+    // 手动「动态层降分辨率」（仅 CPU 回退生效）与自适应画质取更激进者。
+    final renderScale = prefs.rippleLowRes
+        ? math.min(rippleLowResScale, adaptiveScale)
+        : adaptiveScale;
     final scheme = Theme.of(context).colorScheme;
     final chrome = Theme.of(context).extension<AppChromeColors>();
     final gradient = DecoratedBox(
@@ -69,14 +75,17 @@ class PlayerBackground extends ConsumerWidget {
           fit: StackFit.expand,
           children: [
             gradient,
-            // 模糊封面背景（与 blur 档共用）；水纹纹理未就绪/失败时透出。
-            BlurredCover(cover: cover!),
+            // 不再叠 BlurredCover：RippleBackground 每帧画出**不透明**的预烘焙
+            // （模糊+饱和）封面，完全覆盖其下任何模糊层；此前那层全屏
+            // ImageFiltered(sigma45) 纯属每帧重算的浪费（Impeller 无图层缓存）。
             RippleBackground(
               cover: cover,
               playing: playing,
               speed: prefs.playerBgRippleSpeed,
               animate: !prefs.performanceMode,
+              useShader: prefs.rippleShaderEnabled,
               renderScale: renderScale,
+              damageClippedDynamic: prefs.rippleDamageClip,
               fallbackColor: Colors.transparent,
             ),
           ],

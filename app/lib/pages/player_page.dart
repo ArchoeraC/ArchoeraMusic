@@ -14,8 +14,9 @@ import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
 import '../stores/app_prefs.dart';
 import '../stores/lyrics_provider.dart';
-import '../stores/player_expanded.dart';
+import '../stores/player_route_animation.dart';
 import '../stores/providers.dart';
+import '../theme/app_theme.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/dialogs/comment_dialog.dart';
 import '../widgets/player/cover_switcher.dart';
@@ -65,12 +66,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   bool _contentMounted = false;
 
   /// 当前 `ModalRoute` 的进入/退出动画（在 [didChangeDependencies] 绑定，
-  /// 状态变更驱动 [_contentMounted]）。
+  /// 状态变更驱动 [_contentMounted]；同时写入 provider 供壳层驱动收起动效）。
   Animation<double>? _routeAnimation;
 
-  /// 展开信号写入器：在 `initState` 缓存 notifier（Riverpod 3 不允许
-  /// 在 `State.dispose()` 里再碰 `ref`——此时 element 已 defunct）。
-  PlayerExpandedNotifier? _expandedNotifier;
+  /// 播放页路由动画写入器（dispose 时不能再经 ref 获取，initState 缓存）。
+  PlayerRouteAnimationNotifier? _routeAnimNotifier;
 
   /// 封面节拍脉冲动画：鼓点命中 → forward(from: 0) 驱动 1 → 1.03 → 1 回弹。
   /// 脉冲检测在 C 引擎（fft.c detect_beat 三频段）完成，Dart 侧消费
@@ -138,41 +138,40 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     windowManager.addListener(this);
     // 初始全屏状态校准：Windows 平台事件可能缺失，改为主动查询真实状态。
     unawaited(_syncFullScreen());
-    // 缓存展开信号写入器（dispose 时不能再经 ref 获取）。
-    _expandedNotifier = ref.read(playerExpandedProvider.notifier);
-    // 挂载即标记展开（对齐原项目 status.isPlayerExpanded）；延后到首帧，
-    // 避免在构建期修改壳层正在监听的 provider。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _expandedNotifier?.set(true);
-    });
+    // 缓存路由动画写入器（dispose 时不能再经 ref 获取）。
+    _routeAnimNotifier = ref.read(playerRouteAnimationProvider.notifier);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 绑定所在路由的进入/退出动画，驱动重内容挂载时机。
+    // 绑定所在路由的进入/退出动画：驱动重内容（背景/歌词）挂载时机，并写入
+    // provider 供壳层驱动主页收缩/展开（同一控制器 → 同帧同步）。
     final animation = ModalRoute.of(context)?.animation;
     if (!identical(animation, _routeAnimation)) {
       _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
       _routeAnimation = animation;
       _routeAnimation?.addStatusListener(_onRouteAnimationStatus);
     }
-    // 兜底同步：路由转场可能已结束（例如无动效/重建），避免漏掉首次 completed。
-    _syncContentMounted();
+    // 延后到帧末，避免在构建期修改壳层正在监听的 provider。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _routeAnimNotifier?.set(_routeAnimation);
+      _syncContentMounted();
+    });
   }
 
   /// 以当前路由动画状态校准 [_contentMounted]（幂等）。
   ///
-  /// 只在「进入动画已完成」时置真；**不主动置假**——退出时保持内容挂载，
-  /// 直到路由销毁（对齐原版收起后背景 500ms 才卸载、退出下滑期间背景仍在）。
+  /// 只在进入动画完成后置真；退出时保持内容挂载直到路由销毁。
   void _syncContentMounted() {
-    final shouldMount = _routeAnimation?.status == AnimationStatus.completed;
-    if (shouldMount && !_contentMounted) {
+    if (_routeAnimation?.status == AnimationStatus.completed &&
+        !_contentMounted) {
       setState(() => _contentMounted = true);
     }
   }
 
-  /// 路由转场状态 → 内容挂载态：仅在进入动画完成时挂载；卸载交给路由销毁。
+  /// 路由转场状态 → 重内容挂载态（进入完成才挂载背景/歌词）。
   void _onRouteAnimationStatus(AnimationStatus status) {
     if (!mounted) return;
     if (status == AnimationStatus.completed && !_contentMounted) {
@@ -183,8 +182,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   @override
   void dispose() {
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
-    // 卸载即折叠，壳层据此反向收起（scale/opacity 还原）。
-    _expandedNotifier?.set(false);
+    // 清空路由动画（壳层恢复折叠态）。
+    _routeAnimNotifier?.set(null);
     windowManager.removeListener(this);
     _hideTimer?.cancel();
     _coverPulse.dispose();

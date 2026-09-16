@@ -9,6 +9,7 @@ extension _BarLyricTextView on _BarLyricTextState {
     final positionMs = ref.watch(
       playbackProvider.select((s) => s.position.inMilliseconds),
     );
+    final playing = ref.watch(playbackProvider.select((s) => s.playing));
     final prefs = ref.watch(appPrefsProvider);
     final showTranslation = prefs.showTranslation;
     final groups = ref
@@ -113,7 +114,11 @@ extension _BarLyricTextView on _BarLyricTextState {
                   animMs: _animMs,
                 );
               }
-              return _Marquee(text: span.toPlainText(), span: span);
+              return _Marquee(
+                text: span.toPlainText(),
+                span: span,
+                playing: playing,
+              );
             }
             return Align(
               alignment: Alignment.centerRight,
@@ -172,10 +177,17 @@ class _KaraokeFollow extends StatelessWidget {
 }
 
 class _Marquee extends StatefulWidget {
-  const _Marquee({required this.text, required this.span});
+  const _Marquee({
+    required this.text,
+    required this.span,
+    required this.playing,
+  });
 
   final String text;
   final TextSpan span;
+
+  /// 播放中才循环滚动；暂停时停表冻结当前位移，避免空闲持续出帧。
+  final bool playing;
 
   @override
   State<_Marquee> createState() => _MarqueeState();
@@ -197,24 +209,47 @@ class _MarqueeState extends State<_Marquee>
       vsync: this,
       duration: const Duration(seconds: 5),
     );
-    _startTimer = Timer(const Duration(milliseconds: 2000), _start);
+    if (widget.playing) {
+      _startTimer = Timer(const Duration(milliseconds: 2000), _start);
+    }
   }
 
   @override
   void didUpdateWidget(_Marquee oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.text == oldWidget.text) return;
-    _startTimer?.cancel();
-    _ctrl
-      ..stop()
-      ..value = 0;
-    _textWidth = null;
-    _startTimer = Timer(const Duration(milliseconds: 2000), _start);
-    setState(() {});
+    if (widget.text != oldWidget.text) {
+      _startTimer?.cancel();
+      _startTimer = null;
+      _ctrl
+        ..stop()
+        ..value = 0;
+      _textWidth = null;
+      if (widget.playing) {
+        _startTimer = Timer(const Duration(milliseconds: 2000), _start);
+      }
+      setState(() {});
+      return;
+    }
+    if (widget.playing != oldWidget.playing) {
+      if (widget.playing) {
+        // 恢复播放：已测宽则接续滚动，否则重新走延迟启动。
+        if (_textWidth != null) {
+          _ctrl.repeat();
+        } else {
+          _startTimer?.cancel();
+          _startTimer = Timer(const Duration(milliseconds: 2000), _start);
+        }
+      } else {
+        // 暂停：停表冻结（ticker 不再请求帧）。
+        _startTimer?.cancel();
+        _startTimer = null;
+        _ctrl.stop();
+      }
+    }
   }
 
   void _start() {
-    if (!mounted) return;
+    if (!mounted || !widget.playing) return;
     final painter = TextPainter(
       text: widget.span,
       maxLines: 1,

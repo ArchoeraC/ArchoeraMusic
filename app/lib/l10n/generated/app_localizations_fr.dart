@@ -9,6 +9,34 @@ class AppLocalizationsFr extends AppLocalizations {
   AppLocalizationsFr([String locale = 'fr']) : super(locale);
 
   @override
+  String get settingsCatRender => 'Performance et rendu';
+
+  @override
+  String get settingsRenderSubtitle =>
+      'Accélération GPU et coût de rendu (expérimental)';
+
+  @override
+  String get settingsRippleShader => 'Shader GPU des ondulations';
+
+  @override
+  String get settingsRippleShaderDesc =>
+      'Dessiner les ondulations avec un fragment shader (désactivé = maillage CPU)';
+
+  @override
+  String get settingsRippleLowRes => 'Calque dynamique en demi-résolution';
+
+  @override
+  String get settingsRippleLowResDesc =>
+      'Rendre le calque dynamique des ondulations en demi-résolution puis agrandir ; chemin CPU uniquement';
+
+  @override
+  String get settingsRippleDamageClip => 'Découpage par région de dommage';
+
+  @override
+  String get settingsRippleDamageClipDesc =>
+      'Ne redessiner que les bandes d\'ondulations actives ; chemin CPU uniquement';
+
+  @override
   String get menuTrackDetail => 'Détails du média';
 
   @override
@@ -1472,10 +1500,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsDeveloperDisabled => 'Mode développeur désactivé';
-
-  @override
-  String get settingsDeveloperHoldHint =>
-      'Maintenez 10 secondes pour activer le mode développeur (souris : maintenir enfoncé)';
 
   @override
   String get settingsSearchHint => 'Rechercher des paramètres…';

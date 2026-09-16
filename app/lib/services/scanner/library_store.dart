@@ -28,6 +28,11 @@ class LibraryState {
     this.scanErrors = 0,
     this.scanCanceled = false,
     this.tracks = const [],
+    this.totalCount = 0,
+    this.totalSizeBytes = 0,
+    this.totalDurationMs = 0,
+    this.hasMore = false,
+    this.loadingMore = false,
     this.searchQuery = '',
     this.error,
   });
@@ -50,28 +55,30 @@ class LibraryState {
   final int scanErrors;
   final bool scanCanceled;
 
-  /// 曲目全量（按标题排序，内存过滤搜索）。
+  /// 已载入的曲目窗口（按标题排序；分页追加，**不含 lyrics**）。
+  ///
+  /// 不再是全量：滚动触底经 [LibraryNotifier.loadMore] 续拉；搜索经 SQL 下推
+  /// 后同样只驻留当前窗口。
   final List<TrackRow> tracks;
+
+  /// 当前搜索条件下的曲目总数（无搜索时等于曲库总数）。
+  final int totalCount;
+
+  /// 曲库总文件大小（字节，来自 DB 聚合，非窗口求和）。
+  final int totalSizeBytes;
+
+  /// 曲库总时长（毫秒，来自 DB 聚合，非窗口求和）。
+  final int totalDurationMs;
+
+  /// 是否还有未载入的曲目（窗口 < [totalCount]）。
+  final bool hasMore;
+
+  /// 是否正在加载下一页。
+  final bool loadingMore;
 
   final String searchQuery;
 
   final String? error;
-
-  /// 搜索过滤后的曲目。
-  List<TrackRow> get filteredTracks {
-    final q = searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return tracks;
-    return tracks.where((t) {
-      if (t.title.toLowerCase().contains(q)) return true;
-      if (t.artistNames.join(' / ').toLowerCase().contains(q)) return true;
-      if ((t.albumName ?? '').toLowerCase().contains(q)) return true;
-      return false;
-    }).toList();
-  }
-
-  /// 曲目总文件大小（字节）。
-  int get totalSizeBytes =>
-      tracks.fold(0, (sum, t) => sum + (t.fileSize > 0 ? t.fileSize : 0));
 
   LibraryState copyWith({
     bool? initialized,
@@ -84,6 +91,11 @@ class LibraryState {
     int? scanErrors,
     bool? scanCanceled,
     List<TrackRow>? tracks,
+    int? totalCount,
+    int? totalSizeBytes,
+    int? totalDurationMs,
+    bool? hasMore,
+    bool? loadingMore,
     String? searchQuery,
     String? error,
   }) {
@@ -98,6 +110,11 @@ class LibraryState {
       scanErrors: scanErrors ?? this.scanErrors,
       scanCanceled: scanCanceled ?? this.scanCanceled,
       tracks: tracks ?? this.tracks,
+      totalCount: totalCount ?? this.totalCount,
+      totalSizeBytes: totalSizeBytes ?? this.totalSizeBytes,
+      totalDurationMs: totalDurationMs ?? this.totalDurationMs,
+      hasMore: hasMore ?? this.hasMore,
+      loadingMore: loadingMore ?? this.loadingMore,
       searchQuery: searchQuery ?? this.searchQuery,
       error: error ?? this.error,
     );
@@ -111,7 +128,13 @@ class LibraryState {
 class LibraryNotifier extends Notifier<LibraryState>
     with _LibraryStoreCore, _LibraryStoreScan {
   @override
-  LibraryState build() => const LibraryState();
+  LibraryState build() {
+    ref.onDispose(() {
+      _searchDebounce?.cancel();
+      _searchDebounce = null;
+    });
+    return const LibraryState();
+  }
 
   /// 进行中的扫描器（供 cancelScan 调用 C# 静态 CTS 取消）。
   @override
@@ -121,14 +144,24 @@ class LibraryNotifier extends Notifier<LibraryState>
   @override
   DateTime? _lastAutoRefreshAt;
 
+  /// 搜索输入去抖（SQL 下推前合并连续输入）。
+  @override
+  Timer? _searchDebounce;
+
   /// 扫描目录配置文件路径。
   static String _scanDirsFile() => _LibraryStoreCore._libraryScanDirsFilePath();
 
   /// 初始化：读扫描目录 + 载入曲库（幂等）。
   Future<void> init() => _initLibrary();
 
-  /// 重新载入曲目（从 library.db）。
+  /// 重新载入曲目（从 library.db，回到第一页）。
   Future<void> reloadTracks() => _reloadTracks();
+
+  /// 滚动触底续拉下一页（无更多 / 加载中时忽略）。
+  Future<void> loadMore() => _loadMore();
+
+  /// 按当前搜索条件取全量曲目（不含 lyrics，供「播放全部」建队列）。
+  Future<List<TrackRow>> allTracks() => _allTracks();
 
   void setSearchQuery(String q) => _setSearchQuery(q);
 
