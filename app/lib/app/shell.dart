@@ -13,11 +13,13 @@ import '../services/playback/playback_notifier.dart';
 import '../services/scanner/library_store.dart';
 import '../stores/app_prefs.dart';
 import '../stores/player_expanded.dart';
+import '../stores/shell_branch.dart';
 import '../widgets/common/anim.dart';
 import '../widgets/common/fps_monitor.dart';
 import '../widgets/layout/nav_header.dart';
 import '../widgets/layout/player_bar.dart';
 import '../widgets/layout/side_bar.dart';
+import 'shell_expand_transition.dart';
 
 /// 应用壳（对齐原项目 MainLayout.vue）：
 /// 左侧 SideBar（可折叠分组导航）+ 右侧（顶部 NavHeader + 页面区）
@@ -57,26 +59,29 @@ class AppShell extends ConsumerWidget {
         ref.read(libraryStoreProvider.notifier).maybeAutoRefresh();
       });
     }
-    final content = Row(
-      children: [
-        SideBar(navigationShell: navigationShell),
-        const VerticalDivider(width: 1),
-        Expanded(
-          child: Column(
-            children: [
-              const NavHeader(),
-              const Divider(height: 1),
-              Expanded(
-                child: _BranchTransition(
-                  index: navigationShell.currentIndex,
-                  transition: prefs.routeTransition,
-                  child: navigationShell,
+    final content = _ShellBranchIndexSync(
+      navigationShell: navigationShell,
+      child: Row(
+        children: [
+          SideBar(navigationShell: navigationShell),
+          const VerticalDivider(width: 1),
+          Expanded(
+            child: Column(
+              children: [
+                const NavHeader(),
+                const Divider(height: 1),
+                Expanded(
+                  child: _BranchTransition(
+                    index: navigationShell.currentIndex,
+                    transition: prefs.routeTransition,
+                    child: navigationShell,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
     return Scaffold(
       body: Stack(
@@ -86,8 +91,13 @@ class AppShell extends ConsumerWidget {
           Positioned.fill(
             child: Padding(
               padding: EdgeInsets.only(bottom: !floating && showBar ? 82 : 0),
-              child: _ShellExpandTransition(
+              child: ShellExpandTransition(
                 expanded: playerExpanded,
+                disableAnimations: noAnim(context),
+                // 完全展开后壳内容卸载，仅保留一层纯色背景（无列表/图片）。
+                placeholder: ColoredBox(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                ),
                 child: content,
               ),
             ),
@@ -109,34 +119,51 @@ class AppShell extends ConsumerWidget {
   }
 }
 
-/// 全屏播放器展开时主壳内容的收起/展开动效（对齐原版 MainLayout 根容器：
-/// `transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.7,0,0.3,1)]`
-/// + 目标 `scale-95 opacity-0 pointer-events-none`）。
-///
-/// 折叠态（默认）直接以 scale 1 / opacity 1 渲染、不包 [IgnorePointer]，
-/// 与改动前逐帧一致；性能模式 duration 归零，直切目标态。
-class _ShellExpandTransition extends StatelessWidget {
-  const _ShellExpandTransition({required this.expanded, required this.child});
+/// 全屏播放器完全展开时壳内容（含 [StatefulNavigationShell]）会被真正卸载，
+/// 收起时重新挂载。go_router 重建时会依据当前路由推导分支索引，这里额外把
+/// 最近一次索引记到 [shellBranchIndexProvider]，并在重挂载后于 post-frame
+/// 用 [StatefulNavigationShell.goBranch] 兜底恢复，确保分支索引不丢失。
+class _ShellBranchIndexSync extends ConsumerStatefulWidget {
+  const _ShellBranchIndexSync({
+    required this.navigationShell,
+    required this.child,
+  });
 
-  final bool expanded;
+  final StatefulNavigationShell navigationShell;
   final Widget child;
 
   @override
+  ConsumerState<_ShellBranchIndexSync> createState() =>
+      _ShellBranchIndexSyncState();
+}
+
+class _ShellBranchIndexSyncState extends ConsumerState<_ShellBranchIndexSync> {
+  @override
+  void initState() {
+    super.initState();
+    final remembered = ref.read(shellBranchIndexProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.navigationShell.currentIndex != remembered) {
+        widget.navigationShell.goBranch(remembered);
+      }
+    });
+  }
+
+  /// 已记录的分支索引（避免每帧重复调度）。
+  int? _lastIndex;
+
+  @override
   Widget build(BuildContext context) {
-    Widget result = AnimatedScale(
-      scale: expanded ? 0.95 : 1,
-      duration: animDuration(context, const Duration(milliseconds: 500)),
-      curve: const Cubic(0.7, 0, 0.3, 1),
-      child: AnimatedOpacity(
-        opacity: expanded ? 0 : 1,
-        duration: animDuration(context, const Duration(milliseconds: 500)),
-        curve: const Cubic(0.7, 0, 0.3, 1),
-        child: child,
-      ),
-    );
-    // 展开态拦截指针事件（折叠态不引入 IgnorePointer，保持默认语义）。
-    if (expanded) result = IgnorePointer(child: result);
-    return result;
+    final index = widget.navigationShell.currentIndex;
+    if (_lastIndex != index) {
+      _lastIndex = index;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(shellBranchIndexProvider.notifier).set(index);
+      });
+    }
+    return widget.child;
   }
 }
 
