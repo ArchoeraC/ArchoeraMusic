@@ -2,8 +2,9 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// `ripple_background.dart` 的绘制器部分：GPU 着色器绘制、CPU 兜底网格引擎、
-/// 涟漪数据与重绘通知。作为 `part` 共享主库私有状态（见 [RippleBackground]）。
+/// 水纹背景的**动态层**绘制器：GPU 着色器绘制、CPU 兜底网格引擎、涟漪数据与
+/// 重绘通知。作为 `part` 共享主库私有状态（见 [RippleBackground]）；静态层纹理
+/// 由 `RippleStaticLayer` 提供。
 part of 'ripple_background.dart';
 
 /// GPU 着色器绘制：单 pass 折射 + 饱和 + 高光/压暗 + 压暗。
@@ -18,10 +19,10 @@ class _RippleShaderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    final to = s._preparedCurrent;
+    final to = s._static.current;
     if (w <= 0 || h <= 0 || to == null) return;
-    final from = s._preparedOld ?? to;
-    final mix = s._preparedOld != null ? s._mix : 1.0;
+    final from = s._static.old ?? to;
+    final mix = s._static.old != null ? s._mix : 1.0;
 
     shader.setFloat(RippleUniforms.size, w);
     shader.setFloat(RippleUniforms.size + 1, h);
@@ -232,7 +233,7 @@ class _RipplePainter extends CustomPainter {
     final h = size.height;
     if (w <= 0 || h <= 0) return;
     // 优先用预烘焙（模糊+饱和）纹理；未就绪时暂用原图。
-    final img = s._preparedCurrent ?? s._current;
+    final img = s._static.current ?? s._current;
     if (img == null) {
       canvas.drawRect(
         Offset.zero & size,
@@ -250,7 +251,7 @@ class _RipplePainter extends CustomPainter {
       indices: _indices,
     );
     final rect = Offset.zero & size;
-    final old = s._preparedOld ?? s._old;
+    final old = s._static.old ?? s._old;
     if (old != null && s._mix < 0.999) {
       _drawImage(canvas, rect, verts, old, 1);
       _drawImage(canvas, rect, verts, img, s._mix);

@@ -12,6 +12,10 @@
 /// - **CPU（仅着色器不可用时兜底）**：网格顶点折射 + `ImageShader`（见 [_RipplePainter]）。
 ///
 /// 切歌时旧封面与新封面按 700ms 交叉淡入（GPU 路径在着色器内 `mix` 两纹理）。
+///
+/// 拆为静态层（[RippleStaticLayer]：预烘焙封面纹理及生命周期）与动态层
+/// （`ripple_dynamic_layer.dart`：涟漪模拟/绘制），本文件负责解析封面、
+/// 驱动涟漪与组合两层。
 library;
 
 import 'dart:async';
@@ -23,10 +27,10 @@ import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 
-import 'blurred_cover.dart';
 import 'ripple_shader.dart';
+import 'ripple_static_layer.dart';
 
-part 'ripple_painters.dart';
+part 'ripple_dynamic_layer.dart';
 
 /// 同时存活的涟漪上限（对齐上游 MAX_RIPPLES）。
 const int _kMaxRipples = 48;
@@ -105,13 +109,18 @@ class _RippleBackgroundState extends State<RippleBackground>
   /// GPU 路径：着色器实例（着色器加载成功后非空）。
   ui.FragmentShader? _shader;
 
-  /// GPU 路径：预烘焙（模糊+饱和）的封面纹理（当前 / 交叉淡入的旧封面）。
-  ui.Image? _preparedCurrent;
-  ui.Image? _preparedOld;
+  /// 静态层：预烘焙（模糊+饱和）封面纹理及生命周期。
+  late final RippleStaticLayer _static;
 
   @override
   void initState() {
     super.initState();
+    _static = RippleStaticLayer(
+      isMounted: () => mounted,
+      rebuild: setState,
+      blurSigma: widget.blurSigma,
+      saturation: widget.saturation,
+    );
     _ticker = createTicker(_tick);
     _resetRipples();
     _resolveCover();
@@ -133,8 +142,11 @@ class _RippleBackgroundState extends State<RippleBackground>
     // 模糊/饱和度变化 → 预烘焙封面需重做（仅 GPU 路径用）。
     if (old.blurSigma != widget.blurSigma ||
         old.saturation != widget.saturation) {
+      _static
+        ..blurSigma = widget.blurSigma
+        ..saturation = widget.saturation;
       final cur = _current;
-      if (cur != null) _prepareCover(cur, transition: false);
+      if (cur != null) _static.prepareCover(cur, transition: false);
     }
     _repaint.notify();
   }
@@ -145,8 +157,7 @@ class _RippleBackgroundState extends State<RippleBackground>
     _ticker.dispose();
     _repaint.dispose();
     _shader?.dispose();
-    _preparedCurrent?.dispose();
-    _preparedOld?.dispose();
+    _static.dispose();
     super.dispose();
   }
 
@@ -162,60 +173,6 @@ class _RippleBackgroundState extends State<RippleBackground>
     final program = await RippleShaderLoader.load();
     if (!mounted || program == null) return;
     setState(() => _shader = program.fragmentShader());
-  }
-
-  /// 预烘焙：封面 → 模糊 + 饱和纹理（一次，替代每帧全屏模糊）。
-  ///
-  /// 用同步 [ui.Picture.toImageSync]：`toImage` 为异步，在 widget 测试的
-  /// fake-async 环境下会产出空白图；`toImageSync` 同步光栅化，测试/真机一致。
-  ui.Image? _prepare(ui.Image src) {
-    // flutter test 的 fake-async 环境无法光栅化 Picture.toImage(Sync)（会得空白
-    // 纹理）；测试统一走「原图 + 每帧滤镜」回退（见 build）。
-    if (Platform.environment.containsKey('FLUTTER_TEST')) return null;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final paint = Paint()
-      ..imageFilter = ui.ImageFilter.blur(
-        sigmaX: widget.blurSigma,
-        sigmaY: widget.blurSigma,
-      )
-      ..colorFilter = saturationColorFilter(widget.saturation);
-    canvas.drawImage(src, Offset.zero, paint);
-    final pic = recorder.endRecording();
-    try {
-      return pic.toImageSync(src.width, src.height);
-    } catch (_) {
-      return null;
-    } finally {
-      pic.dispose();
-    }
-  }
-
-  void _prepareCover(ui.Image img, {required bool transition}) {
-    // 延后到微任务再 setState，避免在 image 回调（可能处于构建期）同步 setState。
-    unawaited(Future<void>.microtask(() {
-      if (!mounted) return;
-      final prepared = _prepare(img);
-      if (prepared == null) return;
-      final old = _preparedCurrent;
-      setState(() {
-        if (transition && old != null) {
-          _disposeLater(_preparedOld);
-          _preparedOld = old; // 转移所有权给旧槽
-        } else {
-          _disposeLater(_preparedOld);
-          _preparedOld = null;
-          _disposeLater(old);
-        }
-        _preparedCurrent = prepared;
-      });
-    }));
-  }
-
-  /// 延后一帧释放，避免当前帧仍被 sampler/绘制引用。
-  void _disposeLater(ui.Image? img) {
-    if (img == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) => img.dispose());
   }
 
   // ── 封面解析 ─────────────────────────────────────────────────────────
@@ -246,7 +203,7 @@ class _RippleBackgroundState extends State<RippleBackground>
       (info, _) {
         if (!mounted) return;
         final img = info.image;
-        if (identical(_current, img) && _preparedCurrent != null) return;
+        if (identical(_current, img) && _static.current != null) return;
         var transition = false;
         if (!widget.animate) {
           _old = null;
@@ -257,7 +214,7 @@ class _RippleBackgroundState extends State<RippleBackground>
           transition = true;
         }
         _current = img;
-        _prepareCover(img, transition: transition);
+        _static.prepareCover(img, transition: transition);
         _repaint.notify();
       },
       onError: (_, _) {},
@@ -328,8 +285,7 @@ class _RippleBackgroundState extends State<RippleBackground>
       if (_mix >= 1) {
         _transitioning = false;
         // 交叉淡入结束：旧封面纹理可释放。
-        _disposeLater(_preparedOld);
-        _preparedOld = null;
+        _static.releaseOld();
       }
     }
     _repaint.notify();
@@ -341,7 +297,7 @@ class _RippleBackgroundState extends State<RippleBackground>
   @override
   Widget build(BuildContext context) {
     final shader = _shader;
-    final prepared = _preparedCurrent;
+    final prepared = _static.current;
     // GPU 主路径（默认关闭，见 kEnableRippleShader）。
     if (kEnableRippleShader && shader != null && prepared != null) {
       return RepaintBoundary(
@@ -358,16 +314,7 @@ class _RippleBackgroundState extends State<RippleBackground>
       size: Size.infinite,
     );
     if (prepared == null) {
-      paint = ColorFiltered(
-        colorFilter: saturationColorFilter(widget.saturation),
-        child: ImageFiltered(
-          imageFilter: ui.ImageFilter.blur(
-            sigmaX: widget.blurSigma,
-            sigmaY: widget.blurSigma,
-          ),
-          child: paint,
-        ),
-      );
+      paint = _static.wrapFallback(paint);
     }
     return RepaintBoundary(
       child: Stack(
