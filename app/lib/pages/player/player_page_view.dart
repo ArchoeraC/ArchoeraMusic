@@ -52,6 +52,10 @@ extension _PlayerPageView on _PlayerPageState {
     final prefs = ref.watch(appPrefsProvider);
     final showLyrics = prefs.showLyricsInPlayer;
     final transitionStyle = prefs.transitionStyle;
+    // 重内容（背景 / 歌词）在路由进入动画结束后才挂载；性能模式直切视为已完成。
+    final contentMounted =
+        _contentMounted ||
+        (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
     final hasLyrics = ref
         .watch(currentLyricsProvider)
         .maybeWhen(data: (l) => l.isNotEmpty, orElse: () => false);
@@ -64,9 +68,13 @@ extension _PlayerPageView on _PlayerPageState {
         onPointerSignal: (_) => _pokeControls(),
         child: Stack(
           children: [
-            Positioned.fill(
-              child: PlayerBackground(cover: current?.cover, playing: playing),
-            ),
+            if (contentMounted)
+              Positioned.fill(
+                child: PlayerBackground(
+                  cover: current?.cover,
+                  playing: playing,
+                ),
+              ),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -100,6 +108,7 @@ extension _PlayerPageView on _PlayerPageState {
                         hasLyrics: hasLyrics,
                         hasSource: hasSource,
                         showLyrics: showLyrics,
+                        contentMounted: contentMounted,
                         transitionStyle: transitionStyle,
                         slideNext: _slideNext,
                         coverPulse: _coverPulse,
@@ -246,6 +255,7 @@ class _PlayerMainBody extends StatelessWidget {
     required this.hasLyrics,
     required this.hasSource,
     required this.showLyrics,
+    required this.contentMounted,
     required this.transitionStyle,
     required this.slideNext,
     required this.coverPulse,
@@ -263,6 +273,7 @@ class _PlayerMainBody extends StatelessWidget {
   final bool hasLyrics;
   final bool hasSource;
   final bool showLyrics;
+  final bool contentMounted;
   final String transitionStyle;
   final bool slideNext;
   final AnimationController coverPulse;
@@ -299,11 +310,14 @@ class _PlayerMainBody extends StatelessWidget {
           beatStrength: beatStrength,
           l10n: l10n,
         );
-        final lyricsBlock = PlayerLyricsBlock(
-          hasLyrics: hasLyrics,
-          lyricScale: lyricScale,
-          onSeek: onSeekLyric,
-        );
+        // 歌词块同样等路由进入动画结束后再挂载（对齐原版 lyricMounted）。
+        final lyricsBlock = contentMounted
+            ? PlayerLyricsBlock(
+                hasLyrics: hasLyrics,
+                lyricScale: lyricScale,
+                onSeek: onSeekLyric,
+              )
+            : const SizedBox.shrink();
         return RepaintBoundary(
           child: Stack(
             clipBehavior: Clip.none,
