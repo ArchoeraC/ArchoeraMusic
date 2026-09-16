@@ -127,33 +127,26 @@ final appRouter = GoRouter(
       path: '/player',
       pageBuilder: (context, state) => CustomTransitionPage(
         key: state.pageKey,
-        transitionDuration: const Duration(milliseconds: 320),
-        reverseTransitionDuration: const Duration(milliseconds: 260),
-        transitionsBuilder:
-            (context, animation, secondaryAnimation, child) {
+        transitionDuration: const Duration(milliseconds: 500),
+        reverseTransitionDuration: const Duration(milliseconds: 500),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
           // 性能模式（MediaQuery.disableAnimations）：播放页直切，无展开动效
           if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
             return child;
           }
-          // 底部展开 + 轻微放大 + 淡入（对齐原版 FullPlayer 从底部
-          // 展开的覆盖层语义；easeOutQuart 收尾更柔顺，避免生硬）
+          // 纯垂直上滑（对齐原版 FullPlayer：enter/leave 均
+          // `translate-y-full → 0`，500ms cubic-bezier(0.7,0,0.3,1)）。
           final curved = CurvedAnimation(
             parent: animation,
-            curve: Curves.easeOutQuart,
-            reverseCurve: Curves.easeInQuart,
+            curve: const Cubic(0.7, 0, 0.3, 1),
+            reverseCurve: const Cubic(0.7, 0, 0.3, 1),
           );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.08),
-                end: Offset.zero,
-              ).animate(curved),
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
-                child: child,
-              ),
-            ),
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
           );
         },
         child: const PlayerPage(),

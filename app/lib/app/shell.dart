@@ -12,6 +12,8 @@ import 'package:go_router/go_router.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/scanner/library_store.dart';
 import '../stores/app_prefs.dart';
+import '../stores/player_expanded.dart';
+import '../widgets/common/anim.dart';
 import '../widgets/common/fps_monitor.dart';
 import '../widgets/layout/nav_header.dart';
 import '../widgets/layout/player_bar.dart';
@@ -40,6 +42,9 @@ class AppShell extends ConsumerWidget {
         prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
     final floating = prefs.floatingPlayerBar;
     final collapsed = prefs.sidebarCollapsed;
+    // 全屏播放器展开时，主壳内容（侧边栏 + 页面区）缩放淡出并忽略指针
+    // （对齐原版 MainLayout：scale-95 opacity-0 pointer-events-none）。
+    final playerExpanded = ref.watch(playerExpandedProvider);
     // 播放条可见时，停靠模式给内容底部留白（对齐原版 mb-20），
     // 防止被全宽停靠条遮挡；悬浮模式占满全高（侧边栏可到底）。
     final showBar = ref.watch(
@@ -81,7 +86,10 @@ class AppShell extends ConsumerWidget {
           Positioned.fill(
             child: Padding(
               padding: EdgeInsets.only(bottom: !floating && showBar ? 82 : 0),
-              child: content,
+              child: _ShellExpandTransition(
+                expanded: playerExpanded,
+                child: content,
+              ),
             ),
           ),
           // 底部播放条（悬浮层，不占布局空间——对齐原版 MainLayout 的
@@ -98,6 +106,37 @@ class AppShell extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// 全屏播放器展开时主壳内容的收起/展开动效（对齐原版 MainLayout 根容器：
+/// `transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.7,0,0.3,1)]`
+/// + 目标 `scale-95 opacity-0 pointer-events-none`）。
+///
+/// 折叠态（默认）直接以 scale 1 / opacity 1 渲染、不包 [IgnorePointer]，
+/// 与改动前逐帧一致；性能模式 duration 归零，直切目标态。
+class _ShellExpandTransition extends StatelessWidget {
+  const _ShellExpandTransition({required this.expanded, required this.child});
+
+  final bool expanded;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget result = AnimatedScale(
+      scale: expanded ? 0.95 : 1,
+      duration: animDuration(context, const Duration(milliseconds: 500)),
+      curve: const Cubic(0.7, 0, 0.3, 1),
+      child: AnimatedOpacity(
+        opacity: expanded ? 0 : 1,
+        duration: animDuration(context, const Duration(milliseconds: 500)),
+        curve: const Cubic(0.7, 0, 0.3, 1),
+        child: child,
+      ),
+    );
+    // 展开态拦截指针事件（折叠态不引入 IgnorePointer，保持默认语义）。
+    if (expanded) result = IgnorePointer(child: result);
+    return result;
   }
 }
 
