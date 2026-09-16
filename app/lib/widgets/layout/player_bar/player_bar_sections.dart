@@ -23,12 +23,15 @@ extension _PlayerBarSections on _PlayerBarState {
       children: [
         SizedBox(
           height: 22,
-          child: PlaybackProgressSlider(
-            dragMs: _dragMs,
-            buffering: buffering,
-            enabled: hasSource,
-            onDragChanged: _setDragMs,
-            onSeekEnd: (_) => _clearDragMs(),
+          // 进度每 50ms 更新：独立重绘层，避免带动整条播放条重绘
+          child: RepaintBoundary(
+            child: PlaybackProgressSlider(
+              dragMs: _dragMs,
+              buffering: buffering,
+              enabled: hasSource,
+              onDragChanged: _setDragMs,
+              onSeekEnd: (_) => _clearDragMs(),
+            ),
           ),
         ),
         SizedBox(
@@ -83,9 +86,12 @@ extension _PlayerBarSections on _PlayerBarState {
         children: [
           Tooltip(
             message: l10n.playerBarOpenPlayer,
-            child: _BarCover(
-              cover: track?.cover,
-              onTap: hasContent ? () => context.push('/player') : null,
+            // 封面异步加载完成/悬停动效：独立重绘层
+            child: RepaintBoundary(
+              child: _BarCover(
+                cover: track?.cover,
+                onTap: hasContent ? () => context.push('/player') : null,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -173,21 +179,29 @@ extension _PlayerBarSections on _PlayerBarState {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final s = ref.watch(
-                        playbackProvider.select(
-                          (s) => (pos: s.position, dur: s.duration),
-                        ),
-                      );
-                      return Text(
-                        '${formatClock(s.pos)} / ${formatClock(s.dur)}',
-                        style: theme.textTheme.bodySmall,
-                      );
-                    },
+                  // 播放时间每 50ms 更新：独立重绘层
+                  RepaintBoundary(
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final s = ref.watch(
+                          playbackProvider.select(
+                            (s) => (pos: s.position, dur: s.duration),
+                          ),
+                        );
+                        return Text(
+                          '${formatClock(s.pos)} / ${formatClock(s.dur)}',
+                          style: theme.textTheme.bodySmall,
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 4),
-                  const SizedBox(width: 120, height: 12, child: _BarInfoArea()),
+                  // 迷你歌词/频谱逐帧刷新：独立重绘层
+                  const SizedBox(
+                    width: 120,
+                    height: 12,
+                    child: RepaintBoundary(child: _BarInfoArea()),
+                  ),
                 ],
               ),
             ),
