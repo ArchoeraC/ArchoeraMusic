@@ -65,6 +65,7 @@ extension _LibraryPageView on _LibraryPageState {
           else
             Expanded(
               child: SongList(
+                key: const PageStorageKey('page.library'),
                 items: tracks,
                 playingId: playingId,
                 isPlaying: isPlaying,

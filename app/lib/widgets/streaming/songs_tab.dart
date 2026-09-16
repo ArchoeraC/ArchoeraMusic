@@ -108,6 +108,7 @@ class _SongsTabState extends ConsumerState<StreamingSongsTab> {
         else
           Expanded(
             child: SongList(
+              key: const PageStorageKey('page.streaming.songs'),
               items: filtered,
               playingId: playingId,
               isPlaying: isPlaying,

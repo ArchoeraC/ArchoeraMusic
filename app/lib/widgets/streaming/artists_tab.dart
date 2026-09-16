@@ -34,6 +34,7 @@ class StreamingArtistsTab extends ConsumerWidget {
       );
     }
     return CoverGrid(
+      key: const PageStorageKey('page.streaming.artists'),
       items: [
         for (final a in artists)
           CoverItem(

@@ -36,6 +36,7 @@ extension _StreamingArtistDetailPageView on _StreamingArtistDetailPageState {
         scheme: scheme,
         onRetry: _load,
         child: SingleChildScrollView(
+          key: PageStorageKey('page.streaming.artist.${widget.id}'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

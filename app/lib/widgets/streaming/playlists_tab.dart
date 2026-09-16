@@ -35,6 +35,7 @@ class StreamingPlaylistsTab extends ConsumerWidget {
       );
     }
     return CoverGrid(
+      key: const PageStorageKey('page.streaming.playlists'),
       items: [
         for (final p in playlists)
           CoverItem(

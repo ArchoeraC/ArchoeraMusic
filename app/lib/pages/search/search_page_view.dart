@@ -93,6 +93,7 @@ extension _SearchPageView on _SearchPageState {
             index: _tabs.index,
             children: [
               SongList(
+                key: const PageStorageKey('page.search.songs'),
                 items: _songs.items,
                 playingId: playingId,
                 isPlaying: isPlaying,
@@ -106,6 +107,7 @@ extension _SearchPageView on _SearchPageState {
                 onReachBottom: () => _fetch(append: true),
               ),
               CoverGrid(
+                key: const PageStorageKey('page.search.albums'),
                 items: _albums.items,
                 loading: _albums.loadingMore,
                 hasMore: _albums.hasMore,
@@ -115,6 +117,7 @@ extension _SearchPageView on _SearchPageState {
                 onReachBottom: () => _fetch(append: true),
               ),
               CoverGrid(
+                key: const PageStorageKey('page.search.artists'),
                 items: _artists.items,
                 loading: _artists.loadingMore,
                 hasMore: _artists.hasMore,
@@ -124,6 +127,7 @@ extension _SearchPageView on _SearchPageState {
                 onReachBottom: () => _fetch(append: true),
               ),
               CoverGrid(
+                key: const PageStorageKey('page.search.playlists'),
                 items: _playlists.items,
                 loading: _playlists.loadingMore,
                 hasMore: _playlists.hasMore,
