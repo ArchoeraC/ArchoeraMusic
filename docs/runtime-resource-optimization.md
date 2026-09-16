@@ -31,9 +31,13 @@
 - GPU 是其中最严重的一项：全屏播放页在集显（iGPU）上掉帧。
 
 ### 1.2 目标（可验收）
-1. **iGPU 优先**：Intel UHD/Iris、AMD Vega、Apple 集显上全屏播放页达帧预算；
-   软渲染（llvmpipe/SwiftShader）不崩、可降级。
-2. **不靠独显**：不以「上独显才流畅」为前提。
+1. **iGPU 为默认目标**（硬约束）：Intel UHD/Iris、AMD Vega/APU、Apple 集显上全屏播放页
+   达帧预算；软渲染（llvmpipe/SwiftShader）不崩、可降级。**多 GPU 机器默认走集显路径。**
+2. **不得依赖 / 请求独显**（硬约束）：
+   - 不导出 `NvOptimusEnablement`、`AmdPowerXpressRequestHighPerformance` 等
+     「高功耗 GPU」标志，不做任何「诱导系统切独显」的事；
+   - 不依赖独显专属能力（compute / storage buffer / 几何着色器 / 大 UBO / 高倍 MSAA）；
+   - 不以「上独显才流畅」为前提——效果预算按集显设计，独显只是余量。
 3. **常量级常驻**：内存峰值与歌长/列表长度/分支数量弱相关，可回收。
 4. **不在渲染主路径引入新进程**：遵守 `AGENTS.md`（不新增进程承载图形/桥接）。
 
@@ -411,6 +415,18 @@
 | **驱动 Impeller/Skia 的 pass 合并 / 渲染目标部分更新 / tile 栅格** | ❌ | 无公开 API——只能用**层隔离 + 局部绘制**近似 |
 | **多进程 GPU 模型 / 自写 GPU 后端 / fork 引擎** | ❌ | 明确放弃（见 §7） |
 
+**GPU 依赖边界（硬约束，用户 2026-09-16）**
+- **默认按集显设计、优先集显运行**：效果预算以 iGPU 为基线，**不选独显、不要求独显**；
+  多 GPU 机器上不主动请求高功耗 GPU。
+- **禁止诱导切换独显**：不导出 `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance`
+  等标志；不通过创建高功耗上下文 / 大显存分配「钓」独显。
+- **不使用独显专属特性**：compute shader、storage buffer、geometry shader、大 UBO、
+  高倍 MSAA 等一律不依赖（也与 §3 的 iGPU 约束一致）。
+- **设备选择不在我们手里**：Flutter/Impeller 的 GPU 设备选择由引擎 + 驱动决定，
+  Dart 无法可靠强制集显；因此策略是**把效果压到集显够用**，而非「指定 GPU」。
+- 如需读取当前渲染器/GPU 信息用于画质分档，**只能经 `apl_*` 桥接**（系统能力），
+  且**只读、不切换**；优先用帧时间自适应（§4.5），避免平台差异。
+
 **模块化（单一职责、避免巨型文件）**
 - `app/lib/widgets/player/background/`：拆 `player_background.dart`（档位选择）、
   `blurred_cover.dart`、`ripple_static_layer.dart`、`ripple_dynamic_layer.dart`、`ripple_shader.dart`
@@ -560,7 +576,8 @@
   §3 的框架只作机制参考（实现边界见 §4.0）。
 - 不自写跨平台 GPU 后端 / 不 fork Impeller；不改 Flutter 引擎；不驱动引擎内部 pass 合并。
 - **不在 Dart 直调平台 API**（禁 MethodChannel / `Process.run`）；系统能力只能经 `apl_*` 桥接。
-- 不以独显为前提、不为「高级效果」牺牲 iGPU 可用性。
+- **不依赖、不请求、不诱导独显**：不导出 Optimus / PowerXpress 等高功耗标志，
+  不使用独显专属特性；不为「高级效果」牺牲 iGPU 可用性。
 - 不做无度量的「感觉优化」：每期必须以 R0 指标对照。
 
 ---
