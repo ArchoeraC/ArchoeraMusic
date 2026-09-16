@@ -79,6 +79,8 @@ extension _SettingsDialogView on _SettingsDialogState {
                           children: [
                             ListView(
                               padding: EdgeInsets.zero,
+                              // 每项恒为 40 高 + 上下各 1.5 的 padding。
+                              itemExtent: 43,
                               children: [
                                 for (final cat in SettingsCategory.values)
                                   if (cat.visible(devMode))
