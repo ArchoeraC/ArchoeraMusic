@@ -55,6 +55,7 @@ class RippleBackground extends StatefulWidget {
     this.blurSigma = 14,
     this.saturation = 1.3,
     this.darken = 0.5,
+    this.renderScale = 1.0,
     this.fallbackColor = const Color(0xFF141420),
   });
 
@@ -78,6 +79,15 @@ class RippleBackground extends StatefulWidget {
 
   /// 压暗叠加强度（0~1，对齐上游 rgba(0,0,0,0.5)）。
   final double darken;
+
+  /// CPU 动态层离屏渲染尺度（opt-in，R1 实验开关，见
+  /// docs/runtime-resource-optimization.md §4.1）。
+  ///
+  /// 默认 `1.0`（与旧行为逐字节一致，不产生额外分配）；当 `< 0.999` 时，CPU
+  /// 网格路径先在 `Size(w*scale, h*scale)` 的离屏 `Picture` 中计算并同步光栅化，
+  /// 再 `drawImageRect` 放大贴回全屏，以降低填充率与网格成本。取值在使用时夹到
+  /// `[0.25, 1.0]`。GPU 着色器路径暂不感知该参数（见 `_RippleShaderPainter`）。
+  final double renderScale;
 
   /// 无封面时的底色。
   final Color fallbackColor;
@@ -111,6 +121,10 @@ class _RippleBackgroundState extends State<RippleBackground>
 
   /// 静态层：预烘焙（模糊+饱和）封面纹理及生命周期。
   late final RippleStaticLayer _static;
+
+  /// 低分辨率动态层缓存图（仅 [RippleBackground.renderScale] < 1 时使用）。
+  /// 每帧换新、旧图延后一帧释放（复用 [RippleStaticLayer.disposeLater]）。
+  ui.Image? _smallImage;
 
   @override
   void initState() {
@@ -158,6 +172,7 @@ class _RippleBackgroundState extends State<RippleBackground>
     _repaint.dispose();
     _shader?.dispose();
     _static.dispose();
+    _smallImage?.dispose();
     super.dispose();
   }
 
@@ -199,26 +214,23 @@ class _RippleBackgroundState extends State<RippleBackground>
       _repaint.notify();
       return;
     }
-    final listener = ImageStreamListener(
-      (info, _) {
-        if (!mounted) return;
-        final img = info.image;
-        if (identical(_current, img) && _static.current != null) return;
-        var transition = false;
-        if (!widget.animate) {
-          _old = null;
-          _mix = 1;
-        } else if (_current != null && !identical(_current, img)) {
-          _old = _current;
-          _beginTransition();
-          transition = true;
-        }
-        _current = img;
-        _static.prepareCover(img, transition: transition);
-        _repaint.notify();
-      },
-      onError: (_, _) {},
-    );
+    final listener = ImageStreamListener((info, _) {
+      if (!mounted) return;
+      final img = info.image;
+      if (identical(_current, img) && _static.current != null) return;
+      var transition = false;
+      if (!widget.animate) {
+        _old = null;
+        _mix = 1;
+      } else if (_current != null && !identical(_current, img)) {
+        _old = _current;
+        _beginTransition();
+        transition = true;
+      }
+      _current = img;
+      _static.prepareCover(img, transition: transition);
+      _repaint.notify();
+    }, onError: (_, _) {});
     _listener = listener;
     _stream = provider.resolve(ImageConfiguration.empty)..addListener(listener);
   }
@@ -293,6 +305,9 @@ class _RippleBackgroundState extends State<RippleBackground>
 
   /// 无封面时底色（供 painter 读取，避免跨类访问 protected 的 widget）。
   Color get fallbackColor => widget.fallbackColor;
+
+  /// 夹到 `[0.25, 1.0]` 的动态层渲染尺度（见 [RippleBackground.renderScale]）。
+  double get _renderScale => widget.renderScale.clamp(0.25, 1.0).toDouble();
 
   @override
   Widget build(BuildContext context) {

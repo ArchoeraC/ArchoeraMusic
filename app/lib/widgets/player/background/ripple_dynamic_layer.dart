@@ -8,6 +8,9 @@
 part of 'ripple_background.dart';
 
 /// GPU 着色器绘制：单 pass 折射 + 饱和 + 高光/压暗 + 压暗。
+///
+/// 注意：GPU 路径暂不感知 [RippleBackground.renderScale]——低分辨率离屏是 CPU
+/// 兜底路径（`_RipplePainter`）的 opt-in 实验开关，GPU 侧仍按全分辨率绘制。
 class _RippleShaderPainter extends CustomPainter {
   _RippleShaderPainter(this.s, Listenable repaint, this.shader)
     : super(repaint: repaint);
@@ -114,7 +117,8 @@ class _RipplePainter extends CustomPainter {
         indices[m++] = c;
       }
     }
-    _positions = positions;    _indices = indices;
+    _positions = positions;
+    _indices = indices;
     _texCoords = Float32List(vc * 2);
     _lightColors = Int32List(vc);
     _darkColors = Int32List(vc);
@@ -227,18 +231,72 @@ class _RipplePainter extends CustomPainter {
     }
   }
 
+  /// 低分辨率离屏渲染：把内容画进 `Size(w*scale, h*scale)` 的 Picture 并同步
+  /// 光栅化。失败抛异常（调用方捕获后回退全分辨率直绘）。
+  ui.Image? _renderSmall(double w, double h, double scale) {
+    final smallW = math.max(1, (w * scale).round());
+    final smallH = math.max(1, (h * scale).round());
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    _paintContent(canvas, Size(smallW.toDouble(), smallH.toDouble()));
+    final pic = recorder.endRecording();
+    try {
+      return pic.toImageSync(smallW, smallH);
+    } finally {
+      pic.dispose();
+    }
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    if (w <= 0 || h <= 0) return;
+    final scale = s._renderScale;
+    // 默认（scale≈1）：与旧实现逐字节一致，不产生额外分配。
+    if (scale < 0.999) {
+      // flutter test 的 fake-async 环境无法光栅化 Picture.toImageSync（会得
+      // 空白图）；同 RippleStaticLayer.prepare 守卫，回退全分辨率直绘。
+      if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+        ui.Image? small;
+        try {
+          small = _renderSmall(w, h, scale);
+        } catch (_) {
+          small = null;
+        }
+        if (small != null) {
+          final prev = s._smallImage;
+          s._smallImage = small;
+          canvas.drawImageRect(
+            small,
+            Rect.fromLTWH(
+              0,
+              0,
+              small.width.toDouble(),
+              small.height.toDouble(),
+            ),
+            Offset.zero & size,
+            Paint()..filterQuality = FilterQuality.low,
+          );
+          // 旧图延后一帧释放，避免当前帧仍被引用。
+          if (prev != null) s._static.disposeLater(prev);
+          return;
+        }
+      }
+    }
+    _paintContent(canvas, size);
+  }
+
+  /// 共享绘制主体：可画进真实 canvas 或低分辨率 recorder canvas（[renderScale]
+  /// < 1 时以 `Size(w*scale, h*scale)` 调用，网格/字段随之在低分辨率计算）。
+  void _paintContent(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
     if (w <= 0 || h <= 0) return;
     // 优先用预烘焙（模糊+饱和）纹理；未就绪时暂用原图。
     final img = s._static.current ?? s._current;
     if (img == null) {
-      canvas.drawRect(
-        Offset.zero & size,
-        Paint()..color = s.fallbackColor,
-      );
+      canvas.drawRect(Offset.zero & size, Paint()..color = s.fallbackColor);
       return;
     }
     _ensureMesh(w, h);
