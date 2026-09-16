@@ -14,10 +14,17 @@ extension _LyricsViewBuild on _LyricsViewState {
         final maxWidth = math.max(40.0, constraints.maxWidth - 24);
         // 用环境默认字体（含主题字体/回退链）实测，保证换行点与渲染一致。
         final baseStyle = DefaultTextStyle.of(context).style;
+        final textScaler = MediaQuery.textScalerOf(context);
         // 实测每行高度（长行换行后可变），用于滚动定位。
         final heights = <double>[
           for (var i = 0; i < widget.groups.length; i++)
-            _rowHeight(widget.groups[i], i == index, maxWidth, baseStyle),
+            _rowHeight(
+              widget.groups[i],
+              i == index,
+              maxWidth,
+              baseStyle,
+              textScaler,
+            ),
         ];
         if (index != _current) {
           _current = index;
@@ -56,10 +63,44 @@ extension _LyricsViewBuild on _LyricsViewState {
     );
   }
 
-  /// 单行渲染高度：主行（当前行放大加粗）+（当前行）翻译小字 + 竖直内边距，
-  /// 且不小于设置行高 [LyricsView.lineHeight]。与 [_Line] 的布局结构保持一致，
-  /// 保证滚动定位精确。
+  /// 单行渲染高度：先查有界缓存（同文本 / 样式 / 宽度 / 文本缩放下高度
+  /// 不变），未命中再实测。缓存仅存放结果，不改变任何布局语义。
   double _rowHeight(
+    LyricGroup g,
+    bool isCurrent,
+    double maxWidth,
+    TextStyle base,
+    TextScaler textScaler,
+  ) {
+    final key = _LyricsRowHeightKey(
+      text: g.original.text,
+      // 仅当前行使用翻译；其余行归一为 null 以提升命中率。
+      translation: isCurrent ? g.translation : null,
+      isCurrent: isCurrent,
+      fontSize: widget.fontSize,
+      lineHeight: widget.lineHeight,
+      maxWidth: maxWidth,
+      showTranslation: widget.showTranslation,
+      baseStyle: base,
+      textScaler: textScaler,
+    );
+    final cached = _rowHeightCache.remove(key);
+    if (cached != null) {
+      _rowHeightCache[key] = cached; // 命中 → 移到末尾（最近使用）。
+      return cached;
+    }
+    final height = _measureRowHeight(g, isCurrent, maxWidth, base);
+    if (_rowHeightCache.length >= _kLyricsRowHeightCacheMax) {
+      _rowHeightCache.remove(_rowHeightCache.keys.first); // 淘汰最旧一项。
+    }
+    _rowHeightCache[key] = height;
+    return height;
+  }
+
+  /// 实测单行渲染高度：主行（当前行放大加粗）+（当前行）翻译小字 + 竖直
+  /// 内边距，且不小于设置行高 [LyricsView.lineHeight]。与 [_Line] 的布局结构
+  /// 保持一致，保证滚动定位精确。
+  double _measureRowHeight(
     LyricGroup g,
     bool isCurrent,
     double maxWidth,
@@ -108,6 +149,65 @@ extension _LyricsViewBuild on _LyricsViewState {
         pad + acc + (index < heights.length ? heights[index] / 2 : 0.0);
     return math.max(0.0, center - viewH / 2);
   }
+}
+
+/// [_rowHeight] 缓存容量上限（简单有界，避免歌词行数很大时无界增长）。
+const int _kLyricsRowHeightCacheMax = 256;
+
+/// [_rowHeight] 的缓存键：仅包含会影响实测高度的输入（文本 / 翻译 /
+/// 是否当前行 / 字号 / 行高 / 可用宽度 / 是否显示翻译 / 默认字体样式 /
+/// 文本缩放）。任一输入变化即键失配，等价于失效重算。
+@immutable
+class _LyricsRowHeightKey {
+  const _LyricsRowHeightKey({
+    required this.text,
+    required this.translation,
+    required this.isCurrent,
+    required this.fontSize,
+    required this.lineHeight,
+    required this.maxWidth,
+    required this.showTranslation,
+    required this.baseStyle,
+    required this.textScaler,
+  });
+
+  final String text;
+  final String? translation;
+  final bool isCurrent;
+  final double fontSize;
+  final double lineHeight;
+  final double maxWidth;
+  final bool showTranslation;
+  final TextStyle baseStyle;
+  final TextScaler textScaler;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is _LyricsRowHeightKey &&
+        other.text == text &&
+        other.translation == translation &&
+        other.isCurrent == isCurrent &&
+        other.fontSize == fontSize &&
+        other.lineHeight == lineHeight &&
+        other.maxWidth == maxWidth &&
+        other.showTranslation == showTranslation &&
+        other.baseStyle == baseStyle &&
+        other.textScaler == textScaler;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    text,
+    translation,
+    isCurrent,
+    fontSize,
+    lineHeight,
+    maxWidth,
+    showTranslation,
+    baseStyle,
+    textScaler,
+  );
 }
 
 class _Line extends StatelessWidget {
