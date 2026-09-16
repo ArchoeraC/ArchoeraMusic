@@ -21,6 +21,10 @@
   以低分辨率绘制**；回退阶梯保证软渲染/老 iGPU 可用。
 - 生命周期：`go_router` 已做「懒建分支 + `Offstage` + `TickerMode`」，缺的是**卸载**（分支状态永驻）
   与**模块按需**（downloader 启动常驻，见 [module-on-demand-load-plan.md](module-on-demand-load-plan.md)）。
+- **范围不限于播放页**（用户 2026-09-16）：列表 / 首页 / 搜索 / 侧边栏 / 顶栏 / 播放条 /
+  毛玻璃弹窗 / 路由转场 / 图片外观背景同样按四杠杆治理（见 §2.1、§4.6）。
+- **实现边界硬约束**：只落 **Dart + 既有 FFI 桥接**、**集显优先且不依赖独显**、**不改引擎**
+  （见 §1.2、§4.0、§7）。
 
 ---
 
@@ -57,6 +61,22 @@
 > 说明：Electron/Chromium 自身内存并不小；真正可比的是**单个效果的开销预算**与**生命周期纪律**，
 > 框架只是提供了成熟的合成器机制。我们的思路是「**借用机制，不照搬架构**」。
 
+### 2.1 全应用 UI 面盘点（优化**不止播放页**）
+
+| UI 面 | 现状 / 成本来源 | Dart 侧杠杆（§4.6） | 源码依据（§3） |
+|---|---|---|---|
+| 歌曲/专辑/歌手/歌单**列表** | 每项封面解码 + 圆角裁剪 + 阴影；滚动时 build/layout 大量离屏项 | `cacheWidth/cacheHeight` 按显示解码；`SliverFixedExtentList` + 小 `cacheExtent`；慎用 `ClipRRect`/阴影；`addRepaintBoundaries`/`addAutomaticKeepAlives` 取舍 | 3.7（`viewport.dart:289`、`sliver_fixed_extent_list.dart:410-494`、`scroll_delegate.dart:560-572`） |
+| **首页 / 发现** | 大图背景 + 多个横向列表 + 频繁重建 | 分区 `RepaintBoundary`；横向列表同列表纪律；背景静态层 | 3.6 / 3.7 |
+| **搜索页** | 输入联动全页重建 + 结果列表 | 去抖；列表复用；避免整页重绘（拆边界） | 3.7 |
+| **侧边栏 / 顶栏 / 底部播放条** | 常驻；播放进度/封面频繁变化牵连重建 | 进度条/封面单独 `RepaintBoundary` 隔离；热路径避免 `AnnotatedRegionLayer` 等非保留层 | 3.7（`proxy_box.dart:4672-4683`） |
+| **设置 / 弹窗 / 毛玻璃**（`glass_surface` 等） | `BackdropFilter` = 额外离屏 pass + 采样 backdrop | 限制范围、避免大层；单控件滤镜优先 `ImageFiltered`；不透明优先 | 3.4（`canvas.cc:1146-1520`）、3.7 |
+| **路由转场** | 整页 clip/opacity/filter 动画 → 合成提升/离屏 | 性能模式直切（已有）；避免大范围 `Clip`/分数 `Opacity` 动画，改用位移/淡入小层 | 3.7（`proxy_box.dart:897-900`） |
+| **图片外观背景**（`appearanceStyle=image`） | 全屏封面 + 模糊 | 静态层缓存 + 降采样（同背景主线） | 3.6 / 4.1 |
+| **播放页**（背景/歌词/频谱） | 见专项文档 | 静态/动态分层、损坏区、批处理 | 3.3–3.9 |
+
+> 全应用通用的四个杠杆与 §0 一致：**图层缓存 / 只画变化 / 降分辨率 / 不可见即停**。
+> 列表与图片是除播放页之外**收益最大的两块**（解码内存 + 滚动帧时间）。
+
 ---
 
 ## 3. 跨框架机制调研（源码级，提炼可迁移项）
@@ -68,6 +88,11 @@
 > - WebRender：`mozilla-firefox/firefox`（main）`gfx/wr/webrender/` — 路径省略前缀 `src/`。
 > - Impeller：`flutter/engine` commit `ae5c3603`（main）— 路径省略前缀 `impeller/`。
 > - Skia：`google/skia` commit `9875bb59`（main）— 路径含 `src/`。
+> - **Flutter engine `flow/` + `lib/ui/`**：同 `flutter/engine` 仓库（光栅缓存 / 损伤区 / 图层）。
+> - **Flutter framework**：`flutter/flutter` commit `3cdba02`（main）`packages/flutter/lib/src`。
+> - **Dear ImGui**：`ocornut/imgui`（main）。
+> - **Slint**：`slint-ui/slint`（main）`internal/`（脏区 / 部分渲染 / 项目缓存）。
+> - （另已克隆 `zed-industries/zed` 的 `crates/gpui`，待需要时再精读。）
 > - 复现（GitHub 经本机代理 `127.0.0.1:7897`）：
 >   `git clone --depth 1 https://github.com/qt/qtdeclarative`；
 >   `git clone --depth 1 --filter=blob:none --sparse https://chromium.googlesource.com/chromium/src && git -C src sparse-checkout set cc`；
@@ -367,7 +392,130 @@
   `src/core/SkImageFilterTypes.cpp:1479-1497`；sigma 上限 532（CPU 135）：
   `src/effects/imagefilters/SkBlurImageFilter.cpp:151,201`。
 
-### 3.6 可迁移机制清单（附源码出处）
+### 3.6 Flutter engine `flow`（源码精读：光栅缓存 / 损伤 / 图层）
+
+**光栅缓存（RasterCache）**
+- 键分 `kLayer / kLayerChildren / kDisplayList`：`flow/raster_cache_key.h:24,78,96-104`。
+- **层缓存准入**：尝试次数 `>= threshold`（计数器从 1 起，默认 threshold=1）；
+  `OpacityLayer` 自身永不缓存（`layer_cached_threshold=INT_MAX`）但允许缓存子块：
+  `flow/layers/layer_raster_cache_item.cc:44-78`、`layer_raster_cache_item.h:19-21,64-69`。
+- **DisplayList 复杂度阈值**：GL/Metal `complexity_score > 200000`（注释「≈1ms」），
+  Naive/软件 `op_count > 5`：`display_list/benchmarking/dl_complexity_gl.h:23-26`、
+  `dl_complexity.h:41-47`。
+- **每帧最多新建 3 个 DL 缓存**；且需**连续可见 ~3 帧**（`access_threshold=3`）才入缓存：
+  `flow/raster_cache.h:139-142`、`raster_cache_util.h:21`、`display_list_raster_cache_item.cc:103-123`。
+- **无字节/条目上限**：唯一回收是「本帧未见即逐出」（非 LRU/非内存压力）：
+  `flow/raster_cache.cc:144-155,214-232`。
+- 键**忽略平移**（层滑动不失效，缩放/旋转会失效）：`raster_cache_key.h:87-91`；
+  `ImageFilterLayer` 需渲染 **3** 次后才缓存：`raster_cache_util.h:37`。
+- ⚠ **该缓存是 Skia 专用**（`#if !SLIMPELLER`，Impeller 构建编译掉）——
+  桌面若走 Impeller，`RepaintBoundary` 的实际缓存收益需实测确认（见 §8.8）。
+
+**损伤区 / 部分重绘**
+- `Damage = frame_damage + buffer_damage`（后者含历史累积），绘制按 damage 裁剪：
+  `flow/diff_context.h:22-35`；`ComputeClipRect` 用上一帧 `paint_region_map` 差分：
+  `compositor_context.cc:14-45`。
+- 保留层差分：前后缀相同（`IsReplacing`）且无 readback/texture 的子树**直接复用上一帧区域**：
+  `flow/layers/container_layer.cc:39-103`。
+- **Impeller 仅在 damage 非全屏且某轴比例 ≤ `kImpellerRepaintRatio=0.7` 时**才部分重绘：
+  `flow/compositor_context.cc:195-221`；否则整帧。
+- Dart 侧唯一直接开关：`SceneBuilder.addPicture(isComplexHint, willChangeHint)` →
+  引擎 `is_complex`/`will_change`（`willChangeHint` 会**抑制**缓存）：
+  `lib/ui/compositing.dart:515-520`、`lib/ui/compositing/scene_builder.cc:220-237`。
+
+**图层 → saveLayer 规则**
+- `ContainerLayer::PrerollChildren` 用不重叠检测把后面被覆盖的孩子的可渲染状态清零：
+  `container_layer.cc:122-167`。
+- 能让孩子自己携带 alpha（`kCallerCanApplyOpacity`）就避免 `saveLayer`：
+  `flow/layers/layer_state_stack.h:225-230`、`opacity_layer.cc:36-68`。
+- `ClipRectLayer` **只有 `Clip.kAntiAliasWithSaveLayer`** 才真 `saveLayer`，普通裁剪只是 clip：
+  `clip_shape_layer.h:44-105`。
+
+### 3.7 Flutter framework（`rendering/` + `widgets/` 源码精读）
+
+**重绘边界 / 图层复用（我们最直接的杠杆）**
+- `isRepaintBoundary` 默认 false，`RenderRepaintBoundary` 为 true；`markNeedsPaint` 走到边界即停、
+  把**脏回溯**截断在边界：`rendering/object.dart:3112,3368-3408`。
+- 仅 alpha/filter 变化时走 `updateLayerProperties`，**复用 display list、不重绘子树**：
+  `object.dart:1293-1333`；`_compositeChild` 在 `!_needsPaint && _wasRepaintBoundary` 时**原样复用图层**：
+  `object.dart:249-291`。
+- 布局边界规则 `_isRelayoutBoundary`（紧约束 / 不依赖父尺寸即可局部化重排）：`object.dart:2893`。
+
+**合成提升（compositing promotion）**
+- `_needsCompositing = 子需要 || isRepaintBoundary || alwaysNeedsCompositing`：
+  `object.dart:3274-3306`。
+- **分数 `Opacity` 会强制 `alwaysNeedsCompositing` + 边界**，把整条祖先链提升为合成并加边界：
+  `proxy_box.dart:897-900`；`ShaderMask`/`BackdropFilter`/`ImageFiltered`/`ColorFiltered`/
+  `Transform(filterQuality)` 同理自动合成。
+- 帧顺序：`flushLayout → flushCompositingBits → flushPaint → compositeFrame`：
+  `rendering/binding.dart:691-702`。
+
+**列表 / Sliver（全应用重点）**
+- 默认 `cacheExtent = 250` 逻辑像素（两侧）；viewport 仅在溢出时裁剪、本身是重绘边界：
+  `rendering/viewport.dart:289,749,970-982`。
+- `RenderSliverList` 构建到 `targetEndScrollOffset`（含 cache）后 `collectGarbage` 回收视口外：
+  `rendering/sliver_list.dart:262-332`；**cache 内的孩子仍会 build + layout**。
+- 已知 `itemExtent` 时用 `SliverFixedExtentList`（按 index 算偏移，无逐子布局）：
+  `sliver_fixed_extent_list.dart:410-494`。
+- delegate 默认 `addRepaintBoundaries` / `addAutomaticKeepAlives` / `addSemanticIndexes` 全 true：
+  `scroll_delegate.dart:560-572`；`AutomaticKeepAlive` 会把离屏 child 留在 `_keepAliveBucket`：
+  `sliver_multi_box_adaptor.dart:355-419`。
+
+**图片 / 可见性 / 效果**
+- `Image.cacheWidth/cacheHeight` 是**物理像素**解码尺寸，直接决定 `ImageCache` 内存：
+  `widgets/image.dart:314-332`。
+- `TickerMode(enabled:false)` 只静音 ticker（时间仍走）；`Offstage` 仍**布局**、只是不绘制；
+  `Visibility` 默认直接移除子树（丢状态）、`maintainAnimation:false` 才包 `TickerMode`：
+  `widgets/ticker_provider.dart:394-400`、`rendering/proxy_box.dart:3833-3889`、
+  `widgets/indexed_stack.dart:464-473`。
+- `Opacity` 仅 1.0/0.0 有快路径；`Clip` 默认 `antiAlias`（非 saveLayer）；`ImageFiltered` 是
+  重绘边界 + `ImageFilterLayer`：`widgets/basic.dart:352-353`、`rendering/layer.dart:1607,1697`、
+  `widgets/image_filter.dart:98-108`。
+- `AnnotatedRegionLayer` 每次 paint 都重建（非保留层）——**热路径避免**：`proxy_box.dart:4672-4683`。
+
+### 3.8 Dear ImGui（源码精读：批处理 / 图集 / 裁剪）
+
+- **批处理**：始终预置一个 `ImDrawCmd`，图元直接追加；**只有** clip 变化、纹理变化、
+  顶点偏移溢出（16-bit `1<<16`）、用户回调、channel 切换才新开 cmd；
+  且新 cmd 为空且 idx 连续时会**合并回去**：`imgui_draw.cpp:461-474,591-652,577-587,737-744`。
+- 顶点/索引用**写游标**顺序追加，`PrimReserve/PrimUnreserve` 只调 `resize` + 指针推进：
+  `imgui_draw.cpp:733-767`；每帧只 `resize(0)` 保留容量（不释放）：`:461-463,478-492`。
+- **图集**：`TexGlyphPadding=1`、最小 `512×128`、最大 `8192`，stb_rect_pack 打包，
+  增长按 2 的幂、优先正方形；当「丢弃面积 < 打包面积 20%」时原地重排而不扩张：
+  `imgui_draw.cpp:2672-2686,4231-4261`；白色像素 UV 供纯色填充、线条 UV 供 AA 线：
+  `:3638,3654-3702`。
+- **镶嵌容差**：`CurveTessellationMaxError=1.12`、`CircleTessellationMaxError=0.30`，
+  圆分段夹在 `[4,512]`，1/4 圆弧查表 48 段：`imgui.cpp:1579-1580`、
+  `imgui_internal.h:872-885`。
+- **AA 成本**：`_FringeScale = 1/pixel_density`，AA 填充 `n*6` 索引 / `n*2` 顶点：
+  `imgui_draw.cpp:723-728,1099-1153`。
+- 对 Dart 的启示：**持久 append-only 顶点/索引缓冲 + 写游标**；同状态图元（列表行、频谱柱、
+  字形 quad）应合并到一条 draw；纯色用白像素 UV、字形共用一个图集。
+
+### 3.9 Slint（源码精读：脏区 / 部分渲染 / 项目缓存）
+
+- **DirtyRegion 上限 3 个矩形**（内联数组，无分配），满时并入「增长最小」者：
+  `internal/core/partial_renderer.rs:258-317`；每个可渲染项带 `CachedRenderingData`
+  （`cache_index` + `cache_generation`）跨缓存清理校验：`:42-48`。
+- **脏区计算**：`compute_dirty_regions` 自后向前比较几何（`same_geometry`）、
+  `PropertyTracker::is_dirty`、兄弟顺序 rank；`filter_item` 直接**跳过不与脏区相交的项**
+  （连文字 shaping 都省）：`:449,543-654,740-809`。
+- **`PartialRendererCache`**：slab + `generation`（初值 1）；无容量上限：
+  `:208-253`。`RepaintBufferType::{NewBuffer,Reused,Swapped}` 决定全新/仅脏/近两帧并集：
+  `:380-394`。
+- Skia 后端仅「CPU 表面或 `SLINT_SKIA_PARTIAL_RENDERING`」才部分渲染，脏区作为
+  `clip_rect`/`clip_path`；`back_buffer_age` 用 3 帧历史：`internal/renderers/skia/lib.rs:338-347,916-923,383-384,771-782`。
+- **逐项缓存**：`ItemCache<T>`（per component/item + `PropertyTracker` 自动失效）承载
+  image/layer/path/box-shadow 缓存；box-shadow 全局池 `MAX_CACHED_SHADOWS=16`（LRU）：
+  `internal/core/item_rendering.rs:38-90`、`internal/core/graphics/boxshadowcache.rs:175,236-244`。
+- **有界预算**：解码图缓存 **5 MiB** `CLruCache`：`internal/core/graphics/image/cache.rs:49-58`；
+  Skia 字体缓存 **64** 项、软件字形缓存 **1 MiB**（4 个亚像素分箱）、
+  parley 布局缓存 `ENTRY_LIMIT=1024`：`internal/renderers/skia/font_cache.rs:12`、
+  `internal/renderers/software/fonts/vectorfont.rs:68,29`、
+  `internal/core/textlayout/sharedparley/cache.rs:43`。
+- 软件渲染只对脏区做背景填充并按行裁剪已覆盖前缀：`internal/renderers/software/lib.rs:559-707,1322-1360`。
+
+### 3.10 可迁移机制清单（附源码出处）
 
 | 机制 | 源码出处 | 我们对应的落点 |
 |---|---|---|
@@ -538,15 +686,54 @@
 - 帧时间滑动窗口 → 档位：着色器开/关、动态层降采样倍率、涟漪上限、频谱开关。
 - 复用 `FrameGovernor`/`performanceMode`；不要新增互相冲突的开关（见 §8）。
 
+### 4.6 全应用 UI 纪律（列表 / 图片 / 毛玻璃 / 转场）
+
+> 目标面见 §2.1；原则仍是「图层缓存 / 只画变化 / 降分辨率 / 不可见即停」。全部 Dart 可做。
+
+**列表 / 网格（除播放页外最大收益）**
+- 已知行高用 `SliverFixedExtentList`/`itemExtent`（按 index 算偏移，无逐子布局）：
+  `rendering/sliver_fixed_extent_list.dart:410-494`。
+- `cacheExtent` 默认 **250** 逻辑像素/侧（`rendering/viewport.dart:289`）；**cache 内仍 build+layout**
+  （`sliver_list.dart:262-332`），长列表应下调。
+- delegate 默认 `addRepaintBoundaries=true`（每行一个层）；行内容轻时可关闭以减少层数，
+  但要先测（`widgets/scroll_delegate.dart:560-572`）。
+- 慎用 `AutomaticKeepAliveClientMixin`（离屏 child 常驻 `_keepAliveBucket`）：
+  `sliver_multi_box_adaptor.dart:355-419`。
+- 行内**避免** `ClipRRect`/阴影/`BackdropFilter`；封面圆角可改用预烘焙圆角图或小半径 `ClipRRect`（§3.4/§3.7）。
+
+**图片 / 封面**
+- 一律按显示尺寸解码：`Image.cacheWidth/cacheHeight`（**物理像素**）：
+  `widgets/image.dart:314-332`（沿用现有 `CoverImage`）。
+- 设 `PaintingBinding.instance.imageCache.maximumSizeBytes` 上限，并在路由退出 `evict/clear`
+  （对照：Skia 资源缓存 256 MiB / 图片 32 MiB、Slint 解码图 5 MiB、`cc` 128 MiB；§3.5/§3.9/§3.1）。
+- 全屏背景图走 §4.1 的静态层 + 降采样。
+
+**毛玻璃 / 弹窗**（`widgets/common/glass_surface.dart`、登录/队列面板等）
+- `BackdropFilter` 在 Impeller 下是**新 pass + 离屏纹理 + 全量采样**（§3.4）：限制 clip 范围、
+  避免全屏；单控件过滤优先 `ImageFiltered`（`widgets/image_filter.dart:98-108`，§3.7）。
+- 能不用模糊就不用——不透明/纯色优先（§3.4 `canvas.cc:1450-1475`）。
+
+**转场 / 动画 / 常驻部件**
+- 避免大范围 `Clip`、分数 `Opacity`、`ShaderMask` 动画：会触发合成提升与离屏
+  （`proxy_box.dart:897-900`，§3.7）；性能模式已直切，其余用位移/小区域淡入。
+- 侧边栏/顶栏/播放条：用 `RepaintBoundary` 隔离进度条/封面等高频变化区；热路径避免非保留层
+  （如 `AnnotatedRegionLayer` 每次 paint 重建，`proxy_box.dart:4672-4683`）。
+- 自管动画在隐藏时 `TickerMode(enabled:false)`；`Visibility` 默认移除子树（丢状态），
+  需保状态用 `Offstage`（仍会布局）：`widgets/indexed_stack.dart:464-473`、`rendering/proxy_box.dart:3833-3889`。
+
+> ⚠ **待实测**：§3.6 指出 `flow` 的 RasterCache 是 **Skia 专用**，Impeller 构建会编译掉——
+> 因此 `RepaintBoundary` 在 Impeller 下的缓存收益需要实测确认（见 §8.8），再决定列表行是否保留边界。
+
 ---
 
 ## 5. 分期（可验收）
 
 | 阶段 | 内容 | 实现层 / 模块（§4.0） | 验收 |
 |---|---|---|---|
-| **R0** | profile 基线：全屏 2K/4K，记录 UI/raster 帧时间 + GPU 占用（iGPU 与 llvmpipe） | Dart（`addTimingsCallback`）｜`services/render/quality_governor.dart` | 基线与瓶颈归属报告 |
+| **R0** | profile 基线：**全应用**（列表/首页/搜索/播放页）2K/4K，记录 UI/raster 帧时间 + GPU 占用（iGPU 与 llvmpipe） | Dart（`addTimingsCallback`）｜`services/render/quality_governor.dart` | 基线与瓶颈归属报告（分页面） |
 | **R1** | 背景**静态层缓存** + **动态层损伤区** + 降分辨率（§4.1） | Dart｜`widgets/player/background/*`、`services/render/damage_region.dart` | iGPU 全屏达帧预算；视觉与上游一致；软渲染可回退 |
 | **R2** | 图层纪律 + 生命周期（§4.2/§4.4）：稳定层隔离、去无谓裁剪、分支卸载、downloader 解除常驻 | Dart + FFI（模块注册表）｜`services/lifecycle/branch_lifecycle.dart`、`services/native_module_registry.dart` | RSS 可控、启动时间不退化；切页/切歌后可回收 |
+| **R2b** | **全应用 UI 面**（§4.6）：列表/网格纪律、图片解码与缓存上限、毛玻璃范围、转场、常驻部件隔离 | Dart｜`widgets/list/*`、`widgets/common/glass_surface.dart`、`services/render/layer_budget.dart` | 列表滚动帧时间达标；图片常驻内存有界；无全屏模糊弹窗 |
 | **R3** | 文本/几何批处理（§4.3，按 R1/R2 后剩余瓶颈定） | Dart｜`widgets/player/lyrics_v7/*`、`widgets/player/spectrum_view/*` | 歌词区 UI 帧时间≈常数；频谱无离屏 |
 | **R4** | 自适应画质（§4.5） | Dart｜`services/render/quality_governor.dart` | 目标机稳定在帧预算内，无独显依赖 |
 
@@ -559,11 +746,13 @@
 
 ## 6. 验收与指标
 
-- **帧时间**：DevTools Performance 分 UI / raster 线程；全屏播放页 60Hz 达帧预算（有余量再冲 120Hz）。
+- **帧时间（全应用）**：DevTools Performance 分 UI / raster 线程；**播放页 + 长列表滚动 +
+  首页/搜索** 60Hz 达帧预算（有余量再冲 120Hz）。
 - **GPU 占用**：Linux `intel_gpu_top`/`radeontop`；Windows 任务管理器辅以 PresentMon/GPUView。
-- **内存**：DevTools Memory，峰值/常驻 RSS；切歌、切页、退出播放页后可回落。
+- **内存**：DevTools Memory，峰值/常驻 RSS；**图片/列表缓存有界**；切歌、切页、退出播放页后可回落。
 - **启动时间**：冷启动到首帧；模块按需后不劣化。
-- **正确性/回退**：涟漪不变量与上游一致；`FragmentProgram` 不可用 / 软渲染时功能可用。
+- **正确性/回退**：涟漪不变量与上游一致；`FragmentProgram` 不可用 / 软渲染时功能可用；
+  列表行为/滚动位置/图片占位不回退。
 - **CI**：`dart analyze lib` 0 issue、`flutter test` 全绿（既有网络/凭据用例除外）。
 
 ---
@@ -593,6 +782,13 @@
    （参考：`cc` 的 partial raster **默认关闭**，`layer_tree_settings.h:112`；需小实验权衡。）
 7. **缓存回收策略**：是否照 `cc` 引入「字节上限 + 优先级 + 空闲回收」（`tile_manager.cc:912-1092,495-517`），
    还是保持 Flutter `ImageCache` + 分支卸载的轻量组合即可？
+8. **Impeller 下 `RepaintBoundary` 还有多少缓存收益？**（§3.6 指出 `flow` RasterCache 是 Skia 专用、
+   Impeller 编译掉）——需实测：同页面开关边界对 raster 帧时间的影响，再决定列表行是否保留边界。
+9. **列表行边界与 `KeepAlive` 取舍**：默认 `addRepaintBoundaries=true` + `AutomaticKeepAlive`
+   在长列表上的层数/内存代价，是否对某些列表关闭？
+10. **图片缓存预算**：`ImageCache.maximumSizeBytes` 取值与页面退出 `evict` 策略（对照 Skia 32/128、
+    Slint 5 MiB、`cc` 128 MiB）。
+11. **毛玻璃降级**：`glass_surface` 等是否提供「无模糊」档，或缩小 `BackdropFilter` 范围？
 
 ---
 
@@ -604,10 +800,13 @@
   [test-suite-2026-09-10.md](test-suite-2026-09-10.md)
 - 上游实现：`SPlayer-Next/src/components/player/FullPlayer/PlayerBackground.vue`、
   `.../BackgroundRipple.vue`
-- 外部机制参考（**源码级，§3.1–3.5**；克隆命令见 §3 引言）：
+- 外部机制参考（**源码级，§3.1–3.9**；克隆命令见 §3 引言）：
   - Qt `qtdeclarative@3027a40c`（dev）、Chromium `chromium/src@823ae20f`（main，仅 `cc/`）、
     Mozilla WebRender（`mozilla-firefox/firefox` main，`gfx/wr/webrender/`）、
-    Flutter Impeller（`flutter/engine@ae5c3603`，`impeller/`）、Skia（`google/skia@9875bb59`）。
+    Flutter Impeller（`flutter/engine@ae5c3603`，`impeller/`）、Skia（`google/skia@9875bb59`）、
+    Flutter engine `flow/`+`lib/ui/`（光栅缓存/损伤区/图层）、Flutter framework
+    （`flutter/flutter@3cdba02`，`rendering/`+`widgets/`）、Dear ImGui（`ocornut/imgui`）、
+    Slint（`slint-ui/slint`，`internal/`）。
   - 文档补充：Qt Quick Scene Graph / Performance
     （`doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html`、`.../qtquick-performance.html`）；
     Flutter `dart:ui`：`RepaintBoundary` 层缓存、`FragmentProgram`、
