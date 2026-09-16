@@ -76,6 +76,12 @@ class _LyricsViewState extends State<LyricsView> {
   /// 当前行索引（避免每帧滚动）。
   int _current = -1;
 
+  /// 实测行高缓存（有界 LRU）。50ms 位置 tick / 滚动 / 主题稳定时，
+  /// 绝大多数行的文本与样式未变，直接命中原高度即可跳过重复的
+  /// TextPainter 布局（每次 build 原本对全部行跑一遍 = O(行数)）。
+  /// 宽度 / 字号 / 文本缩放 / 默认字体样式变化时键失配自然失效。
+  final _rowHeightCache = <_LyricsRowHeightKey, double>{};
+
   @override
   void dispose() {
     _controller.dispose();
