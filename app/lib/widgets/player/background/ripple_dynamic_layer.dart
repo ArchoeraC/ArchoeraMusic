@@ -82,8 +82,18 @@ class _RipplePainter extends CustomPainter {
   Int32List _lightColors = Int32List(0);
   Int32List _darkColors = Int32List(0);
 
+  /// 未折射纹理坐标缓存（仅 `damageClippedDynamic` 开启时使用）。
+  Float32List _staticTexCoords = Float32List(0);
+  double _staticW = 0;
+  double _staticH = 0;
+  int _staticImgW = 0;
+  int _staticImgH = 0;
+
   /// 目标网格密度（像素/格）：越大越省，越小越细腻。
   static const double _cellPx = 12;
+
+  /// 波带截断半径：`|dw| > _bandCut` 的顶点贡献视为 0（见 [_computeField]）。
+  static const double _bandCut = 0.5;
 
   void _ensureMesh(double w, double h) {
     if (_cols > 0 && _w == w && _h == h) return;
@@ -140,7 +150,7 @@ class _RipplePainter extends CustomPainter {
     final time = s._simTime;
     final n = ripples.length;
 
-    const bandCut = 0.5; // |dw|>0.5 → exp(-24)≈4e-11，可忽略
+    const bandCut = _bandCut; // |dw|>0.5 → exp(-24)≈4e-11，可忽略
     final rx = Float64List(n);
     final ry = Float64List(n);
     final rRadius = Float64List(n);
@@ -230,6 +240,147 @@ class _RipplePainter extends CustomPainter {
         k += 2;
       }
     }
+  }
+
+  /// 计算「未折射」纹理坐标并缓存到 [_staticTexCoords]。
+  ///
+  /// 与 [_computeField] 在 `ox=oy=0`（即所有涟漪外盘之外）时逐位一致：相同的
+  /// 宽高比补偿与 `clamp(0.001, 0.999)`。仅在网格尺寸或封面尺寸变化时重算，正常帧
+  /// 复用；这也是「全屏静态层」与动态层在损伤区外逐位相同的前提。
+  void _ensureStaticCoords(double w, double h, ui.Image img) {
+    if (_staticTexCoords.isNotEmpty &&
+        _staticW == w &&
+        _staticH == h &&
+        _staticImgW == img.width &&
+        _staticImgH == img.height) {
+      return;
+    }
+    final aspect = w / h;
+    final imgAspect = img.width / img.height;
+    final vc = (_cols + 1) * (_rows + 1);
+    final coords = Float32List(vc * 2);
+    var k = 0;
+    for (var j = 0; j <= _rows; j++) {
+      final v = j / _rows;
+      for (var i = 0; i <= _cols; i++) {
+        final u = i / _cols;
+        var tu = u;
+        var tv = v;
+        if (aspect > imgAspect) {
+          tv = (tv - 0.5) * (imgAspect / aspect) + 0.5;
+        } else {
+          tu = (tu - 0.5) * (aspect / imgAspect) + 0.5;
+        }
+        coords[k++] = tu.clamp(0.001, 0.999);
+        coords[k++] = tv.clamp(0.001, 0.999);
+      }
+    }
+    _staticTexCoords = coords;
+    _staticW = w;
+    _staticH = h;
+    _staticImgW = img.width;
+    _staticImgH = img.height;
+  }
+
+  /// 收集本帧所有活动涟漪的外盘 AABB 到 [region]（画布坐标）。
+  ///
+  /// 与 [_computeField] 的顶点剔除判据完全一致：外盘半径 `radius + _bandCut`，
+  /// `u` 方向半宽 `outer / aspect`、`v` 方向半宽 `outer`；再与画布矩形求交，丢弃
+  /// 屏外涟漪。AABB 是外盘的**包围盒**（沿轴向恰好相切），因此裁剪边界处的高斯
+  /// 包络 `exp(-|dw|*48)` 至多 `exp(-24) ≈ 3.8e-11`。
+  void _collectDamage(DamageRegion region, double w, double h) {
+    final aspect = w / h;
+    final time = s._simTime;
+    final clip = Offset.zero & Size(w, h);
+    for (final rp in s._ripples) {
+      final age = time - rp.birth;
+      if (age <= 0 || age > _kRippleLifetime) continue;
+      final outer = age * rp.speed + _bandCut;
+      final rect = Rect.fromLTRB(
+        (rp.x - outer / aspect) * w,
+        (rp.y - outer) * h,
+        (rp.x + outer / aspect) * w,
+        (rp.y + outer) * h,
+      ).intersect(clip);
+      if (!rect.isEmpty) region.add(rect);
+    }
+  }
+
+  /// R1-b / §4.1「只画损伤区」：全屏缓存静态层 + 裁剪到外盘 AABB 并集的动态层。
+  ///
+  /// 静态层用未折射纹理坐标（[_ensureStaticCoords]），与动态层在任一涟漪外盘
+  /// 之外逐位一致；动态层（折射 + 高光/压暗）仅在 [DamageRegion] 并集内重绘。
+  /// 裁剪边界处包络已降至 `exp(-24)` 量级，跨边界三角形的插值对 8bit 颜色与
+  /// 亚像素采样均为 0，故与全量绘制逐像素一致、无缝。仅 CPU 兜底路径使用；
+  /// GPU 着色器主路径不感知该开关。
+  void _paintClipped(Canvas canvas, Size size, ui.Image img) {
+    final w = size.width;
+    final h = size.height;
+    final rect = Offset.zero & size;
+    final old = s._static.old ?? s._old;
+    final fading = old != null && s._mix < 0.999;
+
+    // ① 全屏静态层：未折射、无高光/压暗。
+    _ensureStaticCoords(w, h, img);
+    final staticVerts = ui.Vertices.raw(
+      ui.VertexMode.triangles,
+      _positions,
+      textureCoordinates: _staticTexCoords,
+      indices: _indices,
+    );
+    if (fading) {
+      _drawImage(canvas, rect, staticVerts, old, 1);
+      _drawImage(canvas, rect, staticVerts, img, s._mix);
+    } else {
+      _drawImage(canvas, rect, staticVerts, img, 1);
+    }
+
+    // ② 动态层：仅在损伤区内重绘（折射 + 高光/压暗）。
+    // 矩形上限取涟漪上限：合并虽仍是并集（覆盖完整），但会把远处涟漪并成大块，
+    // 使裁剪近似全屏而失去意义；故不做 3 块合并。
+    final damage = DamageRegion(maxRects: _kMaxRipples);
+    _collectDamage(damage, w, h);
+    if (damage.isEmpty) return;
+    canvas.save();
+    final clip = ui.Path();
+    for (final r in damage.rects) {
+      clip.addRect(r);
+    }
+    canvas.clipPath(clip);
+    _computeField(w, h, img);
+    final dynamicVerts = ui.Vertices.raw(
+      ui.VertexMode.triangles,
+      _positions,
+      textureCoordinates: _texCoords,
+      indices: _indices,
+    );
+    if (fading) {
+      _drawImage(canvas, rect, dynamicVerts, old, 1);
+      _drawImage(canvas, rect, dynamicVerts, img, s._mix);
+    } else {
+      _drawImage(canvas, rect, dynamicVerts, img, 1);
+    }
+    canvas.drawVertices(
+      ui.Vertices.raw(
+        ui.VertexMode.triangles,
+        _positions,
+        colors: _lightColors,
+        indices: _indices,
+      ),
+      BlendMode.plus,
+      Paint(),
+    );
+    canvas.drawVertices(
+      ui.Vertices.raw(
+        ui.VertexMode.triangles,
+        _positions,
+        colors: _darkColors,
+        indices: _indices,
+      ),
+      BlendMode.srcOver,
+      Paint(),
+    );
+    canvas.restore();
   }
 
   void _drawImage(
@@ -331,6 +482,11 @@ class _RipplePainter extends CustomPainter {
       return;
     }
     _ensureMesh(w, h);
+    // opt-in：默认关闭，以下分支不产生任何额外分配，行为与旧实现逐位一致。
+    if (s.widget.damageClippedDynamic) {
+      _paintClipped(canvas, size, img);
+      return;
+    }
     _computeField(w, h, img);
 
     final verts = ui.Vertices.raw(

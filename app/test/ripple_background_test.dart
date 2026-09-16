@@ -157,4 +157,33 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(RippleBackground), findsOneWidget);
   });
+
+  testWidgets('damageClippedDynamic 损伤区裁剪路径（测试环境回退）无异常', (tester) async {
+    late final String path;
+    await tester.runAsync(() async {
+      path = await _writeTempCover();
+      // 预热进 imageCache，使组件解析同步命中。
+      final stream = FileImage(File(path)).resolve(ImageConfiguration.empty);
+      final c = Completer<void>();
+      stream.addListener(ImageStreamListener((_, _) => c.complete()));
+      await c.future;
+    });
+
+    await tester.pumpWidget(
+      _wrap(
+        RippleBackground(
+          cover: 'file://$path',
+          playing: true,
+          speed: 3,
+          damageClippedDynamic: true,
+        ),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(tester.takeException(), isNull);
+    expect(find.byType(RippleBackground), findsOneWidget);
+    expect(find.byType(CustomPaint), findsWidgets);
+  });
 }
