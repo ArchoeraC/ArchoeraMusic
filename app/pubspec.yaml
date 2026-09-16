@@ -89,7 +89,10 @@ hooks:
 #   - hooks 2.1.0 需 meta ^1.19.0 + record_use ^1.0.0（sqlite3 约束允许 <3.0.0）
 # 验证通过则保留并同步约束，失败则移除本段回退。
 dependency_overrides:
-  code_assets: 2.0.0
+  # code_assets 2.1.0：native_toolchain_c 0.19.5（sqlite3 hook 传递依赖，随
+  # pub 解析自动升级）要求 code_assets ^2.1.0 并使用新增的 Architecture.arm64e；
+  # 若锁 2.0.0 会在 macOS arm64 hook 编译期报 Member not found: 'arm64e'。
+  code_assets: 2.1.0
   analyzer: 14.3.0
   test: 1.32.0
   test_api: 0.7.14
