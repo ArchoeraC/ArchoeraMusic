@@ -92,7 +92,7 @@
 > - **Flutter framework**：`flutter/flutter` commit `3cdba02`（main）`packages/flutter/lib/src`。
 > - **Dear ImGui**：`ocornut/imgui`（main）。
 > - **Slint**：`slint-ui/slint`（main）`internal/`（脏区 / 部分渲染 / 项目缓存）。
-> - （另已克隆 `zed-industries/zed` 的 `crates/gpui`，待需要时再精读。）
+> - **GPUI（Zed）**：`zed-industries/zed`（main）`crates/gpui` + `gpui_apple`/`gpui_wgpu`（批处理 / 图集 / 元素复用）。
 > - 复现（GitHub 经本机代理 `127.0.0.1:7897`）：
 >   `git clone --depth 1 https://github.com/qt/qtdeclarative`；
 >   `git clone --depth 1 --filter=blob:none --sparse https://chromium.googlesource.com/chromium/src && git -C src sparse-checkout set cc`；
@@ -515,15 +515,60 @@
   `internal/core/textlayout/sharedparley/cache.rs:43`。
 - 软件渲染只对脏区做背景填充并按行裁剪已覆盖前缀：`internal/renderers/software/lib.rs:559-707,1322-1360`。
 
-### 3.10 可迁移机制清单（附源码出处）
+### 3.10 GPUI（Zed，源码精读：批处理 / 图集 / 元素复用）
+
+- **Scene / 批处理**：每种图元一个独立扁平 `Vec` + `paint_operations` 回放日志；
+  `insert_primitive` 先按 `bounds ∩ content_mask` 裁剪、空则**剔除**：`crates/gpui/src/scene.rs:41-53,87-101`。
+- 批次 = 8 路有序流按 `(order, kind)` 归并；**精灵还会在 `texture_id` 变化处断批**
+  （一张图集一个 draw）；同 order 的种类序
+  `Shadow < Quad < Path < Underline < Mono < Subpixel < Poly < Surface`；
+  `finish()` 按 order / `(order, tile_id)` 排序：`scene.rs:288-466,202-212,151-163`。
+- **`ContentMask` 不切批**（作为逐图元数据用于裁剪与 shader 内裁剪）：`scene.rs:477-496`。
+  `Scene::replay(range, prev_scene)` 直接重放上一帧绘制操作（缓存子树复用）：
+  `scene.rs:141-149`。
+- **元素复用 / 失效**：元素 id 为路径化 `GlobalElementId(Arc<[ElementId]>)`；
+  保留状态 `Frame.element_states: FxHashMap<(GlobalElementId, TypeId), …>` 逐帧只搬运被访问的键：
+  `window.rs:7218,981,1123-1133,4077`。`ViewElement` 按
+  `ViewElementCacheKey{bounds, content_mask, text_style}` 复用，命中则**整棵子树跳过布局/绘制**：
+  `view.rs:285-296,325-331`。`mark_view_dirty` 会**把所有祖先标脏**（已脏则提前停）：
+  `window.rs:166-191,2140-2152`；复用时 `reuse_prepaint`/`reuse_paint` + `Scene::replay`：
+  `window.rs:3689-3799`。
+- **列表**：变高 `List` 用 `SumTree` 存高度，只测量/渲染视口 + `overdraw` 内的项；
+  宽度变化清空全部缓存高度：`elements/list.rs:1027-1124,1543-1558`。定高 `uniform_list`
+  只测一项推导总高、无 overdraw：`elements/uniform_list.rs:473-490`。
+- **无像素级遮挡裁剪**：`BoundsTree`（分支 `MAX_CHILDREN=12`）只用于 **z-order 赋值**；
+  命中测试是 `Frame.hitboxes` 的**线性逆序扫描**，遮挡靠显式
+  `occlude_mouse()`/`block_mouse_except_scroll()` 标志：`bounds_tree.rs:11,120-136`、
+  `window.rs:1093-1115`、`elements/div.rs:748-764`。
+- **图集**：`PlatformAtlas::get_or_insert_with` 按 `AtlasKey{Glyph,Svg,Image}` 去重，
+  `AtlasTextureKind{Monochrome,Polychrome,Subpixel}`；`etagere::BucketedAtlasAllocator` 分桶打包，
+  默认 **1024²**、Metal 上限 **16384²**、tile padding **0**；引用计数归零后纹理槽进 `free_list` 复用：
+  `platform.rs:1379-1542`、`metal_atlas.rs:96-135,62-92`、`wgpu_atlas.rs:159-195`。
+- **图片缓存是反面教材**：核心 `RetainAllImageCache` **无上限、不淘汰**（只显式 drop）；
+  LRU 只出现在 example（`max_items=30`）：`elements/image_cache.rs:222-304`、
+  `examples/image_gallery.rs:169-225`。
+- **渲染映射**：Metal 整个主 pass **一个命令缓冲 + 一个 encoder**，每个 batch = 一次实例化 draw；
+  **路径特殊**：结束 encoder、单独多重采样 pass 光栅化再回主 pass 合成：
+  `metal_renderer.rs:658-748,1398-1410`、`wgpu_renderer.rs:1405-1540`；
+  实例缓冲上限 **256 MiB**、Metal 对齐 256：`metal_renderer.rs:41-42`、`wgpu_renderer.rs:17-19`。
+- 常量：图集 1024²~16384²；deferred 嵌套上限 10（`window.rs:3594`）；arena 初始 1 MiB（`:333`）；
+  `SUBPIXEL_VARIANTS_X=4`（`text_system.rs:49`）。
+
+> 对我们的启示：**批处理键 = (z-order, 图元种类, 图集页)**；`ContentMask` 不切批；
+> 缓存子树用「key + 脏集合 + 绘制回放」；GPUI **不做遮挡裁剪**——Flutter 侧同样只能靠
+> `Offstage`/`TickerMode` 与显式隐藏，而不是指望引擎自动剔除。
+
+### 3.11 可迁移机制清单（附源码出处）
 
 | 机制 | 源码出处 | 我们对应的落点 |
 |---|---|---|
-| 图层缓存 / FBO 复用（脏标志驱动） | Qt `qsgrhilayer.cpp:68-81`；WR `tile_cache/mod.rs:254-283`；`cc` `effect_node.h:224-226` | 背景**静态层**、播放条、侧边栏包 `RepaintBoundary` |
-| 只更新损伤区（需平台能力） | WR `invalidation/quadtree.rs:394-434`、`tile_cache/mod.rs:533-563`；`cc` `tile_manager.cc:1509-1516` | 水纹**动态层**只画活动涟漪（Flutter 无 RT partial-update API，只能层隔离近似） |
+| 图层缓存 / FBO 复用（脏标志驱动） | Qt `qsgrhilayer.cpp:68-81`；WR `tile_cache/mod.rs:254-283`；`cc` `effect_node.h:224-226`；Flutter framework `object.dart:249-291`、engine `display_list_raster_cache_item.cc:52-63`（**Skia 专用**） | 背景**静态层**、播放条、侧边栏包 `RepaintBoundary` |
+| 缓存子树按 key + 脏集合 + 绘制回放 | GPUI `view.rs:285-296`、`window.rs:3689-3799` | 稳定层复用；`RepaintBoundary` 的等价物 |
+| 只更新损伤区（需平台能力） | WR `invalidation/quadtree.rs:394-434`、`tile_cache/mod.rs:533-563`；`cc` `tile_manager.cc:1509-1516`；Flutter engine `compositor_context.cc:195-221`（Impeller 仅轴比≤0.7） | 水纹**动态层**只画活动涟漪（Flutter 无 RT partial-update API，只能层隔离近似） |
+| 批处理键 = (z-order, 种类, 图集页) | GPUI `scene.rs:288-466,202-212`；Flutter engine `canvas.cc:1450-1475` | 频谱单 Path（已 P3）→ 评估 `drawAtlas`；纯色用白像素 UV |
 | 降分辨率 / LOD | `cc` `tile_size_calculator.cc:67-85`；Skia `SkImageFilterTypes.cpp:1479-1497` | 动态层低分辨率离屏、静态层 1/2~1/4 预烘焙 |
 | 内存上限 + 优先级/空闲回收 | WR `texture_cache.rs:1119-1219`、`picture_textures.rs:296-327`；Skia `GrResourceCache.h:89`；`cc` `tile_manager.cc:912-1092` | 图片/图层缓存上限、空闲回收 |
-| 遮挡裁剪 / 不可见即停 | WR `composite.rs:1824-1963`、`rectangle_occlusion.rs:73-143`；`cc` `occlusion_tracker.cc:129-226`；Qt `qsgnode.cpp:1329` | `Offstage`/`Visibility` + `TickerMode`（已有，扩展） |
+| 遮挡裁剪 / 不可见即停 | WR `composite.rs:1824-1963`、`rectangle_occlusion.rs:73-143`；`cc` `occlusion_tracker.cc:129-226`；Qt `qsgnode.cpp:1329`；GPUI **无遮挡剔除**（`bounds_tree.rs:11,120-136`） | `Offstage`/`Visibility` + `TickerMode`（已有，扩展）；**须显式隐藏**，别指望引擎剔除 |
 | 合批（键相等 / 序冲突即断） | Impeller `text_contents.cc:162`；Skia `OpsTask.cpp:54-55,279-296`；Qt `qsgbatchrenderer.cpp:1800-1946`；WR `batch.rs:211-236` | 频谱单 Path（已 P3）→ 评估 `drawAtlas`；歌词字形缓存 |
 | 裁剪代价（轴对齐整数 clip 才走 scissor） | Impeller `entity_pass_clip_stack.cc:149-172`；Qt `qsgbatchrenderer.cpp:2440-2479` | 减少 `ClipRRect`/AA 圆角/`saveLayer`，列表 delegate 内禁止 |
 | 离屏 pass 是最大开销（不合并回） | Impeller `canvas.cc:1146-1520`、`contents.cc:56-119`；Skia `SkCanvas.cpp:1007-1078` | 禁全屏 `BackdropFilter`/`ImageFiltered`；滤镜限小层 |
@@ -800,13 +845,13 @@
   [test-suite-2026-09-10.md](test-suite-2026-09-10.md)
 - 上游实现：`SPlayer-Next/src/components/player/FullPlayer/PlayerBackground.vue`、
   `.../BackgroundRipple.vue`
-- 外部机制参考（**源码级，§3.1–3.9**；克隆命令见 §3 引言）：
+- 外部机制参考（**源码级，§3.1–3.10**；克隆命令见 §3 引言）：
   - Qt `qtdeclarative@3027a40c`（dev）、Chromium `chromium/src@823ae20f`（main，仅 `cc/`）、
     Mozilla WebRender（`mozilla-firefox/firefox` main，`gfx/wr/webrender/`）、
     Flutter Impeller（`flutter/engine@ae5c3603`，`impeller/`）、Skia（`google/skia@9875bb59`）、
     Flutter engine `flow/`+`lib/ui/`（光栅缓存/损伤区/图层）、Flutter framework
     （`flutter/flutter@3cdba02`，`rendering/`+`widgets/`）、Dear ImGui（`ocornut/imgui`）、
-    Slint（`slint-ui/slint`，`internal/`）。
+    Slint（`slint-ui/slint`，`internal/`）、GPUI（`zed-industries/zed`，`crates/gpui`+`gpui_apple`+`gpui_wgpu`）。
   - 文档补充：Qt Quick Scene Graph / Performance
     （`doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html`、`.../qtquick-performance.html`）；
     Flutter `dart:ui`：`RepaintBoundary` 层缓存、`FragmentProgram`、
