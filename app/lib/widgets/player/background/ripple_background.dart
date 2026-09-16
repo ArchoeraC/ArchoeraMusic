@@ -27,6 +27,7 @@ import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 
+import '../../../services/render/damage_region.dart';
 import 'ripple_shader.dart';
 import 'ripple_static_layer.dart';
 
@@ -56,6 +57,7 @@ class RippleBackground extends StatefulWidget {
     this.saturation = 1.3,
     this.darken = 0.5,
     this.renderScale = 1.0,
+    this.damageClippedDynamic = false,
     this.fallbackColor = const Color(0xFF141420),
   });
 
@@ -88,6 +90,24 @@ class RippleBackground extends StatefulWidget {
   /// 再 `drawImageRect` 放大贴回全屏，以降低填充率与网格成本。取值在使用时夹到
   /// `[0.25, 1.0]`。GPU 着色器路径暂不感知该参数（见 `_RippleShaderPainter`）。
   final double renderScale;
+
+  /// 可选：动态层只重绘「损伤区」（默认 `false`，R1-b / §4.1 实验开关）。
+  ///
+  /// 开启后 CPU 兜底网格路径（`_RipplePainter`）按两层绘制：
+  /// ① 全屏静态层——未经折射、无高光/压暗的预烘焙封面（与动态层在涟漪
+  ///    外盘之外的逐顶点值**逐位一致**，纹理坐标缓存复用）；
+  /// ② 动态层（折射 + 高光/压暗）仅裁剪到本帧所有活动涟漪外盘 AABB 的并集内重绘。
+  ///
+  /// **精确性**：`_computeField` 对任一涟漪外盘 AABB 之外的顶点整段跳过逐涟漪
+  /// 循环（折射偏移与高光恒为 0），故动态层与静态层只可能在 AABB 并集内部不同。
+  /// 裁剪边界贴合外盘边界 `dc = radius + 0.5`，该处高斯包络 `exp(-|dw|*48)` 已降为
+  /// `exp(-24) ≈ 3.8e-11`；被裁掉的跨边界三角形即使插值，幅度也只剩此量级（网格
+  /// 最小 16×9，顶点离边界至多一格，包络只会更小），乘位移/高光系数后对 8bit
+  /// 颜色与亚像素采样均为 0。因此裁剪结果与全量绘制**逐像素一致**、边界无缝。
+  ///
+  /// 关闭（默认）时不走该分支，行为与旧实现逐字节一致、不产生额外分配。
+  /// GPU 着色器主路径（`_RippleShaderPainter`）暂不感知该参数，仍全屏单 pass。
+  final bool damageClippedDynamic;
 
   /// 无封面时的底色。
   final Color fallbackColor;
