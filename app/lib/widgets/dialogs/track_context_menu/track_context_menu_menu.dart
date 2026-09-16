@@ -96,11 +96,11 @@ Future<void> _defaultToggleLike(
   if (!context.mounted) return;
   final l10n = context.l10n;
   if (!ok) {
-    toast(
-      track.source == 'kugou'
-          ? l10n.toastLoginRequiredKugou
-          : l10n.toastLoginRequiredNetease,
-    );
+    toast(switch (track.source) {
+      'kugou' => l10n.toastLoginRequiredKugou,
+      'qqmusic' => l10n.toastQqLikeSyncFailed,
+      _ => l10n.toastLoginRequiredNetease,
+    });
     return;
   }
   toast(controller.isLiked(track) ? l10n.toastLiked : l10n.toastUnliked);

@@ -44,8 +44,7 @@ Future<_HttpResult> _httpGet(
   Map<String, String>? headers,
   bool manual = false,
   Duration timeout = const Duration(seconds: 8),
-}) =>
-    _http('GET', url, headers: headers, manual: manual, timeout: timeout);
+}) => _http('GET', url, headers: headers, manual: manual, timeout: timeout);
 
 Future<_HttpResult> _httpPostForm(
   String url,
@@ -53,7 +52,9 @@ Future<_HttpResult> _httpPostForm(
   Map<String, String>? headers,
   bool manual = false,
 }) {
-  final body = form.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+  final body = form.entries
+      .map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}')
+      .join('&');
   return _http(
     'POST',
     url,
@@ -133,8 +134,9 @@ List<String> _parsePtuiArgs(String text) {
   return args;
 }
 
-String _joinForm(Map<String, String> form) =>
-    form.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+String _joinForm(Map<String, String> form) => form.entries
+    .map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}')
+    .join('&');
 
 /// 登录前清空残留 cookie（避免上个账号污染）
 void _resetJar() => _cookieJar = <String, String>{};
@@ -205,7 +207,9 @@ Future<Map<String, dynamic>> _qrCheck(String key, String type) async {
   final nickname = args.length > 5 ? args[5] : '';
 
   if (statusCode == '65') return {'code': 200, 'status': 0};
-  if (statusCode == '67') return {'code': 200, 'status': 2, 'nickname': nickname};
+  if (statusCode == '67') {
+    return {'code': 200, 'status': 2, 'nickname': nickname};
+  }
   if (statusCode == '0') {
     final jumpUrl = args.length > 2 ? args[2] : '';
     if (jumpUrl.isEmpty || !jumpUrl.startsWith('http')) {
@@ -219,7 +223,8 @@ Future<Map<String, dynamic>> _qrCheck(String key, String type) async {
       headers: {'Referer': 'https://xui.ptlogin2.qq.com/'},
       manual: true,
     );
-    final pSkey = _cookieJar['p_skey'] ??
+    final pSkey =
+        _cookieJar['p_skey'] ??
         _cookieJar['p_sKey'] ??
         _cookieJar['skey'] ??
         _cookieJar['pskey'];
@@ -290,22 +295,19 @@ Future<Map<String, dynamic>> _finalizeLogin(
   if (uinStr.isEmpty || musickey == null || '$musickey'.isEmpty) {
     throw HttpException('QQ登录响应缺少有效凭据');
   }
-  final saved = qmCredentialToSession(
-    loginData,
-    fallbackMusicId: fallbackUin,
-  );
+  final saved = qmCredentialToSession(loginData, fallbackMusicId: fallbackUin);
   qmMergeQQMusicCookies(saved);
   final nick = loginData['nick'] ?? loginData['nickname'];
-  final logo = loginData['logo'] ?? loginData['avatarUrl'];
+  final logo = qmNormalizeCover(
+    loginData['logo']?.toString() ?? loginData['avatarUrl']?.toString(),
+  );
   final fallbackAvatar =
       'https://q.qlogo.cn/headimg_dl?dst_uin=$uinStr&spec=100';
   return <String, dynamic>{
     'code': 200,
     'status': 4,
     'nickname': nick == null ? '' : '$nick',
-    'avatarUrl': (logo == null || '$logo'.isEmpty)
-        ? fallbackAvatar
-        : '$logo',
+    'avatarUrl': logo.isEmpty ? fallbackAvatar : logo,
   };
 }
 
@@ -320,4 +322,3 @@ QmModule qmLoginQrCheck = (params) async {
   if (key.isEmpty) throw StateError('缺少二维码 key');
   return _qrCheck(key, type);
 };
-

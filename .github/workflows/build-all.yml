@@ -14,7 +14,7 @@
 #  ├─ linux-appimage(needs linux-deb)     : AppImage（linuxdeploy 收拢动态依赖）
 #  ├─ linux-flatpak (needs linux-deb)     : .flatpak（包装预构建 bundle）
 #  ├─ linux-nix     (独立源构建)          : NixOS flake 产物 tar.gz（nixpkgs 工具链）
-#  ├─ build         (matrix macos/windows): .app / NSIS+portable zip
+#  ├─ build         (matrix macos/windows): .app / Inno Setup installer+portable zip
 #  └─ release       (needs 全部；tag v* 触发)
 #
 #  产物文件名带发行版标识（如 ArchoeraMusic-v<ver>-ubuntu24.04-x86_64.deb、
@@ -250,7 +250,7 @@ jobs:
 
       - name: Upload Windows build logs (排查用)
         if: matrix.os == 'windows' && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-build-logs
           path: |
@@ -288,20 +288,20 @@ jobs:
           CPPWINRT_INCLUDE: C:\vcpkg\installed\x64-windows-release\include
         run: flutter build windows --release
 
-      # ─────────────── Windows：NSIS 安装器 + 便携 zip ──────────────
-      - name: Install NSIS (Windows)
+      # ─────────── Windows：Inno Setup 安装器（per-user 免 UAC）+ 便携 zip ───────────
+      - name: Install Inno Setup (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
-        run: choco install nsis -y --no-progress
+        run: choco install innosetup -y --no-progress
 
-      - name: Package Windows (NSIS installer + portable zip)
+      - name: Package Windows (Inno Setup installer + portable zip)
         if: matrix.os == 'windows'
         shell: pwsh
         working-directory: ${{ github.workspace }}
         run: |
           $ver = (Select-String -Path "app/pubspec.yaml" -Pattern '^version:').Line.Split(' ')[1].Trim()
           $rel = "app\build\windows\x64\runner\Release"
-          $out = "build\windows-extra"
+          $out = "$PWD\build\windows-extra"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
 
           # 防伪公钥随包分发（供用户离线验签；私钥绝不入库/入包）
@@ -310,15 +310,15 @@ jobs:
           # 便携 zip：Release 目录整体（含 native/、data/、插件 dll）
           Compress-Archive -Path "$rel\*" -DestinationPath "$out\ArchoeraMusic-$ver-windows-x64-portable.zip" -Force
 
-          # NSIS 安装器（优先 PATH 内 makensis，其次 choco 默认安装目录）
-          $mk = Get-Command makensis -ErrorAction SilentlyContinue
-          if ($null -eq $mk) { $mk = "C:\Program Files (x86)\NSIS\makensis.exe" }
-          else { $mk = $mk.Source }
-          & $mk `
-            /DVERSION="$ver" `
-            /DAPP_DIR="$PWD\$rel" `
-            /DOUT_FILE="$PWD\$out\ArchoeraMusic-$ver-windows-x64-setup.exe" `
-            packaging\windows\archoera_music.nsi
+          # Inno Setup 安装器（优先 PATH 内 iscc，其次 6.x 默认安装目录）
+          $iscc = Get-Command iscc -ErrorAction SilentlyContinue
+          if ($null -eq $iscc) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          else { $iscc = $iscc.Source }
+          & $iscc `
+            "/DVersion=$ver" `
+            "/DAppDir=$PWD\$rel" `
+            "/DOutputDir=$out" `
+            packaging\windows\archoera_music.iss
           Get-ChildItem "$out"
 
       - name: Verify EraSync kernel bundled (Windows)
@@ -372,7 +372,7 @@ jobs:
 
       - name: Upload artifact (macOS .app)
         if: matrix.os == 'macos'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-macos-arm64
           path: app/build/macos/Build/Products/Release/archoera_music.app
@@ -380,15 +380,15 @@ jobs:
 
       - name: Upload artifact (Windows runner Release)
         if: matrix.os == 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-windows-x64
           path: app/build/windows/x64/runner/Release
           if-no-files-found: error
 
-      - name: Upload artifact (Windows NSIS + portable)
+      - name: Upload artifact (Windows installer + portable)
         if: matrix.os == 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-windows-extra
           path: build/windows-extra/*
@@ -438,13 +438,13 @@ jobs:
         env:
           DISTRO_TAG: ubuntu24.04
       - name: Upload bundle artifact (原始 bundle)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-x64
           path: app/build/linux/x64/release/bundle
           if-no-files-found: error
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-deb
           path: dist/linux/*
@@ -495,7 +495,7 @@ jobs:
           DISTRO_TAG: deepin25
           DISTRO_NOTE: 仅 Deepin 25（glibc 2.38）；其它发行版请安装对应包
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-deepin
           path: dist/linux/*
@@ -538,7 +538,7 @@ jobs:
         env:
           DISTRO_TAG: fedora
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-rpm
           path: dist/linux/*
@@ -590,7 +590,7 @@ jobs:
             "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-arch-x86_64.pkg.tar.zst"
           echo "→ dist/linux/"*.pkg.tar.zst
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-arch
           path: dist/linux/*
@@ -612,7 +612,7 @@ jobs:
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
       - name: Download bundle artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ArchoeraMusic-linux-x64
           path: bundle
@@ -649,7 +649,7 @@ jobs:
           LINUXDEPLOY: /tmp/linuxdeploy.AppImage
           APPIMAGE_EXTRACT_AND_RUN: '1'
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-appimage
           path: dist/linux/*.AppImage
@@ -669,7 +669,7 @@ jobs:
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
       - name: Download bundle artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ArchoeraMusic-linux-x64
           path: bundle
@@ -688,7 +688,7 @@ jobs:
         env:
           DISTRO_TAG: flatpak
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-flatpak
           path: dist/linux/*.flatpak
@@ -722,7 +722,7 @@ jobs:
           tar -czf "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz" -C result .
           ls -la dist/linux/*nixos*.tar.gz
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ArchoeraMusic-linux-nix
           path: dist/linux/*nixos*.tar.gz
@@ -750,10 +750,10 @@ jobs:
       actions: read
     steps:
       - name: Checkout (签名工具 + 公钥)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download all platform build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
 
@@ -772,7 +772,7 @@ jobs:
           test -d artifacts/ArchoeraMusic-linux-nix       # Linux NixOS tar.gz
           test -d artifacts/ArchoeraMusic-macos-arm64     # macOS .app
           test -d artifacts/ArchoeraMusic-windows-x64     # Windows runner Release
-          test -d artifacts/ArchoeraMusic-windows-extra   # Windows NSIS + portable
+          test -d artifacts/ArchoeraMusic-windows-extra   # Windows installer + portable
           mkdir -p assets
           # Linux：各发行版安装包直接作为独立 asset（tar.gz/deb/AppImage/flatpak/
           # nixos/rpm/pkg.tar.zst 均已带版本号，名称不冲突）
@@ -783,7 +783,7 @@ jobs:
           cp artifacts/ArchoeraMusic-linux-appimage/* assets/
           cp artifacts/ArchoeraMusic-linux-flatpak/* assets/
           cp artifacts/ArchoeraMusic-linux-nix/* assets/
-          # Windows：NSIS 安装器与便携 zip 直接作为独立 asset
+          # Windows：Inno Setup 安装器与便携 zip 直接作为独立 asset
           cp artifacts/ArchoeraMusic-windows-extra/* assets/
           # upload-artifact@v4 打包会丢失可执行位：下载后按 Mach-O/ELF magic
           # 恢复 +x（否则 .app/Contents/MacOS 主二进制与 native/ 子进程解包后无法运行）

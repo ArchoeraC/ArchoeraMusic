@@ -12,6 +12,7 @@
 /// 仅需登录 Cookie（uin + key），出站为官方 `c.y.qq.com`。
 library;
 
+import '../core/config.dart';
 import '../core/request.dart';
 import '../core/types.dart';
 
@@ -25,8 +26,7 @@ const _profileOrderUrl =
     'https://c.y.qq.com/fav/fcgi-bin/fcg_get_profile_order_asset.fcg';
 
 /// 自建歌单端点。
-const _userCreatedUrl =
-    'https://c.y.qq.com/rsc/fcgi-bin/fcg_user_created_diss';
+const _userCreatedUrl = 'https://c.y.qq.com/rsc/fcgi-bin/fcg_user_created_diss';
 
 Map<String, dynamic> _loggedOut() => {
   'code': 301,
@@ -90,10 +90,28 @@ QmModule qmUserCreatedDiss = (params) async {
   );
   final json = await qmGetRaw(uri);
   if (_intOf(json['code']) != 0) {
-    return {'code': 500, 'message': _str(json['message']), 'playlists': const []};
+    return {
+      'code': 500,
+      'message': _str(json['message']),
+      'playlists': const [],
+    };
   }
   final data = json['data'] is Map ? json['data'] as Map : const {};
   final out = <Map<String, dynamic>>[];
+  final seen = <String>{};
+  void addEntry(String id, String name, String cover, int count, String desc) {
+    if (id.isEmpty || name.isEmpty || !seen.add(id)) return;
+    out.add({
+      'id': id,
+      'name': name,
+      'cover': qmNormalizeCover(cover),
+      'trackCount': count,
+      'creator': uin,
+      'description': desc,
+    });
+  }
+
+  // 新接口：disslist（diss_cover / cover）。
   for (final item in (data['disslist'] as List?) ?? const []) {
     if (item is! Map) continue;
     final id = _str(item['dissid']).isNotEmpty
@@ -102,23 +120,37 @@ QmModule qmUserCreatedDiss = (params) async {
     final name = _str(item['diss_name']).isNotEmpty
         ? _str(item['diss_name'])
         : _str(item['title']);
-    if (id.isEmpty || name.isEmpty) continue;
-    out.add({
-      'id': id,
-      'name': name,
-      'cover': _str(item['diss_cover']).isNotEmpty
+    final count = _intOf(item['song_count']) != 0
+        ? _intOf(item['song_count'])
+        : (_intOf(item['song_num']) != 0
+              ? _intOf(item['song_num'])
+              : _intOf(item['song_cnt']));
+    addEntry(
+      id,
+      name,
+      _str(item['diss_cover']).isNotEmpty
           ? _str(item['diss_cover'])
           : _str(item['cover']),
-      'trackCount': _intOf(item['song_count']) != 0
-          ? _intOf(item['song_count'])
-          : (_intOf(item['song_num']) != 0
-                ? _intOf(item['song_num'])
-                : _intOf(item['song_cnt'])),
-      'creator': uin,
-      'description': _str(item['diss_desc']).isNotEmpty
+      count,
+      _str(item['diss_desc']).isNotEmpty
           ? _str(item['diss_desc'])
           : _str(item['desc']),
-    });
+    );
+  }
+
+  // 旧接口：list（imgurl）——对齐 music-lib/qq GetUserPlaylists 的双数组兼容。
+  for (final item in (data['list'] as List?) ?? const []) {
+    if (item is! Map) continue;
+    final count = _intOf(item['song_count']) != 0
+        ? _intOf(item['song_count'])
+        : _intOf(item['song_num']);
+    addEntry(
+      _str(item['dissid']),
+      _str(item['dissname']),
+      _str(item['imgurl']),
+      count,
+      _str(item['introduction']),
+    );
   }
   return {'code': 200, 'loggedIn': true, 'playlists': out};
 };
@@ -143,7 +175,7 @@ QmModule qmProfileOrderPlaylists = (params) async {
     out.add({
       'id': id,
       'name': name,
-      'cover': _str(item['logo']),
+      'cover': qmNormalizeCover(_str(item['logo'])),
       'trackCount': _intOf(item['songnum']),
       'creator': _str(item['nickname']).isNotEmpty
           ? _str(item['nickname'])
@@ -192,7 +224,7 @@ QmModule qmProfileOrderSongs = (params) async {
       'coverOriginal': albumMid.isEmpty
           ? ''
           : 'https://y.gtimg.cn/music/photo_new/T002R800x800M000$albumMid.jpg',
-      'duration': _intOf(d['interval']),
+      'duration': _intOf(d['interval']) * 1000,
       'size128': _intOf(d['size128']),
       'size320': _intOf(d['size320']),
       'sizeFlac': _intOf(d['sizeflac']),

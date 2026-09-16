@@ -1,0 +1,40 @@
+﻿ArchoeraMusic 用户协议与免责声明
+
+本软件（ArchoeraMusic）以 AGPL-3.0 开源：遵守其条款即可自由使用、学习、修改与再分发，合规的开源商业使用同样被许可；本项目不提供脱离 AGPL 义务的闭源商业授权。安装并使用本软件前，请阅读并同意以下声明。
+
+一、软件性质
+本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。
+
+二、内容来源与版权
+本软件自身不提供、不存储、不分发任何音乐内容。音频、歌词、封面等均来自您的本地文件或各音乐平台公开接口，其版权归原权利人及平台所有，本软件不主张任何所有权。
+
+三、版权数据处理义务
+使用过程中产生的版权数据（播放链接、歌词、封面等）仅供您个人试听与学习研究，请勿用于商业或公开传播；建议在产生后 24 小时内清除。如需长期欣赏，请通过正版渠道购买或订阅，支持正版音乐。
+
+四、使用限制
+请勿利用本软件从事商业行为、批量抓取、爬取或转售内容；请勿在违反当地法律法规或相关平台服务条款的情况下使用本软件；请勿绕过在线平台的技术保护措施、访问控制或服务条款。
+
+五、登录与账号
+本软件提供扫码登录（用各音乐平台官方 App 扫描本软件展示的二维码）与账号凭据登录，用于同步收藏、歌单并解锁相应功能。请注意：
+ · 二维码由对应平台官方接口生成，本软件不收集、不解析、不向任何第三方发送您的登录二维码、账号、密码或短信验证码；
+ · 登录成功后获得的会话凭据（Cookie / Token 等）仅保存在本机（凭据保险库加密存储），不会上传至开发者或任何非平台服务器；
+ · 扫码登录等同于您授权本软件以您的账号访问对应平台，收藏、播放、评论等操作会真实作用于您的账号；
+ · 请妥善保管设备与系统账户，在公共或共享设备上登录后请及时退出登录并清理凭据；
+ · 平台可能对第三方客户端登录进行风控、限制或封禁，由此产生的账号异常、功能受限等风险由您自行承担。
+
+六、隐私与本地数据
+本软件不设开发者服务器，不收集、不上传您的个人信息、使用行为、曲库内容或登录凭据；您的曲库、历史、收藏、下载、设置与登录态均保存在本机数据目录，卸载或使用「安全」中的删除功能可清除；与在线平台交互时，请求由您的设备直接发往对应平台，受该平台隐私政策与服务条款约束。
+
+七、第三方服务与风险
+各在线音乐平台的接口、鉴权方式与可用性由平台单方决定，可能随时变更、限制或关闭，导致登录失效、功能不可用或数据无法同步；本软件按现状提供，不对第三方服务的持续可用性、稳定性或数据完整性作出任何承诺。
+
+八、免责声明
+本软件按「现状」提供，不对其作出任何明示或默示的保证。因使用或无法使用本软件，或因在线平台接口变更、账号限制、登录凭据失效、账号被风控或封禁、功能失效等产生的任何直接或间接损失，均由使用者自行承担。
+
+本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。
+
+English Notice
+
+ArchoeraMusic is free software licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). It is a third-party, open-source client with no affiliation, cooperation or authorization relationship with any music platform. It neither provides, stores nor distributes any music content; all content comes from your local files or public platform interfaces and remains the property of the respective rights holders.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. You are solely responsible for how you use this software and for complying with all applicable laws and platform terms of service.
