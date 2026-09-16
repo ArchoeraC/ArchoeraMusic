@@ -55,44 +55,145 @@
 
 ---
 
-## 3. 跨框架机制调研（提炼可迁移项）
+## 3. 跨框架机制调研（源码级，提炼可迁移项）
 
-### 3.1 Chromium / Electron（`cc` 合成器）
+> **调研基线（2026-09-16 本地浅克隆）**：
+> - Qt：`qtdeclarative` commit `3027a40c`（dev，Qt 6.x）— 下文路径省略前缀 `src/quick/scenegraph/`
+>   （item 层为 `src/quick/items/`）。
+> - Chromium：`chromium/src` commit `823ae20f`（main）— 下文路径省略前缀 `cc/`。
+> - 复现：`git clone --depth 1 https://github.com/qt/qtdeclarative`；
+>   `git clone --depth 1 --filter=blob:none --sparse https://chromium.googlesource.com/chromium/src && git -C src sparse-checkout set cc`。
 
-- **图层化（layerization）**：动画/滚动元素提升为独立合成层，未变图层不重光栅（`will-change`）。
-- **分块光栅（tiling）**：把大层切成固定像素块（256/512），只光栅/上传受影响的块。
-- **部分重绘（partial raster / damage）**：只重绘**损伤区**；静态内容不重复计算。
-- **遮挡裁剪（occlusion culling）**：被不透明层完全覆盖的内容直接丢弃绘制。
-- **绘制批处理（quad batching）**：相同材质/纹理的 quad 合并，减少 draw call / 状态切换。
-- **可丢弃内存（discardable memory）**：内存压力下抛弃可再生资源（解码图、缓存纹理）。
-- **后台节流（background throttling）**：不可见标签降频/停渲染。
+### 3.1 Chromium / Electron（`cc` 合成器，源码精读）
 
-### 3.2 Qt Quick（Scene Graph + RHI）
+**分块（tiling）与尺寸策略**
+- GPU 光栅瓦片≈**视口高度 / 4**，随内容宽度缩小收窄到 2、1：`layers/tile_size_calculator.cc:67-85`。
+- 再夹到 `max_gpu_raster_tile_size` 与最小高度 **256px**：`tile_size_calculator.cc:54-58`、
+  `trees/layer_tree_settings.h:94`。
+- 软件/未分块默认 **256×256**，**< 512² 的小层不分块**（这是小层的关键省法）：
+  `trees/layer_tree_settings.cc:17-18`。
+- 每块**边距 1 texel**（`tiles/picture_layer_tiling.h:78`、`base/tiling_data.cc:172-228`），
+  尺寸**向上对齐 32/64**（`tile_size_calculator.cc:19-27,51-52`）——避免接缝并利于纹理对齐。
 
-Qt 的文档把与我们的问题高度重合的坑写得很直白，可直接对照：
+**部分光栅 / 只更新损伤区**
+- 失效区域→瓦片重映射（含边距），旧瓦片带 `invalid_content_rect` 复用：
+  `tiles/picture_layer_tiling.cc:278-328`、`tiles/tile.h:137-145`。
+- **只回放脏像素**：旧资源 ∩ 脏矩形，仅栅格化变化部分：`tiles/tile_manager.cc:1509-1516`、
+  `raster/one_copy_raster_buffer_provider.cc:266-272`；`raster/raster_source.cc:86-117`。
+  默认 `use_partial_raster=false`，且需 `msaa_sample_count==0`：`trees/layer_tree_settings.h:112`、
+  `tile_manager.cc:2116-2122`。
+- 优先级 `NOW / SOON / EVENTUALLY` + 到可视区距离；被遮挡瓦片降级而非不处理：
+  `tiles/tile_priority.h:36-57`、`tiles/picture_layer_tiling.cc:768-828`。
+- 每帧调度上限 **32** 个栅格任务：`tile_manager.cc:1006-1011`、`layer_tree_settings.h:120`。
+- 远景（> `max_preraster_distance=1000px`）**只解码图片、不栅格**：
+  `picture_layer_tiling.cc:737-741`、`layer_tree_settings.h:128`。
 
-- **保留式场景图**：渲染前已知全部图元 → **批处理**、可视顺序无关的**重排**、**丢弃被遮挡图元**
-  （三者正是 `cc` 的 batching / reorder / occlusion）。
-- **`QSGNode::preprocess`**：按当前 scale 决定 **LOD**、只更新**纹理局部**——即「按需精度」。
-- **`QSGLayer` / `ShaderEffectSource`**：把子树预渲到 FBO 后复用；文档同时警告
-  `ShaderEffectSource` 的**额外离屏代价很贵**，`QQuickPaintedItem` 是**两级**（先光栅后贴），
-  能直接上场景图就别用它。
-- **裁剪不是优化**：`clip` 会**阻止重排、破坏批处理**，在 delegate 里尤其糟。
-  （对照：Flutter 的 `ClipRect`/`ClipRRect`/`saveLayer` 同样打断合批；`saveLayer` 更是整层离屏。）
-- **遮挡与不可见**：被不透明元素完全盖住的应 `visible=false`；不可见但仍需存在的元素也应
-  `visible=false` 以免绘制（但动画/绑定仍在跑——这点和 Flutter 的 `Visibility`/`TickerMode` 一致）。
-- **不透明优于半透明**：半透明要混合，破坏不透明优化（一个透明像素即整图按透明处理）。
-- **`ShaderEffect`**：逐像素运行，低端机**限制指令数**；大面积时是填充率杀手。
-- **图片**：`Image.asynchronous`、**`sourceSize` 按显示尺寸解码**（对照 `CoverImage` 的
-  `cacheWidth/cacheHeight`）；避免无谓 `smooth`。
-- **生命周期**：`Loader` 懒加载，**`destroy()` 释放**未用元素；**粒子系统不可见即停**。
-- **渲染循环**：`threaded`（GUI/render 线程分离，vsync 驱动动画）——Flutter/Impeller 已内建同构分离。
+**内存上限与回收**
+- 默认策略 **64 MiB**：`trees/layer_tree_settings.cc:22-24`；硬/软限拆分：
+  `trees/layer_tree_host_impl.cc:1806-1826`。
+- `AssignGpuMemoryToTiles`：NOW 用硬限、其余用软限，逐级按优先级驱逐；
+  `NOW` 放不下时报“limits exceeded”：`tile_manager.cc:912-1092`。
+- 空闲 **5 分钟**回收低于可见-NOW 优先级的瓦片：`tile_manager.h:388`、`tile_manager.cc:495-517`；
+  `TrimPrepaintTiles` 清 `> SOON`：`tile_manager.cc:520-580`。
 
-### 3.3 WebRender（Servo / Firefox）
+**遮挡裁剪（occlusion culling）**
+- 遍历 effect-tree，只有**不透明、轴对齐、非 mask** 的层才遮挡；小矩形（< **160×160**）跳过跟踪：
+  `trees/occlusion_tracker.cc:129-226,357-411`；`trees/layer_tree_settings.cc:19`、
+  `trees/layer_tree_impl.cc:1886-1889`。
+- 遮挡写回各层 `occlusion_in_content_space`（`layer_tree_impl.cc:1891-1931`），
+  参与瓦片优先级默认**关**（`layer_tree_settings.h:121`、`layers/picture_layer_impl.cc:429-440`）。
+
+**图层化 / 不透明快路径**
+- `will-change` → `raster_even_if_not_drawn`（离屏也预栅格）：`trees/property_tree.cc:977-982`、
+  `trees/draw_property_utils.cc:1190-1200`。
+- **每个 render surface 一个 FBO**；提升原因枚举在 `trees/effect_node.h:34-64`（opacity/filter/
+  backdrop/mask/clipPath/blend/copy 等），`HasRenderSurface()` `:224-226`。
+- `SetContentsOpaque` → 免整层透明 clear、只清边距：`layers/layer.cc:894-900`、
+  `layers/picture_layer.cc:123`、`raster/raster_source.cc:87-102`。
+- filter 会**扩张离屏**并保守清遮挡：`paint/filter_operations.cc:63-86,120`。
+
+**批处理 / paint op**
+- op 存在单一 `PaintOpBuffer`，`DisplayItemList::Finalize` 建 **rtree 空间索引**，
+  回放只取与目标矩形相交的 op：`paint/paint_op_buffer.h:167,328`、`paint/display_item_list.cc:85-125,200-213`。
+- **纯色瓦片直接跳过栅格**：≤ `kMaxOpsToAnalyze=5` 个 op 时分析为纯色即不画：
+  `tile_manager.cc:65,950-976`、`paint/solid_color_analyzer.cc:294,327,335`。
+
+**图片解码缓存（对我们的封面/列表最直接）**
+- 预算默认 **128 MiB**、低端 **32 MiB**、RAM ≥ 4 GiB 时 **256 MiB**：
+  `tiles/image_decode_cache_utils.cc:20-38`。
+- **按目标尺寸 + mip 解码**：`software_image_decode_cache.cc:118-140,400-410`、
+  `gpu_image_decode_cache.cc:1581-1610`。
+- 工作集上限 **256 items**（`gpu_image_decode_cache.cc:68-75`），LRU 驱逐（`:1839-1881`），
+  持久缓存上限 2000/挂起 0（`:917-918`）。
+- 内存压力：`SetShouldAggressivelyFreeResources(true) → EnsureCapacity(0)`（`:1247-1270`），
+  30s 过期清理（`:1388-1417`）；GPU 条目**不保留** CPU 像素（`:1780`）。
+- **可丢弃内存**：解码像素 `Unlock()` 交 OS 回收：`tiles/software_image_decode_cache_utils.cc:68-88,165`、
+  `gpu_image_decode_cache.cc:1985-1988`。
+
+**节流 / 调度**
+- 单帧提交上限 `kMaxPendingSubmitFrames=1`：`scheduler/scheduler_state_machine.cc:34,1497-1503`。
+- 主帧限制到 ~60Hz（slack 0.9）：`scheduler_state_machine.cc:36,50-76,1481-1494`。
+- 连续无损伤 commit 后 ×2 节流：`proxy_common.cc:22-59`。
+
+### 3.2 Qt Quick（Scene Graph + RHI，源码精读）
+
+**图层 / 离屏 FBO 缓存**
+- **脏标志驱动**：`QSGRhiLayer::updateTexture()` 仅在 `(m_live||m_grab) && m_dirtyTexture` 时抓取，
+  抓取后清标志 → **内容未变不重渲**：`qsgrhilayer.cpp:68-81,411-414`。
+- RT 仅在像素尺寸/格式/递归/mipmap/MSAA 变化时重建：`qsgrhilayer.cpp:261-265`；
+  格式 `RGBA8/RGBA16F/RGBA32F`（`:138-161`），mipmap 每次抓取都 `generateMips`（贵）：`:274-276,484-489`。
+- `layer.enabled` 实际是 `QQuickShaderEffectSource`（hideSource）；默认 `live=true, mipmap=false,
+  smooth=false, RGBA8`：`src/quick/items/qquickitem.cpp:9937-9964,9869-9883`。
+
+**只更新损伤区（增量重建）**
+- RHI 路径**没有** damage-rect；改为「脏子树重建 + 批次复用」：重建位
+  `FullRebuild|BuildRenderLists|BuildBatches`（`coreapi/qsgbatchrenderer.cpp:870-872`），
+  按 batch root 局部重建（`:1632-1682`），有 order 预算，溢出则整表重建（`:570-587`）。
+- 几何/材质变化能复用 batch 才 `needsUpload`，否则失效：`:1464-1487`；
+  仅 dirty item 同步：`src/quick/items/qquickwindow.cpp:2151-2168`。
+- **软件后端有真正的 dirty region**（可对照）：`adaptations/software/qsgsoftwarerenderer.cpp:26-32`。
+
+**合批（batching）**
+- 不透明判据：`inheritedOpacity > 0.999` 且非混合材质且有深度缓冲（`OPAQUE_LIMIT`）：
+  `qsgbatchrenderer.cpp:80,1545-1549`；不透明**前→后**、透明**后→前**排序：`:3828-3841`。
+- 合并键：同 root / clipList / drawingMode / attributes / 材质 type/compare / 继承不透明度等：
+  `:1800-1811,1917-1930`；**透明重叠保护**（重叠即停止合并）：`:1823-1838,1891-1946`。
+- 自动批根阈值 64 个可渲染节点 / 1024 顶点；VBO/IBO 池上限 2 MB：
+  `:1440-1447,913-914,89,1029-1035`。
+
+**字形 / 纹理图集**
+- SDF 图集：`RED_OR_ALPHA8`、**padding=2**、最多 **3** 张 `TextureSizeMax`；分配失败按
+  **未使用 LRU 逐出**：`qsgrhidistancefieldglyphcache.cpp:19-21,47-58,60-86,273-278`。
+- 曲线字形：按 **base font size=64** 生成网格一次，运行时按 `pixelSize/fontSize` 缩放复用：
+  `qsgcurveglyphatlas.cpp:16-26,120-142`。
+- 图像图集：起始 `max(512,nextPow2)`、每项 **pad +2**、超过 `max(w,h)/2` 走独立纹理：
+  `util/qsgrhiatlastexture.cpp:39-51,83,192,153-158`、`util/qsgareaallocator.cpp:22`。
+
+**裁剪（clip）**
+- 矩形轴对齐 → **scissor**，只有非矩形/旋转才用 **stencil**：
+  `coreapi/qsgnode.cpp:1097-1103`、`qsgbatchrenderer.cpp:2440-2479`（scissor）vs `:2480-2642`（stencil）。
+- stencil 每帧聚合一次、跨批复用；**clipList 不同则不合并**：`:2410-2414,2616-2621,2653-2660,1800,1917`。
+
+**遮挡 / 不可见跳过**
+- 不透明度 < **0.001** 阻断整棵子树：`coreapi/qsgnode.cpp:1329,1394-1397`、
+  `qsgbatchrenderer.cpp:1398-1413,1533-1534`。
+- `visible=false` → opacity 归零（`qquickwindow.cpp:2393-2418`）；ListView/GridView 视口外
+  `setVisible(false)`（`qquicklistview.cpp:908`、`qquickgridview.cpp:630-640`）；
+  `ItemObservesViewport` 让 item 按窗口视口裁剪（`qquickitem.h:141-142`）。
+
+**渲染循环 / 空闲**
+- Qt 6 **已无 `RenderPolicy`**（Qt5 API 移除）；`QSG_RENDER_LOOP` 仅 `basic|threaded`：
+  `qsgrenderloop.cpp:226-235`。
+- 线程在无更新时睡眠：`qsgthreadedrenderloop.cpp:993-998`；Qt 6 **暴露即出帧**（与 Qt5 不同）：`:730-738`。
+- vsync 驱动动画、坏 vsync 检测（20 样本）：`:1124-1138,1583-1607`；`QSG_NO_VSYNC`：
+  `qsgdefaultcontext.cpp:191-205`。
+
+### 3.3 WebRender（Servo / Firefox，文档级，未拉源码）
 
 - **保留式显示列表（display list）** + **picture caching**：把「内容切片」缓存为纹理，
   仅滚动/变换时不重录。
 - **clip / scroll 节点**与**内容无关的合成**；GPU 批次 + **纹理图集（atlas）**。
+- （源码精读留待需要时再补：`webrender/src/`。）
 
 ### 3.4 Flutter / Impeller 与 Skia（我们的运行层）
 
@@ -106,19 +207,21 @@ Qt 的文档把与我们的问题高度重合的坑写得很直白，可直接�
 - **`BackdropFilter` / `ImageFiltered` / `saveLayer`** = Qt 的 `ShaderEffectSource`：
   都是**多一遍离屏**，全屏使用是红线级开销（现有 render 文档 §3.2.6 已述）。
 
-### 3.5 可迁移机制清单
+### 3.5 可迁移机制清单（附源码出处）
 
-| 机制 | 主要出处 | 我们对应的落点 |
+| 机制 | 源码出处 | 我们对应的落点 |
 |---|---|---|
-| 图层缓存 / FBO 复用 | Qt `QSGLayer`、`cc` layers | 背景**静态层**、播放条、侧边栏包 `RepaintBoundary` |
-| 只更新损伤区 | `cc` partial raster、Qt preprocess | 水纹**动态层**只画活动涟漪 |
-| 降分辨率 / LOD | `cc` tiling、Qt preprocess | 动态层低分辨率离屏、静态层 1/2~1/4 预烘焙 |
-| 遮挡裁剪 / 不可见即停 | Qt `visible=false`、`cc` occlusion | `Offstage`/`Visibility` + `TickerMode`（已有，扩展） |
-| 批处理 / 图集 | Qt batching、Skia `drawAtlas`、WebRender atlas | 频谱单 Path（已 P3）→ 评估 `drawAtlas`；歌词字形缓存 |
-| 裁剪的代价 | Qt「clip 不是优化」 | 减少 `Clip*`/`saveLayer`，尤其列表 delegate |
-| 不透明优先 | Qt | 避免无谓半透明/模糊叠层 |
-| 生命周期 / Loader | Qt Loader+destroy、`cc` discardable | 页面分支卸载、模块注册表、图片缓存上限 |
-| 后台节流 | Chromium background throttling | `power_saver.dart` + `FrameGovernor`（连 ticker 一起停） |
+| 图层缓存 / FBO 复用（脏标志驱动） | Qt `qsgrhilayer.cpp:68-81,411-414`；`cc` `effect_node.h:224-226` | 背景**静态层**、播放条、侧边栏包 `RepaintBoundary` |
+| 只更新损伤区 | `cc` `picture_layer_tiling.cc:278-328`、`tile_manager.cc:1509-1516`；Qt `qsgbatchrenderer.cpp:1632-1682` | 水纹**动态层**只画活动涟漪 |
+| 降分辨率 / LOD | `cc` `tile_size_calculator.cc:67-85`；Qt `qsgcurveglyphatlas.cpp:120-142` | 动态层低分辨率离屏、静态层 1/2~1/4 预烘焙 |
+| 内存上限 + 优先级回收 | `cc` `tile_manager.cc:912-1092,495-517`；`layer_tree_settings.cc:22-24` | 图片/图层缓存上限、空闲回收 |
+| 遮挡裁剪 / 不可见即停 | `cc` `occlusion_tracker.cc:129-226`；Qt `qsgnode.cpp:1329`、`qsgbatchrenderer.cpp:1533` | `Offstage`/`Visibility` + `TickerMode`（已有，扩展） |
+| 批处理 / 图集 | Qt `qsgbatchrenderer.cpp:1800-1946`、`qsgrhiatlastexture.cpp`；Skia `drawAtlas` | 频谱单 Path（已 P3）→ 评估 `drawAtlas`；歌词字形缓存 |
+| 裁剪的代价（scissor > stencil，且破坏合批） | Qt `qsgbatchrenderer.cpp:2440-2479,1800` | 减少 `Clip*`/`saveLayer`，列表 delegate 内禁止 |
+| 不透明快路径 | `cc` `layer.cc:894-900`、`raster_source.cc:87-102`；Qt `qsgbatchrenderer.cpp:1545-1549` | 避免无谓半透明/模糊叠层 |
+| 图片按显示尺寸解码 + 解码缓存上限 | `cc` `image_decode_cache_utils.cc:20-38`、`software_image_decode_cache.cc:118-140` | 沿用 `CoverImage` `cacheWidth/Height` + `ImageCache` 上限 |
+| 生命周期 / Loader | Qt `Loader`+`destroy()`（文档）；`cc` discardable | 页面分支卸载、模块注册表、图片缓存上限 |
+| 后台节流（连 ticker 一起停） | `cc` `scheduler_state_machine.cc:1481-1503`；Qt `qsgthreadedrenderloop.cpp:993-998` | `power_saver.dart` + `FrameGovernor` |
 
 ---
 
@@ -135,6 +238,15 @@ Qt 的文档把与我们的问题高度重合的坑写得很直白，可直接�
 3. **降分辨率**：动态层在 **1/2~1/4** 离屏分辨率计算再放大；静态层预烘焙同样降采样。
    对应 `cc` tiling 与 Qt LOD，也是原 render 文档 §4.1 P2b 的思路。
 4. **收敛 pass**：理想压到 **2 pass**（静态层贴图；动态层脏区），不再 gradient+blur+折射+压暗四遍。
+
+**源码给出的具体形状（照抄机制，不照搬规模）**：
+- `cc` 的「只回放脏像素」= 旧资源 ∩ 脏矩形（`tile_manager.cc:1509-1516`）——我们只需
+  **每个涟漪的波带包围盒作为脏矩形**，与上一帧合并后只在该区域重画动态层。
+- **警惕**：`cc` 的 partial raster **默认关闭**（`layer_tree_settings.h:112`，且要求无 MSAA），
+  说明「损伤区」不是无脑收益——我们要用**小规模实验**验证（见 §8.1），而不是默认全上。
+- 「降分辨率」在 `cc` 是**视口/4** 的瓦片（`tile_size_calculator.cc:67-85`），并非全屏半分辨率；
+  我们不一定要固定 1/2，可按设备帧时间**自适应**（§4.5）。
+- 小层可**不分块**（< 512²，`layer_tree_settings.cc:17-18`）——对应我们的「频谱/歌词区不解锁额外层」。
 
 **动态层的实现选型（待实测，见 §8）**：
 - A. **局部几何**：按涟漪波带生成环带/局部网格，用 `FragmentProgram` 或 `drawVertices` 绘制。
@@ -153,10 +265,20 @@ Qt 的文档把与我们的问题高度重合的坑写得很直白，可直接�
   把「每帧变化的层」与「几乎不变的层」隔离（避免全屏重光栅）。
 - **去离屏 pass**：清理无谓 `ClipRRect`/`ClipRect`/`saveLayer`/`BackdropFilter`；
   列表 delegate 内**禁止**裁剪（Qt：clip 破坏批处理）。已有 `ShaderMask` 渐隐并入画笔（P3）为先例。
-- **不透明优先 / 遮挡即不画**：被不透明层盖住或不可见的内容 `Visibility(visible:false)` 或
-  `Offstage`，不要用「透明」硬画。
+- **裁剪优先矩形（scissor 而非 stencil）**：能用轴对齐矩形裁剪就别用圆角/旋转裁剪——
+  Qt 对矩形 clip 走 scissor、非矩形才落到 stencil（`qsgbatchrenderer.cpp:2440-2479` vs `:2480-2642`），
+  且 **clipList 不同即无法合批**（`:1800,1917`）。Flutter 侧 `ClipRect` 比 `ClipRRect` 更易合批。
+- **不透明快路径**：`cc` 对不透明层免整层 clear、只清边距（`raster_source.cc:87-102`）；
+  Flutter 侧表现为「避免无谓 `saveLayer`/半透明叠层」，让不透明子树可被合批/裁剪。
+- **避免大层上的 opacity/filter/backdrop 动画**：这些会把层提升为独立 render surface/FBO
+  （`cc` `effect_node.h:34-64`），是 overdraw 与显存来源；动画尽量落在小层或并入着色器。
+- **遮挡即不画**：被不透明层盖住或不可见的内容 `Visibility(visible:false)` 或 `Offstage`，
+  不要用「透明」硬画；小区域可忽略（`cc` 最小遮挡跟踪 160×160，`layer_tree_settings.cc:19`）。
 - **图片预算**：沿用 `CoverImage` 的按显示尺寸解码；补 `PaintingBinding.imageCache` 上限
-  与「路由退出 evict」。
+  与「路由退出 evict」。对照 `cc`：解码缓存默认 128 MiB（低端 32 / ≥4 GiB 256，
+  `image_decode_cache_utils.cc:20-38`），按目标尺寸 + mip 解码，内存压力直接释放
+  （`gpu_image_decode_cache.cc:1247-1270`）。Flutter 的 `ImageCache`（`maximumSizeBytes`）
+  可设同类上限并在低内存时 `evict`/`clear`。
 
 ### 4.3 文本 / 几何批处理
 
@@ -230,6 +352,10 @@ Qt 的文档把与我们的问题高度重合的坑写得很直白，可直接�
 3. **页面卸载策略**：保留状态（`PageStorage`/provider）还是直接丢弃重建？卸载触发条件（时长/内存/可见性）。
 4. **画质开关**：新增统一 `effectQuality` 档位，还是继续复用 `performanceMode` 二档？
 5. **测量基建**：是否能接入脚本化帧时间/GPU 采集，进 CI 或本地基准（对照 `benchmark-2026-09-10.md`）。
+6. **损伤区粒度**：按「每个活动涟漪的波带包围盒」逐个 dirty rect，还是整个动态层半分辨率刷新？
+   （参考：`cc` 的 partial raster **默认关闭**，`layer_tree_settings.h:112`；需小实验权衡。）
+7. **缓存回收策略**：是否照 `cc` 引入「字节上限 + 优先级 + 空闲回收」（`tile_manager.cc:912-1092,495-517`），
+   还是保持 Flutter `ImageCache` + 分支卸载的轻量组合即可？
 
 ---
 
@@ -241,12 +367,12 @@ Qt 的文档把与我们的问题高度重合的坑写得很直白，可直接�
   [test-suite-2026-09-10.md](test-suite-2026-09-10.md)
 - 上游实现：`SPlayer-Next/src/components/player/FullPlayer/PlayerBackground.vue`、
   `.../BackgroundRipple.vue`
-- 外部机制参考（调研自公开文档）：
-  - Qt Quick Scene Graph / Performance：`doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html`、
+- 外部机制参考：
+  - **源码级（本地克隆精读，§3.1–3.2）**：Qt `qtdeclarative@3027a40c`（dev）、
+    Chromium `chromium/src@823ae20f`（main，仅 `cc/`）；克隆命令见 §3 引言。
+  - Qt Quick Scene Graph / Performance 文档：`doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html`、
     `doc.qt.io/qt-6/qtquick-performance.html`（batching、preprocess/LOD、`QSGLayer`、
     「clip 不是优化」、不可见即不画、`sourceSize`、Loader/destroy、粒子不可见即停）。
-  - Chromium `cc` 合成器：图层化 / tiling / partial raster / occlusion / quad batching /
-    discardable memory。
-  - WebRender：保留显示列表 + picture caching + atlas。
+  - WebRender（文档级）：保留显示列表 + picture caching + atlas。
   - Flutter/Impeller：`RepaintBoundary` 层缓存、`FragmentProgram`、
     `ImageFilter.shader`（仅 Impeller，`painting.dart:4461`）、Skia `drawAtlas`。
