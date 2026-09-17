@@ -126,6 +126,20 @@ archoera_shell_v1 客户端已绑定 clients=1 capabilities=238 ← 会话桥接
 
 ## 说明 / 限制
 
+- **开机/关机画面：Plymouth**（`Packages=plymouth`）。主题
+  `mkosi.extra/usr/share/plymouth/themes/archoera/`（深色底 `#0E1117` + 品牌 logo
+  （自 `logo.png` 提亮）+ 细进度条；系统未上报进度时呼吸脉冲，开机早期与关机阶段都有动效），
+  默认主题写在 `mkosi.extra/etc/plymouth/plymouthd.conf`。
+  - 单元 enablement：Arch 的 `plymouth-*.service` **没有 `[Install]`**（标准流程靠 initrd 的
+    `poweroff/reboot.target.wants`），我们用 mkosi-initrd，故在 `tmpfiles.d` 里建同名符号链接：
+    `sysinit.target.wants/plymouth-start`、`multi-user.target.wants/plymouth-quit(-wait)`、
+    `poweroff.target.wants/plymouth-poweroff`、`reboot.target.wants/plymouth-reboot`。
+    DRM 交接由 systemd 保证（`getty@tty1.service` 自带 `After=plymouth-quit-wait.service`）。
+  - **内核参数必须加 `plymouth.ignore-serial-consoles`**：我们以 `console=hvc0` 收日志，
+    Plymouth 检测到串口会给所有显示强制文本 details 主题（实测日志
+    `serial consoles detected, managing them with details forced`），加了这条才会用图形主题。
+  - 实测（QEMU `screendump` 抓帧）：开机与重启/关机均出现主题画面（深底 + logo + 进度条），
+    随后正常交接给合成器；串口日志不受影响。
 - **电源动作授权走 polkit**：logind 的 `power-off` / `reboot` / `suspend` / `hibernate`
   由 polkit 判定，默认策略 `allow_active=yes`（活动会话免鉴权，与普通桌面一致），
   故镜像需安装 `polkit`（已装并 enable）。会话脚本启动时会用 `pkcheck` 自检并打印
