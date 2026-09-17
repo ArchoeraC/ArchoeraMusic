@@ -1,0 +1,9 @@
+[Plymouth Theme]
+Name=ArchoeraOS
+Description=ArchoeraOS 极简启动/关机画面（深色底 + 品牌 logo + 细进度条）
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/archoera
+ScriptFile=/usr/share/plymouth/themes/archoera/archoera.script
+ConsoleLogBackgroundColor=0x00000000

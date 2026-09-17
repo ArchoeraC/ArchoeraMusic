@@ -1,0 +1,89 @@
+# ArchoeraOS 极简启动 / 关机画面
+# 结构严格参照官方 themes/script/script.script（避免脚本语法导致 plymouth 回退文本主题）。
+# 视觉：深色底 #0E1117 + 品牌 logo + 细进度条；系统未上报进度时做呼吸脉冲（开机早期/关机时）。
+
+Window.SetBackgroundTopColor(0.055, 0.067, 0.090);
+Window.SetBackgroundBottomColor(0.055, 0.067, 0.090);
+
+#----------------------------------------- Logo --------------------------------
+
+logo.image = Image("logo.png");
+logo.sprite = Sprite(logo.image);
+
+message_sprite = Sprite();
+
+#----------------------------------------- Progress Bar --------------------------------
+
+progress_box.image = Image("progress_box.png");
+progress_box.sprite = Sprite(progress_box.image);
+
+progress_bar.original_image = Image("progress_bar.png");
+progress_bar.sprite = Sprite();
+
+progress_bar.ratio = 0;
+
+fun update_progress(ratio)
+  {
+    if (ratio < 0.02)
+      ratio = 0.06;
+    if (ratio > 1)
+      ratio = 1;
+    progress_bar.ratio = ratio;
+    progress_bar.image = progress_bar.original_image.Scale(Math.Int(progress_bar.original_image.GetWidth() * ratio), progress_bar.original_image.GetHeight());
+    progress_bar.sprite.SetImage(progress_bar.image);
+    update_layout();
+  }
+
+fun progress_callback(duration, progress)
+  {
+    update_progress(progress);
+  }
+
+Plymouth.SetBootProgressFunction(progress_callback);
+
+#----------------------------------------- Layout / Refresh --------------------------------
+
+fun update_layout()
+  {
+    logo.sprite.SetX(Window.GetX() + Window.GetWidth() / 2 - logo.image.GetWidth() / 2);
+    logo.sprite.SetY(Window.GetY() + Window.GetHeight() / 2 - logo.image.GetHeight() / 2 - 48);
+
+    progress_box.x = Window.GetX() + Window.GetWidth() / 2 - progress_box.image.GetWidth() / 2;
+    progress_box.y = Window.GetY() + Window.GetHeight() / 2 + 56;
+    progress_box.sprite.SetPosition(progress_box.x, progress_box.y, 2);
+
+    progress_bar.x = progress_box.x;
+    progress_bar.y = progress_box.y + (progress_box.image.GetHeight() - progress_bar.original_image.GetHeight()) / 2;
+    progress_bar.sprite.SetPosition(progress_bar.x, progress_bar.y, 3);
+
+    message_sprite.SetPosition(Window.GetX() + Window.GetWidth() / 2, progress_box.y + 26, 4);
+  }
+
+# 未上报进度（开机早期、关机阶段）时呼吸，避免进度条长时间不动。
+fun refresh_callback()
+  {
+    if (progress_bar.ratio < 0.02)
+      update_progress(0.06 + 0.10 * (Math.Cos(Plymouth.GetTicks() / 320.0) + 1) / 2);
+    else
+      update_layout();
+  }
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+#----------------------------------------- Message --------------------------------
+
+fun display_message_callback(text)
+  {
+    message_sprite.SetImage(Image.Text(text, 0.816, 0.827, 0.855));
+    update_layout();
+  }
+
+fun hide_message_callback()
+  {
+    message_sprite.SetImage(Image.Text("", 0.816, 0.827, 0.855));
+  }
+
+Plymouth.SetDisplayMessageFunction(display_message_callback);
+Plymouth.SetHideMessageFunction(hide_message_callback);
+
+update_progress(0);

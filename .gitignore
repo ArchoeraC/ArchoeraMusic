@@ -109,4 +109,5 @@ app/test/*_manual_test.dart
 /os/vm/mkosi.crt
 /os/vm/mkosi.key.pub
 /os/vm/mkosi.extra/opt/archoera-music/
-/os/vm/mkosi.extra/usr/share/
+# 仅忽略「从宿主复制」的光标主题；镜像自带的 Plymouth 主题与 skel 需入库。
+/os/vm/mkosi.extra/usr/share/icons/
