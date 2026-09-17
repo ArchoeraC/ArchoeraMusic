@@ -1997,6 +1997,54 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsPlayerBgFluid => 'Fluid';
+
+  @override
+  String get settingsPlayerBgFlowSpeed => 'Flow Speed';
+
+  @override
+  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+    return 'Fluid flow speed $speed';
+  }
+
+  @override
+  String get settingsPlayerBgRenderScale => 'Render Scale';
+
+  @override
+  String settingsPlayerBgRenderScaleDesc(Object scale) {
+    return 'Resolution $scale× (lower saves power)';
+  }
+
+  @override
+  String get settingsPlayerBgFps => 'Frame Rate Limit';
+
+  @override
+  String settingsPlayerBgFpsDesc(Object fps) {
+    return '$fps FPS';
+  }
+
+  @override
+  String get settingsPlayerBgFreezeOnPause => 'Freeze on Pause';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOn =>
+      'Background freezes while paused';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOff =>
+      'Background keeps flowing while paused';
+
+  @override
+  String get settingsPlayerBgBeat => 'Bass Beat Pulse';
+
+  @override
+  String get settingsPlayerBgBeatOn => 'Background pulses with the bass';
+
+  @override
+  String get settingsPlayerBgBeatOff =>
+      'Background does not pulse with the beat';
+
+  @override
   String get settingsAdaptiveRenderQuality => 'Adaptive Render Quality';
 
   @override

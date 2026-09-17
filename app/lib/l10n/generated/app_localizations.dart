@@ -3614,6 +3614,84 @@ abstract class AppLocalizations {
   /// **'流动速度 {speed}'**
   String settingsPlayerBgRippleSpeedDesc(Object speed);
 
+  /// No description provided for @settingsPlayerBgFluid.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流体'**
+  String get settingsPlayerBgFluid;
+
+  /// No description provided for @settingsPlayerBgFlowSpeed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流动速度'**
+  String get settingsPlayerBgFlowSpeed;
+
+  /// No description provided for @settingsPlayerBgFlowSpeedDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流体速度 {speed}'**
+  String settingsPlayerBgFlowSpeedDesc(Object speed);
+
+  /// No description provided for @settingsPlayerBgRenderScale.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'渲染比例'**
+  String get settingsPlayerBgRenderScale;
+
+  /// No description provided for @settingsPlayerBgRenderScaleDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'分辨率 {scale}×（越低越省电）'**
+  String settingsPlayerBgRenderScaleDesc(Object scale);
+
+  /// No description provided for @settingsPlayerBgFps.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'帧率上限'**
+  String get settingsPlayerBgFps;
+
+  /// No description provided for @settingsPlayerBgFpsDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{fps} FPS'**
+  String settingsPlayerBgFpsDesc(Object fps);
+
+  /// No description provided for @settingsPlayerBgFreezeOnPause.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂停时冻结'**
+  String get settingsPlayerBgFreezeOnPause;
+
+  /// No description provided for @settingsPlayerBgFreezeOnPauseOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂停后背景静止'**
+  String get settingsPlayerBgFreezeOnPauseOn;
+
+  /// No description provided for @settingsPlayerBgFreezeOnPauseOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂停后背景继续流动'**
+  String get settingsPlayerBgFreezeOnPauseOff;
+
+  /// No description provided for @settingsPlayerBgBeat.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'低频节拍脉动'**
+  String get settingsPlayerBgBeat;
+
+  /// No description provided for @settingsPlayerBgBeatOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'背景随低频鼓点脉动'**
+  String get settingsPlayerBgBeatOn;
+
+  /// No description provided for @settingsPlayerBgBeatOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'背景不随节拍脉动'**
+  String get settingsPlayerBgBeatOff;
+
   /// No description provided for @settingsAdaptiveRenderQuality.
   ///
   /// In zh_CN, this message translates to:

@@ -1939,6 +1939,51 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get settingsPlayerBgFluid => '流体';
+
+  @override
+  String get settingsPlayerBgFlowSpeed => '流れる速さ';
+
+  @override
+  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+    return '流体の速さ $speed';
+  }
+
+  @override
+  String get settingsPlayerBgRenderScale => 'レンダリング解像度';
+
+  @override
+  String settingsPlayerBgRenderScaleDesc(Object scale) {
+    return '解像度 $scale×（低いほど省電力）';
+  }
+
+  @override
+  String get settingsPlayerBgFps => 'フレームレート上限';
+
+  @override
+  String settingsPlayerBgFpsDesc(Object fps) {
+    return '$fps FPS';
+  }
+
+  @override
+  String get settingsPlayerBgFreezeOnPause => '一時停止時に停止';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOn => '一時停止中は背景を静止';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOff => '一時停止中も背景が流れ続ける';
+
+  @override
+  String get settingsPlayerBgBeat => '低音ビートで脈動';
+
+  @override
+  String get settingsPlayerBgBeatOn => '低音に合わせて背景が脈動';
+
+  @override
+  String get settingsPlayerBgBeatOff => 'ビートで脈動しない';
+
+  @override
   String get settingsAdaptiveRenderQuality => '適応レンダリング品質';
 
   @override
