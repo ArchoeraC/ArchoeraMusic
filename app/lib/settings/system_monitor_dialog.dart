@@ -96,7 +96,7 @@ class _SystemMonitorBodyState extends ConsumerState<SystemMonitorBody> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final palette = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final output = ref.watch(osOutputProvider);
     final session = ref.watch(osSessionStateProvider);
@@ -127,7 +127,7 @@ class _SystemMonitorBodyState extends ConsumerState<SystemMonitorBody> {
             : '${stats.cpuPercent}%',
         detail: stats == null ? '' : '${stats.cpuCount} × CPU',
         chart: _cpuHistory,
-        accent: palette ? const Color(0xFF4FC3F7) : const Color(0xFF0288D1),
+        accent: isDark ? const Color(0xFF4FC3F7) : const Color(0xFF0288D1),
       ),
       _MonitorCard(
         title: l10n.systemResMemory,
@@ -136,7 +136,7 @@ class _SystemMonitorBodyState extends ConsumerState<SystemMonitorBody> {
             ? ''
             : '${_formatKb(stats.memUsedKb)} / ${_formatKb(stats.memTotalKb)}',
         chart: _memHistory,
-        accent: palette ? const Color(0xFF9575CD) : const Color(0xFF5E35B1),
+        accent: isDark ? const Color(0xFF9575CD) : const Color(0xFF5E35B1),
       ),
       _MonitorCard(
         title: l10n.systemResDisk,
@@ -145,7 +145,7 @@ class _SystemMonitorBodyState extends ConsumerState<SystemMonitorBody> {
             ? ''
             : '${_formatKb(stats.diskUsedKb)} / ${_formatKb(stats.diskTotalKb)}',
         progress: stats == null ? null : stats.diskPercent / 100,
-        accent: palette ? const Color(0xFF4DB6AC) : const Color(0xFF00796B),
+        accent: isDark ? const Color(0xFF4DB6AC) : const Color(0xFF00796B),
       ),
       _MonitorCard(
         title: l10n.systemResTemp,
@@ -153,13 +153,13 @@ class _SystemMonitorBodyState extends ConsumerState<SystemMonitorBody> {
             ? '—'
             : '${stats!.tempCelsius!.toStringAsFixed(1)} °C',
         detail: stats?.tempCelsius == null ? l10n.systemDisplayUnknown : '',
-        accent: palette ? const Color(0xFFFF8A65) : const Color(0xFFE64A19),
+        accent: isDark ? const Color(0xFFFF8A65) : const Color(0xFFE64A19),
       ),
       _MonitorCard(
         title: l10n.systemResUptime,
         value: stats?.uptimeLabel ?? '—',
         detail: '',
-        accent: palette ? const Color(0xFF90A4AE) : const Color(0xFF455A64),
+        accent: isDark ? const Color(0xFF90A4AE) : const Color(0xFF455A64),
       ),
       _MonitorCard(
         title: l10n.systemStatusAudio,
@@ -168,19 +168,19 @@ class _SystemMonitorBodyState extends ConsumerState<SystemMonitorBody> {
             : l10n.systemStatusIdle,
         detail: '${(playback.volume * 100).round()}%',
         progress: playback.volume.clamp(0.0, 1.0),
-        accent: palette ? const Color(0xFF81C784) : const Color(0xFF2E7D32),
+        accent: isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32),
       ),
       _MonitorCard(
         title: l10n.systemStatusIme,
         value: imeLabel,
         detail: '',
-        accent: palette ? const Color(0xFFFFD54F) : const Color(0xFFF9A825),
+        accent: isDark ? const Color(0xFFFFD54F) : const Color(0xFFF9A825),
       ),
       _MonitorCard(
         title: l10n.systemStatusCursorTheme,
         value: cursorTheme,
         detail: cursorSize.isEmpty ? '' : '${cursorSize}px',
-        accent: palette ? const Color(0xFFA1887F) : const Color(0xFF5D4037),
+        accent: isDark ? const Color(0xFFA1887F) : const Color(0xFF5D4037),
       ),
       if (capabilities.bluetoothAvailable)
         _MonitorCard(
@@ -194,7 +194,7 @@ class _SystemMonitorBodyState extends ConsumerState<SystemMonitorBody> {
               ? ''
               : '${_bt!.powered ? l10n.systemBtPowered : l10n.systemBtOff} · '
                     '${l10n.systemBtDevices} ${_bt!.devicesConnected}',
-          accent: palette ? const Color(0xFF64B5F6) : const Color(0xFF1565C0),
+          accent: isDark ? const Color(0xFF64B5F6) : const Color(0xFF1565C0),
         ),
     ];
 
@@ -456,7 +456,8 @@ class _SparklinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SparklinePainter oldDelegate) =>
-      oldDelegate.samples != samples || oldDelegate.color != color;
+      // samples 为原地变更的滚动列表（同一引用），比较引用会漏重绘。
+      true;
 }
 
 /// KiB → 人类可读（GiB / MiB）。
