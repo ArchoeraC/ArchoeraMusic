@@ -89,3 +89,31 @@ pub fn apply(device: &Backlight, logind: Option<&Logind>, percent: u32) -> Optio
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn device(max: u32) -> Backlight {
+        Backlight {
+            name: "test_backlight".to_string(),
+            dir: PathBuf::from("/nonexistent"),
+            max,
+        }
+    }
+
+    #[test]
+    fn raw_value_keeps_a_minimum_of_one() {
+        let dev = device(255);
+        assert_eq!(dev.raw_for(0), 1);
+        assert_eq!(dev.raw_for(1), 2); // 1 * 255 / 100 = 2（整数截断）
+        assert_eq!(dev.raw_for(50), 127);
+        assert_eq!(dev.raw_for(100), 255);
+    }
+
+    #[test]
+    fn raw_value_clamps_over_range_input() {
+        let dev = device(1000);
+        assert_eq!(dev.raw_for(1000), 1000);
+    }
+}

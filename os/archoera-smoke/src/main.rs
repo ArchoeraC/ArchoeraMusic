@@ -266,6 +266,8 @@ impl Smoke {
 
         // 生成流动的 Archoera 配色渐变（暗底 + 青/紫光带）。
         let phase = self.phase;
+        // 保留 `chunks_exact_mut`：`as_chunks` 需要 Rust 1.88，而本 workspace 声明 1.80+。
+        #[allow(clippy::chunks_exact_to_as_chunks)]
         for (index, chunk) in canvas.chunks_exact_mut(4).enumerate() {
             let x = (index % width as usize) as u32;
             let y = (index / width as usize) as u32;

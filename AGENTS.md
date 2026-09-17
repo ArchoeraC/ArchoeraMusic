@@ -35,6 +35,16 @@ cmake -S app/native/platform -B app/native/platform/build -DCMAKE_BUILD_TYPE=Rel
 cmake --build app/native/platform/build -j
 ```
 
+改动 ArchoeraOS 会话层（`os/`，Rust workspace）时另跑：
+```bash
+cd os
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo check -p archoera-shell --features udev   # 需 libseat/libdrm/gbm/libinput/libudev 开发文件
+```
+CI 见 `.github/workflows/os-ci.yml`（改动 `os/**` 时自动触发）。
+
 ## 架构约定（务必遵守）
 
 ### 系统调用统一走 C++ 桥接器

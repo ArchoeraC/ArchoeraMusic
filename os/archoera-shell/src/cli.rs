@@ -176,3 +176,117 @@ fn print_help() {
            -h, --help             显示本帮助"
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(list: &[&str]) -> Vec<OsString> {
+        list.iter().map(OsString::from).collect()
+    }
+
+    #[test]
+    fn defaults_are_winit_no_command() {
+        let cfg = ShellConfig::from_args(args(&["archoera-shell"])).unwrap();
+        assert_eq!(cfg.socket_name, None);
+        assert_eq!(cfg.command, None);
+        assert_eq!(cfg.backend, BackendKind::Winit);
+        assert_eq!(cfg.volume, 100);
+        assert!(cfg.exit_on_close);
+    }
+
+    #[test]
+    fn parses_flags_and_backend() {
+        let cfg = ShellConfig::from_args(args(&[
+            "archoera-shell",
+            "--socket",
+            "archoera-test",
+            "--backend",
+            "udev",
+            "--volume",
+            "42",
+            "--no-exit-on-close",
+        ]))
+        .unwrap();
+        assert_eq!(cfg.socket_name.as_deref(), Some("archoera-test"));
+        assert_eq!(cfg.backend, BackendKind::Udev);
+        assert_eq!(cfg.volume, 42);
+        assert!(!cfg.exit_on_close);
+    }
+
+    #[test]
+    fn volume_is_clamped_to_100() {
+        let cfg = ShellConfig::from_args(args(&["archoera-shell", "--volume", "999"])).unwrap();
+        assert_eq!(cfg.volume, 100);
+    }
+
+    #[test]
+    fn command_flag_splits_and_honors_quotes() {
+        let cfg = ShellConfig::from_args(args(&[
+            "archoera-shell",
+            "--command",
+            "archoera_music --title \"hello world\"",
+        ]))
+        .unwrap();
+        assert_eq!(
+            cfg.command,
+            Some(vec![
+                "archoera_music".to_string(),
+                "--title".to_string(),
+                "hello world".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn double_dash_takes_remaining_argv_verbatim() {
+        let cfg = ShellConfig::from_args(args(&[
+            "archoera-shell",
+            "--socket",
+            "s",
+            "--",
+            "/usr/bin/archoera_music",
+            "--flag with spaces",
+        ]))
+        .unwrap();
+        assert_eq!(cfg.socket_name.as_deref(), Some("s"));
+        assert_eq!(
+            cfg.command,
+            Some(vec![
+                "/usr/bin/archoera_music".to_string(),
+                "--flag with spaces".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_flag_and_backend() {
+        assert!(ShellConfig::from_args(args(&["archoera-shell", "--nope"])).is_err());
+        assert!(ShellConfig::from_args(args(&["archoera-shell", "--backend", "x11"])).is_err());
+    }
+
+    #[test]
+    fn missing_value_is_an_error() {
+        assert!(ShellConfig::from_args(args(&["archoera-shell", "--socket"])).is_err());
+    }
+
+    #[test]
+    fn shell_tokenizer_handles_quotes_and_escapes() {
+        assert_eq!(
+            split_whitespace("a  b\tc"),
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
+        assert_eq!(
+            split_whitespace("cmd 'single quoted' \"double quoted\""),
+            vec![
+                "cmd".to_string(),
+                "single quoted".to_string(),
+                "double quoted".to_string()
+            ]
+        );
+        assert_eq!(
+            split_whitespace(r"cmd a\ b"),
+            vec!["cmd".to_string(), "a b".to_string()]
+        );
+    }
+}

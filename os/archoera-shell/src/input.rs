@@ -194,3 +194,29 @@ fn media_key_for(keycode: Keycode) -> Option<MediaKey> {
         _ => return None,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_evdev_media_keys_via_xkb_offset() {
+        for (evdev, expected) in [
+            (114u32, MediaKey::VolumeDown),
+            (115, MediaKey::VolumeUp),
+            (113, MediaKey::Mute),
+            (164, MediaKey::PlayPause),
+            (163, MediaKey::Next),
+            (165, MediaKey::Previous),
+            (166, MediaKey::Stop),
+        ] {
+            assert_eq!(media_key_for(Keycode::new(evdev + 8)), Some(expected));
+        }
+    }
+
+    #[test]
+    fn ordinary_keys_are_not_media_keys() {
+        assert_eq!(media_key_for(Keycode::new(30 + 8)), None); // KEY_A
+        assert_eq!(media_key_for(Keycode::new(8)), None); // evdev 0
+    }
+}
