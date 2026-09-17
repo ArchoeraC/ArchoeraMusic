@@ -1330,5 +1330,13 @@
   "systemBtUnavailable": "Bluetooth indisponible",
   "systemBtPowered": "Activé",
   "systemBtOff": "Désactivé",
-  "systemBtDevices": "Appareils connectés"
+  "systemBtDevices": "Appareils connectés",
+  "systemStatusAudio": "Audio",
+  "systemStatusPlaying": "Lecture",
+  "systemStatusPaused": "En pause",
+  "systemStatusIdle": "Aucune lecture",
+  "systemStatusInput": "Saisie",
+  "systemStatusIme": "Méthode de saisie",
+  "systemStatusImeWayland": "Saisie de texte Wayland",
+  "systemStatusCursorTheme": "Thème du curseur"
 }

@@ -4556,4 +4556,28 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get systemBtDevices => 'Verbundene Geräte';
+
+  @override
+  String get systemStatusAudio => 'Audio';
+
+  @override
+  String get systemStatusPlaying => 'Wiedergabe';
+
+  @override
+  String get systemStatusPaused => 'Pausiert';
+
+  @override
+  String get systemStatusIdle => 'Keine Wiedergabe';
+
+  @override
+  String get systemStatusInput => 'Eingabe';
+
+  @override
+  String get systemStatusIme => 'Eingabemethode';
+
+  @override
+  String get systemStatusImeWayland => 'Wayland-Texteingabe';
+
+  @override
+  String get systemStatusCursorTheme => 'Cursor-Thema';
 }

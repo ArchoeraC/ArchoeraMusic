@@ -1330,5 +1330,13 @@
   "systemBtUnavailable": "블루투스 사용 불가",
   "systemBtPowered": "켜짐",
   "systemBtOff": "꺼짐",
-  "systemBtDevices": "연결된 기기"
+  "systemBtDevices": "연결된 기기",
+  "systemStatusAudio": "오디오",
+  "systemStatusPlaying": "재생 중",
+  "systemStatusPaused": "일시 정지",
+  "systemStatusIdle": "재생 안 함",
+  "systemStatusInput": "입력",
+  "systemStatusIme": "입력기",
+  "systemStatusImeWayland": "Wayland 텍스트 입력",
+  "systemStatusCursorTheme": "커서 테마"
 }

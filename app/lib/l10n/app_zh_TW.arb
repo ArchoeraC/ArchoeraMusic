@@ -1330,5 +1330,13 @@
   "systemBtUnavailable": "藍牙無法使用",
   "systemBtPowered": "已開啟",
   "systemBtOff": "已關閉",
-  "systemBtDevices": "已連接裝置"
+  "systemBtDevices": "已連接裝置",
+  "systemStatusAudio": "音訊",
+  "systemStatusPlaying": "播放中",
+  "systemStatusPaused": "已暫停",
+  "systemStatusIdle": "未播放",
+  "systemStatusInput": "輸入",
+  "systemStatusIme": "輸入法",
+  "systemStatusImeWayland": "Wayland 文字輸入",
+  "systemStatusCursorTheme": "游標主題"
 }

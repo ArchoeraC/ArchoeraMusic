@@ -4357,4 +4357,28 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get systemBtDevices => '接続中の機器';
+
+  @override
+  String get systemStatusAudio => 'オーディオ';
+
+  @override
+  String get systemStatusPlaying => '再生中';
+
+  @override
+  String get systemStatusPaused => '一時停止';
+
+  @override
+  String get systemStatusIdle => '停止中';
+
+  @override
+  String get systemStatusInput => '入力';
+
+  @override
+  String get systemStatusIme => '入力メソッド';
+
+  @override
+  String get systemStatusImeWayland => 'Wayland テキスト入力';
+
+  @override
+  String get systemStatusCursorTheme => 'カーソルテーマ';
 }

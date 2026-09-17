@@ -289,6 +289,21 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
     }
 
     // 系统状态（只读汇总）。
+    final playback = ref.watch(playbackProvider);
+    final imeEnv =
+        Platform.environment['GTK_IM_MODULE'] ??
+        Platform.environment['QT_IM_MODULE'] ??
+        Platform.environment['XMODIFIERS'] ??
+        '';
+    final imeLabel = imeEnv.contains('fcitx')
+        ? 'fcitx5'
+        : (imeEnv.contains('ibus')
+              ? 'IBus'
+              : l10n.systemStatusImeWayland);
+    final cursorTheme =
+        Platform.environment['XCURSOR_THEME'] ?? l10n.systemDisplayUnknown;
+    final cursorSize = Platform.environment['XCURSOR_SIZE'] ?? '';
+
     final statusRows = <Widget>[
       SettingTile(
         icon: EtaIcons.informationOutline,
@@ -333,6 +348,28 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
           subtitle: screenOn ? l10n.systemScreenOn : l10n.systemScreenOff,
           trailing: const SizedBox.shrink(),
         ),
+      SettingTile(
+        icon: EtaIcons.musicOutline,
+        title: l10n.systemStatusAudio,
+        subtitle:
+            '${playback.playing ? l10n.systemStatusPlaying : l10n.systemStatusIdle}'
+            ' · ${(playback.volume * 100).round()}%',
+        trailing: const SizedBox.shrink(),
+      ),
+      SettingTile(
+        icon: EtaIcons.micOutline,
+        title: l10n.systemStatusIme,
+        subtitle: imeLabel,
+        trailing: const SizedBox.shrink(),
+      ),
+      SettingTile(
+        icon: EtaIcons.deviceOutline,
+        title: l10n.systemStatusCursorTheme,
+        subtitle: cursorSize.isEmpty
+            ? cursorTheme
+            : '$cursorTheme · ${cursorSize}px',
+        trailing: const SizedBox.shrink(),
+      ),
     ];
     add(SettingSection(title: l10n.systemStatusTitle, children: statusRows));
 

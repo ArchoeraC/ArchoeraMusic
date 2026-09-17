@@ -4590,4 +4590,28 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get systemBtDevices => 'Appareils connectés';
+
+  @override
+  String get systemStatusAudio => 'Audio';
+
+  @override
+  String get systemStatusPlaying => 'Lecture';
+
+  @override
+  String get systemStatusPaused => 'En pause';
+
+  @override
+  String get systemStatusIdle => 'Aucune lecture';
+
+  @override
+  String get systemStatusInput => 'Saisie';
+
+  @override
+  String get systemStatusIme => 'Méthode de saisie';
+
+  @override
+  String get systemStatusImeWayland => 'Saisie de texte Wayland';
+
+  @override
+  String get systemStatusCursorTheme => 'Thème du curseur';
 }

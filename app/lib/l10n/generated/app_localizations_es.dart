@@ -4585,4 +4585,28 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get systemBtDevices => 'Dispositivos conectados';
+
+  @override
+  String get systemStatusAudio => 'Audio';
+
+  @override
+  String get systemStatusPlaying => 'Reproduciendo';
+
+  @override
+  String get systemStatusPaused => 'En pausa';
+
+  @override
+  String get systemStatusIdle => 'Sin reproducción';
+
+  @override
+  String get systemStatusInput => 'Entrada';
+
+  @override
+  String get systemStatusIme => 'Método de entrada';
+
+  @override
+  String get systemStatusImeWayland => 'Entrada de texto Wayland';
+
+  @override
+  String get systemStatusCursorTheme => 'Tema del cursor';
 }

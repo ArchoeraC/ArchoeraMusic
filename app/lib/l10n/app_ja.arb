@@ -1330,5 +1330,13 @@
   "systemBtUnavailable": "Bluetooth 利用不可",
   "systemBtPowered": "オン",
   "systemBtOff": "オフ",
-  "systemBtDevices": "接続中の機器"
+  "systemBtDevices": "接続中の機器",
+  "systemStatusAudio": "オーディオ",
+  "systemStatusPlaying": "再生中",
+  "systemStatusPaused": "一時停止",
+  "systemStatusIdle": "停止中",
+  "systemStatusInput": "入力",
+  "systemStatusIme": "入力メソッド",
+  "systemStatusImeWayland": "Wayland テキスト入力",
+  "systemStatusCursorTheme": "カーソルテーマ"
 }

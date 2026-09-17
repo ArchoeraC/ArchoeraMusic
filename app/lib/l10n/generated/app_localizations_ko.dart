@@ -4363,4 +4363,28 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get systemBtDevices => '연결된 기기';
+
+  @override
+  String get systemStatusAudio => '오디오';
+
+  @override
+  String get systemStatusPlaying => '재생 중';
+
+  @override
+  String get systemStatusPaused => '일시 정지';
+
+  @override
+  String get systemStatusIdle => '재생 안 함';
+
+  @override
+  String get systemStatusInput => '입력';
+
+  @override
+  String get systemStatusIme => '입력기';
+
+  @override
+  String get systemStatusImeWayland => 'Wayland 텍스트 입력';
+
+  @override
+  String get systemStatusCursorTheme => '커서 테마';
 }

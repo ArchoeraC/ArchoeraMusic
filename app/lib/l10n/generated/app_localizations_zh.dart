@@ -4308,6 +4308,30 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get systemBtDevices => '已连接设备';
+
+  @override
+  String get systemStatusAudio => '音频';
+
+  @override
+  String get systemStatusPlaying => '播放中';
+
+  @override
+  String get systemStatusPaused => '已暂停';
+
+  @override
+  String get systemStatusIdle => '未播放';
+
+  @override
+  String get systemStatusInput => '输入';
+
+  @override
+  String get systemStatusIme => '输入法';
+
+  @override
+  String get systemStatusImeWayland => 'Wayland 文本输入';
+
+  @override
+  String get systemStatusCursorTheme => '光标主题';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -8614,6 +8638,30 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get systemBtDevices => '已连接设备';
+
+  @override
+  String get systemStatusAudio => '音频';
+
+  @override
+  String get systemStatusPlaying => '播放中';
+
+  @override
+  String get systemStatusPaused => '已暂停';
+
+  @override
+  String get systemStatusIdle => '未播放';
+
+  @override
+  String get systemStatusInput => '输入';
+
+  @override
+  String get systemStatusIme => '输入法';
+
+  @override
+  String get systemStatusImeWayland => 'Wayland 文本输入';
+
+  @override
+  String get systemStatusCursorTheme => '光标主题';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -12921,4 +12969,28 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get systemBtDevices => '已連接裝置';
+
+  @override
+  String get systemStatusAudio => '音訊';
+
+  @override
+  String get systemStatusPlaying => '播放中';
+
+  @override
+  String get systemStatusPaused => '已暫停';
+
+  @override
+  String get systemStatusIdle => '未播放';
+
+  @override
+  String get systemStatusInput => '輸入';
+
+  @override
+  String get systemStatusIme => '輸入法';
+
+  @override
+  String get systemStatusImeWayland => 'Wayland 文字輸入';
+
+  @override
+  String get systemStatusCursorTheme => '游標主題';
 }

@@ -1330,5 +1330,13 @@
   "systemBtUnavailable": "Bluetooth unavailable",
   "systemBtPowered": "On",
   "systemBtOff": "Off",
-  "systemBtDevices": "Connected devices"
+  "systemBtDevices": "Connected devices",
+  "systemStatusAudio": "Audio",
+  "systemStatusPlaying": "Playing",
+  "systemStatusPaused": "Paused",
+  "systemStatusIdle": "Not playing",
+  "systemStatusInput": "Input",
+  "systemStatusIme": "Input method",
+  "systemStatusImeWayland": "Wayland text input",
+  "systemStatusCursorTheme": "Cursor theme"
 }

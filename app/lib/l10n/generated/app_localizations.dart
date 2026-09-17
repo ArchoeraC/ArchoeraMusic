@@ -8017,6 +8017,54 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'已连接设备'**
   String get systemBtDevices;
+
+  /// No description provided for @systemStatusAudio.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音频'**
+  String get systemStatusAudio;
+
+  /// No description provided for @systemStatusPlaying.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放中'**
+  String get systemStatusPlaying;
+
+  /// No description provided for @systemStatusPaused.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已暂停'**
+  String get systemStatusPaused;
+
+  /// No description provided for @systemStatusIdle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未播放'**
+  String get systemStatusIdle;
+
+  /// No description provided for @systemStatusInput.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'输入'**
+  String get systemStatusInput;
+
+  /// No description provided for @systemStatusIme.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'输入法'**
+  String get systemStatusIme;
+
+  /// No description provided for @systemStatusImeWayland.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Wayland 文本输入'**
+  String get systemStatusImeWayland;
+
+  /// No description provided for @systemStatusCursorTheme.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'光标主题'**
+  String get systemStatusCursorTheme;
 }
 
 class _AppLocalizationsDelegate
