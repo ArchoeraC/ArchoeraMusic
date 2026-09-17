@@ -29,9 +29,17 @@ os/vm/build.sh vm
   （覆盖 `archoera-shell` udev 二进制的动态依赖）。
 - `mkosi.extra/opt/archoera/`：`archoera-shell`（`--features udev`）、`archoera-control`、
   `archoera-smoke`。
+- `mkosi.extra/opt/archoera-music/`：**真实播放器 bundle**（`build.sh` 从
+  `app/build/linux/x64/release/bundle` 复制；已 gitignore）。运行库对齐
+  `packaging/linux/PKGBUILD` 的 `depends`，另加 `ffmpeg`/`glycin`/`icu`
+  （bundle 内嵌 FFmpeg 动态依赖系统编解码库）与 `libsecret`/`adwaita-icon-theme`。
+- `mkosi.extra/etc/locale.conf` + `mkosi.postinst`：生成 `en_US.UTF-8`/`zh_CN.UTF-8`。
+  **不设 locale 会让 Dart 拿到 `"C"`，播放器 l10n 解析失败**（托盘/文案异常）。
 - 自动登录用 mkosi 官方 `Autologin=yes`：**root 在 `/dev/tty1`（VT 会话）与 `/dev/hvc0`
   自动登录**。`/etc/profile.d/zz-archoera.sh` 在 tty1 上 `exec` 会话脚本；
   `/usr/local/bin/archoera-session` 循环启动合成器并把日志写入串口 `hvc0`。
+  会话客户端优先用真实播放器（`/opt/archoera-music/archoera_music`），缺失时回退
+  `archoera-smoke`。
   - 之所以必须是 **tty1（VT）**：systemd-logind 只对 VT 会话允许 `TakeControl`，
     串口会话会让 `libseat` 报 `Function not implemented`。
 - `Ssh=yes`（VSock）：配合 `mkosi genkey` 可用 `mkosi ssh`（本环境实测未转发 stdout，
@@ -51,6 +59,23 @@ configure: 1280x800 ... MAXIMIZED | ACTIVATED   ← 客户端拿到 kiosk 全屏
 
 即：libseat(会话) → DRM 主设备 → 模式选择 → 输出点亮 → GBM/EGL 渲染器 →
 dmabuf v4 反馈 → 客户端接入 → configure → 出帧，全链路在真实 DRM/KMS 上跑通。
+
+### 真实播放器在 VM 内完整启动
+
+```
+[session] 启动 udev kiosk ... client='/opt/archoera-music/archoera_music'
+已拉起会话客户端 pid=419 program="/opt/archoera-music/archoera_music"
+Using the Impeller rendering backend (OpenGLESSDF).      ← Flutter 走 GLES/Impeller 出图
+archoera_shell_v1 客户端已绑定 clients=1 capabilities=238 ← 会话桥接握手成功
+[os] session=OsSessionState.ready
+（随后稳定驻留：仅一次启动、无退出/重启）
+```
+
+已知降级（不影响启动与出图）：
+
+- **[vault]** 无 D-Bus 会话总线 / Secret Service，凭据保险库不可用（登录态不持久化）。
+- `Gdk-Message: Unable to load  from the cursor theme`、`Gtk-CRITICAL gtk_widget_get_scale_factor`
+  —— 无鼠标光标主题 / 无头会话下的无害告警。
 
 ### 该 VM 暴露并修复的两个真实缺陷
 

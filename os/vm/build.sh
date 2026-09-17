@@ -21,6 +21,19 @@ mkdir -p "$HERE/mkosi.extra/opt/archoera"
 for bin in archoera-shell archoera-control archoera-smoke; do
     install -m 0755 "$OS/target/release/$bin" "$HERE/mkosi.extra/opt/archoera/$bin"
 done
+
+# 真实播放器 bundle（若已构建）：装进 /opt/archoera-music 供 kiosk 会话启动。
+REPO="$(cd "$OS/.." && pwd)"
+BUNDLE="$REPO/app/build/linux/x64/release/bundle"
+if [ -x "$BUNDLE/archoera_music" ]; then
+    echo "==> 打包播放器 bundle: $BUNDLE"
+    rm -rf "$HERE/mkosi.extra/opt/archoera-music"
+    mkdir -p "$HERE/mkosi.extra/opt/archoera-music"
+    cp -a "$BUNDLE/." "$HERE/mkosi.extra/opt/archoera-music/"
+else
+    echo "==> 未找到播放器 bundle（$BUNDLE），VM 内将回退 smoke"
+fi
+
 chmod 0755 "$HERE/mkosi.extra/usr/local/bin/archoera-session" 2>/dev/null || true
 
 if [ "$PROFILE" = "vm" ]; then

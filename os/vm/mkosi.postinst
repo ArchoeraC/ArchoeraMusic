@@ -1,0 +1,10 @@
+#!/bin/sh
+# 镜像构建收尾：生成常用 locale。
+# 无 locale 时 GTK/Dart 上报 "C"，播放器的 l10n 解析会失败（托盘/文案异常）。
+set -e
+
+if [ -f /etc/locale.gen ]; then
+    sed -i 's/^#\s*\(en_US\.UTF-8\s*UTF-8\)/\1/' /etc/locale.gen
+    sed -i 's/^#\s*\(zh_CN\.UTF-8\s*UTF-8\)/\1/' /etc/locale.gen
+    locale-gen
+fi

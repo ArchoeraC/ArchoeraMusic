@@ -1,5 +1,7 @@
 #!/bin/sh
-# tty1 kiosk 会话：启动 udev 合成器并托管 smoke；无头时日志进串口 hvc0。
+# tty1 kiosk 会话：启动 udev 合成器并托管会话客户端。
+# 优先拉起真实播放器（/opt/archoera-music/archoera_music），缺失时回退 smoke。
+# 无头时日志进串口 hvc0。
 export RUST_LOG="${RUST_LOG:-archoera_shell=info,warn}"
 if [ -w /dev/hvc0 ]; then
     exec >/dev/hvc0 2>&1
@@ -10,10 +12,21 @@ if [ -f /opt/archoera/session.args ]; then
     args="$(cat /opt/archoera/session.args)"
 fi
 
+APP=/opt/archoera-music/archoera_music
+if [ -x "$APP" ]; then
+    client="$APP"
+else
+    client=/opt/archoera/archoera-smoke
+fi
+
+# 播放器是 GTK3 客户端：强制 Wayland 后端；virtio-gpu 无 virgl，用软件 GL。
+export GDK_BACKEND=wayland
+export LIBGL_ALWAYS_SOFTWARE=1
+
 while true; do
-    echo "[session] 启动 udev kiosk $(date -Is) args='${args}'"
+    echo "[session] 启动 udev kiosk $(date -Is) args='${args}' client='${client}'"
     # shellcheck disable=SC2086
-    /opt/archoera/archoera-shell --backend udev $args -- /opt/archoera/archoera-smoke
+    /opt/archoera/archoera-shell --backend udev $args -- "$client"
     echo "[session] 合成器退出 rc=$?，5s 后重试"
     sleep 5
 done
