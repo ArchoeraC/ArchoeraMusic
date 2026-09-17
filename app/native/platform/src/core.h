@@ -35,6 +35,8 @@ constexpr uint32_t CAP_APP_INSTANCE = 1u << 6;
 constexpr uint32_t CAP_SYSTEM_ACCENT = 1u << 7;
 constexpr uint32_t CAP_SYSTEM_THEME = 1u << 8;
 constexpr uint32_t CAP_OS_SESSION = 1u << 9;
+constexpr uint32_t CAP_SYS_STATS = 1u << 10;
+constexpr uint32_t CAP_BLUETOOTH = 1u << 11;
 
 // ── 事件类型 / 命令 ───────────────────────────────────────────────
 constexpr int32_t EVENT_MEDIA_COMMAND = 1;

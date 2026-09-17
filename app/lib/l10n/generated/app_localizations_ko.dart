@@ -4327,4 +4327,40 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get systemStatusReady => '준비됨';
+
+  @override
+  String get systemResourcesTitle => '시스템 리소스';
+
+  @override
+  String get systemResCpu => 'CPU';
+
+  @override
+  String get systemResMemory => '메모리';
+
+  @override
+  String get systemResDisk => '저장 공간';
+
+  @override
+  String get systemResUptime => '가동 시간';
+
+  @override
+  String get systemResTemp => '온도';
+
+  @override
+  String get systemBluetoothTitle => '블루투스';
+
+  @override
+  String get systemBtAbsent => '블루투스 어댑터 없음';
+
+  @override
+  String get systemBtUnavailable => '블루투스 사용 불가';
+
+  @override
+  String get systemBtPowered => '켜짐';
+
+  @override
+  String get systemBtOff => '꺼짐';
+
+  @override
+  String get systemBtDevices => '연결된 기기';
 }

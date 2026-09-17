@@ -13,6 +13,7 @@
 #include "backend.h"
 
 #include "core.h"
+#include "sysinfo.h"
 #include "os_session.h"
 
 #include <dbus/dbus.h>
@@ -1017,6 +1018,8 @@ uint32_t caps() {
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
     // ArchoeraOS 会话：仅当 Wayland socket 暴露 archoera_shell_v1 全局时置位。
     if (os_session::available()) c |= CAP_OS_SESSION;
+    if (sysinfo::statsAvailable()) c |= CAP_SYS_STATS;
+    if (sysinfo::bluetoothAvailable()) c |= CAP_BLUETOOTH;
     return c;
 }
 
@@ -1024,6 +1027,7 @@ int32_t init() {
     dbus_threads_init_default();
     // 探测 ArchoeraOS 会话（不保持连接；真正订阅在 apl_os_set_events）。
     os_session::probe();
+    sysinfo::probe();
     g_running.store(true, std::memory_order_release);
     g_pump = new std::thread(pumpLoop);
     return OK;
@@ -1032,6 +1036,7 @@ int32_t init() {
 int32_t shutdown() {
     g_running.store(false, std::memory_order_release);
     os_session::shutdown();
+    sysinfo::shutdown();
     if (g_pump != nullptr) {
         if (g_pump->joinable()) g_pump->join();
         delete g_pump;

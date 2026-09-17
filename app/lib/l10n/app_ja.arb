@@ -1318,5 +1318,17 @@
   "systemStatusTitle": "システム状態",
   "systemStatusOutput": "出力",
   "systemStatusSession": "セッション",
-  "systemStatusReady": "準備完了"
+  "systemStatusReady": "準備完了",
+  "systemResourcesTitle": "システムリソース",
+  "systemResCpu": "CPU",
+  "systemResMemory": "メモリ",
+  "systemResDisk": "ストレージ",
+  "systemResUptime": "稼働時間",
+  "systemResTemp": "温度",
+  "systemBluetoothTitle": "Bluetooth",
+  "systemBtAbsent": "Bluetooth アダプターなし",
+  "systemBtUnavailable": "Bluetooth 利用不可",
+  "systemBtPowered": "オン",
+  "systemBtOff": "オフ",
+  "systemBtDevices": "接続中の機器"
 }

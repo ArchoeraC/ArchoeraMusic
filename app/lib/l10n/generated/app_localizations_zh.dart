@@ -4272,6 +4272,42 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get systemStatusReady => '就绪';
+
+  @override
+  String get systemResourcesTitle => '系统资源';
+
+  @override
+  String get systemResCpu => 'CPU';
+
+  @override
+  String get systemResMemory => '内存';
+
+  @override
+  String get systemResDisk => '存储';
+
+  @override
+  String get systemResUptime => '运行时长';
+
+  @override
+  String get systemResTemp => '温度';
+
+  @override
+  String get systemBluetoothTitle => '蓝牙';
+
+  @override
+  String get systemBtAbsent => '无蓝牙适配器';
+
+  @override
+  String get systemBtUnavailable => '蓝牙不可用';
+
+  @override
+  String get systemBtPowered => '已开启';
+
+  @override
+  String get systemBtOff => '已关闭';
+
+  @override
+  String get systemBtDevices => '已连接设备';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -8542,6 +8578,42 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get systemStatusReady => '就绪';
+
+  @override
+  String get systemResourcesTitle => '系统资源';
+
+  @override
+  String get systemResCpu => 'CPU';
+
+  @override
+  String get systemResMemory => '内存';
+
+  @override
+  String get systemResDisk => '存储';
+
+  @override
+  String get systemResUptime => '运行时长';
+
+  @override
+  String get systemResTemp => '温度';
+
+  @override
+  String get systemBluetoothTitle => '蓝牙';
+
+  @override
+  String get systemBtAbsent => '无蓝牙适配器';
+
+  @override
+  String get systemBtUnavailable => '蓝牙不可用';
+
+  @override
+  String get systemBtPowered => '已开启';
+
+  @override
+  String get systemBtOff => '已关闭';
+
+  @override
+  String get systemBtDevices => '已连接设备';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -12813,4 +12885,40 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get systemStatusReady => '就緒';
+
+  @override
+  String get systemResourcesTitle => '系統資源';
+
+  @override
+  String get systemResCpu => 'CPU';
+
+  @override
+  String get systemResMemory => '記憶體';
+
+  @override
+  String get systemResDisk => '儲存空間';
+
+  @override
+  String get systemResUptime => '運行時間';
+
+  @override
+  String get systemResTemp => '溫度';
+
+  @override
+  String get systemBluetoothTitle => '藍牙';
+
+  @override
+  String get systemBtAbsent => '無藍牙適配器';
+
+  @override
+  String get systemBtUnavailable => '藍牙無法使用';
+
+  @override
+  String get systemBtPowered => '已開啟';
+
+  @override
+  String get systemBtOff => '已關閉';
+
+  @override
+  String get systemBtDevices => '已連接裝置';
 }

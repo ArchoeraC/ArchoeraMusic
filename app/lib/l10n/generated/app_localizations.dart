@@ -7945,6 +7945,78 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'就绪'**
   String get systemStatusReady;
+
+  /// No description provided for @systemResourcesTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统资源'**
+  String get systemResourcesTitle;
+
+  /// No description provided for @systemResCpu.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'CPU'**
+  String get systemResCpu;
+
+  /// No description provided for @systemResMemory.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内存'**
+  String get systemResMemory;
+
+  /// No description provided for @systemResDisk.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'存储'**
+  String get systemResDisk;
+
+  /// No description provided for @systemResUptime.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'运行时长'**
+  String get systemResUptime;
+
+  /// No description provided for @systemResTemp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'温度'**
+  String get systemResTemp;
+
+  /// No description provided for @systemBluetoothTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'蓝牙'**
+  String get systemBluetoothTitle;
+
+  /// No description provided for @systemBtAbsent.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无蓝牙适配器'**
+  String get systemBtAbsent;
+
+  /// No description provided for @systemBtUnavailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'蓝牙不可用'**
+  String get systemBtUnavailable;
+
+  /// No description provided for @systemBtPowered.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开启'**
+  String get systemBtPowered;
+
+  /// No description provided for @systemBtOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已关闭'**
+  String get systemBtOff;
+
+  /// No description provided for @systemBtDevices.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已连接设备'**
+  String get systemBtDevices;
 }
 
 class _AppLocalizationsDelegate

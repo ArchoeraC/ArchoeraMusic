@@ -54,6 +54,8 @@ extern "C" {
 #define APL_CAP_SYSTEM_ACCENT      (1u << 7) /* 系统主题色（DE accent） */
 #define APL_CAP_SYSTEM_THEME       (1u << 8) /* 系统深浅色（light/dark） */
 #define APL_CAP_OS_SESSION         (1u << 9) /* ArchoeraOS 合成器会话（archoera_shell_v1，仅 Wayland 且运行于 archoera-shell） */
+#define APL_CAP_SYS_STATS          (1u << 10) /* 系统资源快照（CPU/内存/磁盘/运行时长/温度） */
+#define APL_CAP_BLUETOOTH          (1u << 11) /* 蓝牙适配器状态（BlueZ；无适配器/无 BlueZ 时不置位） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -120,6 +122,35 @@ APL_API int32_t apl_os_set_output_transform(int32_t transform); /* 0..7，见 wl
 
 /* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
 APL_API int32_t apl_notify(const char *title, const char *body);
+
+/* ── 系统资源 / 蓝牙（只读快照；轮询式，无事件）─────────────────── */
+typedef struct AplSysStats {
+    int32_t cpu_count;        /* 逻辑核数 */
+    int32_t cpu_percent;      /* 0-100；自上次调用起的平均占用（首次 -1） */
+    int64_t mem_total_kb;
+    int64_t mem_available_kb;
+    int64_t swap_total_kb;
+    int64_t swap_free_kb;
+    int64_t disk_total_kb;    /* 数据目录所在文件系统（不可得时 0） */
+    int64_t disk_free_kb;
+    int64_t uptime_sec;
+    int32_t temp_millic;      /* 温度 ×1000；<0 = 无传感器/不可得 */
+} AplSysStats;
+
+/* 读取系统资源快照；成功返回 0 并写 out（结构体由调用方分配）。 */
+APL_API int32_t apl_sys_stats(AplSysStats *out);
+
+typedef struct AplBtState {
+    int32_t present;           /* 存在蓝牙适配器 */
+    int32_t powered;           /* 适配器已开启 */
+    int32_t discoverable;
+    int32_t pairable;
+    int32_t devices_connected; /* 已连接设备数 */
+    AplString adapter_name;    /* 适配器名（仅调用期间有效；无适配器时 data=NULL） */
+} AplBtState;
+
+/* 读取蓝牙适配器状态；无 BlueZ/无适配器返回负值（Dart 侧据此显示「无蓝牙」）。 */
+APL_API int32_t apl_bt_state(AplBtState *out);
 
 /* 一次性读取系统主题色（0=成功并写 r/g/b，0-255；<0=不可得）。
  * 注：应用层不应主动轮询/查询系统色；正常路径是 apl_system_accent_set_events

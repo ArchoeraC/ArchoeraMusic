@@ -19,11 +19,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'ffi_system_media.dart';
 import 'ffi_system_os.dart';
 import 'ffi_system_power.dart';
+import 'ffi_system_status.dart';
 import 'ffi_system_window.dart';
 import 'platform_bindings.dart';
 import 'system_media.dart';
 import 'system_os.dart';
 import 'system_power.dart';
+import 'system_status.dart';
 import 'system_window.dart';
 
 class PlatformCapabilities {
@@ -33,6 +35,7 @@ class PlatformCapabilities {
     required this.media,
     required this.window,
     required this.os,
+    required this.status,
     required this.caps,
   });
 
@@ -48,6 +51,9 @@ class PlatformCapabilities {
   /// ArchoeraOS 合成器会话（未运行时为空实现）。
   final SystemOsSession os;
 
+  /// 系统资源 / 蓝牙只读状态（桥接不支持时为空实现）。
+  final SystemStatus status;
+
   bool get powerInhibitAvailable => caps & aplCapPowerInhibit != 0;
   bool get screenStateAvailable => caps & aplCapPowerScreenState != 0;
   bool get mediaSessionAvailable => caps & aplCapMediaSession != 0;
@@ -55,6 +61,8 @@ class PlatformCapabilities {
   bool get appInstanceAvailable => caps & aplCapAppInstance != 0;
   bool get systemAccentAvailable => caps & aplCapSystemAccent != 0;
   bool get osSessionAvailable => caps & aplCapOsSession != 0;
+  bool get sysStatsAvailable => caps & aplCapSysStats != 0;
+  bool get bluetoothAvailable => caps & aplCapBluetooth != 0;
   bool get bridgeLoaded => _bindings != null;
 
   /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
@@ -139,6 +147,12 @@ class PlatformCapabilities {
               b.osSessionSymbolsAvailable)
           ? FfiSystemOsSession(b)
           : NoopSystemOsSession.instance,
+      status:
+          (b != null &&
+              (caps & aplCapSysStats != 0 || caps & aplCapBluetooth != 0) &&
+              (b.sysStatsSymbolsAvailable || b.bluetoothSymbolsAvailable))
+          ? FfiSystemStatus(b)
+          : NoopSystemStatus.instance,
     );
     _instance = built;
     return built;

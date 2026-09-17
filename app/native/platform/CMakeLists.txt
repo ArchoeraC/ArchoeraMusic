@@ -48,6 +48,8 @@ elseif(UNIX)
   list(APPEND ARCHOERA_SOURCES src/backend_linux.cpp)
   # ArchoeraOS 会话客户端：dlopen libwayland-client（不新增链接依赖）。
   list(APPEND ARCHOERA_SOURCES src/os_session_linux.cpp)
+  # 系统资源 / 蓝牙（/proc、statvfs、BlueZ over libdbus）。
+  list(APPEND ARCHOERA_SOURCES src/sysinfo_linux.cpp)
 else()
   list(APPEND ARCHOERA_SOURCES src/backend_stub.cpp)
 endif()

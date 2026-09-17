@@ -10,6 +10,7 @@
 
 #include "backend.h"
 #include "core.h"
+#include "sysinfo.h"
 
 namespace {
 constexpr int32_t kAbiVersion = 1;
@@ -150,6 +151,16 @@ int32_t apl_os_set_output_mode(int32_t width, int32_t height) {
 int32_t apl_os_set_output_transform(int32_t transform) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     return archoera::osSessionSetOutputTransform(transform);
+}
+
+int32_t apl_sys_stats(AplSysStats* out) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::sysinfo::stats(out);
+}
+
+int32_t apl_bt_state(AplBtState* out) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::sysinfo::btState(out);
 }
 
 int32_t apl_notify(const char* title, const char* body) {

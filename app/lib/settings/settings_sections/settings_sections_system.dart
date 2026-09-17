@@ -23,6 +23,41 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
   /// 亮度滑块本地草稿（拖动期间优先显示；松手后置 null 交回 provider）。
   double? _brightnessDraft;
 
+  /// 系统资源 / 蓝牙：设置页可见期间轮询（2s），不可见即停。
+  Timer? _statusTimer;
+  SysStats? _stats;
+  BluetoothState? _bt;
+
+  @override
+  void initState() {
+    super.initState();
+    final status = ref.read(platformCapabilitiesProvider).status;
+    if (status.statsAvailable || status.bluetoothAvailable) {
+      _refreshStatus();
+      _statusTimer = Timer.periodic(
+        const Duration(seconds: 2),
+        (_) => _refreshStatus(),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _statusTimer?.cancel();
+    super.dispose();
+  }
+
+  void _refreshStatus() {
+    final status = ref.read(platformCapabilitiesProvider).status;
+    final stats = status.statsAvailable ? status.stats() : null;
+    final bt = status.bluetoothAvailable ? status.bluetooth() : null;
+    if (!mounted) return;
+    setState(() {
+      _stats = stats;
+      _bt = bt;
+    });
+  }
+
   /// 弹出危险操作确认框；用户确认返回 true（取消/关闭返回 false）。
   Future<bool> _confirm(String action) async {
     final l10n = context.l10n;
@@ -301,6 +336,84 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
     ];
     add(SettingSection(title: l10n.systemStatusTitle, children: statusRows));
 
+    // 系统资源（2s 轮询快照）。
+    final stats = _stats;
+    if (stats != null) {
+      add(
+        SettingSection(
+          title: l10n.systemResourcesTitle,
+          children: [
+            SettingTile(
+              icon: EtaIcons.chipOutline,
+              title: l10n.systemResCpu,
+              subtitle: stats.cpuPercent < 0
+                  ? '${stats.cpuCount} × CPU'
+                  : '${stats.cpuPercent}% · ${stats.cpuCount} × CPU',
+              trailing: const SizedBox.shrink(),
+            ),
+            SettingTile(
+              icon: EtaIcons.memoryStickOutline,
+              title: l10n.systemResMemory,
+              subtitle:
+                  '${_formatKb(stats.memUsedKb)} / ${_formatKb(stats.memTotalKb)}'
+                  ' (${stats.memPercent}%)',
+              trailing: const SizedBox.shrink(),
+            ),
+            SettingTile(
+              icon: EtaIcons.storageOutline,
+              title: l10n.systemResDisk,
+              subtitle:
+                  '${_formatKb(stats.diskUsedKb)} / ${_formatKb(stats.diskTotalKb)}'
+                  ' (${stats.diskPercent}%)',
+              trailing: const SizedBox.shrink(),
+            ),
+            SettingTile(
+              icon: EtaIcons.serverOutline,
+              title: l10n.systemResUptime,
+              subtitle: stats.uptimeLabel,
+              trailing: const SizedBox.shrink(),
+            ),
+            if (stats.tempCelsius != null)
+              SettingTile(
+                icon: EtaIcons.fireOutline,
+                title: l10n.systemResTemp,
+                subtitle: '${stats.tempCelsius!.toStringAsFixed(1)} °C',
+                trailing: const SizedBox.shrink(),
+              ),
+          ],
+        ),
+      );
+    }
+
+    // 蓝牙（只读状态；无 BlueZ/无适配器时给出说明）。
+    if (ref.watch(platformCapabilitiesProvider).bluetoothAvailable) {
+      final bt = _bt;
+      add(
+        SettingSection(
+          title: l10n.systemBluetoothTitle,
+          children: [
+            SettingTile(
+              icon: EtaIcons.bluetooth,
+              title: bt?.adapterName ?? l10n.systemBluetoothTitle,
+              subtitle: bt == null
+                  ? l10n.systemBtUnavailable
+                  : (!bt.present
+                        ? l10n.systemBtAbsent
+                        : (bt.powered ? l10n.systemBtPowered : l10n.systemBtOff)),
+              trailing: const SizedBox.shrink(),
+            ),
+            if (bt != null && bt.present)
+              SettingTile(
+                icon: EtaIcons.deviceOutline,
+                title: l10n.systemBtDevices,
+                subtitle: '${bt.devicesConnected}',
+                trailing: const SizedBox.shrink(),
+              ),
+          ],
+        ),
+      );
+    }
+
     // 会话态提示（挂起/关机前）。
     if (session != OsSessionState.ready) {
       add(
@@ -374,4 +487,11 @@ class _SystemChoiceRow<T> extends StatelessWidget {
       ),
     );
   }
+}
+
+/// KiB → 人类可读（GiB / MiB）。
+String _formatKb(int kb) {
+  if (kb >= 1024 * 1024) return '${(kb / (1024 * 1024)).toStringAsFixed(1)} GiB';
+  if (kb >= 1024) return '${(kb / 1024).toStringAsFixed(0)} MiB';
+  return '$kb KiB';
 }

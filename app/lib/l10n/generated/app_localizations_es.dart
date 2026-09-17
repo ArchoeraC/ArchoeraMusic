@@ -4549,4 +4549,40 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get systemStatusReady => 'Listo';
+
+  @override
+  String get systemResourcesTitle => 'Recursos del sistema';
+
+  @override
+  String get systemResCpu => 'CPU';
+
+  @override
+  String get systemResMemory => 'Memoria';
+
+  @override
+  String get systemResDisk => 'Almacenamiento';
+
+  @override
+  String get systemResUptime => 'Tiempo activo';
+
+  @override
+  String get systemResTemp => 'Temperatura';
+
+  @override
+  String get systemBluetoothTitle => 'Bluetooth';
+
+  @override
+  String get systemBtAbsent => 'Sin adaptador Bluetooth';
+
+  @override
+  String get systemBtUnavailable => 'Bluetooth no disponible';
+
+  @override
+  String get systemBtPowered => 'Activado';
+
+  @override
+  String get systemBtOff => 'Desactivado';
+
+  @override
+  String get systemBtDevices => 'Dispositivos conectados';
 }

@@ -1318,5 +1318,17 @@
   "systemStatusTitle": "系统状态",
   "systemStatusOutput": "输出",
   "systemStatusSession": "会话",
-  "systemStatusReady": "就绪"
+  "systemStatusReady": "就绪",
+  "systemResourcesTitle": "系统资源",
+  "systemResCpu": "CPU",
+  "systemResMemory": "内存",
+  "systemResDisk": "存储",
+  "systemResUptime": "运行时长",
+  "systemResTemp": "温度",
+  "systemBluetoothTitle": "蓝牙",
+  "systemBtAbsent": "无蓝牙适配器",
+  "systemBtUnavailable": "蓝牙不可用",
+  "systemBtPowered": "已开启",
+  "systemBtOff": "已关闭",
+  "systemBtDevices": "已连接设备"
 }

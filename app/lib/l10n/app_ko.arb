@@ -1318,5 +1318,17 @@
   "systemStatusTitle": "시스템 상태",
   "systemStatusOutput": "출력",
   "systemStatusSession": "세션",
-  "systemStatusReady": "준비됨"
+  "systemStatusReady": "준비됨",
+  "systemResourcesTitle": "시스템 리소스",
+  "systemResCpu": "CPU",
+  "systemResMemory": "메모리",
+  "systemResDisk": "저장 공간",
+  "systemResUptime": "가동 시간",
+  "systemResTemp": "온도",
+  "systemBluetoothTitle": "블루투스",
+  "systemBtAbsent": "블루투스 어댑터 없음",
+  "systemBtUnavailable": "블루투스 사용 불가",
+  "systemBtPowered": "켜짐",
+  "systemBtOff": "꺼짐",
+  "systemBtDevices": "연결된 기기"
 }

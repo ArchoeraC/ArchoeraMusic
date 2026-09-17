@@ -4321,4 +4321,40 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get systemStatusReady => '準備完了';
+
+  @override
+  String get systemResourcesTitle => 'システムリソース';
+
+  @override
+  String get systemResCpu => 'CPU';
+
+  @override
+  String get systemResMemory => 'メモリ';
+
+  @override
+  String get systemResDisk => 'ストレージ';
+
+  @override
+  String get systemResUptime => '稼働時間';
+
+  @override
+  String get systemResTemp => '温度';
+
+  @override
+  String get systemBluetoothTitle => 'Bluetooth';
+
+  @override
+  String get systemBtAbsent => 'Bluetooth アダプターなし';
+
+  @override
+  String get systemBtUnavailable => 'Bluetooth 利用不可';
+
+  @override
+  String get systemBtPowered => 'オン';
+
+  @override
+  String get systemBtOff => 'オフ';
+
+  @override
+  String get systemBtDevices => '接続中の機器';
 }

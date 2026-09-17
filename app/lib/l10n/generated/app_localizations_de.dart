@@ -4520,4 +4520,40 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get systemStatusReady => 'Bereit';
+
+  @override
+  String get systemResourcesTitle => 'Systemressourcen';
+
+  @override
+  String get systemResCpu => 'CPU';
+
+  @override
+  String get systemResMemory => 'Arbeitsspeicher';
+
+  @override
+  String get systemResDisk => 'Speicher';
+
+  @override
+  String get systemResUptime => 'Laufzeit';
+
+  @override
+  String get systemResTemp => 'Temperatur';
+
+  @override
+  String get systemBluetoothTitle => 'Bluetooth';
+
+  @override
+  String get systemBtAbsent => 'Kein Bluetooth-Adapter';
+
+  @override
+  String get systemBtUnavailable => 'Bluetooth nicht verfügbar';
+
+  @override
+  String get systemBtPowered => 'Eingeschaltet';
+
+  @override
+  String get systemBtOff => 'Ausgeschaltet';
+
+  @override
+  String get systemBtDevices => 'Verbundene Geräte';
 }

@@ -21,6 +21,7 @@ import 'package:ffi/ffi.dart';
 
 import '../native_lib_paths.dart';
 import 'system_media.dart';
+import 'system_status.dart';
 
 // ── 常量（对齐 archoera_platform.h）───────────────────────────────
 
@@ -39,6 +40,8 @@ const int aplCapAppInstance = 1 << 6;
 const int aplCapSystemAccent = 1 << 7;
 const int aplCapSystemTheme = 1 << 8;
 const int aplCapOsSession = 1 << 9;
+const int aplCapSysStats = 1 << 10;
+const int aplCapBluetooth = 1 << 11;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -190,6 +193,59 @@ final class AplEventPayload extends Union {
   external AplOsOutputPayload osOutput;
 }
 
+/// 系统资源快照（对齐 AplSysStats）。
+final class AplSysStatsFfi extends Struct {
+  @Int32()
+  external int cpuCount;
+
+  @Int32()
+  external int cpuPercent;
+
+  @Int64()
+  external int memTotalKb;
+
+  @Int64()
+  external int memAvailableKb;
+
+  @Int64()
+  external int swapTotalKb;
+
+  @Int64()
+  external int swapFreeKb;
+
+  @Int64()
+  external int diskTotalKb;
+
+  @Int64()
+  external int diskFreeKb;
+
+  @Int64()
+  external int uptimeSec;
+
+  @Int32()
+  external int tempMillic;
+}
+
+/// 蓝牙状态（对齐 AplBtState）。
+final class AplBtStateFfi extends Struct {
+  @Int32()
+  external int present;
+
+  @Int32()
+  external int powered;
+
+  @Int32()
+  external int discoverable;
+
+  @Int32()
+  external int pairable;
+
+  @Int32()
+  external int devicesConnected;
+
+  external AplStringFfi adapterName;
+}
+
 final class AplEventFfi extends Struct {
   @Int32()
   external int type;
@@ -211,6 +267,8 @@ typedef _AplPowerScreenC = Int32 Function(Int32 on);
 typedef _AplWindowEventsC = Int32 Function(Int32 on);
 typedef _AplInstanceAcquireC = Int32 Function();
 typedef _AplNotifyC = Int32 Function(Pointer<Utf8> title, Pointer<Utf8> body);
+typedef _AplSysStatsC = Int32 Function(Pointer<AplSysStatsFfi> out);
+typedef _AplBtStateC = Int32 Function(Pointer<AplBtStateFfi> out);
 typedef _AplSystemAccentC =
     Int32 Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsC = Int32 Function(Int32 on);
@@ -249,6 +307,8 @@ typedef _AplPowerScreenD = int Function(int on);
 typedef _AplWindowEventsD = int Function(int on);
 typedef _AplInstanceAcquireD = int Function();
 typedef _AplNotifyD = int Function(Pointer<Utf8> title, Pointer<Utf8> body);
+typedef _AplSysStatsD = int Function(Pointer<AplSysStatsFfi> out);
+typedef _AplBtStateD = int Function(Pointer<AplBtStateFfi> out);
 typedef _AplSystemAccentD =
     int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsD = int Function(int on);
@@ -484,6 +544,14 @@ class PlatformBindings {
           'apl_os_set_output_transform',
         ),
       ),
+      _sysStats = _try(
+        () => lib.lookupFunction<_AplSysStatsC, _AplSysStatsD>(
+          'apl_sys_stats',
+        ),
+      ),
+      _btState = _try(
+        () => lib.lookupFunction<_AplBtStateC, _AplBtStateD>('apl_bt_state'),
+      ),
       _setCallback = lib.lookupFunction<_SetEventCallbackC, _SetEventCallbackD>(
         'apl_set_event_callback',
       ) {
@@ -534,6 +602,8 @@ class PlatformBindings {
   final _AplOsSetPercentD? _osSetOutputScale;
   final _AplOsSetModeD? _osSetOutputMode;
   final _AplOsSetPercentD? _osSetOutputTransform;
+  final _AplSysStatsD? _sysStats;
+  final _AplBtStateD? _btState;
 
   // 四类事件广播流（ffi_* 实现订阅转译）
   final _commandCtrl = StreamController<MediaCommandEvent>.broadcast();
@@ -596,6 +666,61 @@ class PlatformBindings {
       calloc.free(r);
       calloc.free(g);
       calloc.free(b);
+    }
+  }
+
+  /// 系统资源 / 蓝牙符号是否可用（旧版桥接缺失时返回 false）。
+  bool get sysStatsSymbolsAvailable => _sysStats != null;
+  bool get bluetoothSymbolsAvailable => _btState != null;
+
+  /// 系统资源快照；不可用/失败返回 null。
+  SysStats? sysStats() {
+    final fn = _sysStats;
+    if (fn == null) return null;
+    final out = calloc<AplSysStatsFfi>();
+    try {
+      if (fn(out) != aplOk) return null;
+      final s = out.ref;
+      return SysStats(
+        cpuCount: s.cpuCount,
+        cpuPercent: s.cpuPercent,
+        memTotalKb: s.memTotalKb,
+        memAvailableKb: s.memAvailableKb,
+        swapTotalKb: s.swapTotalKb,
+        swapFreeKb: s.swapFreeKb,
+        diskTotalKb: s.diskTotalKb,
+        diskFreeKb: s.diskFreeKb,
+        uptimeSec: s.uptimeSec,
+        tempMillic: s.tempMillic,
+      );
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  /// 蓝牙状态；不可用/失败返回 null。
+  BluetoothState? bluetoothState() {
+    final fn = _btState;
+    if (fn == null) return null;
+    final out = calloc<AplBtStateFfi>();
+    try {
+      if (fn(out) != aplOk) return null;
+      final s = out.ref;
+      final name = s.adapterName.data;
+      return BluetoothState(
+        present: s.present != 0,
+        powered: s.powered != 0,
+        discoverable: s.discoverable != 0,
+        pairable: s.pairable != 0,
+        devicesConnected: s.devicesConnected,
+        adapterName: name == nullptr
+            ? null
+            : name.cast<Utf8>().toDartString(
+                length: s.adapterName.len,
+              ),
+      );
+    } finally {
+      calloc.free(out);
     }
   }
 

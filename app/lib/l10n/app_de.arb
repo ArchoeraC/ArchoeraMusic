@@ -1318,5 +1318,17 @@
   "systemStatusTitle": "Systemstatus",
   "systemStatusOutput": "Ausgabe",
   "systemStatusSession": "Sitzung",
-  "systemStatusReady": "Bereit"
+  "systemStatusReady": "Bereit",
+  "systemResourcesTitle": "Systemressourcen",
+  "systemResCpu": "CPU",
+  "systemResMemory": "Arbeitsspeicher",
+  "systemResDisk": "Speicher",
+  "systemResUptime": "Laufzeit",
+  "systemResTemp": "Temperatur",
+  "systemBluetoothTitle": "Bluetooth",
+  "systemBtAbsent": "Kein Bluetooth-Adapter",
+  "systemBtUnavailable": "Bluetooth nicht verfügbar",
+  "systemBtPowered": "Eingeschaltet",
+  "systemBtOff": "Ausgeschaltet",
+  "systemBtDevices": "Verbundene Geräte"
 }

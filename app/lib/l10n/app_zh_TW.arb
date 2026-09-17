@@ -1318,5 +1318,17 @@
   "systemStatusTitle": "系統狀態",
   "systemStatusOutput": "輸出",
   "systemStatusSession": "工作階段",
-  "systemStatusReady": "就緒"
+  "systemStatusReady": "就緒",
+  "systemResourcesTitle": "系統資源",
+  "systemResCpu": "CPU",
+  "systemResMemory": "記憶體",
+  "systemResDisk": "儲存空間",
+  "systemResUptime": "運行時間",
+  "systemResTemp": "溫度",
+  "systemBluetoothTitle": "藍牙",
+  "systemBtAbsent": "無藍牙適配器",
+  "systemBtUnavailable": "藍牙無法使用",
+  "systemBtPowered": "已開啟",
+  "systemBtOff": "已關閉",
+  "systemBtDevices": "已連接裝置"
 }

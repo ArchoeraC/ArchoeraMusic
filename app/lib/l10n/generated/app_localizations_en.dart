@@ -4473,4 +4473,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get systemStatusReady => 'Ready';
+
+  @override
+  String get systemResourcesTitle => 'System resources';
+
+  @override
+  String get systemResCpu => 'CPU';
+
+  @override
+  String get systemResMemory => 'Memory';
+
+  @override
+  String get systemResDisk => 'Storage';
+
+  @override
+  String get systemResUptime => 'Uptime';
+
+  @override
+  String get systemResTemp => 'Temperature';
+
+  @override
+  String get systemBluetoothTitle => 'Bluetooth';
+
+  @override
+  String get systemBtAbsent => 'No Bluetooth adapter';
+
+  @override
+  String get systemBtUnavailable => 'Bluetooth unavailable';
+
+  @override
+  String get systemBtPowered => 'On';
+
+  @override
+  String get systemBtOff => 'Off';
+
+  @override
+  String get systemBtDevices => 'Connected devices';
 }

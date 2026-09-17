@@ -498,3 +498,13 @@ int32_t osSessionSetOutputMode(int32_t, int32_t) { return ERR_UNSUPPORTED; }
 int32_t osSessionSetOutputTransform(int32_t) { return ERR_UNSUPPORTED; }
 
 }  // namespace archoera
+
+// ── 系统资源 / 蓝牙：未覆盖平台返回 UNSUPPORTED ─────────────────────
+namespace sysinfo {
+bool statsAvailable() { return false; }
+bool bluetoothAvailable() { return false; }
+void probe() {}
+int32_t stats(AplSysStats*) { return ERR_UNSUPPORTED; }
+int32_t btState(AplBtState*) { return ERR_UNSUPPORTED; }
+void shutdown() {}
+}  // namespace sysinfo
