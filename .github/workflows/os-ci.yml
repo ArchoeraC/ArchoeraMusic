@@ -78,5 +78,5 @@ jobs:
       - name: 单元测试
         run: cargo test --workspace
 
-      - name: udev 后端编译检查
-        run: cargo check -p archoera-shell --features udev
+      - name: udev 后端编译检查（clippy，特征开启）
+        run: cargo clippy -p archoera-shell --features udev --all-targets -- -D warnings
