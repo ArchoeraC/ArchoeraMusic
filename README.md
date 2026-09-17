@@ -178,7 +178,7 @@ os/vm/build.sh vm       # 构建并启动 QEMU/KVM（自动透传 virtio-gpu / �
 
 ### 1. 当前许可证
 
-本项目整体以 **GNU Affero General Public License, version 3（AGPL-3.0）** 发布（许可证正文见仓库根 [LICENSE](LICENSE)），并采用 **AGPL-3.0-or-later** 弹性授权策略（含 "or any later version" 条款，升级触发与流程见下文「未来许可证升级策略」）。
+本项目整体（不包含因封装需要的包括但不限于Linux内核等依赖文件）以 **GNU Affero General Public License, version 3（AGPL-3.0）** 发布（许可证正文见仓库根 [LICENSE](LICENSE)），并采用 **AGPL-3.0-or-later** 弹性授权策略（含 "or any later version" 条款，升级触发与流程见下文「未来许可证升级策略」）。
 
 - **版权持有者**：BetaStudio2
 - **起始许可版本**：AGPL-3.0（`AGPL-3.0-or-later`，含后续版本弹性条款）
@@ -304,4 +304,4 @@ os/vm/build.sh vm       # 构建并启动 QEMU/KVM（自动透传 virtio-gpu / �
 
 - 仓库：<https://github.com/BetaStudio2/ArchoeraMusic>
 
-贡献前请阅读 **[CONTRIBUTING.md](CONTRIBUTING.md)（开发规范）** 与 [docs/architecture.md](docs/architecture.md) 中的实施路线与技术戒律。PR 合入前需要通过签名或显式确认接受上文「贡献者授权」条款。
+贡献前请阅读……还是别想着这个仓库也做贡献了吧……

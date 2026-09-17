@@ -25,6 +25,19 @@ SOCKET=wayland-archoera
 echo "[session] 用户=$(id -un) uid=$(id -u) home=$HOME runtime=${XDG_RUNTIME_DIR:-未设置}"
 echo "[session] 会话=$(loginctl show-session "$(loginctl list-sessions --no-legend 2>/dev/null | awk -v u="$(id -un)" '$3==u {print $1; exit}')" -p Type -p Active -p Seat -p VTNr 2>/dev/null | tr '\n' ' ')"
 
+# 电源动作授权自检：logind 的 power-off/reboot/suspend/hibernate 由 polkit 判定，
+# 活动会话默认 allow_active=yes（免鉴权）。无 polkit/非活动会话会显示「需鉴权」，
+# 据此可直接定位「点了关机/重启没反应」。
+if command -v pkcheck >/dev/null 2>&1; then
+    for action in power-off reboot suspend hibernate; do
+        if pkcheck --action-id "org.freedesktop.login1.$action" --process $$ >/dev/null 2>&1; then
+            echo "[session] polkit 授权: $action = 允许"
+        else
+            echo "[session] polkit 授权: $action = 拒绝/需鉴权"
+        fi
+    done
+fi
+
 # session D-Bus（无 systemd 用户会话时手动拉起）。
 if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && command -v dbus-daemon >/dev/null 2>&1; then
     DBUS_SESSION_BUS_ADDRESS="$(dbus-daemon --session --fork --print-address)"

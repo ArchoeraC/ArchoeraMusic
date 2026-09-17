@@ -126,6 +126,11 @@ archoera_shell_v1 客户端已绑定 clients=1 capabilities=238 ← 会话桥接
 
 ## 说明 / 限制
 
+- **电源动作授权走 polkit**：logind 的 `power-off` / `reboot` / `suspend` / `hibernate`
+  由 polkit 判定，默认策略 `allow_active=yes`（活动会话免鉴权，与普通桌面一致），
+  故镜像需安装 `polkit`（已装并 enable）。会话脚本启动时会用 `pkcheck` 自检并打印
+  `[session] polkit 授权: power-off = 允许` 等行，便于定位「点了没反应」。
+  （kiosk 里没有 polkit 鉴权代理，因此不给 `archoera` 加 `wheel`；只依赖 allow_active。）
 - 镜像已启用 BlueZ（`multi-user.target.wants` 符号链接由 tmpfiles 在首次启动创建；
   VM 无蓝牙适配器时 `bluetooth.service` 因 `ConditionPathIsDirectory=/sys/class/bluetooth`
   被跳过，桥接据此不置位蓝牙能力位，UI 不显示蓝牙分区）。
