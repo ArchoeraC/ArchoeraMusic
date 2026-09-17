@@ -90,9 +90,21 @@ issuescreenshot/
 # 本地临时测试（封面取色对照预览等，作者标注不入库）
 app/test/*_manual_test.dart
 
+# ArchoeraOS VM 构建产物（mkosi；本地镜像与缓存不入库）
+/os/vm/mkosi.output/
+/os/vm/mkosi.cache/
+/os/vm/mkosi.tools/
+/os/vm/mkosi.extra/opt/archoera/
+/os/vm/stage/
+
 # 编辑器临时文件（Kate swap / vim swap / 备份）
 *.kate-swp
 *.swp
 *.swo
 *~
 *.bak
+
+# mkosi SSH 凭据（禁止入库）
+/os/vm/mkosi.key
+/os/vm/mkosi.crt
+/os/vm/mkosi.key.pub

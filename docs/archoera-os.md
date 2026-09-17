@@ -320,7 +320,7 @@ GTK3 + EGL/Impeller 全屏渲染、dmabuf 导入与桌面方向均正确。踩�
 |---|---|---|
 | P0 | 嵌套合成器 + kiosk 策略 + 自定义协议 + 控制面 + 冒烟客户端 | ✅ |
 | P1 | `linux-dmabuf`（winit v3 / udev v4 feedback），renderer 上提共享状态 | ✅ |
-| P2 | udev 后端（DRM/KMS + libinput + libseat），编译验证 | ✅（未上机） |
+| P2 | udev 后端（DRM/KMS + libinput + libseat），编译验证 | ✅（已在 virtio-gpu VM 上验证，见 `os/vm/`） |
 | P3 | 会话接入：`ARCHOERA_SESSION_APP` 拉起 Flutter 播放器并验证全屏渲染 | ✅（嵌套已验，udev 待上机） |
 | P4 | 媒体键 / 电源键 / 音量键的端到端（libinput → 播放器） | ✅（协议桥接已接入；硬件按键实测待上机） |
 | P5 | 开机即视：systemd 用户会话 / getty 自动登录 + 最小 rootfs 打包（独立层） | ⬜ |

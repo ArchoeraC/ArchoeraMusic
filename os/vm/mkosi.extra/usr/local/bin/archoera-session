@@ -1,0 +1,24 @@
+#!/bin/sh
+# ArchoeraOS kiosk 会话（VM 验证用）：由 mkosi Autologin 在 tty1 自动登录后启动。
+# 日志同时输出到串口 hvc0（无头抓取）与 stdout。
+export RUST_LOG="${RUST_LOG:-archoera_shell=info,warn}"
+exec >/dev/hvc0 2>&1
+
+echo "[archoera-session] start $(date -Is) uid=$(id -u) tty=$(tty 2>/dev/null || echo '?')"
+echo "[diag] session=${XDG_SESSION_ID:-?} runtime=${XDG_RUNTIME_DIR:-?}"
+loginctl show-session "${XDG_SESSION_ID:-1}" -p Type -p Active -p Seat -p VTNr 2>&1
+ls -l /dev/dri /dev/input 2>&1
+
+while true; do
+    # 可选覆盖：在镜像内写 /opt/archoera/session.args 可追加参数
+    # （如 `--mode 1024x768 --scale 2`），无需重启即可用于下一轮循环。
+    args=""
+    if [ -f /opt/archoera/session.args ]; then
+        args="$(cat /opt/archoera/session.args)"
+    fi
+    echo "[archoera-session] 启动 udev kiosk $(date -Is) args='${args}'"
+    # shellcheck disable=SC2086
+    /opt/archoera/archoera-shell --backend udev $args -- /opt/archoera/archoera-smoke
+    echo "[archoera-session] 合成器退出 rc=$?，5s 后重试"
+    sleep 5
+done
