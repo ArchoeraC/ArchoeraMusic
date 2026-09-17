@@ -30,6 +30,7 @@ extension _LikedPageActions on _LikedPageState {
 
   void _switchPlatform(String platform) {
     if (platform == _platform) return;
+    ref.read(likedPlatformProvider.notifier).set(platform);
     setState(() => _platform = platform);
     if (_loggedIn) _ensureLoaded(platform);
   }

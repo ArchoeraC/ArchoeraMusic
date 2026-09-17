@@ -6,6 +6,8 @@ part of '../streaming_page.dart';
 
 extension _StreamingPageActions on _StreamingPageState {
   void _onTabChanged() {
+    // 记住 Tab（跨壳内容卸载/重挂载恢复）。
+    ref.read(streamingTabIndexProvider.notifier).set(_tab.index);
     if (_tab.indexIsChanging) return;
     _fetchCurrent();
   }

@@ -26,6 +26,7 @@ import '../../widgets/streaming/server_dropdown.dart';
 import '../../widgets/streaming/songs_tab.dart';
 import '../../widgets/streaming/status_dot.dart';
 import '../../services/streaming/streaming_provider.dart';
+import '../../stores/shell_page_state.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'streaming_page/streaming_page_actions.dart';
@@ -46,7 +47,12 @@ class _StreamingPageState extends ConsumerState<StreamingPage>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 4, vsync: this);
+    // 恢复上次 Tab（壳内容因播放页展开被卸载后重建）。
+    _tab = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: ref.read(streamingTabIndexProvider) ?? 0,
+    );
     _tab.addListener(_onTabChanged);
     // 启动时自动连接已有激活服务器（不阻塞首帧）
     WidgetsBinding.instance.addPostFrameCallback((_) {
