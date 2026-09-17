@@ -202,6 +202,24 @@ archoera-shell/src/
 
 ---
 
+## 7.1 默认用户与数据布局
+
+ArchoeraOS 以**普通用户 `archoera`**（uid 1000，家目录 `/home/archoera`）承载会话与
+持久化数据；DRM/输入设备经 `libseat → systemd-logind` 的 VT 会话授权，**不需要 root**。
+
+| 路径 | 用途 |
+|---|---|
+| `~/.local/share/ArchoeraMusic/` | 播放器数据：偏好、`scan_dirs.json`（媒体库）、流媒体服务器、下载 |
+| `~/.config/fcitx5/` | 输入法配置（镜像播种拼音 profile） |
+| `~/.local/state/archoera-session.log` | kiosk 会话日志（合成器/客户端/输入法） |
+| `~/Music/` | 媒体库默认位置（可在设置 → 系统 → 显示/媒体库中修改） |
+
+落地方式：`sysusers.d`（用户 + seat/tty/video/render/input/audio 组）、`tmpfiles.d`
+（家目录、XDG 子目录、从 `/usr/share/archoera/skel` 播种初始配置，目标存在则不覆盖）、
+自建 getty drop-in（tty1 → archoera；hvc0 → root 调试口）。
+
+---
+
 ## 8. 渲染路径
 
 - `GlesRenderer` + `smithay::desktop::space::render_output` + `OutputDamageTracker`；
