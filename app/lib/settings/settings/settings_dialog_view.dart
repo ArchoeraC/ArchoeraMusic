@@ -12,6 +12,9 @@ extension _SettingsDialogView on _SettingsDialogState {
     final window = MediaQuery.sizeOf(context);
     final animated = ref.watch(appPrefsProvider).sidebarNavStyle == 'animated';
     final devMode = ref.watch(appPrefsProvider).developerMode;
+    final osAvailable = ref
+        .watch(platformCapabilitiesProvider)
+        .osSessionAvailable;
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _updateCategoryIndicator(),
     );
@@ -83,7 +86,10 @@ extension _SettingsDialogView on _SettingsDialogState {
                               itemExtent: 43,
                               children: [
                                 for (final cat in SettingsCategory.values)
-                                  if (cat.visible(devMode))
+                                  if (cat.visible(
+                                    devMode,
+                                    osAvailable: osAvailable,
+                                  ))
                                     _buildCategoryItem(
                                       scheme,
                                       cat,
@@ -424,6 +430,18 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.serverOutline,
       ),
       _SearchEntry(
+        SettingsCategory.system,
+        l10n.systemBrightnessTitle,
+        l10n.systemScreenTitle,
+        EtaIcons.brightnessOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.system,
+        l10n.systemPowerTitle,
+        l10n.systemPowerShutdown,
+        EtaIcons.powerOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.about,
         l10n.settingsVersion,
         l10n.settingsSearchAboutSubtitle,
@@ -569,6 +587,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                 SettingsCategory.scrape => const ScrapeSection(),
                 SettingsCategory.scanner => const ScansSection(),
                 SettingsCategory.mediaSource => StreamingServerList(),
+                SettingsCategory.system => const SystemSection(),
                 SettingsCategory.about => AboutSection(
                   version: _version,
                   devHolding: _devHolding,
@@ -614,9 +633,12 @@ extension _SettingsDialogView on _SettingsDialogState {
   Widget _buildSearchResults(ColorScheme scheme, AppLocalizations l10n) {
     final q = _query.trim().toLowerCase();
     final devMode = ref.watch(appPrefsProvider).developerMode;
-    final index = _buildSearchIndex(
-      l10n,
-    ).where((e) => e.category.visible(devMode)).toList();
+    final osAvailable = ref
+        .watch(platformCapabilitiesProvider)
+        .osSessionAvailable;
+    final index = _buildSearchIndex(l10n)
+        .where((e) => e.category.visible(devMode, osAvailable: osAvailable))
+        .toList();
     final matches = index.where((e) => _searchMatch(e, q, l10n)).toList();
     if (matches.isEmpty) {
       return Center(
@@ -653,7 +675,7 @@ extension _SettingsDialogView on _SettingsDialogState {
           ),
           const SizedBox(height: 8),
           for (final cat in SettingsCategory.values)
-            if (cat.visible(devMode) &&
+            if (cat.visible(devMode, osAvailable: osAvailable) &&
                 matches.any((e) => e.category == cat)) ...[
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),

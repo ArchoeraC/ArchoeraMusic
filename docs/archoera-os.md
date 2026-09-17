@@ -301,6 +301,13 @@ GTK3 + EGL/Impeller 全屏渲染、dmabuf 导入与桌面方向均正确。踩�
 协议请求-事件往返已端到端验证（`set_volume(42)` → 合成器状态 42 → `volume_changed(42)`
 回传）；硬件媒体键触发待真机。
 
+**可见 UI**：设置弹窗新增「系统」分类（`settings_sections_system.dart`），仅在
+`osSessionAvailable` 时出现在导航中，内容按会话能力位动态渲染——电池状态、亮度滑条
+（松手落地）、屏幕 DPMS 开关、以及**经确认框**的关机 / 重启 / 挂起 / 休眠按钮；
+未运行于 `archoera-shell` 时显示说明行。状态经 Riverpod `NotifierProvider`
+（`osSessionProvider` 及其派生 provider）供 UI 订阅，回归测试见
+`app/test/system_section_test.dart`。
+
 ---
 
 ## 11. 路线图

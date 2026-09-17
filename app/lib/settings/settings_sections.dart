@@ -23,6 +23,9 @@ import '../app/app_quit.dart';
 import '../app/theme_provider.dart';
 import '../app/watermark.dart';
 import '../services/downloader/download_controller.dart';
+import '../services/platform/os_session.dart';
+import '../services/platform/platform_capabilities.dart';
+import '../services/platform/system_os.dart';
 import '../services/playback/engine_bindings.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/scraper/scrape_controller.dart';
@@ -49,6 +52,7 @@ part 'settings_sections/settings_sections_scrape.dart';
 part 'settings_sections/settings_sections_storage.dart';
 part 'settings_sections/settings_sections_about.dart';
 part 'settings_sections/settings_sections_developer.dart';
+part 'settings_sections/settings_sections_system.dart';
 
 // ── 输出设备（引擎 list_sinks JSON → Dart 模型）──────────────────────
 

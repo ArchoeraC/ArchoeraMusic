@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../services/platform/platform_capabilities.dart';
 import '../stores/app_prefs.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/anim.dart';

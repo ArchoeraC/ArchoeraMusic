@@ -18,6 +18,18 @@ enum OsSessionState { ready, shuttingDown, suspending }
 /// 电源键（对齐协议 `power_key`）。
 enum OsPowerKey { power, sleep, suspend }
 
+/// archoera_shell_v1 能力位（与协议 `capability` 一致）。
+abstract final class OsCapability {
+  static const int brightness = 1 << 0;
+  static const int power = 1 << 1;
+  static const int volume = 1 << 2;
+  static const int mediaKeys = 1 << 3;
+  static const int battery = 1 << 4;
+  static const int suspend = 1 << 5;
+  static const int powerKey = 1 << 6;
+  static const int screen = 1 << 7;
+}
+
 /// 电池快照。
 class OsBatteryState {
   const OsBatteryState({

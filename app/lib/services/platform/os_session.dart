@@ -5,7 +5,7 @@
 /// ArchoeraOS 会话宿主：把「播放器即系统」的会话状态接进应用。
 ///
 /// - 订阅合成器会话事件（媒体键经既有媒体命令流复用；电源键/亮度/电池/会话态
-///   在此观察）；
+///   在此观察并写入状态，供设置「系统」分区等 UI 读取）；
 /// - `shutting_down` / `suspending` 前暂停播放；
 /// - 把播放器音量镜像给合成器（`apl_os_set_volume`），使系统侧状态一致。
 ///
@@ -21,6 +21,101 @@ import '../playback/playback_notifier.dart';
 import '../playback/playback_state.dart';
 import 'platform_capabilities.dart';
 import 'system_os.dart';
+
+/// ArchoeraOS 会话状态快照（不可变）。
+@immutable
+class OsState {
+  const OsState({
+    this.capabilities = 0,
+    this.brightness,
+    this.battery,
+    this.screenEnabled,
+    this.session = OsSessionState.ready,
+  });
+
+  /// 会话能力位图（archoera_shell_v1 capability；0 = 未知/未订阅）。
+  final int capabilities;
+
+  /// 当前亮度（0-100；null = 未知）。
+  final int? brightness;
+
+  /// 当前电池状态（null = 未知/无电池）。
+  final OsBatteryState? battery;
+
+  /// 屏幕开关（DPMS；null = 未知）。
+  final bool? screenEnabled;
+
+  /// 会话态。
+  final OsSessionState session;
+
+  static const Object _unset = Object();
+
+  OsState copyWith({
+    int? capabilities,
+    Object? brightness = _unset,
+    Object? battery = _unset,
+    Object? screenEnabled = _unset,
+    OsSessionState? session,
+  }) {
+    return OsState(
+      capabilities: capabilities ?? this.capabilities,
+      brightness: identical(brightness, _unset)
+          ? this.brightness
+          : brightness as int?,
+      battery: identical(battery, _unset)
+          ? this.battery
+          : battery as OsBatteryState?,
+      screenEnabled: identical(screenEnabled, _unset)
+          ? this.screenEnabled
+          : screenEnabled as bool?,
+      session: session ?? this.session,
+    );
+  }
+}
+
+/// 会话状态 Notifier（由 [OsSessionHost] 写入）。
+class OsSessionNotifier extends Notifier<OsState> {
+  @override
+  OsState build() => const OsState();
+
+  void setCapabilities(int v) => state = state.copyWith(capabilities: v);
+  void setBrightness(int? v) => state = state.copyWith(brightness: v);
+  void setBattery(OsBatteryState? v) => state = state.copyWith(battery: v);
+  void setScreenEnabled(bool? v) => state = state.copyWith(screenEnabled: v);
+  void setSession(OsSessionState v) => state = state.copyWith(session: v);
+}
+
+/// 会话状态总源。
+final osSessionProvider = NotifierProvider<OsSessionNotifier, OsState>(
+  OsSessionNotifier.new,
+);
+
+/// 派生只读 provider（供 UI 订阅，避免整体重建）。
+final osCapabilitiesProvider = Provider<int>(
+  (ref) => ref.watch(osSessionProvider.select((s) => s.capabilities)),
+);
+final osBrightnessProvider = Provider<int?>(
+  (ref) => ref.watch(osSessionProvider.select((s) => s.brightness)),
+);
+final osBatteryProvider = Provider<OsBatteryState?>(
+  (ref) => ref.watch(osSessionProvider.select((s) => s.battery)),
+);
+final osScreenEnabledProvider = Provider<bool?>(
+  (ref) => ref.watch(osSessionProvider.select((s) => s.screenEnabled)),
+);
+final osSessionStateProvider = Provider<OsSessionState>(
+  (ref) => ref.watch(osSessionProvider.select((s) => s.session)),
+);
+
+/// 会话能力是否可用（供设置导航 gate；测试可覆盖）。
+final osSessionAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(platformCapabilitiesProvider).osSessionAvailable,
+);
+
+/// 会话控制面（请求入口；测试可覆盖为假实现）。
+final osSessionControllerProvider = Provider<SystemOsSession>(
+  (ref) => ref.watch(platformCapabilitiesProvider).os,
+);
 
 class OsSessionHost extends ConsumerStatefulWidget {
   const OsSessionHost({super.key, required this.child});
@@ -38,6 +133,8 @@ class _OsSessionHostState extends ConsumerState<OsSessionHost> {
   bool _eventsOn = false;
   int _lastVolumePercent = -1;
 
+  OsSessionNotifier get _osState => ref.read(osSessionProvider.notifier);
+
   @override
   void initState() {
     super.initState();
@@ -46,16 +143,29 @@ class _OsSessionHostState extends ConsumerState<OsSessionHost> {
       return;
     }
 
-    _subs.add(_os.session.listen(_onSession));
+    _subs.add(_os.capabilities.listen(_osState.setCapabilities));
+    _subs.add(_os.brightness.listen(_osState.setBrightness));
     _subs.add(
-      _os.battery.listen(
-        (b) => debugPrint(
+      _os.battery.listen((b) {
+        _osState.setBattery(b);
+        debugPrint(
           '[os] battery present=${b.present} ${b.percent}% '
           '${b.charging ? 'charging' : 'discharging'}',
-        ),
-      ),
+        );
+      }),
     );
-    _subs.add(_os.screenEnabled.listen((e) => debugPrint('[os] screen=$e')));
+    _subs.add(
+      _os.screenEnabled.listen((e) {
+        _osState.setScreenEnabled(e);
+        debugPrint('[os] screen=$e');
+      }),
+    );
+    _subs.add(
+      _os.session.listen((s) {
+        _osState.setSession(s);
+        _onSession(s);
+      }),
+    );
     _subs.add(_os.powerKey.listen((k) => debugPrint('[os] power_key=$k')));
 
     _eventsOn = _os.setEvents(true) == 0;

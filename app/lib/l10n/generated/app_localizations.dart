@@ -7753,6 +7753,138 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'返回'**
   String get shortcutActionBack;
+
+  /// No description provided for @settingsCatSystem.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统'**
+  String get settingsCatSystem;
+
+  /// No description provided for @settingsSystemSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'亮度、屏幕与电源（ArchoeraOS 会话）'**
+  String get settingsSystemSubtitle;
+
+  /// No description provided for @systemUnavailableTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未运行于 ArchoeraOS'**
+  String get systemUnavailableTitle;
+
+  /// No description provided for @systemUnavailableBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前会话未提供 archoera_shell_v1 控制面，亮度与电源等系统能力不可用。'**
+  String get systemUnavailableBody;
+
+  /// No description provided for @systemBatteryTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'电池'**
+  String get systemBatteryTitle;
+
+  /// No description provided for @systemBatteryPercent.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{percent}%'**
+  String systemBatteryPercent(int percent);
+
+  /// No description provided for @systemBatteryCharging.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'充电中'**
+  String get systemBatteryCharging;
+
+  /// No description provided for @systemBatteryDischarging.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'使用电池'**
+  String get systemBatteryDischarging;
+
+  /// No description provided for @systemBatteryAbsent.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无电池'**
+  String get systemBatteryAbsent;
+
+  /// No description provided for @systemBrightnessTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'屏幕亮度'**
+  String get systemBrightnessTitle;
+
+  /// No description provided for @systemScreenTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'屏幕'**
+  String get systemScreenTitle;
+
+  /// No description provided for @systemScreenOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'点亮'**
+  String get systemScreenOn;
+
+  /// No description provided for @systemScreenOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'熄灭'**
+  String get systemScreenOff;
+
+  /// No description provided for @systemPowerTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'电源'**
+  String get systemPowerTitle;
+
+  /// No description provided for @systemPowerShutdown.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关机'**
+  String get systemPowerShutdown;
+
+  /// No description provided for @systemPowerReboot.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重启'**
+  String get systemPowerReboot;
+
+  /// No description provided for @systemPowerSuspend.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'挂起'**
+  String get systemPowerSuspend;
+
+  /// No description provided for @systemPowerHibernate.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'休眠'**
+  String get systemPowerHibernate;
+
+  /// No description provided for @systemConfirmTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确认{action}'**
+  String systemConfirmTitle(String action);
+
+  /// No description provided for @systemConfirmBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确定要{action}吗？'**
+  String systemConfirmBody(String action);
+
+  /// No description provided for @systemSessionSuspending.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统即将挂起'**
+  String get systemSessionSuspending;
+
+  /// No description provided for @systemSessionShuttingDown.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统即将关闭'**
+  String get systemSessionShuttingDown;
 }
 
 class _AppLocalizationsDelegate

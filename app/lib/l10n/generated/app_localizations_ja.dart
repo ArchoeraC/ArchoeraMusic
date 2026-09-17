@@ -4218,4 +4218,77 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get shortcutActionBack => '戻る';
+
+  @override
+  String get settingsCatSystem => 'システム';
+
+  @override
+  String get settingsSystemSubtitle => '明るさ・画面・電源（ArchoeraOS セッション）';
+
+  @override
+  String get systemUnavailableTitle => 'ArchoeraOS 上で実行されていません';
+
+  @override
+  String get systemUnavailableBody =>
+      'このセッションには archoera_shell_v1 コントロールプレーンがないため、明るさや電源は利用できません。';
+
+  @override
+  String get systemBatteryTitle => 'バッテリー';
+
+  @override
+  String systemBatteryPercent(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get systemBatteryCharging => '充電中';
+
+  @override
+  String get systemBatteryDischarging => 'バッテリー駆動';
+
+  @override
+  String get systemBatteryAbsent => 'バッテリーなし';
+
+  @override
+  String get systemBrightnessTitle => '明るさ';
+
+  @override
+  String get systemScreenTitle => '画面';
+
+  @override
+  String get systemScreenOn => 'オン';
+
+  @override
+  String get systemScreenOff => 'オフ';
+
+  @override
+  String get systemPowerTitle => '電源';
+
+  @override
+  String get systemPowerShutdown => 'シャットダウン';
+
+  @override
+  String get systemPowerReboot => '再起動';
+
+  @override
+  String get systemPowerSuspend => 'サスペンド';
+
+  @override
+  String get systemPowerHibernate => 'ハイバネート';
+
+  @override
+  String systemConfirmTitle(String action) {
+    return '$actionの確認';
+  }
+
+  @override
+  String systemConfirmBody(String action) {
+    return '本当に$actionしますか？';
+  }
+
+  @override
+  String get systemSessionSuspending => 'まもなくサスペンドします';
+
+  @override
+  String get systemSessionShuttingDown => 'まもなくシャットダウンします';
 }

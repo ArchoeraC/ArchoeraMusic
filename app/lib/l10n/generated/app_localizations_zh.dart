@@ -4169,6 +4169,79 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get shortcutActionBack => '返回';
+
+  @override
+  String get settingsCatSystem => '系统';
+
+  @override
+  String get settingsSystemSubtitle => '亮度、屏幕与电源（ArchoeraOS 会话）';
+
+  @override
+  String get systemUnavailableTitle => '未运行于 ArchoeraOS';
+
+  @override
+  String get systemUnavailableBody =>
+      '当前会话未提供 archoera_shell_v1 控制面，亮度与电源等系统能力不可用。';
+
+  @override
+  String get systemBatteryTitle => '电池';
+
+  @override
+  String systemBatteryPercent(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get systemBatteryCharging => '充电中';
+
+  @override
+  String get systemBatteryDischarging => '使用电池';
+
+  @override
+  String get systemBatteryAbsent => '无电池';
+
+  @override
+  String get systemBrightnessTitle => '屏幕亮度';
+
+  @override
+  String get systemScreenTitle => '屏幕';
+
+  @override
+  String get systemScreenOn => '点亮';
+
+  @override
+  String get systemScreenOff => '熄灭';
+
+  @override
+  String get systemPowerTitle => '电源';
+
+  @override
+  String get systemPowerShutdown => '关机';
+
+  @override
+  String get systemPowerReboot => '重启';
+
+  @override
+  String get systemPowerSuspend => '挂起';
+
+  @override
+  String get systemPowerHibernate => '休眠';
+
+  @override
+  String systemConfirmTitle(String action) {
+    return '确认$action';
+  }
+
+  @override
+  String systemConfirmBody(String action) {
+    return '确定要$action吗？';
+  }
+
+  @override
+  String get systemSessionSuspending => '系统即将挂起';
+
+  @override
+  String get systemSessionShuttingDown => '系统即将关闭';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -8336,6 +8409,79 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get shortcutActionBack => '返回';
+
+  @override
+  String get settingsCatSystem => '系统';
+
+  @override
+  String get settingsSystemSubtitle => '亮度、屏幕与电源（ArchoeraOS 会话）';
+
+  @override
+  String get systemUnavailableTitle => '未运行于 ArchoeraOS';
+
+  @override
+  String get systemUnavailableBody =>
+      '当前会话未提供 archoera_shell_v1 控制面，亮度与电源等系统能力不可用。';
+
+  @override
+  String get systemBatteryTitle => '电池';
+
+  @override
+  String systemBatteryPercent(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get systemBatteryCharging => '充电中';
+
+  @override
+  String get systemBatteryDischarging => '使用电池';
+
+  @override
+  String get systemBatteryAbsent => '无电池';
+
+  @override
+  String get systemBrightnessTitle => '屏幕亮度';
+
+  @override
+  String get systemScreenTitle => '屏幕';
+
+  @override
+  String get systemScreenOn => '点亮';
+
+  @override
+  String get systemScreenOff => '熄灭';
+
+  @override
+  String get systemPowerTitle => '电源';
+
+  @override
+  String get systemPowerShutdown => '关机';
+
+  @override
+  String get systemPowerReboot => '重启';
+
+  @override
+  String get systemPowerSuspend => '挂起';
+
+  @override
+  String get systemPowerHibernate => '休眠';
+
+  @override
+  String systemConfirmTitle(String action) {
+    return '确认$action';
+  }
+
+  @override
+  String systemConfirmBody(String action) {
+    return '确定要$action吗？';
+  }
+
+  @override
+  String get systemSessionSuspending => '系统即将挂起';
+
+  @override
+  String get systemSessionShuttingDown => '系统即将关闭';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -12504,4 +12650,77 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get shortcutActionBack => '返回';
+
+  @override
+  String get settingsCatSystem => '系統';
+
+  @override
+  String get settingsSystemSubtitle => '亮度、螢幕與電源（ArchoeraOS 工作階段）';
+
+  @override
+  String get systemUnavailableTitle => '未執行於 ArchoeraOS';
+
+  @override
+  String get systemUnavailableBody =>
+      '目前工作階段未提供 archoera_shell_v1 控制面，亮度與電源等系統能力無法使用。';
+
+  @override
+  String get systemBatteryTitle => '電池';
+
+  @override
+  String systemBatteryPercent(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get systemBatteryCharging => '充電中';
+
+  @override
+  String get systemBatteryDischarging => '使用電池';
+
+  @override
+  String get systemBatteryAbsent => '無電池';
+
+  @override
+  String get systemBrightnessTitle => '螢幕亮度';
+
+  @override
+  String get systemScreenTitle => '螢幕';
+
+  @override
+  String get systemScreenOn => '點亮';
+
+  @override
+  String get systemScreenOff => '熄滅';
+
+  @override
+  String get systemPowerTitle => '電源';
+
+  @override
+  String get systemPowerShutdown => '關機';
+
+  @override
+  String get systemPowerReboot => '重新開機';
+
+  @override
+  String get systemPowerSuspend => '暫停';
+
+  @override
+  String get systemPowerHibernate => '休眠';
+
+  @override
+  String systemConfirmTitle(String action) {
+    return '確認$action';
+  }
+
+  @override
+  String systemConfirmBody(String action) {
+    return '確定要$action嗎？';
+  }
+
+  @override
+  String get systemSessionSuspending => '系統即將暫停';
+
+  @override
+  String get systemSessionShuttingDown => '系統即將關閉';
 }

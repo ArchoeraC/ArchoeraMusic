@@ -4449,4 +4449,79 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get shortcutActionBack => 'Retour';
+
+  @override
+  String get settingsCatSystem => 'Système';
+
+  @override
+  String get settingsSystemSubtitle =>
+      'Luminosité, écran et alimentation (session ArchoeraOS)';
+
+  @override
+  String get systemUnavailableTitle => 'N\'est pas exécuté sur ArchoeraOS';
+
+  @override
+  String get systemUnavailableBody =>
+      'Cette session ne fournit pas le plan de contrôle archoera_shell_v1 ; la luminosité et l\'alimentation sont indisponibles.';
+
+  @override
+  String get systemBatteryTitle => 'Batterie';
+
+  @override
+  String systemBatteryPercent(int percent) {
+    return '$percent %';
+  }
+
+  @override
+  String get systemBatteryCharging => 'En charge';
+
+  @override
+  String get systemBatteryDischarging => 'Sur batterie';
+
+  @override
+  String get systemBatteryAbsent => 'Aucune batterie';
+
+  @override
+  String get systemBrightnessTitle => 'Luminosité';
+
+  @override
+  String get systemScreenTitle => 'Écran';
+
+  @override
+  String get systemScreenOn => 'Allumé';
+
+  @override
+  String get systemScreenOff => 'Éteint';
+
+  @override
+  String get systemPowerTitle => 'Alimentation';
+
+  @override
+  String get systemPowerShutdown => 'Éteindre';
+
+  @override
+  String get systemPowerReboot => 'Redémarrer';
+
+  @override
+  String get systemPowerSuspend => 'Veille';
+
+  @override
+  String get systemPowerHibernate => 'Hibernation';
+
+  @override
+  String systemConfirmTitle(String action) {
+    return 'Confirmer $action';
+  }
+
+  @override
+  String systemConfirmBody(String action) {
+    return 'Voulez-vous vraiment $action ?';
+  }
+
+  @override
+  String get systemSessionSuspending =>
+      'Le système va bientôt se mettre en veille';
+
+  @override
+  String get systemSessionShuttingDown => 'Le système va bientôt s\'éteindre';
 }
