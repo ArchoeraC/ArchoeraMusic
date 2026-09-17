@@ -13,6 +13,7 @@ import '../services/playback/playback_notifier.dart';
 import '../services/qqmusic/qq_liked_store.dart';
 import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
 import '../stores/providers.dart';
+import '../stores/shell_page_state.dart';
 import '../../l10n/l10n.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../widgets/dialogs/kugou_login_button.dart';
@@ -49,7 +50,8 @@ class LikedPage extends ConsumerStatefulWidget {
 class _LikedPageState extends ConsumerState<LikedPage> {
   static const _qqPlatform = 'qqmusic';
 
-  String _platform = 'netease';
+  /// 当前平台；存于 [likedPlatformProvider]（跨壳内容卸载/重挂载保留）。
+  late String _platform;
   bool _resolving = false;
 
   bool get _neteaseLoggedIn => ref.read(neteaseAuthProvider) != null;
@@ -67,14 +69,19 @@ class _LikedPageState extends ConsumerState<LikedPage> {
   @override
   void initState() {
     super.initState();
-    // 默认选已登录平台（NT优先；无NT/KG但已登录 QQ → QQ 本机
-    // 红心；都未登录保持NT引导）
-    if (!_neteaseLoggedIn && _kugouLoggedIn) {
-      _platform = 'kugou';
-    } else if (!_neteaseLoggedIn && !_kugouLoggedIn && _qqLoggedIn) {
-      _platform = _qqPlatform;
-    }
+    // 优先恢复上次显式选择（壳内容因播放页展开被卸载后重建）；
+    // 无显式选择时按登录态给默认值：默认选已登录平台（NT优先；无NT/KG
+    // 但已登录 QQ → QQ 本机红心；都未登录保持NT引导）。
+    _platform = ref.read(likedPlatformProvider) ?? _defaultPlatform();
     if (_loggedIn) _ensureLoaded(_platform);
+  }
+
+  String _defaultPlatform() {
+    if (!_neteaseLoggedIn && _kugouLoggedIn) return 'kugou';
+    if (!_neteaseLoggedIn && !_kugouLoggedIn && _qqLoggedIn) {
+      return _qqPlatform;
+    }
+    return 'netease';
   }
 
   LikedStore get _store => ref.read(likedStoreProvider);

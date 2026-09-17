@@ -8,6 +8,8 @@ part of '../search_page.dart';
 
 extension _SearchPageActions on _SearchPageState {
   void _onTabChanged() {
+    // 记住 Tab（跨壳内容卸载/重挂载恢复）。
+    ref.read(searchTabIndexProvider.notifier).set(_tabs.index);
     if (!_tabs.indexIsChanging) return;
     // 切换 tab：未拉过则按需请求（对齐 Search.vue watch activeTab）
     if (_query.isNotEmpty && !_currentState.loaded) {
@@ -20,6 +22,7 @@ extension _SearchPageActions on _SearchPageState {
   /// 并行合并——songs 与 albums/artists/playlists 各 tab 均聚合）。
   void _switchPlatform(String platform) {
     if (platform == _platform) return;
+    ref.read(searchPlatformProvider.notifier).set(platform);
     setState(() => _platform = platform);
     _resetAll();
     if (_query.isNotEmpty) unawaited(_fetch(append: false));

@@ -15,6 +15,7 @@ import '../services/playback/playback_notifier.dart';
 import '../services/qqmusic/qqmusic_api.dart' show QqApiException;
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
+import '../stores/shell_page_state.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/list/cover_grid.dart';
@@ -66,7 +67,10 @@ class _SearchPageState extends ConsumerState<SearchPage>
   String _error = '';
 
   /// 搜索平台（'netease' / 'kugou' / 'qqmusic' / 'all' 聚合）。
-  String _platform = 'netease';
+  ///
+  /// 存于 [searchPlatformProvider]（跨壳内容卸载/重挂载保留），
+  /// 页面 `State` 重建时于 [initState] 恢复。
+  late String _platform;
 
   /// 聚合搜索（'all'）：**songs** tab 各平台分页游标。
   final Map<String, _AggState> _songAgg = {
@@ -91,7 +95,13 @@ class _SearchPageState extends ConsumerState<SearchPage>
   void initState() {
     super.initState();
     _query = widget.initialQuery.trim();
-    _tabs = TabController(length: 4, vsync: this);
+    // 恢复上次的平台 / Tab 选择（壳内容因播放页展开被卸载后重建）。
+    _platform = ref.read(searchPlatformProvider) ?? 'netease';
+    _tabs = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: ref.read(searchTabIndexProvider) ?? 0,
+    );
     _tabs.addListener(_onTabChanged);
     if (_query.isNotEmpty) {
       unawaited(_fetch(append: false));
