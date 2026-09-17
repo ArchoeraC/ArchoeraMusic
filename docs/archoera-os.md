@@ -139,6 +139,9 @@ archoera-shell/src/
 
 - `Logind::connect()` 连系统总线；失败则 `logind = None`。
 - **电源**：`PowerOff` / `Reboot`（先 `interactive=false`，失败再 `true`）。
+- **挂起/休眠**：logind `CanSuspend` / `CanHibernate` 报 `yes` 才置 `suspend` 能力位；
+  `Suspend` / `Hibernate` 是同步阻塞调用（系统恢复后才返回），动作前广播 `suspending`，
+  返回后恢复为 `ready`。
 - **亮度**：优先 `/sys/class/backlight` 直写（`brightness.rs`），logind
   `Session.SetBrightness` 兜底；两者都没有 → 不置 `brightness` 能力位。
 - **防休眠**：`zwp_idle_inhibit_manager_v1` → `logind.Inhibit("idle", ..., "block")`，
@@ -146,32 +149,42 @@ archoera-shell/src/
 - **电池**：`/sys/class/power_supply` 采样，周期性广播。
 - **音量**：合成器只做**状态镜像**与事件广播，实际音频由播放器落实（`set_volume`
   仅更新内部值并回 `volume_changed`）。
-- **媒体键**：合成器把硬件键映射为 `media_key` 事件下发给播放器。
-- **能力位**：按实际可用性动态计算（背光/logind/电池各自决定是否置位），bind 时下发。
+- **屏幕**：`set_screen_enabled` 由 udev 后端落实（`DrmOutputManager::pause` /
+  `activate`，即 DPMS）；嵌套后端不置位 `screen` 能力位，请求被静默忽略。
+- **媒体键 / 电源键**：合成器把硬件键映射为 `media_key` / `power_key` 事件下发给播放器
+  （媒体键同时照常转发给客户端）。
+- **能力位**：按实际可用性动态计算（背光/logind/挂起/电池/屏幕各自决定是否置位），
+  bind 时下发。
 
 ---
 
-## 7. `archoera_shell_v1` 协议
+## 7. `archoera_shell_v1` 协议（version 2）
 
-全局对象，每客户端绑定一次；bind 时立即下发 `capabilities` + 当前状态（亮度/音量/电池/会话）。
+全局对象，每客户端绑定一次；bind 时立即下发 `capabilities` + 当前状态（亮度/音量/电池/屏幕/会话）。
 
 | 方向 | 名称 | 参数 |
 |---|---|---|
 | request | `destroy` | （destructor） |
 | request | `power_off` / `reboot` | — |
+| request | `suspend` / `hibernate` | — |
 | request | `set_brightness` | `percent: uint` |
 | request | `set_volume` | `percent: uint` |
+| request | `set_screen_enabled` | `enabled: uint` |
 | event | `capabilities` | `flags: uint`（bitfield） |
 | event | `brightness_changed` / `volume_changed` | `percent: uint` |
 | event | `media_key` | `key: enum media_key` |
+| event | `power_key` | `key: enum power_key`（power/sleep/suspend） |
 | event | `battery` | `present/percent/charging: uint` |
 | event | `session` | `state: enum session_state` |
+| event | `screen_enabled_changed` | `enabled: uint` |
 
-能力位：`brightness=1`、`power=2`、`volume=4`、`media_keys=8`、`battery=16`。
+能力位：`brightness=1`、`power=2`、`volume=4`、`media_keys=8`、`battery=16`、
+`suspend=32`、`power_key=64`、`screen=128`（仅 udev 后端置位 `screen`）。
 **未置位的请求被静默忽略**（不报协议错误），保证前后兼容与降级安全。
 
 设计要点：越界百分比由合成器夹取；`destroy` 只销毁协议对象，不影响会话本身；
-`session = shutting_down` 在电源动作**之前**广播并 flush，给播放器保存/淡出的机会。
+`session = shutting_down` 在电源动作**之前**广播并 flush，给播放器保存/淡出的机会；
+`suspending` 同理，且在系统恢复后重新下发 `ready`（挂起是同步阻塞调用）。
 
 ---
 

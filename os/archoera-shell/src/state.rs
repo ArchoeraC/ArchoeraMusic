@@ -43,7 +43,7 @@ use crate::{
     cli::ShellConfig,
     control::ControlPlane,
     kiosk::OutputRect,
-    protocol::{ArchoeraShellV1, Capability, MediaKey, SessionState},
+    protocol::{ArchoeraShellV1, Capability, MediaKey, PowerKey, SessionState},
     CalloopData,
 };
 
@@ -349,6 +349,9 @@ impl ArchoeraShell {
             battery.percent,
             battery.charging as u32,
         );
+        if self.has_capability(Capability::Screen) {
+            shell.screen_enabled_changed(self.control.screen_enabled() as u32);
+        }
         shell.session(self.session_state);
     }
 
@@ -371,6 +374,14 @@ impl ArchoeraShell {
 
     pub fn notify_media_key(&self, key: MediaKey) {
         self.broadcast(|s| s.media_key(key));
+    }
+
+    pub fn notify_power_key(&self, key: PowerKey) {
+        self.broadcast(|s| s.power_key(key));
+    }
+
+    pub fn notify_screen_enabled(&self, enabled: bool) {
+        self.broadcast(|s| s.screen_enabled_changed(enabled as u32));
     }
 
     pub fn notify_session(&self, state: SessionState) {
@@ -399,11 +410,23 @@ impl ArchoeraShell {
         if !self.needs_redraw {
             return;
         }
+        // 熄屏期间不合成（udev 输出已暂停）：保持 dirty，亮屏时补一帧。
+        if self.control.screen_supported() && !self.control.screen_enabled() {
+            return;
+        }
         let space = &self.space;
         if let Some(backend) = self.backend.as_mut() {
             if let Err(err) = backend.request_frame(space) {
                 tracing::warn!(%err, "调度重绘失败");
             }
+        }
+    }
+
+    /// 开关屏幕（DPMS），委派渲染后端；非 udev 后端为无操作。
+    pub fn set_screen_power(&mut self, enabled: bool) -> anyhow::Result<()> {
+        match self.backend.as_mut() {
+            Some(backend) => backend.set_screen_power(enabled),
+            None => Ok(()),
         }
     }
 

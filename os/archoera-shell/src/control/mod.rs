@@ -26,6 +26,9 @@ pub struct ControlPlane {
     volume: u32,
     /// 防休眠抑制 fd：持有即生效，丢弃即释放。
     idle_inhibit: Option<OwnedFd>,
+    /// 屏幕开关（DPMS）是否受支持：仅 udev 裸机后端可置位。
+    screen_supported: bool,
+    screen_enabled: bool,
 }
 
 impl ControlPlane {
@@ -41,8 +44,16 @@ impl ControlPlane {
         if logind.is_some() {
             capabilities |= Capability::Power;
         }
+        // 挂起/休眠：logind 明确报告可用时才置位（普通用户即可）。
+        if let Some(logind) = &logind {
+            if logind.can_suspend() || logind.can_hibernate() {
+                capabilities |= Capability::Suspend;
+            }
+        }
         // 音量由播放器落实，合成器只做状态镜像与事件广播，故始终置位。
         capabilities |= Capability::Volume | Capability::MediaKeys;
+        // 电源键 / 睡眠键由输入后端映射后广播，始终置位。
+        capabilities |= Capability::PowerKey;
         if battery.is_some() {
             capabilities |= Capability::Battery;
         }
@@ -54,6 +65,8 @@ impl ControlPlane {
             capabilities,
             volume: volume.min(100),
             idle_inhibit: None,
+            screen_supported: false,
+            screen_enabled: true,
         }
     }
 
@@ -99,6 +112,51 @@ impl ControlPlane {
             .reboot(false)
             .or_else(|_| logind.reboot(true))
             .map_err(|e| anyhow::anyhow!("重启失败: {e}"))
+    }
+
+    pub fn suspend(&self) -> anyhow::Result<()> {
+        let logind = self
+            .logind
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("logind 不可用，无法挂起"))?;
+        logind
+            .suspend(false)
+            .or_else(|_| logind.suspend(true))
+            .map_err(|e| anyhow::anyhow!("挂起失败: {e}"))
+    }
+
+    pub fn hibernate(&self) -> anyhow::Result<()> {
+        let logind = self
+            .logind
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("logind 不可用，无法休眠"))?;
+        logind
+            .hibernate(false)
+            .or_else(|_| logind.hibernate(true))
+            .map_err(|e| anyhow::anyhow!("休眠失败: {e}"))
+    }
+
+    /// 标记屏幕开关能力（由 udev 后端初始化时置位）。
+    pub fn set_screen_supported(&mut self, supported: bool) {
+        self.screen_supported = supported;
+        if supported {
+            self.capabilities |= Capability::Screen;
+        } else {
+            self.capabilities.remove(Capability::Screen);
+        }
+    }
+
+    pub fn screen_supported(&self) -> bool {
+        self.screen_supported
+    }
+
+    pub fn screen_enabled(&self) -> bool {
+        self.screen_enabled
+    }
+
+    /// 记录屏幕开关状态（实际 DPMS 动作由后端落实）。
+    pub fn set_screen_enabled(&mut self, enabled: bool) {
+        self.screen_enabled = enabled;
     }
 
     pub fn battery_state(&self) -> BatteryState {

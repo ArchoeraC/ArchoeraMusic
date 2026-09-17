@@ -60,6 +60,37 @@ impl Logind {
         Ok(())
     }
 
+    /// 挂起到内存。
+    pub fn suspend(&self, interactive: bool) -> anyhow::Result<()> {
+        self.manager()?
+            .call::<_, _, ()>("Suspend", &(interactive,))?;
+        Ok(())
+    }
+
+    /// 休眠到磁盘。
+    pub fn hibernate(&self, interactive: bool) -> anyhow::Result<()> {
+        self.manager()?
+            .call::<_, _, ()>("Hibernate", &(interactive,))?;
+        Ok(())
+    }
+
+    /// `CanSuspend` / `CanHibernate` 是否返回 `"yes"`（普通用户可用）。
+    pub fn can_suspend(&self) -> bool {
+        self.can("CanSuspend")
+    }
+
+    pub fn can_hibernate(&self) -> bool {
+        self.can("CanHibernate")
+    }
+
+    fn can(&self, method: &str) -> bool {
+        self.manager()
+            .ok()
+            .and_then(|manager| manager.call::<_, _, String>(method, &()).ok())
+            .map(|answer| answer == "yes")
+            .unwrap_or(false)
+    }
+
     /// 设置背光。`subsystem` 固定为 `"backlight"`，`name` 为 `/sys/class/backlight` 下的设备名。
     pub fn set_brightness(&self, name: &str, value: u32) -> anyhow::Result<()> {
         let manager = self.manager()?;

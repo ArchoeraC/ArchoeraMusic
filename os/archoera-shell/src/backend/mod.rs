@@ -121,6 +121,17 @@ impl Backend {
             Backend::Udev(backend) => backend.render(space),
         }
     }
+
+    /// 开关屏幕（DPMS）。仅 udev 后端实现（暂停 / 激活 DRM 输出管理器）；
+    /// 嵌套后端不置位该能力，这里为无操作。
+    #[cfg_attr(not(feature = "udev"), allow(unused_variables))]
+    pub fn set_screen_power(&mut self, enabled: bool) -> anyhow::Result<()> {
+        match self {
+            Backend::Winit(_) => Ok(()),
+            #[cfg(feature = "udev")]
+            Backend::Udev(backend) => backend.set_screen_power(enabled),
+        }
+    }
 }
 
 /// 按配置初始化渲染/输入后端。

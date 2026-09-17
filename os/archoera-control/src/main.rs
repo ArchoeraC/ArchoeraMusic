@@ -22,7 +22,7 @@ use wayland_client::{
     Connection, Dispatch, QueueHandle,
 };
 
-use protocol::{ArchoeraShellV1, Capability, Event, MediaKey, SessionState};
+use protocol::{ArchoeraShellV1, Capability, Event, MediaKey, PowerKey, SessionState};
 
 fn main() -> ExitCode {
     match run() {
@@ -48,7 +48,7 @@ fn run() -> Result<()> {
         registry_queue_init::<ControlState>(&conn).context("初始化 Wayland registry 失败")?;
     let qh = queue.handle();
     let shell: ArchoeraShellV1 = globals
-        .bind(&qh, 1..=1, ())
+        .bind(&qh, 1..=2, ())
         .context("合成器未提供 archoera_shell_v1 全局对象（当前会话不是 ArchoeraOS？）")?;
 
     let mut state = ControlState::default();
@@ -101,6 +101,31 @@ fn run() -> Result<()> {
             let _ = queue.roundtrip(&mut state);
             println!("已提交重启请求");
         }
+        Command::Suspend => {
+            queue.roundtrip(&mut state).context("读取初始能力失败")?;
+            warn_if_unsupported(&state, Capability::Suspend, "挂起");
+            shell.suspend();
+            let _ = queue.roundtrip(&mut state);
+            println!("已提交挂起请求（系统恢复后返回）");
+        }
+        Command::Hibernate => {
+            queue.roundtrip(&mut state).context("读取初始能力失败")?;
+            warn_if_unsupported(&state, Capability::Suspend, "休眠");
+            shell.hibernate();
+            let _ = queue.roundtrip(&mut state);
+            println!("已提交休眠请求");
+        }
+        Command::Screen(on) => {
+            queue.roundtrip(&mut state).context("读取初始能力失败")?;
+            warn_if_unsupported(&state, Capability::Screen, "屏幕控制");
+            shell.set_screen_enabled(on as u32);
+            queue.roundtrip(&mut state).context("提交屏幕请求失败")?;
+            match state.screen {
+                Some(current) if current != on => println!("屏幕请求已发送"),
+                Some(_) => println!("屏幕 → {}", if on { "开" } else { "关" }),
+                None => println!("屏幕请求已发送（当前会话未通告屏幕状态）"),
+            }
+        }
     }
 
     Ok(())
@@ -115,6 +140,8 @@ struct ControlState {
     /// (是否插电, 电量百分比, 是否充电中)
     battery: Option<(bool, u32, bool)>,
     session: Option<SessionState>,
+    /// 屏幕开关（DPMS）；仅 udev 后端会下发。
+    screen: Option<bool>,
     /// `watch` 模式下随事件逐条打印。
     verbose: bool,
 }
@@ -160,6 +187,9 @@ impl Dispatch<ArchoeraShellV1, ()> for ControlState {
             Event::MediaKey { key } => {
                 println!("媒体键: {}", media_key_label(key.into_result().ok()));
             }
+            Event::PowerKey { key } => {
+                println!("电源键: {}", power_key_label(key.into_result().ok()));
+            }
             Event::Battery {
                 present,
                 percent,
@@ -179,8 +209,15 @@ impl Dispatch<ArchoeraShellV1, ()> for ControlState {
                         match session {
                             SessionState::Ready => "就绪",
                             SessionState::ShuttingDown => "即将结束（关机/重启/退出）",
+                            SessionState::Suspending => "即将挂起/休眠",
                         }
                     );
+                }
+            }
+            Event::ScreenEnabledChanged { enabled } => {
+                state.screen = Some(enabled != 0);
+                if state.verbose {
+                    println!("屏幕: {}", if enabled != 0 { "开" } else { "关" });
                 }
             }
         }
@@ -207,12 +244,16 @@ fn print_status(state: &ControlState) {
     if let Some(battery) = state.battery {
         println!("{}", format_battery(battery));
     }
+    if let Some(screen) = state.screen {
+        println!("屏幕: {}", if screen { "开" } else { "关" });
+    }
     let session = state.session.unwrap_or(SessionState::Ready);
     println!(
         "会话: {}",
         match session {
             SessionState::Ready => "就绪",
             SessionState::ShuttingDown => "即将结束",
+            SessionState::Suspending => "即将挂起/休眠",
         }
     );
 }
@@ -225,6 +266,9 @@ fn format_caps(caps: Capability) -> String {
         (Capability::Volume, "volume"),
         (Capability::MediaKeys, "media_keys"),
         (Capability::Battery, "battery"),
+        (Capability::Suspend, "suspend"),
+        (Capability::PowerKey, "power_key"),
+        (Capability::Screen, "screen"),
     ] {
         if caps.contains(cap) {
             names.push(name);
@@ -261,6 +305,15 @@ fn media_key_label(key: Option<MediaKey>) -> &'static str {
     }
 }
 
+fn power_key_label(key: Option<PowerKey>) -> &'static str {
+    match key {
+        Some(PowerKey::Power) => "电源键",
+        Some(PowerKey::Sleep) => "睡眠键",
+        Some(PowerKey::Suspend) => "挂起键",
+        None => "未知",
+    }
+}
+
 fn warn_if_unsupported(state: &ControlState, cap: Capability, what: &str) {
     if let Some(caps) = state.caps {
         if !caps.contains(cap) {
@@ -278,6 +331,10 @@ enum Command {
     Volume(u32),
     PowerOff,
     Reboot,
+    Suspend,
+    Hibernate,
+    /// 屏幕开关（true = 点亮）。
+    Screen(bool),
 }
 
 struct Cli;
@@ -313,6 +370,9 @@ impl Cli {
             Some("volume") => Command::Volume(parse_percent(rest.get(1))?),
             Some("power-off" | "poweroff") => Command::PowerOff,
             Some("reboot") => Command::Reboot,
+            Some("suspend") => Command::Suspend,
+            Some("hibernate") => Command::Hibernate,
+            Some("screen") => Command::Screen(parse_on_off(rest.get(1))?),
             Some(other) => bail!("未知命令 `{other}`（--help 查看用法）"),
         };
         Ok((socket, command))
@@ -325,6 +385,16 @@ fn parse_percent(arg: Option<&String>) -> Result<u32> {
         .parse()
         .with_context(|| format!("`{raw}` 不是合法的百分比"))?;
     Ok(value.min(100))
+}
+
+/// 解析屏幕开关参数：`on`/`1`/`true` 为点亮，`off`/`0`/`false` 为熄屏。
+fn parse_on_off(arg: Option<&String>) -> Result<bool> {
+    match arg.map(String::as_str) {
+        Some("on" | "1" | "true" | "yes") => Ok(true),
+        Some("off" | "0" | "false" | "no") => Ok(false),
+        Some(other) => bail!("`{other}` 不是合法的屏幕状态（on / off）"),
+        None => bail!("screen 命令需要 on 或 off 参数"),
+    }
 }
 
 fn print_usage() {
@@ -342,6 +412,9 @@ archoera-control —— ArchoeraOS 控制面客户端
   volume <0-100>      设置会话音量
   power-off           关闭系统电源
   reboot              重启系统
+  suspend             挂起系统到内存（恢复后返回）
+  hibernate           休眠系统到磁盘
+  screen <on|off>     开关屏幕（DPMS，仅 udev 后端）
 
 选项:
   -s, --socket <name> 指定 WAYLAND_DISPLAY（默认读环境变量）

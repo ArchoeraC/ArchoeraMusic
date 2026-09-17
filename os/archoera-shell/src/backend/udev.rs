@@ -87,6 +87,21 @@ impl UdevBackend {
         &mut self.renderer
     }
 
+    /// 开关屏幕（DPMS）：暂停 / 重新激活 DRM 输出管理器。
+    ///
+    /// 与 VT 抢占复用同一机制（`pause` / `activate`）；熄屏期间 `schedule_redraw`
+    /// 会保持 dirty 而不合成，亮屏后补一帧。
+    pub fn set_screen_power(&mut self, enabled: bool) -> anyhow::Result<()> {
+        if enabled {
+            self.manager
+                .activate(false)
+                .map_err(|e| anyhow::anyhow!("点亮屏幕失败: {e:?}"))?;
+        } else {
+            self.manager.pause();
+        }
+        Ok(())
+    }
+
     /// 合成并提交所有输出的下一帧。
     pub fn render(&mut self, space: &Space<Window>) -> anyhow::Result<()> {
         for (crtc, surface) in self.surfaces.iter_mut() {
@@ -250,6 +265,8 @@ pub fn init_udev(
 
     std::env::set_var("WAYLAND_DISPLAY", &data.state.socket_name);
     data.state.backend = Some(Backend::Udev(backend));
+    // 裸机后端可经 DrmOutputManager 暂停/激活实现 DPMS 熄屏，置位该能力位。
+    data.state.control.set_screen_supported(true);
 
     // 首帧：事件驱动模型下没有客户端提交时也要先把底色画出来。
     data.state.mark_dirty();

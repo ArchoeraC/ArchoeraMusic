@@ -9,7 +9,7 @@
     the terms of the GNU Affero General Public License v3.0 or later.
   </copyright>
 
-  <interface name="archoera_shell_v1" version="1">
+  <interface name="archoera_shell_v1" version="2">
     <description summary="ArchoeraOS 会话控制对象">
       ArchoeraOS 是一个「播放器即系统」的 kiosk 会话：ArchoeraMusic 以全屏
       特权客户端运行，通过本协议驱动合成器完成会话级操作（关机/重启/亮度），
@@ -29,6 +29,9 @@
       <entry name="volume" value="4" summary="可上报/设置会话音量（由播放器落实）"/>
       <entry name="media_keys" value="8" summary="会下发媒体键事件"/>
       <entry name="battery" value="16" summary="会下发电池状态事件"/>
+      <entry name="suspend" value="32" summary="可执行挂起 / 休眠"/>
+      <entry name="power_key" value="64" summary="会下发电源键 / 睡眠键事件"/>
+      <entry name="screen" value="128" summary="可开关屏幕（udev 后端 DPMS；嵌套后端不置位）"/>
     </enum>
 
     <enum name="media_key">
@@ -46,6 +49,14 @@
       <description summary="会话状态"/>
       <entry name="ready" value="1" summary="会话就绪，播放器可正常交互"/>
       <entry name="shutting_down" value="2" summary="合成器即将结束（关机/重启/退出）"/>
+      <entry name="suspending" value="3" summary="系统即将挂起/休眠（恢复后会重新下发 ready）"/>
+    </enum>
+
+    <enum name="power_key">
+      <description summary="电源/睡眠键动作"/>
+      <entry name="power" value="0" summary="电源键（KEY_POWER）"/>
+      <entry name="sleep" value="1" summary="睡眠键（KEY_SLEEP）"/>
+      <entry name="suspend" value="2" summary="挂起键（KEY_SUSPEND）"/>
     </enum>
 
     <request name="destroy" type="destructor">
@@ -68,6 +79,19 @@
     <request name="set_volume">
       <description summary="上报/设置会话音量百分比（0-100）；由播放器落实实际音频后端"/>
       <arg name="percent" type="uint" summary="0-100"/>
+    </request>
+
+    <request name="suspend">
+      <description summary="挂起系统到内存（logind Suspend；普通用户即可）"/>
+    </request>
+
+    <request name="hibernate">
+      <description summary="休眠系统到磁盘（logind Hibernate；不可用时被忽略）"/>
+    </request>
+
+    <request name="set_screen_enabled">
+      <description summary="开关屏幕（DPMS）；enabled != 0 为点亮。仅 screen 能力位可用时生效"/>
+      <arg name="enabled" type="uint" summary="0=熄屏，非 0=亮屏"/>
     </request>
 
     <event name="capabilities">
@@ -100,6 +124,16 @@
     <event name="session">
       <description summary="会话状态变化"/>
       <arg name="state" type="uint" enum="session_state"/>
+    </event>
+
+    <event name="power_key">
+      <description summary="电源/睡眠键被按下"/>
+      <arg name="key" type="uint" enum="power_key"/>
+    </event>
+
+    <event name="screen_enabled_changed">
+      <description summary="屏幕开关状态变化（DPMS），enabled != 0 为点亮"/>
+      <arg name="enabled" type="uint"/>
     </event>
   </interface>
 </protocol>

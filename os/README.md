@@ -149,8 +149,11 @@ archoera-control [--socket <name>] [命令]
 | `volume <0-100>` | 设置会话音量 |
 | `power-off` | 关闭系统电源 |
 | `reboot` | 重启系统 |
+| `suspend` | 挂起到内存（恢复后返回） |
+| `hibernate` | 休眠到磁盘 |
+| `screen <on\|off>` | 开关屏幕（DPMS，仅 udev 后端通告能力） |
 
-## `archoera_shell_v1` 协议速览
+## `archoera_shell_v1` 协议速览（version 2）
 
 全局对象，每个客户端绑定一次；合成器在 bind 时立即下发 `capabilities` 与当前状态。
 
@@ -158,15 +161,21 @@ archoera-control [--socket <name>] [命令]
 |---|---|---|
 | request | `destroy` | 销毁本地 shell 对象 |
 | request | `power_off` / `reboot` | 系统电源动作 |
+| request | `suspend` / `hibernate` | 挂起 / 休眠（logind，普通用户） |
 | request | `set_brightness(percent)` | 设置背光（0-100） |
 | request | `set_volume(percent)` | 设置会话音量（由播放器落实） |
-| event | `capabilities(flags)` | 能力位：`brightness=1` `power=2` `volume=4` `media_keys=8` `battery=16` |
+| request | `set_screen_enabled(enabled)` | 开关屏幕（DPMS，仅 `screen` 能力可用时） |
+| event | `capabilities(flags)` | 能力位：`brightness=1` `power=2` `volume=4` `media_keys=8` `battery=16` `suspend=32` `power_key=64` `screen=128` |
 | event | `brightness_changed` / `volume_changed` | 当前值（0-100） |
 | event | `media_key(key)` | `play_pause/next/previous/stop/volume_up/volume_down/mute` |
+| event | `power_key(key)` | `power` / `sleep` / `suspend`（KEY_POWER / KEY_SLEEP / KEY_SUSPEND） |
 | event | `battery(present, percent, charging)` | 电池状态 |
-| event | `session(state)` | `ready` / `shutting_down` |
+| event | `session(state)` | `ready` / `shutting_down` / `suspending` |
+| event | `screen_enabled_changed(enabled)` | 屏幕开关状态 |
 
 未置位的能力对应请求会被**静默忽略**（不产生协议错误），客户端不应据此崩溃。
+`session = suspending` 在挂起/休眠**之前**广播（播放器可暂停 / 保存），恢复后回到
+`ready`；`shutting_down` 仍在电源动作前广播。
 
 ## 平台与权限
 

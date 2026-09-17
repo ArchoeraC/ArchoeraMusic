@@ -17,7 +17,10 @@ use smithay::{
     utils::SERIAL_COUNTER,
 };
 
-use crate::{protocol::MediaKey, state::ArchoeraShell};
+use crate::{
+    protocol::{MediaKey, PowerKey},
+    state::ArchoeraShell,
+};
 
 impl ArchoeraShell {
     /// 处理来自任一输入后端的事件。
@@ -31,6 +34,9 @@ impl ArchoeraShell {
                 if key_state == KeyState::Pressed {
                     if let Some(key) = media_key_for(keycode) {
                         self.notify_media_key(key);
+                    }
+                    if let Some(key) = power_key_for(keycode) {
+                        self.notify_power_key(key);
                     }
                 }
 
@@ -195,6 +201,18 @@ fn media_key_for(keycode: Keycode) -> Option<MediaKey> {
     })
 }
 
+/// 把 XKB keycode（evdev + 8）映射为电源/睡眠键。
+fn power_key_for(keycode: Keycode) -> Option<PowerKey> {
+    const EVDEV_OFFSET: u32 = 8;
+    let evdev = keycode.raw().saturating_sub(EVDEV_OFFSET);
+    Some(match evdev {
+        116 => PowerKey::Power,   // KEY_POWER
+        142 => PowerKey::Sleep,   // KEY_SLEEP
+        205 => PowerKey::Suspend, // KEY_SUSPEND
+        _ => return None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -218,5 +236,17 @@ mod tests {
     fn ordinary_keys_are_not_media_keys() {
         assert_eq!(media_key_for(Keycode::new(30 + 8)), None); // KEY_A
         assert_eq!(media_key_for(Keycode::new(8)), None); // evdev 0
+    }
+
+    #[test]
+    fn maps_evdev_power_keys_via_xkb_offset() {
+        for (evdev, expected) in [
+            (116u32, PowerKey::Power),
+            (142, PowerKey::Sleep),
+            (205, PowerKey::Suspend),
+        ] {
+            assert_eq!(power_key_for(Keycode::new(evdev + 8)), Some(expected));
+        }
+        assert_eq!(power_key_for(Keycode::new(30 + 8)), None); // KEY_A
     }
 }

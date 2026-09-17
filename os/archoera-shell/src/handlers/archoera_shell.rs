@@ -56,6 +56,9 @@ impl Dispatch<ArchoeraShellV1, ()> for ArchoeraShell {
             }
             Request::PowerOff => begin_shutdown(state, ShutdownAction::PowerOff),
             Request::Reboot => begin_shutdown(state, ShutdownAction::Reboot),
+            Request::Suspend => begin_suspend(state, SuspendAction::Suspend),
+            Request::Hibernate => begin_suspend(state, SuspendAction::Hibernate),
+            Request::SetScreenEnabled { enabled } => set_screen_enabled(state, enabled != 0),
             // destroy 由 wayland-server 处理析构；其余为协议未来扩展。
             _ => {}
         }
@@ -103,5 +106,70 @@ fn begin_shutdown(state: &mut ArchoeraShell, action: ShutdownAction) {
     match result {
         Ok(()) => tracing::info!(?action, "已提交系统电源动作"),
         Err(err) => tracing::error!(%err, ?action, "系统电源动作失败"),
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum SuspendAction {
+    Suspend,
+    Hibernate,
+}
+
+/// 挂起/休眠流程：先广播 `suspending`（播放器可保存 / 暂停），刷出事件后再提交。
+///
+/// logind 的 `Suspend` / `Hibernate` 是**同步阻塞**调用——它在系统恢复后才返回，
+/// 因此这里会阻塞合成器事件循环（挂起期间本就无需响应）。成功返回后恢复到就绪态。
+fn begin_suspend(state: &mut ArchoeraShell, action: SuspendAction) {
+    if !state.has_capability(Capability::Suspend) {
+        tracing::warn!(?action, "会话无挂起能力，忽略挂起请求");
+        return;
+    }
+
+    let previous = state.session_state;
+    state.session_state = SessionState::Suspending;
+    state.notify_session(SessionState::Suspending);
+
+    let mut dhandle = state.display_handle.clone();
+    if let Err(err) = dhandle.flush_clients() {
+        tracing::warn!(%err, "挂起前刷出客户端事件失败");
+    }
+
+    let result = match action {
+        SuspendAction::Suspend => state.control.suspend(),
+        SuspendAction::Hibernate => state.control.hibernate(),
+    };
+
+    // 无论成功（已恢复）还是失败，都回到挂起前的会话状态。
+    state.session_state = previous;
+    state.notify_session(previous);
+    state.mark_dirty();
+    state.schedule_redraw();
+
+    match result {
+        Ok(()) => tracing::info!(?action, "系统挂起完成并已恢复"),
+        Err(err) => tracing::error!(%err, ?action, "系统挂起动作失败"),
+    }
+}
+
+/// 开关屏幕（DPMS）。仅 `screen` 能力位可用时生效；udev 后端执行，其它后端无操作。
+fn set_screen_enabled(state: &mut ArchoeraShell, enabled: bool) {
+    if !state.has_capability(Capability::Screen) {
+        tracing::debug!("会话无屏幕控制能力，忽略 set_screen_enabled");
+        return;
+    }
+    if state.control.screen_enabled() == enabled {
+        return;
+    }
+
+    match state.set_screen_power(enabled) {
+        Ok(()) => {
+            state.control.set_screen_enabled(enabled);
+            state.notify_screen_enabled(enabled);
+            // 亮屏后补一帧；熄屏时 schedule 会被跳过（保持 dirty）。
+            state.mark_dirty();
+            state.schedule_redraw();
+            tracing::info!(enabled, "屏幕开关已切换");
+        }
+        Err(err) => tracing::warn!(%err, enabled, "屏幕开关失败"),
     }
 }
