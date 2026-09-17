@@ -129,8 +129,9 @@ archoera-shell/src/
 - **看门狗**：客户端曾接入且全部退出后结束会话（`--no-exit-on-close` 可关闭）。
 - **输出变化**：winit 窗口 resize 时把 `Size<Physical>` 转 `Logical` 后重配所有窗口。
 
-> 说明：`kiosk.rs` 集中了「是否接受窗口」的策略点（`accepts`），后续可在此加白名单 /
-> 拒绝第二个客户端等约束。
+> 说明：`kiosk::accepts` 集中了「是否接受窗口」的策略，并**默认强制单客户端**
+> （`space` 已有窗口时拒绝后续 toplevel，`--allow-multiple` 可关闭）；后续可在此加
+> app_id 白名单等约束。
 
 ---
 
@@ -321,7 +322,10 @@ GTK 只能退化到软件绘制，而 Flutter Linux embedder 要求 GL，因此*
   因此 `sudo pacman -S seatd` 即可满足 smithay 的 `libseat-sys`（其 `build.rs` 走
   `pkg-config::probe_library("libseat")`）。
 - **smithay 0.7 只有 libseat 一种会话后端**（`src/backend/session/` 仅 `libseat.rs`），
-  没有 logind/direct 备选，所以 `seatd` 是裸机后端的硬依赖。
+  没有 logind/direct 备选，所以 `seatd` **包**（提供 libseat）是裸机后端的硬依赖。
+  但包里的 `seatd` **守护进程是可选的**：libseat 找不到 `/run/seatd.sock` 时会自动回退到
+  **logind**（内置后端），全程普通用户、无需 root / polkit / 常驻服务；可用
+  `LIBSEAT_BACKEND=logind|seatd` 强制指定。
 - **连接器扫描**用官方 `smithay-drm-extras`（`drm_scanner`，仅依赖 `drm`）。其
   `display-info` 默认 feature 已关闭，避免引入 `libdisplay-info` 这一额外系统库。
 - **WSL2 只适合编译，不适合运行**：无 `/dev/dri` / `/dev/input`，Mesa 走软件路径；

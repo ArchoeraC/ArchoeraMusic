@@ -47,7 +47,7 @@ use smithay::{
 use smithay_drm_extras::drm_scanner::{DrmScanEvent, DrmScanner};
 
 use super::{Backend, CLEAR_COLOR};
-use crate::{protocol::SessionState, state::ArchoeraShell, CalloopData};
+use crate::{kiosk, protocol::SessionState, state::ArchoeraShell, CalloopData};
 
 /// 优先尝试的扫描输出像素格式（10-bit 优先，回退 8-bit）。
 const SUPPORTED_FORMATS: &[smithay::backend::allocator::Fourcc] = &[
@@ -78,6 +78,8 @@ pub struct UdevBackend {
     session: LibSeatSession,
     libinput: Libinput,
     surfaces: HashMap<crtc::Handle, UdevSurface>,
+    /// 连接器扫描器：保留状态以支持热插拔增量扫描（Connected / Disconnected）。
+    scanner: DrmScanner,
 }
 
 impl UdevBackend {
@@ -123,10 +125,18 @@ pub fn init_udev(
     data: &mut CalloopData,
 ) -> anyhow::Result<()> {
     // 1. libseat 会话（普通用户即可，无需 root / polkit）。
+    //
+    // libseat 会优先连 seatd（`/run/seatd.sock`），未运行时自动回退到 **logind**
+    // 这一内置后端——因此无需常驻守护进程或 root；可用 `LIBSEAT_BACKEND`
+    // 强制指定（`logind` / `seatd`）。
     let (mut session, session_notifier) =
         LibSeatSession::new().map_err(|e| anyhow::anyhow!("初始化 libseat 会话失败: {e}"))?;
     let seat_name = session.seat();
-    tracing::info!(seat = %seat_name, "libseat 会话就绪");
+    tracing::info!(
+        seat = %seat_name,
+        backend = std::env::var("LIBSEAT_BACKEND").as_deref().unwrap_or("auto"),
+        "libseat 会话就绪"
+    );
 
     // 2. libinput（经会话打开设备）。
     let mut libinput_context =
@@ -141,7 +151,7 @@ pub fn init_udev(
         .map_err(|e| anyhow::anyhow!("初始化 udev 监视失败: {e}"))?;
 
     // 4. 选主 GPU 并打开。
-    let path = pick_drm_device(&seat_name)?;
+    let path = pick_drm_device(&seat_name, data.state.config.drm_device.as_deref())?;
     let node = DrmNode::from_path(&path)
         .map_err(|e| anyhow::anyhow!("解析 DRM 节点 {} 失败: {e}", path.display()))?;
     tracing::info!(node = ?node, path = %path.display(), "使用主 GPU");
@@ -233,6 +243,7 @@ pub fn init_udev(
         session,
         libinput: libinput_context.clone(),
         surfaces,
+        scanner,
     };
     data.state
         .setup_dmabuf(backend.renderer(), Some(node.dev_id()));
@@ -311,7 +322,13 @@ pub fn init_udev(
                 tracing::info!(?device_id, path = %path.display(), "DRM 设备接入（单 GPU 后端暂不接管）");
             }
             UdevEvent::Changed { device_id } => {
-                tracing::debug!(?device_id, "DRM 设备状态变化");
+                if device_id == primary_dev_id {
+                    if let Err(err) = refresh_outputs(&mut data.state, &data.display_handle) {
+                        tracing::warn!(%err, "重新扫描连接器失败");
+                    }
+                } else {
+                    tracing::debug!(?device_id, "其它 DRM 设备状态变化");
+                }
             }
             UdevEvent::Removed { device_id } => {
                 if device_id == primary_dev_id {
@@ -326,8 +343,17 @@ pub fn init_udev(
     Ok(())
 }
 
-/// 选择主 DRM 设备：优先固件标注的主 GPU，否则取首个。
-fn pick_drm_device(seat: &str) -> anyhow::Result<PathBuf> {
+/// 选择主 DRM 设备：优先显式指定（`--drm-device` / `ARCHOERA_DRM_DEVICE`），
+/// 否则用固件标注的主 GPU，再退化为首个可用 GPU。
+fn pick_drm_device(seat: &str, forced: Option<&str>) -> anyhow::Result<PathBuf> {
+    if let Some(forced) = forced {
+        let path = PathBuf::from(forced);
+        if !path.exists() {
+            anyhow::bail!("指定的 DRM 设备不存在: {}", path.display());
+        }
+        tracing::info!(path = %path.display(), "使用显式指定的 DRM 设备");
+        return Ok(path);
+    }
     if let Ok(Some(path)) = primary_gpu(seat) {
         return Ok(path);
     }
@@ -336,6 +362,130 @@ fn pick_drm_device(seat: &str) -> anyhow::Result<PathBuf> {
         .into_iter()
         .next()
         .ok_or_else(|| anyhow::anyhow!("未找到可用 DRM 设备（/dev/dri 是否存在？）"))
+}
+
+/// 处理 DRM 连接器热插拔：增量扫描，点亮新连接器、移除已断开的输出，
+/// 并在主输出消失时重新选择；一块输出都不剩则结束会话。
+///
+/// 注：kiosk 仍把播放器窗口放在**主输出**上，热插入的新输出只铺底色，
+/// 不做跨屏窗口迁移（kiosk 单窗口语义）。本路径尚未在真实硬件上验证。
+fn refresh_outputs(
+    state: &mut ArchoeraShell,
+    display_handle: &DisplayHandle,
+) -> anyhow::Result<()> {
+    {
+        let Some(Backend::Udev(backend)) = state.backend.as_mut() else {
+            return Ok(());
+        };
+
+        let scan = backend
+            .scanner
+            .scan_connectors(backend.manager.device())
+            .map_err(|e| anyhow::anyhow!("扫描 DRM 连接器失败: {e}"))?;
+
+        // 1) 移除已断开的输出。
+        for event in scan.iter() {
+            if let DrmScanEvent::Disconnected {
+                connector,
+                crtc: Some(crtc),
+            } = event
+            {
+                if let Some(surface) = backend.surfaces.remove(&crtc) {
+                    tracing::info!(
+                        ?crtc,
+                        output = %output_label(&connector),
+                        "输出断开，移除"
+                    );
+                    state.space.unmap_output(&surface.output);
+                }
+            }
+        }
+
+        // 2) 点亮新接入的连接器（追加到现有输出右侧）。
+        let mut next_x = state
+            .space
+            .outputs()
+            .filter_map(|o| state.space.output_geometry(o))
+            .map(|geo| geo.loc.x + geo.size.w)
+            .max()
+            .unwrap_or(0);
+        for event in scan.iter() {
+            if let DrmScanEvent::Connected {
+                connector,
+                crtc: Some(crtc),
+            } = event
+            {
+                if backend.surfaces.contains_key(&crtc) {
+                    continue;
+                }
+                match setup_output(
+                    &mut backend.manager,
+                    &mut backend.renderer,
+                    display_handle,
+                    &mut state.space,
+                    &connector,
+                    crtc,
+                    next_x,
+                ) {
+                    Ok((drm_output, output)) => {
+                        if let Some(geo) = state.space.output_geometry(&output) {
+                            next_x += geo.size.w;
+                        }
+                        backend
+                            .surfaces
+                            .insert(crtc, UdevSurface { drm_output, output });
+                    }
+                    Err(err) => tracing::warn!(
+                        ?crtc,
+                        output = %output_label(&connector),
+                        %err,
+                        "点亮热插拔输出失败"
+                    ),
+                }
+            }
+        }
+    }
+
+    // 3) 主输出失效则重选；一块都不剩就结束会话。
+    let primary_alive = match state.output.as_ref() {
+        Some(primary) => {
+            let name = primary.name();
+            state.space.outputs().any(|o| o.name() == name)
+        }
+        None => false,
+    };
+    if primary_alive {
+        state.mark_dirty();
+        state.schedule_redraw();
+        return Ok(());
+    }
+
+    let new_primary = state.space.outputs().next().cloned();
+    match &new_primary {
+        Some(output) => tracing::info!(output = %output.name(), "重新选择主输出"),
+        None => tracing::warn!("已无可用输出，结束会话"),
+    }
+    state.output = new_primary;
+    if state.output.is_some() {
+        if let Some(rect) = state.output_rect() {
+            kiosk::reconfigure_all(&state.space, rect);
+        }
+        state.mark_dirty();
+        state.schedule_redraw();
+    } else {
+        state.notify_session(SessionState::ShuttingDown);
+        state.loop_signal.stop();
+    }
+    Ok(())
+}
+
+/// 连接器的人类可读标识（如 `DP-1`）。
+fn output_label(connector: &connector::Info) -> String {
+    format!(
+        "{}-{}",
+        connector.interface().as_str(),
+        connector.interface_id()
+    )
 }
 
 /// 在给定 CRTC 上点亮一个连接器，创建 Wayland `Output` 全局并返回 `DrmOutput`。

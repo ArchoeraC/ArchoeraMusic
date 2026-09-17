@@ -55,8 +55,27 @@ pub fn reconfigure_all(space: &Space<Window>, output: OutputRect) {
     }
 }
 
-/// kiosk 是否允许该窗口停留在 space 中：目前恒为真，集中此处以便后续扩展
-/// （例如拒绝第二个客户端、仅允许白名单应用）。
-pub fn accepts(_window: &Window) -> bool {
-    true
+/// kiosk 是否接受新窗口：默认**单客户端**——`space` 中已有窗口时拒绝后续 toplevel，
+/// 避免第二个客户端抢占 kiosk 界面；`--allow-multiple` 可关闭该限制。
+///
+/// 集中此处以便后续扩展（例如按 app_id 白名单放行）。
+pub fn accepts(space: &Space<Window>, allow_multiple: bool) -> bool {
+    allow_multiple || space.elements().next().is_none()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_space_accepts_first_window() {
+        let space: Space<Window> = Space::default();
+        assert!(accepts(&space, false));
+    }
+
+    #[test]
+    fn allow_multiple_bypasses_single_client_rule() {
+        let space: Space<Window> = Space::default();
+        assert!(accepts(&space, true));
+    }
 }

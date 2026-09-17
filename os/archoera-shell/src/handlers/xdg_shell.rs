@@ -37,8 +37,8 @@ impl XdgShellHandler for ArchoeraShell {
 
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
         let window = Window::new_wayland_window(surface);
-        if !kiosk::accepts(&window) {
-            debug!("kiosk 策略拒绝新窗口");
+        if !kiosk::accepts(&self.space, self.config.allow_multiple) {
+            debug!("kiosk 已有窗口，拒绝第二个 toplevel（--allow-multiple 可关闭该限制）");
             return;
         }
 

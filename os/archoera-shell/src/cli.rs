@@ -27,6 +27,10 @@ pub struct ShellConfig {
     pub volume: u32,
     /// 运行后端。
     pub backend: BackendKind,
+    /// 是否允许第二个 toplevel（默认 false：kiosk 单窗口）。
+    pub allow_multiple: bool,
+    /// 指定 DRM 设备节点（如 `/dev/dri/card1`）；`None` 用固件主 GPU 或首个。
+    pub drm_device: Option<String>,
 }
 
 impl Default for ShellConfig {
@@ -37,6 +41,8 @@ impl Default for ShellConfig {
             exit_on_close: true,
             volume: 100,
             backend: BackendKind::Winit,
+            allow_multiple: false,
+            drm_device: None,
         }
     }
 }
@@ -50,8 +56,10 @@ impl ShellConfig {
     /// - `-- <argv...>`：剩余参数整体作为命令（可含带空格参数）；
     /// - `--backend winit|udev`；
     /// - `--no-exit-on-close`：客户端全退后不结束会话；
+    /// - `--allow-multiple`：允许第二个 toplevel（默认 kiosk 单窗口）；
+    /// - `--drm-device <path>`：udev 后端指定 DRM 节点；
     /// - `--volume <n>`；
-    /// - `ARCHOERA_SESSION_APP`：未显式给命令时的环境兜底。
+    /// - `ARCHOERA_SESSION_APP` / `ARCHOERA_DRM_DEVICE`：未显式给值时的环境兜底。
     pub fn from_env() -> anyhow::Result<Self> {
         Self::from_args(std::env::args_os())
     }
@@ -97,6 +105,11 @@ impl ShellConfig {
                     };
                 }
                 "--no-exit-on-close" => cfg.exit_on_close = false,
+                "--allow-multiple" => cfg.allow_multiple = true,
+                "--drm-device" => {
+                    i += 1;
+                    cfg.drm_device = Some(take(&rest, i, "--drm-device")?);
+                }
                 "--" => {
                     let argv: Vec<String> = rest
                         .drain(i + 1..)
@@ -116,6 +129,14 @@ impl ShellConfig {
             if let Ok(app) = std::env::var("ARCHOERA_SESSION_APP") {
                 if !app.trim().is_empty() {
                     cfg.command = Some(split_whitespace(&app));
+                }
+            }
+        }
+
+        if cfg.drm_device.is_none() {
+            if let Ok(dev) = std::env::var("ARCHOERA_DRM_DEVICE") {
+                if !dev.trim().is_empty() {
+                    cfg.drm_device = Some(dev);
                 }
             }
         }
@@ -173,6 +194,8 @@ fn print_help() {
            --backend <winit|udev> 运行后端（默认 winit，嵌套开发）\n\
            --volume <0-100>       初始会话音量\n\
            --no-exit-on-close     客户端全部退出后不结束会话\n\
+           --allow-multiple       允许第二个 toplevel（默认 kiosk 只接受一个）\n\
+           --drm-device <path>    udev 后端指定 DRM 节点（默认固件主 GPU / 首个）\n\
            -h, --help             显示本帮助"
     );
 }
@@ -193,6 +216,21 @@ mod tests {
         assert_eq!(cfg.backend, BackendKind::Winit);
         assert_eq!(cfg.volume, 100);
         assert!(cfg.exit_on_close);
+        assert!(!cfg.allow_multiple);
+        assert_eq!(cfg.drm_device, None);
+    }
+
+    #[test]
+    fn parses_kiosk_and_drm_device_flags() {
+        let cfg = ShellConfig::from_args(args(&[
+            "archoera-shell",
+            "--allow-multiple",
+            "--drm-device",
+            "/dev/dri/card1",
+        ]))
+        .unwrap();
+        assert!(cfg.allow_multiple);
+        assert_eq!(cfg.drm_device.as_deref(), Some("/dev/dri/card1"));
     }
 
     #[test]

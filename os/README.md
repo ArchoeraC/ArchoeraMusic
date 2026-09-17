@@ -99,18 +99,23 @@ cargo fmt --all -- --check
 设备经 libseat 打开）：
 
 ```bash
-# 需要先安装 seatd（Arch）并提供 libseat 开发文件，见上文构建说明
+# 需要 seatd 包提供的 libseat 开发文件（Arch：extra/seatd），见上文构建说明
 cargo build -p archoera-shell --features udev
-sudo systemctl enable --now seatd        # 或依赖 libseat 的 logind 后端
+# seatd 常驻服务可选：libseat 未找到 /run/seatd.sock 时会自动回退到 logind（内置后端）。
+# 普通用户即可；无需 root / polkit。可用 LIBSEAT_BACKEND=logind|seatd 强制指定。
+sudo systemctl enable --now seatd        # 可选
 ./target/debug/archoera-shell --backend udev -- /path/to/archoera_music
 ```
 
-实现要点：单 GPU（首个可用 DRM 设备）→ GBM 分配 + EGL/GLES 渲染 → 每个连接器一个
-`DrmOutput`，vblank 到达后回收上一帧；**仅在有新客户端提交时**再合成并 `queue_frame`，
-空帧不再排队，vblank 随之停止（客户端提交经 `schedule_redraw` 唤醒），故空闲时零功耗。
-输入经 libinput 注入同一 seat；会话被抢占（VT 切换）时暂停渲染与输入，恢复后重新激活
-输出。dmabuf 以 **v4 反馈**注册，告知客户端主渲染设备。热插拔目前仅在主 DRM 设备移除时
-结束会话。
+实现要点：单 GPU（首个可用 DRM 设备，或 `--drm-device` 显式指定）→ GBM 分配 + EGL/GLES
+渲染 → 每个连接器一个 `DrmOutput`，vblank 到达后回收上一帧；**仅在有新客户端提交时**再
+合成并 `queue_frame`，空帧不再排队，vblank 随之停止（客户端提交经 `schedule_redraw` 唤醒），
+故空闲时零功耗。输入经 libinput 注入同一 seat；会话被抢占（VT 切换）时暂停渲染与输入，
+恢复后重新激活输出。dmabuf 以 **v4 反馈**注册，告知客户端主渲染设备。
+
+连接器**热插拔**会增量重扫：新接入的连接器被点亮并挂到 `space`（kiosk 窗口仍在主输出上，
+不做跨屏迁移），断开的输出被移除；主输出消失时自动改选剩余输出，一块都不剩则广播
+`shutting_down` 并结束会话。主 DRM 设备被移除时同样结束会话。
 
 > ⚠️ 该后端**尚未在真实硬件上验证**，首次上机请重点检查连接器枚举、模式选择与
 > vblank 回收。
@@ -125,6 +130,8 @@ sudo systemctl enable --now seatd        # 或依赖 libseat 的 logind 后端
 | `--backend <winit\|udev>` | 运行后端（默认 `winit`） |
 | `--volume <0-100>` | 初始会话音量 |
 | `--no-exit-on-close` | 客户端全退后不结束会话 |
+| `--allow-multiple` | 允许第二个 toplevel（默认 kiosk 只接受一个） |
+| `--drm-device <path>` | udev 后端指定 DRM 节点（默认固件主 GPU，可用 `ARCHOERA_DRM_DEVICE` 兜底） |
 
 ## 控制面 CLI（`archoera-control`）
 
@@ -176,11 +183,13 @@ archoera-control [--socket <name>] [命令]
 - **`zwp_linux_dmabuf_v1` 已提供**：winit 后端注册 **v3** 全局，udev 后端注册 **v4**
   反馈；两者共用共享状态里的 `GlesRenderer`，`dmabuf_imported` 同步导入缓冲。
   渲染器不报告任何 dmabuf 格式时（纯软件渲染）会跳过注册，客户端自动回退 `wl_shm`。
-  注：WSLg 下实测上报 114 个格式，但真机之外的 dmabuf 分配受限。
+  注：真实 GPU 上嵌套实测上报 236 个格式；WSLg/WSL2 下 dmabuf 分配仍受限。
 - **Flutter 端到端未验证**：需要能分配 dmabuf 的真实 GPU；`archoera-smoke`（`wl_shm`）
   仅验证合成器客户端面渲染通路。
-- **udev 后端未上机验证**：开发机（WSL2）无 `/dev/dri` / `/dev/input`，只做了编译验证；
-  多 GPU / 热插拔 / DRM lease / 同步对象（syncobj）等均未实现。
+- **udev 后端未上机验证**：为避免抢占当前桌面会话（KDE Wayland 持有 DRM master /
+  输入），开发期仍只做**编译验证**；真实上机请重点检查连接器枚举、模式选择、vblank 回收
+  与热插拔。多 GPU **合成**（`MultiRenderer`）、DRM lease、同步对象（syncobj）未实现；
+  单卡 + `--drm-device` 选择与连接器热插拔已实现。
 
 ## 许可
 
