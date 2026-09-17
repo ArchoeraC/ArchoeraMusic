@@ -239,6 +239,11 @@ pub fn init_udev(
                 super::output_transform(data.state.config.transform),
             ) {
                 Ok((drm_output, output)) => {
+                    // 首个点亮的输出作为 kiosk 主输出：kiosk 策略据此给窗口发
+                    // configure（否则 output_rect() 为 None，客户端永不显示）。
+                    if data.state.output.is_none() {
+                        data.state.output = Some(output.clone());
+                    }
                     if let Some(geo) = data.state.space.output_geometry(&output) {
                         cursor_x += geo.size.w;
                     }

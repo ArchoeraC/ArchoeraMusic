@@ -249,6 +249,11 @@ impl ArchoeraShell {
         }
         self.space.refresh();
         self.popups.cleanup();
+        // 冲刷帧回调 / popup configure 等事件（udev 的 vblank 路径依赖此步）。
+        let mut dh = self.display_handle.clone();
+        if let Err(err) = dh.flush_clients() {
+            tracing::warn!(%err, "flush_clients 失败");
+        }
         Ok(())
     }
 
@@ -295,6 +300,11 @@ impl ArchoeraShell {
                     // 标记并按需唤醒后端，取代「永远重绘」：无客户端活动时完全空闲。
                     data.state.mark_dirty();
                     data.state.schedule_redraw();
+                    // 关键：把对客户端的回复（registry 全局、configure、帧回调）冲刷出去。
+                    // 缺此步客户端会永远等不到回复（表现为卡死/黑屏）。
+                    if let Err(err) = data.display_handle.flush_clients() {
+                        tracing::warn!(%err, "flush_clients 失败");
+                    }
                     Ok(PostAction::Continue)
                 },
             )

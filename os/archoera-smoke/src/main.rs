@@ -115,11 +115,11 @@ fn run() -> anyhow::Result<()> {
         loop_handle,
     };
 
-    println!("ArchoeraOS 冒烟客户端已连接（Ctrl-C 退出）");
+    eprintln!("ArchoeraOS 冒烟客户端已连接（Ctrl-C 退出）");
     while !state.exit {
         event_loop.dispatch(Duration::from_millis(16), &mut state)?;
     }
-    println!("冒烟客户端退出");
+    eprintln!("冒烟客户端退出");
     Ok(())
 }
 
@@ -214,7 +214,7 @@ impl WindowHandler for Smoke {
         self.buffer = None;
         self.width = configure.new_size.0.map(|v| v.get()).unwrap_or(64);
         self.height = configure.new_size.1.map(|v| v.get()).unwrap_or(64);
-        println!("configure: {}x{} {:?}", self.width, self.height, configure);
+        eprintln!("configure: {}x{} {:?}", self.width, self.height, configure);
 
         if self.first_configure {
             self.first_configure = false;

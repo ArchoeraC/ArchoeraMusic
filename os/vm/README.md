@@ -41,14 +41,25 @@ os/vm/build.sh vm
 
 ```
 use main GPU: /dev/dri/card0 (Primary)
-已点亮输出 connector=Virtual-1 mode=1024x768@60   # --mode 1024x768 生效
+已点亮输出 connector=Virtual-1 mode=1280x800@75
 DRM 输出已就绪 outputs=1
 已注册 zwp_linux_dmabuf_v1 formats=114 dmabuf_v4=true
 已拉起会话客户端 /opt/archoera/archoera-smoke
+ArchoeraOS 冒烟客户端已连接（Ctrl-C 退出）
+configure: 1280x800 ... MAXIMIZED | ACTIVATED   ← 客户端拿到 kiosk 全屏配置
 ```
 
 即：libseat(会话) → DRM 主设备 → 模式选择 → 输出点亮 → GBM/EGL 渲染器 →
-dmabuf v4 反馈 → 客户端接入，全链路在真实 DRM/KMS 上跑通。
+dmabuf v4 反馈 → 客户端接入 → configure → 出帧，全链路在真实 DRM/KMS 上跑通。
+
+### 该 VM 暴露并修复的两个真实缺陷
+
+1. **udev 未设置主输出**：`init_udev` 只把 `Output` 放进 `space`，没设
+   `ArchoeraShell.output`，导致 `output_rect()` 恒为 `None`，kiosk 永不发 configure
+   （客户端不绘制，只剩深色底 → 看起来像黑屏）。
+2. **从不 flush 客户端事件**：winit 是在 `Redraw` 里 `flush_clients` 的，udev 路径没有；
+   事件驱动之后 registry 全局 / configure / 帧回调都闷在缓冲里，客户端卡死
+   （`registry_queue_init` 永不返回）。现于「客户端派发后」与「每帧渲染后」各冲刷一次。
 
 ## 说明 / 限制
 
