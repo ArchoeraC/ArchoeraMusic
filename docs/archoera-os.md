@@ -180,7 +180,11 @@ archoera-shell/src/
   kiosk 底色 `#0E1117`（对齐 `AppPalette.dark.surface`）。
 - 每帧 `submit` 后对所有窗口 `send_frame`（驱动客户端 `wl_surface.frame` 回调），
   `space.refresh()` / `popups.cleanup()` / `flush_clients()`。
-- 持续 `request_redraw` 驱动合成（原型期用「永远重绘」换简单，后续应改为损伤区驱动）。
+- **事件驱动的按需重绘**（取代原型期的「永远重绘」）：`ArchoeraShell` 持有
+  `needs_redraw` 标志，客户端消息（缓冲提交 / 帧回调请求 / 协议请求）与输出变化
+  置位，随后 `schedule_redraw()` 唤醒后端——winit 请求一次窗口重绘、udev 同步合成
+  一帧。无客户端活动时合成器完全空闲（实测嵌套空闲 CPU ≈ 0，主线程阻塞在
+  `epoll_wait`），有活动时按客户端节奏出帧。
 - **渲染后端拥有自己的输出状态**（`backend/mod.rs`）：`WinitBackend` 持有
   `WinitGraphicsBackend` + `Output` + `OutputDamageTracker`；`UdevBackend` 持有
   `GlesRenderer` + `DrmOutputManager` + 每 CRTC 的 `DrmOutput`。对外只暴露

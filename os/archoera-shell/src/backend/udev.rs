@@ -240,6 +240,10 @@ pub fn init_udev(
     std::env::set_var("WAYLAND_DISPLAY", &data.state.socket_name);
     data.state.backend = Some(Backend::Udev(backend));
 
+    // 首帧：事件驱动模型下没有客户端提交时也要先把底色画出来。
+    data.state.mark_dirty();
+    data.state.schedule_redraw();
+
     // 9. 事件源：libinput / 会话 / DRM vblank / udev 热插拔。
     event_loop
         .handle()
@@ -268,6 +272,7 @@ pub fn init_udev(
                         tracing::warn!(?err, "激活 DRM 输出失败");
                     }
                 }
+                data.state.mark_dirty();
                 if let Err(err) = data.state.render_frame() {
                     tracing::warn!(%err, "恢复后重绘失败");
                 }
@@ -287,8 +292,12 @@ pub fn init_udev(
                         }
                     }
                 }
-                if let Err(err) = data.state.render_frame() {
-                    tracing::warn!(%err, "vblank 后重绘失败");
+                // 事件驱动：仅在有新提交时合成；空帧不 queue_frame，vblank 自然停止，
+                // 直至下一次 schedule_redraw 唤醒。
+                if data.state.needs_redraw() {
+                    if let Err(err) = data.state.render_frame() {
+                        tracing::warn!(%err, "vblank 后重绘失败");
+                    }
                 }
             }
             DrmEvent::Error(err) => tracing::error!(?err, "DRM 设备错误"),

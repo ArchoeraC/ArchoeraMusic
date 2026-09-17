@@ -31,6 +31,8 @@ impl CompositorHandler for ArchoeraShell {
 
     fn commit(&mut self, surface: &WlSurface) {
         on_commit_buffer_handler::<Self>(surface);
+        // 任何表面提交都可能改变画面；配合 display 事件源实现按需重绘。
+        self.mark_dirty();
 
         // 子表面同步提交不触发顶层窗口状态刷新。
         if !is_sync_subsurface(surface) {

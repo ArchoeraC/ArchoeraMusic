@@ -106,9 +106,11 @@ sudo systemctl enable --now seatd        # 或依赖 libseat 的 logind 后端
 ```
 
 实现要点：单 GPU（首个可用 DRM 设备）→ GBM 分配 + EGL/GLES 渲染 → 每个连接器一个
-`DrmOutput`，vblank 到达后回收上一帧并合成下一帧；输入经 libinput 注入同一 seat；
-会话被抢占（VT 切换）时暂停渲染与输入，恢复后重新激活输出。dmabuf 以 **v4 反馈**
-注册，告知客户端主渲染设备。热插拔目前仅在主 DRM 设备移除时结束会话。
+`DrmOutput`，vblank 到达后回收上一帧；**仅在有新客户端提交时**再合成并 `queue_frame`，
+空帧不再排队，vblank 随之停止（客户端提交经 `schedule_redraw` 唤醒），故空闲时零功耗。
+输入经 libinput 注入同一 seat；会话被抢占（VT 切换）时暂停渲染与输入，恢复后重新激活
+输出。dmabuf 以 **v4 反馈**注册，告知客户端主渲染设备。热插拔目前仅在主 DRM 设备移除时
+结束会话。
 
 > ⚠️ 该后端**尚未在真实硬件上验证**，首次上机请重点检查连接器枚举、模式选择与
 > vblank 回收。

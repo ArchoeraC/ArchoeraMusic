@@ -77,6 +77,8 @@ impl WinitBackend {
 }
 
 /// 渲染后端。持有 renderer，因此需要长期存活在共享状态里。
+// udev 变体较大（DrmOutputManager 等）；kiosk 单实例，省一次间接寻址比省 7KB 更值。
+#[allow(clippy::large_enum_variant)]
 pub enum Backend {
     /// 嵌套窗口（winit）。
     Winit(WinitBackend),
@@ -104,12 +106,19 @@ impl Backend {
         }
     }
 
-    /// 请求下一帧重绘（winit 需要显式请求；udev 由 vblank 驱动）。
-    pub fn request_redraw(&self) {
+    /// 请求下一帧：把「需要重绘」落到具体后端。
+    ///
+    /// - winit：请求一次窗口重绘，合成在 `WinitEvent::Redraw` 里发生；
+    /// - udev：没有重绘事件，直接同步合成一帧，由下一次 vblank 回收。
+    #[cfg_attr(not(feature = "udev"), allow(unused_variables))]
+    pub fn request_frame(&mut self, space: &Space<Window>) -> anyhow::Result<()> {
         match self {
-            Backend::Winit(backend) => backend.request_redraw(),
+            Backend::Winit(backend) => {
+                backend.request_redraw();
+                Ok(())
+            }
             #[cfg(feature = "udev")]
-            Backend::Udev(_) => {}
+            Backend::Udev(backend) => backend.render(space),
         }
     }
 }

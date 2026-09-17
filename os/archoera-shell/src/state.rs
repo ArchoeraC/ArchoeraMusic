@@ -95,6 +95,10 @@ pub struct ArchoeraShell {
     /// 当前有效的 idle-inhibitor surface 数量（0 → 未抑制）。
     pub idle_inhibitors: u32,
     pub idle_reason: Option<String>,
+
+    /// 事件驱动的重绘标志：为真表示有新的客户端提交 / 输出变化需要合成，
+    /// 为假时合成器完全空闲（不再空转 vblank / request_redraw）。
+    needs_redraw: bool,
 }
 
 impl ArchoeraShell {
@@ -162,6 +166,7 @@ impl ArchoeraShell {
             control,
             idle_inhibitors: 0,
             idle_reason: None,
+            needs_redraw: false,
         }
     }
 
@@ -215,7 +220,13 @@ impl ArchoeraShell {
     }
 
     /// 合成并提交一帧：渲染全部输出、驱动客户端帧回调、清理已销毁的 popup。
+    ///
+    /// 调用即清空重绘标志：本帧合成的是「清零前」累积的全部状态。若渲染期间又有
+    /// 客户端提交（不会发生：渲染不派发客户端消息），标志会被重新置位。
     pub fn render_frame(&mut self) -> anyhow::Result<()> {
+        self.needs_redraw = false;
+        tracing::trace!("合成一帧");
+
         if let Some(backend) = self.backend.as_mut() {
             backend.render(&self.space)?;
         }
@@ -272,6 +283,10 @@ impl ArchoeraShell {
                             .dispatch_clients(&mut data.state)
                             .expect("dispatch_clients 失败");
                     }
+                    // 任一客户端消息（缓冲提交 / 帧回调请求 / 协议请求）都可能改变画面。
+                    // 标记并按需唤醒后端，取代「永远重绘」：无客户端活动时完全空闲。
+                    data.state.mark_dirty();
+                    data.state.schedule_redraw();
                     Ok(PostAction::Continue)
                 },
             )
@@ -365,6 +380,31 @@ impl ArchoeraShell {
     /// 能力位是否可用（供请求侧校验）。
     pub fn has_capability(&self, cap: Capability) -> bool {
         self.control.capabilities().contains(cap)
+    }
+
+    /// 标记需要重绘；随后由 [`Self::schedule_redraw`] 落到具体后端。
+    pub fn mark_dirty(&mut self) {
+        self.needs_redraw = true;
+    }
+
+    /// 当前是否有待合成的更新。
+    pub fn needs_redraw(&self) -> bool {
+        self.needs_redraw
+    }
+
+    /// 把「需要重绘」落到后端：
+    /// - winit：请求一次窗口重绘，真正的合成在 `WinitEvent::Redraw` 回调里；
+    /// - udev：没有重绘事件，直接同步合成一帧（由下一次 vblank 回收）。
+    pub fn schedule_redraw(&mut self) {
+        if !self.needs_redraw {
+            return;
+        }
+        let space = &self.space;
+        if let Some(backend) = self.backend.as_mut() {
+            if let Err(err) = backend.request_frame(space) {
+                tracing::warn!(%err, "调度重绘失败");
+            }
+        }
     }
 
     /// 让 kiosk 焦点落在最上层窗口。

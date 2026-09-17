@@ -57,6 +57,10 @@ pub fn init_winit(
     data.state.setup_dmabuf(backend.renderer(), None);
     data.state.backend = Some(Backend::Winit(backend));
 
+    // 首帧：事件驱动模型下没有客户端提交时也要先把底色画出来。
+    data.state.mark_dirty();
+    data.state.schedule_redraw();
+
     // 让子进程（会话客户端）默认连到本合成器。
     std::env::set_var("WAYLAND_DISPLAY", &data.state.socket_name);
 
@@ -82,15 +86,16 @@ pub fn init_winit(
                         );
                     }
                     kiosk::reconfigure_all(&state.space, Rectangle::from_size(size.to_logical(1)));
+                    state.mark_dirty();
+                    state.schedule_redraw();
                 }
                 WinitEvent::Input(event) => state.process_input_event(event),
                 WinitEvent::Redraw => {
                     if let Err(err) = state.render_frame() {
                         tracing::error!(%err, "合成渲染失败");
                     }
-                    if let Some(backend) = state.backend.as_ref() {
-                        backend.request_redraw();
-                    }
+                    // 事件驱动：渲染后不再无条件 request_redraw。若客户端在帧回调后
+                    // 产生新提交，会经 Wayland dispatch → schedule_redraw 再次唤醒。
                     if let Err(err) = display_handle.flush_clients() {
                         tracing::warn!(%err, "刷出客户端事件失败");
                     }
