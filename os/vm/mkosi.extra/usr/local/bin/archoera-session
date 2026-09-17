@@ -1,5 +1,6 @@
 #!/bin/sh
-# tty1 kiosk 会话：启动 udev 合成器并托管会话客户端。
+# tty1 kiosk 会话（以默认用户 archoera 运行，非 root）：启动 udev 合成器并托管
+# 会话客户端。DRM/输入设备经 libseat → systemd-logind 的 VT 会话授权。
 # 优先拉起真实播放器（/opt/archoera-music/archoera_music），缺失时回退 smoke。
 # 无头时日志进串口 hvc0。
 #
@@ -8,12 +9,21 @@
 # - 输入法 fcitx5：其 Wayland 前端以 `zwp_input_method_v2` 接入合成器，
 #   合成器把客户端 `zwp_text_input_v3` 的输入上下文转给它（smithay 桥接）。
 export RUST_LOG="${RUST_LOG:-archoera_shell=info,warn}"
+# 日志：无头（有串口）时进 hvc0；否则落家目录，便于 GUI 模式下事后排查。
 if [ -w /dev/hvc0 ]; then
     exec >/dev/hvc0 2>&1
+else
+    LOG="${XDG_STATE_HOME:-$HOME/.local/state}/archoera-session.log"
+    mkdir -p "$(dirname "$LOG")"
+    exec >>"$LOG" 2>&1
 fi
 
 # 固定 socket 名，输入法才能确定连哪个 Wayland 显示。
 SOCKET=wayland-archoera
+
+# 会话自述：便于确认「以普通用户 archoera + logind VT 会话」运行而非 root。
+echo "[session] 用户=$(id -un) uid=$(id -u) home=$HOME runtime=${XDG_RUNTIME_DIR:-未设置}"
+echo "[session] 会话=$(loginctl show-session "$(loginctl list-sessions --no-legend 2>/dev/null | awk -v u="$(id -un)" '$3==u {print $1; exit}')" -p Type -p Active -p Seat -p VTNr 2>/dev/null | tr '\n' ' ')"
 
 # session D-Bus（无 systemd 用户会话时手动拉起）。
 if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && command -v dbus-daemon >/dev/null 2>&1; then

@@ -1,0 +1,4 @@
+# ArchoeraOS：只启用需要的 locale。
+# mkosi 会在镜像收尾时检测到未注释条目并自动运行 locale-gen（全注释会跳过）。
+en_US.UTF-8 UTF-8
+zh_CN.UTF-8 UTF-8

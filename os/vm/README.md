@@ -35,13 +35,23 @@ os/vm/build.sh vm
   （bundle 内嵌 FFmpeg 动态依赖系统编解码库）与 `libsecret`/`adwaita-icon-theme`。
 - `mkosi.extra/etc/locale.conf` + `mkosi.postinst`：生成 `en_US.UTF-8`/`zh_CN.UTF-8`。
   **不设 locale 会让 Dart 拿到 `"C"`，播放器 l10n 解析失败**（托盘/文案异常）。
-- 自动登录用 mkosi 官方 `Autologin=yes`：**root 在 `/dev/tty1`（VT 会话）与 `/dev/hvc0`
-  自动登录**。`/etc/profile.d/zz-archoera.sh` 在 tty1 上 `exec` 会话脚本；
-  `/usr/local/bin/archoera-session` 循环启动合成器并把日志写入串口 `hvc0`。
-  会话客户端优先用真实播放器（`/opt/archoera-music/archoera_music`），缺失时回退
-  `archoera-smoke`。
+- **默认用户 `archoera`（uid 1000，家目录 `/home/archoera`）**：由
+  `sysusers.d/zz-archoera.conf`（用户 + seat/tty/video/render/input/audio 组）与
+  `tmpfiles.d/archoera.conf`（家目录、XDG 子目录、`~/Music`、并从
+  `/usr/share/archoera/skel` **播种**初始配置——fcitx5 拼音 profile、
+  `scan_dirs.json`）落地；目标已存在时不覆盖，数据随磁盘镜像持久保存。
+- 自动登录（不再用 mkosi `Autologin=`，它只支持 root）：
+  `getty@tty1.service.d/autologin.conf` → **archoera**；`serial-getty@hvc0.service.d/
+  autologin.conf` → **root**（无头排查口，同时接收会话日志）。
+  `/etc/profile.d/zz-archoera.sh` 在 tty1 上以**普通用户** `exec` 会话脚本；
+  `/usr/local/bin/archoera-session` 循环启动合成器，日志默认写
+  `~/.local/state/archoera-session.log`（内核把 `/dev/hvc0` 设为 0600 root:tty，
+  普通用户不可写；无头排查时用 hvc0 的 root 口 `cat` 该文件即可）。会话客户端优先用真实播放器
+  （`/opt/archoera-music/archoera_music`），缺失时回退 `archoera-smoke`。
   - 之所以必须是 **tty1（VT）**：systemd-logind 只对 VT 会话允许 `TakeControl`，
     串口会话会让 `libseat` 报 `Function not implemented`。
+  - 以普通用户运行时，DRM/输入设备由 **libseat → logind** 的 VT 会话授权（与生产
+    形态一致），不需要 root。
 - `Ssh=yes`（VSock）：配合 `mkosi genkey` 可用 `mkosi ssh`（本环境实测未转发 stdout，
   仅作备用）。
 - **光标主题**：`build.sh` 把宿主当前使用的 XCursor 主题（KDE `kcminputrc` /
@@ -116,8 +126,13 @@ archoera_shell_v1 客户端已绑定 clients=1 capabilities=238 ← 会话桥接
 
 ## 说明 / 限制
 
-- **VM 内以 root 自动登录**（mkosi `Autologin=` 仅支持 root）：用于验证 DRM/KMS 通路。
-  生产形态是**普通用户**的 kiosk 会话（`sysusers.d/kiosk.conf` 已备好）。
+- 镜像已启用 BlueZ（`multi-user.target.wants` 符号链接由 tmpfiles 在首次启动创建；
+  VM 无蓝牙适配器时 `bluetooth.service` 因 `ConditionPathIsDirectory=/sys/class/bluetooth`
+  被跳过，桥接据此不置位蓝牙能力位，UI 不显示蓝牙分区）。
+- 默认用户 `archoera`（uid 1000、`/home/archoera`）承载需要持久化的数据：
+  `~/.local/share/ArchoeraMusic`（偏好/扫描目录/流媒体列表/下载）、`~/.config/fcitx5`、
+  `~/.local/state`（会话日志）、`~/Music`（媒体库默认位置）。tty1 会话以该用户运行；
+  `/dev/hvc0` 仍为 root 调试口。
 - 首次启动 initrd 里可能有较长的 D-Bus 停止等待，引导偏慢；用**事件等待**
   （轮询串口日志出现关键标记）比固定 sleep 更省时。
 - 目录镜像（`Format=directory`）需要 `ForeignUIDRange=yes` + 宿主
