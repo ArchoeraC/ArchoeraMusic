@@ -6,6 +6,7 @@
 mod backend;
 mod cli;
 mod control;
+mod cursor;
 mod handlers;
 mod input;
 mod kiosk;
@@ -100,6 +101,8 @@ fn spawn_session_app(argv: &[String], socket_name: &OsStr) -> anyhow::Result<Chi
     command
         .args(args)
         .env("WAYLAND_DISPLAY", socket_name)
+        // kiosk 标记：客户端据此关闭窗口装饰（无 WM 装饰，也不画 CSD 标题栏）。
+        .env("ARCHOERA_KIOSK", "1")
         .env_remove("WAYLAND_SOCKET")
         .env_remove("DISPLAY");
 

@@ -59,6 +59,57 @@ impl Dispatch<ArchoeraShellV1, ()> for ArchoeraShell {
             Request::Suspend => begin_suspend(state, SuspendAction::Suspend),
             Request::Hibernate => begin_suspend(state, SuspendAction::Hibernate),
             Request::SetScreenEnabled { enabled } => set_screen_enabled(state, enabled != 0),
+            Request::SetOutputScale { scale_milli } => {
+                if !state.has_capability(Capability::Output) {
+                    tracing::debug!("会话无输出能力，忽略 set_output_scale");
+                    return;
+                }
+                // 夹取到 [100%, 400%]，避免客户端传 0/异常值。
+                let scale = (scale_milli as f64 / 1000.0).clamp(1.0, 4.0);
+                if (state.output_scale - scale).abs() < f64::EPSILON {
+                    return;
+                }
+                state.output_scale = scale;
+                if let Err(err) = state.apply_output_config() {
+                    tracing::warn!(%err, "应用输出缩放失败");
+                } else {
+                    tracing::info!(scale, "输出缩放已更新");
+                }
+            }
+            Request::SetOutputMode { width, height } => {
+                if !state.has_capability(Capability::Output) {
+                    tracing::debug!("会话无输出能力，忽略 set_output_mode");
+                    return;
+                }
+                let mode = if width == 0 || height == 0 {
+                    None
+                } else {
+                    Some((width as i32, height as i32))
+                };
+                state.output_mode = mode;
+                if let Err(err) = state.apply_output_config() {
+                    tracing::warn!(%err, "应用输出模式失败");
+                } else {
+                    tracing::info!(?mode, "输出模式已更新");
+                }
+            }
+            Request::SetOutputTransform { transform } => {
+                if !state.has_capability(Capability::Output) {
+                    tracing::debug!("会话无输出能力，忽略 set_output_transform");
+                    return;
+                }
+                let code = transform.into_result().map(|t| t as u32).unwrap_or(0);
+                let transform = crate::backend::transform_from_code(code);
+                if state.output_transform == transform {
+                    return;
+                }
+                state.output_transform = transform;
+                if let Err(err) = state.apply_output_config() {
+                    tracing::warn!(%err, "应用输出变换失败");
+                } else {
+                    tracing::info!(?transform, "输出变换已更新");
+                }
+            }
             // destroy 由 wayland-server 处理析构；其余为协议未来扩展。
             _ => {}
         }

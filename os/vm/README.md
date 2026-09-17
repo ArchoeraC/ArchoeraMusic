@@ -44,6 +44,28 @@ os/vm/build.sh vm
     串口会话会让 `libseat` 报 `Function not implemented`。
 - `Ssh=yes`（VSock）：配合 `mkosi genkey` 可用 `mkosi ssh`（本环境实测未转发 stdout，
   仅作备用）。
+- **光标主题**：`build.sh` 把宿主当前使用的 XCursor 主题（KDE `kcminputrc` /
+  gsettings，缺省 Adwaita）复制进 `mkosi.extra/usr/share/icons/` 并写入
+  `/opt/archoera/cursor-theme`；会话脚本据此导出 `XCURSOR_THEME`/`XCURSOR_SIZE`
+  （已 gitignore，不入库）。
+- **输入法**：会话脚本先起一个 session D-Bus，再等合成器 socket 出现后启动
+  `fcitx5`（Wayland 前端以 `zwp_input_method_v2` 接入）。镜像含 `fcitx5` +
+  `fcitx5-chinese-addons`，并预置启用拼音的 `/root/.config/fcitx5/profile`。
+
+## 光标 / 输入法（合成器侧）
+
+- 协议：`wl_pointer.set_cursor`、`zwp_cursor_shape_v1`（客户端直接请求命名形状）、
+  `zwp_text_input_v3` + `zwp_input_method_v2`（输入法；smithay 负责两侧状态互转与
+  键盘抓取，合成器只接全局对象、随键盘焦点自动 enter/leave、并把 IME 候选窗口
+  用 `PopupManager` 跟踪后随窗口渲染）。
+- 渲染顺序很关键：DRM 合成器的元素切片是**前 → 后（最上层在前）**，遇到
+  「不透明且铺满输出」的元素会把其后的元素全部 skipped。光标必须放在**最前**，
+  否则会被全屏应用窗口盖住（表现为「开机有指针、进应用后消失」）。
+- 光标来源优先级：客户端 cursor surface → 命名形状（`XCURSOR_THEME` 主题，按
+  `cursor_icon::CursorIcon::name()` 查 XCursor 名）→ 内置兜底位图
+  （`resources/cursor.rgba`，`resources/gen_fallback_cursor.py` 生成）。
+- 客户端给了**没有缓冲**的 cursor surface（典型：GTK 主题查找失败后仍调用
+  `set_cursor`）时回退到命名默认光标，避免指针凭空消失。
 
 ## 已验证（virtio-gpu / KVM）
 
@@ -73,11 +95,12 @@ archoera_shell_v1 客户端已绑定 clients=1 capabilities=238 ← 会话桥接
 
 已知降级（不影响启动与出图）：
 
-- **[vault]** 无 D-Bus 会话总线 / Secret Service，凭据保险库不可用（登录态不持久化）。
-- `Gdk-Message: Unable to load  from the cursor theme`、`Gtk-CRITICAL gtk_widget_get_scale_factor`
-  —— 无鼠标光标主题 / 无头会话下的无害告警。
+- **[vault]** 无 Secret Service（只起了 session D-Bus，没有 keyring 守护进程），
+  凭据保险库不可用（登录态不持久化）。
+- `Gtk-CRITICAL gtk_widget_get_scale_factor` —— 无头/无窗口管理器会话下的无害告警。
+- 光标/输入法已在 GUI 下人工验证：指针可见并随控件变化，fcitx5 可切拼音输入。
 
-### 该 VM 暴露并修复的两个真实缺陷
+### 该 VM 暴露并修复的四个真实缺陷
 
 1. **udev 未设置主输出**：`init_udev` 只把 `Output` 放进 `space`，没设
    `ArchoeraShell.output`，导致 `output_rect()` 恒为 `None`，kiosk 永不发 configure
@@ -85,6 +108,11 @@ archoera_shell_v1 客户端已绑定 clients=1 capabilities=238 ← 会话桥接
 2. **从不 flush 客户端事件**：winit 是在 `Redraw` 里 `flush_clients` 的，udev 路径没有；
    事件驱动之后 registry 全局 / configure / 帧回调都闷在缓冲里，客户端卡死
    （`registry_queue_init` 永不返回）。现于「客户端派发后」与「每帧渲染后」各冲刷一次。
+3. **光标元素排在最底层**：DRM 合成器元素需**前 → 后**排列，光标被放到最后 →
+   被不透明全屏窗口遮住（开机可见、进应用消失）。现光标前置。
+4. **缺 `zwp_cursor_shape_v1`**：没有它时 GTK 走「按名字查主题」，而 Flutter 初始
+   光标名是空串 → 加载失败 → GTK 仍发一个**没有缓冲**的 cursor surface → 指针消失。
+   现注册该协议（GTK 直接请求命名形状），并在 surface 光标渲染为空时回退命名光标。
 
 ## 说明 / 限制
 

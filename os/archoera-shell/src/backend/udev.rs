@@ -29,15 +29,15 @@ use smithay::{
         },
         egl::{context::EGLContext, EGLDisplay},
         libinput::{LibinputInputBackend, LibinputSessionInterface},
-        renderer::{element::surface::WaylandSurfaceRenderElement, gles::GlesRenderer},
+        renderer::gles::GlesRenderer,
         session::{libseat::LibSeatSession, Event as SessionEvent, Session},
         udev::{all_gpus, primary_gpu, UdevBackend as UdevDeviceMonitor, UdevEvent},
     },
-    desktop::{space::SpaceRenderElements, Space, Window},
+    desktop::{Space, Window},
     output::{Mode as WlMode, Output, PhysicalProperties, Scale},
     reexports::{
         calloop::EventLoop,
-        drm::control::{connector, crtc, ModeTypeFlags},
+        drm::control::{connector, crtc, Device as ControlDevice, ModeTypeFlags},
         input::Libinput,
         rustix::fs::OFlags,
         wayland_server::DisplayHandle,
@@ -46,8 +46,10 @@ use smithay::{
 };
 use smithay_drm_extras::drm_scanner::{DrmScanEvent, DrmScanner};
 
-use super::{Backend, CLEAR_COLOR};
-use crate::{kiosk, protocol::SessionState, state::ArchoeraShell, CalloopData};
+use super::{Backend, OutputElement, CLEAR_COLOR};
+use crate::{
+    cursor::PointerElement, kiosk, protocol::SessionState, state::ArchoeraShell, CalloopData,
+};
 
 /// 优先尝试的扫描输出像素格式（10-bit 优先，回退 8-bit）。
 const SUPPORTED_FORMATS: &[smithay::backend::allocator::Fourcc] = &[
@@ -61,12 +63,17 @@ type GbmAlloc = GbmAllocator<DrmDeviceFd>;
 type GbmExport = GbmFramebufferExporter<DrmDeviceFd>;
 type OutputManager = DrmOutputManager<GbmAlloc, GbmExport, (), DrmDeviceFd>;
 type DrmOutputHandle = DrmOutput<GbmAlloc, GbmExport, (), DrmDeviceFd>;
-type UdevElements = SpaceRenderElements<GlesRenderer, WaylandSurfaceRenderElement<GlesRenderer>>;
+/// 每输出渲染元素（桌面内容 + 指针光标）。
+type UdevElements = OutputElement;
 
 /// 单块 DRM 设备上的一个已点亮输出。
 struct UdevSurface {
     drm_output: DrmOutputHandle,
     output: Output,
+    /// 该输出对应的连接器（运行时切换模式需查其模式表）。
+    connector: connector::Handle,
+    /// 当前生效的 DRM 模式（用于判断是否需要切换）。
+    mode: smithay::reexports::drm::control::Mode,
 }
 
 /// 裸机后端状态。
@@ -102,17 +109,82 @@ impl UdevBackend {
         Ok(())
     }
 
-    /// 合成并提交所有输出的下一帧。
-    pub fn render(&mut self, space: &Space<Window>) -> anyhow::Result<()> {
+    /// 运行时应用输出配置：按 `mode_pref` 为每个输出挑选并切换 DRM 模式。
+    ///
+    /// 缩放/变换由共享状态更新 `wl_output`（`DrmCompositor` 每帧从 `Output` 读取
+    /// 当前变换），模式切换必须走 `use_mode`（会同时调整 swapchain）。返回实际
+    /// 生效的模式（主输出），供上层同步 `wl_output`。
+    pub fn apply_output_config(
+        &mut self,
+        _scale: f64,
+        _transform: Transform,
+        mode_pref: Option<(i32, i32)>,
+    ) -> anyhow::Result<Option<smithay::output::Mode>> {
+        let mut applied: Option<smithay::output::Mode> = None;
         for (crtc, surface) in self.surfaces.iter_mut() {
-            let elements =
-                match space.render_elements_for_output(&mut self.renderer, &surface.output, 1.0) {
-                    Ok(elements) => elements,
-                    Err(err) => {
-                        tracing::warn!(?crtc, %err, "收集渲染元素失败");
-                        continue;
-                    }
-                };
+            let info = self
+                .manager
+                .device()
+                .get_connector(surface.connector, true)
+                .map_err(|e| anyhow::anyhow!("读取连接器模式失败: {e}"))?;
+            let Some(mode) = pick_mode(&info, mode_pref) else {
+                tracing::warn!(?crtc, "连接器没有匹配的显示模式，保持当前模式");
+                continue;
+            };
+            if mode != surface.mode {
+                surface
+                    .drm_output
+                    .use_mode(
+                        mode,
+                        &mut self.renderer,
+                        &DrmOutputRenderElements::<GlesRenderer, UdevElements>::default(),
+                    )
+                    .map_err(|e| anyhow::anyhow!("切换输出模式失败: {e:?}"))?;
+                surface.mode = mode;
+                tracing::info!(?crtc, mode = ?mode, "DRM 输出模式已切换");
+            }
+            applied = Some(WlMode::from(mode));
+        }
+        Ok(applied)
+    }
+
+    /// 合成并提交所有输出的下一帧（桌面内容 + 指针光标）。
+    pub fn render(
+        &mut self,
+        space: &Space<Window>,
+        pointer: &PointerElement,
+    ) -> anyhow::Result<()> {
+        for (crtc, surface) in self.surfaces.iter_mut() {
+            // DRM 合成器要求元素按「前 → 后」排列（最上层在前）：光标置顶，
+            // 其后才是窗口与候选窗口，否则会被不透明的全屏窗口直接盖掉/跳过。
+            let mut elements: Vec<UdevElements> = Vec::new();
+
+            // 指针落在这个输出上才画光标（kiosk 通常只有一个输出）。
+            if let Some(geo) = space.output_geometry(&surface.output) {
+                let location = pointer.location();
+                if geo.to_f64().contains(location) {
+                    let scale = smithay::utils::Scale::from(
+                        surface.output.current_scale().fractional_scale(),
+                    );
+                    let position = location - geo.loc.to_f64();
+                    elements.extend(
+                        pointer
+                            .render_elements(&mut self.renderer, position, scale, 1.0)
+                            .into_iter()
+                            .map(OutputElement::from),
+                    );
+                }
+            }
+
+            match space.render_elements_for_output(&mut self.renderer, &surface.output, 1.0) {
+                Ok(space_elements) => {
+                    elements.extend(space_elements.into_iter().map(OutputElement::Space))
+                }
+                Err(err) => {
+                    tracing::warn!(?crtc, %err, "收集渲染元素失败");
+                    continue;
+                }
+            }
 
             match surface.drm_output.render_frame(
                 &mut self.renderer,
@@ -234,11 +306,11 @@ pub fn init_udev(
                 &connector,
                 crtc,
                 cursor_x,
-                data.state.config.mode,
-                super::output_scale(data.state.config.scale),
-                super::output_transform(data.state.config.transform),
+                data.state.output_mode,
+                super::output_scale(data.state.output_scale),
+                data.state.output_transform,
             ) {
-                Ok((drm_output, output)) => {
+                Ok((drm_output, output, mode)) => {
                     // 首个点亮的输出作为 kiosk 主输出：kiosk 策略据此给窗口发
                     // configure（否则 output_rect() 为 None，客户端永不显示）。
                     if data.state.output.is_none() {
@@ -247,7 +319,15 @@ pub fn init_udev(
                     if let Some(geo) = data.state.space.output_geometry(&output) {
                         cursor_x += geo.size.w;
                     }
-                    surfaces.insert(crtc, UdevSurface { drm_output, output });
+                    surfaces.insert(
+                        crtc,
+                        UdevSurface {
+                            drm_output,
+                            output,
+                            connector: connector.handle(),
+                            mode,
+                        },
+                    );
                 }
                 Err(err) => tracing::warn!(?crtc, %err, "点亮连接器失败，跳过"),
             }
@@ -275,6 +355,8 @@ pub fn init_udev(
     data.state.backend = Some(Backend::Udev(backend));
     // 裸机后端可经 DrmOutputManager 暂停/激活实现 DPMS 熄屏，置位该能力位。
     data.state.control.set_screen_supported(true);
+    // 也可运行时切换输出模式/缩放/旋转（set_output_* 请求）。
+    data.state.control.set_output_supported(true);
 
     // 首帧：事件驱动模型下没有客户端提交时也要先把底色画出来。
     data.state.mark_dirty();
@@ -451,17 +533,23 @@ fn refresh_outputs(
                     &connector,
                     crtc,
                     next_x,
-                    state.config.mode,
-                    super::output_scale(state.config.scale),
-                    super::output_transform(state.config.transform),
+                    state.output_mode,
+                    super::output_scale(state.output_scale),
+                    state.output_transform,
                 ) {
-                    Ok((drm_output, output)) => {
+                    Ok((drm_output, output, mode)) => {
                         if let Some(geo) = state.space.output_geometry(&output) {
                             next_x += geo.size.w;
                         }
-                        backend
-                            .surfaces
-                            .insert(crtc, UdevSurface { drm_output, output });
+                        backend.surfaces.insert(
+                            crtc,
+                            UdevSurface {
+                                drm_output,
+                                output,
+                                connector: connector.handle(),
+                                mode,
+                            },
+                        );
                     }
                     Err(err) => tracing::warn!(
                         ?crtc,
@@ -516,26 +604,17 @@ fn output_label(connector: &connector::Info) -> String {
     )
 }
 
-/// 在给定 CRTC 上点亮一个连接器，创建 Wayland `Output` 全局并返回 `DrmOutput`。
+/// 从连接器模式表挑选目标模式。
 ///
-/// `mode_pref` 为期望分辨率（`--mode`）：在连接器模式中优先精确匹配该尺寸
-/// （preferred 优先、刷新率更高者优先），无匹配则回退 preferred / 首个模式。
-#[allow(clippy::too_many_arguments)]
-fn setup_output(
-    manager: &mut OutputManager,
-    renderer: &mut GlesRenderer,
-    display_handle: &DisplayHandle,
-    space: &mut Space<Window>,
+/// `mode_pref`（`--mode` / `set_output_mode`）存在时优先精确匹配该尺寸
+/// （preferred 优先、刷新率更高者优先）；无匹配或未指定时回退 preferred、再回退首个。
+// 保留 map_or：`is_none_or` 需要 Rust 1.82，而本 workspace 声明 1.80+。
+#[allow(clippy::unnecessary_map_or)]
+fn pick_mode(
     connector: &connector::Info,
-    crtc: crtc::Handle,
-    x: i32,
     mode_pref: Option<(i32, i32)>,
-    scale: Scale,
-    transform: Transform,
-) -> anyhow::Result<(DrmOutputHandle, Output)> {
-    // 保留 map_or：`is_none_or` 需要 Rust 1.82，而本 workspace 声明 1.80+。
-    #[allow(clippy::unnecessary_map_or)]
-    let mode = connector
+) -> Option<smithay::reexports::drm::control::Mode> {
+    connector
         .modes()
         .iter()
         .filter(|mode| {
@@ -558,7 +637,32 @@ fn setup_output(
         })
         .or_else(|| connector.modes().first())
         .copied()
-        .ok_or_else(|| anyhow::anyhow!("连接器没有可用显示模式"))?;
+}
+
+/// 在给定 CRTC 上点亮一个连接器，创建 Wayland `Output` 全局并返回 `DrmOutput`。
+///
+/// `mode_pref` 为期望分辨率（`--mode`）：在连接器模式中优先精确匹配该尺寸
+/// （preferred 优先、刷新率更高者优先），无匹配则回退 preferred / 首个模式。
+#[allow(clippy::too_many_arguments)]
+fn setup_output(
+    manager: &mut OutputManager,
+    renderer: &mut GlesRenderer,
+    display_handle: &DisplayHandle,
+    space: &mut Space<Window>,
+    connector: &connector::Info,
+    crtc: crtc::Handle,
+    x: i32,
+    mode_pref: Option<(i32, i32)>,
+    scale: Scale,
+    transform: Transform,
+) -> anyhow::Result<(
+    DrmOutputHandle,
+    Output,
+    smithay::reexports::drm::control::Mode,
+)> {
+    // 保留 map_or：`is_none_or` 需要 Rust 1.82，而本 workspace 声明 1.80+。
+    let mode =
+        pick_mode(connector, mode_pref).ok_or_else(|| anyhow::anyhow!("连接器没有可用显示模式"))?;
     let wl_mode = WlMode::from(mode);
 
     let (phys_w, phys_h) = connector.size().unwrap_or((0, 0));
@@ -601,5 +705,5 @@ fn setup_output(
         "已点亮输出"
     );
 
-    Ok((drm_output, output))
+    Ok((drm_output, output, mode))
 }

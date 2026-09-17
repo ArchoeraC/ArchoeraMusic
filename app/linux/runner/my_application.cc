@@ -99,6 +99,12 @@ static void my_application_activate(GApplication* application) {
   // in case the window manager does more exotic layout, e.g. tiling.
   // If running on Wayland assume the header bar will work (may need changing
   // if future cases occur).
+  // ArchoeraOS（自研 kiosk 合成器，无 WM 装饰）：由合成器设置 ARCHOERA_KIOSK=1，
+  // 此时不画 CSD 标题栏、窗口无边框，界面即全屏内容。
+  const gchar* kiosk_env = g_getenv("ARCHOERA_KIOSK");
+  const gboolean kiosk_mode =
+      kiosk_env != nullptr && *kiosk_env != '\0' && g_strcmp0(kiosk_env, "0") != 0;
+
   gboolean use_header_bar = TRUE;
 #ifdef GDK_WINDOWING_X11
   GdkScreen* screen = gtk_window_get_screen(window);
@@ -109,6 +115,10 @@ static void my_application_activate(GApplication* application) {
     }
   }
 #endif
+  if (kiosk_mode) {
+    use_header_bar = FALSE;
+    gtk_window_set_decorated(window, FALSE);
+  }
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));

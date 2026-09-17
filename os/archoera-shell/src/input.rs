@@ -53,7 +53,8 @@ impl ArchoeraShell {
             }
             InputEvent::PointerMotion { event, .. } => {
                 let pointer = self.seat.get_pointer().unwrap();
-                let mut location = pointer.current_location() + event.delta();
+                let previous = pointer.current_location();
+                let mut location = previous + event.delta();
                 self.clamp_pointer(&mut location);
 
                 let serial = SERIAL_COUNTER.next_serial();
@@ -68,6 +69,13 @@ impl ArchoeraShell {
                     },
                 );
                 pointer.frame(self);
+
+                // 指针位置变化即需重绘（光标跟随）；未移动则不触发。
+                if location != previous {
+                    self.cursor.set_location(location);
+                    self.mark_dirty();
+                    self.schedule_redraw();
+                }
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let Some(output) = self.space.outputs().next() else {
@@ -82,6 +90,7 @@ impl ArchoeraShell {
 
                 let serial = SERIAL_COUNTER.next_serial();
                 let pointer = self.seat.get_pointer().unwrap();
+                let previous = pointer.current_location();
                 let under = self.surface_under(location);
                 pointer.motion(
                     self,
@@ -93,6 +102,12 @@ impl ArchoeraShell {
                     },
                 );
                 pointer.frame(self);
+
+                if location != previous {
+                    self.cursor.set_location(location);
+                    self.mark_dirty();
+                    self.schedule_redraw();
+                }
             }
             InputEvent::PointerButton { event, .. } => {
                 let pointer = self.seat.get_pointer().unwrap();

@@ -109,3 +109,4 @@ app/test/*_manual_test.dart
 /os/vm/mkosi.crt
 /os/vm/mkosi.key.pub
 /os/vm/mkosi.extra/opt/archoera-music/
+/os/vm/mkosi.extra/usr/share/

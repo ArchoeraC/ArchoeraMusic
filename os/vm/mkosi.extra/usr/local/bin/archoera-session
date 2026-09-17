@@ -2,15 +2,55 @@
 # tty1 kiosk 会话：启动 udev 合成器并托管会话客户端。
 # 优先拉起真实播放器（/opt/archoera-music/archoera_music），缺失时回退 smoke。
 # 无头时日志进串口 hvc0。
+#
+# 会话内还负责：
+# - 一个 session D-Bus（fcitx5 / libsecret 等需要）；
+# - 输入法 fcitx5：其 Wayland 前端以 `zwp_input_method_v2` 接入合成器，
+#   合成器把客户端 `zwp_text_input_v3` 的输入上下文转给它（smithay 桥接）。
 export RUST_LOG="${RUST_LOG:-archoera_shell=info,warn}"
 if [ -w /dev/hvc0 ]; then
     exec >/dev/hvc0 2>&1
 fi
 
+# 固定 socket 名，输入法才能确定连哪个 Wayland 显示。
+SOCKET=wayland-archoera
+
+# session D-Bus（无 systemd 用户会话时手动拉起）。
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && command -v dbus-daemon >/dev/null 2>&1; then
+    DBUS_SESSION_BUS_ADDRESS="$(dbus-daemon --session --fork --print-address)"
+    export DBUS_SESSION_BUS_ADDRESS
+fi
+
+# 光标主题：build.sh 已把宿主当前主题复制进镜像并写入 /opt/archoera/cursor-theme。
+if [ -r /opt/archoera/cursor-theme ]; then
+    CURSOR_THEME="$(sed -n '1p' /opt/archoera/cursor-theme)"
+    CURSOR_SIZE="$(sed -n '2p' /opt/archoera/cursor-theme)"
+    [ -n "$CURSOR_THEME" ] && export XCURSOR_THEME="$CURSOR_THEME"
+    [ -n "$CURSOR_SIZE" ] && export XCURSOR_SIZE="$CURSOR_SIZE"
+fi
+
+# 输入法：等合成器 socket 出现后启动 fcitx5（Wayland 前端）。
+start_ime() {
+    i=0
+    while [ "$i" -lt 150 ]; do
+        [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$SOCKET" ] && break
+        i=$((i + 1))
+        sleep 0.2
+    done
+    if command -v fcitx5 >/dev/null 2>&1; then
+        echo "[session] 启动输入法 fcitx5（Wayland 前端 → zwp_input_method_v2）"
+        WAYLAND_DISPLAY="$SOCKET" fcitx5 -d --replace
+    else
+        echo "[session] 未安装 fcitx5，跳过输入法"
+    fi
+}
+start_ime &
+
 args=""
 if [ -f /opt/archoera/session.args ]; then
     args="$(cat /opt/archoera/session.args)"
 fi
+args="--socket $SOCKET $args"
 
 APP=/opt/archoera-music/archoera_music
 if [ -x "$APP" ]; then
@@ -20,8 +60,10 @@ else
 fi
 
 # 播放器是 GTK3 客户端：强制 Wayland 后端；virtio-gpu 无 virgl，用软件 GL。
+# 输入法走 Wayland text-input-v3，因此不设 GTK_IM_MODULE（会走合成器 → fcitx5）。
 export GDK_BACKEND=wayland
 export LIBGL_ALWAYS_SOFTWARE=1
+unset GTK_IM_MODULE
 
 while true; do
     echo "[session] 启动 udev kiosk $(date -Is) args='${args}' client='${client}'"

@@ -9,11 +9,11 @@
     the terms of the GNU Affero General Public License v3.0 or later.
   </copyright>
 
-  <interface name="archoera_shell_v1" version="2">
+  <interface name="archoera_shell_v1" version="3">
     <description summary="ArchoeraOS 会话控制对象">
       ArchoeraOS 是一个「播放器即系统」的 kiosk 会话：ArchoeraMusic 以全屏
-      特权客户端运行，通过本协议驱动合成器完成会话级操作（关机/重启/亮度），
-      并从合成器接收系统事件（媒体键、电量、会话状态）。
+      特权客户端运行，通过本协议驱动合成器完成会话级操作（关机/重启/亮度/显示），
+      并从合成器接收系统事件（媒体键、电量、会话状态、输出状态）。
 
       本接口是全局对象，每个客户端绑定一次。合成器在 bind 时立即下发
       capabilities 与当前系统状态；客户端据此决定启用哪些系统功能入口。
@@ -32,6 +32,7 @@
       <entry name="suspend" value="32" summary="可执行挂起 / 休眠"/>
       <entry name="power_key" value="64" summary="会下发电源键 / 睡眠键事件"/>
       <entry name="screen" value="128" summary="可开关屏幕（udev 后端 DPMS；嵌套后端不置位）"/>
+      <entry name="output" value="256" summary="可运行时修改输出模式/缩放/旋转（仅 udev 后端置位）"/>
     </enum>
 
     <enum name="media_key">
@@ -57,6 +58,18 @@
       <entry name="power" value="0" summary="电源键（KEY_POWER）"/>
       <entry name="sleep" value="1" summary="睡眠键（KEY_SLEEP）"/>
       <entry name="suspend" value="2" summary="挂起键（KEY_SUSPEND）"/>
+    </enum>
+
+    <enum name="output_transform">
+      <description summary="输出变换（与 wl_output.transform 数值一致）"/>
+      <entry name="normal" value="0"/>
+      <entry name="90" value="1"/>
+      <entry name="180" value="2"/>
+      <entry name="270" value="3"/>
+      <entry name="flipped" value="4"/>
+      <entry name="flipped_90" value="5"/>
+      <entry name="flipped_180" value="6"/>
+      <entry name="flipped_270" value="7"/>
     </enum>
 
     <request name="destroy" type="destructor">
@@ -92,6 +105,24 @@
     <request name="set_screen_enabled">
       <description summary="开关屏幕（DPMS）；enabled != 0 为点亮。仅 screen 能力位可用时生效"/>
       <arg name="enabled" type="uint" summary="0=熄屏，非 0=亮屏"/>
+    </request>
+
+    <request name="set_output_scale">
+      <description summary="设置输出缩放（千分数，如 1500 = 150%）。仅 output 能力位可用时生效；
+        越界会被夹取到 [1000, 4000]。分数缩放经 wp_fractional_scale_v1 下发。"/>
+      <arg name="scale_milli" type="uint" summary="缩放 × 1000"/>
+    </request>
+
+    <request name="set_output_mode">
+      <description summary="切换输出分辨率。width/height 为 0 表示回到首选模式；
+        连接器无匹配模式时静默保持当前模式。仅 output 能力位可用时生效。"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+    </request>
+
+    <request name="set_output_transform">
+      <description summary="设置输出变换（旋转/镜像），取值见 output_transform。仅 output 能力位可用时生效。"/>
+      <arg name="transform" type="uint" enum="output_transform"/>
     </request>
 
     <event name="capabilities">
@@ -134,6 +165,17 @@
     <event name="screen_enabled_changed">
       <description summary="屏幕开关状态变化（DPMS），enabled != 0 为点亮"/>
       <arg name="enabled" type="uint"/>
+    </event>
+
+    <event name="output_state">
+      <description summary="主输出当前状态（bind 时立即下发一次，之后变化时下发）。
+        宽高为当前模式的物理像素，scale_milli 为缩放千分数，transform 见
+        output_transform，refresh_millihz 为刷新率 × 1000。"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="scale_milli" type="uint"/>
+      <arg name="transform" type="uint" enum="output_transform"/>
+      <arg name="refresh_millihz" type="uint"/>
     </event>
   </interface>
 </protocol>

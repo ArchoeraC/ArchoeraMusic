@@ -18,13 +18,14 @@ use smithay::{
         },
         winit::WinitGraphicsBackend,
     },
-    desktop::{space::render_output, Space, Window},
+    desktop::{space::render_output, space::SpaceRenderElements, Space, Window},
     output::{Output, Scale},
     utils::{Rectangle, Transform},
 };
 
 use crate::{
     cli::{BackendKind, TransformKind},
+    cursor::{CursorRenderElement, PointerElement},
     CalloopData,
 };
 
@@ -35,6 +36,13 @@ mod udev;
 
 /// kiosk 桌面底色（对齐 ArchoeraMusic `AppPalette.dark.surface` #0E1117）。
 pub const CLEAR_COLOR: [f32; 4] = [0.0549, 0.0667, 0.0902, 1.0];
+
+// 每个输出的一帧渲染元素：桌面内容 + 指针光标（光标最后绘制，位于最上层）。
+smithay::backend::renderer::element::render_elements! {
+    pub OutputElement<=GlesRenderer>;
+    Space = SpaceRenderElements<GlesRenderer, WaylandSurfaceRenderElement<GlesRenderer>>,
+    Cursor = CursorRenderElement<GlesRenderer>,
+}
 
 /// f64 缩放倍数 → smithay 输出缩放。
 ///
@@ -66,6 +74,34 @@ pub fn output_transform(kind: TransformKind) -> Transform {
     }
 }
 
+/// 输出变换 → 协议 `output_transform` 数值（与 `wl_output.transform` 一致）。
+pub fn transform_code(transform: Transform) -> u32 {
+    match transform {
+        Transform::Normal => 0,
+        Transform::_90 => 1,
+        Transform::_180 => 2,
+        Transform::_270 => 3,
+        Transform::Flipped => 4,
+        Transform::Flipped90 => 5,
+        Transform::Flipped180 => 6,
+        Transform::Flipped270 => 7,
+    }
+}
+
+/// 协议 `output_transform` 数值 → 输出变换。
+pub fn transform_from_code(code: u32) -> Transform {
+    match code {
+        1 => Transform::_90,
+        2 => Transform::_180,
+        3 => Transform::_270,
+        4 => Transform::Flipped,
+        5 => Transform::Flipped90,
+        6 => Transform::Flipped180,
+        7 => Transform::Flipped270,
+        _ => Transform::Normal,
+    }
+}
+
 /// winit 嵌套后端的渲染状态。
 pub struct WinitBackend {
     graphics: WinitGraphicsBackend<GlesRenderer>,
@@ -74,7 +110,7 @@ pub struct WinitBackend {
 }
 
 impl WinitBackend {
-    fn render(&mut self, space: &Space<Window>) -> anyhow::Result<()> {
+    fn render(&mut self, space: &Space<Window>, _pointer: &PointerElement) -> anyhow::Result<()> {
         let damage = Rectangle::from_size(self.graphics.window_size());
         {
             let (renderer, mut framebuffer) = self
@@ -130,12 +166,16 @@ impl Backend {
         }
     }
 
-    /// 合成并提交一帧（渲染 `space` 的全部输出）。
-    pub fn render(&mut self, space: &Space<Window>) -> anyhow::Result<()> {
+    /// 合成并提交一帧（渲染 `space` 的全部输出 + 指针光标）。
+    pub fn render(
+        &mut self,
+        space: &Space<Window>,
+        pointer: &PointerElement,
+    ) -> anyhow::Result<()> {
         match self {
-            Backend::Winit(backend) => backend.render(space),
+            Backend::Winit(backend) => backend.render(space, pointer),
             #[cfg(feature = "udev")]
-            Backend::Udev(backend) => backend.render(space),
+            Backend::Udev(backend) => backend.render(space, pointer),
         }
     }
 
@@ -144,14 +184,18 @@ impl Backend {
     /// - winit：请求一次窗口重绘，合成在 `WinitEvent::Redraw` 里发生；
     /// - udev：没有重绘事件，直接同步合成一帧，由下一次 vblank 回收。
     #[cfg_attr(not(feature = "udev"), allow(unused_variables))]
-    pub fn request_frame(&mut self, space: &Space<Window>) -> anyhow::Result<()> {
+    pub fn request_frame(
+        &mut self,
+        space: &Space<Window>,
+        pointer: &PointerElement,
+    ) -> anyhow::Result<()> {
         match self {
             Backend::Winit(backend) => {
                 backend.request_redraw();
                 Ok(())
             }
             #[cfg(feature = "udev")]
-            Backend::Udev(backend) => backend.render(space),
+            Backend::Udev(backend) => backend.render(space, pointer),
         }
     }
 
@@ -163,6 +207,23 @@ impl Backend {
             Backend::Winit(_) => Ok(()),
             #[cfg(feature = "udev")]
             Backend::Udev(backend) => backend.set_screen_power(enabled),
+        }
+    }
+
+    /// 应用输出配置到硬件：切换 DRM 模式（udev）等；返回实际生效的模式。
+    ///
+    /// 缩放/变换只改 `wl_output` 状态，无需硬件动作；模式切换必须走 DRM。
+    #[cfg_attr(not(feature = "udev"), allow(unused_variables))]
+    pub fn apply_output_config(
+        &mut self,
+        scale: f64,
+        transform: Transform,
+        mode: Option<(i32, i32)>,
+    ) -> anyhow::Result<Option<smithay::output::Mode>> {
+        match self {
+            Backend::Winit(_) => Ok(None),
+            #[cfg(feature = "udev")]
+            Backend::Udev(backend) => backend.apply_output_config(scale, transform, mode),
         }
     }
 }
@@ -181,5 +242,48 @@ pub fn init(
             "本次构建未启用 udev 后端；请以 `cargo build --features udev` 构建，\
              并确保系统已安装 libseat / libinput / libdrm / gbm / libudev"
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transform_code_round_trips_every_kind() {
+        for kind in [
+            TransformKind::Normal,
+            TransformKind::R90,
+            TransformKind::R180,
+            TransformKind::R270,
+            TransformKind::Flipped,
+            TransformKind::Flipped90,
+            TransformKind::Flipped180,
+            TransformKind::Flipped270,
+        ] {
+            let transform = output_transform(kind);
+            assert_eq!(transform_from_code(transform_code(transform)), transform);
+        }
+    }
+
+    #[test]
+    fn unknown_transform_code_falls_back_to_normal() {
+        assert_eq!(transform_from_code(42), Transform::Normal);
+    }
+
+    #[test]
+    fn output_scale_distinguishes_integral_and_fractional() {
+        assert_eq!(output_scale(2.0).fractional_scale(), 2.0);
+        assert_eq!(output_scale(1.0).fractional_scale(), 1.0);
+        match output_scale(1.5) {
+            Scale::Custom {
+                advertised_integer,
+                fractional,
+            } => {
+                assert_eq!(advertised_integer, 2);
+                assert!((fractional - 1.5).abs() < f64::EPSILON);
+            }
+            other => panic!("期望分数缩放，得到 {other:?}"),
+        }
     }
 }

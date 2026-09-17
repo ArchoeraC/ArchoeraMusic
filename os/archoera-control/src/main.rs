@@ -22,7 +22,9 @@ use wayland_client::{
     Connection, Dispatch, QueueHandle,
 };
 
-use protocol::{ArchoeraShellV1, Capability, Event, MediaKey, PowerKey, SessionState};
+use protocol::{
+    ArchoeraShellV1, Capability, Event, MediaKey, OutputTransform, PowerKey, SessionState,
+};
 
 fn main() -> ExitCode {
     match run() {
@@ -142,6 +144,8 @@ struct ControlState {
     session: Option<SessionState>,
     /// 屏幕开关（DPMS）；仅 udev 后端会下发。
     screen: Option<bool>,
+    /// 主输出状态 (宽, 高, 缩放×1000, 刷新率 mHz)。
+    output: Option<(u32, u32, u32, u32)>,
     /// `watch` 模式下随事件逐条打印。
     verbose: bool,
 }
@@ -220,6 +224,32 @@ impl Dispatch<ArchoeraShellV1, ()> for ControlState {
                     println!("屏幕: {}", if enabled != 0 { "开" } else { "关" });
                 }
             }
+            Event::OutputState {
+                width,
+                height,
+                scale_milli,
+                transform,
+                refresh_millihz,
+            } => {
+                state.output = Some((width, height, scale_milli, refresh_millihz));
+                if state.verbose {
+                    println!(
+                        "输出: {width}x{height} @ {:.3}Hz 缩放 {:.1}% 变换 {}",
+                        refresh_millihz as f64 / 1000.0,
+                        scale_milli as f64 / 10.0,
+                        match transform.into_result().unwrap_or(OutputTransform::Normal) {
+                            OutputTransform::Normal => "normal",
+                            OutputTransform::_90 => "90",
+                            OutputTransform::_180 => "180",
+                            OutputTransform::_270 => "270",
+                            OutputTransform::Flipped => "flipped",
+                            OutputTransform::Flipped90 => "flipped-90",
+                            OutputTransform::Flipped180 => "flipped-180",
+                            OutputTransform::Flipped270 => "flipped-270",
+                        }
+                    );
+                }
+            }
         }
     }
 }
@@ -247,6 +277,13 @@ fn print_status(state: &ControlState) {
     if let Some(screen) = state.screen {
         println!("屏幕: {}", if screen { "开" } else { "关" });
     }
+    if let Some((w, h, scale_milli, refresh_millihz)) = state.output {
+        println!(
+            "输出: {w}x{h} @ {:.3}Hz 缩放 {:.1}%",
+            refresh_millihz as f64 / 1000.0,
+            scale_milli as f64 / 10.0
+        );
+    }
     let session = state.session.unwrap_or(SessionState::Ready);
     println!(
         "会话: {}",
@@ -269,6 +306,7 @@ fn format_caps(caps: Capability) -> String {
         (Capability::Suspend, "suspend"),
         (Capability::PowerKey, "power_key"),
         (Capability::Screen, "screen"),
+        (Capability::Output, "output"),
     ] {
         if caps.contains(cap) {
             names.push(name);

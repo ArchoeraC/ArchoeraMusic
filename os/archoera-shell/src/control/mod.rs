@@ -150,6 +150,15 @@ impl ControlPlane {
         self.screen_supported
     }
 
+    /// 标记输出显示设置能力（模式/缩放/旋转；由 udev 后端初始化时置位）。
+    pub fn set_output_supported(&mut self, supported: bool) {
+        if supported {
+            self.capabilities |= Capability::Output;
+        } else {
+            self.capabilities.remove(Capability::Output);
+        }
+    }
+
     pub fn screen_enabled(&self) -> bool {
         self.screen_enabled
     }

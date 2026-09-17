@@ -25,17 +25,20 @@ use smithay::{
             Display, DisplayHandle, Resource,
         },
     },
-    utils::{Logical, Point},
+    utils::{Logical, Point, Transform},
     wayland::{
         compositor::{CompositorClientState, CompositorState},
+        cursor_shape::CursorShapeManagerState,
         dmabuf::{DmabufFeedbackBuilder, DmabufGlobal, DmabufState},
-        fractional_scale::FractionalScaleManagerState,
+        fractional_scale::{self, FractionalScaleManagerState},
         idle_inhibit::IdleInhibitManagerState,
+        input_method::InputMethodManagerState,
         output::OutputManagerState,
         selection::data_device::DataDeviceState,
         shell::xdg::{decoration::XdgDecorationState, XdgShellState},
         shm::ShmState,
         socket::ListeningSocketSource,
+        text_input::TextInputManagerState,
     },
 };
 
@@ -43,6 +46,7 @@ use crate::{
     backend::Backend,
     cli::ShellConfig,
     control::ControlPlane,
+    cursor::PointerElement,
     kiosk::OutputRect,
     protocol::{ArchoeraShellV1, Capability, MediaKey, PowerKey, SessionState},
     CalloopData,
@@ -54,6 +58,13 @@ pub struct ArchoeraShell {
     pub socket_name: OsString,
     pub display_handle: DisplayHandle,
     pub config: ShellConfig,
+
+    /// 当前输出缩放（1.0 = 100%；运行时可由协议修改）。
+    pub output_scale: f64,
+    /// 期望输出模式（宽, 高）；`None` = 连接器首选模式。
+    pub output_mode: Option<(i32, i32)>,
+    /// 当前输出变换（旋转/镜像）。
+    pub output_transform: Transform,
 
     // 桌面 / 输出
     pub space: Space<Window>,
@@ -77,6 +88,15 @@ pub struct ArchoeraShell {
     pub seat_state: SeatState<Self>,
     pub data_device_state: DataDeviceState,
     pub seat: Seat<Self>,
+    /// 指针光标（形状 + 位图 + 位置）。
+    pub cursor: PointerElement,
+    /// `zwp_cursor_shape_v1`：客户端直接请求命名形状（GTK 据此跳过主题查找）。
+    pub cursor_shape_state: CursorShapeManagerState,
+
+    // 输入法（IME）：客户端 zwp_text_input_v3 ↔ IME zwp_input_method_v2，
+    // smithay 负责两侧状态互转，合成器只需接全局对象与 popup。
+    pub text_input_state: TextInputManagerState,
+    pub input_method_state: InputMethodManagerState,
 
     // linux-dmabuf（Flutter / GTK 的 EGL 渲染前提；不可用时客户端回退 wl_shm）
     pub dmabuf_state: DmabufState,
@@ -124,6 +144,16 @@ impl ArchoeraShell {
         let data_device_state = DataDeviceState::new::<Self>(&dh);
         let popups = PopupManager::default();
 
+        // 光标命名形状协议：GTK 只要看到它就直接请求形状（否则会回退到主题查找，
+        // 在无桌面环境的系统上常失败并退化成「隐藏光标」）。
+        let cursor_shape_state = CursorShapeManagerState::new::<Self>(&dh);
+
+        // 输入法：客户端侧 `zwp_text_input_v3`，IME 侧 `zwp_input_method_v2`。
+        // smithay 负责两侧状态互转（输入上下文、preedit/commit、键盘抓取），
+        // 合成器只需把两个全局对象接上并渲染候选窗口 popup。
+        let text_input_state = TextInputManagerState::new::<Self>(&dh);
+        let input_method_state = InputMethodManagerState::new::<Self, _>(&dh, |_client| true);
+
         // 注册 ArchoeraOS 控制协议全局对象。
         let _global = dh.create_global::<Self, ArchoeraShellV1, ()>(1, ());
 
@@ -143,11 +173,18 @@ impl ArchoeraShell {
         );
         let loop_signal = event_loop.get_signal();
 
+        let output_scale = config.scale;
+        let output_mode = config.mode;
+        let output_transform = crate::backend::output_transform(config.transform);
+
         Self {
             start_time,
             socket_name,
             display_handle: dh,
             config,
+            output_scale,
+            output_mode,
+            output_transform,
             space: Space::default(),
             output: None,
             popups,
@@ -163,6 +200,10 @@ impl ArchoeraShell {
             seat_state,
             data_device_state,
             seat,
+            cursor: PointerElement::new(),
+            cursor_shape_state,
+            text_input_state,
+            input_method_state,
             dmabuf_state: DmabufState::new(),
             dmabuf_global: None,
             shell_clients: Vec::new(),
@@ -235,7 +276,7 @@ impl ArchoeraShell {
         tracing::trace!("合成一帧");
 
         if let Some(backend) = self.backend.as_mut() {
-            backend.render(&self.space)?;
+            backend.render(&self.space, &self.cursor)?;
         }
 
         let elapsed = self.start_time.elapsed();
@@ -255,6 +296,75 @@ impl ArchoeraShell {
             tracing::warn!(%err, "flush_clients 失败");
         }
         Ok(())
+    }
+
+    /// 当前主输出的显示状态：(宽, 高, 缩放×1000, 变换, 刷新率 mHz)。
+    pub fn output_state_info(&self) -> Option<(i32, i32, u32, u32, u32)> {
+        let output = self.output.as_ref()?;
+        let mode = output.current_mode()?;
+        let scale = output.current_scale().fractional_scale();
+        Some((
+            mode.size.w,
+            mode.size.h,
+            (scale * 1000.0).round() as u32,
+            crate::backend::transform_code(output.current_transform()),
+            mode.refresh.max(0) as u32,
+        ))
+    }
+
+    /// 下发主输出状态（bind 时与每次变化后）。
+    pub fn notify_output_state(&self) {
+        if let Some((w, h, scale, transform, refresh)) = self.output_state_info() {
+            let transform = crate::protocol::output_transform_from_code(transform);
+            self.broadcast(|s| s.output_state(w as u32, h as u32, scale, transform, refresh));
+        }
+    }
+
+    /// 应用运行时显示设置（缩放/模式/变换）并通知客户端。
+    ///
+    /// - 模式切换走后端（udev 改 DRM 模式）；
+    /// - 缩放/变换更新 `wl_output` 状态，并对已有 surface 重发分数缩放；
+    /// - 之后 kiosk 按新逻辑尺寸重新 configure 窗口并重绘。
+    pub fn apply_output_config(&mut self) -> anyhow::Result<()> {
+        let applied_mode = match self.backend.as_mut() {
+            Some(backend) => backend.apply_output_config(
+                self.output_scale,
+                self.output_transform,
+                self.output_mode,
+            )?,
+            None => None,
+        };
+
+        if let Some(output) = self.output.clone() {
+            let scale = crate::backend::output_scale(self.output_scale);
+            output.change_current_state(
+                applied_mode,
+                Some(self.output_transform),
+                Some(scale),
+                None,
+            );
+        }
+
+        // 缩放变化要让已存在的表面重新拿到 preferred_scale（分数缩放）。
+        self.refresh_fractional_scale();
+
+        if let Some(rect) = self.output_rect() {
+            crate::kiosk::reconfigure_all(&self.space, rect);
+        }
+        self.mark_dirty();
+        self.schedule_redraw();
+        self.notify_output_state();
+        Ok(())
+    }
+
+    /// 把当前缩放重新下发给所有已订阅 `wp_fractional_scale_v1` 的表面。
+    fn refresh_fractional_scale(&self) {
+        let scale = self.output_scale.max(1.0);
+        for window in self.space.elements() {
+            window.with_surfaces(|_surface, states| {
+                fractional_scale::with_fractional_scale(states, |fs| fs.set_preferred_scale(scale));
+            });
+        }
     }
 
     fn init_wayland_listener(
@@ -370,6 +480,10 @@ impl ArchoeraShell {
         if self.has_capability(Capability::Screen) {
             shell.screen_enabled_changed(self.control.screen_enabled() as u32);
         }
+        if let Some((w, h, scale_milli, transform, refresh)) = self.output_state_info() {
+            let transform = crate::protocol::output_transform_from_code(transform);
+            shell.output_state(w as u32, h as u32, scale_milli, transform, refresh);
+        }
         shell.session(self.session_state);
     }
 
@@ -433,8 +547,9 @@ impl ArchoeraShell {
             return;
         }
         let space = &self.space;
+        let cursor = &self.cursor;
         if let Some(backend) = self.backend.as_mut() {
-            if let Err(err) = backend.request_frame(space) {
+            if let Err(err) = backend.request_frame(space, cursor) {
                 tracing::warn!(%err, "调度重绘失败");
             }
         }

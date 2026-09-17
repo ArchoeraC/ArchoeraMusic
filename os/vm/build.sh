@@ -36,6 +36,33 @@ fi
 
 chmod 0755 "$HERE/mkosi.extra/usr/local/bin/archoera-session" 2>/dev/null || true
 
+# 光标主题：把宿主当前使用的 XCursor 主题复制进镜像（用户要求「用我在用的那套」）。
+# 主题名取自 KDE（kcminputrc）或 gsettings，缺省 Adwaita（镜像自带）。
+cursor_theme=""
+if [ -r "$HOME/.config/kcminputrc" ]; then
+    cursor_theme="$(sed -n 's/^cursorTheme=//p' "$HOME/.config/kcminputrc" | head -1)"
+fi
+if [ -z "$cursor_theme" ] && command -v gsettings >/dev/null 2>&1; then
+    cursor_theme="$(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null | tr -d "'")"
+fi
+if [ -z "$cursor_theme" ] || [ ! -d "/usr/share/icons/$cursor_theme/cursors" ]; then
+    cursor_theme=Adwaita
+fi
+cursor_size=""
+if [ -r "$HOME/.config/kcminputrc" ]; then
+    cursor_size="$(sed -n 's/^cursorSize=//p' "$HOME/.config/kcminputrc" | head -1)"
+fi
+[ -n "$cursor_size" ] || cursor_size=24
+
+if [ ! -d "$HERE/mkosi.extra/usr/share/icons/$cursor_theme/cursors" ]; then
+    echo "==> 复制光标主题: $cursor_theme (size=$cursor_size)"
+    rm -rf "$HERE/mkosi.extra/usr/share/icons/$cursor_theme"
+    mkdir -p "$HERE/mkosi.extra/usr/share/icons"
+    cp -a "/usr/share/icons/$cursor_theme" "$HERE/mkosi.extra/usr/share/icons/"
+fi
+mkdir -p "$HERE/mkosi.extra/opt/archoera"
+printf '%s\n%s\n' "$cursor_theme" "$cursor_size" > "$HERE/mkosi.extra/opt/archoera/cursor-theme"
+
 if [ "$PROFILE" = "vm" ]; then
     # 无头 VM 默认不带 GPU（mkosi 仅在 Console=gui 时加 virtio-gpu-pci），
     # 这里显式补上 GPU 与输入设备，供 udev/DRM 后端验证。

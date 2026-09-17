@@ -27,6 +27,8 @@ libc = "0.2"
 zbus = { version = "5", features = ["blocking-api"] }
 # DRM 连接器扫描（仅 udev 后端需要）。display-info feature 关闭，避免引入 libdisplay-info。
 smithay-drm-extras = { version = "0.1.0", default-features = false, optional = true }
+# XCursor 主题解析（指针光标）。
+xcursor = "0.3"
 
 [features]
 default = ["logind"]
