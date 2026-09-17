@@ -302,11 +302,6 @@ GTK3 + EGL/Impeller 全屏渲染、dmabuf 导入与桌面方向均正确。踩�
 - 播放器音量变化镜像回合成器（`apl_os_set_volume`），系统侧状态一致；
 - 关机 / 重启 / 挂起 / 熄屏等请求由 UI 经 `PlatformCapabilities.os` 下发。
 
-**窗口装饰**：目标镜像没有完整桌面环境，播放器是铺满屏幕的唯一界面，因此 Linux
-runner 在 **Wayland 下不绘制 GTK header bar**，并显式 `gtk_window_set_decorated(FALSE)`
-（既无 GTK CSD，也无 KWin/其他 WM 的标题栏与最小化按钮）；X11 保留传统标题栏仅用于
-常规桌面开发调试。kiosk 合成器本身亦以 `ServerSide` 模式不绘制任何装饰。
-
 协议请求-事件往返已端到端验证（`set_volume(42)` → 合成器状态 42 → `volume_changed(42)`
 回传）；硬件媒体键触发待真机。
 

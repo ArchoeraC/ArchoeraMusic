@@ -92,19 +92,30 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
-  // ArchoeraOS 目标镜像**没有完整桌面环境**，播放器是铺满屏幕的唯一界面：
-  // 因此 Wayland 下既不要 GTK 自绘 header bar，也不要窗口管理器标题栏——
-  // 显式置为无装饰（kiosk 合成器本身也不绘制装饰）。
-  // X11 下保留传统标题栏，便于在常规桌面里开发/调试（拖动、关闭）。
-  gboolean is_x11 = FALSE;
+  // Use a header bar when running in GNOME as this is the common style used
+  // by applications and is the setup most users will be using (e.g. Ubuntu
+  // desktop).
+  // If running on X and not using GNOME then just use a traditional title bar
+  // in case the window manager does more exotic layout, e.g. tiling.
+  // If running on Wayland assume the header bar will work (may need changing
+  // if future cases occur).
+  gboolean use_header_bar = TRUE;
 #ifdef GDK_WINDOWING_X11
   GdkScreen* screen = gtk_window_get_screen(window);
-  is_x11 = GDK_IS_X11_SCREEN(screen);
+  if (GDK_IS_X11_SCREEN(screen)) {
+    const gchar* wm_name = gdk_x11_screen_get_window_manager_name(screen);
+    if (g_strcmp0(wm_name, "GNOME Shell") != 0) {
+      use_header_bar = FALSE;
+    }
+  }
 #endif
-  if (is_x11) {
-    gtk_window_set_title(window, "archoera_music");
+  if (use_header_bar) {
+    GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
+    gtk_widget_show(GTK_WIDGET(header_bar));
+    gtk_header_bar_set_title(header_bar, "archoera_music");
+    gtk_header_bar_set_show_close_button(header_bar, TRUE);
+    gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_decorated(window, FALSE);
     gtk_window_set_title(window, "archoera_music");
   }
 
