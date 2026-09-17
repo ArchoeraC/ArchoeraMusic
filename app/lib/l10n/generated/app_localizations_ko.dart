@@ -4297,4 +4297,34 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get systemSessionShuttingDown => '곧 종료됩니다';
+
+  @override
+  String get systemDisplayTitle => '디스플레이';
+
+  @override
+  String get systemDisplayMode => '해상도';
+
+  @override
+  String get systemDisplayScale => '배율';
+
+  @override
+  String get systemDisplayRotation => '회전';
+
+  @override
+  String get systemDisplayAuto => '자동(기본)';
+
+  @override
+  String get systemDisplayUnknown => '알 수 없음';
+
+  @override
+  String get systemStatusTitle => '시스템 상태';
+
+  @override
+  String get systemStatusOutput => '출력';
+
+  @override
+  String get systemStatusSession => '세션';
+
+  @override
+  String get systemStatusReady => '준비됨';
 }

@@ -45,8 +45,8 @@ namespace {
 using wl_display = struct wl_display;
 using wl_proxy = struct wl_proxy;
 
-// ── archoera_shell_v1（对齐 os/protocol/archoera-shell-v1.xml v2）──────
-constexpr uint32_t kInterfaceVersion = 2;
+// ── archoera_shell_v1（对齐 os/protocol/archoera-shell-v1.xml v3）──────
+constexpr uint32_t kInterfaceVersion = 3;
 
 // 请求 opcode（顺序即 XML 中 <request> 出现顺序）。
 enum Op : uint32_t {
@@ -58,6 +58,9 @@ enum Op : uint32_t {
     OP_SUSPEND,
     OP_HIBERNATE,
     OP_SET_SCREEN_ENABLED,
+    OP_SET_OUTPUT_SCALE,
+    OP_SET_OUTPUT_MODE,
+    OP_SET_OUTPUT_TRANSFORM,
 };
 
 // 事件 opcode。
@@ -70,6 +73,7 @@ enum Ev : uint32_t {
     EV_SESSION,
     EV_POWER_KEY,
     EV_SCREEN_ENABLED_CHANGED,
+    EV_OUTPUT_STATE,
 };
 
 constexpr uint32_t kMarshalFlagDestroy = 1;
@@ -83,6 +87,9 @@ const struct wl_message kRequests[] = {
     {"suspend", "", nullptr},
     {"hibernate", "", nullptr},
     {"set_screen_enabled", "u", nullptr},
+    {"set_output_scale", "u", nullptr},
+    {"set_output_mode", "uu", nullptr},
+    {"set_output_transform", "u", nullptr},
 };
 
 const struct wl_message kEvents[] = {
@@ -94,14 +101,15 @@ const struct wl_message kEvents[] = {
     {"session", "u", nullptr},
     {"power_key", "u", nullptr},
     {"screen_enabled_changed", "u", nullptr},
+    {"output_state", "uuuuu", nullptr},
 };
 
 const struct wl_interface kShellInterface = {
     "archoera_shell_v1",
     static_cast<int>(kInterfaceVersion),
-    8,
+    11,
     kRequests,
-    8,
+    9,
     kEvents,
 };
 
@@ -203,6 +211,7 @@ bool g_seen = false;
 struct Request {
     uint32_t op;
     uint32_t arg;
+    uint32_t arg2;
 };
 std::mutex g_queue_mtx;
 std::vector<Request> g_queue;
@@ -243,6 +252,12 @@ void on_power_key(void*, wl_proxy*, uint32_t key) {
 void on_screen_enabled(void*, wl_proxy*, uint32_t enabled) {
     dispatch(makeOsScreen(enabled != 0));
 }
+void on_output_state(void*, wl_proxy*, uint32_t width, uint32_t height, uint32_t scale_milli,
+                     uint32_t transform, uint32_t refresh_millihz) {
+    dispatch(makeOsOutput(static_cast<int32_t>(width), static_cast<int32_t>(height),
+                          static_cast<int32_t>(scale_milli), static_cast<int32_t>(transform),
+                          static_cast<int32_t>(refresh_millihz)));
+}
 
 struct ShellEvents {
     void (*capabilities)(void*, wl_proxy*, uint32_t);
@@ -253,11 +268,13 @@ struct ShellEvents {
     void (*session)(void*, wl_proxy*, uint32_t);
     void (*power_key)(void*, wl_proxy*, uint32_t);
     void (*screen_enabled_changed)(void*, wl_proxy*, uint32_t);
+    void (*output_state)(void*, wl_proxy*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 };
 
 const ShellEvents kShellEvents = {
-    on_capabilities, on_brightness, on_volume,               on_media_key,
-    on_battery,      on_session,    on_power_key,            on_screen_enabled,
+    on_capabilities, on_brightness, on_volume,    on_media_key,
+    on_battery,      on_session,    on_power_key, on_screen_enabled,
+    on_output_state,
 };
 
 // ── registry 监听器（探测与正式连接共用）──────────────────────────
@@ -288,7 +305,12 @@ void sendRequest(const Request& r) {
         case OP_SET_BRIGHTNESS:
         case OP_SET_VOLUME:
         case OP_SET_SCREEN_ENABLED:
+        case OP_SET_OUTPUT_SCALE:
+        case OP_SET_OUTPUT_TRANSFORM:
             g_api->proxy_marshal_flags(g_shell, r.op, nullptr, version, flags, r.arg);
+            break;
+        case OP_SET_OUTPUT_MODE:
+            g_api->proxy_marshal_flags(g_shell, r.op, nullptr, version, flags, r.arg, r.arg2);
             break;
         default:
             g_api->proxy_marshal_flags(g_shell, r.op, nullptr, version, flags);
@@ -462,7 +484,7 @@ int32_t startLocked() {
     return OK;
 }
 
-int32_t enqueue(uint32_t op, uint32_t arg) {
+int32_t enqueue(uint32_t op, uint32_t arg, uint32_t arg2 = 0) {
     if (!g_available.load()) return ERR_UNSUPPORTED;
     {
         std::lock_guard<std::mutex> lock(g_state_mtx);
@@ -473,7 +495,7 @@ int32_t enqueue(uint32_t op, uint32_t arg) {
     }
     {
         std::lock_guard<std::mutex> lock(g_queue_mtx);
-        g_queue.push_back(Request{op, arg});
+        g_queue.push_back(Request{op, arg, arg2});
     }
     const int wake = g_wake_fd;
     if (wake >= 0) {
@@ -527,6 +549,16 @@ int32_t powerOff() { return enqueue(OP_POWER_OFF, 0); }
 int32_t reboot() { return enqueue(OP_REBOOT, 0); }
 int32_t suspend() { return enqueue(OP_SUSPEND, 0); }
 int32_t hibernate() { return enqueue(OP_HIBERNATE, 0); }
+int32_t setOutputScale(int32_t scaleMilli) {
+    return enqueue(OP_SET_OUTPUT_SCALE, static_cast<uint32_t>(std::max(0, scaleMilli)));
+}
+int32_t setOutputMode(int32_t width, int32_t height) {
+    return enqueue(OP_SET_OUTPUT_MODE, static_cast<uint32_t>(std::max(0, width)),
+                   static_cast<uint32_t>(std::max(0, height)));
+}
+int32_t setOutputTransform(int32_t transform) {
+    return enqueue(OP_SET_OUTPUT_TRANSFORM, static_cast<uint32_t>(std::max(0, transform)));
+}
 
 void shutdown() {
     std::lock_guard<std::mutex> lock(g_state_mtx);

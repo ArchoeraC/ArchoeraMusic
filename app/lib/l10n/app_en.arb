@@ -1308,5 +1308,15 @@
   "systemConfirmTitle": "Confirm {action}",
   "systemConfirmBody": "Are you sure you want to {action}?",
   "systemSessionSuspending": "The system is about to suspend",
-  "systemSessionShuttingDown": "The system is about to shut down"
+  "systemSessionShuttingDown": "The system is about to shut down",
+  "systemDisplayTitle": "Display",
+  "systemDisplayMode": "Resolution",
+  "systemDisplayScale": "Scale",
+  "systemDisplayRotation": "Rotation",
+  "systemDisplayAuto": "Automatic (preferred)",
+  "systemDisplayUnknown": "Unknown",
+  "systemStatusTitle": "System status",
+  "systemStatusOutput": "Output",
+  "systemStatusSession": "Session",
+  "systemStatusReady": "Ready"
 }

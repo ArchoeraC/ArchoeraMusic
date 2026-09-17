@@ -28,6 +28,41 @@ abstract final class OsCapability {
   static const int suspend = 1 << 5;
   static const int powerKey = 1 << 6;
   static const int screen = 1 << 7;
+  static const int output = 1 << 8;
+}
+
+/// 主输出状态（对齐协议 `output_state`）。
+class OsOutputState {
+  const OsOutputState({
+    required this.width,
+    required this.height,
+    required this.scaleMilli,
+    required this.transform,
+    required this.refreshMillihz,
+  });
+
+  /// 模式物理像素。
+  final int width;
+  final int height;
+
+  /// 缩放千分数（1500 = 150%）。
+  final int scaleMilli;
+
+  /// 变换（0..7，与 wl_output.transform 一致）。
+  final int transform;
+
+  /// 刷新率 × 1000。
+  final int refreshMillihz;
+
+  double get scale => scaleMilli / 1000;
+
+  /// 旋转角度（仅 0/90/180/270 有意义）。
+  int get rotationDegrees => switch (transform) {
+    1 || 5 => 90,
+    2 || 6 => 180,
+    3 || 7 => 270,
+    _ => 0,
+  };
 }
 
 /// 电池快照。
@@ -61,6 +96,13 @@ abstract interface class SystemOsSession {
   int suspend();
   int hibernate();
 
+  /// 显示设置（仅 [OsCapability.output] 置位时生效）。
+  /// [scaleMilli] 千分数（1500 = 150%）；[width]/[height] 为 0 表示首选模式；
+  /// [transform] 见 [OsOutputState.transform]。
+  int setOutputScale(int scaleMilli);
+  int setOutputMode(int width, int height);
+  int setOutputTransform(int transform);
+
   /// 会话能力位图（archoera_shell_v1 capability）。
   Stream<int> get capabilities;
 
@@ -72,6 +114,9 @@ abstract interface class SystemOsSession {
   Stream<OsSessionState> get session;
   Stream<bool> get screenEnabled;
   Stream<OsPowerKey> get powerKey;
+
+  /// 主输出状态（订阅成功后合成器立即下发一次，之后变化时下发）。
+  Stream<OsOutputState> get output;
 }
 
 /// 空实现：未接 ArchoeraOS 会话时静默降级。
@@ -108,6 +153,15 @@ class NoopSystemOsSession implements SystemOsSession {
   int hibernate() => -1;
 
   @override
+  int setOutputScale(int scaleMilli) => -1;
+
+  @override
+  int setOutputMode(int width, int height) => -1;
+
+  @override
+  int setOutputTransform(int transform) => -1;
+
+  @override
   Stream<int> get capabilities => const Stream.empty();
 
   @override
@@ -127,4 +181,7 @@ class NoopSystemOsSession implements SystemOsSession {
 
   @override
   Stream<OsPowerKey> get powerKey => const Stream.empty();
+
+  @override
+  Stream<OsOutputState> get output => const Stream.empty();
 }

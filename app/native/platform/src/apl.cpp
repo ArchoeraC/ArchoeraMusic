@@ -137,6 +137,21 @@ int32_t apl_os_hibernate(void) {
     return archoera::osSessionHibernate();
 }
 
+int32_t apl_os_set_output_scale(int32_t scale_milli) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionSetOutputScale(scale_milli);
+}
+
+int32_t apl_os_set_output_mode(int32_t width, int32_t height) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionSetOutputMode(width, height);
+}
+
+int32_t apl_os_set_output_transform(int32_t transform) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionSetOutputTransform(transform);
+}
+
 int32_t apl_notify(const char* title, const char* body) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     if (title == nullptr) return archoera::ERR_BACKEND;

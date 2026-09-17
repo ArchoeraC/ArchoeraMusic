@@ -7885,6 +7885,66 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'系统即将关闭'**
   String get systemSessionShuttingDown;
+
+  /// No description provided for @systemDisplayTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'显示'**
+  String get systemDisplayTitle;
+
+  /// No description provided for @systemDisplayMode.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'分辨率'**
+  String get systemDisplayMode;
+
+  /// No description provided for @systemDisplayScale.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'缩放'**
+  String get systemDisplayScale;
+
+  /// No description provided for @systemDisplayRotation.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'旋转'**
+  String get systemDisplayRotation;
+
+  /// No description provided for @systemDisplayAuto.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动（首选）'**
+  String get systemDisplayAuto;
+
+  /// No description provided for @systemDisplayUnknown.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未知'**
+  String get systemDisplayUnknown;
+
+  /// No description provided for @systemStatusTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统状态'**
+  String get systemStatusTitle;
+
+  /// No description provided for @systemStatusOutput.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'输出'**
+  String get systemStatusOutput;
+
+  /// No description provided for @systemStatusSession.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'会话'**
+  String get systemStatusSession;
+
+  /// No description provided for @systemStatusReady.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'就绪'**
+  String get systemStatusReady;
 }
 
 class _AppLocalizationsDelegate

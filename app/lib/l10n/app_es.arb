@@ -1308,5 +1308,15 @@
   "systemConfirmTitle": "Confirmar {action}",
   "systemConfirmBody": "¿Seguro que quieres {action}?",
   "systemSessionSuspending": "El sistema se suspenderá en breve",
-  "systemSessionShuttingDown": "El sistema se apagará en breve"
+  "systemSessionShuttingDown": "El sistema se apagará en breve",
+  "systemDisplayTitle": "Pantalla",
+  "systemDisplayMode": "Resolución",
+  "systemDisplayScale": "Escala",
+  "systemDisplayRotation": "Rotación",
+  "systemDisplayAuto": "Automático (preferido)",
+  "systemDisplayUnknown": "Desconocido",
+  "systemStatusTitle": "Estado del sistema",
+  "systemStatusOutput": "Salida",
+  "systemStatusSession": "Sesión",
+  "systemStatusReady": "Listo"
 }

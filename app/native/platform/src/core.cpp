@@ -162,4 +162,16 @@ AplEvent makeOsPowerKey(int32_t key) {
     return e;
 }
 
+AplEvent makeOsOutput(int32_t width, int32_t height, int32_t scaleMilli, int32_t transform,
+                      int32_t refreshMillihz) {
+    AplEvent e{};
+    e.type = APL_EVENT_OS_OUTPUT;
+    e.u.os_output.width = width;
+    e.u.os_output.height = height;
+    e.u.os_output.scale_milli = scaleMilli;
+    e.u.os_output.transform = transform;
+    e.u.os_output.refresh_millihz = refreshMillihz;
+    return e;
+}
+
 }  // namespace archoera

@@ -4490,4 +4490,34 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get systemSessionShuttingDown =>
       'Das System wird bald heruntergefahren';
+
+  @override
+  String get systemDisplayTitle => 'Anzeige';
+
+  @override
+  String get systemDisplayMode => 'Auflösung';
+
+  @override
+  String get systemDisplayScale => 'Skalierung';
+
+  @override
+  String get systemDisplayRotation => 'Drehung';
+
+  @override
+  String get systemDisplayAuto => 'Automatisch (bevorzugt)';
+
+  @override
+  String get systemDisplayUnknown => 'Unbekannt';
+
+  @override
+  String get systemStatusTitle => 'Systemstatus';
+
+  @override
+  String get systemStatusOutput => 'Ausgabe';
+
+  @override
+  String get systemStatusSession => 'Sitzung';
+
+  @override
+  String get systemStatusReady => 'Bereit';
 }

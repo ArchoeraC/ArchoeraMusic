@@ -1310,5 +1310,12 @@ int32_t osSessionPowerOff() { return os_session::powerOff(); }
 int32_t osSessionReboot() { return os_session::reboot(); }
 int32_t osSessionSuspend() { return os_session::suspend(); }
 int32_t osSessionHibernate() { return os_session::hibernate(); }
+int32_t osSessionSetOutputScale(int32_t scaleMilli) { return os_session::setOutputScale(scaleMilli); }
+int32_t osSessionSetOutputMode(int32_t width, int32_t height) {
+    return os_session::setOutputMode(width, height);
+}
+int32_t osSessionSetOutputTransform(int32_t transform) {
+    return os_session::setOutputTransform(transform);
+}
 
 }  // namespace archoera

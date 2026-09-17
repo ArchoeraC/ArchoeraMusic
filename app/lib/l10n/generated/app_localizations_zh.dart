@@ -4242,6 +4242,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get systemSessionShuttingDown => '系统即将关闭';
+
+  @override
+  String get systemDisplayTitle => '显示';
+
+  @override
+  String get systemDisplayMode => '分辨率';
+
+  @override
+  String get systemDisplayScale => '缩放';
+
+  @override
+  String get systemDisplayRotation => '旋转';
+
+  @override
+  String get systemDisplayAuto => '自动（首选）';
+
+  @override
+  String get systemDisplayUnknown => '未知';
+
+  @override
+  String get systemStatusTitle => '系统状态';
+
+  @override
+  String get systemStatusOutput => '输出';
+
+  @override
+  String get systemStatusSession => '会话';
+
+  @override
+  String get systemStatusReady => '就绪';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -8482,6 +8512,36 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get systemSessionShuttingDown => '系统即将关闭';
+
+  @override
+  String get systemDisplayTitle => '显示';
+
+  @override
+  String get systemDisplayMode => '分辨率';
+
+  @override
+  String get systemDisplayScale => '缩放';
+
+  @override
+  String get systemDisplayRotation => '旋转';
+
+  @override
+  String get systemDisplayAuto => '自动（首选）';
+
+  @override
+  String get systemDisplayUnknown => '未知';
+
+  @override
+  String get systemStatusTitle => '系统状态';
+
+  @override
+  String get systemStatusOutput => '输出';
+
+  @override
+  String get systemStatusSession => '会话';
+
+  @override
+  String get systemStatusReady => '就绪';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -12723,4 +12783,34 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get systemSessionShuttingDown => '系統即將關閉';
+
+  @override
+  String get systemDisplayTitle => '顯示';
+
+  @override
+  String get systemDisplayMode => '解析度';
+
+  @override
+  String get systemDisplayScale => '縮放';
+
+  @override
+  String get systemDisplayRotation => '旋轉';
+
+  @override
+  String get systemDisplayAuto => '自動（偏好）';
+
+  @override
+  String get systemDisplayUnknown => '未知';
+
+  @override
+  String get systemStatusTitle => '系統狀態';
+
+  @override
+  String get systemStatusOutput => '輸出';
+
+  @override
+  String get systemStatusSession => '工作階段';
+
+  @override
+  String get systemStatusReady => '就緒';
 }

@@ -4524,4 +4524,34 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get systemSessionShuttingDown => 'Le système va bientôt s\'éteindre';
+
+  @override
+  String get systemDisplayTitle => 'Affichage';
+
+  @override
+  String get systemDisplayMode => 'Résolution';
+
+  @override
+  String get systemDisplayScale => 'Mise à l\'échelle';
+
+  @override
+  String get systemDisplayRotation => 'Rotation';
+
+  @override
+  String get systemDisplayAuto => 'Automatique (par défaut)';
+
+  @override
+  String get systemDisplayUnknown => 'Inconnu';
+
+  @override
+  String get systemStatusTitle => 'État du système';
+
+  @override
+  String get systemStatusOutput => 'Sortie';
+
+  @override
+  String get systemStatusSession => 'Session';
+
+  @override
+  String get systemStatusReady => 'Prêt';
 }

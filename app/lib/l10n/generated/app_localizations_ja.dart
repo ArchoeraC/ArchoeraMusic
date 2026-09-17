@@ -4291,4 +4291,34 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get systemSessionShuttingDown => 'まもなくシャットダウンします';
+
+  @override
+  String get systemDisplayTitle => 'ディスプレイ';
+
+  @override
+  String get systemDisplayMode => '解像度';
+
+  @override
+  String get systemDisplayScale => '拡大縮小';
+
+  @override
+  String get systemDisplayRotation => '回転';
+
+  @override
+  String get systemDisplayAuto => '自動（推奨）';
+
+  @override
+  String get systemDisplayUnknown => '不明';
+
+  @override
+  String get systemStatusTitle => 'システム状態';
+
+  @override
+  String get systemStatusOutput => '出力';
+
+  @override
+  String get systemStatusSession => 'セッション';
+
+  @override
+  String get systemStatusReady => '準備完了';
 }

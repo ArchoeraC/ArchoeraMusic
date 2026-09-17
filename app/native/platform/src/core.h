@@ -51,6 +51,7 @@ constexpr int32_t EVENT_OS_BATTERY = 11;
 constexpr int32_t EVENT_OS_SESSION = 12;
 constexpr int32_t EVENT_OS_SCREEN = 13;
 constexpr int32_t EVENT_OS_POWER_KEY = 14;
+constexpr int32_t EVENT_OS_OUTPUT = 15;
 
 constexpr int32_t CMD_PLAY = 0;
 constexpr int32_t CMD_PAUSE = 1;
@@ -91,6 +92,8 @@ AplEvent makeOsBattery(int32_t present, int32_t percent, int32_t charging);
 AplEvent makeOsSession(int32_t state);
 AplEvent makeOsScreen(bool enabled);
 AplEvent makeOsPowerKey(int32_t key);
+AplEvent makeOsOutput(int32_t width, int32_t height, int32_t scaleMilli, int32_t transform,
+                   int32_t refreshMillihz);
 
 }  // namespace archoera
 

@@ -31,6 +31,7 @@ class OsState {
     this.battery,
     this.screenEnabled,
     this.session = OsSessionState.ready,
+    this.output,
   });
 
   /// 会话能力位图（archoera_shell_v1 capability；0 = 未知/未订阅）。
@@ -48,6 +49,9 @@ class OsState {
   /// 会话态。
   final OsSessionState session;
 
+  /// 主输出状态（null = 未知/未接入）。
+  final OsOutputState? output;
+
   static const Object _unset = Object();
 
   OsState copyWith({
@@ -56,6 +60,7 @@ class OsState {
     Object? battery = _unset,
     Object? screenEnabled = _unset,
     OsSessionState? session,
+    Object? output = _unset,
   }) {
     return OsState(
       capabilities: capabilities ?? this.capabilities,
@@ -69,6 +74,7 @@ class OsState {
           ? this.screenEnabled
           : screenEnabled as bool?,
       session: session ?? this.session,
+      output: identical(output, _unset) ? this.output : output as OsOutputState?,
     );
   }
 }
@@ -83,6 +89,7 @@ class OsSessionNotifier extends Notifier<OsState> {
   void setBattery(OsBatteryState? v) => state = state.copyWith(battery: v);
   void setScreenEnabled(bool? v) => state = state.copyWith(screenEnabled: v);
   void setSession(OsSessionState v) => state = state.copyWith(session: v);
+  void setOutput(OsOutputState v) => state = state.copyWith(output: v);
 }
 
 /// 会话状态总源。
@@ -105,6 +112,9 @@ final osScreenEnabledProvider = Provider<bool?>(
 );
 final osSessionStateProvider = Provider<OsSessionState>(
   (ref) => ref.watch(osSessionProvider.select((s) => s.session)),
+);
+final osOutputProvider = Provider<OsOutputState?>(
+  (ref) => ref.watch(osSessionProvider.select((s) => s.output)),
 );
 
 /// 会话能力是否可用（供设置导航 gate；测试可覆盖）。
@@ -167,6 +177,16 @@ class _OsSessionHostState extends ConsumerState<OsSessionHost> {
       }),
     );
     _subs.add(_os.powerKey.listen((k) => debugPrint('[os] power_key=$k')));
+    _subs.add(
+      _os.output.listen((o) {
+        _osState.setOutput(o);
+        debugPrint(
+          '[os] output ${o.width}x${o.height} @ '
+          '${(o.refreshMillihz / 1000).toStringAsFixed(1)}Hz '
+          'scale=${o.scale} rotate=${o.rotationDegrees}',
+        );
+      }),
+    );
 
     _eventsOn = _os.setEvents(true) == 0;
     debugPrint('[os] 会话事件订阅: $_eventsOn');

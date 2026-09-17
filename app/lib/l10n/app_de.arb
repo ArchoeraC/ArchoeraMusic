@@ -1308,5 +1308,15 @@
   "systemConfirmTitle": "{action} bestätigen",
   "systemConfirmBody": "Möchtest du wirklich {action}?",
   "systemSessionSuspending": "Das System wechselt bald in den Bereitschaftsmodus",
-  "systemSessionShuttingDown": "Das System wird bald heruntergefahren"
+  "systemSessionShuttingDown": "Das System wird bald heruntergefahren",
+  "systemDisplayTitle": "Anzeige",
+  "systemDisplayMode": "Auflösung",
+  "systemDisplayScale": "Skalierung",
+  "systemDisplayRotation": "Drehung",
+  "systemDisplayAuto": "Automatisch (bevorzugt)",
+  "systemDisplayUnknown": "Unbekannt",
+  "systemStatusTitle": "Systemstatus",
+  "systemStatusOutput": "Ausgabe",
+  "systemStatusSession": "Sitzung",
+  "systemStatusReady": "Bereit"
 }

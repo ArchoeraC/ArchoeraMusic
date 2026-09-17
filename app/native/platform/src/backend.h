@@ -46,6 +46,9 @@ int32_t osSessionPowerOff();
 int32_t osSessionReboot();
 int32_t osSessionSuspend();
 int32_t osSessionHibernate();
+int32_t osSessionSetOutputScale(int32_t scaleMilli);
+int32_t osSessionSetOutputMode(int32_t width, int32_t height);
+int32_t osSessionSetOutputTransform(int32_t transform);
 
 int32_t notify(const char* title, const char* body);
 

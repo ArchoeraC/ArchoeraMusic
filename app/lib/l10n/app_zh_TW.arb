@@ -1308,5 +1308,15 @@
   "systemConfirmTitle": "確認{action}",
   "systemConfirmBody": "確定要{action}嗎？",
   "systemSessionSuspending": "系統即將暫停",
-  "systemSessionShuttingDown": "系統即將關閉"
+  "systemSessionShuttingDown": "系統即將關閉",
+  "systemDisplayTitle": "顯示",
+  "systemDisplayMode": "解析度",
+  "systemDisplayScale": "縮放",
+  "systemDisplayRotation": "旋轉",
+  "systemDisplayAuto": "自動（偏好）",
+  "systemDisplayUnknown": "未知",
+  "systemStatusTitle": "系統狀態",
+  "systemStatusOutput": "輸出",
+  "systemStatusSession": "工作階段",
+  "systemStatusReady": "就緒"
 }

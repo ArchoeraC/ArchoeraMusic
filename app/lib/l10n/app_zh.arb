@@ -1308,5 +1308,15 @@
   "systemConfirmTitle": "确认{action}",
   "systemConfirmBody": "确定要{action}吗？",
   "systemSessionSuspending": "系统即将挂起",
-  "systemSessionShuttingDown": "系统即将关闭"
+  "systemSessionShuttingDown": "系统即将关闭",
+  "systemDisplayTitle": "显示",
+  "systemDisplayMode": "分辨率",
+  "systemDisplayScale": "缩放",
+  "systemDisplayRotation": "旋转",
+  "systemDisplayAuto": "自动（首选）",
+  "systemDisplayUnknown": "未知",
+  "systemStatusTitle": "系统状态",
+  "systemStatusOutput": "输出",
+  "systemStatusSession": "会话",
+  "systemStatusReady": "就绪"
 }

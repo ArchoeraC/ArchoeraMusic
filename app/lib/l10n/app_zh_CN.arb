@@ -1311,5 +1311,15 @@
   "systemSessionShuttingDown": "系统即将关闭",
   "@systemBatteryPercent": {"placeholders": {"percent": {"type": "int"}}},
   "@systemConfirmTitle": {"placeholders": {"action": {"type": "String"}}},
-  "@systemConfirmBody": {"placeholders": {"action": {"type": "String"}}}
+  "@systemConfirmBody": {"placeholders": {"action": {"type": "String"}}},
+  "systemDisplayTitle": "显示",
+  "systemDisplayMode": "分辨率",
+  "systemDisplayScale": "缩放",
+  "systemDisplayRotation": "旋转",
+  "systemDisplayAuto": "自动（首选）",
+  "systemDisplayUnknown": "未知",
+  "systemStatusTitle": "系统状态",
+  "systemStatusOutput": "输出",
+  "systemStatusSession": "会话",
+  "systemStatusReady": "就绪"
 }

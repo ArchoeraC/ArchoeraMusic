@@ -41,6 +41,17 @@ class FfiSystemOsSession implements SystemOsSession {
   int hibernate() => _b.osHibernate();
 
   @override
+  int setOutputScale(int scaleMilli) => _b.osSetOutputScale(scaleMilli);
+
+  @override
+  int setOutputMode(int width, int height) =>
+      _b.osSetOutputMode(width, height);
+
+  @override
+  int setOutputTransform(int transform) =>
+      _b.osSetOutputTransform(transform);
+
+  @override
   Stream<int> get capabilities => _b.osCapabilitiesEvents.map((e) => e.caps);
 
   @override
@@ -68,6 +79,17 @@ class FfiSystemOsSession implements SystemOsSession {
   @override
   Stream<OsPowerKey> get powerKey =>
       _b.osPowerKeyEvents.map((e) => _powerKeyFromNative(e.key));
+
+  @override
+  Stream<OsOutputState> get output => _b.osOutputEvents.map(
+    (e) => OsOutputState(
+      width: e.width,
+      height: e.height,
+      scaleMilli: e.scaleMilli,
+      transform: e.transform,
+      refreshMillihz: e.refreshMillihz,
+    ),
+  );
 
   static OsSessionState _sessionFromNative(int raw) => switch (raw) {
     2 => OsSessionState.shuttingDown,

@@ -1308,5 +1308,15 @@
   "systemConfirmTitle": "{action}の確認",
   "systemConfirmBody": "本当に{action}しますか？",
   "systemSessionSuspending": "まもなくサスペンドします",
-  "systemSessionShuttingDown": "まもなくシャットダウンします"
+  "systemSessionShuttingDown": "まもなくシャットダウンします",
+  "systemDisplayTitle": "ディスプレイ",
+  "systemDisplayMode": "解像度",
+  "systemDisplayScale": "拡大縮小",
+  "systemDisplayRotation": "回転",
+  "systemDisplayAuto": "自動（推奨）",
+  "systemDisplayUnknown": "不明",
+  "systemStatusTitle": "システム状態",
+  "systemStatusOutput": "出力",
+  "systemStatusSession": "セッション",
+  "systemStatusReady": "準備完了"
 }

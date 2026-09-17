@@ -4519,4 +4519,34 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get systemSessionShuttingDown => 'El sistema se apagará en breve';
+
+  @override
+  String get systemDisplayTitle => 'Pantalla';
+
+  @override
+  String get systemDisplayMode => 'Resolución';
+
+  @override
+  String get systemDisplayScale => 'Escala';
+
+  @override
+  String get systemDisplayRotation => 'Rotación';
+
+  @override
+  String get systemDisplayAuto => 'Automático (preferido)';
+
+  @override
+  String get systemDisplayUnknown => 'Desconocido';
+
+  @override
+  String get systemStatusTitle => 'Estado del sistema';
+
+  @override
+  String get systemStatusOutput => 'Salida';
+
+  @override
+  String get systemStatusSession => 'Sesión';
+
+  @override
+  String get systemStatusReady => 'Listo';
 }

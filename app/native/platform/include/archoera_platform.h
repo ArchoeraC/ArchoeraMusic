@@ -112,6 +112,12 @@ APL_API int32_t apl_os_reboot(void);
 APL_API int32_t apl_os_suspend(void);
 APL_API int32_t apl_os_hibernate(void);
 
+/* 显示设置（仅 archoera-shell udev 后端提供 output 能力位时生效）。
+ * 合成器会夹取缩放（100%-400%）并忽略连接器不支持的尺寸/变换。 */
+APL_API int32_t apl_os_set_output_scale(int32_t scale_milli); /* 千分数，如 1500=150% */
+APL_API int32_t apl_os_set_output_mode(int32_t width, int32_t height); /* 0,0 = 首选模式 */
+APL_API int32_t apl_os_set_output_transform(int32_t transform); /* 0..7，见 wl_output.transform */
+
 /* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
 APL_API int32_t apl_notify(const char *title, const char *body);
 
@@ -149,6 +155,7 @@ typedef enum {
     APL_EVENT_OS_SESSION      = 12, /* u.os.session：1=ready 2=shutting_down 3=suspending */
     APL_EVENT_OS_SCREEN       = 13, /* u.os.screen：1=亮屏 0=熄屏 */
     APL_EVENT_OS_POWER_KEY    = 14, /* u.os.power_key：0=power 1=sleep 2=suspend */
+    APL_EVENT_OS_OUTPUT       = 15, /* u.os_output：主输出 宽/高/缩放×1000/变换/刷新 mHz */
 } AplEventType;
 
 typedef enum {
@@ -175,6 +182,14 @@ typedef struct AplEvent {
         struct { int32_t state; } os_session;  /* 1=ready 2=shutting_down 3=suspending */
         struct { int32_t screen; } os_screen;  /* 1=亮屏 0=熄屏 */
         struct { int32_t key; } os_power_key;  /* 0=power 1=sleep 2=suspend */
+        /* 主输出状态（OS_OUTPUT）：宽/高（物理像素）、缩放千分数、变换（0..7）、刷新率 mHz */
+        struct {
+            int32_t width;
+            int32_t height;
+            int32_t scale_milli;
+            int32_t transform;
+            int32_t refresh_millihz;
+        } os_output;
     } u;
 } AplEvent;
 

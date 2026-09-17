@@ -42,6 +42,11 @@ int32_t reboot();
 int32_t suspend();
 int32_t hibernate();
 
+// 显示设置（仅合成器置位 output 能力时生效）。
+int32_t setOutputScale(int32_t scaleMilli);
+int32_t setOutputMode(int32_t width, int32_t height);
+int32_t setOutputTransform(int32_t transform);
+
 // 断开连接、停止泵线程（apl_shutdown）。
 void shutdown();
 

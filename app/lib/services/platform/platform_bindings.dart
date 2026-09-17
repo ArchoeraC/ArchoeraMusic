@@ -54,6 +54,7 @@ const int aplEventOsBattery = 11;
 const int aplEventOsSession = 12;
 const int aplEventOsScreen = 13;
 const int aplEventOsPowerKey = 14;
+const int aplEventOsOutput = 15;
 
 const int aplAbiVersion = 1;
 
@@ -126,6 +127,24 @@ final class AplOsBatteryPayload extends Struct {
   external int charging;
 }
 
+/// ArchoeraOS 会话：主输出状态（宽/高物理像素、缩放×1000、变换、刷新率 mHz）。
+final class AplOsOutputPayload extends Struct {
+  @Int32()
+  external int width;
+
+  @Int32()
+  external int height;
+
+  @Int32()
+  external int scaleMilli;
+
+  @Int32()
+  external int transform;
+
+  @Int32()
+  external int refreshMillihz;
+}
+
 final class AplEventPayload extends Union {
   @Int32()
   external int command;
@@ -166,6 +185,9 @@ final class AplEventPayload extends Union {
   /// ArchoeraOS 会话：电源键（0=power 1=sleep 2=suspend）。
   @Int32()
   external int osPowerKey;
+
+  /// ArchoeraOS 会话：主输出状态。
+  external AplOsOutputPayload osOutput;
 }
 
 final class AplEventFfi extends Struct {
@@ -196,6 +218,7 @@ typedef _AplSystemThemeSetEventsC = Int32 Function(Int32 on);
 typedef _AplOsSetEventsC = Int32 Function(Int32 on);
 typedef _AplOsSetPercentC = Int32 Function(Int32 percent);
 typedef _AplOsSetScreenC = Int32 Function(Int32 on);
+typedef _AplOsSetModeC = Int32 Function(Int32 width, Int32 height);
 typedef _AplOsVoidC = Int32 Function();
 typedef _AplMediaTrackC = Int32 Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackC =
@@ -233,6 +256,7 @@ typedef _AplSystemThemeSetEventsD = int Function(int on);
 typedef _AplOsSetEventsD = int Function(int on);
 typedef _AplOsSetPercentD = int Function(int percent);
 typedef _AplOsSetScreenD = int Function(int on);
+typedef _AplOsSetModeD = int Function(int width, int height);
 typedef _AplOsVoidD = int Function();
 typedef _AplMediaTrackD = int Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackD =
@@ -348,6 +372,23 @@ final class AplOsPowerKeyEvent extends AplNativeEvent {
   final int key;
 }
 
+/// ArchoeraOS 会话：主输出状态。
+final class AplOsOutputEvent extends AplNativeEvent {
+  const AplOsOutputEvent({
+    required this.width,
+    required this.height,
+    required this.scaleMilli,
+    required this.transform,
+    required this.refreshMillihz,
+  });
+
+  final int width;
+  final int height;
+  final int scaleMilli;
+  final int transform;
+  final int refreshMillihz;
+}
+
 /// libarchoera_platform 绑定（进程级单例，[tryLoad] 失败返回 null → Noop）。
 class PlatformBindings {
   PlatformBindings._(DynamicLibrary lib)
@@ -428,6 +469,21 @@ class PlatformBindings {
       _osHibernate = _try(
         () => lib.lookupFunction<_AplOsVoidC, _AplOsVoidD>('apl_os_hibernate'),
       ),
+      _osSetOutputScale = _try(
+        () => lib.lookupFunction<_AplOsSetPercentC, _AplOsSetPercentD>(
+          'apl_os_set_output_scale',
+        ),
+      ),
+      _osSetOutputMode = _try(
+        () => lib.lookupFunction<_AplOsSetModeC, _AplOsSetModeD>(
+          'apl_os_set_output_mode',
+        ),
+      ),
+      _osSetOutputTransform = _try(
+        () => lib.lookupFunction<_AplOsSetPercentC, _AplOsSetPercentD>(
+          'apl_os_set_output_transform',
+        ),
+      ),
       _setCallback = lib.lookupFunction<_SetEventCallbackC, _SetEventCallbackD>(
         'apl_set_event_callback',
       ) {
@@ -475,6 +531,9 @@ class PlatformBindings {
   final _AplOsVoidD? _osReboot;
   final _AplOsVoidD? _osSuspend;
   final _AplOsVoidD? _osHibernate;
+  final _AplOsSetPercentD? _osSetOutputScale;
+  final _AplOsSetModeD? _osSetOutputMode;
+  final _AplOsSetPercentD? _osSetOutputTransform;
 
   // 四类事件广播流（ffi_* 实现订阅转译）
   final _commandCtrl = StreamController<MediaCommandEvent>.broadcast();
@@ -491,6 +550,7 @@ class PlatformBindings {
   final _osSessionCtrl = StreamController<AplOsSessionEvent>.broadcast();
   final _osScreenCtrl = StreamController<AplOsScreenEvent>.broadcast();
   final _osPowerKeyCtrl = StreamController<AplOsPowerKeyEvent>.broadcast();
+  final _osOutputCtrl = StreamController<AplOsOutputEvent>.broadcast();
 
   /// ArchoeraOS 会话函数是否可用（桥接提供且非旧版）。
   bool get osSessionSymbolsAvailable => _osSetEvents != null;
@@ -508,6 +568,12 @@ class PlatformBindings {
   int osReboot() => _osReboot?.call() ?? aplErrUnsupported;
   int osSuspend() => _osSuspend?.call() ?? aplErrUnsupported;
   int osHibernate() => _osHibernate?.call() ?? aplErrUnsupported;
+  int osSetOutputScale(int scaleMilli) =>
+      _osSetOutputScale?.call(scaleMilli) ?? aplErrUnsupported;
+  int osSetOutputMode(int width, int height) =>
+      _osSetOutputMode?.call(width, height) ?? aplErrUnsupported;
+  int osSetOutputTransform(int transform) =>
+      _osSetOutputTransform?.call(transform) ?? aplErrUnsupported;
 
   /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
   int acquireInstance() => _instanceAcquire();
@@ -579,6 +645,7 @@ class PlatformBindings {
   Stream<AplOsSessionEvent> get osSessionEvents => _osSessionCtrl.stream;
   Stream<AplOsScreenEvent> get osScreenEvents => _osScreenCtrl.stream;
   Stream<AplOsPowerKeyEvent> get osPowerKeyEvents => _osPowerKeyCtrl.stream;
+  Stream<AplOsOutputEvent> get osOutputEvents => _osOutputCtrl.stream;
 
   /// 栈上指针仅在回调期间有效——同步取值后立即投递。
   static void _onNativeEvent(
@@ -636,6 +703,16 @@ class PlatformBindings {
         b._osSessionCtrl.add(AplOsSessionEvent(ref.u.osSession));
       case aplEventOsScreen:
         b._osScreenCtrl.add(AplOsScreenEvent(ref.u.osScreen != 0));
+      case aplEventOsOutput:
+        b._osOutputCtrl.add(
+          AplOsOutputEvent(
+            width: ref.u.osOutput.width,
+            height: ref.u.osOutput.height,
+            scaleMilli: ref.u.osOutput.scaleMilli,
+            transform: ref.u.osOutput.transform,
+            refreshMillihz: ref.u.osOutput.refreshMillihz,
+          ),
+        );
       case aplEventOsPowerKey:
         b._osPowerKeyCtrl.add(AplOsPowerKeyEvent(ref.u.osPowerKey));
     }

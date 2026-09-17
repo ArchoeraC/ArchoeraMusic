@@ -1308,5 +1308,15 @@
   "systemConfirmTitle": "{action} 확인",
   "systemConfirmBody": "정말 {action}하시겠습니까?",
   "systemSessionSuspending": "곧 절전 모드로 전환됩니다",
-  "systemSessionShuttingDown": "곧 종료됩니다"
+  "systemSessionShuttingDown": "곧 종료됩니다",
+  "systemDisplayTitle": "디스플레이",
+  "systemDisplayMode": "해상도",
+  "systemDisplayScale": "배율",
+  "systemDisplayRotation": "회전",
+  "systemDisplayAuto": "자동(기본)",
+  "systemDisplayUnknown": "알 수 없음",
+  "systemStatusTitle": "시스템 상태",
+  "systemStatusOutput": "출력",
+  "systemStatusSession": "세션",
+  "systemStatusReady": "준비됨"
 }
