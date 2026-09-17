@@ -1,0 +1,44 @@
+[package]
+name = "archoera-shell"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "ArchoeraOS 自研 Wayland kiosk 合成器（smithay），承载 ArchoeraMusic 全屏会话"
+
+[dependencies]
+# 合成器框架。desktop = Space/Window 抽象；wayland_frontend = 协议服务端。
+smithay = { version = "0.7", default-features = false, features = [
+  "backend_winit",
+  "wayland_frontend",
+  "desktop",
+  "renderer_gl",
+] }
+# 自定义协议代码生成（proc-macro，直接在源码内展开）。
+wayland-scanner = "0.31"
+# 生成的 bitfield 枚举（capability）以 bitflags 展开。
+bitflags = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+libc = "0.2"
+# logind D-Bus 控制面（关机/重启/亮度/防休眠）。纯 Rust，无需系统开发库。
+zbus = { version = "5", features = ["blocking-api"] }
+# DRM 连接器扫描（仅 udev 后端需要）。display-info feature 关闭，避免引入 libdisplay-info。
+smithay-drm-extras = { version = "0.1.0", default-features = false, optional = true }
+
+[features]
+default = ["logind"]
+# 通电控制面：经 systemd-logind 完成关机/重启/亮度/防休眠（普通用户即可，无需提权）。
+logind = []
+# 裸机（DRM/KMS + libinput + libseat）后端。需系统安装 libseat / libinput / libdrm / gbm / libudev。
+udev = [
+  "dep:smithay-drm-extras",
+  "smithay/backend_drm",
+  "smithay/backend_gbm",
+  "smithay/backend_egl",
+  "smithay/backend_libinput",
+  "smithay/backend_session_libseat",
+  "smithay/backend_udev",
+]

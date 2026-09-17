@@ -1,0 +1,196 @@
+//! 输入事件处理：键盘（含媒体键）、指针（相对/绝对）、滚轮。
+//!
+//! kiosk 语义下没有多窗口堆叠：点击即把焦点交给命中的窗口（通常只有播放器一个）。
+//! 媒体键（音量/播放/上一首/下一首）在**转发给客户端的同时**额外经
+//! `archoera_shell_v1` 广播 `media_key` 事件，使尚未实现该协议的客户端也能照常
+//! 收到按键，而实现了协议的会话可据此驱动系统级行为。
+
+use smithay::{
+    backend::input::{
+        AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
+        KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent, PointerMotionEvent,
+    },
+    input::{
+        keyboard::{FilterResult, Keycode},
+        pointer::{AxisFrame, ButtonEvent, MotionEvent},
+    },
+    utils::SERIAL_COUNTER,
+};
+
+use crate::{protocol::MediaKey, state::ArchoeraShell};
+
+impl ArchoeraShell {
+    /// 处理来自任一输入后端的事件。
+    pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
+        match event {
+            InputEvent::Keyboard { event, .. } => {
+                let keycode = event.key_code();
+                let key_state = event.state();
+
+                // 媒体键：先广播给会话，再照常转发（兼容未实现协议的客户端）。
+                if key_state == KeyState::Pressed {
+                    if let Some(key) = media_key_for(keycode) {
+                        self.notify_media_key(key);
+                    }
+                }
+
+                let serial = SERIAL_COUNTER.next_serial();
+                let time = Event::time_msec(&event);
+                self.seat.get_keyboard().unwrap().input::<(), _>(
+                    self,
+                    keycode,
+                    key_state,
+                    serial,
+                    time,
+                    |_, _, _| FilterResult::Forward,
+                );
+            }
+            InputEvent::PointerMotion { event, .. } => {
+                let pointer = self.seat.get_pointer().unwrap();
+                let mut location = pointer.current_location() + event.delta();
+                self.clamp_pointer(&mut location);
+
+                let serial = SERIAL_COUNTER.next_serial();
+                let under = self.surface_under(location);
+                pointer.motion(
+                    self,
+                    under,
+                    &MotionEvent {
+                        location,
+                        serial,
+                        time: event.time_msec(),
+                    },
+                );
+                pointer.frame(self);
+            }
+            InputEvent::PointerMotionAbsolute { event, .. } => {
+                let Some(output) = self.space.outputs().next() else {
+                    return;
+                };
+                let Some(output_geo) = self.space.output_geometry(output) else {
+                    return;
+                };
+                let mut location =
+                    event.position_transformed(output_geo.size) + output_geo.loc.to_f64();
+                self.clamp_pointer(&mut location);
+
+                let serial = SERIAL_COUNTER.next_serial();
+                let pointer = self.seat.get_pointer().unwrap();
+                let under = self.surface_under(location);
+                pointer.motion(
+                    self,
+                    under,
+                    &MotionEvent {
+                        location,
+                        serial,
+                        time: event.time_msec(),
+                    },
+                );
+                pointer.frame(self);
+            }
+            InputEvent::PointerButton { event, .. } => {
+                let pointer = self.seat.get_pointer().unwrap();
+                let serial = SERIAL_COUNTER.next_serial();
+                let button = event.button_code();
+                let button_state = event.state();
+
+                if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
+                    let hit = self
+                        .space
+                        .element_under(pointer.current_location())
+                        .map(|(w, _)| w.clone());
+                    if let Some(window) = hit {
+                        self.space.raise_element(&window, true);
+                        if let Some(toplevel) = window.toplevel() {
+                            self.seat.get_keyboard().unwrap().set_focus(
+                                self,
+                                Some(toplevel.wl_surface().clone()),
+                                serial,
+                            );
+                        }
+                    }
+                }
+
+                pointer.button(
+                    self,
+                    &ButtonEvent {
+                        button,
+                        state: button_state,
+                        serial,
+                        time: event.time_msec(),
+                    },
+                );
+                pointer.frame(self);
+            }
+            InputEvent::PointerAxis { event, .. } => {
+                let source = event.source();
+                let horizontal_amount = event.amount(Axis::Horizontal).unwrap_or_else(|| {
+                    event.amount_v120(Axis::Horizontal).unwrap_or(0.0) * 15.0 / 120.
+                });
+                let vertical_amount = event.amount(Axis::Vertical).unwrap_or_else(|| {
+                    event.amount_v120(Axis::Vertical).unwrap_or(0.0) * 15.0 / 120.
+                });
+                let horizontal_v120 = event.amount_v120(Axis::Horizontal);
+                let vertical_v120 = event.amount_v120(Axis::Vertical);
+
+                let mut frame = AxisFrame::new(event.time_msec()).source(source);
+                if horizontal_amount != 0.0 {
+                    frame = frame.value(Axis::Horizontal, horizontal_amount);
+                    if let Some(v) = horizontal_v120 {
+                        frame = frame.v120(Axis::Horizontal, v as i32);
+                    }
+                }
+                if vertical_amount != 0.0 {
+                    frame = frame.value(Axis::Vertical, vertical_amount);
+                    if let Some(v) = vertical_v120 {
+                        frame = frame.v120(Axis::Vertical, v as i32);
+                    }
+                }
+                if source == AxisSource::Finger {
+                    if event.amount(Axis::Horizontal) == Some(0.0) {
+                        frame = frame.stop(Axis::Horizontal);
+                    }
+                    if event.amount(Axis::Vertical) == Some(0.0) {
+                        frame = frame.stop(Axis::Vertical);
+                    }
+                }
+
+                let pointer = self.seat.get_pointer().unwrap();
+                pointer.axis(self, frame);
+                pointer.frame(self);
+            }
+            _ => {}
+        }
+    }
+
+    /// 把指针位置夹取到输出范围内。
+    fn clamp_pointer(&self, location: &mut smithay::utils::Point<f64, smithay::utils::Logical>) {
+        let Some(rect) = self.output_rect() else {
+            return;
+        };
+        let max_x = (rect.loc.x + rect.size.w - 1) as f64;
+        let max_y = (rect.loc.y + rect.size.h - 1) as f64;
+        location.x = location
+            .x
+            .clamp(rect.loc.x as f64, max_x.max(rect.loc.x as f64));
+        location.y = location
+            .y
+            .clamp(rect.loc.y as f64, max_y.max(rect.loc.y as f64));
+    }
+}
+
+/// 把 XKB keycode（evdev + 8）映射为媒体键。
+fn media_key_for(keycode: Keycode) -> Option<MediaKey> {
+    const EVDEV_OFFSET: u32 = 8;
+    let evdev = keycode.raw().saturating_sub(EVDEV_OFFSET);
+    Some(match evdev {
+        114 => MediaKey::VolumeDown, // KEY_VOLUMEDOWN
+        115 => MediaKey::VolumeUp,   // KEY_VOLUMEUP
+        113 => MediaKey::Mute,       // KEY_MUTE
+        164 => MediaKey::PlayPause,  // KEY_PLAYPAUSE
+        163 => MediaKey::Next,       // KEY_NEXTSONG
+        165 => MediaKey::Previous,   // KEY_PREVIOUSSONG
+        166 => MediaKey::Stop,       // KEY_STOPCD
+        _ => return None,
+    })
+}

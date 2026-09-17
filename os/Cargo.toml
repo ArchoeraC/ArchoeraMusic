@@ -1,0 +1,25 @@
+# ArchoeraOS —— 系统级组件 workspace
+# Copyright (C) 2026 Archoera && BetaStudio2
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# 该 workspace 独立于 app/（Flutter 应用）与 app/native/platform（C++ 能力桥接）：
+# 它承载「把播放器变成系统」所需的用户会话层——自研 Wayland 合成器与自定义协议。
+[workspace]
+resolver = "2"
+members = [
+  "archoera-shell",
+  "archoera-control",
+  "archoera-smoke",
+]
+
+[workspace.package]
+edition = "2021"
+license = "AGPL-3.0-or-later"
+authors = ["Archoera && BetaStudio2"]
+repository = "https://github.com/BetaStudio2/ArchoeraMusic"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"

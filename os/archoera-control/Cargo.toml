@@ -1,0 +1,17 @@
+[package]
+name = "archoera-control"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "ArchoeraOS 控制面客户端：经 archoera_shell_v1 与合成器通信（协议验证 / 命令行工具）"
+
+[dependencies]
+# Wayland 客户端栈。
+wayland-client = "0.31"
+# 自定义协议代码生成（proc-macro，与 archoera-shell 共享同一份 XML）。
+wayland-scanner = "0.31"
+# 生成的 capability 枚举以 bitflags 展开。
+bitflags = "2"
+anyhow = "1"

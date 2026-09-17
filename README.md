@@ -6,6 +6,10 @@
 
 > 开源、多端、面向本地与在线音乐的混合架构播放器
 
+> [!CAUTION]
+> **Caution**：本分支纯属娱乐项目，只是用于抨击部分过度代码洁癖等的项目。
+> 即使可以正常使用，也非常不建议作为主力机（你还要当主力机？！）食用。
+
 <p align="center">
   <img src="screenshot.png" width="720" alt="ArchoeraMusic 主界面">
 </p>

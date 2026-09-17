@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="archoera_shell_v1">
+  <copyright>
+    Copyright (C) 2026 Archoera &amp;&amp; BetaStudio2
+    SPDX-License-Identifier: AGPL-3.0-or-later
+
+    This is an official ArchoeraOS protocol. Permission is hereby granted to
+    use, copy, modify and distribute this protocol specification, subject to
+    the terms of the GNU Affero General Public License v3.0 or later.
+  </copyright>
+
+  <interface name="archoera_shell_v1" version="1">
+    <description summary="ArchoeraOS 会话控制对象">
+      ArchoeraOS 是一个「播放器即系统」的 kiosk 会话：ArchoeraMusic 以全屏
+      特权客户端运行，通过本协议驱动合成器完成会话级操作（关机/重启/亮度），
+      并从合成器接收系统事件（媒体键、电量、会话状态）。
+
+      本接口是全局对象，每个客户端绑定一次。合成器在 bind 时立即下发
+      capabilities 与当前系统状态；客户端据此决定启用哪些系统功能入口。
+    </description>
+
+    <enum name="capability" bitfield="true">
+      <description summary="客户端可用的系统能力位">
+        合成器在 capabilities 事件中通告本会话实际可用的能力；未置位的能力
+        对应请求会被静默忽略（不产生协议错误），客户端不应据此崩溃。
+      </description>
+      <entry name="brightness" value="1" summary="可设置屏幕/背光亮度"/>
+      <entry name="power" value="2" summary="可执行关机 / 重启"/>
+      <entry name="volume" value="4" summary="可上报/设置会话音量（由播放器落实）"/>
+      <entry name="media_keys" value="8" summary="会下发媒体键事件"/>
+      <entry name="battery" value="16" summary="会下发电池状态事件"/>
+    </enum>
+
+    <enum name="media_key">
+      <description summary="媒体键 / 硬件键动作"/>
+      <entry name="play_pause" value="0"/>
+      <entry name="next" value="1"/>
+      <entry name="previous" value="2"/>
+      <entry name="stop" value="3"/>
+      <entry name="volume_up" value="4"/>
+      <entry name="volume_down" value="5"/>
+      <entry name="mute" value="6"/>
+    </enum>
+
+    <enum name="session_state">
+      <description summary="会话状态"/>
+      <entry name="ready" value="1" summary="会话就绪，播放器可正常交互"/>
+      <entry name="shutting_down" value="2" summary="合成器即将结束（关机/重启/退出）"/>
+    </enum>
+
+    <request name="destroy" type="destructor">
+      <description summary="销毁本地 shell 对象（不影响会话本身）"/>
+    </request>
+
+    <request name="power_off">
+      <description summary="关闭系统电源（等价于用户按下电源键后确认关机）"/>
+    </request>
+
+    <request name="reboot">
+      <description summary="重启系统"/>
+    </request>
+
+    <request name="set_brightness">
+      <description summary="设置亮度百分比（0-100），越界会被夹取到有效区间"/>
+      <arg name="percent" type="uint" summary="0-100"/>
+    </request>
+
+    <request name="set_volume">
+      <description summary="上报/设置会话音量百分比（0-100）；由播放器落实实际音频后端"/>
+      <arg name="percent" type="uint" summary="0-100"/>
+    </request>
+
+    <event name="capabilities">
+      <description summary="会话可用能力位（见 capability 枚举）"/>
+      <arg name="flags" type="uint"/>
+    </event>
+
+    <event name="brightness_changed">
+      <description summary="当前亮度百分比"/>
+      <arg name="percent" type="uint"/>
+    </event>
+
+    <event name="volume_changed">
+      <description summary="当前会话音量百分比"/>
+      <arg name="percent" type="uint"/>
+    </event>
+
+    <event name="media_key">
+      <description summary="媒体键 / 硬件键被按下"/>
+      <arg name="key" type="uint" enum="media_key"/>
+    </event>
+
+    <event name="battery">
+      <description summary="电池状态（无电池时 present = 0，其余字段无意义）"/>
+      <arg name="present" type="uint"/>
+      <arg name="percent" type="uint"/>
+      <arg name="charging" type="uint"/>
+    </event>
+
+    <event name="session">
+      <description summary="会话状态变化"/>
+      <arg name="state" type="uint" enum="session_state"/>
+    </event>
+  </interface>
+</protocol>

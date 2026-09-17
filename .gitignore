@@ -48,6 +48,9 @@ app/core/subsonic/transcoder/target/
 # downloader（Rust 下载器 cdylib）
 app/core/downloader/target/
 
+# ArchoeraOS（os/ Rust workspace：合成器 / 控制面 / 冒烟客户端）
+os/target/
+
 # vault（C# NativeAOT 凭据保险库；build*/ 由 build.sh / build-test.sh 产出）
 app/core/vault/build/
 app/core/vault/src/build/
