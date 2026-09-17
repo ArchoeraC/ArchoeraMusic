@@ -39,9 +39,6 @@ dependencies:
     sdk: flutter
   intl: any
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
   ffi: ^2.2.0
   go_router: ^18.0.1
   # 官方 Material UI 拆分包（原 package:flutter/material.dart 独立化）
@@ -124,6 +121,7 @@ flutter:
   # GLSL 片元着色器（P2：播放页水纹背景，见 docs/player-render-optimization.md）
   shaders:
     - shaders/ripple.frag
+    - shaders/fluid.frag
 
   # 自带字体（统一中英混排度量，消除系统兜底字体的错位）：
   #   Noto Sans SC（主字体，Google 开源 OFL，从系统 NotoSansCJK SC face 提取）——

@@ -233,11 +233,26 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置播放页背景样式（gradient / solid / ripple）与水纹速度（1~6）。
-  void setPlayerBackground({String? type, double? rippleSpeed}) {
+  /// 设置播放页背景样式（gradient / blur / solid / ripple / fluid）、
+  /// 水纹速度（1~6）与流体参数（流速 0.1~10 / 渲染比例 0.5~2 / 帧率 24~120 /
+  /// 暂停冻结 / 节拍脉动）。
+  void setPlayerBackground({
+    String? type,
+    double? rippleSpeed,
+    double? flowSpeed,
+    double? renderScale,
+    int? fps,
+    bool? freezeOnPause,
+    bool? beat,
+  }) {
     state = state.copyWithPlayerBackground(
       type: type,
       rippleSpeed: rippleSpeed,
+      flowSpeed: flowSpeed,
+      renderScale: renderScale,
+      fps: fps,
+      freezeOnPause: freezeOnPause,
+      beat: beat,
     );
     state.save();
   }

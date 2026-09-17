@@ -2029,6 +2029,52 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get settingsPlayerBgFluid => 'Fluido';
+
+  @override
+  String get settingsPlayerBgFlowSpeed => 'Velocidad de flujo';
+
+  @override
+  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+    return 'Velocidad del fluido $speed';
+  }
+
+  @override
+  String get settingsPlayerBgRenderScale => 'Escala de renderizado';
+
+  @override
+  String settingsPlayerBgRenderScaleDesc(Object scale) {
+    return 'Resolución $scale× (menor ahorra energía)';
+  }
+
+  @override
+  String get settingsPlayerBgFps => 'Límite de FPS';
+
+  @override
+  String settingsPlayerBgFpsDesc(Object fps) {
+    return '$fps FPS';
+  }
+
+  @override
+  String get settingsPlayerBgFreezeOnPause => 'Congelar al pausar';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOn => 'El fondo se congela al pausar';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOff =>
+      'El fondo sigue fluyendo al pausar';
+
+  @override
+  String get settingsPlayerBgBeat => 'Pulso de graves';
+
+  @override
+  String get settingsPlayerBgBeatOn => 'El fondo pulsa con los graves';
+
+  @override
+  String get settingsPlayerBgBeatOff => 'El fondo no pulsa con el ritmo';
+
+  @override
   String get settingsAdaptiveRenderQuality =>
       'Calidad de renderizado adaptativa';
 
