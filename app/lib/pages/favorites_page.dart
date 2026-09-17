@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/netease/netease_api.dart';
 import '../stores/providers.dart';
+import '../stores/shell_page_state.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/list/cover_grid.dart';
 import '../widgets/dialogs/netease_login_dialog.dart';
@@ -45,10 +46,12 @@ enum _KgTab { created, collectedPlaylist, collectedAlbum }
 enum _QqTab { created, collectedPlaylist, liked }
 
 class _FavoritesPageState extends ConsumerState<FavoritesPage> {
-  _Platform _platform = _Platform.netease;
-  _FavTab _tab = _FavTab.playlist;
-  _KgTab _kgTab = _KgTab.created;
-  _QqTab _qqTab = _QqTab.created;
+  /// 当前平台 / 分类 Tab；均存于 [shell_page_state] provider（跨壳内容
+  /// 卸载/重挂载保留），`State` 重建时于 [initState] 恢复。
+  late _Platform _platform;
+  late _FavTab _tab;
+  late _KgTab _kgTab;
+  late _QqTab _qqTab;
 
   /// 各 tab 缓存数据（key：'netease.playlist' / 'kugou.created' 等；切换保留，
   /// 登录态变化时清空）。
@@ -94,8 +97,39 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   @override
   void initState() {
     super.initState();
+    // 恢复上次平台 / 分类选择（壳内容因播放页展开被卸载后重建）。
+    _platform = _platformFromName(ref.read(favoritesPlatformProvider));
+    _tab = _favTabFromName(ref.read(favoritesNeteaseTabProvider));
+    _kgTab = _kgTabFromName(ref.read(favoritesKugouTabProvider));
+    _qqTab = _qqTabFromName(ref.read(favoritesQqTabProvider));
     if (_loggedIn) _fetch();
   }
+
+  /// provider 里的平台名 → 枚举；无/非法值回退 NT。
+  static _Platform _platformFromName(String? name) => switch (name) {
+    'kugou' => _Platform.kugou,
+    'qqmusic' => _Platform.qqmusic,
+    _ => _Platform.netease,
+  };
+
+  /// provider 里的分类名 → 枚举；无/非法值回退各自首项。
+  static _FavTab _favTabFromName(String? name) => switch (name) {
+    'album' => _FavTab.album,
+    'artist' => _FavTab.artist,
+    _ => _FavTab.playlist,
+  };
+
+  static _KgTab _kgTabFromName(String? name) => switch (name) {
+    'collectedPlaylist' => _KgTab.collectedPlaylist,
+    'collectedAlbum' => _KgTab.collectedAlbum,
+    _ => _KgTab.created,
+  };
+
+  static _QqTab _qqTabFromName(String? name) => switch (name) {
+    'collectedPlaylist' => _QqTab.collectedPlaylist,
+    'liked' => _QqTab.liked,
+    _ => _QqTab.created,
+  };
 
   void _clearCacheState() {
     _cache.clear();
@@ -105,18 +139,22 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   }
 
   void _setPlatform(_Platform platform) {
+    ref.read(favoritesPlatformProvider.notifier).set(platform.name);
     setState(() => _platform = platform);
   }
 
   void _setFavTab(_FavTab tab) {
+    ref.read(favoritesNeteaseTabProvider.notifier).set(tab.name);
     setState(() => _tab = tab);
   }
 
   void _setKgTab(_KgTab tab) {
+    ref.read(favoritesKugouTabProvider.notifier).set(tab.name);
     setState(() => _kgTab = tab);
   }
 
   void _setQqTab(_QqTab tab) {
+    ref.read(favoritesQqTabProvider.notifier).set(tab.name);
     setState(() => _qqTab = tab);
   }
 
