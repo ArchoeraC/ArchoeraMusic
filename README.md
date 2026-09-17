@@ -2,9 +2,9 @@
   <img src="logo.png" width="128" height="128" alt="ArchoeraMusic">
 </p>
 
-# ArchoeraMusic
+# ArchoeraOS
 
-> 开源、多端、面向本地与在线音乐的混合架构播放器
+> 开源、多端、面向本地与在线音乐的混合架构播放器——系统？
 
 > [!CAUTION]
 > **Caution**：本分支纯属娱乐项目，只是用于抨击部分过度代码洁癖而“清理一切不必要东西”等过度的行为。
