@@ -23,41 +23,6 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
   /// 亮度滑块本地草稿（拖动期间优先显示；松手后置 null 交回 provider）。
   double? _brightnessDraft;
 
-  /// 系统资源 / 蓝牙：设置页可见期间轮询（2s），不可见即停。
-  Timer? _statusTimer;
-  SysStats? _stats;
-  BluetoothState? _bt;
-
-  @override
-  void initState() {
-    super.initState();
-    final status = ref.read(platformCapabilitiesProvider).status;
-    if (status.statsAvailable || status.bluetoothAvailable) {
-      _refreshStatus();
-      _statusTimer = Timer.periodic(
-        const Duration(seconds: 2),
-        (_) => _refreshStatus(),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _statusTimer?.cancel();
-    super.dispose();
-  }
-
-  void _refreshStatus() {
-    final status = ref.read(platformCapabilitiesProvider).status;
-    final stats = status.statsAvailable ? status.stats() : null;
-    final bt = status.bluetoothAvailable ? status.bluetooth() : null;
-    if (!mounted) return;
-    setState(() {
-      _stats = stats;
-      _bt = bt;
-    });
-  }
-
   /// 弹出危险操作确认框；用户确认返回 true（取消/关闭返回 false）。
   Future<bool> _confirm(String action) async {
     final l10n = context.l10n;
@@ -288,168 +253,23 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
       );
     }
 
-    // 系统状态（只读汇总）。
-    final playback = ref.watch(playbackProvider);
-    final imeEnv =
-        Platform.environment['GTK_IM_MODULE'] ??
-        Platform.environment['QT_IM_MODULE'] ??
-        Platform.environment['XMODIFIERS'] ??
-        '';
-    final imeLabel = imeEnv.contains('fcitx')
-        ? 'fcitx5'
-        : (imeEnv.contains('ibus')
-              ? 'IBus'
-              : l10n.systemStatusImeWayland);
-    final cursorTheme =
-        Platform.environment['XCURSOR_THEME'] ?? l10n.systemDisplayUnknown;
-    final cursorSize = Platform.environment['XCURSOR_SIZE'] ?? '';
-
-    final statusRows = <Widget>[
-      SettingTile(
-        icon: EtaIcons.informationOutline,
-        title: l10n.systemStatusSession,
-        subtitle: switch (session) {
-          OsSessionState.ready => l10n.systemStatusReady,
-          OsSessionState.suspending => l10n.systemSessionSuspending,
-          OsSessionState.shuttingDown => l10n.systemSessionShuttingDown,
-        },
-        trailing: const SizedBox.shrink(),
+    // 只读的系统状态 / 资源集中在「系统监视器」弹窗中。
+    add(
+      SettingSection(
+        title: l10n.systemStatusTitle,
+        children: [
+          InkWell(
+            onTap: () => showSystemMonitorDialog(context),
+            child: SettingTile(
+              icon: EtaIcons.monitorOutline,
+              title: l10n.systemMonitorTitle,
+              subtitle: l10n.systemMonitorHint,
+              trailing: const Icon(EtaIcons.arrowRight, size: 18),
+            ),
+          ),
+        ],
       ),
-      if (output != null)
-        SettingTile(
-          icon: EtaIcons.monitorOutline,
-          title: l10n.systemStatusOutput,
-          subtitle:
-              '${output.width}×${output.height} · '
-              '${(output.refreshMillihz / 1000).toStringAsFixed(1)} Hz · '
-              '${output.scale}× · ${output.rotationDegrees}°',
-          trailing: const SizedBox.shrink(),
-        ),
-      if (brightness != null)
-        SettingTile(
-          icon: EtaIcons.brightnessOutline,
-          title: l10n.systemBrightnessTitle,
-          subtitle: '$brightness%',
-          trailing: const SizedBox.shrink(),
-        ),
-      if (battery != null && battery.present)
-        SettingTile(
-          icon: EtaIcons.flashOutline,
-          title: l10n.systemBatteryTitle,
-          subtitle:
-              '${l10n.systemBatteryPercent(battery.percent)} · '
-              '${battery.charging ? l10n.systemBatteryCharging : l10n.systemBatteryDischarging}',
-          trailing: const SizedBox.shrink(),
-        ),
-      if (screenOn != null)
-        SettingTile(
-          icon: EtaIcons.monitorOutline,
-          title: l10n.systemScreenTitle,
-          subtitle: screenOn ? l10n.systemScreenOn : l10n.systemScreenOff,
-          trailing: const SizedBox.shrink(),
-        ),
-      SettingTile(
-        icon: EtaIcons.musicOutline,
-        title: l10n.systemStatusAudio,
-        subtitle:
-            '${playback.playing ? l10n.systemStatusPlaying : l10n.systemStatusIdle}'
-            ' · ${(playback.volume * 100).round()}%',
-        trailing: const SizedBox.shrink(),
-      ),
-      SettingTile(
-        icon: EtaIcons.micOutline,
-        title: l10n.systemStatusIme,
-        subtitle: imeLabel,
-        trailing: const SizedBox.shrink(),
-      ),
-      SettingTile(
-        icon: EtaIcons.deviceOutline,
-        title: l10n.systemStatusCursorTheme,
-        subtitle: cursorSize.isEmpty
-            ? cursorTheme
-            : '$cursorTheme · ${cursorSize}px',
-        trailing: const SizedBox.shrink(),
-      ),
-    ];
-    add(SettingSection(title: l10n.systemStatusTitle, children: statusRows));
-
-    // 系统资源（2s 轮询快照）。
-    final stats = _stats;
-    if (stats != null) {
-      add(
-        SettingSection(
-          title: l10n.systemResourcesTitle,
-          children: [
-            SettingTile(
-              icon: EtaIcons.chipOutline,
-              title: l10n.systemResCpu,
-              subtitle: stats.cpuPercent < 0
-                  ? '${stats.cpuCount} × CPU'
-                  : '${stats.cpuPercent}% · ${stats.cpuCount} × CPU',
-              trailing: const SizedBox.shrink(),
-            ),
-            SettingTile(
-              icon: EtaIcons.memoryStickOutline,
-              title: l10n.systemResMemory,
-              subtitle:
-                  '${_formatKb(stats.memUsedKb)} / ${_formatKb(stats.memTotalKb)}'
-                  ' (${stats.memPercent}%)',
-              trailing: const SizedBox.shrink(),
-            ),
-            SettingTile(
-              icon: EtaIcons.storageOutline,
-              title: l10n.systemResDisk,
-              subtitle:
-                  '${_formatKb(stats.diskUsedKb)} / ${_formatKb(stats.diskTotalKb)}'
-                  ' (${stats.diskPercent}%)',
-              trailing: const SizedBox.shrink(),
-            ),
-            SettingTile(
-              icon: EtaIcons.serverOutline,
-              title: l10n.systemResUptime,
-              subtitle: stats.uptimeLabel,
-              trailing: const SizedBox.shrink(),
-            ),
-            if (stats.tempCelsius != null)
-              SettingTile(
-                icon: EtaIcons.fireOutline,
-                title: l10n.systemResTemp,
-                subtitle: '${stats.tempCelsius!.toStringAsFixed(1)} °C',
-                trailing: const SizedBox.shrink(),
-              ),
-          ],
-        ),
-      );
-    }
-
-    // 蓝牙（只读状态；无 BlueZ/无适配器时给出说明）。
-    if (ref.watch(platformCapabilitiesProvider).bluetoothAvailable) {
-      final bt = _bt;
-      add(
-        SettingSection(
-          title: l10n.systemBluetoothTitle,
-          children: [
-            SettingTile(
-              icon: EtaIcons.bluetooth,
-              title: bt?.adapterName ?? l10n.systemBluetoothTitle,
-              subtitle: bt == null
-                  ? l10n.systemBtUnavailable
-                  : (!bt.present
-                        ? l10n.systemBtAbsent
-                        : (bt.powered ? l10n.systemBtPowered : l10n.systemBtOff)),
-              trailing: const SizedBox.shrink(),
-            ),
-            if (bt != null && bt.present)
-              SettingTile(
-                icon: EtaIcons.deviceOutline,
-                title: l10n.systemBtDevices,
-                subtitle: '${bt.devicesConnected}',
-                trailing: const SizedBox.shrink(),
-              ),
-          ],
-        ),
-      );
-    }
+    );
 
     // 会话态提示（挂起/关机前）。
     if (session != OsSessionState.ready) {
@@ -524,11 +344,4 @@ class _SystemChoiceRow<T> extends StatelessWidget {
       ),
     );
   }
-}
-
-/// KiB → 人类可读（GiB / MiB）。
-String _formatKb(int kb) {
-  if (kb >= 1024 * 1024) return '${(kb / (1024 * 1024)).toStringAsFixed(1)} GiB';
-  if (kb >= 1024) return '${(kb / 1024).toStringAsFixed(0)} MiB';
-  return '$kb KiB';
 }

@@ -1338,5 +1338,7 @@
   "systemStatusInput": "Eingabe",
   "systemStatusIme": "Eingabemethode",
   "systemStatusImeWayland": "Wayland-Texteingabe",
-  "systemStatusCursorTheme": "Cursor-Thema"
+  "systemStatusCursorTheme": "Cursor-Thema",
+  "systemMonitorTitle": "Systemmonitor",
+  "systemMonitorHint": "Ressourcen und Systemstatus auf einen Blick"
 }

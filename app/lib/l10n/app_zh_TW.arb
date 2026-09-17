@@ -1338,5 +1338,7 @@
   "systemStatusInput": "輸入",
   "systemStatusIme": "輸入法",
   "systemStatusImeWayland": "Wayland 文字輸入",
-  "systemStatusCursorTheme": "游標主題"
+  "systemStatusCursorTheme": "游標主題",
+  "systemMonitorTitle": "系統監視器",
+  "systemMonitorHint": "資源使用與系統狀態一覽"
 }

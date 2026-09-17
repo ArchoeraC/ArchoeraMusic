@@ -4332,6 +4332,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get systemStatusCursorTheme => '光标主题';
+
+  @override
+  String get systemMonitorTitle => '系统监视器';
+
+  @override
+  String get systemMonitorHint => '资源占用与系统状态一览';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -8662,6 +8668,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get systemStatusCursorTheme => '光标主题';
+
+  @override
+  String get systemMonitorTitle => '系统监视器';
+
+  @override
+  String get systemMonitorHint => '资源占用与系统状态一览';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -12993,4 +13005,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get systemStatusCursorTheme => '游標主題';
+
+  @override
+  String get systemMonitorTitle => '系統監視器';
+
+  @override
+  String get systemMonitorHint => '資源使用與系統狀態一覽';
 }

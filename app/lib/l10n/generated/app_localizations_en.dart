@@ -4533,4 +4533,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get systemStatusCursorTheme => 'Cursor theme';
+
+  @override
+  String get systemMonitorTitle => 'System monitor';
+
+  @override
+  String get systemMonitorHint => 'Resources and system status at a glance';
 }

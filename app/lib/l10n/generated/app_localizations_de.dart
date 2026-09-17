@@ -4580,4 +4580,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get systemStatusCursorTheme => 'Cursor-Thema';
+
+  @override
+  String get systemMonitorTitle => 'Systemmonitor';
+
+  @override
+  String get systemMonitorHint => 'Ressourcen und Systemstatus auf einen Blick';
 }

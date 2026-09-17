@@ -1338,5 +1338,7 @@
   "systemStatusInput": "입력",
   "systemStatusIme": "입력기",
   "systemStatusImeWayland": "Wayland 텍스트 입력",
-  "systemStatusCursorTheme": "커서 테마"
+  "systemStatusCursorTheme": "커서 테마",
+  "systemMonitorTitle": "시스템 모니터",
+  "systemMonitorHint": "리소스 및 시스템 상태 한눈에 보기"
 }

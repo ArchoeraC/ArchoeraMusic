@@ -8065,6 +8065,18 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'光标主题'**
   String get systemStatusCursorTheme;
+
+  /// No description provided for @systemMonitorTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统监视器'**
+  String get systemMonitorTitle;
+
+  /// No description provided for @systemMonitorHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'资源占用与系统状态一览'**
+  String get systemMonitorHint;
 }
 
 class _AppLocalizationsDelegate

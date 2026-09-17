@@ -8,7 +8,7 @@
 /// 草稿值 / 私有辅助方法，仅在 build 内从 ref 读取偏好与 l10n。
 library;
 
-import 'dart:async' show StreamSubscription, Timer;
+import 'dart:async' show StreamSubscription;
 import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:io' show File, Platform, Process, ProcessStartMode;
 
@@ -26,7 +26,6 @@ import '../services/downloader/download_controller.dart';
 import '../services/platform/os_session.dart';
 import '../services/platform/platform_capabilities.dart';
 import '../services/platform/system_os.dart';
-import '../services/platform/system_status.dart';
 import '../services/playback/engine_bindings.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/scraper/scrape_controller.dart';
@@ -39,6 +38,7 @@ import '../widgets/common/toast.dart';
 import '../widgets/dialogs/s_dialog.dart';
 import '../widgets/player/s_controls.dart';
 import 'settings_color_picker.dart';
+import 'system_monitor_dialog.dart';
 import 'settings_widgets.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 

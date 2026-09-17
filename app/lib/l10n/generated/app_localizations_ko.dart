@@ -4387,4 +4387,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get systemStatusCursorTheme => '커서 테마';
+
+  @override
+  String get systemMonitorTitle => '시스템 모니터';
+
+  @override
+  String get systemMonitorHint => '리소스 및 시스템 상태 한눈에 보기';
 }

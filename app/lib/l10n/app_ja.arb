@@ -1338,5 +1338,7 @@
   "systemStatusInput": "入力",
   "systemStatusIme": "入力メソッド",
   "systemStatusImeWayland": "Wayland テキスト入力",
-  "systemStatusCursorTheme": "カーソルテーマ"
+  "systemStatusCursorTheme": "カーソルテーマ",
+  "systemMonitorTitle": "システムモニター",
+  "systemMonitorHint": "リソースとシステム状態の一覧"
 }

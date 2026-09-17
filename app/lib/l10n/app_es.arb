@@ -1338,5 +1338,7 @@
   "systemStatusInput": "Entrada",
   "systemStatusIme": "Método de entrada",
   "systemStatusImeWayland": "Entrada de texto Wayland",
-  "systemStatusCursorTheme": "Tema del cursor"
+  "systemStatusCursorTheme": "Tema del cursor",
+  "systemMonitorTitle": "Monitor del sistema",
+  "systemMonitorHint": "Recursos y estado del sistema de un vistazo"
 }

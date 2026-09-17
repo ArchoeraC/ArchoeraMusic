@@ -4381,4 +4381,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get systemStatusCursorTheme => 'カーソルテーマ';
+
+  @override
+  String get systemMonitorTitle => 'システムモニター';
+
+  @override
+  String get systemMonitorHint => 'リソースとシステム状態の一覧';
 }

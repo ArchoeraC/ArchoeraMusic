@@ -1338,5 +1338,7 @@
   "systemStatusInput": "Saisie",
   "systemStatusIme": "Méthode de saisie",
   "systemStatusImeWayland": "Saisie de texte Wayland",
-  "systemStatusCursorTheme": "Thème du curseur"
+  "systemStatusCursorTheme": "Thème du curseur",
+  "systemMonitorTitle": "Moniteur système",
+  "systemMonitorHint": "Ressources et état du système en un coup d'œil"
 }

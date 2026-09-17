@@ -1338,5 +1338,7 @@
   "systemStatusInput": "Input",
   "systemStatusIme": "Input method",
   "systemStatusImeWayland": "Wayland text input",
-  "systemStatusCursorTheme": "Cursor theme"
+  "systemStatusCursorTheme": "Cursor theme",
+  "systemMonitorTitle": "System monitor",
+  "systemMonitorHint": "Resources and system status at a glance"
 }

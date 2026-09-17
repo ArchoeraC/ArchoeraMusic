@@ -1341,5 +1341,7 @@
   "systemStatusInput": "输入",
   "systemStatusIme": "输入法",
   "systemStatusImeWayland": "Wayland 文本输入",
-  "systemStatusCursorTheme": "光标主题"
+  "systemStatusCursorTheme": "光标主题",
+  "systemMonitorTitle": "系统监视器",
+  "systemMonitorHint": "资源占用与系统状态一览"
 }
