@@ -2019,6 +2019,54 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get settingsPlayerBgFluid => 'Fluid';
+
+  @override
+  String get settingsPlayerBgFlowSpeed => 'Fließgeschwindigkeit';
+
+  @override
+  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+    return 'Fließgeschwindigkeit $speed';
+  }
+
+  @override
+  String get settingsPlayerBgRenderScale => 'Render-Skalierung';
+
+  @override
+  String settingsPlayerBgRenderScaleDesc(Object scale) {
+    return 'Auflösung $scale× (niedriger spart Strom)';
+  }
+
+  @override
+  String get settingsPlayerBgFps => 'Bildratenlimit';
+
+  @override
+  String settingsPlayerBgFpsDesc(Object fps) {
+    return '$fps FPS';
+  }
+
+  @override
+  String get settingsPlayerBgFreezeOnPause => 'Bei Pause einfrieren';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOn =>
+      'Hintergrund friert bei Pause ein';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOff =>
+      'Hintergrund fließt bei Pause weiter';
+
+  @override
+  String get settingsPlayerBgBeat => 'Bass-Puls';
+
+  @override
+  String get settingsPlayerBgBeatOn => 'Hintergrund pulsiert mit dem Bass';
+
+  @override
+  String get settingsPlayerBgBeatOff =>
+      'Hintergrund pulsiert nicht mit dem Takt';
+
+  @override
   String get settingsAdaptiveRenderQuality => 'Adaptive Renderqualität';
 
   @override
