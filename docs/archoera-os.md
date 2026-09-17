@@ -208,6 +208,10 @@ archoera-shell/src/
   `render(space)`，`ArchoeraShell::render_frame` 负责帧回调与清理。
   winit 后端的输出 transform 固定为 **`Transform::Flipped180`**（抵消 EGL 窗口表面的
   Y 翻转，与 smithay `smallvil` 一致）；用 `Normal` 会让整个合成输出上下颠倒。
+- **输出参数**：`--mode WxH`（udev 在连接器模式中挑选，preferred/高刷优先）、
+  `--scale`（0.25–4.0）、`--transform`（旋转/镜像）。缩放同时经 `wl_output.scale`
+  （整数向上取整）与 `wp_fractional_scale_v1` 的 `preferred_scale` 下发，
+  客户端可按物理像素清晰渲染；kiosk 窗口始终以输出的**逻辑尺寸**铺满。
 - **dmabuf**：renderer 由后端持有并可被 `DmabufHandler` 同步借用——winit 注册 v3、
   udev 注册 v4（`DmabufFeedbackBuilder`）。
 - 播放器自身的重渲染优化（着色器、损伤区、字形图集）见

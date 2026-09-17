@@ -38,10 +38,14 @@ pub fn init_winit(
     let _global = output.create_global::<ArchoeraShell>(&data.display_handle);
     // winit/EGL 窗口表面的原点在左下，需用 Flipped180 抵消 OpenGL 的 Y 翻转，
     // 否则整个合成输出会上下颠倒（与 smithay 官方 smallvil 一致）。
+    // 用户 `--transform` 在此基础上叠加（组合）。
+    let base = Transform::Flipped180;
+    let user = super::output_transform(data.state.config.transform);
+    let transform = base + user;
     output.change_current_state(
         Some(mode),
-        Some(Transform::Flipped180),
-        None,
+        Some(transform),
+        Some(super::output_scale(data.state.config.scale)),
         Some((0, 0).into()),
     );
     output.set_preferred(mode);

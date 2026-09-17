@@ -14,6 +14,35 @@ pub enum BackendKind {
     Udev,
 }
 
+/// kiosk 输出变换（旋转 / 镜像）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransformKind {
+    Normal,
+    R90,
+    R180,
+    R270,
+    Flipped,
+    Flipped90,
+    Flipped180,
+    Flipped270,
+}
+
+impl TransformKind {
+    fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "normal" => Self::Normal,
+            "90" => Self::R90,
+            "180" => Self::R180,
+            "270" => Self::R270,
+            "flipped" => Self::Flipped,
+            "flipped90" => Self::Flipped90,
+            "flipped180" => Self::Flipped180,
+            "flipped270" => Self::Flipped270,
+            _ => return None,
+        })
+    }
+}
+
 /// 会话启动配置。
 #[derive(Debug, Clone)]
 pub struct ShellConfig {
@@ -31,6 +60,12 @@ pub struct ShellConfig {
     pub allow_multiple: bool,
     /// 指定 DRM 设备节点（如 `/dev/dri/card1`）；`None` 用固件主 GPU 或首个。
     pub drm_device: Option<String>,
+    /// 期望输出分辨率（宽, 高）；udev 后端据此挑选连接器模式，`None` 用 preferred。
+    pub mode: Option<(i32, i32)>,
+    /// 输出缩放（>0；1.0 = 100%）。整数用于 wl_output，分数用于 wp_fractional_scale。
+    pub scale: f64,
+    /// 输出变换（旋转/镜像）。
+    pub transform: TransformKind,
 }
 
 impl Default for ShellConfig {
@@ -43,6 +78,9 @@ impl Default for ShellConfig {
             backend: BackendKind::Winit,
             allow_multiple: false,
             drm_device: None,
+            mode: None,
+            scale: 1.0,
+            transform: TransformKind::Normal,
         }
     }
 }
@@ -110,6 +148,31 @@ impl ShellConfig {
                     i += 1;
                     cfg.drm_device = Some(take(&rest, i, "--drm-device")?);
                 }
+                "--mode" => {
+                    i += 1;
+                    let raw = take(&rest, i, "--mode")?;
+                    cfg.mode = Some(parse_mode(&raw)?);
+                }
+                "--scale" => {
+                    i += 1;
+                    let raw = take(&rest, i, "--scale")?;
+                    let scale: f64 = raw
+                        .parse()
+                        .map_err(|_| anyhow::anyhow!("`{raw}` 不是合法的缩放倍数"))?;
+                    if !(0.25..=4.0).contains(&scale) {
+                        anyhow::bail!("--scale 需在 0.25..=4.0 之间（当前 {scale}）");
+                    }
+                    cfg.scale = scale;
+                }
+                "--transform" => {
+                    i += 1;
+                    let raw = take(&rest, i, "--transform")?;
+                    cfg.transform = TransformKind::parse(&raw).ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "未知变换 `{raw}`（normal/90/180/270/flipped/flipped90/flipped180/flipped270）"
+                        )
+                    })?;
+                }
                 "--" => {
                     let argv: Vec<String> = rest
                         .drain(i + 1..)
@@ -149,6 +212,26 @@ fn take(rest: &[OsString], index: usize, flag: &str) -> anyhow::Result<String> {
     rest.get(index)
         .map(|s| s.to_string_lossy().into_owned())
         .ok_or_else(|| anyhow::anyhow!("参数 {flag} 缺少取值"))
+}
+
+/// 解析 `WxH`（如 `1920x1080`）为分辨率。
+fn parse_mode(raw: &str) -> anyhow::Result<(i32, i32)> {
+    let (w, h) = raw
+        .split_once('x')
+        .or_else(|| raw.split_once('X'))
+        .ok_or_else(|| anyhow::anyhow!("`{raw}` 不是合法的分辨率（形如 1920x1080）"))?;
+    let w: i32 = w
+        .trim()
+        .parse()
+        .map_err(|_| anyhow::anyhow!("`{raw}` 宽度非法"))?;
+    let h: i32 = h
+        .trim()
+        .parse()
+        .map_err(|_| anyhow::anyhow!("`{raw}` 高度非法"))?;
+    if w <= 0 || h <= 0 {
+        anyhow::bail!("分辨率必须为正（{raw}）");
+    }
+    Ok((w, h))
 }
 
 /// 极简 shell 分词：支持单/双引号与反斜杠转义，足够表达会话命令。
@@ -196,6 +279,9 @@ fn print_help() {
            --no-exit-on-close     客户端全部退出后不结束会话\n\
            --allow-multiple       允许第二个 toplevel（默认 kiosk 只接受一个）\n\
            --drm-device <path>    udev 后端指定 DRM 节点（默认固件主 GPU / 首个）\n\
+           --mode <WxH>           期望输出分辨率（udev 挑连接器模式；默认 preferred）\n\
+           --scale <f>            输出缩放 0.25-4.0（默认 1.0）\n\
+           --transform <t>        normal/90/180/270/flipped/flipped90/flipped180/flipped270\n\
            -h, --help             显示本帮助"
     );
 }
@@ -218,6 +304,33 @@ mod tests {
         assert!(cfg.exit_on_close);
         assert!(!cfg.allow_multiple);
         assert_eq!(cfg.drm_device, None);
+        assert_eq!(cfg.mode, None);
+        assert!((cfg.scale - 1.0).abs() < f64::EPSILON);
+        assert_eq!(cfg.transform, TransformKind::Normal);
+    }
+
+    #[test]
+    fn parses_display_options() {
+        let cfg = ShellConfig::from_args(args(&[
+            "archoera-shell",
+            "--mode",
+            "1920x1080",
+            "--scale",
+            "1.5",
+            "--transform",
+            "90",
+        ]))
+        .unwrap();
+        assert_eq!(cfg.mode, Some((1920, 1080)));
+        assert!((cfg.scale - 1.5).abs() < f64::EPSILON);
+        assert_eq!(cfg.transform, TransformKind::R90);
+    }
+
+    #[test]
+    fn rejects_bad_display_options() {
+        assert!(ShellConfig::from_args(args(&["archoera-shell", "--mode", "1920"])).is_err());
+        assert!(ShellConfig::from_args(args(&["archoera-shell", "--scale", "9"])).is_err());
+        assert!(ShellConfig::from_args(args(&["archoera-shell", "--transform", "tilt"])).is_err());
     }
 
     #[test]

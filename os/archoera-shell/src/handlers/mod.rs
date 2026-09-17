@@ -10,10 +10,13 @@ mod dmabuf;
 mod xdg_shell;
 
 use smithay::{
-    delegate_data_device, delegate_idle_inhibit, delegate_output, delegate_seat,
+    delegate_data_device, delegate_fractional_scale, delegate_idle_inhibit, delegate_output,
+    delegate_seat,
     input::{Seat, SeatHandler, SeatState},
     reexports::wayland_server::{protocol::wl_surface::WlSurface, Resource},
     wayland::{
+        compositor::with_states,
+        fractional_scale::{self, FractionalScaleHandler},
         idle_inhibit::IdleInhibitHandler,
         output::OutputHandler,
         selection::{
@@ -113,3 +116,20 @@ impl IdleInhibitHandler for ArchoeraShell {
 }
 
 delegate_idle_inhibit!(ArchoeraShell);
+
+//
+// wp_fractional_scale_v1（客户端按输出分数缩放清晰渲染）
+//
+
+impl FractionalScaleHandler for ArchoeraShell {
+    fn new_fractional_scale(&mut self, surface: WlSurface) {
+        // 输出缩放由 `--scale` 决定；新 surface 订阅时即告知首选分数缩放，
+        // 客户端（GTK/Flutter）据此按物理像素渲染，避免模糊。
+        let scale = self.config.scale;
+        with_states(&surface, |states| {
+            fractional_scale::with_fractional_scale(states, |fs| fs.set_preferred_scale(scale));
+        });
+    }
+}
+
+delegate_fractional_scale!(ArchoeraShell);

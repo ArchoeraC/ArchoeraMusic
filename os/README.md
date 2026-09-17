@@ -108,7 +108,12 @@ sudo systemctl enable --now seatd        # 可选
 ```
 
 实现要点：单 GPU（首个可用 DRM 设备，或 `--drm-device` 显式指定）→ GBM 分配 + EGL/GLES
-渲染 → 每个连接器一个 `DrmOutput`，vblank 到达后回收上一帧；**仅在有新客户端提交时**再
+渲染 → 每个连接器一个 `DrmOutput`。**显示参数**：`--mode WxH` 在连接器模式中精确挑选
+（preferred 优先、刷新率更高者优先），`--scale` / `--transform` 设置输出缩放与旋转/镜像；
+缩放会同时经 `wl_output.scale`（整数向上取整）与 `wp_fractional_scale_v1`
+（`preferred_scale`，按物理像素清晰渲染）告知客户端，kiosk 窗口按其逻辑尺寸铺满。
+
+vblank 到达后回收上一帧；**仅在有新客户端提交时**再
 合成并 `queue_frame`，空帧不再排队，vblank 随之停止（客户端提交经 `schedule_redraw` 唤醒），
 故空闲时零功耗。输入经 libinput 注入同一 seat；会话被抢占（VT 切换）时暂停渲染与输入，
 恢复后重新激活输出。dmabuf 以 **v4 反馈**注册，告知客户端主渲染设备。
@@ -132,6 +137,9 @@ sudo systemctl enable --now seatd        # 可选
 | `--no-exit-on-close` | 客户端全退后不结束会话 |
 | `--allow-multiple` | 允许第二个 toplevel（默认 kiosk 只接受一个） |
 | `--drm-device <path>` | udev 后端指定 DRM 节点（默认固件主 GPU，可用 `ARCHOERA_DRM_DEVICE` 兜底） |
+| `--mode <WxH>` | 期望输出分辨率（udev 据此挑连接器模式；默认 preferred） |
+| `--scale <f>` | 输出缩放 0.25–4.0（默认 1.0）；分数缩放经 `wp_fractional_scale_v1` 下发 |
+| `--transform <t>` | 输出旋转/镜像：`normal/90/180/270/flipped/flipped90/flipped180/flipped270` |
 
 ## 控制面 CLI（`archoera-control`）
 

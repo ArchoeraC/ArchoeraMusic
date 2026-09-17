@@ -29,6 +29,7 @@ use smithay::{
     wayland::{
         compositor::{CompositorClientState, CompositorState},
         dmabuf::{DmabufFeedbackBuilder, DmabufGlobal, DmabufState},
+        fractional_scale::FractionalScaleManagerState,
         idle_inhibit::IdleInhibitManagerState,
         output::OutputManagerState,
         selection::data_device::DataDeviceState,
@@ -72,6 +73,7 @@ pub struct ArchoeraShell {
     pub idle_inhibit_state: IdleInhibitManagerState,
     pub shm_state: ShmState,
     pub output_manager_state: OutputManagerState,
+    pub fractional_scale_state: FractionalScaleManagerState,
     pub seat_state: SeatState<Self>,
     pub data_device_state: DataDeviceState,
     pub seat: Seat<Self>,
@@ -118,6 +120,7 @@ impl ArchoeraShell {
         let idle_inhibit_state = IdleInhibitManagerState::new::<Self>(&dh);
         let shm_state = ShmState::new::<Self>(&dh, vec![]);
         let output_manager_state = OutputManagerState::new_with_xdg_output::<Self>(&dh);
+        let fractional_scale_state = FractionalScaleManagerState::new::<Self>(&dh);
         let data_device_state = DataDeviceState::new::<Self>(&dh);
         let popups = PopupManager::default();
 
@@ -156,6 +159,7 @@ impl ArchoeraShell {
             idle_inhibit_state,
             shm_state,
             output_manager_state,
+            fractional_scale_state,
             seat_state,
             data_device_state,
             seat,

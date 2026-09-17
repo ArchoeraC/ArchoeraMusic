@@ -19,11 +19,14 @@ use smithay::{
         winit::WinitGraphicsBackend,
     },
     desktop::{space::render_output, Space, Window},
-    output::Output,
-    utils::Rectangle,
+    output::{Output, Scale},
+    utils::{Rectangle, Transform},
 };
 
-use crate::{cli::BackendKind, CalloopData};
+use crate::{
+    cli::{BackendKind, TransformKind},
+    CalloopData,
+};
 
 mod winit;
 
@@ -32,6 +35,36 @@ mod udev;
 
 /// kiosk 桌面底色（对齐 ArchoeraMusic `AppPalette.dark.surface` #0E1117）。
 pub const CLEAR_COLOR: [f32; 4] = [0.0549, 0.0667, 0.0902, 1.0];
+
+/// f64 缩放倍数 → smithay 输出缩放。
+///
+/// 整数用 [`Scale::Integer`]；分数用 [`Scale::Custom`]（`wl_output` 取整向上，
+/// 真值经 `wp_fractional_scale_v1` 下发，客户端可据此清晰渲染）。
+pub fn output_scale(scale: f64) -> Scale {
+    let integral = scale.fract().abs() < f64::EPSILON;
+    if integral && scale >= 1.0 {
+        Scale::Integer(scale.round() as i32)
+    } else {
+        Scale::Custom {
+            advertised_integer: scale.ceil().max(1.0) as i32,
+            fractional: scale,
+        }
+    }
+}
+
+/// CLI 变换枚举 → smithay 输出变换。
+pub fn output_transform(kind: TransformKind) -> Transform {
+    match kind {
+        TransformKind::Normal => Transform::Normal,
+        TransformKind::R90 => Transform::_90,
+        TransformKind::R180 => Transform::_180,
+        TransformKind::R270 => Transform::_270,
+        TransformKind::Flipped => Transform::Flipped,
+        TransformKind::Flipped90 => Transform::Flipped90,
+        TransformKind::Flipped180 => Transform::Flipped180,
+        TransformKind::Flipped270 => Transform::Flipped270,
+    }
+}
 
 /// winit 嵌套后端的渲染状态。
 pub struct WinitBackend {

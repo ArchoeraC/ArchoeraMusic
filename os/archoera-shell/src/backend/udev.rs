@@ -34,7 +34,7 @@ use smithay::{
         udev::{all_gpus, primary_gpu, UdevBackend as UdevDeviceMonitor, UdevEvent},
     },
     desktop::{space::SpaceRenderElements, Space, Window},
-    output::{Mode as WlMode, Output, PhysicalProperties},
+    output::{Mode as WlMode, Output, PhysicalProperties, Scale},
     reexports::{
         calloop::EventLoop,
         drm::control::{connector, crtc, ModeTypeFlags},
@@ -42,7 +42,7 @@ use smithay::{
         rustix::fs::OFlags,
         wayland_server::DisplayHandle,
     },
-    utils::DeviceFd,
+    utils::{DeviceFd, Transform},
 };
 use smithay_drm_extras::drm_scanner::{DrmScanEvent, DrmScanner};
 
@@ -234,6 +234,9 @@ pub fn init_udev(
                 &connector,
                 crtc,
                 cursor_x,
+                data.state.config.mode,
+                super::output_scale(data.state.config.scale),
+                super::output_transform(data.state.config.transform),
             ) {
                 Ok((drm_output, output)) => {
                     if let Some(geo) = data.state.space.output_geometry(&output) {
@@ -443,6 +446,9 @@ fn refresh_outputs(
                     &connector,
                     crtc,
                     next_x,
+                    state.config.mode,
+                    super::output_scale(state.config.scale),
+                    super::output_transform(state.config.transform),
                 ) {
                     Ok((drm_output, output)) => {
                         if let Some(geo) = state.space.output_geometry(&output) {
@@ -506,6 +512,9 @@ fn output_label(connector: &connector::Info) -> String {
 }
 
 /// 在给定 CRTC 上点亮一个连接器，创建 Wayland `Output` 全局并返回 `DrmOutput`。
+///
+/// `mode_pref` 为期望分辨率（`--mode`）：在连接器模式中优先精确匹配该尺寸
+/// （preferred 优先、刷新率更高者优先），无匹配则回退 preferred / 首个模式。
 #[allow(clippy::too_many_arguments)]
 fn setup_output(
     manager: &mut OutputManager,
@@ -515,11 +524,33 @@ fn setup_output(
     connector: &connector::Info,
     crtc: crtc::Handle,
     x: i32,
+    mode_pref: Option<(i32, i32)>,
+    scale: Scale,
+    transform: Transform,
 ) -> anyhow::Result<(DrmOutputHandle, Output)> {
+    // 保留 map_or：`is_none_or` 需要 Rust 1.82，而本 workspace 声明 1.80+。
+    #[allow(clippy::unnecessary_map_or)]
     let mode = connector
         .modes()
         .iter()
-        .find(|mode| mode.mode_type().contains(ModeTypeFlags::PREFERRED))
+        .filter(|mode| {
+            mode_pref.map_or(true, |(w, h)| {
+                let size = mode.size();
+                size.0 as i32 == w && size.1 as i32 == h
+            })
+        })
+        .max_by_key(|mode| {
+            (
+                mode.mode_type().contains(ModeTypeFlags::PREFERRED) as u8,
+                mode.vrefresh(),
+            )
+        })
+        .or_else(|| {
+            connector
+                .modes()
+                .iter()
+                .find(|mode| mode.mode_type().contains(ModeTypeFlags::PREFERRED))
+        })
         .or_else(|| connector.modes().first())
         .copied()
         .ok_or_else(|| anyhow::anyhow!("连接器没有可用显示模式"))?;
@@ -543,7 +574,7 @@ fn setup_output(
     output.set_preferred(wl_mode);
 
     let position = (x, 0).into();
-    output.change_current_state(Some(wl_mode), None, None, Some(position));
+    output.change_current_state(Some(wl_mode), Some(transform), Some(scale), Some(position));
     space.map_output(&output, position);
 
     let drm_output = manager
