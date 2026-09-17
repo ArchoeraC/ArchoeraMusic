@@ -1940,6 +1940,51 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get settingsPlayerBgFluid => '유체';
+
+  @override
+  String get settingsPlayerBgFlowSpeed => '흐름 속도';
+
+  @override
+  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+    return '유체 흐름 속도 $speed';
+  }
+
+  @override
+  String get settingsPlayerBgRenderScale => '렌더링 비율';
+
+  @override
+  String settingsPlayerBgRenderScaleDesc(Object scale) {
+    return '해상도 $scale× (낮을수록 절전)';
+  }
+
+  @override
+  String get settingsPlayerBgFps => '프레임률 제한';
+
+  @override
+  String settingsPlayerBgFpsDesc(Object fps) {
+    return '$fps FPS';
+  }
+
+  @override
+  String get settingsPlayerBgFreezeOnPause => '일시정지 시 정지';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOn => '일시정지 중 배경 정지';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOff => '일시정지 중에도 배경 흐름';
+
+  @override
+  String get settingsPlayerBgBeat => '저음 비트 맥동';
+
+  @override
+  String get settingsPlayerBgBeatOn => '저음에 맞춰 배경 맥동';
+
+  @override
+  String get settingsPlayerBgBeatOff => '비트에 맥동하지 않음';
+
+  @override
   String get settingsAdaptiveRenderQuality => '적응형 렌더링 품질';
 
   @override

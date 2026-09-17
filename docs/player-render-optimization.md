@@ -21,7 +21,7 @@
 
   | 模块 | 真正瓶颈 | 主手段 | GLSL 定位 |
   |---|---|---|---|
-  | 背景（水纹/模糊） | 逐像素填充率 + CPU 顶点场 | **片元着色器** | 主解 |
+  | 背景（水纹/流体/模糊） | 逐像素填充率 + CPU 顶点场 | **片元着色器** | 主解 |
   | 高级歌词 | **UI 线程** `TextPainter.layout()` + 逐行 `saveLayer` | **Paragraph 缓存 + 字形图集批渲染** | 仅后处理特效 |
   | 频谱 | draw call 数量（每 bar 一次 `drawRRect`） | **批处理** | 基本不需要 |
 
@@ -81,7 +81,7 @@
 
 | 引擎 | 文件 | 状态 | 备注 |
 |---|---|---|---|
-| 背景 | `player_background.dart` + `ripple_background.dart` | 活跃 | 4 档：gradient/blur/solid/ripple |
+| 背景 | `player_background.dart` + `ripple_background.dart` / `fluid_background.dart` | 活跃 | 5 档：gradient/blur/solid/ripple/fluid |
 | 高级歌词（v7） | `lyrics_v7/lyrics_physics_wall.dart` | 活跃 | 自研布局 + 闭式弹簧 + CustomPainter |
 | 简单歌词 | `lyrics_view.dart` | 活跃 | 回退档 |
 | 频谱 | `spectrum_view/spectrum_view_painter.dart` | 活跃 | bars/wave/waveUp |
@@ -164,6 +164,34 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
   `runtime-resource-optimization.md` §4.1 的 **R1**——「静态层缓存一次 + 动态层只画损伤区
   （活动涟漪波带）+ 降采样」三段组合，并给出 A/B/C 三种实现选型（§8.1）与回退阶梯。
   重开 `kEnableRippleShader` 不再是前提，而由 R1 实测决定。
+
+### 4.1b 流体背景（对齐上游 AMLL `MeshGradientRenderer`，P2 已实现）
+
+上游 SPlayer-Next 的 `playerBgType: 'animation'` 是 AMLL 的 WebGL 网格渐变：每首歌随机
+一个双三次 Hermite 控制点网格（subdiv=50）形变封面，片元再绕 `(0.2,0.2)` 旋转（时间+音量）、
+按 `1-音量` 缩放、dither、晕影，切歌 alpha 0→1.1 交叉淡入。Flutter 端落法：
+
+- **Hermite 形变一次性烘焙为位移贴图**（`fluid_mesh.dart`）：
+  `buildFluidWarpMesh` 逐行照搬上游 `updateMesh`（含 gl-matrix 列主序矩阵与 5 组预设 /
+  `cp-generate` 随机生成），把「未 aspect 校正的 NDC `pos` → 纹理坐标 `v_uv`」前向栅格化
+  进 `drawVertices`（顶点色 = RG 存 `v_uv`，`BlendMode.dst`），`Picture.toImageSync` 出图。
+  **每首歌只烘焙一次**（`256×256`，subdiv=50），窗口缩放不需重烘焙。
+- **片元单 pass**（`app/shaders/fluid.frag`）：屏幕 uv → **逆 aspect**（还原上游顶点着色器）
+  → 查位移图得 `v_uv` → 旋转/缩放 → **镜像重复**采封面 → 音量 alpha/晕影/dither → 预乘输出。
+  uniform 扁平布局 `FluidUniforms`（uSize/uAspect/uVolume/uSinAngle/uCosAngle/uAlpha，
+  sampler uWarp/uCover），含与 `.frag` 一致性的单元测试。
+- **封面预烘焙**（`fluid_cover.dart`）：封面压到 32×32 → 上游四步色调（对比度 0.4 →
+  饱和 3.0 → 对比度 1.7 → 亮度 0.75，中间不夹取故合并成**单个颜色矩阵**）→
+  `blurImage(radius=2, quality=4)` 盒式模糊，均为纯 CPU 字节运算，逐位移植且可单测。
+- **多状态交叉淡入**：每个曲目状态持有（位移图, 封面）与 alpha，按序叠加绘制
+  （`drawRect` 时引擎会**拷贝** uniforms，故复用同一 `FragmentShader` 安全）；旧状态在
+  新状态 alpha 达 1.1 后释放。上游 `meshStates` 语义一致。
+- **设置项完整对齐上游**：`player.playerBg*` → 流速（0.1~10，默认 4）/ 渲染比例
+  （0.5~2，默认 0.5，`renderScale` 低分辨率离屏）/ 帧率上限（24~120，默认 30）/
+  暂停冻结（默认 false）/ 低频节拍脉动（默认 false，移植 `getBassPulse` 80~180Hz +
+  attack/decay 平滑）。性能模式停表呈现静态帧。
+- **回退**：着色器不可用 / `ARCHOERA_FLUID_SHADER=0` / 位移图烘焙失败 / `flutter test`
+  软件渲染 → 「预烘焙封面直铺」，不崩不空。
 
 ### 4.2 高级歌词 → 字形引擎（不上 GLSL 做排版）
 

@@ -23,6 +23,14 @@ const transitionStyleKey = 'player.transitionStyle';
 const playerBgTypeKey = 'player.bgType';
 const playerBgRippleSpeedKey = 'player.bgRippleSpeed';
 
+/// 流体背景（对齐上游 player.playerBg*）：流速 / 渲染比例 / 帧率上限 /
+/// 暂停冻结 / 低频节拍脉动。
+const playerBgFlowSpeedKey = 'player.bgFlowSpeed';
+const playerBgRenderScaleKey = 'player.bgRenderScale';
+const playerBgFpsKey = 'player.bgFps';
+const playerBgFreezeOnPauseKey = 'player.bgFreezeOnPause';
+const playerBgBeatKey = 'player.bgBeat';
+
 /// 自适应画质（依帧时间自动调整水纹渲染分辨率；默认关）。
 const adaptiveRenderQualityKey = 'player.adaptiveRenderQuality';
 
@@ -83,12 +91,36 @@ const String defaultSpectrumStyle = 'bars';
 const Set<String> spectrumStyles = {'bars', 'wave', 'waveUp'};
 
 /// 播放页背景样式（'gradient' 渐变 / 'blur' 模糊封面 / 'solid' 纯色 /
-/// 'ripple' 水纹；默认 'gradient'，保持原主题渐变观感）。
+/// 'ripple' 水纹 / 'fluid' 流体；默认 'gradient'，保持原主题渐变观感）。
 const String defaultPlayerBgType = 'gradient';
-const Set<String> playerBgTypes = {'gradient', 'blur', 'solid', 'ripple'};
+const Set<String> playerBgTypes = {
+  'gradient',
+  'blur',
+  'solid',
+  'ripple',
+  'fluid',
+};
 
 /// 水纹流动速度（1~6，默认 3）。
 const double defaultPlayerBgRippleSpeed = 3;
+
+/// 流体流动速度（0.1~10，默认 4；对齐上游 player.playerBgFlowSpeed）。
+const double defaultPlayerBgFlowSpeed = 4;
+
+/// 流体渲染比例（0.5~2，默认 0.5；对齐上游 player.playerBgRenderScale，
+/// 0.5 = 半分辨率离屏后放大，省填充率）。
+const double defaultPlayerBgRenderScale = 0.5;
+
+/// 流体帧率上限（24~120，默认 30；对齐上游 player.playerBgFps）。
+const int defaultPlayerBgFps = 30;
+
+/// 暂停时冻结流体流动（默认 false；对齐上游 player.playerBgFreezeOnPause，
+/// 关闭时暂停后背景仍持续流动）。
+const bool defaultPlayerBgFreezeOnPause = false;
+
+/// 低频节拍脉动（默认 false；对齐上游 player.playerBgBeat，开启后按 80~180Hz
+/// 低频脉冲调制流体旋转/缩放）。
+const bool defaultPlayerBgBeat = false;
 
 /// 自适应画质（默认关，保持旧行为）。开启后 [RenderQualityService] 依据
 /// `FrameTiming` 在 full/balanced/performance 档位间切换，作为播放页水纹
@@ -163,7 +195,7 @@ extension PlayerPrefs on AppPrefs {
   }
 
   /// 播放页背景样式（'gradient' 渐变 / 'blur' 模糊封面 / 'solid' 纯色 /
-  /// 'ripple' 水纹；非法值回退默认 'gradient'）。
+  /// 'ripple' 水纹 / 'fluid' 流体；非法值回退默认 'gradient'）。
   String get playerBgType {
     final v = data[playerBgTypeKey];
     if (playerBgTypes.contains(v)) return v as String;
@@ -176,6 +208,35 @@ extension PlayerPrefs on AppPrefs {
     if (v == null) return defaultPlayerBgRippleSpeed;
     return v.toDouble().clamp(1.0, 6.0);
   }
+
+  /// 流体流动速度（0.1~10，默认 4）。
+  double get playerBgFlowSpeed {
+    final v = data[playerBgFlowSpeedKey] as num?;
+    if (v == null) return defaultPlayerBgFlowSpeed;
+    return v.toDouble().clamp(0.1, 10.0);
+  }
+
+  /// 流体渲染比例（0.5~2，默认 0.5）。
+  double get playerBgRenderScale {
+    final v = data[playerBgRenderScaleKey] as num?;
+    if (v == null) return defaultPlayerBgRenderScale;
+    return v.toDouble().clamp(0.5, 2.0);
+  }
+
+  /// 流体帧率上限（24~120，默认 30）。
+  int get playerBgFps {
+    final v = data[playerBgFpsKey] as num?;
+    if (v == null) return defaultPlayerBgFps;
+    return v.round().clamp(24, 120);
+  }
+
+  /// 暂停时冻结流体流动（默认 false）。
+  bool get playerBgFreezeOnPause =>
+      data[playerBgFreezeOnPauseKey] as bool? ?? defaultPlayerBgFreezeOnPause;
+
+  /// 低频节拍脉动（默认 false）。
+  bool get playerBgBeat =>
+      data[playerBgBeatKey] as bool? ?? defaultPlayerBgBeat;
 
   /// 自适应画质（默认关）：开启后按帧时间自动调整水纹渲染分辨率。
   bool get adaptiveRenderQuality =>
@@ -284,14 +345,29 @@ extension PlayerPrefs on AppPrefs {
       AppPrefs(initialData: {...data, showTranslationKey: value});
 
   /// 设置播放页背景样式 / 水纹速度（非法样式不写入，getter 回退默认）。
-  AppPrefs copyWithPlayerBackground({String? type, double? rippleSpeed}) =>
-      AppPrefs(
-        initialData: {
-          ...data,
-          if (playerBgTypes.contains(type)) playerBgTypeKey: type,
-          playerBgRippleSpeedKey: ?rippleSpeed?.clamp(1.0, 6.0),
-        },
-      );
+  ///
+  /// 流体参数同段写入：流速 0.1~10、渲染比例 0.5~2、帧率 24~120、
+  /// 暂停冻结 / 节拍脉动开关。
+  AppPrefs copyWithPlayerBackground({
+    String? type,
+    double? rippleSpeed,
+    double? flowSpeed,
+    double? renderScale,
+    int? fps,
+    bool? freezeOnPause,
+    bool? beat,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      if (playerBgTypes.contains(type)) playerBgTypeKey: type,
+      playerBgRippleSpeedKey: ?rippleSpeed?.clamp(1.0, 6.0),
+      playerBgFlowSpeedKey: ?flowSpeed?.clamp(0.1, 10.0),
+      playerBgRenderScaleKey: ?renderScale?.clamp(0.5, 2.0),
+      playerBgFpsKey: ?fps?.clamp(24, 120),
+      playerBgFreezeOnPauseKey: ?freezeOnPause,
+      playerBgBeatKey: ?beat,
+    },
+  );
 
   /// 设置自适应画质开关（默认关）。
   AppPrefs copyWithAdaptiveRenderQuality(bool value) =>

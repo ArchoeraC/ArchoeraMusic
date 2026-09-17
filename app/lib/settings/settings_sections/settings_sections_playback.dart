@@ -795,6 +795,10 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                     value: 'ripple',
                     child: Text(l10n.settingsPlayerBgRipple),
                   ),
+                  DropdownMenuItem(
+                    value: 'fluid',
+                    child: Text(l10n.settingsPlayerBgFluid),
+                  ),
                 ],
               ),
             ),
@@ -826,6 +830,77 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 onChanged: (value) => ref
                     .read(appPrefsProvider.notifier)
                     .setAdaptiveRenderQuality(value),
+              ),
+            ],
+            if (prefs.playerBgType == 'fluid') ...[
+              SettingSliderTile(
+                icon: EtaIcons.transfer,
+                title: l10n.settingsPlayerBgFlowSpeed,
+                subtitle: l10n.settingsPlayerBgFlowSpeedDesc(
+                  prefs.playerBgFlowSpeed.toStringAsFixed(1),
+                ),
+                value: prefs.playerBgFlowSpeed,
+                min: 0.1,
+                max: 10,
+                divisions: 99,
+                label: prefs.playerBgFlowSpeed.toStringAsFixed(1),
+                onChanged: (v) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setPlayerBackground(flowSpeed: v),
+              ),
+              SettingSliderTile(
+                icon: EtaIcons.dashboard4Outline,
+                title: l10n.settingsPlayerBgRenderScale,
+                subtitle: l10n.settingsPlayerBgRenderScaleDesc(
+                  prefs.playerBgRenderScale.toStringAsFixed(1),
+                ),
+                value: prefs.playerBgRenderScale,
+                min: 0.5,
+                max: 2,
+                divisions: 15,
+                label: '${prefs.playerBgRenderScale.toStringAsFixed(1)}×',
+                onChanged: (v) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setPlayerBackground(renderScale: v),
+              ),
+              SettingSliderTile(
+                icon: EtaIcons.stopwatchOutline,
+                title: l10n.settingsPlayerBgFps,
+                subtitle: l10n.settingsPlayerBgFpsDesc(
+                  prefs.playerBgFps.toString(),
+                ),
+                value: prefs.playerBgFps.toDouble(),
+                min: 24,
+                max: 120,
+                divisions: 48,
+                label: '${prefs.playerBgFps} FPS',
+                onChanged: (v) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setPlayerBackground(fps: v.round()),
+              ),
+              SettingSwitchTile(
+                icon: EtaIcons.bedtimeOffOutline,
+                title: l10n.settingsPlayerBgFreezeOnPause,
+                subtitle: prefs.playerBgFreezeOnPause
+                    ? l10n.settingsPlayerBgFreezeOnPauseOn
+                    : l10n.settingsPlayerBgFreezeOnPauseOff,
+                value: prefs.playerBgFreezeOnPause,
+                onChanged: (value) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setPlayerBackground(freezeOnPause: value),
+              ),
+              SettingSwitchTile(
+                icon: prefs.playerBgBeat
+                    ? EtaIcons.soundLine
+                    : EtaIcons.soundLineOutline,
+                title: l10n.settingsPlayerBgBeat,
+                subtitle: prefs.playerBgBeat
+                    ? l10n.settingsPlayerBgBeatOn
+                    : l10n.settingsPlayerBgBeatOff,
+                value: prefs.playerBgBeat,
+                onChanged: (value) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setPlayerBackground(beat: value),
               ),
             ],
           ],

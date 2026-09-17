@@ -4,14 +4,15 @@
 
 /// 全屏播放器背景。
 ///
-/// 支持四种样式（设置 → 播放 → 播放页背景）：
+/// 支持五种样式（设置 → 播放 → 播放页背景）：
 /// - `gradient`：主题主色 → 播放器底色的对角渐变（默认，兜底）；
 /// - `blur`：封面重度模糊背景（`blur(45px) saturate(1.2)` + 放大 + 压暗）；
 /// - `solid`：深色纯色；
 /// - `ripple`：模糊封面（[BlurredCover]）+ 水纹折射（[RippleBackground] 叠加其上，
-///   对齐上游 `.bg-blur-wrap` + ripple canvas 的分层结构）。
+///   对齐上游 `.bg-blur-wrap` + ripple canvas 的分层结构）；
+/// - `fluid`：流体背景（[FluidBackground]，对齐上游 AMLL `MeshGradientRenderer`）。
 ///
-/// 无封面时 blur / ripple 均回退渐变。
+/// 无封面时 blur / ripple / fluid 均回退渐变。
 library;
 
 import 'dart:math' as math;
@@ -24,6 +25,7 @@ import '../../../services/render/render_quality_service.dart';
 import '../../../stores/app_prefs.dart';
 import '../../../theme/app_theme.dart';
 import 'blurred_cover.dart';
+import 'fluid_background.dart';
 import 'ripple_background.dart';
 
 /// 全屏播放器背景。[cover] 为当前曲目封面地址；[playing] 透传给水纹动画。
@@ -87,6 +89,24 @@ class PlayerBackground extends ConsumerWidget {
               renderScale: renderScale,
               damageClippedDynamic: prefs.rippleDamageClip,
               fallbackColor: Colors.transparent,
+            ),
+          ],
+        );
+      case 'fluid':
+        if (!hasCover) return gradient;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            gradient,
+            FluidBackground(
+              cover: cover,
+              playing: playing,
+              animate: !prefs.performanceMode,
+              flowSpeed: prefs.playerBgFlowSpeed,
+              renderScale: prefs.playerBgRenderScale,
+              fps: prefs.playerBgFps,
+              freezeOnPause: prefs.playerBgFreezeOnPause,
+              beat: prefs.playerBgBeat,
             ),
           ],
         );

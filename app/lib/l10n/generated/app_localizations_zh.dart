@@ -1915,6 +1915,51 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsPlayerBgFluid => '流体';
+
+  @override
+  String get settingsPlayerBgFlowSpeed => '流动速度';
+
+  @override
+  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+    return '流体速度 $speed';
+  }
+
+  @override
+  String get settingsPlayerBgRenderScale => '渲染比例';
+
+  @override
+  String settingsPlayerBgRenderScaleDesc(Object scale) {
+    return '分辨率 $scale×（越低越省电）';
+  }
+
+  @override
+  String get settingsPlayerBgFps => '帧率上限';
+
+  @override
+  String settingsPlayerBgFpsDesc(Object fps) {
+    return '$fps FPS';
+  }
+
+  @override
+  String get settingsPlayerBgFreezeOnPause => '暂停时冻结';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOn => '暂停后背景静止';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOff => '暂停后背景继续流动';
+
+  @override
+  String get settingsPlayerBgBeat => '低频节拍脉动';
+
+  @override
+  String get settingsPlayerBgBeatOn => '背景随低频鼓点脉动';
+
+  @override
+  String get settingsPlayerBgBeatOff => '背景不随节拍脉动';
+
+  @override
   String get settingsAdaptiveRenderQuality => '自适应画质';
 
   @override
@@ -6037,6 +6082,51 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
+  String get settingsPlayerBgFluid => '流体';
+
+  @override
+  String get settingsPlayerBgFlowSpeed => '流动速度';
+
+  @override
+  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+    return '流体速度 $speed';
+  }
+
+  @override
+  String get settingsPlayerBgRenderScale => '渲染比例';
+
+  @override
+  String settingsPlayerBgRenderScaleDesc(Object scale) {
+    return '分辨率 $scale×（越低越省电）';
+  }
+
+  @override
+  String get settingsPlayerBgFps => '帧率上限';
+
+  @override
+  String settingsPlayerBgFpsDesc(Object fps) {
+    return '$fps FPS';
+  }
+
+  @override
+  String get settingsPlayerBgFreezeOnPause => '暂停时冻结';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOn => '暂停后背景静止';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOff => '暂停后背景继续流动';
+
+  @override
+  String get settingsPlayerBgBeat => '低频节拍脉动';
+
+  @override
+  String get settingsPlayerBgBeatOn => '背景随低频鼓点脉动';
+
+  @override
+  String get settingsPlayerBgBeatOff => '背景不随节拍脉动';
+
+  @override
   String get settingsAdaptiveRenderQuality => '自适应画质';
 
   @override
@@ -10157,6 +10247,51 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String settingsPlayerBgRippleSpeedDesc(Object speed) {
     return '流動速度 $speed';
   }
+
+  @override
+  String get settingsPlayerBgFluid => '流體';
+
+  @override
+  String get settingsPlayerBgFlowSpeed => '流動速度';
+
+  @override
+  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+    return '流體流動速度 $speed';
+  }
+
+  @override
+  String get settingsPlayerBgRenderScale => '渲染比例';
+
+  @override
+  String settingsPlayerBgRenderScaleDesc(Object scale) {
+    return '解析度 $scale×（越低越省電）';
+  }
+
+  @override
+  String get settingsPlayerBgFps => '幀率上限';
+
+  @override
+  String settingsPlayerBgFpsDesc(Object fps) {
+    return '$fps FPS';
+  }
+
+  @override
+  String get settingsPlayerBgFreezeOnPause => '暫停時凍結';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOn => '暫停後背景靜止';
+
+  @override
+  String get settingsPlayerBgFreezeOnPauseOff => '暫停後背景繼續流動';
+
+  @override
+  String get settingsPlayerBgBeat => '低頻節拍脈動';
+
+  @override
+  String get settingsPlayerBgBeatOn => '背景隨低頻鼓點脈動';
+
+  @override
+  String get settingsPlayerBgBeatOff => '背景不隨節拍脈動';
 
   @override
   String get settingsAdaptiveRenderQuality => '自適應畫質';
