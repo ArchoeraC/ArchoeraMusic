@@ -15,7 +15,18 @@ import 'dart:async';
 import 'platform_failure.dart';
 
 /// OS 媒体会话派发的统一命令。
-enum MediaCommand { play, pause, toggle, stop, next, previous }
+enum MediaCommand {
+  play,
+  pause,
+  toggle,
+  stop,
+  next,
+  previous,
+  // 音量键（ArchoeraOS 会话 / 部分桌面媒体会话会派发）
+  volumeUp,
+  volumeDown,
+  volumeMute,
+}
 
 /// 媒体命令（含参数命令：seek）。
 sealed class MediaEvent {

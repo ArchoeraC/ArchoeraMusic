@@ -118,6 +118,10 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_MEDIA_SEEK         (1u << 3)   /* 系统 UI 可拖进度条 */
 #define APL_CAP_MEDIA_ARTWORK      (1u << 4)
 #define APL_CAP_WINDOW_STATE       (1u << 5)   /* 窗口最小化/失焦事件 */
+#define APL_CAP_APP_INSTANCE       (1u << 6)   /* 单实例仲裁（文件锁） */
+#define APL_CAP_SYSTEM_ACCENT      (1u << 7)   /* 系统主题色（DE accent） */
+#define APL_CAP_SYSTEM_THEME       (1u << 8)   /* 系统深浅色（light/dark） */
+#define APL_CAP_OS_SESSION         (1u << 9)   /* ArchoeraOS 合成器会话（archoera_shell_v1；仅 Linux/Wayland） */
 ```
 
 ### 3.2 字符串与元数据（零 JSON）
@@ -202,11 +206,21 @@ typedef enum {
     APL_EVENT_SCREEN_STATE  = 3,  /* u.screen：active */
     APL_EVENT_WINDOW_STATE  = 4,  /* u.window：minimized / focused（即时布尔快照） */
     APL_EVENT_BACKEND_STATE = 5,  /* u.backend：lost（后端断连，Dart 显式告警 + Noop 回落） */
-    APL_EVENT_SYSTEM_ACCENT = 6,  /* 主题色变更（无载荷；收到后重读 apl_system_accent 去重） */
+    APL_EVENT_SYSTEM_ACCENT = 6,  /* 主题色变更（u.accent：r/g/b 0-255） */
+    APL_EVENT_SYSTEM_THEME  = 7,  /* 系统深浅色（u.theme.dark：1=深色） */
+    /* ArchoeraOS 会话（archoera_shell_v1）*/
+    APL_EVENT_OS_CAPABILITIES = 8,  /* u.os_caps.caps：会话能力位 */
+    APL_EVENT_OS_BRIGHTNESS   = 9,  /* u.os_value.value：亮度 0-100 */
+    APL_EVENT_OS_VOLUME       = 10, /* u.os_value.value：会话音量 0-100 */
+    APL_EVENT_OS_BATTERY      = 11, /* u.os_battery：present/percent/charging */
+    APL_EVENT_OS_SESSION      = 12, /* u.os_session.state：1=ready 2=shutting_down 3=suspending */
+    APL_EVENT_OS_SCREEN       = 13, /* u.os_screen.screen：1=亮 0=熄 */
+    APL_EVENT_OS_POWER_KEY    = 14, /* u.os_power_key.key：0=power 1=sleep 2=suspend */
 } AplEventType;
 
 typedef enum { APL_CMD_PLAY=0, APL_CMD_PAUSE, APL_CMD_TOGGLE, APL_CMD_STOP,
-               APL_CMD_NEXT, APL_CMD_PREV } AplCommand;
+               APL_CMD_NEXT, APL_CMD_PREV,
+               APL_CMD_VOLUME_UP=6, APL_CMD_VOLUME_DOWN, APL_CMD_VOLUME_MUTE } AplCommand;
 
 typedef struct AplEvent {
     int32_t type;
@@ -217,6 +231,14 @@ typedef struct AplEvent {
         int32_t active;                 /* SCREEN_STATE */
         struct { int32_t minimized; int32_t focused; } window;
         int32_t backend_lost;           /* BACKEND_STATE：1=断连 */
+        struct { int32_t r; int32_t g; int32_t b; } accent;
+        struct { int32_t dark; } theme;
+        struct { int32_t caps; } os_caps;       /* OS_CAPABILITIES */
+        struct { int32_t value; } os_value;     /* OS_BRIGHTNESS / OS_VOLUME */
+        struct { int32_t present; int32_t percent; int32_t charging; } os_battery;
+        struct { int32_t state; } os_session;
+        struct { int32_t screen; } os_screen;
+        struct { int32_t key; } os_power_key;
     } u;
 } AplEvent;
 
@@ -250,6 +272,41 @@ int32_t apl_system_accent_set_events(int32_t on);
 
 能力位 `APL_CAP_SYSTEM_ACCENT`（1<<7）。事件只表示“可能已变”，Dart
 （`systemAccentProvider`，StreamProvider）收到后重读并**按颜色去重**。
+
+### 3.8 ArchoeraOS 会话（`archoera_shell_v1`，仅 Linux/Wayland）
+
+运行于自研 kiosk 合成器 `archoera-shell` 下时，桥接以**第二条 Wayland 连接**绑定
+合成器的自定义全局对象，接住「播放器即系统」所需的会话控制面。实现见
+`src/os_session_linux.cpp` / `src/os_session.h`；协议定义见
+`os/protocol/archoera-shell-v1.xml`（version 2）。
+
+```c
+/* 订阅/退订会话事件（媒体键复用 APL_EVENT_MEDIA_COMMAND）；订阅成功时合成器
+   立即下发当前状态（能力位/亮度/音量/电池/会话/屏幕）。 */
+int32_t apl_os_set_events(int32_t on);
+
+int32_t apl_os_set_brightness(int32_t percent);   /* 0-100，越界由合成器夹取 */
+int32_t apl_os_set_volume(int32_t percent);       /* 0-100（合成器只做镜像） */
+int32_t apl_os_set_screen_enabled(int32_t on);    /* DPMS，仅 udev 后端置 screen 能力 */
+int32_t apl_os_power_off(void);
+int32_t apl_os_reboot(void);
+int32_t apl_os_suspend(void);
+int32_t apl_os_hibernate(void);
+```
+
+要点：
+
+- **零新增链接依赖**：`libwayland-client` 经 `dlopen` 使用（同 GTK 处理），协议接口
+  按 XML 手写映射，因此打包/CI 无需声明 wayland 依赖；
+- **线程模型**：专用泵线程独占 Wayland 调用（`wl_display_prepare_read` + poll +
+  eventfd 唤醒），Dart 线程只入队请求，规避 libwayland 的线程安全约束；
+- **探测与订阅分离**：`apl_init` 仅连接一次探测全局是否存在（决定 `OS_SESSION`
+  能力位），真正订阅在 `apl_os_set_events(true)`（此时 Dart 已订阅事件流，初始状态
+  不会丢）；
+- 未运行于 `archoera-shell`（普通桌面）时不置能力位，工厂注入 `NoopSystemOsSession`，
+  静默降级。
+- Dart 侧契约 `system_os.dart` / `ffi_system_os.dart`；宿主 `os_session.dart`
+  负责「关机/挂起前暂停播放」与「播放器音量 → 合成器镜像」。
 
 ## 4. 各平台实现要点
 

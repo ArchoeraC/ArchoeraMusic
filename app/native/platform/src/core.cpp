@@ -4,6 +4,7 @@
 
 #include "core.h"
 
+#include <atomic>
 #include <mutex>
 
 namespace archoera {
@@ -14,10 +15,13 @@ bool g_initialized = false;
 AplEventCallback g_callback = nullptr;
 void* g_user_data = nullptr;
 
-// 进程级事件槽：回调可能是异步 NativeCallable.listener，Dart 稍后读取指针，
-// 若指向栈内存届时已失效。事件低速率，覆盖竞争可接受（至多读到更新的一条，
-// 绝不读垃圾）。
-AplEvent g_event_slot{};
+// 进程级事件槽**环形数组**：回调可能是异步 NativeCallable.listener，Dart 稍后读取
+// 指针，若指向栈内存届时已失效；单个槽又会在初值突发（capabilities/亮度/音量/
+// 电池/会话一次性下发）时互相覆盖。环形槽保证同一突发的每条事件各占一个槽，
+// Dart 读到的是各自的值（极端积压时最多读到较新的一条，绝不读垃圾）。
+constexpr size_t kEventSlots = 64;
+AplEvent g_event_slots[kEventSlots]{};
+std::atomic<uint32_t> g_event_slot_next{0};
 
 }  // namespace
 
@@ -40,14 +44,18 @@ void setEventCallback(AplEventCallback cb, void* user_data) {
 void dispatch(const AplEvent& event) {
     AplEventCallback cb;
     void* user;
+    AplEvent* slot;
     {
         std::lock_guard<std::mutex> lock(g_mutex);
-        g_event_slot = event;
+        const uint32_t index =
+            g_event_slot_next.fetch_add(1, std::memory_order_relaxed) % kEventSlots;
+        slot = &g_event_slots[index];
+        *slot = event;
         cb = g_callback;
         user = g_user_data;
     }
     if (cb == nullptr) return;
-    cb(&g_event_slot, user);
+    cb(slot, user);
 }
 
 AplEvent makeCommand(int32_t command) {
@@ -100,6 +108,57 @@ AplEvent makeSystemTheme(bool dark) {
     AplEvent e{};
     e.type = APL_EVENT_SYSTEM_THEME;
     e.u.theme.dark = dark ? 1 : 0;
+    return e;
+}
+
+AplEvent makeOsCapabilities(uint32_t caps) {
+    AplEvent e{};
+    e.type = APL_EVENT_OS_CAPABILITIES;
+    e.u.os_caps.caps = static_cast<int32_t>(caps);
+    return e;
+}
+
+AplEvent makeOsBrightness(int32_t percent) {
+    AplEvent e{};
+    e.type = APL_EVENT_OS_BRIGHTNESS;
+    e.u.os_value.value = percent;
+    return e;
+}
+
+AplEvent makeOsVolume(int32_t percent) {
+    AplEvent e{};
+    e.type = APL_EVENT_OS_VOLUME;
+    e.u.os_value.value = percent;
+    return e;
+}
+
+AplEvent makeOsBattery(int32_t present, int32_t percent, int32_t charging) {
+    AplEvent e{};
+    e.type = APL_EVENT_OS_BATTERY;
+    e.u.os_battery.present = present;
+    e.u.os_battery.percent = percent;
+    e.u.os_battery.charging = charging;
+    return e;
+}
+
+AplEvent makeOsSession(int32_t state) {
+    AplEvent e{};
+    e.type = APL_EVENT_OS_SESSION;
+    e.u.os_session.state = state;
+    return e;
+}
+
+AplEvent makeOsScreen(bool enabled) {
+    AplEvent e{};
+    e.type = APL_EVENT_OS_SCREEN;
+    e.u.os_screen.screen = enabled ? 1 : 0;
+    return e;
+}
+
+AplEvent makeOsPowerKey(int32_t key) {
+    AplEvent e{};
+    e.type = APL_EVENT_OS_POWER_KEY;
+    e.u.os_power_key.key = key;
     return e;
 }
 

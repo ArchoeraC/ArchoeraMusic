@@ -36,6 +36,17 @@ int32_t systemAccentSetEvents(bool on);
 // 订阅系统深浅色（平台推送：订阅即推当前值，之后推变化）。
 int32_t systemThemeSetEvents(bool on);
 
+// ── ArchoeraOS 会话（archoera_shell_v1；仅 Linux/Wayland 实现，其余平台返回
+// ERR_UNSUPPORTED 且不置 CAP_OS_SESSION 能力位）────────────────────
+int32_t osSessionSetEvents(int32_t on);
+int32_t osSessionSetBrightness(int32_t percent);
+int32_t osSessionSetVolume(int32_t percent);
+int32_t osSessionSetScreenEnabled(int32_t on);
+int32_t osSessionPowerOff();
+int32_t osSessionReboot();
+int32_t osSessionSuspend();
+int32_t osSessionHibernate();
+
 int32_t notify(const char* title, const char* body);
 
 }  // namespace archoera

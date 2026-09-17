@@ -96,6 +96,47 @@ int32_t apl_system_theme_set_events(int32_t on) {
     return archoera::systemThemeSetEvents(on != 0);
 }
 
+/* ── ArchoeraOS 会话 ── */
+int32_t apl_os_set_events(int32_t on) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionSetEvents(on);
+}
+
+int32_t apl_os_set_brightness(int32_t percent) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionSetBrightness(percent);
+}
+
+int32_t apl_os_set_volume(int32_t percent) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionSetVolume(percent);
+}
+
+int32_t apl_os_set_screen_enabled(int32_t on) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionSetScreenEnabled(on);
+}
+
+int32_t apl_os_power_off(void) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionPowerOff();
+}
+
+int32_t apl_os_reboot(void) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionReboot();
+}
+
+int32_t apl_os_suspend(void) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionSuspend();
+}
+
+int32_t apl_os_hibernate(void) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionHibernate();
+}
+
 int32_t apl_notify(const char* title, const char* body) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     if (title == nullptr) return archoera::ERR_BACKEND;

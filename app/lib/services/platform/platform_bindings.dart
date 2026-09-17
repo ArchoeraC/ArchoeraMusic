@@ -38,6 +38,7 @@ const int aplCapWindowState = 1 << 5;
 const int aplCapAppInstance = 1 << 6;
 const int aplCapSystemAccent = 1 << 7;
 const int aplCapSystemTheme = 1 << 8;
+const int aplCapOsSession = 1 << 9;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -46,6 +47,13 @@ const int aplEventWindowState = 4;
 const int aplEventBackendState = 5;
 const int aplEventSystemAccent = 6;
 const int aplEventSystemTheme = 7;
+const int aplEventOsCapabilities = 8;
+const int aplEventOsBrightness = 9;
+const int aplEventOsVolume = 10;
+const int aplEventOsBattery = 11;
+const int aplEventOsSession = 12;
+const int aplEventOsScreen = 13;
+const int aplEventOsPowerKey = 14;
 
 const int aplAbiVersion = 1;
 
@@ -106,6 +114,18 @@ final class AplThemePayload extends Struct {
   external int dark;
 }
 
+/// ArchoeraOS 会话电池事件负载（present/percent/charging）。
+final class AplOsBatteryPayload extends Struct {
+  @Int32()
+  external int present;
+
+  @Int32()
+  external int percent;
+
+  @Int32()
+  external int charging;
+}
+
 final class AplEventPayload extends Union {
   @Int32()
   external int command;
@@ -123,6 +143,29 @@ final class AplEventPayload extends Union {
   external AplAccentPayload accent;
 
   external AplThemePayload theme;
+
+  /// ArchoeraOS 会话：capabilities 位图。
+  @Int32()
+  external int osCaps;
+
+  /// ArchoeraOS 会话：brightness / volume 百分比（0-100）。
+  @Int32()
+  external int osValue;
+
+  /// ArchoeraOS 会话：电池。
+  external AplOsBatteryPayload osBattery;
+
+  /// ArchoeraOS 会话：1=ready 2=shutting_down 3=suspending。
+  @Int32()
+  external int osSession;
+
+  /// ArchoeraOS 会话：屏幕开关（1=亮 0=熄）。
+  @Int32()
+  external int osScreen;
+
+  /// ArchoeraOS 会话：电源键（0=power 1=sleep 2=suspend）。
+  @Int32()
+  external int osPowerKey;
 }
 
 final class AplEventFfi extends Struct {
@@ -146,18 +189,33 @@ typedef _AplPowerScreenC = Int32 Function(Int32 on);
 typedef _AplWindowEventsC = Int32 Function(Int32 on);
 typedef _AplInstanceAcquireC = Int32 Function();
 typedef _AplNotifyC = Int32 Function(Pointer<Utf8> title, Pointer<Utf8> body);
-typedef _AplSystemAccentC = Int32 Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
+typedef _AplSystemAccentC =
+    Int32 Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsC = Int32 Function(Int32 on);
 typedef _AplSystemThemeSetEventsC = Int32 Function(Int32 on);
+typedef _AplOsSetEventsC = Int32 Function(Int32 on);
+typedef _AplOsSetPercentC = Int32 Function(Int32 percent);
+typedef _AplOsSetScreenC = Int32 Function(Int32 on);
+typedef _AplOsVoidC = Int32 Function();
 typedef _AplMediaTrackC = Int32 Function(Pointer<AplTrackMetaFfi> track);
-typedef _AplMediaPlaybackC = Int32 Function(
-    Int32 state, Int64 positionMs, Double speed, Double volume, Int32 loop, Int32 shuffle);
+typedef _AplMediaPlaybackC =
+    Int32 Function(
+      Int32 state,
+      Int64 positionMs,
+      Double speed,
+      Double volume,
+      Int32 loop,
+      Int32 shuffle,
+    );
 typedef _AplMediaWindowC = Int32 Function(Int64 window);
-typedef _SetEventCallbackC = Int32 Function(
-    Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
+typedef _SetEventCallbackC =
+    Int32 Function(
+      Pointer<NativeFunction<AplEventCallbackC>>,
+      Pointer<Void> userData,
+    );
 
-typedef AplEventCallbackC = Void Function(
-    Pointer<AplEventFfi> event, Pointer<Void> userData);
+typedef AplEventCallbackC =
+    Void Function(Pointer<AplEventFfi> event, Pointer<Void> userData);
 
 typedef _AplVersionD = int Function();
 typedef _AplInitD = int Function();
@@ -168,15 +226,30 @@ typedef _AplPowerScreenD = int Function(int on);
 typedef _AplWindowEventsD = int Function(int on);
 typedef _AplInstanceAcquireD = int Function();
 typedef _AplNotifyD = int Function(Pointer<Utf8> title, Pointer<Utf8> body);
-typedef _AplSystemAccentD = int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
+typedef _AplSystemAccentD =
+    int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsD = int Function(int on);
 typedef _AplSystemThemeSetEventsD = int Function(int on);
+typedef _AplOsSetEventsD = int Function(int on);
+typedef _AplOsSetPercentD = int Function(int percent);
+typedef _AplOsSetScreenD = int Function(int on);
+typedef _AplOsVoidD = int Function();
 typedef _AplMediaTrackD = int Function(Pointer<AplTrackMetaFfi> track);
-typedef _AplMediaPlaybackD = int Function(
-    int state, int positionMs, double speed, double volume, int loop, int shuffle);
+typedef _AplMediaPlaybackD =
+    int Function(
+      int state,
+      int positionMs,
+      double speed,
+      double volume,
+      int loop,
+      int shuffle,
+    );
 typedef _AplMediaWindowD = int Function(int window);
-typedef _SetEventCallbackD = int Function(
-    Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
+typedef _SetEventCallbackD =
+    int Function(
+      Pointer<NativeFunction<AplEventCallbackC>>,
+      Pointer<Void> userData,
+    );
 
 // ── 绑定 ───────────────────────────────────────────────────────────
 
@@ -226,39 +299,150 @@ final class AplThemeEvent extends AplNativeEvent {
   final bool dark;
 }
 
+/// ArchoeraOS 会话：能力位图（与 archoera_shell_v1 capability 位一致）。
+final class AplOsCapabilitiesEvent extends AplNativeEvent {
+  const AplOsCapabilitiesEvent(this.caps);
+  final int caps;
+}
+
+/// ArchoeraOS 会话：亮度百分比（0-100）。
+final class AplOsBrightnessEvent extends AplNativeEvent {
+  const AplOsBrightnessEvent(this.percent);
+  final int percent;
+}
+
+/// ArchoeraOS 会话：音量百分比（0-100，合成器镜像）。
+final class AplOsVolumeEvent extends AplNativeEvent {
+  const AplOsVolumeEvent(this.percent);
+  final int percent;
+}
+
+/// ArchoeraOS 会话：电池状态。
+final class AplOsBatteryEvent extends AplNativeEvent {
+  const AplOsBatteryEvent({
+    required this.present,
+    required this.percent,
+    required this.charging,
+  });
+
+  final bool present;
+  final int percent;
+  final bool charging;
+}
+
+/// ArchoeraOS 会话：会话态（1=ready 2=shutting_down 3=suspending）。
+final class AplOsSessionEvent extends AplNativeEvent {
+  const AplOsSessionEvent(this.state);
+  final int state;
+}
+
+/// ArchoeraOS 会话：屏幕开关（DPMS）。
+final class AplOsScreenEvent extends AplNativeEvent {
+  const AplOsScreenEvent(this.enabled);
+  final bool enabled;
+}
+
+/// ArchoeraOS 会话：电源键（0=power 1=sleep 2=suspend）。
+final class AplOsPowerKeyEvent extends AplNativeEvent {
+  const AplOsPowerKeyEvent(this.key);
+  final int key;
+}
+
 /// libarchoera_platform 绑定（进程级单例，[tryLoad] 失败返回 null → Noop）。
 class PlatformBindings {
   PlatformBindings._(DynamicLibrary lib)
-      : _version = lib.lookupFunction<_AplVersionC, _AplVersionD>('apl_abi_version'),
-        _init = lib.lookupFunction<_AplInitC, _AplInitD>('apl_init'),
-        _shutdown = lib.lookupFunction<_AplShutdownC, _AplShutdownD>('apl_shutdown'),
-        _caps = lib.lookupFunction<_AplCapsC, _AplCapsD>('apl_capabilities'),
-        _powerInhibit =
-            lib.lookupFunction<_AplPowerInhibitC, _AplPowerInhibitD>('apl_power_set_sleep_inhibit'),
-        _powerScreen =
-            lib.lookupFunction<_AplPowerScreenC, _AplPowerScreenD>('apl_power_set_screen_events'),
-        _windowEvents =
-            lib.lookupFunction<_AplWindowEventsC, _AplWindowEventsD>('apl_window_set_events'),
-        _instanceAcquire =
-            lib.lookupFunction<_AplInstanceAcquireC, _AplInstanceAcquireD>('apl_instance_acquire'),
-        _notify = lib.lookupFunction<_AplNotifyC, _AplNotifyD>('apl_notify'),
-        _systemAccent = lib
-            .lookupFunction<_AplSystemAccentC, _AplSystemAccentD>('apl_system_accent'),
-        _systemAccentSetEvents = lib.lookupFunction<_AplSystemAccentSetEventsC,
-            _AplSystemAccentSetEventsD>('apl_system_accent_set_events'),
-        _systemThemeSetEvents = lib.lookupFunction<_AplSystemThemeSetEventsC,
-            _AplSystemThemeSetEventsD>('apl_system_theme_set_events'),
-        _mediaTrack =
-            lib.lookupFunction<_AplMediaTrackC, _AplMediaTrackD>('apl_media_set_track'),
-        _mediaPlayback =
-            lib.lookupFunction<_AplMediaPlaybackC, _AplMediaPlaybackD>('apl_media_set_playback'),
-        _mediaWindow =
-            lib.lookupFunction<_AplMediaWindowC, _AplMediaWindowD>('apl_media_set_window'),
-        _setCallback = lib
-            .lookupFunction<_SetEventCallbackC, _SetEventCallbackD>('apl_set_event_callback') {
+    : _version = lib.lookupFunction<_AplVersionC, _AplVersionD>(
+        'apl_abi_version',
+      ),
+      _init = lib.lookupFunction<_AplInitC, _AplInitD>('apl_init'),
+      _shutdown = lib.lookupFunction<_AplShutdownC, _AplShutdownD>(
+        'apl_shutdown',
+      ),
+      _caps = lib.lookupFunction<_AplCapsC, _AplCapsD>('apl_capabilities'),
+      _powerInhibit = lib.lookupFunction<_AplPowerInhibitC, _AplPowerInhibitD>(
+        'apl_power_set_sleep_inhibit',
+      ),
+      _powerScreen = lib.lookupFunction<_AplPowerScreenC, _AplPowerScreenD>(
+        'apl_power_set_screen_events',
+      ),
+      _windowEvents = lib.lookupFunction<_AplWindowEventsC, _AplWindowEventsD>(
+        'apl_window_set_events',
+      ),
+      _instanceAcquire = lib
+          .lookupFunction<_AplInstanceAcquireC, _AplInstanceAcquireD>(
+            'apl_instance_acquire',
+          ),
+      _notify = lib.lookupFunction<_AplNotifyC, _AplNotifyD>('apl_notify'),
+      _systemAccent = lib.lookupFunction<_AplSystemAccentC, _AplSystemAccentD>(
+        'apl_system_accent',
+      ),
+      _systemAccentSetEvents = lib
+          .lookupFunction<
+            _AplSystemAccentSetEventsC,
+            _AplSystemAccentSetEventsD
+          >('apl_system_accent_set_events'),
+      _systemThemeSetEvents = lib
+          .lookupFunction<_AplSystemThemeSetEventsC, _AplSystemThemeSetEventsD>(
+            'apl_system_theme_set_events',
+          ),
+      _mediaTrack = lib.lookupFunction<_AplMediaTrackC, _AplMediaTrackD>(
+        'apl_media_set_track',
+      ),
+      _mediaPlayback = lib
+          .lookupFunction<_AplMediaPlaybackC, _AplMediaPlaybackD>(
+            'apl_media_set_playback',
+          ),
+      _mediaWindow = lib.lookupFunction<_AplMediaWindowC, _AplMediaWindowD>(
+        'apl_media_set_window',
+      ),
+      // ArchoeraOS 会话符号：可选（旧版桥接缺失时应整体降级为 Noop，而非拖垮桥接）
+      _osSetEvents = _try(
+        () => lib.lookupFunction<_AplOsSetEventsC, _AplOsSetEventsD>(
+          'apl_os_set_events',
+        ),
+      ),
+      _osSetBrightness = _try(
+        () => lib.lookupFunction<_AplOsSetPercentC, _AplOsSetPercentD>(
+          'apl_os_set_brightness',
+        ),
+      ),
+      _osSetVolume = _try(
+        () => lib.lookupFunction<_AplOsSetPercentC, _AplOsSetPercentD>(
+          'apl_os_set_volume',
+        ),
+      ),
+      _osSetScreen = _try(
+        () => lib.lookupFunction<_AplOsSetScreenC, _AplOsSetScreenD>(
+          'apl_os_set_screen_enabled',
+        ),
+      ),
+      _osPowerOff = _try(
+        () => lib.lookupFunction<_AplOsVoidC, _AplOsVoidD>('apl_os_power_off'),
+      ),
+      _osReboot = _try(
+        () => lib.lookupFunction<_AplOsVoidC, _AplOsVoidD>('apl_os_reboot'),
+      ),
+      _osSuspend = _try(
+        () => lib.lookupFunction<_AplOsVoidC, _AplOsVoidD>('apl_os_suspend'),
+      ),
+      _osHibernate = _try(
+        () => lib.lookupFunction<_AplOsVoidC, _AplOsVoidD>('apl_os_hibernate'),
+      ),
+      _setCallback = lib.lookupFunction<_SetEventCallbackC, _SetEventCallbackD>(
+        'apl_set_event_callback',
+      ) {
     // 事件回调：listener 可从任意 OS 线程触发，事件按到达序进入 Dart 端口
     _eventCallable = NativeCallable<AplEventCallbackC>.listener(_onNativeEvent);
     _setCallback(_eventCallable.nativeFunction, nullptr);
+  }
+
+  /// 查询可选符号，缺失（旧版桥接）返回 null 以优雅降级。
+  static T? _try<T>(T Function() lookup) {
+    try {
+      return lookup();
+    } catch (_) {
+      return null;
+    }
   }
 
   static PlatformBindings? _instance;
@@ -283,6 +467,14 @@ class PlatformBindings {
   final _AplMediaPlaybackD _mediaPlayback;
   final _AplMediaWindowD _mediaWindow;
   final _SetEventCallbackD _setCallback;
+  final _AplOsSetEventsD? _osSetEvents;
+  final _AplOsSetPercentD? _osSetBrightness;
+  final _AplOsSetPercentD? _osSetVolume;
+  final _AplOsSetScreenD? _osSetScreen;
+  final _AplOsVoidD? _osPowerOff;
+  final _AplOsVoidD? _osReboot;
+  final _AplOsVoidD? _osSuspend;
+  final _AplOsVoidD? _osHibernate;
 
   // 四类事件广播流（ffi_* 实现订阅转译）
   final _commandCtrl = StreamController<MediaCommandEvent>.broadcast();
@@ -292,6 +484,30 @@ class PlatformBindings {
   final _backendCtrl = StreamController<AplBackendEvent>.broadcast();
   final _accentCtrl = StreamController<AplAccentEvent>.broadcast();
   final _themeCtrl = StreamController<AplThemeEvent>.broadcast();
+  final _osCapsCtrl = StreamController<AplOsCapabilitiesEvent>.broadcast();
+  final _osBrightnessCtrl = StreamController<AplOsBrightnessEvent>.broadcast();
+  final _osVolumeCtrl = StreamController<AplOsVolumeEvent>.broadcast();
+  final _osBatteryCtrl = StreamController<AplOsBatteryEvent>.broadcast();
+  final _osSessionCtrl = StreamController<AplOsSessionEvent>.broadcast();
+  final _osScreenCtrl = StreamController<AplOsScreenEvent>.broadcast();
+  final _osPowerKeyCtrl = StreamController<AplOsPowerKeyEvent>.broadcast();
+
+  /// ArchoeraOS 会话函数是否可用（桥接提供且非旧版）。
+  bool get osSessionSymbolsAvailable => _osSetEvents != null;
+
+  // ── ArchoeraOS 会话正向调用（符号缺失返回 UNSUPPORTED）──
+  int osSetEvents(bool on) =>
+      _osSetEvents?.call(on ? 1 : 0) ?? aplErrUnsupported;
+  int osSetBrightness(int percent) =>
+      _osSetBrightness?.call(percent) ?? aplErrUnsupported;
+  int osSetVolume(int percent) =>
+      _osSetVolume?.call(percent) ?? aplErrUnsupported;
+  int osSetScreenEnabled(bool on) =>
+      _osSetScreen?.call(on ? 1 : 0) ?? aplErrUnsupported;
+  int osPowerOff() => _osPowerOff?.call() ?? aplErrUnsupported;
+  int osReboot() => _osReboot?.call() ?? aplErrUnsupported;
+  int osSuspend() => _osSuspend?.call() ?? aplErrUnsupported;
+  int osHibernate() => _osHibernate?.call() ?? aplErrUnsupported;
 
   /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
   int acquireInstance() => _instanceAcquire();
@@ -355,45 +571,88 @@ class PlatformBindings {
   Stream<AplBackendEvent> get backendEvents => _backendCtrl.stream;
   Stream<AplAccentEvent> get accentEvents => _accentCtrl.stream;
   Stream<AplThemeEvent> get themeEvents => _themeCtrl.stream;
+  Stream<AplOsCapabilitiesEvent> get osCapabilitiesEvents => _osCapsCtrl.stream;
+  Stream<AplOsBrightnessEvent> get osBrightnessEvents =>
+      _osBrightnessCtrl.stream;
+  Stream<AplOsVolumeEvent> get osVolumeEvents => _osVolumeCtrl.stream;
+  Stream<AplOsBatteryEvent> get osBatteryEvents => _osBatteryCtrl.stream;
+  Stream<AplOsSessionEvent> get osSessionEvents => _osSessionCtrl.stream;
+  Stream<AplOsScreenEvent> get osScreenEvents => _osScreenCtrl.stream;
+  Stream<AplOsPowerKeyEvent> get osPowerKeyEvents => _osPowerKeyCtrl.stream;
 
   /// 栈上指针仅在回调期间有效——同步取值后立即投递。
-  static void _onNativeEvent(Pointer<AplEventFfi> event, Pointer<Void> userData) {
+  static void _onNativeEvent(
+    Pointer<AplEventFfi> event,
+    Pointer<Void> userData,
+  ) {
     final b = _instance;
     if (b == null || event == nullptr) return;
     final ref = event.ref;
     switch (ref.type) {
       case aplEventMediaCommand:
-        b._commandCtrl.add(MediaCommandEvent(_commandFromNative(ref.u.command)));
+        b._commandCtrl.add(
+          MediaCommandEvent(_commandFromNative(ref.u.command)),
+        );
       case aplEventMediaSeek:
-        b._seekCtrl.add(AplSeekEvent(relMs: ref.u.seek.relMs, absMs: ref.u.seek.absMs));
+        b._seekCtrl.add(
+          AplSeekEvent(relMs: ref.u.seek.relMs, absMs: ref.u.seek.absMs),
+        );
       case aplEventScreenState:
         b._screenCtrl.add(AplScreenEvent(ref.u.active != 0));
       case aplEventWindowState:
-        b._windowCtrl.add(AplWindowEvent(
-          minimized: ref.u.window.minimized != 0,
-          focused: ref.u.window.focused != 0,
-        ));
+        b._windowCtrl.add(
+          AplWindowEvent(
+            minimized: ref.u.window.minimized != 0,
+            focused: ref.u.window.focused != 0,
+          ),
+        );
       case aplEventBackendState:
         b._backendCtrl.add(AplBackendEvent(ref.u.backendLost != 0));
       case aplEventSystemAccent:
-        b._accentCtrl.add(AplAccentEvent(
-          r: ref.u.accent.r,
-          g: ref.u.accent.g,
-          b: ref.u.accent.b,
-        ));
+        b._accentCtrl.add(
+          AplAccentEvent(
+            r: ref.u.accent.r,
+            g: ref.u.accent.g,
+            b: ref.u.accent.b,
+          ),
+        );
       case aplEventSystemTheme:
         b._themeCtrl.add(AplThemeEvent(ref.u.theme.dark != 0));
+      case aplEventOsCapabilities:
+        b._osCapsCtrl.add(AplOsCapabilitiesEvent(ref.u.osCaps));
+      case aplEventOsBrightness:
+        b._osBrightnessCtrl.add(AplOsBrightnessEvent(ref.u.osValue));
+      case aplEventOsVolume:
+        b._osVolumeCtrl.add(AplOsVolumeEvent(ref.u.osValue));
+      case aplEventOsBattery:
+        b._osBatteryCtrl.add(
+          AplOsBatteryEvent(
+            present: ref.u.osBattery.present != 0,
+            percent: ref.u.osBattery.percent,
+            charging: ref.u.osBattery.charging != 0,
+          ),
+        );
+      case aplEventOsSession:
+        b._osSessionCtrl.add(AplOsSessionEvent(ref.u.osSession));
+      case aplEventOsScreen:
+        b._osScreenCtrl.add(AplOsScreenEvent(ref.u.osScreen != 0));
+      case aplEventOsPowerKey:
+        b._osPowerKeyCtrl.add(AplOsPowerKeyEvent(ref.u.osPowerKey));
     }
   }
 
   static MediaCommand _commandFromNative(int raw) => switch (raw) {
-        0 => MediaCommand.play,
-        1 => MediaCommand.pause,
-        2 => MediaCommand.toggle,
-        3 => MediaCommand.stop,
-        4 => MediaCommand.next,
-        _ => MediaCommand.previous,
-      };
+    0 => MediaCommand.play,
+    1 => MediaCommand.pause,
+    2 => MediaCommand.toggle,
+    3 => MediaCommand.stop,
+    4 => MediaCommand.next,
+    5 => MediaCommand.previous,
+    6 => MediaCommand.volumeUp,
+    7 => MediaCommand.volumeDown,
+    8 => MediaCommand.volumeMute,
+    _ => MediaCommand.previous,
+  };
 
   // ── 正向调用 ──
 
@@ -405,13 +664,25 @@ class PlatformBindings {
 
   int setWindowEvents(bool on) => _windowEvents(on ? 1 : 0);
 
-  int setPlayback(int state, int positionMs, double speed, double volume, int loop, int shuffle) =>
-      _mediaPlayback(state, positionMs, speed, volume, loop, shuffle);
+  int setPlayback(
+    int state,
+    int positionMs,
+    double speed,
+    double volume,
+    int loop,
+    int shuffle,
+  ) => _mediaPlayback(state, positionMs, speed, volume, loop, shuffle);
 
   int setWindow(int window) => _mediaWindow(window);
 
   /// 拷贝曲目元数据到原生内存发起调用；调用同步返回后立即释放。
-  int setTrack(String? title, String? artist, String? album, int? durationMs, String? artUrl) {
+  int setTrack(
+    String? title,
+    String? artist,
+    String? album,
+    int? durationMs,
+    String? artUrl,
+  ) {
     if (title == null) return _mediaTrack(nullptr);
     final meta = calloc<AplTrackMetaFfi>();
     final pointers = <Pointer<Uint8>>[];
@@ -447,7 +718,11 @@ class PlatformBindings {
 
   /// 本地封面（file:// 或本地路径）→ 读文件字节填入 [view]（供原生内存流）；
   /// http(s) / 空 / 读取失败则置空（原生按 artUrl 处理）。
-  void _fillArtBytes(AplStringFfi view, String? artUrl, List<Pointer<Uint8>> sink) {
+  void _fillArtBytes(
+    AplStringFfi view,
+    String? artUrl,
+    List<Pointer<Uint8>> sink,
+  ) {
     view.data = nullptr;
     view.len = 0;
     if (artUrl == null || artUrl.isEmpty) return;
@@ -481,6 +756,15 @@ class PlatformBindings {
     _screenCtrl.close();
     _windowCtrl.close();
     _backendCtrl.close();
+    _accentCtrl.close();
+    _themeCtrl.close();
+    _osCapsCtrl.close();
+    _osBrightnessCtrl.close();
+    _osVolumeCtrl.close();
+    _osBatteryCtrl.close();
+    _osSessionCtrl.close();
+    _osScreenCtrl.close();
+    _osPowerKeyCtrl.close();
     _instance = null;
   }
 }

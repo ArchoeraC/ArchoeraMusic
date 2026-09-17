@@ -53,6 +53,7 @@ extern "C" {
 #define APL_CAP_APP_INSTANCE       (1u << 6) /* 单实例仲裁（文件锁） */
 #define APL_CAP_SYSTEM_ACCENT      (1u << 7) /* 系统主题色（DE accent） */
 #define APL_CAP_SYSTEM_THEME       (1u << 8) /* 系统深浅色（light/dark） */
+#define APL_CAP_OS_SESSION         (1u << 9) /* ArchoeraOS 合成器会话（archoera_shell_v1，仅 Wayland 且运行于 archoera-shell） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -94,6 +95,23 @@ APL_API int32_t apl_media_set_window(int64_t window);   /* HWND/NSWindow*；非�
 /* 单实例：1=首实例；0=已有实例（调用方应退出）；<0=错误。进程内幂等。 */
 APL_API int32_t apl_instance_acquire(void);
 
+/* ── ArchoeraOS 会话（archoera_shell_v1）─────────────────────────── */
+/* 仅当运行在 archoera-shell kiosk 会话下（Wayland socket 暴露该全局）时可用；
+ * 未接入时以下请求返回 APL_ERR_UNSUPPORTED，事件流为空。 */
+
+/* 订阅/退订会话事件（APL_EVENT_OS_* / 媒体键命令）。
+ * 订阅成功时合成器会立即下发当前会话状态（能力位/亮度/音量/电池/会话/屏幕）。 */
+APL_API int32_t apl_os_set_events(int32_t on);
+
+/* 请求（越界百分比由合成器夹取；无对应能力位时被静默忽略）。 */
+APL_API int32_t apl_os_set_brightness(int32_t percent);
+APL_API int32_t apl_os_set_volume(int32_t percent);
+APL_API int32_t apl_os_set_screen_enabled(int32_t on);
+APL_API int32_t apl_os_power_off(void);
+APL_API int32_t apl_os_reboot(void);
+APL_API int32_t apl_os_suspend(void);
+APL_API int32_t apl_os_hibernate(void);
+
 /* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
 APL_API int32_t apl_notify(const char *title, const char *body);
 
@@ -123,11 +141,20 @@ typedef enum {
     APL_EVENT_BACKEND_STATE = 5, /* u.backend_lost：1=后端断连 */
     APL_EVENT_SYSTEM_ACCENT = 6, /* 系统主题色（u.accent：r/g/b 0-255，平台推送） */
     APL_EVENT_SYSTEM_THEME  = 7, /* 系统深浅色（u.theme.dark：1=深色，平台推送） */
+    /* ── ArchoeraOS 会话（archoera_shell_v1）── */
+    APL_EVENT_OS_CAPABILITIES = 8,  /* u.os.caps：会话能力位（见 apl_os_* 注释） */
+    APL_EVENT_OS_BRIGHTNESS   = 9,  /* u.os.value：亮度 0-100 */
+    APL_EVENT_OS_VOLUME       = 10, /* u.os.value：会话音量 0-100 */
+    APL_EVENT_OS_BATTERY      = 11, /* u.os.battery：present/percent/charging */
+    APL_EVENT_OS_SESSION      = 12, /* u.os.session：1=ready 2=shutting_down 3=suspending */
+    APL_EVENT_OS_SCREEN       = 13, /* u.os.screen：1=亮屏 0=熄屏 */
+    APL_EVENT_OS_POWER_KEY    = 14, /* u.os.power_key：0=power 1=sleep 2=suspend */
 } AplEventType;
 
 typedef enum {
     APL_CMD_PLAY = 0, APL_CMD_PAUSE, APL_CMD_TOGGLE, APL_CMD_STOP,
     APL_CMD_NEXT, APL_CMD_PREV,
+    APL_CMD_VOLUME_UP = 6, APL_CMD_VOLUME_DOWN, APL_CMD_VOLUME_MUTE,
 } AplCommand;
 
 typedef struct AplEvent {
@@ -141,6 +168,13 @@ typedef struct AplEvent {
         int32_t backend_lost; /* BACKEND_STATE */
         struct { int32_t r; int32_t g; int32_t b; } accent; /* SYSTEM_ACCENT：0-255 */
         struct { int32_t dark; } theme; /* SYSTEM_THEME：1=深色 0=浅色 */
+        /* ── ArchoeraOS 会话 ── */
+        struct { int32_t caps; } os_caps;      /* OS_CAPABILITIES */
+        struct { int32_t value; } os_value;    /* OS_BRIGHTNESS / OS_VOLUME：0-100 */
+        struct { int32_t present; int32_t percent; int32_t charging; } os_battery;
+        struct { int32_t state; } os_session;  /* 1=ready 2=shutting_down 3=suspending */
+        struct { int32_t screen; } os_screen;  /* 1=亮屏 0=熄屏 */
+        struct { int32_t key; } os_power_key;  /* 0=power 1=sleep 2=suspend */
     } u;
 } AplEvent;
 

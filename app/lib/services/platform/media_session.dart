@@ -89,6 +89,12 @@ class _MediaSessionHostState extends ConsumerState<MediaSessionHost> {
             unawaited(n.playNext());
           case MediaCommand.previous:
             unawaited(n.playPrevious());
+          case MediaCommand.volumeUp:
+            unawaited(n.setVolume((s.volume + 0.05).clamp(0.0, 1.0)));
+          case MediaCommand.volumeDown:
+            unawaited(n.setVolume((s.volume - 0.05).clamp(0.0, 1.0)));
+          case MediaCommand.volumeMute:
+            unawaited(n.setVolume(s.volume > 0 ? 0.0 : 1.0));
         }
       case MediaSeekEvent(:final offsetMs):
         unawaited(n.seek(s.position + Duration(milliseconds: offsetMs)));

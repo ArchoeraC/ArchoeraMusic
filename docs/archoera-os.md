@@ -289,6 +289,18 @@ GTK 只能退化到软件绘制，而 Flutter Linux embedder 要求 GL，因此*
 GTK3 + EGL/Impeller 全屏渲染、dmabuf 导入与桌面方向均正确。踩到的坑：winit 后端的
 输出 transform 必须是 `Transform::Flipped180`，否则整个合成输出上下颠倒（见 §8）。
 
+**播放器侧接入（P4）**：`app/native/platform/src/os_session_linux.cpp` 以 `dlopen`
+的 `libwayland-client` 开第二条连接绑定 `archoera_shell_v1`，经 `apl_os_*` C ABI
+暴露给 Dart（`SystemOsSession` / `OsSessionHost`）：
+
+- 媒体键（含音量键）复用既有 `APL_EVENT_MEDIA_COMMAND` 通道 → 播放控制器；
+- 电源键 / 亮度 / 电池 / 会话态直接观察，`shutting_down` / `suspending` 前暂停播放；
+- 播放器音量变化镜像回合成器（`apl_os_set_volume`），系统侧状态一致；
+- 关机 / 重启 / 挂起 / 熄屏等请求由 UI 经 `PlatformCapabilities.os` 下发。
+
+协议请求-事件往返已端到端验证（`set_volume(42)` → 合成器状态 42 → `volume_changed(42)`
+回传）；硬件媒体键触发待真机。
+
 ---
 
 ## 11. 路线图
@@ -299,7 +311,7 @@ GTK3 + EGL/Impeller 全屏渲染、dmabuf 导入与桌面方向均正确。踩�
 | P1 | `linux-dmabuf`（winit v3 / udev v4 feedback），renderer 上提共享状态 | ✅ |
 | P2 | udev 后端（DRM/KMS + libinput + libseat），编译验证 | ✅（未上机） |
 | P3 | 会话接入：`ARCHOERA_SESSION_APP` 拉起 Flutter 播放器并验证全屏渲染 | ✅（嵌套已验，udev 待上机） |
-| P4 | 媒体键 / 电源键 / 音量键的端到端（libinput → 播放器） | ⬜（合成器侧事件已就绪） |
+| P4 | 媒体键 / 电源键 / 音量键的端到端（libinput → 播放器） | ✅（协议桥接已接入；硬件按键实测待上机） |
 | P5 | 开机即视：systemd 用户会话 / getty 自动登录 + 最小 rootfs 打包（独立层） | ⬜ |
 | P6 | 运行时不变量校验 / 签名水印 / 安全启动（复用现有发布与验签工具链） | ⬜ |
 

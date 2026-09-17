@@ -484,4 +484,14 @@ int32_t notify(const char* title, const char* body) {
     return OK;
 }
 
+// ArchoeraOS 会话：仅 Linux/Wayland 提供，其余平台恒不支持（能力位不置位）。
+int32_t osSessionSetEvents(int32_t) { return ERR_UNSUPPORTED; }
+int32_t osSessionSetBrightness(int32_t) { return ERR_UNSUPPORTED; }
+int32_t osSessionSetVolume(int32_t) { return ERR_UNSUPPORTED; }
+int32_t osSessionSetScreenEnabled(int32_t) { return ERR_UNSUPPORTED; }
+int32_t osSessionPowerOff() { return ERR_UNSUPPORTED; }
+int32_t osSessionReboot() { return ERR_UNSUPPORTED; }
+int32_t osSessionSuspend() { return ERR_UNSUPPORTED; }
+int32_t osSessionHibernate() { return ERR_UNSUPPORTED; }
+
 }  // namespace archoera

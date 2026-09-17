@@ -17,10 +17,12 @@ import 'dart:ui' show Color;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'ffi_system_media.dart';
+import 'ffi_system_os.dart';
 import 'ffi_system_power.dart';
 import 'ffi_system_window.dart';
 import 'platform_bindings.dart';
 import 'system_media.dart';
+import 'system_os.dart';
 import 'system_power.dart';
 import 'system_window.dart';
 
@@ -30,6 +32,7 @@ class PlatformCapabilities {
     required this.power,
     required this.media,
     required this.window,
+    required this.os,
     required this.caps,
   });
 
@@ -42,12 +45,16 @@ class PlatformCapabilities {
   final SystemMedia media;
   final SystemWindow window;
 
+  /// ArchoeraOS 合成器会话（未运行时为空实现）。
+  final SystemOsSession os;
+
   bool get powerInhibitAvailable => caps & aplCapPowerInhibit != 0;
   bool get screenStateAvailable => caps & aplCapPowerScreenState != 0;
   bool get mediaSessionAvailable => caps & aplCapMediaSession != 0;
   bool get windowStateAvailable => caps & aplCapWindowState != 0;
   bool get appInstanceAvailable => caps & aplCapAppInstance != 0;
   bool get systemAccentAvailable => caps & aplCapSystemAccent != 0;
+  bool get osSessionAvailable => caps & aplCapOsSession != 0;
   bool get bridgeLoaded => _bindings != null;
 
   /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
@@ -82,8 +89,9 @@ class PlatformCapabilities {
   /// 系统主题色**推送**流：桥接在订阅时立即推当前值，之后推变化
   /// （Dart 不主动查询）。桥接不可用时为空流。
   Stream<Color> get accentEvents =>
-      (_bindings?.accentEvents ?? const Stream.empty())
-          .map((e) => Color.fromARGB(255, e.r, e.g, e.b));
+      (_bindings?.accentEvents ?? const Stream.empty()).map(
+        (e) => Color.fromARGB(255, e.r, e.g, e.b),
+      );
 
   bool get systemThemeAvailable => caps & aplCapSystemTheme != 0;
 
@@ -125,6 +133,12 @@ class PlatformCapabilities {
       window: (b != null && caps & aplCapWindowState != 0)
           ? FfiSystemWindow(b)
           : NoopSystemWindow.instance,
+      os:
+          (b != null &&
+              caps & aplCapOsSession != 0 &&
+              b.osSessionSymbolsAvailable)
+          ? FfiSystemOsSession(b)
+          : NoopSystemOsSession.instance,
     );
     _instance = built;
     return built;
