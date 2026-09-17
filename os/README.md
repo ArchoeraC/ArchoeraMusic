@@ -8,10 +8,10 @@
 kiosk 合成器，让播放器以唯一一个全屏客户端构成系统 shell。
 
 > 状态：**可运行的嵌套原型 + 可编译的裸机后端**。合成器（`archoera-shell`）、自定义协议、
-> 控制面客户端（`archoera-control`）与冒烟客户端（`archoera-smoke`）均已在 WSLg 的
-> Wayland 会话中端到端验证通过；`zwp_linux_dmabuf_v1` 已注册（Flutter/GTK 的 EGL 前提）。
-> 裸机（DRM/KMS + libinput + libseat）后端已实现并**编译验证**，但因开发机无 `/dev/dri`，
-> **尚未在真实硬件上运行验证**。
+> 控制面客户端（`archoera-control`）与冒烟客户端（`archoera-smoke`）均已在嵌套 Wayland
+> 会话中端到端验证通过，并已在**真实 GPU**（Intel + NVIDIA）上托管 ArchoeraMusic：
+> 全屏 kiosk、`zwp_linux_dmabuf_v1` 导入与桌面方向全部正确。裸机（DRM/KMS + libinput +
+> libseat）后端已实现并**编译验证**，但为避免抢占桌面会话，**尚未在真实硬件上运行验证**。
 >
 > 本目录独立于 `app/`（Flutter 应用）与 `app/native/platform`（C++ 平台桥接）：
 > 它承载「把播放器变成系统」所需的用户会话层。设计文档见
@@ -193,8 +193,9 @@ archoera-control [--socket <name>] [命令]
   反馈；两者共用共享状态里的 `GlesRenderer`，`dmabuf_imported` 同步导入缓冲。
   渲染器不报告任何 dmabuf 格式时（纯软件渲染）会跳过注册，客户端自动回退 `wl_shm`。
   注：真实 GPU 上嵌套实测上报 236 个格式；WSLg/WSL2 下 dmabuf 分配仍受限。
-- **Flutter 端到端未验证**：需要能分配 dmabuf 的真实 GPU；`archoera-smoke`（`wl_shm`）
-  仅验证合成器客户端面渲染通路。
+- **Flutter 端到端已（嵌套）验证**：在真实 GPU 上托管 `ArchoeraMusic`，全屏 kiosk 渲染、
+  dmabuf 导入与桌面方向均正确。要点：winit 输出必须用 `Transform::Flipped180` 抵消
+  EGL 窗口表面的 Y 翻转，否则整个合成输出会上下颠倒（与 smithay `smallvil` 一致）。
 - **udev 后端未上机验证**：为避免抢占当前桌面会话（KDE Wayland 持有 DRM master /
   输入），开发期仍只做**编译验证**；真实上机请重点检查连接器枚举、模式选择、vblank 回收
   与热插拔。多 GPU **合成**（`MultiRenderer`）、DRM lease、同步对象（syncobj）未实现；

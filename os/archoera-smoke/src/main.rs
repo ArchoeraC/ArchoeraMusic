@@ -265,6 +265,7 @@ impl Smoke {
         };
 
         // 生成流动的 Archoera 配色渐变（暗底 + 青/紫光带）。
+        // 顶部红色条 + 左侧绿色条作为**方向标记**：便于在合成器里一眼判断是否上下翻转。
         let phase = self.phase;
         // 保留 `chunks_exact_mut`：`as_chunks` 需要 Rust 1.88，而本 workspace 声明 1.80+。
         #[allow(clippy::chunks_exact_to_as_chunks)]
@@ -272,7 +273,11 @@ impl Smoke {
             let x = (index % width as usize) as u32;
             let y = (index / width as usize) as u32;
             let wave = ((x + phase) / 24 + y / 24) % 2;
-            let (r, g, b) = if wave == 0 {
+            let (r, g, b) = if y < 6 {
+                (0xE0, 0x30, 0x30) // 顶边：红
+            } else if x < 6 {
+                (0x30, 0xE0, 0x60) // 左边：绿
+            } else if wave == 0 {
                 (0x0E, 0x11, 0x17)
             } else {
                 (0x2A, 0x9D, 0x8F)

@@ -1,7 +1,8 @@
 # ArchoeraOS：把播放器变成系统（ArchoeraOS Design）
 
 > 状态：**进行中（2026-09-17）**——嵌套原型端到端跑通（合成器 + 自定义协议 + 控制面 +
-> 冒烟客户端）；DRM/KMS 裸机后端与 `linux-dmabuf` 未实现。
+> 冒烟客户端），并已在真实 GPU 上托管 ArchoeraMusic：全屏 kiosk、`linux-dmabuf` 导入与
+> 桌面方向均正确。DRM/KMS 裸机后端已实现并**编译验证**，尚未上机。
 > 目标：在 x86_64 通用 PC / 虚拟机上，让 ArchoeraMusic **以全屏唯一客户端的形态成为
 > 整个系统界面**（kiosk 会话），而不是运行在某个桌面里的一个窗口。
 > 范围：用户会话层——Wayland 合成器、会话级控制协议、kiosk 策略；不含内核/驱动。
@@ -203,6 +204,8 @@ archoera-shell/src/
   `WinitGraphicsBackend` + `Output` + `OutputDamageTracker`；`UdevBackend` 持有
   `GlesRenderer` + `DrmOutputManager` + 每 CRTC 的 `DrmOutput`。对外只暴露
   `render(space)`，`ArchoeraShell::render_frame` 负责帧回调与清理。
+  winit 后端的输出 transform 固定为 **`Transform::Flipped180`**（抵消 EGL 窗口表面的
+  Y 翻转，与 smithay `smallvil` 一致）；用 `Normal` 会让整个合成输出上下颠倒。
 - **dmabuf**：renderer 由后端持有并可被 `DmabufHandler` 同步借用——winit 注册 v3、
   udev 注册 v4（`DmabufFeedbackBuilder`）。
 - 播放器自身的重渲染优化（着色器、损伤区、字形图集）见
@@ -278,10 +281,11 @@ GTK 只能退化到软件绘制，而 Flutter Linux embedder 要求 GL，因此*
 3. `impl DmabufHandler`（`handlers/dmabuf.rs`）：`dmabuf_imported` 内
    `renderer.import_dmabuf(&dmabuf, None)` 成功则 `notifier.successful::<State>()`，
    失败则 `notifier.failed()`；
-4. 渲染器不报告任何格式时**跳过注册**，客户端自动回退 `wl_shm`（WSLg 实测上报 114 个）。
+4. 渲染器不报告任何格式时**跳过注册**，客户端自动回退 `wl_shm`（真实 GPU 实测上报 236 个格式）。
 
-**仍未验证**：Flutter 的端到端 GL 渲染需要真实 GPU 上能分配/导入 dmabuf 的环境；
-`archoera-smoke` 只覆盖 `wl_shm` 路径。这是下一步（P3）的首要目标。
+**已验证（嵌套）**：在真实 GPU（Intel + NVIDIA）上以 winit 后端托管 `ArchoeraMusic`，
+GTK3 + EGL/Impeller 全屏渲染、dmabuf 导入与桌面方向均正确。踩到的坑：winit 后端的
+输出 transform 必须是 `Transform::Flipped180`，否则整个合成输出上下颠倒（见 §8）。
 
 ---
 
@@ -292,13 +296,15 @@ GTK 只能退化到软件绘制，而 Flutter Linux embedder 要求 GL，因此*
 | P0 | 嵌套合成器 + kiosk 策略 + 自定义协议 + 控制面 + 冒烟客户端 | ✅ |
 | P1 | `linux-dmabuf`（winit v3 / udev v4 feedback），renderer 上提共享状态 | ✅ |
 | P2 | udev 后端（DRM/KMS + libinput + libseat），编译验证 | ✅（未上机） |
-| P3 | 会话接入：`ARCHOERA_SESSION_APP` 拉起 Flutter 播放器并验证全屏渲染 | ⬜ 下一步 |
-| P4 | 媒体键 / 电源键 / 音量键的端到端（libinput → 播放器） | ⬜ |
+| P3 | 会话接入：`ARCHOERA_SESSION_APP` 拉起 Flutter 播放器并验证全屏渲染 | ✅（嵌套已验，udev 待上机） |
+| P4 | 媒体键 / 电源键 / 音量键的端到端（libinput → 播放器） | ⬜（合成器侧事件已就绪） |
 | P5 | 开机即视：systemd 用户会话 / getty 自动登录 + 最小 rootfs 打包（独立层） | ⬜ |
 | P6 | 运行时不变量校验 / 签名水印 / 安全启动（复用现有发布与验签工具链） | ⬜ |
 
-新增约束（P2 之后）：合成器启动后由后端决定是否 vsync（udev 用 vblank，winit 用
-`request_redraw`）；多 GPU / 热插拔 / DRM lease / syncobj 均未实现，kiosk 场景按单卡设计。
+新增约束（P2 之后）：合成器采用**事件驱动的按需重绘**——winit 仅在需要时
+`request_redraw`（空闲零重绘），udev 仅在 `needs_redraw` 时合成并由 vblank 回收。
+多 GPU **合成**（`MultiRenderer`）/ DRM lease / syncobj 未实现，kiosk 场景按单卡设计；
+单卡可通过 `--drm-device` 显式选择，连接器热插拔已实现。
 
 ---
 

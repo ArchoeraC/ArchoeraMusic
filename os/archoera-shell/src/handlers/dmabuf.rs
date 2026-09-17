@@ -8,7 +8,10 @@
 //! 自动回退到 `wl_shm`（见 `ArchoeraShell::setup_dmabuf`）。
 
 use smithay::{
-    backend::{allocator::dmabuf::Dmabuf, renderer::ImportDma},
+    backend::{
+        allocator::{dmabuf::Dmabuf, Buffer},
+        renderer::ImportDma,
+    },
     wayland::dmabuf::{DmabufGlobal, DmabufHandler, DmabufState, ImportNotifier},
 };
 
@@ -30,6 +33,14 @@ impl DmabufHandler for ArchoeraShell {
             notifier.failed();
             return;
         };
+
+        tracing::trace!(
+            y_inverted = dmabuf.y_inverted(),
+            format = ?dmabuf.format(),
+            modifier = ?dmabuf.format().modifier,
+            size = ?dmabuf.size(),
+            "导入客户端 dmabuf"
+        );
 
         match backend.renderer().import_dmabuf(&dmabuf, None) {
             Ok(_) => {
