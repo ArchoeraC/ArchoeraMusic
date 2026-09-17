@@ -1,17 +1,18 @@
 <p align="center">
-  <img src="logo.png" width="128" height="128" alt="ArchoeraMusic">
+  <img src="logo.png" width="128" height="128" alt="ArchoeraOS">
 </p>
 
 # ArchoeraOS
 
-> 开源、多端、面向本地与在线音乐的混合架构播放器——系统？
+> 一个把音乐播放器当操作系统的恶趣味实验——装在桌面上叫播放器，接管显卡和输入设备就叫系统了。
 
 > [!CAUTION]
 > **Caution**：本分支纯属娱乐项目，只是用于抨击部分过度代码洁癖而“清理一切不必要东西”等过度的行为。
 > 即使可以正常使用，也非常不建议作为主力机（你还要当主力机？！）食用。
+> 说具体点：这里没有桌面环境、没有窗口管理、没有托盘，只有一个全屏播放器，和一层为了让它成为“系统”而写出来的合成器。
 
 <p align="center">
-  <img src="screenshot.png" width="720" alt="ArchoeraMusic 主界面">
+  <img src="screenshot.png" width="720" alt="ArchoeraOS：播放器即系统界面">
 </p>
 
 ---
@@ -19,20 +20,34 @@
 ## 目录
 
 1. [项目简介](#项目简介)
-2. [技术架构](#技术架构)
-3. [项目结构](#项目结构)
-4. [构建与运行](#构建与运行)
-5. [文档](#文档)
-6. [许可证（Licensing）](#许可证licensing)
-7. [第三方声明](#第三方声明)
-8. [特别鸣谢（Acknowledgements）](#特别鸣谢acknowledgements)
-9. [联系与贡献](#联系与贡献)
+2. [系统构成](#系统构成)
+3. [关键设计](#关键设计)
+4. [项目结构](#项目结构)
+5. [构建与运行](#构建与运行)
+6. [文档](#文档)
+7. [许可证（Licensing）](#许可证licensing)
+8. [第三方声明](#第三方声明)
+9. [特别鸣谢（Acknowledgements）](#特别鸣谢acknowledgements)
+10. [联系与贡献](#联系与贡献)
 
 ---
 
 ## 项目简介
 
-ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面为主（Linux / Windows / macOS）」，UI 层采用 Flutter 开发。
+**ArchoeraOS** 是本仓库的**会话层分支**：把播放器从「桌面上运行的一个应用」变成「整机唯一的界面」。
+播放器本体（Flutter + GTK3）与上游 `main` 完全一致，区别在于它在这里跑在自研合成器之上、以全屏
+kiosk 客户端的身份存在，并通过自定义协议驱动会话级能力。
+
+- **自研 kiosk 合成器**（`os/archoera-shell`，Rust + smithay）：直接接管 DRM/KMS、libinput、libseat，
+  不经 Plasma / KWin / X11；单客户端、单输出、无窗口装饰。
+- **自定义会话协议 `archoera_shell_v1`（v3）**：播放器向合成器请求关机/重启/挂起、亮度、屏幕开关与
+  运行时显示设置（缩放/分辨率/旋转），并接收媒体键、电源键、电池、会话状态与主输出状态。
+- **平台能力桥接 `apl_*`（C ABI）**：会话、电源防休眠、系统媒体会话、窗口状态、系统主题色/深浅色、
+  系统资源与蓝牙状态——零 JSON、零子进程、同进程动态链接（`app/native/platform`）。
+- **默认用户 `archoera`**：普通用户 + `libseat → systemd-logind` 的 VT 会话授权，DRM/输入设备全链路
+  **不提权**；家目录承载偏好、媒体库、下载与输入法配置。
+- **最小镜像 `os/vm/`（mkosi + QEMU/KVM）**：一条命令构建可引导镜像并启动 VM，用于验证真实
+  DRM/KMS 通路（虚拟 GPU 上同样跑通出图、光标与输入法）。
 
 > **使用声明（太长不看版）**：本项目自研代码以 **AGPL-3.0-or-later** 开源。
 > **AGPL 认可开源商业化**：在遵守其义务（分发或提供网络服务时以 AGPL 开放源码、保留声明并标注修改）的前提下，
@@ -40,65 +55,46 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面�
 > 闭源集成、换壳/套壳再分发、不开放源码的商业托管/网络服务等不在授权范围内，本项目也不提供闭源商业授权。
 > 本声明仅为开发者对授权边界的说明，法律层面以根目录 `LICENSE`（AGPL-3.0-or-later）为准。
 
-- 连接**网易云音乐 / 酷狗音乐 / QQ 音乐**等在线服务
-- 支持本地音乐库扫描与元数据刮削、多平台下载
-- 内置统一 C 音频引擎：EQ / 响度归一化 / 限幅器 / FFT 频谱 / 变速变调 / Opus 转码管线
-- 桌面端原生模块 **FFI 直连**（`archoera_mediaengine` 共享库）
-- 可选启动 **Subsonic 兼容服务端**（Go），并支持 Subsonic / Jellyfin 流媒体服务器聚合
+---
 
-### 本地曲库：扫描与刮削
+## 系统构成
 
-音乐库扫描（C# `archoera-scanner`）与元数据刮削 / 目录整理（C++ `archoera-scraper`）均以 **FFI 直连、进程内执行**，不占用本地端口：
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ ArchoeraMusic（Flutter + GTK3）  ← 唯一界面：全屏 kiosk 客户端       │
+│   播放 / 媒体库 / 设置（含「系统」分区与系统监视器）/ 歌词 / 频谱        │
+└───────────────┬───────────────────────────────┬────────────────────┘
+                │ Wayland                        │ apl_* C ABI（FFI 直连）
+                │ xdg-shell · dmabuf · 光标形状     │
+                │ 分数缩放 · text-input/IME        │
+┌───────────────┴───────────────────┐  ┌────────┴──────────────────────┐
+│ os/archoera-shell（Rust + smithay）│  │ app/native/platform（C++/ObjC++）│
+│  ├─ kiosk 策略：单窗口全屏、无装饰  │  │  会话（archoera_shell_v1 客户端）│
+│  ├─ DRM/KMS + EGL/GBM 直接扫描输出 │  │  电源防休眠 / 系统媒体会话      │
+│  ├─ libinput + libseat(logind)     │  │  窗口状态 / 系统主题色与深浅色   │
+│  ├─ archoera_shell_v1 服务端（v3） │  │  系统资源 / 蓝牙（BlueZ）       │
+│  ├─ 光标 / 输入法 / 分数缩放协议   │  └───────────────────────────────┘
+│  └─ 控制面：logind 电源 / 亮度      │
+└───────────────────────────────────┘
+```
 
-**扫描（音乐库）**
-
-- **增量扫描**：进入音乐库页自动刷新（5 分钟去重）或点刷新按钮手动触发；
-  **全量扫描重建**：音乐库页 `⋯` 菜单 →「全量扫描」，确认后清空曲库 DB 并从扫描目录重建（不删除源文件）。
-- **运行设置**：扫描并行度（0=自动，按 CPU/内存自适应）、数据库批量写入上限。
-- **安全上限**：单文件大小、单轮最大文件数、连续解析错误数（可自定义；默认 500MB / 50000 / 50）。
-- **自定义音频扩展名**：在内置白名单（`mp3 flac ogg opus oga m4a aac wav ape wv dsf dsd dff mp4 aiff aif wma mka mpc mpp mp+ mp2 aifc m4b webm`）之上追加自定义扩展名。
-- **坏文件隔离区**：连续解析失败 ≥3 次的文件自动移入 `database/quarantine/`，可在扫描设置中浏览、单删 / 清空或打开目录。
-- 扫描目录管理在音乐库页 `⋯` →「扫描目录」（多目录、路径去重）。
-
-**刮削（元数据补齐）**
-
-- **多源并发刮削**：MusicBrainz（权威 + MBID/ISRC）、Deezer、iTunes、网易云、QQ 音乐、酷狗、酷我、咪咕 8 个在线源，外加 **AcoustID 音频指纹**回退；命中相似度评分、多源字段择优合并，并自动补封面（Cover Art Archive → 各源回退）与歌词（LRCLIB → 中文源）。
-- **写入选项**：元数据 / 封面 / 歌词嵌入开关；**跳过已刮削**（已有 MusicBrainz ID 或 ISRC 的文件不再重复联网）。
-- **高级参数**：并发查询线程数（0=自动）、批大小、失败重试上限（超出后不再重试）。
-- **仅目录整理（不联网）**：按模板把目录内文件移动到目标目录树——可用变量 `artist / albumArtist / album / genre / year / disc / track / title / ext`，以 `/` 分隔目录层级，**始终保留原文件名**；内置 歌手/专辑、仅歌手、风格/歌手/专辑、年份/歌手/专辑 四套预设模板。
-- 刮削成功后把标签写入音频文件（ID3v2 / Xiph / MP4 / RIFF 等），封面写入标签与本地封面缓存；结果经「下次扫描」读取入库。
-
-**UI 入口**：设置 →「刮削」（目录 / 数据源 / 写入选项 / 高级参数 / 仅目录整理）；设置 →「扫描」（并行度、上限、扩展名、隔离区）；音乐库页 `⋯` 菜单（扫描目录 / 全量扫描 / 媒体统计）。
+`os/`（系统会话层）与 `app/`（播放器 + 桥接）是两个独立构建单元：合成器是 Rust workspace，
+播放器与桥接是 Flutter/CMake 工程；两者只通过 **Wayland 协议**与 **apl_* C ABI** 通信。
 
 ---
 
-## 技术架构
+## 关键设计
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│ Flutter App（Dart）                                            │
-│  ├─ UI：Riverpod 状态 · go_router 路由 · 自绘歌词/频谱           │
-│  ├─ 业务层：PlaybackController · 平台 API（纯 Dart）· 事件总线  │
-│  ├─ 桥接层：engine_bindings（FFI 直连 mediaengine）· 平台壳      │
-│  └─ 平台壳：linux / windows / macos                            │
-└───────────────────────────┬───────────────────────────────────┘
-                            │ FFI 直连
-┌───────────────────────────┴───────────────────────────────────┐
-│ 多语言原生工具链                                               │
-│  ├─ C   `archoera-audio-engine`  解码→DSP→Opus 编码（主引擎）   │
-│  ├─ C#  `archoera-scanner`       音乐库扫描 TagLibSharp         │
-│  ├─ C++ `archoera-scraper`       元数据刮削 + TagLib 写入       │
-│  ├─ Rust tempo-rs               变速变调（静态链接进 C 引擎）   │
-│  └─ Go  `archoera-subsonic`     Subsonic 服务端（可选启用）     │
-└───────────────────────────────────────────────────────────────┘
-```
-
-**关键架构决策**：
-
-- **平台协议层纯 Dart 化**：网易云/酷狗/QQ 音乐签名算法与请求逻辑全 Dart 化
-- **桌面端原生 FFI 直连**：音频引擎（`archoera_mediaengine` 共享库）进程内转码 + miniaudio
-- **统一音频管线**：在线/本地共用 C 引擎转码管线，DSP 在引擎内完成
-- **Subsonic 代码复用**：Go Subsonic 在桌面端与独立服务端**完全共享一份代码**，通过 build tag 区分（详见 [架构文档](docs/architecture.md)）
+- **普通用户即可（最小权限）**：DRM/输入设备经 `libseat → systemd-logind` 的 VT 会话打开，
+  不请求 root、不写系统目录、不安装服务或驱动。
+- **没有桌面环境**：不做窗口管理、装饰与托盘；所有 toplevel 一律被配置为输出尺寸 +
+  Maximized/Fullscreen，客户端自己负责整个界面。
+- **GPU 优先**：dmabuf v4 反馈 + EGL/GBM 扫描输出；视觉重活走 GPU（如播放页水纹为单 pass 着色器），
+  重计算与阻塞 IO 下沉原生层/后台 isolate。
+- **事件驱动按需重绘**：没有客户端提交时合成器完全空闲，不空转 vblank。
+- **协议内省 + 运行时设置**：合成器 bind 时下发当前状态（能力位/亮度/音量/电池/会话/屏幕/输出），
+  v3 起 `set_output_scale/mode/transform` 可运行时改显示参数；未置位的请求被静默忽略，保证降级安全。
+- **系统能力统一走桥接**：Dart 只调 `apl_*`，不直调平台 API、不起子进程、不解析平台数据。
 
 ---
 
@@ -106,172 +102,73 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面�
 
 ```
 ArchoeraMusic/
-├── LICENSE                     # 许可证正文（AGPL-3.0，见下文升级策略）
-├── README.md                   # 本文件
-├── .gitignore
-├── app/                        # Flutter 应用
-│   ├── pubspec.yaml            # 应用清单（版本 / 依赖 / 国际化）
-│   ├── l10n.yaml               # 国际化配置
-│   ├── analysis_options.yaml
-│   ├── assets/                 # 字体（NotoSC / MiSans / HarmonyOS SC）、图标
-│   ├── lib/
-│   │   ├── main.dart
-│   │   ├── apis/               # 纯 Dart 平台 API：netease / kugou / qqmusic / lyric
-│   │   ├── app/                # 应用壳：bootstrap / router / shell / theme_provider
-│   │   ├── pages/              # 页面：home / library / liked / streaming / download 等
-│   │   ├── services/           # 业务层：playback / scanner / scraper / downloader / subsonic 等
-│   │   ├── stores/             # Riverpod 状态：app_prefs / playback_session / event_bus
-│   │   ├── settings/           # 设置弹窗与媒体源管理
-│   │   ├── theme/              # 主题与封面取色
-│   │   ├── widgets/            # 组件：common / layout / player / list / dialogs
-│   │   └── l10n/               # 国际化（ARB 源 + 生成）
-│   ├── linux/ windows/ macos/  # 平台壳
-│   └── core/                   # 多语言原生模块（源码，Windows 由 build_windows.bat 一站式构建）
-│       ├── audio-engine/       # C + Rust tempo-rs（FFmpeg / Opus / EQ / FFT / Tempo）
-│       ├── scanner/            # C# NativeAOT（TagLibSharp + SqliteDirectWriter）
-│       ├── scraper/            # C++（多源刮削 + TagLib 写入）
-│       ├── downloader/         # Rust 下载引擎（Kugou / Netease 自研签名 + FFI）
-│       └── subsonic/           # Go Subsonic 服务（桌面 FFI / 独立服务共享，含 Rust 转码器）
-└── docs/
-    ├── architecture.md         # 架构设计（进程模型 / 音频管线 / FFI 桥接）
-    └── download-module.md      # 下载模块设计规范
+├── app/                        # Flutter 应用 + 原生模块（播放器本体）
+│   ├── lib/                    # UI / 业务层 / services/platform（apl_* 绑定与外观层）
+│   ├── linux|windows|macos/    # 平台壳（Linux 壳在 kiosk 下无装饰）
+│   ├── native/platform/        # 平台能力桥接（apl_* C ABI；Linux/macOS/Windows/兜底）
+│   └── core/                   # 原生播放栈（audio-engine / scanner / scraper / downloader / subsonic）
+├── os/                         # ArchoeraOS 会话层（Rust workspace）
+│   ├── archoera-shell/         # kiosk 合成器（winit 嵌套 / udev 裸机）
+│   ├── archoera-control/       # 会话协议 CLI（状态查看 / 控制，兼协议端到端验证器）
+│   ├── archoera-smoke/         # 最小 Wayland 客户端（合成器冒烟）
+│   ├── protocol/               # archoera-shell-v1.xml（协议唯一真源）
+│   └── vm/                     # mkosi + QEMU/KVM 最小镜像与工具
+└── docs/                       # 会话层 / 桥接 / 渲染 / 架构等设计文档
 ```
 
 ---
 
 ## 构建与运行
 
-> CI：仓库 `.github/workflows/` 提供三端（Linux / Windows / macOS）完整打包
-> workflows，手动触发或推送 `v*` 标签时构建全部原生模块 + Flutter 应用并上传产物。
+### 播放器（桌面）
 
-### 前置
-
-- Flutter SDK `^3.12.2`（`cat app/pubspec.yaml | grep sdk`）
-- CMake ≥ 3.16 / C 工具链（构建 audio-engine / scraper；`FindSQLite3` 自 3.14 起才提供 `SQLite3::SQLite3` target，低版本将回退到变量链接）
-- **Zig 0.16.x**（自研解码内核 EraAudio，`app/core/audio-engine/kernel`；编译顺序：先 `zig build -Doptimize=ReleaseFast`
-  再 cmake 构建 audio-engine，缺失时引擎回退 FFmpeg/Stable——详见 `docs/engine-integration-bench.md`）
-- .NET SDK（构建 scanner）
-- Rust 工具链（构建 tempo-rs / transcoder）
-- Go 工具链（构建 subsonic）
-
-### 快速开始
-
-> 面向用户的完整自编译手册（含「太长不看版」速通命令、三端环境、缓存外置与常见问题）：
-> **[docs/user-build-from-source.md](docs/user-build-from-source.md)**。下方为快速副本。
+上游形态的完整自编译手册（三端环境、缓存外置、常见问题）见
+**[docs/user-build-from-source.md](docs/user-build-from-source.md)**；CI 见 `.github/workflows/`。
 
 ```bash
-# 1. 拿源码
 git clone https://github.com/BetaStudio2/ArchoeraMusic.git
 cd ArchoeraMusic
-
-# 2. 构建原生模块
-#   Linux / macOS：逐模块构建（入口与 CI workflow 对齐，见 .github/workflows/build-*.yml）
-#     audio-engine: cmake -S app/core/audio-engine -B app/core/audio-engine/build -DCMAKE_BUILD_TYPE=Release && cmake --build ...
-#     scanner:      bash app/core/scanner/build.sh <linux-x64|osx-arm64>
-#     scraper:      cmake -S app/core/scraper -B app/core/scraper/build -DCMAKE_BUILD_TYPE=Release && cmake --build ...
-#     downloader:   cargo build --release --manifest-path app/core/downloader/Cargo.toml
-#     subsonic:     bash app/core/subsonic/build.sh
-#   Windows：app/core/build_windows.bat 一站式构建（vcpkg + MSVC，见脚本头注释）
-
-# 3. 启动 Flutter
-cd app
-flutter pub get
-flutter run -d linux      # 或 windows / macos
+flutter pub get --directory app
+flutter build linux --release          # 产物：app/build/linux/x64/release/bundle/
 ```
 
-> 提示：Windows / macOS 桌面端的原生模块经 **FFI** 以共享库形式（`archoera_mediaengine.dll` / `libarchoera_subsonic.dylib` 等）打进应用，无需子进程。
-
----
-
-## 自研解码内核基准（EraAudio，实验性）
-
-> 2026-09-05 行业对比（FFmpeg n9.0.1 / libFLAC / LAME / speexdec / libopus / libvorbis）。
-> 定位：**实验性参考，非发布承诺**。自研 Zig 内核（`--engine-mode 1`）当前为「优先尝试、
-> 失败回退 FFmpeg」的渐进接管路线，基准用于量化差距、排定优化项。
-> 全量方法/原始数据/复现见 [docs/benchmark-industry-2026-09-05.md](docs/benchmark-industry-2026-09-05.md)，
-> 引擎集成与旧口径基准见 [docs/engine-integration-bench.md](docs/engine-integration-bench.md)。
-
-**总体评分（100 = speed40 + memory30 + correctness20 + coverage10）**：
-EraAudio **95.6/100（A+；跨轮 95.0–95.6）** vs 引擎内 Stable/FFmpeg 97.6（A+）→
-**相对 FFmpeg ≈97.9%**（Δ≈−2.0，区间 97.0%–97.9%）；`flac -d` / `lame --decode`
-（各自格式、作地面真值）100；`speexdec` 80（极性分歧，见 doc）。同机：Intel i9-13980HX ·
-Linux · 200s 高熵噪声语料 · 解码→PCM 不重编码；lossless 类 native 输出与 FFmpeg **逐位一致**，
-lossy 类 `|corr|≥0.999`、`±≤1 LSB`（ac3/eac3≈0.96、speex 极性分歧另注）。贴近阈值行有
-±4 分跨轮抖动（ac3/flac/m4a），判档请看区间与分差方向。
-
-| 格式 | EraAudio | Stable(FFmpeg) | 格式 | EraAudio | Stable(FFmpeg) |
-|---|---|---|---|---|---|
-| flac(直解) | 97.9 A+ | 100 A+ | mp2 | 100 A+ | 96 A+ |
-| wav / wv / mka | 100 A+ | 100 A+ | opus | 100 A+ | 100 A+ |
-| tta | 82 B | 100 A+ | vorbis | 100 A+ | 100 A+ |
-| mp3 | 100 A+ | 96 A+ | aac(m4a) | 100 A+ | 96 A+ |
-| dts | 82 B | 96 A+ | aac(adts) | 100 A+ | 96 A+ |
-| speex | 88 B | 88 B | ac3 | 92 A | 100 A+ |
-| | | | eac3 | 92 A | 96 A+ |
-
-**已知短板（评分依据，详见 doc §6）**：① 直解 `.flac` native ≈46–50× 实时（比 FFmpeg 慢 ~20×，
-自研 flac 帧解码器待优化；经 mka 轨 ≈260–280× 正常）；② tta/dts 峰值 RSS 55/85MB（平台 ≈29MB，
-疑似整缓冲，待多尺寸验证）；③ ac3/eac3 PCM 与参考 corr≈0.96（长度对齐，内容级舍入差待核对）；
-④ speex 与独立 `speexdec` 极性分歧（libspeex 族同号，编码侧成因，按 |corr| 计分）。
-
-重跑命令（产物落 `app/core/audio-engine/tests/bench/`）：
+### 会话层（`os/`，Rust workspace）
 
 ```bash
-cd app/core/audio-engine
-zig build -Doptimize=ReleaseFast && cmake --build build
-python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
+cd os
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo build --release -p archoera-shell --features udev   # 裸机（DRM/KMS + libinput + libseat）
 ```
 
----
+`udev` 后端需系统提供 `libseat` / `libinput` / `libdrm` / `gbm` / `libudev` 开发文件；
+不启用时仍可用 `winit` 后端嵌套运行在现有桌面会话里（开发/集成测试）。
 
-## 安全说明（凭据保险库）
+### 最小镜像与虚拟机（`os/vm/`）
 
-> 凭据保险库（`app/core/vault`）对登录会话与流媒体服务器密码做 2-of-2 加密存储。以下说明对**测试后门**与**发布产物边界**作出声明，请勿在生产环境启用任何测试开关。
-> **安全漏洞请走私密渠道报告**（[SECURITY.md](SECURITY.md)），禁止公开 Issue / PR / Discussion 讨论漏洞细节。
+```bash
+os/vm/build.sh build    # 构建可引导镜像（mkosi；Format=disk + systemd-boot）
+os/vm/build.sh vm       # 构建并启动 QEMU/KVM（自动透传 virtio-gpu / 键盘 / 触摸板）
+```
 
-### 测试明文存储（仅限调试，后期删除）
-
-- `ARCHOERA_VAULT_INSECURE_FILE_STORE=1` 是**测试专用明文存储开关**（份额明文落盘，非真实安全等级），仅存在于**测试构建**：
-  - 由 `app/core/vault/build-test.sh`（`#if VAULT_TESTING` 条件编译）产出 `archoera-vault-test`，仅用于本地调试与 CI（headless 无 D-Bus Secret Service 时验证完整加解密链路）；
-  - **生产构建** `app/core/vault/build.sh` 产物 `archoera-vault` **不编译该逻辑**——即使设置该环境变量也无法启用明文存储（可对发布产物执行 `strings -el` 验证无 `ARCHOERA_VAULT_INSECURE_FILE_STORE`）；
-  - **该测试后门计划在 Linux keyring CI 基建完善后删除**（届时测试改用真实 OS 安全存储）。
-- 测试产物 `archoera-vault-test` **绝不进入发布产物**（bundle / 安装包 / release artifact 均不含，打包流程无引用）。
-
-### 二进制替换防护（防「测试/被替换二进制混入安装包」）
-
-- **双重校验（fail-closed）**：
-  1. **加载前校验**：`archoera-vault --version` 输出 `ARCHOERA-VAULT-PROD-*` 才允许解析默认路径二进制；
-  2. **握手内 marker 校验（主防线）**：每次 serve 会话的握手应答尾部携带构建标记 `BuildInfo.Marker`（PROD/TEST 版本指纹）。主程序解析应答第 5 字段——默认路径解析的 vault 必须为 PROD 标记，**缺失或非 PROD（即携带 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 显式启动指令的测试构建）→ 杀进程 + 删除默认路径副本 + 拒绝解密 + 置版本异常 fatal 态**，UI 顶层 `VaultVersionGate` 全屏拦截，**仅允许用户退出**（不提供销毁/重试等继续操作）；
-- 即使攻击者通过木马等方式把预编译的测试二进制（含明文存储后门）下载并替换进应用安装包，应用**不会加载它**；即便绕过加载前 `--version` 校验，握手阶段 marker 校验仍会拒绝并删除副本——凭据无法被该后门读取；
-- `ARCHOERA_VAULT_BIN` 仅作为显式信任边界供测试/CI 使用（设置进程环境本身即需系统权限，生产路径绝不设置）：env 显式指定的二进制跳过 PROD 校验（信任边界），但 marker 存在性仍校验（防旧版协议误判）。
-
-### 信任根边界（威胁模型声明）
-
-- **应用层防线覆盖范围**：仅替换 vault 二进制（→ 双重校验 fail-closed 删副本）、爆破主密钥（→ 2-of-2 + Argon2id + 退避锁定）——均已纵深防护；
-- **边界**：信任根在主程序进程。攻击者**同时替换主程序（Dart 可执行 / FFI 库）** 或**在其内嵌主动联网上传程序段**时，vault 视主进程为合法握手对象、无法区分被篡改的主程序——此威胁（进程注入 / 信任根攻破）**超出应用层能力**，由 OS 信任链承担：Windows Authenticode 签名 / macOS 公证 / 安装包完整性校验（已列入 credential-vault-plan 待办）；
-- 本方案无法承诺具有拦截「同用户权限下完全控制进程 / 按源码重实现的攻击者」的能力（Kerckhoffs 原则，见 [credential-vault-plan §1.2](docs/credential-vault-plan.md)）。
-
-### 份额覆盖风险与恢复（OS 安全存储全局共享）
-
-- **现象**：解锁报 `The computed authentication tag did not match the input authentication tag`，应用降级为内存态（日志「凭据保险库不可用，登录态将不持久化」），功能可用但重启需重新登录。
-- **根因**：OS 模式（v1）下授权侧份额 S 存于 OS 安全存储（Linux Secret Service / macOS Keychain / Windows DPAPI），**存储键全局共享、无 per-app 隔离**（Linux 为 schema `archoera.vault` / account `master-share`）。同一设备上**任何一份应用副本**（安装包 / 开发 bundle / CI 产物）在 vault 未初始化时执行 `init` 都会**覆盖**该份额——若 vault 文件与份额不同代（例如更新前初始化、之后另一副本再次 `init` 覆盖份额），即出现上述解锁失败；**覆盖不可逆，旧份额无法找回，旧登录态不可恢复**。
-- **恢复**：删除应用数据目录下的 `credentials.vault`（及同目录 `vault.lockout` / `vault.auth` 残留），应用下次启动自动初始化全新 vault——**旧登录态丢失，需重新登录各平台账号**；或直接执行 `archoera-vault destroy <数据目录>`（一并删除份额与锁定状态）后重启应用。
-- **数据目录**：Linux `~/.local/share/ArchoeraMusic`；macOS/Windows 见应用数据目录（路径解析见 `resolveDataDir()`）。
-- **避免**：勿在同一设备上同时运行多份不同数据目录的应用副本并各自初始化；升级/替换安装包前如需保留登录态，**不要删除 vault 文件**，并避免在新副本上触发重新初始化。
+镜像里会话以**默认用户 `archoera`**（uid 1000、`/home/archoera`）运行，日志落在
+`~/.local/state/archoera-session.log`；hvc0 为 root 调试口。已验证结果与踩坑记录见
+**[os/vm/README.md](os/vm/README.md)**。
 
 ---
 
 ## 文档
 
+- [ArchoeraOS 会话层设计](docs/archoera-os.md) —— 合成器 / 会话协议 v3 / kiosk 策略 / 默认用户与数据布局
+- [平台原生桥接（apl_* C ABI）](docs/platform-native-bridge.md) —— 能力位 / 事件 / 零 JSON / 同进程动态链接
+- [平台能力外观层](docs/platform-capability-facade.md) —— Dart 侧能力接口与每平台实现（FFI ⇄ Noop 降级）
+- [播放页渲染优化](docs/player-render-optimization.md) —— 水纹着色器与性能预算
+- [VM 工具与已验证结果](os/vm/README.md) —— mkosi 镜像 / QEMU / 串口排查 / 缺陷记录
+- [用户自编译手册（太长不看版）](docs/user-build-from-source.md) —— 三端从源码构建 / 调试 / 打包 / 缓存外置
 - [架构设计](docs/architecture.md) —— 进程模型 / 音频管线 / FFI 桥接
-- [用户自编译手册（太长不看版）](docs/user-build-from-source.md) —— 三端从源码构建 / 调试 / 打包 / 缓存外置 / 常见问题
-- [eta 图标体系食用说明](app/lib/eta/README.md) —— EtaIcons/EtaMark 引用写法 / 实心描边命名 / 新增字形 / 重新生成
-- [自研解码内核行业基准（EraAudio）](docs/benchmark-industry-2026-09-05.md) —— FFmpeg/libFLAC/LAME/speexdec 横评 + 评分（95.6 A+）
-- [引擎集成与基准（EraAudio vs Stable）](docs/engine-integration-bench.md) —— EOF/错误语义、内存流式化、样本数对齐
-- [音频 Zig 解码内核路线图](docs/audio-kernel-zig.md) —— 内核架构 / 逐格式接管 / 第三方来源登记
-- [平台能力外观层](docs/platform-capability-facade.md) —— 防休眠 / 媒体会话与蓝牙耳机控制 / 系统定位的能力接口 + 每平台实现
-- [下载模块设计规范](docs/download-module.md) —— 下载引擎架构 / 自研边界 / 依赖许可
-- 使用与授权声明见文首；第三方依赖与许可逐项见各模块 `THIRD-PARTY-LICENSES.md`（汇总见「[第三方声明](#第三方声明)」与「[许可证（Licensing）](#许可证licensing)」）
+- [eta 图标体系食用说明](app/lib/eta/README.md) —— EtaIcons/EtaMark 引用写法 / 新增字形
+- 使用与授权声明见文首；第三方依赖与许可逐项见各模块 `THIRD-PARTY-LICENSES.md`
 
 ---
 
