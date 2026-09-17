@@ -89,6 +89,8 @@ pub struct ArchoeraShell {
     pub client_count: Arc<AtomicUsize>,
     /// 是否曾有客户端接入（避免空会话启动即退出）。
     pub had_client: bool,
+    /// 由合成器拉起的会话命令（kiosk 主进程）；其退出即代表会话结束。
+    pub session_child: Option<std::process::Child>,
 
     // 控制面
     pub control: ControlPlane,
@@ -163,6 +165,7 @@ impl ArchoeraShell {
             session_state: SessionState::Ready,
             client_count,
             had_client: false,
+            session_child: None,
             control,
             idle_inhibitors: 0,
             idle_reason: None,
@@ -277,12 +280,13 @@ impl ArchoeraShell {
                 Generic::new(display, Interest::READ, Mode::Level),
                 |_, display, data| {
                     // SAFETY: display 的生命周期由本事件源持有，直到事件循环结束。
-                    unsafe {
+                    let dispatched = unsafe {
                         display
                             .get_mut()
                             .dispatch_clients(&mut data.state)
-                            .expect("dispatch_clients 失败");
-                    }
+                            .expect("dispatch_clients 失败")
+                    };
+                    tracing::trace!(dispatched, "display 事件");
                     // 任一客户端消息（缓冲提交 / 帧回调请求 / 协议请求）都可能改变画面。
                     // 标记并按需唤醒后端，取代「永远重绘」：无客户端活动时完全空闲。
                     data.state.mark_dirty();
@@ -454,7 +458,8 @@ pub struct ClientState {
 
 impl ClientState {
     pub fn new(counter: Arc<AtomicUsize>) -> Self {
-        counter.fetch_add(1, Ordering::SeqCst);
+        let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
+        tracing::debug!(count, "Wayland 客户端接入");
         Self {
             compositor_state: CompositorClientState::default(),
             counter,
@@ -464,7 +469,8 @@ impl ClientState {
 
 impl Drop for ClientState {
     fn drop(&mut self) {
-        self.counter.fetch_sub(1, Ordering::SeqCst);
+        let count = self.counter.fetch_sub(1, Ordering::SeqCst) - 1;
+        tracing::debug!(count, "Wayland 客户端断开");
     }
 }
 

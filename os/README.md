@@ -90,8 +90,8 @@ cargo fmt --all -- --check
 # 或：--command "archoera_music --flag"，或设置 ARCHOERA_SESSION_APP
 ```
 
-合成器会把 `WAYLAND_DISPLAY=archoera-test` 注入被托管的会话命令，客户端退出后
-（`--no-exit-on-close` 未指定时）整个 kiosk 会话结束。
+合成器会把 `WAYLAND_DISPLAY=archoera-test` 注入被托管的会话命令；**会话进程退出后**
+（`--no-exit-on-close` 未指定时）整个 kiosk 会话结束，同时终止可能残留的会话进程。
 
 ## 运行（裸机 DRM/KMS）
 

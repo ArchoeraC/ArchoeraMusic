@@ -12,7 +12,7 @@ mod kiosk;
 mod protocol;
 mod state;
 
-use std::{ffi::OsStr, time::Duration};
+use std::{ffi::OsStr, process::Child, time::Duration};
 
 use smithay::reexports::{
     calloop::{
@@ -56,7 +56,10 @@ fn main() -> anyhow::Result<()> {
     backend::init(&mut event_loop, &mut data)?;
 
     match &config.command {
-        Some(argv) => spawn_session_app(argv, &data.state.socket_name)?,
+        Some(argv) => {
+            let child = spawn_session_app(argv, &data.state.socket_name)?;
+            data.state.session_child = Some(child);
+        }
         None => tracing::info!(
             socket = ?data.state.socket_name,
             "未指定会话命令，可用该 WAYLAND_DISPLAY 手动接入客户端"
@@ -68,6 +71,12 @@ fn main() -> anyhow::Result<()> {
     }
 
     event_loop.run(None, &mut data, |_| {})?;
+
+    // 会话结束：终止仍存活的会话客户端，避免留下孤儿进程。
+    if let Some(mut child) = data.state.session_child.take() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
     tracing::info!("ArchoeraOS 会话结束");
     Ok(())
 }
@@ -82,7 +91,7 @@ fn init_tracing() {
 }
 
 /// 拉起会话客户端，并把合成器的 socket 注入其环境。
-fn spawn_session_app(argv: &[String], socket_name: &OsStr) -> anyhow::Result<()> {
+fn spawn_session_app(argv: &[String], socket_name: &OsStr) -> anyhow::Result<Child> {
     let (program, args) = argv
         .split_first()
         .ok_or_else(|| anyhow::anyhow!("会话命令为空"))?;
@@ -96,16 +105,30 @@ fn spawn_session_app(argv: &[String], socket_name: &OsStr) -> anyhow::Result<()>
 
     let child = command.spawn()?;
     tracing::info!(pid = child.id(), program, "已拉起会话客户端");
-    Ok(())
+    Ok(child)
 }
 
-/// kiosk 看门狗：客户端曾接入且全部退出后，结束整个会话。
+/// kiosk 看门狗：会话客户端进程退出（或全部 Wayland 客户端退出）后结束会话。
 fn install_session_watchdog(event_loop: &EventLoop<CalloopData>) -> anyhow::Result<()> {
     let timer = Timer::from_duration(Duration::from_secs(1));
     event_loop
         .handle()
         .insert_source(timer, |_, _, data| {
             let state = &mut data.state;
+
+            // 1) 合成器拉起的会话进程退出：最可靠的结束信号，不依赖 Wayland 断连检测
+            //    （对持续渲染的客户端，客户端数量不一定能及时归零）。
+            let child_exited = match state.session_child.as_mut() {
+                Some(child) => matches!(child.try_wait(), Ok(Some(_)) | Err(_)),
+                None => false,
+            };
+            if child_exited {
+                tracing::info!("会话客户端进程已退出，结束 kiosk 会话");
+                state.loop_signal.stop();
+                return TimeoutAction::Drop;
+            }
+
+            // 2) 兜底：曾接入的 Wayland 客户端全部退出。
             if state.client_count() > 0 {
                 state.had_client = true;
                 return TimeoutAction::ToDuration(Duration::from_secs(1));
