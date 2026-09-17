@@ -161,7 +161,7 @@ archoera-shell/src/
 
 ---
 
-## 7. `archoera_shell_v1` 协议（version 2）
+## 7. `archoera_shell_v1` 协议（version 3）
 
 全局对象，每客户端绑定一次；bind 时立即下发 `capabilities` + 当前状态（亮度/音量/电池/屏幕/会话）。
 
@@ -173,6 +173,9 @@ archoera-shell/src/
 | request | `set_brightness` | `percent: uint` |
 | request | `set_volume` | `percent: uint` |
 | request | `set_screen_enabled` | `enabled: uint` |
+| request | `set_output_scale` (v3) | `scale_milli: uint`（1000-4000；夹取） |
+| request | `set_output_mode` (v3) | `width/height: uint`（0,0 = 首选模式） |
+| request | `set_output_transform` (v3) | `transform: enum output_transform`（同 wl_output） |
 | event | `capabilities` | `flags: uint`（bitfield） |
 | event | `brightness_changed` / `volume_changed` | `percent: uint` |
 | event | `media_key` | `key: enum media_key` |
@@ -180,10 +183,18 @@ archoera-shell/src/
 | event | `battery` | `present/percent/charging: uint` |
 | event | `session` | `state: enum session_state` |
 | event | `screen_enabled_changed` | `enabled: uint` |
+| event | `output_state` (v3) | `width/height/scale_milli/transform/refresh_millihz: uint` |
 
 能力位：`brightness=1`、`power=2`、`volume=4`、`media_keys=8`、`battery=16`、
-`suspend=32`、`power_key=64`、`screen=128`（仅 udev 后端置位 `screen`）。
+`suspend=32`、`power_key=64`、`screen=128`、`output=256`（`screen`/`output` 仅 udev
+后端置位；`output` 支持运行时改分辨率/缩放/旋转，缩放经分数缩放下发给客户端）。
 **未置位的请求被静默忽略**（不报协议错误），保证前后兼容与降级安全。
+
+设置侧：播放器「设置 → 系统」新增**显示**组（缩放 100-200%、常见分辨率、旋转
+0/90/180/270，经上述 v3 请求运行时生效）与**系统状态**汇总（会话/输出/亮度/电池/
+屏幕）；另有**系统资源**（CPU/内存/存储/运行时长/温度，轮询 `apl_sys_stats`）与
+**蓝牙**（BlueZ 适配器状态，`apl_bt_state`）——这两项属桥接（`app/native/platform`）
+的系统能力，不经过合成器协议。
 
 设计要点：越界百分比由合成器夹取；`destroy` 只销毁协议对象，不影响会话本身；
 `session = shutting_down` 在电源动作**之前**广播并 flush，给播放器保存/淡出的机会；

@@ -61,6 +61,10 @@ app/native/platform/
 │   ├── backend_windows.cpp      # MSVC C++：Win32 + WinRT(SMTC/Toast)
 │   ├── backend_linux.cpp        # C++ + libdbus：MPRIS2/Inhibit/熄屏/主题色 + dlopen GTK
 │   ├── backend_macos.mm         # ObjC++：AppKit/MediaPlayer
+│   ├── os_session.h             # ArchoeraOS 会话客户端契约（archoera_shell_v1）
+│   ├── os_session_linux.cpp     # dlopen libwayland-client 的会话客户端（手写协议映射）
+│   ├── sysinfo.h                # 系统资源 / 蓝牙契约
+│   ├── sysinfo_linux.cpp        # /proc + statvfs + thermal + BlueZ(D-Bus)
 │   └── backend_stub.cpp         # 未覆盖平台兜底（能力位图 0）
 └── （无 test/：C ABI 由 Dart 侧 platform_bindings 与冒烟程序验证）
 ```
@@ -122,6 +126,21 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_SYSTEM_ACCENT      (1u << 7)   /* 系统主题色（DE accent） */
 #define APL_CAP_SYSTEM_THEME       (1u << 8)   /* 系统深浅色（light/dark） */
 #define APL_CAP_OS_SESSION         (1u << 9)   /* ArchoeraOS 合成器会话（archoera_shell_v1；仅 Linux/Wayland） */
+#define APL_CAP_SYS_STATS          (1u << 10)  /* 系统资源快照（CPU/内存/磁盘/运行时长/温度） */
+#define APL_CAP_BLUETOOTH          (1u << 11)  /* 蓝牙适配器状态（BlueZ；无适配器/无 BlueZ 时不置位） */
+```
+
+**系统资源 / 蓝牙**（只读快照、轮询式；UI 可见时定时读取）：
+
+```c
+typedef struct AplSysStats { int32_t cpu_count; int32_t cpu_percent; /* -1=首次采样 */
+    int64_t mem_total_kb; int64_t mem_available_kb; int64_t swap_total_kb; int64_t swap_free_kb;
+    int64_t disk_total_kb; int64_t disk_free_kb; int64_t uptime_sec; int32_t temp_millic; } AplSysStats;
+int32_t apl_sys_stats(AplSysStats* out);
+
+typedef struct AplBtState { int32_t present, powered, discoverable, pairable, devices_connected;
+    AplString adapter_name; } AplBtState;   /* adapter_name 仅调用期间有效 */
+int32_t apl_bt_state(AplBtState* out);
 ```
 
 ### 3.2 字符串与元数据（零 JSON）
@@ -216,6 +235,7 @@ typedef enum {
     APL_EVENT_OS_SESSION      = 12, /* u.os_session.state：1=ready 2=shutting_down 3=suspending */
     APL_EVENT_OS_SCREEN       = 13, /* u.os_screen.screen：1=亮 0=熄 */
     APL_EVENT_OS_POWER_KEY    = 14, /* u.os_power_key.key：0=power 1=sleep 2=suspend */
+    APL_EVENT_OS_OUTPUT       = 15, /* u.os_output：宽/高/缩放×1000/变换/刷新 mHz（协议 v3） */
 } AplEventType;
 
 typedef enum { APL_CMD_PLAY=0, APL_CMD_PAUSE, APL_CMD_TOGGLE, APL_CMD_STOP,
