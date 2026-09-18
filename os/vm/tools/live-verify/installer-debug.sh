@@ -4,7 +4,7 @@
 set -uo pipefail
 REPO=/home/betastudio2/文档/SPlayer-Next/ArchoeraMusic
 INSTALLER="$REPO/os/vm/mkosi.profiles/live/live-extra/usr/local/bin/archoera-install"
-ISO="$REPO/os/vm/mkosi.output/archoera-live.iso"
+ISO="${ISO:-$REPO/os/vm/mkosi.output/archoera-live.iso}"
 WORK=/tmp/opencode/iso-verify
 MON=$WORK/mon.sock
 SOCK=$WORK/serial.sock

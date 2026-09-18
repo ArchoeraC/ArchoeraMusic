@@ -2,7 +2,7 @@
 # 启动 Live，跑 guest-fsexp.sh（wipefs→重建分区表→mkfs→mount 对照实验），取回输出。
 set -uo pipefail
 REPO=/home/betastudio2/文档/SPlayer-Next/ArchoeraMusic
-ISO="$REPO/os/vm/mkosi.output/archoera-live.iso"
+ISO="${ISO:-$REPO/os/vm/mkosi.output/archoera-live.iso}"
 WORK=/tmp/opencode/iso-verify
 MON=$WORK/mon.sock
 SOCK=$WORK/serial.sock
