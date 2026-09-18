@@ -280,17 +280,6 @@ impl ArchoeraShell {
         );
     }
 
-    /// 输出的建议刷新间隔（客户端 frame callback 用）：wl_output 的 refresh 单位是 mHz，
-    /// 这里换算成周期纳秒；拿不到当前模式时退回 60Hz。
-    fn frame_refresh(output: &Output) -> Option<std::time::Duration> {
-        output
-            .current_mode()
-            .map(|m| {
-                std::time::Duration::from_nanos(1_000_000_000_000u64 / m.refresh.max(1) as u64)
-            })
-            .or(Some(std::time::Duration::from_micros(16_667)))
-    }
-
     /// 合成并提交一帧：渲染全部输出、驱动客户端帧回调、清理已销毁的 popup。
     ///
     /// 调用即清空重绘标志：本帧合成的是「清零前」累积的全部状态。若渲染期间又有
@@ -303,11 +292,11 @@ impl ArchoeraShell {
             backend.render(&self.space, &self.cursor)?;
         }
 
-        let elapsed = self.start_time.elapsed();
+        let frame_time = monotonic_now();
         let outputs: Vec<Output> = self.space.outputs().cloned().collect();
         for output in &outputs {
             self.space.elements().for_each(|window| {
-                window.send_frame(output, elapsed, Self::frame_refresh(output), |_, _| {
+                window.send_frame(output, frame_time, frame_refresh(output), |_, _| {
                     Some(output.clone())
                 })
             });
@@ -631,4 +620,34 @@ impl ClientData for ClientState {
     fn initialized(&self, _client_id: ClientId) {}
 
     fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {}
+}
+
+/// 协议时间戳基准：**CLOCK_MONOTONIC**（毫秒级 Duration）。
+///
+/// Wayland 的 `wl_callback.done` / 输入事件时间戳按生态惯例（wlroots/weston）都是
+/// 「自开机起的单调毫秒」。GTK/Flutter 的 frame clock 会拿它和自己的单调钟比对来推算
+/// 刷新节拍；若传「合成器启动以来的时长」（anvil 例子的写法），客户端会算出离谱的
+/// 间隔 → 抖动、卡顿。故统一取 CLOCK_MONOTONIC。
+pub fn monotonic_now() -> std::time::Duration {
+    let mut ts = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: clock_gettime 只写 ts；CLOCK_MONOTONIC 在所有受支持平台上都可用。
+    unsafe {
+        libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts);
+    }
+    std::time::Duration::new(
+        ts.tv_sec.max(0) as u64,
+        ts.tv_nsec.clamp(0, 999_999_999) as u32,
+    )
+}
+
+/// 输出的建议刷新间隔（客户端 frame callback 用）：wl_output 的 refresh 单位是 mHz，
+/// 这里换算成周期纳秒；拿不到当前模式时退回 60Hz。
+fn frame_refresh(output: &Output) -> Option<std::time::Duration> {
+    output
+        .current_mode()
+        .map(|m| std::time::Duration::from_nanos(1_000_000_000_000u64 / m.refresh.max(1) as u64))
+        .or(Some(std::time::Duration::from_micros(16_667)))
 }

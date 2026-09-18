@@ -271,7 +271,7 @@ impl ArchoeraShell {
             KeyState::Released
         };
         let serial = SERIAL_COUNTER.next_serial();
-        let time = self.start_time.elapsed().as_millis() as u32;
+        let time = crate::state::monotonic_now().as_millis() as u32;
         self.seat.get_keyboard().unwrap().input::<(), _>(
             self,
             keycode,
