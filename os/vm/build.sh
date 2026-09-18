@@ -36,6 +36,14 @@ fi
 
 chmod 0755 "$HERE/mkosi.extra/usr/local/bin/archoera-session" 2>/dev/null || true
 
+# Plymouth 主题：唯一来源在 mkosi.extra，同步一份进 mkosi.initrd.extra（initrd 阶段也要用）。
+if [ -d "$HERE/mkosi.extra/usr/share/plymouth/themes/archoera" ]; then
+    rm -rf "$HERE/mkosi.initrd.extra/usr/share/plymouth/themes/archoera"
+    mkdir -p "$HERE/mkosi.initrd.extra/usr/share/plymouth/themes"
+    cp -a "$HERE/mkosi.extra/usr/share/plymouth/themes/archoera" \
+          "$HERE/mkosi.initrd.extra/usr/share/plymouth/themes/"
+fi
+
 # 光标主题：把宿主当前使用的 XCursor 主题复制进镜像（用户要求「用我在用的那套」）。
 # 主题名取自 KDE（kcminputrc）或 gsettings，缺省 Adwaita（镜像自带）。
 cursor_theme=""

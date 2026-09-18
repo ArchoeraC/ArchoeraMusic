@@ -1,0 +1,15 @@
+# ArchoeraOS 覆盖版：去掉 After=getty@tty1.service（默认要等 kiosk 会话停完才开始
+# 关机画面）。与停止会话并行启动，能更早拿到 DRM、缩短画面空档。
+[Unit]
+Description=Show Plymouth Halt Screen
+After=display-manager.service plymouth-start.service
+Before=systemd-poweroff.service
+DefaultDependencies=no
+ConditionKernelCommandLine=!plymouth.enable=0
+ConditionVirtualization=!container
+
+[Service]
+ExecStart=/usr/bin/plymouthd --mode=shutdown --attach-to-session
+ExecStartPost=-/usr/bin/plymouth show-splash
+Type=forking
+RemainAfterExit=yes
