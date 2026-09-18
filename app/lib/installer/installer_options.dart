@@ -221,8 +221,11 @@ final installerTimezoneList = <String>[
   for (final zones in installerTimezones.values) ...zones,
 ];
 
-/// 根文件系统候选项（与安装器脚本的 `fs=ext4|btrfs` 一致）。
-const installerFilesystems = <String>['ext4', 'btrfs'];
+/// 根文件系统候选项（与安装器脚本的 `fs=ext4|btrfs|xfs|f2fs` 一致）。
+///
+/// btrfs 会建立 `@` / `@home` / `@opt` / `@cache` / `@log` 子卷布局（与维护者本机
+/// 同构，见安装器脚本），因此它的交换选项只能是不使用。
+const installerFilesystems = <String>['ext4', 'btrfs', 'xfs', 'f2fs'];
 
 /// 交换候选项（`swap=none|file`；btrfs 上不支持交换文件）。
 const installerSwaps = <String>['none', 'file'];

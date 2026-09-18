@@ -4568,6 +4568,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get installerFilesystem => 'Filesystem';
 
   @override
+  String get installerBtrfsNote =>
+      'btrfs creates @ / @home / @opt / @cache / @log subvolumes (same layout as the maintainer\'s machine, snapshot friendly)';
+
+  @override
   String get installerSwap => 'Swap';
 
   @override

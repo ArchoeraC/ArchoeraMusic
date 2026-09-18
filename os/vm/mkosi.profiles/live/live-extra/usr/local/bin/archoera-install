@@ -12,8 +12,8 @@
 #   locale=zh_CN.UTF-8     系统语言（镜像内已生成 en_US.UTF-8 / zh_CN.UTF-8）
 #   timezone=Asia/Shanghai 时区（/usr/share/zoneinfo 下的名字）
 #   keymap=us              控制台键盘布局（/etc/vconsole.conf）
-#   fs=ext4|btrfs          根文件系统
-#   swap=none|file         交换：无 / 交换文件（btrfs 上不支持 file）
+#   fs=ext4|btrfs|xfs|f2fs 根文件系统（btrfs 会建 @/@home/@opt/@cache/@log 子卷）
+#   swap=none|file         交换：无 / 交换文件（btrfs 子卷布局上不支持 file）
 #   encrypt=0|1            整盘 root 分区用 LUKS2 加密
 #   autologin=0|1          是否保持 tty1 自动登录进 kiosk（默认 1）
 #
@@ -89,14 +89,14 @@ fi
 
 [ -n "$DISK" ] || fail "计划里缺少 disk=，且命令行也没给目标磁盘"
 [ -b "$DISK" ] || fail "不是块设备：$DISK"
-case "$FS" in ext4|btrfs) ;; *) fail "不支持的文件系统：$FS（可选 ext4 / btrfs）" ;; esac
+case "$FS" in ext4|btrfs|xfs|f2fs) ;; *) fail "不支持的文件系统：$FS（可选 ext4 / btrfs / xfs / f2fs）" ;; esac
 case "$SWAP" in none|file) ;; *) fail "不支持的 swap：$SWAP（可选 none / file）" ;; esac
 case "$ENCRYPT" in 0|1) ;; *) fail "encrypt 只能是 0 或 1" ;; esac
 if [ "$ENCRYPT" = "1" ] && [ -z "$LUKS_PASS" ]; then
     fail "要求加密但 secrets 里没有 luks_passphrase"
 fi
 if [ "$SWAP" = "file" ] && [ "$FS" = "btrfs" ]; then
-    fail "btrfs 上暂不支持交换文件（请选 swap=none，或改用 ext4）"
+    fail "btrfs 子卷布局上不支持交换文件（请选 swap=none，或改用 ext4/xfs/f2fs）"
 fi
 
 # 目标盘分区名：/dev/vda → /dev/vda1；/dev/nvme0n1 → /dev/nvme0n1p1
@@ -117,6 +117,10 @@ fi
 
 cleanup() {
     umount "$TARGET/boot" 2>/dev/null || true
+    for m in run sys proc dev; do umount "$TARGET/$m" 2>/dev/null || true; done
+    if [ "$FS" = "btrfs" ]; then
+        for m in var/log var/cache opt home; do umount "$TARGET/$m" 2>/dev/null || true; done
+    fi
     umount "$TARGET" 2>/dev/null || true
     if [ "$ENCRYPT" = "1" ]; then cryptsetup close "$MAPPER" 2>/dev/null || true; fi
 }
@@ -167,16 +171,35 @@ fi
 
 step 12 "格式化分区（ESP=vfat，root=$FS）"
 mkfs.fat -F32 -n ARCHOERAS "$ESP" >/dev/null
-if [ "$FS" = "btrfs" ]; then
-    mkfs.btrfs -f -L ArchoeraOS "$ROOTDEV" >/dev/null
-else
-    mkfs.ext4 -F -q -L ArchoeraOS "$ROOTDEV"
-fi
+case "$FS" in
+    ext4)  mkfs.ext4 -F -q -L ArchoeraOS "$ROOTDEV" ;;
+    btrfs) mkfs.btrfs -f -L ArchoeraOS "$ROOTDEV" >/dev/null ;;
+    xfs)   mkfs.xfs -f -L ArchoeraOS "$ROOTDEV" >/dev/null ;;
+    f2fs)  mkfs.f2fs -f -l ArchoeraOS "$ROOTDEV" >/dev/null ;;
+esac
 
 step 20 "挂载目标系统"
 mkdir -p "$TARGET"
+ROOTFLAGS=""
+BTRFS_SUBVOLS=0
 if [ "$FS" = "btrfs" ]; then
-    mount -o compress=zstd:1,noatime "$ROOTDEV" "$TARGET"
+    # 子卷布局与维护者本机同构：@（根）/ @home / @opt / @cache / @log。
+    # @cache 与 @log 用 nodatacow：日志与缓存的写放大不值得压缩/COW。
+    BTRFS_OPTS="noatime,compress=zstd,space_cache=v2,discard=async"
+    mount "$ROOTDEV" "$TARGET"
+    for sv in @ @home @opt @cache @log; do
+        btrfs subvolume create "$TARGET/$sv" >/dev/null
+    done
+    umount "$TARGET"
+    mount -o "subvol=@,$BTRFS_OPTS" "$ROOTDEV" "$TARGET"
+    for d in home opt var/cache var/log; do mkdir -p "$TARGET/$d"; done
+    mount -o "subvol=@home,$BTRFS_OPTS" "$ROOTDEV" "$TARGET/home"
+    mount -o "subvol=@opt,$BTRFS_OPTS" "$ROOTDEV" "$TARGET/opt"
+    mount -o "subvol=@cache,noatime,nodatacow,compress=zstd,discard=async" "$ROOTDEV" "$TARGET/var/cache"
+    mount -o "subvol=@log,noatime,nodatacow,compress=zstd,discard=async" "$ROOTDEV" "$TARGET/var/log"
+    # initrd 从 cmdline 挂根时不知道默认子卷，必须显式给 rootflags=subvol=@
+    ROOTFLAGS="rootflags=subvol=@"
+    BTRFS_SUBVOLS=1
 else
     mount "$ROOTDEV" "$TARGET"
 fi
@@ -203,73 +226,90 @@ rsync -aHAXx --delete \
     --exclude=/swapfile \
     / "$TARGET/"
 
-# ── 5) 引导条目 ────────────────────────────────────────────────────
-step 70 "写入引导"
-if findmnt -n /boot >/dev/null 2>&1; then
-    cp -a /boot/. "$TARGET/boot/"
-fi
+# ── 5) 引导：标准 systemd-boot（kernel-install + BLS）───────────────
+#
+# 不再手工把内核/initrd 拷进 ESP：那样装出来的系统在内核升级后 ESP 永远停在
+# 旧内核（且口令变更后没有重建 initrd 的路径）。这里走标准链路：
+#   /etc/kernel/cmdline（BLS 条目的 options 来源）
+#   kernel-install add <kver> <vmlinuz>
+#     → 50-dracut.install：dracut 生成 initrd
+#     → 90-loaderentry.install：写 $ESP/<machine-id>/<kver>/ 与 loader/entries/<machine-id>-<kver>.conf
+# 之后 pacman 升级内核会由 systemd 的 hook 自动重跑同一条链路（见
+# /etc/kernel/install.conf 的 layout=bls + initrd_generator=dracut）。
+step 70 "写入引导（systemd-boot + kernel-install/BLS）"
 NEWROOT_PARTUUID="$(blkid -s PARTUUID -o value "$ROOTPART")"
-NEWESP_PARTUUID="$(blkid -s PARTUUID -o value "$ESP")"
 NEWROOT_UUID="$(blkid -s UUID -o value "$ROOTDEV")"
 NEWESP_UUID="$(blkid -s UUID -o value "$ESP")"
 
-KERNEL=""
-for cand in "$TARGET"/usr/lib/modules/*/vmlinuz "$TARGET"/boot/vmlinuz-*; do
-    [ -f "$cand" ] || continue
-    case "$cand" in "$TARGET"/boot/*) KERNEL="/${cand#"$TARGET"/boot/}" ;; esac
-    break
-done
-if [ -n "$KERNEL" ] && [ ! -f "$TARGET/boot$KERNEL" ]; then
-    src=""
-    for cand in "$TARGET"/usr/lib/modules/*/vmlinuz; do [ -f "$cand" ] && src="$cand" && break; done
-    if [ -n "$src" ]; then
-        cp -a "$src" "$TARGET/boot/vmlinuz-linux"
-        KERNEL="/vmlinuz-linux"
-    fi
-fi
+# machine-id 必须先生成好：BLS 目录名用它，留空还会让首启弹 systemd-firstboot。
+rm -f "$TARGET/etc/machine-id"
+systemd-machine-id-setup --root="$TARGET" >/dev/null 2>&1 \
+    || printf '%s\n' "$(tr -d '-' </proc/sys/kernel/random/uuid)" > "$TARGET/etc/machine-id"
 
-INITRDS=()
-while IFS= read -r f; do
-    rel="/${f#"$TARGET"/boot/}"
-    cp -a "$f" "$TARGET/boot$rel" 2>/dev/null || true
-    INITRDS+=("$rel")
-done < <(find "$TARGET/boot" -maxdepth 3 -type f \( -name 'initrd' -o -name 'initrd-*' -o -name '*kernel-modules.initrd' \) 2>/dev/null | sort)
-if [ "${#INITRDS[@]}" -eq 0 ]; then
-    for cand in "$TARGET"/usr/lib/modules/*/initrd; do
-        [ -f "$cand" ] || continue
-        cp -a "$cand" "$TARGET/boot/initrd-linux"
-        INITRDS=("/initrd-linux")
-        break
-    done
-fi
-[ -n "$KERNEL" ] || fail "未找到内核镜像（无法生成引导条目）"
-[ "${#INITRDS[@]}" -gt 0 ] || fail "未找到 initrd（无法生成引导条目）"
-
-rm -f "$TARGET"/boot/loader/entries/*.conf
-mkdir -p "$TARGET/boot/loader/entries"
-
-# root 参数：加密时用 mapper，并交给 systemd-initrd 解锁（rd.luks.name）。
+# root 参数：加密时用 mapper（rd.luks.name 交给 systemd-initrd 解锁）；btrfs 带 rootflags。
 if [ "$ENCRYPT" = "1" ]; then
     ROOT_OPTS="root=/dev/mapper/$MAPPER rd.luks.name=$NEWROOT_PARTUUID=$MAPPER"
 else
     ROOT_OPTS="root=PARTUUID=$NEWROOT_PARTUUID"
 fi
-{
-    echo "title   ArchoeraOS"
-    echo "linux   $KERNEL"
-    for i in "${INITRDS[@]}"; do echo "initrd  $i"; done
-    echo "options $ROOT_OPTS rw splash plymouth.ignore-serial-consoles"
-} > "$TARGET/boot/loader/entries/archoera.conf"
+[ -n "$ROOTFLAGS" ] && ROOT_OPTS="$ROOT_OPTS $ROOTFLAGS"
+CMDLINE="$ROOT_OPTS rw splash plymouth.ignore-serial-consoles"
+mkdir -p "$TARGET/etc/kernel"
+printf '%s\n' "$CMDLINE" > "$TARGET/etc/kernel/cmdline"
 
-bootctl --esp-path="$TARGET/boot" install >/dev/null 2>&1 || true
-printf 'default archoera.conf\ntimeout 0\n' > "$TARGET/boot/loader/loader.conf"
+# Live 带过来的旧引导产物清掉（避免 ESP 里留着 Live 的内核/initrd 与旧条目）。
+rm -rf "$TARGET/boot/loader/entries"
+rm -f "$TARGET/boot/vmlinuz-linux" "$TARGET/boot/initrd-linux"
+
+# systemd-boot 本体（含可移动介质回退路径 EFI/BOOT/BOOTX64.EFI）。
+if ! bootctl --esp-path="$TARGET/boot" install >/dev/null 2>&1; then
+    step 72 "bootctl install 失败，尝试只复制引导文件"
+    mkdir -p "$TARGET/boot/EFI/BOOT" "$TARGET/boot/EFI/systemd"
+    cp -f /usr/lib/systemd/boot/efi/systemd-bootx64.efi "$TARGET/boot/EFI/systemd/" 2>/dev/null || true
+    cp -f /usr/lib/systemd/boot/efi/systemd-bootx64.efi "$TARGET/boot/EFI/BOOT/BOOTX64.EFI" 2>/dev/null || true
+fi
+
+# 在 chroot 里生成 initrd 与条目：kernel-install 需要 /proc /sys /dev /run。
+KVER=""
+for d in "$TARGET"/usr/lib/modules/*/; do
+    [ -d "$d" ] || continue
+    KVER="$(basename "$d")"
+    break
+done
+[ -n "$KVER" ] || fail "目标系统里没有 /usr/lib/modules/<版本>（无法生成 initrd）"
+[ -x "$TARGET/usr/bin/dracut" ] || fail "目标系统缺少 dracut（initrd 生成器）"
+
+step 76 "生成 initrd 与引导条目（dracut + kernel-install，视机器性能 1-3 分钟）"
+for m in dev proc sys run; do
+    mkdir -p "$TARGET/$m"
+    mount --bind "/$m" "$TARGET/$m" 2>/dev/null || true
+done
+chroot "$TARGET" /usr/bin/env -i \
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin \
+    HOME=/root TERM=dumb LANG=C \
+    kernel-install add "$KVER" "/usr/lib/modules/$KVER/vmlinuz" \
+    || fail "kernel-install 失败（initrd/引导条目未生成）"
+for m in run sys proc dev; do umount "$TARGET/$m" 2>/dev/null || true; done
+
+ENTRY="$(ls "$TARGET/boot/loader/entries" 2>/dev/null | head -1)"
+[ -n "$ENTRY" ] || fail "kernel-install 没有生成引导条目"
+printf 'default %s\ntimeout 0\neditor no\n' "$ENTRY" > "$TARGET/boot/loader/loader.conf"
 
 # ── 6) 收尾配置 ────────────────────────────────────────────────────
 step 88 "写 fstab / crypttab / 本地化 / 用户"
-FSTYPE_OPTS="rw,relatime"
-if [ "$FS" = "btrfs" ]; then FSTYPE_OPTS="rw,relatime,compress=zstd:1,noatime"; fi
 {
-    echo "UUID=$NEWROOT_UUID /     $FS $FSTYPE_OPTS 0 1"
+    if [ "$FS" = "btrfs" ]; then
+        OPTS="noatime,compress=zstd,space_cache=v2,discard=async"
+        echo "UUID=$NEWROOT_UUID /           btrfs subvol=/@,$OPTS 0 1"
+        echo "UUID=$NEWROOT_UUID /home       btrfs subvol=/@home,$OPTS 0 2"
+        echo "UUID=$NEWROOT_UUID /opt        btrfs subvol=/@opt,$OPTS 0 2"
+        echo "UUID=$NEWROOT_UUID /var/cache  btrfs subvol=/@cache,noatime,nodatacow,compress=zstd,discard=async 0 2"
+        echo "UUID=$NEWROOT_UUID /var/log    btrfs subvol=/@log,noatime,nodatacow,compress=zstd,discard=async 0 2"
+    else
+        FSTYPE_OPTS="rw,relatime"
+        [ "$FS" = "f2fs" ] && FSTYPE_OPTS="rw,relatime,compress_algorithm=zstd"
+        echo "UUID=$NEWROOT_UUID /     $FS $FSTYPE_OPTS 0 1"
+    fi
     echo "UUID=$NEWESP_UUID  /boot vfat rw,relatime,fmask=0022,dmask=0022 0 2"
     [ -n "$SWAPFILE" ] && echo "$SWAPFILE none swap defaults,nofail 0 0"
 } > "$TARGET/etc/fstab"
@@ -338,14 +378,14 @@ rm -f "$TARGET/etc/archoera-live" \
       "$TARGET/usr/lib/systemd/system/archoera-install.service" \
       "$TARGET/usr/local/bin/archoera-install"
 rm -rf "$TARGET/usr/lib/systemd/system/multi-user.target.d/20-archoera-kmscon.conf"
-# machine-id 必须重新生成有效值（留空会让首启弹 systemd-firstboot）。
-rm -f "$TARGET/etc/machine-id"
-systemd-machine-id-setup --root="$TARGET" >/dev/null 2>&1 \
-    || printf '%s\n' "$(tr -d '-' </proc/sys/kernel/random/uuid)" > "$TARGET/etc/machine-id"
 sync
 
 step 96 "卸载"
+for m in run sys proc dev; do umount "$TARGET/$m" 2>/dev/null || true; done
 umount "$TARGET/boot" 2>/dev/null || true
+if [ "$FS" = "btrfs" ]; then
+    for m in var/log var/cache opt home; do umount "$TARGET/$m" 2>/dev/null || true; done
+fi
 umount "$TARGET" 2>/dev/null || true
 if [ "$ENCRYPT" = "1" ]; then cryptsetup close "$MAPPER" 2>/dev/null || true; fi
 trap - EXIT

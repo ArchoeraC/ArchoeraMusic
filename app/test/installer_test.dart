@@ -170,6 +170,21 @@ void main() {
       expect(draft.toPlan().luksPassphrase, 'longenough');
     });
 
+    test('文件系统候选含 ext4/btrfs/xfs/f2fs（btrfs 为子卷布局）', () {
+      expect(
+        installerFilesystems,
+        containsAll(<String>['ext4', 'btrfs', 'xfs', 'f2fs']),
+      );
+      final draft = InstallerDraft()
+        ..fs = 'xfs'
+        ..swap = 'file';
+      draft.normalize();
+      expect(draft.swap, 'file', reason: 'xfs 允许交换文件');
+      draft.fs = 'btrfs';
+      draft.normalize();
+      expect(draft.swap, 'none', reason: 'btrfs 子卷布局不支持交换文件');
+    });
+
     test('名称规则与 btrfs 交换文件收敛', () {
       final draft = InstallerDraft()
         ..fs = 'btrfs'

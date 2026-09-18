@@ -8138,6 +8138,12 @@ abstract class AppLocalizations {
   /// **'文件系统'**
   String get installerFilesystem;
 
+  /// No description provided for @installerBtrfsNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'btrfs 会建立 @ / @home / @opt / @cache / @log 子卷（与维护者本机同构，便于快照/回滚）'**
+  String get installerBtrfsNote;
+
   /// No description provided for @installerSwap.
   ///
   /// In zh_CN, this message translates to:

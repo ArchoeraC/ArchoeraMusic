@@ -557,11 +557,13 @@ class _DiskStep extends StatelessWidget {
                 selected: draft.fs == fs,
                 onSelected: (_) {
                   draft.fs = fs;
+                  if (fs == 'btrfs') draft.swap = 'none';
                   onChanged();
                 },
               ),
           ],
         ),
+        if (draft.fs == 'btrfs') _Hint(l10n.installerBtrfsNote),
         const SizedBox(height: 14),
         _GroupLabel(l10n.installerSwap),
         Wrap(

@@ -4365,6 +4365,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get installerFilesystem => '文件系统';
 
   @override
+  String get installerBtrfsNote =>
+      'btrfs 会建立 @ / @home / @opt / @cache / @log 子卷（与维护者本机同构，便于快照/回滚）';
+
+  @override
   String get installerSwap => '交换空间';
 
   @override
@@ -9010,6 +9014,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get installerFilesystem => '文件系统';
+
+  @override
+  String get installerBtrfsNote =>
+      'btrfs 会建立 @ / @home / @opt / @cache / @log 子卷（与维护者本机同构，便于快照/回滚）';
 
   @override
   String get installerSwap => '交换空间';
@@ -13658,6 +13666,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get installerFilesystem => '檔案系統';
+
+  @override
+  String get installerBtrfsNote =>
+      'btrfs 會建立 @ / @home / @opt / @cache / @log 子卷（與維護者本機同構，便於快照/回滾）';
 
   @override
   String get installerSwap => '交換空間';

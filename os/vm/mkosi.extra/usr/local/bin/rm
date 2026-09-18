@@ -1,0 +1,63 @@
+#!/bin/sh
+# ArchoeraOS 安全网：拒绝「根级路径」的删除 —— 特别是 `rm -rf /`、`rm -rf /*`。
+#
+# 定位：**防误操作/防恶意脚本的兜底**，不是安全边界。拿到 root 的人仍可直接调
+# `/usr/bin/rm` 或写自己的程序绕过；系统也不靠它做权限隔离（ArchoeraOS 不装 sudo，
+# 特权动作一律经 polkit 规则授权，见 /usr/share/polkit-1/rules.d/）。
+#
+# 为什么放在 /usr/local/bin：PATH 里它先于 /usr/bin；sudo 的默认 secure_path 也是
+# `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`，因此**`sudo rm ...`
+# 同样会经过这里**（这正是「特别是 sudo 下的」那一条要覆盖的场景）。
+#
+# 规则：
+#   1. 一律拒绝 --no-preserve-root（那是让 `rm -rf /` 真正生效的开关）；
+#   2. 任何操作数解析为 `/` 或**只有一个路径段**的绝对路径（/usr、/boot、/* 展开后
+#      的每一项）→ 拒绝。`/tmp/*`、`/var/log/foo` 这类多层级路径照常放行；
+#   3. 其余原样交给 /usr/bin/rm。
+#
+# 确需删除根级目录时，显式使用 /usr/bin/rm（这是有意为之的「二次确认」）。
+
+set -u
+real_rm=/usr/bin/rm
+
+[ -x "$real_rm" ] || exit 127
+
+after_ddash=0
+for arg in "$@"; do
+    if [ "$after_ddash" = 0 ]; then
+        case "$arg" in
+            --no-preserve-root)
+                echo "rm: 已拒绝：--no-preserve-root（ArchoeraOS 守卫；确需如此请用 $real_rm）" >&2
+                exit 1
+                ;;
+            --)
+                after_ddash=1
+                continue
+                ;;
+            -*)
+                continue
+                ;;
+        esac
+    fi
+
+    # 解析为绝对路径（-m 不要求路径存在）。
+    p=$(readlink -m -- "$arg" 2>/dev/null) || p=$arg
+    case "$p" in
+        /) 
+            echo "rm: 已拒绝：删除根目录 $(printf '%s' "$arg")（ArchoeraOS 守卫；确需如此请用 $real_rm）" >&2
+            exit 1
+            ;;
+        /*)
+            rest=${p#/}
+            case "$rest" in
+                */*) : ;;  # 多层级（/var/log/foo、/home/user）→ 放行
+                *)
+                    echo "rm: 已拒绝：$(printf '%s' "$arg") 指向根级路径（ArchoeraOS 守卫；确需如此请用 $real_rm）" >&2
+                    exit 1
+                    ;;
+            esac
+            ;;
+    esac
+done
+
+exec "$real_rm" "$@"

@@ -20,7 +20,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 IMG="${1:-$HERE/mkosi.output/archoera-live.raw}"
 OUT="$HERE/mkosi.output/archoera-live.iso"
-WORK="${MKISO_WORK:-/tmp/archoera-iso}"
+# 工作目录：默认放**磁盘**缓存而不是 /tmp —— /tmp 往往是 tmpfs（内存），
+# 而这里要落 ~600MB 的 initrd、~650MB 的 efiboot.img 与整棵 rootfs 树，
+# 在 tmpfs 上会把内存吃光并报「设备上没有空间」。需要换位置用 MKISO_WORK=...
+WORK="${MKISO_WORK:-${XDG_CACHE_HOME:-$HOME/.cache}/archoera-mkiso}"
 VOLID=ARCHOERA_LIVE
 
 [ -f "$IMG" ] || { echo "找不到 Live 镜像：$IMG（先跑 build.sh build --profile live）" >&2; exit 1; }
@@ -133,10 +136,22 @@ ls -la "$BOOT"
 
 # ── 4) 小 EFI FAT 映像（El Torito 载荷）：systemd-boot + 内核 + initrd ──
 EB="$WORK/efiboot.img"
+mkdir -p "$WORK"
+AVAIL_KB=$(df -Pk "$WORK" | awk 'NR==2{print $4}')
+if [ "${AVAIL_KB:-0}" -lt $((8 * 1024 * 1024)) ]; then
+    echo "!! $WORK 可用空间不足 8GiB（当前 $(( ${AVAIL_KB:-0} / 1024 / 1024 ))GiB）" >&2
+    echo "   可换位置：MKISO_WORK=/path/to/disk/cache $0" >&2
+    exit 1
+fi
+
 echo "==> 生成 EFI 启动映像 $EB（含内核与 initrd）…"
-# 容量 = 引导文件总和 + 32MiB 余量
-NEED=$(du -sm "$BOOT" | cut -f1)
-SIZE=$((NEED + 32))
+# 容量 = 引导文件**实际字节数** + 64MiB 余量（FAT32 表/簇开销 + 对齐）。
+# ⚠ 不要用 du -sm 的块占用：initrd 已 ~600MB，四舍五入与簇开销会顶到边界
+# 而报「设备上没有空间 / fat_write failed」。
+_sz() { stat -c %s "$1" 2>/dev/null || echo 0; }
+NEED=$(( ( $(_sz "$BOOT/BOOTX64.EFI") + $(_sz "$BOOT/vmlinuz") \
+           + $(_sz "$BOOT/initramfs-linux.img") + 1048575 ) / 1048576 + 64 ))
+SIZE=$NEED
 rm -f "$EB"; truncate -s "${SIZE}M" "$EB"
 mkfs.fat -F32 -n ARCHOERAEFI "$EB" >/dev/null
 

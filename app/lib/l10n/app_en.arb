@@ -1352,6 +1352,7 @@
   "installerDiskNone": "No target disk available",
   "installerDiskWarning": "All partitions and data on the selected disk will be erased. This cannot be undone.",
   "installerFilesystem": "Filesystem",
+  "installerBtrfsNote": "btrfs creates @ / @home / @opt / @cache / @log subvolumes (same layout as the maintainer's machine, snapshot friendly)",
   "installerSwap": "Swap",
   "installerSwapNone": "None",
   "installerSwapFile": "Swap file",

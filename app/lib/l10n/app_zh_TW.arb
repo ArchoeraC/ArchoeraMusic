@@ -1352,6 +1352,7 @@
   "installerDiskNone": "沒有可選的目標磁碟",
   "installerDiskWarning": "所選磁碟上的所有分割區與資料都會被清除，且無法復原。",
   "installerFilesystem": "檔案系統",
+  "installerBtrfsNote": "btrfs 會建立 @ / @home / @opt / @cache / @log 子卷（與維護者本機同構，便於快照/回滾）",
   "installerSwap": "交換空間",
   "installerSwapNone": "不使用",
   "installerSwapFile": "交換檔案",

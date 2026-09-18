@@ -4420,6 +4420,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get installerFilesystem => '文件系统';
 
   @override
+  String get installerBtrfsNote =>
+      'btrfs 会建立 @ / @home / @opt / @cache / @log 子卷（与维护者本机同构，便于快照/回滚）';
+
+  @override
   String get installerSwap => '交换空间';
 
   @override
