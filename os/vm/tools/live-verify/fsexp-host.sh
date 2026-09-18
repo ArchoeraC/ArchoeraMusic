@@ -37,7 +37,7 @@ for i in $(seq 1 60); do
     printf '%s' "$out" | grep -q READY_ && { echo "== 串口可用"; break; }
 done
 
-B64=$(base64 -w0 /tmp/opencode/guest-fsexp.sh)
+B64=$(base64 -w0 $(dirname "$0")/guest-fsexp.sh)
 ser "echo $B64 | base64 -d > /tmp/fx.sh && wc -c /tmp/fx.sh && echo FX_READY" 90 12 >/dev/null 2>&1
 ser "setsid nohup bash /tmp/fx.sh > /tmp/fx.out 2>&1 < /dev/null & sleep 2; echo FX_STARTED" 60 10 >/dev/null 2>&1
 

@@ -50,7 +50,7 @@ ser "echo $B64 | base64 -d > /usr/local/bin/archoera-install && chmod 0755 /usr/
 ser "grep -c on_err /usr/local/bin/archoera-install" 30 6 | tail -2
 
 echo "== 下发并后台执行调试脚本"
-GB64=$(base64 -w0 /tmp/opencode/guest-debug.sh)
+GB64=$(base64 -w0 $(dirname "$0")/guest-debug.sh)
 ser "echo $GB64 | base64 -d > /tmp/gd.sh && wc -c /tmp/gd.sh && echo GD_READY" 60 10 | tail -3
 
 echo "== 后台执行调试脚本"
