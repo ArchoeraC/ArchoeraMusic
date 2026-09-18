@@ -31,6 +31,13 @@ ser() {
     { sleep 0.4; printf '\n'; sleep 0.4; printf '%s\n' "$cmd"; sleep "$wait"; } \
         | timeout "$total" socat - UNIX-CONNECT:"$SOCK" 2>/dev/null | tr -d '\r'
 }
+# 只读探测：**不发**任何输入，只看串口当前输出。
+# 为什么需要它：initrd 的 LUKS 口令提示会把任何输入当口令，若用 ser() 探测就会被
+# 吞掉一次（实测：口令被吃、要重试才能解锁，核对命令的输出也因此拿不到）。
+read_serial() {
+    local total="${1:-8}"
+    timeout "$total" socat -T "$((total - 1))" - UNIX-CONNECT:"$SOCK" </dev/null 2>/dev/null | tr -d '\r'
+}
 clean() {
     python3 -c "
 import sys,re
@@ -65,18 +72,22 @@ for i in $(seq 1 30); do
     fi
     sleep 6
     shot "boot-$(printf '%02d' "$i")"
-    out=$(ser "echo BOOTPROBE_$RANDOM" 25 5 || true)
-    # LUKS：initrd 会在 active console（hvc0）上提示输入口令
+    # 只读探测：只看输出，绝不输入（否则会吃掉 LUKS 口令提示 ✗）。
+    out=$(read_serial 8 || true)
     if printf '%s' "$out" | grep -qiE 'passphrase|password for'; then
         if [ -z "$LUKS_PASS" ]; then
             echo "!! 出现 LUKS 口令提示，但没给口令；请带第二参数重跑" >&2
             exit 1
         fi
         echo "== 检测到 LUKS 口令提示，输入口令…"
-        ser "$LUKS_PASS" 60 15 | clean | tail -5
+        ser "$LUKS_PASS" 90 12 | clean | tail -3
         continue
     fi
-    if printf '%s' "$out" | grep -q BOOTPROBE_; then booted=1; break; fi
+    # 已进系统：安装器把 console=hvc0 写进目标 cmdline，hvc0 上有 root 自动登录，
+    # 因此看到 root shell 提示符即视为启动完成。
+    if printf '%s' "$out" | grep -qE '\[root@|^[^[:space:]]*#[[:space:]]'; then
+        booted=1; break
+    fi
     [ $((i % 3)) -eq 0 ] && echo "… 等待启动（$((i*6))s）"
 done
 
