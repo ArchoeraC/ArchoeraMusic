@@ -105,7 +105,23 @@ if [ -d "$EXTRA_SRC" ]; then
     echo "    已加入 initrd 扩展：$(du -sh "$EXTRA_CPIO" | cut -f1)"
 fi
 
-cat "$SPLIT/microcode.initrd" "$SPLIT/initrd.raw" "$SPLIT/kernel-modules.initrd" "$EXTRA_CPIO" \
+# 早期固件：mkosi 生成的 initrd 只按「模块依赖」带固件，实测缺 Intel AX201 蓝牙所需的
+# `intel/ibt-0040-*`（只有 ibt-11-5/12-16），且 FirmwareInclude 也扩不到 modules initrd →
+# 真机表现为「无蓝牙适配器」。这里直接从镜像树把蓝牙/无线/有线固件目录补进合成 initrd。
+FW_CPIO="$WORK/initrd-fw.cpio"
+FW_ROOT="$WORK/initrd-fw"
+rm -rf "$FW_ROOT"; mkdir -p "$FW_ROOT"
+for d in intel/ibt intel/iwlwifi rtl_bt rtl_nic mediatek qca; do
+    src="$TREE/usr/lib/firmware/$d"
+    [ -e "$src" ] || continue
+    mkdir -p "$FW_ROOT/usr/lib/firmware/$(dirname "$d")"
+    cp -a "$src" "$FW_ROOT/usr/lib/firmware/$(dirname "$d")/"
+done
+(cd "$FW_ROOT" && find . -mindepth 1 | cpio -o -H newc --quiet) > "$FW_CPIO"
+echo "    已补早期固件：$(du -sh "$FW_CPIO" | cut -f1)"
+
+cat "$SPLIT/microcode.initrd" "$SPLIT/initrd.raw" "$SPLIT/kernel-modules.initrd" \
+    "$EXTRA_CPIO" "$FW_CPIO" \
     | zstd -T0 -3 -f -o "$BOOT/initramfs-linux.img"
 cp "$SPLIT/vmlinuz" "$BOOT/vmlinuz"
 cp "$SPLIT/BOOTX64.EFI" "$BOOT/BOOTX64.EFI"
