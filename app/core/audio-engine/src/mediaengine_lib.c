@@ -1620,37 +1620,8 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
 }
 
 
-/* sink 质量分类（供 UI 决策；启发式，non-canonical）：
-   - "hfp":   蓝牙通话/低质（<44.1kHz 或单声道且带 bluetooth/headset 特征）
-   - "low":   低质/单声道（无蓝牙特征）
-   - "a2dp":  蓝牙立体声（≥44.1kHz 2ch 且 bluetooth 特征）
-   - "hdmi"/"usb"/"internal": 按名称特征；无特征 = "unknown" */
-static const char *sink_class_str(const char *id, const char *name,
-                                  unsigned rate, unsigned channels)
-{
-    char buf[256];
-    size_t i;
-    const char *low = (rate > 0 && (rate < 44100 || channels < 2)) ? "y" : "";
-    int is_bt = 0, is_hdmi = 0, is_usb = 0;
-
-    snprintf(buf, sizeof(buf), "%s %s", id ? id : "", name ? name : "");
-    for (i = 0; i < strlen(buf); ++i) buf[i] = (char)tolower((unsigned char)buf[i]);
-    if (strstr(buf, "bluetooth") || strstr(buf, "bluez") ||
-        strstr(buf, "blue_") || strstr(buf, "headset") ||
-        strstr(buf, "head-unit")) is_bt = 1;
-    if (strstr(buf, "hdmi")) is_hdmi = 1;
-    if (strstr(buf, "usb")) is_usb = 1;
-
-    if (is_bt && low[0]) return "hfp";
-    if (is_bt) return "a2dp";
-    if (low[0]) return "low";
-    if (is_hdmi) return "hdmi";
-    if (is_usb) return "usb";
-    if (strstr(buf, "analog") || strstr(buf, "built") ||
-        strstr(buf, "speaker") || strstr(buf, "internal") ||
-        strstr(buf, "pci")) return "internal";
-    return "unknown";
-}
+/* sink 分类由 audio_output 模块的平台 provider 给出（player_sink_info.cls），
+   经 player_sink_class_str 转稳定字符串；旧名称启发式已迁入 audio_output_platform.c。 */
 
 int archoera_mediaengine_list_sinks(char *buf, int cap)
 {
@@ -1680,17 +1651,20 @@ int archoera_mediaengine_list_sinks(char *buf, int cap)
     for (i = 0; i < n; ++i) {
         char eid[PLAYER_SINK_ID_CAP * 2 + 8];
         char ename[PLAYER_SINK_ID_CAP * 2 + 8];
-        char item[PLAYER_SINK_ID_CAP * 8 + 128];
+        char edesc[PLAYER_SINK_ID_CAP * 2 + 8];
+        char item[PLAYER_SINK_ID_CAP * 8 + 192];
         json_escape_str(infos[i].id, eid, sizeof(eid));
         json_escape_str(infos[i].name, ename, sizeof(ename));
-        const char *cls = sink_class_str(infos[i].id, infos[i].name,
-                                        infos[i].sample_rate, infos[i].channels);
+        json_escape_str(infos[i].description, edesc, sizeof(edesc));
+        const char *cls = player_sink_class_str(infos[i].cls);
         snprintf(item, sizeof(item),
-                 "%s{\"id\":\"%s\",\"name\":\"%s\",\"rate\":%u,"
-                 "\"channels\":%u,\"default\":%s,\"class\":\"%s\"}",
-                 i ? "," : "", eid, ename,
+                 "%s{\"id\":\"%s\",\"name\":\"%s\",\"description\":\"%s\","
+                 "\"rate\":%u,\"channels\":%u,\"default\":%s,"
+                 "\"flags\":%u,\"class\":\"%s\"}",
+                 i ? "," : "", eid, ename, edesc,
                  infos[i].sample_rate, infos[i].channels,
-                 infos[i].is_default ? "true" : "false", cls);
+                 infos[i].is_default ? "true" : "false",
+                 infos[i].flags, cls);
         size_t ilen = strlen(item);
         if (used + ilen + 2 > (size_t)cap) {
             /* 缓冲区不足：写不下完整数组 → 失败（调用方加大 cap 重试） */

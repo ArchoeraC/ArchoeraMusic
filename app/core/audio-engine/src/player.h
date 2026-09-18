@@ -59,13 +59,19 @@ int player_sink_select(const player_sink_candidate *p_candidates,
 #define PLAYER_SINK_ID_CAP 256
 
 typedef struct {
-    char id[PLAYER_SINK_ID_CAP];    /* 后端原生 id（pulse sink 名 / alsa 设备名） */
+    char id[PLAYER_SINK_ID_CAP];    /* 后端原生 id（pulse sink 名 / alsa 设备名 / wasapi/coreaudio） */
     char name[PLAYER_SINK_ID_CAP];  /* 描述名（pulse description / alsa 友好名） */
+    char description[PLAYER_SINK_ID_CAP]; /* 副标题（类别/总线等，可空） */
     unsigned sample_rate;           /* nativeDataFormats[0].sampleRate（0=未知） */
     unsigned channels;              /* nativeDataFormats[0].channels（0=未知） */
     int has_native;                 /* native 格式已知 */
     int is_default;                 /* 系统当前默认 playback 设备 */
+    unsigned flags;                 /* AUDIO_OUTPUT_F_*（见 audio_output.h） */
+    int cls;                        /* AUDIO_OUTPUT_CLASS_*（见 audio_output.h） */
 } player_sink_info;
+
+/** 类别枚举 → 稳定字符串（player_list_sinks 结果的 JSON class 字段）。 */
+const char *player_sink_class_str(int cls);
 
 /**
  * 枚举全部播放 sink（含按设备取 native 格式）。
