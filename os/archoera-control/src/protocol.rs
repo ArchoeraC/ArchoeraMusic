@@ -21,5 +21,6 @@ pub mod generated {
 }
 
 pub use generated::archoera_shell_v1::{
-    ArchoeraShellV1, Capability, Event, MediaKey, OutputTransform, PowerKey, SessionState,
+    ArchoeraShellV1, Capability, Event, MediaKey, OutputFlag, OutputTransform, PowerKey,
+    SessionState,
 };

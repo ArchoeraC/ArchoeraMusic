@@ -23,7 +23,8 @@ use wayland_client::{
 };
 
 use protocol::{
-    ArchoeraShellV1, Capability, Event, MediaKey, OutputTransform, PowerKey, SessionState,
+    ArchoeraShellV1, Capability, Event, MediaKey, OutputFlag, OutputTransform, PowerKey,
+    SessionState,
 };
 
 fn main() -> ExitCode {
@@ -190,6 +191,75 @@ impl Dispatch<ArchoeraShellV1, ()> for ControlState {
             }
             Event::MediaKey { key } => {
                 println!("媒体键: {}", media_key_label(key.into_result().ok()));
+            }
+            Event::OutputInfo {
+                output,
+                name,
+                flags,
+            } => {
+                let f = flags.into_result().unwrap_or_else(|_| OutputFlag::empty());
+                if state.verbose {
+                    println!(
+                        "输出 {output}: {name}{}{}",
+                        if f.contains(OutputFlag::Enabled) {
+                            " enabled"
+                        } else {
+                            " disabled"
+                        },
+                        if f.contains(OutputFlag::Primary) {
+                            " primary"
+                        } else {
+                            ""
+                        }
+                    );
+                }
+            }
+            Event::OutputCurrent {
+                output,
+                width,
+                height,
+                scale_milli,
+                transform,
+                refresh_millihz,
+            } => {
+                if state.verbose {
+                    println!(
+                        "输出 {output} 当前: {width}x{height} @{:.2}Hz 缩放 {}% 变换 {transform:?}",
+                        refresh_millihz as f64 / 1000.0,
+                        scale_milli as f64 / 100.0
+                    );
+                }
+            }
+            Event::OutputMode {
+                output,
+                index,
+                width,
+                height,
+                refresh_millihz,
+                flags,
+            } => {
+                let f = flags.into_result().unwrap_or_else(|_| OutputFlag::empty());
+                if state.verbose {
+                    println!(
+                        "输出 {output} 模式 {index}: {width}x{height} @{:.2}Hz{}{}",
+                        refresh_millihz as f64 / 1000.0,
+                        if f.contains(OutputFlag::Current) {
+                            " *"
+                        } else {
+                            ""
+                        },
+                        if f.contains(OutputFlag::Preferred) {
+                            " !"
+                        } else {
+                            ""
+                        }
+                    );
+                }
+            }
+            Event::OutputModesEnd { output, count } => {
+                if state.verbose {
+                    println!("输出 {output} 模式共 {count} 项");
+                }
             }
             Event::PowerKey { key } => {
                 println!("电源键: {}", power_key_label(key.into_result().ok()));
