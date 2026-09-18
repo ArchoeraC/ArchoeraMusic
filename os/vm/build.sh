@@ -82,7 +82,23 @@ if [ "$PROFILE" = "vm" ]; then
         "$@"
 fi
 
-mkosi -C "$HERE" --force "$PROFILE" "$@"
+# 产物 / 工作区落盘位置可覆盖 —— 全量构建要写 ~20G（镜像树、6.4G raw、5G ISO），
+# 反复构建会明显磨损系统盘。把它指到大容量挂载点或内存盘即可：
+#   MKOSI_OUT_DIR=/run/media/<user>/<card>/dir    # 输出（raw/initrd/vmlinuz，单文件）
+#   MKOSI_WORK_DIR=/tmp/mkosi-ws                  # 工作区（构建期镜像树，含软链，须 POSIX）
+#   MKISO_WORK=/tmp/mkiso                         # mkiso 中间件（含软链，须 POSIX）
+#   MKISO_OUT=/run/media/<user>/<card>/archoera-live.iso
+MKOSI_EXTRA=()
+if [ -n "${MKOSI_OUT_DIR:-}" ]; then
+    mkdir -p "$MKOSI_OUT_DIR"
+    MKOSI_EXTRA+=(-O "$MKOSI_OUT_DIR")
+fi
+if [ -n "${MKOSI_WORK_DIR:-}" ]; then
+    mkdir -p "$MKOSI_WORK_DIR"
+    MKOSI_EXTRA+=(--workspace-directory "$MKOSI_WORK_DIR")
+fi
+
+mkosi -C "$HERE" --force "$PROFILE" "${MKOSI_EXTRA[@]}" "$@"
 rc=$?
 
 # Live profile：在 mkosi 的混合镜像基础上，用 xorriso 组装「标准 ISO」。
@@ -91,7 +107,7 @@ rc=$?
 # 标准形态见 mkiso.sh（root=ISO9660 + systemd.volatile=overlay；El Torito 指向
 # 小 FAT 映像里的 systemd-boot）。
 if [[ " $* " == *" --profile live "* ]] || [[ " $* " == *"--profile=live"* ]]; then
-    RAW="$HERE/mkosi.output/archoera-live.raw"
+    RAW="${MKOSI_OUT_DIR:-$HERE/mkosi.output}/archoera-live.raw"
     if [ -f "$RAW" ] && [ -x "$HERE/mkiso.sh" ]; then
         "$HERE/mkiso.sh" "$RAW"
     fi

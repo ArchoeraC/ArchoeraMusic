@@ -19,7 +19,10 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 IMG="${1:-$HERE/mkosi.output/archoera-live.raw}"
-OUT="$HERE/mkosi.output/archoera-live.iso"
+# 产物落盘位置可覆盖：构建耗盘（树/root/EFI/ISO 加起来 ~15G），把它指到大容量挂载点
+# 或内存盘可以避免反复磨损系统盘，例如：
+#   MKISO_OUT=/run/media/<user>/<card>/archoera-live.iso MKISO_WORK=/tmp/mkiso os/vm/mkiso.sh
+OUT="${MKISO_OUT:-$HERE/mkosi.output/archoera-live.iso}"
 # 工作目录：默认放**磁盘**缓存而不是 /tmp —— /tmp 往往是 tmpfs（内存），
 # 而这里要落 ~600MB 的 initrd、~650MB 的 efiboot.img 与整棵 rootfs 树，
 # 在 tmpfs 上会把内存吃光并报「设备上没有空间」。需要换位置用 MKISO_WORK=...
