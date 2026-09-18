@@ -93,6 +93,47 @@ impl Dispatch<ArchoeraShellV1, ()> for ArchoeraShell {
                     tracing::info!(?mode, "输出模式已更新");
                 }
             }
+            Request::OutputSetMode { output, index } => {
+                if !state.has_capability(Capability::Output) {
+                    tracing::debug!("会话无输出能力，忽略 output_set_mode");
+                    return;
+                }
+                // TODO(per-output)：按 output id 定位后切换到该输出的第 index 个模式。
+                tracing::info!(output, index, "output_set_mode（暂按主输出处理）");
+            }
+            Request::OutputSetScale {
+                output,
+                scale_milli,
+            } => {
+                if !state.has_capability(Capability::Output) {
+                    tracing::debug!("会话无输出能力，忽略 output_set_scale");
+                    return;
+                }
+                let scale = (scale_milli as f64 / 1000.0).clamp(1.0, 4.0);
+                if (state.output_scale - scale).abs() < f64::EPSILON {
+                    return;
+                }
+                state.output_scale = scale;
+                if let Err(err) = state.apply_output_config() {
+                    tracing::warn!(%err, "应用输出缩放失败");
+                } else {
+                    tracing::info!(output, scale, "输出缩放已更新");
+                }
+            }
+            Request::OutputSetTransform { output, transform } => {
+                if !state.has_capability(Capability::Output) {
+                    tracing::debug!("会话无输出能力，忽略 output_set_transform");
+                    return;
+                }
+                let code = transform.into_result().map(|v| v as u32).unwrap_or(0);
+                let tf = crate::backend::transform_from_code(code);
+                state.output_transform = tf;
+                if let Err(err) = state.apply_output_config() {
+                    tracing::warn!(%err, "应用输出变换失败");
+                } else {
+                    tracing::info!(output, ?tf, "输出变换已更新");
+                }
+            }
             Request::SetOutputTransform { transform } => {
                 if !state.has_capability(Capability::Output) {
                     tracing::debug!("会话无输出能力，忽略 set_output_transform");

@@ -9,7 +9,7 @@
     the terms of the GNU Affero General Public License v3.0 or later.
   </copyright>
 
-  <interface name="archoera_shell_v1" version="4">
+  <interface name="archoera_shell_v1" version="5">
     <description summary="ArchoeraOS 会话控制对象">
       ArchoeraOS 是一个「播放器即系统」的 kiosk 会话：ArchoeraMusic 以全屏
       特权客户端运行，通过本协议驱动合成器完成会话级操作（关机/重启/亮度/显示），
@@ -17,6 +17,12 @@
 
       本接口是全局对象，每个客户端绑定一次。合成器在 bind 时立即下发
       capabilities 与当前系统状态；客户端据此决定启用哪些系统功能入口。
+
+      v5 起显示控制改为 **per-output**：合成器用 output_info/output_current/
+      output_mode/output_modes_end 下发每个输出的名字、当前状态与**完整模式列表**
+      （分辨率 × 刷新率，带 current/preferred 标记），客户端用 output_set_mode
+      （按索引）/output_set_scale/output_set_transform 精确设置某个输出。
+      旧的 set_output_* 请求保留，作用于**主输出**（向后兼容）。
     </description>
 
     <enum name="capability" bitfield="true">
@@ -73,6 +79,14 @@
       <entry name="flipped_270" value="7"/>
     </enum>
 
+    <enum name="output_flag" bitfield="true">
+      <description summary="输出 / 模式的标记位"/>
+      <entry name="current" value="1" summary="该模式是当前使用中的模式（output_mode 中）"/>
+      <entry name="preferred" value="2" summary="该模式是显示器首选模式（output_mode 中）"/>
+      <entry name="enabled" value="4" summary="该输出已启用（output_info 中）"/>
+      <entry name="primary" value="8" summary="该输出是主输出（output_info 中）"/>
+    </enum>
+
     <request name="destroy" type="destructor">
       <description summary="销毁本地 shell 对象（不影响会话本身）"/>
     </request>
@@ -123,6 +137,26 @@
 
     <request name="set_output_transform">
       <description summary="设置输出变换（旋转/镜像），取值见 output_transform。仅 output 能力位可用时生效。"/>
+      <arg name="transform" type="uint" enum="output_transform"/>
+    </request>
+
+    <request name="output_set_mode">
+      <description summary="按索引切换某个输出的模式（索引来自该输出的 output_mode 列表）。
+        index 越界或输出不存在时静默忽略。仅 output 能力位可用时生效。"/>
+      <arg name="output" type="uint" summary="output_info 下发的输出 id"/>
+      <arg name="index" type="uint" summary="该输出模式列表中的下标"/>
+    </request>
+
+    <request name="output_set_scale">
+      <description summary="设置某个输出的缩放（千分数，1500 = 150%），夹取到 [1000, 4000]。
+        仅 output 能力位可用时生效。"/>
+      <arg name="output" type="uint" summary="输出 id"/>
+      <arg name="scale_milli" type="uint" summary="缩放 × 1000"/>
+    </request>
+
+    <request name="output_set_transform">
+      <description summary="设置某个输出的变换（旋转/镜像）。仅 output 能力位可用时生效。"/>
+      <arg name="output" type="uint" summary="输出 id"/>
       <arg name="transform" type="uint" enum="output_transform"/>
     </request>
 
@@ -188,5 +222,40 @@
       <arg name="transform" type="uint" enum="output_transform"/>
       <arg name="refresh_millihz" type="uint"/>
     </event>
+    <event name="output_info">
+      <description summary="一个输出出现（bind 时对每个输出各下发一次；之后热插拔时下发）。
+        name 为连接器名（如 eDP-1 / HDMI-A-1 / Virtual-1）。flags 见 output_flag。"/>
+      <arg name="output" type="uint"/>
+      <arg name="name" type="string"/>
+      <arg name="flags" type="uint" enum="output_flag"/>
+    </event>
+
+    <event name="output_current">
+      <description summary="某个输出的当前状态（bind 时下发一次，之后该输出变化时下发）。"/>
+      <arg name="output" type="uint"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="scale_milli" type="uint"/>
+      <arg name="transform" type="uint" enum="output_transform"/>
+      <arg name="refresh_millihz" type="uint"/>
+    </event>
+
+    <event name="output_mode">
+      <description summary="某个输出的一个可用模式；同一输出连续下发 count 条，
+        最后一条 output_modes_end 收尾（客户端据此重建下拉列表）。"/>
+      <arg name="output" type="uint"/>
+      <arg name="index" type="uint"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="refresh_millihz" type="uint" summary="刷新率 × 1000"/>
+      <arg name="flags" type="uint" enum="output_flag" summary="current / preferred 标记"/>
+    </event>
+
+    <event name="output_modes_end">
+      <description summary="某个输出的模式列表下发完毕（count 为该输出模式总数）。"/>
+      <arg name="output" type="uint"/>
+      <arg name="count" type="uint"/>
+    </event>
+
   </interface>
 </protocol>
