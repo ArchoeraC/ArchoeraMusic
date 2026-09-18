@@ -4575,6 +4575,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get netBtPairAuthorizeHint => '是否允许该设备与本机配对/连接？';
 
   @override
+  String get netBtPairNoCodeHint => '该设备不显示配对码（Just Works），是否允许配对？';
+
+  @override
   String get netBtPairedGroup => '已配对设备';
 
   @override

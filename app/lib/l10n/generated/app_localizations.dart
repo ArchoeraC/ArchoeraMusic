@@ -7994,6 +7994,12 @@ abstract class AppLocalizations {
   /// **'是否允许该设备与本机配对/连接？'**
   String get netBtPairAuthorizeHint;
 
+  /// No description provided for @netBtPairNoCodeHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'该设备不显示配对码（Just Works），是否允许配对？'**
+  String get netBtPairNoCodeHint;
+
   /// No description provided for @netBtPairedGroup.
   ///
   /// In zh_CN, this message translates to:

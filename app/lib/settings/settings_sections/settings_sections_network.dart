@@ -122,9 +122,13 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
       case BtPairPromptKind.confirm:
       case BtPairPromptKind.authorize:
       case BtPairPromptKind.unknown:
-        final body = prompt.kind == BtPairPromptKind.confirm
+        // passkey=0 表示这次是 Just Works（设备不显示配对码，常见于蓝牙耳机）：
+        // 没有码可核对，只问是否允许配对；有码时才提示「核对是否一致」。
+        final hasCode =
+            prompt.kind == BtPairPromptKind.confirm && prompt.passkey != 0;
+        final body = hasCode
             ? '${l10n.netBtPairConfirmHint}\n\n$code'
-            : l10n.netBtPairAuthorizeHint;
+            : l10n.netBtPairNoCodeHint;
         final ok = await SDialog.show<bool>(
           context,
           title: l10n.netBtPairTitle,

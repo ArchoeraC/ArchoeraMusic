@@ -1328,6 +1328,7 @@
   "netBtPairShowHint": "請在裝置上輸入此配對碼：",
   "netBtPairEnterHint": "請輸入裝置上顯示的配對碼或 PIN",
   "netBtPairAuthorizeHint": "是否允許該裝置與本機配對/連接？",
+  "netBtPairNoCodeHint": "該裝置不顯示配對碼（Just Works），是否允許配對？",
   "netBtPairedGroup": "已配對裝置",
   "netBtAvailableGroup": "可用裝置",
   "netBtConnect": "連接",

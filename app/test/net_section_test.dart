@@ -324,6 +324,17 @@ void main() {
     await tester.tap(find.text('确定'));
     await tester.pumpAndSettle();
     expect(net.calls, contains('btPairReply:true:654321'));
+
+    // Just Works（passkey=0，设备不显示码，如蓝牙耳机）：只问是否允许配对，
+    // 不能把 0 当成配对码展示。
+    net.emitPrompt(
+      const BtPairPrompt(kind: BtPairPromptKind.confirm, passkey: 0),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Just Works'), findsOneWidget);
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+    expect(net.calls, contains('btPairReply:true:'));
     expect(tester.takeException(), isNull);
   });
 

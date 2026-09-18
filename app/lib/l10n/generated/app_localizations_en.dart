@@ -4497,6 +4497,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get netBtPairAuthorizeHint => 'Allow this device to pair/connect?';
 
   @override
+  String get netBtPairNoCodeHint =>
+      'This device shows no pairing code (Just Works) — allow pairing?';
+
+  @override
   String get netBtPairedGroup => 'Paired devices';
 
   @override
