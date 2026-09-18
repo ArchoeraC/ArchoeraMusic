@@ -1,0 +1,9 @@
+# ArchoeraOS Live：tty3 由 kmscon 提供；用同名实例文件屏蔽 getty 别名，
+# 避免切到 tty3 时 logind 又拉起 getty 与 kmscon 互相 Conflict。
+[Unit]
+Description=ArchoeraOS Live：tty3 由 kmscon 提供
+After=systemd-user-sessions.service
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
