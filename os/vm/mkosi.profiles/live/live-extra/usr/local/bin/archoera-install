@@ -281,7 +281,10 @@ else
     ROOT_OPTS="root=PARTUUID=$NEWROOT_PARTUUID"
 fi
 [ -n "$ROOTFLAGS" ] && ROOT_OPTS="$ROOT_OPTS $ROOTFLAGS"
-CMDLINE="$ROOT_OPTS rw splash plymouth.ignore-serial-consoles"
+# ⚠ console=tty0 与 console=hvc0 都要给：systemd 只为「active console」实例化
+# serial-getty@hvc0，而镜像里的 root 自动登录 drop-in 挂在它下面。缺 console=hvc0
+# 时装出来的系统**串口没有任何 shell**，也无法在串口里输 LUKS 口令（无头排查口失效）。
+CMDLINE="$ROOT_OPTS rw splash plymouth.ignore-serial-consoles console=tty0 console=hvc0"
 mkdir -p "$TARGET/etc/kernel"
 printf '%s\n' "$CMDLINE" > "$TARGET/etc/kernel/cmdline"
 # 去掉 Live 的引导 token（mkosi 构建期写入的 "archoera-live"）：留着的话
