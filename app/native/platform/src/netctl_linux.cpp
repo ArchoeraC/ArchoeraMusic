@@ -942,10 +942,27 @@ int32_t btCallDevice(const char* address, const char* method, int timeout_ms) {
     if (bus == nullptr) return ERR_BACKEND;
     const std::string path = btDevicePathLocked(bus, address);
     if (path.empty()) return ERR_STATE;
-    DBusMessage* reply = callLocked(bus, kBlueZ, path.c_str(), kDevice1, method, timeout_ms);
-    if (reply == nullptr) return ERR_BACKEND;
-    dbus_message_unref(reply);
-    return OK;
+    DBusMessage* msg = dbus_message_new_method_call(kBlueZ, path.c_str(), kDevice1, method);
+    if (msg == nullptr) return ERR_BACKEND;
+    DBusError err;
+    dbus_error_init(&err);
+    DBusMessage* reply = dbus_connection_send_with_reply_and_block(bus, msg, timeout_ms, &err);
+    bool ok = reply != nullptr;
+    // 已经处于目标状态（已配对/已连接）视为成功，避免 UI 报假错误。
+    if (!ok && dbus_error_is_set(&err) && err.name != nullptr &&
+        (std::strstr(err.name, "AlreadyExists") != nullptr ||
+         std::strstr(err.name, "AlreadyConnected") != nullptr ||
+         std::strstr(err.name, "InProgress") != nullptr)) {
+        ok = true;
+    }
+    if (!ok && dbus_error_is_set(&err)) {
+        std::fprintf(stderr, "[netctl] %s 失败: %s (%s)\n", method, err.name ? err.name : "?",
+                     err.message ? err.message : "");
+    }
+    if (reply != nullptr) dbus_message_unref(reply);
+    if (dbus_error_is_set(&err)) dbus_error_free(&err);
+    dbus_message_unref(msg);
+    return ok ? OK : ERR_BACKEND;
 }
 
 int32_t btPair(const char* address) {

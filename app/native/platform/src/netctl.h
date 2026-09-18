@@ -37,6 +37,7 @@ int32_t btDisconnect(const char* address);
 int32_t btForget(const char* address);
 int32_t btSetEnabled(int32_t on);
 
+void netctlStart();
 void shutdown();
 
 }  // namespace netctl
