@@ -1,0 +1,89 @@
+#!/bin/bash
+# ArchoeraOS Live：在 initrd 阶段为 root 设备兜底。
+#
+# 背景：`root=LABEL=ARCHOERA_LIVE` 要求内核里存在承载该 ISO9660 的块设备。
+# 光驱（El Torito）、dd 到 U 盘都没问题；但 **Ventoy 正常模式**是用它自己的 grub
+# 从 ISO 里取出内核/initrd 直接启动，不会给 booted 内核留下指向该 ISO 的块设备
+# → LABEL 永远不出现 → 卡在 `A start job is running for /dev/disk/by-label/...`。
+#
+# 这里做两件事：
+#   1) 若引导器传了 archiso 风格的 `img_dev=` / `img_loop=`，直接采用；
+#   2) 否则扫描本地分区（Ventoy 的 exFAT 分区等）里的 *.iso，用 blkid 校验卷标，
+#      命中就 losetup 挂上 → udev 生成 /dev/disk/by-label/ARCHOERA_LIVE → root 可用。
+set -u
+
+LABEL=ARCHOERA_LIVE
+MNT=/run/archoera-mnt
+say() { echo "archoera-live: $*" > /dev/console 2>/dev/null || true; }
+
+modprobe loop >/dev/null 2>&1 || true
+for m in exfat vfat nls_cp437 nls_ascii ntfs3 isofs; do
+    modprobe "$m" >/dev/null 2>&1 || true
+done
+
+# 尝试把一个 ISO 文件挂成 loop 设备；成功（卷标匹配）返回 0 且保持挂载。
+try_loop() {
+    local f="$1" loop lbl
+    [ -f "$f" ] || return 1
+    loop=$(losetup --find --show --read-only "$f" 2>/dev/null) || return 1
+    lbl=$(blkid -o value -s LABEL "$loop" 2>/dev/null)
+    if [ "$lbl" = "$LABEL" ]; then
+        say "命中 ISO: $f → $loop (LABEL=$lbl)"
+        return 0
+    fi
+    losetup -d "$loop" 2>/dev/null || true
+    return 1
+}
+
+mkdir -p "$MNT"
+
+# 显式参数优先（archiso 风格：img_dev=/dev/sda1 img_loop=/archoera-live.iso）
+if [ -n "${img_dev:-}" ] && [ -n "${img_loop:-}" ]; then
+    if mount -o ro "$img_dev" "$MNT" 2>/dev/null; then
+        if try_loop "$MNT$img_loop"; then
+            umount "$MNT" 2>/dev/null || true
+            udevadm trigger --settle >/dev/null 2>&1 || true
+            exit 0
+        fi
+        umount "$MNT" 2>/dev/null || true
+    fi
+fi
+
+# 扫描本地块设备（含整盘；分区还没枚举出来时靠外层循环重试）。
+# 命中则 losetup 保持挂载并返回 0。
+scan_once() {
+    local dev f found=0
+    for dev in /dev/sd*[0-9] /dev/hd*[0-9] /dev/vd*[0-9] /dev/nvme*n*p[0-9] /dev/mmcblk*p[0-9] \
+               /dev/sd[a-z] /dev/vd[a-z] /dev/nvme*n[0-9]; do
+        [ -b "$dev" ] || continue
+        mount -o ro "$dev" "$MNT" 2>/dev/null || continue
+        found=0
+        while IFS= read -r f; do
+            if try_loop "$f"; then found=1; break; fi
+        done < <(find "$MNT" -maxdepth 4 -type f -iname '*.iso' 2>/dev/null | head -20)
+        umount "$MNT" 2>/dev/null || true
+        if [ "$found" = 1 ]; then
+            say "命中设备 $dev"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# 主循环：**每轮先看 by-label**（光驱/dd 很快就有，看到就立刻退出，不做任何扫描）；
+# 从第 2 轮起才开始扫描本地分区（Ventoy 等把 ISO 当文件的场景）。
+for i in 1 2 3 4 5 6 7 8; do
+    if [ -e "/dev/disk/by-label/$LABEL" ]; then
+        [ "$i" -gt 1 ] && say "by-label 已出现，跳过扫描"
+        exit 0
+    fi
+    if [ "$i" -ge 2 ] && scan_once; then
+        udevadm trigger --settle >/dev/null 2>&1 || true
+        exit 0
+    fi
+    udevadm settle --timeout=3 >/dev/null 2>&1 || true
+    sleep 2
+done
+
+say "本地介质上没有找到 LABEL=$LABEL 的 ISO（Ventoy 用户可改用 dd 或 memdisk 模式）"
+exit 0

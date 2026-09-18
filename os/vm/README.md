@@ -24,6 +24,76 @@ os/vm/build.sh vm
 时自带 GPU）与输入设备：`virtio-keyboard-pci` / `virtio-tablet-pci` /
 `virtio-multitouch-pci`（多点触摸，供触摸与屏幕键盘验证）。RAM 默认 2G（≤ 4G）。
 
+## Live 介质 / 标准 ISO（`mkiso.sh`）
+
+Live 镜像（`build.sh build --profile live`）产出的是 **mkosi 混合镜像**：El Torito 引导项
+指向镜像内的 ESP **分区**。Ventoy/光盘把 ISO 当 CD（2048 字节扇区）暴露时，镜像里的 GPT
+分区对内核不可见 → 卡在设备枚举（`root=PARTUUID` 永不出现）。
+
+`os/vm/mkiso.sh` 用 **xorriso** 把它重打包成**标准 ISO**（与 archiso 同构）：
+
+```bash
+os/vm/build.sh build --profile live     # mkosi 构建（收尾会自动调用 mkiso.sh）
+# 单独对已有镜像组装（中间产物可缓存复用，加速迭代）：
+MKISO_WORK=~/.cache/archoera-mkiso os/vm/mkiso.sh mkosi.output/archoera-live.raw
+```
+
+- **root = ISO9660 本身**（只读）+ `systemd.volatile=overlay`（tmpfs 可写层）：
+  内核参数 `root=LABEL=ARCHOERA_LIVE rootfstype=iso9660`，不再依赖镜像内 `PARTUUID`，
+  因此 Ventoy 的「CD 暴露」方式也能挂上 root。
+- **El Torito 载荷是一个小 FAT 映像**（`EFI/BOOT/efiboot.img`），里面同时放
+  **systemd-boot、`loader/entries/archoera.conf`、以及内核与 initrd 本体**。
+  ⚠ **关键**：systemd-boot 只在**它自己所在的卷**里解析条目的 `linux`/`initrd` 路径。
+  把内核留在 ISO9660 上会「静默失败」——固件启动项一闪，直接回退固件菜单
+  （实测 OVMF 打印 `BdsDxe: starting Boot0002 "UEFI QEMU DVD-ROM"` 之后无任何输出，
+  随后进入 `Reboot Into Firmware Interface` 倒计时）。archiso 同理：它的 El Torito
+  FAT 里就带着 `/arch/boot/x86_64/vmlinuz-linux` + `initramfs-linux.img`。
+- 同一套引导文件也放在 **ISO9660 的相同路径**（`/archoera/boot/**`、`/EFI/BOOT/BOOTX64.EFI`、
+  `/loader/**`），便于 Ventoy/其它能读 ISO9660 的引导器。
+- `xorriso -z`（zisofs **透明压缩**）：6.2G 混合镜像 → ~3.9G ISO。内核
+  `CONFIG_ZISOFS=y` 直接透明解压，无需自定义 initrd/hook。
+- 引导用 mkosi 的**三件套**合成**单个** initrd（`microcode.initrd` + `initrd` +
+  `<kver>/kernel-modules.initrd`）：只有 `kernel-modules.initrd` 带模块元数据
+  （`modules.alias`/`modules.dep`），缺它 udev 就无法按 modalias 加载 `sr_mod`/
+  `usb-storage` 等 → 光驱 `/dev/sr0` 永不出现 → 卡在 `by-label` 等待
+  （`initramfs-linux.img` 正是没有模块元数据的那一个）。
+  ⚠ 合成必须「先解开压缩成员 → 裸 cpio 拼接 → 再整体压成一个归档」；直接 `cat`
+  「压缩成员 + 裸 cpio」会被内核解压器吞掉（实测失败），三件套分三段传也有同样风险。
+- ISO 根只读：**必须预置有效的 `/etc/machine-id`**（脚本写入 32 位十六进制），否则
+  `systemd-firstboot` 每次开机都会占住 tty1 跑文本向导（镜像里该文件是 `uninitialized`），
+  kiosk 永远起不来；entry 另加 `systemd.firstboot=no` 兜底。安装器会在目标盘**重新生成**
+  有效 machine-id（`systemd-machine-id-setup --root=`）——留空会让装出来的系统首启再弹一次向导。
+- 实测（QEMU/KVM，最终 ISO）：**光驱** ~20~40s 进 kiosk（10s 出播放器启动画面）、
+  **Ventoy 正常模式**（USB exFAT 分区里放 ISO）~20~50s，日志为
+  `命中 ISO: … → /dev/loop0` → `Found device /dev/disk/by-label/ARCHOERA_LIVE` → `Mounted /sysroot`；
+  光驱/dd 路径下定位单元直接跳过（`by-label 已出现，跳过扫描`），零额外延迟。
+- **Ventoy「正常模式」兜底**：Ventoy 用它自己的 grub 从 ISO 里取出内核/initrd 直接启动，
+  但**不会**给 booted 内核留下指向该 ISO 的块设备 → `root=LABEL=` 会一直等不到。
+  为此合成 initrd 里追加了 `archoera-iso-locate.service`（源码在
+  `os/vm/live-initrd-extra/`，`mkiso.sh` 以**裸 cpio** 拼进合成 initrd）：先认 archiso 风格的
+  `img_dev=`/`img_loop=`，否则扫描本地分区（含 Ventoy 的 exFAT 分区）里的 `*.iso`，
+  用 `blkid` 核对卷标后 `losetup` 挂上 → udev 生成 `by-label` 链接（带重试，USB 枚举有时间差）。
+  光驱/dd 启动时 `by-label` 早已存在，该单元会被 `ConditionPathExists` 跳过，不产生开销。
+- **已验证全链路**（QEMU/KVM + OVMF，`-drive media=cdrom`）：固件 → El Torito FAT 里的
+  systemd-boot → 内核 → 合成 initrd → `root=LABEL=ARCHOERA_LIVE rootfstype=iso9660`
+  + `systemd.volatile=overlay` → 进 kiosk（真实播放器界面）。
+
+### 引导目录形态（不必手工改）
+
+EDK2 的 `MdeModulePkg/Universal/Disk/PartitionDxe/ElTorito.c` 表明：固件**不检查
+platform 字节**（只看 `0x88` 指示字与 `LBA != 0`），且 **`SectorCount < 2` 时按
+「整个 CD 区」建立子设备**。因此 xorriso 写出的 `validation platform=0xEF`、
+`SectorCount=0`、no-emulation 的目录完全可用——无需手工改成
+「validation=0x00 + section header 0xEF」的形态。用 QEMU 以**光驱**方式验证：
+
+```bash
+qemu-system-x86_64 -machine q35,accel=kvm -m 2048 -smp 2 \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd \
+  -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd \
+  -drive file=mkosi.output/archoera-live.iso,media=cdrom,readonly=on,format=raw \
+  -display none -device virtio-gpu-pci -device virtio-keyboard-pci
+```
+
 ## 镜像内容 / 自动启动
 
 - 标准内核 `linux` + systemd + `mesa`/`libdrm`/`libinput`/`libxkbcommon`/`seatd`/`dbus`

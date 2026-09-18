@@ -85,14 +85,15 @@ fi
 mkosi -C "$HERE" --force "$PROFILE" "$@"
 rc=$?
 
-# Live profile：产物（El Torito 混合镜像）同时是 ISO —— 硬链接一份 .iso 便于刻录/分发
-# （同 inode，不额外占空间）。注意必须在构建**之后**执行。
+# Live profile：在 mkosi 的混合镜像基础上，用 xorriso 组装「标准 ISO」。
+# 为什么不用 mkosi 的 El Torito：它指向镜像内的 ESP 分区；Ventoy/光盘把 ISO 当
+# CD（2048 字节扇区）暴露时，镜像内 GPT 分区对内核不可见 → 卡在设备枚举。
+# 标准形态见 mkiso.sh（root=ISO9660 + systemd.volatile=overlay；El Torito 指向
+# 小 FAT 映像里的 systemd-boot）。
 if [[ " $* " == *" --profile live "* ]] || [[ " $* " == *"--profile=live"* ]]; then
     RAW="$HERE/mkosi.output/archoera-live.raw"
-    if [ -f "$RAW" ]; then
-        ln -f "$RAW" "$HERE/mkosi.output/archoera-live.iso"
-        echo "==> Live ISO: $HERE/mkosi.output/archoera-live.iso"
-        echo "    写 U 盘: dd if=mkosi.output/archoera-live.iso of=/dev/sdX bs=4M status=progress oflag=sync"
+    if [ -f "$RAW" ] && [ -x "$HERE/mkiso.sh" ]; then
+        "$HERE/mkiso.sh" "$RAW"
     fi
 fi
 exit $rc

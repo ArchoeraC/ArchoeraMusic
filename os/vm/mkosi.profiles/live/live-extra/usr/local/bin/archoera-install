@@ -134,11 +134,15 @@ cat > "$TARGET/etc/fstab" <<EOF
 UUID=$(blkid -s UUID -o value "$ROOT") /     ext4 rw,relatime 0 1
 UUID=$(blkid -s UUID -o value "$ESP")  /boot vfat rw,relatime,fmask=0022,dmask=0022 0 2
 EOF
-# 目标系统不再是 Live：移除标记与 Live 专用单元，重置 machine-id。
+# 目标系统不再是 Live：移除标记与 Live 专用单元。
+# machine-id 要**重新生成一个有效值**（而不是留空）：留空会让 systemd-firstboot
+# 在目标系统首启时跑文本向导、占住 tty1，kiosk 起不来。
 rm -f "$TARGET/etc/archoera-live" \
       "$TARGET/etc/systemd/system/multi-user.target.wants/archoera-install.service" \
       "$TARGET/usr/lib/systemd/system/archoera-install.service"
-: > "$TARGET/etc/machine-id"
+rm -f "$TARGET/etc/machine-id"
+systemd-machine-id-setup --root="$TARGET" >/dev/null 2>&1 \
+    || printf '%s\n' "$(tr -d '-' </proc/sys/kernel/random/uuid)" > "$TARGET/etc/machine-id"
 sync
 
 step 96 "卸载"

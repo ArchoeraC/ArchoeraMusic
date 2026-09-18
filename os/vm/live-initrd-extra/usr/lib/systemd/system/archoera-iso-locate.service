@@ -1,0 +1,18 @@
+[Unit]
+Description=ArchoeraOS Live: locate the live ISO image on local media (Ventoy fallback)
+Documentation=file:///usr/lib/archoera/iso-locate
+DefaultDependencies=no
+Wants=systemd-udevd.service
+After=systemd-udevd.service
+Before=initrd-root-device.target sysroot.mount
+ConditionPathExists=!/dev/disk/by-label/ARCHOERA_LIVE
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/archoera/iso-locate
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=initrd-root-device.target
