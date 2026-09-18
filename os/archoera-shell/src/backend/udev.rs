@@ -86,6 +86,8 @@ pub struct UdevBackend {
     surfaces: HashMap<crtc::Handle, UdevSurface>,
     /// 连接器扫描器：保留状态以支持热插拔增量扫描（Connected / Disconnected）。
     scanner: DrmScanner,
+    /// 本次 render 是否真的向 DRM 提交了帧（空帧不提交、也就没有 vblank）。
+    pub frame_queued: bool,
 }
 
 impl UdevBackend {
@@ -160,6 +162,7 @@ impl UdevBackend {
         space: &Space<Window>,
         pointer: &PointerElement,
     ) -> anyhow::Result<()> {
+        self.frame_queued = false;
         for (crtc, surface) in self.surfaces.iter_mut() {
             // DRM 合成器要求元素按「前 → 后」排列（最上层在前）：光标置顶，
             // 其后才是窗口与候选窗口，否则会被不透明的全屏窗口直接盖掉/跳过。
@@ -200,8 +203,9 @@ impl UdevBackend {
             ) {
                 Ok(result) => {
                     if !result.is_empty {
-                        if let Err(err) = surface.drm_output.queue_frame(()) {
-                            tracing::warn!(?crtc, ?err, "提交 DRM 帧失败");
+                        match surface.drm_output.queue_frame(()) {
+                            Ok(()) => self.frame_queued = true,
+                            Err(err) => tracing::warn!(?crtc, ?err, "提交 DRM 帧失败"),
                         }
                     }
                 }
@@ -353,6 +357,7 @@ pub fn init_udev(
         libinput: libinput_context.clone(),
         surfaces,
         scanner,
+        frame_queued: false,
     };
     data.state
         .setup_dmabuf(backend.renderer(), Some(node.dev_id()));

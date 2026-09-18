@@ -132,6 +132,8 @@ pub struct ArchoeraShell {
     /// udev：已有一帧交给 DRM、等 vblank 回收。用于把「一帧在飞行中」期间的
     /// 多次脏标记合并成一次合成（否则每个输入事件都会做一次全屏合成）。
     frame_in_flight: bool,
+    /// 上次 `render_frame` 的单调毫秒（用于门控自愈）。
+    last_render_ms: u64,
 }
 
 impl ArchoeraShell {
@@ -232,6 +234,7 @@ impl ArchoeraShell {
             idle_reason: None,
             needs_redraw: false,
             frame_in_flight: false,
+            last_render_ms: 0,
         }
     }
 
@@ -306,11 +309,15 @@ impl ArchoeraShell {
     /// 客户端提交（不会发生：渲染不派发客户端消息），标志会被重新置位。
     pub fn render_frame(&mut self) -> anyhow::Result<()> {
         self.needs_redraw = false;
-        self.frame_in_flight = true;
+        self.last_render_ms = monotonic_now().as_millis() as u64;
         tracing::trace!("合成一帧");
 
         if let Some(backend) = self.backend.as_mut() {
             backend.render(&self.space, &self.cursor)?;
+            // 只有真的提交了 DRM 帧才算「一帧在飞行中」：空帧不会产生 vblank，
+            // 若也置位就会把后续的 schedule_redraw 永久挡掉（表现为画面定住，
+            // 切 VT 回来走 ActivateSession 直接合成、于是又正常几帧）。
+            self.frame_in_flight = backend.last_render_queued();
         }
 
         self.space.refresh();
@@ -604,7 +611,13 @@ impl ArchoeraShell {
         #[cfg(not(feature = "udev"))]
         let is_udev = false;
         if is_udev && self.frame_in_flight {
-            return;
+            // 自愈：超过 ~50ms 没有新的合成（约两帧 @60Hz），认为 vblank 丢了/被吞了，
+            // 放行一次以免画面永久卡住。
+            let now = monotonic_now().as_millis() as u64;
+            if now.saturating_sub(self.last_render_ms) < 50 {
+                return;
+            }
+            self.frame_in_flight = false;
         }
         let space = &self.space;
         let cursor = &self.cursor;

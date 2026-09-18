@@ -199,6 +199,17 @@ impl Backend {
         }
     }
 
+    /// 上一次 `render()` 是否真的提交了帧（udev 空帧不提交，也就没有 vblank）。
+    /// 用于把「一帧在飞行中」的多次脏标记合并成一次合成，同时避免空帧把门控卡死。
+    #[cfg_attr(not(feature = "udev"), allow(unused_variables))]
+    pub fn last_render_queued(&self) -> bool {
+        match self {
+            Backend::Winit(_) => false,
+            #[cfg(feature = "udev")]
+            Backend::Udev(backend) => backend.frame_queued,
+        }
+    }
+
     /// 切换 VT（Ctrl+Alt+Fn 转发给 libseat/logind）。
     ///
     /// DRM/KMS 会话处于 `KD_GRAPHICS` 时内核**不再处理** VT 切换组合键，必须由合成器转发，
