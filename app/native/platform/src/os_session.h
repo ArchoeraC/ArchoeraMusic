@@ -47,6 +47,10 @@ int32_t setOutputScale(int32_t scaleMilli);
 int32_t setOutputMode(int32_t width, int32_t height);
 int32_t setOutputTransform(int32_t transform);
 
+// 注入按键（屏幕键盘；仅合成器置位 keyboard 能力时生效）。
+// keycode 为 evdev 键码（KEY_*），pressed true=按下 false=释放。
+int32_t key(int32_t keycode, bool pressed);
+
 // 断开连接、停止泵线程（apl_shutdown）。
 void shutdown();
 

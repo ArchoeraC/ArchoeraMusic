@@ -111,7 +111,7 @@ archoera-shell/src/
 ├── cli.rs           启动参数（socket / 会话命令 / 后端 / 音量 / 退出策略）
 ├── state.rs         ArchoeraShell 中心状态、listener、广播 helper、ClientState
 ├── kiosk.rs         全屏 / 无装饰 / 单窗口策略
-├── input.rs         媒体键映射（evdev → XKB keycode = evdev+8）
+├── input.rs         指针/触摸/键盘事件；媒体键映射；屏幕键盘按键注入（evdev → XKB keycode = evdev+8）
 ├── protocol/        自定义协议服务端绑定（proc-macro 展开）
 ├── handlers/        compositor+shm / dmabuf / xdg_shell(+decoration) / seat+data_device+output+idle_inhibit / archoera_shell_v1
 ├── control/         logind.rs + brightness.rs + battery.rs（策略/机制分层）
@@ -161,7 +161,7 @@ archoera-shell/src/
 
 ---
 
-## 7. `archoera_shell_v1` 协议（version 3）
+## 7. `archoera_shell_v1` 协议（version 4）
 
 全局对象，每客户端绑定一次；bind 时立即下发 `capabilities` + 当前状态（亮度/音量/电池/屏幕/会话）。
 
@@ -176,6 +176,7 @@ archoera-shell/src/
 | request | `set_output_scale` (v3) | `scale_milli: uint`（1000-4000；夹取） |
 | request | `set_output_mode` (v3) | `width/height: uint`（0,0 = 首选模式） |
 | request | `set_output_transform` (v3) | `transform: enum output_transform`（同 wl_output） |
+| request | `key` (v4) | `keycode: uint`（evdev `KEY_*`）/ `state: uint`（0=释放 1=按下） |
 | event | `capabilities` | `flags: uint`（bitfield） |
 | event | `brightness_changed` / `volume_changed` | `percent: uint` |
 | event | `media_key` | `key: enum media_key` |
@@ -186,9 +187,20 @@ archoera-shell/src/
 | event | `output_state` (v3) | `width/height/scale_milli/transform/refresh_millihz: uint` |
 
 能力位：`brightness=1`、`power=2`、`volume=4`、`media_keys=8`、`battery=16`、
-`suspend=32`、`power_key=64`、`screen=128`、`output=256`（`screen`/`output` 仅 udev
-后端置位；`output` 支持运行时改分辨率/缩放/旋转，缩放经分数缩放下发给客户端）。
+`suspend=32`、`power_key=64`、`screen=128`、`output=256`、`keyboard=512`（`screen`/`output`
+仅 udev 后端置位；`output` 支持运行时改分辨率/缩放/旋转，缩放经分数缩放下发给客户端；
+`keyboard` 与硬件无关、始终置位，表示可经 `key` 注入按键）。
 **未置位的请求被静默忽略**（不报协议错误），保证前后兼容与降级安全。
+
+**触摸与屏幕键盘（v4）**：座位新增 `wl_touch`——触摸按下即命中窗口、置顶并把键盘
+焦点交给它，使输入框重新获得焦点、`zwp_text_input_v3` / `zwp_input_method_v2` 随之
+激活（触摸设备常无物理键盘）。合成器另注册 `zwp_virtual_keyboard_v1`：fcitx5 的
+Wayland 前端**同时**要求 `zwp_input_method_v2` 与 `zwp_virtual_keyboard_v1` 两个全局
+才会初始化输入上下文，缺后者时它根本不抓取键盘，表现为「快捷键切不了输入法」。
+播放器内置屏幕键盘（`app/lib/widgets/common/touch_keyboard/`）仅在 `keyboard` 能力位置位
+时出现，触摸聚焦文本输入框自动弹出；按键经 `key` 请求注入**座位键盘**（而非直接走
+`zwp_virtual_keyboard_v1`），因此与物理键盘同路径：先由 fcitx5 的键盘抓取消费
+（拼音、候选、中英切换），未被消费的按键再转发给焦点客户端。
 
 设置侧：播放器「设置 → 系统」新增**显示**组（缩放 100-200%、常见分辨率、旋转
 0/90/180/270，经上述 v3 请求运行时生效）与**系统状态**汇总（会话/输出/亮度/电池/
@@ -269,7 +281,7 @@ cargo check -p archoera-shell --features udev
 2. `archoera-control --socket archoera-wl status`：
 
    ```
-   能力: power, volume, media_keys, battery
+   能力: power, volume, media_keys, battery, keyboard
    亮度: 不可用
    音量: 100%
    电池: 84%（充电中）
@@ -329,7 +341,10 @@ GTK3 + EGL/Impeller 全屏渲染、dmabuf 导入与桌面方向均正确。踩�
 - 媒体键（含音量键）复用既有 `APL_EVENT_MEDIA_COMMAND` 通道 → 播放控制器；
 - 电源键 / 亮度 / 电池 / 会话态直接观察，`shutting_down` / `suspending` 前暂停播放；
 - 播放器音量变化镜像回合成器（`apl_os_set_volume`），系统侧状态一致；
-- 关机 / 重启 / 挂起 / 熄屏等请求由 UI 经 `PlatformCapabilities.os` 下发。
+- 关机 / 重启 / 挂起 / 熄屏等请求由 UI 经 `PlatformCapabilities.os` 下发；
+- **屏幕键盘**：`SystemOsSession.key()`（`apl_os_key` → `archoera_shell_v1.key`）把 OSK
+  按键注入合成器座位键盘，输入法可正常消费（见 §7）。OSK 仅在 `keyboard` 能力位置位
+  时启用，触摸聚焦文本输入框自动弹出，桌面鼠标/键盘用户不受影响。
 
 协议请求-事件往返已端到端验证（`set_volume(42)` → 合成器状态 42 → `volume_changed(42)`
 回传）；硬件媒体键触发待真机。

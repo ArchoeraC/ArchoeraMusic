@@ -52,6 +52,9 @@ class FfiSystemOsSession implements SystemOsSession {
       _b.osSetOutputTransform(transform);
 
   @override
+  int key(int keycode, int state) => _b.osKey(keycode, state);
+
+  @override
   Stream<int> get capabilities => _b.osCapabilitiesEvents.map((e) => e.caps);
 
   @override

@@ -54,6 +54,9 @@ impl ControlPlane {
         capabilities |= Capability::Volume | Capability::MediaKeys;
         // 电源键 / 睡眠键由输入后端映射后广播，始终置位。
         capabilities |= Capability::PowerKey;
+        // 键盘注入（屏幕键盘 → 合成器 → 焦点客户端/输入法）始终可用：
+        // 与硬件无关，直接走座位键盘路径。
+        capabilities |= Capability::Keyboard;
         if battery.is_some() {
             capabilities |= Capability::Battery;
         }

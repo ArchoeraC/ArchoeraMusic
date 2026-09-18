@@ -49,6 +49,8 @@ int32_t osSessionHibernate();
 int32_t osSessionSetOutputScale(int32_t scaleMilli);
 int32_t osSessionSetOutputMode(int32_t width, int32_t height);
 int32_t osSessionSetOutputTransform(int32_t transform);
+// 注入按键（屏幕键盘）：keycode 为 evdev 键码，pressed true=按下。
+int32_t osSessionKey(int32_t keycode, int32_t pressed);
 
 int32_t notify(const char* title, const char* body);
 

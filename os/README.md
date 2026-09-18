@@ -31,7 +31,7 @@ os/
 │       ├── cli.rs                 # 启动参数
 │       ├── state.rs               # 全局状态 + Wayland listener
 │       ├── kiosk.rs               # 全屏 / 无装饰 / 单窗口策略
-│       ├── input.rs               # 媒体键映射
+│       ├── input.rs               # 指针/触摸/键盘事件 + 媒体键映射 + 屏幕键盘按键注入
 │       ├── protocol/              # 自定义协议服务端绑定（proc-macro）
 │       ├── handlers/              # compositor / xdg-shell / dmabuf / archoera_shell_v1
 │       ├── control/               # logind / 背光 / 电池 控制面
@@ -162,7 +162,7 @@ archoera-control [--socket <name>] [命令]
 | `hibernate` | 休眠到磁盘 |
 | `screen <on\|off>` | 开关屏幕（DPMS，仅 udev 后端通告能力） |
 
-## `archoera_shell_v1` 协议速览（version 2）
+## `archoera_shell_v1` 协议速览（version 4）
 
 全局对象，每个客户端绑定一次；合成器在 bind 时立即下发 `capabilities` 与当前状态。
 
@@ -174,17 +174,34 @@ archoera-control [--socket <name>] [命令]
 | request | `set_brightness(percent)` | 设置背光（0-100） |
 | request | `set_volume(percent)` | 设置会话音量（由播放器落实） |
 | request | `set_screen_enabled(enabled)` | 开关屏幕（DPMS，仅 `screen` 能力可用时） |
-| event | `capabilities(flags)` | 能力位：`brightness=1` `power=2` `volume=4` `media_keys=8` `battery=16` `suspend=32` `power_key=64` `screen=128` |
+| request | `set_output_scale(scale_milli)` (v3) | 输出缩放千分数（1000-4000，夹取） |
+| request | `set_output_mode(width, height)` (v3) | 输出分辨率（0,0 = 首选） |
+| request | `set_output_transform(transform)` (v3) | 输出旋转/镜像（同 `wl_output`） |
+| request | `key(keycode, state)` (v4) | 注入按键（evdev `KEY_*`；0=释放 1=按下） |
+| event | `capabilities(flags)` | 能力位：`brightness=1` `power=2` `volume=4` `media_keys=8` `battery=16` `suspend=32` `power_key=64` `screen=128` `output=256` `keyboard=512` |
 | event | `brightness_changed` / `volume_changed` | 当前值（0-100） |
 | event | `media_key(key)` | `play_pause/next/previous/stop/volume_up/volume_down/mute` |
 | event | `power_key(key)` | `power` / `sleep` / `suspend`（KEY_POWER / KEY_SLEEP / KEY_SUSPEND） |
 | event | `battery(present, percent, charging)` | 电池状态 |
 | event | `session(state)` | `ready` / `shutting_down` / `suspending` |
 | event | `screen_enabled_changed(enabled)` | 屏幕开关状态 |
+| event | `output_state(...)` (v3) | 主输出宽高/缩放/旋转/刷新率 |
 
 未置位的能力对应请求会被**静默忽略**（不产生协议错误），客户端不应据此崩溃。
 `session = suspending` 在挂起/休眠**之前**广播（播放器可暂停 / 保存），恢复后回到
 `ready`；`shutting_down` 仍在电源动作前广播。
+
+### 触摸与屏幕键盘
+
+- 座位提供 `wl_touch`：触摸按下即命中窗口、置顶并置键盘焦点，驱动 `zwp_text_input_v3` /
+  `zwp_input_method_v2` 激活（触摸设备常无物理键盘）。
+- 合成器注册 `zwp_virtual_keyboard_v1`：fcitx5 的 Wayland 前端**同时**要求
+  `zwp_input_method_v2` 与 `zwp_virtual_keyboard_v1` 才会初始化输入上下文；缺后者时
+  它不抓取键盘，表现为「快捷键切不了输入法」。
+- `key` 请求走**座位键盘**路径（而非直接 `zwp_virtual_keyboard_v1`）：先由 fcitx5 的
+  键盘抓取消费（拼音 / 候选 / 中英切换），未被消费的按键再转发给焦点客户端。
+- 播放器内置 OSK（`app/lib/widgets/common/touch_keyboard/`）在 `keyboard` 能力位可用时，
+  触摸聚焦文本输入框自动弹出；桌面鼠标/键盘用户不受影响。
 
 ## 平台与权限
 

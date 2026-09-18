@@ -39,6 +39,7 @@ use smithay::{
         shm::ShmState,
         socket::ListeningSocketSource,
         text_input::TextInputManagerState,
+        virtual_keyboard::VirtualKeyboardManagerState,
     },
 };
 
@@ -97,6 +98,11 @@ pub struct ArchoeraShell {
     // smithay 负责两侧状态互转，合成器只需接全局对象与 popup。
     pub text_input_state: TextInputManagerState,
     pub input_method_state: InputMethodManagerState,
+    /// `zwp_virtual_keyboard_v1`：IME（fcitx5）在 Wayland 前端下**同时**要求
+    /// `zwp_input_method_v2` 与 `zwp_virtual_keyboard_v1` 两个全局才会初始化输入
+    /// 上下文；缺少后者时 fcitx5 永远不会抓取键盘，快捷键切输入法无效。
+    /// 该协议也供屏幕键盘 / 虚拟键盘客户端注入按键。
+    pub virtual_keyboard_state: VirtualKeyboardManagerState,
 
     // linux-dmabuf（Flutter / GTK 的 EGL 渲染前提；不可用时客户端回退 wl_shm）
     pub dmabuf_state: DmabufState,
@@ -153,15 +159,21 @@ impl ArchoeraShell {
         // 合成器只需把两个全局对象接上并渲染候选窗口 popup。
         let text_input_state = TextInputManagerState::new::<Self>(&dh);
         let input_method_state = InputMethodManagerState::new::<Self, _>(&dh, |_client| true);
+        // 虚拟键盘：fcitx5 的 Wayland 前端据此初始化并转发未处理的按键；
+        // 也用于后续屏幕键盘注入按键。
+        let virtual_keyboard_state =
+            VirtualKeyboardManagerState::new::<Self, _>(&dh, |_client| true);
 
-        // 注册 ArchoeraOS 控制协议全局对象。
-        let _global = dh.create_global::<Self, ArchoeraShellV1, ()>(1, ());
+        // 注册 ArchoeraOS 控制协议全局对象（v4 起支持屏幕键盘按键注入）。
+        let _global = dh.create_global::<Self, ArchoeraShellV1, ()>(4, ());
 
         let mut seat_state = SeatState::new();
         let mut seat: Seat<Self> = seat_state.new_wl_seat(&dh, "archoera");
         seat.add_keyboard(Default::default(), 200, 25)
             .expect("创建键盘失败");
         seat.add_pointer();
+        // 触摸：kiosk 需要支持触摸设备（触摸即聚焦命中窗口，并驱动 text-input/IME）。
+        seat.add_touch();
 
         let control = ControlPlane::new(config.volume);
         let client_count = Arc::new(AtomicUsize::new(0));
@@ -204,6 +216,7 @@ impl ArchoeraShell {
             cursor_shape_state,
             text_input_state,
             input_method_state,
+            virtual_keyboard_state,
             dmabuf_state: DmabufState::new(),
             dmabuf_global: None,
             shell_clients: Vec::new(),

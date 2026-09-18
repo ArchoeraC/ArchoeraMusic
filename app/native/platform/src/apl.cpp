@@ -153,6 +153,11 @@ int32_t apl_os_set_output_transform(int32_t transform) {
     return archoera::osSessionSetOutputTransform(transform);
 }
 
+int32_t apl_os_key(int32_t keycode, int32_t state) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::osSessionKey(keycode, state);
+}
+
 int32_t apl_sys_stats(AplSysStats* out) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     return archoera::sysinfo::stats(out);

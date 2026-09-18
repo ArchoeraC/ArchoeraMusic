@@ -277,6 +277,7 @@ typedef _AplOsSetEventsC = Int32 Function(Int32 on);
 typedef _AplOsSetPercentC = Int32 Function(Int32 percent);
 typedef _AplOsSetScreenC = Int32 Function(Int32 on);
 typedef _AplOsSetModeC = Int32 Function(Int32 width, Int32 height);
+typedef _AplOsKeyC = Int32 Function(Int32 keycode, Int32 state);
 typedef _AplOsVoidC = Int32 Function();
 typedef _AplMediaTrackC = Int32 Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackC =
@@ -317,6 +318,7 @@ typedef _AplOsSetEventsD = int Function(int on);
 typedef _AplOsSetPercentD = int Function(int percent);
 typedef _AplOsSetScreenD = int Function(int on);
 typedef _AplOsSetModeD = int Function(int width, int height);
+typedef _AplOsKeyD = int Function(int keycode, int state);
 typedef _AplOsVoidD = int Function();
 typedef _AplMediaTrackD = int Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackD =
@@ -544,6 +546,9 @@ class PlatformBindings {
           'apl_os_set_output_transform',
         ),
       ),
+      _osKey = _try(
+        () => lib.lookupFunction<_AplOsKeyC, _AplOsKeyD>('apl_os_key'),
+      ),
       _sysStats = _try(
         () => lib.lookupFunction<_AplSysStatsC, _AplSysStatsD>(
           'apl_sys_stats',
@@ -602,6 +607,7 @@ class PlatformBindings {
   final _AplOsSetPercentD? _osSetOutputScale;
   final _AplOsSetModeD? _osSetOutputMode;
   final _AplOsSetPercentD? _osSetOutputTransform;
+  final _AplOsKeyD? _osKey;
   final _AplSysStatsD? _sysStats;
   final _AplBtStateD? _btState;
 
@@ -644,6 +650,11 @@ class PlatformBindings {
       _osSetOutputMode?.call(width, height) ?? aplErrUnsupported;
   int osSetOutputTransform(int transform) =>
       _osSetOutputTransform?.call(transform) ?? aplErrUnsupported;
+  int osKey(int keycode, int state) =>
+      _osKey?.call(keycode, state) ?? aplErrUnsupported;
+
+  /// 屏幕键盘按键注入符号是否可用（旧版桥接可能缺失）。
+  bool get osKeySymbolsAvailable => _osKey != null;
 
   /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
   int acquireInstance() => _instanceAcquire();

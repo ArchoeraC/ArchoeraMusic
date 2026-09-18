@@ -78,6 +78,7 @@ if [ "$PROFILE" = "vm" ]; then
         -device virtio-gpu-pci \
         -device virtio-keyboard-pci \
         -device virtio-tablet-pci \
+        -device virtio-multitouch-pci \
         "$@"
 fi
 

@@ -110,6 +110,16 @@ impl Dispatch<ArchoeraShellV1, ()> for ArchoeraShell {
                     tracing::info!(?transform, "输出变换已更新");
                 }
             }
+            Request::Key {
+                keycode,
+                state: key_state,
+            } => {
+                if !state.has_capability(Capability::Keyboard) {
+                    tracing::debug!("会话无键盘注入能力，忽略 key");
+                    return;
+                }
+                state.inject_key(keycode, key_state != 0);
+            }
             // destroy 由 wayland-server 处理析构；其余为协议未来扩展。
             _ => {}
         }

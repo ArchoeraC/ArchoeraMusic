@@ -15,13 +15,14 @@ sudo pacman -S --needed qemu-system-x86 qemu-img edk2-ovmf mkosi python-pefile
 # 构建镜像（先编 release 二进制放进镜像，再 mkosi --force build）
 os/vm/build.sh build
 
-# 构建并启动 VM（自动补 virtio-gpu / 键盘 / 触摸板）
+# 构建并启动 VM（自动补 virtio-gpu / 键盘 / 触摸板 / 多点触摸）
 os/vm/build.sh vm
 ```
 
 镜像为 `Format=disk`（`mkosi.output/archoera-kiosk.raw`，2G 稀疏）。`udev` 后端需要
 真实 DRM 设备，因此 `vm` 会透传 `-device virtio-gpu-pci`（mkosi 仅在 `Console=gui`
-时自带 GPU）。RAM 默认 2G（≤ 4G）。
+时自带 GPU）与输入设备：`virtio-keyboard-pci` / `virtio-tablet-pci` /
+`virtio-multitouch-pci`（多点触摸，供触摸与屏幕键盘验证）。RAM 默认 2G（≤ 4G）。
 
 ## 镜像内容 / 自动启动
 
@@ -59,8 +60,8 @@ os/vm/build.sh vm
   `/opt/archoera/cursor-theme`；会话脚本据此导出 `XCURSOR_THEME`/`XCURSOR_SIZE`
   （已 gitignore，不入库）。
 - **输入法**：会话脚本先起一个 session D-Bus，再等合成器 socket 出现后启动
-  `fcitx5`（Wayland 前端以 `zwp_input_method_v2` 接入）。镜像含 `fcitx5` +
-  `fcitx5-chinese-addons`，并预置启用拼音的 `/root/.config/fcitx5/profile`。
+  `fcitx5`（Wayland 前端以 `zwp_input_method_v2` + `zwp_virtual_keyboard_v1` 接入）。
+  镜像含 `fcitx5` + `fcitx5-chinese-addons`，并预置启用拼音的 `/root/.config/fcitx5/profile`。
 
 ## 光标 / 输入法（合成器侧）
 
@@ -68,6 +69,13 @@ os/vm/build.sh vm
   `zwp_text_input_v3` + `zwp_input_method_v2`（输入法；smithay 负责两侧状态互转与
   键盘抓取，合成器只接全局对象、随键盘焦点自动 enter/leave、并把 IME 候选窗口
   用 `PopupManager` 跟踪后随窗口渲染）。
+- **`zwp_virtual_keyboard_v1` 必需**：fcitx5 的 Wayland 前端在初始化输入上下文前
+  会同时查找 `zwp_input_method_v2` 与 `zwp_virtual_keyboard_v1`；只有前者时它不会
+  抓取键盘，表现为「无法切换输入法」。合成器注册该全局后 fcitx5 才会真正接管键盘，
+  Ctrl+Space 切拼音/中英生效；未被 IME 消费的按键再由它经虚拟键盘转发给客户端。
+- **触摸**：座位提供 `wl_touch`。触摸按下即命中窗口、置顶并把键盘焦点交给它，
+  使 `zwp_text_input_v3` / `zwp_input_method_v2` 激活——触摸设备常无物理键盘，
+  播放器内置 OSK 据此在触摸聚焦输入框时弹出（见 `app/lib/widgets/common/touch_keyboard/`）。
 - 渲染顺序很关键：DRM 合成器的元素切片是**前 → 后（最上层在前）**，遇到
   「不透明且铺满输出」的元素会把其后的元素全部 skipped。光标必须放在**最前**，
   否则会被全屏应用窗口盖住（表现为「开机有指针、进应用后消失」）。
@@ -98,7 +106,7 @@ dmabuf v4 反馈 → 客户端接入 → configure → 出帧，全链路在真�
 [session] 启动 udev kiosk ... client='/opt/archoera-music/archoera_music'
 已拉起会话客户端 pid=419 program="/opt/archoera-music/archoera_music"
 Using the Impeller rendering backend (OpenGLESSDF).      ← Flutter 走 GLES/Impeller 出图
-archoera_shell_v1 客户端已绑定 clients=1 capabilities=238 ← 会话桥接握手成功
+archoera_shell_v1 客户端已绑定 clients=1 capabilities=750 ← 会话桥接握手成功（含 keyboard）
 [os] session=OsSessionState.ready
 （随后稳定驻留：仅一次启动、无退出/重启）
 ```
@@ -108,9 +116,10 @@ archoera_shell_v1 客户端已绑定 clients=1 capabilities=238 ← 会话桥接
 - **[vault]** 无 Secret Service（只起了 session D-Bus，没有 keyring 守护进程），
   凭据保险库不可用（登录态不持久化）。
 - `Gtk-CRITICAL gtk_widget_get_scale_factor` —— 无头/无窗口管理器会话下的无害告警。
-- 光标/输入法已在 GUI 下人工验证：指针可见并随控件变化，fcitx5 可切拼音输入。
+- 光标/输入法/触摸已在 GUI 下人工验证：指针可见并随控件变化，fcitx5 可切拼音输入；
+  触摸聚焦输入框会弹出播放器内置 OSK，其按键与物理键盘同路径（IME 可消费）。
 
-### 该 VM 暴露并修复的四个真实缺陷
+### 该 VM 暴露并修复的六个真实缺陷
 
 1. **udev 未设置主输出**：`init_udev` 只把 `Output` 放进 `space`，没设
    `ArchoeraShell.output`，导致 `output_rect()` 恒为 `None`，kiosk 永不发 configure
@@ -123,6 +132,12 @@ archoera_shell_v1 客户端已绑定 clients=1 capabilities=238 ← 会话桥接
 4. **缺 `zwp_cursor_shape_v1`**：没有它时 GTK 走「按名字查主题」，而 Flutter 初始
    光标名是空串 → 加载失败 → GTK 仍发一个**没有缓冲**的 cursor surface → 指针消失。
    现注册该协议（GTK 直接请求命名形状），并在 surface 光标渲染为空时回退命名光标。
+5. **缺 `zwp_virtual_keyboard_v1`**：fcitx5 的 Wayland 前端**同时**要求
+   `zwp_input_method_v2` 与 `zwp_virtual_keyboard_v1` 才会初始化输入上下文，缺后者时
+   它不抓取键盘 → 快捷键切不了输入法。现注册该全局，并供播放器 OSK 注入按键。
+6. **座位无 `wl_touch`、触摸不聚焦**：触摸设备上无法点选输入框、键盘焦点不转移，
+   `zwp_text_input_v3` / `zwp_input_method_v2` 不激活。现 `seat.add_touch()` 并让
+   触摸按下命中窗口 + 置顶 + 置键盘焦点；配合播放器内置 OSK 形成完整触摸输入闭环。
 
 ## 说明 / 限制
 
