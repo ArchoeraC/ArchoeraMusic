@@ -1,0 +1,9 @@
+// ArchoeraOS（Live）：允许 kiosk 会话用户启动/停止「安装到磁盘」单元。
+// 仅当该单元存在（Live 镜像）时才有意义；已安装系统里没有本文件与单元。
+polkit.addRule(function (action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "archoera-install.service" &&
+        subject.user == "archoera" && subject.active) {
+        return polkit.Result.YES;
+    }
+});

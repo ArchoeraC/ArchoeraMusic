@@ -82,4 +82,17 @@ if [ "$PROFILE" = "vm" ]; then
         "$@"
 fi
 
-exec mkosi -C "$HERE" --force "$PROFILE" "$@"
+mkosi -C "$HERE" --force "$PROFILE" "$@"
+rc=$?
+
+# Live profile：产物（El Torito 混合镜像）同时是 ISO —— 硬链接一份 .iso 便于刻录/分发
+# （同 inode，不额外占空间）。注意必须在构建**之后**执行。
+if [[ " $* " == *" --profile live "* ]] || [[ " $* " == *"--profile=live"* ]]; then
+    RAW="$HERE/mkosi.output/archoera-live.raw"
+    if [ -f "$RAW" ]; then
+        ln -f "$RAW" "$HERE/mkosi.output/archoera-live.iso"
+        echo "==> Live ISO: $HERE/mkosi.output/archoera-live.iso"
+        echo "    写 U 盘: dd if=mkosi.output/archoera-live.iso of=/dev/sdX bs=4M status=progress oflag=sync"
+    fi
+fi
+exit $rc

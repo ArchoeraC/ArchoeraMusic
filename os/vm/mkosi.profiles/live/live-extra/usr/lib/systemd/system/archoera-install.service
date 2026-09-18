@@ -1,0 +1,13 @@
+# ArchoeraOS 安装到磁盘（仅 Live 镜像存在）：由向导写目标盘后 systemctl start。
+[Unit]
+Description=ArchoeraOS 安装到目标磁盘
+ConditionPathExists=/etc/archoera-live
+After=local-fs.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=0
+# 目标磁盘由向导写入（/run/archoera-install 归属 kiosk 用户）：
+#   TARGET=/dev/vda
+EnvironmentFile=/run/archoera-install/target.env
+ExecStart=/usr/local/bin/archoera-install ${TARGET}
