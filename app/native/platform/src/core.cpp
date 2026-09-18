@@ -176,11 +176,12 @@ AplEvent makeOsOutput(int32_t width, int32_t height, int32_t scaleMilli, int32_t
     return e;
 }
 
-AplEvent makeBtPairPrompt(int32_t kind, int32_t passkey, const char* text) {
+AplEvent makeBtPairPrompt(int32_t kind, int32_t passkey, int32_t entered, const char* text) {
     AplEvent e{};
     e.type = APL_EVENT_BT_PAIR_PROMPT;
     e.u.bt_pair_prompt.kind = kind;
     e.u.bt_pair_prompt.passkey = passkey;
+    e.u.bt_pair_prompt.entered = entered;
     if (text != nullptr && text[0] != '\0') {
         std::snprintf(e.u.bt_pair_prompt.text, sizeof(e.u.bt_pair_prompt.text), "%s", text);
         e.u.bt_pair_prompt.has_text = 1;

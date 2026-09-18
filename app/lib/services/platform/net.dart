@@ -93,12 +93,20 @@ enum BtPairPromptKind {
 
 /// 一次配对提示：界面据此弹「确认配对码 / 输入 PIN / 在设备上输入」。
 class BtPairPrompt {
-  const BtPairPrompt({required this.kind, this.passkey = 0, this.text = ''});
+  const BtPairPrompt({
+    required this.kind,
+    this.passkey = 0,
+    this.entered = 0,
+    this.text = '',
+  });
 
   final BtPairPromptKind kind;
 
   /// 设备/BlueZ 给出的 6 位码（0 = 无）。
   final int passkey;
+
+  /// 仅 [BtPairPromptKind.display] 有意义：用户在设备上已输入的位数。
+  final int entered;
 
   /// 需要输入/展示的 PIN 或配对码（可能为空）。
   final String text;

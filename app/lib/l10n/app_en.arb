@@ -1328,6 +1328,8 @@
   "netBtPairShowHint": "Enter this pairing code on the device:",
   "netBtPairEnterHint": "Enter the pairing code or PIN shown on the device",
   "netBtPairAuthorizeHint": "Allow this device to pair/connect?",
+  "netBtPairedGroup": "Paired devices",
+  "netBtAvailableGroup": "Available devices",
   "netBtConnect": "Connect",
   "netBtDisconnect": "Disconnect",
   "netBtForget": "Forget",

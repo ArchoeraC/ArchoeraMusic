@@ -444,10 +444,13 @@ typedef struct AplEvent {
         } os_output;
         /* 蓝牙配对提示（BT_PAIR_PROMPT）。
          * kind 见 APL_BT_PAIR_*；passkey 为设备/BlueZ 给出的 6 位码（0 = 无）；
+         * entered 仅对 kind=DISPLAY 有意义：用户在设备上已输入的位数（BlueZ 每输入
+         * 一位就重发一次 DisplayPasskey，界面据此实时刷新）；
          * has_text=1 时 text 是需要在界面里输入/展示的 PIN 或配对码（NUL 结尾，UTF-8）。 */
         struct {
             int32_t kind;
             int32_t passkey;
+            int32_t entered;
             int32_t has_text;
             char text[64];
         } bt_pair_prompt;

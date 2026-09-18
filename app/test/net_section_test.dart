@@ -327,6 +327,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('蓝牙：已配对/可用分组 + 组内排序，显示码实时刷新', (tester) async {
+    final net = _btNet();
+    await tester.pumpWidget(_host(net));
+    await tester.pumpAndSettle();
+
+    // 分组标题：已配对（含已连接）与可用设备各一组。
+    expect(find.text('已配对设备'), findsOneWidget);
+    expect(find.text('可用设备'), findsOneWidget);
+
+    // 「在设备上输入」提示：弹窗显示码与进度，且随重复事件实时刷新（BlueZ 每输入
+    // 一位重发一次 DisplayPasskey）。
+    net.emitPrompt(
+      const BtPairPrompt(
+        kind: BtPairPromptKind.display,
+        passkey: 424242,
+        entered: 0,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('424242'), findsOneWidget);
+    expect(find.textContaining('(0/6)'), findsOneWidget);
+
+    net.emitPrompt(
+      const BtPairPrompt(
+        kind: BtPairPromptKind.display,
+        passkey: 424242,
+        entered: 3,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('(3/6)'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('分类可见性：仅在有无线/蓝牙适配器时出现', (tester) async {
     expect(SettingsCategory.network.visible(false, netAvailable: false), false);
     expect(SettingsCategory.network.visible(false, netAvailable: true), true);

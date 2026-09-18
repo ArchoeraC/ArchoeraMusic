@@ -1150,6 +1150,7 @@ DBusHandlerResult agentFilter(DBusConnection* conn, DBusMessage* msg, void* /*da
 
     int32_t kind = -1;
     uint32_t passkey = 0;
+    uint32_t entered = 0;
     std::string shown;
     const char* path = nullptr;
     if (std::strcmp(member, "RequestConfirmation") == 0) {
@@ -1168,11 +1169,12 @@ DBusHandlerResult agentFilter(DBusConnection* conn, DBusMessage* msg, void* /*da
             return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
         kind = APL_BT_PAIR_ENTER_PIN;
     } else if (std::strcmp(member, "DisplayPasskey") == 0) {
-        uint32_t entered = 0;
+        dbus_uint16_t done = 0;
         if (!dbus_message_get_args(msg, nullptr, DBUS_TYPE_OBJECT_PATH, &path,
-                                   DBUS_TYPE_UINT32, &passkey, DBUS_TYPE_UINT16, &entered,
+                                   DBUS_TYPE_UINT32, &passkey, DBUS_TYPE_UINT16, &done,
                                    DBUS_TYPE_INVALID))
             return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        entered = done;
         kind = APL_BT_PAIR_DISPLAY;
     } else if (std::strcmp(member, "DisplayPinCode") == 0) {
         const char* pin = nullptr;
@@ -1188,6 +1190,18 @@ DBusHandlerResult agentFilter(DBusConnection* conn, DBusMessage* msg, void* /*da
         return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
     }
 
+    // DisplayPasskey / DisplayPinCode **不等待用户**：BlueZ 无返回值，且 DisplayPasskey
+    // 会随用户在设备上每输入一位重复调用（靠它刷新「已输入 n/6」）。这里立即回消息，
+    // 只把提示事件推给界面；否则会阻塞后续回调，数字永远不刷新。
+    if (kind == APL_BT_PAIR_DISPLAY) {
+        dispatch(makeBtPairPrompt(kind, static_cast<int32_t>(passkey),
+                                  static_cast<int32_t>(entered), shown.c_str()));
+        DBusMessage* reply = dbus_message_new_method_return(msg);
+        dbus_connection_send(conn, reply, nullptr);
+        dbus_message_unref(reply);
+        return DBUS_HANDLER_RESULT_HANDLED;
+    }
+
     {
         std::lock_guard<std::mutex> lock(g_prompt_mtx);
         g_prompt_pending = true;
@@ -1195,13 +1209,14 @@ DBusHandlerResult agentFilter(DBusConnection* conn, DBusMessage* msg, void* /*da
         g_prompt_accept = false;
         g_prompt_text.clear();
     }
-    dispatch(makeBtPairPrompt(kind, static_cast<int32_t>(passkey), shown.c_str()));
+    dispatch(makeBtPairPrompt(kind, static_cast<int32_t>(passkey), 0, shown.c_str()));
 
     std::string answer;
     bool accept = false;
     {
         std::unique_lock<std::mutex> lock(g_prompt_mtx);
-        if (g_prompt_cv.wait_for(lock, std::chrono::milliseconds(60000),
+        // 等待用户回答：给足时间（配对可能要用户在设备上操作一会儿）。
+        if (g_prompt_cv.wait_for(lock, std::chrono::milliseconds(180000),
                                  [] { return g_prompt_answered; })) {
             accept = g_prompt_accept;
             answer = g_prompt_text;
@@ -1300,7 +1315,8 @@ int32_t btPairStart(const char* address) {
     const std::string addr = address;
     // Pair() 可能耗时数十秒（等用户确认），放到工作线程；结果用事件回传。
     std::thread([addr] {
-        const int32_t rc = btCallDevice(addr.c_str(), "Pair", 120000);
+        // 配对可能要用户在设备上输入/确认，给足时间（提示侧的等待是 180s）。
+        const int32_t rc = btCallDevice(addr.c_str(), "Pair", 240000);
         dispatch(makeBtPairResult(rc == OK, rc == OK ? 0 : rc));
     }).detach();
     return OK;

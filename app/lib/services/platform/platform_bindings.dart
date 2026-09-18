@@ -230,6 +230,10 @@ final class AplBtPairPromptPayload extends Struct {
   @Int32()
   external int passkey;
 
+  /// 仅 DISPLAY 有意义：用户在设备上已输入的位数（BlueZ 每输入一位重发一次）。
+  @Int32()
+  external int entered;
+
   /// text 是否有效（1 = 需要在界面输入/展示）。
   @Int32()
   external int hasText;
@@ -707,6 +711,7 @@ final class AplBtPairPromptEvent extends AplNativeEvent {
   const AplBtPairPromptEvent({
     required this.kind,
     required this.passkey,
+    required this.entered,
     required this.hasText,
     required this.text,
   });
@@ -716,6 +721,9 @@ final class AplBtPairPromptEvent extends AplNativeEvent {
 
   /// 6 位配对码（0 = 无）。
   final int passkey;
+
+  /// 仅 DISPLAY：用户在设备上已输入的位数。
+  final int entered;
   final bool hasText;
 
   /// 需要在界面输入/展示的 PIN 或配对码（hasText 为真时有效）。
@@ -1663,6 +1671,7 @@ class PlatformBindings {
           AplBtPairPromptEvent(
             kind: ref.u.btPairPrompt.kind,
             passkey: ref.u.btPairPrompt.passkey,
+            entered: ref.u.btPairPrompt.entered,
             hasText: ref.u.btPairPrompt.hasText != 0,
             text: b._cstr(ref.u.btPairPrompt.text),
           ),

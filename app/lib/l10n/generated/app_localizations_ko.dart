@@ -4348,6 +4348,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get netBtPairAuthorizeHint => '是否允许该设备与本机配对/连接？';
 
   @override
+  String get netBtPairedGroup => '已配对设备';
+
+  @override
+  String get netBtAvailableGroup => '可用设备';
+
+  @override
   String get netBtConnect => '连接';
 
   @override

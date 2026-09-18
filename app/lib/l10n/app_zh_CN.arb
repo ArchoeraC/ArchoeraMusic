@@ -1333,6 +1333,8 @@
   "netBtPairShowHint": "请在设备上输入此配对码：",
   "netBtPairEnterHint": "请输入设备上显示的配对码或 PIN",
   "netBtPairAuthorizeHint": "是否允许该设备与本机配对/连接？",
+  "netBtPairedGroup": "已配对设备",
+  "netBtAvailableGroup": "可用设备",
   "netBtConnect": "连接",
   "netBtDisconnect": "断开",
   "netBtForget": "忘记",

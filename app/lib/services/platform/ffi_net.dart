@@ -27,10 +27,19 @@ class FfiNet implements NetService {
 
   @override
   Future<List<WifiNetwork>> wifiScan() async {
-    // 桥接侧的 RequestScan 是异步的：触发后立刻读只会拿到旧列表（5GHz AP 往往要等
-    // 整轮扫描结束才出现）。这里触发一次、稍等、再读一次 —— 不阻塞桥接线程。
-    _b.netWifiScan();
-    await Future<void>.delayed(const Duration(milliseconds: 1800));
+    // 桥接侧的 RequestScan 是异步的（触发后就返回）。这里先触发一次，再轮询到
+    // 结果发生变化（出现新的 SSID）或超时 —— 固定 sleep 在慢扫描时会拿到旧列表，
+    // 5GHz AP 尤其容易漏。
+    final before = _b.netWifiScan();
+    final beforeSsids = before.map((n) => n.ssid).toSet();
+    for (var i = 0; i < 12; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      final now = _b.netWifiScan();
+      if (now.length != before.length ||
+          now.any((n) => !beforeSsids.contains(n.ssid))) {
+        return now;
+      }
+    }
     return _b.netWifiScan();
   }
 
@@ -87,6 +96,7 @@ class FfiNet implements NetService {
         _ => BtPairPromptKind.unknown,
       },
       passkey: e.passkey,
+      entered: e.entered,
       text: e.text,
     ),
   );

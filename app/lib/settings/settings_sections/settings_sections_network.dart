@@ -65,6 +65,10 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
   StreamSubscription<BtPairPrompt>? _promptSub;
   StreamSubscription<BtPairResult>? _resultSub;
 
+  /// 「在设备上输入配对码」的实时提示（BlueZ 每输入一位重发一次事件）。
+  final ValueNotifier<BtPairPrompt?> _pairDisplay = ValueNotifier(null);
+  bool _displayDialogOpen = false;
+
   /// 处理一次配对提示。
   Future<void> _handlePairPrompt(BtPairPrompt prompt) async {
     if (!mounted) return;
@@ -81,23 +85,40 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
         );
         _net.btPairReply(entered != null && entered.isNotEmpty, entered);
       case BtPairPromptKind.display:
+        // 桥接已即时回复 BlueZ（DisplayPasskey 无返回值且会被反复调用），这里只负责
+        // 让用户看到码与「已输入 n/6」。已开着的弹窗靠 ValueNotifier 实时刷新。
+        _pairDisplay.value = prompt;
+        if (_displayDialogOpen) return;
+        _displayDialogOpen = true;
         await SDialog.show<void>(
           context,
           title: l10n.netBtPairTitle,
-          child: Text(
-            '${l10n.netBtPairShowHint}\n\n$code',
-            style: const TextStyle(fontSize: 13, height: 1.6),
+          child: ValueListenableBuilder<BtPairPrompt?>(
+            valueListenable: _pairDisplay,
+            builder: (_, p, _) {
+              final shown = p == null
+                  ? code
+                  : (p.text.isNotEmpty ? p.text : '${p.passkey}');
+              final done = p?.entered ?? prompt.entered;
+              return Text(
+                '${l10n.netBtPairShowHint}\n\n$shown   ($done/6)',
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.8,
+                  letterSpacing: 2,
+                ),
+              );
+            },
           ),
           actions: [
-            FilledButton(
-              onPressed: () {
-                _net.btPairReply(true, null);
-                Navigator.pop(context);
-              },
-              child: Text(l10n.commonConfirm),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l10n.commonClose),
             ),
           ],
         );
+        _displayDialogOpen = false;
+        _pairDisplay.value = null;
       case BtPairPromptKind.confirm:
       case BtPairPromptKind.authorize:
       case BtPairPromptKind.unknown:
@@ -360,6 +381,12 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
 
   Widget _btSection(AppLocalizations l10n, BluetoothState bt) {
     final visible = _devices.where(_usableDevice).toList();
+    // Plasma 式分组与排序：已配对（含已连接）在前，其余为可用设备；组内按
+    // 已连接 > 已配对 > 信号强度 > 名称。
+    final paired = visible.where((d) => d.paired || d.connected).toList()
+      ..sort(_btCompare);
+    final available = visible.where((d) => !d.paired && !d.connected).toList()
+      ..sort(_btCompare);
     final subtitle = _btScanning
         ? l10n.netBtScanning
         : _btBusy
@@ -410,7 +437,10 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
               ],
             ),
           ),
-          for (final device in visible) _btTile(l10n, device),
+          if (paired.isNotEmpty) _BtGroupLabel(l10n.netBtPairedGroup),
+          for (final device in paired) _btTile(l10n, device),
+          if (available.isNotEmpty) _BtGroupLabel(l10n.netBtAvailableGroup),
+          for (final device in available) _btTile(l10n, device),
           if (visible.isEmpty && !_btBusy)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
@@ -419,6 +449,14 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
         ],
       ],
     );
+  }
+
+  /// 蓝牙设备排序：已连接 > 已配对 > 信号强 > 名称。
+  int _btCompare(BtDevice a, BtDevice b) {
+    if (a.connected != b.connected) return a.connected ? -1 : 1;
+    if (a.paired != b.paired) return a.paired ? -1 : 1;
+    if (a.rssi != b.rssi) return b.rssi.compareTo(a.rssi);
+    return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
   }
 
   Widget _btTile(AppLocalizations l10n, BtDevice device) {
@@ -481,6 +519,29 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
       title: device.displayName,
       subtitle: subtitle,
       trailing: Row(mainAxisSize: MainAxisSize.min, children: trailing),
+    );
+  }
+}
+
+/// 蓝牙列表里的小分组标题（已配对 / 可用设备）。
+class _BtGroupLabel extends StatelessWidget {
+  const _BtGroupLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
     );
   }
 }
