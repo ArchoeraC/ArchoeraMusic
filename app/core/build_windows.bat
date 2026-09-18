@@ -149,10 +149,11 @@ cl /nologo /O2 /std:c11 /MD /LD /I include /I src /I include\compat /I "%VCPKG_P
     src\mediaengine_lib.c src\tempo.c src\decoder.c src\resampler.c ^
     src\encoder.c src\equalizer.c src\loudness.c src\limiter.c ^
     src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
+    src\audio_output.c src\audio_output_platform.c src\audio_output_windows.c ^
     src\segstore.c ^
     "%VCPKG_PREFIX%\lib\avformat.lib" "%VCPKG_PREFIX%\lib\avcodec.lib" ^
     "%VCPKG_PREFIX%\lib\avutil.lib" "%VCPKG_PREFIX%\lib\swresample.lib" ^
-    build\libaudio_tempo.lib %KERNEL_FLAG% %KERNEL_LIB% ntdll.lib ^
+    build\libaudio_tempo.lib %KERNEL_FLAG% %KERNEL_LIB% ntdll.lib ole32.lib ^
     /Fe:build\archoera_mediaengine.dll /link /DEF:build\archoera_mediaengine.def
 if errorlevel 1 exit /b 1
 popd

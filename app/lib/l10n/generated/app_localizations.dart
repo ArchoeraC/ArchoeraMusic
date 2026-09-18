@@ -3128,6 +3128,30 @@ abstract class AppLocalizations {
   /// **'选择此项将让音乐走系统默认的通话/低质设备，音质几乎损毁，不推荐。'**
   String get settingsOutputDeviceDefaultRowCallNote;
 
+  /// No description provided for @settingsOutputDeviceShowAll.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'显示全部设备（{count}）'**
+  String settingsOutputDeviceShowAll(int count);
+
+  /// No description provided for @settingsOutputDeviceHideUnused.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'只看可用设备'**
+  String get settingsOutputDeviceHideUnused;
+
+  /// No description provided for @settingsOutputDeviceUnavailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不可用'**
+  String get settingsOutputDeviceUnavailable;
+
+  /// No description provided for @settingsOutputDeviceVirtualTag.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'虚拟设备'**
+  String get settingsOutputDeviceVirtualTag;
+
   /// No description provided for @settingsSinkChangedFailed.
   ///
   /// In zh_CN, this message translates to:
