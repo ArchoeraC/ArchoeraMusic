@@ -1730,6 +1730,20 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diese Wahl leitet Musik über den Anruf-/Niedrigqualitäts-Standard — der Klang wird fast zerstört. Nicht empfohlen.';
 
   @override
+  String settingsOutputDeviceShowAll(int count) {
+    return 'Alle Geräte anzeigen ($count)';
+  }
+
+  @override
+  String get settingsOutputDeviceHideUnused => 'Nur nutzbare anzeigen';
+
+  @override
+  String get settingsOutputDeviceUnavailable => 'Nicht verfügbar';
+
+  @override
+  String get settingsOutputDeviceVirtualTag => 'Virtuell';
+
+  @override
   String settingsSinkChangedFailed(Object err) {
     return 'Ausgabegerät konnte nicht gewechselt werden: $err';
   }
