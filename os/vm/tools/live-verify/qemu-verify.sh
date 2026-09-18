@@ -85,7 +85,7 @@ shot 01-player
 echo "== 抓帧：01-player.ppm（播放器 kiosk）"
 
 echo "== 下发并后台执行 guest 验证脚本"
-B64=$(base64 -w0 /tmp/opencode/guest-verify.sh)
+B64=$(base64 -w0 "$(dirname "$0")/guest-verify.sh")
 ser "echo $B64 | base64 -d > /tmp/gv.sh && echo GUEST_SCRIPT_OK" 40 10 >/dev/null 2>&1
 ser "setsid nohup bash /tmp/gv.sh > /tmp/gv.out 2>&1 < /dev/null & echo STARTED" 40 10 >/dev/null 2>&1
 
