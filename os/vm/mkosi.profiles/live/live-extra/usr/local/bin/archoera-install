@@ -338,6 +338,15 @@ for m in run sys proc dev; do umount "$TARGET/$m" 2>/dev/null || true; done
 
 ENTRY="$(ls "$TARGET/boot/loader/entries" 2>/dev/null | head -1)"
 [ -n "$ENTRY" ] || fail "kernel-install 没有生成引导条目"
+# ⚠ 必须确认 initrd 真生成了：dracut 失败时 kernel-install 仍可能留下条目，
+# 之前出现过「报 100% 完成、装出来的系统却没有 initrd、根本起不来」。
+grep -qE '^initrd' "$TARGET/boot/loader/entries/$ENTRY" || fail "引导条目里没有 initrd"
+while read -r _ initrd_path; do
+    case "$initrd_path" in
+        /*) [ -f "$TARGET/boot$initrd_path" ] || fail "引导条目引用的 initrd 不存在：$initrd_path" ;;
+        *)  [ -f "$TARGET/boot/$initrd_path" ] || fail "引导条目引用的 initrd 不存在：$initrd_path" ;;
+    esac
+done < <(grep -E '^initrd' "$TARGET/boot/loader/entries/$ENTRY")
 printf 'default %s\ntimeout 0\neditor no\n' "$ENTRY" > "$TARGET/boot/loader/loader.conf"
 
 # ── 6) 收尾配置 ────────────────────────────────────────────────────
