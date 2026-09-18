@@ -256,6 +256,29 @@ fi
 CMDLINE="$ROOT_OPTS rw splash plymouth.ignore-serial-consoles"
 mkdir -p "$TARGET/etc/kernel"
 printf '%s\n' "$CMDLINE" > "$TARGET/etc/kernel/cmdline"
+# 去掉 Live 的引导 token（mkosi 构建期写入的 "archoera-live"）：留着的话
+# kernel-install 会继续用它命名 $ESP/<token>/<kver>/ 与条目，装出来的系统带着
+# "live" 字样、多台/多次安装还会互相覆盖同名条目。删掉后自动回落到 machine-id。
+rm -f "$TARGET/etc/kernel/entry-token"
+
+# fstab 必须在 kernel-install 之前写好：dracut 的 use_fstab=yes 与 bootctl 的
+# ESP 判定都读它（写入顺序错了会拿到 Live 的空 fstab）。
+{
+    if [ "$FS" = "btrfs" ]; then
+        OPTS="noatime,compress=zstd,space_cache=v2,discard=async"
+        echo "UUID=$NEWROOT_UUID /           btrfs subvol=/@,$OPTS 0 1"
+        echo "UUID=$NEWROOT_UUID /home       btrfs subvol=/@home,$OPTS 0 2"
+        echo "UUID=$NEWROOT_UUID /opt        btrfs subvol=/@opt,$OPTS 0 2"
+        echo "UUID=$NEWROOT_UUID /var/cache  btrfs subvol=/@cache,noatime,nodatacow,compress=zstd,discard=async 0 2"
+        echo "UUID=$NEWROOT_UUID /var/log    btrfs subvol=/@log,noatime,nodatacow,compress=zstd,discard=async 0 2"
+    else
+        FSTYPE_OPTS="rw,relatime"
+        [ "$FS" = "f2fs" ] && FSTYPE_OPTS="rw,relatime,compress_algorithm=zstd"
+        echo "UUID=$NEWROOT_UUID /     $FS $FSTYPE_OPTS 0 1"
+    fi
+    echo "UUID=$NEWESP_UUID  /boot vfat rw,relatime,fmask=0022,dmask=0022 0 2"
+    [ -n "$SWAPFILE" ] && echo "$SWAPFILE none swap defaults,nofail 0 0"
+} > "$TARGET/etc/fstab"
 
 # Live 带过来的旧引导产物清掉（避免 ESP 里留着 Live 的内核/initrd 与旧条目）。
 rm -rf "$TARGET/boot/loader/entries"
@@ -296,24 +319,7 @@ ENTRY="$(ls "$TARGET/boot/loader/entries" 2>/dev/null | head -1)"
 printf 'default %s\ntimeout 0\neditor no\n' "$ENTRY" > "$TARGET/boot/loader/loader.conf"
 
 # ── 6) 收尾配置 ────────────────────────────────────────────────────
-step 88 "写 fstab / crypttab / 本地化 / 用户"
-{
-    if [ "$FS" = "btrfs" ]; then
-        OPTS="noatime,compress=zstd,space_cache=v2,discard=async"
-        echo "UUID=$NEWROOT_UUID /           btrfs subvol=/@,$OPTS 0 1"
-        echo "UUID=$NEWROOT_UUID /home       btrfs subvol=/@home,$OPTS 0 2"
-        echo "UUID=$NEWROOT_UUID /opt        btrfs subvol=/@opt,$OPTS 0 2"
-        echo "UUID=$NEWROOT_UUID /var/cache  btrfs subvol=/@cache,noatime,nodatacow,compress=zstd,discard=async 0 2"
-        echo "UUID=$NEWROOT_UUID /var/log    btrfs subvol=/@log,noatime,nodatacow,compress=zstd,discard=async 0 2"
-    else
-        FSTYPE_OPTS="rw,relatime"
-        [ "$FS" = "f2fs" ] && FSTYPE_OPTS="rw,relatime,compress_algorithm=zstd"
-        echo "UUID=$NEWROOT_UUID /     $FS $FSTYPE_OPTS 0 1"
-    fi
-    echo "UUID=$NEWESP_UUID  /boot vfat rw,relatime,fmask=0022,dmask=0022 0 2"
-    [ -n "$SWAPFILE" ] && echo "$SWAPFILE none swap defaults,nofail 0 0"
-} > "$TARGET/etc/fstab"
-
+step 88 "写 crypttab / 本地化 / 用户"
 # 加密时写 crypttab（systemd 会用它在 initrd 阶段解锁）。
 if [ "$ENCRYPT" = "1" ]; then
     {

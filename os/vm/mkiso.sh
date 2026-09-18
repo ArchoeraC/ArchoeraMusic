@@ -171,7 +171,11 @@ ENTRY="$STAGE/loader/entries/archoera.conf"
     echo "title   ArchoeraOS Live"
     echo "linux   /archoera/boot/vmlinuz"
     echo "initrd  /archoera/boot/initramfs-linux.img"
-    echo "options root=LABEL=$VOLID rootfstype=iso9660 splash plymouth.ignore-serial-consoles systemd.volatile=overlay archoera.live=1 systemd.firstboot=no"
+    # ⚠ console=tty0 与 console=hvc0 都要显式给：systemd 只为「active console」
+    # 实例化 serial-getty@hvc0，而镜像里那份 root 自动登录 drop-in 正是挂在
+    # serial-getty@hvc0 上的 —— 不给 console=hvc0 就永远不会有人监听串口，
+    # 无头排查口等于不存在（本次验证就是踩了这个）。
+    echo "options root=LABEL=$VOLID rootfstype=iso9660 splash plymouth.ignore-serial-consoles console=tty0 console=hvc0 systemd.volatile=overlay archoera.live=1 systemd.firstboot=no"
 } > "$ENTRY"
 echo "--- $ENTRY"; cat "$ENTRY"
 mcopy -o -s -i "$EB" "$STAGE/EFI"     ::/
