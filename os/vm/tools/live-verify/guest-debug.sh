@@ -8,6 +8,7 @@ touch "$STATE/debug"          # 开 xtrace → $STATE/trace
 rm -f "$STATE/done" "$STATE/failed" "$STATE/percent" "$STATE/message" "$STATE/trace"
 
 FSKIND="${GV_FS:-ext4}"
+ENC="${GV_ENC:-0}"
 cat > "$STATE/plan" <<EOF
 disk=/dev/vda
 hostname=dbg-${FSKIND}
@@ -17,10 +18,15 @@ timezone=Asia/Shanghai
 keymap=cn
 fs=${FSKIND}
 swap=none
-encrypt=0
+encrypt=${ENC}
 autologin=1
 EOF
 chmod 0600 "$STATE/plan"
+if [ "$ENC" = "1" ]; then
+    printf 'luks_passphrase=verify-pass-123\nuser_password=\nroot_password=\n' > "$STATE/secrets"
+    chmod 0600 "$STATE/secrets"
+    say "已写 secrets（luks_passphrase=verify-pass-123）"
+fi
 
 say "=== 安装器版本自检 ==="
 grep -c "on_err" /usr/local/bin/archoera-install || true
@@ -45,6 +51,21 @@ tail -60 "$STATE/trace" 2>/dev/null | sed 's/^/  /'
 
 say "=== journal 尾部 30 行 ==="
 journalctl -u archoera-install.service -n 30 --no-pager 2>/dev/null | tail -30 | sed 's/^/  /'
+
+if [ "$ENC" = "1" ]; then
+    say "=== LUKS 核对 ==="
+    say "luksDump: $(cryptsetup luksDump /dev/vda2 2>/dev/null | grep -E 'Version|PBKDF' | tr '\n' ' ')"
+    if echo 'verify-pass-123' | cryptsetup open /dev/vda2 chkroot - 2>&1; then
+        mkdir -p /mnt/luks
+        if mount /dev/mapper/chkroot /mnt/luks 2>&1; then
+            say "crypttab: $(grep -v '^#' /mnt/luks/etc/crypttab 2>/dev/null | tr '\n' ' ')"
+            umount /mnt/luks
+        fi
+        cryptsetup close chkroot
+    else
+        say "!! 口令打不开 LUKS"
+    fi
+fi
 
 say "=== ESP 与目标系统核对 ==="
 mkdir -p /mnt/esp /mnt/root
