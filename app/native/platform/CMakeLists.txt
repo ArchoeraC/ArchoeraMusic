@@ -54,6 +54,8 @@ elseif(UNIX)
   list(APPEND ARCHOERA_SOURCES src/sysinfo_gpu_linux.cpp)
   # Live 安装向导支持（磁盘清单/启动安装/进度）。
   list(APPEND ARCHOERA_SOURCES src/live_linux.cpp)
+  # WiFi/蓝牙控制（NetworkManager / BlueZ，走 libdbus）。
+  list(APPEND ARCHOERA_SOURCES src/netctl_linux.cpp)
 else()
   list(APPEND ARCHOERA_SOURCES src/backend_stub.cpp)
 endif()

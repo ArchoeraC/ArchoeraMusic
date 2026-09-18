@@ -11,6 +11,7 @@
 #include "backend.h"
 #include "core.h"
 #include "live.h"
+#include "netctl.h"
 #include "sysinfo.h"
 
 namespace {
@@ -188,6 +189,27 @@ int32_t apl_live_install_start(const AplLivePlan* plan) {
 int32_t apl_live_install_status(AplLiveInstallStatus* out) {
     return archoera::live::installStatus(out);
 }
+
+int32_t apl_wifi_state(AplWifiState* out) { return archoera::netctl::wifiState(out); }
+int32_t apl_wifi_scan(AplWifiNetwork* out, uint32_t max, uint32_t* count) {
+    return archoera::netctl::wifiScan(out, max, count);
+}
+int32_t apl_wifi_connect(const char* ssid, const char* psk) {
+    return archoera::netctl::wifiConnect(ssid, psk);
+}
+int32_t apl_wifi_disconnect(void) { return archoera::netctl::wifiDisconnect(); }
+int32_t apl_wifi_set_enabled(int32_t on) { return archoera::netctl::wifiSetEnabled(on); }
+int32_t apl_wifi_forget(const char* ssid) { return archoera::netctl::wifiForget(ssid); }
+int32_t apl_bt_scan_start(void) { return archoera::netctl::btScanStart(); }
+int32_t apl_bt_scan_stop(void) { return archoera::netctl::btScanStop(); }
+int32_t apl_bt_devices(AplBtDevice* out, uint32_t max, uint32_t* count) {
+    return archoera::netctl::btDevices(out, max, count);
+}
+int32_t apl_bt_pair(const char* address) { return archoera::netctl::btPair(address); }
+int32_t apl_bt_connect(const char* address) { return archoera::netctl::btConnect(address); }
+int32_t apl_bt_disconnect(const char* address) { return archoera::netctl::btDisconnect(address); }
+int32_t apl_bt_forget(const char* address) { return archoera::netctl::btForget(address); }
+int32_t apl_bt_set_enabled(int32_t on) { return archoera::netctl::btSetEnabled(on); }
 
 int32_t apl_notify(const char* title, const char* body) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;

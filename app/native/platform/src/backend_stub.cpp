@@ -69,3 +69,24 @@ int32_t installStart(const AplLivePlan*) { return ERR_UNSUPPORTED; }
 int32_t installStatus(AplLiveInstallStatus*) { return ERR_UNSUPPORTED; }
 }  // namespace live
 
+namespace netctl {
+bool wifiAvailable() { return false; }
+bool bluetoothAvailable() { return false; }
+int32_t wifiState(AplWifiState*) { return ERR_UNSUPPORTED; }
+int32_t wifiScan(AplWifiNetwork*, uint32_t, uint32_t*) { return ERR_UNSUPPORTED; }
+int32_t wifiConnect(const char*, const char*) { return ERR_UNSUPPORTED; }
+int32_t wifiDisconnect() { return ERR_UNSUPPORTED; }
+int32_t wifiSetEnabled(int32_t) { return ERR_UNSUPPORTED; }
+int32_t wifiForget(const char*) { return ERR_UNSUPPORTED; }
+int32_t btScanStart() { return ERR_UNSUPPORTED; }
+int32_t btScanStop() { return ERR_UNSUPPORTED; }
+int32_t btDevices(AplBtDevice*, uint32_t, uint32_t*) { return ERR_UNSUPPORTED; }
+int32_t btPair(const char*) { return ERR_UNSUPPORTED; }
+int32_t btConnect(const char*) { return ERR_UNSUPPORTED; }
+int32_t btDisconnect(const char*) { return ERR_UNSUPPORTED; }
+int32_t btForget(const char*) { return ERR_UNSUPPORTED; }
+int32_t btSetEnabled(int32_t) { return ERR_UNSUPPORTED; }
+void shutdown() {}
+}  // namespace netctl
+
+
