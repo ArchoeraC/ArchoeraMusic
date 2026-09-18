@@ -430,30 +430,37 @@ impl ArchoeraShell {
             let transform = crate::protocol::output_transform_from_code(transform);
             self.broadcast(|s| s.output_state(w as u32, h as u32, scale, transform, refresh));
         }
+        self.broadcast(|s| self.emit_output_events_to(s));
+    }
+
+    /// 把每个输出的协议 v5 事件（output_info / output_current / output_mode* /
+    /// output_modes_end）发给指定客户端。
+    ///
+    /// ⚠ 必须**同时**用于「bind 首次下发」（`send_initial_state`）与变化广播：
+    /// 只在变化时广播的话，客户端启动时拿不到任何输出 → `apl_os_output_list`
+    /// 返回空 → 显示设置里只剩「未检测到显示输出」（实测踩过：分辨率/缩放/旋转
+    /// 全都没了）。
+    fn emit_output_events_to(&self, shell: &ArchoeraShellV1) {
         for ev in self.output_events() {
             let transform = crate::protocol::output_transform_from_code(ev.transform);
-            self.broadcast(|s| {
-                let flags =
-                    crate::protocol::OutputFlag::Enabled | crate::protocol::OutputFlag::Primary;
-                s.output_info(ev.id, ev.name.clone(), flags);
-                s.output_current(
-                    ev.id,
-                    ev.width,
-                    ev.height,
-                    ev.scale_milli,
-                    transform,
-                    ev.refresh,
-                );
-                for (i, (mw, mh, mrefresh)) in ev.modes.iter().enumerate() {
-                    let mut mflags = crate::protocol::OutputFlag::empty();
-                    if *mw as u32 == ev.width && *mh as u32 == ev.height && *mrefresh == ev.refresh
-                    {
-                        mflags |= crate::protocol::OutputFlag::Current;
-                    }
-                    s.output_mode(ev.id, i as u32, *mw as u32, *mh as u32, *mrefresh, mflags);
+            let flags = crate::protocol::OutputFlag::Enabled | crate::protocol::OutputFlag::Primary;
+            shell.output_info(ev.id, ev.name.clone(), flags);
+            shell.output_current(
+                ev.id,
+                ev.width,
+                ev.height,
+                ev.scale_milli,
+                transform,
+                ev.refresh,
+            );
+            for (i, (mw, mh, mrefresh)) in ev.modes.iter().enumerate() {
+                let mut mflags = crate::protocol::OutputFlag::empty();
+                if *mw as u32 == ev.width && *mh as u32 == ev.height && *mrefresh == ev.refresh {
+                    mflags |= crate::protocol::OutputFlag::Current;
                 }
-                s.output_modes_end(ev.id, ev.modes.len() as u32);
-            });
+                shell.output_mode(ev.id, i as u32, *mw as u32, *mh as u32, *mrefresh, mflags);
+            }
+            shell.output_modes_end(ev.id, ev.modes.len() as u32);
         }
     }
 
@@ -667,6 +674,9 @@ impl ArchoeraShell {
             let transform = crate::protocol::output_transform_from_code(transform);
             shell.output_state(w as u32, h as u32, scale_milli, transform, refresh);
         }
+        // 协议 v5 的 per-output 事件：新绑定的客户端必须立刻拿到全部输出与模式表，
+        // 否则 apl_os_output_list 为空、显示设置区只剩「未检测到显示输出」。
+        self.emit_output_events_to(shell);
         shell.session(self.session_state);
     }
 
