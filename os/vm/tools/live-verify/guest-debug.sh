@@ -7,14 +7,15 @@ say() { echo "$@"; }
 touch "$STATE/debug"          # 开 xtrace → $STATE/trace
 rm -f "$STATE/done" "$STATE/failed" "$STATE/percent" "$STATE/message" "$STATE/trace"
 
+FSKIND="${GV_FS:-ext4}"
 cat > "$STATE/plan" <<EOF
 disk=/dev/vda
-hostname=dbg-ext4
+hostname=dbg-${FSKIND}
 username=archoera
 locale=zh_CN.UTF-8
 timezone=Asia/Shanghai
 keymap=cn
-fs=ext4
+fs=${FSKIND}
 swap=none
 encrypt=0
 autologin=1
@@ -28,7 +29,8 @@ say "=== 宿主侧状态核对 ==="
 say "hostname=$(hostname)  /etc/hostname=$(cat /etc/hostname 2>/dev/null | head -1)"
 say "vda 分区: $(lsblk -no NAME,SIZE,FSTYPE /dev/vda 2>/dev/null | tr '\n' '|')"
 
-say "=== 直接跑安装器（前台，输出到 /tmp/gd.out）==="
+say "=== 直接跑安装器（fs=${FSKIND}，前台，输出到 /tmp/gd.out）==="
+grep -n "FSKIND\|^fs=" "$STATE/plan" | head -3
 /usr/local/bin/archoera-install > /tmp/gd.out 2>&1
 say "安装器退出码=$?"
 say "--- gd.out 尾部 ---"; tail -30 /tmp/gd.out | sed 's/^/  /' 

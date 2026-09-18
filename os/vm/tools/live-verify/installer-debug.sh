@@ -54,7 +54,7 @@ GB64=$(base64 -w0 "$(dirname "$0")/guest-debug.sh")
 ser "echo $GB64 | base64 -d > /tmp/gd.sh && wc -c /tmp/gd.sh && echo GD_READY" 60 10 | tail -3
 
 echo "== 后台执行调试脚本"
-ser "setsid nohup bash /tmp/gd.sh > /tmp/gd.log 2>&1 < /dev/null & sleep 2; ls -l /tmp/gd.sh /tmp/gd.log; echo GD_STARTED" 60 12 | tail -4
+ser "setsid nohup env GV_FS=${GV_FS:-ext4} bash /tmp/gd.sh > /tmp/gd.log 2>&1 < /dev/null & sleep 2; echo \"GD_STARTED fs=${GV_FS:-ext4}\"" 60 12 | tail -3
 
 echo "== 轮询（安装约 3-6 分钟）"
 for i in $(seq 1 60); do
