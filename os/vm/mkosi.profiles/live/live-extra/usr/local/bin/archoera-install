@@ -53,6 +53,30 @@ if [ -e "$STATE/debug" ]; then
     set -x
 fi
 
+# ── 0) 仅列出候选磁盘（向导用；不修改任何东西）────────────────────────
+# ⚠ 必须放在**所有**计划解析/校验之前：`archoera-live-devices.service` 启动时用
+# `archoera-install --list` 生成 /run/archoera-install/devices，而先前的
+# `[ -n "$DISK" ] || fail "计划里缺少 disk=…"` 会让它直接失败 → 向导拿不到任何磁盘
+# → 无法选择、无法下一步（实测踩过）。
+if [ "${1:-}" = "--list" ]; then
+    live_src="$(findmnt -n -o SOURCE / | sed 's/\[.*//')"
+    live_disk="$(lsblk -no PKNAME "$live_src" 2>/dev/null | head -1)"
+    {
+        echo "# name|size_bytes|model|tran|is_live"
+        while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            case "$name" in loop*|zram*|sr*|ram*|dm-*|md*) continue ;; esac
+            size="$(lsblk -bdno SIZE "/dev/$name" 2>/dev/null | head -1)"; [ -n "$size" ] || size=0
+            model="$(lsblk -dno MODEL "/dev/$name" 2>/dev/null | head -1 | tr -d '|')"
+            tran="$(lsblk -dno TRAN "/dev/$name" 2>/dev/null | head -1)"
+            live=0; [ "$name" = "$live_disk" ] && live=1
+            printf '%s|%s|%s|%s|%s\n' "$name" "$size" "$model" "$tran" "$live"
+        done < <(lsblk -dno NAME 2>/dev/null)
+    } > "$STATE/devices"
+    cat "$STATE/devices"
+    exit 0
+fi
+
 step() {
     printf '%s\n' "$2" > "$STATE/message"
     printf '%s\n' "$1" > "$STATE/percent"
@@ -148,25 +172,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ── 1b) 仅列出候选磁盘（向导用；不修改任何东西）──────────────────────
-if [ "${1:-}" = "--list" ]; then
-    live_src="$(findmnt -n -o SOURCE / | sed 's/\[.*//')"
-    live_disk="$(lsblk -no PKNAME "$live_src" 2>/dev/null | head -1)"
-    {
-        echo "# name|size_bytes|model|tran|is_live"
-        while IFS= read -r name; do
-            [ -n "$name" ] || continue
-            case "$name" in loop*|zram*|sr*|ram*|dm-*|md*) continue ;; esac
-            size="$(lsblk -bdno SIZE "/dev/$name" 2>/dev/null | head -1)"; [ -n "$size" ] || size=0
-            model="$(lsblk -dno MODEL "/dev/$name" 2>/dev/null | head -1 | tr -d '|')"
-            tran="$(lsblk -dno TRAN "/dev/$name" 2>/dev/null | head -1)"
-            live=0; [ "$name" = "$live_disk" ] && live=1
-            printf '%s|%s|%s|%s|%s\n' "$name" "$size" "$model" "$tran" "$live"
-        done < <(lsblk -dno NAME 2>/dev/null)
-    } > "$STATE/devices"
-    cat "$STATE/devices"
-    exit 0
-fi
+# ── 1b) 磁盘枚举已在文件开头处理（必须先于计划校验，见上方注释）────────
 
 # ── 2) 分区 ────────────────────────────────────────────────────────
 step 3 "创建分区表（GPT：ESP 1G + root）"

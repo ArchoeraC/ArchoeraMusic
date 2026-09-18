@@ -479,6 +479,23 @@ impl ArchoeraShell {
             .and_then(|b| b.output_meta().get(id as usize).map(|(n, _)| n.clone()))
     }
 
+    /// 显示设置变化后的统一收尾。
+    ///
+    /// 关键：**必须重新 configure kiosk 窗口**。缩放/模式/旋转会改变输出的
+    /// *逻辑*尺寸，而 kiosk 客户端是全屏客户端、尺寸由合成器 `configure` 决定；
+    /// 只更新 `wl_output` 状态而不重新 configure 的话，客户端既不知道尺寸变了、
+    /// 也不会重绘（实测：改缩放后画面不动）。
+    fn after_output_change(&mut self) {
+        // 缩放变化要让已存在的表面重新拿到 preferred_scale（分数缩放）。
+        self.refresh_fractional_scale();
+        if let Some(rect) = self.output_rect() {
+            crate::kiosk::reconfigure_all(&self.space, rect);
+        }
+        self.mark_dirty();
+        self.schedule_redraw();
+        self.notify_output_state();
+    }
+
     /// 把某个输出切到它模式表里的第 index 个模式。
     pub fn set_output_mode_index(&mut self, name: &str, index: usize) -> anyhow::Result<()> {
         let applied = match self.backend.as_mut() {
@@ -488,7 +505,7 @@ impl ArchoeraShell {
         if let (Some(mode), Some(output)) = (applied, self.output_by_name(name)) {
             output.change_current_state(Some(mode), None, None, None);
         }
-        self.notify_output_state();
+        self.after_output_change();
         Ok(())
     }
 
@@ -498,8 +515,7 @@ impl ArchoeraShell {
         if let Some(output) = self.output_by_name(name) {
             output.change_current_state(None, None, Some(scale), None);
         }
-        self.refresh_fractional_scale();
-        self.notify_output_state();
+        self.after_output_change();
     }
 
     /// 单独设置某个输出的变换（旋转/镜像）。
@@ -507,7 +523,7 @@ impl ArchoeraShell {
         if let Some(output) = self.output_by_name(name) {
             output.change_current_state(None, Some(transform), None, None);
         }
-        self.notify_output_state();
+        self.after_output_change();
     }
 
     /// 应用运行时显示设置（缩放/模式/变换）并通知客户端。
@@ -535,15 +551,9 @@ impl ArchoeraShell {
             );
         }
 
-        // 缩放变化要让已存在的表面重新拿到 preferred_scale（分数缩放）。
-        self.refresh_fractional_scale();
-
-        if let Some(rect) = self.output_rect() {
-            crate::kiosk::reconfigure_all(&self.space, rect);
-        }
-        self.mark_dirty();
-        self.schedule_redraw();
-        self.notify_output_state();
+        // 缩放变化要让已存在的表面重新拿到 preferred_scale（分数缩放）、重新
+        // configure kiosk 窗口并重绘 —— 统一收尾见 `after_output_change`。
+        self.after_output_change();
         Ok(())
     }
 
