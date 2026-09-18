@@ -22,6 +22,7 @@ import 'package:ffi/ffi.dart';
 
 import '../native_lib_paths.dart';
 import 'live_install.dart';
+import 'net.dart';
 import 'system_media.dart';
 import 'system_status.dart';
 
@@ -303,6 +304,46 @@ final class AplLiveInstallStatusFfi extends Struct {
   external AplStringFfi message;
 }
 
+/// WiFi：概况（与 C 侧 AplWifiState 一致）。
+final class AplWifiStateFfi extends Struct {
+  @Int32()
+  external int present;
+  @Int32()
+  external int enabled;
+  @Int32()
+  external int connected;
+  @Int32()
+  external int signal;
+  external AplStringFfi ssid;
+  external AplStringFfi ip;
+  external AplStringFfi security;
+}
+
+/// WiFi：扫描到的一个 AP（与 C 侧 AplWifiNetwork 一致）。
+final class AplWifiNetworkFfi extends Struct {
+  external AplStringFfi ssid;
+  @Int32()
+  external int signal;
+  @Int32()
+  external int security;
+  @Int32()
+  external int connected;
+  @Int32()
+  external int saved;
+}
+
+/// 蓝牙：一个设备（与 C 侧 AplBtDevice 一致）。
+final class AplBtDeviceFfi extends Struct {
+  external AplStringFfi address;
+  external AplStringFfi name;
+  @Int32()
+  external int paired;
+  @Int32()
+  external int connected;
+  @Int32()
+  external int rssi;
+}
+
 typedef _AplVersionC = Int32 Function();
 typedef _AplInitC = Int32 Function();
 typedef _AplShutdownC = Int32 Function();
@@ -371,6 +412,37 @@ typedef _AplLiveInstallStatusC =
     Int32 Function(Pointer<AplLiveInstallStatusFfi> out);
 typedef _AplLiveInstallStatusD =
     int Function(Pointer<AplLiveInstallStatusFfi> out);
+typedef _AplWifiStateC = Int32 Function(Pointer<AplWifiStateFfi> out);
+typedef _AplWifiStateD = int Function(Pointer<AplWifiStateFfi> out);
+typedef _AplWifiScanC =
+    Int32 Function(
+      Pointer<AplWifiNetworkFfi> out,
+      Uint32 max,
+      Pointer<Uint32> count,
+    );
+typedef _AplWifiScanD =
+    int Function(
+      Pointer<AplWifiNetworkFfi> out,
+      int max,
+      Pointer<Uint32> count,
+    );
+typedef _AplWifiConnectC =
+    Int32 Function(Pointer<Utf8> ssid, Pointer<Utf8> psk);
+typedef _AplWifiConnectD = int Function(Pointer<Utf8> ssid, Pointer<Utf8> psk);
+typedef _AplVoidIntC = Int32 Function();
+typedef _AplVoidIntD = int Function();
+typedef _AplStrIntC = Int32 Function(Pointer<Utf8> value);
+typedef _AplStrIntD = int Function(Pointer<Utf8> value);
+typedef _AplIntArgC = Int32 Function(Int32 on);
+typedef _AplIntArgD = int Function(int on);
+typedef _AplBtDevicesC =
+    Int32 Function(
+      Pointer<AplBtDeviceFfi> out,
+      Uint32 max,
+      Pointer<Uint32> count,
+    );
+typedef _AplBtDevicesD =
+    int Function(Pointer<AplBtDeviceFfi> out, int max, Pointer<Uint32> count);
 typedef _AplSystemAccentD =
     int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsD = int Function(int on);
@@ -638,6 +710,62 @@ class PlatformBindings {
               'apl_live_install_status',
             ),
       ),
+      // WiFi / 蓝牙（apl_wifi_* / apl_bt_*）
+      _wifiState = _try(
+        () => lib.lookupFunction<_AplWifiStateC, _AplWifiStateD>(
+          'apl_wifi_state',
+        ),
+      ),
+      _wifiScan = _try(
+        () => lib.lookupFunction<_AplWifiScanC, _AplWifiScanD>('apl_wifi_scan'),
+      ),
+      _wifiConnect = _try(
+        () => lib.lookupFunction<_AplWifiConnectC, _AplWifiConnectD>(
+          'apl_wifi_connect',
+        ),
+      ),
+      _wifiDisconnect = _try(
+        () => lib.lookupFunction<_AplVoidIntC, _AplVoidIntD>(
+          'apl_wifi_disconnect',
+        ),
+      ),
+      _wifiSetEnabled = _try(
+        () => lib.lookupFunction<_AplIntArgC, _AplIntArgD>(
+          'apl_wifi_set_enabled',
+        ),
+      ),
+      _wifiForget = _try(
+        () => lib.lookupFunction<_AplStrIntC, _AplStrIntD>('apl_wifi_forget'),
+      ),
+      _btScanStart = _try(
+        () =>
+            lib.lookupFunction<_AplVoidIntC, _AplVoidIntD>('apl_bt_scan_start'),
+      ),
+      _btScanStop = _try(
+        () =>
+            lib.lookupFunction<_AplVoidIntC, _AplVoidIntD>('apl_bt_scan_stop'),
+      ),
+      _btDevices = _try(
+        () => lib.lookupFunction<_AplBtDevicesC, _AplBtDevicesD>(
+          'apl_bt_devices',
+        ),
+      ),
+      _btPair = _try(
+        () => lib.lookupFunction<_AplStrIntC, _AplStrIntD>('apl_bt_pair'),
+      ),
+      _btConnect = _try(
+        () => lib.lookupFunction<_AplStrIntC, _AplStrIntD>('apl_bt_connect'),
+      ),
+      _btDisconnect = _try(
+        () => lib.lookupFunction<_AplStrIntC, _AplStrIntD>('apl_bt_disconnect'),
+      ),
+      _btForget = _try(
+        () => lib.lookupFunction<_AplStrIntC, _AplStrIntD>('apl_bt_forget'),
+      ),
+      _btSetEnabled = _try(
+        () =>
+            lib.lookupFunction<_AplIntArgC, _AplIntArgD>('apl_bt_set_enabled'),
+      ),
       _setCallback = lib.lookupFunction<_SetEventCallbackC, _SetEventCallbackD>(
         'apl_set_event_callback',
       ) {
@@ -695,6 +823,20 @@ class PlatformBindings {
   final _AplLiveDiskListD? _liveDiskList;
   final _AplLiveInstallStartD? _liveInstallStart;
   final _AplLiveInstallStatusD? _liveInstallStatus;
+  final _AplWifiStateD? _wifiState;
+  final _AplWifiScanD? _wifiScan;
+  final _AplWifiConnectD? _wifiConnect;
+  final _AplVoidIntD? _wifiDisconnect;
+  final _AplIntArgD? _wifiSetEnabled;
+  final _AplStrIntD? _wifiForget;
+  final _AplVoidIntD? _btScanStart;
+  final _AplVoidIntD? _btScanStop;
+  final _AplBtDevicesD? _btDevices;
+  final _AplStrIntD? _btPair;
+  final _AplStrIntD? _btConnect;
+  final _AplStrIntD? _btDisconnect;
+  final _AplStrIntD? _btForget;
+  final _AplIntArgD? _btSetEnabled;
 
   // 四类事件广播流（ffi_* 实现订阅转译）
   final _commandCtrl = StreamController<MediaCommandEvent>.broadcast();
@@ -821,6 +963,157 @@ class PlatformBindings {
     }
   }
 
+  // ── WiFi / 蓝牙（apl_wifi_* / apl_bt_*）──────────────────────────
+
+  WifiState? netWifiState() {
+    final fn = _wifiState;
+    if (fn == null) return null;
+    final out = calloc<AplWifiStateFfi>();
+    try {
+      if (fn(out) != 0) return null;
+      return WifiState(
+        present: out.ref.present != 0,
+        enabled: out.ref.enabled != 0,
+        connected: out.ref.connected != 0,
+        signal: out.ref.signal,
+        ssid: _liveStr(out.ref.ssid),
+        ip: _liveStr(out.ref.ip),
+        security: _wifiSecFromInt(_liveStr(out.ref.security)),
+      );
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  WifiSecurity _wifiSecFromInt(String raw) {
+    switch (raw) {
+      case 'open':
+        return WifiSecurity.open;
+      case 'psk':
+        return WifiSecurity.psk;
+      default:
+        return WifiSecurity.unknown;
+    }
+  }
+
+  List<WifiNetwork> netWifiScan() {
+    final fn = _wifiScan;
+    if (fn == null) return const <WifiNetwork>[];
+    const max = 64;
+    final out = calloc<AplWifiNetworkFfi>(max);
+    final count = calloc<Uint32>();
+    try {
+      if (fn(out, max, count) != 0) return const <WifiNetwork>[];
+      final n = count.value;
+      return <WifiNetwork>[
+        for (var i = 0; i < n; i++)
+          WifiNetwork(
+            ssid: _liveStr(out[i].ssid),
+            signal: out[i].signal,
+            security:
+                WifiSecurity.values[out[i].security.clamp(
+                  0,
+                  WifiSecurity.values.length - 1,
+                )],
+            connected: out[i].connected != 0,
+            saved: out[i].saved != 0,
+          ),
+      ];
+    } finally {
+      calloc.free(out);
+      calloc.free(count);
+    }
+  }
+
+  bool netWifiConnect(String ssid, {String? password}) {
+    final fn = _wifiConnect;
+    if (fn == null) return false;
+    final s = ssid.toNativeUtf8();
+    final p = (password ?? '').toNativeUtf8();
+    try {
+      return fn(s, p) == 0;
+    } finally {
+      malloc.free(s);
+      malloc.free(p);
+    }
+  }
+
+  bool netWifiDisconnect() {
+    final fn = _wifiDisconnect;
+    return fn == null ? false : fn() == 0;
+  }
+
+  bool netWifiSetEnabled(bool on) {
+    final fn = _wifiSetEnabled;
+    return fn == null ? false : fn(on ? 1 : 0) == 0;
+  }
+
+  bool netWifiForget(String ssid) {
+    final fn = _wifiForget;
+    if (fn == null) return false;
+    final s = ssid.toNativeUtf8();
+    try {
+      return fn(s) == 0;
+    } finally {
+      malloc.free(s);
+    }
+  }
+
+  List<BtDevice> netBtDevices() {
+    final fn = _btDevices;
+    if (fn == null) return const <BtDevice>[];
+    const max = 64;
+    final out = calloc<AplBtDeviceFfi>(max);
+    final count = calloc<Uint32>();
+    try {
+      if (fn(out, max, count) != 0) return const <BtDevice>[];
+      final n = count.value;
+      return <BtDevice>[
+        for (var i = 0; i < n; i++)
+          BtDevice(
+            address: _liveStr(out[i].address),
+            name: _liveStr(out[i].name),
+            paired: out[i].paired != 0,
+            connected: out[i].connected != 0,
+            rssi: out[i].rssi,
+          ),
+      ];
+    } finally {
+      calloc.free(out);
+      calloc.free(count);
+    }
+  }
+
+  bool netBtScanStart() {
+    final fn = _btScanStart;
+    return fn == null ? false : fn() == 0;
+  }
+
+  bool netBtScanStop() {
+    final fn = _btScanStop;
+    return fn == null ? false : fn() == 0;
+  }
+
+  bool _btCall(_AplStrIntD? fn, String address) {
+    if (fn == null) return false;
+    final a = address.toNativeUtf8();
+    try {
+      return fn(a) == 0;
+    } finally {
+      malloc.free(a);
+    }
+  }
+
+  bool netBtPair(String address) => _btCall(_btPair, address);
+  bool netBtConnect(String address) => _btCall(_btConnect, address);
+  bool netBtDisconnect(String address) => _btCall(_btDisconnect, address);
+  bool netBtForget(String address) => _btCall(_btForget, address);
+
+  bool netBtSetEnabled(bool on) {
+    final fn = _btSetEnabled;
+    return fn == null ? false : fn(on ? 1 : 0) == 0;
+  }
+
   /// 写计划并启动安装单元。
   bool liveInstallStart(LivePlan plan) {
     final fn = _liveInstallStart;
@@ -875,6 +1168,10 @@ class PlatformBindings {
 
   /// Live 安装向导符号是否可用（仅 Live 镜像的桥接带这些符号）。
   bool get liveSymbolsAvailable => _liveAvailable != null;
+
+  /// WiFi / 蓝牙符号是否可用。
+  bool get wifiSymbolsAvailable => _wifiState != null;
+  bool get bluetoothControlSymbolsAvailable => _btDevices != null;
 
   /// 系统资源快照；不可用/失败返回 null。
   SysStats? sysStats() {
