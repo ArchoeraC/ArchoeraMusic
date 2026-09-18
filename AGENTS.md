@@ -141,6 +141,13 @@ qemu-system-x86_64 -machine q35,accel=kvm -m 2048 -smp 2 \
   里的 `*.iso`，`blkid` 核对卷标后 `losetup` 挂上 → udev 生成 `by-label` 链接（带重试，
   USB 枚举有时间差）。光驱/dd 启动时 `by-label` 早已存在，该单元会被 `ConditionPathExists`
   跳过，不产生开销。
+- **不要把 `kmscon` 放在基础镜像**：它默认跑 `/bin/login`，而 Live/安装环境下 root 密码是锁的
+  → tty 进去也只能看登录提示。它只属于 Live（`live-extra` 里覆盖 `ExecStart` 为
+  `--login -- /bin/bash -l` 给出 root 调试 shell），并同时放一个同名 `autovt@ttyN.service`
+  空实例，避免 logind 切到该 tty 时再拉 getty 与它 `Conflict`。
+- **清理构建进程时不要用匹配命令行的模式**（如 `ps | awk /build[.]sh/ | kill`）：脚本自身的
+  命令行里就含这些字样，会把自己杀掉、并连中间产物一起丢（实测把 live 的 raw/iso 都弄没了）。
+  需要中止构建就直接杀 mkosi 的 PID，或先确认没有构建在跑再重建。
 - 验证基线（QEMU/KVM，都是最终 ISO 实测）：**光驱** ~20~40s 进 kiosk、**USB/Ventoy** ~20~50s；
   真机通常更快。若卡在 `by-label` 等待或文本向导，按上文查缺模块元数据 / machine-id / ISO 定位。
 
