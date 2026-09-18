@@ -52,6 +52,36 @@ if [ -r /opt/archoera/cursor-theme ]; then
     [ -n "$CURSOR_SIZE" ] && export XCURSOR_SIZE="$CURSOR_SIZE"
 fi
 
+# 音频：拉起 PipeWire + WirePlumber（+ PulseAudio 兼容层）。
+# 播放引擎（miniaudio）走 PulseAudio 后端，**没有服务端就完全没声音**。
+# live 环境里 logind 的 `systemd --user` 不一定可用，所以直接拉起进程（随会话退出），
+# 并用 pgrep 兜底避免与已存在的实例重复启动。
+start_audio() {
+    if ! command -v pipewire >/dev/null 2>&1; then
+        echo "[session] 未安装 pipewire，跳过音频服务端"
+        return
+    fi
+    if ! pgrep -x pipewire >/dev/null 2>&1; then
+        echo "[session] 启动 PipeWire"
+        pipewire >/dev/null 2>&1 &
+    fi
+    i=0
+    while [ "$i" -lt 50 ]; do
+        [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/pipewire-0" ] && break
+        i=$((i + 1))
+        sleep 0.1
+    done
+    if command -v pipewire-pulse >/dev/null 2>&1 && ! pgrep -x pipewire-pulse >/dev/null 2>&1; then
+        echo "[session] 启动 pipewire-pulse（PulseAudio 兼容接口）"
+        pipewire-pulse >/dev/null 2>&1 &
+    fi
+    if command -v wireplumber >/dev/null 2>&1 && ! pgrep -x wireplumber >/dev/null 2>&1; then
+        echo "[session] 启动 WirePlumber（会话策略与设备管理）"
+        wireplumber >/dev/null 2>&1 &
+    fi
+}
+start_audio
+
 # 输入法：等合成器 socket 出现后启动 fcitx5（Wayland 前端）。
 start_ime() {
     i=0

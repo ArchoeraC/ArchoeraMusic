@@ -6,7 +6,7 @@
 use std::{
     ffi::OsString,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
     time::Instant,
@@ -308,6 +308,25 @@ impl ArchoeraShell {
         if let Err(err) = dh.flush_clients() {
             tracing::warn!(%err, "flush_clients 失败");
         }
+        // 帧率诊断：约每 5 秒在日志里打一条（info）。真机上若看到 fps 远高于屏幕
+        // 刷新率，说明客户端没有被节流（帧回调/时间戳路径还有问题）；若 fps 正常但
+        // 仍然卡，则瓶颈在每帧的合成/上传或应用自身。
+        let now_ms = monotonic_now().as_millis() as u64;
+        let last_ms = FRAME_LOG_MS.load(Ordering::Relaxed);
+        if last_ms == 0 {
+            FRAME_LOG_MS.store(now_ms, Ordering::Relaxed);
+        } else if now_ms.saturating_sub(last_ms) >= 5000 {
+            let frames = FRAME_COUNT.swap(0, Ordering::Relaxed);
+            let secs = now_ms.saturating_sub(last_ms) as f64 / 1000.0;
+            tracing::info!(
+                frames,
+                fps = (frames as f64 / secs).round() as u64,
+                "合成器帧率"
+            );
+            FRAME_LOG_MS.store(now_ms, Ordering::Relaxed);
+        }
+        FRAME_COUNT.fetch_add(1, Ordering::Relaxed);
+
         Ok(())
     }
 
@@ -643,11 +662,14 @@ pub fn monotonic_now() -> std::time::Duration {
     )
 }
 
-/// 输出的建议刷新间隔（客户端 frame callback 用）：wl_output 的 refresh 单位是 mHz，
-/// 这里换算成周期纳秒；拿不到当前模式时退回 60Hz。
+/// 输出的建议刷新间隔（客户端 frame callback 用）：wl_output 的 refresh 单位是 mHz，/// 这里换算成周期纳秒；拿不到当前模式时退回 60Hz。
 fn frame_refresh(output: &Output) -> Option<std::time::Duration> {
     output
         .current_mode()
         .map(|m| std::time::Duration::from_nanos(1_000_000_000_000u64 / m.refresh.max(1) as u64))
         .or(Some(std::time::Duration::from_micros(16_667)))
 }
+
+// ── 帧率诊断（约每 5 秒一行 info；数值异常高说明客户端没有被节流）──────────
+static FRAME_COUNT: AtomicU64 = AtomicU64::new(0);
+static FRAME_LOG_MS: AtomicU64 = AtomicU64::new(0);
