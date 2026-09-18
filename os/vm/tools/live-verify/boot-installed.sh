@@ -20,6 +20,11 @@ MON=$WORK/mon.sock
 SOCK=$WORK/serial.sock
 mkdir -p "$WORK"; rm -f "$MON" "$SOCK"
 [ -f "$IMG" ] || { echo "找不到磁盘镜像：$IMG（先用 installer-debug.sh 装一次）" >&2; exit 1; }
+# OVMF 变量盘：每个工作目录都要有一份可写的（缺了 QEMU 会直接退出，脚本会空转）。
+if [ ! -f "$WORK/OVMF_VARS.fd" ]; then
+    cp /usr/share/edk2/x64/OVMF_VARS.4m.fd "$WORK/OVMF_VARS.fd" 2>/dev/null \
+      || cp /usr/share/edk2/x64/OVMF_VARS.fd "$WORK/OVMF_VARS.fd"
+fi
 
 ser() {
     local cmd="$1" total="${2:-30}" wait="${3:-8}"
@@ -54,6 +59,10 @@ echo "qemu pid=$QPID  盘=$IMG  LUKS 口令=${LUKS_PASS:-(无)}"
 
 booted=0
 for i in $(seq 1 30); do
+    # QEMU 起不来/中途死了要立刻报，否则就是空等 90 秒（踩过：OVMF_VARS 缺失）。
+    if ! kill -0 "$QPID" 2>/dev/null; then
+        echo "!! QEMU 已退出：" >&2; tail -5 "$WORK/qemu.log" >&2; exit 1
+    fi
     sleep 6
     shot "boot-$(printf '%02d' "$i")"
     out=$(ser "echo BOOTPROBE_$RANDOM" 25 5 || true)
