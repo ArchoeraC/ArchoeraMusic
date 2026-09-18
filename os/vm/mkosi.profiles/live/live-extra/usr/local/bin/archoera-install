@@ -335,11 +335,21 @@ for m in dev proc sys run; do
     mkdir -p "$TARGET/$m"
     mount --bind "/$m" "$TARGET/$m" 2>/dev/null || true
 done
-chroot "$TARGET" /usr/bin/env -i \
-    PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin \
-    HOME=/root TERM=dumb LANG=C \
-    kernel-install add "$KVER" "/usr/lib/modules/$KVER/vmlinuz" \
-    || fail "kernel-install 失败（initrd/引导条目未生成）"
+KINSTALL_LOG="$STATE/kinstall.log"
+if ! chroot "$TARGET" /usr/bin/env -i \
+        PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin \
+        HOME=/root TERM=dumb LANG=C \
+        kernel-install add "$KVER" "/usr/lib/modules/$KVER/vmlinuz" \
+        >"$KINSTALL_LOG" 2>&1; then
+    tail -20 "$KINSTALL_LOG" >&2
+    fail "kernel-install 失败（initrd/引导条目未生成，详见 $KINSTALL_LOG）"
+fi
+# ⚠ dracut 报错时 kernel-install 仍可能返回 0（dracut 的插件不传递失败），并且
+# 可能留下一个**残缺但存在**的 initrd —— 光看退出码/文件存在都会误判成功。
+if grep -qE 'dracut\[E\]|dracut-install: ERROR' "$KINSTALL_LOG"; then
+    grep -E 'dracut\[E\]|dracut-install: ERROR' "$KINSTALL_LOG" | tail -10 >&2
+    fail "dracut 生成 initrd 时报错（initrd 可能残缺，详见 $KINSTALL_LOG）"
+fi
 for m in run sys proc dev; do umount "$TARGET/$m" 2>/dev/null || true; done
 
 ENTRY="$(ls "$TARGET/boot/loader/entries" 2>/dev/null | head -1)"
