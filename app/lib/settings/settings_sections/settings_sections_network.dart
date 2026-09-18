@@ -256,12 +256,16 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
         ),
     ];
 
+    // connected 兜底：桥接按 ActiveAccessPoint 的 SSID 判定；若该 AP 未出现在本次
+    // 扫描结果里（缓存/时机差异），至少与当前连接同名的那条也标成已连接。
+    final isConnected =
+        network.connected || (_wifi.connected && network.ssid == _wifi.ssid);
     final subtitle = <String>[
       if (network.frequencyMhz > 0)
         network.is5Ghz ? l10n.netWifiBand5 : l10n.netWifiBand24,
       if (network.signal > 0) '${network.signal}%',
       _securityLabel(network.security),
-      if (network.connected) l10n.netWifiConnected,
+      if (isConnected) l10n.netWifiConnected,
       if (network.saved) l10n.netWifiSaved,
     ].join(' · ');
 
