@@ -12,6 +12,15 @@
 - 依赖：`qemu-system-x86_64`、`qemu-img`、`socat`、`python3`（仅用于去掉串口 OSC 噪声）
 - 需要 KVM；VM 内存默认 4G（`dracut` 在 chroot 里生成 initrd 比较吃内存/临时空间）
 
+## 省盘原则（重要）
+
+每次**全量重建**会写 ~17GB（mkosi 镜像树 + 6.4G raw + 4.7G ISO），对 SSD 很不友好。
+绝大多数验证不需要重建：
+
+- 安装器、dracut 配置、systemd 单元、polkit 规则 → 用 `live-shell.sh` 注入后直接试；
+- 只有**包清单 / 内核 / initrd 生成方式**这类改动才真的需要 `build.sh`，且应**批量合并**后重建一次；
+- 重建时把上一版 ISO 先删掉（别同时留两份 5G 产物）。
+
 ## 用法
 
 ```bash
@@ -23,6 +32,12 @@ bash os/vm/tools/live-verify/installer-debug.sh
 
 # ③ 完整验证：ext4(+交换) / xfs / f2fs / btrfs+LUKS2 依次装并核对产物
 bash os/vm/tools/live-verify/qemu-verify.sh
+
+# ④ 常驻 Live 会话（免重建迭代，推荐）：
+bash os/vm/tools/live-verify/live-shell.sh
+#   live> :put ./archoera-install /usr/local/bin/archoera-install
+#   live> :putdir ../dracut.conf.d /etc/dracut.conf.d
+#   live> systemctl start archoera-install
 ```
 
 配套的 guest 侧脚本（`guest-*.sh`）由对应的 host 脚本以 base64 注入 Live，一般不用手改。
