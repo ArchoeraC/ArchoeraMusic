@@ -1132,3 +1132,11 @@ int32_t btState(AplBtState*) { return ERR_UNSUPPORTED; }
 int32_t gpus(AplGpuInfo*, uint32_t, uint32_t*) { return ERR_UNSUPPORTED; }
 void shutdown() {}
 }  // namespace sysinfo
+
+namespace live {
+bool available() { return false; }
+int32_t diskList(AplLiveDisk*, uint32_t, uint32_t*) { return ERR_UNSUPPORTED; }
+int32_t installStart(const AplLivePlan*) { return ERR_UNSUPPORTED; }
+int32_t installStatus(AplLiveInstallStatus*) { return ERR_UNSUPPORTED; }
+}  // namespace live
+

@@ -10,6 +10,7 @@
 
 #include "backend.h"
 #include "core.h"
+#include "live.h"
 #include "sysinfo.h"
 
 namespace {
@@ -170,6 +171,22 @@ int32_t apl_bt_state(AplBtState* out) {
 
 int32_t apl_gpu_list(AplGpuInfo* out, uint32_t max, uint32_t* count) {
     return archoera::sysinfo::gpus(out, max, count);
+}
+
+int32_t apl_live_available(void) {
+    return archoera::live::available() ? 1 : 0;
+}
+
+int32_t apl_live_disk_list(AplLiveDisk* out, uint32_t max, uint32_t* count) {
+    return archoera::live::diskList(out, max, count);
+}
+
+int32_t apl_live_install_start(const AplLivePlan* plan) {
+    return archoera::live::installStart(plan);
+}
+
+int32_t apl_live_install_status(AplLiveInstallStatus* out) {
+    return archoera::live::installStatus(out);
 }
 
 int32_t apl_notify(const char* title, const char* body) {

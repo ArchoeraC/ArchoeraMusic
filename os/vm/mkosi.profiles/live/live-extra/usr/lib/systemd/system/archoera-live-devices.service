@@ -1,0 +1,16 @@
+# ArchoeraOS Live：启动时把候选目标磁盘清单写进 /run/archoera-install/devices。
+#
+# 为什么用单元而不是让桥接/应用去跑命令：桥接层与 Dart 侧都不允许起子进程，
+# 所以由 shell 侧的安装器 `--list` 生成一次，桥接只读文件。
+[Unit]
+Description=ArchoeraOS Live：生成候选目标磁盘清单
+ConditionPathExists=/etc/archoera-live
+DefaultDependencies=no
+After=local-fs.target
+Before=getty.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/archoera-install --list
+StandardOutput=null

@@ -112,6 +112,20 @@ else
     client=/opt/archoera/archoera-smoke
 fi
 
+# 安装向导交接：播放器（Live 里带「安装 ArchoeraOS」入口）写
+# /run/archoera-install/request 后自行退出 → 合成器 watchdog 随之退出 → 这里把客户端
+# 换成同一二进制的 --installer 模式（独立进程、全屏向导）。向导结束后同样写标记退出，
+# 于是会话回到播放器。全程不需要 Dart 侧起任何子进程。
+client_args=""
+if [ -f /run/archoera-install/request ]; then
+    rm -f /run/archoera-install/request
+    if [ -x "$APP" ]; then
+        client="$APP"
+        client_args="--installer"
+        echo "[session] 检测到安装向导请求 → 以 --installer 模式启动客户端"
+    fi
+fi
+
 # 播放器是 GTK3 客户端：强制 Wayland 后端。
 # 输入法走 Wayland text-input-v3，因此不设 GTK_IM_MODULE（会走合成器 → fcitx5）。
 export GDK_BACKEND=wayland
@@ -126,9 +140,9 @@ fi
 unset GTK_IM_MODULE
 
 while true; do
-    echo "[session] 启动 udev kiosk $(date -Is) args='${args}' client='${client}'"
+    echo "[session] 启动 udev kiosk $(date -Is) args='${args}' client='${client}' client_args='${client_args}'"
     # shellcheck disable=SC2086
-    /opt/archoera/archoera-shell --backend udev $args -- "$client"
+    /opt/archoera/archoera-shell --backend udev $args -- "$client" $client_args
     echo "[session] 合成器退出 rc=$?，5s 后重试"
     sleep 5
 done

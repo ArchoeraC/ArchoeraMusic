@@ -52,6 +52,8 @@ elseif(UNIX)
   list(APPEND ARCHOERA_SOURCES src/sysinfo_linux.cpp)
   # 显卡枚举（DRM/sysfs）。
   list(APPEND ARCHOERA_SOURCES src/sysinfo_gpu_linux.cpp)
+  # Live 安装向导支持（磁盘清单/启动安装/进度）。
+  list(APPEND ARCHOERA_SOURCES src/live_linux.cpp)
 else()
   list(APPEND ARCHOERA_SOURCES src/backend_stub.cpp)
 endif()

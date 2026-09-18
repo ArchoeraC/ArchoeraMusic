@@ -266,6 +266,57 @@ APL_API int32_t apl_system_accent_set_events(int32_t on);
  * 事件 APL_EVENT_SYSTEM_THEME 携带 u.theme.dark（1=深色，0=浅色）。 */
 APL_API int32_t apl_system_theme_set_events(int32_t on);
 
+/* ── Live 安装向导（仅 Live 镜像；ArchoeraOS）───────────────────── *
+ * 说明：只有 Live 环境（存在 /etc/archoera-live）可用；已安装系统返回
+ * APL_ERR_UNSUPPORTED。这里不做任何子进程：磁盘清单读 /sys/block，
+ * 计划/口令由本层写文件，启动安装通过在 **system bus** 上调 systemd 的
+ * StartUnit（polkit 允许活动会话的 kiosk 用户启动该单元）。
+ * 字符串生命周期同 WiFi：仅在该次调用后、下一次同类调用前有效。 */
+
+typedef struct AplLiveDisk {
+    AplString name;       /* 不含 /dev/，如 "nvme0n1" */
+    int64_t size_bytes;
+    AplString model;
+    AplString transport;  /* nvme / sata / usb / mmc / … */
+    int32_t is_live;      /* 1 = 当前 Live 介质所在磁盘（禁止选为目标） */
+} AplLiveDisk;
+
+typedef struct AplLivePlan {
+    AplString disk;       /* "/dev/nvme0n1" */
+    AplString hostname;
+    AplString username;
+    AplString locale;     /* 如 "zh_CN.UTF-8" */
+    AplString timezone;   /* 如 "Asia/Shanghai" */
+    AplString keymap;     /* 如 "us" / "cn" */
+    AplString fs;         /* "ext4" | "btrfs" */
+    AplString swap;       /* "none" | "file" */
+    int32_t encrypt;      /* 0/1 → LUKS2 加密 root */
+    int32_t autologin;    /* 0/1 → 是否保持 tty1 自动登录进 kiosk */
+    AplString luks_passphrase; /* encrypt=1 时必填 */
+    AplString user_password;   /* 空 = 不设（kiosk 自动登录不需要） */
+    AplString root_password;   /* 空 = 保持 root 锁定 */
+} AplLivePlan;
+
+typedef struct AplLiveInstallStatus {
+    int32_t running;      /* 单元正在运行 */
+    int32_t done;         /* /run/archoera-install/done 存在 */
+    int32_t failed;       /* failed 文件存在（message 为原因） */
+    int32_t percent;      /* -1 = 未知 */
+    AplString message;    /* 当前步骤说明 */
+} AplLiveInstallStatus;
+
+/* 1 = 当前是 Live 环境（/etc/archoera-live 存在），否则 0。 */
+APL_API int32_t apl_live_available(void);
+
+/* 候选目标磁盘（已排除 loop/zram/sr/dm/md；含 is_live 标记）。 */
+APL_API int32_t apl_live_disk_list(AplLiveDisk *out, uint32_t max, uint32_t *count);
+
+/* 写计划（含 0600 的 secrets）并启动安装单元。返回 0 = 已启动。 */
+APL_API int32_t apl_live_install_start(const AplLivePlan *plan);
+
+/* 读取安装进度（供向导轮询）。 */
+APL_API int32_t apl_live_install_status(AplLiveInstallStatus *out);
+
 /* ── 反向事件（OS → Dart）──────────────────────────────────────── */
 typedef enum {
     APL_EVENT_MEDIA_COMMAND = 1,
