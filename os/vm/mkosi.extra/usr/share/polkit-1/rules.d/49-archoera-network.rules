@@ -1,0 +1,18 @@
+// ArchoeraOS：允许 kiosk 会话用户管理网络连接。
+//
+// 为什么需要：NetworkManager 默认把「新建连接」的写权限限制为 auth_admin（需要鉴权代理），
+// 而 kiosk 环境没有 polkit 鉴权代理 → 新连的 WiFi 只能落成 per-user 的临时配置。这里
+// 与电源/安装单元那两条规则同思路：只放行**活动会话**里的 kiosk 用户。
+polkit.addRule(function (action, subject) {
+    var allowed = [
+        "org.freedesktop.NetworkManager.settings.modify.system",
+        "org.freedesktop.NetworkManager.settings.modify.own",
+        "org.freedesktop.NetworkManager.network-control",
+        "org.freedesktop.NetworkManager.wifi.scan",
+        "org.freedesktop.NetworkManager.wifi.share.open",
+        "org.freedesktop.NetworkManager.enable-disable-wifi"
+    ];
+    if (allowed.indexOf(action.id) >= 0 && subject.user == "archoera" && subject.active) {
+        return polkit.Result.YES;
+    }
+});

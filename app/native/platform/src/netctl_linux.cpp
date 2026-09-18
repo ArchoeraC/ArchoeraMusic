@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <strings.h>
 #include <map>
 #include <mutex>
 #include <string>
@@ -469,16 +470,239 @@ int32_t wifiDisconnect() {
     return OK;
 }
 
+
+// ── 设置字典小工具（用于 AddAndActivateConnection）────────────────────
+void putStr(DBusMessageIter* props, const char* key, const char* value) {
+    DBusMessageIter entry, var;
+    const char* k = key;
+    dbus_message_iter_open_container(props, DBUS_TYPE_DICT_ENTRY, nullptr, &entry);
+    dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &k);
+    dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "s", &var);
+    dbus_message_iter_append_basic(&var, DBUS_TYPE_STRING, &value);
+    dbus_message_iter_close_container(&entry, &var);
+    dbus_message_iter_close_container(props, &entry);
+}
+
+void putBytes(DBusMessageIter* props, const char* key, const char* data, int len) {
+    DBusMessageIter entry, var, arr;
+    const char* k = key;
+    dbus_message_iter_open_container(props, DBUS_TYPE_DICT_ENTRY, nullptr, &entry);
+    dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &k);
+    dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "ay", &var);
+    dbus_message_iter_open_container(&var, DBUS_TYPE_ARRAY, "y", &arr);
+    for (int i = 0; i < len; ++i) {
+        const unsigned char b = static_cast<unsigned char>(data[i]);
+        dbus_message_iter_append_basic(&arr, DBUS_TYPE_BYTE, &b);
+    }
+    dbus_message_iter_close_container(&var, &arr);
+    dbus_message_iter_close_container(&entry, &var);
+    dbus_message_iter_close_container(props, &entry);
+}
+
+void openSection(DBusMessageIter* settings, const char* name, DBusMessageIter* sect) {
+    const char* n = name;
+    dbus_message_iter_open_container(settings, DBUS_TYPE_DICT_ENTRY, nullptr, sect);
+    dbus_message_iter_append_basic(sect, DBUS_TYPE_STRING, &n);
+}
+
+// 找某个 SSID 对应的 AP 对象路径。
+std::string findApBySsid(DBusConnection* bus, const std::string& dev, const std::string& ssid) {
+    std::vector<std::string> aps;
+    readObjectPathArray(bus, kNm, dev.c_str(), kNmWireless, "AccessPoints", &aps);
+    for (const std::string& ap : aps) {
+        if (readApSsid(bus, ap) == ssid) return ap;
+    }
+    return "";
+}
+
+std::string randomUuid() {
+    FILE* f = std::fopen("/proc/sys/kernel/random/uuid", "r");
+    if (f == nullptr) return "00000000-0000-4000-8000-000000000000";
+    char buf[64] = {0};
+    if (std::fgets(buf, sizeof(buf), f) == nullptr) buf[0] = '\0';
+    std::fclose(f);
+    std::string s(buf);
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+    return s.empty() ? "00000000-0000-4000-8000-000000000000" : s;
+}
+
 int32_t wifiConnect(const char* ssid, const char* psk) {
-    (void)ssid;
-    (void)psk;
-    // 下一刀：AddAndActivateConnection 的设置字典（a{sa{sv}}）。
-    return ERR_UNSUPPORTED;
+    if (ssid == nullptr || ssid[0] == '\0') return ERR_STATE;
+
+    std::lock_guard<std::mutex> lock(g_mtx);
+    DBusConnection* bus = busLocked();
+    if (bus == nullptr) return ERR_BACKEND;
+    const std::string dev = wirelessDeviceLocked(bus);
+    if (dev.empty()) return ERR_UNSUPPORTED;
+    const std::string ap = findApBySsid(bus, dev, ssid);
+    if (ap.empty()) return ERR_STATE;  // 还没扫到这个 SSID，UI 应先扫描
+
+    const bool needPsk = (psk != nullptr && psk[0] != '\0');
+    const std::string uuid = randomUuid();
+
+    DBusMessage* msg = dbus_message_new_method_call(kNm, kNmPath, kNm,
+                                                    "AddAndActivateConnection");
+    if (msg == nullptr) return ERR_BACKEND;
+    DBusMessageIter it, settings, sect, props;
+    dbus_message_iter_init_append(msg, &it);
+    const char* devPath = dev.c_str();
+    const char* apPath = ap.c_str();
+    dbus_message_iter_append_basic(&it, DBUS_TYPE_OBJECT_PATH, &devPath);
+    dbus_message_iter_append_basic(&it, DBUS_TYPE_OBJECT_PATH, &apPath);
+    dbus_message_iter_open_container(&it, DBUS_TYPE_ARRAY, "{sa{sv}}", &settings);
+
+    // 「connection」
+    openSection(&settings, "connection", &sect);
+    dbus_message_iter_open_container(&sect, DBUS_TYPE_ARRAY, "{sv}", &props);
+    putStr(&props, "id", ssid);
+    putStr(&props, "type", "802-11-wireless");
+    putStr(&props, "uuid", uuid.c_str());
+    dbus_message_iter_close_container(&sect, &props);
+    dbus_message_iter_close_container(&settings, &sect);
+
+    // 「802-11-wireless」（ssid 是字节数组）
+    openSection(&settings, "802-11-wireless", &sect);
+    dbus_message_iter_open_container(&sect, DBUS_TYPE_ARRAY, "{sv}", &props);
+    putBytes(&props, "ssid", ssid, static_cast<int>(std::strlen(ssid)));
+    putStr(&props, "mode", "infrastructure");
+    dbus_message_iter_close_container(&sect, &props);
+    dbus_message_iter_close_container(&settings, &sect);
+
+    // 「802-11-wireless-security」（仅加密网络）
+    if (needPsk) {
+        openSection(&settings, "802-11-wireless-security", &sect);
+        dbus_message_iter_open_container(&sect, DBUS_TYPE_ARRAY, "{sv}", &props);
+        putStr(&props, "key-mgmt", "wpa-psk");
+        putStr(&props, "psk", psk);
+        dbus_message_iter_close_container(&sect, &props);
+        dbus_message_iter_close_container(&settings, &sect);
+    }
+
+    // 「ipv4」/「ipv6」都自动
+    openSection(&settings, "ipv4", &sect);
+    dbus_message_iter_open_container(&sect, DBUS_TYPE_ARRAY, "{sv}", &props);
+    putStr(&props, "method", "auto");
+    dbus_message_iter_close_container(&sect, &props);
+    dbus_message_iter_close_container(&settings, &sect);
+    openSection(&settings, "ipv6", &sect);
+    dbus_message_iter_open_container(&sect, DBUS_TYPE_ARRAY, "{sv}", &props);
+    putStr(&props, "method", "auto");
+    dbus_message_iter_close_container(&sect, &props);
+    dbus_message_iter_close_container(&settings, &sect);
+
+    dbus_message_iter_close_container(&it, &settings);
+
+    DBusError err;
+    dbus_error_init(&err);
+    // 连接可能较慢（扫描/关联/认证），给足超时。
+    DBusMessage* reply = dbus_connection_send_with_reply_and_block(bus, msg, 30000, &err);
+    const bool ok = reply != nullptr;
+    if (reply != nullptr) dbus_message_unref(reply);
+    if (dbus_error_is_set(&err)) {
+        if (std::strstr(err.message, "AlreadyExists") != nullptr) {
+            dbus_error_free(&err);
+            dbus_message_unref(msg);
+            return OK;
+        }
+        dbus_error_free(&err);
+    }
+    dbus_message_unref(msg);
+    return ok ? OK : ERR_BACKEND;
 }
 
 int32_t wifiForget(const char* ssid) {
-    (void)ssid;
-    return ERR_UNSUPPORTED;
+    if (ssid == nullptr || ssid[0] == '\0') return ERR_STATE;
+    std::lock_guard<std::mutex> lock(g_mtx);
+    DBusConnection* bus = busLocked();
+    if (bus == nullptr) return ERR_BACKEND;
+
+    // Settings.ListConnections → 逐个读 GetSettings，匹配 connection.id 后 Delete。
+    DBusMessage* listMsg = dbus_message_new_method_call(
+        kNm, "/org/freedesktop/NetworkManager/Settings",
+        "org.freedesktop.NetworkManager.Settings", "ListConnections");
+    if (listMsg == nullptr) return ERR_BACKEND;
+    DBusError err;
+    dbus_error_init(&err);
+    DBusMessage* reply = dbus_connection_send_with_reply_and_block(bus, listMsg, 5000, &err);
+    dbus_message_unref(listMsg);
+    if (dbus_error_is_set(&err)) dbus_error_free(&err);
+    if (reply == nullptr) return ERR_BACKEND;
+
+    std::vector<std::string> conns;
+    DBusMessageIter it;
+    if (dbus_message_iter_init(reply, &it) && dbus_message_iter_get_arg_type(&it) == DBUS_TYPE_ARRAY) {
+        DBusMessageIter arr;
+        for (dbus_message_iter_recurse(&it, &arr);
+             dbus_message_iter_get_arg_type(&arr) == DBUS_TYPE_OBJECT_PATH;
+             dbus_message_iter_next(&arr)) {
+            const char* p = nullptr;
+            dbus_message_iter_get_basic(&arr, &p);
+            if (p != nullptr) conns.emplace_back(p);
+        }
+    }
+    dbus_message_unref(reply);
+
+    for (const std::string& c : conns) {
+        DBusMessage* getMsg = dbus_message_new_method_call(
+            kNm, c.c_str(), "org.freedesktop.NetworkManager.Settings.Connection", "GetSettings");
+        if (getMsg == nullptr) continue;
+        DBusError e2;
+        dbus_error_init(&e2);
+        DBusMessage* r = dbus_connection_send_with_reply_and_block(bus, getMsg, 5000, &e2);
+        dbus_message_unref(getMsg);
+        if (dbus_error_is_set(&e2)) dbus_error_free(&e2);
+        if (r == nullptr) continue;
+
+        // 解析 a{sa{sv}} 里的 connection.id
+        std::string id;
+        DBusMessageIter root;
+        if (dbus_message_iter_init(r, &root) && dbus_message_iter_get_arg_type(&root) == DBUS_TYPE_ARRAY) {
+            DBusMessageIter se;
+            for (dbus_message_iter_recurse(&root, &se);
+                 dbus_message_iter_get_arg_type(&se) == DBUS_TYPE_DICT_ENTRY;
+                 dbus_message_iter_next(&se)) {
+                DBusMessageIter secEntry;
+                dbus_message_iter_recurse(&se, &secEntry);
+                const char* secName = nullptr;
+                dbus_message_iter_get_basic(&secEntry, &secName);
+                dbus_message_iter_next(&secEntry);
+                DBusMessageIter props;
+                dbus_message_iter_recurse(&secEntry, &props);
+                if (secName == nullptr || std::strcmp(secName, "connection") != 0) continue;
+                for (; dbus_message_iter_get_arg_type(&props) == DBUS_TYPE_DICT_ENTRY;
+                     dbus_message_iter_next(&props)) {
+                    DBusMessageIter pe;
+                    dbus_message_iter_recurse(&props, &pe);
+                    const char* key = nullptr;
+                    dbus_message_iter_get_basic(&pe, &key);
+                    if (key == nullptr || std::strcmp(key, "id") != 0) continue;
+                    dbus_message_iter_next(&pe);
+                    DBusMessageIter var;
+                    dbus_message_iter_recurse(&pe, &var);
+                    if (dbus_message_iter_get_arg_type(&var) == DBUS_TYPE_STRING) {
+                        const char* s = nullptr;
+                        dbus_message_iter_get_basic(&var, &s);
+                        if (s != nullptr) id = s;
+                    }
+                }
+            }
+        }
+        dbus_message_unref(r);
+        if (id != ssid) continue;
+
+        DBusMessage* del = dbus_message_new_method_call(
+            kNm, c.c_str(), "org.freedesktop.NetworkManager.Settings.Connection", "Delete");
+        if (del == nullptr) return ERR_BACKEND;
+        DBusError e3;
+        dbus_error_init(&e3);
+        DBusMessage* rd = dbus_connection_send_with_reply_and_block(bus, del, 5000, &e3);
+        const bool ok = rd != nullptr;
+        if (rd != nullptr) dbus_message_unref(rd);
+        if (dbus_error_is_set(&e3)) dbus_error_free(&e3);
+        dbus_message_unref(del);
+        return ok ? OK : ERR_BACKEND;
+    }
+    return ERR_STATE;  // 没有该 SSID 的已保存配置
 }
 
 int32_t btScanStart() {
@@ -656,25 +880,106 @@ int32_t btSetEnabled(int32_t on) {
     return ok ? OK : ERR_BACKEND;
 }
 
+// 按 MAC 找 BlueZ 设备对象路径。
+std::string btDevicePathLocked(DBusConnection* bus, const char* address) {
+    if (address == nullptr) return "";
+    DBusMessage* reply = callLocked(bus, kBlueZ, "/", "org.freedesktop.DBus.ObjectManager",
+                                    "GetManagedObjects", 5000);
+    if (reply == nullptr) return "";
+    std::string found;
+    DBusMessageIter root;
+    if (dbus_message_iter_init(reply, &root) &&
+        dbus_message_iter_get_arg_type(&root) == DBUS_TYPE_ARRAY) {
+        DBusMessageIter obj;
+        for (dbus_message_iter_recurse(&root, &obj);
+             dbus_message_iter_get_arg_type(&obj) == DBUS_TYPE_DICT_ENTRY;
+             dbus_message_iter_next(&obj)) {
+            DBusMessageIter entry;
+            dbus_message_iter_recurse(&obj, &entry);
+            const char* path = nullptr;
+            dbus_message_iter_get_basic(&entry, &path);
+            dbus_message_iter_next(&entry);
+            DBusMessageIter ifaces;
+            dbus_message_iter_recurse(&entry, &ifaces);
+            for (; dbus_message_iter_get_arg_type(&ifaces) == DBUS_TYPE_DICT_ENTRY;
+                 dbus_message_iter_next(&ifaces)) {
+                DBusMessageIter ie;
+                dbus_message_iter_recurse(&ifaces, &ie);
+                const char* iface = nullptr;
+                dbus_message_iter_get_basic(&ie, &iface);
+                if (iface == nullptr || path == nullptr || std::strcmp(iface, kDevice1) != 0) continue;
+                dbus_message_iter_next(&ie);
+                DBusMessageIter props;
+                dbus_message_iter_recurse(&ie, &props);
+                for (; dbus_message_iter_get_arg_type(&props) == DBUS_TYPE_DICT_ENTRY;
+                     dbus_message_iter_next(&props)) {
+                    DBusMessageIter pe;
+                    dbus_message_iter_recurse(&props, &pe);
+                    const char* key = nullptr;
+                    dbus_message_iter_get_basic(&pe, &key);
+                    if (key == nullptr || std::strcmp(key, "Address") != 0) continue;
+                    dbus_message_iter_next(&pe);
+                    DBusMessageIter var;
+                    dbus_message_iter_recurse(&pe, &var);
+                    const char* s = nullptr;
+                    if (dbus_message_iter_get_arg_type(&var) == DBUS_TYPE_STRING) {
+                        dbus_message_iter_get_basic(&var, &s);
+                    }
+                    if (s != nullptr && strcasecmp(s, address) == 0) found = path;
+                }
+            }
+            if (!found.empty()) break;
+        }
+    }
+    dbus_message_unref(reply);
+    return found;
+}
+
+int32_t btCallDevice(const char* address, const char* method, int timeout_ms) {
+    if (address == nullptr || address[0] == '\0') return ERR_STATE;
+    std::lock_guard<std::mutex> lock(g_mtx);
+    DBusConnection* bus = busLocked();
+    if (bus == nullptr) return ERR_BACKEND;
+    const std::string path = btDevicePathLocked(bus, address);
+    if (path.empty()) return ERR_STATE;
+    DBusMessage* reply = callLocked(bus, kBlueZ, path.c_str(), kDevice1, method, timeout_ms);
+    if (reply == nullptr) return ERR_BACKEND;
+    dbus_message_unref(reply);
+    return OK;
+}
+
 int32_t btPair(const char* address) {
-    (void)address;
-    // 下一刀：注册 NoInputNoOutput agent 后调 Device1.Pair。
-    return ERR_UNSUPPORTED;
+    // 已配对设备会返回 AlreadyExists（视为成功）；**未配对**设备需要 BlueZ agent
+    // （下一刀：NoInputNoOutput agent），当前会失败并如实返回错误。
+    const int32_t rc = btCallDevice(address, "Pair", 60000);
+    return rc;
 }
 
-int32_t btConnect(const char* address) {
-    (void)address;
-    return ERR_UNSUPPORTED;
-}
+int32_t btConnect(const char* address) { return btCallDevice(address, "Connect", 30000); }
 
-int32_t btDisconnect(const char* address) {
-    (void)address;
-    return ERR_UNSUPPORTED;
-}
+int32_t btDisconnect(const char* address) { return btCallDevice(address, "Disconnect", 15000); }
 
 int32_t btForget(const char* address) {
-    (void)address;
-    return ERR_UNSUPPORTED;
+    if (address == nullptr || address[0] == '\0') return ERR_STATE;
+    std::lock_guard<std::mutex> lock(g_mtx);
+    DBusConnection* bus = busLocked();
+    if (bus == nullptr) return ERR_BACKEND;
+    const std::string adapter = adapterPathLocked(bus);
+    const std::string path = btDevicePathLocked(bus, address);
+    if (adapter.empty() || path.empty()) return ERR_STATE;
+    DBusMessage* msg = dbus_message_new_method_call(kBlueZ, adapter.c_str(), kAdapter1,
+                                                    "RemoveDevice");
+    if (msg == nullptr) return ERR_BACKEND;
+    const char* p = path.c_str();
+    dbus_message_append_args(msg, DBUS_TYPE_OBJECT_PATH, &p, DBUS_TYPE_INVALID);
+    DBusError err;
+    dbus_error_init(&err);
+    DBusMessage* reply = dbus_connection_send_with_reply_and_block(bus, msg, 10000, &err);
+    const bool ok = reply != nullptr;
+    if (reply != nullptr) dbus_message_unref(reply);
+    if (dbus_error_is_set(&err)) dbus_error_free(&err);
+    dbus_message_unref(msg);
+    return ok ? OK : ERR_BACKEND;
 }
 
 }  // namespace netctl
