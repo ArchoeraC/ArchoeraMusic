@@ -28,7 +28,8 @@ pub mod generated {
 }
 
 pub use generated::archoera_shell_v1::{
-    ArchoeraShellV1, Capability, MediaKey, OutputTransform, PowerKey, Request, SessionState,
+    ArchoeraShellV1, Capability, MediaKey, OutputFlag, OutputTransform, PowerKey, Request,
+    SessionState,
 };
 
 /// 协议 `output_transform` 数值 → 生成枚举（越界回退 normal）。

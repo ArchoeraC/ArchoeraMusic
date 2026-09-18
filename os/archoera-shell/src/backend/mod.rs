@@ -199,6 +199,15 @@ impl Backend {
         }
     }
 
+    /// 各输出的（连接器名, 模式列表）；嵌套后端没有真实输出，返回空。
+    pub fn output_meta(&self) -> Vec<OutputMeta> {
+        match self {
+            Backend::Winit(_) => Vec::new(),
+            #[cfg(feature = "udev")]
+            Backend::Udev(backend) => backend.output_meta(),
+        }
+    }
+
     /// 上一次 `render()` 是否真的提交了帧（udev 空帧不提交，也就没有 vblank）。
     /// 用于把「一帧在飞行中」的多次脏标记合并成一次合成，同时避免空帧把门控卡死。
     #[cfg_attr(not(feature = "udev"), allow(unused_variables))]
@@ -251,6 +260,12 @@ impl Backend {
         }
     }
 }
+
+/// 一个显示模式：(宽, 高, 刷新率 mHz)。
+pub type OutputMode = (i32, i32, u32);
+
+/// 一个输出的元数据：(连接器名, 模式列表)。
+pub type OutputMeta = (String, Vec<OutputMode>);
 
 /// 按配置初始化渲染/输入后端。
 pub fn init(

@@ -74,6 +74,10 @@ struct UdevSurface {
     connector: connector::Handle,
     /// 当前生效的 DRM 模式（用于判断是否需要切换）。
     mode: smithay::reexports::drm::control::Mode,
+    /// 连接器名（如 eDP-1 / HDMI-A-1），供协议 output_info 使用。
+    name: String,
+    /// 该连接器支持的全部模式：(宽, 高, 刷新率 mHz)。
+    modes: Vec<super::OutputMode>,
 }
 
 /// 裸机后端状态。
@@ -100,6 +104,17 @@ impl UdevBackend {
         self.session
             .change_vt(vt)
             .map_err(|e| anyhow::anyhow!("libseat change_vt({vt}) 失败: {e}"))
+    }
+
+    /// 各输出的（连接器名, 模式列表）快照，按名字排序保证 id 稳定。
+    pub fn output_meta(&self) -> Vec<super::OutputMeta> {
+        let mut out: Vec<super::OutputMeta> = self
+            .surfaces
+            .values()
+            .map(|s| (s.name.clone(), s.modes.clone()))
+            .collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
     }
 
     /// 开关屏幕（DPMS）：暂停 / 重新激活 DRM 输出管理器。
@@ -335,7 +350,25 @@ pub fn init_udev(
                             drm_output,
                             output,
                             connector: connector.handle(),
+
                             mode,
+                            name: format!(
+                                "{}-{}",
+                                connector.interface().as_str(),
+                                connector.interface_id()
+                            ),
+                            modes: connector
+                                .modes()
+                                .iter()
+                                .map(|m| {
+                                    let size = m.size();
+                                    (
+                                        size.0 as i32,
+                                        size.1 as i32,
+                                        m.vrefresh().saturating_mul(1000),
+                                    )
+                                })
+                                .collect(),
                         },
                     );
                 }
@@ -562,7 +595,25 @@ fn refresh_outputs(
                                 drm_output,
                                 output,
                                 connector: connector.handle(),
+
                                 mode,
+                                name: format!(
+                                    "{}-{}",
+                                    connector.interface().as_str(),
+                                    connector.interface_id()
+                                ),
+                                modes: connector
+                                    .modes()
+                                    .iter()
+                                    .map(|m| {
+                                        let size = m.size();
+                                        (
+                                            size.0 as i32,
+                                            size.1 as i32,
+                                            m.vrefresh().saturating_mul(1000),
+                                        )
+                                    })
+                                    .collect(),
                             },
                         );
                     }

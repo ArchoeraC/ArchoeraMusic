@@ -136,6 +136,18 @@ pub struct ArchoeraShell {
     last_render_ms: u64,
 }
 
+/// 一个输出的事件快照（协议 output_info/output_current/output_mode* 的数据源）。
+struct OutputEventData {
+    id: u32,
+    name: String,
+    width: u32,
+    height: u32,
+    scale_milli: u32,
+    transform: u32,
+    refresh: u32,
+    modes: Vec<crate::backend::OutputMode>,
+}
+
 impl ArchoeraShell {
     pub fn new(
         event_loop: &mut EventLoop<CalloopData>,
@@ -363,11 +375,85 @@ impl ArchoeraShell {
         ))
     }
 
+    /// 每个输出的一份快照：(id, 名字, 当前宽高/缩放/变换/刷新率, 模式表)。
+    fn output_events(&self) -> Vec<OutputEventData> {
+        let mut out = Vec::new();
+        let meta = match self.backend.as_ref() {
+            Some(b) => b.output_meta(),
+            None => Vec::new(),
+        };
+        if meta.is_empty() {
+            return out;
+        }
+        // 按输出名排序后的下标即协议里的稳定 id。
+        let outputs: Vec<Output> = self.space.outputs().cloned().collect();
+        for (id, (name, modes)) in meta.into_iter().enumerate() {
+            // 该名字对应的 Output（smithay 的输出名同源）。
+            let Some(output) = outputs.iter().find(|o| {
+                o.name() == name || o.name().ends_with(&name) || name.ends_with(&o.name())
+            }) else {
+                continue;
+            };
+            let Some(snap) = Self::output_snapshot(output) else {
+                continue;
+            };
+            out.push(OutputEventData {
+                id: id as u32,
+                name,
+                width: snap.0 as u32,
+                height: snap.1 as u32,
+                scale_milli: snap.2,
+                transform: snap.3,
+                refresh: snap.4,
+                modes,
+            });
+        }
+        out
+    }
+
+    /// 单个输出的 (宽, 高, 缩放千分比, 变换码, 刷新率 mHz)。
+    fn output_snapshot(output: &Output) -> Option<(i32, i32, u32, u32, u32)> {
+        let mode = output.current_mode()?;
+        let scale = output.current_scale().fractional_scale();
+        Some((
+            mode.size.w,
+            mode.size.h,
+            (scale * 1000.0).round() as u32,
+            crate::backend::transform_code(output.current_transform()),
+            mode.refresh.max(0) as u32,
+        ))
+    }
+
     /// 下发主输出状态（bind 时与每次变化后）。
     pub fn notify_output_state(&self) {
         if let Some((w, h, scale, transform, refresh)) = self.output_state_info() {
             let transform = crate::protocol::output_transform_from_code(transform);
             self.broadcast(|s| s.output_state(w as u32, h as u32, scale, transform, refresh));
+        }
+        for ev in self.output_events() {
+            let transform = crate::protocol::output_transform_from_code(ev.transform);
+            self.broadcast(|s| {
+                let flags =
+                    crate::protocol::OutputFlag::Enabled | crate::protocol::OutputFlag::Primary;
+                s.output_info(ev.id, ev.name.clone(), flags);
+                s.output_current(
+                    ev.id,
+                    ev.width,
+                    ev.height,
+                    ev.scale_milli,
+                    transform,
+                    ev.refresh,
+                );
+                for (i, (mw, mh, mrefresh)) in ev.modes.iter().enumerate() {
+                    let mut mflags = crate::protocol::OutputFlag::empty();
+                    if *mw as u32 == ev.width && *mh as u32 == ev.height && *mrefresh == ev.refresh
+                    {
+                        mflags |= crate::protocol::OutputFlag::Current;
+                    }
+                    s.output_mode(ev.id, i as u32, *mw as u32, *mh as u32, *mrefresh, mflags);
+                }
+                s.output_modes_end(ev.id, ev.modes.len() as u32);
+            });
         }
     }
 
