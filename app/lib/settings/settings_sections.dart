@@ -57,14 +57,19 @@ class _SinkDevice {
   const _SinkDevice({
     required this.id,
     required this.name,
+    required this.description,
     required this.rate,
     required this.channels,
     required this.isDefault,
     required this.cls,
+    required this.flags,
   });
 
   final String id;
   final String name;
+
+  /// 引擎给出的副标题（类别/总线等，可空）。
+  final String description;
 
   /// 设备原生采样率（Hz）。
   final int rate;
@@ -75,24 +80,40 @@ class _SinkDevice {
   /// 是否为系统当前默认输出（引擎标记）。
   final bool isDefault;
 
-  /// 引擎上报的设备类别（JSON `class`：a2dp|hfp|low|hdmi|usb|internal|unknown）。
+  /// 引擎上报的设备类别（JSON `class`：a2dp|hfp|low|hdmi|usb|internal|virtual|unknown）。
   /// 运行时缺字段/未知值一律解析为 `'unknown'`（按非通话类兼容处理）。
   final String cls;
 
+  /// 引擎上报的设备 flag 位（`AUDIO_OUTPUT_F_*`，旧引擎缺字段时为 0）。
+  final int flags;
+
   /// 是否通话/低质类（HFP 免提、通话音档、单声道/低采样等）——音乐经其输出
   /// 接近“毁音质”，部分耳机甚至故意不兼容可能无声/异常。
-  ///
-  /// 分类规则：class 为 `hfp`/`low` 直接判定；或原生格式不达标
-  /// （采样率/声道未知 0 时不算，避免误伤无法枚举规格的设备）。
   bool get isCall =>
       cls == 'hfp' ||
       cls == 'low' ||
+      (flags & _sinkFlagLowQuality) != 0 ||
       (rate > 0 && rate < 44100) ||
       (channels > 0 && channels < 2);
 
   /// 是否为可正常播放音乐的达标输出（与 [isCall] 互补）。
   bool get isGood => !isCall;
+
+  /// 引擎建议默认隐藏（不可用/未插拔/虚拟/monitor，KDE 风格「展开可见」）。
+  bool get hidden => (flags & _sinkFlagHidden) != 0;
+
+  /// 虚拟/插件伪设备（null/dmix 等）。
+  bool get isVirtual => (flags & _sinkFlagVirtual) != 0;
+
+  /// 系统当前不可用（端口未激活）。
+  bool get unavailable => (flags & _sinkFlagAvailable) == 0;
 }
+
+// 引擎 flag 位（对齐 app/core/audio-engine/src/audio_output.h，旧引擎为 0）。
+const int _sinkFlagAvailable = 1 << 1;
+const int _sinkFlagVirtual = 1 << 3;
+const int _sinkFlagLowQuality = 1 << 5;
+const int _sinkFlagHidden = 1 << 6;
 
 /// 解析引擎返回的 JSON 设备数组（`list_sinks`）；格式非法返回空列表。
 List<_SinkDevice> _parseSinks(String raw) {
@@ -109,10 +130,12 @@ List<_SinkDevice> _parseSinks(String raw) {
         _SinkDevice(
           id: id,
           name: name,
+          description: (e['description'] as String?) ?? '',
           rate: (e['rate'] as num?)?.toInt() ?? 0,
           channels: (e['channels'] as num?)?.toInt() ?? 0,
           isDefault: e['default'] == true,
           cls: _parseSinkClass(e['class']),
+          flags: (e['flags'] as num?)?.toInt() ?? 0,
         ),
       );
     }
@@ -122,12 +145,18 @@ List<_SinkDevice> _parseSinks(String raw) {
   }
 }
 
-/// 归一化引擎 `class` 字段：仅接受 a2dp|hfp|low|hdmi|usb|internal，其余
+/// 归一化引擎 `class` 字段：仅接受 a2dp|hfp|low|hdmi|usb|internal|virtual，其余
 /// （缺字段/未知/空白）一律视为 `'unknown'`（兼容旧引擎 JSON）。
 String _parseSinkClass(Object? raw) {
   if (raw is! String) return 'unknown';
   return switch (raw) {
-    'a2dp' || 'hfp' || 'low' || 'hdmi' || 'usb' || 'internal' => raw,
+    'a2dp' ||
+    'hfp' ||
+    'low' ||
+    'hdmi' ||
+    'usb' ||
+    'internal' ||
+    'virtual' => raw,
     _ => 'unknown',
   };
 }

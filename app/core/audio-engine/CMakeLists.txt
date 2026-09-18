@@ -153,8 +153,21 @@ set(AUDIO_ENGINE_SOURCES
     src/pipeline.c
     src/pcm_uds.c
     src/player.c
+    src/audio_output.c
+    src/audio_output_platform.c
     src/segstore.c
 )
+
+# 输出设备枚举平台后端（编译期单选；与 audio_output_platform.h 的约定一致）
+if(WIN32)
+    list(APPEND AUDIO_ENGINE_SOURCES src/audio_output_windows.c)
+elseif(APPLE)
+    list(APPEND AUDIO_ENGINE_SOURCES src/audio_output_macos.c)
+elseif(UNIX)
+    list(APPEND AUDIO_ENGINE_SOURCES src/audio_output_linux.c)
+else()
+    list(APPEND AUDIO_ENGINE_SOURCES src/audio_output_stub.c)
+endif()
 
 set(AUDIO_ENGINE_EXTRA_SOURCES
     src/tempo.c
@@ -178,6 +191,15 @@ target_include_directories(audio_engine_static PUBLIC
 target_link_libraries(audio_engine_static PUBLIC ${FFMPEG_LIBRARIES})
 target_link_directories(audio_engine_static PUBLIC ${FFMPEG_LIBRARY_DIRS})
 target_compile_options(audio_engine_static PUBLIC ${FFMPEG_CFLAGS_OTHER})
+# dlopen（libpulse 运行期加载）在旧 glibc 需 -ldl；新 glibc 已并入 libc（CMAKE_DL_LIBS 为空）
+if(CMAKE_DL_LIBS)
+    target_link_libraries(audio_engine_static PUBLIC ${CMAKE_DL_LIBS})
+endif()
+# macOS：CoreAudio/CoreFoundation（audio_output_macos.c 原生设备枚举）
+if(APPLE)
+    target_link_libraries(audio_engine_static PUBLIC
+        "-framework CoreAudio" "-framework CoreFoundation")
+endif()
 
 # ── Zig 解码内核接入：EraAudio 原生优先路径（native_decoder.c → zk_*）────
 if(HAS_ARCHOERA_KERNEL)

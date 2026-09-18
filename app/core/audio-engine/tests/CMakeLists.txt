@@ -23,6 +23,11 @@ add_engine_test(test_limiter test_limiter.c)
 add_engine_test(test_fft test_fft.c)
 add_engine_test(test_loudness test_loudness.c)
 
+# 输出设备枚举：名称启发式分类 / ALSA 虚拟设备标记（纯函数，headless，无设备依赖）
+add_engine_test(test_audio_output test_audio_output.c)
+set_tests_properties(test_audio_output PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # wait_event 事件驱动契约测试：直接编译 mediaengine_lib.c 本体（与
 # libarchoera_mediaengine.so 同源），真实引擎句柄验证阻塞/唤醒/超时/
 # 销毁唤醒/多次 create-destroy。tempo.c 以无 HAS_TEMPO 的 stub 链接。

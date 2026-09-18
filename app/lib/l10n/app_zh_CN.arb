@@ -508,6 +508,15 @@
   "settingsOutputDeviceUseCall": "仍走通话/低质",
   "settingsOutputDeviceDefaultIsCall": "系统默认输出当前是通话/低质设备（如蓝牙免提 HFP）。音乐会以通话级音质播放、几乎毁掉音质；部分耳机还故意不兼容，可能无声或异常。建议改用高质量输出。",
   "settingsOutputDeviceDefaultRowCallNote": "选择此项将让音乐走系统默认的通话/低质设备，音质几乎损毁，不推荐。",
+  "settingsOutputDeviceShowAll": "显示全部设备（{count}）",
+  "@settingsOutputDeviceShowAll": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "settingsOutputDeviceHideUnused": "只看可用设备",
+  "settingsOutputDeviceUnavailable": "不可用",
+  "settingsOutputDeviceVirtualTag": "虚拟设备",
   "settingsSinkChangedFailed": "切换输出设备失败：{err}",
   "settingsEngine": "解码引擎",
   "settingsEngineNote": "解码引擎在应用启动时加载；此处切换需冷启动后生效。",

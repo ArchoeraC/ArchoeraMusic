@@ -1668,6 +1668,20 @@ class AppLocalizationsJa extends AppLocalizations {
       'これを選ぶと音楽はシステム既定の通話・低品質デバイスへ流れ、音質がほぼ損なわれます。非推奨です。';
 
   @override
+  String settingsOutputDeviceShowAll(int count) {
+    return 'すべてのデバイスを表示（$count）';
+  }
+
+  @override
+  String get settingsOutputDeviceHideUnused => '使用可能なもののみ表示';
+
+  @override
+  String get settingsOutputDeviceUnavailable => '利用不可';
+
+  @override
+  String get settingsOutputDeviceVirtualTag => '仮想デバイス';
+
+  @override
   String settingsSinkChangedFailed(Object err) {
     return '出力デバイスの切り替えに失敗しました：$err';
   }
