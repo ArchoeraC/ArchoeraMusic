@@ -23,11 +23,16 @@ class FfiNet implements NetService {
   );
 
   @override
-  Future<WifiState> wifiState() async =>
-      _b.netWifiState() ?? const WifiState();
+  Future<WifiState> wifiState() async => _b.netWifiState() ?? const WifiState();
 
   @override
-  Future<List<WifiNetwork>> wifiScan() async => _b.netWifiScan();
+  Future<List<WifiNetwork>> wifiScan() async {
+    // 桥接侧的 RequestScan 是异步的：触发后立刻读只会拿到旧列表（5GHz AP 往往要等
+    // 整轮扫描结束才出现）。这里触发一次、稍等、再读一次 —— 不阻塞桥接线程。
+    _b.netWifiScan();
+    await Future<void>.delayed(const Duration(milliseconds: 1800));
+    return _b.netWifiScan();
+  }
 
   @override
   Future<bool> wifiConnect(String ssid, {String? password}) async =>

@@ -4473,6 +4473,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get netWifiSaved => '已保存';
 
   @override
+  String get netWifiBand24 => '2.4G';
+
+  @override
+  String get netWifiBand5 => '5G';
+
+  @override
   String get netWifiConnect => '连接';
 
   @override

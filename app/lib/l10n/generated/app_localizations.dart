@@ -7862,6 +7862,18 @@ abstract class AppLocalizations {
   /// **'已保存'**
   String get netWifiSaved;
 
+  /// No description provided for @netWifiBand24.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'2.4G'**
+  String get netWifiBand24;
+
+  /// No description provided for @netWifiBand5.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'5G'**
+  String get netWifiBand5;
+
   /// No description provided for @netWifiConnect.
   ///
   /// In zh_CN, this message translates to:

@@ -386,6 +386,10 @@ final class AplWifiNetworkFfi extends Struct {
   external int connected;
   @Int32()
   external int saved;
+
+  /// 频段（MHz）：24xx = 2.4G，5xxx = 5G；0 = 未知。
+  @Int32()
+  external int frequencyMhz;
 }
 
 /// 蓝牙：一个设备（与 C 侧 AplBtDevice 一致）。
@@ -1210,6 +1214,7 @@ class PlatformBindings {
                 )],
             connected: out[i].connected != 0,
             saved: out[i].saved != 0,
+            frequencyMhz: out[i].frequencyMhz,
           ),
       ];
     } finally {

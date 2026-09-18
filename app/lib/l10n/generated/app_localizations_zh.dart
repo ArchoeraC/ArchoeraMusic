@@ -4227,6 +4227,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get netWifiSaved => '已保存';
 
   @override
+  String get netWifiBand24 => '2.4G';
+
+  @override
+  String get netWifiBand5 => '5G';
+
+  @override
   String get netWifiConnect => '连接';
 
   @override
@@ -8876,6 +8882,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get netWifiSaved => '已保存';
+
+  @override
+  String get netWifiBand24 => '2.4G';
+
+  @override
+  String get netWifiBand5 => '5G';
 
   @override
   String get netWifiConnect => '连接';
@@ -13528,6 +13540,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get netWifiSaved => '已儲存';
+
+  @override
+  String get netWifiBand24 => '2.4G';
+
+  @override
+  String get netWifiBand5 => '5G';
 
   @override
   String get netWifiConnect => '連接';

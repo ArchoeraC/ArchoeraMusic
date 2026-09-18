@@ -253,8 +253,12 @@ typedef struct AplWifiNetwork {
     AplString ssid;
     int32_t signal;       /* 0-100 */
     int32_t security;     /* APL_WIFI_SEC_* */
-    int32_t connected;
+    int32_t connected;    /* 该 SSID 是当前活动连接 */
     int32_t saved;        /* 已有保存的连接配置（可免密重连） */
+    /* 频段（MHz）：2.4G 为 24xx，5G 为 5xxx；0 = 未知。
+     * 暴露它是为了 UI 能标出 2.4G/5G —— 5GHz AP 需要内核有管制数据库
+     * （wireless-regdb）才会被扫到，否则用户会以为「不支持 5GHz」。 */
+    int32_t frequency_mhz;
 } AplWifiNetwork;
 
 /* 读取 WiFi 概况。无 NM / 无无线设备返回负值。 */

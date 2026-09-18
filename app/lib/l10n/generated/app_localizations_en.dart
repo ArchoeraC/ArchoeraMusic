@@ -4429,6 +4429,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get netWifiSaved => 'Saved';
 
   @override
+  String get netWifiBand24 => '2.4G';
+
+  @override
+  String get netWifiBand5 => '5G';
+
+  @override
   String get netWifiConnect => 'Connect';
 
   @override

@@ -32,6 +32,7 @@ class WifiNetwork {
     required this.security,
     this.connected = false,
     this.saved = false,
+    this.frequencyMhz = 0,
   });
 
   final String ssid;
@@ -43,6 +44,15 @@ class WifiNetwork {
 
   /// 已有保存的连接配置（可直接免密重连）。
   final bool saved;
+
+  /// 频段（MHz）：24xx = 2.4G，5xxx = 5G；0 = 未知。
+  ///
+  /// 之所以要暴露它：5GHz AP 需要内核有管制数据库（wireless-regdb）才会出现在
+  /// 扫描结果里，否则用户会以为「不支持 5GHz」。UI 标出频段便于确认。
+  final int frequencyMhz;
+
+  /// 是否 5GHz（4900MHz 以上）。
+  bool get is5Ghz => frequencyMhz >= 4900;
 }
 
 /// WiFi 概况快照。

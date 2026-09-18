@@ -1306,6 +1306,8 @@
   "netWifiEmpty": "未发现可用网络",
   "netWifiScanning": "正在扫描…",
   "netWifiSaved": "已保存",
+  "netWifiBand24": "2.4G",
+  "netWifiBand5": "5G",
   "netWifiConnect": "连接",
   "netWifiDisconnect": "断开",
   "netWifiForget": "忘记",

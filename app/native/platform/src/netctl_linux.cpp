@@ -27,6 +27,7 @@
 #include <strings.h>
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -379,6 +380,61 @@ int32_t wifiState(AplWifiState* out) {
     return OK;
 }
 
+// 读一个连接 profile 的 (id, type)。
+// ⚠ 新版 NetworkManager **不再暴露 Settings.Connection 的 Id/Type 属性**（对象上只剩
+// GetSettings 方法与 VersionId），按属性读会拿到空值 —— 这正是「已保存」标记恒为 0
+// 的原因。凡是要判断 profile 身份的地方都必须走 GetSettings。
+bool readConnectionIdentity(DBusConnection* bus, const char* path, std::string* id,
+                            std::string* type) {
+    DBusMessage* msg = dbus_message_new_method_call(
+        kNm, path, "org.freedesktop.NetworkManager.Settings.Connection", "GetSettings");
+    if (msg == nullptr) return false;
+    DBusError err;
+    dbus_error_init(&err);
+    DBusMessage* r = dbus_connection_send_with_reply_and_block(bus, msg, 5000, &err);
+    dbus_message_unref(msg);
+    if (dbus_error_is_set(&err)) dbus_error_free(&err);
+    if (r == nullptr) return false;
+
+    bool seen = false;
+    DBusMessageIter root;
+    if (dbus_message_iter_init(r, &root) && dbus_message_iter_get_arg_type(&root) == DBUS_TYPE_ARRAY) {
+        DBusMessageIter se;
+        for (dbus_message_iter_recurse(&root, &se);
+             dbus_message_iter_get_arg_type(&se) == DBUS_TYPE_DICT_ENTRY;
+             dbus_message_iter_next(&se)) {
+            DBusMessageIter secEntry;
+            dbus_message_iter_recurse(&se, &secEntry);
+            const char* secName = nullptr;
+            dbus_message_iter_get_basic(&secEntry, &secName);
+            if (secName == nullptr || std::strcmp(secName, "connection") != 0) continue;
+            dbus_message_iter_next(&secEntry);
+            DBusMessageIter props;
+            dbus_message_iter_recurse(&secEntry, &props);
+            for (; dbus_message_iter_get_arg_type(&props) == DBUS_TYPE_DICT_ENTRY;
+                 dbus_message_iter_next(&props)) {
+                DBusMessageIter pe;
+                dbus_message_iter_recurse(&props, &pe);
+                const char* key = nullptr;
+                dbus_message_iter_get_basic(&pe, &key);
+                if (key == nullptr) continue;
+                dbus_message_iter_next(&pe);
+                DBusMessageIter var;
+                dbus_message_iter_recurse(&pe, &var);
+                if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) continue;
+                const char* s = nullptr;
+                dbus_message_iter_get_basic(&var, &s);
+                if (s == nullptr) continue;
+                if (std::strcmp(key, "id") == 0 && id != nullptr) *id = s;
+                if (std::strcmp(key, "type") == 0 && type != nullptr) *type = s;
+                seen = true;
+            }
+        }
+    }
+    dbus_message_unref(r);
+    return seen;
+}
+
 int32_t wifiScan(AplWifiNetwork* out, uint32_t max, uint32_t* count) {
     if (out == nullptr || count == nullptr) return ERR_STATE;
     *count = 0;
@@ -415,12 +471,38 @@ int32_t wifiScan(AplWifiNetwork* out, uint32_t max, uint32_t* count) {
     std::vector<std::string> ssids;
     std::vector<int> secs;
     std::vector<int> strengths;
+    std::vector<uint32_t> freqs;
+
+    // 当前活动 AP（用于标 connected）与该适配器上「已保存」的无线 SSID 集合
+    // （用于标 saved —— 之前这两项恒为 0，导致 UI 里「忘记」按钮永不出现）。
+    std::string active_ap;
+    readProp(bus, kNm, dev.c_str(), kNmWireless, "ActiveAccessPoint", DBUS_TYPE_OBJECT_PATH,
+             nullptr, &active_ap);
+    std::set<std::string> saved_ssids;
+    {
+        // 已保存的无线连接：Settings.Connections（ao）→ 每个 profile 经 GetSettings
+        // 取 connection.type / connection.id（Id 惯例上等于 SSID，wifiForget 也按它匹配）。
+        std::vector<std::string> profiles;
+        if (readObjectPathArray(bus, kNm, "/org/freedesktop/NetworkManager/Settings",
+                                "org.freedesktop.NetworkManager.Settings", "Connections",
+                                &profiles)) {
+            for (const std::string& p : profiles) {
+                std::string id;
+                std::string kind;
+                if (!readConnectionIdentity(bus, p.c_str(), &id, &kind)) continue;
+                if (kind != "802-11-wireless" || id.empty()) continue;
+                saved_ssids.insert(id);
+            }
+        }
+    }
 
     for (const std::string& ap : aps) {
         std::string ssid = readApSsid(bus, ap);
         if (ssid.empty()) continue;  // 隐藏网络跳过
         unsigned char strength = 0;
         readProp(bus, kNm, ap.c_str(), kNmAp, "Strength", DBUS_TYPE_BYTE, &strength, nullptr);
+        uint32_t freq = 0;
+        readProp(bus, kNm, ap.c_str(), kNmAp, "Frequency", DBUS_TYPE_UINT32, &freq, nullptr);
         const int sec = wifiSecurityFromAp(bus, ap);
         auto it = best.find(ssid);
         if (it == best.end()) {
@@ -428,9 +510,11 @@ int32_t wifiScan(AplWifiNetwork* out, uint32_t max, uint32_t* count) {
             ssids.push_back(ssid);
             secs.push_back(sec);
             strengths.push_back(strength);
+            freqs.push_back(freq);
         } else if (strength > strengths[it->second]) {
             strengths[it->second] = strength;
             secs[it->second] = sec;
+            freqs[it->second] = freq;
         }
     }
 
@@ -440,10 +524,25 @@ int32_t wifiScan(AplWifiNetwork* out, uint32_t max, uint32_t* count) {
         *n = AplWifiNetwork{};
         n->signal = strengths[i];
         n->security = secs[i];
+        n->frequency_mhz = static_cast<int32_t>(freqs[i]);
+        n->saved = saved_ssids.count(ssids[i]) > 0 ? 1 : 0;
+        n->connected = 1;  // 先置位，下面按需清掉
         g_strs.push_back(ssids[i]);
         n->ssid.data = g_strs.back().c_str();
         n->ssid.len = g_strs.back().size();
         ++idx;
+    }
+    // connected：只有与 ActiveAccessPoint 的 SSID 一致才算。
+    if (!active_ap.empty()) {
+        const std::string active_ssid = readApSsid(bus, active_ap);
+        for (uint32_t i = 0; i < idx; ++i) {
+            out[i].connected = (out[i].ssid.data != nullptr &&
+                                active_ssid == std::string(out[i].ssid.data, out[i].ssid.len))
+                                   ? 1
+                                   : 0;
+        }
+    } else {
+        for (uint32_t i = 0; i < idx; ++i) out[i].connected = 0;
     }
     *count = idx;
     return OK;

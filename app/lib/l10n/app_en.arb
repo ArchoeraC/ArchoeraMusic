@@ -1306,6 +1306,8 @@
   "netWifiEmpty": "No available networks",
   "netWifiScanning": "Scanning…",
   "netWifiSaved": "Saved",
+  "netWifiBand24": "2.4G",
+  "netWifiBand5": "5G",
   "netWifiConnect": "Connect",
   "netWifiDisconnect": "Disconnect",
   "netWifiForget": "Forget",

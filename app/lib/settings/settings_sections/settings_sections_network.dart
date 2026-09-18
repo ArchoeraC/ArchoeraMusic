@@ -257,8 +257,11 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
     ];
 
     final subtitle = <String>[
+      if (network.frequencyMhz > 0)
+        network.is5Ghz ? l10n.netWifiBand5 : l10n.netWifiBand24,
       if (network.signal > 0) '${network.signal}%',
       _securityLabel(network.security),
+      if (network.connected) l10n.netWifiConnected,
       if (network.saved) l10n.netWifiSaved,
     ].join(' · ');
 
