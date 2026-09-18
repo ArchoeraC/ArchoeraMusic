@@ -1,4 +1,5 @@
 // ArchoeraMusic UI
+import 'dart:async';
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -66,6 +67,31 @@ class _FakeNet implements NetService {
     calls.add('btPair:$address');
     return true;
   }
+
+  final _prompts = StreamController<BtPairPrompt>.broadcast();
+  final _results = StreamController<BtPairResult>.broadcast();
+
+  @override
+  int btPairStart(String address) {
+    calls.add('btPairStart:$address');
+    return 0;
+  }
+
+  @override
+  int btPairReply(bool accept, String? text) {
+    calls.add('btPairReply:$accept:${text ?? ''}');
+    return 0;
+  }
+
+  @override
+  Stream<BtPairPrompt> get btPairPrompts => _prompts.stream;
+
+  @override
+  Stream<BtPairResult> get btPairResults => _results.stream;
+
+  /// 测试用：推送一条配对提示 / 结果。
+  void emitPrompt(BtPairPrompt p) => _prompts.add(p);
+  void emitResult(BtPairResult r) => _results.add(r);
 
   @override
   Future<bool> btConnect(String address) async {
@@ -158,6 +184,8 @@ _FakeNet _btNet() => _FakeNet(
       connected: true,
     ),
     BtDevice(address: 'AA:BB:CC:DD:EE:02'),
+    // 有名字但未配对：会出现在「可用设备」里（未命名的会被默认折叠）。
+    BtDevice(address: 'AA:BB:CC:DD:EE:03', name: 'Speaker'),
   ],
 );
 
@@ -266,6 +294,36 @@ void main() {
 
     // 无名且未配对的设备默认收起。
     expect(find.text('AA:BB:CC:DD:EE:02'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('蓝牙：配对改走异步 API，配对码提示能确认/输入', (tester) async {
+    final net = _btNet();
+    await tester.pumpWidget(_host(net));
+    await tester.pumpAndSettle();
+
+    // 未配对的有名设备：点「配对」应调用 btPairStart（立即返回），而不是同步 btPair。
+    await tester.tap(find.text('配对'));
+    await tester.pumpAndSettle();
+    expect(net.calls, contains('btPairStart:AA:BB:CC:DD:EE:03'));
+
+    // BlueZ 回调：设备显示 6 位码要求确认 → 弹窗 → 确认后回落 true。
+    net.emitPrompt(
+      const BtPairPrompt(kind: BtPairPromptKind.confirm, passkey: 123456),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('123456'), findsOneWidget);
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+    expect(net.calls, contains('btPairReply:true:'));
+
+    // 需要输入配对码的设备：输入后带上文本回落。
+    net.emitPrompt(const BtPairPrompt(kind: BtPairPromptKind.enterPasskey));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '654321');
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+    expect(net.calls, contains('btPairReply:true:654321'));
     expect(tester.takeException(), isNull);
   });
 

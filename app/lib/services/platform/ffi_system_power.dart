@@ -16,12 +16,14 @@ class FfiSystemPower implements SystemPower {
     _screenSub = _b.screenEvents.listen((e) => _screenCtrl.add(e.active));
     _backendSub = _b.backendEvents.listen((e) {
       if (e.lost) {
-        _failures.add(PlatformCapabilityFailure(
-          capability: 'power',
-          code: aplErrBackend,
-          message: aplErrorMessage(aplErrBackend),
-          lost: true,
-        ));
+        _failures.add(
+          PlatformCapabilityFailure(
+            capability: 'power',
+            code: aplErrBackend,
+            message: aplErrorMessage(aplErrBackend),
+            lost: true,
+          ),
+        );
       }
     });
   }
@@ -46,7 +48,8 @@ class FfiSystemPower implements SystemPower {
   Stream<PlatformCapabilityFailure> get failures => _failures.stream;
 
   @override
-  Future<bool> setScreenEvents(bool on) async => _b.setScreenEvents(on) == aplOk;
+  Future<bool> setScreenEvents(bool on) async =>
+      _b.setScreenEvents(on) == aplOk;
 
   @override
   Future<void> dispose() async {

@@ -7964,6 +7964,36 @@ abstract class AppLocalizations {
   /// **'配对'**
   String get netBtPair;
 
+  /// No description provided for @netBtPairTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'蓝牙配对'**
+  String get netBtPairTitle;
+
+  /// No description provided for @netBtPairConfirmHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请确认设备上显示的配对码是否一致：'**
+  String get netBtPairConfirmHint;
+
+  /// No description provided for @netBtPairShowHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请在设备上输入此配对码：'**
+  String get netBtPairShowHint;
+
+  /// No description provided for @netBtPairEnterHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入设备上显示的配对码或 PIN'**
+  String get netBtPairEnterHint;
+
+  /// No description provided for @netBtPairAuthorizeHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'是否允许该设备与本机配对/连接？'**
+  String get netBtPairAuthorizeHint;
+
   /// No description provided for @netBtConnect.
   ///
   /// In zh_CN, this message translates to:

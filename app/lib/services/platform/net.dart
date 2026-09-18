@@ -81,6 +81,39 @@ class WifiState {
   final WifiSecurity security;
 }
 
+/// 蓝牙配对提示（对齐 APL_BT_PAIR_*）。
+enum BtPairPromptKind {
+  confirm,
+  enterPin,
+  enterPasskey,
+  display,
+  authorize,
+  unknown,
+}
+
+/// 一次配对提示：界面据此弹「确认配对码 / 输入 PIN / 在设备上输入」。
+class BtPairPrompt {
+  const BtPairPrompt({required this.kind, this.passkey = 0, this.text = ''});
+
+  final BtPairPromptKind kind;
+
+  /// 设备/BlueZ 给出的 6 位码（0 = 无）。
+  final int passkey;
+
+  /// 需要输入/展示的 PIN 或配对码（可能为空）。
+  final String text;
+}
+
+/// 一次异步配对的结果。
+class BtPairResult {
+  const BtPairResult({required this.ok, this.err = 0});
+
+  final bool ok;
+
+  /// ok=false 时的负错误码。
+  final int err;
+}
+
 /// 一个蓝牙设备。
 class BtDevice {
   const BtDevice({
@@ -144,6 +177,19 @@ abstract interface class NetService {
   Future<List<BtDevice>> btDevices();
 
   Future<bool> btPair(String address);
+
+  /// 异步配对：立即返回（0=已发起）。过程/结果见 [btPairPrompts] / [btPairResults]。
+  /// 需要配对码/PIN 的设备必须用它（同步 [btPair] 无法处理）。
+  int btPairStart(String address);
+
+  /// 回答最近的配对提示：[accept]=false 拒绝；[text] 为 PIN/配对码（无则 null）。
+  int btPairReply(bool accept, String? text);
+
+  /// 配对过程中的提示（确认 6 位码 / 输入 PIN / 在设备上输入）。
+  Stream<BtPairPrompt> get btPairPrompts;
+
+  /// 异步配对结束（成功或错误码）。
+  Stream<BtPairResult> get btPairResults;
   Future<bool> btConnect(String address);
   Future<void> btDisconnect(String address);
   Future<void> btForget(String address);
@@ -186,6 +232,18 @@ class UnavailableNetService implements NetService {
 
   @override
   Future<bool> btPair(String address) async => false;
+
+  @override
+  int btPairStart(String address) => -1;
+
+  @override
+  int btPairReply(bool accept, String? text) => -1;
+
+  @override
+  Stream<BtPairPrompt> get btPairPrompts => const Stream.empty();
+
+  @override
+  Stream<BtPairResult> get btPairResults => const Stream.empty();
 
   @override
   Future<bool> btConnect(String address) async => false;

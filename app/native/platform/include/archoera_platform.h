@@ -295,6 +295,24 @@ APL_API int32_t apl_bt_devices(AplBtDevice *out, uint32_t max, uint32_t *count);
 
 /* 配对（内部注册 agent 并等待结果，可能耗时数秒；无 PIN 的 Just Works 设备直接完成）。 */
 APL_API int32_t apl_bt_pair(const char *address);
+
+/* ── 蓝牙配对（异步 + 配对码）────────────────────────────────────────
+ * apl_bt_pair 是同步阻塞调用，无法处理需要配对码/PIN 的设备（没有任何界面可以
+ * 让用户确认或输入）。下面这组是推荐用法：
+ *   1. apl_bt_pair_start(addr) 立即返回；
+ *   2. 过程中桥接推 APL_EVENT_BT_PAIR_PROMPT（见 APL_BT_PAIR_*），界面据此提示；
+ *   3. 用户回答后用 apl_bt_pair_reply(accept, text) 回传；
+ *   4. 结束推 APL_EVENT_BT_PAIR_RESULT（ok / err）。
+ * 提示类型（u.bt_pair_prompt.kind）： */
+#define APL_BT_PAIR_CONFIRM       1 /* 设备显示 6 位码，确认是否一致（passkey 有效） */
+#define APL_BT_PAIR_ENTER_PIN     2 /* 需输入 PIN（has_text=0；回答里带字符串） */
+#define APL_BT_PAIR_ENTER_PASSKEY 3 /* 需输入 6 位配对码（回答里带字符串） */
+#define APL_BT_PAIR_DISPLAY       4 /* 请在设备上输入 passkey（仅提示，回复 accept 即可） */
+#define APL_BT_PAIR_AUTHORIZE     5 /* 请求授权（设备/服务），确认即接受 */
+
+APL_API int32_t apl_bt_pair_start(const char *address);
+/* accept=0 拒绝；text 为 PIN/配对码（无则传 NULL）。 */
+APL_API int32_t apl_bt_pair_reply(int32_t accept, const char *text);
 APL_API int32_t apl_bt_connect(const char *address);
 APL_API int32_t apl_bt_disconnect(const char *address);
 /* 取消配对并移除设备记录。 */
@@ -387,6 +405,9 @@ typedef enum {
     APL_EVENT_OS_SCREEN       = 13, /* u.os.screen：1=亮屏 0=熄屏 */
     APL_EVENT_OS_POWER_KEY    = 14, /* u.os.power_key：0=power 1=sleep 2=suspend */
     APL_EVENT_OS_OUTPUT       = 15, /* u.os_output：主输出 宽/高/缩放×1000/变换/刷新 mHz */
+    /* 蓝牙配对（异步配对流程；见 apl_bt_pair_start / apl_bt_pair_reply） */
+    APL_EVENT_BT_PAIR_PROMPT  = 16, /* u.bt_pair_prompt：需要用户确认/输入配对码 */
+    APL_EVENT_BT_PAIR_RESULT  = 17, /* u.bt_pair_result：配对结束（成功或错误码） */
 } AplEventType;
 
 typedef enum {
@@ -421,6 +442,20 @@ typedef struct AplEvent {
             int32_t transform;
             int32_t refresh_millihz;
         } os_output;
+        /* 蓝牙配对提示（BT_PAIR_PROMPT）。
+         * kind 见 APL_BT_PAIR_*；passkey 为设备/BlueZ 给出的 6 位码（0 = 无）；
+         * has_text=1 时 text 是需要在界面里输入/展示的 PIN 或配对码（NUL 结尾，UTF-8）。 */
+        struct {
+            int32_t kind;
+            int32_t passkey;
+            int32_t has_text;
+            char text[64];
+        } bt_pair_prompt;
+        /* 蓝牙配对结果（BT_PAIR_RESULT）：ok=1 成功；ok=0 时 err 为负错误码。 */
+        struct {
+            int32_t ok;
+            int32_t err;
+        } bt_pair_result;
     } u;
 } AplEvent;
 

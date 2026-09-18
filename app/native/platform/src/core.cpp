@@ -5,6 +5,8 @@
 #include "core.h"
 
 #include <atomic>
+#include <cstdio>
+#include <cstring>
 #include <mutex>
 
 namespace archoera {
@@ -171,6 +173,29 @@ AplEvent makeOsOutput(int32_t width, int32_t height, int32_t scaleMilli, int32_t
     e.u.os_output.scale_milli = scaleMilli;
     e.u.os_output.transform = transform;
     e.u.os_output.refresh_millihz = refreshMillihz;
+    return e;
+}
+
+AplEvent makeBtPairPrompt(int32_t kind, int32_t passkey, const char* text) {
+    AplEvent e{};
+    e.type = APL_EVENT_BT_PAIR_PROMPT;
+    e.u.bt_pair_prompt.kind = kind;
+    e.u.bt_pair_prompt.passkey = passkey;
+    if (text != nullptr && text[0] != '\0') {
+        std::snprintf(e.u.bt_pair_prompt.text, sizeof(e.u.bt_pair_prompt.text), "%s", text);
+        e.u.bt_pair_prompt.has_text = 1;
+    } else {
+        e.u.bt_pair_prompt.text[0] = '\0';
+        e.u.bt_pair_prompt.has_text = 0;
+    }
+    return e;
+}
+
+AplEvent makeBtPairResult(bool ok, int32_t err) {
+    AplEvent e{};
+    e.type = APL_EVENT_BT_PAIR_RESULT;
+    e.u.bt_pair_result.ok = ok ? 1 : 0;
+    e.u.bt_pair_result.err = err;
     return e;
 }
 

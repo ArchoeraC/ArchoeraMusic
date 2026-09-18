@@ -42,6 +42,85 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
     super.initState();
     unawaited(_refreshWifi());
     unawaited(_refreshBt());
+    // 配对提示（需要配对码/PIN 的设备由 BlueZ agent 回调上来）：弹窗确认或输入，
+    // 再用 btPairReply 回答。没有这段的话，需要配对码的设备必然配对失败。
+    _promptSub = _net.btPairPrompts.listen(
+      (p) => unawaited(_handlePairPrompt(p)),
+    );
+    _resultSub = _net.btPairResults.listen((r) {
+      if (!r.ok && mounted) {
+        toast(context.l10n.netFailedPair, type: ToastType.error);
+      }
+      unawaited(_refreshBt());
+    });
+  }
+
+  @override
+  void dispose() {
+    _promptSub?.cancel();
+    _resultSub?.cancel();
+    super.dispose();
+  }
+
+  StreamSubscription<BtPairPrompt>? _promptSub;
+  StreamSubscription<BtPairResult>? _resultSub;
+
+  /// 处理一次配对提示。
+  Future<void> _handlePairPrompt(BtPairPrompt prompt) async {
+    if (!mounted) return;
+    final l10n = context.l10n;
+    final code = prompt.text.isNotEmpty ? prompt.text : '${prompt.passkey}';
+    switch (prompt.kind) {
+      case BtPairPromptKind.enterPin:
+      case BtPairPromptKind.enterPasskey:
+        final entered = await SettingPromptDialog.show(
+          context,
+          title: l10n.netBtPairTitle,
+          description: l10n.netBtPairEnterHint,
+          keyboardType: TextInputType.number,
+        );
+        _net.btPairReply(entered != null && entered.isNotEmpty, entered);
+      case BtPairPromptKind.display:
+        await SDialog.show<void>(
+          context,
+          title: l10n.netBtPairTitle,
+          child: Text(
+            '${l10n.netBtPairShowHint}\n\n$code',
+            style: const TextStyle(fontSize: 13, height: 1.6),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                _net.btPairReply(true, null);
+                Navigator.pop(context);
+              },
+              child: Text(l10n.commonConfirm),
+            ),
+          ],
+        );
+      case BtPairPromptKind.confirm:
+      case BtPairPromptKind.authorize:
+      case BtPairPromptKind.unknown:
+        final body = prompt.kind == BtPairPromptKind.confirm
+            ? '${l10n.netBtPairConfirmHint}\n\n$code'
+            : l10n.netBtPairAuthorizeHint;
+        final ok = await SDialog.show<bool>(
+          context,
+          title: l10n.netBtPairTitle,
+          child: Text(body, style: const TextStyle(fontSize: 13, height: 1.6)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l10n.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(l10n.commonConfirm),
+            ),
+          ],
+        );
+        _net.btPairReply(ok == true, null);
+    }
   }
 
   Future<void> _refreshWifi() async {
@@ -367,10 +446,12 @@ class _NetworkSectionState extends ConsumerState<NetworkSection> {
     } else {
       trailing.add(
         TextButton(
-          onPressed: () async {
-            final ok = await _net.btPair(device.address);
-            if (!ok) toast(l10n.netFailedPair, type: ToastType.error);
-            await _refreshBt();
+          onPressed: () {
+            // 异步配对：立即返回，提示/结果走事件流（可处理需要配对码的设备）。
+            final rc = _net.btPairStart(device.address);
+            if (rc < 0) {
+              toast(l10n.netFailedPair, type: ToastType.error);
+            }
           },
           child: Text(l10n.netBtPair),
         ),

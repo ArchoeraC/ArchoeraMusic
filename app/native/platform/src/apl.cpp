@@ -227,6 +227,12 @@ int32_t apl_bt_devices(AplBtDevice* out, uint32_t max, uint32_t* count) {
     return archoera::netctl::btDevices(out, max, count);
 }
 int32_t apl_bt_pair(const char* address) { return archoera::netctl::btPair(address); }
+int32_t apl_bt_pair_start(const char* address) {
+    return archoera::netctl::btPairStart(address);
+}
+int32_t apl_bt_pair_reply(int32_t accept, const char* text) {
+    return archoera::netctl::btPairReply(accept, text);
+}
 int32_t apl_bt_connect(const char* address) { return archoera::netctl::btConnect(address); }
 int32_t apl_bt_disconnect(const char* address) { return archoera::netctl::btDisconnect(address); }
 int32_t apl_bt_forget(const char* address) { return archoera::netctl::btForget(address); }

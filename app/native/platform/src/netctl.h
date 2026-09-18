@@ -32,6 +32,10 @@ int32_t btScanStart();
 int32_t btScanStop();
 int32_t btDevices(AplBtDevice* out, uint32_t max, uint32_t* count);
 int32_t btPair(const char* address);
+/* 异步配对（推荐）：立即返回，过程与结果经事件下发（可处理配对码/PIN）。 */
+int32_t btPairStart(const char* address);
+/* 回答最近一次配对提示；text 为 PIN/配对码（无则 nullptr）。 */
+int32_t btPairReply(int32_t accept, const char* text);
 int32_t btConnect(const char* address);
 int32_t btDisconnect(const char* address);
 int32_t btForget(const char* address);

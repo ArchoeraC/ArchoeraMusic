@@ -74,7 +74,9 @@ class OsState {
           ? this.screenEnabled
           : screenEnabled as bool?,
       session: session ?? this.session,
-      output: identical(output, _unset) ? this.output : output as OsOutputState?,
+      output: identical(output, _unset)
+          ? this.output
+          : output as OsOutputState?,
     );
   }
 }

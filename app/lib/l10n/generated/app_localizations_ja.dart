@@ -4327,6 +4327,21 @@ class AppLocalizationsJa extends AppLocalizations {
   String get netBtPair => '配对';
 
   @override
+  String get netBtPairTitle => '蓝牙配对';
+
+  @override
+  String get netBtPairConfirmHint => '请确认设备上显示的配对码是否一致：';
+
+  @override
+  String get netBtPairShowHint => '请在设备上输入此配对码：';
+
+  @override
+  String get netBtPairEnterHint => '请输入设备上显示的配对码或 PIN';
+
+  @override
+  String get netBtPairAuthorizeHint => '是否允许该设备与本机配对/连接？';
+
+  @override
   String get netBtConnect => '连接';
 
   @override

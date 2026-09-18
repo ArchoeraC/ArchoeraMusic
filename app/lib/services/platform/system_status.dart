@@ -41,8 +41,7 @@ class SysStats {
 
   int get memUsedKb => (memTotalKb - memAvailableKb).clamp(0, memTotalKb);
 
-  int get memPercent =>
-      memTotalKb > 0 ? ((memUsedKb * 100) ~/ memTotalKb) : 0;
+  int get memPercent => memTotalKb > 0 ? ((memUsedKb * 100) ~/ memTotalKb) : 0;
 
   int get diskUsedKb => (diskTotalKb - diskFreeKb).clamp(0, diskTotalKb);
 

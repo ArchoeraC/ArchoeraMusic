@@ -96,6 +96,9 @@ AplEvent makeOsScreen(bool enabled);
 AplEvent makeOsPowerKey(int32_t key);
 AplEvent makeOsOutput(int32_t width, int32_t height, int32_t scaleMilli, int32_t transform,
                    int32_t refreshMillihz);
+/* 蓝牙配对提示/结果（见 apl_bt_pair_start 的说明）。 */
+AplEvent makeBtPairPrompt(int32_t kind, int32_t passkey, const char* text);
+AplEvent makeBtPairResult(bool ok, int32_t err);
 
 }  // namespace archoera
 

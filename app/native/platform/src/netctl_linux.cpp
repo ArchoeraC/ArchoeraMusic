@@ -22,13 +22,18 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <strings.h>
 #include <map>
 #include <mutex>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace archoera {
@@ -1085,7 +1090,230 @@ int32_t btCallDevice(const char* address, const char* method, int timeout_ms) {
     return ok ? OK : ERR_BACKEND;
 }
 
+// ── 蓝牙配对 agent（异步 + 配对码）──────────────────────────────────
+//
+// 为什么需要它：`Device1.Pair()` 在需要配对码/PIN 的设备上会由 BlueZ 回调 agent
+// 的方法（RequestConfirmation / RequestPasskey / RequestPinCode / DisplayPasskey /
+// RequestAuthorization）。没有 agent 时这些设备**必然配对失败**（此前就是这样）。
+//
+// 关键设计：
+//  - agent 跑在**独立的 system bus 连接**上（`open_private`，不是共享的
+//    dbus_bus_get），并有自己的派发线程。若共用一条连接，agent 回调可能在
+//    「主控线程正阻塞在 send_with_reply_and_block」时被派发，而我们又要等 Dart
+//    回答 —— Dart 正是那个被阻塞的调用者，必然死锁。
+//  - 回调里：发 APL_EVENT_BT_PAIR_PROMPT 事件 → 等 Dart 调 apl_bt_pair_reply
+//    （最多 60s，超时按拒绝处理）→ 回 BlueZ。
+//  - Pair() 本身放在工作线程执行，结果推 APL_EVENT_BT_PAIR_RESULT。
+namespace {
+
+constexpr const char* kAgent1 = "org.bluez.Agent1";
+constexpr const char* kAgentMgr = "org.bluez.AgentManager1";
+constexpr const char* kAgentPath = "/org/archoera/agent";
+
+std::mutex g_prompt_mtx;
+std::condition_variable g_prompt_cv;
+bool g_prompt_pending = false;
+bool g_prompt_answered = false;
+bool g_prompt_accept = false;
+std::string g_prompt_text;
+
+DBusConnection* g_agent_bus = nullptr;
+std::thread* g_agent_thread = nullptr;
+std::atomic<bool> g_agent_running{false};
+
+// Dart 侧回答（apl_bt_pair_reply）。
+void agentAnswerFromDart(bool accept, const std::string& text) {
+    std::lock_guard<std::mutex> lock(g_prompt_mtx);
+    if (!g_prompt_pending) return;
+    g_prompt_accept = accept;
+    g_prompt_text = text;
+    g_prompt_answered = true;
+    g_prompt_cv.notify_all();
+}
+
+// agent 方法处理器（agent 连接自己的派发线程上调用）。
+DBusHandlerResult agentFilter(DBusConnection* conn, DBusMessage* msg, void* /*data*/) {
+    if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_METHOD_CALL)
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    const char* iface = dbus_message_get_interface(msg);
+    const char* member = dbus_message_get_member(msg);
+    if (iface == nullptr || member == nullptr || std::strcmp(iface, kAgent1) != 0)
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+    // Release/Cancel：直接回空。
+    if (std::strcmp(member, "Release") == 0 || std::strcmp(member, "Cancel") == 0) {
+        DBusMessage* reply = dbus_message_new_method_return(msg);
+        dbus_connection_send(conn, reply, nullptr);
+        dbus_message_unref(reply);
+        return DBUS_HANDLER_RESULT_HANDLED;
+    }
+
+    int32_t kind = -1;
+    uint32_t passkey = 0;
+    std::string shown;
+    const char* path = nullptr;
+    if (std::strcmp(member, "RequestConfirmation") == 0) {
+        if (!dbus_message_get_args(msg, nullptr, DBUS_TYPE_OBJECT_PATH, &path,
+                                   DBUS_TYPE_UINT32, &passkey, DBUS_TYPE_INVALID))
+            return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        kind = APL_BT_PAIR_CONFIRM;
+    } else if (std::strcmp(member, "RequestPasskey") == 0) {
+        if (!dbus_message_get_args(msg, nullptr, DBUS_TYPE_OBJECT_PATH, &path,
+                                   DBUS_TYPE_INVALID))
+            return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        kind = APL_BT_PAIR_ENTER_PASSKEY;
+    } else if (std::strcmp(member, "RequestPinCode") == 0) {
+        if (!dbus_message_get_args(msg, nullptr, DBUS_TYPE_OBJECT_PATH, &path,
+                                   DBUS_TYPE_INVALID))
+            return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        kind = APL_BT_PAIR_ENTER_PIN;
+    } else if (std::strcmp(member, "DisplayPasskey") == 0) {
+        uint32_t entered = 0;
+        if (!dbus_message_get_args(msg, nullptr, DBUS_TYPE_OBJECT_PATH, &path,
+                                   DBUS_TYPE_UINT32, &passkey, DBUS_TYPE_UINT16, &entered,
+                                   DBUS_TYPE_INVALID))
+            return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        kind = APL_BT_PAIR_DISPLAY;
+    } else if (std::strcmp(member, "DisplayPinCode") == 0) {
+        const char* pin = nullptr;
+        if (!dbus_message_get_args(msg, nullptr, DBUS_TYPE_OBJECT_PATH, &path,
+                                   DBUS_TYPE_STRING, &pin, DBUS_TYPE_INVALID))
+            return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        if (pin != nullptr) shown = pin;
+        kind = APL_BT_PAIR_DISPLAY;
+    } else if (std::strcmp(member, "RequestAuthorization") == 0 ||
+               std::strcmp(member, "AuthorizeService") == 0) {
+        kind = APL_BT_PAIR_AUTHORIZE;
+    } else {
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_prompt_mtx);
+        g_prompt_pending = true;
+        g_prompt_answered = false;
+        g_prompt_accept = false;
+        g_prompt_text.clear();
+    }
+    dispatch(makeBtPairPrompt(kind, static_cast<int32_t>(passkey), shown.c_str()));
+
+    std::string answer;
+    bool accept = false;
+    {
+        std::unique_lock<std::mutex> lock(g_prompt_mtx);
+        if (g_prompt_cv.wait_for(lock, std::chrono::milliseconds(60000),
+                                 [] { return g_prompt_answered; })) {
+            accept = g_prompt_accept;
+            answer = g_prompt_text;
+        }
+        g_prompt_pending = false;
+    }
+
+    DBusMessage* reply = nullptr;
+    if (!accept) {
+        reply = dbus_message_new_error(msg, "org.bluez.Error.Rejected", "rejected by user");
+    } else if (kind == APL_BT_PAIR_ENTER_PASSKEY) {
+        const uint32_t v = answer.empty() ? 0u
+                                          : static_cast<uint32_t>(std::strtoul(answer.c_str(), nullptr, 10));
+        reply = dbus_message_new_method_return(msg);
+        dbus_message_append_args(reply, DBUS_TYPE_UINT32, &v, DBUS_TYPE_INVALID);
+    } else if (kind == APL_BT_PAIR_ENTER_PIN) {
+        const char* s = answer.empty() ? "0000" : answer.c_str();
+        reply = dbus_message_new_method_return(msg);
+        dbus_message_append_args(reply, DBUS_TYPE_STRING, &s, DBUS_TYPE_INVALID);
+    } else {
+        reply = dbus_message_new_method_return(msg);
+    }
+    if (reply != nullptr) {
+        dbus_connection_send(conn, reply, nullptr);
+        dbus_message_unref(reply);
+    }
+    return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+// 按需建立 agent 连接与线程，并注册到 BlueZ。
+bool agentEnsure() {
+    if (g_agent_bus != nullptr) return true;
+    DBusError err;
+    dbus_error_init(&err);
+    // ⚠ 用私有连接（不是 dbus_bus_get 的共享连接）：见上面的死锁说明。
+    const char* addr = std::getenv("DBUS_SYSTEM_BUS_ADDRESS");
+    if (addr == nullptr || addr[0] == '\0') addr = "unix:path=/run/dbus/system_bus_socket";
+    DBusConnection* bus = dbus_connection_open_private(addr, &err);
+    if (bus == nullptr) {
+        if (dbus_error_is_set(&err)) dbus_error_free(&err);
+        return false;
+    }
+    if (!dbus_bus_register(bus, &err)) {
+        if (dbus_error_is_set(&err)) dbus_error_free(&err);
+        dbus_connection_close(bus);
+        dbus_connection_unref(bus);
+        return false;
+    }
+    dbus_connection_add_filter(bus, agentFilter, nullptr, nullptr);
+
+    // 注册 agent（DisplayYesNo：能确认 6 位码，也能收 PIN/配对码输入）。
+    DBusMessage* reg = dbus_message_new_method_call(kBlueZ, "/org/bluez", kAgentMgr,
+                                                    "RegisterAgent");
+    if (reg == nullptr) return false;
+    const char* capability = "DisplayYesNo";
+    const char* agent_path = kAgentPath;
+    dbus_message_append_args(reg, DBUS_TYPE_OBJECT_PATH, &agent_path, DBUS_TYPE_STRING,
+                             &capability, DBUS_TYPE_INVALID);
+    DBusMessage* r = dbus_connection_send_with_reply_and_block(bus, reg, 5000, &err);
+    dbus_message_unref(reg);
+    if (dbus_error_is_set(&err)) dbus_error_free(&err);
+    if (r == nullptr) return false;
+    dbus_message_unref(r);
+
+    DBusMessage* def = dbus_message_new_method_call(kBlueZ, "/org/bluez", kAgentMgr,
+                                                    "RequestDefaultAgent");
+    if (def != nullptr) {
+        dbus_message_append_args(def, DBUS_TYPE_OBJECT_PATH, &agent_path, DBUS_TYPE_INVALID);
+        DBusMessage* r2 = dbus_connection_send_with_reply_and_block(bus, def, 5000, &err);
+        dbus_message_unref(def);
+        if (dbus_error_is_set(&err)) dbus_error_free(&err);
+        if (r2 != nullptr) dbus_message_unref(r2);
+    }
+
+    g_agent_bus = bus;
+    g_agent_running.store(true);
+    g_agent_thread = new std::thread([] {
+        while (g_agent_running.load()) {
+            if (!dbus_connection_read_write_dispatch(g_agent_bus, 200)) break;
+        }
+    });
+    return true;
+}
+
+}  // namespace
+
+int32_t btPairStart(const char* address) {
+    if (address == nullptr || address[0] == '\0') return ERR_STATE;
+    {
+        std::lock_guard<std::mutex> lock(g_mtx);
+        DBusConnection* bus = busLocked();
+        if (bus == nullptr) return ERR_BACKEND;
+        if (btDevicePathLocked(bus, address).empty()) return ERR_STATE;
+    }
+    if (!agentEnsure()) return ERR_BACKEND;
+    const std::string addr = address;
+    // Pair() 可能耗时数十秒（等用户确认），放到工作线程；结果用事件回传。
+    std::thread([addr] {
+        const int32_t rc = btCallDevice(addr.c_str(), "Pair", 120000);
+        dispatch(makeBtPairResult(rc == OK, rc == OK ? 0 : rc));
+    }).detach();
+    return OK;
+}
+
+int32_t btPairReply(int32_t accept, const char* text) {
+    if (g_agent_bus == nullptr) return ERR_UNSUPPORTED;
+    agentAnswerFromDart(accept != 0, text != nullptr ? text : "");
+    return OK;
+}
+
 int32_t btPair(const char* address) {
+
     // 已配对设备会返回 AlreadyExists（视为成功）；**未配对**设备需要 BlueZ agent
     // （下一刀：NoInputNoOutput agent），当前会失败并如实返回错误。
     const int32_t rc = btCallDevice(address, "Pair", 60000);

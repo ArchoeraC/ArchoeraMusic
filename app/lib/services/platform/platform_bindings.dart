@@ -70,6 +70,17 @@ const int aplEventOsScreen = 13;
 const int aplEventOsPowerKey = 14;
 const int aplEventOsOutput = 15;
 
+/// 蓝牙配对提示 / 结果（见 [netBtPairStart]；补齐无法用同步 Pair 处理的配对码场景）。
+const int aplEventBtPairPrompt = 16;
+const int aplEventBtPairResult = 17;
+
+/// 配对提示类型（对齐 APL_BT_PAIR_*）。
+const int aplBtPairConfirm = 1;
+const int aplBtPairEnterPin = 2;
+const int aplBtPairEnterPasskey = 3;
+const int aplBtPairDisplay = 4;
+const int aplBtPairAuthorize = 5;
+
 const int aplAbiVersion = 1;
 
 // ── 结构体镜像 ─────────────────────────────────────────────────────
@@ -202,6 +213,39 @@ final class AplEventPayload extends Union {
 
   /// ArchoeraOS 会话：主输出状态。
   external AplOsOutputPayload osOutput;
+
+  /// 蓝牙配对提示（aplEventBtPairPrompt）。
+  external AplBtPairPromptPayload btPairPrompt;
+
+  /// 蓝牙配对结果（aplEventBtPairResult）。
+  external AplBtPairResultPayload btPairResult;
+}
+
+/// 蓝牙配对提示载荷（对齐 C 侧 u.bt_pair_prompt）。
+final class AplBtPairPromptPayload extends Struct {
+  @Int32()
+  external int kind;
+
+  /// 设备/BlueZ 给出的 6 位码（0 = 无）。
+  @Int32()
+  external int passkey;
+
+  /// text 是否有效（1 = 需要在界面输入/展示）。
+  @Int32()
+  external int hasText;
+
+  @Array(64)
+  external Array<Uint8> text;
+}
+
+/// 蓝牙配对结果载荷（对齐 C 侧 u.bt_pair_result）。
+final class AplBtPairResultPayload extends Struct {
+  @Int32()
+  external int ok;
+
+  /// ok=0 时的负错误码。
+  @Int32()
+  external int err;
 }
 
 /// archoera_shell_v1 输出快照（对齐 AplOsOutput；字段顺序必须严格一致）。
@@ -493,6 +537,10 @@ typedef _AplVoidIntC = Int32 Function();
 typedef _AplVoidIntD = int Function();
 typedef _AplStrIntC = Int32 Function(Pointer<Utf8> value);
 typedef _AplStrIntD = int Function(Pointer<Utf8> value);
+typedef _AplBtPairStartC = Int32 Function(Pointer<Utf8> address);
+typedef _AplBtPairStartD = int Function(Pointer<Utf8> address);
+typedef _AplBtPairReplyC = Int32 Function(Int32 accept, Pointer<Utf8> text);
+typedef _AplBtPairReplyD = int Function(int accept, Pointer<Utf8> text);
 typedef _AplIntArgC = Int32 Function(Int32 on);
 typedef _AplIntArgD = int Function(int on);
 typedef _AplBtDevicesC =
@@ -654,6 +702,36 @@ final class AplOsPowerKeyEvent extends AplNativeEvent {
 }
 
 /// ArchoeraOS 会话：主输出状态。
+/// 蓝牙配对提示事件：界面据此弹出「确认配对码 / 输入 PIN」提示。
+final class AplBtPairPromptEvent extends AplNativeEvent {
+  const AplBtPairPromptEvent({
+    required this.kind,
+    required this.passkey,
+    required this.hasText,
+    required this.text,
+  });
+
+  /// 见 aplBtPair*：1=确认 2=输入PIN 3=输入配对码 4=在设备输入 5=授权。
+  final int kind;
+
+  /// 6 位配对码（0 = 无）。
+  final int passkey;
+  final bool hasText;
+
+  /// 需要在界面输入/展示的 PIN 或配对码（hasText 为真时有效）。
+  final String text;
+}
+
+/// 蓝牙配对结果事件（一次异步配对结束）。
+final class AplBtPairResultEvent extends AplNativeEvent {
+  const AplBtPairResultEvent({required this.ok, required this.err});
+
+  final bool ok;
+
+  /// ok=false 时的负错误码。
+  final int err;
+}
+
 final class AplOsOutputEvent extends AplNativeEvent {
   const AplOsOutputEvent({
     required this.width,
@@ -862,6 +940,16 @@ class PlatformBindings {
           'apl_bt_devices',
         ),
       ),
+      _btPairStart = _try(
+        () => lib.lookupFunction<_AplBtPairStartC, _AplBtPairStartD>(
+          'apl_bt_pair_start',
+        ),
+      ),
+      _btPairReply = _try(
+        () => lib.lookupFunction<_AplBtPairReplyC, _AplBtPairReplyD>(
+          'apl_bt_pair_reply',
+        ),
+      ),
       _btPair = _try(
         () => lib.lookupFunction<_AplStrIntC, _AplStrIntD>('apl_bt_pair'),
       ),
@@ -950,6 +1038,8 @@ class PlatformBindings {
   final _AplVoidIntD? _btScanStop;
   final _AplBtDevicesD? _btDevices;
   final _AplStrIntD? _btPair;
+  final _AplBtPairStartD? _btPairStart;
+  final _AplBtPairReplyD? _btPairReply;
   final _AplStrIntD? _btConnect;
   final _AplStrIntD? _btDisconnect;
   final _AplStrIntD? _btForget;
@@ -971,6 +1061,8 @@ class PlatformBindings {
   final _osScreenCtrl = StreamController<AplOsScreenEvent>.broadcast();
   final _osPowerKeyCtrl = StreamController<AplOsPowerKeyEvent>.broadcast();
   final _osOutputCtrl = StreamController<AplOsOutputEvent>.broadcast();
+  final _btPairPromptCtrl = StreamController<AplBtPairPromptEvent>.broadcast();
+  final _btPairResultCtrl = StreamController<AplBtPairResultEvent>.broadcast();
 
   /// ArchoeraOS 会话函数是否可用（桥接提供且非旧版）。
   bool get osSessionSymbolsAvailable => _osSetEvents != null;
@@ -1303,6 +1395,32 @@ class PlatformBindings {
   }
 
   bool netBtPair(String address) => _btCall(_btPair, address);
+
+  /// 异步配对：立即返回（0=已发起），过程中的提示/结果经事件流下发。
+  /// 需要配对码/PIN 的设备必须走这条（同步 [netBtPair] 会失败）。
+  int netBtPairStart(String address) {
+    final fn = _btPairStart;
+    if (fn == null) return aplErrUnsupported;
+    final p = address.toNativeUtf8();
+    try {
+      return fn(p);
+    } finally {
+      malloc.free(p);
+    }
+  }
+
+  /// 回答最近的配对提示：[accept]=false 拒绝；[text] 为 PIN/配对码（无则 null）。
+  int netBtPairReply(bool accept, String? text) {
+    final fn = _btPairReply;
+    if (fn == null) return aplErrUnsupported;
+    final p = (text == null || text.isEmpty) ? nullptr : text.toNativeUtf8();
+    try {
+      return fn(accept ? 1 : 0, p);
+    } finally {
+      if (p != nullptr) malloc.free(p);
+    }
+  }
+
   bool netBtConnect(String address) => _btCall(_btConnect, address);
   bool netBtDisconnect(String address) => _btCall(_btDisconnect, address);
   bool netBtForget(String address) => _btCall(_btForget, address);
@@ -1467,6 +1585,10 @@ class PlatformBindings {
   Stream<AplOsScreenEvent> get osScreenEvents => _osScreenCtrl.stream;
   Stream<AplOsPowerKeyEvent> get osPowerKeyEvents => _osPowerKeyCtrl.stream;
   Stream<AplOsOutputEvent> get osOutputEvents => _osOutputCtrl.stream;
+  Stream<AplBtPairPromptEvent> get btPairPromptEvents =>
+      _btPairPromptCtrl.stream;
+  Stream<AplBtPairResultEvent> get btPairResultEvents =>
+      _btPairResultCtrl.stream;
 
   /// 栈上指针仅在回调期间有效——同步取值后立即投递。
   static void _onNativeEvent(
@@ -1536,6 +1658,22 @@ class PlatformBindings {
         );
       case aplEventOsPowerKey:
         b._osPowerKeyCtrl.add(AplOsPowerKeyEvent(ref.u.osPowerKey));
+      case aplEventBtPairPrompt:
+        b._btPairPromptCtrl.add(
+          AplBtPairPromptEvent(
+            kind: ref.u.btPairPrompt.kind,
+            passkey: ref.u.btPairPrompt.passkey,
+            hasText: ref.u.btPairPrompt.hasText != 0,
+            text: b._cstr(ref.u.btPairPrompt.text),
+          ),
+        );
+      case aplEventBtPairResult:
+        b._btPairResultCtrl.add(
+          AplBtPairResultEvent(
+            ok: ref.u.btPairResult.ok != 0,
+            err: ref.u.btPairResult.err,
+          ),
+        );
     }
   }
 

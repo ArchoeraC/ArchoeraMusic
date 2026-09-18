@@ -37,9 +37,9 @@ class PlatformCapabilityFailure {
 
 /// APL 错误码 → 描述。
 String aplErrorMessage(int code) => switch (code) {
-      0 => 'ok',
-      -1 => 'unsupported on this platform',
-      -2 => 'backend failure',
-      -3 => 'invalid state / not initialized',
-      _ => 'unknown error',
-    };
+  0 => 'ok',
+  -1 => 'unsupported on this platform',
+  -2 => 'backend failure',
+  -3 => 'invalid state / not initialized',
+  _ => 'unknown error',
+};

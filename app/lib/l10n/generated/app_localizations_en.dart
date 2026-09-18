@@ -4480,6 +4480,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get netBtPair => 'Pair';
 
   @override
+  String get netBtPairTitle => 'Bluetooth pairing';
+
+  @override
+  String get netBtPairConfirmHint =>
+      'Confirm this pairing code shown on the device:';
+
+  @override
+  String get netBtPairShowHint => 'Enter this pairing code on the device:';
+
+  @override
+  String get netBtPairEnterHint =>
+      'Enter the pairing code or PIN shown on the device';
+
+  @override
+  String get netBtPairAuthorizeHint => 'Allow this device to pair/connect?';
+
+  @override
   String get netBtConnect => 'Connect';
 
   @override

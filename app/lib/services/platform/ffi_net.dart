@@ -70,6 +70,32 @@ class FfiNet implements NetService {
   Future<bool> btPair(String address) async => _b.netBtPair(address);
 
   @override
+  int btPairStart(String address) => _b.netBtPairStart(address);
+
+  @override
+  int btPairReply(bool accept, String? text) => _b.netBtPairReply(accept, text);
+
+  @override
+  Stream<BtPairPrompt> get btPairPrompts => _b.btPairPromptEvents.map(
+    (e) => BtPairPrompt(
+      kind: switch (e.kind) {
+        1 => BtPairPromptKind.confirm,
+        2 => BtPairPromptKind.enterPin,
+        3 => BtPairPromptKind.enterPasskey,
+        4 => BtPairPromptKind.display,
+        5 => BtPairPromptKind.authorize,
+        _ => BtPairPromptKind.unknown,
+      },
+      passkey: e.passkey,
+      text: e.text,
+    ),
+  );
+
+  @override
+  Stream<BtPairResult> get btPairResults =>
+      _b.btPairResultEvents.map((e) => BtPairResult(ok: e.ok, err: e.err));
+
+  @override
   Future<bool> btConnect(String address) async => _b.netBtConnect(address);
 
   @override

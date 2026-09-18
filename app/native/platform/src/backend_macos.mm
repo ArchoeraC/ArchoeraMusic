@@ -538,6 +538,8 @@ int32_t btScanStart() { return ERR_UNSUPPORTED; }
 int32_t btScanStop() { return ERR_UNSUPPORTED; }
 int32_t btDevices(AplBtDevice*, uint32_t, uint32_t*) { return ERR_UNSUPPORTED; }
 int32_t btPair(const char*) { return ERR_UNSUPPORTED; }
+int32_t btPairStart(const char*) { return ERR_UNSUPPORTED; }
+int32_t btPairReply(int32_t, const char*) { return ERR_UNSUPPORTED; }
 int32_t btConnect(const char*) { return ERR_UNSUPPORTED; }
 int32_t btDisconnect(const char*) { return ERR_UNSUPPORTED; }
 int32_t btForget(const char*) { return ERR_UNSUPPORTED; }

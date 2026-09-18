@@ -4278,6 +4278,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get netBtPair => '配对';
 
   @override
+  String get netBtPairTitle => '蓝牙配对';
+
+  @override
+  String get netBtPairConfirmHint => '请确认设备上显示的配对码是否一致：';
+
+  @override
+  String get netBtPairShowHint => '请在设备上输入此配对码：';
+
+  @override
+  String get netBtPairEnterHint => '请输入设备上显示的配对码或 PIN';
+
+  @override
+  String get netBtPairAuthorizeHint => '是否允许该设备与本机配对/连接？';
+
+  @override
   String get netBtConnect => '连接';
 
   @override
@@ -8933,6 +8948,21 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get netBtPair => '配对';
+
+  @override
+  String get netBtPairTitle => '蓝牙配对';
+
+  @override
+  String get netBtPairConfirmHint => '请确认设备上显示的配对码是否一致：';
+
+  @override
+  String get netBtPairShowHint => '请在设备上输入此配对码：';
+
+  @override
+  String get netBtPairEnterHint => '请输入设备上显示的配对码或 PIN';
+
+  @override
+  String get netBtPairAuthorizeHint => '是否允许该设备与本机配对/连接？';
 
   @override
   String get netBtConnect => '连接';
@@ -13591,6 +13621,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get netBtPair => '配對';
+
+  @override
+  String get netBtPairTitle => '藍牙配對';
+
+  @override
+  String get netBtPairConfirmHint => '請確認裝置上顯示的配對碼是否一致：';
+
+  @override
+  String get netBtPairShowHint => '請在裝置上輸入此配對碼：';
+
+  @override
+  String get netBtPairEnterHint => '請輸入裝置上顯示的配對碼或 PIN';
+
+  @override
+  String get netBtPairAuthorizeHint => '是否允許該裝置與本機配對/連接？';
 
   @override
   String get netBtConnect => '連接';
