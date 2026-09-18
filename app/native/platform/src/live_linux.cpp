@@ -227,14 +227,23 @@ int32_t installStatus(AplLiveInstallStatus* out) {
     *out = AplLiveInstallStatus{};
     out->percent = -1;
 
+    if (!available()) return ERR_UNSUPPORTED;  // 非 Live：不假装在装
+
     std::string s;
+    bool has_progress = false;
     if (readFile(joinPath(kStateDir, "percent"), &s) && !s.empty()) {
         out->percent = std::atoi(s.c_str());
+        has_progress = true;
     }
-    if (readFile(joinPath(kStateDir, "message"), &s)) g_status_message = s;
+    if (readFile(joinPath(kStateDir, "message"), &s) && !s.empty()) {
+        g_status_message = s;
+        has_progress = true;
+    }
     out->done = ::access(joinPath(kStateDir, "done").c_str(), F_OK) == 0 ? 1 : 0;
     out->failed = ::access(joinPath(kStateDir, "failed").c_str(), F_OK) == 0 ? 1 : 0;
-    out->running = (!out->done && !out->failed) ? 1 : 0;
+    // 只有安装器写过进度（percent/message）才算「在跑」：否则刚进向导、
+    // 单元还没起来时会误报 running。
+    out->running = (!out->done && !out->failed && has_progress) ? 1 : 0;
     if (!g_status_message.empty()) {
         out->message.data = g_status_message.c_str();
         out->message.len = g_status_message.size();

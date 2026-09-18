@@ -10,7 +10,7 @@ library;
 
 import 'dart:async' show StreamSubscription, unawaited;
 import 'dart:convert' show jsonDecode, jsonEncode;
-import 'dart:io' show File, Platform, Process, ProcessStartMode, exit;
+import 'dart:io' show File, Platform, Process, ProcessStartMode;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:material_ui/material_ui.dart';

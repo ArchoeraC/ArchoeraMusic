@@ -75,7 +75,9 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
       return;
     }
     toast(l10n.installerEntrySwitching);
-    exit(0);
+    // 必须走统一退出入口：它会 flush 会话、dispose 平台桥接（含**释放单实例
+    // 互斥体**）——否则接力启动的向导会被实例锁挡住。
+    await quitApplication(ref);
   }
 
   /// 确认后执行系统请求（桥接返回码无需在 UI 处理：不可用时能力位已 gate）。
