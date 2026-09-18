@@ -228,7 +228,9 @@ int32_t installStatus(AplLiveInstallStatus* out) {
     out->percent = -1;
 
     std::string s;
-    if (readFile(joinPath(kStateDir, "percent"), &s)) out->percent = std::atoi(s.c_str());
+    if (readFile(joinPath(kStateDir, "percent"), &s) && !s.empty()) {
+        out->percent = std::atoi(s.c_str());
+    }
     if (readFile(joinPath(kStateDir, "message"), &s)) g_status_message = s;
     out->done = ::access(joinPath(kStateDir, "done").c_str(), F_OK) == 0 ? 1 : 0;
     out->failed = ::access(joinPath(kStateDir, "failed").c_str(), F_OK) == 0 ? 1 : 0;

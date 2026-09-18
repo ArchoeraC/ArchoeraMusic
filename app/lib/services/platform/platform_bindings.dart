@@ -13,6 +13,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io' show File;
 import 'dart:ui' show Color;
@@ -20,6 +21,7 @@ import 'dart:ui' show Color;
 import 'package:ffi/ffi.dart';
 
 import '../native_lib_paths.dart';
+import 'live_install.dart';
 import 'system_media.dart';
 import 'system_status.dart';
 
@@ -258,6 +260,49 @@ final class AplEventFfi extends Struct {
 
 // ── 函数签名 ───────────────────────────────────────────────────────
 
+/// Live 安装向导：候选目标磁盘（与 C 侧 AplLiveDisk 一致）。
+final class AplLiveDiskFfi extends Struct {
+  external AplStringFfi name;
+  @Int64()
+  external int sizeBytes;
+  external AplStringFfi model;
+  external AplStringFfi transport;
+  @Int32()
+  external int isLive;
+}
+
+/// Live 安装向导：安装计划（与 C 侧 AplLivePlan 一致；字段顺序必须严格一致）。
+final class AplLivePlanFfi extends Struct {
+  external AplStringFfi disk;
+  external AplStringFfi hostname;
+  external AplStringFfi username;
+  external AplStringFfi locale;
+  external AplStringFfi timezone;
+  external AplStringFfi keymap;
+  external AplStringFfi fs;
+  external AplStringFfi swap;
+  @Int32()
+  external int encrypt;
+  @Int32()
+  external int autologin;
+  external AplStringFfi luksPassphrase;
+  external AplStringFfi userPassword;
+  external AplStringFfi rootPassword;
+}
+
+/// Live 安装向导：进度（与 C 侧 AplLiveInstallStatus 一致）。
+final class AplLiveInstallStatusFfi extends Struct {
+  @Int32()
+  external int running;
+  @Int32()
+  external int done;
+  @Int32()
+  external int failed;
+  @Int32()
+  external int percent;
+  external AplStringFfi message;
+}
+
 typedef _AplVersionC = Int32 Function();
 typedef _AplInitC = Int32 Function();
 typedef _AplShutdownC = Int32 Function();
@@ -310,6 +355,22 @@ typedef _AplInstanceAcquireD = int Function();
 typedef _AplNotifyD = int Function(Pointer<Utf8> title, Pointer<Utf8> body);
 typedef _AplSysStatsD = int Function(Pointer<AplSysStatsFfi> out);
 typedef _AplBtStateD = int Function(Pointer<AplBtStateFfi> out);
+typedef _AplLiveAvailableC = Int32 Function();
+typedef _AplLiveAvailableD = int Function();
+typedef _AplLiveDiskListC =
+    Int32 Function(
+      Pointer<AplLiveDiskFfi> out,
+      Uint32 max,
+      Pointer<Uint32> count,
+    );
+typedef _AplLiveDiskListD =
+    int Function(Pointer<AplLiveDiskFfi> out, int max, Pointer<Uint32> count);
+typedef _AplLiveInstallStartC = Int32 Function(Pointer<AplLivePlanFfi> plan);
+typedef _AplLiveInstallStartD = int Function(Pointer<AplLivePlanFfi> plan);
+typedef _AplLiveInstallStatusC =
+    Int32 Function(Pointer<AplLiveInstallStatusFfi> out);
+typedef _AplLiveInstallStatusD =
+    int Function(Pointer<AplLiveInstallStatusFfi> out);
 typedef _AplSystemAccentD =
     int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsD = int Function(int on);
@@ -550,12 +611,32 @@ class PlatformBindings {
         () => lib.lookupFunction<_AplOsKeyC, _AplOsKeyD>('apl_os_key'),
       ),
       _sysStats = _try(
-        () => lib.lookupFunction<_AplSysStatsC, _AplSysStatsD>(
-          'apl_sys_stats',
-        ),
+        () => lib.lookupFunction<_AplSysStatsC, _AplSysStatsD>('apl_sys_stats'),
       ),
       _btState = _try(
         () => lib.lookupFunction<_AplBtStateC, _AplBtStateD>('apl_bt_state'),
+      ),
+      // Live 安装向导（仅 Live 镜像的桥接提供；缺失时整体降级）
+      _liveAvailable = _try(
+        () => lib.lookupFunction<_AplLiveAvailableC, _AplLiveAvailableD>(
+          'apl_live_available',
+        ),
+      ),
+      _liveDiskList = _try(
+        () => lib.lookupFunction<_AplLiveDiskListC, _AplLiveDiskListD>(
+          'apl_live_disk_list',
+        ),
+      ),
+      _liveInstallStart = _try(
+        () => lib.lookupFunction<_AplLiveInstallStartC, _AplLiveInstallStartD>(
+          'apl_live_install_start',
+        ),
+      ),
+      _liveInstallStatus = _try(
+        () =>
+            lib.lookupFunction<_AplLiveInstallStatusC, _AplLiveInstallStatusD>(
+              'apl_live_install_status',
+            ),
       ),
       _setCallback = lib.lookupFunction<_SetEventCallbackC, _SetEventCallbackD>(
         'apl_set_event_callback',
@@ -610,6 +691,10 @@ class PlatformBindings {
   final _AplOsKeyD? _osKey;
   final _AplSysStatsD? _sysStats;
   final _AplBtStateD? _btState;
+  final _AplLiveAvailableD? _liveAvailable;
+  final _AplLiveDiskListD? _liveDiskList;
+  final _AplLiveInstallStartD? _liveInstallStart;
+  final _AplLiveInstallStatusD? _liveInstallStatus;
 
   // 四类事件广播流（ffi_* 实现订阅转译）
   final _commandCtrl = StreamController<MediaCommandEvent>.broadcast();
@@ -680,9 +765,116 @@ class PlatformBindings {
     }
   }
 
+  // ── Live 安装向导（apl_live_*）────────────────────────────────────
+
+  String _liveStr(AplStringFfi v) {
+    final data = v.data;
+    if (v.len == 0 || data.address == 0) return '';
+    return utf8.decode(data.asTypedList(v.len), allowMalformed: true);
+  }
+
+  void _livePut(AplStringFfi slot, String value, List<Pointer<Uint8>> keep) {
+    if (value.isEmpty) {
+      slot.data = nullptr;
+      slot.len = 0;
+      return;
+    }
+    final bytes = utf8.encode(value);
+    final p = malloc<Uint8>(bytes.length + 1);
+    p.asTypedList(bytes.length).setAll(0, bytes);
+    p[bytes.length] = 0;
+    keep.add(p);
+    slot.data = p;
+    slot.len = bytes.length;
+  }
+
+  /// 是否 Live 环境（桥接缺失/非 Live 返回 false）。
+  bool liveAvailable() {
+    final fn = _liveAvailable;
+    if (fn == null) return false;
+    return fn() == 1;
+  }
+
+  /// 候选目标磁盘；不可用或失败返回空列表。
+  List<LiveDisk> liveDisks() {
+    final fn = _liveDiskList;
+    if (fn == null) return const <LiveDisk>[];
+    const max = 32;
+    final out = calloc<AplLiveDiskFfi>(max);
+    final count = calloc<Uint32>();
+    try {
+      if (fn(out, max, count) != 0) return const <LiveDisk>[];
+      final n = count.value;
+      return <LiveDisk>[
+        for (var i = 0; i < n; i++)
+          LiveDisk(
+            name: _liveStr(out[i].name),
+            sizeBytes: out[i].sizeBytes,
+            model: _liveStr(out[i].model),
+            transport: _liveStr(out[i].transport),
+            isLive: out[i].isLive != 0,
+          ),
+      ];
+    } finally {
+      calloc.free(out);
+      calloc.free(count);
+    }
+  }
+
+  /// 写计划并启动安装单元。
+  bool liveInstallStart(LivePlan plan) {
+    final fn = _liveInstallStart;
+    if (fn == null) return false;
+    final out = calloc<AplLivePlanFfi>();
+    final keep = <Pointer<Uint8>>[];
+    try {
+      _livePut(out.ref.disk, plan.disk, keep);
+      _livePut(out.ref.hostname, plan.hostname, keep);
+      _livePut(out.ref.username, plan.username, keep);
+      _livePut(out.ref.locale, plan.locale, keep);
+      _livePut(out.ref.timezone, plan.timezone, keep);
+      _livePut(out.ref.keymap, plan.keymap, keep);
+      _livePut(out.ref.fs, plan.fs, keep);
+      _livePut(out.ref.swap, plan.swap, keep);
+      out.ref.encrypt = plan.encrypt ? 1 : 0;
+      out.ref.autologin = plan.autologin ? 1 : 0;
+      _livePut(out.ref.luksPassphrase, plan.luksPassphrase, keep);
+      _livePut(out.ref.userPassword, plan.userPassword, keep);
+      _livePut(out.ref.rootPassword, plan.rootPassword, keep);
+      return fn(out) == 0;
+    } finally {
+      for (final p in keep) {
+        malloc.free(p);
+      }
+      calloc.free(out);
+    }
+  }
+
+  /// 读取安装进度；不可用返回 null。
+  LiveInstallStatus? liveInstallStatus() {
+    final fn = _liveInstallStatus;
+    if (fn == null) return null;
+    final out = calloc<AplLiveInstallStatusFfi>();
+    try {
+      if (fn(out) != 0) return null;
+      return LiveInstallStatus(
+        running: out.ref.running != 0,
+        done: out.ref.done != 0,
+        failed: out.ref.failed != 0,
+        percent: out.ref.percent,
+        message: _liveStr(out.ref.message),
+      );
+    } finally {
+      calloc.free(out);
+    }
+  }
+
   /// 系统资源 / 蓝牙符号是否可用（旧版桥接缺失时返回 false）。
   bool get sysStatsSymbolsAvailable => _sysStats != null;
   bool get bluetoothSymbolsAvailable => _btState != null;
+
+  /// Live 安装向导符号是否可用（仅 Live 镜像的桥接带这些符号）。
+  bool get liveSymbolsAvailable => _liveAvailable != null;
 
   /// 系统资源快照；不可用/失败返回 null。
   SysStats? sysStats() {
@@ -726,9 +918,7 @@ class PlatformBindings {
         devicesConnected: s.devicesConnected,
         adapterName: name == nullptr
             ? null
-            : name.cast<Utf8>().toDartString(
-                length: s.adapterName.len,
-              ),
+            : name.cast<Utf8>().toDartString(length: s.adapterName.len),
       );
     } finally {
       calloc.free(out);
