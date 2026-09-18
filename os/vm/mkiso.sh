@@ -68,7 +68,11 @@ fi
 # 合成方式：先解开压缩成员，再裸 cpio 拼接后**整体**压成一个归档。直接 `cat`
 # 「压缩成员 + 裸 cpio」会被内核解压器吞掉（实测），所以不能简单拼接。
 ESP_IMG="$WORK/esp.img"
-if [ ! -f "$ESP_IMG" ]; then
+# ⚠ 必须和 root 一样带新鲜度判断：ESP 里放着内核/microcode/initrd/模块 initrd 与
+# systemd-boot。若只在「文件不存在」时抽取，重建后仍会拿**上一版**的 initrd 合成
+# ISO —— 表现为「改了 initrd 配置但怎么验证都没变化」（实测踩过：esp.img 停在几小时前，
+# 期间所有验证用的都是旧 initrd）。
+if [ ! -f "$ESP_IMG" ] || [ "$IMG" -nt "$ESP_IMG" ]; then
     echo "==> 抽取 ESP（$((ESP_SIZE/2048))MiB）…"
     dd if="$IMG" of="$ESP_IMG" bs=512 skip="$ESP_START" count="$ESP_SIZE" status=none
 fi
@@ -78,12 +82,14 @@ mkdir -p "$BOOT" "$SPLIT"
 # 清掉上一版可能留下的旧引导文件（脚本管理的目录，避免把旧 initrd 也打进 ISO）
 rm -rf "$TREE/archoera/boot"
 mkdir -p "$TREE/archoera/boot"
-copy_esp() { mcopy -o -i "$ESP_IMG" "::$1" "$2" 2>/dev/null; }
+# ⚠ 所有 mcopy 都要 `</dev/null`：mtools 会打开 /dev/tty 做交互确认（覆盖/异常时），
+# 在脚本里没有终端输入就**永久挂住**（实测：卡 12 分钟、0% CPU、wchan=wait_woken）。
+copy_esp() { mcopy -o -i "$ESP_IMG" "::$1" "$2" </dev/null 2>/dev/null; }
 echo "==> 取内核 / 微码 / 模块 initrd（三件套）…"
 copy_esp /vmlinuz-linux "$SPLIT/vmlinuz" || { echo "ESP 里没有 vmlinuz-linux" >&2; mdir -i "$ESP_IMG" -a ::/ >&2; exit 1; }
 copy_esp "/*/microcode.initrd" "$SPLIT/microcode.initrd" || { echo "缺 microcode.initrd" >&2; exit 1; }
 copy_esp "/*/initrd"           "$SPLIT/initrd"           || { echo "缺 initrd" >&2; exit 1; }
-mcopy -o -i "$ESP_IMG" "::/*/*/kernel-modules.initrd" "$SPLIT/kernel-modules.initrd" 2>/dev/null \
+mcopy -o -i "$ESP_IMG" "::/*/*/kernel-modules.initrd" "$SPLIT/kernel-modules.initrd" </dev/null 2>/dev/null \
     || { echo "缺 kernel-modules.initrd" >&2; exit 1; }
 copy_esp /EFI/BOOT/BOOTX64.EFI "$SPLIT/BOOTX64.EFI" || { echo "ESP 里没有 BOOTX64.EFI" >&2; exit 1; }
 
@@ -178,9 +184,9 @@ ENTRY="$STAGE/loader/entries/archoera.conf"
     echo "options root=LABEL=$VOLID rootfstype=iso9660 splash plymouth.ignore-serial-consoles console=tty0 console=hvc0 systemd.volatile=overlay archoera.live=1 systemd.firstboot=no"
 } > "$ENTRY"
 echo "--- $ENTRY"; cat "$ENTRY"
-mcopy -o -s -i "$EB" "$STAGE/EFI"     ::/
-mcopy -o -s -i "$EB" "$STAGE/loader"  ::/
-mcopy -o -s -i "$EB" "$STAGE/archoera" ::/
+mcopy -o -s -i "$EB" "$STAGE/EFI"      ::/ </dev/null
+mcopy -o -s -i "$EB" "$STAGE/loader"   ::/ </dev/null
+mcopy -o -s -i "$EB" "$STAGE/archoera" ::/ </dev/null
 
 # 同一套文件也放 ISO9660（Ventoy/其它能读 ISO9660 的引导器用；路径与 FAT 内一致）
 cp -a "$STAGE/EFI"     "$TREE/"
