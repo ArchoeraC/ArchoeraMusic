@@ -24,6 +24,7 @@
 #
 # 进度：写 /run/archoera-install/{percent,message,done,failed}（供向导轮询）。
 set -euo pipefail
+set -E  # ERR 陷阱在函数内也生效（配合 on_err 定位失败行）
 
 STATE=/run/archoera-install
 TARGET=/mnt/archoera
@@ -31,14 +32,35 @@ PLAN="$STATE/plan"
 SECRETS="$STATE/secrets"
 mkdir -p "$STATE"
 
+# 未预期的失败（set -e 直接退出）原本只留下一个空的 failed 文件，无法定位。
+# 这里用 ERR 陷阱把「行号 + 命令 + rc」写进 failed，并附 trace 尾部；set -E 让
+# 函数内部也触发。
+on_err() {
+    local rc=$? line=$1 cmd=$2
+    if [ ! -s "$STATE/failed" ]; then
+        {
+            printf '未预期失败 rc=%s（第 %s 行）：%s\n' "$rc" "$line" "$cmd"
+            [ -s "$STATE/trace" ] && { echo "--- trace 尾部 ---"; tail -20 "$STATE/trace"; }
+        } > "$STATE/failed"
+    fi
+}
+trap 'on_err "$?" "$LINENO" "$BASH_COMMAND"' ERR
+
+# 排障开关：存在 $STATE/debug 时开 xtrace（写 $STATE/trace），正常安装不留痕。
+if [ -e "$STATE/debug" ]; then
+    PS4='+${LINENO}: '
+    exec 2> >(tee -a "$STATE/trace" >&2)
+    set -x
+fi
+
 step() {
     printf '%s\n' "$2" > "$STATE/message"
     printf '%s\n' "$1" > "$STATE/percent"
     echo "[archoera-install] $1% — $2"
 }
 fail() {
-    printf '%s\n' "$1" > "$STATE/failed"
-    echo "[archoera-install] 失败: $1" >&2
+    printf '%s\n' "${1:-未知失败（无消息）}" > "$STATE/failed"
+    echo "[archoera-install] 失败: ${1:-未知失败（无消息）}" >&2
     exit 1
 }
 
