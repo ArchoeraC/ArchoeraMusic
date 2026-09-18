@@ -457,6 +457,52 @@ impl ArchoeraShell {
         }
     }
 
+    /// 按连接器名找 wl_output。
+    fn output_by_name(&self, name: &str) -> Option<Output> {
+        self.space
+            .outputs()
+            .find(|o| o.name() == name || o.name().ends_with(name))
+            .cloned()
+    }
+
+    /// 按名字取模式表（协议 id → 名字 → 模式表）。
+    pub fn output_name_for_id(&self, id: u32) -> Option<String> {
+        self.backend
+            .as_ref()
+            .and_then(|b| b.output_meta().get(id as usize).map(|(n, _)| n.clone()))
+    }
+
+    /// 把某个输出切到它模式表里的第 index 个模式。
+    pub fn set_output_mode_index(&mut self, name: &str, index: usize) -> anyhow::Result<()> {
+        let applied = match self.backend.as_mut() {
+            Some(b) => b.set_output_mode_index(name, index)?,
+            None => None,
+        };
+        if let (Some(mode), Some(output)) = (applied, self.output_by_name(name)) {
+            output.change_current_state(Some(mode), None, None, None);
+        }
+        self.notify_output_state();
+        Ok(())
+    }
+
+    /// 单独设置某个输出的缩放（千分比；缩放是合成器侧状态，不涉及 DRM 模式切换）。
+    pub fn set_output_scale_for(&mut self, name: &str, scale_milli: u32) {
+        let scale = crate::backend::output_scale((scale_milli as f64 / 1000.0).clamp(1.0, 4.0));
+        if let Some(output) = self.output_by_name(name) {
+            output.change_current_state(None, None, Some(scale), None);
+        }
+        self.refresh_fractional_scale();
+        self.notify_output_state();
+    }
+
+    /// 单独设置某个输出的变换（旋转/镜像）。
+    pub fn set_output_transform_for(&mut self, name: &str, transform: Transform) {
+        if let Some(output) = self.output_by_name(name) {
+            output.change_current_state(None, Some(transform), None, None);
+        }
+        self.notify_output_state();
+    }
+
     /// 应用运行时显示设置（缩放/模式/变换）并通知客户端。
     ///
     /// - 模式切换走后端（udev 改 DRM 模式）；

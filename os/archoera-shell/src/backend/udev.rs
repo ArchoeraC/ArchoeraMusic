@@ -171,6 +171,58 @@ impl UdevBackend {
         Ok(applied)
     }
 
+    /// 把名为 `name` 的输出切换到它模式表里的第 `index` 个模式。
+    ///
+    /// 与 `apply_output_config` 的区别：按 (宽, 高, **刷新率**) 三元组精确定位，
+    /// 因此同分辨率的 165Hz / 60Hz 可以区分（KScreen 那种列表也才切得对）。
+    pub fn set_output_mode_index(
+        &mut self,
+        name: &str,
+        index: usize,
+    ) -> anyhow::Result<Option<smithay::output::Mode>> {
+        for surface in self.surfaces.values_mut() {
+            if surface.name != name {
+                continue;
+            }
+            let Some(&(w, h, refresh)) = surface.modes.get(index) else {
+                return Ok(None);
+            };
+            let info = self
+                .manager
+                .device()
+                .get_connector(surface.connector, true)
+                .map_err(|e| anyhow::anyhow!("读取连接器模式失败: {e}"))?;
+            let Some(mode) = info
+                .modes()
+                .iter()
+                .find(|m| {
+                    let sz = m.size();
+                    sz.0 as i32 == w
+                        && sz.1 as i32 == h
+                        && m.vrefresh().saturating_mul(1000) == refresh
+                })
+                .copied()
+            else {
+                tracing::warn!(name, index, "该输出没有这个模式");
+                return Ok(None);
+            };
+            if mode != surface.mode {
+                surface
+                    .drm_output
+                    .use_mode(
+                        mode,
+                        &mut self.renderer,
+                        &DrmOutputRenderElements::<GlesRenderer, UdevElements>::default(),
+                    )
+                    .map_err(|e| anyhow::anyhow!("切换输出模式失败: {e:?}"))?;
+                surface.mode = mode;
+                tracing::info!(name, index, mode = ?mode, "DRM 输出模式已按索引切换");
+            }
+            return Ok(Some(WlMode::from(mode)));
+        }
+        Ok(None)
+    }
+
     /// 合成并提交所有输出的下一帧（桌面内容 + 指针光标）。
     pub fn render(
         &mut self,

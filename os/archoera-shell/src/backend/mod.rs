@@ -199,6 +199,20 @@ impl Backend {
         }
     }
 
+    /// 按输出名 + 模式索引切换 DRM 模式；嵌套后端无操作。
+    #[cfg_attr(not(feature = "udev"), allow(unused_variables))]
+    pub fn set_output_mode_index(
+        &mut self,
+        name: &str,
+        index: usize,
+    ) -> anyhow::Result<Option<smithay::output::Mode>> {
+        match self {
+            Backend::Winit(_) => Ok(None),
+            #[cfg(feature = "udev")]
+            Backend::Udev(backend) => backend.set_output_mode_index(name, index),
+        }
+    }
+
     /// 各输出的（连接器名, 模式列表）；嵌套后端没有真实输出，返回空。
     pub fn output_meta(&self) -> Vec<OutputMeta> {
         match self {
