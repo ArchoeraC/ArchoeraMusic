@@ -1737,6 +1737,20 @@ class AppLocalizationsEs extends AppLocalizations {
       'Elegir esto envía la música al predeterminado de llamada/baja calidad del sistema; el sonido casi se destruye. No recomendado.';
 
   @override
+  String settingsOutputDeviceShowAll(int count) {
+    return 'Mostrar todos los dispositivos ($count)';
+  }
+
+  @override
+  String get settingsOutputDeviceHideUnused => 'Mostrar solo los utilizables';
+
+  @override
+  String get settingsOutputDeviceUnavailable => 'No disponible';
+
+  @override
+  String get settingsOutputDeviceVirtualTag => 'Virtual';
+
+  @override
   String settingsSinkChangedFailed(Object err) {
     return 'No se pudo cambiar el dispositivo de salida: $err';
   }

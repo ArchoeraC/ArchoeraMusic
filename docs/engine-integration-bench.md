@@ -196,6 +196,39 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
 - 原则不变：绝不静默自动切设备；一切为用户显式动作。
 
 
+## 9c. 2026-09-18 输出枚举模块化（audio_output 接口 + KDE 式折叠）
+- 动机：枚举/分类逻辑散在 `player.c` + `mediaengine_lib.c`；且 `player_context_open` 硬编码
+  pulse/alsa，Windows/macOS 枚举为空。改为引擎内独立模块、经**接口**注入平台差异（保留在引擎，
+  枚举与打开设备同源，彻底避免「桥接枚举 id 与引擎 id 对不上」的通信问题）。
+- 模块：`src/audio_output.{h,c}`（通用枚举/默认标记/flag 归纳 + `audio_output_provider` 函数指针表）
+  + `audio_output_platform.{h,c}`（通用小工具/名称启发式/选择入口）
+  + 平台后端 `audio_output_{linux,windows,macos,stub}.c`（CMake / build_windows.bat 按平台
+    编译期选择）。
+  - 枚举条目 `audio_output_entry` 同时含 `info`（给 UI）与 `ma_device_id`（给播放）——同源。
+  - 后端优先级由 provider 给出：Linux=pulse→alsa；Windows/macOS=NULL（miniaudio 平台默认，
+    修复此前枚举为空）；`audio_output_id_from_device` 增 wasapi(宽字符→UTF-8)/coreaudio 分支。
+  - flags：`DEFAULT|AVAILABLE|PLUGGED|VIRTUAL|MONITOR|LOW_QUALITY|HIDDEN`；class 增 `virtual`。
+  - Linux：dlopen libpulse（不新增链接依赖）读 sink `proplist`
+    （`device.form-factor`/`device.bus`/`device.class`/`bluetooth.codec`）与 `active_port` 可用性
+    做精确分类/插拔；结果 3s 缓存（播放启动不做额外往返）；libpulse 缺失回退名称启发式。
+  - Windows：WASAPI（`IMMDeviceEnumerator` + `IPropertyStore`）读取
+    `PKEY_AudioEndpoint_FormFactor` / `PKEY_Device_EnumeratorName`（BTHENUM/BTHHFENUM/USB/SWD…）
+    与 `DEVICE_STATE_*`，分类蓝牙 HFP/A2DP、HDMI/SPDIF、USB、内置、虚拟并判可用性；
+    链接 `ole32.lib`（GUID/属性键在源码内手写，不依赖 uuid.lib/propsys.lib）。
+  - macOS：CoreAudio `AudioObjectGetPropertyData` 读 `kAudioDevicePropertyTransportType` /
+    `kAudioDevicePropertyDeviceIsAlive` / `kAudioDevicePropertyDeviceUID`，分类
+    Bluetooth/HDMI/DisplayPort/USB/BuiltIn/Virtual/Aggregate 并判可用性；
+    CMake 链接 `CoreAudio`/`CoreFoundation`。
+- `archoera_mediaengine_list_sinks` JSON 增 `description`、`flags`；`class` 改由 provider 给出
+  （旧名称启发式迁入 `audio_output_platform.c` 作基线）。默认设备永不置 HIDDEN。
+- Dart：`_SinkDevice` 解析 `description/flags`，增 `hidden/isVirtual/unavailable`；设置页默认只列
+  可用设备（不可用/未插拔/虚拟/monitor 折叠），底部「显示全部设备（N）/只看可用设备」展开；
+  默认/当前选中设备始终可见。l10n ×9 增 2 key。
+- 验证：CMake 构建通过；`ctest` 18/18；`list_sinks` 冒烟（WSLg pulse：`flags=15`，default 不隐藏）；
+  `dart analyze lib` 0 issue；`audio_output_macos.c` 经 clang + MacOSX14.0 SDK 交叉编译
+  arm64/x86_64 通过。Windows 端（WASAPI）本机无 MSVC/mingw 工具链，交 CI Windows runner 真机验证。
+
+
 ## 10. 2026-09-05 FLAC 提速 + 流式起播 + 简约进度触摸
 - FLAC 慢根因：`kernel/io.zig` `.file` 形态**逐字节 positional read**（每字节一次 syscall，200s 文件 ~2700 万次）。
   修复：.file 加 16KB 前瞻缓存（seek/peek 语义不变，不预读越界字节；其它格式通用受益）。收益：

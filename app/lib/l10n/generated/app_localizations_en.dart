@@ -1712,6 +1712,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Selecting this routes music through the call/low-quality system default — the sound is nearly ruined; not recommended.';
 
   @override
+  String settingsOutputDeviceShowAll(int count) {
+    return 'Show all devices ($count)';
+  }
+
+  @override
+  String get settingsOutputDeviceHideUnused => 'Show usable only';
+
+  @override
+  String get settingsOutputDeviceUnavailable => 'Unavailable';
+
+  @override
+  String get settingsOutputDeviceVirtualTag => 'Virtual';
+
+  @override
   String settingsSinkChangedFailed(Object err) {
     return 'Failed to switch output device: $err';
   }

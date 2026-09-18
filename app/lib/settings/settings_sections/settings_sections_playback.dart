@@ -19,6 +19,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
   List<_SinkDevice>? _sinks;
   bool _sinksFailed = false;
   bool _sinkBusy = false;
+  bool _showAllSinks = false;
   StreamSubscription<String>? _sinkFailSub;
 
   @override
@@ -272,17 +273,30 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         ),
       );
     }
-    final sorted = [...sinks]
+    // KDE 风格：默认只显示「可用/有用」设备；不可用/虚拟/monitor 折叠在
+    // 「显示全部设备」下（当前选中项始终可见，避免选了却看不到）。
+    final hiddenAll = sinks.where((d) => d.hidden).toList();
+    final usable = sinks
+        .where((d) => !d.hidden || d.isDefault || prefs.sink == d.id)
+        .toList();
+    final shown = _showAllSinks ? [...sinks] : usable;
+    final sorted = shown
       ..sort((a, b) {
-        if (a.isCall == b.isCall) return 0;
-        return a.isCall ? 1 : -1;
+        // 可用/有用在前：隐藏项置后，通话/低质置后
+        if (a.hidden != b.hidden) return a.hidden ? 1 : -1;
+        if (a.isCall != b.isCall) return a.isCall ? 1 : -1;
+        return 0;
       });
     for (final d in sorted) {
+      final fmt = l10n.settingsOutputDeviceFormat(d.channels, d.rate);
+      final desc = d.description.isNotEmpty ? '${d.description} · $fmt' : fmt;
       rows.add(
         _EngineOptionTile(
-          icon: d.isCall ? EtaIcons.bluetooth : EtaIcons.speakerOutline,
+          icon: d.isCall
+              ? EtaIcons.bluetooth
+              : (d.hidden ? EtaIcons.eyeCloseOutline : EtaIcons.speakerOutline),
           title: d.name,
-          desc: l10n.settingsOutputDeviceFormat(d.channels, d.rate),
+          desc: desc,
           badges: [
             if (d.isDefault)
               (
@@ -290,6 +304,16 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 color: scheme.primary,
               ),
             if (d.isCall) _callBadge(scheme, l10n),
+            if (d.unavailable)
+              (
+                text: l10n.settingsOutputDeviceUnavailable,
+                color: scheme.onSurfaceVariant,
+              )
+            else if (d.isVirtual)
+              (
+                text: l10n.settingsOutputDeviceVirtualTag,
+                color: scheme.onSurfaceVariant,
+              ),
           ],
           selected: prefs.sink == d.id,
           busy: _sinkBusy,
@@ -300,6 +324,21 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         rows.add(const _SinkHfpNote());
         rows.add(const _A2dpGuideBlock());
       }
+    }
+    if (hiddenAll.isNotEmpty) {
+      rows.add(
+        _EngineOptionTile(
+          icon: _showAllSinks ? EtaIcons.upSmall : EtaIcons.downSmall,
+          title: _showAllSinks
+              ? l10n.settingsOutputDeviceHideUnused
+              : l10n.settingsOutputDeviceShowAll(hiddenAll.length),
+          desc: '',
+          badges: const [],
+          selected: false,
+          busy: false,
+          onTap: () => setState(() => _showAllSinks = !_showAllSinks),
+        ),
+      );
     }
     return rows;
   }

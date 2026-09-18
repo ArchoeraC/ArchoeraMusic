@@ -16,7 +16,14 @@
  */
 #define _POSIX_C_SOURCE 200809L
 
+/* 单头文件实现仅编译一次（player.c 内）。必须在 player.h / audio_output.h
+   之前——这两个头会 include miniaudio.h 的声明，若先包含则实现被 include
+   guard 吞掉。 */
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
+
 #include "player.h"
+#include "audio_output.h"
 
 #include "resampler.h"
 #include <libavutil/samplefmt.h>
@@ -30,10 +37,6 @@
 #ifdef _WIN32
 #include <stddef.h>   /* wchar_t */
 #endif
-
-/* 单头文件实现仅编译一次（player.c 内） */
-#define MINIAUDIO_IMPLEMENTATION
-#include "miniaudio.h"
 
 /* 位置事件推送间隔默认值（音频秒）：50ms 对齐 FFT 拉模式轮询（20Hz 分析）。
    运行期经 player_set_position_interval 可动态调整（降频协商，见
@@ -206,96 +209,43 @@ static ma_bool32 arch_str_contains_ci(const char *haystack, const char *needle)
     return MA_FALSE;
 }
 
-/* player_probe_entry：枚举得 id/name/isDefault（pulse/alsa 枚举不带 native
-   格式），再逐个 ma_context_get_device_info 取原生 sampleRate/channels。 */
-typedef struct {
-    player_sink_candidate c;
-    ma_device_id dev_id;                /* 完整设备 id（按选中整拷给 engine） */
-    char id_buf[MA_MAX_DEVICE_NAME_LENGTH + 1];
-    char name_buf[MA_MAX_DEVICE_NAME_LENGTH + 1];
-} player_probe_entry;
+/* player_probe_entry：直接复用 audio_output 模块的枚举条目
+   （info 给 UI + dev_id 给播放，二者同源；分类/去重见 audio_output.*）。 */
+typedef audio_output_entry player_probe_entry;
 
-static const char *arch_device_id_str(const ma_context *pCtx, const ma_device_id *pId,
-                                     char *pOut, size_t outCap)
-{
-    if (pId == NULL) { if (outCap) pOut[0] = '\0'; return pOut; }
-    switch (pCtx->backend) {
-    case ma_backend_pulseaudio:
-        ma_strncpy_s(pOut, outCap, pId->pulse, (size_t)-1); break;
-    case ma_backend_alsa:
-        ma_strncpy_s(pOut, outCap, pId->alsa, (size_t)-1); break;
-    default:
-        /* 非 pulse/alsa 后端不做显式选择（回到默认设备语义） */
-        if (outCap) {
-            pOut[0] = '\0';
-        }
-        break;
-    }
-    return pOut;
-}
 
-/* 采集候选列表：返回堆上数组（calloc），*p_count 个数；失败返回 NULL。
+/* 采集候选列表：转调 audio_output 模块（通用枚举 + 平台分类），保留原接口。
+   返回堆上数组（calloc），*p_count 个数；失败/无设备返回 NULL。
    返回数组需 player_probe_free 释放。 */
 static player_probe_entry *player_probe_collect(ma_context *pCtx, int *p_count)
 {
-    ma_result r;
-    ma_device_info *pPlay = NULL, *pCap = NULL;
-    ma_uint32 nPlay = 0, nCap = 0;
-    player_probe_entry *out;
-    ma_uint32 i;
+    audio_output_entry *entries = NULL;
+    int n;
 
     if (p_count) *p_count = 0;
     if (pCtx == NULL) return NULL;
 
-    r = ma_context_get_devices(pCtx, &pPlay, &nPlay, &pCap, &nCap);
-    if (r != MA_SUCCESS || nPlay == 0 || pPlay == NULL) {
-        return NULL;
-    }
-
-    out = (player_probe_entry *)calloc(nPlay, sizeof(*out));
-    if (!out) return NULL;
-
-    for (i = 0; i < nPlay; ++i) {
-        player_probe_entry *e = &out[i];
-        ma_device_info di;
-
-        e->c.id   = e->id_buf;
-        e->c.name = e->name_buf;
-        e->dev_id = pPlay[i].id;
-        arch_device_id_str(pCtx, &pPlay[i].id, e->id_buf, sizeof(e->id_buf));
-        ma_strncpy_s(e->name_buf, sizeof(e->name_buf), pPlay[i].name, (size_t)-1);
-        e->c.is_default = pPlay[i].isDefault ? 1 : 0;
-        e->c.sample_rate = 0;
-        e->c.channels = 0;
-        e->c.has_native = 0;
-
-        /* native 格式：get_device_info 逐个查（pulse 填 sink sample_spec 等） */
-        MA_ZERO_OBJECT(&di);
-        if (ma_context_get_device_info(pCtx, ma_device_type_playback,
-                                       &pPlay[i].id, &di) == MA_SUCCESS &&
-            di.nativeDataFormatCount > 0) {
-            e->c.sample_rate = di.nativeDataFormats[0].sampleRate;
-            e->c.channels    = di.nativeDataFormats[0].channels;
-            e->c.has_native  = 1;
-        }
-    }
-    if (p_count) *p_count = (int)nPlay;
-    return out;
+    n = audio_output_collect(pCtx, &entries);
+    if (n <= 0) return entries;  /* NULL（失败/无设备） */
+    if (p_count) *p_count = n;
+    return entries;
 }
 
 static void player_probe_free(player_probe_entry *p)
 {
-    if (p) { free(p); }
+    audio_output_free(p);
 }
 
-/* 初始化一个可供 ma_engine 自建设备使用的 context（优先 pulse，其次 alsa，
-   与 miniaudio 默认 Linux 后端优先级一致）。成功返回 0，失败返回 -1。 */
+/* 打开枚举/播放用 context（后端优先级由平台 provider 决定：
+   Linux=pulse→alsa；Windows/macOS=平台默认）。成功返回 0，失败返回 -1。 */
 static int player_context_open(ma_context *pCtx)
 {
-    static const ma_backend backends[] = { ma_backend_pulseaudio, ma_backend_alsa };
-    ma_result r = ma_context_init(backends, 2, NULL, pCtx);
-    if (r != MA_SUCCESS) return -1;
-    return 0;
+    return audio_output_context_open(pCtx);
+}
+
+const char *player_sink_class_str(int cls)
+{
+    return audio_output_class_str(cls);
 }
 
 /* ── 会话无关 sink 枚举导出（Dart 侧 archoera_mediaengine_list_sinks 复用）── */
@@ -318,13 +268,17 @@ int player_list_sinks(player_sink_info *out, int cap)
     }
     for (i = 0; i < n && i < cap; ++i) {
         player_sink_info *dst = &out[i];
-        dst->sample_rate = probes[i].c.sample_rate;
-        dst->channels    = probes[i].c.channels;
-        dst->has_native  = probes[i].c.has_native;
-        dst->is_default  = probes[i].c.is_default;
-        ma_strncpy_s(dst->id, sizeof(dst->id), probes[i].c.id, (size_t)-1);
-        ma_strncpy_s(dst->name, sizeof(dst->name),
-                     probes[i].c.name, (size_t)-1);
+        const audio_output *src = &probes[i].info;
+        dst->sample_rate = src->sample_rate;
+        dst->channels    = src->channels;
+        dst->has_native  = src->has_native;
+        dst->is_default  = (src->flags & AUDIO_OUTPUT_F_DEFAULT) ? 1 : 0;
+        dst->flags       = src->flags;
+        dst->cls         = src->cls;
+        ma_strncpy_s(dst->id, sizeof(dst->id), src->id, (size_t)-1);
+        ma_strncpy_s(dst->name, sizeof(dst->name), src->name, (size_t)-1);
+        ma_strncpy_s(dst->description, sizeof(dst->description),
+                     src->description, (size_t)-1);
     }
     player_probe_free(probes);
     ma_context_uninit(&ctx);
@@ -393,7 +347,13 @@ PlayerCtx *player_start_opts(const char *ogg_path,
             if (cands != NULL) {
                 int i;
                 for (i = 0; i < n; ++i) {
-                    cands[i] = probes[i].c;
+                    cands[i].id = probes[i].info.id;
+                    cands[i].name = probes[i].info.name;
+                    cands[i].sample_rate = probes[i].info.sample_rate;
+                    cands[i].channels = probes[i].info.channels;
+                    cands[i].has_native = probes[i].info.has_native;
+                    cands[i].is_default =
+                        (probes[i].info.flags & AUDIO_OUTPUT_F_DEFAULT) ? 1 : 0;
                     if (cands[i].is_default && default_idx < 0) default_idx = i;
                 }
                 sel_idx = player_sink_select(cands, n, env_override,
@@ -417,21 +377,21 @@ PlayerCtx *player_start_opts(const char *ogg_path,
             if (target_idx >= 0) {
                 player_probe_entry *t = &probes[target_idx];
                 ma_strncpy_s(sink_name, sizeof(sink_name),
-                             t->c.name, (size_t)-1);
+                             t->info.name, (size_t)-1);
                 ma_strncpy_s(sink_dev, sizeof(sink_dev),
-                             t->c.id, (size_t)-1);
-                sink_rate = t->c.sample_rate;
-                sink_ch   = t->c.channels;
-                sink_native_known = t->c.has_native;
+                             t->info.id, (size_t)-1);
+                sink_rate = t->info.sample_rate;
+                sink_ch   = t->info.channels;
+                sink_native_known = t->info.has_native;
             } else if (sel_idx >= 0) {
                 /* 枚举中没有默认项但选中了某 sink（极端）：仅用其 id/name */
                 ma_strncpy_s(sink_name, sizeof(sink_name),
-                             probes[sel_idx].c.name, (size_t)-1);
+                             probes[sel_idx].info.name, (size_t)-1);
                 ma_strncpy_s(sink_dev, sizeof(sink_dev),
-                             probes[sel_idx].c.id, (size_t)-1);
-                sink_rate = probes[sel_idx].c.sample_rate;
-                sink_ch   = probes[sel_idx].c.channels;
-                sink_native_known = probes[sel_idx].c.has_native;
+                             probes[sel_idx].info.id, (size_t)-1);
+                sink_rate = probes[sel_idx].info.sample_rate;
+                sink_ch   = probes[sel_idx].info.channels;
+                sink_native_known = probes[sel_idx].info.has_native;
             }
         } else {
             if (probes) player_probe_free(probes);
@@ -768,7 +728,13 @@ PlayerCtx *player_stream_open(const char *sink_id,
                 (player_sink_candidate *)calloc((size_t)n, sizeof(*cands));
             if (cands != NULL) {
                 for (i = 0; i < n; ++i) {
-                    cands[i] = probes[i].c;
+                    cands[i].id = probes[i].info.id;
+                    cands[i].name = probes[i].info.name;
+                    cands[i].sample_rate = probes[i].info.sample_rate;
+                    cands[i].channels = probes[i].info.channels;
+                    cands[i].has_native = probes[i].info.has_native;
+                    cands[i].is_default =
+                        (probes[i].info.flags & AUDIO_OUTPUT_F_DEFAULT) ? 1 : 0;
                     if (cands[i].is_default && default_idx < 0) default_idx = i;
                 }
                 sel_idx = player_sink_select(cands, n, env_override,
@@ -783,10 +749,10 @@ PlayerCtx *player_stream_open(const char *sink_id,
             }
             if (target_idx >= 0) {
                 player_probe_entry *t = &probes[target_idx];
-                ma_strncpy_s(sink_name, sizeof(sink_name), t->c.name, (size_t)-1);
-                sink_rate = t->c.sample_rate;
-                sink_ch   = t->c.channels;
-                sink_native_known = t->c.has_native;
+                ma_strncpy_s(sink_name, sizeof(sink_name), t->info.name, (size_t)-1);
+                sink_rate = t->info.sample_rate;
+                sink_ch   = t->info.channels;
+                sink_native_known = t->info.has_native;
             }
         } else {
             if (probes) player_probe_free(probes);
@@ -1099,7 +1065,13 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
                 (player_sink_candidate *)calloc((size_t)n, sizeof(*cands));
             if (cands != NULL) {
                 for (i = 0; i < n; ++i) {
-                    cands[i] = probes[i].c;
+                    cands[i].id = probes[i].info.id;
+                    cands[i].name = probes[i].info.name;
+                    cands[i].sample_rate = probes[i].info.sample_rate;
+                    cands[i].channels = probes[i].info.channels;
+                    cands[i].has_native = probes[i].info.has_native;
+                    cands[i].is_default =
+                        (probes[i].info.flags & AUDIO_OUTPUT_F_DEFAULT) ? 1 : 0;
                     if (cands[i].is_default && default_idx < 0) default_idx = i;
                 }
                 sel_idx = player_sink_select(cands, n, env_override,
@@ -1112,10 +1084,10 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
             }
             if (target_idx >= 0) {
                 player_probe_entry *t = &probes[target_idx];
-                ma_strncpy_s(sink_name, sizeof(sink_name), t->c.name, (size_t)-1);
-                sink_rate = t->c.sample_rate;
-                sink_ch   = t->c.channels;
-                sink_native_known = t->c.has_native;
+                ma_strncpy_s(sink_name, sizeof(sink_name), t->info.name, (size_t)-1);
+                sink_rate = t->info.sample_rate;
+                sink_ch   = t->info.channels;
+                sink_native_known = t->info.has_native;
             }
         }
         if (probes) player_probe_free(probes);

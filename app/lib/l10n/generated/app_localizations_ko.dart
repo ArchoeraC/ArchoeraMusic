@@ -1670,6 +1670,20 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 항목을 선택하면 음악이 시스템 기본 통화/저음질 기기로 나가 음질이 거의 손상됩니다. 권장하지 않습니다.';
 
   @override
+  String settingsOutputDeviceShowAll(int count) {
+    return '모든 장치 표시($count)';
+  }
+
+  @override
+  String get settingsOutputDeviceHideUnused => '사용 가능한 장치만 보기';
+
+  @override
+  String get settingsOutputDeviceUnavailable => '사용 불가';
+
+  @override
+  String get settingsOutputDeviceVirtualTag => '가상 장치';
+
+  @override
   String settingsSinkChangedFailed(Object err) {
     return '출력 장치 전환 실패: $err';
   }

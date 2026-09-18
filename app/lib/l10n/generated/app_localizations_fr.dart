@@ -1732,6 +1732,21 @@ class AppLocalizationsFr extends AppLocalizations {
       'Choisir ceci fait passer la musique par le défaut basse qualité du système ; le son est presque détruit — déconseillé.';
 
   @override
+  String settingsOutputDeviceShowAll(int count) {
+    return 'Afficher tous les appareils ($count)';
+  }
+
+  @override
+  String get settingsOutputDeviceHideUnused =>
+      'Afficher uniquement les utilisables';
+
+  @override
+  String get settingsOutputDeviceUnavailable => 'Indisponible';
+
+  @override
+  String get settingsOutputDeviceVirtualTag => 'Virtuel';
+
+  @override
   String settingsSinkChangedFailed(Object err) {
     return 'Échec du changement de périphérique de sortie : $err';
   }

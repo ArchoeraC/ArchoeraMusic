@@ -1650,6 +1650,20 @@ class AppLocalizationsZh extends AppLocalizations {
       '选择此项将让音乐走系统默认的通话/低质设备，音质几乎损毁，不推荐。';
 
   @override
+  String settingsOutputDeviceShowAll(int count) {
+    return '显示全部设备（$count）';
+  }
+
+  @override
+  String get settingsOutputDeviceHideUnused => '只看可用设备';
+
+  @override
+  String get settingsOutputDeviceUnavailable => '不可用';
+
+  @override
+  String get settingsOutputDeviceVirtualTag => '虚拟设备';
+
+  @override
   String settingsSinkChangedFailed(Object err) {
     return '切换输出设备失败：$err';
   }
@@ -5986,6 +6000,20 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       '选择此项将让音乐走系统默认的通话/低质设备，音质几乎损毁，不推荐。';
 
   @override
+  String settingsOutputDeviceShowAll(int count) {
+    return '显示全部设备（$count）';
+  }
+
+  @override
+  String get settingsOutputDeviceHideUnused => '只看可用设备';
+
+  @override
+  String get settingsOutputDeviceUnavailable => '不可用';
+
+  @override
+  String get settingsOutputDeviceVirtualTag => '虚拟设备';
+
+  @override
   String settingsSinkChangedFailed(Object err) {
     return '切换输出设备失败：$err';
   }
@@ -10320,6 +10348,20 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get settingsOutputDeviceDefaultRowCallNote =>
       '選擇此項將讓音樂走系統預設的通話/低品質裝置，音質幾乎損毀，不建議。';
+
+  @override
+  String settingsOutputDeviceShowAll(int count) {
+    return '顯示全部裝置（$count）';
+  }
+
+  @override
+  String get settingsOutputDeviceHideUnused => '只看可用裝置';
+
+  @override
+  String get settingsOutputDeviceUnavailable => '不可用';
+
+  @override
+  String get settingsOutputDeviceVirtualTag => '虛擬裝置';
 
   @override
   String settingsSinkChangedFailed(Object err) {
