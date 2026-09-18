@@ -111,11 +111,15 @@ fi
 FW_CPIO="$WORK/initrd-fw.cpio"
 FW_ROOT="$WORK/initrd-fw"
 rm -rf "$FW_ROOT"; mkdir -p "$FW_ROOT"
-for d in intel/ibt intel/iwlwifi rtl_bt rtl_nic mediatek qca; do
-    src="$TREE/usr/lib/firmware/$d"
-    [ -e "$src" ] || continue
-    mkdir -p "$FW_ROOT/usr/lib/firmware/$(dirname "$d")"
-    cp -a "$src" "$FW_ROOT/usr/lib/firmware/$(dirname "$d")/"
+# 注意 `intel/ibt-*` 是**文件名前缀**（ibt-0040-*.sfi 等是文件，不是目录），
+# 而 `intel/iwlwifi`、`rtl_nic` 等是目录 —— 统一按 glob 展开后复制。
+for pat in "intel/ibt-*" "intel/iwlwifi" "rtl_bt" "rtl_nic" "mediatek" "qca"; do
+    for src in $TREE/usr/lib/firmware/$pat; do
+        [ -e "$src" ] || continue
+        rel="${src#"$TREE/usr/lib/firmware/"}"
+        mkdir -p "$FW_ROOT/usr/lib/firmware/$(dirname "$rel")"
+        cp -a "$src" "$FW_ROOT/usr/lib/firmware/$(dirname "$rel")/"
+    done
 done
 (cd "$FW_ROOT" && find . -mindepth 1 | cpio -o -H newc --quiet) > "$FW_CPIO"
 echo "    已补早期固件：$(du -sh "$FW_CPIO" | cut -f1)"
