@@ -414,6 +414,8 @@ pub fn init_udev(
                         if let Err(err) = surface.drm_output.frame_submitted() {
                             tracing::warn!(?crtc, ?err, "回收 DRM 帧失败");
                         }
+                        // 帧已上屏：允许下一次调度立即合成（合并帧的边界）。
+                        data.state.note_frame_submitted();
                         // 帧已上屏 → 现在才通知客户端可以画下一帧（节拍关键）。
                         data.state.send_frame_callbacks();
                     }

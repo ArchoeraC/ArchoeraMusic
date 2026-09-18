@@ -112,10 +112,17 @@ else
     client=/opt/archoera/archoera-smoke
 fi
 
-# 播放器是 GTK3 客户端：强制 Wayland 后端；virtio-gpu 无 virgl，用软件 GL。
+# 播放器是 GTK3 客户端：强制 Wayland 后端。
 # 输入法走 Wayland text-input-v3，因此不设 GTK_IM_MODULE（会走合成器 → fcitx5）。
 export GDK_BACKEND=wayland
-export LIBGL_ALWAYS_SOFTWARE=1
+# ⚠ 不要无条件开软件渲染：这会让**合成器与播放器双双走 llvmpipe**。真机上的表现是
+# 全屏合成掉到 ~18fps、一操作（点击/移动）就 100% CPU、完全不碰 GPU —— 那是早期
+# 「virtio-gpu 无 virgl」的 VM 调试遗留。仅无 GPU 的 VM 测试用 ARCHOERA_SOFTWARE_GL=1
+# 显式开启。
+if [ "${ARCHOERA_SOFTWARE_GL:-0}" = "1" ]; then
+    echo "[session] 按 ARCHOERA_SOFTWARE_GL=1 强制软件渲染（仅供无 GPU 的 VM）"
+    export LIBGL_ALWAYS_SOFTWARE=1
+fi
 unset GTK_IM_MODULE
 
 while true; do

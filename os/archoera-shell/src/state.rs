@@ -129,6 +129,9 @@ pub struct ArchoeraShell {
     /// 事件驱动的重绘标志：为真表示有新的客户端提交 / 输出变化需要合成，
     /// 为假时合成器完全空闲（不再空转 vblank / request_redraw）。
     needs_redraw: bool,
+    /// udev：已有一帧交给 DRM、等 vblank 回收。用于把「一帧在飞行中」期间的
+    /// 多次脏标记合并成一次合成（否则每个输入事件都会做一次全屏合成）。
+    frame_in_flight: bool,
 }
 
 impl ArchoeraShell {
@@ -228,6 +231,7 @@ impl ArchoeraShell {
             idle_inhibitors: 0,
             idle_reason: None,
             needs_redraw: false,
+            frame_in_flight: false,
         }
     }
 
@@ -302,6 +306,7 @@ impl ArchoeraShell {
     /// 客户端提交（不会发生：渲染不派发客户端消息），标志会被重新置位。
     pub fn render_frame(&mut self) -> anyhow::Result<()> {
         self.needs_redraw = false;
+        self.frame_in_flight = true;
         tracing::trace!("合成一帧");
 
         if let Some(backend) = self.backend.as_mut() {
@@ -574,6 +579,11 @@ impl ArchoeraShell {
         self.needs_redraw
     }
 
+    /// DRM 帧已被 vblank 回收：允许下一次 `schedule_redraw` 立即合成。
+    pub fn note_frame_submitted(&mut self) {
+        self.frame_in_flight = false;
+    }
+
     /// 把「需要重绘」落到后端：
     /// - winit：请求一次窗口重绘，真正的合成在 `WinitEvent::Redraw` 回调里；
     /// - udev：没有重绘事件，直接同步合成一帧（由下一次 vblank 回收）。
@@ -583,6 +593,17 @@ impl ArchoeraShell {
         }
         // 熄屏期间不合成（udev 输出已暂停）：保持 dirty，亮屏时补一帧。
         if self.control.screen_supported() && !self.control.screen_enabled() {
+            return;
+        }
+
+        // udev：已有一帧在飞行中时只保留 dirty，由 vblank 合并成一次合成。
+        // 这是「一操作（点击/移动）就掉帧」的根因修复：输入事件可达上百 Hz，
+        // 此前每个事件都会触发一次全屏合成，帧率立刻垮掉。
+        #[cfg(feature = "udev")]
+        let is_udev = matches!(self.backend, Some(Backend::Udev(_)));
+        #[cfg(not(feature = "udev"))]
+        let is_udev = false;
+        if is_udev && self.frame_in_flight {
             return;
         }
         let space = &self.space;
