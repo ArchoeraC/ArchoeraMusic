@@ -57,6 +57,18 @@ class _RecordingOs implements SystemOsSession {
   int setOutputTransform(int transform) => 0;
 
   @override
+  List<OsDisplayOutput> displayOutputs() => const <OsDisplayOutput>[];
+
+  @override
+  int setDisplayOutputMode(int outputId, int index) => 0;
+
+  @override
+  int setDisplayOutputScale(int outputId, int scaleMilli) => 0;
+
+  @override
+  int setDisplayOutputTransform(int outputId, int transform) => 0;
+
+  @override
   Stream<int> get capabilities => const Stream.empty();
   @override
   Stream<int> get brightness => const Stream.empty();

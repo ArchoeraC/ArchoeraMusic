@@ -49,6 +49,12 @@ int32_t osSessionHibernate();
 int32_t osSessionSetOutputScale(int32_t scaleMilli);
 int32_t osSessionSetOutputMode(int32_t width, int32_t height);
 int32_t osSessionSetOutputTransform(int32_t transform);
+// 显示输出（per-output，协议 v5）：快照 + 精确设置（输出 id 来自 outputList）。
+int32_t osSessionOutputList(AplOsOutput* out, uint32_t max, uint32_t* count);
+int32_t osSessionOutputModes(uint32_t outputId, AplOsOutputMode* out, uint32_t max, uint32_t* count);
+int32_t osSessionSetOutputModeIndex(uint32_t outputId, uint32_t index);
+int32_t osSessionSetOutputScaleFor(uint32_t outputId, uint32_t scaleMilli);
+int32_t osSessionSetOutputTransformFor(uint32_t outputId, uint32_t transform);
 // 注入按键（屏幕键盘）：keycode 为 evdev 键码，pressed true=按下。
 int32_t osSessionKey(int32_t keycode, int32_t pressed);
 

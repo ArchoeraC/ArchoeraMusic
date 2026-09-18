@@ -4477,6 +4477,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get systemDisplayUnknown => 'Unknown';
 
   @override
+  String get systemDisplayPrimaryBadge => 'Primary';
+
+  @override
+  String get systemDisplayDisabled => 'Disabled';
+
+  @override
+  String get systemDisplayLoading => 'Reading display information…';
+
+  @override
+  String get systemDisplayNoOutputs => 'No display outputs detected';
+
+  @override
+  String get systemDisplayCustom => 'Custom…';
+
+  @override
+  String get systemDisplayCustomScale => 'Custom scale (%)';
+
+  @override
   String get systemStatusTitle => 'System status';
 
   @override

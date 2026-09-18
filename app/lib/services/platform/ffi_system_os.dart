@@ -44,12 +44,25 @@ class FfiSystemOsSession implements SystemOsSession {
   int setOutputScale(int scaleMilli) => _b.osSetOutputScale(scaleMilli);
 
   @override
-  int setOutputMode(int width, int height) =>
-      _b.osSetOutputMode(width, height);
+  int setOutputMode(int width, int height) => _b.osSetOutputMode(width, height);
 
   @override
-  int setOutputTransform(int transform) =>
-      _b.osSetOutputTransform(transform);
+  int setOutputTransform(int transform) => _b.osSetOutputTransform(transform);
+
+  @override
+  List<OsDisplayOutput> displayOutputs() => _b.osDisplayOutputs();
+
+  @override
+  int setDisplayOutputMode(int outputId, int index) =>
+      _b.osSetDisplayOutputMode(outputId, index);
+
+  @override
+  int setDisplayOutputScale(int outputId, int scaleMilli) =>
+      _b.osSetDisplayOutputScale(outputId, scaleMilli);
+
+  @override
+  int setDisplayOutputTransform(int outputId, int transform) =>
+      _b.osSetDisplayOutputTransform(outputId, transform);
 
   @override
   int key(int keycode, int state) => _b.osKey(keycode, state);

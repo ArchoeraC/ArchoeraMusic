@@ -7946,6 +7946,42 @@ abstract class AppLocalizations {
   /// **'未知'**
   String get systemDisplayUnknown;
 
+  /// No description provided for @systemDisplayPrimaryBadge.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'主输出'**
+  String get systemDisplayPrimaryBadge;
+
+  /// No description provided for @systemDisplayDisabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已关闭'**
+  String get systemDisplayDisabled;
+
+  /// No description provided for @systemDisplayLoading.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在读取显示信息…'**
+  String get systemDisplayLoading;
+
+  /// No description provided for @systemDisplayNoOutputs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未检测到显示输出'**
+  String get systemDisplayNoOutputs;
+
+  /// No description provided for @systemDisplayCustom.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义…'**
+  String get systemDisplayCustom;
+
+  /// No description provided for @systemDisplayCustomScale.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义缩放（%）'**
+  String get systemDisplayCustomScale;
+
   /// No description provided for @systemStatusTitle.
   ///
   /// In zh_CN, this message translates to:

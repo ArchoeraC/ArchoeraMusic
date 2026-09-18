@@ -4325,6 +4325,24 @@ class AppLocalizationsJa extends AppLocalizations {
   String get systemDisplayUnknown => '不明';
 
   @override
+  String get systemDisplayPrimaryBadge => '主输出';
+
+  @override
+  String get systemDisplayDisabled => '已关闭';
+
+  @override
+  String get systemDisplayLoading => '正在读取显示信息…';
+
+  @override
+  String get systemDisplayNoOutputs => '未检测到显示输出';
+
+  @override
+  String get systemDisplayCustom => '自定义…';
+
+  @override
+  String get systemDisplayCustomScale => '自定义缩放（%）';
+
+  @override
   String get systemStatusTitle => 'システム状態';
 
   @override

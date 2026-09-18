@@ -54,6 +54,7 @@ part 'settings_sections/settings_sections_storage.dart';
 part 'settings_sections/settings_sections_about.dart';
 part 'settings_sections/settings_sections_developer.dart';
 part 'settings_sections/settings_sections_system.dart';
+part 'settings_sections/settings_sections_display.dart';
 
 // ── 输出设备（引擎 list_sinks JSON → Dart 模型）──────────────────────
 

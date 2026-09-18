@@ -12,7 +12,7 @@
 //!  - **专用泵线程 + 事件 fd 唤醒**：所有 Wayland 调用（marshal/dispatch）都在泵
 //!    线程执行；Dart 线程只把请求压入队列并写 eventfd，避免 libwayland 的线程
 //!    安全问题。
-//!  - 手写接口与 `os/protocol/archoera-shell-v1.xml`（version 4）逐字段对应；
+//!  - 手写接口与 `os/protocol/archoera-shell-v1.xml`（version 5）逐字段对应；
 //!    事件/请求的 opcode 顺序必须与 XML 一致。
 
 #include "os_session.h"
@@ -35,6 +35,7 @@
 #include <cstdio>
 #include <cstring>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -45,8 +46,8 @@ namespace {
 using wl_display = struct wl_display;
 using wl_proxy = struct wl_proxy;
 
-// ── archoera_shell_v1（对齐 os/protocol/archoera-shell-v1.xml v4）──────
-constexpr uint32_t kInterfaceVersion = 4;
+// ── archoera_shell_v1（对齐 os/protocol/archoera-shell-v1.xml v5）──────
+constexpr uint32_t kInterfaceVersion = 5;
 
 // 请求 opcode（顺序即 XML 中 <request> 出现顺序）。
 enum Op : uint32_t {
@@ -61,6 +62,10 @@ enum Op : uint32_t {
     OP_SET_OUTPUT_SCALE,
     OP_SET_OUTPUT_MODE,
     OP_SET_OUTPUT_TRANSFORM,
+    // v5：per-output 精确设置（按 output_info 下发的 output id）。
+    OP_OUTPUT_SET_MODE,
+    OP_OUTPUT_SET_SCALE,
+    OP_OUTPUT_SET_TRANSFORM,
     OP_KEY,
 };
 
@@ -75,6 +80,11 @@ enum Ev : uint32_t {
     EV_POWER_KEY,
     EV_SCREEN_ENABLED_CHANGED,
     EV_OUTPUT_STATE,
+    // v5：per-output 描述（info/current/mode…/modes_end）。
+    EV_OUTPUT_INFO,
+    EV_OUTPUT_CURRENT,
+    EV_OUTPUT_MODE,
+    EV_OUTPUT_MODES_END,
 };
 
 constexpr uint32_t kMarshalFlagDestroy = 1;
@@ -91,6 +101,9 @@ const struct wl_message kRequests[] = {
     {"set_output_scale", "u", nullptr},
     {"set_output_mode", "uu", nullptr},
     {"set_output_transform", "u", nullptr},
+    {"output_set_mode", "uu", nullptr},
+    {"output_set_scale", "uu", nullptr},
+    {"output_set_transform", "uu", nullptr},
     {"key", "uu", nullptr},
 };
 
@@ -104,14 +117,18 @@ const struct wl_message kEvents[] = {
     {"power_key", "u", nullptr},
     {"screen_enabled_changed", "u", nullptr},
     {"output_state", "uuuuu", nullptr},
+    {"output_info", "usu", nullptr},
+    {"output_current", "uuuuuu", nullptr},
+    {"output_mode", "uuuuuu", nullptr},
+    {"output_modes_end", "uu", nullptr},
 };
 
 const struct wl_interface kShellInterface = {
     "archoera_shell_v1",
     static_cast<int>(kInterfaceVersion),
-    12,
+    15,
     kRequests,
-    9,
+    13,
     kEvents,
 };
 
@@ -209,6 +226,44 @@ uint32_t g_seen_name = 0;
 uint32_t g_seen_version = 0;
 bool g_seen = false;
 
+// 输出注册表（协议 v5）：由泵线程在 output_info/current/mode/modes_end 中写入，
+// Dart 线程经 outputList/outputModes 读取（快照式，不走事件回调）。
+struct OutputModeEntry {
+    uint32_t index = 0;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t refresh = 0;  // mHz
+    uint32_t flags = 0;    // protocol output_flag
+};
+struct OutputEntry {
+    uint32_t id = 0;
+    std::string name;
+    uint32_t flags = 0;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t scale_milli = 1000;
+    uint32_t transform = 0;
+    uint32_t refresh = 0;  // mHz
+    std::vector<OutputModeEntry> modes;
+};
+std::mutex g_outputs_mtx;  // 保护 g_outputs
+std::vector<OutputEntry> g_outputs;
+
+// 取（或新建）某 id 的条目；调用方须持有 g_outputs_mtx。
+OutputEntry& outputFor(uint32_t id) {
+    for (auto& o : g_outputs) {
+        if (o.id == id) return o;
+    }
+    g_outputs.push_back(OutputEntry{});
+    g_outputs.back().id = id;
+    return g_outputs.back();
+}
+
+void clearOutputs() {
+    std::lock_guard<std::mutex> lock(g_outputs_mtx);
+    g_outputs.clear();
+}
+
 // 请求队列（marshal 只在泵线程做）。
 struct Request {
     uint32_t op;
@@ -261,6 +316,43 @@ void on_output_state(void*, wl_proxy*, uint32_t width, uint32_t height, uint32_t
                           static_cast<int32_t>(refresh_millihz)));
 }
 
+void on_output_info(void*, wl_proxy*, uint32_t id, const char* name, uint32_t flags) {
+    std::lock_guard<std::mutex> lock(g_outputs_mtx);
+    OutputEntry& o = outputFor(id);
+    o.name = (name != nullptr) ? name : "";
+    o.flags = flags;
+}
+void on_output_current(void*, wl_proxy*, uint32_t id, uint32_t width, uint32_t height,
+                       uint32_t scale_milli, uint32_t transform, uint32_t refresh) {
+    std::lock_guard<std::mutex> lock(g_outputs_mtx);
+    OutputEntry& o = outputFor(id);
+    o.width = width;
+    o.height = height;
+    o.scale_milli = scale_milli;
+    o.transform = transform;
+    o.refresh = refresh;
+}
+void on_output_mode(void*, wl_proxy*, uint32_t id, uint32_t index, uint32_t width, uint32_t height,
+                    uint32_t refresh, uint32_t flags) {
+    std::lock_guard<std::mutex> lock(g_outputs_mtx);
+    OutputEntry& o = outputFor(id);
+    // 按事件里的 index 落位：该下标必须与合成器的模式表一致，
+    // 因为 output_set_mode 就是按同一下标寻址的。
+    if (index >= o.modes.size()) o.modes.resize(index + 1);
+    OutputModeEntry& m = o.modes[index];
+    m.index = index;
+    m.width = width;
+    m.height = height;
+    m.refresh = refresh;
+    m.flags = flags;
+}
+void on_output_modes_end(void*, wl_proxy*, uint32_t id, uint32_t count) {
+    std::lock_guard<std::mutex> lock(g_outputs_mtx);
+    OutputEntry& o = outputFor(id);
+    // count 是权威条数：清掉可能残留的旧尾项。
+    if (o.modes.size() > count) o.modes.resize(count);
+}
+
 struct ShellEvents {
     void (*capabilities)(void*, wl_proxy*, uint32_t);
     void (*brightness_changed)(void*, wl_proxy*, uint32_t);
@@ -271,12 +363,19 @@ struct ShellEvents {
     void (*power_key)(void*, wl_proxy*, uint32_t);
     void (*screen_enabled_changed)(void*, wl_proxy*, uint32_t);
     void (*output_state)(void*, wl_proxy*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+    void (*output_info)(void*, wl_proxy*, uint32_t, const char*, uint32_t);
+    void (*output_current)(void*, wl_proxy*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
+                           uint32_t);
+    void (*output_mode)(void*, wl_proxy*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
+                        uint32_t);
+    void (*output_modes_end)(void*, wl_proxy*, uint32_t, uint32_t);
 };
 
 const ShellEvents kShellEvents = {
-    on_capabilities, on_brightness, on_volume,    on_media_key,
-    on_battery,      on_session,    on_power_key, on_screen_enabled,
-    on_output_state,
+    on_capabilities,  on_brightness,     on_volume,      on_media_key,
+    on_battery,       on_session,        on_power_key,   on_screen_enabled,
+    on_output_state,  on_output_info,    on_output_current,
+    on_output_mode,   on_output_modes_end,
 };
 
 // ── registry 监听器（探测与正式连接共用）──────────────────────────
@@ -312,6 +411,9 @@ void sendRequest(const Request& r) {
             g_api->proxy_marshal_flags(g_shell, r.op, nullptr, version, flags, r.arg);
             break;
         case OP_SET_OUTPUT_MODE:
+        case OP_OUTPUT_SET_MODE:
+        case OP_OUTPUT_SET_SCALE:
+        case OP_OUTPUT_SET_TRANSFORM:
         case OP_KEY:
             g_api->proxy_marshal_flags(g_shell, r.op, nullptr, version, flags, r.arg, r.arg2);
             break;
@@ -398,6 +500,7 @@ void joinStaleLocked() {
 }
 
 void teardownLocked() {
+    clearOutputs();  // 连接重建后由 bind 重新下发
     if (g_thread != nullptr) {
         g_running.store(false);
         if (g_wake_fd >= 0) {
@@ -564,6 +667,78 @@ int32_t setOutputTransform(int32_t transform) {
 }
 int32_t key(int32_t keycode, bool pressed) {
     return enqueue(OP_KEY, static_cast<uint32_t>(std::max(0, keycode)), pressed ? 1u : 0u);
+}
+
+namespace {
+// 读取快照前确保会话连接已建立（与 enqueue 同策略：按需自动连接）。
+// 返回 OK 或负值错误。
+int32_t ensureConnected() {
+    if (!g_available.load()) return ERR_UNSUPPORTED;
+    std::lock_guard<std::mutex> lock(g_state_mtx);
+    if (g_running.load()) return OK;
+    return startLocked();
+}
+}  // namespace
+
+int32_t outputList(AplOsOutput* out, uint32_t max, uint32_t* count) {
+    if (out == nullptr || count == nullptr) return ERR_STATE;
+    *count = 0;
+    const int32_t rc = ensureConnected();
+    if (rc != OK) return rc;
+
+    std::lock_guard<std::mutex> lock(g_outputs_mtx);
+    *count = static_cast<uint32_t>(g_outputs.size());
+    const uint32_t n = std::min<uint32_t>(max, *count);
+    for (uint32_t i = 0; i < n; ++i) {
+        const OutputEntry& o = g_outputs[i];
+        AplOsOutput& dst = out[i];
+        std::memset(&dst, 0, sizeof(dst));
+        dst.id = o.id;
+        std::snprintf(dst.name, sizeof(dst.name), "%s", o.name.c_str());
+        dst.flags = o.flags;
+        dst.width = o.width;
+        dst.height = o.height;
+        dst.scale_milli = o.scale_milli;
+        dst.transform = o.transform;
+        dst.refresh_millihz = o.refresh;
+        dst.mode_count = static_cast<uint32_t>(o.modes.size());
+    }
+    return static_cast<int32_t>(*count);
+}
+
+int32_t outputModes(uint32_t outputId, AplOsOutputMode* out, uint32_t max, uint32_t* count) {
+    if (out == nullptr || count == nullptr) return ERR_STATE;
+    *count = 0;
+    const int32_t rc = ensureConnected();
+    if (rc != OK) return rc;
+
+    std::lock_guard<std::mutex> lock(g_outputs_mtx);
+    for (const OutputEntry& o : g_outputs) {
+        if (o.id != outputId) continue;
+        *count = static_cast<uint32_t>(o.modes.size());
+        const uint32_t n = std::min<uint32_t>(max, *count);
+        for (uint32_t i = 0; i < n; ++i) {
+            const OutputModeEntry& m = o.modes[i];
+            AplOsOutputMode& dst = out[i];
+            dst.index = m.index;
+            dst.width = m.width;
+            dst.height = m.height;
+            dst.refresh_millihz = m.refresh;
+            dst.flags = m.flags;
+        }
+        return static_cast<int32_t>(*count);
+    }
+    return ERR_STATE;  // 没有这个输出
+}
+
+int32_t setOutputModeIndex(uint32_t outputId, uint32_t index) {
+    return enqueue(OP_OUTPUT_SET_MODE, outputId, index);
+}
+int32_t setOutputScaleFor(uint32_t outputId, uint32_t scaleMilli) {
+    return enqueue(OP_OUTPUT_SET_SCALE, outputId, scaleMilli);
+}
+int32_t setOutputTransformFor(uint32_t outputId, uint32_t transform) {
+    return enqueue(OP_OUTPUT_SET_TRANSFORM, outputId, transform);
 }
 
 void shutdown() {

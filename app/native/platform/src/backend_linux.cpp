@@ -1322,6 +1322,22 @@ int32_t osSessionSetOutputMode(int32_t width, int32_t height) {
 int32_t osSessionSetOutputTransform(int32_t transform) {
     return os_session::setOutputTransform(transform);
 }
+int32_t osSessionOutputList(AplOsOutput* out, uint32_t max, uint32_t* count) {
+    return os_session::outputList(out, max, count);
+}
+int32_t osSessionOutputModes(uint32_t outputId, AplOsOutputMode* out, uint32_t max,
+                             uint32_t* count) {
+    return os_session::outputModes(outputId, out, max, count);
+}
+int32_t osSessionSetOutputModeIndex(uint32_t outputId, uint32_t index) {
+    return os_session::setOutputModeIndex(outputId, index);
+}
+int32_t osSessionSetOutputScaleFor(uint32_t outputId, uint32_t scaleMilli) {
+    return os_session::setOutputScaleFor(outputId, scaleMilli);
+}
+int32_t osSessionSetOutputTransformFor(uint32_t outputId, uint32_t transform) {
+    return os_session::setOutputTransformFor(outputId, transform);
+}
 int32_t osSessionKey(int32_t keycode, int32_t pressed) {
     return os_session::key(keycode, pressed != 0);
 }

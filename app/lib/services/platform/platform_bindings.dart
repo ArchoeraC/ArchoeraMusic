@@ -24,6 +24,7 @@ import '../native_lib_paths.dart';
 import 'live_install.dart';
 import 'net.dart';
 import 'system_media.dart';
+import 'system_os.dart';
 import 'system_status.dart';
 
 // ── 常量（对齐 archoera_platform.h）───────────────────────────────
@@ -38,6 +39,12 @@ const int aplCapPowerScreenState = 1 << 1;
 const int aplCapMediaSession = 1 << 2;
 const int aplCapMediaSeek = 1 << 3;
 const int aplCapMediaArtwork = 1 << 4;
+
+/// archoera_shell_v1 输出 / 模式标记位（对齐 APL_OS_OUTPUT_*）。
+const int aplOsOutputCurrent = 1 << 0;
+const int aplOsOutputPreferred = 1 << 1;
+const int aplOsOutputEnabled = 1 << 2;
+const int aplOsOutputPrimary = 1 << 3;
 const int aplCapWindowState = 1 << 5;
 const int aplCapAppInstance = 1 << 6;
 const int aplCapSystemAccent = 1 << 7;
@@ -194,6 +201,54 @@ final class AplEventPayload extends Union {
 
   /// ArchoeraOS 会话：主输出状态。
   external AplOsOutputPayload osOutput;
+}
+
+/// archoera_shell_v1 输出快照（对齐 AplOsOutput；字段顺序必须严格一致）。
+final class AplOsOutputFfi extends Struct {
+  @Uint32()
+  external int id;
+
+  @Array(64)
+  external Array<Uint8> name;
+
+  @Uint32()
+  external int flags;
+
+  @Uint32()
+  external int width;
+
+  @Uint32()
+  external int height;
+
+  @Uint32()
+  external int scaleMilli;
+
+  @Uint32()
+  external int transform;
+
+  @Uint32()
+  external int refreshMillihz;
+
+  @Uint32()
+  external int modeCount;
+}
+
+/// archoera_shell_v1 输出模式（对齐 AplOsOutputMode）。
+final class AplOsOutputModeFfi extends Struct {
+  @Uint32()
+  external int index;
+
+  @Uint32()
+  external int width;
+
+  @Uint32()
+  external int height;
+
+  @Uint32()
+  external int refreshMillihz;
+
+  @Uint32()
+  external int flags;
 }
 
 /// 系统资源快照（对齐 AplSysStats）。
@@ -451,6 +506,32 @@ typedef _AplOsSetEventsD = int Function(int on);
 typedef _AplOsSetPercentD = int Function(int percent);
 typedef _AplOsSetScreenD = int Function(int on);
 typedef _AplOsSetModeD = int Function(int width, int height);
+typedef _AplOsOutputListC =
+    Int32 Function(
+      Pointer<AplOsOutputFfi> out,
+      Uint32 max,
+      Pointer<Uint32> count,
+    );
+typedef _AplOsOutputListD =
+    int Function(Pointer<AplOsOutputFfi> out, int max, Pointer<Uint32> count);
+typedef _AplOsOutputModesC =
+    Int32 Function(
+      Uint32 outputId,
+      Pointer<AplOsOutputModeFfi> out,
+      Uint32 max,
+      Pointer<Uint32> count,
+    );
+typedef _AplOsOutputModesD =
+    int Function(
+      int outputId,
+      Pointer<AplOsOutputModeFfi> out,
+      int max,
+      Pointer<Uint32> count,
+    );
+typedef _AplOsOutputSetModeC = Int32 Function(Uint32 outputId, Uint32 index);
+typedef _AplOsOutputSetModeD = int Function(int outputId, int index);
+typedef _AplOsOutputSetUintC = Int32 Function(Uint32 outputId, Uint32 value);
+typedef _AplOsOutputSetUintD = int Function(int outputId, int value);
 typedef _AplOsKeyD = int Function(int keycode, int state);
 typedef _AplOsVoidD = int Function();
 typedef _AplMediaTrackD = int Function(Pointer<AplTrackMetaFfi> track);
@@ -679,6 +760,32 @@ class PlatformBindings {
           'apl_os_set_output_transform',
         ),
       ),
+      // per-output（协议 v5）：缺失时显示设置退回旧的主输出接口。
+      _osOutputList = _try(
+        () => lib.lookupFunction<_AplOsOutputListC, _AplOsOutputListD>(
+          'apl_os_output_list',
+        ),
+      ),
+      _osOutputModes = _try(
+        () => lib.lookupFunction<_AplOsOutputModesC, _AplOsOutputModesD>(
+          'apl_os_output_modes',
+        ),
+      ),
+      _osOutputSetMode = _try(
+        () => lib.lookupFunction<_AplOsOutputSetModeC, _AplOsOutputSetModeD>(
+          'apl_os_output_set_mode',
+        ),
+      ),
+      _osOutputSetScale = _try(
+        () => lib.lookupFunction<_AplOsOutputSetUintC, _AplOsOutputSetUintD>(
+          'apl_os_output_set_scale',
+        ),
+      ),
+      _osOutputSetTransform = _try(
+        () => lib.lookupFunction<_AplOsOutputSetUintC, _AplOsOutputSetUintD>(
+          'apl_os_output_set_transform',
+        ),
+      ),
       _osKey = _try(
         () => lib.lookupFunction<_AplOsKeyC, _AplOsKeyD>('apl_os_key'),
       ),
@@ -816,6 +923,11 @@ class PlatformBindings {
   final _AplOsSetPercentD? _osSetOutputScale;
   final _AplOsSetModeD? _osSetOutputMode;
   final _AplOsSetPercentD? _osSetOutputTransform;
+  final _AplOsOutputListD? _osOutputList;
+  final _AplOsOutputModesD? _osOutputModes;
+  final _AplOsOutputSetModeD? _osOutputSetMode;
+  final _AplOsOutputSetUintD? _osOutputSetScale;
+  final _AplOsOutputSetUintD? _osOutputSetTransform;
   final _AplOsKeyD? _osKey;
   final _AplSysStatsD? _sysStats;
   final _AplBtStateD? _btState;
@@ -877,6 +989,76 @@ class PlatformBindings {
       _osSetOutputMode?.call(width, height) ?? aplErrUnsupported;
   int osSetOutputTransform(int transform) =>
       _osSetOutputTransform?.call(transform) ?? aplErrUnsupported;
+
+  /// per-output 显示设置符号是否可用（协议 v5 桥接）。
+  bool get osDisplayOutputsAvailable => _osOutputList != null;
+
+  /// 读取全部输出快照（含完整模式列表）；不可用或失败返回空列表。
+  List<OsDisplayOutput> osDisplayOutputs() {
+    final fn = _osOutputList;
+    if (fn == null) return const <OsDisplayOutput>[];
+    const maxOutputs = 16;
+    final out = calloc<AplOsOutputFfi>(maxOutputs);
+    final count = calloc<Uint32>();
+    try {
+      if (fn(out, maxOutputs, count) < 0) return const <OsDisplayOutput>[];
+      final n = count.value.clamp(0, maxOutputs);
+      return <OsDisplayOutput>[
+        for (var i = 0; i < n; i++)
+          OsDisplayOutput(
+            id: out[i].id,
+            name: _cstr(out[i].name),
+            enabled: out[i].flags & aplOsOutputEnabled != 0,
+            primary: out[i].flags & aplOsOutputPrimary != 0,
+            width: out[i].width,
+            height: out[i].height,
+            scaleMilli: out[i].scaleMilli,
+            transform: out[i].transform,
+            refreshMillihz: out[i].refreshMillihz,
+            modes: _readOutputModes(out[i].id, out[i].modeCount),
+          ),
+      ];
+    } finally {
+      calloc.free(out);
+      calloc.free(count);
+    }
+  }
+
+  /// 某个输出的模式列表；失败返回空列表。
+  List<OsDisplayMode> _readOutputModes(int outputId, int hint) {
+    final fn = _osOutputModes;
+    if (fn == null) return const <OsDisplayMode>[];
+    final cap = hint > 64 ? hint : 64;
+    final out = calloc<AplOsOutputModeFfi>(cap);
+    final count = calloc<Uint32>();
+    try {
+      if (fn(outputId, out, cap, count) < 0) {
+        return const <OsDisplayMode>[];
+      }
+      final n = count.value.clamp(0, cap);
+      return <OsDisplayMode>[
+        for (var i = 0; i < n; i++)
+          OsDisplayMode(
+            index: out[i].index,
+            width: out[i].width,
+            height: out[i].height,
+            refreshMillihz: out[i].refreshMillihz,
+            isCurrent: out[i].flags & aplOsOutputCurrent != 0,
+            isPreferred: out[i].flags & aplOsOutputPreferred != 0,
+          ),
+      ];
+    } finally {
+      calloc.free(out);
+      calloc.free(count);
+    }
+  }
+
+  int osSetDisplayOutputMode(int outputId, int index) =>
+      _osOutputSetMode?.call(outputId, index) ?? aplErrUnsupported;
+  int osSetDisplayOutputScale(int outputId, int scaleMilli) =>
+      _osOutputSetScale?.call(outputId, scaleMilli) ?? aplErrUnsupported;
+  int osSetDisplayOutputTransform(int outputId, int transform) =>
+      _osOutputSetTransform?.call(outputId, transform) ?? aplErrUnsupported;
   int osKey(int keycode, int state) =>
       _osKey?.call(keycode, state) ?? aplErrUnsupported;
 
@@ -908,6 +1090,16 @@ class PlatformBindings {
   }
 
   // ── Live 安装向导（apl_live_*）────────────────────────────────────
+
+  /// 读取 C ABI 里的定长 NUL 结尾字符串（AplOsOutput.name）。
+  String _cstr(Array<Uint8> arr) {
+    final bytes = arr.elements;
+    var end = 0;
+    while (end < bytes.length && bytes[end] != 0) {
+      end++;
+    }
+    return utf8.decode(bytes.sublist(0, end), allowMalformed: true);
+  }
 
   String _liveStr(AplStringFfi v) {
     final data = v.data;

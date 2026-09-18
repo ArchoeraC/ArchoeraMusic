@@ -48,6 +48,13 @@ int32_t osSessionSetOutputScale(int32_t) { return ERR_UNSUPPORTED; }
 int32_t osSessionSetOutputMode(int32_t, int32_t) { return ERR_UNSUPPORTED; }
 int32_t osSessionSetOutputTransform(int32_t) { return ERR_UNSUPPORTED; }
 int32_t osSessionKey(int32_t, int32_t) { return ERR_UNSUPPORTED; }
+int32_t osSessionOutputList(AplOsOutput*, uint32_t, uint32_t*) { return ERR_UNSUPPORTED; }
+int32_t osSessionOutputModes(uint32_t, AplOsOutputMode*, uint32_t, uint32_t*) {
+    return ERR_UNSUPPORTED;
+}
+int32_t osSessionSetOutputModeIndex(uint32_t, uint32_t) { return ERR_UNSUPPORTED; }
+int32_t osSessionSetOutputScaleFor(uint32_t, uint32_t) { return ERR_UNSUPPORTED; }
+int32_t osSessionSetOutputTransformFor(uint32_t, uint32_t) { return ERR_UNSUPPORTED; }
 
 }  // namespace archoera
 

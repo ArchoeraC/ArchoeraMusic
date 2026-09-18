@@ -155,6 +155,27 @@ int32_t apl_os_set_output_transform(int32_t transform) {
     return archoera::osSessionSetOutputTransform(transform);
 }
 
+int32_t apl_os_output_list(AplOsOutput* out, uint32_t max, uint32_t* count) {
+    return archoera::osSessionOutputList(out, max, count);
+}
+
+int32_t apl_os_output_modes(uint32_t output_id, AplOsOutputMode* out, uint32_t max,
+                            uint32_t* count) {
+    return archoera::osSessionOutputModes(output_id, out, max, count);
+}
+
+int32_t apl_os_output_set_mode(uint32_t output_id, uint32_t index) {
+    return archoera::osSessionSetOutputModeIndex(output_id, index);
+}
+
+int32_t apl_os_output_set_scale(uint32_t output_id, uint32_t scale_milli) {
+    return archoera::osSessionSetOutputScaleFor(output_id, scale_milli);
+}
+
+int32_t apl_os_output_set_transform(uint32_t output_id, uint32_t transform) {
+    return archoera::osSessionSetOutputTransformFor(output_id, transform);
+}
+
 int32_t apl_os_key(int32_t keycode, int32_t state) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     return archoera::osSessionKey(keycode, state);

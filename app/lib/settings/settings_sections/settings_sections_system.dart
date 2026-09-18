@@ -201,56 +201,9 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
       );
     }
 
-    // 显示（输出分辨率 / 缩放 / 旋转；仅 udev 后端置位 output 能力）。
-    final output = ref.watch(osOutputProvider);
+    // 显示（per-output 分辨率 / 缩放 / 旋转；仅 udev 后端置位 output 能力）。
     if (osCaps & OsCapability.output != 0) {
-      final scalePercent = (output?.scaleMilli ?? 1000) ~/ 10;
-      final rotation = output?.rotationDegrees ?? 0;
-      final mode = (output?.width ?? 0, output?.height ?? 0);
-      final modeLabel = output == null
-          ? l10n.systemDisplayUnknown
-          : '${output.width}×${output.height} · '
-                '${(output.refreshMillihz / 1000).toStringAsFixed(1)} Hz';
-      add(
-        SettingSection(
-          title: l10n.systemDisplayTitle,
-          children: [
-            SettingTile(
-              icon: EtaIcons.monitorOutline,
-              title: l10n.systemStatusOutput,
-              subtitle: modeLabel,
-              trailing: const SizedBox.shrink(),
-            ),
-            _SystemChoiceRow<int>(
-              label: l10n.systemDisplayScale,
-              options: const [100, 125, 150, 175, 200],
-              selected: scalePercent,
-              labelOf: (v) => '$v%',
-              onSelected: (v) => controller.setOutputScale(v * 10),
-            ),
-            _SystemChoiceRow<(int, int)>(
-              label: l10n.systemDisplayMode,
-              options: const [
-                (0, 0),
-                (1280, 720),
-                (1280, 800),
-                (1920, 1080),
-              ],
-              selected: mode,
-              labelOf: (v) =>
-                  v.$1 == 0 ? l10n.systemDisplayAuto : '${v.$1}×${v.$2}',
-              onSelected: (v) => controller.setOutputMode(v.$1, v.$2),
-            ),
-            _SystemChoiceRow<int>(
-              label: l10n.systemDisplayRotation,
-              options: const [0, 90, 180, 270],
-              selected: rotation,
-              labelOf: (v) => '$v°',
-              onSelected: (v) => controller.setOutputTransform(_transformCode(v)),
-            ),
-          ],
-        ),
-      );
+      add(const DisplaySettingsSection());
     }
 
     // 只读的系统状态 / 资源集中在「系统监视器」弹窗中。
@@ -296,52 +249,3 @@ int _transformCode(int degrees) => switch (degrees) {
   270 => 3,
   _ => 0,
 };
-
-/// 一行「标签 + 选项胶囊」（用于显示设置的缩放/分辨率/旋转）。
-class _SystemChoiceRow<T> extends StatelessWidget {
-  const _SystemChoiceRow({
-    required this.label,
-    required this.options,
-    required this.selected,
-    required this.labelOf,
-    required this.onSelected,
-  });
-
-  final String label;
-  final List<T> options;
-  final T selected;
-  final String Function(T) labelOf;
-  final ValueChanged<T> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final option in options)
-                ChoiceChip(
-                  label: Text(labelOf(option)),
-                  selected: option == selected,
-                  onSelected: (_) => onSelected(option),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}

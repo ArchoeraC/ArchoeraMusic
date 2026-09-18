@@ -66,6 +66,104 @@ class OsOutputState {
   };
 }
 
+/// 一个显示输出的可用模式（对齐协议 `output_mode`）。
+///
+/// [index] 是该输出模式表里的下标，设置时原样交给
+/// [SystemOsSession.setDisplayOutputMode]。
+class OsDisplayMode {
+  const OsDisplayMode({
+    required this.index,
+    required this.width,
+    required this.height,
+    required this.refreshMillihz,
+    required this.isCurrent,
+    required this.isPreferred,
+  });
+
+  final int index;
+  final int width;
+  final int height;
+
+  /// 刷新率 × 1000（165000 = 165.00Hz）。
+  final int refreshMillihz;
+
+  /// 该模式正在使用中。
+  final bool isCurrent;
+
+  /// 显示器首选模式。
+  final bool isPreferred;
+
+  double get refreshHz => refreshMillihz / 1000;
+
+  /// 下拉列表文案：`2560×1600 @165.00 Hz`。
+  String get label =>
+      '$width×$height @${refreshHz.toStringAsFixed(refreshHz % 1 == 0 ? 0 : 2)} Hz';
+}
+
+/// 一个显示输出（对齐协议 `output_info` + `output_current` + 模式表）。
+class OsDisplayOutput {
+  const OsDisplayOutput({
+    required this.id,
+    required this.name,
+    required this.enabled,
+    required this.primary,
+    required this.width,
+    required this.height,
+    required this.scaleMilli,
+    required this.transform,
+    required this.refreshMillihz,
+    required this.modes,
+  });
+
+  /// 协议输出 id（原样传给设置函数）。
+  final int id;
+
+  /// 连接器名（如 `eDP-1` / `HDMI-A-1`）。
+  final String name;
+
+  final bool enabled;
+  final bool primary;
+
+  /// 当前模式。
+  final int width;
+  final int height;
+  final int refreshMillihz;
+
+  /// 当前缩放千分数（1500 = 150%）。
+  final int scaleMilli;
+
+  /// 当前变换（0..7，与 wl_output.transform 一致）。
+  final int transform;
+
+  /// 该输出的完整模式列表（下拉列表数据源）。
+  final List<OsDisplayMode> modes;
+
+  double get scale => scaleMilli / 1000;
+
+  int get rotationDegrees => switch (transform) {
+    1 || 5 => 90,
+    2 || 6 => 180,
+    3 || 7 => 270,
+    _ => 0,
+  };
+
+  /// 当前模式在 [modes] 中的下标（找不到返回 null）。
+  int? get currentModeIndex {
+    for (final m in modes) {
+      if (m.isCurrent) return m.index;
+    }
+    return null;
+  }
+
+  /// 当前模式文案；模式表里没有对应项时回退到当前状态字段。
+  String get currentModeLabel {
+    for (final m in modes) {
+      if (m.isCurrent) return m.label;
+    }
+    return '$width×$height @${(refreshMillihz / 1000).toStringAsFixed(1)} Hz';
+  }
+}
+
 /// 电池快照。
 class OsBatteryState {
   const OsBatteryState({
@@ -103,6 +201,21 @@ abstract interface class SystemOsSession {
   int setOutputScale(int scaleMilli);
   int setOutputMode(int width, int height);
   int setOutputTransform(int transform);
+
+  /// per-output 显示快照（协议 v5；含每个输出的完整模式列表）。
+  ///
+  /// 快照式读取：显示设置页打开/点刷新时调用一次即可，不依赖常驻事件订阅。
+  /// 未接入 archoera-shell 或桥接为旧版（无 v5 符号）时返回空列表。
+  List<OsDisplayOutput> displayOutputs();
+
+  /// 按索引切换某个输出的模式（[index] 来自 [OsDisplayOutput.modes]）。
+  int setDisplayOutputMode(int outputId, int index);
+
+  /// 设置某个输出的缩放（千分数；合成器夹取到 100%-400%）。
+  int setDisplayOutputScale(int outputId, int scaleMilli);
+
+  /// 设置某个输出的变换（旋转/镜像；见 [OsDisplayOutput.transform]）。
+  int setDisplayOutputTransform(int outputId, int transform);
 
   /// 注入一个按键（屏幕键盘 → 合成器 → 焦点客户端/输入法）。
   ///
@@ -168,6 +281,18 @@ class NoopSystemOsSession implements SystemOsSession {
 
   @override
   int setOutputTransform(int transform) => -1;
+
+  @override
+  List<OsDisplayOutput> displayOutputs() => const <OsDisplayOutput>[];
+
+  @override
+  int setDisplayOutputMode(int outputId, int index) => -1;
+
+  @override
+  int setDisplayOutputScale(int outputId, int scaleMilli) => -1;
+
+  @override
+  int setDisplayOutputTransform(int outputId, int transform) => -1;
 
   @override
   int key(int keycode, int state) => -1;

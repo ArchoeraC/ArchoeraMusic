@@ -47,6 +47,15 @@ int32_t setOutputScale(int32_t scaleMilli);
 int32_t setOutputMode(int32_t width, int32_t height);
 int32_t setOutputTransform(int32_t transform);
 
+// 显示输出（per-output，协议 v5）：快照式读取 + 精确设置。
+// outputList/outputModes 为只读快照（必要时自动建立会话连接），
+// 设置函数按 output_id 精确作用于该输出。
+int32_t outputList(AplOsOutput* out, uint32_t max, uint32_t* count);
+int32_t outputModes(uint32_t outputId, AplOsOutputMode* out, uint32_t max, uint32_t* count);
+int32_t setOutputModeIndex(uint32_t outputId, uint32_t index);
+int32_t setOutputScaleFor(uint32_t outputId, uint32_t scaleMilli);
+int32_t setOutputTransformFor(uint32_t outputId, uint32_t transform);
+
 // 注入按键（屏幕键盘；仅合成器置位 keyboard 能力时生效）。
 // keycode 为 evdev 键码（KEY_*），pressed true=按下 false=释放。
 int32_t key(int32_t keycode, bool pressed);

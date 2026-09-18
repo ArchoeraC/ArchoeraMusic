@@ -121,6 +121,54 @@ APL_API int32_t apl_os_set_output_scale(int32_t scale_milli); /* 千分数，如
 APL_API int32_t apl_os_set_output_mode(int32_t width, int32_t height); /* 0,0 = 首选模式 */
 APL_API int32_t apl_os_set_output_transform(int32_t transform); /* 0..7，见 wl_output.transform */
 
+/* ── 显示输出（per-output；协议 v5；只读快照 + 精确设置）──────────────
+ * 快照式接口（同显卡/蓝牙）：显示设置页打开或用户刷新时调用一次即可，不要求
+ * 常驻事件订阅；仅在运行于 archoera-shell 且合成器置位 output 能力位时有效，
+ * 否则返回 APL_ERR_UNSUPPORTED / 空列表。
+ *
+ * 旧的主输出接口（apl_os_set_output_*）保留，作用于主输出；新代码应改用下面
+ * 的 per-output 接口，以获得「分辨率 × 刷新率」完整列表与多显示器分别设置。 */
+
+/* 输出 / 模式标记位（数值与协议 output_flag 一致，可直接按位判断）。 */
+#define APL_OS_OUTPUT_CURRENT   (1u << 0) /* 该模式是当前使用中的模式（output_modes） */
+#define APL_OS_OUTPUT_PREFERRED (1u << 1) /* 该模式是显示器首选模式（output_modes） */
+#define APL_OS_OUTPUT_ENABLED   (1u << 2) /* 该输出已启用（output_list） */
+#define APL_OS_OUTPUT_PRIMARY   (1u << 3) /* 该输出是主输出（output_list） */
+
+typedef struct AplOsOutput {
+    uint32_t id;              /* 输出 id：原样传给 apl_os_output_set_* 与 apl_os_output_modes */
+    char name[64];            /* 连接器名（如 eDP-1 / HDMI-A-1 / Virtual-1），NUL 结尾 */
+    uint32_t flags;           /* APL_OS_OUTPUT_ENABLED / APL_OS_OUTPUT_PRIMARY */
+    uint32_t width;           /* 当前模式宽（物理像素） */
+    uint32_t height;          /* 当前模式高 */
+    uint32_t scale_milli;     /* 当前缩放 ×1000（1500 = 150%） */
+    uint32_t transform;       /* 当前变换 0..7（见 wl_output.transform） */
+    uint32_t refresh_millihz; /* 当前刷新率 ×1000 */
+    uint32_t mode_count;      /* 可用模式数量（供下拉列表预分配） */
+} AplOsOutput;
+
+typedef struct AplOsOutputMode {
+    uint32_t index;           /* 模式下标：原样传给 apl_os_output_set_mode */
+    uint32_t width;
+    uint32_t height;
+    uint32_t refresh_millihz; /* 刷新率 ×1000（165000 = 165.00Hz） */
+    uint32_t flags;           /* APL_OS_OUTPUT_CURRENT / APL_OS_OUTPUT_PREFERRED */
+} AplOsOutputMode;
+
+/* 列出全部输出；out 由调用方分配，max 为容量。成功返回输出个数并写 *count
+ * （max 不足时只填前 max 项，*count 仍是完整个数）；未接入返回负值。 */
+APL_API int32_t apl_os_output_list(AplOsOutput *out, uint32_t max, uint32_t *count);
+
+/* 列出某个输出的全部模式（下拉列表数据源）。语义同 apl_os_output_list；
+ * output_id 不存在时返回负值。 */
+APL_API int32_t apl_os_output_modes(uint32_t output_id, AplOsOutputMode *out, uint32_t max,
+                                    uint32_t *count);
+
+/* per-output 设置（仅 output 能力位可用时生效；越界/不存在的输出被静默忽略）。 */
+APL_API int32_t apl_os_output_set_mode(uint32_t output_id, uint32_t index);
+APL_API int32_t apl_os_output_set_scale(uint32_t output_id, uint32_t scale_milli);
+APL_API int32_t apl_os_output_set_transform(uint32_t output_id, uint32_t transform);
+
 /* 注入一个按键（屏幕键盘 → 合成器 → 焦点客户端/输入法）。
  * keycode 为 evdev 键码（KEY_*，如 KEY_A=30），并非 XKB keycode；state 0=释放 1=按下。
  * 合成器按物理键盘路径处理，输入法（fcitx5）可正常消费；仅 archoera_shell_v1
