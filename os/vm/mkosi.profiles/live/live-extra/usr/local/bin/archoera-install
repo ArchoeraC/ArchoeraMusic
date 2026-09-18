@@ -1,22 +1,37 @@
 #!/bin/bash
-# ArchoeraOS 安装器（Live → 目标磁盘）。
+# ArchoeraOS 安装器 v2（Live → 目标磁盘）。
 #
-#   archoera-install <目标磁盘，如 /dev/vda>
+# 用法（由安装向导/桥接经 systemd 启动，建议不要手工调用）：
+#   archoera-install                 # 读 /run/archoera-install/plan 与 secrets
+#   archoera-install <磁盘>          # 兼容旧用法：整盘擦除 + ext4（不加密）
 #
-# 行为：整盘擦除安装（GPT：512M ESP + 剩余 root/ext4）→ 格式化 → 复制 Live 系统
-#      （只读层 + 本次会话改动）→ 生成 loader 条目（写入目标 root 的 PARTUUID，
-#      去掉 Live 专用内核参数）→ 写 fstab / 重置 machine-id → 完成。
+# 计划文件 /run/archoera-install/plan（key=value，键可省，走默认）：
+#   disk=/dev/nvme0n1      目标磁盘（必填，兼容旧用法时来自命令行）
+#   hostname=archoera      主机名
+#   username=archoera      登录用户名（与镜像默认一致时不做改名）
+#   locale=zh_CN.UTF-8     系统语言（镜像内已生成 en_US.UTF-8 / zh_CN.UTF-8）
+#   timezone=Asia/Shanghai 时区（/usr/share/zoneinfo 下的名字）
+#   keymap=us              控制台键盘布局（/etc/vconsole.conf）
+#   fs=ext4|btrfs          根文件系统
+#   swap=none|file         交换：无 / 交换文件（btrfs 上不支持 file）
+#   encrypt=0|1            整盘 root 分区用 LUKS2 加密
+#   autologin=0|1          是否保持 tty1 自动登录进 kiosk（默认 1）
 #
-# 进度：写 /run/archoera-install/{step,percent,message,done,failed}，
-#       供安装向导轮询（目录由 tmpfiles 预建并归属 kiosk 用户）。
+# 口令文件 /run/archoera-install/secrets（0600，由向导写入，绝不走命令行）：
+#   luks_passphrase=...    encrypt=1 时必填
+#   user_password=...      留空表示不设密码（kiosk 自动登录本就不需要）
+#   root_password=...      留空保持 root 锁定
+#
+# 进度：写 /run/archoera-install/{percent,message,done,failed}（供向导轮询）。
 set -euo pipefail
 
-DISK="${1:?用法: archoera-install <目标磁盘>}"
 STATE=/run/archoera-install
 TARGET=/mnt/archoera
+PLAN="$STATE/plan"
+SECRETS="$STATE/secrets"
 mkdir -p "$STATE"
 
-step() { # step <百分比> <说明>
+step() {
     printf '%s\n' "$2" > "$STATE/message"
     printf '%s\n' "$1" > "$STATE/percent"
     echo "[archoera-install] $1% — $2"
@@ -27,7 +42,62 @@ fail() {
     exit 1
 }
 
+# ── 1) 读取计划 ────────────────────────────────────────────────────
+DISK=""
+HOSTNAME_="archoera"
+USERNAME="archoera"
+LOCALE_="en_US.UTF-8"
+TIMEZONE="UTC"
+KEYMAP="us"
+FS="ext4"
+SWAP="none"
+ENCRYPT=0
+AUTOLOGIN=1
+LUKS_PASS=""
+USER_PASS=""
+ROOT_PASS=""
+
+read_kv() { # read_kv <文件> <变量名>
+    local file="$1" key="$2"
+    [ -f "$file" ] || return 0
+    local line
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            "$key="*) printf '%s' "${line#"$key"=}" ; return 0 ;;
+        esac
+    done < "$file"
+}
+
+if [ -f "$PLAN" ]; then
+    DISK="$(read_kv "$PLAN" disk)"
+    HOSTNAME_="$(read_kv "$PLAN" hostname)";   HOSTNAME_="${HOSTNAME_:-archoera}"
+    USERNAME="$(read_kv "$PLAN" username)";    USERNAME="${USERNAME:-archoera}"
+    LOCALE_="$(read_kv "$PLAN" locale)";       LOCALE_="${LOCALE_:-en_US.UTF-8}"
+    TIMEZONE="$(read_kv "$PLAN" timezone)";    TIMEZONE="${TIMEZONE:-UTC}"
+    KEYMAP="$(read_kv "$PLAN" keymap)";        KEYMAP="${KEYMAP:-us}"
+    FS="$(read_kv "$PLAN" fs)";                FS="${FS:-ext4}"
+    SWAP="$(read_kv "$PLAN" swap)";            SWAP="${SWAP:-none}"
+    ENCRYPT="$(read_kv "$PLAN" encrypt)";      ENCRYPT="${ENCRYPT:-0}"
+    AUTOLOGIN="$(read_kv "$PLAN" autologin)";  AUTOLOGIN="${AUTOLOGIN:-1}"
+    LUKS_PASS="$(read_kv "$SECRETS" luks_passphrase)"
+    USER_PASS="$(read_kv "$SECRETS" user_password)"
+    ROOT_PASS="$(read_kv "$SECRETS" root_password)"
+else
+    # 兼容旧用法：archoera-install <磁盘>
+    DISK="${1:-}"
+fi
+
+[ -n "$DISK" ] || fail "计划里缺少 disk=，且命令行也没给目标磁盘"
 [ -b "$DISK" ] || fail "不是块设备：$DISK"
+case "$FS" in ext4|btrfs) ;; *) fail "不支持的文件系统：$FS（可选 ext4 / btrfs）" ;; esac
+case "$SWAP" in none|file) ;; *) fail "不支持的 swap：$SWAP（可选 none / file）" ;; esac
+case "$ENCRYPT" in 0|1) ;; *) fail "encrypt 只能是 0 或 1" ;; esac
+if [ "$ENCRYPT" = "1" ] && [ -z "$LUKS_PASS" ]; then
+    fail "要求加密但 secrets 里没有 luks_passphrase"
+fi
+if [ "$SWAP" = "file" ] && [ "$FS" = "btrfs" ]; then
+    fail "btrfs 上暂不支持交换文件（请选 swap=none，或改用 ext4）"
+fi
 
 # 目标盘分区名：/dev/vda → /dev/vda1；/dev/nvme0n1 → /dev/nvme0n1p1
 case "$DISK" in
@@ -35,7 +105,9 @@ case "$DISK" in
     *)      PART_PREFIX="$DISK" ;;
 esac
 ESP="${PART_PREFIX}1"
-ROOT="${PART_PREFIX}2"
+ROOTPART="${PART_PREFIX}2"
+MAPPER="cryptroot"
+ROOTDEV="$ROOTPART"
 
 # 安全检查：不允许把 Live 自身所在磁盘作为目标。
 LIVE_SRC="$(findmnt -n -o SOURCE / | sed 's/\[.*//')"
@@ -43,52 +115,110 @@ if [ -n "$LIVE_SRC" ] && [ "$(lsblk -no PKNAME "$LIVE_SRC" 2>/dev/null | head -1
     fail "目标磁盘正是当前 Live 介质：$DISK"
 fi
 
-step 3 "创建分区表（GPT：ESP + root）"
+cleanup() {
+    umount "$TARGET/boot" 2>/dev/null || true
+    umount "$TARGET" 2>/dev/null || true
+    if [ "$ENCRYPT" = "1" ]; then cryptsetup close "$MAPPER" 2>/dev/null || true; fi
+}
+trap cleanup EXIT
+
+# ── 1b) 仅列出候选磁盘（向导用；不修改任何东西）──────────────────────
+if [ "${1:-}" = "--list" ]; then
+    live_src="$(findmnt -n -o SOURCE / | sed 's/\[.*//')"
+    live_disk="$(lsblk -no PKNAME "$live_src" 2>/dev/null | head -1)"
+    {
+        echo "# name|size_bytes|model|tran|is_live"
+        while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            case "$name" in loop*|zram*|sr*|ram*|dm-*|md*) continue ;; esac
+            size="$(lsblk -bdno SIZE "/dev/$name" 2>/dev/null | head -1)"; [ -n "$size" ] || size=0
+            model="$(lsblk -dno MODEL "/dev/$name" 2>/dev/null | head -1 | tr -d '|')"
+            tran="$(lsblk -dno TRAN "/dev/$name" 2>/dev/null | head -1)"
+            live=0; [ "$name" = "$live_disk" ] && live=1
+            printf '%s|%s|%s|%s|%s\n' "$name" "$size" "$model" "$tran" "$live"
+        done < <(lsblk -dno NAME 2>/dev/null)
+    } > "$STATE/devices"
+    cat "$STATE/devices"
+    exit 0
+fi
+
+# ── 2) 分区 ────────────────────────────────────────────────────────
+step 3 "创建分区表（GPT：ESP 1G + root）"
 wipefs -a "$DISK"
 sfdisk --wipe always "$DISK" >/dev/null <<EOF
 label: gpt
-name=ESP, size=512M, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+name=ESP, size=1G, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
 name=ArchoeraOS, type=4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709
 EOF
-# 重读分区表（parted 未装；util-linux 的 blockdev + udevadm 即可）。
 blockdev --rereadpt "$DISK" 2>/dev/null || true
 udevadm settle || true
+[ -b "$ESP" ] || fail "ESP 分区未出现：$ESP"
+[ -b "$ROOTPART" ] || fail "root 分区未出现：$ROOTPART"
 
-step 12 "格式化分区"
+# ── 3) 加密（可选）与格式化 ────────────────────────────────────────
+if [ "$ENCRYPT" = "1" ]; then
+    step 8 "创建 LUKS2 容器（argon2id）"
+    printf '%s' "$LUKS_PASS" | cryptsetup luksFormat --type luks2 --batch-mode \
+        --pbkdf argon2id --key-file - "$ROOTPART" >/dev/null
+    step 11 "打开加密容器"
+    printf '%s' "$LUKS_PASS" | cryptsetup open --key-file - "$ROOTPART" "$MAPPER" >/dev/null
+    ROOTDEV="/dev/mapper/$MAPPER"
+fi
+
+step 12 "格式化分区（ESP=vfat，root=$FS）"
 mkfs.fat -F32 -n ARCHOERAS "$ESP" >/dev/null
-mkfs.ext4 -F -q -L ArchoeraOS "$ROOT"
+if [ "$FS" = "btrfs" ]; then
+    mkfs.btrfs -f -L ArchoeraOS "$ROOTDEV" >/dev/null
+else
+    mkfs.ext4 -F -q -L ArchoeraOS "$ROOTDEV"
+fi
 
 step 20 "挂载目标系统"
 mkdir -p "$TARGET"
-mount "$ROOT" "$TARGET"
+if [ "$FS" = "btrfs" ]; then
+    mount -o compress=zstd:1,noatime "$ROOTDEV" "$TARGET"
+else
+    mount "$ROOTDEV" "$TARGET"
+fi
 mkdir -p "$TARGET/boot"
 mount "$ESP" "$TARGET/boot"
 
+# 交换文件（可选；放在根文件系统上，fstab 里带 nofail）
+SWAPFILE=""
+if [ "$SWAP" = "file" ]; then
+    step 24 "创建交换文件（4G）"
+    if fallocate -l 4G "$TARGET/swapfile" 2>/dev/null; then :; else
+        dd if=/dev/zero of="$TARGET/swapfile" bs=1M count=4096 status=none
+    fi
+    chmod 600 "$TARGET/swapfile"
+    mkswap "$TARGET/swapfile" >/dev/null
+    SWAPFILE="/swapfile"
+fi
+
+# ── 4) 复制系统 ────────────────────────────────────────────────────
 step 30 "复制系统文件（约 1-3 分钟）"
-# -x 只跨本文件系统（Live root 是 overlay）；/boot 是独立 ESP，稍后单独复制。
-# 排除运行时目录与目标挂载点，避免自复制。
 rsync -aHAXx --delete \
     --exclude=/proc --exclude=/sys --exclude=/dev --exclude=/run \
     --exclude=/tmp --exclude=/mnt --exclude=/media --exclude=/lost+found \
+    --exclude=/swapfile \
     / "$TARGET/"
 
+# ── 5) 引导条目 ────────────────────────────────────────────────────
 step 70 "写入引导"
-# 复制 Live 的 ESP 内容（内核 / initrd / systemd-boot），再按目标分区重写条目。
 if findmnt -n /boot >/dev/null 2>&1; then
     cp -a /boot/. "$TARGET/boot/"
 fi
-NEWROOT="$(blkid -s PARTUUID -o value "$ROOT")"
-NEWESP="$(blkid -s PARTUUID -o value "$ESP")"
+NEWROOT_PARTUUID="$(blkid -s PARTUUID -o value "$ROOTPART")"
+NEWESP_PARTUUID="$(blkid -s PARTUUID -o value "$ESP")"
+NEWROOT_UUID="$(blkid -s UUID -o value "$ROOTDEV")"
+NEWESP_UUID="$(blkid -s UUID -o value "$ESP")"
 
-# 取内核与 initrd（相对目标 ESP 的路径，systemd-boot 用 / 分隔）。
 KERNEL=""
 for cand in "$TARGET"/usr/lib/modules/*/vmlinuz "$TARGET"/boot/vmlinuz-*; do
     [ -f "$cand" ] || continue
-    KERNEL="/${cand#"$TARGET"/boot/}"
     case "$cand" in "$TARGET"/boot/*) KERNEL="/${cand#"$TARGET"/boot/}" ;; esac
     break
 done
-# 若内核在 /usr/lib/modules 下而不在 ESP 上，则复制到 ESP 根再引用。
 if [ -n "$KERNEL" ] && [ ! -f "$TARGET/boot$KERNEL" ]; then
     src=""
     for cand in "$TARGET"/usr/lib/modules/*/vmlinuz; do [ -f "$cand" ] && src="$cand" && break; done
@@ -105,7 +235,6 @@ while IFS= read -r f; do
     INITRDS+=("$rel")
 done < <(find "$TARGET/boot" -maxdepth 3 -type f \( -name 'initrd' -o -name 'initrd-*' -o -name '*kernel-modules.initrd' \) 2>/dev/null | sort)
 if [ "${#INITRDS[@]}" -eq 0 ]; then
-    # 兜底：把 /usr/lib/modules 下的 initrd（若有）放到 ESP
     for cand in "$TARGET"/usr/lib/modules/*/initrd; do
         [ -f "$cand" ] || continue
         cp -a "$cand" "$TARGET/boot/initrd-linux"
@@ -114,32 +243,102 @@ if [ "${#INITRDS[@]}" -eq 0 ]; then
     done
 fi
 [ -n "$KERNEL" ] || fail "未找到内核镜像（无法生成引导条目）"
+[ "${#INITRDS[@]}" -gt 0 ] || fail "未找到 initrd（无法生成引导条目）"
 
-# 只保留我们生成的条目，避免旧条目指回 Live 的 root。
 rm -f "$TARGET"/boot/loader/entries/*.conf
 mkdir -p "$TARGET/boot/loader/entries"
+
+# root 参数：加密时用 mapper，并交给 systemd-initrd 解锁（rd.luks.name）。
+if [ "$ENCRYPT" = "1" ]; then
+    ROOT_OPTS="root=/dev/mapper/$MAPPER rd.luks.name=$NEWROOT_PARTUUID=$MAPPER"
+else
+    ROOT_OPTS="root=PARTUUID=$NEWROOT_PARTUUID"
+fi
 {
     echo "title   ArchoeraOS"
     echo "linux   $KERNEL"
     for i in "${INITRDS[@]}"; do echo "initrd  $i"; done
-    echo "options root=PARTUUID=$NEWROOT rw splash plymouth.ignore-serial-consoles"
+    echo "options $ROOT_OPTS rw splash plymouth.ignore-serial-consoles"
 } > "$TARGET/boot/loader/entries/archoera.conf"
 
-# systemd-boot：优先用 bootctl 安装（含随机种子/EFI 变量），失败则信任已复制的 ESP。
 bootctl --esp-path="$TARGET/boot" install >/dev/null 2>&1 || true
 printf 'default archoera.conf\ntimeout 0\n' > "$TARGET/boot/loader/loader.conf"
 
-step 88 "收尾配置"
-cat > "$TARGET/etc/fstab" <<EOF
-UUID=$(blkid -s UUID -o value "$ROOT") /     ext4 rw,relatime 0 1
-UUID=$(blkid -s UUID -o value "$ESP")  /boot vfat rw,relatime,fmask=0022,dmask=0022 0 2
+# ── 6) 收尾配置 ────────────────────────────────────────────────────
+step 88 "写 fstab / crypttab / 本地化 / 用户"
+FSTYPE_OPTS="rw,relatime"
+if [ "$FS" = "btrfs" ]; then FSTYPE_OPTS="rw,relatime,compress=zstd:1,noatime"; fi
+{
+    echo "UUID=$NEWROOT_UUID /     $FS $FSTYPE_OPTS 0 1"
+    echo "UUID=$NEWESP_UUID  /boot vfat rw,relatime,fmask=0022,dmask=0022 0 2"
+    [ -n "$SWAPFILE" ] && echo "$SWAPFILE none swap defaults,nofail 0 0"
+} > "$TARGET/etc/fstab"
+
+# 加密时写 crypttab（systemd 会用它在 initrd 阶段解锁）。
+if [ "$ENCRYPT" = "1" ]; then
+    {
+        echo "# <name> <device> <password> <options>"
+        echo "$MAPPER PARTUUID=$NEWROOT_PARTUUID none luks,discard"
+    } > "$TARGET/etc/crypttab"
+else
+    rm -f "$TARGET/etc/crypttab"
+fi
+
+# 语言 / 时区 / 键盘
+printf 'LANG=%s\n' "$LOCALE_" > "$TARGET/etc/locale.conf"
+if [ -e "$TARGET/usr/share/zoneinfo/$TIMEZONE" ]; then
+    ln -sf "/usr/share/zoneinfo/$TIMEZONE" "$TARGET/etc/localtime"
+fi
+printf 'KEYMAP=%s\n' "$KEYMAP" > "$TARGET/etc/vconsole.conf"
+
+# 主机名
+printf '%s\n' "$HOSTNAME_" > "$TARGET/etc/hostname"
+{
+    echo "127.0.0.1 localhost"
+    echo "::1       localhost"
+    echo "127.0.1.1 $HOSTNAME_.localdomain $HOSTNAME_"
+} > "$TARGET/etc/hosts"
+
+# 用户名：默认与镜像一致（archoera）时无需改动；否则改名并同步相关配置。
+if [ "$USERNAME" != "archoera" ]; then
+    step 90 "重命名用户 archoera → $USERNAME"
+    groupmod -R "$TARGET" -n "$USERNAME" archoera 2>/dev/null || true
+    usermod -R "$TARGET" -l "$USERNAME" -d "/home/$USERNAME" -m archoera 2>/dev/null || true
+    # 镜像里所有绝对路径的引用（tmpfiles/skel 播种）一起改掉。
+    grep -rl "/home/archoera" "$TARGET/usr/lib/tmpfiles.d" "$TARGET/usr/local/bin" 2>/dev/null \
+        | while IFS= read -r f; do sed -i "s#/home/archoera#/home/$USERNAME#g" "$f"; done
+    sed -i "s/^archoera:/$USERNAME:/" "$TARGET/etc/passwd" 2>/dev/null || true
+fi
+
+# 自动登录（kiosk 形态默认开启）
+AUTOLOGIN_FILE="$TARGET/etc/systemd/system/getty@tty1.service.d/autologin.conf"
+if [ "$AUTOLOGIN" = "1" ]; then
+    mkdir -p "$(dirname "$AUTOLOGIN_FILE")"
+    cat > "$AUTOLOGIN_FILE" <<EOF
+# ArchoeraOS：tty1 以 $USERNAME 自动登录并直接进入 kiosk 会话。
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin $USERNAME %I \$TERM
 EOF
-# 目标系统不再是 Live：移除标记与 Live 专用单元。
-# machine-id 要**重新生成一个有效值**（而不是留空）：留空会让 systemd-firstboot
-# 在目标系统首启时跑文本向导、占住 tty1，kiosk 起不来。
+else
+    rm -f "$AUTOLOGIN_FILE"
+fi
+
+# 口令（只在给了才设；chpasswd 的 --root 直接改目标盘）
+if [ -n "$USER_PASS" ]; then
+    printf '%s:%s\n' "$USERNAME" "$USER_PASS" | chpasswd -R "$TARGET" || fail "设置用户密码失败"
+fi
+if [ -n "$ROOT_PASS" ]; then
+    printf 'root:%s\n' "$ROOT_PASS" | chpasswd -R "$TARGET" || fail "设置 root 密码失败"
+fi
+
+# 目标系统不再是 Live。
 rm -f "$TARGET/etc/archoera-live" \
       "$TARGET/etc/systemd/system/multi-user.target.wants/archoera-install.service" \
-      "$TARGET/usr/lib/systemd/system/archoera-install.service"
+      "$TARGET/usr/lib/systemd/system/archoera-install.service" \
+      "$TARGET/usr/local/bin/archoera-install"
+rm -rf "$TARGET/usr/lib/systemd/system/multi-user.target.d/20-archoera-kmscon.conf"
+# machine-id 必须重新生成有效值（留空会让首启弹 systemd-firstboot）。
 rm -f "$TARGET/etc/machine-id"
 systemd-machine-id-setup --root="$TARGET" >/dev/null 2>&1 \
     || printf '%s\n' "$(tr -d '-' </proc/sys/kernel/random/uuid)" > "$TARGET/etc/machine-id"
@@ -148,7 +347,9 @@ sync
 step 96 "卸载"
 umount "$TARGET/boot" 2>/dev/null || true
 umount "$TARGET" 2>/dev/null || true
+if [ "$ENCRYPT" = "1" ]; then cryptsetup close "$MAPPER" 2>/dev/null || true; fi
+trap - EXIT
 
 step 100 "安装完成"
 : > "$STATE/done"
-echo "[archoera-install] 完成：$DISK"
+echo "[archoera-install] 完成：$DISK（fs=$FS encrypt=$ENCRYPT user=$USERNAME host=$HOSTNAME_）"

@@ -7,7 +7,7 @@ After=local-fs.target
 [Service]
 Type=oneshot
 TimeoutStartSec=0
-# 目标磁盘由向导写入（/run/archoera-install 归属 kiosk 用户）：
-#   TARGET=/dev/vda
-EnvironmentFile=/run/archoera-install/target.env
-ExecStart=/usr/local/bin/archoera-install ${TARGET}
+# 目标磁盘与全部选项由向导写入计划文件（目录归属 kiosk 用户）：
+#   /run/archoera-install/plan     key=value（disk/hostname/locale/encrypt/fs/...）
+#   /run/archoera-install/secrets  0600（luks_passphrase/user_password/root_password）
+ExecStart=/usr/local/bin/archoera-install
