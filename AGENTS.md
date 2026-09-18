@@ -112,6 +112,19 @@ qemu-system-x86_64 -machine q35,accel=kvm -m 2048 -smp 2 \
   （`initramfs-linux.img` 没有模块元数据，单用它就是这个问题）。
   ⚠ 合成必须是「**先解开压缩成员 → 裸 cpio 拼接 → 再整体压成一个归档**」：
   直接 `cat` 压缩成员 + 裸 cpio 会被内核解压器吞掉（实测三件套分三段传同样有此风险）。
+- **initrd 必须显式强制带上「早期就枚举」设备所需的模块**：mkosi-initrd 的 `KernelModules=`
+  未列出的模块会被当作**可选而直接排除，连同其依赖的固件一起**不进 initrd。蓝牙/网卡/无线
+  正是在 initrd 阶段就枚举并 probe 的，缺了它们真机就表现为「无蓝牙适配器 / 上不了网」
+  （Intel AX201 需要 `intel/ibt-0040-*`，实测只带上了 ibt-11-5/12-16）。
+  故 `mkosi.initrd.conf` 强制列出 `btusb`/`btintel`/`btrtl`/`btbcm`/`btmtk`/`bluetooth`/
+  `r8169`/`iwlwifi`/`iwlmvm`；`mkiso.sh` 另把 `intel/ibt`、`intel/iwlwifi`、`rtl_bt`、
+  `rtl_nic`、`mediatek`、`qca` 固件目录直接补进合成 initrd 兜底（不依赖 mkosi 固件语义）。
+  固件路径备忘：Intel 无线在顶层 `iwlwifi-*` **与** `intel/iwlwifi/`；Intel 蓝牙 `intel/ibt-*`；
+  Realtek 有线 `rtl_nic/*`、蓝牙 `rtl_bt/*`。
+- **不要在 `mkosi.extra` 里放单元 `.wants` 符号链接**：mkosi 拷入时会丢掉符号链接（实测镜像里
+  根本不存在，`multi-user.target.wants/NetworkManager.service` 等都没有）。enable 单元一律用
+  **普通文件 drop-in**（`/etc/systemd/system/<target>.d/*.conf` 里的 `Wants=`），或既有
+  tmpfiles 规则兜底。
 - 压缩只用 xorriso `-z`（zisofs 透明压缩，内核 `CONFIG_ZISOFS=y`）：不要引 squashfs 或
   自定义 initrd hook。
 - `mkfs.fat -n` 卷标 ≤ 11 字符。EDK2 固件不检查 El Torito platform 字节，且 `SectorCount < 2`
