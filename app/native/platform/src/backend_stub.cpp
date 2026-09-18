@@ -58,5 +58,6 @@ bool bluetoothAvailable() { return false; }
 void probe() {}
 int32_t stats(AplSysStats*) { return ERR_UNSUPPORTED; }
 int32_t btState(AplBtState*) { return ERR_UNSUPPORTED; }
+int32_t gpus(AplGpuInfo*, uint32_t, uint32_t*) { return ERR_UNSUPPORTED; }
 void shutdown() {}
 }  // namespace sysinfo

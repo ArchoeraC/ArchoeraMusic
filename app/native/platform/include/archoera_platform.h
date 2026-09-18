@@ -56,6 +56,7 @@ extern "C" {
 #define APL_CAP_OS_SESSION         (1u << 9) /* ArchoeraOS 合成器会话（archoera_shell_v1，仅 Wayland 且运行于 archoera-shell） */
 #define APL_CAP_SYS_STATS          (1u << 10) /* 系统资源快照（CPU/内存/磁盘/运行时长/温度） */
 #define APL_CAP_BLUETOOTH          (1u << 11) /* 蓝牙适配器状态（BlueZ；无适配器/无 BlueZ 时不置位） */
+#define APL_CAP_WIFI               (1u << 12) /* WiFi（NetworkManager；无无线设备/NM 时不置位） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -146,6 +147,25 @@ typedef struct AplSysStats {
 /* 读取系统资源快照；成功返回 0 并写 out（结构体由调用方分配）。 */
 APL_API int32_t apl_sys_stats(AplSysStats *out);
 
+/* ── 显卡（只读快照；Linux 走 DRM/sysfs）───────────────────────── */
+/* 说明：当前只实现 Linux（`/sys/class/drm/card*` + hwmon + 驱动特有文件），
+ * 未实现平台返回 APL_ERR_UNSUPPORTED。字符串生命周期同 WiFi：仅在该次调用后、
+ * 下一次同类调用前有效。usage_percent 对 Intel(i915/xe) 暂不可得（需 fdinfo 统计），
+ * 返回 -1；Amdgpu 走 gpu_busy_percent。 */
+typedef struct AplGpuInfo {
+    AplString name;              /* 可读名（厂商 + 驱动；如 "Intel i915"） */
+    AplString driver;            /* 内核驱动：amdgpu / i915 / xe / nouveau / virtio-pci … */
+    AplString pci_id;            /* "1002:164e"；非 PCI（如 virtio）为空 */
+    int32_t temperature_millic;  /* 温度 ×1000；<0 = 无传感器 */
+    int32_t usage_percent;       /* 0-100；-1 = 不可得 */
+    int64_t vram_total_kb;       /* <=0 = 不可得 */
+    int64_t vram_used_kb;        /* <=0 = 不可得 */
+    int32_t clock_mhz;           /* 当前核心频率；<0 = 不可得 */
+} AplGpuInfo;
+
+/* 列出显卡；out 由调用方分配。无 DRM 设备（或未实现）返回负值。 */
+APL_API int32_t apl_gpu_list(AplGpuInfo *out, uint32_t max, uint32_t *count);
+
 typedef struct AplBtState {
     int32_t present;           /* 存在蓝牙适配器 */
     int32_t powered;           /* 适配器已开启 */
@@ -157,6 +177,77 @@ typedef struct AplBtState {
 
 /* 读取蓝牙适配器状态；无 BlueZ/无适配器返回负值（Dart 侧据此显示「无蓝牙」）。 */
 APL_API int32_t apl_bt_state(AplBtState *out);
+
+/* ── WiFi（NetworkManager）──────────────────────────────────────── */
+/* 说明：以下接口 Linux 走 system bus 的 NetworkManager；未实现平台返回
+ * APL_ERR_UNSUPPORTED，Dart 侧据此隐藏「WiFi」分区。
+ * 字符串生命周期：输出结构体里的 AplString 指向后端内部缓冲，
+ * **仅在该次调用返回后、下一次同类调用之前有效**，Dart 侧应立即复制。 */
+
+typedef struct AplWifiState {
+    int32_t present;      /* 系统有无线设备（rfkill/NM） */
+    int32_t enabled;      /* 无线总开关已打开 */
+    int32_t connected;    /* 已连接某个 AP */
+    int32_t signal;       /* 当前连接信号 0-100；未连接 = -1 */
+    AplString ssid;       /* 当前 SSID（未连接 data=NULL） */
+    AplString ip;         /* IPv4 地址（未连接 data=NULL） */
+    AplString security;   /* 当前连接安全类型（如 "wpa-psk"；未知可为 NULL） */
+} AplWifiState;
+
+/* security 取值（与 NM 名称无关的稳定枚举，便于 Dart 直接判断是否需要密码） */
+#define APL_WIFI_SEC_OPEN     0
+#define APL_WIFI_SEC_WEP      1
+#define APL_WIFI_SEC_PSK      2 /* WPA/WPA2/WPA3 个人版 */
+#define APL_WIFI_SEC_8021X    3 /* 企业版（本 UI 暂不支持配置） */
+#define APL_WIFI_SEC_UNKNOWN  4
+
+typedef struct AplWifiNetwork {
+    AplString ssid;
+    int32_t signal;       /* 0-100 */
+    int32_t security;     /* APL_WIFI_SEC_* */
+    int32_t connected;
+    int32_t saved;        /* 已有保存的连接配置（可免密重连） */
+} AplWifiNetwork;
+
+/* 读取 WiFi 概况。无 NM / 无无线设备返回负值。 */
+APL_API int32_t apl_wifi_state(AplWifiState *out);
+
+/* 触发一次扫描并返回结果（内部等待扫描完成，可能耗时数百毫秒）。
+ * out 为调用方数组，写入最多 max 条，*count 回传实际条数。 */
+APL_API int32_t apl_wifi_scan(AplWifiNetwork *out, uint32_t max, uint32_t *count);
+
+/* 连接：psk=NULL 表示开放网络或已有保存配置。成功返回 0（异步连接已发起）。 */
+APL_API int32_t apl_wifi_connect(const char *ssid, const char *psk);
+APL_API int32_t apl_wifi_disconnect(void);
+APL_API int32_t apl_wifi_set_enabled(int32_t on);
+/* 删除已保存的连接配置。 */
+APL_API int32_t apl_wifi_forget(const char *ssid);
+
+/* ── 蓝牙控制（BlueZ）───────────────────────────────────────────── */
+/* 与 apl_bt_state（只读快照）配套：这里做扫描/配对/连接/开关。
+ * 字符串生命周期同 WiFi：结果仅在该次调用后、下一次同类调用前有效。 */
+
+typedef struct AplBtDevice {
+    AplString address;    /* "AA:BB:CC:DD:EE:FF" */
+    AplString name;       /* 可读名（可能为空） */
+    int32_t paired;
+    int32_t connected;
+    int32_t rssi;         /* 扫描期间信号 dBm；未知 < 0 */
+} AplBtDevice;
+
+/* 开始/停止发现（配对前通常需要先 start）。 */
+APL_API int32_t apl_bt_scan_start(void);
+APL_API int32_t apl_bt_scan_stop(void);
+/* 读取已知设备列表（含刚发现的）；out 由调用方分配。 */
+APL_API int32_t apl_bt_devices(AplBtDevice *out, uint32_t max, uint32_t *count);
+
+/* 配对（内部注册 agent 并等待结果，可能耗时数秒；无 PIN 的 Just Works 设备直接完成）。 */
+APL_API int32_t apl_bt_pair(const char *address);
+APL_API int32_t apl_bt_connect(const char *address);
+APL_API int32_t apl_bt_disconnect(const char *address);
+/* 取消配对并移除设备记录。 */
+APL_API int32_t apl_bt_forget(const char *address);
+APL_API int32_t apl_bt_set_enabled(int32_t on);
 
 /* 一次性读取系统主题色（0=成功并写 r/g/b，0-255；<0=不可得）。
  * 注：应用层不应主动轮询/查询系统色；正常路径是 apl_system_accent_set_events

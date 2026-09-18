@@ -50,6 +50,8 @@ elseif(UNIX)
   list(APPEND ARCHOERA_SOURCES src/os_session_linux.cpp)
   # 系统资源 / 蓝牙（/proc、statvfs、BlueZ over libdbus）。
   list(APPEND ARCHOERA_SOURCES src/sysinfo_linux.cpp)
+  # 显卡枚举（DRM/sysfs）。
+  list(APPEND ARCHOERA_SOURCES src/sysinfo_gpu_linux.cpp)
 else()
   list(APPEND ARCHOERA_SOURCES src/backend_stub.cpp)
 endif()

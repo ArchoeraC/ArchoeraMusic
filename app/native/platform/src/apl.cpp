@@ -168,6 +168,10 @@ int32_t apl_bt_state(AplBtState* out) {
     return archoera::sysinfo::btState(out);
 }
 
+int32_t apl_gpu_list(AplGpuInfo* out, uint32_t max, uint32_t* count) {
+    return archoera::sysinfo::gpus(out, max, count);
+}
+
 int32_t apl_notify(const char* title, const char* body) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     if (title == nullptr) return archoera::ERR_BACKEND;

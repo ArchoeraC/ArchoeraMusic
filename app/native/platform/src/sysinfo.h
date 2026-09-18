@@ -26,6 +26,8 @@ void probe();
 // 读取快照；成功返回 OK 并写 out。
 int32_t stats(AplSysStats* out);
 int32_t btState(AplBtState* out);
+// 显卡列表（Linux：DRM/sysfs；其余平台返回 ERR_UNSUPPORTED）。
+int32_t gpus(AplGpuInfo* out, uint32_t max, uint32_t* count);
 
 // 释放缓存（apl_shutdown）。
 void shutdown();
