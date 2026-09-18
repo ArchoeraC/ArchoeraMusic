@@ -280,6 +280,17 @@ impl ArchoeraShell {
         );
     }
 
+    /// 输出的建议刷新间隔（客户端 frame callback 用）：wl_output 的 refresh 单位是 mHz，
+    /// 这里换算成周期纳秒；拿不到当前模式时退回 60Hz。
+    fn frame_refresh(output: &Output) -> Option<std::time::Duration> {
+        output
+            .current_mode()
+            .map(|m| {
+                std::time::Duration::from_nanos(1_000_000_000_000u64 / m.refresh.max(1) as u64)
+            })
+            .or(Some(std::time::Duration::from_micros(16_667)))
+    }
+
     /// 合成并提交一帧：渲染全部输出、驱动客户端帧回调、清理已销毁的 popup。
     ///
     /// 调用即清空重绘标志：本帧合成的是「清零前」累积的全部状态。若渲染期间又有
@@ -296,7 +307,7 @@ impl ArchoeraShell {
         let outputs: Vec<Output> = self.space.outputs().cloned().collect();
         for output in &outputs {
             self.space.elements().for_each(|window| {
-                window.send_frame(output, elapsed, Some(std::time::Duration::ZERO), |_, _| {
+                window.send_frame(output, elapsed, Self::frame_refresh(output), |_, _| {
                     Some(output.clone())
                 })
             });
