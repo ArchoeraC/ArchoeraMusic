@@ -198,7 +198,13 @@ case "$FS" in
     btrfs) mkfs.btrfs -f -L ArchoeraOS "$ROOTDEV" >/dev/null ;;
     xfs)   mkfs.xfs -f -L ArchoeraOS "$ROOTDEV" >/dev/null ;;
     f2fs)  mkfs.f2fs -f -l ArchoeraOS "$ROOTDEV" >/dev/null ;;
+    # 兜底：没有 default 分支的话，$FS 只要与上面不完全相等就会**静默什么都不做**，
+    # 然后挂载必然报 bad superblock（本次 xfs/f2fs「失败」的可疑来源之一）。
+    *)     fail "内部错误：$FS 没有对应的 mkfs 分支" ;;
 esac
+# 再确认格式化真的写进去了（blkid 认得出该 fs 才算数）。
+GOT_FS="$(blkid -s TYPE -o value "$ROOTDEV" 2>/dev/null || true)"
+[ "$GOT_FS" = "$FS" ] || fail "格式化后 blkid 报告的类型是 '$GOT_FS'，与要求的 $FS 不符"
 
 step 20 "挂载目标系统"
 mkdir -p "$TARGET"
