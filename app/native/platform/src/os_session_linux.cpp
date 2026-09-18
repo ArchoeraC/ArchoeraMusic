@@ -12,7 +12,7 @@
 //!  - **专用泵线程 + 事件 fd 唤醒**：所有 Wayland 调用（marshal/dispatch）都在泵
 //!    线程执行；Dart 线程只把请求压入队列并写 eventfd，避免 libwayland 的线程
 //!    安全问题。
-//!  - 手写接口与 `os/protocol/archoera-shell-v1.xml`（version 2）逐字段对应；
+//!  - 手写接口与 `os/protocol/archoera-shell-v1.xml`（version 4）逐字段对应；
 //!    事件/请求的 opcode 顺序必须与 XML 一致。
 
 #include "os_session.h"
@@ -45,8 +45,8 @@ namespace {
 using wl_display = struct wl_display;
 using wl_proxy = struct wl_proxy;
 
-// ── archoera_shell_v1（对齐 os/protocol/archoera-shell-v1.xml v3）──────
-constexpr uint32_t kInterfaceVersion = 3;
+// ── archoera_shell_v1（对齐 os/protocol/archoera-shell-v1.xml v4）──────
+constexpr uint32_t kInterfaceVersion = 4;
 
 // 请求 opcode（顺序即 XML 中 <request> 出现顺序）。
 enum Op : uint32_t {
@@ -61,6 +61,7 @@ enum Op : uint32_t {
     OP_SET_OUTPUT_SCALE,
     OP_SET_OUTPUT_MODE,
     OP_SET_OUTPUT_TRANSFORM,
+    OP_KEY,
 };
 
 // 事件 opcode。
@@ -90,6 +91,7 @@ const struct wl_message kRequests[] = {
     {"set_output_scale", "u", nullptr},
     {"set_output_mode", "uu", nullptr},
     {"set_output_transform", "u", nullptr},
+    {"key", "uu", nullptr},
 };
 
 const struct wl_message kEvents[] = {
@@ -107,7 +109,7 @@ const struct wl_message kEvents[] = {
 const struct wl_interface kShellInterface = {
     "archoera_shell_v1",
     static_cast<int>(kInterfaceVersion),
-    11,
+    12,
     kRequests,
     9,
     kEvents,
@@ -310,6 +312,7 @@ void sendRequest(const Request& r) {
             g_api->proxy_marshal_flags(g_shell, r.op, nullptr, version, flags, r.arg);
             break;
         case OP_SET_OUTPUT_MODE:
+        case OP_KEY:
             g_api->proxy_marshal_flags(g_shell, r.op, nullptr, version, flags, r.arg, r.arg2);
             break;
         default:
@@ -558,6 +561,9 @@ int32_t setOutputMode(int32_t width, int32_t height) {
 }
 int32_t setOutputTransform(int32_t transform) {
     return enqueue(OP_SET_OUTPUT_TRANSFORM, static_cast<uint32_t>(std::max(0, transform)));
+}
+int32_t key(int32_t keycode, bool pressed) {
+    return enqueue(OP_KEY, static_cast<uint32_t>(std::max(0, keycode)), pressed ? 1u : 0u);
 }
 
 void shutdown() {

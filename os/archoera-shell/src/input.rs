@@ -9,12 +9,14 @@ use smithay::{
     backend::input::{
         AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
         KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent, PointerMotionEvent,
+        TouchEvent,
     },
     input::{
         keyboard::{FilterResult, Keycode},
         pointer::{AxisFrame, ButtonEvent, MotionEvent},
+        touch::{DownEvent as TouchDown, MotionEvent as TouchMove, UpEvent as TouchUp},
     },
-    utils::SERIAL_COUNTER,
+    utils::{Logical, Point, SERIAL_COUNTER},
 };
 
 use crate::{
@@ -180,12 +182,108 @@ impl ArchoeraShell {
                 pointer.axis(self, frame);
                 pointer.frame(self);
             }
+            InputEvent::TouchDown { event } => {
+                let Some(rect) = self.output_rect() else {
+                    return;
+                };
+                let mut location = event.position_transformed(rect.size) + rect.loc.to_f64();
+                self.clamp_pointer(&mut location);
+
+                // 触摸即聚焦：抬起命中窗口并把键盘焦点交给它，客户端 text-input
+                // 重新获得焦点后 IME 才会跟随（触摸设备常无物理键盘）。
+                let hit = self.space.element_under(location).map(|(w, _)| w.clone());
+                if let Some(window) = hit {
+                    self.space.raise_element(&window, true);
+                    if let Some(toplevel) = window.toplevel() {
+                        let serial = SERIAL_COUNTER.next_serial();
+                        self.seat.get_keyboard().unwrap().set_focus(
+                            self,
+                            Some(toplevel.wl_surface().clone()),
+                            serial,
+                        );
+                    }
+                }
+
+                let serial = SERIAL_COUNTER.next_serial();
+                let focus = self.surface_under(location);
+                self.seat.get_touch().unwrap().down(
+                    self,
+                    focus,
+                    &TouchDown {
+                        slot: event.slot(),
+                        location,
+                        serial,
+                        time: event.time_msec(),
+                    },
+                );
+            }
+            InputEvent::TouchMotion { event } => {
+                let Some(rect) = self.output_rect() else {
+                    return;
+                };
+                let mut location = event.position_transformed(rect.size) + rect.loc.to_f64();
+                self.clamp_pointer(&mut location);
+
+                // 焦点只在 down 时确定；motion 传入的位置仅用于拖放命中判定。
+                let focus = self.surface_under(location);
+                self.seat.get_touch().unwrap().motion(
+                    self,
+                    focus,
+                    &TouchMove {
+                        slot: event.slot(),
+                        location,
+                        time: event.time_msec(),
+                    },
+                );
+            }
+            InputEvent::TouchUp { event } => {
+                let serial = SERIAL_COUNTER.next_serial();
+                self.seat.get_touch().unwrap().up(
+                    self,
+                    &TouchUp {
+                        slot: event.slot(),
+                        serial,
+                        time: event.time_msec(),
+                    },
+                );
+            }
+            InputEvent::TouchCancel { .. } => {
+                self.seat.get_touch().unwrap().cancel(self);
+            }
+            InputEvent::TouchFrame { .. } => {
+                self.seat.get_touch().unwrap().frame(self);
+            }
             _ => {}
         }
     }
 
+    /// 注入一个按键（屏幕键盘 → `archoera_shell_v1.key`）。
+    ///
+    /// 走与物理键盘完全相同的路径（座位键盘 + 输入法键盘抓取）：fcitx5 等 IME
+    /// 能正常处理后，未被消费的按键再由 IME 经虚拟键盘转发给焦点客户端。
+    /// `evdev` 为 evdev 键码（KEY_*），内部换算为 XKB keycode（+8）。
+    pub fn inject_key(&mut self, evdev: u32, pressed: bool) {
+        const EVDEV_OFFSET: u32 = 8;
+        let keycode = Keycode::new(evdev.saturating_add(EVDEV_OFFSET));
+        let key_state = if pressed {
+            KeyState::Pressed
+        } else {
+            KeyState::Released
+        };
+        let serial = SERIAL_COUNTER.next_serial();
+        let time = self.start_time.elapsed().as_millis() as u32;
+        self.seat.get_keyboard().unwrap().input::<(), _>(
+            self,
+            keycode,
+            key_state,
+            serial,
+            time,
+            |_, _, _| FilterResult::Forward,
+        );
+    }
+
     /// 把指针位置夹取到输出范围内。
-    fn clamp_pointer(&self, location: &mut smithay::utils::Point<f64, smithay::utils::Logical>) {
+    fn clamp_pointer(&self, location: &mut Point<f64, Logical>) {
         let Some(rect) = self.output_rect() else {
             return;
         };

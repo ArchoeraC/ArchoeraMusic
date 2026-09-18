@@ -29,6 +29,7 @@ abstract final class OsCapability {
   static const int powerKey = 1 << 6;
   static const int screen = 1 << 7;
   static const int output = 1 << 8;
+  static const int keyboard = 1 << 9;
 }
 
 /// 主输出状态（对齐协议 `output_state`）。
@@ -103,6 +104,13 @@ abstract interface class SystemOsSession {
   int setOutputMode(int width, int height);
   int setOutputTransform(int transform);
 
+  /// 注入一个按键（屏幕键盘 → 合成器 → 焦点客户端/输入法）。
+  ///
+  /// [keycode] 为 evdev 键码（KEY_*，如 A=30），并非 Flutter 的 logical key；
+  /// [state] 0=释放 1=按下。仅 [OsCapability.keyboard] 置位时生效。修饰键由调用方
+  /// 自行按下/释放（如 Shift+A）。合成器按物理键盘路径处理，输入法可正常消费。
+  int key(int keycode, int state);
+
   /// 会话能力位图（archoera_shell_v1 capability）。
   Stream<int> get capabilities;
 
@@ -160,6 +168,9 @@ class NoopSystemOsSession implements SystemOsSession {
 
   @override
   int setOutputTransform(int transform) => -1;
+
+  @override
+  int key(int keycode, int state) => -1;
 
   @override
   Stream<int> get capabilities => const Stream.empty();

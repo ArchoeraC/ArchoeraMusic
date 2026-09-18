@@ -307,6 +307,7 @@ fn format_caps(caps: Capability) -> String {
         (Capability::PowerKey, "power_key"),
         (Capability::Screen, "screen"),
         (Capability::Output, "output"),
+        (Capability::Keyboard, "keyboard"),
     ] {
         if caps.contains(cap) {
             names.push(name);

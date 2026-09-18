@@ -1118,6 +1118,7 @@ int32_t osSessionHibernate() { return ERR_UNSUPPORTED; }
 int32_t osSessionSetOutputScale(int32_t) { return ERR_UNSUPPORTED; }
 int32_t osSessionSetOutputMode(int32_t, int32_t) { return ERR_UNSUPPORTED; }
 int32_t osSessionSetOutputTransform(int32_t) { return ERR_UNSUPPORTED; }
+int32_t osSessionKey(int32_t, int32_t) { return ERR_UNSUPPORTED; }
 
 }  // namespace archoera
 

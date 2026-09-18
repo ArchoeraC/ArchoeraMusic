@@ -69,6 +69,18 @@ class _FakeOs implements SystemOsSession {
   }
 
   @override
+  int setOutputScale(int scaleMilli) => 0;
+
+  @override
+  int setOutputMode(int width, int height) => 0;
+
+  @override
+  int setOutputTransform(int transform) => 0;
+
+  @override
+  int key(int keycode, int state) => 0;
+
+  @override
   Stream<int> get capabilities => const Stream.empty();
   @override
   Stream<int> get brightness => const Stream.empty();
@@ -82,6 +94,8 @@ class _FakeOs implements SystemOsSession {
   Stream<bool> get screenEnabled => const Stream.empty();
   @override
   Stream<OsPowerKey> get powerKey => const Stream.empty();
+  @override
+  Stream<OsOutputState> get output => const Stream.empty();
 }
 
 Widget _section(Widget child) =>

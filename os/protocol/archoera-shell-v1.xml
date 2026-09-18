@@ -9,7 +9,7 @@
     the terms of the GNU Affero General Public License v3.0 or later.
   </copyright>
 
-  <interface name="archoera_shell_v1" version="3">
+  <interface name="archoera_shell_v1" version="4">
     <description summary="ArchoeraOS 会话控制对象">
       ArchoeraOS 是一个「播放器即系统」的 kiosk 会话：ArchoeraMusic 以全屏
       特权客户端运行，通过本协议驱动合成器完成会话级操作（关机/重启/亮度/显示），
@@ -33,6 +33,7 @@
       <entry name="power_key" value="64" summary="会下发电源键 / 睡眠键事件"/>
       <entry name="screen" value="128" summary="可开关屏幕（udev 后端 DPMS；嵌套后端不置位）"/>
       <entry name="output" value="256" summary="可运行时修改输出模式/缩放/旋转（仅 udev 后端置位）"/>
+      <entry name="keyboard" value="512" summary="可注入按键（屏幕键盘 → 合成器 → 焦点客户端/输入法）"/>
     </enum>
 
     <enum name="media_key">
@@ -123,6 +124,16 @@
     <request name="set_output_transform">
       <description summary="设置输出变换（旋转/镜像），取值见 output_transform。仅 output 能力位可用时生效。"/>
       <arg name="transform" type="uint" enum="output_transform"/>
+    </request>
+
+    <request name="key">
+      <description summary="注入一个按键（屏幕键盘 / 虚拟键盘）。
+        合成器按普通物理键盘路径处理：先经输入法（IME）的键盘抓取，未被消费的按键再
+        转发给当前焦点客户端。keycode 为 evdev 键码（与 wl_keyboard.key 一致，
+        如 KEY_A = 30），state 0=释放 1=按下；修饰键由调用方自行按下/释放
+        （如 Shift + A）。仅 keyboard 能力位可用时生效。"/>
+      <arg name="keycode" type="uint" summary="evdev 键码（KEY_*）"/>
+      <arg name="state" type="uint" summary="0=释放 1=按下"/>
     </request>
 
     <event name="capabilities">

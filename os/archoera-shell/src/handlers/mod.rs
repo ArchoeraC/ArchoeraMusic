@@ -12,6 +12,7 @@ mod xdg_shell;
 use smithay::{
     delegate_cursor_shape, delegate_data_device, delegate_fractional_scale, delegate_idle_inhibit,
     delegate_input_method_manager, delegate_output, delegate_seat, delegate_text_input_manager,
+    delegate_virtual_keyboard_manager,
     desktop::{PopupKind, PopupManager},
     input::{Seat, SeatHandler, SeatState},
     reexports::wayland_server::{protocol::wl_surface::WlSurface, Resource},
@@ -200,3 +201,11 @@ impl InputMethodHandler for ArchoeraShell {
 
 delegate_input_method_manager!(ArchoeraShell);
 delegate_text_input_manager!(ArchoeraShell);
+
+//
+// zwp_virtual_keyboard_v1（虚拟键盘 / IME 按键转发）
+//
+// fcitx5 的 Wayland 前端在启用输入法上下文前会同时查找 `zwp_input_method_v2` 与
+// `zwp_virtual_keyboard_v1`；只有前者时它不会抓取键盘，表现为「无法切换输入法」。
+// 该全局同时允许屏幕键盘客户端注入按键。按键经 `Seat` 的键盘焦点直接下发给客户端。
+delegate_virtual_keyboard_manager!(ArchoeraShell);

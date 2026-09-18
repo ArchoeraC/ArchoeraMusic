@@ -1322,5 +1322,8 @@ int32_t osSessionSetOutputMode(int32_t width, int32_t height) {
 int32_t osSessionSetOutputTransform(int32_t transform) {
     return os_session::setOutputTransform(transform);
 }
+int32_t osSessionKey(int32_t keycode, int32_t pressed) {
+    return os_session::key(keycode, pressed != 0);
+}
 
 }  // namespace archoera

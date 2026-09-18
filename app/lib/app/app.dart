@@ -18,6 +18,7 @@ import '../theme/cover_color.dart';
 import '../widgets/common/app_shortcuts.dart';
 import '../widgets/common/scheme_intro_gate.dart';
 import '../widgets/common/toast.dart';
+import '../widgets/common/touch_keyboard/touch_keyboard.dart';
 import '../widgets/common/vault_crash_gate.dart';
 import '../widgets/common/vault_unlock_gate.dart';
 import '../widgets/common/vault_version_gate.dart';
@@ -129,7 +130,11 @@ class ArchoeraMusicApp extends ConsumerWidget {
                 Widget gate = SplashGate(
                   engine: prefs.engine,
                   child: SchemeIntroGate(
-                    child: AppShortcuts(child: ToastOverlay(child: appChild)),
+                    child: AppShortcuts(
+                      child: ToastOverlay(
+                        child: TouchKeyboardHost(child: appChild),
+                      ),
+                    ),
                   ),
                 );
                 // v2 口令模式启动解锁门：vault 待口令解锁时全屏拦截，

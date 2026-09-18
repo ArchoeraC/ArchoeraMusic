@@ -120,6 +120,12 @@ APL_API int32_t apl_os_set_output_scale(int32_t scale_milli); /* 千分数，如
 APL_API int32_t apl_os_set_output_mode(int32_t width, int32_t height); /* 0,0 = 首选模式 */
 APL_API int32_t apl_os_set_output_transform(int32_t transform); /* 0..7，见 wl_output.transform */
 
+/* 注入一个按键（屏幕键盘 → 合成器 → 焦点客户端/输入法）。
+ * keycode 为 evdev 键码（KEY_*，如 KEY_A=30），并非 XKB keycode；state 0=释放 1=按下。
+ * 合成器按物理键盘路径处理，输入法（fcitx5）可正常消费；仅 archoera_shell_v1
+ * 的 keyboard 能力位置位时生效。修饰键由调用方自行按下/释放。 */
+APL_API int32_t apl_os_key(int32_t keycode, int32_t state);
+
 /* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
 APL_API int32_t apl_notify(const char *title, const char *body);
 
