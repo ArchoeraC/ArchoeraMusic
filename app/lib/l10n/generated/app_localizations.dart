@@ -8024,6 +8024,330 @@ abstract class AppLocalizations {
   /// **'配对失败'**
   String get netFailedPair;
 
+  /// No description provided for @installerTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'安装 ArchoeraOS'**
+  String get installerTitle;
+
+  /// No description provided for @installerStepLanguage.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'语言'**
+  String get installerStepLanguage;
+
+  /// No description provided for @installerStepTimezone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'时区'**
+  String get installerStepTimezone;
+
+  /// No description provided for @installerStepKeyboard.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'键盘'**
+  String get installerStepKeyboard;
+
+  /// No description provided for @installerStepDisk.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'目标磁盘'**
+  String get installerStepDisk;
+
+  /// No description provided for @installerStepEncryption.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'磁盘加密'**
+  String get installerStepEncryption;
+
+  /// No description provided for @installerStepUser.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用户'**
+  String get installerStepUser;
+
+  /// No description provided for @installerStepSummary.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确认安装'**
+  String get installerStepSummary;
+
+  /// No description provided for @installerStepProgress.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在安装'**
+  String get installerStepProgress;
+
+  /// No description provided for @installerStepDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'安装完成'**
+  String get installerStepDone;
+
+  /// No description provided for @installerBack.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'上一步'**
+  String get installerBack;
+
+  /// No description provided for @installerNext.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下一步'**
+  String get installerNext;
+
+  /// No description provided for @installerStart.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开始安装'**
+  String get installerStart;
+
+  /// No description provided for @installerSearchHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'搜索'**
+  String get installerSearchHint;
+
+  /// No description provided for @installerSearchEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'没有匹配项'**
+  String get installerSearchEmpty;
+
+  /// No description provided for @installerDiskLive.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前 Live 介质'**
+  String get installerDiskLive;
+
+  /// No description provided for @installerDiskNone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'没有可选的目标磁盘'**
+  String get installerDiskNone;
+
+  /// No description provided for @installerDiskWarning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'所选磁盘上的所有分区与数据都会被清除，且无法恢复。'**
+  String get installerDiskWarning;
+
+  /// No description provided for @installerFilesystem.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'文件系统'**
+  String get installerFilesystem;
+
+  /// No description provided for @installerSwap.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'交换空间'**
+  String get installerSwap;
+
+  /// No description provided for @installerSwapNone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不使用'**
+  String get installerSwapNone;
+
+  /// No description provided for @installerSwapFile.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'交换文件'**
+  String get installerSwapFile;
+
+  /// No description provided for @installerEncryptTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'加密磁盘（LUKS2）'**
+  String get installerEncryptTitle;
+
+  /// No description provided for @installerEncryptHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开机时需要输入口令解锁，丢失口令将无法恢复数据。'**
+  String get installerEncryptHint;
+
+  /// No description provided for @installerLuksPassphrase.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'加密口令'**
+  String get installerLuksPassphrase;
+
+  /// No description provided for @installerLuksConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'再次输入口令'**
+  String get installerLuksConfirm;
+
+  /// No description provided for @installerPassphraseTooShort.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'口令至少需要 8 个字符'**
+  String get installerPassphraseTooShort;
+
+  /// No description provided for @installerPassphraseMismatch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'两次输入的口令不一致'**
+  String get installerPassphraseMismatch;
+
+  /// No description provided for @installerEncryptWarning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'口令无法找回：请务必牢记，或另行妥善保存。'**
+  String get installerEncryptWarning;
+
+  /// No description provided for @installerEncryptOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已启用（LUKS2）'**
+  String get installerEncryptOn;
+
+  /// No description provided for @installerEncryptOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未启用'**
+  String get installerEncryptOff;
+
+  /// No description provided for @installerUsername.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用户名'**
+  String get installerUsername;
+
+  /// No description provided for @installerHostname.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'主机名'**
+  String get installerHostname;
+
+  /// No description provided for @installerUserPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用户密码'**
+  String get installerUserPassword;
+
+  /// No description provided for @installerRootPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'root 密码'**
+  String get installerRootPassword;
+
+  /// No description provided for @installerPasswordOptional.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'留空表示不设置'**
+  String get installerPasswordOptional;
+
+  /// No description provided for @installerInvalidName.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'只能用小写字母、数字与连字符，且以字母开头'**
+  String get installerInvalidName;
+
+  /// No description provided for @installerAutologin.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开机自动登录'**
+  String get installerAutologin;
+
+  /// No description provided for @installerAutologinHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'直接进入 ArchoeraMusic kiosk，不显示登录提示'**
+  String get installerAutologinHint;
+
+  /// No description provided for @installerEnabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已启用'**
+  String get installerEnabled;
+
+  /// No description provided for @installerDisabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已关闭'**
+  String get installerDisabled;
+
+  /// No description provided for @installerSummaryEraseWarning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'点击「开始安装」后立即写入磁盘，此操作不可撤销。'**
+  String get installerSummaryEraseWarning;
+
+  /// No description provided for @installerProgressPreparing.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在准备…'**
+  String get installerProgressPreparing;
+
+  /// No description provided for @installerProgressFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'安装失败'**
+  String get installerProgressFailed;
+
+  /// No description provided for @installerProgressRetry.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重试'**
+  String get installerProgressRetry;
+
+  /// No description provided for @installerDoneBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统已写入目标磁盘，可以重启进入 ArchoeraOS 了。'**
+  String get installerDoneBody;
+
+  /// No description provided for @installerDoneHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'若要从 Live 介质移除后再使用该磁盘，请先关机再拔出。'**
+  String get installerDoneHint;
+
+  /// No description provided for @installerRebootNow.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'立即重启'**
+  String get installerRebootNow;
+
+  /// No description provided for @installerPowerOffNow.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关机'**
+  String get installerPowerOffNow;
+
+  /// No description provided for @installerEntry.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'安装 ArchoeraOS'**
+  String get installerEntry;
+
+  /// No description provided for @installerEntryHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'把系统安装到本机磁盘（仅 Live 介质可用）'**
+  String get installerEntryHint;
+
+  /// No description provided for @installerEntryConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将退出播放器并启动安装向导，确定继续？'**
+  String get installerEntryConfirm;
+
+  /// No description provided for @installerEntryFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无法启动安装向导'**
+  String get installerEntryFailed;
+
+  /// No description provided for @installerEntrySwitching.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在切换到安装向导…'**
+  String get installerEntrySwitching;
+
   /// No description provided for @systemUnavailableTitle.
   ///
   /// In zh_CN, this message translates to:

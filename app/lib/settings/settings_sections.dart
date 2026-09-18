@@ -10,7 +10,7 @@ library;
 
 import 'dart:async' show StreamSubscription, unawaited;
 import 'dart:convert' show jsonDecode, jsonEncode;
-import 'dart:io' show File, Platform, Process, ProcessStartMode;
+import 'dart:io' show File, Platform, Process, ProcessStartMode, exit;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:material_ui/material_ui.dart';
@@ -23,6 +23,7 @@ import '../app/app_quit.dart';
 import '../app/theme_provider.dart';
 import '../app/watermark.dart';
 import '../services/downloader/download_controller.dart';
+import '../services/platform/live_install.dart';
 import '../services/platform/net.dart';
 import '../services/platform/os_session.dart';
 import '../services/platform/platform_capabilities.dart';

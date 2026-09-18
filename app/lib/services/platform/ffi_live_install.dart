@@ -8,6 +8,8 @@
 /// 进度同样读文件。这里只做类型转换与转发。
 library;
 
+import 'dart:io';
+
 import 'live_install.dart';
 import 'platform_bindings.dart';
 
@@ -28,4 +30,19 @@ class FfiLiveInstall implements LiveInstallService {
   @override
   LiveInstallStatus status() =>
       _b.liveInstallStatus() ?? const LiveInstallStatus();
+
+  @override
+  bool requestInstaller() {
+    if (!available) return false;
+    // 这就是「应用自己的运行时目录」里的一个标记文件（Live 镜像用 tmpfiles
+    // 建 /run/archoera-install，属主为 kiosk 用户），不涉及任何系统调用或子进程。
+    try {
+      const dir = '/run/archoera-install';
+      if (!Directory(dir).existsSync()) return false;
+      File('$dir/request').writeAsStringSync('1\n');
+      return true;
+    } on FileSystemException {
+      return false;
+    }
+  }
 }

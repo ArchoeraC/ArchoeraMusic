@@ -16,12 +16,14 @@ import 'dart:ui' show Color;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'ffi_live_install.dart';
 import 'ffi_net.dart';
 import 'ffi_system_media.dart';
 import 'ffi_system_os.dart';
 import 'ffi_system_power.dart';
 import 'ffi_system_status.dart';
 import 'ffi_system_window.dart';
+import 'live_install.dart';
 import 'net.dart';
 import 'platform_bindings.dart';
 import 'system_media.dart';
@@ -39,6 +41,7 @@ class PlatformCapabilities {
     required this.os,
     required this.status,
     required this.net,
+    required this.liveInstall,
     required this.caps,
   });
 
@@ -59,6 +62,9 @@ class PlatformCapabilities {
 
   /// 网络（WiFi）与蓝牙控制（桥接不支持时为空实现）。
   final NetService net;
+
+  /// Live 安装向导（仅 Live 镜像的桥接提供；已安装系统为空实现）。
+  final LiveInstallService liveInstall;
 
   bool get powerInhibitAvailable => caps & aplCapPowerInhibit != 0;
   bool get screenStateAvailable => caps & aplCapPowerScreenState != 0;
@@ -170,6 +176,9 @@ class PlatformCapabilities {
               (b.wifiSymbolsAvailable || b.bluetoothControlSymbolsAvailable))
           ? FfiNet(b)
           : const UnavailableNetService(),
+      liveInstall: (b != null && b.liveSymbolsAvailable)
+          ? FfiLiveInstall(b)
+          : const UnavailableLiveInstall(),
     );
     _instance = built;
     return built;
@@ -188,6 +197,11 @@ class PlatformCapabilities {
 /// 网络与蓝牙服务（测试可覆盖为假实现）。
 final netServiceProvider = Provider<NetService>(
   (ref) => ref.watch(platformCapabilitiesProvider).net,
+);
+
+/// Live 安装向导（测试可覆盖为假实现）。
+final liveInstallProvider = Provider<LiveInstallService>(
+  (ref) => ref.watch(platformCapabilitiesProvider).liveInstall,
 );
 
 /// 系统状态只读快照（测试可覆盖为假实现）。

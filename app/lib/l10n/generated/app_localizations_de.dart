@@ -4554,6 +4554,168 @@ class AppLocalizationsDe extends AppLocalizations {
   String get netFailedPair => '配对失败';
 
   @override
+  String get installerTitle => '安装 ArchoeraOS';
+
+  @override
+  String get installerStepLanguage => '语言';
+
+  @override
+  String get installerStepTimezone => '时区';
+
+  @override
+  String get installerStepKeyboard => '键盘';
+
+  @override
+  String get installerStepDisk => '目标磁盘';
+
+  @override
+  String get installerStepEncryption => '磁盘加密';
+
+  @override
+  String get installerStepUser => '用户';
+
+  @override
+  String get installerStepSummary => '确认安装';
+
+  @override
+  String get installerStepProgress => '正在安装';
+
+  @override
+  String get installerStepDone => '安装完成';
+
+  @override
+  String get installerBack => '上一步';
+
+  @override
+  String get installerNext => '下一步';
+
+  @override
+  String get installerStart => '开始安装';
+
+  @override
+  String get installerSearchHint => '搜索';
+
+  @override
+  String get installerSearchEmpty => '没有匹配项';
+
+  @override
+  String get installerDiskLive => '当前 Live 介质';
+
+  @override
+  String get installerDiskNone => '没有可选的目标磁盘';
+
+  @override
+  String get installerDiskWarning => '所选磁盘上的所有分区与数据都会被清除，且无法恢复。';
+
+  @override
+  String get installerFilesystem => '文件系统';
+
+  @override
+  String get installerSwap => '交换空间';
+
+  @override
+  String get installerSwapNone => '不使用';
+
+  @override
+  String get installerSwapFile => '交换文件';
+
+  @override
+  String get installerEncryptTitle => '加密磁盘（LUKS2）';
+
+  @override
+  String get installerEncryptHint => '开机时需要输入口令解锁，丢失口令将无法恢复数据。';
+
+  @override
+  String get installerLuksPassphrase => '加密口令';
+
+  @override
+  String get installerLuksConfirm => '再次输入口令';
+
+  @override
+  String get installerPassphraseTooShort => '口令至少需要 8 个字符';
+
+  @override
+  String get installerPassphraseMismatch => '两次输入的口令不一致';
+
+  @override
+  String get installerEncryptWarning => '口令无法找回：请务必牢记，或另行妥善保存。';
+
+  @override
+  String get installerEncryptOn => '已启用（LUKS2）';
+
+  @override
+  String get installerEncryptOff => '未启用';
+
+  @override
+  String get installerUsername => '用户名';
+
+  @override
+  String get installerHostname => '主机名';
+
+  @override
+  String get installerUserPassword => '用户密码';
+
+  @override
+  String get installerRootPassword => 'root 密码';
+
+  @override
+  String get installerPasswordOptional => '留空表示不设置';
+
+  @override
+  String get installerInvalidName => '只能用小写字母、数字与连字符，且以字母开头';
+
+  @override
+  String get installerAutologin => '开机自动登录';
+
+  @override
+  String get installerAutologinHint => '直接进入 ArchoeraMusic kiosk，不显示登录提示';
+
+  @override
+  String get installerEnabled => '已启用';
+
+  @override
+  String get installerDisabled => '已关闭';
+
+  @override
+  String get installerSummaryEraseWarning => '点击「开始安装」后立即写入磁盘，此操作不可撤销。';
+
+  @override
+  String get installerProgressPreparing => '正在准备…';
+
+  @override
+  String get installerProgressFailed => '安装失败';
+
+  @override
+  String get installerProgressRetry => '重试';
+
+  @override
+  String get installerDoneBody => '系统已写入目标磁盘，可以重启进入 ArchoeraOS 了。';
+
+  @override
+  String get installerDoneHint => '若要从 Live 介质移除后再使用该磁盘，请先关机再拔出。';
+
+  @override
+  String get installerRebootNow => '立即重启';
+
+  @override
+  String get installerPowerOffNow => '关机';
+
+  @override
+  String get installerEntry => '安装 ArchoeraOS';
+
+  @override
+  String get installerEntryHint => '把系统安装到本机磁盘（仅 Live 介质可用）';
+
+  @override
+  String get installerEntryConfirm => '将退出播放器并启动安装向导，确定继续？';
+
+  @override
+  String get installerEntryFailed => '无法启动安装向导';
+
+  @override
+  String get installerEntrySwitching => '正在切换到安装向导…';
+
+  @override
   String get systemUnavailableTitle => 'Läuft nicht unter ArchoeraOS';
 
   @override

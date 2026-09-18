@@ -109,6 +109,13 @@ abstract interface class LiveInstallService {
 
   /// 轮询进度。
   LiveInstallStatus status();
+
+  /// 请求启动安装向导：写 `/run/archoera-install/request` 并返回是否成功。
+  ///
+  /// 调用方（播放器）成功后应立即退出：合成器的 watchdog 随之退出，Live 的会话
+  /// 脚本检测到该标记后，以 `ARCHOERA_MODE=installer` 启动**同一个**二进制并进
+  /// 入向导。仅供 Live 环境使用。
+  bool requestInstaller();
 }
 
 /// 占位实现：非 Live 环境 / 桥接不可用时使用（不抛异常）。
@@ -126,4 +133,7 @@ class UnavailableLiveInstall implements LiveInstallService {
 
   @override
   LiveInstallStatus status() => const LiveInstallStatus();
+
+  @override
+  bool requestInstaller() => false;
 }

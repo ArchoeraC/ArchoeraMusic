@@ -47,6 +47,37 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
     return confirmed ?? false;
   }
 
+  /// 请求启动安装向导：写标记 → 退出播放器（合成器 watchdog 退出 → 会话脚本
+  /// 以 ARCHOERA_MODE=installer 重新拉起同一二进制）。仅在 Live 介质上出现。
+  Future<void> _requestInstaller(LiveInstallService live) async {
+    final l10n = context.l10n;
+    final confirmed = await SDialog.show<bool>(
+      context,
+      title: l10n.installerEntry,
+      child: Text(
+        l10n.installerEntryConfirm,
+        style: const TextStyle(fontSize: 13, height: 1.6),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(l10n.commonCancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(l10n.commonConfirm),
+        ),
+      ],
+    );
+    if (confirmed != true) return;
+    if (!live.requestInstaller()) {
+      toast(l10n.installerEntryFailed, type: ToastType.error);
+      return;
+    }
+    toast(l10n.installerEntrySwitching);
+    exit(0);
+  }
+
   /// 确认后执行系统请求（桥接返回码无需在 UI 处理：不可用时能力位已 gate）。
   Future<void> _invoke(String action, int Function() request) async {
     if (!await _confirm(action)) return;
@@ -204,6 +235,27 @@ class _SystemSectionState extends ConsumerState<SystemSection> {
     // 显示（per-output 分辨率 / 缩放 / 旋转；仅 udev 后端置位 output 能力）。
     if (osCaps & OsCapability.output != 0) {
       add(const DisplaySettingsSection());
+    }
+
+    // Live 安装入口（仅 Live 介质；已安装系统上 available 为 false）。
+    final live = ref.watch(liveInstallProvider);
+    if (live.available) {
+      add(
+        SettingSection(
+          title: l10n.installerTitle,
+          children: [
+            InkWell(
+              onTap: () => _requestInstaller(live),
+              child: SettingTile(
+                icon: EtaIcons.downloadOutline,
+                title: l10n.installerEntry,
+                subtitle: l10n.installerEntryHint,
+                trailing: const Icon(EtaIcons.arrowRight, size: 18),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     // 只读的系统状态 / 资源集中在「系统监视器」弹窗中。

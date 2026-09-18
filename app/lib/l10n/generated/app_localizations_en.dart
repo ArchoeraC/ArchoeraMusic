@@ -4510,6 +4510,179 @@ class AppLocalizationsEn extends AppLocalizations {
   String get netFailedPair => 'Pairing failed';
 
   @override
+  String get installerTitle => 'Install ArchoeraOS';
+
+  @override
+  String get installerStepLanguage => 'Language';
+
+  @override
+  String get installerStepTimezone => 'Time zone';
+
+  @override
+  String get installerStepKeyboard => 'Keyboard';
+
+  @override
+  String get installerStepDisk => 'Target disk';
+
+  @override
+  String get installerStepEncryption => 'Disk encryption';
+
+  @override
+  String get installerStepUser => 'User';
+
+  @override
+  String get installerStepSummary => 'Confirm';
+
+  @override
+  String get installerStepProgress => 'Installing';
+
+  @override
+  String get installerStepDone => 'Finished';
+
+  @override
+  String get installerBack => 'Back';
+
+  @override
+  String get installerNext => 'Next';
+
+  @override
+  String get installerStart => 'Start install';
+
+  @override
+  String get installerSearchHint => 'Search';
+
+  @override
+  String get installerSearchEmpty => 'No matches';
+
+  @override
+  String get installerDiskLive => 'current live medium';
+
+  @override
+  String get installerDiskNone => 'No target disk available';
+
+  @override
+  String get installerDiskWarning =>
+      'All partitions and data on the selected disk will be erased. This cannot be undone.';
+
+  @override
+  String get installerFilesystem => 'Filesystem';
+
+  @override
+  String get installerSwap => 'Swap';
+
+  @override
+  String get installerSwapNone => 'None';
+
+  @override
+  String get installerSwapFile => 'Swap file';
+
+  @override
+  String get installerEncryptTitle => 'Encrypt the disk (LUKS2)';
+
+  @override
+  String get installerEncryptHint =>
+      'A passphrase is required at boot; losing it means losing the data.';
+
+  @override
+  String get installerLuksPassphrase => 'Encryption passphrase';
+
+  @override
+  String get installerLuksConfirm => 'Repeat passphrase';
+
+  @override
+  String get installerPassphraseTooShort =>
+      'Passphrase must be at least 8 characters';
+
+  @override
+  String get installerPassphraseMismatch => 'Passphrases do not match';
+
+  @override
+  String get installerEncryptWarning =>
+      'The passphrase cannot be recovered: memorise it or store it safely.';
+
+  @override
+  String get installerEncryptOn => 'Enabled (LUKS2)';
+
+  @override
+  String get installerEncryptOff => 'Disabled';
+
+  @override
+  String get installerUsername => 'Username';
+
+  @override
+  String get installerHostname => 'Hostname';
+
+  @override
+  String get installerUserPassword => 'User password';
+
+  @override
+  String get installerRootPassword => 'root password';
+
+  @override
+  String get installerPasswordOptional => 'Leave empty to skip';
+
+  @override
+  String get installerInvalidName =>
+      'Lowercase letters, digits and hyphens only, starting with a letter';
+
+  @override
+  String get installerAutologin => 'Log in automatically';
+
+  @override
+  String get installerAutologinHint =>
+      'Boot straight into the ArchoeraMusic kiosk';
+
+  @override
+  String get installerEnabled => 'Enabled';
+
+  @override
+  String get installerDisabled => 'Disabled';
+
+  @override
+  String get installerSummaryEraseWarning =>
+      'Starting the install writes to the disk immediately and cannot be undone.';
+
+  @override
+  String get installerProgressPreparing => 'Preparing…';
+
+  @override
+  String get installerProgressFailed => 'Installation failed';
+
+  @override
+  String get installerProgressRetry => 'Retry';
+
+  @override
+  String get installerDoneBody =>
+      'The system has been written to the target disk; you can reboot into ArchoeraOS.';
+
+  @override
+  String get installerDoneHint =>
+      'If you want to reuse the disk, power off first, then remove the live medium.';
+
+  @override
+  String get installerRebootNow => 'Reboot now';
+
+  @override
+  String get installerPowerOffNow => 'Power off';
+
+  @override
+  String get installerEntry => 'Install ArchoeraOS';
+
+  @override
+  String get installerEntryHint =>
+      'Install the system to this machine (live medium only)';
+
+  @override
+  String get installerEntryConfirm =>
+      'The player will exit and the installer will start. Continue?';
+
+  @override
+  String get installerEntryFailed => 'Could not start the installer';
+
+  @override
+  String get installerEntrySwitching => 'Switching to the installer…';
+
+  @override
   String get systemUnavailableTitle => 'Not running on ArchoeraOS';
 
   @override

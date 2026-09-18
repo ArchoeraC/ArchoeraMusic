@@ -18,6 +18,7 @@ import 'services/streaming/streaming_store.dart';
 import 'stores/app_prefs.dart';
 import 'stores/vault_session_store.dart';
 import 'app/app.dart';
+import 'installer/installer_wizard.dart';
 import 'app/watermark.dart';
 import 'widgets/list/cover_image.dart';
 import 'widgets/common/tray_integration.dart';
@@ -35,6 +36,15 @@ Future<void> main() async {
   // 防伪锚点：把 'ARCHOERA DESIGNED' 编译进内核/AOT 快照字符串表
   // （见 app/watermark.dart；勿删，反编译识别非官方重新打包）。
   archoeraWatermarkAnchor();
+  // ArchoeraOS 安装向导模式：Live 的会话脚本检测到安装请求后，以
+  // ARCHOERA_MODE=installer 启动**同一个**二进制（Flutter 的 Linux runner 不透传
+  // argv，故用环境变量交接）。向导是独立全屏应用，不初始化播放器栈（凭据保险
+  // 库 / 音频引擎 / 托盘都不需要），启动更快、也不碰用户数据；它排在单实例守卫
+  // **之前**——两种模式接力运行，不该被上一个模式的实例锁挡住。
+  if (Platform.environment['ARCHOERA_MODE'] == 'installer') {
+    runApp(const ProviderScope(child: InstallerApp()));
+    return;
+  }
   // 单实例守卫（经 Zig 平台桥接文件锁/命名互斥体，禁止多开）：已有实例则用应用
   // 自身对话框提示后退出（第二实例的 Flutter 引擎已由原生 runner 起好，直接
   // runApp 最小页）。桥接缺失时不再静默放行（旧 Dart 兜底不可靠）——显式失败。
@@ -48,18 +58,23 @@ Future<void> main() async {
   }
   if (!firstInstance) {
     final parts = Platform.localeName.replaceAll('-', '_').split('_');
-    final locale = parts.length >= 2 ? Locale(parts[0], parts[1]) : Locale(parts[0]);
+    final locale = parts.length >= 2
+        ? Locale(parts[0], parts[1])
+        : Locale(parts[0]);
     // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。
     await windowManager.ensureInitialized();
     await windowManager.setSize(const Size(420, 260));
     await windowManager.center();
     await windowManager.show();
     final l10n = lookupAppLocalizations(locale);
-    runApp(_AlreadyRunningApp(
+    runApp(
+      _AlreadyRunningApp(
         title: l10n.instanceAlreadyRunningTitle,
         message: l10n.instanceAlreadyRunning,
         okLabel: l10n.vaultCrashDismiss,
-        locale: locale));
+        locale: locale,
+      ),
+    );
     return;
   }
   // 预加载内置 SQLite（libe_sqlite3）：dart sqlite3 包经 hooks 配置
@@ -76,8 +91,7 @@ Future<void> main() async {
   // 推荐 / vault 实验性）来自设置页偏好，控制惰性重建时初始化哪种方案。
   final prefs = AppPrefs.load();
   StreamingStore.defaultScheme = prefs.credentialScheme;
-  final sessionStore =
-      VaultSessionStore(defaultScheme: prefs.credentialScheme);
+  final sessionStore = VaultSessionStore(defaultScheme: prefs.credentialScheme);
   await sessionStore.initialize();
   if (!sessionStore.vaultAvailable) {
     // 凭据保险库不可用：登录态仅内存保留（不静默降级为明文持久化）
@@ -112,11 +126,12 @@ class _BrowserUserAgentOverrides extends HttpOverrides {
 
 /// 二次启动提示：自绘对话框卡片（无页面包裹感），窗口已缩为对话框尺寸。
 class _AlreadyRunningApp extends StatelessWidget {
-  const _AlreadyRunningApp(
-      {required this.title,
-      required this.message,
-      required this.okLabel,
-      required this.locale});
+  const _AlreadyRunningApp({
+    required this.title,
+    required this.message,
+    required this.okLabel,
+    required this.locale,
+  });
 
   final String title;
   final String message;
@@ -134,14 +149,21 @@ class _AlreadyRunningApp extends StatelessWidget {
         AppLocalizations.delegate,
         ...GlobalMaterialLocalizations.delegates,
       ],
-      home: _AlreadyRunningCard(title: title, message: message, okLabel: okLabel),
+      home: _AlreadyRunningCard(
+        title: title,
+        message: message,
+        okLabel: okLabel,
+      ),
     );
   }
 }
 
 class _AlreadyRunningCard extends StatelessWidget {
-  const _AlreadyRunningCard(
-      {required this.title, required this.message, required this.okLabel});
+  const _AlreadyRunningCard({
+    required this.title,
+    required this.message,
+    required this.okLabel,
+  });
 
   final String title;
   final String message;
@@ -170,16 +192,22 @@ class _AlreadyRunningCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Center(
-                child: Text(title,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600)),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: scheme.onSurfaceVariant)),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 16),
               Center(
                 child: FilledButton(
@@ -220,8 +248,11 @@ class _WarnPainter extends CustomPainter {
       ..strokeWidth = 2.6
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(Offset(w / 2, h * 0.40), Offset(w / 2, h * 0.64), mark);
-    canvas.drawCircle(Offset(w / 2, h * 0.75), 1.6,
-        Paint()..color = const Color(0xFFFFB300));
+    canvas.drawCircle(
+      Offset(w / 2, h * 0.75),
+      1.6,
+      Paint()..color = const Color(0xFFFFB300),
+    );
   }
 
   @override
