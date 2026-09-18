@@ -57,6 +57,13 @@ if [ ! -d "$TREE" ] || [ "$ROOT_IMG" -nt "$TREE/etc/os-release" ]; then
     mkdir -p "$TREE"
     debugfs -R "rdump / $TREE" "$ROOT_IMG" >/dev/null 2>&1 || true
     [ -e "$TREE/etc/os-release" ] || { echo "导出 root 文件树失败" >&2; exit 1; }
+    # 树导出后 root.ext4 就没用了（后面只从 raw 抽 ESP）。在内存盘上跑时它占 5.7G，
+    # 会让后面的 efiboot/ISO 阶段撞上空间上限，所以允许导出后立即删掉：
+    #   MKISO_DROP_ROOT_IMG=1 MKISO_WORK=/tmp/mkiso os/vm/mkiso.sh
+    if [ "${MKISO_DROP_ROOT_IMG:-0}" = "1" ]; then
+        rm -f "$ROOT_IMG"
+        echo "==> 已删除中间产物 root.ext4（MKISO_DROP_ROOT_IMG=1）"
+    fi
 fi
 
 # ── 3) 取引导文件（内核 / 微码 / initrd） ───────────────────────────
@@ -146,9 +153,12 @@ ls -la "$BOOT"
 # ── 4) 小 EFI FAT 映像（El Torito 载荷）：systemd-boot + 内核 + initrd ──
 EB="$WORK/efiboot.img"
 mkdir -p "$WORK"
+# 这一阶段之后只剩 efiboot（~0.65G）+ EFI staging（~0.7G）+ ISO 写出（用 MKISO_OUT，
+# 通常在别的挂载点），所以最低要求按实际需要给 ~2GiB 即可。
+# （早先写 8GiB 过于保守：内存盘上 root/tree/esp/boot 已占掉 ~13G 时会误报失败。）
 AVAIL_KB=$(df -Pk "$WORK" | awk 'NR==2{print $4}')
-if [ "${AVAIL_KB:-0}" -lt $((8 * 1024 * 1024)) ]; then
-    echo "!! $WORK 可用空间不足 8GiB（当前 $(( ${AVAIL_KB:-0} / 1024 / 1024 ))GiB）" >&2
+if [ "${AVAIL_KB:-0}" -lt $((2 * 1024 * 1024)) ]; then
+    echo "!! $WORK 可用空间不足 2GiB（当前 $(( ${AVAIL_KB:-0} / 1024 / 1024 ))GiB）" >&2
     echo "   可换位置：MKISO_WORK=/path/to/disk/cache $0" >&2
     exit 1
 fi
