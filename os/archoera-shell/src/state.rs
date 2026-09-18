@@ -280,6 +280,22 @@ impl ArchoeraShell {
         );
     }
 
+    /// 向各输出的客户端下发 frame 回调。
+    ///
+    /// **必须在帧真正上屏之后调用**：udev 走 vblank（`frame_submitted` 之后），
+    /// winit 走 Redraw 之后。若在「合成完但还没上屏」时就发（此前的做法），客户端会
+    /// 赶在上一帧之前画下一帧，多余提交被 `queue_frame` 丢弃 → 表现为**低帧率/卡顿**。
+    pub fn send_frame_callbacks(&mut self) {
+        let now = monotonic_now();
+        let outputs: Vec<Output> = self.space.outputs().cloned().collect();
+        for output in &outputs {
+            let refresh = frame_refresh(output);
+            self.space.elements().for_each(|window| {
+                window.send_frame(output, now, refresh, |_, _| Some(output.clone()));
+            });
+        }
+    }
+
     /// 合成并提交一帧：渲染全部输出、驱动客户端帧回调、清理已销毁的 popup。
     ///
     /// 调用即清空重绘标志：本帧合成的是「清零前」累积的全部状态。若渲染期间又有
@@ -292,15 +308,6 @@ impl ArchoeraShell {
             backend.render(&self.space, &self.cursor)?;
         }
 
-        let frame_time = monotonic_now();
-        let outputs: Vec<Output> = self.space.outputs().cloned().collect();
-        for output in &outputs {
-            self.space.elements().for_each(|window| {
-                window.send_frame(output, frame_time, frame_refresh(output), |_, _| {
-                    Some(output.clone())
-                })
-            });
-        }
         self.space.refresh();
         self.popups.cleanup();
         // 冲刷帧回调 / popup configure 等事件（udev 的 vblank 路径依赖此步）。

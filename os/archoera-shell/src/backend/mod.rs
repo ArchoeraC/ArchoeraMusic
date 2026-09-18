@@ -199,6 +199,19 @@ impl Backend {
         }
     }
 
+    /// 切换 VT（Ctrl+Alt+Fn 转发给 libseat/logind）。
+    ///
+    /// DRM/KMS 会话处于 `KD_GRAPHICS` 时内核**不再处理** VT 切换组合键，必须由合成器转发，
+    /// 否则用户无法切到 tty（安装器的 tty2 也进不去）。
+    #[cfg_attr(not(feature = "udev"), allow(unused_variables))]
+    pub fn change_vt(&mut self, vt: i32) -> anyhow::Result<()> {
+        match self {
+            Backend::Winit(_) => Ok(()), // 嵌套后端无 VT 概念
+            #[cfg(feature = "udev")]
+            Backend::Udev(backend) => backend.change_vt(vt),
+        }
+    }
+
     /// 开关屏幕（DPMS）。仅 udev 后端实现（暂停 / 激活 DRM 输出管理器）；
     /// 嵌套后端不置位该能力，这里为无操作。
     #[cfg_attr(not(feature = "udev"), allow(unused_variables))]

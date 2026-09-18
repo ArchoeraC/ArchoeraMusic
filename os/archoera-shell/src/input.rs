@@ -44,13 +44,35 @@ impl ArchoeraShell {
 
                 let serial = SERIAL_COUNTER.next_serial();
                 let time = Event::time_msec(&event);
+                // Ctrl+Alt+Fn → 切换 VT。DRM/KMS 会话处于 KD_GRAPHICS 时内核不再处理这组
+                // 组合键（图形模式下由显示服务负责），所以必须我们自己转发给 libseat/logind，
+                // 否则用户永远切不到 tty（安装器的 tty2 也进不去、无法排查问题）。
+                // 注意 keycode 是 XKB 码：F1 = 67 … F12 = 78（evdev + 8）。
+                let vt_switch =
+                    if key_state == KeyState::Pressed && (67..=78).contains(&keycode.raw()) {
+                        Some(keycode.raw() as i32 - 66)
+                    } else {
+                        None
+                    };
                 self.seat.get_keyboard().unwrap().input::<(), _>(
                     self,
                     keycode,
                     key_state,
                     serial,
                     time,
-                    |_, _, _| FilterResult::Forward,
+                    move |state, mods, _| {
+                        if let Some(vt) = vt_switch {
+                            if mods.ctrl && mods.alt {
+                                if let Some(backend) = state.backend.as_mut() {
+                                    if let Err(err) = backend.change_vt(vt) {
+                                        tracing::warn!(%err, vt, "切换 VT 失败");
+                                    }
+                                }
+                                return FilterResult::Intercept(());
+                            }
+                        }
+                        FilterResult::Forward
+                    },
                 );
             }
             InputEvent::PointerMotion { event, .. } => {

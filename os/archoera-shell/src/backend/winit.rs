@@ -100,6 +100,7 @@ pub fn init_winit(
                     if let Err(err) = state.render_frame() {
                         tracing::error!(%err, "合成渲染失败");
                     }
+                    state.send_frame_callbacks();
                     // 事件驱动：渲染后不再无条件 request_redraw。若客户端在帧回调后
                     // 产生新提交，会经 Wayland dispatch → schedule_redraw 再次唤醒。
                     if let Err(err) = display_handle.flush_clients() {

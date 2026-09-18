@@ -81,7 +81,6 @@ pub struct UdevBackend {
     renderer: GlesRenderer,
     manager: OutputManager,
     /// libseat 会话：即使不直接查询也必须持有——`drop` 会关闭它打开的所有设备。
-    #[allow(dead_code)]
     session: LibSeatSession,
     libinput: Libinput,
     surfaces: HashMap<crtc::Handle, UdevSurface>,
@@ -92,6 +91,13 @@ pub struct UdevBackend {
 impl UdevBackend {
     pub fn renderer(&mut self) -> &mut GlesRenderer {
         &mut self.renderer
+    }
+
+    /// 切换 VT：转发给 libseat（logind 后端会做实际的 VT 切换与 DRM 主控交接）。
+    pub fn change_vt(&mut self, vt: i32) -> anyhow::Result<()> {
+        self.session
+            .change_vt(vt)
+            .map_err(|e| anyhow::anyhow!("libseat change_vt({vt}) 失败: {e}"))
     }
 
     /// 开关屏幕（DPMS）：暂停 / 重新激活 DRM 输出管理器。
@@ -408,6 +414,8 @@ pub fn init_udev(
                         if let Err(err) = surface.drm_output.frame_submitted() {
                             tracing::warn!(?crtc, ?err, "回收 DRM 帧失败");
                         }
+                        // 帧已上屏 → 现在才通知客户端可以画下一帧（节拍关键）。
+                        data.state.send_frame_callbacks();
                     }
                 }
                 // 事件驱动：仅在有新提交时合成；空帧不 queue_frame，vblank 自然停止，
