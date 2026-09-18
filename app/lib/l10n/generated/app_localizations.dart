@@ -7778,6 +7778,18 @@ abstract class AppLocalizations {
   /// **'返回'**
   String get shortcutActionBack;
 
+  /// No description provided for @settingsCatNetwork.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'网络'**
+  String get settingsCatNetwork;
+
+  /// No description provided for @settingsNetworkSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'WiFi 与蓝牙'**
+  String get settingsNetworkSubtitle;
+
   /// No description provided for @settingsCatSystem.
   ///
   /// In zh_CN, this message translates to:
@@ -7789,6 +7801,228 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'亮度、屏幕与电源（ArchoeraOS 会话）'**
   String get settingsSystemSubtitle;
+
+  /// No description provided for @netUnavailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本机未检测到无线网卡或蓝牙适配器。'**
+  String get netUnavailable;
+
+  /// No description provided for @netWifiTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'WiFi'**
+  String get netWifiTitle;
+
+  /// No description provided for @netWifiEnabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已启用'**
+  String get netWifiEnabled;
+
+  /// No description provided for @netWifiDisabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已关闭'**
+  String get netWifiDisabled;
+
+  /// No description provided for @netWifiConnected.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已连接'**
+  String get netWifiConnected;
+
+  /// No description provided for @netWifiNotConnected.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未连接'**
+  String get netWifiNotConnected;
+
+  /// No description provided for @netWifiAvailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'可用网络'**
+  String get netWifiAvailable;
+
+  /// No description provided for @netWifiEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未发现可用网络'**
+  String get netWifiEmpty;
+
+  /// No description provided for @netWifiScanning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在扫描…'**
+  String get netWifiScanning;
+
+  /// No description provided for @netWifiSaved.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已保存'**
+  String get netWifiSaved;
+
+  /// No description provided for @netWifiConnect.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'连接'**
+  String get netWifiConnect;
+
+  /// No description provided for @netWifiDisconnect.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'断开'**
+  String get netWifiDisconnect;
+
+  /// No description provided for @netWifiForget.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'忘记'**
+  String get netWifiForget;
+
+  /// No description provided for @netWifiPasswordTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'WiFi 密码'**
+  String get netWifiPasswordTitle;
+
+  /// No description provided for @netWifiPasswordHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入密码'**
+  String get netWifiPasswordHint;
+
+  /// No description provided for @netWifiPasswordRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'该网络需要密码'**
+  String get netWifiPasswordRequired;
+
+  /// No description provided for @netBtTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'蓝牙'**
+  String get netBtTitle;
+
+  /// No description provided for @netBtDevices.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备'**
+  String get netBtDevices;
+
+  /// No description provided for @netBtEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未发现设备'**
+  String get netBtEmpty;
+
+  /// No description provided for @netBtScanning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在扫描…'**
+  String get netBtScanning;
+
+  /// No description provided for @netBtScanStart.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开始扫描'**
+  String get netBtScanStart;
+
+  /// No description provided for @netBtScanStop.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'停止扫描'**
+  String get netBtScanStop;
+
+  /// No description provided for @netBtPaired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已配对'**
+  String get netBtPaired;
+
+  /// No description provided for @netBtConnected.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已连接'**
+  String get netBtConnected;
+
+  /// No description provided for @netBtPair.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'配对'**
+  String get netBtPair;
+
+  /// No description provided for @netBtConnect.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'连接'**
+  String get netBtConnect;
+
+  /// No description provided for @netBtDisconnect.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'断开'**
+  String get netBtDisconnect;
+
+  /// No description provided for @netBtForget.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'忘记'**
+  String get netBtForget;
+
+  /// No description provided for @netShowUnavailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'显示不可用的设备'**
+  String get netShowUnavailable;
+
+  /// No description provided for @netHideUnavailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'收起不可用的设备'**
+  String get netHideUnavailable;
+
+  /// No description provided for @netSecOpen.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开放'**
+  String get netSecOpen;
+
+  /// No description provided for @netSecWep.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'WEP'**
+  String get netSecWep;
+
+  /// No description provided for @netSecPsk.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'WPA/WPA2'**
+  String get netSecPsk;
+
+  /// No description provided for @netSecEnterprise.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'企业级'**
+  String get netSecEnterprise;
+
+  /// No description provided for @netSecUnknown.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未知加密'**
+  String get netSecUnknown;
+
+  /// No description provided for @netFailedConnect.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'连接失败'**
+  String get netFailedConnect;
+
+  /// No description provided for @netFailedPair.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'配对失败'**
+  String get netFailedPair;
 
   /// No description provided for @systemUnavailableTitle.
   ///

@@ -4461,11 +4461,128 @@ class AppLocalizationsEs extends AppLocalizations {
   String get shortcutActionBack => 'Atrás';
 
   @override
+  String get settingsCatNetwork => '网络';
+
+  @override
+  String get settingsNetworkSubtitle => 'WiFi 与蓝牙';
+
+  @override
   String get settingsCatSystem => 'Sistema';
 
   @override
   String get settingsSystemSubtitle =>
       'Brillo, pantalla y energía (sesión ArchoeraOS)';
+
+  @override
+  String get netUnavailable => '本机未检测到无线网卡或蓝牙适配器。';
+
+  @override
+  String get netWifiTitle => 'WiFi';
+
+  @override
+  String get netWifiEnabled => '已启用';
+
+  @override
+  String get netWifiDisabled => '已关闭';
+
+  @override
+  String get netWifiConnected => '已连接';
+
+  @override
+  String get netWifiNotConnected => '未连接';
+
+  @override
+  String get netWifiAvailable => '可用网络';
+
+  @override
+  String get netWifiEmpty => '未发现可用网络';
+
+  @override
+  String get netWifiScanning => '正在扫描…';
+
+  @override
+  String get netWifiSaved => '已保存';
+
+  @override
+  String get netWifiConnect => '连接';
+
+  @override
+  String get netWifiDisconnect => '断开';
+
+  @override
+  String get netWifiForget => '忘记';
+
+  @override
+  String get netWifiPasswordTitle => 'WiFi 密码';
+
+  @override
+  String get netWifiPasswordHint => '请输入密码';
+
+  @override
+  String get netWifiPasswordRequired => '该网络需要密码';
+
+  @override
+  String get netBtTitle => '蓝牙';
+
+  @override
+  String get netBtDevices => '设备';
+
+  @override
+  String get netBtEmpty => '未发现设备';
+
+  @override
+  String get netBtScanning => '正在扫描…';
+
+  @override
+  String get netBtScanStart => '开始扫描';
+
+  @override
+  String get netBtScanStop => '停止扫描';
+
+  @override
+  String get netBtPaired => '已配对';
+
+  @override
+  String get netBtConnected => '已连接';
+
+  @override
+  String get netBtPair => '配对';
+
+  @override
+  String get netBtConnect => '连接';
+
+  @override
+  String get netBtDisconnect => '断开';
+
+  @override
+  String get netBtForget => '忘记';
+
+  @override
+  String get netShowUnavailable => '显示不可用的设备';
+
+  @override
+  String get netHideUnavailable => '收起不可用的设备';
+
+  @override
+  String get netSecOpen => '开放';
+
+  @override
+  String get netSecWep => 'WEP';
+
+  @override
+  String get netSecPsk => 'WPA/WPA2';
+
+  @override
+  String get netSecEnterprise => '企业级';
+
+  @override
+  String get netSecUnknown => '未知加密';
+
+  @override
+  String get netFailedConnect => '连接失败';
+
+  @override
+  String get netFailedPair => '配对失败';
 
   @override
   String get systemUnavailableTitle => 'No se ejecuta en ArchoeraOS';

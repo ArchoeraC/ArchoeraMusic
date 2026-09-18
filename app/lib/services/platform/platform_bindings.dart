@@ -52,6 +52,7 @@ const int aplCapSystemTheme = 1 << 8;
 const int aplCapOsSession = 1 << 9;
 const int aplCapSysStats = 1 << 10;
 const int aplCapBluetooth = 1 << 11;
+const int aplCapWifi = 1 << 12;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;

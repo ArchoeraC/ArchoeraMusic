@@ -12,9 +12,9 @@ extension _SettingsDialogView on _SettingsDialogState {
     final window = MediaQuery.sizeOf(context);
     final animated = ref.watch(appPrefsProvider).sidebarNavStyle == 'animated';
     final devMode = ref.watch(appPrefsProvider).developerMode;
-    final osAvailable = ref
-        .watch(platformCapabilitiesProvider)
-        .osSessionAvailable;
+    final platform = ref.watch(platformCapabilitiesProvider);
+    final osAvailable = platform.osSessionAvailable;
+    final netAvailable = platform.netAvailable;
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _updateCategoryIndicator(),
     );
@@ -89,6 +89,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                                   if (cat.visible(
                                     devMode,
                                     osAvailable: osAvailable,
+                                    netAvailable: netAvailable,
                                   ))
                                     _buildCategoryItem(
                                       scheme,
@@ -587,6 +588,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                 SettingsCategory.scrape => const ScrapeSection(),
                 SettingsCategory.scanner => const ScansSection(),
                 SettingsCategory.mediaSource => StreamingServerList(),
+                SettingsCategory.network => const NetworkSection(),
                 SettingsCategory.system => const SystemSection(),
                 SettingsCategory.about => AboutSection(
                   version: _version,
@@ -633,11 +635,17 @@ extension _SettingsDialogView on _SettingsDialogState {
   Widget _buildSearchResults(ColorScheme scheme, AppLocalizations l10n) {
     final q = _query.trim().toLowerCase();
     final devMode = ref.watch(appPrefsProvider).developerMode;
-    final osAvailable = ref
-        .watch(platformCapabilitiesProvider)
-        .osSessionAvailable;
+    final platform = ref.watch(platformCapabilitiesProvider);
+    final osAvailable = platform.osSessionAvailable;
+    final netAvailable = platform.netAvailable;
     final index = _buildSearchIndex(l10n)
-        .where((e) => e.category.visible(devMode, osAvailable: osAvailable))
+        .where(
+          (e) => e.category.visible(
+            devMode,
+            osAvailable: osAvailable,
+            netAvailable: netAvailable,
+          ),
+        )
         .toList();
     final matches = index.where((e) => _searchMatch(e, q, l10n)).toList();
     if (matches.isEmpty) {
@@ -675,7 +683,11 @@ extension _SettingsDialogView on _SettingsDialogState {
           ),
           const SizedBox(height: 8),
           for (final cat in SettingsCategory.values)
-            if (cat.visible(devMode, osAvailable: osAvailable) &&
+            if (cat.visible(
+                  devMode,
+                  osAvailable: osAvailable,
+                  netAvailable: netAvailable,
+                ) &&
                 matches.any((e) => e.category == cat)) ...[
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),

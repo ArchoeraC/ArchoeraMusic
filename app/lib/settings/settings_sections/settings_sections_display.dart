@@ -67,42 +67,20 @@ class _DisplaySettingsSectionState
 
   /// 自定义缩放：弹输入框（1%-400%，合成器会夹取）。
   Future<void> _customScale(OsDisplayOutput output) async {
-    final l10n = context.l10n;
-    final text = TextEditingController(
-      text: '${(output.scaleMilli / 10).round()}',
-    );
-    final value = await SDialog.show<int>(
+    final value = await SettingPromptDialog.show(
       context,
-      title: l10n.systemDisplayCustomScale,
-      child: TextField(
-        controller: text,
-        autofocus: true,
-        keyboardType: const TextInputType.numberWithOptions(decimal: false),
-        decoration: InputDecoration(
-          suffixText: '%',
-          border: const OutlineInputBorder(),
-          hintText: '125',
-        ),
-        onSubmitted: (v) => Navigator.pop(context, int.tryParse(v.trim())),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n.commonCancel),
-        ),
-        FilledButton(
-          onPressed: () =>
-              Navigator.pop(context, int.tryParse(text.text.trim())),
-          child: Text(l10n.commonConfirm),
-        ),
-      ],
+      title: context.l10n.systemDisplayCustomScale,
+      initial: '${(output.scaleMilli / 10).round()}',
+      hint: '125',
+      suffixText: '%',
+      keyboardType: TextInputType.number,
     );
-    text.dispose();
-    if (value == null || value < 1 || value > 400) return;
+    final percent = int.tryParse((value ?? '').trim());
+    if (percent == null || percent < 1 || percent > 400) return;
     _apply(
       () => ref
           .read(osSessionControllerProvider)
-          .setDisplayOutputScale(output.id, value * 10),
+          .setDisplayOutputScale(output.id, percent * 10),
     );
   }
 

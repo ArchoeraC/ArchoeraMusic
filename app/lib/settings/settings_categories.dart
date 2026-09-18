@@ -21,6 +21,9 @@ enum SettingsCategory {
   scanner(EtaIcons.search3Outline),
   mediaSource(EtaIcons.serverOutline),
 
+  /// 网络（WiFi / 蓝牙；仅本机有无线或蓝牙适配器时显示）。
+  network(EtaIcons.wifi),
+
   /// 系统（ArchoeraOS 会话控制：亮度/屏幕/电源；仅会话可用时显示）。
   system(EtaIcons.brightnessOutline),
   about(EtaIcons.informationOutline),
@@ -44,6 +47,7 @@ enum SettingsCategory {
     scrape => l10n.settingsCatScrape,
     scanner => l10n.settingsCatScanner,
     mediaSource => l10n.settingsCatMediaSource,
+    network => l10n.settingsCatNetwork,
     system => l10n.settingsCatSystem,
     about => l10n.settingsCatAbout,
     developer => l10n.settingsCatDeveloper,
@@ -61,6 +65,7 @@ enum SettingsCategory {
     scrape => l10n.settingsScrapeSubtitle,
     scanner => l10n.settingsScannerSubtitle,
     mediaSource => l10n.settingsMediaSourceSubtitle,
+    network => l10n.settingsNetworkSubtitle,
     system => l10n.settingsSystemSubtitle,
     about => l10n.settingsAboutSubtitle,
     developer => l10n.settingsDeveloperSubtitle,
@@ -69,9 +74,14 @@ enum SettingsCategory {
   /// 该分类是否在设置导航中显示：开发者分类仅在开启开发者模式后出现；
   /// 下载分类（下载接口）在开发者模式下才可见；系统分类仅在运行于
   /// ArchoeraOS 会话（[osAvailable]）时出现。
-  bool visible(bool developerMode, {bool osAvailable = false}) {
+  bool visible(
+    bool developerMode, {
+    bool osAvailable = false,
+    bool netAvailable = false,
+  }) {
     if (this == SettingsCategory.developer) return developerMode;
     if (this == SettingsCategory.download) return developerMode;
+    if (this == SettingsCategory.network) return netAvailable;
     if (this == SettingsCategory.system) return osAvailable;
     return true;
   }

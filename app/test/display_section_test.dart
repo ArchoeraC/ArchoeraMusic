@@ -188,6 +188,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('缩放下拉：选「自定义…」弹输入框，百分比 ×10 下发', (tester) async {
+    final os = _FakeOs([_panel(id: 3, name: 'eDP-1', primary: true)]);
+    await tester.pumpWidget(_host(os));
+    await tester.pumpAndSettle();
+
+    // 第二个下拉栏是缩放（分辨率 / 缩放 / 旋转）。
+    await tester.tap(find.byType(DropdownButton<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自定义…').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('自定义缩放（%）'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '137');
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+
+    expect(os.scaleCalls, [(3, 1370)]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('旋转下拉：90° → transform 码 1（作用于该输出）', (tester) async {
     final os = _FakeOs([_panel(id: 7, name: 'HDMI-A-1', primary: true)]);
     await tester.pumpWidget(_host(os));

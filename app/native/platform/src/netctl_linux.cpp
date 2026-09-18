@@ -305,11 +305,17 @@ int32_t wifiState(AplWifiState* out) {
     out->security.data = g_wifi_sec.c_str();
     out->security.len = g_wifi_sec.size();
 
-    // IPv4 地址（aau：每项 [addr, prefix]，网络字节序）。
+    // 清掉上一条连接的残留（断开后不应还显示旧地址）。
+    g_wifi_ip.clear();
+
+    // IPv4 地址：AddressData 的类型是 **aa{sv}**（每项是
+    //   {'address': <'192.168.50.5'>, 'prefix': <u32>}），
+    // 不是 aau —— 早期版本按 aau 解析 uint32，于是永远读不到、IP 恒为空。
     std::string ip4;
     if (readProp(bus, kNm, dev.c_str(), kNmDev, "Ip4Config", DBUS_TYPE_OBJECT_PATH, nullptr, &ip4) &&
         !ip4.empty() && ip4 != "/") {
-        DBusMessage* msg = getPropMsg(kNm, ip4.c_str(), "org.freedesktop.NetworkManager.IP4Config", "AddressData");
+        DBusMessage* msg = getPropMsg(kNm, ip4.c_str(), "org.freedesktop.NetworkManager.IP4Config",
+                                     "AddressData");
         if (msg != nullptr) {
             DBusError err;
             dbus_error_init(&err);
@@ -327,18 +333,33 @@ int32_t wifiState(AplWifiState* out) {
                         for (dbus_message_iter_recurse(&var, &arr);
                              dbus_message_iter_get_arg_type(&arr) == DBUS_TYPE_ARRAY;
                              dbus_message_iter_next(&arr)) {
-                            DBusMessageIter entry;
-                            dbus_message_iter_recurse(&arr, &entry);
-                            uint32_t addr = 0;
-                            if (dbus_message_iter_get_arg_type(&entry) == DBUS_TYPE_UINT32) {
-                                dbus_message_iter_get_basic(&entry, &addr);
-                                char buf[32];
-                                std::snprintf(buf, sizeof(buf), "%u.%u.%u.%u",
-                                              addr & 0xff, (addr >> 8) & 0xff, (addr >> 16) & 0xff,
-                                              (addr >> 24) & 0xff);
-                                g_wifi_ip = buf;
+                            // 每项是 a{sv}：找到 key "address"（variant 内为字符串）。
+                            DBusMessageIter dict;
+                            dbus_message_iter_recurse(&arr, &dict);
+                            bool got = false;
+                            for (;
+                                 dbus_message_iter_get_arg_type(&dict) == DBUS_TYPE_DICT_ENTRY;
+                                 dbus_message_iter_next(&dict)) {
+                                DBusMessageIter entry;
+                                dbus_message_iter_recurse(&dict, &entry);
+                                if (dbus_message_iter_get_arg_type(&entry) != DBUS_TYPE_STRING) continue;
+                                const char* key = nullptr;
+                                dbus_message_iter_get_basic(&entry, &key);
+                                if (key == nullptr || std::strcmp(key, "address") != 0) continue;
+                                DBusMessageIter val;
+                                dbus_message_iter_next(&entry);
+                                dbus_message_iter_recurse(&entry, &val);  // 解开 variant
+                                if (dbus_message_iter_get_arg_type(&val) == DBUS_TYPE_STRING) {
+                                    const char* addr = nullptr;
+                                    dbus_message_iter_get_basic(&val, &addr);
+                                    if (addr != nullptr) {
+                                        g_wifi_ip = addr;
+                                        got = true;
+                                    }
+                                }
+                                break;
                             }
-                            break;  // 只需要第一个地址
+                            if (got) break;  // 只需要第一个地址
                         }
                     }
                 }

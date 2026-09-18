@@ -4385,11 +4385,129 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutActionBack => 'Back';
 
   @override
+  String get settingsCatNetwork => 'Network';
+
+  @override
+  String get settingsNetworkSubtitle => 'Wi-Fi and Bluetooth';
+
+  @override
   String get settingsCatSystem => 'System';
 
   @override
   String get settingsSystemSubtitle =>
       'Brightness, screen and power (ArchoeraOS session)';
+
+  @override
+  String get netUnavailable =>
+      'No wireless adapter or Bluetooth adapter detected.';
+
+  @override
+  String get netWifiTitle => 'Wi-Fi';
+
+  @override
+  String get netWifiEnabled => 'Enabled';
+
+  @override
+  String get netWifiDisabled => 'Disabled';
+
+  @override
+  String get netWifiConnected => 'Connected';
+
+  @override
+  String get netWifiNotConnected => 'Not connected';
+
+  @override
+  String get netWifiAvailable => 'Available networks';
+
+  @override
+  String get netWifiEmpty => 'No available networks';
+
+  @override
+  String get netWifiScanning => 'Scanning…';
+
+  @override
+  String get netWifiSaved => 'Saved';
+
+  @override
+  String get netWifiConnect => 'Connect';
+
+  @override
+  String get netWifiDisconnect => 'Disconnect';
+
+  @override
+  String get netWifiForget => 'Forget';
+
+  @override
+  String get netWifiPasswordTitle => 'Wi-Fi password';
+
+  @override
+  String get netWifiPasswordHint => 'Enter password';
+
+  @override
+  String get netWifiPasswordRequired => 'This network requires a password';
+
+  @override
+  String get netBtTitle => 'Bluetooth';
+
+  @override
+  String get netBtDevices => 'Devices';
+
+  @override
+  String get netBtEmpty => 'No devices found';
+
+  @override
+  String get netBtScanning => 'Scanning…';
+
+  @override
+  String get netBtScanStart => 'Start scan';
+
+  @override
+  String get netBtScanStop => 'Stop scan';
+
+  @override
+  String get netBtPaired => 'Paired';
+
+  @override
+  String get netBtConnected => 'Connected';
+
+  @override
+  String get netBtPair => 'Pair';
+
+  @override
+  String get netBtConnect => 'Connect';
+
+  @override
+  String get netBtDisconnect => 'Disconnect';
+
+  @override
+  String get netBtForget => 'Forget';
+
+  @override
+  String get netShowUnavailable => 'Show unavailable devices';
+
+  @override
+  String get netHideUnavailable => 'Hide unavailable devices';
+
+  @override
+  String get netSecOpen => 'Open';
+
+  @override
+  String get netSecWep => 'WEP';
+
+  @override
+  String get netSecPsk => 'WPA/WPA2';
+
+  @override
+  String get netSecEnterprise => 'Enterprise';
+
+  @override
+  String get netSecUnknown => 'Unknown security';
+
+  @override
+  String get netFailedConnect => 'Connection failed';
+
+  @override
+  String get netFailedPair => 'Pairing failed';
 
   @override
   String get systemUnavailableTitle => 'Not running on ArchoeraOS';
