@@ -4,146 +4,61 @@
 
 /// 当前播放曲目的歌词（§10.2 歌词流水线 UI 端入口）。
 ///
-/// 数据流：`playback state.track` → 平台 lyric 层（缓存 + 模糊匹配）→
-/// 原生富结果（YRC/KRC 逐字 + LRC 翻译）→ `parseLyricGroups` 按行对齐
-/// 的歌词组（原文 + 翻译 + 逐字片段）。空列表 = 暂无歌词（播放页走空态）。
+/// 数据流：`playback state.track` → [LyricsEngine]（来源顺序回退 + 统一解码）
+/// → [LyricPipeline]（排除规则 / 脏话还原）→ 渲染端。空列表 = 暂无歌词。
 ///
-/// 「解锁脏话」开关（强迫症预设）开启时，原文 / 翻译 / 逐字片段统一
-/// 还原被星号遮盖的脏话（对齐原项目 uncensorProfanity）。
+/// 引擎与来源的职责见 `services/lyrics/engine/` 与 `services/lyrics/sources/`；
+/// 本文件只做 Riverpod 接线与偏好读取。
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../apis/lyric/kugou.dart';
-import '../apis/lyric/netease.dart';
-import '../apis/lyric/qqmusic.dart';
+import '../services/lyrics/engine/lyric_pipeline.dart';
+import '../services/lyrics/engine/lyrics_engine.dart';
 import '../services/lyrics/lyric_line.dart';
-import '../services/lyrics/profanity.dart';
-import '../services/netease/track.dart';
+import '../services/lyrics/sources/kugou_lyric_source.dart';
+import '../services/lyrics/sources/local_lyric_source.dart';
+import '../services/lyrics/sources/netease_lyric_source.dart';
+import '../services/lyrics/sources/qqmusic_lyric_source.dart';
+import '../services/lyrics/sources/streaming_lyric_source.dart';
 import '../services/playback/playback_notifier.dart';
-import '../services/scanner/tracks_db.dart';
 import 'app_prefs.dart';
+
+/// 歌词引擎（应用级单例；来源可插拔）。
+final lyricsEngineProvider = Provider<LyricsEngine>(
+  (ref) => LyricsEngine([
+    const NeteaseLyricSource(),
+    const QqmusicLyricSource(),
+    const KugouLyricSource(),
+    const LocalLyricSource(),
+    StreamingLyricSource(ref),
+  ]),
+);
 
 /// 按当前播放曲目解析出的歌词组；曲目变化时自动重新拉取。
 final currentLyricsProvider = FutureProvider<List<LyricGroup>>((ref) async {
-  // watch 建立依赖（必须在 await 前）：开关变化时自动重算歌词
-  final uncensor = ref.watch(appPrefsProvider).uncensorProfanity;
-  final groups = await _fetchGroups(ref);
-  if (!uncensor) return groups;
-  return _uncensorGroups(groups);
-});
-
-/// 拉取并解析当前曲目的歌词组（按平台分流）。
-Future<List<LyricGroup>> _fetchGroups(Ref ref) async {
+  // watch 建立依赖：偏好 / 曲目变化时自动重算歌词。
+  final prefs = ref.watch(appPrefsProvider);
   final track = ref.watch(playbackProvider.select((s) => s.track));
   final trackId = ref.watch(playbackProvider.select((s) => s.trackId));
   if (track == null) return const [];
 
-  switch (track.source) {
-    case 'netease':
-      // 优先按平台 id 直取富结果（lyric_new：YRC 逐字 + ytlrc/tlyric 翻译），
-      // 无 id 时走「歌名+歌手 → 搜索 → 最佳候选」模糊链路。
-      final match = (trackId != null && trackId.isNotEmpty)
-          ? await nmGetLyricByPlatformId(trackId)
-          : await nmGetLyricByQuery(track);
-      if (match == null) return const [];
-      return parseLyricGroups(
-        content: match.content,
-        format: match.format,
-        translation: match.translation,
+  final groups = await ref
+      .watch(lyricsEngineProvider)
+      .resolve(
+        track,
+        trackId: trackId,
+        sourceOrder: prefs.lyricSourceOrder,
+        preferRich: prefs.preferWordByWord,
       );
 
-    case 'kugou':
-      final match = await kgGetLyricByQuery(track);
-      if (match == null) return const [];
-      // apis 层 KRC 已解成 LX 逐字格式（<offset,dur> 字级标签），
-      // parseLyricGroups 会保留逐字；翻译（trans）一并对齐。
-      return parseLyricGroups(
-        content: match.content,
-        format: match.format,
-        translation: match.translation,
-      );
-
-    case 'qqmusic':
-      // 优先按 QQ 数字 songID 直取（QRC 逐字 + 翻译 + 罗马音），
-      // 无 id 时走「歌名+歌手 → 搜索 → 最佳候选」模糊链路。
-      final match = (trackId != null && trackId.isNotEmpty)
-          ? await qmGetLyricByPlatformId(trackId, track.qqmusic?.mid)
-          : await qmGetLyricByQuery(track);
-      if (match == null) return const [];
-      return parseLyricGroups(
-        content: match.content,
-        format: match.format,
-        translation: match.translation,
-      );
-
-    default:
-      // 本地曲目：scanner 直写 library.db 的内嵌歌词元数据。
-      // 列表查询不再携带 lyrics（省内存），此处按 track 懒查 DB。
-      // 标准 LRC 直接解析；无时间标签的纯文本降级为整段显示
-      // （LyricGroup.original.timeMs 置 0，静态歌词全文展示）。
-      var raw = track.lyrics;
-      if (raw == null || raw.trim().isEmpty) {
-        raw = await _loadLocalLyrics(track);
-      }
-      if (raw == null || raw.trim().isEmpty) return const [];
-      final groups = parseLyricGroups(content: raw, format: 'lrc');
-      if (groups.isNotEmpty) return groups;
-      return raw
-          .split('\n')
-          .map((l) => l.trim())
-          .where((l) => l.isNotEmpty)
-          .map((l) => LyricGroup(original: LyricLine(timeMs: 0, text: l)))
-          .toList();
-  }
-}
-
-/// 本地曲目懒查内嵌歌词：优先按 id，回退按本地路径。
-///
-/// 列表查询已不携带 lyrics（见 `tracks_db.dart` 的显式列），仅在需要歌词时
-/// 打开 library.db 单行查询；非本地曲目 / 查询失败返回 null。
-Future<String?> _loadLocalLyrics(Track track) async {
-  if (track.source != 'local' && (track.localPath ?? '').isEmpty) return null;
-  TracksDb? db;
-  try {
-    db = TracksDb.open();
-    final byId = track.id.isNotEmpty ? db.lyricsById(track.id) : null;
-    if (byId != null && byId.trim().isNotEmpty) return byId;
-    final path = track.localPath;
-    if (path != null && path.isNotEmpty) return db.lyricsByPath(path);
-    return byId;
-  } catch (_) {
-    return null;
-  } finally {
-    db?.close();
-  }
-}
-
-/// 对歌词组应用脏话还原（重建不可变对象：原文 / 翻译 / 逐字片段）。
-List<LyricGroup> _uncensorGroups(List<LyricGroup> groups) {
-  return [
-    for (final g in groups)
-      LyricGroup(
-        original: LyricLine(
-          timeMs: g.original.timeMs,
-          text: unmaskProfanity(g.original.text),
-        ),
-        translation: g.translation == null
-            ? null
-            : unmaskProfanity(g.translation!),
-        fragments: g.fragments == null
-            ? null
-            : [
-                for (final f in g.fragments!)
-                  LyricFragment(
-                    text: unmaskProfanity(f.text),
-                    startMs: f.startMs,
-                    durationMs: f.durationMs,
-                  ),
-              ],
-        // 必须保留行结束时间：AMLL 引擎用 endMs 判定严格覆盖范围，
-        // 丢失会让“无行覆盖”的间隙/末尾判定失效。
-        endMs: g.endMs,
-      ),
-  ];
-}
+  return LyricPipeline.standard.process(
+    groups,
+    LyricProcessContext(
+      excludeEnabled: prefs.lyricExcludeEnabled,
+      excludeKeywords: prefs.lyricExcludeKeywords,
+      excludeRegexes: prefs.lyricExcludeRegexes,
+      uncensor: prefs.uncensorProfanity,
+    ),
+  );
+});

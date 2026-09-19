@@ -75,7 +75,7 @@ void showTrackContextMenu(
           onTap: () => showTrackDetailDialog(context, track: track),
         ),
       ],
-      if (canDownload && ref.read(appPrefsProvider).developerMode)
+      if (canDownload && ref.read(appPrefsProvider).downloadModuleEnabled)
         SContextMenuItem(
           label: l10n.menuDownload,
           icon: EtaIcons.downloadOutline,

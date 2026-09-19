@@ -19,6 +19,27 @@ const spectrumBarWidthKey = 'player.spectrumBarWidth';
 const spectrumStyleKey = 'player.spectrumStyle';
 const transitionStyleKey = 'player.transitionStyle';
 
+// ── 进度条 / 播放条细节（强迫症）─────────────
+const showProgressTooltipKey = 'player.showProgressTooltip';
+const showProgressLyricKey = 'player.showProgressLyric';
+const snapToLyricKey = 'player.snapToLyric';
+const timeFormatKey = 'player.timeFormat';
+const showPlaybackSourceKey = 'player.showPlaybackSource';
+
+// ── 播放页封面布局（强迫症）─────────────
+const coverLayoutKey = 'player.coverLayout';
+const coverLyricRatioKey = 'player.coverLyricRatio';
+const autoCenterCoverKey = 'player.autoCenterCover';
+const followCoverColorKey = 'player.followCoverColor';
+
+// ── 播放体验（强迫症）─────────────
+const reverseSpectrumKey = 'player.spectrumReverse';
+const autoImmersiveKey = 'player.autoImmersive';
+const mediaSessionKey = 'system.mediaSession';
+const registerProtocolKey = 'system.registerProtocol';
+const crossfadeEnabledKey = 'player.fade';
+const crossfadeDurationMsKey = 'player.fadeDuration';
+
 // ── 播放页背景 ─────────────
 const playerBgTypeKey = 'player.bgType';
 const playerBgRippleSpeedKey = 'player.bgRippleSpeed';
@@ -40,6 +61,7 @@ const barLyricsKey = 'player.barLyrics';
 const barSpectrumKey = 'player.barSpectrum';
 const barEnhancedLyricsKey = 'lyrics.barEnhanced';
 const showTranslationKey = 'lyrics.showTranslation';
+const showRomanizationKey = 'lyrics.showRomanization';
 
 /// 原音质直通（不转码）：开 = 引擎保持源采样率播放（Hi-Res/无损不降质，
 /// 默认）；关 = 统一 48kHz 转码管线（与 Web/批量行为一致）。
@@ -126,6 +148,59 @@ const bool defaultPlayerBgBeat = false;
 /// `FrameTiming` 在 full/balanced/performance 档位间切换，作为播放页水纹
 /// 背景的 `renderScale`（见 docs/runtime-resource-optimization.md §4.5 / R4）。
 const bool defaultAdaptiveRenderQuality = false;
+
+/// 进度条悬停提示（默认开；鼠标悬停显示对应时间）。
+const bool defaultShowProgressTooltip = true;
+
+/// 全屏播放器进度条上方显示当前歌词（默认关）。
+const bool defaultShowProgressLyric = false;
+
+/// 拖动进度条松手吸附最近歌词行（默认关）。
+const bool defaultSnapToLyric = false;
+
+/// 播放时间格式（对齐上游 player.timeFormat）：
+/// `current-total` 已播/总时长 / `remaining-total` 剩余/总时长 /
+/// `current-remaining` 已播/剩余。
+const String defaultTimeFormat = 'current-total';
+const Set<String> timeFormats = {
+  'current-total',
+  'remaining-total',
+  'current-remaining',
+};
+
+/// 播放条显示来源平台（默认关）。
+const bool defaultShowPlaybackSource = false;
+
+/// 播放页封面布局（`default` 左右分栏 / `fullscreen` 全屏封面）。
+const String defaultCoverLayout = 'default';
+const Set<String> coverLayouts = {'default', 'fullscreen'};
+
+/// 封面/歌词宽度比例（0.3~0.6，默认 0.45；对齐上游 player.coverLyricRatio）。
+const double defaultCoverLyricRatio = 0.45;
+
+/// 无歌词时自动居中封面并隐藏歌词区（默认开；对齐上游 autoCenterCover）。
+const bool defaultAutoCenterCover = true;
+
+/// 歌词颜色跟随当前封面主色（默认关；对齐上游 followCoverColor）。
+const bool defaultFollowCoverColor = false;
+
+/// 反向频谱（水平翻转；默认关，对齐上游 reverseSpectrum）。
+const bool defaultReverseSpectrum = false;
+
+/// 自动沉浸（鼠标离开/静止时隐藏顶/底栏与鼠标；默认关，对齐上游 autoImmersive）。
+const bool defaultAutoImmersive = false;
+
+/// 同步到系统媒体会话（MPRIS/SMTC/Now Playing；默认开）。
+const bool defaultMediaSession = true;
+
+/// 注册 `archoera://` 协议处理程序（默认关；仅当前用户，免提权）。
+const bool defaultRegisterProtocol = false;
+
+/// 切歌淡入（新会话音量 0→目标；默认关，对齐上游 fadeEnabled）。
+const bool defaultCrossfadeEnabled = false;
+
+/// 切歌淡入时长（ms，100~2000，默认 400）。
+const int defaultCrossfadeDurationMs = 400;
 
 /// 播放器域偏好：直通/自动播放/会话记忆/频谱/封面动效/切歌动效/音量/播放条。
 extension PlayerPrefs on AppPrefs {
@@ -262,6 +337,80 @@ extension PlayerPrefs on AppPrefs {
   /// 歌词显示翻译（播放条迷你歌词与全屏播放器；默认开）。
   bool get showTranslation => data[showTranslationKey] as bool? ?? true;
 
+  /// 歌词显示音译（罗马音；默认关）。
+  bool get showRomanization => data[showRomanizationKey] as bool? ?? false;
+
+  /// 进度条悬停提示（默认开）。
+  bool get showProgressTooltip =>
+      data[showProgressTooltipKey] as bool? ?? defaultShowProgressTooltip;
+
+  /// 全屏播放器进度条上方显示当前歌词（默认关）。
+  bool get showProgressLyric =>
+      data[showProgressLyricKey] as bool? ?? defaultShowProgressLyric;
+
+  /// 拖动进度条吸附最近歌词行（默认关）。
+  bool get snapToLyric => data[snapToLyricKey] as bool? ?? defaultSnapToLyric;
+
+  /// 播放时间格式（非法值回退 [defaultTimeFormat]）。
+  String get timeFormat {
+    final v = data[timeFormatKey];
+    if (timeFormats.contains(v)) return v as String;
+    return defaultTimeFormat;
+  }
+
+  /// 播放条显示来源平台（默认关）。
+  bool get showPlaybackSource =>
+      data[showPlaybackSourceKey] as bool? ?? defaultShowPlaybackSource;
+
+  /// 播放页封面布局（`default` 左右分栏 / `fullscreen` 全屏封面）。
+  String get coverLayout {
+    final v = data[coverLayoutKey];
+    if (coverLayouts.contains(v)) return v as String;
+    return defaultCoverLayout;
+  }
+
+  /// 封面/歌词宽度比例（0.3~0.6，默认 0.45）。
+  double get coverLyricRatio {
+    final v = data[coverLyricRatioKey] as num?;
+    if (v == null) return defaultCoverLyricRatio;
+    return v.toDouble().clamp(0.3, 0.6);
+  }
+
+  /// 无歌词时自动居中封面（默认开）。
+  bool get autoCenterCover =>
+      data[autoCenterCoverKey] as bool? ?? defaultAutoCenterCover;
+
+  /// 歌词颜色跟随封面主色（默认关）。
+  bool get followCoverColor =>
+      data[followCoverColorKey] as bool? ?? defaultFollowCoverColor;
+
+  /// 反向频谱（默认关）。
+  bool get reverseSpectrum =>
+      data[reverseSpectrumKey] as bool? ?? defaultReverseSpectrum;
+
+  /// 自动沉浸（默认关）。
+  bool get autoImmersive =>
+      data[autoImmersiveKey] as bool? ?? defaultAutoImmersive;
+
+  /// 同步系统媒体会话（默认开）。
+  bool get mediaSessionEnabled =>
+      data[mediaSessionKey] as bool? ?? defaultMediaSession;
+
+  /// 注册 `archoera://` 协议处理程序（默认关）。
+  bool get registerProtocol =>
+      data[registerProtocolKey] as bool? ?? defaultRegisterProtocol;
+
+  /// 切歌淡入开关（默认关）。
+  bool get crossfadeEnabled =>
+      data[crossfadeEnabledKey] as bool? ?? defaultCrossfadeEnabled;
+
+  /// 切歌淡入时长（ms，100~2000，默认 400）。
+  int get crossfadeDurationMs {
+    final v = data[crossfadeDurationMsKey] as num?;
+    if (v == null) return defaultCrossfadeDurationMs;
+    return v.toInt().clamp(100, 2000);
+  }
+
   AppPrefs copyWithPassthrough(bool value) =>
       AppPrefs(initialData: {...data, passthroughKey: value});
 
@@ -344,6 +493,9 @@ extension PlayerPrefs on AppPrefs {
   AppPrefs copyWithShowTranslation(bool value) =>
       AppPrefs(initialData: {...data, showTranslationKey: value});
 
+  AppPrefs copyWithShowRomanization(bool value) =>
+      AppPrefs(initialData: {...data, showRomanizationKey: value});
+
   /// 设置播放页背景样式 / 水纹速度（非法样式不写入，getter 回退默认）。
   ///
   /// 流体参数同段写入：流速 0.1~10、渲染比例 0.5~2、帧率 24~120、
@@ -372,4 +524,63 @@ extension PlayerPrefs on AppPrefs {
   /// 设置自适应画质开关（默认关）。
   AppPrefs copyWithAdaptiveRenderQuality(bool value) =>
       AppPrefs(initialData: {...data, adaptiveRenderQualityKey: value});
+
+  /// 设置进度条 / 播放条细节（悬停提示 / 进度歌词 / 吸附 / 时间格式 / 来源）。
+  AppPrefs copyWithProgressDisplay({
+    bool? showTooltip,
+    bool? showLyric,
+    bool? snapToLyric,
+    String? timeFormat,
+    bool? showSource,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      showProgressTooltipKey: ?showTooltip,
+      showProgressLyricKey: ?showLyric,
+      snapToLyricKey: ?snapToLyric,
+      if (timeFormats.contains(timeFormat)) timeFormatKey: timeFormat,
+      showPlaybackSourceKey: ?showSource,
+    },
+  );
+
+  /// 设置播放页封面布局（布局 / 占比 / 自动居中 / 跟随封面色）。
+  AppPrefs copyWithCoverLayout({
+    String? layout,
+    double? ratio,
+    bool? autoCenter,
+    bool? followCoverColor,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      if (coverLayouts.contains(layout)) coverLayoutKey: layout,
+      coverLyricRatioKey: ?ratio?.clamp(0.3, 0.6),
+      autoCenterCoverKey: ?autoCenter,
+      followCoverColorKey: ?followCoverColor,
+    },
+  );
+
+  /// 设置反向频谱开关（默认关）。
+  AppPrefs copyWithReverseSpectrum(bool value) =>
+      AppPrefs(initialData: {...data, reverseSpectrumKey: value});
+
+  /// 设置自动沉浸开关（默认关）。
+  AppPrefs copyWithAutoImmersive(bool value) =>
+      AppPrefs(initialData: {...data, autoImmersiveKey: value});
+
+  /// 设置系统媒体会话同步开关（默认开）。
+  AppPrefs copyWithMediaSession(bool value) =>
+      AppPrefs(initialData: {...data, mediaSessionKey: value});
+
+  /// 设置 archoera:// 协议注册开关（默认关）。
+  AppPrefs copyWithRegisterProtocol(bool value) =>
+      AppPrefs(initialData: {...data, registerProtocolKey: value});
+
+  /// 设置切歌淡入（开关 / 时长 ms）。
+  AppPrefs copyWithCrossfade({bool? enabled, int? durationMs}) => AppPrefs(
+    initialData: {
+      ...data,
+      crossfadeEnabledKey: ?enabled,
+      crossfadeDurationMsKey: ?durationMs?.clamp(100, 2000),
+    },
+  );
 }

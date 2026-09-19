@@ -755,6 +755,14 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               ),
             ),
             SettingSwitchTile(
+              icon: EtaIcons.flipHorizontal,
+              title: l10n.settingsReverseSpectrum,
+              subtitle: l10n.settingsReverseSpectrumDesc,
+              value: prefs.reverseSpectrum,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setReverseSpectrum(value),
+            ),
+            SettingSwitchTile(
               icon: prefs.barSpectrum
                   ? EtaIcons.chartBar
                   : EtaIcons.chartBarOutline,
@@ -767,6 +775,62 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   .read(appPrefsProvider.notifier)
                   .setBarDisplay(barSpectrum: value),
             ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SettingSection(
+          title: l10n.settingsSectionExperience,
+          children: [
+            SettingSwitchTile(
+              icon: EtaIcons.fullscreen,
+              title: l10n.settingsAutoImmersive,
+              subtitle: l10n.settingsAutoImmersiveDesc,
+              value: prefs.autoImmersive,
+              onChanged: (value) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setAutoImmersive(value),
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.music,
+              title: l10n.settingsCrossfade,
+              subtitle: l10n.settingsCrossfadeDesc,
+              value: prefs.crossfadeEnabled,
+              onChanged: (value) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setCrossfade(enabled: value),
+            ),
+            if (prefs.crossfadeEnabled)
+              SettingSliderTile(
+                icon: EtaIcons.stopwatchOutline,
+                title: l10n.settingsCrossfadeDuration,
+                subtitle:
+                    '${(prefs.crossfadeDurationMs / 1000).toStringAsFixed(1)} s',
+                value: prefs.crossfadeDurationMs.toDouble(),
+                min: 100,
+                max: 2000,
+                divisions: 38,
+                label: '${prefs.crossfadeDurationMs} ms',
+                onChanged: (v) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setCrossfade(durationMs: v.round()),
+              ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // 系统集成（媒体会话 / 协议唤醒）
+        SettingSection(
+          title: l10n.settingsSectionSystem,
+          children: [
+            SettingSwitchTile(
+              icon: EtaIcons.serverOutline,
+              title: l10n.settingsMediaSession,
+              subtitle: l10n.settingsMediaSessionDesc,
+              value: prefs.mediaSessionEnabled,
+              onChanged: (value) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setMediaSession(value),
+            ),
+            const _ProtocolRegisterTile(),
           ],
         ),
         const SizedBox(height: 20),
@@ -944,7 +1008,176 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ],
           ],
         ),
+        const SizedBox(height: 20),
+        SettingSection(
+          title: l10n.settingsCoverLayout,
+          note: l10n.settingsCoverLayoutDesc,
+          children: [
+            SettingTile(
+              icon: EtaIcons.square,
+              title: l10n.settingsCoverLayout,
+              subtitle: l10n.settingsCoverLayoutDesc,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption(
+                    'default',
+                    l10n.settingsCoverLayoutDefault,
+                  ),
+                  SSegmentedOption(
+                    'fullscreen',
+                    l10n.settingsCoverLayoutFullscreen,
+                  ),
+                ],
+                selected: prefs.coverLayout,
+                onChanged: (v) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setCoverLayout(layout: v),
+              ),
+            ),
+            SettingSliderTile(
+              icon: EtaIcons.transferHorizontal,
+              title: l10n.settingsCoverLyricRatio,
+              subtitle: l10n.settingsCoverLyricRatioDesc,
+              value: prefs.coverLyricRatio,
+              min: 0.3,
+              max: 0.6,
+              divisions: 6,
+              label: '${(prefs.coverLyricRatio * 100).round()}%',
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setCoverLayout(ratio: v),
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.fullscreen,
+              title: l10n.settingsAutoCenterCover,
+              subtitle: l10n.settingsAutoCenterCoverDesc,
+              value: prefs.autoCenterCover,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setCoverLayout(autoCenter: v),
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.paletteOutline,
+              title: l10n.settingsFollowCoverColor,
+              subtitle: l10n.settingsFollowCoverColorDesc,
+              value: prefs.followCoverColor,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setCoverLayout(followCoverColor: v),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SettingSection(
+          title: l10n.settingsShowProgressTooltip,
+          children: [
+            SettingSwitchTile(
+              icon: EtaIcons.informationOutline,
+              title: l10n.settingsShowProgressTooltip,
+              subtitle: l10n.settingsShowProgressTooltipDesc,
+              value: prefs.showProgressTooltip,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setProgressDisplay(showTooltip: v),
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.fileMusicOutline,
+              title: l10n.settingsShowProgressLyric,
+              subtitle: l10n.settingsShowProgressLyricDesc,
+              value: prefs.showProgressLyric,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setProgressDisplay(showLyric: v),
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.aimingOutline,
+              title: l10n.settingsSnapToLyric,
+              subtitle: l10n.settingsSnapToLyricDesc,
+              value: prefs.snapToLyric,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setProgressDisplay(snapToLyric: v),
+            ),
+            SettingTile(
+              icon: EtaIcons.stopwatchOutline,
+              title: l10n.settingsTimeFormat,
+              subtitle: l10n.settingsTimeFormatDesc,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption(
+                    'current-total',
+                    l10n.settingsTimeFormatCurrentTotal,
+                  ),
+                  SSegmentedOption(
+                    'remaining-total',
+                    l10n.settingsTimeFormatRemainingTotal,
+                  ),
+                  SSegmentedOption(
+                    'current-remaining',
+                    l10n.settingsTimeFormatCurrentRemaining,
+                  ),
+                ],
+                selected: prefs.timeFormat,
+                onChanged: (v) => ref
+                    .read(appPrefsProvider.notifier)
+                    .setProgressDisplay(timeFormat: v),
+              ),
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.serverOutline,
+              title: l10n.settingsShowPlaybackSource,
+              subtitle: l10n.settingsShowPlaybackSourceDesc,
+              value: prefs.showPlaybackSource,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setProgressDisplay(showSource: v),
+            ),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+/// archoera:// 协议注册开关（系统集成）。
+class _ProtocolRegisterTile extends ConsumerWidget {
+  const _ProtocolRegisterTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final prefs = ref.watch(appPrefsProvider);
+    final caps = ref.read(platformCapabilitiesProvider);
+    final available = caps.deepLinkAvailable;
+    return SettingSwitchTile(
+      icon: EtaIcons.link,
+      title: l10n.settingsRegisterProtocol,
+      subtitle: !available
+          ? l10n.settingsRegisterProtocolUnavailable
+          : (prefs.registerProtocol
+                ? l10n.settingsRegisterProtocolOn
+                : l10n.settingsRegisterProtocolOff),
+      value: prefs.registerProtocol && available,
+      enabled: available,
+      onChanged: available
+          ? (v) async {
+              final notifier = ref.read(appPrefsProvider.notifier);
+              if (v) {
+                final ok = await caps.deepLink.register('archoera');
+                if (!ok) {
+                  toast(
+                    l10n.settingsRegisterProtocolFailed,
+                    type: ToastType.error,
+                  );
+                  return;
+                }
+                notifier.setRegisterProtocol(true);
+              } else {
+                await caps.deepLink.unregister('archoera');
+                notifier.setRegisterProtocol(false);
+              }
+            }
+          : null,
     );
   }
 }

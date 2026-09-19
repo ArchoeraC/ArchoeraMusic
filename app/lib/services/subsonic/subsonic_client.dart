@@ -40,9 +40,6 @@ class SubsonicClient {
   static const _requestTimeout = Duration(seconds: 30);
   static final HttpClient _client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
 
-  /// 关闭底层连接池。
-  static void closeHttpClient() => _client.close(force: true);
-
   /// 基础地址：本机内置服务端（isArchoeraServer）连接时自动协商端口。
   String get _base => resolvedServerBaseUrl(config);
 
@@ -88,6 +85,9 @@ class SubsonicClient {
       'v': subsonicApiVersion,
       'c': subsonicClientName,
       'f': 'json',
+      // ArchoeraMusic 客户端扩展：服务端据此在「无内嵌歌词」时附带
+      // archoeraFetchOnline 标记（标准客户端不带，行为不变）。
+      'archoeraExt': '1',
     };
   }
 
@@ -296,25 +296,42 @@ class SubsonicClient {
   }
 
   /// 取歌词；优先 getLyricsBySongId 转 LRC，失败回退旧 getLyrics。
-  Future<String?> getLyrics(String originalId, {String? artist, String? title}) async {
+  ///
+  /// 若服务端为 ArchoeraMusic 且曲库无内嵌歌词，返回 [StreamingLyrics.fetchOnline]
+  /// （扩展标记），由客户端自行在线补全。
+  Future<StreamingLyrics> getLyrics(
+    String originalId, {
+    String? artist,
+    String? title,
+  }) async {
     try {
       final wrap = await _callApi('getLyricsBySongId', {'id': originalId});
+      final fetchOnline = wrap['archoeraFetchOnline'] == true;
       final lyricsList = wrap['lyricsList'];
       if (lyricsList is Map) {
         final structured = lyricsList['structuredLyrics'];
         if (structured is List && structured.isNotEmpty) {
           final line = (structured.first as Map)['line'];
           if (line is List && line.isNotEmpty) {
-            return line
-                .map((l) {
-                  final m = l as Map;
-                  return '${formatLrcTimestamp((m['start'] as num? ?? 0).toInt())}'
-                      '${m['value'] ?? ''}';
-                })
-                .join('\n');
+            // 有 start 视为同步歌词 → 补 LRC 时间戳；否则按纯文本返回。
+            final synced = line.any((l) => (l as Map)['start'] != null);
+            final text = synced
+                ? line
+                      .map((l) {
+                        final m = l as Map;
+                        return '${formatLrcTimestamp((m['start'] as num? ?? 0).toInt())}'
+                            '${m['value'] ?? ''}';
+                      })
+                      .join('\n')
+                : line
+                      .map((l) => (l as Map)['value']?.toString() ?? '')
+                      .where((s) => s.isNotEmpty)
+                      .join('\n');
+            if (text.trim().isNotEmpty) return StreamingLyrics(lrc: text);
           }
         }
       }
+      if (fetchOnline) return const StreamingLyrics(fetchOnline: true);
     } catch (_) {
       // 旧 Subsonic 没有 getLyricsBySongId，下面回退
     }
@@ -328,13 +345,16 @@ class SubsonicClient {
         final lyrics = wrap['lyrics'];
         if (lyrics is Map) {
           final text = lyrics['value']?.toString() ?? '';
-          if (text.trim().isNotEmpty) return text;
+          if (text.trim().isNotEmpty) return StreamingLyrics(lrc: text);
+        }
+        if (wrap['archoeraFetchOnline'] == true) {
+          return const StreamingLyrics(fetchOnline: true);
         }
       } catch (_) {
         // 没有就没有
       }
     }
-    return null;
+    return const StreamingLyrics();
   }
 
   List<Track> _toTracks(List<SubsonicSong> songs) {

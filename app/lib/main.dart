@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
@@ -12,6 +13,7 @@ import 'apis/runtime.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'theme/app_theme.dart';
 import 'services/platform/platform_capabilities.dart';
+import 'services/deeplink/deep_link_router.dart';
 import 'services/power/frame_governor.dart';
 import 'services/scanner/sqlite_preload.dart';
 import 'services/streaming/streaming_store.dart';
@@ -47,6 +49,11 @@ Future<void> main() async {
     exit(1);
   }
   if (!firstInstance) {
+    // 协议唤醒：把本次 argv 中的 archoera:// 转发给首实例；成功则静默退出。
+    if (platformCaps.deepLinkAvailable) {
+      final forwarded = await platformCaps.deepLink.forward();
+      if (forwarded == 1) exit(0);
+    }
     final parts = Platform.localeName.replaceAll('-', '_').split('_');
     final locale = parts.length >= 2 ? Locale(parts[0], parts[1]) : Locale(parts[0]);
     // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。
@@ -93,9 +100,17 @@ Future<void> main() async {
   PaintingBinding.instance.imageCache.maximumSize = 1000;
   // 窗口管理（后台常驻：关闭到托盘需拦截窗口关闭事件）
   await windowManager.ensureInitialized();
+  // 协议唤醒：启动前按偏好注册 archoera://（仅当前用户，免提权）。
+  if (platformCaps.deepLinkAvailable && prefs.registerProtocol) {
+    unawaited(platformCaps.deepLink.register('archoera'));
+  }
   runApp(
     const ProviderScope(child: TrayIntegration(child: ArchoeraMusicApp())),
   );
+  // 订阅 deep link 并派发（启动期链接先缓冲，首帧后统一处理）。
+  final deepLinkRouter = DeepLinkRouter(platformCaps.deepLink);
+  deepLinkRouter.start();
+  WidgetsBinding.instance.addPostFrameCallback((_) => deepLinkRouter.markReady());
 }
 
 /// 让所有 HttpClient（含 Flutter Image.network 共享 client）默认携带浏览器 UA。

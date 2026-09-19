@@ -16,6 +16,7 @@ import '../../../services/lyrics/lyric_line.dart';
 import '../../../services/playback/playback_notifier.dart';
 import '../../../stores/app_prefs.dart';
 import '../../../stores/lyrics_provider.dart';
+import '../../../theme/cover_color.dart';
 import 'lyrics_v7/lyrics_physics_wall.dart';
 import 'lyrics_view.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -57,12 +58,21 @@ class PlayerLyricsBlock extends ConsumerWidget {
         .watch(currentLyricsProvider)
         .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
     final prefs = ref.watch(appPrefsProvider);
-    final fontSize = prefs.lyricFontSize * lyricScale;
-    final lineHeight = prefs.lyricLineHeight * lyricScale;
-    // 高亮颜色：可选跟随软件全局主题色（colorScheme.primary）。
-    final playedColor = prefs.lyricFollowAccent
-        ? colorScheme.primary
-        : Color(prefs.lyricPlayedColor);
+    // 自适应字号：随窗口高度缩放（关闭则固定 px）。
+    final scale = prefs.lyricAdaptiveFontSize ? lyricScale : 1.0;
+    final fontSize = prefs.lyricFontSize * scale;
+    final lineHeight = prefs.lyricLineHeight * scale;
+    final fontWeight = FontWeight.values.firstWhere(
+      (w) => w.value == prefs.lyricFontWeight,
+      orElse: () => FontWeight.w600,
+    );
+    // 高亮颜色优先级：跟随封面主色（强迫症） > 跟随软件主题色 > 自定义色。
+    final coverAccent = ref.watch(coverColorProvider);
+    final playedColor = (prefs.followCoverColor && coverAccent != null)
+        ? coverAccent
+        : (prefs.lyricFollowAccent
+              ? colorScheme.primary
+              : Color(prefs.lyricPlayedColor));
     final unplayedColor = Color(prefs.lyricUnplayedColor);
     final showTranslation = prefs.showTranslation;
     // 引擎切换：simple（旧实现）/ amll（AMLL 歌词墙）
@@ -73,11 +83,13 @@ class PlayerLyricsBlock extends ConsumerWidget {
                 positionMs: pos,
                 // 歌词墙直接用设置原始 px（不再乘 lyricScale 二次缩放），
                 // 保证“28px 就是 28px”。
-                fontSize: prefs.lyricFontSize,
+                fontSize: fontSize,
                 fontFamily: prefs.fontFamily,
+                fontWeight: fontWeight,
                 playedColor: playedColor,
                 unplayedColor: unplayedColor,
                 showTranslation: showTranslation,
+                showRomanization: prefs.showRomanization,
                 alignFraction: prefs.amllAlignFraction,
                 inactiveAlpha: prefs.amllInactiveAlpha,
                 wordSweep: prefs.amllWordSweep,
@@ -91,9 +103,11 @@ class PlayerLyricsBlock extends ConsumerWidget {
                 positionMs: pos,
                 fontSize: fontSize,
                 lineHeight: lineHeight,
+                fontWeight: fontWeight,
                 playedColor: playedColor,
                 unplayedColor: unplayedColor,
                 showTranslation: showTranslation,
+                showRomanization: prefs.showRomanization,
                 onSeek: onSeek,
               );
     return ClipRect(child: wall);

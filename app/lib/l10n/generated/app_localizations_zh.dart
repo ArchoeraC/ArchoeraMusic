@@ -771,10 +771,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => 'NT';
+  String get platformNetease => '网易云音乐';
 
   @override
-  String get platformKugou => 'KG';
+  String get platformKugou => '酷狗音乐';
 
   @override
   String get platformAll => '聚合';
@@ -3734,7 +3734,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QM';
+  String get platformQQMusic => 'QQ 音乐';
 
   @override
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';
@@ -4183,6 +4183,386 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get shortcutActionBack => '返回';
+
+  @override
+  String get commonReset => '重置';
+
+  @override
+  String get settingsDevDownloadModuleDesc =>
+      '下载接口（侧边栏 / 右键菜单 / 设置分类）的独立开关；默认关闭，开启前会提示风险。';
+
+  @override
+  String get settingsDevDownloadModuleOn => '下载模块已开启';
+
+  @override
+  String get settingsDevDownloadModuleOff => '下载模块已关闭';
+
+  @override
+  String get settingsDevDownloadWarningTitle => '开启下载模块？';
+
+  @override
+  String get settingsDevDownloadWarningBody =>
+      '下载模块面向本地调试与自用，可能涉及第三方平台版权与服务条款风险；请自行承担相关责任。';
+
+  @override
+  String get settingsDevDownloadWarningAgree => '我已知晓，开启';
+
+  @override
+  String get settingsSidebarCustomize => '侧边栏自定义';
+
+  @override
+  String get settingsSidebarCustomizeDesc => '显示 / 隐藏并排序侧边栏导航项';
+
+  @override
+  String get settingsSidebarCustomizeTitle => '侧边栏自定义';
+
+  @override
+  String get settingsSidebarCustomizeHint => '拖动排序，右侧开关控制显示与隐藏';
+
+  @override
+  String get settingsShowProgressTooltip => '进度悬停提示';
+
+  @override
+  String get settingsShowProgressTooltipDesc => '鼠标悬停在进度条上时显示对应时间';
+
+  @override
+  String get settingsShowProgressLyric => '进度条显示歌词';
+
+  @override
+  String get settingsShowProgressLyricDesc => '在全屏播放器进度条上方显示当前歌词';
+
+  @override
+  String get settingsSnapToLyric => '吸附到歌词';
+
+  @override
+  String get settingsSnapToLyricDesc => '拖动进度条松手时吸附到最近的歌词行';
+
+  @override
+  String get settingsTimeFormat => '时间格式';
+
+  @override
+  String get settingsTimeFormatDesc => '播放时间的显示方式';
+
+  @override
+  String get settingsTimeFormatCurrentTotal => '已播 / 总时长';
+
+  @override
+  String get settingsTimeFormatRemainingTotal => '剩余 / 总时长';
+
+  @override
+  String get settingsTimeFormatCurrentRemaining => '已播 / 剩余';
+
+  @override
+  String get settingsShowPlaybackSource => '显示播放来源';
+
+  @override
+  String get settingsShowPlaybackSourceDesc => '在播放条显示当前曲目的来源平台';
+
+  @override
+  String get settingsCoverLayout => '封面布局';
+
+  @override
+  String get settingsCoverLayoutDesc => '全屏播放器封面的呈现方式';
+
+  @override
+  String get settingsCoverLayoutDefault => '默认';
+
+  @override
+  String get settingsCoverLayoutFullscreen => '全屏封面';
+
+  @override
+  String get settingsCoverLyricRatio => '封面/歌词占比';
+
+  @override
+  String get settingsCoverLyricRatioDesc => '播放页封面与歌词区域的宽度比例';
+
+  @override
+  String get settingsAutoCenterCover => '自动居中封面';
+
+  @override
+  String get settingsAutoCenterCoverDesc => '无歌词时自动居中封面并隐藏歌词区域';
+
+  @override
+  String get settingsFollowCoverColor => '跟随封面颜色';
+
+  @override
+  String get settingsFollowCoverColorDesc => '歌词颜色跟随当前封面主色调';
+
+  @override
+  String get settingsLyricSourceOrder => '歌词来源顺序';
+
+  @override
+  String get settingsLyricSourceOrderDesc => '当前平台无歌词时，按顺序回退到其它平台';
+
+  @override
+  String get settingsLyricFormatOrder => '歌词格式顺序';
+
+  @override
+  String get settingsLyricFormatOrderDesc => '优先使用的歌词格式（逐字 / 标准）';
+
+  @override
+  String get settingsLyricOrderHint => '拖动排序；越靠前优先级越高';
+
+  @override
+  String get settingsLyricOrderReset => '重置';
+
+  @override
+  String get settingsSectionLyricExclude => '歌词排除规则';
+
+  @override
+  String get settingsLyricExcludeEnabled => '启用歌词排除';
+
+  @override
+  String get settingsLyricExcludeEnabledOn => '已按规则排除匹配的歌词行';
+
+  @override
+  String get settingsLyricExcludeEnabledOff => '关闭时不排除任何歌词';
+
+  @override
+  String get settingsLyricExcludeRules => '排除规则';
+
+  @override
+  String get settingsLyricExcludeRulesDesc => '按关键词或正则排除匹配的歌词行';
+
+  @override
+  String get settingsLyricExcludeDialogTitle => '歌词排除规则';
+
+  @override
+  String get settingsLyricExcludeDialogHint => '匹配到的歌词行将不会显示；关键词不区分大小写';
+
+  @override
+  String get settingsLyricExcludeTabKeywords => '关键词';
+
+  @override
+  String get settingsLyricExcludeTabRegex => '正则';
+
+  @override
+  String get settingsLyricExcludeKeywordHint => '任一行包含该关键词即排除';
+
+  @override
+  String get settingsLyricExcludeRegexHint => '支持正则表达式（Dart RegExp 语法）';
+
+  @override
+  String get settingsLyricExcludePlaceholder => '输入后回车或点添加';
+
+  @override
+  String get settingsLyricExcludeAdd => '添加';
+
+  @override
+  String get settingsLyricExcludeEmpty => '暂无规则';
+
+  @override
+  String get settingsLyricExcludeInvalidRegex => '正则表达式无效';
+
+  @override
+  String get settingsLyricExcludeDuplicate => '规则已存在';
+
+  @override
+  String get settingsLyricExcludeClear => '清空';
+
+  @override
+  String get commonConfigure => '配置';
+
+  @override
+  String get settingsShowRomanization => '显示音译';
+
+  @override
+  String get settingsShowRomanizationOn => '开启：当前行下方显示罗马音';
+
+  @override
+  String get settingsShowRomanizationOff => '关闭：不显示罗马音';
+
+  @override
+  String get settingsLyricAdaptiveFontSize => '自适应字号';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeDesc => '歌词字号随窗口高度自动缩放';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeOn => '开启：字号随窗口缩放';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeOff => '关闭：固定字号';
+
+  @override
+  String get settingsLyricFontWeight => '歌词字重';
+
+  @override
+  String get settingsLyricFontWeightDesc => '当前行歌词文字粗细';
+
+  @override
+  String get settingsLyricWeightRegular => '常规';
+
+  @override
+  String get settingsLyricWeightMedium => '中等';
+
+  @override
+  String get settingsLyricWeightSemiBold => '半粗';
+
+  @override
+  String get settingsLyricWeightBold => '粗体';
+
+  @override
+  String get sleepTimer => '睡眠定时';
+
+  @override
+  String get sleepTimerOff => '关闭';
+
+  @override
+  String get sleepTimer15 => '15 分钟';
+
+  @override
+  String get sleepTimer30 => '30 分钟';
+
+  @override
+  String get sleepTimer60 => '60 分钟';
+
+  @override
+  String get sleepTimer90 => '90 分钟';
+
+  @override
+  String get sleepTimerEndOfTrack => '播完当前曲';
+
+  @override
+  String get sleepTimerFired => '睡眠定时已到，已暂停播放';
+
+  @override
+  String get settingsReverseSpectrum => '反向频谱';
+
+  @override
+  String get settingsReverseSpectrumDesc => '频谱水平翻转显示';
+
+  @override
+  String get settingsAutoImmersive => '自动沉浸';
+
+  @override
+  String get settingsAutoImmersiveDesc => '指针离开或静止时自动隐藏顶/底栏';
+
+  @override
+  String get settingsMediaSession => '系统媒体会话';
+
+  @override
+  String get settingsMediaSessionDesc => '同步到系统媒体控件（媒体键 / 蓝牙耳机）';
+
+  @override
+  String get settingsCrossfade => '切歌淡入';
+
+  @override
+  String get settingsCrossfadeDesc => '新曲目音量从 0 渐升，避免硬起音';
+
+  @override
+  String get settingsCrossfadeDuration => '淡入时长';
+
+  @override
+  String get settingsSectionExperience => '播放体验';
+
+  @override
+  String get settingsCatAudioEffects => '音频效果';
+
+  @override
+  String get settingsAudioEffectsSubtitle => '均衡器 · 响度 · 变速';
+
+  @override
+  String get settingsSectionEqualizer => '均衡器';
+
+  @override
+  String get settingsEqEnabled => '启用均衡器';
+
+  @override
+  String get settingsEqEnabledOn => '已启用';
+
+  @override
+  String get settingsEqEnabledOff => '已关闭';
+
+  @override
+  String get settingsEqPreset => '均衡器预设';
+
+  @override
+  String get settingsEqPreamp => '预增益';
+
+  @override
+  String get settingsEqPreampDesc => '整体提升或衰减，避免削波';
+
+  @override
+  String get settingsEqLimiter => '限幅器';
+
+  @override
+  String get settingsEqLimiterDesc => '防止削波失真';
+
+  @override
+  String get settingsEqReset => '重置均衡器';
+
+  @override
+  String get settingsEqPresetFlat => '平坦';
+
+  @override
+  String get settingsEqPresetPop => '流行';
+
+  @override
+  String get settingsEqPresetRock => '摇滚';
+
+  @override
+  String get settingsEqPresetJazz => '爵士';
+
+  @override
+  String get settingsEqPresetClassical => '古典';
+
+  @override
+  String get settingsEqPresetVocal => '人声';
+
+  @override
+  String get settingsEqPresetBass => '低音增强';
+
+  @override
+  String get settingsEqPresetCustom => '自定义';
+
+  @override
+  String get settingsSectionNormalization => '响度归一化';
+
+  @override
+  String get settingsNormalization => '响度归一化';
+
+  @override
+  String get settingsNormalizationDesc => '自动调整音量，使不同曲目响度一致';
+
+  @override
+  String get settingsNormalizationOn => '已开启';
+
+  @override
+  String get settingsNormalizationOff => '已关闭';
+
+  @override
+  String get settingsSectionSpeed => '播放速度';
+
+  @override
+  String get settingsPlaybackSpeed => '播放速度';
+
+  @override
+  String get settingsPlaybackSpeedDesc => '变速不变调，不影响音高';
+
+  @override
+  String get settingsPlaybackSpeedNormal => '恢复正常速度';
+
+  @override
+  String get settingsSectionSystem => '系统集成';
+
+  @override
+  String get settingsRegisterProtocol => '注册 archoera:// 协议';
+
+  @override
+  String get settingsRegisterProtocolDesc => '允许浏览器/其它应用用 archoera:// 链接唤起本应用';
+
+  @override
+  String get settingsRegisterProtocolOn => '已注册';
+
+  @override
+  String get settingsRegisterProtocolOff => '未注册';
+
+  @override
+  String get settingsRegisterProtocolUnavailable => '当前平台不支持';
+
+  @override
+  String get settingsRegisterProtocolFailed => '协议注册失败';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -4952,10 +5332,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
-  String get platformNetease => 'NT';
+  String get platformNetease => '网易云音乐';
 
   @override
-  String get platformKugou => 'KG';
+  String get platformKugou => '酷狗音乐';
 
   @override
   String get platformAll => '聚合';
@@ -7915,7 +8295,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QM';
+  String get platformQQMusic => 'QQ 音乐';
 
   @override
   String get loginQqQrLogin => 'QM扫码登录';
@@ -8364,6 +8744,386 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get shortcutActionBack => '返回';
+
+  @override
+  String get commonReset => '重置';
+
+  @override
+  String get settingsDevDownloadModuleDesc =>
+      '下载接口（侧边栏 / 右键菜单 / 设置分类）的独立开关；默认关闭，开启前会提示风险。';
+
+  @override
+  String get settingsDevDownloadModuleOn => '下载模块已开启';
+
+  @override
+  String get settingsDevDownloadModuleOff => '下载模块已关闭';
+
+  @override
+  String get settingsDevDownloadWarningTitle => '开启下载模块？';
+
+  @override
+  String get settingsDevDownloadWarningBody =>
+      '下载模块面向本地调试与自用，可能涉及第三方平台版权与服务条款风险；请自行承担相关责任。';
+
+  @override
+  String get settingsDevDownloadWarningAgree => '我已知晓，开启';
+
+  @override
+  String get settingsSidebarCustomize => '侧边栏自定义';
+
+  @override
+  String get settingsSidebarCustomizeDesc => '显示 / 隐藏并排序侧边栏导航项';
+
+  @override
+  String get settingsSidebarCustomizeTitle => '侧边栏自定义';
+
+  @override
+  String get settingsSidebarCustomizeHint => '拖动排序，右侧开关控制显示与隐藏';
+
+  @override
+  String get settingsShowProgressTooltip => '进度悬停提示';
+
+  @override
+  String get settingsShowProgressTooltipDesc => '鼠标悬停在进度条上时显示对应时间';
+
+  @override
+  String get settingsShowProgressLyric => '进度条显示歌词';
+
+  @override
+  String get settingsShowProgressLyricDesc => '在全屏播放器进度条上方显示当前歌词';
+
+  @override
+  String get settingsSnapToLyric => '吸附到歌词';
+
+  @override
+  String get settingsSnapToLyricDesc => '拖动进度条松手时吸附到最近的歌词行';
+
+  @override
+  String get settingsTimeFormat => '时间格式';
+
+  @override
+  String get settingsTimeFormatDesc => '播放时间的显示方式';
+
+  @override
+  String get settingsTimeFormatCurrentTotal => '已播 / 总时长';
+
+  @override
+  String get settingsTimeFormatRemainingTotal => '剩余 / 总时长';
+
+  @override
+  String get settingsTimeFormatCurrentRemaining => '已播 / 剩余';
+
+  @override
+  String get settingsShowPlaybackSource => '显示播放来源';
+
+  @override
+  String get settingsShowPlaybackSourceDesc => '在播放条显示当前曲目的来源平台';
+
+  @override
+  String get settingsCoverLayout => '封面布局';
+
+  @override
+  String get settingsCoverLayoutDesc => '全屏播放器封面的呈现方式';
+
+  @override
+  String get settingsCoverLayoutDefault => '默认';
+
+  @override
+  String get settingsCoverLayoutFullscreen => '全屏封面';
+
+  @override
+  String get settingsCoverLyricRatio => '封面/歌词占比';
+
+  @override
+  String get settingsCoverLyricRatioDesc => '播放页封面与歌词区域的宽度比例';
+
+  @override
+  String get settingsAutoCenterCover => '自动居中封面';
+
+  @override
+  String get settingsAutoCenterCoverDesc => '无歌词时自动居中封面并隐藏歌词区域';
+
+  @override
+  String get settingsFollowCoverColor => '跟随封面颜色';
+
+  @override
+  String get settingsFollowCoverColorDesc => '歌词颜色跟随当前封面主色调';
+
+  @override
+  String get settingsLyricSourceOrder => '歌词来源顺序';
+
+  @override
+  String get settingsLyricSourceOrderDesc => '当前平台无歌词时，按顺序回退到其它平台';
+
+  @override
+  String get settingsLyricFormatOrder => '歌词格式顺序';
+
+  @override
+  String get settingsLyricFormatOrderDesc => '优先使用的歌词格式（逐字 / 标准）';
+
+  @override
+  String get settingsLyricOrderHint => '拖动排序；越靠前优先级越高';
+
+  @override
+  String get settingsLyricOrderReset => '重置';
+
+  @override
+  String get settingsSectionLyricExclude => '歌词排除规则';
+
+  @override
+  String get settingsLyricExcludeEnabled => '启用歌词排除';
+
+  @override
+  String get settingsLyricExcludeEnabledOn => '已按规则排除匹配的歌词行';
+
+  @override
+  String get settingsLyricExcludeEnabledOff => '关闭时不排除任何歌词';
+
+  @override
+  String get settingsLyricExcludeRules => '排除规则';
+
+  @override
+  String get settingsLyricExcludeRulesDesc => '按关键词或正则排除匹配的歌词行';
+
+  @override
+  String get settingsLyricExcludeDialogTitle => '歌词排除规则';
+
+  @override
+  String get settingsLyricExcludeDialogHint => '匹配到的歌词行将不会显示；关键词不区分大小写';
+
+  @override
+  String get settingsLyricExcludeTabKeywords => '关键词';
+
+  @override
+  String get settingsLyricExcludeTabRegex => '正则';
+
+  @override
+  String get settingsLyricExcludeKeywordHint => '任一行包含该关键词即排除';
+
+  @override
+  String get settingsLyricExcludeRegexHint => '支持正则表达式（Dart RegExp 语法）';
+
+  @override
+  String get settingsLyricExcludePlaceholder => '输入后回车或点添加';
+
+  @override
+  String get settingsLyricExcludeAdd => '添加';
+
+  @override
+  String get settingsLyricExcludeEmpty => '暂无规则';
+
+  @override
+  String get settingsLyricExcludeInvalidRegex => '正则表达式无效';
+
+  @override
+  String get settingsLyricExcludeDuplicate => '规则已存在';
+
+  @override
+  String get settingsLyricExcludeClear => '清空';
+
+  @override
+  String get commonConfigure => '配置';
+
+  @override
+  String get settingsShowRomanization => '显示音译';
+
+  @override
+  String get settingsShowRomanizationOn => '开启：当前行下方显示罗马音';
+
+  @override
+  String get settingsShowRomanizationOff => '关闭：不显示罗马音';
+
+  @override
+  String get settingsLyricAdaptiveFontSize => '自适应字号';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeDesc => '歌词字号随窗口高度自动缩放';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeOn => '开启：字号随窗口缩放';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeOff => '关闭：固定字号';
+
+  @override
+  String get settingsLyricFontWeight => '歌词字重';
+
+  @override
+  String get settingsLyricFontWeightDesc => '当前行歌词文字粗细';
+
+  @override
+  String get settingsLyricWeightRegular => '常规';
+
+  @override
+  String get settingsLyricWeightMedium => '中等';
+
+  @override
+  String get settingsLyricWeightSemiBold => '半粗';
+
+  @override
+  String get settingsLyricWeightBold => '粗体';
+
+  @override
+  String get sleepTimer => '睡眠定时';
+
+  @override
+  String get sleepTimerOff => '关闭';
+
+  @override
+  String get sleepTimer15 => '15 分钟';
+
+  @override
+  String get sleepTimer30 => '30 分钟';
+
+  @override
+  String get sleepTimer60 => '60 分钟';
+
+  @override
+  String get sleepTimer90 => '90 分钟';
+
+  @override
+  String get sleepTimerEndOfTrack => '播完当前曲';
+
+  @override
+  String get sleepTimerFired => '睡眠定时已到，已暂停播放';
+
+  @override
+  String get settingsReverseSpectrum => '反向频谱';
+
+  @override
+  String get settingsReverseSpectrumDesc => '频谱水平翻转显示';
+
+  @override
+  String get settingsAutoImmersive => '自动沉浸';
+
+  @override
+  String get settingsAutoImmersiveDesc => '指针离开或静止时自动隐藏顶/底栏';
+
+  @override
+  String get settingsMediaSession => '系统媒体会话';
+
+  @override
+  String get settingsMediaSessionDesc => '同步到系统媒体控件（媒体键 / 蓝牙耳机）';
+
+  @override
+  String get settingsCrossfade => '切歌淡入';
+
+  @override
+  String get settingsCrossfadeDesc => '新曲目音量从 0 渐升，避免硬起音';
+
+  @override
+  String get settingsCrossfadeDuration => '淡入时长';
+
+  @override
+  String get settingsSectionExperience => '播放体验';
+
+  @override
+  String get settingsCatAudioEffects => '音频效果';
+
+  @override
+  String get settingsAudioEffectsSubtitle => '均衡器 · 响度 · 变速';
+
+  @override
+  String get settingsSectionEqualizer => '均衡器';
+
+  @override
+  String get settingsEqEnabled => '启用均衡器';
+
+  @override
+  String get settingsEqEnabledOn => '已启用';
+
+  @override
+  String get settingsEqEnabledOff => '已关闭';
+
+  @override
+  String get settingsEqPreset => '均衡器预设';
+
+  @override
+  String get settingsEqPreamp => '预增益';
+
+  @override
+  String get settingsEqPreampDesc => '整体提升或衰减，避免削波';
+
+  @override
+  String get settingsEqLimiter => '限幅器';
+
+  @override
+  String get settingsEqLimiterDesc => '防止削波失真';
+
+  @override
+  String get settingsEqReset => '重置均衡器';
+
+  @override
+  String get settingsEqPresetFlat => '平坦';
+
+  @override
+  String get settingsEqPresetPop => '流行';
+
+  @override
+  String get settingsEqPresetRock => '摇滚';
+
+  @override
+  String get settingsEqPresetJazz => '爵士';
+
+  @override
+  String get settingsEqPresetClassical => '古典';
+
+  @override
+  String get settingsEqPresetVocal => '人声';
+
+  @override
+  String get settingsEqPresetBass => '低音增强';
+
+  @override
+  String get settingsEqPresetCustom => '自定义';
+
+  @override
+  String get settingsSectionNormalization => '响度归一化';
+
+  @override
+  String get settingsNormalization => '响度归一化';
+
+  @override
+  String get settingsNormalizationDesc => '自动调整音量，使不同曲目响度一致';
+
+  @override
+  String get settingsNormalizationOn => '已开启';
+
+  @override
+  String get settingsNormalizationOff => '已关闭';
+
+  @override
+  String get settingsSectionSpeed => '播放速度';
+
+  @override
+  String get settingsPlaybackSpeed => '播放速度';
+
+  @override
+  String get settingsPlaybackSpeedDesc => '变速不变调，不影响音高';
+
+  @override
+  String get settingsPlaybackSpeedNormal => '恢复正常速度';
+
+  @override
+  String get settingsSectionSystem => '系统集成';
+
+  @override
+  String get settingsRegisterProtocol => '注册 archoera:// 协议';
+
+  @override
+  String get settingsRegisterProtocolDesc => '允许浏览器/其它应用用 archoera:// 链接唤起本应用';
+
+  @override
+  String get settingsRegisterProtocolOn => '已注册';
+
+  @override
+  String get settingsRegisterProtocolOff => '未注册';
+
+  @override
+  String get settingsRegisterProtocolUnavailable => '当前平台不支持';
+
+  @override
+  String get settingsRegisterProtocolFailed => '协议注册失败';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -9133,10 +9893,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
-  String get platformNetease => 'NT';
+  String get platformNetease => '网易云音乐';
 
   @override
-  String get platformKugou => 'KG';
+  String get platformKugou => '酷狗音乐';
 
   @override
   String get platformAll => '聚合';
@@ -12097,7 +12857,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ 音樂';
+  String get platformQQMusic => 'QQ 音乐';
 
   @override
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';
@@ -12546,4 +13306,384 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get shortcutActionBack => '返回';
+
+  @override
+  String get commonReset => '重置';
+
+  @override
+  String get settingsDevDownloadModuleDesc =>
+      '下载接口（侧边栏 / 右键菜单 / 设置分类）的独立开关；默认关闭，开启前会提示风险。';
+
+  @override
+  String get settingsDevDownloadModuleOn => '下载模块已开启';
+
+  @override
+  String get settingsDevDownloadModuleOff => '下载模块已关闭';
+
+  @override
+  String get settingsDevDownloadWarningTitle => '开启下载模块？';
+
+  @override
+  String get settingsDevDownloadWarningBody =>
+      '下载模块面向本地调试与自用，可能涉及第三方平台版权与服务条款风险；请自行承担相关责任。';
+
+  @override
+  String get settingsDevDownloadWarningAgree => '我已知晓，开启';
+
+  @override
+  String get settingsSidebarCustomize => '侧边栏自定义';
+
+  @override
+  String get settingsSidebarCustomizeDesc => '显示 / 隐藏并排序侧边栏导航项';
+
+  @override
+  String get settingsSidebarCustomizeTitle => '侧边栏自定义';
+
+  @override
+  String get settingsSidebarCustomizeHint => '拖动排序，右侧开关控制显示与隐藏';
+
+  @override
+  String get settingsShowProgressTooltip => '进度悬停提示';
+
+  @override
+  String get settingsShowProgressTooltipDesc => '鼠标悬停在进度条上时显示对应时间';
+
+  @override
+  String get settingsShowProgressLyric => '进度条显示歌词';
+
+  @override
+  String get settingsShowProgressLyricDesc => '在全屏播放器进度条上方显示当前歌词';
+
+  @override
+  String get settingsSnapToLyric => '吸附到歌词';
+
+  @override
+  String get settingsSnapToLyricDesc => '拖动进度条松手时吸附到最近的歌词行';
+
+  @override
+  String get settingsTimeFormat => '时间格式';
+
+  @override
+  String get settingsTimeFormatDesc => '播放时间的显示方式';
+
+  @override
+  String get settingsTimeFormatCurrentTotal => '已播 / 总时长';
+
+  @override
+  String get settingsTimeFormatRemainingTotal => '剩余 / 总时长';
+
+  @override
+  String get settingsTimeFormatCurrentRemaining => '已播 / 剩余';
+
+  @override
+  String get settingsShowPlaybackSource => '显示播放来源';
+
+  @override
+  String get settingsShowPlaybackSourceDesc => '在播放条显示当前曲目的来源平台';
+
+  @override
+  String get settingsCoverLayout => '封面布局';
+
+  @override
+  String get settingsCoverLayoutDesc => '全屏播放器封面的呈现方式';
+
+  @override
+  String get settingsCoverLayoutDefault => '默认';
+
+  @override
+  String get settingsCoverLayoutFullscreen => '全屏封面';
+
+  @override
+  String get settingsCoverLyricRatio => '封面/歌词占比';
+
+  @override
+  String get settingsCoverLyricRatioDesc => '播放页封面与歌词区域的宽度比例';
+
+  @override
+  String get settingsAutoCenterCover => '自动居中封面';
+
+  @override
+  String get settingsAutoCenterCoverDesc => '无歌词时自动居中封面并隐藏歌词区域';
+
+  @override
+  String get settingsFollowCoverColor => '跟随封面颜色';
+
+  @override
+  String get settingsFollowCoverColorDesc => '歌词颜色跟随当前封面主色调';
+
+  @override
+  String get settingsLyricSourceOrder => '歌词来源顺序';
+
+  @override
+  String get settingsLyricSourceOrderDesc => '当前平台无歌词时，按顺序回退到其它平台';
+
+  @override
+  String get settingsLyricFormatOrder => '歌词格式顺序';
+
+  @override
+  String get settingsLyricFormatOrderDesc => '优先使用的歌词格式（逐字 / 标准）';
+
+  @override
+  String get settingsLyricOrderHint => '拖动排序；越靠前优先级越高';
+
+  @override
+  String get settingsLyricOrderReset => '重置';
+
+  @override
+  String get settingsSectionLyricExclude => '歌词排除规则';
+
+  @override
+  String get settingsLyricExcludeEnabled => '启用歌词排除';
+
+  @override
+  String get settingsLyricExcludeEnabledOn => '已按规则排除匹配的歌词行';
+
+  @override
+  String get settingsLyricExcludeEnabledOff => '关闭时不排除任何歌词';
+
+  @override
+  String get settingsLyricExcludeRules => '排除规则';
+
+  @override
+  String get settingsLyricExcludeRulesDesc => '按关键词或正则排除匹配的歌词行';
+
+  @override
+  String get settingsLyricExcludeDialogTitle => '歌词排除规则';
+
+  @override
+  String get settingsLyricExcludeDialogHint => '匹配到的歌词行将不会显示；关键词不区分大小写';
+
+  @override
+  String get settingsLyricExcludeTabKeywords => '关键词';
+
+  @override
+  String get settingsLyricExcludeTabRegex => '正则';
+
+  @override
+  String get settingsLyricExcludeKeywordHint => '任一行包含该关键词即排除';
+
+  @override
+  String get settingsLyricExcludeRegexHint => '支持正则表达式（Dart RegExp 语法）';
+
+  @override
+  String get settingsLyricExcludePlaceholder => '输入后回车或点添加';
+
+  @override
+  String get settingsLyricExcludeAdd => '添加';
+
+  @override
+  String get settingsLyricExcludeEmpty => '暂无规则';
+
+  @override
+  String get settingsLyricExcludeInvalidRegex => '正则表达式无效';
+
+  @override
+  String get settingsLyricExcludeDuplicate => '规则已存在';
+
+  @override
+  String get settingsLyricExcludeClear => '清空';
+
+  @override
+  String get commonConfigure => '配置';
+
+  @override
+  String get settingsShowRomanization => '显示音译';
+
+  @override
+  String get settingsShowRomanizationOn => '开启：当前行下方显示罗马音';
+
+  @override
+  String get settingsShowRomanizationOff => '关闭：不显示罗马音';
+
+  @override
+  String get settingsLyricAdaptiveFontSize => '自适应字号';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeDesc => '歌词字号随窗口高度自动缩放';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeOn => '开启：字号随窗口缩放';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeOff => '关闭：固定字号';
+
+  @override
+  String get settingsLyricFontWeight => '歌词字重';
+
+  @override
+  String get settingsLyricFontWeightDesc => '当前行歌词文字粗细';
+
+  @override
+  String get settingsLyricWeightRegular => '常规';
+
+  @override
+  String get settingsLyricWeightMedium => '中等';
+
+  @override
+  String get settingsLyricWeightSemiBold => '半粗';
+
+  @override
+  String get settingsLyricWeightBold => '粗体';
+
+  @override
+  String get sleepTimer => '睡眠定时';
+
+  @override
+  String get sleepTimerOff => '关闭';
+
+  @override
+  String get sleepTimer15 => '15 分钟';
+
+  @override
+  String get sleepTimer30 => '30 分钟';
+
+  @override
+  String get sleepTimer60 => '60 分钟';
+
+  @override
+  String get sleepTimer90 => '90 分钟';
+
+  @override
+  String get sleepTimerEndOfTrack => '播完当前曲';
+
+  @override
+  String get sleepTimerFired => '睡眠定时已到，已暂停播放';
+
+  @override
+  String get settingsReverseSpectrum => '反向频谱';
+
+  @override
+  String get settingsReverseSpectrumDesc => '频谱水平翻转显示';
+
+  @override
+  String get settingsAutoImmersive => '自动沉浸';
+
+  @override
+  String get settingsAutoImmersiveDesc => '指针离开或静止时自动隐藏顶/底栏';
+
+  @override
+  String get settingsMediaSession => '系统媒体会话';
+
+  @override
+  String get settingsMediaSessionDesc => '同步到系统媒体控件（媒体键 / 蓝牙耳机）';
+
+  @override
+  String get settingsCrossfade => '切歌淡入';
+
+  @override
+  String get settingsCrossfadeDesc => '新曲目音量从 0 渐升，避免硬起音';
+
+  @override
+  String get settingsCrossfadeDuration => '淡入时长';
+
+  @override
+  String get settingsSectionExperience => '播放体验';
+
+  @override
+  String get settingsCatAudioEffects => '音频效果';
+
+  @override
+  String get settingsAudioEffectsSubtitle => '均衡器 · 响度 · 变速';
+
+  @override
+  String get settingsSectionEqualizer => '均衡器';
+
+  @override
+  String get settingsEqEnabled => '启用均衡器';
+
+  @override
+  String get settingsEqEnabledOn => '已启用';
+
+  @override
+  String get settingsEqEnabledOff => '已关闭';
+
+  @override
+  String get settingsEqPreset => '均衡器预设';
+
+  @override
+  String get settingsEqPreamp => '预增益';
+
+  @override
+  String get settingsEqPreampDesc => '整体提升或衰减，避免削波';
+
+  @override
+  String get settingsEqLimiter => '限幅器';
+
+  @override
+  String get settingsEqLimiterDesc => '防止削波失真';
+
+  @override
+  String get settingsEqReset => '重置均衡器';
+
+  @override
+  String get settingsEqPresetFlat => '平坦';
+
+  @override
+  String get settingsEqPresetPop => '流行';
+
+  @override
+  String get settingsEqPresetRock => '摇滚';
+
+  @override
+  String get settingsEqPresetJazz => '爵士';
+
+  @override
+  String get settingsEqPresetClassical => '古典';
+
+  @override
+  String get settingsEqPresetVocal => '人声';
+
+  @override
+  String get settingsEqPresetBass => '低音增强';
+
+  @override
+  String get settingsEqPresetCustom => '自定义';
+
+  @override
+  String get settingsSectionNormalization => '响度归一化';
+
+  @override
+  String get settingsNormalization => '响度归一化';
+
+  @override
+  String get settingsNormalizationDesc => '自动调整音量，使不同曲目响度一致';
+
+  @override
+  String get settingsNormalizationOn => '已开启';
+
+  @override
+  String get settingsNormalizationOff => '已关闭';
+
+  @override
+  String get settingsSectionSpeed => '播放速度';
+
+  @override
+  String get settingsPlaybackSpeed => '播放速度';
+
+  @override
+  String get settingsPlaybackSpeedDesc => '变速不变调，不影响音高';
+
+  @override
+  String get settingsPlaybackSpeedNormal => '恢复正常速度';
+
+  @override
+  String get settingsSectionSystem => '系统集成';
+
+  @override
+  String get settingsRegisterProtocol => '注册 archoera:// 协议';
+
+  @override
+  String get settingsRegisterProtocolDesc => '允许浏览器/其它应用用 archoera:// 链接唤起本应用';
+
+  @override
+  String get settingsRegisterProtocolOn => '已注册';
+
+  @override
+  String get settingsRegisterProtocolOff => '未注册';
+
+  @override
+  String get settingsRegisterProtocolUnavailable => '当前平台不支持';
+
+  @override
+  String get settingsRegisterProtocolFailed => '协议注册失败';
 }

@@ -38,6 +38,8 @@ class LyricsView extends StatefulWidget {
     this.playedColor,
     this.unplayedColor,
     this.showTranslation = true,
+    this.showRomanization = false,
+    this.fontWeight = FontWeight.w600,
   });
 
   final List<LyricGroup> groups;
@@ -62,6 +64,12 @@ class LyricsView extends StatefulWidget {
 
   /// 显示翻译（当前行翻译次行小字；设置「显示翻译」，默认开）。
   final bool showTranslation;
+
+  /// 显示音译（当前行罗马音次行小字；设置「显示音译」，默认关）。
+  final bool showRomanization;
+
+  /// 当前行字重（设置「歌词字重」，默认半粗）。
+  final FontWeight fontWeight;
 
   /// 行高默认值（含间距）。
   static const double defaultLineHeight = 44;

@@ -16,12 +16,33 @@ extension _SongRowView on _SongRowState {
     final bestQuality = _bestQuality(item, l10n);
 
     return Listener(
-      // 右键 → 自绘上下文菜单（PointerEvent.position 为全局坐标）
+      // 右键 → 自绘上下文菜单（PointerEvent.position 为全局坐标）；
+      // 触摸长按 500ms 同样弹出（触摸没有右键）。
       onPointerDown: (e) {
-        if (widget.onContextMenu != null &&
-            (e.buttons & kSecondaryMouseButton) != 0) {
+        _suppressTap = false;
+        if (widget.onContextMenu == null) return;
+        if ((e.buttons & kSecondaryMouseButton) != 0) {
           widget.onContextMenu!(item, e.position);
+          return;
         }
+        if (e.kind == PointerDeviceKind.touch) {
+          _ctxHoldPos = e.position;
+          _ctxHoldTimer?.cancel();
+          _ctxHoldTimer = Timer(const Duration(milliseconds: 500), () {
+            final p = _ctxHoldPos;
+            _cancelCtxHold();
+            if (p != null) {
+              _suppressTap = true;  // 吞掉松手时紧随的 tap
+              widget.onContextMenu!(item, p);
+            }
+          });
+        }
+      },
+      onPointerUp: (_) => _cancelCtxHold(),
+      onPointerCancel: (_) => _cancelCtxHold(),
+      onPointerMove: (e) {
+        final p = _ctxHoldPos;
+        if (p != null && (e.position - p).distance > 12) _cancelCtxHold();
       },
       child: MouseRegion(
         onEnter: (_) => _setHover(true),
@@ -31,9 +52,15 @@ extension _SongRowView on _SongRowState {
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             // 批量模式：行点击切换选择（不做播放）
-            onTap: widget.batchActive
-                ? widget.onToggleSelect
-                : () => widget.onPlay(item),
+            onTap: () {
+              // 长按已弹上下文菜单：吞掉这次松手 tap。
+              if (consumeLongPressTap()) return;
+              if (widget.batchActive) {
+                widget.onToggleSelect?.call();
+              } else {
+                widget.onPlay(item);
+              }
+            },
             child: AnimatedContainer(
               duration: animDuration(
                 context,

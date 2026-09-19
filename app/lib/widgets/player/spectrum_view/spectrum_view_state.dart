@@ -59,14 +59,17 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
     final color = widget.color ?? Theme.of(context).colorScheme.primary;
     final style =
         widget.style ?? SpectrumStyle.fromStorage(prefs.spectrumStyle);
+    final reverse = widget.reverse ?? prefs.reverseSpectrum;
     if (_painter.barWidth != barWidth ||
         _painter.color != color ||
         _painter.style != style ||
+        _painter.reverse != reverse ||
         _painter.nowMs != _clockMs) {
       _painter
         ..barWidth = barWidth
         ..color = color
         ..style = style
+        ..reverse = reverse
         ..nowMs = _clockMs;
       _repaint.value++;
     }

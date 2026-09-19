@@ -29,6 +29,12 @@ int32_t mediaSetWindow(int64_t) { return ERR_UNSUPPORTED; }
 
 int32_t appInstanceAcquire() { return 1; }
 
+int32_t protocolRegister(const char*) { return ERR_UNSUPPORTED; }
+int32_t protocolUnregister(const char*) { return ERR_UNSUPPORTED; }
+int32_t deepLinkTake(AplString*) { return ERR_UNSUPPORTED; }
+int32_t deepLinkForward() { return ERR_UNSUPPORTED; }
+int32_t windowActivate() { return ERR_UNSUPPORTED; }
+
 bool systemAccent(int32_t*, int32_t*, int32_t*) { return false; }
 int32_t systemAccentSetEvents(bool) { return ERR_UNSUPPORTED; }
 int32_t systemThemeSetEvents(bool) { return ERR_UNSUPPORTED; }

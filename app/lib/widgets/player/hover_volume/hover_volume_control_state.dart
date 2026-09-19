@@ -19,6 +19,21 @@ class _HoverVolumeSliderState extends ConsumerState<HoverVolumeSlider> {
     super.dispose();
   }
 
+  /// 点按展开滑条并重置自动隐藏（点击展开没有 hover 退出事件，用定时器收起）。
+  void _expand() {
+    _openTimer?.cancel();
+    _hideTimer?.cancel();
+    if (!_expanded || !_sliderMounted) {
+      setState(() {
+        _expanded = true;
+        _sliderMounted = true;
+      });
+    }
+    _hideTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) setState(() => _expanded = false);
+    });
+  }
+
   void _onEnter(PointerEnterEvent _) {
     _hideTimer?.cancel();
     _openTimer?.cancel();
@@ -74,7 +89,8 @@ class _HoverVolumeSliderState extends ConsumerState<HoverVolumeSlider> {
                 ? EtaIcons.volumeOff
                 : (vol < 0.5 ? EtaIcons.volumeMute : EtaIcons.volume),
             size: 22,
-            onPressed: _toggleMute,
+            // 收起时点按 = 展开滑条；展开时点按 = 静音切换（鼠标/触摸通用）。
+            onPressed: _expanded ? _toggleMute : _expand,
           ),
           if (_expanded || _sliderMounted)
             _SlideIn(
@@ -94,10 +110,15 @@ class _HoverVolumeSliderState extends ConsumerState<HoverVolumeSlider> {
                   ),
                   child: Slider(
                     value: vol,
-                    onChanged: (v) =>
-                        ref.read(playbackProvider.notifier).previewVolume(v),
-                    onChangeEnd: (v) =>
-                        ref.read(playbackProvider.notifier).setVolume(v),
+                    onChanged: (v) {
+                      // 拖动期间不自动收起。
+                      _hideTimer?.cancel();
+                      ref.read(playbackProvider.notifier).previewVolume(v);
+                    },
+                    onChangeEnd: (v) {
+                      ref.read(playbackProvider.notifier).setVolume(v);
+                      _expand(); // 重新计时自动收起（无 hover 退出时也生效）
+                    },
                   ),
                 ),
               ),

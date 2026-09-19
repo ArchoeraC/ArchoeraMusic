@@ -62,7 +62,11 @@ func Open(dbPath string) error {
 	}
 	// 单连接避免 WAL 读写竞争
 	mediaPool.SetMaxOpenConns(1)
-	return mediaPool.Ping()
+	if err := mediaPool.Ping(); err != nil {
+		return err
+	}
+	refreshMediaColumns()
+	return nil
 }
 
 // DefaultUserDBPath 返回用户库默认路径（与媒体库同目录，独立加密库）
@@ -196,6 +200,8 @@ func EnsureTables() error {
 			return fmt.Errorf("create user table: %w", err)
 		}
 	}
+	// 曲库表就绪后探测实际列，兼容桌面端旧库缺列（如 genre）。
+	refreshMediaColumns()
 	return nil
 }
 
@@ -539,9 +545,60 @@ func scanTrack(row interface{ Scan(...any) error }) (model.Track, error) {
 	return t, nil
 }
 
-const trackColumns = `id, path, title, track, artists, album, duration, cover,
+// wantedTrackColumns 服务端期望的曲目列（桌面端 scanner 库与服务端自建库的并集）。
+var wantedTrackColumns = []string{
+	"id", "path", "title", "track", "artists", "album", "duration", "cover",
+	"codec", "sample_rate", "bit_rate", "channels", "bits_per_sample",
+	"file_size", "file_mtime", "file_ctime", "scanned_at", "lyrics", "genre",
+}
+
+const defaultTrackColumns = `id, path, title, track, artists, album, duration, cover,
 	codec, sample_rate, bit_rate, channels, bits_per_sample,
 	file_size, file_mtime, file_ctime, scanned_at, lyrics, genre`
+
+var (
+	// trackColumns 实际查询列表：缺列用 `NULL AS <col>` 占位，保证 scanTrack
+	// 的列数与顺序恒定（桌面端旧 library.db 可能没有 genre 列）。
+	trackColumns   = defaultTrackColumns
+	mediaHasColumn = map[string]bool{}
+)
+
+// refreshMediaColumns 读取 tracks 实际列并重建查询列表。
+// 曲库表不存在（冷启动尚未建表）时不改变默认列表。
+func refreshMediaColumns() {
+	if mediaPool == nil {
+		return
+	}
+	cols := map[string]bool{}
+	rows, err := mediaPool.Query("PRAGMA table_info(tracks)")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt any
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			continue
+		}
+		cols[name] = true
+	}
+	if len(cols) == 0 {
+		trackColumns = defaultTrackColumns
+		return
+	}
+	mediaHasColumn = cols
+	parts := make([]string, 0, len(wantedTrackColumns))
+	for _, c := range wantedTrackColumns {
+		if cols[c] {
+			parts = append(parts, c)
+		} else {
+			parts = append(parts, "NULL AS "+c)
+		}
+	}
+	trackColumns = strings.Join(parts, ", ")
+}
 
 // GetAllTracks 获取全部曲目
 func GetAllTracks() ([]model.Track, error) {
@@ -744,6 +801,10 @@ type GenreSummary struct {
 // GetGenres 聚合 tracks.genre 列，返回非空流派及其歌曲/专辑数
 // genre 列可能存储单个流派或以 ; / , / / 分隔的多个流派，做拆分处理
 func GetGenres() ([]GenreSummary, error) {
+	// 兼容桌面端旧库：无 genre 列时返回空，不报错。
+	if !mediaHasColumn["genre"] {
+		return []GenreSummary{}, nil
+	}
 	rows, err := mediaPool.Query(`
 		SELECT genre, COUNT(*) AS track_count,
 		       COUNT(DISTINCT json_extract(album, '$.name')) AS album_count
@@ -805,6 +866,10 @@ func splitGenres(s string) []string {
 
 // GetTracksByGenre 按 genre 模糊匹配获取曲目（支持分页）
 func GetTracksByGenre(genre string, limit, offset int) ([]model.Track, error) {
+	// 兼容桌面端旧库：无 genre 列时返回空，不报错。
+	if !mediaHasColumn["genre"] {
+		return nil, nil
+	}
 	if limit <= 0 {
 		limit = 10
 	}

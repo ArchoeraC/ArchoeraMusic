@@ -12,7 +12,7 @@
 #include "core.h"
 
 namespace {
-constexpr int32_t kAbiVersion = 1;
+constexpr int32_t kAbiVersion = 2;
 }  // namespace
 
 extern "C" {
@@ -78,6 +78,34 @@ int32_t apl_media_set_window(int64_t window) {
 int32_t apl_instance_acquire(void) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     return archoera::appInstanceAcquire();
+}
+
+int32_t apl_protocol_register(const char* scheme) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (scheme == nullptr || *scheme == '\0') return archoera::ERR_STATE;
+    return archoera::protocolRegister(scheme);
+}
+
+int32_t apl_protocol_unregister(const char* scheme) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (scheme == nullptr || *scheme == '\0') return archoera::ERR_STATE;
+    return archoera::protocolUnregister(scheme);
+}
+
+int32_t apl_deep_link_take(AplString* out) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (out == nullptr) return archoera::ERR_STATE;
+    return archoera::deepLinkTake(out);
+}
+
+int32_t apl_deep_link_forward(void) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::deepLinkForward();
+}
+
+int32_t apl_window_activate(void) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::windowActivate();
 }
 
 int32_t apl_system_accent(int32_t* r, int32_t* g, int32_t* b) {
