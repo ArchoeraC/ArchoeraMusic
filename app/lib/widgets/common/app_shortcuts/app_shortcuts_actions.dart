@@ -133,8 +133,8 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
       // Router/Navigator 之上，`context.go/push` 会抛「No GoRouter found in
       // context」。故一律用全局 appRouter / rootNavigatorKey 导航。
       case ShortcutAction.openPlayer:
-        // ignore: discarded_futures
-        appRouter.push('/player');
+        // 幂等展开：已在播放页 / push 在途时不重复入栈（见 openPlayerPage）。
+        openPlayerPage();
       case ShortcutAction.openSettings:
         final ctx = rootNavigatorKey.currentContext;
         if (ctx != null) showSettingsDialog(ctx);
@@ -149,6 +149,12 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
       case ShortcutAction.goHistory:
       case ShortcutAction.goDownload:
       case ShortcutAction.goStreaming:
+        // 下载模块未开启时不响应「前往下载」（与侧边栏 / 设置分类的
+        // 隐藏策略保持一致）。
+        if (action == ShortcutAction.goDownload &&
+            !ref.read(appPrefsProvider).downloadModuleEnabled) {
+          break;
+        }
         final route = action.route;
         if (route != null) {
           // ignore: discarded_futures

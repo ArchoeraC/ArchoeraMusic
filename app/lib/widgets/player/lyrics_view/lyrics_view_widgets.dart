@@ -52,6 +52,8 @@ extension _LyricsViewBuild on _LyricsViewState {
                 playedColor: widget.playedColor,
                 unplayedColor: widget.unplayedColor,
                 showTranslation: widget.showTranslation,
+                showRomanization: widget.showRomanization,
+                fontWeight: widget.fontWeight,
                 onTap: widget.onSeek == null
                     ? null
                     : () => widget.onSeek!(group.original.timeMs),
@@ -74,13 +76,16 @@ extension _LyricsViewBuild on _LyricsViewState {
   ) {
     final key = _LyricsRowHeightKey(
       text: g.original.text,
-      // 仅当前行使用翻译；其余行归一为 null 以提升命中率。
+      // 仅当前行使用翻译/音译；其余行归一为 null 以提升命中率。
       translation: isCurrent ? g.translation : null,
+      romaji: isCurrent ? g.romaji : null,
       isCurrent: isCurrent,
       fontSize: widget.fontSize,
       lineHeight: widget.lineHeight,
       maxWidth: maxWidth,
       showTranslation: widget.showTranslation,
+      showRomanization: widget.showRomanization,
+      fontWeight: widget.fontWeight,
       baseStyle: base,
       textScaler: textScaler,
     );
@@ -112,7 +117,7 @@ extension _LyricsViewBuild on _LyricsViewState {
         text: g.original.text,
         style: base.copyWith(
           fontSize: fs,
-          fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
+          fontWeight: isCurrent ? widget.fontWeight : FontWeight.w400,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -125,6 +130,22 @@ extension _LyricsViewBuild on _LyricsViewState {
       final sub = TextPainter(
         text: TextSpan(
           text: g.translation!,
+          style: base.copyWith(
+            fontSize: math.max(9.0, widget.fontSize * kTranslationFontScale),
+            height: 1.2,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: maxWidth);
+      h += math.max(2, widget.fontSize * kMainTranslationGapEm) + sub.height;
+    }
+    if (isCurrent &&
+        widget.showRomanization &&
+        (g.romaji?.isNotEmpty ?? false)) {
+      final sub = TextPainter(
+        text: TextSpan(
+          text: g.romaji!,
           style: base.copyWith(
             fontSize: math.max(9.0, widget.fontSize * kTranslationFontScale),
             height: 1.2,
@@ -162,22 +183,28 @@ class _LyricsRowHeightKey {
   const _LyricsRowHeightKey({
     required this.text,
     required this.translation,
+    required this.romaji,
     required this.isCurrent,
     required this.fontSize,
     required this.lineHeight,
     required this.maxWidth,
     required this.showTranslation,
+    required this.showRomanization,
+    required this.fontWeight,
     required this.baseStyle,
     required this.textScaler,
   });
 
   final String text;
   final String? translation;
+  final String? romaji;
   final bool isCurrent;
   final double fontSize;
   final double lineHeight;
   final double maxWidth;
   final bool showTranslation;
+  final bool showRomanization;
+  final FontWeight fontWeight;
   final TextStyle baseStyle;
   final TextScaler textScaler;
 
@@ -187,11 +214,14 @@ class _LyricsRowHeightKey {
     return other is _LyricsRowHeightKey &&
         other.text == text &&
         other.translation == translation &&
+        other.romaji == romaji &&
         other.isCurrent == isCurrent &&
         other.fontSize == fontSize &&
         other.lineHeight == lineHeight &&
         other.maxWidth == maxWidth &&
         other.showTranslation == showTranslation &&
+        other.showRomanization == showRomanization &&
+        other.fontWeight == fontWeight &&
         other.baseStyle == baseStyle &&
         other.textScaler == textScaler;
   }
@@ -200,11 +230,14 @@ class _LyricsRowHeightKey {
   int get hashCode => Object.hash(
     text,
     translation,
+    romaji,
     isCurrent,
     fontSize,
     lineHeight,
     maxWidth,
     showTranslation,
+    showRomanization,
+    fontWeight,
     baseStyle,
     textScaler,
   );
@@ -220,6 +253,8 @@ class _Line extends StatelessWidget {
     this.playedColor,
     this.unplayedColor,
     this.showTranslation = true,
+    this.showRomanization = false,
+    this.fontWeight = FontWeight.w600,
     this.onTap,
   });
 
@@ -231,6 +266,8 @@ class _Line extends StatelessWidget {
   final Color? playedColor;
   final Color? unplayedColor;
   final bool showTranslation;
+  final bool showRomanization;
+  final FontWeight fontWeight;
   final VoidCallback? onTap;
 
   @override
@@ -257,6 +294,18 @@ class _Line extends StatelessWidget {
             ),
           )
         : null;
+    final romanization =
+        (isCurrent && showRomanization && group.romaji != null)
+        ? Text(
+            group.romaji!,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: math.max(9.0, fontSize * kTranslationFontScale),
+              height: 1.2,
+              color: lineColor.withValues(alpha: 0.6),
+            ),
+          )
+        : null;
 
     return MouseRegion(
       cursor: onTap == null
@@ -271,7 +320,7 @@ class _Line extends StatelessWidget {
           style: isCurrent
               ? TextStyle(
                   fontSize: fontSize + 3,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: fontWeight,
                   color: lineColor,
                 )
               : TextStyle(fontSize: fontSize, color: dimColor),
@@ -285,6 +334,12 @@ class _Line extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 original,
+                if (romanization != null) ...[
+                  SizedBox(
+                    height: math.max(2, fontSize * kMainTranslationGapEm),
+                  ),
+                  romanization,
+                ],
                 if (translation != null) ...[
                   SizedBox(
                     height: math.max(2, fontSize * kMainTranslationGapEm),

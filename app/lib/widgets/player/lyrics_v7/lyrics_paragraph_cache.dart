@@ -14,12 +14,14 @@ library;
 
 import 'dart:ui' as ui;
 
-/// 单行缓存槽（主行 + 可选翻译）。
+/// 单行缓存槽（主行 + 可选翻译 + 可选音译）。
 class _LineSlot {
   Object? mainKey;
   ui.Paragraph? main;
   Object? translationKey;
   ui.Paragraph? translation;
+  Object? romajiKey;
+  ui.Paragraph? romaji;
 }
 
 /// 歌词段落缓存。
@@ -54,6 +56,27 @@ class LyricsParagraphCache {
     final p = build();
     slot.translation = p;
     slot.translationKey = key;
+    return p;
+  }
+
+  /// 取（或构建）第 [index] 行的音译（罗马音）段落。
+  ///
+  /// [key] 为 null 表示当前无音译：清空该槽并返回 null。
+  ui.Paragraph? obtainRomanization(
+    int index,
+    Object? key,
+    ui.Paragraph Function() build,
+  ) {
+    final slot = _lines.putIfAbsent(index, _LineSlot.new);
+    if (slot.romajiKey == key) return slot.romaji;
+    if (key == null) {
+      slot.romaji = null;
+      slot.romajiKey = null;
+      return null;
+    }
+    final p = build();
+    slot.romaji = p;
+    slot.romajiKey = key;
     return p;
   }
 

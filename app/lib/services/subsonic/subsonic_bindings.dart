@@ -24,10 +24,6 @@ typedef SubsonicPollEventDart =
     int Function(int handle, Pointer<Uint8> buf, int bufLen);
 typedef SubsonicDestroyNative = Void Function(IntPtr handle);
 typedef SubsonicDestroyDart = void Function(int handle);
-typedef SubsonicLyricResponseNative =
-    Void Function(IntPtr handle, IntPtr requestId, Pointer<Utf8> resultJson);
-typedef SubsonicLyricResponseDart =
-    void Function(int handle, int requestId, Pointer<Utf8> resultJson);
 typedef SubsonicEncryptNative =
     Int32 Function(
       IntPtr handle,
@@ -89,10 +85,6 @@ class SubsonicBindings {
   late final SubsonicDestroyDart destroy = _lib
       .lookupFunction<SubsonicDestroyNative, SubsonicDestroyDart>(
         'archoera_subsonic_destroy',
-      );
-  late final SubsonicLyricResponseDart lyricResponse = _lib
-      .lookupFunction<SubsonicLyricResponseNative, SubsonicLyricResponseDart>(
-        'archoera_subsonic_lyric_response',
       );
   late final SubsonicEncryptDart encrypt = _lib
       .lookupFunction<SubsonicEncryptNative, SubsonicEncryptDart>(

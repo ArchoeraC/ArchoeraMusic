@@ -56,7 +56,14 @@ class _SongListFloatActionsState extends State<SongListFloatActions> {
   bool _hovered = false; // 鼠标在按钮组上
   Timer? _hideTimer;
 
-  bool get _visible => !widget.batchActive && (_active || _hovered);
+  /// 已滚动离开顶部（按钮组在滑动位置保持可见，触摸无 hover 也能点）。
+  bool get _scrolled {
+    final c = widget.controller;
+    return c.hasClients && c.offset > widget.threshold;
+  }
+
+  bool get _visible =>
+      !widget.batchActive && (_active || _hovered || _scrolled);
 
   @override
   void initState() {

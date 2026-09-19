@@ -1523,13 +1523,13 @@ abstract class AppLocalizations {
   /// No description provided for @platformNetease.
   ///
   /// In zh_CN, this message translates to:
-  /// **'NT'**
+  /// **'网易云音乐'**
   String get platformNetease;
 
   /// No description provided for @platformKugou.
   ///
   /// In zh_CN, this message translates to:
-  /// **'KG'**
+  /// **'酷狗音乐'**
   String get platformKugou;
 
   /// No description provided for @platformAll.
@@ -6941,7 +6941,7 @@ abstract class AppLocalizations {
   /// No description provided for @platformQQMusic.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QM'**
+  /// **'QQ 音乐'**
   String get platformQQMusic;
 
   /// No description provided for @loginQqQrLogin.
@@ -7777,6 +7777,762 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'返回'**
   String get shortcutActionBack;
+
+  /// No description provided for @commonReset.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重置'**
+  String get commonReset;
+
+  /// No description provided for @settingsDevDownloadModuleDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下载接口（侧边栏 / 右键菜单 / 设置分类）的独立开关；默认关闭，开启前会提示风险。'**
+  String get settingsDevDownloadModuleDesc;
+
+  /// No description provided for @settingsDevDownloadModuleOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下载模块已开启'**
+  String get settingsDevDownloadModuleOn;
+
+  /// No description provided for @settingsDevDownloadModuleOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下载模块已关闭'**
+  String get settingsDevDownloadModuleOff;
+
+  /// No description provided for @settingsDevDownloadWarningTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启下载模块？'**
+  String get settingsDevDownloadWarningTitle;
+
+  /// No description provided for @settingsDevDownloadWarningBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下载模块面向本地调试与自用，可能涉及第三方平台版权与服务条款风险；请自行承担相关责任。'**
+  String get settingsDevDownloadWarningBody;
+
+  /// No description provided for @settingsDevDownloadWarningAgree.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我已知晓，开启'**
+  String get settingsDevDownloadWarningAgree;
+
+  /// No description provided for @settingsSidebarCustomize.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'侧边栏自定义'**
+  String get settingsSidebarCustomize;
+
+  /// No description provided for @settingsSidebarCustomizeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'显示 / 隐藏并排序侧边栏导航项'**
+  String get settingsSidebarCustomizeDesc;
+
+  /// No description provided for @settingsSidebarCustomizeTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'侧边栏自定义'**
+  String get settingsSidebarCustomizeTitle;
+
+  /// No description provided for @settingsSidebarCustomizeHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'拖动排序，右侧开关控制显示与隐藏'**
+  String get settingsSidebarCustomizeHint;
+
+  /// No description provided for @settingsShowProgressTooltip.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'进度悬停提示'**
+  String get settingsShowProgressTooltip;
+
+  /// No description provided for @settingsShowProgressTooltipDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'鼠标悬停在进度条上时显示对应时间'**
+  String get settingsShowProgressTooltipDesc;
+
+  /// No description provided for @settingsShowProgressLyric.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'进度条显示歌词'**
+  String get settingsShowProgressLyric;
+
+  /// No description provided for @settingsShowProgressLyricDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在全屏播放器进度条上方显示当前歌词'**
+  String get settingsShowProgressLyricDesc;
+
+  /// No description provided for @settingsSnapToLyric.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'吸附到歌词'**
+  String get settingsSnapToLyric;
+
+  /// No description provided for @settingsSnapToLyricDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'拖动进度条松手时吸附到最近的歌词行'**
+  String get settingsSnapToLyricDesc;
+
+  /// No description provided for @settingsTimeFormat.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'时间格式'**
+  String get settingsTimeFormat;
+
+  /// No description provided for @settingsTimeFormatDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放时间的显示方式'**
+  String get settingsTimeFormatDesc;
+
+  /// No description provided for @settingsTimeFormatCurrentTotal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已播 / 总时长'**
+  String get settingsTimeFormatCurrentTotal;
+
+  /// No description provided for @settingsTimeFormatRemainingTotal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'剩余 / 总时长'**
+  String get settingsTimeFormatRemainingTotal;
+
+  /// No description provided for @settingsTimeFormatCurrentRemaining.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已播 / 剩余'**
+  String get settingsTimeFormatCurrentRemaining;
+
+  /// No description provided for @settingsShowPlaybackSource.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'显示播放来源'**
+  String get settingsShowPlaybackSource;
+
+  /// No description provided for @settingsShowPlaybackSourceDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在播放条显示当前曲目的来源平台'**
+  String get settingsShowPlaybackSourceDesc;
+
+  /// No description provided for @settingsCoverLayout.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'封面布局'**
+  String get settingsCoverLayout;
+
+  /// No description provided for @settingsCoverLayoutDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'全屏播放器封面的呈现方式'**
+  String get settingsCoverLayoutDesc;
+
+  /// No description provided for @settingsCoverLayoutDefault.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'默认'**
+  String get settingsCoverLayoutDefault;
+
+  /// No description provided for @settingsCoverLayoutFullscreen.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'全屏封面'**
+  String get settingsCoverLayoutFullscreen;
+
+  /// No description provided for @settingsCoverLyricRatio.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'封面/歌词占比'**
+  String get settingsCoverLyricRatio;
+
+  /// No description provided for @settingsCoverLyricRatioDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放页封面与歌词区域的宽度比例'**
+  String get settingsCoverLyricRatioDesc;
+
+  /// No description provided for @settingsAutoCenterCover.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动居中封面'**
+  String get settingsAutoCenterCover;
+
+  /// No description provided for @settingsAutoCenterCoverDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无歌词时自动居中封面并隐藏歌词区域'**
+  String get settingsAutoCenterCoverDesc;
+
+  /// No description provided for @settingsFollowCoverColor.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'跟随封面颜色'**
+  String get settingsFollowCoverColor;
+
+  /// No description provided for @settingsFollowCoverColorDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词颜色跟随当前封面主色调'**
+  String get settingsFollowCoverColorDesc;
+
+  /// No description provided for @settingsLyricSourceOrder.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词来源顺序'**
+  String get settingsLyricSourceOrder;
+
+  /// No description provided for @settingsLyricSourceOrderDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前平台无歌词时，按顺序回退到其它平台'**
+  String get settingsLyricSourceOrderDesc;
+
+  /// No description provided for @settingsLyricFormatOrder.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词格式顺序'**
+  String get settingsLyricFormatOrder;
+
+  /// No description provided for @settingsLyricFormatOrderDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'优先使用的歌词格式（逐字 / 标准）'**
+  String get settingsLyricFormatOrderDesc;
+
+  /// No description provided for @settingsLyricOrderHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'拖动排序；越靠前优先级越高'**
+  String get settingsLyricOrderHint;
+
+  /// No description provided for @settingsLyricOrderReset.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重置'**
+  String get settingsLyricOrderReset;
+
+  /// No description provided for @settingsSectionLyricExclude.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词排除规则'**
+  String get settingsSectionLyricExclude;
+
+  /// No description provided for @settingsLyricExcludeEnabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用歌词排除'**
+  String get settingsLyricExcludeEnabled;
+
+  /// No description provided for @settingsLyricExcludeEnabledOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已按规则排除匹配的歌词行'**
+  String get settingsLyricExcludeEnabledOn;
+
+  /// No description provided for @settingsLyricExcludeEnabledOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭时不排除任何歌词'**
+  String get settingsLyricExcludeEnabledOff;
+
+  /// No description provided for @settingsLyricExcludeRules.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'排除规则'**
+  String get settingsLyricExcludeRules;
+
+  /// No description provided for @settingsLyricExcludeRulesDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'按关键词或正则排除匹配的歌词行'**
+  String get settingsLyricExcludeRulesDesc;
+
+  /// No description provided for @settingsLyricExcludeDialogTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词排除规则'**
+  String get settingsLyricExcludeDialogTitle;
+
+  /// No description provided for @settingsLyricExcludeDialogHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'匹配到的歌词行将不会显示；关键词不区分大小写'**
+  String get settingsLyricExcludeDialogHint;
+
+  /// No description provided for @settingsLyricExcludeTabKeywords.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关键词'**
+  String get settingsLyricExcludeTabKeywords;
+
+  /// No description provided for @settingsLyricExcludeTabRegex.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正则'**
+  String get settingsLyricExcludeTabRegex;
+
+  /// No description provided for @settingsLyricExcludeKeywordHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'任一行包含该关键词即排除'**
+  String get settingsLyricExcludeKeywordHint;
+
+  /// No description provided for @settingsLyricExcludeRegexHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'支持正则表达式（Dart RegExp 语法）'**
+  String get settingsLyricExcludeRegexHint;
+
+  /// No description provided for @settingsLyricExcludePlaceholder.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'输入后回车或点添加'**
+  String get settingsLyricExcludePlaceholder;
+
+  /// No description provided for @settingsLyricExcludeAdd.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'添加'**
+  String get settingsLyricExcludeAdd;
+
+  /// No description provided for @settingsLyricExcludeEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂无规则'**
+  String get settingsLyricExcludeEmpty;
+
+  /// No description provided for @settingsLyricExcludeInvalidRegex.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正则表达式无效'**
+  String get settingsLyricExcludeInvalidRegex;
+
+  /// No description provided for @settingsLyricExcludeDuplicate.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'规则已存在'**
+  String get settingsLyricExcludeDuplicate;
+
+  /// No description provided for @settingsLyricExcludeClear.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'清空'**
+  String get settingsLyricExcludeClear;
+
+  /// No description provided for @commonConfigure.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'配置'**
+  String get commonConfigure;
+
+  /// No description provided for @settingsShowRomanization.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'显示音译'**
+  String get settingsShowRomanization;
+
+  /// No description provided for @settingsShowRomanizationOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启：当前行下方显示罗马音'**
+  String get settingsShowRomanizationOn;
+
+  /// No description provided for @settingsShowRomanizationOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭：不显示罗马音'**
+  String get settingsShowRomanizationOff;
+
+  /// No description provided for @settingsLyricAdaptiveFontSize.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自适应字号'**
+  String get settingsLyricAdaptiveFontSize;
+
+  /// No description provided for @settingsLyricAdaptiveFontSizeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词字号随窗口高度自动缩放'**
+  String get settingsLyricAdaptiveFontSizeDesc;
+
+  /// No description provided for @settingsLyricAdaptiveFontSizeOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启：字号随窗口缩放'**
+  String get settingsLyricAdaptiveFontSizeOn;
+
+  /// No description provided for @settingsLyricAdaptiveFontSizeOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭：固定字号'**
+  String get settingsLyricAdaptiveFontSizeOff;
+
+  /// No description provided for @settingsLyricFontWeight.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词字重'**
+  String get settingsLyricFontWeight;
+
+  /// No description provided for @settingsLyricFontWeightDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前行歌词文字粗细'**
+  String get settingsLyricFontWeightDesc;
+
+  /// No description provided for @settingsLyricWeightRegular.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'常规'**
+  String get settingsLyricWeightRegular;
+
+  /// No description provided for @settingsLyricWeightMedium.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'中等'**
+  String get settingsLyricWeightMedium;
+
+  /// No description provided for @settingsLyricWeightSemiBold.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'半粗'**
+  String get settingsLyricWeightSemiBold;
+
+  /// No description provided for @settingsLyricWeightBold.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'粗体'**
+  String get settingsLyricWeightBold;
+
+  /// No description provided for @sleepTimer.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'睡眠定时'**
+  String get sleepTimer;
+
+  /// No description provided for @sleepTimerOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭'**
+  String get sleepTimerOff;
+
+  /// No description provided for @sleepTimer15.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'15 分钟'**
+  String get sleepTimer15;
+
+  /// No description provided for @sleepTimer30.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'30 分钟'**
+  String get sleepTimer30;
+
+  /// No description provided for @sleepTimer60.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'60 分钟'**
+  String get sleepTimer60;
+
+  /// No description provided for @sleepTimer90.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'90 分钟'**
+  String get sleepTimer90;
+
+  /// No description provided for @sleepTimerEndOfTrack.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播完当前曲'**
+  String get sleepTimerEndOfTrack;
+
+  /// No description provided for @sleepTimerFired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'睡眠定时已到，已暂停播放'**
+  String get sleepTimerFired;
+
+  /// No description provided for @settingsReverseSpectrum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'反向频谱'**
+  String get settingsReverseSpectrum;
+
+  /// No description provided for @settingsReverseSpectrumDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'频谱水平翻转显示'**
+  String get settingsReverseSpectrumDesc;
+
+  /// No description provided for @settingsAutoImmersive.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动沉浸'**
+  String get settingsAutoImmersive;
+
+  /// No description provided for @settingsAutoImmersiveDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'指针离开或静止时自动隐藏顶/底栏'**
+  String get settingsAutoImmersiveDesc;
+
+  /// No description provided for @settingsMediaSession.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统媒体会话'**
+  String get settingsMediaSession;
+
+  /// No description provided for @settingsMediaSessionDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'同步到系统媒体控件（媒体键 / 蓝牙耳机）'**
+  String get settingsMediaSessionDesc;
+
+  /// No description provided for @settingsCrossfade.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切歌淡入'**
+  String get settingsCrossfade;
+
+  /// No description provided for @settingsCrossfadeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'新曲目音量从 0 渐升，避免硬起音'**
+  String get settingsCrossfadeDesc;
+
+  /// No description provided for @settingsCrossfadeDuration.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'淡入时长'**
+  String get settingsCrossfadeDuration;
+
+  /// No description provided for @settingsSectionExperience.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放体验'**
+  String get settingsSectionExperience;
+
+  /// No description provided for @settingsCatAudioEffects.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音频效果'**
+  String get settingsCatAudioEffects;
+
+  /// No description provided for @settingsAudioEffectsSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'均衡器 · 响度 · 变速'**
+  String get settingsAudioEffectsSubtitle;
+
+  /// No description provided for @settingsSectionEqualizer.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'均衡器'**
+  String get settingsSectionEqualizer;
+
+  /// No description provided for @settingsEqEnabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用均衡器'**
+  String get settingsEqEnabled;
+
+  /// No description provided for @settingsEqEnabledOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已启用'**
+  String get settingsEqEnabledOn;
+
+  /// No description provided for @settingsEqEnabledOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已关闭'**
+  String get settingsEqEnabledOff;
+
+  /// No description provided for @settingsEqPreset.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'均衡器预设'**
+  String get settingsEqPreset;
+
+  /// No description provided for @settingsEqPreamp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'预增益'**
+  String get settingsEqPreamp;
+
+  /// No description provided for @settingsEqPreampDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'整体提升或衰减，避免削波'**
+  String get settingsEqPreampDesc;
+
+  /// No description provided for @settingsEqLimiter.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'限幅器'**
+  String get settingsEqLimiter;
+
+  /// No description provided for @settingsEqLimiterDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'防止削波失真'**
+  String get settingsEqLimiterDesc;
+
+  /// No description provided for @settingsEqReset.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重置均衡器'**
+  String get settingsEqReset;
+
+  /// No description provided for @settingsEqPresetFlat.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'平坦'**
+  String get settingsEqPresetFlat;
+
+  /// No description provided for @settingsEqPresetPop.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流行'**
+  String get settingsEqPresetPop;
+
+  /// No description provided for @settingsEqPresetRock.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'摇滚'**
+  String get settingsEqPresetRock;
+
+  /// No description provided for @settingsEqPresetJazz.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'爵士'**
+  String get settingsEqPresetJazz;
+
+  /// No description provided for @settingsEqPresetClassical.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'古典'**
+  String get settingsEqPresetClassical;
+
+  /// No description provided for @settingsEqPresetVocal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'人声'**
+  String get settingsEqPresetVocal;
+
+  /// No description provided for @settingsEqPresetBass.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'低音增强'**
+  String get settingsEqPresetBass;
+
+  /// No description provided for @settingsEqPresetCustom.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义'**
+  String get settingsEqPresetCustom;
+
+  /// No description provided for @settingsSectionNormalization.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'响度归一化'**
+  String get settingsSectionNormalization;
+
+  /// No description provided for @settingsNormalization.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'响度归一化'**
+  String get settingsNormalization;
+
+  /// No description provided for @settingsNormalizationDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动调整音量，使不同曲目响度一致'**
+  String get settingsNormalizationDesc;
+
+  /// No description provided for @settingsNormalizationOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开启'**
+  String get settingsNormalizationOn;
+
+  /// No description provided for @settingsNormalizationOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已关闭'**
+  String get settingsNormalizationOff;
+
+  /// No description provided for @settingsSectionSpeed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放速度'**
+  String get settingsSectionSpeed;
+
+  /// No description provided for @settingsPlaybackSpeed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放速度'**
+  String get settingsPlaybackSpeed;
+
+  /// No description provided for @settingsPlaybackSpeedDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'变速不变调，不影响音高'**
+  String get settingsPlaybackSpeedDesc;
+
+  /// No description provided for @settingsPlaybackSpeedNormal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'恢复正常速度'**
+  String get settingsPlaybackSpeedNormal;
+
+  /// No description provided for @settingsSectionSystem.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统集成'**
+  String get settingsSectionSystem;
+
+  /// No description provided for @settingsRegisterProtocol.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'注册 archoera:// 协议'**
+  String get settingsRegisterProtocol;
+
+  /// No description provided for @settingsRegisterProtocolDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'允许浏览器/其它应用用 archoera:// 链接唤起本应用'**
+  String get settingsRegisterProtocolDesc;
+
+  /// No description provided for @settingsRegisterProtocolOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已注册'**
+  String get settingsRegisterProtocolOn;
+
+  /// No description provided for @settingsRegisterProtocolOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未注册'**
+  String get settingsRegisterProtocolOff;
+
+  /// No description provided for @settingsRegisterProtocolUnavailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前平台不支持'**
+  String get settingsRegisterProtocolUnavailable;
+
+  /// No description provided for @settingsRegisterProtocolFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'协议注册失败'**
+  String get settingsRegisterProtocolFailed;
 }
 
 class _AppLocalizationsDelegate

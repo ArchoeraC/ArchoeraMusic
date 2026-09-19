@@ -38,6 +38,7 @@ const int aplCapWindowState = 1 << 5;
 const int aplCapAppInstance = 1 << 6;
 const int aplCapSystemAccent = 1 << 7;
 const int aplCapSystemTheme = 1 << 8;
+const int aplCapDeepLink = 1 << 9;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -46,8 +47,9 @@ const int aplEventWindowState = 4;
 const int aplEventBackendState = 5;
 const int aplEventSystemAccent = 6;
 const int aplEventSystemTheme = 7;
+const int aplEventDeepLink = 8;
 
-const int aplAbiVersion = 1;
+const int aplAbiVersion = 2;
 
 // ── 结构体镜像 ─────────────────────────────────────────────────────
 
@@ -123,6 +125,9 @@ final class AplEventPayload extends Union {
   external AplAccentPayload accent;
 
   external AplThemePayload theme;
+
+  @Int32()
+  external int deepLink;
 }
 
 final class AplEventFfi extends Struct {
@@ -153,6 +158,11 @@ typedef _AplMediaTrackC = Int32 Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackC = Int32 Function(
     Int32 state, Int64 positionMs, Double speed, Double volume, Int32 loop, Int32 shuffle);
 typedef _AplMediaWindowC = Int32 Function(Int64 window);
+typedef _AplProtocolRegisterC = Int32 Function(Pointer<Utf8> scheme);
+typedef _AplProtocolUnregisterC = Int32 Function(Pointer<Utf8> scheme);
+typedef _AplDeepLinkTakeC = Int32 Function(Pointer<AplStringFfi> out);
+typedef _AplDeepLinkForwardC = Int32 Function();
+typedef _AplWindowActivateC = Int32 Function();
 typedef _SetEventCallbackC = Int32 Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
 
@@ -175,6 +185,11 @@ typedef _AplMediaTrackD = int Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackD = int Function(
     int state, int positionMs, double speed, double volume, int loop, int shuffle);
 typedef _AplMediaWindowD = int Function(int window);
+typedef _AplProtocolRegisterD = int Function(Pointer<Utf8> scheme);
+typedef _AplProtocolUnregisterD = int Function(Pointer<Utf8> scheme);
+typedef _AplDeepLinkTakeD = int Function(Pointer<AplStringFfi> out);
+typedef _AplDeepLinkForwardD = int Function();
+typedef _AplWindowActivateD = int Function();
 typedef _SetEventCallbackD = int Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
 
@@ -226,6 +241,11 @@ final class AplThemeEvent extends AplNativeEvent {
   final bool dark;
 }
 
+/// deep link 到达信号（Dart 再调 [PlatformBindings.deepLinkTake] 取 URI）。
+final class AplDeepLinkEvent extends AplNativeEvent {
+  const AplDeepLinkEvent();
+}
+
 /// libarchoera_platform 绑定（进程级单例，[tryLoad] 失败返回 null → Noop）。
 class PlatformBindings {
   PlatformBindings._(DynamicLibrary lib)
@@ -254,6 +274,16 @@ class PlatformBindings {
             lib.lookupFunction<_AplMediaPlaybackC, _AplMediaPlaybackD>('apl_media_set_playback'),
         _mediaWindow =
             lib.lookupFunction<_AplMediaWindowC, _AplMediaWindowD>('apl_media_set_window'),
+        _protocolRegister = lib.lookupFunction<_AplProtocolRegisterC, _AplProtocolRegisterD>(
+            'apl_protocol_register'),
+        _protocolUnregister = lib.lookupFunction<_AplProtocolUnregisterC, _AplProtocolUnregisterD>(
+            'apl_protocol_unregister'),
+        _deepLinkTakeFn =
+            lib.lookupFunction<_AplDeepLinkTakeC, _AplDeepLinkTakeD>('apl_deep_link_take'),
+        _deepLinkForwardFn = lib.lookupFunction<_AplDeepLinkForwardC, _AplDeepLinkForwardD>(
+            'apl_deep_link_forward'),
+        _windowActivateFn = lib.lookupFunction<_AplWindowActivateC, _AplWindowActivateD>(
+            'apl_window_activate'),
         _setCallback = lib
             .lookupFunction<_SetEventCallbackC, _SetEventCallbackD>('apl_set_event_callback') {
     // 事件回调：listener 可从任意 OS 线程触发，事件按到达序进入 Dart 端口
@@ -282,6 +312,11 @@ class PlatformBindings {
   final _AplMediaTrackD _mediaTrack;
   final _AplMediaPlaybackD _mediaPlayback;
   final _AplMediaWindowD _mediaWindow;
+  final _AplProtocolRegisterD _protocolRegister;
+  final _AplProtocolUnregisterD _protocolUnregister;
+  final _AplDeepLinkTakeD _deepLinkTakeFn;
+  final _AplDeepLinkForwardD _deepLinkForwardFn;
+  final _AplWindowActivateD _windowActivateFn;
   final _SetEventCallbackD _setCallback;
 
   // 四类事件广播流（ffi_* 实现订阅转译）
@@ -292,6 +327,7 @@ class PlatformBindings {
   final _backendCtrl = StreamController<AplBackendEvent>.broadcast();
   final _accentCtrl = StreamController<AplAccentEvent>.broadcast();
   final _themeCtrl = StreamController<AplThemeEvent>.broadcast();
+  final _deepLinkCtrl = StreamController<AplDeepLinkEvent>.broadcast();
 
   /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
   int acquireInstance() => _instanceAcquire();
@@ -355,6 +391,45 @@ class PlatformBindings {
   Stream<AplBackendEvent> get backendEvents => _backendCtrl.stream;
   Stream<AplAccentEvent> get accentEvents => _accentCtrl.stream;
   Stream<AplThemeEvent> get themeEvents => _themeCtrl.stream;
+  Stream<AplDeepLinkEvent> get deepLinkEvents => _deepLinkCtrl.stream;
+
+  /// 注册/注销当前用户的 URI scheme 处理程序（免提权）；[aplOk]=成功。
+  int protocolRegister(String scheme) {
+    final s = scheme.toNativeUtf8();
+    try {
+      return _protocolRegister(s);
+    } finally {
+      malloc.free(s);
+    }
+  }
+
+  int protocolUnregister(String scheme) {
+    final s = scheme.toNativeUtf8();
+    try {
+      return _protocolUnregister(s);
+    } finally {
+      malloc.free(s);
+    }
+  }
+
+  /// 取出一个待处理 deep link URI（无则 null；内部静态缓冲，已即时拷贝）。
+  String? deepLinkTake() {
+    final out = calloc<AplStringFfi>();
+    try {
+      if (_deepLinkTakeFn(out) <= 0) return null;
+      final ref = out.ref;
+      if (ref.data == nullptr || ref.len <= 0) return null;
+      return ref.data.cast<Utf8>().toDartString(length: ref.len);
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  /// 次实例转发自身 argv 中的 URI：1=已转发 / 0=无 / <0=错误。
+  int deepLinkForward() => _deepLinkForwardFn();
+
+  /// 置前/激活主窗口（<0=失败）。
+  int activateWindow() => _windowActivateFn();
 
   /// 栈上指针仅在回调期间有效——同步取值后立即投递。
   static void _onNativeEvent(Pointer<AplEventFfi> event, Pointer<Void> userData) {
@@ -383,6 +458,8 @@ class PlatformBindings {
         ));
       case aplEventSystemTheme:
         b._themeCtrl.add(AplThemeEvent(ref.u.theme.dark != 0));
+      case aplEventDeepLink:
+        b._deepLinkCtrl.add(const AplDeepLinkEvent());
     }
   }
 
@@ -481,6 +558,7 @@ class PlatformBindings {
     _screenCtrl.close();
     _windowCtrl.close();
     _backendCtrl.close();
+    _deepLinkCtrl.close();
     _instance = null;
   }
 }

@@ -12,6 +12,7 @@ extension _SettingsDialogView on _SettingsDialogState {
     final window = MediaQuery.sizeOf(context);
     final animated = ref.watch(appPrefsProvider).sidebarNavStyle == 'animated';
     final devMode = ref.watch(appPrefsProvider).developerMode;
+    final downloadModule = ref.watch(appPrefsProvider).downloadModuleEnabled;
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _updateCategoryIndicator(),
     );
@@ -83,7 +84,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                               itemExtent: 43,
                               children: [
                                 for (final cat in SettingsCategory.values)
-                                  if (cat.visible(devMode))
+                                  if (cat.visible(devMode, downloadModule))
                                     _buildCategoryItem(
                                       scheme,
                                       cat,
@@ -173,6 +174,12 @@ extension _SettingsDialogView on _SettingsDialogState {
       ),
       _SearchEntry(
         SettingsCategory.appearance,
+        l10n.settingsSidebarCustomize,
+        l10n.settingsSidebarCustomizeDesc,
+        EtaIcons.listCheck2,
+      ),
+      _SearchEntry(
+        SettingsCategory.appearance,
         l10n.settingsFloatingBar,
         l10n.settingsSearchFloatingBarSubtitle,
         EtaIcons.miniplayerOutline,
@@ -238,6 +245,54 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.magic2Outline,
       ),
       _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsCoverLayout,
+        l10n.settingsCoverLayoutDesc,
+        EtaIcons.square,
+      ),
+      _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsShowProgressLyric,
+        l10n.settingsShowProgressLyricDesc,
+        EtaIcons.fileMusicOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsTimeFormat,
+        l10n.settingsTimeFormatDesc,
+        EtaIcons.stopwatchOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsShowPlaybackSource,
+        l10n.settingsShowPlaybackSourceDesc,
+        EtaIcons.serverOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsRegisterProtocol,
+        l10n.settingsRegisterProtocolDesc,
+        EtaIcons.link,
+      ),
+      _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsSectionEqualizer,
+        l10n.settingsAudioEffectsSubtitle,
+        EtaIcons.soundLine,
+      ),
+      _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsNormalization,
+        l10n.settingsNormalizationDesc,
+        EtaIcons.transferHorizontal,
+      ),
+      _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsPlaybackSpeed,
+        l10n.settingsPlaybackSpeedDesc,
+        EtaIcons.stopwatchOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.lyrics,
         l10n.settingsPlayerLyrics,
         l10n.settingsSearchPlayerLyricsSubtitle,
@@ -272,6 +327,24 @@ extension _SettingsDialogView on _SettingsDialogState {
         l10n.settingsSearchColorTitle,
         l10n.settingsSearchColorSubtitle,
         EtaIcons.paletteOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.lyrics,
+        l10n.settingsLyricSourceOrder,
+        l10n.settingsLyricSourceOrderDesc,
+        EtaIcons.serverOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.lyrics,
+        l10n.settingsLyricFormatOrder,
+        l10n.settingsLyricFormatOrderDesc,
+        EtaIcons.fileMusicOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.lyrics,
+        l10n.settingsSectionLyricExclude,
+        l10n.settingsLyricExcludeRulesDesc,
+        EtaIcons.magic2Outline,
       ),
       _SearchEntry(
         SettingsCategory.lyrics,
@@ -552,6 +625,7 @@ extension _SettingsDialogView on _SettingsDialogState {
               child: switch (_category) {
                 SettingsCategory.appearance => const AppearanceSection(),
                 SettingsCategory.playback => const PlaybackSection(),
+                SettingsCategory.audioEffects => const AudioEffectsSection(),
                 SettingsCategory.shortcuts => const ShortcutsSection(),
                 SettingsCategory.lyrics => const LyricsSection(),
                 SettingsCategory.preset => const PresetSection(),
@@ -614,9 +688,10 @@ extension _SettingsDialogView on _SettingsDialogState {
   Widget _buildSearchResults(ColorScheme scheme, AppLocalizations l10n) {
     final q = _query.trim().toLowerCase();
     final devMode = ref.watch(appPrefsProvider).developerMode;
+    final downloadModule = ref.watch(appPrefsProvider).downloadModuleEnabled;
     final index = _buildSearchIndex(
       l10n,
-    ).where((e) => e.category.visible(devMode)).toList();
+    ).where((e) => e.category.visible(devMode, downloadModule)).toList();
     final matches = index.where((e) => _searchMatch(e, q, l10n)).toList();
     if (matches.isEmpty) {
       return Center(
@@ -653,7 +728,7 @@ extension _SettingsDialogView on _SettingsDialogState {
           ),
           const SizedBox(height: 8),
           for (final cat in SettingsCategory.values)
-            if (cat.visible(devMode) &&
+            if (cat.visible(devMode, downloadModule) &&
                 matches.any((e) => e.category == cat)) ...[
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),

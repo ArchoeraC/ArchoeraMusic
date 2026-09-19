@@ -56,6 +56,7 @@ class SpectrumView extends ConsumerStatefulWidget {
     this.opacity = 0.65,
     this.enabled,
     this.style,
+    this.reverse,
   });
 
   /// 画布高度（逻辑像素）。
@@ -80,6 +81,9 @@ class SpectrumView extends ConsumerStatefulWidget {
 
   /// 频谱样式；null 时跟随设置（player.spectrumStyle）。
   final SpectrumStyle? style;
+
+  /// 反向（水平翻转）；null 时跟随设置（player.spectrumReverse）。
+  final bool? reverse;
 
   @override
   ConsumerState<SpectrumView> createState() => _SpectrumViewState();

@@ -210,20 +210,26 @@ class CoverColorNotifier extends Notifier<Color?> {
     ref.listen(playbackProvider.select((s) => s.track), (_, track) {
       _extract(track?.cover);
     });
-    // 切到 cover 来源 → 立即按当前曲目取色；切走 → 清空
-    ref.listen(appPrefsProvider.select((p) => p.themeSource), (_, source) {
-      if (source == 'cover') {
-        _extract(ref.read(playbackProvider).track?.cover);
-      } else {
-        state = null;
-      }
-    });
+    // 主题色来源切到 cover、或开启「歌词跟随封面颜色」→ 立即按当前曲目
+    // 取色；两者都关闭 → 清空（避免无谓的封面取色请求）。
+    ref.listen(
+      appPrefsProvider.select((p) => (p.themeSource, p.followCoverColor)),
+      (_, v) {
+        if (v.$1 == 'cover' || v.$2) {
+          _extract(ref.read(playbackProvider).track?.cover);
+        } else {
+          state = null;
+        }
+      },
+    );
     _extract(ref.read(playbackProvider).track?.cover);
     return null;
   }
 
   Future<void> _extract(String? cover) async {
-    if (ref.read(appPrefsProvider).themeSource != 'cover') return;
+    final prefs = ref.read(appPrefsProvider);
+    // 仅在需要封面色时取色（global cover 主题 或 歌词跟随封面颜色）。
+    if (prefs.themeSource != 'cover' && !prefs.followCoverColor) return;
     // 竞态 token：只认最后一次取色结果
     final token = ++_token;
     final color = cover == null || cover.isEmpty

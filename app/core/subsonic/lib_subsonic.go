@@ -7,8 +7,7 @@
 // 原为 CLI（main() + 环境变量 + spawn 转码器子进程 + HTTP 回调 Node.js TS）。
 // FFI 化（Dart 直连）：
 //   - create 异步启动 http server（监听端口供外部 Subsonic 客户端连接，服务端=发送方）
-//   - 事件（started/error/lyric-request/scan-request）经 poll_event 拉取
-//   - 在线歌词注入：事件 + archoera_subsonic_lyric_response 异步响应（见 config 包说明）
+//   - 事件（started/error/scan-request）经 poll_event 拉取
 //   - 凭据加解密导出给 Dart 管理层（格式与 TS encryptString 兼容）
 package main
 
@@ -198,15 +197,6 @@ func archoera_subsonic_destroy(h C.intptr_t) {
 		_ = st.srv.Shutdown(ctx)
 	}
 	<-st.done
-}
-
-//export archoera_subsonic_lyric_response
-func archoera_subsonic_lyric_response(_ C.intptr_t, requestID C.long, resultJSON *C.char) {
-	res := ""
-	if resultJSON != nil {
-		res = C.GoString(resultJSON)
-	}
-	config.RespondLyric(int64(requestID), res)
 }
 
 //export archoera_subsonic_encrypt

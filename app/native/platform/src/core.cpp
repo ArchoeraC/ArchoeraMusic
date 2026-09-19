@@ -103,4 +103,11 @@ AplEvent makeSystemTheme(bool dark) {
     return e;
 }
 
+AplEvent makeDeepLink() {
+    AplEvent e{};
+    e.type = APL_EVENT_DEEP_LINK;
+    e.u.deep_link = 1;
+    return e;
+}
+
 }  // namespace archoera

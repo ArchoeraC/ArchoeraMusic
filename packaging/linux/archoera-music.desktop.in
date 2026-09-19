@@ -7,5 +7,6 @@ Exec=@EXEC@
 Icon=awa.archoera.betastudio2.archoera_music
 Terminal=false
 Categories=Audio;Music;AudioVideo;
+MimeType=x-scheme-handler/archoera;
 Keywords=music;player;audio;subsonic;netease;kugou;
 StartupWMClass=awa.archoera.betastudio2.archoera_music

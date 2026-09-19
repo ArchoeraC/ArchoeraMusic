@@ -53,6 +53,7 @@ extern "C" {
 #define APL_CAP_APP_INSTANCE       (1u << 6) /* 单实例仲裁（文件锁） */
 #define APL_CAP_SYSTEM_ACCENT      (1u << 7) /* 系统主题色（DE accent） */
 #define APL_CAP_SYSTEM_THEME       (1u << 8) /* 系统深浅色（light/dark） */
+#define APL_CAP_DEEP_LINK          (1u << 9) /* 自定义 URI scheme 唤醒（archoera://） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -94,6 +95,25 @@ APL_API int32_t apl_media_set_window(int64_t window);   /* HWND/NSWindow*；非�
 /* 单实例：1=首实例；0=已有实例（调用方应退出）；<0=错误。进程内幂等。 */
 APL_API int32_t apl_instance_acquire(void);
 
+/* ── DeepLink / 协议唤醒（archoera://）─────────────────────────────
+ * 注册/注销当前用户的 URI scheme 处理程序（免提权，仅当前用户）。幂等；
+ * 平台不支持/失败返回负值。Windows 写 HKCU；Linux 写 per-user desktop 并
+ * 经 GIO 注册默认处理；macOS 由 Info.plist 静态声明，返回 APL_OK。 */
+APL_API int32_t apl_protocol_register(const char *scheme);
+APL_API int32_t apl_protocol_unregister(const char *scheme);
+
+/* 取出一个待处理 deep link URI（冷启动 argv 或次实例转发）：
+ * 1=有并写入 out（指向桥接静态缓冲，下次调用前有效，Dart 须立即拷贝）；
+ * 0=无；<0=错误。 */
+APL_API int32_t apl_deep_link_take(AplString *out);
+
+/* 次实例：把自身 argv 中的 URI 转发给首实例并激活其窗口。
+ * 1=已转发（调用方应静默退出）；0=无 URI 可转发；<0=错误。 */
+APL_API int32_t apl_deep_link_forward(void);
+
+/* 置前/激活主窗口（三平台；无窗口/失败返回负值）。 */
+APL_API int32_t apl_window_activate(void);
+
 /* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
 APL_API int32_t apl_notify(const char *title, const char *body);
 
@@ -123,6 +143,7 @@ typedef enum {
     APL_EVENT_BACKEND_STATE = 5, /* u.backend_lost：1=后端断连 */
     APL_EVENT_SYSTEM_ACCENT = 6, /* 系统主题色（u.accent：r/g/b 0-255，平台推送） */
     APL_EVENT_SYSTEM_THEME  = 7, /* 系统深浅色（u.theme.dark：1=深色，平台推送） */
+    APL_EVENT_DEEP_LINK     = 8, /* 收到 deep link（u.deep_link=1；Dart 调 apl_deep_link_take 取） */
 } AplEventType;
 
 typedef enum {
@@ -141,6 +162,7 @@ typedef struct AplEvent {
         int32_t backend_lost; /* BACKEND_STATE */
         struct { int32_t r; int32_t g; int32_t b; } accent; /* SYSTEM_ACCENT：0-255 */
         struct { int32_t dark; } theme; /* SYSTEM_THEME：1=深色 0=浅色 */
+        int32_t deep_link;  /* DEEP_LINK：1=有 pending（Dart 再取） */
     } u;
 } AplEvent;
 

@@ -23,6 +23,7 @@ class _SpectrumPainter extends CustomPainter {
   double radius;
   Color color = Colors.transparent;
   SpectrumStyle style = SpectrumStyle.bars;
+  bool reverse = false;
   int nowMs = 0;
 
   final List<Float64List> _prev = [Float64List(fftSize), Float64List(fftSize)];
@@ -98,8 +99,9 @@ class _SpectrumPainter extends CustomPainter {
   int _buildBins() {
     final channelLength = fftSize - skipLow;
     for (var i = 0; i < channelLength; i++) {
-      _stereo[i] = _display[0][fftSize - 1 - i];
-      _stereo[channelLength + i] = _display[1][skipLow + i];
+      final src = reverse ? (channelLength - 1 - i) : i;
+      _stereo[i] = _display[0][fftSize - 1 - src];
+      _stereo[channelLength + i] = _display[1][skipLow + src];
     }
     return channelLength * 2;
   }
@@ -236,5 +238,6 @@ class _SpectrumPainter extends CustomPainter {
       old.barWidth != barWidth ||
       old.radius != radius ||
       old.color != color ||
-      old.style != style;
+      old.style != style ||
+      old.reverse != reverse;
 }

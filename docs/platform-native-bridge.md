@@ -118,7 +118,16 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_MEDIA_SEEK         (1u << 3)   /* 系统 UI 可拖进度条 */
 #define APL_CAP_MEDIA_ARTWORK      (1u << 4)
 #define APL_CAP_WINDOW_STATE       (1u << 5)   /* 窗口最小化/失焦事件 */
+#define APL_CAP_APP_INSTANCE       (1u << 6)   /* 单实例仲裁（文件锁 / 命名互斥体） */
+#define APL_CAP_SYSTEM_ACCENT      (1u << 7)   /* 系统主题色（DE accent） */
+#define APL_CAP_SYSTEM_THEME       (1u << 8)   /* 系统深浅色（light/dark） */
+#define APL_CAP_DEEP_LINK          (1u << 9)   /* archoera:// 协议唤醒（ABI v2） */
 ```
+
+协议唤醒（`APL_CAP_DEEP_LINK`，ABI v2 起）：`apl_protocol_register/unregister`
+注册当前用户处理程序（免提权）、`apl_deep_link_take` 取回待处理 URI、
+`apl_deep_link_forward` 次实例转发、`apl_window_activate` 置前主窗口；
+接收侧发 `APL_EVENT_DEEP_LINK` 信号，Dart 收到后调用 `apl_deep_link_take`。
 
 ### 3.2 字符串与元数据（零 JSON）
 

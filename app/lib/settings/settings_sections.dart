@@ -23,6 +23,7 @@ import '../app/app_quit.dart';
 import '../app/theme_provider.dart';
 import '../app/watermark.dart';
 import '../services/downloader/download_controller.dart';
+import '../services/platform/platform_capabilities.dart';
 import '../services/playback/engine_bindings.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/scraper/scrape_controller.dart';
@@ -40,6 +41,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'settings_sections/settings_sections_appearance.dart';
 part 'settings_sections/settings_sections_playback.dart';
+part 'settings_sections/settings_sections_audio_fx.dart';
 part 'settings_sections/settings_sections_shortcuts.dart';
 part 'settings_sections/settings_sections_lyrics.dart';
 part 'settings_sections/settings_sections_preset.dart';

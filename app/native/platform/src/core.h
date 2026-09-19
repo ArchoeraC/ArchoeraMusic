@@ -34,6 +34,7 @@ constexpr uint32_t CAP_WINDOW_STATE = 1u << 5;
 constexpr uint32_t CAP_APP_INSTANCE = 1u << 6;
 constexpr uint32_t CAP_SYSTEM_ACCENT = 1u << 7;
 constexpr uint32_t CAP_SYSTEM_THEME = 1u << 8;
+constexpr uint32_t CAP_DEEP_LINK = 1u << 9;
 
 // ── 事件类型 / 命令 ───────────────────────────────────────────────
 constexpr int32_t EVENT_MEDIA_COMMAND = 1;
@@ -43,6 +44,7 @@ constexpr int32_t EVENT_WINDOW_STATE = 4;
 constexpr int32_t EVENT_BACKEND_STATE = 5;
 constexpr int32_t EVENT_SYSTEM_ACCENT = 6;
 constexpr int32_t EVENT_SYSTEM_THEME = 7;
+constexpr int32_t EVENT_DEEP_LINK = 8;
 
 constexpr int32_t CMD_PLAY = 0;
 constexpr int32_t CMD_PAUSE = 1;
@@ -71,6 +73,9 @@ AplEvent makeWindowState(bool minimized, bool focused);
 AplEvent makeBackendLost(bool lost);
 AplEvent makeSystemAccent(int32_t r, int32_t g, int32_t b);
 AplEvent makeSystemTheme(bool dark);
+
+// deep link 待取信号（u.deep_link=1）。
+AplEvent makeDeepLink();
 
 }  // namespace archoera
 

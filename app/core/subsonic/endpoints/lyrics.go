@@ -5,39 +5,29 @@
 package endpoints
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
-	"github.com/betastudio2/archoera-subsonic/config"
 	"github.com/betastudio2/archoera-subsonic/db"
 	"github.com/betastudio2/archoera-subsonic/lyric"
 	"github.com/betastudio2/archoera-subsonic/util"
 	"github.com/betastudio2/archoera-subsonic/xmlutil"
 )
 
-/** 在线歌词注入响应 */
-type injectLyricResp struct {
-	Main        string `json:"main,omitempty"`
-	Translation string `json:"translation,omitempty"`
-	Romaji      string `json:"romaji,omitempty"`
+// 歌词端点：只读取服务端曲库中扫描到的内嵌歌词。
+//
+// 服务端只负责「消费/传输」元数据：曲库没有内嵌歌词时返回空，由客户端
+// （Subsonic 客户端）自行决定是否做在线歌词查询。服务端不回调宿主、
+// 不做在线抓取，避免阻塞请求与跨进程同步等待。
+
+// wantsArchExt 是否为 ArchoeraMusic 客户端（带扩展参数）。
+// 仅在此时才在响应中附带非标准扩展字段，保证对标准 Subsonic 客户端零影响。
+func wantsArchExt(r *http.Request) bool {
+	return r.URL.Query().Get("archoeraExt") == "1"
 }
 
-/** 请求宿主（Dart）获取在线歌词：发 lyric-request 事件并同步等待结果 */
-func fetchOnlineLyrics(id, title, artist string) *injectLyricResp {
-	res := config.RequestOnlineLyrics(id, title, artist)
-	if res == "" {
-		return nil
-	}
-	var result injectLyricResp
-	if err := json.Unmarshal([]byte(res), &result); err != nil {
-		return nil
-	}
-	if result.Main == "" {
-		return nil
-	}
-	return &result
-}
+// 扩展字段名（我方客户端识别）：曲库无内嵌歌词，提示客户端自行在线补全。
+const archExtFetchOnline = "archoeraFetchOnline"
 
 // GetLyrics /rest/getLyrics.view
 func GetLyrics(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +58,7 @@ func GetLyrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1) 取内嵌歌词
+	// 只取内嵌歌词；无则返回空。
 	var mainLyric string
 	if trackID != "" {
 		if embedded, err := db.GetTrackLyrics(trackID); err == nil && strings.TrimSpace(embedded) != "" {
@@ -76,15 +66,13 @@ func GetLyrics(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 2) 内嵌歌词为空时，回调 TS 获取在线歌词
-	if mainLyric == "" && titleStr != "" {
-		if online := fetchOnlineLyrics(trackID, titleStr, artistStr); online != nil {
-			mainLyric = online.Main
-		}
-	}
-
 	if mainLyric == "" {
-		xmlutil.Send(w, r, map[string]any{"lyrics": map[string]any{}}, nil)
+		// 无内嵌歌词：标准客户端得到空；我方客户端附带扩展标记，自行在线补全。
+		resp := map[string]any{"lyrics": map[string]any{}}
+		if wantsArchExt(r) {
+			resp[archExtFetchOnline] = true
+		}
+		xmlutil.Send(w, r, resp, nil)
 		return
 	}
 
@@ -114,33 +102,44 @@ func GetLyricsBySongId(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 只取内嵌歌词；无则返回空。
 	embedded, err := db.GetTrackLyrics(id)
 	if err != nil || strings.TrimSpace(embedded) == "" {
-		// 内嵌歌词为空时，回调 TS 获取在线歌词
-		artists := util.ParseArtists(track.ArtistsJSON)
-		artistStr := util.FirstArtist(artists)
-		if online := fetchOnlineLyrics(id, track.Title, artistStr); online != nil {
-			embedded = online.Main
+		resp := map[string]any{"lyricsList": map[string]any{}}
+		if wantsArchExt(r) {
+			resp[archExtFetchOnline] = true
 		}
-	}
-
-	if embedded == "" || strings.TrimSpace(embedded) == "" {
-		xmlutil.Send(w, r, map[string]any{"lyricsList": map[string]any{}}, nil)
+		xmlutil.Send(w, r, resp, nil)
 		return
 	}
 
 	prepared := lyric.Prepare(lyric.TrackLyricPayload{Main: embedded})
-	if len(prepared.StructuredLines) == 0 {
-		xmlutil.Send(w, r, map[string]any{"lyricsList": map[string]any{}}, nil)
+
+	// 有行级时间轴 → synced；纯文本 → synced=false 的逐行歌词（无 start）。
+	lines := make([]any, 0, len(prepared.StructuredLines))
+	if len(prepared.StructuredLines) > 0 {
+		for _, l := range prepared.StructuredLines {
+			lines = append(lines, map[string]any{"start": l.Start, "value": l.Value})
+		}
+	} else {
+		for _, raw := range strings.Split(prepared.ClassicText, "\n") {
+			line := strings.TrimSpace(raw)
+			if line == "" {
+				continue
+			}
+			lines = append(lines, map[string]any{"value": line})
+		}
+	}
+	if len(lines) == 0 {
+		resp := map[string]any{"lyricsList": map[string]any{}}
+		if wantsArchExt(r) {
+			resp[archExtFetchOnline] = true
+		}
+		xmlutil.Send(w, r, resp, nil)
 		return
 	}
 
 	artists := util.ParseArtists(track.ArtistsJSON)
-	lines := make([]any, 0, len(prepared.StructuredLines))
-	for _, l := range prepared.StructuredLines {
-		lines = append(lines, map[string]any{"start": l.Start, "value": l.Value})
-	}
-
 	xmlutil.Send(w, r, map[string]any{
 		"lyricsList": map[string]any{
 			"structuredLyrics": []any{

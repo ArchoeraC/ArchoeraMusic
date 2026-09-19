@@ -11,6 +11,9 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../services/netease/track.dart';
+import '../services/lyrics/lyric_line.dart';
+import '../services/playback/sleep_timer.dart';
+import '../utils/format.dart';
 import '../services/playback/playback_notifier.dart';
 import '../stores/app_prefs.dart';
 import '../stores/lyrics_provider.dart';
@@ -59,6 +62,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   /// 倒计时结束后淡出控件。
   bool _controlsVisible = true;
   Timer? _hideTimer;
+
+  /// 指针是否在播放页窗口内（自动沉浸：离开窗口立即隐藏顶/底栏）。
+  bool _pointerInside = true;
 
   /// 路由进入动画是否已完成：完成前不挂载重内容（背景 / 歌词块），
   /// 对齐原版 FullPlayer 的 `lyricMounted`（`@after-enter` 后才挂载）
