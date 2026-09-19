@@ -34,6 +34,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -906,6 +907,197 @@ void messageBox(const char* title, const char* body) {
     ::MessageBoxW(nullptr, wbody.c_str(), wtitle.c_str(), MB_ICONINFORMATION);
 }
 
+// ── DeepLink / 协议唤醒（HKCU 注册 + 隐藏消息窗口 + WM_COPYDATA 转发）──
+// 全程当前用户、免提权：scheme 写 HKCU\Software\Classes；跨实例转发用隐藏
+// 消息窗口 + WM_COPYDATA（不依赖提权，也不起子进程）。
+constexpr wchar_t kDeepLinkClass[] = L"ArchoeraMusic.DeepLink";
+HWND g_deeplink_hwnd = nullptr;
+std::mutex g_deeplink_mutex;
+std::string g_deeplink_pending;  // UTF-8；单条待取
+
+std::wstring utf8ToWideLocal(const char* s) {
+    if (s == nullptr) return std::wstring();
+    const int n = ::MultiByteToWideChar(CP_UTF8, 0, s, -1, nullptr, 0);
+    if (n <= 1) return std::wstring();
+    std::wstring out(static_cast<size_t>(n - 1), L'\0');
+    ::MultiByteToWideChar(CP_UTF8, 0, s, -1, out.data(), n);
+    return out;
+}
+
+std::string wideToUtf8Local(const wchar_t* s) {
+    if (s == nullptr) return std::string();
+    const int n =
+        ::WideCharToMultiByte(CP_UTF8, 0, s, -1, nullptr, 0, nullptr, nullptr);
+    if (n <= 1) return std::string();
+    std::string out(static_cast<size_t>(n - 1), '\0');
+    ::WideCharToMultiByte(CP_UTF8, 0, s, -1, out.data(), n, nullptr, nullptr);
+    return out;
+}
+
+// 从命令行中提取首个 `archoera://` 参数（去引号；只认前缀，不解析内容）。
+std::string extractUrlFromCommandLine(const wchar_t* cmd) {
+    if (cmd == nullptr) return std::string();
+    const std::wstring line(cmd);
+    const std::wstring wprefix = L"archoera://";
+    size_t pos = 0;
+    while (pos < line.size()) {
+        while (pos < line.size() && (line[pos] == L' ' || line[pos] == L'\t')) {
+            pos++;
+        }
+        if (pos >= line.size()) break;
+        std::wstring token;
+        if (line[pos] == L'"') {
+            pos++;
+            while (pos < line.size() && line[pos] != L'"') {
+                token.push_back(line[pos++]);
+            }
+            if (pos < line.size()) pos++;
+        } else {
+            while (pos < line.size() && line[pos] != L' ' && line[pos] != L'\t') {
+                token.push_back(line[pos++]);
+            }
+        }
+        if (token.size() >= wprefix.size() &&
+            ::_wcsnicmp(token.c_str(), wprefix.c_str(), wprefix.size()) == 0) {
+            return wideToUtf8Local(token.c_str());
+        }
+    }
+    return std::string();
+}
+
+void activateFlutterWindow() {
+    HWND hwnd = findFlutterWindow();
+    if (hwnd == nullptr) return;
+    if (::IsIconic(hwnd)) ::ShowWindow(hwnd, SW_RESTORE);
+    ::SetForegroundWindow(hwnd);
+}
+
+void setPendingDeepLink(const std::string& url) {
+    if (url.empty()) return;
+    {
+        std::lock_guard<std::mutex> lock(g_deeplink_mutex);
+        g_deeplink_pending = url;
+    }
+    dispatch(makeDeepLink());
+    activateFlutterWindow();
+}
+
+LRESULT CALLBACK deepLinkWndProc(HWND hwnd, UINT msg, WPARAM wparam,
+                                 LPARAM lparam) {
+    if (msg == WM_COPYDATA) {
+        auto* cds = reinterpret_cast<COPYDATASTRUCT*>(lparam);
+        if (cds != nullptr && cds->lpData != nullptr && cds->cbData > 0 &&
+            cds->cbData < 8192) {
+            std::string url(static_cast<const char*>(cds->lpData), cds->cbData);
+            setPendingDeepLink(url);
+            return TRUE;
+        }
+    } else if (msg == WM_APP + 0x51) {
+        activateFlutterWindow();
+        return 0;
+    }
+    return ::DefWindowProcW(hwnd, msg, wparam, lparam);
+}
+
+void ensureDeepLinkWindow() {
+    if (g_deeplink_hwnd != nullptr) return;
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof(wc);
+    wc.lpfnWndProc = deepLinkWndProc;
+    wc.hInstance = ::GetModuleHandleW(nullptr);
+    wc.lpszClassName = kDeepLinkClass;
+    ::RegisterClassExW(&wc);  // 已注册返回 0，忽略
+    g_deeplink_hwnd = ::CreateWindowExW(
+        WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, kDeepLinkClass,
+        L"ArchoeraMusic.DeepLink", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr,
+        wc.hInstance, nullptr);
+}
+
+void destroyDeepLinkWindow() {
+    if (g_deeplink_hwnd != nullptr) {
+        ::DestroyWindow(g_deeplink_hwnd);
+        g_deeplink_hwnd = nullptr;
+    }
+}
+
+int32_t protocolRegisterWin(const char* scheme) {
+    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
+    const std::wstring base =
+        L"Software\\Classes\\" + utf8ToWideLocal(scheme);
+    HKEY hkey = nullptr;
+    if (::RegCreateKeyExW(HKEY_CURRENT_USER, base.c_str(), 0, nullptr, 0,
+                          KEY_WRITE, nullptr, &hkey, nullptr) != ERROR_SUCCESS) {
+        return ERR_BACKEND;
+    }
+    const wchar_t* desc = L"URL:ArchoeraMusic";
+    ::RegSetValueExW(
+        hkey, nullptr, 0, REG_SZ,
+        reinterpret_cast<const BYTE*>(desc),
+        static_cast<DWORD>((std::wcslen(desc) + 1) * sizeof(wchar_t)));
+    const wchar_t* url_protocol = L"";
+    ::RegSetValueExW(hkey, L"URL Protocol", 0, REG_SZ,
+                     reinterpret_cast<const BYTE*>(url_protocol),
+                     sizeof(wchar_t));
+    ::RegCloseKey(hkey);
+
+    const std::wstring cmd_key = base + L"\\shell\\open\\command";
+    if (::RegCreateKeyExW(HKEY_CURRENT_USER, cmd_key.c_str(), 0, nullptr, 0,
+                          KEY_WRITE, nullptr, &hkey, nullptr) != ERROR_SUCCESS) {
+        return ERR_BACKEND;
+    }
+    wchar_t exe[MAX_PATH] = {0};
+    ::GetModuleFileNameW(nullptr, exe, MAX_PATH);
+    const std::wstring cmd = L"\"" + std::wstring(exe) + L"\" \"%1\"";
+    ::RegSetValueExW(hkey, nullptr, 0, REG_SZ,
+                     reinterpret_cast<const BYTE*>(cmd.c_str()),
+                     static_cast<DWORD>((cmd.size() + 1) * sizeof(wchar_t)));
+    ::RegCloseKey(hkey);
+    return OK;
+}
+
+int32_t protocolUnregisterWin(const char* scheme) {
+    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
+    const std::wstring base =
+        L"Software\\Classes\\" + utf8ToWideLocal(scheme);
+    ::RegDeleteTreeW(HKEY_CURRENT_USER, base.c_str());
+    return OK;
+}
+
+// 静态缓冲：out 指向它，下次调用前有效（Dart 立即拷贝）。
+std::string g_deeplink_take_buf;
+
+int32_t deepLinkTakeWin(AplString* out) {
+    if (out == nullptr) return ERR_STATE;
+    std::lock_guard<std::mutex> lock(g_deeplink_mutex);
+    if (g_deeplink_pending.empty()) {
+        out->data = nullptr;
+        out->len = 0;
+        return 0;
+    }
+    g_deeplink_take_buf = g_deeplink_pending;
+    g_deeplink_pending.clear();
+    out->data = g_deeplink_take_buf.c_str();
+    out->len = g_deeplink_take_buf.size();
+    return 1;
+}
+
+int32_t deepLinkForwardWin() {
+    const std::string url = extractUrlFromCommandLine(::GetCommandLineW());
+    if (url.empty()) return 0;
+    HWND target = ::FindWindowW(kDeepLinkClass, nullptr);
+    if (target == nullptr) return ERR_BACKEND;
+    COPYDATASTRUCT cds{};
+    cds.dwData = 0x41524D31;  // 'ARM1'
+    cds.cbData = static_cast<DWORD>(url.size());
+    cds.lpData = const_cast<char*>(url.data());
+    DWORD_PTR result = 0;
+    const LRESULT sent = ::SendMessageTimeoutW(
+        target, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&cds),
+        SMTO_ABORTIFHUNG | SMTO_NORMAL, 3000, &result);
+    if (sent == 0) return ERR_BACKEND;
+    return 1;
+}
+
 }  // namespace
 
 // ── 后端接口 ──────────────────────────────────────────────────────
@@ -913,12 +1105,22 @@ void messageBox(const char* title, const char* body) {
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
-           CAP_SYSTEM_THEME;
+           CAP_SYSTEM_THEME | CAP_DEEP_LINK;
 }
 
 int32_t init() {
     setAumid();             // 显式 AUMID（媒体浮出/任务栏分组 + Toast 身份）
     ensureToastShortcut();  // Toast 前提：开始菜单快捷方式带同一 AUMID
+    // 协议唤醒：隐藏消息窗口（接收次实例 WM_COPYDATA）+ 冷启动 argv 中的 URI。
+    ensureDeepLinkWindow();
+    {
+        const std::string cold =
+            extractUrlFromCommandLine(::GetCommandLineW());
+        if (!cold.empty()) {
+            std::lock_guard<std::mutex> lock(g_deeplink_mutex);
+            g_deeplink_pending = cold;
+        }
+    }
 #ifdef ARCHOERA_WINRT
     winrt_smtc::probe();  // 确认 DLL 已加载（写日志，便于排查）
 #endif
@@ -948,6 +1150,7 @@ int32_t shutdown() {
         ::CloseHandle(g_instance_mutex);
         g_instance_mutex = nullptr;
     }
+    destroyDeepLinkWindow();
     g_screen_events.store(false, std::memory_order_release);
     g_window_events.store(false, std::memory_order_release);
     return OK;
@@ -1030,6 +1233,24 @@ int32_t appInstanceAcquire() {
     }
     g_instance_mutex = h;
     return 1;
+}
+
+int32_t protocolRegister(const char* scheme) {
+    return protocolRegisterWin(scheme);
+}
+
+int32_t protocolUnregister(const char* scheme) {
+    return protocolUnregisterWin(scheme);
+}
+
+int32_t deepLinkTake(AplString* out) { return deepLinkTakeWin(out); }
+
+int32_t deepLinkForward() { return deepLinkForwardWin(); }
+
+int32_t windowActivate() {
+    if (findFlutterWindow() == nullptr) return ERR_BACKEND;
+    activateFlutterWindow();
+    return OK;
 }
 
 bool systemAccent(int32_t* r, int32_t* g, int32_t* b) {

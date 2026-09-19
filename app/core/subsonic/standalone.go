@@ -9,9 +9,9 @@
 //   - 以环境变量/flag 配置（固定端口、曲库/数据目录、转码器路径）
 //   - 复用 lib_subsonic.go 的 runServer 与转码器
 //   - 无 Dart 宿主，因此：
-//       · 启动时经 SUB_ADMIN_USER/SUB_ADMIN_PASSWORD 引导管理员（库内无用户时）
-//       · started/error 事件写日志；scan-request 仅提示（扫描为宿主侧能力）；
-//         lyric-request 会超时返回空（在线歌词在无宿主下不可用）
+//     · 启动时经 SUB_ADMIN_USER/SUB_ADMIN_PASSWORD 引导管理员（库内无用户时）
+//     · started/error 事件写日志；scan-request 仅提示（扫描为宿主侧能力）；
+//     歌词只读曲库内嵌，在线歌词交客户端
 //   - 曲库需预置（挂载桌面端生成的 library.db，或由外部进程写入 tracks 表）
 //
 // 构建：go build -tags standalone -o archoera-subsonic .
@@ -151,8 +151,6 @@ func drainEvents(events <-chan string) {
 		switch {
 		case strings.Contains(ev, `"type":"scan-request"`):
 			log.Printf("收到扫描请求：standalone 模式扫描为宿主侧能力，需外部预置曲库")
-		case strings.Contains(ev, `"type":"lyric-request"`):
-			log.Printf("收到在线歌词请求：standalone 模式无宿主，返回空（在线歌词不可用）")
 		default:
 			log.Printf("事件: %s", ev)
 		}

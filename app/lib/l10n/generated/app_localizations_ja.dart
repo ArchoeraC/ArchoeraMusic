@@ -777,10 +777,10 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => 'NT';
+  String get platformNetease => 'NetEase Cloud Music';
 
   @override
-  String get platformKugou => 'KG';
+  String get platformKugou => 'Kugou Music';
 
   @override
   String get platformAll => 'すべて';
@@ -3779,7 +3779,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ ミュージック';
+  String get platformQQMusic => 'QQ Music';
 
   @override
   String get loginQqQrLogin => 'QQ ミュージック QR コードでログイン';
@@ -4232,4 +4232,411 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get shortcutActionBack => '戻る';
+
+  @override
+  String get commonReset => 'Reset';
+
+  @override
+  String get settingsDevDownloadModuleDesc =>
+      'Separate switch for the download interface (sidebar / context menu / settings category). Off by default; warns before enabling.';
+
+  @override
+  String get settingsDevDownloadModuleOn => 'Download module enabled';
+
+  @override
+  String get settingsDevDownloadModuleOff => 'Download module disabled';
+
+  @override
+  String get settingsDevDownloadWarningTitle => 'Enable download module?';
+
+  @override
+  String get settingsDevDownloadWarningBody =>
+      'The download module is intended for local debugging and personal use. It may involve copyright and terms-of-service risks with third-party platforms. Use at your own discretion.';
+
+  @override
+  String get settingsDevDownloadWarningAgree => 'I understand, enable';
+
+  @override
+  String get settingsSidebarCustomize => 'Customize sidebar';
+
+  @override
+  String get settingsSidebarCustomizeDesc =>
+      'Show, hide and reorder sidebar items';
+
+  @override
+  String get settingsSidebarCustomizeTitle => 'Customize sidebar';
+
+  @override
+  String get settingsSidebarCustomizeHint =>
+      'Drag to reorder; use the switch to show or hide';
+
+  @override
+  String get settingsShowProgressTooltip => 'Progress hover tooltip';
+
+  @override
+  String get settingsShowProgressTooltipDesc =>
+      'Show the time under the cursor when hovering the progress bar';
+
+  @override
+  String get settingsShowProgressLyric => 'Show lyric on progress bar';
+
+  @override
+  String get settingsShowProgressLyricDesc =>
+      'Show the current lyric above the progress bar in the full player';
+
+  @override
+  String get settingsSnapToLyric => 'Snap to lyric';
+
+  @override
+  String get settingsSnapToLyricDesc =>
+      'Snap to the nearest lyric line when releasing the progress bar';
+
+  @override
+  String get settingsTimeFormat => 'Time format';
+
+  @override
+  String get settingsTimeFormatDesc => 'How playback time is displayed';
+
+  @override
+  String get settingsTimeFormatCurrentTotal => 'Elapsed / total';
+
+  @override
+  String get settingsTimeFormatRemainingTotal => 'Remaining / total';
+
+  @override
+  String get settingsTimeFormatCurrentRemaining => 'Elapsed / remaining';
+
+  @override
+  String get settingsShowPlaybackSource => 'Show playback source';
+
+  @override
+  String get settingsShowPlaybackSourceDesc =>
+      'Show the source platform of the current track in the player bar';
+
+  @override
+  String get settingsCoverLayout => 'Cover layout';
+
+  @override
+  String get settingsCoverLayoutDesc =>
+      'How the cover is presented in the full player';
+
+  @override
+  String get settingsCoverLayoutDefault => 'Default';
+
+  @override
+  String get settingsCoverLayoutFullscreen => 'Fullscreen cover';
+
+  @override
+  String get settingsCoverLyricRatio => 'Cover / lyrics ratio';
+
+  @override
+  String get settingsCoverLyricRatioDesc =>
+      'Width ratio of the cover and lyrics areas';
+
+  @override
+  String get settingsAutoCenterCover => 'Auto-center cover';
+
+  @override
+  String get settingsAutoCenterCoverDesc =>
+      'Center the cover and hide lyrics when there are no lyrics';
+
+  @override
+  String get settingsFollowCoverColor => 'Follow cover color';
+
+  @override
+  String get settingsFollowCoverColorDesc =>
+      'Lyric colors follow the dominant color of the current cover';
+
+  @override
+  String get settingsLyricSourceOrder => 'Lyric source order';
+
+  @override
+  String get settingsLyricSourceOrderDesc =>
+      'Fall back to other platforms in this order when the current platform has no lyrics';
+
+  @override
+  String get settingsLyricFormatOrder => 'Lyric format order';
+
+  @override
+  String get settingsLyricFormatOrderDesc =>
+      'Preferred lyric formats (word-by-word / standard)';
+
+  @override
+  String get settingsLyricOrderHint =>
+      'Drag to reorder; higher position means higher priority';
+
+  @override
+  String get settingsLyricOrderReset => 'Reset';
+
+  @override
+  String get settingsSectionLyricExclude => 'Lyric exclusion rules';
+
+  @override
+  String get settingsLyricExcludeEnabled => 'Enable lyric exclusion';
+
+  @override
+  String get settingsLyricExcludeEnabledOn =>
+      'Matching lyric lines are excluded';
+
+  @override
+  String get settingsLyricExcludeEnabledOff => 'No lines are excluded when off';
+
+  @override
+  String get settingsLyricExcludeRules => 'Exclusion rules';
+
+  @override
+  String get settingsLyricExcludeRulesDesc =>
+      'Exclude lyric lines matching keywords or regular expressions';
+
+  @override
+  String get settingsLyricExcludeDialogTitle => 'Lyric exclusion rules';
+
+  @override
+  String get settingsLyricExcludeDialogHint =>
+      'Matching lines will be hidden; keywords are case-insensitive';
+
+  @override
+  String get settingsLyricExcludeTabKeywords => 'Keywords';
+
+  @override
+  String get settingsLyricExcludeTabRegex => 'Regex';
+
+  @override
+  String get settingsLyricExcludeKeywordHint =>
+      'Exclude any line containing this keyword';
+
+  @override
+  String get settingsLyricExcludeRegexHint =>
+      'Regular expressions supported (Dart RegExp syntax)';
+
+  @override
+  String get settingsLyricExcludePlaceholder =>
+      'Type and press enter, or click add';
+
+  @override
+  String get settingsLyricExcludeAdd => 'Add';
+
+  @override
+  String get settingsLyricExcludeEmpty => 'No rules yet';
+
+  @override
+  String get settingsLyricExcludeInvalidRegex => 'Invalid regular expression';
+
+  @override
+  String get settingsLyricExcludeDuplicate => 'Rule already exists';
+
+  @override
+  String get settingsLyricExcludeClear => 'Clear';
+
+  @override
+  String get commonConfigure => 'Configure';
+
+  @override
+  String get settingsShowRomanization => 'Show romanization';
+
+  @override
+  String get settingsShowRomanizationOn =>
+      'On: show romanization below the current line';
+
+  @override
+  String get settingsShowRomanizationOff => 'Off: hide romanization';
+
+  @override
+  String get settingsLyricAdaptiveFontSize => 'Adaptive font size';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeDesc =>
+      'Scale the lyric font size with window height';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeOn => 'On: scales with the window';
+
+  @override
+  String get settingsLyricAdaptiveFontSizeOff => 'Off: fixed font size';
+
+  @override
+  String get settingsLyricFontWeight => 'Lyric font weight';
+
+  @override
+  String get settingsLyricFontWeightDesc => 'Weight of the active lyric line';
+
+  @override
+  String get settingsLyricWeightRegular => 'Regular';
+
+  @override
+  String get settingsLyricWeightMedium => 'Medium';
+
+  @override
+  String get settingsLyricWeightSemiBold => 'Semibold';
+
+  @override
+  String get settingsLyricWeightBold => 'Bold';
+
+  @override
+  String get sleepTimer => 'Sleep timer';
+
+  @override
+  String get sleepTimerOff => 'Off';
+
+  @override
+  String get sleepTimer15 => '15 minutes';
+
+  @override
+  String get sleepTimer30 => '30 minutes';
+
+  @override
+  String get sleepTimer60 => '60 minutes';
+
+  @override
+  String get sleepTimer90 => '90 minutes';
+
+  @override
+  String get sleepTimerEndOfTrack => 'End of current track';
+
+  @override
+  String get sleepTimerFired => 'Sleep timer reached; playback paused';
+
+  @override
+  String get settingsReverseSpectrum => 'Reverse spectrum';
+
+  @override
+  String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
+
+  @override
+  String get settingsAutoImmersive => 'Auto immersive';
+
+  @override
+  String get settingsAutoImmersiveDesc =>
+      'Hide the top and bottom bars when the pointer leaves or is idle';
+
+  @override
+  String get settingsMediaSession => 'System media session';
+
+  @override
+  String get settingsMediaSessionDesc =>
+      'Sync with system media controls (media keys / Bluetooth)';
+
+  @override
+  String get settingsCrossfade => 'Fade in on track change';
+
+  @override
+  String get settingsCrossfadeDesc =>
+      'Ramp volume from 0 on new tracks to avoid hard starts';
+
+  @override
+  String get settingsCrossfadeDuration => 'Fade-in duration';
+
+  @override
+  String get settingsSectionExperience => 'Playback experience';
+
+  @override
+  String get settingsCatAudioEffects => 'Audio effects';
+
+  @override
+  String get settingsAudioEffectsSubtitle => 'Equalizer · loudness · speed';
+
+  @override
+  String get settingsSectionEqualizer => 'Equalizer';
+
+  @override
+  String get settingsEqEnabled => 'Enable equalizer';
+
+  @override
+  String get settingsEqEnabledOn => 'Enabled';
+
+  @override
+  String get settingsEqEnabledOff => 'Disabled';
+
+  @override
+  String get settingsEqPreset => 'Equalizer preset';
+
+  @override
+  String get settingsEqPreamp => 'Preamp';
+
+  @override
+  String get settingsEqPreampDesc => 'Overall boost or cut to avoid clipping';
+
+  @override
+  String get settingsEqLimiter => 'Limiter';
+
+  @override
+  String get settingsEqLimiterDesc => 'Prevent clipping distortion';
+
+  @override
+  String get settingsEqReset => 'Reset equalizer';
+
+  @override
+  String get settingsEqPresetFlat => 'Flat';
+
+  @override
+  String get settingsEqPresetPop => 'Pop';
+
+  @override
+  String get settingsEqPresetRock => 'Rock';
+
+  @override
+  String get settingsEqPresetJazz => 'Jazz';
+
+  @override
+  String get settingsEqPresetClassical => 'Classical';
+
+  @override
+  String get settingsEqPresetVocal => 'Vocal';
+
+  @override
+  String get settingsEqPresetBass => 'Bass boost';
+
+  @override
+  String get settingsEqPresetCustom => 'Custom';
+
+  @override
+  String get settingsSectionNormalization => 'Loudness normalization';
+
+  @override
+  String get settingsNormalization => 'Loudness normalization';
+
+  @override
+  String get settingsNormalizationDesc =>
+      'Adjust volume so tracks have consistent loudness';
+
+  @override
+  String get settingsNormalizationOn => 'On';
+
+  @override
+  String get settingsNormalizationOff => 'Off';
+
+  @override
+  String get settingsSectionSpeed => 'Playback speed';
+
+  @override
+  String get settingsPlaybackSpeed => 'Playback speed';
+
+  @override
+  String get settingsPlaybackSpeedDesc => 'Time-stretch without changing pitch';
+
+  @override
+  String get settingsPlaybackSpeedNormal => 'Normal speed';
+
+  @override
+  String get settingsSectionSystem => 'System integration';
+
+  @override
+  String get settingsRegisterProtocol => 'Register archoera:// protocol';
+
+  @override
+  String get settingsRegisterProtocolDesc =>
+      'Allow browsers and other apps to wake this app via archoera:// links';
+
+  @override
+  String get settingsRegisterProtocolOn => 'Registered';
+
+  @override
+  String get settingsRegisterProtocolOff => 'Not registered';
+
+  @override
+  String get settingsRegisterProtocolUnavailable =>
+      'Not supported on this platform';
+
+  @override
+  String get settingsRegisterProtocolFailed => 'Failed to register protocol';
 }

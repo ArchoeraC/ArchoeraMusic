@@ -40,10 +40,20 @@ List<double> computeLineHeights(
   String? fontFamily,
   required double maxWidth,
   bool showTranslation = kDefaultShowTranslation,
+  bool showRomanization = false,
+  FontWeight fontWeight = FontWeight.w600,
 }) {
   return [
     for (final g in groups)
-      _measureGroup(g, fontSize, fontFamily, maxWidth, showTranslation),
+      _measureGroup(
+        g,
+        fontSize,
+        fontFamily,
+        maxWidth,
+        showTranslation,
+        showRomanization,
+        fontWeight,
+      ),
   ];
 }
 
@@ -53,15 +63,17 @@ double _measureGroup(
   String? fontFamily,
   double maxWidth,
   bool showTranslation,
+  bool showRomanization,
+  FontWeight fontWeight,
 ) {
-  // 主行按激活态字重（w600）保守测量：长行换行后的行数不会因激活加粗
+  // 主行按激活态字重保守测量：长行换行后的行数不会因激活加粗
   // 而变多导致溢出；非激活行即使略窄也只会多留一点行距。
   var h = _textHeight(
     g.original.text,
     fontSize,
     fontFamily,
     maxWidth,
-    fontWeight: FontWeight.w600,
+    fontWeight: fontWeight,
   );
   if (showTranslation && (g.translation?.isNotEmpty ?? false)) {
     final gap = fontSize * kMainTranslationGapEm;
@@ -69,6 +81,17 @@ double _measureGroup(
         (gap < 3 ? 3 : gap) +
         _textHeight(
           g.translation!,
+          fontSize * kTranslationFontScale,
+          fontFamily,
+          maxWidth,
+        );
+  }
+  if (showRomanization && (g.romaji?.isNotEmpty ?? false)) {
+    final gap = fontSize * kMainTranslationGapEm;
+    h +=
+        (gap < 3 ? 3 : gap) +
+        _textHeight(
+          g.romaji!,
           fontSize * kTranslationFontScale,
           fontFamily,
           maxWidth,

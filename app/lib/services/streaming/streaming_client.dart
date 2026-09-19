@@ -210,11 +210,17 @@ class StreamingClient {
   }
 
   /// 取歌词；[artist]/[title] 仅 Subsonic 旧端点回退用。
-  Future<String?> getLyrics(String originalId, {String? artist, String? title}) {
+  Future<StreamingLyrics> getLyrics(
+    String originalId, {
+    String? artist,
+    String? title,
+  }) {
     final sub = _sub;
-    if (sub != null) return sub.getLyrics(originalId, artist: artist, title: title);
+    if (sub != null) {
+      return sub.getLyrics(originalId, artist: artist, title: title);
+    }
     final jelly = _jelly;
     if (jelly != null) return jelly.getLyrics(originalId);
-    return Future.value(null);
+    return Future.value(const StreamingLyrics());
   }
 }

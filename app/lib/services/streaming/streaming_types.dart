@@ -243,3 +243,17 @@ class StreamingListParams {
   final int? offset;
   final int? limit;
 }
+
+/// 流媒体歌词结果。
+///
+/// [lrc] 为服务器返回的歌词文本（LRC 或纯文本）；[fetchOnline] 为
+/// ArchoeraMusic 服务端扩展标记：曲库无内嵌歌词，提示客户端自行在线补全
+/// （仅我方服务端 + 我方客户端会出现；标准 Subsonic 客户端不受影响）。
+class StreamingLyrics {
+  const StreamingLyrics({this.lrc, this.fetchOnline = false});
+
+  final String? lrc;
+  final bool fetchOnline;
+
+  bool get hasLrc => lrc != null && lrc!.trim().isNotEmpty;
+}

@@ -19,9 +19,10 @@ import '../logger.dart';
 import '../netease/api.dart';
 import '../runtime.dart';
 import 'fingerprint.dart';
+import 'format.dart';
+import 'match.dart';
 import 'ttml.dart';
 import 'types.dart';
-import 'utils.dart';
 
 /// `{ lyric: string }` 结构取文本
 String? _lyricText(Object? obj) => obj is Map ? obj['lyric']?.toString() : null;
@@ -130,22 +131,11 @@ String convertNeteaseNewYrc(String yrc) {
 String convertNeteaseNewYrcToLrc(String yrc) =>
     convertNeteaseNewYrc(yrc).replaceAll(RegExp(r'<[^>]*>'), '');
 
-/// 主歌词：yrc 优先，其次 lrc（新版 yrc 自动归一化）
-({String content, String format})? _pickMain(String? yrc, String? lrc) {
-  final yrcContent = yrc?.trim();
-  if (yrcContent != null && yrcContent.isNotEmpty) {
-    return (
-      content: _isNewYrcFormat(yrcContent)
-          ? convertNeteaseNewYrc(yrcContent)
-          : yrcContent,
-      format: 'yrc',
-    );
-  }
-  final lrcContent = lrc?.trim();
-  if (lrcContent != null && lrcContent.isNotEmpty) {
-    return (content: lrcContent, format: 'lrc');
-  }
-  return null;
+/// 主歌词逐字内容：新版 YRC 自动归一化，空返回 null。
+String? _normalizeNeteaseYrc(String? yrc) {
+  final c = yrc?.trim();
+  if (c == null || c.isEmpty) return null;
+  return _isNewYrcFormat(c) ? convertNeteaseNewYrc(c) : c;
 }
 
 /// 翻译 / 罗马音：`ytlrc` / `yromalrc` 时间戳更贴 YRC 行边界，优先选用
@@ -166,19 +156,36 @@ String convertNeteaseNewYrcToLrc(String yrc) =>
   return null;
 }
 
-/// 按 id 直取歌词
-Future<LyricMatchResult?> nmGetLyricByPlatformId(String id) async {
+/// 按 id 直取歌词（`preferRich=false` 时优先标准 LRC 而非逐字 YRC）。
+Future<LyricMatchResult?> nmGetLyricByPlatformId(
+  String id, {
+  bool preferRich = true,
+}) async {
+  final cachePlatform = lyricCachePlatform('netease', preferRich: preferRich);
   // 立刻预热 TTML 抓取
   prefetchTTML('netease', [id]);
   // 缓存命中直接返回
-  final cached = getRuntime().lyricCache.get('netease', id);
+  final cached = getRuntime().lyricCache.get(cachePlatform, id);
   if (cached != null) return LyricMatchResult.fromJson(cached);
 
   try {
     final res = await nmCallNetease('lyric_new', {'id': id});
     if (res.status != 200 || res.body['code'] != 200) return null;
-    // 主歌词：yrc > lrc
-    final main = _pickMain(_lyricText(res.body['yrc']), _lyricText(res.body['lrc']));
+    // 主歌词：逐字 YRC vs 标准 LRC（按用户格式顺序）
+    final main = pickLyricFormat(
+      [
+        LyricFormatCandidate(
+          content: _normalizeNeteaseYrc(_lyricText(res.body['yrc'])),
+          format: 'yrc',
+          wordByWord: true,
+        ),
+        LyricFormatCandidate(
+          content: _lyricText(res.body['lrc']),
+          format: 'lrc',
+        ),
+      ],
+      preferRich: preferRich,
+    );
     if (main == null) return null;
     // 翻译 / 罗马音
     final trans = _pickSub(_lyricText(res.body['ytlrc']), _lyricText(res.body['tlyric']));
@@ -192,7 +199,7 @@ Future<LyricMatchResult?> nmGetLyricByPlatformId(String id) async {
       romaji: roma?.content,
       romajiFormat: roma?.format,
     );
-    getRuntime().lyricCache.set('netease', id, result.toJson());
+    getRuntime().lyricCache.set(cachePlatform, id, result.toJson());
     return result;
   } catch (err) {
     coreLog.warn('[lyric:netease] getByPlatformId($id) failed: $err');
@@ -201,53 +208,53 @@ Future<LyricMatchResult?> nmGetLyricByPlatformId(String id) async {
 }
 
 /// 按 Track 元数据模糊搜索：search → 挑最佳 → 单次请求歌词
-Future<LyricMatchResult?> nmGetLyricByQuery(Track track) async {
-  // 命中映射缓存：跳过 search → 直接走 byId
-  final fingerprint = buildFingerprint(track);
-  final cached = getRuntime().lyricMatchCache.get(fingerprint, 'netease');
-  if (cached != null) return nmGetLyricByPlatformId(cached.platformId);
-
-  final keyword = buildLyricSearchKeyword(track);
-  if (keyword.isEmpty) return null;
-
-  // 搜索 + 归一化
-  final candidates = <LyricCandidate<Map<String, String>>>[];
-  try {
-    final res = await nmCallNetease('search', {
-      'keywords': keyword,
-      'type': 1,
-      'limit': 20,
-    });
-    if (res.status != 200) return null;
-    final result = res.body['result'];
-    final songs = result is Map ? (result['songs'] as List? ?? const []) : const [];
-    for (final item in songs) {
-      final song = (item as Map).cast<String, dynamic>();
-      final artists = (song['artists'] as List? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map((a) => a['name']?.toString() ?? '');
-      final album = song['album'];
-      candidates.add(LyricCandidate<Map<String, String>>(
-        name: song['name']?.toString() ?? '',
-        artist: artists.join(' / '),
-        album: album is Map ? album['name']?.toString() : null,
-        duration: (song['duration'] as num?)?.toInt(),
-        extra: {'id': '${song['id']}'},
-      ));
-    }
-  } catch (err) {
-    coreLog.warn('[lyric:netease] search("$keyword") failed: $err');
-    return null;
-  }
-
-  final best = pickBestCandidate(candidates, track);
-  coreLog.info(
-    '[lyric:netease] fuzzy "$keyword" → ${candidates.length} hits, '
-    'best=${best?.name ?? 'none'}',
+Future<LyricMatchResult?> nmGetLyricByQuery(
+  Track track, {
+  bool preferRich = true,
+}) {
+  return fetchMatchedLyric(
+    platform: 'netease',
+    track: track,
+    idOf: (extra) => extra['id'] ?? '',
+    byId: (id, _) => nmGetLyricByPlatformId(id, preferRich: preferRich),
+    search: (keyword) async {
+      final candidates = <LyricCandidate<Map<String, String>>>[];
+      try {
+        final res = await nmCallNetease('search', {
+          'keywords': keyword,
+          'type': 1,
+          'limit': 20,
+        });
+        if (res.status != 200) return candidates;
+        final result = res.body['result'];
+        final songs = result is Map
+            ? (result['songs'] as List? ?? const [])
+            : const [];
+        for (final item in songs) {
+          final song = (item as Map).cast<String, dynamic>();
+          final artists = (song['artists'] as List? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map((a) => a['name']?.toString() ?? '');
+          final album = song['album'];
+          candidates.add(
+            LyricCandidate<Map<String, String>>(
+              name: song['name']?.toString() ?? '',
+              artist: artists.join(' / '),
+              album: album is Map ? album['name']?.toString() : null,
+              duration: (song['duration'] as num?)?.toInt(),
+              extra: {'id': '${song['id']}'},
+            ),
+          );
+        }
+      } catch (err) {
+        coreLog.warn('[lyric:netease] search("$keyword") failed: $err');
+      }
+      return candidates;
+    },
+    logMatch: (keyword, hits, best) => coreLog.info(
+      '[lyric:netease] fuzzy "$keyword" → $hits hits, best=${best ?? 'none'}',
+    ),
   );
-  if (best == null) return null;
-  getRuntime().lyricMatchCache.set(fingerprint, 'netease', best.extra['id'] ?? '');
-  return nmGetLyricByPlatformId(best.extra['id'] ?? '');
 }
 
 /// 按 id 直取标准 LRC 文本（含 [mm:ss.xx] 时间戳）。

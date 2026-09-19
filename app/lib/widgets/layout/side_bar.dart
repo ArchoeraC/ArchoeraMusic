@@ -69,42 +69,65 @@ class _SideBarState extends ConsumerState<SideBar> {
   bool _indicatorReady = false;
 
   List<(String, List<_NavItem>)> _navGroups(AppLocalizations l10n) {
-    // 开发者模式关闭时隐藏「下载」入口（避免纠纷；设置-关于长按版本开启）
-    final devMode = ref.read(appPrefsProvider).developerMode;
+    final prefs = ref.read(appPrefsProvider);
+    // 下载模块（开发者模式 + 独立开关）关闭时隐藏「下载」入口。
+    final downloadModule = prefs.downloadModuleEnabled;
+    final hidden = prefs.sidebarHiddenKeys;
+    // 稳定 key → （分支 index, 文案, 图标, 选中图标）。
+    final defs = <String, (int, String, IconData, IconData)>{
+      'home': (0, l10n.sidebarHome, EtaIcons.homeOutline, EtaIcons.home),
+      'library': (
+        1,
+        l10n.sidebarLibrary,
+        EtaIcons.music2Outline,
+        EtaIcons.music2,
+      ),
+      'streaming': (
+        7,
+        l10n.sidebarStreaming,
+        EtaIcons.serverOutline,
+        EtaIcons.server,
+      ),
+      'liked': (2, l10n.sidebarLiked, EtaIcons.heartOutline, EtaIcons.heart),
+      'favorites': (
+        3,
+        l10n.sidebarFavorites,
+        EtaIcons.starOutline,
+        EtaIcons.star,
+      ),
+      'history': (4, l10n.sidebarHistory, EtaIcons.history, EtaIcons.history),
+      'download': (
+        5,
+        l10n.sidebarDownload,
+        EtaIcons.downloadOutline,
+        EtaIcons.download,
+      ),
+    };
+    const musicKeys = ['home', 'library', 'streaming'];
+    const personalKeys = ['liked', 'favorites', 'history', 'download'];
+
+    List<_NavItem> itemsOf(List<String> groupKeys) {
+      final out = <_NavItem>[];
+      // 按用户自定义顺序遍历（[AppPrefs.sidebarOrder] 已归一化补齐）。
+      for (final key in prefs.sidebarOrder) {
+        if (!groupKeys.contains(key)) continue;
+        if (hidden.contains(key)) continue;
+        if (key == 'download' && !downloadModule) continue;
+        final d = defs[key];
+        if (d == null) continue;
+        out.add(_NavItem(d.$1, d.$2, d.$3, d.$4));
+      }
+      return out;
+    }
+
+    final groups = <(String, List<_NavItem>)>[
+      (l10n.sidebarGroupMusic, itemsOf(musicKeys)),
+      (l10n.sidebarGroupPersonal, itemsOf(personalKeys)),
+    ];
+    // 分组内项全部隐藏时不渲染空标题。
     return [
-      (
-        l10n.sidebarGroupMusic,
-        [
-          _NavItem(0, l10n.sidebarHome, EtaIcons.homeOutline, EtaIcons.home),
-          _NavItem(
-            1,
-            l10n.sidebarLibrary,
-            EtaIcons.music2Outline,
-            EtaIcons.music2,
-          ),
-          _NavItem(7, l10n.sidebarStreaming, EtaIcons.serverOutline, EtaIcons.server),
-        ],
-      ),
-      (
-        l10n.sidebarGroupPersonal,
-        [
-          _NavItem(
-            2,
-            l10n.sidebarLiked,
-            EtaIcons.heartOutline,
-            EtaIcons.heart,
-          ),
-          _NavItem(3, l10n.sidebarFavorites, EtaIcons.starOutline, EtaIcons.star),
-          _NavItem(4, l10n.sidebarHistory, EtaIcons.history, EtaIcons.history),
-          if (devMode)
-            _NavItem(
-              5,
-              l10n.sidebarDownload,
-              EtaIcons.downloadOutline,
-              EtaIcons.download,
-            ),
-        ],
-      ),
+      for (final g in groups)
+        if (g.$2.isNotEmpty) g,
     ];
   }
 

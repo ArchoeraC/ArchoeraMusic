@@ -2,7 +2,10 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
+import 'dart:async';
+
+import 'package:flutter/gestures.dart'
+    show kSecondaryMouseButton, PointerDeviceKind;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -86,6 +89,33 @@ class SongRow extends ConsumerStatefulWidget {
 
 class _SongRowState extends ConsumerState<SongRow> {
   bool _hover = false;
+
+  /// 触摸长按上下文菜单：按住计时 + 按下位置（触摸没有右键）。
+  Timer? _ctxHoldTimer;
+  Offset? _ctxHoldPos;
+
+  /// 长按已弹出菜单：抑制松手时紧随的 InkWell tap（避免“弹菜单又播放”）。
+  bool _suppressTap = false;
+
+  @override
+  void dispose() {
+    _ctxHoldTimer?.cancel();
+    super.dispose();
+  }
+
+  /// 取消触摸长按计时（抬起 / 取消 / 移动超阈值时）。
+  void _cancelCtxHold() {
+    _ctxHoldTimer?.cancel();
+    _ctxHoldTimer = null;
+    _ctxHoldPos = null;
+  }
+
+  /// 长按松手后的首次 tap 是否应被吞掉（长按已弹菜单）。
+  bool consumeLongPressTap() {
+    if (!_suppressTap) return false;
+    _suppressTap = false;
+    return true;
+  }
 
   /// 行背景：播放中主色高亮 → 批量模式已选浅色 → 悬停浅底 → 透明。
   Color _rowColor(Color primary) {

@@ -55,6 +55,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _c.wordSweep = widget.wordSweep;
     _c.hidePassed = widget.hidePassed;
     _c.showTranslation = widget.showTranslation;
+    _c.showRomanization = widget.showRomanization;
+    _c.fontWeight = widget.fontWeight;
   }
 
   @override
@@ -75,7 +77,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     }
     _lastPosMs = widget.positionMs;
     if (old.fontSize != widget.fontSize ||
-        old.fontFamily != widget.fontFamily) {
+        old.fontFamily != widget.fontFamily ||
+        old.fontWeight != widget.fontWeight ||
+        old.showTranslation != widget.showTranslation ||
+        old.showRomanization != widget.showRomanization) {
       _metricsDirty = true;
     }
     _maybeRetarget();
@@ -130,6 +135,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       fontFamily: widget.fontFamily,
       maxWidth: math.max(40, w - 24),
       showTranslation: widget.showTranslation,
+      showRomanization: widget.showRomanization,
+      fontWeight: widget.fontWeight,
     );
     final centers = computeCenters(
       heights,

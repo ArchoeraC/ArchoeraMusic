@@ -188,6 +188,53 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
     }
   }
 
+  /// 引擎音量渐变（默认约 250ms，easeOut）：每 ~16ms 推送一次引擎音量，
+  /// 听感平滑过渡。用于退出弹窗的降半/回升与切歌淡入；**不修改
+  /// `state.volume`**（UI 音量控件显示值保持不变），也不写 prefs。
+  ///
+  /// 定义在基类：会话 mixin（切歌淡入）与控制器（duck/restore）都要用。
+  Future<void> _fadeVolume({
+    required double from,
+    required double to,
+    int durationMs = 250,
+  }) async {
+    const stepMs = 16;
+    final rawSteps = durationMs ~/ stepMs;
+    final steps = rawSteps < 1 ? 1 : rawSteps;
+    for (var i = 1; i <= steps; i++) {
+      final t = Curves.easeOut.transform(i / steps);
+      final v = from + (to - from) * t;
+      // ignore: discarded_futures
+      await _engine?.setVolume(v);
+      await Future<void>.delayed(const Duration(milliseconds: stepMs));
+    }
+  }
+
+  /// 把音频效果偏好（EQ / 限幅 / 响度归一化 / 变速）下发到当前引擎会话。
+  ///
+  /// 引擎支持运行时命令，改动即时生效；无会话时忽略（偏好已落盘，
+  /// 会话创建后会再下发）。
+  Future<void> applyAudioEffects() async {
+    final engine = _engine;
+    if (engine == null) return;
+    final p = ref.read(appPrefsProvider);
+    try {
+      await engine.sendCommand('set_eq', {
+        'gains': p.eqEnabled ? p.eqGains : List<double>.filled(eqBandCount, 0),
+        'preamp': p.eqEnabled ? p.eqPreampDb : 0.0,
+      });
+      await engine.sendCommand('set_limiter', {'enabled': p.limiterEnabled});
+      await engine.sendCommand('set_normalization', {
+        'enabled': p.normalizationEnabled,
+      });
+      final speed = p.playbackSpeed;
+      await engine.sendCommand('set_tempo', {'enabled': speed != 1.0});
+      await engine.sendCommand('set_tempo_speed', {'speed': speed});
+    } catch (e) {
+      _log('下发音频效果失败: $e');
+    }
+  }
+
   void _pollSpectrum();
 
   void _syncFftActive();
@@ -312,22 +359,6 @@ class PlaybackNotifier extends _PlaybackNotifierBase
     if (base == null) return;
     _duckBaseVolume = null;
     await _fadeVolume(from: base / 2, to: base);
-  }
-
-  /// 引擎音量渐变（约 250ms，easeOut）：每 ~16ms 推送一次引擎音量，
-  /// 听感平滑过渡。用于退出弹窗的降半/回升；**不修改 `state.volume`**
-  /// （UI 音量控件显示值保持不变），也不写 prefs（用户原音量始终保留）。
-  Future<void> _fadeVolume({required double from, required double to}) async {
-    const stepMs = 16;
-    const totalMs = 250;
-    final steps = totalMs ~/ stepMs;
-    for (var i = 1; i <= steps; i++) {
-      final t = Curves.easeOut.transform(i / steps);
-      final v = from + (to - from) * t;
-      // ignore: discarded_futures
-      await _engine?.setVolume(v);
-      await Future<void>.delayed(const Duration(milliseconds: stepMs));
-    }
   }
 
   /// 输出设备切换失败流（err 文本；见 [_sinkFailureCtrl]）。

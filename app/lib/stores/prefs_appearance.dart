@@ -19,6 +19,8 @@ const backgroundScaleKey = 'appearance.backgroundScale';
 const routeTransitionKey = 'appearance.routeTransition';
 const sidebarCollapsedKey = 'appearance.sidebarCollapsed';
 const sidebarNavStyleKey = 'appearance.sidebarNavStyle';
+const sidebarOrderKey = 'appearance.sidebarOrder';
+const sidebarHiddenKeysKey = 'appearance.sidebarHiddenKeys';
 const localeKey = 'appearance.locale';
 const floatingBarKey = 'appearance.floatingPlayerBar';
 const fontFamilyKey = 'appearance.fontFamily';
@@ -28,9 +30,40 @@ const weatherAutoLocateKey = 'appearance.weatherAutoLocate';
 const weatherCityKey = 'appearance.weatherCity';
 const weatherLocateSourceKey = 'appearance.weatherLocateSource';
 
+/// 侧边栏导航项稳定 key（与 `SideBar` 的 `_NavItem` 一一对应）与默认顺序。
+///
+/// 顺序即侧边栏显示顺序；分组由生成建侧边栏时按 key 归属决定
+/// （音乐：home/library/streaming，个人：liked/favorites/history/download）。
+const List<String> defaultSidebarOrder = [
+  'home',
+  'library',
+  'streaming',
+  'liked',
+  'favorites',
+  'history',
+  'download',
+];
+
+/// 归一化侧边栏顺序：仅保留合法 key、去重，缺失项按默认顺序补齐。
+List<String> _normalizeSidebarOrder(Object? value) {
+  final out = <String>[];
+  if (value is List) {
+    for (final e in value) {
+      if (e is String &&
+          defaultSidebarOrder.contains(e) &&
+          !out.contains(e)) {
+        out.add(e);
+      }
+    }
+  }
+  for (final e in defaultSidebarOrder) {
+    if (!out.contains(e)) out.add(e);
+  }
+  return out;
+}
+
 /// 外观域偏好：主题色/背景/动效/侧边栏/语言/字体/封面圆角。
-extension AppearancePrefs on AppPrefs {
-  /// 自定义主色（ARGB 值）；null = 使用设计体系默认亮蓝。
+extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；null = 使用设计体系默认亮蓝。
   /// 对齐原版 appearance.themeSource=custom + customColor（hex）。
   int? get accent => data[accentKey] as int?;
 
@@ -95,6 +128,19 @@ extension AppearancePrefs on AppPrefs {
   String get sidebarNavStyle {
     final v = data[sidebarNavStyleKey];
     return v == 'animated' ? 'animated' : 'default';
+  }
+
+  /// 侧边栏导航项显示顺序（合法 key、去重、缺失按默认补齐）。
+  List<String> get sidebarOrder => _normalizeSidebarOrder(data[sidebarOrderKey]);
+
+  /// 侧边栏隐藏的导航项 key 集合（仅含合法 key）。
+  Set<String> get sidebarHiddenKeys {
+    final v = data[sidebarHiddenKeysKey];
+    if (v is! List) return const {};
+    return {
+      for (final e in v)
+        if (e is String && defaultSidebarOrder.contains(e)) e,
+    };
   }
 
   /// 界面语言（BCP-47 字符串如 `zh-CN` / `en`；null = 跟随系统，默认）。
@@ -246,6 +292,22 @@ extension AppearancePrefs on AppPrefs {
 
   AppPrefs copyWithFloatingBar(bool value) =>
       AppPrefs(initialData: {...data, floatingBarKey: value});
+
+  /// 设置侧边栏自定义（导航项显示顺序 / 隐藏项集合）。
+  AppPrefs copyWithSidebarCustomize({
+    List<String>? order,
+    Set<String>? hidden,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      if (order != null) sidebarOrderKey: _normalizeSidebarOrder(order),
+      if (hidden != null)
+        sidebarHiddenKeysKey: [
+          for (final k in defaultSidebarOrder)
+            if (hidden.contains(k)) k,
+        ],
+    },
+  );
 
   AppPrefs copyWithAppearance({String? fontFamily, double? coverRadius}) =>
       AppPrefs(

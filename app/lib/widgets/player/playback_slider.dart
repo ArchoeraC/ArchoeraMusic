@@ -26,6 +26,8 @@ library;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../utils/format.dart';
+
 part 'playback_slider/playback_slider_state.dart';
 
 class PlaybackSlider extends StatefulWidget {
@@ -34,6 +36,7 @@ class PlaybackSlider extends StatefulWidget {
     required this.value,
     required this.max,
     required this.buffering,
+    this.showTooltip = true,
     this.onChanged,
     this.onChangeEnd,
   });
@@ -43,6 +46,9 @@ class PlaybackSlider extends StatefulWidget {
 
   /// 缓冲中：轨道叠加流动指示条（进度样式自动降透明）。
   final bool buffering;
+
+  /// 悬停时在轨道上方显示对应时间提示（默认开）。
+  final bool showTooltip;
 
   final ValueChanged<double>? onChanged;
   final ValueChanged<double>? onChangeEnd;
