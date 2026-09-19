@@ -239,6 +239,17 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
               ),
             ),
             SettingTile(
+              icon: EtaIcons.listCheck2,
+              title: l10n.settingsSidebarCustomize,
+              subtitle: l10n.settingsSidebarCustomizeDesc,
+              trailing: SButton(
+                label: l10n.commonConfigure,
+                variant: SButtonVariant.secondary,
+                size: SButtonSize.small,
+                onPressed: () => _editSidebar(context, prefs),
+              ),
+            ),
+            SettingTile(
               icon: EtaIcons.magic2Outline,
               title: l10n.settingsRouteTransition,
               subtitle: l10n.settingsRouteTransitionDesc,
@@ -815,5 +826,196 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
     );
     if (color == null || !mounted) return;
     ref.read(appPrefsProvider.notifier).setAccent(color.toARGB32());
+  }
+
+  /// 编辑侧边栏自定义（导航项显示顺序 + 显示/隐藏）。
+  Future<void> _editSidebar(BuildContext context, AppPrefs prefs) async {
+    final l10n = context.l10n;
+    final result = await SDialog.show<(List<String>, Set<String>)>(
+      context,
+      title: l10n.settingsSidebarCustomizeTitle,
+      description: l10n.settingsSidebarCustomizeHint,
+      width: 440,
+      child: _SidebarCustomizeEditor(
+        order: prefs.sidebarOrder,
+        hidden: prefs.sidebarHiddenKeys,
+      ),
+    );
+    if (result != null) {
+      ref.read(appPrefsProvider.notifier).setSidebarCustomize(
+        order: result.$1,
+        hidden: result.$2,
+      );
+    }
+  }
+}
+
+/// 侧边栏自定义编辑器（分组内拖拽排序 + 显示/隐藏开关）。
+///
+/// 返回（完整显示顺序, 隐藏项集合）；取消返回 null。
+class _SidebarCustomizeEditor extends StatefulWidget {
+  const _SidebarCustomizeEditor({required this.order, required this.hidden});
+
+  final List<String> order;
+  final Set<String> hidden;
+
+  @override
+  State<_SidebarCustomizeEditor> createState() => _SidebarCustomizeEditorState();
+}
+
+class _SidebarCustomizeEditorState extends State<_SidebarCustomizeEditor> {
+  static const _music = ['home', 'library', 'streaming'];
+  static const _personal = ['liked', 'favorites', 'history', 'download'];
+
+  late final List<String> _musicOrder = _subOrder(_music);
+  late final List<String> _personalOrder = _subOrder(_personal);
+  late final Set<String> _hidden = {...widget.hidden};
+
+  List<String> _subOrder(List<String> group) => [
+    for (final k in widget.order)
+      if (group.contains(k)) k,
+  ];
+
+  String _label(String key, AppLocalizations l10n) => switch (key) {
+    'home' => l10n.sidebarHome,
+    'library' => l10n.sidebarLibrary,
+    'streaming' => l10n.sidebarStreaming,
+    'liked' => l10n.sidebarLiked,
+    'favorites' => l10n.sidebarFavorites,
+    'history' => l10n.sidebarHistory,
+    'download' => l10n.sidebarDownload,
+    _ => key,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _group(context, l10n: context.l10n, title: context.l10n.sidebarGroupMusic, list: _musicOrder),
+        const SizedBox(height: 14),
+        _group(context, l10n: context.l10n, title: context.l10n.sidebarGroupPersonal, list: _personalOrder),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Spacer(),
+            SButton(
+              label: context.l10n.commonCancel,
+              variant: SButtonVariant.secondary,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            const SizedBox(width: 10),
+            SButton(
+              label: context.l10n.commonSave,
+              onPressed: () => Navigator.of(context).pop((
+                [..._musicOrder, ..._personalOrder],
+                _hidden,
+              )),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _group(
+    BuildContext context, {
+    required AppLocalizations l10n,
+    required String title,
+    required List<String> list,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: (list.length * 46).clamp(60, 240).toDouble(),
+          child: ReorderableListView.builder(
+            buildDefaultDragHandles: false,
+            padding: EdgeInsets.zero,
+            itemCount: list.length,
+            onReorderItem: (oldIndex, newIndex) {
+              setState(() {
+                final item = list.removeAt(oldIndex);
+                list.insert(newIndex, item);
+              });
+            },
+            itemBuilder: (context, index) {
+              final key = list[index];
+              final shown = !_hidden.contains(key);
+              return Padding(
+                key: ValueKey(key),
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: scheme.outline.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 22,
+                        child: Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          _label(key, l10n),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: shown
+                                ? scheme.onSurface
+                                : scheme.onSurface.withValues(alpha: 0.45),
+                          ),
+                        ),
+                      ),
+                      Switch(
+                        value: shown,
+                        onChanged: (v) => setState(() {
+                          if (v) {
+                            _hidden.remove(key);
+                          } else {
+                            _hidden.add(key);
+                          }
+                        }),
+                      ),
+                      ReorderableDragStartListener(
+                        index: index,
+                        child: Icon(
+                          EtaIcons.menu,
+                          size: 18,
+                          color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 }

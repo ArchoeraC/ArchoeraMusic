@@ -314,9 +314,9 @@ class JellyfinClient {
   }
 
   /// 取歌词（Jellyfin 10.8+ /Audio/{id}/Lyrics）；同步行转 LRC，纯文本不加时间戳。
-  Future<String?> getLyrics(String originalId) async {
+  Future<StreamingLyrics> getLyrics(String originalId) async {
     final token = config.accessToken;
-    if (token == null || token.isEmpty) return null;
+    if (token == null || token.isEmpty) return const StreamingLyrics();
     try {
       final json = await _callApi('Audio/$originalId/Lyrics');
       final linesRaw = json['Lyrics'];
@@ -331,7 +331,7 @@ class JellyfinClient {
                 )
                 .toList()
           : <({int start, String text})>[];
-      if (lines.isEmpty) return null;
+      if (lines.isEmpty) return const StreamingLyrics();
       final meta = json['Metadata'];
       final isSyncedFlag = meta is Map ? meta['IsSynced'] : null;
       final isSynced = isSyncedFlag is bool
@@ -342,13 +342,17 @@ class JellyfinClient {
             .map((l) => l.text)
             .where((t) => t.isNotEmpty)
             .join('\n');
-        return text.isEmpty ? null : text;
+        return text.isEmpty
+            ? const StreamingLyrics()
+            : StreamingLyrics(lrc: text);
       }
-      return lines
-          .map((l) => '${formatLrcTimestamp(l.start ~/ 10000)}${l.text}')
-          .join('\n');
+      return StreamingLyrics(
+        lrc: lines
+            .map((l) => '${formatLrcTimestamp(l.start ~/ 10000)}${l.text}')
+            .join('\n'),
+      );
     } catch (_) {
-      return null;
+      return const StreamingLyrics();
     }
   }
 }

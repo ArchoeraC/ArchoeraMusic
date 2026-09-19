@@ -62,6 +62,15 @@ class _Painter extends CustomPainter {
     canvas.restore();
 
     final tr = g.translation;
+    var below = centerY + main.height / 2;
+    final gap = math.max(3.0, fs * kMainTranslationGapEm);
+    final ro = g.romaji;
+    if (c.showRomanization && ro != null && ro.isNotEmpty) {
+      final sub = _romajiParagraph(ro, index, isActive, alpha, fs, maxWidth);
+      below += gap;
+      canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
+      below += sub.height;
+    }
     if (c.showTranslation && tr != null && tr.isNotEmpty) {
       final sub = _translationParagraph(
         tr,
@@ -71,13 +80,8 @@ class _Painter extends CustomPainter {
         fs,
         maxWidth,
       );
-      canvas.drawParagraph(
-        sub,
-        Offset(
-          c.w / 2 - sub.width / 2,
-          centerY + main.height / 2 + math.max(3.0, fs * kMainTranslationGapEm),
-        ),
-      );
+      below += gap;
+      canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
     }
   }
 
@@ -92,14 +96,14 @@ class _Painter extends CustomPainter {
   ) {
     final frags = g.fragments;
     if (isActive && c.wordSweep && frags != null && frags.isNotEmpty) {
-      final b = ui.ParagraphBuilder(_pStyle(c.fontFamily, fs, FontWeight.w600));
-      b.pushStyle(_uiStyle(c.fontFamily, fs, FontWeight.w600, c.played));
+      final b = ui.ParagraphBuilder(_pStyle(c.fontFamily, fs, c.fontWeight));
+      b.pushStyle(_uiStyle(c.fontFamily, fs, c.fontWeight, c.played));
       for (final f in frags) {
         b.pushStyle(
           _uiStyle(
             c.fontFamily,
             fs,
-            FontWeight.w600,
+            c.fontWeight,
             _fragColor(f, g.original.timeMs),
           ),
         );
@@ -109,7 +113,7 @@ class _Painter extends CustomPainter {
       b.pop();
       return _layout(b, maxWidth);
     }
-    final weight = isActive ? FontWeight.w600 : FontWeight.w400;
+    final weight = isActive ? c.fontWeight : FontWeight.w400;
     final color = isActive
         ? (c.positionMs >= g.original.timeMs ? c.played : c.unplayed)
         : c.unplayed.withValues(alpha: alpha);
@@ -145,6 +149,29 @@ class _Painter extends CustomPainter {
     final subFs = fs * kTranslationFontScale;
     final key = (text, c.fontFamily, subFs, color.toARGB32(), maxWidth);
     return c.cache.obtainTranslation(index, key, () {
+      final b = ui.ParagraphBuilder(_pStyle(c.fontFamily, subFs, FontWeight.w400));
+      b.pushStyle(_uiStyle(c.fontFamily, subFs, FontWeight.w400, color));
+      b.addText(text);
+      b.pop();
+      return _layout(b, maxWidth);
+    })!;
+  }
+
+  /// 音译（罗马音）小字段落（颜色含透明度，替代 saveLayer）。
+  ui.Paragraph _romajiParagraph(
+    String text,
+    int index,
+    bool isActive,
+    double alpha,
+    double fs,
+    double maxWidth,
+  ) {
+    final color = isActive
+        ? c.played.withValues(alpha: 0.65)
+        : c.unplayed.withValues(alpha: alpha * 0.85);
+    final subFs = fs * kTranslationFontScale;
+    final key = (text, c.fontFamily, subFs, color.toARGB32(), maxWidth);
+    return c.cache.obtainRomanization(index, key, () {
       final b = ui.ParagraphBuilder(_pStyle(c.fontFamily, subFs, FontWeight.w400));
       b.pushStyle(_uiStyle(c.fontFamily, subFs, FontWeight.w400, color));
       b.addText(text);

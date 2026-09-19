@@ -15,6 +15,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/l10n.dart';
+import '../../stores/app_prefs.dart';
 import '../../widgets/common/toast.dart';
 import '../playback/playback_notifier.dart';
 import '../playback/playback_state.dart';
@@ -43,6 +44,9 @@ class _MediaSessionHostState extends ConsumerState<MediaSessionHost> {
   int _lastPosMs = 0;
   bool _lostToasted = false;
 
+  /// 媒体会话同步是否启用（设置「系统媒体会话」；关闭时清空并忽略命令）。
+  bool _active = false;
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +64,10 @@ class _MediaSessionHostState extends ConsumerState<MediaSessionHost> {
     });
     // 初始同步（应用启动即恢复的播放状态）
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _sync(ref.read(playbackProvider));
+      if (!mounted) return;
+      if (ref.read(appPrefsProvider).mediaSessionEnabled) {
+        _sync(ref.read(playbackProvider));
+      }
     });
   }
 
@@ -72,6 +79,7 @@ class _MediaSessionHostState extends ConsumerState<MediaSessionHost> {
   }
 
   void _onCommand(MediaEvent e) {
+    if (!_active) return;
     final n = ref.read(playbackProvider.notifier);
     final s = ref.read(playbackProvider);
     switch (e) {
@@ -158,7 +166,22 @@ class _MediaSessionHostState extends ConsumerState<MediaSessionHost> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(playbackProvider, (prev, next) => _sync(next));
+    final enabled = ref.watch(
+      appPrefsProvider.select((p) => p.mediaSessionEnabled),
+    );
+    if (enabled && !_active) {
+      _active = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _sync(ref.read(playbackProvider));
+      });
+    } else if (!enabled && _active) {
+      _active = false;
+      unawaited(_media.clearNowPlaying());
+      unawaited(_media.setPlaybackState(MediaPlaybackState.stopped));
+    }
+    if (enabled) {
+      ref.listen(playbackProvider, (prev, next) => _sync(next));
+    }
     return widget.child;
   }
 }

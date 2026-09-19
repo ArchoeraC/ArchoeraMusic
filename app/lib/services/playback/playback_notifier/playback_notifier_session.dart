@@ -52,7 +52,10 @@ mixin _PlaybackNotifierSession
       unawaited(engine.sendCommand('set_sink', {'id': sinkId}));
     }
     _lastSpectrumAtMs = -1000;
-    unawaited(engine.setVolume(state.volume));
+    // 切歌淡入：新会话从 0 逐渐升到目标音量（避免硬起音）。
+    final fadeIn = ref.read(appPrefsProvider).crossfadeEnabled;
+    final fadeMs = ref.read(appPrefsProvider).crossfadeDurationMs;
+    unawaited(engine.setVolume(fadeIn ? 0 : state.volume));
     state = state.copyWith(
       source: source,
       sessionId: engine.sessionId,
@@ -87,6 +90,12 @@ mixin _PlaybackNotifierSession
       return;
     }
     _log(memoryStore ? '引擎 store 内存源会话就绪，开始播放' : '引擎会话就绪，开始播放');
+    if (fadeIn) {
+      // ignore: discarded_futures
+      _fadeVolume(from: 0, to: state.volume, durationMs: fadeMs);
+    }
+    // 会话就绪后下发音频效果（EQ / 限幅 / 响度归一化 / 变速）。
+    unawaited(applyAudioEffects());
   }
 
   void _recordHistoryOnce() {

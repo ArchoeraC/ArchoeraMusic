@@ -46,6 +46,7 @@ class LyricGroup {
   const LyricGroup({
     required this.original,
     this.translation,
+    this.romaji,
     this.fragments,
     this.endMs,
   });
@@ -54,6 +55,9 @@ class LyricGroup {
 
   /// 该行翻译文本（与原文行时间对齐；无翻译为 null）。
   final String? translation;
+
+  /// 该行音译（罗马音）文本（与原文行时间对齐；无音译为 null）。
+  final String? romaji;
 
   /// 增强型逐字片段（行内按 [LyricFragment.startMs] 升序；
   /// 普通 LRC 行为 null）。
@@ -108,6 +112,7 @@ List<LyricGroup> parseLyricGroups({
   required String content,
   required String format,
   String? translation,
+  String? romaji,
 }) {
   final reTs = RegExp(r'\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]');
   final reFrag = RegExp(r'<(\d+),(\d+)>([^<\r\n]*)');
@@ -161,25 +166,34 @@ List<LyricGroup> parseLyricGroups({
       ? const <LyricLine>[]
       : parseLrc(translation, keepEmpty: true);
   final transTimes = [for (final t in transLines) t.timeMs];
-  String? transAt(int timeMs) {
-    if (transTimes.isEmpty) return null;
-    var lo = 0, hi = transTimes.length - 1;
+  final romaLines = (romaji == null || romaji.trim().isEmpty)
+      ? const <LyricLine>[]
+      : parseLrc(romaji, keepEmpty: true);
+  final romaTimes = [for (final t in romaLines) t.timeMs];
+
+  /// 取与 [timeMs] 最近的行文本（容差 4s；空文本视为无）。
+  String? nearestAt(List<LyricLine> lines, List<int> times, int timeMs) {
+    if (times.isEmpty) return null;
+    var lo = 0, hi = times.length - 1;
     while (lo < hi) {
       final mid = (lo + hi) >> 1;
-      if (transTimes[mid] < timeMs) {
+      if (times[mid] < timeMs) {
         lo = mid + 1;
       } else {
         hi = mid;
       }
     }
     var best = lo;
-    final dCur = (timeMs - transTimes[lo]).abs();
-    if (lo > 0 && (timeMs - transTimes[lo - 1]).abs() < dCur) best = lo - 1;
-    if ((timeMs - transTimes[best]).abs() > 4000) return null;
-    // 空翻译文本视为无翻译（空串渲染会占行高）
-    final t = transLines[best].text;
+    final dCur = (timeMs - times[lo]).abs();
+    if (lo > 0 && (timeMs - times[lo - 1]).abs() < dCur) best = lo - 1;
+    if ((timeMs - times[best]).abs() > 4000) return null;
+    // 空文本行视为无内容（空串渲染会占行高）
+    final t = lines[best].text;
     return t.isEmpty ? null : t;
   }
+
+  String? transAt(int timeMs) => nearestAt(transLines, transTimes, timeMs);
+  String? romaAt(int timeMs) => nearestAt(romaLines, romaTimes, timeMs);
 
   // 交错翻译合并：本地下载（KG等）的 LRC 常见「主行 + 同时间戳译文」
   // 的交错结构（`[mm:ss.xx]原文` 后紧跟 `[mm:ss.xx]译文`，如
@@ -201,6 +215,7 @@ List<LyricGroup> parseLyricGroups({
       groups[groups.length - 1] = LyricGroup(
         original: last.original,
         translation: line.text,
+        romaji: last.romaji,
         fragments: last.fragments,
       );
       continue;
@@ -208,6 +223,7 @@ List<LyricGroup> parseLyricGroups({
     groups.add(LyricGroup(
       original: line,
       translation: transAt(line.timeMs),
+      romaji: romaAt(line.timeMs),
       fragments: sortedFrags[i],
     ));
   }
@@ -222,6 +238,7 @@ List<LyricGroup> parseLyricGroups({
     return LyricGroup(
       original: g.original,
       translation: g.translation,
+      romaji: g.romaji,
       fragments: _fillFragmentDurations(
         g.fragments,
         g.original.timeMs,

@@ -52,6 +52,10 @@ extension _PlayerPageView on _PlayerPageState {
     final prefs = ref.watch(appPrefsProvider);
     final showLyrics = prefs.showLyricsInPlayer;
     final transitionStyle = prefs.transitionStyle;
+    final coverLayout = prefs.coverLayout;
+    final coverLyricRatio = prefs.coverLyricRatio;
+    final autoCenterCover = prefs.autoCenterCover;
+    final autoImmersive = prefs.autoImmersive;
     // 重内容（背景 / 歌词）在路由进入动画结束后才挂载；性能模式直切视为已完成。
     final contentMounted =
         _contentMounted ||
@@ -69,7 +73,25 @@ extension _PlayerPageView on _PlayerPageState {
       backgroundColor: playerBg,
       // 硬裁切到播放页范围（对齐原版 FullPlayer 根节点 `overflow-hidden`）：
       // 封面背景经 blur/scale 后的绘制不会溢出到播放页之外。
-      body: ClipRect(
+      body: MouseRegion(
+        onEnter: (_) {
+          if (!mounted) return;
+          if (!_pointerInside) setState(() => _pointerInside = true);
+          _pokeControls();
+        },
+        onExit: (_) {
+          if (!mounted) return;
+          setState(() => _pointerInside = false);
+          // 自动沉浸：指针离开窗口立即隐藏控件（含顶栏）。
+          if (ref.read(appPrefsProvider).autoImmersive) {
+            _hideTimer?.cancel();
+            setState(() => _controlsVisible = false);
+          }
+        },
+        cursor: (autoImmersive && !_controlsVisible)
+            ? SystemMouseCursors.none
+            : MouseCursor.defer,
+        child: ClipRect(
         child: Listener(
           behavior: HitTestBehavior.translucent,
           onPointerHover: (_) => _pokeControls(),
@@ -90,22 +112,34 @@ extension _PlayerPageView on _PlayerPageState {
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Column(
                     children: [
-                      _PlayerTopBar(
-                        l10n: l10n,
-                        showLyrics: showLyrics,
-                        hasLyrics: hasLyrics,
-                        colorScheme: colorScheme,
-                        current: current,
-                        quality: quality,
-                        isFullScreen: _isFullScreen,
-                        onClose: () => context.pop(),
-                        onToggleLyrics: hasLyrics
-                            ? () => ref
-                                  .read(appPrefsProvider.notifier)
-                                  .setShowLyricsInPlayer(!showLyrics)
-                            : null,
-                        onSelectQuality: notifier.setQuality,
-                        onToggleFullscreen: _toggleFullscreen,
+                      // 自动沉浸：控件隐藏时顶栏一并淡出（普通模式顶栏常驻）。
+                      AnimatedOpacity(
+                        opacity: (!autoImmersive || _controlsVisible) ? 1 : 0,
+                        duration: animDuration(
+                          context,
+                          const Duration(milliseconds: 300),
+                        ),
+                        curve: Curves.easeOut,
+                        child: IgnorePointer(
+                          ignoring: autoImmersive && !_controlsVisible,
+                          child: _PlayerTopBar(
+                            l10n: l10n,
+                            showLyrics: showLyrics,
+                            hasLyrics: hasLyrics,
+                            colorScheme: colorScheme,
+                            current: current,
+                            quality: quality,
+                            isFullScreen: _isFullScreen,
+                            onClose: () => context.pop(),
+                            onToggleLyrics: hasLyrics
+                                ? () => ref
+                                      .read(appPrefsProvider.notifier)
+                                      .setShowLyricsInPlayer(!showLyrics)
+                                : null,
+                            onSelectQuality: notifier.setQuality,
+                            onToggleFullscreen: _toggleFullscreen,
+                          ),
+                        ),
                       ),
                       Expanded(
                         child: _PlayerMainBody(
@@ -120,6 +154,9 @@ extension _PlayerPageView on _PlayerPageState {
                           showLyrics: showLyrics,
                           contentMounted: contentMounted,
                           transitionStyle: transitionStyle,
+                          coverLayout: coverLayout,
+                          coverLyricRatio: coverLyricRatio,
+                          autoCenterCover: autoCenterCover,
                           slideNext: _slideNext,
                           coverPulse: _coverPulse,
                           beatStrength: _lastBeatStrength,
@@ -150,6 +187,7 @@ extension _PlayerPageView on _PlayerPageState {
                         shuffle: shuffle,
                         repeatMode: repeatMode,
                         playing: playing,
+                        showProgressLyric: prefs.showProgressLyric,
                         onDragChanged: (v) => setState(() => _dragMs = v),
                         onSeekEnd: (_) => setState(() => _dragMs = null),
                         onToggleLike: _toggleLike,
@@ -166,6 +204,7 @@ extension _PlayerPageView on _PlayerPageState {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -233,6 +272,7 @@ class _PlayerTopBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          const _SleepTimerButton(),
           if (current != null)
             QualityMenu(
               levels: _PlayerPageState._availableLevels(current),
@@ -256,6 +296,63 @@ class _PlayerTopBar extends StatelessWidget {
   }
 }
 
+/// 睡眠定时按钮（播放页顶栏）：倒计时 / 播完当前曲 / 关闭。
+class _SleepTimerButton extends ConsumerWidget {
+  const _SleepTimerButton();
+
+  String _label(String v, AppLocalizations l10n) => switch (v) {
+    'off' => l10n.sleepTimerOff,
+    '15' => l10n.sleepTimer15,
+    '30' => l10n.sleepTimer30,
+    '60' => l10n.sleepTimer60,
+    '90' => l10n.sleepTimer90,
+    'eot' => l10n.sleepTimerEndOfTrack,
+    _ => v,
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final timer = ref.watch(sleepTimerProvider);
+    final remaining = timer.mode == SleepMode.duration
+        ? formatClock(timer.remaining)
+        : '';
+    final tooltip = timer.mode == SleepMode.endOfTrack
+        ? l10n.sleepTimerEndOfTrack
+        : timer.active
+        ? '${l10n.sleepTimer} · $remaining'
+        : l10n.sleepTimer;
+    return PopupMenuButton<String>(
+      tooltip: tooltip,
+      icon: Icon(
+        EtaIcons.stopwatchOutline,
+        color: timer.active ? Theme.of(context).colorScheme.primary : null,
+      ),
+      onSelected: (v) {
+        final n = ref.read(sleepTimerProvider.notifier);
+        switch (v) {
+          case 'off':
+            n.cancel();
+          case '15':
+            n.startDuration(const Duration(minutes: 15));
+          case '30':
+            n.startDuration(const Duration(minutes: 30));
+          case '60':
+            n.startDuration(const Duration(minutes: 60));
+          case '90':
+            n.startDuration(const Duration(minutes: 90));
+          case 'eot':
+            n.startEndOfTrack();
+        }
+      },
+      itemBuilder: (context) => [
+        for (final v in const ['off', '15', '30', '60', '90', 'eot'])
+          PopupMenuItem(value: v, child: Text(_label(v, l10n))),
+      ],
+    );
+  }
+}
+
 class _PlayerMainBody extends StatelessWidget {
   const _PlayerMainBody({
     required this.source,
@@ -269,6 +366,9 @@ class _PlayerMainBody extends StatelessWidget {
     required this.showLyrics,
     required this.contentMounted,
     required this.transitionStyle,
+    required this.coverLayout,
+    required this.coverLyricRatio,
+    required this.autoCenterCover,
     required this.slideNext,
     required this.coverPulse,
     required this.beatStrength,
@@ -287,6 +387,9 @@ class _PlayerMainBody extends StatelessWidget {
   final bool showLyrics;
   final bool contentMounted;
   final String transitionStyle;
+  final String coverLayout;
+  final double coverLyricRatio;
+  final bool autoCenterCover;
   final bool slideNext;
   final AnimationController coverPulse;
   final double beatStrength;
@@ -297,13 +400,20 @@ class _PlayerMainBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, c) {
-        final coverByWidth = c.maxWidth * 0.45 * 0.85;
+        // 封面布局：默认左右分栏（宽度按占比），全屏封面用更大的左栏。
+        final fullscreen = coverLayout == 'fullscreen';
+        final coverFraction = fullscreen ? 0.6 : coverLyricRatio;
+        final lyricsFraction = fullscreen ? 0.5 : (1 - coverLyricRatio);
+        final coverByWidth = c.maxWidth * coverFraction * (fullscreen ? 0.95 : 0.85);
         final coverByHeight = c.maxHeight * 0.5;
         final size =
             (coverByWidth < coverByHeight ? coverByWidth : coverByHeight).clamp(
               180.0,
               520.0,
             );
+        // 无歌词时封面是否自动居中（全屏封面模式不位移）。
+        final coverCentered =
+            !fullscreen && autoCenterCover && !(showLyrics && hasLyrics);
         final lyricScale = (MediaQuery.sizeOf(context).height / 1080).clamp(
           0.85,
           1.6,
@@ -338,11 +448,11 @@ class _PlayerMainBody extends StatelessWidget {
                 top: 0,
                 bottom: 0,
                 left: 0,
-                width: c.maxWidth * 0.45,
+                width: c.maxWidth * coverFraction,
                 child: AnimatedSlide(
-                  offset: showLyrics && hasLyrics
-                      ? Offset.zero
-                      : const Offset(11 / 18, 0),
+                  offset: coverCentered
+                      ? const Offset(11 / 18, 0)
+                      : Offset.zero,
                   duration: animDuration(
                     context,
                     const Duration(milliseconds: 600),
@@ -365,7 +475,7 @@ class _PlayerMainBody extends StatelessWidget {
                 top: 0,
                 bottom: 0,
                 right: 0,
-                width: c.maxWidth * 0.55,
+                width: c.maxWidth * lyricsFraction,
                 child: IgnorePointer(
                   ignoring: !showLyrics || !hasLyrics,
                   child: AnimatedOpacity(
@@ -405,6 +515,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
     required this.shuffle,
     required this.repeatMode,
     required this.playing,
+    required this.showProgressLyric,
     required this.onDragChanged,
     required this.onSeekEnd,
     required this.onToggleLike,
@@ -424,6 +535,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
   final bool shuffle;
   final String repeatMode;
   final bool playing;
+  final bool showProgressLyric;
   final ValueChanged<double?> onDragChanged;
   final ValueChanged<double> onSeekEnd;
   final ValueChanged<Track> onToggleLike;
@@ -456,6 +568,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (showProgressLyric) const _ProgressLyric(),
                 PlaybackProgressSlider(
                   showTimes: true,
                   textStyle: theme.textTheme.bodySmall,
@@ -487,6 +600,42 @@ class _PlayerBottomOverlay extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 进度条上方的当前歌词行（强迫症：`showProgressLyric`）。
+///
+/// 独立 Consumer 订阅位置与歌词，避免 50ms 位置更新带动整个播放页重建。
+class _ProgressLyric extends ConsumerWidget {
+  const _ProgressLyric();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final pos = ref.watch(
+      playbackProvider.select((s) => s.position.inMilliseconds),
+    );
+    final groups = ref
+        .watch(currentLyricsProvider)
+        .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
+    if (groups.isEmpty) return const SizedBox.shrink();
+    final i = lyricIndexAt(groups, pos);
+    if (i < 0 || i >= groups.length) return const SizedBox.shrink();
+    final text = groups[i].original.text;
+    if (text.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.primary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

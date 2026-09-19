@@ -81,6 +81,10 @@ extension _PlayerBarSections on _PlayerBarState {
     required bool hasContent,
   }) {
     final l10n = context.l10n;
+    final showSource = ref.watch(
+      appPrefsProvider.select((p) => p.showPlaybackSource),
+    );
+    final sourceLabel = _sourceLabel(context, track?.source);
     return Expanded(
       child: Row(
         children: [
@@ -90,7 +94,7 @@ extension _PlayerBarSections on _PlayerBarState {
             child: RepaintBoundary(
               child: _BarCover(
                 cover: track?.cover,
-                onTap: hasContent ? () => context.push('/player') : null,
+                onTap: hasContent ? openPlayerPage : null,
               ),
             ),
           ),
@@ -100,11 +104,21 @@ extension _PlayerBarSections on _PlayerBarState {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title ?? l10n.playerBarUntitled,
-                  style: theme.textTheme.titleSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title ?? l10n.playerBarUntitled,
+                        style: theme.textTheme.titleSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (showSource && sourceLabel != null) ...[
+                      const SizedBox(width: 6),
+                      _SourceBadge(label: sourceLabel),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -122,6 +136,15 @@ extension _PlayerBarSections on _PlayerBarState {
       ),
     );
   }
+
+  /// 播放来源显示名（仅在线平台；本地/流媒体返回 null 不显示角标）。
+  String? _sourceLabel(BuildContext context, String? source) =>
+      switch (source) {
+        'netease' => context.l10n.platformNetease,
+        'qqmusic' => context.l10n.platformQQMusic,
+        'kugou' => context.l10n.platformKugou,
+        _ => null,
+      };
 
   Widget _buildCenterControls({
     required BuildContext context,
@@ -188,8 +211,11 @@ extension _PlayerBarSections on _PlayerBarState {
                             (s) => (pos: s.position, dur: s.duration),
                           ),
                         );
+                        final mode = ref.watch(
+                          appPrefsProvider.select((p) => p.timeFormat),
+                        );
                         return Text(
-                          '${formatClock(s.pos)} / ${formatClock(s.dur)}',
+                          formatTimeLabel(s.pos, s.dur, mode),
                           style: theme.textTheme.bodySmall,
                         );
                       },

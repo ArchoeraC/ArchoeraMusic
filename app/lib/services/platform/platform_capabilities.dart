@@ -18,8 +18,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'ffi_system_media.dart';
 import 'ffi_system_power.dart';
+import 'ffi_system_deep_link.dart';
 import 'ffi_system_window.dart';
 import 'platform_bindings.dart';
+import 'system_deep_link.dart';
 import 'system_media.dart';
 import 'system_power.dart';
 import 'system_window.dart';
@@ -30,6 +32,7 @@ class PlatformCapabilities {
     required this.power,
     required this.media,
     required this.window,
+    required this.deepLink,
     required this.caps,
   });
 
@@ -41,6 +44,7 @@ class PlatformCapabilities {
   final SystemPower power;
   final SystemMedia media;
   final SystemWindow window;
+  final SystemDeepLink deepLink;
 
   bool get powerInhibitAvailable => caps & aplCapPowerInhibit != 0;
   bool get screenStateAvailable => caps & aplCapPowerScreenState != 0;
@@ -48,6 +52,7 @@ class PlatformCapabilities {
   bool get windowStateAvailable => caps & aplCapWindowState != 0;
   bool get appInstanceAvailable => caps & aplCapAppInstance != 0;
   bool get systemAccentAvailable => caps & aplCapSystemAccent != 0;
+  bool get deepLinkAvailable => caps & aplCapDeepLink != 0;
   bool get bridgeLoaded => _bindings != null;
 
   /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
@@ -125,6 +130,9 @@ class PlatformCapabilities {
       window: (b != null && caps & aplCapWindowState != 0)
           ? FfiSystemWindow(b)
           : NoopSystemWindow.instance,
+      deepLink: (b != null && caps & aplCapDeepLink != 0)
+          ? FfiSystemDeepLink(b)
+          : NoopSystemDeepLink.instance,
     );
     _instance = built;
     return built;
@@ -135,6 +143,7 @@ class PlatformCapabilities {
     await power.dispose();
     await media.dispose();
     await window.dispose();
+    await deepLink.dispose();
     _bindings?.dispose();
     _instance = null;
   }

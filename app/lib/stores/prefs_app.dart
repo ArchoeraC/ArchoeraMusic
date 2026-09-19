@@ -12,6 +12,11 @@ const developerModeKey = 'app.developerMode';
 /// 「FPS/内存监控浮层」独立开关，跟随开发者模式，关闭应用后一并重置。
 const devFpsMonitorKey = 'app.devFpsMonitor';
 
+/// 开发者「下载模块」独立开关（会话级，默认关）：
+/// 侧边栏「下载」入口、曲目右键「下载」与设置「下载」分类仅在
+/// 开发者模式 + 本开关同时开启后显示（开启前会弹出风险确认）。
+const devDownloadModuleKey = 'app.devDownloadModule';
+
 /// 关闭应用时行为（ask=每次询问 / background=后台播放 / quit=直接退出）。
 const String defaultCloseBehavior = 'ask';
 
@@ -42,4 +47,16 @@ extension AppLevelPrefs on AppPrefs {
 
   AppPrefs copyWithDevFpsMonitor(bool value) =>
       AppPrefs(initialData: {...data, devFpsMonitorKey: value});
+
+  /// 开发者「下载模块」开关（默认关，见 [devDownloadModuleKey]）。
+  bool get devDownloadModule => data[devDownloadModuleKey] as bool? ?? false;
+
+  /// 下载模块是否真正可用（开发者模式 + 下载模块开关同时开启）。
+  ///
+  /// 侧边栏入口 / 右键菜单 / 设置分类统一以此判定，避免各处重复
+  /// 组合 [developerMode] 与 [devDownloadModule]。
+  bool get downloadModuleEnabled => developerMode && devDownloadModule;
+
+  AppPrefs copyWithDevDownloadModule(bool value) =>
+      AppPrefs(initialData: {...data, devDownloadModuleKey: value});
 }

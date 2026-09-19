@@ -75,21 +75,6 @@ class SubsonicServerError extends SubsonicServerEvent {
   final String message;
 }
 
-/// lyric-request：服务端请求宿主查在线歌词。
-/// 宿主查完后须调用 controller.respondLyric(requestId, resultJson)。
-class SubsonicLyricRequest extends SubsonicServerEvent {
-  SubsonicLyricRequest({
-    required this.requestId,
-    required this.songId,
-    required this.title,
-    required this.artist,
-  });
-  final int requestId;
-  final String songId;
-  final String title;
-  final String artist;
-}
-
 /// scan-request：外部请求触发曲库扫描（宿主接入 scanner）。
 class SubsonicScanRequest extends SubsonicServerEvent {
   SubsonicScanRequest(this.fullScan);
@@ -122,7 +107,6 @@ class SubsonicController {
   }
 
   /// 取一条事件；无事件返回 null。事件类型见 [SubsonicServerEvent]。
-  /// lyric-request 需宿主查询在线歌词后经 [respondLyric] 回填。
   SubsonicServerEvent? pollEvent() {
     _checkNotDisposed();
     const bufLen = 16384;
@@ -135,19 +119,6 @@ class SubsonicController {
       return _parseEvent(text);
     } finally {
       calloc.free(buf);
-    }
-  }
-
-  /// 提交在线歌词查询结果。
-  /// [resultJson] 结构：`{"main": "...", "translation": "...", "romaji": "..."}`
-  ///（与 endpoints.injectLyricResp 对齐；main 为空视为无歌词）。
-  void respondLyric(int requestId, String resultJson) {
-    _checkNotDisposed();
-    final resultPtr = resultJson.toNativeUtf8();
-    try {
-      _bindings.lyricResponse(_h, requestId, resultPtr);
-    } finally {
-      calloc.free(resultPtr);
     }
   }
 
@@ -201,13 +172,6 @@ class SubsonicController {
           );
         case 'error':
           return SubsonicServerError(json['message']?.toString() ?? 'unknown');
-        case 'lyric-request':
-          return SubsonicLyricRequest(
-            requestId: (json['id'] as num).toInt(),
-            songId: json['songId']?.toString() ?? '',
-            title: json['title']?.toString() ?? '',
-            artist: json['artist']?.toString() ?? '',
-          );
         case 'scan-request':
           return SubsonicScanRequest(json['fullScan'] as bool? ?? false);
         default:

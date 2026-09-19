@@ -9,6 +9,7 @@
 //! 由 CMake 以 clang++（-fobjc-arc）编译，直接链接 AppKit/MediaPlayer/Foundation。
 
 #import <AppKit/AppKit.h>
+#import <Carbon/Carbon.h>
 #import <Foundation/Foundation.h>
 #import <MediaPlayer/MediaPlayer.h>
 #import <UserNotifications/UserNotifications.h>
@@ -24,6 +25,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <string>
 
 namespace archoera {
@@ -33,6 +35,9 @@ void pushAccent();
 
 // 推送一次当前系统深浅色（定义见文件后部）；平台推送模型，Dart 不查询。
 void pushTheme();
+
+// 记录一条待处理 deep link（定义见文件后部；macOS 经 AppleEvent 投递）。
+void setPendingDeepLink(const char* uri);
 
 namespace {
 
@@ -131,6 +136,16 @@ void emitWindow() {
     (void)event;
     archoera::dispatch(archoera::makeCommand(archoera::CMD_TOGGLE));
     return MPRemoteCommandHandlerStatusSuccess;
+}
+
+- (void)onOpenURL:(NSAppleEventDescriptor*)event
+    withReplyEvent:(NSAppleEventDescriptor*)reply {
+    (void)reply;
+    NSString* url = [[event paramDescriptorForKeyword:keyDirectObject]
+        stringValue];
+    if (url != nil) {
+        archoera::setPendingDeepLink([url UTF8String]);
+    }
 }
 
 - (MPRemoteCommandHandlerStatus)onNext:(MPRemoteCommandEvent*)event {
@@ -232,15 +247,45 @@ void ensureRemoteCommands() {
 
 }  // namespace
 
+// ── DeepLink / 协议唤醒（Info.plist 声明 scheme + AppleEvent 接收）──
+std::mutex g_deeplink_mutex;
+std::string g_deeplink_pending;   // UTF-8；单条待取
+std::string g_deeplink_take_buf;  // take 返回缓冲
+
+void setPendingDeepLink(const char* uri) {
+    if (uri == nullptr || *uri == '\0') return;
+    {
+        std::lock_guard<std::mutex> lock(g_deeplink_mutex);
+        g_deeplink_pending = uri;
+    }
+    dispatch(makeDeepLink());
+}
+
 // ── 后端接口 ──────────────────────────────────────────────────────
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
-           CAP_SYSTEM_THEME;
+           CAP_SYSTEM_THEME | CAP_DEEP_LINK;
 }
 
 int32_t init() {
     ensureRemoteCommands();
+    // 协议唤醒：注册 archoera:// AppleEvent 处理器（scheme 由 Info.plist
+    // CFBundleURLTypes 静态声明；运行时无需写系统注册表）。
+    NSAppleEventManager* aem = [NSAppleEventManager sharedAppleEventManager];
+    if (aem != nil) {
+        [aem setEventHandler:observer()
+                 andSelector:@selector(onOpenURL:withReplyEvent:)
+               forEventClass:kInternetEventClass
+                  andEventID:kAEGetURL];
+    }
+    // 冷启动：LaunchServices 把 URL 作为启动参数传入。
+    for (NSString* arg in [[NSProcessInfo processInfo] arguments]) {
+        if ([arg hasPrefix:@"archoera://"]) {
+            setPendingDeepLink([arg UTF8String]);
+            break;
+        }
+    }
     return OK;
 }
 
@@ -380,6 +425,39 @@ int32_t appInstanceAcquire() {
         return 0;
     }
     return 1;
+}
+
+// scheme 由 Info.plist 静态声明，运行时注册为幂等空操作。
+int32_t protocolRegister(const char*) { return OK; }
+int32_t protocolUnregister(const char*) { return OK; }
+
+int32_t deepLinkTake(AplString* out) {
+    if (out == nullptr) return ERR_STATE;
+    std::lock_guard<std::mutex> lock(g_deeplink_mutex);
+    if (g_deeplink_pending.empty()) {
+        out->data = nullptr;
+        out->len = 0;
+        return 0;
+    }
+    g_deeplink_take_buf = g_deeplink_pending;
+    g_deeplink_pending.clear();
+    out->data = g_deeplink_take_buf.c_str();
+    out->len = g_deeplink_take_buf.size();
+    return 1;
+}
+
+// macOS 单实例由 LaunchServices 保证，URL 直接作为 AppleEvent 投递给运行中的
+// 实例，无需自行转发。
+int32_t deepLinkForward() { return 0; }
+
+int32_t windowActivate() {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [NSApp activateIgnoringOtherApps:YES];
+      NSWindow* w = [NSApp mainWindow];
+      if (w == nil) w = [NSApp keyWindow];
+      if (w != nil) [w makeKeyAndOrderFront:nil];
+    });
+    return OK;
 }
 
 bool systemAccent(int32_t* r, int32_t* g, int32_t* b) {

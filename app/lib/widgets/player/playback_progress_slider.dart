@@ -5,7 +5,10 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/lyrics/lyric_line.dart';
 import '../../services/playback/playback_notifier.dart';
+import '../../stores/app_prefs.dart';
+import '../../stores/lyrics_provider.dart';
 import '../../utils/format.dart';
 import 'playback_slider.dart';
 
@@ -47,6 +50,13 @@ class PlaybackProgressSlider extends ConsumerWidget {
     final s = ref.watch(
       playbackProvider.select((s) => (pos: s.position, dur: s.duration)),
     );
+    final prefs = ref.watch(appPrefsProvider);
+    // 吸附到歌词：仅在启用且当前曲目有歌词时生效。
+    final groups = prefs.snapToLyric
+        ? ref
+              .watch(currentLyricsProvider)
+              .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[])
+        : const <LyricGroup>[];
     final durMs = s.dur.inMilliseconds;
     final ms = (dragMs ?? s.pos.inMilliseconds)
         .clamp(0, durMs < 1 ? 1 : durMs)
@@ -55,12 +65,16 @@ class PlaybackProgressSlider extends ConsumerWidget {
       value: ms,
       max: durMs < 1 ? 1 : durMs.toDouble(),
       buffering: buffering,
+      showTooltip: prefs.showProgressTooltip,
       onChanged: enabled ? onDragChanged : null,
       onChangeEnd: enabled
           ? (v) async {
               onSeekEnd(v);
+              final target = (prefs.snapToLyric && groups.isNotEmpty)
+                  ? _nearestLyricMs(groups, v)
+                  : v;
               try {
-                await notifier.seek(Duration(milliseconds: v.round()));
+                await notifier.seek(Duration(milliseconds: target.round()));
               } catch (_) {
                 // 错误已记入播放日志
               }
@@ -68,12 +82,27 @@ class PlaybackProgressSlider extends ConsumerWidget {
           : null,
     );
     if (!showTimes) return slider;
+    final (left, right) = formatTimePair(s.pos, s.dur, prefs.timeFormat);
     return Row(
       children: [
-        Text(formatClock(s.pos), style: textStyle),
+        Text(left, style: textStyle),
         Expanded(child: slider),
-        Text(formatClock(s.dur), style: textStyle),
+        Text(right, style: textStyle),
       ],
     );
+  }
+
+  /// 最近歌词行起始毫秒（用于拖动松手吸附）。
+  static double _nearestLyricMs(List<LyricGroup> groups, double ms) {
+    var best = groups.first.original.timeMs.toDouble();
+    var bestDist = (best - ms).abs();
+    for (final g in groups) {
+      final d = (g.original.timeMs - ms).abs();
+      if (d < bestDist) {
+        bestDist = d;
+        best = g.original.timeMs.toDouble();
+      }
+    }
+    return best;
   }
 }
