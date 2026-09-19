@@ -13,7 +13,7 @@
   `user.signingkey <GPG key id>`、`commit.gpgsign true`、`tag.gpgsign true`；
   remote 使用 SSH，推送无需 token。
 - **验证**：`ssh -T git@github.com`（应回显用户名）；`git log --show-signature -1`（签名有效）。
-- **红线**：禁止把 token、私钥写入仓库、脚本或 remote URL；凭据只保存在本地密钥环。
+- **红线**：禁止把 token、私钥写入仓库、脚本或 remote URL；凭据只保存在本地密钥环；禁止bash与指令代替手动write；禁止无意义全量重编
 
 ## 构建与测试（提交前必跑）
 ```bash
