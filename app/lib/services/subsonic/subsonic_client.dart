@@ -40,9 +40,6 @@ class SubsonicClient {
   static const _requestTimeout = Duration(seconds: 30);
   static final HttpClient _client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
 
-  /// 关闭底层连接池。
-  static void closeHttpClient() => _client.close(force: true);
-
   /// 基础地址：本机内置服务端（isArchoeraServer）连接时自动协商端口。
   String get _base => resolvedServerBaseUrl(config);
 
