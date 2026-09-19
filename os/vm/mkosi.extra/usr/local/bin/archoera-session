@@ -8,6 +8,13 @@
 # - 一个 session D-Bus（fcitx5 / libsecret 等需要）；
 # - 输入法 fcitx5：其 Wayland 前端以 `zwp_input_method_v2` 接入合成器，
 #   合成器把客户端 `zwp_text_input_v3` 的输入上下文转给它（smithay 桥接）。
+#
+# ⚠ 输入法生命周期必须与合成器**成对**（见下方 start_ime/stop_ime）：
+#   smithay 0.7 的 input-method 桥接不支持热重连——已有一个 IME 实例时，第二个
+#   实例会被 `add_instance` 拒之门外（只对旧实例发 unavailable、却不登记新实例），
+#   结果是「换一个实例 = 输入法永久失效」。所以每次合成器重启都重建 fcitx5，
+#   且绝不在合成器存活时替换它；合成器侧的 ime 看门狗发现 IME 断开也会主动退出，
+#   由本脚本把两者一起重启。
 export RUST_LOG="${RUST_LOG:-archoera_shell=info,warn}"
 # 日志：无头（有串口）时进 hvc0；否则落家目录，便于 GUI 模式下事后排查。
 if [ -w /dev/hvc0 ]; then
@@ -20,10 +27,13 @@ fi
 
 # 固定 socket 名，输入法才能确定连哪个 Wayland 显示。
 SOCKET=wayland-archoera
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+SOCKET_PATH="$RUNTIME_DIR/$SOCKET"
 
 # 会话自述：便于确认「以普通用户 archoera + logind VT 会话」运行而非 root。
 echo "[session] 用户=$(id -un) uid=$(id -u) home=$HOME runtime=${XDG_RUNTIME_DIR:-未设置}"
 echo "[session] 会话=$(loginctl show-session "$(loginctl list-sessions --no-legend 2>/dev/null | awk -v u="$(id -un)" '$3==u {print $1; exit}')" -p Type -p Active -p Seat -p VTNr 2>/dev/null | tr '\n' ' ')"
+echo "[session] fcitx5=$(command -v fcitx5 >/dev/null 2>&1 && echo 有 || echo 无)"
 
 # 电源动作授权自检：logind 的 power-off/reboot/suspend/hibernate 由 polkit 判定，
 # 活动会话默认 allow_active=yes（免鉴权）。无 polkit/非活动会话会显示「需鉴权」，
@@ -82,22 +92,69 @@ start_audio() {
 }
 start_audio
 
-# 输入法：等合成器 socket 出现后启动 fcitx5（Wayland 前端）。
-start_ime() {
+# ── 输入法：与合成器成对生命周期 ────────────────────────────────────────────
+# 当前实例的进程号（空 = 未运行）。
+IME_PID=""
+
+# 等合成器 socket **由本轮**创建。启动前已清掉陈旧 socket 文件，因此它出现即代表
+# 新合成器已在监听（避免 fcitx5 抢在 socket 就绪前连接失败）。
+wait_for_socket() {
     i=0
-    while [ "$i" -lt 150 ]; do
-        [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$SOCKET" ] && break
+    while [ "$i" -lt 300 ]; do
+        [ -S "$SOCKET_PATH" ] && return 0
         i=$((i + 1))
-        sleep 0.2
+        sleep 0.1
     done
-    if command -v fcitx5 >/dev/null 2>&1; then
-        echo "[session] 启动输入法 fcitx5（Wayland 前端 → zwp_input_method_v2）"
-        WAYLAND_DISPLAY="$SOCKET" fcitx5 -d --replace
-    else
-        echo "[session] 未安装 fcitx5，跳过输入法"
-    fi
+    return 1
 }
-start_ime &
+
+# 启动 fcitx5：先确保没有上一轮残留实例，再以前台模式作为脚本子进程拉起。
+# 不用 `--replace`：替换会在旧实例仍连接时触发 smithay 的实例登记缺陷。
+start_ime() {
+    if ! command -v fcitx5 >/dev/null 2>&1; then
+        echo "[session] 未安装 fcitx5，跳过输入法"
+        return 0
+    fi
+    # 清掉残留（上一轮异常退出、或手工启动的实例），避免两个实例并存。
+    if pgrep -x fcitx5 >/dev/null 2>&1; then
+        echo "[session] 发现残留 fcitx5，先清理"
+        pkill -x fcitx5 2>/dev/null
+        i=0
+        while pgrep -x fcitx5 >/dev/null 2>&1 && [ "$i" -lt 30 ]; do
+            i=$((i + 1))
+            sleep 0.1
+        done
+        pkill -9 -x fcitx5 2>/dev/null
+    fi
+    echo "[session] 启动输入法 fcitx5（Wayland 前端 → zwp_input_method_v2）"
+    # 前台运行并置于后台（不用 -d 守护化），这样能拿到 PID 并随合成器一起收尾。
+    WAYLAND_DISPLAY="$SOCKET" fcitx5 &
+    IME_PID=$!
+}
+
+# 结束当前输入法实例，并等它真正退出（避免残留连上下一轮合成器）。
+stop_ime() {
+    [ -n "$IME_PID" ] || return 0
+    if kill -0 "$IME_PID" 2>/dev/null; then
+        kill "$IME_PID" 2>/dev/null
+        i=0
+        while kill -0 "$IME_PID" 2>/dev/null && [ "$i" -lt 20 ]; do
+            i=$((i + 1))
+            sleep 0.1
+        done
+        kill -9 "$IME_PID" 2>/dev/null
+    fi
+    IME_PID=""
+}
+
+# 脚本异常退出（tty 断开 / 被杀）时也收尾，避免孤儿合成器与输入法。
+cleanup_on_exit() {
+    [ -n "${SH_PID:-}" ] && kill "$SH_PID" 2>/dev/null
+    stop_ime
+}
+# 终止信号统一转成正常退出，从而只走一次 EXIT 收尾。
+trap cleanup_on_exit EXIT
+trap 'exit 0' TERM INT HUP
 
 args=""
 if [ -f /opt/archoera/session.args ]; then
@@ -146,9 +203,37 @@ while true; do
     else
         unset ARCHOERA_MODE
     fi
+
+    # 清掉上一轮可能残留的 socket（合成器已退出），使 wait_for_socket 只认本轮监听。
+    rm -f "$SOCKET_PATH" "$SOCKET_PATH.lock"
+
     echo "[session] 启动 udev kiosk $(date -Is) args='${args}' client='${client}' mode='$MODE'"
     # shellcheck disable=SC2086
-    /opt/archoera/archoera-shell --backend udev $args -- "$client"
-    echo "[session] 合成器退出 rc=$?，5s 后重试"
+    /opt/archoera/archoera-shell --backend udev $args -- "$client" &
+    SH_PID=$!
+
+    if wait_for_socket; then
+        start_ime
+    else
+        echo "[session] 等待合成器 socket 超时（合成器可能启动失败），跳过输入法"
+    fi
+
+    # 成对监视：合成器或输入法任一退出，都一起收尾再重开，绝不留半桥接状态。
+    while :; do
+        if ! kill -0 "$SH_PID" 2>/dev/null; then
+            break
+        fi
+        if [ -n "$IME_PID" ] && ! kill -0 "$IME_PID" 2>/dev/null; then
+            echo "[session] fcitx5 已退出，重启会话以重建输入法桥接"
+            kill "$SH_PID" 2>/dev/null
+            break
+        fi
+        sleep 0.5
+    done
+
+    wait "$SH_PID"
+    rc=$?
+    stop_ime
+    echo "[session] 合成器退出 rc=$rc，5s 后重试"
     sleep 5
 done

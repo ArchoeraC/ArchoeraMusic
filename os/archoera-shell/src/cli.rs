@@ -66,6 +66,11 @@ pub struct ShellConfig {
     pub scale: f64,
     /// 输出变换（旋转/镜像）。
     pub transform: TransformKind,
+    /// 输入法看门狗：**曾在线的 IME 断开后结束会话**（会话脚本据此成对重启
+    /// 合成器 + fcitx5）。smithay 0.7 的 input-method 桥接不支持热重连——有旧实例
+    /// 时 `add_instance` 只会对旧实例发 `unavailable` 却不登记新实例，重连会永久
+    /// 打断输入法。故宁可结束会话重建。`--no-ime-watch` 可关闭。
+    pub ime_watch: bool,
 }
 
 impl Default for ShellConfig {
@@ -81,6 +86,7 @@ impl Default for ShellConfig {
             mode: None,
             scale: 1.0,
             transform: TransformKind::Normal,
+            ime_watch: true,
         }
     }
 }
@@ -94,6 +100,7 @@ impl ShellConfig {
     /// - `-- <argv...>`：剩余参数整体作为命令（可含带空格参数）；
     /// - `--backend winit|udev`；
     /// - `--no-exit-on-close`：客户端全退后不结束会话；
+    /// - `--no-ime-watch`：输入法断开后不结束会话（默认结束以成对重建桥接）；
     /// - `--allow-multiple`：允许第二个 toplevel（默认 kiosk 单窗口）；
     /// - `--drm-device <path>`：udev 后端指定 DRM 节点；
     /// - `--volume <n>`；
@@ -143,6 +150,7 @@ impl ShellConfig {
                     };
                 }
                 "--no-exit-on-close" => cfg.exit_on_close = false,
+                "--no-ime-watch" => cfg.ime_watch = false,
                 "--allow-multiple" => cfg.allow_multiple = true,
                 "--drm-device" => {
                     i += 1;
@@ -201,6 +209,13 @@ impl ShellConfig {
                 if !dev.trim().is_empty() {
                     cfg.drm_device = Some(dev);
                 }
+            }
+        }
+
+        // 会话脚本可用环境变量关闭输入法看门狗（默认开启）。
+        if let Ok(v) = std::env::var("ARCHOERA_IME_WATCH") {
+            if matches!(v.trim(), "0" | "false" | "no" | "off") {
+                cfg.ime_watch = false;
             }
         }
 
@@ -277,6 +292,7 @@ fn print_help() {
            --backend <winit|udev> 运行后端（默认 winit，嵌套开发）\n\
            --volume <0-100>       初始会话音量\n\
            --no-exit-on-close     客户端全部退出后不结束会话\n\
+           --no-ime-watch         不在输入法断开后结束会话（默认会结束以成对重建）\n\
            --allow-multiple       允许第二个 toplevel（默认 kiosk 只接受一个）\n\
            --drm-device <path>    udev 后端指定 DRM 节点（默认固件主 GPU / 首个）\n\
            --mode <WxH>           期望输出分辨率（udev 挑连接器模式；默认 preferred）\n\
@@ -344,6 +360,14 @@ mod tests {
         .unwrap();
         assert!(cfg.allow_multiple);
         assert_eq!(cfg.drm_device.as_deref(), Some("/dev/dri/card1"));
+    }
+
+    #[test]
+    fn ime_watch_defaults_on_and_can_be_disabled() {
+        let cfg = ShellConfig::from_args(args(&["archoera-shell"])).unwrap();
+        assert!(cfg.ime_watch);
+        let cfg = ShellConfig::from_args(args(&["archoera-shell", "--no-ime-watch"])).unwrap();
+        assert!(!cfg.ime_watch);
     }
 
     #[test]

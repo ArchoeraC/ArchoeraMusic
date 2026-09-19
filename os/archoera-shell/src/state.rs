@@ -119,6 +119,11 @@ pub struct ArchoeraShell {
     pub had_client: bool,
     /// 由合成器拉起的会话命令（kiosk 主进程）；其退出即代表会话结束。
     pub session_child: Option<std::process::Child>,
+    /// 输入法看门狗：是否曾有 IME 实例接入。曾接入后变为 false 即结束会话，
+    /// 让会话脚本成对重启合成器与 fcitx5（smithay 0.7 不支持 IME 热重连）。
+    pub ime_was_connected: bool,
+    /// 连续观测到 IME 断开的看门狗周期数（去抖：需连续若干周期才判定真断开）。
+    pub ime_disconnect_ticks: u32,
 
     // 控制面
     pub control: ControlPlane,
@@ -241,6 +246,8 @@ impl ArchoeraShell {
             client_count,
             had_client: false,
             session_child: None,
+            ime_was_connected: false,
+            ime_disconnect_ticks: 0,
             control,
             idle_inhibitors: 0,
             idle_reason: None,

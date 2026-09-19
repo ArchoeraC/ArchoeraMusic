@@ -129,9 +129,17 @@ qemu-system-x86_64 -machine q35,accel=kvm -m 2048 -smp 2 \
   gsettings，缺省 Adwaita）复制进 `mkosi.extra/usr/share/icons/` 并写入
   `/opt/archoera/cursor-theme`；会话脚本据此导出 `XCURSOR_THEME`/`XCURSOR_SIZE`
   （已 gitignore，不入库）。
-- **输入法**：会话脚本先起一个 session D-Bus，再等合成器 socket 出现后启动
-  `fcitx5`（Wayland 前端以 `zwp_input_method_v2` + `zwp_virtual_keyboard_v1` 接入）。
-  镜像含 `fcitx5` + `fcitx5-chinese-addons`，并预置启用拼音的 `/root/.config/fcitx5/profile`。
+- **输入法**：会话脚本先起一个 session D-Bus，合成器 socket **就绪后**才启动
+  `fcitx5`（Wayland 前端以 `zwp_input_method_v2` + `zwp_virtual_keyboard_v1` 接入），
+  且其生命周期与合成器**成对**：合成器每重启一轮就重建 fcitx5，绝不在合成器存活时
+  替换（不用 `--replace`）——smithay 0.7 的 input-method 桥接在有旧实例时不会登记新
+  实例，热替换会把输入法永久打断。fcitx5 或合成器任一退出，会话脚本都会把两者一起
+  收尾再重开；合成器侧另有 IME 看门狗（抓取丢失约 3s → 主动优雅退出）兜底。
+  镜像含 `fcitx5` + `fcitx5-chinese-addons`，并预置启用拼音的 profile。
+- **候选窗观感**：预置自绘的 `archoera` 深色主题（`/usr/share/fcitx5/themes/archoera/`，
+  与应用近黑调色板一致、9 宫格圆角 + 柔和投影，不依赖合成器模糊），并在
+  `~/.config/fcitx5/conf/classicui.conf` 里选为默认。素材由
+  [`fcitx5-theme/gen_theme.py`](fcitx5-theme/gen_theme.py) 生成（PIL 自绘，非 KDE 素材）。
 
 ## 光标 / 输入法（合成器侧）
 
@@ -143,6 +151,11 @@ qemu-system-x86_64 -machine q35,accel=kvm -m 2048 -smp 2 \
   会同时查找 `zwp_input_method_v2` 与 `zwp_virtual_keyboard_v1`；只有前者时它不会
   抓取键盘，表现为「无法切换输入法」。合成器注册该全局后 fcitx5 才会真正接管键盘，
   Ctrl+Space 切拼音/中英生效；未被 IME 消费的按键再由它经虚拟键盘转发给客户端。
+- **IME 生命周期与看门狗**：fcitx5 接入并抓取键盘后，合成器每秒观测一次
+  `keyboard_grabbed()`；连续约 3s 丢失即判定输入法断开，**主动优雅结束会话**
+  （`--no-ime-watch` 可关闭）。原因是 smithay 0.7 的 input-method 桥接不支持热重连
+  （已有旧实例时新实例不会被登记），只能成对重建。SIGTERM/SIGINT 也走优雅退出，
+  结束时一并终止会话客户端，避免孤儿进程。
 - **触摸**：座位提供 `wl_touch`。触摸按下即命中窗口、置顶并把键盘焦点交给它，
   使 `zwp_text_input_v3` / `zwp_input_method_v2` 激活——触摸设备常无物理键盘，
   播放器内置 OSK 据此在触摸聚焦输入框时弹出（见 `app/lib/widgets/common/touch_keyboard/`）。

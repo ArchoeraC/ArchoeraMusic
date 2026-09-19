@@ -200,6 +200,10 @@ archoera-control [--socket <name>] [命令]
   它不抓取键盘，表现为「快捷键切不了输入法」。
 - `key` 请求走**座位键盘**路径（而非直接 `zwp_virtual_keyboard_v1`）：先由 fcitx5 的
   键盘抓取消费（拼音 / 候选 / 中英切换），未被消费的按键再转发给焦点客户端。
+- **输入法生命周期成对**：会话脚本在合成器 socket 就绪后才启动 fcitx5，合成器每轮
+  重启都重建 fcitx5（不用 `--replace`）；合成器的 IME 看门狗在抓取连续约 3s 丢失后
+  主动优雅结束会话（`--no-ime-watch` 关闭），避免 smithay 0.7 不支持 IME 热重连导致的
+  「换实例即失效」。SIGTERM/SIGINT 亦优雅收尾并终止会话客户端。
 - 播放器内置 OSK（`app/lib/widgets/common/touch_keyboard/`）在 `keyboard` 能力位可用时，
   触摸聚焦文本输入框自动弹出；桌面鼠标/键盘用户不受影响。
 
