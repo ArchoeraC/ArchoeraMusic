@@ -1,0 +1,26 @@
+#!/bin/sh
+# 防止把 os/ 交叉提交进不跟踪 os/ 的分支（如 main）。
+#
+# 安装：git config core.hooksPath .githooks
+# 绕过：git commit --no-verify
+#
+# 判据：先看当前 HEAD 是否跟踪 os/。
+#   - 跟踪 os/（ArchoeraOS）→ 放行；
+#   - 不跟踪 os/（main）  → 暂存区里出现任何 os/ 路径即拒绝。
+# 这样同一份钩子可以安全地存在于所有分支，不会误伤 ArchoeraOS。
+
+# 当前分支跟踪 os/ → 放行
+if git ls-tree -r --name-only HEAD -- os/ 2>/dev/null | grep -q .; then
+    exit 0
+fi
+
+# 不跟踪 os/：检查暂存区（含 git add -f 强加的忽略文件）
+staged=$(git diff --cached --name-only --diff-filter=ACMR -- os/)
+if [ -n "$staged" ]; then
+    echo "pre-commit 拦截：当前分支（$(git branch --show-current)）不跟踪 os/，拒绝提交：" >&2
+    echo "$staged" | sed 's/^/    /' >&2
+    echo "如确需提交，使用：git commit --no-verify" >&2
+    exit 1
+fi
+
+exit 0
