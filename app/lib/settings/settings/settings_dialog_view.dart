@@ -78,20 +78,24 @@ extension _SettingsDialogView on _SettingsDialogState {
                         child: Stack(
                           key: _catHostKey,
                           children: [
-                            ListView(
-                              padding: EdgeInsets.zero,
-                              // 每项恒为 40 高 + 上下各 1.5 的 padding。
-                              itemExtent: 43,
-                              children: [
-                                for (final cat in SettingsCategory.values)
-                                  if (cat.visible(devMode, downloadModule))
-                                    _buildCategoryItem(
-                                      scheme,
-                                      cat,
-                                      l10n,
-                                      animated,
-                                    ),
-                              ],
+                            // 隐藏侧栏滚动条（保留滚轮 / 拖拽滚动）。
+                            ScrollConfiguration(
+                              behavior: const _NoScrollbarBehavior(),
+                              child: ListView(
+                                padding: EdgeInsets.zero,
+                                // 每项恒为 40 高 + 上下各 1.5 的 padding。
+                                itemExtent: 43,
+                                children: [
+                                  for (final cat in SettingsCategory.values)
+                                    if (cat.visible(devMode, downloadModule))
+                                      _buildCategoryItem(
+                                        scheme,
+                                        cat,
+                                        l10n,
+                                        animated,
+                                      ),
+                                ],
+                              ),
                             ),
                             if (animated && _catIndicatorReady)
                               AnimatedPositioned(
@@ -841,5 +845,19 @@ extension _SettingsDialogView on _SettingsDialogState {
       start = idx + q.length;
     }
     return spans;
+  }
+}
+
+/// 不构建滚动条（隐藏滚动条的列表仍可滚轮 / 拖拽滚动）。
+class _NoScrollbarBehavior extends ScrollBehavior {
+  const _NoScrollbarBehavior();
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }
