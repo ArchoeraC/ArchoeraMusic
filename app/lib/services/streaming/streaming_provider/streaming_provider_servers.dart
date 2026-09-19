@@ -95,6 +95,10 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
     _persist();
     if (changed) {
       _resetBrowseCache();
+    }
+    // 同一服务器在「断开连接」后再次点击「连接」也要重连（changed 为 false，
+    // 仅凭 changed 判断会变成空操作，表现即「断开后无法重新连接」）。
+    if (changed || !state.connected) {
       await _connectImpl();
     }
   }
