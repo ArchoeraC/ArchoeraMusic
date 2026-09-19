@@ -233,7 +233,7 @@ extension _SideBarView on _SideBarState {
                       ),
                     ),
                   ),
-                  // 内容行
+                  // 内容行：折叠时只留图标并居中（否则透明文字仍占宽，会把图标挤到边缘）
                   Row(
                     mainAxisAlignment: collapsed
                         ? MainAxisAlignment.center
@@ -245,14 +245,8 @@ extension _SideBarView on _SideBarState {
                         size: 19,
                         color: foreground,
                       ),
-                      // 折叠时文字淡出（对齐 SMenu opacity 过渡）
-                      Expanded(
-                        child: AnimatedOpacity(
-                          duration: animDuration(
-                            context,
-                            const Duration(milliseconds: 200),
-                          ),
-                          opacity: collapsed ? 0 : 1,
+                      if (!collapsed)
+                        Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(left: 12),
                             child: Text(
@@ -268,7 +262,6 @@ extension _SideBarView on _SideBarState {
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ],
