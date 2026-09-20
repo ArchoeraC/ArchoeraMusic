@@ -7484,6 +7484,42 @@ abstract class AppLocalizations {
   /// **'非激活行失焦'**
   String get settingsAmllBlur;
 
+  /// No description provided for @settingsAmllBlurNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动会按帧率调整：先在 1 层内做模糊，吃不住就自动关掉。'**
+  String get settingsAmllBlurNote;
+
+  /// No description provided for @settingsAmllBlurAuto.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动'**
+  String get settingsAmllBlurAuto;
+
+  /// No description provided for @settingsAmllBlurFast.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流畅'**
+  String get settingsAmllBlurFast;
+
+  /// No description provided for @settingsAmllBlurLite.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'轻量（近似）'**
+  String get settingsAmllBlurLite;
+
+  /// No description provided for @settingsAmllBlurQuality.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'画质'**
+  String get settingsAmllBlurQuality;
+
+  /// No description provided for @settingsAmllBlurOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭'**
+  String get settingsAmllBlurOff;
+
   /// No description provided for @settingsAmllSpring.
   ///
   /// In zh_CN, this message translates to:

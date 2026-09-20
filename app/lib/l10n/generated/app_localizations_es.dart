@@ -4308,6 +4308,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAmllBlur => 'Desenfocar líneas inactivas';
 
   @override
+  String get settingsAmllBlurNote =>
+      'Automático se adapta a la tasa de fotogramas: primero desenfoque en una capa y, si no basta, se desactiva solo.';
+
+  @override
+  String get settingsAmllBlurAuto => 'Automático';
+
+  @override
+  String get settingsAmllBlurFast => 'Rápido';
+
+  @override
+  String get settingsAmllBlurLite => 'Ligero (aproximado)';
+
+  @override
+  String get settingsAmllBlurQuality => 'Calidad';
+
+  @override
+  String get settingsAmllBlurOff => 'Desactivado';
+
+  @override
   String get settingsAmllSpring => 'Resorte de desplazamiento';
 
   @override

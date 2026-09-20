@@ -14,6 +14,10 @@ class _Painter extends CustomPainter {
   /// 激活行未唱部分的透明度（对齐 AMLL `--dark-mask-alpha`）。
   static const double _unsungAlpha = 0.4;
 
+  /// 轻量档伪散焦：把非激活行「放大 4% + 低透明」再画一遍（零离屏层、零高斯）。
+  static const double _liteGhostScale = 1.04;
+  static const double _liteGhostAlpha = 0.35;
+
   /// 激活行已唱部分的透明度（对齐 AMLL `--bright-mask-alpha`）。
   static const double _litAlpha = 1.0;
 
@@ -26,6 +30,7 @@ class _Painter extends CustomPainter {
     final viewH = c.h > 0 ? c.h : size.height;
     final visible = <int>{};
     final keepFrag = <int>{};
+    final fades = <int, double>{};
     final hideBoundary = c.active >= 0 ? c.active : (c.anchor + 1);
     for (var i = 0; i < n; i++) {
       final cy = c.y[i];
@@ -36,7 +41,26 @@ class _Painter extends CustomPainter {
       final fade = i < c.fade.length ? c.fade[i] : 0.0;
       // 淡出中的上一激活行仍需逐字渲染数据（否则会从扫亮态「啪」地变灰）。
       if (fade > 0.02) keepFrag.add(i);
-      _drawLine(canvas, i, cy, fade);
+      fades[i] = fade;
+    }
+    if (c.blurMode == LyricsBlurMode.panel && c.blurStrength > 0.02) {
+      // 整层档：所有非激活外观（含淡出中的上一激活行）画进**同一个**离屏层，
+      // 一次高斯（1/4 重采样）→ 层数与可见行数无关；激活外观随后清晰叠回。
+      canvas.saveLayer(
+        Rect.fromLTWH(0, 0, math.max(1.0, c.w), viewH),
+        Paint()..imageFilter = _panelFilter(c.blurStrength),
+      );
+      for (final i in visible) {
+        _drawBase(canvas, i, c.y[i], fades[i]!);
+      }
+      canvas.restore();
+      for (final i in visible) {
+        _drawActiveLayer(canvas, i, c.y[i], fades[i]!);
+      }
+    } else {
+      for (final i in visible) {
+        _drawLine(canvas, i, c.y[i], fades[i]!);
+      }
     }
     _drawInterludeDots(canvas, viewH);
     // 只缓存可见窗口 → 常驻内存 O(视口)，与歌长无关（§3.4）。
@@ -87,9 +111,58 @@ class _Painter extends CustomPainter {
     return a;
   }
 
-  /// 当前失焦半径（px，由状态层平滑；对齐 AMLL `blur(min(5, 1+distance))`）。
-  double _blurFor(int i) =>
-      (c.enableBlur && i < c.blur.length) ? c.blur[i] : 0;
+  /// 当前行失焦等级（px，= AMLL 的 `blur()` 参数 = 高斯 σ）。
+  ///
+  /// 只有逐行档才逐行取值；整层档由 [_panelFilter] 统一处理，关闭/降级档恒为 0。
+  double _blurFor(int i) {
+    if (c.blurMode != LyricsBlurMode.perLine) return 0;
+    if (i >= c.blur.length) return 0;
+    return c.blur[i];
+  }
+
+  /// 整层档的失焦滤镜：在 1/[kPanelBlurDownsample] 尺寸上做等效高斯再放大回原尺寸。
+  ///
+  /// 用图像滤镜图（compose + matrix）实现，**不产生任何纹理缓存/显存占用**；
+  /// 非激活行本来就是模糊的，重采样肉眼不可辨（见 docs/player-render-optimization.md）。
+  /// [amount] 为 0~1 的强度（悬停/关闭时平滑归零），固定倍率下只与 σ 有关，做了 memo。
+  ui.ImageFilter _panelFilter(double amount) {
+    final sigma = kPanelBlurSigma * amount.clamp(0.0, 1.0);
+    if (_panelFilterCacheSigma == sigma) return _panelFilterCache!;
+    final filter = _buildPanelFilter(sigma);
+    _panelFilterCacheSigma = sigma;
+    _panelFilterCache = filter;
+    return filter;
+  }
+
+  static double? _panelFilterCacheSigma;
+  static ui.ImageFilter? _panelFilterCache;
+
+  static Float64List _scaleMatrix(double s) => Float64List.fromList(<double>[
+        s, 0, 0, 0, //
+        0, s, 0, 0, //
+        0, 0, 1, 0, //
+        0, 0, 0, 1, //
+      ]);
+
+  static ui.ImageFilter _buildPanelFilter(double sigma) {
+    final k = kPanelBlurDownsample;
+    if (k <= 0 || k >= 1) {
+      return ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
+    }
+    return ui.ImageFilter.compose(
+      outer: ui.ImageFilter.matrix(
+        _scaleMatrix(1 / k),
+        filterQuality: ui.FilterQuality.low,
+      ),
+      inner: ui.ImageFilter.compose(
+        outer: ui.ImageFilter.blur(sigmaX: sigma * k, sigmaY: sigma * k),
+        inner: ui.ImageFilter.matrix(
+          _scaleMatrix(k),
+          filterQuality: ui.FilterQuality.low,
+        ),
+      ),
+    );
+  }
 
   /// 当前缩放（激活 1.0，非激活 0.97）。
   double _scaleFor(int i) => i < c.scale.length ? c.scale[i] : 1.0;
@@ -107,78 +180,97 @@ class _Painter extends CustomPainter {
     return Rect.fromLTRB(0, cy - h / 2 - pad, math.max(1.0, c.w), bottom);
   }
 
+  /// 逐行档：一行一个离屏高斯（最贴 AMLL 的半径梯度，层数 ≈ 可见行数）。
   void _drawLine(Canvas canvas, int index, double cy, double fade) {
+    final blur = _blurFor(index);
+    final blurLayer = blur > 0.05;
+    if (blurLayer) {
+      // 失焦用离屏高斯：Flutter 无法给 drawParagraph 直接加 ImageFilter，
+      // 只能对整行开层。σ 直接取 AMLL 的 blur 参数（= σ，不折半）。
+      canvas.saveLayer(
+        _lineBounds(index, cy),
+        Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+      );
+    }
+    _drawBase(canvas, index, cy, fade);
+    _drawActiveLayer(canvas, index, cy, fade);
+    if (blurLayer) canvas.restore();
+  }
+
+  /// 基础层：非激活外观（未唱色）。`fade → 1` 时完全被激活外观盖住，可跳过。
+  ///
+  /// `fade` 在 (0,1) 之间时给基础层乘 `(1-fade)`，与激活层的 `fade` 加权形成
+  /// 真正的交叉淡化（否则两层叠加会在过渡中段整体偏亮）。
+  void _drawBase(Canvas canvas, int index, double cy, double fade) {
+    if (fade >= 0.995) return;
     final g = c.groups[index];
     final fs = g.isBG ? c.fontSize * kBgFontScale : c.fontSize;
     final maxWidth = math.max(40.0, c.w - _widthPad);
     final alpha = _alphaFor(index);
     final scale = _scaleFor(index);
-    final blur = _blurFor(index);
-    final bounds = _lineBounds(index, cy);
-
-    final blurLayer = blur > 0.05;
-    if (blurLayer) {
-      // 失焦用离屏高斯：Flutter 无法给 drawParagraph 直接加 ImageFilter，
-      // 只能对整行开层。仅非激活行、且按距离限制在 5px 内。
+    final base = _solidParagraph(
+      index,
+      g,
+      active: false,
+      alpha: alpha,
+      fs: fs,
+      maxWidth: maxWidth,
+    );
+    final crossfade = fade > 0.005;
+    if (crossfade) {
       canvas.saveLayer(
-        bounds,
-        Paint()
-          ..imageFilter = ui.ImageFilter.blur(
-            sigmaX: blur * 0.5,
-            sigmaY: blur * 0.5,
-          ),
+        _lineBounds(index, cy),
+        Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 1 - fade),
       );
     }
-
-    // 基础层：非激活外观（未唱色）。fade→1 时完全被激活外观盖住，可跳过。
-    // fade 在 (0,1) 之间时给基础层乘 (1-fade)，与激活层的 fade 加权形成
-    // 真正的交叉淡化（否则两层叠加会在过渡中段整体偏亮）。
-    if (fade < 0.995) {
-      final base = _solidParagraph(
+    canvas.save();
+    canvas.translate(c.w / 2, cy);
+    canvas.scale(scale);
+    canvas.translate(-base.width / 2, -base.height / 2);
+    canvas.drawParagraph(base, Offset.zero);
+    canvas.restore();
+    // 轻量档：不跑高斯，用一次放大 + 低透明重绘近似散焦（强度随悬停/切档平滑）。
+    if (c.blurMode == LyricsBlurMode.lite && c.blurStrength > 0.02) {
+      final ghost = _solidParagraph(
         index,
         g,
         active: false,
-        alpha: alpha,
+        alpha: alpha * _liteGhostAlpha * c.blurStrength,
         fs: fs,
         maxWidth: maxWidth,
       );
-      final crossfade = fade > 0.005;
-      if (crossfade) {
-        canvas.saveLayer(
-          bounds,
-          Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 1 - fade),
-        );
-      }
       canvas.save();
       canvas.translate(c.w / 2, cy);
-      canvas.scale(scale);
-      canvas.translate(-base.width / 2, -base.height / 2);
-      canvas.drawParagraph(base, Offset.zero);
-      canvas.restore();
-      _drawSubLines(
-        canvas,
-        index,
-        g,
-        cy + base.height / 2,
-        active: false,
-        alpha: alpha,
-        fs: fs,
-        maxWidth: maxWidth,
-      );
-      if (crossfade) canvas.restore();
-    }
-
-    // 激活外观层：整层按 fade 调节透明度，实现「点亮/熄灭」交叉淡化。
-    if (fade > 0.005) {
-      canvas.saveLayer(
-        bounds,
-        Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: fade),
-      );
-      _drawActive(canvas, index, g, cy, scale, fs, maxWidth);
+      canvas.scale(scale * _liteGhostScale);
+      canvas.translate(-ghost.width / 2, -ghost.height / 2);
+      canvas.drawParagraph(ghost, Offset.zero);
       canvas.restore();
     }
+    _drawSubLines(
+      canvas,
+      index,
+      g,
+      cy + base.height / 2,
+      active: false,
+      alpha: alpha,
+      fs: fs,
+      maxWidth: maxWidth,
+    );
+    if (crossfade) canvas.restore();
+  }
 
-    if (blurLayer) canvas.restore();
+  /// 激活外观层：整层按 `fade` 调节透明度，实现「点亮/熄灭」交叉淡化。
+  void _drawActiveLayer(Canvas canvas, int index, double cy, double fade) {
+    if (fade <= 0.005) return;
+    final g = c.groups[index];
+    final fs = g.isBG ? c.fontSize * kBgFontScale : c.fontSize;
+    final maxWidth = math.max(40.0, c.w - _widthPad);
+    canvas.saveLayer(
+      _lineBounds(index, cy),
+      Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: fade),
+    );
+    _drawActive(canvas, index, g, cy, _scaleFor(index), fs, maxWidth);
+    canvas.restore();
   }
 
   /// 激活外观（已唱色 + 扫亮遮罩 + 逐词上浮/强调）。

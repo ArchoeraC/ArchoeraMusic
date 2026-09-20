@@ -334,6 +334,15 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
     _ => id,
   };
 
+  /// 失焦档位 → 显示名（`amll.blurQuality`）。
+  String _blurQualityLabel(AppLocalizations l10n, String key) => switch (key) {
+    'fast' => l10n.settingsAmllBlurFast,
+    'lite' => l10n.settingsAmllBlurLite,
+    'quality' => l10n.settingsAmllBlurQuality,
+    'off' => l10n.settingsAmllBlurOff,
+    _ => l10n.settingsAmllBlurAuto,
+  };
+
   Widget _buildAmllWallSection(
     AppLocalizations l10n,
     ColorScheme scheme,
@@ -385,12 +394,25 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
           value: prefs.amllEnableScale,
           onChanged: (v) => notifier.setLyricAmll(enableScale: v),
         ),
-        SettingSwitchTile(
+        SettingTile(
           icon: EtaIcons.blurOnOutline,
           title: l10n.settingsAmllBlur,
-          subtitle: '',
-          value: prefs.amllEnableBlur,
-          onChanged: (v) => notifier.setLyricAmll(enableBlur: v),
+          subtitle: l10n.settingsAmllBlurNote,
+          trailing: DropdownButton<String>(
+            value: prefs.amllBlurQuality,
+            underline: const SizedBox.shrink(),
+            isDense: true,
+            items: [
+              for (final q in amllBlurQualities)
+                DropdownMenuItem(
+                  value: q,
+                  child: Text(_blurQualityLabel(l10n, q)),
+                ),
+            ],
+            onChanged: (v) {
+              if (v != null) notifier.setLyricAmll(blurQuality: v);
+            },
+          ),
         ),
         SettingTile(
           icon: EtaIcons.magic2Outline,

@@ -4088,6 +4088,25 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsAmllBlur => '비활성 줄 흐리게';
 
   @override
+  String get settingsAmllBlurNote =>
+      '자동은 프레임률에 맞춰 조정합니다(먼저 1개 레이어로 흐리게, 버거우면 자동으로 끕니다).';
+
+  @override
+  String get settingsAmllBlurAuto => '자동';
+
+  @override
+  String get settingsAmllBlurFast => '가볍게';
+
+  @override
+  String get settingsAmllBlurLite => '경량(근사)';
+
+  @override
+  String get settingsAmllBlurQuality => '고화질';
+
+  @override
+  String get settingsAmllBlurOff => '끔';
+
+  @override
   String get settingsAmllSpring => '스크롤 스프링';
 
   @override

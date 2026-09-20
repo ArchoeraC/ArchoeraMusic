@@ -4038,6 +4038,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAmllBlur => '非激活行失焦';
 
   @override
+  String get settingsAmllBlurNote => '自动会按帧率调整：先在 1 层内做模糊，吃不住就自动关掉。';
+
+  @override
+  String get settingsAmllBlurAuto => '自动';
+
+  @override
+  String get settingsAmllBlurFast => '流畅';
+
+  @override
+  String get settingsAmllBlurLite => '轻量（近似）';
+
+  @override
+  String get settingsAmllBlurQuality => '画质';
+
+  @override
+  String get settingsAmllBlurOff => '关闭';
+
+  @override
   String get settingsAmllSpring => '滚动弹簧';
 
   @override
@@ -8600,6 +8618,24 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsAmllBlur => '非激活行失焦';
+
+  @override
+  String get settingsAmllBlurNote => '自动会按帧率调整：先在 1 层内做模糊，吃不住就自动关掉。';
+
+  @override
+  String get settingsAmllBlurAuto => '自动';
+
+  @override
+  String get settingsAmllBlurFast => '流畅';
+
+  @override
+  String get settingsAmllBlurLite => '轻量（近似）';
+
+  @override
+  String get settingsAmllBlurQuality => '画质';
+
+  @override
+  String get settingsAmllBlurOff => '关闭';
 
   @override
   String get settingsAmllSpring => '滚动弹簧';
@@ -13165,6 +13201,24 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAmllBlur => '非激活行失焦';
+
+  @override
+  String get settingsAmllBlurNote => '自動會依畫面更新率調整：先在 1 層內做模糊，撐不住就自動關閉。';
+
+  @override
+  String get settingsAmllBlurAuto => '自動';
+
+  @override
+  String get settingsAmllBlurFast => '流暢';
+
+  @override
+  String get settingsAmllBlurLite => '輕量（近似）';
+
+  @override
+  String get settingsAmllBlurQuality => '畫質';
+
+  @override
+  String get settingsAmllBlurOff => '關閉';
 
   @override
   String get settingsAmllSpring => '捲動彈簧';
