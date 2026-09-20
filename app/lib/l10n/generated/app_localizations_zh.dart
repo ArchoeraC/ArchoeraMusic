@@ -771,10 +771,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => '网易云音乐';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => '酷狗音乐';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => '聚合';
@@ -2229,7 +2229,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsGroupingFlat => '全部平铺在下载目录下';
 
   @override
-  String get settingsGroupingPlatform => '按平台建子目录（Kugou / Netease）';
+  String get settingsGroupingPlatform => '按平台建子目录（KG / NT）';
 
   @override
   String get settingsGroupingArtist => '按歌手建子目录';
@@ -2295,7 +2295,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsFingerprintNote =>
-      '下载器向KG / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。';
+      '下载器向KG / NT请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。';
 
   @override
   String get settingsDownloadDynamicFingerprint => '动态设备指纹';
@@ -2309,7 +2309,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsResetFingerprintDesc =>
-      '重置后本机在KG / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？';
+      '重置后本机在KG / NT看来是新设备，旧指纹下的在线状态可能失效。确定重置？';
 
   @override
   String get toastFingerprintReset => '已重置设备指纹';
@@ -3734,7 +3734,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ 音乐';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';
@@ -5335,10 +5335,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
-  String get platformNetease => '网易云音乐';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => '酷狗音乐';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => '聚合';
@@ -6793,7 +6793,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsGroupingFlat => '全部平铺在下载目录下';
 
   @override
-  String get settingsGroupingPlatform => '按平台建子目录（Kugou / Netease）';
+  String get settingsGroupingPlatform => '按平台建子目录（KG / NT）';
 
   @override
   String get settingsGroupingArtist => '按歌手建子目录';
@@ -6859,7 +6859,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsFingerprintNote =>
-      '下载器向KG / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。';
+      '下载器向KG / NT请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。';
 
   @override
   String get settingsDownloadDynamicFingerprint => '动态设备指纹';
@@ -6873,7 +6873,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsResetFingerprintDesc =>
-      '重置后本机在KG / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？';
+      '重置后本机在KG / NT看来是新设备，旧指纹下的在线状态可能失效。确定重置？';
 
   @override
   String get toastFingerprintReset => '已重置设备指纹';
@@ -8298,7 +8298,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ 音乐';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'QM扫码登录';
@@ -9899,10 +9899,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
-  String get platformNetease => '网易云音乐';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => '酷狗音乐';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => '聚合';
@@ -11358,7 +11358,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsGroupingFlat => '全部平鋪在下載目錄下';
 
   @override
-  String get settingsGroupingPlatform => '按平台建立子目錄（Kugou / Netease）';
+  String get settingsGroupingPlatform => '按平台建立子目錄（KG / NT）';
 
   @override
   String get settingsGroupingArtist => '按歌手建立子目錄';
@@ -12863,7 +12863,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ 音乐';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'QQ 音樂掃碼登入';

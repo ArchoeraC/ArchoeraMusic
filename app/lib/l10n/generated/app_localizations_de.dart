@@ -278,20 +278,20 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String navHeaderKugouId(Object id) {
-    return 'Kugou $id';
+    return 'KG $id';
   }
 
   @override
   String get navHeaderKugouMusic => 'KG';
 
   @override
-  String get navHeaderLoginAccount => 'Anmelden (Netease / Kugou)';
+  String get navHeaderLoginAccount => 'Anmelden (NT / KG)';
 
   @override
   String get navHeaderLogout => 'Abmelden';
 
   @override
-  String get navHeaderNeteaseAccount => 'Netease-Konto';
+  String get navHeaderNeteaseAccount => 'NT-Konto';
 
   @override
   String get navHeaderNeteaseMusic => 'NT';
@@ -448,11 +448,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get toastLoginRequiredKugou =>
-      'Vorgang fehlgeschlagen (stellen Sie sicher, dass Sie in Ihrem Kugou-Konto angemeldet sind)';
+      'Vorgang fehlgeschlagen (stellen Sie sicher, dass Sie in Ihrem KG-Konto angemeldet sind)';
 
   @override
   String get toastLoginRequiredNetease =>
-      'Vorgang fehlgeschlagen (stellen Sie sicher, dass Sie in Ihrem Netease-Konto angemeldet sind)';
+      'Vorgang fehlgeschlagen (stellen Sie sicher, dass Sie in Ihrem NT-Konto angemeldet sind)';
 
   @override
   String get toastNoQualityInfo =>
@@ -800,10 +800,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => 'NetEase Cloud Music';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => 'Kugou Music';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => 'Alle';
@@ -937,14 +937,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pageFavEmptyHint =>
-      'Nach Favorisieren in der NetEase-App automatisch synchronisiert';
+      'Nach Favorisieren in der NT-App automatisch synchronisiert';
 
   @override
   String get pageFavLoginTitle => 'Anmelden, um Favoriten anzusehen';
 
   @override
   String get pageFavLoginDesc =>
-      'Per QR bei NetEase anmelden, Favoriten synchronisieren';
+      'Per QR bei NT anmelden, Favoriten synchronisieren';
 
   @override
   String get pageFavKgCreated => 'Erstellte Wiedergabelisten';
@@ -984,11 +984,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pageFavKugouLoginDesc =>
-      'Per QR bei Kugou anmelden, um erstellte/gespeicherte Wiedergabelisten und Alben zu synchronisieren';
+      'Per QR bei KG anmelden, um erstellte/gespeicherte Wiedergabelisten und Alben zu synchronisieren';
 
   @override
   String get pageFavKugouEmptyHint =>
-      'Wird automatisch synchronisiert, wenn du in der Kugou-App favorisierst';
+      'Wird automatisch synchronisiert, wenn du in der KG-App favorisierst';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1026,11 +1026,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pageLikedKugouLoginHint =>
-      'Zum Anmelden, um Kugou-»Gefällt mir« zu synchronisieren';
+      'Zum Anmelden, um KG-»Gefällt mir« zu synchronisieren';
 
   @override
   String get pageLikedNeteaseLoginHint =>
-      'Zum Anmelden, um NetEase-Favoriten zu synchronisieren';
+      'Zum Anmelden, um NT-Favoriten zu synchronisieren';
 
   @override
   String get pageLikedLoadFailed =>
@@ -1041,11 +1041,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pageLikedKugouEmptyHint =>
-      'Nach »Gefällt mir« in der Kugou-App automatisch synchronisiert';
+      'Nach »Gefällt mir« in der KG-App automatisch synchronisiert';
 
   @override
   String get pageLikedNeteaseEmptyHint =>
-      'Nach Herz in der NetEase-App automatisch synchronisiert';
+      'Nach Herz in der NT-App automatisch synchronisiert';
 
   @override
   String get toastQqLikeSyncFailed =>
@@ -1084,11 +1084,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pageLikedKugouLoginDesc =>
-      'Per QR bei Kugou anmelden, »Gefällt mir« synchronisieren';
+      'Per QR bei KG anmelden, »Gefällt mir« synchronisieren';
 
   @override
   String get pageLikedNeteaseLoginDesc =>
-      'Per QR bei NetEase anmelden, Herzen synchronisieren';
+      'Per QR bei NT anmelden, Herzen synchronisieren';
 
   @override
   String get libraryScanDirs => 'Scan-Ordner';
@@ -1246,8 +1246,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pageHomeDailyLoggedIn => 'Für dich ausgewählt';
 
   @override
-  String get pageHomeDailyLoginHint =>
-      'Bei NetEase anmelden für tägliche Updates';
+  String get pageHomeDailyLoginHint => 'Bei NT anmelden für tägliche Updates';
 
   @override
   String get pageHomeDailyPlay => 'Heutige Empfehlung abspielen';
@@ -2354,8 +2353,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsGroupingFlat => 'Alles flach im Download-Ordner';
 
   @override
-  String get settingsGroupingPlatform =>
-      'Unterordner nach Plattform（Kugou / Netease）';
+  String get settingsGroupingPlatform => 'Unterordner nach Plattform（KG / NT）';
 
   @override
   String get settingsGroupingArtist => 'Unterordner nach Künstler';
@@ -2425,7 +2423,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsFingerprintNote =>
-      'Gerätekennung für Kugou-/Netease-Downloads; beim ersten Start erzeugt und dauerhaft stabil, je Nutzer einzigartig.';
+      'Gerätekennung für KG-/NT-Downloads; beim ersten Start erzeugt und dauerhaft stabil, je Nutzer einzigartig.';
 
   @override
   String get settingsDownloadDynamicFingerprint =>
@@ -2440,7 +2438,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsResetFingerprintDesc =>
-      'Nach dem Zurücksetzen erscheint dieser Rechner bei Kugou / Netease als neues Gerät; Sitzungen unter dem alten Fingerprint könnten ungültig werden. Jetzt zurücksetzen?';
+      'Nach dem Zurücksetzen erscheint dieser Rechner bei KG / NT als neues Gerät; Sitzungen unter dem alten Fingerprint könnten ungültig werden. Jetzt zurücksetzen?';
 
   @override
   String get toastFingerprintReset => 'Geräte-Fingerprint zurückgesetzt';
@@ -2672,7 +2670,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsSecurityNote =>
-      'Löscht unwiderruflich alle lokalen Anmeldedaten und Sitzungen (Streaming-Server-Passwörter, Netease-/Kugou-Sitzungen, lokale Subsonic-Konten) und macht die Plattform-Tokens ungültig. Bibliothek, Verlauf und Downloads bleiben unberührt.';
+      'Löscht unwiderruflich alle lokalen Anmeldedaten und Sitzungen (Streaming-Server-Passwörter, NT-/KG-Sitzungen, lokale Subsonic-Konten) und macht die Plattform-Tokens ungültig. Bibliothek, Verlauf und Downloads bleiben unberührt.';
 
   @override
   String get settingsSecurityStreaming => 'Streaming-Server-Anmeldedaten';
@@ -2689,7 +2687,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSecuritySession => 'Sitzungen von Drittanbieter-Konten';
 
   @override
-  String get settingsSecuritySessionDesc => 'Netease-/Kugou-Anmeldestatus';
+  String get settingsSecuritySessionDesc => 'NT-/KG-Anmeldestatus';
 
   @override
   String get settingsSecurityUserDb => 'Lokale Benutzerdatenbank';
@@ -2958,7 +2956,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'Die Verfahren verwenden inkompatible verschlüsselte Strukturen. Der Wechsel zerstört das aktuelle Tresorgewölbe und baut die Datenbank neu auf; alle Anmeldedaten (Netease / Kugou / Streaming-Konten) gehen verloren und erfordern eine erneute Anmeldung.';
+      'Die Verfahren verwenden inkompatible verschlüsselte Strukturen. Der Wechsel zerstört das aktuelle Tresorgewölbe und baut die Datenbank neu auf; alle Anmeldedaten (NT / KG / Streaming-Konten) gehen verloren und erfordern eine erneute Anmeldung.';
 
   @override
   String get settingsSchemeSwitchKeep => 'Aktuelles beibehalten';
@@ -3958,7 +3956,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ Music';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'Mit QQ-Music-QR-Code anmelden';

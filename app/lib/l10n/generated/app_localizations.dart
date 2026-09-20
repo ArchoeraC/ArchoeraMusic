@@ -1523,13 +1523,13 @@ abstract class AppLocalizations {
   /// No description provided for @platformNetease.
   ///
   /// In zh_CN, this message translates to:
-  /// **'网易云音乐'**
+  /// **'NT'**
   String get platformNetease;
 
   /// No description provided for @platformKugou.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗音乐'**
+  /// **'KG'**
   String get platformKugou;
 
   /// No description provided for @platformAll.
@@ -4205,7 +4205,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsGroupingPlatform.
   ///
   /// In zh_CN, this message translates to:
-  /// **'按平台建子目录（Kugou / Netease）'**
+  /// **'按平台建子目录（KG / NT）'**
   String get settingsGroupingPlatform;
 
   /// No description provided for @settingsGroupingArtist.
@@ -4319,7 +4319,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsFingerprintNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'下载器向KG / 网易请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。'**
+  /// **'下载器向KG / NT请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。'**
   String get settingsFingerprintNote;
 
   /// No description provided for @settingsDownloadDynamicFingerprint.
@@ -4343,7 +4343,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsResetFingerprintDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'重置后本机在KG / 网易看来是新设备，旧指纹下的在线状态可能失效。确定重置？'**
+  /// **'重置后本机在KG / NT看来是新设备，旧指纹下的在线状态可能失效。确定重置？'**
   String get settingsResetFingerprintDesc;
 
   /// No description provided for @toastFingerprintReset.
@@ -6941,7 +6941,7 @@ abstract class AppLocalizations {
   /// No description provided for @platformQQMusic.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ 音乐'**
+  /// **'QM'**
   String get platformQQMusic;
 
   /// No description provided for @loginQqQrLogin.
