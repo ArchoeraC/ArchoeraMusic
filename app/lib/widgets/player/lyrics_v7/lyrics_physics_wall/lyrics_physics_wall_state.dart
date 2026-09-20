@@ -23,7 +23,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 需要参与弹簧/过渡动画的行窗口 `[_winStart, _winEnd)`。
   ///
   /// 屏幕只显示得下有限几行：换行时窗口外的行直接停驻到目标，不重建求解器、
-  /// 不参与每帧循环。见 `kViewportWindowMarginPx`。
+  /// 不参与每帧循环。见 `kViewportWindowMarginRatio`。
   int _winStart = 0;
   int _winEnd = 0;
 
@@ -367,11 +367,12 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 行的目标屏幕中心（含用户浏览偏移）。
   double _targetForUser(int i, int anchor) => _targetFor(i, anchor) + _user;
 
-  /// 重算需要参与动画的行窗口（视口 ± [kViewportWindowMarginPx]）。
+  /// 重算需要参与动画的行窗口（视口 ± 自适应余量）。
   ///
-  /// 目标中心随索引单调递增（centers 单调），故用二分而不是遍历全量数组。
-  /// 窗口移动后，新进入窗口的行把过渡态（淡入/缩放/失焦）吸附到目标值，
-  /// 避免带着过期状态进来闪一下。
+  /// 判定用**行本体**（中心 ± 半高）与视口的关系，而不是只看中心：行高可变
+  /// （长行换行后可以很高），只看中心会让「只露出一半甚至一点」的行落到窗口外，
+  /// 于是它不参与动画、整墙滚动时在屏幕上跳一下。从锚点向两侧扩张，遇到第一个
+  /// 完全越过余量边界的行即停 —— O(窗口)，与歌长无关。
   void _updateWindow() {
     final n = _y.length;
     if (n == 0 || _c.centers.isEmpty || _anchorIdx < 0) {
@@ -380,27 +381,23 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       return;
     }
     final h = _c.h > 0 ? _c.h : 400.0;
-    final top = -kViewportWindowMarginPx;
-    final bottom = h + kViewportWindowMarginPx;
-    final base = _c.centers[_anchorIdx] - h * _c.align - _user;
-    var lo = 0;
-    var hi = n; // 第一个「目标中心 >= y」的行下标
-    int lowerBound(double y) {
-      lo = 0;
-      hi = n;
-      while (lo < hi) {
-        final mid = (lo + hi) >> 1;
-        if (_c.centers[mid] - base >= y) {
-          hi = mid;
-        } else {
-          lo = mid + 1;
-        }
-      }
-      return lo;
+    final margin = math.max(
+      h * kViewportWindowMarginRatio,
+      kViewportWindowMarginMinPx,
+    );
+    final a = _anchorIdx;
+    var s = a;
+    while (s > 0) {
+      final top = _targetForUser(s - 1, a) - _heights[s - 1] / 2;
+      if (top < -margin) break;
+      s--;
     }
-
-    final s = math.max(0, lowerBound(top) - 1);
-    final e = math.min(n, lowerBound(bottom + 0.5) + 1);
+    var e = a + 1;
+    while (e < n) {
+      final bottom = _targetForUser(e, a) + _heights[e] / 2;
+      if (bottom > h + margin) break;
+      e++;
+    }
     if (s == _winStart && e == _winEnd) return;
     final oldStart = _winStart;
     final oldEnd = _winEnd;
