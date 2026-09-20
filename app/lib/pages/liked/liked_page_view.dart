@@ -22,6 +22,16 @@ extension _LikedPageView on _LikedPageState {
     ref.listen(qqMusicApiProvider.select((s) => s.isLoggedIn), (prev, next) {
       if (prev != next) _onAuthChanged(_LikedPageState._qqPlatform);
     });
+    ref.listen(nekoApiProvider.select((s) => s.isLoggedIn), (prev, next) {
+      if (prev != next) _onAuthChanged('neko');
+    });
+    final nekoEnabled = ref.watch(
+      appPrefsProvider.select((p) => p.nekoEnabled),
+    );
+    // 实验性音源关闭时，若当前停留在 NK 平台则退回 NT。
+    ref.listen(appPrefsProvider.select((p) => p.nekoEnabled), (prev, next) {
+      if (next == false && _platform == 'neko') _switchPlatform('netease');
+    });
 
     final neteaseStore = ref.watch(likedStoreProvider);
     final qqStore = ref.watch(qqLikedStoreProvider);
@@ -37,9 +47,11 @@ extension _LikedPageView on _LikedPageState {
     final subtitle = !_loggedIn
         ? (qq
               ? ''
-              : (_platform == 'kugou'
-                    ? l10n.pageLikedKugouLoginHint
-                    : l10n.pageLikedNeteaseLoginHint))
+              : switch (_platform) {
+                  'kugou' => l10n.pageLikedKugouLoginHint,
+                  'neko' => l10n.pageLikedNekoLoginHint,
+                  _ => l10n.pageLikedNeteaseLoginHint,
+                })
         : qq
         ? (qqTracks.isEmpty
               ? l10n.pageLikedQqHint
@@ -53,6 +65,7 @@ extension _LikedPageView on _LikedPageState {
           _LikedHeader(
             subtitle: subtitle,
             platform: _platform,
+            nekoEnabled: nekoEnabled,
             loggedIn: _loggedIn,
             qq: qq,
             qqLoaded: qqLoaded,
@@ -144,9 +157,11 @@ extension _LikedPageView on _LikedPageState {
       return StreamingEmptyState(
         icon: EtaIcons.heartOutline,
         title: l10n.pageLikedLoginTitle,
-        subtitle: _platform == 'kugou'
-            ? l10n.pageLikedKugouLoginDesc
-            : l10n.pageLikedNeteaseLoginDesc,
+        subtitle: switch (_platform) {
+          'kugou' => l10n.pageLikedKugouLoginDesc,
+          'neko' => l10n.pageLikedNekoLoginDesc,
+          _ => l10n.pageLikedNeteaseLoginDesc,
+        },
         buttonLabel: l10n.navHeaderQrLogin,
         buttonIcon: EtaIcons.qrcode,
         onButton: () async {
@@ -157,6 +172,8 @@ extension _LikedPageView on _LikedPageState {
               barrierDismissible: false,
               builder: (_) => const KgQrLoginDialog(),
             );
+          } else if (_platform == 'neko') {
+            await showNekoLoginDialog(context);
           } else {
             showNeteaseLoginDialog(context);
           }
@@ -186,9 +203,11 @@ extension _LikedPageView on _LikedPageState {
         theme: theme,
         scheme: scheme,
         title: l10n.pageLikedEmpty,
-        message: _platform == 'kugou'
-            ? l10n.pageLikedKugouEmptyHint
-            : l10n.pageLikedNeteaseEmptyHint,
+        message: switch (_platform) {
+          'kugou' => l10n.pageLikedKugouEmptyHint,
+          'neko' => l10n.pageLikedNekoEmptyHint,
+          _ => l10n.pageLikedNeteaseEmptyHint,
+        },
       );
     }
     return SongList(
@@ -208,6 +227,7 @@ class _LikedHeader extends StatelessWidget {
   const _LikedHeader({
     required this.subtitle,
     required this.platform,
+    required this.nekoEnabled,
     required this.loggedIn,
     required this.qq,
     required this.qqLoaded,
@@ -222,6 +242,7 @@ class _LikedHeader extends StatelessWidget {
 
   final String subtitle;
   final String platform;
+  final bool nekoEnabled;
   final bool loggedIn;
   final bool qq;
   final bool qqLoaded;
@@ -286,6 +307,7 @@ class _LikedHeader extends StatelessWidget {
               SSegmentedOption('netease', l10n.platformNetease),
               SSegmentedOption('kugou', l10n.platformKugou),
               SSegmentedOption('qqmusic', l10n.platformQQMusic),
+              if (nekoEnabled) SSegmentedOption('neko', l10n.platformNeko),
             ],
             selected: platform,
             onChanged: onSwitchPlatform,

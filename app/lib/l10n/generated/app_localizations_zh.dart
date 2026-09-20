@@ -780,6 +780,127 @@ class AppLocalizationsZh extends AppLocalizations {
   String get platformAll => '聚合';
 
   @override
+  String get menuDeleteFile => '删除文件';
+
+  @override
+  String get libraryDeleteFileTitle => '删除文件';
+
+  @override
+  String libraryDeleteFileMessage(Object name) {
+    return '将永久删除「$name」，且无法恢复。确定继续吗？';
+  }
+
+  @override
+  String get libraryDeleteFileConfirm => '删除';
+
+  @override
+  String get toastFileDeleted => '已删除文件';
+
+  @override
+  String get toastDeleteFileFailed => '删除文件失败';
+
+  @override
+  String get toastRevealFileFailed => '无法定位文件（系统文件管理器不可用）';
+
+  @override
+  String get settingsSectionThirdPartyService => '第三方服务致谢';
+
+  @override
+  String get settingsNekoAttribution => '本程序由 Neko 歌姬计划 API 提供技术支持';
+
+  @override
+  String get settingsNekoApiDocs => 'Neko 歌姬计划 API 文档';
+
+  @override
+  String get settingsSongCacheMemoryHint => '已开启「纯内存播放」，歌曲缓存不会写入磁盘';
+
+  @override
+  String get platformNeko => 'NK';
+
+  @override
+  String get settingsCatExperimentalSource => '实验性音源';
+
+  @override
+  String get settingsExperimentalSourceSubtitle => '第三方音源（默认关闭）';
+
+  @override
+  String get settingsNekoTitle => 'NekoMusic';
+
+  @override
+  String get settingsNekoNote => '第三方实验音源，非官方接入；仅支持登录，不提供注册与 VIP 开通，接口可能随时失效。';
+
+  @override
+  String get settingsNekoEnable => '启用 NekoMusic';
+
+  @override
+  String get settingsNekoEnableDesc => '在搜索、我喜欢、收藏中显示 NK（默认关闭）';
+
+  @override
+  String get settingsNekoLogin => '登录';
+
+  @override
+  String get settingsNekoLogout => '退出登录';
+
+  @override
+  String settingsNekoLoggedInAs(Object name) {
+    return '已登录：$name';
+  }
+
+  @override
+  String get settingsNekoNotLoggedIn => '未登录';
+
+  @override
+  String get nekoLoginTitle => '登录 NekoMusic';
+
+  @override
+  String get nekoLoginTabQr => '扫码登录';
+
+  @override
+  String get nekoLoginTabPassword => '账号密码';
+
+  @override
+  String get nekoLoginEmail => '邮箱';
+
+  @override
+  String get nekoLoginPassword => '密码';
+
+  @override
+  String get nekoLoginPasswordHint => '请输入密码';
+
+  @override
+  String get nekoLoginSubmit => '登录';
+
+  @override
+  String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
+
+  @override
+  String get nekoQrScanned => '已扫码，请在手机上确认';
+
+  @override
+  String get nekoQrCanceled => '已取消登录';
+
+  @override
+  String get nekoQrExpired => '二维码已过期，请重新生成';
+
+  @override
+  String get toastLoginRequiredNeko => '操作失败（请确认已登录 NK 账号）';
+
+  @override
+  String get pageLikedNekoLoginHint => '登录 NK 后查看我喜欢';
+
+  @override
+  String get pageLikedNekoLoginDesc => '登录 NekoMusic 后同步「我喜欢」收藏';
+
+  @override
+  String get pageLikedNekoEmptyHint => '还没有喜欢的歌曲，去搜索页点亮红心吧';
+
+  @override
+  String get pageFavNekoLoginDesc => '登录 NekoMusic 后查看歌单与收藏';
+
+  @override
+  String get pageFavNekoEmptyHint => '还没有歌单或收藏';
+
+  @override
   String toastPlayedAll(Object count) {
     return '已播放全部 $count 首';
   }
@@ -5362,6 +5483,127 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get platformAll => '聚合';
 
   @override
+  String get menuDeleteFile => '删除文件';
+
+  @override
+  String get libraryDeleteFileTitle => '删除文件';
+
+  @override
+  String libraryDeleteFileMessage(Object name) {
+    return '将永久删除「$name」，且无法恢复。确定继续吗？';
+  }
+
+  @override
+  String get libraryDeleteFileConfirm => '删除';
+
+  @override
+  String get toastFileDeleted => '已删除文件';
+
+  @override
+  String get toastDeleteFileFailed => '删除文件失败';
+
+  @override
+  String get toastRevealFileFailed => '无法定位文件（系统文件管理器不可用）';
+
+  @override
+  String get settingsSectionThirdPartyService => '第三方服务致谢';
+
+  @override
+  String get settingsNekoAttribution => '本程序由 Neko 歌姬计划 API 提供技术支持';
+
+  @override
+  String get settingsNekoApiDocs => 'Neko 歌姬计划 API 文档';
+
+  @override
+  String get settingsSongCacheMemoryHint => '已开启「纯内存播放」，歌曲缓存不会写入磁盘';
+
+  @override
+  String get platformNeko => 'NK';
+
+  @override
+  String get settingsCatExperimentalSource => '实验性音源';
+
+  @override
+  String get settingsExperimentalSourceSubtitle => '第三方音源（默认关闭）';
+
+  @override
+  String get settingsNekoTitle => 'NekoMusic';
+
+  @override
+  String get settingsNekoNote => '第三方实验音源，非官方接入；仅支持登录，不提供注册与 VIP 开通，接口可能随时失效。';
+
+  @override
+  String get settingsNekoEnable => '启用 NekoMusic';
+
+  @override
+  String get settingsNekoEnableDesc => '在搜索、我喜欢、收藏中显示 NK（默认关闭）';
+
+  @override
+  String get settingsNekoLogin => '登录';
+
+  @override
+  String get settingsNekoLogout => '退出登录';
+
+  @override
+  String settingsNekoLoggedInAs(Object name) {
+    return '已登录：$name';
+  }
+
+  @override
+  String get settingsNekoNotLoggedIn => '未登录';
+
+  @override
+  String get nekoLoginTitle => '登录 NekoMusic';
+
+  @override
+  String get nekoLoginTabQr => '扫码登录';
+
+  @override
+  String get nekoLoginTabPassword => '账号密码';
+
+  @override
+  String get nekoLoginEmail => '邮箱';
+
+  @override
+  String get nekoLoginPassword => '密码';
+
+  @override
+  String get nekoLoginPasswordHint => '请输入密码';
+
+  @override
+  String get nekoLoginSubmit => '登录';
+
+  @override
+  String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
+
+  @override
+  String get nekoQrScanned => '已扫码，请在手机上确认';
+
+  @override
+  String get nekoQrCanceled => '已取消登录';
+
+  @override
+  String get nekoQrExpired => '二维码已过期，请重新生成';
+
+  @override
+  String get toastLoginRequiredNeko => '操作失败（请确认已登录 NK 账号）';
+
+  @override
+  String get pageLikedNekoLoginHint => '登录 NK 后查看我喜欢';
+
+  @override
+  String get pageLikedNekoLoginDesc => '登录 NekoMusic 后同步「我喜欢」收藏';
+
+  @override
+  String get pageLikedNekoEmptyHint => '还没有喜欢的歌曲，去搜索页点亮红心吧';
+
+  @override
+  String get pageFavNekoLoginDesc => '登录 NekoMusic 后查看歌单与收藏';
+
+  @override
+  String get pageFavNekoEmptyHint => '还没有歌单或收藏';
+
+  @override
   String toastPlayedAll(Object count) {
     return '已播放全部 $count 首';
   }
@@ -9942,6 +10184,127 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get platformAll => '聚合';
+
+  @override
+  String get menuDeleteFile => '刪除檔案';
+
+  @override
+  String get libraryDeleteFileTitle => '刪除檔案';
+
+  @override
+  String libraryDeleteFileMessage(Object name) {
+    return '將永久刪除「$name」，且無法復原。確定繼續嗎？';
+  }
+
+  @override
+  String get libraryDeleteFileConfirm => '刪除';
+
+  @override
+  String get toastFileDeleted => '已刪除檔案';
+
+  @override
+  String get toastDeleteFileFailed => '刪除檔案失敗';
+
+  @override
+  String get toastRevealFileFailed => '無法定位檔案（系統檔案管理員不可用）';
+
+  @override
+  String get settingsSectionThirdPartyService => '第三方服務致謝';
+
+  @override
+  String get settingsNekoAttribution => '本程式由 Neko 歌姬計劃 API 提供技術支援';
+
+  @override
+  String get settingsNekoApiDocs => 'Neko 歌姬計劃 API 文件';
+
+  @override
+  String get settingsSongCacheMemoryHint => '已開啟「純記憶體播放」，歌曲快取不會寫入磁碟';
+
+  @override
+  String get platformNeko => 'NK';
+
+  @override
+  String get settingsCatExperimentalSource => '實驗性音源';
+
+  @override
+  String get settingsExperimentalSourceSubtitle => '第三方音源（預設關閉）';
+
+  @override
+  String get settingsNekoTitle => 'NekoMusic';
+
+  @override
+  String get settingsNekoNote => '第三方實驗音源，非官方接入；僅支援登入，不提供註冊與 VIP 開通，介面可能隨時失效。';
+
+  @override
+  String get settingsNekoEnable => '啟用 NekoMusic';
+
+  @override
+  String get settingsNekoEnableDesc => '在搜尋、我喜歡、收藏中顯示 NK（預設關閉）';
+
+  @override
+  String get settingsNekoLogin => '登入';
+
+  @override
+  String get settingsNekoLogout => '登出';
+
+  @override
+  String settingsNekoLoggedInAs(Object name) {
+    return '已登入：$name';
+  }
+
+  @override
+  String get settingsNekoNotLoggedIn => '未登入';
+
+  @override
+  String get nekoLoginTitle => '登入 NekoMusic';
+
+  @override
+  String get nekoLoginTabQr => '掃碼登入';
+
+  @override
+  String get nekoLoginTabPassword => '帳號密碼';
+
+  @override
+  String get nekoLoginEmail => '信箱';
+
+  @override
+  String get nekoLoginPassword => '密碼';
+
+  @override
+  String get nekoLoginPasswordHint => '請輸入密碼';
+
+  @override
+  String get nekoLoginSubmit => '登入';
+
+  @override
+  String get nekoLoginQrHint => '請使用 NekoMusic 手機 App 掃碼登入';
+
+  @override
+  String get nekoQrScanned => '已掃碼，請在手機上確認';
+
+  @override
+  String get nekoQrCanceled => '已取消登入';
+
+  @override
+  String get nekoQrExpired => '二維碼已過期，請重新產生';
+
+  @override
+  String get toastLoginRequiredNeko => '操作失敗（請確認已登入 NK 帳號）';
+
+  @override
+  String get pageLikedNekoLoginHint => '登入 NK 後查看我喜歡';
+
+  @override
+  String get pageLikedNekoLoginDesc => '登入 NekoMusic 後同步「我喜歡」收藏';
+
+  @override
+  String get pageLikedNekoEmptyHint => '還沒有喜歡的歌曲，去搜尋頁點亮紅心吧';
+
+  @override
+  String get pageFavNekoLoginDesc => '登入 NekoMusic 後查看歌單與收藏';
+
+  @override
+  String get pageFavNekoEmptyHint => '還沒有歌單或收藏';
 
   @override
   String toastPlayedAll(Object count) {

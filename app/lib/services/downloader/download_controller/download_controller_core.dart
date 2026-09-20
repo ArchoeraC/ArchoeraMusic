@@ -7,7 +7,8 @@ part of '../download_controller.dart';
 /// 支持「播放管线回退解析」的来源：
 /// - kugou/netease：Rust 自研解析，失败后回退；
 /// - qqmusic：Rust 无自研解析（enqueue 后即失败）→ 直接走 Dart 播放管线。
-const _downloadFallbackSources = {'kugou', 'netease', 'qqmusic'};
+/// 走 Dart 播放管线回退解析的来源（Rust 无自研解析的：QQ / 实验性 Neko）。
+const _downloadFallbackSources = {'kugou', 'netease', 'qqmusic', 'neko'};
 
 mixin _DownloadControllerCore on Notifier<DownloadState> {
   DownloaderEngine? get _engine;
@@ -340,7 +341,24 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
     final current = _taskById(taskId);
     if (current == null || current.status != 'failed') return;
 
-    final resolved = _buildPreResolved(track, url, quality);
+    // Neko 直传原文件、直链无扩展名：按文件头魔数嗅探真实容器（对齐官方
+    // PC 客户端），失败再回退 `fileFormat`，避免落盘扩展名错配。
+    String? extOverride;
+    if (track.source == 'neko') {
+      try {
+        extOverride = await ref.read(nekoApiProvider).probeAudioExtension(
+          track.id,
+        );
+      } catch (_) {
+        // 探测失败回退默认扩展名
+      }
+    }
+    final resolved = _buildPreResolved(
+      track,
+      url,
+      quality,
+      extOverride: extOverride,
+    );
     final code = engine.retryWithUrl(taskId, resolved);
     debugPrint('下载回退${code == 0 ? '已提交' : '提交失败(code=$code)'}: ${track.title}');
   }
@@ -349,9 +367,11 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
   Map<String, dynamic> _buildPreResolved(
     Track track,
     String url,
-    String quality,
-  ) {
+    String quality, {
+    String? extOverride,
+  }) {
     final ext =
+        extOverride ??
         _extFromUrl(url) ??
         ((quality == 'lossless' || quality == 'hi-res') ? 'flac' : 'mp3');
     final headers = <List<String>>[];

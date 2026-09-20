@@ -9,6 +9,8 @@
 // 不与 FFI 实现混用（bridgeLoaded 仅在真机带产物时为 true）。
 
 import 'package:archoera_music/services/platform/ffi_system_power.dart';
+import 'package:archoera_music/services/platform/platform_bindings.dart'
+    show aplErrUnsupported;
 import 'package:archoera_music/services/platform/platform_capabilities.dart';
 import 'package:archoera_music/services/platform/system_media.dart';
 import 'package:archoera_music/services/platform/system_power.dart';
@@ -32,6 +34,9 @@ void main() {
     expect(caps.powerInhibitAvailable, isFalse);
     expect(caps.mediaSessionAvailable, isFalse);
     expect(caps.windowStateAvailable, isFalse);
+    // 文件管理器定位能力：桥接缺失 → 不可用且返回 UNSUPPORTED（Dart 侧降级）。
+    expect(caps.revealPathAvailable, isFalse);
+    expect(caps.revealPath('/tmp'), aplErrUnsupported);
   });
 
   test('factory uses FFI implementation when capability present', () {

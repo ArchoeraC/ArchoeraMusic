@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/platform/platform_bindings.dart' show aplOk;
+import '../services/platform/platform_capabilities.dart';
 import '../services/scanner/library_store.dart';
 import '../services/scanner/local_track.dart';
 import '../../l10n/l10n.dart';

@@ -803,6 +803,136 @@ class AppLocalizationsEn extends AppLocalizations {
   String get platformAll => 'All';
 
   @override
+  String get menuDeleteFile => 'Delete file';
+
+  @override
+  String get libraryDeleteFileTitle => 'Delete file';
+
+  @override
+  String libraryDeleteFileMessage(Object name) {
+    return 'This permanently deletes \"$name\" and cannot be undone. Continue?';
+  }
+
+  @override
+  String get libraryDeleteFileConfirm => 'Delete';
+
+  @override
+  String get toastFileDeleted => 'File deleted';
+
+  @override
+  String get toastDeleteFileFailed => 'Failed to delete file';
+
+  @override
+  String get toastRevealFileFailed =>
+      'Couldn\'t reveal the file (no file manager available)';
+
+  @override
+  String get settingsSectionThirdPartyService => 'Third-party services';
+
+  @override
+  String get settingsNekoAttribution => 'Powered by Neko Music API';
+
+  @override
+  String get settingsNekoApiDocs => 'Neko Music API docs';
+
+  @override
+  String get settingsSongCacheMemoryHint =>
+      '\"In-memory playback\" is on — song cache won\'t be written to disk';
+
+  @override
+  String get platformNeko => 'NK';
+
+  @override
+  String get settingsCatExperimentalSource => 'Experimental sources';
+
+  @override
+  String get settingsExperimentalSourceSubtitle =>
+      'Third-party sources (off by default)';
+
+  @override
+  String get settingsNekoTitle => 'NekoMusic';
+
+  @override
+  String get settingsNekoNote =>
+      'Third-party experimental source, unofficial; login only — no sign-up or VIP purchase. May stop working at any time.';
+
+  @override
+  String get settingsNekoEnable => 'Enable NekoMusic';
+
+  @override
+  String get settingsNekoEnableDesc =>
+      'Show NK in search, liked and favorites (off by default)';
+
+  @override
+  String get settingsNekoLogin => 'Log in';
+
+  @override
+  String get settingsNekoLogout => 'Log out';
+
+  @override
+  String settingsNekoLoggedInAs(Object name) {
+    return 'Signed in as $name';
+  }
+
+  @override
+  String get settingsNekoNotLoggedIn => 'Not signed in';
+
+  @override
+  String get nekoLoginTitle => 'Sign in to NekoMusic';
+
+  @override
+  String get nekoLoginTabQr => 'QR code';
+
+  @override
+  String get nekoLoginTabPassword => 'Email & password';
+
+  @override
+  String get nekoLoginEmail => 'Email';
+
+  @override
+  String get nekoLoginPassword => 'Password';
+
+  @override
+  String get nekoLoginPasswordHint => 'Enter your password';
+
+  @override
+  String get nekoLoginSubmit => 'Sign in';
+
+  @override
+  String get nekoLoginQrHint => 'Scan with the NekoMusic mobile app to sign in';
+
+  @override
+  String get nekoQrScanned => 'Scanned, confirm on your phone';
+
+  @override
+  String get nekoQrCanceled => 'Sign-in canceled';
+
+  @override
+  String get nekoQrExpired => 'QR code expired, please regenerate';
+
+  @override
+  String get toastLoginRequiredNeko =>
+      'Operation failed (please make sure you are logged in to your NK account)';
+
+  @override
+  String get pageLikedNekoLoginHint => 'Sign in to NK to view your liked songs';
+
+  @override
+  String get pageLikedNekoLoginDesc =>
+      'Sign in to NekoMusic to sync your liked songs';
+
+  @override
+  String get pageLikedNekoEmptyHint =>
+      'No liked songs yet — tap the heart on the search page';
+
+  @override
+  String get pageFavNekoLoginDesc =>
+      'Sign in to NekoMusic to view playlists and favorites';
+
+  @override
+  String get pageFavNekoEmptyHint => 'No playlists or favorites yet';
+
+  @override
   String toastPlayedAll(Object count) {
     return 'Played all $count songs';
   }

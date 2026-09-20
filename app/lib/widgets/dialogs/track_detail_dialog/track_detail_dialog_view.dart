@@ -113,6 +113,7 @@ class _TrackDetailBody extends StatelessWidget {
   String _sourceLabel(AppLocalizations l10n, Track t) => switch (t.source) {
     'netease' => l10n.brandNetease,
     'kugou' => l10n.brandKugou,
+    'neko' => l10n.platformNeko,
     'local' => l10n.trackSourceLocal,
     'streaming' => l10n.trackSourceStreaming,
     _ => t.source,

@@ -204,6 +204,9 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
     final likedPath = LikedCacheStore.defaultDbPath();
     final prefs = ref.watch(appPrefsProvider);
     final notifier = ref.read(appPrefsProvider.notifier);
+    // 纯内存播放（不落盘）开启时，歌曲磁盘缓存不生效（见 _playTrackMeta）：
+    // 开关置灰并说明，避免「开了却没用」的困惑。
+    final memoryPlay = prefs.engineMemoryPlay;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -217,13 +220,16 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
                   ? EtaIcons.pin
                   : EtaIcons.pinOutline,
               title: l10n.settingsSongCache,
-              subtitle: prefs.songCacheEnabled
-                  ? l10n.settingsSongCacheOn
-                  : l10n.settingsSongCacheOff,
-              value: prefs.songCacheEnabled,
-              onChanged: notifier.setSongCacheEnabled,
+              subtitle: memoryPlay
+                  ? l10n.settingsSongCacheMemoryHint
+                  : (prefs.songCacheEnabled
+                        ? l10n.settingsSongCacheOn
+                        : l10n.settingsSongCacheOff),
+              value: memoryPlay ? false : prefs.songCacheEnabled,
+              enabled: !memoryPlay,
+              onChanged: memoryPlay ? null : notifier.setSongCacheEnabled,
             ),
-            if (prefs.songCacheEnabled)
+            if (prefs.songCacheEnabled && !memoryPlay)
               SettingSliderTile(
                 icon: EtaIcons.storageOutline,
                 title: l10n.settingsSongCacheLimitTitle,

@@ -150,6 +150,33 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
           ],
         ),
         const SizedBox(height: 12),
+        // ── 第三方服务致谢（Neko 歌姬计划 API 附加条款要求的署名与链接）──
+        SettingSection(
+          title: l10n.settingsSectionThirdPartyService,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Text(
+                l10n.settingsNekoAttribution,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.6,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+                ),
+              ),
+            ),
+            SettingTile(
+              icon: EtaIcons.link,
+              title: l10n.settingsNekoApiDocs,
+              subtitle: _kNekoApiDocsUrl,
+              trailing: SettingCopyButton(
+                value: _kNekoApiDocsUrl,
+                label: l10n.settingsNekoApiDocs,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         // ── 特别致谢（按类别分组列出使用 / 参考的开源项目；点条目复制链接）──
         SettingSection(
           title: l10n.settingsSectionThanks,
@@ -255,6 +282,10 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
   /// 项目 GitHub 仓库地址（仅展示 / 复制，不打开链接）。
   static const String _kRepoUrl =
       'https://github.com/BetaStudio2/ArchoeraMusic';
+
+  /// Neko 歌姬计划 API 文档（其附加条款要求的原始链接）。
+  static const String _kNekoApiDocsUrl =
+      'https://github.com/FantasyNetworkCN/NekoMusicDocs';
 
   Widget _envRow(String label, String value) {
     final scheme = Theme.of(context).colorScheme;
@@ -388,6 +419,12 @@ const List<_ThanksItem> _kThanksDesign = [
   ),
   _ThanksItem('MoeKoeMusic', '', 'https://github.com/MoeKoeMusic/MoeKoeMusic'),
   _ThanksItem('Mineradio', '', 'https://github.com/XxHuberrr/Mineradio'),
+  // 实验性第三方音源（Neko 歌姬计划）：仅经其公开 HTTP API 互操作，未并入其源代码。
+  _ThanksItem(
+    'NekoMusic (Neko歌姬计划)',
+    'GPL-3.0 / AGPL-3.0',
+    'https://github.com/FantasyNetworkCN/NekoMusicDocs',
+  ),
   _ThanksItem(
     'AMLL (Apple Music-like Lyrics)',
     'MIT',

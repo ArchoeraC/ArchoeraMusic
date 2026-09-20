@@ -27,7 +27,10 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     try {
       var playUrl = url;
       final prefs = ref.read(appPrefsProvider);
-      if (prefs.songCacheEnabled &&
+      // 纯内存播放（不落盘）优先：开启时不读也不写歌曲磁盘缓存——否则与
+      // 「不落盘」语义冲突（缓存读命中会走本地文件、未命中会后台落盘）。
+      if (!prefs.engineMemoryPlay &&
+          prefs.songCacheEnabled &&
           url.isNotEmpty &&
           (track.source == 'kugou' || track.source == 'netease')) {
         final id = track.source == 'kugou'
@@ -91,21 +94,28 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     final idx = state.queueIndex;
     if (idx < 0 || idx >= q.length) return;
     final track = q[idx];
+    // 实验性音源 Neko 元数据不规范：播放前用其它音源补充/重写**展示元数据**
+    // （标题/歌手/专辑/封面/时长；不改 id 与 source，播放仍走 Neko 直链）。
+    // 结果按曲目 id 缓存，仅首次播放多一次搜索请求。失败静默用原元数据。
+    var playTrack = track;
+    if (track.source == 'neko' && ref.read(appPrefsProvider).nekoEnabled) {
+      playTrack = await ref.read(nekoMetadataEnricherProvider).enrich(track);
+    }
     final String? url;
     try {
-      url = await _resolveSource(track, quality: state.quality);
+      url = await _resolveSource(playTrack, quality: state.quality);
     } catch (e) {
-      _log('解析播放源异常: ${track.title}: $e');
-      return _handleTrackFailure(track, '解析播放源异常');
+      _log('解析播放源异常: ${playTrack.title}: $e');
+      return _handleTrackFailure(playTrack, '解析播放源异常');
     }
     if (url == null || url.isEmpty) {
-      _log('无法解析播放源: ${track.title}');
-      await _handleTrackFailure(track, '无可用播放源');
+      _log('无法解析播放源: ${playTrack.title}');
+      await _handleTrackFailure(playTrack, '无可用播放源');
       return;
     }
-    final ok = await _playTrackMeta(url, track);
+    final ok = await _playTrackMeta(url, playTrack);
     if (!ok) {
-      await _handleTrackFailure(track, '播放加载失败');
+      await _handleTrackFailure(playTrack, '播放加载失败');
     }
   }
 

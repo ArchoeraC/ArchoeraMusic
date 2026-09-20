@@ -168,6 +168,12 @@ class LibraryNotifier extends Notifier<LibraryState>
   /// 从曲库移除曲目（仅删 library.db 记录，不删源文件；命中返回 true）。
   Future<bool> removeTrackByPath(String path) => _removeTrackByPath(path);
 
+  /// 删除曲目文件（磁盘）并从曲库移除。
+  ///
+  /// 文件删除失败时**不动曲库**（避免「曲库移除了但文件还在」的误导）；
+  /// 文件已不存在视为删除成功（仅清理曲库记录）。
+  Future<bool> deleteTrackFile(String path) => _deleteTrackFile(path);
+
   /// 添加扫描目录（已存在 / 非目录时忽略，返回是否成功）。
   bool addScanDir(String dir) => _addScanDir(dir);
 

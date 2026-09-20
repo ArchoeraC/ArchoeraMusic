@@ -785,6 +785,129 @@ class AppLocalizationsJa extends AppLocalizations {
   String get platformAll => 'すべて';
 
   @override
+  String get menuDeleteFile => 'ファイルを削除';
+
+  @override
+  String get libraryDeleteFileTitle => 'ファイルを削除';
+
+  @override
+  String libraryDeleteFileMessage(Object name) {
+    return '「$name」を完全に削除します。元に戻せません。続行しますか？';
+  }
+
+  @override
+  String get libraryDeleteFileConfirm => '削除';
+
+  @override
+  String get toastFileDeleted => 'ファイルを削除しました';
+
+  @override
+  String get toastDeleteFileFailed => 'ファイルの削除に失敗しました';
+
+  @override
+  String get toastRevealFileFailed => 'ファイルを表示できません（ファイルマネージャーが利用できません）';
+
+  @override
+  String get settingsSectionThirdPartyService => 'サードパーティサービス';
+
+  @override
+  String get settingsNekoAttribution => '本アプリは Neko Music API によって提供されています';
+
+  @override
+  String get settingsNekoApiDocs => 'Neko Music API ドキュメント';
+
+  @override
+  String get settingsSongCacheMemoryHint =>
+      '「メモリ内再生」が有効なため、楽曲キャッシュはディスクに書き込まれません';
+
+  @override
+  String get platformNeko => 'NK';
+
+  @override
+  String get settingsCatExperimentalSource => '実験的音源';
+
+  @override
+  String get settingsExperimentalSourceSubtitle => 'サードパーティ音源（既定でオフ）';
+
+  @override
+  String get settingsNekoTitle => 'NekoMusic';
+
+  @override
+  String get settingsNekoNote =>
+      'サードパーティの実験的音源です（非公式）。ログインのみ対応で、新規登録や VIP 購入はありません。予告なく利用できなくなる場合があります。';
+
+  @override
+  String get settingsNekoEnable => 'NekoMusic を有効化';
+
+  @override
+  String get settingsNekoEnableDesc => '検索・お気に入り・ライブラリに NK を表示（既定でオフ）';
+
+  @override
+  String get settingsNekoLogin => 'ログイン';
+
+  @override
+  String get settingsNekoLogout => 'ログアウト';
+
+  @override
+  String settingsNekoLoggedInAs(Object name) {
+    return 'ログイン中：$name';
+  }
+
+  @override
+  String get settingsNekoNotLoggedIn => '未ログイン';
+
+  @override
+  String get nekoLoginTitle => 'NekoMusic にログイン';
+
+  @override
+  String get nekoLoginTabQr => '二次元コード';
+
+  @override
+  String get nekoLoginTabPassword => 'メールとパスワード';
+
+  @override
+  String get nekoLoginEmail => 'メール';
+
+  @override
+  String get nekoLoginPassword => 'パスワード';
+
+  @override
+  String get nekoLoginPasswordHint => 'パスワードを入力';
+
+  @override
+  String get nekoLoginSubmit => 'ログイン';
+
+  @override
+  String get nekoLoginQrHint => 'NekoMusic アプリでスキャンしてログイン';
+
+  @override
+  String get nekoQrScanned => 'スキャン済み。スマホで確認してください';
+
+  @override
+  String get nekoQrCanceled => 'ログインをキャンセルしました';
+
+  @override
+  String get nekoQrExpired => '二次元コードの有効期限が切れました。再生成してください';
+
+  @override
+  String get toastLoginRequiredNeko => '操作に失敗しました（NK アカウントにログインしているか確認してください）';
+
+  @override
+  String get pageLikedNekoLoginHint => 'NK にログインしてお気に入りを表示';
+
+  @override
+  String get pageLikedNekoLoginDesc => 'NekoMusic にログインしてお気に入りを同期';
+
+  @override
+  String get pageLikedNekoEmptyHint => 'お気に入りの曲はまだありません。検索ページでハートをタップ';
+
+  @override
+  String get pageFavNekoLoginDesc => 'NekoMusic にログインしてプレイリストとお気に入りを表示';
+
+  @override
+  String get pageFavNekoEmptyHint => 'プレイリストやお気に入りはまだありません';
+
+  @override
   String toastPlayedAll(Object count) {
     return '$count 曲をすべて再生しました';
   }

@@ -18,6 +18,8 @@ extension _TrackListDialogActions on _TrackListDialogState {
         url = await ref.read(neteaseApiProvider).resolvePlayUrl(track.id);
       } else if (track.source == 'qqmusic') {
         url = await ref.read(qqMusicApiProvider).resolvePlayUrl(track);
+      } else if (track.source == 'neko') {
+        url = await ref.read(nekoApiProvider).resolvePlayUrl(track);
       } else {
         url = null;
       }

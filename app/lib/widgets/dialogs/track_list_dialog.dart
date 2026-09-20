@@ -191,6 +191,62 @@ Future<void> showNeteaseArtistDialog(BuildContext context, CoverItem artist) {
   );
 }
 
+/// Neko曲目列表弹窗（歌手单曲 / 我喜欢 复用）。
+Future<void> showNekoTracksDialog(
+  BuildContext context, {
+  required String title,
+  String? subtitle,
+  String? cover,
+  required Future<List<Track>> Function(WidgetRef ref) loadTracks,
+}) => showKugouTracksDialog(
+  context,
+  title: title,
+  subtitle: subtitle,
+  cover: cover,
+  loadTracks: loadTracks,
+);
+
+/// Neko公开歌单详情弹窗（搜索结果的歌单）。
+Future<void> showNekoPlaylistDetailDialog(
+  BuildContext context,
+  CoverItem playlist,
+) {
+  return showNekoTracksDialog(
+    context,
+    title: playlist.title,
+    subtitle: playlist.subtitle,
+    cover: playlist.cover,
+    loadTracks: (ref) =>
+        ref.read(nekoApiProvider).playlistTracks(playlist.id),
+  );
+}
+
+/// Neko收藏歌单详情弹窗（收藏页「收藏的歌单」）。
+Future<void> showNekoFavoritePlaylistDialog(
+  BuildContext context,
+  CoverItem playlist,
+) {
+  return showNekoTracksDialog(
+    context,
+    title: playlist.title,
+    subtitle: playlist.subtitle,
+    cover: playlist.cover,
+    loadTracks: (ref) =>
+        ref.read(nekoApiProvider).favoritePlaylistTracks(playlist.id),
+  );
+}
+
+/// Neko歌手详情弹窗（歌手全部曲目）。
+Future<void> showNekoArtistDialog(BuildContext context, CoverItem artist) {
+  return showNekoTracksDialog(
+    context,
+    title: artist.title,
+    subtitle: context.l10n.trackListArtistHotSongs,
+    cover: artist.cover,
+    loadTracks: (ref) => ref.read(nekoApiProvider).artistTracks(artist.id),
+  );
+}
+
 /// 打开每日推荐弹窗（需登录；未登录返回空列表由 UI 提示）。
 Future<void> showDailyRecommendDialog(BuildContext context) {
   final l10n = context.l10n;

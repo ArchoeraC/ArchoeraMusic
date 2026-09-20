@@ -1,0 +1,241 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+// 实验性音源 NekoMusic（`neko`）纯函数 / 模型单测：服务器地址归一化、
+// Track 映射、用户会话往返、二维码状态解析。
+
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:archoera_music/apis/neko/neko_client.dart';
+import 'package:archoera_music/services/neko/neko_audio.dart';
+import 'package:archoera_music/services/neko/neko_lyrics.dart';
+import 'package:archoera_music/services/neko/neko_types.dart';
+import 'package:archoera_music/services/netease/track.dart';
+
+void main() {
+  group('normalizeNekoBaseUrl', () {
+    test('空值 / 空白回退默认站点', () {
+      expect(normalizeNekoBaseUrl(null), kDefaultNekoBaseUrl);
+      expect(normalizeNekoBaseUrl('   '), kDefaultNekoBaseUrl);
+    });
+
+    test('补 scheme 并去除尾斜杠', () {
+      expect(
+        normalizeNekoBaseUrl('music.cnmsb.xin/'),
+        'https://music.cnmsb.xin',
+      );
+      expect(
+        normalizeNekoBaseUrl('http://127.0.0.1:65535//'),
+        'http://127.0.0.1:65535',
+      );
+    });
+
+    test('保留既有 scheme', () {
+      expect(
+        normalizeNekoBaseUrl('https://a.b/c'),
+        'https://a.b/c',
+      );
+    });
+  });
+
+  group('NekoClient.resolveUrl', () {
+    test('相对路径拼接为绝对地址；绝对地址原样返回', () {
+      final c = NekoClient(baseUrl: 'https://x.y');
+      expect(c.resolveUrl('/api/music/cover/1'), 'https://x.y/api/music/cover/1');
+      expect(c.resolveUrl('http://a/b'), 'http://a/b');
+    });
+  });
+
+  group('Track.fromNekoSong', () {
+    test('字段映射 + 封面直链 + 秒转毫秒', () {
+      final t = Track.fromNekoSong(
+        {
+          'id': 42,
+          'title': '晴天',
+          'artist': '周杰伦',
+          'album': '叶惠美',
+          'duration': 269,
+          'lrc': true,
+        },
+        baseUrl: 'https://music.cnmsb.xin',
+      );
+      expect(t.source, 'neko');
+      expect(t.id, '42');
+      expect(t.title, '晴天');
+      expect(t.artistNames, '周杰伦');
+      expect(t.album?.name, '叶惠美');
+      expect(t.album?.cover, 'https://music.cnmsb.xin/api/music/cover/42');
+      expect(t.duration, 269000);
+      expect(t.cover, 'https://music.cnmsb.xin/api/music/cover/42');
+    });
+
+    test('多歌手分隔 / 无 baseUrl 不产生封面 / 缺字段安全默认', () {
+      final t = Track.fromNekoSong({
+        'id': 1,
+        'title': 'x',
+        'artist': 'A、B/C & D',
+      });
+      expect(t.artists.map((a) => a.name).toList(), ['A', 'B', 'C', 'D']);
+      expect(t.cover, isNull);
+      expect(t.album, isNull);
+      expect(t.duration, 0);
+    });
+  });
+
+  group('NekoUser 会话往返', () {
+    test('toSessionMap → fromSessionMap 保持字段', () {
+      const u = NekoUser(
+        id: '7',
+        username: '喵喵',
+        email: 'a@b.c',
+        isVip: true,
+        vipExpiresAt: '2027-01-01T00:00:00',
+      );
+      final back = NekoUser.fromSessionMap(u.toSessionMap());
+      expect(back.id, '7');
+      expect(back.username, '喵喵');
+      expect(back.email, 'a@b.c');
+      expect(back.isVip, isTrue);
+      expect(back.vipExpiresAt, '2027-01-01T00:00:00');
+      expect(back.displayName, '喵喵');
+    });
+
+    test('非会员 / 无 vipExpiresAt 往返', () {
+      const u = NekoUser(id: '1', username: '', email: 'x@y.z');
+      final map = u.toSessionMap();
+      expect(map.containsKey('vipExpiresAt'), isFalse);
+      final back = NekoUser.fromSessionMap(map);
+      expect(back.isVip, isFalse);
+      expect(back.vipExpiresAt, isNull);
+      // 昵称为空时回退邮箱
+      expect(back.displayName, 'x@y.z');
+    });
+  });
+
+  group('sniffAudioExtension（直传文件头嗅探）', () {
+    test('fLaC → flac', () {
+      expect(sniffAudioExtension([0x66, 0x4C, 0x61, 0x43, 0, 0, 0, 34]), 'flac');
+    });
+
+    test('RIFF....WAVE → wav', () {
+      final head = [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45];
+      expect(sniffAudioExtension(head), 'wav');
+    });
+
+    test('OggS → ogg', () {
+      expect(sniffAudioExtension([0x4F, 0x67, 0x67, 0x53, 0, 2]), 'ogg');
+    });
+
+    test('ID3 → mp3；MPEG 帧同步 0xFFEx → mp3', () {
+      expect(sniffAudioExtension([0x49, 0x44, 0x33, 0x04]), 'mp3');
+      expect(sniffAudioExtension([0xFF, 0xFB, 0x90, 0x00]), 'mp3');
+    });
+
+    test('RIFF 但非 WAVE / 未知 → null', () {
+      expect(
+        sniffAudioExtension([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x41, 0x56, 0x49, 0x20]),
+        isNull,
+      );
+      expect(sniffAudioExtension([0x00, 0x01, 0x02, 0x03]), isNull);
+      expect(sniffAudioExtension(const []), isNull);
+    });
+  });
+
+  group('parseNekoLyrics（非标准 LRC 归一化）', () {
+    test('正文带时间戳 + 下一行 {"译文"}：译文独立成行、同时间戳', () {
+      final p = parseNekoLyrics(
+        '[00:12.34]晴天\n'
+        '{"Sunny day"}\n'
+        '[00:15.00]故事的小黄花\n'
+        "{'The little yellow flower of the story'}\n",
+      );
+      expect(p.content, '[00:12.34]晴天\n[00:15.00]故事的小黄花');
+      expect(
+        p.translation,
+        '[00:12.34]Sunny day\n'
+        '[00:15.00]The little yellow flower of the story',
+      );
+    });
+
+    test('整行 [mm:ss.xx]{"译文"}（译文自带时间戳）也归一化', () {
+      final p = parseNekoLyrics(
+        '[00:01.00]原文一\n'
+        '[00:01.00]{"译文一"}\n'
+        '[00:02.00]原文二\n'
+        '{"译文二"}\n',
+      );
+      expect(p.content, '[00:01.00]原文一\n[00:02.00]原文二');
+      expect(p.translation, '[00:01.00]译文一\n[00:02.00]译文二');
+    });
+
+    test('一行多时间戳：正文保留原样，译文按全部时间戳展开', () {
+      final p = parseNekoLyrics(
+        '[00:01.00][00:05.00]副歌\n'
+        '{"Chorus"}\n',
+      );
+      expect(p.content, '[00:01.00][00:05.00]副歌');
+      expect(p.translation, '[00:01.00]Chorus\n[00:05.00]Chorus');
+    });
+
+    test('# 注释 / 元信息行被忽略；无译文时 translation 为 null', () {
+      final p = parseNekoLyrics(
+        '# 本歌词由 XX 提供\n'
+        '[ar:某歌手]\n'
+        '[00:01.00]只有正文\n',
+      );
+      expect(p.content, '[00:01.00]只有正文');
+      expect(p.translation, isNull);
+    });
+
+    test('孤立 {"译文"}（前面无正文）不产生悬空译文', () {
+      final p = parseNekoLyrics('{"没有归属"}\n[00:01.00]正文\n');
+      expect(p.content, '[00:01.00]正文');
+      expect(p.translation, isNull);
+    });
+
+    test('大括号但非引号包裹的正文行：视为译文（宽松兼容）', () {
+      final p = parseNekoLyrics(
+        '[00:01.00]正文\n'
+        '{中文翻译}\n',
+      );
+      expect(p.translation, '[00:01.00]中文翻译');
+    });
+  });
+
+  group('NekoQrStatus', () {
+    test('confirmed 带 token 与用户', () {
+      final s = NekoQrStatus.fromJson({
+        'status': 'confirmed',
+        'token': 'abc123',
+        'user': {'id': 1, 'username': 'n'},
+      });
+      expect(s.state, NekoQrState.confirmed);
+      expect(s.token, 'abc123');
+      expect(s.user?.username, 'n');
+    });
+
+    test('各状态映射 + 未知回退', () {
+      expect(
+        NekoQrStatus.fromJson({'status': 'pending'}).state,
+        NekoQrState.pending,
+      );
+      expect(
+        NekoQrStatus.fromJson({'status': 'scanned'}).state,
+        NekoQrState.scanned,
+      );
+      expect(
+        NekoQrStatus.fromJson({'status': 'canceled'}).state,
+        NekoQrState.canceled,
+      );
+      expect(
+        NekoQrStatus.fromJson({'status': 'expired'}).state,
+        NekoQrState.expired,
+      );
+      expect(
+        NekoQrStatus.fromJson({'status': '??? '}).state,
+        NekoQrState.unknown,
+      );
+    });
+  });
+}

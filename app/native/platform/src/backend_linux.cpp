@@ -1137,7 +1137,8 @@ bool notifyViaDbus(const char* title, const char* body) {
 uint32_t caps() {
     uint32_t c = CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_MEDIA_SESSION |
                  CAP_MEDIA_SEEK | CAP_MEDIA_ARTWORK | CAP_APP_INSTANCE |
-                 CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME | CAP_DEEP_LINK;
+                 CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME | CAP_DEEP_LINK |
+                 CAP_REVEAL_PATH;
     const bool hasDisplay = std::getenv("WAYLAND_DISPLAY") != nullptr ||
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
@@ -1509,6 +1510,142 @@ int32_t systemThemeSetEvents(bool on) {
 int32_t notify(const char* title, const char* body) {
     // 仅走 D-Bus org.freedesktop.Notifications（零子进程）。
     return notifyViaDbus(title, body) ? OK : ERR_BACKEND;
+}
+
+// ── 文件管理器定位（零子进程：FileManager1 D-Bus + GIO 回退）─────────
+namespace {
+
+// GIO（dlopen）：path → file:// URI（含百分号转义）与「用默认应用打开」回退。
+struct GioReveal {
+    void* handle = nullptr;
+    void* (*file_new_for_path)(const char*) = nullptr;
+    char* (*file_get_uri)(void*) = nullptr;
+    void (*object_unref)(void*) = nullptr;
+    void (*gfree)(void*) = nullptr;
+    int (*launch_default_for_uri)(const char*, void*, void**) = nullptr;
+    void (*error_free)(void*) = nullptr;
+
+    bool ok() const {
+        return handle != nullptr && file_new_for_path != nullptr &&
+               file_get_uri != nullptr && launch_default_for_uri != nullptr;
+    }
+};
+
+const GioReveal& gioReveal() {
+    static const GioReveal api = [] {
+        GioReveal a;
+        a.handle = dlopen("libgio-2.0.so.0", RTLD_NOW);
+        if (a.handle == nullptr) a.handle = dlopen(nullptr, RTLD_NOW);
+        if (a.handle != nullptr) {
+            a.file_new_for_path =
+                reinterpret_cast<decltype(a.file_new_for_path)>(
+                    dlsym(a.handle, "g_file_new_for_path"));
+            a.file_get_uri = reinterpret_cast<decltype(a.file_get_uri)>(
+                dlsym(a.handle, "g_file_get_uri"));
+            a.object_unref = reinterpret_cast<decltype(a.object_unref)>(
+                dlsym(a.handle, "g_object_unref"));
+            a.gfree = reinterpret_cast<decltype(a.gfree)>(
+                dlsym(a.handle, "g_free"));
+            a.launch_default_for_uri =
+                reinterpret_cast<decltype(a.launch_default_for_uri)>(
+                    dlsym(a.handle, "g_app_info_launch_default_for_uri"));
+            a.error_free = reinterpret_cast<decltype(a.error_free)>(
+                dlsym(a.handle, "g_error_free"));
+        }
+        return a;
+    }();
+    return api;
+}
+
+std::string pathToUri(const std::string& path) {
+    const auto& gio = gioReveal();
+    if (!gio.ok()) return std::string();
+    void* f = gio.file_new_for_path(path.c_str());
+    if (f == nullptr) return std::string();
+    char* uri = gio.file_get_uri(f);
+    std::string out = uri != nullptr ? uri : std::string();
+    if (uri != nullptr && gio.gfree != nullptr) gio.gfree(uri);
+    if (gio.object_unref != nullptr) gio.object_unref(f);
+    return out;
+}
+
+std::string parentDir(const std::string& path) {
+    const auto pos = path.find_last_of('/');
+    if (pos == std::string::npos) return path;
+    if (pos == 0) return std::string("/");
+    return path.substr(0, pos);
+}
+
+bool gioOpenDir(const std::string& dir) {
+    const auto& gio = gioReveal();
+    if (!gio.ok()) return false;
+    const std::string uri = pathToUri(dir);
+    if (uri.empty()) return false;
+    void* err = nullptr;
+    const int ok = gio.launch_default_for_uri(uri.c_str(), nullptr, &err);
+    if (err != nullptr && gio.error_free != nullptr) gio.error_free(err);
+    return ok != 0;
+}
+
+// org.freedesktop.FileManager1.ShowItems(as uris, s startup_id)
+bool fileManagerShowItems(const std::string& uri) {
+    DBusError err;
+    dbus_error_init(&err);
+    DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
+    if (c == nullptr) {
+        dbus_error_free(&err);
+        return false;
+    }
+    DBusMessage* msg = dbus_message_new_method_call(
+        "org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
+        "org.freedesktop.FileManager1", "ShowItems");
+    bool ok = false;
+    if (msg != nullptr) {
+        // ShowItems(as uris, s startup_id)：数组用迭代器构造（append_args 的
+        // 数组变参极易写错指针层级，实测会段错误）。
+        DBusMessageIter it;
+        DBusMessageIter arr;
+        dbus_message_iter_init_append(msg, &it);
+        const char* u = uri.c_str();
+        if (dbus_message_iter_open_container(
+                &it, DBUS_TYPE_ARRAY, DBUS_TYPE_STRING_AS_STRING, &arr) &&
+            dbus_message_iter_append_basic(&arr, DBUS_TYPE_STRING, &u) &&
+            dbus_message_iter_close_container(&it, &arr)) {
+            const char* startup = "";
+            if (dbus_message_iter_append_basic(&it, DBUS_TYPE_STRING,
+                                               &startup)) {
+                DBusError e2;
+                dbus_error_init(&e2);
+                DBusMessage* reply =
+                    dbus_connection_send_with_reply_and_block(c, msg, 3000,
+                                                              &e2);
+                ok = reply != nullptr;
+                if (reply != nullptr) dbus_message_unref(reply);
+                dbus_error_free(&e2);
+            }
+        }
+        dbus_message_unref(msg);
+    }
+    dbus_error_free(&err);
+    dbus_connection_unref(c);
+    return ok;
+}
+
+}  // namespace
+
+int32_t revealPath(const char* path) {
+    if (path == nullptr || *path == '\0') return ERR_STATE;
+    struct stat st;
+    if (::stat(path, &st) != 0) return ERR_BACKEND;  // 路径不存在
+    const std::string p(path);
+    const bool isDir = S_ISDIR(st.st_mode) != 0;
+    // 优先 FileManager1 定位（文件会被选中；目录被打开）。
+    const std::string uri = pathToUri(p);
+    if (!uri.empty() && fileManagerShowItems(uri)) return OK;
+    // 回退：GIO 用默认应用打开所在目录（文件）或本目录（目录）。
+    const std::string dir = isDir ? p : parentDir(p);
+    if (!dir.empty() && gioOpenDir(dir)) return OK;
+    return ERR_BACKEND;
 }
 
 }  // namespace archoera

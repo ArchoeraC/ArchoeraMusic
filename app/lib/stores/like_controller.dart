@@ -19,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/netease/track.dart';
 import '../services/qqmusic/qq_liked_store.dart';
 import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
+import 'app_prefs.dart';
 import 'providers.dart';
 
 class LikeController extends ChangeNotifier {
@@ -31,6 +32,9 @@ class LikeController extends ChangeNotifier {
 
   /// QQ 红心 songmid 集合（本机 + 登录后并入在线；见 [QqLikedStore]）。
   final Set<String> _qqmusicIds = {};
+
+  /// Neko 红心 id 集合（实验性音源；在线权威，未登录/未启用为空）。
+  final Set<String> _nekoIds = {};
 
   bool _syncing = false;
 
@@ -97,14 +101,18 @@ class LikeController extends ChangeNotifier {
     if (track.source == 'qqmusic') {
       return _qqmusicIds.contains(_qqKey(track));
     }
+    if (track.source == 'neko') {
+      return _nekoIds.contains(track.id);
+    }
     return _neteaseIds.contains(track.id);
   }
 
   /// 平台已喜欢 id 集合（'kugou' → KG hash；'qqmusic' → songmid；
-  /// 其余 → NT id；SongList 渲染用）。
+  /// 'neko' → Neko id；其余 → NT id；SongList 渲染用）。
   Set<String> idsFor(String source) {
     if (source == 'kugou') return _kugouIds;
     if (source == 'qqmusic') return _qqmusicIds;
+    if (source == 'neko') return _nekoIds;
     return _neteaseIds;
   }
 
@@ -119,7 +127,9 @@ class LikeController extends ChangeNotifier {
   /// 仅当调用方确在展示该平台「我喜欢的」权威列表时才能调用——绝不能把普通
   /// 歌单当收藏集合传进来（会把红心集合整体清空）。对账后 notify UI 重绘。
   void reconcileFromAuthoritative(String platform, List<Track> tracks) {
-    if (platform != 'netease' && platform != 'kugou') return;
+    if (platform != 'netease' && platform != 'kugou' && platform != 'neko') {
+      return;
+    }
     final serverKeys = <String>{};
     for (final t in tracks) {
       if (t.source != platform) continue;
@@ -245,6 +255,23 @@ class LikeController extends ChangeNotifier {
       // 本机库加载失败：保留内存态（下次 sync 重试）
     }
 
+    // Neko（实验性音源，默认关）：仅启用且登录时拉在线收藏 id；
+    // 未启用或未登录即清空（红心集合与服务器保持一致）。
+    if (_ref.read(appPrefsProvider).nekoEnabled) {
+      final neko = _ref.read(nekoApiProvider);
+      if (neko.isLoggedIn) {
+        try {
+          _alignToServer('neko', await neko.likedIds());
+        } catch (_) {
+          // 网络失败保留旧集合
+        }
+      } else {
+        _nekoIds.clear();
+      }
+    } else {
+      _nekoIds.clear();
+    }
+
     _loaded = true;
     notifyListeners();
   }
@@ -305,6 +332,26 @@ class LikeController extends ChangeNotifier {
 
     if (track.source == 'qqmusic') {
       return _toggleQq(track);
+    }
+
+    if (track.source == 'neko') {
+      // Neko：在线权威（需登录）。乐观更新 + 失败回滚。
+      _markDirty('neko', track.id);
+      _nekoIds
+        ..remove(track.id)
+        ..addAll(target ? {track.id} : const {});
+      notifyListeners();
+      try {
+        await _ref.read(nekoApiProvider).like(track.id, like: target);
+        return true;
+      } catch (_) {
+        _clearDirty('neko', track.id);
+        _nekoIds
+          ..remove(track.id)
+          ..addAll(wasLiked ? {track.id} : const {});
+        notifyListeners();
+        return false;
+      }
     }
 
     // NT
@@ -390,6 +437,7 @@ class LikeController extends ChangeNotifier {
   void reset() {
     _neteaseIds.clear();
     _kugouIds.clear();
+    _nekoIds.clear();
     // 登出后旧账号的缓冲标记不再适用（对账由重登后新一轮 sync 重算）
     _dirtyKeys.clear();
     // 注：QQ 红心以本机库为主源，登出 QQ 不清空 _qqmusicIds（sync 会按

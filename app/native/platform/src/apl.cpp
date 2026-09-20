@@ -130,4 +130,10 @@ int32_t apl_notify(const char* title, const char* body) {
     return archoera::notify(title, body != nullptr ? body : "");
 }
 
+int32_t apl_reveal_path(const char* path) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (path == nullptr || *path == '\0') return archoera::ERR_STATE;
+    return archoera::revealPath(path);
+}
+
 }  // extern "C"

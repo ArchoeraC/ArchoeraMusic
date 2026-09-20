@@ -31,8 +31,10 @@ import '../services/shortcuts/shortcut_action.dart';
 import '../services/shortcuts/shortcut_binding.dart';
 import '../stores/app_prefs.dart';
 import '../stores/data_dir.dart';
+import '../stores/providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/toast.dart';
+import '../widgets/dialogs/neko_login_dialog.dart';
 import '../widgets/dialogs/s_dialog.dart';
 import '../widgets/player/s_controls.dart';
 import 'settings_color_picker.dart';
@@ -49,6 +51,7 @@ part 'settings_sections/settings_sections_render.dart';
 part 'settings_sections/settings_sections_download.dart';
 part 'settings_sections/settings_sections_scrape.dart';
 part 'settings_sections/settings_sections_storage.dart';
+part 'settings_sections/settings_sections_experimental_source.dart';
 part 'settings_sections/settings_sections_about.dart';
 part 'settings_sections/settings_sections_developer.dart';
 
