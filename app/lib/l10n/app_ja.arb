@@ -1296,6 +1296,7 @@
   "settingsAmllBlurNote": "自動はフレームレートに合わせて調整します（まず 1 レイヤーでぼかし、重ければ自動でオフ）。",
   "settingsAmllBlurAuto": "自動",
   "settingsAmllBlurFast": "軽量",
+  "settingsAmllBlurLite": "軽量（近似）",
   "settingsAmllBlurQuality": "高画質",
   "settingsAmllBlurOff": "オフ",
   "settingsAmllSpring": "スクロールのバネ",

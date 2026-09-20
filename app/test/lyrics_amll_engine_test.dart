@@ -1147,6 +1147,31 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('设置「轻量」档：零高斯伪散焦，显式选择不吃自动降级', (tester) async {
+      final groups = buildGroups(40);
+      await tester.pumpWidget(
+        buildWall(
+          groups,
+          20000,
+          playing: true,
+          blurQuality: LyricsBlurQuality.lite,
+        ),
+      );
+      await settle(tester, frames: 40);
+      final dynamic s = stateOf(tester);
+      expect(s.debugBlurMode(), LyricsBlurMode.lite);
+      expect(s.debugPanelBlur(), closeTo(1.0, 0.05), reason: '伪散焦强度应到位');
+      // 轻量档不跑高斯：逐行失焦值不参与渲染，但仍同步维护。
+      for (var i = 0; i < 60; i++) {
+        s.debugNoteFrame(rasterMs: 30.0, uiMs: 3.0);
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      final dynamic after = stateOf(tester);
+      expect(after.debugBlurDegraded(), isFalse);
+      expect(after.debugBlurMode(), LyricsBlurMode.lite);
+      expect(tester.takeException(), isNull, reason: '伪散焦路径不应抛异常');
+    });
+
     testWidgets('设置「流畅」档：固定整层档，显式选择不吃自动降级', (tester) async {
       final groups = buildGroups(40);
       await tester.pumpWidget(

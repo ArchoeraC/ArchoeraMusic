@@ -1296,6 +1296,7 @@
   "settingsAmllBlurNote": "Auto s'adapte à la fréquence d'images : d'abord un flou sur une seule couche, puis désactivation automatique si nécessaire.",
   "settingsAmllBlurAuto": "Auto",
   "settingsAmllBlurFast": "Rapide",
+  "settingsAmllBlurLite": "Léger (approximatif)",
   "settingsAmllBlurQuality": "Qualité",
   "settingsAmllBlurOff": "Désactivé",
   "settingsAmllSpring": "Ressort de défilement",

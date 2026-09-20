@@ -7502,6 +7502,12 @@ abstract class AppLocalizations {
   /// **'流畅'**
   String get settingsAmllBlurFast;
 
+  /// No description provided for @settingsAmllBlurLite.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'轻量（近似）'**
+  String get settingsAmllBlurLite;
+
   /// No description provided for @settingsAmllBlurQuality.
   ///
   /// In zh_CN, this message translates to:

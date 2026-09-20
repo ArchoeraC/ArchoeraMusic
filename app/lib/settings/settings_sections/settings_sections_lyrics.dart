@@ -337,6 +337,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
   /// 失焦档位 → 显示名（`amll.blurQuality`）。
   String _blurQualityLabel(AppLocalizations l10n, String key) => switch (key) {
     'fast' => l10n.settingsAmllBlurFast,
+    'lite' => l10n.settingsAmllBlurLite,
     'quality' => l10n.settingsAmllBlurQuality,
     'off' => l10n.settingsAmllBlurOff,
     _ => l10n.settingsAmllBlurAuto,

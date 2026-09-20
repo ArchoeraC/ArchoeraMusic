@@ -45,8 +45,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 测试用：强制档位（等价于环境变量覆盖，但可在用例内切换）。
   LyricsBlurMode? _debugModeOverride;
 
-  /// 整层失焦强度 0~1（平滑；悬停/关闭/降级时归零）。
-  double _panelBlur = 0;
+  /// 整层/轻量档的失焦强度 0~1（平滑；悬停/关闭/降级时归零）。
+  double _blurStrength = 0;
 
   /// 文本可用宽度（按需测量用）。
   double _maxWidth = 0;
@@ -150,7 +150,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _c.wordFadeWidth = widget.wordFadeWidth;
   }
 
-  /// 生效的失焦档位（不含悬停；悬停只压 [panelBlur] / 逐行目标为 0）。
+  /// 生效的失焦档位（不含悬停；悬停只压 [blurStrength] / 逐行目标为 0）。
   LyricsBlurMode get _blurModeResolved => resolveLyricsBlurMode(
         quality: widget.blurQuality,
         override: _debugModeOverride ?? lyricsBlurOverride,
@@ -160,12 +160,15 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 把档位与整层强度同步到绘制上下文（每帧 build 都会调）。
   void _syncBlurMode() {
     _c.blurMode = _blurModeResolved;
-    _c.panelBlur = _panelBlur;
+    _c.blurStrength = _blurStrength;
   }
 
-  /// 整层失焦的目标强度：整层档 + 未悬停 → 1，否则 0（平滑归零）。
-  double _panelBlurTarget() =>
-      _blurModeResolved == LyricsBlurMode.panel && !_hovering ? 1.0 : 0.0;
+  /// 整层/轻量档的失焦强度目标：对应档位 + 未悬停 → 1，否则 0（平滑归零）。
+  double _panelBlurTarget() {
+    final m = _blurModeResolved;
+    final wants = m == LyricsBlurMode.panel || m == LyricsBlurMode.lite;
+    return wants && !_hovering ? 1.0 : 0.0;
+  }
 
   /// 帧耗时采样：判定「这台机器是否吃得住失焦」（见 [LyricsBlurBudget]）。
   void _onTimings(List<ui.FrameTiming> timings) {
@@ -237,7 +240,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     for (var i = 0; i < _blur.length; i++) {
       _blur[i] = 0;
     }
-    _panelBlur = 0;
+    _blurStrength = 0;
   }
 
   /// 播放位置严格覆盖的行索引（`start <= pos < end`）。
@@ -784,8 +787,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         _blur[i] = bt;
       }
       final pt = _panelBlurTarget();
-      if (_panelBlur != pt) changed = true;
-      _panelBlur = pt;
+      if (_blurStrength != pt) changed = true;
+      _blurStrength = pt;
       // ⚠ 重绘走 _repaint.notify()（不触发 build），所以上下文必须在这里同步，
       // 不能只靠 build 里的 _syncStyle（否则整层档在两次位置事件之间强度恒为 0）。
       _syncBlurMode();
@@ -793,14 +796,14 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     }
     var moving = false;
     final pt = _panelBlurTarget();
-    if ((_panelBlur - pt).abs() > 0.01) {
-      var p = _panelBlur;
+    if ((_blurStrength - pt).abs() > 0.01) {
+      var p = _blurStrength;
       p += (pt - p) * (1 - math.exp(-dt / 0.1));
       if ((pt - p).abs() < 0.01) p = pt;
-      _panelBlur = p;
+      _blurStrength = p;
       moving = true;
-    } else if (_panelBlur != pt) {
-      _panelBlur = pt;
+    } else if (_blurStrength != pt) {
+      _blurStrength = pt;
     }
     for (var i = _winStart; i < we; i++) {
       final active = i == _c.active;
@@ -961,9 +964,9 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   @visibleForTesting
   LyricsBlurMode debugBlurMode() => _blurModeResolved;
 
-  /// 整层失焦强度（0~1）。
+  /// 整层/轻量档的失焦强度（0~1）。
   @visibleForTesting
-  double debugPanelBlur() => _panelBlur;
+  double debugPanelBlur() => _blurStrength;
 
   /// 是否已因帧预算自动降级。
   @visibleForTesting

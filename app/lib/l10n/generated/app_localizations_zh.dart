@@ -4047,6 +4047,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAmllBlurFast => '流畅';
 
   @override
+  String get settingsAmllBlurLite => '轻量（近似）';
+
+  @override
   String get settingsAmllBlurQuality => '画质';
 
   @override
@@ -8624,6 +8627,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsAmllBlurFast => '流畅';
+
+  @override
+  String get settingsAmllBlurLite => '轻量（近似）';
 
   @override
   String get settingsAmllBlurQuality => '画质';
@@ -13204,6 +13210,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAmllBlurFast => '流暢';
+
+  @override
+  String get settingsAmllBlurLite => '輕量（近似）';
 
   @override
   String get settingsAmllBlurQuality => '畫質';

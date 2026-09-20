@@ -1296,6 +1296,7 @@
   "settingsAmllBlurNote": "Automatisch passt sich der Bildrate an: zuerst Weichzeichnen in einer Ebene, bei Bedarf automatisch aus.",
   "settingsAmllBlurAuto": "Automatisch",
   "settingsAmllBlurFast": "Schnell",
+  "settingsAmllBlurLite": "Leicht (Näherung)",
   "settingsAmllBlurQuality": "Qualität",
   "settingsAmllBlurOff": "Aus",
   "settingsAmllSpring": "Scroll-Feder",

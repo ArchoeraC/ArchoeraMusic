@@ -72,6 +72,11 @@ enum LyricsBlurMode {
   /// [lyricsBlurOverride] 在真机上切换对比。
   perLine,
 
+  /// 轻量（近似）失焦：**不跑高斯**，把非激活行「放大 4% + 低透明」重绘一次做
+  /// 伪散焦。零离屏层，基准成本 7.7ms（无失焦 6.3ms）；观感是重影式柔化，
+  /// 与 AMLL 的高斯不同 —— 给吃不住任何高斯层的核显/软件光栅。
+  lite,
+
   /// 不失焦（只剩透明度景深）。
   off,
 }
@@ -87,6 +92,11 @@ enum LyricsBlurQuality {
 
   /// 流畅优先：固定整层档（1 个离屏层 + 1/4 重采样），不自动降级。
   fast('fast'),
+
+  /// 轻量（近似）：**不跑高斯**，用「放大 4% + 低透明重绘一次」做伪散焦
+  /// （零离屏层，基准里几乎等于无失焦的成本）。观感是重影式柔化，与 AMLL 的
+  /// 高斯不是一回事 —— 给连「整层档」都吃不住的核显/软件光栅留的选项。
+  lite('lite'),
 
   /// 画质优先：固定逐行档（σ = `min(5, 1+距离)`，最贴 AMLL 的半径梯度），最吃 GPU。
   quality('quality'),
@@ -158,6 +168,8 @@ LyricsBlurMode resolveLyricsBlurMode({
       return LyricsBlurMode.off;
     case LyricsBlurQuality.fast:
       return LyricsBlurMode.panel;
+    case LyricsBlurQuality.lite:
+      return LyricsBlurMode.lite;
     case LyricsBlurQuality.quality:
       return LyricsBlurMode.perLine;
     case LyricsBlurQuality.auto:
@@ -299,8 +311,8 @@ class _PaintCtx {
   /// 与帧预算自动降级。
   LyricsBlurMode blurMode = LyricsBlurMode.panel;
 
-  /// 整层失焦强度 0~1（悬停/失焦开关切换时由状态层平滑到 0，避免「啪」地变换）。
-  double panelBlur = 0;
+  /// 整层/轻量档的失焦强度 0~1（悬停/切档时由状态层平滑到 0，避免「啪」地变换）。
+  double blurStrength = 0;
   double wordFadeWidth = 0.5;
   Color played = const Color(0xFFD0D3DA);
   Color unplayed = const Color(0xFF9AA1B5);

@@ -47,7 +47,7 @@ const List<String> lyricFormats = ['yrc', 'qrc', 'krc', 'lrc'];
 const List<String> defaultLyricFormatOrder = ['yrc', 'qrc', 'krc', 'lrc'];
 
 /// 失焦档位可选值（`amll.blurQuality`；与 `LyricsBlurQuality` 一一对应）。
-const List<String> amllBlurQualities = ['auto', 'fast', 'quality', 'off'];
+const List<String> amllBlurQualities = ['auto', 'fast', 'lite', 'quality', 'off'];
 
 /// 归一化「顺序」列表：仅保留白名单内、去重，缺失项按 [fallback] 补齐。
 List<String> _normalizeOrder(

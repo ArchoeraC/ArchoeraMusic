@@ -4098,6 +4098,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsAmllBlurFast => '가볍게';
 
   @override
+  String get settingsAmllBlurLite => '경량(근사)';
+
+  @override
   String get settingsAmllBlurQuality => '고화질';
 
   @override
