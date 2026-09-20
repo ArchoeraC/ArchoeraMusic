@@ -58,36 +58,88 @@ void main() {
   });
 
   group('resolveLyricsBlurMode', () {
-    test('默认整层档（层数恒定，弱机友好）', () {
-      expect(
-        resolveLyricsBlurMode(enableBlur: true, autoDegraded: false),
-        LyricsBlurMode.panel,
-      );
-    });
-
-    test('关闭开关 → off', () {
-      expect(
-        resolveLyricsBlurMode(enableBlur: false, autoDegraded: false),
-        LyricsBlurMode.off,
-      );
-    });
-
-    test('自动降级 → off', () {
-      expect(
-        resolveLyricsBlurMode(enableBlur: true, autoDegraded: true),
-        LyricsBlurMode.off,
-      );
-    });
-
-    test('显式覆盖优先于一切（含关闭开关与降级）', () {
+    test('auto：默认整层档（层数恒定，弱机友好），降级后关闭', () {
       expect(
         resolveLyricsBlurMode(
-          enableBlur: false,
+          quality: LyricsBlurQuality.auto,
+          autoDegraded: false,
+        ),
+        LyricsBlurMode.panel,
+      );
+      expect(
+        resolveLyricsBlurMode(
+          quality: LyricsBlurQuality.auto,
+          autoDegraded: true,
+        ),
+        LyricsBlurMode.off,
+      );
+    });
+
+    test('fast → 整层；quality → 逐行；off → 关闭', () {
+      expect(
+        resolveLyricsBlurMode(
+          quality: LyricsBlurQuality.fast,
+          autoDegraded: false,
+        ),
+        LyricsBlurMode.panel,
+      );
+      expect(
+        resolveLyricsBlurMode(
+          quality: LyricsBlurQuality.quality,
+          autoDegraded: false,
+        ),
+        LyricsBlurMode.perLine,
+      );
+      expect(
+        resolveLyricsBlurMode(
+          quality: LyricsBlurQuality.off,
+          autoDegraded: false,
+        ),
+        LyricsBlurMode.off,
+      );
+    });
+
+    test('显式档位不吃自动降级（决定权交给用户）', () {
+      expect(
+        resolveLyricsBlurMode(
+          quality: LyricsBlurQuality.fast,
+          autoDegraded: true,
+        ),
+        LyricsBlurMode.panel,
+      );
+      expect(
+        resolveLyricsBlurMode(
+          quality: LyricsBlurQuality.quality,
+          autoDegraded: true,
+        ),
+        LyricsBlurMode.perLine,
+      );
+    });
+
+    test('诊断用环境变量覆盖优先于一切（含自动降级）', () {
+      expect(
+        resolveLyricsBlurMode(
+          quality: LyricsBlurQuality.off,
           override: LyricsBlurMode.perLine,
           autoDegraded: true,
         ),
         LyricsBlurMode.perLine,
       );
+    });
+  });
+
+  group('LyricsBlurQuality.parse', () {
+    test('识别四个档位', () {
+      expect(LyricsBlurQuality.parse('auto'), LyricsBlurQuality.auto);
+      expect(LyricsBlurQuality.parse('fast'), LyricsBlurQuality.fast);
+      expect(LyricsBlurQuality.parse('quality'), LyricsBlurQuality.quality);
+      expect(LyricsBlurQuality.parse('off'), LyricsBlurQuality.off);
+    });
+
+    test('未知/空 → auto（默认档）', () {
+      expect(LyricsBlurQuality.parse(null), LyricsBlurQuality.auto);
+      expect(LyricsBlurQuality.parse(''), LyricsBlurQuality.auto);
+      expect(LyricsBlurQuality.parse('fancy'), LyricsBlurQuality.auto);
     });
   });
 

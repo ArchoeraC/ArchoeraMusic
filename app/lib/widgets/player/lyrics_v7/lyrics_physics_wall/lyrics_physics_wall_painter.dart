@@ -112,7 +112,7 @@ class _Painter extends CustomPainter {
   /// 只有逐行档才逐行取值；整层档由 [_panelFilter] 统一处理，关闭/降级档恒为 0。
   double _blurFor(int i) {
     if (c.blurMode != LyricsBlurMode.perLine) return 0;
-    if (!c.enableBlur || i >= c.blur.length) return 0;
+    if (i >= c.blur.length) return 0;
     return c.blur[i];
   }
 

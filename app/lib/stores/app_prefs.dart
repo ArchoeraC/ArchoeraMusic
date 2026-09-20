@@ -525,7 +525,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     bool? wordSweep,
     bool? hidePassed,
     bool? enableScale,
-    bool? enableBlur,
+    String? blurQuality,
     String? springPreset,
   }) {
     state = state.copyWithAmll(
@@ -535,7 +535,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       wordSweep: wordSweep,
       hidePassed: hidePassed,
       enableScale: enableScale,
-      enableBlur: enableBlur,
+      blurQuality: blurQuality,
       springPreset: springPreset,
     );
     state.save();

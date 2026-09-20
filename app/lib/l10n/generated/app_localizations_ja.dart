@@ -4082,6 +4082,22 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAmllBlur => '非アクティブ行をぼかす';
 
   @override
+  String get settingsAmllBlurNote =>
+      '自動はフレームレートに合わせて調整します（まず 1 レイヤーでぼかし、重ければ自動でオフ）。';
+
+  @override
+  String get settingsAmllBlurAuto => '自動';
+
+  @override
+  String get settingsAmllBlurFast => '軽量';
+
+  @override
+  String get settingsAmllBlurQuality => '高画質';
+
+  @override
+  String get settingsAmllBlurOff => 'オフ';
+
+  @override
   String get settingsAmllSpring => 'スクロールのバネ';
 
   @override

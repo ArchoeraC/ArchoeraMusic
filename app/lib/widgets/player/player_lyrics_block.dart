@@ -110,7 +110,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
                 wordSweep: prefs.amllWordSweep,
                 hidePassed: prefs.amllHidePassed,
                 enableScale: prefs.amllEnableScale,
-                enableBlur: prefs.amllEnableBlur,
+                blurQuality: LyricsBlurQuality.parse(prefs.amllBlurQuality),
                 springPreset: prefs.amllSpringPreset,
                 animate: !ref.read(appPrefsProvider).performanceMode,
                 onSeek: onSeek ?? (_) {},
