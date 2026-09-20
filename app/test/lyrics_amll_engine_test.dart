@@ -40,6 +40,7 @@ Widget buildWall(
   bool playing = false,
   bool showRomanization = false,
   bool showTranslation = true,
+  bool enableBlur = true,
   double width = 400,
   double height = 500,
 }) => MaterialApp(
@@ -53,6 +54,7 @@ Widget buildWall(
         playing: playing,
         showRomanization: showRomanization,
         showTranslation: showTranslation,
+        enableBlur: enableBlur,
         onSeek: (_) {},
       ),
     ),
@@ -1020,6 +1022,104 @@ void main() {
       final after = s.debugBlur() as List<double>;
       expect(after[19], closeTo(2.0, 0.1), reason: '移出后应恢复失焦');
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('整层失焦为默认档：强度收敛到 1，绘制不抛异常', (tester) async {
+      final groups = buildGroups(40);
+      await tester.pumpWidget(buildWall(groups, 20000));
+      await settle(tester);
+      final dynamic s = stateOf(tester);
+      expect(s.debugBlurMode(), LyricsBlurMode.panel, reason: '默认走整层档');
+      expect(s.debugPanelBlur(), closeTo(1.0, 0.05), reason: '整层强度应平滑到 ~1');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('整层档：悬停把强度压到 0，移出后恢复', (tester) async {
+      final groups = buildGroups(40);
+      await tester.pumpWidget(buildWall(groups, 20000));
+      await settle(tester);
+      expect((stateOf(tester) as dynamic).debugPanelBlur(), closeTo(1.0, 0.05));
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(find.byType(AmllPhysicsWall)));
+      await tester.pump();
+      await settle(tester, frames: 30);
+      expect((stateOf(tester) as dynamic).debugPanelBlur(), closeTo(0.0, 0.02),
+          reason: '悬停时整层失焦应归零（对齐 :hover filter: unset）');
+
+      await mouse.moveTo(const Offset(-50, -50));
+      await tester.pump();
+      await settle(tester, frames: 30);
+      expect((stateOf(tester) as dynamic).debugPanelBlur(), closeTo(1.0, 0.05));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('逐行档可强制启用：按距离失焦且绘制不抛异常', (tester) async {
+      final groups = buildGroups(40);
+      await tester.pumpWidget(buildWall(groups, 20000));
+      await settle(tester);
+      (stateOf(tester) as dynamic).debugForceBlurMode(LyricsBlurMode.perLine);
+      await settle(tester, frames: 40);
+      final dynamic s = stateOf(tester);
+      expect(s.debugBlurMode(), LyricsBlurMode.perLine);
+      expect(s.debugPanelBlur(), closeTo(0.0, 0.05), reason: '逐行档不用整层强度');
+      final blur = s.debugBlur() as List<double>;
+      expect(blur[20], closeTo(0.0, 0.05));
+      expect(blur[19], closeTo(2.0, 0.1));
+      expect(blur[16], closeTo(5.0, 0.1));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('关闭失焦开关：整层强度恒为 0', (tester) async {
+      final groups = buildGroups(40);
+      await tester.pumpWidget(buildWall(groups, 20000, enableBlur: false));
+      await settle(tester);
+      final dynamic s = stateOf(tester);
+      expect(s.debugBlurMode(), LyricsBlurMode.off);
+      expect(s.debugPanelBlur(), closeTo(0.0, 0.02));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('连续光栅掉帧 → 自动降级关闭失焦（且只降不升）', (tester) async {
+      final groups = buildGroups(40);
+      // playing=true 让 ticker 常驻（降级只统计歌词墙在动的帧）。
+      await tester.pumpWidget(buildWall(groups, 20000, playing: true));
+      await settle(tester, frames: 10);
+      final dynamic s = stateOf(tester);
+      expect(s.debugBlurMode(), LyricsBlurMode.panel);
+
+      for (var i = 0; i < 60; i++) {
+        s.debugNoteFrame(rasterMs: 30.0, uiMs: 3.0);
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      final dynamic after = stateOf(tester);
+      expect(after.debugBlurDegraded(), isTrue, reason: '持续光栅超预算应降级');
+      expect(after.debugBlurMode(), LyricsBlurMode.off);
+      await settle(tester, frames: 30);
+      expect((stateOf(tester) as dynamic).debugPanelBlur(), closeTo(0.0, 0.05),
+          reason: '降级后整层强度归零');
+
+      // 后续就算帧时间正常也不会自己升回来（避免画质抖动）。
+      for (var i = 0; i < 60; i++) {
+        after.debugNoteFrame(rasterMs: 6.0, uiMs: 3.0);
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      expect((stateOf(tester) as dynamic).debugBlurMode(), LyricsBlurMode.off);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UI 线程卡顿不触发失焦降级（不是失焦的锅）', (tester) async {
+      final groups = buildGroups(40);
+      await tester.pumpWidget(buildWall(groups, 20000, playing: true));
+      await settle(tester, frames: 10);
+      final dynamic s = stateOf(tester);
+      for (var i = 0; i < 60; i++) {
+        s.debugNoteFrame(rasterMs: 30.0, uiMs: 20.0);
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      expect((stateOf(tester) as dynamic).debugBlurDegraded(), isFalse);
+      expect((stateOf(tester) as dynamic).debugBlurMode(), LyricsBlurMode.panel);
     });
 
     testWidgets('位置连续跳变（拖动进度条）时高亮跟随、整墙平滑滑动', (tester) async {

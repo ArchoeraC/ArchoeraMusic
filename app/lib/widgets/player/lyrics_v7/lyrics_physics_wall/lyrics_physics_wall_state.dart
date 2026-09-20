@@ -37,6 +37,17 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 鼠标是否悬停在歌词区（悬停时取消失焦，对齐 AMLL）。
   bool _hovering = false;
 
+  /// 失焦帧预算守卫：本会话内一旦判定这台机器「吃不住」就 latch 成 off
+  /// （只降不升，避免画质来回抖动）。见 [LyricsBlurBudget]。
+  final LyricsBlurBudget _blurBudget = LyricsBlurBudget();
+  bool _blurDegraded = false;
+
+  /// 测试用：强制档位（等价于环境变量覆盖，但可在用例内切换）。
+  LyricsBlurMode? _debugModeOverride;
+
+  /// 整层失焦强度 0~1（平滑；悬停/关闭/降级时归零）。
+  double _panelBlur = 0;
+
   /// 文本可用宽度（按需测量用）。
   double _maxWidth = 0;
 
@@ -110,10 +121,12 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _ticker = createTicker(_tick);
     _clock.reset(widget.positionMs, playing: _wantsClock);
     _syncStyle();
+    SchedulerBinding.instance.addTimingsCallback(_onTimings);
   }
 
   @override
   void dispose() {
+    SchedulerBinding.instance.removeTimingsCallback(_onTimings);
     _userReset?.cancel();
     _ticker.dispose();
     _repaint.dispose();
@@ -134,7 +147,49 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _c.fontWeight = widget.fontWeight;
     _c.enableScale = widget.enableScale;
     _c.enableBlur = widget.enableBlur;
+    _syncBlurMode();
     _c.wordFadeWidth = widget.wordFadeWidth;
+  }
+
+  /// 生效的失焦档位（不含悬停；悬停只压 [panelBlur] / 逐行目标为 0）。
+  LyricsBlurMode get _blurModeResolved => resolveLyricsBlurMode(
+        enableBlur: widget.enableBlur,
+        override: _debugModeOverride ?? lyricsBlurOverride,
+        autoDegraded: _blurDegraded,
+      );
+
+  /// 把档位与整层强度同步到绘制上下文（每帧 build 都会调）。
+  void _syncBlurMode() {
+    _c.blurMode = _blurModeResolved;
+    _c.panelBlur = _panelBlur;
+  }
+
+  /// 整层失焦的目标强度：整层档 + 未悬停 → 1，否则 0（平滑归零）。
+  double _panelBlurTarget() =>
+      _blurModeResolved == LyricsBlurMode.panel && !_hovering ? 1.0 : 0.0;
+
+  /// 帧耗时采样：判定「这台机器是否吃得住失焦」（见 [LyricsBlurBudget]）。
+  void _onTimings(List<ui.FrameTiming> timings) {
+    for (final t in timings) {
+      _noteFrame(
+        rasterMs: t.rasterDuration.inMicroseconds / 1000.0,
+        uiMs: t.buildDuration.inMicroseconds / 1000.0,
+      );
+    }
+  }
+
+  /// 记一帧光栅/UI 耗时；连续超预算就把失焦降级成 off 并 latch。
+  void _noteFrame({required double rasterMs, required double uiMs}) {
+    // 显式指定档位（诊断 A/B）时不自动降级，否则没法对比。
+    if (lyricsBlurOverride != null || _blurDegraded) return;
+    if (!widget.enableBlur || !_ticker.isActive) return;
+    if (_blurBudget.onFrame(rasterMs, uiMs: uiMs)) {
+      _blurDegraded = true;
+      _blurBudget.reset();
+      _syncBlurMode();
+      _ensureTicker(); // 让整层强度平滑归零
+      _repaint.notify();
+    }
   }
 
   @override
@@ -181,6 +236,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     for (var i = 0; i < _blur.length; i++) {
       _blur[i] = 0;
     }
+    _panelBlur = 0;
   }
 
   /// 播放位置严格覆盖的行索引（`start <= pos < end`）。
@@ -484,6 +540,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     for (var i = _winStart; i < we; i++) {
       _blur[i] = _blurTargetFor(i);
     }
+    // 整层档的强度归零/恢复要过渡，得把 ticker 拉起来（否则移出后停在 0）。
+    _ensureTicker();
     _repaint.notify();
   }
 
@@ -723,9 +781,25 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         _scale[i] = st;
         _blur[i] = bt;
       }
+      final pt = _panelBlurTarget();
+      if (_panelBlur != pt) changed = true;
+      _panelBlur = pt;
+      // ⚠ 重绘走 _repaint.notify()（不触发 build），所以上下文必须在这里同步，
+      // 不能只靠 build 里的 _syncStyle（否则整层档在两次位置事件之间强度恒为 0）。
+      _syncBlurMode();
       return changed;
     }
     var moving = false;
+    final pt = _panelBlurTarget();
+    if ((_panelBlur - pt).abs() > 0.01) {
+      var p = _panelBlur;
+      p += (pt - p) * (1 - math.exp(-dt / 0.1));
+      if ((pt - p).abs() < 0.01) p = pt;
+      _panelBlur = p;
+      moving = true;
+    } else if (_panelBlur != pt) {
+      _panelBlur = pt;
+    }
     for (var i = _winStart; i < we; i++) {
       final active = i == _c.active;
       final ft = active ? 1.0 : 0.0;
@@ -751,6 +825,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         _blur[i] = bt;
       }
     }
+    // 同上：上下文里的整层强度/档位随动画一起同步。
+    _syncBlurMode();
     return moving;
   }
 
@@ -878,6 +954,31 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 每行当前失焦半径（px）。
   @visibleForTesting
   List<double> debugBlur() => List.of(_blur);
+
+  /// 当前生效的失焦档位（含窗口/悬停/降级判定后的结果）。
+  @visibleForTesting
+  LyricsBlurMode debugBlurMode() => _blurModeResolved;
+
+  /// 整层失焦强度（0~1）。
+  @visibleForTesting
+  double debugPanelBlur() => _panelBlur;
+
+  /// 是否已因帧预算自动降级。
+  @visibleForTesting
+  bool debugBlurDegraded() => _blurDegraded;
+
+  /// 直接喂一帧耗时（[ui.FrameTiming] 没有公开构造器，测试只能走这里）。
+  @visibleForTesting
+  void debugNoteFrame({required double rasterMs, double uiMs = 0}) =>
+      _noteFrame(rasterMs: rasterMs, uiMs: uiMs);
+
+  /// 强制失焦档位（null = 回到自动解析）。
+  @visibleForTesting
+  void debugForceBlurMode(LyricsBlurMode? mode) {
+    _debugModeOverride = mode;
+    _syncBlurMode();
+    _repaint.notify();
+  }
 
   /// 当前段落缓存条目数（应随可见窗口有界，不随歌长增长）。
   @visibleForTesting
