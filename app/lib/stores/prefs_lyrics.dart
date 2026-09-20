@@ -21,6 +21,7 @@ const amllInactiveAlphaKey = 'amll.inactiveAlpha';
 const amllWordSweepKey = 'amll.wordSweep';
 const amllHidePassedKey = 'amll.hidePassed';
 const amllEnableScaleKey = 'amll.enableScale';
+const amllEnableBlurKey = 'amll.enableBlur';
 const amllSpringPresetKey = 'amll.springPreset';
 
 // ── 歌词来源 / 格式顺序（强迫症）─────────────────────────────────
@@ -174,10 +175,13 @@ extension AmllLyricsPrefs on AppPrefs {
   /// 已唱过的行淡出隐藏（默认关）。
   bool get amllHidePassed => data[amllHidePassedKey] as bool? ?? false;
 
-  /// 非激活行缩放（激活 1 / 非激活 0.92，默认开）。
+  /// 非激活行缩放（激活 1.0 / 非激活 0.97，弹簧平滑；默认开）。
   bool get amllEnableScale => data[amllEnableScaleKey] as bool? ?? true;
 
-  /// 弹簧预设（'default'|'smooth'|'responsive'|'jello'|'heavy'）。
+  /// 非激活行高斯失焦（按距离 1~5px，默认开，对齐 AMLL enableBlur）。
+  bool get amllEnableBlur => data[amllEnableBlurKey] as bool? ?? true;
+
+  /// 弹簧预设（'default' 为 AMLL 自适应策略，其余为固定手感）。
   String get amllSpringPreset =>
       data[amllSpringPresetKey] as String? ?? 'default';
 
@@ -188,6 +192,7 @@ extension AmllLyricsPrefs on AppPrefs {
     bool? wordSweep,
     bool? hidePassed,
     bool? enableScale,
+    bool? enableBlur,
     String? springPreset,
   }) => AppPrefs(
     initialData: {
@@ -198,6 +203,7 @@ extension AmllLyricsPrefs on AppPrefs {
       amllWordSweepKey: ?wordSweep,
       amllHidePassedKey: ?hidePassed,
       amllEnableScaleKey: ?enableScale,
+      amllEnableBlurKey: ?enableBlur,
       amllSpringPresetKey: ?springPreset,
     },
   );

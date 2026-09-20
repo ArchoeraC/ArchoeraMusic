@@ -404,6 +404,9 @@ C 引擎 fft 阶段（管线内 DSP 之后、编码之前，与输出格式无�
 
 **渲染（Flutter）**
 - **歌词引擎 Dart 移植（重点工程）**：原项目 `Lyrics/engine/`（AMLL：line-builder / word-builder / spring / line-animations / emphasize / interlude / scroll-preroll / split-words）→ Apple Music 风格逐字/逐词高亮动画、弹簧曲线、间奏处理（详见 §10.7）
+  - **表现层对齐已实现（2026-09-20）**：时钟 vsync 插值、羽化渐变扫亮、非激活行失焦/缩放景深、
+    逐词上浮、长音强调辉光、间奏三点、背景人声行 —— 见 [lyrics-amll-alignment.md](lyrics-amll-alignment.md)。
+    仍未移植：换行平衡（line-balancer）、ruby/罗马音、对唱布局、scroll-preroll。
 - 翻译行：双行模式（原文 + 译文），可开关
 - 无歌词回退：显示"纯音乐 / 无歌词"状态
 - **歌词窗口（Phase 3）**：独立窗口经引擎 position 事件（50ms `pollEvent`）同步（「隐藏即静默」——窗口不可见不推送）
@@ -488,6 +491,8 @@ C 引擎 fft 阶段（管线内 DSP 之后、编码之前，与输出格式无�
 
 **歌词引擎（最重移植）**
 - `Lyrics/engine/`（AMLL：line/word-builder、spring、line-animations、emphasize、interlude、scroll-preroll、split-words）→ **Dart 全量移植**（§10.2），逐字/逐词高亮、弹簧动画
+- **进度（2026-09-20）**：spring / line-builder（布局锚点+级联）/ word 高亮 / emphasize / interlude 已落地，
+  见 [lyrics-amll-alignment.md](lyrics-amll-alignment.md)；未移植：scroll-preroll、line-balancer、ruby、对唱
 - 渲染约束：`RepaintBoundary` 局部重绘，文本行用 `TextPainter`，避免整页重建
 
 **动画与主题**

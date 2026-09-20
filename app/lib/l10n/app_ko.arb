@@ -1292,6 +1292,7 @@
   "settingsAmllWordSweep": "단어 스윕",
   "settingsAmllHidePassed": "지난 행 숨기기",
   "settingsAmllScale": "비활성 행 축소",
+  "settingsAmllBlur": "비활성 줄 흐리게",
   "settingsAmllSpring": "스크롤 스프링",
   "commonReset": "Reset",
   "settingsDevDownloadModuleDesc": "Separate switch for the download interface (sidebar / context menu / settings category). Off by default; warns before enabling.",

@@ -4035,6 +4035,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAmllScale => '非激活行缩放';
 
   @override
+  String get settingsAmllBlur => '非激活行失焦';
+
+  @override
   String get settingsAmllSpring => '滚动弹簧';
 
   @override
@@ -8594,6 +8597,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsAmllScale => '非激活行缩放';
+
+  @override
+  String get settingsAmllBlur => '非激活行失焦';
 
   @override
   String get settingsAmllSpring => '滚动弹簧';
@@ -13156,6 +13162,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAmllScale => '非啟用行縮放';
+
+  @override
+  String get settingsAmllBlur => '非激活行失焦';
 
   @override
   String get settingsAmllSpring => '捲動彈簧';
