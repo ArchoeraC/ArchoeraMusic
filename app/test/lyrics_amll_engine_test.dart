@@ -665,18 +665,22 @@ void main() {
       expect((s.debugScale() as List<double>)[4], closeTo(1.0, 1e-3));
     });
 
-    testWidgets('非激活行按距离失焦（仅 ±kMaxBlurDistance 行内，远处为 0）', (tester) async {
+    testWidgets('除高亮行外所有行都失焦（半径 1+距离，上限 5px）', (tester) async {
       final groups = buildGroups(40);
       await tester.pumpWidget(buildWall(groups, 20000));
       await settle(tester);
-      final blur = (stateOf(tester) as dynamic).debugBlur() as List<double>;
-      expect(blur[20], closeTo(0.0, 0.05));
-      expect(blur[19], closeTo(1.0, 0.1));
-      expect(blur[18], closeTo(2.0, 0.1));
-      // 超出 kMaxBlurDistance 的行不再开离屏模糊层（只剩透明度层次），
-      // 这是省掉每帧高斯层的关键。
-      expect(blur[17], 0);
-      expect(blur[10], 0);
+      dynamic s = stateOf(tester);
+      final blur = s.debugBlur() as List<double>;
+      final ws = s.debugWindowStart() as int;
+      final we = s.debugWindowEnd() as int;
+      expect(we - ws, greaterThan(6), reason: '窗口应覆盖视口附近若干行');
+      // 窗口内：只有高亮行不模糊，其余按 AMLL `resolveBlurLevel = min(5, 1+距离)`。
+      // 窗口外的行不参与渲染（停驻），不在此断言范围。
+      for (var i = ws; i < we; i++) {
+        final d = (i - 20).abs();
+        final expected = d == 0 ? 0.0 : math.min(5.0, 1.0 + d);
+        expect(blur[i], closeTo(expected, 0.1), reason: '第 $i 行（距高亮 $d 行）');
+      }
     });
 
     testWidgets('间奏期间不高亮任何行且显示三点', (tester) async {
@@ -996,7 +1000,7 @@ void main() {
       await settle(tester);
       dynamic s = stateOf(tester);
       final before = s.debugBlur() as List<double>;
-      expect(before[19], closeTo(1.0, 0.1), reason: '未悬停时相邻行有失焦');
+      expect(before[19], closeTo(2.0, 0.1), reason: '未悬停时相邻行有失焦');
 
       final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await mouse.addPointer(location: Offset.zero);
@@ -1014,7 +1018,7 @@ void main() {
       await settle(tester, frames: 20);
       s = stateOf(tester);
       final after = s.debugBlur() as List<double>;
-      expect(after[19], closeTo(1.0, 0.1), reason: '移出后应恢复失焦');
+      expect(after[19], closeTo(2.0, 0.1), reason: '移出后应恢复失焦');
       expect(tester.takeException(), isNull);
     });
 
