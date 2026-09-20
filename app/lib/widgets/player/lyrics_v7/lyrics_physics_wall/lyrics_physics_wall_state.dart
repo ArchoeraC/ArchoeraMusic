@@ -61,6 +61,13 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   bool get _usePolicy => widget.springPreset == kDefaultSpringPreset;
 
   /// 解算当前应使用的行弹簧参数。
+  /// 第 [index] 行与上一行的时间间隔（毫秒）；首行/越界返回 null（无间隔）。
+  int? _lineIntervalMs(int index) {
+    final g = widget.groups;
+    if (index <= 0 || index >= g.length) return null;
+    return g[index].original.timeMs - g[index - 1].original.timeMs;
+  }
+
   SpringParams _resolveSpringParams({
     required bool seeking,
     required bool interludeActive,
@@ -69,12 +76,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       return kSpringPresets[widget.springPreset] ?? kSpringPresets['smooth']!;
     }
     final groups = widget.groups;
-    final anchor = _anchorIdx;
-    int? interval;
-    if (anchor > 0 && anchor < groups.length) {
-      interval =
-          groups[anchor].original.timeMs - groups[anchor - 1].original.timeMs;
-    }
+    final interval = _lineIntervalMs(_anchorIdx);
     final pos = _clock.valueMs;
     var endOfSong = false;
     if (groups.isNotEmpty) {
@@ -367,6 +369,31 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 行的目标屏幕中心（含用户浏览偏移）。
   double _targetForUser(int i, int anchor) => _targetFor(i, anchor) + _user;
 
+  /// 是否属于「高速换行」——此时不等弹簧，直接吸附成普通滚动。
+  ///
+  /// 上游 AMLL 在高速段靠「间隔越短刚度越高（→220）」让观感接近普通滚动；
+  /// 我们直接吸附，观感更利落、也省掉一串来不及安顿的弹簧。
+  ///
+  /// 判定刻意**收紧**，四条同时满足才算：
+  /// 1. 不是 seek（seek 已有自己的慢速/瞬移策略）；
+  /// 2. 只推进**一行**（多行跳变按跨屏跳转处理）；
+  /// 3. 相邻行间隔 ≤ [kFastLineChangeMs]（确实是"高速"）；
+  /// 4. 位移约等于一行（≤ [kFastLineChangeMaxShiftRatio] × 视口高），
+  ///    排除掉锚点索引变了但真正位移很大的情况（例如中间夹了间奏预留）。
+  bool _isFastLineChange({
+    required int anchor,
+    required int oldAnchor,
+    required bool seekSnap,
+    required double shift,
+  }) {
+    if (seekSnap) return false;
+    if ((anchor - oldAnchor).abs() != 1) return false;
+    final interval = _lineIntervalMs(anchor);
+    if (interval == null || interval > kFastLineChangeMs) return false;
+    final h = _c.h > 0 ? _c.h : 400.0;
+    return shift <= h * kFastLineChangeMaxShiftRatio;
+  }
+
   /// 重算需要参与动画的行窗口（视口 ± 自适应余量）。
   ///
   /// 判定用**行本体**（中心 ± 半高）与视口的关系，而不是只看中心：行高可变
@@ -492,7 +519,12 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     // 锚点位移超过一屏视作跨屏跳转：所有行同步位移（无级联），
     // 保证行距不塌陷、不产生“炸动画”或重叠伪影。仅触摸拖拽/性能模式瞬移。
     final shift = (_c.centers[anchor] - _c.centers[oldAnchor]).abs();
-    final snap = snapNow || !widget.animate;
+    final snap = snapNow || !widget.animate || _isFastLineChange(
+      anchor: anchor,
+      oldAnchor: oldAnchor,
+      seekSnap: seekSnap,
+      shift: shift,
+    );
     final noCascade = !stagger || (oldAnchor != anchor && shift > _c.h);
     _ever = true;
     final n = _y.length;
