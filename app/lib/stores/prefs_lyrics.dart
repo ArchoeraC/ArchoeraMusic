@@ -11,6 +11,8 @@ const lyricLineHeightKey = 'lyrics.lineHeight';
 const lyricPlayedColorKey = 'lyrics.playedColor';
 const lyricUnplayedColorKey = 'lyrics.unplayedColor';
 const lyricFollowAccentKey = 'lyrics.followAccent';
+const lyricAdaptiveFontSizeKey = 'lyrics.adaptiveFontSize';
+const lyricFontWeightKey = 'lyrics.fontWeight';
 
 // ── AMLL 歌词墙（AMLL 引擎）偏好键 ──────────────────────────────
 const lyricEngineKey = 'lyrics.engine'; // 'simple' | 'amll'
@@ -19,7 +21,56 @@ const amllInactiveAlphaKey = 'amll.inactiveAlpha';
 const amllWordSweepKey = 'amll.wordSweep';
 const amllHidePassedKey = 'amll.hidePassed';
 const amllEnableScaleKey = 'amll.enableScale';
+const amllEnableBlurKey = 'amll.enableBlur';
 const amllSpringPresetKey = 'amll.springPreset';
+
+// ── 歌词来源 / 格式顺序（强迫症）─────────────────────────────────
+const lyricSourceOrderKey = 'lyrics.sourceOrder';
+const lyricFormatOrderKey = 'lyrics.formatOrder';
+
+// ── 歌词排除规则（强迫症）────────────────────────────────────────
+const lyricExcludeEnabledKey = 'lyrics.excludeEnabled';
+const lyricExcludeKeywordsKey = 'lyrics.excludeKeywords';
+const lyricExcludeRegexesKey = 'lyrics.excludeRegexes';
+
+/// 支持的在线歌词平台（与 Track.source 一致）；数组顺序即回退优先级。
+const List<String> lyricPlatforms = ['netease', 'qqmusic', 'kugou'];
+
+/// 默认歌词来源顺序（当前平台无歌词时按此顺序回退到其它平台）。
+const List<String> defaultLyricSourceOrder = ['netease', 'qqmusic', 'kugou'];
+
+/// 歌词格式标识：yrc/qrc/krc 为逐字富格式，lrc 为标准格式。
+const List<String> lyricFormats = ['yrc', 'qrc', 'krc', 'lrc'];
+
+/// 默认歌词格式优先级（逐字优先，其次标准 LRC）。
+const List<String> defaultLyricFormatOrder = ['yrc', 'qrc', 'krc', 'lrc'];
+
+/// 归一化「顺序」列表：仅保留白名单内、去重，缺失项按 [fallback] 补齐。
+List<String> _normalizeOrder(
+  Object? value,
+  List<String> allowed,
+  List<String> fallback,
+) {
+  final out = <String>[];
+  if (value is List) {
+    for (final e in value) {
+      if (e is String && allowed.contains(e) && !out.contains(e)) out.add(e);
+    }
+  }
+  for (final e in fallback) {
+    if (!out.contains(e)) out.add(e);
+  }
+  return out;
+}
+
+/// 归一化字符串列表（去空、trim；非法值返回空列表）。
+List<String> _normalizeStringList(Object? value) {
+  if (value is! List) return const [];
+  return [
+    for (final e in value)
+      if (e is String && e.trim().isNotEmpty) e.trim(),
+  ];
+}
 
 /// 由歌词字号自动换算行距（行距不再由用户手调，避免字号/行距组合失衡）。
 ///
@@ -55,6 +106,16 @@ extension LyricsPrefs on AppPrefs {
   /// 已唱/高亮颜色跟随软件全局主题色（默认关；开则忽略 [lyricPlayedColor]）。
   bool get lyricFollowAccent => data[lyricFollowAccentKey] as bool? ?? false;
 
+  /// 自适应字号（默认开）：歌词字号随窗口高度自动缩放（对齐原版 adaptiveFontSize）。
+  bool get lyricAdaptiveFontSize =>
+      data[lyricAdaptiveFontSizeKey] as bool? ?? true;
+
+  /// 当前行歌词字重（400/500/600/700；非法值回退 600）。
+  int get lyricFontWeight {
+    final v = (data[lyricFontWeightKey] as num?)?.toInt();
+    return (v == 400 || v == 500 || v == 600 || v == 700) ? v! : 600;
+  }
+
   AppPrefs copyWithLyrics({bool? showInPlayer}) =>
       AppPrefs(initialData: {...data, showLyricsKey: ?showInPlayer});
 
@@ -64,6 +125,7 @@ extension LyricsPrefs on AppPrefs {
     int? playedColor,
     int? unplayedColor,
     bool? followAccent,
+    int? fontWeight,
   }) => AppPrefs(
     initialData: {
       ...data,
@@ -72,8 +134,17 @@ extension LyricsPrefs on AppPrefs {
       lyricPlayedColorKey: ?playedColor,
       lyricUnplayedColorKey: ?unplayedColor,
       lyricFollowAccentKey: ?followAccent,
+      if (fontWeight == 400 ||
+          fontWeight == 500 ||
+          fontWeight == 600 ||
+          fontWeight == 700)
+        lyricFontWeightKey: fontWeight,
     },
   );
+
+  /// 设置歌词自适应字号开关（默认开）。
+  AppPrefs copyWithAdaptiveFontSize(bool value) =>
+      AppPrefs(initialData: {...data, lyricAdaptiveFontSizeKey: value});
 }
 
 /// AMLL 歌词墙偏好：引擎选择 + 布局/视觉参数。
@@ -104,10 +175,13 @@ extension AmllLyricsPrefs on AppPrefs {
   /// 已唱过的行淡出隐藏（默认关）。
   bool get amllHidePassed => data[amllHidePassedKey] as bool? ?? false;
 
-  /// 非激活行缩放（激活 1 / 非激活 0.92，默认开）。
+  /// 非激活行缩放（激活 1.0 / 非激活 0.97，弹簧平滑；默认开）。
   bool get amllEnableScale => data[amllEnableScaleKey] as bool? ?? true;
 
-  /// 弹簧预设（'default'|'smooth'|'responsive'|'jello'|'heavy'）。
+  /// 非激活行高斯失焦（按距离 1~5px，默认开，对齐 AMLL enableBlur）。
+  bool get amllEnableBlur => data[amllEnableBlurKey] as bool? ?? true;
+
+  /// 弹簧预设（'default' 为 AMLL 自适应策略，其余为固定手感）。
   String get amllSpringPreset =>
       data[amllSpringPresetKey] as String? ?? 'default';
 
@@ -118,6 +192,7 @@ extension AmllLyricsPrefs on AppPrefs {
     bool? wordSweep,
     bool? hidePassed,
     bool? enableScale,
+    bool? enableBlur,
     String? springPreset,
   }) => AppPrefs(
     initialData: {
@@ -128,7 +203,85 @@ extension AmllLyricsPrefs on AppPrefs {
       amllWordSweepKey: ?wordSweep,
       amllHidePassedKey: ?hidePassed,
       amllEnableScaleKey: ?enableScale,
+      amllEnableBlurKey: ?enableBlur,
       amllSpringPresetKey: ?springPreset,
+    },
+  );
+}
+
+/// 歌词来源 / 格式顺序与排除规则（强迫症设置）。
+extension LyricPipelinePrefs on AppPrefs {
+  /// 歌词来源回退顺序（合法平台、去重、缺失按默认补齐）。
+  List<String> get lyricSourceOrder => _normalizeOrder(
+    data[lyricSourceOrderKey],
+    lyricPlatforms,
+    defaultLyricSourceOrder,
+  );
+
+  /// 歌词格式优先级（合法格式、去重、缺失按默认补齐）。
+  List<String> get lyricFormatOrder => _normalizeOrder(
+    data[lyricFormatOrderKey],
+    lyricFormats,
+    defaultLyricFormatOrder,
+  );
+
+  /// 是否优先逐字格式：格式顺序中首个非 lrc（逐字）格式排在 lrc 之前。
+  bool get preferWordByWord {
+    final order = lyricFormatOrder;
+    final rich = order.indexWhere((f) => f != 'lrc');
+    final lrc = order.indexOf('lrc');
+    if (rich < 0) return false;
+    if (lrc < 0) return true;
+    return rich < lrc;
+  }
+
+  /// 是否启用歌词排除规则（默认关）。
+  bool get lyricExcludeEnabled =>
+      data[lyricExcludeEnabledKey] as bool? ?? false;
+
+  /// 排除关键词（行内含任意关键词即排除；不区分大小写）。
+  List<String> get lyricExcludeKeywords =>
+      _normalizeStringList(data[lyricExcludeKeywordsKey]);
+
+  /// 排除正则（Dart RegExp 语法；解析失败视为未命中）。
+  List<String> get lyricExcludeRegexes =>
+      _normalizeStringList(data[lyricExcludeRegexesKey]);
+
+  AppPrefs copyWithLyricSourceOrder(List<String> order) => AppPrefs(
+    initialData: {
+      ...data,
+      lyricSourceOrderKey: _normalizeOrder(
+        order,
+        lyricPlatforms,
+        defaultLyricSourceOrder,
+      ),
+    },
+  );
+
+  AppPrefs copyWithLyricFormatOrder(List<String> order) => AppPrefs(
+    initialData: {
+      ...data,
+      lyricFormatOrderKey: _normalizeOrder(
+        order,
+        lyricFormats,
+        defaultLyricFormatOrder,
+      ),
+    },
+  );
+
+  /// 设置歌词排除规则（启用开关 / 关键词 / 正则）。
+  AppPrefs copyWithLyricExclude({
+    bool? enabled,
+    List<String>? keywords,
+    List<String>? regexes,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      lyricExcludeEnabledKey: ?enabled,
+      if (keywords != null)
+        lyricExcludeKeywordsKey: _normalizeStringList(keywords),
+      if (regexes != null)
+        lyricExcludeRegexesKey: _normalizeStringList(regexes),
     },
   );
 }

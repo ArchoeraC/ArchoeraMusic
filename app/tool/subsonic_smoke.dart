@@ -11,7 +11,7 @@
 //      仅填主机，端口自动协商（仅换端口、保留主机，覆盖 IPv6/域名）
 //   4. SubsonicAdmin 创建用户（encrypt 密码）
 //   5. SubsonicClient 闭环：ping / listAlbums / getAlbumSongs /
-//      stream 转码（dlopen Rust）/ getLyrics（歌词桥 lyric-request → respondLyric）
+//      stream 转码（dlopen Rust）/ getLyrics（只读曲库内嵌歌词）
 //   6. destroy
 // 用法：dart run tool/subsonic_smoke.dart
 // ignore_for_file: avoid_print
@@ -204,31 +204,21 @@ void main() async {
   }
   print('OK: stream 转码 MP3 ${bytes2.length} bytes (fffb)');
 
-  // 7) 歌词桥：getLyrics → lyric-request 事件 → respondLyric
-  //    （Dart HTTP 请求挂起时事件循环仍可 poll controller 事件）
-  String? lyricResp;
-  var lyricDone = false;
-  final lyricFuture = client
-      .getLyrics(songs.first.id, artist: 'Smoke Artist', title: songs.first.title)
-      .then((v) {
-        lyricResp = v;
-        lyricDone = true;
-      });
-  final lyricDeadline = DateTime.now().add(const Duration(seconds: 10));
-  while (!lyricDone && DateTime.now().isBefore(lyricDeadline)) {
-    final ev = controller.pollEvent();
-    if (ev is SubsonicLyricRequest) {
-      print('OK: lyric-request id=${ev.requestId} song=${ev.songId}');
-      controller.respondLyric(ev.requestId, jsonEncode({'main': '[00:00.00]Smoke lyric'}));
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+  // 7) 歌词：只读服务端曲库内嵌歌词；无内嵌时立即返回（可带扩展标记，由客户端补全）
+  final lyrics = await client
+      .getLyrics(
+        songs.first.id,
+        artist: 'Smoke Artist',
+        title: songs.first.title,
+      )
+      .timeout(const Duration(seconds: 3));
+  if (lyrics.hasLrc) {
+    print('OK: 歌词来自曲库内嵌（${lyrics.lrc!.split('\n').length} 行）');
+  } else if (lyrics.fetchOnline) {
+    print('OK: 服务端无内嵌歌词 → 扩展标记（客户端自行在线补全）');
+  } else {
+    print('OK: 无歌词 → 空返回且不阻塞（在线歌词交客户端处理）');
   }
-  await lyricFuture;
-  if (lyricResp == null || !lyricResp!.contains('Smoke lyric')) {
-    print('FAIL: 歌词桥返回异常: $lyricResp');
-    exit(1);
-  }
-  print('OK: 歌词桥闭环: $lyricResp');
 
   // 8) destroy
   controller.dispose();

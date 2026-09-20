@@ -15,6 +15,7 @@ extension _SettingsDialogView on _SettingsDialogState {
     final platform = ref.watch(platformCapabilitiesProvider);
     final osAvailable = platform.osSessionAvailable;
     final netAvailable = platform.netAvailable;
+    final downloadModule = ref.watch(appPrefsProvider).downloadModuleEnabled;
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _updateCategoryIndicator(),
     );
@@ -80,24 +81,29 @@ extension _SettingsDialogView on _SettingsDialogState {
                         child: Stack(
                           key: _catHostKey,
                           children: [
-                            ListView(
-                              padding: EdgeInsets.zero,
-                              // 每项恒为 40 高 + 上下各 1.5 的 padding。
-                              itemExtent: 43,
-                              children: [
-                                for (final cat in SettingsCategory.values)
-                                  if (cat.visible(
-                                    devMode,
-                                    osAvailable: osAvailable,
-                                    netAvailable: netAvailable,
-                                  ))
-                                    _buildCategoryItem(
-                                      scheme,
-                                      cat,
-                                      l10n,
-                                      animated,
-                                    ),
-                              ],
+                            // 隐藏侧栏滚动条（保留滚轮 / 拖拽滚动）。
+                            ScrollConfiguration(
+                              behavior: const _NoScrollbarBehavior(),
+                              child: ListView(
+                                padding: EdgeInsets.zero,
+                                // 每项恒为 40 高 + 上下各 1.5 的 padding。
+                                itemExtent: 43,
+                                children: [
+                                  for (final cat in SettingsCategory.values)
+                                    if (cat.visible(
+                                      devMode,
+                                      downloadModule,
+                                      osAvailable: osAvailable,
+                                      netAvailable: netAvailable,
+                                    ))
+                                      _buildCategoryItem(
+                                        scheme,
+                                        cat,
+                                        l10n,
+                                        animated,
+                                      ),
+                                ],
+                              ),
                             ),
                             if (animated && _catIndicatorReady)
                               AnimatedPositioned(
@@ -180,6 +186,12 @@ extension _SettingsDialogView on _SettingsDialogState {
       ),
       _SearchEntry(
         SettingsCategory.appearance,
+        l10n.settingsSidebarCustomize,
+        l10n.settingsSidebarCustomizeDesc,
+        EtaIcons.listCheck2,
+      ),
+      _SearchEntry(
+        SettingsCategory.appearance,
         l10n.settingsFloatingBar,
         l10n.settingsSearchFloatingBarSubtitle,
         EtaIcons.miniplayerOutline,
@@ -245,6 +257,54 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.magic2Outline,
       ),
       _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsCoverLayout,
+        l10n.settingsCoverLayoutDesc,
+        EtaIcons.square,
+      ),
+      _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsShowProgressLyric,
+        l10n.settingsShowProgressLyricDesc,
+        EtaIcons.fileMusicOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsTimeFormat,
+        l10n.settingsTimeFormatDesc,
+        EtaIcons.stopwatchOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsShowPlaybackSource,
+        l10n.settingsShowPlaybackSourceDesc,
+        EtaIcons.serverOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.playback,
+        l10n.settingsRegisterProtocol,
+        l10n.settingsRegisterProtocolDesc,
+        EtaIcons.link,
+      ),
+      _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsSectionEqualizer,
+        l10n.settingsAudioEffectsSubtitle,
+        EtaIcons.soundLine,
+      ),
+      _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsNormalization,
+        l10n.settingsNormalizationDesc,
+        EtaIcons.transferHorizontal,
+      ),
+      _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsPlaybackSpeed,
+        l10n.settingsPlaybackSpeedDesc,
+        EtaIcons.stopwatchOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.lyrics,
         l10n.settingsPlayerLyrics,
         l10n.settingsSearchPlayerLyricsSubtitle,
@@ -279,6 +339,24 @@ extension _SettingsDialogView on _SettingsDialogState {
         l10n.settingsSearchColorTitle,
         l10n.settingsSearchColorSubtitle,
         EtaIcons.paletteOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.lyrics,
+        l10n.settingsLyricSourceOrder,
+        l10n.settingsLyricSourceOrderDesc,
+        EtaIcons.serverOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.lyrics,
+        l10n.settingsLyricFormatOrder,
+        l10n.settingsLyricFormatOrderDesc,
+        EtaIcons.fileMusicOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.lyrics,
+        l10n.settingsSectionLyricExclude,
+        l10n.settingsLyricExcludeRulesDesc,
+        EtaIcons.magic2Outline,
       ),
       _SearchEntry(
         SettingsCategory.lyrics,
@@ -571,6 +649,7 @@ extension _SettingsDialogView on _SettingsDialogState {
               child: switch (_category) {
                 SettingsCategory.appearance => const AppearanceSection(),
                 SettingsCategory.playback => const PlaybackSection(),
+                SettingsCategory.audioEffects => const AudioEffectsSection(),
                 SettingsCategory.shortcuts => const ShortcutsSection(),
                 SettingsCategory.lyrics => const LyricsSection(),
                 SettingsCategory.preset => const PresetSection(),
@@ -638,10 +717,12 @@ extension _SettingsDialogView on _SettingsDialogState {
     final platform = ref.watch(platformCapabilitiesProvider);
     final osAvailable = platform.osSessionAvailable;
     final netAvailable = platform.netAvailable;
+    final downloadModule = ref.watch(appPrefsProvider).downloadModuleEnabled;
     final index = _buildSearchIndex(l10n)
         .where(
           (e) => e.category.visible(
             devMode,
+            downloadModule,
             osAvailable: osAvailable,
             netAvailable: netAvailable,
           ),
@@ -685,6 +766,7 @@ extension _SettingsDialogView on _SettingsDialogState {
           for (final cat in SettingsCategory.values)
             if (cat.visible(
                   devMode,
+                  downloadModule,
                   osAvailable: osAvailable,
                   netAvailable: netAvailable,
                 ) &&
@@ -800,5 +882,19 @@ extension _SettingsDialogView on _SettingsDialogState {
       start = idx + q.length;
     }
     return spans;
+  }
+}
+
+/// 不构建滚动条（隐藏滚动条的列表仍可滚轮 / 拖拽滚动）。
+class _NoScrollbarBehavior extends ScrollBehavior {
+  const _NoScrollbarBehavior();
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }

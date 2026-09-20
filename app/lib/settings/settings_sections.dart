@@ -47,6 +47,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'settings_sections/settings_sections_appearance.dart';
 part 'settings_sections/settings_sections_playback.dart';
+part 'settings_sections/settings_sections_audio_fx.dart';
 part 'settings_sections/settings_sections_shortcuts.dart';
 part 'settings_sections/settings_sections_lyrics.dart';
 part 'settings_sections/settings_sections_preset.dart';

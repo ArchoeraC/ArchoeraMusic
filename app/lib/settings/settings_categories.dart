@@ -11,6 +11,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 enum SettingsCategory {
   appearance(EtaIcons.paletteOutline),
   playback(EtaIcons.playCircleOutline),
+  audioEffects(EtaIcons.soundLine),
   shortcuts(EtaIcons.space),
   lyrics(EtaIcons.fileMusicOutline),
   preset(EtaIcons.firstAidKitOutline),
@@ -38,6 +39,7 @@ enum SettingsCategory {
   String label(AppLocalizations l10n) => switch (this) {
     appearance => l10n.settingsCatAppearance,
     playback => l10n.settingsCatPlayback,
+    audioEffects => l10n.settingsCatAudioEffects,
     shortcuts => l10n.settingsCatShortcuts,
     lyrics => l10n.settingsCatLyrics,
     preset => l10n.settingsCatPreset,
@@ -56,6 +58,7 @@ enum SettingsCategory {
   String subtitle(AppLocalizations l10n) => switch (this) {
     appearance => l10n.settingsAppearanceSubtitle,
     playback => l10n.settingsPlaybackSubtitle,
+    audioEffects => l10n.settingsAudioEffectsSubtitle,
     shortcuts => l10n.settingsShortcutsSubtitle,
     lyrics => l10n.settingsLyricsSubtitle,
     preset => l10n.settingsPresetSubtitle,
@@ -71,16 +74,17 @@ enum SettingsCategory {
     developer => l10n.settingsDeveloperSubtitle,
   };
 
-  /// 该分类是否在设置导航中显示：开发者分类仅在开启开发者模式后出现；
-  /// 下载分类（下载接口）在开发者模式下才可见；系统分类仅在运行于
-  /// ArchoeraOS 会话（[osAvailable]）时出现。
+  /// 下载分类（下载接口）仅在开发者模式 + 「下载模块」开关同时开启后出现；
+  /// 系统分类仅在运行于 ArchoeraOS 会话（[osAvailable]）时出现，
+  /// 网络分类仅在具备网络能力（[netAvailable]）时出现。
   bool visible(
-    bool developerMode, {
+    bool developerMode,
+    bool downloadModule, {
     bool osAvailable = false,
     bool netAvailable = false,
   }) {
     if (this == SettingsCategory.developer) return developerMode;
-    if (this == SettingsCategory.download) return developerMode;
+    if (this == SettingsCategory.download) return downloadModule;
     if (this == SettingsCategory.network) return netAvailable;
     if (this == SettingsCategory.system) return osAvailable;
     return true;

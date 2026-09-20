@@ -159,3 +159,25 @@ final appRouter = GoRouter(
     ),
   ],
 );
+
+/// 全屏播放页路由的 push 是否在途（push 到 pop 之间为 true）。
+///
+/// 用于 [openPlayerPage] 的幂等防护：快捷键长按 / 封面连点会重复触发
+/// push，若不加防护会不断叠加播放页路由（表现为「播放页可被无限打开」）。
+bool _playerRouteInFlight = false;
+
+/// 展开全屏播放页（幂等）。
+///
+/// 双重防护，避免重复入栈：
+/// 1. 当前顶层路由已是 `/player` → 直接返回；
+/// 2. 已有一次 push 在途（尚未 pop）→ 直接返回。
+///
+/// 快捷键（`ShortcutAction.openPlayer`）与播放条封面统一走此入口。
+void openPlayerPage() {
+  if (_playerRouteInFlight) return;
+  if (appRouter.routerDelegate.currentConfiguration.uri.path == '/player') {
+    return;
+  }
+  _playerRouteInFlight = true;
+  appRouter.push('/player').whenComplete(() => _playerRouteInFlight = false);
+}

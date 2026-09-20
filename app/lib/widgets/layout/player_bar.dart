@@ -4,11 +4,11 @@
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/lyrics/lyric_line.dart';
+import '../../app/router.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
 import '../../stores/lyrics_provider.dart';

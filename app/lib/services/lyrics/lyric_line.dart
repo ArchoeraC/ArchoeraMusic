@@ -46,14 +46,19 @@ class LyricGroup {
   const LyricGroup({
     required this.original,
     this.translation,
+    this.romaji,
     this.fragments,
     this.endMs,
+    this.isBG = false,
   });
 
   final LyricLine original;
 
   /// 该行翻译文本（与原文行时间对齐；无翻译为 null）。
   final String? translation;
+
+  /// 该行音译（罗马音）文本（与原文行时间对齐；无音译为 null）。
+  final String? romaji;
 
   /// 增强型逐字片段（行内按 [LyricFragment.startMs] 升序；
   /// 普通 LRC 行为 null）。
@@ -62,6 +67,11 @@ class LyricGroup {
   /// 行结束时间（毫秒，取下一行起始；末行由调用方/引擎用默认时长兜底）。
   /// 由解析器按有序时间轴后置计算，供 AMLL 引擎做连续滚动与逐字时长。
   final int? endMs;
+
+  /// 背景人声行（整行被圆括号包裹，对齐 AMLL `isBG`）。
+  ///
+  /// 渲染为更小、更暗、挂在主行下方的一行（不单独占一个纵向槽位）。
+  final bool isBG;
 }
 
 /// 解析 LRC 文本 → 时间轴有序行。
@@ -103,17 +113,19 @@ List<LyricLine> parseLrc(String lrc, {bool keepEmpty = false}) {
 ///
 /// - 主歌词时间戳格式同 [parseLrc]；
 /// - YRC/KRC 的 `<start,dur>字` 字级标签解析为 [LyricFragment]（行内偏移）；
-/// - 翻译按「时间最近」归属到主行（容差 4s，避免前奏/间隔误挂）。
+/// - 翻译 / 音译（罗马音）按「时间最近」归属到主行（容差 4s，避免前奏/间隔误挂）。
 List<LyricGroup> parseLyricGroups({
   required String content,
   required String format,
   String? translation,
+  String? romaji,
 }) {
   final reTs = RegExp(r'\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]');
   final reFrag = RegExp(r'<(\d+),(\d+)>([^<\r\n]*)');
 
   final lines = <LyricLine>[];
   final frags = <List<LyricFragment>?>[];
+  final bgFlags = <bool>[];
   for (final raw in content.split('\n')) {
     final matches = reTs.allMatches(raw).toList();
     if (matches.isEmpty) continue;
@@ -129,10 +141,22 @@ List<LyricGroup> parseLyricGroups({
         durationMs: int.parse(fm.group(2)!),
       ));
     }
-    final text = fragments.isEmpty
+    var text = fragments.isEmpty
         ? body.replaceAll(reFrag, '').trim()
         : fragments.map((f) => f.text).join().trim();
     if (text.isEmpty) continue;
+    // 整行被圆括号包裹 → 背景人声；剥掉最外层括号（对齐 AMLL isBG）。
+    // 逐字行同样要剥，否则括号会跟着逐字扫亮。
+    final bg = isBgText(text);
+    if (bg) {
+      if (fragments.isEmpty) {
+        text = text.substring(1, text.length - 1).trim();
+      } else {
+        trimBgParentheses(fragments);
+        text = fragments.map((f) => f.text).join().trim();
+      }
+      if (text.isEmpty) continue;
+    }
     for (final m in matches) {
       final min = int.parse(m.group(1)!);
       final sec = int.parse(m.group(2)!);
@@ -145,13 +169,15 @@ List<LyricGroup> parseLyricGroups({
         text: text,
       ));
       frags.add(fragments.isEmpty ? null : List.of(fragments));
+      bgFlags.add(bg);
     }
   }
-  // 按时间排序（frags 同步）
+  // 按时间排序（frags / bgFlags 同步）
   final order = List.generate(lines.length, (i) => i)
     ..sort((a, b) => lines[a].timeMs.compareTo(lines[b].timeMs));
   final sortedLines = [for (final i in order) lines[i]];
   final sortedFrags = [for (final i in order) frags[i]];
+  final sortedBg = [for (final i in order) bgFlags[i]];
 
   // 翻译对齐：每个主行挂「时间最近」的翻译行（容差内）
   // 翻译保留空正文行（keepEmpty）：KRC 译文首行常为空串占位，若丢弃
@@ -161,25 +187,34 @@ List<LyricGroup> parseLyricGroups({
       ? const <LyricLine>[]
       : parseLrc(translation, keepEmpty: true);
   final transTimes = [for (final t in transLines) t.timeMs];
-  String? transAt(int timeMs) {
-    if (transTimes.isEmpty) return null;
-    var lo = 0, hi = transTimes.length - 1;
+  final romaLines = (romaji == null || romaji.trim().isEmpty)
+      ? const <LyricLine>[]
+      : parseLrc(romaji, keepEmpty: true);
+  final romaTimes = [for (final t in romaLines) t.timeMs];
+
+  /// 取与 [timeMs] 最近的行文本（容差 4s；空文本视为无内容）。
+  String? nearestAt(List<LyricLine> lines, List<int> times, int timeMs) {
+    if (times.isEmpty) return null;
+    var lo = 0, hi = times.length - 1;
     while (lo < hi) {
       final mid = (lo + hi) >> 1;
-      if (transTimes[mid] < timeMs) {
+      if (times[mid] < timeMs) {
         lo = mid + 1;
       } else {
         hi = mid;
       }
     }
     var best = lo;
-    final dCur = (timeMs - transTimes[lo]).abs();
-    if (lo > 0 && (timeMs - transTimes[lo - 1]).abs() < dCur) best = lo - 1;
-    if ((timeMs - transTimes[best]).abs() > 4000) return null;
-    // 空翻译文本视为无翻译（空串渲染会占行高）
-    final t = transLines[best].text;
+    final dCur = (timeMs - times[lo]).abs();
+    if (lo > 0 && (timeMs - times[lo - 1]).abs() < dCur) best = lo - 1;
+    if ((timeMs - times[best]).abs() > 4000) return null;
+    // 空文本视为无内容（空串渲染会占行高）
+    final t = lines[best].text;
     return t.isEmpty ? null : t;
   }
+
+  String? transAt(int timeMs) => nearestAt(transLines, transTimes, timeMs);
+  String? romaAt(int timeMs) => nearestAt(romaLines, romaTimes, timeMs);
 
   // 交错翻译合并：本地下载（KG等）的 LRC 常见「主行 + 同时间戳译文」
   // 的交错结构（`[mm:ss.xx]原文` 后紧跟 `[mm:ss.xx]译文`，如
@@ -201,14 +236,19 @@ List<LyricGroup> parseLyricGroups({
       groups[groups.length - 1] = LyricGroup(
         original: last.original,
         translation: line.text,
+        romaji: last.romaji,
         fragments: last.fragments,
+        isBG: last.isBG,
       );
       continue;
     }
     groups.add(LyricGroup(
       original: line,
-      translation: transAt(line.timeMs),
+      // 背景人声行不挂翻译/音译（同一时间戳的译文属于主行，避免重复）。
+      translation: sortedBg[i] ? null : transAt(line.timeMs),
+      romaji: sortedBg[i] ? null : romaAt(line.timeMs),
       fragments: sortedFrags[i],
+      isBG: sortedBg[i],
     ));
   }
   // 行结束时间后置计算：下一行起始即本行结束（末行给默认 4s 兜底，
@@ -222,14 +262,50 @@ List<LyricGroup> parseLyricGroups({
     return LyricGroup(
       original: g.original,
       translation: g.translation,
+      romaji: g.romaji,
       fragments: _fillFragmentDurations(
         g.fragments,
         g.original.timeMs,
         end,
       ),
       endMs: end,
+      isBG: g.isBG,
     );
   });
+}
+
+/// 整行是否被圆括号包裹（半角 `()` 或全角 `（）`）——背景人声判定，
+/// 对齐 AMLL `isBackgroundVocalText` / `checkIsBG`。
+bool isBgText(String text) {
+  if (text.length < 2) return false;
+  final a = text.codeUnitAt(0);
+  final b = text.codeUnitAt(text.length - 1);
+  final open = a == 0x28 || a == 0xFF08; // ( （
+  final close = b == 0x29 || b == 0xFF09; // ) ）
+  return open && close;
+}
+
+/// 剥掉背景人声行首尾片段的括号（就地修改），并丢弃因此变空的片段。
+void trimBgParentheses(List<LyricFragment> frags) {
+  if (frags.isEmpty) return;
+  final first = frags.first;
+  if (first.text.isNotEmpty) {
+    frags[0] = LyricFragment(
+      text: first.text.substring(1),
+      startMs: first.startMs,
+      durationMs: first.durationMs,
+    );
+  }
+  final lastIdx = frags.length - 1;
+  final last = frags[lastIdx];
+  if (last.text.isNotEmpty) {
+    frags[lastIdx] = LyricFragment(
+      text: last.text.substring(0, last.text.length - 1),
+      startMs: last.startMs,
+      durationMs: last.durationMs,
+    );
+  }
+  frags.removeWhere((f) => f.text.isEmpty);
 }
 
 /// 补齐逐字片段的缺失时长：以「下一字起始（或行尾）」为当前字结束。

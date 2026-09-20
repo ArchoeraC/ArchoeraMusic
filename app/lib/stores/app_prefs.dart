@@ -11,6 +11,7 @@ import '../services/playback/playback_session.dart';
 import 'data_dir.dart';
 import 'prefs_app.dart';
 import 'prefs_appearance.dart';
+import 'prefs_audio_fx.dart';
 import 'prefs_download.dart';
 import 'prefs_history.dart';
 import 'prefs_lyrics.dart';
@@ -26,6 +27,7 @@ import 'prefs_shortcuts.dart';
 
 export 'prefs_app.dart';
 export 'prefs_appearance.dart';
+export 'prefs_audio_fx.dart';
 export 'prefs_download.dart';
 export 'prefs_history.dart';
 export 'prefs_lyrics.dart';
@@ -88,10 +90,11 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     // 会话内其它设置变更的 save() 会把整个 data（含 developerMode）
     // 连带写盘，这里统一清掉上会话残留，保证内存与磁盘都以关闭态起步。
     // 开发者组件开关（FPS 监控等）同理会话级、默认全关，一并重置。
-    if (prefs.developerMode || prefs.devFpsMonitor) {
+    if (prefs.developerMode || prefs.devFpsMonitor || prefs.devDownloadModule) {
       final reset = prefs
           .copyWithDeveloperMode(false)
-          .copyWithDevFpsMonitor(false);
+          .copyWithDevFpsMonitor(false)
+          .copyWithDevDownloadModule(false);
       reset.save();
       return reset;
     }
@@ -227,6 +230,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置歌词显示音译（罗马音）开关。
+  void setShowRomanization(bool value) {
+    state = state.copyWithShowRomanization(value);
+    state.save();
+  }
+
   /// 设置封面切换动效样式（scale / slide）。
   void setTransitionStyle(String value) {
     state = state.copyWithTransitionStyle(value);
@@ -260,6 +269,100 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置自适应画质（按帧时间自动调整水纹渲染分辨率；默认关）。
   void setAdaptiveRenderQuality(bool value) {
     state = state.copyWithAdaptiveRenderQuality(value);
+    state.save();
+  }
+
+  /// 设置进度条 / 播放条细节（悬停提示 / 进度歌词 / 吸附 / 时间格式 / 来源）。
+  void setProgressDisplay({
+    bool? showTooltip,
+    bool? showLyric,
+    bool? snapToLyric,
+    String? timeFormat,
+    bool? showSource,
+  }) {
+    state = state.copyWithProgressDisplay(
+      showTooltip: showTooltip,
+      showLyric: showLyric,
+      snapToLyric: snapToLyric,
+      timeFormat: timeFormat,
+      showSource: showSource,
+    );
+    state.save();
+  }
+
+  /// 设置播放页封面布局（布局 / 占比 / 自动居中 / 跟随封面色）。
+  void setCoverLayout({
+    String? layout,
+    double? ratio,
+    bool? autoCenter,
+    bool? followCoverColor,
+  }) {
+    state = state.copyWithCoverLayout(
+      layout: layout,
+      ratio: ratio,
+      autoCenter: autoCenter,
+      followCoverColor: followCoverColor,
+    );
+    state.save();
+  }
+
+  /// 设置反向频谱（默认关）。
+  void setReverseSpectrum(bool value) {
+    state = state.copyWithReverseSpectrum(value);
+    state.save();
+  }
+
+  /// 设置自动沉浸（默认关）。
+  void setAutoImmersive(bool value) {
+    state = state.copyWithAutoImmersive(value);
+    state.save();
+  }
+
+  /// 设置系统媒体会话同步（默认开）。
+  void setMediaSession(bool value) {
+    state = state.copyWithMediaSession(value);
+    state.save();
+  }
+
+  /// 设置 archoera:// 协议注册（默认关）。
+  void setRegisterProtocol(bool value) {
+    state = state.copyWithRegisterProtocol(value);
+    state.save();
+  }
+
+  /// 设置切歌淡入（开关 / 时长 ms）。
+  void setCrossfade({bool? enabled, int? durationMs}) {
+    state = state.copyWithCrossfade(enabled: enabled, durationMs: durationMs);
+    state.save();
+  }
+
+  /// 设置均衡器（开关 / 10 段增益 / 预增益 / 预设 / 限幅器）。
+  void setEq({
+    bool? enabled,
+    List<double>? gains,
+    double? preampDb,
+    String? preset,
+    bool? limiter,
+  }) {
+    state = state.copyWithEq(
+      enabled: enabled,
+      gains: gains,
+      preampDb: preampDb,
+      preset: preset,
+      limiter: limiter,
+    );
+    state.save();
+  }
+
+  /// 设置响度归一化开关。
+  void setNormalization(bool value) {
+    state = state.copyWithNormalization(value);
+    state.save();
+  }
+
+  /// 设置播放速度（0.5~2.0；变速不变调）。
+  void setPlaybackSpeed(double value) {
+    state = state.copyWithPlaybackSpeed(value);
     state.save();
   }
 
@@ -318,6 +421,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置侧边栏（折叠状态 / 导航高亮动效）。
   void setSidebar({bool? collapsed, String? navStyle}) {
     state = state.copyWithSidebar(collapsed: collapsed, navStyle: navStyle);
+    state.save();
+  }
+
+  /// 设置侧边栏自定义（导航项显示顺序 / 隐藏项集合）。
+  void setSidebarCustomize({List<String>? order, Set<String>? hidden}) {
+    state = state.copyWithSidebarCustomize(order: order, hidden: hidden);
     state.save();
   }
 
@@ -389,6 +498,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     int? playedColor,
     int? unplayedColor,
     bool? followAccent,
+    int? fontWeight,
   }) {
     state = state.copyWithLyricStyle(
       fontSize: fontSize,
@@ -396,7 +506,14 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       playedColor: playedColor,
       unplayedColor: unplayedColor,
       followAccent: followAccent,
+      fontWeight: fontWeight,
     );
+    state.save();
+  }
+
+  /// 设置歌词自适应字号（默认开；字号随窗口高度缩放）。
+  void setLyricAdaptiveFontSize(bool value) {
+    state = state.copyWithAdaptiveFontSize(value);
     state.save();
   }
 
@@ -408,6 +525,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     bool? wordSweep,
     bool? hidePassed,
     bool? enableScale,
+    bool? enableBlur,
     String? springPreset,
   }) {
     state = state.copyWithAmll(
@@ -417,7 +535,34 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       wordSweep: wordSweep,
       hidePassed: hidePassed,
       enableScale: enableScale,
+      enableBlur: enableBlur,
       springPreset: springPreset,
+    );
+    state.save();
+  }
+
+  /// 设置歌词来源回退顺序（仅合法平台，归一化后写入）。
+  void setLyricSourceOrder(List<String> order) {
+    state = state.copyWithLyricSourceOrder(order);
+    state.save();
+  }
+
+  /// 设置歌词格式优先级（仅合法格式，归一化后写入）。
+  void setLyricFormatOrder(List<String> order) {
+    state = state.copyWithLyricFormatOrder(order);
+    state.save();
+  }
+
+  /// 设置歌词排除规则（启用开关 / 关键词 / 正则）。
+  void setLyricExclude({
+    bool? enabled,
+    List<String>? keywords,
+    List<String>? regexes,
+  }) {
+    state = state.copyWithLyricExclude(
+      enabled: enabled,
+      keywords: keywords,
+      regexes: regexes,
     );
     state.save();
   }
@@ -659,6 +804,9 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     if (!value && next.devFpsMonitor) {
       next = next.copyWithDevFpsMonitor(false);
     }
+    if (!value && next.devDownloadModule) {
+      next = next.copyWithDevDownloadModule(false);
+    }
     state = next;
   }
 
@@ -666,6 +814,11 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 开启时生效——[FpsMonitorHost] 双重门控）。
   void setDevFpsMonitor(bool value) {
     state = state.copyWithDevFpsMonitor(value);
+  }
+
+  /// 开发者「下载模块」开关（会话级，默认关；仅在开发者模式开启时生效）。
+  void setDevDownloadModule(bool value) {
+    state = state.copyWithDevDownloadModule(value);
   }
 
   /// 设置节能模式总开关。

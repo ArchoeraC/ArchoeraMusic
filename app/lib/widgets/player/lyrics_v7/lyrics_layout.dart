@@ -12,27 +12,57 @@
 /// 纯 Dart/Flutter，仅依赖 [TextPainter]，不依赖 Riverpod 等状态库。
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart';
 
 import '../../../services/lyrics/lyric_line.dart';
 
-/// 主行与翻译之间的间距（按主字号比例）。
+/// 主行与翻译之间的间距（按主字号比例）——**简单引擎 `LyricsView` 专用**。
 const double kMainTranslationGapEm = 0.05; // 主↔译 0.05×
 
-/// 翻译小字字号相对主字号的倍率（0.6）。
+/// 翻译小字字号相对主字号的倍率（0.6）——**简单引擎 `LyricsView` 专用**。
 const double kTranslationFontScale = 0.6;
+
+/// ── v7 AMLL 引擎的排版度量（对齐 AMLL `lyric-player.module.css`）──────
+
+/// 主行行高倍率（CSS `line-height: 1.2`）。
+const double kLyricLineHeightEm = 1.2;
+
+/// 相邻两行之间的间隙（AMLL `.lyricLineWrapper` 上下各 `padding: .4em`）。
+const double kLyricLineGapEm = 0.8;
+
+/// 主行与翻译之间的间隙（AMLL wrapper 的 `gap: .3em`）。
+const double kLyricTranslationGapEm = 0.3;
+
+/// 翻译字号倍率（AMLL `.lyricSubLine`：`max(.5em, 10px)`）。
+const double kLyricTranslationFontScale = 0.5;
+
+/// 翻译字号下限（px）。
+const double kLyricTranslationMinPx = 10;
+
+/// 翻译行高倍率（AMLL `.lyricSubLine`：`line-height: 1.5em`）。
+const double kLyricTranslationLineHeightEm = 1.5;
+
+/// 翻译字号（px）：`max(.5em, 10px)`。
+double lyricTranslationFontSize(double fontSize) =>
+    math.max(kLyricTranslationMinPx, fontSize * kLyricTranslationFontScale);
 
 /// 翻译小字是否计入行高的开关默认值。
 const bool kDefaultShowTranslation = true;
+
+/// 背景人声行字号相对主行的倍率（对齐 AMLL `--amll-lp-bg-line-scale` 0.7）。
+const double kBgFontScale = 0.7;
 
 /// 相邻两行中心之间的默认间隙（逻辑像素）。
 const double kDefaultGapPx = 8;
 
 /// 按组实测每行高度（逻辑像素）。
 ///
-/// 单组行高 = 主行原文 [TextPainter] 实测高；若 [showTranslation] 且该组
-/// 带翻译，再加主行与译文间距 + 小字号译文实测高。文本按 [fontSize] /
-/// [fontFamily] 在 [maxWidth] 内单行排版（过长省略号截断），
+/// 单组行高 = 主行原文 [TextPainter] 实测高；若 [showRomanization] 且该组
+/// 带音译，再加一行小字号音译；若 [showTranslation] 且该组带翻译，再加
+/// 一行小字号译文（绘制顺序与 painter 一致：音译在上、译文在下）。
+/// 文本按 [fontSize] / [fontFamily] / [fontWeight] 在 [maxWidth] 内排版，
 /// [TextPainter] 统一使用 `textDirection: TextDirection.ltr`。
 List<double> computeLineHeights(
   List<LyricGroup> groups, {
@@ -40,10 +70,20 @@ List<double> computeLineHeights(
   String? fontFamily,
   required double maxWidth,
   bool showTranslation = kDefaultShowTranslation,
+  bool showRomanization = false,
+  FontWeight fontWeight = FontWeight.w600,
 }) {
   return [
     for (final g in groups)
-      _measureGroup(g, fontSize, fontFamily, maxWidth, showTranslation),
+      _measureGroup(
+        g,
+        fontSize,
+        fontFamily,
+        maxWidth,
+        showTranslation,
+        showRomanization,
+        fontWeight,
+      ),
   ];
 }
 
@@ -53,25 +93,43 @@ double _measureGroup(
   String? fontFamily,
   double maxWidth,
   bool showTranslation,
+  bool showRomanization,
+  FontWeight fontWeight,
 ) {
-  // 主行按激活态字重（w600）保守测量：长行换行后的行数不会因激活加粗
+  // 背景人声行字号更小（对齐 AMLL `--amll-lp-bg-line-scale`）。
+  final mainFs = g.isBG ? fontSize * kBgFontScale : fontSize;
+  // 主行按激活态字重保守测量：长行换行后的行数不会因激活加粗
   // 而变多导致溢出；非激活行即使略窄也只会多留一点行距。
   var h = _textHeight(
     g.original.text,
-    fontSize,
+    mainFs,
     fontFamily,
     maxWidth,
-    fontWeight: FontWeight.w600,
+    fontWeight: fontWeight,
+    lineHeightEm: kLyricLineHeightEm,
   );
-  if (showTranslation && (g.translation?.isNotEmpty ?? false)) {
-    final gap = fontSize * kMainTranslationGapEm;
+  final subFs = lyricTranslationFontSize(fontSize);
+  // 音译（罗马音）在主行下方、翻译之上（与 painter 的绘制顺序一致）。
+  if (!g.isBG && showRomanization && (g.romaji?.isNotEmpty ?? false)) {
     h +=
-        (gap < 3 ? 3 : gap) +
+        fontSize * kLyricTranslationGapEm +
         _textHeight(
-          g.translation!,
-          fontSize * kTranslationFontScale,
+          g.romaji!,
+          subFs,
           fontFamily,
           maxWidth,
+          lineHeightEm: kLyricTranslationLineHeightEm,
+        );
+  }
+  if (!g.isBG && showTranslation && (g.translation?.isNotEmpty ?? false)) {
+    h +=
+        fontSize * kLyricTranslationGapEm +
+        _textHeight(
+          g.translation!,
+          subFs,
+          fontFamily,
+          maxWidth,
+          lineHeightEm: kLyricTranslationLineHeightEm,
         );
   }
   return h;
@@ -79,12 +137,16 @@ double _measureGroup(
 
 /// 单段文本排版实测高。TextPainter 按约定传入 [fontFamily]（可为 null，
 /// 走默认字体）与 ltr 方向；超过 [maxWidth] 时自动换行，返回多行总高。
+///
+/// [lineHeightEm] 必须与绘制端（`ui.ParagraphStyle` / `ui.TextStyle` 的
+/// `height`）一致，否则行高会与实际渲染不符。
 double _textHeight(
   String text,
   double fs,
   String? fontFamily,
   double maxWidth, {
   FontWeight fontWeight = FontWeight.w400,
+  double lineHeightEm = kLyricLineHeightEm,
 }) {
   final tp = TextPainter(
     text: TextSpan(
@@ -93,6 +155,7 @@ double _textHeight(
         fontFamily: fontFamily,
         fontSize: fs,
         fontWeight: fontWeight,
+        height: lineHeightEm,
       ),
     ),
     textDirection: TextDirection.ltr,
@@ -105,18 +168,37 @@ double _textHeight(
 ///
 /// 第一行中心在自身半高处；后续行中心 = 前一行中心 + 前一行半高 +
 /// [gapPx] + 本行半高。空列表返回空列表。
+///
+/// [isBg] 标记背景人声行：背景人声**不占独立纵向槽位**，挂在最近一个
+/// 主行下方（间距为 [gapPx] × 0.4），因此主行滚动时背景行同步跟随
+/// （对齐 AMLL 的 bg line 与主行同组）。
 List<double> computeCenters(
   List<double> heights, {
   double gapPx = kDefaultGapPx,
+  List<bool>? isBg,
 }) {
   if (heights.isEmpty) return const [];
   final centers = <double>[];
-  var acc = heights[0] / 2;
+  int? lastMain;
   for (var i = 0; i < heights.length; i++) {
-    centers.add(acc);
-    if (i + 1 < heights.length) {
-      acc += heights[i] / 2 + gapPx + heights[i + 1] / 2;
+    final bg = isBg != null && i < isBg.length && isBg[i];
+    if (bg && lastMain != null) {
+      centers.add(
+        centers[lastMain] +
+            heights[lastMain] / 2 +
+            gapPx * 0.4 +
+            heights[i] / 2,
+      );
+      continue;
     }
+    if (lastMain == null) {
+      centers.add(heights[i] / 2);
+    } else {
+      centers.add(
+        centers[lastMain] + heights[lastMain] / 2 + gapPx + heights[i] / 2,
+      );
+    }
+    lastMain = i;
   }
   return centers;
 }

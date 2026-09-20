@@ -122,12 +122,14 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_MEDIA_SEEK         (1u << 3)   /* 系统 UI 可拖进度条 */
 #define APL_CAP_MEDIA_ARTWORK      (1u << 4)
 #define APL_CAP_WINDOW_STATE       (1u << 5)   /* 窗口最小化/失焦事件 */
-#define APL_CAP_APP_INSTANCE       (1u << 6)   /* 单实例仲裁（文件锁） */
+#define APL_CAP_APP_INSTANCE       (1u << 6)   /* 单实例仲裁（文件锁 / 命名互斥体） */
 #define APL_CAP_SYSTEM_ACCENT      (1u << 7)   /* 系统主题色（DE accent） */
 #define APL_CAP_SYSTEM_THEME       (1u << 8)   /* 系统深浅色（light/dark） */
 #define APL_CAP_OS_SESSION         (1u << 9)   /* ArchoeraOS 合成器会话（archoera_shell_v1；仅 Linux/Wayland） */
 #define APL_CAP_SYS_STATS          (1u << 10)  /* 系统资源快照（CPU/内存/磁盘/运行时长/温度） */
 #define APL_CAP_BLUETOOTH          (1u << 11)  /* 蓝牙适配器状态（BlueZ；无适配器/无 BlueZ 时不置位） */
+#define APL_CAP_WIFI               (1u << 12)  /* WiFi（NetworkManager；无无线设备/NM 时不置位） */
+#define APL_CAP_DEEP_LINK          (1u << 13)  /* archoera:// 协议唤醒（ABI v2；与 OS_SESSION 撞位后顺延） */
 ```
 
 **系统资源 / 蓝牙**（只读快照、轮询式；UI 可见时定时读取）：
@@ -142,6 +144,12 @@ typedef struct AplBtState { int32_t present, powered, discoverable, pairable, de
     AplString adapter_name; } AplBtState;   /* adapter_name 仅调用期间有效 */
 int32_t apl_bt_state(AplBtState* out);
 ```
+```
+
+协议唤醒（`APL_CAP_DEEP_LINK`，ABI v2 起）：`apl_protocol_register/unregister`
+注册当前用户处理程序（免提权）、`apl_deep_link_take` 取回待处理 URI、
+`apl_deep_link_forward` 次实例转发、`apl_window_activate` 置前主窗口；
+接收侧发 `APL_EVENT_DEEP_LINK` 信号，Dart 收到后调用 `apl_deep_link_take`。
 
 ### 3.2 字符串与元数据（零 JSON）
 

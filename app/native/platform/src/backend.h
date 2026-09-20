@@ -30,6 +30,13 @@ int32_t mediaSetWindow(int64_t window);
 
 int32_t appInstanceAcquire();
 
+// deep link / 协议唤醒（见 include/archoera_platform.h）
+int32_t protocolRegister(const char* scheme);
+int32_t protocolUnregister(const char* scheme);
+int32_t deepLinkTake(AplString* out);
+int32_t deepLinkForward();
+int32_t windowActivate();
+
 bool systemAccent(int32_t* r, int32_t* g, int32_t* b);
 int32_t systemAccentSetEvents(bool on);
 

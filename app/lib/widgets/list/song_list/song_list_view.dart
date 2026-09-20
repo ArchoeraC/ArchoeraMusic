@@ -20,7 +20,7 @@ extension _SongListView on _SongListState {
               showIndex: widget.showIndex,
               showAlbum: widget.showAlbum,
               showDuration: widget.showDuration,
-              developerMode: ref.watch(appPrefsProvider).developerMode,
+              downloadModule: ref.watch(appPrefsProvider).downloadModuleEnabled,
               l10n: l10n,
               scheme: theme.colorScheme,
               allSelected: _allSelected,
@@ -107,7 +107,7 @@ class _SongListHeader extends StatelessWidget {
     required this.showIndex,
     required this.showAlbum,
     required this.showDuration,
-    required this.developerMode,
+    required this.downloadModule,
     required this.l10n,
     required this.scheme,
     required this.onEnterBatch,
@@ -128,7 +128,7 @@ class _SongListHeader extends StatelessWidget {
   final bool showIndex;
   final bool showAlbum;
   final bool showDuration;
-  final bool developerMode;
+  final bool downloadModule;
   final AppLocalizations l10n;
   final ColorScheme scheme;
   final VoidCallback onEnterBatch;
@@ -184,7 +184,7 @@ class _SongListHeader extends StatelessWidget {
               enabled: !none,
               onTap: onBatchAddQueue,
             ),
-            if (developerMode)
+            if (downloadModule)
               _SongListIconButton(
                 tooltip: l10n.batchDownload,
                 icon: EtaIcons.downloadOutline,

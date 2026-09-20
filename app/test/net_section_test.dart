@@ -373,7 +373,15 @@ void main() {
   });
 
   testWidgets('分类可见性：仅在有无线/蓝牙适配器时出现', (tester) async {
-    expect(SettingsCategory.network.visible(false, netAvailable: false), false);
-    expect(SettingsCategory.network.visible(false, netAvailable: true), true);
+    // 签名：visible(developerMode, downloadModule, {osAvailable, netAvailable})；
+    // 网络分类只取决于 netAvailable。
+    expect(
+      SettingsCategory.network.visible(false, false, netAvailable: false),
+      false,
+    );
+    expect(
+      SettingsCategory.network.visible(false, false, netAvailable: true),
+      true,
+    );
   });
 }

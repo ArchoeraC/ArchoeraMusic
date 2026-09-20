@@ -37,6 +37,9 @@ constexpr uint32_t CAP_SYSTEM_THEME = 1u << 8;
 constexpr uint32_t CAP_OS_SESSION = 1u << 9;
 constexpr uint32_t CAP_SYS_STATS = 1u << 10;
 constexpr uint32_t CAP_BLUETOOTH = 1u << 11;
+constexpr uint32_t CAP_WIFI = 1u << 12;
+// 与 apl 头文件一致：DEEP_LINK 原为 bit 9，与 CAP_OS_SESSION 撞位 → 顺延到 13。
+constexpr uint32_t CAP_DEEP_LINK = 1u << 13;
 
 // ── 事件类型 / 命令 ───────────────────────────────────────────────
 constexpr int32_t EVENT_MEDIA_COMMAND = 1;
@@ -54,6 +57,8 @@ constexpr int32_t EVENT_OS_SESSION = 12;
 constexpr int32_t EVENT_OS_SCREEN = 13;
 constexpr int32_t EVENT_OS_POWER_KEY = 14;
 constexpr int32_t EVENT_OS_OUTPUT = 15;
+// 与 apl 头文件一致：DEEP_LINK 原为 8，与 EVENT_OS_CAPABILITIES（及蓝牙配对的 16/17）撞位 → 顺延到 18。
+constexpr int32_t EVENT_DEEP_LINK = 18;
 
 constexpr int32_t CMD_PLAY = 0;
 constexpr int32_t CMD_PAUSE = 1;
@@ -99,6 +104,8 @@ AplEvent makeOsOutput(int32_t width, int32_t height, int32_t scaleMilli, int32_t
 /* 蓝牙配对提示/结果（见 apl_bt_pair_start 的说明）。entered 仅 DISPLAY 有意义。 */
 AplEvent makeBtPairPrompt(int32_t kind, int32_t passkey, int32_t entered, const char* text);
 AplEvent makeBtPairResult(bool ok, int32_t err);
+// deep link 待取信号（u.deep_link=1）。
+AplEvent makeDeepLink();
 
 }  // namespace archoera
 

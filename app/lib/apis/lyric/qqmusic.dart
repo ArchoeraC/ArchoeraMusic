@@ -15,31 +15,24 @@ import '../../services/netease/track.dart';
 import '../logger.dart';
 import '../qqmusic/api.dart';
 import '../runtime.dart';
-import 'fingerprint.dart';
+import 'format.dart';
+import 'match.dart';
 import 'ttml.dart';
 import 'types.dart';
-import 'utils.dart';
-
-/// qrc 优先，其次 lrc
-({String content, String format})? _pickFormatted(String? qrc, String? lrc) {
-  final qrcContent = qrc?.trim();
-  if (qrcContent != null && qrcContent.isNotEmpty) {
-    return (content: qrcContent, format: 'qrc');
-  }
-  final lrcContent = lrc?.trim();
-  if (lrcContent != null && lrcContent.isNotEmpty) {
-    return (content: lrcContent, format: 'lrc');
-  }
-  return null;
-}
 
 /// 按 QQMusic 数字 songID 直取歌词
-Future<LyricMatchResult?> qmGetLyricByPlatformId(String id, [String? mid]) async {
+Future<LyricMatchResult?> qmGetLyricByPlatformId(
+  String id, {
+  String? mid,
+  bool preferRich = true,
+}) async {
+  final cachePlatform = lyricCachePlatform('qqmusic', preferRich: preferRich);
+  final midValue = (mid == null || mid.isEmpty) ? null : mid;
   // 立刻预热 TTML 抓取，与本接口的 lyric 调用并行
   // AMLL DB 里 QM 条目 mid / 数字 id 都可能是 key，依次试
-  prefetchTTML('qqmusic', mid != null ? [mid, id] : [id]);
+  prefetchTTML('qqmusic', midValue != null ? [midValue, id] : [id]);
 
-  final cached = getRuntime().lyricCache.get('qqmusic', id);
+  final cached = getRuntime().lyricCache.get(cachePlatform, id);
   if (cached != null) return LyricMatchResult.fromJson(cached);
 
   try {
@@ -53,7 +46,17 @@ Future<LyricMatchResult?> qmGetLyricByPlatformId(String id, [String? mid]) async
       return null;
     }
 
-    final main = _pickFormatted(body['qrc']?.toString(), body['lrc']?.toString());
+    final main = pickLyricFormat(
+      [
+        LyricFormatCandidate(
+          content: body['qrc']?.toString(),
+          format: 'qrc',
+          wordByWord: true,
+        ),
+        LyricFormatCandidate(content: body['lrc']?.toString(), format: 'lrc'),
+      ],
+      preferRich: preferRich,
+    );
     if (main == null) return null;
 
     final trans = body['trans']?.toString().trim();
@@ -67,9 +70,9 @@ Future<LyricMatchResult?> qmGetLyricByPlatformId(String id, [String? mid]) async
       translationFormat: (trans == null || trans.isEmpty) ? null : 'lrc',
       romaji: (roma == null || roma.isEmpty) ? null : roma,
       romajiFormat: (roma == null || roma.isEmpty) ? null : main.format,
-      extra: mid != null ? {'mid': mid} : null,
+      extra: midValue != null ? {'mid': midValue} : null,
     );
-    getRuntime().lyricCache.set('qqmusic', id, result.toJson());
+    getRuntime().lyricCache.set(cachePlatform, id, result.toJson());
     return result;
   } catch (err) {
     coreLog.warn('[lyric:qqmusic] getByPlatformId($id) failed: $err');
@@ -78,51 +81,47 @@ Future<LyricMatchResult?> qmGetLyricByPlatformId(String id, [String? mid]) async
 }
 
 /// 按 Track 元数据模糊搜索：search → 挑最佳 → 单次请求歌词
-Future<LyricMatchResult?> qmGetLyricByQuery(Track track) async {
-  final fingerprint = buildFingerprint(track);
-  final cached = getRuntime().lyricMatchCache.get(fingerprint, 'qqmusic');
-  if (cached != null) {
-    return qmGetLyricByPlatformId(
-      cached.platformId,
-      cached.extra?['mid'] as String?,
-    );
-  }
-
-  final keyword = buildLyricSearchKeyword(track);
-  if (keyword.isEmpty) return null;
-
-  final candidates = <LyricCandidate<Map<String, String>>>[];
-  try {
-    final body = await qmCall('search', {'keywords': keyword, 'limit': 25});
-    if (body is! Map || body['code'] != 200) return null;
-    final songs = body['songs'] as List? ?? const [];
-    for (final item in songs) {
-      final song = (item as Map).cast<String, dynamic>();
-      candidates.add(LyricCandidate<Map<String, String>>(
-        name: song['name']?.toString() ?? '',
-        artist: song['artist']?.toString() ?? '',
-        album: song['album']?.toString(),
-        duration: (song['duration'] as num?)?.toInt(),
-        extra: {'id': '${song['id']}', 'mid': '${song['mid'] ?? ''}'},
-      ));
-    }
-  } catch (err) {
-    coreLog.warn('[lyric:qqmusic] search("$keyword") failed: $err');
-    return null;
-  }
-
-  final best = pickBestCandidate(candidates, track);
-  coreLog.info(
-    '[lyric:qqmusic] fuzzy "$keyword" → ${candidates.length} hits, '
-    'best=${best?.name ?? 'none'}',
+Future<LyricMatchResult?> qmGetLyricByQuery(
+  Track track, {
+  bool preferRich = true,
+}) {
+  return fetchMatchedLyric(
+    platform: 'qqmusic',
+    track: track,
+    idOf: (extra) => extra['id'] ?? '',
+    byId: (id, extra) => qmGetLyricByPlatformId(
+      id,
+      mid: extra['mid'],
+      preferRich: preferRich,
+    ),
+    search: (keyword) async {
+      final candidates = <LyricCandidate<Map<String, String>>>[];
+      try {
+        final body = await qmCall('search', {'keywords': keyword, 'limit': 25});
+        if (body is! Map || body['code'] != 200) return candidates;
+        final songs = body['songs'] as List? ?? const [];
+        for (final item in songs) {
+          final song = (item as Map).cast<String, dynamic>();
+          candidates.add(
+            LyricCandidate<Map<String, String>>(
+              name: song['name']?.toString() ?? '',
+              artist: song['artist']?.toString() ?? '',
+              album: song['album']?.toString(),
+              duration: (song['duration'] as num?)?.toInt(),
+              extra: {
+                'id': '${song['id']}',
+                'mid': '${song['mid'] ?? ''}',
+              },
+            ),
+          );
+        }
+      } catch (err) {
+        coreLog.warn('[lyric:qqmusic] search("$keyword") failed: $err');
+      }
+      return candidates;
+    },
+    logMatch: (keyword, hits, best) => coreLog.info(
+      '[lyric:qqmusic] fuzzy "$keyword" → $hits hits, best=${best ?? 'none'}',
+    ),
   );
-  if (best == null) return null;
-  final mid = best.extra['mid'];
-  getRuntime().lyricMatchCache.set(
-    fingerprint,
-    'qqmusic',
-    best.extra['id'] ?? '',
-    mid == null || mid.isEmpty ? null : {'mid': mid},
-  );
-  return qmGetLyricByPlatformId(best.extra['id'] ?? '', best.extra['mid']);
 }

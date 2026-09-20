@@ -20,6 +20,7 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -623,6 +624,88 @@ DBusHandlerResult filter(DBusConnection* c, DBusMessage* msg, void*) {
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
+// ── DeepLink / 协议唤醒（per-user desktop + GIO 注册 + D-Bus OpenUri）──
+const char* kDeepLinkIface = "org.archoera.ArchooeraMusic";
+const char* kDeepLinkPath = "/org/archoera/ArchooeraMusic";
+const char* kDeepLinkName = "org.archoera.ArchooeraMusic";
+
+std::mutex g_deeplink_mutex;
+std::string g_deeplink_pending;   // UTF-8；单条待取
+std::string g_deeplink_take_buf;  // take 返回缓冲
+
+void setPendingDeepLink(const char* uri) {
+    if (uri == nullptr || *uri == '\0') return;
+    {
+        std::lock_guard<std::mutex> lock(g_deeplink_mutex);
+        g_deeplink_pending = uri;
+    }
+    dispatch(makeDeepLink());
+}
+
+int32_t deepLinkTakeLinux(AplString* out) {
+    if (out == nullptr) return ERR_STATE;
+    std::lock_guard<std::mutex> lock(g_deeplink_mutex);
+    if (g_deeplink_pending.empty()) {
+        out->data = nullptr;
+        out->len = 0;
+        return 0;
+    }
+    g_deeplink_take_buf = g_deeplink_pending;
+    g_deeplink_pending.clear();
+    out->data = g_deeplink_take_buf.c_str();
+    out->len = g_deeplink_take_buf.size();
+    return 1;
+}
+
+DBusHandlerResult deepLinkObjectHandler(DBusConnection* c, DBusMessage* msg,
+                                        void*) {
+    if (dbus_message_is_method_call(msg, kDeepLinkIface, "OpenUri")) {
+        const char* uri = nullptr;
+        if (dbus_message_get_args(msg, nullptr, DBUS_TYPE_STRING, &uri,
+                                  DBUS_TYPE_INVALID)) {
+            setPendingDeepLink(uri);
+        }
+        DBusMessage* reply = dbus_message_new_method_return(msg);
+        dbus_connection_send(c, reply, nullptr);
+        dbus_message_unref(reply);
+        return DBUS_HANDLER_RESULT_HANDLED;
+    }
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+}
+
+void registerDeepLinkObject(DBusConnection* c) {
+    static const DBusObjectPathVTable vtable = {
+        nullptr, deepLinkObjectHandler, nullptr,
+        nullptr, nullptr, nullptr};
+    dbus_connection_register_object_path(c, kDeepLinkPath, &vtable, nullptr);
+}
+
+std::string readCmdlineUrl() {
+    FILE* f = ::fopen("/proc/self/cmdline", "rb");
+    if (f == nullptr) return std::string();
+    std::string data;
+    char buf[4096];
+    size_t r;
+    while ((r = std::fread(buf, 1, sizeof(buf), f)) > 0) data.append(buf, r);
+    std::fclose(f);
+    size_t start = 0;
+    while (start < data.size()) {
+        size_t end = data.find('\0', start);
+        if (end == std::string::npos) end = data.size();
+        const std::string arg = data.substr(start, end - start);
+        if (arg.rfind("archoera://", 0) == 0) return arg;
+        start = end + 1;
+    }
+    return std::string();
+}
+
+std::string desktopFilePath() {
+    const char* home = std::getenv("HOME");
+    if (home == nullptr || *home == '\0') return std::string();
+    return std::string(home) +
+           "/.local/share/applications/archoera_music.desktop";
+}
+
 // ── 连接管理 ──────────────────────────────────────────────────────
 void addMatch(DBusConnection* c, const char* rule) {
     DBusError err;
@@ -695,6 +778,11 @@ DBusConnection* ensureConn() {
             g_service = fallback;
         }
     }
+
+    // 协议唤醒：第二个 well-known name（与 MPRIS 名不同，互不冲突），
+    // 导出 OpenUri 供次实例转发（见 backend 接口 deepLinkForward）。
+    tryRequestName(c, kDeepLinkName);
+    registerDeepLinkObject(c);
 
     pickScreensaver(c);
     addMatch(c,
@@ -849,6 +937,7 @@ int (*gtk_widget_get_visible)(void*) = nullptr;
 int (*gtk_window_is_active)(void*) = nullptr;
 void* (*gtk_widget_get_window)(void*) = nullptr;
 int (*gdk_window_get_state)(void*) = nullptr;
+void (*gtk_window_present)(void*) = nullptr;
 
 void* g_win = nullptr;
 unsigned g_timer = 0;
@@ -888,6 +977,8 @@ bool load() {
         g_gtk, "gtk_widget_get_window");
     gdk_window_get_state = sym<decltype(gdk_window_get_state)>(
         g_gdk, "gdk_window_get_state");
+    gtk_window_present =
+        sym<decltype(gtk_window_present)>(g_gtk, "gtk_window_present");
     g_loaded = g_idle_add != nullptr && g_timeout_add != nullptr &&
                g_source_remove != nullptr &&
                g_application_get_default != nullptr &&
@@ -900,6 +991,42 @@ bool load() {
 }
 
 bool available() { return load(); }
+
+// 置前主窗口：GTK 只在主循环线程安全，故经 g_idle_add 调度。
+int activateOnMain(void*) {
+    struct GList {
+        void* data;
+        GList* next;
+        GList* prev;
+    };
+    void* win = g_win;
+    if (win == nullptr && g_application_get_default != nullptr &&
+        gtk_application_get_windows != nullptr) {
+        void* app = g_application_get_default();
+        if (app != nullptr) {
+            auto* it = static_cast<GList*>(gtk_application_get_windows(app));
+            while (it != nullptr) {
+                if (it->data != nullptr) {
+                    win = it->data;
+                    break;
+                }
+                it = it->next;
+            }
+        }
+    }
+    if (win != nullptr && gtk_window_present != nullptr) {
+        gtk_window_present(win);
+    }
+    return 0;  // G_SOURCE_REMOVE
+}
+
+void activate() {
+    if (!load() || gtk_window_present == nullptr ||
+        g_idle_add == nullptr) {
+        return;
+    }
+    g_idle_add(activateOnMain, nullptr);
+}
 
 void emit() {
     if (!g_enabled.load(std::memory_order_acquire)) return;
@@ -1012,7 +1139,7 @@ bool notifyViaDbus(const char* title, const char* body) {
 uint32_t caps() {
     uint32_t c = CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_MEDIA_SESSION |
                  CAP_MEDIA_SEEK | CAP_MEDIA_ARTWORK | CAP_APP_INSTANCE |
-                 CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME;
+                 CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME | CAP_DEEP_LINK;
     const bool hasDisplay = std::getenv("WAYLAND_DISPLAY") != nullptr ||
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
@@ -1030,6 +1157,12 @@ int32_t init() {
     sysinfo::probe();
     g_running.store(true, std::memory_order_release);
     g_pump = new std::thread(pumpLoop);
+    // 冷启动：命令行中的 archoera:// URL（协议处理程序把 URL 作为 argv 传入）。
+    const std::string cold = readCmdlineUrl();
+    if (!cold.empty()) {
+        std::lock_guard<std::mutex> lock(g_deeplink_mutex);
+        g_deeplink_pending = cold;
+    }
     return OK;
 }
 
@@ -1142,6 +1275,89 @@ int32_t appInstanceAcquire() {
     }
     g_instance_fd = fd;
     return 1;
+}
+
+int32_t protocolRegister(const char* scheme) {
+    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
+    const std::string path = desktopFilePath();
+    if (path.empty()) return ERR_BACKEND;
+    char exe[4096] = {0};
+    const ssize_t n = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+    if (n <= 0) return ERR_BACKEND;
+    exe[n] = '\0';
+    const size_t slash = path.find_last_of('/');
+    if (slash != std::string::npos) {
+        const std::string dir = path.substr(0, slash);
+        // 只建最后一级；父目录（~/.local/share/applications）通常已存在。
+        ::mkdir(dir.c_str(), 0700);
+    }
+    FILE* f = ::fopen(path.c_str(), "w");
+    if (f == nullptr) return ERR_BACKEND;
+    std::fprintf(f,
+                 "[Desktop Entry]\n"
+                 "Type=Application\n"
+                 "Name=ArchoeraMusic\n"
+                 "Exec=\"%s\" %%U\n"
+                 "Terminal=false\n"
+                 "NoDisplay=true\n"
+                 "MimeType=x-scheme-handler/%s;\n",
+                 exe, scheme);
+    std::fclose(f);
+    // GIO 注册默认处理（best-effort，无 GIO 时仅写 desktop 文件）。
+    void* gio = dlopen("libgio-2.0.so.0", RTLD_NOW);
+    if (gio != nullptr) {
+        auto new_from_file = reinterpret_cast<void* (*)(const char*)>(
+            dlsym(gio, "g_desktop_app_info_new_from_filename"));
+        auto set_default =
+            reinterpret_cast<int (*)(void*, const char*, void*)>(
+                dlsym(gio, "g_app_info_set_as_default_for_type"));
+        if (new_from_file != nullptr && set_default != nullptr) {
+            void* info = new_from_file(path.c_str());
+            if (info != nullptr) {
+                const std::string ct = std::string("x-scheme-handler/") + scheme;
+                set_default(info, ct.c_str(), nullptr);
+            }
+        }
+    }
+    return OK;
+}
+
+int32_t protocolUnregister(const char* scheme) {
+    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
+    const std::string path = desktopFilePath();
+    if (!path.empty()) ::unlink(path.c_str());
+    return OK;
+}
+
+int32_t deepLinkTake(AplString* out) { return deepLinkTakeLinux(out); }
+
+int32_t deepLinkForward() {
+    const std::string url = readCmdlineUrl();
+    if (url.empty()) return 0;
+    DBusError err;
+    dbus_error_init(&err);
+    DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
+    if (c == nullptr) {
+        dbus_error_free(&err);
+        return ERR_BACKEND;
+    }
+    DBusMessage* msg = dbus_message_new_method_call(
+        kDeepLinkName, kDeepLinkPath, kDeepLinkIface, "OpenUri");
+    const char* u = url.c_str();
+    dbus_message_append_args(msg, DBUS_TYPE_STRING, &u, DBUS_TYPE_INVALID);
+    DBusMessage* reply =
+        dbus_connection_send_with_reply_and_block(c, msg, 2000, &err);
+    dbus_message_unref(msg);
+    const bool ok = reply != nullptr;
+    if (reply != nullptr) dbus_message_unref(reply);
+    dbus_error_free(&err);
+    dbus_connection_unref(c);
+    return ok ? 1 : ERR_BACKEND;
+}
+
+int32_t windowActivate() {
+    gtkwin::activate();
+    return OK;
 }
 
 // 系统主题色（DE accent）：XDG Desktop Portal（跨 DE 标准）：

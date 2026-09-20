@@ -23,6 +23,29 @@ String formatMs(int ms) {
   return h > 0 ? '$h:${pad(m)}:${pad(s)}' : '$m:${pad(s)}';
 }
 
+/// 按显示模式返回「播放时间对」（左 / 右），对齐上游 player.timeFormat：
+/// - `current-total`：左=已播，右=总时长；
+/// - `remaining-total`：左=剩余（带 `-`），右=总时长；
+/// - `current-remaining`：左=已播，右=剩余（带 `-`）。
+///
+/// 位置超出总时长时剩余按 0 计。
+(String, String) formatTimePair(Duration pos, Duration dur, String mode) {
+  final current = formatClock(pos);
+  final total = formatClock(dur);
+  final remain = formatClock(dur > pos ? dur - pos : Duration.zero);
+  return switch (mode) {
+    'remaining-total' => ('-$remain', total),
+    'current-remaining' => (current, '-$remain'),
+    _ => (current, total),
+  };
+}
+
+/// 单串形式（播放条用）：`左 / 右`，格式见 [formatTimePair]。
+String formatTimeLabel(Duration pos, Duration dur, String mode) {
+  final (left, right) = formatTimePair(pos, dur, mode);
+  return '$left / $right';
+}
+
 /// 字节数人类可读（B / KB / MB / GB / TB；<=0 返回 "0 B"）。
 String formatBytes(int bytes) {
   if (bytes <= 0) return '0 B';

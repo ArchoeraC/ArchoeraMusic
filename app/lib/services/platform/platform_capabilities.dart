@@ -22,10 +22,12 @@ import 'ffi_system_media.dart';
 import 'ffi_system_os.dart';
 import 'ffi_system_power.dart';
 import 'ffi_system_status.dart';
+import 'ffi_system_deep_link.dart';
 import 'ffi_system_window.dart';
 import 'live_install.dart';
 import 'net.dart';
 import 'platform_bindings.dart';
+import 'system_deep_link.dart';
 import 'system_media.dart';
 import 'system_os.dart';
 import 'system_power.dart';
@@ -42,6 +44,7 @@ class PlatformCapabilities {
     required this.status,
     required this.net,
     required this.liveInstall,
+    required this.deepLink,
     required this.caps,
   });
 
@@ -53,6 +56,7 @@ class PlatformCapabilities {
   final SystemPower power;
   final SystemMedia media;
   final SystemWindow window;
+  final SystemDeepLink deepLink;
 
   /// ArchoeraOS 合成器会话（未运行时为空实现）。
   final SystemOsSession os;
@@ -80,6 +84,8 @@ class PlatformCapabilities {
   bool get netAvailable =>
       caps & (aplCapWifi | aplCapBluetooth) != 0 &&
       (net is! UnavailableNetService);
+
+  bool get deepLinkAvailable => caps & aplCapDeepLink != 0;
   bool get bridgeLoaded => _bindings != null;
 
   /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
@@ -179,6 +185,9 @@ class PlatformCapabilities {
       liveInstall: (b != null && b.liveSymbolsAvailable)
           ? FfiLiveInstall(b)
           : const UnavailableLiveInstall(),
+      deepLink: (b != null && caps & aplCapDeepLink != 0)
+          ? FfiSystemDeepLink(b)
+          : NoopSystemDeepLink.instance,
     );
     _instance = built;
     return built;
@@ -189,6 +198,7 @@ class PlatformCapabilities {
     await power.dispose();
     await media.dispose();
     await window.dispose();
+    await deepLink.dispose();
     _bindings?.dispose();
     _instance = null;
   }
