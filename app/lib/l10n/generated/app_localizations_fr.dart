@@ -277,20 +277,20 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String navHeaderKugouId(Object id) {
-    return 'Kugou $id';
+    return 'KG $id';
   }
 
   @override
   String get navHeaderKugouMusic => 'KG';
 
   @override
-  String get navHeaderLoginAccount => 'Se connecter (Netease / Kugou)';
+  String get navHeaderLoginAccount => 'Se connecter (NT / KG)';
 
   @override
   String get navHeaderLogout => 'Se déconnecter';
 
   @override
-  String get navHeaderNeteaseAccount => 'Compte Netease';
+  String get navHeaderNeteaseAccount => 'Compte NT';
 
   @override
   String get navHeaderNeteaseMusic => 'NT';
@@ -448,11 +448,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get toastLoginRequiredKugou =>
-      'Échec de l\'opération (assurez-vous d\'être connecté à votre compte Kugou)';
+      'Échec de l\'opération (assurez-vous d\'être connecté à votre compte KG)';
 
   @override
   String get toastLoginRequiredNetease =>
-      'Échec de l\'opération (assurez-vous d\'être connecté à votre compte Netease)';
+      'Échec de l\'opération (assurez-vous d\'être connecté à votre compte NT)';
 
   @override
   String get toastNoQualityInfo =>
@@ -799,10 +799,10 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => 'NetEase Cloud Music';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => 'Kugou Music';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => 'Tout';
@@ -936,14 +936,14 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get pageFavEmptyHint =>
-      'Les favoris de l\'app NetEase se synchronisent automatiquement ici';
+      'Les favoris de l\'app NT se synchronisent automatiquement ici';
 
   @override
   String get pageFavLoginTitle => 'Connectez-vous pour voir vos favoris';
 
   @override
   String get pageFavLoginDesc =>
-      'Connectez-vous par QR avec NetEase Cloud Music pour synchroniser playlists, albums et artistes';
+      'Connectez-vous par QR avec NT pour synchroniser playlists, albums et artistes';
 
   @override
   String get pageFavKgCreated => 'Playlists créées';
@@ -983,11 +983,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get pageFavKugouLoginDesc =>
-      'Connectez-vous par QR avec Kugou pour synchroniser playlists et albums créés ou enregistrés';
+      'Connectez-vous par QR avec KG pour synchroniser playlists et albums créés ou enregistrés';
 
   @override
   String get pageFavKugouEmptyHint =>
-      'Synchronisation automatique après favori dans l\'app Kugou';
+      'Synchronisation automatique après favori dans l\'app KG';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1026,11 +1026,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get pageLikedKugouLoginHint =>
-      'Connectez-vous pour synchroniser les « J\'aime » Kugou';
+      'Connectez-vous pour synchroniser les « J\'aime » KG';
 
   @override
   String get pageLikedNeteaseLoginHint =>
-      'Connectez-vous pour synchroniser les favoris NetEase';
+      'Connectez-vous pour synchroniser les favoris NT';
 
   @override
   String get pageLikedLoadFailed => 'Échec du chargement des j\'aime';
@@ -1040,11 +1040,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get pageLikedKugouEmptyHint =>
-      'Les « J\'aime » dans l\'app Kugou se synchronisent ici';
+      'Les « J\'aime » dans l\'app KG se synchronisent ici';
 
   @override
   String get pageLikedNeteaseEmptyHint =>
-      'Les cœurs dans NetEase se synchronisent ici';
+      'Les cœurs dans NT se synchronisent ici';
 
   @override
   String get toastQqLikeSyncFailed =>
@@ -1083,11 +1083,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get pageLikedKugouLoginDesc =>
-      'Connectez-vous par QR avec Kugou pour synchroniser vos « J\'aime »';
+      'Connectez-vous par QR avec KG pour synchroniser vos « J\'aime »';
 
   @override
   String get pageLikedNeteaseLoginDesc =>
-      'Connectez-vous par QR avec NetEase pour synchroniser vos cœurs';
+      'Connectez-vous par QR avec NT pour synchroniser vos cœurs';
 
   @override
   String get libraryScanDirs => 'Dossiers analysés';
@@ -1247,7 +1247,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get pageHomeDailyLoginHint =>
-      'Connectez-vous à NetEase pour des mises à jour quotidiennes';
+      'Connectez-vous à NT pour des mises à jour quotidiennes';
 
   @override
   String get pageHomeDailyPlay => 'Lire les recommandations du jour';
@@ -2370,8 +2370,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'Tout à plat dans le dossier de téléchargement';
 
   @override
-  String get settingsGroupingPlatform =>
-      'Sous-dossier par plateforme（Kugou / Netease）';
+  String get settingsGroupingPlatform => 'Sous-dossier par plateforme（KG / NT）';
 
   @override
   String get settingsGroupingArtist => 'Sous-dossier par artiste';
@@ -2442,7 +2441,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsFingerprintNote =>
-      'Identifiant d\'appareil envoyé avec les téléchargements Kugou / Netease ; généré au premier lancement et stable, unique par utilisateur.';
+      'Identifiant d\'appareil envoyé avec les téléchargements KG / NT ; généré au premier lancement et stable, unique par utilisateur.';
 
   @override
   String get settingsDownloadDynamicFingerprint => 'Empreinte dynamique';
@@ -2457,7 +2456,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsResetFingerprintDesc =>
-      'Après réinitialisation, cette machine apparaîtra comme un nouvel appareil pour Kugou / Netease ; les sessions liées à l\'ancienne empreinte peuvent cesser de fonctionner. Réinitialiser ?';
+      'Après réinitialisation, cette machine apparaîtra comme un nouvel appareil pour KG / NT ; les sessions liées à l\'ancienne empreinte peuvent cesser de fonctionner. Réinitialiser ?';
 
   @override
   String get toastFingerprintReset => 'Empreinte de l\'appareil réinitialisée';
@@ -2692,7 +2691,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsSecurityNote =>
-      'Supprime de façon irréversible tous les identifiants et sessions de compte (mots de passe des serveurs de streaming, sessions Netease/Kugou, comptes Subsonic locaux) et invalide les jetons de la plateforme. La bibliothèque, l\'historique et les téléchargements ne sont pas affectés.';
+      'Supprime de façon irréversible tous les identifiants et sessions de compte (mots de passe des serveurs de streaming, sessions NT/KG, comptes Subsonic locaux) et invalide les jetons de la plateforme. La bibliothèque, l\'historique et les téléchargements ne sont pas affectés.';
 
   @override
   String get settingsSecurityStreaming =>
@@ -2711,7 +2710,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSecuritySession => 'Sessions de comptes tiers';
 
   @override
-  String get settingsSecuritySessionDesc => 'État de connexion Netease / Kugou';
+  String get settingsSecuritySessionDesc => 'État de connexion NT / KG';
 
   @override
   String get settingsSecurityUserDb => 'Base d\'utilisateurs locale';
@@ -2983,7 +2982,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'Les méthodes utilisent des structures chiffrées incompatibles. Le changement détruit le coffre actuel et reconstruit la base de données ; tous les identifiants de connexion (Netease / Kugou / comptes de streaming) seront perdus et nécessiteront une nouvelle connexion.';
+      'Les méthodes utilisent des structures chiffrées incompatibles. Le changement détruit le coffre actuel et reconstruit la base de données ; tous les identifiants de connexion (NT / KG / comptes de streaming) seront perdus et nécessiteront une nouvelle connexion.';
 
   @override
   String get settingsSchemeSwitchKeep => 'Conserver l\'actuel';
@@ -3992,7 +3991,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ Music';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'Se connecter avec le QR code QM';
