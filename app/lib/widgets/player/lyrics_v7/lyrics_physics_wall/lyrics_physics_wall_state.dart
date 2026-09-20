@@ -16,9 +16,26 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   List<double> _blur = const [];
   bool _metricsDirty = true;
 
-  /// 已识别出的间奏（长空隙）与每段间奏三点的自然纵坐标。
+  /// 间奏预留（三点）与每行自然中心等布局数据。
   List<LyricInterlude> _interludes = const [];
   List<double> _interludeDotY = const [];
+
+  /// 需要参与弹簧/过渡动画的行窗口 `[_winStart, _winEnd)`。
+  ///
+  /// 屏幕只显示得下有限几行：换行时窗口外的行直接停驻到目标，不重建求解器、
+  /// 不参与每帧循环。见 `kViewportWindowMarginPx`。
+  int _winStart = 0;
+  int _winEnd = 0;
+
+  /// 每行高度（实测或估算）与「是否已实测」标记。
+  ///
+  /// 视口外的远行先用 [estimateLineHeight] 估算、进视口时再实测（按需测量），
+  /// 避免拖字号/改宽度时为整首歌逐行排版。
+  List<double> _heights = const [];
+  List<bool> _measured = const [];
+
+  /// 文本可用宽度（按需测量用）。
+  double _maxWidth = 0;
 
   /// 播放时钟：把 ~20Hz 的位置事件插值到 vsync。
   final LyricClock _clock = LyricClock();
@@ -217,23 +234,72 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     // 切歌 / 字号 / 字体 / 宽度变化 → 段落缓存整体失效。
     _c.cache.clear();
     _c.fragCache.clear();
-    final heights = computeLineHeights(
-      groups,
-      fontSize: widget.fontSize,
-      fontFamily: widget.fontFamily,
-      maxWidth: math.max(40, w - 24),
-      showTranslation: widget.showTranslation,
-      showRomanization: widget.showRomanization,
-      fontWeight: widget.fontWeight,
-    );
+    _maxWidth = math.max(40, w - 24);
+    final n = groups.length;
+    // 先全部用**估算**行高，只对进入视口的行做真实排版（见 _ensureMeasured）。
+    // 这样拖字号/改窗口宽度不会为整首歌排一遍版。
+    if (_heights.length != n) {
+      _heights = List<double>.filled(n, 0);
+      _measured = List<bool>.filled(n, false);
+    } else {
+      for (var i = 0; i < n; i++) {
+        _measured[i] = false;
+      }
+    }
+    for (var i = 0; i < n; i++) {
+      _heights[i] = estimateLineHeight(
+        groups[i],
+        fontSize: widget.fontSize,
+        showTranslation: widget.showTranslation,
+        showRomanization: widget.showRomanization,
+      );
+    }
+    _interludes = computeInterludes(groups);
+    _recomputeCenters();
+    final centers = _c.centers;
+    if (_y.length != n) {
+      _y = [
+        for (final _ in groups)
+          Spring1D(initialPosition: centers.isEmpty ? 0 : centers.first),
+      ];
+      _scale = List<double>.filled(n, 1);
+      _fade = List<double>.filled(n, 0);
+      _blur = List<double>.filled(n, 0);
+    }
+    _c.y = [for (final s in _y) s.current];
+    _c.scale = _scale;
+    _c.fade = _fade;
+    _c.blur = _blur;
+    // 窗口由 _updateWindow 在首次重排时收敛（此处先置空，避免把全量当窗口）。
+    _winStart = 0;
+    _winEnd = 0;
+    // 新歌 / 首次布局：整墙从视口下方飞入（对齐 AMLL RebuildView 的
+    // `resetPosition`）。已挂载过且只是尺寸/字号变化时保留当前位置，
+    // 由弹簧平滑过渡到新布局。
+    if (_flyIn) {
+      final from = (_c.h > 0 ? _c.h : 400.0) * 1.5;
+      for (var i = 0; i < _y.length; i++) {
+        _y[i].hardSet(centers.isEmpty ? from : centers[i] + from);
+        _c.y[i] = _y[i].current;
+      }
+      _flyIn = false;
+    }
+    _metricsDirty = false;
+  }
+
+  /// 由当前 [_heights] 重建自然中心与间奏预留。
+  ///
+  /// O(N) 纯算术（几百次加法），比逐行排版便宜几个数量级，可随按需测量
+  /// 随时重算。
+  void _recomputeCenters() {
+    final heights = _heights;
     final centers = computeCenters(
       heights,
       gapPx: widget.fontSize * kLyricLineGapEm,
-      isBg: [for (final g in groups) g.isBG],
+      isBg: [for (final g in widget.groups) g.isBG],
     ); // 行间 0.8×（AMLL wrapper 上下 .4em 内边距）
     // 间奏预留：空隙之后的行整体下移「三点 + 上下留白」的高度，空隙本身
     // 成为三点的位置（对齐 AMLL 给 anchor 之后的行加 interludeTotalHeight）。
-    _interludes = computeInterludes(groups);
     final dotSize = widget.fontSize * 0.3;
     final dotMargin = widget.fontSize * 0.4;
     final interludeExtra = dotSize + dotMargin * 2;
@@ -262,32 +328,33 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     }
     _c.heights = heights;
     _c.centers = centers;
-    final n = groups.length;
-    if (_y.length != n) {
-      _y = [
-        for (final _ in groups)
-          Spring1D(initialPosition: centers.isEmpty ? 0 : centers.first),
-      ];
-      _scale = List<double>.filled(n, 1);
-      _fade = List<double>.filled(n, 0);
-      _blur = List<double>.filled(n, 0);
-    }
-    _c.y = [for (final s in _y) s.current];
-    _c.scale = _scale;
-    _c.fade = _fade;
-    _c.blur = _blur;
-    // 新歌 / 首次布局：整墙从视口下方飞入（对齐 AMLL RebuildView 的
-    // `resetPosition`）。已挂载过且只是尺寸/字号变化时保留当前位置，
-    // 由弹簧平滑过渡到新布局。
-    if (_flyIn) {
-      final from = (_c.h > 0 ? _c.h : 400.0) * 1.5;
-      for (var i = 0; i < _y.length; i++) {
-        _y[i].hardSet(centers.isEmpty ? from : centers[i] + from);
-        _c.y[i] = _y[i].current;
+  }
+
+  /// 按需测量 `[from, to)` 内尚未测量的行（视口外的远行继续用估算值）。
+  void _ensureMeasured(int from, int to) {
+    final groups = widget.groups;
+    if (groups.isEmpty) return;
+    final s = math.max(0, from);
+    final e = math.min(to, groups.length);
+    var changed = false;
+    for (var i = s; i < e; i++) {
+      if (_measured[i]) continue;
+      _measured[i] = true;
+      final h = computeLineHeight(
+        groups[i],
+        fontSize: widget.fontSize,
+        fontFamily: widget.fontFamily,
+        maxWidth: _maxWidth,
+        showTranslation: widget.showTranslation,
+        showRomanization: widget.showRomanization,
+        fontWeight: widget.fontWeight,
+      );
+      if ((h - _heights[i]).abs() > 0.01) {
+        _heights[i] = h;
+        changed = true;
       }
-      _flyIn = false;
     }
-    _metricsDirty = false;
+    if (changed) _recomputeCenters();
   }
 
   double _targetFor(int i, int anchor) {
@@ -295,6 +362,83 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     if (centers.isEmpty) return 0;
     final h = _c.h > 0 ? _c.h : 400.0;
     return centers[i] - (centers[anchor] - h * _c.align);
+  }
+
+  /// 行的目标屏幕中心（含用户浏览偏移）。
+  double _targetForUser(int i, int anchor) => _targetFor(i, anchor) + _user;
+
+  /// 重算需要参与动画的行窗口（视口 ± [kViewportWindowMarginPx]）。
+  ///
+  /// 目标中心随索引单调递增（centers 单调），故用二分而不是遍历全量数组。
+  /// 窗口移动后，新进入窗口的行把过渡态（淡入/缩放/失焦）吸附到目标值，
+  /// 避免带着过期状态进来闪一下。
+  void _updateWindow() {
+    final n = _y.length;
+    if (n == 0 || _c.centers.isEmpty || _anchorIdx < 0) {
+      _winStart = 0;
+      _winEnd = n;
+      return;
+    }
+    final h = _c.h > 0 ? _c.h : 400.0;
+    final top = -kViewportWindowMarginPx;
+    final bottom = h + kViewportWindowMarginPx;
+    final base = _c.centers[_anchorIdx] - h * _c.align - _user;
+    var lo = 0;
+    var hi = n; // 第一个「目标中心 >= y」的行下标
+    int lowerBound(double y) {
+      lo = 0;
+      hi = n;
+      while (lo < hi) {
+        final mid = (lo + hi) >> 1;
+        if (_c.centers[mid] - base >= y) {
+          hi = mid;
+        } else {
+          lo = mid + 1;
+        }
+      }
+      return lo;
+    }
+
+    final s = math.max(0, lowerBound(top) - 1);
+    final e = math.min(n, lowerBound(bottom + 0.5) + 1);
+    if (s == _winStart && e == _winEnd) return;
+    final oldStart = _winStart;
+    final oldEnd = _winEnd;
+    _winStart = s;
+    _winEnd = e;
+    // 新进入窗口的行：把过渡态吸附到当前目标（窗口外的行不维护过渡态）。
+    for (var i = s; i < e; i++) {
+      if (i >= oldStart && i < oldEnd) continue;
+      _snapVisuals(i);
+    }
+    // 掉出窗口的行：停驻到目标位置（不重建求解器），过渡态吸附到端点。
+    for (var i = oldStart; i < oldEnd && i < n; i++) {
+      if (i >= s && i < e) continue;
+      _y[i].park(_targetForUser(i, _anchorIdx));
+      _c.y[i] = _y[i].current;
+      _snapVisuals(i);
+    }
+  }
+
+  /// 把某行的过渡态直接设为「当前目标」（无动画）。
+  void _snapVisuals(int i) {
+    if (i < 0 || i >= _fade.length) return;
+    final active = i == _c.active;
+    _fade[i] = active ? 1.0 : 0.0;
+    _scale[i] = !widget.enableScale
+        ? 1.0
+        : (1.0 - (1.0 - _fade[i]) * 0.03);
+    _blur[i] = _blurTargetFor(i);
+  }
+
+  /// 失焦目标（px）：只在距锚点 [kMaxBlurDistance] 行以内才模糊。
+  double _blurTargetFor(int i) {
+    if (!widget.enableBlur) return 0;
+    final anchor = _anchorIdx;
+    if (anchor < 0) return 0;
+    final d = (i - anchor).abs();
+    if (d == 0 || d > kMaxBlurDistance) return 0;
+    return math.min(kMaxBlurPx, d.toDouble());
   }
 
   /// 重新计算各行弹簧目标。
@@ -355,12 +499,23 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     final noCascade = !stagger || (oldAnchor != anchor && shift > _c.h);
     _ever = true;
     final n = _y.length;
-    final targets = [for (var i = 0; i < n; i++) _targetFor(i, anchor)];
+    // 先定窗口：只有窗口内的行参与动画，窗口外直接停驻到目标。
+    // 窗口内的行按需实测（窗口外的行继续用估算行高，不排版）。
+    _updateWindow();
+    _ensureMeasured(_winStart, _winEnd);
+    _updateWindow();
+    final ws = _winStart;
+    final we = _winEnd;
     if (snap) {
+      // 整墙瞬移（跨屏跳转/性能模式）：窗口内重建求解器，窗口外只停驻。
       for (var i = 0; i < n; i++) {
         final spring = _y[i];
-        spring.params = _posYParams;
-        spring.hardSet(targets[i]);
+        if (i >= ws && i < we) {
+          spring.params = _posYParams;
+          spring.hardSet(_targetForUser(i, anchor));
+        } else {
+          spring.park(_targetForUser(i, anchor));
+        }
         _c.y[i] = spring.current;
       }
       _repaint.notify();
@@ -368,18 +523,23 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     }
     // 级联延迟（对齐 AMLL calculateLayout）：自「底部仍在视口内」的第一行
     // 向下累积 50ms，锚点及其之后按 1.05 衰减；上方行先动、越往下越晚，
-    // 形成整墙一起「推上去」的观感。若按“距激活行距离”给延迟，快速换行时
-    // 上方行会滞后堆叠。
+    // 形成整墙一起「推上去」的观感。延迟只在窗口内累积（窗口外不参与动画）。
     var moving = false;
     var cascadeDelay = 0.0;
     var baseDelay = noCascade ? 0.0 : kCascadeStepMs;
     for (var i = 0; i < n; i++) {
       final spring = _y[i];
+      final target = _targetForUser(i, anchor);
+      if (i < ws || i >= we) {
+        spring.park(target);
+        _c.y[i] = spring.current;
+        continue;
+      }
       spring.params = _posYParams;
-      spring.setTarget(targets[i], delayMs: cascadeDelay);
+      spring.setTarget(target, delayMs: cascadeDelay);
       _c.y[i] = spring.current;
       if (!spring.arrived()) moving = true;
-      if (targets[i] + _c.heights[i] >= 0) {
+      if (target + _c.heights[i] >= 0) {
         cascadeDelay += baseDelay;
         if (i >= anchor) baseDelay /= 1.05;
       }
@@ -391,20 +551,27 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 把用户浏览偏移并入各行弹簧目标（无级联延迟）。
   ///
   /// [snap] 触摸拖拽时直接跟手（对齐 AMLL `ContinuousScroll` 的 `snapPosY`）；
-  /// 滚轮走弹簧（`DiscreteScroll`）。
+  /// 滚轮走弹簧（`DiscreteScroll`）。只处理视口窗口内的行。
   void _pushUserTargets({bool snap = false}) {
     if (_c.centers.isEmpty || _y.isEmpty) return;
     final anchor = (_anchorIdx >= 0 && _anchorIdx < _c.centers.length)
         ? _anchorIdx
         : 0;
-    for (var i = 0; i < _y.length; i++) {
+    _updateWindow();
+    _ensureMeasured(_winStart, _winEnd);
+    final n = _y.length;
+    for (var i = 0; i < n; i++) {
       final spring = _y[i];
-      spring.params = _posYParams;
-      final to = _targetFor(i, anchor) + _user;
-      if (snap) {
-        spring.hardSet(to);
+      final to = _targetForUser(i, anchor);
+      if (i < _winStart || i >= _winEnd) {
+        spring.park(to);
       } else {
-        spring.setTarget(to);
+        spring.params = _posYParams;
+        if (snap) {
+          spring.hardSet(to);
+        } else {
+          spring.setTarget(to);
+        }
       }
       _c.y[i] = spring.current;
     }
@@ -459,37 +626,47 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       moving = true;
     }
 
-    for (var i = 0; i < _y.length; i++) {
+    // 只推进视口窗口内的弹簧：窗口外的行已「停驻」在目标，无需每帧求解。
+    var springsMoved = false;
+    final we = math.min(_winEnd, _y.length);
+    for (var i = _winStart; i < we; i++) {
       final s = _y[i];
       if (!s.arrived()) {
         _c.y[i] = s.update(dt);
-        moving = true;
+        springsMoved = true;
       }
     }
-    if (_animateVisuals(dt)) moving = true;
+    if (springsMoved) moving = true;
+    final visualsMoved = _animateVisuals(dt);
+    if (visualsMoved) moving = true;
 
     if (!moving) _ticker.stop();
-    _repaint.notify();
+    // 只有真正会改变画面时才重绘：整行级歌词（无逐字片段）且弹簧/过渡静止时，
+    // 时钟推进并不改变任何像素，没必要按 60fps 重绘整墙。
+    final sweeping =
+        _clock.isRunning &&
+        _c.active >= 0 &&
+        _c.active < _c.groups.length &&
+        _c.wordSweep &&
+        (_c.groups[_c.active].fragments?.isNotEmpty ?? false);
+    if (moving || sweeping || _c.dots.visible) _repaint.notify();
   }
 
-  /// 平滑「点亮 / 熄灭 / 缩放 / 失焦」过渡态。
+  /// 平滑「点亮 / 熄灭 / 缩放 / 失焦」过渡态（只处理视口窗口内的行）。
   ///
   /// 用指数趋近而不是给每行再挂弹簧：行数可达数百，弹簧对象与逐帧求解
   /// 成本不划算，且这几项都是纯装饰量，指数平滑足够。
   bool _animateVisuals(double dt) {
     final n = _fade.length;
     if (n == 0) return false;
+    final we = math.min(_winEnd, n);
     if (!widget.animate) {
       // 性能模式：直接吸附到目标，不做过渡。
-      final anchor = _anchorIdx;
       var changed = false;
-      for (var i = 0; i < n; i++) {
+      for (var i = _winStart; i < we; i++) {
         final ft = i == _c.active ? 1.0 : 0.0;
         final st = widget.enableScale ? 1.0 - (1.0 - ft) * 0.03 : 1.0;
-        final d = anchor < 0 ? 0.0 : (i - anchor).abs().toDouble();
-        final bt = (!widget.enableBlur || d == 0)
-            ? 0.0
-            : math.min(kMaxBlurPx, d);
+        final bt = _blurTargetFor(i);
         if (_fade[i] != ft || _scale[i] != st || _blur[i] != bt) changed = true;
         _fade[i] = ft;
         _scale[i] = st;
@@ -497,9 +674,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       }
       return changed;
     }
-    final anchor = _anchorIdx;
     var moving = false;
-    for (var i = 0; i < n; i++) {
+    for (var i = _winStart; i < we; i++) {
       final active = i == _c.active;
       final ft = active ? 1.0 : 0.0;
       var f = _fade[i];
@@ -513,8 +689,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       final st = widget.enableScale ? 1.0 - (1.0 - f) * 0.03 : 1.0;
       if ((_scale[i] - st).abs() > 1e-4) moving = true;
       _scale[i] = st;
-      final d = anchor < 0 ? 0.0 : (i - anchor).abs().toDouble();
-      final bt = (!widget.enableBlur || d == 0) ? 0.0 : math.min(kMaxBlurPx, d);
+      final bt = _blurTargetFor(i);
       var b = _blur[i];
       if ((b - bt).abs() > 0.01) {
         b += (bt - b) * (1 - math.exp(-dt / 0.1));
@@ -651,6 +826,18 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 当前段落缓存条目数（应随可见窗口有界，不随歌长增长）。
   @visibleForTesting
   int debugCacheEntries() => _c.cache.entryCount;
+
+  /// 当前参与动画的行窗口起点（测试用）。
+  @visibleForTesting
+  int debugWindowStart() => _winStart;
+
+  /// 当前参与动画的行窗口终点（不含，测试用）。
+  @visibleForTesting
+  int debugWindowEnd() => _winEnd;
+
+  /// 已实测行高的行数（其余为估算；测试用）。
+  @visibleForTesting
+  int debugMeasuredCount() => _measured.where((m) => m).length;
 
   /// 当前逐字渲染缓存条目数（有界）。
   @visibleForTesting

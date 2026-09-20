@@ -117,6 +117,21 @@ class Spring1D {
     _settled = true;
   }
 
+  /// 「停驻」到某位置：与 [hardSet] 一样立即到位，但**不重建求解器**。
+  ///
+  /// 用于视口窗口之外的行——它们不参与每帧动画，重建闭式解只是白白分配闭包。
+  /// 停驻后 `_settled = true`，[update]/[arrived] 都会提前返回当前值；
+  /// 之后一旦 [setTarget]/[hardSet] 被调用，求解器会按当时的位姿重建。
+  void park(double v) {
+    current = v;
+    velocity = 0;
+    targetPosition = v;
+    _pending = null;
+    delayMs = 0;
+    _time = 0;
+    _settled = true;
+  }
+
   /// 推进弹簧状态。[elapsedSec] 为距上次调用经过的秒数（帧间隔）。
   ///
   /// 延迟队列未到期时，弹簧继续按当前目标求值（与上游 Spring 一致：延迟

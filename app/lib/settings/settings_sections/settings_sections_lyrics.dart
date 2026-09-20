@@ -144,8 +144,8 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
               ),
               value: prefs.lyricFontSize,
               min: 14,
-              max: 38,
-              divisions: 24,
+              max: 60,
+              divisions: 46,
               label: '${prefs.lyricFontSize.round()}px',
               onChanged: (v) => ref
                   .read(appPrefsProvider.notifier)

@@ -64,6 +64,10 @@ const double kDefaultGapPx = 8;
 /// 一行小字号译文（绘制顺序与 painter 一致：音译在上、译文在下）。
 /// 文本按 [fontSize] / [fontFamily] / [fontWeight] 在 [maxWidth] 内排版，
 /// [TextPainter] 统一使用 `textDirection: TextDirection.ltr`。
+///
+/// ⚠ 这是「全量测量」：会为**每一行**排一次版。视口化之后引擎只用它做
+/// 测试/兜底，运行时请用 [computeLineHeight]（按需）+
+/// [estimateLineHeight]（未测量的远行估算）。
 List<double> computeLineHeights(
   List<LyricGroup> groups, {
   required double fontSize,
@@ -75,16 +79,58 @@ List<double> computeLineHeights(
 }) {
   return [
     for (final g in groups)
-      _measureGroup(
+      computeLineHeight(
         g,
-        fontSize,
-        fontFamily,
-        maxWidth,
-        showTranslation,
-        showRomanization,
-        fontWeight,
+        fontSize: fontSize,
+        fontFamily: fontFamily,
+        maxWidth: maxWidth,
+        showTranslation: showTranslation,
+        showRomanization: showRomanization,
+        fontWeight: fontWeight,
       ),
   ];
+}
+
+/// 单组行高实测（按需测量用，度量与 [computeLineHeights] 完全一致）。
+double computeLineHeight(
+  LyricGroup g, {
+  required double fontSize,
+  String? fontFamily,
+  required double maxWidth,
+  bool showTranslation = kDefaultShowTranslation,
+  bool showRomanization = false,
+  FontWeight fontWeight = FontWeight.w600,
+}) {
+  return _measureGroup(
+    g,
+    fontSize,
+    fontFamily,
+    maxWidth,
+    showTranslation,
+    showRomanization,
+    fontWeight,
+  );
+}
+
+/// 未测量行的**估算**行高（不做排版）。
+///
+/// 视口之外的行不值得为几行可见歌词就整首排版：先用估算值参与中心计算，
+/// 等该行进入视口再用 [computeLineHeight] 实测替换（AMLL 的
+/// `LayoutCalculator` 也是这么做的：未测量行用 `defaultLineHeight` 兜底）。
+double estimateLineHeight(
+  LyricGroup g, {
+  required double fontSize,
+  bool showTranslation = kDefaultShowTranslation,
+  bool showRomanization = false,
+}) {
+  var h = fontSize * kLyricLineHeightEm;
+  if (g.isBG) return h * kBgFontScale;
+  final subFs = lyricTranslationFontSize(fontSize);
+  final subH = fontSize * kLyricTranslationGapEm +
+      subFs * kLyricTranslationLineHeightEm;
+  if (showRomanization && (g.romaji?.isNotEmpty ?? false)) h += subH;
+  if (showTranslation && (g.translation?.isNotEmpty ?? false)) h += subH;
+  return h;
 }
 
 double _measureGroup(
