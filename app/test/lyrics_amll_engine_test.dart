@@ -9,6 +9,8 @@ library;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -986,6 +988,59 @@ void main() {
         greaterThan(0.5),
         reason: '正常间隔的换行应仍在弹簧途中，不能被吸附吞掉',
       );
+    });
+
+    testWidgets('鼠标悬停时取消失焦（对齐 AMLL :hover filter: unset）', (tester) async {
+      final groups = buildGroups(40);
+      await tester.pumpWidget(buildWall(groups, 20000));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final before = s.debugBlur() as List<double>;
+      expect(before[19], closeTo(1.0, 0.1), reason: '未悬停时相邻行有失焦');
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(find.byType(AmllPhysicsWall)));
+      await tester.pump();
+      await settle(tester, frames: 20);
+      s = stateOf(tester);
+      final hovered = s.debugBlur() as List<double>;
+      expect(hovered[19], 0, reason: '悬停时失焦应被取消');
+      expect(hovered[18], 0);
+
+      // 移出后恢复失焦。
+      await mouse.moveTo(const Offset(-50, -50));
+      await tester.pump();
+      await settle(tester, frames: 20);
+      s = stateOf(tester);
+      final after = s.debugBlur() as List<double>;
+      expect(after[19], closeTo(1.0, 0.1), reason: '移出后应恢复失焦');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('位置连续跳变（拖动进度条）时高亮跟随、整墙平滑滑动', (tester) async {
+      final groups = buildGroups(200); // 每行 1000ms
+      await tester.pumpWidget(buildWall(groups, 20 * 1000));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      // 模拟拖动：位置一次跳 5s（典型拖动步进），并保持暂停（拖动中不推进时钟）
+      await tester.pumpWidget(buildWall(groups, 120 * 1000));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      // 高亮立刻跟到新位置（不等动画）
+      expect(s.debugActive(), 120);
+      // 但整墙是"滑"过去的：锚点行一帧后还没到目标位（弹簧途中）
+      final y = s.debugY() as List<double>;
+      final centers = s.debugCenters() as List<double>;
+      final anchor = s.debugAnchor() as int;
+      double target(int i) => centers[i] - (centers[anchor] - 500 * 0.5);
+      expect(anchor, 120);
+      expect(
+        (y[anchor] - target(anchor)).abs(),
+        greaterThan(1.0),
+        reason: '拖动时应平滑滑动到目标，而不是瞬移',
+      );
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('背景人声行不占独立纵向槽位（与主行间距小于主行间距）', (tester) async {

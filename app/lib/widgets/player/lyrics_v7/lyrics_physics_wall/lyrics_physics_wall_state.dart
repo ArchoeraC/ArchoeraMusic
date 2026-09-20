@@ -34,6 +34,9 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   List<double> _heights = const [];
   List<bool> _measured = const [];
 
+  /// 鼠标是否悬停在歌词区（悬停时取消失焦，对齐 AMLL）。
+  bool _hovering = false;
+
   /// 文本可用宽度（按需测量用）。
   double _maxWidth = 0;
 
@@ -456,13 +459,27 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   }
 
   /// 失焦目标（px）：只在距锚点 [kMaxBlurDistance] 行以内才模糊。
+  ///
+  /// 鼠标悬停在歌词区时一律为 0（对齐 AMLL `.amll-lyric-player:hover …
+  /// filter: unset`）：方便用户悬停阅读/滚动，也避免模糊影响辨识。
   double _blurTargetFor(int i) {
-    if (!widget.enableBlur) return 0;
+    if (!widget.enableBlur || _hovering) return 0;
     final anchor = _anchorIdx;
     if (anchor < 0) return 0;
     final d = (i - anchor).abs();
     if (d == 0 || d > kMaxBlurDistance) return 0;
     return math.min(kMaxBlurPx, d.toDouble());
+  }
+
+  /// 悬停状态变化：立即重算窗口内的失焦（不做过渡，对齐上游 `!important` 立即生效）。
+  void _setHovering(bool v) {
+    if (_hovering == v) return;
+    _hovering = v;
+    final we = math.min(_winEnd, _blur.length);
+    for (var i = _winStart; i < we; i++) {
+      _blur[i] = _blurTargetFor(i);
+    }
+    _repaint.notify();
   }
 
   /// 重新计算各行弹簧目标。
@@ -768,45 +785,50 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         _maybeRetarget();
         _ensureTicker();
 
-        return Listener(
-          onPointerSignal: (e) {
-            if (e is PointerScrollEvent) {
-              _beginUserScroll();
-              _user = (_user - e.scrollDelta.dy).clamp(
-                -_userExtent,
-                _userExtent,
-              );
-              _pushUserTargets();
-              _armUserReset();
-            }
-          },
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapUp: (d) => _seekAt(d.localPosition.dy),
-            onVerticalDragStart: (d) {
-              _beginUserScroll();
-              // 触摸按下即与目标对齐，避免第一帧跳变。
-              _pushUserTargets(snap: true);
-              _armUserReset();
+        return MouseRegion(
+          // 悬停取消失焦（对齐 AMLL `.amll-lyric-player:hover … filter: unset`）。
+          onEnter: (_) => _setHovering(true),
+          onExit: (_) => _setHovering(false),
+          child: Listener(
+            onPointerSignal: (e) {
+              if (e is PointerScrollEvent) {
+                _beginUserScroll();
+                _user = (_user - e.scrollDelta.dy).clamp(
+                  -_userExtent,
+                  _userExtent,
+                );
+                _pushUserTargets();
+                _armUserReset();
+              }
             },
-            onVerticalDragUpdate: (d) {
-              // 累积每次移动的增量（primaryDelta 是「相对上一帧」的增量），
-              // 不能用起点 + 单次增量，否则多事件拖拽几乎不动。
-              // 触摸拖拽直接跟手（对齐 AMLL ContinuousScroll 的 snapPosY）。
-              final delta = d.primaryDelta ?? d.delta.dy;
-              _user = (_user + delta).clamp(-_userExtent, _userExtent);
-              _pushUserTargets(snap: true);
-              _armUserReset();
-            },
-            onVerticalDragEnd: (_) {
-              _armUserReset();
-            },
-            onVerticalDragCancel: () {
-              _armUserReset();
-            },
-            child: CustomPaint(
-              size: Size(w, h),
-              painter: _Painter(_c, _repaint),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (d) => _seekAt(d.localPosition.dy),
+              onVerticalDragStart: (d) {
+                _beginUserScroll();
+                // 触摸按下即与目标对齐，避免第一帧跳变。
+                _pushUserTargets(snap: true);
+                _armUserReset();
+              },
+              onVerticalDragUpdate: (d) {
+                // 累积每次移动的增量（primaryDelta 是「相对上一帧」的增量），
+                // 不能用起点 + 单次增量，否则多事件拖拽几乎不动。
+                // 触摸拖拽直接跟手（对齐 AMLL ContinuousScroll 的 snapPosY）。
+                final delta = d.primaryDelta ?? d.delta.dy;
+                _user = (_user + delta).clamp(-_userExtent, _userExtent);
+                _pushUserTargets(snap: true);
+                _armUserReset();
+              },
+              onVerticalDragEnd: (_) {
+                _armUserReset();
+              },
+              onVerticalDragCancel: () {
+                _armUserReset();
+              },
+              child: CustomPaint(
+                size: Size(w, h),
+                painter: _Painter(_c, _repaint),
+              ),
             ),
           ),
         );
