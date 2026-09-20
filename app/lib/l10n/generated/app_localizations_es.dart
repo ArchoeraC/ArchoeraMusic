@@ -4306,6 +4306,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAmllScale => 'Reducir líneas inactivas';
 
   @override
+  String get settingsAmllBlur => 'Desenfocar líneas inactivas';
+
+  @override
   String get settingsAmllSpring => 'Resorte de desplazamiento';
 
   @override

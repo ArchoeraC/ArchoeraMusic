@@ -4090,6 +4090,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsAmllScale => '비활성 행 축소';
 
   @override
+  String get settingsAmllBlur => '비활성 줄 흐리게';
+
+  @override
   String get settingsAmllSpring => '스크롤 스프링';
 
   @override

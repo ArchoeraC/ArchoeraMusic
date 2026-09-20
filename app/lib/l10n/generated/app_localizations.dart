@@ -7478,6 +7478,12 @@ abstract class AppLocalizations {
   /// **'非激活行缩放'**
   String get settingsAmllScale;
 
+  /// No description provided for @settingsAmllBlur.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'非激活行失焦'**
+  String get settingsAmllBlur;
+
   /// No description provided for @settingsAmllSpring.
   ///
   /// In zh_CN, this message translates to:
