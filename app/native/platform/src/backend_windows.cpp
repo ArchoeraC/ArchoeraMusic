@@ -29,6 +29,9 @@
 #include <propkey.h>
 #include <propvarutil.h>
 #include <shlobj.h>
+// ShellExecuteW / ILCreateFromPathW / ILFree 等 shell 助手：WIN32_LEAN_AND_MEAN
+// 下 windows.h 不再隐式包含 shellapi.h，需显式引入（否则 MSVC C2039/C3861）。
+#include <shellapi.h>
 
 #include <atomic>
 #include <cstdio>
