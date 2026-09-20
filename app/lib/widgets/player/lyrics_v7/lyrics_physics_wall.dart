@@ -48,6 +48,21 @@ const double kCascadeStepMs = 50; // 与上游 AMLL 的 0.05s base 级联一致
 /// 非激活行最大失焦半径（逻辑像素，对应 AMLL `blur(1+distance)` 的 5px 上限）。
 const double kMaxBlurPx = 5.0;
 
+/// 失焦只作用于距锚点不超过该行数的行。
+///
+/// 更远的行本来就只剩透明度层次，再为它们每帧开离屏高斯层（`saveLayer` +
+/// `ImageFilter.blur`）性价比极低——这是歌词区最主要的 raster 开销来源之一。
+const int kMaxBlurDistance = 2;
+
+/// 视口窗口上下余量：取「视口高度 × [kViewportWindowMarginRatio]」与
+/// [kViewportWindowMarginMinPx] 的较大者。
+///
+/// 不写死像素：全屏/4K 需要更大的余量，小窗口不该把整首歌都算进窗口。
+const double kViewportWindowMarginRatio = 0.6;
+
+/// 视口窗口余量下限（逻辑像素）。
+const double kViewportWindowMarginMinPx = 180.0;
+
 /// 激活行「点亮」过渡时间常数（秒）：0→1 用 [kActivateTauIn]，1→0 用
 /// [kActivateTauOut]（对齐 AMLL `--mask-alpha-duration` 的 .3s / .45s）。
 const double kActivateTauIn = 0.09;

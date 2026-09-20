@@ -38,11 +38,13 @@ Widget buildWall(
   bool playing = false,
   bool showRomanization = false,
   bool showTranslation = true,
+  double width = 400,
+  double height = 500,
 }) => MaterialApp(
   home: Scaffold(
     body: SizedBox(
-      width: 400,
-      height: 500,
+      width: width,
+      height: height,
       child: AmllPhysicsWall(
         groups: groups,
         positionMs: pos,
@@ -661,7 +663,7 @@ void main() {
       expect((s.debugScale() as List<double>)[4], closeTo(1.0, 1e-3));
     });
 
-    testWidgets('非激活行按距离失焦，激活行与远处行为 0', (tester) async {
+    testWidgets('非激活行按距离失焦（仅 ±kMaxBlurDistance 行内，远处为 0）', (tester) async {
       final groups = buildGroups(40);
       await tester.pumpWidget(buildWall(groups, 20000));
       await settle(tester);
@@ -669,8 +671,10 @@ void main() {
       expect(blur[20], closeTo(0.0, 0.05));
       expect(blur[19], closeTo(1.0, 0.1));
       expect(blur[18], closeTo(2.0, 0.1));
-      // 距离超过上限后钳制在 kMaxBlurPx。
-      expect(blur[10], closeTo(kMaxBlurPx, 0.1));
+      // 超出 kMaxBlurDistance 的行不再开离屏模糊层（只剩透明度层次），
+      // 这是省掉每帧高斯层的关键。
+      expect(blur[17], 0);
+      expect(blur[10], 0);
     });
 
     testWidgets('间奏期间不高亮任何行且显示三点', (tester) async {
@@ -847,6 +851,90 @@ void main() {
       s = stateOf(tester);
       final withoutRoma = s.debugHeights() as List<double>;
       expect(withoutRoma[0], lessThan(withSub[0]));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('视口窗口：只动画可见窗口内的行，窗口外停驻且不全量测量', (tester) async {
+      final groups = buildGroups(600);
+      await tester.pumpWidget(buildWall(groups, 300 * 1000));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final ws = s.debugWindowStart() as int;
+      final we = s.debugWindowEnd() as int;
+      expect(ws, greaterThan(0), reason: '长歌应只圈出视口附近，而不是从头开始');
+      expect(we - ws, lessThan(80), reason: '窗口只覆盖视口 ± 余量，不随歌长增长');
+      // 按需测量：只为窗口附近的行排版，不整首排版
+      expect(s.debugMeasuredCount() as int, lessThan(80));
+      // 窗口外的行精确停驻在目标位置（不参与每帧弹簧求解）
+      final y = s.debugY() as List<double>;
+      final centers = s.debugCenters() as List<double>;
+      final anchor = s.debugAnchor() as int;
+      double target(int i) => centers[i] - (centers[anchor] - 500 * 0.5);
+      for (final i in <int>[0, 1, ws - 1, we, 300, 599]) {
+        if (i < 0 || i >= groups.length || (i >= ws && i < we)) continue;
+        expect(y[i], closeTo(target(i), 0.01), reason: '窗口外第 $i 行应停驻在目标');
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('行窗口随视口高度自适应（窗口越大圈越多行）', (tester) async {
+      final groups = buildGroups(600);
+      int windowSize(dynamic s) =>
+          (s.debugWindowEnd() as int) - (s.debugWindowStart() as int);
+      await tester.pumpWidget(
+        buildWall(groups, 300 * 1000, height: 260),
+      );
+      await settle(tester);
+      final small = windowSize(stateOf(tester));
+      await tester.pumpWidget(
+        buildWall(groups, 300 * 1000, height: 1200),
+      );
+      await settle(tester);
+      final big = windowSize(stateOf(tester));
+      expect(
+        big,
+        greaterThan(small),
+        reason: '余量随视口高度放大：$small → $big',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('屏幕内的行（含只露出一半的长行）必须都在动画窗口内', (tester) async {
+      // 长短行混排：长行换行后会很高，用来验证"按行本体判定"。
+      final groups = <LyricGroup>[
+        for (var i = 0; i < 200; i++)
+          LyricGroup(
+            original: LyricLine(
+              timeMs: i * 1000,
+              text: i % 5 == 0
+                  ? '这是一行很长的歌词内容它会在可用宽度内自动换行成好几行从而显著变高$i'
+                  : '短行 $i',
+            ),
+            endMs: (i + 1) * 1000,
+          ),
+      ];
+      await tester.pumpWidget(buildWall(groups, 60 * 1000));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final ws = s.debugWindowStart() as int;
+      final we = s.debugWindowEnd() as int;
+      final y = s.debugY() as List<double>;
+      final heights = s.debugHeights() as List<double>;
+      const viewH = 500.0;
+      var visibleCount = 0;
+      for (var i = 0; i < groups.length; i++) {
+        final cy = y[i];
+        final half = heights[i] / 2;
+        final visible = cy + half >= 0 && cy - half <= viewH;
+        if (!visible) continue;
+        visibleCount++;
+        expect(
+          i >= ws && i < we,
+          isTrue,
+          reason: '可见行 $i（center=$cy, h=${heights[i]}）必须在窗口 [$ws,$we) 内',
+        );
+      }
+      expect(visibleCount, greaterThan(0));
       expect(tester.takeException(), isNull);
     });
 

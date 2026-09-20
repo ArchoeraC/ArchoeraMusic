@@ -234,6 +234,7 @@ Animations，逐 `<span>` 可独立变换）。本轮把 AMLL 的表现层补齐
 | 行距/行高度量 | `kLyricLineHeightEm 1.2` + `kLyricLineGapEm 0.8`（对齐 AMLL wrapper 内边距） | 无 |
 | 换行弹簧 | `spring_policy.dart`：按行间隔自适应（170~220，ζ≈1.1 不过冲）；仅播放推进带级联；新歌整墙飞入 | 无（减少过冲反而更省重绘） |
 | 音译（罗马音） | 来自 main：`LyricGroup.romaji` + `showRomanization`，绘制在译文**之上** | 每行多 1 个小段落（可选） |
+| **视口窗口化**（2026-09-20） | 只有视口 ±240px 内的行参与弹簧/过渡（窗口外 `park()` 不重建求解器）；行高按需实测（视口外用估算）；重绘抑制（无变化不 notify）；失焦限 ±2 行 | 换行/每帧/字号变化的成本都从 **O(歌长) → O(视口)** |
 
 - **性能纪律**：所有新效果都受 `animate`（性能模式）与 `amll.enableBlur` /
   `amll.enableScale` 开关约束；性能模式下直接吸附目标值、无 ticker。
