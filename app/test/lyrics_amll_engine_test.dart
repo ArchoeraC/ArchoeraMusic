@@ -661,7 +661,7 @@ void main() {
       expect((s.debugScale() as List<double>)[4], closeTo(1.0, 1e-3));
     });
 
-    testWidgets('非激活行按距离失焦，激活行与远处行为 0', (tester) async {
+    testWidgets('非激活行按距离失焦（仅 ±kMaxBlurDistance 行内，远处为 0）', (tester) async {
       final groups = buildGroups(40);
       await tester.pumpWidget(buildWall(groups, 20000));
       await settle(tester);
@@ -669,8 +669,10 @@ void main() {
       expect(blur[20], closeTo(0.0, 0.05));
       expect(blur[19], closeTo(1.0, 0.1));
       expect(blur[18], closeTo(2.0, 0.1));
-      // 距离超过上限后钳制在 kMaxBlurPx。
-      expect(blur[10], closeTo(kMaxBlurPx, 0.1));
+      // 超出 kMaxBlurDistance 的行不再开离屏模糊层（只剩透明度层次），
+      // 这是省掉每帧高斯层的关键。
+      expect(blur[17], 0);
+      expect(blur[10], 0);
     });
 
     testWidgets('间奏期间不高亮任何行且显示三点', (tester) async {
@@ -847,6 +849,29 @@ void main() {
       s = stateOf(tester);
       final withoutRoma = s.debugHeights() as List<double>;
       expect(withoutRoma[0], lessThan(withSub[0]));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('视口窗口：只动画可见窗口内的行，窗口外停驻且不全量测量', (tester) async {
+      final groups = buildGroups(600);
+      await tester.pumpWidget(buildWall(groups, 300 * 1000));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final ws = s.debugWindowStart() as int;
+      final we = s.debugWindowEnd() as int;
+      expect(ws, greaterThan(0), reason: '长歌应只圈出视口附近，而不是从头开始');
+      expect(we - ws, lessThan(80), reason: '窗口只覆盖视口 ± 余量，不随歌长增长');
+      // 按需测量：只为窗口附近的行排版，不整首排版
+      expect(s.debugMeasuredCount() as int, lessThan(80));
+      // 窗口外的行精确停驻在目标位置（不参与每帧弹簧求解）
+      final y = s.debugY() as List<double>;
+      final centers = s.debugCenters() as List<double>;
+      final anchor = s.debugAnchor() as int;
+      double target(int i) => centers[i] - (centers[anchor] - 500 * 0.5);
+      for (final i in <int>[0, 1, ws - 1, we, 300, 599]) {
+        if (i < 0 || i >= groups.length || (i >= ws && i < we)) continue;
+        expect(y[i], closeTo(target(i), 0.01), reason: '窗口外第 $i 行应停驻在目标');
+      }
       expect(tester.takeException(), isNull);
     });
 
