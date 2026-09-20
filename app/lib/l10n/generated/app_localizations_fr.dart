@@ -4312,6 +4312,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsAmllScale => 'Réduire les lignes inactives';
 
   @override
+  String get settingsAmllBlur => 'Flou sur les lignes inactives';
+
+  @override
   String get settingsAmllSpring => 'Ressort de défilement';
 
   @override

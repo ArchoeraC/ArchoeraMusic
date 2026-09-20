@@ -1,6 +1,7 @@
 # 播放页渲染优化专项（Player Render Optimization）
 
-> 状态：**进行中（2026-09-11；2026-09-16 调整）**——P1（歌词缓存）、P3（频谱批处理）**已实现**；
+> 状态：**进行中（2026-09-11；2026-09-20 更新）**——P1（歌词缓存）、P3（频谱批处理）**已实现**；
+> **歌词表现层已对齐 AMLL（§4.2b：时钟插值/羽化扫亮/景深/逐词动画/间奏点/背景人声）**；
 > P2 背景：封面预烘焙 + CPU 网格已优化并生效，**全分辨率 GLSL 因集显扛不住默认关闭**；
 > **P2b 由 `runtime-resource-optimization.md` R1 细化并取代**（不是单一半分辨率，
 > 而是「静态层缓存 + 损伤区动态层 + 降采样」组合）；P4 字形图集 / P5 自适应画质规划中。
@@ -215,6 +216,31 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
    - 半分辨率、单 pass。
 
 - 简单引擎 `LyricsView` 的 O(N) 每 build 全量测高同样按 1 收敛。
+
+#### 4.2b 表现层：AMLL 效果对齐（2026-09-20 已实现）
+
+P1 只解决了「排版权」成本；**观感**与上游 AMLL 仍有明显差距（AMLL 是 DOM + Web
+Animations，逐 `<span>` 可独立变换）。本轮把 AMLL 的表现层补齐到 Flutter：
+
+| 能力 | 实现 | 成本 |
+|---|---|---|
+| 播放时钟插值 | `lyric_clock.dart`：~20Hz 位置事件外推 + 上限 150ms；播放中 ticker 常开 | 播放中持续重绘（60fps） |
+| 逐字渲染 | `lyrics_fragment_render.dart`：整行段落取 `getBoxesForRange` 逐字盒 + 逐字左对齐小段落（缓存） | 每行 1 次整行 layout + 2N 次小段落（换行时一次性） |
+| 羽化扫亮 | 逐字 dstIn 线性渐变遮罩（未唱 α0.4 → 已唱 α1.0），当前扫过字 1 层 `saveLayer` | 每帧 1 层（仅激活行） |
+| 景深 | 非激活行 `ImageFilter.blur(1..5px)` + 弹簧化 `scale 0.97` + 距离透明度 | 每帧 ≤5 层离屏（可按距离收敛） |
+| 逐词上浮/长音强调 | `lyrics_word_anim.dart`（AMLL float + emphasize 脉冲：辉光/缩放/推挤/bob） | 长音字/词每帧重建 1 个小段落 |
+| 间奏三点 | `interlude_dots.dart`（≥7s 空隙；依次点亮 + 呼吸 + 两段退场） | 3 个圆，可忽略 |
+| 背景人声行 | 解析整行括号 → `isBG`；0.7× 字号、0.4 透明度、挂主行下方不占槽位 | 无额外成本 |
+| 行距/行高度量 | `kLyricLineHeightEm 1.2` + `kLyricLineGapEm 0.8`（对齐 AMLL wrapper 内边距） | 无 |
+| 换行弹簧 | `spring_policy.dart`：按行间隔自适应（170~220，ζ≈1.1 不过冲）；仅播放推进带级联；新歌整墙飞入 | 无（减少过冲反而更省重绘） |
+| 音译（罗马音） | 来自 main：`LyricGroup.romaji` + `showRomanization`，绘制在译文**之上** | 每行多 1 个小段落（可选） |
+
+- **性能纪律**：所有新效果都受 `animate`（性能模式）与 `amll.enableBlur` /
+  `amll.enableScale` 开关约束；性能模式下直接吸附目标值、无 ticker。
+- **注意**：软件渲染（`flutter test` 的 `toImage`、llvmpipe）下逐行
+  `ImageFilter.blur` 极慢（实测单帧渲染秒级），**真机 GPU 下才是可接受成本**；
+  这印证了「blur 必须可关 + 性能模式必须能退」。
+- 详细设计/对齐清单/刻意简化项见 [lyrics-amll-alignment.md](lyrics-amll-alignment.md)。
 
 ### 4.3 频谱 → 批处理（P3 已实现）
 

@@ -138,22 +138,21 @@ void main() {
         fontSize: fontSize,
         maxWidth: maxWidth,
       );
-      // Ahem 测试字体行高 = fontSize：无翻译组 20，
-      // 带翻译组 = 主行 + max(3, fs*gapEm) + fs*transScale
+      // 主行行高 = fontSize × kLyricLineHeightEm（对齐 CSS line-height:1.2）；
+      // 带翻译组 = 主行 + fontSize×0.3 + max(10, fontSize×0.5)×1.5。
+      final mainH = fontSize * kLyricLineHeightEm;
+      final subH =
+          (fontSize * kLyricTranslationFontScale < kLyricTranslationMinPx
+                  ? kLyricTranslationMinPx
+                  : fontSize * kLyricTranslationFontScale) *
+              kLyricTranslationLineHeightEm;
       expect(heights, hasLength(3));
-      expect(heights[0], closeTo(20, 0.01));
+      expect(heights[0], closeTo(mainH, 0.01));
       expect(
         heights[1],
-        closeTo(
-          fontSize +
-              (fontSize * kMainTranslationGapEm < 3
-                  ? 3
-                  : fontSize * kMainTranslationGapEm) +
-              fontSize * kTranslationFontScale,
-          0.01,
-        ),
+        closeTo(mainH + fontSize * kLyricTranslationGapEm + subH, 0.01),
       );
-      expect(heights[2], closeTo(20, 0.01));
+      expect(heights[2], closeTo(mainH, 0.01));
 
       final noTrans = computeLineHeights(
         groups,
@@ -161,7 +160,7 @@ void main() {
         maxWidth: maxWidth,
         showTranslation: false,
       );
-      expect(noTrans[1], closeTo(20, 0.01));
+      expect(noTrans[1], closeTo(mainH, 0.01));
     });
 
     test('computeCenters 按 半高+间隙+半高 累计', () {
@@ -183,14 +182,14 @@ void main() {
       ];
       final h = computeLineHeights(long, fontSize: fs, maxWidth: maxW);
       expect(h.single, greaterThan(fs * 1.5), reason: '10 字 / 每行 5 字 = 2 行');
-      expect(h.single, closeTo(fs * 2, 1.0));
+      expect(h.single, closeTo(fs * 2 * kLyricLineHeightEm, 1.0));
 
       // 短行仍是单行高。
       final short = <LyricGroup>[
         const LyricGroup(original: LyricLine(timeMs: 0, text: '你好')),
       ];
       final hs = computeLineHeights(short, fontSize: fs, maxWidth: maxW);
-      expect(hs.single, closeTo(fs, 0.01));
+      expect(hs.single, closeTo(fs * kLyricLineHeightEm, 0.01));
     });
 
     test('空输入返回空列表', () {

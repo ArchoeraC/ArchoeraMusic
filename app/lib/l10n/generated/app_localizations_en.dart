@@ -4233,6 +4233,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAmllScale => 'Shrink inactive lines';
 
   @override
+  String get settingsAmllBlur => 'Blur inactive lines';
+
+  @override
   String get settingsAmllSpring => 'Scroll spring';
 
   @override

@@ -385,6 +385,13 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
           value: prefs.amllEnableScale,
           onChanged: (v) => notifier.setLyricAmll(enableScale: v),
         ),
+        SettingSwitchTile(
+          icon: EtaIcons.blurOnOutline,
+          title: l10n.settingsAmllBlur,
+          subtitle: '',
+          value: prefs.amllEnableBlur,
+          onChanged: (v) => notifier.setLyricAmll(enableBlur: v),
+        ),
         SettingTile(
           icon: EtaIcons.magic2Outline,
           title: l10n.settingsAmllSpring,

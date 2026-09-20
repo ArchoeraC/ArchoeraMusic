@@ -1292,6 +1292,7 @@
   "settingsAmllWordSweep": "Wort-Sweep",
   "settingsAmllHidePassed": "Gesungene Zeilen ausblenden",
   "settingsAmllScale": "Inaktive Zeilen verkleinern",
+  "settingsAmllBlur": "Inaktive Zeilen weichzeichnen",
   "settingsAmllSpring": "Scroll-Feder",
   "commonReset": "Reset",
   "settingsDevDownloadModuleDesc": "Separate switch for the download interface (sidebar / context menu / settings category). Off by default; warns before enabling.",

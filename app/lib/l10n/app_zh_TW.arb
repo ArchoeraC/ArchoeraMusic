@@ -1292,6 +1292,7 @@
   "settingsAmllWordSweep": "逐字掃亮",
   "settingsAmllHidePassed": "隱藏已唱行",
   "settingsAmllScale": "非啟用行縮放",
+  "settingsAmllBlur": "非激活行失焦",
   "settingsAmllSpring": "捲動彈簧",
   "commonReset": "重置",
   "settingsDevDownloadModuleDesc": "下载接口（侧边栏 / 右键菜单 / 设置分类）的独立开关；默认关闭，开启前会提示风险。",

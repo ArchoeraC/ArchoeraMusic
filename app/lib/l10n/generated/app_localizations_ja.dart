@@ -4083,6 +4083,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAmllScale => '非アクティブ行を縮小';
 
   @override
+  String get settingsAmllBlur => '非アクティブ行をぼかす';
+
+  @override
   String get settingsAmllSpring => 'スクロールのバネ';
 
   @override
