@@ -15,22 +15,26 @@
 /// - 时钟：把 ~20Hz 的播放位置事件经 [LyricClock] 插值到 vsync，逐字扫亮
 ///   与滚动因此是平滑的（对齐 AMLL 的 rAF 驱动）。
 /// - 绘制：CustomPainter 可见行裁剪；非激活行按距离做**弹簧缩放 + 高斯失焦
-///   （blur）+ 透明度**景深，激活行用「羽化遮罩扫亮 + 逐词上浮/长音强调」，
+///   （blur）+ 透明度**景深（失焦默认走「整层一次 + 1/4 重采样」，见
+///   [LyricsBlurMode]），激活行用「羽化遮罩扫亮 + 逐词上浮/长音强调」，
 ///   翻译小字随主行；点击 seek、拖拽浏览松手回弹、可隐藏已唱行。
 /// 纯 Dart/Flutter，无第三方依赖、无 FFI。
 library;
 
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart' show PointerScrollEvent;
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/scheduler.dart' show Ticker;
+import 'package:flutter/scheduler.dart' show SchedulerBinding, Ticker;
 
 import '../../../services/lyrics/lyric_line.dart';
 import 'interlude_dots.dart';
 import 'lyric_clock.dart';
+import 'lyrics_blur_budget.dart';
 import 'lyrics_fragment_render.dart';
 import 'lyrics_layout.dart';
 import 'lyrics_paragraph_cache.dart';
@@ -46,7 +50,79 @@ part 'lyrics_physics_wall/lyrics_physics_wall_painter.dart';
 const double kCascadeStepMs = 50; // 与上游 AMLL 的 0.05s base 级联一致
 
 /// 非激活行最大失焦半径（逻辑像素，对应 AMLL `blur(1+distance)` 的 5px 上限）。
+///
+/// ⚠ AMLL 的 `filter: blur(Xpx)` 里 X 就是**高斯 σ**（CSS Filter Effects 规范：
+/// blur() 的参数「defines the value of the standard deviation」），所以逐行档的
+/// σ 直接取本值（2~5），不再额外折半。
 const double kMaxBlurPx = 5.0;
+
+/// 非激活行失焦的实现档位：观感目标相同，成本差一个量级。
+enum LyricsBlurMode {
+  /// 整层一次失焦（**默认**）：所有非激活行画进同一个离屏层，一次高斯，
+  /// 且在 1/4 尺寸上做（[kPanelBlurDownsample]）。
+  ///
+  /// 层数恒定、与可见行数无关；半径统一为 [kPanelBlurSigma]，不区分距离
+  /// （AMLL 是每行独立 σ 2~5，这里取中值近似——刻意差异，见
+  /// docs/lyrics-amll-alignment.md §3.10）。
+  panel,
+
+  /// 逐行 bounded 失焦：最贴 AMLL（每行独立 σ = `min(5, 1+距离)`），
+  /// 但每帧离屏层数 ≈ 可见行数，弱机/软件光栅上会直接爆帧
+  /// （基准见 docs/player-render-optimization.md §4.2）。可用环境变量
+  /// [lyricsBlurOverride] 在真机上切换对比。
+  perLine,
+
+  /// 不失焦（只剩透明度景深）。
+  off,
+}
+
+/// 整层失焦的等效高斯 σ（AMLL 每行 σ 为 `min(5, 1+距离)` = 2~5，取中值）。
+const double kPanelBlurSigma = 3.0;
+
+/// 整层失焦的降采样倍率：模糊在 1/4 尺寸上做（模糊像素量 1/4），再放大回原尺寸。
+///
+/// 非激活行本来就是模糊的，重采样几乎看不出差别；这是「保留观感、砍掉成本」
+/// 的关键一步（同一场景基准：整层 1/1 = 39.4ms，1/4 = 16.2ms）。
+const double kPanelBlurDownsample = 0.25;
+
+/// 诊断用环境变量：`ARCHOERA_LYRICS_BLUR=perline|panel|off`。
+///
+/// 与 `ARCHOERA_FLUID_SHADER` / `ARCHOERA_RIPPLE_SHADER` 同一套做法：不改代码、
+/// 不重编译就能在真机上 A/B 失焦档位。显式指定时**不做自动降级**（便于对比）。
+/// 解析失败返回 null（= 用默认档位）。
+LyricsBlurMode? lyricsBlurOverrideFrom(String? raw) {
+  switch (raw?.trim().toLowerCase()) {
+    case 'perline':
+    case 'per-line':
+    case 'per_line':
+      return LyricsBlurMode.perLine;
+    case 'panel':
+      return LyricsBlurMode.panel;
+    case 'off':
+    case 'none':
+    case '0':
+      return LyricsBlurMode.off;
+    default:
+      return null;
+  }
+}
+
+/// 进程启动时的环境变量覆盖（只读一次；见 [lyricsBlurOverrideFrom]）。
+final LyricsBlurMode? lyricsBlurOverride =
+    lyricsBlurOverrideFrom(Platform.environment['ARCHOERA_LYRICS_BLUR']);
+
+/// 解析最终生效的失焦档位。
+///
+/// 优先级：环境变量 > 关闭开关 / 自动降级 > 默认 [LyricsBlurMode.panel]。
+LyricsBlurMode resolveLyricsBlurMode({
+  required bool enableBlur,
+  LyricsBlurMode? override,
+  required bool autoDegraded,
+}) {
+  if (override != null) return override;
+  if (!enableBlur || autoDegraded) return LyricsBlurMode.off;
+  return LyricsBlurMode.panel;
+}
 
 /// 视口窗口上下余量：取「视口高度 × [kViewportWindowMarginRatio]」与
 /// [kViewportWindowMarginMinPx] 的较大者。
@@ -142,7 +218,7 @@ class AmllPhysicsWall extends StatefulWidget {
   /// 非激活行缩放（激活 1.0 / 非激活 0.97，弹簧平滑）。
   final bool enableScale;
 
-  /// 非激活行高斯失焦（按距离 1~5px）。
+  /// 非激活行高斯失焦（具体档位见 [LyricsBlurMode]；false = 完全不失焦）。
   final bool enableBlur;
 
   /// 扫亮羽化带宽度（× 字号，对齐 AMLL `wordFadeWidth`）。
@@ -164,7 +240,7 @@ class _PaintCtx {
   List<double> y = const []; // 每行当前屏幕中心
   List<double> scale = const []; // 每行当前缩放（非激活 → 0.97）
   List<double> fade = const []; // 每行激活外观权重 0（未激活）~1（激活）
-  List<double> blur = const []; // 每行失焦 sigma（px）
+  List<double> blur = const []; // 每行失焦等级（px = AMLL blur 参数 = 高斯 σ）
   double w = 0;
   double h = 0;
   double align = 0.5;
@@ -178,6 +254,13 @@ class _PaintCtx {
   FontWeight fontWeight = FontWeight.w600;
   bool enableScale = true;
   bool enableBlur = true;
+
+  /// 生效的失焦档位（见 [LyricsBlurMode]）：已含关闭开关、环境变量覆盖
+  /// 与帧预算自动降级。
+  LyricsBlurMode blurMode = LyricsBlurMode.panel;
+
+  /// 整层失焦强度 0~1（悬停/失焦开关切换时由状态层平滑到 0，避免「啪」地变换）。
+  double panelBlur = 0;
   double wordFadeWidth = 0.5;
   Color played = const Color(0xFFD0D3DA);
   Color unplayed = const Color(0xFF9AA1B5);
