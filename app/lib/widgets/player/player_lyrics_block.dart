@@ -28,6 +28,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
     required this.hasLyrics,
     required this.lyricScale,
     this.onSeek,
+    this.dragMs,
   });
 
   /// 是否有歌词（无歌词显示空态占位图标）。
@@ -38,6 +39,13 @@ class PlayerLyricsBlock extends ConsumerWidget {
 
   /// 点击歌词行 seek 回调（参数为毫秒；无可播源时为 null → 禁用点击）。
   final ValueChanged<int>? onSeek;
+
+  /// 拖动进度条中的目标位置（毫秒）；null = 跟随播放器实时位置。
+  ///
+  /// 拖动时把该位置直接喂给歌词引擎，让**高亮与滚动跟随手指**（对齐 AMLL：
+  /// 拖动进度条时高亮跟着走），同时冻结内部时钟——拖动位置是「用户目标」，
+  /// 不能当成播放推进来外推。
+  final double? dragMs;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -55,6 +63,11 @@ class PlayerLyricsBlock extends ConsumerWidget {
       playbackProvider.select((s) => s.position.inMilliseconds),
     );
     final playing = ref.watch(playbackProvider.select((s) => s.playing));
+    // 拖动进度条时用「拖动位置」驱动歌词（高亮/滚动跟随手指），并冻结时钟：
+    // 此时不是播放推进，不能让它外推。
+    final drag = dragMs;
+    final effPos = drag?.round() ?? pos;
+    final effPlaying = drag == null && playing;
     final groups = ref
         .watch(currentLyricsProvider)
         .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
@@ -81,8 +94,8 @@ class PlayerLyricsBlock extends ConsumerWidget {
         prefs.lyricEngine == 'amll'
             ? AmllPhysicsWall(
                 groups: groups,
-                positionMs: pos,
-                playing: playing, // 播放中时内部时钟按 vsync 插值
+                positionMs: effPos,
+                playing: effPlaying, // 播放中时内部时钟按 vsync 插值
                 // 字号与 simple 引擎一致：受「自适应字号」开关控制
                 // （开启则随窗口高度缩放）。
                 fontSize: fontSize,
@@ -104,7 +117,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
               )
             : LyricsView(
                 groups: groups,
-                positionMs: pos,
+                positionMs: effPos,
                 fontSize: fontSize,
                 lineHeight: lineHeight,
                 fontWeight: fontWeight,
