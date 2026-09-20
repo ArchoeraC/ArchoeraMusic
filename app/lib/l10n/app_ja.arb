@@ -1292,6 +1292,7 @@
   "settingsAmllWordSweep": "ワードスイープ",
   "settingsAmllHidePassed": "歌い終わった行を隠す",
   "settingsAmllScale": "非アクティブ行を縮小",
+  "settingsAmllBlur": "非アクティブ行をぼかす",
   "settingsAmllSpring": "スクロールのバネ",
   "commonReset": "Reset",
   "settingsDevDownloadModuleDesc": "Separate switch for the download interface (sidebar / context menu / settings category). Off by default; warns before enabling.",

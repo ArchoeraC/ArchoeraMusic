@@ -4276,6 +4276,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAmllScale => 'Inaktive Zeilen verkleinern';
 
   @override
+  String get settingsAmllBlur => 'Inaktive Zeilen weichzeichnen';
+
+  @override
   String get settingsAmllSpring => 'Scroll-Feder';
 
   @override

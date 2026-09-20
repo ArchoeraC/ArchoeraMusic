@@ -54,6 +54,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
     final pos = ref.watch(
       playbackProvider.select((s) => s.position.inMilliseconds),
     );
+    final playing = ref.watch(playbackProvider.select((s) => s.playing));
     final groups = ref
         .watch(currentLyricsProvider)
         .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
@@ -81,8 +82,9 @@ class PlayerLyricsBlock extends ConsumerWidget {
             ? AmllPhysicsWall(
                 groups: groups,
                 positionMs: pos,
-                // 歌词墙直接用设置原始 px（不再乘 lyricScale 二次缩放），
-                // 保证“28px 就是 28px”。
+                playing: playing, // 播放中时内部时钟按 vsync 插值
+                // 字号与 simple 引擎一致：受「自适应字号」开关控制
+                // （开启则随窗口高度缩放）。
                 fontSize: fontSize,
                 fontFamily: prefs.fontFamily,
                 fontWeight: fontWeight,
@@ -94,6 +96,8 @@ class PlayerLyricsBlock extends ConsumerWidget {
                 inactiveAlpha: prefs.amllInactiveAlpha,
                 wordSweep: prefs.amllWordSweep,
                 hidePassed: prefs.amllHidePassed,
+                enableScale: prefs.amllEnableScale,
+                enableBlur: prefs.amllEnableBlur,
                 springPreset: prefs.amllSpringPreset,
                 animate: !ref.read(appPrefsProvider).performanceMode,
                 onSeek: onSeek ?? (_) {},

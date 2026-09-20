@@ -1292,6 +1292,7 @@
   "settingsAmllWordSweep": "Balayage mot à mot",
   "settingsAmllHidePassed": "Masquer les lignes déjà chantées",
   "settingsAmllScale": "Réduire les lignes inactives",
+  "settingsAmllBlur": "Flou sur les lignes inactives",
   "settingsAmllSpring": "Ressort de défilement",
   "commonReset": "Reset",
   "settingsDevDownloadModuleDesc": "Separate switch for the download interface (sidebar / context menu / settings category). Off by default; warns before enabling.",

@@ -99,6 +99,8 @@ class UncensorLyricProcessor implements LyricPostProcessor {
                 ],
           // 必须保留行结束时间：AMLL 引擎用 endMs 判定严格覆盖范围。
           endMs: g.endMs,
+          // 背景人声标记：渲染字号/位置与主行不同，重建时必须保留。
+          isBG: g.isBG,
         ),
     ];
   }

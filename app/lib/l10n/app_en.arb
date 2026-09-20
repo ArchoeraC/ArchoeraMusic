@@ -1243,6 +1243,7 @@
   "settingsAmllWordSweep": "Word sweep",
   "settingsAmllHidePassed": "Hide passed lines",
   "settingsAmllScale": "Shrink inactive lines",
+  "settingsAmllBlur": "Blur inactive lines",
   "settingsAmllSpring": "Scroll spring",
   "toastSleepInhibitFailed": "Failed to keep the system awake",
   "toastMediaSessionLost": "System media session disconnected",
