@@ -75,13 +75,20 @@ void main() {
       );
     });
 
-    test('fast → 整层；quality → 逐行；off → 关闭', () {
+    test('fast → 整层；lite → 轻量；quality → 逐行；off → 关闭', () {
       expect(
         resolveLyricsBlurMode(
           quality: LyricsBlurQuality.fast,
           autoDegraded: false,
         ),
         LyricsBlurMode.panel,
+      );
+      expect(
+        resolveLyricsBlurMode(
+          quality: LyricsBlurQuality.lite,
+          autoDegraded: false,
+        ),
+        LyricsBlurMode.lite,
       );
       expect(
         resolveLyricsBlurMode(
@@ -114,6 +121,13 @@ void main() {
         ),
         LyricsBlurMode.perLine,
       );
+      expect(
+        resolveLyricsBlurMode(
+          quality: LyricsBlurQuality.lite,
+          autoDegraded: true,
+        ),
+        LyricsBlurMode.lite,
+      );
     });
 
     test('诊断用环境变量覆盖优先于一切（含自动降级）', () {
@@ -132,6 +146,7 @@ void main() {
     test('识别四个档位', () {
       expect(LyricsBlurQuality.parse('auto'), LyricsBlurQuality.auto);
       expect(LyricsBlurQuality.parse('fast'), LyricsBlurQuality.fast);
+      expect(LyricsBlurQuality.parse('lite'), LyricsBlurQuality.lite);
       expect(LyricsBlurQuality.parse('quality'), LyricsBlurQuality.quality);
       expect(LyricsBlurQuality.parse('off'), LyricsBlurQuality.off);
     });

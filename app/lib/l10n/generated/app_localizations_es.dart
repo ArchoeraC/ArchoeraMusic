@@ -4318,6 +4318,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAmllBlurFast => 'Rápido';
 
   @override
+  String get settingsAmllBlurLite => 'Ligero (aproximado)';
+
+  @override
   String get settingsAmllBlurQuality => 'Calidad';
 
   @override

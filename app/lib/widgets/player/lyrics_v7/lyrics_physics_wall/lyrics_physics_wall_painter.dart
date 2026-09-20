@@ -14,6 +14,10 @@ class _Painter extends CustomPainter {
   /// 激活行未唱部分的透明度（对齐 AMLL `--dark-mask-alpha`）。
   static const double _unsungAlpha = 0.4;
 
+  /// 轻量档伪散焦：把非激活行「放大 4% + 低透明」再画一遍（零离屏层、零高斯）。
+  static const double _liteGhostScale = 1.04;
+  static const double _liteGhostAlpha = 0.35;
+
   /// 激活行已唱部分的透明度（对齐 AMLL `--bright-mask-alpha`）。
   static const double _litAlpha = 1.0;
 
@@ -39,12 +43,12 @@ class _Painter extends CustomPainter {
       if (fade > 0.02) keepFrag.add(i);
       fades[i] = fade;
     }
-    if (c.blurMode == LyricsBlurMode.panel && c.panelBlur > 0.02) {
+    if (c.blurMode == LyricsBlurMode.panel && c.blurStrength > 0.02) {
       // 整层档：所有非激活外观（含淡出中的上一激活行）画进**同一个**离屏层，
       // 一次高斯（1/4 重采样）→ 层数与可见行数无关；激活外观随后清晰叠回。
       canvas.saveLayer(
         Rect.fromLTWH(0, 0, math.max(1.0, c.w), viewH),
-        Paint()..imageFilter = _panelFilter(c.panelBlur),
+        Paint()..imageFilter = _panelFilter(c.blurStrength),
       );
       for (final i in visible) {
         _drawBase(canvas, i, c.y[i], fades[i]!);
@@ -225,6 +229,23 @@ class _Painter extends CustomPainter {
     canvas.translate(-base.width / 2, -base.height / 2);
     canvas.drawParagraph(base, Offset.zero);
     canvas.restore();
+    // 轻量档：不跑高斯，用一次放大 + 低透明重绘近似散焦（强度随悬停/切档平滑）。
+    if (c.blurMode == LyricsBlurMode.lite && c.blurStrength > 0.02) {
+      final ghost = _solidParagraph(
+        index,
+        g,
+        active: false,
+        alpha: alpha * _liteGhostAlpha * c.blurStrength,
+        fs: fs,
+        maxWidth: maxWidth,
+      );
+      canvas.save();
+      canvas.translate(c.w / 2, cy);
+      canvas.scale(scale * _liteGhostScale);
+      canvas.translate(-ghost.width / 2, -ghost.height / 2);
+      canvas.drawParagraph(ghost, Offset.zero);
+      canvas.restore();
+    }
     _drawSubLines(
       canvas,
       index,

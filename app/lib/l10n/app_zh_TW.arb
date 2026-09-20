@@ -1296,6 +1296,7 @@
   "settingsAmllBlurNote": "自動會依畫面更新率調整：先在 1 層內做模糊，撐不住就自動關閉。",
   "settingsAmllBlurAuto": "自動",
   "settingsAmllBlurFast": "流暢",
+  "settingsAmllBlurLite": "輕量（近似）",
   "settingsAmllBlurQuality": "畫質",
   "settingsAmllBlurOff": "關閉",
   "settingsAmllSpring": "捲動彈簧",

@@ -4092,6 +4092,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAmllBlurFast => '軽量';
 
   @override
+  String get settingsAmllBlurLite => '軽量（近似）';
+
+  @override
   String get settingsAmllBlurQuality => '高画質';
 
   @override

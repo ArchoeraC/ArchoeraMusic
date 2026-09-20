@@ -4245,6 +4245,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAmllBlurFast => 'Fast';
 
   @override
+  String get settingsAmllBlurLite => 'Light (approximate)';
+
+  @override
   String get settingsAmllBlurQuality => 'Quality';
 
   @override

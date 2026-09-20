@@ -1296,6 +1296,7 @@
   "settingsAmllBlurNote": "자동은 프레임률에 맞춰 조정합니다(먼저 1개 레이어로 흐리게, 버거우면 자동으로 끕니다).",
   "settingsAmllBlurAuto": "자동",
   "settingsAmllBlurFast": "가볍게",
+  "settingsAmllBlurLite": "경량(근사)",
   "settingsAmllBlurQuality": "고화질",
   "settingsAmllBlurOff": "끔",
   "settingsAmllSpring": "스크롤 스프링",

@@ -1254,6 +1254,7 @@
   "settingsAmllBlurNote": "自动会按帧率调整：先在 1 层内做模糊，吃不住就自动关掉。",
   "settingsAmllBlurAuto": "自动",
   "settingsAmllBlurFast": "流畅",
+  "settingsAmllBlurLite": "轻量（近似）",
   "settingsAmllBlurQuality": "画质",
   "settingsAmllBlurOff": "关闭",
   "settingsAmllSpring": "滚动弹簧",
