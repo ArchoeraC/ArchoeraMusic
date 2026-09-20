@@ -54,12 +54,14 @@ const double kMaxBlurPx = 5.0;
 /// `ImageFilter.blur`）性价比极低——这是歌词区最主要的 raster 开销来源之一。
 const int kMaxBlurDistance = 2;
 
-/// 视口窗口上下各留的余量（逻辑像素）。
+/// 视口窗口上下余量：取「视口高度 × [kViewportWindowMarginRatio]」与
+/// [kViewportWindowMarginMinPx] 的较大者。
 ///
-/// 屏幕只显示得下有限几行，因此**只有该窗口内的行参与弹簧/过渡动画**：
-/// 换行时窗口外的行直接吸附到目标（不重建求解器、不参与每帧计算），
-/// 只有用户滚动/跳转需要时才把它们纳入窗口。这是「不重建全量歌词」的关键。
-const double kViewportWindowMarginPx = 240.0;
+/// 不写死像素：全屏/4K 需要更大的余量，小窗口不该把整首歌都算进窗口。
+const double kViewportWindowMarginRatio = 0.6;
+
+/// 视口窗口余量下限（逻辑像素）。
+const double kViewportWindowMarginMinPx = 180.0;
 
 /// 激活行「点亮」过渡时间常数（秒）：0→1 用 [kActivateTauIn]，1→0 用
 /// [kActivateTauOut]（对齐 AMLL `--mask-alpha-duration` 的 .3s / .45s）。
