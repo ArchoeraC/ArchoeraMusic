@@ -161,6 +161,7 @@ extension _PlayerPageView on _PlayerPageState {
                           coverPulse: _coverPulse,
                           beatStrength: _lastBeatStrength,
                           l10n: l10n,
+                          dragMs: _dragMs,
                           onSeekLyric: hasSource
                               ? (ms) =>
                                     notifier.seek(Duration(milliseconds: ms))
@@ -374,6 +375,7 @@ class _PlayerMainBody extends StatelessWidget {
     required this.beatStrength,
     required this.l10n,
     required this.onSeekLyric,
+    this.dragMs,
   });
 
   final String? source;
@@ -395,6 +397,9 @@ class _PlayerMainBody extends StatelessWidget {
   final double beatStrength;
   final AppLocalizations l10n;
   final ValueChanged<int>? onSeekLyric;
+
+  /// 拖动进度条中的目标位置（毫秒）；null = 未拖动。
+  final double? dragMs;
 
   @override
   Widget build(BuildContext context) {
@@ -438,6 +443,7 @@ class _PlayerMainBody extends StatelessWidget {
                 hasLyrics: hasLyrics,
                 lyricScale: lyricScale,
                 onSeek: onSeekLyric,
+                dragMs: dragMs,
               )
             : const SizedBox.shrink();
         return RepaintBoundary(
@@ -568,7 +574,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (showProgressLyric) const _ProgressLyric(),
+                if (showProgressLyric) _ProgressLyric(dragMs: dragMs),
                 PlaybackProgressSlider(
                   showTimes: true,
                   textStyle: theme.textTheme.bodySmall,
@@ -608,7 +614,12 @@ class _PlayerBottomOverlay extends StatelessWidget {
 ///
 /// 独立 Consumer 订阅位置与歌词，避免 50ms 位置更新带动整个播放页重建。
 class _ProgressLyric extends ConsumerWidget {
-  const _ProgressLyric();
+  const _ProgressLyric({this.dragMs});
+
+  /// 拖动进度条中的目标位置（毫秒）；null = 跟随播放器实时位置。
+  ///
+  /// 拖动时跟随手指（对齐 AMLL：拖动进度条时高亮跟着走），与全屏歌词墙一致。
+  final double? dragMs;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -620,7 +631,7 @@ class _ProgressLyric extends ConsumerWidget {
         .watch(currentLyricsProvider)
         .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
     if (groups.isEmpty) return const SizedBox.shrink();
-    final i = lyricIndexAt(groups, pos);
+    final i = lyricIndexAt(groups, dragMs?.round() ?? pos);
     if (i < 0 || i >= groups.length) return const SizedBox.shrink();
     final text = groups[i].original.text;
     if (text.trim().isEmpty) return const SizedBox.shrink();
