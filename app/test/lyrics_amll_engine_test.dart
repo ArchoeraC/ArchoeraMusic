@@ -938,6 +938,56 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('高速换行（单步 + 间隔很短）直接吸附，不再等弹簧', (tester) async {
+      // 间隔 200ms 的密集歌词
+      final fast = <LyricGroup>[
+        for (var i = 0; i < 60; i++)
+          LyricGroup(
+            original: LyricLine(timeMs: i * 200, text: '第 $i 行'),
+            endMs: (i + 1) * 200,
+          ),
+      ];
+      await tester.pumpWidget(buildWall(fast, 20 * 200));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final anchor0 = s.debugAnchor() as int;
+      // 只推进一行（+200ms，远低于 2000ms 的 seek 阈值）
+      await tester.pumpWidget(buildWall(fast, (anchor0 + 1) * 200));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      final anchor = s.debugAnchor() as int;
+      final y = s.debugY() as List<double>;
+      final centers = s.debugCenters() as List<double>;
+      double target(int i) => centers[i] - (centers[anchor] - 500 * 0.5);
+      expect(anchor, anchor0 + 1);
+      expect(
+        y[anchor],
+        closeTo(target(anchor), 0.01),
+        reason: '高速换行应直接吸附到目标（不走弹簧）',
+      );
+    });
+
+    testWidgets('正常速度换行仍走弹簧（只有高速才吸附）', (tester) async {
+      final slow = buildGroups(60); // 每行 1000ms
+      await tester.pumpWidget(buildWall(slow, 20 * 1000));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final anchor0 = s.debugAnchor() as int;
+      await tester.pumpWidget(buildWall(slow, (anchor0 + 1) * 1000));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      final anchor = s.debugAnchor() as int;
+      final y = s.debugY() as List<double>;
+      final centers = s.debugCenters() as List<double>;
+      double target(int i) => centers[i] - (centers[anchor] - 500 * 0.5);
+      expect(anchor, anchor0 + 1);
+      expect(
+        (y[anchor] - target(anchor)).abs(),
+        greaterThan(0.5),
+        reason: '正常间隔的换行应仍在弹簧途中，不能被吸附吞掉',
+      );
+    });
+
     testWidgets('背景人声行不占独立纵向槽位（与主行间距小于主行间距）', (tester) async {
       final groups = [
         LyricGroup(

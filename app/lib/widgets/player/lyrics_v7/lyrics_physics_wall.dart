@@ -63,6 +63,16 @@ const double kViewportWindowMarginRatio = 0.6;
 /// 视口窗口余量下限（逻辑像素）。
 const double kViewportWindowMarginMinPx = 180.0;
 
+/// 「高速换行」判定：相邻两行间隔 ≤ 该值（毫秒）时，等弹簧安顿已来不及，
+/// 直接吸附成普通滚动（观感对齐 AMLL 高速换行段）。
+///
+/// 判定刻意收紧（见 `_maybeRetarget`）：仅在「非 seek + 只推进一行 +
+/// 间隔 ≤ 本值 + 位移约等于一行」时生效，正常速度的换行仍然走弹簧。
+const int kFastLineChangeMs = 250;
+
+/// 高速换行判定的位移上限（视口高度比例）：超过就按跨屏跳转处理。
+const double kFastLineChangeMaxShiftRatio = 0.4;
+
 /// 激活行「点亮」过渡时间常数（秒）：0→1 用 [kActivateTauIn]，1→0 用
 /// [kActivateTauOut]（对齐 AMLL `--mask-alpha-duration` 的 .3s / .45s）。
 const double kActivateTauIn = 0.09;
