@@ -269,20 +269,20 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String navHeaderKugouId(Object id) {
-    return 'Kugou $id';
+    return 'KG $id';
   }
 
   @override
   String get navHeaderKugouMusic => 'KG';
 
   @override
-  String get navHeaderLoginAccount => 'ログイン（Netease / Kugou）';
+  String get navHeaderLoginAccount => 'ログイン（NT / KG）';
 
   @override
   String get navHeaderLogout => 'ログアウト';
 
   @override
-  String get navHeaderNeteaseAccount => 'Neteaseアカウント';
+  String get navHeaderNeteaseAccount => 'NTアカウント';
 
   @override
   String get navHeaderNeteaseMusic => 'NT';
@@ -436,12 +436,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get toastLiked => 'お気に入りに追加しました';
 
   @override
-  String get toastLoginRequiredKugou =>
-      '操作に失敗しました（Kugouアカウントにログインしているか確認してください）';
+  String get toastLoginRequiredKugou => '操作に失敗しました（KGアカウントにログインしているか確認してください）';
 
   @override
   String get toastLoginRequiredNetease =>
-      '操作に失敗しました（Neteaseアカウントにログインしているか確認してください）';
+      '操作に失敗しました（NTアカウントにログインしているか確認してください）';
 
   @override
   String get toastNoQualityInfo => 'この曲に利用可能な音質情報がなく、ダウンロードできません';
@@ -777,10 +776,10 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => 'NetEase Cloud Music';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => 'Kugou Music';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => 'すべて';
@@ -909,14 +908,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pageFavEmpty => 'まだお気に入りがありません';
 
   @override
-  String get pageFavEmptyHint => 'NetEase Cloud Music App でお気に入り登録すると自動同期';
+  String get pageFavEmptyHint => 'NT App でお気に入り登録すると自動同期';
 
   @override
   String get pageFavLoginTitle => 'ログインしてお気に入りを表示';
 
   @override
-  String get pageFavLoginDesc =>
-      'NetEase Cloud Music にQRログインし、お気に入りのプレイリスト・アルバム・アーティストを同期';
+  String get pageFavLoginDesc => 'NT にQRログインし、お気に入りのプレイリスト・アルバム・アーティストを同期';
 
   @override
   String get pageFavKgCreated => '作成したプレイリスト';
@@ -993,10 +991,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pageSearchFailed => '検索に失敗しました';
 
   @override
-  String get pageLikedKugouLoginHint => 'ログインするとKugouの「お気に入り」を同期できます';
+  String get pageLikedKugouLoginHint => 'ログインするとKGの「お気に入り」を同期できます';
 
   @override
-  String get pageLikedNeteaseLoginHint => 'ログインするとNetEaseのお気に入りを同期できます';
+  String get pageLikedNeteaseLoginHint => 'ログインするとNTのお気に入りを同期できます';
 
   @override
   String get pageLikedLoadFailed => 'お気に入りリストの読み込みに失敗しました';
@@ -1005,11 +1003,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pageLikedEmpty => 'まだお気に入りの曲がありません';
 
   @override
-  String get pageLikedKugouEmptyHint => 'Kugou App で「お気に入り」に追加すると自動同期';
+  String get pageLikedKugouEmptyHint => 'KG App で「お気に入り」に追加すると自動同期';
 
   @override
-  String get pageLikedNeteaseEmptyHint =>
-      'NetEase Cloud Music App でハートをタップすると自動同期';
+  String get pageLikedNeteaseEmptyHint => 'NT App でハートをタップすると自動同期';
 
   @override
   String get toastQqLikeSyncFailed =>
@@ -1044,11 +1041,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pageLikedLoginTitle => 'ログインしてお気に入りの曲を表示';
 
   @override
-  String get pageLikedKugouLoginDesc => 'Kugou にQRログインし、「お気に入り」コレクションを同期';
+  String get pageLikedKugouLoginDesc => 'KG にQRログインし、「お気に入り」コレクションを同期';
 
   @override
-  String get pageLikedNeteaseLoginDesc =>
-      'NetEase Cloud Music にQRログインし、ハートのコレクションを同期';
+  String get pageLikedNeteaseLoginDesc => 'NT にQRログインし、ハートのコレクションを同期';
 
   @override
   String get libraryScanDirs => 'スキャンディレクトリ';
@@ -1204,7 +1200,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pageHomeDailyLoggedIn => 'あなたの好みに合わせて厳選';
 
   @override
-  String get pageHomeDailyLoginHint => 'NetEaseアカウントにログインすると毎日更新されます';
+  String get pageHomeDailyLoginHint => 'NTアカウントにログインすると毎日更新されます';
 
   @override
   String get pageHomeDailyPlay => '今日のおすすめを再生';
@@ -2254,7 +2250,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsGroupingFlat => 'すべてダウンロードフォルダにフラットに配置';
 
   @override
-  String get settingsGroupingPlatform => 'プラットフォーム別サブフォルダ（Kugou / Netease）';
+  String get settingsGroupingPlatform => 'プラットフォーム別サブフォルダ（KG / NT）';
 
   @override
   String get settingsGroupingArtist => 'アーティスト別サブフォルダ';
@@ -2323,7 +2319,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsFingerprintNote =>
-      'KG / 网易のダウンロード要求に付与されるデバイス識別子。初回起動時に生成され固定、ユーザーごとに異なります。';
+      'KG / NTのダウンロード要求に付与されるデバイス識別子。初回起動時に生成され固定、ユーザーごとに異なります。';
 
   @override
   String get settingsDownloadDynamicFingerprint => '動的デバイスフィンガープリント';
@@ -2337,7 +2333,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsResetFingerprintDesc =>
-      'リセット後、この端末はKG / 网易から新しいデバイスと見なされます。古いフィンガープリントのオンライン状態は無効になる可能性があります。リセットしますか？';
+      'リセット後、この端末はKG / NTから新しいデバイスと見なされます。古いフィンガープリントのオンライン状態は無効になる可能性があります。リセットしますか？';
 
   @override
   String get toastFingerprintReset => 'デバイスフィンガープリントをリセットしました';
@@ -2835,7 +2831,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      '各スキームは暗号化データ構造が互換でないため、切り替え時は既存の vault を破棄してデータベースを再構築します。すべてのログイン認証情報（网易雲 / KG / ストリーミングアカウント）が失われ、再ログインが必要です。';
+      '各スキームは暗号化データ構造が互換でないため、切り替え時は既存の vault を破棄してデータベースを再構築します。すべてのログイン認証情報（NT / KG / ストリーミングアカウント）が失われ、再ログインが必要です。';
 
   @override
   String get settingsSchemeSwitchKeep => '現在のまま';
@@ -3779,7 +3775,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ Music';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'QQ ミュージック QR コードでログイン';

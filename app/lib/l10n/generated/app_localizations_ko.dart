@@ -269,23 +269,23 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String navHeaderKugouId(Object id) {
-    return 'Kugou $id';
+    return 'KG $id';
   }
 
   @override
   String get navHeaderKugouMusic => 'KG';
 
   @override
-  String get navHeaderLoginAccount => '로그인(Netease / Kugou)';
+  String get navHeaderLoginAccount => '로그인(NT / KG)';
 
   @override
   String get navHeaderLogout => '로그아웃';
 
   @override
-  String get navHeaderNeteaseAccount => 'Netease 계정';
+  String get navHeaderNeteaseAccount => 'NT 계정';
 
   @override
-  String get navHeaderNeteaseMusic => 'Netease 음악';
+  String get navHeaderNeteaseMusic => 'NT 음악';
 
   @override
   String get navHeaderQqMusic => 'QQ 음악';
@@ -436,11 +436,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toastLiked => '즐겨찾기에 추가되었습니다';
 
   @override
-  String get toastLoginRequiredKugou => '작업에 실패했습니다(Kugou 계정에 로그인했는지 확인해 주세요)';
+  String get toastLoginRequiredKugou => '작업에 실패했습니다(KG 계정에 로그인했는지 확인해 주세요)';
 
   @override
-  String get toastLoginRequiredNetease =>
-      '작업에 실패했습니다(Netease 계정에 로그인했는지 확인해 주세요)';
+  String get toastLoginRequiredNetease => '작업에 실패했습니다(NT 계정에 로그인했는지 확인해 주세요)';
 
   @override
   String get toastNoQualityInfo => '이 곡은 사용 가능한 음질 정보가 없어 다운로드할 수 없습니다';
@@ -778,10 +777,10 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => 'NetEase Cloud Music';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => 'Kugou Music';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => '전체';
@@ -910,15 +909,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get pageFavEmpty => '아직 즐겨찾기가 없습니다';
 
   @override
-  String get pageFavEmptyHint =>
-      'NetEase Cloud Music 앱에서 즐겨찾기에 추가하면 여기에 자동 동기화됩니다';
+  String get pageFavEmptyHint => 'NT 앱에서 즐겨찾기에 추가하면 여기에 자동 동기화됩니다';
 
   @override
   String get pageFavLoginTitle => '로그인하여 즐겨찾기 보기';
 
   @override
   String get pageFavLoginDesc =>
-      'NetEase Cloud Music 계정으로 QR 로그인하여 즐겨찾기 플레이리스트, 앨범, 아티스트를 동기화하세요';
+      'NT 계정으로 QR 로그인하여 즐겨찾기 플레이리스트, 앨범, 아티스트를 동기화하세요';
 
   @override
   String get pageFavKgCreated => '내가 만든 플레이리스트';
@@ -995,10 +993,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get pageSearchFailed => '검색 실패';
 
   @override
-  String get pageLikedKugouLoginHint => '로그인하면 Kugou \'좋아요\'를 동기화할 수 있습니다';
+  String get pageLikedKugouLoginHint => '로그인하면 KG \'좋아요\'를 동기화할 수 있습니다';
 
   @override
-  String get pageLikedNeteaseLoginHint => '로그인하면 NetEase 즐겨찾기를 동기화할 수 있습니다';
+  String get pageLikedNeteaseLoginHint => '로그인하면 NT 즐겨찾기를 동기화할 수 있습니다';
 
   @override
   String get pageLikedLoadFailed => '좋아요 목록 불러오기 실패';
@@ -1007,11 +1005,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get pageLikedEmpty => '아직 좋아요한 곡이 없습니다';
 
   @override
-  String get pageLikedKugouEmptyHint => 'Kugou 앱에서 \'좋아요\'에 추가하면 여기에 자동 동기화됩니다';
+  String get pageLikedKugouEmptyHint => 'KG 앱에서 \'좋아요\'에 추가하면 여기에 자동 동기화됩니다';
 
   @override
-  String get pageLikedNeteaseEmptyHint =>
-      'NetEase Cloud Music 앱에서 하트를 누르면 여기에 자동 동기화됩니다';
+  String get pageLikedNeteaseEmptyHint => 'NT 앱에서 하트를 누르면 여기에 자동 동기화됩니다';
 
   @override
   String get toastQqLikeSyncFailed =>
@@ -1046,12 +1043,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get pageLikedLoginTitle => '로그인하여 좋아요한 곡 보기';
 
   @override
-  String get pageLikedKugouLoginDesc =>
-      'Kugou 앱으로 QR 로그인하여 \'좋아요\' 컬렉션을 동기화하세요';
+  String get pageLikedKugouLoginDesc => 'KG 앱으로 QR 로그인하여 \'좋아요\' 컬렉션을 동기화하세요';
 
   @override
-  String get pageLikedNeteaseLoginDesc =>
-      'NetEase Cloud Music 계정으로 QR 로그인하여 하트 컬렉션을 동기화하세요';
+  String get pageLikedNeteaseLoginDesc => 'NT 계정으로 QR 로그인하여 하트 컬렉션을 동기화하세요';
 
   @override
   String get libraryScanDirs => '스캔 디렉터리';
@@ -1207,7 +1202,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get pageHomeDailyLoggedIn => '당신의 취향에 맞춰 엄선';
 
   @override
-  String get pageHomeDailyLoginHint => 'NetEase 계정에 로그인하면 매일 업데이트됩니다';
+  String get pageHomeDailyLoginHint => 'NT 계정에 로그인하면 매일 업데이트됩니다';
 
   @override
   String get pageHomeDailyPlay => '오늘의 추천 재생';
@@ -2256,7 +2251,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsGroupingFlat => '모두 다운로드 폴더에 플랫하게 배치';
 
   @override
-  String get settingsGroupingPlatform => '플랫폼별 하위 폴더（Kugou / Netease）';
+  String get settingsGroupingPlatform => '플랫폼별 하위 폴더（KG / NT）';
 
   @override
   String get settingsGroupingArtist => '아티스트별 하위 폴더';
@@ -2565,7 +2560,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSecurityNote =>
-      '기기의 모든 계정 자격 증명과 로그인 세션(스트리밍 서버 비밀번호, Netease/Kugou 로그인 상태, 로컬 Subsonic 계정)을 되돌릴 수 없게 삭제하고 플랫폼 토큰을 무효화합니다. 라이브러리·기록·다운로드 파일에는 영향을 주지 않습니다.';
+      '기기의 모든 계정 자격 증명과 로그인 세션(스트리밍 서버 비밀번호, NT/KG 로그인 상태, 로컬 Subsonic 계정)을 되돌릴 수 없게 삭제하고 플랫폼 토큰을 무효화합니다. 라이브러리·기록·다운로드 파일에는 영향을 주지 않습니다.';
 
   @override
   String get settingsSecurityStreaming => '스트리밍 서버 자격 증명';
@@ -2582,7 +2577,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsSecuritySession => '타사 계정 세션';
 
   @override
-  String get settingsSecuritySessionDesc => 'Netease / Kugou 로그인 상태';
+  String get settingsSecuritySessionDesc => 'NT / KG 로그인 상태';
 
   @override
   String get settingsSecurityUserDb => '로컬 사용자 데이터베이스';
@@ -2840,7 +2835,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      '각 방식은 암호화 데이터 구조가 호환되지 않아 전환 시 기존 vault를 폐기하고 데이터베이스를 재구축합니다. 모든 로그인 자격 증명(网易雲 / KG / 스트리밍 계정)이 유실되며 다시 로그인해야 합니다.';
+      '각 방식은 암호화 데이터 구조가 호환되지 않아 전환 시 기존 vault를 폐기하고 데이터베이스를 재구축합니다. 모든 로그인 자격 증명(NT / KG / 스트리밍 계정)이 유실되며 다시 로그인해야 합니다.';
 
   @override
   String get settingsSchemeSwitchKeep => '현재 유지';
@@ -3786,7 +3781,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ Music';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'QQ 뮤직 QR 코드로 로그인';

@@ -275,20 +275,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String navHeaderKugouId(Object id) {
-    return 'Kugou $id';
+    return 'KG $id';
   }
 
   @override
   String get navHeaderKugouMusic => 'KG';
 
   @override
-  String get navHeaderLoginAccount => 'Log in (Netease / Kugou)';
+  String get navHeaderLoginAccount => 'Log in (NT / KG)';
 
   @override
   String get navHeaderLogout => 'Log out';
 
   @override
-  String get navHeaderNeteaseAccount => 'Netease account';
+  String get navHeaderNeteaseAccount => 'NT account';
 
   @override
   String get navHeaderNeteaseMusic => 'NT';
@@ -444,11 +444,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toastLoginRequiredKugou =>
-      'Operation failed (please make sure you are logged in to your Kugou account)';
+      'Operation failed (please make sure you are logged in to your KG account)';
 
   @override
   String get toastLoginRequiredNetease =>
-      'Operation failed (please make sure you are logged in to your Netease account)';
+      'Operation failed (please make sure you are logged in to your NT account)';
 
   @override
   String get toastNoQualityInfo =>
@@ -794,10 +794,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get platformNetease => 'NetEase Cloud Music';
+  String get platformNetease => 'NT';
 
   @override
-  String get platformKugou => 'Kugou Music';
+  String get platformKugou => 'KG';
 
   @override
   String get platformAll => 'All';
@@ -930,14 +930,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pageFavEmptyHint =>
-      'Favorites in the Netease app sync here automatically';
+      'Favorites in the NT app sync here automatically';
 
   @override
   String get pageFavLoginTitle => 'Sign in to view favorites';
 
   @override
   String get pageFavLoginDesc =>
-      'Scan to log in to Netease and sync favorite playlists, albums and artists';
+      'Scan to log in to NT and sync favorite playlists, albums and artists';
 
   @override
   String get pageFavKgCreated => 'Created playlists';
@@ -977,11 +977,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pageFavKugouLoginDesc =>
-      'Scan to log in to Kugou and sync created and collected playlists and albums';
+      'Scan to log in to KG and sync created and collected playlists and albums';
 
   @override
   String get pageFavKugouEmptyHint =>
-      'Synced automatically when you favorite in the Kugou app';
+      'Synced automatically when you favorite in the KG app';
 
   @override
   String pageSearchLoadingTrack(Object title) {
@@ -1022,7 +1022,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pageLikedKugouLoginHint => 'Sign in to sync your KuGou favorites';
 
   @override
-  String get pageLikedNeteaseLoginHint => 'Sign in to sync Netease favorites';
+  String get pageLikedNeteaseLoginHint => 'Sign in to sync NT favorites';
 
   @override
   String get pageLikedLoadFailed => 'Failed to load liked songs';
@@ -1036,7 +1036,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pageLikedNeteaseEmptyHint =>
-      'Liked songs in the Netease app sync here automatically';
+      'Liked songs in the NT app sync here automatically';
 
   @override
   String get toastQqLikeSyncFailed =>
@@ -1078,7 +1078,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pageLikedNeteaseLoginDesc =>
-      'Scan to log in to Netease and sync liked songs';
+      'Scan to log in to NT and sync liked songs';
 
   @override
   String get libraryScanDirs => 'Scan directories';
@@ -1237,7 +1237,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pageHomeDailyLoginHint =>
-      'Updates daily after you sign in with your Netease account';
+      'Updates daily after you sign in with your NT account';
 
   @override
   String get pageHomeDailyPlay => 'Play today\'s picks';
@@ -2329,8 +2329,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsGroupingFlat => 'All flat in download folder';
 
   @override
-  String get settingsGroupingPlatform =>
-      'Subfolder by platform (Kugou / Netease)';
+  String get settingsGroupingPlatform => 'Subfolder by platform (KG / NT)';
 
   @override
   String get settingsGroupingArtist => 'Subfolder by artist';
@@ -2399,7 +2398,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFingerprintNote =>
-      'Device ID carried in Kugou / Netease download requests; generated on first launch and kept stable, unique per user.';
+      'Device ID carried in KG / NT download requests; generated on first launch and kept stable, unique per user.';
 
   @override
   String get settingsDownloadDynamicFingerprint => 'Dynamic device fingerprint';
@@ -2413,7 +2412,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetFingerprintDesc =>
-      'After reset, this machine appears as a new device to Kugou / Netease; online sessions under the old fingerprint may stop working. Reset now?';
+      'After reset, this machine appears as a new device to KG / NT; online sessions under the old fingerprint may stop working. Reset now?';
 
   @override
   String get toastFingerprintReset => 'Device fingerprint reset';
@@ -2643,7 +2642,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSecurityNote =>
-      'Irreversibly deletes all local account credentials and sessions (streaming server passwords, Netease/Kugou sessions, local Subsonic accounts) and revokes platform tokens. Library, history and downloads are not affected.';
+      'Irreversibly deletes all local account credentials and sessions (streaming server passwords, NT/KG sessions, local Subsonic accounts) and revokes platform tokens. Library, history and downloads are not affected.';
 
   @override
   String get settingsSecurityStreaming => 'Streaming server credentials';
@@ -2660,7 +2659,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSecuritySession => 'Third-party account sessions';
 
   @override
-  String get settingsSecuritySessionDesc => 'Netease / Kugou sign-in status';
+  String get settingsSecuritySessionDesc => 'NT / KG sign-in status';
 
   @override
   String get settingsSecurityUserDb => 'Local user database';
@@ -2923,7 +2922,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSchemeSwitchRebuildDesc =>
-      'The schemes use incompatible encrypted structures. Switching destroys the current vault and rebuilds the database; all login credentials (Netease / Kugou / streaming accounts) will be lost and require re-login.';
+      'The schemes use incompatible encrypted structures. Switching destroys the current vault and rebuilds the database; all login credentials (NT / KG / streaming accounts) will be lost and require re-login.';
 
   @override
   String get settingsSchemeSwitchKeep => 'Keep current';
@@ -3917,7 +3916,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get brandQqMusic => 'QM';
 
   @override
-  String get platformQQMusic => 'QQ Music';
+  String get platformQQMusic => 'QM';
 
   @override
   String get loginQqQrLogin => 'Sign in with QM QR code';
