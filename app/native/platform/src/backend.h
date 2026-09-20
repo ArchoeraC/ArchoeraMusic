@@ -45,6 +45,9 @@ int32_t systemThemeSetEvents(bool on);
 
 int32_t notify(const char* title, const char* body);
 
+// 文件管理器定位路径（文件 → 打开所在目录并选中；目录 → 打开）。
+int32_t revealPath(const char* path);
+
 }  // namespace archoera
 
 #endif  // ARCHOERA_BACKEND_H

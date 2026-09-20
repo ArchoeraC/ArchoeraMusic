@@ -115,6 +115,19 @@ mixin _LibraryStoreCore on Notifier<LibraryState> {
     });
   }
 
+  /// 删除曲目文件（磁盘）并从曲库移除（见 [LibraryNotifier.deleteTrackFile]）。
+  Future<bool> _deleteTrackFile(String path) async {
+    if (path.isEmpty) return false;
+    try {
+      final f = File(path);
+      if (await f.exists()) await f.delete();
+    } catch (_) {
+      return false; // 删除失败：保留曲库记录，交由调用方提示
+    }
+    await _removeTrackByPath(path);
+    return true;
+  }
+
   Future<bool> _removeTrackByPath(String path) async {
     if (path.isEmpty) return false;
     try {

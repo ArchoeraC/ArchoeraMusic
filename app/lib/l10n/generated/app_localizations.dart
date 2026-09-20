@@ -1538,6 +1538,240 @@ abstract class AppLocalizations {
   /// **'聚合'**
   String get platformAll;
 
+  /// No description provided for @menuDeleteFile.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除文件'**
+  String get menuDeleteFile;
+
+  /// No description provided for @libraryDeleteFileTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除文件'**
+  String get libraryDeleteFileTitle;
+
+  /// No description provided for @libraryDeleteFileMessage.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将永久删除「{name}」，且无法恢复。确定继续吗？'**
+  String libraryDeleteFileMessage(Object name);
+
+  /// No description provided for @libraryDeleteFileConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除'**
+  String get libraryDeleteFileConfirm;
+
+  /// No description provided for @toastFileDeleted.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已删除文件'**
+  String get toastFileDeleted;
+
+  /// No description provided for @toastDeleteFileFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除文件失败'**
+  String get toastDeleteFileFailed;
+
+  /// No description provided for @toastRevealFileFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无法定位文件（系统文件管理器不可用）'**
+  String get toastRevealFileFailed;
+
+  /// No description provided for @settingsSectionThirdPartyService.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'第三方服务致谢'**
+  String get settingsSectionThirdPartyService;
+
+  /// No description provided for @settingsAttribution.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本程序由  歌姬计划 API 提供技术支持'**
+  String get settingsAttribution;
+
+  /// No description provided for @settingsApiDocs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **' 歌姬计划 API 文档'**
+  String get settingsApiDocs;
+
+  /// No description provided for @settingsSongCacheMemoryHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开启「纯内存播放」，歌曲缓存不会写入磁盘'**
+  String get settingsSongCacheMemoryHint;
+
+  /// No description provided for @platform.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'NK'**
+  String get platform;
+
+  /// No description provided for @settingsCatExperimentalSource.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'实验性音源'**
+  String get settingsCatExperimentalSource;
+
+  /// No description provided for @settingsExperimentalSourceSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'第三方音源（默认关闭）'**
+  String get settingsExperimentalSourceSubtitle;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **''**
+  String get settingsTitle;
+
+  /// No description provided for @settingsNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'第三方实验音源，非官方接入；仅支持登录，不提供注册与 VIP 开通，接口可能随时失效。'**
+  String get settingsNote;
+
+  /// No description provided for @settingsEnable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用 '**
+  String get settingsEnable;
+
+  /// No description provided for @settingsEnableDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在搜索、我喜欢、收藏中显示 NK（默认关闭）'**
+  String get settingsEnableDesc;
+
+  /// No description provided for @settingsLogin.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录'**
+  String get settingsLogin;
+
+  /// No description provided for @settingsLogout.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'退出登录'**
+  String get settingsLogout;
+
+  /// No description provided for @settingsLoggedInAs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已登录：{name}'**
+  String settingsLoggedInAs(Object name);
+
+  /// No description provided for @settingsNotLoggedIn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未登录'**
+  String get settingsNotLoggedIn;
+
+  /// No description provided for @LoginTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录 '**
+  String get LoginTitle;
+
+  /// No description provided for @LoginTabQr.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫码登录'**
+  String get LoginTabQr;
+
+  /// No description provided for @LoginTabPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'账号密码'**
+  String get LoginTabPassword;
+
+  /// No description provided for @LoginEmail.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'邮箱'**
+  String get LoginEmail;
+
+  /// No description provided for @LoginPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'密码'**
+  String get LoginPassword;
+
+  /// No description provided for @LoginPasswordHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入密码'**
+  String get LoginPasswordHint;
+
+  /// No description provided for @LoginSubmit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录'**
+  String get LoginSubmit;
+
+  /// No description provided for @LoginQrHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请使用  手机 App 扫码登录'**
+  String get LoginQrHint;
+
+  /// No description provided for @QrScanned.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已扫码，请在手机上确认'**
+  String get QrScanned;
+
+  /// No description provided for @QrCanceled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已取消登录'**
+  String get QrCanceled;
+
+  /// No description provided for @QrExpired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'二维码已过期，请重新生成'**
+  String get QrExpired;
+
+  /// No description provided for @toastLoginRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'操作失败（请确认已登录 NK 账号）'**
+  String get toastLoginRequired;
+
+  /// No description provided for @pageLikedLoginHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录 NK 后查看我喜欢'**
+  String get pageLikedLoginHint;
+
+  /// No description provided for @pageLikedLoginDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录  后同步「我喜欢」收藏'**
+  String get pageLikedLoginDesc;
+
+  /// No description provided for @pageLikedEmptyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'还没有喜欢的歌曲，去搜索页点亮红心吧'**
+  String get pageLikedEmptyHint;
+
+  /// No description provided for @pageFavLoginDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录  后查看歌单与收藏'**
+  String get pageFavLoginDesc;
+
+  /// No description provided for @pageFavEmptyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'还没有歌单或收藏'**
+  String get pageFavEmptyHint;
+
   /// No description provided for @toastPlayedAll.
   ///
   /// In zh_CN, this message translates to:

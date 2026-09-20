@@ -14,9 +14,13 @@ class _AccountsMenu extends ConsumerWidget {
     final netease = ref.watch(neteaseAuthProvider);
     final kugouApi = ref.read(kugouApiProvider);
     final qqApi = ref.read(qqMusicApiProvider);
+    final Enabled = ref.watch(
+      appPrefsProvider.select((p) => p.Enabled),
+    );
+    final Api = ref.read(ApiProvider);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([kugouApi, qqApi]),
+      listenable: Listenable.merge([kugouApi, qqApi, Api]),
       builder: (context, _) {
         final kugou = kugouApi.session;
         final qqProfile = qqApi.profile;
@@ -85,6 +89,12 @@ class _AccountsMenu extends ConsumerWidget {
               case 'logout_qq':
                 ref.read(qqMusicApiProvider).logout();
                 toast(context.l10n.loginLoggedOut(context.l10n.brandQqMusic));
+              case 'login_':
+                showLoginDialog(context);
+              case 'logout_':
+                Api.logout();
+                ref.read(likeControllerProvider).sync();
+                toast(context.l10n.loginLoggedOut(l10n.settingsTitle));
             }
           },
           itemBuilder: (_) => [
@@ -127,6 +137,20 @@ class _AccountsMenu extends ConsumerWidget {
                   ? l10n.navHeaderQqId(qqApi.uin)
                   : qqNick,
             ),
+            // 实验性音源 （仅启用时显示）。
+            if (Enabled)
+              ..._platformSection(
+                l10n: l10n,
+                title: l10n.settingsTitle,
+                loggedIn: Api.isLoggedIn,
+                loginValue: 'login_',
+                logoutValue: 'logout_',
+                nameValue: 'name_',
+                avatarName: Api.account?.displayName ?? '',
+                displayName:
+                    Api.account?.displayName ??
+                    l10n.settingsNotLoggedIn,
+              ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),

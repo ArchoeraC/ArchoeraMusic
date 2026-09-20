@@ -49,7 +49,7 @@ extension _LibraryPageActions on _LibraryPageState {
         SContextMenuItem(
           label: l10n.menuLocateFile,
           icon: EtaIcons.folderOpenOutline,
-          onTap: () => _toast(l10n.menuLocateFileComingSoon),
+          onTap: () => _revealFile(track),
         ),
         SContextMenuItem(
           label: l10n.menuRemoveFromLibrary,
@@ -62,8 +62,64 @@ extension _LibraryPageActions on _LibraryPageState {
             _toast(ok ? l10n.toastRemovedFromLibrary : l10n.toastRemoveFailed);
           },
         ),
+        // 直接删除曲目文件（磁盘）并从曲库移除：危险操作，二次确认。
+        SContextMenuItem(
+          label: l10n.menuDeleteFile,
+          icon: EtaIcons.wastebasketOutline,
+          danger: true,
+          onTap: () => _deleteFile(track),
+        ),
       ],
     );
+  }
+
+  /// 删除曲目文件（磁盘）并从曲库移除（危险操作，需确认）。
+  Future<void> _deleteFile(Track track) async {
+    final l10n = context.l10n;
+    final path = track.localPath;
+    if (path == null || path.isEmpty) {
+      _toast(l10n.toastMissingLocalPath);
+      return;
+    }
+    final confirmed = await SDialog.show<bool>(
+      context,
+      title: l10n.libraryDeleteFileTitle,
+      description: l10n.libraryDeleteFileMessage(track.title),
+      width: 440,
+      child: const SizedBox.shrink(),
+      actions: [
+        SButton(
+          label: l10n.commonCancel,
+          variant: SButtonVariant.secondary,
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        SButton(
+          label: l10n.libraryDeleteFileConfirm,
+          variant: SButtonVariant.error,
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
+    );
+    if (confirmed != true || !mounted) return;
+    final done = await ref
+        .read(libraryStoreProvider.notifier)
+        .deleteTrackFile(path);
+    if (!mounted) return;
+    _toast(done ? l10n.toastFileDeleted : l10n.toastDeleteFileFailed);
+  }
+
+  /// 在系统文件管理器中定位曲目文件（走平台桥接，零子进程）。
+  void _revealFile(Track track) {
+    final l10n = context.l10n;
+    final path = track.localPath;
+    if (path == null || path.isEmpty) {
+      _toast(l10n.toastMissingLocalPath);
+      return;
+    }
+    final rc = PlatformCapabilities.instance().revealPath(path);
+    if (rc != aplOk) {
+      _toast(l10n.toastRevealFileFailed);
+    }
   }
 
   void _handleEmptyAddFolder(LibraryState state) {

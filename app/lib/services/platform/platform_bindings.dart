@@ -39,6 +39,7 @@ const int aplCapAppInstance = 1 << 6;
 const int aplCapSystemAccent = 1 << 7;
 const int aplCapSystemTheme = 1 << 8;
 const int aplCapDeepLink = 1 << 9;
+const int aplCapRevealPath = 1 << 10;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -151,6 +152,7 @@ typedef _AplPowerScreenC = Int32 Function(Int32 on);
 typedef _AplWindowEventsC = Int32 Function(Int32 on);
 typedef _AplInstanceAcquireC = Int32 Function();
 typedef _AplNotifyC = Int32 Function(Pointer<Utf8> title, Pointer<Utf8> body);
+typedef _AplRevealPathC = Int32 Function(Pointer<Utf8> path);
 typedef _AplSystemAccentC = Int32 Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsC = Int32 Function(Int32 on);
 typedef _AplSystemThemeSetEventsC = Int32 Function(Int32 on);
@@ -178,6 +180,7 @@ typedef _AplPowerScreenD = int Function(int on);
 typedef _AplWindowEventsD = int Function(int on);
 typedef _AplInstanceAcquireD = int Function();
 typedef _AplNotifyD = int Function(Pointer<Utf8> title, Pointer<Utf8> body);
+typedef _AplRevealPathD = int Function(Pointer<Utf8> path);
 typedef _AplSystemAccentD = int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsD = int Function(int on);
 typedef _AplSystemThemeSetEventsD = int Function(int on);
@@ -262,6 +265,8 @@ class PlatformBindings {
         _instanceAcquire =
             lib.lookupFunction<_AplInstanceAcquireC, _AplInstanceAcquireD>('apl_instance_acquire'),
         _notify = lib.lookupFunction<_AplNotifyC, _AplNotifyD>('apl_notify'),
+        _revealPath =
+            lib.lookupFunction<_AplRevealPathC, _AplRevealPathD>('apl_reveal_path'),
         _systemAccent = lib
             .lookupFunction<_AplSystemAccentC, _AplSystemAccentD>('apl_system_accent'),
         _systemAccentSetEvents = lib.lookupFunction<_AplSystemAccentSetEventsC,
@@ -306,6 +311,7 @@ class PlatformBindings {
   final _AplWindowEventsD _windowEvents;
   final _AplInstanceAcquireD _instanceAcquire;
   final _AplNotifyD _notify;
+  final _AplRevealPathD _revealPath;
   final _AplSystemAccentD _systemAccent;
   final _AplSystemAccentSetEventsD _systemAccentSetEvents;
   final _AplSystemThemeSetEventsD _systemThemeSetEvents;
@@ -350,6 +356,16 @@ class PlatformBindings {
       calloc.free(r);
       calloc.free(g);
       calloc.free(b);
+    }
+  }
+
+  /// 在系统文件管理器中定位路径（文件→打开所在目录并选中；目录→打开）。
+  int revealPath(String path) {
+    final p = path.toNativeUtf8();
+    try {
+      return _revealPath(p);
+    } finally {
+      malloc.free(p);
     }
   }
 

@@ -8,6 +8,7 @@
 /// 顺序固定为「先按原文匹配排除 → 再还原脏话」，与既有行为一致。
 library;
 
+import '../ad_filter.dart';
 import '../lyric_line.dart';
 import '../profanity.dart';
 
@@ -29,6 +30,19 @@ class LyricProcessContext {
 /// 歌词后处理器。
 abstract interface class LyricPostProcessor {
   List<LyricGroup> process(List<LyricGroup> groups, LyricProcessContext ctx);
+}
+
+/// 内置广告清洗：逐行删除广告/推广歌词（**强内置、全音源、无开关**）。
+///
+/// 与下载引擎 `sanitize.rs` 同规则；无论来源平台，展示前统一过滤。
+class AdLyricProcessor implements LyricPostProcessor {
+  const AdLyricProcessor();
+
+  @override
+  List<LyricGroup> process(List<LyricGroup> groups, LyricProcessContext ctx) => [
+    for (final g in groups)
+      if (!isAdMetadataText(g.original.text)) g,
+  ];
 }
 
 /// 按关键词/正则丢弃匹配的歌词行。
@@ -112,8 +126,11 @@ class LyricPipeline {
 
   final List<LyricPostProcessor> processors;
 
-  /// 标准管线（排除 → 脏话还原）。
+  /// 标准管线（广告清洗 → 排除 → 脏话还原）。
+  ///
+  /// 广告清洗置于最前：先把站点推广行删掉，再走用户排除规则/脏话还原。
   static const LyricPipeline standard = LyricPipeline([
+    AdLyricProcessor(),
     ExcludeLyricProcessor(),
     UncensorLyricProcessor(),
   ]);

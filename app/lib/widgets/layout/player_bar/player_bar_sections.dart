@@ -143,6 +143,7 @@ extension _PlayerBarSections on _PlayerBarState {
         'netease' => context.l10n.platformNetease,
         'qqmusic' => context.l10n.platformQQMusic,
         'kugou' => context.l10n.platformKugou,
+        '' => context.l10n.platform,
         _ => null,
       };
 
@@ -246,7 +247,9 @@ extension _PlayerBarSections on _PlayerBarState {
               ),
             ),
             if (track != null &&
-                (track.source == 'netease' || track.source == 'kugou'))
+                (track.source == 'netease' ||
+                    track.source == 'kugou' ||
+                    track.source == ''))
               _BarLikeButton(track: track),
           ],
         ),

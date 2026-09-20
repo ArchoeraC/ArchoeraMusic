@@ -54,6 +54,7 @@ extern "C" {
 #define APL_CAP_SYSTEM_ACCENT      (1u << 7) /* 系统主题色（DE accent） */
 #define APL_CAP_SYSTEM_THEME       (1u << 8) /* 系统深浅色（light/dark） */
 #define APL_CAP_DEEP_LINK          (1u << 9) /* 自定义 URI scheme 唤醒（archoera://） */
+#define APL_CAP_REVEAL_PATH        (1u << 10) /* 文件管理器定位路径（定位文件/打开所在目录） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -116,6 +117,15 @@ APL_API int32_t apl_window_activate(void);
 
 /* 系统提示（UTF-8 title/body；用于“已有实例”提示等）。失败返回负值。 */
 APL_API int32_t apl_notify(const char *title, const char *body);
+
+/* ── 文件管理器定位（免提权、零子进程）────────────────────────────
+ * 在系统文件管理器中定位 [path]（UTF-8 绝对路径）：
+ *   - 文件 → 打开其所在目录并尽量选中该文件（reveal）；
+ *   - 目录 → 直接打开该目录。
+ * Linux 走 org.freedesktop.FileManager1 D-Bus（回退 GIO 打开所在目录）；
+ * Windows 走 SHOpenFolderAndSelectItems / ShellExecute；macOS 走 NSWorkspace。
+ * 返回 APL_OK / 负错误码（路径不存在 / 无可用文件管理器）。 */
+APL_API int32_t apl_reveal_path(const char *path);
 
 /* 一次性读取系统主题色（0=成功并写 r/g/b，0-255；<0=不可得）。
  * 注：应用层不应主动轮询/查询系统色；正常路径是 apl_system_accent_set_events

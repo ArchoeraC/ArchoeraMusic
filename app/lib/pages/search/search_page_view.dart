@@ -18,7 +18,16 @@ extension _SearchPageView on _SearchPageState {
       ...like.idsFor('netease'),
       ...like.idsFor('kugou'),
       ...like.idsFor('qqmusic'),
+      ...like.idsFor(''),
     };
+    final Enabled = ref.watch(
+      appPrefsProvider.select((p) => p.Enabled),
+    );
+    // 实验性音源关闭时，若当前停留在 NK 平台则退回 NT（避免选择项消失后
+    // 仍对其发请求）。
+    ref.listen(appPrefsProvider.select((p) => p.Enabled), (prev, next) {
+      if (next == false && _platform == '') _switchPlatform('netease');
+    });
 
     return Scaffold(
       body: Column(
@@ -28,6 +37,7 @@ extension _SearchPageView on _SearchPageState {
             query: _query,
             platform: _platform,
             tabs: _tabs,
+            Enabled: Enabled,
             onPlatformChanged: _switchPlatform,
           ),
           const Divider(height: 1),
@@ -149,12 +159,16 @@ class _SearchPageHeader extends StatelessWidget {
     required this.query,
     required this.platform,
     required this.tabs,
+    required this.Enabled,
     required this.onPlatformChanged,
   });
 
   final String query;
   final String platform;
   final TabController tabs;
+
+  /// 实验性音源启用时才展示 NK 平台页签。
+  final bool Enabled;
   final ValueChanged<String> onPlatformChanged;
 
   @override
@@ -188,6 +202,7 @@ class _SearchPageHeader extends StatelessWidget {
                   SSegmentedOption('netease', l10n.platformNetease),
                   SSegmentedOption('kugou', l10n.platformKugou),
                   SSegmentedOption('qqmusic', l10n.platformQQMusic),
+                  if (Enabled) SSegmentedOption('', l10n.platform),
                   SSegmentedOption('all', l10n.platformAll),
                 ],
                 selected: platform,

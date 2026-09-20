@@ -44,7 +44,8 @@ extension _PlayerPageView on _PlayerPageState {
         current != null &&
         (current.source == 'netease' ||
             current.source == 'kugou' ||
-            current.source == 'qqmusic');
+            current.source == 'qqmusic' ||
+            current.source == '');
     final liked = canLike
         ? ref.watch(likeControllerProvider).isLiked(current)
         : false;
@@ -274,7 +275,8 @@ class _PlayerTopBar extends StatelessWidget {
           ),
           const Spacer(),
           const _SleepTimerButton(),
-          if (current != null)
+          //  为直传原文件、无音质档：不展示无意义的音质切换。
+          if (current != null && current!.source != '')
             QualityMenu(
               levels: _PlayerPageState._availableLevels(current),
               current: quality,

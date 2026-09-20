@@ -39,6 +39,8 @@ extension _HistoryPageActions on _HistoryPageState {
         url = track.localPath;
       } else if (track.source == 'netease') {
         url = await ref.read(neteaseApiProvider).resolvePlayUrl(track.id);
+      } else if (track.source == '') {
+        url = await ref.read(ApiProvider).resolvePlayUrl(track);
       } else {
         url = null;
       }

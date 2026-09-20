@@ -110,6 +110,17 @@ class PlatformCapabilities {
     return b.notify(title, body);
   }
 
+  /// 是否具备「文件管理器定位路径」能力。
+  bool get revealPathAvailable => caps & aplCapRevealPath != 0;
+
+  /// 在系统文件管理器中定位 [path]（文件→打开所在目录并选中；目录→打开）。
+  /// 桥接不可用/无该能力返回 [aplErrUnsupported]。返回 0=成功。
+  int revealPath(String path) {
+    final b = _bindings;
+    if (b == null || caps & aplCapRevealPath == 0) return aplErrUnsupported;
+    return b.revealPath(path);
+  }
+
   static PlatformCapabilities? _instance;
 
   /// 进程级单例；重复访问返回同一实例。

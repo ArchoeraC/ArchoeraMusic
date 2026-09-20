@@ -265,7 +265,7 @@ void setPendingDeepLink(const char* uri) {
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
-           CAP_SYSTEM_THEME | CAP_DEEP_LINK;
+           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH;
 }
 
 int32_t init() {
@@ -559,6 +559,29 @@ int32_t notify(const char* title, const char* body) {
              withCompletionHandler:^(NSError* error) {
                (void)error;
              }];
+    return OK;
+}
+
+int32_t revealPath(const char* path) {
+    if (path == nullptr || *path == '\0') return ERR_STATE;
+    @autoreleasepool {
+        NSString* p = [NSString stringWithUTF8String:path];
+        if (p == nil) return ERR_BACKEND;
+        BOOL isDir = NO;
+        if (![[NSFileManager defaultManager] fileExistsAtPath:p
+                                                  isDirectory:&isDir]) {
+            return ERR_BACKEND;  // 路径不存在
+        }
+        NSURL* url = [NSURL fileURLWithPath:p];
+        NSWorkspace* ws = [NSWorkspace sharedWorkspace];
+        if (isDir) {
+            // 目录：直接打开（Finder）。
+            [ws openURL:url];
+        } else {
+            // 文件：在 Finder 中打开所在目录并选中该文件。
+            [ws activateFileViewerSelectingURLs:@[ url ]];
+        }
+    }
     return OK;
 }
 
