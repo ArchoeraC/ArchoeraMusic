@@ -76,6 +76,38 @@ enum LyricsBlurMode {
   off,
 }
 
+/// 用户可选的失焦档位（设置项 `amll.blurQuality`，默认 [auto]）。
+///
+/// 与 [LyricsBlurMode] 的区别：这里是**用户意图**（要不要省、要不要贴上游），
+/// 由 [resolveLyricsBlurMode] 映射到实际画法；显式选择时不做自动降级
+/// ——决定权在用户手里。
+enum LyricsBlurQuality {
+  /// 自动（默认）：整层档起步；若这台机器持续掉帧，守卫自动关掉失焦（只降不升）。
+  auto('auto'),
+
+  /// 流畅优先：固定整层档（1 个离屏层 + 1/4 重采样），不自动降级。
+  fast('fast'),
+
+  /// 画质优先：固定逐行档（σ = `min(5, 1+距离)`，最贴 AMLL 的半径梯度），最吃 GPU。
+  quality('quality'),
+
+  /// 关闭失焦（只剩透明度景深）。
+  off('off');
+
+  const LyricsBlurQuality(this.key);
+
+  /// 持久化键（`amll.blurQuality` 的取值）。
+  final String key;
+
+  /// 解析持久化值；未知/空 → [auto]。
+  static LyricsBlurQuality parse(String? raw) {
+    for (final q in values) {
+      if (q.key == raw) return q;
+    }
+    return LyricsBlurQuality.auto;
+  }
+}
+
 /// 整层失焦的等效高斯 σ（AMLL 每行 σ 为 `min(5, 1+距离)` = 2~5，取中值）。
 const double kPanelBlurSigma = 3.0;
 
@@ -111,17 +143,26 @@ LyricsBlurMode? lyricsBlurOverrideFrom(String? raw) {
 final LyricsBlurMode? lyricsBlurOverride =
     lyricsBlurOverrideFrom(Platform.environment['ARCHOERA_LYRICS_BLUR']);
 
-/// 解析最终生效的失焦档位。
+/// 解析最终生效的失焦画法。
 ///
-/// 优先级：环境变量 > 关闭开关 / 自动降级 > 默认 [LyricsBlurMode.panel]。
+/// 优先级：诊断用环境变量 > 用户档位。只有 [LyricsBlurQuality.auto] 会吃
+/// 自动降级；用户显式选了 `fast`/`quality` 就照他选的来（决定权交给用户）。
 LyricsBlurMode resolveLyricsBlurMode({
-  required bool enableBlur,
+  required LyricsBlurQuality quality,
   LyricsBlurMode? override,
   required bool autoDegraded,
 }) {
   if (override != null) return override;
-  if (!enableBlur || autoDegraded) return LyricsBlurMode.off;
-  return LyricsBlurMode.panel;
+  switch (quality) {
+    case LyricsBlurQuality.off:
+      return LyricsBlurMode.off;
+    case LyricsBlurQuality.fast:
+      return LyricsBlurMode.panel;
+    case LyricsBlurQuality.quality:
+      return LyricsBlurMode.perLine;
+    case LyricsBlurQuality.auto:
+      return autoDegraded ? LyricsBlurMode.off : LyricsBlurMode.panel;
+  }
 }
 
 /// 视口窗口上下余量：取「视口高度 × [kViewportWindowMarginRatio]」与
@@ -183,7 +224,7 @@ class AmllPhysicsWall extends StatefulWidget {
     this.wordSweep = true,
     this.hidePassed = false,
     this.enableScale = true,
-    this.enableBlur = true,
+    this.blurQuality = LyricsBlurQuality.auto,
     this.wordFadeWidth = 0.5,
     this.springPreset = 'default',
     this.animate = true,
@@ -218,8 +259,8 @@ class AmllPhysicsWall extends StatefulWidget {
   /// 非激活行缩放（激活 1.0 / 非激活 0.97，弹簧平滑）。
   final bool enableScale;
 
-  /// 非激活行高斯失焦（具体档位见 [LyricsBlurMode]；false = 完全不失焦）。
-  final bool enableBlur;
+  /// 非激活行失焦档位（默认 [LyricsBlurQuality.auto]；见 [LyricsBlurMode]）。
+  final LyricsBlurQuality blurQuality;
 
   /// 扫亮羽化带宽度（× 字号，对齐 AMLL `wordFadeWidth`）。
   final double wordFadeWidth;
@@ -253,7 +294,6 @@ class _PaintCtx {
   bool showRomanization = false;
   FontWeight fontWeight = FontWeight.w600;
   bool enableScale = true;
-  bool enableBlur = true;
 
   /// 生效的失焦档位（见 [LyricsBlurMode]）：已含关闭开关、环境变量覆盖
   /// 与帧预算自动降级。

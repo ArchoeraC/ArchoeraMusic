@@ -146,14 +146,13 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _c.showRomanization = widget.showRomanization;
     _c.fontWeight = widget.fontWeight;
     _c.enableScale = widget.enableScale;
-    _c.enableBlur = widget.enableBlur;
     _syncBlurMode();
     _c.wordFadeWidth = widget.wordFadeWidth;
   }
 
   /// 生效的失焦档位（不含悬停；悬停只压 [panelBlur] / 逐行目标为 0）。
   LyricsBlurMode get _blurModeResolved => resolveLyricsBlurMode(
-        enableBlur: widget.enableBlur,
+        quality: widget.blurQuality,
         override: _debugModeOverride ?? lyricsBlurOverride,
         autoDegraded: _blurDegraded,
       );
@@ -182,7 +181,9 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   void _noteFrame({required double rasterMs, required double uiMs}) {
     // 显式指定档位（诊断 A/B）时不自动降级，否则没法对比。
     if (lyricsBlurOverride != null || _blurDegraded) return;
-    if (!widget.enableBlur || !_ticker.isActive) return;
+    // 用户显式选了档位就照他选的来，不自动降级。
+    if (widget.blurQuality != LyricsBlurQuality.auto) return;
+    if (!_ticker.isActive) return;
     if (_blurBudget.onFrame(rasterMs, uiMs: uiMs)) {
       _blurDegraded = true;
       _blurBudget.reset();
@@ -520,11 +521,12 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 鼠标悬停在歌词区时一律为 0（对齐 AMLL `.amll-lyric-player:hover …
   /// filter: unset`）：方便用户悬停阅读/滚动，也避免模糊影响辨识。
   ///
-  /// ⚠ 这是歌词区最主要的 raster 开销（每行一个离屏高斯层）：弱机可关
-  /// `amll.enableBlur` 或开性能模式。要保留观感又降成本，下一步是把非高亮行
-  /// 画到**半分辨率**图层上再放大（见 docs/player-render-optimization.md §3.2）。
+  /// ⚠ 失焦是歌词区最主要的 raster 开销。默认档（整层 + 1/4 重采样）已经把它
+  /// 压到 1 个离屏层；用户还可在设置里把 `amll.blurQuality` 设为流畅/画质/关闭，
+  /// 弱机另有「连续掉帧自动关闭」兜底（见 [LyricsBlurQuality] / [LyricsBlurBudget]）。
   double _blurTargetFor(int i) {
-    if (!widget.enableBlur || _hovering) return 0;
+    if (_hovering) return 0;
+    if (_blurModeResolved == LyricsBlurMode.off) return 0;
     final anchor = _anchorIdx;
     if (anchor < 0) return 0;
     final d = (i - anchor).abs();

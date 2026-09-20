@@ -220,7 +220,7 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
 | 上下边缘渐隐 | **未实现**（旧文档曾声称有） | AMLL 无此效果；景深已提供层次 |
 | 手动浏览回归 | 除「下一行开始时 ≥500ms 未滚动」外，另保留 5s 无操作兜底 | 长间奏里不会把用户永久留在浏览态 |
 | 弹簧预设 | 保留 `smooth/responsive/jello/heavy` 固定手感供覆盖 | 上游没有预设概念；`default` 已与上游一致 |
-| 失焦半径分布（整层档） | 默认档用**统一** σ=3，而不是上游的逐行梯度（σ 2→5） | 整层一次 = 层数恒定、成本可预测；半径梯度是次要成分（「除高亮行外都糊」才是主要成分）。要梯度可切 `perLine` 档或 `ARCHOERA_LYRICS_BLUR=perline` |
+| 失焦半径分布（整层档） | `auto`/`fast` 档用**统一** σ=3，而不是上游的逐行梯度（σ 2→5） | 整层一次 = 层数恒定、成本可预测；半径梯度是次要成分（「除高亮行外都糊」才是主要成分）。要梯度可在设置里选 `quality`（或 `ARCHOERA_LYRICS_BLUR=perline`） |
 | 换行平衡 / ruby / 对唱 | 未实现 | 属数据模型/排版层，另立专项 |
 
 ---
@@ -231,7 +231,7 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
 |---|---|---|
 | `lyrics.engine` | `simple` | `amll` 才启用本引擎（本轮未改默认） |
 | `lyrics.fontSize` | `18`（14–**60**） | 字号上限提到 60px |
-| `amll.enableBlur` | `true` | 关掉非激活行失焦（对齐上游的「除高亮行外全模糊」；这是歌词区最大 raster 开销，弱机可关） |
+| `amll.blurQuality` | `auto` | 失焦档位：`auto` 自动（整层档起步 + 帧预算兜底）/ `fast` 流畅（固定整层档，1 层 + 1/4 重采样）/ `quality` 画质（固定逐行 σ=`min(5,1+距离)`，最贴上游、最吃 GPU）/ `off` 关闭。**显式档位不吃自动降级**（决定权交给用户）。旧键 `amll.enableBlur=false` 自动迁移为 `off` |
 | `ARCHOERA_LYRICS_BLUR` | 未设 | 诊断/AB 用环境变量：`perline` / `panel` / `off`。显式指定时会**禁用自动降级**（便于对比真机手感） |
 | `amll.enableScale` | `true` | 关掉非激活行缩放 |
 | `amll.inactiveAlpha` | `0.45` | 非激活行透明度下限 |
@@ -258,8 +258,11 @@ headless 基准：无失焦 **6.3ms**、逐行失焦 **28.5ms**、整层 1/4 重
   **罗马音与背景人声共存**（解析挂载、重建保留 `romaji`+`isBG`）、
   以及墙体行为（插值推进、淡入、缩放、按距离失焦、间奏期高亮清空、缓存有界、
   羽化扫亮像素级验证、音译行渲染、背景行不占槽位）。
-- `test/lyrics_blur_budget_test.dart`：失焦档位解析（默认/开关/降级/覆盖优先级、
-  环境变量别名）与帧预算守卫（窗口未满不下结论、达阈值才降、UI 线程卡顿不计入）。
+- `test/lyrics_blur_budget_test.dart`：失焦档位解析（auto/fast/quality/off 映射、
+  显式档位不吃降级、环境变量覆盖优先级、`LyricsBlurQuality.parse`）与帧预算守卫
+  （窗口未满不下结论、达阈值才降、UI 线程卡顿不计入）。
+- `test/lyrics_prefs_test.dart`：`amll.blurQuality` 默认/写入/非法值回落/
+  旧键 `amll.enableBlur=false` 迁移。
 - `lyrics_amll_engine_test.dart` 另含：整层档为默认且强度收敛、悬停归零/恢复、
   强制逐行档仍按距离失焦、关闭开关恒不失焦、连续掉帧自动降级且只降不升。
 - 既有回归：`test/amll_physics_wall_test.dart`（锚点/seek/高速换行）、

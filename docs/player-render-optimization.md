@@ -272,14 +272,15 @@ Animations，逐 `<span>` 可独立变换）。本轮把 AMLL 的表现层补齐
    σ 因算法分支反而更慢）→ 所以「把 σ 调到 AMLL 原值、让观感更准」几乎免费。
 2. 「整层一次」在 1/1 下**不比逐行便宜**（面积更大）；只有在**降采样**后才赢
    ——这正是选「整层 + 1/4」而不是「整层 + 原分辨率」的原因。
-3. 因此默认档定为 `panel`（整层 + 1/4 重采样，用 `ImageFilter.compose` +
-   `ImageFilter.matrix` 实现，**不产生纹理缓存、不占显存**），`perLine` 保留给
-   追求上游半径梯度的机器。
+3. 因此 `auto`（默认）/`fast` 档都走 `panel`（整层 + 1/4 重采样，用
+   `ImageFilter.compose` + `ImageFilter.matrix` 实现，**不产生纹理缓存、不占显存**），
+   追求上游半径梯度的机器可在设置里选 `quality`（逐行）。用户也可直接选 `off`
+   ——三类机器（独显/核显/无 GPU）的需求差别太大，**把决定权交给用户 + 自动兜底**。
 4. 再往下（@1/8）收益递减，且过糊；「假失焦」虽然接近零成本，但观感与高斯
    差别明显，只在极弱机上才有意义 —— 目前由「帧预算守卫」直接降级为关闭，
    不做假失焦（少一种观感、少一条分支）。
-5. **真机确认方式**：`ARCHOERA_LYRICS_BLUR=perline|panel|off` 启动即可 A/B
-   （显式指定会禁用自动降级）。⚠ 待办：在带 GPU 的 Windows/Linux 真机上复测
+5. **真机确认方式**：设置里选档位（`amll.blurQuality`），或诊断用环境变量
+   `ARCHOERA_LYRICS_BLUR=perline|panel|off` 启动 A/B（显式指定会禁用自动降级）。⚠ 待办：在带 GPU 的 Windows/Linux 真机上复测
    （本机 WSLg 起不了 GUI，Impeller 的 blur 实现与 Skia 不同，见 flutter#191207）。
 
 ### 4.3 频谱 → 批处理（P3 已实现）

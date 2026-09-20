@@ -40,7 +40,7 @@ Widget buildWall(
   bool playing = false,
   bool showRomanization = false,
   bool showTranslation = true,
-  bool enableBlur = true,
+  LyricsBlurQuality blurQuality = LyricsBlurQuality.auto,
   double width = 400,
   double height = 500,
 }) => MaterialApp(
@@ -54,7 +54,7 @@ Widget buildWall(
         playing: playing,
         showRomanization: showRomanization,
         showTranslation: showTranslation,
-        enableBlur: enableBlur,
+        blurQuality: blurQuality,
         onSeek: (_) {},
       ),
     ),
@@ -790,7 +790,7 @@ void main() {
                   ],
                   positionMs: 2500,
                   fontSize: 22,
-                  enableBlur: false,
+                  blurQuality: LyricsBlurQuality.off,
                   enableScale: false,
                   alignFraction: 0.5,
                   onSeek: (_) {},
@@ -1071,9 +1071,11 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('关闭失焦开关：整层强度恒为 0', (tester) async {
+    testWidgets('设置里选「关闭」：整层强度恒为 0', (tester) async {
       final groups = buildGroups(40);
-      await tester.pumpWidget(buildWall(groups, 20000, enableBlur: false));
+      await tester.pumpWidget(
+        buildWall(groups, 20000, blurQuality: LyricsBlurQuality.off),
+      );
       await settle(tester);
       final dynamic s = stateOf(tester);
       expect(s.debugBlurMode(), LyricsBlurMode.off);
@@ -1120,6 +1122,53 @@ void main() {
       await tester.pump(const Duration(milliseconds: 16));
       expect((stateOf(tester) as dynamic).debugBlurDegraded(), isFalse);
       expect((stateOf(tester) as dynamic).debugBlurMode(), LyricsBlurMode.panel);
+    });
+
+    testWidgets('设置「画质」档：固定逐行，显式选择不吃自动降级', (tester) async {
+      final groups = buildGroups(40);
+      await tester.pumpWidget(
+        buildWall(
+          groups,
+          20000,
+          playing: true,
+          blurQuality: LyricsBlurQuality.quality,
+        ),
+      );
+      await settle(tester, frames: 10);
+      final dynamic s = stateOf(tester);
+      expect(s.debugBlurMode(), LyricsBlurMode.perLine);
+      for (var i = 0; i < 60; i++) {
+        s.debugNoteFrame(rasterMs: 30.0, uiMs: 3.0);
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      final dynamic after = stateOf(tester);
+      expect(after.debugBlurDegraded(), isFalse, reason: '显式档位不自动降级');
+      expect(after.debugBlurMode(), LyricsBlurMode.perLine);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('设置「流畅」档：固定整层档，显式选择不吃自动降级', (tester) async {
+      final groups = buildGroups(40);
+      await tester.pumpWidget(
+        buildWall(
+          groups,
+          20000,
+          playing: true,
+          blurQuality: LyricsBlurQuality.fast,
+        ),
+      );
+      await settle(tester, frames: 10);
+      final dynamic s = stateOf(tester);
+      expect(s.debugBlurMode(), LyricsBlurMode.panel);
+      for (var i = 0; i < 60; i++) {
+        s.debugNoteFrame(rasterMs: 30.0, uiMs: 3.0);
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      final dynamic after = stateOf(tester);
+      expect(after.debugBlurDegraded(), isFalse);
+      expect(after.debugBlurMode(), LyricsBlurMode.panel);
+      expect(after.debugPanelBlur(), greaterThan(0.5), reason: '整层仍生效');
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('位置连续跳变（拖动进度条）时高亮跟随、整墙平滑滑动', (tester) async {
