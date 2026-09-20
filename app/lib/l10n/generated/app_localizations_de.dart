@@ -809,6 +809,138 @@ class AppLocalizationsDe extends AppLocalizations {
   String get platformAll => 'Alle';
 
   @override
+  String get menuDeleteFile => 'Datei löschen';
+
+  @override
+  String get libraryDeleteFileTitle => 'Datei löschen';
+
+  @override
+  String libraryDeleteFileMessage(Object name) {
+    return '„$name“ wird dauerhaft gelöscht. Nicht rückgängig zu machen. Fortfahren?';
+  }
+
+  @override
+  String get libraryDeleteFileConfirm => 'Löschen';
+
+  @override
+  String get toastFileDeleted => 'Datei gelöscht';
+
+  @override
+  String get toastDeleteFileFailed => 'Datei konnte nicht gelöscht werden';
+
+  @override
+  String get toastRevealFileFailed =>
+      'Datei konnte nicht angezeigt werden (kein Dateimanager verfügbar)';
+
+  @override
+  String get settingsSectionThirdPartyService => 'Drittanbieter-Dienste';
+
+  @override
+  String get settingsAttribution =>
+      'Bereitgestellt mit Unterstützung der  Music API';
+
+  @override
+  String get settingsApiDocs => ' Music API-Dokumentation';
+
+  @override
+  String get settingsSongCacheMemoryHint =>
+      '„In-Memory-Wiedergabe“ ist aktiv – der Song-Cache wird nicht auf die Festplatte geschrieben';
+
+  @override
+  String get platform => 'NK';
+
+  @override
+  String get settingsCatExperimentalSource => 'Experimentelle Quellen';
+
+  @override
+  String get settingsExperimentalSourceSubtitle =>
+      'Drittanbieter-Quellen (standardmäßig aus)';
+
+  @override
+  String get settingsTitle => '';
+
+  @override
+  String get settingsNote =>
+      'Experimentelle Drittanbieter-Quelle, inoffiziell; nur Anmeldung (keine Registrierung/VIP-Kauf). Kann jederzeit ausfallen.';
+
+  @override
+  String get settingsEnable => ' aktivieren';
+
+  @override
+  String get settingsEnableDesc =>
+      'NK in Suche, Favoriten und Bibliothek anzeigen (standardmäßig aus)';
+
+  @override
+  String get settingsLogin => 'Anmelden';
+
+  @override
+  String get settingsLogout => 'Abmelden';
+
+  @override
+  String settingsLoggedInAs(Object name) {
+    return 'Angemeldet als $name';
+  }
+
+  @override
+  String get settingsNotLoggedIn => 'Nicht angemeldet';
+
+  @override
+  String get LoginTitle => 'Bei  anmelden';
+
+  @override
+  String get LoginTabQr => 'QR-Code';
+
+  @override
+  String get LoginTabPassword => 'E-Mail und Passwort';
+
+  @override
+  String get LoginEmail => 'E-Mail';
+
+  @override
+  String get LoginPassword => 'Passwort';
+
+  @override
+  String get LoginPasswordHint => 'Passwort eingeben';
+
+  @override
+  String get LoginSubmit => 'Anmelden';
+
+  @override
+  String get LoginQrHint => 'Mit der -App scannen und anmelden';
+
+  @override
+  String get QrScanned => 'Gescannt, bitte am Handy bestätigen';
+
+  @override
+  String get QrCanceled => 'Anmeldung abgebrochen';
+
+  @override
+  String get QrExpired => 'QR-Code abgelaufen, bitte neu erzeugen';
+
+  @override
+  String get toastLoginRequired =>
+      'Aktion fehlgeschlagen (bitte prüfen, ob du bei deinem NK-Konto angemeldet bist)';
+
+  @override
+  String get pageLikedLoginHint =>
+      'Melde dich bei NK an, um deine Lieblingssongs zu sehen';
+
+  @override
+  String get pageLikedLoginDesc =>
+      'Melde dich bei  an, um Lieblingssongs zu synchronisieren';
+
+  @override
+  String get pageLikedEmptyHint =>
+      'Noch keine Lieblingssongs – tippe in der Suche auf das Herz';
+
+  @override
+  String get pageFavLoginDesc =>
+      'Melde dich bei  an, um Playlists und Favoriten zu sehen';
+
+  @override
+  String get pageFavEmptyHint => 'Noch keine Playlists oder Favoriten';
+
+  @override
   String toastPlayedAll(Object count) {
     return '$count Titel abgespielt';
   }

@@ -53,6 +53,10 @@ Future<String?> resolvePlaySource(
     }
     return ref.read(qqMusicApiProvider).resolvePlayUrl(track, quality: quality);
   }
+  if (track.source == '') {
+    // 实验性音源： 音频直链（id 即服务器曲目 id）。
+    return ref.read(ApiProvider).resolvePlayUrl(track, quality: quality);
+  }
   if (track.source == 'streaming') {
     final serverId = track.serverId;
     final originalId = track.originalId;

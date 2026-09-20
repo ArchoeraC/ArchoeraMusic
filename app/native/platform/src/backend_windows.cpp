@@ -1105,7 +1105,7 @@ int32_t deepLinkForwardWin() {
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
-           CAP_SYSTEM_THEME | CAP_DEEP_LINK;
+           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH;
 }
 
 int32_t init() {
@@ -1325,6 +1325,26 @@ int32_t notify(const char* title, const char* body) {
 #endif
     messageBox(title, body);
     return OK;
+}
+
+int32_t revealPath(const char* path) {
+    if (path == nullptr || *path == '\0') return ERR_STATE;
+    const std::wstring w = utf8ToWideLocal(path);
+    if (w.empty()) return ERR_BACKEND;
+    const DWORD attrs = ::GetFileAttributesW(w.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES) return ERR_BACKEND;  // 路径不存在
+    if ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        // 目录：直接用文件管理器打开。
+        const auto r = reinterpret_cast<INT_PTR>(::ShellExecuteW(
+            nullptr, L"open", w.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        return r > 32 ? OK : ERR_BACKEND;
+    }
+    // 文件：打开所在目录并选中该文件。
+    PIDLIST_ABSOLUTE pidl = ::ILCreateFromPathW(w.c_str());
+    if (pidl == nullptr) return ERR_BACKEND;
+    const HRESULT hr = ::SHOpenFolderAndSelectItems(pidl, 0, nullptr, 0);
+    ::ILFree(pidl);
+    return SUCCEEDED(hr) ? OK : ERR_BACKEND;
 }
 
 }  // namespace archoera

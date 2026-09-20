@@ -66,6 +66,7 @@ extension _SearchPageActions on _SearchPageState {
       'netease' => l.platformNetease,
       'kugou' => l.platformKugou,
       'qqmusic' => l.platformQQMusic,
+      '' => l.platform,
       _ => source,
     };
   }
@@ -82,6 +83,8 @@ extension _SearchPageActions on _SearchPageState {
         url = await ref.read(neteaseApiProvider).resolvePlayUrl(track.id);
       } else if (track.source == 'qqmusic') {
         url = await ref.read(qqMusicApiProvider).resolvePlayUrl(track);
+      } else if (track.source == '') {
+        url = await ref.read(ApiProvider).resolvePlayUrl(track);
       } else {
         url = null;
       }
@@ -127,7 +130,22 @@ extension _SearchPageActions on _SearchPageState {
       _openQqCover(item);
       return;
     }
+    if (src == '') {
+      _openCover(item);
+      return;
+    }
     _openNeteaseCover(item);
+  }
+
+  void _openCover(CoverItem item) {
+    switch (_tab) {
+      case _SearchTab.playlists:
+        showPlaylistDetailDialog(context, item);
+      case _SearchTab.artists:
+        showArtistDialog(context, item);
+      default:
+        break;
+    }
   }
 
   void _openNeteaseCover(CoverItem item) {
@@ -193,6 +211,7 @@ extension _SearchPageActions on _SearchPageState {
     return switch (source) {
       'kugou' => l10n.toastLoginRequiredKugou,
       'qqmusic' => l10n.toastQqLikeSyncFailed,
+      '' => l10n.toastLoginRequired,
       _ => l10n.toastLoginRequiredNetease,
     };
   }

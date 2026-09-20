@@ -41,4 +41,6 @@ int32_t systemThemeSetEvents(bool) { return ERR_UNSUPPORTED; }
 
 int32_t notify(const char*, const char*) { return ERR_UNSUPPORTED; }
 
+int32_t revealPath(const char*) { return ERR_UNSUPPORTED; }
+
 }  // namespace archoera

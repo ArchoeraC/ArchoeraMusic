@@ -6,10 +6,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/netease/netease_api.dart';
+import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../stores/shell_page_state.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/list/cover_grid.dart';
+import '../widgets/dialogs/_login_dialog.dart';
 import '../widgets/dialogs/netease_login_dialog.dart';
 import '../widgets/dialogs/kugou_login_button.dart';
 import '../widgets/dialogs/qqmusic_login_dialog.dart';
@@ -34,7 +36,7 @@ class FavoritesPage extends ConsumerStatefulWidget {
   ConsumerState<FavoritesPage> createState() => _FavoritesPageState();
 }
 
-enum _Platform { netease, kugou, qqmusic }
+enum _Platform { netease, kugou, qqmusic,  }
 
 /// NT收藏 tab。
 enum _FavTab { playlist, album, artist }
@@ -45,6 +47,9 @@ enum _KgTab { created, collectedPlaylist, collectedAlbum }
 /// QM收藏 tab（自建歌单 / 收藏歌单 / 我喜欢）。
 enum _QqTab { created, collectedPlaylist, liked }
 
+/// 收藏 tab（自建歌单 / 收藏歌单 / 我喜欢）。
+enum _Tab { created, collectedPlaylist, liked }
+
 class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   /// 当前平台 / 分类 Tab；均存于 [shell_page_state] provider（跨壳内容
   /// 卸载/重挂载保留），`State` 重建时于 [initState] 恢复。
@@ -52,6 +57,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   late _FavTab _tab;
   late _KgTab _kgTab;
   late _QqTab _qqTab;
+  late _Tab _Tab;
 
   /// 各 tab 缓存数据（key：'netease.playlist' / 'kugou.created' 等；切换保留，
   /// 登录态变化时清空）。
@@ -63,11 +69,13 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   bool get _neteaseLoggedIn => ref.read(neteaseAuthProvider) != null;
   bool get _kugouLoggedIn => ref.read(kugouApiProvider).session != null;
   bool get _qqLoggedIn => ref.read(qqMusicApiProvider).isLoggedIn;
+  bool get _LoggedIn => ref.read(ApiProvider).isLoggedIn;
 
   /// 当前平台是否已登录（内容区据此显示数据或登录引导）。
   bool get _loggedIn => switch (_platform) {
     _Platform.kugou => _kugouLoggedIn,
     _Platform.qqmusic => _qqLoggedIn,
+    _Platform. => _LoggedIn,
     _Platform.netease => _neteaseLoggedIn,
   };
 
@@ -75,6 +83,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
     final tab = switch (_platform) {
       _Platform.kugou => _kgTab.name,
       _Platform.qqmusic => _qqTab.name,
+      _Platform. => _Tab.name,
       _Platform.netease => _tab.name,
     };
     return '${_platform.name}.$tab';
@@ -94,14 +103,28 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
     'qqmusic.liked',
   ];
 
+  /// 三个 tab 的 key（一次 `userLibrary()` 拉全部分类）。
+  static const _Keys = [
+    '.created',
+    '.collectedPlaylist',
+    '.liked',
+  ];
+
   @override
   void initState() {
     super.initState();
     // 恢复上次平台 / 分类选择（壳内容因播放页展开被卸载后重建）。
-    _platform = _platformFromName(ref.read(favoritesPlatformProvider));
+    var platform = _platformFromName(ref.read(favoritesPlatformProvider));
+    // 实验性音源已关闭时不保留 NK 选择（避免对其发请求）。
+    if (platform == _Platform. &&
+        !ref.read(appPrefsProvider).Enabled) {
+      platform = _Platform.netease;
+    }
+    _platform = platform;
     _tab = _favTabFromName(ref.read(favoritesNeteaseTabProvider));
     _kgTab = _kgTabFromName(ref.read(favoritesKugouTabProvider));
     _qqTab = _qqTabFromName(ref.read(favoritesQqTabProvider));
+    _Tab = _TabFromName(ref.read(favoritesTabProvider));
     if (_loggedIn) _fetch();
   }
 
@@ -109,6 +132,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   static _Platform _platformFromName(String? name) => switch (name) {
     'kugou' => _Platform.kugou,
     'qqmusic' => _Platform.qqmusic,
+    '' => _Platform.,
     _ => _Platform.netease,
   };
 
@@ -129,6 +153,12 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
     'collectedPlaylist' => _QqTab.collectedPlaylist,
     'liked' => _QqTab.liked,
     _ => _QqTab.created,
+  };
+
+  static _Tab _TabFromName(String? name) => switch (name) {
+    'collectedPlaylist' => _Tab.collectedPlaylist,
+    'liked' => _Tab.liked,
+    _ => _Tab.created,
   };
 
   void _clearCacheState() {
@@ -158,6 +188,11 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
     setState(() => _qqTab = tab);
   }
 
+  void _setTab(_Tab tab) {
+    ref.read(favoritesTabProvider.notifier).set(tab.name);
+    setState(() => _Tab = tab);
+  }
+
   void _markLoading(String key) {
     setState(() {
       _loading.add(key);
@@ -171,6 +206,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
       _loaded.addAll(switch (_platform) {
         _Platform.kugou => _kgKeys,
         _Platform.qqmusic => _qqKeys,
+        _Platform. => _Keys,
         _Platform.netease => [key],
       });
     });
