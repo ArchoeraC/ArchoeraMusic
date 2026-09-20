@@ -18,6 +18,7 @@ import '../services/lyrics/engine/lyrics_engine.dart';
 import '../services/lyrics/lyric_line.dart';
 import '../services/lyrics/sources/kugou_lyric_source.dart';
 import '../services/lyrics/sources/local_lyric_source.dart';
+import '../services/lyrics/sources/neko_lyric_source.dart';
 import '../services/lyrics/sources/netease_lyric_source.dart';
 import '../services/lyrics/sources/qqmusic_lyric_source.dart';
 import '../services/lyrics/sources/streaming_lyric_source.dart';
@@ -32,6 +33,7 @@ final lyricsEngineProvider = Provider<LyricsEngine>(
     const KugouLyricSource(),
     const LocalLyricSource(),
     StreamingLyricSource(ref),
+    NekoLyricSource(ref),
   ]),
 );
 

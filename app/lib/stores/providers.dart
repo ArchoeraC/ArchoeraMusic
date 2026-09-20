@@ -12,6 +12,8 @@ import '../services/history/history_store.dart';
 import '../services/kugou/kugou_api.dart';
 import '../services/liked/liked_cache.dart';
 import '../services/liked/liked_loader.dart';
+import '../services/neko/neko_api.dart';
+import '../services/neko/neko_metadata.dart';
 import '../services/netease/apis_netease_caller.dart';
 import '../services/netease/netease_api.dart';
 import '../services/platform/platform_capabilities.dart';
@@ -90,6 +92,19 @@ final kugouApiProvider = ChangeNotifierProvider<KugouApi>((ref) => KugouApi());
 /// [ChangeNotifierProvider]：登录态（cookie 落盘 vault）变化时通知 UI。
 final qqMusicApiProvider = ChangeNotifierProvider<QqMusicApi>(
   (ref) => QqMusicApi(),
+);
+
+// ── 实验性音源 NekoMusic ────────────────────────────────────────
+
+/// NekoMusic 直连（统一 REST + 不透明 token；纯 Dart，无签名加密）。
+///
+/// **实验性音源，默认关闭**（`source.neko.enabled`）：关闭时 UI 不展示
+/// Neko 平台、也不发请求。登录态变化（token 恢复 / 登录 / 登出）时通知 UI。
+final nekoApiProvider = ChangeNotifierProvider<NekoApi>((ref) => NekoApi());
+
+/// Neko 元数据补充/重写（下载入队前用其它音源规范化标题/歌手/专辑/封面）。
+final nekoMetadataEnricherProvider = Provider<NekoMetadataEnricher>(
+  (ref) => NekoMetadataEnricher(ref),
 );
 
 // ── 顶栏微型天气 ────────────────────────────────────────────────

@@ -14,8 +14,11 @@ void showTrackContextMenu(
   Future<void> Function(Track track)? onToggleLike,
   List<SContextMenuItem> extra = const [],
 }) {
-  final isOnline = track.source == 'netease' || track.source == 'kugou';
-  // 可下载来源：KG/NT（Rust 自研）+ QQMusic（Dart 播放管线回退）。
+  final isOnline =
+      track.source == 'netease' ||
+      track.source == 'kugou' ||
+      track.source == 'neko';
+  // 可下载来源：KG/NT（Rust 自研）+ QQMusic/Neko（Dart 播放管线回退）。
   final canDownload = isOnline || track.source == 'qqmusic';
   final liked = ref.read(likeControllerProvider).isLiked(track);
   final toggle = onToggleLike ?? (t) => _defaultToggleLike(context, ref, t);
@@ -45,11 +48,12 @@ void showTrackContextMenu(
           icon: liked ? EtaIcons.heart : EtaIcons.heartOutline,
           onTap: () => toggle(track),
         ),
-        SContextMenuItem(
-          label: l10n.menuComment,
-          icon: EtaIcons.chatOutline,
-          onTap: () => showCommentDialog(context, track: track),
-        ),
+        if (track.source != 'neko')
+          SContextMenuItem(
+            label: l10n.menuComment,
+            icon: EtaIcons.chatOutline,
+            onTap: () => showCommentDialog(context, track: track),
+          ),
         SContextMenuItem.divider(),
         if (track.source == 'netease' &&
             track.artists.isNotEmpty &&
@@ -66,6 +70,19 @@ void showTrackContextMenu(
                   title: artist.name,
                   cover: track.cover,
                 ),
+              );
+            },
+          ),
+        // Neko 无歌手 id，只能用名字搜索；点击查看该歌手曲目。
+        if (track.source == 'neko' && track.artists.isNotEmpty)
+          SContextMenuItem(
+            label: l10n.menuViewArtist,
+            icon: EtaIcons.userOutline,
+            onTap: () {
+              final artist = track.artists.first;
+              showNekoArtistDialog(
+                context,
+                CoverItem(id: artist.name, title: artist.name),
               );
             },
           ),
@@ -99,6 +116,7 @@ Future<void> _defaultToggleLike(
     toast(switch (track.source) {
       'kugou' => l10n.toastLoginRequiredKugou,
       'qqmusic' => l10n.toastQqLikeSyncFailed,
+      'neko' => l10n.toastLoginRequiredNeko,
       _ => l10n.toastLoginRequiredNetease,
     });
     return;

@@ -16,6 +16,7 @@
 ///   这些标识符是判断文件是否已刮削的可靠依据
 
 #include "scraper.h"
+#include "sanitize.h"
 #include <taglib/tag.h>
 #include <taglib/fileref.h>
 #include <taglib/mpegfile.h>
@@ -57,26 +58,32 @@ public:
                      const ScraperConfig& cfg) {
         try {
             lastError_.clear();
+            // 内置广告清洗（全音源）：字段整体为广告则删除，歌词逐行删除广告行。
+            // 在写入前统一执行，保证写进文件的元数据/歌词无站点推广污染。
+            ScrapeResult clean = result;
+            sanitize::sanitizeResult(clean);
+            const ScrapeResult& res = clean;
+
             std::string ext = filePath.substr(filePath.find_last_of('.') + 1);
             std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
             
             bool success = false;
             
             if (ext == "mp3") {
-                success = writeMp3(filePath, result, cfg);
+                success = writeMp3(filePath, res, cfg);
             } else if (ext == "flac") {
-                success = writeFlac(filePath, result, cfg);
+                success = writeFlac(filePath, res, cfg);
             } else if (ext == "ogg" || ext == "oga" || ext == "opus") {
-                success = writeOgg(filePath, result, cfg);
+                success = writeOgg(filePath, res, cfg);
             } else if (ext == "wav") {
-                success = writeWav(filePath, result, cfg);
+                success = writeWav(filePath, res, cfg);
             } else if (ext == "aiff" || ext == "aif") {
-                success = writeAiff(filePath, result, cfg);
+                success = writeAiff(filePath, res, cfg);
             } else if (ext == "m4a" || ext == "aac" || ext == "mp4") {
-                success = writeMp4(filePath, result, cfg);
+                success = writeMp4(filePath, res, cfg);
             } else {
                 // 对于其他格式，回退到使用 FileRef
-                success = writeGeneric(filePath, result, cfg);
+                success = writeGeneric(filePath, res, cfg);
             }
             
             if (!success) {
@@ -418,6 +425,24 @@ private:
         }
         if (!id3v2) return;
 
+        // 内置广告清洗：删除广告类注释/歌词帧（即使本次没有新值也要清掉）。
+        {
+            auto commFrames = id3v2->frameList("COMM");
+            for (auto* frame : commFrames) {
+                auto* comm = dynamic_cast<TagLib::ID3v2::CommentsFrame*>(frame);
+                if (comm && sanitize::isAdText(comm->text().to8Bit(true))) {
+                    id3v2->removeFrame(frame, true);
+                }
+            }
+            auto usltFrames = id3v2->frameList("USLT");
+            for (auto* frame : usltFrames) {
+                auto* uslt = dynamic_cast<TagLib::ID3v2::UnsynchronizedLyricsFrame*>(frame);
+                if (uslt && sanitize::isAdText(uslt->text().to8Bit(true))) {
+                    id3v2->removeFrame(frame, true);
+                }
+            }
+        }
+
         // 按条件移除现有扩展帧，避免覆盖时重复，同时保留用户已有的其他字段
         auto removeFramesIf = [&](const char* id) {
             auto frames = id3v2->frameList(id);
@@ -525,6 +550,24 @@ private:
 
         if (!vc) return;
 
+        // 内置广告清洗：删除广告字段（COMMENT/DESCRIPTION/LABEL/PUBLISHER…
+        // 及广告歌词）——即使本次没有新值也要清掉源文件自带的推广。
+        {
+            const auto& fields = vc->fieldListMap();
+            std::vector<TagLib::String> toRemove;
+            for (auto it = fields.begin(); it != fields.end(); ++it) {
+                for (const auto& v : it->second) {
+                    if (sanitize::isAdText(v.to8Bit(true))) {
+                        toRemove.push_back(it->first);
+                        break;
+                    }
+                }
+            }
+            for (const auto& k : toRemove) {
+                vc->removeFields(k);
+            }
+        }
+
         // 专辑艺术家
         if (result.albumArtist) {
             vc->addField("ALBUMARTIST", TagLib::String(*result.albumArtist, TagLib::String::UTF8), true);
@@ -564,6 +607,23 @@ private:
 
         TagLib::MP4::Tag* mp4Tag = mp4File->tag();
         if (!mp4Tag) return;
+
+        // 内置广告清洗：删除广告文本项（©cmt 注释 / 歌词等）。
+        {
+            auto items = mp4Tag->itemMap();
+            std::vector<TagLib::String> toRemove;
+            for (const auto& kv : items) {
+                for (const auto& s : kv.second.toStringList()) {
+                    if (sanitize::isAdText(s.to8Bit(true))) {
+                        toRemove.push_back(kv.first);
+                        break;
+                    }
+                }
+            }
+            for (const auto& k : toRemove) {
+                mp4Tag->removeItem(k);
+            }
+        }
 
         auto replaceFreeform = [&](const char* key, const std::string& value) {
             mp4Tag->removeItem(TagLib::String(key, TagLib::String::Latin1));

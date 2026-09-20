@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/downloader/download_controller.dart';
+import '../../services/platform/platform_capabilities.dart';
 import '../common/toast.dart';
 import '../common/anim.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -121,15 +122,9 @@ class DownloadTaskTile extends ConsumerWidget {
   }
 
   void _launchDir(String dir) {
-    try {
-      if (Platform.isLinux) {
-        Process.run('xdg-open', [dir]);
-      } else if (Platform.isMacOS) {
-        Process.run('open', [dir]);
-      } else if (Platform.isWindows) {
-        Process.run('explorer', [dir]);
-      }
-    } catch (_) {}
+    // 走平台桥接（零子进程）；失败静默。
+    if (dir.isEmpty) return;
+    PlatformCapabilities.instance().revealPath(dir);
   }
 }
 

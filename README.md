@@ -36,7 +36,7 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，定位「桌面�
 > 闭源集成、换壳/套壳再分发、不开放源码的商业托管/网络服务等不在授权范围内，本项目也不提供闭源商业授权。
 > 本声明仅为开发者对授权边界的说明，法律层面以根目录 `LICENSE`（AGPL-3.0-or-later）为准。
 
-- 连接**网易云音乐 / 酷狗音乐 / QQ 音乐**等在线服务
+- 连接**网易云音乐 / 酷狗音乐 / QQ 音乐**等在线服务（另含**实验性第三方音源** Neko 歌姬计划，默认关闭）
 - 支持本地音乐库扫描与元数据刮削、多平台下载
 - 内置统一 C 音频引擎：EQ / 响度归一化 / 限幅器 / FFT 频谱 / 变速变调 / Opus 转码管线
 - 桌面端原生模块 **FFI 直连**（`archoera_mediaengine` 共享库）
@@ -371,6 +371,11 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 - **[ncm-api-rs](https://github.com/SPlayer-Dev/ncm-api-rs)（WTFPL）** —— Rust 化签名实现方案
 - **[MoeKoeMusic](https://github.com/MoeKoeMusic/MoeKoeMusic)** —— 开源高颜值酷狗第三方客户端，桌面端体验与平台接入思路
 - **[Mineradio](https://github.com/XxHuberrr/Mineradio)** —— Windows 桌面沉浸式音乐播放器，歌词舞台与视觉呈现思路
+- **[NekoMusic / Neko 歌姬计划](https://github.com/FantasyNetworkCN/NekoMusicDocs)（服务端 GPL-3.0；PC 客户端 AGPL-3.0 并附 AGPLv3 §7 附加条款）** ——
+  **实验性第三方音源**（登录 / 搜索 / 收藏 / 歌单 / 直链 / 歌词）的 API 契约来源。本项目**仅经其公开 HTTP API 互操作，
+  未复制或链接其源代码**（下载扩展名按文件头魔数自行实现）；并依其附加条款在「设置 → 关于」页署名
+  「本程序由 Neko 歌姬计划 API 提供技术支持」、给出本项目仓库与 [其 API 文档](https://github.com/FantasyNetworkCN/NekoMusicDocs) 链接。
+  该音源**默认关闭**，仅用户显式开启后才会请求。
 
 **代码 / 参考实现致谢**（audio-engine 与 Zig 解码内核所依赖、参考或移植的第三方组件，许可证逐项见各模块 `THIRD-PARTY-LICENSES.md`）：
 

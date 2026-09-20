@@ -501,6 +501,24 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.serverOutline,
       ),
       _SearchEntry(
+        SettingsCategory.experimentalSource,
+        l10n.settingsCatExperimentalSource,
+        l10n.settingsExperimentalSourceSubtitle,
+        EtaIcons.flaskOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.experimentalSource,
+        l10n.settingsNekoEnable,
+        l10n.settingsNekoEnableDesc,
+        EtaIcons.flaskOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.experimentalSource,
+        l10n.settingsNekoTitle,
+        l10n.settingsNekoNote,
+        EtaIcons.flaskOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.about,
         l10n.settingsVersion,
         l10n.settingsSearchAboutSubtitle,
@@ -647,6 +665,8 @@ extension _SettingsDialogView on _SettingsDialogState {
                 SettingsCategory.scrape => const ScrapeSection(),
                 SettingsCategory.scanner => const ScansSection(),
                 SettingsCategory.mediaSource => StreamingServerList(),
+                SettingsCategory.experimentalSource =>
+                  const ExperimentalSourceSection(),
                 SettingsCategory.about => AboutSection(
                   version: _version,
                   devHolding: _devHolding,

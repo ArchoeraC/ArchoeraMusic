@@ -122,12 +122,20 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_SYSTEM_ACCENT      (1u << 7)   /* 系统主题色（DE accent） */
 #define APL_CAP_SYSTEM_THEME       (1u << 8)   /* 系统深浅色（light/dark） */
 #define APL_CAP_DEEP_LINK          (1u << 9)   /* archoera:// 协议唤醒（ABI v2） */
+#define APL_CAP_REVEAL_PATH        (1u << 10)  /* 文件管理器定位路径（免提权、零子进程） */
 ```
 
 协议唤醒（`APL_CAP_DEEP_LINK`，ABI v2 起）：`apl_protocol_register/unregister`
 注册当前用户处理程序（免提权）、`apl_deep_link_take` 取回待处理 URI、
 `apl_deep_link_forward` 次实例转发、`apl_window_activate` 置前主窗口；
 接收侧发 `APL_EVENT_DEEP_LINK` 信号，Dart 收到后调用 `apl_deep_link_take`。
+
+文件管理器定位（`APL_CAP_REVEAL_PATH`，ABI v2 起）：`apl_reveal_path(path)`
+在系统文件管理器中定位路径（文件 → 打开所在目录并选中；目录 → 打开）——
+音乐库「定位文件」、下载「打开所在目录」、隔离区「打开目录」统一走本能力，
+**不再起 `xdg-open`/`explorer` 等子进程**。Linux 走 `org.freedesktop.FileManager1`
+D-Bus（回退 GIO 默认应用打开所在目录）；Windows 走 `SHOpenFolderAndSelectItems` /
+`ShellExecute`；macOS 走 `NSWorkspace`。
 
 ### 3.2 字符串与元数据（零 JSON）
 

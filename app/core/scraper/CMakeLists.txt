@@ -111,4 +111,9 @@ if(NOT WIN32)
         target_link_libraries(test_scraper_wait PRIVATE Threads::Threads)
     endif()
     add_test(NAME test_scraper_wait COMMAND test_scraper_wait)
+
+    # 内置广告清洗单测（header-only，直接编译源文件即可）。
+    add_executable(test_sanitize tests/test_sanitize.cpp)
+    target_include_directories(test_sanitize PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    add_test(NAME test_sanitize COMMAND test_sanitize)
 endif()

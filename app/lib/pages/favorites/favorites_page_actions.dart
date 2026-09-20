@@ -35,9 +35,17 @@ extension _FavoritesPageActions on _FavoritesPageState {
     if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
   }
 
+  void _switchNekoTab(_NekoTab tab) {
+    if (tab == _nekoTab) return;
+    _setNekoTab(tab);
+    if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
+  }
+
   Future<void> _fetch() async {
     final key = _cacheKey;
     if (_loading.contains(key)) return;
+    // 异步间隙前取本地化文案（避免 await 后使用 BuildContext）。
+    final likedLabel = context.l10n.sidebarLiked;
     _markLoading(key);
     try {
       if (_platform == _Platform.kugou) {
@@ -52,6 +60,60 @@ extension _FavoritesPageActions on _FavoritesPageState {
         _cache['kugou.collectedAlbum'] = lib.collectedAlbums
             .map((i) => i.toCoverItem())
             .toList();
+      } else if (_platform == _Platform.neko) {
+        final api = ref.read(nekoApiProvider);
+        final lib = await api.userLibrary();
+        String? cover(String? path) {
+          if (path == null ||
+              path.isEmpty ||
+              path.contains('/avatar/default')) {
+            return null;
+          }
+          return api.resolveUrl(path);
+        }
+
+        _cache['neko.created'] = lib.createdPlaylists
+            .map(
+              (p) => CoverItem(
+                id: p.id,
+                title: p.name,
+                cover: cover(p.firstMusicCover),
+                subtitle: p.creator ?? '',
+                trackCount: p.musicCount,
+                source: 'neko',
+              ),
+            )
+            .toList();
+        _cache['neko.collectedPlaylist'] = lib.collectedPlaylists
+            .map(
+              (p) => CoverItem(
+                id: p.id,
+                title: p.name,
+                cover: cover(p.firstMusicCover),
+                subtitle: p.creator ?? '',
+                trackCount: p.musicCount,
+                source: 'neko',
+              ),
+            )
+            .toList();
+        // 「我喜欢」个人聚合项（计数由 favorites 接口轻量获取）。
+        var likedItems = const <CoverItem>[];
+        try {
+          final ids = await api.likedIds();
+          if (ids.isNotEmpty) {
+            likedItems = [
+              CoverItem(
+                id: 'profile:favorites',
+                title: likedLabel,
+                trackCount: ids.length,
+                source: 'neko',
+              ),
+            ];
+          }
+        } catch (_) {
+          // 计数失败不影响歌单展示
+        }
+        _cache['neko.liked'] = likedItems;
       } else if (_platform == _Platform.qqmusic) {
         final lib = await ref.read(qqMusicApiProvider).userLibrary();
         // 一次拉取填充全部分类（切换 tab 不再重复请求）
@@ -119,6 +181,23 @@ extension _FavoritesPageActions on _FavoritesPageState {
       showKugouPlaylistDetailDialog(context, item);
       return;
     }
+    if (_platform == _Platform.neko) {
+      if (_nekoTab == _NekoTab.liked) {
+        showNekoTracksDialog(
+          context,
+          title: item.title,
+          cover: item.cover,
+          loadTracks: (ref) => ref.read(nekoApiProvider).likedTracks(),
+        );
+        return;
+      }
+      if (_nekoTab == _NekoTab.collectedPlaylist) {
+        showNekoFavoritePlaylistDialog(context, item);
+        return;
+      }
+      showNekoPlaylistDetailDialog(context, item);
+      return;
+    }
     if (_platform == _Platform.qqmusic) {
       if (_qqTab == _QqTab.liked) {
         showQqTracksDialog(
@@ -152,6 +231,8 @@ extension _FavoritesPageActions on _FavoritesPageState {
       );
     } else if (_platform == _Platform.qqmusic) {
       showQqMusicLoginDialog(context);
+    } else if (_platform == _Platform.neko) {
+      await showNekoLoginDialog(context);
     } else {
       showNeteaseLoginDialog(context);
     }

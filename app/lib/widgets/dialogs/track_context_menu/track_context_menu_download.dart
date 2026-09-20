@@ -9,13 +9,15 @@ Future<void> downloadTracks(
   WidgetRef ref,
   List<Track> tracks,
 ) async {
-  // 支持的下载来源：KG/NT（Rust 自研解析）+ QQMusic（Dart 播放管线回退）。
+  // 支持的下载来源：KG/NT（Rust 自研解析）+ QQMusic/Neko（Dart 播放管线回退）。
+  // Neko 音频直链公开、无需登录。
   final online = tracks
       .where(
         (t) =>
             t.source == 'netease' ||
             t.source == 'kugou' ||
-            t.source == 'qqmusic',
+            t.source == 'qqmusic' ||
+            t.source == 'neko',
       )
       .toList();
   if (online.isEmpty) return;
@@ -28,7 +30,11 @@ Future<void> downloadTracks(
   if (!context.mounted) return;
   final l10n = context.l10n;
   final defaultQuality = ref.read(appPrefsProvider).downloadQuality;
-  final quality = await _pickDownloadQuality(context, defaultQuality);
+  // Neko 为直传原文件、无音质档：整批均为 Neko 时跳过音质选择，直接用默认。
+  final onlyNeko = online.every((t) => t.source == 'neko');
+  final quality = onlyNeko
+      ? defaultQuality
+      : await _pickDownloadQuality(context, defaultQuality);
   if (quality == null || !context.mounted) return;
   final controller = ref.read(downloadControllerProvider.notifier);
   // 引擎按需加载：入队前确保引擎就绪（首次入队可能尚未加载）。
@@ -43,6 +49,12 @@ Future<void> downloadTracks(
           .read(kugouApiProvider)
           .enrichKugouHashes(target);
       if (enriched != null) target = enriched;
+    } else if (t.source == 'neko') {
+      // Neko 元数据不规范：入队前用其它音源补充/重写（标签与文件名受益），
+      // 并强制重写歌词（Neko 内嵌/平台歌词常为站点广告）。
+      target = await ref
+          .read(nekoMetadataEnricherProvider)
+          .enrich(target, fetchLyrics: true);
     }
     if (controller.enqueue(target, quality: quality) != null) ok++;
   }

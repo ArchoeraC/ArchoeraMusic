@@ -346,8 +346,8 @@ class Track {
   /// 付费等级（0 免费 / 1 VIP / 2 购买，对齐 TrackFee）。
   final int fee;
 
-  /// 来源平台（'netease' / 'kugou' / 'qqmusic' / 'local'，决定播放源解析
-  /// 与音质切换路径）。
+  /// 来源平台（'netease' / 'kugou' / 'qqmusic' / 'neko' / 'local'，决定播放源
+  /// 解析与音质切换路径）。
   final String source;
 
   /// KG品质信息（source == 'kugou' 时存在）。
@@ -384,6 +384,29 @@ class Track {
 
   /// 替换KG品质信息，其余字段原样保留（下载前补齐 hash 链时使用）。
   Track copyWithKugou(KugouTrackInfo? kugou) => Track(
+    id: id,
+    title: title,
+    comment: comment,
+    artists: artists,
+    album: album,
+    duration: duration,
+    cover: cover,
+    fee: fee,
+    source: source,
+    kugou: kugou,
+    qqmusic: qqmusic,
+    localPath: localPath,
+    lyrics: lyrics,
+    serverId: serverId,
+    originalId: originalId,
+    coverOriginal: coverOriginal,
+    fileSize: fileSize,
+    quality: quality,
+    isOriginal: isOriginal,
+  );
+
+  /// 替换歌词文本，其余字段原样保留（Neko 下载前强制重写歌词用）。
+  Track copyWithLyrics(String? lyrics) => Track(
     id: id,
     title: title,
     comment: comment,
@@ -678,6 +701,38 @@ class Track {
         mediaMid: mediaMid,
         sizes: sizes,
       ),
+    );
+  }
+
+  /// NekoMusic 歌曲对象 → Track（实验性音源 `neko`）。
+  ///
+  /// 字段：`id / title / artist / album / duration`（秒）/ `lrc`。
+  /// 封面与音频直链由 `baseUrl` 现算（`/api/music/cover/{id}`、`/api/music/file/{id}`），
+  /// 故无需在 Track 上另存来源元数据——[id] 即 Neko 曲目 id。
+  factory Track.fromNekoSong(Map<String, dynamic> json, {String baseUrl = ''}) {
+    final id = json['id']?.toString() ?? '';
+    final artistStr = json['artist']?.toString() ?? '';
+    final artists = artistStr
+        .split(RegExp(r'[、/,&;]'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .map((n) => TrackArtist(name: n))
+        .toList();
+    final albumName = json['album']?.toString() ?? '';
+    final cover = (id.isEmpty || baseUrl.isEmpty)
+        ? null
+        : '$baseUrl/api/music/cover/$id';
+    final durationSec = (json['duration'] as num?)?.toInt() ?? 0;
+    return Track(
+      id: id,
+      title: json['title']?.toString() ?? '',
+      artists: artists,
+      album: albumName.isEmpty
+          ? null
+          : TrackAlbum(name: albumName, cover: cover),
+      duration: durationSec * 1000,
+      cover: cover,
+      source: 'neko',
     );
   }
 

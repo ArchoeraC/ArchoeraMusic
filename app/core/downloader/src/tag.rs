@@ -157,6 +157,8 @@ pub fn write_tags(path: &Path, content: &TagContent) -> Result<(), String> {
         if let Some(lyrics) = content.lyrics {
             let lrc = lyrics.trim();
             if !lrc.is_empty() {
+                // 先删旧歌词项，避免与源文件夹带的（可能是广告的）歌词并存。
+                tag.remove_key(&ItemKey::Lyrics);
                 tag.insert_text(ItemKey::Lyrics, lrc.to_string());
             }
         }
@@ -171,6 +173,24 @@ pub fn write_tags(path: &Path, content: &TagContent) -> Result<(), String> {
                 );
                 tag.push_picture(picture);
             }
+        }
+
+        // 内置：删除全部广告/推广类标签项（**全音源通用**）。即使本次没有可写
+        // 歌词，也会把源文件夹带的广告歌词/COMMENT/LABEL/PUBLISHER 等删掉
+        // （如 Neko 直传文件的「资源来自Neko云音乐…」）。图片项 text() 为 None，
+        // 不受影响。
+        let ad_keys: Vec<ItemKey> = tag
+            .items()
+            .filter(|it| {
+                it.value()
+                    .text()
+                    .map(crate::sanitize::is_ad_text)
+                    .unwrap_or(false)
+            })
+            .map(|it| it.key().clone())
+            .collect();
+        for key in ad_keys {
+            tag.remove_key(&key);
         }
     } // 结束 tag 借用
 
@@ -331,6 +351,42 @@ mod tests {
         assert!(t.get_string(&ItemKey::Lyrics).is_some());
         eprintln!("端到端写标签成功: {:?}", t.title());
         let _ = std::fs::remove_file(&prefixed);
+    }
+
+    /// 端到端：源文件夹带广告 LYRICS/COMMENT/LABEL/PUBLISHER 时，write_tags
+    /// 必须把这些广告项删除（内置全音源清洗）。
+    /// 用法：TAG_TEST_FILE=/path/to/neko.flac cargo test ads -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn e2e_strip_ad_tags_on_real_file() {
+        let src = std::env::var("TAG_TEST_FILE").expect("需要 TAG_TEST_FILE");
+        let clean = std::fs::read(&src).unwrap();
+        let p = write_tmp("e2e_ads.flac", &clean);
+
+        // 模拟下载：传入规范字段（歌词缺失，源文件自带广告歌词应被删除）。
+        write_tags(
+            &p,
+            &TagContent {
+                title: "三拜红尘凉",
+                artist: "尹昔眠",
+                album: "三拜红尘凉",
+                lyrics: None,
+                cover: None,
+            },
+        )
+        .unwrap();
+
+        let tagged = Probe::open(&p).unwrap().read().unwrap();
+        let t = tagged.primary_tag().or_else(|| tagged.first_tag()).unwrap();
+        let ads: Vec<String> = t
+            .items()
+            .filter_map(|it| it.value().text())
+            .filter(|s| crate::sanitize::is_ad_text(s))
+            .map(str::to_string)
+            .collect();
+        eprintln!("剩余广告项: {ads:?}");
+        assert!(ads.is_empty(), "广告标签项未被清除: {ads:?}");
+        let _ = std::fs::remove_file(&p);
     }
 
     /// 端到端：对「真实 Netease FLAC」（fLaC 在 0 偏移、自带空 SEEKTABLE +

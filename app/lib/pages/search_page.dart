@@ -74,7 +74,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
 
   /// 聚合搜索（'all'）：**songs** tab 各平台分页游标。
   final Map<String, _AggState> _songAgg = {
-    for (final p in _aggPlatforms) p: _AggState(),
+    for (final p in _aggAllPlatforms) p: _AggState(),
   };
 
   /// 聚合搜索（'all'）：**albums/artists/playlists** tab 各平台分页游标。
@@ -83,9 +83,15 @@ class _SearchPageState extends ConsumerState<SearchPage>
   /// 来源失败后的退避闸门（防连打触发更强风控）。
   final SearchSourceCooldown _sourceCooldown = SearchSourceCooldown();
 
+  /// 本次参与聚合的平台：固定三方 + 启用实验性音源时的 `neko`。
+  List<String> get _aggActive => [
+    ..._aggPlatforms,
+    if (ref.read(appPrefsProvider).nekoEnabled) 'neko',
+  ];
+
   Map<String, _AggState> _coverAggFor(_SearchTab tab) =>
       _coverAgg.putIfAbsent(tab, () {
-        return {for (final p in _aggPlatforms) p: _AggState()};
+        return {for (final p in _aggAllPlatforms) p: _AggState()};
       });
 
   /// 是否正在解析播放源（防连点）。
@@ -96,7 +102,11 @@ class _SearchPageState extends ConsumerState<SearchPage>
     super.initState();
     _query = widget.initialQuery.trim();
     // 恢复上次的平台 / Tab 选择（壳内容因播放页展开被卸载后重建）。
-    _platform = ref.read(searchPlatformProvider) ?? 'netease';
+    final restored = ref.read(searchPlatformProvider) ?? 'netease';
+    // 实验性音源已关闭时不保留 NK 平台选择（避免对其发请求）。
+    _platform = (restored == 'neko' && !ref.read(appPrefsProvider).nekoEnabled)
+        ? 'netease'
+        : restored;
     _tabs = TabController(
       length: 4,
       vsync: this,

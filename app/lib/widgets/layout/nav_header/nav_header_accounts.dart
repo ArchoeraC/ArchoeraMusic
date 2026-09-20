@@ -14,9 +14,13 @@ class _AccountsMenu extends ConsumerWidget {
     final netease = ref.watch(neteaseAuthProvider);
     final kugouApi = ref.read(kugouApiProvider);
     final qqApi = ref.read(qqMusicApiProvider);
+    final nekoEnabled = ref.watch(
+      appPrefsProvider.select((p) => p.nekoEnabled),
+    );
+    final nekoApi = ref.read(nekoApiProvider);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([kugouApi, qqApi]),
+      listenable: Listenable.merge([kugouApi, qqApi, nekoApi]),
       builder: (context, _) {
         final kugou = kugouApi.session;
         final qqProfile = qqApi.profile;
@@ -85,6 +89,12 @@ class _AccountsMenu extends ConsumerWidget {
               case 'logout_qq':
                 ref.read(qqMusicApiProvider).logout();
                 toast(context.l10n.loginLoggedOut(context.l10n.brandQqMusic));
+              case 'login_neko':
+                showNekoLoginDialog(context);
+              case 'logout_neko':
+                nekoApi.logout();
+                ref.read(likeControllerProvider).sync();
+                toast(context.l10n.loginLoggedOut(l10n.settingsNekoTitle));
             }
           },
           itemBuilder: (_) => [
@@ -127,6 +137,20 @@ class _AccountsMenu extends ConsumerWidget {
                   ? l10n.navHeaderQqId(qqApi.uin)
                   : qqNick,
             ),
+            // 实验性音源 Neko（仅启用时显示）。
+            if (nekoEnabled)
+              ..._platformSection(
+                l10n: l10n,
+                title: l10n.settingsNekoTitle,
+                loggedIn: nekoApi.isLoggedIn,
+                loginValue: 'login_neko',
+                logoutValue: 'logout_neko',
+                nameValue: 'name_neko',
+                avatarName: nekoApi.account?.displayName ?? '',
+                displayName:
+                    nekoApi.account?.displayName ??
+                    l10n.settingsNekoNotLoggedIn,
+              ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),

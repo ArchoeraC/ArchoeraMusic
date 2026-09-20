@@ -110,10 +110,17 @@ pub async fn enrich_file(
         artist: request.artist.clone(),
         album: request.album.clone().unwrap_or_default(),
         cover_url: None,
-        lyrics: None,
+        // 强制重写歌词：enqueue 传入的标准 LRC 视为权威（Dart 侧已从标准源取回）。
+        lyrics: request.lyrics.clone().filter(|s| !s.trim().is_empty()),
     };
     meta.fill_from(&platform);
     meta.fill_from(&embedded.meta);
+    // Neko 等直传源：其内嵌/平台歌词常为站点广告或非标准格式，不可信——
+    // 强制丢弃内嵌歌词，仅保留 enqueue 传入的标准 LRC；为空则留给下方
+    // LRCLIB 兜底（绝不再回落到广告词）。
+    if request.source == SourcePlatform::Neko {
+        meta.lyrics = request.lyrics.clone().filter(|s| !s.trim().is_empty());
+    }
     if meta.lyrics.is_none() {
         meta.lyrics = lyrics;
     }
@@ -154,11 +161,13 @@ pub async fn enrich_file(
         None
     };
 
+    // 内置广告清洗（全音源、全端一致）：字段值整体为广告则删除，歌词逐行删除
+    // 广告行（如「资源来自 XX 云音乐」「获取更多无损音乐 https://…」）。
     EnrichedMetadata {
-        title: meta.title,
-        artist: meta.artist,
-        album: meta.album,
-        lyrics: meta.lyrics,
+        title: crate::sanitize::sanitize_field(&meta.title).unwrap_or_default(),
+        artist: crate::sanitize::sanitize_field(&meta.artist).unwrap_or_default(),
+        album: crate::sanitize::sanitize_field(&meta.album).unwrap_or_default(),
+        lyrics: meta.lyrics.as_deref().and_then(crate::sanitize::sanitize_lyrics),
         cover,
     }
 }
@@ -193,7 +202,9 @@ pub async fn fetch_platform_info(
     match request.source {
         SourcePlatform::Kugou => kugou_info(client, request).await,
         SourcePlatform::Netease => netease_info(client, request).await,
-        SourcePlatform::Qqmusic => TrackMetadata::default(),
+        // QQ / Neko 无 Rust 侧平台接口：用 enqueue 传入元数据 + 兜底源
+        // （MusicBrainz / CAA）补全。
+        SourcePlatform::Qqmusic | SourcePlatform::Neko => TrackMetadata::default(),
     }
 }
 
@@ -205,7 +216,8 @@ pub async fn fetch_platform_lyrics(
     match request.source {
         SourcePlatform::Kugou => kugou_lyrics(client, request).await,
         SourcePlatform::Netease => netease_lyrics(client, request).await,
-        SourcePlatform::Qqmusic => None,
+        // 歌词兜底：enqueue 未带歌词时走 LRCLIB（见 enrich_file）。
+        SourcePlatform::Qqmusic | SourcePlatform::Neko => None,
     }
 }
 

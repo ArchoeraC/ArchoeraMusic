@@ -15,6 +15,7 @@ import 'prefs_audio_fx.dart';
 import 'prefs_download.dart';
 import 'prefs_history.dart';
 import 'prefs_lyrics.dart';
+import 'prefs_neko.dart';
 import 'prefs_player.dart';
 import 'prefs_power.dart';
 import 'prefs_preset.dart';
@@ -31,6 +32,7 @@ export 'prefs_audio_fx.dart';
 export 'prefs_download.dart';
 export 'prefs_history.dart';
 export 'prefs_lyrics.dart';
+export 'prefs_neko.dart';
 export 'prefs_player.dart';
 export 'prefs_power.dart';
 export 'prefs_preset.dart';
@@ -637,6 +639,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置「关闭应用时」行为（ask=每次询问 / background=后台播放 / quit=直接退出）。
   void setCloseBehavior(String value) {
     state = state.copyWithCloseBehavior(value);
+    state.save();
+  }
+
+  /// 设置实验性音源 NekoMusic 总开关（默认关）。
+  void setNekoEnabled(bool value) {
+    state = state.copyWithNekoEnabled(value);
     state.save();
   }
 

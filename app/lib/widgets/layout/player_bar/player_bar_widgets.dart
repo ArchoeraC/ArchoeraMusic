@@ -88,6 +88,7 @@ class _BarLikeButtonState extends ConsumerState<_BarLikeButton> {
         toast(switch (widget.track.source) {
           'kugou' => context.l10n.toastLoginRequiredKugou,
           'qqmusic' => context.l10n.toastQqLikeSyncFailed,
+          'neko' => context.l10n.toastLoginRequiredNeko,
           _ => context.l10n.toastLoginRequiredNetease,
         }, type: ToastType.error);
       }

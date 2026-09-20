@@ -809,6 +809,138 @@ class AppLocalizationsDe extends AppLocalizations {
   String get platformAll => 'Alle';
 
   @override
+  String get menuDeleteFile => 'Datei löschen';
+
+  @override
+  String get libraryDeleteFileTitle => 'Datei löschen';
+
+  @override
+  String libraryDeleteFileMessage(Object name) {
+    return '„$name“ wird dauerhaft gelöscht. Nicht rückgängig zu machen. Fortfahren?';
+  }
+
+  @override
+  String get libraryDeleteFileConfirm => 'Löschen';
+
+  @override
+  String get toastFileDeleted => 'Datei gelöscht';
+
+  @override
+  String get toastDeleteFileFailed => 'Datei konnte nicht gelöscht werden';
+
+  @override
+  String get toastRevealFileFailed =>
+      'Datei konnte nicht angezeigt werden (kein Dateimanager verfügbar)';
+
+  @override
+  String get settingsSectionThirdPartyService => 'Drittanbieter-Dienste';
+
+  @override
+  String get settingsNekoAttribution =>
+      'Bereitgestellt mit Unterstützung der Neko Music API';
+
+  @override
+  String get settingsNekoApiDocs => 'Neko Music API-Dokumentation';
+
+  @override
+  String get settingsSongCacheMemoryHint =>
+      '„In-Memory-Wiedergabe“ ist aktiv – der Song-Cache wird nicht auf die Festplatte geschrieben';
+
+  @override
+  String get platformNeko => 'NK';
+
+  @override
+  String get settingsCatExperimentalSource => 'Experimentelle Quellen';
+
+  @override
+  String get settingsExperimentalSourceSubtitle =>
+      'Drittanbieter-Quellen (standardmäßig aus)';
+
+  @override
+  String get settingsNekoTitle => 'NekoMusic';
+
+  @override
+  String get settingsNekoNote =>
+      'Experimentelle Drittanbieter-Quelle, inoffiziell; nur Anmeldung (keine Registrierung/VIP-Kauf). Kann jederzeit ausfallen.';
+
+  @override
+  String get settingsNekoEnable => 'NekoMusic aktivieren';
+
+  @override
+  String get settingsNekoEnableDesc =>
+      'NK in Suche, Favoriten und Bibliothek anzeigen (standardmäßig aus)';
+
+  @override
+  String get settingsNekoLogin => 'Anmelden';
+
+  @override
+  String get settingsNekoLogout => 'Abmelden';
+
+  @override
+  String settingsNekoLoggedInAs(Object name) {
+    return 'Angemeldet als $name';
+  }
+
+  @override
+  String get settingsNekoNotLoggedIn => 'Nicht angemeldet';
+
+  @override
+  String get nekoLoginTitle => 'Bei NekoMusic anmelden';
+
+  @override
+  String get nekoLoginTabQr => 'QR-Code';
+
+  @override
+  String get nekoLoginTabPassword => 'E-Mail und Passwort';
+
+  @override
+  String get nekoLoginEmail => 'E-Mail';
+
+  @override
+  String get nekoLoginPassword => 'Passwort';
+
+  @override
+  String get nekoLoginPasswordHint => 'Passwort eingeben';
+
+  @override
+  String get nekoLoginSubmit => 'Anmelden';
+
+  @override
+  String get nekoLoginQrHint => 'Mit der NekoMusic-App scannen und anmelden';
+
+  @override
+  String get nekoQrScanned => 'Gescannt, bitte am Handy bestätigen';
+
+  @override
+  String get nekoQrCanceled => 'Anmeldung abgebrochen';
+
+  @override
+  String get nekoQrExpired => 'QR-Code abgelaufen, bitte neu erzeugen';
+
+  @override
+  String get toastLoginRequiredNeko =>
+      'Aktion fehlgeschlagen (bitte prüfen, ob du bei deinem NK-Konto angemeldet bist)';
+
+  @override
+  String get pageLikedNekoLoginHint =>
+      'Melde dich bei NK an, um deine Lieblingssongs zu sehen';
+
+  @override
+  String get pageLikedNekoLoginDesc =>
+      'Melde dich bei NekoMusic an, um Lieblingssongs zu synchronisieren';
+
+  @override
+  String get pageLikedNekoEmptyHint =>
+      'Noch keine Lieblingssongs – tippe in der Suche auf das Herz';
+
+  @override
+  String get pageFavNekoLoginDesc =>
+      'Melde dich bei NekoMusic an, um Playlists und Favoriten zu sehen';
+
+  @override
+  String get pageFavNekoEmptyHint => 'Noch keine Playlists oder Favoriten';
+
+  @override
   String toastPlayedAll(Object count) {
     return '$count Titel abgespielt';
   }

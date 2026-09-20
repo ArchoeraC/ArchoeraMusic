@@ -66,6 +66,11 @@ class LikedStore extends ChangeNotifier {
     if (platform == 'kugou') {
       return _ref.read(kugouApiProvider).session?.userid;
     }
+    if (platform == 'neko') {
+      // 实验性音源：未登录（无 userId）视为未登录，页面显示登录引导。
+      final id = _ref.read(nekoApiProvider).userId;
+      return id.isEmpty ? null : id;
+    }
     return _ref.read(neteaseAuthProvider)?.userId;
   }
 
@@ -136,7 +141,9 @@ class LikedStore extends ChangeNotifier {
   /// 红心与列表同源，无需对账。对账在 [LikeController] 内部有缓冲期防
   /// 与本端刚 toggle 竞争；异常绝不影响列表展示。
   void _reconcileHearts(String platform, List<Track> tracks) {
-    if (platform == 'kugou' || platform == 'netease') {
+    if (platform == 'kugou' ||
+        platform == 'netease' ||
+        platform == 'neko') {
       try {
         _ref
             .read(likeControllerProvider)
@@ -226,6 +233,9 @@ class LikedStore extends ChangeNotifier {
   Future<List<Track>> _fetchAll(String platform) async {
     if (platform == 'kugou') {
       return _ref.read(kugouApiProvider).likedTracks();
+    }
+    if (platform == 'neko') {
+      return _ref.read(nekoApiProvider).likedTracks();
     }
     final account = _ref.read(neteaseAuthProvider);
     if (account == null) return const <Track>[];

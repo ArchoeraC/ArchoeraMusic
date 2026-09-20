@@ -117,6 +117,10 @@ extension _SearchPageFetch on _SearchPageState {
     required int loaded,
   }) {
     final page = append ? (loaded ~/ _SearchPageState._pageSize) + 1 : 1;
+    if (platform == 'neko') {
+      // Neko：服务端无分页（上限约 50），一次给全，hasMore=false。
+      return ref.read(nekoApiProvider).searchSongs(_query, page: 1);
+    }
     if (platform == 'kugou') {
       return ref
           .read(kugouApiProvider)
@@ -141,11 +145,10 @@ extension _SearchPageFetch on _SearchPageState {
   /// 任一源失败只标记该源（展示「该源暂不可用」占位 + 手动重试），成功源
   /// 照常展示——修复「QQ 一源失败 → 整页 all 聚合一起失败」的问题。
   Future<void> _fetchSongsAll({required bool append}) async {
+    final all = _aggActive;
     final active = append
-        ? _aggPlatforms
-              .where((p) => _songAgg[p]!.hasMore && !_songAgg[p]!.failed)
-              .toList()
-        : _aggPlatforms;
+        ? all.where((p) => _songAgg[p]!.hasMore && !_songAgg[p]!.failed).toList()
+        : all;
     if (active.isEmpty) return;
     await _loadSongsFrom(active, append: append);
   }
@@ -298,6 +301,15 @@ extension _SearchPageFetch on _SearchPageState {
     final qqArtists = platform == 'qqmusic' && tab == _SearchTab.artists;
     final requestSize = qqArtists ? 30 : _SearchPageState._pageSize;
     final page = append ? (loaded ~/ requestSize) + 1 : 1;
+    if (platform == 'neko') {
+      // Neko：歌单/歌手搜索均无分页；专辑无接口（返回空）。
+      final api = ref.read(nekoApiProvider);
+      return switch (tab) {
+        _SearchTab.playlists => api.searchPlaylists(_query),
+        _SearchTab.artists => api.searchArtists(_query),
+        _ => api.searchAlbums(_query),
+      };
+    }
     if (platform == 'kugou') {
       return () async {
         final raw = await ref
@@ -356,11 +368,10 @@ extension _SearchPageFetch on _SearchPageState {
   Future<void> _fetchCoversAll({required bool append}) async {
     final tab = _tab;
     final states = _coverAggFor(tab);
+    final all = _aggActive;
     final active = append
-        ? _aggPlatforms
-              .where((p) => states[p]!.hasMore && !states[p]!.failed)
-              .toList()
-        : _aggPlatforms;
+        ? all.where((p) => states[p]!.hasMore && !states[p]!.failed).toList()
+        : all;
     if (active.isEmpty) return;
     await _loadCoversFrom(tab, active, append: append);
   }
@@ -490,7 +501,7 @@ extension _SearchPageFetch on _SearchPageState {
   /// 聚合整批都失败（首屏无任何可用结果）时的错误文案。
   String _aggAllFailedText(Map<String, _AggState> states) {
     final lines = <String>[];
-    for (final p in _aggPlatforms) {
+    for (final p in _aggActive) {
       final st = states[p]!;
       if (st.failed) {
         lines.add('${_platformLabel(p)}：${_failureDetail(p, st.error)}');

@@ -326,6 +326,8 @@ class _CoverSourceTag extends StatelessWidget {
       'netease' => ('云', const Color(0xFFC20C0C)),
       'kugou' => ('酷', const Color(0xFF00A7E0)),
       'qqmusic' => ('Q', const Color(0xFF31C27C)),
+      // 实验性音源 NekoMusic（聚合搜索徽标用 K）
+      'neko' => ('K', const Color(0xFF8B5CF6)),
       _ => ('', Colors.transparent),
     };
     if (label.isEmpty) return const SizedBox.shrink();

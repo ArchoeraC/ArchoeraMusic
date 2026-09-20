@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../../services/platform/platform_capabilities.dart';
 import '../../services/scanner/library_scanner.dart';
 import '../../stores/app_prefs.dart';
 import 'settings_widgets.dart';
@@ -379,11 +380,8 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
   }
 
   void _openQuarantineDir() {
-    try {
-      Process.start('xdg-open', [_quarantineDir]);
-    } catch (_) {
-      // 无 xdg-open（macOS/Windows）忽略；隔离目录路径已在 note 中展示
-    }
+    // 走平台桥接（零子进程）；失败静默（隔离目录路径已在 note 中展示）。
+    PlatformCapabilities.instance().revealPath(_quarantineDir);
   }
 
   String _fmtSize(int bytes) {

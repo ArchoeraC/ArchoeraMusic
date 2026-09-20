@@ -14,6 +14,7 @@
 ///    适用于已扫描入库的曲目需要重新刮削的场景。
 
 #include "scraper.h"
+#include "sanitize.h"
 #include "api_client.h"
 #include "db_client.h"
 #include "scraper_db.h"
@@ -159,6 +160,9 @@ public:
 
             // 2. 多源解析（MusicBrainz → Deezer → iTunes，含封面/歌词）
             auto result = resolver_.resolve(track);
+            // 内置广告清洗（全音源）：删除广告字段/歌词行，后续写出与状态判断
+            // 均基于清洗后的结果（绝不把站点推广写进标签）。
+            sanitize::sanitizeResult(result);
 
             bool haveIdentifier = result.mbid.has_value() || result.isrc.has_value();
             bool haveMetadata = result.title.has_value() && result.artist.has_value();
@@ -332,6 +336,8 @@ public:
 
             // 1. 多源解析（MusicBrainz → Deezer → iTunes，含封面/歌词）
             auto result = resolver_.resolve(*track);
+            // 内置广告清洗（全音源）：见上（写标签前统一删除站点推广）。
+            sanitize::sanitizeResult(result);
 
             bool haveIdentifier = result.mbid.has_value() || result.isrc.has_value();
             bool haveMetadata = result.title.has_value() && result.artist.has_value();

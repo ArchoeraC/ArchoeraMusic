@@ -204,6 +204,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     if (track.source == 'kugou' && track.kugou != null) {
       return levels.where((l) => track.kugou!.hashFor(l) != null).toList();
     }
+    // Neko 直链无音质档（服务端单一文件），不展示无意义的档位切换。
+    if (track.source == 'neko') return const ['hq'];
     return levels;
   }
 
@@ -215,6 +217,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       toast(switch (track.source) {
         'kugou' => l10n.toastLoginRequiredKugou,
         'qqmusic' => l10n.toastQqLikeSyncFailed,
+        'neko' => l10n.toastLoginRequiredNeko,
         _ => l10n.toastLoginRequiredNetease,
       }, type: ToastType.error);
     }

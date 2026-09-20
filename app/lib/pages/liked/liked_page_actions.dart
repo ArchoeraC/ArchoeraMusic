@@ -13,6 +13,11 @@ extension _LikedPageActions on _LikedPageState {
       if (kQqFavExperimental && ref.read(qqMusicApiProvider).isLoggedIn) {
         unawaited(_mergeQqOnlineQuiet());
       }
+    } else if (platform == 'neko') {
+      // 实验性音源：仅启用 + 登录后才拉取（关闭时不发请求）。
+      if (ref.read(appPrefsProvider).nekoEnabled && _nekoLoggedIn) {
+        _store.ensureLoaded(platform);
+      }
     } else {
       _store.ensureLoaded(platform);
     }
@@ -42,8 +47,12 @@ extension _LikedPageActions on _LikedPageState {
     }
     final store = _store;
     store.reset(platform);
-    final logged = platform == 'kugou' ? _kugouLoggedIn : _neteaseLoggedIn;
-    if (logged) store.ensureLoaded(platform);
+    final logged = switch (platform) {
+      'kugou' => _kugouLoggedIn,
+      'neko' => _nekoLoggedIn,
+      _ => _neteaseLoggedIn,
+    };
+    if (logged) _ensureLoaded(platform);
   }
 
   void _toast(String msg) => toast(msg);
@@ -75,6 +84,8 @@ extension _LikedPageActions on _LikedPageState {
         url = await ref.read(neteaseApiProvider).resolvePlayUrl(track.id);
       } else if (track.source == 'qqmusic') {
         url = await ref.read(qqMusicApiProvider).resolvePlayUrl(track);
+      } else if (track.source == 'neko') {
+        url = await ref.read(nekoApiProvider).resolvePlayUrl(track);
       } else {
         url = null;
       }
@@ -98,6 +109,7 @@ extension _LikedPageActions on _LikedPageState {
     return switch (source) {
       'kugou' => l10n.toastLoginRequiredKugou,
       'qqmusic' => l10n.toastQqLikeSyncFailed,
+      'neko' => l10n.toastLoginRequiredNeko,
       _ => l10n.toastLoginRequiredNetease,
     };
   }

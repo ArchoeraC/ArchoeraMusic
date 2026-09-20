@@ -8,12 +8,11 @@
 /// 操作只调控制器接口，不触碰任何下载逻辑。
 library;
 
-import 'dart:io';
-
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/downloader/download_controller.dart';
+import '../services/platform/platform_capabilities.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/download/delete_dialog.dart';
@@ -146,16 +145,8 @@ class _DownloadPageState extends ConsumerState<DownloadPage> {
   }
 
   void _launchDir(String dir) {
-    try {
-      if (Platform.isLinux) {
-        Process.run('xdg-open', [dir]);
-      } else if (Platform.isMacOS) {
-        Process.run('open', [dir]);
-      } else if (Platform.isWindows) {
-        Process.run('explorer', [dir]);
-      }
-    } catch (_) {
-      // 打开目录失败静默（仅影响便利性）
-    }
+    // 走平台桥接（零子进程）；失败静默（仅影响便利性）。
+    if (dir.isEmpty) return;
+    PlatformCapabilities.instance().revealPath(dir);
   }
 }

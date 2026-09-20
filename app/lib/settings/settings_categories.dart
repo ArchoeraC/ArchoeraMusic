@@ -21,6 +21,9 @@ enum SettingsCategory {
   scrape(EtaIcons.magic3),
   scanner(EtaIcons.search3Outline),
   mediaSource(EtaIcons.serverOutline),
+
+  /// 实验性音源（第三方音源接入，默认关闭）。
+  experimentalSource(EtaIcons.flaskOutline),
   about(EtaIcons.informationOutline),
 
   /// 开发者（隐藏分类：仅开启开发者模式后可见；开启方式为关于页
@@ -43,6 +46,7 @@ enum SettingsCategory {
     scrape => l10n.settingsCatScrape,
     scanner => l10n.settingsCatScanner,
     mediaSource => l10n.settingsCatMediaSource,
+    experimentalSource => l10n.settingsCatExperimentalSource,
     about => l10n.settingsCatAbout,
     developer => l10n.settingsCatDeveloper,
   };
@@ -60,6 +64,7 @@ enum SettingsCategory {
     scrape => l10n.settingsScrapeSubtitle,
     scanner => l10n.settingsScannerSubtitle,
     mediaSource => l10n.settingsMediaSourceSubtitle,
+    experimentalSource => l10n.settingsExperimentalSourceSubtitle,
     about => l10n.settingsAboutSubtitle,
     developer => l10n.settingsDeveloperSubtitle,
   };

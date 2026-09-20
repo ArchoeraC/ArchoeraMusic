@@ -12,11 +12,13 @@ import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/qqmusic/qq_liked_store.dart';
 import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
+import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../stores/shell_page_state.dart';
 import '../../l10n/l10n.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../widgets/dialogs/kugou_login_button.dart';
+import '../widgets/dialogs/neko_login_dialog.dart';
 import '../widgets/dialogs/netease_login_dialog.dart';
 import '../widgets/dialogs/qqmusic_login_dialog.dart';
 import '../widgets/player/s_controls.dart';
@@ -57,14 +59,20 @@ class _LikedPageState extends ConsumerState<LikedPage> {
   bool get _neteaseLoggedIn => ref.read(neteaseAuthProvider) != null;
   bool get _kugouLoggedIn => ref.read(kugouApiProvider).session != null;
   bool get _qqLoggedIn => ref.read(qqMusicApiProvider).isLoggedIn;
+  bool get _nekoLoggedIn => ref.read(nekoApiProvider).isLoggedIn;
 
-  /// NT / KG平台需对应账号登录；QQ 平台本机红心优先、不要求登录。
+  /// NT / KG / Neko平台需对应账号登录；QQ 平台本机红心优先、不要求登录。
   bool get _requiresLogin => _platform != _qqPlatform;
 
   /// 当前平台是否「可用」（内容区据此显示数据 / 登录引导 / 本机列表）。
-  bool get _loggedIn => _requiresLogin
-      ? (_platform == 'kugou' ? _kugouLoggedIn : _neteaseLoggedIn)
-      : true;
+  bool get _loggedIn {
+    if (!_requiresLogin) return true;
+    return switch (_platform) {
+      'kugou' => _kugouLoggedIn,
+      'neko' => _nekoLoggedIn,
+      _ => _neteaseLoggedIn,
+    };
+  }
 
   @override
   void initState() {
@@ -72,7 +80,11 @@ class _LikedPageState extends ConsumerState<LikedPage> {
     // 优先恢复上次显式选择（壳内容因播放页展开被卸载后重建）；
     // 无显式选择时按登录态给默认值：默认选已登录平台（NT优先；无NT/KG
     // 但已登录 QQ → QQ 本机红心；都未登录保持NT引导）。
-    _platform = ref.read(likedPlatformProvider) ?? _defaultPlatform();
+    final restored = ref.read(likedPlatformProvider);
+    // 实验性音源已关闭时不保留 NK 选择（避免对其发请求）。
+    _platform = (restored == 'neko' && !ref.read(appPrefsProvider).nekoEnabled)
+        ? _defaultPlatform()
+        : (restored ?? _defaultPlatform());
     if (_loggedIn) _ensureLoaded(_platform);
   }
 
