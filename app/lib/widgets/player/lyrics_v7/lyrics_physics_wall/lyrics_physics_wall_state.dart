@@ -458,17 +458,22 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _blur[i] = _blurTargetFor(i);
   }
 
-  /// 失焦目标（px）：只在距锚点 [kMaxBlurDistance] 行以内才模糊。
+  /// 失焦目标（px）：对齐 AMLL `resolveBlurLevel` —— **除高亮行外所有行都模糊**，
+  /// 半径随距离增长（`1 + 距离`，上限 [kMaxBlurPx]）。
   ///
   /// 鼠标悬停在歌词区时一律为 0（对齐 AMLL `.amll-lyric-player:hover …
   /// filter: unset`）：方便用户悬停阅读/滚动，也避免模糊影响辨识。
+  ///
+  /// ⚠ 这是歌词区最主要的 raster 开销（每行一个离屏高斯层）：弱机可关
+  /// `amll.enableBlur` 或开性能模式。要保留观感又降成本，下一步是把非高亮行
+  /// 画到**半分辨率**图层上再放大（见 docs/player-render-optimization.md §3.2）。
   double _blurTargetFor(int i) {
     if (!widget.enableBlur || _hovering) return 0;
     final anchor = _anchorIdx;
     if (anchor < 0) return 0;
     final d = (i - anchor).abs();
-    if (d == 0 || d > kMaxBlurDistance) return 0;
-    return math.min(kMaxBlurPx, d.toDouble());
+    if (d == 0) return 0;
+    return math.min(kMaxBlurPx, 1.0 + d);
   }
 
   /// 悬停状态变化：立即重算窗口内的失焦（不做过渡，对齐上游 `!important` 立即生效）。
