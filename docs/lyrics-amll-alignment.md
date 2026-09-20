@@ -81,8 +81,9 @@ Flutter 的 `ui.Paragraph` 做不到逐 run 变换、也不能给文字直接加
 - `blur`：非激活行按 `min(5, 距离)` px 做 `saveLayer + ImageFilter.blur`
   （`sigma = px × 0.5`）。Flutter 无法给 `drawParagraph` 直接挂 `ImageFilter`，
   只能开层；按距离收敛（远处行本来就接近透明度下限，可跳过）。
-  另有两道收敛：只对距锚点 `≤ kMaxBlurDistance(2)` 行生效，且**鼠标悬停时全部取消**
-  （对齐 AMLL `.amll-lyric-player:hover … filter: unset`，方便悬停阅读与滚动）。
+  另有一道收敛：**鼠标悬停时全部取消**（对齐 AMLL `.amll-lyric-player:hover … filter: unset`，
+  方便悬停阅读与滚动）。其余情况与上游一致：**除高亮行外每一行都模糊**，
+  半径 `min(5, 1 + 距离)`（对齐 `resolveBlurLevel`）。
 - `scale` / `fade` / `blur` 都用**指数趋近**而不是给每行再挂弹簧：行数可达数百，
   逐行弹簧对象 + 逐帧求解不划算，且这三项是纯装饰量。
 - 焦点行 = 激活行；无激活行（前奏/末尾/间奏）时用布局锚点，避免整墙瞬间变灰。
@@ -179,7 +180,7 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
 | **行窗口** | 维持 `[_winStart, _winEnd)`：只有视口 ± 自适应余量（`max(视口高 × 0.6, 180px)`）内的行参与弹簧/过渡；边界按**行本体**（中心 ± 半高）判定，半可见的行也留在窗口内；窗口外 `Spring1D.park()`（**不重建求解器**，不参与每帧） | 换行时不再为全量行重建闭式解（原来每行 3 个闭包）；每帧循环从 O(歌长) 降到 O(视口) |
 | **按需测量行高** | 视口外用 `estimateLineHeight()` 估算，进视口才 `computeLineHeight()` 实测；中心用 O(N) 纯算术重算 | 拖字号/改窗口宽度不再为整首逐行 `TextPainter.layout()` |
 | **重绘抑制** | `_tick` 只在「弹簧在动 / 过渡在动 / 激活行有逐字片段（扫亮在推）/ 间奏三点可见」时才 `notify()` | 整行级歌词（无逐字）不再按 60fps 重绘整墙，只在位置事件（~20Hz）重绘 |
-| **失焦限距** | 只对距锚点 `≤ kMaxBlurDistance(2)` 的行开 `saveLayer + ImageFilter.blur` | 每帧离屏高斯层从 ≤5 降到 ≤2（歌词区最大的 raster 开销之一） |
+| **失焦（对齐上游）** | 除高亮行外**每一行**都开 `saveLayer + ImageFilter.blur`，半径 `min(5, 1+距离)`（对齐 AMLL `resolveBlurLevel`）；悬停时全部取消 | 这是歌词区最大的 raster 开销（≈可见行数层）；弱机可关 `enableBlur`/性能模式；进一步降本可把非高亮行画到半分辨率层再放大 |
 | **字体上限** | 字号可调范围 14–**60px**（原 38px 上限偏小） | — |
 
 > 前置条件是 `Spring1D.park()`：视口外的行停在目标位置但**不重建求解器**
@@ -221,7 +222,7 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
 |---|---|---|
 | `lyrics.engine` | `simple` | `amll` 才启用本引擎（本轮未改默认） |
 | `lyrics.fontSize` | `18`（14–**60**） | 字号上限提到 60px |
-| `amll.enableBlur` | `true` | 关掉非激活行失焦（弱机省 GPU；注意只对 ±2 行生效） |
+| `amll.enableBlur` | `true` | 关掉非激活行失焦（对齐上游的「除高亮行外全模糊」，是歌词区最大 raster 开销；弱机可关） |
 | `amll.enableScale` | `true` | 关掉非激活行缩放 |
 | `amll.inactiveAlpha` | `0.45` | 非激活行透明度下限 |
 | `amll.wordSweep` | `true` | 关掉后激活行走整行模式（无逐字） |
