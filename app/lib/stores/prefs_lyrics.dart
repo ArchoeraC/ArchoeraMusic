@@ -21,7 +21,8 @@ const amllInactiveAlphaKey = 'amll.inactiveAlpha';
 const amllWordSweepKey = 'amll.wordSweep';
 const amllHidePassedKey = 'amll.hidePassed';
 const amllEnableScaleKey = 'amll.enableScale';
-const amllEnableBlurKey = 'amll.enableBlur';
+const amllBlurQualityKey = 'amll.blurQuality'; // auto | fast | quality | off
+const amllEnableBlurKey = 'amll.enableBlur'; // 旧键（仅用于迁移）
 const amllSpringPresetKey = 'amll.springPreset';
 
 // ── 歌词来源 / 格式顺序（强迫症）─────────────────────────────────
@@ -44,6 +45,9 @@ const List<String> lyricFormats = ['yrc', 'qrc', 'krc', 'lrc'];
 
 /// 默认歌词格式优先级（逐字优先，其次标准 LRC）。
 const List<String> defaultLyricFormatOrder = ['yrc', 'qrc', 'krc', 'lrc'];
+
+/// 失焦档位可选值（`amll.blurQuality`；与 `LyricsBlurQuality` 一一对应）。
+const List<String> amllBlurQualities = ['auto', 'fast', 'lite', 'quality', 'off'];
 
 /// 归一化「顺序」列表：仅保留白名单内、去重，缺失项按 [fallback] 补齐。
 List<String> _normalizeOrder(
@@ -178,8 +182,14 @@ extension AmllLyricsPrefs on AppPrefs {
   /// 非激活行缩放（激活 1.0 / 非激活 0.97，弹簧平滑；默认开）。
   bool get amllEnableScale => data[amllEnableScaleKey] as bool? ?? true;
 
-  /// 非激活行高斯失焦（按距离 1~5px，默认开，对齐 AMLL enableBlur）。
-  bool get amllEnableBlur => data[amllEnableBlurKey] as bool? ?? true;
+  /// 非激活行失焦档位（`auto`/`fast`/`quality`/`off`，默认 `auto`）。
+  ///
+  /// 兼容旧键：`amll.enableBlur == false` 视为 `off`（新键存在时以新键为准）。
+  String get amllBlurQuality {
+    final v = data[amllBlurQualityKey] as String?;
+    if (v != null && amllBlurQualities.contains(v)) return v;
+    return (data[amllEnableBlurKey] as bool? ?? true) ? 'auto' : 'off';
+  }
 
   /// 弹簧预设（'default' 为 AMLL 自适应策略，其余为固定手感）。
   String get amllSpringPreset =>
@@ -192,7 +202,7 @@ extension AmllLyricsPrefs on AppPrefs {
     bool? wordSweep,
     bool? hidePassed,
     bool? enableScale,
-    bool? enableBlur,
+    String? blurQuality,
     String? springPreset,
   }) => AppPrefs(
     initialData: {
@@ -203,7 +213,10 @@ extension AmllLyricsPrefs on AppPrefs {
       amllWordSweepKey: ?wordSweep,
       amllHidePassedKey: ?hidePassed,
       amllEnableScaleKey: ?enableScale,
-      amllEnableBlurKey: ?enableBlur,
+      amllBlurQualityKey: ?(blurQuality != null &&
+              amllBlurQualities.contains(blurQuality)
+          ? blurQuality
+          : null),
       amllSpringPresetKey: ?springPreset,
     },
   );

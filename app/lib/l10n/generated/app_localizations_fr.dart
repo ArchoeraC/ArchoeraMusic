@@ -4314,6 +4314,25 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsAmllBlur => 'Flou sur les lignes inactives';
 
   @override
+  String get settingsAmllBlurNote =>
+      'Auto s\'adapte à la fréquence d\'images : d\'abord un flou sur une seule couche, puis désactivation automatique si nécessaire.';
+
+  @override
+  String get settingsAmllBlurAuto => 'Auto';
+
+  @override
+  String get settingsAmllBlurFast => 'Rapide';
+
+  @override
+  String get settingsAmllBlurLite => 'Léger (approximatif)';
+
+  @override
+  String get settingsAmllBlurQuality => 'Qualité';
+
+  @override
+  String get settingsAmllBlurOff => 'Désactivé';
+
+  @override
   String get settingsAmllSpring => 'Ressort de défilement';
 
   @override

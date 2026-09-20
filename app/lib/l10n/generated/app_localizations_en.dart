@@ -4235,6 +4235,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAmllBlur => 'Blur inactive lines';
 
   @override
+  String get settingsAmllBlurNote =>
+      'Auto adapts to your frame rate: blurs in a single layer first, and turns itself off if that is still too heavy.';
+
+  @override
+  String get settingsAmllBlurAuto => 'Auto';
+
+  @override
+  String get settingsAmllBlurFast => 'Fast';
+
+  @override
+  String get settingsAmllBlurLite => 'Light (approximate)';
+
+  @override
+  String get settingsAmllBlurQuality => 'Quality';
+
+  @override
+  String get settingsAmllBlurOff => 'Off';
+
+  @override
   String get settingsAmllSpring => 'Scroll spring';
 
   @override

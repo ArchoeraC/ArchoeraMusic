@@ -28,4 +28,48 @@ void main() {
       expect(off.lyricFollowAccent, isFalse);
     });
   });
+
+  group('amllBlurQuality（失焦档位）', () {
+    test('默认 auto（自动，带帧预算兜底）', () {
+      expect(AppPrefs().amllBlurQuality, 'auto');
+    });
+
+    test('四个档位都能写入并读回', () {
+      for (final q in amllBlurQualities) {
+        expect(AppPrefs().copyWithAmll(blurQuality: q).amllBlurQuality, q);
+      }
+    });
+
+    test('非法/未知值回落到 auto，不写入脏值', () {
+      expect(
+        AppPrefs(initialData: {amllBlurQualityKey: 'bogus'}).amllBlurQuality,
+        'auto',
+      );
+      expect(
+        AppPrefs().copyWithAmll(blurQuality: 'bogus').amllBlurQuality,
+        'auto',
+      );
+    });
+
+    test('旧键 amll.enableBlur=false 迁移为 off；新键优先', () {
+      expect(
+        AppPrefs(initialData: {amllEnableBlurKey: false}).amllBlurQuality,
+        'off',
+      );
+      expect(
+        AppPrefs(initialData: {amllEnableBlurKey: true}).amllBlurQuality,
+        'auto',
+      );
+      // 新键存在时忽略旧键（老用户改过设置也不受影响）。
+      expect(
+        AppPrefs(
+          initialData: {
+            amllEnableBlurKey: false,
+            amllBlurQualityKey: 'quality',
+          },
+        ).amllBlurQuality,
+        'quality',
+      );
+    });
+  });
 }

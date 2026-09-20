@@ -4277,6 +4277,25 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAmllBlur => 'Inaktive Zeilen weichzeichnen';
 
   @override
+  String get settingsAmllBlurNote =>
+      'Automatisch passt sich der Bildrate an: zuerst Weichzeichnen in einer Ebene, bei Bedarf automatisch aus.';
+
+  @override
+  String get settingsAmllBlurAuto => 'Automatisch';
+
+  @override
+  String get settingsAmllBlurFast => 'Schnell';
+
+  @override
+  String get settingsAmllBlurLite => 'Leicht (Näherung)';
+
+  @override
+  String get settingsAmllBlurQuality => 'Qualität';
+
+  @override
+  String get settingsAmllBlurOff => 'Aus';
+
+  @override
   String get settingsAmllSpring => 'Scroll-Feder';
 
   @override
