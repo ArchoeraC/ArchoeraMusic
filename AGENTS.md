@@ -122,6 +122,10 @@ bash app/tool/sign_watermark.sh          # 本地运行；CI 环境会拒绝执�
   含 Environment secret `ARCHOERA_WM_KEY1_PEM`（key1 PEM）。
 - **Ruleset `protect-main`**（branch）：要求 PR、禁止强推（non_fast_forward）、禁止删除；
   Required approvals = 0（单人可自建 PR 自合并）。**禁止直接 push `main`**。
+- **Ruleset `protect-archoeraos`**（branch `ArchoeraOS`）：禁止删除（`deletion`）、禁止强推
+  （`non_fast_forward`）；**不要求 PR**（保留维护者直接推送的长期分支工作流）。
+  `ArchoeraOS` 是长期维护的发行版分支，承载 shell/网络/蓝牙/安装向导等大量独有提交，
+  **不得删除**。
 - **Ruleset `protect-release-tags`**（tag `v*`）：禁止**更新/删除**已发布 tag（不可移动）。
   故打 tag 前务必确认版本号。
 - **CODEOWNERS**：`.github/CODEOWNERS` 把 CI/工具/打包/水印等关键路径指向维护者。
@@ -141,5 +145,7 @@ bash app/tool/sign_watermark.sh          # 本地运行；CI 环境会拒绝执�
 - 禁止提交任何私钥/凭据（`.gitignore` 已忽略 `*.key`、`*_priv.pem`；公钥 `watermark_pub*.pem` 需跟踪）。
 - 禁止在 CI 运行 `sign_watermark.sh`（会打印私钥材料；脚本已加 `CI` 环境拒绝）。
 - 签名步骤不要开 `set -x`。
+- 禁止删除 `ArchoeraOS` 分支、对其强推，或把它并入 `main` 后删除（已由 ruleset
+  `protect-archoeraos` 在服务端拦截；清理分支时务必排除它）。
 - "Hmm"等可能会导致死循环，尽可能不要触及
 
