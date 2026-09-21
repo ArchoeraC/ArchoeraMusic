@@ -17,63 +17,63 @@
 // libopus / RFC 6716 reference code). They are omitted here.
 
 // ff_celt_model_tapset: C dims [4], type uint16_t
-pub const ff_celt_model_tapset = [4]u16{
+pub const era_celt_model_tapset = [4]u16{
         4, 2, 3, 4,
 };
 
 // ff_celt_model_spread: C dims [5], type uint16_t
-pub const ff_celt_model_spread = [5]u16{
+pub const era_celt_model_spread = [5]u16{
         32, 7, 9, 30, 32,
 };
 
 // ff_celt_model_alloc_trim: C dims [12], type uint16_t
-pub const ff_celt_model_alloc_trim = [12]u16{
+pub const era_celt_model_alloc_trim = [12]u16{
         128, 2, 4, 9, 19, 41, 87, 109, 119, 124, 126, 128,
 };
 
 // ff_celt_freq_bands: C dims [22], type uint8_t (NOT float; indexed flat, in steps of 200 Hz)
-pub const ff_celt_freq_bands = [22]u8{
+pub const era_celt_freq_bands = [22]u8{
         0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24,
         28, 34, 40, 48, 60, 78, 100,
 };
 
 // ff_celt_freq_range: C dims [21], type uint8_t
-pub const ff_celt_freq_range = [21]u8{
+pub const era_celt_freq_range = [21]u8{
         1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4,
         6, 6, 8, 12, 18, 22,
 };
 
 // ff_celt_log_freq_range: C dims [21], type uint8_t
-pub const ff_celt_log_freq_range = [21]u8{
+pub const era_celt_log_freq_range = [21]u8{
         0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 16, 16, 16,
         21, 21, 24, 29, 34, 36,
 };
 
 // ff_celt_tf_select: C dims [4][2][2][2], type int8_t, flattened row-major
-pub const ff_celt_tf_select = [32]i8{
+pub const era_celt_tf_select = [32]i8{
         0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -2, 1, 0, 1,
         -1, 0, -2, 0, -3, 2, 0, 1, -1, 0, -2, 0, -3, 3, 0,
         1, -1,
 };
 
 // ff_celt_mean_energy: C dims [25], type float
-pub const ff_celt_mean_energy = [25]f32{
+pub const era_celt_mean_energy = [25]f32{
         6.437500, 6.250000, 5.750000, 5.312500, 5.062500, 4.812500, 4.500000, 4.375000, 4.875000, 4.687500, 4.562500, 4.437500, 4.875000, 4.625000, 4.312500,
         4.500000, 4.375000, 4.625000, 4.750000, 4.437500, 3.750000, 3.750000, 3.750000, 3.750000, 3.750000,
 };
 
 // ff_celt_alpha_coef: C dims [4], type float, computed from A/32768.0
-pub const ff_celt_alpha_coef = [4]f32{
+pub const era_celt_alpha_coef = [4]f32{
         0.8984375, 0.796875, 0.6484375, 0.5,
 };
 
 // ff_celt_beta_coef: C dims [4], type float, computed from 1.0 - A/32768.0
-pub const ff_celt_beta_coef = [4]f32{
+pub const era_celt_beta_coef = [4]f32{
         0.079986572265625, 0.32000732421875, 0.6300048828125, 0.79998779296875,
 };
 
 // ff_celt_coarse_energy_dist: C dims [4][2][42], type uint8_t, flattened row-major
-pub const ff_celt_coarse_energy_dist = [336]u8{
+pub const era_celt_coarse_energy_dist = [336]u8{
         72, 127, 65, 129, 66, 128, 65, 128, 64, 128, 62, 128, 64, 128, 64,
         128, 92, 78, 92, 79, 92, 78, 90, 79, 116, 41, 115, 40, 114, 40,
         132, 26, 132, 26, 145, 17, 161, 12, 176, 10, 177, 11, 24, 179, 48,
@@ -100,7 +100,7 @@ pub const ff_celt_coarse_energy_dist = [336]u8{
 };
 
 // ff_celt_static_alloc: C dims [11][21], type uint8_t, flattened row-major
-pub const ff_celt_static_alloc = [231]u8{
+pub const era_celt_static_alloc = [231]u8{
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 90, 80, 75, 69, 63, 56, 49, 40, 34,
         29, 20, 18, 10, 0, 0, 0, 0, 0, 0, 0, 0, 110, 100, 90,
@@ -120,7 +120,7 @@ pub const ff_celt_static_alloc = [231]u8{
 };
 
 // ff_celt_static_caps: C dims [4][2][21], type uint8_t, flattened row-major
-pub const ff_celt_static_caps = [168]u8{
+pub const era_celt_static_caps = [168]u8{
         224, 224, 224, 224, 224, 224, 224, 224, 160, 160, 160, 160, 185, 185, 185,
         178, 178, 168, 134, 61, 37, 224, 224, 224, 224, 224, 224, 224, 224, 240,
         240, 240, 240, 207, 207, 207, 198, 198, 183, 144, 66, 40, 160, 160, 160,
@@ -136,7 +136,7 @@ pub const ff_celt_static_caps = [168]u8{
 };
 
 // ff_celt_cache_bits: C dims [392], type uint8_t
-pub const ff_celt_cache_bits = [392]u8{
+pub const era_celt_cache_bits = [392]u8{
         40, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
         7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
         7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 40, 15, 23, 28,
@@ -167,7 +167,7 @@ pub const ff_celt_cache_bits = [392]u8{
 };
 
 // ff_celt_cache_index: C dims [105], type int16_t (NOT int)
-pub const ff_celt_cache_index = [105]i16{
+pub const era_celt_cache_index = [105]i16{
         -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 41, 41, 41,
         82, 82, 123, 164, 200, 222, 0, 0, 0, 0, 0, 0, 0, 0, 41,
         41, 41, 41, 123, 123, 123, 164, 164, 240, 266, 283, 295, 41, 41, 41,
@@ -178,25 +178,25 @@ pub const ff_celt_cache_index = [105]i16{
 };
 
 // ff_celt_log2_frac: C dims [24], type uint8_t
-pub const ff_celt_log2_frac = [24]u8{
+pub const era_celt_log2_frac = [24]u8{
         0, 8, 13, 16, 19, 21, 23, 24, 26, 27, 28, 29, 30, 31, 32,
         32, 33, 34, 34, 35, 36, 36, 37, 37,
 };
 
 // ff_celt_bit_interleave: C dims [16], type uint8_t
-pub const ff_celt_bit_interleave = [16]u8{
+pub const era_celt_bit_interleave = [16]u8{
         0, 1, 1, 1, 2, 3, 3, 3, 2, 3, 3, 3, 2, 3, 3,
         3,
 };
 
 // ff_celt_bit_deinterleave: C dims [16], type uint8_t, hex
-pub const ff_celt_bit_deinterleave = [16]u8{
+pub const era_celt_bit_deinterleave = [16]u8{
         0x00, 0x03, 0x0C, 0x0F, 0x30, 0x33, 0x3C, 0x3F, 0xC0, 0xC3, 0xCC, 0xCF, 0xF0, 0xF3, 0xFC,
         0xFF,
 };
 
 // ff_celt_hadamard_order: C dims [46], type uint8_t (2+4+8+16+16)
-pub const ff_celt_hadamard_order = [46]u8{
+pub const era_celt_hadamard_order = [46]u8{
         1, 0, 3, 0, 2, 1, 7, 0, 4, 3, 6, 1, 5, 2, 15,
         0, 8, 7, 12, 3, 11, 4, 14, 1, 9, 6, 13, 2, 10, 5,
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
@@ -204,29 +204,29 @@ pub const ff_celt_hadamard_order = [46]u8{
 };
 
 // ff_celt_qn_exp2: C dims [8], type uint16_t
-pub const ff_celt_qn_exp2 = [8]u16{
+pub const era_celt_qn_exp2 = [8]u16{
         16384, 17866, 19483, 21247, 23170, 25267, 27554, 30048,
 };
 
 // ff_celt_postfilter_taps: C dims [3][3], type float, flattened row-major
-pub const ff_celt_postfilter_taps = [9]f32{
+pub const era_celt_postfilter_taps = [9]f32{
         0.3066406250, 0.2170410156, 0.1296386719, 0.4638671875, 0.2680664062, 0.0, 0.7998046875, 0.1000976562, 0.0,
 };
 
 // ff_celt_band_end: C dims [5], type uint8_t
-pub const ff_celt_band_end = [5]u8{
+pub const era_celt_band_end = [5]u8{
         13, 17, 17, 19, 21,
 };
 
 // ff_opus_default_coupled_streams: C dims [8], type uint8_t
-pub const ff_opus_default_coupled_streams = [8]u8{
+pub const era_opus_default_coupled_streams = [8]u8{
         0, 1, 1, 2, 2, 2, 2, 3,
 };
 
 // ff_celt_window: C macro ff_celt_window = ff_celt_window_padded + 8;
 // source array ff_celt_window_padded is [136]f32 (8 leading zeros + 120 window + 8 trailing ones).
 // Here we emit the 120 actual window values (indices 8..127).
-pub const ff_celt_window = [120]f32{
+pub const era_celt_window = [120]f32{
         6.7286966e-05, 0.00060551348, 0.0016815970, 0.0032947962, 0.0054439943, 0.0081276923, 0.011344001, 0.015090633, 0.019364886, 0.024163635, 0.029483315, 0.035319905, 0.041668911, 0.048525347, 0.055883718,
         0.063737999, 0.072081616, 0.080907428, 0.090207705, 0.099974111, 0.11019769, 0.12086883, 0.13197729, 0.14351214, 0.15546177, 0.16781389, 0.18055550, 0.19367290, 0.20715171, 0.22097682,
         0.23513243, 0.24960208, 0.26436860, 0.27941419, 0.29472040, 0.31026818, 0.32603788, 0.34200931, 0.35816177, 0.37447407, 0.39092462, 0.40749142, 0.42415215, 0.44088423, 0.45766484,
@@ -238,7 +238,7 @@ pub const ff_celt_window = [120]f32{
 };
 
 // ff_celt_window_padded: full aligned source array (kept for completeness / alignment reference).
-pub const ff_celt_window_padded = [136]f32{
+pub const era_celt_window_padded = [136]f32{
         0.00000000, 0.00000000, 0.00000000, 0.00000000, 0.00000000, 0.00000000, 0.00000000, 0.00000000, 6.7286966e-05, 0.00060551348, 0.0016815970, 0.0032947962, 0.0054439943, 0.0081276923, 0.011344001,
         0.015090633, 0.019364886, 0.024163635, 0.029483315, 0.035319905, 0.041668911, 0.048525347, 0.055883718, 0.063737999, 0.072081616, 0.080907428, 0.090207705, 0.099974111, 0.11019769, 0.12086883,
         0.13197729, 0.14351214, 0.15546177, 0.16781389, 0.18055550, 0.19367290, 0.20715171, 0.22097682, 0.23513243, 0.24960208, 0.26436860, 0.27941419, 0.29472040, 0.31026818, 0.32603788,
@@ -252,7 +252,7 @@ pub const ff_celt_window_padded = [136]f32{
 };
 
 // ff_celt_window2: C dims [120], type float, square of window for postfilter
-pub const ff_celt_window2 = [120]f32{
+pub const era_celt_window2 = [120]f32{
         4.5275357e-09, 3.66647e-07, 2.82777e-06, 1.08557e-05, 2.96371e-05, 6.60594e-05, 0.000128686, 0.000227727, 0.000374999, 0.000583881, 0.000869266, 0.0012475, 0.0017363, 0.00235471, 0.00312299,
         0.00406253, 0.00519576, 0.00654601, 0.00813743, 0.00999482, 0.0121435, 0.0146093, 0.017418, 0.0205957, 0.0241684, 0.0281615, 0.0326003, 0.0375092, 0.0429118, 0.0488308,
         0.0552873, 0.0623012, 0.0698908, 0.0780723, 0.0868601, 0.0962664, 0.106301, 0.11697, 0.12828, 0.140231, 0.152822, 0.166049, 0.179905, 0.194379, 0.209457,
@@ -265,7 +265,7 @@ pub const ff_celt_window2 = [120]f32{
 
 // ff_opus_deemph_weights: DECLARE_ALIGNED(16, const float, ...)[16]
 // values computed from CELT_EMPH_COEFF = 0.8500061035 (powers, rounded to f32 as in C).
-pub const ff_opus_deemph_weights = [16]f32{
+pub const era_opus_deemph_weights = [16]f32{
         0.850006103515625, 0.7225103974342346, 0.6141382455825806, 0.5220212340354919, 0.0, 0.850006103515625, 0.7225103974342346, 0.6141382455825806, 0.0, 0.0, 0.850006103515625, 0.7225103974342346, 0.0, 0.0, 0.0,
         0.850006103515625,
 };
@@ -275,7 +275,7 @@ pub const ff_opus_deemph_weights = [16]f32{
 
 // ff_celt_pvq_u_row: C is 'const uint32_t * const ff_celt_pvq_u_row[15]' = offsets into celt_pvq_u.
 // Emitted as offsets (indices into celt_pvq_u), not pointers.
-pub const ff_celt_pvq_u_row_offsets = [15]u32{
+pub const era_celt_pvq_u_row_offsets = [15]u32{
         0, 176, 351, 525, 698, 870, 1041, 1131, 1178, 1207, 1226, 1240, 1248, 1254, 1257,
 };
 

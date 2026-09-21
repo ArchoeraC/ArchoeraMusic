@@ -72,16 +72,16 @@ fn parsePostfilter(f: *CeltFrame, rc: *Rc, consumed_in: u32) u32 {
             const gain = 0.09375 * (@as(f32, @floatFromInt(rawq)) + 1.0);
             var tapset: i32 = 0;
             if (rc.tell() + 2 <= @as(u32, @intCast(f.framebits))) {
-                tapset = @intCast(rc.decCdf(&tables.ff_celt_model_tapset));
+                tapset = @intCast(rc.decCdf(&tables.era_celt_model_tapset));
             }
             for (0..2) |i| {
                 const block = &f.block[i];
                 block.pf_period_new = @max(period, CELT_POSTFILTER_MINPERIOD);
                 block.pf_tapset_new = tapset;
                 block.pf_gain_new = gain;
-                block.pf_gains_new[0] = gain * tables.ff_celt_postfilter_taps[@as(usize, @intCast(tapset)) * 3 + 0];
-                block.pf_gains_new[1] = gain * tables.ff_celt_postfilter_taps[@as(usize, @intCast(tapset)) * 3 + 1];
-                block.pf_gains_new[2] = gain * tables.ff_celt_postfilter_taps[@as(usize, @intCast(tapset)) * 3 + 2];
+                block.pf_gains_new[0] = gain * tables.era_celt_postfilter_taps[@as(usize, @intCast(tapset)) * 3 + 0];
+                block.pf_gains_new[1] = gain * tables.era_celt_postfilter_taps[@as(usize, @intCast(tapset)) * 3 + 1];
+                block.pf_gains_new[2] = gain * tables.era_celt_postfilter_taps[@as(usize, @intCast(tapset)) * 3 + 2];
             }
         }
         consumed = rc.tell();
@@ -95,16 +95,16 @@ fn parsePostfilter(f: *CeltFrame, rc: *Rc, consumed_in: u32) u32 {
 
  fn decodeCoarseEnergy(f: *CeltFrame, rc: *Rc) void {
     var prev: [2]f32 = .{ 0, 0 };
-    var alpha = tables.ff_celt_alpha_coef[@intCast(f.size)];
+    var alpha = tables.era_celt_alpha_coef[@intCast(f.size)];
     const beta_int: [4]i32 = .{ 30147, 22282, 12124, 6554 };
     var beta: f32 = @floatFromInt(beta_int[@intCast(f.size)]);
     beta = beta / 32768.0;
-    var model = tables.ff_celt_coarse_energy_dist[@as(usize, @intCast(f.size)) * 84 + 0 ..];
+    var model = tables.era_celt_coarse_energy_dist[@as(usize, @intCast(f.size)) * 84 + 0 ..];
 
     if (rc.tell() + 3 <= @as(u32, @intCast(f.framebits)) and rc.decLog(3) != 0) {
         alpha = 0.0;
         beta = 4915.0 / 32768.0;
-        model = tables.ff_celt_coarse_energy_dist[@as(usize, @intCast(f.size)) * 84 + 42 ..];
+        model = tables.era_celt_coarse_energy_dist[@as(usize, @intCast(f.size)) * 84 + 42 ..];
     }
 
     for (0..CELT_MAX_BANDS) |i| {
@@ -124,7 +124,7 @@ fn parsePostfilter(f: *CeltFrame, rc: *Rc, consumed_in: u32) u32 {
                 const sym = rc.decLaplace(symbol, decay);
                 value = @floatFromInt(sym);
             } else if (available >= 2) {
-                const x: i32 = @intCast(rc.decCdf(&tables.ff_celt_model_tapset));
+                const x: i32 = @intCast(rc.decCdf(&tables.era_celt_model_tapset));
                 value = @floatFromInt((x >> 1) ^ -(x & 1));
             } else if (available >= 1) {
                 value = -@as(f32, @floatFromInt(rc.decLog(1)));
@@ -157,14 +157,14 @@ fn decodeTfChanges(f: *CeltFrame, rc: *Rc) void {
     }
 
     if (tf_select_bit and
-        tables.ff_celt_tf_select[@as(usize, @intCast(f.size)) * 8 + @as(usize, @intFromBool(f.transient)) * 4 + 0 * 2 + @as(usize, @intCast(tf_changed))] !=
-        tables.ff_celt_tf_select[@as(usize, @intCast(f.size)) * 8 + @as(usize, @intFromBool(f.transient)) * 4 + 1 * 2 + @as(usize, @intCast(tf_changed))])
+        tables.era_celt_tf_select[@as(usize, @intCast(f.size)) * 8 + @as(usize, @intFromBool(f.transient)) * 4 + 0 * 2 + @as(usize, @intCast(tf_changed))] !=
+        tables.era_celt_tf_select[@as(usize, @intCast(f.size)) * 8 + @as(usize, @intFromBool(f.transient)) * 4 + 1 * 2 + @as(usize, @intCast(tf_changed))])
     {
         tf_select = rc.decLog(1) != 0;
     }
 
     for (f.start_band..f.end_band) |j| {
-        f.tf_change[j] = tables.ff_celt_tf_select[@as(usize, @intCast(f.size)) * 8 + @as(usize, @intFromBool(f.transient)) * 4 + @as(usize, @intFromBool(tf_select)) * 2 + @as(usize, @intCast(f.tf_change[j]))];
+        f.tf_change[j] = tables.era_celt_tf_select[@as(usize, @intCast(f.size)) * 8 + @as(usize, @intFromBool(f.transient)) * 4 + @as(usize, @intFromBool(tf_select)) * 2 + @as(usize, @intCast(f.tf_change[j]))];
     }
 }
 
@@ -232,21 +232,21 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
 
     // Spread
     if (rc.tell() + 4 <= @as(u32, @intCast(f.framebits))) {
-        f.spread = @intCast(rc.decCdf(&tables.ff_celt_model_spread));
+        f.spread = @intCast(rc.decCdf(&tables.era_celt_model_spread));
     } else {
         f.spread = ct.SPREAD_NORMAL;
     }
 
     // caps
     for (0..CELT_MAX_BANDS) |b| {
-        f.caps[b] = normc((@as(i32, tables.ff_celt_static_caps[@as(usize, @intCast(f.size)) * 42 + (@as(usize, @intCast(f.channels)) - 1) * 21 + b]) + 64) * @as(i32, tables.ff_celt_freq_range[b]), f.channels, f.size);
+        f.caps[b] = normc((@as(i32, tables.era_celt_static_caps[@as(usize, @intCast(f.size)) * 42 + (@as(usize, @intCast(f.channels)) - 1) * 21 + b]) + 64) * @as(i32, tables.era_celt_freq_range[b]), f.channels, f.size);
     }
 
     // Band boosts
     tbits_8ths = f.framebits << 3;
     i = f.start_band;
     while (i < f.end_band) : (i += 1) {
-        const quanta = @as(i32, tables.ff_celt_freq_range[i]) << @intCast(f.channels - 1 + f.size);
+        const quanta = @as(i32, tables.era_celt_freq_range[i]) << @intCast(f.channels - 1 + f.size);
         var b_dynalloc = dynalloc;
         const boost_amount = f.alloc_boost[i];
         const q = @min(quanta << 3, @max(6 << 3, quanta));
@@ -265,7 +265,7 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
     // Allocation trim
     f.alloc_trim = 5;
     if (rc.tellFrac() + (6 << 3) <= @as(u32, @bitCast(tbits_8ths))) {
-        f.alloc_trim = @intCast(rc.decCdf(&tables.ff_celt_model_alloc_trim));
+        f.alloc_trim = @intCast(rc.decCdf(&tables.era_celt_model_alloc_trim));
     }
 
     // Anti-collapse bit reservation
@@ -282,7 +282,7 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
 
     // Intensity/dual stereo bit reservation
     if (f.channels == 2) {
-        intensitystereo_bit = tables.ff_celt_log2_frac[f.end_band - f.start_band];
+        intensitystereo_bit = tables.era_celt_log2_frac[f.end_band - f.start_band];
         if (intensitystereo_bit <= tbits_8ths) {
             tbits_8ths -= intensitystereo_bit;
             if (tbits_8ths >= 1 << 3) {
@@ -297,12 +297,12 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
     // Trim offsets
     for (f.start_band..f.end_band) |b| {
         const trim = f.alloc_trim - 5 - f.size;
-        const band = @as(i32, tables.ff_celt_freq_range[b]) * @as(i32, @intCast(f.end_band - b - 1));
+        const band = @as(i32, tables.era_celt_freq_range[b]) * @as(i32, @intCast(f.end_band - b - 1));
         const duration = f.size + 3;
         const scale = duration + f.channels - 1;
-        threshold[b] = @max(3 * @as(i32, tables.ff_celt_freq_range[b]) << @intCast(duration) >> 4, f.channels << 3);
+        threshold[b] = @max(3 * @as(i32, tables.era_celt_freq_range[b]) << @intCast(duration) >> 4, f.channels << 3);
         trim_offset[b] = (trim * (band << @intCast(scale))) >> 6; // 算术右移（C 语义）
-        if (@as(i32, tables.ff_celt_freq_range[b]) << @intCast(f.size) == 1) {
+        if (@as(i32, tables.era_celt_freq_range[b]) << @intCast(f.size) == 1) {
             trim_offset[b] -= f.channels << 3;
         }
     }
@@ -317,7 +317,7 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
         var j = f.end_band;
         while (j > f.start_band) {
             j -= 1;
-            bandbits = normc(@as(i32, tables.ff_celt_freq_range[j]) * @as(i32, tables.ff_celt_static_alloc[@as(usize, @intCast(center)) * CELT_MAX_BANDS + j]), f.channels, f.size);
+            bandbits = normc(@as(i32, tables.era_celt_freq_range[j]) * @as(i32, tables.era_celt_static_alloc[@as(usize, @intCast(center)) * CELT_MAX_BANDS + j]), f.channels, f.size);
             if (bandbits != 0) bandbits = @max(bandbits + trim_offset[j], 0);
             bandbits += boost[j];
             if (bandbits >= threshold[j] or done != 0) {
@@ -339,11 +339,11 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
 
     // 第二分法
     for (f.start_band..f.end_band) |b| {
-        bits1[b] = normc(@as(i32, tables.ff_celt_freq_range[b]) * @as(i32, tables.ff_celt_static_alloc[@as(usize, @intCast(low)) * CELT_MAX_BANDS + b]), f.channels, f.size);
+        bits1[b] = normc(@as(i32, tables.era_celt_freq_range[b]) * @as(i32, tables.era_celt_static_alloc[@as(usize, @intCast(low)) * CELT_MAX_BANDS + b]), f.channels, f.size);
         bits2[b] = if (high >= CELT_VECTORS)
             f.caps[b]
         else
-            normc(@as(i32, tables.ff_celt_freq_range[b]) * @as(i32, tables.ff_celt_static_alloc[@as(usize, @intCast(high)) * CELT_MAX_BANDS + b]), f.channels, f.size);
+            normc(@as(i32, tables.era_celt_freq_range[b]) * @as(i32, tables.era_celt_static_alloc[@as(usize, @intCast(high)) * CELT_MAX_BANDS + b]), f.channels, f.size);
 
         if (bits1[b] != 0) bits1[b] = @max(bits1[b] + trim_offset[b], 0);
         if (bits2[b] != 0) bits2[b] = @max(bits2[b] + trim_offset[b], 0);
@@ -407,10 +407,10 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
             break;
         }
         remaining = tbits_8ths - total;
-        bandbits = @divTrunc(remaining, @as(i32, @intCast(tables.ff_celt_freq_bands[j + 1] - tables.ff_celt_freq_bands[f.start_band])));
-        remaining -= bandbits * @as(i32, @intCast(tables.ff_celt_freq_bands[j + 1] - tables.ff_celt_freq_bands[f.start_band]));
-        allocation = f.pulses[j] + bandbits * @as(i32, tables.ff_celt_freq_range[j]);
-        allocation += @max(remaining - @as(i32, @intCast(tables.ff_celt_freq_bands[j] - tables.ff_celt_freq_bands[f.start_band])), 0);
+        bandbits = @divTrunc(remaining, @as(i32, @intCast(tables.era_celt_freq_bands[j + 1] - tables.era_celt_freq_bands[f.start_band])));
+        remaining -= bandbits * @as(i32, @intCast(tables.era_celt_freq_bands[j + 1] - tables.era_celt_freq_bands[f.start_band]));
+        allocation = f.pulses[j] + bandbits * @as(i32, tables.era_celt_freq_range[j]);
+        allocation += @max(remaining - @as(i32, @intCast(tables.era_celt_freq_bands[j] - tables.era_celt_freq_bands[f.start_band])), 0);
 
         if (allocation >= @max(threshold[j], (f.channels + 1) << 3)) {
             const do_not_skip = rc.decLog(1) != 0;
@@ -421,7 +421,7 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
         total -= f.pulses[j];
         if (intensitystereo_bit != 0) {
             total -= intensitystereo_bit;
-            intensitystereo_bit = tables.ff_celt_log2_frac[j - f.start_band];
+            intensitystereo_bit = tables.era_celt_log2_frac[j - f.start_band];
             total += intensitystereo_bit;
         }
         f.pulses[j] = if (allocation >= f.channels << 3) f.channels << 3 else 0;
@@ -446,18 +446,18 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
 
     // 剩余位分配给低带
     remaining = tbits_8ths - total;
-    bandbits = @divTrunc(remaining, @as(i32, @intCast(tables.ff_celt_freq_bands[f.coded_bands] - tables.ff_celt_freq_bands[f.start_band])));
-    remaining -= bandbits * @as(i32, @intCast(tables.ff_celt_freq_bands[f.coded_bands] - tables.ff_celt_freq_bands[f.start_band]));
+    bandbits = @divTrunc(remaining, @as(i32, @intCast(tables.era_celt_freq_bands[f.coded_bands] - tables.era_celt_freq_bands[f.start_band])));
+    remaining -= bandbits * @as(i32, @intCast(tables.era_celt_freq_bands[f.coded_bands] - tables.era_celt_freq_bands[f.start_band]));
     for (f.start_band..f.coded_bands) |b| {
-        const bits = @min(remaining, @as(i32, tables.ff_celt_freq_range[b]));
-        f.pulses[b] += bits + bandbits * @as(i32, tables.ff_celt_freq_range[b]);
+        const bits = @min(remaining, @as(i32, tables.era_celt_freq_range[b]));
+        f.pulses[b] += bits + bandbits * @as(i32, tables.era_celt_freq_range[b]);
         remaining -= bits;
     }
 
     // 最终确定分配
     i = f.start_band;
     while (i < f.coded_bands) : (i += 1) {
-        const N = @as(i32, tables.ff_celt_freq_range[i]) << @intCast(f.size);
+        const N = @as(i32, tables.era_celt_freq_range[i]) << @intCast(f.size);
         const prev_extra = extrabits;
         f.pulses[i] += extrabits;
 
@@ -472,7 +472,7 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
             f.pulses[i] -= extrabits;
 
             dof = N * f.channels + @intFromBool(f.channels == 2 and N > 2 and !f.dual_stereo and i < f.intensity_stereo);
-            temp = dof * (@as(i32, tables.ff_celt_log_freq_range[i]) + (f.size << 3));
+            temp = dof * (@as(i32, tables.era_celt_log_freq_range[i]) + (f.size << 3));
             offset = @divTrunc(temp, 2) - dof * CELT_FINE_OFFSET;
             if (N == 2) offset += dof << 1;
 
@@ -530,8 +530,8 @@ fn quantBands(f: *CeltFrame, pvq: *Pvq, rc: *Rc) void {
     var i: usize = f.start_band;
     while (i < f.end_band) : (i += 1) {
         var cm: [2]u32 = .{ (@as(u32, 1) << @intCast(f.blocks)) - 1, (@as(u32, 1) << @intCast(f.blocks)) - 1 };
-        const band_offset = @as(usize, tables.ff_celt_freq_bands[i]) << @intCast(f.size);
-        const band_size = @as(usize, tables.ff_celt_freq_range[i]) << @intCast(f.size);
+        const band_offset = @as(usize, tables.era_celt_freq_bands[i]) << @intCast(f.size);
+        const band_size = @as(usize, tables.era_celt_freq_range[i]) << @intCast(f.size);
         const X = f.block[0].coeffs[band_offset..][0..band_size];
         const Y = if (f.channels == 2) f.block[1].coeffs[band_offset..][0..band_size] else null;
 
@@ -547,7 +547,7 @@ fn quantBands(f: *CeltFrame, pvq: *Pvq, rc: *Rc) void {
             b = @min(b, (1 << 14) - 1);
         }
 
-        if ((tables.ff_celt_freq_bands[i] -% tables.ff_celt_freq_range[i] >= tables.ff_celt_freq_bands[f.start_band] or
+        if ((tables.era_celt_freq_bands[i] -% tables.era_celt_freq_range[i] >= tables.era_celt_freq_bands[f.start_band] or
             i == f.start_band + 1) and (update_lowband or lowband_offset == 0))
         {
             lowband_offset = i;
@@ -555,7 +555,7 @@ fn quantBands(f: *CeltFrame, pvq: *Pvq, rc: *Rc) void {
 
         if (i == f.start_band + 1) {
             // Hybrid Folding（RFC 8251 §9）
-            const count = (@as(usize, tables.ff_celt_freq_range[i]) - @as(usize, tables.ff_celt_freq_range[i - 1])) << @intCast(f.size);
+            const count = (@as(usize, tables.era_celt_freq_range[i]) - @as(usize, tables.era_celt_freq_range[i - 1])) << @intCast(f.size);
             @memcpy(norm1[band_offset..][0..count], norm1[band_offset - count ..][0..count]);
             if (f.channels == 2) @memcpy(norm2[band_offset..][0..count], norm2[band_offset - count ..][0..count]);
         }
@@ -563,15 +563,15 @@ fn quantBands(f: *CeltFrame, pvq: *Pvq, rc: *Rc) void {
         var norm_loc1: ?[]const f32 = null;
         var norm_loc2: ?[]const f32 = null;
         if (lowband_offset != 0 and (f.spread != SPREAD_AGGRESSIVE or f.blocks > 1 or f.tf_change[i] < 0)) {
-            const efl = @max(@as(i32, tables.ff_celt_freq_bands[f.start_band]),
-                @as(i32, tables.ff_celt_freq_bands[lowband_offset]) - @as(i32, tables.ff_celt_freq_range[i]));
+            const efl = @max(@as(i32, tables.era_celt_freq_bands[f.start_band]),
+                @as(i32, tables.era_celt_freq_bands[lowband_offset]) - @as(i32, tables.era_celt_freq_range[i]));
             var foldstart = lowband_offset;
             while (true) {
                 foldstart -= 1;
-                if (@as(i32, tables.ff_celt_freq_bands[foldstart]) <= efl) break;
+                if (@as(i32, tables.era_celt_freq_bands[foldstart]) <= efl) break;
             }
             var foldend = lowband_offset - 1;
-            while (foldend + 1 < i and @as(i32, tables.ff_celt_freq_bands[foldend + 1]) < efl + @as(i32, tables.ff_celt_freq_range[i])) foldend += 1;
+            while (foldend + 1 < i and @as(i32, tables.era_celt_freq_bands[foldend + 1]) < efl + @as(i32, tables.era_celt_freq_range[i])) foldend += 1;
 
             cm[0] = 0;
             cm[1] = 0;
@@ -587,7 +587,7 @@ fn quantBands(f: *CeltFrame, pvq: *Pvq, rc: *Rc) void {
 
         if (f.dual_stereo and i == f.intensity_stereo) {
             f.dual_stereo = false;
-            var j = @as(usize, tables.ff_celt_freq_bands[f.start_band]) << @intCast(f.size);
+            var j = @as(usize, tables.era_celt_freq_bands[f.start_band]) << @intCast(f.size);
             while (j < band_offset) : (j += 1) {
                 norm1[j] = (norm1[j] + norm2[j]) / 2;
             }
@@ -618,14 +618,14 @@ fn quantBands(f: *CeltFrame, pvq: *Pvq, rc: *Rc) void {
 
 fn processAnticollapse(f: *CeltFrame) void {
     for (f.start_band..f.end_band) |i| {
-        const n = @as(usize, tables.ff_celt_freq_range[i]) << @intCast(f.size);
+        const n = @as(usize, tables.era_celt_freq_range[i]) << @intCast(f.size);
         const depth = @divTrunc(1 + f.pulses[i], @as(i32, @intCast(n)));
         const thresh: f32 = @floatCast(@exp2(-1.0 - 0.125 * @as(f64, @floatFromInt(depth))));
         const sqrt_1: f32 = 1.0 / @sqrt(@as(f32, @floatFromInt(n)));
         for (0..@intCast(f.channels)) |c| {
             const block = &f.block[c];
             var renormalize = false;
-            const xptr = block.coeffs[@as(usize, tables.ff_celt_freq_bands[i]) << @intCast(f.size) ..][0..n];
+            const xptr = block.coeffs[@as(usize, tables.era_celt_freq_bands[i]) << @intCast(f.size) ..][0..n];
             var prev: [2]f32 = .{ block.prev_energy[0][i], block.prev_energy[1][i] };
             if (f.channels == 1) {
                 const block1 = &f.block[1];
@@ -639,7 +639,7 @@ fn processAnticollapse(f: *CeltFrame) void {
             r = @min(thresh, r) * sqrt_1;
             for (0..@as(usize, 1) << @intCast(f.size)) |k| {
                 if ((block.collapse_masks[i] & (@as(u8, 1) << @intCast(k))) == 0) {
-                    for (0..@as(usize, tables.ff_celt_freq_range[i])) |j| {
+                    for (0..@as(usize, tables.era_celt_freq_range[i])) |j| {
                         xptr[(j << @intCast(f.size)) + k] = if ((ct.celtRng(f) & 0x8000) != 0) r else -r;
                     }
                     renormalize = true;
@@ -652,12 +652,12 @@ fn processAnticollapse(f: *CeltFrame) void {
 
 fn denormalize(f: *CeltFrame, block: *CeltBlock, data: []f32) void {
     for (f.start_band..f.end_band) |i| {
-        const dst = data[@as(usize, tables.ff_celt_freq_bands[i]) << @intCast(f.size) ..];
-        const log_norm = block.energy[i] + tables.ff_celt_mean_energy[i];
+        const dst = data[@as(usize, tables.era_celt_freq_bands[i]) << @intCast(f.size) ..];
+        const log_norm = block.energy[i] + tables.era_celt_mean_energy[i];
         // libopus FLOAT celt_exp2_db：celt_exp2(PSHR32(x, DB_SHIFT-10))，float 下 PSHR32=恒等，
         // celt_exp2(x)=exp(0.6931471805599453094·x)（double 计算后截断 f32）。
         const norm: f32 = @floatCast(@exp(0.6931471805599453094 * @as(f64, @min(log_norm, 32.0))));
-        for (0..@as(usize, tables.ff_celt_freq_range[i]) << @intCast(f.size)) |j| {
+        for (0..@as(usize, tables.era_celt_freq_range[i]) << @intCast(f.size)) |j| {
             dst[j] *= norm;
         }
     }
@@ -694,12 +694,12 @@ fn combFilter(buf: []f32, base: usize, t0_in: i32, t1_in: i32, n: usize, g0: f32
     if (g0 == 0.0 and g1 == 0.0) return; // x==y 时 OPUS_MOVE 为 no-op
     const t0: i32 = @max(t0_in, CELT_POSTFILTER_MINPERIOD);
     const t1: i32 = @max(t1_in, CELT_POSTFILTER_MINPERIOD);
-    const g00 = g0 * tables.ff_celt_postfilter_taps[@as(usize, @intCast(tapset0)) * 3 + 0];
-    const g01 = g0 * tables.ff_celt_postfilter_taps[@as(usize, @intCast(tapset0)) * 3 + 1];
-    const g02 = g0 * tables.ff_celt_postfilter_taps[@as(usize, @intCast(tapset0)) * 3 + 2];
-    const g10 = g1 * tables.ff_celt_postfilter_taps[@as(usize, @intCast(tapset1)) * 3 + 0];
-    const g11 = g1 * tables.ff_celt_postfilter_taps[@as(usize, @intCast(tapset1)) * 3 + 1];
-    const g12 = g1 * tables.ff_celt_postfilter_taps[@as(usize, @intCast(tapset1)) * 3 + 2];
+    const g00 = g0 * tables.era_celt_postfilter_taps[@as(usize, @intCast(tapset0)) * 3 + 0];
+    const g01 = g0 * tables.era_celt_postfilter_taps[@as(usize, @intCast(tapset0)) * 3 + 1];
+    const g02 = g0 * tables.era_celt_postfilter_taps[@as(usize, @intCast(tapset0)) * 3 + 2];
+    const g10 = g1 * tables.era_celt_postfilter_taps[@as(usize, @intCast(tapset1)) * 3 + 0];
+    const g11 = g1 * tables.era_celt_postfilter_taps[@as(usize, @intCast(tapset1)) * 3 + 1];
+    const g12 = g1 * tables.era_celt_postfilter_taps[@as(usize, @intCast(tapset1)) * 3 + 2];
 
     const t1u: usize = @intCast(t1);
     const t0u: usize = @intCast(t0);
@@ -712,7 +712,7 @@ fn combFilter(buf: []f32, base: usize, t0_in: i32, t1_in: i32, n: usize, g0: f32
     if (g0 == g1 and t0 == t1 and tapset0 == tapset1) ov = 0;
     for (0..ov) |i| {
         // f = window[i]²（f32 运行时乘法，与 libopus MULT_COEF 一致）
-        const f = tables.ff_celt_window[i] * tables.ff_celt_window[i];
+        const f = tables.era_celt_window[i] * tables.era_celt_window[i];
         const x0 = buf[base + i + 2 - t1u];
         const d = buf[base + i];
         // MULT_COEF_32(MULT_COEF((1-f),g0*),x[...]) 顺序
@@ -911,7 +911,7 @@ for (0..@intCast(f.output_channels)) |i| {
         const dst_off = out_syn + j * f.blocksize;
         const shift: usize = if (f.transient) ct.CELT_MAX_LOG_BLOCKS else @as(usize, @intCast(ct.CELT_MAX_LOG_BLOCKS - f.size));
         const stride: usize = if (f.transient) f.blocks else 1;
-        kiss.cltMdctBackward(&f.mdct, block.coeffs[j .. frame_size], block.buf[dst_off .. dst_off + f.blocksize + CELT_OVERLAP], &tables.ff_celt_window, CELT_OVERLAP, shift, stride);
+        kiss.cltMdctBackward(&f.mdct, block.coeffs[j .. frame_size], block.buf[dst_off .. dst_off + f.blocksize + CELT_OVERLAP], &tables.era_celt_window, CELT_OVERLAP, shift, stride);
     }
 
     // 后滤波（作用于 out_syn）

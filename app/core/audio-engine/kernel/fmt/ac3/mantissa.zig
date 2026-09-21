@@ -16,10 +16,8 @@
 //!   decodeTransformCoeffs      — decode_transform_coeffs（561-590）：整帧逐声道驱动
 //!
 //! 与 C 的差异（务必知悉）：
-//!   - AVLFG 按任务契约简化为单状态 LCG state = 1664525*state + 1013904223（32 位），
-//!     每次调用返回新状态；FFmpeg 现行 64 槽拉格斐式 PRNG 不在本移植范围。
-//!   - Ctx 无 dith_state 字段（共享契约不可改），故抖动状态为模块级单例；
-//!     解码器实例使用前须调用 resetDith()。
+//!   - 抖动 PRNG 状态现放在 Ctx.jitter（每解码器实例一份），对照 FFmpeg 现行
+//!     libavutil/lfg.h：64 状态加性 LFG，open/seek 时以 seed=0 初始化。
 //!   - C 的 get_bits 越界静默返回 0；本实现 BitReader 越界抛 error.Corrupt，
 //!     函数以 bool 表示错误（false=成功，true=位流损坏），与 coupling.zig 一致。
 //!   - C 中 bap>15 时打印错误并钳位为 15，此处直接钳位（无日志）。
@@ -31,8 +29,8 @@
 //!   相位标志仅对 ch==2 所在带取反。
 
 const t = @import("tables.zig");
-const md5impl = @import("md5.zig");
 const Ctx = @import("ctx.zig").Ctx;
+const JitterRng = @import("ctx.zig").JitterRng;
 const MantGroups = @import("ctx.zig").MantGroups;
 const BitReader = @import("../aac/bitreader.zig").BitReader;
 
@@ -44,48 +42,6 @@ pub const scale_factors = [25]f32{
     0x1p-15, 0x1p-16, 0x1p-17, 0x1p-18, 0x1p-19,
     0x1p-20, 0x1p-21, 0x1p-22, 0x1p-23, 0x1p-24,
 };
-
-/// 抖动 AVLFG（对照 FFmpeg libavutil/lfg.h AVLFG：64 状态加性 LFG）。
-pub const AvLfg = struct {
-    state: [64]u32 = [_]u32{0} ** 64,
-    index: u32 = 0,
-
-    pub fn init(self: *AvLfg, seed: u32) void {
-        var tmp: [16]u8 = [_]u8{0} ** 16;
-        var i: usize = 8;
-        while (i < 64) : (i += 4) {
-            std.mem.writeInt(u32, tmp[0..4], seed, .little);
-            tmp[4] = @intCast(i);
-            var md5: md5impl.Md5 = .init(.{});
-            md5.update(&tmp);
-            md5.final(&tmp);
-            self.state[i] = std.mem.readInt(u32, tmp[0..4], .little);
-            self.state[i + 1] = std.mem.readInt(u32, tmp[4..8], .little);
-            self.state[i + 2] = std.mem.readInt(u32, tmp[8..12], .little);
-            self.state[i + 3] = std.mem.readInt(u32, tmp[12..16], .little);
-        }
-        self.index = 0;
-    }
-
-    pub fn next(self: *AvLfg) u32 {
-        const v = self.state[@intCast(self.index & 63)] +% self.state[@intCast((self.index -% 24) & 63)] +% self.state[@intCast((self.index -% 55) & 63)];
-        self.state[@intCast(self.index & 63)] = v;
-        self.index +%= 1;
-        return v;
-    }
-};
-
-var dith: AvLfg = .{};
-
-/// 重置抖动状态（对应 C 中 av_lfg_init(&s->dith_state, 0)）。
-pub fn resetDith() void {
-    dith.init(0);
-}
-
-/// 取下一个 AVLFG 值（对应 C `av_lfg_get`）。
-pub fn nextDith() u32 {
-    return dith.next();
-}
 
 /// 反量化：mantissa * 2^-exponent（对照 C dequantize_coeff float 路径）。
 /// exponent 须在 0..24（C 直接查表，不做边界检查）。
@@ -155,10 +111,9 @@ pub fn ac3DecodeTransformCoeffsCh(s: *Ctx, ch_index: usize, m: *MantGroups) bool
         switch (bap) {
             0 => {
                 if (dither) {
-                    const r = dith.next();
+                    const r = s.jitter.next();
 
                     mantissa = @bitCast(@as(u32, ((r >> 8) *% 181) >> 8) -% 5931008);
-
                 } else {
                     mantissa = 0;
 
@@ -330,7 +285,7 @@ fn decodeTransformCoeffsAht(s: *Ctx, ch: usize) bool {
         const bits: u32 = t.eac3_bits_vs_hebap[hebap];
         if (hebap == 0) {
             for (0..6) |blk| {
-                s.pre_mantissa[ch][bin][blk] = @bitCast((nextDith() & 0x7FFFFF) -% 0x400000);
+                s.pre_mantissa[ch][bin][blk] = @bitCast((s.jitter.next() & 0x7FFFFF) -% 0x400000);
             }
         } else if (hebap < 8) {
             const v: usize = @intCast(gb.readBits(@intCast(bits)) catch return true);
@@ -443,10 +398,14 @@ test "dequantizeCoeff: mantissa=1000 exp=2 → 250.0" {
     try std.testing.expectEqual(@as(f32, 1.0), dequantizeCoeff(16777216, 24));
 }
 
-test "AvLfg: av_lfg_init(0) 前 5 步与 C 参考一致" {
-    var lcg: AvLfg = .{};
+test "JitterRng: 首 14 步抽取与参考序列一致" {
+    var lcg: JitterRng = .{};
     lcg.init(0);
-    const expected = [_]u32{ 3871727025, 2377540866, 3249482316, 1094828782, 1054253117 };
+    const expected = [_]u32{
+        3871727025, 2377540866, 3249482316, 1094828782, 1054253117,
+        298508994,  411131605,  76776409,   1018776758, 2310341264,
+        330524499,  777130914,  466047169,  2028893094,
+    };
     for (expected) |e| {
         try std.testing.expectEqual(e, lcg.next());
     }

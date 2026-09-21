@@ -245,6 +245,23 @@ fn readAt(r: *io.Reader, off: u64, buf: []u8) Error!usize {
     return r.read(buf);
 }
 
+/// 一次性读入 box 自 `skip` 字节起的剩余 payload（供表解析批量读取）。
+/// 动机：stsz/stco 等表若逐条目 `readAt`（每次 seek+read 一次 syscall），
+/// 万级样本会产生万级 syscall（实测 m4a open ≈4.5ms 全在此）。整块读一次即可。
+/// 返回调用方 alloca 的缓冲（须 free）；长度不足 → Corrupt。
+fn readBoxRest(r: *io.Reader, box: Box, allocator: Allocator, skip: u64) Error![]u8 {
+    const header = box.data - box.start;
+    if (box.size < header + skip) return error.Corrupt;
+    const len: usize = @intCast(box.size - header - skip);
+    const buf = try allocator.alloc(u8, len);
+    errdefer allocator.free(buf);
+    if (len > 0) {
+        const n = try readAt(r, box.data + skip, buf);
+        if (n != len) return error.Corrupt;
+    }
+    return buf;
+}
+
 fn readU32(r: *io.Reader, off: u64) Error!u32 {
     var b: [4]u8 = undefined;
     const n = try readAt(r, off, &b);
@@ -556,21 +573,17 @@ fn parseStts(r: *io.Reader, box: Box, allocator: Allocator, total: *u64) Error![
     if (count > (box.size - 8) / 8) return error.Corrupt; // 条目数越界（§13.3）
     const runs = try allocator.alloc(SttsRun, count);
     errdefer allocator.free(runs);
-    const end = box.data + box.size;
-    var off = box.data + 8;
+    const raw = try readBoxRest(r, box, allocator, 8);
+    defer allocator.free(raw);
+    if (raw.len < @as(usize, count) * 8) return error.Corrupt;
     var sum: u64 = 0;
     for (0..count) |i| {
-        if (off + 8 > end) return error.Corrupt;
-        var e: [8]u8 = undefined;
-        const m = try readAt(r, off, &e);
-        if (m != 8) return error.Corrupt;
         runs[i] = .{
-            .count = std.mem.readInt(u32, e[0..4], .big),
-            .delta = std.mem.readInt(u32, e[4..8], .big),
+            .count = std.mem.readInt(u32, raw[i * 8 ..][0..4], .big),
+            .delta = std.mem.readInt(u32, raw[i * 8 + 4 ..][0..4], .big),
         };
         sum += @as(u64, runs[i].count) * runs[i].delta;
         if (sum > (1 << 62)) return error.Corrupt;
-        off += 8;
     }
     total.* = sum;
     return runs;
@@ -585,21 +598,17 @@ fn parseStsc(r: *io.Reader, box: Box, allocator: Allocator) Error![]StscRun {
     if (count > (box.size - 8) / 12) return error.Corrupt;
     const runs = try allocator.alloc(StscRun, count);
     errdefer allocator.free(runs);
-    const end = box.data + box.size;
-    var off = box.data + 8;
+    const raw = try readBoxRest(r, box, allocator, 8);
+    defer allocator.free(raw);
+    if (raw.len < @as(usize, count) * 12) return error.Corrupt;
     var prev_first: u32 = 0;
     for (0..count) |i| {
-        if (off + 12 > end) return error.Corrupt;
-        var e: [12]u8 = undefined;
-        const m = try readAt(r, off, &e);
-        if (m != 12) return error.Corrupt;
         runs[i] = .{
-            .first_chunk = std.mem.readInt(u32, e[0..4], .big),
-            .samples_per_chunk = std.mem.readInt(u32, e[4..8], .big),
+            .first_chunk = std.mem.readInt(u32, raw[i * 12 ..][0..4], .big),
+            .samples_per_chunk = std.mem.readInt(u32, raw[i * 12 + 4 ..][0..4], .big),
         };
         if (runs[i].first_chunk < prev_first) return error.Corrupt; // 非升序
         prev_first = runs[i].first_chunk;
-        off += 12;
     }
     return runs;
 }
@@ -615,22 +624,14 @@ fn parseChunkOffsets(r: *io.Reader, box: Box, allocator: Allocator) Error![]u64 
     if (count > (box.size - 8) / stride) return error.Corrupt;
     const offs = try allocator.alloc(u64, count);
     errdefer allocator.free(offs);
-    const end = box.data + box.size;
-    var off = box.data + 8;
+    const raw = try readBoxRest(r, box, allocator, 8);
+    defer allocator.free(raw);
+    if (raw.len < @as(usize, count) * @as(usize, stride)) return error.Corrupt;
     for (0..count) |i| {
-        if (off + stride > end) return error.Corrupt;
         if (is64) {
-            var e: [8]u8 = undefined;
-            const m = try readAt(r, off, &e);
-            if (m != 8) return error.Corrupt;
-            offs[i] = std.mem.readInt(u64, &e, .big);
-            off += 8;
+            offs[i] = std.mem.readInt(u64, raw[i * 8 ..][0..8], .big);
         } else {
-            var e: [4]u8 = undefined;
-            const m = try readAt(r, off, &e);
-            if (m != 4) return error.Corrupt;
-            offs[i] = std.mem.readInt(u32, &e, .big);
-            off += 4;
+            offs[i] = std.mem.readInt(u32, raw[i * 4 ..][0..4], .big);
         }
     }
     return offs;
@@ -651,15 +652,11 @@ fn parseStsz(r: *io.Reader, box: Box, allocator: Allocator) Error!Stsz {
     if (sample_count > (box.size - 12) / 4) return error.Corrupt;
     const sizes = try allocator.alloc(u32, sample_count);
     errdefer allocator.free(sizes);
-    const end = box.data + box.size;
-    var off = box.data + 12;
+    const raw = try readBoxRest(r, box, allocator, 12);
+    defer allocator.free(raw);
+    if (raw.len < @as(usize, sample_count) * 4) return error.Corrupt;
     for (0..sample_count) |i| {
-        if (off + 4 > end) return error.Corrupt;
-        var e: [4]u8 = undefined;
-        const m = try readAt(r, off, &e);
-        if (m != 4) return error.Corrupt;
-        sizes[i] = std.mem.readInt(u32, &e, .big);
-        off += 4;
+        sizes[i] = std.mem.readInt(u32, raw[i * 4 ..][0..4], .big);
     }
     return .{ .sample_count = sample_count, .uniform_size = 0, .sizes = sizes };
 }

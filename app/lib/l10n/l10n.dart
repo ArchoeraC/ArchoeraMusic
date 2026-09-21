@@ -55,6 +55,8 @@ String l10nQualityLabel(AppLocalizations l10n, String quality) {
 /// 本地化播放模式标签。
 String l10nRepeatModeLabel(AppLocalizations l10n, String mode) {
   switch (mode) {
+    case 'off':
+      return l10n.repeatModeOff;
     case 'list':
       return l10n.repeatModeList;
     case 'one':

@@ -45,10 +45,10 @@ pub const SideInfoIndices = struct {
 
 /// silk_decoder_control：预测与编码参数
 pub const DecoderControl = struct {
-    pitch_l: [MAX_NB_SUBFR]i32 = undefined,
-    gains_q16: [MAX_NB_SUBFR]i32 = undefined,
-    pred_coef_q12: [2][MAX_LPC_ORDER]i16 = undefined,
-    ltp_coef_q14: [LTP_ORDER * MAX_NB_SUBFR]i16 = undefined,
+    pitch_l: [MAX_NB_SUBFR]i32 = std.mem.zeroes([MAX_NB_SUBFR]i32),
+    gains_q16: [MAX_NB_SUBFR]i32 = std.mem.zeroes([MAX_NB_SUBFR]i32),
+    pred_coef_q12: [2][MAX_LPC_ORDER]i16 = std.mem.zeroes([2][MAX_LPC_ORDER]i16),
+    ltp_coef_q14: [LTP_ORDER * MAX_NB_SUBFR]i16 = std.mem.zeroes([LTP_ORDER * MAX_NB_SUBFR]i16),
     ltp_scale_q14: i32 = 0,
 };
 
@@ -78,7 +78,7 @@ pub const DecoderState = struct {
     vad_flags: [MAX_FRAMES_PER_PACKET]i32 = undefined,
     lbrr_flag: i32 = 0,
     lbrr_flags: [MAX_FRAMES_PER_PACKET]i32 = undefined,
-    ps_nlsf_cb: *const st.NlsfCb = undefined,
+    ps_nlsf_cb: ?*const st.NlsfCb = null,
     indices: SideInfoIndices = .{},
     loss_cnt: i32 = 0,
     prev_signal_type: i32 = 0,
@@ -194,7 +194,7 @@ pub fn decodeIndices(psDec: *DecoderState, rc: *rcmod.Rc, frame_index: i32, deco
     // NLSF 索引
     var ec_ix: [MAX_LPC_ORDER]i16 = undefined;
     var pred_q8: [MAX_LPC_ORDER]u8 = undefined;
-    const cb = psDec.ps_nlsf_cb;
+    const cb = psDec.ps_nlsf_cb.?;
     psDec.indices.nlsf_indices[0] = @intCast(rc.decIcdf(cb.cb1_icdf[@as(usize, @intCast(RSHIFT(@as(i32, psDec.indices.signal_type), 1))) * @as(usize, @intCast(cb.n_vectors)) ..], 8));
     nlsfUnpack(&ec_ix, &pred_q8, cb, psDec.indices.nlsf_indices[0]);
     i = 0;
@@ -418,7 +418,7 @@ pub fn decodeParameters(psDec: *DecoderState, ctrl: *DecoderControl, cond_coding
     gainsDequant(&ctrl.gains_q16, &psDec.indices.gains_indices, &psDec.last_gain_index, cond_coding == CODE_CONDITIONALLY, psDec.nb_subfr);
 
     // NLSF 解码
-    nlsfDecode(&p_nlsf_q15, &psDec.indices.nlsf_indices, psDec.ps_nlsf_cb);
+    nlsfDecode(&p_nlsf_q15, &psDec.indices.nlsf_indices, psDec.ps_nlsf_cb.?);
     nlsf2a(ctrl.pred_coef_q12[1][0..], &p_nlsf_q15, psDec.lpc_order);
 
     if (psDec.first_frame_after_reset == 1) {
@@ -1713,6 +1713,10 @@ pub fn decoderSetFs(psDec: *DecoderState, fs_khz: i32, fs_api_hz: i32) i32 {
             psDec.lag_prev = 100;
             psDec.last_gain_index = 10;
             psDec.prev_signal_type = TYPE_NO_VOICE_ACTIVITY;
+            // libopus silk_reset_decoder：重置历史状态（避免读到未初始化内存 →
+            // 同文件两次解码结果不同）。prev_nlsf_q15 供首帧 NLSF 插值的起点。
+            @memset(&psDec.prev_nlsf_q15, 0);
+            psDec.prev_gain_q16 = @as(i32, 1) << 16;
             @memset(&psDec.out_buf, 0);
             @memset(&psDec.s_lpc_q14_buf, 0);
         }

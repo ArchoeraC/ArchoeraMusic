@@ -13,12 +13,12 @@
 //! 消费；entry_offset（符号偏移）在 lbr.zig 中应用。
 
 /// dcadata.c:8732
-pub const ff_dca_avg_g3_freqs = [3]u16{
+pub const era_dca_avg_g3_freqs = [3]u16{
     16000, 18000, 24000,
 };
 
 /// dcadata.c:8734
-pub const ff_dca_fst_amp = [44]u16{
+pub const era_dca_fst_amp = [44]u16{
     0, 1, 2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 28, 36,
     44, 52, 60, 76, 92, 108, 124, 156, 188, 220, 252, 316, 380, 444,
     508, 636, 764, 892, 1020, 1276, 1532, 1788, 2044, 2556, 3068, 3580, 4092, 5116,
@@ -26,43 +26,43 @@ pub const ff_dca_fst_amp = [44]u16{
 };
 
 /// dcadata.c:8748
-pub const ff_dca_freq_to_sb = [32]u8{
+pub const era_dca_freq_to_sb = [32]u8{
     0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4,
     4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
     5, 5, 5, 5,
 };
 
 /// dcadata.c:8753
-pub const ff_dca_ph0_shift = [8]i8{
+pub const era_dca_ph0_shift = [8]i8{
     -32, 96, -96, 32, 96, -32, 32, -96,
 };
 
 /// dcadata.c:8757
-pub const ff_dca_grid_1_to_scf = [11]u8{
+pub const era_dca_grid_1_to_scf = [11]u8{
     0, 1, 2, 3, 4, 6, 7, 10, 14, 19, 26,
 };
 
 /// dcadata.c:8761
-pub const ff_dca_grid_2_to_scf = [3]u8{
+pub const era_dca_grid_2_to_scf = [3]u8{
     4, 10, 18,
 };
 
 /// dcadata.c:8765
-pub const ff_dca_scf_to_grid_1 = [32]u8{
+pub const era_dca_scf_to_grid_1 = [32]u8{
     0, 1, 2, 3, 4, 4, 5, 5, 5, 6, 6, 6, 6, 7,
     7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9,
     9, 9, 9, 10,
 };
 
 /// dcadata.c:8770
-pub const ff_dca_scf_to_grid_2 = [32]u8{
+pub const era_dca_scf_to_grid_2 = [32]u8{
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
     1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
     2, 2, 2, 2,
 };
 
 /// dcadata.c:8775
-pub const ff_dca_grid_1_weights = [12][32]u8{
+pub const era_dca_grid_1_weights = [12][32]u8{
     .{ 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     .{ 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     .{ 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -78,7 +78,7 @@ pub const ff_dca_grid_1_weights = [12][32]u8{
 };
 
 /// dcadata.c:8836
-pub const ff_dca_sb_reorder = [8][8]u8{
+pub const era_dca_sb_reorder = [8][8]u8{
     .{ 0, 1, 2, 3, 4, 5, 6, 7 },
     .{ 1, 0, 2, 3, 4, 5, 6, 7 },
     .{ 3, 1, 0, 2, 4, 5, 6, 7 },
@@ -90,19 +90,19 @@ pub const ff_dca_sb_reorder = [8][8]u8{
 };
 
 /// dcadata.c:8847
-pub const ff_dca_lfe_delta_index_16 = [8]i8{
+pub const era_dca_lfe_delta_index_16 = [8]i8{
     -4, -3, -2, -1, 2, 4, 6, 8,
 };
 
 /// dcadata.c:8851
-pub const ff_dca_lfe_delta_index_24 = [32]i8{
+pub const era_dca_lfe_delta_index_24 = [32]i8{
     -8, -8, -7, -7, -6, -6, -5, -5, -4, -4, -3, -3, -2, -2,
     -1, -1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
     7, 7, 8, 8,
 };
 
 /// dcadata.c:8856
-pub const ff_dca_rsd_pack_5_in_8 = [256]u16{
+pub const era_dca_rsd_pack_5_in_8 = [256]u16{
     0x0000, 0x0100, 0x0200, 0x0040, 0x0140, 0x0240, 0x0080, 0x0180, 0x0280, 0x0010, 0x0110, 0x0210, 0x0050, 0x0150,
     0x0250, 0x0090, 0x0190, 0x0290, 0x0020, 0x0120, 0x0220, 0x0060, 0x0160, 0x0260, 0x00a0, 0x01a0, 0x02a0, 0x0004,
     0x0104, 0x0204, 0x0044, 0x0144, 0x0244, 0x0084, 0x0184, 0x0284, 0x0014, 0x0114, 0x0214, 0x0054, 0x0154, 0x0254,
@@ -125,7 +125,7 @@ pub const ff_dca_rsd_pack_5_in_8 = [256]u16{
 };
 
 /// dcadata.c:8891
-pub const ff_dca_rsd_pack_3_in_7 = [128][3]u8{
+pub const era_dca_rsd_pack_3_in_7 = [128][3]u8{
     .{ 0, 0, 0 },
     .{ 0, 0, 1 },
     .{ 0, 0, 2 },
@@ -257,40 +257,40 @@ pub const ff_dca_rsd_pack_3_in_7 = [128][3]u8{
 };
 
 /// dca.c:41
-pub const ff_dca_freq_ranges = [16]u8{
+pub const era_dca_freq_ranges = [16]u8{
     0, 1, 2, 3, 4, 1, 2, 3, 4, 4, 0, 1, 2, 3, 4, 4,
 };
 
 /// dcadata.c:8926
-pub const ff_dca_rsd_level_2a = [2]f32{
+pub const era_dca_rsd_level_2a = [2]f32{
     -0.47, 0.47,
 };
 
 /// dcadata.c:8930
-pub const ff_dca_rsd_level_2b = [2]f32{
+pub const era_dca_rsd_level_2b = [2]f32{
     -0.645, 0.645,
 };
 
 /// dcadata.c:8934
-pub const ff_dca_rsd_level_3 = [3]f32{
+pub const era_dca_rsd_level_3 = [3]f32{
     -0.645, 0.0, 0.645,
 };
 
 /// dcadata.c:8938
-pub const ff_dca_rsd_level_5 = [5]f32{
+pub const era_dca_rsd_level_5 = [5]f32{
     -0.875, -0.375, 0.0,
     0.375, 0.875,
 };
 
 /// dcadata.c:8942
-pub const ff_dca_rsd_level_8 = [8]f32{
+pub const era_dca_rsd_level_8 = [8]f32{
     -1.0, -0.625, -0.291666667,
     0.0, 0.25, 0.5,
     0.75, 1.0,
 };
 
 /// dcadata.c:8946
-pub const ff_dca_rsd_level_16 = [16]f32{
+pub const era_dca_rsd_level_16 = [16]f32{
     -1.3125, -1.1375, -0.9625,
     -0.7875, -0.6125, -0.4375,
     -0.2625, -0.0875, 0.0875,
@@ -300,7 +300,7 @@ pub const ff_dca_rsd_level_16 = [16]f32{
 };
 
 /// dcadata.c:8953
-pub const ff_dca_synth_env = [32]f32{
+pub const era_dca_synth_env = [32]f32{
     0.00240763666390, 0.00960735979838, 0.02152983213390,
     0.03806023374436, 0.05903936782582, 0.08426519384873,
     0.11349477331863, 0.14644660940673, 0.18280335791818,
@@ -315,7 +315,7 @@ pub const ff_dca_synth_env = [32]f32{
 };
 
 /// dcadata.c:8964
-pub const ff_dca_corr_cf = [32][11]f32{
+pub const era_dca_corr_cf = [32][11]f32{
     .{ -0.01179, 0.04281, 0.46712, 0.46345, -3.94525, 3.94525, -0.46345, -0.46712, -0.04281, 0.01179, -0.00299 },
     .{ -0.00929, 0.04882, 0.45252, 0.37972, -3.85446, 4.03189, -0.55069, -0.48040, -0.03599, 0.01445, -0.00229 },
     .{ -0.00696, 0.05403, 0.43674, 0.29961, -3.75975, 4.11413, -0.64135, -0.49221, -0.02834, 0.01726, -0.00156 },
@@ -351,7 +351,7 @@ pub const ff_dca_corr_cf = [32][11]f32{
 };
 
 /// dcadata.c:9031
-pub const ff_dca_quant_amp = [57]f32{
+pub const era_dca_quant_amp = [57]f32{
     4.88281250E-04, 1.46484375E-03, 2.32267031E-03,
     3.28475167E-03, 4.64534014E-03, 6.56950334E-03,
     9.29068029E-03, 1.31390067E-02, 1.85813606E-02,
@@ -374,7 +374,7 @@ pub const ff_dca_quant_amp = [57]f32{
 };
 
 /// dcadata.c:9049
-pub const ff_dca_st_coeff = [34]f32{
+pub const era_dca_st_coeff = [34]f32{
     2.69086857E+01, 2.69086857E+01, 1.34543419E+01,
     6.72717142E+00, 3.36358571E+00, 1.68179286E+00,
     8.40896428E-01, 5.94603479E-01, 4.20448214E-01,
@@ -390,7 +390,7 @@ pub const ff_dca_st_coeff = [34]f32{
 };
 
 /// dcadata.c:9061
-pub const ff_dca_long_window = [128]f32{
+pub const era_dca_long_window = [128]f32{
     0.00000000E+00, 7.42882412E-06, 5.28020973E-05,
     1.71007006E-04, 3.96653224E-04, 7.63946096E-04,
     1.30655791E-03, 2.05750111E-03, 3.04900459E-03,
@@ -437,7 +437,7 @@ pub const ff_dca_long_window = [128]f32{
 };
 
 /// dcadata.c:9096
-pub const ff_dca_lfe_step_size_16 = [101]f32{
+pub const era_dca_lfe_step_size_16 = [101]f32{
     2.1362956633198035E-004, 2.4414807580797754E-004, 2.7466658528397473E-004,
     2.7466658528397473E-004, 3.0518509475997192E-004, 3.3570360423596911E-004,
     3.9674062318796350E-004, 4.2725913266396069E-004, 4.5777764213995788E-004,
@@ -475,7 +475,7 @@ pub const ff_dca_lfe_step_size_16 = [101]f32{
 };
 
 /// dcadata.c:9133
-pub const ff_dca_lfe_step_size_24 = [144]f32{
+pub const era_dca_lfe_step_size_24 = [144]f32{
     3.5762791128491298E-006, 3.9339070241340428E-006, 4.4107442391805934E-006,
     4.7683721504655064E-006, 5.2452093655120570E-006, 5.8412558843202453E-006,
     6.4373024031284336E-006, 7.0333489219366219E-006, 7.7486047445064479E-006,
@@ -527,7 +527,7 @@ pub const ff_dca_lfe_step_size_24 = [144]f32{
 };
 
 /// dcadata.c:9184
-pub const ff_dca_bank_coeff = [10]f32{
+pub const era_dca_bank_coeff = [10]f32{
     0.022810893, 0.41799772, 0.90844810,
     0.99973983, 0.068974845, 0.34675997,
     0.29396889, 0.19642374, 0.308658270,
@@ -535,7 +535,7 @@ pub const ff_dca_bank_coeff = [10]f32{
 };
 
 /// dcadata.c:9190
-pub const ff_dca_lfe_iir = [5][4]f32{
+pub const era_dca_lfe_iir = [5][4]f32{
     .{ -0.98618466, 1.9861259, 1.0, -1.9840510 },
     .{ -0.98883152, 1.9887193, 1.0, -1.9979848 },
     .{ -0.99252087, 1.9923381, 1.0, -1.9990897 },

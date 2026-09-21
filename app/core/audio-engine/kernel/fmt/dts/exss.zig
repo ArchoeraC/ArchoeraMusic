@@ -144,7 +144,7 @@ fn parseDescriptor(
             try skipBits(br, tsize * 8);
         }
         a.pcm_bit_res = @intCast((try rb(br, 5)) + 1);
-        a.max_sample_rate = dt.ff_dca_sampling_freqs[@intCast(try rb(br, 4))];
+        a.max_sample_rate = dt.era_dca_sampling_freqs[@intCast(try rb(br, 4))];
         a.nchannels_total = @intCast((try rb(br, 8)) + 1);
         a.one_to_one_map_ch_to_spkr = (try rb1(br)) != 0;
         if (a.one_to_one_map_ch_to_spkr) {

@@ -7,6 +7,7 @@ import 'dart:io';
 
 import '../netease/track.dart';
 import '../../stores/data_dir.dart';
+import 'playback_state.dart';
 
 /// 播放会话快照（仅记录关闭前的最后一次：队列 + 当前曲 + 位置 + 播放模式）。
 ///
@@ -37,7 +38,7 @@ class PlaybackSnapshot {
   /// 上次播放位置（毫秒，恢复续播用）。
   final int positionMs;
 
-  /// 播放模式（'list' / 'one'）。
+  /// 播放模式（'off' 顺序 / 'list' 列表循环 / 'one' 单曲循环）。
   final String repeatMode;
 
   /// 随机播放开关。
@@ -117,7 +118,7 @@ class PlaybackSnapshot {
           const [],
       queueIndex: (json['queueIndex'] as num?)?.toInt() ?? -1,
       positionMs: (json['positionMs'] as num?)?.toInt() ?? 0,
-      repeatMode: json['repeatMode']?.toString() ?? 'list',
+      repeatMode: _sanitizeRepeatMode(json['repeatMode']?.toString()),
       shuffle: json['shuffle'] == true,
       quality: json['quality']?.toString() ?? 'hq',
       playing: json['playing'] == true,
@@ -139,6 +140,10 @@ class PlaybackSnapshot {
     return track;
   }
 }
+
+/// 校验快照里的播放模式：非法/缺失回落 `'list'`（避免旧快照里的未知值）。
+String _sanitizeRepeatMode(String? raw) =>
+    repeatModeCycle.contains(raw) ? raw! : 'list';
 
 /// 播放会话快照持久化（JSON 文件 `last_session.json`，覆盖式写入）。
 class PlaybackSessionStore {

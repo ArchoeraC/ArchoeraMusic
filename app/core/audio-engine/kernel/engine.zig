@@ -19,6 +19,7 @@
 const std = @import("std");
 const err = @import("error.zig");
 const decoder = @import("decoder.zig");
+const kernel_io = @import("io.zig");
 const convert = @import("pcm/convert.zig");
 
 const Allocator = std.mem.Allocator;
@@ -82,7 +83,49 @@ pub const Engine = struct {
     info: decoder.Info,
     /// 原生 → float32 转换的中间缓冲（按需增长，生命周期与 Engine 一致）
     raw: []u8,
+    /// 回调流形态的 peek 缓冲（非回调打开时为空；close 时释放）
+    cb_buffer: []u8 = &.{},
+    /// 回调流形态的 C 回调适配器（非回调打开时为 null；close 时释放）
+    cb_adapter: ?*CbAdapter = null,
 };
+
+/// C ABI 回调函数指针（与 `include/kernel_bridge.h` 的 zk_read_cb / zk_seek_cb 对齐）
+pub const CReadFn = *const fn (ctx: ?*anyopaque, buf: [*]u8, len: usize) callconv(.c) usize;
+pub const CSeekFn = *const fn (ctx: ?*anyopaque, off: i64, whence: c_int, buffered: usize) callconv(.c) c_int;
+
+/// 把 C 回调桥接到 `io.Reader` 的 Zig 回调签名（ctx 即本适配器）。
+pub const CbAdapter = struct {
+    ctx: ?*anyopaque,
+    c_read: CReadFn,
+    c_seek: CSeekFn,
+
+    fn readZ(a: *anyopaque, buf: []u8) usize {
+        const self: *CbAdapter = @ptrCast(@alignCast(a));
+        if (buf.len == 0) return 0;
+        return self.c_read(self.ctx, buf.ptr, buf.len);
+    }
+
+    fn seekZ(a: *anyopaque, off: i64, whence: i32, buffered: usize) bool {
+        const self: *CbAdapter = @ptrCast(@alignCast(a));
+        return self.c_seek(self.ctx, off, @intCast(whence), buffered) != 0;
+    }
+};
+
+/// 由 C 回调适配器构造 `io.Reader.Callback`（供池/直连会话共用）。
+pub fn cReaderCallback(adapter: *CbAdapter, size_hint: u64) kernel_io.Reader.Callback {
+    return .{
+        .ctx = @ptrCast(adapter),
+        .on_read = CbAdapter.readZ,
+        .on_seek = CbAdapter.seekZ,
+        .size_hint = size_hint,
+    };
+}
+
+/// 释放 C 回调适配器（作为 session 回调 owner 的析构）。
+pub fn cAdapterDestroy(ctx: *anyopaque, allocator: std.mem.Allocator) void {
+    const a: *CbAdapter = @ptrCast(@alignCast(ctx));
+    allocator.destroy(a);
+}
 
 /// errbuf 布局（kernel_bridge.h 契约）：
 ///   errbuf[0..4]  — LE c_int 稳定状态码（err.Status）
@@ -152,6 +195,81 @@ pub fn zkOpenMem(data: [*]const u8, len: usize, info: *ZkInfo, errbuf: [*]u8, er
         .dec = dec,
         .info = zinfo,
         .raw = &.{},
+    };
+    info.* = .{
+        .sample_rate = @intCast(zinfo.sample_rate),
+        .channels = @intCast(zinfo.channels),
+        .bits_per_sample = @intCast(zinfo.bits_per_sample),
+        .duration_us = zinfo.duration_us,
+        .duration_known = switch (zinfo.duration_known) {
+            .exact => 0,
+            .estimate => 1,
+            .unknown => 2,
+        },
+        .codec_name = zinfo.codec_name.ptr,
+        .format_name = zinfo.format_name.ptr,
+        .title = metaPtr(zinfo.metadata.title),
+        .artist = metaPtr(zinfo.metadata.artist),
+        .album = metaPtr(zinfo.metadata.album),
+        .date = metaPtr(zinfo.metadata.date),
+        .genre = metaPtr(zinfo.metadata.genre),
+        .comment = metaPtr(zinfo.metadata.comment),
+    };
+    return eng;
+}
+
+/// 从 **C 回调流**打开解码器（在线流式源；宿主注入 read/seek，内核保持零网络栈）。
+/// `ctx` / `on_read` / `on_seek` 生命周期归调用方（C 壳）——内核仅消费，close 时
+/// 只释放 peek 缓冲与适配器，**不触碰** ctx（宿主自行关闭其传输，如 AVIO）。
+/// `size_hint` = 已知总字节（0=未知，seek end 不可用）。契约同 [zkOpen]。
+pub fn zkOpenCallback(
+    ctx: ?*anyopaque,
+    on_read: CReadFn,
+    on_seek: CSeekFn,
+    size_hint: u64,
+    info: *ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: c_int,
+) ?*Engine {
+    const gpa = std.heap.c_allocator;
+    const adapter = gpa.create(CbAdapter) catch {
+        fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
+        return null;
+    };
+    adapter.* = .{ .ctx = ctx, .c_read = on_read, .c_seek = on_seek };
+    const buf = gpa.alloc(u8, kernel_io.peek_buffer_size) catch {
+        gpa.destroy(adapter);
+        fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
+        return null;
+    };
+    var reader = kernel_io.Reader.openCallback(.{
+        .ctx = @ptrCast(adapter),
+        .on_read = CbAdapter.readZ,
+        .on_seek = CbAdapter.seekZ,
+        .size_hint = size_hint,
+    }, buf);
+
+    var zinfo: decoder.Info = undefined;
+    var dec = decoder.openReader(gpa, &reader, &zinfo) catch |e| {
+        gpa.free(buf);
+        gpa.destroy(adapter);
+        fillErrBuf(errbuf, errbuf_size, e);
+        return null;
+    };
+    const eng = gpa.create(Engine) catch {
+        dec.deinit();
+        gpa.free(buf);
+        gpa.destroy(adapter);
+        fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
+        return null;
+    };
+    eng.* = .{
+        .allocator = gpa,
+        .dec = dec,
+        .info = zinfo,
+        .raw = &.{},
+        .cb_buffer = buf,
+        .cb_adapter = adapter,
     };
     info.* = .{
         .sample_rate = @intCast(zinfo.sample_rate),
@@ -247,11 +365,13 @@ pub fn zkPositionMs(d: *Engine) i64 {
     return d.dec.positionMs();
 }
 
-/// 释放会话全部资源（含 decoder 与 raw 缓冲）
+/// 释放会话全部资源（含 decoder、raw 缓冲与回调适配器）
 pub fn zkClose(d: *Engine) void {
     const gpa = d.allocator;
     if (d.raw.len > 0) gpa.free(d.raw);
     d.dec.deinit();
+    if (d.cb_buffer.len > 0) gpa.free(d.cb_buffer);
+    if (d.cb_adapter) |a| gpa.destroy(a);
     gpa.destroy(d);
 }
 
@@ -299,8 +419,9 @@ pub fn fillErrBuf(buf: [*]u8, buf_size: c_int, e: anyerror) void {
 
 const testing = std.testing;
 
-/// 在 tmpDir 写一个 16-bit 单声道 WAV 文件，返回 NUL 终止的绝对路径（黄金样本）
-fn writeTestWav(tmp: *testing.TmpDir, io: std.Io, name: []const u8) ![:0]u8 {
+/// 在 tmpDir 写一个 16-bit 单声道 WAV 文件，返回 NUL 终止的绝对路径（黄金样本）。
+/// `pub` 供 kernel.zig 的 zk_* FFI 测试复用（单一测试样本来源）。
+pub fn writeTestWav(tmp: *testing.TmpDir, io: std.Io, name: []const u8) ![:0]u8 {
     // 黄金样本：i16 序列 0..7（8 帧，8000Hz）
     var samples: [16]u8 = undefined;
     for (0..8) |i| {
@@ -422,6 +543,75 @@ test "zk: read 输出 float32 交错" {
     }
     // EOF
     try testing.expectEqual(@as(isize, 0), zkRead(eng, &out, 8, &ch));
+}
+
+test "zk: openCallback（宿主回调流）read/seek 与文件路径一致" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io_inst = std.Io.Threaded.global_single_threaded.io();
+    const full = try writeTestWav(&tmp, io_inst, "t.wav");
+    defer testing.allocator.free(full);
+
+    // 读回文件字节作为回调流的内容（模拟宿主注入的传输）
+    const f = try std.Io.Dir.openFile(.cwd(), io_inst, full, .{});
+    const len = try std.Io.File.length(f, io_inst);
+    const data = try testing.allocator.alloc(u8, len);
+    defer testing.allocator.free(data);
+    _ = try std.Io.File.readPositionalAll(f, io_inst, data, 0);
+    std.Io.File.close(f, io_inst);
+
+    const Ctx = struct {
+        data: []const u8,
+        pos: usize = 0,
+
+        fn read(ctx: ?*anyopaque, buf: [*]u8, n: usize) callconv(.c) usize {
+            const self: *@This() = @ptrCast(@alignCast(ctx.?));
+            if (self.pos >= self.data.len) return 0;
+            const avail = @min(n, self.data.len - self.pos);
+            @memcpy(buf[0..avail], self.data[self.pos .. self.pos + avail]);
+            self.pos += avail;
+            return avail;
+        }
+
+        fn seek(ctx: ?*anyopaque, off: i64, whence: c_int, buffered: usize) callconv(.c) c_int {
+            const self: *@This() = @ptrCast(@alignCast(ctx.?));
+            const base: i64 = switch (whence) {
+                0 => 0,
+                1 => @as(i64, @intCast(self.pos)) - @as(i64, @intCast(buffered)),
+                2 => @intCast(self.data.len),
+                else => return 0,
+            };
+            const np = base + off;
+            if (np < 0 or np > @as(i64, @intCast(self.data.len))) return 0;
+            self.pos = @intCast(np);
+            return 1;
+        }
+    };
+    var ctx = Ctx{ .data = data };
+    var info: ZkInfo = undefined;
+    var errbuf: [64]u8 = undefined;
+    const eng = zkOpenCallback(@ptrCast(&ctx), Ctx.read, Ctx.seek, data.len, &info, &errbuf, errbuf.len);
+    try testing.expect(eng != null);
+    defer zkClose(eng.?);
+
+    try testing.expectEqual(@as(c_int, 8000), info.sample_rate);
+    try testing.expectEqual(@as(c_int, 1), info.channels);
+    try testing.expectEqual(@as(c_int, 16), info.bits_per_sample);
+
+    var out: [16]f32 = undefined;
+    var ch: c_int = 0;
+    const frames = zkRead(eng.?, &out, 8, &ch);
+    try testing.expectEqual(@as(isize, 8), frames);
+    for (0..8) |i| {
+        try testing.expectApproxEqAbs(@as(f32, @floatFromInt(@as(i16, @intCast(i)))) / 32768.0, out[i], 1e-6);
+    }
+    // seek 回起点重读：验证回调 seek → pos 同步 → 数据一致
+    try testing.expectEqual(@as(c_int, 0), zkSeekMs(eng.?, 0));
+    const frames2 = zkRead(eng.?, &out, 8, &ch);
+    try testing.expectEqual(@as(isize, 8), frames2);
+    for (0..8) |i| {
+        try testing.expectApproxEqAbs(@as(f32, @floatFromInt(@as(i16, @intCast(i)))) / 32768.0, out[i], 1e-6);
+    }
 }
 
 test "zk: seek/position 往返" {

@@ -1983,7 +1983,7 @@ test "mka: ac3 接入（帧直拼）长度对齐 ffmpeg" {
         .ch = 1,
         .bits = 16,
         .bytes = 220500,
-        .md5 = "b338b989c1118f5de0befba2fb6b3098",
+        .md5 = "b130bf7b026f9a536be5d9079992d3f0",
     });
 }
 
@@ -1995,7 +1995,7 @@ test "mka: eac3 接入（帧直拼）长度对齐 ffmpeg" {
         .ch = 1,
         .bits = 16,
         .bytes = 220500,
-        .md5 = "fe5f2ef582f1b1242e85b2b8ba96c82b",
+        .md5 = "19e6697e1fee6cbd4fde71b6c0fe0a69",
     });
 }
 

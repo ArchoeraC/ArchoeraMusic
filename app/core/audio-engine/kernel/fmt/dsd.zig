@@ -69,7 +69,7 @@ fn bitReverse(b: u8) u8 {
     }
     return r;
 }
-const ff_reverse = blk: {
+const era_reverse = blk: {
     @setEvalBranchQuota(100000);
     var t: [256]u8 = undefined;
     for (0..256) |i| t[i] = bitReverse(@intCast(i));
@@ -98,7 +98,7 @@ const ctables_lsbf = blk: {
             const sign: f64 = if (((e >> (7 - m)) & 1) != 0) 1.0 else -1.0;
             for (0..CTABLES) |t2| acc[t2] += sign * htaps[t2 * 8 + m];
         }
-        for (0..CTABLES) |t2| t[CTABLES - 1 - t2][ff_reverse[e]] = acc[t2];
+        for (0..CTABLES) |t2| t[CTABLES - 1 - t2][era_reverse[e]] = acc[t2];
     }
     break :blk t;
 };
@@ -110,7 +110,7 @@ fn dsd2pcmTranslate(fifo: *[FIFOSIZE]u8, pos: *u8, lsbf: bool, src: []const u8, 
     for (src, 0..) |b, i_out| {
         fifo[p] = b;
         const rp = (p -% 6) & (FIFOSIZE - 1);
-        fifo[rp] = ff_reverse[fifo[rp]];
+        fifo[rp] = era_reverse[fifo[rp]];
         var sum: f64 = 0;
         for (0..CTABLES) |i| {
             const a = fifo[(p -% i) & (FIFOSIZE - 1)];

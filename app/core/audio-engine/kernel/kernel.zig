@@ -71,6 +71,28 @@ export fn zk_decoder_open_mem(
     return engine.zkOpenMem(data, len, info, errbuf, errbuf_size);
 }
 
+/// 从 C 回调流打开解码器（在线流式源；宿主注入 read/seek，内核零网络栈）。
+/// 契约同 [zk_decoder_open]；ctx 与回调生命周期归调用方，须覆盖解码会话。
+export fn zk_decoder_open_cb(
+    ctx: ?*anyopaque,
+    on_read: ?engine.CReadFn,
+    on_seek: ?engine.CSeekFn,
+    size_hint: c_ulonglong,
+    info: *engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: c_int,
+) ?*engine.Engine {
+    const read_fn = on_read orelse {
+        engine.fillErrBuf(errbuf, errbuf_size, error.OpenFailed);
+        return null;
+    };
+    const seek_fn = on_seek orelse {
+        engine.fillErrBuf(errbuf, errbuf_size, error.OpenFailed);
+        return null;
+    };
+    return engine.zkOpenCallback(ctx, read_fn, seek_fn, @intCast(size_hint), info, errbuf, errbuf_size);
+}
+
 /// 解码最多 max_frames 帧 float32 交错到 out。
 /// 返回 >=0 帧数（0 = EOF）；错误返回负值（-err.Status，见 include/kernel_bridge.h）。
 export fn zk_decoder_read(
@@ -116,49 +138,56 @@ const DecOnce = struct {
 
     fn run(t: *task.Task) void {
         const d: *DecOnce = @fieldParentPtr("task", t);
-        var zinfo: decoder.Info = undefined;
-        var dec = decoder.open(std.heap.c_allocator, d.path, &zinfo) catch |e| {
-            d.frames = -@as(isize, @intFromEnum(err.statusOf(e)));
-            return;
-        };
-        defer dec.deinit();
-
-        if (d.info_out) |zi| fillZkInfoMinimal(zi, zinfo);
-
-        const ch = zinfo.channels;
-        const bytes_per = @as(usize, zinfo.bits_per_sample) / 8;
-        d.ch = ch;
-        if (ch == 0 or bytes_per == 0) {
-            d.frames = -@as(isize, @intFromEnum(err.Status.corrupt));
-            return;
-        }
-        const frame_bytes: usize = @as(usize, ch) * bytes_per;
-        var raw: [65536]u8 = undefined;
-        var produced: usize = 0;
-        while (produced < d.cap_frames) {
-            const room_frames = raw.len / frame_bytes;
-            const chunk = @min(@min(room_frames, d.cap_frames - produced), @as(usize, 4096));
-            if (chunk == 0) break;
-            var c: u8 = 0;
-            const n = dec.read(raw[0 .. chunk * frame_bytes], chunk, &c) catch |e| {
-                d.frames = -@as(isize, @intFromEnum(err.statusOf(e)));
-                return;
-            };
-            if (n == 0) break;
-            const samples = n * @as(usize, c);
-            _ = convert.toFloat(
-                d.out[produced * @as(usize, ch) ..][0..samples],
-                raw[0 .. n * frame_bytes],
-                zinfo.bits_per_sample,
-                zinfo.is_float,
-                endianOfCodec(zinfo.codec_name),
-            );
-            produced += n;
-            if (n < chunk) break; // EOF
-        }
-        d.frames = @intCast(produced);
+        d.frames = decodeInto(d.path, d.out, d.cap_frames, d.info_out, &d.ch);
     }
 };
+
+/// 一次「open path → 解至多 cap_frames 帧 float32 交错到 out（含 info 最小字段）」的
+/// 公共体：`zk_engine_decode_once`（表面同步）与 `zk_submit_decode`（异步句柄）共用，
+/// 保证两路**返回语义/失败状态码单一来源**（§6.1 任务提交面与句柄）。
+/// 返回 >=0 实际帧数（0 = EOF）/ <0 = -（enum ZkStatus）；`ch_out` 输出实际声道数。
+fn decodeInto(
+    path: []const u8,
+    out: [*]f32,
+    cap_frames: usize,
+    info_out: ?*engine.ZkInfo,
+    ch_out: *u8,
+) isize {
+    var zinfo: decoder.Info = undefined;
+    var dec = decoder.open(std.heap.c_allocator, path, &zinfo) catch |e|
+        return -@as(isize, @intFromEnum(err.statusOf(e)));
+    defer dec.deinit();
+
+    if (info_out) |zi| fillZkInfoMinimal(zi, zinfo);
+
+    const ch = zinfo.channels;
+    const bytes_per = @as(usize, zinfo.bits_per_sample) / 8;
+    ch_out.* = ch;
+    if (ch == 0 or bytes_per == 0) return -@as(isize, @intFromEnum(err.Status.corrupt));
+    const frame_bytes: usize = @as(usize, ch) * bytes_per;
+    var raw: [65536]u8 = undefined;
+    var produced: usize = 0;
+    while (produced < cap_frames) {
+        const room_frames = raw.len / frame_bytes;
+        const chunk = @min(@min(room_frames, cap_frames - produced), @as(usize, 4096));
+        if (chunk == 0) break;
+        var c: u8 = 0;
+        const n = dec.read(raw[0 .. chunk * frame_bytes], chunk, &c) catch |e|
+            return -@as(isize, @intFromEnum(err.statusOf(e)));
+        if (n == 0) break;
+        const samples = n * @as(usize, c);
+        _ = convert.toFloat(
+            out[produced * @as(usize, ch) ..][0..samples],
+            raw[0 .. n * frame_bytes],
+            zinfo.bits_per_sample,
+            zinfo.is_float,
+            endianOfCodec(zinfo.codec_name),
+        );
+        produced += n;
+        if (n < chunk) break; // EOF
+    }
+    return @intCast(produced);
+}
 
 /// 由 codec_name（如 "pcm_s16be"）推断原生字节序（与 engine.endianOf 同语义）
 fn endianOfCodec(codec_name: []const u8) std.builtin.Endian {
@@ -256,6 +285,77 @@ export fn zk_engine_decode_once(
     out_channels.* = @intCast(holder.ch);
     std.heap.c_allocator.destroy(holder);
     return frames;
+}
+
+// ---------------------------------------------------------------------------
+// 结构化任务提交面（§6.1 任务提交面与句柄；加法式）
+//
+// zk_submit_decode 非阻塞提交（立即返回句柄）→ zk_task_wait 完工事件取结果 →
+// zk_task_free 释放。复用 khost.Host.submit（定容任务槽，满即拒 = InstanceLimit）
+// 与 task.Task 完工事件（无轮询）；解码体与 zk_engine_decode_once 共用 decodeInto，
+// 语义/失败状态码一致。句柄 = C 侧不透明 `ZkTask`。
+// ---------------------------------------------------------------------------
+
+/// 异步解码任务句柄载体（C 侧 `ZkTask`）。生命周期：
+/// `zk_submit_decode` 分配（c_allocator）→ `zk_task_wait`（可重复，幂等）→ `zk_task_free`。
+/// `path`/`out` 只存引用，调用方须保证其存活到 wait 返回（worker 异步读，见头契约）。
+const SubmitDecode = struct {
+    task: task.Task = .{ .run = run },
+    path: []const u8,
+    out: [*]f32,
+    cap_frames: usize,
+    info_out: ?*engine.ZkInfo = null,
+    frames: isize = 0,
+    ch: u8 = 0,
+
+    fn run(t: *task.Task) void {
+        const d: *SubmitDecode = @fieldParentPtr("task", t);
+        d.frames = decodeInto(d.path, d.out, d.cap_frames, d.info_out, &d.ch);
+    }
+};
+
+/// 提交一次池内异步解码任务（非阻塞；契约见 include/kernel_bridge.h）。
+/// 立即返回句柄；失败（h/path/out 为空 / max_frames==0 / 池停机 / 任务槽满 /
+/// OOM）返回 null。**不阻塞**：worker 完工事件由 `zk_task_wait` 收。
+export fn zk_submit_decode(
+    h: ?*khost.Host,
+    path: ?[*:0]const u8,
+    out: ?[*]f32,
+    max_frames: usize,
+    info: ?*engine.ZkInfo,
+) ?*SubmitDecode {
+    const host = h orelse return null;
+    const p = path orelse return null;
+    const o = out orelse return null;
+    if (max_frames == 0) return null; // 参数非法：零容量解码请求
+    const holder = std.heap.c_allocator.create(SubmitDecode) catch return null;
+    holder.* = .{
+        .path = std.mem.span(p),
+        .out = o,
+        .cap_frames = max_frames,
+        .info_out = info,
+    };
+    if (host.submit(&holder.task) == null) {
+        std.heap.c_allocator.destroy(holder);
+        return null; // 池停机 / 任务槽满（满即拒，docs/engine-master-pool-design.md §5.4）
+    }
+    return holder;
+}
+
+/// 等待任务完工（阻塞、无轮询）。返回 >=0 实际帧数（0=EOF）/ <0 = -（enum ZkStatus）。
+/// 完工事件保持置位 → 可重复调用（幂等）；t 为 NULL 返回 -（ZK_IO_ERROR）。
+export fn zk_task_wait(t: ?*SubmitDecode) c_longlong {
+    const d = t orelse return -@as(c_longlong, @intFromEnum(err.Status.io_error));
+    task.wait(&d.task);
+    return @intCast(d.frames);
+}
+
+/// 释放任务句柄（t 为 NULL 时空操作）。内部先 wait 收尾（幂等），未显式 wait 直接
+/// free 也不悬垂。**同一句柄只可 free 一次**（重复 free 属未定义行为，契约明确）。
+export fn zk_task_free(t: ?*SubmitDecode) void {
+    const d = t orelse return;
+    task.wait(&d.task);
+    std.heap.c_allocator.destroy(d);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,14 +495,79 @@ export fn zk_engine_open(
         host.streamClose();
         return null;
     };
+    return streamAdopt(host, sess, info, errbuf, errbuf_size);
+}
+
+/// 打开**内存源**流式会话（契约同 [zk_engine_open]）；`data` 所有权归调用方，
+/// 须覆盖会话生命周期。内存在池 worker 上经 `decoder.openMem` 解码。
+export fn zk_engine_open_mem(
+    h: ?*khost.Host,
+    data: [*]const u8,
+    len: usize,
+    info: ?*engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: usize,
+) ?*Stream {
+    const host = h orelse return null;
+    if (!host.streamOpen()) return null;
+    const sess = session.Session.createMem(std.heap.c_allocator, data[0..len]) catch {
+        host.streamClose();
+        return null;
+    };
+    return streamAdopt(host, sess, info, errbuf, errbuf_size);
+}
+
+/// 打开**宿主回调流**流式会话（契约同 [zk_engine_open]）。`ctx`/回调生命周期归
+/// 调用方；内核自持 peek 缓冲，close 时释放（不触碰 ctx）。
+export fn zk_engine_open_cb(
+    h: ?*khost.Host,
+    ctx: ?*anyopaque,
+    on_read: ?engine.CReadFn,
+    on_seek: ?engine.CSeekFn,
+    size_hint: c_ulonglong,
+    info: ?*engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: usize,
+) ?*Stream {
+    const host = h orelse return null;
+    const c = ctx orelse return null;
+    const rd = on_read orelse return null;
+    const sk = on_seek orelse return null;
+    if (!host.streamOpen()) return null;
+    const adapter = std.heap.c_allocator.create(engine.CbAdapter) catch {
+        host.streamClose();
+        return null;
+    };
+    adapter.* = .{ .ctx = c, .c_read = rd, .c_seek = sk };
+    const sess = session.Session.createCallback(
+        std.heap.c_allocator,
+        engine.cReaderCallback(adapter, @intCast(size_hint)),
+        .{ .ctx = @ptrCast(adapter), .destroy = engine.cAdapterDestroy },
+    ) catch {
+        std.heap.c_allocator.destroy(adapter);
+        host.streamClose();
+        return null;
+    };
+    return streamAdopt(host, sess, info, errbuf, errbuf_size);
+}
+
+/// 会话建成后的公共收尾：挂 Stream 壳 → 池内 start → 等完工 → info/errbuf。
+/// 失败统一回补 stream 计数并释放会话壳（含回调 peek 缓冲）。
+fn streamAdopt(
+    host: *khost.Host,
+    sess: *session.Session,
+    info: ?*engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: usize,
+) ?*Stream {
     const st = std.heap.c_allocator.create(Stream) catch {
-        std.heap.c_allocator.destroy(sess);
+        sess.destroy();
         host.streamClose();
         return null;
     };
     st.* = .{ .host = host, .s = sess };
     if (!sess.start(host.rt)) {
-        std.heap.c_allocator.destroy(sess);
+        sess.destroy();
         std.heap.c_allocator.destroy(st);
         host.streamClose();
         return null;
@@ -413,7 +578,7 @@ export fn zk_engine_open(
             zi.* = std.mem.zeroes(engine.ZkInfo);
         }
         fillErrStatus(errbuf, errbuf_size, @intFromEnum(err.statusOf(sess.step.err orelse error.DecodeFailed)));
-        std.heap.c_allocator.destroy(sess);
+        sess.destroy();
         std.heap.c_allocator.destroy(st);
         host.streamClose();
         return null;
@@ -505,6 +670,112 @@ export fn zk_engine_close(st: ?*Stream) void {
     s.s.deinit(); // Session.deinit 自释放会话壳
     s.host.streamClose(); // 最后一个流关闭时若停机待收尾 → 释放 host/rt
     std.heap.c_allocator.destroy(s);
+}
+
+// ---------------------------------------------------------------------------
+// 结构化任务提交面测试（zk_submit_decode / zk_task_wait / zk_task_free）
+// ---------------------------------------------------------------------------
+
+const testing = std.testing;
+
+test "zk_submit_decode: submit→wait 帧数/采样率与 sync 一致；重复 wait/free 安全" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io_inst = std.Io.Threaded.global_single_threaded.io();
+    const full = try engine.writeTestWav(&tmp, io_inst, "submit.wav");
+    defer testing.allocator.free(full);
+
+    const h = try khost.Host.init(std.heap.c_allocator, .{ .min_workers = 2, .max_workers = 4, .cap_tasks = 8 });
+    defer {
+        h.shutdown();
+        h.deinit();
+    }
+
+    var out: [16]f32 = undefined;
+    var info: engine.ZkInfo = undefined;
+    const t = zk_submit_decode(h, full.ptr, &out, 8, &info);
+    try testing.expect(t != null);
+    const n = zk_task_wait(t);
+    try testing.expectEqual(@as(c_longlong, 8), n);
+    try testing.expectEqual(@as(c_int, 8000), info.sample_rate);
+    try testing.expectEqual(@as(c_int, 1), info.channels);
+    try testing.expectEqual(@as(c_int, 16), info.bits_per_sample);
+    for (0..8) |i| {
+        try testing.expectApproxEqAbs(
+            @as(f32, @floatFromInt(@as(i16, @intCast(i)))) / 32768.0,
+            out[i],
+            1e-6,
+        );
+    }
+    // 完工事件保持置位：重复 wait 幂等（与 zk_engine_decode_once 语义一致）
+    try testing.expectEqual(@as(c_longlong, 8), zk_task_wait(t));
+    zk_task_free(t);
+    zk_task_free(null); // NULL 空操作
+}
+
+test "zk_submit_decode: 不存在的 path → 负状态码（与 decode_once 对齐）；未 wait 直接 free 安全" {
+    const h = try khost.Host.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 2, .cap_tasks = 4 });
+    defer {
+        h.shutdown();
+        h.deinit();
+    }
+    var out: [8]f32 = undefined;
+    const t = zk_submit_decode(h, "/nonexistent/definitely-missing.wav", &out, 8, null);
+    try testing.expect(t != null);
+    const n = zk_task_wait(t);
+    try testing.expectEqual(
+        @as(c_longlong, -@as(c_longlong, @intFromEnum(err.Status.open_failed))),
+        n,
+    );
+    zk_task_free(t);
+
+    // 未 wait 直接 free：free 内兜底 wait 收尾，不悬垂
+    const t2 = zk_submit_decode(h, "/nonexistent/definitely-missing-2.wav", &out, 8, null);
+    try testing.expect(t2 != null);
+    zk_task_free(t2);
+}
+
+test "zk_submit_decode: 参数非法（h/path/out 空、max_frames=0）→ null" {
+    var out: [8]f32 = undefined;
+    try testing.expect(zk_submit_decode(null, "x.wav", &out, 8, null) == null);
+    const h = try khost.Host.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 1, .cap_tasks = 1 });
+    defer {
+        h.shutdown();
+        h.deinit();
+    }
+    try testing.expect(zk_submit_decode(h, null, &out, 8, null) == null);
+    try testing.expect(zk_submit_decode(h, "x.wav", null, 8, null) == null);
+    try testing.expect(zk_submit_decode(h, "x.wav", &out, 0, null) == null);
+}
+
+test "zk_submit_decode: 任务槽满（cap=1）→ null（InstanceLimit）；释放后可再提交" {
+    const h = try khost.Host.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 1, .cap_tasks = 1 });
+    var gate = std.atomic.Value(bool).init(false);
+    defer {
+        gate.store(true, .release);
+        h.shutdown();
+        h.deinit();
+    }
+    // 阻塞任务占满唯一任务槽（完工前槽不释放）
+    const Blocker = struct {
+        task: task.Task,
+        gate: *std.atomic.Value(bool),
+        fn body(t: *task.Task) void {
+            const self: *@This() = @fieldParentPtr("task", t);
+            while (!self.gate.load(.acquire)) std.Thread.yield() catch {};
+        }
+    };
+    var blocker = Blocker{ .task = .{ .run = Blocker.body }, .gate = &gate };
+    try testing.expect(h.submit(&blocker.task) != null);
+
+    var out: [8]f32 = undefined;
+    // 槽满：zk_submit_decode 分配载体后 submit 失败 → NULL（path 不会被触碰）
+    try testing.expect(zk_submit_decode(h, "/nonexistent/whatever.wav", &out, 8, null) == null);
+
+    // 放行 → 槽自动释放 → active 回落 0
+    gate.store(true, .release);
+    task.wait(&blocker.task);
+    try testing.expectEqual(@as(usize, 0), h.active());
 }
 
 test {

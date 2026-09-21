@@ -282,7 +282,7 @@ pub const WmaDec = struct {
             var lpos: usize = 0;
             var i: usize = 0;
             while (i < 25) : (i += 1) {
-                const cf: usize = tab.ff_wma_critical_freqs[i];
+                const cf: usize = tab.era_wma_critical_freqs[i];
                 const pos: usize = ((block_len * 2 * cf) + (sr >> 1)) / sr;
                 var posc = pos;
                 if (posc > block_len) posc = block_len;
@@ -328,7 +328,7 @@ pub const WmaDec = struct {
                 var j: usize = 0;
                 var lpos: usize = 0;
                 for (0..25) |i| {
-                    const cf: usize = tab.ff_wma_critical_freqs[i];
+                    const cf: usize = tab.era_wma_critical_freqs[i];
                     const pos0 = ((block_len * 2 * cf) + (sr << 1)) / (4 * sr);
                     var pos = pos0 << 2;
                     if (pos > block_len) pos = block_len;
@@ -361,7 +361,7 @@ pub const WmaDec = struct {
     }
 
     fn initExpVlc(self: *WmaDec) void {
-        self.expvlc = Vlc.build(&tab.ff_aac_scalefactor_code, &tab.ff_aac_scalefactor_bits, &self.expvlc_work);
+        self.expvlc = Vlc.build(&tab.era_aac_scalefactor_code, &tab.era_aac_scalefactor_bits, &self.expvlc_work);
         for (tab.pow_tab_bits, 0..) |bitsv, i| self.pow_tab[i] = @bitCast(bitsv);
     }
 
@@ -481,7 +481,7 @@ pub const WmaDec = struct {
         for (0..NB_LSP_COEFS) |i| {
             const nbits: usize = if (i == 0 or i >= 8) 3 else 4;
             const val = gb.get(nbits);
-            lsp[i] = @bitCast(tab.ff_wma_lsp_codebook[i][val]);
+            lsp[i] = @bitCast(tab.era_wma_lsp_codebook[i][val]);
         }
         const n = self.block_len;
         var val_max: f32 = 0;

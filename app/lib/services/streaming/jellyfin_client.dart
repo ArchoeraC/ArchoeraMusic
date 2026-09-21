@@ -18,6 +18,7 @@ import '../subsonic/subsonic_local.dart';
 import 'streaming_errors.dart';
 import 'streaming_http.dart';
 import 'streaming_models.dart';
+import 'streaming_quality.dart';
 import 'streaming_session.dart';
 import 'streaming_types.dart';
 
@@ -151,8 +152,10 @@ class JellyfinClient {
   Future<String> getStreamUrl(
     String originalId, {
     String? playSessionId,
+    String streamingQuality = 'original',
   }) async {
     final userId = _requireAuth();
+    final t = streamingTranscodeFor(streamingQuality);
     final query = <String, String>{
       'UserId': userId,
       'DeviceId': _deviceId(),
@@ -164,6 +167,11 @@ class JellyfinClient {
       'EnableRedirection': 'true',
       'EnableRemoteMedia': _isEmby ? 'true' : 'false',
       if (_isEmby) 'Static': 'true',
+      // 转码档位（标准 Jellyfin/Emby 参数）：仅非原文件时下发。
+      if (!t.isOriginal) ...{
+        'AudioCodec': 'mp3',
+        'MaxStreamingBitrate': '${t.maxBitRateKbps * 1000}',
+      },
     };
     return '${resolvedServerBaseUrl(config)}/Audio/$originalId/universal?${encodeQuery(query)}';
   }

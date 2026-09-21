@@ -4,6 +4,8 @@
 > 口径：墙钟 `time.monotonic`；CPU = user+sys；峰值 RSS = `/proc/<pid>/status VmHWM` 2ms 轮询；静音/headless（不写音频设备）。
 > 本文合并并取代此前的分散报告（见文末「历史文本清理」）。跨机请比**相对值/×RT**，勿比毫秒。
 
+> **更新（2026-09-21）**：本篇 §1「解码 scorecard」已被 [`benchmark-2026-09-21.md`](benchmark-2026-09-21.md) **取代**（最小/最大 FFmpeg 双基线 + TTA/DTS/AC-3/Speex 修复后的结果，对 FFmpeg 归一 100.8%）；本篇其余章节（并发、扫描、历史汇总等）仍然有效。
+
 ---
 
 ## 1. 解码 scorecard（15 格式，FFmpeg = 100 分）

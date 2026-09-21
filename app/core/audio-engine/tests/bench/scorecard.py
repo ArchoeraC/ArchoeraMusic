@@ -679,8 +679,9 @@ def main():
                 try:
                     with open(errf) as fh:
                         log = fh.read()
-                    take = "native" if ("自研内核接管" in log and eng == "era") else \
-                           ("native" if "自研内核接管" in log else "ffmpeg")
+                    native_log = ("自研内核接管" in log) or ("EraAudio: 接管" in log)
+                    take = "native" if (native_log and eng == "era") else \
+                           ("native" if native_log else "ffmpeg")
                 except OSError:
                     take = ""
             elif eng == "ffmpeg":

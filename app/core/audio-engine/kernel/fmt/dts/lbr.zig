@@ -562,8 +562,8 @@ pub const LbrDecoder = struct {
         // 采样率。注意 LBR 帧头 sr_code 走 ff_dca_sampling_freqs（dca.c），
         // 与 core 子流的 ff_dca_sample_rate_tab（tables.zig sample_rates）是两张表。
         const sr_code = try gb.byte();
-        if (sr_code >= dt.ff_dca_sampling_freqs.len) return error.Invalid;
-        self.sample_rate = dt.ff_dca_sampling_freqs[sr_code];
+        if (sr_code >= dt.era_dca_sampling_freqs.len) return error.Invalid;
+        self.sample_rate = dt.era_dca_sampling_freqs[sr_code];
         if (self.sample_rate > 48000) return error.Unsupported;
 
         // LBR 扬声器掩码（DCA_SPEAKER_PAIR 位布局：bit0=C bit1=LR bit2=LsRs bit3=LFE1...）
@@ -598,7 +598,7 @@ pub const LbrDecoder = struct {
         }
 
         // 频率范围
-        self.freq_range = lt.ff_dca_freq_ranges[sr_code];
+        self.freq_range = lt.era_dca_freq_ranges[sr_code];
 
         // 分辨率档
         if (self.bit_rate_orig >= 44000 * (self.nchannels_total + 2))
@@ -619,7 +619,7 @@ pub const LbrDecoder = struct {
         self.nsubbands = @as(usize, 8) << @intCast(self.limited_range);
 
         self.g3_avg_only_start_sb = @min(
-            self.nsubbands * lt.ff_dca_avg_g3_freqs[self.res_profile] / (self.limited_rate / 2),
+            self.nsubbands * lt.era_dca_avg_g3_freqs[self.res_profile] / (self.limited_rate / 2),
             self.nsubbands,
         );
         self.min_mono_subband = @min(self.nsubbands * 2000 / (self.limited_rate / 2), self.nsubbands);
@@ -667,7 +667,7 @@ pub const LbrDecoder = struct {
         const nwin = @as(usize, 32) << @intCast(self.freq_range);
         // 长窗按 freq_range 抽取（C 源：i << (2 - s->freq_range)，与 band_limit 无关）
         for (0..nwin) |i| {
-            self.window[i] = lt.ff_dca_long_window[i << @intCast(2 - self.freq_range)];
+            self.window[i] = lt.era_dca_long_window[i << @intCast(2 - self.freq_range)];
         }
 
         var scale = imdct_scale;
@@ -755,7 +755,7 @@ pub const LbrDecoder = struct {
     // LFE（parse_lfe_24 / parse_lfe_16 / parse_lfe_chunk）
     // ==========================================================================
     fn parseLfe24(self: *LbrDecoder, br: *BitReaderLE) LbrError!void {
-        const step_max: i32 = lt.ff_dca_lfe_step_size_24.len - 1;
+        const step_max: i32 = lt.era_dca_lfe_step_size_24.len - 1;
 
         const ps: u32 = try br.read(24);
         const si: i32 = @intCast(ps >> 23);
@@ -765,7 +765,7 @@ pub const LbrDecoder = struct {
         var step_i: i32 = @intCast(try br.read(8));
         if (step_i > step_max) return error.Invalid;
 
-        var step = lt.ff_dca_lfe_step_size_24[@intCast(step_i)];
+        var step = lt.era_dca_lfe_step_size_24[@intCast(step_i)];
 
         for (0..64) |i| {
             const code = try br.read(6);
@@ -785,16 +785,16 @@ pub const LbrDecoder = struct {
                 if (value > 3.0) value = 3.0;
             }
 
-            step_i += lt.ff_dca_lfe_delta_index_24[code & 31];
+            step_i += lt.era_dca_lfe_delta_index_24[code & 31];
             step_i = std.math.clamp(step_i, 0, step_max);
 
-            step = lt.ff_dca_lfe_step_size_24[@intCast(step_i)];
+            step = lt.era_dca_lfe_step_size_24[@intCast(step_i)];
             self.lfe_data[i] = value * self.lfe_scale;
         }
     }
 
     fn parseLfe16(self: *LbrDecoder, br: *BitReaderLE) LbrError!void {
-        const step_max: i32 = lt.ff_dca_lfe_step_size_16.len - 1;
+        const step_max: i32 = lt.era_dca_lfe_step_size_16.len - 1;
 
         const ps: u32 = try br.read(16);
         const si: i32 = @intCast(ps >> 15);
@@ -804,7 +804,7 @@ pub const LbrDecoder = struct {
         var step_i: i32 = @intCast(try br.read(8));
         if (step_i > step_max) return error.Invalid;
 
-        var step = lt.ff_dca_lfe_step_size_16[@intCast(step_i)];
+        var step = lt.era_dca_lfe_step_size_16[@intCast(step_i)];
 
         for (0..64) |i| {
             const code = try br.read(4);
@@ -822,10 +822,10 @@ pub const LbrDecoder = struct {
                 if (value > 3.0) value = 3.0;
             }
 
-            step_i += lt.ff_dca_lfe_delta_index_16[code & 7];
+            step_i += lt.era_dca_lfe_delta_index_16[code & 7];
             step_i = std.math.clamp(step_i, 0, step_max);
 
-            step = lt.ff_dca_lfe_step_size_16[@intCast(step_i)];
+            step = lt.era_dca_lfe_step_size_16[@intCast(step_i)];
             self.lfe_data[i] = value * self.lfe_scale;
         }
     }
@@ -865,9 +865,9 @@ pub const LbrDecoder = struct {
                 if (self.curr_gb.bitsLeft() < 1) return error.Invalid;
 
                 diff = try self.parseVlc(&v.tnl_grp[group]);
-                if (diff >= lt.ff_dca_fst_amp.len) return error.Invalid;
+                if (diff >= lt.era_dca_fst_amp.len) return error.Invalid;
 
-                diff = (try self.curr_gb.read(@intCast(diff >> 2))) + lt.ff_dca_fst_amp[diff];
+                diff = (try self.curr_gb.read(@intCast(diff >> 2))) + lt.era_dca_fst_amp[diff];
                 if (diff <= 1) break; // 子帧结束
 
                 freq += diff - 2;
@@ -877,8 +877,8 @@ pub const LbrDecoder = struct {
                 const main_ch: usize = @intCast(try self.curr_gb.read(ch_nbits));
                 var main_amp: u32 = try self.parseVlc(&v.tnl_scf);
                 const sb_idx: usize = freq >> @as(u6, @intCast(7 - group));
-                if (sb_idx >= lt.ff_dca_freq_to_sb.len) return error.Invalid;
-                main_amp +%= lt.ff_dca_freq_to_sb[sb_idx];
+                if (sb_idx >= lt.era_dca_freq_to_sb.len) return error.Invalid;
+                main_amp +%= lt.era_dca_freq_to_sb[sb_idx];
                 main_amp +%= @intCast(self.limited_range);
                 main_amp -%= 2;
                 amp[main_ch] = if (main_amp < amp_max) main_amp else 0;
@@ -908,7 +908,7 @@ pub const LbrDecoder = struct {
                     const ph_rot_i: i32 = @as(i32, 256) - xf * 128 - fd * 4;
                     tp.ph_rot = @truncate(@as(u32, @bitCast(ph_rot_i)));
 
-                    const shift: i32 = @as(i32, lt.ff_dca_ph0_shift[(tp.x_freq & 3) * 2 + (freq & 1)]) -
+                    const shift: i32 = @as(i32, lt.era_dca_ph0_shift[(tp.x_freq & 3) * 2 + (freq & 1)]) -
                         ((@as(i32, @intCast(tp.ph_rot)) << @as(u5, @intCast(5 - group))) - @as(i32, @intCast(tp.ph_rot)));
 
                     for (0..self.nchannels) |ch| {
@@ -1026,7 +1026,7 @@ pub const LbrDecoder = struct {
         else
             val = 16 -% (val >> 1);
 
-        if (val >= lt.ff_dca_st_coeff.len) val = 16;
+        if (val >= lt.era_dca_st_coeff.len) val = 16;
         return val;
     }
 
@@ -1036,10 +1036,10 @@ pub const LbrDecoder = struct {
         const br = &self.curr_gb;
 
         // 尺度因子
-        const nscf = lt.ff_dca_scf_to_grid_1[self.nsubbands - 1] + 1;
+        const nscf = lt.era_dca_scf_to_grid_1[self.nsubbands - 1] + 1;
         for (2..nscf) |sb| {
             try self.parseScaleFactors(&self.grid_1_scf[ch1][sb]);
-            if (ch1 != ch2 and lt.ff_dca_grid_1_to_scf[sb] < self.min_mono_subband)
+            if (ch1 != ch2 and lt.era_dca_grid_1_to_scf[sb] < self.min_mono_subband)
                 try self.parseScaleFactors(&self.grid_1_scf[ch2][sb]);
         }
 
@@ -1081,9 +1081,9 @@ pub const LbrDecoder = struct {
 
     fn parseGrid1SecCh(self: *LbrDecoder, ch2: usize) LbrError!void {
         // 尺度因子
-        const nscf = lt.ff_dca_scf_to_grid_1[self.nsubbands - 1] + 1;
+        const nscf = lt.era_dca_scf_to_grid_1[self.nsubbands - 1] + 1;
         for (2..nscf) |sb| {
-            if (lt.ff_dca_grid_1_to_scf[sb] >= self.min_mono_subband)
+            if (lt.era_dca_grid_1_to_scf[sb] >= self.min_mono_subband)
                 try self.parseScaleFactors(&self.grid_1_scf[ch2][sb]);
         }
 
@@ -1128,7 +1128,7 @@ pub const LbrDecoder = struct {
                     const code = try br.read(8);
                     const base = blk * 8;
                     for (0..8) |j| {
-                        samples[base + j] = lt.ff_dca_rsd_level_2a[(code >> @intCast(j)) & 1];
+                        samples[base + j] = lt.era_dca_rsd_level_2a[(code >> @intCast(j)) & 1];
                     }
                 }
                 i = nblocks * 8;
@@ -1137,17 +1137,17 @@ pub const LbrDecoder = struct {
                 if (coding_method) {
                     while (i < LBR_TIME_SAMPLES and br.bitsLeft() >= 2) : (i += 1) {
                         if ((try br.read(1)) != 0)
-                            samples[i] = lt.ff_dca_rsd_level_2b[try br.read(1)]
+                            samples[i] = lt.era_dca_rsd_level_2b[try br.read(1)]
                         else
                             samples[i] = 0;
                     }
                 } else {
                     const nblocks: usize = @min(@as(usize, @intCast(br.bitsLeft())) / 8, (LBR_TIME_SAMPLES + 4) / 5);
                     for (0..nblocks) |blk| {
-                        const code = lt.ff_dca_rsd_pack_5_in_8[try br.read(8)];
+                        const code = lt.era_dca_rsd_pack_5_in_8[try br.read(8)];
                         const base = blk * 5;
                         for (0..5) |j| {
-                            samples[base + j] = lt.ff_dca_rsd_level_3[(code >> @intCast(j * 2)) & 3];
+                            samples[base + j] = lt.era_dca_rsd_level_3[(code >> @intCast(j * 2)) & 3];
                         }
                     }
                     i = nblocks * 5;
@@ -1159,20 +1159,20 @@ pub const LbrDecoder = struct {
                     const code = try br.read(7);
                     const base = blk * 3;
                     for (0..3) |j| {
-                        samples[base + j] = lt.ff_dca_rsd_level_5[lt.ff_dca_rsd_pack_3_in_7[code][j]];
+                        samples[base + j] = lt.era_dca_rsd_level_5[lt.era_dca_rsd_pack_3_in_7[code][j]];
                     }
                 }
                 i = nblocks * 3;
             },
             4 => {
                 while (i < LBR_TIME_SAMPLES and br.bitsLeft() >= 6) : (i += 1) {
-                    samples[i] = lt.ff_dca_rsd_level_8[try self.parseVlc(&(self.vlc.?).rsd)];
+                    samples[i] = lt.era_dca_rsd_level_8[try self.parseVlc(&(self.vlc.?).rsd)];
                 }
             },
             5 => {
                 const nblocks: usize = @min(@as(usize, @intCast(br.bitsLeft())) / 4, LBR_TIME_SAMPLES);
                 for (0..nblocks) |blk| {
-                    samples[blk] = lt.ff_dca_rsd_level_16[try br.read(4)];
+                    samples[blk] = lt.era_dca_rsd_level_16[try br.read(4)];
                 }
                 i = nblocks;
             },
@@ -1299,7 +1299,7 @@ pub const LbrDecoder = struct {
         }
 
         // 低子带量化级重排
-        for (0..8) |sb| self.quant_levels[ch1 / 2][sb] = quant_levels[lt.ff_dca_sb_reorder[max_sb][sb]];
+        for (0..8) |sb| self.quant_levels[ch1 / 2][sb] = quant_levels[lt.era_dca_sb_reorder[max_sb][sb]];
         for (8..self.nsubbands) |sb| self.quant_levels[ch1 / 2][sb] = quant_levels[sb];
 
         // 前两子带 LPC
@@ -1317,14 +1317,14 @@ pub const LbrDecoder = struct {
     }
 
     fn parseGrid2(self: *LbrDecoder, ch1: usize, ch2: usize, start_sb: usize, end_sb: usize, flag: bool) LbrError!void {
-        const nscf = lt.ff_dca_scf_to_grid_2[self.nsubbands - 1] + 1;
+        const nscf = lt.era_dca_scf_to_grid_2[self.nsubbands - 1] + 1;
         const end = @min(end_sb, nscf);
 
         for (start_sb..end) |sb| {
             for (ch1..ch2 + 1) |ch| {
                 const g2_scf = &self.grid_2_scf[ch][sb];
 
-                if ((ch != ch1 and lt.ff_dca_grid_2_to_scf[sb] >= self.min_mono_subband) != flag) {
+                if ((ch != ch1 and lt.era_dca_grid_2_to_scf[sb] >= self.min_mono_subband) != flag) {
                     if (!flag) g2_scf.* = self.grid_2_scf[ch1][sb];
                     continue;
                 }
@@ -1376,11 +1376,11 @@ pub const LbrDecoder = struct {
     fn decodeGrid(self: *LbrDecoder, ch1: usize, ch2: usize) void {
         for (ch1..ch2 + 1) |ch| {
             for (0..self.nsubbands) |sb| {
-                const g1_sb = lt.ff_dca_scf_to_grid_1[sb];
+                const g1_sb = lt.era_dca_scf_to_grid_1[sb];
                 const g1_scf_a = &self.grid_1_scf[ch][g1_sb];
                 const g1_scf_b = &self.grid_1_scf[ch][g1_sb + 1];
-                const w1: i32 = lt.ff_dca_grid_1_weights[g1_sb][sb];
-                const w2: i32 = lt.ff_dca_grid_1_weights[g1_sb + 1][sb];
+                const w1: i32 = lt.era_dca_grid_1_weights[g1_sb][sb];
+                const w2: i32 = lt.era_dca_grid_1_weights[g1_sb + 1][sb];
                 const hr_scf = &self.high_res_scf[ch][sb];
 
                 if (sb < 4) {
@@ -1465,14 +1465,14 @@ pub const LbrDecoder = struct {
                         var scf: u32 = hr_scf[i];
                         if (scf > amp_max) scf = amp_max;
                         const base = i * 16;
-                        for (0..16) |j| samples[base + j] *= lt.ff_dca_quant_amp[scf];
+                        for (0..16) |j| samples[base + j] *= lt.era_dca_quant_amp[scf];
                     }
                 } else {
-                    const g2_scf = &self.grid_2_scf[ch][lt.ff_dca_scf_to_grid_2[sb]];
+                    const g2_scf = &self.grid_2_scf[ch][lt.era_dca_scf_to_grid_2[sb]];
                     for (0..LBR_TIME_SAMPLES / 2) |i| {
                         var scf: u32 = @as(u32, hr_scf[i / 8]) -% @as(u32, g2_scf[i]);
                         if (scf > amp_max) scf = amp_max;
-                        const qa = lt.ff_dca_quant_amp[scf];
+                        const qa = lt.era_dca_quant_amp[scf];
                         samples[i * 2] *= qa;
                         samples[i * 2 + 1] *= qa;
                     }
@@ -1538,8 +1538,8 @@ pub const LbrDecoder = struct {
                 if (self.ch_pres[ch2] & (@as(u32, 1) << @intCast(sb)) != 0) continue;
 
                 for (1..5) |sf| {
-                    const prev = lt.ff_dca_st_coeff[pt_st[sf - 1]];
-                    const next = lt.ff_dca_st_coeff[pt_st[sf]];
+                    const prev = lt.era_dca_st_coeff[pt_st[sf - 1]];
+                    const next = lt.era_dca_st_coeff[pt_st[sf]];
                     const base = (sf - 1) * 32;
                     for (0..32) |i| {
                         samples[base + i] *= @as(f32, @floatFromInt(32 - @as(i32, @intCast(i)))) * prev + @as(f32, @floatFromInt(i)) * next;
@@ -1561,10 +1561,10 @@ pub const LbrDecoder = struct {
             const tp = &self.tones[(start + i) & (LBR_TONES - 1)];
 
             if (tp.amp[ch] != 0) {
-                const amp: f32 = lt.ff_dca_synth_env[@intCast(synth_idx)] * lt.ff_dca_quant_amp[tp.amp[ch]];
+                const amp: f32 = lt.era_dca_synth_env[@intCast(synth_idx)] * lt.era_dca_quant_amp[tp.amp[ch]];
                 const c = amp * cos_tab[tp.phs[ch] & 255];
                 const s = amp * cos_tab[(@as(usize, tp.phs[ch]) + 64) & 255];
-                const cf = &lt.ff_dca_corr_cf[tp.f_delt];
+                const cf = &lt.era_dca_corr_cf[tp.f_delt];
                 const x_freq: i32 = tp.x_freq;
 
                 const idx = [11]i32{ x_freq - 5, x_freq - 4, x_freq - 3, x_freq - 2, x_freq - 1, x_freq, x_freq + 1, x_freq + 2, x_freq + 3, x_freq + 4, x_freq + 5 };
@@ -1628,7 +1628,7 @@ pub const LbrDecoder = struct {
 
     /// lbr_bank（dcadsp.c lbr_bank_c）— 短窗 + 8 点 MDCT + 混叠抵消
     fn lbrBank(self: *LbrDecoder, output: *[LBR_SUBBANDS * 4]f32, ch: usize, ofs: usize, len: usize) void {
-        const coeff = lt.ff_dca_bank_coeff;
+        const coeff = lt.era_dca_bank_coeff;
         const sw0 = coeff[0];
         const sw1 = coeff[1];
         const sw2 = coeff[2];
@@ -1801,7 +1801,7 @@ pub const LbrDecoder = struct {
 
     /// lfe_iir（dcadsp.c lfe_iir_c）：5 级双二阶级联插值
     fn lfeIir(self: *LbrDecoder, output: []f32, input: []const f32, factor: usize) void {
-        const iir = lt.ff_dca_lfe_iir;
+        const iir = lt.era_dca_lfe_iir;
         var op: usize = 0;
         for (0..64) |i| {
             var res: f32 = input[i];
@@ -2249,8 +2249,8 @@ test "lbr: 全部 ≤48k 采样率码经 ff_dca_sampling_freqs 正确映射" {
         var dec = LbrDecoder.init(a);
         defer dec.deinit();
         try dec.parse(frame);
-        try testing.expectEqual(dt.ff_dca_sampling_freqs[code], dec.sample_rate);
-        try testing.expectEqual(lt.ff_dca_freq_ranges[code], dec.freq_range);
+        try testing.expectEqual(dt.era_dca_sampling_freqs[code], dec.sample_rate);
+        try testing.expectEqual(lt.era_dca_freq_ranges[code], dec.freq_range);
         try dec.filterFrame();
         try testing.expectEqual(@as(u8, 1), dec.outputNchannels());
     }

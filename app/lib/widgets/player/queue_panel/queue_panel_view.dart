@@ -253,6 +253,7 @@ class _QueuePanelHeader extends StatelessWidget {
           ),
           IconButton(
             tooltip: switch (repeatMode) {
+              'off' => l10n.queueRepeatOff,
               'list' => l10n.queueRepeatList,
               'one' => l10n.queueRepeatOne,
               _ => l10n.queueRepeatMode,
@@ -262,7 +263,10 @@ class _QueuePanelHeader extends StatelessWidget {
             icon: Icon(
               repeatMode == 'one' ? EtaIcons.repeatOne : EtaIcons.repeat,
               size: 19,
-              color: scheme.primary,
+              // 顺序播放（不循环）压暗，与列表/单曲的高亮区分。
+              color: repeatMode == 'off'
+                  ? scheme.onSurfaceVariant
+                  : scheme.primary,
             ),
           ),
           IconButton(

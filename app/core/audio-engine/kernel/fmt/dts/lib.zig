@@ -380,7 +380,8 @@ const decoder2 = @import("../../decoder.zig");
 
 const DtsCtx = struct {
     allocator: stdio.mem.Allocator,
-    data: []u8,
+    /// 按值持有（decoder.open 传入的 reader 拷贝，deinit 时关闭）
+    reader: io2.Reader,
     pcm: []i16,
     sample_rate: u32,
     channels: u8,
@@ -430,21 +431,374 @@ fn dtsPos(ctx: *anyopaque) i64 {
 fn dtsDeinit(ctx: *anyopaque) void {
     const self: *DtsCtx = @ptrCast(@alignCast(ctx));
     const a = self.allocator;
-    a.free(self.data);
     a.free(self.pcm);
+    self.reader.deinit();
     a.destroy(self);
 }
 
-/// 打开 .dts/.dtshd 整文件解码；成功接管 `reader` 所有权。
-///
-/// .dtshd 容器路径（DTSHDHDR → STRMDATA 载荷）对每个访问单元执行
-/// core +（EXSS 中存在的）XLL 解码：XLL 可用时输出全声道无损上混结果，
-/// 否则回落 core 子流。与既有 .dts 裸流 core 定点路径共用输出语义（s16）。
+// ---------------------------------------------------------------------------
+// 裸 .dts core 流式解码（RSS 收口）：不再整读文件、不再整段预解码 PCM。
+//   - open 先做一次「只解不存」的流式扫描，得到精确 sr/ch/总样本数与
+//     最大单帧样本数（供定长队列分配）；
+//   - read 时逐 core 帧经 Reader 读入**定长复用缓冲**（≤16KB），解码后写入
+//     交错 s16 队列；常驻内存 ∝ 单帧 × 声道，与文件体积无关。
+//   - 帧同步/伪 sync 重同步/帧间差额跳过/跨 EOF 截断停止等语义对齐 Iterator。
+// ---------------------------------------------------------------------------
+
+/// core 帧字节上限：frame_size = header 14 位 + 1 → 最大 16384。
+const max_core_frame: usize = 16384;
+/// 同步扫描窗口（仅用于定位，复用；不缓存音频）。
+const scan_window: usize = 64 * 1024;
+
+/// 流式 core 帧读取器：按 sync 定位 + header.frame_size 前进，逐帧读入定长缓冲。
+/// 输出帧字节始终为 BE16（le16 流在读入后原地做 16-bit 字交换）。
+const FrameReader = struct {
+    reader: io2.Reader, // 按值持有（deinit 由所属会话负责）
+    order: ByteOrder,
+    file_size: u64,
+    /// 下一待扫描的文件偏移
+    next_off: u64 = 0,
+    scan_buf: []u8,
+    frame_buf: []u8,
+    /// 当前帧字节数（含 sync；已按 order 归一为 BE16）
+    frame_len: usize = 0,
+
+    /// 定位并读入下一帧。EOF / 截断（帧跨过文件尾）→ false。
+    fn next(self: *FrameReader) Error!bool {
+        while (true) {
+            const off = (try self.findSyncFrom(self.next_off)) orelse return false;
+            if (off + hdr.header_window > self.file_size) return false;
+            if (!try self.readAt(off, self.frame_buf[0..hdr.header_window])) return false;
+            const header = hdr.parse(self.frame_buf[0..hdr.header_window], self.order) catch {
+                self.next_off = off + 1; // 伪 sync：前进 1 字节重扫
+                continue;
+            };
+            const fs: usize = header.frame_size;
+            if (fs > self.frame_buf.len) {
+                self.next_off = off + 1;
+                continue;
+            }
+            if (off + fs > self.file_size) {
+                self.next_off = self.file_size; // 尾部残帧：不产出（原 Iterator 亦不解码）
+                return false;
+            }
+            if (fs < hdr.header_window) {
+                self.next_off = off + 1;
+                continue;
+            }
+            if (!try self.readAt(off + hdr.header_window, self.frame_buf[hdr.header_window..fs])) return false;
+            if (self.order == .le16) {
+                var i: usize = 0;
+                while (i + 1 < fs) : (i += 2) {
+                    const t0 = self.frame_buf[i];
+                    self.frame_buf[i] = self.frame_buf[i + 1];
+                    self.frame_buf[i + 1] = t0;
+                }
+            }
+            self.frame_len = fs;
+            self.next_off = off + fs;
+            return true;
+        }
+    }
+
+    /// 从文件偏移 from 起定位下一个 core sync（滑窗扫描，内存 = scan_window）。
+    fn findSyncFrom(self: *FrameReader, from: u64) Error!?u64 {
+        if (from >= self.file_size) return null;
+        try self.reader.seek(@intCast(from), .start);
+        var win_start: u64 = from;
+        var win_len: usize = 0;
+        while (true) {
+            const n = try self.reader.read(self.scan_buf[win_len..]);
+            win_len += n;
+            if (win_len >= 4) {
+                if (findSync(self.scan_buf[0..win_len], 0, self.order)) |i| return win_start + i;
+            }
+            if (n == 0) return null; // EOF
+            const keep: usize = @min(@as(usize, 3), win_len);
+            stdio.mem.copyForwards(u8, self.scan_buf[0..keep], self.scan_buf[win_len - keep .. win_len]);
+            win_start += win_len - keep;
+            win_len = keep;
+        }
+    }
+
+    /// 定位读取恰好 buf.len 字节；不足（EOF）→ false。
+    fn readAt(self: *FrameReader, off: u64, buf: []u8) Error!bool {
+        try self.reader.seek(@intCast(off), .start);
+        var got: usize = 0;
+        while (got < buf.len) {
+            const n = try self.reader.read(buf[got..]);
+            if (n == 0) break;
+            got += n;
+        }
+        return got == buf.len;
+    }
+};
+
+/// 流式扫描统计（不保留任何帧/PCM）。
+const StreamScan = struct {
+    sr: u32,
+    ch: u8,
+    total_samples: usize,
+    max_interleaved: usize,
+};
+
+/// 只解不存扫描：逐帧 core 解码，累计采样/声道并记录最大单帧交错样本数。
+/// 输出被丢弃，故内存仅为扫描窗 + 单帧缓冲 + 解码器内部状态。
+fn scanStreamCore(
+    allocator: stdio.mem.Allocator,
+    reader: *io2.Reader,
+    order: ByteOrder,
+    fsize: u64,
+) Error!StreamScan {
+    const sbuf = try allocator.alloc(u8, scan_window);
+    defer allocator.free(sbuf);
+    const fbuf = try allocator.alloc(u8, max_core_frame);
+    defer allocator.free(fbuf);
+
+    var fr = FrameReader{
+        .reader = reader.*,
+        .order = order,
+        .file_size = fsize,
+        .scan_buf = sbuf,
+        .frame_buf = fbuf,
+    };
+    var dec = core.DcaDecoder.init(allocator);
+    defer dec.deinit();
+
+    var sr: u32 = 0;
+    var ch: u8 = 0;
+    var total: usize = 0;
+    var maxil: usize = 0;
+    var frame: core.DecodedFrame = undefined;
+    while (try fr.next()) {
+        dec.decode(fr.frame_buf[0..fr.frame_len], &frame) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return error.Corrupt,
+        };
+        if (sr == 0) {
+            sr = frame.sample_rate;
+            ch = @intCast(frame.nch);
+        }
+        total += frame.nsamples;
+        const il = frame.nsamples * frame.nch;
+        if (il > maxil) maxil = il;
+    }
+    if (sr == 0 or ch == 0 or total == 0) return error.Corrupt;
+    return .{ .sr = sr, .ch = ch, .total_samples = total, .max_interleaved = maxil };
+}
+
+/// 裸 core 流式解码上下文。
+const StreamCtx = struct {
+    allocator: stdio.mem.Allocator,
+    fr: FrameReader,
+    dec: core.DcaDecoder,
+    sample_rate: u32,
+    channels: u8,
+    total_samples: usize, // 每声道
+    cursor: usize = 0,
+    /// 当前帧交错 s16 队列（容量 = 扫描得最大单帧交错样本数）
+    queue: []i16,
+    q_len: usize = 0, // 当前帧样本数
+    q_pos: usize = 0, // 本帧内已消费样本
+    have_queue: bool = false,
+    /// 当前队列首样本对应的全局样本位置
+    frame_start_sample: usize = 0,
+    /// 已解码帧累计样本（每声道）
+    decoded_upto: usize = 0,
+
+    /// 解码下一帧到 queue；EOF → false。seek 重启后自动丢弃目标之前的整帧。
+    fn decodeNextFrame(self: *StreamCtx) Error!bool {
+        while (true) {
+            if (!try self.fr.next()) return false;
+            var frame: core.DecodedFrame = undefined;
+            self.dec.decode(self.fr.frame_buf[0..self.fr.frame_len], &frame) catch |e| switch (e) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => return error.Corrupt,
+            };
+            if (frame.nch != self.channels) return error.Corrupt;
+            self.frame_start_sample = self.decoded_upto;
+            self.decoded_upto += frame.nsamples;
+            const il = frame.nsamples * frame.nch;
+            if (il > self.queue.len) return error.Corrupt;
+            var p: usize = 0;
+            for (0..frame.nsamples) |nn| {
+                for (0..frame.nch) |c| {
+                    self.queue[p] = toS16(frame.planes[c][nn]);
+                    p += 1;
+                }
+            }
+            self.q_len = frame.nsamples;
+            // seek 目标落在本帧之后：整帧丢弃，继续解码至覆盖目标
+            if (self.decoded_upto <= self.cursor) continue;
+            self.have_queue = true;
+            return true;
+        }
+    }
+
+    fn read(self: *StreamCtx, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
+        out_channels.* = self.channels;
+        if (self.cursor >= self.total_samples) return 0;
+        const interleave = @as(usize, self.channels) * 2;
+        const avail_total = self.total_samples - self.cursor;
+        const want = @min(@min(max_samples, avail_total), out.len / interleave);
+        if (want == 0 or out.len == 0) return 0;
+
+        var produced: usize = 0;
+        while (produced < want) {
+            if (!self.have_queue) {
+                if (!(try self.decodeNextFrame())) return error.Corrupt;
+            }
+            if (self.cursor < self.frame_start_sample) return error.Corrupt;
+            if (self.cursor >= self.frame_start_sample + self.q_len) {
+                self.have_queue = false; // 本帧已整体越过（应仅发生于 seek 重启）
+                continue;
+            }
+            self.q_pos = self.cursor - self.frame_start_sample;
+            const take = @min(want - produced, self.q_len - self.q_pos);
+            const src = stdio.mem.sliceAsBytes(self.queue[self.q_pos * self.channels ..][0 .. take * self.channels]);
+            @memcpy(out[produced * interleave ..][0 .. take * interleave], src);
+            self.cursor += take;
+            produced += take;
+            if (self.cursor >= self.frame_start_sample + self.q_len) self.have_queue = false;
+        }
+        return produced;
+    }
+
+    /// 回到流起点并重建解码器（DTS core 合成/预测历史跨帧，跳转必须从头重建以
+    /// 保证与整段预解码逐样本一致）。
+    fn restart(self: *StreamCtx) Error!void {
+        try self.fr.reader.seek(0, .start);
+        self.fr.next_off = 0;
+        self.fr.frame_len = 0;
+        self.dec.deinit();
+        self.dec = core.DcaDecoder.init(self.allocator);
+        self.decoded_upto = 0;
+        self.frame_start_sample = 0;
+        self.q_len = 0;
+        self.q_pos = 0;
+        self.have_queue = false;
+    }
+};
+
+const stream_vtable = decoder2.Decoder.VTable{
+    .read = streamRead,
+    .seek_ms = streamSeek,
+    .position_ms = streamPos,
+    .deinit = streamDeinit,
+};
+
+fn streamRead(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
+    const self: *StreamCtx = @ptrCast(@alignCast(ctx));
+    return self.read(out, max_samples, out_channels);
+}
+fn streamSeek(ctx: *anyopaque, ms: i64) Error!void {
+    const self: *StreamCtx = @ptrCast(@alignCast(ctx));
+    const target: usize = if (ms <= 0)
+        0
+    else
+        @min(@as(usize, @intCast(@divTrunc(@as(u128, @intCast(ms)) * self.sample_rate, 1000))), self.total_samples);
+    if (target == self.cursor) return; // 原地：保留当前帧余量
+    if (target > self.cursor) {
+        // 顺序前进：解码器历史（合成/预测）跨帧且不可逆，但**向前**可沿用已解状态，
+        // read/decodeNextFrame 会丢弃 [旧 cursor, target) 的样本，无需重建。
+        self.cursor = target;
+        return;
+    }
+    // 回退：历史不可逆，必须从头重建后解码丢弃至目标（保证与整段预解码逐样本一致）。
+    try self.restart();
+    self.cursor = target;
+}
+fn streamPos(ctx: *anyopaque) i64 {
+    const self: *StreamCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(@divTrunc(@as(i128, @intCast(self.cursor)) * 1000, @as(i128, self.sample_rate)));
+}
+fn streamDeinit(ctx: *anyopaque) void {
+    const self: *StreamCtx = @ptrCast(@alignCast(ctx));
+    const a = self.allocator;
+    self.dec.deinit();
+    a.free(self.queue);
+    a.free(self.fr.scan_buf);
+    a.free(self.fr.frame_buf);
+    self.fr.reader.deinit();
+    a.destroy(self);
+}
+
+/// 裸 core 流式 open：扫描统计 → 构造流式会话（只解不存，RSS 与体积无关）。
+fn openStreamCore(
+    allocator: stdio.mem.Allocator,
+    reader: *io2.Reader,
+    info: *decoder2.Info,
+    order: ByteOrder,
+) Error!decoder2.Decoder {
+    const fsize = reader.size() catch return error.Corrupt;
+    const sc = try scanStreamCore(allocator, reader, order, fsize);
+    try reader.seek(0, .start);
+
+    const ctx = try allocator.create(StreamCtx);
+    errdefer allocator.destroy(ctx);
+    const sbuf = try allocator.alloc(u8, scan_window);
+    errdefer allocator.free(sbuf);
+    const fbuf = try allocator.alloc(u8, max_core_frame);
+    errdefer allocator.free(fbuf);
+    const queue = try allocator.alloc(i16, @max(sc.max_interleaved, 1));
+    errdefer allocator.free(queue);
+
+    ctx.* = .{
+        .allocator = allocator,
+        .fr = .{
+            .reader = reader.*, // 接管所有权（deinit 关闭）
+            .order = order,
+            .file_size = fsize,
+            .scan_buf = sbuf,
+            .frame_buf = fbuf,
+        },
+        .dec = core.DcaDecoder.init(allocator),
+        .sample_rate = sc.sr,
+        .channels = sc.ch,
+        .total_samples = sc.total_samples,
+        .queue = queue,
+    };
+
+    info.* = .{
+        .sample_rate = sc.sr,
+        .channels = sc.ch,
+        .bits_per_sample = 16,
+        .is_float = false,
+        .duration_us = @intCast(@divTrunc(@as(i128, @intCast(sc.total_samples)) * 1_000_000, @as(i128, sc.sr))),
+        .duration_known = .exact,
+        .codec_name = "dts",
+        .format_name = "dts",
+        .profile = dtsProfile2(false, false, 0, false, sc.sr),
+        .metadata = .{},
+    };
+    return .{ .vtable = &stream_vtable, .ctx = ctx };
+}
+
+/// 打开 .dts/.dtshd。裸 core 流走流式路径（RSS 收口）；容器 / EXSS-only /
+/// 14-bit 等仍走整读路径。成功接管 `reader` 所有权（流式）或按原语义处理。
 pub fn open(allocator: stdio.mem.Allocator, reader: *io2.Reader, info: *decoder2.Info) Error!decoder2.Decoder {
     const sz = reader.size() catch return error.Corrupt;
     if (sz <= 0 or sz > 512 * 1024 * 1024) return error.UnsupportedFormat;
+
+    // 仅前瞻首 8 字节做分流（peek 不消耗位置，也不整读）。
+    try reader.seek(0, .start);
+    var head: [8]u8 = undefined;
+    const hn = try reader.peek(&head);
+    const is_container = hn >= 8 and stdio.mem.eql(u8, head[0..8], "DTSHDHDR");
+    if (!is_container and hn >= 4) {
+        if (detectOrder(head[0..4])) |o| {
+            if (o == .be16 or o == .le16) return openStreamCore(allocator, reader, info, o);
+        }
+    }
+    return openWhole(allocator, reader, info, sz);
+}
+
+/// 整读路径（.dtshd 容器 / EXSS-only / 14-bit 等）：读全文件 → 预解码 PCM。
+/// 成功接管 `reader` 所有权（由 DtsCtx 关闭）。
+fn openWhole(allocator: stdio.mem.Allocator, reader: *io2.Reader, info: *decoder2.Info, sz: u64) Error!decoder2.Decoder {
+    try reader.seek(0, .start);
     const data = try allocator.alloc(u8, @intCast(sz));
-    errdefer allocator.free(data);
+    defer allocator.free(data); // 预解码后即释放（不再整文件常驻）
     var got: usize = 0;
     while (got < data.len) {
         const n = try reader.read(data[got..]);
@@ -547,7 +901,7 @@ pub fn open(allocator: stdio.mem.Allocator, reader: *io2.Reader, info: *decoder2
     errdefer allocator.destroy(ctx);
     ctx.* = .{
         .allocator = allocator,
-        .data = data,
+        .reader = reader.*, // 接管所有权（deinit 关闭）
         .pcm = try pcm_list.toOwnedSlice(allocator),
         .sample_rate = sr,
         .channels = ch,

@@ -20,6 +20,7 @@ import 'package:crypto/crypto.dart';
 
 import '../netease/track.dart';
 import '../streaming/streaming_errors.dart';
+import '../streaming/streaming_quality.dart';
 import '../streaming/streaming_types.dart';
 import 'subsonic_local.dart';
 import 'subsonic_models.dart';
@@ -182,8 +183,16 @@ class SubsonicClient {
   }
 
   /// 取流播放 URL（Subsonic 协议无 PlaySessionId）。
-  String getStreamUrl(String originalId) =>
-      subsonicStreamUrl(_base, originalId, _buildAuth());
+  String getStreamUrl(String originalId, {String streamingQuality = 'original'}) {
+    final t = streamingTranscodeFor(streamingQuality);
+    return subsonicStreamUrl(
+      _base,
+      originalId,
+      _buildAuth(),
+      format: t.format,
+      maxBitRate: t.maxBitRateKbps,
+    );
+  }
 
   /// 拉专辑列表（按字母排序）。
   Future<List<StreamingAlbum>> listAlbums({int limit = 500, int offset = 0}) async {

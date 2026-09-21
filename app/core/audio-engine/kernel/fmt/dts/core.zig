@@ -372,7 +372,7 @@ pub const DcaDecoder = struct {
                     const scale_code: u32 = try br.readBits(6);
                     const index: i64 = @as(i64, scale_code) * 4 - dt.FF_DCA_DMIXTABLE_OFFSET - 3;
                     if (index < 0 or index >= dt.FF_DCA_INV_DMIXTABLE_SIZE) return error.Invalid;
-                    self.xxch_dmix_scale_inv = @intCast(dt.ff_dca_inv_dmixtable[@intCast(index)]);
+                    self.xxch_dmix_scale_inv = @intCast(dt.era_dca_inv_dmixtable[@intCast(index)]);
                     for (0..nch) |ch| {
                         const m: u32 = try br.readBits(@intCast(self.xxch_mask_nbits));
                         if (m & ~self.xxch_core_mask != 0) return error.Invalid;
@@ -388,7 +388,7 @@ pub const DcaDecoder = struct {
                                 if (code != 0) {
                                     const di: usize = @intCast(code * 4 - 3);
                                     if (di >= dt.FF_DCA_DMIXTABLE_SIZE) return error.Invalid;
-                                    const tval: i32 = @intCast(dt.ff_dca_dmixtable[di]);
+                                    const tval: i32 = @intCast(dt.era_dca_dmixtable[di]);
                                     self.xxch_dmix_coeff[ci] = (tval ^ sign) -% sign;
                                 } else {
                                     self.xxch_dmix_coeff[ci] = 0;
@@ -425,13 +425,13 @@ pub const DcaDecoder = struct {
         }
         for (0..CODE_BOOKS) |n| {
             for (xch_base..self.nchannels) |ch| {
-                self.quant_index_sel[ch][n] = @intCast(try br.readBits(@intCast(dt.ff_dca_quant_index_sel_nbits[n])));
+                self.quant_index_sel[ch][n] = @intCast(try br.readBits(@intCast(dt.era_dca_quant_index_sel_nbits[n])));
             }
         }
         for (0..CODE_BOOKS) |n| {
             for (xch_base..self.nchannels) |ch| {
-                if (self.quant_index_sel[ch][n] < dt.ff_dca_quant_index_group_size[n]) {
-                    self.scale_factor_adj[ch][n] = @intCast(dt.ff_dca_scale_factor_adj[try br.readBits(2)]);
+                if (self.quant_index_sel[ch][n] < dt.era_dca_quant_index_group_size[n]) {
+                    self.scale_factor_adj[ch][n] = @intCast(dt.era_dca_scale_factor_adj[try br.readBits(2)]);
                 }
             }
         }
@@ -453,9 +453,9 @@ pub const DcaDecoder = struct {
     fn parseScale(self: *DcaDecoder, br: *BitReader, scale_index: *i32, sel: u8) !i32 {
         _ = self;
         const scale_table: []const u32 = if (sel > 5)
-            &dt.ff_dca_scale_factor_quant7
+            &dt.era_dca_scale_factor_quant7
         else
-            &dt.ff_dca_scale_factor_quant6;
+            &dt.era_dca_scale_factor_quant6;
         var idx: i32 = undefined;
         if (sel < 5) {
             scale_index.* += @as(i32, try huff.decode(&huff.scalef_tables[sel], br));
@@ -478,7 +478,7 @@ pub const DcaDecoder = struct {
         }
         idx += 64;
         if (idx < 0 or idx >= 129) return error.Invalid;
-        return @intCast(dt.ff_dca_joint_scale_factors[@intCast(idx)]);
+        return @intCast(dt.era_dca_joint_scale_factors[@intCast(idx)]);
     }
 
     // ======================================================================
@@ -589,7 +589,7 @@ pub const DcaDecoder = struct {
         if (abits <= CODE_BOOKS) {
             const n: usize = @intCast(abits - 1);
             const sel = self.quant_index_sel[ch][n];
-            if (sel < dt.ff_dca_quant_index_group_size[n]) {
+            if (sel < dt.era_dca_quant_index_group_size[n]) {
                 for (audio) |*v| v.* = @as(i32, try huff.decode(&huff.quant_tables[n][sel], br));
                 return 1;
             }
@@ -604,7 +604,7 @@ pub const DcaDecoder = struct {
         const nbits = block_code_nbits[@intCast(abits - 1)];
         const c1: u64 = try br.readBits(nbits);
         const c2: u64 = try br.readBits(nbits);
-        const levels: u64 = dt.ff_dca_quant_levels[@intCast(abits)];
+        const levels: u64 = dt.era_dca_quant_levels[@intCast(abits)];
         const offset: i64 = @intCast((levels - 1) / 2);
         var code1: u64 = c1;
         var code2: u64 = c2;
@@ -628,7 +628,7 @@ pub const DcaDecoder = struct {
             if (self.prediction_mode[ch][band]) {
                 const pred_id = self.prediction_vq_index[ch][band];
                 const row = self.band[ch][band];
-                const coeff = dt.ff_dca_adpcm_vb[@as(usize, pred_id) * 4 ..][0..4];
+                const coeff = dt.era_dca_adpcm_vb[@as(usize, pred_id) * 4 ..][0..4];
                 var j: usize = 0;
                 while (j < len) : (j += 1) {
                     var pred: i64 = 0;
@@ -676,7 +676,7 @@ pub const DcaDecoder = struct {
     }
 
     fn decodeHf(self: *DcaDecoder, ch: usize, vq_index: *const [DCA_SUBBANDS]u32, ofs: usize, len: usize) void {
-        const hf = dt.ff_dca_high_freq_vq;
+        const hf = dt.era_dca_high_freq_vq;
         for (self.subband_vq_start[ch]..self.nsubbands[ch]) |band| {
             const coeff: *const [32]i8 = @ptrCast(hf[@as(usize, vq_index[band]) * 32 ..][0..32]);
             const scale = self.scale_factors[ch][band][0];
@@ -716,7 +716,7 @@ pub const DcaDecoder = struct {
             }
             const idx = try br.readBits(8);
             if (idx >= 128) return error.Invalid;
-            const scale: i32 = @intCast(dt.ff_dca_scale_factor_quant7[idx]);
+            const scale: i32 = @intCast(dt.era_dca_scale_factor_quant7[idx]);
             const scale2: i32 = dsp.mul23(4697620, scale); // 0.035*(1<<27)
             var n: usize = 0;
             var ofs = lfe_pos.*;
@@ -737,9 +737,9 @@ pub const DcaDecoder = struct {
                     var audio: [8]i32 = undefined;
                     const is_huff = try self.extractAudio(br, &audio, abits, ch);
                     const step_size: u32 = if (self.bit_rate == 3)
-                        dt.ff_dca_lossless_quant[@intCast(abits)]
+                        dt.era_dca_lossless_quant[@intCast(abits)]
                     else
-                        dt.ff_dca_lossy_quant[@intCast(abits)];
+                        dt.era_dca_lossy_quant[@intCast(abits)];
 
                     const trans_ssf = self.transition_mode[sf][ch][band];
                     var scale: i32 = undefined;
@@ -978,9 +978,9 @@ pub const DcaDecoder = struct {
         // XBR 尺度因子（根方表：scale_factor_sel>5 → quant7，否则 quant6）
         for (xbr_base_ch..xbr_nchannels) |ch| {
             const scale_table: []const u32 = if (self.scale_factor_sel[ch] > 5)
-                &dt.ff_dca_scale_factor_quant7
+                &dt.era_dca_scale_factor_quant7
             else
-                &dt.ff_dca_scale_factor_quant6;
+                &dt.era_dca_scale_factor_quant6;
             for (0..xbr_nsubbands[ch]) |band| {
                 if (xbr_bit_allocation[ch][band] != 0) {
                     var scale_index: usize = @intCast(try br.readBits(xbr_scale_nbits[ch]));
@@ -1014,7 +1014,7 @@ pub const DcaDecoder = struct {
                         continue;
                     }
 
-                    const step_size: u32 = dt.ff_dca_lossless_quant[@intCast(abits)];
+                    const step_size: u32 = dt.era_dca_lossless_quant[@intCast(abits)];
                     const trans_ssf: u8 = if (xbr_transition_mode) self.transition_mode[sf][ch][band] else 0;
                     const scale: i32 = if (trans_ssf == 0 or ssf < trans_ssf)
                         xbr_scale_factors[ch][band][0]
@@ -1308,7 +1308,7 @@ pub const DcaDecoder = struct {
         const nbooks: usize = 6 + 4 * @as(usize, if (self.x96_high_res) 1 else 0);
         for (0..nbooks) |n| {
             for (xch_base..self.x96_nchannels) |ch| {
-                self.quant_index_sel[ch][n] = @intCast(try br.readBits(@intCast(dt.ff_dca_quant_index_sel_nbits[n])));
+                self.quant_index_sel[ch][n] = @intCast(try br.readBits(@intCast(dt.era_dca_quant_index_sel_nbits[n])));
             }
         }
         if (exss) {
@@ -1404,7 +1404,7 @@ pub const DcaDecoder = struct {
                         var ssf: usize = 0;
                         while (ssf < (self.nsubsubframes[sf] + 1) / 2) : (ssf += 1) {
                             const vq_addr = try br.readBits(10);
-                            const coeff: *const [32]i8 = @ptrCast(dt.ff_dca_high_freq_vq[vq_addr * 32 ..][0..32]);
+                            const coeff: *const [32]i8 = @ptrCast(dt.era_dca_high_freq_vq[vq_addr * 32 ..][0..32]);
                             const n: usize = @min(nsamples - ssf * 16, 16);
                             for (0..n) |k| {
                                 const v: i32 = coeff[k];
@@ -1429,9 +1429,9 @@ pub const DcaDecoder = struct {
                     const is_huff = try self.extractAudio(br, &audio, abits, ch);
                     _ = is_huff;
                     const step_size: u32 = if (self.bit_rate == 3)
-                        dt.ff_dca_lossless_quant[@intCast(abits)]
+                        dt.era_dca_lossless_quant[@intCast(abits)]
                     else
-                        dt.ff_dca_lossy_quant[@intCast(abits)];
+                        dt.era_dca_lossy_quant[@intCast(abits)];
                     const scale = self.scale_factors[ch][band >> 1][band & 1];
                     self.dequantize(self.x96BandData(ch, band), ofs, &audio, step_size, scale);
                 }
@@ -1470,7 +1470,7 @@ pub const DcaDecoder = struct {
             if (self.prediction_mode[ch][band]) {
                 const pred_id = self.prediction_vq_index[ch][band];
                 const row = self.x96_band[ch][band];
-                const coeff = dt.ff_dca_adpcm_vb[@as(usize, pred_id) * 4 ..][0..4];
+                const coeff = dt.era_dca_adpcm_vb[@as(usize, pred_id) * 4 ..][0..4];
                 var j: usize = 0;
                 while (j < len) : (j += 1) {
                     var pred: i64 = 0;
@@ -1523,7 +1523,7 @@ pub const DcaDecoder = struct {
 
         // 主声道
         if (x96_synth) {
-            const window: *const [1024]i32 = &dt.ff_dca_fir_64bands_fixed;
+            const window: *const [1024]i32 = &dt.era_dca_fir_64bands_fixed;
             for (0..self.nchannels) |ch| {
                 const spkr = self.mapPrmChToSpkr(ch) orelse return error.Unsupported;
                 const pl = plane[spkr] orelse return error.Unsupported;
@@ -1531,9 +1531,9 @@ pub const DcaDecoder = struct {
             }
         } else {
             const window: *const [512]i32 = if (self.filter_perfect)
-                &dt.ff_dca_fir_32bands_perfect_fixed
+                &dt.era_dca_fir_32bands_perfect_fixed
             else
-                &dt.ff_dca_fir_32bands_nonperfect_fixed;
+                &dt.era_dca_fir_32bands_nonperfect_fixed;
             for (0..self.nchannels) |ch| {
                 const spkr = self.mapPrmChToSpkr(ch) orelse return error.Unsupported;
                 const pl = plane[spkr] orelse return error.Unsupported;
@@ -1546,10 +1546,10 @@ pub const DcaDecoder = struct {
             const pl = plane[5] orelse return error.Unsupported;
             if (x96_synth) {
                 const mid = nsamples / 2;
-                dsp.lfeFirFixed(pl[mid..nsamples], self.lfe_rows, &dt.ff_dca_lfe_fir_64_fixed, self.npcmblocks);
+                dsp.lfeFirFixed(pl[mid..nsamples], self.lfe_rows, &dt.era_dca_lfe_fir_64_fixed, self.npcmblocks);
                 dsp.lfeX96Fixed(pl, pl[mid..nsamples], &self.lfe_history_x96, mid);
             } else {
-                dsp.lfeFirFixed(pl, self.lfe_rows, &dt.ff_dca_lfe_fir_64_fixed, self.npcmblocks);
+                dsp.lfeFirFixed(pl, self.lfe_rows, &dt.era_dca_lfe_fir_64_fixed, self.npcmblocks);
             }
             const n = self.npcmblocks >> 1;
             for (0..DCA_LFE_HISTORY) |kk| {

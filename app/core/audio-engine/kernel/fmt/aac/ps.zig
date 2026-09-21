@@ -841,7 +841,7 @@ fn decorrelation(self: *PSCtx, is34: bool) void {
 
     // 1) 功率累加
     const n_bands = NR_BANDS[@intFromBool(is34)];
-    const k_to_i: []const i8 = if (is34) &pst.ff_k_to_i_34 else &pst.ff_k_to_i_20;
+    const k_to_i: []const i8 = if (is34) &pst.era_k_to_i_34 else &pst.era_k_to_i_20;
     for (0..n_bands) |k| {
         const i: usize = @intCast(k_to_i[k]);
         psAddSquares(power[i][0..32], &self.Lbuf[k]);
@@ -1040,7 +1040,7 @@ fn stereoProcessing(self: *PSCtx, is34: bool) void {
 
     // 4.4 包络间插值 + 应用
     const n_bands = NR_BANDS[@intFromBool(is34)];
-    const k_to_i: []const i8 = if (is34) &pst.ff_k_to_i_34 else &pst.ff_k_to_i_20;
+    const k_to_i: []const i8 = if (is34) &pst.era_k_to_i_34 else &pst.era_k_to_i_20;
     e = 0;
     while (e < @as(usize, @intCast(ps2.num_env))) : (e += 1) {
         const start: i32 = ps2.border_position[e];

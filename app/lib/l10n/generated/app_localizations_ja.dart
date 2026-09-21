@@ -231,6 +231,19 @@ class AppLocalizationsJa extends AppLocalizations {
   String get downloadRequiresLoginTitle => 'ダウンロードにはログインが必要です';
 
   @override
+  String get downloadStreamingWarnTitle => 'ストリーミングのダウンロードは推奨されません';
+
+  @override
+  String get downloadStreamingWarnBody =>
+      'ストリーミングの視聴が安定している場合、あまり使わない場合、または自分でサーバーを運用している場合は、ローカルへのダウンロードはおすすめしません。';
+
+  @override
+  String get downloadStreamingWarnDontAsk => '今後表示しない';
+
+  @override
+  String get downloadStreamingWarnProceed => 'それでもダウンロード';
+
+  @override
   String get menuComment => 'コメントを見る';
 
   @override
@@ -327,6 +340,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get queueRepeatOne => '1曲リピート';
+
+  @override
+  String get queueRepeatOff => '順番に再生';
+
+  @override
+  String get queueFinished => 'プレイリストの再生が終了し、一時停止しました';
 
   @override
   String get queueShuffle => 'シャッフル再生';
@@ -3454,6 +3473,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get repeatModeOne => '1曲リピート';
 
   @override
+  String get repeatModeOff => '順番に再生';
+
+  @override
   String get sidebarStreaming => 'ストリーミング';
 
   @override
@@ -3578,6 +3600,25 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get streamingHint => 'メディアソース';
+
+  @override
+  String get streamingQualityTitle => 'ストリーミング音質';
+
+  @override
+  String get streamingQualityNote =>
+      '原本を優先。トランスコード段はサーバーに汎用 MP3 への変換を要求します（サーバー対応が必要、標準パラメータで他サーバーと互換）。';
+
+  @override
+  String get streamingQualityOriginal => '原本';
+
+  @override
+  String get streamingQualityHigh => '高 (320k)';
+
+  @override
+  String get streamingQualityMedium => '中 (192k)';
+
+  @override
+  String get streamingQualityLow => '低 (128k)';
 
   @override
   String get streamingHintDetail =>

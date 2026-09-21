@@ -19,6 +19,9 @@ const downloadFilenameTemplateKey = 'download.filenameTemplate';
 const downloadHistoryLimitKey = 'download.historyLimit';
 const downloaderIdentityKey = 'download.downloaderIdentity';
 const downloadDynamicFingerprintKey = 'download.dynamicFingerprint';
+/// 流媒体下载提示「不再提示」。
+const downloadStreamingNoticeDismissedKey =
+    'download.streamingNoticeDismissed';
 
 /// 生成下载器设备指纹（对齐 downloader-identity-plan §3.1，格式与 Rust
 /// `DownloaderIdentity` / resolvers.rs 消费侧一致）：
@@ -129,6 +132,17 @@ extension DownloadPrefs on AppPrefs {
     return AppPrefs(initialData: {
       ...data,
       downloadDynamicFingerprintKey: value,
+    });
+  }
+
+  /// 流媒体下载提示「不再提示」（默认 false = 每次提示）。
+  bool get downloadStreamingNoticeDismissed =>
+      (data[downloadStreamingNoticeDismissedKey] as bool?) ?? false;
+
+  AppPrefs copyWithDownloadStreamingNoticeDismissed(bool value) {
+    return AppPrefs(initialData: {
+      ...data,
+      downloadStreamingNoticeDismissedKey: value,
     });
   }
 
