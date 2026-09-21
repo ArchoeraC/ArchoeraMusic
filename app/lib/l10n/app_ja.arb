@@ -1419,6 +1419,28 @@
   "sleepTimer90": "90 minutes",
   "sleepTimerEndOfTrack": "End of current track",
   "sleepTimerFired": "Sleep timer reached; playback paused",
+  "sleepTimerFinishTrack": "Finish current track before pausing",
+  "sleepTimerWaitingTrackEnd": "Sleep timer reached; will pause after the current track",
+  "sleepTimerMinutes": "{minutes} 分",
+  "sleepTimerMinutesUnit": "分",
+  "sleepTimerCustom": "カスタム…",
+  "sleepTimerCustomTitle": "カスタムスリープタイマー",
+  "sleepTimerCustomLabel": "分",
+  "sleepTimerCustomInvalid": "1〜600 分の整数を入力してください",
+  "sleepTimerPresets": "スリープタイマーのプリセット",
+  "sleepTimerPresetsDesc": "スリープタイマーメニューに表示するクイック時間。追加・削除でき、空にすると「カスタム / 現在の曲を最後まで / オフ」のみ表示します。",
+  "sleepTimerPresetsAdd": "追加",
+  "sleepTimerPresetsEmpty": "プリセットなし",
+  "sleepTimerPresetsDuplicate": "その時間は既にプリセットにあります",
+  "sleepTimerPresetsEdit": "編集",
+  "settingsSectionSleepTimer": "スリープタイマー",
+  "@sleepTimerMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "settingsReverseSpectrum": "Reverse spectrum",
   "settingsReverseSpectrumDesc": "Flip the spectrum horizontally",
   "settingsAutoImmersive": "Auto immersive",

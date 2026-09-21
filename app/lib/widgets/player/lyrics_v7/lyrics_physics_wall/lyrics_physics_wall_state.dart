@@ -537,14 +537,14 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     return math.min(kMaxBlurPx, 1.0 + d);
   }
 
-  /// 悬停状态变化：立即重算窗口内的失焦（不做过渡，对齐上游 `!important` 立即生效）。
+  /// 悬停状态变化：让失焦量平滑过渡到新目标（整层/逐行档一致）。
+  ///
+  /// 原实现直接吸附（对齐上游 `!important` 立即生效），但瞬切观感生硬、
+  /// 「变清晰」的动效不明显。改为交给 [_animateVisuals] 按 [kBlurTau] 指数趋近，
+  /// 模糊↔清晰有肉眼可辨的过渡（移出后重新失焦同样平滑）。
   void _setHovering(bool v) {
     if (_hovering == v) return;
     _hovering = v;
-    final we = math.min(_winEnd, _blur.length);
-    for (var i = _winStart; i < we; i++) {
-      _blur[i] = _blurTargetFor(i);
-    }
     // 整层档的强度归零/恢复要过渡，得把 ticker 拉起来（否则移出后停在 0）。
     _ensureTicker();
     _repaint.notify();
@@ -798,7 +798,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     final pt = _panelBlurTarget();
     if ((_blurStrength - pt).abs() > 0.01) {
       var p = _blurStrength;
-      p += (pt - p) * (1 - math.exp(-dt / 0.1));
+      p += (pt - p) * (1 - math.exp(-dt / kBlurTau));
       if ((pt - p).abs() < 0.01) p = pt;
       _blurStrength = p;
       moving = true;
@@ -822,7 +822,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       final bt = _blurTargetFor(i);
       var b = _blur[i];
       if ((b - bt).abs() > 0.01) {
-        b += (bt - b) * (1 - math.exp(-dt / 0.1));
+        b += (bt - b) * (1 - math.exp(-dt / kBlurTau));
         if ((bt - b).abs() < 0.01) b = bt;
         _blur[i] = b;
         moving = true;

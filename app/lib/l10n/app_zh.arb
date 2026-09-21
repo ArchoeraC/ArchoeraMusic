@@ -1419,6 +1419,28 @@
   "sleepTimer90": "90 分钟",
   "sleepTimerEndOfTrack": "播完当前曲",
   "sleepTimerFired": "睡眠定时已到，已暂停播放",
+  "sleepTimerFinishTrack": "到时播完当前曲再暂停",
+  "sleepTimerWaitingTrackEnd": "定时已到，将在当前曲结束后暂停",
+  "sleepTimerMinutes": "{minutes} 分钟",
+  "sleepTimerMinutesUnit": "分钟",
+  "sleepTimerCustom": "自定义…",
+  "sleepTimerCustomTitle": "自定义睡眠定时",
+  "sleepTimerCustomLabel": "分钟数",
+  "sleepTimerCustomInvalid": "请输入 1–600 之间的分钟数",
+  "sleepTimerPresets": "睡眠定时预设",
+  "sleepTimerPresetsDesc": "睡眠定时菜单里的快捷时长，可增删；留空则只显示「自定义」「播完当前曲」「关闭」。",
+  "sleepTimerPresetsAdd": "添加",
+  "sleepTimerPresetsEmpty": "未设置预设",
+  "sleepTimerPresetsDuplicate": "该时长已在预设里",
+  "sleepTimerPresetsEdit": "编辑",
+  "settingsSectionSleepTimer": "睡眠定时",
+  "@sleepTimerMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "settingsReverseSpectrum": "反向频谱",
   "settingsReverseSpectrumDesc": "频谱水平翻转显示",
   "settingsAutoImmersive": "自动沉浸",

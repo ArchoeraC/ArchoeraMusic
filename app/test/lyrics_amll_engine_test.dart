@@ -279,7 +279,9 @@ void main() {
         LyricGroup(
           original: const LyricLine(timeMs: 0, text: 'A'),
           endMs: 1000,
-          fragments: const [LyricFragment(text: 'A', startMs: 0, durationMs: 500)],
+          fragments: const [
+            LyricFragment(text: 'A', startMs: 0, durationMs: 500),
+          ],
         ),
         LyricGroup(original: const LyricLine(timeMs: 6000, text: 'B')),
       ];
@@ -485,10 +487,7 @@ void main() {
       expect(mid.stiffness, greaterThan(slow.stiffness));
       expect(mid.stiffness, lessThan(fast.stiffness));
       // 超出范围被钳制。
-      expect(
-        resolvePosYSpringPolicy(intervalMs: 20).stiffness,
-        fast.stiffness,
-      );
+      expect(resolvePosYSpringPolicy(intervalMs: 20).stiffness, fast.stiffness);
       expect(
         resolvePosYSpringPolicy(intervalMs: 5000).stiffness,
         slow.stiffness,
@@ -524,7 +523,10 @@ void main() {
       const fs = 20.0;
       const h = <double>[fs * kLyricLineHeightEm, fs * kLyricLineHeightEm];
       final centers = computeCenters(h, gapPx: fs * kLyricLineGapEm);
-      expect(centers[1] - centers[0], closeTo(h[0] + fs * kLyricLineGapEm, 1e-9));
+      expect(
+        centers[1] - centers[0],
+        closeTo(h[0] + fs * kLyricLineGapEm, 1e-9),
+      );
     });
 
     test('音译行计入行高（主行 + 音译 + 译文，顺序与绘制一致）', () {
@@ -537,10 +539,12 @@ void main() {
         ),
       ];
       final mainH = fs * kLyricLineHeightEm;
-      final subH =
-          lyricTranslationFontSize(fs) * kLyricTranslationLineHeightEm;
+      final subH = lyricTranslationFontSize(fs) * kLyricTranslationLineHeightEm;
       final noSub = computeLineHeights(groups, fontSize: fs, maxWidth: 400);
-      expect(noSub.single, closeTo(mainH + fs * kLyricTranslationGapEm + subH, 0.01));
+      expect(
+        noSub.single,
+        closeTo(mainH + fs * kLyricTranslationGapEm + subH, 0.01),
+      );
 
       final withRoma = computeLineHeights(
         groups,
@@ -550,10 +554,7 @@ void main() {
       );
       expect(
         withRoma.single,
-        closeTo(
-          mainH + 2 * (fs * kLyricTranslationGapEm + subH),
-          0.01,
-        ),
+        closeTo(mainH + 2 * (fs * kLyricTranslationGapEm + subH), 0.01),
       );
 
       // 关闭音译/翻译后只剩主行。
@@ -782,9 +783,21 @@ void main() {
                       endMs: 4000,
                       fragments: const [
                         LyricFragment(text: 'A', startMs: 0, durationMs: 1000),
-                        LyricFragment(text: 'A', startMs: 1000, durationMs: 1000),
-                        LyricFragment(text: 'B', startMs: 2000, durationMs: 1000),
-                        LyricFragment(text: 'B', startMs: 3000, durationMs: 1000),
+                        LyricFragment(
+                          text: 'A',
+                          startMs: 1000,
+                          durationMs: 1000,
+                        ),
+                        LyricFragment(
+                          text: 'B',
+                          startMs: 2000,
+                          durationMs: 1000,
+                        ),
+                        LyricFragment(
+                          text: 'B',
+                          startMs: 3000,
+                          durationMs: 1000,
+                        ),
                       ],
                     ),
                   ],
@@ -841,9 +854,7 @@ void main() {
           endMs: 6000,
         ),
       ];
-      await tester.pumpWidget(
-        buildWall(groups, 0, showRomanization: true),
-      );
+      await tester.pumpWidget(buildWall(groups, 0, showRomanization: true));
       await settle(tester);
       dynamic s = stateOf(tester);
       final withSub = s.debugHeights() as List<double>;
@@ -852,9 +863,7 @@ void main() {
       expect(tester.takeException(), isNull);
 
       // 关闭音译后该行变矮。
-      await tester.pumpWidget(
-        buildWall(groups, 0, showRomanization: false),
-      );
+      await tester.pumpWidget(buildWall(groups, 0, showRomanization: false));
       await settle(tester);
       s = stateOf(tester);
       final withoutRoma = s.debugHeights() as List<double>;
@@ -889,21 +898,13 @@ void main() {
       final groups = buildGroups(600);
       int windowSize(dynamic s) =>
           (s.debugWindowEnd() as int) - (s.debugWindowStart() as int);
-      await tester.pumpWidget(
-        buildWall(groups, 300 * 1000, height: 260),
-      );
+      await tester.pumpWidget(buildWall(groups, 300 * 1000, height: 260));
       await settle(tester);
       final small = windowSize(stateOf(tester));
-      await tester.pumpWidget(
-        buildWall(groups, 300 * 1000, height: 1200),
-      );
+      await tester.pumpWidget(buildWall(groups, 300 * 1000, height: 1200));
       await settle(tester);
       final big = windowSize(stateOf(tester));
-      expect(
-        big,
-        greaterThan(small),
-        reason: '余量随视口高度放大：$small → $big',
-      );
+      expect(big, greaterThan(small), reason: '余量随视口高度放大：$small → $big');
       expect(tester.takeException(), isNull);
     });
 
@@ -1008,7 +1009,7 @@ void main() {
       await mouse.addPointer(location: Offset.zero);
       await mouse.moveTo(tester.getCenter(find.byType(AmllPhysicsWall)));
       await tester.pump();
-      await settle(tester, frames: 20);
+      await settle(tester, frames: 90);
       s = stateOf(tester);
       final hovered = s.debugBlur() as List<double>;
       expect(hovered[19], 0, reason: '悬停时失焦应被取消');
@@ -1017,7 +1018,7 @@ void main() {
       // 移出后恢复失焦。
       await mouse.moveTo(const Offset(-50, -50));
       await tester.pump();
-      await settle(tester, frames: 20);
+      await settle(tester, frames: 90);
       s = stateOf(tester);
       final after = s.debugBlur() as List<double>;
       expect(after[19], closeTo(2.0, 0.1), reason: '移出后应恢复失焦');
@@ -1044,13 +1045,16 @@ void main() {
       await mouse.addPointer(location: Offset.zero);
       await mouse.moveTo(tester.getCenter(find.byType(AmllPhysicsWall)));
       await tester.pump();
-      await settle(tester, frames: 30);
-      expect((stateOf(tester) as dynamic).debugPanelBlur(), closeTo(0.0, 0.02),
-          reason: '悬停时整层失焦应归零（对齐 :hover filter: unset）');
+      await settle(tester, frames: 90);
+      expect(
+        (stateOf(tester) as dynamic).debugPanelBlur(),
+        closeTo(0.0, 0.02),
+        reason: '悬停时整层失焦应归零（对齐 :hover filter: unset）',
+      );
 
       await mouse.moveTo(const Offset(-50, -50));
       await tester.pump();
-      await settle(tester, frames: 30);
+      await settle(tester, frames: 90);
       expect((stateOf(tester) as dynamic).debugPanelBlur(), closeTo(1.0, 0.05));
       expect(tester.takeException(), isNull);
     });
@@ -1060,7 +1064,7 @@ void main() {
       await tester.pumpWidget(buildWall(groups, 20000));
       await settle(tester);
       (stateOf(tester) as dynamic).debugForceBlurMode(LyricsBlurMode.perLine);
-      await settle(tester, frames: 40);
+      await settle(tester, frames: 90);
       final dynamic s = stateOf(tester);
       expect(s.debugBlurMode(), LyricsBlurMode.perLine);
       expect(s.debugPanelBlur(), closeTo(0.0, 0.05), reason: '逐行档不用整层强度');
@@ -1098,10 +1102,12 @@ void main() {
       final dynamic after = stateOf(tester);
       expect(after.debugBlurDegraded(), isTrue, reason: '持续光栅超预算应降级');
       expect(after.debugBlurMode(), LyricsBlurMode.off);
-      await settle(tester, frames: 30);
-      expect((stateOf(tester) as dynamic).debugPanelBlur(), closeTo(0.0, 0.05),
-          reason: '降级后整层强度归零');
-
+      await settle(tester, frames: 90);
+      expect(
+        (stateOf(tester) as dynamic).debugPanelBlur(),
+        closeTo(0.0, 0.05),
+        reason: '降级后整层强度归零',
+      );
       // 后续就算帧时间正常也不会自己升回来（避免画质抖动）。
       for (var i = 0; i < 60; i++) {
         after.debugNoteFrame(rasterMs: 6.0, uiMs: 3.0);
@@ -1121,7 +1127,10 @@ void main() {
       }
       await tester.pump(const Duration(milliseconds: 16));
       expect((stateOf(tester) as dynamic).debugBlurDegraded(), isFalse);
-      expect((stateOf(tester) as dynamic).debugBlurMode(), LyricsBlurMode.panel);
+      expect(
+        (stateOf(tester) as dynamic).debugBlurMode(),
+        LyricsBlurMode.panel,
+      );
     });
 
     testWidgets('设置「画质」档：固定逐行，显式选择不吃自动降级', (tester) async {
@@ -1157,7 +1166,7 @@ void main() {
           blurQuality: LyricsBlurQuality.lite,
         ),
       );
-      await settle(tester, frames: 40);
+      await settle(tester, frames: 90);
       final dynamic s = stateOf(tester);
       expect(s.debugBlurMode(), LyricsBlurMode.lite);
       expect(s.debugPanelBlur(), closeTo(1.0, 0.05), reason: '伪散焦强度应到位');
@@ -1218,6 +1227,48 @@ void main() {
         greaterThan(1.0),
         reason: '拖动时应平滑滑动到目标，而不是瞬移',
       );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('倒带后继续播放：先前在下方展示过的行不应叠进当前行', (tester) async {
+      // 回归：视口外的行被 park 停驻后，重新入窗时曾把停驻前的速度注入新运动，
+      // 冲过目标、叠到当前行上（表现为「下方展示过的歌词在后方叠层/换行」）。
+      final groups = buildGroups(60); // 每行 1000ms
+      await tester.pumpWidget(buildWall(groups, 30 * 1000));
+      await settle(tester);
+
+      // 往回拖进度条（连续往回）。
+      await tester.pumpWidget(buildWall(groups, 10 * 1000));
+      await tester.pump(const Duration(milliseconds: 16));
+      // 松手：先跳回旧播放位置（playing），再落到 seek 目标。
+      await tester.pumpWidget(buildWall(groups, 30 * 1000, playing: true));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pumpWidget(buildWall(groups, 10 * 1000, playing: true));
+      await settle(tester, frames: 200);
+
+      // 继续播放，逐行推进：每个瞬间可见行都必须按行号单调排列。
+      for (final p in [11, 12, 13]) {
+        await tester.pumpWidget(buildWall(groups, p * 1000, playing: true));
+        for (var f = 0; f < 3; f++) {
+          for (var k = 0; k < 10; k++) {
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          final s = stateOf(tester);
+          final y = s.debugY() as List<double>;
+          final h = s.debugHeights() as List<double>;
+          final visible = <int>[
+            for (var i = 0; i < y.length; i++)
+              if (y[i] + h[i] / 2 >= 0 && y[i] - h[i] / 2 <= 500) i,
+          ];
+          for (var k = 1; k < visible.length; k++) {
+            expect(
+              y[visible[k]],
+              greaterThan(y[visible[k - 1]]),
+              reason: '第 ${visible[k]} 行叠到了第 ${visible[k - 1]} 行后方',
+            );
+          }
+        }
+      }
       expect(tester.takeException(), isNull);
     });
 

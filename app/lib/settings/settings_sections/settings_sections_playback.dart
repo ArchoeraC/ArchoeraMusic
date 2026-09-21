@@ -425,7 +425,9 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
     );
     final v = int.tryParse(ctrl.text.trim());
     if (ok == true && v != null && v >= 1) {
-      ref.read(appPrefsProvider.notifier).setEngineMemory(
+      ref
+          .read(appPrefsProvider.notifier)
+          .setEngineMemory(
             policy: 'limit',
             limitMb: v.clamp(1, 1 << 18).toInt(),
           );
@@ -457,6 +459,14 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
     if (ok == true) {
       ref.read(appPrefsProvider.notifier).setEngineMemory(policy: 'unlimited');
     }
+  }
+
+  /// 编辑睡眠定时快捷预设（弹窗返回后落盘）。
+  Future<void> _editSleepTimerPresets() async {
+    final current = ref.read(appPrefsProvider).sleepTimerPresets;
+    final next = await showSleepTimerPresetsDialog(context, current);
+    if (next == null || !mounted) return;
+    ref.read(appPrefsProvider.notifier).setSleepTimerPresets(next);
   }
 
   @override
@@ -544,9 +554,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsMemoryPlaySection,
-          note: prefs.engineMemoryPlay
-              ? null
-              : l10n.settingsMemoryFileModeNote,
+          note: prefs.engineMemoryPlay ? null : l10n.settingsMemoryFileModeNote,
           children: [
             SettingSwitchTile(
               icon: EtaIcons.memoryStickOutline,
@@ -564,12 +572,14 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 label: l10n.settingsMemoryPolicyAuto,
                 subtitle: l10n.settingsMemoryPolicyAutoSub,
                 selected: prefs.pcmMemPolicy == 'auto',
-                onTap: () =>
-                    ref.read(appPrefsProvider.notifier).setEngineMemory(policy: 'auto'),
+                onTap: () => ref
+                    .read(appPrefsProvider.notifier)
+                    .setEngineMemory(policy: 'auto'),
               ),
               _MemoryPolicyTile(
                 label: l10n.settingsMemoryPolicyLimit,
-                subtitle: '${prefs.pcmMemLimitMb} MB · '
+                subtitle:
+                    '${prefs.pcmMemLimitMb} MB · '
                     '${l10n.settingsMemoryLimitHint}',
                 selected: prefs.pcmMemPolicy == 'limit',
                 onTap: () => _pickMemoryLimitMb(prefs.pcmMemLimitMb),
@@ -588,9 +598,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           title: l10n.settingsSectionMemory,
           children: [
             SettingSwitchTile(
-              icon: prefs.sessionMemory
-                  ? EtaIcons.history
-                  : EtaIcons.history,
+              icon: prefs.sessionMemory ? EtaIcons.history : EtaIcons.history,
               title: l10n.settingsSessionMemory,
               subtitle: prefs.sessionMemory
                   ? l10n.settingsSessionMemoryOn
@@ -640,10 +648,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   fontWeight: FontWeight.w600,
                   color: scheme.onSurface,
                 ),
-                icon: Icon(
-                  EtaIcons.downSmall,
-                  color: scheme.onSurfaceVariant,
-                ),
+                icon: Icon(EtaIcons.downSmall, color: scheme.onSurfaceVariant),
                 onChanged: (v) {
                   if (v == null) return;
                   ref.read(appPrefsProvider.notifier).setCloseBehavior(v);
@@ -671,9 +676,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           title: l10n.settingsSectionPower,
           children: [
             SettingSwitchTile(
-              icon: prefs.powerSaver
-                  ? EtaIcons.leaf
-                  : EtaIcons.leafOutline,
+              icon: prefs.powerSaver ? EtaIcons.leaf : EtaIcons.leafOutline,
               title: l10n.settingsPowerSaver,
               subtitle: prefs.powerSaver
                   ? l10n.settingsPowerSaverOn
@@ -693,6 +696,25 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               value: prefs.suppressSleep,
               onChanged: (value) =>
                   ref.read(appPrefsProvider.notifier).setSuppressSleep(value),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SettingSection(
+          title: l10n.settingsSectionSleepTimer,
+          children: [
+            SettingTile(
+              icon: EtaIcons.stopwatchOutline,
+              title: l10n.sleepTimerPresets,
+              subtitle: prefs.sleepTimerPresets.isEmpty
+                  ? l10n.sleepTimerPresetsEmpty
+                  : prefs.sleepTimerPresets
+                        .map(l10n.sleepTimerMinutes)
+                        .join(' · '),
+              trailing: TextButton(
+                onPressed: _editSleepTimerPresets,
+                child: Text(l10n.sleepTimerPresetsEdit),
+              ),
             ),
           ],
         ),
@@ -786,9 +808,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               title: l10n.settingsAutoImmersive,
               subtitle: l10n.settingsAutoImmersiveDesc,
               value: prefs.autoImmersive,
-              onChanged: (value) => ref
-                  .read(appPrefsProvider.notifier)
-                  .setAutoImmersive(value),
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setAutoImmersive(value),
             ),
             SettingSwitchTile(
               icon: EtaIcons.music,
@@ -826,9 +847,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               title: l10n.settingsMediaSession,
               subtitle: l10n.settingsMediaSessionDesc,
               value: prefs.mediaSessionEnabled,
-              onChanged: (value) => ref
-                  .read(appPrefsProvider.notifier)
-                  .setMediaSession(value),
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setMediaSession(value),
             ),
             const _ProtocolRegisterTile(),
           ],
@@ -871,10 +891,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   fontWeight: FontWeight.w600,
                   color: scheme.onSurface,
                 ),
-                icon: Icon(
-                  EtaIcons.downSmall,
-                  color: scheme.onSurfaceVariant,
-                ),
+                icon: Icon(EtaIcons.downSmall, color: scheme.onSurfaceVariant),
                 onChanged: (v) {
                   if (v == null) return;
                   ref
@@ -1019,10 +1036,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               subtitle: l10n.settingsCoverLayoutDesc,
               trailing: SSegmented<String>(
                 options: [
-                  SSegmentedOption(
-                    'default',
-                    l10n.settingsCoverLayoutDefault,
-                  ),
+                  SSegmentedOption('default', l10n.settingsCoverLayoutDefault),
                   SSegmentedOption(
                     'fullscreen',
                     l10n.settingsCoverLayoutFullscreen,
@@ -1043,9 +1057,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               max: 0.6,
               divisions: 6,
               label: '${(prefs.coverLyricRatio * 100).round()}%',
-              onChanged: (v) => ref
-                  .read(appPrefsProvider.notifier)
-                  .setCoverLayout(ratio: v),
+              onChanged: (v) =>
+                  ref.read(appPrefsProvider.notifier).setCoverLayout(ratio: v),
             ),
             SettingSwitchTile(
               icon: EtaIcons.fullscreen,
@@ -1323,11 +1336,7 @@ class _SinkDefaultCallBanner extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  EtaIcons.warning,
-                  size: 18,
-                  color: scheme.error,
-                ),
+                Icon(EtaIcons.warning, size: 18, color: scheme.error),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

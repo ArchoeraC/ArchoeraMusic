@@ -1419,6 +1419,28 @@
   "sleepTimer90": "90 minutes",
   "sleepTimerEndOfTrack": "End of current track",
   "sleepTimerFired": "Sleep timer reached; playback paused",
+  "sleepTimerFinishTrack": "Finish current track before pausing",
+  "sleepTimerWaitingTrackEnd": "Sleep timer reached; will pause after the current track",
+  "sleepTimerMinutes": "{minutes} Minuten",
+  "sleepTimerMinutesUnit": "Min.",
+  "sleepTimerCustom": "Benutzerdefiniert…",
+  "sleepTimerCustomTitle": "Benutzerdefinierter Sleep-Timer",
+  "sleepTimerCustomLabel": "Minuten",
+  "sleepTimerCustomInvalid": "Bitte Minuten zwischen 1 und 600 eingeben",
+  "sleepTimerPresets": "Sleep-Timer-Voreinstellungen",
+  "sleepTimerPresetsDesc": "Schnelldauern im Sleep-Timer-Menü. Einträge hinzufügen oder entfernen; leer lassen, um nur Benutzerdefiniert / Aktuellen Titel beenden / Aus anzuzeigen.",
+  "sleepTimerPresetsAdd": "Hinzufügen",
+  "sleepTimerPresetsEmpty": "Keine Voreinstellungen",
+  "sleepTimerPresetsDuplicate": "Diese Dauer ist bereits eine Voreinstellung",
+  "sleepTimerPresetsEdit": "Bearbeiten",
+  "settingsSectionSleepTimer": "Sleep-Timer",
+  "@sleepTimerMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "settingsReverseSpectrum": "Reverse spectrum",
   "settingsReverseSpectrumDesc": "Flip the spectrum horizontally",
   "settingsAutoImmersive": "Auto immersive",
