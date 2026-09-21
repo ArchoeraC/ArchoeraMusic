@@ -372,7 +372,9 @@ begin
   WizardForm.DirEdit.OnChange := @DirEditChanged;
 
   { 更新模式：欢迎页文案改为「正在更新 旧版本 → 新版本」。
-    [name]/[name/ver] 需手动展开（见 ExpandAppNamePlaceholders）。 }
+    注意：文案里的 name / name-ver 占位符（即 [name]、[name/ver]）需手动展开，
+    见 ExpandAppNamePlaceholders。行首不要直接以 [ 开头，否则会被
+    Inno 的段落解析器当成 section 头而报 Invalid section tag。 }
   if PrevInstalled then
   begin
     WizardForm.WelcomeLabel1.Caption :=
