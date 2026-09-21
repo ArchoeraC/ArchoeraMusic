@@ -114,7 +114,7 @@ class _HomeHeader extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          l10n.pageHomeGreeting(greeting, name),
+          l10n.pageHomeGreeting(greeting: greeting, name: name),
           style: TextStyle(
             fontSize: 13,
             color: scheme.onSurfaceVariant.withValues(alpha: 0.75),

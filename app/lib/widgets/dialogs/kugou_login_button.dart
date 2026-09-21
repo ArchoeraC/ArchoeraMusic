@@ -61,14 +61,14 @@ class _KugouLoginButtonState extends ConsumerState<KugouLoginButton> {
     final ok = await showKugouLoginDialog(context);
     if (ok && mounted) {
       setState(() {});
-      _toast(context.l10n.loginKugouSuccessVip(context.l10n.brandKugou));
+      _toast(context.l10n.loginKugouSuccessVip(platform: context.l10n.brandKugou));
     }
   }
 
   void _logout() {
     _api.clearSession();
     setState(() {});
-    _toast(context.l10n.loginLoggedOut(context.l10n.brandKugou));
+    _toast(context.l10n.loginLoggedOut(platform: context.l10n.brandKugou));
   }
 
   void _toast(String message) => toast(message);
@@ -308,7 +308,7 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
 
   String _statusText(AppLocalizations l10n) => switch (_status) {
     2 => l10n.loginWaitingConfirm,
-    _ => l10n.loginKugouScanHint(l10n.brandKugou),
+    _ => l10n.loginKugouScanHint(platform: l10n.brandKugou),
   };
 
   @override

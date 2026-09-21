@@ -23,7 +23,7 @@ extension _StreamingPlaylistDetailPageView
         title: meta?.name ?? '',
         subtitle: [
           if (meta?.owner?.isNotEmpty == true) meta!.owner!,
-          if (songs != null) l10n.streamingPlaylistSongs(songs.length),
+          if (songs != null) l10n.streamingPlaylistSongs(count: songs.length),
         ].join(' · '),
         onPlayAll: songs == null || songs.isEmpty
             ? null

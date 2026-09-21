@@ -235,7 +235,7 @@ class _QueuePanelHeader extends StatelessWidget {
           const SizedBox(width: 8),
           if (queueLength > 0)
             Text(
-              l10n.queueTrackCount(queueLength),
+              l10n.queueTrackCount(count: queueLength),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),

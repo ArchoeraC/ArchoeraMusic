@@ -84,7 +84,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
               icon: EtaIcons.dashboard4Outline,
               title: l10n.settingsScanParallelism,
               subtitle: l10n.settingsScanParallelismDesc(
-                prefs.scanParallelism <= 0
+                value: prefs.scanParallelism <= 0
                     ? l10n.settingsValueAuto
                     : '${prefs.scanParallelism}',
               ),
@@ -99,7 +99,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
               icon: EtaIcons.menuOutline,
               title: l10n.settingsScanBatch,
               subtitle: l10n.settingsScanBatchDesc(
-                prefs.scanBatchSize <= 0
+                value: prefs.scanBatchSize <= 0
                     ? l10n.settingsValueAuto
                     : '${prefs.scanBatchSize}',
               ),
@@ -167,7 +167,7 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionScanQuarantine,
-          note: l10n.settingsScanQuarantineNote(_quarantineDir),
+          note: l10n.settingsScanQuarantineNote(dir: _quarantineDir),
           children: [
             if (_loadingQuarantine)
               const Padding(

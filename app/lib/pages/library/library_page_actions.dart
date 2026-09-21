@@ -16,7 +16,7 @@ extension _LibraryPageActions on _LibraryPageState {
       // 队列中已有则跳转，否则建立队列（切歌/播放列表可用）
       ref.read(playbackProvider.notifier).playTrack(track);
     } catch (e) {
-      _toast(l10n.toastPlayFailed('$e'));
+      _toast(l10n.toastPlayFailed(msg: '$e'));
     }
   }
 
@@ -84,7 +84,7 @@ extension _LibraryPageActions on _LibraryPageState {
     final confirmed = await SDialog.show<bool>(
       context,
       title: l10n.libraryDeleteFileTitle,
-      description: l10n.libraryDeleteFileMessage(track.title),
+      description: l10n.libraryDeleteFileMessage(name: track.title),
       width: 440,
       child: const SizedBox.shrink(),
       actions: [

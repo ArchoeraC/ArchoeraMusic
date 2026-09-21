@@ -71,7 +71,7 @@ class _ExperimentalSourceSectionState
               icon: EtaIcons.userOutline,
               title: l10n.settingsLogin,
               subtitle: loggedIn
-                  ? l10n.settingsLoggedInAs(account?.displayName ?? '')
+                  ? l10n.settingsLoggedInAs(name: account?.displayName ?? '')
                   : l10n.settingsNotLoggedIn,
               enabled: enabled,
               trailing: loggedIn

@@ -65,9 +65,9 @@ extension _LikedPageActions on _LikedPageState {
       if (tracks.isEmpty) return;
       await ref.read(playbackProvider.notifier).playQueue(tracks);
       if (!mounted) return;
-      _toast(context.l10n.toastPlayedAll(tracks.length));
+      _toast(context.l10n.toastPlayedAll(count: tracks.length));
     } catch (e) {
-      if (mounted) _toast(context.l10n.trackListPlaySourceFailed('$e'));
+      if (mounted) _toast(context.l10n.trackListPlaySourceFailed(msg: '$e'));
     } finally {
       if (mounted) setState(() => _resolving = false);
     }
@@ -98,7 +98,7 @@ extension _LikedPageActions on _LikedPageState {
           .read(playbackProvider.notifier)
           .playNow(track, resolvedUrl: url);
     } catch (e) {
-      if (mounted) _toast(context.l10n.trackListPlaySourceFailed('$e'));
+      if (mounted) _toast(context.l10n.trackListPlaySourceFailed(msg: '$e'));
     } finally {
       if (mounted) setState(() => _resolving = false);
     }
@@ -156,7 +156,7 @@ extension _LikedPageActions on _LikedPageState {
       final n = await _qqStore.mergeOnline(online);
       ref.read(likeControllerProvider).mergeOnlineQq(online);
       if (!mounted) return;
-      _toast(n > 0 ? l10n.pageLikedQqSynced(n) : l10n.pageLikedQqSyncedNone);
+      _toast(n > 0 ? l10n.pageLikedQqSynced(count: n) : l10n.pageLikedQqSyncedNone);
     } catch (_) {
       if (!mounted) return;
       _toast(l10n.toastQqLikeSyncFailed);

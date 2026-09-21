@@ -161,7 +161,7 @@ extension _CommentDialogActions on _CommentDialogState {
     }
     final account = ref.read(neteaseAuthProvider);
     if (account == null) {
-      toast(l10n.commentLoginRequired(l10n.brandNetease));
+      toast(l10n.commentLoginRequired(platform: l10n.brandNetease));
       showNeteaseLoginDialog(context);
       return;
     }
@@ -180,7 +180,7 @@ extension _CommentDialogActions on _CommentDialogState {
       if (!mounted) return;
       final err = e is NeteaseApiError ? e : null;
       final code = err?.body?['code'];
-      toast(code == 505 ? l10n.commentDuplicate : l10n.commentSendFailed('$e'));
+      toast(code == 505 ? l10n.commentDuplicate : l10n.commentSendFailed(msg: '$e'));
     } finally {
       if (mounted) setState(() => _sending = false);
     }

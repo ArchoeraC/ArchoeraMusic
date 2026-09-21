@@ -42,7 +42,7 @@ extension _NeteaseLoginDialogView on _NeteaseLoginDialogState {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            l10n.loginTitleBrand(l10n.brandNetease),
+                            l10n.loginTitleBrand(platform: l10n.brandNetease),
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),

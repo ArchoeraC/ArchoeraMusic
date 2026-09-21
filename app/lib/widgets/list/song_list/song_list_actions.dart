@@ -93,7 +93,7 @@ extension _SongListActions on _SongListState {
     for (final t in tracks) {
       notifier.insertToQueue(t);
     }
-    toast(context.l10n.toastBatchAddedToQueue(tracks.length));
+    toast(context.l10n.toastBatchAddedToQueue(count: tracks.length));
     if (mounted) _exitBatch();
   }
 

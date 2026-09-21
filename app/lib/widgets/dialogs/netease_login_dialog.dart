@@ -160,7 +160,7 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
           final l10n = context.l10n;
           _status = status.code == 802
               ? l10n.loginWaitingConfirm
-              : l10n.loginNeteaseScanHint(l10n.brandNetease);
+              : l10n.loginNeteaseScanHint(platform: l10n.brandNetease);
         });
       }
     } catch (e) {

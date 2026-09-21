@@ -67,7 +67,7 @@ extension _CommentDialogView on _CommentDialogState {
         return _EmptyHint(
           icon: EtaIcons.cloudOutline,
           text: l10n.commentNotFound(
-            _isKugou
+            platform: _isKugou
                 ? l10n.brandKugou
                 : _isQq
                 ? l10n.platformQQMusic
@@ -259,7 +259,7 @@ class _CommentTile extends StatelessWidget {
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
     if (sameDay) return '$hh:$mm';
-    return l10n.commentTimeFormat(dt.day, dt.month, '$hh:$mm');
+    return l10n.commentTimeFormat(day: dt.day, month: dt.month, time: '$hh:$mm');
   }
 
   @override
@@ -345,7 +345,7 @@ class _CommentTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      l10n.commentReplyFormat(reply.text, reply.userName),
+                      l10n.commentReplyFormat(text: reply.text, user: reply.userName),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(

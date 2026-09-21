@@ -27,18 +27,18 @@ String _failText(AppLocalizations l10n, MemorySourceFailDetail f) {
     case MemorySourceFailKind.notHttpSource:
       return l10n.memorySourceFailNotHttp;
     case MemorySourceFailKind.isolateSpawn:
-      return l10n.memorySourceFailIsolateSpawn(f.error ?? '');
+      return l10n.memorySourceFailIsolateSpawn(error: f.error ?? '');
     case MemorySourceFailKind.httpStatus:
-      return l10n.memorySourceFailHttpStatus(f.httpCode ?? 0, f.httpStatus ?? '');
+      return l10n.memorySourceFailHttpStatus(code: f.httpCode ?? 0, status: f.httpStatus ?? '');
     case MemorySourceFailKind.overWholeCeiling:
       return l10n.memorySourceFailOverWholeCeiling(
-        formatBytes(f.content ?? 0),
-        formatBytes(f.limit ?? 0),
+        content: formatBytes(f.content ?? 0),
+        limit: formatBytes(f.limit ?? 0),
       );
     case MemorySourceFailKind.grewOverCeiling:
       return l10n.memorySourceFailGrewCeiling(
-        formatBytes(f.got ?? 0),
-        formatBytes(f.limit ?? 0),
+        got: formatBytes(f.got ?? 0),
+        limit: formatBytes(f.limit ?? 0),
       );
     case MemorySourceFailKind.emptyContent:
       return l10n.memorySourceFailEmpty;
@@ -47,9 +47,9 @@ String _failText(AppLocalizations l10n, MemorySourceFailDetail f) {
     case MemorySourceFailKind.segstoreFillError:
       return l10n.memorySourceFailSegFill;
     case MemorySourceFailKind.segstoreFillException:
-      return l10n.memorySourceFailSegFillEx(f.error ?? '');
+      return l10n.memorySourceFailSegFillEx(error: f.error ?? '');
     case MemorySourceFailKind.downloadFailed:
-      return l10n.memorySourceFailDownload(f.error ?? '');
+      return l10n.memorySourceFailDownload(error: f.error ?? '');
   }
 }
 

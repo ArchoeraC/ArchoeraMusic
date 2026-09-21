@@ -16,7 +16,7 @@ extension _LibraryHeaderActions on LibraryHeader {
     try {
       ref.read(playbackProvider.notifier).playQueue(tracks);
     } catch (e) {
-      _toast(context, l10n.toastPlayFailed('$e'));
+      _toast(context, l10n.toastPlayFailed(msg: '$e'));
     }
   }
 
@@ -86,7 +86,7 @@ extension _LibraryHeaderActions on LibraryHeader {
     _toast(
       context,
       customTarget.isEmpty
-          ? l10n.settingsOrganizeUsingDefault(target)
+          ? l10n.settingsOrganizeUsingDefault(dir: target)
           : l10n.toastOrganizeStarted,
     );
   }
@@ -149,7 +149,7 @@ extension _LibraryHeaderActions on LibraryHeader {
           _buildLibraryHeaderStatRow(
             context,
             l10n.libraryStatTracks,
-            l10n.libraryStatTrackCount(state.totalCount),
+            l10n.libraryStatTrackCount(count: state.totalCount),
           ),
           _buildLibraryHeaderStatRow(
             context,
@@ -164,7 +164,7 @@ extension _LibraryHeaderActions on LibraryHeader {
           _buildLibraryHeaderStatRow(
             context,
             l10n.libraryScanDirs,
-            l10n.libraryScanDirCount(state.scanDirs.length),
+            l10n.libraryScanDirCount(count: state.scanDirs.length),
           ),
         ],
       ),
@@ -195,9 +195,9 @@ extension _LibraryHeaderActions on LibraryHeader {
     final h = totalSec ~/ 3600;
     final m = (totalSec % 3600) ~/ 60;
     final s = totalSec % 60;
-    if (h > 0) return l10n.libraryHoursMinutes(h, m);
-    if (m > 0) return l10n.libraryMinutes(m);
-    return l10n.librarySeconds(s);
+    if (h > 0) return l10n.libraryHoursMinutes(h: h, m: m);
+    if (m > 0) return l10n.libraryMinutes(m: m);
+    return l10n.librarySeconds(s: s);
   }
 
   void _toast(BuildContext context, String msg) {
