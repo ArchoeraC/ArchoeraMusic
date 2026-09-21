@@ -88,7 +88,9 @@ class PlayerLyricsBlock extends ConsumerWidget {
               ? colorScheme.primary
               : Color(prefs.lyricPlayedColor));
     final unplayedColor = Color(prefs.lyricUnplayedColor);
-    final showTranslation = prefs.showTranslation;
+    // 全屏播放器始终显示翻译：设置项「显示翻译」仅作用于播放条迷你歌词
+    // （见 bar_lyric_text_widgets.dart），不在此处受其控制。
+    const showTranslation = true;
     // 引擎切换：simple（旧实现）/ amll（AMLL 歌词墙）
     final wall =
         prefs.lyricEngine == 'amll'

@@ -334,7 +334,7 @@ extension PlayerPrefs on AppPrefs {
   /// 播放条迷你歌词以卡拉OK 逐字高亮显示；关闭则始终显示普通整行歌词。
   bool get barEnhancedLyrics => data[barEnhancedLyricsKey] as bool? ?? true;
 
-  /// 歌词显示翻译（播放条迷你歌词与全屏播放器；默认开）。
+  /// 播放条迷你歌词显示翻译（默认开）；全屏播放器始终显示翻译，不受此项控制。
   bool get showTranslation => data[showTranslationKey] as bool? ?? true;
 
   /// 歌词显示音译（罗马音；默认关）。
