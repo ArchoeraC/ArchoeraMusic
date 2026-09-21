@@ -136,13 +136,13 @@ extension _FavoritesPageView on _FavoritesPageState {
                   ),
                 ),
                 const SizedBox(width: 12),
-                SSegmented<_Platform>(
+                SDropdown<_Platform>(
                   options: [
-                    SSegmentedOption(_Platform.netease, l10n.platformNetease),
-                    SSegmentedOption(_Platform.kugou, l10n.platformKugou),
-                    SSegmentedOption(_Platform.qqmusic, l10n.platformQQMusic),
+                    SDropdownOption(_Platform.netease, l10n.platformNetease),
+                    SDropdownOption(_Platform.kugou, l10n.platformKugou),
+                    SDropdownOption(_Platform.qqmusic, l10n.platformQQMusic),
                     if (Enabled)
-                      SSegmentedOption(_Platform., l10n.platform),
+                      SDropdownOption(_Platform., l10n.platform),
                   ],
                   selected: _platform,
                   onChanged: _switchPlatform,
