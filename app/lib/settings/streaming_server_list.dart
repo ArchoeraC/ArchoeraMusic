@@ -81,7 +81,7 @@ class _StreamingServerListState extends ConsumerState<StreamingServerList> {
     setState(() => _switchingId = null);
     final s = ref.read(streamingProvider);
     if (s.connected && s.activeServerId == cfg.id) {
-      toast(l10n.streamingToastConnected(cfg.name));
+      toast(l10n.streamingToastConnected(name: cfg.name));
     } else {
       toast(
         s.connectionError ?? l10n.streamingServerConnectFailed,
@@ -110,7 +110,7 @@ class _StreamingServerListState extends ConsumerState<StreamingServerList> {
       context,
       title: l10n.streamingServerDeleteConfirmTitle,
       child: Text(
-        l10n.streamingServerDeleteConfirm(cfg.name),
+        l10n.streamingServerDeleteConfirm(name: cfg.name),
         style: TextStyle(
           fontSize: 13,
           color: Theme.of(context).colorScheme.onSurfaceVariant,

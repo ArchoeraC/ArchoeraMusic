@@ -222,7 +222,7 @@ class _SleepTimerPresetsDialogState extends State<_SleepTimerPresetsDialog> {
               children: [
                 for (final m in _presets)
                   InputChip(
-                    label: Text(l10n.sleepTimerMinutes(m)),
+                    label: Text(l10n.sleepTimerMinutes(minutes: m)),
                     deleteIcon: const Icon(EtaIcons.deleteOutline, size: 18),
                     onDeleted: () => _remove(m),
                   ),

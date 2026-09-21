@@ -71,7 +71,7 @@ class _ExperimentalSourceSectionState
               icon: EtaIcons.userOutline,
               title: l10n.settingsNekoLogin,
               subtitle: loggedIn
-                  ? l10n.settingsNekoLoggedInAs(account?.displayName ?? '')
+                  ? l10n.settingsNekoLoggedInAs(name: account?.displayName ?? '')
                   : l10n.settingsNekoNotLoggedIn,
               enabled: enabled,
               trailing: loggedIn

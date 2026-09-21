@@ -43,7 +43,7 @@ extension _SecuritySectionView on _SecuritySectionState {
               icon: EtaIcons.serverOutline,
               title: l10n.settingsSecurityStreaming,
               info:
-                  '${streamingServersPath()}\n${_formatBytes(_streamingBytes)} · ${l10n.settingsSecurityStreamingCount(_streamingCount)} · ${l10n.settingsSecurityStreamingDesc}',
+                  '${streamingServersPath()}\n${_formatBytes(_streamingBytes)} · ${l10n.settingsSecurityStreamingCount(count: _streamingCount)} · ${l10n.settingsSecurityStreamingDesc}',
               enabled: _hasStreaming,
               onDestroy: _destroyStreaming,
             ),

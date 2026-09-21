@@ -170,12 +170,6 @@ abstract class AppLocalizations {
   /// **'时长'**
   String get trackDetailDuration;
 
-  /// No description provided for @trackDetailArtist.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'歌手'**
-  String get trackDetailArtist;
-
   /// No description provided for @trackDetailAlbum.
   ///
   /// In zh_CN, this message translates to:
@@ -294,13 +288,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'已加入播放队列 {count} 首'**
-  String toastBatchAddedToQueue(Object count);
+  String toastBatchAddedToQueue({required Object count});
 
   /// No description provided for @toastBatchAddedToDownloadQueue.
   ///
   /// In zh_CN, this message translates to:
   /// **'已加入下载队列 {count} 首'**
-  String toastBatchAddedToDownloadQueue(Object count);
+  String toastBatchAddedToDownloadQueue({required Object count});
 
   /// No description provided for @settingsBarEnhancedLyrics.
   ///
@@ -367,12 +361,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'系统可能按空闲计划休眠'**
   String get settingsSuppressSleepOff;
-
-  /// No description provided for @settingsPowerSaverNote.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'节能模式监听窗口状态事件自动降帧，无需轮询；窗口不可见或显示器关闭时，渲染引擎本身已停止绘制。「禁用系统休眠」仅在播放中生效。'**
-  String get settingsPowerSaverNote;
 
   /// No description provided for @settingsCloseBehavior.
   ///
@@ -476,12 +464,6 @@ abstract class AppLocalizations {
   /// **'加载中'**
   String get commonLoading;
 
-  /// No description provided for @commonLossless.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'无损'**
-  String get commonLossless;
-
   /// No description provided for @commonOriginal.
   ///
   /// In zh_CN, this message translates to:
@@ -546,7 +528,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'获取{platform}下载链接需登录，未登录只能试听，无法下载完整音质。\n\n请先登录{platform}账号后重试。'**
-  String downloadRequiresLoginContent(Object platform);
+  String downloadRequiresLoginContent({required Object platform});
 
   /// No description provided for @downloadRequiresLoginTitle.
   ///
@@ -602,17 +584,11 @@ abstract class AppLocalizations {
   /// **'账号'**
   String get navHeaderAccount;
 
-  /// No description provided for @navHeaderComingSoon.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'敬请期待'**
-  String get navHeaderComingSoon;
-
   /// No description provided for @navHeaderKugouId.
   ///
   /// In zh_CN, this message translates to:
   /// **'KG {id}'**
-  String navHeaderKugouId(Object id);
+  String navHeaderKugouId({required Object id});
 
   /// No description provided for @navHeaderKugouMusic.
   ///
@@ -774,7 +750,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 首'**
-  String queueTrackCount(Object count);
+  String queueTrackCount({required Object count});
 
   /// No description provided for @searchHistory.
   ///
@@ -804,7 +780,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'搜索“{query}”'**
-  String searchQuick(Object query);
+  String searchQuick({required Object query});
 
   /// No description provided for @sidebarBackHome.
   ///
@@ -906,7 +882,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'已加入下载队列：{quality}'**
-  String toastAddedToDownloadQueue(Object quality);
+  String toastAddedToDownloadQueue({required Object quality});
 
   /// No description provided for @toastAddedToQueue.
   ///
@@ -966,7 +942,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'加载失败：{msg}'**
-  String commonLoadFailed(Object msg);
+  String commonLoadFailed({required Object msg});
 
   /// No description provided for @commonRetry.
   ///
@@ -1014,13 +990,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'发送评论需要登录{platform}账号'**
-  String commentLoginRequired(Object platform);
+  String commentLoginRequired({required Object platform});
 
   /// No description provided for @commentNotFound.
   ///
   /// In zh_CN, this message translates to:
   /// **'未找到该歌曲的{platform}评论'**
-  String commentNotFound(Object platform);
+  String commentNotFound({required Object platform});
 
   /// No description provided for @commentPublished.
   ///
@@ -1032,7 +1008,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'@{user}：{text}'**
-  String commentReplyFormat(Object text, Object user);
+  String commentReplyFormat({required Object text, required Object user});
 
   /// No description provided for @commentSend.
   ///
@@ -1044,13 +1020,17 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'发送失败：{msg}'**
-  String commentSendFailed(Object msg);
+  String commentSendFailed({required Object msg});
 
   /// No description provided for @commentTimeFormat.
   ///
   /// In zh_CN, this message translates to:
   /// **'{month}月{day}日 {time}'**
-  String commentTimeFormat(Object day, Object month, Object time);
+  String commentTimeFormat({
+    required Object day,
+    required Object month,
+    required Object time,
+  });
 
   /// No description provided for @commentTitle.
   ///
@@ -1122,19 +1102,19 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{platform}已登录'**
-  String loginKugouLoggedIn(Object platform);
+  String loginKugouLoggedIn({required Object platform});
 
   /// No description provided for @loginKugouLogin.
   ///
   /// In zh_CN, this message translates to:
   /// **'{platform}登录'**
-  String loginKugouLogin(Object platform);
+  String loginKugouLogin({required Object platform});
 
   /// No description provided for @loginKugouQrLogin.
   ///
   /// In zh_CN, this message translates to:
   /// **'{platform}扫码登录'**
-  String loginKugouQrLogin(Object platform);
+  String loginKugouQrLogin({required Object platform});
 
   /// No description provided for @loginKugouResponseMissingToken.
   ///
@@ -1146,43 +1126,37 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'请使用{platform} App 扫一扫登录'**
-  String loginKugouScanHint(Object platform);
+  String loginKugouScanHint({required Object platform});
 
   /// No description provided for @loginKugouSession.
   ///
   /// In zh_CN, this message translates to:
   /// **'{platform}登录态'**
-  String loginKugouSession(Object platform);
+  String loginKugouSession({required Object platform});
 
   /// No description provided for @loginKugouSuccessVip.
   ///
   /// In zh_CN, this message translates to:
   /// **'{platform}登录成功，VIP 曲目已解锁'**
-  String loginKugouSuccessVip(Object platform);
+  String loginKugouSuccessVip({required Object platform});
 
   /// No description provided for @loginLoggedOut.
   ///
   /// In zh_CN, this message translates to:
   /// **'已退出{platform}登录'**
-  String loginLoggedOut(Object platform);
+  String loginLoggedOut({required Object platform});
 
   /// No description provided for @loginLogoutWithId.
   ///
   /// In zh_CN, this message translates to:
   /// **'退出登录（{id}）'**
-  String loginLogoutWithId(Object id);
-
-  /// No description provided for @loginNeteaseQrTitle.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'扫码登录{platform}'**
-  String loginNeteaseQrTitle(Object platform);
+  String loginLogoutWithId({required Object id});
 
   /// No description provided for @loginNeteaseScanHint.
   ///
   /// In zh_CN, this message translates to:
   /// **'请使用{platform} App 扫码登录'**
-  String loginNeteaseScanHint(Object platform);
+  String loginNeteaseScanHint({required Object platform});
 
   /// No description provided for @loginQrExpired.
   ///
@@ -1254,7 +1228,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{platform}登录'**
-  String loginTitleBrand(String platform);
+  String loginTitleBrand({required String platform});
 
   /// No description provided for @loginPhoneHint.
   ///
@@ -1346,30 +1320,6 @@ abstract class AppLocalizations {
   /// **'已扫码，请在手机上确认登录'**
   String get loginWaitingConfirm;
 
-  /// No description provided for @loginConfirmCheck.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'我已确认，检查登录'**
-  String get loginConfirmCheck;
-
-  /// No description provided for @loginChecking.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'检查中…'**
-  String get loginChecking;
-
-  /// No description provided for @loginScanThenConfirm.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'扫码并在手机确认后，点下方按钮'**
-  String get loginScanThenConfirm;
-
-  /// No description provided for @loginScannedThenConfirm.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'已扫码，请在手机点击确认，再点一次'**
-  String get loginScannedThenConfirm;
-
   /// No description provided for @trackListArtistHotSongs.
   ///
   /// In zh_CN, this message translates to:
@@ -1398,7 +1348,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'暂无歌曲（每日推荐需登录{platform}）'**
-  String trackListEmptyDailyLogin(Object platform);
+  String trackListEmptyDailyLogin({required Object platform});
 
   /// No description provided for @trackListNoPlayableSource.
   ///
@@ -1416,7 +1366,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'获取播放源失败: {msg}'**
-  String trackListPlaySourceFailed(Object msg);
+  String trackListPlaySourceFailed({required Object msg});
 
   /// No description provided for @trayNext.
   ///
@@ -1518,7 +1468,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'共 {count} 首歌曲 · 点击播放'**
-  String commonSongCountHint(Object count);
+  String commonSongCountHint({required Object count});
 
   /// No description provided for @platformNetease.
   ///
@@ -1554,7 +1504,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'将永久删除「{name}」，且无法恢复。确定继续吗？'**
-  String libraryDeleteFileMessage(Object name);
+  String libraryDeleteFileMessage({required Object name});
 
   /// No description provided for @libraryDeleteFileConfirm.
   ///
@@ -1662,7 +1612,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'已登录：{name}'**
-  String settingsNekoLoggedInAs(Object name);
+  String settingsNekoLoggedInAs({required Object name});
 
   /// No description provided for @settingsNekoNotLoggedIn.
   ///
@@ -1776,25 +1726,19 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'已播放全部 {count} 首'**
-  String toastPlayedAll(Object count);
+  String toastPlayedAll({required Object count});
 
   /// No description provided for @toastPlayFailed.
   ///
   /// In zh_CN, this message translates to:
   /// **'播放失败：{msg}'**
-  String toastPlayFailed(Object msg);
+  String toastPlayFailed({required Object msg});
 
   /// No description provided for @toastMissingLocalPath.
   ///
   /// In zh_CN, this message translates to:
   /// **'缺少本地文件路径'**
   String get toastMissingLocalPath;
-
-  /// No description provided for @toastLocateComingSoon.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'打开文件管理器（Phase 2 接入）'**
-  String get toastLocateComingSoon;
 
   /// No description provided for @toastRemovedFromLibrary.
   ///
@@ -1812,7 +1756,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'每日推荐需要登录{platform}账号'**
-  String toastDailyRequiresLogin(Object platform);
+  String toastDailyRequiresLogin({required Object platform});
 
   /// No description provided for @toastPlaylistEmpty.
   ///
@@ -1950,7 +1894,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'共 {count} 个收藏歌单'**
-  String pageFavPlaylistCount(Object count);
+  String pageFavPlaylistCount({required Object count});
 
   /// No description provided for @pageFavPlaylistLoginHint.
   ///
@@ -1962,7 +1906,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'共 {count} 张收藏专辑'**
-  String pageFavAlbumCount(Object count);
+  String pageFavAlbumCount({required Object count});
 
   /// No description provided for @pageFavAlbumLoginHint.
   ///
@@ -1974,7 +1918,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'共 {count} 位收藏歌手'**
-  String pageFavArtistCount(Object count);
+  String pageFavArtistCount({required Object count});
 
   /// No description provided for @pageFavArtistLoginHint.
   ///
@@ -2034,7 +1978,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'共 {count} 个创建的歌单'**
-  String pageFavKgCreatedCount(Object count);
+  String pageFavKgCreatedCount({required Object count});
 
   /// No description provided for @pageFavKgCreatedLoginHint.
   ///
@@ -2046,7 +1990,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'共 {count} 个收藏歌单'**
-  String pageFavKgCollectedPlaylistCount(Object count);
+  String pageFavKgCollectedPlaylistCount({required Object count});
 
   /// No description provided for @pageFavKgCollectedPlaylistLoginHint.
   ///
@@ -2058,7 +2002,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'共 {count} 张收藏专辑'**
-  String pageFavKgCollectedAlbumCount(Object count);
+  String pageFavKgCollectedAlbumCount({required Object count});
 
   /// No description provided for @pageFavKgCollectedAlbumLoginHint.
   ///
@@ -2082,13 +2026,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'开始加载：{title}'**
-  String pageSearchLoadingTrack(Object title);
-
-  /// No description provided for @pageSearchDetailComingSoon.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'{title} — 详情页待接入'**
-  String pageSearchDetailComingSoon(Object title);
+  String pageSearchLoadingTrack({required Object title});
 
   /// No description provided for @menuViewArtist.
   ///
@@ -2214,7 +2152,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'在线收藏已并入：新增 {count} 首'**
-  String pageLikedQqSynced(Object count);
+  String pageLikedQqSynced({required Object count});
 
   /// No description provided for @pageLikedQqSyncedNone.
   ///
@@ -2286,31 +2224,31 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 首'**
-  String libraryStatTrackCount(Object count);
+  String libraryStatTrackCount({required Object count});
 
   /// No description provided for @libraryScanDirCount.
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 个'**
-  String libraryScanDirCount(Object count);
+  String libraryScanDirCount({required Object count});
 
   /// No description provided for @libraryHoursMinutes.
   ///
   /// In zh_CN, this message translates to:
   /// **'{h} 小时 {m} 分钟'**
-  String libraryHoursMinutes(Object h, Object m);
+  String libraryHoursMinutes({required Object h, required Object m});
 
   /// No description provided for @libraryMinutes.
   ///
   /// In zh_CN, this message translates to:
   /// **'{m} 分钟'**
-  String libraryMinutes(Object m);
+  String libraryMinutes({required Object m});
 
   /// No description provided for @librarySeconds.
   ///
   /// In zh_CN, this message translates to:
   /// **'{s} 秒'**
-  String librarySeconds(Object s);
+  String librarySeconds({required Object s});
 
   /// No description provided for @librarySearchHint.
   ///
@@ -2334,7 +2272,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 首{extra}'**
-  String libraryTrackCount(Object count, Object extra);
+  String libraryTrackCount({required Object count, required Object extra});
 
   /// No description provided for @libraryEmptyWaitScan.
   ///
@@ -2377,12 +2315,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'定位文件'**
   String get menuLocateFile;
-
-  /// No description provided for @menuLocateFileComingSoon.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'打开文件管理器 Phase 2 接入'**
-  String get menuLocateFileComingSoon;
 
   /// No description provided for @menuRemoveFromLibrary.
   ///
@@ -2544,7 +2476,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{greeting}，{name}'**
-  String pageHomeGreeting(Object greeting, Object name);
+  String pageHomeGreeting({required Object greeting, required Object name});
 
   /// No description provided for @greetingLate.
   ///
@@ -2592,7 +2524,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'已选 {count} 项'**
-  String downloadSelectedCount(Object count);
+  String downloadSelectedCount({required Object count});
 
   /// No description provided for @downloadSelectAll.
   ///
@@ -2634,13 +2566,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'进行中 {count}'**
-  String downloadActiveCount(Object count);
+  String downloadActiveCount({required Object count});
 
   /// No description provided for @downloadDoneCount.
   ///
   /// In zh_CN, this message translates to:
   /// **'已完成 {count}'**
-  String downloadDoneCount(Object count);
+  String downloadDoneCount({required Object count});
 
   /// No description provided for @downloadOpenDir.
   ///
@@ -2670,7 +2602,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'删除所选 {count} 个任务'**
-  String downloadDeleteSelectedTitle(Object count);
+  String downloadDeleteSelectedTitle({required Object count});
 
   /// No description provided for @downloadDeleteSelectedMessage.
   ///
@@ -2736,19 +2668,23 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'下载中 {percent}%（{received}）{speed}'**
-  String downloadStatusRunning(Object percent, Object received, Object speed);
+  String downloadStatusRunning({
+    required Object percent,
+    required Object received,
+    required Object speed,
+  });
 
   /// No description provided for @downloadStatusRunningNoPercent.
   ///
   /// In zh_CN, this message translates to:
   /// **'下载中…{speed}'**
-  String downloadStatusRunningNoPercent(Object speed);
+  String downloadStatusRunningNoPercent({required Object speed});
 
   /// No description provided for @downloadStatusPausedWith.
   ///
   /// In zh_CN, this message translates to:
   /// **'已暂停（{received}）'**
-  String downloadStatusPausedWith(Object received);
+  String downloadStatusPausedWith({required Object received});
 
   /// No description provided for @downloadStatusPaused.
   ///
@@ -2760,13 +2696,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'失败：{error}'**
-  String downloadStatusFailed(Object error);
-
-  /// No description provided for @downloadStatusFailedUnknown.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'失败：未知错误'**
-  String get downloadStatusFailedUnknown;
+  String downloadStatusFailed({required Object error});
 
   /// No description provided for @downloadStatusCanceled.
   ///
@@ -2778,7 +2708,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'完成（{size}）'**
-  String downloadStatusDone(Object size);
+  String downloadStatusDone({required Object size});
 
   /// No description provided for @downloadStatusAlready.
   ///
@@ -2970,13 +2900,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'未找到「{query}」相关设置'**
-  String settingsSearchNoResult(Object query);
+  String settingsSearchNoResult({required Object query});
 
   /// No description provided for @settingsSearchMatchCount.
   ///
   /// In zh_CN, this message translates to:
   /// **'匹配 {count} 项'**
-  String settingsSearchMatchCount(Object count);
+  String settingsSearchMatchCount({required Object count});
 
   /// No description provided for @settingsSectionTheme.
   ///
@@ -3032,41 +2962,11 @@ abstract class AppLocalizations {
   /// **'主色种子'**
   String get settingsAccentTitle;
 
-  /// No description provided for @settingsAccentSystem.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'跟随系统主题色（{color}）'**
-  String settingsAccentSystem(Object color);
-
-  /// No description provided for @settingsAccentSystemFallback.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'跟随系统主题色（读取失败，回退自定义）'**
-  String get settingsAccentSystemFallback;
-
-  /// No description provided for @settingsAccentDefault.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'默认灰（设计体系）'**
-  String get settingsAccentDefault;
-
-  /// No description provided for @settingsAccentCustom.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'自定义（按种子动态生成配色）'**
-  String get settingsAccentCustom;
-
   /// No description provided for @settingsAccentDefaultTooltip.
   ///
   /// In zh_CN, this message translates to:
   /// **'默认灰'**
   String get settingsAccentDefaultTooltip;
-
-  /// No description provided for @settingsAccentSystemTooltip.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'跟随系统主题色'**
-  String get settingsAccentSystemTooltip;
 
   /// No description provided for @settingsAccentCustomTooltip.
   ///
@@ -3192,7 +3092,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{radius}px 圆角'**
-  String settingsCoverRadiusPx(Object radius);
+  String settingsCoverRadiusPx({required Object radius});
 
   /// No description provided for @settingsCoverRadiusSharpLabel.
   ///
@@ -3254,12 +3154,6 @@ abstract class AppLocalizations {
   /// **'统一 48kHz 转码管线'**
   String get settingsPassthroughOff;
 
-  /// No description provided for @settingsPassthroughNote.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'关闭转码保持源采样率播放，开启则统一 48kHz 输出；切换后自动重载当前曲目生效。'**
-  String get settingsPassthroughNote;
-
   /// No description provided for @settingsOutputDevice.
   ///
   /// In zh_CN, this message translates to:
@@ -3288,7 +3182,10 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{rate} Hz · {channels} 声道'**
-  String settingsOutputDeviceFormat(Object channels, Object rate);
+  String settingsOutputDeviceFormat({
+    required Object channels,
+    required Object rate,
+  });
 
   /// No description provided for @settingsOutputDeviceDefaultTag.
   ///
@@ -3366,7 +3263,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'显示全部设备（{count}）'**
-  String settingsOutputDeviceShowAll(int count);
+  String settingsOutputDeviceShowAll({required int count});
 
   /// No description provided for @settingsOutputDeviceHideUnused.
   ///
@@ -3390,7 +3287,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'切换输出设备失败：{err}'**
-  String settingsSinkChangedFailed(Object err);
+  String settingsSinkChangedFailed({required Object err});
 
   /// No description provided for @settingsEngine.
   ///
@@ -3582,25 +3479,34 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'内存源 worker 启动失败：{error}'**
-  String memorySourceFailIsolateSpawn(Object error);
+  String memorySourceFailIsolateSpawn({required Object error});
 
   /// No description provided for @memorySourceFailHttpStatus.
   ///
   /// In zh_CN, this message translates to:
   /// **'HTTP {code} {status}'**
-  String memorySourceFailHttpStatus(Object code, Object status);
+  String memorySourceFailHttpStatus({
+    required Object code,
+    required Object status,
+  });
 
   /// No description provided for @memorySourceFailOverWholeCeiling.
   ///
   /// In zh_CN, this message translates to:
   /// **'整首内容 {content} 超过纯内存整首驻留上限 {limit}'**
-  String memorySourceFailOverWholeCeiling(Object content, Object limit);
+  String memorySourceFailOverWholeCeiling({
+    required Object content,
+    required Object limit,
+  });
 
   /// No description provided for @memorySourceFailGrewCeiling.
   ///
   /// In zh_CN, this message translates to:
   /// **'下载中途超过纯内存整首驻留上限（{got} > {limit}）'**
-  String memorySourceFailGrewCeiling(Object got, Object limit);
+  String memorySourceFailGrewCeiling({
+    required Object got,
+    required Object limit,
+  });
 
   /// No description provided for @memorySourceFailEmpty.
   ///
@@ -3624,13 +3530,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'内存源写入异常：{error}'**
-  String memorySourceFailSegFillEx(Object error);
+  String memorySourceFailSegFillEx({required Object error});
 
   /// No description provided for @memorySourceFailDownload.
   ///
   /// In zh_CN, this message translates to:
   /// **'下载失败：{error}'**
-  String memorySourceFailDownload(Object error);
+  String memorySourceFailDownload({required Object error});
 
   /// No description provided for @memorySourceFailUnknown.
   ///
@@ -3732,7 +3638,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{width}px（1~12，全屏播放器）'**
-  String settingsSpectrumBarWidthDesc(Object width);
+  String settingsSpectrumBarWidthDesc({required Object width});
 
   /// No description provided for @settingsBarSpectrum.
   ///
@@ -3870,7 +3776,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'流动速度 {speed}'**
-  String settingsPlayerBgRippleSpeedDesc(Object speed);
+  String settingsPlayerBgRippleSpeedDesc({required Object speed});
 
   /// No description provided for @settingsPlayerBgFluid.
   ///
@@ -3888,7 +3794,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'流体速度 {speed}'**
-  String settingsPlayerBgFlowSpeedDesc(Object speed);
+  String settingsPlayerBgFlowSpeedDesc({required Object speed});
 
   /// No description provided for @settingsPlayerBgRenderScale.
   ///
@@ -3900,7 +3806,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'分辨率 {scale}×（越低越省电）'**
-  String settingsPlayerBgRenderScaleDesc(Object scale);
+  String settingsPlayerBgRenderScaleDesc({required Object scale});
 
   /// No description provided for @settingsPlayerBgFps.
   ///
@@ -3912,7 +3818,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{fps} FPS'**
-  String settingsPlayerBgFpsDesc(Object fps);
+  String settingsPlayerBgFpsDesc({required Object fps});
 
   /// No description provided for @settingsPlayerBgFreezeOnPause.
   ///
@@ -3967,66 +3873,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'播放页背景始终满分辨率渲染'**
   String get settingsAdaptiveRenderQualityOff;
-
-  /// No description provided for @settingsSectionShortcuts.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'快捷键'**
-  String get settingsSectionShortcuts;
-
-  /// No description provided for @settingsShortcutSpace.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'空格'**
-  String get settingsShortcutSpace;
-
-  /// No description provided for @settingsShortcutSpaceDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'播放 / 暂停'**
-  String get settingsShortcutSpaceDesc;
-
-  /// No description provided for @settingsShortcutArrows.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'← / →'**
-  String get settingsShortcutArrows;
-
-  /// No description provided for @settingsShortcutArrowsDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'后退 / 前进 10 秒'**
-  String get settingsShortcutArrowsDesc;
-
-  /// No description provided for @settingsShortcutSearch.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'Ctrl / Cmd + F'**
-  String get settingsShortcutSearch;
-
-  /// No description provided for @settingsShortcutLibrary.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'Ctrl / Cmd + L'**
-  String get settingsShortcutLibrary;
-
-  /// No description provided for @settingsShortcutLibraryDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'音乐库'**
-  String get settingsShortcutLibraryDesc;
-
-  /// No description provided for @settingsShortcutEsc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'Esc'**
-  String get settingsShortcutEsc;
-
-  /// No description provided for @settingsShortcutEscDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'返回（关闭弹窗 / 全屏播放器）'**
-  String get settingsShortcutEscDesc;
 
   /// No description provided for @settingsSectionPlayerLyrics.
   ///
@@ -4104,19 +3950,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{size}px（当前行放大高亮）'**
-  String settingsLyricFontSizeDesc(Object size);
+  String settingsLyricFontSizeDesc({required Object size});
 
   /// No description provided for @settingsLyricLineHeight.
   ///
   /// In zh_CN, this message translates to:
   /// **'歌词行距'**
   String get settingsLyricLineHeight;
-
-  /// No description provided for @settingsLyricLineHeightDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'{height}px（含行间距）'**
-  String settingsLyricLineHeightDesc(Object height);
 
   /// No description provided for @settingsLyricPlayedColor.
   ///
@@ -4358,12 +4198,6 @@ abstract class AppLocalizations {
   /// **'恢复默认'**
   String get settingsRestoreDefault;
 
-  /// No description provided for @settingsDownloadRootNote.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'默认跟随媒体库目录；修改目录回车保存，进行中的下载任务会终止。'**
-  String get settingsDownloadRootNote;
-
   /// No description provided for @settingsSectionFilename.
   ///
   /// In zh_CN, this message translates to:
@@ -4398,7 +4232,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'下载弹窗默认选中 {quality}，档位不足时自动降级'**
-  String settingsDownloadQualityDesc(Object quality);
+  String settingsDownloadQualityDesc({required Object quality});
 
   /// No description provided for @settingsDownloadQualityNote.
   ///
@@ -4422,7 +4256,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 个并行任务（1~5）'**
-  String settingsDownloadConcurrentDesc(Object count);
+  String settingsDownloadConcurrentDesc({required Object count});
 
   /// No description provided for @settingsDownloadGrouping.
   ///
@@ -4488,7 +4322,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'限 {speed}，实时生效'**
-  String settingsSpeedLimited(Object speed);
+  String settingsSpeedLimited({required Object speed});
 
   /// No description provided for @settingsSpeedUnlimitedLabel.
   ///
@@ -4500,7 +4334,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{speed} MB/s'**
-  String settingsSpeedMbps(Object speed);
+  String settingsSpeedMbps({required Object speed});
 
   /// No description provided for @settingsSpeedNote.
   ///
@@ -4524,13 +4358,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 条（10~500）· 超上限自动淘汰最旧'**
-  String settingsDownloadHistoryDesc(Object count);
+  String settingsDownloadHistoryDesc({required Object count});
 
   /// No description provided for @settingsDownloadHistoryCount.
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 条'**
-  String settingsDownloadHistoryCount(Object count);
+  String settingsDownloadHistoryCount({required Object count});
 
   /// No description provided for @settingsDownloadHistoryNote.
   ///
@@ -4614,19 +4448,19 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{n} B/s'**
-  String settingsSpeedBs(Object n);
+  String settingsSpeedBs({required Object n});
 
   /// No description provided for @settingsSpeedKbs.
   ///
   /// In zh_CN, this message translates to:
   /// **'{n} KB/s'**
-  String settingsSpeedKbs(Object n);
+  String settingsSpeedKbs({required Object n});
 
   /// No description provided for @settingsSpeedMbs.
   ///
   /// In zh_CN, this message translates to:
   /// **'{n} MB/s'**
-  String settingsSpeedMbs(Object n);
+  String settingsSpeedMbs({required Object n});
 
   /// No description provided for @settingsSectionFileLocation.
   ///
@@ -4716,7 +4550,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'最多 {count} 条'**
-  String settingsHistoryLimitOn(Object count);
+  String settingsHistoryLimitOn({required Object count});
 
   /// No description provided for @settingsHistoryLimitUnlimited.
   ///
@@ -4758,13 +4592,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'已复制{label}'**
-  String toastCopied(Object label);
-
-  /// No description provided for @settingsStorageNote.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERA_DATA_DIR 覆盖。'**
-  String get settingsStorageNote;
+  String toastCopied({required Object label});
 
   /// No description provided for @settingsSectionCache.
   ///
@@ -4860,7 +4688,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 首'**
-  String settingsCacheSongs(Object count);
+  String settingsCacheSongs({required Object count});
 
   /// No description provided for @settingsSearchSongCacheSubtitle.
   ///
@@ -4902,13 +4730,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 条'**
-  String settingsCacheEntries(Object count);
+  String settingsCacheEntries({required Object count});
 
   /// No description provided for @settingsCacheImages.
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 张'**
-  String settingsCacheImages(Object count);
+  String settingsCacheImages({required Object count});
 
   /// No description provided for @settingsCacheRefresh.
   ///
@@ -4932,7 +4760,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'清除「{name}」？'**
-  String settingsCacheClearConfirmTitle(Object name);
+  String settingsCacheClearConfirmTitle({required Object name});
 
   /// No description provided for @settingsCacheClearConfirmDesc.
   ///
@@ -4956,7 +4784,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'已清除{name}缓存'**
-  String toastCacheCleared(Object name);
+  String toastCacheCleared({required Object name});
 
   /// No description provided for @toastCacheAllCleared.
   ///
@@ -4986,7 +4814,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 台服务器'**
-  String settingsSecurityStreamingCount(Object count);
+  String settingsSecurityStreamingCount({required Object count});
 
   /// No description provided for @settingsSecurityStreamingDesc.
   ///
@@ -5040,7 +4868,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'销毁「{name}」？'**
-  String settingsSecurityConfirmTitle(Object name);
+  String settingsSecurityConfirmTitle({required Object name});
 
   /// No description provided for @settingsSecurityConfirmAllTitle.
   ///
@@ -5052,7 +4880,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'将主动失效相关平台 token、覆盖写入并删除文件，此操作不可恢复。输入「{word}」以确认。'**
-  String settingsSecurityConfirmDesc(Object word);
+  String settingsSecurityConfirmDesc({required Object word});
 
   /// No description provided for @settingsSecurityConfirmWord.
   ///
@@ -5064,13 +4892,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'输入「{word}」'**
-  String settingsSecurityConfirmHint(Object word);
+  String settingsSecurityConfirmHint({required Object word});
 
   /// No description provided for @toastSecurityDestroyed.
   ///
   /// In zh_CN, this message translates to:
   /// **'已销毁：{name}'**
-  String toastSecurityDestroyed(Object name);
+  String toastSecurityDestroyed({required Object name});
 
   /// No description provided for @toastSecurityAllDestroyed.
   ///
@@ -5082,49 +4910,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'销毁失败，文件仍可能残留：{path}'**
-  String toastSecurityDestroyFailed(Object path);
-
-  /// No description provided for @settingsDeviceBindSection.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'高级 · 设备绑定'**
-  String get settingsDeviceBindSection;
-
-  /// No description provided for @settingsDeviceBindNote.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'增强型可选项（opt-in）：本机免密 + 设备变更走恢复口令，不依赖系统安全存储。开启将读取本机设备标识（仅存本地、不会上传）。默认关闭，普通用户使用 v1 加密已足够。'**
-  String get settingsDeviceBindNote;
-
-  /// No description provided for @settingsDeviceBindSwitch.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'设备绑定免密'**
-  String get settingsDeviceBindSwitch;
-
-  /// No description provided for @settingsDeviceBindSwitchDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'本机自动解锁；换机/重装走恢复口令'**
-  String get settingsDeviceBindSwitchDesc;
-
-  /// No description provided for @settingsDeviceBindSwitchOffDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'未启用。当前系统安全存储不可用，可开启设备绑定实现本机免密（无需口令）'**
-  String get settingsDeviceBindSwitchOffDesc;
-
-  /// No description provided for @settingsDeviceBindSwitchV1Desc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'当前为 v1（系统安全存储）模式；开启将升级为设备绑定（免密 + 恢复口令，既有数据保留）'**
-  String get settingsDeviceBindSwitchV1Desc;
-
-  /// No description provided for @settingsDeviceBindSwitchV2Desc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'当前为 v2（口令）模式；开启需先输入当前口令解锁，随后升级为设备绑定（本机免密）'**
-  String get settingsDeviceBindSwitchV2Desc;
+  String toastSecurityDestroyFailed({required Object path});
 
   /// No description provided for @settingsDeviceBindPrivacyTitle.
   ///
@@ -5304,7 +5090,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'关闭失败：{error}'**
-  String toastDeviceBindCloseFailed(Object error);
+  String toastDeviceBindCloseFailed({required Object error});
 
   /// No description provided for @toastDeviceBindRecovered.
   ///
@@ -5461,18 +5247,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'加密方案已切换，重启后生效'**
   String get toastSchemeSwitched;
-
-  /// No description provided for @settingsVaultSection.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'凭据加密'**
-  String get settingsVaultSection;
-
-  /// No description provided for @settingsVaultNote.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'选择凭据的加密保护等级：v1 系统保护（默认）/ v2 口令保护 / v3 设备绑定（增强项 opt-in，读取本机设备标识，仅存本地、不会上传）。v1 ↔ v2 可随时互切；v3 为终点档，关闭后回落为 v2。'**
-  String get settingsVaultNote;
 
   /// No description provided for @settingsVaultModeV1.
   ///
@@ -5742,7 +5516,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'v{version} · Flutter 桌面端'**
-  String settingsVersionFormat(Object version);
+  String settingsVersionFormat({required Object version});
 
   /// No description provided for @settingsAudioEngine.
   ///
@@ -5930,12 +5704,6 @@ abstract class AppLocalizations {
   /// **'特别致谢'**
   String get settingsSectionThanks;
 
-  /// No description provided for @settingsThanksText.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'本软件使用、依赖或参考了以下开源项目（完整许可清单见仓库 THIRD-PARTY-NOTICES.md 及各模块 THIRD-PARTY-LICENSES.md）：\n\n· 设计思路借鉴：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 核心组件：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/公有领域）、signalsmith-stretch（MIT）、SQLite（公有领域）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· 解码参考：minimp3（CC0-1.0）、stb_vorbis（公有领域/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· 图标：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n感谢以上项目的作者。'**
-  String get settingsThanksText;
-
   /// No description provided for @settingsThanksDesign.
   ///
   /// In zh_CN, this message translates to:
@@ -5982,7 +5750,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 首'**
-  String commonTrackCount(Object count);
+  String commonTrackCount({required Object count});
 
   /// No description provided for @settingsSearchColorTitle.
   ///
@@ -6019,12 +5787,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'文件名模板'**
   String get settingsSearchFilenameTitle;
-
-  /// No description provided for @settingsSearchAccentSubtitle.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'自定义主色种子 · 色板'**
-  String get settingsSearchAccentSubtitle;
 
   /// No description provided for @settingsThemeSource.
   ///
@@ -6162,7 +5924,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'对背景图片应用高斯模糊（{blur}px）'**
-  String settingsBackgroundBlurDesc(Object blur);
+  String settingsBackgroundBlurDesc({required Object blur});
 
   /// No description provided for @settingsBackgroundDim.
   ///
@@ -6174,7 +5936,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'叠加的黑色遮罩透明度（{dim}%），越高前景越易读'**
-  String settingsBackgroundDimDesc(Object dim);
+  String settingsBackgroundDimDesc({required Object dim});
 
   /// No description provided for @settingsBackgroundScale.
   ///
@@ -6186,7 +5948,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'背景图的缩放倍数（{scale}x）'**
-  String settingsBackgroundScaleDesc(Object scale);
+  String settingsBackgroundScaleDesc({required Object scale});
 
   /// No description provided for @settingsSidebarCollapsed.
   ///
@@ -6578,12 +6340,6 @@ abstract class AppLocalizations {
   /// **'音频引擎 · Subsonic 服务端'**
   String get settingsSearchAboutSubtitle;
 
-  /// No description provided for @qualityLossless.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'无损'**
-  String get qualityLossless;
-
   /// No description provided for @repeatModeList.
   ///
   /// In zh_CN, this message translates to:
@@ -6595,30 +6351,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'单曲循环'**
   String get repeatModeOne;
-
-  /// No description provided for @commonUnknownTrack.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'未知名歌曲'**
-  String get commonUnknownTrack;
-
-  /// No description provided for @commonAnonymousUser.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'匿名用户'**
-  String get commonAnonymousUser;
-
-  /// No description provided for @commonCanceled.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'已取消'**
-  String get commonCanceled;
-
-  /// No description provided for @commonILike.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'我喜欢'**
-  String get commonILike;
 
   /// No description provided for @sidebarStreaming.
   ///
@@ -6672,7 +6404,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'当前生效目录：{dirs}'**
-  String settingsScrapeDirsNote(Object dirs);
+  String settingsScrapeDirsNote({required Object dirs});
 
   /// No description provided for @settingsSectionScrapeSources.
   ///
@@ -6768,7 +6500,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'正在处理：{file}'**
-  String settingsScrapeCurrent(Object file);
+  String settingsScrapeCurrent({required Object file});
 
   /// No description provided for @settingsScrapeSuccess.
   ///
@@ -6924,7 +6656,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'已连接 {name}'**
-  String streamingToastConnected(Object name);
+  String streamingToastConnected({required Object name});
 
   /// No description provided for @streamingServerConnectFailed.
   ///
@@ -6948,7 +6680,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'确定删除服务器「{name}」吗？'**
-  String streamingServerDeleteConfirm(Object name);
+  String streamingServerDeleteConfirm({required Object name});
 
   /// No description provided for @streamingServerRemoved.
   ///
@@ -7122,25 +6854,25 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 首歌曲'**
-  String streamingTotalSongs(Object count);
+  String streamingTotalSongs({required Object count});
 
   /// No description provided for @streamingTotalAlbums.
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 张专辑'**
-  String streamingTotalAlbums(Object count);
+  String streamingTotalAlbums({required Object count});
 
   /// No description provided for @streamingTotalArtists.
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 位歌手'**
-  String streamingTotalArtists(Object count);
+  String streamingTotalArtists({required Object count});
 
   /// No description provided for @streamingTotalPlaylists.
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 个歌单'**
-  String streamingTotalPlaylists(Object count);
+  String streamingTotalPlaylists({required Object count});
 
   /// No description provided for @streamingEmptyNoResults.
   ///
@@ -7152,19 +6884,19 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 首歌曲'**
-  String streamingAlbumSongs(Object count);
+  String streamingAlbumSongs({required Object count});
 
   /// No description provided for @streamingArtistAlbums.
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 张专辑'**
-  String streamingArtistAlbums(Object count);
+  String streamingArtistAlbums({required Object count});
 
   /// No description provided for @streamingPlaylistSongs.
   ///
   /// In zh_CN, this message translates to:
   /// **'{count} 首歌曲'**
-  String streamingPlaylistSongs(Object count);
+  String streamingPlaylistSongs({required Object count});
 
   /// No description provided for @brandQqMusic.
   ///
@@ -7194,25 +6926,19 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'QQ {id}'**
-  String navHeaderQqId(String id);
-
-  /// No description provided for @toastQqNotSupported.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'QM暂不支持该操作'**
-  String get toastQqNotSupported;
+  String navHeaderQqId({required String id});
 
   /// No description provided for @searchSourceFailed.
   ///
   /// In zh_CN, this message translates to:
   /// **'「{source}」搜索暂不可用'**
-  String searchSourceFailed(Object source);
+  String searchSourceFailed({required Object source});
 
   /// No description provided for @searchQqRiskDetail.
   ///
   /// In zh_CN, this message translates to:
   /// **'QM接口限流或风控拦截（代码 {code}），已停止自动重试，请稍后再试'**
-  String searchQqRiskDetail(Object code);
+  String searchQqRiskDetail({required Object code});
 
   /// No description provided for @searchNetworkError.
   ///
@@ -7224,31 +6950,13 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'平台返回错误（{code}）'**
-  String searchPlatformError(Object code);
+  String searchPlatformError({required Object code});
 
   /// No description provided for @searchWaitRetry.
   ///
   /// In zh_CN, this message translates to:
   /// **'请求过于频繁，请稍候再试'**
   String get searchWaitRetry;
-
-  /// No description provided for @qqMusicDownloadUnsupported.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'QM暂不支持下载（风控）。'**
-  String get qqMusicDownloadUnsupported;
-
-  /// No description provided for @qqMusicDownloadSkipped.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'已跳过 {count} 首 QM（暂不支持下载）。'**
-  String qqMusicDownloadSkipped(Object count);
-
-  /// No description provided for @platformQqMusic.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'QM'**
-  String get platformQqMusic;
 
   /// No description provided for @settingsValueAuto.
   ///
@@ -7314,7 +7022,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'多源并发查询线程数（0=自动，当前 {value}）'**
-  String settingsScrapeWorkersDesc(Object value);
+  String settingsScrapeWorkersDesc({required Object value});
 
   /// No description provided for @settingsScrapeBatch.
   ///
@@ -7326,7 +7034,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'每批处理文件数（当前 {value}）'**
-  String settingsScrapeBatchDesc(Object value);
+  String settingsScrapeBatchDesc({required Object value});
 
   /// No description provided for @settingsScrapeRetries.
   ///
@@ -7338,7 +7046,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'重试达到该次数后不再重试（当前 {value}）'**
-  String settingsScrapeRetriesDesc(Object value);
+  String settingsScrapeRetriesDesc({required Object value});
 
   /// No description provided for @settingsSectionScrapeOrganize.
   ///
@@ -7406,12 +7114,6 @@ abstract class AppLocalizations {
   /// **'开始整理'**
   String get settingsScrapeOrganizeStart;
 
-  /// No description provided for @settingsOrganizeCancel.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'取消整理'**
-  String get settingsOrganizeCancel;
-
   /// No description provided for @settingsOrganizeRunning.
   ///
   /// In zh_CN, this message translates to:
@@ -7440,7 +7142,11 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'整理完成：移动 {moved}，跳过 {skipped}，失败 {failed}'**
-  String settingsOrganizeDone(Object failed, Object moved, Object skipped);
+  String settingsOrganizeDone({
+    required Object failed,
+    required Object moved,
+    required Object skipped,
+  });
 
   /// No description provided for @settingsOrganizeNoTarget.
   ///
@@ -7452,7 +7158,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'未设置整理目标目录，使用默认音乐目录：{dir}'**
-  String settingsOrganizeUsingDefault(Object dir);
+  String settingsOrganizeUsingDefault({required Object dir});
 
   /// No description provided for @toastOrganizeNoDirs.
   ///
@@ -7494,7 +7200,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'并行解析文件数（0=自动，当前 {value}）'**
-  String settingsScanParallelismDesc(Object value);
+  String settingsScanParallelismDesc({required Object value});
 
   /// No description provided for @settingsScanBatch.
   ///
@@ -7506,7 +7212,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'数据库批量写入上限（0=自动，当前 {value}）'**
-  String settingsScanBatchDesc(Object value);
+  String settingsScanBatchDesc({required Object value});
 
   /// No description provided for @settingsSectionScanLimits.
   ///
@@ -7550,12 +7256,6 @@ abstract class AppLocalizations {
   /// **'音频扩展名'**
   String get settingsSectionScanExts;
 
-  /// No description provided for @settingsScanExtraExts.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'额外扩展名'**
-  String get settingsScanExtraExts;
-
   /// No description provided for @settingsScanExtraExtsNote.
   ///
   /// In zh_CN, this message translates to:
@@ -7578,7 +7278,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'连续解析失败 ≥3 次的文件会被移入隔离目录：{dir}'**
-  String settingsScanQuarantineNote(Object dir);
+  String settingsScanQuarantineNote({required Object dir});
 
   /// No description provided for @settingsScanQuarantineEmpty.
   ///
@@ -7627,12 +7327,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'将清空当前曲库记录并从扫描目录重建（不删除源文件）。此操作不可撤销，扫描期间会占用较多磁盘 IO。'**
   String get libraryFullScanConfirmDesc;
-
-  /// No description provided for @libraryFullScanDescription.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'清空曲库并从扫描目录重建'**
-  String get libraryFullScanDescription;
 
   /// No description provided for @settingsSectionLyricEngine.
   ///
@@ -8060,12 +7754,6 @@ abstract class AppLocalizations {
   /// **'重置'**
   String get commonReset;
 
-  /// No description provided for @settingsDevDownloadModuleDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'下载接口（侧边栏 / 右键菜单 / 设置分类）的独立开关；默认关闭，开启前会提示风险。'**
-  String get settingsDevDownloadModuleDesc;
-
   /// No description provided for @settingsDevDownloadModuleOn.
   ///
   /// In zh_CN, this message translates to:
@@ -8432,12 +8120,6 @@ abstract class AppLocalizations {
   /// **'自适应字号'**
   String get settingsLyricAdaptiveFontSize;
 
-  /// No description provided for @settingsLyricAdaptiveFontSizeDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'歌词字号随窗口高度自动缩放'**
-  String get settingsLyricAdaptiveFontSizeDesc;
-
   /// No description provided for @settingsLyricAdaptiveFontSizeOn.
   ///
   /// In zh_CN, this message translates to:
@@ -8498,30 +8180,6 @@ abstract class AppLocalizations {
   /// **'关闭'**
   String get sleepTimerOff;
 
-  /// No description provided for @sleepTimer15.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'15 分钟'**
-  String get sleepTimer15;
-
-  /// No description provided for @sleepTimer30.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'30 分钟'**
-  String get sleepTimer30;
-
-  /// No description provided for @sleepTimer60.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'60 分钟'**
-  String get sleepTimer60;
-
-  /// No description provided for @sleepTimer90.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'90 分钟'**
-  String get sleepTimer90;
-
   /// No description provided for @sleepTimerEndOfTrack.
   ///
   /// In zh_CN, this message translates to:
@@ -8550,7 +8208,7 @@ abstract class AppLocalizations {
   ///
   /// In zh_CN, this message translates to:
   /// **'{minutes} 分钟'**
-  String sleepTimerMinutes(int minutes);
+  String sleepTimerMinutes({required int minutes});
 
   /// No description provided for @sleepTimerMinutesUnit.
   ///
@@ -8731,12 +8389,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'预增益'**
   String get settingsEqPreamp;
-
-  /// No description provided for @settingsEqPreampDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'整体提升或衰减，避免削波'**
-  String get settingsEqPreampDesc;
 
   /// No description provided for @settingsEqLimiter.
   ///

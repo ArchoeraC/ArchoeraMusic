@@ -36,7 +36,7 @@ extension _DownloadPageView on _DownloadPageState {
       return Row(
         children: [
           Text(
-            l10n.downloadSelectedCount(_selected.length),
+            l10n.downloadSelectedCount(count: _selected.length),
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -99,13 +99,13 @@ extension _DownloadPageView on _DownloadPageState {
         _statChip(
           scheme,
           EtaIcons.download,
-          l10n.downloadActiveCount(state.activeCount),
+          l10n.downloadActiveCount(count: state.activeCount),
         ),
         const SizedBox(width: 8),
         _statChip(
           scheme,
           EtaIcons.checkCircleOutline,
-          l10n.downloadDoneCount(state.doneCount),
+          l10n.downloadDoneCount(count: state.doneCount),
         ),
         const Spacer(),
         if (state.tasks.isNotEmpty)

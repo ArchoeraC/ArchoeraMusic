@@ -189,7 +189,7 @@ class CoverCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.l10n;
     final placeholder = Container(
       color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
       child: Icon(
@@ -202,7 +202,7 @@ class CoverCard extends StatelessWidget {
         subtitleOverride ??
         (item.subtitle.isEmpty
             ? (item.trackCount > 0
-                  ? l10n.commonTrackCount(item.trackCount)
+                  ? l10n.commonTrackCount(count: item.trackCount)
                   : '')
             : item.subtitle);
     return MouseRegion(

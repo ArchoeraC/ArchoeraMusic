@@ -55,7 +55,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
           title: l10n.settingsSectionScrapeDirs,
           note: dirs.isEmpty
               ? l10n.settingsScrapeDirsEmptyNote
-              : l10n.settingsScrapeDirsNote(dirs.join(' ; ')),
+              : l10n.settingsScrapeDirsNote(dirs: dirs.join(' ; ')),
           children: [
             SettingPathFieldCard(
               icon: EtaIcons.folderOutline,
@@ -177,7 +177,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
               icon: EtaIcons.chipOutline,
               title: l10n.settingsScrapeWorkers,
               subtitle: l10n.settingsScrapeWorkersDesc(
-                prefs.scrapeWorkers <= 0
+                value: prefs.scrapeWorkers <= 0
                     ? l10n.settingsValueAuto
                     : '${prefs.scrapeWorkers}',
               ),
@@ -191,7 +191,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
               icon: EtaIcons.menuOutline,
               title: l10n.settingsScrapeBatch,
               subtitle: l10n.settingsScrapeBatchDesc(
-                '${prefs.scrapeBatchSize}',
+                value: '${prefs.scrapeBatchSize}',
               ),
               value: prefs.scrapeBatchSize.toDouble().clamp(1, 64),
               min: 1,
@@ -203,7 +203,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
               icon: EtaIcons.refresh,
               title: l10n.settingsScrapeRetries,
               subtitle: l10n.settingsScrapeRetriesDesc(
-                '${prefs.scrapeMaxRetries}',
+                value: '${prefs.scrapeMaxRetries}',
               ),
               value: prefs.scrapeMaxRetries.toDouble().clamp(0, 10),
               min: 0,
@@ -407,9 +407,9 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
                   : scrape.canceled
                   ? l10n.settingsScrapeCanceled
                   : l10n.settingsOrganizeDone(
-                      scrape.success,
-                      scrape.skipped,
-                      scrape.failed,
+                      moved: scrape.success,
+                      skipped: scrape.skipped,
+                      failed: scrape.failed,
                     ),
               style: TextStyle(
                 fontSize: 12.5,
@@ -471,7 +471,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
           pattern: prefs.scrapeOrganizePattern,
         );
     if (customTarget.isEmpty) {
-      toast(l10n.settingsOrganizeUsingDefault(target));
+      toast(l10n.settingsOrganizeUsingDefault(dir: target));
     } else {
       toast(l10n.toastOrganizeStarted);
     }
@@ -500,7 +500,7 @@ class _ScrapeSectionState extends ConsumerState<ScrapeSection> {
             Text(
               scrape.current.isEmpty
                   ? l10n.settingsScrapeScanning
-                  : l10n.settingsScrapeCurrent(scrape.current),
+                  : l10n.settingsScrapeCurrent(file: scrape.current),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),

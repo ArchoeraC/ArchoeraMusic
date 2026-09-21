@@ -140,7 +140,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
               icon: EtaIcons.fontSize,
               title: l10n.settingsLyricFontSize,
               subtitle: l10n.settingsLyricFontSizeDesc(
-                prefs.lyricFontSize.round(),
+                size: prefs.lyricFontSize.round(),
               ),
               value: prefs.lyricFontSize,
               min: 14,

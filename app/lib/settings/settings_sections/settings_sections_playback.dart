@@ -30,7 +30,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
       err,
     ) {
       if (!mounted) return;
-      toast(context.l10n.settingsSinkChangedFailed(err), type: ToastType.error);
+      toast(context.l10n.settingsSinkChangedFailed(err: err), type: ToastType.error);
     });
   }
 
@@ -288,7 +288,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         return 0;
       });
     for (final d in sorted) {
-      final fmt = l10n.settingsOutputDeviceFormat(d.channels, d.rate);
+      final fmt = l10n.settingsOutputDeviceFormat(channels: d.channels, rate: d.rate);
       final desc = d.description.isNotEmpty ? '${d.description} · $fmt' : fmt;
       rows.add(
         _EngineOptionTile(
@@ -331,7 +331,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
           icon: _showAllSinks ? EtaIcons.upSmall : EtaIcons.downSmall,
           title: _showAllSinks
               ? l10n.settingsOutputDeviceHideUnused
-              : l10n.settingsOutputDeviceShowAll(hiddenAll.length),
+              : l10n.settingsOutputDeviceShowAll(count: hiddenAll.length),
           desc: '',
           badges: const [],
           selected: false,
@@ -709,7 +709,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               subtitle: prefs.sleepTimerPresets.isEmpty
                   ? l10n.sleepTimerPresetsEmpty
                   : prefs.sleepTimerPresets
-                        .map(l10n.sleepTimerMinutes)
+                        .map((m) => l10n.sleepTimerMinutes(minutes: m))
                         .join(' · '),
               trailing: TextButton(
                 onPressed: _editSleepTimerPresets,
@@ -750,7 +750,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               icon: EtaIcons.columnsOutline,
               title: l10n.settingsSpectrumBarWidth,
               subtitle: l10n.settingsSpectrumBarWidthDesc(
-                prefs.spectrumBarWidth,
+                width: prefs.spectrumBarWidth,
               ),
               value: prefs.spectrumBarWidth.toDouble(),
               min: 1,
@@ -927,7 +927,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 icon: EtaIcons.drop,
                 title: l10n.settingsPlayerBgRippleSpeed,
                 subtitle: l10n.settingsPlayerBgRippleSpeedDesc(
-                  prefs.playerBgRippleSpeed.toStringAsFixed(1),
+                  speed: prefs.playerBgRippleSpeed.toStringAsFixed(1),
                 ),
                 value: prefs.playerBgRippleSpeed,
                 min: 1,
@@ -957,7 +957,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 icon: EtaIcons.transfer,
                 title: l10n.settingsPlayerBgFlowSpeed,
                 subtitle: l10n.settingsPlayerBgFlowSpeedDesc(
-                  prefs.playerBgFlowSpeed.toStringAsFixed(1),
+                  speed: prefs.playerBgFlowSpeed.toStringAsFixed(1),
                 ),
                 value: prefs.playerBgFlowSpeed,
                 min: 0.1,
@@ -972,7 +972,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 icon: EtaIcons.dashboard4Outline,
                 title: l10n.settingsPlayerBgRenderScale,
                 subtitle: l10n.settingsPlayerBgRenderScaleDesc(
-                  prefs.playerBgRenderScale.toStringAsFixed(1),
+                  scale: prefs.playerBgRenderScale.toStringAsFixed(1),
                 ),
                 value: prefs.playerBgRenderScale,
                 min: 0.5,
@@ -987,7 +987,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 icon: EtaIcons.stopwatchOutline,
                 title: l10n.settingsPlayerBgFps,
                 subtitle: l10n.settingsPlayerBgFpsDesc(
-                  prefs.playerBgFps.toString(),
+                  fps: prefs.playerBgFps.toString(),
                 ),
                 value: prefs.playerBgFps.toDouble(),
                 min: 24,

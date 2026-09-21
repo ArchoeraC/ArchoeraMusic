@@ -105,7 +105,7 @@ class _DownloadPageState extends ConsumerState<DownloadPage> {
     final l10n = context.l10n;
     final choice = await showDownloadDeleteDialog(
       context,
-      title: l10n.downloadDeleteSelectedTitle(_selected.length),
+      title: l10n.downloadDeleteSelectedTitle(count: _selected.length),
       message: l10n.downloadDeleteSelectedMessage,
     );
     if (choice == null || !mounted) return;

@@ -53,7 +53,7 @@ extension _HistoryPageActions on _HistoryPageState {
           .read(playbackProvider.notifier)
           .playNow(track, resolvedUrl: url);
     } catch (e) {
-      if (mounted) _toast(context.l10n.trackListPlaySourceFailed('$e'));
+      if (mounted) _toast(context.l10n.trackListPlaySourceFailed(msg: '$e'));
     } finally {
       if (mounted) _setResolving(false);
     }

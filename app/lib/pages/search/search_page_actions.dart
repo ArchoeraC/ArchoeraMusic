@@ -49,24 +49,24 @@ extension _SearchPageActions on _SearchPageState {
 
   /// QQ 失败文案映射：风控 → 带内码提示；网络 → 网络提示；业务码 → 带码。
   String _qqFailureText(QqApiException e) {
-    final l = context.l10n;
+    final l10n = context.l10n;
     final kind = e.kind;
-    if (kind == QmErrorKind.risk) return l.searchQqRiskDetail(e.code ?? 0);
-    if (kind == QmErrorKind.transient) return l.searchNetworkError;
+    if (kind == QmErrorKind.risk) return l10n.searchQqRiskDetail(code: e.code ?? 0);
+    if (kind == QmErrorKind.transient) return l10n.searchNetworkError;
     if (kind == QmErrorKind.code) {
-      return l.searchPlatformError('${e.code ?? '?'}');
+      return l10n.searchPlatformError(code: '${e.code ?? '?'}');
     }
     return e.message;
   }
 
   /// 平台显示名（横幅「{source}」用）。
   String _platformLabel(String source) {
-    final l = context.l10n;
+    final l10n = context.l10n;
     return switch (source) {
-      'netease' => l.platformNetease,
-      'kugou' => l.platformKugou,
-      'qqmusic' => l.platformQQMusic,
-      'neko' => l.platformNeko,
+      'netease' => l10n.platformNetease,
+      'kugou' => l10n.platformKugou,
+      'qqmusic' => l10n.platformQQMusic,
+      'neko' => l10n.platformNeko,
       _ => source,
     };
   }
@@ -93,11 +93,11 @@ extension _SearchPageActions on _SearchPageState {
         _toast(context.l10n.trackListNoPlayableSource);
         return;
       }
-      _toast(context.l10n.pageSearchLoadingTrack(track.title));
+      _toast(context.l10n.pageSearchLoadingTrack(title: track.title));
       // 完整转码在后台执行，await 会阻塞到转码完成，故不等待
       unawaited(_loadUrl(url, track));
     } catch (e) {
-      if (mounted) _toast(context.l10n.trackListPlaySourceFailed('$e'));
+      if (mounted) _toast(context.l10n.trackListPlaySourceFailed(msg: '$e'));
     } finally {
       if (mounted) setState(() => _resolving = false);
     }

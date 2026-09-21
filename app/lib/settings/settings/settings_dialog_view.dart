@@ -729,7 +729,7 @@ extension _SettingsDialogView on _SettingsDialogState {
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.settingsSearchNoResult(_query),
+              l10n.settingsSearchNoResult(query: _query),
               style: TextStyle(
                 fontSize: 13,
                 color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
@@ -744,7 +744,7 @@ extension _SettingsDialogView on _SettingsDialogState {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            l10n.settingsSearchMatchCount(matches.length),
+            l10n.settingsSearchMatchCount(count: matches.length),
             style: TextStyle(
               fontSize: 11,
               color: scheme.onSurfaceVariant.withValues(alpha: 0.6),

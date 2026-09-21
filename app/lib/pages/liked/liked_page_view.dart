@@ -55,8 +55,8 @@ extension _LikedPageView on _LikedPageState {
         : qq
         ? (qqTracks.isEmpty
               ? l10n.pageLikedQqHint
-              : l10n.commonSongCountHint(qqTracks.length))
-        : l10n.commonSongCountHint(store!.total(_platform));
+              : l10n.commonSongCountHint(count: qqTracks.length))
+        : l10n.commonSongCountHint(count: store!.total(_platform));
 
     return Scaffold(
       body: Column(

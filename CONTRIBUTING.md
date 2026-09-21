@@ -254,7 +254,14 @@ cd app && flutter run -d linux      # 本地调试
   | `lib/eta/` | 自建图标字体引用（见 `lib/eta/README.md`） |
 
 - **文案（i18n）**：所有面向用户的文案必须走 gen_l10n 管道（`l10n.yaml`，模板 `app_zh_CN.arb`），
-  新增 key 同步补 `app_en_US.arb`；禁止硬编码中文/英文字符串进 widget。
+  新增 key 同步补 `app_en.arb`；禁止硬编码中文/英文字符串进 widget。
+  - **命名参数**（`use-named-parameters: true`）：带占位符的生成方法参数为命名必填，
+    调用写作 `l10n.foo(count: n)`；参数名以模板 ARB 的占位符名为准，禁止位置传参。
+  - **ICU 转义**（`use-escaping: true`）：ARB 文案里的字面单引号写作 `''`（如 `don''t`、
+    法语 `l''application`）；`'...'` 包裹的内容按字面量处理（特殊字符不解析）。
+  - **访问方式**：Widget 层用 `context.l10n`，非 Widget 层用 `l10nProvider`；
+    不要直调 `AppLocalizations.of(context)`，也不要用单字母别名（如 `final l = context.l10n`）。
+  - **清理**：删除功能时同步从所有 `app_*.arb` 移除不再引用的 key（含其 `@key` 元数据）。
 - **图标**：统一用自建 `EtaIcons`（必要时 `EtaMark`），不混用 Material Icons 字形；
   新字形按 `app/eta-tools/eta_icons/` 流程从源集生成登记，不手写字体。
 - **注释与文档**：公共 API（service / binding / store 层）给出 dartdoc；涉及协议、坑点

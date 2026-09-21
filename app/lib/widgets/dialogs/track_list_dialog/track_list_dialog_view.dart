@@ -53,7 +53,7 @@ extension _TrackListDialogView on _TrackListDialogState {
                       return SizedBox(
                         height: listHeight,
                         child: _DialogErrorView(
-                          message: l10n.commonLoadFailed('${snapshot.error}'),
+                          message: l10n.commonLoadFailed(msg: '${snapshot.error}'),
                           onRetry: _reload,
                         ),
                       );
@@ -139,7 +139,7 @@ extension _BrowseDialogView on _KugouBrowseDialogState {
                     }
                     if (snapshot.hasError) {
                       return _DialogErrorView(
-                        message: l10n.commonLoadFailed('${snapshot.error}'),
+                        message: l10n.commonLoadFailed(msg: '${snapshot.error}'),
                         onRetry: _reloadBrowse,
                       );
                     }
@@ -310,7 +310,7 @@ class _TrackListEmpty extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            l10n.trackListEmptyDailyLogin(l10n.brandNetease),
+            l10n.trackListEmptyDailyLogin(platform: l10n.brandNetease),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
