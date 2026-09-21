@@ -234,6 +234,10 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(
 //   - 字符串字面量只写 ASCII；
 //   - 一切本地化文案走 [Messages] / [CustomMessages] + CustomMessage()/ExpandConstant('{cm:…}')。
 // 注意：[Code] 内只能用 Pascal 注释（// 或 { }），不能用 `;`。
+// 注意：{ } 块注释不可嵌套——注释内不得出现花括号（如 cm: 常量写法），
+//       否则内层 `}` 会提前闭合注释、其后的文字被当成代码而报 Syntax error；
+//       也不得让注释某行去缩进后以 `[` 开头（会被当成 section 头）。
+//       需要提及这类字符时，用 `//` 行注释或改写文字（见下方 ExpandAppNamePlaceholders）。
 var
   DiskFreeLabel: TNewStaticText;
   PrevInstalled: Boolean;
@@ -347,7 +351,7 @@ begin
 end;
 
 { [CustomMessages] 文案不会展开内置消息占位符 [name]/[name/ver]：Inno 只对
-  内置 Setup 消息替换这些前缀（{cm:…} 与 CustomMessage() 均不处理），故此处手动
+  内置 Setup 消息替换这些前缀（cm: 常量与 CustomMessage() 均不处理），故此处手动
   展开——这样各语言「更新」文案可沿用 Inno 惯例占位符，且与内置消息行为一致。 }
 function ExpandAppNamePlaceholders(const S: String): String;
 var
