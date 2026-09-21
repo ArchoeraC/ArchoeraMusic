@@ -4883,6 +4883,55 @@ class AppLocalizationsFr extends AppLocalizations {
   String get sleepTimerFired => 'Sleep timer reached; playback paused';
 
   @override
+  String get sleepTimerFinishTrack => 'Finish current track before pausing';
+
+  @override
+  String get sleepTimerWaitingTrackEnd =>
+      'Sleep timer reached; will pause after the current track';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes minutes';
+  }
+
+  @override
+  String get sleepTimerMinutesUnit => 'min';
+
+  @override
+  String get sleepTimerCustom => 'Personnalisé…';
+
+  @override
+  String get sleepTimerCustomTitle => 'Minuteur personnalisé';
+
+  @override
+  String get sleepTimerCustomLabel => 'Minutes';
+
+  @override
+  String get sleepTimerCustomInvalid => 'Saisissez des minutes entre 1 et 600';
+
+  @override
+  String get sleepTimerPresets => 'Préréglages du minuteur';
+
+  @override
+  String get sleepTimerPresetsDesc =>
+      'Durées rapides du menu du minuteur. Ajoutez ou supprimez des entrées ; laissez vide pour n\'afficher que Personnalisé / Fin du titre / Désactivé.';
+
+  @override
+  String get sleepTimerPresetsAdd => 'Ajouter';
+
+  @override
+  String get sleepTimerPresetsEmpty => 'Aucun préréglage';
+
+  @override
+  String get sleepTimerPresetsDuplicate => 'Cette durée est déjà un préréglage';
+
+  @override
+  String get sleepTimerPresetsEdit => 'Modifier';
+
+  @override
+  String get settingsSectionSleepTimer => 'Minuteur';
+
+  @override
   String get settingsReverseSpectrum => 'Reverse spectrum';
 
   @override

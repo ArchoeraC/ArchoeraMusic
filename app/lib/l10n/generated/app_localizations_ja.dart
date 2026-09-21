@@ -4638,6 +4638,55 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sleepTimerFired => 'Sleep timer reached; playback paused';
 
   @override
+  String get sleepTimerFinishTrack => 'Finish current track before pausing';
+
+  @override
+  String get sleepTimerWaitingTrackEnd =>
+      'Sleep timer reached; will pause after the current track';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes 分';
+  }
+
+  @override
+  String get sleepTimerMinutesUnit => '分';
+
+  @override
+  String get sleepTimerCustom => 'カスタム…';
+
+  @override
+  String get sleepTimerCustomTitle => 'カスタムスリープタイマー';
+
+  @override
+  String get sleepTimerCustomLabel => '分';
+
+  @override
+  String get sleepTimerCustomInvalid => '1〜600 分の整数を入力してください';
+
+  @override
+  String get sleepTimerPresets => 'スリープタイマーのプリセット';
+
+  @override
+  String get sleepTimerPresetsDesc =>
+      'スリープタイマーメニューに表示するクイック時間。追加・削除でき、空にすると「カスタム / 現在の曲を最後まで / オフ」のみ表示します。';
+
+  @override
+  String get sleepTimerPresetsAdd => '追加';
+
+  @override
+  String get sleepTimerPresetsEmpty => 'プリセットなし';
+
+  @override
+  String get sleepTimerPresetsDuplicate => 'その時間は既にプリセットにあります';
+
+  @override
+  String get sleepTimerPresetsEdit => '編集';
+
+  @override
+  String get settingsSectionSleepTimer => 'スリープタイマー';
+
+  @override
   String get settingsReverseSpectrum => 'Reverse spectrum';
 
   @override

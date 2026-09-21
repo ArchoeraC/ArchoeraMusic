@@ -93,120 +93,120 @@ extension _PlayerPageView on _PlayerPageState {
             ? SystemMouseCursors.none
             : MouseCursor.defer,
         child: ClipRect(
-        child: Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerHover: (_) => _pokeControls(),
-          onPointerDown: (_) => _pokeControls(),
-          onPointerSignal: (_) => _pokeControls(),
-          child: Stack(
-            children: [
-              Positioned.fill(child: ColoredBox(color: playerBg)),
-              if (contentMounted)
-                Positioned.fill(
-                  child: PlayerBackground(
-                    cover: current?.cover,
-                    playing: playing,
+          child: Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerHover: (_) => _pokeControls(),
+            onPointerDown: (_) => _pokeControls(),
+            onPointerSignal: (_) => _pokeControls(),
+            child: Stack(
+              children: [
+                Positioned.fill(child: ColoredBox(color: playerBg)),
+                if (contentMounted)
+                  Positioned.fill(
+                    child: PlayerBackground(
+                      cover: current?.cover,
+                      playing: playing,
+                    ),
                   ),
-                ),
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Column(
-                    children: [
-                      // 自动沉浸：控件隐藏时顶栏一并淡出（普通模式顶栏常驻）。
-                      AnimatedOpacity(
-                        opacity: (!autoImmersive || _controlsVisible) ? 1 : 0,
-                        duration: animDuration(
-                          context,
-                          const Duration(milliseconds: 300),
-                        ),
-                        curve: Curves.easeOut,
-                        child: IgnorePointer(
-                          ignoring: autoImmersive && !_controlsVisible,
-                          child: _PlayerTopBar(
-                            l10n: l10n,
-                            showLyrics: showLyrics,
-                            hasLyrics: hasLyrics,
-                            colorScheme: colorScheme,
-                            current: current,
-                            quality: quality,
-                            isFullScreen: _isFullScreen,
-                            onClose: () => context.pop(),
-                            onToggleLyrics: hasLyrics
-                                ? () => ref
-                                      .read(appPrefsProvider.notifier)
-                                      .setShowLyricsInPlayer(!showLyrics)
-                                : null,
-                            onSelectQuality: notifier.setQuality,
-                            onToggleFullscreen: _toggleFullscreen,
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      children: [
+                        // 自动沉浸：控件隐藏时顶栏一并淡出（普通模式顶栏常驻）。
+                        AnimatedOpacity(
+                          opacity: (!autoImmersive || _controlsVisible) ? 1 : 0,
+                          duration: animDuration(
+                            context,
+                            const Duration(milliseconds: 300),
+                          ),
+                          curve: Curves.easeOut,
+                          child: IgnorePointer(
+                            ignoring: autoImmersive && !_controlsVisible,
+                            child: _PlayerTopBar(
+                              l10n: l10n,
+                              showLyrics: showLyrics,
+                              hasLyrics: hasLyrics,
+                              colorScheme: colorScheme,
+                              current: current,
+                              quality: quality,
+                              isFullScreen: _isFullScreen,
+                              onClose: () => context.pop(),
+                              onToggleLyrics: hasLyrics
+                                  ? () => ref
+                                        .read(appPrefsProvider.notifier)
+                                        .setShowLyricsInPlayer(!showLyrics)
+                                  : null,
+                              onSelectQuality: notifier.setQuality,
+                              onToggleFullscreen: _toggleFullscreen,
+                            ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: _PlayerMainBody(
-                          source: source,
-                          current: current,
-                          title: title,
-                          subtitle: subtitle,
-                          playing: playing,
-                          hasContent: hasContent,
-                          hasLyrics: hasLyrics,
-                          hasSource: hasSource,
-                          showLyrics: showLyrics,
-                          contentMounted: contentMounted,
-                          transitionStyle: transitionStyle,
-                          coverLayout: coverLayout,
-                          coverLyricRatio: coverLyricRatio,
-                          autoCenterCover: autoCenterCover,
-                          slideNext: _slideNext,
-                          coverPulse: _coverPulse,
-                          beatStrength: _lastBeatStrength,
-                          l10n: l10n,
-                          dragMs: _dragMs,
-                          onSeekLyric: hasSource
-                              ? (ms) =>
-                                    notifier.seek(Duration(milliseconds: ms))
-                              : null,
+                        Expanded(
+                          child: _PlayerMainBody(
+                            source: source,
+                            current: current,
+                            title: title,
+                            subtitle: subtitle,
+                            playing: playing,
+                            hasContent: hasContent,
+                            hasLyrics: hasLyrics,
+                            hasSource: hasSource,
+                            showLyrics: showLyrics,
+                            contentMounted: contentMounted,
+                            transitionStyle: transitionStyle,
+                            coverLayout: coverLayout,
+                            coverLyricRatio: coverLyricRatio,
+                            autoCenterCover: autoCenterCover,
+                            slideNext: _slideNext,
+                            coverPulse: _coverPulse,
+                            beatStrength: _lastBeatStrength,
+                            l10n: l10n,
+                            dragMs: _dragMs,
+                            onSeekLyric: hasSource
+                                ? (ms) =>
+                                      notifier.seek(Duration(milliseconds: ms))
+                                : null,
+                          ),
                         ),
-                      ),
-                      Text(
-                        !hasContent
-                            ? l10n.playerPageLoadHint
-                            : (buffering ? l10n.playerBarBuffering : ''),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      _PlayerBottomOverlay(
-                        controlsVisible: _controlsVisible,
-                        theme: theme,
-                        dragMs: _dragMs,
-                        buffering: buffering,
-                        hasSource: hasSource,
-                        hasContent: hasContent,
-                        hasQueue: hasQueue,
-                        canLike: canLike,
-                        liked: liked,
-                        current: current,
-                        shuffle: shuffle,
-                        repeatMode: repeatMode,
-                        playing: playing,
-                        showProgressLyric: prefs.showProgressLyric,
-                        onDragChanged: (v) => setState(() => _dragMs = v),
-                        onSeekEnd: (_) => setState(() => _dragMs = null),
-                        onToggleLike: _toggleLike,
-                        onShowComments: () {
-                          if (current != null) {
-                            showCommentDialog(context, track: current);
-                          }
-                        },
-                      ),
-                    ],
+                        Text(
+                          !hasContent
+                              ? l10n.playerPageLoadHint
+                              : (buffering ? l10n.playerBarBuffering : ''),
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        _PlayerBottomOverlay(
+                          controlsVisible: _controlsVisible,
+                          theme: theme,
+                          dragMs: _dragMs,
+                          buffering: buffering,
+                          hasSource: hasSource,
+                          hasContent: hasContent,
+                          hasQueue: hasQueue,
+                          canLike: canLike,
+                          liked: liked,
+                          current: current,
+                          shuffle: shuffle,
+                          repeatMode: repeatMode,
+                          playing: playing,
+                          showProgressLyric: prefs.showProgressLyric,
+                          onDragChanged: (v) => setState(() => _dragMs = v),
+                          onSeekEnd: (_) => setState(() => _dragMs = null),
+                          onToggleLike: _toggleLike,
+                          onShowComments: () {
+                            if (current != null) {
+                              showCommentDialog(context, track: current);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -299,24 +299,17 @@ class _PlayerTopBar extends StatelessWidget {
   }
 }
 
-/// 睡眠定时按钮（播放页顶栏）：倒计时 / 播完当前曲 / 关闭。
+/// 睡眠定时按钮（播放页顶栏）：预设倒计时 / 自定义 / 播完当前曲 /
+/// 到时播完再暂停 / 关闭。
 class _SleepTimerButton extends ConsumerWidget {
   const _SleepTimerButton();
-
-  String _label(String v, AppLocalizations l10n) => switch (v) {
-    'off' => l10n.sleepTimerOff,
-    '15' => l10n.sleepTimer15,
-    '30' => l10n.sleepTimer30,
-    '60' => l10n.sleepTimer60,
-    '90' => l10n.sleepTimer90,
-    'eot' => l10n.sleepTimerEndOfTrack,
-    _ => v,
-  };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final timer = ref.watch(sleepTimerProvider);
+    final prefs = ref.watch(appPrefsProvider);
+    final finishTrack = prefs.sleepFinishTrack;
     final remaining = timer.mode == SleepMode.duration
         ? formatClock(timer.remaining)
         : '';
@@ -331,26 +324,52 @@ class _SleepTimerButton extends ConsumerWidget {
         EtaIcons.stopwatchOutline,
         color: timer.active ? Theme.of(context).colorScheme.primary : null,
       ),
-      onSelected: (v) {
+      onSelected: (v) async {
         final n = ref.read(sleepTimerProvider.notifier);
-        switch (v) {
-          case 'off':
-            n.cancel();
-          case '15':
-            n.startDuration(const Duration(minutes: 15));
-          case '30':
-            n.startDuration(const Duration(minutes: 30));
-          case '60':
-            n.startDuration(const Duration(minutes: 60));
-          case '90':
-            n.startDuration(const Duration(minutes: 90));
-          case 'eot':
-            n.startEndOfTrack();
+        if (v == 'finishTrack') {
+          ref.read(appPrefsProvider.notifier).setSleepFinishTrack(!finishTrack);
+          return;
+        }
+        if (v == 'off') {
+          n.cancel();
+          return;
+        }
+        if (v == 'eot') {
+          n.startEndOfTrack();
+          return;
+        }
+        if (v == 'custom') {
+          final initial = prefs.sleepTimerCustomMinutes ?? 30;
+          final m = await showSleepTimerMinutesDialog(
+            context,
+            initialMinutes: initial,
+          );
+          if (m == null) return;
+          ref.read(appPrefsProvider.notifier).setSleepTimerCustomMinutes(m);
+          n.startDuration(Duration(minutes: m));
+          return;
+        }
+        if (v.startsWith('min:')) {
+          final m = int.tryParse(v.substring(4));
+          if (m != null) n.startDuration(Duration(minutes: m));
         }
       },
       itemBuilder: (context) => [
-        for (final v in const ['off', '15', '30', '60', '90', 'eot'])
-          PopupMenuItem(value: v, child: Text(_label(v, l10n))),
+        CheckedPopupMenuItem<String>(
+          value: 'finishTrack',
+          checked: finishTrack,
+          child: Text(l10n.sleepTimerFinishTrack),
+        ),
+        const PopupMenuDivider(),
+        for (final m in prefs.sleepTimerPresets)
+          PopupMenuItem(
+            value: 'min:$m',
+            child: Text(l10n.sleepTimerMinutes(m)),
+          ),
+        PopupMenuItem(value: 'custom', child: Text(l10n.sleepTimerCustom)),
+        const PopupMenuDivider(),
+        PopupMenuItem(value: 'eot', child: Text(l10n.sleepTimerEndOfTrack)),
+        PopupMenuItem(value: 'off', child: Text(l10n.sleepTimerOff)),
       ],
     );
   }
@@ -411,7 +430,8 @@ class _PlayerMainBody extends StatelessWidget {
         final fullscreen = coverLayout == 'fullscreen';
         final coverFraction = fullscreen ? 0.6 : coverLyricRatio;
         final lyricsFraction = fullscreen ? 0.5 : (1 - coverLyricRatio);
-        final coverByWidth = c.maxWidth * coverFraction * (fullscreen ? 0.95 : 0.85);
+        final coverByWidth =
+            c.maxWidth * coverFraction * (fullscreen ? 0.95 : 0.85);
         final coverByHeight = c.maxHeight * 0.5;
         final size =
             (coverByWidth < coverByHeight ? coverByWidth : coverByHeight).clamp(

@@ -8534,6 +8534,96 @@ abstract class AppLocalizations {
   /// **'睡眠定时已到，已暂停播放'**
   String get sleepTimerFired;
 
+  /// No description provided for @sleepTimerFinishTrack.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'到时播完当前曲再暂停'**
+  String get sleepTimerFinishTrack;
+
+  /// No description provided for @sleepTimerWaitingTrackEnd.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'定时已到，将在当前曲结束后暂停'**
+  String get sleepTimerWaitingTrackEnd;
+
+  /// No description provided for @sleepTimerMinutes.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{minutes} 分钟'**
+  String sleepTimerMinutes(int minutes);
+
+  /// No description provided for @sleepTimerMinutesUnit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'分钟'**
+  String get sleepTimerMinutesUnit;
+
+  /// No description provided for @sleepTimerCustom.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义…'**
+  String get sleepTimerCustom;
+
+  /// No description provided for @sleepTimerCustomTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自定义睡眠定时'**
+  String get sleepTimerCustomTitle;
+
+  /// No description provided for @sleepTimerCustomLabel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'分钟数'**
+  String get sleepTimerCustomLabel;
+
+  /// No description provided for @sleepTimerCustomInvalid.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入 1–600 之间的分钟数'**
+  String get sleepTimerCustomInvalid;
+
+  /// No description provided for @sleepTimerPresets.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'睡眠定时预设'**
+  String get sleepTimerPresets;
+
+  /// No description provided for @sleepTimerPresetsDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'睡眠定时菜单里的快捷时长，可增删；留空则只显示「自定义」「播完当前曲」「关闭」。'**
+  String get sleepTimerPresetsDesc;
+
+  /// No description provided for @sleepTimerPresetsAdd.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'添加'**
+  String get sleepTimerPresetsAdd;
+
+  /// No description provided for @sleepTimerPresetsEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未设置预设'**
+  String get sleepTimerPresetsEmpty;
+
+  /// No description provided for @sleepTimerPresetsDuplicate.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'该时长已在预设里'**
+  String get sleepTimerPresetsDuplicate;
+
+  /// No description provided for @sleepTimerPresetsEdit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'编辑'**
+  String get sleepTimerPresetsEdit;
+
+  /// No description provided for @settingsSectionSleepTimer.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'睡眠定时'**
+  String get settingsSectionSleepTimer;
+
   /// No description provided for @settingsReverseSpectrum.
   ///
   /// In zh_CN, this message translates to:

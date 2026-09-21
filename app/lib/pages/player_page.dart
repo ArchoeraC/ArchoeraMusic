@@ -22,6 +22,7 @@ import '../stores/providers.dart';
 import '../theme/app_theme.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/dialogs/comment_dialog.dart';
+import '../widgets/dialogs/sleep_timer_dialogs.dart';
 import '../widgets/player/cover_switcher.dart';
 import '../widgets/player/playback_progress_slider.dart';
 import '../widgets/player/player_controls_row.dart';

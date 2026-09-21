@@ -1419,6 +1419,28 @@
   "sleepTimer90": "90 minutes",
   "sleepTimerEndOfTrack": "End of current track",
   "sleepTimerFired": "Sleep timer reached; playback paused",
+  "sleepTimerFinishTrack": "Finish current track before pausing",
+  "sleepTimerWaitingTrackEnd": "Sleep timer reached; will pause after the current track",
+  "sleepTimerMinutes": "{minutes}분",
+  "sleepTimerMinutesUnit": "분",
+  "sleepTimerCustom": "사용자 지정…",
+  "sleepTimerCustomTitle": "사용자 지정 수면 타이머",
+  "sleepTimerCustomLabel": "분",
+  "sleepTimerCustomInvalid": "1~600 사이의 분을 입력하세요",
+  "sleepTimerPresets": "수면 타이머 프리셋",
+  "sleepTimerPresetsDesc": "수면 타이머 메뉴에 표시할 빠른 시간입니다. 추가하거나 삭제할 수 있으며, 비워 두면 사용자 지정 / 현재 곡 끝까지 / 끄기만 표시합니다.",
+  "sleepTimerPresetsAdd": "추가",
+  "sleepTimerPresetsEmpty": "프리셋 없음",
+  "sleepTimerPresetsDuplicate": "해당 시간이 이미 프리셋에 있습니다",
+  "sleepTimerPresetsEdit": "편집",
+  "settingsSectionSleepTimer": "수면 타이머",
+  "@sleepTimerMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "settingsReverseSpectrum": "Reverse spectrum",
   "settingsReverseSpectrumDesc": "Flip the spectrum horizontally",
   "settingsAutoImmersive": "Auto immersive",

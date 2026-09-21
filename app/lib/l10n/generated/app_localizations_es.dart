@@ -4878,6 +4878,56 @@ class AppLocalizationsEs extends AppLocalizations {
   String get sleepTimerFired => 'Sleep timer reached; playback paused';
 
   @override
+  String get sleepTimerFinishTrack => 'Finish current track before pausing';
+
+  @override
+  String get sleepTimerWaitingTrackEnd =>
+      'Sleep timer reached; will pause after the current track';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes minutos';
+  }
+
+  @override
+  String get sleepTimerMinutesUnit => 'min';
+
+  @override
+  String get sleepTimerCustom => 'Personalizado…';
+
+  @override
+  String get sleepTimerCustomTitle => 'Temporizador personalizado';
+
+  @override
+  String get sleepTimerCustomLabel => 'Minutos';
+
+  @override
+  String get sleepTimerCustomInvalid => 'Introduce minutos entre 1 y 600';
+
+  @override
+  String get sleepTimerPresets => 'Ajustes del temporizador';
+
+  @override
+  String get sleepTimerPresetsDesc =>
+      'Duraciones rápidas del menú del temporizador. Añade o elimina entradas; déjalo vacío para mostrar solo Personalizado / Fin de la pista / Desactivado.';
+
+  @override
+  String get sleepTimerPresetsAdd => 'Añadir';
+
+  @override
+  String get sleepTimerPresetsEmpty => 'Sin ajustes';
+
+  @override
+  String get sleepTimerPresetsDuplicate =>
+      'Esa duración ya está en los ajustes';
+
+  @override
+  String get sleepTimerPresetsEdit => 'Editar';
+
+  @override
+  String get settingsSectionSleepTimer => 'Temporizador';
+
+  @override
   String get settingsReverseSpectrum => 'Reverse spectrum';
 
   @override
