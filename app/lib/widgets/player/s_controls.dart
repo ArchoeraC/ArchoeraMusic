@@ -336,3 +336,97 @@ class SSegmented<T> extends StatelessWidget {
   }
 }
 
+/// 下拉选项。
+class SDropdownOption<T> {
+  const SDropdownOption(this.value, this.label, {this.icon});
+
+  final T value;
+  final String label;
+
+  /// 可选前导图标（音源切换时通常留空，仅用文字标签）。
+  final IconData? icon;
+}
+
+/// 自绘下拉栏（统一音源/单选切换观感，替代分页上的分段控件）。
+///
+/// 外观与 [SSegmented] 同源：`onSurface 6%` 圆角 pill 容器，显示当前选项
+/// 标签 + 下拉箭头，展开为圆角菜单。用于「来源平台」这类「候选多、占用
+/// 横向空间大」的切换（搜索 / 收藏 / 我喜欢 三页统一）。
+class SDropdown<T> extends StatelessWidget {
+  const SDropdown({
+    super.key,
+    required this.options,
+    required this.selected,
+    required this.onChanged,
+    this.maxWidth = 180,
+  });
+
+  final List<SDropdownOption<T>> options;
+  final T selected;
+  final ValueChanged<T> onChanged;
+
+  /// 菜单项文字最大宽度（超出省略，防长标签撑爆菜单）。
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // 选中值必须命中某一项，否则 DropdownButton 会断言失败（如实验性音源
+    // 被关闭后其选项已移除）。
+    final value = options.any((o) => o.value == selected)
+        ? selected
+        : (options.isEmpty ? null : options.first.value);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.onSurface.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: DropdownButton<T>(
+            value: value,
+            isDense: true,
+            borderRadius: BorderRadius.circular(10),
+            menuMaxHeight: 320,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurface,
+            ),
+            icon: Icon(EtaIcons.downSmall, color: scheme.onSurfaceVariant),
+            onChanged: (v) {
+              if (v == null || v == selected) return;
+              onChanged(v);
+            },
+            items: [
+              for (final o in options)
+                DropdownMenuItem<T>(
+                  value: o.value,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (o.icon != null) ...[
+                        Icon(o.icon, size: 15, color: scheme.onSurfaceVariant),
+                        const SizedBox(width: 6),
+                      ],
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxWidth),
+                        child: Text(
+                          o.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

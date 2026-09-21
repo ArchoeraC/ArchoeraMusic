@@ -302,12 +302,12 @@ class _LikedHeader extends StatelessWidget {
             ),
             const SizedBox(width: 12),
           ],
-          SSegmented<String>(
+          SDropdown<String>(
             options: [
-              SSegmentedOption('netease', l10n.platformNetease),
-              SSegmentedOption('kugou', l10n.platformKugou),
-              SSegmentedOption('qqmusic', l10n.platformQQMusic),
-              if (nekoEnabled) SSegmentedOption('neko', l10n.platformNeko),
+              SDropdownOption('netease', l10n.platformNetease),
+              SDropdownOption('kugou', l10n.platformKugou),
+              SDropdownOption('qqmusic', l10n.platformQQMusic),
+              if (nekoEnabled) SDropdownOption('neko', l10n.platformNeko),
             ],
             selected: platform,
             onChanged: onSwitchPlatform,

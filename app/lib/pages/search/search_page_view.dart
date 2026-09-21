@@ -197,13 +197,13 @@ class _SearchPageHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              SSegmented<String>(
+              SDropdown<String>(
                 options: [
-                  SSegmentedOption('netease', l10n.platformNetease),
-                  SSegmentedOption('kugou', l10n.platformKugou),
-                  SSegmentedOption('qqmusic', l10n.platformQQMusic),
-                  if (nekoEnabled) SSegmentedOption('neko', l10n.platformNeko),
-                  SSegmentedOption('all', l10n.platformAll),
+                  SDropdownOption('netease', l10n.platformNetease),
+                  SDropdownOption('kugou', l10n.platformKugou),
+                  SDropdownOption('qqmusic', l10n.platformQQMusic),
+                  if (nekoEnabled) SDropdownOption('neko', l10n.platformNeko),
+                  SDropdownOption('all', l10n.platformAll),
                 ],
                 selected: platform,
                 onChanged: onPlatformChanged,
