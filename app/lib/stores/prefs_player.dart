@@ -13,6 +13,9 @@ const pcmMemPolicyKey = 'audio.pcmMemPolicy';
 const pcmMemLimitMbKey = 'audio.pcmMemLimitMb';
 const autoPlayOnLaunchKey = 'player.autoPlayOnLaunch';
 const sessionMemoryKey = 'player.sessionMemory';
+const sleepFinishTrackKey = 'player.sleepTimerFinishTrack';
+const sleepTimerPresetsKey = 'player.sleepTimerPresets';
+const sleepTimerCustomMinutesKey = 'player.sleepTimerCustomMinutes';
 const enableSpectrumKey = 'player.enableSpectrum';
 const coverBeatScaleKey = 'player.coverBeatScale';
 const spectrumBarWidthKey = 'player.spectrumBarWidth';
@@ -96,6 +99,20 @@ const bool defaultAutoPlayOnLaunch = false;
 /// 会话记忆（记录关闭前的最后一次播放现场：队列/位置/模式/音质；默认开）。
 /// 关闭后不再保存也不恢复现场；「启动时自动播放」仅在开启记忆时才有意义。
 const bool defaultSessionMemory = true;
+
+/// 睡眠定时到点后是否等当前曲播完再暂停（默认开）。
+///
+/// 关闭则恢复旧行为：倒计时归零立即暂停（可能停在曲中）。
+const bool defaultSleepFinishTrack = true;
+
+/// 睡眠定时的快捷预设（分钟；可在设置里编辑；默认 15/30/60/90）。
+///
+/// 存盘为 `List<int>`；用户删光后为空列表（只保留「自定义…/播完当前曲/关闭」）。
+const List<int> defaultSleepTimerPresets = [15, 30, 60, 90];
+
+/// 睡眠定时分钟数的合法范围（自定义输入 / 预设编辑共用）。
+const int minSleepTimerMinutes = 1;
+const int maxSleepTimerMinutes = 600;
 
 /// 频谱可视化总开关（对齐原版 player.enableSpectrum，默认开）。
 const bool defaultEnableSpectrum = true;
@@ -229,8 +246,10 @@ extension PlayerPrefs on AppPrefs {
 
   /// 'limit' 策略的保留上限（MB；1 ~ 262144 收敛）。
   int get pcmMemLimitMb =>
-      ((data[pcmMemLimitMbKey] as num?)?.toInt() ?? defaultPcmMemLimitMb)
-          .clamp(1, 1 << 18);
+      ((data[pcmMemLimitMbKey] as num?)?.toInt() ?? defaultPcmMemLimitMb).clamp(
+        1,
+        1 << 18,
+      );
 
   /// 启动时自动播放（恢复会话时自动续播）。
   bool get autoPlayOnLaunch =>
@@ -239,6 +258,33 @@ extension PlayerPrefs on AppPrefs {
   /// 会话记忆（记录/恢复上次播放现场）。
   bool get sessionMemory =>
       data[sessionMemoryKey] as bool? ?? defaultSessionMemory;
+
+  /// 睡眠定时到点后是否等当前曲播完再暂停（默认开）。
+  bool get sleepFinishTrack =>
+      data[sleepFinishTrackKey] as bool? ?? defaultSleepFinishTrack;
+
+  /// 睡眠定时快捷预设（分钟）：去重、clamp 到合法范围。
+  ///
+  /// 键缺失（旧数据）回退默认；键存在但为空列表表示用户删光了预设。
+  List<int> get sleepTimerPresets {
+    final raw = data[sleepTimerPresetsKey];
+    if (raw is! List) return defaultSleepTimerPresets;
+    final out = <int>[];
+    for (final v in raw) {
+      if (v is! num) continue;
+      final m = v.round().clamp(minSleepTimerMinutes, maxSleepTimerMinutes);
+      if (!out.contains(m)) out.add(m);
+    }
+    return out;
+  }
+
+  /// 最近一次自定义睡眠定时的分钟数；未设置/非法返回 null。
+  int? get sleepTimerCustomMinutes {
+    final v = data[sleepTimerCustomMinutesKey];
+    if (v is! num) return null;
+    final m = v.round();
+    return (m < minSleepTimerMinutes || m > maxSleepTimerMinutes) ? null : m;
+  }
 
   bool get enableSpectrum =>
       data[enableSpectrumKey] as bool? ?? defaultEnableSpectrum;
@@ -429,21 +475,39 @@ extension PlayerPrefs on AppPrefs {
     bool? enabled,
     String? policy,
     int? limitMb,
-  }) =>
-      AppPrefs(
-        initialData: {
-          ...data,
-          engineMemoryKey: ?enabled,
-          if (pcmMemPolicies.contains(policy)) pcmMemPolicyKey: policy,
-          pcmMemLimitMbKey: ?limitMb?.clamp(1, 1 << 18),
-        },
-      );
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      engineMemoryKey: ?enabled,
+      if (pcmMemPolicies.contains(policy)) pcmMemPolicyKey: policy,
+      pcmMemLimitMbKey: ?limitMb?.clamp(1, 1 << 18),
+    },
+  );
 
   AppPrefs copyWithAutoPlay(bool value) =>
       AppPrefs(initialData: {...data, autoPlayOnLaunchKey: value});
 
   AppPrefs copyWithMemory(bool value) =>
       AppPrefs(initialData: {...data, sessionMemoryKey: value});
+
+  /// 设置睡眠定时「到时播完当前曲再暂停」。
+  AppPrefs copyWithSleepFinishTrack(bool value) =>
+      AppPrefs(initialData: {...data, sleepFinishTrackKey: value});
+
+  /// 设置睡眠定时快捷预设（分钟）。
+  AppPrefs copyWithSleepTimerPresets(List<int> presets) =>
+      AppPrefs(initialData: {...data, sleepTimerPresetsKey: presets});
+
+  /// 记忆最近一次自定义睡眠定时（分钟数 clamp 到合法范围）。
+  AppPrefs copyWithSleepTimerCustomMinutes(int minutes) => AppPrefs(
+    initialData: {
+      ...data,
+      sleepTimerCustomMinutesKey: minutes.clamp(
+        minSleepTimerMinutes,
+        maxSleepTimerMinutes,
+      ),
+    },
+  );
 
   AppPrefs copyWithSpectrum({bool? enable, int? barWidth}) => AppPrefs(
     initialData: {

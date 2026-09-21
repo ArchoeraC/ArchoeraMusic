@@ -36,6 +36,7 @@ import '../theme/app_theme.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/dialogs/neko_login_dialog.dart';
 import '../widgets/dialogs/s_dialog.dart';
+import '../widgets/dialogs/sleep_timer_dialogs.dart';
 import '../widgets/player/s_controls.dart';
 import 'settings_color_picker.dart';
 import 'settings_widgets.dart';

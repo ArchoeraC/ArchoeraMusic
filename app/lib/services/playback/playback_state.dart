@@ -30,6 +30,7 @@ class PlaybackState {
     this.playing = false,
     this.position = Duration.zero,
     this.duration = Duration.zero,
+    this.trackEndStopCount = 0,
     this.logs = const [],
     this.fft,
     this.queue = const [],
@@ -62,6 +63,12 @@ class PlaybackState {
   final bool playing;
   final Duration position;
   final Duration duration;
+
+  /// 曲尾「到时暂停」计数：睡眠定时置位 `stopAtTrackEnd` 后，当前曲**自然
+  /// 到达末帧**（引擎 `player:ended`）时原地暂停、不续播下一曲，并 +1。
+  /// 定时器监听该计数增长即可确认「播完当前曲」已收尾（见 sleep_timer.dart）。
+  final int trackEndStopCount;
+
   final List<String> logs;
 
   /// 最近一帧 FFT 频谱（128 bins [0,1]，对数映射 80~2000Hz）。
@@ -107,6 +114,7 @@ class PlaybackState {
     bool? playing,
     Duration? position,
     Duration? duration,
+    int? trackEndStopCount,
     List<String>? logs,
     Object? fft = _unset,
     List<Track>? queue,
@@ -131,6 +139,7 @@ class PlaybackState {
       playing: playing ?? this.playing,
       position: position ?? this.position,
       duration: duration ?? this.duration,
+      trackEndStopCount: trackEndStopCount ?? this.trackEndStopCount,
       logs: logs ?? this.logs,
       fft: identical(fft, _unset) ? this.fft : fft as FftFrame?,
       queue: queue ?? this.queue,

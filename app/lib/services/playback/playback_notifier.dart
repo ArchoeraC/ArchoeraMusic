@@ -71,6 +71,13 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// 若此标志为 true 则立即暂停（不置 playing），避免闪播。
   bool _pendingPauseAfterReady = false;
 
+  /// 睡眠定时「播完当前曲再暂停」：置位后当前曲**自然到达末帧**（引擎
+  /// `player:ended`）时原地暂停、**不自动续播下一曲**——对齐「按歌曲时间表
+  /// 在末尾停住」，而不是等下一曲开始播放才暂停（旧实现按 trackId 变化判定，
+  /// 会先听到下一曲开头）。收尾后自动复位并递增
+  /// [PlaybackState.trackEndStopCount]。由 [SleepTimerNotifier] 置位/复位。
+  bool _stopAtTrackEnd = false;
+
   /// 冷启动「启动时自动播放」续播尝试进行中（见 [restore]）。
   ///
   /// 目的：防止**中间态落盘覆盖「可续播」快照**。restore 先把现场恢复为
@@ -519,9 +526,14 @@ class PlaybackNotifier extends _PlaybackNotifierBase
     if (engine == null) {
       final track = state.currentQueueTrack;
       if (track == null || state.playing) return;
-      _log('从保存位置续播: ${track.title} @${state.position.inMilliseconds}ms');
+      // 曲尾边界：位置已到/越过整曲末尾（如睡眠定时在曲尾停住）→ 从头重放，
+      // 否则会从末尾续播、瞬间再次结束。
+      var offsetMs = state.position.inMilliseconds;
+      final durMs = state.duration.inMilliseconds;
+      if (durMs > 0 && offsetMs >= durMs) offsetMs = 0;
+      _log('从保存位置续播: ${track.title} @${offsetMs}ms');
       // ignore: discarded_futures
-      unawaited(_resumeFrom(track, offsetMs: state.position.inMilliseconds));
+      unawaited(_resumeFrom(track, offsetMs: offsetMs));
       return;
     }
     if (state.playing) {
@@ -531,6 +543,26 @@ class PlaybackNotifier extends _PlaybackNotifierBase
       engine.play();
       state = state.copyWith(playing: true);
     }
+    _syncFftActive();
+  }
+
+  /// 睡眠定时「播完当前曲再暂停」开关（见 [_stopAtTrackEnd]）。
+  ///
+  /// 置位后，当前曲自然播放到末尾时 [PlaybackNotifier] 会停在原地并递增
+  /// [PlaybackState.trackEndStopCount]，**不**自动切下一曲。用户手动切歌
+  /// （[playNext] / [playAt]）不经过该路径。
+  bool get stopAtTrackEnd => _stopAtTrackEnd;
+  set stopAtTrackEnd(bool value) => _stopAtTrackEnd = value;
+
+  /// 显式暂停（睡眠定时 / 系统事件调用）。
+  ///
+  /// 与 [toggle] 的关键区别：**不依赖当前状态取反**——定时触发瞬间若正处于
+  /// 切歌 / 缓冲过渡（`playing` 恰为 false），`toggle` 会把「本应暂停」变成
+  /// 恢复播放，导致定时形同虚设。已在暂停态则无事发生（幂等）。
+  void pause() {
+    if (!state.playing) return;
+    _engine?.pause();
+    state = state.copyWith(playing: false, buffering: false);
     _syncFftActive();
   }
 

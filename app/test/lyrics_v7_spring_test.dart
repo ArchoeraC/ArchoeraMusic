@@ -105,6 +105,32 @@ void main() {
       expect(s.current, 123.5);
     });
 
+    test('park 后 setTarget 不继承停驻前的速度（倒带入窗不冲过头）', () {
+      final s = Spring1D();
+      s.hardSet(0);
+      s.setTarget(1000);
+      for (var i = 0; i < 8; i++) {
+        s.update(0.01); // 加速
+      }
+      // 运行中改目标：本次求解器的初速度即当前高速（模拟拖动中断/换行打断）。
+      s.setTarget(900);
+      for (var i = 0; i < 3; i++) {
+        s.update(0.01);
+      }
+      expect(s.velocity, greaterThan(100), reason: '前置条件：停驻前处于高速');
+
+      s.park(500); // 视口外的行停驻
+      s.setTarget(400); // 重新入窗，目标在当前下方
+      var maxY = s.current;
+      for (var i = 0; i < 150; i++) {
+        s.update(0.004);
+        if (s.current > maxY) maxY = s.current;
+      }
+      // 停驻态初速度应为 0：从 500 向 400 只应下行（轻微过冲也不该上冲）。
+      expect(maxY, lessThan(505), reason: '不应把停驻前的向上速度注入新运动');
+      expect(s.current, closeTo(400, 1.0));
+    });
+
     test('默认参数（欠阻尼）下 300ms 内基本收敛（误差 < 1）', () {
       // 默认 mass0.9/damping15/stiffness90 阻尼比 ≈ 0.83，轻微欠阻尼。
       // 小位移（6px）下 300ms 的解析误差约 0.7px，满足 < 1 收敛判据。
@@ -143,9 +169,9 @@ void main() {
       final mainH = fontSize * kLyricLineHeightEm;
       final subH =
           (fontSize * kLyricTranslationFontScale < kLyricTranslationMinPx
-                  ? kLyricTranslationMinPx
-                  : fontSize * kLyricTranslationFontScale) *
-              kLyricTranslationLineHeightEm;
+              ? kLyricTranslationMinPx
+              : fontSize * kLyricTranslationFontScale) *
+          kLyricTranslationLineHeightEm;
       expect(heights, hasLength(3));
       expect(heights[0], closeTo(mainH, 0.01));
       expect(
@@ -176,9 +202,7 @@ void main() {
       const fs = 20.0;
       const maxW = 100.0;
       final long = <LyricGroup>[
-        const LyricGroup(
-          original: LyricLine(timeMs: 0, text: '一二三四五六七八九十'),
-        ),
+        const LyricGroup(original: LyricLine(timeMs: 0, text: '一二三四五六七八九十')),
       ];
       final h = computeLineHeights(long, fontSize: fs, maxWidth: maxW);
       expect(h.single, greaterThan(fs * 1.5), reason: '10 字 / 每行 5 字 = 2 行');
