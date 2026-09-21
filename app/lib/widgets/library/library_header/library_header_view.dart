@@ -142,8 +142,8 @@ extension _LibraryHeaderView on LibraryHeader {
       final size = _formatSize(state.totalSizeBytes);
       child = Text(
         l10n.libraryTrackCount(
-          state.totalCount,
-          size.isEmpty ? '' : ' · $size',
+          count: state.totalCount,
+          extra: size.isEmpty ? '' : ' · $size',
         ),
         style: TextStyle(
           fontSize: 13,

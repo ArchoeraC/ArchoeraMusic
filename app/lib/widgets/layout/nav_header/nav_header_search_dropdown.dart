@@ -339,7 +339,7 @@ class _SearchDropdown extends ConsumerWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  l10n.searchQuick(query),
+                  l10n.searchQuick(query: query),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 13),

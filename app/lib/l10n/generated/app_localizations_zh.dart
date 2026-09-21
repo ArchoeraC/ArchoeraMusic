@@ -39,9 +39,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get trackDetailDuration => '时长';
 
   @override
-  String get trackDetailArtist => '歌手';
-
-  @override
   String get trackDetailAlbum => '专辑';
 
   @override
@@ -99,12 +96,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get batchSelectHint => '批量选择';
 
   @override
-  String toastBatchAddedToQueue(Object count) {
+  String toastBatchAddedToQueue({required Object count}) {
     return '已加入播放队列 $count 首';
   }
 
   @override
-  String toastBatchAddedToDownloadQueue(Object count) {
+  String toastBatchAddedToDownloadQueue({required Object count}) {
     return '已加入下载队列 $count 首';
   }
 
@@ -140,10 +137,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSuppressSleepOff => '系统可能按空闲计划休眠';
-
-  @override
-  String get settingsPowerSaverNote =>
-      '节能模式监听窗口状态事件自动降帧，无需轮询；窗口不可见或显示器关闭时，渲染引擎本身已停止绘制。「禁用系统休眠」仅在播放中生效。';
 
   @override
   String get settingsCloseBehavior => '关闭应用时';
@@ -197,9 +190,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonLoading => '加载中';
 
   @override
-  String get commonLossless => '无损';
-
-  @override
   String get commonOriginal => '原唱';
 
   @override
@@ -230,7 +220,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadQualityTitle => '下载音质';
 
   @override
-  String downloadRequiresLoginContent(Object platform) {
+  String downloadRequiresLoginContent({required Object platform}) {
     return '获取$platform下载链接需登录，未登录只能试听，无法下载完整音质。\n\n请先登录$platform账号后重试。';
   }
 
@@ -262,10 +252,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get navHeaderAccount => '账号';
 
   @override
-  String get navHeaderComingSoon => '敬请期待';
-
-  @override
-  String navHeaderKugouId(Object id) {
+  String navHeaderKugouId({required Object id}) {
     return 'KG $id';
   }
 
@@ -348,7 +335,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get queueTitle => '播放队列';
 
   @override
-  String queueTrackCount(Object count) {
+  String queueTrackCount({required Object count}) {
     return '$count 首';
   }
 
@@ -365,7 +352,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchHot => '热搜';
 
   @override
-  String searchQuick(Object query) {
+  String searchQuick({required Object query}) {
     return '搜索“$query”';
   }
 
@@ -418,7 +405,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get songListLocatePlaying => '定位播放位置';
 
   @override
-  String toastAddedToDownloadQueue(Object quality) {
+  String toastAddedToDownloadQueue({required Object quality}) {
     return '已加入下载队列：$quality';
   }
 
@@ -450,7 +437,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonEmptyContent => '暂无内容';
 
   @override
-  String commonLoadFailed(Object msg) {
+  String commonLoadFailed({required Object msg}) {
     return '加载失败：$msg';
   }
 
@@ -476,12 +463,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commentLatest => '最新';
 
   @override
-  String commentLoginRequired(Object platform) {
+  String commentLoginRequired({required Object platform}) {
     return '发送评论需要登录$platform账号';
   }
 
   @override
-  String commentNotFound(Object platform) {
+  String commentNotFound({required Object platform}) {
     return '未找到该歌曲的$platform评论';
   }
 
@@ -489,7 +476,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commentPublished => '评论已发布';
 
   @override
-  String commentReplyFormat(Object text, Object user) {
+  String commentReplyFormat({required Object text, required Object user}) {
     return '@$user：$text';
   }
 
@@ -497,12 +484,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commentSend => '发送';
 
   @override
-  String commentSendFailed(Object msg) {
+  String commentSendFailed({required Object msg}) {
     return '发送失败：$msg';
   }
 
   @override
-  String commentTimeFormat(Object day, Object month, Object time) {
+  String commentTimeFormat({
+    required Object day,
+    required Object month,
+    required Object time,
+  }) {
     return '$month月$day日 $time';
   }
 
@@ -540,17 +531,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginFetchingQr => '正在获取二维码…';
 
   @override
-  String loginKugouLoggedIn(Object platform) {
+  String loginKugouLoggedIn({required Object platform}) {
     return '$platform已登录';
   }
 
   @override
-  String loginKugouLogin(Object platform) {
+  String loginKugouLogin({required Object platform}) {
     return '$platform登录';
   }
 
   @override
-  String loginKugouQrLogin(Object platform) {
+  String loginKugouQrLogin({required Object platform}) {
     return '$platform扫码登录';
   }
 
@@ -558,37 +549,32 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginKugouResponseMissingToken => '登录响应缺少 token/userid';
 
   @override
-  String loginKugouScanHint(Object platform) {
+  String loginKugouScanHint({required Object platform}) {
     return '请使用$platform App 扫一扫登录';
   }
 
   @override
-  String loginKugouSession(Object platform) {
+  String loginKugouSession({required Object platform}) {
     return '$platform登录态';
   }
 
   @override
-  String loginKugouSuccessVip(Object platform) {
+  String loginKugouSuccessVip({required Object platform}) {
     return '$platform登录成功，VIP 曲目已解锁';
   }
 
   @override
-  String loginLoggedOut(Object platform) {
+  String loginLoggedOut({required Object platform}) {
     return '已退出$platform登录';
   }
 
   @override
-  String loginLogoutWithId(Object id) {
+  String loginLogoutWithId({required Object id}) {
     return '退出登录（$id）';
   }
 
   @override
-  String loginNeteaseQrTitle(Object platform) {
-    return '扫码登录$platform';
-  }
-
-  @override
-  String loginNeteaseScanHint(Object platform) {
+  String loginNeteaseScanHint({required Object platform}) {
     return '请使用$platform App 扫码登录';
   }
 
@@ -627,7 +613,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginTabEmail => '邮箱';
 
   @override
-  String loginTitleBrand(String platform) {
+  String loginTitleBrand({required String platform}) {
     return '$platform登录';
   }
 
@@ -678,18 +664,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginWaitingConfirm => '已扫码，请在手机上确认登录';
 
   @override
-  String get loginConfirmCheck => '我已確認，檢查登入';
-
-  @override
-  String get loginChecking => '檢查中…';
-
-  @override
-  String get loginScanThenConfirm => '掃碼並在手機確認後，點下方按鈕';
-
-  @override
-  String get loginScannedThenConfirm => '已掃碼，請在手機點擊確認，再點一次';
-
-  @override
   String get trackListArtistHotSongs => '艺人热门歌曲';
 
   @override
@@ -702,7 +676,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get trackListDailyRecommendSubtitle => '根据口味每天更新';
 
   @override
-  String trackListEmptyDailyLogin(Object platform) {
+  String trackListEmptyDailyLogin({required Object platform}) {
     return '暂无歌曲（每日推荐需登录$platform）';
   }
 
@@ -713,7 +687,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get trackListPlayAll => '播放全部';
 
   @override
-  String trackListPlaySourceFailed(Object msg) {
+  String trackListPlaySourceFailed({required Object msg}) {
     return '获取播放源失败: $msg';
   }
 
@@ -766,7 +740,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonUnknownError => '未知错误';
 
   @override
-  String commonSongCountHint(Object count) {
+  String commonSongCountHint({required Object count}) {
     return '共 $count 首歌曲 · 点击播放';
   }
 
@@ -786,7 +760,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libraryDeleteFileTitle => '删除文件';
 
   @override
-  String libraryDeleteFileMessage(Object name) {
+  String libraryDeleteFileMessage({required Object name}) {
     return '将永久删除「$name」，且无法恢复。确定继续吗？';
   }
 
@@ -842,7 +816,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsNekoLogout => '退出登录';
 
   @override
-  String settingsNekoLoggedInAs(Object name) {
+  String settingsNekoLoggedInAs({required Object name}) {
     return '已登录：$name';
   }
 
@@ -901,20 +875,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageFavNekoEmptyHint => '还没有歌单或收藏';
 
   @override
-  String toastPlayedAll(Object count) {
+  String toastPlayedAll({required Object count}) {
     return '已播放全部 $count 首';
   }
 
   @override
-  String toastPlayFailed(Object msg) {
+  String toastPlayFailed({required Object msg}) {
     return '播放失败：$msg';
   }
 
   @override
   String get toastMissingLocalPath => '缺少本地文件路径';
-
-  @override
-  String get toastLocateComingSoon => '打开文件管理器（Phase 2 接入）';
 
   @override
   String get toastRemovedFromLibrary => '已从曲库移除';
@@ -923,7 +894,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastRemoveFailed => '移除失败';
 
   @override
-  String toastDailyRequiresLogin(Object platform) {
+  String toastDailyRequiresLogin({required Object platform}) {
     return '每日推荐需要登录$platform账号';
   }
 
@@ -994,7 +965,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageHistoryEmptyHint => '播放过的歌曲会自动记录在这里';
 
   @override
-  String pageFavPlaylistCount(Object count) {
+  String pageFavPlaylistCount({required Object count}) {
     return '共 $count 个收藏歌单';
   }
 
@@ -1002,7 +973,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageFavPlaylistLoginHint => '登录后可查看收藏的歌单';
 
   @override
-  String pageFavAlbumCount(Object count) {
+  String pageFavAlbumCount({required Object count}) {
     return '共 $count 张收藏专辑';
   }
 
@@ -1010,7 +981,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageFavAlbumLoginHint => '登录后可查看收藏的专辑';
 
   @override
-  String pageFavArtistCount(Object count) {
+  String pageFavArtistCount({required Object count}) {
     return '共 $count 位收藏歌手';
   }
 
@@ -1042,7 +1013,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageFavKgCollectedAlbum => '收藏的专辑';
 
   @override
-  String pageFavKgCreatedCount(Object count) {
+  String pageFavKgCreatedCount({required Object count}) {
     return '共 $count 个创建的歌单';
   }
 
@@ -1050,7 +1021,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageFavKgCreatedLoginHint => '登录后可查看创建的歌单';
 
   @override
-  String pageFavKgCollectedPlaylistCount(Object count) {
+  String pageFavKgCollectedPlaylistCount({required Object count}) {
     return '共 $count 个收藏歌单';
   }
 
@@ -1058,7 +1029,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageFavKgCollectedPlaylistLoginHint => '登录后可查看收藏的歌单';
 
   @override
-  String pageFavKgCollectedAlbumCount(Object count) {
+  String pageFavKgCollectedAlbumCount({required Object count}) {
     return '共 $count 张收藏专辑';
   }
 
@@ -1072,13 +1043,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageFavKugouEmptyHint => '在KG App 收藏后自动同步';
 
   @override
-  String pageSearchLoadingTrack(Object title) {
+  String pageSearchLoadingTrack({required Object title}) {
     return '开始加载：$title';
-  }
-
-  @override
-  String pageSearchDetailComingSoon(Object title) {
-    return '$title — 详情页待接入';
   }
 
   @override
@@ -1142,7 +1108,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageLikedQqSyncOnline => '同步線上收藏（實驗）';
 
   @override
-  String pageLikedQqSynced(Object count) {
+  String pageLikedQqSynced({required Object count}) {
     return '線上收藏已併入：新增 $count 首';
   }
 
@@ -1180,27 +1146,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libraryStatSize => '总大小';
 
   @override
-  String libraryStatTrackCount(Object count) {
+  String libraryStatTrackCount({required Object count}) {
     return '$count 首';
   }
 
   @override
-  String libraryScanDirCount(Object count) {
+  String libraryScanDirCount({required Object count}) {
     return '$count 个';
   }
 
   @override
-  String libraryHoursMinutes(Object h, Object m) {
+  String libraryHoursMinutes({required Object h, required Object m}) {
     return '$h 小时 $m 分钟';
   }
 
   @override
-  String libraryMinutes(Object m) {
+  String libraryMinutes({required Object m}) {
     return '$m 分钟';
   }
 
   @override
-  String librarySeconds(Object s) {
+  String librarySeconds({required Object s}) {
     return '$s 秒';
   }
 
@@ -1214,7 +1180,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libraryScanningFiles => '正在统计文件…';
 
   @override
-  String libraryTrackCount(Object count, Object extra) {
+  String libraryTrackCount({required Object count, required Object extra}) {
     return '$count 首$extra';
   }
 
@@ -1238,9 +1204,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get menuLocateFile => '定位文件';
-
-  @override
-  String get menuLocateFileComingSoon => '打开文件管理器 Phase 2 接入';
 
   @override
   String get menuRemoveFromLibrary => '从曲库移除';
@@ -1321,7 +1284,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageHomeDailyLogin => '登录解锁每日推荐';
 
   @override
-  String pageHomeGreeting(Object greeting, Object name) {
+  String pageHomeGreeting({required Object greeting, required Object name}) {
     return '$greeting，$name';
   }
 
@@ -1347,7 +1310,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadDeleteWithMedia => '删除任务及媒体文件';
 
   @override
-  String downloadSelectedCount(Object count) {
+  String downloadSelectedCount({required Object count}) {
     return '已选 $count 项';
   }
 
@@ -1370,12 +1333,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadExitSelect => '退出批量选择';
 
   @override
-  String downloadActiveCount(Object count) {
+  String downloadActiveCount({required Object count}) {
     return '进行中 $count';
   }
 
   @override
-  String downloadDoneCount(Object count) {
+  String downloadDoneCount({required Object count}) {
     return '已完成 $count';
   }
 
@@ -1392,7 +1355,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadEmptyHint => '在歌曲上右键 → 下载，即可加入队列';
 
   @override
-  String downloadDeleteSelectedTitle(Object count) {
+  String downloadDeleteSelectedTitle({required Object count}) {
     return '删除所选 $count 个任务';
   }
 
@@ -1427,17 +1390,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadStatusResolving => '解析下载地址…';
 
   @override
-  String downloadStatusRunning(Object percent, Object received, Object speed) {
+  String downloadStatusRunning({
+    required Object percent,
+    required Object received,
+    required Object speed,
+  }) {
     return '下载中 $percent%（$received）$speed';
   }
 
   @override
-  String downloadStatusRunningNoPercent(Object speed) {
+  String downloadStatusRunningNoPercent({required Object speed}) {
     return '下载中…$speed';
   }
 
   @override
-  String downloadStatusPausedWith(Object received) {
+  String downloadStatusPausedWith({required Object received}) {
     return '已暂停（$received）';
   }
 
@@ -1445,18 +1412,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadStatusPaused => '已暂停';
 
   @override
-  String downloadStatusFailed(Object error) {
+  String downloadStatusFailed({required Object error}) {
     return '失败：$error';
   }
-
-  @override
-  String get downloadStatusFailedUnknown => '失败：未知错误';
 
   @override
   String get downloadStatusCanceled => '已取消';
 
   @override
-  String downloadStatusDone(Object size) {
+  String downloadStatusDone({required Object size}) {
     return '完成（$size）';
   }
 
@@ -1556,12 +1520,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSearchHint => '搜索设置…';
 
   @override
-  String settingsSearchNoResult(Object query) {
+  String settingsSearchNoResult({required Object query}) {
     return '未找到「$query」相关设置';
   }
 
   @override
-  String settingsSearchMatchCount(Object count) {
+  String settingsSearchMatchCount({required Object count}) {
     return '匹配 $count 项';
   }
 
@@ -1593,24 +1557,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAccentTitle => '主色种子';
 
   @override
-  String settingsAccentSystem(Object color) {
-    return '跟随系统主题色（$color）';
-  }
-
-  @override
-  String get settingsAccentSystemFallback => '跟随系统主题色（读取失败，回退自定义）';
-
-  @override
-  String get settingsAccentDefault => '默认灰（设计体系）';
-
-  @override
-  String get settingsAccentCustom => '自定义（按种子动态生成配色）';
-
-  @override
   String get settingsAccentDefaultTooltip => '默认灰';
-
-  @override
-  String get settingsAccentSystemTooltip => '跟随系统主题色';
 
   @override
   String get settingsAccentCustomTooltip => '自定义取色';
@@ -1673,7 +1620,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCoverRadiusSharp => '直角（信息密度高）';
 
   @override
-  String settingsCoverRadiusPx(Object radius) {
+  String settingsCoverRadiusPx({required Object radius}) {
     return '${radius}px 圆角';
   }
 
@@ -1708,10 +1655,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPassthroughOff => '统一 48kHz 转码管线';
 
   @override
-  String get settingsPassthroughNote =>
-      '关闭转码保持源采样率播放，开启则统一 48kHz 输出；切换后自动重载当前曲目生效。';
-
-  @override
   String get settingsOutputDevice => '输出设备';
 
   @override
@@ -1725,7 +1668,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsOutputDeviceDefaultDesc => '跟随系统当前输出设备（引擎不自动改道）';
 
   @override
-  String settingsOutputDeviceFormat(Object channels, Object rate) {
+  String settingsOutputDeviceFormat({
+    required Object channels,
+    required Object rate,
+  }) {
     return '$rate Hz · $channels 声道';
   }
 
@@ -1771,7 +1717,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '选择此项将让音乐走系统默认的通话/低质设备，音质几乎损毁，不推荐。';
 
   @override
-  String settingsOutputDeviceShowAll(int count) {
+  String settingsOutputDeviceShowAll({required int count}) {
     return '显示全部设备（$count）';
   }
 
@@ -1785,7 +1731,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsOutputDeviceVirtualTag => '虚拟设备';
 
   @override
-  String settingsSinkChangedFailed(Object err) {
+  String settingsSinkChangedFailed({required Object err}) {
     return '切换输出设备失败：$err';
   }
 
@@ -1887,22 +1833,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get memorySourceFailNotHttp => '在线源不是 http(s) 直链';
 
   @override
-  String memorySourceFailIsolateSpawn(Object error) {
+  String memorySourceFailIsolateSpawn({required Object error}) {
     return '内存源 worker 启动失败：$error';
   }
 
   @override
-  String memorySourceFailHttpStatus(Object code, Object status) {
+  String memorySourceFailHttpStatus({
+    required Object code,
+    required Object status,
+  }) {
     return 'HTTP $code $status';
   }
 
   @override
-  String memorySourceFailOverWholeCeiling(Object content, Object limit) {
+  String memorySourceFailOverWholeCeiling({
+    required Object content,
+    required Object limit,
+  }) {
     return '整首内容 $content 超过纯内存整首驻留上限 $limit';
   }
 
   @override
-  String memorySourceFailGrewCeiling(Object got, Object limit) {
+  String memorySourceFailGrewCeiling({
+    required Object got,
+    required Object limit,
+  }) {
     return '下载中途超过纯内存整首驻留上限（$got > $limit）';
   }
 
@@ -1916,12 +1871,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get memorySourceFailSegFill => '内存源写入失败';
 
   @override
-  String memorySourceFailSegFillEx(Object error) {
+  String memorySourceFailSegFillEx({required Object error}) {
     return '内存源写入异常：$error';
   }
 
   @override
-  String memorySourceFailDownload(Object error) {
+  String memorySourceFailDownload({required Object error}) {
     return '下载失败：$error';
   }
 
@@ -1974,7 +1929,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSpectrumBarWidth => '频谱柱宽';
 
   @override
-  String settingsSpectrumBarWidthDesc(Object width) {
+  String settingsSpectrumBarWidthDesc({required Object width}) {
     return '${width}px（1~12，全屏播放器）';
   }
 
@@ -2045,7 +2000,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlayerBgRippleSpeed => '水纹速度';
 
   @override
-  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+  String settingsPlayerBgRippleSpeedDesc({required Object speed}) {
     return '流动速度 $speed';
   }
 
@@ -2056,7 +2011,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlayerBgFlowSpeed => '流动速度';
 
   @override
-  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+  String settingsPlayerBgFlowSpeedDesc({required Object speed}) {
     return '流体速度 $speed';
   }
 
@@ -2064,7 +2019,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlayerBgRenderScale => '渲染比例';
 
   @override
-  String settingsPlayerBgRenderScaleDesc(Object scale) {
+  String settingsPlayerBgRenderScaleDesc({required Object scale}) {
     return '分辨率 $scale×（越低越省电）';
   }
 
@@ -2072,7 +2027,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlayerBgFps => '帧率上限';
 
   @override
-  String settingsPlayerBgFpsDesc(Object fps) {
+  String settingsPlayerBgFpsDesc({required Object fps}) {
     return '$fps FPS';
   }
 
@@ -2102,36 +2057,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsAdaptiveRenderQualityOff => '播放页背景始终满分辨率渲染';
-
-  @override
-  String get settingsSectionShortcuts => '快捷键';
-
-  @override
-  String get settingsShortcutSpace => '空格';
-
-  @override
-  String get settingsShortcutSpaceDesc => '播放 / 暂停';
-
-  @override
-  String get settingsShortcutArrows => '← / →';
-
-  @override
-  String get settingsShortcutArrowsDesc => '后退 / 前进 10 秒';
-
-  @override
-  String get settingsShortcutSearch => 'Ctrl / Cmd + F';
-
-  @override
-  String get settingsShortcutLibrary => 'Ctrl / Cmd + L';
-
-  @override
-  String get settingsShortcutLibraryDesc => '音乐库';
-
-  @override
-  String get settingsShortcutEsc => 'Esc';
-
-  @override
-  String get settingsShortcutEscDesc => '返回（关闭弹窗 / 全屏播放器）';
 
   @override
   String get settingsSectionPlayerLyrics => '播放器歌词';
@@ -2170,17 +2095,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLyricFontSize => '歌词字号';
 
   @override
-  String settingsLyricFontSizeDesc(Object size) {
+  String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（当前行放大高亮）';
   }
 
   @override
   String get settingsLyricLineHeight => '歌词行距';
-
-  @override
-  String settingsLyricLineHeightDesc(Object height) {
-    return '${height}px（含行间距）';
-  }
 
   @override
   String get settingsLyricPlayedColor => '已唱颜色';
@@ -2305,9 +2225,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsRestoreDefault => '恢复默认';
 
   @override
-  String get settingsDownloadRootNote => '默认跟随媒体库目录；修改目录回车保存，进行中的下载任务会终止。';
-
-  @override
   String get settingsSectionFilename => '文件名';
 
   @override
@@ -2324,7 +2241,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDownloadQuality => '默认下载音质';
 
   @override
-  String settingsDownloadQualityDesc(Object quality) {
+  String settingsDownloadQualityDesc({required Object quality}) {
     return '下载弹窗默认选中 $quality，档位不足时自动降级';
   }
 
@@ -2339,7 +2256,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDownloadConcurrent => '同时下载数';
 
   @override
-  String settingsDownloadConcurrentDesc(Object count) {
+  String settingsDownloadConcurrentDesc({required Object count}) {
     return '$count 个并行任务（1~5）';
   }
 
@@ -2374,7 +2291,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSpeedUnlimited => '不限速（默认）';
 
   @override
-  String settingsSpeedLimited(Object speed) {
+  String settingsSpeedLimited({required Object speed}) {
     return '限 $speed，实时生效';
   }
 
@@ -2382,7 +2299,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSpeedUnlimitedLabel => '不限速';
 
   @override
-  String settingsSpeedMbps(Object speed) {
+  String settingsSpeedMbps({required Object speed}) {
     return '$speed MB/s';
   }
 
@@ -2396,12 +2313,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDownloadHistoryLimit => '下载记录上限';
 
   @override
-  String settingsDownloadHistoryDesc(Object count) {
+  String settingsDownloadHistoryDesc({required Object count}) {
     return '$count 条（10~500）· 超上限自动淘汰最旧';
   }
 
   @override
-  String settingsDownloadHistoryCount(Object count) {
+  String settingsDownloadHistoryCount({required Object count}) {
     return '$count 条';
   }
 
@@ -2448,17 +2365,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastTemplateUpdated => '已更新文件名模板';
 
   @override
-  String settingsSpeedBs(Object n) {
+  String settingsSpeedBs({required Object n}) {
     return '$n B/s';
   }
 
   @override
-  String settingsSpeedKbs(Object n) {
+  String settingsSpeedKbs({required Object n}) {
     return '$n KB/s';
   }
 
   @override
-  String settingsSpeedMbs(Object n) {
+  String settingsSpeedMbs({required Object n}) {
     return '$n MB/s';
   }
 
@@ -2506,7 +2423,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsHistoryLimit => '历史条数上限';
 
   @override
-  String settingsHistoryLimitOn(Object count) {
+  String settingsHistoryLimitOn({required Object count}) {
     return '最多 $count 条';
   }
 
@@ -2530,13 +2447,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCopy => '复制';
 
   @override
-  String toastCopied(Object label) {
+  String toastCopied({required Object label}) {
     return '已复制$label';
   }
-
-  @override
-  String get settingsStorageNote =>
-      '媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERA_DATA_DIR 覆盖。';
 
   @override
   String get settingsSectionCache => '缓存管理';
@@ -2586,7 +2499,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSongCacheLimitTitle => '缓存上限';
 
   @override
-  String settingsCacheSongs(Object count) {
+  String settingsCacheSongs({required Object count}) {
     return '$count 首';
   }
 
@@ -2609,12 +2522,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCacheCover => '封面图片缓存';
 
   @override
-  String settingsCacheEntries(Object count) {
+  String settingsCacheEntries({required Object count}) {
     return '$count 条';
   }
 
   @override
-  String settingsCacheImages(Object count) {
+  String settingsCacheImages({required Object count}) {
     return '$count 张';
   }
 
@@ -2628,7 +2541,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCacheClearAll => '清空全部';
 
   @override
-  String settingsCacheClearConfirmTitle(Object name) {
+  String settingsCacheClearConfirmTitle({required Object name}) {
     return '清除「$name」？';
   }
 
@@ -2643,7 +2556,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '将删除上方全部缓存（内存与磁盘），不影响曲库、历史与账号信息。';
 
   @override
-  String toastCacheCleared(Object name) {
+  String toastCacheCleared({required Object name}) {
     return '已清除$name缓存';
   }
 
@@ -2661,7 +2574,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSecurityStreaming => '流媒体服务器凭据';
 
   @override
-  String settingsSecurityStreamingCount(Object count) {
+  String settingsSecurityStreamingCount({required Object count}) {
     return '$count 台服务器';
   }
 
@@ -2690,7 +2603,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSecurityDestroyAll => '一键销毁全部';
 
   @override
-  String settingsSecurityConfirmTitle(Object name) {
+  String settingsSecurityConfirmTitle({required Object name}) {
     return '销毁「$name」？';
   }
 
@@ -2698,7 +2611,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSecurityConfirmAllTitle => '确认销毁全部敏感数据？';
 
   @override
-  String settingsSecurityConfirmDesc(Object word) {
+  String settingsSecurityConfirmDesc({required Object word}) {
     return '将主动失效相关平台 token、覆盖写入并删除文件，此操作不可恢复。输入「$word」以确认。';
   }
 
@@ -2706,12 +2619,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSecurityConfirmWord => '销毁';
 
   @override
-  String settingsSecurityConfirmHint(Object word) {
+  String settingsSecurityConfirmHint({required Object word}) {
     return '输入「$word」';
   }
 
   @override
-  String toastSecurityDestroyed(Object name) {
+  String toastSecurityDestroyed({required Object name}) {
     return '已销毁：$name';
   }
 
@@ -2719,34 +2632,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastSecurityAllDestroyed => '全部敏感数据已销毁';
 
   @override
-  String toastSecurityDestroyFailed(Object path) {
+  String toastSecurityDestroyFailed({required Object path}) {
     return '销毁失败，文件仍可能残留：$path';
   }
-
-  @override
-  String get settingsDeviceBindSection => '高级 · 设备绑定';
-
-  @override
-  String get settingsDeviceBindNote =>
-      '增强型可选项（opt-in）：本机免密 + 设备变更走恢复口令，不依赖系统安全存储。开启将读取本机设备标识（仅存本地、不会上传）。默认关闭，普通用户使用 v1 加密已足够。';
-
-  @override
-  String get settingsDeviceBindSwitch => '设备绑定免密';
-
-  @override
-  String get settingsDeviceBindSwitchDesc => '本机自动解锁；换机/重装走恢复口令';
-
-  @override
-  String get settingsDeviceBindSwitchOffDesc =>
-      '未启用。当前系统安全存储不可用，可开启设备绑定实现本机免密（无需口令）';
-
-  @override
-  String get settingsDeviceBindSwitchV1Desc =>
-      '当前为 v1（系统安全存储）模式；开启将升级为设备绑定（免密 + 恢复口令，既有数据保留）';
-
-  @override
-  String get settingsDeviceBindSwitchV2Desc =>
-      '当前为 v2（口令）模式；开启需先输入当前口令解锁，随后升级为设备绑定（本机免密）';
 
   @override
   String get settingsDeviceBindPrivacyTitle => '开启设备绑定免密？';
@@ -2840,7 +2728,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastDeviceBindRecoveryNeeded => '未设置恢复口令，无法关闭设备绑定';
 
   @override
-  String toastDeviceBindCloseFailed(Object error) {
+  String toastDeviceBindCloseFailed({required Object error}) {
     return '关闭失败：$error';
   }
 
@@ -2932,13 +2820,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toastSchemeSwitched => '加密方案已切换，重启后生效';
-
-  @override
-  String get settingsVaultSection => '凭据加密';
-
-  @override
-  String get settingsVaultNote =>
-      '选择凭据的加密保护等级：v1 系统保护（默认）/ v2 口令保护 / v3 设备绑定（增强项 opt-in，读取本机设备标识，仅存本地、不会上传）。v1 ↔ v2 可随时互切；v3 为终点档，关闭后回落为 v2。';
 
   @override
   String get settingsVaultModeV1 => 'v1 系统保护';
@@ -3085,7 +2966,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsVersionUnknown => 'v未知 · Flutter 桌面端';
 
   @override
-  String settingsVersionFormat(Object version) {
+  String settingsVersionFormat({required Object version}) {
     return 'v$version · Flutter 桌面端';
   }
 
@@ -3193,10 +3074,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionThanks => '特别致谢';
 
   @override
-  String get settingsThanksText =>
-      '本软件使用、依赖或参考了以下开源项目（完整许可清单见仓库 THIRD-PARTY-NOTICES.md 及各模块 THIRD-PARTY-LICENSES.md）：\n\n· 设计思路借鉴：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 核心组件：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/公有领域）、signalsmith-stretch（MIT）、SQLite（公有领域）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· 解码参考：minimp3（CC0-1.0）、stb_vorbis（公有领域/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· 图标：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n感谢以上项目的作者。';
-
-  @override
   String get settingsThanksDesign => '设计思路借鉴';
 
   @override
@@ -3219,7 +3096,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonNoLyrics => '暂无歌词';
 
   @override
-  String commonTrackCount(Object count) {
+  String commonTrackCount({required Object count}) {
     return '$count 首';
   }
 
@@ -3240,9 +3117,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSearchFilenameTitle => '文件名模板';
-
-  @override
-  String get settingsSearchAccentSubtitle => '自定义主色种子 · 色板';
 
   @override
   String get settingsThemeSource => '主题色来源';
@@ -3311,7 +3185,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsBackgroundBlur => '背景模糊';
 
   @override
-  String settingsBackgroundBlurDesc(Object blur) {
+  String settingsBackgroundBlurDesc({required Object blur}) {
     return '对背景图片应用高斯模糊（${blur}px）';
   }
 
@@ -3319,7 +3193,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsBackgroundDim => '遮罩浓度';
 
   @override
-  String settingsBackgroundDimDesc(Object dim) {
+  String settingsBackgroundDimDesc({required Object dim}) {
     return '叠加的黑色遮罩透明度（$dim%），越高前景越易读';
   }
 
@@ -3327,7 +3201,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsBackgroundScale => '缩放大小';
 
   @override
-  String settingsBackgroundScaleDesc(Object scale) {
+  String settingsBackgroundScaleDesc({required Object scale}) {
     return '背景图的缩放倍数（${scale}x）';
   }
 
@@ -3533,25 +3407,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSearchAboutSubtitle => '音频引擎 · Subsonic 服务端';
 
   @override
-  String get qualityLossless => '无损';
-
-  @override
   String get repeatModeList => '列表循环';
 
   @override
   String get repeatModeOne => '单曲循环';
-
-  @override
-  String get commonUnknownTrack => '未知名歌曲';
-
-  @override
-  String get commonAnonymousUser => '匿名用户';
-
-  @override
-  String get commonCanceled => '已取消';
-
-  @override
-  String get commonILike => '我喜欢';
 
   @override
   String get sidebarStreaming => '流媒体';
@@ -3579,7 +3438,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScrapeDirsEmptyNote => '未配置刮削目录，刮削时将跟随媒体库扫描目录。';
 
   @override
-  String settingsScrapeDirsNote(Object dirs) {
+  String settingsScrapeDirsNote({required Object dirs}) {
     return '当前生效目录：$dirs';
   }
 
@@ -3629,7 +3488,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScrapeScanning => '正在扫描目录…';
 
   @override
-  String settingsScrapeCurrent(Object file) {
+  String settingsScrapeCurrent({required Object file}) {
     return '正在处理：$file';
   }
 
@@ -3710,7 +3569,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get streamingServerConnect => '连接';
 
   @override
-  String streamingToastConnected(Object name) {
+  String streamingToastConnected({required Object name}) {
     return '已连接 $name';
   }
 
@@ -3724,7 +3583,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get streamingServerDeleteConfirmTitle => '删除服务器';
 
   @override
-  String streamingServerDeleteConfirm(Object name) {
+  String streamingServerDeleteConfirm({required Object name}) {
     return '确定删除服务器「$name」吗？';
   }
 
@@ -3814,22 +3673,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get streamingEmptyNotConnected => '未连接到任何服务器';
 
   @override
-  String streamingTotalSongs(Object count) {
+  String streamingTotalSongs({required Object count}) {
     return '$count 首歌曲';
   }
 
   @override
-  String streamingTotalAlbums(Object count) {
+  String streamingTotalAlbums({required Object count}) {
     return '$count 张专辑';
   }
 
   @override
-  String streamingTotalArtists(Object count) {
+  String streamingTotalArtists({required Object count}) {
     return '$count 位歌手';
   }
 
   @override
-  String streamingTotalPlaylists(Object count) {
+  String streamingTotalPlaylists({required Object count}) {
     return '$count 个歌单';
   }
 
@@ -3837,17 +3696,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get streamingEmptyNoResults => '没有匹配的结果';
 
   @override
-  String streamingAlbumSongs(Object count) {
+  String streamingAlbumSongs({required Object count}) {
     return '$count 首歌曲';
   }
 
   @override
-  String streamingArtistAlbums(Object count) {
+  String streamingArtistAlbums({required Object count}) {
     return '$count 张专辑';
   }
 
   @override
-  String streamingPlaylistSongs(Object count) {
+  String streamingPlaylistSongs({required Object count}) {
     return '$count 首歌曲';
   }
 
@@ -3864,20 +3723,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginQqScanHint => '請使用手機 QQ 掃一掃登入';
 
   @override
-  String navHeaderQqId(String id) {
+  String navHeaderQqId({required String id}) {
     return 'QQ $id';
   }
 
   @override
-  String get toastQqNotSupported => 'QQ 音樂暫不支援此操作';
-
-  @override
-  String searchSourceFailed(Object source) {
+  String searchSourceFailed({required Object source}) {
     return '「$source」搜尋暫不可用';
   }
 
   @override
-  String searchQqRiskDetail(Object code) {
+  String searchQqRiskDetail({required Object code}) {
     return 'QQ 音樂介面限流或風控攔截（代碼 $code），已停止自動重試，請稍後再試';
   }
 
@@ -3885,23 +3741,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchNetworkError => '網路連線失敗或請求逾時，請稍後再試';
 
   @override
-  String searchPlatformError(Object code) {
+  String searchPlatformError({required Object code}) {
     return '平台傳回錯誤（$code）';
   }
 
   @override
   String get searchWaitRetry => '請求過於頻繁，請稍候再試';
-
-  @override
-  String get qqMusicDownloadUnsupported => 'QM暂不支持下载（风控）。';
-
-  @override
-  String qqMusicDownloadSkipped(Object count) {
-    return '已跳过 $count 首 QM（暂不支持下载）。';
-  }
-
-  @override
-  String get platformQqMusic => 'QM';
 
   @override
   String get settingsValueAuto => '自动';
@@ -3935,7 +3780,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScrapeWorkers => '并发查询线程';
 
   @override
-  String settingsScrapeWorkersDesc(Object value) {
+  String settingsScrapeWorkersDesc({required Object value}) {
     return '多源并发查询线程数（0=自动，当前 $value）';
   }
 
@@ -3943,7 +3788,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScrapeBatch => '批大小';
 
   @override
-  String settingsScrapeBatchDesc(Object value) {
+  String settingsScrapeBatchDesc({required Object value}) {
     return '每批处理文件数（当前 $value）';
   }
 
@@ -3951,7 +3796,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScrapeRetries => '失败重试上限';
 
   @override
-  String settingsScrapeRetriesDesc(Object value) {
+  String settingsScrapeRetriesDesc({required Object value}) {
     return '重试达到该次数后不再重试（当前 $value）';
   }
 
@@ -3991,9 +3836,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScrapeOrganizeStart => '开始整理';
 
   @override
-  String get settingsOrganizeCancel => '取消整理';
-
-  @override
   String get settingsOrganizeRunning => '正在整理文件…';
 
   @override
@@ -4006,7 +3848,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsOrganizeFailed => '失败';
 
   @override
-  String settingsOrganizeDone(Object failed, Object moved, Object skipped) {
+  String settingsOrganizeDone({
+    required Object failed,
+    required Object moved,
+    required Object skipped,
+  }) {
     return '整理完成：移动 $moved，跳过 $skipped，失败 $failed';
   }
 
@@ -4014,7 +3860,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsOrganizeNoTarget => '未配置媒体库扫描目录，无法确定默认整理目录';
 
   @override
-  String settingsOrganizeUsingDefault(Object dir) {
+  String settingsOrganizeUsingDefault({required Object dir}) {
     return '未设置整理目标目录，使用默认音乐目录：$dir';
   }
 
@@ -4037,7 +3883,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScanParallelism => '扫描并行度';
 
   @override
-  String settingsScanParallelismDesc(Object value) {
+  String settingsScanParallelismDesc({required Object value}) {
     return '并行解析文件数（0=自动，当前 $value）';
   }
 
@@ -4045,7 +3891,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsScanBatch => '批大小';
 
   @override
-  String settingsScanBatchDesc(Object value) {
+  String settingsScanBatchDesc({required Object value}) {
     return '数据库批量写入上限（0=自动，当前 $value）';
   }
 
@@ -4071,9 +3917,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionScanExts => '音频扩展名';
 
   @override
-  String get settingsScanExtraExts => '额外扩展名';
-
-  @override
   String get settingsScanExtraExtsNote => '在引擎内置白名单之上追加扫描的音频扩展名';
 
   @override
@@ -4083,7 +3926,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionScanQuarantine => '坏文件隔离区';
 
   @override
-  String settingsScanQuarantineNote(Object dir) {
+  String settingsScanQuarantineNote({required Object dir}) {
     return '连续解析失败 ≥3 次的文件会被移入隔离目录：$dir';
   }
 
@@ -4111,9 +3954,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get libraryFullScanConfirmDesc =>
       '将清空当前曲库记录并从扫描目录重建（不删除源文件）。此操作不可撤销，扫描期间会占用较多磁盘 IO。';
-
-  @override
-  String get libraryFullScanDescription => '清空曲库并从扫描目录重建';
 
   @override
   String get settingsSectionLyricEngine => '歌词引擎';
@@ -4330,10 +4170,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonReset => '重置';
 
   @override
-  String get settingsDevDownloadModuleDesc =>
-      '下载接口（侧边栏 / 右键菜单 / 设置分类）的独立开关；默认关闭，开启前会提示风险。';
-
-  @override
   String get settingsDevDownloadModuleOn => '下载模块已开启';
 
   @override
@@ -4518,9 +4354,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLyricAdaptiveFontSize => '自适应字号';
 
   @override
-  String get settingsLyricAdaptiveFontSizeDesc => '歌词字号随窗口高度自动缩放';
-
-  @override
   String get settingsLyricAdaptiveFontSizeOn => '开启：字号随窗口缩放';
 
   @override
@@ -4551,18 +4384,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sleepTimerOff => '关闭';
 
   @override
-  String get sleepTimer15 => '15 分钟';
-
-  @override
-  String get sleepTimer30 => '30 分钟';
-
-  @override
-  String get sleepTimer60 => '60 分钟';
-
-  @override
-  String get sleepTimer90 => '90 分钟';
-
-  @override
   String get sleepTimerEndOfTrack => '播完当前曲';
 
   @override
@@ -4575,7 +4396,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sleepTimerWaitingTrackEnd => '定时已到，将在当前曲结束后暂停';
 
   @override
-  String sleepTimerMinutes(int minutes) {
+  String sleepTimerMinutes({required int minutes}) {
     return '$minutes 分钟';
   }
 
@@ -4669,9 +4490,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsEqPreamp => '预增益';
-
-  @override
-  String get settingsEqPreampDesc => '整体提升或衰减，避免削波';
 
   @override
   String get settingsEqLimiter => '限幅器';
@@ -4790,9 +4608,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get trackDetailDuration => '时长';
 
   @override
-  String get trackDetailArtist => '歌手';
-
-  @override
   String get trackDetailAlbum => '专辑';
 
   @override
@@ -4850,12 +4665,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get batchSelectHint => '批量选择';
 
   @override
-  String toastBatchAddedToQueue(Object count) {
+  String toastBatchAddedToQueue({required Object count}) {
     return '已加入播放队列 $count 首';
   }
 
   @override
-  String toastBatchAddedToDownloadQueue(Object count) {
+  String toastBatchAddedToDownloadQueue({required Object count}) {
     return '已加入下载队列 $count 首';
   }
 
@@ -4891,10 +4706,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSuppressSleepOff => '系统可能按空闲计划休眠';
-
-  @override
-  String get settingsPowerSaverNote =>
-      '节能模式监听窗口状态事件自动降帧，无需轮询；窗口不可见或显示器关闭时，渲染引擎本身已停止绘制。「禁用系统休眠」仅在播放中生效。';
 
   @override
   String get settingsCloseBehavior => '关闭应用时';
@@ -4948,9 +4759,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get commonLoading => '加载中';
 
   @override
-  String get commonLossless => '无损';
-
-  @override
   String get commonOriginal => '原唱';
 
   @override
@@ -4981,7 +4789,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get downloadQualityTitle => '下载音质';
 
   @override
-  String downloadRequiresLoginContent(Object platform) {
+  String downloadRequiresLoginContent({required Object platform}) {
     return '获取$platform下载链接需登录，未登录只能试听，无法下载完整音质。\n\n请先登录$platform账号后重试。';
   }
 
@@ -5013,10 +4821,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get navHeaderAccount => '账号';
 
   @override
-  String get navHeaderComingSoon => '敬请期待';
-
-  @override
-  String navHeaderKugouId(Object id) {
+  String navHeaderKugouId({required Object id}) {
     return 'KG $id';
   }
 
@@ -5099,7 +4904,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get queueTitle => '播放队列';
 
   @override
-  String queueTrackCount(Object count) {
+  String queueTrackCount({required Object count}) {
     return '$count 首';
   }
 
@@ -5116,7 +4921,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get searchHot => '热搜';
 
   @override
-  String searchQuick(Object query) {
+  String searchQuick({required Object query}) {
     return '搜索“$query”';
   }
 
@@ -5169,7 +4974,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get songListLocatePlaying => '定位播放位置';
 
   @override
-  String toastAddedToDownloadQueue(Object quality) {
+  String toastAddedToDownloadQueue({required Object quality}) {
     return '已加入下载队列：$quality';
   }
 
@@ -5201,7 +5006,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get commonEmptyContent => '暂无内容';
 
   @override
-  String commonLoadFailed(Object msg) {
+  String commonLoadFailed({required Object msg}) {
     return '加载失败：$msg';
   }
 
@@ -5227,12 +5032,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get commentLatest => '最新';
 
   @override
-  String commentLoginRequired(Object platform) {
+  String commentLoginRequired({required Object platform}) {
     return '发送评论需要登录$platform账号';
   }
 
   @override
-  String commentNotFound(Object platform) {
+  String commentNotFound({required Object platform}) {
     return '未找到该歌曲的$platform评论';
   }
 
@@ -5240,7 +5045,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get commentPublished => '评论已发布';
 
   @override
-  String commentReplyFormat(Object text, Object user) {
+  String commentReplyFormat({required Object text, required Object user}) {
     return '@$user：$text';
   }
 
@@ -5248,12 +5053,16 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get commentSend => '发送';
 
   @override
-  String commentSendFailed(Object msg) {
+  String commentSendFailed({required Object msg}) {
     return '发送失败：$msg';
   }
 
   @override
-  String commentTimeFormat(Object day, Object month, Object time) {
+  String commentTimeFormat({
+    required Object day,
+    required Object month,
+    required Object time,
+  }) {
     return '$month月$day日 $time';
   }
 
@@ -5291,17 +5100,17 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginFetchingQr => '正在获取二维码…';
 
   @override
-  String loginKugouLoggedIn(Object platform) {
+  String loginKugouLoggedIn({required Object platform}) {
     return '$platform已登录';
   }
 
   @override
-  String loginKugouLogin(Object platform) {
+  String loginKugouLogin({required Object platform}) {
     return '$platform登录';
   }
 
   @override
-  String loginKugouQrLogin(Object platform) {
+  String loginKugouQrLogin({required Object platform}) {
     return '$platform扫码登录';
   }
 
@@ -5309,37 +5118,32 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginKugouResponseMissingToken => '登录响应缺少 token/userid';
 
   @override
-  String loginKugouScanHint(Object platform) {
+  String loginKugouScanHint({required Object platform}) {
     return '请使用$platform App 扫一扫登录';
   }
 
   @override
-  String loginKugouSession(Object platform) {
+  String loginKugouSession({required Object platform}) {
     return '$platform登录态';
   }
 
   @override
-  String loginKugouSuccessVip(Object platform) {
+  String loginKugouSuccessVip({required Object platform}) {
     return '$platform登录成功，VIP 曲目已解锁';
   }
 
   @override
-  String loginLoggedOut(Object platform) {
+  String loginLoggedOut({required Object platform}) {
     return '已退出$platform登录';
   }
 
   @override
-  String loginLogoutWithId(Object id) {
+  String loginLogoutWithId({required Object id}) {
     return '退出登录（$id）';
   }
 
   @override
-  String loginNeteaseQrTitle(Object platform) {
-    return '扫码登录$platform';
-  }
-
-  @override
-  String loginNeteaseScanHint(Object platform) {
+  String loginNeteaseScanHint({required Object platform}) {
     return '请使用$platform App 扫码登录';
   }
 
@@ -5378,7 +5182,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginTabEmail => '邮箱';
 
   @override
-  String loginTitleBrand(String platform) {
+  String loginTitleBrand({required String platform}) {
     return '$platform登录';
   }
 
@@ -5429,18 +5233,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginWaitingConfirm => '已扫码，请在手机上确认登录';
 
   @override
-  String get loginConfirmCheck => '我已确认，检查登录';
-
-  @override
-  String get loginChecking => '检查中…';
-
-  @override
-  String get loginScanThenConfirm => '扫码并在手机确认后，点下方按钮';
-
-  @override
-  String get loginScannedThenConfirm => '已扫码，请在手机点击确认，再点一次';
-
-  @override
   String get trackListArtistHotSongs => '艺人热门歌曲';
 
   @override
@@ -5453,7 +5245,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get trackListDailyRecommendSubtitle => '根据口味每天更新';
 
   @override
-  String trackListEmptyDailyLogin(Object platform) {
+  String trackListEmptyDailyLogin({required Object platform}) {
     return '暂无歌曲（每日推荐需登录$platform）';
   }
 
@@ -5464,7 +5256,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get trackListPlayAll => '播放全部';
 
   @override
-  String trackListPlaySourceFailed(Object msg) {
+  String trackListPlaySourceFailed({required Object msg}) {
     return '获取播放源失败: $msg';
   }
 
@@ -5517,7 +5309,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get commonUnknownError => '未知错误';
 
   @override
-  String commonSongCountHint(Object count) {
+  String commonSongCountHint({required Object count}) {
     return '共 $count 首歌曲 · 点击播放';
   }
 
@@ -5537,7 +5329,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get libraryDeleteFileTitle => '删除文件';
 
   @override
-  String libraryDeleteFileMessage(Object name) {
+  String libraryDeleteFileMessage({required Object name}) {
     return '将永久删除「$name」，且无法恢复。确定继续吗？';
   }
 
@@ -5593,7 +5385,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsNekoLogout => '退出登录';
 
   @override
-  String settingsNekoLoggedInAs(Object name) {
+  String settingsNekoLoggedInAs({required Object name}) {
     return '已登录：$name';
   }
 
@@ -5652,20 +5444,17 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageFavNekoEmptyHint => '还没有歌单或收藏';
 
   @override
-  String toastPlayedAll(Object count) {
+  String toastPlayedAll({required Object count}) {
     return '已播放全部 $count 首';
   }
 
   @override
-  String toastPlayFailed(Object msg) {
+  String toastPlayFailed({required Object msg}) {
     return '播放失败：$msg';
   }
 
   @override
   String get toastMissingLocalPath => '缺少本地文件路径';
-
-  @override
-  String get toastLocateComingSoon => '打开文件管理器（Phase 2 接入）';
 
   @override
   String get toastRemovedFromLibrary => '已从曲库移除';
@@ -5674,7 +5463,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get toastRemoveFailed => '移除失败';
 
   @override
-  String toastDailyRequiresLogin(Object platform) {
+  String toastDailyRequiresLogin({required Object platform}) {
     return '每日推荐需要登录$platform账号';
   }
 
@@ -5745,7 +5534,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageHistoryEmptyHint => '播放过的歌曲会自动记录在这里';
 
   @override
-  String pageFavPlaylistCount(Object count) {
+  String pageFavPlaylistCount({required Object count}) {
     return '共 $count 个收藏歌单';
   }
 
@@ -5753,7 +5542,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageFavPlaylistLoginHint => '登录后可查看收藏的歌单';
 
   @override
-  String pageFavAlbumCount(Object count) {
+  String pageFavAlbumCount({required Object count}) {
     return '共 $count 张收藏专辑';
   }
 
@@ -5761,7 +5550,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageFavAlbumLoginHint => '登录后可查看收藏的专辑';
 
   @override
-  String pageFavArtistCount(Object count) {
+  String pageFavArtistCount({required Object count}) {
     return '共 $count 位收藏歌手';
   }
 
@@ -5793,7 +5582,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageFavKgCollectedAlbum => '收藏的专辑';
 
   @override
-  String pageFavKgCreatedCount(Object count) {
+  String pageFavKgCreatedCount({required Object count}) {
     return '共 $count 个创建的歌单';
   }
 
@@ -5801,7 +5590,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageFavKgCreatedLoginHint => '登录后可查看创建的歌单';
 
   @override
-  String pageFavKgCollectedPlaylistCount(Object count) {
+  String pageFavKgCollectedPlaylistCount({required Object count}) {
     return '共 $count 个收藏歌单';
   }
 
@@ -5809,7 +5598,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageFavKgCollectedPlaylistLoginHint => '登录后可查看收藏的歌单';
 
   @override
-  String pageFavKgCollectedAlbumCount(Object count) {
+  String pageFavKgCollectedAlbumCount({required Object count}) {
     return '共 $count 张收藏专辑';
   }
 
@@ -5823,13 +5612,8 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageFavKugouEmptyHint => '在KG App 收藏后自动同步';
 
   @override
-  String pageSearchLoadingTrack(Object title) {
+  String pageSearchLoadingTrack({required Object title}) {
     return '开始加载：$title';
-  }
-
-  @override
-  String pageSearchDetailComingSoon(Object title) {
-    return '$title — 详情页待接入';
   }
 
   @override
@@ -5893,7 +5677,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageLikedQqSyncOnline => '同步在线收藏（实验）';
 
   @override
-  String pageLikedQqSynced(Object count) {
+  String pageLikedQqSynced({required Object count}) {
     return '在线收藏已并入：新增 $count 首';
   }
 
@@ -5931,27 +5715,27 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get libraryStatSize => '总大小';
 
   @override
-  String libraryStatTrackCount(Object count) {
+  String libraryStatTrackCount({required Object count}) {
     return '$count 首';
   }
 
   @override
-  String libraryScanDirCount(Object count) {
+  String libraryScanDirCount({required Object count}) {
     return '$count 个';
   }
 
   @override
-  String libraryHoursMinutes(Object h, Object m) {
+  String libraryHoursMinutes({required Object h, required Object m}) {
     return '$h 小时 $m 分钟';
   }
 
   @override
-  String libraryMinutes(Object m) {
+  String libraryMinutes({required Object m}) {
     return '$m 分钟';
   }
 
   @override
-  String librarySeconds(Object s) {
+  String librarySeconds({required Object s}) {
     return '$s 秒';
   }
 
@@ -5965,7 +5749,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get libraryScanningFiles => '正在统计文件…';
 
   @override
-  String libraryTrackCount(Object count, Object extra) {
+  String libraryTrackCount({required Object count, required Object extra}) {
     return '$count 首$extra';
   }
 
@@ -5989,9 +5773,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get menuLocateFile => '定位文件';
-
-  @override
-  String get menuLocateFileComingSoon => '打开文件管理器 Phase 2 接入';
 
   @override
   String get menuRemoveFromLibrary => '从曲库移除';
@@ -6072,7 +5853,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageHomeDailyLogin => '登录解锁每日推荐';
 
   @override
-  String pageHomeGreeting(Object greeting, Object name) {
+  String pageHomeGreeting({required Object greeting, required Object name}) {
     return '$greeting，$name';
   }
 
@@ -6098,7 +5879,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get downloadDeleteWithMedia => '删除任务及媒体文件';
 
   @override
-  String downloadSelectedCount(Object count) {
+  String downloadSelectedCount({required Object count}) {
     return '已选 $count 项';
   }
 
@@ -6121,12 +5902,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get downloadExitSelect => '退出批量选择';
 
   @override
-  String downloadActiveCount(Object count) {
+  String downloadActiveCount({required Object count}) {
     return '进行中 $count';
   }
 
   @override
-  String downloadDoneCount(Object count) {
+  String downloadDoneCount({required Object count}) {
     return '已完成 $count';
   }
 
@@ -6143,7 +5924,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get downloadEmptyHint => '在歌曲上右键 → 下载，即可加入队列';
 
   @override
-  String downloadDeleteSelectedTitle(Object count) {
+  String downloadDeleteSelectedTitle({required Object count}) {
     return '删除所选 $count 个任务';
   }
 
@@ -6178,17 +5959,21 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get downloadStatusResolving => '解析下载地址…';
 
   @override
-  String downloadStatusRunning(Object percent, Object received, Object speed) {
+  String downloadStatusRunning({
+    required Object percent,
+    required Object received,
+    required Object speed,
+  }) {
     return '下载中 $percent%（$received）$speed';
   }
 
   @override
-  String downloadStatusRunningNoPercent(Object speed) {
+  String downloadStatusRunningNoPercent({required Object speed}) {
     return '下载中…$speed';
   }
 
   @override
-  String downloadStatusPausedWith(Object received) {
+  String downloadStatusPausedWith({required Object received}) {
     return '已暂停（$received）';
   }
 
@@ -6196,18 +5981,15 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get downloadStatusPaused => '已暂停';
 
   @override
-  String downloadStatusFailed(Object error) {
+  String downloadStatusFailed({required Object error}) {
     return '失败：$error';
   }
-
-  @override
-  String get downloadStatusFailedUnknown => '失败：未知错误';
 
   @override
   String get downloadStatusCanceled => '已取消';
 
   @override
-  String downloadStatusDone(Object size) {
+  String downloadStatusDone({required Object size}) {
     return '完成（$size）';
   }
 
@@ -6307,12 +6089,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSearchHint => '搜索设置…';
 
   @override
-  String settingsSearchNoResult(Object query) {
+  String settingsSearchNoResult({required Object query}) {
     return '未找到「$query」相关设置';
   }
 
   @override
-  String settingsSearchMatchCount(Object count) {
+  String settingsSearchMatchCount({required Object count}) {
     return '匹配 $count 项';
   }
 
@@ -6344,24 +6126,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsAccentTitle => '主色种子';
 
   @override
-  String settingsAccentSystem(Object color) {
-    return '跟随系统主题色（$color）';
-  }
-
-  @override
-  String get settingsAccentSystemFallback => '跟随系统主题色（读取失败，回退自定义）';
-
-  @override
-  String get settingsAccentDefault => '默认灰（设计体系）';
-
-  @override
-  String get settingsAccentCustom => '自定义（按种子动态生成配色）';
-
-  @override
   String get settingsAccentDefaultTooltip => '默认灰';
-
-  @override
-  String get settingsAccentSystemTooltip => '跟随系统主题色';
 
   @override
   String get settingsAccentCustomTooltip => '自定义取色';
@@ -6424,7 +6189,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsCoverRadiusSharp => '直角（信息密度高）';
 
   @override
-  String settingsCoverRadiusPx(Object radius) {
+  String settingsCoverRadiusPx({required Object radius}) {
     return '${radius}px 圆角';
   }
 
@@ -6459,10 +6224,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsPassthroughOff => '统一 48kHz 转码管线';
 
   @override
-  String get settingsPassthroughNote =>
-      '关闭转码保持源采样率播放，开启则统一 48kHz 输出；切换后自动重载当前曲目生效。';
-
-  @override
   String get settingsOutputDevice => '输出设备';
 
   @override
@@ -6476,7 +6237,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsOutputDeviceDefaultDesc => '跟随系统当前输出设备（引擎不自动改道）';
 
   @override
-  String settingsOutputDeviceFormat(Object channels, Object rate) {
+  String settingsOutputDeviceFormat({
+    required Object channels,
+    required Object rate,
+  }) {
     return '$rate Hz · $channels 声道';
   }
 
@@ -6522,7 +6286,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       '选择此项将让音乐走系统默认的通话/低质设备，音质几乎损毁，不推荐。';
 
   @override
-  String settingsOutputDeviceShowAll(int count) {
+  String settingsOutputDeviceShowAll({required int count}) {
     return '显示全部设备（$count）';
   }
 
@@ -6536,7 +6300,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsOutputDeviceVirtualTag => '虚拟设备';
 
   @override
-  String settingsSinkChangedFailed(Object err) {
+  String settingsSinkChangedFailed({required Object err}) {
     return '切换输出设备失败：$err';
   }
 
@@ -6638,22 +6402,31 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get memorySourceFailNotHttp => '在线源不是 http(s) 直链';
 
   @override
-  String memorySourceFailIsolateSpawn(Object error) {
+  String memorySourceFailIsolateSpawn({required Object error}) {
     return '内存源 worker 启动失败：$error';
   }
 
   @override
-  String memorySourceFailHttpStatus(Object code, Object status) {
+  String memorySourceFailHttpStatus({
+    required Object code,
+    required Object status,
+  }) {
     return 'HTTP $code $status';
   }
 
   @override
-  String memorySourceFailOverWholeCeiling(Object content, Object limit) {
+  String memorySourceFailOverWholeCeiling({
+    required Object content,
+    required Object limit,
+  }) {
     return '整首内容 $content 超过纯内存整首驻留上限 $limit';
   }
 
   @override
-  String memorySourceFailGrewCeiling(Object got, Object limit) {
+  String memorySourceFailGrewCeiling({
+    required Object got,
+    required Object limit,
+  }) {
     return '下载中途超过纯内存整首驻留上限（$got > $limit）';
   }
 
@@ -6667,12 +6440,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get memorySourceFailSegFill => '内存源写入失败';
 
   @override
-  String memorySourceFailSegFillEx(Object error) {
+  String memorySourceFailSegFillEx({required Object error}) {
     return '内存源写入异常：$error';
   }
 
   @override
-  String memorySourceFailDownload(Object error) {
+  String memorySourceFailDownload({required Object error}) {
     return '下载失败：$error';
   }
 
@@ -6725,7 +6498,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSpectrumBarWidth => '频谱柱宽';
 
   @override
-  String settingsSpectrumBarWidthDesc(Object width) {
+  String settingsSpectrumBarWidthDesc({required Object width}) {
     return '${width}px（1~12，全屏播放器）';
   }
 
@@ -6796,7 +6569,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsPlayerBgRippleSpeed => '水纹速度';
 
   @override
-  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+  String settingsPlayerBgRippleSpeedDesc({required Object speed}) {
     return '流动速度 $speed';
   }
 
@@ -6807,7 +6580,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsPlayerBgFlowSpeed => '流动速度';
 
   @override
-  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+  String settingsPlayerBgFlowSpeedDesc({required Object speed}) {
     return '流体速度 $speed';
   }
 
@@ -6815,7 +6588,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsPlayerBgRenderScale => '渲染比例';
 
   @override
-  String settingsPlayerBgRenderScaleDesc(Object scale) {
+  String settingsPlayerBgRenderScaleDesc({required Object scale}) {
     return '分辨率 $scale×（越低越省电）';
   }
 
@@ -6823,7 +6596,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsPlayerBgFps => '帧率上限';
 
   @override
-  String settingsPlayerBgFpsDesc(Object fps) {
+  String settingsPlayerBgFpsDesc({required Object fps}) {
     return '$fps FPS';
   }
 
@@ -6853,36 +6626,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsAdaptiveRenderQualityOff => '播放页背景始终满分辨率渲染';
-
-  @override
-  String get settingsSectionShortcuts => '快捷键';
-
-  @override
-  String get settingsShortcutSpace => '空格';
-
-  @override
-  String get settingsShortcutSpaceDesc => '播放 / 暂停';
-
-  @override
-  String get settingsShortcutArrows => '← / →';
-
-  @override
-  String get settingsShortcutArrowsDesc => '后退 / 前进 10 秒';
-
-  @override
-  String get settingsShortcutSearch => 'Ctrl / Cmd + F';
-
-  @override
-  String get settingsShortcutLibrary => 'Ctrl / Cmd + L';
-
-  @override
-  String get settingsShortcutLibraryDesc => '音乐库';
-
-  @override
-  String get settingsShortcutEsc => 'Esc';
-
-  @override
-  String get settingsShortcutEscDesc => '返回（关闭弹窗 / 全屏播放器）';
 
   @override
   String get settingsSectionPlayerLyrics => '播放器歌词';
@@ -6921,17 +6664,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsLyricFontSize => '歌词字号';
 
   @override
-  String settingsLyricFontSizeDesc(Object size) {
+  String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（当前行放大高亮）';
   }
 
   @override
   String get settingsLyricLineHeight => '歌词行距';
-
-  @override
-  String settingsLyricLineHeightDesc(Object height) {
-    return '${height}px（含行间距）';
-  }
 
   @override
   String get settingsLyricPlayedColor => '已唱颜色';
@@ -7056,9 +6794,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsRestoreDefault => '恢复默认';
 
   @override
-  String get settingsDownloadRootNote => '默认跟随媒体库目录；修改目录回车保存，进行中的下载任务会终止。';
-
-  @override
   String get settingsSectionFilename => '文件名';
 
   @override
@@ -7075,7 +6810,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsDownloadQuality => '默认下载音质';
 
   @override
-  String settingsDownloadQualityDesc(Object quality) {
+  String settingsDownloadQualityDesc({required Object quality}) {
     return '下载弹窗默认选中 $quality，档位不足时自动降级';
   }
 
@@ -7090,7 +6825,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsDownloadConcurrent => '同时下载数';
 
   @override
-  String settingsDownloadConcurrentDesc(Object count) {
+  String settingsDownloadConcurrentDesc({required Object count}) {
     return '$count 个并行任务（1~5）';
   }
 
@@ -7125,7 +6860,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSpeedUnlimited => '不限速（默认）';
 
   @override
-  String settingsSpeedLimited(Object speed) {
+  String settingsSpeedLimited({required Object speed}) {
     return '限 $speed，实时生效';
   }
 
@@ -7133,7 +6868,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSpeedUnlimitedLabel => '不限速';
 
   @override
-  String settingsSpeedMbps(Object speed) {
+  String settingsSpeedMbps({required Object speed}) {
     return '$speed MB/s';
   }
 
@@ -7147,12 +6882,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsDownloadHistoryLimit => '下载记录上限';
 
   @override
-  String settingsDownloadHistoryDesc(Object count) {
+  String settingsDownloadHistoryDesc({required Object count}) {
     return '$count 条（10~500）· 超上限自动淘汰最旧';
   }
 
   @override
-  String settingsDownloadHistoryCount(Object count) {
+  String settingsDownloadHistoryCount({required Object count}) {
     return '$count 条';
   }
 
@@ -7199,17 +6934,17 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get toastTemplateUpdated => '已更新文件名模板';
 
   @override
-  String settingsSpeedBs(Object n) {
+  String settingsSpeedBs({required Object n}) {
     return '$n B/s';
   }
 
   @override
-  String settingsSpeedKbs(Object n) {
+  String settingsSpeedKbs({required Object n}) {
     return '$n KB/s';
   }
 
   @override
-  String settingsSpeedMbs(Object n) {
+  String settingsSpeedMbs({required Object n}) {
     return '$n MB/s';
   }
 
@@ -7257,7 +6992,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsHistoryLimit => '历史条数上限';
 
   @override
-  String settingsHistoryLimitOn(Object count) {
+  String settingsHistoryLimitOn({required Object count}) {
     return '最多 $count 条';
   }
 
@@ -7281,13 +7016,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsCopy => '复制';
 
   @override
-  String toastCopied(Object label) {
+  String toastCopied({required Object label}) {
     return '已复制$label';
   }
-
-  @override
-  String get settingsStorageNote =>
-      '媒体库与用户数据物理拆分；路径可用环境变量 ARCHOERA_DATA_DIR 覆盖。';
 
   @override
   String get settingsSectionCache => '缓存管理';
@@ -7337,7 +7068,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSongCacheLimitTitle => '缓存上限';
 
   @override
-  String settingsCacheSongs(Object count) {
+  String settingsCacheSongs({required Object count}) {
     return '$count 首';
   }
 
@@ -7360,12 +7091,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsCacheCover => '封面图片缓存';
 
   @override
-  String settingsCacheEntries(Object count) {
+  String settingsCacheEntries({required Object count}) {
     return '$count 条';
   }
 
   @override
-  String settingsCacheImages(Object count) {
+  String settingsCacheImages({required Object count}) {
     return '$count 张';
   }
 
@@ -7379,7 +7110,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsCacheClearAll => '清空全部';
 
   @override
-  String settingsCacheClearConfirmTitle(Object name) {
+  String settingsCacheClearConfirmTitle({required Object name}) {
     return '清除「$name」？';
   }
 
@@ -7394,7 +7125,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       '将删除上方全部缓存（内存与磁盘），不影响曲库、历史与账号信息。';
 
   @override
-  String toastCacheCleared(Object name) {
+  String toastCacheCleared({required Object name}) {
     return '已清除$name缓存';
   }
 
@@ -7412,7 +7143,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSecurityStreaming => '流媒体服务器凭据';
 
   @override
-  String settingsSecurityStreamingCount(Object count) {
+  String settingsSecurityStreamingCount({required Object count}) {
     return '$count 台服务器';
   }
 
@@ -7441,7 +7172,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSecurityDestroyAll => '一键销毁全部';
 
   @override
-  String settingsSecurityConfirmTitle(Object name) {
+  String settingsSecurityConfirmTitle({required Object name}) {
     return '销毁「$name」？';
   }
 
@@ -7449,7 +7180,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSecurityConfirmAllTitle => '确认销毁全部敏感数据？';
 
   @override
-  String settingsSecurityConfirmDesc(Object word) {
+  String settingsSecurityConfirmDesc({required Object word}) {
     return '将主动失效相关平台 token、覆盖写入并删除文件，此操作不可恢复。输入「$word」以确认。';
   }
 
@@ -7457,12 +7188,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSecurityConfirmWord => '销毁';
 
   @override
-  String settingsSecurityConfirmHint(Object word) {
+  String settingsSecurityConfirmHint({required Object word}) {
     return '输入「$word」';
   }
 
   @override
-  String toastSecurityDestroyed(Object name) {
+  String toastSecurityDestroyed({required Object name}) {
     return '已销毁：$name';
   }
 
@@ -7470,34 +7201,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get toastSecurityAllDestroyed => '全部敏感数据已销毁';
 
   @override
-  String toastSecurityDestroyFailed(Object path) {
+  String toastSecurityDestroyFailed({required Object path}) {
     return '销毁失败，文件仍可能残留：$path';
   }
-
-  @override
-  String get settingsDeviceBindSection => '高级 · 设备绑定';
-
-  @override
-  String get settingsDeviceBindNote =>
-      '增强型可选项（opt-in）：本机免密 + 设备变更走恢复口令，不依赖系统安全存储。开启将读取本机设备标识（仅存本地、不会上传）。默认关闭，普通用户使用 v1 加密已足够。';
-
-  @override
-  String get settingsDeviceBindSwitch => '设备绑定免密';
-
-  @override
-  String get settingsDeviceBindSwitchDesc => '本机自动解锁；换机/重装走恢复口令';
-
-  @override
-  String get settingsDeviceBindSwitchOffDesc =>
-      '未启用。当前系统安全存储不可用，可开启设备绑定实现本机免密（无需口令）';
-
-  @override
-  String get settingsDeviceBindSwitchV1Desc =>
-      '当前为 v1（系统安全存储）模式；开启将升级为设备绑定（免密 + 恢复口令，既有数据保留）';
-
-  @override
-  String get settingsDeviceBindSwitchV2Desc =>
-      '当前为 v2（口令）模式；开启需先输入当前口令解锁，随后升级为设备绑定（本机免密）';
 
   @override
   String get settingsDeviceBindPrivacyTitle => '开启设备绑定免密？';
@@ -7591,7 +7297,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get toastDeviceBindRecoveryNeeded => '未设置恢复口令，无法关闭设备绑定';
 
   @override
-  String toastDeviceBindCloseFailed(Object error) {
+  String toastDeviceBindCloseFailed({required Object error}) {
     return '关闭失败：$error';
   }
 
@@ -7683,13 +7389,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get toastSchemeSwitched => '加密方案已切换，重启后生效';
-
-  @override
-  String get settingsVaultSection => '凭据加密';
-
-  @override
-  String get settingsVaultNote =>
-      '选择凭据的加密保护等级：v1 系统保护（默认）/ v2 口令保护 / v3 设备绑定（增强项 opt-in，读取本机设备标识，仅存本地、不会上传）。v1 ↔ v2 可随时互切；v3 为终点档，关闭后回落为 v2。';
 
   @override
   String get settingsVaultModeV1 => 'v1 系统保护';
@@ -7836,7 +7535,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsVersionUnknown => 'v未知 · Flutter 桌面端';
 
   @override
-  String settingsVersionFormat(Object version) {
+  String settingsVersionFormat({required Object version}) {
     return 'v$version · Flutter 桌面端';
   }
 
@@ -7944,10 +7643,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSectionThanks => '特别致谢';
 
   @override
-  String get settingsThanksText =>
-      '本软件使用、依赖或参考了以下开源项目（完整许可清单见仓库 THIRD-PARTY-NOTICES.md 及各模块 THIRD-PARTY-LICENSES.md）：\n\n· 设计思路借鉴：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 核心组件：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/公有领域）、signalsmith-stretch（MIT）、SQLite（公有领域）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· 解码参考：minimp3（CC0-1.0）、stb_vorbis（公有领域/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· 图标：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n感谢以上项目的作者。';
-
-  @override
   String get settingsThanksDesign => '设计思路借鉴';
 
   @override
@@ -7970,7 +7665,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get commonNoLyrics => '暂无歌词';
 
   @override
-  String commonTrackCount(Object count) {
+  String commonTrackCount({required Object count}) {
     return '$count 首';
   }
 
@@ -7991,9 +7686,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSearchFilenameTitle => '文件名模板';
-
-  @override
-  String get settingsSearchAccentSubtitle => '自定义主色种子 · 色板';
 
   @override
   String get settingsThemeSource => '主题色来源';
@@ -8062,7 +7754,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsBackgroundBlur => '背景模糊';
 
   @override
-  String settingsBackgroundBlurDesc(Object blur) {
+  String settingsBackgroundBlurDesc({required Object blur}) {
     return '对背景图片应用高斯模糊（${blur}px）';
   }
 
@@ -8070,7 +7762,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsBackgroundDim => '遮罩浓度';
 
   @override
-  String settingsBackgroundDimDesc(Object dim) {
+  String settingsBackgroundDimDesc({required Object dim}) {
     return '叠加的黑色遮罩透明度（$dim%），越高前景越易读';
   }
 
@@ -8078,7 +7770,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsBackgroundScale => '缩放大小';
 
   @override
-  String settingsBackgroundScaleDesc(Object scale) {
+  String settingsBackgroundScaleDesc({required Object scale}) {
     return '背景图的缩放倍数（${scale}x）';
   }
 
@@ -8284,25 +7976,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSearchAboutSubtitle => '音频引擎 · Subsonic 服务端';
 
   @override
-  String get qualityLossless => '无损';
-
-  @override
   String get repeatModeList => '列表循环';
 
   @override
   String get repeatModeOne => '单曲循环';
-
-  @override
-  String get commonUnknownTrack => '未知名歌曲';
-
-  @override
-  String get commonAnonymousUser => '匿名用户';
-
-  @override
-  String get commonCanceled => '已取消';
-
-  @override
-  String get commonILike => '我喜欢';
 
   @override
   String get sidebarStreaming => '流媒体';
@@ -8330,7 +8007,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsScrapeDirsEmptyNote => '未配置刮削目录，刮削时将跟随媒体库扫描目录。';
 
   @override
-  String settingsScrapeDirsNote(Object dirs) {
+  String settingsScrapeDirsNote({required Object dirs}) {
     return '当前生效目录：$dirs';
   }
 
@@ -8380,7 +8057,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsScrapeScanning => '正在扫描目录…';
 
   @override
-  String settingsScrapeCurrent(Object file) {
+  String settingsScrapeCurrent({required Object file}) {
     return '正在处理：$file';
   }
 
@@ -8461,7 +8138,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get streamingServerConnect => '连接';
 
   @override
-  String streamingToastConnected(Object name) {
+  String streamingToastConnected({required Object name}) {
     return '已连接 $name';
   }
 
@@ -8475,7 +8152,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get streamingServerDeleteConfirmTitle => '删除服务器';
 
   @override
-  String streamingServerDeleteConfirm(Object name) {
+  String streamingServerDeleteConfirm({required Object name}) {
     return '确定删除服务器「$name」吗？';
   }
 
@@ -8565,22 +8242,22 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get streamingEmptyNotConnected => '未连接到任何服务器';
 
   @override
-  String streamingTotalSongs(Object count) {
+  String streamingTotalSongs({required Object count}) {
     return '$count 首歌曲';
   }
 
   @override
-  String streamingTotalAlbums(Object count) {
+  String streamingTotalAlbums({required Object count}) {
     return '$count 张专辑';
   }
 
   @override
-  String streamingTotalArtists(Object count) {
+  String streamingTotalArtists({required Object count}) {
     return '$count 位歌手';
   }
 
   @override
-  String streamingTotalPlaylists(Object count) {
+  String streamingTotalPlaylists({required Object count}) {
     return '$count 个歌单';
   }
 
@@ -8588,17 +8265,17 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get streamingEmptyNoResults => '没有匹配的结果';
 
   @override
-  String streamingAlbumSongs(Object count) {
+  String streamingAlbumSongs({required Object count}) {
     return '$count 首歌曲';
   }
 
   @override
-  String streamingArtistAlbums(Object count) {
+  String streamingArtistAlbums({required Object count}) {
     return '$count 张专辑';
   }
 
   @override
-  String streamingPlaylistSongs(Object count) {
+  String streamingPlaylistSongs({required Object count}) {
     return '$count 首歌曲';
   }
 
@@ -8615,20 +8292,17 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginQqScanHint => '请使用手机 QQ 扫一扫登录';
 
   @override
-  String navHeaderQqId(String id) {
+  String navHeaderQqId({required String id}) {
     return 'QQ $id';
   }
 
   @override
-  String get toastQqNotSupported => 'QM暂不支持该操作';
-
-  @override
-  String searchSourceFailed(Object source) {
+  String searchSourceFailed({required Object source}) {
     return '「$source」搜索暂不可用';
   }
 
   @override
-  String searchQqRiskDetail(Object code) {
+  String searchQqRiskDetail({required Object code}) {
     return 'QM接口限流或风控拦截（代码 $code），已停止自动重试，请稍后再试';
   }
 
@@ -8636,23 +8310,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get searchNetworkError => '网络连接失败或请求超时，请稍后重试';
 
   @override
-  String searchPlatformError(Object code) {
+  String searchPlatformError({required Object code}) {
     return '平台返回错误（$code）';
   }
 
   @override
   String get searchWaitRetry => '请求过于频繁，请稍候再试';
-
-  @override
-  String get qqMusicDownloadUnsupported => 'QM暂不支持下载（风控）。';
-
-  @override
-  String qqMusicDownloadSkipped(Object count) {
-    return '已跳过 $count 首 QM（暂不支持下载）。';
-  }
-
-  @override
-  String get platformQqMusic => 'QM';
 
   @override
   String get settingsValueAuto => '自动';
@@ -8686,7 +8349,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsScrapeWorkers => '并发查询线程';
 
   @override
-  String settingsScrapeWorkersDesc(Object value) {
+  String settingsScrapeWorkersDesc({required Object value}) {
     return '多源并发查询线程数（0=自动，当前 $value）';
   }
 
@@ -8694,7 +8357,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsScrapeBatch => '批大小';
 
   @override
-  String settingsScrapeBatchDesc(Object value) {
+  String settingsScrapeBatchDesc({required Object value}) {
     return '每批处理文件数（当前 $value）';
   }
 
@@ -8702,7 +8365,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsScrapeRetries => '失败重试上限';
 
   @override
-  String settingsScrapeRetriesDesc(Object value) {
+  String settingsScrapeRetriesDesc({required Object value}) {
     return '重试达到该次数后不再重试（当前 $value）';
   }
 
@@ -8742,9 +8405,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsScrapeOrganizeStart => '开始整理';
 
   @override
-  String get settingsOrganizeCancel => '取消整理';
-
-  @override
   String get settingsOrganizeRunning => '正在整理文件…';
 
   @override
@@ -8757,7 +8417,11 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsOrganizeFailed => '失败';
 
   @override
-  String settingsOrganizeDone(Object failed, Object moved, Object skipped) {
+  String settingsOrganizeDone({
+    required Object failed,
+    required Object moved,
+    required Object skipped,
+  }) {
     return '整理完成：移动 $moved，跳过 $skipped，失败 $failed';
   }
 
@@ -8765,7 +8429,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsOrganizeNoTarget => '未配置媒体库扫描目录，无法确定默认整理目录';
 
   @override
-  String settingsOrganizeUsingDefault(Object dir) {
+  String settingsOrganizeUsingDefault({required Object dir}) {
     return '未设置整理目标目录，使用默认音乐目录：$dir';
   }
 
@@ -8788,7 +8452,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsScanParallelism => '扫描并行度';
 
   @override
-  String settingsScanParallelismDesc(Object value) {
+  String settingsScanParallelismDesc({required Object value}) {
     return '并行解析文件数（0=自动，当前 $value）';
   }
 
@@ -8796,7 +8460,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsScanBatch => '批大小';
 
   @override
-  String settingsScanBatchDesc(Object value) {
+  String settingsScanBatchDesc({required Object value}) {
     return '数据库批量写入上限（0=自动，当前 $value）';
   }
 
@@ -8822,9 +8486,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSectionScanExts => '音频扩展名';
 
   @override
-  String get settingsScanExtraExts => '额外扩展名';
-
-  @override
   String get settingsScanExtraExtsNote => '在引擎内置白名单之上追加扫描的音频扩展名';
 
   @override
@@ -8834,7 +8495,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSectionScanQuarantine => '坏文件隔离区';
 
   @override
-  String settingsScanQuarantineNote(Object dir) {
+  String settingsScanQuarantineNote({required Object dir}) {
     return '连续解析失败 ≥3 次的文件会被移入隔离目录：$dir';
   }
 
@@ -8862,9 +8523,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   @override
   String get libraryFullScanConfirmDesc =>
       '将清空当前曲库记录并从扫描目录重建（不删除源文件）。此操作不可撤销，扫描期间会占用较多磁盘 IO。';
-
-  @override
-  String get libraryFullScanDescription => '清空曲库并从扫描目录重建';
 
   @override
   String get settingsSectionLyricEngine => '歌词引擎';
@@ -9081,10 +8739,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get commonReset => '重置';
 
   @override
-  String get settingsDevDownloadModuleDesc =>
-      '下载接口（侧边栏 / 右键菜单 / 设置分类）的独立开关；默认关闭，开启前会提示风险。';
-
-  @override
   String get settingsDevDownloadModuleOn => '下载模块已开启';
 
   @override
@@ -9269,9 +8923,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsLyricAdaptiveFontSize => '自适应字号';
 
   @override
-  String get settingsLyricAdaptiveFontSizeDesc => '歌词字号随窗口高度自动缩放';
-
-  @override
   String get settingsLyricAdaptiveFontSizeOn => '开启：字号随窗口缩放';
 
   @override
@@ -9302,18 +8953,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get sleepTimerOff => '关闭';
 
   @override
-  String get sleepTimer15 => '15 分钟';
-
-  @override
-  String get sleepTimer30 => '30 分钟';
-
-  @override
-  String get sleepTimer60 => '60 分钟';
-
-  @override
-  String get sleepTimer90 => '90 分钟';
-
-  @override
   String get sleepTimerEndOfTrack => '播完当前曲';
 
   @override
@@ -9326,7 +8965,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get sleepTimerWaitingTrackEnd => '定时已到，将在当前曲结束后暂停';
 
   @override
-  String sleepTimerMinutes(int minutes) {
+  String sleepTimerMinutes({required int minutes}) {
     return '$minutes 分钟';
   }
 
@@ -9420,9 +9059,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsEqPreamp => '预增益';
-
-  @override
-  String get settingsEqPreampDesc => '整体提升或衰减，避免削波';
 
   @override
   String get settingsEqLimiter => '限幅器';
@@ -9541,9 +9177,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get trackDetailDuration => '時長';
 
   @override
-  String get trackDetailArtist => '歌手';
-
-  @override
   String get trackDetailAlbum => '專輯';
 
   @override
@@ -9601,12 +9234,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get batchSelectHint => '批次選擇';
 
   @override
-  String toastBatchAddedToQueue(Object count) {
+  String toastBatchAddedToQueue({required Object count}) {
     return '已加入播放佇列 $count 首';
   }
 
   @override
-  String toastBatchAddedToDownloadQueue(Object count) {
+  String toastBatchAddedToDownloadQueue({required Object count}) {
     return '已加入下載佇列 $count 首';
   }
 
@@ -9642,10 +9275,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSuppressSleepOff => '系統可能依閒置計畫休眠';
-
-  @override
-  String get settingsPowerSaverNote =>
-      '節能模式監聽視窗狀態事件自動降幀，無需輪詢；視窗不可見或顯示器關閉時，渲染引擎本身已停止繪製。「停用系統休眠」僅在播放中生效。';
 
   @override
   String get settingsCloseBehavior => '關閉應用程式時';
@@ -9699,9 +9328,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get commonLoading => '載入中';
 
   @override
-  String get commonLossless => '無損';
-
-  @override
   String get commonOriginal => '原唱';
 
   @override
@@ -9732,7 +9358,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get downloadQualityTitle => '下載音質';
 
   @override
-  String downloadRequiresLoginContent(Object platform) {
+  String downloadRequiresLoginContent({required Object platform}) {
     return '取得$platform下載連結需登入，未登入只能試聽，無法下載完整音質。\n\n請先登入$platform帳號後重試。';
   }
 
@@ -9764,10 +9390,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get navHeaderAccount => '帳號';
 
   @override
-  String get navHeaderComingSoon => '敬請期待';
-
-  @override
-  String navHeaderKugouId(Object id) {
+  String navHeaderKugouId({required Object id}) {
     return 'KG $id';
   }
 
@@ -9850,7 +9473,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get queueTitle => '播放佇列';
 
   @override
-  String queueTrackCount(Object count) {
+  String queueTrackCount({required Object count}) {
     return '$count 首';
   }
 
@@ -9867,7 +9490,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get searchHot => '熱搜';
 
   @override
-  String searchQuick(Object query) {
+  String searchQuick({required Object query}) {
     return '搜尋「$query」';
   }
 
@@ -9920,7 +9543,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get songListLocatePlaying => '定位播放位置';
 
   @override
-  String toastAddedToDownloadQueue(Object quality) {
+  String toastAddedToDownloadQueue({required Object quality}) {
     return '已加入下載佇列：$quality';
   }
 
@@ -9952,7 +9575,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get commonEmptyContent => '暫無內容';
 
   @override
-  String commonLoadFailed(Object msg) {
+  String commonLoadFailed({required Object msg}) {
     return '載入失敗：$msg';
   }
 
@@ -9978,12 +9601,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get commentLatest => '最新';
 
   @override
-  String commentLoginRequired(Object platform) {
+  String commentLoginRequired({required Object platform}) {
     return '傳送留言需要登入$platform帳號';
   }
 
   @override
-  String commentNotFound(Object platform) {
+  String commentNotFound({required Object platform}) {
     return '未找到該歌曲的$platform留言';
   }
 
@@ -9991,7 +9614,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get commentPublished => '留言已發布';
 
   @override
-  String commentReplyFormat(Object text, Object user) {
+  String commentReplyFormat({required Object text, required Object user}) {
     return '@$user：$text';
   }
 
@@ -9999,12 +9622,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get commentSend => '傳送';
 
   @override
-  String commentSendFailed(Object msg) {
+  String commentSendFailed({required Object msg}) {
     return '傳送失敗：$msg';
   }
 
   @override
-  String commentTimeFormat(Object day, Object month, Object time) {
+  String commentTimeFormat({
+    required Object day,
+    required Object month,
+    required Object time,
+  }) {
     return '$month月$day日 $time';
   }
 
@@ -10042,17 +9669,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get loginFetchingQr => '正在取得 QR Code…';
 
   @override
-  String loginKugouLoggedIn(Object platform) {
+  String loginKugouLoggedIn({required Object platform}) {
     return '$platform已登入';
   }
 
   @override
-  String loginKugouLogin(Object platform) {
+  String loginKugouLogin({required Object platform}) {
     return '$platform登入';
   }
 
   @override
-  String loginKugouQrLogin(Object platform) {
+  String loginKugouQrLogin({required Object platform}) {
     return '$platform掃碼登入';
   }
 
@@ -10060,37 +9687,32 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get loginKugouResponseMissingToken => '登入回應缺少 token/userid';
 
   @override
-  String loginKugouScanHint(Object platform) {
+  String loginKugouScanHint({required Object platform}) {
     return '請使用$platform App 掃一掃登入';
   }
 
   @override
-  String loginKugouSession(Object platform) {
+  String loginKugouSession({required Object platform}) {
     return '$platform登入狀態';
   }
 
   @override
-  String loginKugouSuccessVip(Object platform) {
+  String loginKugouSuccessVip({required Object platform}) {
     return '$platform登入成功，VIP 曲目已解鎖';
   }
 
   @override
-  String loginLoggedOut(Object platform) {
+  String loginLoggedOut({required Object platform}) {
     return '已退出$platform登入';
   }
 
   @override
-  String loginLogoutWithId(Object id) {
+  String loginLogoutWithId({required Object id}) {
     return '登出（$id）';
   }
 
   @override
-  String loginNeteaseQrTitle(Object platform) {
-    return '掃碼登入$platform';
-  }
-
-  @override
-  String loginNeteaseScanHint(Object platform) {
+  String loginNeteaseScanHint({required Object platform}) {
     return '請使用$platform App 掃碼登入';
   }
 
@@ -10129,7 +9751,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get loginTabEmail => '信箱';
 
   @override
-  String loginTitleBrand(String platform) {
+  String loginTitleBrand({required String platform}) {
     return '$platform登入';
   }
 
@@ -10180,18 +9802,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get loginWaitingConfirm => '已掃碼，請在手機上確認登入';
 
   @override
-  String get loginConfirmCheck => '我已確認，檢查登入';
-
-  @override
-  String get loginChecking => '檢查中…';
-
-  @override
-  String get loginScanThenConfirm => '掃碼並在手機確認後，點下方按鈕';
-
-  @override
-  String get loginScannedThenConfirm => '已掃碼，請在手機點擊確認，再點一次';
-
-  @override
   String get trackListArtistHotSongs => '藝人熱門歌曲';
 
   @override
@@ -10204,7 +9814,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get trackListDailyRecommendSubtitle => '依口味每天更新';
 
   @override
-  String trackListEmptyDailyLogin(Object platform) {
+  String trackListEmptyDailyLogin({required Object platform}) {
     return '暫無歌曲（每日推薦需登入$platform）';
   }
 
@@ -10215,7 +9825,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get trackListPlayAll => '播放全部';
 
   @override
-  String trackListPlaySourceFailed(Object msg) {
+  String trackListPlaySourceFailed({required Object msg}) {
     return '取得播放來源失敗: $msg';
   }
 
@@ -10268,7 +9878,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get commonUnknownError => '未知錯誤';
 
   @override
-  String commonSongCountHint(Object count) {
+  String commonSongCountHint({required Object count}) {
     return '共 $count 首歌曲 · 點擊播放';
   }
 
@@ -10288,7 +9898,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get libraryDeleteFileTitle => '刪除檔案';
 
   @override
-  String libraryDeleteFileMessage(Object name) {
+  String libraryDeleteFileMessage({required Object name}) {
     return '將永久刪除「$name」，且無法復原。確定繼續嗎？';
   }
 
@@ -10344,7 +9954,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsNekoLogout => '登出';
 
   @override
-  String settingsNekoLoggedInAs(Object name) {
+  String settingsNekoLoggedInAs({required Object name}) {
     return '已登入：$name';
   }
 
@@ -10403,20 +10013,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageFavNekoEmptyHint => '還沒有歌單或收藏';
 
   @override
-  String toastPlayedAll(Object count) {
+  String toastPlayedAll({required Object count}) {
     return '已播放全部 $count 首';
   }
 
   @override
-  String toastPlayFailed(Object msg) {
+  String toastPlayFailed({required Object msg}) {
     return '播放失敗：$msg';
   }
 
   @override
   String get toastMissingLocalPath => '缺少本機檔案路徑';
-
-  @override
-  String get toastLocateComingSoon => '開啟檔案管理員（Phase 2 接入）';
 
   @override
   String get toastRemovedFromLibrary => '已從音樂庫移除';
@@ -10425,7 +10032,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get toastRemoveFailed => '移除失敗';
 
   @override
-  String toastDailyRequiresLogin(Object platform) {
+  String toastDailyRequiresLogin({required Object platform}) {
     return '每日推薦需要登入$platform帳號';
   }
 
@@ -10496,7 +10103,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageHistoryEmptyHint => '播放過的歌曲會自動記錄在這裡';
 
   @override
-  String pageFavPlaylistCount(Object count) {
+  String pageFavPlaylistCount({required Object count}) {
     return '共 $count 個收藏歌單';
   }
 
@@ -10504,7 +10111,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageFavPlaylistLoginHint => '登入後可檢視收藏的歌單';
 
   @override
-  String pageFavAlbumCount(Object count) {
+  String pageFavAlbumCount({required Object count}) {
     return '共 $count 張收藏專輯';
   }
 
@@ -10512,7 +10119,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageFavAlbumLoginHint => '登入後可檢視收藏的專輯';
 
   @override
-  String pageFavArtistCount(Object count) {
+  String pageFavArtistCount({required Object count}) {
     return '共 $count 位收藏歌手';
   }
 
@@ -10544,7 +10151,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageFavKgCollectedAlbum => '收藏的專輯';
 
   @override
-  String pageFavKgCreatedCount(Object count) {
+  String pageFavKgCreatedCount({required Object count}) {
     return '共 $count 個建立的歌單';
   }
 
@@ -10552,7 +10159,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageFavKgCreatedLoginHint => '登入後可查看建立的歌單';
 
   @override
-  String pageFavKgCollectedPlaylistCount(Object count) {
+  String pageFavKgCollectedPlaylistCount({required Object count}) {
     return '共 $count 個收藏歌單';
   }
 
@@ -10560,7 +10167,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageFavKgCollectedPlaylistLoginHint => '登入後可查看收藏的歌單';
 
   @override
-  String pageFavKgCollectedAlbumCount(Object count) {
+  String pageFavKgCollectedAlbumCount({required Object count}) {
     return '共 $count 張收藏專輯';
   }
 
@@ -10574,13 +10181,8 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageFavKugouEmptyHint => '在KG App 收藏後自動同步';
 
   @override
-  String pageSearchLoadingTrack(Object title) {
+  String pageSearchLoadingTrack({required Object title}) {
     return '開始載入：$title';
-  }
-
-  @override
-  String pageSearchDetailComingSoon(Object title) {
-    return '$title — 詳情頁待接入';
   }
 
   @override
@@ -10644,7 +10246,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageLikedQqSyncOnline => '同步線上收藏（實驗）';
 
   @override
-  String pageLikedQqSynced(Object count) {
+  String pageLikedQqSynced({required Object count}) {
     return '線上收藏已併入：新增 $count 首';
   }
 
@@ -10682,27 +10284,27 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get libraryStatSize => '總大小';
 
   @override
-  String libraryStatTrackCount(Object count) {
+  String libraryStatTrackCount({required Object count}) {
     return '$count 首';
   }
 
   @override
-  String libraryScanDirCount(Object count) {
+  String libraryScanDirCount({required Object count}) {
     return '$count 個';
   }
 
   @override
-  String libraryHoursMinutes(Object h, Object m) {
+  String libraryHoursMinutes({required Object h, required Object m}) {
     return '$h 小時 $m 分鐘';
   }
 
   @override
-  String libraryMinutes(Object m) {
+  String libraryMinutes({required Object m}) {
     return '$m 分鐘';
   }
 
   @override
-  String librarySeconds(Object s) {
+  String librarySeconds({required Object s}) {
     return '$s 秒';
   }
 
@@ -10716,7 +10318,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get libraryScanningFiles => '正在統計檔案…';
 
   @override
-  String libraryTrackCount(Object count, Object extra) {
+  String libraryTrackCount({required Object count, required Object extra}) {
     return '$count 首$extra';
   }
 
@@ -10740,9 +10342,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get menuLocateFile => '定位檔案';
-
-  @override
-  String get menuLocateFileComingSoon => '開啟檔案管理員 Phase 2 接入';
 
   @override
   String get menuRemoveFromLibrary => '從曲庫移除';
@@ -10823,7 +10422,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageHomeDailyLogin => '登入解鎖每日推薦';
 
   @override
-  String pageHomeGreeting(Object greeting, Object name) {
+  String pageHomeGreeting({required Object greeting, required Object name}) {
     return '$greeting，$name';
   }
 
@@ -10849,7 +10448,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get downloadDeleteWithMedia => '刪除任務及媒體檔案';
 
   @override
-  String downloadSelectedCount(Object count) {
+  String downloadSelectedCount({required Object count}) {
     return '已選 $count 項';
   }
 
@@ -10872,12 +10471,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get downloadExitSelect => '退出批量選擇';
 
   @override
-  String downloadActiveCount(Object count) {
+  String downloadActiveCount({required Object count}) {
     return '進行中 $count';
   }
 
   @override
-  String downloadDoneCount(Object count) {
+  String downloadDoneCount({required Object count}) {
     return '已完成 $count';
   }
 
@@ -10894,7 +10493,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get downloadEmptyHint => '在歌曲上右鍵 → 下載，即可加入佇列';
 
   @override
-  String downloadDeleteSelectedTitle(Object count) {
+  String downloadDeleteSelectedTitle({required Object count}) {
     return '刪除所選 $count 個任務';
   }
 
@@ -10929,17 +10528,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get downloadStatusResolving => '解析下載位址…';
 
   @override
-  String downloadStatusRunning(Object percent, Object received, Object speed) {
+  String downloadStatusRunning({
+    required Object percent,
+    required Object received,
+    required Object speed,
+  }) {
     return '下載中 $percent%（$received）$speed';
   }
 
   @override
-  String downloadStatusRunningNoPercent(Object speed) {
+  String downloadStatusRunningNoPercent({required Object speed}) {
     return '下載中…$speed';
   }
 
   @override
-  String downloadStatusPausedWith(Object received) {
+  String downloadStatusPausedWith({required Object received}) {
     return '已暫停（$received）';
   }
 
@@ -10947,18 +10550,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get downloadStatusPaused => '已暫停';
 
   @override
-  String downloadStatusFailed(Object error) {
+  String downloadStatusFailed({required Object error}) {
     return '失敗：$error';
   }
-
-  @override
-  String get downloadStatusFailedUnknown => '失敗：未知錯誤';
 
   @override
   String get downloadStatusCanceled => '已取消';
 
   @override
-  String downloadStatusDone(Object size) {
+  String downloadStatusDone({required Object size}) {
     return '完成（$size）';
   }
 
@@ -11058,12 +10658,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSearchHint => '搜尋設定…';
 
   @override
-  String settingsSearchNoResult(Object query) {
+  String settingsSearchNoResult({required Object query}) {
     return '未找到「$query」相關設定';
   }
 
   @override
-  String settingsSearchMatchCount(Object count) {
+  String settingsSearchMatchCount({required Object count}) {
     return '符合 $count 項';
   }
 
@@ -11095,24 +10695,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsAccentTitle => '主色種子';
 
   @override
-  String settingsAccentSystem(Object color) {
-    return '跟隨系統主題色（$color）';
-  }
-
-  @override
-  String get settingsAccentSystemFallback => '跟隨系統主題色（讀取失敗，回退自訂）';
-
-  @override
-  String get settingsAccentDefault => '預設灰（設計體系）';
-
-  @override
-  String get settingsAccentCustom => '自訂（依種子動態生成配色）';
-
-  @override
   String get settingsAccentDefaultTooltip => '預設灰';
-
-  @override
-  String get settingsAccentSystemTooltip => '跟隨系統主題色';
 
   @override
   String get settingsAccentCustomTooltip => '自訂取色';
@@ -11175,7 +10758,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsCoverRadiusSharp => '直角（資訊密度高）';
 
   @override
-  String settingsCoverRadiusPx(Object radius) {
+  String settingsCoverRadiusPx({required Object radius}) {
     return '${radius}px 圓角';
   }
 
@@ -11210,10 +10793,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsPassthroughOff => '統一 48kHz 轉碼管線';
 
   @override
-  String get settingsPassthroughNote =>
-      '關閉轉碼保持源取樣率播放，開啟則統一 48kHz 輸出；切換後自動重載目前曲目生效。';
-
-  @override
   String get settingsOutputDevice => '輸出裝置';
 
   @override
@@ -11227,7 +10806,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsOutputDeviceDefaultDesc => '跟隨系統目前的輸出裝置（引擎不自動改道）';
 
   @override
-  String settingsOutputDeviceFormat(Object channels, Object rate) {
+  String settingsOutputDeviceFormat({
+    required Object channels,
+    required Object rate,
+  }) {
     return '$rate Hz · $channels 聲道';
   }
 
@@ -11273,7 +10855,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '選擇此項將讓音樂走系統預設的通話/低品質裝置，音質幾乎損毀，不建議。';
 
   @override
-  String settingsOutputDeviceShowAll(int count) {
+  String settingsOutputDeviceShowAll({required int count}) {
     return '顯示全部裝置（$count）';
   }
 
@@ -11287,7 +10869,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsOutputDeviceVirtualTag => '虛擬裝置';
 
   @override
-  String settingsSinkChangedFailed(Object err) {
+  String settingsSinkChangedFailed({required Object err}) {
     return '切換輸出裝置失敗：$err';
   }
 
@@ -11389,22 +10971,31 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get memorySourceFailNotHttp => '線上來源不是 http(s) 直鏈';
 
   @override
-  String memorySourceFailIsolateSpawn(Object error) {
+  String memorySourceFailIsolateSpawn({required Object error}) {
     return '記憶體來源 worker 啟動失敗：$error';
   }
 
   @override
-  String memorySourceFailHttpStatus(Object code, Object status) {
+  String memorySourceFailHttpStatus({
+    required Object code,
+    required Object status,
+  }) {
     return 'HTTP $code $status';
   }
 
   @override
-  String memorySourceFailOverWholeCeiling(Object content, Object limit) {
+  String memorySourceFailOverWholeCeiling({
+    required Object content,
+    required Object limit,
+  }) {
     return '整首內容 $content 超過純記憶體整首駐留上限 $limit';
   }
 
   @override
-  String memorySourceFailGrewCeiling(Object got, Object limit) {
+  String memorySourceFailGrewCeiling({
+    required Object got,
+    required Object limit,
+  }) {
     return '下載中途超過純記憶體整首駐留上限（$got > $limit）';
   }
 
@@ -11418,12 +11009,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get memorySourceFailSegFill => '記憶體來源寫入失敗';
 
   @override
-  String memorySourceFailSegFillEx(Object error) {
+  String memorySourceFailSegFillEx({required Object error}) {
     return '記憶體來源寫入異常：$error';
   }
 
   @override
-  String memorySourceFailDownload(Object error) {
+  String memorySourceFailDownload({required Object error}) {
     return '下載失敗：$error';
   }
 
@@ -11476,7 +11067,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSpectrumBarWidth => '頻譜柱寬';
 
   @override
-  String settingsSpectrumBarWidthDesc(Object width) {
+  String settingsSpectrumBarWidthDesc({required Object width}) {
     return '${width}px（1~12，全螢幕播放器）';
   }
 
@@ -11547,7 +11138,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsPlayerBgRippleSpeed => '水紋速度';
 
   @override
-  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+  String settingsPlayerBgRippleSpeedDesc({required Object speed}) {
     return '流動速度 $speed';
   }
 
@@ -11558,7 +11149,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsPlayerBgFlowSpeed => '流動速度';
 
   @override
-  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+  String settingsPlayerBgFlowSpeedDesc({required Object speed}) {
     return '流體流動速度 $speed';
   }
 
@@ -11566,7 +11157,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsPlayerBgRenderScale => '渲染比例';
 
   @override
-  String settingsPlayerBgRenderScaleDesc(Object scale) {
+  String settingsPlayerBgRenderScaleDesc({required Object scale}) {
     return '解析度 $scale×（越低越省電）';
   }
 
@@ -11574,7 +11165,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsPlayerBgFps => '幀率上限';
 
   @override
-  String settingsPlayerBgFpsDesc(Object fps) {
+  String settingsPlayerBgFpsDesc({required Object fps}) {
     return '$fps FPS';
   }
 
@@ -11604,36 +11195,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAdaptiveRenderQualityOff => '播放頁背景始終以滿解析度渲染';
-
-  @override
-  String get settingsSectionShortcuts => '快速鍵';
-
-  @override
-  String get settingsShortcutSpace => '空白鍵';
-
-  @override
-  String get settingsShortcutSpaceDesc => '播放 / 暫停';
-
-  @override
-  String get settingsShortcutArrows => '← / →';
-
-  @override
-  String get settingsShortcutArrowsDesc => '後退 / 前進 10 秒';
-
-  @override
-  String get settingsShortcutSearch => 'Ctrl / Cmd + F';
-
-  @override
-  String get settingsShortcutLibrary => 'Ctrl / Cmd + L';
-
-  @override
-  String get settingsShortcutLibraryDesc => '音樂庫';
-
-  @override
-  String get settingsShortcutEsc => 'Esc';
-
-  @override
-  String get settingsShortcutEscDesc => '返回（關閉彈窗 / 全螢幕播放器）';
 
   @override
   String get settingsSectionPlayerLyrics => '播放器歌詞';
@@ -11672,17 +11233,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsLyricFontSize => '歌詞字級';
 
   @override
-  String settingsLyricFontSizeDesc(Object size) {
+  String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（目前行放大高亮）';
   }
 
   @override
   String get settingsLyricLineHeight => '歌詞行距';
-
-  @override
-  String settingsLyricLineHeightDesc(Object height) {
-    return '${height}px（含行間距）';
-  }
 
   @override
   String get settingsLyricPlayedColor => '已唱顏色';
@@ -11807,10 +11363,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsRestoreDefault => '恢復預設';
 
   @override
-  String get settingsDownloadRootNote =>
-      '預設跟隨媒體庫目錄；修改目錄按 Enter 儲存，進行中的下載任務會終止。';
-
-  @override
   String get settingsSectionFilename => '檔名';
 
   @override
@@ -11827,7 +11379,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsDownloadQuality => '預設下載音質';
 
   @override
-  String settingsDownloadQualityDesc(Object quality) {
+  String settingsDownloadQualityDesc({required Object quality}) {
     return '下載彈窗預設選中 $quality，檔位不足時自動降級';
   }
 
@@ -11842,7 +11394,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsDownloadConcurrent => '同時下載數';
 
   @override
-  String settingsDownloadConcurrentDesc(Object count) {
+  String settingsDownloadConcurrentDesc({required Object count}) {
     return '$count 個平行任務（1~5）';
   }
 
@@ -11877,7 +11429,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSpeedUnlimited => '不限速（預設）';
 
   @override
-  String settingsSpeedLimited(Object speed) {
+  String settingsSpeedLimited({required Object speed}) {
     return '限 $speed，即時生效';
   }
 
@@ -11885,7 +11437,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSpeedUnlimitedLabel => '不限速';
 
   @override
-  String settingsSpeedMbps(Object speed) {
+  String settingsSpeedMbps({required Object speed}) {
     return '$speed MB/s';
   }
 
@@ -11899,12 +11451,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsDownloadHistoryLimit => '下載記錄上限';
 
   @override
-  String settingsDownloadHistoryDesc(Object count) {
+  String settingsDownloadHistoryDesc({required Object count}) {
     return '$count 條（10~500）· 超上限自動淘汰最舊';
   }
 
   @override
-  String settingsDownloadHistoryCount(Object count) {
+  String settingsDownloadHistoryCount({required Object count}) {
     return '$count 條';
   }
 
@@ -11951,17 +11503,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get toastTemplateUpdated => '已更新檔名模板';
 
   @override
-  String settingsSpeedBs(Object n) {
+  String settingsSpeedBs({required Object n}) {
     return '$n B/s';
   }
 
   @override
-  String settingsSpeedKbs(Object n) {
+  String settingsSpeedKbs({required Object n}) {
     return '$n KB/s';
   }
 
   @override
-  String settingsSpeedMbs(Object n) {
+  String settingsSpeedMbs({required Object n}) {
     return '$n MB/s';
   }
 
@@ -12009,7 +11561,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsHistoryLimit => '歷史筆數上限';
 
   @override
-  String settingsHistoryLimitOn(Object count) {
+  String settingsHistoryLimitOn({required Object count}) {
     return '最多 $count 筆';
   }
 
@@ -12033,13 +11585,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsCopy => '複製';
 
   @override
-  String toastCopied(Object label) {
+  String toastCopied({required Object label}) {
     return '已複製$label';
   }
-
-  @override
-  String get settingsStorageNote =>
-      '媒體庫與使用者資料實體拆分；路徑可用環境變數 ARCHOERA_DATA_DIR 覆蓋。';
 
   @override
   String get settingsSectionCache => '快取管理';
@@ -12089,7 +11637,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSongCacheLimitTitle => '快取上限';
 
   @override
-  String settingsCacheSongs(Object count) {
+  String settingsCacheSongs({required Object count}) {
     return '$count 首';
   }
 
@@ -12112,12 +11660,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsCacheCover => '封面圖片快取';
 
   @override
-  String settingsCacheEntries(Object count) {
+  String settingsCacheEntries({required Object count}) {
     return '$count 筆';
   }
 
   @override
-  String settingsCacheImages(Object count) {
+  String settingsCacheImages({required Object count}) {
     return '$count 張';
   }
 
@@ -12131,7 +11679,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsCacheClearAll => '全部清空';
 
   @override
-  String settingsCacheClearConfirmTitle(Object name) {
+  String settingsCacheClearConfirmTitle({required Object name}) {
     return '清除「$name」？';
   }
 
@@ -12146,7 +11694,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '將刪除上方全部快取（記憶體與磁碟），不影響曲庫、歷史與帳號資訊。';
 
   @override
-  String toastCacheCleared(Object name) {
+  String toastCacheCleared({required Object name}) {
     return '已清除$name快取';
   }
 
@@ -12164,7 +11712,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSecurityStreaming => '串流伺服器憑證';
 
   @override
-  String settingsSecurityStreamingCount(Object count) {
+  String settingsSecurityStreamingCount({required Object count}) {
     return '$count 台伺服器';
   }
 
@@ -12193,7 +11741,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSecurityDestroyAll => '一鍵銷毀全部';
 
   @override
-  String settingsSecurityConfirmTitle(Object name) {
+  String settingsSecurityConfirmTitle({required Object name}) {
     return '銷毀「$name」？';
   }
 
@@ -12201,7 +11749,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSecurityConfirmAllTitle => '確認銷毀全部敏感資料？';
 
   @override
-  String settingsSecurityConfirmDesc(Object word) {
+  String settingsSecurityConfirmDesc({required Object word}) {
     return '將主動失效相關平台 token、覆蓋寫入並刪除檔案，此操作不可恢復。輸入「$word」以確認。';
   }
 
@@ -12209,12 +11757,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSecurityConfirmWord => '銷毀';
 
   @override
-  String settingsSecurityConfirmHint(Object word) {
+  String settingsSecurityConfirmHint({required Object word}) {
     return '輸入「$word」';
   }
 
   @override
-  String toastSecurityDestroyed(Object name) {
+  String toastSecurityDestroyed({required Object name}) {
     return '已銷毀：$name';
   }
 
@@ -12222,34 +11770,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get toastSecurityAllDestroyed => '全部敏感資料已銷毀';
 
   @override
-  String toastSecurityDestroyFailed(Object path) {
+  String toastSecurityDestroyFailed({required Object path}) {
     return '銷毀失敗，檔案仍可能殘留：$path';
   }
-
-  @override
-  String get settingsDeviceBindSection => '進階 · 裝置綁定';
-
-  @override
-  String get settingsDeviceBindNote =>
-      '增強型可選項（opt-in）：本機免密 + 裝置變更走復原密碼，不依賴系統安全儲存。開啟將讀取本機裝置識別碼（僅存本機、不會上傳）。預設關閉，一般使用者使用 v1 加密已足夠。';
-
-  @override
-  String get settingsDeviceBindSwitch => '裝置綁定免密';
-
-  @override
-  String get settingsDeviceBindSwitchDesc => '本機自動解鎖；換機/重裝走復原密碼';
-
-  @override
-  String get settingsDeviceBindSwitchOffDesc =>
-      '未啟用。目前系統安全儲存無法使用，可開啟裝置綁定實現本機免密（無需密碼）';
-
-  @override
-  String get settingsDeviceBindSwitchV1Desc =>
-      '目前為 v1（系統安全儲存）模式；開啟將升級為裝置綁定（免密 + 復原密碼，既有資料保留）';
-
-  @override
-  String get settingsDeviceBindSwitchV2Desc =>
-      '目前為 v2（密碼）模式；開啟需先輸入目前密碼解鎖，隨後升級為裝置綁定（本機免密）';
 
   @override
   String get settingsDeviceBindPrivacyTitle => '開啟裝置綁定免密？';
@@ -12343,7 +11866,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get toastDeviceBindRecoveryNeeded => '未設定復原密碼，無法關閉裝置綁定';
 
   @override
-  String toastDeviceBindCloseFailed(Object error) {
+  String toastDeviceBindCloseFailed({required Object error}) {
     return '關閉失敗：$error';
   }
 
@@ -12435,13 +11958,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get toastSchemeSwitched => '加密方案已切換，重啟後生效';
-
-  @override
-  String get settingsVaultSection => '憑證加密';
-
-  @override
-  String get settingsVaultNote =>
-      '選擇憑證的加密保護等級：v1 系統保護（預設）/ v2 密碼保護 / v3 裝置綁定（增強項 opt-in，讀取本機裝置識別碼，僅存本機、不會上傳）。v1 ↔ v2 可隨時互切；v3 為終點檔，關閉後回落為 v2。';
 
   @override
   String get settingsVaultModeV1 => 'v1 系統保護';
@@ -12588,7 +12104,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsVersionUnknown => 'v未知 · Flutter 桌面端';
 
   @override
-  String settingsVersionFormat(Object version) {
+  String settingsVersionFormat({required Object version}) {
     return 'v$version · Flutter 桌面端';
   }
 
@@ -12696,10 +12212,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSectionThanks => '特別致謝';
 
   @override
-  String get settingsThanksText =>
-      '本軟體使用、依賴或參考了以下開源專案（完整授權清單見倉庫 THIRD-PARTY-NOTICES.md 及各模組 THIRD-PARTY-LICENSES.md）：\n\n· 設計思路借鏡：KuGouMusicApi（MIT）、NeteaseCloudMusicApi（MIT）、ncm-api-rs（WTFPL）、MoeKoeMusic、Mineradio\n· 核心元件：Flutter、FFmpeg（LGPL-2.1+）、libopus（BSD-3-Clause）、TagLib（LGPL-2.1+/MPL-1.1）、miniaudio（MIT-0/公有領域）、signalsmith-stretch（MIT）、SQLite（公有領域）、libcurl、OpenSSL（Apache-2.0）、nlohmann/json（MIT）\n· 解碼參考：minimp3（CC0-1.0）、stb_vorbis（公有領域/MIT-0）、kissfft（BSD-3-Clause）、WavPack（BSD-3-Clause）、dsd2pcm（BSD）、OpenCORE/PV-AMR（Apache-2.0）\n· 圖示：MingCute Icons（Apache-2.0）、Tabler Icons（MIT）、Lucide（ISC）、line-md（MIT）\n\n感謝以上專案的作者。';
-
-  @override
   String get settingsThanksDesign => '設計思路借鏡';
 
   @override
@@ -12722,7 +12234,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get commonNoLyrics => '暫無歌詞';
 
   @override
-  String commonTrackCount(Object count) {
+  String commonTrackCount({required Object count}) {
     return '$count 首';
   }
 
@@ -12743,9 +12255,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSearchFilenameTitle => '檔名模板';
-
-  @override
-  String get settingsSearchAccentSubtitle => '自訂主色種子 · 色板';
 
   @override
   String get settingsThemeSource => '主題色來源';
@@ -12814,7 +12323,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsBackgroundBlur => '背景模糊';
 
   @override
-  String settingsBackgroundBlurDesc(Object blur) {
+  String settingsBackgroundBlurDesc({required Object blur}) {
     return '對背景圖片套用高斯模糊（${blur}px）';
   }
 
@@ -12822,7 +12331,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsBackgroundDim => '遮罩濃度';
 
   @override
-  String settingsBackgroundDimDesc(Object dim) {
+  String settingsBackgroundDimDesc({required Object dim}) {
     return '疊加的黑色遮罩透明度（$dim%），越高前景越易讀';
   }
 
@@ -12830,7 +12339,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsBackgroundScale => '縮放大小';
 
   @override
-  String settingsBackgroundScaleDesc(Object scale) {
+  String settingsBackgroundScaleDesc({required Object scale}) {
     return '背景圖的縮放倍數（${scale}x）';
   }
 
@@ -13036,25 +12545,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSearchAboutSubtitle => '音訊引擎 · Subsonic 伺服端';
 
   @override
-  String get qualityLossless => '無損';
-
-  @override
   String get repeatModeList => '列表循環';
 
   @override
   String get repeatModeOne => '單曲循環';
-
-  @override
-  String get commonUnknownTrack => '未知名歌曲';
-
-  @override
-  String get commonAnonymousUser => '匿名使用者';
-
-  @override
-  String get commonCanceled => '已取消';
-
-  @override
-  String get commonILike => '我喜歡';
 
   @override
   String get sidebarStreaming => '串流媒體';
@@ -13082,7 +12576,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsScrapeDirsEmptyNote => '未設定刮削目錄，刮削時將跟隨媒體庫掃描目錄。';
 
   @override
-  String settingsScrapeDirsNote(Object dirs) {
+  String settingsScrapeDirsNote({required Object dirs}) {
     return '目前生效目錄：$dirs';
   }
 
@@ -13132,7 +12626,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsScrapeScanning => '正在掃描目錄…';
 
   @override
-  String settingsScrapeCurrent(Object file) {
+  String settingsScrapeCurrent({required Object file}) {
     return '正在處理：$file';
   }
 
@@ -13213,7 +12707,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get streamingServerConnect => '連線';
 
   @override
-  String streamingToastConnected(Object name) {
+  String streamingToastConnected({required Object name}) {
     return '已連線 $name';
   }
 
@@ -13227,7 +12721,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get streamingServerDeleteConfirmTitle => '刪除伺服器';
 
   @override
-  String streamingServerDeleteConfirm(Object name) {
+  String streamingServerDeleteConfirm({required Object name}) {
     return '確定刪除伺服器「$name」嗎？';
   }
 
@@ -13317,22 +12811,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get streamingEmptyNotConnected => '未連線到任何伺服器';
 
   @override
-  String streamingTotalSongs(Object count) {
+  String streamingTotalSongs({required Object count}) {
     return '$count 首歌曲';
   }
 
   @override
-  String streamingTotalAlbums(Object count) {
+  String streamingTotalAlbums({required Object count}) {
     return '$count 張專輯';
   }
 
   @override
-  String streamingTotalArtists(Object count) {
+  String streamingTotalArtists({required Object count}) {
     return '$count 位歌手';
   }
 
   @override
-  String streamingTotalPlaylists(Object count) {
+  String streamingTotalPlaylists({required Object count}) {
     return '$count 個播放清單';
   }
 
@@ -13340,17 +12834,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get streamingEmptyNoResults => '沒有相符的結果';
 
   @override
-  String streamingAlbumSongs(Object count) {
+  String streamingAlbumSongs({required Object count}) {
     return '$count 首歌曲';
   }
 
   @override
-  String streamingArtistAlbums(Object count) {
+  String streamingArtistAlbums({required Object count}) {
     return '$count 張專輯';
   }
 
   @override
-  String streamingPlaylistSongs(Object count) {
+  String streamingPlaylistSongs({required Object count}) {
     return '$count 首歌曲';
   }
 
@@ -13367,20 +12861,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get loginQqScanHint => '請使用手機 QQ 掃一掃登入';
 
   @override
-  String navHeaderQqId(String id) {
+  String navHeaderQqId({required String id}) {
     return 'QQ $id';
   }
 
   @override
-  String get toastQqNotSupported => 'QQ 音樂暫不支援此操作';
-
-  @override
-  String searchSourceFailed(Object source) {
+  String searchSourceFailed({required Object source}) {
     return '「$source」搜尋暫不可用';
   }
 
   @override
-  String searchQqRiskDetail(Object code) {
+  String searchQqRiskDetail({required Object code}) {
     return 'QQ 音樂介面限流或風控攔截（代碼 $code），已停止自動重試，請稍後再試';
   }
 
@@ -13388,23 +12879,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get searchNetworkError => '網路連線失敗或請求逾時，請稍後再試';
 
   @override
-  String searchPlatformError(Object code) {
+  String searchPlatformError({required Object code}) {
     return '平台傳回錯誤（$code）';
   }
 
   @override
   String get searchWaitRetry => '請求過於頻繁，請稍候再試';
-
-  @override
-  String get qqMusicDownloadUnsupported => 'QQ 音樂暫不支援下載（風控）。';
-
-  @override
-  String qqMusicDownloadSkipped(Object count) {
-    return '已略過 $count 首 QQ 音樂（暫不支援下載）。';
-  }
-
-  @override
-  String get platformQqMusic => 'QM';
 
   @override
   String get settingsValueAuto => '自動';
@@ -13438,7 +12918,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsScrapeWorkers => '並行查詢執行緒';
 
   @override
-  String settingsScrapeWorkersDesc(Object value) {
+  String settingsScrapeWorkersDesc({required Object value}) {
     return '多來源並行查詢執行緒數（0=自動，目前 $value）';
   }
 
@@ -13446,7 +12926,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsScrapeBatch => '批次大小';
 
   @override
-  String settingsScrapeBatchDesc(Object value) {
+  String settingsScrapeBatchDesc({required Object value}) {
     return '每批處理檔案數（目前 $value）';
   }
 
@@ -13454,7 +12934,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsScrapeRetries => '失敗重試上限';
 
   @override
-  String settingsScrapeRetriesDesc(Object value) {
+  String settingsScrapeRetriesDesc({required Object value}) {
     return '重試達到該次數後不再重試（目前 $value）';
   }
 
@@ -13494,9 +12974,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsScrapeOrganizeStart => '開始整理';
 
   @override
-  String get settingsOrganizeCancel => '取消整理';
-
-  @override
   String get settingsOrganizeRunning => '正在整理檔案…';
 
   @override
@@ -13509,7 +12986,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsOrganizeFailed => '失敗';
 
   @override
-  String settingsOrganizeDone(Object failed, Object moved, Object skipped) {
+  String settingsOrganizeDone({
+    required Object failed,
+    required Object moved,
+    required Object skipped,
+  }) {
     return '整理完成：移動 $moved，略過 $skipped，失敗 $failed';
   }
 
@@ -13517,7 +12998,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsOrganizeNoTarget => '未設定媒體庫掃描目錄，無法確定預設整理目錄';
 
   @override
-  String settingsOrganizeUsingDefault(Object dir) {
+  String settingsOrganizeUsingDefault({required Object dir}) {
     return '未設定整理目標目錄，使用預設音樂目錄：$dir';
   }
 
@@ -13540,7 +13021,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsScanParallelism => '掃描並行度';
 
   @override
-  String settingsScanParallelismDesc(Object value) {
+  String settingsScanParallelismDesc({required Object value}) {
     return '並行解析檔案數（0=自動，目前 $value）';
   }
 
@@ -13548,7 +13029,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsScanBatch => '批次大小';
 
   @override
-  String settingsScanBatchDesc(Object value) {
+  String settingsScanBatchDesc({required Object value}) {
     return '資料庫批次寫入上限（0=自動，目前 $value）';
   }
 
@@ -13574,9 +13055,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSectionScanExts => '音訊副檔名';
 
   @override
-  String get settingsScanExtraExts => '額外副檔名';
-
-  @override
   String get settingsScanExtraExtsNote => '在引擎內建白名單之上追加掃描的音訊副檔名';
 
   @override
@@ -13586,7 +13064,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSectionScanQuarantine => '壞檔隔離區';
 
   @override
-  String settingsScanQuarantineNote(Object dir) {
+  String settingsScanQuarantineNote({required Object dir}) {
     return '連續解析失敗 ≥3 次的檔案會被移入隔離目錄：$dir';
   }
 
@@ -13614,9 +13092,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get libraryFullScanConfirmDesc =>
       '將清空目前曲庫紀錄並從掃描目錄重建（不刪除來源檔案）。此操作無法撤銷，掃描期間會占用較多磁碟 IO。';
-
-  @override
-  String get libraryFullScanDescription => '清空曲庫並從掃描目錄重建';
 
   @override
   String get settingsSectionLyricEngine => '歌詞引擎';
@@ -13833,10 +13308,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get commonReset => '重置';
 
   @override
-  String get settingsDevDownloadModuleDesc =>
-      '下载接口（侧边栏 / 右键菜单 / 设置分类）的独立开关；默认关闭，开启前会提示风险。';
-
-  @override
   String get settingsDevDownloadModuleOn => '下载模块已开启';
 
   @override
@@ -14021,9 +13492,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsLyricAdaptiveFontSize => '自适应字号';
 
   @override
-  String get settingsLyricAdaptiveFontSizeDesc => '歌词字号随窗口高度自动缩放';
-
-  @override
   String get settingsLyricAdaptiveFontSizeOn => '开启：字号随窗口缩放';
 
   @override
@@ -14054,18 +13522,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get sleepTimerOff => '关闭';
 
   @override
-  String get sleepTimer15 => '15 分钟';
-
-  @override
-  String get sleepTimer30 => '30 分钟';
-
-  @override
-  String get sleepTimer60 => '60 分钟';
-
-  @override
-  String get sleepTimer90 => '90 分钟';
-
-  @override
   String get sleepTimerEndOfTrack => '播完当前曲';
 
   @override
@@ -14078,7 +13534,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get sleepTimerWaitingTrackEnd => '定时已到，将在当前曲结束后暂停';
 
   @override
-  String sleepTimerMinutes(int minutes) {
+  String sleepTimerMinutes({required int minutes}) {
     return '$minutes 分鐘';
   }
 
@@ -14172,9 +13628,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsEqPreamp => '预增益';
-
-  @override
-  String get settingsEqPreampDesc => '整体提升或衰减，避免削波';
 
   @override
   String get settingsEqLimiter => '限幅器';

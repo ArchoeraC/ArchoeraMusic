@@ -82,7 +82,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
               icon: EtaIcons.highQualityOutline,
               title: l10n.settingsDownloadQuality,
               subtitle: l10n.settingsDownloadQualityDesc(
-                l10nQualityLabel(l10n, prefs.downloadQuality),
+                quality: l10nQualityLabel(l10n, prefs.downloadQuality),
               ),
               trailing: SSegmented<String>(
                 options: [
@@ -104,7 +104,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
               icon: EtaIcons.dashboard4Outline,
               title: l10n.settingsDownloadConcurrent,
               subtitle: l10n.settingsDownloadConcurrentDesc(
-                prefs.downloadMaxConcurrent,
+                count: prefs.downloadMaxConcurrent,
               ),
               value:
                   _downloadConcurrentDraft ??
@@ -156,7 +156,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
               subtitle: prefs.downloadSpeedLimit <= 0
                   ? l10n.settingsSpeedUnlimited
                   : l10n.settingsSpeedLimited(
-                      _fmtSpeedLabel(prefs.downloadSpeedLimit, l10n),
+                      speed: _fmtSpeedLabel(prefs.downloadSpeedLimit, l10n),
                     ),
               value:
                   _downloadSpeedDraft ??
@@ -167,7 +167,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
               label: _downloadSpeedDraft != null && _downloadSpeedDraft! <= 0
                   ? l10n.settingsSpeedUnlimitedLabel
                   : l10n.settingsSpeedMbps(
-                      ((_downloadSpeedDraft ??
+                      speed: ((_downloadSpeedDraft ??
                               prefs.downloadSpeedLimit / (1024 * 1024)))
                           .toStringAsFixed(1),
                     ),
@@ -191,7 +191,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
               icon: EtaIcons.historyOutline,
               title: l10n.settingsDownloadHistoryLimit,
               subtitle: l10n.settingsDownloadHistoryDesc(
-                prefs.downloadHistoryLimit,
+                count: prefs.downloadHistoryLimit,
               ),
               value:
                   _downloadHistoryLimitDraft ??
@@ -200,7 +200,7 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
               max: 500,
               divisions: 49,
               label: l10n.settingsDownloadHistoryCount(
-                (_downloadHistoryLimitDraft ??
+                count: (_downloadHistoryLimitDraft ??
                         prefs.downloadHistoryLimit.toDouble())
                     .round(),
               ),
@@ -307,9 +307,9 @@ class _DownloadSectionState extends ConsumerState<DownloadSection> {
   }
 
   String _fmtSpeedLabel(int bytesPerSec, AppLocalizations l10n) {
-    if (bytesPerSec < 1024) return l10n.settingsSpeedBs(bytesPerSec);
+    if (bytesPerSec < 1024) return l10n.settingsSpeedBs(n: bytesPerSec);
     final kb = bytesPerSec / 1024;
-    if (kb < 1024) return l10n.settingsSpeedKbs(kb.toStringAsFixed(0));
-    return l10n.settingsSpeedMbs((kb / 1024).toStringAsFixed(1));
+    if (kb < 1024) return l10n.settingsSpeedKbs(n: kb.toStringAsFixed(0));
+    return l10n.settingsSpeedMbs(n: (kb / 1024).toStringAsFixed(1));
   }
 }

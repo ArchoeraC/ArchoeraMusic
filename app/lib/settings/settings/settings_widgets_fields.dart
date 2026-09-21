@@ -28,7 +28,7 @@ class SettingCopyButton extends StatelessWidget {
           await Clipboard.setData(ClipboardData(text: value));
           if (!context.mounted) return;
           toast(
-            l10n.toastCopied(label),
+            l10n.toastCopied(label: label),
             type: ToastType.success,
             duration: const Duration(milliseconds: 1200),
           );

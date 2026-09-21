@@ -249,16 +249,16 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               icon: EtaIcons.musicOutline,
               title: l10n.settingsSongCache,
               info:
-                  '${_formatBytes(_songBytes)} · ${l10n.settingsCacheSongs(_songFiles)}',
+                  '${_formatBytes(_songBytes)} · ${l10n.settingsCacheSongs(count: _songFiles)}',
               enabled: _songFiles > 0,
               onClear: () => _confirmClear(
                 context,
                 title: l10n.settingsCacheClearConfirmTitle(
-                  l10n.settingsSongCache,
+                  name: l10n.settingsSongCache,
                 ),
                 desc: l10n.settingsCacheClearConfirmDesc,
                 confirmLabel: l10n.settingsCacheClear,
-                toastMsg: l10n.toastCacheCleared(l10n.settingsSongCache),
+                toastMsg: l10n.toastCacheCleared(name: l10n.settingsSongCache),
                 action: () => SongCache.shared.clear(),
               ),
             ),
@@ -311,16 +311,16 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               icon: EtaIcons.heartOutline,
               title: l10n.settingsCacheLiked,
               info:
-                  '$likedPath\n${_formatBytes(_likedBytes)} · ${l10n.settingsCacheEntries(_likedRows)}',
+                  '$likedPath\n${_formatBytes(_likedBytes)} · ${l10n.settingsCacheEntries(count: _likedRows)}',
               enabled: _likedRows > 0,
               onClear: () => _confirmClear(
                 context,
                 title: l10n.settingsCacheClearConfirmTitle(
-                  l10n.settingsCacheLiked,
+                  name: l10n.settingsCacheLiked,
                 ),
                 desc: l10n.settingsCacheClearConfirmDesc,
                 confirmLabel: l10n.settingsCacheClear,
-                toastMsg: l10n.toastCacheCleared(l10n.settingsCacheLiked),
+                toastMsg: l10n.toastCacheCleared(name: l10n.settingsCacheLiked),
                 action: _clearLiked,
               ),
             ),
@@ -392,16 +392,16 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               context,
               icon: EtaIcons.fileMusicOutline,
               title: l10n.settingsCacheLyric,
-              info: l10n.settingsCacheEntries(_lyricCount),
+              info: l10n.settingsCacheEntries(count: _lyricCount),
               enabled: _lyricCount > 0,
               onClear: () => _confirmClear(
                 context,
                 title: l10n.settingsCacheClearConfirmTitle(
-                  l10n.settingsCacheLyric,
+                  name: l10n.settingsCacheLyric,
                 ),
                 desc: l10n.settingsCacheClearConfirmDesc,
                 confirmLabel: l10n.settingsCacheClear,
-                toastMsg: l10n.toastCacheCleared(l10n.settingsCacheLyric),
+                toastMsg: l10n.toastCacheCleared(name: l10n.settingsCacheLyric),
                 action: getRuntime().lyricCache.clear,
               ),
             ),
@@ -409,16 +409,16 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               context,
               icon: EtaIcons.transferVerticalOutline,
               title: l10n.settingsCacheLyricMatch,
-              info: l10n.settingsCacheEntries(_matchCount),
+              info: l10n.settingsCacheEntries(count: _matchCount),
               enabled: _matchCount > 0,
               onClear: () => _confirmClear(
                 context,
                 title: l10n.settingsCacheClearConfirmTitle(
-                  l10n.settingsCacheLyricMatch,
+                  name: l10n.settingsCacheLyricMatch,
                 ),
                 desc: l10n.settingsCacheClearConfirmDesc,
                 confirmLabel: l10n.settingsCacheClear,
-                toastMsg: l10n.toastCacheCleared(l10n.settingsCacheLyricMatch),
+                toastMsg: l10n.toastCacheCleared(name: l10n.settingsCacheLyricMatch),
                 action: getRuntime().lyricMatchCache.clear,
               ),
             ),
@@ -426,16 +426,16 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               context,
               icon: EtaIcons.docmentOutline,
               title: l10n.settingsCacheLyricTtml,
-              info: l10n.settingsCacheEntries(_ttmlCount),
+              info: l10n.settingsCacheEntries(count: _ttmlCount),
               enabled: _ttmlCount > 0,
               onClear: () => _confirmClear(
                 context,
                 title: l10n.settingsCacheClearConfirmTitle(
-                  l10n.settingsCacheLyricTtml,
+                  name: l10n.settingsCacheLyricTtml,
                 ),
                 desc: l10n.settingsCacheClearConfirmDesc,
                 confirmLabel: l10n.settingsCacheClear,
-                toastMsg: l10n.toastCacheCleared(l10n.settingsCacheLyricTtml),
+                toastMsg: l10n.toastCacheCleared(name: l10n.settingsCacheLyricTtml),
                 action: getRuntime().lyricTtmlCache.clear,
               ),
             ),
@@ -444,16 +444,16 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               icon: EtaIcons.picOutline,
               title: l10n.settingsCacheCover,
               info:
-                  '${_formatBytes(_imageBytes)} · ${l10n.settingsCacheImages(_imageLive)}',
+                  '${_formatBytes(_imageBytes)} · ${l10n.settingsCacheImages(count: _imageLive)}',
               enabled: _imageBytes > 0,
               onClear: () => _confirmClear(
                 context,
                 title: l10n.settingsCacheClearConfirmTitle(
-                  l10n.settingsCacheCover,
+                  name: l10n.settingsCacheCover,
                 ),
                 desc: l10n.settingsCacheClearConfirmDesc,
                 confirmLabel: l10n.settingsCacheClear,
-                toastMsg: l10n.toastCacheCleared(l10n.settingsCacheCover),
+                toastMsg: l10n.toastCacheCleared(name: l10n.settingsCacheCover),
                 action: () {
                   final imageCache = PaintingBinding.instance.imageCache;
                   imageCache.clear();

@@ -83,22 +83,22 @@ class DownloadTaskTile extends ConsumerWidget {
         final speed = task.speed > 0 ? ' · ${_fmtSpeed(task.speed)}' : '';
         return p != null
             ? l10n.downloadStatusRunning(
-                (p * 100).round(),
-                _fmtSize(task.received),
-                speed,
+                percent: (p * 100).round(),
+                received: _fmtSize(task.received),
+                speed: speed,
               )
-            : l10n.downloadStatusRunningNoPercent(speed);
+            : l10n.downloadStatusRunningNoPercent(speed: speed);
       case 'paused':
         return task.received > 0
-            ? l10n.downloadStatusPausedWith(_fmtSize(task.received))
+            ? l10n.downloadStatusPausedWith(received: _fmtSize(task.received))
             : l10n.downloadStatusPaused;
       case 'failed':
-        return l10n.downloadStatusFailed(task.error ?? l10n.commonUnknownError);
+        return l10n.downloadStatusFailed(error: task.error ?? l10n.commonUnknownError);
       case 'canceled':
         return l10n.downloadStatusCanceled;
       case 'done':
         return l10n.downloadStatusDone(
-          _fmtSize(task.fileSize ?? task.received),
+          size: _fmtSize(task.fileSize ?? task.received),
         );
       case 'already':
         return l10n.downloadStatusAlready;

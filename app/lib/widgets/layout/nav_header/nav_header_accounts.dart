@@ -88,13 +88,13 @@ class _AccountsMenu extends ConsumerWidget {
                 showQqMusicLoginDialog(context);
               case 'logout_qq':
                 ref.read(qqMusicApiProvider).logout();
-                toast(context.l10n.loginLoggedOut(context.l10n.brandQqMusic));
+                toast(context.l10n.loginLoggedOut(platform: context.l10n.brandQqMusic));
               case 'login_neko':
                 showNekoLoginDialog(context);
               case 'logout_neko':
                 nekoApi.logout();
                 ref.read(likeControllerProvider).sync();
-                toast(context.l10n.loginLoggedOut(l10n.settingsNekoTitle));
+                toast(context.l10n.loginLoggedOut(platform: l10n.settingsNekoTitle));
             }
           },
           itemBuilder: (_) => [
@@ -121,7 +121,7 @@ class _AccountsMenu extends ConsumerWidget {
               avatarUrl: kugou?.avatarUrl,
               avatarName: kugouNick.isEmpty ? (kugou?.userid ?? '') : kugouNick,
               displayName: kugouNick.isEmpty
-                  ? l10n.navHeaderKugouId(kugou?.userid ?? '')
+                  ? l10n.navHeaderKugouId(id: kugou?.userid ?? '')
                   : kugouNick,
             ),
             ..._platformSection(
@@ -134,7 +134,7 @@ class _AccountsMenu extends ConsumerWidget {
               avatarUrl: qqProfile?.avatarUrl,
               avatarName: qqNick.isEmpty ? qqApi.uin : qqNick,
               displayName: qqNick.isEmpty
-                  ? l10n.navHeaderQqId(qqApi.uin)
+                  ? l10n.navHeaderQqId(id: qqApi.uin)
                   : qqNick,
             ),
             // 实验性音源 Neko（仅启用时显示）。

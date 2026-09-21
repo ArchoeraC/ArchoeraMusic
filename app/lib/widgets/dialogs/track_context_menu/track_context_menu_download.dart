@@ -60,9 +60,9 @@ Future<void> downloadTracks(
   }
   if (context.mounted) {
     if (ok > 1) {
-      toast(l10n.toastBatchAddedToDownloadQueue(ok));
+      toast(l10n.toastBatchAddedToDownloadQueue(count: ok));
     } else if (ok == 1) {
-      toast(l10n.toastAddedToDownloadQueue(l10nQualityLabel(l10n, quality)));
+      toast(l10n.toastAddedToDownloadQueue(quality: l10nQualityLabel(l10n, quality)));
     } else {
       toast(l10n.toastDownloadEngineNotReady);
     }
@@ -144,7 +144,7 @@ Future<bool> _showLoginPrompt(BuildContext context, String platform) async {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    l10n.downloadRequiresLoginContent(platform),
+                    l10n.downloadRequiresLoginContent(platform: platform),
                     style: TextStyle(
                       fontSize: 13,
                       color: scheme.onSurfaceVariant,

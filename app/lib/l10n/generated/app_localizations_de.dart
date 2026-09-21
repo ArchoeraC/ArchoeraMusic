@@ -43,9 +43,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get trackDetailDuration => 'Dauer';
 
   @override
-  String get trackDetailArtist => 'Interpret';
-
-  @override
   String get trackDetailAlbum => 'Album';
 
   @override
@@ -103,12 +100,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get batchSelectHint => 'Mehrfachauswahl';
 
   @override
-  String toastBatchAddedToQueue(Object count) {
+  String toastBatchAddedToQueue({required Object count}) {
     return '$count Titel zur Warteschlange hinzugefügt';
   }
 
   @override
-  String toastBatchAddedToDownloadQueue(Object count) {
+  String toastBatchAddedToDownloadQueue({required Object count}) {
     return '$count Titel zur Download-Warteschlange hinzugefügt';
   }
 
@@ -149,10 +146,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsSuppressSleepOff =>
       'System kann je nach Leerlaufplan schlafen';
-
-  @override
-  String get settingsPowerSaverNote =>
-      'Der Energiesparmodus senkt die Bildrate über Fensterzustandsereignisse (kein Polling). Bei ausgeblendetem Fenster oder ausgeschaltetem Display stoppt die Engine das Rendering bereits. „Systemschlaf verhindern“ gilt nur während der Wiedergabe.';
 
   @override
   String get settingsCloseBehavior => 'Beim Schließen der App';
@@ -208,9 +201,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commonLoading => 'Wird geladen';
 
   @override
-  String get commonLossless => 'Verlustfrei';
-
-  @override
   String get commonOriginal => 'Original';
 
   @override
@@ -241,7 +231,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get downloadQualityTitle => 'Download-Qualität';
 
   @override
-  String downloadRequiresLoginContent(Object platform) {
+  String downloadRequiresLoginContent({required Object platform}) {
     return 'Um Download-Links von $platform zu erhalten, ist eine Anmeldung erforderlich. Ohne Anmeldung nur Vorschau, keine volle Qualität.\n\nBitte melden Sie sich in Ihrem $platform-Konto an und versuchen Sie es erneut.';
   }
 
@@ -274,10 +264,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get navHeaderAccount => 'Konto';
 
   @override
-  String get navHeaderComingSoon => 'Bald verfügbar';
-
-  @override
-  String navHeaderKugouId(Object id) {
+  String navHeaderKugouId({required Object id}) {
     return 'KG $id';
   }
 
@@ -362,7 +349,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get queueTitle => 'Wiedergabewarteschlange';
 
   @override
-  String queueTrackCount(Object count) {
+  String queueTrackCount({required Object count}) {
     return '$count Titel';
   }
 
@@ -379,7 +366,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get searchHot => 'Trends';
 
   @override
-  String searchQuick(Object query) {
+  String searchQuick({required Object query}) {
     return '„$query“ suchen';
   }
 
@@ -432,7 +419,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get songListLocatePlaying => 'Wiedergabe finden';
 
   @override
-  String toastAddedToDownloadQueue(Object quality) {
+  String toastAddedToDownloadQueue({required Object quality}) {
     return 'Zur Download-Warteschlange hinzugefügt: $quality';
   }
 
@@ -468,7 +455,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commonEmptyContent => 'Kein Inhalt';
 
   @override
-  String commonLoadFailed(Object msg) {
+  String commonLoadFailed({required Object msg}) {
     return 'Laden fehlgeschlagen: $msg';
   }
 
@@ -494,12 +481,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commentLatest => 'Neueste';
 
   @override
-  String commentLoginRequired(Object platform) {
+  String commentLoginRequired({required Object platform}) {
     return 'Melden Sie sich in Ihrem $platform-Konto an, um zu kommentieren';
   }
 
   @override
-  String commentNotFound(Object platform) {
+  String commentNotFound({required Object platform}) {
     return 'Keine $platform-Kommentare für diesen Titel gefunden';
   }
 
@@ -507,7 +494,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commentPublished => 'Kommentar veröffentlicht';
 
   @override
-  String commentReplyFormat(Object text, Object user) {
+  String commentReplyFormat({required Object text, required Object user}) {
     return '@$user: $text';
   }
 
@@ -515,12 +502,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commentSend => 'Senden';
 
   @override
-  String commentSendFailed(Object msg) {
+  String commentSendFailed({required Object msg}) {
     return 'Senden fehlgeschlagen: $msg';
   }
 
   @override
-  String commentTimeFormat(Object day, Object month, Object time) {
+  String commentTimeFormat({
+    required Object day,
+    required Object month,
+    required Object time,
+  }) {
     return '$day.$month. $time';
   }
 
@@ -561,17 +552,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loginFetchingQr => 'QR-Code wird abgerufen…';
 
   @override
-  String loginKugouLoggedIn(Object platform) {
+  String loginKugouLoggedIn({required Object platform}) {
     return 'Bei $platform angemeldet';
   }
 
   @override
-  String loginKugouLogin(Object platform) {
+  String loginKugouLogin({required Object platform}) {
     return 'Mit $platform anmelden';
   }
 
   @override
-  String loginKugouQrLogin(Object platform) {
+  String loginKugouQrLogin({required Object platform}) {
     return 'Per QR-Code bei $platform anmelden';
   }
 
@@ -580,37 +571,32 @@ class AppLocalizationsDe extends AppLocalizations {
       'Anmeldeantwort enthält kein token/userid';
 
   @override
-  String loginKugouScanHint(Object platform) {
+  String loginKugouScanHint({required Object platform}) {
     return 'Scannen Sie den QR-Code mit der $platform-App';
   }
 
   @override
-  String loginKugouSession(Object platform) {
+  String loginKugouSession({required Object platform}) {
     return 'Mit $platform angemeldet';
   }
 
   @override
-  String loginKugouSuccessVip(Object platform) {
+  String loginKugouSuccessVip({required Object platform}) {
     return 'Anmeldung bei $platform erfolgreich, VIP-Titel freigeschaltet';
   }
 
   @override
-  String loginLoggedOut(Object platform) {
+  String loginLoggedOut({required Object platform}) {
     return 'Bei $platform abgemeldet';
   }
 
   @override
-  String loginLogoutWithId(Object id) {
+  String loginLogoutWithId({required Object id}) {
     return 'Abmelden ($id)';
   }
 
   @override
-  String loginNeteaseQrTitle(Object platform) {
-    return 'Per QR-Code bei $platform anmelden';
-  }
-
-  @override
-  String loginNeteaseScanHint(Object platform) {
+  String loginNeteaseScanHint({required Object platform}) {
     return 'Scannen Sie den QR-Code mit der $platform-App';
   }
 
@@ -650,7 +636,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loginTabEmail => 'E-Mail';
 
   @override
-  String loginTitleBrand(String platform) {
+  String loginTitleBrand({required String platform}) {
     return 'Bei $platform anmelden';
   }
 
@@ -703,20 +689,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Gescannt, bitte bestätigen Sie die Anmeldung auf Ihrem Telefon';
 
   @override
-  String get loginConfirmCheck => 'Ich habe bestätigt, Anmeldung prüfen';
-
-  @override
-  String get loginChecking => 'Prüfe…';
-
-  @override
-  String get loginScanThenConfirm =>
-      'Nach dem Scannen und Bestätigen am Handy unten tippen';
-
-  @override
-  String get loginScannedThenConfirm =>
-      'Gescannt. Am Handy bestätigen und erneut tippen';
-
-  @override
   String get trackListArtistHotSongs => 'Beliebte Songs des Künstlers';
 
   @override
@@ -730,7 +702,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Täglich nach Ihrem Geschmack aktualisiert';
 
   @override
-  String trackListEmptyDailyLogin(Object platform) {
+  String trackListEmptyDailyLogin({required Object platform}) {
     return 'Keine Titel (tägliche Empfehlung erfordert $platform-Anmeldung)';
   }
 
@@ -742,7 +714,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get trackListPlayAll => 'Alle abspielen';
 
   @override
-  String trackListPlaySourceFailed(Object msg) {
+  String trackListPlaySourceFailed({required Object msg}) {
     return 'Abrufen der Wiedergabequelle fehlgeschlagen: $msg';
   }
 
@@ -795,7 +767,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commonUnknownError => 'Unbekannter Fehler';
 
   @override
-  String commonSongCountHint(Object count) {
+  String commonSongCountHint({required Object count}) {
     return 'Insgesamt $count Titel · Zum Abspielen klicken';
   }
 
@@ -815,7 +787,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get libraryDeleteFileTitle => 'Datei löschen';
 
   @override
-  String libraryDeleteFileMessage(Object name) {
+  String libraryDeleteFileMessage({required Object name}) {
     return '„$name“ wird dauerhaft gelöscht. Nicht rückgängig zu machen. Fortfahren?';
   }
 
@@ -877,7 +849,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsNekoLogout => 'Abmelden';
 
   @override
-  String settingsNekoLoggedInAs(Object name) {
+  String settingsNekoLoggedInAs({required Object name}) {
     return 'Angemeldet als $name';
   }
 
@@ -941,20 +913,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pageFavNekoEmptyHint => 'Noch keine Playlists oder Favoriten';
 
   @override
-  String toastPlayedAll(Object count) {
+  String toastPlayedAll({required Object count}) {
     return '$count Titel abgespielt';
   }
 
   @override
-  String toastPlayFailed(Object msg) {
+  String toastPlayFailed({required Object msg}) {
     return 'Wiedergabefehler: $msg';
   }
 
   @override
   String get toastMissingLocalPath => 'Lokaler Dateipfad fehlt';
-
-  @override
-  String get toastLocateComingSoon => 'Dateimanager öffnen (Phase 2)';
 
   @override
   String get toastRemovedFromLibrary => 'Aus Bibliothek entfernt';
@@ -963,7 +932,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get toastRemoveFailed => 'Entfernen fehlgeschlagen';
 
   @override
-  String toastDailyRequiresLogin(Object platform) {
+  String toastDailyRequiresLogin({required Object platform}) {
     return 'Tagesempfehlungen erfordern $platform-Anmeldung';
   }
 
@@ -1038,7 +1007,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Abgespielte Titel werden automatisch hier aufgezeichnet';
 
   @override
-  String pageFavPlaylistCount(Object count) {
+  String pageFavPlaylistCount({required Object count}) {
     return '$count Lieblings-Wiedergabelisten';
   }
 
@@ -1046,7 +1015,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pageFavPlaylistLoginHint => 'Zum Anmelden, um Favoriten anzusehen';
 
   @override
-  String pageFavAlbumCount(Object count) {
+  String pageFavAlbumCount({required Object count}) {
     return '$count Lieblingsalben';
   }
 
@@ -1054,7 +1023,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pageFavAlbumLoginHint => 'Zum Anmelden, um Alben anzusehen';
 
   @override
-  String pageFavArtistCount(Object count) {
+  String pageFavArtistCount({required Object count}) {
     return '$count Lieblingskünstler';
   }
 
@@ -1088,7 +1057,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pageFavKgCollectedAlbum => 'Gespeicherte Alben';
 
   @override
-  String pageFavKgCreatedCount(Object count) {
+  String pageFavKgCreatedCount({required Object count}) {
     return '$count erstellte Wiedergabelisten';
   }
 
@@ -1097,7 +1066,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Melde dich an, um deine erstellten Wiedergabelisten zu sehen';
 
   @override
-  String pageFavKgCollectedPlaylistCount(Object count) {
+  String pageFavKgCollectedPlaylistCount({required Object count}) {
     return '$count gespeicherte Wiedergabelisten';
   }
 
@@ -1106,7 +1075,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Melde dich an, um deine gespeicherten Wiedergabelisten zu sehen';
 
   @override
-  String pageFavKgCollectedAlbumCount(Object count) {
+  String pageFavKgCollectedAlbumCount({required Object count}) {
     return '$count gespeicherte Alben';
   }
 
@@ -1123,13 +1092,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wird automatisch synchronisiert, wenn du in der KG-App favorisierst';
 
   @override
-  String pageSearchLoadingTrack(Object title) {
+  String pageSearchLoadingTrack({required Object title}) {
     return 'Lade: $title';
-  }
-
-  @override
-  String pageSearchDetailComingSoon(Object title) {
-    return '$title — Detailseite folgt';
   }
 
   @override
@@ -1203,7 +1167,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Online-Favoriten synchronisieren (experimentell)';
 
   @override
-  String pageLikedQqSynced(Object count) {
+  String pageLikedQqSynced({required Object count}) {
     return 'Online-Favoriten synchronisiert: $count neue Titel hinzugefügt';
   }
 
@@ -1245,27 +1209,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String get libraryStatSize => 'Gesamtgröße';
 
   @override
-  String libraryStatTrackCount(Object count) {
+  String libraryStatTrackCount({required Object count}) {
     return '$count Titel';
   }
 
   @override
-  String libraryScanDirCount(Object count) {
+  String libraryScanDirCount({required Object count}) {
     return '$count Ordner';
   }
 
   @override
-  String libraryHoursMinutes(Object h, Object m) {
+  String libraryHoursMinutes({required Object h, required Object m}) {
     return '$h Std. $m Min.';
   }
 
   @override
-  String libraryMinutes(Object m) {
+  String libraryMinutes({required Object m}) {
     return '$m Min.';
   }
 
   @override
-  String librarySeconds(Object s) {
+  String librarySeconds({required Object s}) {
     return '$s Sek.';
   }
 
@@ -1279,7 +1243,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get libraryScanningFiles => 'Dateien werden gezählt…';
 
   @override
-  String libraryTrackCount(Object count, Object extra) {
+  String libraryTrackCount({required Object count, required Object extra}) {
     return '$count Titel$extra';
   }
 
@@ -1304,9 +1268,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get menuLocateFile => 'Dateipfad öffnen';
-
-  @override
-  String get menuLocateFileComingSoon => 'Dateimanager in Phase 2';
 
   @override
   String get menuRemoveFromLibrary => 'Aus Bibliothek entfernen';
@@ -1387,7 +1348,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pageHomeDailyLogin => 'Anmelden zum Freischalten';
 
   @override
-  String pageHomeGreeting(Object greeting, Object name) {
+  String pageHomeGreeting({required Object greeting, required Object name}) {
     return '$greeting, $name';
   }
 
@@ -1413,7 +1374,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get downloadDeleteWithMedia => 'Aufgabe und Dateien löschen';
 
   @override
-  String downloadSelectedCount(Object count) {
+  String downloadSelectedCount({required Object count}) {
     return '$count ausgewählt';
   }
 
@@ -1436,12 +1397,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get downloadExitSelect => 'Mehrfachauswahl beenden';
 
   @override
-  String downloadActiveCount(Object count) {
+  String downloadActiveCount({required Object count}) {
     return 'Aktiv $count';
   }
 
   @override
-  String downloadDoneCount(Object count) {
+  String downloadDoneCount({required Object count}) {
     return 'Abgeschlossen $count';
   }
 
@@ -1459,7 +1420,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Rechtsklick auf Titel → Download zum Hinzufügen';
 
   @override
-  String downloadDeleteSelectedTitle(Object count) {
+  String downloadDeleteSelectedTitle({required Object count}) {
     return '$count ausgewählte Aufgaben löschen';
   }
 
@@ -1498,17 +1459,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get downloadStatusResolving => 'Download-URL wird aufgelöst…';
 
   @override
-  String downloadStatusRunning(Object percent, Object received, Object speed) {
+  String downloadStatusRunning({
+    required Object percent,
+    required Object received,
+    required Object speed,
+  }) {
     return 'Herunterladen $percent% ($received) $speed';
   }
 
   @override
-  String downloadStatusRunningNoPercent(Object speed) {
+  String downloadStatusRunningNoPercent({required Object speed}) {
     return 'Herunterladen…$speed';
   }
 
   @override
-  String downloadStatusPausedWith(Object received) {
+  String downloadStatusPausedWith({required Object received}) {
     return 'Pausiert ($received)';
   }
 
@@ -1516,19 +1481,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get downloadStatusPaused => 'Pausiert';
 
   @override
-  String downloadStatusFailed(Object error) {
+  String downloadStatusFailed({required Object error}) {
     return 'Fehlgeschlagen: $error';
   }
-
-  @override
-  String get downloadStatusFailedUnknown =>
-      'Fehlgeschlagen: Unbekannter Fehler';
 
   @override
   String get downloadStatusCanceled => 'Abgebrochen';
 
   @override
-  String downloadStatusDone(Object size) {
+  String downloadStatusDone({required Object size}) {
     return 'Abgeschlossen ($size)';
   }
 
@@ -1634,12 +1595,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSearchHint => 'Einstellungen suchen…';
 
   @override
-  String settingsSearchNoResult(Object query) {
+  String settingsSearchNoResult({required Object query}) {
     return 'Keine Einstellungen für「$query」gefunden';
   }
 
   @override
-  String settingsSearchMatchCount(Object count) {
+  String settingsSearchMatchCount({required Object count}) {
     return '$count Treffer';
   }
 
@@ -1672,26 +1633,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAccentTitle => 'Primärfarb-Seed';
 
   @override
-  String settingsAccentSystem(Object color) {
-    return 'Systemakzent folgen（$color）';
-  }
-
-  @override
-  String get settingsAccentSystemFallback =>
-      'Systemakzent folgen（Lesen fehlgeschlagen, Fallback benutzerdefiniert）';
-
-  @override
-  String get settingsAccentDefault => 'Standard-Grau（Design-System）';
-
-  @override
-  String get settingsAccentCustom =>
-      'Benutzerdefiniert（Farben dynamisch aus Seed generiert）';
-
-  @override
   String get settingsAccentDefaultTooltip => 'Standard-Grau';
-
-  @override
-  String get settingsAccentSystemTooltip => 'Systemakzent folgen';
 
   @override
   String get settingsAccentCustomTooltip => 'Farbwähler';
@@ -1755,7 +1697,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsCoverRadiusSharp => 'Quadratisch（hohe Informationsdichte）';
 
   @override
-  String settingsCoverRadiusPx(Object radius) {
+  String settingsCoverRadiusPx({required Object radius}) {
     return '${radius}px Radius';
   }
 
@@ -1793,10 +1735,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Einheitliche 48kHz-Transcodierungs-Pipeline';
 
   @override
-  String get settingsPassthroughNote =>
-      'Passthrough an: Quell-Samplerate; aus: 48kHz-Ausgabe. Gilt nach Neuladen des Titels.';
-
-  @override
   String get settingsOutputDevice => 'Audioausgabegerät';
 
   @override
@@ -1811,7 +1749,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Folgt der aktuellen Systemausgabe (keine automatische Umleitung)';
 
   @override
-  String settingsOutputDeviceFormat(Object channels, Object rate) {
+  String settingsOutputDeviceFormat({
+    required Object channels,
+    required Object rate,
+  }) {
     return '$rate Hz · $channels Kanäle';
   }
 
@@ -1861,7 +1802,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diese Wahl leitet Musik über den Anruf-/Niedrigqualitäts-Standard — der Klang wird fast zerstört. Nicht empfohlen.';
 
   @override
-  String settingsOutputDeviceShowAll(int count) {
+  String settingsOutputDeviceShowAll({required int count}) {
     return 'Alle Geräte anzeigen ($count)';
   }
 
@@ -1875,7 +1816,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsOutputDeviceVirtualTag => 'Virtuell';
 
   @override
-  String settingsSinkChangedFailed(Object err) {
+  String settingsSinkChangedFailed({required Object err}) {
     return 'Ausgabegerät konnte nicht gewechselt werden: $err';
   }
 
@@ -1989,22 +1930,31 @@ class AppLocalizationsDe extends AppLocalizations {
       'Online-Quelle ist kein http(s)-Direktlink';
 
   @override
-  String memorySourceFailIsolateSpawn(Object error) {
+  String memorySourceFailIsolateSpawn({required Object error}) {
     return 'Speicherquellen-Worker konnte nicht starten: $error';
   }
 
   @override
-  String memorySourceFailHttpStatus(Object code, Object status) {
+  String memorySourceFailHttpStatus({
+    required Object code,
+    required Object status,
+  }) {
     return 'HTTP $code $status';
   }
 
   @override
-  String memorySourceFailOverWholeCeiling(Object content, Object limit) {
+  String memorySourceFailOverWholeCeiling({
+    required Object content,
+    required Object limit,
+  }) {
     return 'Gesamtinhalt ($content) überschreitet das Ganz-Titel-Limit für reinen Speicher ($limit)';
   }
 
   @override
-  String memorySourceFailGrewCeiling(Object got, Object limit) {
+  String memorySourceFailGrewCeiling({
+    required Object got,
+    required Object limit,
+  }) {
     return 'Download überschritt unterwegs das Ganz-Titel-Limit für reinen Speicher ($got > $limit)';
   }
 
@@ -2020,12 +1970,12 @@ class AppLocalizationsDe extends AppLocalizations {
       'Schreiben in die Speicherquelle fehlgeschlagen';
 
   @override
-  String memorySourceFailSegFillEx(Object error) {
+  String memorySourceFailSegFillEx({required Object error}) {
     return 'Ausnahme beim Schreiben in die Speicherquelle: $error';
   }
 
   @override
-  String memorySourceFailDownload(Object error) {
+  String memorySourceFailDownload({required Object error}) {
     return 'Download fehlgeschlagen: $error';
   }
 
@@ -2083,7 +2033,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSpectrumBarWidth => 'Spektrumbalken-Breite';
 
   @override
-  String settingsSpectrumBarWidthDesc(Object width) {
+  String settingsSpectrumBarWidthDesc({required Object width}) {
     return '${width}px（1~12, Vollbild-Player）';
   }
 
@@ -2159,7 +2109,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPlayerBgRippleSpeed => 'Wellengeschwindigkeit';
 
   @override
-  String settingsPlayerBgRippleSpeedDesc(Object speed) {
+  String settingsPlayerBgRippleSpeedDesc({required Object speed}) {
     return 'Fließgeschwindigkeit $speed';
   }
 
@@ -2170,7 +2120,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPlayerBgFlowSpeed => 'Fließgeschwindigkeit';
 
   @override
-  String settingsPlayerBgFlowSpeedDesc(Object speed) {
+  String settingsPlayerBgFlowSpeedDesc({required Object speed}) {
     return 'Fließgeschwindigkeit $speed';
   }
 
@@ -2178,7 +2128,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPlayerBgRenderScale => 'Render-Skalierung';
 
   @override
-  String settingsPlayerBgRenderScaleDesc(Object scale) {
+  String settingsPlayerBgRenderScaleDesc({required Object scale}) {
     return 'Auflösung $scale× (niedriger spart Strom)';
   }
 
@@ -2186,7 +2136,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPlayerBgFps => 'Bildratenlimit';
 
   @override
-  String settingsPlayerBgFpsDesc(Object fps) {
+  String settingsPlayerBgFpsDesc({required Object fps}) {
     return '$fps FPS';
   }
 
@@ -2221,37 +2171,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsAdaptiveRenderQualityOff =>
       'Player-Hintergrund wird immer in voller Auflösung gerendert';
-
-  @override
-  String get settingsSectionShortcuts => 'Tastenkürzel';
-
-  @override
-  String get settingsShortcutSpace => 'Leertaste';
-
-  @override
-  String get settingsShortcutSpaceDesc => 'Wiedergabe / Pause';
-
-  @override
-  String get settingsShortcutArrows => '← / →';
-
-  @override
-  String get settingsShortcutArrowsDesc => '10 Sekunden zurück / vor';
-
-  @override
-  String get settingsShortcutSearch => 'Ctrl / Cmd + F';
-
-  @override
-  String get settingsShortcutLibrary => 'Ctrl / Cmd + L';
-
-  @override
-  String get settingsShortcutLibraryDesc => 'Musikbibliothek';
-
-  @override
-  String get settingsShortcutEsc => 'Esc';
-
-  @override
-  String get settingsShortcutEscDesc =>
-      'Zurück（Dialog schließen / Vollbild-Player verlassen）';
 
   @override
   String get settingsSectionPlayerLyrics => 'Player-Songtexte';
@@ -2293,17 +2212,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsLyricFontSize => 'Songtext-Schriftgröße';
 
   @override
-  String settingsLyricFontSizeDesc(Object size) {
+  String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（aktuelle Zeile vergrößert）';
   }
 
   @override
   String get settingsLyricLineHeight => 'Songtext-Zeilenhöhe';
-
-  @override
-  String settingsLyricLineHeightDesc(Object height) {
-    return '${height}px（inkl. Zeilenabstand）';
-  }
 
   @override
   String get settingsLyricPlayedColor => 'Abgespielte Farbe';
@@ -2438,10 +2352,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsRestoreDefault => 'Standard wiederherstellen';
 
   @override
-  String get settingsDownloadRootNote =>
-      'Standard: folgt dem Bibliotheksordner; Ordnerwechsel beendet laufende Downloads. Enter zum Speichern.';
-
-  @override
   String get settingsSectionFilename => 'Dateiname';
 
   @override
@@ -2459,7 +2369,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDownloadQuality => 'Standard-Download-Qualität';
 
   @override
-  String settingsDownloadQualityDesc(Object quality) {
+  String settingsDownloadQualityDesc({required Object quality}) {
     return 'Standard $quality im Download-Dialog; automatischer Fallback bei fehlender Stufe';
   }
 
@@ -2474,7 +2384,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDownloadConcurrent => 'Gleichzeitige Downloads';
 
   @override
-  String settingsDownloadConcurrentDesc(Object count) {
+  String settingsDownloadConcurrentDesc({required Object count}) {
     return '$count parallele Aufgaben（1~5）';
   }
 
@@ -2510,7 +2420,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSpeedUnlimited => 'Unbegrenzt（Standard）';
 
   @override
-  String settingsSpeedLimited(Object speed) {
+  String settingsSpeedLimited({required Object speed}) {
     return 'Auf $speed begrenzt, sofort wirksam';
   }
 
@@ -2518,7 +2428,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSpeedUnlimitedLabel => 'Unbegrenzt';
 
   @override
-  String settingsSpeedMbps(Object speed) {
+  String settingsSpeedMbps({required Object speed}) {
     return '$speed MB/s';
   }
 
@@ -2533,12 +2443,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDownloadHistoryLimit => 'Download-Verlauf-Obergrenze';
 
   @override
-  String settingsDownloadHistoryDesc(Object count) {
+  String settingsDownloadHistoryDesc({required Object count}) {
     return '$count Einträge（10~500）· über Limit automatisch älteste entfernen';
   }
 
   @override
-  String settingsDownloadHistoryCount(Object count) {
+  String settingsDownloadHistoryCount({required Object count}) {
     return '$count Einträge';
   }
 
@@ -2588,17 +2498,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get toastTemplateUpdated => 'Dateinamenvorlage aktualisiert';
 
   @override
-  String settingsSpeedBs(Object n) {
+  String settingsSpeedBs({required Object n}) {
     return '$n B/s';
   }
 
   @override
-  String settingsSpeedKbs(Object n) {
+  String settingsSpeedKbs({required Object n}) {
     return '$n KB/s';
   }
 
   @override
-  String settingsSpeedMbs(Object n) {
+  String settingsSpeedMbs({required Object n}) {
     return '$n MB/s';
   }
 
@@ -2648,7 +2558,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsHistoryLimit => 'Begrenzung der Verlaufseinträge';
 
   @override
-  String settingsHistoryLimitOn(Object count) {
+  String settingsHistoryLimitOn({required Object count}) {
     return 'Bis zu $count Einträge';
   }
 
@@ -2672,13 +2582,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsCopy => 'Kopieren';
 
   @override
-  String toastCopied(Object label) {
+  String toastCopied({required Object label}) {
     return '$label kopiert';
   }
-
-  @override
-  String get settingsStorageNote =>
-      'Medienbibliothek und Benutzerdaten physisch getrennt; Pfade über ARCHOERA_DATA_DIR überschreibbar.';
 
   @override
   String get settingsSectionCache => 'Cache-Verwaltung';
@@ -2731,7 +2637,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSongCacheLimitTitle => 'Cache-Limit';
 
   @override
-  String settingsCacheSongs(Object count) {
+  String settingsCacheSongs({required Object count}) {
     return '$count Titel';
   }
 
@@ -2755,12 +2661,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsCacheCover => 'Coverbild-Cache';
 
   @override
-  String settingsCacheEntries(Object count) {
+  String settingsCacheEntries({required Object count}) {
     return '$count Einträge';
   }
 
   @override
-  String settingsCacheImages(Object count) {
+  String settingsCacheImages({required Object count}) {
     return '$count Bilder';
   }
 
@@ -2774,7 +2680,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsCacheClearAll => 'Alle leeren';
 
   @override
-  String settingsCacheClearConfirmTitle(Object name) {
+  String settingsCacheClearConfirmTitle({required Object name}) {
     return '\"$name\" leeren?';
   }
 
@@ -2790,7 +2696,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Löscht alle obigen Caches (Arbeitsspeicher und Datenträger). Bibliothek, Verlauf und Konten sind nicht betroffen.';
 
   @override
-  String toastCacheCleared(Object name) {
+  String toastCacheCleared({required Object name}) {
     return '$name-Cache geleert';
   }
 
@@ -2808,7 +2714,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSecurityStreaming => 'Streaming-Server-Anmeldedaten';
 
   @override
-  String settingsSecurityStreamingCount(Object count) {
+  String settingsSecurityStreamingCount({required Object count}) {
     return '$count Server';
   }
 
@@ -2837,7 +2743,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSecurityDestroyAll => 'Alles vernichten';
 
   @override
-  String settingsSecurityConfirmTitle(Object name) {
+  String settingsSecurityConfirmTitle({required Object name}) {
     return '„$name“ vernichten?';
   }
 
@@ -2846,7 +2752,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Alle sensiblen Daten vernichten?';
 
   @override
-  String settingsSecurityConfirmDesc(Object word) {
+  String settingsSecurityConfirmDesc({required Object word}) {
     return 'Die Tokens der betroffenen Plattformen werden ungültig gemacht, Dateien werden überschrieben und gelöscht. Dieser Vorgang ist unwiderruflich. Geben Sie „$word“ ein, um zu bestätigen.';
   }
 
@@ -2854,12 +2760,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSecurityConfirmWord => 'vernichten';
 
   @override
-  String settingsSecurityConfirmHint(Object word) {
+  String settingsSecurityConfirmHint({required Object word}) {
     return '„$word“ eingeben';
   }
 
   @override
-  String toastSecurityDestroyed(Object name) {
+  String toastSecurityDestroyed({required Object name}) {
     return 'Vernichtet: $name';
   }
 
@@ -2868,35 +2774,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Alle sensiblen Daten wurden vernichtet';
 
   @override
-  String toastSecurityDestroyFailed(Object path) {
+  String toastSecurityDestroyFailed({required Object path}) {
     return 'Vernichten fehlgeschlagen, Datei kann zurückbleiben: $path';
   }
-
-  @override
-  String get settingsDeviceBindSection => 'Erweitert · Gerätebindung';
-
-  @override
-  String get settingsDeviceBindNote =>
-      'Erweiterte Option (Opt-in): auf diesem Gerät ohne Passwort + Wiederherstellungspasswort nach Gerätewechsel, unabhängig vom sicheren Systemspeicher. Beim Aktivieren wird eine lokale Gerätekennung gelesen (nur lokal gespeichert, niemals hochgeladen). Standardmäßig deaktiviert; die Standard-v1-Verschlüsselung reicht für die meisten Nutzer.';
-
-  @override
-  String get settingsDeviceBindSwitch => 'Passwortlos per Gerätebindung';
-
-  @override
-  String get settingsDeviceBindSwitchDesc =>
-      'Automatische Entsperrung auf diesem Gerät; Wiederherstellungspasswort nach Gerätewechsel';
-
-  @override
-  String get settingsDeviceBindSwitchOffDesc =>
-      'Deaktiviert. Der sichere Systemspeicher ist hier nicht verfügbar; aktivieren Sie die Gerätebindung für passwortlose Entsperrung';
-
-  @override
-  String get settingsDeviceBindSwitchV1Desc =>
-      'Aktuell v1-Modus (sicherer Systemspeicher); Aktivieren aktualisiert auf Gerätebindung (passwortlos + Wiederherstellungspasswort, vorhandene Daten bleiben erhalten)';
-
-  @override
-  String get settingsDeviceBindSwitchV2Desc =>
-      'Aktuell v2-Modus (Passwort); zum Aktivieren muss zuerst das aktuelle Passwort zur Entsperrung eingegeben werden, danach Upgrade auf Gerätebindung (auf diesem Gerät passwortlos)';
 
   @override
   String get settingsDeviceBindPrivacyTitle =>
@@ -3003,7 +2883,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Kein Wiederherstellungspasswort festgelegt; Gerätebindung kann nicht deaktiviert werden';
 
   @override
-  String toastDeviceBindCloseFailed(Object error) {
+  String toastDeviceBindCloseFailed({required Object error}) {
     return 'Deaktivierung fehlgeschlagen: $error';
   }
 
@@ -3099,13 +2979,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get toastSchemeSwitched =>
       'Verschlüsselungsverfahren gewechselt; wirksam nach Neustart';
-
-  @override
-  String get settingsVaultSection => 'Verschlüsselung der Anmeldedaten';
-
-  @override
-  String get settingsVaultNote =>
-      'Schutzstufe für Anmeldedaten wählen: v1 Systemschutz (Standard) / v2 Passwortschutz / v3 Gerätebindung (Opt-in-Erweiterung; liest eine lokale Gerätekennung, nur lokal gespeichert, niemals hochgeladen). v1 ↔ v2 sind frei wechselbar; v3 ist die Endstufe und fällt beim Deaktivieren auf v2 zurück.';
 
   @override
   String get settingsVaultModeV1 => 'v1 Systemschutz';
@@ -3263,7 +3136,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsVersionUnknown => 'v unbekannt · Flutter Desktop';
 
   @override
-  String settingsVersionFormat(Object version) {
+  String settingsVersionFormat({required Object version}) {
     return 'v$version · Flutter Desktop';
   }
 
@@ -3374,10 +3247,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSectionThanks => 'Besonderer Dank';
 
   @override
-  String get settingsThanksText =>
-      'Diese Software nutzt, hängt ab von oder referenziert die folgenden Open-Source-Projekte (vollständige Liste in THIRD-PARTY-NOTICES.md und den THIRD-PARTY-LICENSES.md der Module):\n\n· Design-Inspiration: KuGouMusicApi (MIT), NeteaseCloudMusicApi (MIT), ncm-api-rs (WTFPL), MoeKoeMusic, Mineradio\n· Kernkomponenten: Flutter, FFmpeg (LGPL-2.1+), libopus (BSD-3-Clause), TagLib (LGPL-2.1+/MPL-1.1), miniaudio (MIT-0/Public Domain), signalsmith-stretch (MIT), SQLite (Public Domain), libcurl, OpenSSL (Apache-2.0), nlohmann/json (MIT)\n· Decoder-Referenzen: minimp3 (CC0-1.0), stb_vorbis (Public Domain/MIT-0), kissfft (BSD-3-Clause), WavPack (BSD-3-Clause), dsd2pcm (BSD), OpenCORE/PV-AMR (Apache-2.0)\n· Icons: MingCute Icons (Apache-2.0), Tabler Icons (MIT), Lucide (ISC), line-md (MIT)\n\nDank an die Autoren der oben genannten Projekte.';
-
-  @override
   String get settingsThanksDesign => 'Design-Inspiration';
 
   @override
@@ -3400,7 +3269,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commonNoLyrics => 'Keine Songtexte';
 
   @override
-  String commonTrackCount(Object count) {
+  String commonTrackCount({required Object count}) {
     return '$count Titel';
   }
 
@@ -3423,10 +3292,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsSearchFilenameTitle => 'Dateinamenvorlage';
-
-  @override
-  String get settingsSearchAccentSubtitle =>
-      'Benutzerdefinierte Primärfarb-Seed · Palette';
 
   @override
   String get settingsThemeSource => 'Quelle der Themenfarbe';
@@ -3501,7 +3366,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsBackgroundBlur => 'Hintergrundunschärfe';
 
   @override
-  String settingsBackgroundBlurDesc(Object blur) {
+  String settingsBackgroundBlurDesc({required Object blur}) {
     return 'Gaußsche Unschärfe auf das Hintergrundbild angewendet (${blur}px)';
   }
 
@@ -3509,7 +3374,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsBackgroundDim => 'Maskenstärke';
 
   @override
-  String settingsBackgroundDimDesc(Object dim) {
+  String settingsBackgroundDimDesc({required Object dim}) {
     return 'Deckkraft der schwarzen Überlagerung ($dim%); höher = Vordergrund besser lesbar';
   }
 
@@ -3517,7 +3382,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsBackgroundScale => 'Zoomgröße';
 
   @override
-  String settingsBackgroundScaleDesc(Object scale) {
+  String settingsBackgroundScaleDesc({required Object scale}) {
     return 'Zoomfaktor des Hintergrundbilds (${scale}x)';
   }
 
@@ -3758,25 +3623,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSearchAboutSubtitle => 'Audio-Engine · Subsonic-Server';
 
   @override
-  String get qualityLossless => 'Verlustfrei';
-
-  @override
   String get repeatModeList => 'Liste wiederholen';
 
   @override
   String get repeatModeOne => 'Einen Titel wiederholen';
-
-  @override
-  String get commonUnknownTrack => 'Unbekannter Titel';
-
-  @override
-  String get commonAnonymousUser => 'Anonymer Benutzer';
-
-  @override
-  String get commonCanceled => 'Abgebrochen';
-
-  @override
-  String get commonILike => 'Meine Favoriten';
 
   @override
   String get sidebarStreaming => 'Streaming';
@@ -3807,7 +3657,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Keine Scrape-Verzeichnisse konfiguriert; es werden die Bibliotheks-Scanpfade verwendet.';
 
   @override
-  String settingsScrapeDirsNote(Object dirs) {
+  String settingsScrapeDirsNote({required Object dirs}) {
     return 'Aktive Verzeichnisse: $dirs';
   }
 
@@ -3858,7 +3708,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsScrapeScanning => 'Verzeichnisse werden gescannt…';
 
   @override
-  String settingsScrapeCurrent(Object file) {
+  String settingsScrapeCurrent({required Object file}) {
     return 'Verarbeite: $file';
   }
 
@@ -3942,7 +3792,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get streamingServerConnect => 'Verbinden';
 
   @override
-  String streamingToastConnected(Object name) {
+  String streamingToastConnected({required Object name}) {
     return 'Verbunden mit $name';
   }
 
@@ -3956,7 +3806,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get streamingServerDeleteConfirmTitle => 'Server löschen';
 
   @override
-  String streamingServerDeleteConfirm(Object name) {
+  String streamingServerDeleteConfirm({required Object name}) {
     return 'Server „$name“ löschen?';
   }
 
@@ -4047,22 +3897,22 @@ class AppLocalizationsDe extends AppLocalizations {
   String get streamingEmptyNotConnected => 'Mit keinem Server verbunden';
 
   @override
-  String streamingTotalSongs(Object count) {
+  String streamingTotalSongs({required Object count}) {
     return '$count Titel';
   }
 
   @override
-  String streamingTotalAlbums(Object count) {
+  String streamingTotalAlbums({required Object count}) {
     return '$count Alben';
   }
 
   @override
-  String streamingTotalArtists(Object count) {
+  String streamingTotalArtists({required Object count}) {
     return '$count Künstler';
   }
 
   @override
-  String streamingTotalPlaylists(Object count) {
+  String streamingTotalPlaylists({required Object count}) {
     return '$count Wiedergabelisten';
   }
 
@@ -4070,17 +3920,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get streamingEmptyNoResults => 'Keine passenden Ergebnisse';
 
   @override
-  String streamingAlbumSongs(Object count) {
+  String streamingAlbumSongs({required Object count}) {
     return '$count Titel';
   }
 
   @override
-  String streamingArtistAlbums(Object count) {
+  String streamingArtistAlbums({required Object count}) {
     return '$count Alben';
   }
 
   @override
-  String streamingPlaylistSongs(Object count) {
+  String streamingPlaylistSongs({required Object count}) {
     return '$count Titel';
   }
 
@@ -4097,20 +3947,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loginQqScanHint => 'Mit der QQ-App scannen, um dich anzumelden';
 
   @override
-  String navHeaderQqId(String id) {
+  String navHeaderQqId({required String id}) {
     return 'QQ $id';
   }
 
   @override
-  String get toastQqNotSupported => 'Für QM nicht unterstützt';
-
-  @override
-  String searchSourceFailed(Object source) {
+  String searchSourceFailed({required Object source}) {
     return '$source-Suche ist vorübergehend nicht verfügbar';
   }
 
   @override
-  String searchQqRiskDetail(Object code) {
+  String searchQqRiskDetail({required Object code}) {
     return 'QM hat die Anfrage gedrosselt/risikogesperrt (Code $code); automatische Wiederholungen gestoppt, bitte später erneut versuchen';
   }
 
@@ -4119,25 +3966,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Netzwerkfehler oder Zeitüberschreitung, bitte später erneut versuchen';
 
   @override
-  String searchPlatformError(Object code) {
+  String searchPlatformError({required Object code}) {
     return 'Plattformfehler ($code)';
   }
 
   @override
   String get searchWaitRetry =>
       'Zu viele Anfragen, bitte kurz warten und erneut versuchen';
-
-  @override
-  String get qqMusicDownloadUnsupported =>
-      'QQ-Musik-Downloads werden derzeit nicht unterstützt (Risikomanagement).';
-
-  @override
-  String qqMusicDownloadSkipped(Object count) {
-    return '$count QQ-Musiktitel übersprungen: Downloads für QQ-Musik nicht unterstützt.';
-  }
-
-  @override
-  String get platformQqMusic => 'QM';
 
   @override
   String get settingsValueAuto => 'Auto';
@@ -4173,7 +4008,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsScrapeWorkers => 'Parallele Worker';
 
   @override
-  String settingsScrapeWorkersDesc(Object value) {
+  String settingsScrapeWorkersDesc({required Object value}) {
     return 'Parallele Multi-Quellen-Suchthreads (0=Auto, aktuell $value)';
   }
 
@@ -4181,7 +4016,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsScrapeBatch => 'Stapelgröße';
 
   @override
-  String settingsScrapeBatchDesc(Object value) {
+  String settingsScrapeBatchDesc({required Object value}) {
     return 'Dateien pro Stapel (aktuell $value)';
   }
 
@@ -4189,7 +4024,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsScrapeRetries => 'Max. Wiederholungen';
 
   @override
-  String settingsScrapeRetriesDesc(Object value) {
+  String settingsScrapeRetriesDesc({required Object value}) {
     return 'Dateien, die öfter fehlschlagen, werden isoliert (aktuell $value)';
   }
 
@@ -4232,9 +4067,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsScrapeOrganizeStart => 'Organisieren starten';
 
   @override
-  String get settingsOrganizeCancel => 'Organisieren abbrechen';
-
-  @override
   String get settingsOrganizeRunning => 'Dateien werden organisiert…';
 
   @override
@@ -4247,7 +4079,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsOrganizeFailed => 'Fehlgeschlagen';
 
   @override
-  String settingsOrganizeDone(Object failed, Object moved, Object skipped) {
+  String settingsOrganizeDone({
+    required Object failed,
+    required Object moved,
+    required Object skipped,
+  }) {
     return 'Organisieren fertig: verschoben $moved, übersprungen $skipped, fehlgeschlagen $failed';
   }
 
@@ -4256,7 +4092,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Kein Scan-Verzeichnis der Mediathek konfiguriert; Standard-Organisationsziel nicht ermittelbar';
 
   @override
-  String settingsOrganizeUsingDefault(Object dir) {
+  String settingsOrganizeUsingDefault({required Object dir}) {
     return 'Kein Ziel gesetzt; Standard-Musikordner wird verwendet: $dir';
   }
 
@@ -4280,7 +4116,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsScanParallelism => 'Scan-Parallelität';
 
   @override
-  String settingsScanParallelismDesc(Object value) {
+  String settingsScanParallelismDesc({required Object value}) {
     return 'Parallel geparste Dateien (0=Auto, aktuell $value)';
   }
 
@@ -4288,7 +4124,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsScanBatch => 'Stapelgröße';
 
   @override
-  String settingsScanBatchDesc(Object value) {
+  String settingsScanBatchDesc({required Object value}) {
     return 'DB-Stapelschreiblimit (0=Auto, aktuell $value)';
   }
 
@@ -4315,9 +4151,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSectionScanExts => 'Audio-Erweiterungen';
 
   @override
-  String get settingsScanExtraExts => 'Zusätzliche Erweiterungen';
-
-  @override
   String get settingsScanExtraExtsNote =>
       'Zusätzliche Audio-Erweiterungen zusätzlich zur eingebauten Allowlist';
 
@@ -4329,7 +4162,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSectionScanQuarantine => 'Quarantäne';
 
   @override
-  String settingsScanQuarantineNote(Object dir) {
+  String settingsScanQuarantineNote({required Object dir}) {
     return 'Dateien, die 3+ Mal nicht geparst werden konnten, werden verschoben nach: $dir';
   }
 
@@ -4358,10 +4191,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get libraryFullScanConfirmDesc =>
       'Die Mediathek-Datenbank wird geleert und aus den Scan-Verzeichnissen neu aufgebaut (Quelldateien bleiben erhalten). Nicht rückgängig zu machen; beansprucht währenddessen viel Festplatten-IO.';
-
-  @override
-  String get libraryFullScanDescription =>
-      'Mediathek aus Scan-Verzeichnissen neu aufbauen';
 
   @override
   String get settingsSectionLyricEngine => 'Songtext-Engine';
@@ -4585,10 +4414,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commonReset => 'Reset';
 
   @override
-  String get settingsDevDownloadModuleDesc =>
-      'Separate switch for the download interface (sidebar / context menu / settings category). Off by default; warns before enabling.';
-
-  @override
   String get settingsDevDownloadModuleOn => 'Download module enabled';
 
   @override
@@ -4793,10 +4618,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsLyricAdaptiveFontSize => 'Adaptive font size';
 
   @override
-  String get settingsLyricAdaptiveFontSizeDesc =>
-      'Scale the lyric font size with window height';
-
-  @override
   String get settingsLyricAdaptiveFontSizeOn => 'On: scales with the window';
 
   @override
@@ -4827,18 +4648,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sleepTimerOff => 'Off';
 
   @override
-  String get sleepTimer15 => '15 minutes';
-
-  @override
-  String get sleepTimer30 => '30 minutes';
-
-  @override
-  String get sleepTimer60 => '60 minutes';
-
-  @override
-  String get sleepTimer90 => '90 minutes';
-
-  @override
   String get sleepTimerEndOfTrack => 'End of current track';
 
   @override
@@ -4852,7 +4661,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Sleep timer reached; will pause after the current track';
 
   @override
-  String sleepTimerMinutes(int minutes) {
+  String sleepTimerMinutes({required int minutes}) {
     return '$minutes Minuten';
   }
 
@@ -4951,9 +4760,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsEqPreamp => 'Preamp';
-
-  @override
-  String get settingsEqPreampDesc => 'Overall boost or cut to avoid clipping';
 
   @override
   String get settingsEqLimiter => 'Limiter';

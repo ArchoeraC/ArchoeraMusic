@@ -398,7 +398,7 @@ class _EmptyLyrics extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            AppLocalizations.of(context).commonNoLyrics,
+            context.l10n.commonNoLyrics,
             style: TextStyle(
               fontSize: 13,
               color: scheme.onSurfaceVariant.withValues(alpha: 0.5),

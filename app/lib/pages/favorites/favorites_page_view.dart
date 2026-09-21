@@ -36,15 +36,15 @@ extension _FavoritesPageView on _FavoritesPageState {
       subtitle = switch (_kgTab) {
         _KgTab.created =>
           _kugouLoggedIn
-              ? l10n.pageFavKgCreatedCount(count)
+              ? l10n.pageFavKgCreatedCount(count: count)
               : l10n.pageFavKgCreatedLoginHint,
         _KgTab.collectedPlaylist =>
           _kugouLoggedIn
-              ? l10n.pageFavKgCollectedPlaylistCount(count)
+              ? l10n.pageFavKgCollectedPlaylistCount(count: count)
               : l10n.pageFavKgCollectedPlaylistLoginHint,
         _KgTab.collectedAlbum =>
           _kugouLoggedIn
-              ? l10n.pageFavKgCollectedAlbumCount(count)
+              ? l10n.pageFavKgCollectedAlbumCount(count: count)
               : l10n.pageFavKgCollectedAlbumLoginHint,
       };
     } else if (_platform == _Platform.neko) {
@@ -52,15 +52,15 @@ extension _FavoritesPageView on _FavoritesPageState {
       subtitle = switch (_nekoTab) {
         _NekoTab.created =>
           _nekoLoggedIn
-              ? l10n.pageFavKgCreatedCount(count)
+              ? l10n.pageFavKgCreatedCount(count: count)
               : l10n.pageFavKgCreatedLoginHint,
         _NekoTab.collectedPlaylist =>
           _nekoLoggedIn
-              ? l10n.pageFavKgCollectedPlaylistCount(count)
+              ? l10n.pageFavKgCollectedPlaylistCount(count: count)
               : l10n.pageFavKgCollectedPlaylistLoginHint,
         _NekoTab.liked =>
           _nekoLoggedIn
-              ? l10n.pageFavKgCollectedAlbumCount(count)
+              ? l10n.pageFavKgCollectedAlbumCount(count: count)
               : l10n.pageFavKgCollectedAlbumLoginHint,
       };
     } else if (_platform == _Platform.qqmusic) {
@@ -68,32 +68,32 @@ extension _FavoritesPageView on _FavoritesPageState {
       subtitle = switch (_qqTab) {
         _QqTab.created =>
           _qqLoggedIn
-              ? l10n.pageFavKgCreatedCount(count)
+              ? l10n.pageFavKgCreatedCount(count: count)
               : l10n.pageFavKgCreatedLoginHint,
         _QqTab.collectedPlaylist =>
           _qqLoggedIn
-              ? l10n.pageFavKgCollectedPlaylistCount(count)
+              ? l10n.pageFavKgCollectedPlaylistCount(count: count)
               : l10n.pageFavKgCollectedPlaylistLoginHint,
         _QqTab.liked =>
           _qqLoggedIn
-              ? l10n.pageFavKgCollectedAlbumCount(count)
+              ? l10n.pageFavKgCollectedAlbumCount(count: count)
               : l10n.pageFavKgCollectedAlbumLoginHint,
       };
     } else {
       switch (_tab) {
         case _FavTab.playlist:
           subtitle = _neteaseLoggedIn
-              ? l10n.pageFavPlaylistCount(count)
+              ? l10n.pageFavPlaylistCount(count: count)
               : l10n.pageFavPlaylistLoginHint;
           countIcon = EtaIcons.playlist;
         case _FavTab.album:
           subtitle = _neteaseLoggedIn
-              ? l10n.pageFavAlbumCount(count)
+              ? l10n.pageFavAlbumCount(count: count)
               : l10n.pageFavAlbumLoginHint;
           countIcon = EtaIcons.albumOutline;
         case _FavTab.artist:
           subtitle = _neteaseLoggedIn
-              ? l10n.pageFavArtistCount(count)
+              ? l10n.pageFavArtistCount(count: count)
               : l10n.pageFavArtistLoginHint;
           countIcon = EtaIcons.userOutline;
       }
