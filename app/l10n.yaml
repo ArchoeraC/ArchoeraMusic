@@ -5,3 +5,8 @@ output-dir: lib/l10n/generated
 output-localization-file: app_localizations.dart
 output-class: AppLocalizations
 nullable-getter: false
+# ICU 转义：单引号内的特殊字符按字面量处理，"''" 表示一个字面单引号。
+# ARB 文案中的字面单引号因此写作 "''"（如 don''t）。
+use-escaping: true
+# 生成方法使用命名参数（l10n.key(count: n)），避免位置参数错序。
+use-named-parameters: true

@@ -160,7 +160,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                   icon: EtaIcons.blurOnOutline,
                   title: l10n.settingsBackgroundBlur,
                   subtitle: l10n.settingsBackgroundBlurDesc(
-                    prefs.backgroundBlur,
+                    blur: prefs.backgroundBlur,
                   ),
                   value: prefs.backgroundBlur.toDouble(),
                   min: 0,
@@ -172,7 +172,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                 SettingSliderTile(
                   icon: EtaIcons.moonOutline,
                   title: l10n.settingsBackgroundDim,
-                  subtitle: l10n.settingsBackgroundDimDesc(prefs.backgroundDim),
+                  subtitle: l10n.settingsBackgroundDimDesc(dim: prefs.backgroundDim),
                   value: prefs.backgroundDim,
                   min: 0.3,
                   max: 0.9,
@@ -184,7 +184,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                   icon: EtaIcons.fullscreenExit2Outline,
                   title: l10n.settingsBackgroundScale,
                   subtitle: l10n.settingsBackgroundScaleDesc(
-                    prefs.backgroundScale,
+                    scale: prefs.backgroundScale,
                   ),
                   value: prefs.backgroundScale,
                   min: 1,
@@ -314,7 +314,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
               title: l10n.settingsCoverRadius,
               subtitle: prefs.coverRadius == 0
                   ? l10n.settingsCoverRadiusSharp
-                  : l10n.settingsCoverRadiusPx(prefs.coverRadius.round()),
+                  : l10n.settingsCoverRadiusPx(radius: prefs.coverRadius.round()),
               trailing: SSegmented<double>(
                 options: [
                   SSegmentedOption(0, l10n.settingsCoverRadiusSharpLabel),

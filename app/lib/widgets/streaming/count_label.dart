@@ -26,13 +26,13 @@ class StreamingCountLabel extends StatelessWidget {
     final String text;
     switch (index) {
       case 0:
-        text = l10n.streamingTotalSongs(state.songs.length);
+        text = l10n.streamingTotalSongs(count: state.songs.length);
       case 1:
-        text = l10n.streamingTotalAlbums(state.albums.length);
+        text = l10n.streamingTotalAlbums(count: state.albums.length);
       case 2:
-        text = l10n.streamingTotalArtists(state.artists.length);
+        text = l10n.streamingTotalArtists(count: state.artists.length);
       default:
-        text = l10n.streamingTotalPlaylists(state.playlists.length);
+        text = l10n.streamingTotalPlaylists(count: state.playlists.length);
     }
     return Text(
       text,

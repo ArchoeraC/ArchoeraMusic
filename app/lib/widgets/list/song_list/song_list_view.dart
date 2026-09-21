@@ -163,7 +163,7 @@ class _SongListHeader extends StatelessWidget {
             ),
             Expanded(
               child: Text(
-                l10n.queueTrackCount(selectedCount),
+                l10n.queueTrackCount(count: selectedCount),
                 style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
               ),
             ),

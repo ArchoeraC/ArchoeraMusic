@@ -271,7 +271,7 @@ class _SearchAggFailureBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l10n.searchSourceFailed(platformLabel(source)),
+                    l10n.searchSourceFailed(source: platformLabel(source)),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),

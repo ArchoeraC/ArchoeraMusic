@@ -59,7 +59,7 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
                     title: l10n.settingsVersion,
                     subtitle: widget.version.isEmpty
                         ? l10n.settingsVersionUnknown
-                        : l10n.settingsVersionFormat(widget.version),
+                        : l10n.settingsVersionFormat(version: widget.version),
                     // 官方构建徽标：二进制内水印验签通过才显示该图标；
                     // 失败/缺失则不显示（无文字、无悬浮提示）。
                     trailing: ref.watch(archoeraOfficialBuildProvider)
@@ -345,7 +345,7 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
         await Clipboard.setData(ClipboardData(text: item.url));
         if (!mounted) return;
         toast(
-          context.l10n.toastCopied(item.name),
+          context.l10n.toastCopied(label: item.name),
           type: ToastType.success,
           duration: const Duration(milliseconds: 1200),
         );

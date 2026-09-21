@@ -42,7 +42,7 @@ class StreamingArtistsTab extends ConsumerWidget {
             title: a.name,
             cover: a.avatar,
             subtitle: a.albumCount != null
-                ? l10n.streamingArtistAlbums(a.albumCount!)
+                ? l10n.streamingArtistAlbums(count: a.albumCount!)
                 : '',
           ),
       ],

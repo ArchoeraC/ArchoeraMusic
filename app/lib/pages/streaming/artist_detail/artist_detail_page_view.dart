@@ -23,7 +23,7 @@ extension _StreamingArtistDetailPageView on _StreamingArtistDetailPageState {
         circle: true,
         title: meta?.name ?? '',
         subtitle: albums != null
-            ? l10n.streamingArtistAlbums(albums.length)
+            ? l10n.streamingArtistAlbums(count: albums.length)
             : '',
         onPlayAll: songs == null || songs.isEmpty
             ? null

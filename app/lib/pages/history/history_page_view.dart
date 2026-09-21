@@ -40,7 +40,7 @@ extension _HistoryPageView on _HistoryPageState {
                       const SizedBox(height: 4),
                       Text(
                         hasHistory
-                            ? l10n.commonSongCountHint(_entries.length)
+                            ? l10n.commonSongCountHint(count: _entries.length)
                             : l10n.pageHistorySubtitleEmpty,
                         style: TextStyle(
                           fontSize: 13,

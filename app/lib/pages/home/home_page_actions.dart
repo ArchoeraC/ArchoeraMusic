@@ -44,7 +44,7 @@ extension _HomePageActions on _HomePageState {
     final l10n = context.l10n;
     final account = ref.read(neteaseAuthProvider);
     if (account == null) {
-      _toast(l10n.toastDailyRequiresLogin(l10n.platformNetease));
+      _toast(l10n.toastDailyRequiresLogin(platform: l10n.platformNetease));
       showNeteaseLoginDialog(context);
       return;
     }
@@ -75,9 +75,9 @@ extension _HomePageActions on _HomePageState {
         return;
       }
       ref.read(playbackProvider.notifier).playQueue(tracks);
-      _toast(l10n.toastPlayedAll(tracks.length));
+      _toast(l10n.toastPlayedAll(count: tracks.length));
     } catch (e) {
-      _toast(l10n.toastPlayFailed('$e'));
+      _toast(l10n.toastPlayFailed(msg: '$e'));
     }
   }
 
@@ -90,9 +90,9 @@ extension _HomePageActions on _HomePageState {
         return;
       }
       ref.read(playbackProvider.notifier).playQueue(tracks);
-      _toast(l10n.toastPlayedAll(tracks.length));
+      _toast(l10n.toastPlayedAll(count: tracks.length));
     } catch (e) {
-      _toast(l10n.toastPlayFailed('$e'));
+      _toast(l10n.toastPlayFailed(msg: '$e'));
     }
   }
 

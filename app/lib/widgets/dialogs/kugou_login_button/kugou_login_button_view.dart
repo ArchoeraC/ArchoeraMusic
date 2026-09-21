@@ -16,8 +16,8 @@ extension _KugouLoginButtonView on _KugouLoginButtonState {
         final nickname = session?.nickname;
         return PopupMenuButton<String>(
           tooltip: session == null
-              ? l10n.loginKugouQrLogin(l10n.brandKugou)
-              : l10n.loginKugouSession(l10n.brandKugou),
+              ? l10n.loginKugouQrLogin(platform: l10n.brandKugou)
+              : l10n.loginKugouSession(platform: l10n.brandKugou),
           // 性能模式：菜单直出，无淡入/弹出动效
           popUpAnimationStyle: noAnim(context)
               ? AnimationStyle.noAnimation
@@ -32,7 +32,7 @@ extension _KugouLoginButtonView on _KugouLoginButtonState {
                   PopupMenuItem(
                     value: 'logout',
                     child: Text(
-                      l10n.loginLogoutWithId(nickname ?? session.userid),
+                      l10n.loginLogoutWithId(id: nickname ?? session.userid),
                     ),
                   ),
                 ],
@@ -49,8 +49,8 @@ extension _KugouLoginButtonView on _KugouLoginButtonState {
                 const SizedBox(width: 4),
                 Text(
                   session == null
-                      ? l10n.loginKugouLogin(l10n.brandKugou)
-                      : (nickname ?? l10n.loginKugouLoggedIn(l10n.brandKugou)),
+                      ? l10n.loginKugouLogin(platform: l10n.brandKugou)
+                      : (nickname ?? l10n.loginKugouLoggedIn(platform: l10n.brandKugou)),
                   style: theme.textTheme.bodyMedium,
                 ),
               ],
@@ -101,7 +101,7 @@ extension _KgQrLoginDialogView on _KgQrLoginDialogState {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            l10n.loginTitleBrand(l10n.brandKugou),
+                            l10n.loginTitleBrand(platform: l10n.brandKugou),
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),

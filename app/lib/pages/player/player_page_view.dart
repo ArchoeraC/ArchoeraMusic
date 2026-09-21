@@ -364,7 +364,7 @@ class _SleepTimerButton extends ConsumerWidget {
         for (final m in prefs.sleepTimerPresets)
           PopupMenuItem(
             value: 'min:$m',
-            child: Text(l10n.sleepTimerMinutes(m)),
+            child: Text(l10n.sleepTimerMinutes(minutes: m)),
           ),
         PopupMenuItem(value: 'custom', child: Text(l10n.sleepTimerCustom)),
         const PopupMenuDivider(),

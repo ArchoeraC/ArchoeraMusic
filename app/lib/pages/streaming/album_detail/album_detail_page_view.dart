@@ -22,7 +22,7 @@ extension _StreamingAlbumDetailPageView on _StreamingAlbumDetailPageState {
         title: meta?.name ?? '',
         subtitle: [
           if (meta?.artist?.isNotEmpty == true) meta!.artist!,
-          if (songs != null) l10n.streamingAlbumSongs(songs.length),
+          if (songs != null) l10n.streamingAlbumSongs(count: songs.length),
         ].join(' · '),
         onPlayAll: songs == null || songs.isEmpty
             ? null

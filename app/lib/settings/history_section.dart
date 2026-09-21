@@ -163,7 +163,7 @@ class _HistorySectionState extends ConsumerState<HistorySection> {
                 title: l10n.settingsHistoryLimit,
                 subtitle: limit == null
                     ? l10n.settingsHistoryLimitUnlimited
-                    : l10n.settingsHistoryLimitOn(limit),
+                    : l10n.settingsHistoryLimitOn(count: limit),
                 value: limit != null,
                 onChanged: (v) => _onLimitToggle(
                   context,
@@ -180,7 +180,7 @@ class _HistorySectionState extends ConsumerState<HistorySection> {
                 SettingSliderTile(
                   icon: EtaIcons.storageOutline,
                   title: l10n.settingsHistoryLimit,
-                  subtitle: l10n.settingsHistoryLimitOn(limit),
+                  subtitle: l10n.settingsHistoryLimitOn(count: limit),
                   value: limit.toDouble().clamp(
                     historyLimitMin.toDouble(),
                     historyLimitMax.toDouble(),
@@ -189,7 +189,7 @@ class _HistorySectionState extends ConsumerState<HistorySection> {
                   max: historyLimitMax.toDouble(),
                   divisions:
                       (historyLimitMax - historyLimitMin) ~/ historyLimitStep,
-                  label: l10n.settingsHistoryLimitOn(limit),
+                  label: l10n.settingsHistoryLimitOn(count: limit),
                   onChanged: (v) {
                     final rounded =
                         ((v.round() ~/ historyLimitStep) * historyLimitStep);
@@ -206,7 +206,7 @@ class _HistorySectionState extends ConsumerState<HistorySection> {
                 icon: EtaIcons.broomOutline,
                 title: l10n.settingsHistoryStats,
                 subtitle:
-                    '${l10n.settingsCacheEntries(_count)} · ${_formatBytes(_bytes)}',
+                    '${l10n.settingsCacheEntries(count: _count)} · ${_formatBytes(_bytes)}',
                 trailing: IconButton(
                   tooltip: l10n.commonClear,
                   iconSize: 18,

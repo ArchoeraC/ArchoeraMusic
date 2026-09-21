@@ -33,7 +33,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
       description: desc,
       child: _WordConfirmField(
         word: word,
-        hint: l10n.settingsSecurityConfirmHint(word),
+        hint: l10n.settingsSecurityConfirmHint(word: word),
         cancelLabel: l10n.commonCancel,
         confirmLabel: l10n.settingsSecurityDestroy,
       ),
@@ -44,8 +44,8 @@ extension _SecuritySectionActions on _SecuritySectionState {
     final l10n = context.l10n;
     final ok = await _confirmShred(
       context,
-      l10n.settingsSecurityConfirmTitle(l10n.settingsSecurityStreaming),
-      l10n.settingsSecurityConfirmDesc(l10n.settingsSecurityConfirmWord),
+      l10n.settingsSecurityConfirmTitle(name: l10n.settingsSecurityStreaming),
+      l10n.settingsSecurityConfirmDesc(word: l10n.settingsSecurityConfirmWord),
     );
     if (ok != true || !context.mounted) return;
     await ref.read(streamingProvider.notifier).clearAll();
@@ -57,8 +57,8 @@ extension _SecuritySectionActions on _SecuritySectionState {
     final l10n = context.l10n;
     final ok = await _confirmShred(
       context,
-      l10n.settingsSecurityConfirmTitle(l10n.settingsSecuritySession),
-      l10n.settingsSecurityConfirmDesc(l10n.settingsSecurityConfirmWord),
+      l10n.settingsSecurityConfirmTitle(name: l10n.settingsSecuritySession),
+      l10n.settingsSecurityConfirmDesc(word: l10n.settingsSecurityConfirmWord),
     );
     if (ok != true || !context.mounted) return;
     await _revokeAll();
@@ -79,8 +79,8 @@ extension _SecuritySectionActions on _SecuritySectionState {
     final l10n = context.l10n;
     final ok = await _confirmShred(
       context,
-      l10n.settingsSecurityConfirmTitle(l10n.settingsSecurityUserDb),
-      l10n.settingsSecurityConfirmDesc(l10n.settingsSecurityConfirmWord),
+      l10n.settingsSecurityConfirmTitle(name: l10n.settingsSecurityUserDb),
+      l10n.settingsSecurityConfirmDesc(word: l10n.settingsSecurityConfirmWord),
     );
     if (ok != true || !context.mounted) return;
     final r = destroySensitiveFiles(sqliteFilePaths(userDbPath()));
@@ -92,7 +92,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
     final ok = await _confirmShred(
       context,
       l10n.settingsSecurityConfirmAllTitle,
-      l10n.settingsSecurityConfirmDesc(l10n.settingsSecurityConfirmWord),
+      l10n.settingsSecurityConfirmDesc(word: l10n.settingsSecurityConfirmWord),
     );
     if (ok != true || !context.mounted) return;
     await _revokeAll();
@@ -117,7 +117,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
     final l10n = context.l10n;
     if (failed.isNotEmpty) {
       toast(
-        l10n.toastSecurityDestroyFailed(failed.join(', ')),
+        l10n.toastSecurityDestroyFailed(path: failed.join(', ')),
         type: ToastType.error,
       );
       return;
@@ -125,7 +125,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
     toast(
       name == null
           ? l10n.toastSecurityAllDestroyed
-          : l10n.toastSecurityDestroyed(name),
+          : l10n.toastSecurityDestroyed(name: name),
       type: ToastType.success,
     );
   }
@@ -262,7 +262,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
         type: ok ? ToastType.success : ToastType.warning,
       );
     } on VaultException catch (e) {
-      toast(l10n.toastDeviceBindCloseFailed(e.message), type: ToastType.error);
+      toast(l10n.toastDeviceBindCloseFailed(error: e.message), type: ToastType.error);
     } finally {
       if (mounted) setState(() => _deviceBusy = false);
       await _refreshVault();
