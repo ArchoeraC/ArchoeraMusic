@@ -226,7 +226,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置歌词显示翻译开关。
+  /// 设置播放条歌词显示翻译开关（仅影响播放条迷你歌词）。
   void setShowTranslation(bool value) {
     state = state.copyWithShowTranslation(value);
     state.save();
