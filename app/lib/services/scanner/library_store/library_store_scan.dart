@@ -71,11 +71,22 @@ mixin _LibraryStoreScan on Notifier<LibraryState>, _LibraryStoreCore {
     await _initLibrary();
     if (state.scanning || state.scanDirs.isEmpty) return;
     final now = DateTime.now();
-    if (_lastAutoRefreshAt != null &&
+    // 扫描目录自身 mtime 变了（有新文件落入）→ 绕过节流立即扫描，
+    // 否则新加的媒体要等 5 分钟节流或重启才会入库。
+    final dirsChanged = _scanDirsChangedSinceLastScan();
+    if (!dirsChanged &&
+        _lastAutoRefreshAt != null &&
         now.difference(_lastAutoRefreshAt!) < const Duration(minutes: 5)) {
       return;
     }
     _lastAutoRefreshAt = now;
+    _snapshotScanDirMtimes();
     await _startScan(incremental: true);
   }
+
+  /// 相比上次扫描，扫描目录是否新增/移除或自身 mtime 变化（顶层新增文件可见）。
+  bool _scanDirsChangedSinceLastScan();
+
+  /// 记录当前扫描目录的 mtime 快照（扫描触发时调用）。
+  void _snapshotScanDirMtimes();
 }

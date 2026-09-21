@@ -202,9 +202,9 @@ pub async fn fetch_platform_info(
     match request.source {
         SourcePlatform::Kugou => kugou_info(client, request).await,
         SourcePlatform::Netease => netease_info(client, request).await,
-        // QQ / Neko 无 Rust 侧平台接口：用 enqueue 传入元数据 + 兜底源
+        // QQ / Neko / Streaming 无 Rust 侧平台接口：用 enqueue 传入元数据 + 兜底源
         // （MusicBrainz / CAA）补全。
-        SourcePlatform::Qqmusic | SourcePlatform::Neko => TrackMetadata::default(),
+        SourcePlatform::Qqmusic | SourcePlatform::Neko | SourcePlatform::Streaming => TrackMetadata::default(),
     }
 }
 
@@ -217,7 +217,7 @@ pub async fn fetch_platform_lyrics(
         SourcePlatform::Kugou => kugou_lyrics(client, request).await,
         SourcePlatform::Netease => netease_lyrics(client, request).await,
         // 歌词兜底：enqueue 未带歌词时走 LRCLIB（见 enrich_file）。
-        SourcePlatform::Qqmusic | SourcePlatform::Neko => None,
+        SourcePlatform::Qqmusic | SourcePlatform::Neko | SourcePlatform::Streaming => None,
     }
 }
 

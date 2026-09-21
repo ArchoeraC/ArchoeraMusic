@@ -29,9 +29,22 @@
 
 | 场景 | 播放源形态 |
 |---|---|
-| 本地文件 / streaming 本地 | 本地路径 → `create(source)`（现状不变） |
+| 本地文件 | 本地路径 → `create(source)`（现状不变） |
 | 在线 + SongCache 命中（kugou/netease） | 本地缓存路径 → `create(source)` |
-| 在线 + 缓存关 / 未命中 / qqmusic / streaming 在线 | **Dart 拉流 → SegmentStore → 引擎内存源**（本稿） |
+| 在线 + 缓存关 / 未命中 / qqmusic | **Dart 拉流 → SegmentStore → 引擎内存源**（本稿） |
+| **直传 / 流媒体在线**（`neko` / `streaming`(Subsonic/Jellyfin)） | **引擎 URL 直连流式**（不经 SegmentStore）：直链自带鉴权、支持 Range/206，FFmpeg 按需拉流，起播快且 PCM 同样不落盘 |
+
+> 直传/流媒体源跳过整首内存门的理由：其文件多为大体积无损，且无平台直链缓存兜底；
+> 若先整首拉进 SegmentStore 再解码，起播慢、大文件还会触发内存门禁弹窗。改为 URL 直连后
+> 与「不落盘」语义一致（`engineMemoryPlay` 只约束 PCM 是否落盘，与源形态正交）。
+>
+> **流媒体转码档位（2026-09-21）**：设置「媒体源」页可选 **原文件（默认）/ 高 320k / 中 192k / 低 128k**。
+> 仅使用**标准参数**以保证兼容——Subsonic 系（Navidrome/Airsonic/Subsonic…）用
+> `format`(`raw`/`mp3`) + `maxBitRate`；Jellyfin/Emby 用 `AudioCodec=mp3` + `MaxStreamingBitrate`。
+> 自有服务端同样走标准参数（Rust 转码器输出 MP3），不引入私有协议。**兼容性兜底**：部分服务端
+> 未启用转码时并不报错，而是以 `HTTP 200 + application/json` 返回错误（Navidrome 0.61 实测）；
+> 客户端选转码档后先 **Range 探测首字节**（`audio/*` 或音频魔数才算可用），不可用则**自动回退原文件**
+> 并缓存该服务器结论，避免重复坏 URL。**下载恒取原文件**（转码会改变容器/扩展名，与标签/文件名不符）。
 
 ## 3. 总体数据流
 

@@ -46,7 +46,7 @@ pub const max_channels = 6;
 pub const max_elements = 12;
 
 /// ffmpeg 的字节位反转表（libavutil/reverse.c）
-const ff_reverse = blk: {
+const era_reverse = blk: {
     @setEvalBranchQuota(100000);
     var t: [256]u8 = undefined;
     for (0..256) |x| {
@@ -262,7 +262,7 @@ fn acGet(br: *BitReader, ac: *ArithCoder, p: u32) u1 {
 /// dstdec.c prob_dst_x_bit：由首个 fsets 系数经 ff_reverse 派生首样本概率
 fn probDstXBit(c: i32) u32 {
     const idx: u8 = @truncate(@as(u32, @bitCast(c)) & 127);
-    return (@as(u32, ff_reverse[idx]) >> 1) + 1;
+    return (@as(u32, era_reverse[idx]) >> 1) + 1;
 }
 
 // ---- 每元素 16×256 的字节点积滤波表（dstdec.c build_filter） ----
@@ -456,10 +456,10 @@ test "dst: readMap 通道独立映射（fate 样本帧 0 真实前导位）" {
 
 test "dst: ff_reverse 与 ffmpeg reverse 表抽样一致" {
     // 抽样：0x01→0x80、0x80→0x01、0xF0→0x0F、0x2C→0x34
-    try testing.expectEqual(@as(u8, 0x80), ff_reverse[0x01]);
-    try testing.expectEqual(@as(u8, 0x01), ff_reverse[0x80]);
-    try testing.expectEqual(@as(u8, 0x0F), ff_reverse[0xF0]);
-    try testing.expectEqual(@as(u8, 0x34), ff_reverse[0x2C]);
+    try testing.expectEqual(@as(u8, 0x80), era_reverse[0x01]);
+    try testing.expectEqual(@as(u8, 0x01), era_reverse[0x80]);
+    try testing.expectEqual(@as(u8, 0x0F), era_reverse[0xF0]);
+    try testing.expectEqual(@as(u8, 0x34), era_reverse[0x2C]);
 }
 
 test "dst: prob_dst_x_bit 抽样（对照 dstdec.c 公式）" {

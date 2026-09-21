@@ -194,6 +194,30 @@ add_test(NAME test_era_mem
 set_tests_properties(test_era_mem PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# EraAudio 宿主回调流解码冒烟（docs/audio-kernel-zig.md §6.1/§7）：内存字节经
+# native_decoder_open_cb（宿主 read/seek）打开，与路径后端对拍帧数/采样率/声道，
+# 并验证 seek 后继续解码。证明在线流式源可进入自研内核（此前 URL 一律回退 FFmpeg）。
+add_executable(test_native_callback test_native_callback.c)
+target_link_libraries(test_native_callback PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_native_callback PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_native_callback PRIVATE m)
+endif()
+target_include_directories(test_native_callback PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_native_callback
+         COMMAND test_native_callback
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../samples/aac/t48_m.wav
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/mp3/samples/noxing.mp3
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/opus/samples/tiny.opus)
+set_tests_properties(test_native_callback PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # 集成测试（需要输入文件的跳过 CTEST，仅通过手动运行）
 # add_engine_test(test_pipeline test_pipeline.c)
 
@@ -318,6 +342,22 @@ if(UNIX)
     target_link_libraries(bench_era_pool PRIVATE m)
 endif()
 target_include_directories(bench_era_pool PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+
+# C-Bench 工具：引擎「冷/热启动 → 首帧」基准（headless；不入 ctest，手动运行）
+add_executable(bench_coldstart bench/bench_coldstart.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tempo.c
+)
+target_link_libraries(bench_coldstart PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(bench_coldstart PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(bench_coldstart PRIVATE m)
+endif()
+target_include_directories(bench_coldstart PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
 )

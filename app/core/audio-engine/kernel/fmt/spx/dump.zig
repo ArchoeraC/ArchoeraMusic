@@ -9,7 +9,8 @@
 //! 例如经副本树根转发：`pub const main = @import("kernel/fmt/spx/dump.zig").main;`）：
 //!   zig build-exe dumproot.zig -O ReleaseSafe -lc -femit-bin=dump
 //!   ./dump <file.spx> > mine.s16
-//! 与 `ffmpeg -i <file.spx> -f s16le ref.s16` 逐字节比对即完成验收。
+//! 与 `ffmpeg -c:a libspeex -i <file.spx> -f s16le ref.s16` 对比即完成验收
+//! （NB 亦可对 native `ffmpeg -i`；WB/UWB 以 libspeex 为准，见 decode.zig 头注释）。
 
 const std = @import("std");
 const io = @import("../../io.zig");

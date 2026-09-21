@@ -217,17 +217,22 @@ String? subsonicCoverUrl(
   return '$base/rest/getCoverArt?${_encodeQuery(query)}';
 }
 
-/// 拼 Subsonic stream URL（format=raw 强制原文件 + maxBitRate=0 双保险）。
+/// 拼 Subsonic stream URL。
+///
+/// 默认 `format=raw & maxBitRate=0`（原文件）；传入 [format]/[maxBitRate] 即请求
+/// 服务端转码（标准 Subsonic 参数，Navidrome/Airsonic/Subsonic 通用）。
 String subsonicStreamUrl(
   String base,
   String songId,
-  Map<String, String> auth,
-) {
+  Map<String, String> auth, {
+  String format = 'raw',
+  int maxBitRate = 0,
+}) {
   final query = Map<String, String>.from(auth)
     ..['id'] = songId
     ..['estimateContentLength'] = 'true'
-    ..['format'] = 'raw'
-    ..['maxBitRate'] = '0';
+    ..['format'] = format
+    ..['maxBitRate'] = '$maxBitRate';
   return '$base/rest/stream?${_encodeQuery(query)}';
 }
 

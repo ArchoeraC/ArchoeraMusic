@@ -201,11 +201,23 @@ class StreamingClient {
   }
 
   /// 取流播放 URL；[playSessionId] 仅 jellyfin/emby 用（上层 sessionIdForTrack）。
-  Future<String> getStreamUrl(String originalId, {String? playSessionId}) async {
+  Future<String> getStreamUrl(
+    String originalId, {
+    String? playSessionId,
+    String streamingQuality = 'original',
+  }) async {
     final sub = _sub;
-    if (sub != null) return sub.getStreamUrl(originalId);
+    if (sub != null) {
+      return sub.getStreamUrl(originalId, streamingQuality: streamingQuality);
+    }
     final jelly = _jelly;
-    if (jelly != null) return jelly.getStreamUrl(originalId, playSessionId: playSessionId);
+    if (jelly != null) {
+      return jelly.getStreamUrl(
+        originalId,
+        playSessionId: playSessionId,
+        streamingQuality: streamingQuality,
+      );
+    }
     throw _unsupported();
   }
 

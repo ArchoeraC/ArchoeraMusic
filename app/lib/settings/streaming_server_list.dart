@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/streaming/streaming_provider.dart';
 import '../services/streaming/streaming_types.dart';
+import '../stores/app_prefs.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../theme/app_theme.dart';

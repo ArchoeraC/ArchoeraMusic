@@ -3,6 +3,11 @@
 > 2026-09-05 · 解码引擎选择（Flutter UI，冷重启生效）、C↔Zig 兼容层、
 > 内存流式化与基准结论速记。配套 `app/core/audio-engine/tests/bench/`。
 
+> **更新（2026-09-21）**：本篇 §3/§4 的内存/基准数字早于 TTA/DTS「整文件读入 → 流式/定长缓冲」修复；
+> 最新口径与结果见 [`benchmark-2026-09-21.md`](benchmark-2026-09-21.md)（TTA RSS 35→9MB、DTS 65→10MB；
+> 对 FFmpeg 归一 100.8%）。同批还修复了 opus 解码非确定性、并落地在线流回调（`zk_decoder_open_cb`）与
+> EraSync 常驻池覆盖内存/回调源，详见 [`audio-kernel-zig.md`](audio-kernel-zig.md) §6.1/§16.1。
+
 ## 1. 引擎选择
 - Dart prefs：`audio.engine` = `'stable'`（FFmpeg，默认）/ `'eraudio'`（自研 Zig 内核，实验性）。
   UI 在设置 playback 分类，切换后冷重启生效（Vault 同款流程），l10n 9 语种。

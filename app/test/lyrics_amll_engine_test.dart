@@ -947,7 +947,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('高速换行（单步 + 间隔很短）直接吸附，不再等弹簧', (tester) async {
+    testWidgets('高速换行仍走弹簧（不硬切，对齐 AMLL）', (tester) async {
       // 间隔 200ms 的密集歌词
       final fast = <LyricGroup>[
         for (var i = 0; i < 60; i++)
@@ -970,13 +970,13 @@ void main() {
       double target(int i) => centers[i] - (centers[anchor] - 500 * 0.5);
       expect(anchor, anchor0 + 1);
       expect(
-        y[anchor],
-        closeTo(target(anchor), 0.01),
-        reason: '高速换行应直接吸附到目标（不走弹簧）',
+        (y[anchor] - target(anchor)).abs(),
+        greaterThan(0.5),
+        reason: '高速换行应仍处于弹簧途中，不得硬切吸附',
       );
     });
 
-    testWidgets('正常速度换行仍走弹簧（只有高速才吸附）', (tester) async {
+    testWidgets('正常速度换行同样走弹簧', (tester) async {
       final slow = buildGroups(60); // 每行 1000ms
       await tester.pumpWidget(buildWall(slow, 20 * 1000));
       await settle(tester);

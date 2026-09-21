@@ -98,6 +98,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     f.* = .{ .allocator = allocator, .reader = reader.* };
     errdefer f.reader.deinit();
     initTables();
+    f.s.jitter.init(0);
     f.mdct_256 = mdct.Mdct(f32).init(256);
     f.mdct_128 = mdct.Mdct(f32).init(128);
 
@@ -458,7 +459,9 @@ fn decodeAudioBlock(f: *DecoderCtx, s: *c.Ctx, blk: i32, offset: i32, bit_alloc_
     var ch: usize = if (cpl_in_use != 0) 0 else 1;
     while (ch <= @as(usize, @intCast(s.channels))) : (ch += 1) {
         if (s.eac3 == 0) {
-            s.exp_strategy[@intCast(blk)][ch] = @intCast(gb.readBits(if (ch == @as(usize, @intCast(s.lfe_ch))) 2 else 2) catch return 1);
+            // 对照 C：get_bits(gbc, 2 - (ch == s->lfe_ch))，LFE 只读 1 位
+            const exp_bits: u6 = if (ch == @as(usize, @intCast(s.lfe_ch))) 1 else 2;
+            s.exp_strategy[@intCast(blk)][ch] = @intCast(gb.readBits(exp_bits) catch return 1);
         }
         if (s.exp_strategy[@intCast(blk)][ch] != t.EXP_REUSE) bit_alloc_stages[ch] = 3;
     }
@@ -714,6 +717,8 @@ fn seekMsImpl(ctx: *anyopaque, ms_arg: i64) Error!void {
     f.out_pos = 0;
     f.out_len = 0;
     f.frames_done = 0;
+    // 抖动 PRNG 随从头重解一并复位（对照 ffmpeg ac3_decode_flush 的 av_lfg_init）
+    f.s.jitter.init(0);
     try f.reader.seek(0, .start);
     // 逐帧解码跳过（解码出的帧全部丢弃；readImpl 从目标帧重新解码）
     var guard: usize = 0;
@@ -860,7 +865,7 @@ fn applySpectralExtension(s: *c.Ctx) void {
             const nscale: f32 = s.spx_noise_blend[ch][bnd] * rms_energy[bnd] * (1.0 / -2147483648.0);
             const sscale: f32 = s.spx_signal_blend[ch][bnd];
             for (0..bandsize) |_| {
-                const noise: f32 = nscale * @as(f32, @floatFromInt(@as(i32, @bitCast(mn.nextDith()))));
+                const noise: f32 = nscale * @as(f32, @floatFromInt(@as(i32, @bitCast(s.jitter.next()))));
                 s.transform_coeffs[ch][@as(usize, @intCast(bin))] =
                     s.transform_coeffs[ch][@as(usize, @intCast(bin))] * sscale + noise;
                 bin += 1;

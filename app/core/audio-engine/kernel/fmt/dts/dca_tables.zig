@@ -14,17 +14,17 @@
 pub const DCA_CODE_BOOKS: usize = 10;
 pub const DCA_ADPCM_COEFFS: usize = 4;
 pub const DCA_ADPCM_VQCODEBOOK_SZ: usize = 4096;
-pub const ff_dca_quant_index_sel_nbits: [10]u8 = .{
+pub const era_dca_quant_index_sel_nbits: [10]u8 = .{
     1, 2, 2, 2, 2, 3, 3, 3,
     3, 3,
 };
 
-pub const ff_dca_quant_index_group_size: [10]u8 = .{
+pub const era_dca_quant_index_group_size: [10]u8 = .{
     1, 3, 3, 3, 3, 7, 7, 7,
     7, 7,
 };
 
-pub const ff_dca_scale_factor_quant6: [64]u32 = .{
+pub const era_dca_scale_factor_quant6: [64]u32 = .{
     1,       2,       2,       3,       3,       4,       6,       7,
     10,      12,      16,      20,      26,      34,      44,      56,
     72,      93,      120,     155,     200,     257,     331,     427,
@@ -35,7 +35,7 @@ pub const ff_dca_scale_factor_quant6: [64]u32 = .{
     1819701, 2344229, 3019952, 3890451, 5011872, 6456542, 8317638, 0,
 };
 
-pub const ff_dca_scale_factor_quant7: [128]u32 = .{
+pub const era_dca_scale_factor_quant7: [128]u32 = .{
     1,       1,       2,       2,       2,       2,       3,       3,
     3,       4,       4,       5,       6,       7,       7,       8,
     10,      11,      12,      14,      16,      18,      20,      23,
@@ -54,7 +54,7 @@ pub const ff_dca_scale_factor_quant7: [128]u32 = .{
     5011872, 5688529, 6456542, 7328245, 8317638, 0,       0,       0,
 };
 
-pub const ff_dca_joint_scale_factors: [129]u32 = .{
+pub const era_dca_joint_scale_factors: [129]u32 = .{
     3288,    3490,    3691,    3909,    4144,    4387,    4647,    4924,
     5218,    5528,    5855,    6199,    6568,    6963,    7374,    7810,
     8271,    8758,    9278,    9831,    10410,   11031,   11685,   12373,
@@ -74,32 +74,32 @@ pub const ff_dca_joint_scale_factors: [129]u32 = .{
     5218066,
 };
 
-pub const ff_dca_scale_factor_adj: [4]u32 = .{
+pub const era_dca_scale_factor_adj: [4]u32 = .{
     4194304, 4718592, 5242880, 6029312,
 };
 
-pub const ff_dca_quant_levels: [32]u32 = .{
+pub const era_dca_quant_levels: [32]u32 = .{
     1,       3,       5,       7,     9,      13,     17,     25,
     32,      64,      128,     256,   512,    1024,   2048,   4096,
     8192,    16384,   32768,   65536, 131072, 262144, 524288, 1048576,
     2097152, 4194304, 8388608, 0,     0,      0,      0,      0,
 };
 
-pub const ff_dca_lossy_quant: [32]u32 = .{
+pub const era_dca_lossy_quant: [32]u32 = .{
     0,      6710886, 4194304, 3355443, 2474639, 2097152, 1761608, 1426063,
     796918, 461373,  251658,  146801,  79692,   46137,   27263,   16777,
     10486,  5872,    3355,    1887,    1258,    713,     336,     168,
     84,     42,      21,      0,       0,       0,       0,       0,
 };
 
-pub const ff_dca_lossless_quant: [32]u32 = .{
+pub const era_dca_lossless_quant: [32]u32 = .{
     0,      4194304, 2097152, 1384120, 1048576, 696254, 524288, 348127,
     262144, 131072,  65431,   33026,   16450,   8208,   4100,   2049,
     1024,   512,     256,     128,     64,      32,     16,     8,
     4,      2,       1,       0,       0,       0,      0,      0,
 };
 
-pub const ff_dca_adpcm_vb: [16384]i16 = .{
+pub const era_dca_adpcm_vb: [16384]i16 = .{
     9928,   -2618,  -1093,  -1263, 11077,  -2876,  -1747,  -308,  10503,  -1082,  -1426,  -1167, 9337,   -2403,  -1495, 274,
     10698,  -2529,  -532,   -1122, 10368,  -3974,  -1264,  -750,  10070,  -3667,  346,    863,   10278,  -3093,  311,   -576,
     9894,   -1330,  -1428,  -860,  10544,  -1923,  -1058,  -971,  10996,  -1632,  -841,   -1404, 11832,  -3465,  1658,  -1990,
@@ -1126,7 +1126,7 @@ pub const ff_dca_adpcm_vb: [16384]i16 = .{
     13213,  -10464, 6381,   -3189, 11796,  -13681, 10703,  -6075, 9639,   -7949,  9625,   -3944, 8538,   -6997,  5309,  453,
 };
 
-pub const ff_dca_high_freq_vq: [32768]i8 = .{
+pub const era_dca_high_freq_vq: [32768]i8 = .{
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
     -4,  -2,  2,   1,   -16, -10, 1,   3,   1,   0,   6,   1,   -3,  7,   1,   -22, 2,   -4,  -3,  11,  14,  6,   -1,  1,   -13, 29,  -28, 10,  10,  -8,  0,   -9,
     -8,  8,   -7,  10,  -3,  -12, -5,  -8,  1,   -2,  9,   -2,  -5,  -18, 1,   9,   -8,  -8,  3,   41,  7,   -9,  -9,  22,  -42, -29, 14,  -18, -14, -32, 1,   -15,
@@ -2153,7 +2153,7 @@ pub const ff_dca_high_freq_vq: [32768]i8 = .{
     5,   0,   -6,  5,   6,   3,   3,   -10, -5,  1,   -1,  4,   3,   -11, -8,  5,   4,   -5,  5,   -5,  -7,  -5,  11,  5,   20,  -8,  -16, 21,  -4,  27,  23,  -5,
 };
 
-pub const ff_dca_fir_32bands_perfect_fixed: [512]i32 = .{
+pub const era_dca_fir_32bands_perfect_fixed: [512]i32 = .{
     0,        0,        -3,       -10,      -35,      -105,     -218,     -141,
     -170,     -216,     -239,     -254,     -257,     -251,     -235,     -212,
     -267,     -317,     -362,     -400,     -425,     -434,     -427,     -373,
@@ -2220,7 +2220,7 @@ pub const ff_dca_fir_32bands_perfect_fixed: [512]i32 = .{
     -141,     -218,     -105,     -35,      -10,      -3,       0,        0,
 };
 
-pub const ff_dca_fir_32bands_nonperfect_fixed: [512]i32 = .{
+pub const era_dca_fir_32bands_nonperfect_fixed: [512]i32 = .{
     -53,      -64,      -77,      -91,      -107,     -124,     -144,     -165,
     -189,     -215,     -244,     -277,     -313,     -353,     -397,     -447,
     502,      563,      631,      706,      789,      881,      983,      1095,
@@ -2287,7 +2287,7 @@ pub const ff_dca_fir_32bands_nonperfect_fixed: [512]i32 = .{
     -165,     -144,     -124,     -107,     -91,      -77,      -64,      -53,
 };
 
-pub const ff_dca_lfe_fir_64_fixed: [256]i32 = .{
+pub const era_dca_lfe_fir_64_fixed: [256]i32 = .{
     6103,  52170,   -558064, 1592440, 6290049, 1502534, -546669, 53047,
     1930,  51089,   -568920, 1683709, 6286575, 1414057, -534782, 53729,
     2228,  49794,   -579194, 1776276, 6279634, 1327070, -522445, 54228,
@@ -2323,13 +2323,13 @@ pub const ff_dca_lfe_fir_64_fixed: [256]i32 = .{
 };
 // ---- DTS-HD XLL（dca.c / dcadata.c / dca_xll 定点）表，FFmpeg n9.0.1 ----
 // ff_dca_sampling_freqs（dca.c；XLL chset 采样率索引表，与 core sample_rates 表不同）
-pub const ff_dca_sampling_freqs: [16]u32 = .{
+pub const era_dca_sampling_freqs: [16]u32 = .{
     8000, 16000, 32000, 64000, 128000, 22050, 44100, 88200,
     176400, 352800, 12000, 24000, 48000, 96000, 192000, 384000,
 };
 
 // ff_dca_dmix_primary_nch（主 chset downmix 类型 → 输出声道数，dca_xll parse_dmix_coeffs）
-pub const ff_dca_dmix_primary_nch: [8]u8 = .{
+pub const era_dca_dmix_primary_nch: [8]u8 = .{
     1, 2, 2, 3, 3, 4, 4, 0,
 };
 
@@ -2337,7 +2337,7 @@ pub const ff_dca_dmix_primary_nch: [8]u8 = .{
 pub const FF_DCA_DMIXTABLE_SIZE: usize = 242;
 pub const FF_DCA_INV_DMIXTABLE_SIZE: usize = 201;
 pub const FF_DCA_DMIXTABLE_OFFSET: usize = FF_DCA_DMIXTABLE_SIZE - FF_DCA_INV_DMIXTABLE_SIZE;
-pub const ff_dca_dmixtable: [242]u16 = .{
+pub const era_dca_dmixtable: [242]u16 = .{
     0, 33, 35, 37, 39, 41, 44, 46,
     49, 52, 55, 58, 62, 65, 69, 73,
     78, 82, 87, 92, 98, 104, 110, 116,
@@ -2371,7 +2371,7 @@ pub const ff_dca_dmixtable: [242]u16 = .{
     32300, 32768,
 };
 
-pub const ff_dca_inv_dmixtable: [201]u32 = .{
+pub const era_dca_inv_dmixtable: [201]u32 = .{
     6553600, 6186997, 5840902, 5514167, 5205710, 4914507, 4639593, 4380059,
     4135042, 3903731, 3685360, 3479204, 3284581, 3100844, 2927386, 2763630,
     2609035, 2463088, 2325305, 2195230, 2072430, 2013631, 1956500, 1900990,
@@ -2401,7 +2401,7 @@ pub const ff_dca_inv_dmixtable: [201]u32 = .{
 };
 
 // XLL 自适应预测反射系数表
-pub const ff_dca_xll_refl_coeff: [128]u16 = .{
+pub const era_dca_xll_refl_coeff: [128]u16 = .{
     0, 3070, 5110, 7140, 9156, 11154, 13132, 15085,
     17010, 18904, 20764, 22588, 24373, 26117, 27818, 29474,
     31085, 32648, 34164, 35631, 37049, 38418, 39738, 41008,
@@ -2421,13 +2421,13 @@ pub const ff_dca_xll_refl_coeff: [128]u16 = .{
 };
 
 // XLL 频带合成滤波系数（assemble_freq_bands，dcadsp.c）
-pub const ff_dca_xll_band_coeff: [20]i32 = .{
+pub const era_dca_xll_band_coeff: [20]i32 = .{
     868669, -5931642, -1228483, 4194304, -20577, 122631, -393647, 904476,
     -1696305, 2825313, -4430736, 6791313, 41153, -245210, 785564, -1788164,
     3259333, -5074941, 6928550, -8204883,
 };
 
-pub const ff_dca_fir_64bands_fixed: [1024]i32 = .{
+pub const era_dca_fir_64bands_fixed: [1024]i32 = .{
           -38,       -38,       -43,       -48,       -52,       -57,
           -62,       -67,       -73,       -79,       -85,       -91,
           -98,      -105,      -113,      -121,      -129,      -138,

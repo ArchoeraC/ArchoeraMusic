@@ -54,6 +54,8 @@ extension _StreamingServerListView on _StreamingServerListState {
           ),
         ),
         const SizedBox(height: 12),
+        _buildStreamingQualityCard(scheme, l10n, ref.watch(appPrefsProvider)),
+        const SizedBox(height: 12),
         if (state.servers.isEmpty)
           _buildStreamingServerEmpty(scheme, l10n)
         else
@@ -71,6 +73,61 @@ extension _StreamingServerListView on _StreamingServerListState {
             ),
           ),
       ],
+    );
+  }
+
+  /// 流媒体转码档位选择（original/high/medium/low）。标准参数，兼容其它服务端。
+  Widget _buildStreamingQualityCard(
+    ColorScheme scheme,
+    AppLocalizations l10n,
+    AppPrefs prefs,
+  ) {
+    final current = prefs.streamingQuality;
+    final options = <(String, String)>[
+      ('original', l10n.streamingQualityOriginal),
+      ('high', l10n.streamingQualityHigh),
+      ('medium', l10n.streamingQualityMedium),
+      ('low', l10n.streamingQualityLow),
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: cardDecoration(scheme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.streamingQualityTitle,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            l10n.streamingQualityNote,
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.4,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final (key, label) in options)
+                ChoiceChip(
+                  label: Text(label),
+                  selected: current == key,
+                  onSelected: (_) =>
+                      ref.read(appPrefsProvider.notifier).setStreamingQuality(key),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

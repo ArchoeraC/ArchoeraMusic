@@ -1103,10 +1103,11 @@ static void *engine_thread(void *arg)
     ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)arg;
     int pool_on = 0;
 
-    /* S1 常驻内核池（默认开启）：EraAudio 原生（engine_mode==1）且源为磁盘文件
-     * （非 SegStore 会话）时走 zk_engine 流式 seam；ARCHOERA_ERA_POOL=0 可关闭
-     * （A/B 回退）；失败（含内核未链接）继续旧 zk_decoder 路径，回退语义完全不变。 */
-    if (e->cfg.engine_mode == 1 && !e->store && e->source) {
+    /* S1 常驻内核池（默认开启）：EraAudio 原生（engine_mode==1）时，本地路径 /
+     * 在线回调（source）与 SegStore 内存源（store）均走 zk_engine 流式 seam；
+     * ARCHOERA_ERA_POOL=0 可关闭（A/B 回退）；失败（含内核未链接）继续旧
+     * zk_decoder 路径，回退语义完全不变。 */
+    if (e->cfg.engine_mode == 1 && (e->source || e->store)) {
         const char *pool_env = getenv("ARCHOERA_ERA_POOL");
         if (pool_env == NULL || pool_env[0] != '0') {
             if (native_decoder_pool_begin(1, 2, 16) == 0) {

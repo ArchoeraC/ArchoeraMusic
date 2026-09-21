@@ -242,6 +242,25 @@ Step 3  Rust resolving Future（tokio runtime 中执行）：
               触发 pick_next() 拉 queued 下一个
 ```
 
+### 3.4.1 Dart 回退源与流媒体策略（2026-09-21）
+
+Rust 内置解析仅覆盖 KG/NT；其余源在 Rust `resolving` 阶段恒失败
+（`retryable=true, stage=resolving`），由 Dart 复用播放管线解析 URL 后经
+`archoera_downloader_retry_with_url` 注入（见 §3.2/§3.4）。
+
+| source | Rust 解析 | Dart 解析 | 说明 |
+|---|---|---|---|
+| `qqmusic` | 无 | `resolvePlaySource`（vkey 直链 + UA/Referer/Cookie） | 免费曲免登录 |
+| `neko` | 无 | Neko 直链（无音质档） | 入队前补元数据/歌词；扩展名按文件头嗅探 |
+| `streaming` | 无（`SourcePlatform::Streaming`） | Subsonic/Jellyfin `/rest/stream?format=raw`（原文件，鉴权在 URL） | 扩展名取 `Track.quality.codec`（Subsonic `suffix` / Jellyfin codec） |
+
+**流媒体下载策略**（增强能力 + 明确提示 + 入口收敛）：
+- **右键菜单不提供流媒体下载入口**（`track_context_menu` 的 `canDownload` 排除 `streaming`）；
+  仅**批量下载**（多选/歌单/专辑「下载全部」）可包含流媒体。
+- 首次批量含流媒体时弹出确认（「不建议对流媒体使用下载功能」，可勾选**不再提示**，
+  持久化于 `download.streamingNoticeDismissed`）；确认后才入队。
+- 动机：流媒体源多为自建/可长期访问，下载到本地通常不划算，且可能受服务端转码与带宽影响。
+
 ### 3.5 Rust 内部：HTTP 流式下载 + 回调推送（无轮询）
 
 ```

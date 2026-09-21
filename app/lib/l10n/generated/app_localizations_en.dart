@@ -237,6 +237,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadRequiresLoginTitle => 'Login required to download';
 
   @override
+  String get downloadStreamingWarnTitle =>
+      'Downloading streaming media is not recommended';
+
+  @override
+  String get downloadStreamingWarnBody =>
+      'If you can rely on your streaming server\'s availability, don\'t use it often, or run the media server yourself, downloading to local storage is generally not recommended.';
+
+  @override
+  String get downloadStreamingWarnDontAsk => 'Don\'t show again';
+
+  @override
+  String get downloadStreamingWarnProceed => 'Download anyway';
+
+  @override
   String get menuComment => 'View comments';
 
   @override
@@ -334,6 +348,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get queueRepeatOne => 'Repeat one';
+
+  @override
+  String get queueRepeatOff => 'Play in order';
+
+  @override
+  String get queueFinished => 'Playlist finished, playback paused';
 
   @override
   String get queueShuffle => 'Shuffle';
@@ -3590,6 +3610,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get repeatModeOne => 'Repeat one';
 
   @override
+  String get repeatModeOff => 'Play in order';
+
+  @override
   String get sidebarStreaming => 'Streaming';
 
   @override
@@ -3719,6 +3742,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get streamingHint => 'Media source';
+
+  @override
+  String get streamingQualityTitle => 'Streaming quality';
+
+  @override
+  String get streamingQualityNote =>
+      'Original first; transcode tiers ask the server to transcode to universal MP3 — requires server support, standard params keep other servers compatible.';
+
+  @override
+  String get streamingQualityOriginal => 'Original';
+
+  @override
+  String get streamingQualityHigh => 'High (320k)';
+
+  @override
+  String get streamingQualityMedium => 'Medium (192k)';
+
+  @override
+  String get streamingQualityLow => 'Low (128k)';
 
   @override
   String get streamingHintDetail =>

@@ -85,6 +85,28 @@ ZkDecoder *zk_decoder_open_mem(const unsigned char *data, size_t len,
                                ZkInfo *info, char *errbuf, int errbuf_size);
 
 /**
+ * 从**宿主回调流**打开解码器（在线流式源，docs/audio-kernel-zig.md §6.1/§7）。
+ * 内核保持零网络栈：传输（socket/TLS/Range/重定向）由 C 壳/宿主注入，本层只消费
+ * 字节流。契约与 [zk_decoder_open] 完全一致（info/errbuf/返回语义）。
+ *
+ * `ctx` / `on_read` / `on_seek` 的所有权与生命周期归调用方：须保持有效覆盖整个
+ * 解码会话；[zk_decoder_close] 只释放内核内部（peek 缓冲/适配器），**不触碰** ctx。
+ *
+ * - `on_read(ctx, buf, len)`：填充 buf，返回实际字节数（0 = EOF）；
+ * - `on_seek(ctx, off, whence, buffered)`：whence 0=start / 1=current / 2=end；
+ *   返回非 0 = 成功。`buffered` = 内核 peek 缓冲中已被丢弃、尚未消费的字节数；
+ *   whence=current 时底层流应按 `off - buffered` 相对当前位置前移
+ *   （内核逻辑游标在 `pos`，底层流实际领先 `buffered` 字节）。
+ * - `size_hint`：已知总字节（0 = 未知，此时 whence=end 不可用）。
+ */
+typedef size_t (*zk_read_cb)(void *ctx, unsigned char *buf, size_t len);
+typedef int (*zk_seek_cb)(void *ctx, long long off, int whence, size_t buffered);
+
+ZkDecoder *zk_decoder_open_cb(void *ctx, zk_read_cb on_read, zk_seek_cb on_seek,
+                              unsigned long long size_hint,
+                              ZkInfo *info, char *errbuf, int errbuf_size);
+
+/**
  * 解码最多 max_frames 帧 float32 交错 PCM。
  * @return >=0：实际输出帧数（0 = EOF，正常文件尾）；
  *         <0：解码错误，返回值 = -（enum ZkStatus 状态码），
@@ -134,12 +156,58 @@ long long zk_engine_decode_once(ZkEngine *h, const char *path,
                                 float *out, size_t max_frames,
                                 int *out_channels, ZkInfo *info);
 
+/* ---- 结构化任务提交面（§6.1 任务提交面与句柄；加法式，不改动既有路径）---- */
+
+/** 结构化任务句柄（池内异步批次解码；不透明） */
+typedef struct ZkTask ZkTask;
+
+/**
+ * 提交一次「打开 path → 解码至多 max_frames 帧 float32 交错到 out → 填 info」
+ * 的池内任务。**非阻塞**：立即返回句柄，由 [zk_task_wait] 取结果。
+ * 语义与 [zk_engine_decode_once] 对齐（>=0 帧数（0=EOF）/ <0 = -（enum ZkStatus））。
+ *
+ * `out` 所有权归调用方，须存活到 [zk_task_wait] 返回；`path` 同理（worker 异步读取）；
+ * `info` 可空，成功打开时填解码源信息（最小字段）。
+ * 失败（h/path/out 为空 / max_frames==0 / 池停机 / 任务槽满 InstanceLimit / OOM）
+ * 返回 NULL。
+ */
+ZkTask *zk_submit_decode(ZkEngine *h, const char *path,
+                         float *out, size_t max_frames, ZkInfo *info);
+
+/**
+ * 等待任务完工（阻塞，无轮询）。返回 >=0 帧数（0=EOF）/ <0 = -（enum ZkStatus）。
+ * t 为 NULL 返回 -（ZK_IO_ERROR）。完工事件保持置位 → 可重复调用（幂等）。
+ */
+long long zk_task_wait(ZkTask *t);
+
+/**
+ * 释放任务句柄（t 为 NULL 时空操作）。内部先 wait 收尾（幂等），未显式 wait 直接
+ * free 也不悬垂。**同一句柄只可 free 一次**（重复 free 属未定义行为，契约明确）。
+ */
+void zk_task_free(ZkTask *t);
+
 /** 流式会话句柄（句柄常驻、逐块拉取、池内执行；朝播放迁池 §6.3） */
 typedef struct ZkEngineStream ZkEngineStream;
 
 /** 打开流式会话（池 worker 上 probe+open 一次）。失败返回 NULL 并写 errbuf 状态码。 */
 ZkEngineStream *zk_engine_open(ZkEngine *h, const char *path,
                                ZkInfo *info, char *errbuf, size_t errbuf_size);
+
+/**
+ * 同上，但从**内存字节切片**打开（纯内存源，docs/audio-memory-source.md §7）。
+ * `data` 所有权归调用方，须覆盖会话生命周期。
+ */
+ZkEngineStream *zk_engine_open_mem(ZkEngine *h, const unsigned char *data, size_t len,
+                                   ZkInfo *info, char *errbuf, size_t errbuf_size);
+
+/**
+ * 同上，但从**宿主回调流**打开（在线流式源）。ctx/回调生命周期归调用方；
+ * 内核自持 peek 缓冲，close 释放，不触碰 ctx。签名见上方 zk_read_cb/zk_seek_cb。
+ */
+ZkEngineStream *zk_engine_open_cb(ZkEngine *h, void *ctx,
+                                  zk_read_cb on_read, zk_seek_cb on_seek,
+                                  unsigned long long size_hint,
+                                  ZkInfo *info, char *errbuf, size_t errbuf_size);
 
 /**
  * 逐步拉块解码到 out（float32 交错，最多 max_frames 帧）。

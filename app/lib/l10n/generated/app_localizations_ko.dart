@@ -231,6 +231,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get downloadRequiresLoginTitle => '다운로드하려면 로그인이 필요합니다';
 
   @override
+  String get downloadStreamingWarnTitle => '스트리밍 미디어 다운로드는 권장하지 않습니다';
+
+  @override
+  String get downloadStreamingWarnBody =>
+      '스트리밍 접근이 보장되거나 자주 사용하지 않거나 직접 운영하는 서버라면 로컬로 다운로드하는 것은 권장하지 않습니다.';
+
+  @override
+  String get downloadStreamingWarnDontAsk => '다시 알리지 않기';
+
+  @override
+  String get downloadStreamingWarnProceed => '그래도 다운로드';
+
+  @override
   String get menuComment => '댓글 보기';
 
   @override
@@ -327,6 +340,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get queueRepeatOne => '한 곡 반복';
+
+  @override
+  String get queueRepeatOff => '순차 재생';
+
+  @override
+  String get queueFinished => '재생 목록이 끝나 재생을 일시정지했습니다';
 
   @override
   String get queueShuffle => '셔플 재생';
@@ -3458,6 +3477,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get repeatModeOne => '한 곡 반복';
 
   @override
+  String get repeatModeOff => '순차 재생';
+
+  @override
   String get sidebarStreaming => '스트리밍';
 
   @override
@@ -3583,6 +3605,25 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get streamingHint => '미디어 소스';
+
+  @override
+  String get streamingQualityTitle => '스트리밍 음질';
+
+  @override
+  String get streamingQualityNote =>
+      '원본 우선. 트랜스코드 단계는 서버에 범용 MP3 변환을 요청합니다(서버 지원 필요, 표준 파라미터로 다른 서버와 호환).';
+
+  @override
+  String get streamingQualityOriginal => '원본';
+
+  @override
+  String get streamingQualityHigh => '높음 (320k)';
+
+  @override
+  String get streamingQualityMedium => '보통 (192k)';
+
+  @override
+  String get streamingQualityLow => '낮음 (128k)';
 
   @override
   String get streamingHintDetail =>

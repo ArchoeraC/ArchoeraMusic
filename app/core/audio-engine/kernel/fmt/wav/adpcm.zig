@@ -867,7 +867,7 @@ pub fn swfNbSamples(data_bytes: u64, channels: usize, nbits: u8) u64 {
 
 /// ff_log2_tab（log2_tab.c）：floor(log2(v))，v∈[0,255]。
 /// 值分布：0×2、1×2、2×4、3×8、4×16、5×32、6×64、7×128。
-const ff_log2_tab = [256]u8{
+const era_log2_tab = [256]u8{
     0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
     4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
     5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
@@ -973,7 +973,7 @@ fn g726Log2(v: u32) u32 {
         x >>= 8;
         n += 8;
     }
-    n += ff_log2_tab[@intCast(x)];
+    n += era_log2_tab[@intCast(x)];
     return n;
 }
 

@@ -61,6 +61,23 @@ NativeDecoder *native_decoder_open_mem(const void *data, size_t len, NativeInfo 
                                        char *errbuf, int errbuf_size);
 
 /**
+ * 从**宿主回调流**打开自研内核解码器（在线流式源；docs/audio-kernel-zig.md
+ * §6.1/§7）。内核零网络栈——传输由 C 壳注入，本层只消费字节流。契约同
+ * [native_decoder_open]；`ctx` 与两个回调生命周期归调用方，须覆盖解码器；
+ * [native_decoder_close] 不释放 ctx。
+ *
+ * `on_read(ctx, buf, len)` 返回实际字节（0=EOF）；`on_seek(ctx, off, whence,
+ * buffered)` 非 0 = 成功，whence 0=start/1=current/2=end，current 语义见
+ * kernel_bridge.h。`size_hint` = 已知总字节（0=未知）。
+ */
+NativeDecoder *native_decoder_open_cb(void *ctx,
+                                      size_t (*on_read)(void *, unsigned char *, size_t),
+                                      int (*on_seek)(void *, long long, int, size_t),
+                                      unsigned long long size_hint,
+                                      NativeInfo *info, int *status_out,
+                                      char *errbuf, int errbuf_size);
+
+/**
  * 解码最多 max_frames 帧 float32 交错 PCM。
  * @return >=0：实际帧数（每声道）；0 = EOF（正常文件尾）；
  *         <0：错误——-1 参数错误，其余为负 ZkStatus 状态码

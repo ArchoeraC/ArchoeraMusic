@@ -239,6 +239,20 @@ class AppLocalizationsFr extends AppLocalizations {
   String get downloadRequiresLoginTitle => 'Connexion requise pour télécharger';
 
   @override
+  String get downloadStreamingWarnTitle =>
+      'Téléchargement de flux non recommandé';
+
+  @override
+  String get downloadStreamingWarnBody =>
+      'Si l\'accès au streaming est garanti, que vous l\'utilisez rarement ou qu\'il s\'agit de votre propre serveur, il n\'est pas conseillé de télécharger en local.';
+
+  @override
+  String get downloadStreamingWarnDontAsk => 'Ne plus afficher';
+
+  @override
+  String get downloadStreamingWarnProceed => 'Télécharger quand même';
+
+  @override
   String get menuComment => 'Voir les commentaires';
 
   @override
@@ -338,6 +352,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get queueRepeatOne => 'Répéter une';
+
+  @override
+  String get queueRepeatOff => 'Lecture dans l\'ordre';
+
+  @override
+  String get queueFinished => 'Liste de lecture terminée, lecture en pause';
 
   @override
   String get queueShuffle => 'Lecture aléatoire';
@@ -3664,6 +3684,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get repeatModeOne => 'Répéter une';
 
   @override
+  String get repeatModeOff => 'Lecture dans l\'ordre';
+
+  @override
   String get sidebarStreaming => 'Streaming';
 
   @override
@@ -3793,6 +3816,25 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get streamingHint => 'Source multimédia';
+
+  @override
+  String get streamingQualityTitle => 'Qualité du streaming';
+
+  @override
+  String get streamingQualityNote =>
+      'Original en priorité ; les paliers de transcodage demandent au serveur du MP3 universel — nécessite le support du serveur, paramètres standards compatibles.';
+
+  @override
+  String get streamingQualityOriginal => 'Original';
+
+  @override
+  String get streamingQualityHigh => 'Haute (320k)';
+
+  @override
+  String get streamingQualityMedium => 'Moyenne (192k)';
+
+  @override
+  String get streamingQualityLow => 'Basse (128k)';
 
   @override
   String get streamingHintDetail =>

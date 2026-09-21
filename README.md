@@ -181,41 +181,46 @@ flutter run -d linux      # 或 windows / macos
 
 ## 自研解码内核基准（EraAudio，实验性）
 
-> 2026-09-05 行业对比（FFmpeg n9.0.1 / libFLAC / LAME / speexdec / libopus / libvorbis）。
-> 定位：**实验性参考，非发布承诺**。自研 Zig 内核（`--engine-mode 1`）当前为「优先尝试、
-> 失败回退 FFmpeg」的渐进接管路线，基准用于量化差距、排定优化项。
-> 全量方法/原始数据/复现见 [docs/benchmark-industry-2026-09-05.md](docs/benchmark-industry-2026-09-05.md)，
-> 引擎集成与旧口径基准见 [docs/engine-integration-bench.md](docs/engine-integration-bench.md)。
+> 2026-09-21 行业对比（**出厂最小音频 FFmpeg** + **最大优化 FFmpeg** + `libFLAC/LAME/libopus/libvorbis/libspeex/speexdec`）。
+> 定位：**实验性参考，非发布承诺**。自研 Zig 内核（`--engine-mode 1`）为「优先尝试、失败回退 FFmpeg」的渐进接管路线，基准用于量化差距、排定优化项。
+> 全量方法/原始数据/复现见 [docs/benchmark-2026-09-21.md](docs/benchmark-2026-09-21.md)，历史快照见 [docs/benchmark-industry-2026-09-05.md](docs/benchmark-industry-2026-09-05.md)。
 
-**总体评分（100 = speed40 + memory30 + correctness20 + coverage10）**：
-EraAudio **95.6/100（A+；跨轮 95.0–95.6）** vs 引擎内 Stable/FFmpeg 97.6（A+）→
-**相对 FFmpeg ≈97.9%**（Δ≈−2.0，区间 97.0%–97.9%）；`flac -d` / `lame --decode`
-（各自格式、作地面真值）100；`speexdec` 80（极性分歧，见 doc）。同机：Intel i9-13980HX ·
-Linux · 200s 高熵噪声语料 · 解码→PCM 不重编码；lossless 类 native 输出与 FFmpeg **逐位一致**，
-lossy 类 `|corr|≥0.999`、`±≤1 LSB`（ac3/eac3≈0.96、speex 极性分歧另注）。贴近阈值行有
-±4 分跨轮抖动（ac3/flac/m4a），判档请看区间与分差方向。
+**总体评分（100 = speed40 + memory30 + correctness20 + coverage10；FFmpeg 归一）**：
+EraAudio **100.0/100（A+；多轮 σ=0）** vs 引擎内 Stable/FFmpeg **99.2**（A+）→ **相对 FFmpeg = 100.8%（Δ+0.8）**，
+15/15 格式满分；与各格式专业专用解码器（`flac -d` / `lame` / `libopus` / `libvorbis` / `libspeex` = 100）**持平**，并全面 ≥ 通用 `ffmpeg` CLI。
+基线为**播放器实际内嵌的纯音频 FFmpeg**（`build-ffmpeg-minimal.sh`，纯 LGPL、仅音频、需 `nasm` 才有 `x86asm`），并另用**最大优化 FFmpeg**（`--enable-lto -O3 -march=native`）复核——两者比值相同。
+同机：Intel i9-13980HX · Linux · 200s 高熵噪声语料 · 解码→PCM 不重编码；lossless 类 native 输出与 FFmpeg **逐位一致**，lossy 类 `|corr|≥0.999` 且 `±≤1 LSB`（AC-3/E-AC-3/Speex 已全部修至 corr=1.0）。
 
 | 格式 | EraAudio | Stable(FFmpeg) | 格式 | EraAudio | Stable(FFmpeg) |
 |---|---|---|---|---|---|
-| flac(直解) | 97.9 A+ | 100 A+ | mp2 | 100 A+ | 96 A+ |
-| wav / wv / mka | 100 A+ | 100 A+ | opus | 100 A+ | 100 A+ |
-| tta | 82 B | 100 A+ | vorbis | 100 A+ | 100 A+ |
-| mp3 | 100 A+ | 96 A+ | aac(m4a) | 100 A+ | 96 A+ |
-| dts | 82 B | 96 A+ | aac(adts) | 100 A+ | 96 A+ |
-| speex | 88 B | 88 B | ac3 | 92 A | 100 A+ |
-| | | | eac3 | 92 A | 96 A+ |
+| flac / wav / wv / mka | 100 A+ | 100 A+ | mp2 | 100 A+ | 100 A+ |
+| tta | 100 A+ | 100 A+ | opus | 100 A+ | 100 A+ |
+| dts | 100 A+ | 100 A+ | vorbis | 100 A+ | 100 A+ |
+| ac3 | 100 A+ | 100 A+ | aac(m4a)/(adts) | 100 A+ | 100 A+ |
+| eac3 | 100 A+ | 100 A+ | mp3 | 100 A+ | 100 A+ |
+| speex | 100 A+ | 88 B | | | |
 
-**已知短板（评分依据，详见 doc §6）**：① 直解 `.flac` native ≈46–50× 实时（比 FFmpeg 慢 ~20×，
-自研 flac 帧解码器待优化；经 mka 轨 ≈260–280× 正常）；② tta/dts 峰值 RSS 55/85MB（平台 ≈29MB，
-疑似整缓冲，待多尺寸验证）；③ ac3/eac3 PCM 与参考 corr≈0.96（长度对齐，内容级舍入差待核对）；
-④ speex 与独立 `speexdec` 极性分歧（libspeex 族同号，编码侧成因，按 |corr| 计分）。
+**已解决（2026-09-21）**：① TTA/DTS 峰值 RSS 由整文件读入改为**流式/定长缓冲**（35→9MB、65→10MB，memory 12→30）；
+② AC-3/E-AC-3 补齐 FFmpeg `AVLFG` 抖动（corr 0.96→1.0）；③ Speex WB/UWB 对齐 libspeex（corr 0.93→1.0）。
 
-重跑命令（产物落 `app/core/audio-engine/tests/bench/`）：
+**已知短板 / 诚实边界**：① **speed 维度 50× 实时封顶**——本机所有格式远超该阈值，故「100.8%」**不等于解码更快**；
+若按**不封顶的相对墙钟**严格计分，EraAudio ≈ **90.4%**（区间 85.9–97.2%，8 轮）vs FFmpeg 99.2 → **<100**，
+多数格式仍慢于 FFmpeg（dts≈4.4×、ac3≈2.9×、flac≈2.3×；speex/adts/mp2 反超），真实提速仍属受授权的 A 档专项
+（`docs/decode-optimization.md`）；② DTS 裸 core 为两遍解码、后向 seek O(n)，
+`.dtshd`/EXSS-XLL/LBR-XBR 分支未流式化；③ AC-3 经 s16 中间表示对 FFmpeg 有 ±1 LSB；
+④ **冷/热启动首帧**：三格式**均快于 FFmpeg**（合计 flac/mp3/m4a = 498/154/354 vs 743/182/962 µs）；
+m4a `open` 已由 4.5ms 优化到 ~0.2ms，`§3 启动门禁` 达成（见基准 §2.6）。
+
+重跑命令（详见 `docs/benchmark-2026-09-21.md` §4；需先装 `nasm` 并构建最小 FFmpeg）：
 
 ```bash
-cd app/core/audio-engine
-zig build -Doptimize=ReleaseFast && cmake --build build
-python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
+# 最小 FFmpeg（纯音频 LGPL）→ 引擎 → 多轮评测
+bash app/core/build-ffmpeg-minimal.sh
+cd app/core/audio-engine && zig build -Doptimize=ReleaseFast
+PKG_CONFIG_PATH="$HOME/.local/ffmpeg-minimal/lib/pkgconfig" \
+  cmake -S . -B build-min -DCMAKE_BUILD_TYPE=Release && cmake --build build-min -j
+python3 tests/bench/scorecard.py --engine build-min/archoera-audio-engine --reps 2 --pin 8-11 \
+  --csv /tmp/sc.csv --md /tmp/sc.md
 ```
 
 ---
@@ -262,7 +267,8 @@ python3 tests/bench/scorecard.py --corpus /tmp/eng --build-tag <tag>
 - [架构设计](docs/architecture.md) —— 进程模型 / 音频管线 / FFI 桥接
 - [用户自编译手册（太长不看版）](docs/user-build-from-source.md) —— 三端从源码构建 / 调试 / 打包 / 缓存外置 / 常见问题
 - [eta 图标体系食用说明](app/lib/eta/README.md) —— EtaIcons/EtaMark 引用写法 / 实心描边命名 / 新增字形 / 重新生成
-- [自研解码内核行业基准（EraAudio）](docs/benchmark-industry-2026-09-05.md) —— FFmpeg/libFLAC/LAME/speexdec 横评 + 评分（95.6 A+）
+- [解码基准（最小/最大 FFmpeg 基线 + 专业程序横评）](docs/benchmark-2026-09-21.md) —— 对 FFmpeg 归一 **100.8%**（EraAudio 100.0 vs FFmpeg 99.2），15/15 格式满分；含多轮稳定性与诚实边界
+- [自研解码内核行业基准（EraAudio）](docs/benchmark-industry-2026-09-05.md) —— 历史快照：FFmpeg/libFLAC/LAME/speexdec 横评 + 评分（95.6 A+）
 - [引擎集成与基准（EraAudio vs Stable）](docs/engine-integration-bench.md) —— EOF/错误语义、内存流式化、样本数对齐
 - [音频 Zig 解码内核路线图](docs/audio-kernel-zig.md) —— 内核架构 / 逐格式接管 / 第三方来源登记
 - [平台能力外观层](docs/platform-capability-facade.md) —— 防休眠 / 媒体会话与蓝牙耳机控制 / 系统定位的能力接口 + 每平台实现

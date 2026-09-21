@@ -8,11 +8,48 @@
 //! 各模块（exponents/mantissa/coupling/rematrix/downmix）以本结构为契约，
 //! 用 fmt/aac/bitreader.zig 的 BitReader 读取位流。
 
+const std = @import("std");
 const t = @import("tables.zig");
 const ba = @import("bitalloc.zig");
+const md5impl = @import("md5.zig");
 const BitReader = @import("../aac/bitreader.zig").BitReader;
 
 pub const AC3_OUTPUT_LFEON: i32 = 8;
+
+/// 抖动 PRNG：64 状态加性 LFG（语义对照 FFmpeg libavutil/lfg.h 的加性 LFG 序列；
+/// 命名/实现为本项目自有）。状态放在 Ctx 内（每解码器实例一份），避免多流并发共享全局
+/// 状态导致串扰。
+pub const JitterRng = struct {
+    state: [64]u32 = [_]u32{0} ** 64,
+    index: u32 = 0,
+
+    pub fn init(self: *JitterRng, seed: u32) void {
+        var tmp: [16]u8 = [_]u8{0} ** 16;
+        var i: usize = 8;
+        while (i < 64) : (i += 4) {
+            std.mem.writeInt(u32, tmp[0..4], seed, .little);
+            tmp[4] = @intCast(i);
+            var md5: md5impl.Md5 = .init(.{});
+            md5.update(&tmp);
+            md5.final(&tmp);
+            self.state[i] = std.mem.readInt(u32, tmp[0..4], .little);
+            self.state[i + 1] = std.mem.readInt(u32, tmp[4..8], .little);
+            self.state[i + 2] = std.mem.readInt(u32, tmp[8..12], .little);
+            self.state[i + 3] = std.mem.readInt(u32, tmp[12..16], .little);
+        }
+        self.index = 0;
+    }
+
+    pub fn next(self: *JitterRng) u32 {
+        // 加性 LFG 递推（对齐 FFmpeg 现行 libavutil/lfg.h 抽取序列）：
+        //   state[i&63] = state[(i-24)&63] + state[(i-55)&63]
+        // 注意：不是旧式的 state[i] + state[i-24] + state[i-55]。
+        const v = self.state[@intCast((self.index -% 24) & 63)] +% self.state[@intCast((self.index -% 55) & 63)];
+        self.state[@intCast(self.index & 63)] = v;
+        self.index +%= 1;
+        return v;
+    }
+};
 
 /// 分组尾数状态
 pub const MantGroups = struct {
@@ -27,6 +64,9 @@ pub const MantGroups = struct {
 pub const Ctx = struct {
     /// 位流读取器（指向当前帧缓冲）
     gb: BitReader = undefined,
+
+    /// 抖动 PRNG 状态（jitter；open/seek 时以 seed=0 初始化，语义对照 FFmpeg av_lfg_init）
+    jitter: JitterRng = .{},
 
     // 位流信息
     frame_type: i32 = 0,

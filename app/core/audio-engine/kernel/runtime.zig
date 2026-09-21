@@ -352,17 +352,22 @@ pub const Runtime = struct {
 
         // 扩容提示（F1：容量按 `active` 可服役数，不是从不收缩的 workers.items.len）：
         // 积压 > 可服役数 且还有可建容量（未达 cap 或存在可复用退役槽）→ 请 Master 补建。
-        // 先判 backlog（纯原子读），真有积压才查容量（满 cap 时需持 mutex 扫描复用槽）。
-        self.master_mutex.lockUncancelable(self.io);
-        const grow = !self.shutdown_requested.load(.acquire) and
-            queued_est > self.active.load(.acquire) and
-            self.canSpawn();
-        if (grow) self.need_worker = true;
-        self.master_mutex.unlock(self.io);
-        if (grow) {
-            Io.Condition.broadcast(&self.master_cv, self.io);
-            // timed 兜底模式（stall_timeout_ns>0）：Master 睡在 master_event 上而非 cv
-            Io.Event.set(&self.master_event, self.io);
+        // 热路径优化：先用纯原子读判「是否可能积压」（单流常态 queued_est ≤ active → 免锁
+        // master_mutex）；确有积压才取锁查容量，避免每次 submit 都付一次 master_mutex。
+        const maybe_grow = !self.shutdown_requested.load(.acquire) and
+            queued_est > self.active.load(.acquire);
+        if (maybe_grow) {
+            self.master_mutex.lockUncancelable(self.io);
+            const grow = !self.shutdown_requested.load(.acquire) and
+                queued_est > self.active.load(.acquire) and
+                self.canSpawn();
+            if (grow) self.need_worker = true;
+            self.master_mutex.unlock(self.io);
+            if (grow) {
+                Io.Condition.broadcast(&self.master_cv, self.io);
+                // timed 兜底模式（stall_timeout_ns>0）：Master 睡在 master_event 上而非 cv
+                Io.Event.set(&self.master_event, self.io);
+            }
         }
 
         Io.Condition.signal(&self.jobs_avail, self.io);
@@ -558,11 +563,17 @@ pub const Runtime = struct {
                 self.running -= 1;
                 self.inflight -= 1;
                 const drained = (self.inflight == 0); // 排空事件 → 唯一回收触发
+                // 热路径优化：仅当存在弹性超额（active > min_workers）时才可能回收；单流等
+                // active==min_workers 时 Master 的 maybeReclaim 必为 `serving<=target` 空操作，
+                // 故免去每次排空的 Master 唤醒（少一次 master_mutex 锁 + cv broadcast + 线程调度）。
+                // 正确性：target = max(min_workers, min(peak,max)) ≥ min_workers ≥ active ⇒ 不回收。
+                const might_reclaim = drained and
+                    self.active.load(.acquire) > @as(usize, self.cfg.min_workers);
                 self.mutex.unlock(self.io);
                 Io.Condition.broadcast(&self.idle_cv, self.io);
 
                 self.allocator.destroy(head);
-                if (drained) self.requestReclaim(); // 排空后唤醒 Master 评估回收
+                if (might_reclaim) self.requestReclaim(); // 排空后唤醒 Master 评估回收
                 continue;
             }
             // 队列空：shutdown 或 retire 命令。退出前二次确认在**同锁**内完成（queue_head==null

@@ -24,6 +24,7 @@ import 'prefs_scrape.dart';
 import 'prefs_scan.dart';
 import 'prefs_search.dart';
 import 'prefs_security.dart';
+import 'prefs_streaming.dart';
 import 'prefs_shortcuts.dart';
 
 export 'prefs_app.dart';
@@ -41,6 +42,7 @@ export 'prefs_scrape.dart';
 export 'prefs_scan.dart';
 export 'prefs_search.dart';
 export 'prefs_security.dart';
+export 'prefs_streaming.dart';
 export 'prefs_shortcuts.dart';
 
 /// 应用偏好（轻量 JSON 文件持久化，存数据目录 `prefs.json`）。
@@ -623,6 +625,18 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 关闭 = 持久化指纹。切换后由调用方调 `syncSessions()` 立即重注入/清除。
   void setDownloadDynamicFingerprint(bool value) {
     state = state.copyWithDownloadDynamicFingerprint(value);
+    state.save();
+  }
+
+  /// 流媒体下载提示「不再提示」（勾选后不再弹提示）。
+  void setDownloadStreamingNoticeDismissed(bool value) {
+    state = state.copyWithDownloadStreamingNoticeDismissed(value);
+    state.save();
+  }
+
+  /// 流媒体转码档位（original/high/medium/low，对下一首/重新解析生效）。
+  void setStreamingQuality(String value) {
+    state = state.copyWithStreamingQuality(value);
     state.save();
   }
 

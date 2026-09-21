@@ -9,6 +9,9 @@
 //! `libavformat/oggparsespeex.c`（容器映射）。核心解码见 `decode.zig`，码本见
 //! `data.zig`（自 speexdata.h 逐值转录）。
 //!
+//! 正确性基准为 **ffmpeg 内嵌 libspeex**：NB(mode0) 保持 native 逐位一致，WB/UWB
+//! 按 libspeex 语义修正（低带 wideband 高通等，详见 decode.zig 头注释）。
+//!
 //! 语义要点：
 //!   - 头两包：packet0 = SpeexHeader（魔数 "Speex   "，80 字节标准布局：
 //!     rate@36 / mode@40 / bitstream_ver@44 / channels@48 / bitrate@52 /
@@ -364,6 +367,9 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     while (m <= @as(u32, @intCast(f.hdr.mode))) : (m += 1) {
         f.fc.st[m].init(&spx.speex_modes[m]);
     }
+    // libspeex sb_decoder_init 对低层 NB 解码器 SPEEX_SET_WIDEBAND=1：WB/UWB 流的
+    // mode0 低带输出走 wideband 高通（对齐 libspeex；FFmpeg native 用 narrowband）。
+    if (f.hdr.mode > 0) f.fc.st[0].is_wideband = true;
 
     // 缓冲：帧解码域 + s16 输出（frames_per_packet × frame_size × ch × 2B）
     const fs: usize = @intCast(f.hdr.frame_size);
@@ -686,6 +692,7 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
     while (m <= @as(u32, @intCast(f.hdr.mode))) : (m += 1) {
         f.fc.st[m].init(&spx.speex_modes[m]);
     }
+    if (f.hdr.mode > 0) f.fc.st[0].is_wideband = true;
     f.stereo = .{};
     f.pkt_len = 0;
     f.pkt_pos = 0;
@@ -786,7 +793,9 @@ fn decodeAll(allocator: Allocator, data: []const u8, out: *std.ArrayList(i16)) !
     return info;
 }
 
-fn goldenCase(allocator: Allocator, name: []const u8, data: []const u8, ref: []const u8, want_rate: u32, want_samples: usize) !void {
+/// `bit_exact`：NB(mode0) 仍与 FFmpeg native 逐位一致（保持既有锚点）；
+/// WB/UWB 参考改为 ffmpeg 内嵌 libspeex（浮点路径），只要求 corr 达标。
+fn goldenCase(allocator: Allocator, name: []const u8, data: []const u8, ref: []const u8, want_rate: u32, want_samples: usize, bit_exact: bool) !void {
     var out = std.ArrayList(i16).empty;
     defer out.deinit(allocator);
     const info = try decodeAll(allocator, data, &out);
@@ -796,43 +805,42 @@ fn goldenCase(allocator: Allocator, name: []const u8, data: []const u8, ref: []c
     try testing.expectEqual(want_samples, ng);
     try testing.expectEqual(ng, out.items.len);
     const r = compare(out.items, ref);
-    std.debug.print("  spx {s}: sr={d} n={d} corr={d:.8} max_abs={d} bit-exact {d}/{d} = {d:.4}%\n", .{
+    std.debug.print("  spx {s}: sr={d} n={d} corr={d:.8} max_abs={d} equal {d}/{d} = {d:.4}%\n", .{
         name, info.sample_rate, r.n, r.corr, r.max_abs, r.equal, r.n,
         100.0 * @as(f64, @floatFromInt(r.equal)) / @as(f64, @floatFromInt(r.n)),
     });
     try testing.expect(r.corr >= 0.9999);
-    try testing.expectEqual(r.n, r.equal); // 目标 bit-exact（-lc glibc libm）
+    if (bit_exact) try testing.expectEqual(r.n, r.equal);
 }
 
 test "spx golden: NB q6 8k（ffmpeg native speex 对拍）" {
-    try goldenCase(testing.allocator, "q6_8k", q6_spx, q6_ref, 8000, 24160);
+    try goldenCase(testing.allocator, "q6_8k", q6_spx, q6_ref, 8000, 24160, true);
 }
 
-test "spx golden: WB q8 16k" {
-    try goldenCase(testing.allocator, "q8_16k", q8_spx, q8_ref, 16000, 48320);
+test "spx golden: WB q8 16k（ffmpeg libspeex 参考）" {
+    try goldenCase(testing.allocator, "q8_16k", q8_spx, q8_ref, 16000, 48320, false);
 }
 
-test "spx golden: UWB q10 32k（三层）" {
-    try goldenCase(testing.allocator, "q10_32k", q10_spx, q10_ref, 32000, 64640);
+test "spx golden: UWB q10 32k（三层；ffmpeg libspeex 参考）" {
+    try goldenCase(testing.allocator, "q10_32k", q10_spx, q10_ref, 32000, 64640, false);
 }
 
-test "spx golden: VBR vbr3 16k" {
-    try goldenCase(testing.allocator, "vbr3_16k", vbr_spx, vbr_ref, 16000, 48320);
+test "spx golden: VBR vbr3 16k（ffmpeg libspeex 参考）" {
+    try goldenCase(testing.allocator, "vbr3_16k", vbr_spx, vbr_ref, 16000, 48320, false);
 }
 
-test "spx golden: WB 立体声（inband 强度立体声）" {
+test "spx golden: WB 立体声（inband 强度立体声；ffmpeg libspeex 参考）" {
     var out = std.ArrayList(i16).empty;
     defer out.deinit(testing.allocator);
     const info = try decodeAll(testing.allocator, st_spx, &out);
     try testing.expectEqual(@as(u32, 16000), info.sample_rate);
     try testing.expectEqual(@as(u8, 2), info.channels);
     const r = compare(out.items, st_ref);
-    std.debug.print("  spx st_q8: ch=2 n={d} corr={d:.8} max_abs={d} bit-exact {d}/{d} = {d:.4}%\n", .{
+    std.debug.print("  spx st_q8: ch=2 n={d} corr={d:.8} max_abs={d} equal {d}/{d} = {d:.4}%\n", .{
         r.n, r.corr, r.max_abs, r.equal, r.n,
         100.0 * @as(f64, @floatFromInt(r.equal)) / @as(f64, @floatFromInt(r.n)),
     });
     try testing.expect(r.corr >= 0.9999);
-    try testing.expectEqual(r.n, r.equal);
 }
 
 test "spx golden: NB 4帧/包（terminator + 多帧包）" {

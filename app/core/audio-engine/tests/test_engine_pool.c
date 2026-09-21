@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef _WIN32
+#include <sys/stat.h> /* mkfifo：槽满拒绝路径用 FIFO 占住唯一任务槽 */
+#endif
+
 #include "kernel_bridge.h"
 
 #define FRAMES 16
@@ -65,8 +69,50 @@ static long long sync_decode_all(const char *path, float *buf, int *ch_out) {
     return total;
 }
 
-static void *worker_dec(void *arg) {
-    const char *path = (const char *)arg;
+/* —— 内存/回调源测试辅助 —— */
+static unsigned char *read_file(const char *path, size_t *out_len) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (n <= 0) { fclose(f); return NULL; }
+    unsigned char *b = malloc((size_t)n);
+    if (!b) { fclose(f); return NULL; }
+    if (fread(b, 1, (size_t)n, f) != (size_t)n) { free(b); fclose(f); return NULL; }
+    fclose(f);
+    *out_len = (size_t)n;
+    return b;
+}
+
+typedef struct { const unsigned char *data; size_t len; size_t pos; } CbCtx;
+
+static size_t cb_read(void *ctx, unsigned char *buf, size_t len) {
+    CbCtx *c = (CbCtx *)ctx;
+    if (c->pos >= c->len) return 0;
+    size_t n = c->len - c->pos;
+    if (n > len) n = len;
+    memcpy(buf, c->data + c->pos, n);
+    c->pos += n;
+    return n;
+}
+
+static int cb_seek(void *ctx, long long off, int whence, size_t buffered) {
+    CbCtx *c = (CbCtx *)ctx;
+    long long base;
+    switch (whence) {
+    case 0: base = 0; break;
+    case 1: base = (long long)c->pos - (long long)buffered; break;
+    case 2: base = (long long)c->len; break;
+    default: return 0;
+    }
+    long long np = base + off;
+    if (np < 0 || np > (long long)c->len) return 0;
+    c->pos = (size_t)np;
+    return 1;
+}
+
+static void *worker_dec(void *arg) {    const char *path = (const char *)arg;
     float *buf = malloc((size_t)FRAMES * 8 * sizeof(float));
     int ch = 0;
     long long n = 0;
@@ -221,6 +267,126 @@ int main(int argc, char **argv) {
         zk_engine_shutdown(hs);
         printf("max_streams=2 hard count (2 open → 3rd NULL → close → reopen OK) OK\n");
     }
+
+    /* 7) 池内存源 / 回调源（zk_engine_open_mem / _cb）== sync 参考 */
+    {
+        size_t flen = 0;
+        unsigned char *fbuf = read_file(path, &flen);
+        if (!fbuf) { fprintf(stderr, "read gold wav failed\n"); return 1; }
+        float chunk[FRAMES];
+        ZkInfo mi;
+        char meb[64];
+
+        /* 内存源 */
+        ZkEngineStream *ms = zk_engine_open_mem(h, fbuf, flen, &mi, meb, sizeof meb);
+        if (!ms) { fprintf(stderr, "zk_engine_open_mem failed\n"); free(fbuf); return 1; }
+        long long got = 0;
+        for (;;) {
+            int c2 = 0;
+            long long n2 = zk_engine_read(ms, chunk, 8, &c2);
+            if (n2 < 0) { fprintf(stderr, "mem stream read err %lld\n", n2); free(fbuf); return 1; }
+            if (n2 == 0) break;
+            for (long long k = 0; k < n2; k++) {
+                if (chunk[k] != ref[got + k]) { fprintf(stderr, "mem mismatch at %lld\n", got + k); free(fbuf); return 1; }
+            }
+            got += n2;
+        }
+        if (got != FRAMES) { fprintf(stderr, "mem stream frames %lld\n", got); free(fbuf); return 1; }
+        zk_engine_close(ms);
+        printf("engine open_mem == sync: %lld frames OK\n", got);
+
+        /* 回调源 */
+        CbCtx c = { fbuf, flen, 0 };
+        ZkEngineStream *cs = zk_engine_open_cb(h, &c, cb_read, cb_seek, (unsigned long long)flen,
+                                               &mi, meb, sizeof meb);
+        if (!cs) { fprintf(stderr, "zk_engine_open_cb failed\n"); free(fbuf); return 1; }
+        long long cgot = 0;
+        for (;;) {
+            int c2 = 0;
+            long long n2 = zk_engine_read(cs, chunk, 8, &c2);
+            if (n2 < 0) { fprintf(stderr, "cb stream read err %lld\n", n2); free(fbuf); return 1; }
+            if (n2 == 0) break;
+            for (long long k = 0; k < n2; k++) {
+                if (chunk[k] != ref[cgot + k]) { fprintf(stderr, "cb mismatch at %lld\n", cgot + k); free(fbuf); return 1; }
+            }
+            cgot += n2;
+        }
+        if (cgot != FRAMES) { fprintf(stderr, "cb stream frames %lld\n", cgot); free(fbuf); return 1; }
+        zk_engine_close(cs);
+        printf("engine open_cb == sync: %lld frames OK\n", cgot);
+        free(fbuf);
+    }
+
+    /* 8) 结构化任务提交面（zk_submit_decode / zk_task_wait / zk_task_free）：
+     *    异步提交 4 个任务（同一黄金 WAV），全部提交后逐个 wait；帧数/info/逐样本
+     *    与 sync 参考一致，最后 release。 */
+    {
+        enum { NTASK = 4 };
+        ZkTask *ts[NTASK];
+        float *outs[NTASK];
+        ZkInfo tinfos[NTASK];
+        for (int i = 0; i < NTASK; i++) {
+            outs[i] = malloc((size_t)FRAMES * 8 * sizeof(float));
+            if (!outs[i]) { fprintf(stderr, "alloc submit out failed\n"); return 1; }
+            ts[i] = zk_submit_decode(h, path, outs[i], FRAMES, &tinfos[i]);
+            if (!ts[i]) { fprintf(stderr, "zk_submit_decode #%d failed\n", i); return 1; }
+        }
+        for (int i = 0; i < NTASK; i++) {
+            long long sn = zk_task_wait(ts[i]);
+            if (sn != FRAMES) { fprintf(stderr, "submit task #%d frames %lld\n", i, sn); return 1; }
+            if (tinfos[i].sample_rate != SR || tinfos[i].channels != 1 ||
+                tinfos[i].bits_per_sample != 16) {
+                fprintf(stderr, "submit task #%d info mismatch sr=%d ch=%d bits=%d\n",
+                        i, tinfos[i].sample_rate, tinfos[i].channels, tinfos[i].bits_per_sample);
+                return 1;
+            }
+            for (int k = 0; k < FRAMES; k++) {
+                if (outs[i][k] != ref[k]) {
+                    fprintf(stderr, "submit task #%d sample mismatch at %d\n", i, k);
+                    return 1;
+                }
+            }
+            zk_task_free(ts[i]);
+            free(outs[i]);
+        }
+        printf("submit decode == sync: %d tasks OK\n", NTASK);
+    }
+
+    /* 9) 任务槽满拒绝路径（cap=1）：用 FIFO 占住唯一任务槽（worker 阻塞在 open），
+     *    第二次提交必返回 NULL（InstanceLimit，与 Host.submit 满即拒一致）；
+     *    随后写端打开关闭解锁，任务以负状态码完工。 */
+#if !defined(_WIN32)
+    {
+        const char *fifo = "zkpool_block.fifo";
+        remove(fifo);
+        if (mkfifo(fifo, 0600) != 0) { fprintf(stderr, "mkfifo failed\n"); return 1; }
+        ZkEngine *hb = zk_engine_init(1, 1, 1);
+        if (!hb) { fprintf(stderr, "small host init failed\n"); remove(fifo); return 1; }
+        float b1[64], b2[64];
+        ZkTask *tblock = zk_submit_decode(hb, fifo, b1, 8, NULL);
+        if (!tblock) {
+            fprintf(stderr, "first submit on free slot failed\n");
+            zk_engine_shutdown(hb); remove(fifo); return 1;
+        }
+        ZkTask *t2 = zk_submit_decode(hb, path, b2, 8, NULL);
+        if (t2 != NULL) {
+            fprintf(stderr, "cap=1: second submit must be rejected\n");
+            zk_task_wait(t2); zk_task_free(t2);
+            zk_engine_shutdown(hb); remove(fifo); return 1;
+        }
+        FILE *wf = fopen(fifo, "w"); /* 打开写端再关闭 → reader 见 EOF */
+        if (wf) fclose(wf);
+        long long bn = zk_task_wait(tblock);
+        if (bn >= 0) {
+            fprintf(stderr, "FIFO decode should fail, got %lld\n", bn);
+            zk_task_free(tblock); zk_engine_shutdown(hb); remove(fifo); return 1;
+        }
+        zk_task_free(tblock);
+        zk_engine_shutdown(hb);
+        remove(fifo);
+        printf("submit slot-full (cap=1) reject OK\n");
+    }
+#endif
 
     zk_engine_shutdown(h);
     free(pool);

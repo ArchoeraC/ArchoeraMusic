@@ -23,6 +23,12 @@ static long long now_ms(void) {
     return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
+static long long now_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+
 typedef struct { const char *path; long long frames; } Job;
 static ZkEngine *g_host = NULL;
 
@@ -46,11 +52,98 @@ static void *dec_one(void *arg) {
     return NULL;
 }
 
+static int cmp_ll(const void *a, const void *b) {
+    long long x = *(const long long *)a, y = *(const long long *)b;
+    return (x > y) - (x < y);
+}
+static long long pct(const long long *v, int n, double p) {
+    int i = (int)(p * (n - 1) + 0.5);
+    if (i < 0) i = 0; if (i >= n) i = n - 1;
+    return v[i];
+}
+static void print_stats(const char *tag, long long *v, int n) {
+    qsort(v, (size_t)n, sizeof(long long), cmp_ll);
+    long long sum = 0; for (int i = 0; i < n; i++) sum += v[i];
+    printf("%s p50=%lld p90=%lld p99=%lld mean=%lld\n", tag,
+           pct(v, n, 0.50), pct(v, n, 0.90), pct(v, n, 0.99), sum / n);
+}
+
 int main(int argc, char **argv) {
     int latency = 0;
     int host_max = 1;
     int base = 1;
     int max_streams = 0; /* 0 = 跟随 host_max（压测用） */
+    if (argc > 1 && strcmp(argv[1], "-bench") == 0) {
+        /* 稳态往返统计：预热后 N 次「open+首读+close」，池化 vs sync（µs 分位） */
+        if (argc < 4) { fprintf(stderr, "usage: %s -bench FILE N\n", argv[0]); return 2; }
+        const char *p = argv[2];
+        int N = atoi(argv[3]);
+        if (N < 1) N = 1;
+        char eb[64]; ZkInfo info; float buf[4096]; int ch = 0;
+        long long t = now_us();
+        ZkEngine *h = zk_engine_init(1, 4, 64);
+        long long t_init = now_us() - t;
+        if (!h) { fprintf(stderr, "init fail\n"); return 1; }
+        for (int w = 0; w < 3; w++) {
+            ZkEngineStream *s = zk_engine_open(h, p, &info, eb, sizeof eb);
+            if (s) { zk_engine_read(s, buf, 2048, &ch); zk_engine_close(s); }
+        }
+        long long *pl = malloc(sizeof(long long) * (size_t)N);
+        for (int i = 0; i < N; i++) {
+            long long a = now_us();
+            ZkEngineStream *s = zk_engine_open(h, p, &info, eb, sizeof eb);
+            if (s) { zk_engine_read(s, buf, 2048, &ch); zk_engine_close(s); }
+            pl[i] = now_us() - a;
+        }
+        zk_engine_shutdown(h);
+        for (int w = 0; w < 3; w++) {
+            ZkDecoder *d = zk_decoder_open(p, &info, eb, sizeof eb);
+            if (d) { zk_decoder_read(d, buf, 2048, &ch); zk_decoder_close(d); }
+        }
+        long long *sl = malloc(sizeof(long long) * (size_t)N);
+        for (int i = 0; i < N; i++) {
+            long long a = now_us();
+            ZkDecoder *d = zk_decoder_open(p, &info, eb, sizeof eb);
+            if (d) { zk_decoder_read(d, buf, 2048, &ch); zk_decoder_close(d); }
+            sl[i] = now_us() - a;
+        }
+        printf("RESULT init_us=%lld N=%d\n", t_init, N);
+        print_stats("RESULT pool_open+read+close", pl, N);
+        print_stats("RESULT sync_open+read+close", sl, N);
+        free(pl); free(sl);
+        return 0;
+    }
+    if (argc > 1 && strcmp(argv[1], "-us") == 0) {
+        /* 微秒级冷启动分解：init / pool open / 首块 / sync open / 首块 */
+        if (argc < 3) { fprintf(stderr, "usage: %s -us FILE\n", argv[0]); return 2; }
+        const char *p = argv[2];
+        long long t = now_us();
+        ZkEngine *h = zk_engine_init(1, 4, 64);
+        if (!h) { fprintf(stderr, "init fail\n"); return 1; }
+        long long t_init = now_us() - t;
+        char eb[64]; ZkInfo info;
+        t = now_us();
+        ZkEngineStream *s = zk_engine_open(h, p, &info, eb, sizeof eb);
+        long long t_open = now_us() - t;
+        float buf[4096]; int ch = 0;
+        t = now_us();
+        long long n = s ? zk_engine_read(s, buf, 2048, &ch) : -1;
+        long long t_read = now_us() - t;
+        if (s) zk_engine_close(s);
+        zk_engine_shutdown(h);
+        /* sync 直通对照（无池/无线程） */
+        t = now_us();
+        ZkDecoder *d = zk_decoder_open(p, &info, eb, sizeof eb);
+        long long t_sopen = now_us() - t;
+        t = now_us();
+        long long n2 = d ? zk_decoder_read(d, buf, 2048, &ch) : -1;
+        long long t_sread = now_us() - t;
+        if (d) zk_decoder_close(d);
+        printf("RESULT init_us=%lld pool_open_us=%lld pool_first_read_us=%lld (n=%lld) "
+               "sync_open_us=%lld sync_first_read_us=%lld (n=%lld)\n",
+               t_init, t_open, t_read, n, t_sopen, t_sread, n2);
+        return 0;
+    }
     if (argc > 1 && strcmp(argv[1], "-latency") == 0) { latency = 1; base = 2; }
     if (argc > base && strcmp(argv[base], "-streams") == 0 && argc > base + 1) {
         max_streams = atoi(argv[base + 1]);
