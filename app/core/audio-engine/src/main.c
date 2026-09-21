@@ -416,8 +416,8 @@ static void print_usage(const char *prog)
         "                          位置经 control 事件（playing/position/player:ended）推送\n"
         "\n"
         "解码引擎选项（EraAudio 实验性，原生优先）：\n"
-        "  --engine-mode <0|1>     0=Stable(FFmpeg 默认，现状) 1=EraAudio(自研 Zig\n"
-        "                          内核优先，未接管/失败回退 FFmpeg；默认 0）\n"
+        "  --engine-mode <0|1>     0=Stable(FFmpeg 默认，现状) 1=EraAudio(原生\n"
+        "                          优先，未接管/失败回退 FFmpeg；默认 0）\n"
         "\n"
         "其他:\n"
         "  -h, --help              显示帮助\n"
@@ -1101,7 +1101,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "\n");
     fprintf(stderr, "[audio-engine] 解码引擎: %s\n",
             cfg.engine_mode == 1
-                ? "EraAudio（自研 Zig 内核优先，失败回退 FFmpeg）"
+                ? "EraAudio（原生优先，失败回退 FFmpeg）"
                 : "Stable（FFmpeg）");
 
     /* 控制输出目标：interactive 时默认 fd3（Web/Node），--control-uds 时走 UDS（桌面） */

@@ -34,6 +34,7 @@
 #include <libavutil/mem.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <math.h>
 
 #define LOG_TAG "[audio-engine:pipeline]"
@@ -76,6 +77,11 @@ struct AudioPipeline {
     SegStore    *store;        /* 内存源（整曲已驻留，可 seek） */
     int64_t      store_pos;    /* 内存源读游标 */
     int64_t      store_total;  /* 内存源逻辑总长（AVSEEK_SIZE / seek END） */
+
+    /* EraAudio 在线回调解码（engine_mode==EraAudio 且源为 http(s) URL，
+     * docs/audio-kernel-zig.md §6.1/§7）：以 FFmpeg AVIO 为宿主传输，字节经回调
+     * 喂自研内核（内核保持零网络栈）。native 关闭后释放；非 URL/非 EraAudio 为空。 */
+    void        *era_url_cb;   /* EraUrlCb*：持有 AVIOContext */
 
     /* 音频处理模块 */
     Equalizer   *equalizer;
@@ -153,6 +159,75 @@ static int pipeline_store_avio_open(AudioPipeline *p, SegStore *store)
     return 0;
 }
 
+/* —— EraAudio 在线回调解码：FFmpeg AVIO 作宿主传输（docs/audio-kernel-zig.md §6.1/§7）——
+ * 内核零网络栈：传输（socket/TLS/Range/重定向）全由 C 壳经 AVIO 注入，内核只消费
+ * 字节流。URL 源在 engine_mode==EraAudio 时优先走此路径；失败回退 FFmpeg 主后端。 */
+typedef struct {
+    AVIOContext *avio;
+} EraUrlCb;
+
+static bool source_is_url(const char *s)
+{
+    return s && (strncmp(s, "http://", 7) == 0 || strncmp(s, "https://", 8) == 0);
+}
+
+static size_t era_url_read(void *ctx, unsigned char *buf, size_t len)
+{
+    EraUrlCb *c = (EraUrlCb *)ctx;
+    if (len == 0) return 0;
+    int want = len > (size_t)INT_MAX ? INT_MAX : (int)len;
+    int n = avio_read(c->avio, buf, want);
+    if (n <= 0) return 0; /* EOF 或读错误：统一按 EOF（与流式回调语义一致） */
+    return (size_t)n;
+}
+
+static int era_url_seek(void *ctx, long long off, int whence, size_t buffered)
+{
+    EraUrlCb *c = (EraUrlCb *)ctx;
+    switch (whence) {
+    case 0: /* start */
+        return avio_seek(c->avio, off, SEEK_SET) >= 0;
+    case 2: /* end */
+        return avio_seek(c->avio, off, SEEK_END) >= 0;
+    case 1: /* current：底层流领先内核逻辑游标 buffered 字节 */
+        return avio_seek(c->avio, (int64_t)off - (int64_t)buffered, SEEK_CUR) >= 0;
+    default:
+        return 0;
+    }
+}
+
+/* 打开 URL → 构造 AVIO 宿主传输 → 回调式自研内核解码。
+ * 成功置 p->native / p->native_active / p->era_url_cb；失败不残留资源。 */
+static int pipeline_era_url_open(AudioPipeline *p, const char *url)
+{
+    EraUrlCb *cb = (EraUrlCb *)calloc(1, sizeof(*cb));
+    if (!cb) return -1;
+    if (avio_open2(&cb->avio, url, AVIO_FLAG_READ, NULL, NULL) < 0) {
+        free(cb);
+        return -1;
+    }
+    int64_t sz = avio_size(cb->avio); /* 未知返回负值 → size_hint=0 */
+    NativeInfo ninfo;
+    int st = 1; /* 默认 unsupported */
+    p->native = native_decoder_open_cb(
+        cb, era_url_read, era_url_seek,
+        sz > 0 ? (unsigned long long)sz : 0ULL,
+        &ninfo, &st, p->native_err, sizeof(p->native_err));
+    p->native_status = st;
+    if (!p->native) {
+        avio_close(cb->avio);
+        free(cb);
+        return -1;
+    }
+    p->era_url_cb = cb;
+    p->native_active = true;
+    fprintf(stderr,
+            "%s EraAudio: 接管在线流（%s）— codec=%s / fmt=%s\n",
+            LOG_TAG, url, ninfo.codec_name ? ninfo.codec_name : "?",
+            ninfo.format_name ? ninfo.format_name : "?");
+    return 0;
+}
+
 /* pipeline_create / pipeline_create_store 共用实现：store 非空 → SegStore
  * 内存源（整曲已驻留，可 seek），经 AVIO + decoder_open_mem 解码；store 为空
  * → 磁盘/URL 源，完全走现状（engine_mode==EraAudio 优先自研内核，回退 FFmpeg）。 */
@@ -189,13 +264,13 @@ static AudioPipeline* pipeline_create_impl(const char *source,
                 if (p->native) {
                     p->native_active = true;
                     fprintf(stderr,
-                            "%s EraAudio: 自研内核接管内存源（%llu 字节）— codec=%s / fmt=%s\n",
+                            "%s EraAudio: 接管内存源（%llu 字节）— codec=%s / fmt=%s\n",
                             LOG_TAG, (unsigned long long)blen,
                             ninfo.codec_name ? ninfo.codec_name : "?",
                             ninfo.format_name ? ninfo.format_name : "?");
                 } else {
                     fprintf(stderr,
-                            "%s EraAudio: 内存源自研内核未接管 (status=%d %s)"
+                            "%s EraAudio: 内存源未接管 (status=%d %s)"
                             " → 回退 FFmpeg-mem\n",
                             LOG_TAG, st, p->native_err[0] ? p->native_err : "");
                 }
@@ -209,20 +284,31 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             goto fail;
         }
     } else if (cfg->engine_mode == ENGINE_MODE_ERAUDIO) {
-        NativeInfo ninfo;
-        int st = 1; /* 默认 unsupported */
-        p->native = native_decoder_open(source, &ninfo, &st,
-                                        p->native_err, sizeof(p->native_err));
-        p->native_status = st;
-        if (p->native) {
-            p->native_active = true;
-            fprintf(stderr, "%s EraAudio: 自研内核接管 — codec=%s / fmt=%s\n",
-                    LOG_TAG, ninfo.codec_name ? ninfo.codec_name : "?",
-                    ninfo.format_name ? ninfo.format_name : "?");
+        /* 在线 URL → 宿主 AVIO 回调流（内核零网络栈）；本地路径 → 直接打开。
+         * 两者失败均回退 FFmpeg（Stable 行为零回退）。 */
+        if (source_is_url(source)) {
+            if (pipeline_era_url_open(p, source) != 0) {
+                fprintf(stderr, "%s EraAudio: 在线源不可用/未接管"
+                                " (status=%d %s) → 回退 FFmpeg\n",
+                        LOG_TAG, p->native_status,
+                        p->native_err[0] ? p->native_err : "");
+            }
         } else {
-            fprintf(stderr, "%s EraAudio: 自研内核不可用/未接管 (status=%d %s)"
-                            " → 回退 FFmpeg\n",
-                    LOG_TAG, st, p->native_err[0] ? p->native_err : "");
+            NativeInfo ninfo;
+            int st = 1; /* 默认 unsupported */
+            p->native = native_decoder_open(source, &ninfo, &st,
+                                            p->native_err, sizeof(p->native_err));
+            p->native_status = st;
+            if (p->native) {
+                p->native_active = true;
+                fprintf(stderr, "%s EraAudio: 接管 — codec=%s / fmt=%s\n",
+                        LOG_TAG, ninfo.codec_name ? ninfo.codec_name : "?",
+                        ninfo.format_name ? ninfo.format_name : "?");
+            } else {
+                fprintf(stderr, "%s EraAudio: 不可用/未接管 (status=%d %s)"
+                                " → 回退 FFmpeg\n",
+                        LOG_TAG, st, p->native_err[0] ? p->native_err : "");
+            }
         }
     } else {
         fprintf(stderr, "%s engine_mode=%d（Stable=FFmpeg 默认路径）\n",
@@ -233,7 +319,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
         /* 原生路径：分配读缓冲（float 交错，按源声道数，每帧 1 个 float/ch） */
         int src_ch = native_decoder_channels(p->native);
         if (src_ch <= 0 || src_ch > 16) {
-            fprintf(stderr, "%s 自研内核源声道数异常: %d\n", LOG_TAG, src_ch);
+            fprintf(stderr, "%s EraAudio 源声道数异常: %d\n", LOG_TAG, src_ch);
             goto fail;
         }
         p->native_buf_frames = NATIVE_CHUNK_FRAMES;
@@ -362,12 +448,18 @@ static AudioPipeline* pipeline_create_impl(const char *source,
      *    因「原生不会跳」而失败（断点续播/播放中跳转的兜底）。 */
     if (cfg->start_offset_ms > 0 && p->native_active) {
         if (native_decoder_seek_ms(p->native, cfg->start_offset_ms) != 0) {
-            fprintf(stderr, "%s EraAudio: 自研内核 seek 到 %ldms 失败"
+            fprintf(stderr, "%s EraAudio: seek 到 %ldms 失败"
                             " → 回退 FFmpeg 解码器（offset 起播兜底）\n",
                     LOG_TAG, (long)cfg->start_offset_ms);
             native_decoder_close(p->native);
             p->native = NULL;
             p->native_active = false;
+            if (p->era_url_cb) { /* 在线回调流：native 已关，释放宿主 AVIO 传输 */
+                EraUrlCb *cb = (EraUrlCb *)p->era_url_cb;
+                avio_close(cb->avio);
+                free(cb);
+                p->era_url_cb = NULL;
+            }
             if (p->native_buf) { free(p->native_buf); p->native_buf = NULL; }
             p->native_buf_frames = 0;
             p->dec = decoder_open(source);
@@ -567,7 +659,7 @@ ssize_t pipeline_process(AudioPipeline *p)
             int ret = native_process_chunk(p);
             if (ret <= 0) {
                 if (ret < 0) {
-                    fprintf(stderr, "%s 自研内核解码错误: %d\n", LOG_TAG, ret);
+                    fprintf(stderr, "%s EraAudio 解码错误: %d\n", LOG_TAG, ret);
                     return ret;
                 }
                 p->eof = true; /* 0 = EOF */
@@ -824,6 +916,11 @@ void pipeline_destroy(AudioPipeline *p)
     /* store 内存源 AVIO：decoder 不接管（AVFMT_FLAG_CUSTOM_IO），须在其后释放 */
     if (p->store_avio) avio_context_free(&p->store_avio);
     if (p->native) native_decoder_close(p->native);
+    if (p->era_url_cb) { /* EraAudio 在线回调流：native 关闭后释放宿主 AVIO 传输 */
+        EraUrlCb *cb = (EraUrlCb *)p->era_url_cb;
+        avio_close(cb->avio);
+        free(cb);
+    }
     if (p->resampler) resampler_destroy(p->resampler);
     if (p->encoder) encoder_destroy(p->encoder);
 

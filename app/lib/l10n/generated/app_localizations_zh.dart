@@ -228,6 +228,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadRequiresLoginTitle => '下载需要登录';
 
   @override
+  String get downloadStreamingWarnTitle => '不建议对流媒体使用下载功能';
+
+  @override
+  String get downloadStreamingWarnBody =>
+      '如果您能保证流媒体的访问，或者并不常用，或者为您自己部署的媒体源，其实并不建议下载到本地';
+
+  @override
+  String get downloadStreamingWarnDontAsk => '不再提示';
+
+  @override
+  String get downloadStreamingWarnProceed => '仍要下载';
+
+  @override
   String get menuComment => '查看评论';
 
   @override
@@ -324,6 +337,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get queueRepeatOne => '单曲循环';
+
+  @override
+  String get queueRepeatOff => '顺序播放';
+
+  @override
+  String get queueFinished => '播放列表已播完，已自动暂停';
 
   @override
   String get queueShuffle => '随机播放';
@@ -3413,6 +3432,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get repeatModeOne => '单曲循环';
 
   @override
+  String get repeatModeOff => '顺序播放';
+
+  @override
   String get sidebarStreaming => '流媒体';
 
   @override
@@ -3536,6 +3558,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get streamingHint => '媒体源';
+
+  @override
+  String get streamingQualityTitle => '流媒体音质';
+
+  @override
+  String get streamingQualityNote =>
+      '原文件优先；转码档会请求服务端转码为通用 MP3——需服务端支持，标准参数兼容其它服务端。';
+
+  @override
+  String get streamingQualityOriginal => '原文件';
+
+  @override
+  String get streamingQualityHigh => '高 (320k)';
+
+  @override
+  String get streamingQualityMedium => '中 (192k)';
+
+  @override
+  String get streamingQualityLow => '低 (128k)';
 
   @override
   String get streamingHintDetail =>
@@ -4797,6 +4838,19 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get downloadRequiresLoginTitle => '下载需要登录';
 
   @override
+  String get downloadStreamingWarnTitle => '不建议对流媒体使用下载功能';
+
+  @override
+  String get downloadStreamingWarnBody =>
+      '如果您能保证流媒体的访问，或者并不常用，或者为您自己部署的媒体源，其实并不建议下载到本地';
+
+  @override
+  String get downloadStreamingWarnDontAsk => '不再提示';
+
+  @override
+  String get downloadStreamingWarnProceed => '仍要下载';
+
+  @override
   String get menuComment => '查看评论';
 
   @override
@@ -4893,6 +4947,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get queueRepeatOne => '单曲循环';
+
+  @override
+  String get queueRepeatOff => '顺序播放';
+
+  @override
+  String get queueFinished => '播放列表已播完，已自动暂停';
 
   @override
   String get queueShuffle => '随机播放';
@@ -7982,6 +8042,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get repeatModeOne => '单曲循环';
 
   @override
+  String get repeatModeOff => '顺序播放';
+
+  @override
   String get sidebarStreaming => '流媒体';
 
   @override
@@ -8105,6 +8168,25 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get streamingHint => '媒体源';
+
+  @override
+  String get streamingQualityTitle => '流媒体音质';
+
+  @override
+  String get streamingQualityNote =>
+      '原文件优先；转码档会请求服务端转码为通用 MP3——需服务端支持，标准参数兼容其它服务端。';
+
+  @override
+  String get streamingQualityOriginal => '原文件';
+
+  @override
+  String get streamingQualityHigh => '高 (320k)';
+
+  @override
+  String get streamingQualityMedium => '中 (192k)';
+
+  @override
+  String get streamingQualityLow => '低 (128k)';
 
   @override
   String get streamingHintDetail =>
@@ -9366,6 +9448,19 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get downloadRequiresLoginTitle => '下載需要登入';
 
   @override
+  String get downloadStreamingWarnTitle => '不建議對串流媒體使用下載功能';
+
+  @override
+  String get downloadStreamingWarnBody =>
+      '如果您能確保串流媒體的存取，或者並不常用，或者是您自己架設的媒體來源，其實並不建議下載到本機';
+
+  @override
+  String get downloadStreamingWarnDontAsk => '不再提示';
+
+  @override
+  String get downloadStreamingWarnProceed => '仍要下載';
+
+  @override
   String get menuComment => '查看留言';
 
   @override
@@ -9462,6 +9557,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get queueRepeatOne => '單曲循環';
+
+  @override
+  String get queueRepeatOff => '順序播放';
+
+  @override
+  String get queueFinished => '播放清單已播完，已自動暫停';
 
   @override
   String get queueShuffle => '隨機播放';
@@ -12551,6 +12652,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get repeatModeOne => '單曲循環';
 
   @override
+  String get repeatModeOff => '順序播放';
+
+  @override
   String get sidebarStreaming => '串流媒體';
 
   @override
@@ -12674,6 +12778,25 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get streamingHint => '媒體來源';
+
+  @override
+  String get streamingQualityTitle => '串流音質';
+
+  @override
+  String get streamingQualityNote =>
+      '原文件優先；轉碼檔會請求伺服器轉為通用 MP3——需伺服器支援，標準參數相容其它伺服器。';
+
+  @override
+  String get streamingQualityOriginal => '原文件';
+
+  @override
+  String get streamingQualityHigh => '高 (320k)';
+
+  @override
+  String get streamingQualityMedium => '中 (192k)';
+
+  @override
+  String get streamingQualityLow => '低 (128k)';
 
   @override
   String get streamingHintDetail =>

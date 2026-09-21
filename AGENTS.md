@@ -35,6 +35,18 @@ cmake -S app/native/platform -B app/native/platform/build -DCMAKE_BUILD_TYPE=Rel
 cmake --build app/native/platform/build -j
 ```
 
+Windows/MSVC 兼容自检（本机可交叉，无需 Windows SDK）：
+```bash
+cd app/core/audio-engine
+zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseFast   # Zig 内核；应产出 Windows .lib 且含 zk_* 导出
+# C 壳 Windows 目标编译检查（$FFDIR 为 FFmpeg 头目录；勿用 -I/usr/include，会混入 glibc）：
+#   zig cc -target x86_64-windows-gnu -c -DHAS_ARCHOERA_KERNEL \
+#     -Iinclude -Isrc -Iinclude/compat -I"$FFDIR" src/xxx.c
+```
+> 严格 MSVC（`-target x86_64-windows-msvc`）需 Windows SDK/CRT，本机缺失时跳过，以 Windows CI 为准。
+> 新增 C/ABI 代码须保持：`ssize_t` 走 `audio_engine.h` 的 `_WIN32` 分支、函数指针用 `callconv(.c)`/普通 C 签名、
+> 不引入 `unistd.h`/POSIX-only API；线程原语走 `include/compat/pthread.h`。
+
 ## 架构约定（务必遵守）
 
 ### 系统调用统一走 C++ 桥接器
@@ -65,6 +77,16 @@ cmake --build app/native/platform/build -j
 - 按职责拆文件、单一职责，避免巨型文件（桥接器即范例：`core` / `backend` / `apl` + 每平台一个后端文件）。
 - 跨平台共享逻辑放共享层（`core.*` / `backend.h`），平台特有逻辑放各平台文件；新增平台只加一个后端文件。
 - 新增/修改功能时同样适用：先想清楚归属与拆分，再落代码。
+
+### 命名与原创性（避免与 FFmpeg/上游同形）
+- **我们自己的符号（类型 / 函数 / 变量 / 常量）不得照搬 FFmpeg / libopus / libspeex 等上游的标识符**；
+  算法与语义可以对齐，但命名必须自有——例如抖动 PRNG 用 `JitterRng`，不用 `AVLFG`/`av_lfg_*`。
+- 注释里**可以引用**上游函数/文件作为出处与对照依据（如「对照 FFmpeg `libavcodec/ac3.c`」），
+  这是溯源，不构成我们的符号；但不要把上游标识符直接用作我们的类型/函数/字段名。
+- 内核转写表/内部常量统一用 **`era_` 前缀**（如 `era_dca_dmixtable`、`era_celt_alpha_coef`），
+  不使用上游 `ff_*` 等前缀（含表名、字段名）；测试名字符串可保留出处描述；
+  **新增代码一律不得使用上游前缀**。
+- 判定标准：**不出现与上游逐字相同的标识符**；算法/公式/常量值相同不违规（属规范与事实）。
 
 ### 渲染与性能
 - **高渲染压力优先 GPU**：着色器/滤镜/合成走 GPU（Flutter `FragmentProgram`/shader、Skia/Impeller），

@@ -144,6 +144,34 @@ class LibraryNotifier extends Notifier<LibraryState>
   @override
   DateTime? _lastAutoRefreshAt;
 
+  /// 上次扫描时各扫描目录的 mtime（用于检测新文件落入 → 绕过 5 分钟节流）。
+  final Map<String, DateTime> _lastDirMtimes = {};
+
+  @override
+  bool _scanDirsChangedSinceLastScan() {
+    if (_lastDirMtimes.length != state.scanDirs.length) return true;
+    for (final d in state.scanDirs) {
+      final prev = _lastDirMtimes[d];
+      if (prev == null) return true;
+      try {
+        if (FileStat.statSync(d).modified != prev) return true;
+      } catch (_) {
+        return true; // 目录不可访问：保守触发扫描
+      }
+    }
+    return false;
+  }
+
+  @override
+  void _snapshotScanDirMtimes() {
+    _lastDirMtimes.clear();
+    for (final d in state.scanDirs) {
+      try {
+        _lastDirMtimes[d] = FileStat.statSync(d).modified;
+      } catch (_) {}
+    }
+  }
+
   /// 搜索输入去抖（SQL 下推前合并连续输入）。
   @override
   Timer? _searchDebounce;
@@ -175,10 +203,27 @@ class LibraryNotifier extends Notifier<LibraryState>
   Future<bool> deleteTrackFile(String path) => _deleteTrackFile(path);
 
   /// 添加扫描目录（已存在 / 非目录时忽略，返回是否成功）。
-  bool addScanDir(String dir) => _addScanDir(dir);
+  ///
+  /// 成功后**立即触发一次增量扫描**并作废自动刷新节流——否则新目录里的媒体要等
+  /// 下一次进入音乐库的自动扫描（距上次 ≥5 分钟才跑）或重启才会入库。
+  bool addScanDir(String dir) {
+    final ok = _addScanDir(dir);
+    if (ok) {
+      _lastAutoRefreshAt = null;
+      _snapshotScanDirMtimes();
+      unawaited(_startScan(incremental: true));
+    }
+    return ok;
+  }
 
-  /// 移除扫描目录。
-  void removeScanDir(String dir) => _removeScanDir(dir);
+  /// 移除扫描目录：作废节流并立即增量扫描（增量扫描据此清理该目录下的曲目记录）。
+  void removeScanDir(String dir) {
+    if (!state.scanDirs.contains(dir)) return;
+    _removeScanDir(dir);
+    _lastAutoRefreshAt = null;
+    _snapshotScanDirMtimes();
+    unawaited(_startScan(incremental: true));
+  }
 
   /// 扫描（增量/全量）。进度实时写入 [LibraryState]。
   Future<void> startScan({bool incremental = true}) =>

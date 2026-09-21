@@ -59,11 +59,11 @@ const OpusCtx = struct {
     total_valid: u64 = 0,
     eos: bool = false,
     /// 上一帧 SILK 末样本（dec_API sMid[1] / sSide[1] 喂入）
-    dec0: silk.DecoderState = .{},
-    dec1: silk.DecoderState = .{},
-    sst: silk.StereoDecState = .{},
-    rsm: [2]silk.ResamplerState = undefined,
-    celt_f: celt_types.CeltFrame = undefined,
+    dec0: silk.DecoderState = std.mem.zeroes(silk.DecoderState),
+    dec1: silk.DecoderState = std.mem.zeroes(silk.DecoderState),
+    sst: silk.StereoDecState = std.mem.zeroes(silk.StereoDecState),
+    rsm: [2]silk.ResamplerState = std.mem.zeroes([2]silk.ResamplerState),
+    celt_f: celt_types.CeltFrame = std.mem.zeroes(celt_types.CeltFrame),
     /// 标签元数据（OpusTags 解析；deinit 释放）
     meta: decoder.Metadata = .{},
     prev_mode: u8 = 255,
@@ -72,11 +72,11 @@ const OpusCtx = struct {
     prev_stereo: bool = false,
     cur_red_info: RedundancyInfo = .{},
     /// 当前包解码缓冲（交错 s16）
-    pcm_buf: [PCM_MAX]i16 = undefined,
+    pcm_buf: [PCM_MAX]i16 = std.mem.zeroes([PCM_MAX]i16),
     pcm_len: usize = 0,
     pcm_pos: usize = 0,
     /// 单帧 48k 单声道缓冲（SILK/HYBRID 通道升采样暂存）
-    ch48: [2][CH48_MAX]i16 = undefined,
+    ch48: [2][CH48_MAX]i16 = std.mem.zeroes([2][CH48_MAX]i16),
     /// 当前帧内部 SILK 采样率（kHz）
     silk_fs_khz: i32 = 16,
     frame_size: u32 = 960,
@@ -109,6 +109,7 @@ pub fn setLostCount(ctx: *anyopaque, n: usize) void {
 pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.Decoder {
     const f = try allocator.create(OpusCtx);
     errdefer allocator.destroy(f);
+    @memset(std.mem.asBytes(f), 0); // 全量零初始化（libopus silk_init_decoder 语义）
     f.* = .{
         .allocator = allocator,
         .demux = undefined,
@@ -365,15 +366,15 @@ fn decodeSilkFrame(f: *OpusCtx, data: []const u8, hybrid: bool) Error!void {
     const per_out = fl * (48 / @as(usize, @intCast(f.silk_fs_khz))); // 每子帧 48k 输出样本
     var total_out: usize = 0;
     for (0..nfpp) |_| {
-        var out_l: [SILK_MAX_FRAME + 2]i16 = undefined;
-        var out_r: [SILK_MAX_FRAME + 2]i16 = undefined;
+        var out_l: [SILK_MAX_FRAME + 2]i16 = std.mem.zeroes([SILK_MAX_FRAME + 2]i16);
+        var out_r: [SILK_MAX_FRAME + 2]i16 = std.mem.zeroes([SILK_MAX_FRAME + 2]i16);
         if (f.stereo) {
             silk.decodePacketStereo(&f.dec0, &f.dec1, &f.sst, &rc, out_l[0 .. fl + 2], out_r[0 .. fl + 2]);
             _ = try resampleChannelInto(f, 0, total_out, out_l[1 .. fl + 1]);
             _ = try resampleChannelInto(f, 1, total_out, out_r[1 .. fl + 1]);
         } else {
             silk.decodePacket(&f.dec0, &rc, out_l[0..fl]);
-            var rsm_in: [SILK_MAX_FRAME]i16 = undefined;
+            var rsm_in: [SILK_MAX_FRAME]i16 = std.mem.zeroes([SILK_MAX_FRAME]i16);
             rsm_in[0] = f.prev_last;
             @memcpy(rsm_in[1..fl], out_l[0 .. fl - 1]);
             f.prev_last = out_l[fl - 1];
@@ -390,7 +391,7 @@ fn decodeSilkFrame(f: *OpusCtx, data: []const u8, hybrid: bool) Error!void {
         f.cur_red_info = red_info;
 
         const end_band = celtEndBand(f.config);
-        var out_f: [2][960]f32 = undefined;
+        var out_f: [2][960]f32 = std.mem.zeroes([2][960]f32);
 
         const n_ch = celt.decodeFrame(&f.celt_f, &rc, .{ out_f[0][0..f.frame_size], out_f[1][0..f.frame_size] }, @intCast(@as(usize, 1) + @intFromBool(f.stereo)), f.frame_size, 17, end_band, true) catch |e| return e;
 
@@ -424,8 +425,8 @@ fn decodeLostFrame(f: *OpusCtx) Error!void {
     }
     var total_out: usize = 0;
     for (0..nfpp) |_| {
-        var out_l: [SILK_MAX_FRAME + 2]i16 = undefined;
-        var out_r: [SILK_MAX_FRAME + 2]i16 = undefined;
+        var out_l: [SILK_MAX_FRAME + 2]i16 = std.mem.zeroes([SILK_MAX_FRAME + 2]i16);
+        var out_r: [SILK_MAX_FRAME + 2]i16 = std.mem.zeroes([SILK_MAX_FRAME + 2]i16);
         if (f.stereo) {
             if (f.decoded_any) {
                 silk.decodeLostFrameStereo(&f.dec0, &f.dec1, &f.sst, out_l[0 .. fl + 2], out_r[0 .. fl + 2]);
@@ -443,7 +444,7 @@ fn decodeLostFrame(f: *OpusCtx) Error!void {
                 silk.decodeLostFrame(&f.dec0, out_l[0..fl]);
             }
             f.decoded_any = true;
-            var rsm_in: [SILK_MAX_FRAME]i16 = undefined;
+            var rsm_in: [SILK_MAX_FRAME]i16 = std.mem.zeroes([SILK_MAX_FRAME]i16);
             rsm_in[0] = f.prev_last;
             @memcpy(rsm_in[1..fl], out_l[0 .. fl - 1]);
             f.prev_last = out_l[fl - 1];
@@ -460,7 +461,7 @@ fn decodeLostFrame(f: *OpusCtx) Error!void {
 /// （mono：{decoded[319]_prev, decoded[0..318]}；stereo：{x1[1], L[0..318]}）。
 fn resampleChannelInto(f: *OpusCtx, ch: usize, dst_off: usize, silk16: []const i16) Error!usize {
     const fl = silk16.len;
-    var rsm_buf: [SILK_MAX_FRAME]i16 = undefined;
+    var rsm_buf: [SILK_MAX_FRAME]i16 = std.mem.zeroes([SILK_MAX_FRAME]i16);
     @memcpy(rsm_buf[0..fl], silk16);
     const out_len = fl * (48 / @as(usize, @intCast(f.silk_fs_khz)));
     _ = silk.resampler(&f.rsm[ch], f.ch48[ch][dst_off .. dst_off + out_len], rsm_buf[0..fl], @intCast(fl));
@@ -504,14 +505,14 @@ fn decodeSilkToCeltRedundant(f: *OpusCtx, data: []const u8, info: RedundancyInfo
     var rrc = rcmod.Rc.decInit(red_data);
     rrc.decRawInit(red_data, @intCast(red_data.len));
     const end_band = celtEndBand(f.config);
-    var red_f: [2][240]f32 = undefined;
+    var red_f: [2][240]f32 = std.mem.zeroes([2][240]f32);
     const n_ch = celt.decodeFrame(&f.celt_f, &rrc, .{ red_f[0][0..240], red_f[1][0..240] }, @intCast(@as(usize, 1) + @intFromBool(f.stereo)), 240, 0, end_band, false) catch |e| return e;
 
     const out_len: usize = 960;
     const f2_5: usize = 120;
     for (0..@intCast(n_ch)) |c| {
         for (0..f2_5) |i| {
-            const w = tables.ff_celt_window[i] * tables.ff_celt_window[i];
+            const w = tables.era_celt_window[i] * tables.era_celt_window[i];
             const idx = out_len - f2_5 + i;
             const a = @as(f32, @floatFromInt(f.ch48[c][idx])) * (1.0 / 32768.0);
             const b = red_f[c][f2_5 + i];
@@ -533,7 +534,7 @@ fn decodeCeltPacket(f: *OpusCtx, pp: *const opus_packet.Packet) Error!void {
     for (0..pp.count) |fi| {
         var rc = rcmod.Rc.decInit(pp.frames[fi].data);
         rc.decRawInit(pp.frames[fi].data, @intCast(pp.frames[fi].data.len));
-        var out_f: [2][960]f32 = undefined;
+        var out_f: [2][960]f32 = std.mem.zeroes([2][960]f32);
         const n_ch = celt.decodeFrame(&f.celt_f, &rc, .{ out_f[0][0..pp.frame_size], out_f[1][0..pp.frame_size] }, @intCast(@as(usize, 1) + @intFromBool(pp.stereo)), pp.frame_size, 0, end_band, false) catch |e| return e;
 
         for (0..pp.frame_size) |i| {
@@ -820,6 +821,31 @@ fn lastPageStart(data: []const u8) usize {
 fn openInfo(data: []const u8, info: *decoder.Info) Error!decoder.Decoder {
     var reader = io.Reader.openMem(data);
     return open(testing.allocator, &reader, info);
+}
+
+test "opus: 重复解码确定性（同文件两次 == 逐字节一致）" {
+    const D = struct {
+        fn drain(data: []const u8, out: *std.ArrayList(u8)) !void {
+            var info: decoder.Info = undefined;
+            var dc = try openInfo(data, &info);
+            defer dc.deinit();
+            var buf: [8192]u8 = undefined;
+            var ch: u8 = 0;
+            while (true) {
+                const n = try dc.read(&buf, 2048, &ch);
+                if (n == 0) break;
+                try out.appendSlice(testing.allocator, buf[0 .. n * @as(usize, ch) * 2]);
+            }
+        }
+    };
+    var a = std.ArrayList(u8).empty;
+    defer a.deinit(testing.allocator);
+    var b = std.ArrayList(u8).empty;
+    defer b.deinit(testing.allocator);
+    try D.drain(multi_opus, &a);
+    try D.drain(multi_opus, &b);
+    try testing.expect(a.items.len > 0);
+    try testing.expectEqualSlices(u8, a.items, b.items);
 }
 
 test "opus: open Info 时长（尾页 granule（含 pre-skip，对齐 ffprobe），EOS exact）" {

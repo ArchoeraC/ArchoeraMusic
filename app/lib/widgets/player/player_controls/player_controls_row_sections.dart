@@ -138,12 +138,17 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         CtrlIcon(
-          tooltip: repeatMode == 'list'
-              ? l10n.queueRepeatList
-              : l10n.queueRepeatOne,
+          tooltip: switch (repeatMode) {
+            'off' => l10n.queueRepeatOff,
+            'one' => l10n.queueRepeatOne,
+            _ => l10n.queueRepeatList,
+          },
           icon: repeatMode == 'one' ? EtaIcons.repeatOne : EtaIcons.repeat,
           size: 20,
-          color: colorScheme.primary,
+          // 顺序播放 = 不循环：图标压暗表示「关闭回绕」，与列表/单曲（高亮）区分。
+          color: repeatMode == 'off'
+              ? colorScheme.onSurfaceVariant
+              : colorScheme.primary,
           onPressed: hasContent ? notifier.cycleRepeatMode : null,
         ),
       ],

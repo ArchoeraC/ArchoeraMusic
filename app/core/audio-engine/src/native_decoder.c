@@ -186,23 +186,39 @@ NativeDecoder *native_decoder_open_mem(const void *data, size_t len, NativeInfo 
     ZkInfo zinfo;
     char eb[512];
     NativeDecoder *d;
+    ZkDecoder *zk = NULL;
+    ZkEngineStream *st = NULL;
     memset(&zinfo, 0, sizeof(zinfo));
     memset(eb, 0, sizeof(eb));
 
-    /* 纯内存源走直连 decoder（非池；池 stream seam 为路径输入）。 */
-    ZkDecoder *zk = zk_decoder_open_mem((const unsigned char *)data, len,
-                                        &zinfo, eb, (int)sizeof(eb));
-    if (!zk) {
-        if (status_out) *status_out = read_le32_status(eb);
-        if (errbuf && errbuf_size > 0) {
-            snprintf(errbuf, errbuf_size, "%s", eb + 4);
+    /* 池启用时走 zk_engine 流式 seam（与路径打开同法）；否则直连 decoder。 */
+    if (g_pool) {
+        st = zk_engine_open_mem(g_pool, (const unsigned char *)data, len,
+                                &zinfo, eb, sizeof(eb));
+        if (!st) {
+            if (status_out) *status_out = read_le32_status(eb);
+            if (errbuf && errbuf_size > 0) {
+                snprintf(errbuf, errbuf_size, "%s", eb + 4);
+            }
+            return NULL;
         }
-        return NULL;
+        g_stream_opens++;
+    } else {
+        zk = zk_decoder_open_mem((const unsigned char *)data, len,
+                                 &zinfo, eb, (int)sizeof(eb));
+        if (!zk) {
+            if (status_out) *status_out = read_le32_status(eb);
+            if (errbuf && errbuf_size > 0) {
+                snprintf(errbuf, errbuf_size, "%s", eb + 4);
+            }
+            return NULL;
+        }
     }
 
     d = (NativeDecoder *)calloc(1, sizeof(*d));
     if (!d) {
-        zk_decoder_close(zk);
+        if (zk) zk_decoder_close(zk);
+        if (st) zk_engine_close(st);
         if (status_out) *status_out = 7; /* ZK_OUT_OF_MEMORY */
         if (errbuf && errbuf_size > 0) {
             snprintf(errbuf, errbuf_size, "out of memory");
@@ -210,8 +226,77 @@ NativeDecoder *native_decoder_open_mem(const void *data, size_t len, NativeInfo 
         return NULL;
     }
     d->zk = zk;
-    d->stream = NULL;
-    d->is_stream = 0;
+    d->stream = st;
+    d->is_stream = (st != NULL);
+    d->info = zinfo;
+
+    if (status_out) *status_out = 0;
+    if (info) {
+        info->sample_rate = zinfo.sample_rate;
+        info->channels = zinfo.channels;
+        info->bits_per_sample = zinfo.bits_per_sample;
+        info->duration_us = zinfo.duration_us;
+        info->duration_known = zinfo.duration_known;
+        info->codec_name = zinfo.codec_name;
+        info->format_name = zinfo.format_name;
+    }
+    return d;
+}
+
+NativeDecoder *native_decoder_open_cb(void *ctx,
+                                      size_t (*on_read)(void *, unsigned char *, size_t),
+                                      int (*on_seek)(void *, long long, int, size_t),
+                                      unsigned long long size_hint,
+                                      NativeInfo *info, int *status_out,
+                                      char *errbuf, int errbuf_size)
+{
+    if (!ctx || !on_read || !on_seek) return NULL;
+
+    ZkInfo zinfo;
+    char eb[512];
+    NativeDecoder *d;
+    ZkDecoder *zk = NULL;
+    ZkEngineStream *st = NULL;
+    memset(&zinfo, 0, sizeof(zinfo));
+    memset(eb, 0, sizeof(eb));
+
+    /* 池启用时走 zk_engine 流式 seam；否则直连 decoder（ctx 归调用方）。 */
+    if (g_pool) {
+        st = zk_engine_open_cb(g_pool, ctx, on_read, on_seek, size_hint,
+                               &zinfo, eb, sizeof(eb));
+        if (!st) {
+            if (status_out) *status_out = read_le32_status(eb);
+            if (errbuf && errbuf_size > 0) {
+                snprintf(errbuf, errbuf_size, "%s", eb + 4);
+            }
+            return NULL;
+        }
+        g_stream_opens++;
+    } else {
+        zk = zk_decoder_open_cb(ctx, on_read, on_seek, size_hint,
+                                &zinfo, eb, (int)sizeof(eb));
+        if (!zk) {
+            if (status_out) *status_out = read_le32_status(eb);
+            if (errbuf && errbuf_size > 0) {
+                snprintf(errbuf, errbuf_size, "%s", eb + 4);
+            }
+            return NULL;
+        }
+    }
+
+    d = (NativeDecoder *)calloc(1, sizeof(*d));
+    if (!d) {
+        if (zk) zk_decoder_close(zk);
+        if (st) zk_engine_close(st);
+        if (status_out) *status_out = 7; /* ZK_OUT_OF_MEMORY */
+        if (errbuf && errbuf_size > 0) {
+            snprintf(errbuf, errbuf_size, "out of memory");
+        }
+        return NULL;
+    }
+    d->zk = zk;
+    d->stream = st;
+    d->is_stream = (st != NULL);
     d->info = zinfo;
 
     if (status_out) *status_out = 0;
@@ -333,6 +418,21 @@ NativeDecoder *native_decoder_open_mem(const void *data, size_t len, NativeInfo 
                                        char *errbuf, int errbuf_size)
 {
     (void)data; (void)len; (void)info;
+    if (status_out) *status_out = 1; /* ZK_UNSUPPORTED */
+    if (errbuf && errbuf_size > 0) {
+        snprintf(errbuf, errbuf_size, "archoera_kernel 未链接（构建时无 zig）");
+    }
+    return NULL;
+}
+
+NativeDecoder *native_decoder_open_cb(void *ctx,
+                                      size_t (*on_read)(void *, unsigned char *, size_t),
+                                      int (*on_seek)(void *, long long, int, size_t),
+                                      unsigned long long size_hint,
+                                      NativeInfo *info, int *status_out,
+                                      char *errbuf, int errbuf_size)
+{
+    (void)ctx; (void)on_read; (void)on_seek; (void)size_hint; (void)info;
     if (status_out) *status_out = 1; /* ZK_UNSUPPORTED */
     if (errbuf && errbuf_size > 0) {
         snprintf(errbuf, errbuf_size, "archoera_kernel 未链接（构建时无 zig）");

@@ -10,12 +10,24 @@ library;
 import '../netease/track.dart';
 import 'fft_frame.dart';
 
-/// 播放模式（对齐原项目 RepeatMode：'list' 列表循环 / 'one' 单曲循环）。
-/// 原项目的 'off' 已移除——队列播完末尾回绕，始终循环。
-const repeatModeCycle = ['list', 'one'];
+/// 播放模式（对齐原项目 RepeatMode 并补回 'off'）：
+/// - `'off'` 顺序播放——播到队列末尾**自动暂停**，不回绕；
+/// - `'list'` 列表循环——列表播完从头再来；
+/// - `'one'` 单曲循环。
+///
+/// 默认仍是 `'list'`（与历史行为一致），三态按 [repeatModeCycle] 顺序轮换。
+const repeatModeCycle = ['off', 'list', 'one'];
 
 /// 播放模式文案。
-const repeatModeLabels = <String, String>{'list': '列表循环', 'one': '单曲循环'};
+const repeatModeLabels = <String, String>{
+  'off': '顺序播放',
+  'list': '列表循环',
+  'one': '单曲循环',
+};
+
+/// 顺序播放（`off`）时当前是否已到队列末尾——到此应自动暂停而非回绕续播。
+bool isSequentialQueueEnd(String repeatMode, int queueIndex, int queueLength) =>
+    repeatMode == 'off' && queueLength > 0 && queueIndex >= queueLength - 1;
 
 /// 播放状态（UI 层只读）。
 class PlaybackState {

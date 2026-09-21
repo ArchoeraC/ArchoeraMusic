@@ -536,6 +536,30 @@ abstract class AppLocalizations {
   /// **'下载需要登录'**
   String get downloadRequiresLoginTitle;
 
+  /// No description provided for @downloadStreamingWarnTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不建议对流媒体使用下载功能'**
+  String get downloadStreamingWarnTitle;
+
+  /// No description provided for @downloadStreamingWarnBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'如果您能保证流媒体的访问，或者并不常用，或者为您自己部署的媒体源，其实并不建议下载到本地'**
+  String get downloadStreamingWarnBody;
+
+  /// No description provided for @downloadStreamingWarnDontAsk.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不再提示'**
+  String get downloadStreamingWarnDontAsk;
+
+  /// No description provided for @downloadStreamingWarnProceed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仍要下载'**
+  String get downloadStreamingWarnProceed;
+
   /// No description provided for @menuComment.
   ///
   /// In zh_CN, this message translates to:
@@ -727,6 +751,18 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'单曲循环'**
   String get queueRepeatOne;
+
+  /// No description provided for @queueRepeatOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'顺序播放'**
+  String get queueRepeatOff;
+
+  /// No description provided for @queueFinished.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放列表已播完，已自动暂停'**
+  String get queueFinished;
 
   /// No description provided for @queueShuffle.
   ///
@@ -6352,6 +6388,12 @@ abstract class AppLocalizations {
   /// **'单曲循环'**
   String get repeatModeOne;
 
+  /// No description provided for @repeatModeOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'顺序播放'**
+  String get repeatModeOff;
+
   /// No description provided for @sidebarStreaming.
   ///
   /// In zh_CN, this message translates to:
@@ -6591,6 +6633,42 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'媒体源'**
   String get streamingHint;
+
+  /// No description provided for @streamingQualityTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流媒体音质'**
+  String get streamingQualityTitle;
+
+  /// No description provided for @streamingQualityNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'原文件优先；转码档会请求服务端转码为通用 MP3——需服务端支持，标准参数兼容其它服务端。'**
+  String get streamingQualityNote;
+
+  /// No description provided for @streamingQualityOriginal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'原文件'**
+  String get streamingQualityOriginal;
+
+  /// No description provided for @streamingQualityHigh.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高 (320k)'**
+  String get streamingQualityHigh;
+
+  /// No description provided for @streamingQualityMedium.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'中 (192k)'**
+  String get streamingQualityMedium;
+
+  /// No description provided for @streamingQualityLow.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'低 (128k)'**
+  String get streamingQualityLow;
 
   /// No description provided for @streamingHintDetail.
   ///

@@ -240,6 +240,20 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se requiere iniciar sesión para descargar';
 
   @override
+  String get downloadStreamingWarnTitle =>
+      'No se recomienda descargar contenido en streaming';
+
+  @override
+  String get downloadStreamingWarnBody =>
+      'Si puede garantizar el acceso al streaming, no lo usa con frecuencia o es su propio servidor, no se recomienda descargarlo localmente.';
+
+  @override
+  String get downloadStreamingWarnDontAsk => 'No volver a mostrar';
+
+  @override
+  String get downloadStreamingWarnProceed => 'Descargar igualmente';
+
+  @override
   String get menuComment => 'Ver comentarios';
 
   @override
@@ -338,6 +352,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get queueRepeatOne => 'Repetir una';
+
+  @override
+  String get queueRepeatOff => 'Reproducir en orden';
+
+  @override
+  String get queueFinished =>
+      'Lista de reproducción terminada, reproducción en pausa';
 
   @override
   String get queueShuffle => 'Aleatorio';
@@ -3657,6 +3678,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get repeatModeOne => 'Repetir una';
 
   @override
+  String get repeatModeOff => 'Reproducir en orden';
+
+  @override
   String get sidebarStreaming => 'Transmisión';
 
   @override
@@ -3786,6 +3810,25 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get streamingHint => 'Fuente multimedia';
+
+  @override
+  String get streamingQualityTitle => 'Calidad de streaming';
+
+  @override
+  String get streamingQualityNote =>
+      'Original primero; los niveles de transcodificación piden al servidor MP3 universal: requiere soporte del servidor, los parámetros estándar mantienen compatibilidad.';
+
+  @override
+  String get streamingQualityOriginal => 'Original';
+
+  @override
+  String get streamingQualityHigh => 'Alta (320k)';
+
+  @override
+  String get streamingQualityMedium => 'Media (192k)';
+
+  @override
+  String get streamingQualityLow => 'Baja (128k)';
 
   @override
   String get streamingHintDetail =>

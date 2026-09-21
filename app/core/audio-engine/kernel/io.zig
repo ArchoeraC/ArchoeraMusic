@@ -28,7 +28,7 @@ pub const Kind = enum { file, memory, callback };
 pub const SeekOrigin = enum { start, current, end };
 
 /// callback 形态的 peek 缓冲大小（file 形态无缓冲，见文件头说明）
-const peek_buffer_size = 16 * 1024;
+pub const peek_buffer_size = 16 * 1024;
 
 /// file 形态前瞻缓存块大小（块内逐字节消费零系统调用）
 const file_cache_size = 16 * 1024;
@@ -91,6 +91,34 @@ pub const Reader = struct {
     /// 以内存切片构造（零拷贝、零分配）
     pub fn openMem(data: []const u8) Reader {
         return .{ .kind = .memory, .data = data, .size_hint = data.len };
+    }
+
+    /// 以**回调流**构造（流式输入：网络 URL / 管道 / 宿主注入传输）。
+    ///
+    /// 内核保持零网络栈——传输由宿主（C 壳）注入，本层只消费字节流。
+    /// `ctx` 与 `peek_buffer` 的所有权归调用方：Reader 不释放 ctx，`deinit`
+    /// 对 callback 形态为空操作；`peek_buffer` 须存活到解码会话结束（peek
+    /// 依赖它做前瞻）。`size_hint` = 已知总字节数（0 = 未知，seek end 不可用）。
+    ///
+    /// `on_read(ctx, buf)`：填充 buf，返回实际字节数（0 = EOF）。
+    /// `on_seek(ctx, off, whence, buffered)`：whence 0=start / 1=current / 2=end；
+    /// 语义见字段注释（current 须按 `off - buffered` 前移底层流）。
+    pub const Callback = struct {
+        ctx: *anyopaque,
+        on_read: *const fn (ctx: *anyopaque, buf: []u8) usize,
+        on_seek: *const fn (ctx: *anyopaque, off: i64, whence: i32, buffered: usize) bool,
+        size_hint: u64 = 0,
+    };
+
+    pub fn openCallback(cb: Callback, peek_buffer: []u8) Reader {
+        return .{
+            .kind = .callback,
+            .on_read = cb.on_read,
+            .on_seek = cb.on_seek,
+            .ctx = cb.ctx,
+            .size_hint = cb.size_hint,
+            .buffer = peek_buffer,
+        };
     }
 
     /// 读取（消耗位置）。返回实际读入字节数；0 = EOF。
@@ -170,8 +198,8 @@ pub const Reader = struct {
                 self.pos = @intCast(new_pos);
                 if (self.kind == .file) self.invalidateFileCache();
             },
-            // 流式形态：允许回调自行定位；成功后无法获知新位置，
-            // 调用方随后应通过 read 重新建立 pos（流式输入一般不 seek）。
+            // 流式形态：委托回调定位；成功后同步逻辑游标（pos 须与底层流一致，
+            // 否则 seek 后位置报道/相对定位全部偏移）。
             .callback => {
                 const buffered = self.buf_len - self.buf_pos;
                 // seek 目标落在已缓冲但未消费的范围内 → 仅前移缓冲游标，
@@ -189,6 +217,14 @@ pub const Reader = struct {
                     .end => 2,
                 };
                 if (!self.on_seek.?(self.ctx.?, off, w, buffered)) return error.SeekFailed;
+                const base: i64 = switch (whence) {
+                    .start => 0,
+                    .current => @intCast(self.pos),
+                    .end => @intCast(self.size() catch return error.SeekFailed),
+                };
+                const np = base + off;
+                if (np < 0) return error.SeekFailed;
+                self.pos = @intCast(np);
             },
         }
     }
@@ -292,13 +328,26 @@ pub const Reader = struct {
     // ---- callback 形态（带缓冲，peek 需要）----
 
     fn readBuffered(self: *Reader, buf: []u8) Error!usize {
-        // 大请求直接穿透底层，避免拷贝
+        // 大请求：先把 peek 缓冲中**未消费**的字节交还本次读取（否则直接穿透
+        // 底层会丢弃已预读数据 → 数据缺失/损坏），余量再直接穿透底层避免二次拷贝。
         if (buf.len >= peek_buffer_size) {
-            self.buf_pos = 0;
-            self.buf_len = 0;
-            const n = self.on_read.?(self.ctx.?, buf);
+            var written: usize = 0;
+            const avail = self.buf_len - self.buf_pos;
+            if (avail > 0) {
+                const take = @min(avail, buf.len);
+                @memcpy(buf[0..take], self.buffer[self.buf_pos .. self.buf_pos + take]);
+                self.buf_pos += take;
+                self.pos += take;
+                written = take;
+                if (self.buf_pos >= self.buf_len) {
+                    self.buf_pos = 0;
+                    self.buf_len = 0;
+                }
+            }
+            if (written == buf.len) return written;
+            const n = self.on_read.?(self.ctx.?, buf[written..]);
             self.pos += n;
-            return n;
+            return written + n;
         }
         var written: usize = 0;
         while (written < buf.len) {
@@ -469,4 +518,127 @@ test "callback 形态: 基本读取" {
     // read 消耗
     try testing.expectEqual(@as(usize, ctx.data.len), try r.read(&buf));
     try testing.expectEqualStrings(ctx.data, buf[0..ctx.data.len]);
+}
+
+test "openCallback: read/peek/seek 与底层流位置一致" {
+    const Ctx = struct {
+        data: []const u8,
+        pos: usize = 0,
+
+        fn readFn(ctx: *anyopaque, buf: []u8) usize {
+            const self: *@This() = @ptrCast(@alignCast(ctx));
+            if (self.pos >= self.data.len) return 0; // EOF
+            const n = @min(buf.len, self.data.len - self.pos);
+            @memcpy(buf[0..n], self.data[self.pos .. self.pos + n]);
+            self.pos += n;
+            return n;
+        }
+
+        /// whence 0/1/2；current 按 `off - buffered` 前移底层流（io.zig 契约）。
+        fn seekFn(ctx: *anyopaque, off: i64, whence: i32, buffered: usize) bool {
+            const self: *@This() = @ptrCast(@alignCast(ctx));
+            const base: i64 = switch (whence) {
+                0 => 0,
+                1 => @as(i64, @intCast(self.pos)) - @as(i64, @intCast(buffered)),
+                2 => @intCast(self.data.len),
+                else => return false,
+            };
+            const np = base + off;
+            if (np < 0 or np > @as(i64, @intCast(self.data.len))) return false;
+            self.pos = @intCast(np);
+            return true;
+        }
+    };
+    const payload = "0123456789abcdefghij"; // 20 字节
+    var ctx = Ctx{ .data = payload };
+    const peek_buf = try testing.allocator.alloc(u8, peek_buffer_size);
+    defer testing.allocator.free(peek_buf);
+    var r = Reader.openCallback(.{
+        .ctx = @ptrCast(&ctx),
+        .on_read = Ctx.readFn,
+        .on_seek = Ctx.seekFn,
+        .size_hint = payload.len,
+    }, peek_buf);
+
+    try testing.expectEqual(@as(u64, payload.len), try r.size());
+
+    // peek 触发前瞻缓冲（ctx.pos 领先 reader.pos），但不消耗
+    var buf: [4]u8 = undefined;
+    try testing.expectEqual(@as(usize, 4), try r.peek(&buf));
+    try testing.expectEqualStrings("0123", &buf);
+    try testing.expectEqual(@as(u64, 0), r.pos);
+
+    // read 从缓冲消费
+    try testing.expectEqual(@as(usize, 2), try r.read(buf[0..2]));
+    try testing.expectEqualStrings("01", buf[0..2]);
+
+    // current 回退：跨过缓冲区，验证 off-buffered 语义
+    try r.seek(10, .start);
+    try testing.expectEqual(@as(usize, 4), try r.read(&buf));
+    try testing.expectEqualStrings("abcd", &buf);
+
+    // current 相对回退（pos 14 → 12）
+    try r.seek(-2, .current);
+    try testing.expectEqual(@as(usize, 2), try r.read(buf[0..2]));
+    try testing.expectEqualStrings("cd", buf[0..2]);
+
+    // end / start
+    try r.seek(-2, .end);
+    try testing.expectEqual(@as(usize, 2), try r.read(buf[0..2]));
+    try testing.expectEqualStrings("ij", buf[0..2]);
+    try r.seek(0, .start);
+    try testing.expectEqual(@as(usize, 4), try r.read(&buf));
+    try testing.expectEqualStrings("0123", &buf);
+
+    // 越界 seek 失败
+    try testing.expectError(error.SeekFailed, r.seek(-1, .start));
+}
+
+test "openCallback: 大请求先交还已预读字节（不丢数据）" {
+    const Ctx = struct {
+        data: []const u8,
+        pos: usize = 0,
+        fn readFn(ctx: *anyopaque, buf: []u8) usize {
+            const self: *@This() = @ptrCast(@alignCast(ctx));
+            if (self.pos >= self.data.len) return 0;
+            const n = @min(buf.len, self.data.len - self.pos);
+            @memcpy(buf[0..n], self.data[self.pos .. self.pos + n]);
+            self.pos += n;
+            return n;
+        }
+        fn seekFn(ctx: *anyopaque, off: i64, whence: i32, buffered: usize) bool {
+            const self: *@This() = @ptrCast(@alignCast(ctx));
+            const base: i64 = switch (whence) {
+                0 => 0,
+                1 => @as(i64, @intCast(self.pos)) - @as(i64, @intCast(buffered)),
+                2 => @intCast(self.data.len),
+                else => return false,
+            };
+            const np = base + off;
+            if (np < 0 or np > @as(i64, @intCast(self.data.len))) return false;
+            self.pos = @intCast(np);
+            return true;
+        }
+    };
+    const payload = "0123456789abcdefghij"; // 20 字节
+    var ctx = Ctx{ .data = payload };
+    const peek_buf = try testing.allocator.alloc(u8, peek_buffer_size);
+    defer testing.allocator.free(peek_buf);
+    var r = Reader.openCallback(.{
+        .ctx = @ptrCast(&ctx),
+        .on_read = Ctx.readFn,
+        .on_seek = Ctx.seekFn,
+        .size_hint = payload.len,
+    }, peek_buf);
+
+    // peek 把整段读进 peek 缓冲（未消费），随后大请求必须先把缓冲交还，不能丢
+    var small: [4]u8 = undefined;
+    try testing.expectEqual(@as(usize, 4), try r.peek(&small));
+    const big = try testing.allocator.alloc(u8, peek_buffer_size);
+    defer testing.allocator.free(big);
+    const n = try r.read(big);
+    try testing.expectEqual(@as(usize, payload.len), n);
+    try testing.expectEqualStrings(payload, big[0..payload.len]);
+    // 之后到 EOF
+    try testing.expectEqual(@as(usize, 0), try r.read(big));
 }

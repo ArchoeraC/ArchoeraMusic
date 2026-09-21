@@ -23,6 +23,7 @@ const std = @import("std");
 const runtime = @import("runtime.zig");
 const task = @import("task.zig");
 const decoder = @import("decoder.zig");
+const kio = @import("io.zig");
 const kerr = @import("error.zig");
 
 pub const SessState = enum(u8) {
@@ -33,10 +34,28 @@ pub const SessState = enum(u8) {
     closed, // 实例已释放
 };
 
+/// 会话解码源形态（与 `decoder.open/openMem/openReader` 对应）。
+pub const Source = union(enum) {
+    path: []const u8,
+    mem: []const u8,
+    cb: kio.Reader.Callback,
+};
+
+/// 回调源上下文的析构（会话销毁时调用；通常释放 C 回调适配器）。
+pub const CallbackOwner = struct {
+    ctx: *anyopaque,
+    destroy: *const fn (ctx: *anyopaque, allocator: std.mem.Allocator) void,
+};
+
 pub const Session = struct {
     state: SessState = .new,
     allocator: std.mem.Allocator,
-    path: []const u8, // start 前须有效；open 后实例自建 Reader
+    /// 解码源形态（path / 内存切片 / 宿主回调流）；start 前须有效。
+    source: Source,
+    /// 回调源 peek 缓冲（本会话持有；非回调源为空）
+    cb_buffer: []u8 = &.{},
+    /// 回调源上下文析构（可空）
+    cb_owner: ?CallbackOwner = null,
     dec: ?decoder.Decoder = null,
     info: decoder.Info = undefined,
 
@@ -54,12 +73,35 @@ pub const Session = struct {
     /// 分配会话壳（path 必须调用方持有到 start 完成）
     pub fn create(allocator: std.mem.Allocator, path: []const u8) !*Session {
         const s = try allocator.create(Session);
-        s.* = .{ .allocator = allocator, .path = path };
+        s.* = .{ .allocator = allocator, .source = .{ .path = path } };
+        return s;
+    }
+
+    /// 内存源会话（data 所有权归调用方，须覆盖会话生命周期）。
+    pub fn createMem(allocator: std.mem.Allocator, data: []const u8) !*Session {
+        const s = try allocator.create(Session);
+        s.* = .{ .allocator = allocator, .source = .{ .mem = data } };
+        return s;
+    }
+
+    /// 宿主回调流会话（peek 缓冲本会话分配并释放；`owner` 回调上下文析构可空）。
+    pub fn createCallback(allocator: std.mem.Allocator, cb: kio.Reader.Callback, owner: ?CallbackOwner) !*Session {
+        const s = try allocator.create(Session);
+        errdefer allocator.destroy(s);
+        const buf = try allocator.alloc(u8, kio.peek_buffer_size);
+        s.* = .{ .allocator = allocator, .source = .{ .cb = cb }, .cb_buffer = buf, .cb_owner = owner };
         return s;
     }
 
     pub fn deinit(self: *Session) void {
         std.debug.assert(self.state == .closed);
+        self.destroy();
+    }
+
+    /// 释放会话壳与自有缓冲（不要求 `state==closed`；用于 start 失败清理）。
+    pub fn destroy(self: *Session) void {
+        if (self.cb_owner) |o| o.destroy(o.ctx, self.allocator);
+        if (self.cb_buffer.len > 0) self.allocator.free(self.cb_buffer);
         self.allocator.destroy(self);
     }
 
@@ -78,7 +120,15 @@ pub const Session = struct {
             fn f(t: *task.Task) void {
                 const sess: *Session = @fieldParentPtr("step", t);
                 var info: decoder.Info = undefined;
-                sess.dec = decoder.open(sess.allocator, sess.path, &info) catch |e| {
+                const opened: kerr.Error!decoder.Decoder = switch (sess.source) {
+                    .path => |p| decoder.open(sess.allocator, p, &info),
+                    .mem => |d| decoder.openMem(sess.allocator, d, &info),
+                    .cb => |cb| blk: {
+                        var reader = kio.Reader.openCallback(cb, sess.cb_buffer);
+                        break :blk decoder.openReader(sess.allocator, &reader, &info);
+                    },
+                };
+                sess.dec = opened catch |e| {
                     sess.state = .failed;
                     t.fail(e);
                     return;
