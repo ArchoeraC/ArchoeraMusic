@@ -80,6 +80,10 @@ pub enum SourcePlatform {
     /// 实验性第三方音源 NekoMusic（直传，无音质档；Rust 无自研解析，
     /// 恒走 Dart 播放管线回退预解析 URL；元数据依赖 enqueue 传入 + 兜底源）。
     Neko,
+    /// 流媒体（Subsonic/Jellyfin 等）：直链由 Dart 侧带鉴权生成
+    /// （`/rest/stream?format=raw`，原文件）。Rust 无自研解析，
+    /// 恒走 Dart 播放管线回退预解析 URL。
+    Streaming,
 }
 
 impl SourcePlatform {
@@ -89,6 +93,7 @@ impl SourcePlatform {
             SourcePlatform::Netease => "netease",
             SourcePlatform::Qqmusic => "qqmusic",
             SourcePlatform::Neko => "neko",
+            SourcePlatform::Streaming => "streaming",
         }
     }
 }

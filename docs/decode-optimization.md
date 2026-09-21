@@ -1,6 +1,11 @@
 # 解码提速专项：逐格式 CPU 差距与优化对象
 
-> 状态：**工作稿（2026-09-09）· 未动代码**。数据源：
+> 状态：**工作稿（2026-09-09）· 部分落地**。数据源：
+>
+> **落地（2026-09-21）**：§4 #6「内存侧」已解决——TTA/DTS 由整文件读入改为流式/定长缓冲，
+> 峰值 RSS 35→9MB / 65→10MB（scorecard memory 12→30），PCM 逐位 / corr 不回退；同时修复
+> AC-3/E-AC-3 corr 0.96→1.0、Speex corr 0.93→1.0（属**正确性欠账**，非本提速专项）。
+> 详见 `benchmark-2026-09-21.md`。**A 档提速（§4.1）仍受 §4.2 授权约束，未动**；B 档未启。
 > `docs/benchmark-2026-09-10.md`（scorecard 快照，
 > 同机同语料）与 `benchmark-industry-2026-09-05.md` / `engine-integration-bench.md`。
 > 本文件回答一件事：**总表看 era ≈ FFmpeg 98%，为何还要谈解码效率？差距在逐格式 ×RT，
@@ -75,7 +80,7 @@ SCORE 计分 `speed = 40·min(1, R/50)`：**达到 50× 实时即满分**，之�
 | 3 | **Huffman / 位读取**（aac/mp3） | 逐位函数调用可改批量取位/查表 | bit-exact 易验证 |
 | 4 | **浮点整肃** | `powf/logf/expf/atanf/sqrtf` 常是隐形大头 → 查表/多项式 | 有损格式须保 corr 纪律 |
 | 5 | **mp3 多相合成** | 可换 IMDCT 快速合成 | 保 |corr|≥0.999 / ±≤1 LSB 纪律 |
-| 6 | **内存侧（非速度）**：tta 54MB / dts 83MB RSS | scorecard memory 失分全在此 | 整缓冲 vs 固定大缓冲，需 multi-size 判定 |
+| 6 | **内存侧（非速度）**：tta/dts 整缓冲 RSS | ✅ **已解决（2026-09-21）**：改流式/定长缓冲，tta 35→9MB、dts 65→10MB，memory 12→30 | 详见 `benchmark-2026-09-21.md` |
 
 ### 4.1 方向定调（2026-09-10 用户定）：**零新增缓冲，纯计算砍指令**
 
@@ -153,9 +158,9 @@ FFmpeg**（engine-master-pool-design.md §3 启动预算：冷/热首帧 wall �
 ## 5. 纪律（验收门，scorecard 已内建）
 
 - **无损类**：输出 f32 PCM md5 与 `flac -d` / ffmpeg 逐位一致（lossless bit-exact）；
-- **有损类**：`|corr| ≥ 0.999` 且 ±≤1 LSB（s16 域）不劣化（现 mp3/mp2/aac/dts 已达；
-  ac3/eac3 corr 0.96 与 speex corr 0.93 属**既有正确性欠账**，不在提速专项目标内，
-  勿混入）；
+- **有损类**：`|corr| ≥ 0.999` 且 ±≤1 LSB（s16 域）不劣化——**现全部达标**：mp3/mp2/aac/dts
+  已达；ac3/eac3 corr 0.96→1.0、speex 0.93→1.0 已于 2026-09-21 修复（属既有**正确性欠账**，
+  非提速专项）。
 - 每步重跑 `zig build test`（全量）→ scorecard 全矩阵，看**逐格式 wall 下降**与
   **正确性零回退**；以同轮 CSV 快照判档（跨轮 ±0.5–4 抖动，看分差方向）；
 - **新增**：每步同时跑 `taskset -c 12 perf stat -e instructions,cycles` 对同格式同语料，

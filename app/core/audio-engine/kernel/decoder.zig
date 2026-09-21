@@ -201,8 +201,15 @@ pub fn openWithIo(io_inst: std.Io, allocator: std.mem.Allocator, path: []const u
 /// （引擎回退 FFmpeg）。字节所有权归调用方，解码器只读不释放，生命周期须覆盖解码器。
 pub fn openMem(allocator: std.mem.Allocator, data: []const u8, info: *Info) Error!Decoder {
     var reader = io.Reader.openMem(data);
-    const fmt = try probe.probe(&reader);
-    return registry.dispatch(fmt, allocator, &reader, info);
+    return openReader(allocator, &reader, info);
+}
+
+/// 从**已构造的 Reader**（内存 / 回调流等）打开解码器：probe → Registry 分派。
+/// Reader 由调用方持有（含流式回调的 ctx 与 peek 缓冲），生命周期须覆盖解码器；
+/// 本函数不 deinit reader（callback 形态 deinit 为空操作，file 由 openWithIo 自管）。
+pub fn openReader(allocator: std.mem.Allocator, reader: *io.Reader, info: *Info) Error!Decoder {
+    const fmt = try probe.probe(reader);
+    return registry.dispatch(fmt, allocator, reader, info);
 }
 
 /// 元数据打开结果：优先 probe-only 会话（§8.4.2①），无 `meta` 工厂的格式回退完整

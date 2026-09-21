@@ -37,7 +37,7 @@ const CELT_PVQ_U_MAX = 22;
 inline fn u(n: usize, k: usize) u32 {
     const min_nk = @min(n, k);
     const max_nk = @max(n, k);
-    return tables.celt_pvq_u[tables.ff_celt_pvq_u_row_offsets[min_nk] + max_nk];
+    return tables.celt_pvq_u[tables.era_celt_pvq_u_row_offsets[min_nk] + max_nk];
 }
 
 /// V(N,K) = U(N,K) + U(N,K+1)
@@ -78,7 +78,7 @@ fn computeQn(n: i32, b: i32, offset: i32, pulse_cap: i32, stereo: bool) i32 {
     const n2 = 2 * n - 1 - @intFromBool(stereo and n == 2);
     const qb: i32 = @min(@min(b - pulse_cap - (4 << 3), @divTrunc(b + n2 * offset, n2)), 8 << 3);
     if (qb < (1 << 3 >> 1)) return 1;
-    const exp2 = tables.ff_celt_qn_exp2[@intCast(qb & 0x7)];
+    const exp2 = tables.era_celt_qn_exp2[@intCast(qb & 0x7)];
     const qn = @divTrunc(exp2, @as(u16, 1) << @intCast(14 - (qb >> 3)));
     return @divTrunc(qn + 1, 2) * 2;
 }
@@ -256,7 +256,7 @@ fn expRotation(x: []f32, len: usize, stride: usize, k: u32, spread: u8) void {
 
 /// celt_interleave_hadamard
 fn interleaveHadamard(tmp: []f32, x: []f32, n0: usize, stride: usize, hadamard: bool) void {
-    const order = if (hadamard) tables.ff_celt_hadamard_order[stride - 2 ..] else tables.ff_celt_hadamard_order[30 .. 30 + stride];
+    const order = if (hadamard) tables.era_celt_hadamard_order[stride - 2 ..] else tables.era_celt_hadamard_order[30 .. 30 + stride];
     for (0..stride) |i| {
         for (0..n0) |j| tmp[order[i] * n0 + j] = x[j * stride + i];
     }
@@ -265,7 +265,7 @@ fn interleaveHadamard(tmp: []f32, x: []f32, n0: usize, stride: usize, hadamard: 
 
 /// celt_deinterleave_hadamard
 fn deinterleaveHadamard(tmp: []f32, x: []f32, n0: usize, stride: usize, hadamard: bool) void {
-    const order = if (hadamard) tables.ff_celt_hadamard_order[stride - 2 ..] else tables.ff_celt_hadamard_order[30 .. 30 + stride];
+    const order = if (hadamard) tables.era_celt_hadamard_order[stride - 2 ..] else tables.era_celt_hadamard_order[30 .. 30 + stride];
     for (0..stride) |i| {
         for (0..n0) |j| tmp[j * stride + i] = x[order[i] * n0 + j];
     }
@@ -413,8 +413,8 @@ pub fn quantBand(
         var k: usize = 0;
         while (k < recombine) : (k += 1) {
             if (lowband) |lb| haar1(@constCast(lb), n >> @as(u6, @intCast(k)), @as(usize, 1) << @as(u6, @intCast(k)));
-            fill = @as(u32, tables.ff_celt_bit_interleave[fill & 0xF]) |
-                (@as(u32, tables.ff_celt_bit_interleave[fill >> 4]) << 2);
+            fill = @as(u32, tables.era_celt_bit_interleave[fill & 0xF]) |
+                (@as(u32, tables.era_celt_bit_interleave[fill >> 4]) << 2);
         }
         blocks >>= @intCast(recombine);
         n_b <<= @intCast(recombine);
@@ -443,8 +443,8 @@ pub fn quantBand(
     // 参考语义：cache 无条件指向表（duration ∈ -1..3 时 (duration+1)*21+band ≤ 104
     // 恒在表内；值为 -1 时参考实现读取表前字节，此处空切片兜底且拆分条件不满足）
     var cache: []const u8 = &.{};
-    const cache_idx = tables.ff_celt_cache_index[@as(usize, @intCast(duration + 1)) * CELT_MAX_BANDS + band];
-    if (cache_idx >= 0) cache = tables.ff_celt_cache_bits[@intCast(cache_idx)..];
+    const cache_idx = tables.era_celt_cache_index[@as(usize, @intCast(duration + 1)) * CELT_MAX_BANDS + band];
+    if (cache_idx >= 0) cache = tables.era_celt_cache_bits[@intCast(cache_idx)..];
     var split = stereo;
     if (!stereo and duration >= 0 and n > 2 and cache.len > 0 and b > @as(i32, @intCast(cache[cache[0]])) + 12) {
         n >>= 1;
@@ -457,7 +457,7 @@ pub fn quantBand(
 
     if (split) {
         // θ 解码
-        const pulse_cap = @as(i32, tables.ff_celt_log_freq_range[band]) + duration * 8;
+        const pulse_cap = @as(i32, tables.era_celt_log_freq_range[band]) + duration * 8;
         const offset = (pulse_cap >> 1) - (if (stereo and n == 2) @as(i32, CELT_QTHETA_OFFSET_TWOPHASE) else CELT_QTHETA_OFFSET);
         const qn: i32 = if (stereo and band >= f.intensity_stereo) 1 else computeQn(@intCast(n), b, offset, pulse_cap, stereo);
         const tell = rc.tellFrac();
@@ -633,10 +633,10 @@ pub fn quantBand(
         }
         k = 0;
         while (k < recombine) : (k += 1) {
-            cm = @as(u32, tables.ff_celt_bit_deinterleave[@intCast(cm & 0xF)]) |
-                (@as(u32, tables.ff_celt_bit_deinterleave[cm >> 4 & 0xF]) << 2) |
-                (@as(u32, tables.ff_celt_bit_deinterleave[cm >> 8 & 0xF]) << 4) |
-                (@as(u32, tables.ff_celt_bit_deinterleave[cm >> 12 & 0xF]) << 6);
+            cm = @as(u32, tables.era_celt_bit_deinterleave[@intCast(cm & 0xF)]) |
+                (@as(u32, tables.era_celt_bit_deinterleave[cm >> 4 & 0xF]) << 2) |
+                (@as(u32, tables.era_celt_bit_deinterleave[cm >> 8 & 0xF]) << 4) |
+                (@as(u32, tables.era_celt_bit_deinterleave[cm >> 12 & 0xF]) << 6);
             haar1(x, n0 >> @as(u6, @intCast(k)), @as(usize, 1) << @as(u6, @intCast(k)));
         }
         blocks <<= @intCast(recombine);

@@ -4,13 +4,24 @@
 // EraSync — ArchoeraMusic 自研音频内核
 
 //! Speex CELP 核心解码（对照移植 FFmpeg `libavcodec/speexdec.c`，n9.0.1 native
-//! speex 解码器，浮点路径：全程 f32 与系统 ffmpeg 默认 native `speex` 一致）。
+//! speex 解码器，浮点路径）。
 //!
 //! 移植约定（保证与 C 实现位级一致）：
 //!   - 所有浮点运算保持 C 源的求值顺序（Zig 严格浮点，无 FMA 收缩/重结合）；
 //!   - `@exp`/`@cos`/`@sqrt` 链接 libc 时解析到与 ffmpeg 相同的 glibc libm；
 //!   - 表数据自 reference/FFmpeg/libavcodec/speexdata.h 逐值转录（data.zig）；
 //!   - exc_buf 以「基址 + 有符号偏移」访问，等价 C 的 exc 指针负回看。
+//!
+//! 参考基准（2026-09）：正确性验收以 **ffmpeg 内嵌 libspeex**（`-c:a libspeex`）为准
+//! （scorecard speex 行）。native 与 libspeex 在 WB/UWB 上存在实质差异，本模块在
+//! 保留 NB(mode0) native 逐位锚点的同时，按 libspeex 语义对齐 WB/UWB：
+//!   - WB/UWB 低带 NB 解码器 `is_wideband=1` → 低带输出走 **wideband 高通**
+//!     （libspeex `sb_decoder_init` 对低层 SET_WIDEBAND；native 误用 narrowband）；
+//!   - 高带 `subframe_size==80` 的 gc 增益用 `1.4142f`（libspeex QCONST16，
+//!     native 用 double `M_SQRT2`）；
+//!   - `speex_rand` 保留单位方差因子 `3.4642`（libspeex `math_approx.h`；
+//!     native 漏乘，仅影响 submode1/DTX 舒适噪声）；
+//!   - vocoder / PLC 的 sqrt/exp 按 libspeex 的 double libm 提权。
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -121,8 +132,10 @@ pub fn speexRand(std_dev: f32, seed: *u32) f32 {
     const ran: u32 = 0x3f800000 | (0x007fffff & seed.*);
     var fran: f32 = @bitCast(ran);
     fran -= 1.5;
-    fran *= std_dev;
-    return fran;
+    // libspeex math_approx.h：频谱折叠/舒适噪声用单位方差归一（sqrt(12)≈3.4642）。
+    // FFmpeg native 漏乘该因子；对齐 libspeex 保留（NB submode1/DTX 路径）。
+    const out = @as(f64, 3.4642) * @as(f64, std_dev) * @as(f64, fran);
+    return @floatCast(out);
 }
 
 pub fn computeRms(x: []const f32) f32 {
@@ -1028,7 +1041,7 @@ fn nbDecode(
     if (st.count_lost != 0) {
         var lsp_dist: f32 = 0;
         for (0..NB_ORDER) |i| lsp_dist += @abs(st.old_qlsp[i] - qlsp[i]);
-        const fact = 0.6 * @exp(-0.2 * lsp_dist); // 丢帧 PLC 路径（顺序解码不可达）
+        const fact: f32 = @floatCast(0.6 * @exp(@as(f64, -0.2 * lsp_dist))); // 丢帧 PLC 路径（顺序解码不可达）
         for (0..NB_ORDER) |i| st.mem_sp[i] = fact * st.mem_sp[i];
     }
 
@@ -1156,7 +1169,9 @@ fn nbDecode(
             @memset(st.exc_buf[@intCast(exc_e)..][0..NB_SUBFRAME_SIZE], 0);
             while (st.voc_offset < NB_SUBFRAME_SIZE) {
                 if (st.voc_offset >= 0) {
-                    eset(&st.exc_buf, exc_e, st.voc_offset, @sqrt(2.0 * @as(f32, @floatFromInt(ol_pitch))) * (g * ol_gain));
+                    // libspeex: spx_sqrt(2*ol_pitch)（double sqrt）× (g*ol_gain)
+                    const amp: f64 = @sqrt(@as(f64, @floatFromInt(2 * ol_pitch)));
+                    eset(&st.exc_buf, exc_e, st.voc_offset, @floatCast(amp * @as(f64, g * ol_gain)));
                 }
                 st.voc_offset += ol_pitch;
             }
@@ -1332,8 +1347,9 @@ fn sbDecode(
             const el = low_exc_rms[sub];
             var gc: f32 = 0.87360 * t.gc_quant_bound[gb.getBits(4)];
             if (st.subframe_size == 80) {
-                // M_SQRT2 为 double 常量：C 中 gc 先升 double 再回落 f32
-                gc = @floatCast(@as(f64, gc) * 1.4142135623730951);
+                // libspeex: MULT16_16_P14(QCONST16(1.4142f,14), gc) —— 浮点版即 gc*1.4142f
+                // （FFmpeg native 此处用 double M_SQRT2；对齐 libspeex 改用 1.4142f）
+                gc = gc * 1.4142;
             }
             const scale = (gc * el) / filter_ratio;
             sm.innovation_unquant.?(exc[0..st.subframe_size], sm.innovation_params.?, st.subframe_size, gb, &st.seed);

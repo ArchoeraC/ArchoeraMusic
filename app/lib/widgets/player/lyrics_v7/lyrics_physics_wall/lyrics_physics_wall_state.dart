@@ -11,6 +11,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   final _Repaint _repaint = _Repaint();
   int _lastUs = 0;
   List<Spring1D> _y = const [];
+  /// 各行「滚动起点」（预滚后，ms；长度同 [AmllPhysicsWall.groups]）。
+  List<int> _scrollStart = const [];
   List<double> _scale = const [];
   List<double> _fade = const [];
   List<double> _blur = const [];
@@ -203,6 +205,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _clock.anchor(widget.positionMs, playing: _wantsClock);
     final groupsChanged = old.groups != widget.groups;
     _c.groups = widget.groups;
+    if (groupsChanged) _buildScrollStarts();
     _c.positionMs = _clock.valueMs;
     if (groupsChanged) {
       _seekSnap = true;
@@ -247,10 +250,9 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   ///
   /// 无行覆盖（前奏 / 行间空隙 / 末尾）时返回 -1，交由布局锚点单独处理：
   /// 普通推进保持上一锚点，仅 seek 越界才定位到最近边界行。
-  int get _activeIdx {
+  int _activeIdxAt(int pos) {
     final g = _c.groups;
     if (g.isEmpty) return -1;
-    final pos = _clock.valueMs;
     var res = -1;
     for (var i = 0; i < g.length; i++) {
       if (pos < g[i].original.timeMs) break;
@@ -432,29 +434,70 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 行的目标屏幕中心（含用户浏览偏移）。
   double _targetForUser(int i, int anchor) => _targetFor(i, anchor) + _user;
 
-  /// 是否属于「高速换行」——此时不等弹簧，直接吸附成普通滚动。
+  /// 滚动预滚后的「激活行」：与 [AmllPhysicsWall] 的 AMLL `applyScrollPreroll` 对齐。
   ///
-  /// 上游 AMLL 在高速段靠「间隔越短刚度越高（→220）」让观感接近普通滚动；
-  /// 我们直接吸附，观感更利落、也省掉一串来不及安顿的弹簧。
-  ///
-  /// 判定刻意**收紧**，四条同时满足才算：
-  /// 1. 不是 seek（seek 已有自己的慢速/瞬移策略）；
-  /// 2. 只推进**一行**（多行跳变按跨屏跳转处理）；
-  /// 3. 相邻行间隔 ≤ [kFastLineChangeMs]（确实是"高速"）；
-  /// 4. 位移约等于一行（≤ [kFastLineChangeMaxShiftRatio] × 视口高），
-  ///    排除掉锚点索引变了但真正位移很大的情况（例如中间夹了间奏预留）。
-  bool _isFastLineChange({
-    required int anchor,
-    required int oldAnchor,
-    required bool seekSnap,
-    required double shift,
-  }) {
-    if (seekSnap) return false;
-    if ((anchor - oldAnchor).abs() != 1) return false;
-    final interval = _lineIntervalMs(anchor);
-    if (interval == null || interval > kFastLineChangeMs) return false;
-    final h = _c.h > 0 ? _c.h : 400.0;
-    return shift <= h * kFastLineChangeMaxShiftRatio;
+  /// 用预滚起点（[`_scrollStart`]）而非原始行起点判定，使视野在本行正式开唱前
+  /// 先滚到位；高速换行时弹簧因此有提前量，无需硬切。高亮仍按原始时间。
+  int _scrollActiveAt(int pos) {
+    final g = _c.groups;
+    if (g.isEmpty || _scrollStart.length != g.length) return _activeIdxAt(pos);
+    var res = -1;
+    for (var i = 0; i < g.length; i++) {
+      if (pos < _scrollStart[i]) break;
+      final end = g[i].endMs;
+      if (end == null || pos < end) res = i;
+    }
+    return res;
+  }
+
+  /// 计算各行「滚动起点」（预滚后的起始时间，单位 ms）。对齐 AMLL `applyScrollPreroll`：
+  /// 与前行有间隙则提前 600ms（不早于上一组结束）；与前行重叠（对唱）则提前 400ms
+  /// （不早于前一行时长的 30% 处）；背景行随主行。原始行时间不变。
+  void _buildScrollStarts() {
+    final g = widget.groups;
+    final starts = List<int>.filled(g.length, 0);
+    var prevStart = 0;
+    var prevEnd = 0;
+    var groupStart = 0;
+    var groupEnd = 0;
+    var hasPrev = false;
+    for (var i = 0; i < g.length; i++) {
+      final s = g[i].original.timeMs;
+      final e = g[i].endMs ?? s;
+      if (g[i].isBG) {
+        starts[i] = i > 0 ? starts[i - 1] : s;
+        continue;
+      }
+      int advance;
+      int boundary;
+      if (hasPrev) {
+        final hadGap = s >= prevEnd;
+        if (hadGap) {
+          advance = kScrollPrerollNoOverlapMs;
+          boundary = groupEnd;
+        } else {
+          advance = kScrollPrerollOverlapMs;
+          boundary =
+              prevStart + ((prevEnd - prevStart) * kScrollPrerollOverlapBoundary).round();
+        }
+      } else {
+        advance = kScrollPrerollNoOverlapMs;
+        boundary = 0;
+      }
+      final ns = math.max(boundary, s - advance);
+      starts[i] = ns < s ? ns : s;
+      if (hasPrev && s < groupEnd && e > groupStart) {
+        groupStart = math.min(groupStart, s);
+        groupEnd = math.max(groupEnd, e);
+      } else {
+        groupStart = s;
+        groupEnd = e;
+      }
+      prevStart = s;
+      prevEnd = e;
+      hasPrev = true;
+    }
+    _scrollStart = starts;
   }
 
   /// 重算需要参与动画的行窗口（视口 ± 自适应余量）。
@@ -567,8 +610,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     final pos = _clock.valueMs;
     final interludeIdx = _interludeIndexAt(pos);
     // 间奏期间不点亮任何行（对齐 AMLL：间奏会清空高亮集合），改为三点动画。
-    final active = interludeIdx >= 0 ? -1 : _activeIdx;
-    _c.active = active; // 高亮：严格覆盖播放位置
+    final active = interludeIdx >= 0 ? -1 : _activeIdxAt(pos);
+    _c.active = active; // 高亮：严格覆盖播放位置（预滚只影响滚动锚点，不影响高亮）
     _c.dots = interludeIdx < 0
         ? InterludeDotsState.hidden
         : resolveInterludeDots(
@@ -581,7 +624,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       _repaint.notify();
       return;
     }
-    final anchor = _resolveAnchor(active, seekSnap, interludeIdx);
+    // 滚动锚点用「预滚位置」——对齐 AMLL applyScrollPreroll：与前行无间隙提前 600ms、
+    // 对唱重叠提前 400ms 起滚，让视野在开唱前先滚到位，高速换行时弹簧有提前量。
+    final scrollActive = interludeIdx >= 0 ? -1 : _scrollActiveAt(pos);
+    final anchor = _resolveAnchor(scrollActive, seekSnap, interludeIdx);
     if (anchor < 0) {
       _repaint.notify();
       return;
@@ -604,12 +650,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     // 锚点位移超过一屏视作跨屏跳转：所有行同步位移（无级联），
     // 保证行距不塌陷、不产生“炸动画”或重叠伪影。仅触摸拖拽/性能模式瞬移。
     final shift = (_c.centers[anchor] - _c.centers[oldAnchor]).abs();
-    final snap = snapNow || !widget.animate || _isFastLineChange(
-      anchor: anchor,
-      oldAnchor: oldAnchor,
-      seekSnap: seekSnap,
-      shift: shift,
-    );
+    // 只保留「拖拽/性能模式」与「禁用动画」的硬切；高速换行**不再吸附**——对齐 AMLL：
+    // 换行一律走弹簧 retarget（保速），高速时由更硬的弹簧策略（resolvePosYSpringPolicy
+    // 按行间隔提高刚度）追赶，绝不硬切。
+    final snap = snapNow || !widget.animate;
     final noCascade = !stagger || (oldAnchor != anchor && shift > _c.h);
     _ever = true;
     final n = _y.length;
@@ -853,6 +897,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     // LayoutBuilder/_rebuildMetrics 已按 widget.groups 算好 _c.y/_c.heights，
     // 若不同步这里，painter 会在 _c.groups 仍为空时按 _c.y.length 索引越界。
     _c.groups = groups;
+    if (_scrollStart.length != groups.length) _buildScrollStarts();
     return LayoutBuilder(
       builder: (context, constraints) {
         final rawW = constraints.maxWidth;

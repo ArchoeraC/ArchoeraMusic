@@ -620,6 +620,31 @@ pub const Reader = struct {
 - **零网络栈原则（P2 不变）**：传输层（socket / TLS / Range / 重定向）全部由 C 壳 / 宿主注入，
   内核经 `callback` 只消费字节流——内核仍零 curl/openssl 依赖；不支持网络栈时退回路径 1。
 
+> **落地（2026-09-21）：callback 形态已从「预留」转为「已接入」**
+> - 内核：`io.Reader.openCallback` + `decoder.openReader`；新导出 `zk_decoder_open_cb`
+>   （`include/kernel_bridge.h`，加法式，不改既有 `zk_decoder_open[_mem]`）。C 回调经
+>   `engine.CbAdapter` 桥接到 Zig 回调签名，peek 缓冲由内核分配、close 释放；`ctx` 归宿主。
+> - C 壳：`native_decoder_open_cb` + `pipeline.c` 的 `pipeline_era_url_open`——以 **FFmpeg AVIO**
+>   作宿主传输（`avio_open2/read/seek`），`engine_mode==EraAudio` 的 **http(s) 源**直接进入
+>   自研内核（此前 URL 源一律回退 FFmpeg，属残血态）；失败仍回退 FFmpeg。
+> - 修复顺带发现的两处 `Reader.callback` 缺陷：① 大请求（≥ peek 缓冲）会丢弃已预读未消费
+>   字节 → 数据损坏；② `seek` 后逻辑游标 `pos` 不同步 → 位置/相对定位偏移。均已修正并有
+>   单测覆盖。
+> - 验收：`tests/test_native_callback.c`（flac/wav/mp3/opus 回调流 == 路径后端帧数、采样率、
+>   声道；路径后端自身确定的格式**逐样本 PCM 一致**；EOF 后 seek 回起点仍能续解）；
+>   本地 Range 服务端 HTTP 端到端转码成功且与本地解码同长。
+> - EraSync 常驻池覆盖：新增 `zk_engine_open_mem` / `zk_engine_open_cb`，`session.Source`
+>   （path/mem/cb）+ `native_decoder_open_mem/_cb` 在池启用时同样走 `zk_engine` 流式 seam；
+>   `mediaengine` 的池门控放宽为 `engine_mode==1 && (source || store)`——本地/在线回调/
+>   SegStore 内存源三条路径统一入池（失败回退不变）。`tests/test_engine_pool.c` 增补
+>   `open_mem`/`open_cb` == sync 参考对照。
+> - 附带修复（同日）：**opus 解码非确定性**（同文件两次解码 PCM 不同）——根因是 GOP/解码
+>   路径中多处局部输出暂存（`out_f`/`red_f`/`out_l`/`out_r`/`rsm_in`/`rsm_buf`）声明为
+>   `undefined` 且按「已写长度」部分读取，混入栈垃圾；已改为零初始化，并给 SILK
+>   `DecoderControl`/`prev_nlsf_q15`、CELT/FFT 静态表、`pcmBuf/ch48` 等历史态补零。
+>   现同文件重复解码**逐字节一致**，且 `MALLOC_PERTURB_`↔输出不变；新增
+>   `lib.zig` 确定性回归 + `test_native_callback` 逐样本 PCM 对拍（opus 也纳入）。
+
 ---
 
 ## 7. 格式探测
@@ -853,6 +878,10 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 
 **落地顺序建议**：#1（元数据快路径）→ #2（接管门控）→ #3（基准量化）→ #4（按基准结果打磨）；
 #5 放入 Phase F 顺手完成。
+
+> **async 提交面（2026-09-21）**：`zk_submit_decode / zk_task_wait / zk_task_free` 已落地
+> （§16.1「结构化任务提交面」，加法式任务提交面与句柄）；当前仅 `kind=decode` 一种载体，
+> `kind/source/format` 的完整结构化语义仍属接线面。
 
 > **#1 落地（2026-09-10，A2）**：`zk_metadata_open/close`（结构化 `ZkMetaInfo`/`ZkTag`，
 > **无 JSON**）+ `zk_metadata_set/get_concurrency`（scanner 按 `AdaptiveConcurrency`
@@ -1750,6 +1779,15 @@ void        zk_dsp_destroy(ZkDspChain *d);
   线程、无 async 状态机），由 Pool worker 或 sync 直通调用线程驱动。
 - `EngineConfig` 由 C 壳解析（`audio_engine.h`），桥接层只接收已映射的标量/结构参数，无需
   跨语言传 JSON 结构体。
+- **结构化任务提交面（2026-09-21）**：新增 `zk_submit_decode / zk_task_wait / zk_task_free`
+  （`ZkTask` 不透明句柄；加法式，不改既有 `zk_*`）——非阻塞提交一次「open path → 解码至多
+  `max_frames` 帧 float32 交错到 `out` → 填 `info`（最小字段）」的池内任务，完工事件等待取
+  结果（`task.Task`，无轮询）；返回语义与 `zk_engine_decode_once` 对齐（>=0 帧数（0=EOF）/
+  <0 = -ZkStatus），解码体共用 `decodeInto`（单一来源）。任务槽满 / 停机 / 参数非法 → NULL
+  （`Host.submit` 满即拒 = `InstanceLimit`，`engine-master-pool-design.md` §5.4）。句柄与载体用
+  `std.heap.c_allocator`，`zk_task_free` 释放（内部先 wait 收尾，未 wait 直接 free 亦不悬垂；
+  同一句柄只可 free 一次）。验收：`zig build test` 641/641；`tests/test_engine_pool.c`
+  增补 submit==sync 逐样本对照 + cap=1 槽满拒绝（ctest 20/20）。
 
 ### 16.2 FFI 库：`mediaengine_lib.c`（保留，改动最小）
 

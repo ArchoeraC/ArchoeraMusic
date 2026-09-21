@@ -132,10 +132,9 @@ pub fn fftState(nfft: usize) FftState {
 
 /// 构建共享 base twiddles 的 shift>0 状态（libopus opus_fft_alloc_twiddles 语义）。
 pub fn fftStateShifted(nfft: usize, shift: usize, base: *const FftState) FftState {
-    var st = FftState{
-        .nfft = nfft,
-        .scale = 1.0 / @as(f32, @floatFromInt(nfft)),
-    };
+    var st = std.mem.zeroes(FftState);
+    st.nfft = nfft;
+    st.scale = 1.0 / @as(f32, @floatFromInt(nfft));
     _ = kfFactor(@intCast(nfft), &st.factors);
     st.twiddles = base.twiddles; // 复制 base 全表（值语义安全）
     st.shift = shift;
@@ -145,11 +144,10 @@ pub fn fftStateShifted(nfft: usize, shift: usize, base: *const FftState) FftStat
 
 /// 静态模式表构建 FFT 状态（libopus static_modes_float.h 预生成，位级权威）。
 pub fn fftStateStatic(nfft: usize, shift: usize, base: *const FftState, bitrev: []const u16, factors: []const u16) FftState {
-    var st = FftState{
-        .nfft = nfft,
-        .scale = 1.0 / @as(f32, @floatFromInt(nfft)),
-        .shift = shift,
-    };
+    var st = std.mem.zeroes(FftState);
+    st.nfft = nfft;
+    st.scale = 1.0 / @as(f32, @floatFromInt(nfft));
+    st.shift = shift;
     @memcpy(st.factors[0..factors.len], factors);
     st.twiddles = base.twiddles;
     @memcpy(st.bitrev[0..nfft], bitrev[0..nfft]);
@@ -164,16 +162,15 @@ pub fn mdctInitStatic() MdctLookup {
         .n = n,
         .maxshift = maxshift,
         .shortMdctSize = n >> 4,
-        .kfft = undefined,
-        .trig = undefined,
+        .kfft = std.mem.zeroes([8]FftState),
+        .trig = std.mem.zeroes([2048]f32),
         .trig_len = n - (n >> 1 >> @intCast(maxshift)),
     };
     // base kfft[0]（nfft=480）
-    var base = FftState{
-        .nfft = 480,
-        .scale = 1.0 / 480.0,
-        .shift = 0,
-    };
+    var base = std.mem.zeroes(FftState);
+    base.nfft = 480;
+    base.scale = 1.0 / 480.0;
+    base.shift = 0;
     @memcpy(base.factors[0..16], &stables.fft_factors480);
     for (0..480) |i| base.twiddles[i] = .{ .r = stables.fft_twiddles48000_960[2 * i], .i = stables.fft_twiddles48000_960[2 * i + 1] };
     @memcpy(base.bitrev[0..480], &stables.fft_bitrev480);
@@ -372,8 +369,8 @@ pub fn mdctInit(n: usize, maxshift: usize) MdctLookup {
         .n = n,
         .maxshift = maxshift,
         .shortMdctSize = n >> 4,
-        .kfft = undefined,
-        .trig = undefined,
+        .kfft = std.mem.zeroes([8]FftState),
+        .trig = std.mem.zeroes([2048]f32),
         .trig_len = n - (n >> 1 >> @intCast(maxshift)),
     };
     // kfft[0] 为独立状态，shift>0 共享其 twiddles（libopus 语义）

@@ -1,5 +1,9 @@
 # EraAudio 自研解码内核 · 行业对比基准与评分
 
+> **更新（2026-09-21）**：本篇为历史快照（95.6 A+）。最新口径与结果见
+> [`benchmark-2026-09-21.md`](benchmark-2026-09-21.md)（最小/最大 FFmpeg 双基线 + 专业程序横评，
+> 对 FFmpeg 归一 **100.8%**、15/15 格式满分；TTA/DTS 内存、AC-3/E-AC-3 corr、Speex 均已修复）。
+
 > 2026-09-05 · 实验性定位 · 配套 `app/core/audio-engine/tests/bench/scorecard.py`
 > （一次跑完整矩阵 → CSV + 评分表 + 汇总 md）。
 > 关联：[engine-integration-bench.md](engine-integration-bench.md)（EOF/错误语义、内存流式化、

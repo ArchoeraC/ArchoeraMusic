@@ -491,6 +491,18 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
       if (!ok) await _handleTrackFailure(track, '单曲循环播放失败');
       return;
     }
+    // 顺序播放（'off'）：播到队列末尾**自动暂停**，不回绕、不续播。
+    // 此刻引擎已到 EOF 并自行退出，主动收尾销毁会话；之后按播放键走
+    // 「无引擎」续播路径，从头重放本曲（与睡眠定时收尾同款处理）。
+    if (isSequentialQueueEnd(state.repeatMode, state.queueIndex, q.length)) {
+      state = state.copyWith(playing: false, buffering: false);
+      _syncFftActive();
+      _log('顺序播放：已到队列末尾，自动暂停');
+      unawaited(_stopEngine());
+      // 明确提示用户「已播完」（顺序播放不会静默地停在队尾）。
+      toast(ref.read(l10nProvider).queueFinished, type: ToastType.info);
+      return;
+    }
     await playNext();
   }
 }

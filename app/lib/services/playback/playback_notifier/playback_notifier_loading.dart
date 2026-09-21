@@ -239,13 +239,14 @@ mixin _PlaybackNotifierLoading
   /// `engineMemoryPlay`（内存播放偏好）开且 [source] 为 http(s) 在线 URL
   /// （非本地文件 / SongCache 命中路径）时才尝试 Dart 下载 → SegStore 纯内存会话。
   ///
-  /// **直传音源（Neko）跳过整首内存门禁**：其文件多为大体积无损（>64 MiB 会
-  /// 触发内存门禁弹窗），且没有平台直链缓存路径（NT/KG 有 SongCache 兜底），
-  /// 于是每次播放都要整首拉流——起播慢、大文件还会弹确认框。改为引擎 URL
-  /// 直连流式（Neko 直链支持 Range/206，FFmpeg 按需拉流，起播快且同样不落盘）。
+  /// **直传 / 流媒体源（Neko、Subsonic/Jellyfin）跳过整首内存门禁**：其文件多为
+  /// 大体积无损（>64 MiB 会触发内存门禁弹窗），且没有平台直链缓存路径（NT/KG 有
+  /// SongCache 兜底），于是每次播放都要整首拉流——起播慢、大文件还会弹确认框。
+  /// 改为引擎 URL 直连流式（直链支持 Range/206，FFmpeg 按需拉流，起播快且同样不落盘）。
   bool _memorySourceEligible(String source, Track? track) {
     if (source.isEmpty) return false;
-    if (track?.source == 'neko') return false;
+    final src = track?.source;
+    if (src == 'neko' || src == 'streaming') return false;
     if (!ref.read(appPrefsProvider).engineMemoryPlay) return false;
     return source.startsWith('http://') || source.startsWith('https://');
   }

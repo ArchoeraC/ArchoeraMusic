@@ -415,7 +415,9 @@ C 引擎 fft 阶段（管线内 DSP 之后、编码之前，与输出格式无�
 
 - **归属**：队列 / 播放历史 / UI 偏好 / 业务数据（曲库/统计）统一存 **Dart 本地**（drift 或 Hive，§8）
 - **模型**：`nextQueue` + `prevHistory` + 当前索引；`PlaybackController` 管理
-- **播放模式**：顺序 / 列表循环 / 单曲循环 / 随机（复用原项目语义，随机种子可复现）
+- **播放模式**：`off` 顺序播放（播到队列末尾**自动暂停**并 toast 提示「已播完」，不回绕）/
+  `list` 列表循环 / `one` 单曲循环；与独立的随机开关 `shuffle` 正交组合。三态由播放控件/
+  队列面板的循环按钮轮换（`repeatModeCycle`），随机开启时在该洗牌顺序上播放。
 - **切歌流程**：next/prev → `load(track)` → Flutter 重建引擎实例（`archoera_mediaengine_destroy` 旧 + create 新，继承播放器状态，库内无进程切换）→ 完整转码 → miniaudio 播放新 `stream.wav`
 - **播放统计**：每曲播放完成写 Dart 本地统计；Last.fm scrobble 可选（Phase 3，复用 `apis/lastfm` 思路）
 

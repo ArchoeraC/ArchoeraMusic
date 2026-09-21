@@ -706,8 +706,8 @@ async fn run_task(
         let resolved_result = match request.source {
             SourcePlatform::Kugou => KugouResolver.resolve_play_url(&request, &cancel).await,
             SourcePlatform::Netease => NeteaseResolver.resolve_play_url(&request, &cancel).await,
-            // QQ / Neko：Rust 无自研解析 → 直接失败，交由 Dart 播放管线回退。
-            SourcePlatform::Qqmusic | SourcePlatform::Neko => {
+            // QQ / Neko / Streaming：Rust 无自研解析 → 直接失败，交由 Dart 播放管线回退。
+            SourcePlatform::Qqmusic | SourcePlatform::Neko | SourcePlatform::Streaming => {
                 Err(anyhow::anyhow!("执行部分操作时发生错误"))
             }
         };

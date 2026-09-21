@@ -8,7 +8,15 @@ part of '../download_controller.dart';
 /// - kugou/netease：Rust 自研解析，失败后回退；
 /// - qqmusic：Rust 无自研解析（enqueue 后即失败）→ 直接走 Dart 播放管线。
 /// 走 Dart 播放管线回退解析的来源（Rust 无自研解析的：QQ / 实验性 Neko）。
-const _downloadFallbackSources = {'kugou', 'netease', 'qqmusic', 'neko'};
+const _downloadFallbackSources = {
+  'kugou',
+  'netease',
+  'qqmusic',
+  'neko',
+  // 流媒体（Subsonic/Jellyfin）：Rust 无自研解析，恒走 Dart 播放管线解析
+  // `format=raw` 原文件直链后经 retry_with_url 注入。
+  'streaming',
+};
 
 mixin _DownloadControllerCore on Notifier<DownloadState> {
   DownloaderEngine? get _engine;
@@ -327,6 +335,8 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
         track,
         quality: quality,
         allowQqMusic: true,
+        // 下载流媒体一律取原文件（服务端转码会改变容器/扩展名，与标签/文件名不符）。
+        streamingQuality: 'original',
         log: (m) => debugPrint('下载回退解析: $m'),
       );
     } catch (e) {
@@ -373,6 +383,7 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
     final ext =
         extOverride ??
         _extFromUrl(url) ??
+        _extFromCodec(track.quality?.codec) ??
         ((quality == 'lossless' || quality == 'hi-res') ? 'flac' : 'mp3');
     final headers = <List<String>>[];
     if (track.source == 'netease') {
@@ -417,6 +428,33 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
       if (path.endsWith('.$ext')) return ext;
     }
     return null;
+  }
+
+  /// 由平台元数据 codec/suffix 推断扩展名（流媒体 `format=raw` 为原文件，
+  /// URL 不带扩展名；Subsonic `suffix` / Jellyfin codec 即原始格式）。
+  String? _extFromCodec(String? codec) {
+    final c = (codec ?? '').trim().toLowerCase();
+    if (c.isEmpty) return null;
+    switch (c) {
+      case 'alac':
+      case 'mp4':
+        return 'm4a';
+      case 'mpeg':
+      case 'mpga':
+        return 'mp3';
+    }
+    const known = {
+      'flac',
+      'mp3',
+      'm4a',
+      'aac',
+      'wav',
+      'ogg',
+      'opus',
+      'ape',
+      'wv',
+    };
+    return known.contains(c) ? c : null;
   }
 
   /// 实际品质 key（供 done 事件 actualQuality 展示；近似，以扩展名为准）。

@@ -18,6 +18,12 @@
 //!     24bit → int32<<8（=`-f s32le`）；Info.bits_per_sample 报 8/16/32
 //!     （24bit 以 32bit 承载，与 wmalossless/flac/ALAC 输出语义一致）；
 //!   - format=2（加密）及不支持位深 → UnsupportedFormat（回退 FFmpeg 主后端）。
+//!
+//! 内存纪律（RSS 收口）：
+//!   - **不再整读文件**。open 只按需读 22B 头 + seek 表（O(nframes) 偏移索引），
+//!     音频帧在 read 时用 `reader.seek(帧起点)` 按帧读入**定长复用缓冲**（尺寸 = 最大
+//!     单帧体），解码后立即复用；常驻内存与文件体积无关，仅 ∝ 帧长/声道/位深 + 单帧。
+//!   逐位语义与原先整读路径完全一致（同一 BitReader/FrameDecoder，正文不变）。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
@@ -59,36 +65,65 @@ fn parseHeader(b: []const u8) Error!Header {
     return .{ .format = format, .channels = channels, .bits_per_sample = bits, .sample_rate = sr, .data_length = ns };
 }
 
-/// 解析 seek 表，返回帧字节偏移（相对整个文件）与帧数。
-fn parseFrames(a: std.mem.Allocator, b: []const u8, hdr: *const Header) Error!Frames {
-    const frame_len: usize = @as(usize, 256) * hdr.sample_rate / 245;
+/// 读取恰好 buf.len 字节（循环 read 直到填满或 EOF）。返回实际读入字节数。
+fn readFull(reader: *io.Reader, buf: []u8) Error!usize {
+    var got: usize = 0;
+    while (got < buf.len) {
+        const n = try reader.read(buf[got..]);
+        if (n == 0) break;
+        got += n;
+    }
+    return got;
+}
+
+fn frameLenOf(sample_rate: u32) usize {
+    return @as(usize, 256) * sample_rate / 245;
+}
+
+/// 流式解析 seek 表：从 reader 读 22B 头（由调用方传入已解析 hdr）+ seek 表，
+/// 返回帧字节偏移（相对整个文件）与帧数。**不缓存任何音频字节**。
+/// fsize = reader.size()（调用方已取，避免重复系统调用）。
+fn parseFramesReader(a: std.mem.Allocator, reader: *io.Reader, hdr: *const Header, fsize: u64) Error!Frames {
+    const frame_len = frameLenOf(hdr.sample_rate);
     if (frame_len == 0) return error.Corrupt;
     const dl: u64 = hdr.data_length;
     const last_partial = dl % frame_len;
     const nframes: usize = @intCast(dl / frame_len + (if (last_partial != 0) @as(u64, 1) else 0));
     if (nframes == 0) return error.Corrupt;
 
-    const table_off: usize = 22;
-    const need = table_off + nframes * 4 + 4;
-    if (b.len < need) return error.Corrupt;
+    const table_off: u64 = 22;
+    const need: u64 = table_off + @as(u64, nframes) * 4 + 4;
+    if (fsize < need) return error.Corrupt;
 
     const offs = a.alloc(u64, nframes + 1) catch return error.OutOfMemory;
-    var acc: u64 = table_off + nframes * 4 + 4;
+    errdefer a.free(offs);
+
+    var acc: u64 = need; // 首帧起点 = 表尾
     offs[0] = acc;
+    try reader.seek(table_off, .start);
+    // 分块读表（u32 条目），逐块构建前缀偏移。块内解码，避免为表再分配整表缓冲。
+    var buf: [4096]u8 = undefined;
     var i: usize = 0;
-    while (i < nframes) : (i += 1) {
-        const sz = std.mem.readInt(u32, b[table_off + i * 4 ..][0..4], .little);
-        acc += sz;
-        if (acc < offs[i]) return error.Corrupt; // 溢出
-        offs[i + 1] = acc;
+    while (i < nframes) {
+        const take = @min(nframes - i, buf.len / 4);
+        const nb = take * 4;
+        if (try readFull(reader, buf[0..nb]) < nb) return error.Corrupt;
+        for (0..take) |j| {
+            const sz = std.mem.readInt(u32, buf[j * 4 ..][0..4], .little);
+            acc += sz;
+            if (acc < offs[i + j]) return error.Corrupt; // 溢出
+            offs[i + j + 1] = acc;
+        }
+        i += take;
     }
-    if (acc > b.len) return error.Corrupt;
+    if (acc > fsize) return error.Corrupt;
     return .{ .offsets = offs, .nframes = nframes };
 }
 
 const DecoderCtx = struct {
     allocator: std.mem.Allocator,
-    data: []u8, // 整文件（owned）
+    /// 按值持有（decoder.open 传入的 reader 拷贝，deinit 时关闭）。随机访问按帧 seek。
+    reader: io.Reader,
     frames: Frames, // offsets owned
     sample_rate: u32,
     channels: u8,
@@ -100,6 +135,8 @@ const DecoderCtx = struct {
     // 游标
     cursor: usize = 0, // 绝对样本（每声道）位置
     queue: []u8, // 当前已解码帧的交错字节
+    /// 单帧压缩体复用缓冲（容量 = 全流最大单帧体；按需读入、解码后立刻复用）
+    frame_buf: []u8,
     q_len: usize = 0, // queue 中本帧样本数
     q_pos: usize = 0, // 本帧内已消费样本
     have_queue: bool = false,
@@ -108,12 +145,16 @@ const DecoderCtx = struct {
         return @as(usize, self.channels) * self.width;
     }
 
+    /// 按帧随机访问：seek 到帧起点，读入 frame_buf，解码到 queue。不整读、不缓存音频。
     fn decodeFrameBytes(self: *DecoderCtx, fidx: usize) Error!void {
         const start = self.frames.offsets[fidx];
         const end = self.frames.offsets[fidx + 1];
-        const frame_data = self.data[@intCast(start)..@intCast(end)];
-        if (frame_data.len < 4) return error.Corrupt;
-        const body = frame_data[0 .. frame_data.len - 4]; // 末 4 字节为帧 CRC
+        if (end < start or end - start < 4) return error.Corrupt;
+        const body_len: usize = @intCast(end - start - 4);
+        if (body_len > self.frame_buf.len) return error.Corrupt;
+        try self.reader.seek(@intCast(start), .start);
+        if (try readFull(&self.reader, self.frame_buf[0..body_len]) < body_len) return error.Corrupt;
+        const body = self.frame_buf[0..body_len];
         const fs = @min(self.frame_len, self.total_samples - fidx * self.frame_len);
         var br = core.BitReader.init(body);
         self.frame_dec.decode(&br, @intCast((self.bits_per_sample + 7) / 8), fs, self.queue) catch |e| switch (e) {
@@ -192,8 +233,9 @@ fn deinit(ctx: *anyopaque) void {
     const a = self.allocator;
     self.frame_dec.deinit();
     a.free(self.queue);
+    a.free(self.frame_buf);
     a.free(self.frames.offsets);
-    a.free(self.data);
+    self.reader.deinit();
     a.destroy(self);
 }
 
@@ -208,29 +250,34 @@ fn widthOf(bits: u16) u8 {
 pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.Decoder {
     const fsize = try reader.size();
     if (fsize < 22) return error.Corrupt;
-    const data = try allocator.alloc(u8, @intCast(fsize));
-    errdefer allocator.free(data);
-    var got: usize = 0;
-    while (got < fsize) {
-        const n = reader.read(data[got..]) catch |e| switch (e) {
-            error.Aborted => return error.Aborted,
-            else => return error.IoError,
-        };
-        if (n == 0) break;
-        got += n;
-    }
-    if (got < fsize) return error.Corrupt;
-
-    const hdr = try parseHeader(data);
+    try reader.seek(0, .start);
+    var hbuf: [22]u8 = undefined;
+    if (try readFull(reader, &hbuf) < 22) return error.Corrupt;
+    const hdr = try parseHeader(&hbuf);
     if (hdr.format != 1) return error.UnsupportedFormat;
-    const frames = parseFrames(allocator, data, &hdr) catch |e| switch (e) {
+    const frames = parseFramesReader(allocator, reader, &hdr, fsize) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
-        else => return error.Corrupt,
+        else => return e,
     };
     errdefer allocator.free(frames.offsets);
 
     const width = widthOf(hdr.bits_per_sample);
-    const frame_len: usize = @as(usize, 256) * hdr.sample_rate / 245;
+    const frame_len = frameLenOf(hdr.sample_rate);
+    if (frame_len == 0) return error.Corrupt;
+
+    // 单帧体复用缓冲容量 = 全流最大帧体（顺带校验每帧 ≥ 4 字节帧 CRC）。
+    var max_body: usize = 0;
+    var k: usize = 0;
+    while (k < frames.nframes) : (k += 1) {
+        const d = frames.offsets[k + 1] - frames.offsets[k];
+        if (d < 4) return error.Corrupt;
+        const b: usize = @intCast(d - 4);
+        if (b > max_body) max_body = b;
+    }
+    // 至少 1 字节，保证非零长分配（空帧体在 decodeFrameBytes 仍判 Corrupt）。
+    const frame_buf = try allocator.alloc(u8, @max(max_body, 1));
+    errdefer allocator.free(frame_buf);
+
     // 单帧解码输出缓冲（交错字节）
     const qbytes = frame_len * @as(usize, hdr.channels) * width;
     const queue = try allocator.alloc(u8, qbytes);
@@ -245,7 +292,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     const ctx = try allocator.create(DecoderCtx);
     ctx.* = .{
         .allocator = allocator,
-        .data = data,
+        .reader = undefined, // 末尾赋值（接管所有权）
         .frames = frames,
         .sample_rate = hdr.sample_rate,
         .channels = @intCast(hdr.channels),
@@ -255,7 +302,10 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
         .frame_len = frame_len,
         .frame_dec = fd,
         .queue = queue,
+        .frame_buf = frame_buf,
     };
+    // 接管 reader（按值拷贝；file 形态由本 ctx 负责关闭）
+    ctx.reader = reader.*;
 
     info.* = .{
         .sample_rate = hdr.sample_rate,
@@ -272,14 +322,13 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
 }
 
 // ---------------------------------------------------------------------------
-// 元数据专用快路径（probe-only，§8.4.2①）：整读后仅 parseHeader+parseFrames
-// （seek 表，不解帧），音频终点定位尾部 ID3v2 + 末 128B ID3v1；不建 FrameDecoder。
+// 元数据专用快路径（probe-only，§8.4.2①）：流式读 header+seek 表（不解帧），
+// 音频终点定位尾部 ID3v2 + 末 128B ID3v1；不建 FrameDecoder、不缓存音频。
 // ---------------------------------------------------------------------------
 
 const MetaCtx = struct {
     allocator: std.mem.Allocator,
     reader: io.Reader,
-    data: []u8,
     offsets: []u64,
     meta: decoder.Metadata,
     pics: []decoder.Picture,
@@ -290,7 +339,6 @@ fn metaDeinit(p: *anyopaque) void {
     id3.freeMeta(ctx.allocator, &ctx.meta);
     id3.freePictures(ctx.allocator, &ctx.pics);
     ctx.allocator.free(ctx.offsets);
-    ctx.allocator.free(ctx.data);
     ctx.reader.deinit();
     ctx.allocator.destroy(ctx);
 }
@@ -298,24 +346,14 @@ fn metaDeinit(p: *anyopaque) void {
 pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.MetadataSession {
     const fsize = try reader.size();
     if (fsize < 22) return error.Corrupt;
-    const data = try allocator.alloc(u8, @intCast(fsize));
-    errdefer allocator.free(data);
-    var got: usize = 0;
-    while (got < fsize) {
-        const n = reader.read(data[got..]) catch |e| switch (e) {
-            error.Aborted => return error.Aborted,
-            else => return error.IoError,
-        };
-        if (n == 0) break;
-        got += n;
-    }
-    if (got < fsize) return error.Corrupt;
-
-    const hdr = try parseHeader(data);
+    try reader.seek(0, .start);
+    var hbuf: [22]u8 = undefined;
+    if (try readFull(reader, &hbuf) < 22) return error.Corrupt;
+    const hdr = try parseHeader(&hbuf);
     if (hdr.format != 1) return error.UnsupportedFormat;
-    const frames = parseFrames(allocator, data, &hdr) catch |e| switch (e) {
+    const frames = parseFramesReader(allocator, reader, &hdr, fsize) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
-        else => return error.Corrupt,
+        else => return e,
     };
     errdefer allocator.free(frames.offsets);
 
@@ -329,20 +367,24 @@ pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder
 
     // 音频终点 = 末帧之后；其处若为 ID3v2（TTA 规范：尾置）则解析
     const audio_end = frames.offsets[frames.nframes];
-    if (audio_end + 10 <= data.len and std.mem.eql(u8, data[@intCast(audio_end)..][0..3], "ID3")) {
-        _ = id3.parseV2(reader, allocator, audio_end, &meta, &pics, &rg) catch {};
+    if (audio_end + 10 <= fsize) {
+        try reader.seek(@intCast(audio_end), .start);
+        var tag: [3]u8 = undefined;
+        if (try readFull(reader, &tag) == 3 and std.mem.eql(u8, tag[0..], "ID3")) {
+            _ = id3.parseV2(reader, allocator, audio_end, &meta, &pics, &rg) catch {};
+        }
     }
     id3.parseV1(reader, allocator, fsize, &meta) catch {};
 
     const ctx = try allocator.create(MetaCtx);
     ctx.* = .{
         .allocator = allocator,
-        .reader = reader.*,
-        .data = data,
+        .reader = undefined,
         .offsets = frames.offsets,
         .meta = meta,
         .pics = pics,
     };
+    ctx.reader = reader.*;
 
     info.* = .{
         .sample_rate = hdr.sample_rate,
@@ -523,6 +565,20 @@ test "tta 健壮性: 截断/非法头 → Corrupt，format=2/非法位深 → Un
     try testing.expectError(error.UnsupportedFormat, open(testing.allocator, &r3, &info));
 }
 
+test "tta openMeta: 流式头+seek 表（probe-only，不整读音频）" {
+    const a = testing.allocator;
+    var r = io.Reader.openMem(inside_tta);
+    var info: decoder.Info = undefined;
+    const s = try openMeta(a, &r, &info);
+    defer s.deinit();
+    try testing.expectEqual(@as(u32, 44100), info.sample_rate);
+    try testing.expectEqual(@as(u8, 2), info.channels);
+    try testing.expectEqual(@as(u8, 16), info.bits_per_sample);
+    try testing.expectEqualStrings("tta", info.codec_name);
+    try testing.expectEqualStrings("tta", info.format_name);
+    try testing.expectEqual(@as(i64, 11_888_367), info.duration_us); // 524277/44100
+}
+
 test "tta 纯函数: 帧解码独立性与位深输出布局" {
     const a = testing.allocator;
     // mono.tta 首帧解码 == golden 前 46080×2 字节
@@ -532,7 +588,8 @@ test "tta 纯函数: 帧解码独立性与位深输出布局" {
         const hdr = try parseHeader(mono_tta);
         break :blk hdr;
     };
-    const frames = try parseFrames(a, mono_tta, &mono_hdr);
+    var mr = io.Reader.openMem(mono_tta);
+    const frames = try parseFramesReader(a, &mr, &mono_hdr, mono_tta.len);
     defer a.free(frames.offsets);
     const s = frames.offsets[0];
     const e = frames.offsets[1];

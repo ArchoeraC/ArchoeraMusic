@@ -285,7 +285,7 @@ pub const XllDecoder = struct {
     fn parseDmixCoeffs(self: *XllDecoder, c: *ChSet, ba: BA) DecodeError!void {
         _ = self;
         const m: usize = if (c.primary_chset)
-            dt.ff_dca_dmix_primary_nch[c.dmix_type]
+            dt.era_dca_dmix_primary_nch[c.dmix_type]
         else
             c.hier_ofs;
         var coeff_idx: usize = 0;
@@ -298,8 +298,8 @@ pub const XllDecoder = struct {
                 const index: i64 = @as(i64, @intCast(code & 0xff)) - dt.FF_DCA_DMIXTABLE_OFFSET;
                 if (index < 0 or index >= dt.FF_DCA_INV_DMIXTABLE_SIZE) return error.Invalid;
                 const ui: usize = @intCast(index);
-                const su: i32 = @intCast(dt.ff_dca_dmixtable[ui + dt.FF_DCA_DMIXTABLE_OFFSET]);
-                const siu: i32 = @intCast(dt.ff_dca_inv_dmixtable[ui]);
+                const su: i32 = @intCast(dt.era_dca_dmixtable[ui + dt.FF_DCA_DMIXTABLE_OFFSET]);
+                const siu: i32 = @intCast(dt.era_dca_inv_dmixtable[ui]);
                 scale = (su ^ sign) - sign;
                 scale_inv = (siu ^ sign) - sign;
                 c.dmix_scale[i] = scale;
@@ -311,7 +311,7 @@ pub const XllDecoder = struct {
                 const sign: i32 = @as(i32, @intCast(code >> 8)) - 1;
                 const index: usize = code & 0xff;
                 if (index >= dt.FF_DCA_DMIXTABLE_SIZE) return error.Invalid;
-                var coeff: i32 = @intCast(dt.ff_dca_dmixtable[index]);
+                var coeff: i32 = @intCast(dt.era_dca_dmixtable[index]);
                 if (!c.primary_chset) coeff = dsp.mul16(scale_inv, coeff);
                 c.dmix_coeff[coeff_idx] = (coeff ^ sign) - sign;
                 coeff_idx += 1;
@@ -335,7 +335,7 @@ pub const XllDecoder = struct {
             return error.Unsupported;
         if (c.pcm_bit_res > c.storage_bit_res) return error.Invalid;
 
-        c.freq = dt.ff_dca_sampling_freqs[@intCast(try ba.rb(4))];
+        c.freq = dt.era_dca_sampling_freqs[@intCast(try ba.rb(4))];
         if (c.freq > 192000) return error.Unsupported;
         if ((try ba.rb(2)) != 0) return error.Unsupported;
         if ((try ba.rb(2)) != 0) return error.Unsupported;
@@ -426,9 +426,9 @@ pub const XllDecoder = struct {
                     const k = try getLinear(ba, 8);
                     if (k == -128) return error.Invalid;
                     b.adapt_refl_coeff[i][j] = if (k < 0)
-                        -@as(i32, dt.ff_dca_xll_refl_coeff[@intCast(-k)])
+                        -@as(i32, dt.era_dca_xll_refl_coeff[@intCast(-k)])
                     else
-                        @intCast(dt.ff_dca_xll_refl_coeff[@intCast(k)]);
+                        @intCast(dt.era_dca_xll_refl_coeff[@intCast(k)]);
                 }
             }
 
@@ -830,7 +830,7 @@ pub const XllDecoder = struct {
         const nsamples = self.nframesamples;
         const cb: *ChSetBuf = &self.bufs[c.slot];
         const msb = cb.msb;
-        const coeff: *const [20]i32 = &dt.ff_dca_xll_band_coeff;
+        const coeff: *const [20]i32 = &dt.era_dca_xll_band_coeff;
 
         for (0..c.nchannels) |ch| {
             const b0 = self.msbBase(c, 0, ch);
