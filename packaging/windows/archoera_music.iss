@@ -346,6 +346,19 @@ begin
   RefreshDiskFree;
 end;
 
+{ [CustomMessages] 文案不会展开内置消息占位符 [name]/[name/ver]：Inno 只对
+  内置 Setup 消息替换这些前缀（{cm:…} 与 CustomMessage() 均不处理），故此处手动
+  展开——这样各语言「更新」文案可沿用 Inno 惯例占位符，且与内置消息行为一致。 }
+function ExpandAppNamePlaceholders(const S: String): String;
+var
+  R: String;
+begin
+  R := S;
+  StringChangeEx(R, '[name/ver]', '{#AppName} {#Version}', True);
+  StringChangeEx(R, '[name]', '{#AppName}', True);
+  Result := R;
+end;
+
 { 安装位置页：在路径输入框下方实时显示目标磁盘可用空间
   （所需空间由 Inno 自带的 DiskSpaceLabel 显示）。 }
 procedure InitializeWizard;
@@ -358,12 +371,14 @@ begin
   DiskFreeLabel.Caption := '';
   WizardForm.DirEdit.OnChange := @DirEditChanged;
 
-  { 更新模式：欢迎页文案改为「正在更新 旧版本 → 新版本」。 }
+  { 更新模式：欢迎页文案改为「正在更新 旧版本 → 新版本」。
+    [name]/[name/ver] 需手动展开（见 ExpandAppNamePlaceholders）。 }
   if PrevInstalled then
   begin
-    WizardForm.WelcomeLabel1.Caption := CustomMessage('UpdateWelcomeLabel1');
-    WizardForm.WelcomeLabel2.Caption :=
-      FmtMessage(CustomMessage('UpdateWelcomeLabel2'), [PrevVersion, '{#Version}']);
+    WizardForm.WelcomeLabel1.Caption :=
+      ExpandAppNamePlaceholders(CustomMessage('UpdateWelcomeLabel1'));
+    WizardForm.WelcomeLabel2.Caption := ExpandAppNamePlaceholders(
+      FmtMessage(CustomMessage('UpdateWelcomeLabel2'), [PrevVersion, '{#Version}']));
   end;
 end;
 
