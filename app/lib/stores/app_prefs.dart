@@ -156,6 +156,24 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     }
   }
 
+  /// 设置睡眠定时「到时播完当前曲再暂停」开关。
+  void setSleepFinishTrack(bool value) {
+    state = state.copyWithSleepFinishTrack(value);
+    state.save();
+  }
+
+  /// 设置睡眠定时快捷预设（分钟）。
+  void setSleepTimerPresets(List<int> presets) {
+    state = state.copyWithSleepTimerPresets(presets);
+    state.save();
+  }
+
+  /// 记忆最近一次自定义睡眠定时（分钟）。
+  void setSleepTimerCustomMinutes(int minutes) {
+    state = state.copyWithSleepTimerCustomMinutes(minutes);
+    state.save();
+  }
+
   /// 设置频谱可视化开关。
   void setSpectrumEnabled(bool value) {
     state = state.copyWithSpectrum(enable: value);

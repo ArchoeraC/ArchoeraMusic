@@ -4643,6 +4643,55 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sleepTimerFired => 'Sleep timer reached; playback paused';
 
   @override
+  String get sleepTimerFinishTrack => 'Finish current track before pausing';
+
+  @override
+  String get sleepTimerWaitingTrackEnd =>
+      'Sleep timer reached; will pause after the current track';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes분';
+  }
+
+  @override
+  String get sleepTimerMinutesUnit => '분';
+
+  @override
+  String get sleepTimerCustom => '사용자 지정…';
+
+  @override
+  String get sleepTimerCustomTitle => '사용자 지정 수면 타이머';
+
+  @override
+  String get sleepTimerCustomLabel => '분';
+
+  @override
+  String get sleepTimerCustomInvalid => '1~600 사이의 분을 입력하세요';
+
+  @override
+  String get sleepTimerPresets => '수면 타이머 프리셋';
+
+  @override
+  String get sleepTimerPresetsDesc =>
+      '수면 타이머 메뉴에 표시할 빠른 시간입니다. 추가하거나 삭제할 수 있으며, 비워 두면 사용자 지정 / 현재 곡 끝까지 / 끄기만 표시합니다.';
+
+  @override
+  String get sleepTimerPresetsAdd => '추가';
+
+  @override
+  String get sleepTimerPresetsEmpty => '프리셋 없음';
+
+  @override
+  String get sleepTimerPresetsDuplicate => '해당 시간이 이미 프리셋에 있습니다';
+
+  @override
+  String get sleepTimerPresetsEdit => '편집';
+
+  @override
+  String get settingsSectionSleepTimer => '수면 타이머';
+
+  @override
   String get settingsReverseSpectrum => 'Reverse spectrum';
 
   @override

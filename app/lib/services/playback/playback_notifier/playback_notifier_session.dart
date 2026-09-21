@@ -169,6 +169,22 @@ mixin _PlaybackNotifierSession
         _syncFftActive();
         _log('事件间隔已协商: ${event.intervalMs}ms');
       case EnginePlayerEnded():
+        if (_stopAtTrackEnd) {
+          // 睡眠定时「播完当前曲」：按歌曲时间表在末帧停住，绝不续播下一曲。
+          // 计数 +1 让 [SleepTimerNotifier] 复位其等待态（见 trackEndStopCount）。
+          _stopAtTrackEnd = false;
+          state = state.copyWith(
+            playing: false,
+            buffering: false,
+            trackEndStopCount: state.trackEndStopCount + 1,
+          );
+          _syncFftActive();
+          _log('播放完成（睡眠定时：停在当前曲末尾，不切下一曲）');
+          // 引擎到达 EOF 后自身会退出：主动收尾销毁会话（含内存源 SegStore），
+          // 之后按播放键由 [toggle] 走「无引擎」续播路径，从头重放本曲。
+          unawaited(_stopEngine());
+          return;
+        }
         state = state.copyWith(playing: false, buffering: false);
         _syncFftActive();
         _log('播放完成（miniaudio EOF）');

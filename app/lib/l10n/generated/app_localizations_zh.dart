@@ -4569,6 +4569,54 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sleepTimerFired => '睡眠定时已到，已暂停播放';
 
   @override
+  String get sleepTimerFinishTrack => '到时播完当前曲再暂停';
+
+  @override
+  String get sleepTimerWaitingTrackEnd => '定时已到，将在当前曲结束后暂停';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes 分钟';
+  }
+
+  @override
+  String get sleepTimerMinutesUnit => '分钟';
+
+  @override
+  String get sleepTimerCustom => '自定义…';
+
+  @override
+  String get sleepTimerCustomTitle => '自定义睡眠定时';
+
+  @override
+  String get sleepTimerCustomLabel => '分钟数';
+
+  @override
+  String get sleepTimerCustomInvalid => '请输入 1–600 之间的分钟数';
+
+  @override
+  String get sleepTimerPresets => '睡眠定时预设';
+
+  @override
+  String get sleepTimerPresetsDesc =>
+      '睡眠定时菜单里的快捷时长，可增删；留空则只显示「自定义」「播完当前曲」「关闭」。';
+
+  @override
+  String get sleepTimerPresetsAdd => '添加';
+
+  @override
+  String get sleepTimerPresetsEmpty => '未设置预设';
+
+  @override
+  String get sleepTimerPresetsDuplicate => '该时长已在预设里';
+
+  @override
+  String get sleepTimerPresetsEdit => '编辑';
+
+  @override
+  String get settingsSectionSleepTimer => '睡眠定时';
+
+  @override
   String get settingsReverseSpectrum => '反向频谱';
 
   @override
@@ -9270,6 +9318,54 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get sleepTimerFired => '睡眠定时已到，已暂停播放';
+
+  @override
+  String get sleepTimerFinishTrack => '到时播完当前曲再暂停';
+
+  @override
+  String get sleepTimerWaitingTrackEnd => '定时已到，将在当前曲结束后暂停';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes 分钟';
+  }
+
+  @override
+  String get sleepTimerMinutesUnit => '分钟';
+
+  @override
+  String get sleepTimerCustom => '自定义…';
+
+  @override
+  String get sleepTimerCustomTitle => '自定义睡眠定时';
+
+  @override
+  String get sleepTimerCustomLabel => '分钟数';
+
+  @override
+  String get sleepTimerCustomInvalid => '请输入 1–600 之间的分钟数';
+
+  @override
+  String get sleepTimerPresets => '睡眠定时预设';
+
+  @override
+  String get sleepTimerPresetsDesc =>
+      '睡眠定时菜单里的快捷时长，可增删；留空则只显示「自定义」「播完当前曲」「关闭」。';
+
+  @override
+  String get sleepTimerPresetsAdd => '添加';
+
+  @override
+  String get sleepTimerPresetsEmpty => '未设置预设';
+
+  @override
+  String get sleepTimerPresetsDuplicate => '该时长已在预设里';
+
+  @override
+  String get sleepTimerPresetsEdit => '编辑';
+
+  @override
+  String get settingsSectionSleepTimer => '睡眠定时';
 
   @override
   String get settingsReverseSpectrum => '反向频谱';
@@ -13974,6 +14070,54 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get sleepTimerFired => '睡眠定时已到，已暂停播放';
+
+  @override
+  String get sleepTimerFinishTrack => '到时播完当前曲再暂停';
+
+  @override
+  String get sleepTimerWaitingTrackEnd => '定时已到，将在当前曲结束后暂停';
+
+  @override
+  String sleepTimerMinutes(int minutes) {
+    return '$minutes 分鐘';
+  }
+
+  @override
+  String get sleepTimerMinutesUnit => '分鐘';
+
+  @override
+  String get sleepTimerCustom => '自訂…';
+
+  @override
+  String get sleepTimerCustomTitle => '自訂睡眠定時';
+
+  @override
+  String get sleepTimerCustomLabel => '分鐘數';
+
+  @override
+  String get sleepTimerCustomInvalid => '請輸入 1–600 之間的分鐘數';
+
+  @override
+  String get sleepTimerPresets => '睡眠定時預設';
+
+  @override
+  String get sleepTimerPresetsDesc =>
+      '睡眠定時選單裡的快捷時長，可增刪；留空則只顯示「自訂」「播完目前曲目」「關閉」。';
+
+  @override
+  String get sleepTimerPresetsAdd => '新增';
+
+  @override
+  String get sleepTimerPresetsEmpty => '未設定預設';
+
+  @override
+  String get sleepTimerPresetsDuplicate => '該時長已在預設裡';
+
+  @override
+  String get sleepTimerPresetsEdit => '編輯';
+
+  @override
+  String get settingsSectionSleepTimer => '睡眠定時';
 
   @override
   String get settingsReverseSpectrum => '反向频谱';

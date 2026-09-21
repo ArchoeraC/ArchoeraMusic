@@ -118,8 +118,11 @@ enum LyricsBlurQuality {
   }
 }
 
-/// 整层失焦的等效高斯 σ（AMLL 每行 σ 为 `min(5, 1+距离)` = 2~5，取中值）。
-const double kPanelBlurSigma = 3.0;
+/// 整层失焦的等效高斯 σ（AMLL 每行 σ 为 `min(5, 1+距离)` = 2~5，取中值偏上）。
+///
+/// 2026-09-21 由 3.0 提到 4.0：悬停「模糊↔清晰」的对比更明显（原值偏温和，
+/// 悬停清除时观感变化不够）。整层档仍在 1/4 尺寸上做高斯，开销可忽略。
+const double kPanelBlurSigma = 4.0;
 
 /// 整层失焦的降采样倍率：模糊在 1/4 尺寸上做（模糊像素量 1/4），再放大回原尺寸。
 ///
@@ -200,6 +203,13 @@ const double kFastLineChangeMaxShiftRatio = 0.4;
 /// [kActivateTauOut]（对齐 AMLL `--mask-alpha-duration` 的 .3s / .45s）。
 const double kActivateTauIn = 0.09;
 const double kActivateTauOut = 0.15;
+
+/// 失焦量（整层强度 / 逐行半径）过渡时间常数（秒）。
+///
+/// 悬停「变清晰」与移出「重新失焦」都走这条平滑曲线——原实现悬停为**瞬切**
+/// （对齐 AMLL `:hover filter: unset` 的 `!important` 立即生效），观感偏生硬、
+/// 用户反馈「动效不明显」。改为 ~0.22s 指数趋近，模糊↔清晰的过渡肉眼可辨。
+const double kBlurTau = 0.22;
 
 /// 「default」预设 = **AMLL 自适应弹簧策略**（按行间隔动态调整，见
 /// `spring_policy.dart`），而不是一套固定参数。用户可在设置里换成

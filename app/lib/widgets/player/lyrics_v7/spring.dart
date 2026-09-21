@@ -47,10 +47,7 @@ typedef _Solver = double Function(double t);
 
 /// 一维弹簧：当前位置/速度/目标均以 double 维护，无任何 UI 依赖。
 class Spring1D {
-  Spring1D({
-    double initialPosition = 0,
-    this.params = const SpringParams(),
-  }) {
+  Spring1D({double initialPosition = 0, this.params = const SpringParams()}) {
     current = initialPosition;
     targetPosition = initialPosition;
     velocity = 0;
@@ -82,6 +79,14 @@ class Spring1D {
   double? _pending;
 
   bool _settled = true;
+
+  /// 闭式解算器是否仍代表当前运动。
+  ///
+  /// [park] 只把位置停驻、不重建求解器（省闭包分配），此后 `_pos`/`_vel`
+  /// 是**旧轨迹**的残值；若之后 [setTarget] 直接拿它算初速度，就会把停驻前
+  /// 的速度注入新运动——歌词「倒带」后重新入窗的行会因此冲过目标、与其它行
+  /// 叠在一起。用本标记把这种残值挡掉（停驻行的初速度视为 0）。
+  bool _solverValid = true;
   _Solver _pos = _constantOf(0);
   _Solver _vel = _constantOf(0);
   _Solver _acc = _constantOf(0);
@@ -115,13 +120,15 @@ class Spring1D {
     _vel = _constantOf(0);
     _acc = _constantOf(0);
     _settled = true;
+    _solverValid = true;
   }
 
   /// 「停驻」到某位置：与 [hardSet] 一样立即到位，但**不重建求解器**。
   ///
   /// 用于视口窗口之外的行——它们不参与每帧动画，重建闭式解只是白白分配闭包。
   /// 停驻后 `_settled = true`，[update]/[arrived] 都会提前返回当前值；
-  /// 之后一旦 [setTarget]/[hardSet] 被调用，求解器会按当时的位姿重建。
+  /// 之后一旦 [setTarget]/[hardSet] 被调用，求解器会按当时的位姿重建
+  /// （停驻态下初速度视为 0，见 [_solverValid]）。
   void park(double v) {
     current = v;
     velocity = 0;
@@ -130,6 +137,7 @@ class Spring1D {
     delayMs = 0;
     _time = 0;
     _settled = true;
+    _solverValid = false;
   }
 
   /// 推进弹簧状态。[elapsedSec] 为距上次调用经过的秒数（帧间隔）。
@@ -148,6 +156,8 @@ class Spring1D {
         _restart(to);
       }
     }
+    // 停驻行仍在等延迟目标：保持停驻值，不沿旧解算器漂移（见 [_solverValid]）。
+    if (!_solverValid) return current;
     _time += elapsedSec;
     current = _pos(_time);
     velocity = _vel(_time);
@@ -183,7 +193,8 @@ class Spring1D {
 
   /// 从当前位姿与速度重建求解器，使弹簧向 [to] 过渡。
   void _restart(double to) {
-    final v = _vel(_time);
+    // 停驻态（[park] 之后、或初值态）旧解算器不可用：初速度按 0 处理。
+    final v = _solverValid ? _vel(_time) : 0.0;
     targetPosition = to;
     _time = 0;
     _pos = _solveSpring(from: current, velocity: v, to: to, p: params);
@@ -191,6 +202,7 @@ class Spring1D {
     _acc = _derivative(_vel);
     velocity = v;
     _settled = false;
+    _solverValid = true;
   }
 }
 
