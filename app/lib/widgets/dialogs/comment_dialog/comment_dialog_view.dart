@@ -26,7 +26,8 @@ extension _CommentDialogView on _CommentDialogState {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _CommentDialogHeader(trackTitle: widget.track.title, l10n: l10n),
-              if (!_isKugou)
+              // NT 有「热门 / 最新」两 Tab；KG / NK 只有单一时间线。
+              if (!_isKugou && !_is)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: SSegmented<bool>(
@@ -71,6 +72,8 @@ extension _CommentDialogView on _CommentDialogState {
                 ? l10n.brandKugou
                 : _isQq
                 ? l10n.platformQQMusic
+                : _is
+                ? l10n.platform
                 : l10n.brandNetease,
           ),
         );
