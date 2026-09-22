@@ -100,6 +100,18 @@ const Node = struct {
     next: ?*Node = null,
 };
 
+/// §5.5 排空回落裁决（纯函数，确定性可测）：给定 `serving`（在役数）、`target`（本波
+/// 目标容量）、`keep`（滞后死区上水位）与 `shrink_step`（收步长），返回本事件应回收的
+/// worker 数。`serving <= target + keep` → 0（死区内不动作，防「建一个收一个」抖振）；
+/// 否则回收 `serving - target` 的盈余，受 `shrink_step` 封顶（0 = 不限）。不做任何簿记，
+/// 仅裁决数量——实际标记由 `markOldestIdleLocked` 在锁内完成。
+fn reclaimBudget(serving: usize, target: usize, keep: usize, shrink_step: usize) usize {
+    if (serving <= target + keep) return 0; // 滞后死区
+    var over = serving - target;
+    if (shrink_step > 0) over = @min(over, shrink_step);
+    return over;
+}
+
 /// 任务节点自由表容量上限（P3 实例内存池，§8.4.2 #4）。节点仅 ~24B，128 并发下
 /// 每路至多 1 个在途节点，512 已含 4× 余量；突发超出者回退 malloc，自由表**不无限驻留**
 /// （上限 512×24B ≈ 12KB，进程生命周期内只读复用）。
@@ -937,11 +949,10 @@ pub const Runtime = struct {
         const serving = self.active.load(.monotonic); // 同锁下与 worker 退出互斥
         self.mutex.unlock(self.io);
 
-        // §5.5 滞后死区：目标上水位内的波动不动作（防「建一个收一个」抖振）
+        // §5.5 滞后死区 + 收步长：纯裁决原语（确定性可测），返回本事件回收数（0 = 不动作）
         const keep = @as(usize, self.cfg.keep_watermark);
-        if (serving <= target + keep) return;
-        var over = serving - target;
-        if (self.cfg.shrink_step > 0) over = @min(over, @as(usize, self.cfg.shrink_step));
+        const over = reclaimBudget(serving, target, keep, @as(usize, self.cfg.shrink_step));
+        if (over == 0) return;
 
         // 标最老空闲的 elastic 在役 worker（reg idle、非 stalled/exited/已在 retire、非 pinned）。
         // 锁内判写（与 worker 忙/闲、退出、转忙自清互斥）；busy/pinned 永不入候选。
@@ -2048,7 +2059,9 @@ test "runtime: AS3 markOldestIdleLocked——最老优先 + floor 下限 + pinne
     var done = std.atomic.Value(u32).init(0);
     var jobs: [4]SleepJob = undefined;
     for (&jobs) |*j| j.* = .{ .ms = 5, .done = &done };
-    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 2, .max_workers = 4 });
+    // min==max==4 ⇒ active==min，排空不触发 requestReclaim → Master 不并发裁决，
+    // 本测试的直调裁决与簿记是确定性的（避免与排空回收竞争）。
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 4, .max_workers = 4 });
     defer {
         rt.shutdown();
         rt.deinit();
@@ -2078,7 +2091,8 @@ test "runtime: AS3 调节器参数——收步长上限 + 空闲年龄过滤（m
     var done = std.atomic.Value(u32).init(0);
     var jobs: [4]SleepJob = undefined;
     for (&jobs) |*j| j.* = .{ .ms = 5, .done = &done };
-    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 2, .max_workers = 4 });
+    // min==max==4 ⇒ active==min，排空不触发 requestReclaim（Master 不并发裁决）。
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 4, .max_workers = 4 });
     defer {
         rt.shutdown();
         rt.deinit();
@@ -2147,15 +2161,25 @@ test "runtime: AS2 pinned 1:1——定向步骤同线程执行；全局任务不
     try testing.expectEqual(tables.Class.elastic, rt.reg.entries[id].class);
 }
 
-test "runtime: AS3 滞后死区——serving 在 target+keep 内不回收，越过才收" {
+test "runtime: AS3 滞后死区——serving 在 target+keep 内不回收，越过才收（确定性）" {
+    // 1) 纯裁决原语 reclaimBudget：不做簿记、不依赖线程/时钟
+    try testing.expectEqual(@as(usize, 0), reclaimBudget(4, 2, 2, 0)); // 4 <= 2+2 → 死区
+    try testing.expectEqual(@as(usize, 0), reclaimBudget(5, 2, 3, 0)); // 5 <= 5 → 死区边界
+    try testing.expectEqual(@as(usize, 4), reclaimBudget(6, 2, 3, 0)); // 刚越死区：收全部盈余
+    try testing.expectEqual(@as(usize, 1), reclaimBudget(6, 2, 3, 1)); // 刚越死区 + 步长封顶
+    try testing.expectEqual(@as(usize, 2), reclaimBudget(4, 2, 0, 0)); // 无死区：收全部盈余
+    try testing.expectEqual(@as(usize, 1), reclaimBudget(4, 2, 0, 1)); // 收步长封顶
+    try testing.expectEqual(@as(usize, 3), reclaimBudget(10, 2, 0, 3)); // 步长封顶（盈余 8）
+    try testing.expectEqual(@as(usize, 0), reclaimBudget(2, 2, 0, 0)); // 无盈余
+    try testing.expectEqual(@as(usize, 0), reclaimBudget(1, 3, 0, 0)); // serving < target 不下溢
+
+    // 2) 组合：把裁决预算交给 markOldestIdleLocked 在锁内标记（构造确定状态）。
+    //    min==max==4 ⇒ 排空事件不触发 requestReclaim（active==min），Master 保持纯事件
+    //    睡眠，不会并发调用 maybeReclaim——消除「直调裁决 vs 排空回收」的测试竞态。
     var done = std.atomic.Value(u32).init(0);
     var jobs: [4]SleepJob = undefined;
     for (&jobs) |*j| j.* = .{ .ms = 5, .done = &done };
-    const rt = try Runtime.init(std.heap.c_allocator, .{
-        .min_workers = 1,
-        .max_workers = 4,
-        .keep_watermark = 2,
-    });
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 4, .max_workers = 4 });
     defer {
         rt.shutdown();
         rt.deinit();
@@ -2164,28 +2188,33 @@ test "runtime: AS3 滞后死区——serving 在 target+keep 内不回收，越�
     rt.waitIdle();
     try testing.expectEqual(@as(usize, 4), rt.active.load(.acquire));
 
-    // target = peak = 2：keep=2 → serving(4) <= target+keep(4) → 死区内，不回收
-    rt.mutex.lockUncancelable(rt.io);
-    rt.busy_peak = 2;
-    rt.mutex.unlock(rt.io);
-    rt.maybeReclaim();
-    var retired: usize = 0;
-    for (rt.workers.items, 0..) |_, id| {
-        if (rt.retire[id]) retired += 1;
-    }
-    try testing.expectEqual(@as(usize, 0), retired);
+    const Count = struct {
+        fn retired(r: *Runtime) usize {
+            var n: usize = 0;
+            for (r.workers.items, 0..) |_, id| {
+                if (r.retire[id]) n += 1;
+            }
+            return n;
+        }
+    };
 
-    // keep=0 → serving(4) > target(2) → 回收 2（最老空闲优先）
+    // 死区：serving=4, target=2, keep=2 → budget 0 → 不回收（断言前后均无 retire）
     rt.mutex.lockUncancelable(rt.io);
-    rt.busy_peak = 2;
+    const budget_keep = reclaimBudget(4, 2, 2, 0);
+    const marked_keep = rt.markOldestIdleLocked(2, budget_keep, 0, 0);
     rt.mutex.unlock(rt.io);
-    rt.cfg.keep_watermark = 0;
-    rt.maybeReclaim();
-    retired = 0;
-    for (rt.workers.items, 0..) |_, id| {
-        if (rt.retire[id]) retired += 1;
-    }
-    try testing.expectEqual(@as(usize, 2), retired);
+    try testing.expectEqual(@as(usize, 0), budget_keep);
+    try testing.expectEqual(@as(usize, 0), marked_keep);
+    try testing.expectEqual(@as(usize, 0), Count.retired(rt));
+
+    // 越过死区且 keep=0：serving=4, target=2 → budget 2 → 恰好收 2（最老空闲优先）
+    rt.mutex.lockUncancelable(rt.io);
+    const budget_pass = reclaimBudget(4, 2, 0, 0);
+    const marked_pass = rt.markOldestIdleLocked(2, budget_pass, 0, 0);
+    rt.mutex.unlock(rt.io);
+    try testing.expectEqual(@as(usize, 2), budget_pass);
+    try testing.expectEqual(@as(usize, 2), marked_pass);
+    try testing.expectEqual(@as(usize, 2), Count.retired(rt));
 }
 
 test "runtime: AS3 空闲回收降容——大波撑满后无新事件也回落 min_workers（idle_timeout）" {
