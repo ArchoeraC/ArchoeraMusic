@@ -508,6 +508,25 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get commentReply => '回复';
+
+  @override
+  String commentReplyTo({required Object user}) {
+    return '回复 @$user';
+  }
+
+  @override
+  String get commentDeleteConfirmBody => '删除后无法恢复，确定继续吗？';
+
+  @override
+  String get commentDeleted => '评论已删除';
+
+  @override
+  String commentDeleteFailed({required Object msg}) {
+    return '删除失败：$msg';
+  }
+
+  @override
   String commentTimeFormat({
     required Object day,
     required Object month,
@@ -5118,6 +5137,25 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
+  String get commentReply => '回复';
+
+  @override
+  String commentReplyTo({required Object user}) {
+    return '回复 @$user';
+  }
+
+  @override
+  String get commentDeleteConfirmBody => '删除后无法恢复，确定继续吗？';
+
+  @override
+  String get commentDeleted => '评论已删除';
+
+  @override
+  String commentDeleteFailed({required Object msg}) {
+    return '删除失败：$msg';
+  }
+
+  @override
   String commentTimeFormat({
     required Object day,
     required Object month,
@@ -9725,6 +9763,25 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String commentSendFailed({required Object msg}) {
     return '傳送失敗：$msg';
+  }
+
+  @override
+  String get commentReply => '回覆';
+
+  @override
+  String commentReplyTo({required Object user}) {
+    return '回覆 @$user';
+  }
+
+  @override
+  String get commentDeleteConfirmBody => '刪除後無法復原，確定要繼續嗎？';
+
+  @override
+  String get commentDeleted => '評論已刪除';
+
+  @override
+  String commentDeleteFailed({required Object msg}) {
+    return '刪除失敗：$msg';
   }
 
   @override

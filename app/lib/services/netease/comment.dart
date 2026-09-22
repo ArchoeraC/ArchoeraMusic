@@ -19,6 +19,8 @@ class NeteaseComment {
     this.likedCount = 0,
     this.replyTotal = 0,
     this.reply = const [],
+    this.canDelete = false,
+    this.replyToName,
   });
 
   final String id;
@@ -41,6 +43,12 @@ class NeteaseComment {
 
   /// 被回复的引用内容（beReplied，仅展示引用）。
   final List<NeteaseComment> reply;
+
+  /// 是否可删除（目前仅 NK：服务端按当前登录用户 / 管理员判定）。
+  final bool canDelete;
+
+  /// 被回复者昵称（目前仅 NK 的楼内回复项）。
+  final String? replyToName;
 }
 
 /// 歌曲评论分页。

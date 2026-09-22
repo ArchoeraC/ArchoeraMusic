@@ -512,6 +512,25 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get commentReply => '답글';
+
+  @override
+  String commentReplyTo({required Object user}) {
+    return '@$user에게 답글';
+  }
+
+  @override
+  String get commentDeleteConfirmBody => '삭제하면 되돌릴 수 없습니다. 계속할까요?';
+
+  @override
+  String get commentDeleted => '댓글을 삭제했습니다';
+
+  @override
+  String commentDeleteFailed({required Object msg}) {
+    return '삭제 실패: $msg';
+  }
+
+  @override
   String commentTimeFormat({
     required Object day,
     required Object month,

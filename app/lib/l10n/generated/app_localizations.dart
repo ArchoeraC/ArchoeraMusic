@@ -1058,6 +1058,36 @@ abstract class AppLocalizations {
   /// **'发送失败：{msg}'**
   String commentSendFailed({required Object msg});
 
+  /// No description provided for @commentReply.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'回复'**
+  String get commentReply;
+
+  /// No description provided for @commentReplyTo.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'回复 @{user}'**
+  String commentReplyTo({required Object user});
+
+  /// No description provided for @commentDeleteConfirmBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除后无法恢复，确定继续吗？'**
+  String get commentDeleteConfirmBody;
+
+  /// No description provided for @commentDeleted.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'评论已删除'**
+  String get commentDeleted;
+
+  /// No description provided for @commentDeleteFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除失败：{msg}'**
+  String commentDeleteFailed({required Object msg});
+
   /// No description provided for @commentTimeFormat.
   ///
   /// In zh_CN, this message translates to:

@@ -523,6 +523,25 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get commentReply => 'Reply';
+
+  @override
+  String commentReplyTo({required Object user}) {
+    return 'Reply to @$user';
+  }
+
+  @override
+  String get commentDeleteConfirmBody => 'This cannot be undone. Continue?';
+
+  @override
+  String get commentDeleted => 'Comment deleted';
+
+  @override
+  String commentDeleteFailed({required Object msg}) {
+    return 'Delete failed: $msg';
+  }
+
+  @override
   String commentTimeFormat({
     required Object day,
     required Object month,

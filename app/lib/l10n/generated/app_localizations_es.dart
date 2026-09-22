@@ -528,6 +528,25 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get commentReply => 'Responder';
+
+  @override
+  String commentReplyTo({required Object user}) {
+    return 'Responder a @$user';
+  }
+
+  @override
+  String get commentDeleteConfirmBody => 'No se puede deshacer. ¿Continuar?';
+
+  @override
+  String get commentDeleted => 'Comentario eliminado';
+
+  @override
+  String commentDeleteFailed({required Object msg}) {
+    return 'Error al eliminar: $msg';
+  }
+
+  @override
   String commentTimeFormat({
     required Object day,
     required Object month,

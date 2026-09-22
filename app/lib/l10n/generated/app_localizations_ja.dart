@@ -513,6 +513,25 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get commentReply => '返信';
+
+  @override
+  String commentReplyTo({required Object user}) {
+    return '@$user へ返信';
+  }
+
+  @override
+  String get commentDeleteConfirmBody => '削除すると元に戻せません。続行しますか？';
+
+  @override
+  String get commentDeleted => 'コメントを削除しました';
+
+  @override
+  String commentDeleteFailed({required Object msg}) {
+    return '削除に失敗しました：$msg';
+  }
+
+  @override
   String commentTimeFormat({
     required Object day,
     required Object month,
