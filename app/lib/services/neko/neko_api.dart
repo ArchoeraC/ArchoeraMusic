@@ -16,6 +16,7 @@
 /// 地址变化时旧 token 不通用，[restore] 会丢弃旧会话。
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -88,13 +89,38 @@ class NekoApi extends ChangeNotifier {
     _token = token;
     _account = NekoUser.fromSessionMap(s);
     notifyListeners();
+    // 服务端资料（昵称 / VIP）可能已变：启动后静默刷新一次（失败不影响已恢复的登录态）。
+    unawaited(refreshAccount());
   }
 
-  /// 账号密码登录（`username` 实际为邮箱）。失败抛 [NekoApiException]。
+  /// 拉取当前登录用户资料（`GET /api/user/info`）并落盘。
+  ///
+  /// 服务端自 `786d68e` 起提供该接口；客户端只持久化 token，昵称/VIP 等启动时
+  /// 以服务端为准，避免本地缓存过期（对齐官方 Web 端 `userStore`）。
+  /// 未登录 / 服务端未升级（404） / 离线时静默返回，不抛错。
+  Future<void> refreshAccount() async {
+    final token = _token;
+    if (token == null || token.isEmpty) return;
+    try {
+      final body = await _client().getJson('/api/user/info');
+      if (body['success'] != true) return;
+      final data = body['data'];
+      final userRaw = data is Map ? data['user'] : null;
+      if (userRaw is! Map) return;
+      _account = NekoUser.fromJson(Map<String, dynamic>.from(userRaw));
+      _persistSession();
+      notifyListeners();
+    } catch (_) {
+      // 静默：离线 / 服务端未提供该接口时保留本地会话
+    }
+  }
+
+  /// 账号密码登录（字段名 `email`，服务端自 `3de61c7` 起只认该字段）。
+  /// 失败抛 [NekoApiException]。
   Future<void> loginPassword(String email, String password) async {
     final body = await _client().postJson(
       '/api/user/login',
-      body: {'username': email, 'password': password},
+      body: {'email': email, 'password': password},
     );
     if (body['success'] != true) {
       throw NekoApiException(body['message']?.toString() ?? '登录失败');
@@ -108,7 +134,7 @@ class NekoApi extends ChangeNotifier {
     _token = token;
     _account = userRaw is Map
         ? NekoUser.fromJson(Map<String, dynamic>.from(userRaw))
-        : NekoUser(id: '', username: email, email: email);
+        : NekoUser(id: '', nickname: '', email: email);
     _persistSession();
     notifyListeners();
   }
@@ -388,37 +414,16 @@ class NekoApi extends ChangeNotifier {
     return '$baseUrl/api/music/file/${track.id}';
   }
 
-  /// 曲目文件格式（`/api/music/info/{id}` 的 `fileFormat`，如 mp3/flac/wav）。
-  ///
-  /// 下载时用于推断落盘扩展名（Neko 音频直链无扩展名，无法从 URL 判断）。
-  /// 失败/未知返回 null（调用方回退默认扩展名）。
-  Future<String?> songFormat(String id) async {
-    if (id.isEmpty) return null;
-    try {
-      final body = await _client().getJson('/api/music/info/$id');
-      if (body['success'] == true) {
-        final data = body['data'];
-        final format = data is Map ? data['fileFormat']?.toString() : null;
-        final f = (format ?? '').trim().toLowerCase();
-        if (f.isNotEmpty) return f;
-      }
-    } catch (_) {
-      // 未知格式走默认扩展名
-    }
-    return null;
-  }
-
   /// 探测音频真实扩展名（下载落盘用）。
   ///
-  /// Neko 直链无扩展名且为直传原文件：优先按**文件头魔数**嗅探（对齐官方
-  /// PC 客户端的扩展名判定），失败再回退 `/api/music/info` 的 `fileFormat`。
-  /// 都失败返回 null（调用方用默认 `mp3`）。
+  /// Neko 直链无扩展名且为直传原文件：按**文件头魔数**嗅探（对齐官方 PC
+  /// 客户端的扩展名判定）。注意 `/api/music/info` 自服务端 `de96358` 起
+  /// 已不再返回 `fileFormat`，故不再做字段回退——无法判定返回 null，
+  /// 调用方回退默认 `mp3`。
   Future<String?> probeAudioExtension(String id) async {
     if (id.isEmpty) return null;
     final head = await _client().getLeadingBytes('/api/music/file/$id');
-    final sniffed = sniffAudioExtension(head);
-    if (sniffed != null) return sniffed;
-    return songFormat(id);
+    return sniffAudioExtension(head);
   }
 
   /// 歌词（LRC 文本；无歌词返回 null）。

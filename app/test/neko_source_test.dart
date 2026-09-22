@@ -87,14 +87,14 @@ void main() {
     test('toSessionMap → fromSessionMap 保持字段', () {
       const u = NekoUser(
         id: '7',
-        username: '喵喵',
+        nickname: '喵喵',
         email: 'a@b.c',
         isVip: true,
         vipExpiresAt: '2027-01-01T00:00:00',
       );
       final back = NekoUser.fromSessionMap(u.toSessionMap());
       expect(back.id, '7');
-      expect(back.username, '喵喵');
+      expect(back.nickname, '喵喵');
       expect(back.email, 'a@b.c');
       expect(back.isVip, isTrue);
       expect(back.vipExpiresAt, '2027-01-01T00:00:00');
@@ -102,7 +102,7 @@ void main() {
     });
 
     test('非会员 / 无 vipExpiresAt 往返', () {
-      const u = NekoUser(id: '1', username: '', email: 'x@y.z');
+      const u = NekoUser(id: '1', nickname: '', email: 'x@y.z');
       final map = u.toSessionMap();
       expect(map.containsKey('vipExpiresAt'), isFalse);
       final back = NekoUser.fromSessionMap(map);
@@ -110,6 +110,55 @@ void main() {
       expect(back.vipExpiresAt, isNull);
       // 昵称为空时回退邮箱
       expect(back.displayName, 'x@y.z');
+    });
+
+    test('fromJson 优先 nickname、兼容旧 username', () {
+      expect(NekoUser.fromJson({'id': 1, 'nickname': '新'}).nickname, '新');
+      expect(NekoUser.fromJson({'id': 1, 'username': '旧'}).nickname, '旧');
+      expect(
+        NekoUser.fromJson({'id': 1, 'nickname': '新', 'username': '旧'}).nickname,
+        '新',
+      );
+    });
+
+    test('fromSessionMap 兼容旧 username 键', () {
+      expect(
+        NekoUser.fromSessionMap({'userId': '1', 'username': '旧'}).nickname,
+        '旧',
+      );
+      expect(
+        NekoUser.fromSessionMap({'userId': '1', 'nickname': '新'}).nickname,
+        '新',
+      );
+    });
+  });
+
+  group('NekoPlaylist creator 字段', () {
+    test('优先 nickname、兼容旧 username、空串 → null', () {
+      expect(
+        NekoPlaylist.fromJson({
+          'id': 1,
+          'name': 'p',
+          'creator': {'nickname': '甲'},
+        }).creator,
+        '甲',
+      );
+      expect(
+        NekoPlaylist.fromJson({
+          'id': 1,
+          'name': 'p',
+          'creator': {'username': '乙'},
+        }).creator,
+        '乙',
+      );
+      expect(
+        NekoPlaylist.fromJson({
+          'id': 1,
+          'name': 'p',
+          'creator': {'nickname': ''},
+        }).creator,
+        isNull,
+      );
     });
   });
 
@@ -130,6 +179,15 @@ void main() {
     test('ID3 → mp3；MPEG 帧同步 0xFFEx → mp3', () {
       expect(sniffAudioExtension([0x49, 0x44, 0x33, 0x04]), 'mp3');
       expect(sniffAudioExtension([0xFF, 0xFB, 0x90, 0x00]), 'mp3');
+    });
+
+    test('....ftyp（ISO BMFF / m4a）→ m4a', () {
+      final head = [
+        0x00, 0x00, 0x00, 0x20, // box size
+        0x66, 0x74, 0x79, 0x70, // 'ftyp'
+        0x4D, 0x34, 0x41, 0x20, // 'M4A '
+      ];
+      expect(sniffAudioExtension(head), 'm4a');
     });
 
     test('RIFF 但非 WAVE / 未知 → null', () {
@@ -208,11 +266,11 @@ void main() {
       final s = NekoQrStatus.fromJson({
         'status': 'confirmed',
         'token': 'abc123',
-        'user': {'id': 1, 'username': 'n'},
+        'user': {'id': 1, 'nickname': 'n'},
       });
       expect(s.state, NekoQrState.confirmed);
       expect(s.token, 'abc123');
-      expect(s.user?.username, 'n');
+      expect(s.user?.nickname, 'n');
     });
 
     test('各状态映射 + 未知回退', () {

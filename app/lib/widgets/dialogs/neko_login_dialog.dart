@@ -10,7 +10,7 @@
 ///
 /// - 扫码：`/api/user/qrlogin/create` 取 `nekomusic://...`，本地自绘二维码；
 ///   状态经 SSE `/api/user/qrlogin/status` 推送，confirmed 即落盘并关闭。
-/// - 账号密码：`/api/user/login`（`username` 实为邮箱）。
+/// - 账号密码：`/api/user/login`（请求体字段 `email` + `password`）。
 ///
 /// **不含注册 / 邮箱验证码 / 滑块验证**（本项目不接入注册）。
 library;

@@ -8,25 +8,29 @@
 /// `musicList` 等），解析集中在此，业务层只消费强类型。
 library;
 
-/// Neko 登录用户（`/api/user/login` 的 `data.user`）。
+/// Neko 登录用户（`/api/user/login` 与 `/api/user/info` 的 `data.user`）。
+///
+/// 服务端自 `d6a0117` 起把用户昵称字段统一为 **`nickname`**（旧版为 `username`），
+/// 这里优先读 `nickname`、兼容回退 `username`（老客户端 / 老会话）。
 class NekoUser {
   const NekoUser({
     required this.id,
-    required this.username,
+    required this.nickname,
     this.email = '',
     this.isVip = false,
     this.vipExpiresAt,
   });
 
   final String id;
-  final String username;
+  final String nickname;
   final String email;
   final bool isVip;
   final String? vipExpiresAt;
 
   factory NekoUser.fromJson(Map<String, dynamic> json) => NekoUser(
     id: json['id']?.toString() ?? '',
-    username: json['username']?.toString() ?? '',
+    nickname:
+        json['nickname']?.toString() ?? json['username']?.toString() ?? '',
     email: json['email']?.toString() ?? '',
     isVip: json['isVip'] == true,
     vipExpiresAt: json['vipExpiresAt']?.toString(),
@@ -35,7 +39,7 @@ class NekoUser {
   /// 会话 Map（vault 持久化；键值均 String）。
   Map<String, String> toSessionMap() => {
     'userId': id,
-    'username': username,
+    'nickname': nickname,
     'email': email,
     'isVip': '$isVip',
     'vipExpiresAt': ?vipExpiresAt,
@@ -43,13 +47,14 @@ class NekoUser {
 
   factory NekoUser.fromSessionMap(Map<String, String> s) => NekoUser(
     id: s['userId'] ?? '',
-    username: s['username'] ?? '',
+    // 老会话用 'username' 键；新版写 'nickname'。
+    nickname: s['nickname'] ?? s['username'] ?? '',
     email: s['email'] ?? '',
     isVip: s['isVip'] == 'true',
     vipExpiresAt: s['vipExpiresAt'],
   );
 
-  String get displayName => username.isNotEmpty ? username : email;
+  String get displayName => nickname.isNotEmpty ? nickname : email;
 }
 
 /// 歌单（自建 / 收藏 / 搜索 共用；字段按响应可选）。
@@ -68,7 +73,7 @@ class NekoPlaylist {
   final String description;
   final int musicCount;
 
-  /// 创建者昵称（收藏歌单返回 `creator.username`）。
+  /// 创建者昵称（收藏歌单返回 `creator.nickname`，旧版为 `creator.username`）。
   final String? creator;
 
   /// 首曲封面路径（`/api/music/cover/{id}`，可能为默认头像路径）。
@@ -77,7 +82,7 @@ class NekoPlaylist {
   factory NekoPlaylist.fromJson(Map<String, dynamic> json) {
     final creatorRaw = json['creator'];
     final creatorName = creatorRaw is Map
-        ? creatorRaw['username']?.toString()
+        ? (creatorRaw['nickname'] ?? creatorRaw['username'])?.toString()
         : null;
     return NekoPlaylist(
       id: json['id']?.toString() ?? '',
