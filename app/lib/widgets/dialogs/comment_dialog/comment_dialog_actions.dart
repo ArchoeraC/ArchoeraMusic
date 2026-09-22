@@ -185,7 +185,7 @@ extension _CommentDialogActions on _CommentDialogState {
       return;
     }
     if (_isNeko) {
-      await _sendNeko(id, content);
+      await _sendNeko(id, content, parentId: _replyTo?.id);
       return;
     }
     final account = ref.read(neteaseAuthProvider);
@@ -215,8 +215,12 @@ extension _CommentDialogActions on _CommentDialogState {
     }
   }
 
-  /// NK 源发表评论（`POST /api/comments`；需 NK 登录，服务端有 5s 频率限制）。
-  Future<void> _sendNeko(String musicId, String content) async {
+  /// NK 源发表评论 / 回复（`POST /api/comments`；需 NK 登录，服务端有 5s 频率限制）。
+  Future<void> _sendNeko(
+    String musicId,
+    String content, {
+    String? parentId,
+  }) async {
     final l10n = context.l10n;
     final api = ref.read(nekoApiProvider);
     if (!api.isLoggedIn) {
@@ -226,17 +230,62 @@ extension _CommentDialogActions on _CommentDialogState {
     }
     setState(() => _sending = true);
     try {
-      await api.sendComment(musicId, content);
+      await api.sendComment(musicId, content, parentId: parentId);
       if (!mounted) return;
       _input.clear();
+      setState(() => _replyTo = null);
       toast(l10n.commentPublished, type: ToastType.success);
-      // NK 无「热门」Tab，直接重载当前列表即可看到新评论。
+      // NK 无「热门」Tab，直接重载当前列表即可看到新评论 / 回复。
       await _load(reset: true);
     } catch (e) {
       if (!mounted) return;
       toast(l10n.commentSendFailed(msg: '$e'));
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// 点「回复」：记住目标并聚焦输入框（仅 NK 显示该入口）。
+  void _startReply(NeteaseComment target) {
+    setState(() => _replyTo = target);
+    _inputFocus.requestFocus();
+  }
+
+  void _cancelReply() {
+    if (_replyTo == null) return;
+    setState(() => _replyTo = null);
+  }
+
+  /// NK 源删除评论（服务端只允许删自己的；删楼层连带删回复）。
+  Future<void> _deleteNeko(NeteaseComment target) async {
+    final l10n = context.l10n;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.commonDelete),
+        content: Text(l10n.commentDeleteConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await ref.read(nekoApiProvider).deleteComment(target.id);
+      if (!mounted) return;
+      if (_replyTo?.id == target.id) setState(() => _replyTo = null);
+      toast(l10n.commentDeleted, type: ToastType.success);
+      await _load(reset: true);
+    } catch (e) {
+      if (!mounted) return;
+      toast(l10n.commentDeleteFailed(msg: '$e'));
     }
   }
 }

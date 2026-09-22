@@ -55,6 +55,8 @@ NeteaseComment _nekoToTile(NekoComment c) => NeteaseComment(
   location: c.location,
   replyTotal: c.replyTotal,
   time: c.time,
+  canDelete: c.canDelete,
+  replyToName: c.replyToName,
   reply: c.replies.map(_nekoToTile).toList(),
 );
 
@@ -93,9 +95,15 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   bool _failed = false;
   final ScrollController _scroll = ScrollController();
 
-  /// 发送评论输入框（NT 源显示；KG 与 QQ 未接入发送）。
+  /// 发送评论输入框（NT / NK 源显示；KG 与 QQ 未接入发送）。
   final TextEditingController _input = TextEditingController();
   bool _sending = false;
+
+  /// 正在回复的目标（仅 NK 显示回复入口；null = 发表新楼层）。
+  NeteaseComment? _replyTo;
+
+  /// 输入框焦点（点「回复」后自动聚焦）。
+  final FocusNode _inputFocus = FocusNode();
 
   NeteaseApi get _api => ref.read(neteaseApiProvider);
 
@@ -122,6 +130,7 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   void dispose() {
     _scroll.dispose();
     _input.dispose();
+    _inputFocus.dispose();
     super.dispose();
   }
 

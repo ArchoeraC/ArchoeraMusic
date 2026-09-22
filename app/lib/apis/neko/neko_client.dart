@@ -120,7 +120,10 @@ class NekoClient {
   Future<Map<String, dynamic>> postJson(String path, {Object? body}) =>
       _send('POST', path, body: body);
 
-  Future<Map<String, dynamic>> deleteJson(String path) => _send('DELETE', path);
+  Future<Map<String, dynamic>> deleteJson(
+    String path, {
+    Map<String, String>? query,
+  }) => _send('DELETE', path, query: query);
 
   Future<Map<String, dynamic>> _send(
     String method,

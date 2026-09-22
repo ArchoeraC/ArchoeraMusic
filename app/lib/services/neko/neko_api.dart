@@ -491,6 +491,19 @@ class NekoApi extends ChangeNotifier {
     _ensureSuccess(body);
   }
 
+  /// 删除评论（`DELETE /api/comments?id=`，需登录）。
+  ///
+  /// 服务端只允许删自己的评论（管理员令牌可删任意一条）；删楼层会连带删除
+  /// 该楼层下的全部回复。
+  Future<void> deleteComment(String id) async {
+    if (id.isEmpty) throw NekoApiException('缺少评论 id');
+    final body = await _client().deleteJson(
+      '/api/comments',
+      query: {'id': id},
+    );
+    _ensureSuccess(body);
+  }
+
   // ── 解析辅助 ─────────────────────────────────────────────────
 
   List<Track> _tracksFrom(Object? list) {

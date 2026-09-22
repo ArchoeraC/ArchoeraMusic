@@ -45,7 +45,10 @@ extension _CommentDialogView on _CommentDialogState {
               if (_canSend && _songId != null)
                 _CommentInputBar(
                   controller: _input,
+                  focusNode: _inputFocus,
                   sending: _sending,
+                  replyToName: _replyTo?.userName,
+                  onCancelReply: _cancelReply,
                   theme: theme,
                   scheme: scheme,
                   l10n: l10n,
@@ -110,7 +113,14 @@ extension _CommentDialogView on _CommentDialogState {
             ),
           );
         }
-        return _CommentTile(comment: list[index]);
+        return _CommentTile(
+          comment: list[index],
+          // 回复 / 删除仅在 NK 提供（服务端支持 parentId / canDelete）；
+          // 其它平台传 null → 通用模板自动隐藏这些入口。
+          onReply: _isNeko ? _startReply : null,
+          onDelete: _isNeko ? _deleteNeko : null,
+          renderReplies: _isNeko,
+        );
       },
     );
   }
@@ -166,65 +176,110 @@ class _CommentDialogHeader extends StatelessWidget {
 class _CommentInputBar extends StatelessWidget {
   const _CommentInputBar({
     required this.controller,
+    required this.focusNode,
     required this.sending,
     required this.theme,
     required this.scheme,
     required this.l10n,
     required this.onSend,
+    this.replyToName,
+    this.onCancelReply,
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
   final bool sending;
   final ThemeData theme;
   final ColorScheme scheme;
   final AppLocalizations l10n;
   final Future<void> Function() onSend;
 
+  /// 非空 = 正在回复该用户（顶部显示「回复 @昵称」条；仅 NK 传值）。
+  final String? replyToName;
+  final VoidCallback? onCancelReply;
+
   @override
   Widget build(BuildContext context) {
+    final replyTo = replyToName;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              enabled: !sending,
-              maxLength: 500,
-              style: theme.textTheme.bodyMedium,
-              decoration: InputDecoration(
-                hintText: l10n.commentInputHint,
-                hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-                counterText: '',
-                isDense: true,
-                filled: true,
-                fillColor: scheme.surface.withValues(alpha: 0.6),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+          if (replyTo != null && replyTo.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Icon(EtaIcons.chatOutline, size: 15, color: scheme.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      l10n.commentReplyTo(user: replyTo),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.primary,
+                      ),
+                    ),
+                  ),
+                  InkResponse(
+                    onTap: onCancelReply,
+                    radius: 14,
+                    child: Icon(
+                      EtaIcons.close,
+                      size: 16,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  enabled: !sending,
+                  maxLength: 500,
+                  style: theme.textTheme.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: l10n.commentInputHint,
+                    hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    counterText: '',
+                    isDense: true,
+                    filled: true,
+                    fillColor: scheme.surface.withValues(alpha: 0.6),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => onSend(),
                 ),
               ),
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => onSend(),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton.filled(
-            tooltip: l10n.commentSend,
-            onPressed: sending ? null : onSend,
-            icon: sending
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(EtaIcons.sendPlane, size: 18),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                tooltip: l10n.commentSend,
+                onPressed: sending ? null : onSend,
+                icon: sending
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(EtaIcons.sendPlane, size: 18),
+              ),
+            ],
           ),
         ],
       ),
@@ -247,23 +302,46 @@ class _CommentSpinner extends StatelessWidget {
   }
 }
 
+/// 评论时间文案（楼层与回复共用）。
+String _commentTimeText(AppLocalizations l10n, int? t) {
+  if (t == null) return '';
+  final dt = DateTime.fromMillisecondsSinceEpoch(t);
+  final now = DateTime.now();
+  final sameDay =
+      dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  final hh = dt.hour.toString().padLeft(2, '0');
+  final mm = dt.minute.toString().padLeft(2, '0');
+  if (sameDay) return '$hh:$mm';
+  return l10n.commentTimeFormat(day: dt.day, month: dt.month, time: '$hh:$mm');
+}
+
+/// 「时间 · 属地」元信息（空项自动省略）。
+String _commentMeta(AppLocalizations l10n, NeteaseComment c) {
+  final location = c.location;
+  return [
+    _commentTimeText(l10n, c.time),
+    if (location != null && location.isNotEmpty) location,
+  ].where((s) => s.isNotEmpty).join(' · ');
+}
+
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment});
+  const _CommentTile({
+    required this.comment,
+    this.onReply,
+    this.onDelete,
+    this.renderReplies = false,
+  });
 
   final NeteaseComment comment;
 
-  String _timeText(AppLocalizations l10n) {
-    final t = comment.time;
-    if (t == null) return '';
-    final dt = DateTime.fromMillisecondsSinceEpoch(t);
-    final now = DateTime.now();
-    final sameDay =
-        dt.year == now.year && dt.month == now.month && dt.day == now.day;
-    final hh = dt.hour.toString().padLeft(2, '0');
-    final mm = dt.minute.toString().padLeft(2, '0');
-    if (sameDay) return '$hh:$mm';
-    return l10n.commentTimeFormat(day: dt.day, month: dt.month, time: '$hh:$mm');
-  }
+  /// 回复回调；null = 隐藏回复入口（非 NK）。
+  final void Function(NeteaseComment)? onReply;
+
+  /// 删除回调；null = 隐藏删除入口（非 NK）；单个条目还须 [NeteaseComment.canDelete]。
+  final void Function(NeteaseComment)? onDelete;
+
+  /// true（仅 NK）= 展开全部楼内回复并带操作；false = 只展示第一条引用（旧样式）。
+  final bool renderReplies;
 
   @override
   Widget build(BuildContext context) {
@@ -271,11 +349,7 @@ class _CommentTile extends StatelessWidget {
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
     final reply = comment.reply.isEmpty ? null : comment.reply.first;
-    final meta = [
-      _timeText(l10n),
-      if (comment.location != null && comment.location!.isNotEmpty)
-        comment.location!,
-    ].join(' · ');
+    final meta = _commentMeta(l10n, comment);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -318,6 +392,14 @@ class _CommentTile extends StatelessWidget {
                           ),
                         ],
                       ),
+                    _TileActions(
+                      l10n: l10n,
+                      scheme: scheme,
+                      onReply: onReply == null ? null : () => onReply!(comment),
+                      onDelete: (onDelete != null && comment.canDelete)
+                          ? () => onDelete!(comment)
+                          : null,
+                    ),
                   ],
                 ),
                 if (meta.isNotEmpty)
@@ -336,7 +418,19 @@ class _CommentTile extends StatelessWidget {
                   comment.text,
                   style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
                 ),
-                if (reply != null)
+                if (renderReplies && comment.reply.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final r in comment.reply)
+                        _ReplyTile(
+                          reply: r,
+                          onReply: onReply,
+                          onDelete: onDelete,
+                        ),
+                    ],
+                  )
+                else if (reply != null)
                   Container(
                     margin: const EdgeInsets.only(top: 6),
                     padding: const EdgeInsets.symmetric(
@@ -362,6 +456,160 @@ class _CommentTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 楼内回复条目（NK 展开样式；含回复 / 删除入口）。
+class _ReplyTile extends StatelessWidget {
+  const _ReplyTile({required this.reply, this.onReply, this.onDelete});
+
+  final NeteaseComment reply;
+  final void Function(NeteaseComment)? onReply;
+  final void Function(NeteaseComment)? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = context.l10n;
+    final meta = _commentMeta(l10n, reply);
+    final replyTo = reply.replyToName;
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.fromLTRB(10, 6, 4, 8),
+      decoration: BoxDecoration(
+        color: scheme.surface.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: reply.userName,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (replyTo != null && replyTo.isNotEmpty)
+                        TextSpan(
+                          text: '  ${l10n.commentReplyTo(user: replyTo)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11.5,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              _TileActions(
+                l10n: l10n,
+                scheme: scheme,
+                onReply: onReply == null ? null : () => onReply!(reply),
+                onDelete: (onDelete != null && reply.canDelete)
+                    ? () => onDelete!(reply)
+                    : null,
+              ),
+            ],
+          ),
+          if (meta.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 6),
+              child: Text(
+                meta,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 11,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+          const SizedBox(height: 2),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              reply.text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 12.5,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 楼层 / 回复右侧的「回复 · 删除」图标操作（回调为 null 时不渲染）。
+class _TileActions extends StatelessWidget {
+  const _TileActions({
+    required this.l10n,
+    required this.scheme,
+    this.onReply,
+    this.onDelete,
+  });
+
+  final AppLocalizations l10n;
+  final ColorScheme scheme;
+  final VoidCallback? onReply;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    if (onReply == null && onDelete == null) return const SizedBox.shrink();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onReply != null)
+          _CommentIconAction(
+            tooltip: l10n.commentReply,
+            icon: EtaIcons.chatOutline,
+            color: scheme.onSurfaceVariant,
+            onTap: onReply!,
+          ),
+        if (onDelete != null)
+          _CommentIconAction(
+            tooltip: l10n.commonDelete,
+            icon: EtaIcons.deleteOutline,
+            color: scheme.onSurfaceVariant,
+            onTap: onDelete!,
+          ),
+      ],
+    );
+  }
+}
+
+class _CommentIconAction extends StatelessWidget {
+  const _CommentIconAction({
+    required this.tooltip,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      icon: Icon(icon, size: 16, color: color),
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
     );
   }
 }
