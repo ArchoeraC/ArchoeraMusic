@@ -804,6 +804,11 @@ per-context 思路一致（**EraAudio 相对 FFmpeg 的对称**）；async 主�
 
 ## 9. 落地顺序（建议；尚未定稿）
 
+> **能力扩张接线（2026-09-22）**：本设计剩余接线/增强项已收进
+> [`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md) **§6 方向⑤ A/Sync 执行模型加强**
+> （AS1–AS7：结构化 `zk_submit` / 长流池化收尾 / 容量调节器 / 调度增强 / 容错 / 可观测 / 压测），
+> 作为 Phase H 的一部分排期；本节仍为架构与明细权威。
+
 > 未完工明细（2026-09-09 对照本节与 §5/§6/§7；2026-09-09 二次标注：✔核内路径已满足 /
 > △ 已满足·接线面补齐 / ✖ 属接入或 Benchmark 留最后）：
 > 1. ✔ §6.1 Task 完工层（done|error|fatal + Handle 槽映射）已由 kernel/task.zig + khost.zig

@@ -1,9 +1,9 @@
-# 音频内核能力扩张规划（四方向）
+# 音频内核能力扩张规划（五方向）
 
 > 状态：**规划稿 v1 · 2026-09-22**
 > 定位：在 `docs/audio-kernel-zig.md`（内核权威设计 / 逐格式接管路线）既有的「解码接管」主线之外，
-> 规划下一阶段要扩张的**四项内和能力**——**① 可听频段 DSP · ② 在线流/非本地源 · ③ 更多格式接管 ·
-> ④ 性能/内存**。本文只定**目标、现状、候选清单与验收门**；具体排期与优先级在下一步再定。
+> 规划下一阶段要扩张的**五项内和能力**——**① 可听频段 DSP · ② 在线流/非本地源 · ③ 更多格式接管 ·
+> ④ 性能/内存 · ⑤ A/Sync 执行模型**。本文只定**目标、现状、候选清单与验收门**；具体排期与优先级在下一步再定。
 >
 > 关系：**本文不替代** `audio-kernel-zig.md`——架构、依赖账本、逐格式裁决、不变量仍以该文为准；
 > 本文是它 §19 路线之外的「能力扩张」子计划。冲突处以 `audio-kernel-zig.md` 为准。
@@ -22,14 +22,14 @@
   （Rust cdylib，`app/core/subsonic/transcoder/`，`symphonia` 解码 + **LAME 编码 MP3**）产出转码流，
   经 `endpoints/transcoder_*.go` 的 `dlopen`/`LoadLibrary` 调用；它既不等同于本内核，又包含内核
   不具备的**编码**能力。
-- 结论：内核**不适合整体接管 Subsonic 服务端**（缺编码侧），本计划的四方向扩张因此**聚焦非
+- 结论：内核**不适合整体接管 Subsonic 服务端**（缺编码侧），本计划的五方向扩张因此**聚焦非
   Subsonic 区域**——App 播放侧。
 - 边界澄清（**不在本计划内**）：Subsonic 侧若将来只想复用内核的**解码**能力（保留其 LAME 编码不动），
   属独立议题；本计划**不为 Subsonic 新增编码能力**，也不把「接管服务端」列为目标。
 
 ---
 
-## 1. 四方向总览
+## 1. 五方向总览
 
 | # | 方向 | 一句话目标 | 现状 | 主要依托 |
 |---|---|---|---|---|
@@ -37,6 +37,7 @@
 | ② | **在线流 / 非本地源** | 自研内核直接消费远端流，覆盖 Subsonic 之外的音源 | `zk_decoder_open_cb` + `Reader.callback` 已落地（2026-09-21）；应用侧接线、Range seek、断流恢复待做 | `audio-kernel-zig.md` §6.1 / §8.4；`audio-memory-source.md` |
 | ③ | **更多格式接管** | 补齐剩余长尾格式、拉高生产引擎接管率、打通曲库白名单 | 常见格式 L1 已清零；余 SV7 / Shorten 等；L2/L3 有缺口 | `format-support-matrix.md`；`audio-kernel-zig.md` §3.3/§3.7 |
 | ④ | **性能 / 内存** | 在「零新增缓冲」纪律下继续砍指令、收口常驻内存与启动 | A 档已吃尽、B 档暂停；TTA/DTS RSS 已收口 | `decode-optimization.md`；`engine-master-pool-design.md` |
+| ⑤ | **A/Sync 执行模型** | 把内核常驻池（EraSync）完整接入生产线并增强调度/容量/容错 | 核内已落地（runtime/task/session/khost），**尚未完整接线**；播放池化在 `ARCHOERA_ERA_POOL` 门控后 | `engine-master-pool-design.md`；`audio-kernel-zig.md` §8.4.1 |
 
 > **「非 subsonic 区域」的界定（方向①）**：音频链常见的低频管理是先用**次声/高通滤波器**（subsonic，
 > 约 <20 Hz 去隆隆声）打底，再在**其余可听频段**做处理。本方向即在「subsonic 打底之外的可听频段」
@@ -175,20 +176,70 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 ---
 
-## 6. 优先级与执行顺序（草稿，下一步再定）
+## 6. 方向⑤ A/Sync 执行模型加强
+
+> 架构权威见 [`engine-master-pool-design.md`](engine-master-pool-design.md)（Master async × Pool Sync、
+> 完成即领、容量调节器、流式会话）；语义定义见 `audio-kernel-zig.md` §8.4.1。本节只列**加强项与接线收尾**。
+
+### 6.1 现状（核内已落地，生产线未完整接入）
+
+- **核内**：`kernel/runtime.zig`（EraSync 常驻池：Master 停机/懒就绪协调、同质 worker、完成即领、
+  弹性扩容骨架、worker 状态注册表、停滞检测 + 槽位容量恢复 + 纯事件 hybrid 回收）；
+  `kernel/task.zig`（done|error|fatal + 保证的 timed wait）；`kernel/session.zig`（长流分块串行会话 +
+  seek + 会话故障）；`kernel/khost.zig`（宿主入口：init/submit(Handle, cap 满即拒)/wait/shutdown，
+  关键路径零分配）。
+- **接线**：`zk_engine_init/shutdown/decode_once` + 流式 `zk_engine_open/read/seek_ms/position_ms/close`
+  已在 `kernel_bridge.h`；播放侧可在 `ARCHOERA_ERA_POOL` 门控下切流式 seam（headless A/B 逐位一致）；
+  scanner 元数据快路径 `zk_metadata_*` 已直桥。
+- **未完成**（`engine-master-pool-design.md` §9 明细）：wait_event 推 + 每线程独立 Io 语义；
+  长流的 worker 亲和（pinned 1:1）/ ring 直推 / waiting 停滞排除；§5.5 完整容量调节器；
+  §5.3 对抗性任务防御；128 路批量 tag 与「播放 + 批量混杂」压测；`zk_submit` 结构化 FFI；
+  Windows/MSVC 链接验证。
+
+### 6.2 加强候选
+
+| # | 候选 | 说明 | 价值 |
+|---|---|---|---|
+| AS1 | **结构化任务提交面 `zk_submit`** | `kind/source/format/hint` + 句柄；wait_event 推模式取代轮询 | 生产线统一入口、免 probe |
+| AS2 | **长流池化收尾** | worker 亲和 pinned 1:1 + ring 直推宿主 + waiting 停滞排除；替换 C 壳「1 会话 1 引擎线程」 | 播放走池、去掉专用线程 |
+| AS3 | **容量调节器完整化** | §5.5 双水位 + 步长 + 滞后死区 + 空闲回收降容（retiring + 锁外 join） | 批量风暴后自然回落 |
+| AS4 | **调度增强** | `format_hint` + 预计算计划免 probe；任务分类（pinned/elastic）隔离；优先级/QoS（播放不被批量拖累） | 混杂负载稳定性 |
+| AS5 | **容错/对抗** | §5.3 黑名单/危险等级/难度预留替换；取消语义；超时/停滞闭环 | 不可信输入不拖垮内核 |
+| AS6 | **可观测性** | worker/队列/停滞/回收遥测走模块总线，暴露设置页日志面板 | 排障与容量验证 |
+| AS7 | **压测闭环** | 128 路批量 tag、播放+批量混杂、pinned 不抖动；启动门禁（冷/热首帧快于 FFmpeg） | 结论可量化 |
+
+### 6.3 不变量（加强不得破坏）
+
+- **run-to-completion**：worker↔任务绑定运行至完成，换任务仅在**完全空闲边界**（无抢占/时间片）；
+- **单流内不做帧级 async/多线程**（状态依赖 + CPU 密集）；长流是**分块串行 await**；
+- **Master 只做不会失败的定容簿记**：运行期零堆分配、满即拒、结构上不 panic；
+  线程创建/正常退出归 Master async 独占；
+- **sync 直通保留**为回归/对照基线（`zk_decoder_*`），不因走池而删除。
+
+### 6.4 验收
+
+- `zig build test`（ReleaseFast 全量）+ 引擎 ctest 无回归；
+- headless A/B：`sync == stream == decode_once` 逐位一致、失败语义对齐；
+- 启动门禁：冷/热首帧 wall 快于 FFmpeg 对应口径；
+- 压测：128 路批量 + 混杂负载 fd/内存受控、无状态污染、播放无抖动。
+
+---
+
+## 7. 优先级与执行顺序（草稿，下一步再定）
 
 建议默认顺序（可在下一步调整）：
 
 1. **方向② 应用侧接线 + Range seek 完整化**（打通非 Subsonic 在线源，收益直接可见）；
 2. **方向① 地基（DSP 下沉 Zig）** → 再叠加 D2 次声/低频管理、D1 参数化 EQ；
 3. **方向④ P1 公共地板 + P3 内存池**（与方向①/②并行、互不阻塞）；
-4. **方向③ F3/F4 白名单快赢 + F1/F2 长尾**（独立子项，可随时插入）。
+4. **方向⑤ AS1–AS3 接线收尾 + 调节器**（播放真正走池、批量可回落）；
+5. **方向③ F3/F4 白名单快赢 + F1/F2 长尾**（独立子项，可随时插入）。
 
-> 待定项：D3–D8 功能取舍、B 档是否授权、F4 是否把影视音轨当曲目。
+> 待定项：D3–D8 功能取舍、B 档是否授权、F4 是否把影视音轨当曲目、方向⑤ 的 AS4–AS7 排期。
 
 ---
 
-## 7. 不变量与红线（汇总）
+## 8. 不变量与红线（汇总）
 
 - `archoera_mediaengine.h` 导出符号 / JSON 协议 / `libfft.so` ABI / `stream.wav/.pcm` 格式**不变**（P5）；
 - 内核**零网络栈**，传输宿主注入（P2）；视频解码不做（P4）；
@@ -198,11 +249,11 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 ---
 
-## 8. 关联文档
+## 9. 关联文档
 
 - [audio-kernel-zig.md](audio-kernel-zig.md) —— 内核权威设计与逐格式接管路线（§14 DSP、§6.1 在线流、§19 路线）
 - [decode-optimization.md](decode-optimization.md) —— 解码提速专项（方向④）
 - [format-support-matrix.md](format-support-matrix.md) —— 格式支持三维矩阵（方向③）
 - [audio-memory-playback.md](audio-memory-playback.md) / [audio-memory-source.md](audio-memory-source.md) —— 内存播放与源（方向②④）
-- [engine-master-pool-design.md](engine-master-pool-design.md) —— 主控/线程池架构（方向④）
+- [engine-master-pool-design.md](engine-master-pool-design.md) —— 主控/线程池架构（方向⑤ A/Sync 权威）
 - [benchmark-2026-09-21.md](benchmark-2026-09-21.md) —— 最新基准
