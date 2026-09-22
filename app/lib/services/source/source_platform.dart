@@ -29,6 +29,7 @@ import '../../l10n/l10n.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
 import '../../widgets/dialogs/collection_platform.dart';
+import '../../widgets/dialogs/comment_platform.dart';
 import '../../widgets/dialogs/kugou_login_button.dart';
 import '../../widgets/dialogs/neko_login_dialog.dart';
 import '../../widgets/dialogs/netease_login_dialog.dart';
@@ -206,12 +207,8 @@ abstract class SourcePlatform {
   CollectionPlatform? get collections => null;
 
   /// 该源的评论适配器（`CommentPlatform`，来自
-  /// `widgets/dialogs/comment_platform.dart`）。
-  ///
-  /// 评论注册表与本源注册表是并行的兄弟重构：当前分支尚未并入评论注册表，
-  /// 故以 `dynamic` 暴露、默认 null；并入后各适配器返回
-  /// `commentPlatformFor(source)` 即可，调用方无需改动。
-  dynamic get comments => null;
+  /// `widgets/dialogs/comment_platform.dart`）；无 → null。
+  CommentPlatform? get comments => null;
 
   /// 该源对应的歌词来源（复用现有 `services/lyrics` 管线）；无 → 空列表。
   List<LyricSource> lyricSources(dynamic ref) => const [];
@@ -334,6 +331,9 @@ class _NeteaseSource extends SourcePlatform {
 
   @override
   CollectionPlatform? get collections => collectionPlatform(source);
+
+  @override
+  CommentPlatform? get comments => commentPlatformFor(source);
 
   @override
   List<LyricSource> lyricSources(dynamic ref) => const [NeteaseLyricSource()];
@@ -485,6 +485,9 @@ class _KugouSource extends SourcePlatform {
 
   @override
   CollectionPlatform? get collections => collectionPlatform(source);
+
+  @override
+  CommentPlatform? get comments => commentPlatformFor(source);
 
   @override
   List<LyricSource> lyricSources(dynamic ref) => const [KugouLyricSource()];
@@ -651,6 +654,9 @@ class _QqSource extends SourcePlatform {
   CollectionPlatform? get collections => collectionPlatform(source);
 
   @override
+  CommentPlatform? get comments => commentPlatformFor(source);
+
+  @override
   List<LyricSource> lyricSources(dynamic ref) => const [QqmusicLyricSource()];
 
   @override
@@ -786,6 +792,9 @@ class _NekoSource extends SourcePlatform {
 
   @override
   CollectionPlatform? get collections => collectionPlatform(source);
+
+  @override
+  CommentPlatform? get comments => commentPlatformFor(source);
 
   @override
   List<LyricSource> lyricSources(dynamic ref) => [NekoLyricSource(ref)];
