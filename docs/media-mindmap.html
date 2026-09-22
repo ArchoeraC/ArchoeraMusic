@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ArchoeraMusic 媒体处理 思维导图</title>
+<style>
+  :root{
+    --bg:#06080c; --txt:#e8eef7; --dim:#8b98a8; --line:#2a3646;
+    --play:#4da3ff; --scan:#7ee787; --edge:#ffb454; --perf:#ff7ab6; --pool:#c792ea; --db:#f2cc60; --warn:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font:12.5px/1.5 "JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+       padding:22px 26px 44px}
+  h1{font-size:17px;margin:0 0 2px;letter-spacing:.4px}
+  h1 small{color:var(--dim);font-weight:400;font-size:11.5px;margin-left:8px}
+  .hint{color:var(--dim);font-size:11.5px;margin:4px 0 14px}
+
+  /* ---- 思维导图树 ---- */
+  .map{margin-left:6px}
+  .root{display:inline-block;border:1px solid var(--line);background:#0d1420;
+        border-radius:999px;padding:6px 16px;font-weight:700;color:#fff;letter-spacing:.3px}
+  ul.tree{list-style:none;margin:0;padding-left:24px;position:relative}
+  ul.tree::before{content:"";position:absolute;left:0;top:0;bottom:14px;border-left:1px solid var(--line)}
+  ul.tree > li{position:relative;padding:5px 0 5px 20px}
+  ul.tree > li::before{content:"";position:absolute;left:0;top:16px;width:20px;border-top:1px solid var(--line)}
+  ul.tree > li:last-child::after{content:"";position:absolute;left:-1px;top:16px;bottom:-5px;border-left:1px solid var(--bg)}
+
+  .node{border:1px solid var(--line);border-radius:8px;padding:5px 9px;background:#0d131c;display:inline-block}
+  .node .k{font-weight:700}
+  .play .node{border-color:#1e4b78} .play>.node .k{color:var(--play)}
+  .scan .node{border-color:#245c34} .scan>.node .k{color:var(--scan)}
+  .edge .node{border-color:#6a4a1e} .edge>.node .k{color:var(--edge)}
+  .perf .node{border-color:#6a2450} .perf>.node .k{color:var(--perf)}
+  .d{color:var(--dim)}
+  .warn{color:var(--warn)}
+  .num{color:#ffd479}
+  .tag{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:0 6px;
+       font-size:10.5px;color:var(--dim);margin-left:5px}
+  .leaf{color:var(--dim)}
+  code{color:#cfe6ff;background:#0b1220;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+  .foot{margin-top:18px;border-top:1px dashed var(--line);padding-top:10px;color:var(--dim);font-size:11px}
+</style>
+</head>
+<body>
+
+<h1>ArchoeraMusic 媒体处理 · 思维导图 <small>播放内核 / 内核+扫描器 / 边界 / 扫描器为何提速 · 2026-09-23</small></h1>
+<div class="hint">颜色：<b style="color:var(--play)">播放</b> · <b style="color:var(--scan)">扫描</b> · <b style="color:var(--edge)">边界/红线</b> · <b style="color:var(--perf)">性能根因</b></div>
+
+<div class="map">
+  <div class="root">ArchoeraMusic 媒体处理</div>
+
+  <ul class="tree">
+
+    <!-- ============ 播放 ============ -->
+    <li class="play">
+      <div class="node"><span class="k">① 播放（内核 EraAudio）</span></div>
+      <ul class="tree">
+        <li><div class="node"><span class="d">Dart 编排</span>：PlaybackNotifier · <code>resolvePlaySource</code>
+          <span class="tag">SourcePlatform 注册表：NT/KG/QQ/Neko/local/streaming</span></div></li>
+        <li><div class="node"><span class="d">C 壳</span> <code>pipeline.c</code>：会话 · PCM 落盘或内存 · miniaudio 自播 · 事件 FIFO</div></li>
+        <li><div class="node"><span class="d">传输（宿主注入）</span>：本地文件 · <code>mem</code> · <code>cb</code>（FFmpeg AVIO / HTTP Range）
+          <span class="tag">内核零网络栈</span></div></li>
+        <li><div class="node"><span class="d">解码</span>：EraAudio（已接管格式 flac/mp3/aac/opus/vorbis/mka/dts/tta/spx/shn/mpc…） ↔ FFmpeg 兜底</div></li>
+        <li><div class="node"><span class="d">DSP</span>：EQ / limiter / loudness（<code>kernel/dsp</code>；B 档向量化，与 C 逐位一致）</div></li>
+        <li><div class="node"><span class="d">频谱</span>：<code>libfft.so</code>（Dart 拉窗）</div></li>
+        <li><div class="node"><span class="d">EraSync 常驻池</span>
+          <span class="tag" style="color:var(--pool)">pool</span>：<code>zk_submit</code>（decode/metadata，事件推）· <code>zk_engine_*</code> 流式会话（分块串行，<code>max_streams</code>）·
+          弹性扩容 <b>cap=max_workers</b>（submit 只提示、Master 异步补建、满即拒）· AS3 调节器 · AS2 pinned 1:1（门控）</div></li>
+      </ul>
+    </li>
+
+    <!-- ============ 扫描 ============ -->
+    <li class="scan">
+      <div class="node"><span class="k">② 扫描（内核 + 扫描器）</span></div>
+      <ul class="tree">
+        <li><div class="node">Dart → <span class="d">C# ScannerEngine（NativeAOT）</span>：触发/进度/结果</div></li>
+        <li><div class="node">目录遍历 → <b>Parallel.For</b> 并行解析 · 并行度 = <code>AdaptiveConcurrency.ForIOBound()</code></div></li>
+        <li><div class="node"><span class="d">每文件元数据</span>：TagLibSharp（主路径，多数格式） <b>/</b>
+          <code>zk_metadata_open</code>（<b>同步直桥</b>，native probe：容器/编码/时长/标签/首图）</div></li>
+        <li><div class="node"><span class="d">写</span>：有界 <code>BlockingCollection</code> + 专用写线程 → 批量事务 → SQLite <code>library.db</code>
+          <span class="tag" style="color:var(--db)">WAL · synchronous=NORMAL</span></div></li>
+        <li><div class="node"><span class="d">协商</span>：<code>SetConcurrency(_maxParallelism)</code> → <code>zk_metadata_set_concurrency(n)</code>
+          —— 内核<b>只存</b>（<code>g_meta_concurrency</code>），<span class="warn">不调度/不限流</span></div></li>
+        <li><div class="node"><span class="d">旁路原生模块</span>：刮削(C++, TagLib+libcurl) · 下载(Rust) · Subsonic(Go)</div></li>
+        <li><div class="node"><span class="k">写分配：两级生产者/消费者 + 自适应攒批</span>
+          <span class="tag">scanner 写路径</span></div>
+          <ul class="tree">
+            <li><div class="node"><b>L1 解析线程</b>（<code>Parallel.For</code>，N=<code>_maxParallelism</code>）产出 <code>TrackMetadata</code>
+              → <code>BlockingCollection&lt;TrackMetadata&gt;</code><b>(1024)</b>（满=<b>背压</b>）</div></li>
+            <li><div class="node"><b>L2 <code>scanner-writer</code> 攒批</b>：批量由 <code>AdaptiveBatchSize</code> 动态定
+              （目标 <b>~300ms/批</b>，10..10000 + 内存上限）→ <code>FlushBatch</code>
+              → <code>StageTracksAsync</code> <b>必须快照</b>（<code>new List(...)</code>，因 L2 立即 <code>Clear</code> 复用 batch）</div></li>
+            <li><div class="node"><b>L3 <code>SqliteDirectWriter</code> 专用写线程</b>：<code>BlockingCollection&lt;Action&gt;</code><b>(4096)</b>（背压）
+              · 单写连接 · 每批单事务 <code>INSERT</code> 到 <code>_scanner_stage_tracks</code></div></li>
+            <li><div class="node"><b>最终合并</b>：单事务 <code>INSERT INTO tracks … ON CONFLICT(id) DO UPDATE</code>（stage → 正式表）</div></li>
+            <li><div class="node"><b>读</b>：独立 <code>_readConn</code> + <code>System.Threading.Lock</code>（WAL 读写并发）；PRAGMA <code>WAL</code> + <code>synchronous=NORMAL</code></div></li>
+            <li><div class="node"><b>封面 <code>${id}.img</code> 写盘在解析线程</b>（<code>TryWriteCover</code>），<b>不</b>归写线程
+              <span class="tag">待议：去封面写入化</span></div></li>
+            <li><div class="node leaf">失败：写线程异常 → stderr 后继续（不静默）；<code>FlushBatch</code> 计 Errors；<code>Flush()</code> 排空队列</div></li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+
+    <!-- ============ 边界 ============ -->
+    <li class="edge">
+      <div class="node"><span class="k">③ 边界与红线</span></div>
+      <ul class="tree">
+        <li><div class="node"><b>内核零网络栈</b>：socket/TLS/Range/重定向一律宿主注入，内核只消费字节</div></li>
+        <li><div class="node"><b>扫描元数据不进池</b>：同步直桥 → 不占 EraSync 槽；与播放仅 CPU/内存/磁盘/网络竞争</div></li>
+        <li><div class="node"><b>播放池有界</b>：线程 ≤ <code>max_workers</code>(+1 Master)；快速任务要么早停、要么到 cap 即拒</div></li>
+        <li><div class="node"><b>QoS 缺口</b>：全局队列 FCFS、无优先级/无抢占 → 批量可能拖累播放；<span class="warn">AS4（播放优先/保留 worker/批量节流）未做</span></div></li>
+        <li><div class="node"><b>ABI 不变</b>：<code>archoera_mediaengine.h</code> 导出 / JSON 协议 / <code>libfft.so</code> / <code>stream.wav|.pcm</code>（P5）；内核符号 <code>era_</code> 前缀；系统能力走 <code>app/native/platform</code></div></li>
+      </ul>
+    </li>
+
+    <!-- ============ 扫描器提速 ============ -->
+    <li class="perf">
+      <div class="node"><span class="k">④ 扫描器「爆改」为什么快（约 +10~30%）</span>
+        <span class="tag">提交 29246d8 · 7a9e449 · 3b84419 · b6e535e</span></div>
+      <ul class="tree">
+        <li><div class="node"><b>彻底去 async</b>：<code>Channel&lt;Action&gt;+Task writeLoop</code> → <code>BlockingCollection</code> + 专用写线程
+          <span class="tag">29246d8</span></div>
+          <ul class="tree">
+            <li><div class="node leaf">根因：解析是 <b>CPU-bound + 阻塞 IO</b>，async/await 只产生状态机/TCS/线程池调度开销，<b>没有并发收益</b></div></li>
+            <li><div class="node leaf"><code>Parallel.ForEachAsync</code> → <code>Parallel.For</code>：每文件不再生成 async 状态机
+              <span class="tag">7a9e449</span></div></li>
+            <li><div class="node leaf">全链路同步：<code>UnmanagedCallersOnly</code> 直接同步调用（去掉 <code>Task.Run</code> 跳转）
+              <span class="tag">3b84419</span></div></li>
+          </ul>
+        </li>
+        <li><div class="node"><b>写路径串行化</b>：单写线程 + 批量事务 + <code>PRAGMA synchronous=NORMAL</code> → 少 <code>BUSY</code>/少 fsync；读走独立连接 + WAL 并发；读锁换 .NET9 <code>System.Threading.Lock</code></div></li>
+        <li><div class="node"><b>内核元数据直桥</b>：结构化 C ABI、<b>零 JSON</b>、一次取回标量+标签+首图；TagLib 不支持的格式统一解析
+          <span class="tag">009ca55</span></div></li>
+        <li><div class="node"><b>实测</b>（1000 小文件，<code>b6e535e</code>）：
+          wall <span class="num">151.1 → 137.7 ms</span> · files/s <span class="num">6619 → 7261（+10%）</span> ·
+          CPU <span class="num">0.260 → 0.202 s（−22%）</span> · RSS <span class="num">70.4 → 68.4 MB</span></div></li>
+        <li><div class="node leaf">另：425 文件 × 16 格式的 kernel(TagLib) 联动基准（<code>6b79d70</code>）：吞吐 <span class="num">199–238ms vs 196–226ms（持平）</span>，正确性 <b>0 不一致</b>——直桥的价值在<b>统一解析与更低内存</b>，而非小文件吞吐</div></li>
+      </ul>
+    </li>
+
+  </ul>
+</div>
+
+<div class="foot">
+  依据：<code>docs/audio-kernel-expansion-plan.md</code> · <code>audio-kernel-zig.md</code> · <code>engine-master-pool-design.md</code> ·
+  <code>kernel/runtime.zig</code> · <code>scanner/{ScannerEngine,KernelMetadata}.cs</code> · commit <code>b6e535e</code>（吞吐基线）。
+</div>
+
+</body>
+</html>
