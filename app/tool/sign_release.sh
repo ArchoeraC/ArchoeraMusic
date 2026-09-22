@@ -36,12 +36,12 @@ DIST="${1:-dist/linux}"
   cd "$DIST"
   # shellcheck disable=SC2012
   ls ./*.tar.gz ./*.tar.xz ./*.deb ./*.rpm ./*.AppImage ./*.pkg.tar.zst \
-     ./*.zip ./*.exe 2>/dev/null | xargs -r sha256sum > SHA256SUMS || true
+     ./*.zip ./*.exe ./*.flatpak 2>/dev/null | xargs -r sha256sum > SHA256SUMS || true
 )
 
 for f in "$DIST"/*.tar.gz "$DIST"/*.tar.xz "$DIST"/*.deb "$DIST"/*.rpm \
          "$DIST"/*.AppImage "$DIST"/*.pkg.tar.zst "$DIST"/*.zip "$DIST"/*.exe \
-         "$DIST"/SHA256SUMS; do
+         "$DIST"/*.flatpak "$DIST"/SHA256SUMS; do
   [ -f "$f" ] || continue
   openssl dgst -sha256 -sign "$K1" -out "$f.sig1" "$f"
   echo "→ $f.sig1"

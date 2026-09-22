@@ -58,12 +58,14 @@ static int cmp_ll(const void *a, const void *b) {
 }
 static long long pct(const long long *v, int n, double p) {
     int i = (int)(p * (n - 1) + 0.5);
-    if (i < 0) i = 0; if (i >= n) i = n - 1;
+    if (i < 0) i = 0;
+    if (i >= n) i = n - 1;
     return v[i];
 }
 static void print_stats(const char *tag, long long *v, int n) {
     qsort(v, (size_t)n, sizeof(long long), cmp_ll);
-    long long sum = 0; for (int i = 0; i < n; i++) sum += v[i];
+    long long sum = 0;
+    for (int i = 0; i < n; i++) sum += v[i];
     printf("%s p50=%lld p90=%lld p99=%lld mean=%lld\n", tag,
            pct(v, n, 0.50), pct(v, n, 0.90), pct(v, n, 0.99), sum / n);
 }
