@@ -271,7 +271,7 @@ python3 tests/bench/scorecard.py --engine build-min/archoera-audio-engine --reps
 - [自研解码内核行业基准（EraAudio）](docs/archive/benchmark-industry-2026-09-05.md) —— 历史快照：FFmpeg/libFLAC/LAME/speexdec 横评 + 评分（95.6 A+）
 - [引擎集成与基准（EraAudio vs Stable）](docs/engine-integration-bench.md) —— EOF/错误语义、内存流式化、样本数对齐
 - [音频 Zig 解码内核路线图](docs/audio-kernel-zig.md) —— 内核架构 / 逐格式接管 / 第三方来源登记
-- [音频内核能力扩张规划（四方向）](docs/audio-kernel-expansion-plan.md) —— 可听频段 DSP / 在线流·非本地源 / 更多格式接管 / 性能·内存
+- [音频内核能力扩张规划（五方向）](docs/audio-kernel-expansion-plan.md) —— 可听频段 DSP / 在线流·非本地源 / 更多格式接管 / 性能·内存 / A·Sync 执行模型
 - [平台能力外观层](docs/platform-capability-facade.md) —— 防休眠 / 媒体会话与蓝牙耳机控制 / 系统定位的能力接口 + 每平台实现
 - [下载模块设计规范](docs/download-module.md) —— 下载引擎架构 / 自研边界 / 依赖许可
 - 历史设计稿与基准快照见 [`docs/archive/`](docs/archive/README.md)（已废弃/被取代，仅供溯源）
