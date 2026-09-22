@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ArchoeraMusic 媒体处理逻辑（内核 / 内核+扫描器）</title>
+<style>
+  :root{
+    --bg:#07090d; --panel:#0e131a; --panel2:#121924;
+    --line:#243041; --txt:#e6edf5; --dim:#8b98a8;
+    --dart:#4da3ff; --shell:#ffb454; --kernel:#3ddc97;
+    --ffmpeg:#c792ea; --pool:#ff7ab6; --scanner:#7ee787; --db:#f2cc60;
+    --warn:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font:13px/1.55 "JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+       padding:22px 26px 40px}
+  h1{font-size:18px;margin:0 0 4px;letter-spacing:.5px}
+  h1 small{color:var(--dim);font-weight:400;font-size:12px;margin-left:8px}
+  h2{font-size:14px;margin:22px 0 10px;color:#cfd9e6;
+     border-left:3px solid var(--line);padding-left:9px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 6px;color:var(--dim);font-size:12px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+  @media (max-width:1080px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card h3{margin:0 0 10px;font-size:13px;color:#cfd9e6;font-weight:600}
+  .box{border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin:0 0 8px;
+       background:var(--panel2);position:relative}
+  .box .t{font-weight:700}
+  .box .s{color:var(--dim);font-size:11.5px}
+  .dart{border-color:var(--dart)} .dart .t{color:var(--dart)}
+  .shell{border-color:var(--shell)} .shell .t{color:var(--shell)}
+  .kernel{border-color:var(--kernel)} .kernel .t{color:var(--kernel)}
+  .ffmpeg{border-color:var(--ffmpeg)} .ffmpeg .t{color:var(--ffmpeg)}
+  .pool{border-color:var(--pool)} .pool .t{color:var(--pool)}
+  .scanner{border-color:var(--scanner)} .scanner .t{color:var(--scanner)}
+  .db{border-color:var(--db)} .db .t{color:var(--db)}
+  .arw{text-align:center;color:#5b6b7f;margin:-2px 0 6px;font-size:14px}
+  .branch{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tag{display:inline-block;border:1px solid var(--line);border-radius:20px;
+       padding:1px 8px;font-size:11px;color:var(--dim);margin:2px 4px 0 0}
+  .warn{color:var(--warn)}
+  ul{margin:6px 0 0 0;padding-left:18px;color:var(--dim)}
+  li{margin:2px 0}
+  .foot{margin-top:16px;color:var(--dim);font-size:11.5px;border-top:1px dashed var(--line);padding-top:10px}
+  code{color:#cfe6ff;background:#0b1220;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+</style>
+</head>
+<body>
+
+<h1>ArchoeraMusic 媒体处理逻辑 <small>播放（内核） · 扫描（内核+扫描器） · 现状 2026-09-23</small></h1>
+
+<div class="legend">
+  <span><i style="background:var(--dart)"></i>Dart 编排</span>
+  <span><i style="background:var(--shell)"></i>C 壳（audio-engine）</span>
+  <span><i style="background:var(--kernel)"></i>Zig 内核 EraAudio</span>
+  <span><i style="background:var(--ffmpeg)"></i>FFmpeg / libfft</span>
+  <span><i style="background:var(--pool)"></i>EraSync 常驻池</span>
+  <span><i style="background:var(--scanner)"></i>C# 扫描器</span>
+  <span><i style="background:var(--db)"></i>SQLite / 磁盘</span>
+</div>
+
+<div class="cols">
+
+  <!-- ===================== 播放 ===================== -->
+  <div class="card">
+    <h3>① 播放链路（内核 EraAudio）</h3>
+
+    <div class="box dart">
+      <div class="t">Flutter UI / PlaybackNotifier（Dart）</div>
+      <div class="s">队列/切歌 · <code>resolvePlaySource</code>（SourcePlatform 注册表：NT/KG/QQ/Neko/local/streaming）
+      · 发命令 + 消费 <code>pollEvent</code> · FFT 拉窗</div>
+    </div>
+    <div class="arw">↓ FFI（<code>archoera_mediaengine_*</code>，进程内动态链接，无子进程）</div>
+
+    <div class="box shell">
+      <div class="t">C 壳 archoera-audio-engine（<code>pipeline.c</code>）</div>
+      <div class="s">会话/转码 PCM 落盘或内存 · miniaudio 自播 · 事件 FIFO · 传输层
+        <span class="tag">本地文件</span><span class="tag">mem 内存</span><span class="tag">cb 回调（宿主 FFmpeg AVIO，HTTP Range）</span></div>
+    </div>
+    <div class="arw">↓</div>
+
+    <div class="branch">
+      <div class="box kernel">
+        <div class="t">EraAudio（Zig 内核）解码</div>
+        <div class="s">已接管格式走自研：flac/mp3/aac/opus/vorbis/mka/dts/tta/spx/shn/mpc… <br>
+        DSP：EQ / limiter / loudness（<code>kernel/dsp</code>，C 壳可路由）</div>
+      </div>
+      <div class="box ffmpeg">
+        <div class="t">FFmpeg 兜底 + 拍频</div>
+        <div class="s">未接管格式/复杂容器由 FFmpeg 解码；<br><code>libfft.so</code> 供 Dart 频谱（ABI 不变）</div>
+      </div>
+    </div>
+    <div class="arw">↓ PCM</div>
+
+    <div class="box shell">
+      <div class="t">miniaudio 输出 → 声卡</div>
+      <div class="s">position / ended / error 事件回 Dart；媒体控制走平台桥（C++/ObjC++）</div>
+    </div>
+
+    <h2 style="margin-top:16px">EraSync 常驻池（播放侧并发）</h2>
+    <div class="box pool">
+      <div class="t">runtime / task / session / khost</div>
+      <div class="s">
+        <code>zk_submit</code>（结构化：decode / metadata，wait 走 Io.Event push）<br>
+        <code>zk_engine_open/read/seek</code> 流式会话（分块串行 await，<code>max_streams</code> 硬计数）<br>
+        弹性扩容（<b>cap = max_workers</b>，只有 Master 建/退线程）· 容量调节器（AS3）· pinned 1:1（AS2，门控）
+      </div>
+      <div class="s" style="margin-top:6px">不变量：run-to-completion、单流内无帧级 async、Master 零堆分配/满即拒</div>
+    </div>
+  </div>
+
+  <!-- ===================== 扫描 ===================== -->
+  <div class="card">
+    <h3>② 扫描链路（内核 + 扫描器协作）</h3>
+
+    <div class="box dart">
+      <div class="t">Dart → 播放/扫描调度</div>
+      <div class="s">触发扫描、取进度/结果；不直接解析媒体</div>
+    </div>
+    <div class="arw">↓ FFI（scanner NativeAOT，进程内）</div>
+
+    <div class="box scanner">
+      <div class="t">C# ScannerEngine（NativeAOT）</div>
+      <div class="s">目录遍历 → <b>并行解析</b>（<code>_maxParallelism = AdaptiveConcurrency.ForIOBound()</code>）
+      → 错误入 quarantine → 批量 upsert</div>
+    </div>
+    <div class="arw">↓ 每个文件</div>
+
+    <div class="branch">
+      <div class="box scanner">
+        <div class="t">TagLibSharp 读标签</div>
+        <div class="s">绝大多数格式的主路径（托管侧）</div>
+      </div>
+      <div class="box kernel">
+        <div class="t">内核元数据直桥 <code>zk_metadata_open</code></div>
+        <div class="s">TagLib 不支持/需探测时：<b>同步直桥</b>在 scanner 线程上 native probe
+        （容器/编码/时长/标签/首图）</div>
+      </div>
+    </div>
+    <div class="arw">↓</div>
+    <div class="box db">
+      <div class="t">SQLite library.db（WAL）</div>
+      <div class="s">scanner 直写；Dart 只读（库列表）</div>
+    </div>
+
+    <h2 style="margin-top:16px">协商（现状：单向下发，内核只存）</h2>
+    <div class="box pool">
+      <div class="t">scanner → 内核：并发提示</div>
+      <div class="s">
+        <code>KernelMetadata.SetConcurrency(_maxParallelism)</code> → <code>zk_metadata_set_concurrency(n)</code>
+        （内核写全局 <code>g_meta_concurrency</code>）<br>
+        <code>get</code> 仅回读校验。<b class="warn">内核不据此调度/限流</b>，也不把扫描任务排进 EraSync 池。
+      </div>
+      <div class="s" style="margin-top:6px">元数据并发实际由 <b>scanner 自管</b>；播放池由 <b>max_workers / max_streams</b> 自管。</div>
+    </div>
+  </div>
+</div>
+
+<h2>③ 原生模块分工与共享资源 / 边界</h2>
+<div class="card">
+  <div class="s" style="margin-bottom:8px">
+    重计算下沉到各原生模块，编排与数据留在托管层：
+  </div>
+  <div class="branch" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="box">
+      <div class="t" style="color:var(--kernel)">内核（Zig）</div>
+      <div class="s">解码 / DSP / 元数据探测 / 池调度</div>
+    </div>
+    <div class="box">
+      <div class="t" style="color:var(--ffmpeg)">FFmpeg / libfft</div>
+      <div class="s">兜底解码 · 频谱 FFT（Dart ABI）</div>
+    </div>
+    <div class="box">
+      <div class="t" style="color:var(--scanner)">TagLib++ / Rust / Go</div>
+      <div class="s">刮削（C++ TagLib+libcurl）· 下载（Rust）· Subsonic（Go）</div>
+    </div>
+  </div>
+
+  <ul>
+    <li><b>内核零网络栈</b>：socket/TLS/Range/重定向一律<b>宿主注入</b>（播放抓流由 FFmpeg AVIO；回调只消费字节）。</li>
+    <li><b>扫描元数据不进池</b>：<code>zk_metadata_open</code> 是同步直桥 → 不占 EraSync 槽；与播放的耦合只是 <b>CPU/内存/磁盘/网络</b> 竞争。</li>
+    <li><b>播放池有界</b>：线程数 ≤ <code>max_workers</code>(+1 Master)；`submit` 只发提示、Master 异步补建；满 cap 即拒、积压消失早停。</li>
+    <li><b>QoS 缺口</b>：全局队列 FCFS、无优先级/无抢占 → 批量可能拖累播放；<b>AS4</b>（播放优先 / 保留 worker / 批量节流）尚未实现。</li>
+    <li>其它未做：AS2 的 ring 直推与「C 壳 1 会话 1 引擎线程」替换、N4 每路 Reader 缓冲预算。</li>
+  </ul>
+</div>
+
+<div class="foot">
+  ABI 红线：<code>archoera_mediaengine.h</code> 导出 / JSON 协议 / <code>libfft.so</code> / <code>stream.wav|.pcm</code> 不变（P5）；
+  内核符号 <code>era_</code> 前缀；系统能力走 <code>app/native/platform</code> 桥接（Dart 不直连平台）。
+  &nbsp;·&nbsp; 依据：<code>docs/audio-kernel-zig.md</code>、<code>audio-kernel-expansion-plan.md</code>、<code>engine-master-pool-design.md</code>、<code>kernel/runtime.zig</code>、<code>scanner/{ScannerEngine,KernelMetadata}.cs</code>。
+</div>
+
+</body>
+</html>
