@@ -60,34 +60,17 @@ extension _SearchPageActions on _SearchPageState {
   }
 
   /// 平台显示名（横幅「{source}」用）。
-  String _platformLabel(String source) {
-    final l10n = context.l10n;
-    return switch (source) {
-      'netease' => l10n.platformNetease,
-      'kugou' => l10n.platformKugou,
-      'qqmusic' => l10n.platformQQMusic,
-      'neko' => l10n.platformNeko,
-      _ => source,
-    };
-  }
+  String _platformLabel(String source) =>
+      sourcePlatform(source).label(context.l10n);
 
   /// 点击歌曲：解析播放 URL → 后台完整转码播放（不阻塞 UI）。
   Future<void> _playTrack(Track track) async {
     if (_resolving) return;
     setState(() => _resolving = true);
     try {
-      final String? url;
-      if (track.source == 'kugou' && track.kugou != null) {
-        url = await ref.read(kugouApiProvider).resolvePlayUrl(track.kugou!);
-      } else if (track.source == 'netease') {
-        url = await ref.read(neteaseApiProvider).resolvePlayUrl(track.id);
-      } else if (track.source == 'qqmusic') {
-        url = await ref.read(qqMusicApiProvider).resolvePlayUrl(track);
-      } else if (track.source == 'neko') {
-        url = await ref.read(nekoApiProvider).resolvePlayUrl(track);
-      } else {
-        url = null;
-      }
+      final String? url = await sourcePlatform(
+        track.source,
+      ).resolvePlayUrl(ref, track, quality: 'hq');
       if (!mounted) return;
       if (url == null) {
         _toast(context.l10n.trackListNoPlayableSource);
@@ -122,69 +105,7 @@ extension _SearchPageActions on _SearchPageState {
   /// 平台详情弹窗（NT歌单/专辑/歌手、KG、QQ 均已接通曲目列表）。
   void _onCoverTap(CoverItem item) {
     final src = _platform == 'all' ? item.source : _platform;
-    if (src == 'kugou') {
-      _openKugouCover(item);
-      return;
-    }
-    if (src == 'qqmusic') {
-      _openQqCover(item);
-      return;
-    }
-    if (src == 'neko') {
-      _openNekoCover(item);
-      return;
-    }
-    _openNeteaseCover(item);
-  }
-
-  void _openNekoCover(CoverItem item) {
-    switch (_tab) {
-      case _SearchTab.playlists:
-        showNekoPlaylistDetailDialog(context, item);
-      case _SearchTab.artists:
-        showNekoArtistDialog(context, item);
-      default:
-        break;
-    }
-  }
-
-  void _openNeteaseCover(CoverItem item) {
-    switch (_tab) {
-      case _SearchTab.playlists:
-        showPlaylistDetailDialog(context, item);
-      case _SearchTab.albums:
-        showNeteaseAlbumDialog(context, item);
-      case _SearchTab.artists:
-        showNeteaseArtistDialog(context, item);
-      default:
-        break;
-    }
-  }
-
-  void _openKugouCover(CoverItem item) {
-    switch (_tab) {
-      case _SearchTab.playlists:
-        showKugouPlaylistDetailDialog(context, item);
-      case _SearchTab.albums:
-        showKugouAlbumDialog(context, item);
-      case _SearchTab.artists:
-        showKugouArtistDialog(context, item);
-      default:
-        break;
-    }
-  }
-
-  void _openQqCover(CoverItem item) {
-    switch (_tab) {
-      case _SearchTab.playlists:
-        showQqPlaylistDetailDialog(context, item);
-      case _SearchTab.albums:
-        showQqAlbumDetailDialog(context, item);
-      case _SearchTab.artists:
-        showQqArtistDetailDialog(context, item);
-      default:
-        break;
-    }
+    sourcePlatform(src).openCover(context, ref, _sourceSearchKind(_tab), item);
   }
 
   /// 歌曲右键菜单（通用在线曲目菜单 + 页内歌手占位）。
@@ -206,14 +127,11 @@ extension _SearchPageActions on _SearchPageState {
   }
 
   /// 红心失败提示（各平台独立文案；QQ 在线同步失败提示实验接口可读错误）。
+  /// 文案统一由「收藏平台」适配器提供（`SourcePlatform.collections` 组合）。
   String _likeFailText(String source) {
     final l10n = context.l10n;
-    return switch (source) {
-      'kugou' => l10n.toastLoginRequiredKugou,
-      'qqmusic' => l10n.toastQqLikeSyncFailed,
-      'neko' => l10n.toastLoginRequiredNeko,
-      _ => l10n.toastLoginRequiredNetease,
-    };
+    return sourcePlatform(source).collections?.likeFailedText(l10n) ??
+        l10n.toastLoginRequiredNetease;
   }
 
   /// 行内红心切换：失败提示登录（对齐「我喜欢」页 _toggleLike 语义；

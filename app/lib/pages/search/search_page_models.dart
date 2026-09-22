@@ -56,10 +56,10 @@ class _AggState {
   DateTime? failedAt;
 }
 
-/// 聚合搜索固定参与的平台（netease 用 offset / kugou·qqmusic 用 page 游标）。
-/// 实验性音源 `neko` 启用时才追加（见 `_SearchPageState._aggActive`）。
-const _aggPlatforms = ['netease', 'kugou', 'qqmusic'];
-
-/// 聚合状态表的**键全集**（含 `neko`）：关闭实验性音源时该键不被访问，
-/// 预留可避免启用后因游标表缺键而抛错。
-const _aggAllPlatforms = ['netease', 'kugou', 'qqmusic', 'neko'];
+/// 搜索结果 Tab → 音源注册表的类别（封面搜索 / 详情弹窗分发用）。
+SourceSearchKind _sourceSearchKind(_SearchTab tab) => switch (tab) {
+  _SearchTab.albums => SourceSearchKind.album,
+  _SearchTab.artists => SourceSearchKind.artist,
+  _SearchTab.playlists => SourceSearchKind.playlist,
+  _SearchTab.songs => SourceSearchKind.song,
+};

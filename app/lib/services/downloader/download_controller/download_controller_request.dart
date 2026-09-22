@@ -8,7 +8,6 @@ Map<String, dynamic> buildDownloadRequest(
   Track track, {
   String quality = 'hq',
 }) {
-  final kugou = track.kugou;
   final lyrics = track.lyrics?.trim();
   return {
     'trackId': track.id,
@@ -21,8 +20,6 @@ Map<String, dynamic> buildDownloadRequest(
     // 强制重写歌词（Neko 等直传源在入队前已取标准 LRC）：引擎按
     // 「enqueue 元数据 > 平台 > 内嵌」合并，非空时覆盖内嵌歌词。
     'lyrics': (lyrics == null || lyrics.isEmpty) ? null : lyrics,
-    'extra': (track.source == 'kugou' && kugou != null)
-        ? {'hashes': kugou.hashes, 'sizes': kugou.sizes}
-        : const <String, dynamic>{},
+    'extra': downloadPlatform(track.source).requestExtra(track),
   };
 }

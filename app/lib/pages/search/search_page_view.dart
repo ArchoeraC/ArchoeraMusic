@@ -20,9 +20,8 @@ extension _SearchPageView on _SearchPageState {
       ...like.idsFor('qqmusic'),
       ...like.idsFor('neko'),
     };
-    final nekoEnabled = ref.watch(
-      appPrefsProvider.select((p) => p.nekoEnabled),
-    );
+    // 订阅实验源开关：变化时重建，使 `sourcePlatforms(ref)` 下拉选项同步增减。
+    ref.watch(appPrefsProvider.select((p) => p.nekoEnabled));
     // 实验性音源关闭时，若当前停留在 NK 平台则退回 NT（避免选择项消失后
     // 仍对其发请求）。
     ref.listen(appPrefsProvider.select((p) => p.nekoEnabled), (prev, next) {
@@ -37,7 +36,7 @@ extension _SearchPageView on _SearchPageState {
             query: _query,
             platform: _platform,
             tabs: _tabs,
-            nekoEnabled: nekoEnabled,
+            platforms: sourcePlatforms(ref),
             onPlatformChanged: _switchPlatform,
           ),
           const Divider(height: 1),
@@ -159,7 +158,7 @@ class _SearchPageHeader extends StatelessWidget {
     required this.query,
     required this.platform,
     required this.tabs,
-    required this.nekoEnabled,
+    required this.platforms,
     required this.onPlatformChanged,
   });
 
@@ -167,8 +166,8 @@ class _SearchPageHeader extends StatelessWidget {
   final String platform;
   final TabController tabs;
 
-  /// 实验性音源启用时才展示 NK 平台页签。
-  final bool nekoEnabled;
+  /// 已启用且可搜索的音源（顺序即下拉顺序；含实验源开关过滤）。
+  final List<SourcePlatform> platforms;
   final ValueChanged<String> onPlatformChanged;
 
   @override
@@ -199,10 +198,8 @@ class _SearchPageHeader extends StatelessWidget {
               const SizedBox(width: 16),
               SDropdown<String>(
                 options: [
-                  SDropdownOption('netease', l10n.platformNetease),
-                  SDropdownOption('kugou', l10n.platformKugou),
-                  SDropdownOption('qqmusic', l10n.platformQQMusic),
-                  if (nekoEnabled) SDropdownOption('neko', l10n.platformNeko),
+                  for (final p in platforms)
+                    SDropdownOption(p.source, p.label(l10n)),
                   SDropdownOption('all', l10n.platformAll),
                 ],
                 selected: platform,

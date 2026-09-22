@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/history/history_store.dart';
 import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/source/source_platform.dart';
 import '../stores/providers.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/dialogs/s_context_menu.dart';

@@ -16,24 +16,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/lyrics/engine/lyric_pipeline.dart';
 import '../services/lyrics/engine/lyrics_engine.dart';
 import '../services/lyrics/lyric_line.dart';
-import '../services/lyrics/sources/kugou_lyric_source.dart';
-import '../services/lyrics/sources/local_lyric_source.dart';
-import '../services/lyrics/sources/neko_lyric_source.dart';
-import '../services/lyrics/sources/netease_lyric_source.dart';
-import '../services/lyrics/sources/qqmusic_lyric_source.dart';
-import '../services/lyrics/sources/streaming_lyric_source.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/source/source_platform.dart';
 import 'app_prefs.dart';
 
 /// 歌词引擎（应用级单例；来源可插拔）。
+///
+/// 来源集合由**音源注册表**提供（`SourcePlatform.lyricSources`）：新增音源时
+/// 只需在其 [SourcePlatform] 适配器里声明歌词来源，此处无需改动。
 final lyricsEngineProvider = Provider<LyricsEngine>(
   (ref) => LyricsEngine([
-    const NeteaseLyricSource(),
-    const QqmusicLyricSource(),
-    const KugouLyricSource(),
-    const LocalLyricSource(),
-    StreamingLyricSource(ref),
-    NekoLyricSource(ref),
+    for (final p in allSourcePlatforms()) ...p.lyricSources(ref),
   ]),
 );
 

@@ -273,26 +273,12 @@ mixin _PlaybackNotifierLoading
     if (quality == state.quality) return;
     _log('切换音质 → ${qualityLabels[quality] ?? quality}');
     try {
-      final String? url;
-      if (track.source == 'kugou' && track.kugou != null) {
-        url = await ref
-            .read(kugouApiProvider)
-            .resolvePlayUrl(track.kugou!, quality: quality);
-      } else if (track.source == 'netease') {
-        url = await ref
-            .read(neteaseApiProvider)
-            .resolvePlayUrl(track.id, quality: quality);
-      } else if (track.source == 'qqmusic') {
-        url = await ref
-            .read(qqMusicApiProvider)
-            .resolvePlayUrl(track, quality: quality);
-      } else if (track.source == 'neko') {
-        url = await ref
-            .read(nekoApiProvider)
-            .resolvePlayUrl(track, quality: quality);
-      } else {
-        url = null;
-      }
+      final String? url = await resolvePlaySource(
+        ref,
+        track,
+        quality: quality,
+        log: _log,
+      );
       if (url == null || url.isEmpty) {
         _log('音质切换失败：无可用播放源（可能为 VIP / 版权限制）');
         return;

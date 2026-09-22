@@ -4,20 +4,6 @@
 
 part of '../download_controller.dart';
 
-/// 支持「播放管线回退解析」的来源：
-/// - kugou/netease：Rust 自研解析，失败后回退；
-/// - qqmusic：Rust 无自研解析（enqueue 后即失败）→ 直接走 Dart 播放管线。
-/// 走 Dart 播放管线回退解析的来源（Rust 无自研解析的：QQ / 实验性 Neko）。
-const _downloadFallbackSources = {
-  'kugou',
-  'netease',
-  'qqmusic',
-  'neko',
-  // 流媒体（Subsonic/Jellyfin）：Rust 无自研解析，恒走 Dart 播放管线解析
-  // `format=raw` 原文件直链后经 retry_with_url 注入。
-  'streaming',
-};
-
 mixin _DownloadControllerCore on Notifier<DownloadState> {
   DownloaderEngine? get _engine;
   set _engine(DownloaderEngine? value);
@@ -294,12 +280,13 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
 
   /// Rust 在 resolving 阶段解析失败 → 调度一次播放管线回退解析。
   ///
-  /// kugou/netease：Rust 自研解析失败后回退；qqmusic：Rust 无解析，
-  /// 直接由 Dart 播放管线解析（含 QQ 登录态取流）。
+  /// kugou/netease：Rust 自研解析失败后回退；qqmusic/neko/streaming：Rust
+  /// 无解析，直接由 Dart 播放管线解析（是否回退由适配器 [playbackFallback]
+  /// 决定）。
   void _scheduleFallback(String taskId) {
     final track = _tracks[taskId];
     if (track == null) return;
-    if (!_downloadFallbackSources.contains(track.source)) return;
+    if (!downloadPlatform(track.source).playbackFallback) return;
     unawaited(_resolveFallback(taskId, track));
   }
 
@@ -309,7 +296,7 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
   bool _retryViaFallback(String taskId) {
     final track = _tracks[taskId];
     if (track == null) return false;
-    if (!_downloadFallbackSources.contains(track.source)) return false;
+    if (!downloadPlatform(track.source).playbackFallback) return false;
     if (!_fallbackTried.contains(taskId)) return false;
     _fallbackTried.remove(taskId);
     unawaited(_resolveFallback(taskId, track));
@@ -351,23 +338,15 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
     final current = _taskById(taskId);
     if (current == null || current.status != 'failed') return;
 
-    // Neko 直传原文件、直链无扩展名：按文件头魔数嗅探真实容器（对齐官方
-    // PC 客户端），避免落盘扩展名错配。
-    String? extOverride;
-    if (track.source == 'neko') {
-      try {
-        extOverride = await ref.read(nekoApiProvider).probeAudioExtension(
-          track.id,
-        );
-      } catch (_) {
-        // 探测失败回退默认扩展名
-      }
-    }
+    final platform = downloadPlatform(track.source);
+    // 直链无扩展名的源（如 Neko）由适配器探测真实容器；失败回退通用推断。
+    final probed = await platform.probeExtension(ref, track);
     final resolved = _buildPreResolved(
+      platform,
       track,
       url,
       quality,
-      extOverride: extOverride,
+      probed: probed,
     );
     final code = engine.retryWithUrl(taskId, resolved);
     debugPrint('下载回退${code == 0 ? '已提交' : '提交失败(code=$code)'}: ${track.title}');
@@ -375,91 +354,23 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
 
   /// 构造 Rust `archoera_downloader_retry_with_url` 的 resolvedJson（camelCase）。
   Map<String, dynamic> _buildPreResolved(
+    DownloadPlatform platform,
     Track track,
     String url,
     String quality, {
-    String? extOverride,
+    String? probed,
   }) {
-    final ext =
-        extOverride ??
-        _extFromUrl(url) ??
-        _extFromCodec(track.quality?.codec) ??
-        ((quality == 'lossless' || quality == 'hi-res') ? 'flac' : 'mp3');
-    final headers = <List<String>>[];
-    if (track.source == 'netease') {
-      // 网易 CDN 通常需 Referer/UA；带登录态时补 Cookie（对齐 Rust resolver）。
-      headers.add(const ['Referer', 'https://music.163.com/']);
-      headers.add(const [
-        'User-Agent',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
-            '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0',
-      ]);
-      final cookies = getRuntime().sessionStore.get('netease');
-      if (cookies.isNotEmpty) {
-        headers.add([
-          'Cookie',
-          cookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
-        ]);
-      }
-    } else if (track.source == 'qqmusic') {
-      // QQ CDN 需 UA/Referer；带登录态时补 Cookie（GetVkey 直链鉴权）。
-      headers.add(const ['User-Agent', 'QQMusic 14090008(android 15)']);
-      headers.add(const ['Referer', 'https://y.qq.com']);
-      final cookies = getRuntime().sessionStore.get('qqmusic');
-      if (cookies.isNotEmpty) {
-        headers.add([
-          'Cookie',
-          cookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
-        ]);
-      }
-    }
+    final ext = platform.resolveExtension(
+      track,
+      url: url,
+      quality: quality,
+      probed: probed,
+    );
     return {
       'url': url,
-      'qualityKey': _qualityKeyFor(quality, ext),
+      'qualityKey': platform.qualityKey(quality, ext),
       'fileExt': ext,
-      'headers': headers,
+      'headers': platform.requestHeaders(track, quality),
     };
-  }
-
-  /// 从 URL 路径推断扩展名（决定落盘扩展与标签写入格式）。
-  String? _extFromUrl(String url) {
-    final path = Uri.tryParse(url)?.path.toLowerCase() ?? '';
-    for (final ext in const ['flac', 'mp3', 'm4a', 'aac', 'wav', 'ogg']) {
-      if (path.endsWith('.$ext')) return ext;
-    }
-    return null;
-  }
-
-  /// 由平台元数据 codec/suffix 推断扩展名（流媒体 `format=raw` 为原文件，
-  /// URL 不带扩展名；Subsonic `suffix` / Jellyfin codec 即原始格式）。
-  String? _extFromCodec(String? codec) {
-    final c = (codec ?? '').trim().toLowerCase();
-    if (c.isEmpty) return null;
-    switch (c) {
-      case 'alac':
-      case 'mp4':
-        return 'm4a';
-      case 'mpeg':
-      case 'mpga':
-        return 'mp3';
-    }
-    const known = {
-      'flac',
-      'mp3',
-      'm4a',
-      'aac',
-      'wav',
-      'ogg',
-      'opus',
-      'ape',
-      'wv',
-    };
-    return known.contains(c) ? c : null;
-  }
-
-  /// 实际品质 key（供 done 事件 actualQuality 展示；近似，以扩展名为准）。
-  String _qualityKeyFor(String quality, String ext) {
-    if (ext == 'flac') return quality == 'hi-res' ? 'flac24bit' : 'flac';
-    return quality == 'lq' ? '128k' : '320k';
   }
 }

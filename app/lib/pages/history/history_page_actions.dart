@@ -32,18 +32,9 @@ extension _HistoryPageActions on _HistoryPageState {
     if (_resolving) return;
     _setResolving(true);
     try {
-      final String? url;
-      if (track.source == 'kugou' && track.kugou != null) {
-        url = await ref.read(kugouApiProvider).resolvePlayUrl(track.kugou!);
-      } else if (track.source == 'local') {
-        url = track.localPath;
-      } else if (track.source == 'netease') {
-        url = await ref.read(neteaseApiProvider).resolvePlayUrl(track.id);
-      } else if (track.source == 'neko') {
-        url = await ref.read(nekoApiProvider).resolvePlayUrl(track);
-      } else {
-        url = null;
-      }
+      final String? url = await sourcePlatform(
+        track.source,
+      ).resolvePlayUrl(ref, track, quality: 'hq');
       if (!mounted) return;
       if (url == null || url.isEmpty) {
         _toast(context.l10n.trackListNoPlayableSource);

@@ -70,7 +70,7 @@ impl Quality {
 }
 
 /// 平台来源
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SourcePlatform {
     #[default]
@@ -84,6 +84,12 @@ pub enum SourcePlatform {
     /// （`/rest/stream?format=raw`，原文件）。Rust 无自研解析，
     /// 恒走 Dart 播放管线回退预解析 URL。
     Streaming,
+    /// 未知 / 未来音源：wire 字符串无法识别时**归一到这里**（不再反序列化报错）。
+    ///
+    /// Rust 无自研解析与平台元数据实现，恒走 Dart 预解析直链 + 兜底元数据路径，
+    /// 使新增音源无需修改 Rust 即可入队（注册点见 `resolvers::resolver_for` 与
+    /// `metadata::metadata_capability_for`）。
+    Unknown,
 }
 
 impl SourcePlatform {
@@ -94,7 +100,35 @@ impl SourcePlatform {
             SourcePlatform::Qqmusic => "qqmusic",
             SourcePlatform::Neko => "neko",
             SourcePlatform::Streaming => "streaming",
+            SourcePlatform::Unknown => "unknown",
         }
+    }
+
+    /// 从 wire 字符串解析（大小写不敏感）。
+    ///
+    /// 已登记音源返回对应变体；**未知音源归一为 [SourcePlatform::Unknown]**，
+    /// 不再硬报错。序列化方向（[`SourcePlatform::as_str`] / `Serialize`）对已登记
+    /// 音源保持原字符串不变，故 wire 契约不变。
+    pub fn from_wire(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "kugou" => SourcePlatform::Kugou,
+            "netease" => SourcePlatform::Netease,
+            "qqmusic" => SourcePlatform::Qqmusic,
+            "neko" => SourcePlatform::Neko,
+            "streaming" => SourcePlatform::Streaming,
+            _ => SourcePlatform::Unknown,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SourcePlatform {
+    /// 容忍未知音源：任何字符串都能解析（未知 → [SourcePlatform::Unknown]）。
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(SourcePlatform::from_wire(&s))
     }
 }
 
@@ -189,4 +223,44 @@ pub struct ResolvedUrl {
     pub file_size: Option<u64>,
     /// 下载请求需要带的 headers（Kugou 无；Netease 带 Cookie/Referer）
     pub extra_headers: Vec<(String, String)>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_source_is_tolerated_and_normalized() {
+        // 未来新增音源：未知字符串不再反序列化报错，归一为 Unknown（走预解析直链）。
+        let parsed: SourcePlatform = serde_json::from_str("\"bilibili\"").unwrap();
+        assert_eq!(parsed, SourcePlatform::Unknown);
+        assert_eq!(parsed.as_str(), "unknown");
+        // 含空白的未知值同样归一
+        assert_eq!(SourcePlatform::from_wire("  FUTURE  "), SourcePlatform::Unknown);
+    }
+
+    #[test]
+    fn known_source_wire_strings_unchanged() {
+        for (json, variant, wire) in [
+            ("\"kugou\"", SourcePlatform::Kugou, "kugou"),
+            ("\"netease\"", SourcePlatform::Netease, "netease"),
+            ("\"qqmusic\"", SourcePlatform::Qqmusic, "qqmusic"),
+            ("\"neko\"", SourcePlatform::Neko, "neko"),
+            ("\"streaming\"", SourcePlatform::Streaming, "streaming"),
+        ] {
+            let parsed: SourcePlatform = serde_json::from_str(json).unwrap();
+            assert_eq!(parsed, variant);
+            assert_eq!(serde_json::to_string(&variant).unwrap(), json);
+            assert_eq!(variant.as_str(), wire);
+        }
+    }
+
+    #[test]
+    fn source_from_wire_matches_serde() {
+        for s in ["kugou", "netease", "qqmusic", "neko", "streaming", "unknown", "wat"] {
+            let via_serde: SourcePlatform =
+                serde_json::from_str(&format!("\"{s}\"")).unwrap();
+            assert_eq!(via_serde, SourcePlatform::from_wire(s), "wire={s}");
+        }
+    }
 }

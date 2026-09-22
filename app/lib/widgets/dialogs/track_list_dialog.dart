@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
+import '../../services/source/source_platform.dart';
 import '../../stores/providers.dart';
 import '../../l10n/l10n.dart';
 import '../common/glass_surface.dart';

@@ -16,9 +16,10 @@ class _TrackDetailBody extends StatelessWidget {
     final l10n = context.l10n;
     final t = track;
 
-    final kugouQuality = _kugouQualityLabel(l10n, t);
+    final platform = sourcePlatform(t.source);
+    final qualityLabel = platform.qualityLabel(l10n, t);
     final q = t.quality;
-    final fileSize = t.fileSize ?? _kugouBestSize(t);
+    final fileSize = t.fileSize ?? platform.estimatedFileSize(t);
     final localPath = t.localPath;
 
     return Column(
@@ -47,14 +48,14 @@ class _TrackDetailBody extends StatelessWidget {
           scheme: scheme,
           icon: EtaIcons.cloudOutline,
           label: l10n.trackDetailSource,
-          value: _sourceLabel(l10n, t),
+          value: platform.label(l10n),
         ),
-        if (kugouQuality != null)
+        if (qualityLabel != null)
           _TrackDetailField(
             scheme: scheme,
             icon: EtaIcons.highQualityOutline,
             label: l10n.trackDetailQuality,
-            value: kugouQuality,
+            value: qualityLabel,
           ),
         if (q != null) ...[
           if (q.codec.isNotEmpty)
@@ -108,42 +109,6 @@ class _TrackDetailBody extends StatelessWidget {
           ),
       ],
     );
-  }
-
-  String _sourceLabel(AppLocalizations l10n, Track t) => switch (t.source) {
-    'netease' => l10n.brandNetease,
-    'kugou' => l10n.brandKugou,
-    'neko' => l10n.platformNeko,
-    'local' => l10n.trackSourceLocal,
-    'streaming' => l10n.trackSourceStreaming,
-    _ => t.source,
-  };
-
-  String? _kugouQualityLabel(AppLocalizations l10n, Track t) {
-    final k = t.kugou;
-    if (k == null) return null;
-    const chain = ['hi-res', 'lossless', 'hq', 'sq', 'lq'];
-    String? label;
-    for (final level in chain) {
-      if (k.hashFor(level) != null) {
-        label = l10nQualityLabel(l10n, level);
-        break;
-      }
-    }
-    if (label == null) return null;
-    final size = _kugouBestSize(t);
-    return size == null ? label : '$label · ${_formatBytes(size)}';
-  }
-
-  int? _kugouBestSize(Track t) {
-    const order = ['flac24bit', 'flac', '320k', '128k'];
-    final sizes = t.kugou?.sizes;
-    if (sizes == null) return null;
-    for (final q in order) {
-      final s = sizes[q];
-      if (s != null && s > 0) return s;
-    }
-    return null;
   }
 
   String _formatBytes(int bytes) {
