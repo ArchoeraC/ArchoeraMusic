@@ -24,9 +24,6 @@ import 'bootstrap.dart';
 import 'router.dart';
 import 'theme_provider.dart';
 
-/// 无上限哨兵：ImageCache.maximumSizeBytes 设为该值 ≈ 仅受张数约束。
-const _noLimitBytes = 1 << 60;
-
 /// ArchoeraMusic 应用根：主题 + 路由 + 启动门。
 ///
 /// 主题逻辑在 theme_provider.dart，路由在 router.dart，启动初始化
@@ -69,15 +66,13 @@ class ArchoeraMusicApp extends ConsumerWidget {
     // 性能模式：全局关闭动效（隐式 Animated* 系列自动 0 时长）+ 频谱关闭。
     final performanceMode = prefs.performanceMode;
     // 缓存上限动态应用（设置变更实时生效，幂等）：
-    // - 封面图片 ImageCache 字节上限按偏好（null = 无上限 → 仅张数约束）
+    // - 封面图片 ImageCache 字节上限**恒有上限**（封面是内存大户，不提供「无上限」）
     // - 歌词/匹配/TTML 内存缓存字节上限注入 runtime（null = 无上限）
     final imageCache = PaintingBinding.instance.imageCache;
     final imageLimit = prefs.imageCacheLimitMiB;
     imageCache
       ..maximumSize = 1000
-      ..maximumSizeBytes = imageLimit == null
-          ? _noLimitBytes
-          : imageLimit * 1024 * 1024;
+      ..maximumSizeBytes = imageLimit * 1024 * 1024;
     final lyricLimitBytes = prefs.lyricCacheLimitMiB == null
         ? null
         : prefs.lyricCacheLimitMiB! * 1024 * 1024;

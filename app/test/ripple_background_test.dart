@@ -14,6 +14,14 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/widgets/player/background/ripple_background.dart';
+import 'package:archoera_music/widgets/list/cover_image.dart';
+
+/// 组件内部按「屏幕长边物理像素」解码封面（钳 256~2048）。测试预热**同一个**
+/// provider，使解析同步命中 imageCache（否则 fake-async 下异步解码不会完成）。
+ImageProvider _coverProvider(WidgetTester tester, String path) {
+  final px = tester.view.physicalSize.longestSide.round().clamp(256, 2048);
+  return coverImageProvider('file://$path', decodeWidth: px)!;
+}
 
 /// 生成一张 64×64 渐变 PNG 作为测试封面。
 Future<String> _writeTempCover() async {
@@ -42,7 +50,7 @@ void main() {
     await tester.runAsync(() async {
       path = await _writeTempCover();
       // 预热进 imageCache，使组件解析同步命中。
-      final stream = FileImage(File(path)).resolve(ImageConfiguration.empty);
+      final stream = _coverProvider(tester, path).resolve(ImageConfiguration.empty);
       final c = Completer<void>();
       stream.addListener(ImageStreamListener((_, _) => c.complete()));
       await c.future;
@@ -85,7 +93,7 @@ void main() {
     late final String path;
     await tester.runAsync(() async {
       path = await _writeTempCover();
-      final stream = FileImage(File(path)).resolve(ImageConfiguration.empty);
+      final stream = _coverProvider(tester, path).resolve(ImageConfiguration.empty);
       final c = Completer<void>();
       stream.addListener(ImageStreamListener((_, _) => c.complete()));
       await c.future;
@@ -135,7 +143,7 @@ void main() {
     await tester.runAsync(() async {
       path = await _writeTempCover();
       // 预热进 imageCache，使组件解析同步命中。
-      final stream = FileImage(File(path)).resolve(ImageConfiguration.empty);
+      final stream = _coverProvider(tester, path).resolve(ImageConfiguration.empty);
       final c = Completer<void>();
       stream.addListener(ImageStreamListener((_, _) => c.complete()));
       await c.future;
@@ -163,7 +171,7 @@ void main() {
     await tester.runAsync(() async {
       path = await _writeTempCover();
       // 预热进 imageCache，使组件解析同步命中。
-      final stream = FileImage(File(path)).resolve(ImageConfiguration.empty);
+      final stream = _coverProvider(tester, path).resolve(ImageConfiguration.empty);
       final c = Completer<void>();
       stream.addListener(ImageStreamListener((_, _) => c.complete()));
       await c.future;

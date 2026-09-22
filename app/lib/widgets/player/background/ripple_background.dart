@@ -28,6 +28,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 
 import '../../../services/render/damage_region.dart';
+import '../../list/cover_image.dart';
 import 'ripple_shader.dart';
 import 'ripple_static_layer.dart';
 
@@ -149,6 +150,9 @@ class _RippleBackgroundState extends State<RippleBackground>
   ImageStream? _stream;
   ImageStreamListener? _listener;
 
+  /// 背景封面解码目标长边（物理像素）；0 = 尚未在 [didChangeDependencies] 计算。
+  int _decodePx = 0;
+
   /// GPU 路径：着色器实例（着色器加载成功后非空）。
   ui.FragmentShader? _shader;
 
@@ -170,9 +174,28 @@ class _RippleBackgroundState extends State<RippleBackground>
     );
     _ticker = createTicker(_tick);
     _resetRipples();
-    _resolveCover();
     if (widget.animate) _ensureTicker();
     if (widget.useShader && kEnableRippleShader) _loadShader();
+  }
+
+  /// 背景封面解码目标（物理像素长边）。首次在 [didChangeDependencies] 里按屏幕
+  /// 尺寸算好再解析封面，避免在 [initState] 读 InheritedWidget。
+  int _coverDecodePx() {
+    final mq = MediaQuery.maybeOf(context);
+    if (mq == null) return 2048;
+    final s = mq.size;
+    final longest = (s.width > s.height ? s.width : s.height) * mq.devicePixelRatio;
+    return longest.round().clamp(256, 2048);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final px = _coverDecodePx();
+    if (px != _decodePx) {
+      _decodePx = px;
+      _resolveCover();
+    }
   }
 
   @override
@@ -234,11 +257,9 @@ class _RippleBackgroundState extends State<RippleBackground>
 
   ImageProvider? _providerFor(String? cover) {
     if (cover == null || cover.isEmpty) return null;
-    if (cover.startsWith('http')) return NetworkImage(cover);
-    final path = cover.startsWith('file://') ? cover.substring(7) : cover;
-    final file = File(path);
-    if (!file.existsSync()) return null;
-    return FileImage(file);
+    // 按屏幕物理像素解码（背景只做模糊/折射，超过屏幕尺寸无观感收益，却按平方
+    // 吃内存）。首次解析发生在 didChangeDependencies（_decodePx 已算好）。
+    return coverImageProvider(cover, decodeWidth: _decodePx);
   }
 
   void _resolveCover() {
