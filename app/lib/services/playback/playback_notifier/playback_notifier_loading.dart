@@ -235,6 +235,27 @@ mixin _PlaybackNotifierLoading
     return task;
   }
 
+  /// 方向② N1 接线开关（docs/audio-kernel-expansion-plan.md §3 N1）：让 Subsonic
+  /// 之外的在线源也可跳过「Dart 整首预下载」直接走引擎流式（cb/直连）。
+  ///
+  /// `ARCHOERA_STREAM_DIRECT` 取值（**默认不设 = 保持现状，零行为变化**）：
+  ///   - 未设 / `0` / `false`：现状（在线源由 [engineMemoryPlay] 决定是否整首 SegStore）；
+  ///   - `1` / `true` / `yes` / `all`：所有在线 http(s) 源跳过整首预下载，直接交引擎
+  ///     流式（EraAudio 下经宿主 AVIO 回调路径；Stable 下 FFmpeg 直连）；
+  ///   - 逗号分隔 source 列表（如 `netease,kugou`）：仅这些源直连。
+  static bool _preferStreamDirect(String? source) {
+    final raw = Platform.environment['ARCHOERA_STREAM_DIRECT'];
+    if (raw == null || raw.isEmpty) return false;
+    final v = raw.trim().toLowerCase();
+    if (v == '1' || v == 'true' || v == 'yes' || v == 'all') return true;
+    if (source == null) return false;
+    final wanted = v
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty);
+    return wanted.contains(source.toLowerCase());
+  }
+
   /// M2.2 内存源门禁（docs/audio-memory-source.md §2 三态）：仅当
   /// `engineMemoryPlay`（内存播放偏好）开且 [source] 为 http(s) 在线 URL
   /// （非本地文件 / SongCache 命中路径）时才尝试 Dart 下载 → SegStore 纯内存会话。
@@ -243,9 +264,13 @@ mixin _PlaybackNotifierLoading
   /// 大体积无损（>64 MiB 会触发内存门禁弹窗），且没有平台直链缓存路径（NT/KG 有
   /// SongCache 兜底），于是每次播放都要整首拉流——起播慢、大文件还会弹确认框。
   /// 改为引擎 URL 直连流式（直链支持 Range/206，FFmpeg 按需拉流，起播快且同样不落盘）。
+  ///
+  /// **N1 开关**：[_preferStreamDirect] 开启时，其余在线源（NT/KG/QQ 等注册表源）
+  /// 同样跳过整首预下载 → 引擎直连（内核经宿主回调消费字节，零网络栈不变）。
   bool _memorySourceEligible(String source, Track? track) {
     if (source.isEmpty) return false;
     final src = track?.source;
+    if (_preferStreamDirect(src)) return false;
     if (src == 'neko' || src == 'streaming') return false;
     if (!ref.read(appPrefsProvider).engineMemoryPlay) return false;
     return source.startsWith('http://') || source.startsWith('https://');

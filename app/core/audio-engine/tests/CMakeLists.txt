@@ -218,6 +218,30 @@ add_test(NAME test_native_callback
 set_tests_properties(test_native_callback PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# 回调流 seek / 时长 / 格式一致性回归（方向② N2/N6）：同一 fixture，宿主回调后端
+# 与路径后端的 duration/流参数一致；多位置 seek 后 PCM 逐样本一致；EOF 后 seek 回
+# 0 整曲重解与参考逐字节一致。内存字节模拟「具备 Range 的远端」，无网络即可验证。
+add_executable(test_native_callback_seek test_native_callback_seek.c)
+target_link_libraries(test_native_callback_seek PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_native_callback_seek PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_native_callback_seek PRIVATE m)
+endif()
+target_include_directories(test_native_callback_seek PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_native_callback_seek
+         COMMAND test_native_callback_seek
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../samples/aac/t48_m.wav
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/mp3/samples/noxing.mp3
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/opus/samples/tiny.opus)
+set_tests_properties(test_native_callback_seek PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # 集成测试（需要输入文件的跳过 CTEST，仅通过手动运行）
 # add_engine_test(test_pipeline test_pipeline.c)
 

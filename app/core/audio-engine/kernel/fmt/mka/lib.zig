@@ -781,6 +781,9 @@ fn makeFeedReader(ctx: *Ctx) io.Reader {
         .ctx = @ptrCast(&ctx.feed),
         .buffer = ctx.peek_buf,
         .size_hint = hint,
+        // 前向-only feed：不支持绝对/向后重定位（feedSeek 只接受相对前跳）。
+        // 标记后，内层解码器里依赖随机访问的优化（如 Ogg 尾页时长扫描）会跳过。
+        .random_access = false,
     };
 }
 
