@@ -836,7 +836,7 @@
 2. **静态层载体**：`RepaintBoundary` 层缓存 vs 显式预烘焙 `ui.Image`（内存 vs 重绘/分配）。
 3. **页面卸载策略**：保留状态（`PageStorage`/provider）还是直接丢弃重建？卸载触发条件（时长/内存/可见性）。
 4. **画质开关**：新增统一 `effectQuality` 档位，还是继续复用 `performanceMode` 二档？
-5. **测量基建**：是否能接入脚本化帧时间/GPU 采集，进 CI 或本地基准（对照 `benchmark-2026-09-10.md`）。
+5. **测量基建**：是否能接入脚本化帧时间/GPU 采集，进 CI 或本地基准（对照 `archive/benchmark-2026-09-10.md`）。
 6. **损伤区粒度**：按「每个活动涟漪的波带包围盒」逐个 dirty rect，还是整个动态层半分辨率刷新？
    （参考：`cc` 的 partial raster **默认关闭**，`layer_tree_settings.h:112`；需小实验权衡。）
 7. **缓存回收策略**：是否照 `cc` 引入「字节上限 + 优先级 + 空闲回收」（`tile_manager.cc:912-1092,495-517`），
@@ -855,8 +855,8 @@
 
 - [player-render-optimization.md](player-render-optimization.md) — 播放页三引擎专项（背景/歌词/频谱）
 - [module-on-demand-load-plan.md](module-on-demand-load-plan.md) — 原生模块按需加载与释放
-- [architecture.md](architecture.md)、[benchmark-2026-09-10.md](benchmark-2026-09-10.md)、
-  [test-suite-2026-09-10.md](test-suite-2026-09-10.md)
+- [architecture.md](architecture.md)、[archive/benchmark-2026-09-10.md](archive/benchmark-2026-09-10.md)、
+  [archive/test-suite-2026-09-10.md](archive/test-suite-2026-09-10.md)
 - 上游实现：`SPlayer-Next/src/components/player/FullPlayer/PlayerBackground.vue`、
   `.../BackgroundRipple.vue`
 - 外部机制参考（**源码级，§3.1–3.10**；克隆命令见 §3 引言）：

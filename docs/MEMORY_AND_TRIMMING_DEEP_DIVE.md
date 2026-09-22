@@ -219,7 +219,7 @@ Electron 多进程边界。本项目引擎在进程内（无子进程可裁）�
 
 - **module-on-demand-load-plan.md**：L2 原生模块的按需加载/释放（Tier 1/2）与本文 L2 缓冲治理
   互补——该文聚焦「库内模块生命周期」，本文聚焦「解码输出规模」。
-- **robustness-improvement-plan.md**：会话残留清扫、异常释放与本文 L3 项重叠，落地时并入。
+- **archive/robustness-improvement-plan.md**：会话残留清扫、异常释放与本文 L3 项重叠，落地时并入。
 - **CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md**：其「跨平台能力抽象」视角与本文 L1–L4 分层一致，
   本文为其提供 Dart/桌面端侧的落地清单。
 

@@ -2,7 +2,7 @@
 
 > 状态：设计稿 · 2026-09-08
 > 主题：播放器与 **OS 系统能力** 的统一接口层（防休眠 / 媒体会话与蓝牙耳机控制 / 系统定位等）。
-> 与 `docs/engine-master-worker-scheduling.md`（主控/线程执行调度）主题分开；本层为 **App 侧外观**，
+> 与 `docs/archive/engine-master-worker-scheduling.md`（主控/线程执行调度）主题分开；本层为 **App 侧外观**，
 > 引擎侧音频输出问题不在此层（见 §2 边界）。
 > 沿用原则：仓库 `docs/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md` 的「只有最底层原生原语按平台各写
 > adapter，上面共享一份」论证。
@@ -47,7 +47,7 @@
 | **蓝牙 HFP/输出兼容**（声道/采样率/HFP sink，`player.c`） | 引擎音频层（`audio-kernel-zig.md` §15 + `kernel_bridge.h`） | 是"声音能否出来"的输出问题，不是 App 侧媒体会话外观；引擎内处理并可按需经总线上报 |
 | **天气数据拉取**（Open-Meteo / geocode / ipwho） | 网络服务层（现有 `weather_api.dart`） | 本层只负责"系统坐标获取"，城市名/天气数据不进本层 |
 | **OS 键盘媒体键** | 与 SystemMedia 同源（SMTC/MPRIS 天然覆盖键盘媒体键） | 属本层 SystemMedia；自定义全局快捷键（`app_shortcuts`）是 App 内行为，默认不扩进 OS 能力外观 |
-| **系统占用/日志面板** | `engine-master-worker-scheduling.md` §2.4 模块总线 | 遥测/日志走总线；能力注册状态可作总线上报主题之一 |
+| **系统占用/日志面板** | `archive/engine-master-worker-scheduling.md` §2.4 模块总线 | 遥测/日志走总线；能力注册状态可作总线上报主题之一 |
 
 ## 3. 契约示例（Dart 草案）与平台实现矩阵
 
@@ -83,7 +83,7 @@ abstract interface class SystemPower {
   `<platform>.dart`（实现）+ 工厂（条件导入 / 平台注册表），主程序仅注入接口；
 - **纯 Dart 可行的能力**（D-Bus、GeoClue）用 Dart 包 + 条件导入；必须进 OS 原生 API 的
   （SMTC / NowPlaying / CoreLocation）建议走自有原生模块或插件通道，避免每平台各养一个 Flutter 插件；
-- **引擎侧相关**（蓝牙 HFP 等）走 `kernel_bridge` C ABI 与 `engine-master-worker-scheduling.md` §2.4 总线，
+- **引擎侧相关**（蓝牙 HFP 等）走 `kernel_bridge` C ABI 与 `archive/engine-master-worker-scheduling.md` §2.4 总线，
   Dart 外观不 `Platform.isXxx` 判断引擎内部后端，引擎也不依赖 Dart 的 Platform。
 
 ## 5. 治理规则

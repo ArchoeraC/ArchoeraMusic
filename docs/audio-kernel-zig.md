@@ -21,7 +21,13 @@
 > FFmpeg 兜底路径维持 per-context 不变（§8.3）。**A/Sync 执行与调度模型作为内核「二次增强」、
 > 后置可选**（核心模块化不依赖），见 §8.4.1 / 决策 #17。
 >
-> 替代：`docs/audio-kernel-no-ffmpeg.md`（C11 方案，已废弃，保留作历史分析；其 FFmpeg 依赖点审计、
+> **能力扩张（2026-09-22）**：在「逐格式接管」主线之外，另立五方向子计划（**限非 Subsonic 区域**）——
+> **① 可听频段 DSP · ② 在线流/非本地源 · ③ 更多格式接管 · ④ 性能/内存 · ⑤ A/Sync 执行模型**，
+> 见 **[`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md)**（决策 #21）；
+> 内核为**解码侧**内核、不含编码，故**不整体接管 Subsonic 服务端转码**（决策 #22）。
+> 本文仍为架构/依赖/不变量权威，冲突处以其为准。
+>
+> 替代：`docs/archive/audio-kernel-no-ffmpeg.md`（C11 方案，已废弃，保留作历史分析；其 FFmpeg 依赖点审计、
 > 时长/seek、容错、测试护栏等结论仍适用，冲突处以本文为准）。
 >
 > 依据：AGPL-3.0 项目，任何引入的第三方必须为 Permissive（MIT / Apache-2.0 / BSD / ISC / OFL /
@@ -165,7 +171,7 @@
    明确不引入：faad2（GPL）、libfdk-aac（非自由）、任何 GPL/SSPL/商业源可用（README 红线）
 ```
 
-### 3.4 与既有 `audio-kernel-no-ffmpeg.md` 的差异
+### 3.4 与已归档 C 方案（`archive/audio-kernel-no-ffmpeg.md`）的差异
 
 | 项 | C 方案（旧） | Zig 方案（本稿） |
 |---|---|---|
@@ -229,7 +235,7 @@
 > - **已接管（✅）**：`decoder.zig` 工厂已分发、`probe.formats.* = true`，可直接播放且经逐位对照验收；
 > - **⏳ 规划中**：`probe.zig` 已能识别（`.ogg_vorbis` / `.aac` / `.dsd` / `.amr`），但 decoder 工厂无分支，
 >   当前打开返回 `error.UnsupportedFormat`（由 FFmpeg 主引擎兜底，§8.3）；
-> - **格式缺口全景**：见 `docs/format-gap-analysis.md`（对照 ffmpeg 227 codec / 368 demuxer 逐项核对：
+> - **格式缺口全景**：见 `docs/archive/format-gap-analysis.md`（对照 ffmpeg 227 codec / 368 demuxer 逐项核对：
 >   常见缺口 WMA / DTS / AMR-WB，小众缺口 CAF/AU/Musepack 等，其余为游戏/广播专用建议 FFmpeg 兜底）；
 > - **ALAC 与 M4A 关系**：M4A 容器承载 ALAC 与 AAC-LC 双 codec（均已接管）——stsd
 >   条目分发：`alac` → ALAC 解码器、`mp4a`+`esds`（ASC）→ AAC-LC 解码器；**多声道
@@ -820,7 +826,7 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 > §8.4.2 优先子项 #1–#4）**不依赖**本小节的 Async/Sync——可先以"主控簿记 + 宿主 worker 池 +
 > 纯 Sync 解码线"的最小形态跑通，再按需引入 Async 调度与"完成即领"。具体执行/调度形态
 > （主控 Async × 工作线程 Sync × 完成即领，进程内）见
-> `docs/engine-master-worker-scheduling.md`（源自用户架构草图升级）。
+> `docs/archive/engine-master-worker-scheduling.md`（源自用户架构草图升级）。
 
 **A/Sync 术语对照（先定语义，避免歧义）**：
 
@@ -1664,6 +1670,10 @@ pub const Error = error{
 
 ## 14. DSP 移植与 libfft.so（保持 Dart ABI）
 
+> **能力扩张（2026-09-22）**：本节只定「把现有 C DSP 下沉 Zig」的地基；移植完成后的
+> **可听频段功能扩张**（参数化 EQ / 次声低频管理 / DRC / crossfeed / 等响度…）见
+> [`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md) §2（方向①）。
+
 - `equalizer/loudness/limiter/fft` 四个 DSP 模块把现状 C 实现**逐函数移植到 Zig**
   （现有 C 共 ~1200 行，语义对照移植，配套测试直接复用 `tests/test_equalizer.c` 等黄金断言）；
 - 移植后经 `kernel_bridge.h`（`zk_dsp_*`）被 C 壳 `pipeline.c` 调用；现状 `equalizer.c/loudness.c/
@@ -2099,6 +2109,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
 | **Phase E** 输出层 + 变速自研 | **`kernel/device.zig`**：先 Linux（ALSA/Pulse 动态加载）→ Windows WASAPI → macOS CoreAudio（§15）；经桥接替换 `src/player.c` 内的 miniaudio 调用；**WSOLA 变速**（`kernel/tempo.zig` 自研，tempo-rs 对照） | 三平台真机出声 + 位置事件正确；tempo A/B 主观 + 客观对照通过；`include/miniaudio.h` 与 Rust 依赖删除（输出层 100% Zig/自研） |
 | **Phase F** 接管收尾（可选升主） | T0/T1 全部 Zig 验收后：各格式开关开启即完成接管，`-Dzig-main=true` 可选使 Zig 升为主（**默认仍 FFmpeg 主**）；`THIRD-PARTY-LICENSES.md` 按开关登记；设置页显示已编译解码器清单与 `backend` 归属；可选 AMR/WMA/MP2 按 §3.3 规则评估 | **默认构建**三平台 `ldd`/`dumpbin` 含 FFmpeg（现状回归通过）；`-Duse-ffmpeg=false` 纯 Zig 构建可裁剪、各格式开关独立可控；`zig build test` 全绿 |
 | **Phase G** 引擎模块化 + 高并发（可与 A–F 并行推进） | §8.4/§8.4.2：`decoder.open()` 硬编码 `switch` 收敛为显式 `Module` 描述符 + Registry（主控：分派 + 实例簿记 + 资源上限）；**优先子项按 §8.4.2 顺序**：① 元数据快路径 `metadata.open()`（批量 tag 先摆脱 FFmpeg）→ ② 接管门控 → ③ 并发/批量基准 → ④ 实例内存池；HTTP 直连经 `io.Reader.callback` 接入（§6.1 双路径）；批量 tag/扫描走宿主 worker 池；每路轻量实例；FFmpeg 依赖拆分延后 Phase F。**二次增强（§8.4.1，后置可选，核心不依赖）**：主控 Async × 模块线 Sync + 完成即领（短任务）/ 按流分配分时驱动（长流） | Registry 分派与现状 `switch` 行为一致（全量回归）；实例计数/上限生效；128 路并发（同/异格式混合）fd 与内存受控、无状态污染；批量 tag 走 Zig 元数据快路径且不再建 FFmpeg 实例（基准吞吐达标）；HTTP 直连流式播放 + Range seek 正确；批量 tag 全量代替 FFmpeg 元数据路径；二次增强落地后加验"完成即领"下无线程空转/队列积压 |
+| **Phase H** 能力扩张（2026-09-22） | 五方向子计划（详见 [`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md)）：① **可听频段 DSP**（DSP 下沉 Zig + 功能扩张）；② **在线流/非本地源**（cb 应用侧接线 + Range seek + 断流恢复）；③ **更多格式接管**（SV7/Shorten/白名单/接管率）；④ **性能/内存**（公共地板/内存池/B 档授权）；⑤ **A/Sync 执行模型**（结构化 `zk_submit` + 长流池化 + 容量调节器 + 调度增强） | 各方向以其子计划验收门为准；不破坏 P5 不变量与解码正确性门禁 |
 
 ---
 
@@ -2218,15 +2229,33 @@ void        zk_dsp_destroy(ZkDspChain *d);
     EraAudio 分支下"先试 Zig 再回退"的双倍 open 成本；③ **N 实例并发 + 千文件批量 tag 基准**先行量化，
     防过度工程；④ 实例内存池/Reader 缓冲复用（保持 pread、无预读优点）。FFmpeg 依赖文件拆分
     （decoder.c→decoder_ffmpeg.c）属文件组织，**延后至 Phase F**。落地顺序 ①→②→③→④。
-19. **消费方与线程参数策略（2026-09-08，决策 #19；详见 engine-master-worker-scheduling.md §2.2/§2.3）**：
+19. **消费方与线程参数策略（2026-09-08，决策 #19；详见 archive/engine-master-worker-scheduling.md §2.2/§2.3）**：
     线程数 **M 运行时可配**，按消费方场景取：独立启动（CLI/批量）由用户 `--thread <n>` 指定（对齐
     main.c CLI 风格）；播放器内嵌**默认 1**（顺序单流）；scanner 批量接线取较大值（经优先子项③基准定）。
     实例 cap 短任务批量 ≥ M、长流独立上限（fd/内存护栏）。**scanner 接线为 Phase G 试点**：批量 tag 任务
     （现 TagLibSharp 并行解析）改投本引擎 `kind=tag`，走元数据快路径，接线形式（native FFI / CLI-子进程）
     待定。主控事件循环载体与 per-handle 线程模型迁移路径仍待定。
-20. **scanner 接线与模块总线方向（2026-09-08，决策 #20；详见 engine-master-worker-scheduling.md §2.3/§2.4）**：
+20. **scanner 接线与模块总线方向（2026-09-08，决策 #20；详见 archive/engine-master-worker-scheduling.md §2.3/§2.4）**：
     scanner（NativeAOT C#，与引擎同进程）**模块间 C ABI 直连**引擎，不经 Dart 逐文件中转；A/B 形态 =
     新增轻量 `zk_metadata_*`（probe+tag 即走，不构造 decoder），结果走**结构化 extern struct**（`ZkMetaInfo`）
     且**规避 JSON**（JSON 仅留低频控制面）；**EraAudio 优先、TagLib 兜底（不抛弃）**，保留对照开关。
     为支撑未来**系统占用/播放器日志面板**，规划进程内统一**模块通讯/遥测总线**（`bus_publish/subscribe` +
     环形缓冲，结构化事件），低频遥测与日志走总线，per-file 高吞吐仍走直连 ABI（§2.4 边界）。
+21. **能力扩张五方向（2026-09-22，规划稿）**：在逐格式接管主线之外，另立子计划
+    [`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md)，规划 **① 可听频段 DSP**
+    （C DSP 下沉 Zig 后扩张参数化 EQ / 次声低频管理 / DRC / crossfeed / 等响度等）、
+    **② 在线流/非本地源**（`Reader.callback` 应用侧接线 + Range seek 完整化 + 断流恢复）、
+    **③ 更多格式接管**（Musepack SV7 / Shorten / 白名单与内核 Info 兜底 / 接管门控）、
+    **④ 性能/内存**（公共 PCM 地板 / 实例内存池 / B 档授权提速）、
+    **⑤ A/Sync 执行模型**（结构化 `zk_submit` + 长流池化收尾 + 容量调节器完整化 + 调度/容错增强，
+    架构以 `engine-master-pool-design.md` 为准）。架构与不变量仍以本文为准；
+    具体排期与优先级在下一步确定。对应 §19 **Phase H**。
+22. **内核职责边界：只解码，不整体接管 Subsonic 服务端转码（2026-09-22 澄清）**：
+    内核（EraAudio）为**解码侧**内核——解容器/编解码、采样转换、DSP 与可选封装，
+    **不含 MP3 等编码能力**（§11 的 Opus 编码/OGG 封装为可选模块，桌面路径已停用）。
+    Subsonic 服务端转码是**另一条独立链路**：Go 经 `archoera_transcoder`
+    （Rust cdylib：`symphonia` 解码 + **LAME 编码 MP3**，`app/core/subsonic/transcoder/`，
+    由 `endpoints/transcoder_*.go` dlopen 调用）产出转码流。故内核**不适合整体接管服务端**；
+    决策 #21 / §19 Phase H 的五方向扩张**只面向非 Subsonic 区域**（App 播放路径），
+    **不为 Subsonic 新增编码能力**；服务端若仅复用内核解码属独立议题。详见
+    [`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md) §0。
