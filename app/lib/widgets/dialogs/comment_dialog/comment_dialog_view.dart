@@ -26,8 +26,8 @@ extension _CommentDialogView on _CommentDialogState {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _CommentDialogHeader(trackTitle: widget.track.title, l10n: l10n),
-              // NT 有「热门 / 最新」两 Tab；KG / NK 只有单一时间线。
-              if (!_isKugou && !_isNeko)
+              // 「热门 / 最新」两 Tab 仅对有该能力的平台显示（NT、QQ）。
+              if (_platform.supportsHot)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: SSegmented<bool>(
@@ -70,15 +70,7 @@ extension _CommentDialogView on _CommentDialogState {
       if (_failed) {
         return _EmptyHint(
           icon: EtaIcons.cloudOutline,
-          text: l10n.commentNotFound(
-            platform: _isKugou
-                ? l10n.brandKugou
-                : _isQq
-                ? l10n.platformQQMusic
-                : _isNeko
-                ? l10n.platformNeko
-                : l10n.brandNetease,
-          ),
+          text: l10n.commentNotFound(platform: _platform.label(l10n)),
         );
       }
       return const _CommentSpinner();
@@ -115,11 +107,10 @@ extension _CommentDialogView on _CommentDialogState {
         }
         return _CommentTile(
           comment: list[index],
-          // 回复 / 删除仅在 NK 提供（服务端支持 parentId / canDelete）；
-          // 其它平台传 null → 通用模板自动隐藏这些入口。
-          onReply: _isNeko ? _startReply : null,
-          onDelete: _isNeko ? _deleteNeko : null,
-          renderReplies: _isNeko,
+          // 能力由适配器声明：不具备的平台传 null → 通用模板自动隐藏入口。
+          onReply: _platform.supportsReply ? _startReply : null,
+          onDelete: _platform.supportsDelete ? _deleteComment : null,
+          renderReplies: _platform.expandsReplies,
         );
       },
     );

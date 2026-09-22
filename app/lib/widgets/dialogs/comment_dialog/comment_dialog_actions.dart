@@ -7,69 +7,16 @@
 part of '../comment_dialog.dart';
 
 extension _CommentDialogActions on _CommentDialogState {
+  /// 解析评论目标 id（各源差异全在 [CommentPlatform.resolveTarget]；可能弹登录）。
   Future<void> _match() async {
     setState(() {
       _loading = true;
       _failed = false;
     });
     try {
-      if (_isNeko) {
-        final id = widget.track.id;
-        if (id.isEmpty) {
-          setState(() {
-            _loading = false;
-            _failed = true;
-          });
-          return;
-        }
-        setState(() => _songId = id);
-        await _load(reset: true);
-        return;
-      }
-      if (_isQq) {
-        final mid = widget.track.qqmusic?.mid.isNotEmpty == true
-            ? widget.track.qqmusic!.mid
-            : widget.track.id;
-        if (mid.isEmpty) {
-          setState(() {
-            _loading = false;
-            _failed = true;
-          });
-          return;
-        }
-        if (!ref.read(qqMusicApiProvider).isLoggedIn) {
-          final ok = await showQqMusicLoginDialog(context);
-          if (!mounted) return;
-          if (ok != true) {
-            setState(() {
-              _loading = false;
-              _failed = true;
-            });
-            return;
-          }
-        }
-        if (!mounted) return;
-        setState(() => _songId = mid);
-        await _load(reset: true);
-        return;
-      }
-      if (_isKugou) {
-        final hash = widget.track.kugou?.hash;
-        if (hash == null || hash.isEmpty) {
-          setState(() {
-            _loading = false;
-            _failed = true;
-          });
-          return;
-        }
-        if (!mounted) return;
-        setState(() => _songId = hash);
-        await _load(reset: true);
-        return;
-      }
-      final id = await _api.findNeteaseCommentId(widget.track);
+      final id = await _platform.resolveTarget(context, ref, widget.track);
       if (!mounted) return;
-      if (id == null) {
+      if (id == null || id.isEmpty) {
         setState(() {
           _loading = false;
           _failed = true;
@@ -100,15 +47,12 @@ extension _CommentDialogActions on _CommentDialogState {
       _failed = false;
     });
     try {
-      final page = _isNeko
-          ? await _loadNeko(id, page: nextPage)
-          : _isQq
-          ? await _loadQq(id, page: nextPage)
-          : _isKugou
-          ? await _loadKg(id, page: nextPage)
-          : _hot
-          ? await _api.songHotComments(id, page: nextPage)
-          : await _api.songComments(id, page: nextPage);
+      final page = await _platform.fetchPage(
+        ref,
+        id,
+        hot: _hot,
+        page: nextPage,
+      );
       if (!mounted) return;
       setState(() {
         _page = reset ? page : _mergePage(page, nextPage);
@@ -121,30 +65,6 @@ extension _CommentDialogActions on _CommentDialogState {
         _failed = true;
       });
     }
-  }
-
-  Future<NeteaseCommentPage> _loadKg(String hash, {required int page}) async {
-    final kp = await ref.read(kugouApiProvider).songComments(hash, page: page);
-    return NeteaseCommentPage(
-      list: kp.list.map(_kgToTile).toList(),
-      total: kp.total,
-      page: kp.page,
-      limit: kp.limit,
-    );
-  }
-
-  Future<NeteaseCommentPage> _loadQq(String mid, {required int page}) {
-    return ref.read(qqMusicApiProvider).songComments(mid, page: page, hot: _hot);
-  }
-
-  Future<NeteaseCommentPage> _loadNeko(String musicId, {required int page}) async {
-    final p = await ref.read(nekoApiProvider).songComments(musicId, page: page);
-    return NeteaseCommentPage(
-      list: p.list.map(_nekoToTile).toList(),
-      total: p.total,
-      page: p.page,
-      limit: p.pageSize,
-    );
   }
 
   NeteaseCommentPage _mergePage(NeteaseCommentPage next, int page) {
@@ -184,68 +104,38 @@ extension _CommentDialogActions on _CommentDialogState {
       toast(l10n.commentInputEmpty);
       return;
     }
-    if (_isNeko) {
-      await _sendNeko(id, content, parentId: _replyTo?.id);
-      return;
-    }
-    final account = ref.read(neteaseAuthProvider);
-    if (account == null) {
-      toast(l10n.commentLoginRequired(platform: l10n.brandNetease));
-      showNeteaseLoginDialog(context);
-      return;
-    }
     setState(() => _sending = true);
     try {
-      await _api.sendComment(id, content);
-      if (!mounted) return;
+      final ok = await _platform.send(
+        context,
+        ref,
+        id,
+        content,
+        parentId: _replyTo?.id,
+      );
+      if (!mounted || !ok) return;
       _input.clear();
+      setState(() => _replyTo = null);
       toast(l10n.commentPublished, type: ToastType.success);
-      if (_hot) {
+      // 热门 Tab 下新评论会出现在「最新」：切过去展示；否则直接重载。
+      if (_platform.supportsHot && _hot) {
         _switchTab(false);
       } else {
         await _load(reset: true);
       }
     } catch (e) {
       if (!mounted) return;
-      final err = e is NeteaseApiError ? e : null;
-      final code = err?.body?['code'];
-      toast(code == 505 ? l10n.commentDuplicate : l10n.commentSendFailed(msg: '$e'));
+      toast(
+        e is CommentOperationException
+            ? e.message
+            : l10n.commentSendFailed(msg: '$e'),
+      );
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
-  /// NK 源发表评论 / 回复（`POST /api/comments`；需 NK 登录，服务端有 5s 频率限制）。
-  Future<void> _sendNeko(
-    String musicId,
-    String content, {
-    String? parentId,
-  }) async {
-    final l10n = context.l10n;
-    final api = ref.read(nekoApiProvider);
-    if (!api.isLoggedIn) {
-      toast(l10n.commentLoginRequired(platform: l10n.platformNeko));
-      await showNekoLoginDialog(context);
-      return;
-    }
-    setState(() => _sending = true);
-    try {
-      await api.sendComment(musicId, content, parentId: parentId);
-      if (!mounted) return;
-      _input.clear();
-      setState(() => _replyTo = null);
-      toast(l10n.commentPublished, type: ToastType.success);
-      // NK 无「热门」Tab，直接重载当前列表即可看到新评论 / 回复。
-      await _load(reset: true);
-    } catch (e) {
-      if (!mounted) return;
-      toast(l10n.commentSendFailed(msg: '$e'));
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  /// 点「回复」：记住目标并聚焦输入框（仅 NK 显示该入口）。
+  /// 点「回复」：记住目标并聚焦输入框（仅 [CommentPlatform.supportsReply]）。
   void _startReply(NeteaseComment target) {
     setState(() => _replyTo = target);
     _inputFocus.requestFocus();
@@ -256,8 +146,9 @@ extension _CommentDialogActions on _CommentDialogState {
     setState(() => _replyTo = null);
   }
 
-  /// NK 源删除评论（服务端只允许删自己的；删楼层连带删回复）。
-  Future<void> _deleteNeko(NeteaseComment target) async {
+  /// 删除评论（仅 [CommentPlatform.supportsDelete]；服务端自行鉴权）。
+  Future<void> _deleteComment(NeteaseComment target) async {
+    if (!_platform.supportsDelete) return;
     final l10n = context.l10n;
     final ok = await showDialog<bool>(
       context: context,
@@ -278,7 +169,7 @@ extension _CommentDialogActions on _CommentDialogState {
     );
     if (ok != true || !mounted) return;
     try {
-      await ref.read(nekoApiProvider).deleteComment(target.id);
+      await _platform.delete(ref, target.id);
       if (!mounted) return;
       if (_replyTo?.id == target.id) setState(() => _replyTo = null);
       toast(l10n.commentDeleted, type: ToastType.success);

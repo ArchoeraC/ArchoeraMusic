@@ -2,63 +2,31 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 歌曲评论弹窗（NT对齐原项目 Comments.vue 核心交互；KG走
-/// mcomment commentsv2/getCommentWithLike；QQ走 songmid；NK走
-/// `/api/comments`）。
+/// 歌曲评论弹窗（**通用模板**）。
 ///
-/// 入口 [showCommentDialog]：NT源先 [NeteaseApi.findNeteaseCommentId]
-/// 匹配NT歌曲 id（异源走云搜索），再分「热门 / 最新」两 Tab 分页拉取；
-/// KG源直接用歌曲 hash、NK源直接用歌曲 id 拉评论（无 Tab）。触底自动加载下一页。
+/// 弹窗本身不含任何具体平台分支：所有源差异（目标 id 解析、登录门槛、
+/// 分页 / 热门 Tab、发表 / 回复 / 删除能力、展示名）由 [CommentPlatform]
+/// 注册项提供（见 `widgets/dialogs/comment_platform.dart`）。**新增音源 =
+/// 实现一个 [CommentPlatform] 并注册**，本文件与视图/动作均无需改动。
+///
+/// 入口 [showCommentDialog]；触底自动加载下一页，累计条数有上限。
 library;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../services/kugou/kugou_api.dart';
-import '../../services/neko/neko_types.dart';
 import '../../services/netease/comment.dart';
-import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
-import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/glass_surface.dart';
-import 'neko_login_dialog.dart';
-import 'netease_login_dialog.dart';
-import 'qqmusic_login_dialog.dart';
 import '../player/s_controls.dart';
 import '../common/toast.dart';
+import 'comment_platform.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'comment_dialog/comment_dialog_actions.dart';
 part 'comment_dialog/comment_dialog_view.dart';
-
-/// KG评论 → 弹窗通用展示模型（字段与 NeteaseComment 对齐）。
-NeteaseComment _kgToTile(KugouComment c) => NeteaseComment(
-  id: c.id,
-  userName: c.userName,
-  avatar: c.avatar,
-  text: c.text,
-  location: c.location,
-  likedCount: c.likedCount,
-  replyTotal: c.replyTotal,
-  time: c.timeMs,
-  reply: c.reply.map(_kgToTile).toList(),
-);
-
-/// NK评论 → 弹窗通用展示模型（服务端不返回头像，走首字母占位）。
-NeteaseComment _nekoToTile(NekoComment c) => NeteaseComment(
-  id: c.id,
-  userId: c.userId,
-  userName: c.userName,
-  text: c.text,
-  location: c.location,
-  replyTotal: c.replyTotal,
-  time: c.time,
-  canDelete: c.canDelete,
-  replyToName: c.replyToName,
-  reply: c.replies.map(_nekoToTile).toList(),
-);
 
 /// 打开歌曲评论弹窗。
 Future<void> showCommentDialog(BuildContext context, {required Track track}) {
@@ -84,10 +52,15 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   /// 累计评论条数上限：超出截断并停止触底加载（防长回复列表撑爆内存）。
   static const _maxComments = 400;
 
-  /// 匹配到的NT歌曲 id（null = 匹配中/失败）。
+  /// 当前曲目对应的平台适配器（本弹窗唯一的平台相关入口）。
+  late final CommentPlatform _platform = commentPlatformFor(
+    widget.track.source,
+  );
+
+  /// 解析出的评论目标 id（null = 解析中/失败）。
   String? _songId;
 
-  /// 当前 Tab：true = 热门。
+  /// 当前 Tab：true = 热门（仅 [CommentPlatform.supportsHot] 时显示）。
   bool _hot = true;
 
   NeteaseCommentPage? _page;
@@ -95,29 +68,18 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   bool _failed = false;
   final ScrollController _scroll = ScrollController();
 
-  /// 发送评论输入框（NT / NK 源显示；KG 与 QQ 未接入发送）。
+  /// 发送评论输入框（[CommentPlatform.supportsSend] 时显示）。
   final TextEditingController _input = TextEditingController();
   bool _sending = false;
 
-  /// 正在回复的目标（仅 NK 显示回复入口；null = 发表新楼层）。
+  /// 正在回复的目标（[CommentPlatform.supportsReply] 时可用；null = 发表新楼层）。
   NeteaseComment? _replyTo;
 
   /// 输入框焦点（点「回复」后自动聚焦）。
   final FocusNode _inputFocus = FocusNode();
 
-  NeteaseApi get _api => ref.read(neteaseApiProvider);
-
-  /// 是否KG源（直接按歌曲 hash 拉KG评论，无 Tab、无需登录）。
-  bool get _isKugou => widget.track.source == 'kugou';
-
-  /// 是否 QQ 音乐源（按 songmid 拉评论；官方读取需登录态）。
-  bool get _isQq => widget.track.source == 'qqmusic';
-
-  /// 是否 Neko 源（直接按歌曲 id 拉 `/api/comments`，无 Tab；发布需 NK 登录）。
-  bool get _isNeko => widget.track.source == 'neko';
-
-  /// 是否支持发布评论（NT 与 NK；KG 与 QQ 未接入发送）。
-  bool get _canSend => !_isKugou && !_isQq;
+  /// 是否支持发布评论。
+  bool get _canSend => _platform.supportsSend;
 
   @override
   void initState() {
