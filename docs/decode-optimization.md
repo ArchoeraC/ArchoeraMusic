@@ -6,11 +6,11 @@
 > 峰值 RSS 35→9MB / 65→10MB（scorecard memory 12→30），PCM 逐位 / corr 不回退；同时修复
 > AC-3/E-AC-3 corr 0.96→1.0、Speex corr 0.93→1.0（属**正确性欠账**，非本提速专项）。
 > 详见 `benchmark-2026-09-21.md`。**A 档提速（§4.1）仍受 §4.2 授权约束，未动**；B 档未启。
-> `docs/benchmark-2026-09-10.md`（scorecard 快照，
-> 同机同语料）与 `benchmark-industry-2026-09-05.md` / `engine-integration-bench.md`。
+> `docs/archive/benchmark-2026-09-10.md`（scorecard 快照，
+> 同机同语料）与 `archive/benchmark-industry-2026-09-05.md` / `engine-integration-bench.md`。
 > 本文件回答一件事：**总表看 era ≈ FFmpeg 98%，为何还要谈解码效率？差距在逐格式 ×RT，
 > 被 50× 实时封顶遮住了。**
-> 关联：[benchmark-industry-2026-09-05.md](benchmark-industry-2026-09-05.md)（评分口径）、
+> 关联：[archive/benchmark-industry-2026-09-05.md](archive/benchmark-industry-2026-09-05.md)（评分口径）、
 > [audio-kernel-zig.md](audio-kernel-zig.md) §8.4.2（Phase G 优先子项，含基准先行）、
 > [engine-master-pool-design.md](engine-master-pool-design.md)（调度/并发侧，本专项与之正交）。
 
@@ -86,7 +86,7 @@ SCORE 计分 `speed = 40·min(1, R/50)`：**达到 50× 实时即满分**，之�
 
 > 决策：**不采用缓冲/缓存类提速**——不加 Reader 大块预读、不加位流宽缓冲、不加持久
 > 中间缓冲。理由：属"作弊"式增益、抬高内核常驻开销、且规避与上游的争端。
-> 依据 perf（`docs/benchmark-2026-09-10.md`）：era 与 ffmpeg 的差距是**指令数 2.1–3.4×**
+> 依据 perf（`docs/archive/benchmark-2026-09-10.md`）：era 与 ffmpeg 的差距是**指令数 2.1–3.4×**
 > 而 **CPI 更低**（0.26–0.31 vs 0.42–0.48）——瓶颈是"同功能做了太多指令"，不是访存。
 > 因此路线 = **在不新增任何缓冲区/缓存层的前提下削减指令**（寄存器内取位、查表、
 > SIMD、分支消除、f32 化、循环不变量外提、算法专用化）。
@@ -148,7 +148,7 @@ FFmpeg**（engine-master-pool-design.md §3 启动预算：冷/热首帧 wall �
 - **实例 `prepare` 必须 O(小)、open 时一次、与解码同 worker**，其耗时计入首帧预算；
   预计算后首帧/单流 wall 不得回退到 FFmpeg 基线之上，否则该优化**拒绝**；
 - **派发 hint 省 probe**（`format_hint`）是启动净收益，优先；
-- 每次优化后复测**冷/热首帧**（`docs/benchmark-2026-09-10.md` 口径：冷含引擎 init、
+- 每次优化后复测**冷/热首帧**（`docs/archive/benchmark-2026-09-10.md` 口径：冷含引擎 init、
   热复用池）与单流 wall；启动回退即回退该改动。
 
 **验收（每步）**：无损逐位 / 有损 corr≥0.999 且 ±≤1 LSB 不回退；`taskset -c 12 perf stat
@@ -184,10 +184,10 @@ perf report  # 定位热循环 → 对照 §4 候选
   `linux-tools`）或装 `valgrind`；不可用则退化为**探针式热循环定位**（对 §4 候选函数做
   `std.time`/`Io.Clock.awake` 计时打桩跑真实曲目，输出耗时占比定位瓶颈，见文末补充）。
 - 关联（2026-09-10）：并发/混杂/资源基准与 scorecard 口径见
-  `benchmark-industry-2026-09-05.md`「2026-09-10 更新」与
-  `docs/benchmark-2026-09-10.md`（FFmpeg=100、5 轮
+  `archive/benchmark-industry-2026-09-05.md`「2026-09-10 更新」与
+  `docs/archive/benchmark-2026-09-10.md`（FFmpeg=100、5 轮
   去极值、wall/CPU/RSS 入分）；动刀后可用同口径复测并发与单流。
-- **perf 结果（2026-09-10）**：`docs/benchmark-2026-09-10.md`——era 指令=Stable
+- **perf 结果（2026-09-10）**：`docs/archive/benchmark-2026-09-10.md`——era 指令=Stable
   2.1–3.4×（CPI 更低 0.26–0.31 vs 0.42–0.48 ⇒ 非低效而是**指令多**）。热区（自占比）：
   flac `readBits` ~34% + `io.Reader.read` ~20%（位流≈50%）；aac `decodeIcs` ~39%（谱/
   Huffman/去量化域，MDCT 系 ~11%）；mp3 `synthGranule` ~20% + `readImpl` ~19% + `imdct36`
@@ -212,6 +212,6 @@ python3 scorecard.py --corpus /tmp/eng2 --csv data/SCORE_$(date +%F).csv \
     --md SCORE_$(date +%F).md --build-tag <tag>
 ```
 
-> 机器/工具/口径与已知抖动见 `benchmark-industry-2026-09-05.md` §4/§7（i9-13980HX、
+> 机器/工具/口径与已知抖动见 `archive/benchmark-industry-2026-09-05.md` §4/§7（i9-13980HX、
 > zig 0.16.0、ReleaseFast kernel、单轮 RSS/wall 采样抖动 ±0.5–4 分——看 era vs Stable
 > 的**分差方向**而非个别行绝对分）。

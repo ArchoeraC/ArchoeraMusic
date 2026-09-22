@@ -2,7 +2,7 @@
 
 > 2026-09-04 · 全面盘点自研内核 / 生产引擎 / 曲库扫描三层对格式的支持现状。
 > 元数据列由 **TagLibSharp 2.3.0（scanner 实际引用版本）实测**：对真实或 ffmpeg 自造样本执行
-> `TagLib.File.Create` 探测（见 `format-gap-analysis.md` 历史与下方测量方法）。
+> `TagLib.File.Create` 探测（见 `archive/format-gap-analysis.md` 历史与下方测量方法）。
 > 内核列对应 `app/core/audio-engine/kernel/fmt/*`（自研解码，`zig build test` 现 434/434 绿）。
 
 ## 1. 三维支持模型（务必区分）
@@ -75,7 +75,7 @@ scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的
    增加「内核 Info 兜底」（调用 audio-engine/kernel 的 probe→Info 取时长/位深，替代 TagLib），
    否则保持不进曲库（文件仍可经文件系统直接播放）。优先级取决于产品是否把「电影音轨/录音」当曲目。
 4. 低优残余（L1 内核）：DTS LBR/DTS:X、AMR-WB 6k60 1-f32-ulp、wmavoice 逐函数浮点对拍等，按
-   `format-gap-analysis.md` §3/P2 处理。
+   `archive/format-gap-analysis.md` §3/P2 处理。
 
 ## 4. 旧版 / 小众格式「参考价值」清单（下一批内核实现候选）
 
@@ -98,7 +98,7 @@ scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的
   caf/au/w64/mka(mp4a/ac3/opus)）+ FATE 真实样本（wma 四变体、dtshd 七样本、dsf）。
 - 内核支持列以 `kernel/probe.zig` `Format`/`formats` 开关与 `zig build test`（434/434）为准；
   验证级别见各 `fmt/*` 单测（bit-exact / corr golden）。
-- 该文档与 `format-gap-analysis.md` 配套阅读：本文是「当前支持面快照」，后者是「缺口演化记录」。
+- 该文档与 `archive/format-gap-analysis.md` 配套阅读：本文是「当前支持面快照」，后者是「缺口演化记录」。
 
 ---
 

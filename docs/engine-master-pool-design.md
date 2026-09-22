@@ -9,7 +9,7 @@
 > **一个完整的 Zig 内核**：**主控（Master）+ 调度池（Pool）+ 模块注册表（Registry）**
 > 全部在 Zig 内、自持线程。它取代/落地的前身与约束来源：
 >
-> - **取代** `docs/engine-master-worker-scheduling.md`（"主控 Async × 模块线 Sync +
+> - **取代** `docs/archive/engine-master-worker-scheduling.md`（"主控 Async × 模块线 Sync +
 >   完成即领"调度稿）——本文件是它的**架构落地**，回收/伸缩语义被重定为
 >   **eager+lazy+hybrid 三态 init + worker 状态注册表**（见 §5）；
 > - **落地** `docs/audio-kernel-zig.md` §8.4 / §8.4.1 / §8.4.2（Phase G：模块化 +
@@ -95,7 +95,7 @@
   空闲**——仍绑定同一会话，绝不被改派其它任务。
 - 卡死重派不靠中途切换：靠 **abort + 从头重跑 / 会话级故障**（§6.2），无断点续跑。
 
-### 2.2 与 `engine-master-worker-scheduling.md` 的关系
+### 2.2 与 `archive/engine-master-worker-scheduling.md` 的关系
 
 该稿的「主控 Async × 模块线 Sync + 完成即领」仍是**执行形态的语义**，本文件沿用；
 本文件的增量是**资源生命周期**（eager/lazy/hybrid）与**回收决策结构**（worker 状态
@@ -793,7 +793,7 @@ per-context 思路一致（**EraAudio 相对 FFmpeg 的对称**）；async 主�
 - `docs/audio-kernel-zig.md` §8.4（三层模型/不变量）、§8.4.1（A/Sync 语义、
   调度规则）、§8.4.2（优先子项 ①–④）、§16.1（线程不变量——**待本设计落地时修订**）、
   §19 Phase G。
-- `docs/engine-master-worker-scheduling.md`（调度语义说明，本文件取代其"线程模型"章；
+- `docs/archive/engine-master-worker-scheduling.md`（调度语义说明，本文件取代其"线程模型"章；
   保留 §2.2/§2.3/§2.4 有效）。
 - `docs/architecture.md` §9 引擎/线程现状（"1 会话 1 引擎线程"——本设计落地后更新
   为常驻内核描述）。
