@@ -100,6 +100,11 @@ const Node = struct {
     next: ?*Node = null,
 };
 
+/// 任务节点自由表容量上限（P3 实例内存池，§8.4.2 #4）。节点仅 ~24B，128 并发下
+/// 每路至多 1 个在途节点，512 已含 4× 余量；突发超出者回退 malloc，自由表**不无限驻留**
+/// （上限 512×24B ≈ 12KB，进程生命周期内只读复用）。
+const node_pool_cap: usize = 512;
+
 pub const Runtime = struct {
     allocator: std.mem.Allocator,
     io: Io,
@@ -113,6 +118,12 @@ pub const Runtime = struct {
     /// 在途任务计数（submit +1，worker 跑完 -1；waitIdle 用）
     inflight: usize = 0,
     idle_cv: Io.Condition = .init,
+    /// 任务节点自由表（P3 实例内存池）：worker 完工把节点归还而非销毁，submit 优先复用，
+    /// 消除「每任务一次 malloc/free」——128 并发流式播放/批量 tag 每 chunk 一次的抖动。
+    /// 容量有界 `node_pool_cap`，超出销毁。**与任务队列同一 mutex 保护**（acquire/release
+    /// 均在已持锁的 submit / worker 收尾临界区内），不引入新的同步原语。
+    free_nodes: ?*Node = null,
+    free_count: usize = 0,
 
     // ---- Master 协调 ----
     master_mutex: Io.Mutex = .init,
@@ -361,19 +372,43 @@ pub const Runtime = struct {
         return reusable;
     }
 
+    /// 取一个任务节点（P3 池化；调用方须持 mutex）：优先复用自由表，空则分配。
+    fn acquireNodeLocked(self: *Runtime) !*Node {
+        if (self.free_nodes) |n| {
+            self.free_nodes = n.next;
+            self.free_count -= 1;
+            return n;
+        }
+        return self.allocator.create(Node);
+    }
+
+    /// 归还任务节点（P3 池化；调用方须持 mutex）：容量内入自由表复用，超出销毁。
+    fn releaseNodeLocked(self: *Runtime, n: *Node) void {
+        if (self.free_count < node_pool_cap) {
+            n.next = self.free_nodes;
+            self.free_nodes = n;
+            self.free_count += 1;
+        } else {
+            self.allocator.destroy(n);
+        }
+    }
+
     /// 提交任务（非阻塞；OOM 返回 false）。worker 被唤醒自取（完成即领，§5.1）。
     /// 停机后调用 → false（防停机后入队→无 worker→悬挂 inflight 的接线不匹配）。
     pub fn submit(self: *Runtime, job: Job) bool {
         if (self.shutdown_requested.load(.acquire)) return false;
-        const node = self.allocator.create(Node) catch return false;
-        node.* = .{ .job = job };
         self.mutex.lockUncancelable(self.io);
         // 二次检查（停机竞态窗口内到达也拒绝）
         if (self.shutdown_requested.load(.acquire)) {
             self.mutex.unlock(self.io);
-            self.allocator.destroy(node);
             return false;
         }
+        // 节点取自池（同临界区，见 free_nodes 注释）；分配失败须在改队列前回滚。
+        const node = self.acquireNodeLocked() catch {
+            self.mutex.unlock(self.io);
+            return false;
+        };
+        node.* = .{ .job = job };
         const tail = self.queue_tail;
         if (tail) |t| {
             t.next = node;
@@ -529,6 +564,12 @@ pub const Runtime = struct {
     pub fn deinit(self: *Runtime) void {
         std.debug.assert(self.master == null);
         std.debug.assert(self.workers.items.len == 0);
+        // P3：释放自由表全部驻留节点（须在 shutdown 排空、无并发 submit/release 后）
+        while (self.free_nodes) |n| {
+            self.free_nodes = n.next;
+            self.allocator.destroy(n);
+        }
+        self.free_count = 0;
         self.reg.deinit(self.allocator);
         self.allocator.free(self.started_ns);
         self.allocator.free(self.stalled);
@@ -677,8 +718,9 @@ pub const Runtime = struct {
                 if (self.stalled[id]) {
                     // §5.2 层2：本 worker 已被 Master 判停滞并 detach——放弃本任务时 Master
                     // 已代为复位 reg/started/running/inflight。任务若自返（如 stop 标志任务），
-                    // 不得再写任何共享簿记：只销毁自取节点、置 exited 即退（exited 是最后
-                    // 一条触碰 runtime 的操作，shutdown 据此有界等待）。
+                    // 不得再写任何共享簿记（含 P3 自由表——停滞是低频异常路径，不池化）：
+                    // 只销毁自取节点、置 exited 即退（exited 是最后一条触碰 runtime 的操作，
+                    // shutdown 据此有界等待）。
                     self.mutex.unlock(self.io);
                     self.allocator.destroy(head);
                     self.exited[id].store(true, .release);
@@ -688,6 +730,7 @@ pub const Runtime = struct {
                 me.beginIdle(self.nowUs()); // §5.5 idle_since（回收判定基准；state→idle）
                 self.running -= 1;
                 self.inflight -= 1;
+                self.releaseNodeLocked(head); // P3：节点在解锁前归池复用（替代 per-task free）
                 const drained = (self.inflight == 0); // 排空事件 → 唯一回收触发
                 // 热路径优化：仅当存在弹性超额（active > min_workers）时才可能回收；单流等
                 // active==min_workers 时 Master 的 maybeReclaim 必为 `serving<=target` 空操作，
@@ -698,7 +741,6 @@ pub const Runtime = struct {
                 self.mutex.unlock(self.io);
                 Io.Condition.broadcast(&self.idle_cv, self.io);
 
-                self.allocator.destroy(head);
                 if (might_reclaim) self.requestReclaim(); // 排空后唤醒 Master 评估回收
                 continue;
             }
@@ -2177,4 +2219,26 @@ test "runtime: AS3 空闲回收降容——大波撑满后无新事件也回落 
     try testing.expect(pollActive(rt, 1, 800, 10));
     try testing.expectEqual(@as(u32, 12), done.load(.acquire));
     try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
+}
+
+test "runtime: P3 任务节点池——串行 submit 复用节点，自由表有界" {
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 2 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    var dummy: u8 = 0;
+    const Body = struct {
+        fn run(_: *anyopaque) void {}
+    };
+    // 串行提交 200 次：每次完工节点应回到自由表，下一次 submit 复用（而非再 malloc）。
+    // 若 free_count 恒 >=1 则证明复用路径被走通（无池时 release 直接 destroy，恒为 0）。
+    var i: usize = 0;
+    while (i < 200) : (i += 1) {
+        try testing.expect(rt.submit(.{ .run = Body.run, .ctx = @ptrCast(&dummy) }));
+        rt.waitIdle();
+        try testing.expect(rt.free_count >= 1);
+    }
+    // 自由表容量恒有界：不随提交次数增长（避免无限驻留）。
+    try testing.expect(rt.free_count <= node_pool_cap);
 }

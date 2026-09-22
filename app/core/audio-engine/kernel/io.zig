@@ -151,6 +151,33 @@ pub const Reader = struct {
         };
     }
 
+    /// 从**绝对偏移**读取，不消耗 `pos`、不使用/不改动 file 前瞻缓存。
+    ///   - file：一次 `readPositionalAll` 直达（无 16KB 预读、无缓存二次拷贝）；
+    ///   - memory：目标切片直接 `memcpy`；
+    ///   - callback：无绝对偏移原语，退化为 `seek(offset,.start)` + 普通 `read`
+    ///     （pos 与底层流同步，语义与既有逐段 seek+read 一致）。
+    /// 供**按段/按绝对偏移定位的批量 PCM 读取**（如 wav `readData`）：这类读取每次
+    /// 都显式定位，file 前瞻缓存在每次定位时已被 invalidate、永不会命中，走缓存只会
+    /// 多付一次满块预读 + 一整块二次拷贝。调用方须自行按逻辑游标记账。
+    /// 返回实际读入字节数（0 = EOF）。
+    pub fn readAt(self: *Reader, buf: []u8, offset: u64) Error!usize {
+        if (self.aborted.load(.acquire)) return error.Aborted;
+        return switch (self.kind) {
+            .file => self.readFileAt(buf, offset),
+            .memory => blk: {
+                const data = self.data.?;
+                const p = @min(offset, data.len);
+                const n = @min(buf.len, data.len - p);
+                @memcpy(buf[0..n], data[p .. p + n]);
+                break :blk n;
+            },
+            .callback => blk: {
+                try self.seek(@intCast(offset), .start);
+                break :blk try self.read(buf);
+            },
+        };
+    }
+
     /// 单字节读取快路径（位级解码器逐字节取数专用；无新增缓冲）。
     /// 语义与 `read(&one)` 完全一致（含 abort/EOF），但省去通用 read 的切片/循环开销：
     ///   - memory：直接索引，零调用；
@@ -197,11 +224,16 @@ pub const Reader = struct {
         if (self.aborted.load(.acquire)) return error.Aborted;
         switch (self.kind) {
             .memory, .file => {
-                const end_size = if (self.kind == .file) (try self.size()) else self.data.?.len;
+                // size() 仅 end 定位需要；file 形态 size() 是一次 fstat 系统调用，
+                // start/current（位置读常态）不得为它付费（wav/PCM 每次 readData 都
+                // 先 seek(start)，此前每个 chunk 白付一次 fstat）。语义不变。
                 const base: i64 = switch (whence) {
                     .start => 0,
                     .current => @intCast(self.pos),
-                    .end => @intCast(end_size),
+                    .end => if (self.kind == .file)
+                        @intCast(try self.size())
+                    else
+                        @intCast(self.data.?.len),
                 };
                 const new_pos = base + off;
                 if (new_pos < 0) return error.SeekFailed;
@@ -301,9 +333,14 @@ pub const Reader = struct {
         var written: usize = 0;
         while (written < buf.len) {
             const abs = start + written;
+            // 缓存覆盖部分**整段 memcpy**（此前逐字节循环：小请求预读一满块后要
+            // 走 buf.len 次单字节拷贝，PCM 每 chunk 8KB → 8K 次迭代，是公共
+            // PCM 地板的指令大头）。缓存内容/系统调用次数/pos 语义均不变。
             if (abs >= self.file_cache_start and abs < self.file_cache_start + self.file_cache_len) {
-                buf[written] = self.file_cache[abs - self.file_cache_start];
-                written += 1;
+                const rel = abs - self.file_cache_start;
+                const take = @min(self.file_cache_len - rel, buf.len - written);
+                @memcpy(buf[written .. written + take], self.file_cache[rel .. rel + take]);
+                written += take;
             } else {
                 const remain = buf.len - written;
                 if (remain >= self.file_cache.len) {
@@ -314,7 +351,7 @@ pub const Reader = struct {
                     if (n == 0) break;
                     written += n;
                 } else {
-                    // 缓存空且请求小 → 预读一满块，随后逐字节从缓存服务
+                    // 缓存空且请求小 → 预读一满块，随后从缓存服务（下一轮整段拷贝）
                     const n = try self.readFileAt(self.file_cache[0..], abs);
                     self.file_cache_start = abs;
                     self.file_cache_len = n;
@@ -449,6 +486,42 @@ test "openMem: seek 三种 origin" {
     try testing.expectEqualStrings("67", &buf);
     // 越界前 seek 失败
     try testing.expectError(error.SeekFailed, r.seek(-1, .start));
+}
+
+test "readAt: memory 绝对偏移读取，不改 pos" {
+    var r = Reader.openMem("0123456789");
+    var buf: [4]u8 = undefined;
+    try testing.expectEqual(@as(usize, 4), try r.readAt(&buf, 3));
+    try testing.expectEqualStrings("3456", &buf);
+    try testing.expectEqual(@as(u64, 0), r.pos); // 不消耗位置
+    // 越界偏移 clamp 到 EOF（返回 0），不越界
+    try testing.expectEqual(@as(usize, 0), try r.readAt(&buf, 999));
+}
+
+test "readAt: file 绝对偏移读取，不改 pos；与 read 交错一致" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const data = "abcdefghijklmnop";
+    const f = try tmp.dir.createFile(io, "ra.bin", .{});
+    try std.Io.File.writeStreamingAll(f, io, data);
+    std.Io.File.close(f, io);
+    const full = try std.fs.path.join(testing.allocator, &.{ ".zig-cache", "tmp", tmp.sub_path[0..], "ra.bin" });
+    defer testing.allocator.free(full);
+
+    var r = try Reader.openPath(full);
+    defer r.deinit();
+    var buf: [5]u8 = undefined;
+    try testing.expectEqual(@as(usize, 5), try r.readAt(&buf, 4));
+    try testing.expectEqualStrings("efghi", &buf);
+    try testing.expectEqual(@as(u64, 0), r.pos);
+    // 随后普通 read 仍从 pos=0 起（readAt 不触碰游标/缓存）
+    try testing.expectEqual(@as(usize, 3), try r.read(buf[0..3]));
+    try testing.expectEqualStrings("abc", buf[0..3]);
+    // 大偏移直达（不经前瞻缓存，一次位置读）
+    var big: [8]u8 = undefined;
+    try testing.expectEqual(@as(usize, 8), try r.readAt(&big, 8));
+    try testing.expectEqualStrings("ijklmnop", &big);
 }
 
 test "openMem: abort 后 read/peek/seek 返回 Aborted" {
