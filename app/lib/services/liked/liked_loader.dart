@@ -21,6 +21,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../stores/providers.dart';
+import '../../widgets/dialogs/collection_platform.dart';
 import '../netease/track.dart';
 import 'liked_cache.dart';
 
@@ -61,18 +62,9 @@ class LikedStore extends ChangeNotifier {
   /// 平台加载错误（无缓存时的失败信息）。
   String error(String platform) => _state(platform).error;
 
-  /// 当前平台登录用户 key（NT uid / KG userid），缓存键。
-  String? _userKey(String platform) {
-    if (platform == 'kugou') {
-      return _ref.read(kugouApiProvider).session?.userid;
-    }
-    if (platform == 'neko') {
-      // 实验性音源：未登录（无 userId）视为未登录，页面显示登录引导。
-      final id = _ref.read(nekoApiProvider).userId;
-      return id.isEmpty ? null : id;
-    }
-    return _ref.read(neteaseAuthProvider)?.userId;
-  }
+  /// 当前平台登录用户 key（NT uid / KG userid / NK userId），缓存键。
+  String? _userKey(String platform) =>
+      collectionPlatform(platform).likedUserKey(_ref);
 
   /// 首次进入：缓存秒开 + 网络刷新全量。幂等（重复调用忽略）。
   ///
@@ -141,9 +133,7 @@ class LikedStore extends ChangeNotifier {
   /// 红心与列表同源，无需对账。对账在 [LikeController] 内部有缓冲期防
   /// 与本端刚 toggle 竞争；异常绝不影响列表展示。
   void _reconcileHearts(String platform, List<Track> tracks) {
-    if (platform == 'kugou' ||
-        platform == 'netease' ||
-        platform == 'neko') {
+    if (collectionPlatform(platform).reconcileLiked) {
       try {
         _ref
             .read(likeControllerProvider)
@@ -228,17 +218,8 @@ class LikedStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 全量拉取当前平台收藏（KG likedTracks / NT likedSongs，
-  /// 均为循环翻页拉满）。
-  Future<List<Track>> _fetchAll(String platform) async {
-    if (platform == 'kugou') {
-      return _ref.read(kugouApiProvider).likedTracks();
-    }
-    if (platform == 'neko') {
-      return _ref.read(nekoApiProvider).likedTracks();
-    }
-    final account = _ref.read(neteaseAuthProvider);
-    if (account == null) return const <Track>[];
-    return _ref.read(neteaseApiProvider).likedSongs(account.userId);
-  }
+  /// 全量拉取当前平台收藏（由注册表适配器提供：KG likedTracks / NT likedSongs /
+  /// NK likedTracks，均为循环翻页拉满）。
+  Future<List<Track>> _fetchAll(String platform) =>
+      collectionPlatform(platform).fetchLikedTracks(_ref);
 }
