@@ -124,7 +124,8 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 ### 4.1 现状（见 `format-support-matrix.md`）
 
 - **L1 内核自研解码**：常见格式已全覆盖；MP4 容器 codec 面扩展、DST/TAK/ALS 已接入；
-  残余仅小众圈（Musepack **SV7**、Shorten、DTS-LBR 多声道真实样本、wmavoice 浮点对拍等）；
+  Musepack **SV7** 与 **Shorten（.shn）** 已于较早 checkpoint 接入（2026-09-22 复核：与 FFmpeg
+  逐位一致、`era_` 命名合规），残余仅小众圈（DTS-LBR 多声道真实样本、wmavoice 浮点对拍等）；
 - **L2 生产引擎接管率**：以 FFmpeg 兜底为主，Zig 已接管格式优先；接管门控（§8.4.2 #2）待验收；
 - **L3 曲库白名单**：`.mp2/.mp1/.wavpack 家族/.tta/.tta...` 等部分 TagLib 不支持或未入白名单，
   存在「能播不能收藏」的隐性缺口；「内核 Info 兜底」为**产品决策项**（未实施）。
@@ -133,8 +134,8 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 | # | 候选 | 归属 | 说明 |
 |---|---|---|---|
-| F1 | **Musepack SV7** | L1 | SV8 已完成；SV7 参考 `mpc7.c` |
-| F2 | **Shorten（.shn）** | L1 | 老无损，参考 `shorten.c` |
+| F1 | **Musepack SV7**（已完成） | L1 | ✅ 已接入（2026-09-22 复核与 FFmpeg 逐位一致；命名已 `era_` 合规；参考 `mpc7.c`） |
+| F2 | **Shorten（.shn）**（已完成） | L1 | ✅ 已接入（同上；参考 `shorten.c`） |
 | F3 | **MP2 / MP1 落库** | L3 | 内核已可解，补 scanner 白名单即可（非内核工作） |
 | F4 | **内核 Info 兜底** | L3/产品 | tta/spx/shn/dts/ac3/… 无 TagLib 元数据者，经内核 probe→Info 取时长/位深入库 |
 | F5 | **接管门控 + 接管率监控** | L2 | 静态位图 + `backend` 字段监控（`audio-kernel-zig.md` §8.4.2） |

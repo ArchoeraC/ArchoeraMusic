@@ -246,9 +246,9 @@ fn decodeAll(shn: []const u8) !struct { bytes: std.ArrayList(u8), info: decoder.
 }
 
 test "shn e2e: luckynight-partial.shn (44.1k/16bit 2ch) == ffmpeg s16le（逐位）" {
-    var res = try decodeAll(luckynight_shn);
-    defer res.bytes.deinit(testing.allocator);
-    const info = res.info;
+    var era_res = try decodeAll(luckynight_shn);
+    defer era_res.bytes.deinit(testing.allocator);
+    const info = era_res.info;
     try testing.expectEqual(@as(u32, 44100), info.sample_rate);
     try testing.expectEqual(@as(u8, 2), info.channels);
     try testing.expectEqual(@as(u8, 16), info.bits_per_sample);
@@ -256,7 +256,7 @@ test "shn e2e: luckynight-partial.shn (44.1k/16bit 2ch) == ffmpeg s16le（逐位
     try testing.expectEqualStrings("shn", info.format_name);
     try testing.expectEqual(info.duration_known, .unknown);
 
-    const ns = res.bytes.items.len;
+    const ns = era_res.bytes.items.len;
     const ng = luckynight_golden.len;
     if (ns != ng) {
         std.debug.print("  WARN byte count mine={d} golden={d}\n", .{ ns, ng });
@@ -265,7 +265,7 @@ test "shn e2e: luckynight-partial.shn (44.1k/16bit 2ch) == ffmpeg s16le（逐位
     var first_diff: ?usize = null;
     var equal: usize = 0;
     for (0..limit) |i| {
-        if (res.bytes.items[i] == luckynight_golden[i]) {
+        if (era_res.bytes.items[i] == luckynight_golden[i]) {
             equal += 1;
         } else if (first_diff == null) {
             first_diff = i;
@@ -275,7 +275,7 @@ test "shn e2e: luckynight-partial.shn (44.1k/16bit 2ch) == ffmpeg s16le（逐位
         ns, ng, equal, limit, 100.0 * @as(f64, @floatFromInt(equal)) / @as(f64, @floatFromInt(limit)), first_diff,
     });
     try testing.expectEqual(ng, ns);
-    try testing.expectEqualSlices(u8, luckynight_golden, res.bytes.items);
+    try testing.expectEqualSlices(u8, luckynight_golden, era_res.bytes.items);
 }
 
 test "shn seek: 4000ms 快进重解码 == golden 同区段（随机访问正确性）" {
