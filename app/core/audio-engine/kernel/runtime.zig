@@ -1184,8 +1184,7 @@ test "runtime: 懒就绪 min_workers=0 → 首任务由 Master spawn，排空后
     rt.shutdown();
 }
 
-test "runtime: 弹性扩容——积压大时 Master 补建至 cap，max 界住线程数" {
-    var ctx = TestCtx{};
+test "runtime: 弹性扩容——积压驱动补建至 cap，max 界住线程数（确定性）" {
     const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 8 });
     defer {
         rt.shutdown();
@@ -1193,20 +1192,41 @@ test "runtime: 弹性扩容——积压大时 Master 补建至 cap，max 界住�
     }
     try testing.expectEqual(@as(usize, 1), rt.workers.items.len); // eager 下限
 
-    // 一次性压入 1000 任务 → Master 按 backlog 补建，最多到 8
-    const n = 1000;
-    var submitted: usize = 0;
-    for (0..n) |_| {
-        if (rt.submit(.{ .run = TestCtx.bump, .ctx = &ctx })) submitted += 1;
-    }
-    try testing.expectEqual(n, submitted);
-    rt.waitIdle();
+    // 确定性构造积压：直接置 inflight=100 / running=0（不投真实任务），令
+    // desired = min(running + ceil(backlog/load_factor) + spare, max_workers) = 8。
+    // 不依赖「单个 eager worker 何时把 1000 个琐碎任务排空」的调度时序——旧写法正是
+    // 此竞态：worker 抢在 Master 补建前排空队列 → workers.items.len==1 偶发失败（CI）。
+    rt.mutex.lockUncancelable(rt.io);
+    rt.inflight = 100;
+    rt.running = 0;
+    try testing.expect(rt.needsMoreLocked()); // active(1) < desired(8)：确需补建
+    rt.mutex.unlock(rt.io);
 
-    const grew = rt.workers.items.len;
-    try testing.expect(grew > 1); // 确曾扩容
-    try testing.expect(grew <= 8); // 未越 cap
-    try testing.expectEqual(@as(u32, @intCast(submitted)), ctx.counter.load(.acquire));
-    rt.shutdown();
+    // 以 Master 角色就地补建：逐次 appendWorker（= masterMain do_grow 的 spawn 原语）
+    // 直至满即拒（NoCapacity）；每次都不越 max_workers，达 cap 后不再补建。
+    var built: usize = 0;
+    while (true) {
+        rt.appendWorker() catch |e| switch (e) {
+            error.NoCapacity => break, // 满 cap：满即拒（§5.4），绝不扩容
+            else => return e,
+        };
+        built += 1;
+        try testing.expect(rt.workers.items.len <= 8);
+    }
+    try testing.expectEqual(@as(usize, 7), built); // 1 → 8
+    try testing.expectEqual(@as(usize, 8), rt.workers.items.len);
+    try testing.expectError(error.NoCapacity, rt.appendWorker()); // 满后再调，仍不越界
+
+    // 容量已足：调节器目标被 max_workers 夹住，不再要求补建
+    rt.mutex.lockUncancelable(rt.io);
+    const more = rt.needsMoreLocked();
+    rt.mutex.unlock(rt.io);
+    try testing.expect(!more);
+
+    // 清理构造的假积压（inflight 仅簿记；真实队列为空，worker 空闲等待，shutdown 干净）
+    rt.mutex.lockUncancelable(rt.io);
+    rt.inflight = 0;
+    rt.mutex.unlock(rt.io);
 }
 
 // ---- §5.2 层2：停滞检测（cfg.stall_timeout_ns>0 才启用；默认关 = 与既有行为一致）----
@@ -1365,6 +1385,28 @@ const SleepJob = struct {
     }
 };
 
+/// 汇聚任务（**确定性同步点**）：自旋至本波 `started >= want` 才完工。N 个此类任务必须
+/// N 个 worker 才能全部开工 → 强制 Master 补建到 N，不依赖「谁先被调度 / 任务多快排空」。
+/// 有界预算（超时即放行）避免真失败时把测试挂死；断言仍以确定状态为准。
+const BarrierJob = struct {
+    started: *std.atomic.Value(usize),
+    done: *std.atomic.Value(u32),
+    want: usize,
+    budget_ns: u64 = 5 * std.time.ns_per_s,
+
+    fn run(ctx: *anyopaque) void {
+        const b: *BarrierJob = @ptrCast(@alignCast(ctx));
+        _ = b.started.fetchAdd(1, .acq_rel);
+        const ioinst = Io.Threaded.global_single_threaded.io();
+        const deadline = Io.Timestamp.now(ioinst, .awake).nanoseconds + @as(i96, @intCast(b.budget_ns));
+        while (b.started.load(.acquire) < b.want) {
+            if (Io.Timestamp.now(ioinst, .awake).nanoseconds >= deadline) break;
+            std.Thread.yield() catch {};
+        }
+        _ = b.done.fetchAdd(1, .monotonic);
+    }
+};
+
 /// 有界轮询 `rt.busyCount() == want`（want=0 亦精确匹配）；超时返回 false（防挂死）。
 fn pollBusy(rt: *Runtime, want: usize, iter: usize, ms: u64) bool {
     var i: usize = 0;
@@ -1385,7 +1427,7 @@ fn pollDrained(rt: *Runtime, done: *const std.atomic.Value(u32), want: u32, iter
     return done.load(.acquire) == want and rt.busyCount() == 0;
 }
 
-test "runtime: F3 in-use 记账——停滞 detach 后 busyCount 只算服役 worker，不误计已放弃格" {
+test "runtime: F3 in-use 记账——停滞 detach 后 busyCount 只算服役 worker，不误计已放弃格（确定性）" {
     var probe = StallJob{ .budget_ns = 60 * std.time.ns_per_s };
     const rt = try Runtime.init(std.heap.c_allocator, .{
         .min_workers = 1,
@@ -1398,37 +1440,57 @@ test "runtime: F3 in-use 记账——停滞 detach 后 busyCount 只算服役 wo
         rt.deinit();
     }
 
-    // id0（唯一引导 worker）先占住长转任务 → 将被判停滞并 detach
+    // id0（唯一引导 worker）先占住长转任务（确定性：min=1 时只有它能接）
     try testing.expect(rt.submit(.{ .run = StallJob.run, .ctx = &probe }));
-    // 首波短任务压出 backlog → Master 扩到 max_workers=4（id0 wedged，1..3 服役）
-    var done0 = std.atomic.Value(u32).init(0);
-    var w0: [5]SleepJob = undefined;
-    for (&w0) |*j| j.* = .{ .ms = 40, .done = &done0 };
-    for (&w0) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
 
-    // 停滞检出 + 池长到 4 + 首波排空
-    var ready = false;
-    for (0..600) |_| {
-        if (rt.stall_count.load(.acquire) >= 1 and rt.workers.items.len == 4 and done0.load(.acquire) == 5) {
-            ready = true;
+    // 汇聚任务强制补建到 max_workers=4：3 个任务必须 3 个空闲 worker 才能全部开工
+    //（id0 被长转占住）→ 确定性满编，不依赖调度顺序/任务完成速度。
+    var started = std.atomic.Value(usize).init(0);
+    var done = std.atomic.Value(u32).init(0);
+    var bars: [3]BarrierJob = undefined;
+    for (&bars) |*b| b.* = .{ .started = &started, .done = &done, .want = 3 };
+    for (&bars) |*b| try testing.expect(rt.submit(.{ .run = BarrierJob.run, .ctx = b }));
+    var grew = false;
+    for (0..2000) |_| { // 有界；确定条件：补建到 cap
+        if (rt.workers.items.len == 4) {
+            grew = true;
             break;
         }
-        tSleepMs(10);
+        tSleepMs(2);
     }
-    try testing.expect(ready);
+    try testing.expect(grew);
+    rt.waitIdle();
+    try testing.expectEqual(@as(u32, 3), done.load(.acquire));
+
+    // 确定性 detach：把 id0 的开工时刻置为「很久以前」，直接触发停滞扫描
+    //（不等 120ms 真实时钟 / Master tick；扫描只认 now-started 关系）。
+    rt.mutex.lockUncancelable(rt.io);
+    rt.started_ns[0].store(1, .monotonic);
+    rt.mutex.unlock(rt.io);
+    rt.scanStalled();
     try testing.expectEqual(@as(usize, 1), rt.stall_count.load(.acquire));
     try testing.expect(rt.stalled[0]);
-    try testing.expect(!rt.exited[0].load(.acquire)); // wedged：尚未自退
-    // 首波排空后无在役任务（busyCount 回落 0；done0 领先 reg 置 idle 一拍，故轮询）
-    try testing.expect(pollBusy(rt, 0, 100, 5));
+    try testing.expect(!rt.exited[0].load(.acquire)); // 长转任务仍在跑，尚未自退
 
-    // 在役记账：3 个短占用任务 → 恰 3 个服役 worker busy（已放弃的 id0 不计入）
-    var doneA = std.atomic.Value(u32).init(0);
-    var wa: [3]SleepJob = undefined;
-    for (&wa) |*j| j.* = .{ .ms = 40, .done = &doneA };
-    for (&wa) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
-    try testing.expect(pollBusy(rt, 3, 200, 3));
-    try testing.expect(pollDrained(rt, &doneA, 3, 300, 10));
+    // busyCount 记账：把「已停滞的 id0」与 3 个服役槽都标 busy；stalled 槽必须被排除
+    // → 恰 3（若误计 id0 则为 4）。窗口内临时 inflight=1 使 Master 的空闲回收裁决退避。
+    rt.mutex.lockUncancelable(rt.io);
+    rt.inflight = 1;
+    rt.reg.entries[0].state = .busy; // id0：stalled=true → 不得计入
+    rt.reg.entries[1].markBusy();
+    rt.reg.entries[2].markBusy();
+    rt.reg.entries[3].markBusy();
+    rt.mutex.unlock(rt.io);
+    try testing.expectEqual(@as(usize, 3), rt.busyCount());
+
+    // 还原簿记（真实 worker 仍空闲等待；shutdown 会置 worker_shutdown 收尾）
+    rt.mutex.lockUncancelable(rt.io);
+    rt.reg.entries[0].beginIdle(0);
+    rt.reg.entries[1].beginIdle(0);
+    rt.reg.entries[2].beginIdle(0);
+    rt.reg.entries[3].beginIdle(0);
+    rt.inflight = 0;
+    rt.mutex.unlock(rt.io);
 }
 
 test "runtime: F3 槽位容量恢复——停滞自返后槽复用，二次突发可再达 max_workers 满编" {
@@ -1865,50 +1927,44 @@ fn nsNow() i96 {
     return Io.Timestamp.now(Io.Threaded.global_single_threaded.io(), .awake).nanoseconds;
 }
 
-test "runtime: F1 shrink——大并发波撑满后，小并发波排空回落至 min_workers" {
-    // 波形设计（确定性，不依赖本机速度）：先用 12 个 30ms 占用任务把池撑到真 8 路并发
-    //（并发达峰=8 → 排空后保留 8），再用单任务波（并发达峰=1）把容量回落回 min_workers=1。
+test "runtime: F1 shrink——大并发波撑满后，小并发波排空回落至 min_workers（确定性同步点）" {
+    // 用「汇聚任务」强制 Master 补建到 max_workers：12 个任务必须 8 个 worker 才能全部
+    // 开工（并发达峰=8）→ 不依赖任务完成速度/调度顺序；再以单任务波（峰=1）回落 min=1。
     var done = std.atomic.Value(u32).init(0);
-    var jobs: [12]SleepJob = undefined;
-    for (&jobs) |*j| j.* = .{ .ms = 30, .done = &done };
+    var started = std.atomic.Value(usize).init(0);
+    var jobs: [12]BarrierJob = undefined;
+    for (&jobs) |*j| j.* = .{ .started = &started, .done = &done, .want = 8 };
     const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 8 });
     defer {
         rt.shutdown();
         rt.deinit();
     }
 
-    // 波 1：12 路 30ms 并发 → Master 扩容至 max_workers，8 路真并行
-    for (&jobs) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    // 波 1：12 个汇聚任务（want=8）→ 必须补建到 cap 才能全部开工
+    for (&jobs) |*j| try testing.expect(rt.submit(.{ .run = BarrierJob.run, .ctx = j }));
     var reached_max = false;
-    for (0..300) |_| {
-        if (rt.workers.items.len == 8 and done.load(.acquire) == 12) {
+    for (0..2000) |_| { // 有界（真失败不悬挂）；确定条件：8 worker 就绪
+        if (rt.workers.items.len == 8) {
             reached_max = true;
             break;
         }
-        tSleepMs(10);
+        tSleepMs(2);
     }
     try testing.expect(reached_max); // 确曾用到满编并行（否则无从回落）
     rt.waitIdle();
+    try testing.expectEqual(@as(u32, 12), done.load(.acquire));
     // 排空后保留本波并发达峰（8），不回落（背靠背大波不再重建 → 防 churn）
-    var grown_kept = false;
-    for (0..300) |_| {
-        if (rt.active.load(.acquire) >= 6) { // Master 可能已把 8 保留为 8；≥6 即保留大容量
-            grown_kept = true;
-            break;
-        }
-        tSleepMs(10);
-    }
-    try testing.expect(grown_kept);
+    try testing.expectEqual(@as(usize, 8), rt.active.load(.acquire));
 
     // 波 2：单任务（并发达峰=1）排空 → maybeReclaim 回落至 min_workers=1
-    var one: [1]SleepJob = undefined;
-    one[0] = .{ .ms = 5, .done = &done };
-    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &one[0] }));
+    var one = std.atomic.Value(u32).init(0);
+    var one_job = SleepJob{ .ms = 5, .done = &one };
+    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &one_job }));
     rt.waitIdle();
-    try testing.expect(pollActive(rt, 1, 300, 10));
+    try testing.expect(pollActive(rt, 1, 1000, 5));
     // 全程无 spawn 失败、计数精确（12 + 1）
     try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
-    try testing.expectEqual(@as(u32, 13), done.load(.acquire));
+    try testing.expectEqual(@as(u32, 1), one.load(.acquire));
 }
 
 test "runtime: F1 100×500 同尺寸波——容量有界、无 spawn 失败风暴、计数精确" {
@@ -1940,12 +1996,14 @@ test "runtime: F1 100×500 同尺寸波——容量有界、无 spawn 失败风�
     try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire)); // 无 spawn 失败风暴
 }
 
-test "runtime: F1 lazy min_workers=0——大并发波保留容量、小波回落后可再扩容无死锁" {
+test "runtime: F1 lazy min_workers=0——大并发波保留容量、小波回落后可再扩容无死锁（确定性同步点）" {
     // 纯事件语义：池按「上一波真实并发需求」保留容量（min_workers=0 也不在干活时撤到 0）。
-    // 大波（12×25ms）真并发 → 撑满；随后单任务小波把容量收敛回 1；再次大波可复用扩容。
+    // 大波用汇聚任务**强制补建**（≥4 worker 才能全部开工）；随后单任务小波把容量收敛回 1；
+    // 再次大波可复用退役槽扩容（无死锁/无 spawn 失败/计数精确）。
     var done = std.atomic.Value(u32).init(0);
-    var big: [12]SleepJob = undefined;
-    for (&big) |*j| j.* = .{ .ms = 25, .done = &done };
+    var started = std.atomic.Value(usize).init(0);
+    var big: [12]BarrierJob = undefined;
+    for (&big) |*j| j.* = .{ .started = &started, .done = &done, .want = 4 };
     const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 0, .max_workers = 8 });
     defer {
         rt.shutdown();
@@ -1953,26 +2011,26 @@ test "runtime: F1 lazy min_workers=0——大并发波保留容量、小波回�
     }
     try testing.expectEqual(@as(usize, 0), rt.workers.items.len); // 懒就绪：引导期零 worker
 
-    // 波 1（大）：懒就绪首任务触发 spawn → 真并发撑满
-    for (&big) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    // 波 1（大）：懒就绪首任务触发 spawn；汇聚任务强制补建（≥4 worker 才能全部开工）
+    for (&big) |*j| try testing.expect(rt.submit(.{ .run = BarrierJob.run, .ctx = j }));
     var grew = false;
-    for (0..300) |_| {
-        if (rt.active.load(.acquire) >= 4 and done.load(.acquire) == 12) {
+    for (0..2000) |_| { // 有界；确定条件：至少 4 个 worker 就绪
+        if (rt.active.load(.acquire) >= 4) {
             grew = true;
             break;
         }
-        tSleepMs(10);
+        tSleepMs(2);
     }
     try testing.expect(grew);
     rt.waitIdle();
     try testing.expectEqual(@as(u32, 12), done.load(.acquire));
 
     // 波 2（小）：单任务 → 并发达峰=1 → 排空后容量收敛（回落），不残留满编空闲
-    var small: [1]SleepJob = undefined;
-    small[0] = .{ .ms = 5, .done = &done };
-    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &small[0] }));
+    var one = std.atomic.Value(u32).init(0);
+    var one_job = SleepJob{ .ms = 5, .done = &one };
+    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &one_job }));
     rt.waitIdle();
-    try testing.expect(pollActive(rt, 1, 300, 10));
+    try testing.expect(pollActive(rt, 1, 1000, 5));
 
     // 波 3（再大）：复用退役槽扩容（无 deadlock、无 spawn 失败、计数精确）
     var done2 = std.atomic.Value(u32).init(0);
@@ -1981,7 +2039,7 @@ test "runtime: F1 lazy min_workers=0——大并发波保留容量、小波回�
     for (&big2) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
     rt.waitIdle();
     try testing.expectEqual(@as(u32, 8), done2.load(.acquire));
-    try testing.expectEqual(@as(u32, 13), done.load(.acquire)); // 前两波计数不丢
+    try testing.expectEqual(@as(u32, 1), one.load(.acquire));
     try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
     try testing.expect(rt.workers.items.len <= 8);
 }
