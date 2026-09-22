@@ -11,6 +11,7 @@ const hdr = @import("header.zig");
 const br = @import("bitreader.zig");
 const ht = @import("huffman_tables.zig");
 const t = @import("layer3_tables.zig");
+const vec = @import("vec.zig");
 
 pub const SHORT_BLOCK_TYPE: u8 = 2;
 pub const STOP_BLOCK_TYPE: u8 = 3;
@@ -473,6 +474,14 @@ fn huffman(dst: []f32, bs: *br.BitReader, gr_info: *const GrInfo, scf: []const f
 fn midsideStereo(left: []f32, n: usize) void {
     const right = left[576..];
     var i: usize = 0;
+    while (i + 8 <= n) : (i += 8) {
+        const lp = left.ptr + i;
+        const rp = right.ptr + i;
+        const a = vec.load8(lp);
+        const b = vec.load8(rp);
+        vec.store8(lp, a + b);
+        vec.store8(rp, a - b);
+    }
     while (i < n) : (i += 1) {
         const a = left[i];
         const b = right[i];
@@ -482,7 +491,15 @@ fn midsideStereo(left: []f32, n: usize) void {
 }
 
 fn intensityStereoBand(left: []f32, n: usize, kl: f32, kr: f32) void {
+    const cvl: vec.V8 = @splat(kl);
+    const cvr: vec.V8 = @splat(kr);
     var i: usize = 0;
+    while (i + 8 <= n) : (i += 8) {
+        const p = left.ptr + i;
+        const v = vec.load8(p);
+        vec.store8(p + 576, v * cvr);
+        vec.store8(p, v * cvl);
+    }
     while (i < n) : (i += 1) {
         left[i + 576] = left[i] * kr;
         left[i] = left[i] * kl;
@@ -590,16 +607,17 @@ const g_aa = [2][8]f32{
 };
 
 fn antialias(grbuf_in: []f32, nbands: i32) void {
+    // 8 个抽头相互独立 → V8；先取 u/d 再落两处，逐 lane 与标量同序（位级一致）。
+    const aa0: vec.V8 = @bitCast(g_aa[0]);
+    const aa1: vec.V8 = @bitCast(g_aa[1]);
     var grbuf = grbuf_in;
     var b: i32 = 0;
     while (b < nbands) : (b += 1) {
-        var i: usize = 0;
-        while (i < 8) : (i += 1) {
-            const u = grbuf[18 + i];
-            const d = grbuf[17 - i];
-            grbuf[18 + i] = u * g_aa[0][i] - d * g_aa[1][i];
-            grbuf[17 - i] = u * g_aa[1][i] + d * g_aa[0][i];
-        }
+        const p = grbuf.ptr;
+        const u = vec.load8(p + 18);
+        const d = vec.rev8(vec.load8(p + 10));
+        vec.store8(p + 18, u * aa0 - d * aa1);
+        vec.store8(p + 10, vec.rev8(u * aa1 + d * aa0));
         grbuf = grbuf[18..];
     }
 }
@@ -679,13 +697,27 @@ fn imdct36(grbuf_in: []f32, overlap_in: []f32, window: []const f32, nbands: usiz
         si[5] = -si[5];
         si[7] = -si[7];
 
-        i = 0;
-        while (i < 9) : (i += 1) {
-            const ovl = overlap[i];
-            const sum = co[i] * g_twid9[9 + i] + si[i] * g_twid9[0 + i];
-            overlap[i] = co[i] * g_twid9[0 + i] - si[i] * g_twid9[9 + i];
-            grbuf[i] = ovl * window[0 + i] - sum * window[9 + i];
-            grbuf[17 - i] = ovl * window[9 + i] + sum * window[0 + i];
+        // i=0..7 八个抽头相互独立 → V8；其中 grbuf[17-i] 是逆序落盘，用 rev8 校正。
+        {
+            const ovl = vec.load8(overlap.ptr);
+            const co8 = vec.load8(&co);
+            const si8 = vec.load8(&si);
+            const tw_sc = vec.load8(g_twid9[9..].ptr);
+            const tw_cs = vec.load8(g_twid9[0..].ptr);
+            const w0 = vec.load8(window.ptr);
+            const w9 = vec.load8(window.ptr + 9);
+            const sum = co8 * tw_sc + si8 * tw_cs;
+            vec.store8(overlap.ptr, co8 * tw_cs - si8 * tw_sc);
+            vec.store8(grbuf.ptr, ovl * w0 - sum * w9);
+            vec.store8(grbuf.ptr + 10, vec.rev8(ovl * w9 + sum * w0));
+        }
+        // i=8 尾抽头（标量）
+        {
+            const o8 = overlap[8];
+            const s8 = co[8] * g_twid9[17] + si[8] * g_twid9[8];
+            overlap[8] = co[8] * g_twid9[8] - si[8] * g_twid9[17];
+            grbuf[8] = o8 * window[8] - s8 * window[17];
+            grbuf[9] = o8 * window[17] + s8 * window[8];
         }
         grbuf = grbuf[18..];
         overlap = overlap[9..];
