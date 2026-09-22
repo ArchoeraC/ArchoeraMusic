@@ -27,26 +27,22 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     try {
       var playUrl = url;
       final prefs = ref.read(appPrefsProvider);
+      final platform = sourcePlatform(track.source);
       // 纯内存播放（不落盘）优先：开启时不读也不写歌曲磁盘缓存——否则与
       // 「不落盘」语义冲突（缓存读命中会走本地文件、未命中会后台落盘）。
       if (!prefs.engineMemoryPlay &&
           prefs.songCacheEnabled &&
           url.isNotEmpty &&
-          (track.source == 'kugou' || track.source == 'netease')) {
-        final id = track.source == 'kugou'
-            ? (track.kugou?.hash ?? track.id)
-            : track.id;
+          platform.songCacheable) {
+        final id = platform.songCacheId(track);
         final key = SongCache.shared.cacheKeyFor(track.source, id, q);
         final cached = SongCache.shared.lookup(key);
         if (cached != null) {
           playUrl = cached;
         } else {
-          final referer = track.source == 'kugou'
-              ? 'https://www.kugou.com/'
-              : 'https://music.163.com/';
           unawaited(
             SongCache.shared
-                .storeAsync(key, url, referer: referer)
+                .storeAsync(key, url, referer: platform.songCacheReferer)
                 .then((_) => SongCache.shared.trim(prefs.songCacheLimitMiB)),
           );
         }
@@ -98,9 +94,9 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     // （标题/歌手/专辑/封面/时长；不改 id 与 source，播放仍走 Neko 直链）。
     // 结果按曲目 id 缓存，仅首次播放多一次搜索请求。失败静默用原元数据。
     var playTrack = track;
-    if (track.source == 'neko' && ref.read(appPrefsProvider).nekoEnabled) {
-      playTrack = await ref.read(nekoMetadataEnricherProvider).enrich(track);
-    }
+    // 播放前的**展示元数据**补齐（如 NK 用其它源补全标题/歌手/封面）；
+    // 不改 id/source，播放仍走本源。失败静默用原元数据。
+    playTrack = await sourcePlatform(track.source).enrichMetadata(ref, track);
     final String? url;
     try {
       url = await _resolveSource(playTrack, quality: state.quality);
@@ -140,28 +136,17 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
   }
 
   Future<bool> _tryFallbackSource(Track track) async {
-    if (track.source == 'local' || track.source == 'streaming') return false;
+    final platform = sourcePlatform(track.source);
+    if (!platform.autoFallback) return false;
     final title = track.title.trim();
     if (title.isEmpty) return false;
     final contentKey = _trackContentKey(track);
     if (_fallbackAttempted.contains(contentKey)) return false;
     _fallbackAttempted.add(contentKey);
 
-    final artist = track.artistNames.trim();
-    final keyword = [title, if (artist.isNotEmpty) artist].join(' ');
-    final candidates = <Track>[];
+    final List<Track> candidates;
     try {
-      if (track.source == 'netease') {
-        candidates.addAll(
-          (await ref.read(kugouApiProvider).searchSongs(keyword, limit: 20))
-              .items,
-        );
-      } else {
-        candidates.addAll(
-          (await ref.read(neteaseApiProvider).searchSongs(keyword, limit: 20))
-              .items,
-        );
-      }
+      candidates = await platform.fallbackCandidates(ref, track);
     } catch (e) {
       _log('换源搜索失败: $e');
       return false;

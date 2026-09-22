@@ -169,6 +169,27 @@ abstract class SourcePlatform {
     void Function(String message)? log,
   });
 
+  // ── 播放辅助（歌曲缓存 / 自动换源 / 元数据补齐） ──────────────────
+
+  /// 是否使用磁盘歌曲缓存（NT / KG）。
+  bool get songCacheable => false;
+
+  /// 歌曲缓存键用的曲目 id（KG 用 hash；其余用 [Track.id]）。
+  String songCacheId(Track t) => t.id;
+
+  /// 歌曲缓存落盘时携带的 Referer（可空串）。
+  String get songCacheReferer => '';
+
+  /// 播放失败时是否允许自动换源（搜索另一平台同名曲重试）。
+  /// local / streaming 不参与。
+  bool get autoFallback => true;
+
+  /// 自动换源的候选曲目（搜索另一平台）。[autoFallback] 为 false 时不调用。
+  Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async => const [];
+
+  /// 播放前的展示元数据补齐（NK 用其它源补全）；默认原样返回。
+  Future<Track> enrichMetadata(dynamic ref, Track t) async => t;
+
   // ── 组合能力访问器 ────────────────────────────────────────────────
 
   /// 该源的「收藏 / 我喜欢」适配器；无收藏能力（local / streaming）→ null。
@@ -267,6 +288,27 @@ class _NeteaseSource extends SourcePlatform {
   String get source => 'netease';
 
   @override
+  bool get songCacheable => true;
+
+  @override
+  String get songCacheReferer => 'https://music.163.com/';
+
+  @override
+  Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async {
+    final keyword = [
+      t.title,
+      if (t.artistNames.trim().isNotEmpty) t.artistNames.trim(),
+    ].join(' ');
+    return (await sourcePlatform('kugou').searchSongs(
+      ref,
+      keyword,
+      append: false,
+      loaded: 0,
+      limit: 20,
+    )).items;
+  }
+
+  @override
   String label(AppLocalizations l10n) => l10n.platformNetease;
 
   @override
@@ -362,6 +404,30 @@ class _NeteaseSource extends SourcePlatform {
 class _KugouSource extends SourcePlatform {
   @override
   String get source => 'kugou';
+
+  @override
+  bool get songCacheable => true;
+
+  @override
+  String songCacheId(Track t) => t.kugou?.hash ?? t.id;
+
+  @override
+  String get songCacheReferer => 'https://www.kugou.com/';
+
+  @override
+  Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async {
+    final keyword = [
+      t.title,
+      if (t.artistNames.trim().isNotEmpty) t.artistNames.trim(),
+    ].join(' ');
+    return (await sourcePlatform('netease').searchSongs(
+      ref,
+      keyword,
+      append: false,
+      loaded: 0,
+      limit: 20,
+    )).items;
+  }
 
   @override
   String label(AppLocalizations l10n) => l10n.platformKugou;
@@ -506,6 +572,21 @@ class _QqSource extends SourcePlatform {
   String get source => 'qqmusic';
 
   @override
+  Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async {
+    final keyword = [
+      t.title,
+      if (t.artistNames.trim().isNotEmpty) t.artistNames.trim(),
+    ].join(' ');
+    return (await sourcePlatform('netease').searchSongs(
+      ref,
+      keyword,
+      append: false,
+      loaded: 0,
+      limit: 20,
+    )).items;
+  }
+
+  @override
   String label(AppLocalizations l10n) => l10n.platformQQMusic;
 
   @override
@@ -626,6 +707,27 @@ class _NekoSource extends SourcePlatform {
   String get source => 'neko';
 
   @override
+  Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async {
+    final keyword = [
+      t.title,
+      if (t.artistNames.trim().isNotEmpty) t.artistNames.trim(),
+    ].join(' ');
+    return (await sourcePlatform('netease').searchSongs(
+      ref,
+      keyword,
+      append: false,
+      loaded: 0,
+      limit: 20,
+    )).items;
+  }
+
+  @override
+  Future<Track> enrichMetadata(dynamic ref, Track t) async {
+    if (!enabled(ref)) return t;
+    return ref.read(nekoMetadataEnricherProvider).enrich(t);
+  }
+
+  @override
   String label(AppLocalizations l10n) => l10n.platformNeko;
 
   @override
@@ -722,6 +824,9 @@ class _LocalSource extends SourcePlatform {
   String get source => 'local';
 
   @override
+  bool get autoFallback => false;
+
+  @override
   String label(AppLocalizations l10n) => source;
 
   @override
@@ -755,6 +860,9 @@ class _LocalSource extends SourcePlatform {
 class _StreamingSource extends SourcePlatform {
   @override
   String get source => 'streaming';
+
+  @override
+  bool get autoFallback => false;
 
   @override
   String label(AppLocalizations l10n) => source;
