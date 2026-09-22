@@ -32,10 +32,13 @@
 
 #include <libavutil/samplefmt.h>
 #include <libavutil/mem.h>
+#include <libavutil/error.h>
+#include <libavutil/dict.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <math.h>
+#include <signal.h>
 
 #define LOG_TAG "[audio-engine:pipeline]"
 #include <stdio.h>
@@ -161,9 +164,20 @@ static int pipeline_store_avio_open(AudioPipeline *p, SegStore *store)
 
 /* —— EraAudio 在线回调解码：FFmpeg AVIO 作宿主传输（docs/audio-kernel-zig.md §6.1/§7）——
  * 内核零网络栈：传输（socket/TLS/Range/重定向）全由 C 壳经 AVIO 注入，内核只消费
- * 字节流。URL 源在 engine_mode==EraAudio 时优先走此路径；失败回退 FFmpeg 主后端。 */
+ * 字节流。URL 源在 engine_mode==EraAudio 时优先走此路径；失败回退 FFmpeg 主后端。
+ *
+ * N3 断流/超时/中断语义（内核侧契约不变：on_read 只有 0=EOF）：
+ *   - 超时：avio_open2 传 rw_timeout 限制单次阻塞 IO；HTTP 断流自动重连
+ *     （reconnect / reconnect_streamed / reconnect_delay_max）。
+ *   - 中断：stop/SIGTERM → pipeline_signal_shutdown 置 aborted，AVIOInterruptCB 在
+ *     阻塞 IO 中轮询并打断 avio_read（对应内核 Reader.abort 的宿主侧）。
+ *   - 错误：avio_read 返回的非 EOF 错误记入 io_error，pipeline_process 据其把
+ *     「内核读到的 0」改判为负状态码上报，避免网络错误被当成正常文件尾静默截断。 */
 typedef struct {
     AVIOContext *avio;
+    AVIOInterruptCB interrupt;         /* 阻塞 IO 中断（stop/超时） */
+    volatile sig_atomic_t aborted;     /* 1 = 中断请求 */
+    int io_error;                      /* 最近非 EOF 传输错误（AVERROR；0=无） */
 } EraUrlCb;
 
 static bool source_is_url(const char *s)
@@ -171,29 +185,58 @@ static bool source_is_url(const char *s)
     return s && (strncmp(s, "http://", 7) == 0 || strncmp(s, "https://", 8) == 0);
 }
 
+/* AVIOInterruptCB：返回 1 让 FFmpeg 中止当前阻塞传输。 */
+static int era_url_interrupt(void *opaque)
+{
+    EraUrlCb *c = (EraUrlCb *)opaque;
+    return c->aborted ? 1 : 0;
+}
+
 static size_t era_url_read(void *ctx, unsigned char *buf, size_t len)
 {
     EraUrlCb *c = (EraUrlCb *)ctx;
     if (len == 0) return 0;
+    if (c->aborted) return 0;
     int want = len > (size_t)INT_MAX ? INT_MAX : (int)len;
     int n = avio_read(c->avio, buf, want);
-    if (n <= 0) return 0; /* EOF 或读错误：统一按 EOF（与流式回调语义一致） */
+    if (n == AVERROR_EOF) return 0; /* 正常文件尾（内核 on_read 契约 0=EOF） */
+    if (n <= 0) {
+        /* 非 EOF 错误：内核 on_read 无法就地传错误，记录下来由管线改判上报。
+         * 中断（AVERROR_EXIT）与已置 aborted 属正常停机，不记为错误。 */
+        if (n < 0 && !c->aborted && n != AVERROR_EXIT) c->io_error = n;
+        return 0;
+    }
     return (size_t)n;
 }
 
 static int era_url_seek(void *ctx, long long off, int whence, size_t buffered)
 {
     EraUrlCb *c = (EraUrlCb *)ctx;
+    int64_t r;
     switch (whence) {
-    case 0: /* start */
-        return avio_seek(c->avio, off, SEEK_SET) >= 0;
+    case 0: /* start：绝对重定位（宿主按需发 Range/206） */
+        r = avio_seek(c->avio, off, SEEK_SET);
+        break;
     case 2: /* end */
-        return avio_seek(c->avio, off, SEEK_END) >= 0;
+        r = avio_seek(c->avio, off, SEEK_END);
+        break;
     case 1: /* current：底层流领先内核逻辑游标 buffered 字节 */
-        return avio_seek(c->avio, (int64_t)off - (int64_t)buffered, SEEK_CUR) >= 0;
+        r = avio_seek(c->avio, (int64_t)off - (int64_t)buffered, SEEK_CUR);
+        break;
     default:
         return 0;
     }
+    if (r < 0) return 0;
+    c->io_error = 0; /* 重定位成功 = 从错误中恢复（清除上一次读错误） */
+    return 1;
+}
+
+/* 取出在线传输的待上报错误（无则 0）。由 pipeline_process 在 native 读到
+ * EOF 时调用：非 0 说明是传输错误而非正常文件尾。 */
+static int era_url_take_error(AudioPipeline *p)
+{
+    if (!p->era_url_cb) return 0;
+    return ((EraUrlCb *)p->era_url_cb)->io_error;
 }
 
 /* 打开 URL → 构造 AVIO 宿主传输 → 回调式自研内核解码。
@@ -202,7 +245,21 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
 {
     EraUrlCb *cb = (EraUrlCb *)calloc(1, sizeof(*cb));
     if (!cb) return -1;
-    if (avio_open2(&cb->avio, url, AVIO_FLAG_READ, NULL, NULL) < 0) {
+    cb->interrupt.callback = era_url_interrupt;
+    cb->interrupt.opaque = cb;
+    /* 宿主传输超时/重连（N3）：rw_timeout 为通用协议选项；reconnect* 仅 HTTP
+     * 识别，其它协议未识别者由 avio_open2 原样退回，不影响打开。
+     * 重试**有界**（max_retries + delay_max）：瞬时断流自动续传，持续不可达则
+     * 最终返回错误由管线改判上报（-8 ZK_IO_ERROR），不会无限重连挂住。 */
+    AVDictionary *opts = NULL;
+    av_dict_set(&opts, "rw_timeout", "15000000", 0); /* 15s 单次 IO 上限 */
+    av_dict_set(&opts, "reconnect", "1", 0);
+    av_dict_set(&opts, "reconnect_streamed", "1", 0);
+    av_dict_set(&opts, "reconnect_max_retries", "3", 0);
+    av_dict_set(&opts, "reconnect_delay_max", "5", 0);
+    int oret = avio_open2(&cb->avio, url, AVIO_FLAG_READ, &cb->interrupt, &opts);
+    av_dict_free(&opts);
+    if (oret < 0) {
         free(cb);
         return -1;
     }
@@ -456,6 +513,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             p->native_active = false;
             if (p->era_url_cb) { /* 在线回调流：native 已关，释放宿主 AVIO 传输 */
                 EraUrlCb *cb = (EraUrlCb *)p->era_url_cb;
+                cb->aborted = 1; /* 打断任何在途阻塞 IO 后再关闭 */
                 avio_close(cb->avio);
                 free(cb);
                 p->era_url_cb = NULL;
@@ -662,6 +720,16 @@ ssize_t pipeline_process(AudioPipeline *p)
                     fprintf(stderr, "%s EraAudio 解码错误: %d\n", LOG_TAG, ret);
                     return ret;
                 }
+                /* 0 = 内核读到 EOF。但在线回调流里「传输错误」也被内核契约折叠成
+                 * 0（on_read 只能 0=EOF）；若宿主记录了非 EOF 错误则改判为 IO
+                 * 错误上报，避免断流/超时被当成正常文件尾静默截断（N3）。 */
+                int ioerr = era_url_take_error(p);
+                if (ioerr != 0) {
+                    char eb[AV_ERROR_MAX_STRING_SIZE];
+                    av_strerror(ioerr, eb, sizeof(eb));
+                    fprintf(stderr, "%s EraAudio 在线流中断/超时: %s\n", LOG_TAG, eb);
+                    return -8; /* ZK_IO_ERROR（见 include/kernel_bridge.h） */
+                }
                 p->eof = true; /* 0 = EOF */
                 break;
             }
@@ -862,6 +930,11 @@ void pipeline_signal_shutdown(AudioPipeline *p)
 {
     if (!p) return;
     p->eof = true;
+    /* 在线回调流：置宿主中断标志，AVIOInterruptCB 会打断正在阻塞的 avio_read
+     * （stop/SIGTERM 不被网络停顿拖住）。内核 Reader.abort 的宿主侧对应。 */
+    if (p->era_url_cb) {
+        ((EraUrlCb *)p->era_url_cb)->aborted = 1;
+    }
 }
 
 double pipeline_get_duration(const AudioPipeline *p)
@@ -908,6 +981,8 @@ int pipeline_get_source_channels(const AudioPipeline *p)
 void pipeline_destroy(AudioPipeline *p)
 {
     if (!p) return;
+    /* 先请求中断：若 native 关闭/AVIO 关闭会等待在途阻塞 IO，中断标志让其尽快返回 */
+    if (p->era_url_cb) ((EraUrlCb *)p->era_url_cb)->aborted = 1;
     if (!p->flushed && p->encoder) {
         encoder_flush(p->encoder);
         p->flushed = true;

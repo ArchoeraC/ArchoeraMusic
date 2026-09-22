@@ -148,20 +148,24 @@ pub const TailPage = struct {
 const TAIL_WINDOW: usize = 64 * 1024;
 
 /// 尾窗扫描：定位流的末页 granule（open 时 O(1) 计算精确时长，替代整流预扫描）。
-///   - 仅 file/memory 形态支持（callback 流不可 seek → 返回 null，调用方保持
-///     原有降级路径）；
+///   - file/memory 及**已知总大小的 callback 流**均支持（callback 的 size_hint 来自
+///     宿主，如 HTTP Content-Length；未知大小 → 返回 null，调用方保持降级路径，
+///     时长退化为 estimate/unknown）；
 ///   - 64KB 尾窗内逐 "OggS" 候选经 parsePage 校验（魔数/版本/CRC）：损坏/截断页
 ///     跳过 → 命中前一个完整页（调用方据 eos=false 退 estimate）；
 ///   - `serial`：目标流序列号（0 = 不限定，取窗口内最后一个合法页）；窗口内
 ///     向前扫描取**最后一个**匹配页（多路复用时取该流自己的末页）；
 ///   - granule < 0 的页（未完成流占位）跳过；
-///   - 读位置在返回前恢复（不污染调用方后续 read/页重组）。
+///   - 读位置在返回前**经 seek 恢复**（callback 形态宿主流位置须同步，不能只改
+///     reader.pos——否则宿主停在尾窗读到 EOF，后续读取全部错位）。
 pub fn scanTailPage(reader: *io.Reader, serial: u32) Error!?TailPage {
-    if (reader.kind != .file and reader.kind != .memory) return null;
-    const save = reader.pos;
-    defer reader.pos = save;
+    // 前向-only 宿主（如 mka 合成 feed）不可随机访问：跳过尾窗扫描，避免
+    // 「跳过去再跳回来」使宿主流位置错位。
+    if (!reader.random_access) return null;
     const size = reader.size() catch return null;
     if (size < 27) return null;
+    const save = reader.pos;
+    defer reader.seek(@intCast(save), .start) catch {};
     var buf: [TAIL_WINDOW]u8 = undefined;
     const read_len: usize = @intCast(@min(size, TAIL_WINDOW));
     reader.seek(@intCast(size - read_len), .start) catch return null;
@@ -530,23 +534,65 @@ test "ogg: scanTailPage 末页截断/损坏 → 退前一页（无 EOS）" {
     try testing.expect(!tail2.eos);
 }
 
-test "ogg: scanTailPage 过小输入与 callback 形态返回 null" {
-    var reader = io.Reader.openMem("OggS");
-    try testing.expect((try scanTailPage(&reader, 0)) == null);
-    // callback 流不可 seek → 不扫描
+test "ogg: scanTailPage 过小输入 + callback random_access 语义" {
+    var small = io.Reader.openMem("OggS");
+    try testing.expect((try scanTailPage(&small, 0)) == null);
+
+    const serial: u32 = 0x5151;
+    const data = try buildThreePages(testing.allocator, serial);
+    defer testing.allocator.free(data);
+
+    // 宿主回调（内存字节 + 绝对/相对 seek）：random_access=true → 可尾扫并恢复位置
     const Ctx = struct {
-        fn readFn(_: *anyopaque, _: []u8) usize {
-            return 0;
+        data: []const u8,
+        pos: usize = 0,
+        fn readFn(ctx: *anyopaque, buf: []u8) usize {
+            const self: *@This() = @ptrCast(@alignCast(ctx));
+            if (self.pos >= self.data.len) return 0;
+            const n = @min(buf.len, self.data.len - self.pos);
+            @memcpy(buf[0..n], self.data[self.pos .. self.pos + n]);
+            self.pos += n;
+            return n;
+        }
+        fn seekFn(ctx: *anyopaque, off: i64, whence: i32, buffered: usize) bool {
+            const self: *@This() = @ptrCast(@alignCast(ctx));
+            const base: i64 = switch (whence) {
+                0 => 0,
+                1 => @as(i64, @intCast(self.pos)) - @as(i64, @intCast(buffered)),
+                2 => @intCast(self.data.len),
+                else => return false,
+            };
+            const np = base + off;
+            if (np < 0 or np > @as(i64, @intCast(self.data.len))) return false;
+            self.pos = @intCast(np);
+            return true;
         }
     };
-    var ctx: u8 = 0;
-    var cb = io.Reader{
-        .kind = .callback,
-        .on_read = Ctx.readFn,
+    var ctx = Ctx{ .data = data };
+    const peek_buf = try testing.allocator.alloc(u8, 16 * 1024);
+    defer testing.allocator.free(peek_buf);
+
+    var ra = io.Reader.openCallback(.{
         .ctx = @ptrCast(&ctx),
-        .size_hint = 1000,
-        .buffer = try testing.allocator.alloc(u8, 16 * 1024),
-    };
-    defer testing.allocator.free(cb.buffer);
-    try testing.expect((try scanTailPage(&cb, 0)) == null);
+        .on_read = Ctx.readFn,
+        .on_seek = Ctx.seekFn,
+        .size_hint = data.len,
+        .random_access = true,
+    }, peek_buf);
+    const tail = (try scanTailPage(&ra, serial)) orelse return error.TestUnexpectedResult;
+    try testing.expectEqual(@as(i64, 500), tail.granule);
+    try testing.expect(tail.eos);
+    try testing.expectEqual(@as(u64, 0), ra.pos); // 读位置恢复（宿主经 seek 同步）
+
+    // 前向-only（random_access=false）→ 跳过尾扫，避免「跳过去再跳回来」错位
+    ctx.pos = 0;
+    var fwd = io.Reader.openCallback(.{
+        .ctx = @ptrCast(&ctx),
+        .on_read = Ctx.readFn,
+        .on_seek = Ctx.seekFn,
+        .size_hint = data.len,
+        .random_access = false,
+    }, peek_buf);
+    try testing.expect((try scanTailPage(&fwd, serial)) == null);
+    try testing.expectEqual(@as(u64, 0), fwd.pos);
 }
