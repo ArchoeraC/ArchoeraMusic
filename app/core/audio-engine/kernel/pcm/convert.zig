@@ -25,12 +25,30 @@ const builtin = @import("builtin");
 
 /// 将原生交错 PCM 转换为 float32 交错，返回写入 `out` 的样本数。
 /// 调用方保证 `out.len >= src.len / (bits/8)`。
+///
+/// 字节序作为**编译期常量**下沉到 `toFloatEndian`：原先 `endian` 是运行期参数，
+/// 每个样本都要经 `std.mem.readInt` 做 `endian == native` 分支/`@byteSwap`；大端
+/// 变体（RIFX/AIFF/CAU 大端）与常规小端因此各自编译出无分支的加载序列。位深/浮点
+/// 语义与舍入完全不变（纯分支消除，A 档精度中性）。
 pub fn toFloat(
     out: []f32,
     src: []const u8,
     bits: u8,
     is_float: bool,
     endian: std.builtin.Endian,
+) usize {
+    return switch (endian) {
+        .little => toFloatEndian(.little, out, src, bits, is_float),
+        .big => toFloatEndian(.big, out, src, bits, is_float),
+    };
+}
+
+fn toFloatEndian(
+    comptime endian: std.builtin.Endian,
+    out: []f32,
+    src: []const u8,
+    bits: u8,
+    is_float: bool,
 ) usize {
     const bytes_per = @as(usize, bits) / 8;
     const n = @min(out.len, src.len / bytes_per);
@@ -59,7 +77,7 @@ pub fn toFloat(
         24 => {
             const inv = 1.0 / 8388608.0;
             for (0..n) |i| {
-                out[i] = @as(f32, @floatFromInt(readI24(src[i * 3 ..][0..3], endian))) * inv;
+                out[i] = @as(f32, @floatFromInt(readI24(endian, src[i * 3 ..][0..3]))) * inv;
             }
         },
         32 => {
@@ -101,8 +119,8 @@ pub fn toFloat(
     return n;
 }
 
-/// 读 24 位有符号整数（符号扩展到 i32）
-fn readI24(b: []const u8, endian: std.builtin.Endian) i32 {
+/// 读 24 位有符号整数（符号扩展到 i32，字节序为编译期常量）
+fn readI24(comptime endian: std.builtin.Endian, b: []const u8) i32 {
     var v: u32 = switch (endian) {
         .little => @as(u32, b[0]) | (@as(u32, b[1]) << 8) | (@as(u32, b[2]) << 16),
         .big => (@as(u32, b[0]) << 16) | (@as(u32, b[1]) << 8) | @as(u32, b[2]),
