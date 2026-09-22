@@ -12,8 +12,9 @@
  *   - 线程模型：Zig 内核不持线程，仅被 C 壳（mediaengine_lib.c 引擎线程）调用；
  *   - 内存：Zig 侧统一使用宿主 CRT malloc/free，本层不接管任何所有权。
  *
- * 解码侧（zk_decoder_*）为本阶段已实现符号；DSP 侧（zk_dsp_*）随
- * dsp 模块移植完成加入（Phase A DSP 阶段），届时追加声明。
+ * 解码侧（zk_decoder_*）为本阶段已实现符号；DSP 侧（zk_dsp_eq_* /
+ * zk_dsp_limiter_* / zk_dsp_loudness_*）已随 kernel/dsp 落地（方向① 地基），
+ * fft / resampler / tempo 仍为内核侧接口占位（未导出，见 kernel/dsp/）。
  */
 #ifndef ARCHOERA_KERNEL_BRIDGE_H
 #define ARCHOERA_KERNEL_BRIDGE_H
@@ -123,6 +124,83 @@ long long zk_decoder_position_ms(ZkDecoder *d);
 
 /** 释放解码会话（含底层文件句柄与全部缓冲）；d 为 NULL 时为空操作 */
 void zk_decoder_close(ZkDecoder *d);
+
+/* ---- DSP 下沉（kernel/dsp；docs/audio-kernel-zig.md §14，扩张计划方向① 地基）----
+ *
+ * C 壳 equalizer.c / limiter.c / loudness.c 在 HAS_ARCHOERA_KERNEL 时优先
+ * 路由到本组内核实现，create 失败或内核库缺失时回退各自 C 实现——对外
+ * 行为与既有 ABI（equalizer_* / limiter_* / loudness_*）不变。
+ *
+ * 契约（与 C 实现逐函数对应）：
+ *   - create：非法参数 / OOM 返回 NULL（调用方回退）；
+ *   - process：就地处理**交错 float32**，`samples` 为每声道帧数
+ *     （总样本 = samples × channels，由 create 时给定 channels 决定）；
+ *   - destroy：NULL 空操作；
+ *   - 指针（句柄）生命周期归调用方，错误路径不置全局状态。
+ *
+ * fft / resampler / tempo 本轮仅内核侧接口占位，导出保持 C 现状（尤其
+ * libfft.so 的 Dart ABI 零改动）。
+ */
+
+/** 均衡器句柄（内核 10 段 Biquad；不透明） */
+typedef struct ZkDspEq ZkDspEq;
+
+/** 创建均衡器（sample_rate>0，channels 1..64）；失败返回 NULL。 */
+ZkDspEq *zk_dsp_eq_create(int sample_rate, int channels);
+
+/** 设置 10 段增益（dB，顺序 31.25…16k Hz）；eq/gains 为空时空操作。 */
+void zk_dsp_eq_set_gains(ZkDspEq *eq, const float gains[10]);
+
+/** 设置前级增益（dB）。 */
+void zk_dsp_eq_set_preamp(ZkDspEq *eq, float preamp_db);
+
+/** 就地处理交错 float32 PCM（samples = 每声道帧数）。 */
+void zk_dsp_eq_process(ZkDspEq *eq, float *pcm, int samples);
+
+/** 释放均衡器；NULL 空操作。 */
+void zk_dsp_eq_destroy(ZkDspEq *eq);
+
+/** 限幅器句柄（内核软膝压缩；不透明） */
+typedef struct ZkDspLimiter ZkDspLimiter;
+
+/** 创建限幅器（默认启用、阈值 −1 dB）；失败返回 NULL。 */
+ZkDspLimiter *zk_dsp_limiter_create(int sample_rate, int channels);
+
+/** 启用（enabled != 0）/ 禁用。 */
+void zk_dsp_limiter_set_enabled(ZkDspLimiter *lim, int enabled);
+
+/** 设置阈值（dB，默认 −1.0）。 */
+void zk_dsp_limiter_set_threshold(ZkDspLimiter *lim, float threshold_db);
+
+/** 当前阈值（dB）；lim 为空时返回默认 −1.0。 */
+float zk_dsp_limiter_get_threshold(const ZkDspLimiter *lim);
+
+/** 就地处理交错 float32 PCM（samples = 每声道帧数）。 */
+void zk_dsp_limiter_process(ZkDspLimiter *lim, float *pcm, int samples);
+
+/** 释放限幅器；NULL 空操作。 */
+void zk_dsp_limiter_destroy(ZkDspLimiter *lim);
+
+/** 响度归一化句柄（内核静态增益补偿；不透明） */
+typedef struct ZkDspLoudness ZkDspLoudness;
+
+/** 创建响度实例（默认禁用、目标 −14 LUFS、增益 0 dB）；失败返回 NULL。 */
+ZkDspLoudness *zk_dsp_loudness_create(int sample_rate, int channels);
+
+/** 启用（enabled != 0）/ 禁用。 */
+void zk_dsp_loudness_set_enabled(ZkDspLoudness *l, int enabled);
+
+/** 设置目标响度（LUFS，默认 −14）。 */
+void zk_dsp_loudness_set_target(ZkDspLoudness *l, float target_lufs);
+
+/** 设置预计算增益（dB）。 */
+void zk_dsp_loudness_set_gain(ZkDspLoudness *l, float gain_db);
+
+/** 就地处理交错 float32 PCM（samples = 每声道帧数）。 */
+void zk_dsp_loudness_process(ZkDspLoudness *l, float *pcm, int samples);
+
+/** 释放响度实例；NULL 空操作。 */
+void zk_dsp_loudness_destroy(ZkDspLoudness *l);
 
 /* ---- 常驻内核接入 seam（§7 async 主干；加法式，不改动既有路径）---- */
 

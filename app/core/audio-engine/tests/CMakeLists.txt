@@ -23,6 +23,31 @@ add_engine_test(test_limiter test_limiter.c)
 add_engine_test(test_fft test_fft.c)
 add_engine_test(test_loudness test_loudness.c)
 
+# 内核 DSP（zk_dsp_*）vs 纯 C 实现逐块对照（方向① 地基，docs/audio-kernel-zig.md
+# §14）：dsp_ref/*.c 以重命名符号**再编译一份生产线 C 源码**作为参考（无复制
+# 漂移），与内核 EQ/限幅/响度对拍。依赖 HAS_ARCHOERA_KERNEL（内核静态库在场）。
+if(HAS_ARCHOERA_KERNEL)
+    add_executable(test_dsp_kernel test_dsp_kernel.c
+        dsp_ref/eq_ref.c
+        dsp_ref/lim_ref.c
+        dsp_ref/loud_ref.c
+    )
+    target_link_libraries(test_dsp_kernel PRIVATE audio_engine_static)
+    if(TARGET Threads::Threads)
+        target_link_libraries(test_dsp_kernel PRIVATE Threads::Threads)
+    endif()
+    if(UNIX)
+        target_link_libraries(test_dsp_kernel PRIVATE m)
+    endif()
+    target_include_directories(test_dsp_kernel PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    )
+    add_test(NAME test_dsp_kernel COMMAND test_dsp_kernel)
+    set_tests_properties(test_dsp_kernel PROPERTIES
+        PASS_REGULAR_EXPRESSION "ALL PASS")
+endif()
+
 # 输出设备枚举：名称启发式分类 / ALSA 虚拟设备标记（纯函数，headless，无设备依赖）
 add_engine_test(test_audio_output test_audio_output.c)
 set_tests_properties(test_audio_output PROPERTIES
