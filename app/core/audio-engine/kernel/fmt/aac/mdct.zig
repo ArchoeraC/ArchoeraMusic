@@ -20,6 +20,7 @@
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
+const vec = @import("../../simd/vec.zig");
 
 /// 泛型 MDCT（T = f32 / f64）。f32 用 f32 表（黄金向量位模式），
 /// f64 用提升表；蝶形/FFT 全程 T 精度。
@@ -210,6 +211,35 @@ pub fn Mdct(comptime T: type) type {
             const o2 = 4 * len;
             const o3 = 6 * len;
 
+            // f32 向量路径：每轮 j 的 8 个 k 相互独立，打包成 V8 lane（逐 lane 运算顺序
+            // 与标量 transformW 完全一致 → 逐位一致）。f64 仍走标量（无 f64 实例化）。
+            if (T == f32) {
+                const zf: [*]f32 = @ptrCast(z.ptr);
+                const cf: [*]const f32 = @ptrCast(cos.ptr);
+                var jv: usize = 0;
+                while (jv < len / 4) : (jv += 1) {
+                    const zi = jv * 8;
+                    const ci = jv * 8;
+                    const a0 = vec.loadDeinterleave8(zf + 2 * zi);
+                    const a1 = vec.loadDeinterleave8(zf + 2 * (zi + o1));
+                    const a2 = vec.loadDeinterleave8(zf + 2 * (zi + o2));
+                    const a3 = vec.loadDeinterleave8(zf + 2 * (zi + o3));
+                    const wre = vec.load8(cf + ci);
+                    // lane k = cos[o1 - 8j - k]：取 cos[o1-8j-7 .. o1-8j] 后反序
+                    const wim = vec.rev8(vec.load8(cf + (o1 - 8 * jv - 7)));
+                    const r = transformW8(
+                        a0.re, a0.im, a1.re, a1.im,
+                        a2.re, a2.im, a3.re, a3.im,
+                        wre, wim,
+                    );
+                    vec.storeInterleave8(zf + 2 * zi, r.a0re, r.a0im);
+                    vec.storeInterleave8(zf + 2 * (zi + o1), r.a1re, r.a1im);
+                    vec.storeInterleave8(zf + 2 * (zi + o2), r.a2re, r.a2im);
+                    vec.storeInterleave8(zf + 2 * (zi + o3), r.a3re, r.a3im);
+                }
+                return;
+            }
+
             // C 版用递减指针 wim（可越过表基址，仅相对读取）；此处换算为绝对索引
             // 第 j 轮：cos 正向 ci=8j；wim 绝对索引 = o1 - 8j - k
             var j: usize = 0;
@@ -223,6 +253,66 @@ pub fn Mdct(comptime T: type) type {
                     transformW(&z[zi + k], &z[zi + o1 + k], &z[zi + o2 + k], &z[zi + o3 + k], cos[ci + k], cos[o1 - 8 * j - k]);
                 }
             }
+        }
+
+        const W8 = struct {
+            a0re: vec.V8, a0im: vec.V8,
+            a1re: vec.V8, a1im: vec.V8,
+            a2re: vec.V8, a2im: vec.V8,
+            a3re: vec.V8, a3im: vec.V8,
+        };
+
+        /// transformW 的 8 lane 版本：逐 lane 与标量 transformW 的运算顺序逐条一致
+        /// （不重结合、不引 FMA）。
+        inline fn transformW8(
+            a0re_in: vec.V8,
+            a0im_in: vec.V8,
+            a1re_in: vec.V8,
+            a1im_in: vec.V8,
+            a2re_in: vec.V8,
+            a2im_in: vec.V8,
+            a3re_in: vec.V8,
+            a3im_in: vec.V8,
+            wre: vec.V8,
+            wim: vec.V8,
+        ) W8 {
+            var a0re = a0re_in;
+            var a0im = a0im_in;
+            var a1re = a1re_in;
+            var a1im = a1im_in;
+            var a2re = a2re_in;
+            var a2im = a2im_in;
+            var a3re = a3re_in;
+            var a3im = a3im_in;
+            // CMUL(t1,t2, a2.re,a2.im, wre,-wim); CMUL(t5,t6, a3.re,a3.im, wre,wim)
+            const t1 = a2re * wre + a2im * wim;
+            const t2 = a2im * wre - a2re * wim;
+            var t5 = a3re * wre - a3im * wim;
+            const t6 = a3re * wim + a3im * wre;
+
+            const r0 = a0re;
+            const ai0 = a0im;
+            const r1 = a1re;
+            const ai1 = a1im;
+
+            const t3 = t5 - t1;
+            t5 = t5 + t1;
+            a2re = r0 - t5;
+            a0re = r0 + t5;
+            a3im = ai1 - t3;
+            a1im = ai1 + t3;
+            const t4 = t2 - t6;
+            const t6b = t2 + t6;
+            a3re = r1 - t4;
+            a1re = r1 + t4;
+            a2im = ai0 - t6b;
+            a0im = ai0 + t6b;
+            return .{
+                .a0re = a0re, .a0im = a0im,
+                .a1re = a1re, .a1im = a1im,
+                .a2re = a2re, .a2im = a2im,
+                .a3re = a3re, .a3im = a3im,
+            };
         }
 
         pub fn fftSr(comptime n: usize, z: []Cplx) void {
@@ -372,13 +462,40 @@ pub fn Mdct(comptime T: type) type {
             const z = scratch[0..n2];
 
             // ---- fold（ff_tx_mdct_inv 折叠循环，map 翻倍）----
-            for (0..n2) |i| {
-                const k: usize = @as(usize, self.map[i]) << 1;
-                const tre = in[n - 1 - k];
-                const tim = in[k];
-                const e = self.exp[i]; // permuted 段
-                z[i].re = tre * e.re - tim * e.im;
-                z[i].im = tre * e.im + tim * e.re;
+            if (T == f32) {
+                // 每个 i 独立；输出 z[i] 连续、输入按 map 聚集。8 lane 打包，
+                // lane 内运算顺序与标量一致（逐位一致）。
+                const zf: [*]f32 = @ptrCast(z.ptr);
+                const ef: [*]const f32 = @ptrCast(self.exp.ptr);
+                var i: usize = 0;
+                while (i + 8 <= n2) : (i += 8) {
+                    var tre: vec.V8 = undefined;
+                    var tim: vec.V8 = undefined;
+                    inline for (0..8) |t| {
+                        const k: usize = @as(usize, self.map[i + t]) << 1;
+                        tre[t] = in[n - 1 - k];
+                        tim[t] = in[k];
+                    }
+                    const e = vec.loadDeinterleave8(ef + 2 * i);
+                    vec.storeInterleave8(zf + 2 * i, tre * e.re - tim * e.im, tre * e.im + tim * e.re);
+                }
+                while (i < n2) : (i += 1) {
+                    const k: usize = @as(usize, self.map[i]) << 1;
+                    const tre = in[n - 1 - k];
+                    const tim = in[k];
+                    const e = self.exp[i];
+                    z[i].re = tre * e.re - tim * e.im;
+                    z[i].im = tre * e.im + tim * e.re;
+                }
+            } else {
+                for (0..n2) |i| {
+                    const k: usize = @as(usize, self.map[i]) << 1;
+                    const tre = in[n - 1 - k];
+                    const tim = in[k];
+                    const e = self.exp[i]; // permuted 段
+                    z[i].re = tre * e.re - tim * e.im;
+                    z[i].im = tre * e.im + tim * e.re;
+                }
             }
 
             // ---- n2 点 split-radix FFT（原地）----
@@ -392,22 +509,65 @@ pub fn Mdct(comptime T: type) type {
 
             // ---- post-twiddle（exp += n2 后的 raw 段）----
             const raw = self.exp[n2..];
-            for (0..n4) |i| {
-                const p0 = n4 + i;
-                const p1 = n4 - i - 1;
-                // C 版先快照 src1/src0 再写回（存在别名，顺序敏感）
-                const s1re = z[p1].im;
-                const s1im = z[p1].re;
-                const s0re = z[p0].im;
-                const s0im = z[p0].re;
-                const e1 = raw[p1];
-                const e0 = raw[p0];
-                // CMUL(z[i1].re, z[i0].im, src1.re, src1.im, E.im, E.re)
-                z[p1].re = s1re * e1.im - s1im * e1.re;
-                z[p0].im = s1re * e1.re + s1im * e1.im;
-                // CMUL(z[i0].re, z[i1].im, src0.re, src0.im, F.im, F.re)
-                z[p0].re = s0re * e0.im - s0im * e0.re;
-                z[p1].im = s0re * e0.re + s0im * e0.im;
+            if (T == f32) {
+                // 每 lane 独立；p0 升序、p1 降序（rev8 折算）；lane 内运算顺序与标量一致。
+                const zf: [*]f32 = @ptrCast(z.ptr);
+                const rf: [*]const f32 = @ptrCast(raw.ptr);
+                var i: usize = 0;
+                while (i + 8 <= n4) : (i += 8) {
+                    const p0 = n4 + i;
+                    const b1 = n4 - 8 - i; // p1 降序块基址：p1(t) = n4-1-i-t = b1 + (7-t)
+                    const l0 = vec.loadDeinterleave8(zf + 2 * p0);
+                    const l1 = vec.loadDeinterleave8(zf + 2 * b1);
+                    // p0 段：s0re = z[p0].im，s0im = z[p0].re（升序，直接对应）
+                    const s0re = l0.im;
+                    const s0im = l0.re;
+                    // p1 段：lane t 对应 z[b1+(7-t)] → 反序
+                    const s1re = vec.rev8(l1.im);
+                    const s1im = vec.rev8(l1.re);
+                    const e0 = vec.loadDeinterleave8(rf + 2 * p0);
+                    const e1l = vec.loadDeinterleave8(rf + 2 * b1);
+                    const e1re = vec.rev8(e1l.re);
+                    const e1im = vec.rev8(e1l.im);
+                    const p0re = s0re * e0.im - s0im * e0.re;
+                    const p0im = s1re * e1re + s1im * e1im;
+                    const p1re = s1re * e1im - s1im * e1re;
+                    const p1im = s0re * e0.re + s0im * e0.im;
+                    vec.storeInterleave8(zf + 2 * p0, p0re, p0im);
+                    vec.storeInterleave8(zf + 2 * b1, vec.rev8(p1re), vec.rev8(p1im));
+                }
+                while (i < n4) : (i += 1) {
+                    const p0 = n4 + i;
+                    const p1 = n4 - i - 1;
+                    const s1re = z[p1].im;
+                    const s1im = z[p1].re;
+                    const s0re = z[p0].im;
+                    const s0im = z[p0].re;
+                    const e1 = raw[p1];
+                    const e0 = raw[p0];
+                    z[p1].re = s1re * e1.im - s1im * e1.re;
+                    z[p0].im = s1re * e1.re + s1im * e1.im;
+                    z[p0].re = s0re * e0.im - s0im * e0.re;
+                    z[p1].im = s0re * e0.re + s0im * e0.im;
+                }
+            } else {
+                for (0..n4) |i| {
+                    const p0 = n4 + i;
+                    const p1 = n4 - i - 1;
+                    // C 版先快照 src1/src0 再写回（存在别名，顺序敏感）
+                    const s1re = z[p1].im;
+                    const s1im = z[p1].re;
+                    const s0re = z[p0].im;
+                    const s0im = z[p0].re;
+                    const e1 = raw[p1];
+                    const e0 = raw[p0];
+                    // CMUL(z[i1].re, z[i0].im, src1.re, src1.im, E.im, E.re)
+                    z[p1].re = s1re * e1.im - s1im * e1.re;
+                    z[p0].im = s1re * e1.re + s1im * e1.im;
+                    // CMUL(z[i0].re, z[i1].im, src0.re, src0.im, F.im, F.re)
+                    z[p0].re = s0re * e0.im - s0im * e0.re;
+                    z[p1].im = s0re * e0.re + s0im * e0.im;
+                }
             }
 
             // ---- 交错输出（z 的 re/im 即连续 T）----

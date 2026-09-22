@@ -190,18 +190,18 @@ pub fn symsU16(comptime syms: []const u8) [syms.len]u16 {
 const tables = @import("tables.zig");
 
 inline fn cnkLen(k: usize, n: usize) i32 {
-    return tables.mpc8_cnk_len[k][n] - 1;
+    return tables.era_era_mpc8_cnk_len[k][n] - 1;
 }
 inline fn cnkLost(k: usize, n: usize) u32 {
-    return tables.mpc8_cnk_lost[k][n];
+    return tables.era_era_mpc8_cnk_lost[k][n];
 }
 
 /// mpc8_dec_base(gb, k, n)：k>=1, n>=1（下标 n-1 语义，调用处 n-1 为列）
 pub fn decBase(br: *BitReader, k: usize, n: usize) u32 {
-    const len: i32 = tables.mpc8_cnk_len[k - 1][n - 1] - 1;
+    const len: i32 = tables.era_era_mpc8_cnk_len[k - 1][n - 1] - 1;
     var code: u32 = if (len != 0) br.bits(@intCast(len)) else 0;
-    if (code >= tables.mpc8_cnk_lost[k - 1][n - 1]) {
-        code = ((code << 1) | br.bit()) -% tables.mpc8_cnk_lost[k - 1][n - 1];
+    if (code >= tables.era_era_mpc8_cnk_lost[k - 1][n - 1]) {
+        code = ((code << 1) | br.bit()) -% tables.era_era_mpc8_cnk_lost[k - 1][n - 1];
     }
     return code;
 }
@@ -215,9 +215,9 @@ pub fn decEnum(br: *BitReader, k_in: usize, n_in: usize) u32 {
     var row: usize = k_in - 1; // C 指针语义：cnk[row]
     while (k > 0) {
         n -= 1;
-        if (code >= tables.mpc8_cnk[row][n]) {
+        if (code >= tables.era_era_mpc8_cnk[row][n]) {
             bits |= @as(u32, 1) << @intCast(n);
-            code -= tables.mpc8_cnk[row][n];
+            code -= tables.era_era_mpc8_cnk[row][n];
             if (row > 0) row -= 1;
             k -= 1;
         }
@@ -227,7 +227,7 @@ pub fn decEnum(br: *BitReader, k_in: usize, n_in: usize) u32 {
 
 /// mpc8_get_mod_golomb(gb, m)：返回 0..m 的编码（k=1,n=m+1）
 pub fn getModGolomb(br: *BitReader, m: usize) u32 {
-    if (tables.mpc8_cnk_len[0][m] < 1) return 0;
+    if (tables.era_era_mpc8_cnk_len[0][m] < 1) return 0;
     return decBase(br, 1, m + 1);
 }
 
@@ -243,8 +243,8 @@ pub fn getMask(br: *BitReader, size: usize, t: usize) u32 {
 
 test "vlc canonical build/decode roundtrip" {
     const tables8 = @import("tables.zig");
-    const lens = comptime lensFromCounts(tables8.mpc8_bands_len_counts, 33);
-    const syms = comptime symsU16(&tables8.mpc8_bands_syms);
+    const lens = comptime lensFromCounts(tables8.era_era_mpc8_bands_len_counts, 33);
+    const syms = comptime symsU16(&tables8.era_era_mpc8_bands_syms);
     var v = Vlc.init();
     v.build(33, &lens, &syms, 0);
     try std.testing.expect(v.maxlen > 0);

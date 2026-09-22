@@ -6,17 +6,64 @@
 //! 合成滤波器组（DCT-II + 多相滤波），对标 minimp3 标量路径（CC0）。
 
 const std = @import("std");
+const vec = @import("vec.zig");
 
 const g_sec = [24]f32{
     10.19000816, 0.50060302, 0.50241929, 3.40760851, 0.50547093, 0.52249861, 2.05778098, 0.51544732, 0.56694406, 1.48416460, 0.53104258, 0.64682180, 1.16943991, 0.55310392, 0.78815460, 0.97256821, 0.58293498, 1.06067765, 0.83934963, 0.62250412, 1.72244716, 0.74453628, 0.67480832, 5.10114861,
 };
 
+/// 8 点 DCT 核（对标 minimp3 mp3d_DCT_II 内层蝶形）。
+/// 输入的 4 个「行」相互独立 → 用 V4 逐 lane 并行；每 lane 的运算顺序与标量完全一致，
+/// 不重组浮点、不引入 FMA → 位级一致（B 档手法但无精度风险）。
+inline fn dctRows8(in: [8]V4) [8]V4 {
+    var v0 = in[0];
+    var v1 = in[1];
+    var v2 = in[2];
+    var v3 = in[3];
+    const v4 = in[4];
+    const v5 = in[5];
+    const v6 = in[6];
+    const v7 = in[7];
+    var xt = v0 - v7;
+    v0 += v7;
+    var w7 = v1 - v6;
+    v1 += v6;
+    var w6 = v2 - v5;
+    v2 += v5;
+    var w5 = v3 - v4;
+    v3 += v4;
+    const w4 = v0 - v3;
+    v0 += v3;
+    var w3 = v1 - v2;
+    v1 += v2;
+    var out: [8]V4 = undefined;
+    out[0] = v0 + v1;
+    out[4] = (v0 - v1) * @as(V4, @splat(0.70710677));
+    w5 = w5 + w6;
+    w6 = (w6 + w7) * @as(V4, @splat(0.70710677));
+    w7 = w7 + xt;
+    w3 = (w3 + w4) * @as(V4, @splat(0.70710677));
+    w5 -= w7 * @as(V4, @splat(0.198912367));
+    w7 += w5 * @as(V4, @splat(0.382683432));
+    w5 -= w7 * @as(V4, @splat(0.198912367));
+    const c0 = xt - w6;
+    xt += w6;
+    out[1] = (xt + w7) * @as(V4, @splat(0.50979561));
+    out[2] = (w4 + w3) * @as(V4, @splat(0.54119611));
+    out[3] = (c0 - w5) * @as(V4, @splat(0.60134488));
+    out[5] = (c0 + w5) * @as(V4, @splat(0.89997619));
+    out[6] = (w4 - w3) * @as(V4, @splat(1.30656302));
+    out[7] = (xt - w7) * @as(V4, @splat(2.56291556));
+    return out;
+}
+
 /// DCT-II，对标 minimp3 mp3d_DCT_II 标量路径（n 频带）。
+/// 采集阶段直接产出「列向量」tv[i]（lane = t[0..3][i]），蝶形阶段以 V4 并行 4 行。
 pub fn dctII(grbuf: []f32, n: usize) void {
     var k: usize = 0;
     while (k < n) : (k += 1) {
-        var t: [4][8]f32 = undefined;
         const y = grbuf[k..];
+        var tv: [8]V4 = undefined;
         var i: usize = 0;
         while (i < 8) : (i += 1) {
             const x0 = y[i * 18];
@@ -27,66 +74,23 @@ pub fn dctII(grbuf: []f32, n: usize) void {
             const tt1 = x1 + x2;
             const tt2 = (x1 - x2) * g_sec[3 * i + 0];
             const tt3 = (x0 - x3) * g_sec[3 * i + 1];
-            t[0][i] = tt0 + tt1;
-            t[1][i] = (tt0 - tt1) * g_sec[3 * i + 2];
-            t[2][i] = tt3 + tt2;
-            t[3][i] = (tt3 - tt2) * g_sec[3 * i + 2];
+            const s2 = g_sec[3 * i + 2];
+            tv[i] = .{ tt0 + tt1, (tt0 - tt1) * s2, tt3 + tt2, (tt3 - tt2) * s2 };
         }
-        var b0: [*]f32 = &t[0];
-        var idx: usize = 0;
-        while (idx < 4) : (idx += 1) {
-            var v0 = b0[0];
-            var v1 = b0[1];
-            var v2 = b0[2];
-            var v3 = b0[3];
-            const v4 = b0[4];
-            const v5 = b0[5];
-            const v6 = b0[6];
-            const v7 = b0[7];
-            var xt = v0 - v7;
-            v0 += v7;
-            var w7 = v1 - v6;
-            v1 += v6;
-            var w6 = v2 - v5;
-            v2 += v5;
-            var w5 = v3 - v4;
-            v3 += v4;
-            const w4 = v0 - v3;
-            v0 += v3;
-            var w3 = v1 - v2;
-            v1 += v2;
-            b0[0] = v0 + v1;
-            b0[4] = (v0 - v1) * 0.70710677;
-            w5 = w5 + w6;
-            w6 = (w6 + w7) * 0.70710677;
-            w7 = w7 + xt;
-            w3 = (w3 + w4) * 0.70710677;
-            w5 -= w7 * 0.198912367;
-            w7 += w5 * 0.382683432;
-            w5 -= w7 * 0.198912367;
-            const c0 = xt - w6;
-            xt += w6;
-            b0[1] = (xt + w7) * 0.50979561;
-            b0[2] = (w4 + w3) * 0.54119611;
-            b0[3] = (c0 - w5) * 0.60134488;
-            b0[5] = (c0 + w5) * 0.89997619;
-            b0[6] = (w4 - w3) * 1.30656302;
-            b0[7] = (xt - w7) * 2.56291556;
-            b0 += 8;
-        }
+        const rows = dctRows8(tv);
         var yy: []f32 = y;
         var ic: usize = 0;
         while (ic < 7) : (ic += 1) {
-            yy[0 * 18] = t[0][ic];
-            yy[1 * 18] = t[2][ic] + t[3][ic] + t[3][ic + 1];
-            yy[2 * 18] = t[1][ic] + t[1][ic + 1];
-            yy[3 * 18] = t[2][ic + 1] + t[3][ic] + t[3][ic + 1];
+            yy[0 * 18] = rows[ic][0];
+            yy[1 * 18] = rows[ic][2] + rows[ic][3] + rows[ic + 1][3];
+            yy[2 * 18] = rows[ic][1] + rows[ic + 1][1];
+            yy[3 * 18] = rows[ic + 1][2] + rows[ic][3] + rows[ic + 1][3];
             yy = yy[4 * 18 ..];
         }
-        yy[0 * 18] = t[0][7];
-        yy[1 * 18] = t[2][7] + t[3][7];
-        yy[2 * 18] = t[1][7];
-        yy[3 * 18] = t[3][7];
+        yy[0 * 18] = rows[7][0];
+        yy[1 * 18] = rows[7][2] + rows[7][3];
+        yy[2 * 18] = rows[7][1];
+        yy[3 * 18] = rows[7][3];
     }
 }
 
@@ -137,6 +141,10 @@ fn synthPair(pcm: [*]f32, nch: usize, z: [*]const f32) void {
     pcm[16 * nch] = scalePcm(a);
 }
 
+/// 单条多相抽头的 4 路并行向量（vz/vy 各 4 个连续 f32）。
+/// 4 个「相位样本」相互独立，逐 lane 运算顺序与标量完全一致 → 位级一致（B 档但无精度风险）。
+const V4 = vec.V4;
+
 fn synth(xl: [*]const f32, dstl: [*]f32, nch: usize, lins: [*]f32) void {
     const xr = xl + 576 * (nch - 1);
     const dstr = dstl + (nch - 1);
@@ -161,8 +169,6 @@ fn synth(xl: [*]const f32, dstl: [*]f32, nch: usize, lins: [*]f32) void {
     var wi: usize = 0;
     var i: i32 = 14;
     while (i >= 0) : (i -= 1) {
-        var a: [4]f32 = undefined;
-        var b: [4]f32 = undefined;
         const ii: usize = @intCast(i);
         zlin[4 * ii] = xl[18 * (31 - ii)];
         zlin[4 * ii + 1] = xr[18 * (31 - ii)];
@@ -173,38 +179,39 @@ fn synth(xl: [*]const f32, dstl: [*]f32, nch: usize, lins: [*]f32) void {
         lins[15 * 64 + 4 * ii - 64 + 2] = xl[18 * (1 + ii)];
         lins[15 * 64 + 4 * ii - 64 + 3] = xr[18 * (1 + ii)];
         // S0(0) S2(1) S1(2) S2(3) S1(4) S2(5) S1(6) S2(7)
+        var a: V4 = undefined;
+        var b: V4 = undefined;
         var k: usize = 0;
         while (k < 8) : (k += 1) {
-            const w0 = w[wi];
-            const w1 = w[wi + 1];
+            const w0: V4 = @splat(w[wi]);
+            const w1: V4 = @splat(w[wi + 1]);
             wi += 2;
-            const vz: [*]const f32 = zlin + 4 * ii - 64 * k;
-            const vy: [*]const f32 = zlin + 4 * ii - 64 * (15 - k);
-            var j: usize = 0;
-            switch (k) {
-                0 => while (j < 4) : (j += 1) {
-                    b[j] = vz[j] * w1 + vy[j] * w0;
-                    a[j] = vz[j] * w0 - vy[j] * w1;
-                },
-                1, 3, 5, 7 => while (j < 4) : (j += 1) {
-                    b[j] += vz[j] * w1 + vy[j] * w0;
-                    a[j] += vy[j] * w1 - vz[j] * w0;
-                },
-                else => while (j < 4) : (j += 1) {
-                    b[j] += vz[j] * w1 + vy[j] * w0;
-                    a[j] += vz[j] * w0 - vy[j] * w1;
-                },
+            const vz = vec.load4(zlin + 4 * ii - 64 * k);
+            const vy = vec.load4(zlin + 4 * ii - 64 * (15 - k));
+            if (k == 0) {
+                b = vz * w1 + vy * w0;
+                a = vz * w0 - vy * w1;
+            } else {
+                b += vz * w1 + vy * w0;
+                if (k & 1 != 0) {
+                    a += vy * w1 - vz * w0;
+                } else {
+                    a += vz * w0 - vy * w1;
+                }
             }
-                    }
+        }
 
-        dstr[(15 - ii) * nch] = scalePcm(a[1]);
-        dstr[(17 + ii) * nch] = scalePcm(b[1]);
-        dstl[(15 - ii) * nch] = scalePcm(a[0]);
-        dstl[(17 + ii) * nch] = scalePcm(b[0]);
-        dstr[(47 - ii) * nch] = scalePcm(a[3]);
-        dstr[(49 + ii) * nch] = scalePcm(b[3]);
-        dstl[(47 - ii) * nch] = scalePcm(a[2]);
-        dstl[(49 + ii) * nch] = scalePcm(b[2]);
+        const sc: V4 = @splat(1.0 / 32768.0);
+        const as = a * sc;
+        const bs = b * sc;
+        dstr[(15 - ii) * nch] = as[1];
+        dstr[(17 + ii) * nch] = bs[1];
+        dstl[(15 - ii) * nch] = as[0];
+        dstl[(17 + ii) * nch] = bs[0];
+        dstr[(47 - ii) * nch] = as[3];
+        dstr[(49 + ii) * nch] = bs[3];
+        dstl[(47 - ii) * nch] = as[2];
+        dstl[(49 + ii) * nch] = bs[2];
     }
 }
 

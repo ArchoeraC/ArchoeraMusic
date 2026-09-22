@@ -33,15 +33,15 @@ const tables = @import("tables.zig");
 
 pub const Error = error{ Corrupt, OutOfMemory };
 
-const SBLIMIT = synth.SBLIMIT;
-const SAMPLES_PER_BAND = synth.SAMPLES_PER_BAND;
-const MPC_FRAME_SIZE = synth.MPC_FRAME_SIZE;
-const BANDS = 32;
+const era_sblimit = synth.era_sblimit;
+const era_samples_per_band = synth.era_samples_per_band;
+const era_mpc_frame_size = synth.era_mpc_frame_size;
+const era_mpc_bands = 32;
 
 /// FFmpeg mpc demuxer：DELAY_FRAMES（seek 预热丢弃帧数）
-pub const DELAY_FRAMES = 32;
+pub const era_mpc_delay_frames = 32;
 /// mpc_rate[extradata[2] & 3]（libavformat/mpc.c）
-const mpc_rate = [4]u32{ 44100, 48000, 37800, 32000 };
+const era_mpc_rate = [4]u32{ 44100, 48000, 37800, 32000 };
 
 /// 头部/extradata 解析出的解码器配置（mpc7_decode_init）
 pub const Cfg = struct {
@@ -49,11 +49,11 @@ pub const Cfg = struct {
     /// IS 标志（mpc7.c 读取但不参与解码路径）
     is: bool,
     mss: bool,
-    maxbands: i32,
-    gapless: bool,
-    lastframelen: u32,
+    era_maxbands: i32,
+    era_gapless: bool,
+    era_lastframelen: u32,
     /// 容器声明的帧总数（fcount；0 = 未声明）
-    fcount: u32,
+    era_fcount: u32,
 };
 
 /// 一帧的封装参数（mpc_read_packet 推导；pos 指向文件内载荷起点）
@@ -84,9 +84,9 @@ pub fn parse(data: []const u8, allocator: std.mem.Allocator) Error!Parsed {
     if (!std.mem.eql(u8, data[0..3], "MP+")) return error.Corrupt;
     const ver = data[3];
     if (ver != 7 and ver != 0x17) return error.Corrupt; // 仅 SV7
-    const fcount = std.mem.readInt(u32, data[4..8], .little);
+    const era_fcount = std.mem.readInt(u32, data[4..8], .little);
     // FFmpeg：fcount * sizeof(MPCFrame) >= UINT_MAX → AVERROR_INVALIDDATA
-    if (@as(u64, fcount) * @sizeOf(Frame) >= std.math.maxInt(u32)) return error.Corrupt;
+    if (@as(u64, era_fcount) * @sizeOf(Frame) >= std.math.maxInt(u32)) return error.Corrupt;
 
     // ---- mpc7_decode_init：extradata 16 字节 bswap 后读位域 ----
     const extradata = data[8..24];
@@ -95,18 +95,18 @@ pub fn parse(data: []const u8, allocator: std.mem.Allocator) Error!Parsed {
     bswapBuf(&hdr);
     var gb = vlc.BitReader{ .data = &hdr };
     var cfg: Cfg = .{
-        .sample_rate = mpc_rate[extradata[2] & 3],
+        .sample_rate = era_mpc_rate[extradata[2] & 3],
         .is = gb.bit() != 0,
         .mss = gb.bit() != 0,
-        .maxbands = @intCast(gb.bits(6)),
-        .gapless = undefined,
-        .lastframelen = undefined,
-        .fcount = fcount,
+        .era_maxbands = @intCast(gb.bits(6)),
+        .era_gapless = undefined,
+        .era_lastframelen = undefined,
+        .era_fcount = era_fcount,
     };
-    if (cfg.maxbands >= BANDS) return error.Corrupt;
+    if (cfg.era_maxbands >= era_mpc_bands) return error.Corrupt;
     gb.pos += 88; // skip_bits_long(&gb, 88)
-    cfg.gapless = gb.bit() != 0;
-    cfg.lastframelen = gb.bits(11);
+    cfg.era_gapless = gb.bit() != 0;
+    cfg.era_lastframelen = gb.bits(11);
 
     // ---- mpc_read_packet：帧链推导 ----
     var frames = std.ArrayList(Frame).empty;
@@ -116,7 +116,7 @@ pub fn parse(data: []const u8, allocator: std.mem.Allocator) Error!Parsed {
     var cur: u32 = 0;
     while (true) {
         // `if (c->curframe >= c->fcount && c->fcount) return AVERROR_EOF;`
-        if (fcount != 0 and cur >= fcount) break;
+        if (era_fcount != 0 and cur >= era_fcount) break;
         // 需要读 1–2 个 LE u32 推导帧长；位置越过文件尾 → avio 语义失败，停止
         const need: usize = if (curbits <= 12) 4 else 8;
         if (pos + need > data.len) break;
@@ -130,7 +130,7 @@ pub fn parse(data: []const u8, allocator: std.mem.Allocator) Error!Parsed {
         }
         curbits += 20;
         const size = ((size2 + curbits + 31) & ~@as(u32, 31)) >> 3;
-        const pkt_last = fcount != 0 and (cur + 1) > fcount;
+        const pkt_last = era_fcount != 0 and (cur + 1) > era_fcount;
         // avio_read 不足 size 字节（文件截断）→ AVERROR_INVALIDDATA，该包丢弃
         if (pos + size > data.len) break;
         // 退化防护：合法帧至少含 res/scf/量化位流，4 字节装不下；
@@ -176,15 +176,15 @@ pub const Decoder7 = struct {
     allocator: std.mem.Allocator,
     data: []const u8,
     parsed: Parsed,
-    core: synth.MpcCore = .{},
-    scfi_vlc: vlc.Vlc = vlc.Vlc.init(),
-    dscf_vlc: vlc.Vlc = vlc.Vlc.init(),
-    hdr_vlc: vlc.Vlc = vlc.Vlc.init(),
-    quant_vlc: [7][2]vlc.Vlc = .{ .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() } },
+    core: synth.EraMpcCore = .{},
+    era_scfi_vlc: vlc.Vlc = vlc.Vlc.init(),
+    era_dscf_vlc: vlc.Vlc = vlc.Vlc.init(),
+    era_hdr_vlc: vlc.Vlc = vlc.Vlc.init(),
+    era_quant_vlc: [7][2]vlc.Vlc = .{ .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() }, .{ vlc.Vlc.init(), vlc.Vlc.init() } },
     /// bswap 载荷暂存（init 时按最大帧分配）
     scratch: []u8 = &.{},
 
-    cur_frame: usize = 0,
+    era_cur_frame: usize = 0,
     eof: bool = false,
 
     pub fn init(allocator: std.mem.Allocator, data: []const u8) Error!Decoder7 {
@@ -212,7 +212,7 @@ pub const Decoder7 = struct {
     /// seek"的 FFmpeg 路径一致；会话中途 seek 的 rnd 连续性见 lib.zig 说明）。
     pub fn resetTo(self: *Decoder7, frame: usize) void {
         self.core.init();
-        self.cur_frame = frame;
+        self.era_cur_frame = frame;
         self.eof = frame >= self.parsed.frames.len;
     }
 
@@ -220,44 +220,44 @@ pub const Decoder7 = struct {
         // VLC_INIT_STATIC_TABLE_FROM_LENGTHS：偶数字节为符号、奇数字节为码长
         //（ff_vlc_init_from_lengths 按输入顺序增量分配码字），offset 加在符号上。
         const t = &tables;
-        self.scfi_vlc.build(4, &t.mpc7_scfi_lens, &vlc.symsU16(&t.mpc7_scfi_codes), 0);
-        self.dscf_vlc.build(16, &t.mpc7_dscf_lens, &vlc.symsU16(&t.mpc7_dscf_codes), -7);
-        self.hdr_vlc.build(10, &t.mpc7_hdr_lens, &vlc.symsU16(&t.mpc7_hdr_codes), -5);
+        self.era_scfi_vlc.build(4, &t.era_era_mpc7_scfi_lens, &vlc.symsU16(&t.era_era_mpc7_scfi_codes), 0);
+        self.era_dscf_vlc.build(16, &t.era_era_mpc7_dscf_lens, &vlc.symsU16(&t.era_era_mpc7_dscf_codes), -7);
+        self.era_hdr_vlc.build(10, &t.era_era_mpc7_hdr_lens, &vlc.symsU16(&t.era_era_mpc7_hdr_codes), -5);
         inline for (0..7) |i| {
             inline for (0..2) |j| {
                 const pair = comptime switch (i * 2 + j) {
-                    0 => .{ &t.mpc7_quant_0_0_codes, &t.mpc7_quant_0_0_lens },
-                    1 => .{ &t.mpc7_quant_0_1_codes, &t.mpc7_quant_0_1_lens },
-                    2 => .{ &t.mpc7_quant_1_0_codes, &t.mpc7_quant_1_0_lens },
-                    3 => .{ &t.mpc7_quant_1_1_codes, &t.mpc7_quant_1_1_lens },
-                    4 => .{ &t.mpc7_quant_2_0_codes, &t.mpc7_quant_2_0_lens },
-                    5 => .{ &t.mpc7_quant_2_1_codes, &t.mpc7_quant_2_1_lens },
-                    6 => .{ &t.mpc7_quant_3_0_codes, &t.mpc7_quant_3_0_lens },
-                    7 => .{ &t.mpc7_quant_3_1_codes, &t.mpc7_quant_3_1_lens },
-                    8 => .{ &t.mpc7_quant_4_0_codes, &t.mpc7_quant_4_0_lens },
-                    9 => .{ &t.mpc7_quant_4_1_codes, &t.mpc7_quant_4_1_lens },
-                    10 => .{ &t.mpc7_quant_5_0_codes, &t.mpc7_quant_5_0_lens },
-                    11 => .{ &t.mpc7_quant_5_1_codes, &t.mpc7_quant_5_1_lens },
-                    12 => .{ &t.mpc7_quant_6_0_codes, &t.mpc7_quant_6_0_lens },
-                    13 => .{ &t.mpc7_quant_6_1_codes, &t.mpc7_quant_6_1_lens },
+                    0 => .{ &t.era_era_mpc7_quant_0_0_codes, &t.era_era_mpc7_quant_0_0_lens },
+                    1 => .{ &t.era_era_mpc7_quant_0_1_codes, &t.era_era_mpc7_quant_0_1_lens },
+                    2 => .{ &t.era_era_mpc7_quant_1_0_codes, &t.era_era_mpc7_quant_1_0_lens },
+                    3 => .{ &t.era_era_mpc7_quant_1_1_codes, &t.era_era_mpc7_quant_1_1_lens },
+                    4 => .{ &t.era_era_mpc7_quant_2_0_codes, &t.era_era_mpc7_quant_2_0_lens },
+                    5 => .{ &t.era_era_mpc7_quant_2_1_codes, &t.era_era_mpc7_quant_2_1_lens },
+                    6 => .{ &t.era_era_mpc7_quant_3_0_codes, &t.era_era_mpc7_quant_3_0_lens },
+                    7 => .{ &t.era_era_mpc7_quant_3_1_codes, &t.era_era_mpc7_quant_3_1_lens },
+                    8 => .{ &t.era_era_mpc7_quant_4_0_codes, &t.era_era_mpc7_quant_4_0_lens },
+                    9 => .{ &t.era_era_mpc7_quant_4_1_codes, &t.era_era_mpc7_quant_4_1_lens },
+                    10 => .{ &t.era_era_mpc7_quant_5_0_codes, &t.era_era_mpc7_quant_5_0_lens },
+                    11 => .{ &t.era_era_mpc7_quant_5_1_codes, &t.era_era_mpc7_quant_5_1_lens },
+                    12 => .{ &t.era_era_mpc7_quant_6_0_codes, &t.era_era_mpc7_quant_6_0_lens },
+                    13 => .{ &t.era_era_mpc7_quant_6_1_codes, &t.era_era_mpc7_quant_6_1_lens },
                     else => unreachable,
                 };
                 const syms = comptime vlc.symsU16(pair[0]);
-                self.quant_vlc[i][j].build(t.mpc7_quant_vlc_sizes[i], pair[1], &syms, t.mpc7_quant_vlc_off[i]);
+                self.era_quant_vlc[i][j].build(t.era_era_mpc7_quant_vlc_sizes[i], pair[1], &syms, t.era_era_mpc7_quant_vlc_off[i]);
             }
         }
     }
 
     /// 解码下一帧到 out_planar（[2][1152]）；返回 false = EOF。
     /// 帧解码失败时跳过该帧输出继续（FFmpeg 丢包继续解封装语义）。
-    pub fn next(self: *Decoder7, out_planar: *[2][MPC_FRAME_SIZE]i16) bool {
+    pub fn next(self: *Decoder7, out_planar: *[2][era_mpc_frame_size]i16) bool {
         while (true) {
-            if (self.eof or self.cur_frame >= self.parsed.frames.len) {
+            if (self.eof or self.era_cur_frame >= self.parsed.frames.len) {
                 self.eof = true;
                 return false;
             }
-            const f = self.parsed.frames[self.cur_frame];
-            self.cur_frame += 1;
+            const f = self.parsed.frames[self.era_cur_frame];
+            self.era_cur_frame += 1;
             if (self.decodeFrame(f, out_planar)) |_| {
                 return true;
             } else |_| {
@@ -268,7 +268,7 @@ pub const Decoder7 = struct {
     }
 
     /// mpc7_decode_frame 主体
-    fn decodeFrame(self: *Decoder7, f: Frame, out_planar: *[2][MPC_FRAME_SIZE]i16) Error!void {
+    fn decodeFrame(self: *Decoder7, f: Frame, out_planar: *[2][era_mpc_frame_size]i16) Error!void {
         const c = &self.core;
         const cfg = &self.parsed.cfg;
         const payload = self.data[f.pos .. f.pos + f.size];
@@ -283,28 +283,28 @@ pub const Decoder7 = struct {
         br.pos = f.skip; // skip_bits_long(&gb, skip)
 
         // 本帧 bands[0..=maxbands] 清零（FFmpeg memset sizeof(*bands)*(maxbands+1)）
-        for (0..@as(usize, @intCast(cfg.maxbands)) + 1) |i| {
-            c.bands[i] = .{};
+        for (0..@as(usize, @intCast(cfg.era_maxbands)) + 1) |i| {
+            c.era_bands[i] = .{};
         }
 
         // 读子带量化指数（res）
         var mb: i32 = -1;
         var i: usize = 0;
-        while (i <= @as(usize, @intCast(cfg.maxbands))) : (i += 1) {
+        while (i <= @as(usize, @intCast(cfg.era_maxbands))) : (i += 1) {
             for (0..2) |ch| {
-                const t: i32 = if (i != 0) self.hdr_vlc.get(&br) else 4;
-                var res: i32 = undefined;
+                const t: i32 = if (i != 0) self.era_hdr_vlc.get(&br) else 4;
+                var era_res: i32 = undefined;
                 if (t == 4) {
-                    res = @intCast(br.bits(4));
+                    era_res = @intCast(br.bits(4));
                 } else {
-                    res = c.bands[i - 1].res[ch] + t;
+                    era_res = c.era_bands[i - 1].era_res[ch] + t;
                 }
-                if (res < -1 or res > 17) return error.Corrupt;
-                c.bands[i].res[ch] = res;
+                if (era_res < -1 or era_res > 17) return error.Corrupt;
+                c.era_bands[i].era_res[ch] = era_res;
             }
-            if (c.bands[i].res[0] != 0 or c.bands[i].res[1] != 0) {
+            if (c.era_bands[i].era_res[0] != 0 or c.era_bands[i].era_res[1] != 0) {
                 mb = @intCast(i);
-                if (cfg.mss) c.bands[i].msf = br.bit() != 0;
+                if (cfg.mss) c.era_bands[i].era_msf = br.bit() != 0;
             }
         }
 
@@ -313,8 +313,8 @@ pub const Decoder7 = struct {
         while (ii <= mb) : (ii += 1) {
             const bi: usize = @intCast(ii);
             for (0..2) |ch| {
-                if (c.bands[bi].res[ch] != 0) {
-                    c.bands[bi].scfi[ch] = self.scfi_vlc.get(&br);
+                if (c.era_bands[bi].era_res[ch] != 0) {
+                    c.era_bands[bi].era_scfi[ch] = self.era_scfi_vlc.get(&br);
                 }
             }
         }
@@ -324,11 +324,11 @@ pub const Decoder7 = struct {
         while (ii <= mb) : (ii += 1) {
             const bi: usize = @intCast(ii);
             for (0..2) |ch| {
-                if (c.bands[bi].res[ch] != 0) {
+                if (c.era_bands[bi].era_res[ch] != 0) {
                     var idx3: [3]i32 = undefined;
-                    idx3[2] = c.oldDSCF[ch][bi];
+                    idx3[2] = c.era_old_dscf[ch][bi];
                     idx3[0] = getScaleIdx(self, &br, idx3[2]);
-                    switch (c.bands[bi].scfi[ch]) {
+                    switch (c.era_bands[bi].era_scfi[ch]) {
                         0 => {
                             idx3[1] = getScaleIdx(self, &br, idx3[0]);
                             idx3[2] = getScaleIdx(self, &br, idx3[1]);
@@ -347,21 +347,21 @@ pub const Decoder7 = struct {
                         },
                         else => return error.Corrupt,
                     }
-                    c.bands[bi].scf_idx[ch] = idx3;
-                    c.oldDSCF[ch][bi] = idx3[2];
+                    c.era_bands[bi].era_scf_idx[ch] = idx3;
+                    c.era_old_dscf[ch][bi] = idx3[2];
                 }
             }
         }
 
         // 量化样本（Q 每帧清零；全 32 子带按 res 填充）
-        for (0..2) |ch| @memset(&c.Q[ch], 0);
+        for (0..2) |ch| @memset(&c.era_q[ch], 0);
         var off: usize = 0;
         i = 0;
-        while (i < BANDS) : (i += 1) {
+        while (i < era_mpc_bands) : (i += 1) {
             for (0..2) |ch| {
-                try idxToQuant(self, &br, c.bands[i].res[ch], c.Q[ch][off .. off + SAMPLES_PER_BAND]);
+                try idxToQuant(self, &br, c.era_bands[i].era_res[ch], c.era_q[ch][off .. off + era_samples_per_band]);
             }
-            off += SAMPLES_PER_BAND;
+            off += era_samples_per_band;
         }
 
         // 去量化 + 合成（mpc.c 共用路径；mb 可为 -1 = 全静音帧）
@@ -379,7 +379,7 @@ pub const Decoder7 = struct {
 
 /// get_scale_idx（mpc7.c）：dscf_vlc 差分；t==8（原码 15）→ 6-bit 绝对值
 inline fn getScaleIdx(d: *Decoder7, br: *vlc.BitReader, ref: i32) i32 {
-    const t = d.dscf_vlc.get(br);
+    const t = d.era_dscf_vlc.get(br);
     if (t == 8) return @intCast(br.bits(6));
     return ref + t;
 }
@@ -389,39 +389,39 @@ fn idxToQuant(d: *Decoder7, br: *vlc.BitReader, idx: i32, dst: []i32) Error!void
     switch (idx) {
         -1 => {
             // PNS：LFG 伪随机（帧间状态持续）
-            for (0..SAMPLES_PER_BAND) |j| {
-                dst[j] = @as(i32, @intCast(d.core.rnd.next() & 0x3FC)) - 510;
+            for (0..era_samples_per_band) |j| {
+                dst[j] = @as(i32, @intCast(d.core.era_rnd.next() & 0x3FC)) - 510;
             }
         },
         1 => {
             const sel = br.bit();
             var j: usize = 0;
-            while (j < SAMPLES_PER_BAND / 3) : (j += 1) {
-                const t = d.quant_vlc[0][sel].get(br);
-                dst[j * 3] = tables.mpc7_idx30[@intCast(t)];
-                dst[j * 3 + 1] = tables.mpc7_idx31[@intCast(t)];
-                dst[j * 3 + 2] = tables.mpc7_idx32[@intCast(t)];
+            while (j < era_samples_per_band / 3) : (j += 1) {
+                const t = d.era_quant_vlc[0][sel].get(br);
+                dst[j * 3] = tables.era_era_mpc7_idx30[@intCast(t)];
+                dst[j * 3 + 1] = tables.era_era_mpc7_idx31[@intCast(t)];
+                dst[j * 3 + 2] = tables.era_era_mpc7_idx32[@intCast(t)];
             }
         },
         2 => {
             const sel = br.bit();
             var j: usize = 0;
-            while (j < SAMPLES_PER_BAND / 2) : (j += 1) {
-                const t = d.quant_vlc[1][sel].get(br);
-                dst[j * 2] = tables.mpc7_idx50[@intCast(t)];
-                dst[j * 2 + 1] = tables.mpc7_idx51[@intCast(t)];
+            while (j < era_samples_per_band / 2) : (j += 1) {
+                const t = d.era_quant_vlc[1][sel].get(br);
+                dst[j * 2] = tables.era_era_mpc7_idx50[@intCast(t)];
+                dst[j * 2 + 1] = tables.era_era_mpc7_idx51[@intCast(t)];
             }
         },
         3, 4, 5, 6, 7 => {
             const sel = br.bit();
             const ti: usize = @intCast(idx - 1);
-            for (0..SAMPLES_PER_BAND) |j| {
-                dst[j] = d.quant_vlc[ti][sel].get(br);
+            for (0..era_samples_per_band) |j| {
+                dst[j] = d.era_quant_vlc[ti][sel].get(br);
             }
         },
         8...17 => {
             const t: i32 = (@as(i32, 1) << @intCast(idx - 2)) - 1;
-            for (0..SAMPLES_PER_BAND) |j| {
+            for (0..era_samples_per_band) |j| {
                 dst[j] = @as(i32, @intCast(br.bits(@intCast(idx - 1)))) - t;
             }
         },
@@ -444,11 +444,11 @@ test "sv7: parse 头部与帧链（FATE inside-mp7）" {
     try testing.expectEqual(@as(u32, 44100), parsed.cfg.sample_rate);
     try testing.expectEqual(true, parsed.cfg.mss);
     try testing.expectEqual(false, parsed.cfg.is);
-    try testing.expectEqual(@as(i32, 28), parsed.cfg.maxbands);
-    try testing.expectEqual(true, parsed.cfg.gapless);
-    try testing.expectEqual(@as(u32, 117), parsed.cfg.lastframelen);
+    try testing.expectEqual(@as(i32, 28), parsed.cfg.era_maxbands);
+    try testing.expectEqual(true, parsed.cfg.era_gapless);
+    try testing.expectEqual(@as(u32, 117), parsed.cfg.era_lastframelen);
     // ffprobe 实测 456 包，载荷字节数逐帧一致（见 lib.zig 对拍说明）
-    try testing.expectEqual(@as(u32, 456), parsed.cfg.fcount);
+    try testing.expectEqual(@as(u32, 456), parsed.cfg.era_fcount);
     try testing.expectEqual(@as(usize, 456), parsed.frames.len);
     // 首帧：pos=24 size=12 skip=28（8 位链偏移 + 20 位帧长场；FFmpeg demux 推导值）
     try testing.expectEqual(@as(usize, 24), parsed.frames[0].pos);
@@ -463,7 +463,7 @@ test "sv7: 全流解码帧数与位校验" {
     const data = @embedFile("samples/inside-mp7.mpc");
     var d = try Decoder7.init(alloc, data);
     defer d.deinit();
-    var planar: [2][MPC_FRAME_SIZE]i16 = undefined;
+    var planar: [2][era_mpc_frame_size]i16 = undefined;
     var frames: usize = 0;
     while (d.next(&planar)) frames += 1;
     try testing.expectEqual(@as(usize, 456), frames);

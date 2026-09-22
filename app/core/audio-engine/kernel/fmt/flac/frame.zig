@@ -369,5 +369,6 @@ test "frame: 帧头解析后位置恰在帧头末尾（含 CRC-8 字节）" {
     var r = io.Reader.openMem(bytes);
     var br = BitReader.init(&r);
     _ = try parseHeader(&br);
+    try br.drain(); // peek 批量 refill 下，帧末把消费字节推进 pos
     try testing.expectEqual(@as(u64, bytes.len), r.pos);
 }

@@ -1439,15 +1439,17 @@ fn parseCue(ctx: *WavCtx, reader: *io.Reader, c: chunk.Chunk) Error!void {
 }
 
 /// 从逻辑数据区读取（可能跨段），返回实际读到的字节数。
-/// 每次读前 seek 到段内目标位置（positional read 无隐式状态，跨段安全）。
+/// 每次读按**段内绝对偏移**定位（positional read 无隐式状态，跨段安全）。用
+/// `Reader.readAt` 直达底层而非 seek+read：file 形态下后者每次都要经前瞻缓存，
+/// 而每次定位都会 invalidate 它、缓存永不命中，纯多付「满块预读 + 二次拷贝」
+/// （PCM 地板的主项之一）。bytes/pos 语义不变（逻辑游标仍由 position_bytes 记账）。
 fn readData(w: *WavCtx, buf: []u8) Error!usize {
     var got: usize = 0;
     while (got < buf.len) {
         const loc = locateSeg(w, w.position_bytes + got);
         if (loc.avail == 0) break;
         const n = @min(buf.len - got, loc.avail);
-        try w.reader.seek(@intCast(loc.offset + loc.rel), .start);
-        const r = w.reader.read(buf[got .. got + n]) catch return error.IoError;
+        const r = w.reader.readAt(buf[got .. got + n], loc.offset + loc.rel) catch return error.IoError;
         if (r == 0) break;
         got += r;
     }

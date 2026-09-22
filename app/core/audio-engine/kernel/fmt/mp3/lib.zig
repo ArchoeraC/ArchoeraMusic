@@ -28,6 +28,7 @@
 //! 向量与真实样本验证（PCM 精确一致）。
 
 const std = @import("std");
+const builtin = @import("builtin");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");
 const decoder = @import("../../decoder.zig");
@@ -396,6 +397,83 @@ fn destroyCtx(ctx: *Ctx) void {
 
 // ---- VTable 实现 ----
 
+/// 与旧 readImpl 逐样本一致的量化（f32 →×32768(f64) →截断→钳位 i16）。
+inline fn quantS16(v: f32) i16 {
+    var s: i32 = @intFromFloat(@as(f64, v) * 32768.0);
+    s = @max(@min(s, 32767), -32768);
+    return @intCast(s);
+}
+
+const I16x8 = @Vector(8, i16);
+
+/// 8 路并行量化：逐 lane 与 `quantS16` 同序（f32→f64 精确扩展、×32768 为 2 的幂、
+/// 截断/钳位一致）→ 位级一致。仅用于 ch=1/2 的连续样本段。
+/// 截断目标用 i32（与标量 `quantS16` 一致；AVX2 上 f64→i32 比 f64→i64 廉价得多）。
+inline fn quantS16x8(v: @Vector(8, f32)) I16x8 {
+    const d: @Vector(8, f64) = @floatCast(v);
+    const i: @Vector(8, i32) = @intFromFloat(d * @as(@Vector(8, f64), @splat(32768.0)));
+    const c = @min(@max(i, @as(@Vector(8, i32), @splat(-32768))), @as(@Vector(8, i32), @splat(32767)));
+    return @truncate(c);
+}
+
+/// 写 8 个交错 i16（小端）；大端目标按 `@byteSwap` 校正后整体落盘。
+inline fn storeS16x8(out: []u8, oi: usize, v: I16x8) void {
+    var arr: [8]i16 = @bitCast(v);
+    if (builtin.cpu.arch.endian() == .little) {
+        out[oi..][0..16].* = @bitCast(arr);
+    } else {
+        for (&arr) |*x| x.* = @byteSwap(x.*);
+        out[oi..][0..16].* = @bitCast(arr);
+    }
+}
+
+/// 把 pcm 的 `frames` 帧交错样本量化写入 out[oi0..]。
+/// ch=2 按 4 帧（8 样本）一批做 8 路并行量化，尾帧走标量；ch=1 同理。
+/// 其余声道数走通用标量路径（无每样本整除，算术与旧实现同序 → 位级一致）。
+inline fn quantWrite(out: []u8, oi0: usize, pcm: []const f32, frames: usize, channels: usize, frame_bytes: usize) void {
+    if (channels == 2) {
+        var oi = oi0;
+        var k: usize = 0;
+        while (k + 4 <= frames) : (k += 4) {
+            const vf: @Vector(8, f32) = @bitCast((pcm.ptr + k * 2)[0..8].*);
+            storeS16x8(out, oi, quantS16x8(vf));
+            oi += 16;
+        }
+        while (k < frames) : (k += 1) {
+            const pi = k * 2;
+            std.mem.writeInt(i16, out[oi..][0..2], quantS16(pcm[pi]), .little);
+            std.mem.writeInt(i16, out[oi + 2 ..][0..2], quantS16(pcm[pi + 1]), .little);
+            oi += 4;
+        }
+    } else if (channels == 1) {
+        var oi = oi0;
+        var k: usize = 0;
+        while (k + 8 <= frames) : (k += 8) {
+            const vf: @Vector(8, f32) = @bitCast((pcm.ptr + k)[0..8].*);
+            storeS16x8(out, oi, quantS16x8(vf));
+            oi += 16;
+        }
+        while (k < frames) : (k += 1) {
+            std.mem.writeInt(i16, out[oi..][0..2], quantS16(pcm[k]), .little);
+            oi += 2;
+        }
+    } else {
+        var oi = oi0;
+        var ci: usize = 0;
+        var i: usize = 0;
+        while (i < frames * channels) : (i += 1) {
+            std.mem.writeInt(i16, out[oi..][0..2], quantS16(pcm[i]), .little);
+            ci += 1;
+            if (ci == channels) {
+                ci = 0;
+                oi += frame_bytes;
+            } else {
+                oi += 2;
+            }
+        }
+    }
+}
+
 fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
     const f: *Ctx = @ptrCast(@alignCast(ctx));
     out_channels.* = f.channels;
@@ -424,13 +502,7 @@ fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) E
             give = @min(give, @as(usize, @intCast(@min(rem, std.math.maxInt(usize)))));
         }
         const base = f.tail_off * f.channels;
-        for (0..give * @as(usize, f.channels)) |i| {
-            const v = f.tail[base + i];
-            var s: i32 = @intFromFloat(@as(f64, v) * 32768.0);
-            s = @max(@min(s, 32767), -32768);
-            const idx = (produced + @as(usize, @intCast(i / f.channels))) * frame_bytes + (i % f.channels) * 2;
-            std.mem.writeInt(i16, out[idx..][0..2], @intCast(s), .little);
-        }
+        quantWrite(out, produced * frame_bytes, f.tail[base..], give, f.channels, frame_bytes);
         produced += give;
         f.samples_done += give;
         f.tail_off += give;
@@ -487,15 +559,7 @@ fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) E
             }
         }
         const avail = @min(allowed, cap - produced);
-        const total = avail * f.channels;
-        for (0..total) |i| {
-            const v = f.pcm[fstart * f.channels + i];
-            // 浮点（-1..1，minimp3 FLOAT_OUTPUT 约定）→ int16
-            var s: i32 = @intFromFloat(@as(f64, v) * 32768.0);
-            s = @max(@min(s, 32767), -32768);
-            const idx = (produced + @as(usize, @intCast(i / f.channels))) * frame_bytes + (i % f.channels) * 2;
-            std.mem.writeInt(i16, out[idx..][0..2], @intCast(s), .little);
-        }
+        quantWrite(out, produced * frame_bytes, f.pcm[fstart * f.channels ..], avail, f.channels, frame_bytes);
         produced += avail;
         f.samples_done += avail;
         if (info.frame_bytes > 0) {

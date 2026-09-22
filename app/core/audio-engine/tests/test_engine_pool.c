@@ -388,6 +388,108 @@ int main(int argc, char **argv) {
     }
 #endif
 
+    /* 10) AS1 结构化提交面（zk_submit kind/source + 句柄结果访问器）：
+     *     decode/path 与 sync 参考逐样本一致；outcome/status/frames 对齐；
+     *     metadata/path 填 ZkMetaInfo；参数非法返回 NULL。 */
+    {
+        float sout[FRAMES * 8];
+        int soc = 0;
+        ZkInfo sinfo;
+        ZkSubmitReq req;
+        memset(&req, 0, sizeof req);
+        req.kind = ZK_KIND_DECODE;
+        req.source = ZK_SOURCE_PATH;
+        req.path = path;
+        req.out = sout;
+        req.max_frames = FRAMES;
+        req.out_channels = &soc;
+        req.info = &sinfo;
+        ZkTask *st = zk_submit(h, &req);
+        if (!st) { fprintf(stderr, "zk_submit decode failed\n"); return 1; }
+        if (zk_task_outcome(st) != ZK_SUBMIT_PENDING) {
+            fprintf(stderr, "submit should be pending before wait\n"); return 1;
+        }
+        long long sn = zk_task_wait(st);
+        if (sn != FRAMES || soc != 1) { fprintf(stderr, "zk_submit frames %lld ch %d\n", sn, soc); return 1; }
+        if (zk_task_outcome(st) != ZK_SUBMIT_DONE || zk_task_status(st) != 0) {
+            fprintf(stderr, "zk_submit outcome/status bad\n"); return 1;
+        }
+        if (zk_task_frames(st) != FRAMES) { fprintf(stderr, "zk_task_frames %lld\n", zk_task_frames(st)); return 1; }
+        if (zk_task_wait_timeout(st, 1000) != 1) { fprintf(stderr, "wait_timeout should report done\n"); return 1; }
+        if (sinfo.sample_rate != SR || sinfo.bits_per_sample != 16) {
+            fprintf(stderr, "submit info mismatch sr=%d bits=%d\n", sinfo.sample_rate, sinfo.bits_per_sample);
+            return 1;
+        }
+        for (int i = 0; i < FRAMES; i++) {
+            if (sout[i] != ref[i]) { fprintf(stderr, "submit sample mismatch %d\n", i); return 1; }
+        }
+        zk_task_free(st);
+        zk_task_free(NULL);
+
+        /* metadata kind：池内 probe+open，填 ZkMetaInfo */
+        ZkMetaInfo meta;
+        memset(&meta, 0, sizeof meta);
+        memset(&req, 0, sizeof req);
+        req.kind = ZK_KIND_METADATA;
+        req.source = ZK_SOURCE_PATH;
+        req.path = path;
+        req.meta = &meta;
+        ZkTask *mt = zk_submit(h, &req);
+        if (!mt) { fprintf(stderr, "zk_submit metadata failed\n"); return 1; }
+        long long mn = zk_task_wait(mt);
+        if (mn != 0 || zk_task_outcome(mt) != ZK_SUBMIT_DONE || meta.sample_rate != SR || meta.channels != 1) {
+            fprintf(stderr, "metadata submit bad n=%lld sr=%d ch=%d\n", mn, meta.sample_rate, meta.channels);
+            return 1;
+        }
+        zk_task_free(mt);
+
+        /* 参数非法：metadata + mem 源 → NULL；flags != 0 → NULL */
+        memset(&req, 0, sizeof req);
+        req.kind = ZK_KIND_METADATA;
+        req.source = ZK_SOURCE_MEM;
+        req.meta = &meta;
+        if (zk_submit(h, &req) != NULL) { fprintf(stderr, "metadata/mem should be rejected\n"); return 1; }
+        memset(&req, 0, sizeof req);
+        req.kind = ZK_KIND_DECODE;
+        req.source = ZK_SOURCE_PATH;
+        req.path = path;
+        req.out = sout;
+        req.max_frames = FRAMES;
+        req.flags = 1;
+        if (zk_submit(h, &req) != NULL) { fprintf(stderr, "flags!=0 should be rejected\n"); return 1; }
+
+        printf("structured zk_submit (decode/metadata/outcome) OK\n");
+    }
+
+    /* 11) AS2 pinned 流式会话（zk_engine_open_pinned / zk_engine_stream_pinned）：
+     *     专属 worker 命中；逐块拉取与 sync 参考逐位一致。 */
+    {
+        ZkInfo pinfo;
+        char peb[64];
+        ZkEngineStream *ps = zk_engine_open_pinned(h, path, &pinfo, peb, sizeof peb);
+        if (!ps) { fprintf(stderr, "zk_engine_open_pinned failed\n"); return 1; }
+        if (zk_engine_stream_pinned(ps) != 1) {
+            fprintf(stderr, "expected pinned stream (idle worker available)\n");
+            return 1;
+        }
+        if (pinfo.sample_rate != SR) { fprintf(stderr, "pinned info sr=%d\n", pinfo.sample_rate); return 1; }
+        float chunk[16];
+        long long got = 0;
+        for (;;) {
+            int c2 = 0;
+            long long n2 = zk_engine_read(ps, chunk, 8, &c2);
+            if (n2 < 0) { fprintf(stderr, "pinned read err %lld\n", n2); return 1; }
+            if (n2 == 0) break;
+            for (long long k = 0; k < n2; k++) {
+                if (chunk[k] != ref[got + k]) { fprintf(stderr, "pinned mismatch at %lld\n", got + k); return 1; }
+            }
+            got += n2;
+        }
+        if (got != FRAMES) { fprintf(stderr, "pinned frames %lld\n", got); return 1; }
+        zk_engine_close(ps);
+        printf("engine open_pinned == sync: %lld frames OK\n", got);
+    }
+
     zk_engine_shutdown(h);
     free(pool);
     free(ref);

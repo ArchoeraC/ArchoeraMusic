@@ -82,7 +82,12 @@ pub fn signal(task: *Task) void {
 
 /// 把任务投进池（非阻塞；OOM/队列满返回 false）。worker 完成即领（run-to-completion）。
 pub fn spawnInto(rt: *runtime.Runtime, task: *Task) bool {
-    return rt.submit(.{ .run = bridge, .ctx = task });
+    return rt.submit(jobFor(task));
+}
+
+/// 把 Task 包装为 runtime.Job（供 runtime.submitPinned 定向派发复用；不改变投递语义）。
+pub fn jobFor(task: *Task) runtime.Job {
+    return .{ .run = bridge, .ctx = task };
 }
 
 /// 阻塞等完工（wait_event 推模式的进程内等待形态）。

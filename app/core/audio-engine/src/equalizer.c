@@ -12,6 +12,13 @@
 #include <string.h>
 #include <math.h>
 
+/* 内核 DSP 路由（方向① 地基，docs/audio-kernel-zig.md §14）：
+ * HAS_ARCHOERA_KERNEL 时优先经 zk_dsp_eq_* 走 Zig 内核，create 失败回退下方
+ * 纯 C 实现；内核库缺失则纯 C。对外 API/行为不变。 */
+#if defined(HAS_ARCHOERA_KERNEL)
+#include "../include/kernel_bridge.h"
+#endif
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -36,8 +43,12 @@ struct Equalizer {
     int channels;
     float gains[EQ_BANDS];
     float preamp_db;
-    BiquadFilter *filters;  /* [bands * channels] */
+    BiquadFilter *filters;  /* [bands * channels]；内核路径下为 NULL */
+#if defined(HAS_ARCHOERA_KERNEL)
+    ZkDspEq *zk;            /* 非 NULL → 内核实现（优先） */
+#endif
 };
+
 
 /* 计算 Biquad peaking EQ 系数 */
 static void biquad_calc_peaking(BiquadFilter *f, float freq, float gain_db, float Q, int sample_rate)
@@ -70,17 +81,32 @@ Equalizer* equalizer_create(int sample_rate, int channels)
     eq->channels = channels;
     eq->preamp_db = 0.0f;
 
-    /* 分配滤波器状态：每个频段每个声道一个 */
+    /* 初始增益为 0dB（直通） */
+    for (int i = 0; i < EQ_BANDS; i++) {
+        eq->gains[i] = 0.0f;
+    }
+
+#if defined(HAS_ARCHOERA_KERNEL)
+    /* 优先内核实现；失败（非法参数/OOM）→ 下方 C 回退 */
+    eq->zk = zk_dsp_eq_create(sample_rate, channels);
+    if (eq->zk) {
+        zk_dsp_eq_set_gains(eq->zk, eq->gains);
+        zk_dsp_eq_set_preamp(eq->zk, eq->preamp_db);
+    } else {
+        eq->filters = calloc(EQ_BANDS * channels, sizeof(BiquadFilter));
+        if (!eq->filters) {
+            free(eq);
+            return NULL;
+        }
+    }
+#else
+    /* C 回退：分配滤波器状态：每个频段每个声道一个 */
     eq->filters = calloc(EQ_BANDS * channels, sizeof(BiquadFilter));
     if (!eq->filters) {
         free(eq);
         return NULL;
     }
-
-    /* 初始增益为 0dB（直通） */
-    for (int i = 0; i < EQ_BANDS; i++) {
-        eq->gains[i] = 0.0f;
-    }
+#endif
 
     fprintf(stderr, "%s 创建: %dHz / %dch / %d 频段\n",
             LOG_TAG, sample_rate, channels, EQ_BANDS);
@@ -92,6 +118,13 @@ void equalizer_set_gains(Equalizer *eq, const float gains[EQ_BANDS])
     if (!eq || !gains) return;
 
     memcpy(eq->gains, gains, sizeof(eq->gains));
+
+#if defined(HAS_ARCHOERA_KERNEL)
+    if (eq->zk) {
+        zk_dsp_eq_set_gains(eq->zk, eq->gains);
+        return;
+    }
+#endif
 
     /* 重新计算所有滤波器系数 */
     float Q = 1.414f;  /* sqrt(2)，标准带宽 */
@@ -110,11 +143,24 @@ void equalizer_set_preamp(Equalizer *eq, float preamp_db)
 {
     if (!eq) return;
     eq->preamp_db = preamp_db;
+#if defined(HAS_ARCHOERA_KERNEL)
+    if (eq->zk) {
+        zk_dsp_eq_set_preamp(eq->zk, preamp_db);
+        return;
+    }
+#endif
 }
 
 void equalizer_process(Equalizer *eq, float *pcm, int samples)
 {
     if (!eq || !pcm || samples <= 0) return;
+
+#if defined(HAS_ARCHOERA_KERNEL)
+    if (eq->zk) {
+        zk_dsp_eq_process(eq->zk, pcm, samples);
+        return;
+    }
+#endif
 
     /* 检查是否所有频段都是 0dB（直通模式） */
     bool passthrough = true;
@@ -166,6 +212,9 @@ void equalizer_process(Equalizer *eq, float *pcm, int samples)
 void equalizer_destroy(Equalizer *eq)
 {
     if (!eq) return;
+#if defined(HAS_ARCHOERA_KERNEL)
+    if (eq->zk) zk_dsp_eq_destroy(eq->zk);
+#endif
     if (eq->filters) free(eq->filters);
     free(eq);
 }
