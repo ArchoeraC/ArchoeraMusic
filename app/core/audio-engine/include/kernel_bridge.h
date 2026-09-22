@@ -272,6 +272,17 @@ ZkEngineStream *zk_engine_open(ZkEngine *h, const char *path,
                                ZkInfo *info, char *errbuf, size_t errbuf_size);
 
 /**
+ * AS2：打开**专属 worker（pinned 1:1）**流式会话（契约同 [zk_engine_open]）。
+ * 会话所有步骤在该 worker 上串行执行、不进全局队列、不参与回收；无空闲 worker 时
+ * 自动回退全局队列模式（行为/可用性不变）。`zk_engine_stream_pinned` 查询是否命中。
+ */
+ZkEngineStream *zk_engine_open_pinned(ZkEngine *h, const char *path,
+                                      ZkInfo *info, char *errbuf, size_t errbuf_size);
+
+/** AS2：该流式会话是否命中专属 worker；1 = 是，0 = 否/NULL。 */
+int zk_engine_stream_pinned(ZkEngineStream *s);
+
+/**
  * 同上，但从**内存字节切片**打开（纯内存源，docs/audio-memory-source.md §7）。
  * `data` 所有权归调用方，须覆盖会话生命周期。
  */
@@ -351,6 +362,77 @@ void zk_metadata_set_concurrency(int n);
 
 /** 回读当前并发提示。 */
 int zk_metadata_get_concurrency(void);
+
+/* ---- AS1 结构化任务提交面（kind/source/format/hint + 句柄；wait_event 推模式）----
+ *
+ * 统一入口：一次调用携带 任务种类（kind）/ 源形态（source）/ 格式提示（format_hint）
+ * 与输出缓冲，**非阻塞**返回句柄；由 [zk_task_wait] 阻塞收完工事件（无轮询）。
+ * 既有 [zk_submit_decode]（decode/路径专用）保留为便捷包装，语义与之一致；
+ * 既有 zk_engine_* / zk_decoder_* **不变**。
+ *
+ * `format_hint` 当前仅携带与校验（自动探测仍由内核 probe 决定），为 AS4 预计算
+ * 免 probe 预留；`flags` 为保留位，须为 0。失败（参数非法 / 池停机 / 任务槽满
+ * InstanceLimit / OOM）返回 NULL；若提供 errbuf，失败时写 errbuf[0..4] = LE ZkStatus。
+ */
+enum ZkSubmitKind {
+    ZK_KIND_DECODE   = 0, /**< out/max_frames 解码至多该帧数 */
+    ZK_KIND_METADATA = 1  /**< 只 probe+open，填 *meta（仅 source=path） */
+};
+enum ZkSubmitSource {
+    ZK_SOURCE_PATH = 0,
+    ZK_SOURCE_MEM  = 1,
+    ZK_SOURCE_CB   = 2
+};
+enum ZkSubmitOutcome {
+    ZK_SUBMIT_PENDING = 0,
+    ZK_SUBMIT_DONE    = 1,
+    ZK_SUBMIT_ERROR   = 2,
+    ZK_SUBMIT_FATAL   = 3 /**< 不可预知输入 → 会话级收尾（§5.2 层1） */
+};
+
+typedef struct ZkSubmitReq {
+    int      kind;         /**< enum ZkSubmitKind */
+    int      source;       /**< enum ZkSubmitSource */
+    unsigned format_hint;  /**< 格式提示（0=auto；当前仅携带/校验） */
+    unsigned flags;        /**< 保留，须为 0 */
+
+    /* source = ZK_SOURCE_PATH */
+    const char *path;
+    /* source = ZK_SOURCE_MEM（data 所有权归调用方，须覆盖到 wait 返回） */
+    const unsigned char *data; size_t len;
+    /* source = ZK_SOURCE_CB（ctx/回调生命周期归调用方，须覆盖到 wait 返回） */
+    void *ctx; zk_read_cb on_read; zk_seek_cb on_seek; unsigned long long size_hint;
+
+    /* kind = ZK_KIND_DECODE：float32 交错输出（调用方所有，须覆盖到 wait 返回） */
+    float *out; size_t max_frames; int *out_channels; /**< out_channels 可空 */
+    ZkInfo *info;      /**< 可空；成功时填源信息（decode/metadata） */
+
+    /* kind = ZK_KIND_METADATA：结构化元数据输出（tags/封面指针生命周期同句柄） */
+    ZkMetaInfo *meta;
+
+    /* 诊断缓冲（可空）；失败时 errbuf[0..4] = LE ZkStatus，其后 NUL 消息 */
+    char *errbuf; int errbuf_size;
+} ZkSubmitReq;
+
+/**
+ * 结构化提交。立即返回句柄；失败返回 NULL（见上）。语义：
+ *   - decode：等价 [zk_submit_decode]（支持 path/mem/cb 三种源）；
+ *   - metadata：等价 [zk_metadata_open] 的池内异步版（仅 path），填 *meta。
+ * 句柄生命周期：zk_submit → zk_task_wait（可重复，幂等）→ zk_task_free。
+ */
+ZkTask *zk_submit(ZkEngine *h, const ZkSubmitReq *req);
+
+/** 完工结果（enum ZkSubmitOutcome）；t 为 NULL → PENDING。 */
+int zk_task_outcome(ZkTask *t);
+
+/** 负 ZkStatus（失败）/ 0（成功或进行中）；t 为 NULL → -（ZK_IO_ERROR）。 */
+int zk_task_status(ZkTask *t);
+
+/** decode 帧数（0=EOF）；非 decode 任务返回 0。 */
+long long zk_task_frames(ZkTask *t);
+
+/** 带超时 wait（毫秒）：1=已完工，0=超时；t 为 NULL → 0。 */
+int zk_task_wait_timeout(ZkTask *t, long long timeout_ms);
 
 #ifdef __cplusplus
 }

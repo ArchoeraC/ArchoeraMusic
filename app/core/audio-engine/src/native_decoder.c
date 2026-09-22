@@ -101,6 +101,14 @@ long long native_decoder_stream_opens(void)
     return g_stream_opens;
 }
 
+/* AS2：门控的 worker 亲和（pinned 1:1）。默认关（未设 / != "1"），保持既有全局队列
+ * 行为；开启后路径源流式会话优先取专属 worker（无空闲自动回退全局队列）。 */
+static int pool_pinned_enabled(void)
+{
+    const char *v = getenv("ARCHOERA_ERA_POOL_PINNED");
+    return v && v[0] == '1' && v[1] == '\0';
+}
+
 bool native_decoder_available(void)
 {
     return true;
@@ -128,8 +136,11 @@ NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
     memset(eb, 0, sizeof(eb));
 
     if (g_pool) {
-        /* S1 池路径：流式 seam（同一 errbuf 契约：errbuf[0..4] LE int32 状态码） */
-        st = zk_engine_open(g_pool, path, &zinfo, eb, sizeof(eb));
+        /* S1 池路径：流式 seam（同一 errbuf 契约：errbuf[0..4] LE int32 状态码）。
+         * AS2：ARCHOERA_ERA_POOL_PINNED=1 时优先专属 worker（pinned 1:1）。 */
+        st = pool_pinned_enabled()
+                 ? zk_engine_open_pinned(g_pool, path, &zinfo, eb, sizeof(eb))
+                 : zk_engine_open(g_pool, path, &zinfo, eb, sizeof(eb));
         if (!st) {
             if (status_out) *status_out = read_le32_status(eb);
             if (errbuf && errbuf_size > 0) {
