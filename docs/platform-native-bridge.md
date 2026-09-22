@@ -13,7 +13,7 @@
 >
 > 硬性约束（用户决策 2026-09-10）：
 > 1. **零 JSON**：ABI 全部 extern struct + 定长字段 / UTF-8 指针+长度（对齐
->    `engine-master-worker-scheduling.md` §2.3 `ZkMetaInfo`「规避 JSON」决策）；
+>    `archive/engine-master-worker-scheduling.md` §2.3 `ZkMetaInfo`「规避 JSON」决策）；
 > 2. **零子进程**：同进程动态链接库，`dart:ffi` 直调（类比 `engine_bindings.dart` 加载
 >    `libarchoera_mediaengine`）；
 > 3. **范围 = 桌面三平台**：Windows / Linux / macOS；Android/iOS 不在本期（后续如需另议，

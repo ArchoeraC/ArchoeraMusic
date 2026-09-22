@@ -183,7 +183,7 @@ flutter run -d linux      # 或 windows / macos
 
 > 2026-09-21 行业对比（**出厂最小音频 FFmpeg** + **最大优化 FFmpeg** + `libFLAC/LAME/libopus/libvorbis/libspeex/speexdec`）。
 > 定位：**实验性参考，非发布承诺**。自研 Zig 内核（`--engine-mode 1`）为「优先尝试、失败回退 FFmpeg」的渐进接管路线，基准用于量化差距、排定优化项。
-> 全量方法/原始数据/复现见 [docs/benchmark-2026-09-21.md](docs/benchmark-2026-09-21.md)，历史快照见 [docs/benchmark-industry-2026-09-05.md](docs/benchmark-industry-2026-09-05.md)。
+> 全量方法/原始数据/复现见 [docs/benchmark-2026-09-21.md](docs/benchmark-2026-09-21.md)，历史快照见 [docs/archive/benchmark-industry-2026-09-05.md](docs/archive/benchmark-industry-2026-09-05.md)。
 
 **总体评分（100 = speed40 + memory30 + correctness20 + coverage10；FFmpeg 归一）**：
 EraAudio **100.0/100（A+；多轮 σ=0）** vs 引擎内 Stable/FFmpeg **99.2**（A+）→ **相对 FFmpeg = 100.8%（Δ+0.8）**，
@@ -268,11 +268,13 @@ python3 tests/bench/scorecard.py --engine build-min/archoera-audio-engine --reps
 - [用户自编译手册（太长不看版）](docs/user-build-from-source.md) —— 三端从源码构建 / 调试 / 打包 / 缓存外置 / 常见问题
 - [eta 图标体系食用说明](app/lib/eta/README.md) —— EtaIcons/EtaMark 引用写法 / 实心描边命名 / 新增字形 / 重新生成
 - [解码基准（最小/最大 FFmpeg 基线 + 专业程序横评）](docs/benchmark-2026-09-21.md) —— 对 FFmpeg 归一 **100.8%**（EraAudio 100.0 vs FFmpeg 99.2），15/15 格式满分；含多轮稳定性与诚实边界
-- [自研解码内核行业基准（EraAudio）](docs/benchmark-industry-2026-09-05.md) —— 历史快照：FFmpeg/libFLAC/LAME/speexdec 横评 + 评分（95.6 A+）
+- [自研解码内核行业基准（EraAudio）](docs/archive/benchmark-industry-2026-09-05.md) —— 历史快照：FFmpeg/libFLAC/LAME/speexdec 横评 + 评分（95.6 A+）
 - [引擎集成与基准（EraAudio vs Stable）](docs/engine-integration-bench.md) —— EOF/错误语义、内存流式化、样本数对齐
 - [音频 Zig 解码内核路线图](docs/audio-kernel-zig.md) —— 内核架构 / 逐格式接管 / 第三方来源登记
+- [音频内核能力扩张规划（五方向）](docs/audio-kernel-expansion-plan.md) —— 可听频段 DSP / 在线流·非本地源 / 更多格式接管 / 性能·内存 / A·Sync 执行模型
 - [平台能力外观层](docs/platform-capability-facade.md) —— 防休眠 / 媒体会话与蓝牙耳机控制 / 系统定位的能力接口 + 每平台实现
 - [下载模块设计规范](docs/download-module.md) —— 下载引擎架构 / 自研边界 / 依赖许可
+- 历史设计稿与基准快照见 [`docs/archive/`](docs/archive/README.md)（已废弃/被取代，仅供溯源）
 - 使用与授权声明见文首；第三方依赖与许可逐项见各模块 `THIRD-PARTY-LICENSES.md`（汇总见「[第三方声明](#第三方声明)」与「[许可证（Licensing）](#许可证licensing)」）
 
 ---

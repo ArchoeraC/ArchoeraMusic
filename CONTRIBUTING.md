@@ -113,7 +113,7 @@
 - **禁止「踩一捧一」**：不得以贬低任何其他项目（FFmpeg、KuGouMusicApi、
   NeteaseCloudMusicApi 等上游 / 参考 / 同类项目）的方式抬高本项目；宣传与对比必须基于事实与可复现数据。
 - **禁止不公平比对**：所有对外比较必须方法对等、口径透明、优劣并陈、标注局限。**特别约束
-  FFmpeg vs EraAudio**：比较口径以仓库内基准文档为准（`docs/benchmark-industry-2026-09-05.md` 等），
+  FFmpeg vs EraAudio**：比较口径以仓库内基准文档为准（`docs/archive/benchmark-industry-2026-09-05.md` 等），
   其「实验性参考、非发布承诺」定位与**已知短板声明**（如 flac 直解仍落后 FFmpeg 约 20×、
   tta/dts 内存峰值偏高等）必须一并呈现，**不得选择性引用有利数据**；FFmpeg 是本项目默认主引擎与
   最大依赖，对其保持尊重与致谢（见 README 致谢节）。

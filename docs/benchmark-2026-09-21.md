@@ -2,7 +2,7 @@
 
 > 日期：2026-09-21 · 机器：x86_64 EndeavourOS，i9-13980HX（32 逻辑核）· 构建：ReleaseFast 内核 + CMake 引擎。
 > 口径：`tests/bench/scorecard.py`（15 格式 × 每引擎；墙钟 `time.monotonic`、峰值 RSS `/proc/<pid>/VmRSS` 2ms 轮询、静音 headless）。
-> 本文**取代** `benchmark-2026-09-10.md` §1 的解码 scorecard（该文其余章节仍有效）；`benchmark-industry-2026-09-05.md` 为更早快照。
+> 本文**取代** `archive/benchmark-2026-09-10.md` §1 的解码 scorecard（该文其余章节仍有效）；`archive/benchmark-industry-2026-09-05.md` 为更早快照。
 > 跨机请比**相对值 / ×RT / 归一百分比**，勿比毫秒。
 
 ---
@@ -223,6 +223,6 @@ done
 - 新建本文（2026-09-21）：最小/最大 FFmpeg 双基线 + 专业程序横评 + 多轮稳定性 + 三项修复；
   §2.5 另附**速度不封顶（严格口径）**结果（≈90.4%，区间 85.9–97.2%）；§2.6 附**冷/热启动首帧**
   基准（工具 `tests/bench/bench_coldstart.c`）。
-- `benchmark-2026-09-10.md` §1：解码 scorecard 由本文取代（该文其余结论仍有效）。
-- `benchmark-industry-2026-09-05.md`：更早快照，供历史对照。
+- `archive/benchmark-2026-09-10.md` §1：解码 scorecard 由本文取代（该文其余结论仍有效）。
+- `archive/benchmark-industry-2026-09-05.md`：更早快照，供历史对照。
 - `decode-optimization.md`：TTA/DTS 内存、AC-3/E-AC-3 corr、Speex 对齐三项状态更新。
