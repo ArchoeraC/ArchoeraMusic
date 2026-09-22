@@ -4,6 +4,8 @@
 
 part of '../favorites_page.dart';
 
+// ignore_for_file: invalid_use_of_protected_member
+
 extension _FavoritesPageActions on _FavoritesPageState {
   /// 登录态变化（登录成功 / 退出）时清空缓存并刷新。
   void _onAuthChanged() {
@@ -11,230 +13,46 @@ extension _FavoritesPageActions on _FavoritesPageState {
     if (_loggedIn) _fetch();
   }
 
-  void _switchPlatform(_Platform platform) {
-    if (platform == _platform) return;
-    _setPlatform(platform);
+  void _switchPlatform(String source) {
+    if (source == _platform) return;
+    _setPlatform(source);
     if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
   }
 
-  void _switchTab(_FavTab tab) {
-    if (tab == _tab) return;
-    _setFavTab(tab);
+  void _switchTab(String tabId) {
+    if (tabId == _tab) return;
+    _setTab(tabId);
     if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
   }
 
-  void _switchKgTab(_KgTab tab) {
-    if (tab == _kgTab) return;
-    _setKgTab(tab);
-    if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
-  }
-
-  void _switchQqTab(_QqTab tab) {
-    if (tab == _qqTab) return;
-    _setQqTab(tab);
-    if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
-  }
-
-  void _switchNekoTab(_NekoTab tab) {
-    if (tab == _nekoTab) return;
-    _setNekoTab(tab);
-    if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
-  }
-
+  /// 拉取当前分类：适配器可一次请求填充多个分类（返回 map），这里统一
+  /// 合并缓存并按返回的 key 标记已加载。
   Future<void> _fetch() async {
+    final adapter = _adapter;
     final key = _cacheKey;
     if (_loading.contains(key)) return;
-    // 异步间隙前取本地化文案（避免 await 后使用 BuildContext）。
-    final likedLabel = context.l10n.sidebarLiked;
     _markLoading(key);
     try {
-      if (_platform == _Platform.kugou) {
-        final lib = await ref.read(kugouApiProvider).userLibrary();
-        // 一次拉取填充全部分类（切换 tab 不再重复请求）
-        _cache['kugou.created'] = lib.createdPlaylists
-            .map((i) => i.toCoverItem())
-            .toList();
-        _cache['kugou.collectedPlaylist'] = lib.collectedPlaylists
-            .map((i) => i.toCoverItem())
-            .toList();
-        _cache['kugou.collectedAlbum'] = lib.collectedAlbums
-            .map((i) => i.toCoverItem())
-            .toList();
-      } else if (_platform == _Platform.neko) {
-        final api = ref.read(nekoApiProvider);
-        final lib = await api.userLibrary();
-        String? cover(String? path) {
-          if (path == null ||
-              path.isEmpty ||
-              path.contains('/avatar/default')) {
-            return null;
-          }
-          return api.resolveUrl(path);
-        }
-
-        _cache['neko.created'] = lib.createdPlaylists
-            .map(
-              (p) => CoverItem(
-                id: p.id,
-                title: p.name,
-                cover: cover(p.firstMusicCover),
-                subtitle: p.creator ?? '',
-                trackCount: p.musicCount,
-                source: 'neko',
-              ),
-            )
-            .toList();
-        _cache['neko.collectedPlaylist'] = lib.collectedPlaylists
-            .map(
-              (p) => CoverItem(
-                id: p.id,
-                title: p.name,
-                cover: cover(p.firstMusicCover),
-                subtitle: p.creator ?? '',
-                trackCount: p.musicCount,
-                source: 'neko',
-              ),
-            )
-            .toList();
-        // 「我喜欢」个人聚合项（计数由 favorites 接口轻量获取）。
-        var likedItems = const <CoverItem>[];
-        try {
-          final ids = await api.likedIds();
-          if (ids.isNotEmpty) {
-            likedItems = [
-              CoverItem(
-                id: 'profile:favorites',
-                title: likedLabel,
-                trackCount: ids.length,
-                source: 'neko',
-              ),
-            ];
-          }
-        } catch (_) {
-          // 计数失败不影响歌单展示
-        }
-        _cache['neko.liked'] = likedItems;
-      } else if (_platform == _Platform.qqmusic) {
-        final lib = await ref.read(qqMusicApiProvider).userLibrary();
-        // 一次拉取填充全部分类（切换 tab 不再重复请求）
-        _cache['qqmusic.created'] = lib.created;
-        _cache['qqmusic.collectedPlaylist'] = lib.collected;
-        _cache['qqmusic.liked'] = lib.likedTotal <= 0
-            ? const []
-            : [
-                CoverItem(
-                  id: 'profile:favorites',
-                  title: '我喜欢',
-                  cover: lib.likedCover.isEmpty ? null : lib.likedCover,
-                  trackCount: lib.likedTotal,
-                  source: 'qqmusic',
-                ),
-              ];
-      } else {
-        final account = ref.read(neteaseAuthProvider);
-        final api = ref.read(neteaseApiProvider);
-        final List<CoverItem> items;
-        switch (_tab) {
-          case _FavTab.playlist:
-            final playlists = await api.userPlaylists(account!.userId);
-            items = playlists
-                .where((p) => p.subscribed)
-                .map(
-                  (p) => CoverItem(
-                    id: p.id,
-                    title: p.name,
-                    cover: p.cover,
-                    subtitle: p.owner ?? '',
-                    trackCount: p.trackCount,
-                  ),
-                )
-                .toList();
-          case _FavTab.album:
-            items = await api.albumSublist();
-          case _FavTab.artist:
-            items = await api.artistSublist();
-        }
-        _cache[key] = items;
-      }
+      final result = await adapter.fetchFavorites(ref, _tab);
       if (!mounted) return;
-      _finishFetchSuccess(key);
+      setState(() {
+        _cache.addAll(result);
+        _loading.remove(key);
+        _error.remove(key);
+        _loaded.addAll(result.keys);
+      });
     } catch (e) {
       if (!mounted) return;
-      _finishFetchError(key, e);
+      setState(() {
+        _error[key] = '$e';
+        _loading.remove(key);
+        _loaded.add(key);
+      });
     }
   }
 
-  void _onCoverTap(CoverItem item) {
-    if (_platform == _Platform.kugou) {
-      // 「我喜欢」为个人歌单，走 likedTracks 个人链路（listid→
-      // /v4/get_list_all_file）；其余歌单/收藏专辑统一用公开歌单接口
-      // 打开（global_collection_id；对齐 MoeKoeMusic 跳转 PlaylistDetail）
-      if (item.title == '我喜欢') {
-        showKugouTracksDialog(
-          context,
-          title: item.title,
-          cover: item.cover,
-          loadTracks: (ref) => ref.read(kugouApiProvider).likedTracks(),
-        );
-        return;
-      }
-      showKugouPlaylistDetailDialog(context, item);
-      return;
-    }
-    if (_platform == _Platform.neko) {
-      if (_nekoTab == _NekoTab.liked) {
-        showNekoTracksDialog(
-          context,
-          title: item.title,
-          cover: item.cover,
-          loadTracks: (ref) => ref.read(nekoApiProvider).likedTracks(),
-        );
-        return;
-      }
-      if (_nekoTab == _NekoTab.collectedPlaylist) {
-        showNekoFavoritePlaylistDialog(context, item);
-        return;
-      }
-      showNekoPlaylistDetailDialog(context, item);
-      return;
-    }
-    if (_platform == _Platform.qqmusic) {
-      if (_qqTab == _QqTab.liked) {
-        showQqTracksDialog(
-          context,
-          title: item.title,
-          subtitle: context.l10n.trackListArtistHotSongs,
-          loadTracks: (ref) => ref.read(qqMusicApiProvider).likedSongs(),
-        );
-        return;
-      }
-      showQqPlaylistDetailDialog(context, item);
-      return;
-    }
-    switch (_tab) {
-      case _FavTab.playlist:
-        showPlaylistDetailDialog(context, item);
-      case _FavTab.album:
-        showNeteaseAlbumDialog(context, item);
-      case _FavTab.artist:
-        showNeteaseArtistDialog(context, item);
-    }
-  }
+  void _onCoverTap(CoverItem item) =>
+      _adapter.openFavorite(context, ref, _tab, item);
 
-  Future<void> _login() async {
-    if (_platform == _Platform.kugou) {
-      await showDialog<bool>(
-        context: context,
-        barrierColor: Colors.black.withValues(alpha: 0.5),
-        barrierDismissible: false,
-        builder: (_) => const KgQrLoginDialog(),
-      );
-    } else if (_platform == _Platform.qqmusic) {
-      showQqMusicLoginDialog(context);
-    } else if (_platform == _Platform.neko) {
-      await showNekoLoginDialog(context);
-    } else {
-      showNeteaseLoginDialog(context);
-    }
-  }
+  Future<void> _login() => _adapter.login(context);
 }

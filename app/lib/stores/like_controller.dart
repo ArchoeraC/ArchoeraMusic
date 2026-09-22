@@ -2,15 +2,15 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 红心状态控制器（NT / KG / QM三平台）。
+/// 红心状态控制器（各平台统一走 `CollectionPlatform` 适配器）。
 ///
 /// - 持有各平台已喜欢 id 集合，任意 UI 通过 [isLiked] 查询；
 /// - [toggle] 乐观更新 + 失败回滚（失败返回 false 由调用方提示）；
 /// - [sync] 按当前登录态刷新集合（登录/退出后调用）。
 ///
-/// QQ 特殊：红心键为 **songmid**；本机红心存于 [QqLikedStore]（app 自己的
-/// 「我喜欢」，离线始终可用），在线同步为**实验接口**（kQqFavExperimental）
-/// ——登录 QQ 时并入在线「我喜欢」songmid，写失败回滚本地（见 [_toggleQq]）。
+/// 平台差异（红心键归一、id 集合拉取、收藏/取消、QQ 本机库、Neko 实验开关等）
+/// 全部由 `widgets/dialogs/collection_platform.dart` 的适配器提供；**新增音源
+/// 只需注册适配器**，本文件无需改动。
 library;
 
 import 'package:flutter/foundation.dart';
@@ -18,8 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/netease/track.dart';
 import '../services/qqmusic/qq_liked_store.dart';
-import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
-import 'app_prefs.dart';
+import '../widgets/dialogs/collection_platform.dart';
 import 'providers.dart';
 
 class LikeController extends ChangeNotifier {
@@ -84,61 +83,42 @@ class LikeController extends ChangeNotifier {
     _dirtyKeys.removeWhere((_, at) => now.difference(at) > reconcileGrace);
   }
 
-  /// QQ 红心键（songmid；缺失回退 Track.id）。
-  static String _qqKey(Track t) => qqLikeKey(t);
+  /// 平台集合（新增音源时这里与 [_syncOnce] 的遍历列表同步即可）。
+  Set<String> _setFor(String source) {
+    switch (source) {
+      case 'kugou':
+        return _kugouIds;
+      case 'qqmusic':
+        return _qqmusicIds;
+      case 'neko':
+        return _nekoIds;
+      default:
+        return _neteaseIds;
+    }
+  }
 
-  /// 当前曲目是否已喜欢（按 source 路由到对应平台集合）。
-  ///
-  /// KG以歌曲 hash 为红心键（搜索条目 id 退化为 hash、歌单条目可能为
-  /// audio_id，两者不一致会导致红心状态判定失败；hash 是稳定的歌曲标识）。
-  /// **hash 统一转小写匹配**：歌单接口存大写、mobilecdn 搜索返回小写，
-  /// 与 [songLikeKey] / likedHashSet 保持一致（否则已收藏误标非红心）。
-  /// QM以 **songmid** 为红心键（彻底摆脱「QQ 曲目误走 netease id」）。
+  /// 当前曲目是否已喜欢（按 source 路由到对应平台集合与红心键）。
   bool isLiked(Track track) {
-    if (track.source == 'kugou') {
-      return _kugouIds.contains((track.kugou?.hash ?? track.id).toLowerCase());
-    }
-    if (track.source == 'qqmusic') {
-      return _qqmusicIds.contains(_qqKey(track));
-    }
-    if (track.source == 'neko') {
-      return _nekoIds.contains(track.id);
-    }
-    return _neteaseIds.contains(track.id);
+    final key = collectionPlatform(track.source).likeKey(track);
+    return key.isNotEmpty && _setFor(track.source).contains(key);
   }
 
-  /// 平台已喜欢 id 集合（'kugou' → KG hash；'qqmusic' → songmid；
-  /// 'neko' → Neko id；其余 → NT id；SongList 渲染用）。
-  Set<String> idsFor(String source) {
-    if (source == 'kugou') return _kugouIds;
-    if (source == 'qqmusic') return _qqmusicIds;
-    if (source == 'neko') return _nekoIds;
-    return _neteaseIds;
-  }
+  /// 平台已喜欢 id 集合（SongList 渲染用）。
+  Set<String> idsFor(String source) => _setFor(source);
 
   /// 用服务端权威「我喜欢的」列表对账该平台红心集合（收藏页刷新成功后调用）。
   ///
-  /// - 仅 netease / kugou（服务端权威列表）；QQ 以本机 [QqLikedStore] 为
-  ///   主源、其「我喜欢」页红心与列表同源，不走本方法。
-  /// - **双向**：权威列表含 → 点亮；不含 → 熄灭（跨设备移除后刷新即熄灭）。
-  /// - **缓冲期**（[reconcileGrace]）内本端刚 toggle 的键以本地为准：
-  ///   服务端写入尚未生效时不因旧快照误覆盖（刚点亮不清除 / 刚熄灭不复活）。
-  ///
-  /// 仅当调用方确在展示该平台「我喜欢的」权威列表时才能调用——绝不能把普通
-  /// 歌单当收藏集合传进来（会把红心集合整体清空）。对账后 notify UI 重绘。
+  /// 仅 [CollectionPlatform.reconcileLiked] 的平台参与（QQ 本机列表不走对账）。
+  /// **双向**：权威列表含 → 点亮；不含 → 熄灭；缓冲期内本端刚 toggle 的键
+  /// 以本地为准。对账后 notify UI 重绘。
   void reconcileFromAuthoritative(String platform, List<Track> tracks) {
-    if (platform != 'netease' && platform != 'kugou' && platform != 'neko') {
-      return;
-    }
+    final adapter = collectionPlatform(platform);
+    if (!adapter.reconcileLiked) return;
     final serverKeys = <String>{};
     for (final t in tracks) {
       if (t.source != platform) continue;
-      if (platform == 'kugou') {
-        final h = (t.kugou?.hash ?? t.id).toLowerCase();
-        if (h.isNotEmpty) serverKeys.add(h);
-      } else if (t.id.isNotEmpty) {
-        serverKeys.add(t.id);
-      }
+      final k = adapter.likeKey(t);
+      if (k.isNotEmpty) serverKeys.add(k);
     }
     if (_alignToServer(platform, serverKeys)) notifyListeners();
   }
@@ -162,7 +142,7 @@ class LikeController extends ChangeNotifier {
   /// 以服务端权威键集对齐平台集合（双向）。缓冲期内本端刚 toggle 的键以
   /// 本地状态为准（保留刚点亮 / 不复活刚熄灭）；返回集合是否变化。
   bool _alignToServer(String platform, Set<String> serverKeys) {
-    final cur = idsFor(platform);
+    final cur = _setFor(platform);
     _pruneDirty();
     final next = <String>{};
     // 缓冲期内本端刚点亮的键：旧快照未含也保留
@@ -182,7 +162,7 @@ class LikeController extends ChangeNotifier {
     return true;
   }
 
-  /// 同步三平台红心集合（各自失败互不影响）。
+  /// 同步各平台红心集合（各自失败互不影响）。
   ///
   /// 支持「合并重跑」：同步中收到的登录事件（见 [_pending]）不会丢失，
   /// 当前一轮结束后用最新登录态再跑，避免登录动作被 _syncing 吞掉。
@@ -203,215 +183,49 @@ class LikeController extends ChangeNotifier {
   }
 
   Future<void> _syncOnce() async {
-    // NT：likelist（需登录）
-    final account = _ref.read(neteaseAuthProvider);
-    if (account != null) {
+    // 遍历所有已注册平台（顺序与注册表一致）。未启用（Neko 开关）或不可用
+    // （未登录）的平台清空集合；其余拉轻量 id 集合对齐（网络失败保留旧集合）。
+    for (final source in const ['netease', 'kugou', 'qqmusic', 'neko']) {
+      final adapter = collectionPlatform(source);
+      if (!adapter.enabled(_ref) || !adapter.likedAvailable(_ref)) {
+        _setFor(source).clear();
+        continue;
+      }
       try {
-        final ids = await _ref
-            .read(neteaseApiProvider)
-            .likedIds(account.userId);
-        _alignToServer('netease', ids.toSet());
+        final ids = await adapter.fetchLikedIds(_ref);
+        _alignToServer(source, ids);
       } catch (_) {
         // 网络失败保留旧集合
       }
-    } else {
-      _neteaseIds.clear();
     }
-
-    // KG：轻量红心 hash 集合（likedHashSet 只分页取 hash，不构造
-    // Track / 不写库 / 不触碰收藏页全量列表），红心状态与列表解耦——
-    // 启动同步不做全量拉取，避免被进程退出/写失败影响（sync 语义）
-    final kugou = _ref.read(kugouApiProvider);
-    if (kugou.session != null) {
-      try {
-        final ids = await kugou.likedHashSet();
-        _alignToServer('kugou', ids);
-      } catch (_) {
-        // 网络失败保留旧集合
-      }
-    } else {
-      _kugouIds.clear();
-    }
-
-    // QQ：本机红心（QqLikedStore.songmid）恒为主源，无论登录与否都保留；
-    // 已登录且实验开关开启时并入在线「我喜欢」songmid（add-only）。
-    // 在线拉取失败保留本机集合——「本地红心始终可用，不受在线成败影响」。
-    try {
-      final qqStore = _ref.read(qqLikedStoreProvider);
-      await qqStore.ensureLoaded();
-      final local = qqStore.midSet;
-      final qqApi = _ref.read(qqMusicApiProvider);
-      if (kQqFavExperimental && qqApi.isLoggedIn) {
-        try {
-          final online = await qqApi.likedSongmids();
-          _applyQqLiked(local, online);
-        } catch (_) {
-          _replaceQqLiked(local);
-        }
-      } else {
-        _replaceQqLiked(local);
-      }
-    } catch (_) {
-      // 本机库加载失败：保留内存态（下次 sync 重试）
-    }
-
-    // Neko（实验性音源，默认关）：仅启用且登录时拉在线收藏 id；
-    // 未启用或未登录即清空（红心集合与服务器保持一致）。
-    if (_ref.read(appPrefsProvider).nekoEnabled) {
-      final neko = _ref.read(nekoApiProvider);
-      if (neko.isLoggedIn) {
-        try {
-          _alignToServer('neko', await neko.likedIds());
-        } catch (_) {
-          // 网络失败保留旧集合
-        }
-      } else {
-        _nekoIds.clear();
-      }
-    } else {
-      _nekoIds.clear();
-    }
-
     _loaded = true;
     notifyListeners();
-  }
-
-  /// 以本机集合为底、并入在线 songmid（add-only）重建 QQ 红心集合；
-  /// 缓冲期内本端刚熄灭的键不因在线写未生效而回光。
-  void _applyQqLiked(Set<String> local, Iterable<String> online) {
-    final prev = Set<String>.from(_qqmusicIds);
-    _qqmusicIds
-      ..clear()
-      ..addAll(local);
-    for (final mid in online) {
-      if (mid.isEmpty || _qqmusicIds.contains(mid)) continue;
-      if (_dirtyOf('qqmusic', mid) && !prev.contains(mid)) continue;
-      _qqmusicIds.add(mid);
-    }
-  }
-
-  void _replaceQqLiked(Set<String> local) {
-    _qqmusicIds
-      ..clear()
-      ..addAll(local);
   }
 
   /// 切换红心：乐观更新 + 失败回滚。
   /// 成功返回 true；失败回滚并返回 false（调用方负责提示）。
   Future<bool> toggle(Track track) async {
-    final wasLiked = isLiked(track);
-    final target = !wasLiked;
-
-    if (track.source == 'kugou') {
-      final key = (track.kugou?.hash ?? track.id).toLowerCase();
-      // 缓冲期内服务端写未生效，权威列表刷新不覆盖本端刚做的改动
-      _markDirty('kugou', key);
-      _kugouIds
-        ..remove(key)
-        ..addAll(target ? {key} : const {});
-      notifyListeners();
-      try {
-        final api = _ref.read(kugouApiProvider);
-        if (target) {
-          await api.addToLike(track);
-        } else {
-          await api.removeFromLike(track);
-        }
-        _applyStoreDelta(track, target);
-        return true;
-      } catch (_) {
-        // 回滚
-        _clearDirty('kugou', key);
-        _kugouIds
-          ..remove(key)
-          ..addAll(wasLiked ? {key} : const {});
-        notifyListeners();
-        return false;
-      }
-    }
-
-    if (track.source == 'qqmusic') {
-      return _toggleQq(track);
-    }
-
-    if (track.source == 'neko') {
-      // Neko：在线权威（需登录）。乐观更新 + 失败回滚。
-      _markDirty('neko', track.id);
-      _nekoIds
-        ..remove(track.id)
-        ..addAll(target ? {track.id} : const {});
-      notifyListeners();
-      try {
-        await _ref.read(nekoApiProvider).like(track.id, like: target);
-        return true;
-      } catch (_) {
-        _clearDirty('neko', track.id);
-        _nekoIds
-          ..remove(track.id)
-          ..addAll(wasLiked ? {track.id} : const {});
-        notifyListeners();
-        return false;
-      }
-    }
-
-    // NT
-    _markDirty('netease', track.id);
-    _neteaseIds
-      ..remove(track.id)
-      ..addAll(target ? {track.id} : const {});
-    notifyListeners();
-    try {
-      await _ref.read(neteaseApiProvider).like(track.id, like: target);
-      _applyStoreDelta(track, target);
-      return true;
-    } catch (_) {
-      _clearDirty('netease', track.id);
-      _neteaseIds
-        ..remove(track.id)
-        ..addAll(wasLiked ? {track.id} : const {});
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// QQ 红心切换。
-  ///
-  /// - 乐观更新 songmid 集合；
-  /// - **已登录 + 实验开关**：调在线写接口（favorite_add/remove）——
-  ///   成功才落本机库；失败抛错并**回滚本机**（红心填充态/列表均还原，
-  ///   返回 false 由调用方提示）；
-  /// - **未登录（或实验关闭）**：仅维护本机红心（QqLikedStore 落盘），
-  ///   始终成功——「本地红心始终可用」。
-  Future<bool> _toggleQq(Track track) async {
-    final wasLiked = isLiked(track);
-    final target = !wasLiked;
-    final key = _qqKey(track);
+    final adapter = collectionPlatform(track.source);
+    final key = adapter.likeKey(track);
     if (key.isEmpty) return false;
+    final source = track.source;
+    final set = _setFor(source);
+    final wasLiked = set.contains(key);
+    final target = !wasLiked;
 
-    _markDirty('qqmusic', key);
-    _qqmusicIds
+    // 缓冲期内服务端写未生效，权威列表刷新不覆盖本端刚做的改动
+    _markDirty(source, key);
+    set
       ..remove(key)
       ..addAll(target ? {key} : const {});
     notifyListeners();
-
     try {
-      final store = _ref.read(qqLikedStoreProvider);
-      final qqApi = _ref.read(qqMusicApiProvider);
-      final online = kQqFavExperimental && qqApi.isLoggedIn;
-      if (online) {
-        // 在线写接口失败 → 抛错走下方回滚（不落本机库）
-        await qqApi.like(key, like: target, songId: track.id);
-      }
-      if (target) {
-        await store.add(track);
-      } else {
-        await store.removeByKey(key);
-      }
+      await adapter.setLiked(_ref, track, target);
+      _applyStoreDelta(track, target);
       return true;
     } catch (_) {
-      // 回滚（在线接口失败 / 本机库异常）
-      _clearDirty('qqmusic', key);
-      _qqmusicIds
+      _clearDirty(source, key);
+      set
         ..remove(key)
         ..addAll(wasLiked ? {key} : const {});
       notifyListeners();
@@ -420,9 +234,8 @@ class LikeController extends ChangeNotifier {
   }
 
   /// 服务端确认成功后，同步维护收藏列表增量（新喜欢插入头部 /
-  /// 取消喜欢移除）并写库——与「刷新=全量重拉+写库」同一持久化语义，
-  /// 列表任何变化都落库（local 歌曲不参与平台收藏列表）。
-  /// QQ 走 [QqLikedStore]（_toggleQq 内部维护），不经过本方法。
+  /// 取消喜欢移除）并写库——与「刷新=全量重拉+写库」同一持久化语义。
+  /// QQ 走 [QqLikedStore]、NK 不做本地增量（与既有行为一致）。
   void _applyStoreDelta(Track track, bool target) {
     if (track.source != 'kugou' && track.source != 'netease') return;
     final store = _ref.read(likedStoreProvider);

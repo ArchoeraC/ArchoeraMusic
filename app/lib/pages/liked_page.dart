@@ -2,25 +2,17 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'dart:async';
-
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../services/liked/liked_loader.dart';
 import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
-import '../services/qqmusic/qq_liked_store.dart';
-import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../stores/shell_page_state.dart';
 import '../../l10n/l10n.dart';
 import '../l10n/generated/app_localizations.dart';
-import '../widgets/dialogs/kugou_login_button.dart';
-import '../widgets/dialogs/neko_login_dialog.dart';
-import '../widgets/dialogs/netease_login_dialog.dart';
-import '../widgets/dialogs/qqmusic_login_dialog.dart';
+import '../widgets/dialogs/collection_platform.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/streaming/empty_state.dart';
 import '../widgets/list/song_list.dart';
@@ -33,15 +25,9 @@ part 'liked/liked_page_view.dart';
 
 /// 我喜欢页（对齐原项目 Liked.vue）。
 ///
-/// 平台切换（NT / KG / QM）：
-/// - NT / KG：登录对应平台后拉取「红心收藏」/ KG「我喜欢」歌单
-///   → SongList 可播放（走 [LikedStore]，SQLite 缓存秒开 + SWR 全量刷新）；
-/// - QM：**本机红心为主**（[QqLikedStore]，离线始终可用）——在搜索 /
-///   播放页给任意 QQ 曲目点亮红心即出现在此并可播放；登录 QQ 后可手动
-///   「同步在线收藏」（实验性社区逆向 dirid=201 接口，失败不影响本机）。
-///
-/// 数据加载：NT/KG走 [LikedStore]（见 liked_loader.dart 注释），
-/// QQ 走 [QqLikedStore]（见 qq_liked_store.dart：本机 JSON + 在线并入）。
+/// 平台切换与数据（NT / KG / QM / NK）**全部由 `CollectionPlatform` 注册表
+/// 驱动**：平台列表、登录引导、登录动作、红心键、列表数据、刷新/同步语义、
+/// 空态文案都来自适配器；本页不含任何具体平台分支。新增音源只需注册适配器。
 class LikedPage extends ConsumerStatefulWidget {
   const LikedPage({super.key});
 
@@ -50,57 +36,24 @@ class LikedPage extends ConsumerStatefulWidget {
 }
 
 class _LikedPageState extends ConsumerState<LikedPage> {
-  static const _qqPlatform = 'qqmusic';
-
-  /// 当前平台；存于 [likedPlatformProvider]（跨壳内容卸载/重挂载保留）。
+  /// 当前平台 source；存于 [likedPlatformProvider]（跨壳内容卸载/重挂载保留）。
   late String _platform;
   bool _resolving = false;
 
-  bool get _neteaseLoggedIn => ref.read(neteaseAuthProvider) != null;
-  bool get _kugouLoggedIn => ref.read(kugouApiProvider).session != null;
-  bool get _qqLoggedIn => ref.read(qqMusicApiProvider).isLoggedIn;
-  bool get _nekoLoggedIn => ref.read(nekoApiProvider).isLoggedIn;
-
-  /// NT / KG / Neko平台需对应账号登录；QQ 平台本机红心优先、不要求登录。
-  bool get _requiresLogin => _platform != _qqPlatform;
-
-  /// 当前平台是否「可用」（内容区据此显示数据 / 登录引导 / 本机列表）。
-  bool get _loggedIn {
-    if (!_requiresLogin) return true;
-    return switch (_platform) {
-      'kugou' => _kugouLoggedIn,
-      'neko' => _nekoLoggedIn,
-      _ => _neteaseLoggedIn,
-    };
-  }
+  /// 当前平台「我喜欢」是否可用（QQ 本机红心无需登录）。
+  bool get _available => collectionPlatform(_platform).likedAvailable(ref);
 
   @override
   void initState() {
     super.initState();
-    // 优先恢复上次显式选择（壳内容因播放页展开被卸载后重建）；
-    // 无显式选择时按登录态给默认值：默认选已登录平台（NT优先；无NT/KG
-    // 但已登录 QQ → QQ 本机红心；都未登录保持NT引导）。
+    // 优先恢复上次显式选择（壳内容因播放页展开被卸载后重建）；实验性音源
+    // 已关闭时不保留 NK 选择。无显式选择时按登录态给默认值。
     final restored = ref.read(likedPlatformProvider);
-    // 实验性音源已关闭时不保留 NK 选择（避免对其发请求）。
     _platform = (restored == 'neko' && !ref.read(appPrefsProvider).nekoEnabled)
-        ? _defaultPlatform()
-        : (restored ?? _defaultPlatform());
-    if (_loggedIn) _ensureLoaded(_platform);
+        ? defaultLikedPlatform(ref)
+        : (restored ?? defaultLikedPlatform(ref));
+    if (_available) collectionPlatform(_platform).ensureLikedLoaded(ref);
   }
-
-  String _defaultPlatform() {
-    if (!_neteaseLoggedIn && _kugouLoggedIn) return 'kugou';
-    if (!_neteaseLoggedIn && !_kugouLoggedIn && _qqLoggedIn) {
-      return _qqPlatform;
-    }
-    return 'netease';
-  }
-
-  LikedStore get _store => ref.read(likedStoreProvider);
-  QqLikedStore get _qqStore => ref.read(qqLikedStoreProvider);
-
-  List<Track> _tracks(String platform) =>
-      platform == _qqPlatform ? _qqStore.tracks : _store.tracks(platform);
 
   @override
   Widget build(BuildContext context) => _buildPage(context);

@@ -13,71 +13,44 @@ extension _LikedPageView on _LikedPageState {
     final l10n = context.l10n;
     final playingId = ref.watch(playbackProvider.select((s) => s.trackId));
     final isPlaying = ref.watch(playbackProvider.select((s) => s.playing));
-    ref.listen(neteaseAuthProvider, (prev, next) {
-      _onAuthChanged('netease');
-    });
-    ref.listen(kugouApiProvider.select((s) => s.session?.userid), (prev, next) {
-      if (prev != next) _onAuthChanged('kugou');
-    });
-    ref.listen(qqMusicApiProvider.select((s) => s.isLoggedIn), (prev, next) {
-      if (prev != next) _onAuthChanged(_LikedPageState._qqPlatform);
-    });
-    ref.listen(nekoApiProvider.select((s) => s.isLoggedIn), (prev, next) {
-      if (prev != next) _onAuthChanged('neko');
-    });
-    final nekoEnabled = ref.watch(
-      appPrefsProvider.select((p) => p.nekoEnabled),
-    );
-    // 实验性音源关闭时，若当前停留在 NK 平台则退回 NT。
+
+    // 各平台登录态变化 → 重置/重载（信号由注册表适配器提供）。
+    for (final p in collectionPlatforms(ref)) {
+      ref.listen(p.authSignal, (_, _) => _onAuthChanged(p.source));
+    }
+    // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
+    ref.watch(appPrefsProvider.select((p) => p.nekoEnabled));
+    // 实验性音源关闭时，若当前停留在 NK 平台则退回默认。
     ref.listen(appPrefsProvider.select((p) => p.nekoEnabled), (prev, next) {
-      if (next == false && _platform == 'neko') _switchPlatform('netease');
+      if (next == false && _platform == 'neko') {
+        _switchPlatform(defaultLikedPlatform(ref));
+      }
     });
 
-    final neteaseStore = ref.watch(likedStoreProvider);
-    final qqStore = ref.watch(qqLikedStoreProvider);
-    final store = _platform == _LikedPageState._qqPlatform
-        ? null
-        : neteaseStore;
-    final qq = _platform == _LikedPageState._qqPlatform;
-    final qqTracks = qqStore.tracks;
-    final qqLoaded = qqStore.loaded;
-    final qqLoading = qqStore.loading && !qqLoaded;
-    final qqError = qqStore.error;
+    // 两个可能的「我喜欢」后端（服务端 store / QQ 本机库）变化都会触发重建。
+    ref.watch(likedStoreProvider);
+    ref.watch(qqLikedStoreProvider);
 
-    final subtitle = !_loggedIn
-        ? (qq
-              ? ''
-              : switch (_platform) {
-                  'kugou' => l10n.pageLikedKugouLoginHint,
-                  'neko' => l10n.pageLikedNekoLoginHint,
-                  _ => l10n.pageLikedNeteaseLoginHint,
-                })
-        : qq
-        ? (qqTracks.isEmpty
-              ? l10n.pageLikedQqHint
-              : l10n.commonSongCountHint(count: qqTracks.length))
-        : l10n.commonSongCountHint(count: store!.total(_platform));
+    final adapter = collectionPlatform(_platform);
+    final view = adapter.likedView(ref);
+    final available = adapter.likedAvailable(ref);
 
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _LikedHeader(
-            subtitle: subtitle,
+            subtitle: adapter.likedSubtitle(ref, l10n, view),
             platform: _platform,
-            nekoEnabled: nekoEnabled,
-            loggedIn: _loggedIn,
-            qq: qq,
-            qqLoaded: qqLoaded,
-            qqTracks: qqTracks,
-            qqLoggedIn: _qqLoggedIn,
+            platforms: collectionPlatforms(ref),
+            loggedIn: available,
+            showPlayAll: available && view.loaded && view.tracks.isNotEmpty,
+            showRefresh: available && adapter.likedShowRefresh(ref, view),
+            refreshLabel: adapter.likedRefreshLabel(l10n),
             resolving: _resolving,
-            store: store,
             onPlayAll: _playAll,
             onSwitchPlatform: _switchPlatform,
-            onRefresh: qq
-                ? _refreshQqOnline
-                : () => neteaseStore.refresh(_platform, writeCache: true),
+            onRefresh: () => adapter.likedRefresh(context, ref),
           ),
           const SizedBox(height: 12),
           const Divider(height: 1),
@@ -86,13 +59,8 @@ extension _LikedPageView on _LikedPageState {
               theme: theme,
               scheme: scheme,
               l10n: l10n,
-              store: store,
-              qqStore: qqStore,
-              qq: qq,
-              qqTracks: qqTracks,
-              qqLoaded: qqLoaded,
-              qqLoading: qqLoading,
-              qqError: qqError,
+              adapter: adapter,
+              view: view,
               playingId: playingId,
               isPlaying: isPlaying,
             ),
@@ -106,81 +74,22 @@ extension _LikedPageView on _LikedPageState {
     required ThemeData theme,
     required ColorScheme scheme,
     required AppLocalizations l10n,
-    required LikedStore? store,
-    required QqLikedStore qqStore,
-    required bool qq,
-    required List<Track> qqTracks,
-    required bool qqLoaded,
-    required bool qqLoading,
-    required String qqError,
+    required CollectionPlatform adapter,
+    required LikedView view,
     required String? playingId,
     required bool isPlaying,
   }) {
-    if (qq) {
-      if (qqLoading) {
-        return const Center(
-          child: SizedBox(
-            width: 28,
-            height: 28,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
-          ),
-        );
-      }
-      if (qqError.isNotEmpty && qqTracks.isEmpty) {
-        return _LikedErrorState(
-          message: qqError,
-          onRetry: () => _qqStore.ensureLoaded(),
-        );
-      }
-      if (qqTracks.isEmpty) {
-        return _QqEmptyState(
-          loggedIn: _qqLoggedIn,
-          l10n: l10n,
-          scheme: scheme,
-          theme: theme,
-          onLogin: _showQqLogin,
-          onSync: _refreshQqOnline,
-        );
-      }
-      return SongList(
-        key: const PageStorageKey('page.liked'),
-        items: qqTracks,
-        playingId: playingId,
-        isPlaying: isPlaying,
-        onPlay: _playTrack,
-        onContextMenu: _onTrackMenu,
-        likedIds: qqStore.midSet,
-        onToggleLike: _toggleLike,
-      );
-    }
-    if (!_loggedIn) {
+    if (!adapter.likedAvailable(ref)) {
       return StreamingEmptyState(
         icon: EtaIcons.heartOutline,
         title: l10n.pageLikedLoginTitle,
-        subtitle: switch (_platform) {
-          'kugou' => l10n.pageLikedKugouLoginDesc,
-          'neko' => l10n.pageLikedNekoLoginDesc,
-          _ => l10n.pageLikedNeteaseLoginDesc,
-        },
+        subtitle: adapter.likedLoginDesc(l10n),
         buttonLabel: l10n.navHeaderQrLogin,
         buttonIcon: EtaIcons.qrcode,
-        onButton: () async {
-          if (_platform == 'kugou') {
-            await showDialog<bool>(
-              context: context,
-              barrierColor: Colors.black.withValues(alpha: 0.5),
-              barrierDismissible: false,
-              builder: (_) => const KgQrLoginDialog(),
-            );
-          } else if (_platform == 'neko') {
-            await showNekoLoginDialog(context);
-          } else {
-            showNeteaseLoginDialog(context);
-          }
-        },
+        onButton: () => adapter.login(context),
       );
     }
-    if (store!.loading(_platform) && !store.loaded(_platform)) {
+    if (view.loading && !view.loaded) {
       return const Center(
         child: SizedBox(
           width: 28,
@@ -189,35 +98,34 @@ extension _LikedPageView on _LikedPageState {
         ),
       );
     }
-    if (store.error(_platform).isNotEmpty && !store.loaded(_platform)) {
+    if (view.error.isNotEmpty && !view.loaded) {
       return _LikedErrorCard(
         theme: theme,
         scheme: scheme,
         title: l10n.pageLikedLoadFailed,
-        message: store.error(_platform),
-        onRetry: () => store.refresh(_platform, writeCache: true),
+        message: view.error,
+        onRetry: () => adapter.likedRefresh(context, ref),
       );
     }
-    if (store.tracks(_platform).isEmpty) {
+    if (view.tracks.isEmpty) {
+      final action = adapter.likedEmptyAction(l10n, ref);
       return _LikedEmptyState(
         theme: theme,
         scheme: scheme,
-        title: l10n.pageLikedEmpty,
-        message: switch (_platform) {
-          'kugou' => l10n.pageLikedKugouEmptyHint,
-          'neko' => l10n.pageLikedNekoEmptyHint,
-          _ => l10n.pageLikedNeteaseEmptyHint,
-        },
+        title: adapter.likedEmptyTitle(l10n),
+        message: adapter.likedEmptyHint(l10n),
+        actionLabel: action?.label,
+        onAction: action == null ? null : () => action.run(context, ref),
       );
     }
     return SongList(
       key: const PageStorageKey('page.liked'),
-      items: store.tracks(_platform),
+      items: view.tracks,
       playingId: playingId,
       isPlaying: isPlaying,
       onPlay: _playTrack,
       onContextMenu: _onTrackMenu,
-      likedIds: ref.watch(likeControllerProvider).idsFor(_platform),
+      likedIds: view.likeIds,
       onToggleLike: _toggleLike,
     );
   }
@@ -227,14 +135,12 @@ class _LikedHeader extends StatelessWidget {
   const _LikedHeader({
     required this.subtitle,
     required this.platform,
-    required this.nekoEnabled,
+    required this.platforms,
     required this.loggedIn,
-    required this.qq,
-    required this.qqLoaded,
-    required this.qqTracks,
-    required this.qqLoggedIn,
+    required this.showPlayAll,
+    required this.showRefresh,
+    required this.refreshLabel,
     required this.resolving,
-    required this.store,
     required this.onPlayAll,
     required this.onSwitchPlatform,
     required this.onRefresh,
@@ -242,14 +148,12 @@ class _LikedHeader extends StatelessWidget {
 
   final String subtitle;
   final String platform;
-  final bool nekoEnabled;
+  final List<CollectionPlatform> platforms;
   final bool loggedIn;
-  final bool qq;
-  final bool qqLoaded;
-  final List<Track> qqTracks;
-  final bool qqLoggedIn;
+  final bool showPlayAll;
+  final bool showRefresh;
+  final String refreshLabel;
   final bool resolving;
-  final LikedStore? store;
   final Future<void> Function() onPlayAll;
   final ValueChanged<String> onSwitchPlatform;
   final VoidCallback onRefresh;
@@ -288,11 +192,7 @@ class _LikedHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          if (loggedIn &&
-              (qq
-                  ? qqLoaded && qqTracks.isNotEmpty
-                  : store!.loaded(platform) &&
-                        store!.tracks(platform).isNotEmpty)) ...[
+          if (showPlayAll) ...[
             SButton(
               label: l10n.commonPlayAll,
               icon: EtaIcons.play,
@@ -304,123 +204,20 @@ class _LikedHeader extends StatelessWidget {
           ],
           SDropdown<String>(
             options: [
-              SDropdownOption('netease', l10n.platformNetease),
-              SDropdownOption('kugou', l10n.platformKugou),
-              SDropdownOption('qqmusic', l10n.platformQQMusic),
-              if (nekoEnabled) SDropdownOption('neko', l10n.platformNeko),
+              for (final p in platforms)
+                SDropdownOption(p.source, p.label(l10n)),
             ],
             selected: platform,
             onChanged: onSwitchPlatform,
           ),
           const SizedBox(width: 12),
-          if (loggedIn &&
-              (qq
-                  ? qqLoaded && (qqTracks.isNotEmpty || qqLoggedIn)
-                  : store!.loaded(platform) &&
-                        store!.tracks(platform).isNotEmpty))
+          if (showRefresh)
             SButton(
-              label: qq ? l10n.pageLikedQqSyncOnline : l10n.commonRefresh,
+              label: refreshLabel,
               icon: EtaIcons.refresh,
               variant: SButtonVariant.secondary,
               onPressed: onRefresh,
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QqEmptyState extends StatelessWidget {
-  const _QqEmptyState({
-    required this.loggedIn,
-    required this.l10n,
-    required this.scheme,
-    required this.theme,
-    required this.onLogin,
-    required this.onSync,
-  });
-
-  final bool loggedIn;
-  final AppLocalizations l10n;
-  final ColorScheme scheme;
-  final ThemeData theme;
-  final VoidCallback onLogin;
-  final VoidCallback onSync;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            EtaIcons.heartOutline,
-            size: 48,
-            color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 10),
-          Text(l10n.pageLikedQqEmptyTitle, style: theme.textTheme.bodyMedium),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              l10n.pageLikedQqEmptyHint,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (!loggedIn)
-            SButton(
-              label: l10n.pageLikedQqLoginSync,
-              icon: EtaIcons.qrcode,
-              variant: SButtonVariant.secondary,
-              onPressed: onLogin,
-            )
-          else
-            SButton(
-              label: l10n.pageLikedQqSyncOnline,
-              icon: EtaIcons.refresh,
-              variant: SButtonVariant.secondary,
-              onPressed: onSync,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LikedErrorState extends StatelessWidget {
-  const _LikedErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(EtaIcons.alertOutline, size: 48, color: scheme.error),
-          const SizedBox(height: 10),
-          Text(
-            message,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 14),
-          SButton(
-            label: context.l10n.commonRetry,
-            icon: EtaIcons.refresh,
-            variant: SButtonVariant.secondary,
-            onPressed: onRetry,
-          ),
         ],
       ),
     );
@@ -477,6 +274,8 @@ class _LikedEmptyState extends StatelessWidget {
     required this.scheme,
     required this.title,
     required this.message,
+    this.actionLabel,
+    this.onAction,
   });
 
   final ThemeData theme;
@@ -484,8 +283,13 @@ class _LikedEmptyState extends StatelessWidget {
   final String title;
   final String message;
 
+  /// 可选的空态动作（QQ 平台：登录 / 同步在线收藏）。
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
   @override
   Widget build(BuildContext context) {
+    final label = actionLabel;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -498,12 +302,25 @@ class _LikedEmptyState extends StatelessWidget {
           const SizedBox(height: 10),
           Text(title, style: theme.textTheme.bodyMedium),
           const SizedBox(height: 4),
-          Text(
-            message,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ),
+          if (label != null && onAction != null) ...[
+            const SizedBox(height: 16),
+            SButton(
+              label: label,
+              icon: EtaIcons.refresh,
+              variant: SButtonVariant.secondary,
+              onPressed: onAction,
+            ),
+          ],
         ],
       ),
     );

@@ -9,95 +9,30 @@ extension _FavoritesPageView on _FavoritesPageState {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
-    ref.listen(neteaseAuthProvider, (_, next) => _onAuthChanged());
-    ref.listen(kugouApiProvider, (_, next) => _onAuthChanged());
-    ref.listen(qqMusicApiProvider, (_, next) => _onAuthChanged());
-    ref.listen(nekoApiProvider, (_, next) => _onAuthChanged());
-    final nekoEnabled = ref.watch(
-      appPrefsProvider.select((p) => p.nekoEnabled),
-    );
+
+    // 各平台登录态变化 → 清缓存并按需刷新（信号由注册表提供）。
+    for (final p in collectionPlatforms(ref)) {
+      ref.listen(p.authSignal, (_, _) => _onAuthChanged());
+    }
+    // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
+    ref.watch(appPrefsProvider.select((p) => p.nekoEnabled));
     // 实验性音源关闭时，若当前停留在 NK 平台则退回 NT。
     ref.listen(appPrefsProvider.select((p) => p.nekoEnabled), (prev, next) {
-      if (next == false && _platform == _Platform.neko) {
-        _switchPlatform(_Platform.netease);
-      }
+      if (next == false && _platform == 'neko') _switchPlatform('netease');
     });
 
+    final adapter = _adapter;
+    final tabs = adapter.tabs(l10n);
+    final selectedTab = tabs.firstWhere(
+      (t) => t.id == _tab,
+      orElse: () => tabs.first,
+    );
     final items = _cache[_cacheKey] ?? const <CoverItem>[];
     final loading = _loading.contains(_cacheKey);
     final error = _error[_cacheKey] ?? '';
     final count = items.length;
-
-    // ── 副标题 / 空态图标（按平台 + 分类） ───────────────────────
-    final String subtitle;
-    final IconData countIcon;
-    if (_platform == _Platform.kugou) {
-      countIcon = EtaIcons.music2Outline;
-      subtitle = switch (_kgTab) {
-        _KgTab.created =>
-          _kugouLoggedIn
-              ? l10n.pageFavKgCreatedCount(count: count)
-              : l10n.pageFavKgCreatedLoginHint,
-        _KgTab.collectedPlaylist =>
-          _kugouLoggedIn
-              ? l10n.pageFavKgCollectedPlaylistCount(count: count)
-              : l10n.pageFavKgCollectedPlaylistLoginHint,
-        _KgTab.collectedAlbum =>
-          _kugouLoggedIn
-              ? l10n.pageFavKgCollectedAlbumCount(count: count)
-              : l10n.pageFavKgCollectedAlbumLoginHint,
-      };
-    } else if (_platform == _Platform.neko) {
-      countIcon = EtaIcons.music2Outline;
-      subtitle = switch (_nekoTab) {
-        _NekoTab.created =>
-          _nekoLoggedIn
-              ? l10n.pageFavKgCreatedCount(count: count)
-              : l10n.pageFavKgCreatedLoginHint,
-        _NekoTab.collectedPlaylist =>
-          _nekoLoggedIn
-              ? l10n.pageFavKgCollectedPlaylistCount(count: count)
-              : l10n.pageFavKgCollectedPlaylistLoginHint,
-        _NekoTab.liked =>
-          _nekoLoggedIn
-              ? l10n.pageFavKgCollectedAlbumCount(count: count)
-              : l10n.pageFavKgCollectedAlbumLoginHint,
-      };
-    } else if (_platform == _Platform.qqmusic) {
-      countIcon = EtaIcons.music2Outline;
-      subtitle = switch (_qqTab) {
-        _QqTab.created =>
-          _qqLoggedIn
-              ? l10n.pageFavKgCreatedCount(count: count)
-              : l10n.pageFavKgCreatedLoginHint,
-        _QqTab.collectedPlaylist =>
-          _qqLoggedIn
-              ? l10n.pageFavKgCollectedPlaylistCount(count: count)
-              : l10n.pageFavKgCollectedPlaylistLoginHint,
-        _QqTab.liked =>
-          _qqLoggedIn
-              ? l10n.pageFavKgCollectedAlbumCount(count: count)
-              : l10n.pageFavKgCollectedAlbumLoginHint,
-      };
-    } else {
-      switch (_tab) {
-        case _FavTab.playlist:
-          subtitle = _neteaseLoggedIn
-              ? l10n.pageFavPlaylistCount(count: count)
-              : l10n.pageFavPlaylistLoginHint;
-          countIcon = EtaIcons.playlist;
-        case _FavTab.album:
-          subtitle = _neteaseLoggedIn
-              ? l10n.pageFavAlbumCount(count: count)
-              : l10n.pageFavAlbumLoginHint;
-          countIcon = EtaIcons.albumOutline;
-        case _FavTab.artist:
-          subtitle = _neteaseLoggedIn
-              ? l10n.pageFavArtistCount(count: count)
-              : l10n.pageFavArtistLoginHint;
-          countIcon = EtaIcons.userOutline;
-      }
-    }
+    final loggedIn = _loggedIn;
+    final subtitle = adapter.favTabSubtitle(l10n, _tab, count, loggedIn);
 
     return Scaffold(
       body: Column(
@@ -136,13 +71,10 @@ extension _FavoritesPageView on _FavoritesPageState {
                   ),
                 ),
                 const SizedBox(width: 12),
-                SDropdown<_Platform>(
+                SDropdown<String>(
                   options: [
-                    SDropdownOption(_Platform.netease, l10n.platformNetease),
-                    SDropdownOption(_Platform.kugou, l10n.platformKugou),
-                    SDropdownOption(_Platform.qqmusic, l10n.platformQQMusic),
-                    if (nekoEnabled)
-                      SDropdownOption(_Platform.neko, l10n.platformNeko),
+                    for (final p in collectionPlatforms(ref))
+                      SDropdownOption(p.source, p.label(l10n)),
                   ],
                   selected: _platform,
                   onChanged: _switchPlatform,
@@ -156,59 +88,13 @@ extension _FavoritesPageView on _FavoritesPageState {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: SSegmented<Object>(
-                options: switch (_platform) {
-                  _Platform.kugou => [
-                    SSegmentedOption(_KgTab.created, l10n.pageFavKgCreated),
-                    SSegmentedOption(
-                      _KgTab.collectedPlaylist,
-                      l10n.pageFavKgCollectedPlaylist,
-                    ),
-                    SSegmentedOption(
-                      _KgTab.collectedAlbum,
-                      l10n.pageFavKgCollectedAlbum,
-                    ),
-                  ],
-                  _Platform.qqmusic => [
-                    SSegmentedOption(_QqTab.created, l10n.pageFavKgCreated),
-                    SSegmentedOption(
-                      _QqTab.collectedPlaylist,
-                      l10n.pageFavKgCollectedPlaylist,
-                    ),
-                    SSegmentedOption(_QqTab.liked, l10n.sidebarLiked),
-                  ],
-                  _Platform.neko => [
-                    SSegmentedOption(_NekoTab.created, l10n.pageFavKgCreated),
-                    SSegmentedOption(
-                      _NekoTab.collectedPlaylist,
-                      l10n.pageFavKgCollectedPlaylist,
-                    ),
-                    SSegmentedOption(_NekoTab.liked, l10n.sidebarLiked),
-                  ],
-                  _Platform.netease => [
-                    SSegmentedOption(_FavTab.playlist, l10n.commonPlaylists),
-                    SSegmentedOption(_FavTab.album, l10n.commonAlbums),
-                    SSegmentedOption(_FavTab.artist, l10n.commonArtists),
-                  ],
-                },
-                selected: switch (_platform) {
-                  _Platform.kugou => _kgTab,
-                  _Platform.qqmusic => _qqTab,
-                  _Platform.neko => _nekoTab,
-                  _Platform.netease => _tab,
-                },
-                onChanged: (v) {
-                  switch (_platform) {
-                    case _Platform.kugou:
-                      _switchKgTab(v as _KgTab);
-                    case _Platform.qqmusic:
-                      _switchQqTab(v as _QqTab);
-                    case _Platform.neko:
-                      _switchNekoTab(v as _NekoTab);
-                    case _Platform.netease:
-                      _switchTab(v as _FavTab);
-                  }
-                },
+              child: SSegmented<String>(
+                options: [
+                  for (final t in tabs)
+                    SSegmentedOption(t.id, t.label(l10n)),
+                ],
+                selected: _tab,
+                onChanged: _switchTab,
               ),
             ),
           ),
@@ -216,15 +102,11 @@ extension _FavoritesPageView on _FavoritesPageState {
           const Divider(height: 1),
           // ── 内容区状态机 ─────────────────────────────────────
           Expanded(
-            child: !_loggedIn
+            child: !loggedIn
                 ? StreamingEmptyState(
                     icon: EtaIcons.starOutline,
                     title: l10n.pageFavLoginTitle,
-                    subtitle: switch (_platform) {
-                      _Platform.kugou => l10n.pageFavKugouLoginDesc,
-                      _Platform.neko => l10n.pageFavNekoLoginDesc,
-                      _ => l10n.pageFavLoginDesc,
-                    },
+                    subtitle: adapter.favLoginDesc(l10n),
                     buttonLabel: l10n.navHeaderQrLogin,
                     buttonIcon: EtaIcons.qrcode,
                     onButton: _login,
@@ -275,7 +157,7 @@ extension _FavoritesPageView on _FavoritesPageState {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          countIcon,
+                          selectedTab.icon,
                           size: 48,
                           color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
                         ),
@@ -286,11 +168,7 @@ extension _FavoritesPageView on _FavoritesPageState {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          switch (_platform) {
-                            _Platform.kugou => l10n.pageFavKugouEmptyHint,
-                            _Platform.neko => l10n.pageFavNekoEmptyHint,
-                            _ => l10n.pageFavEmptyHint,
-                          },
+                          adapter.favEmptyHint(l10n),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
@@ -302,10 +180,7 @@ extension _FavoritesPageView on _FavoritesPageState {
                     key: const PageStorageKey('page.favorites'),
                     items: items,
                     onTap: _onCoverTap,
-                    maxCrossAxisExtent:
-                        _platform == _Platform.netease && _tab == _FavTab.artist
-                        ? 150
-                        : 180,
+                    maxCrossAxisExtent: selectedTab.extent,
                   ),
           ),
         ],
