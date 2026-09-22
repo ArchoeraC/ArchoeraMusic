@@ -1,6 +1,6 @@
 # FLAC 专修：调研与计划
 
-> 状态：**调研稿 v1 · 2026-09-22**
+> 状态：**已执行 · 2026-09-22**（结果见 §6）
 > 定位：`audio-kernel-expansion-plan.md` §5.2 P1 已修好**公共 PCM 地板**，但 **FLAC 几乎没吃到**
 > （`decode-optimization.md` §9：指令数仅 −0.8%，当前仍约 **6.2×** 于 FFmpeg）。本文专攻 FLAC 自身。
 > 前置：有损 B 档（MP3/AAC）先行；本文为**无损**格式，**bit-exact 强制**。
@@ -111,3 +111,36 @@
 - flac 指令数相对改前显著下降（目标数量级：接近或优于 FFmpeg 方向；不预设硬指标，按步记录实际）；
 - 全程 **bit-exact**（md5 与 FFmpeg 参考）、首帧不劣化、676/676（多 seed）、ctest 22/22、Windows 交叉通过；
 - 结果回填 `decode-optimization.md`（新增 FLAC 专修小节）并与本文件对照。
+
+---
+
+## 6. 执行结果（2026-09-22）
+
+**保留：FL-1（位流）+ FL-5（CRC）**；FL-2/3/4 实测无收益/负收益，**回退**。
+
+### 6.1 保留的改动
+- `bitreader.zig`：**u64 位缓存** + `io.Reader.peek`（不消费 `pos`）批量 refill（复用既有 16 KiB 缓冲，零新增缓冲）；
+  **懒 CRC**（CRC-on-load，只对已载入位流的字节累加；只在 `bits_avail<n` 时补字节 ⇒ 有效帧绝不载入下一帧字节）；
+  帧末 `drain()` 把**已消费字节数**推进 `reader.pos`（≤16B 栈 scratch，未消费的预读字节留在流中）；
+  `readUnary1` 改 **u64 `@clz`** 一次数零。**未改 `io.zig`**。
+- `crc.zig`：逐位循环 → **comptime 256 项查表**（`era_crc8_table` / `era_crc16_table`，逐位一致）+ word 级 4 字节 unrolled。
+
+### 6.2 量化（`taskset -c 2`，200s 44.1k/2ch）
+
+| 状态 | insn | cycles |
+|---|---|---|
+| 改前 | 7.599G | 1.880G |
+| FL-1 单独（旧逐位 CRC） | 7.489G（−1.4%） | 1.74G |
+| FL-5 单独（旧逐字节 reader） | 5.197G（−31.6%） | 1.27G |
+| **FL-1 + FL-5（保留）** | **5.001G（−34.2%）** | **1.357G（−27.8%）** |
+
+### 6.3 门禁
+- **bit-exact**：引擎 f32 payload md5 **改前==改后**，且 `cmp` FFmpeg 参考**逐位一致**；
+- 零新增缓冲；首帧 hot **196→120µs**、cold **195→117µs**、create 22→19、cold begin+create 245→157（不劣化）；
+- `zig build test` **679/679**（676 基线 + 3 新增，5 个 seed 连跑全绿）；`ctest` 22/22；Windows 交叉通过。
+
+### 6.4 回退（如实）
+- **FL-2** Rice inline：insn 无变化（LLVM 已内联）；
+- **FL-3** `@Vector(4,i64)` LPC 点积：insn 持平、**cycles +12%**（SSE 无 i64 乘法，模拟代价高）；
+- **FL-4** 去相关 `@Vector`：insn 持平（标量已被 LLVM 自动向量化）——33-bit 路径也因此未引入未验证向量。
+- 因此无需 `kernel/simd/**` 新增辅助。
