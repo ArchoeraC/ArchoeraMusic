@@ -352,7 +352,7 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
     if (current == null || current.status != 'failed') return;
 
     // Neko 直传原文件、直链无扩展名：按文件头魔数嗅探真实容器（对齐官方
-    // PC 客户端），失败再回退 `fileFormat`，避免落盘扩展名错配。
+    // PC 客户端），避免落盘扩展名错配。
     String? extOverride;
     if (track.source == 'neko') {
       try {

@@ -9,9 +9,9 @@
 /// `musicdownloadmanager.cpp` 的 `extensionFromBuffer` 保持一致：
 ///
 ///   `fLaC` → flac；`RIFF....WAVE` → wav；`OggS` → ogg；`ID3` → mp3；
-///   `0xFFEx`（MPEG 帧同步）→ mp3。
+///   `0xFFEx`（MPEG 帧同步）→ mp3；`....ftyp`（ISO BMFF）→ m4a。
 ///
-/// 无法判定返回 null（调用方回退 `fileFormat` / 默认 `mp3`）。
+/// 无法判定返回 null（调用方回退默认 `mp3`）。
 library;
 
 /// 依据文件头字节嗅探音频扩展名；无法判定返回 null。
@@ -28,6 +28,14 @@ String? sniffAudioExtension(List<int> head) {
     // ID3 (MP3 with tag)
     if (head[0] == 0x49 && head[1] == 0x44 && head[2] == 0x33) {
       return 'mp3';
+    }
+    // ....ftyp（ISO BMFF：m4a/mp4 容器；box size 在头 4 字节）
+    if (head.length >= 8 &&
+        head[4] == 0x66 &&
+        head[5] == 0x74 &&
+        head[6] == 0x79 &&
+        head[7] == 0x70) {
+      return 'm4a';
     }
     // RIFF....WAVE
     if (head[0] == 0x52 &&
