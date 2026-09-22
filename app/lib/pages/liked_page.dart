@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/source/source_platform.dart';
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../stores/shell_page_state.dart';
