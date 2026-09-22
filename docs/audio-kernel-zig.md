@@ -21,9 +21,10 @@
 > FFmpeg 兜底路径维持 per-context 不变（§8.3）。**A/Sync 执行与调度模型作为内核「二次增强」、
 > 后置可选**（核心模块化不依赖），见 §8.4.1 / 决策 #17。
 >
-> **能力扩张（2026-09-22）**：在「逐格式接管」主线之外，另立四方向子计划——
+> **能力扩张（2026-09-22）**：在「逐格式接管」主线之外，另立四方向子计划（**限非 Subsonic 区域**）——
 > **① 可听频段 DSP · ② 在线流/非本地源 · ③ 更多格式接管 · ④ 性能/内存**，
 > 见 **[`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md)**（决策 #21）；
+> 内核为**解码侧**内核、不含编码，故**不整体接管 Subsonic 服务端转码**（决策 #22）。
 > 本文仍为架构/依赖/不变量权威，冲突处以其为准。
 >
 > 替代：`docs/archive/audio-kernel-no-ffmpeg.md`（C11 方案，已废弃，保留作历史分析；其 FFmpeg 依赖点审计、
@@ -2247,3 +2248,12 @@ void        zk_dsp_destroy(ZkDspChain *d);
     **③ 更多格式接管**（Musepack SV7 / Shorten / 白名单与内核 Info 兜底 / 接管门控）、
     **④ 性能/内存**（公共 PCM 地板 / 实例内存池 / B 档授权提速）。架构与不变量仍以本文为准；
     具体排期与优先级在下一步确定。对应 §19 **Phase H**。
+22. **内核职责边界：只解码，不整体接管 Subsonic 服务端转码（2026-09-22 澄清）**：
+    内核（EraAudio）为**解码侧**内核——解容器/编解码、采样转换、DSP 与可选封装，
+    **不含 MP3 等编码能力**（§11 的 Opus 编码/OGG 封装为可选模块，桌面路径已停用）。
+    Subsonic 服务端转码是**另一条独立链路**：Go 经 `archoera_transcoder`
+    （Rust cdylib：`symphonia` 解码 + **LAME 编码 MP3**，`app/core/subsonic/transcoder/`，
+    由 `endpoints/transcoder_*.go` dlopen 调用）产出转码流。故内核**不适合整体接管服务端**；
+    决策 #21 / §19 Phase H 的四方向扩张**只面向非 Subsonic 区域**（App 播放路径），
+    **不为 Subsonic 新增编码能力**；服务端若仅复用内核解码属独立议题。详见
+    [`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md) §0。

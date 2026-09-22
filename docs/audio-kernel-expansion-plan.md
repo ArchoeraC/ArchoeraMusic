@@ -7,6 +7,25 @@
 >
 > 关系：**本文不替代** `audio-kernel-zig.md`——架构、依赖账本、逐格式裁决、不变量仍以该文为准；
 > 本文是它 §19 路线之外的「能力扩张」子计划。冲突处以 `audio-kernel-zig.md` 为准。
+>
+> **范围（2026-09-22 澄清）**：本计划只面向**非 Subsonic 区域**（App 播放路径：本地曲库 / 内存播放 /
+> 在线源直连）。Subsonic 服务端的转码是另一条链路，内核**不适合整体接管**，见 §0。
+
+---
+
+## 0. 范围与职责边界：为什么是「非 Subsonic 区域」
+
+- 本内核（`app/core/audio-engine`，Zig EraAudio）是**解码侧内核**：解容器 / 编解码、采样转换、DSP、
+  可选封装；**不做转码（编码）**——§11 的 Opus 编码 / OGG 封装为可选模块，桌面路径已停用
+  （`audio-kernel-zig.md` §20「Web 兼容路径存废」）。
+- **Subsonic 服务端的转码是另一条独立链路**：Go 服务端经 `archoera_transcoder`
+  （Rust cdylib，`app/core/subsonic/transcoder/`，`symphonia` 解码 + **LAME 编码 MP3**）产出转码流，
+  经 `endpoints/transcoder_*.go` 的 `dlopen`/`LoadLibrary` 调用；它既不等同于本内核，又包含内核
+  不具备的**编码**能力。
+- 结论：内核**不适合整体接管 Subsonic 服务端**（缺编码侧），本计划的四方向扩张因此**聚焦非
+  Subsonic 区域**——App 播放侧。
+- 边界澄清（**不在本计划内**）：Subsonic 侧若将来只想复用内核的**解码**能力（保留其 LAME 编码不动），
+  属独立议题；本计划**不为 Subsonic 新增编码能力**，也不把「接管服务端」列为目标。
 
 ---
 
