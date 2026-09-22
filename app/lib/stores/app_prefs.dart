@@ -816,18 +816,13 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 封面图片缓存上限（MiB）：语义同 [setLyricCacheLimitMiB]。
+  /// 封面图片缓存上限（MiB）。**始终有上限**（封面是内存大户，不提供
+  /// 「无上限」）；null / <=0 一律按最小值生效。
   void setImageCacheLimitMiB(int? value) {
-    if (value == null || value <= 0) {
-      state = state.copyWithPreset(imageCacheLimitMiB: 0); // 无上限
-    } else {
-      state = state.copyWithPreset(
-        imageCacheLimitMiB: value.clamp(
-          imageCacheLimitMinMiB,
-          imageCacheLimitMaxMiB,
-        ),
-      );
-    }
+    final mb = (value == null || value <= 0)
+        ? imageCacheLimitMinMiB
+        : value.clamp(imageCacheLimitMinMiB, imageCacheLimitMaxMiB);
+    state = state.copyWithPreset(imageCacheLimitMiB: mb);
     state.save();
   }
 

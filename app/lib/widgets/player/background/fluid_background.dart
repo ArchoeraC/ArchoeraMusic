@@ -30,9 +30,14 @@ import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../services/playback/playback_notifier.dart';
+import '../../list/cover_image.dart';
 import 'fluid_cover.dart';
 import 'fluid_mesh.dart';
 import 'fluid_shader.dart';
+
+/// 流体背景最终只用 `kFluidCoverSize`（32×32）纹理；解码到 64 做一次廉价
+/// 超采样即可，**绝不能**整幅解码（`processFluidCover` 会把整幅 RGBA 读出来）。
+const int kFluidCoverDecodePx = 64;
 
 /// 低频脉冲的 attack / decay 平滑系数（对齐上游 `BASS_ATTACK` / `BASS_DECAY`）。
 const double kFluidBassAttack = 0.45;
@@ -254,12 +259,9 @@ class _FluidBackgroundState extends ConsumerState<FluidBackground>
   // ── 封面解析与预烘焙 ─────────────────────────────────────────────────
 
   ImageProvider? _providerFor(String? cover) {
-    if (cover == null || cover.isEmpty) return null;
-    if (cover.startsWith('http')) return NetworkImage(cover);
-    final path = cover.startsWith('file://') ? cover.substring(7) : cover;
-    final file = File(path);
-    if (!file.existsSync()) return null;
-    return FileImage(file);
+    // 只解码到 64px：最终纹理是 32×32，整幅解码纯属浪费（且 processFluidCover
+    // 会 toByteData 读整幅 RGBA，尺寸越大会成倍放大瞬时内存）。
+    return coverImageProvider(cover, decodeWidth: kFluidCoverDecodePx);
   }
 
   void _resolveCover() {
