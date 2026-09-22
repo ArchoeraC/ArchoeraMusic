@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/generated/app_localizations.dart';
+import '../../l10n/l10n.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
 import '../../widgets/dialogs/collection_platform.dart';
@@ -42,6 +43,7 @@ import '../lyrics/sources/qqmusic_lyric_source.dart';
 import '../lyrics/sources/streaming_lyric_source.dart';
 import '../netease/netease_api.dart';
 import '../netease/track.dart';
+import '../../utils/format.dart';
 import '../streaming/streaming_client.dart';
 import '../streaming/streaming_http.dart';
 import '../streaming/streaming_provider.dart';
@@ -189,6 +191,14 @@ abstract class SourcePlatform {
 
   /// 播放前的展示元数据补齐（NK 用其它源补全）；默认原样返回。
   Future<Track> enrichMetadata(dynamic ref, Track t) async => t;
+
+  // ── 媒体信息（右键「媒体详细信息」弹窗） ──────────────────────────
+
+  /// 该源特有的音质描述（如 KG 品质链 + 体积）；无 → null。
+  String? qualityLabel(AppLocalizations l10n, Track t) => null;
+
+  /// 由曲目元数据估算的文件体积（如 KG 各档 sizes 的最优项）；无 → null。
+  int? estimatedFileSize(Track t) => null;
 
   // ── 组合能力访问器 ────────────────────────────────────────────────
 
@@ -431,6 +441,35 @@ class _KugouSource extends SourcePlatform {
 
   @override
   String label(AppLocalizations l10n) => l10n.platformKugou;
+
+  @override
+  int? estimatedFileSize(Track t) {
+    const order = ['flac24bit', 'flac', '320k', '128k'];
+    final sizes = t.kugou?.sizes;
+    if (sizes == null) return null;
+    for (final q in order) {
+      final s = sizes[q];
+      if (s != null && s > 0) return s;
+    }
+    return null;
+  }
+
+  @override
+  String? qualityLabel(AppLocalizations l10n, Track t) {
+    final k = t.kugou;
+    if (k == null) return null;
+    const chain = ['hi-res', 'lossless', 'hq', 'sq', 'lq'];
+    String? label;
+    for (final level in chain) {
+      if (k.hashFor(level) != null) {
+        label = l10nQualityLabel(l10n, level);
+        break;
+      }
+    }
+    if (label == null) return null;
+    final size = estimatedFileSize(t);
+    return size == null ? label : '$label · ${formatBytes(size)}';
+  }
 
   @override
   dynamic get authSignal =>
@@ -824,10 +863,10 @@ class _LocalSource extends SourcePlatform {
   String get source => 'local';
 
   @override
-  bool get autoFallback => false;
+  String label(AppLocalizations l10n) => l10n.trackSourceLocal;
 
   @override
-  String label(AppLocalizations l10n) => source;
+  bool get autoFallback => false;
 
   @override
   bool get searchable => false;
@@ -862,10 +901,10 @@ class _StreamingSource extends SourcePlatform {
   String get source => 'streaming';
 
   @override
-  bool get autoFallback => false;
+  String label(AppLocalizations l10n) => l10n.trackSourceStreaming;
 
   @override
-  String label(AppLocalizations l10n) => source;
+  bool get autoFallback => false;
 
   @override
   bool get searchable => false;
