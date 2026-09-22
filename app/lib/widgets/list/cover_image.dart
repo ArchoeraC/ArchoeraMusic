@@ -98,3 +98,40 @@ class CoverImage extends StatelessWidget {
     return ClipRRect(borderRadius: BorderRadius.circular(radius), child: image);
   }
 }
+
+/// 封面地址 → 按「实际需要的最大位图」在**解码阶段**降采样的 [ImageProvider]。
+///
+/// 封面原图常为 500~1500px，而缩略图/背景等实际展示尺寸有限；整幅解码后再缩放
+/// 会白占数倍内存（RGBA 1024² ≈ 4MB）。这里统一包一层 [ResizeImage]，把 ImageCache
+/// 驻留与解码开销压到真实需求上；[allowUpscaling] 关闭，小图不会被放大。
+///
+/// 地址解析与 [CoverImage] 一致：`//` 协议相对补 https；http(s) 走 [NetworkImage]，
+/// 其余按 `file://` / 绝对路径读盘。返回 null 表示无封面或本地文件不存在。
+ImageProvider? coverImageProvider(
+  String? cover, {
+  int? decodeWidth,
+  int? decodeHeight,
+}) {
+  if (cover == null || cover.isEmpty) return null;
+  var c = cover;
+  if (c.startsWith('//')) c = 'https:$c';
+  final ImageProvider base;
+  if (c.startsWith('http')) {
+    base = NetworkImage(c);
+  } else {
+    final path = c.startsWith('file://') ? c.substring(7) : c;
+    final file = File(path);
+    if (!file.existsSync()) return null;
+    base = FileImage(file);
+  }
+  if (decodeWidth == null && decodeHeight == null) return base;
+  final w = (decodeWidth != null && decodeWidth > 0) ? decodeWidth : null;
+  final h = (decodeHeight != null && decodeHeight > 0) ? decodeHeight : null;
+  if (w == null && h == null) return base;
+  return ResizeImage(
+    base,
+    width: w,
+    height: h,
+    allowUpscaling: false,
+  );
+}

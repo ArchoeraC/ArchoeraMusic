@@ -358,36 +358,21 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
                 label: '${prefs.lyricCacheLimitMiB} MiB',
                 onChanged: (v) => notifier.setLyricCacheLimitMiB(v.round()),
               ),
-            // 封面图片缓存上限（默认最小值开启；关闭 = 无上限，弹窗警告）
-            SettingSwitchTile(
+            // 封面图片缓存上限：**恒有上限**（封面是内存大户，不提供「无上限」；
+            // 旧版本写入的 0/缺失统一回落最小值）。
+            SettingSliderTile(
               icon: EtaIcons.album2Outline,
               title: l10n.settingsCacheLimitCover,
-              subtitle: prefs.imageCacheLimitMiB == null
-                  ? l10n.settingsCacheLimitUnlimited
-                  : '${prefs.imageCacheLimitMiB} MiB',
-              value: prefs.imageCacheLimitMiB != null,
-              onChanged: (v) => _onLimitToggle(
-                context,
-                enabled: v,
-                onEnable: () =>
-                    notifier.setImageCacheLimitMiB(imageCacheLimitMinMiB),
-                onDisable: () => notifier.setImageCacheLimitMiB(0),
-              ),
+              subtitle: '${prefs.imageCacheLimitMiB} MiB',
+              value: prefs.imageCacheLimitMiB.toDouble(),
+              min: imageCacheLimitMinMiB.toDouble(),
+              max: imageCacheLimitMaxMiB.toDouble(),
+              divisions:
+                  (imageCacheLimitMaxMiB - imageCacheLimitMinMiB) ~/
+                  imageCacheLimitStepMiB,
+              label: '${prefs.imageCacheLimitMiB} MiB',
+              onChanged: (v) => notifier.setImageCacheLimitMiB(v.round()),
             ),
-            if (prefs.imageCacheLimitMiB != null)
-              SettingSliderTile(
-                icon: EtaIcons.filter,
-                title: l10n.settingsCacheLimitCover,
-                subtitle: '${prefs.imageCacheLimitMiB} MiB',
-                value: prefs.imageCacheLimitMiB!.toDouble(),
-                min: imageCacheLimitMinMiB.toDouble(),
-                max: imageCacheLimitMaxMiB.toDouble(),
-                divisions:
-                    (imageCacheLimitMaxMiB - imageCacheLimitMinMiB) ~/
-                    imageCacheLimitStepMiB,
-                label: '${prefs.imageCacheLimitMiB} MiB',
-                onChanged: (v) => notifier.setImageCacheLimitMiB(v.round()),
-              ),
             _cacheRow(
               context,
               icon: EtaIcons.fileMusicOutline,
