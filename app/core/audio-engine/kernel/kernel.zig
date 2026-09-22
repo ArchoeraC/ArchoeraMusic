@@ -37,6 +37,7 @@ pub const mace = @import("fmt/wav/mace.zig");
 pub const wav = @import("fmt/wav/lib.zig");
 pub const convert = @import("pcm/convert.zig");
 pub const engine = @import("engine.zig");
+pub const dsp = @import("dsp/lib.zig");
 
 /// 内核版本（语义化版本，与 build.zig.zon 保持同步）
 pub const version: std.SemanticVersion = .{ .major = 0, .minor = 1, .patch = 0 };
@@ -117,6 +118,141 @@ export fn zk_decoder_position_ms(d: *engine.Engine) i64 {
 /// 释放解码会话（含底层文件句柄与全部缓冲）；d 为 NULL 时为空操作（头契约）。
 export fn zk_decoder_close(d: ?*engine.Engine) void {
     if (d) |e| engine.zkClose(e);
+}
+
+// ---------------------------------------------------------------------------
+// DSP 下沉 FFI（docs/audio-kernel-zig.md §14；扩张计划方向① 地基）
+//
+// C 壳 equalizer.c / limiter.c / loudness.c 优先路由本内核实现；内核库缺失
+// （C 侧 HAS_ARCHOERA_KERNEL 未定义）或 create 失败时回退 C 实现。
+// 对外 C 头契约见 include/kernel_bridge.h；Dart 侧 libfft.so ABI 不受影响
+// （fft/resampler/tempo 本轮仅内核侧接口占位，未导出任何符号）。
+// ---------------------------------------------------------------------------
+
+/// 均衡器句柄（C 侧 `ZkDspEq`）；非法参数 / OOM 返回 NULL（C 壳回退）。
+export fn zk_dsp_eq_create(sample_rate: c_int, channels: c_int) ?*dsp.eq.EraEq {
+    if (sample_rate <= 0 or channels <= 0 or channels > 64) return null;
+    return dsp.eq.era_eq_create(
+        std.heap.c_allocator,
+        @intCast(sample_rate),
+        @intCast(channels),
+    ) catch null;
+}
+
+/// 设置 10 段增益（dB）；eq/gains 为 NULL 时空操作。
+export fn zk_dsp_eq_set_gains(eq: ?*dsp.eq.EraEq, gains: ?[*]const f32) void {
+    const e = eq orelse return;
+    const g = gains orelse return;
+    var arr: [dsp.eq.era_eq_band_count]f32 = undefined;
+    for (&arr, 0..) |*v, i| v.* = g[i];
+    dsp.eq.era_eq_set_gains(e, arr);
+}
+
+/// 设置前级增益（dB）。
+export fn zk_dsp_eq_set_preamp(eq: ?*dsp.eq.EraEq, preamp_db: f32) void {
+    const e = eq orelse return;
+    dsp.eq.era_eq_set_preamp(e, preamp_db);
+}
+
+/// 就地处理交错 float32 PCM，samples = 每声道帧数（总样本 = samples×channels）。
+export fn zk_dsp_eq_process(eq: ?*dsp.eq.EraEq, pcm: ?[*]f32, samples: c_int) void {
+    const e = eq orelse return;
+    const p = pcm orelse return;
+    if (samples <= 0) return;
+    const frames: usize = @intCast(samples);
+    dsp.eq.era_eq_process(e, p[0 .. frames * @as(usize, e.channels)], frames);
+}
+
+/// 释放均衡器；eq 为 NULL 时空操作。
+export fn zk_dsp_eq_destroy(eq: ?*dsp.eq.EraEq) void {
+    const e = eq orelse return;
+    dsp.eq.era_eq_destroy(e);
+}
+
+/// 限幅器句柄（C 侧 `ZkDspLimiter`）；非法参数 / OOM 返回 NULL。
+export fn zk_dsp_limiter_create(sample_rate: c_int, channels: c_int) ?*dsp.limiter.EraLimiter {
+    if (sample_rate <= 0 or channels <= 0 or channels > 64) return null;
+    return dsp.limiter.era_limiter_create(
+        std.heap.c_allocator,
+        @intCast(sample_rate),
+        @intCast(channels),
+    ) catch null;
+}
+
+/// 启用（enabled != 0）/ 禁用。
+export fn zk_dsp_limiter_set_enabled(lim: ?*dsp.limiter.EraLimiter, enabled: c_int) void {
+    const l = lim orelse return;
+    dsp.limiter.era_limiter_set_enabled(l, enabled != 0);
+}
+
+/// 设置阈值（dB）。
+export fn zk_dsp_limiter_set_threshold(lim: ?*dsp.limiter.EraLimiter, threshold_db: f32) void {
+    const l = lim orelse return;
+    dsp.limiter.era_limiter_set_threshold(l, threshold_db);
+}
+
+/// 当前阈值（dB）；lim 为 NULL 时返回默认 −1dB。
+export fn zk_dsp_limiter_get_threshold(lim: ?*const dsp.limiter.EraLimiter) f32 {
+    const l = lim orelse return dsp.limiter.era_limiter_default_threshold_db;
+    return dsp.limiter.era_limiter_get_threshold(l);
+}
+
+/// 就地处理交错 float32 PCM（samples = 每声道帧数）。
+export fn zk_dsp_limiter_process(lim: ?*dsp.limiter.EraLimiter, pcm: ?[*]f32, samples: c_int) void {
+    const l = lim orelse return;
+    const p = pcm orelse return;
+    if (samples <= 0) return;
+    const frames: usize = @intCast(samples);
+    dsp.limiter.era_limiter_process(l, p[0 .. frames * @as(usize, l.channels)], frames);
+}
+
+/// 释放限幅器；lim 为 NULL 时空操作。
+export fn zk_dsp_limiter_destroy(lim: ?*dsp.limiter.EraLimiter) void {
+    const l = lim orelse return;
+    dsp.limiter.era_limiter_destroy(l);
+}
+
+/// 响度归一化句柄（C 侧 `ZkDspLoudness`）；非法参数 / OOM 返回 NULL。
+export fn zk_dsp_loudness_create(sample_rate: c_int, channels: c_int) ?*dsp.loudness.EraLoudness {
+    if (sample_rate <= 0 or channels <= 0 or channels > 64) return null;
+    return dsp.loudness.era_loudness_create(
+        std.heap.c_allocator,
+        @intCast(sample_rate),
+        @intCast(channels),
+    ) catch null;
+}
+
+/// 启用（enabled != 0）/ 禁用。
+export fn zk_dsp_loudness_set_enabled(l: ?*dsp.loudness.EraLoudness, enabled: c_int) void {
+    const x = l orelse return;
+    dsp.loudness.era_loudness_set_enabled(x, enabled != 0);
+}
+
+/// 设置目标响度（LUFS）。
+export fn zk_dsp_loudness_set_target(l: ?*dsp.loudness.EraLoudness, target_lufs: f32) void {
+    const x = l orelse return;
+    dsp.loudness.era_loudness_set_target(x, target_lufs);
+}
+
+/// 设置预计算增益（dB）。
+export fn zk_dsp_loudness_set_gain(l: ?*dsp.loudness.EraLoudness, gain_db: f32) void {
+    const x = l orelse return;
+    dsp.loudness.era_loudness_set_gain(x, gain_db);
+}
+
+/// 就地处理交错 float32 PCM（samples = 每声道帧数）。
+export fn zk_dsp_loudness_process(l: ?*dsp.loudness.EraLoudness, pcm: ?[*]f32, samples: c_int) void {
+    const x = l orelse return;
+    const p = pcm orelse return;
+    if (samples <= 0) return;
+    const frames: usize = @intCast(samples);
+    dsp.loudness.era_loudness_process(x, p[0 .. frames * @as(usize, x.channels)], frames);
+}
+
+/// 释放响度实例；l 为 NULL 时空操作。
+export fn zk_dsp_loudness_destroy(l: ?*dsp.loudness.EraLoudness) void {
+    const x = l orelse return;
+    dsp.loudness.era_loudness_destroy(x);
 }
 
 // ---------------------------------------------------------------------------
@@ -910,4 +1046,5 @@ test {
     _ = @import("fmt/amrwb/lib.zig");
     _ = @import("pcm/convert.zig");
     _ = @import("engine.zig");
+    _ = @import("dsp/lib.zig");
 }
