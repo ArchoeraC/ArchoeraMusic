@@ -7,56 +7,16 @@
 part of '../comment_dialog.dart';
 
 extension _CommentDialogActions on _CommentDialogState {
+  /// 解析评论目标 id（各源差异全在 [CommentPlatform.resolveTarget]；可能弹登录）。
   Future<void> _match() async {
     setState(() {
       _loading = true;
       _failed = false;
     });
     try {
-      if (_isQq) {
-        final mid = widget.track.qqmusic?.mid.isNotEmpty == true
-            ? widget.track.qqmusic!.mid
-            : widget.track.id;
-        if (mid.isEmpty) {
-          setState(() {
-            _loading = false;
-            _failed = true;
-          });
-          return;
-        }
-        if (!ref.read(qqMusicApiProvider).isLoggedIn) {
-          final ok = await showQqMusicLoginDialog(context);
-          if (!mounted) return;
-          if (ok != true) {
-            setState(() {
-              _loading = false;
-              _failed = true;
-            });
-            return;
-          }
-        }
-        if (!mounted) return;
-        setState(() => _songId = mid);
-        await _load(reset: true);
-        return;
-      }
-      if (_isKugou) {
-        final hash = widget.track.kugou?.hash;
-        if (hash == null || hash.isEmpty) {
-          setState(() {
-            _loading = false;
-            _failed = true;
-          });
-          return;
-        }
-        if (!mounted) return;
-        setState(() => _songId = hash);
-        await _load(reset: true);
-        return;
-      }
-      final id = await _api.findNeteaseCommentId(widget.track);
+      final id = await _platform.resolveTarget(context, ref, widget.track);
       if (!mounted) return;
-      if (id == null) {
+      if (id == null || id.isEmpty) {
         setState(() {
           _loading = false;
           _failed = true;
@@ -87,13 +47,12 @@ extension _CommentDialogActions on _CommentDialogState {
       _failed = false;
     });
     try {
-      final page = _isQq
-          ? await _loadQq(id, page: nextPage)
-          : _isKugou
-          ? await _loadKg(id, page: nextPage)
-          : _hot
-          ? await _api.songHotComments(id, page: nextPage)
-          : await _api.songComments(id, page: nextPage);
+      final page = await _platform.fetchPage(
+        ref,
+        id,
+        hot: _hot,
+        page: nextPage,
+      );
       if (!mounted) return;
       setState(() {
         _page = reset ? page : _mergePage(page, nextPage);
@@ -106,20 +65,6 @@ extension _CommentDialogActions on _CommentDialogState {
         _failed = true;
       });
     }
-  }
-
-  Future<NeteaseCommentPage> _loadKg(String hash, {required int page}) async {
-    final kp = await ref.read(kugouApiProvider).songComments(hash, page: page);
-    return NeteaseCommentPage(
-      list: kp.list.map(_kgToTile).toList(),
-      total: kp.total,
-      page: kp.page,
-      limit: kp.limit,
-    );
-  }
-
-  Future<NeteaseCommentPage> _loadQq(String mid, {required int page}) {
-    return ref.read(qqMusicApiProvider).songComments(mid, page: page, hot: _hot);
   }
 
   NeteaseCommentPage _mergePage(NeteaseCommentPage next, int page) {
@@ -159,30 +104,79 @@ extension _CommentDialogActions on _CommentDialogState {
       toast(l10n.commentInputEmpty);
       return;
     }
-    final account = ref.read(neteaseAuthProvider);
-    if (account == null) {
-      toast(l10n.commentLoginRequired(platform: l10n.brandNetease));
-      showNeteaseLoginDialog(context);
-      return;
-    }
     setState(() => _sending = true);
     try {
-      await _api.sendComment(id, content);
-      if (!mounted) return;
+      final ok = await _platform.send(
+        context,
+        ref,
+        id,
+        content,
+        parentId: _replyTo?.id,
+      );
+      if (!mounted || !ok) return;
       _input.clear();
+      setState(() => _replyTo = null);
       toast(l10n.commentPublished, type: ToastType.success);
-      if (_hot) {
+      // 热门 Tab 下新评论会出现在「最新」：切过去展示；否则直接重载。
+      if (_platform.supportsHot && _hot) {
         _switchTab(false);
       } else {
         await _load(reset: true);
       }
     } catch (e) {
       if (!mounted) return;
-      final err = e is NeteaseApiError ? e : null;
-      final code = err?.body?['code'];
-      toast(code == 505 ? l10n.commentDuplicate : l10n.commentSendFailed(msg: '$e'));
+      toast(
+        e is CommentOperationException
+            ? e.message
+            : l10n.commentSendFailed(msg: '$e'),
+      );
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// 点「回复」：记住目标并聚焦输入框（仅 [CommentPlatform.supportsReply]）。
+  void _startReply(NeteaseComment target) {
+    setState(() => _replyTo = target);
+    _inputFocus.requestFocus();
+  }
+
+  void _cancelReply() {
+    if (_replyTo == null) return;
+    setState(() => _replyTo = null);
+  }
+
+  /// 删除评论（仅 [CommentPlatform.supportsDelete]；服务端自行鉴权）。
+  Future<void> _deleteComment(NeteaseComment target) async {
+    if (!_platform.supportsDelete) return;
+    final l10n = context.l10n;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.commonDelete),
+        content: Text(l10n.commentDeleteConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await _platform.delete(ref, target.id);
+      if (!mounted) return;
+      if (_replyTo?.id == target.id) setState(() => _replyTo = null);
+      toast(l10n.commentDeleted, type: ToastType.success);
+      await _load(reset: true);
+    } catch (e) {
+      if (!mounted) return;
+      toast(l10n.commentDeleteFailed(msg: '$e'));
     }
   }
 }

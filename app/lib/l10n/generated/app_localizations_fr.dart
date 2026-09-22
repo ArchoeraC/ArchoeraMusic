@@ -527,6 +527,25 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get commentReply => 'Répondre';
+
+  @override
+  String commentReplyTo({required Object user}) {
+    return 'Répondre à @$user';
+  }
+
+  @override
+  String get commentDeleteConfirmBody => 'Action irréversible. Continuer ?';
+
+  @override
+  String get commentDeleted => 'Commentaire supprimé';
+
+  @override
+  String commentDeleteFailed({required Object msg}) {
+    return 'Échec de la suppression : $msg';
+  }
+
+  @override
   String commentTimeFormat({
     required Object day,
     required Object month,
