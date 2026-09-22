@@ -99,13 +99,14 @@ extension PresetPrefs on AppPrefs {
     return n.clamp(lyricCacheLimitMinMiB, lyricCacheLimitMaxMiB);
   }
 
-  /// 封面图片缓存上限（MiB，进程内 ImageCache）：null = 无上限；默认 =
-  /// 最小值 [imageCacheLimitMinMiB]。超限时按 LRU 逐出封面图。
-  int? get imageCacheLimitMiB {
+  /// 封面图片缓存上限（MiB，进程内 ImageCache）。
+  ///
+  /// **恒有上限**（封面是内存大户，不提供「无上限」）：取值恒在
+  /// [imageCacheLimitMinMiB]~[imageCacheLimitMaxMiB]，缺省/非法（含旧版
+  /// 「无上限」写入的 0）一律回落最小值。超限时 ImageCache 按 LRU 逐出。
+  int get imageCacheLimitMiB {
     final v = data[imageCacheLimitMiBKey] as num?;
-    if (v == null) return imageCacheLimitMinMiB;
-    final n = v.toInt();
-    if (n <= 0) return null; // 无上限
+    final n = v?.toInt() ?? imageCacheLimitMinMiB;
     return n.clamp(imageCacheLimitMinMiB, imageCacheLimitMaxMiB);
   }
 

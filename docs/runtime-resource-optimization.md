@@ -749,8 +749,16 @@
 **图片 / 封面**
 - 一律按显示尺寸解码：`Image.cacheWidth/cacheHeight`（**物理像素**）：
   `widgets/image.dart:314-332`（沿用现有 `CoverImage`）。
-- 设 `PaintingBinding.instance.imageCache.maximumSizeBytes` 上限，并在路由退出 `evict/clear`
-  （对照：Skia 资源缓存 256 MiB / 图片 32 MiB、Slint 解码图 5 MiB、`cc` 128 MiB；§3.5/§3.9/§3.1）。
+- `PaintingBinding.instance.imageCache.maximumSizeBytes` **恒有界**（2026-09-22）：封面是
+  内存大户，**不再提供「无上限」**——设置范围固定 `8~1024 MiB`，缺省 / 旧版「无上限」
+  写入的 `0` 一律回落最小值（`prefs_preset.imageCacheLimitMiB` → `app.dart` 应用）。
+- **封面解码尺寸统一化**（2026-09-22）：新增 `coverImageProvider(cover, decodeWidth:)`
+  （`widgets/list/cover_image.dart`，内部 `ResizeImage` + `allowUpscaling:false`），
+  在**解码阶段**压到真实需求，各处只传目标物理像素：
+  - 列表 / 播放条 / 弹窗：`CoverImage`（显示尺寸 × DPR）；
+  - 水纹背景：屏幕长边 × DPR（封顶 2048；背景只做模糊/折射，更大无收益却按平方吃内存）；
+  - 流体背景：64px（最终纹理仅 32×32，且 `processFluidCover` 会 `toByteData` 读整幅 RGBA，
+    整幅解码属纯浪费）。
 - 全屏背景图走 §4.1 的静态层 + 降采样。
 
 **毛玻璃 / 弹窗**（`widgets/common/glass_surface.dart`、登录/队列面板等）
