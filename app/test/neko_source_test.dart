@@ -296,4 +296,88 @@ void main() {
       );
     });
   });
+
+  group('NekoComment 解析', () {
+    test('楼层 + 回复 + 被回复者 + 属地/可删', () {
+      final c = NekoComment.fromJson({
+        'id': 11,
+        'content': '好听',
+        'createdAt': '2026-09-22 10:30:00',
+        'ipRegion': '浙江',
+        'canDelete': true,
+        'replyCount': 1,
+        'user': {'id': 7, 'nickname': '喵'},
+        'replies': [
+          {
+            'id': 12,
+            'content': '同意',
+            'createdAt': '2026-09-22T10:31:00',
+            'user': {'id': 8, 'nickname': '汪'},
+            'replyToUser': {'id': 7, 'nickname': '喵'},
+          },
+        ],
+      });
+      expect(c.id, '11');
+      expect(c.userName, '喵');
+      expect(c.userId, '7');
+      expect(c.text, '好听');
+      expect(c.location, '浙江');
+      expect(c.canDelete, isTrue);
+      expect(c.replyTotal, 1);
+      expect(c.replies.single.userName, '汪');
+      expect(c.replies.single.replyToName, '喵');
+    });
+
+    test('空 ipRegion → null；无 replies / user 安全', () {
+      final c = NekoComment.fromJson({'id': 1, 'content': 'x', 'ipRegion': ''});
+      expect(c.location, isNull);
+      expect(c.userName, '');
+      expect(c.userId, isNull);
+      expect(c.replies, isEmpty);
+      expect(c.replyTotal, 0);
+      expect(c.canDelete, isFalse);
+    });
+
+    test('parseNekoWallClock：东八区墙钟 → 本地基准毫秒', () {
+      final ms = parseNekoWallClock('2026-09-22 10:30:00');
+      expect(ms, isNotNull);
+      expect(
+        DateTime.fromMillisecondsSinceEpoch(ms!, isUtc: true),
+        DateTime.utc(2026, 9, 22, 2, 30, 0), // 10:30 +08:00 → 02:30 UTC
+      );
+      // 'T' 分隔同样解析
+      expect(parseNekoWallClock('2026-09-22T10:30:00'), ms);
+      expect(parseNekoWallClock(null), isNull);
+      expect(parseNekoWallClock(''), isNull);
+      expect(parseNekoWallClock('not-a-date'), isNull);
+    });
+  });
+
+  group('NekoCommentPage.fromData', () {
+    test('分页字段与 hasMore', () {
+      final p = NekoCommentPage.fromData({
+        'page': 2,
+        'pageSize': 20,
+        'total': 45,
+        'hasMore': true,
+        'comments': [
+          {'id': 1, 'content': 'a', 'user': {'nickname': 'A'}},
+          {'id': 2, 'content': 'b', 'user': {'nickname': 'B'}},
+        ],
+      });
+      expect(p.list.length, 2);
+      expect(p.list.first.userName, 'A');
+      expect(p.page, 2);
+      expect(p.pageSize, 20);
+      expect(p.total, 45);
+      expect(p.hasMore, isTrue);
+    });
+
+    test('缺字段安全默认', () {
+      final p = NekoCommentPage.fromData(const {});
+      expect(p.list, isEmpty);
+      expect(p.total, 0);
+      expect(p.hasMore, isFalse);
+    });
+  });
 }

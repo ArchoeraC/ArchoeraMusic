@@ -13,6 +13,19 @@ extension _CommentDialogActions on _CommentDialogState {
       _failed = false;
     });
     try {
+      if (_isNeko) {
+        final id = widget.track.id;
+        if (id.isEmpty) {
+          setState(() {
+            _loading = false;
+            _failed = true;
+          });
+          return;
+        }
+        setState(() => _songId = id);
+        await _load(reset: true);
+        return;
+      }
       if (_isQq) {
         final mid = widget.track.qqmusic?.mid.isNotEmpty == true
             ? widget.track.qqmusic!.mid
@@ -87,7 +100,9 @@ extension _CommentDialogActions on _CommentDialogState {
       _failed = false;
     });
     try {
-      final page = _isQq
+      final page = _isNeko
+          ? await _loadNeko(id, page: nextPage)
+          : _isQq
           ? await _loadQq(id, page: nextPage)
           : _isKugou
           ? await _loadKg(id, page: nextPage)
@@ -120,6 +135,16 @@ extension _CommentDialogActions on _CommentDialogState {
 
   Future<NeteaseCommentPage> _loadQq(String mid, {required int page}) {
     return ref.read(qqMusicApiProvider).songComments(mid, page: page, hot: _hot);
+  }
+
+  Future<NeteaseCommentPage> _loadNeko(String musicId, {required int page}) async {
+    final p = await ref.read(nekoApiProvider).songComments(musicId, page: page);
+    return NeteaseCommentPage(
+      list: p.list.map(_nekoToTile).toList(),
+      total: p.total,
+      page: p.page,
+      limit: p.pageSize,
+    );
   }
 
   NeteaseCommentPage _mergePage(NeteaseCommentPage next, int page) {
@@ -159,6 +184,10 @@ extension _CommentDialogActions on _CommentDialogState {
       toast(l10n.commentInputEmpty);
       return;
     }
+    if (_isNeko) {
+      await _sendNeko(id, content);
+      return;
+    }
     final account = ref.read(neteaseAuthProvider);
     if (account == null) {
       toast(l10n.commentLoginRequired(platform: l10n.brandNetease));
@@ -181,6 +210,31 @@ extension _CommentDialogActions on _CommentDialogState {
       final err = e is NeteaseApiError ? e : null;
       final code = err?.body?['code'];
       toast(code == 505 ? l10n.commentDuplicate : l10n.commentSendFailed(msg: '$e'));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// NK 源发表评论（`POST /api/comments`；需 NK 登录，服务端有 5s 频率限制）。
+  Future<void> _sendNeko(String musicId, String content) async {
+    final l10n = context.l10n;
+    final api = ref.read(nekoApiProvider);
+    if (!api.isLoggedIn) {
+      toast(l10n.commentLoginRequired(platform: l10n.platformNeko));
+      await showNekoLoginDialog(context);
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      await api.sendComment(musicId, content);
+      if (!mounted) return;
+      _input.clear();
+      toast(l10n.commentPublished, type: ToastType.success);
+      // NK 无「热门」Tab，直接重载当前列表即可看到新评论。
+      await _load(reset: true);
+    } catch (e) {
+      if (!mounted) return;
+      toast(l10n.commentSendFailed(msg: '$e'));
     } finally {
       if (mounted) setState(() => _sending = false);
     }

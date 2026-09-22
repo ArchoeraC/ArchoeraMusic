@@ -48,12 +48,11 @@ void showTrackContextMenu(
           icon: liked ? EtaIcons.heart : EtaIcons.heartOutline,
           onTap: () => toggle(track),
         ),
-        if (track.source != 'neko')
-          SContextMenuItem(
-            label: l10n.menuComment,
-            icon: EtaIcons.chatOutline,
-            onTap: () => showCommentDialog(context, track: track),
-          ),
+        SContextMenuItem(
+          label: l10n.menuComment,
+          icon: EtaIcons.chatOutline,
+          onTap: () => showCommentDialog(context, track: track),
+        ),
         SContextMenuItem.divider(),
         if (track.source == 'netease' &&
             track.artists.isNotEmpty &&

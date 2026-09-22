@@ -441,6 +441,56 @@ class NekoApi extends ChangeNotifier {
     }
   }
 
+  // ── 评论 ─────────────────────────────────────────────────────
+
+  /// 歌曲评论（`GET /api/comments?musicId=&page=&pageSize=`，无需登录）。
+  ///
+  /// 服务端返回顶层楼层（含每层回复）分页；[musicId] 即 Neko 歌曲 id。
+  Future<NekoCommentPage> songComments(
+    String musicId, {
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    const empty = NekoCommentPage(
+      list: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+      hasMore: false,
+    );
+    if (musicId.isEmpty) return empty;
+    final body = await _client().getJson(
+      '/api/comments',
+      query: {'musicId': musicId, 'page': '$page', 'pageSize': '$pageSize'},
+    );
+    _ensureSuccess(body);
+    final data = body['data'];
+    if (data is! Map) return empty;
+    return NekoCommentPage.fromData(Map<String, dynamic>.from(data));
+  }
+
+  /// 发表评论 / 回复（`POST /api/comments`，需登录）。
+  ///
+  /// [parentId] 非空表示回复（回复再回复仍归入同一楼层）。服务端限制：
+  /// 内容 ≤500 字、同用户 5 秒间隔（超频时抛带 message 的 [NekoApiException]）。
+  Future<void> sendComment(
+    String musicId,
+    String content, {
+    String? parentId,
+  }) async {
+    if (musicId.isEmpty) throw NekoApiException('缺少曲目 id');
+    final body = await _client().postJson(
+      '/api/comments',
+      body: {
+        'musicId': int.tryParse(musicId) ?? musicId,
+        'content': content,
+        if (parentId != null && parentId.isNotEmpty)
+          'parentId': int.tryParse(parentId) ?? parentId,
+      },
+    );
+    _ensureSuccess(body);
+  }
+
   // ── 解析辅助 ─────────────────────────────────────────────────
 
   List<Track> _tracksFrom(Object? list) {

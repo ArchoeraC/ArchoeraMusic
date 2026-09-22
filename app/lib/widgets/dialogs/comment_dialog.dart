@@ -3,17 +3,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /// 歌曲评论弹窗（NT对齐原项目 Comments.vue 核心交互；KG走
-/// mcomment commentsv2/getCommentWithLike）。
+/// mcomment commentsv2/getCommentWithLike；QQ走 songmid；NK走
+/// `/api/comments`）。
 ///
 /// 入口 [showCommentDialog]：NT源先 [NeteaseApi.findNeteaseCommentId]
 /// 匹配NT歌曲 id（异源走云搜索），再分「热门 / 最新」两 Tab 分页拉取；
-/// KG源直接用歌曲 hash 拉KG评论（无 Tab）。触底自动加载下一页。
+/// KG源直接用歌曲 hash、NK源直接用歌曲 id 拉评论（无 Tab）。触底自动加载下一页。
 library;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/kugou/kugou_api.dart';
+import '../../services/neko/neko_types.dart';
 import '../../services/netease/comment.dart';
 import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
@@ -21,6 +23,7 @@ import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/glass_surface.dart';
+import 'neko_login_dialog.dart';
 import 'netease_login_dialog.dart';
 import 'qqmusic_login_dialog.dart';
 import '../player/s_controls.dart';
@@ -41,6 +44,18 @@ NeteaseComment _kgToTile(KugouComment c) => NeteaseComment(
   replyTotal: c.replyTotal,
   time: c.timeMs,
   reply: c.reply.map(_kgToTile).toList(),
+);
+
+/// NK评论 → 弹窗通用展示模型（服务端不返回头像，走首字母占位）。
+NeteaseComment _nekoToTile(NekoComment c) => NeteaseComment(
+  id: c.id,
+  userId: c.userId,
+  userName: c.userName,
+  text: c.text,
+  location: c.location,
+  replyTotal: c.replyTotal,
+  time: c.time,
+  reply: c.replies.map(_nekoToTile).toList(),
 );
 
 /// 打开歌曲评论弹窗。
@@ -90,7 +105,10 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   /// 是否 QQ 音乐源（按 songmid 拉评论；官方读取需登录态）。
   bool get _isQq => widget.track.source == 'qqmusic';
 
-  /// 是否支持发布评论（NT；KG 与 QQ 未接入发送）。
+  /// 是否 Neko 源（直接按歌曲 id 拉 `/api/comments`，无 Tab；发布需 NK 登录）。
+  bool get _isNeko => widget.track.source == 'neko';
+
+  /// 是否支持发布评论（NT 与 NK；KG 与 QQ 未接入发送）。
   bool get _canSend => !_isKugou && !_isQq;
 
   @override
