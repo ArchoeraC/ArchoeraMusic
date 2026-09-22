@@ -29,6 +29,7 @@ const h = @import("huffman_tables.zig");
 const rt = @import("rt_tables.zig");
 const mdct_mod = @import("mdct.zig");
 const sbr_mod = @import("sbr.zig");
+const vec = @import("../../simd/vec.zig");
 
 const BitReader = brmod.BitReader;
 const Vlc = brmod.Vlc;
@@ -726,6 +727,13 @@ pub const Aac = struct {
                         const base = ch_off + ics.swb_offset[sfb] + group * 128;
                         var i: usize = base;
                         const end = base + len;
+                        // 每样本独立 → 8 路并行；lane 内次序与标量一致（逐位一致）
+                        while (i + 8 <= end) : (i += 8) {
+                            const a = vec.load8(che.ch[0].coeffs[i..].ptr);
+                            const b = vec.load8(che.ch[1].coeffs[i..].ptr);
+                            vec.store8(che.ch[0].coeffs[i..].ptr, a + b);
+                            vec.store8(che.ch[1].coeffs[i..].ptr, a - b);
+                        }
                         while (i < end) : (i += 1) {
                             const tt = che.ch[0].coeffs[i] - che.ch[1].coeffs[i];
                             che.ch[0].coeffs[i] += che.ch[1].coeffs[i];
@@ -760,6 +768,10 @@ pub const Aac = struct {
                         const src = ch0_off + group * 128 + ics.swb_offset[sfb];
                         const dst = ch1_off + group * 128 + ics.swb_offset[sfb];
                         var i: usize = 0;
+                        while (i + 8 <= len) : (i += 8) {
+                            const s = vec.load8(che.ch[0].coeffs[src + i ..].ptr);
+                            vec.store8(che.ch[1].coeffs[dst + i ..].ptr, s * @as(vec.V8, @splat(scale)));
+                        }
                         while (i < len) : (i += 1) {
                             che.ch[1].coeffs[dst + i] = che.ch[0].coeffs[src + i] * scale;
                         }
@@ -780,7 +792,21 @@ pub const Aac = struct {
         // float_dsp vector_fmul_window_c（dst/win/src0 预偏 len 后的展开）：
         //   out[k]          = src0[k]*win[2len-1-k] − src1[len-1-k]*win[k]
         //   out[2len-1-k]   = src0[k]*win[k] + src1[len-1-k]*win[2len-1-k]
+        //
+        // 向量化：一次 8 个 k。每个 k 相互独立，lane 内运算顺序与标量完全相同
+        // （不重结合、不引 FMA）→ 逐位一致；反向访存用 rev8 折算。
         var k: usize = 0;
+        while (k + 8 <= len) : (k += 8) {
+            const s0 = vec.load8(src0.ptr + k);
+            // lane t = src1[len-1-k-t]：取 src1[len-8-k .. len-k] 后反序
+            const s1 = vec.rev8(vec.load8(src1.ptr + (len - 8 - k)));
+            const wi = vec.load8(win.ptr + k);
+            // lane t = win[2len-1-k-t]：取 win[2len-8-k .. 2len-k] 后反序
+            const wj = vec.rev8(vec.load8(win.ptr + (2 * len - 8 - k)));
+            vec.store8(dst.ptr + k, s0 * wj - s1 * wi);
+            // lane t 对应 dst[2len-1-k-t] → 反序后落到连续基址 2len-8-k
+            vec.store8(dst.ptr + (2 * len - 8 - k), vec.rev8(s0 * wi + s1 * wj));
+        }
         while (k < len) : (k += 1) {
             const jj = len - 1 - k;
             const wj = win[2 * len - 1 - k];
@@ -1650,42 +1676,37 @@ pub const Aac = struct {
         const ps_mode = self.sbr_enabled and self.sbr != null and self.sbr.?.ps_enabled;
         const chn: usize = if (ps_mode) 2 else self.channels;
         try self.out_buf.ensureUnusedCapacity(self.gpa, n * chn * 2);
-        var i: usize = 0;
-        while (i < n) : (i += 1) {
-            // 按 out0 升序输出各声道（FL FR FC LFE BL BR ...）
-            var out_idx: usize = 0;
-            while (out_idx < chn) : (out_idx += 1) {
-                var v: i16 = 0;
-                if (ps_mode) {
-                    // PS：mono core → L/R 立体声
-                    v = if (out_idx == 0) floatToS16(self.sbr_buf[i]) else floatToS16(self.sbr_buf2[i]);
-                } else {
-                    // 找布局中 out0 == out_idx 的元素声道（元素从未出现 → 槽位
-                    // 未分配，输出 0，等价原 open 期全量清零语义）
-                    for (self.layout) |le| {
-                        const che = self.che[le.ty][le.id];
-                        if (self.sbr_enabled and (le.ty == 0 or le.ty == 1)) {
-                            if (le.out0 == out_idx) {
-                                v = floatToS16(self.sbr_buf[i]);
-                                break;
-                            }
-                            if (le.nch == 2 and le.out0 + 1 == out_idx) {
-                                v = floatToS16(self.sbr_buf2[i]);
-                                break;
-                            }
-                        }
-                        if (le.out0 == out_idx) {
-                            v = if (che) |c| floatToS16(c.ch[0].output[i]) else 0;
-                            break;
-                        }
-                        if (le.nch == 2 and le.out0 + 1 == out_idx) {
-                            v = if (che) |c| floatToS16(c.ch[1].output[i]) else 0;
-                            break;
-                        }
-                    }
+        // 每帧一次布局解析 → 每输出声道一个源指针（null = 静音），热循环不再逐样本搜布局。
+        var chan_src = [_]?[*]const f32{null} ** MAX_CH;
+        if (ps_mode) {
+            chan_src[0] = &self.sbr_buf;
+            if (chn > 1) chan_src[1] = &self.sbr_buf2;
+        } else {
+            for (self.layout) |le| {
+                const che = self.che[le.ty][le.id];
+                if (self.sbr_enabled and (le.ty == 0 or le.ty == 1)) {
+                    if (le.out0 < chn and chan_src[le.out0] == null)
+                        chan_src[le.out0] = &self.sbr_buf;
+                    if (le.nch == 2 and le.out0 + 1 < chn and chan_src[le.out0 + 1] == null)
+                        chan_src[le.out0 + 1] = &self.sbr_buf2;
+                } else if (che) |c| {
+                    if (le.out0 < chn and chan_src[le.out0] == null)
+                        chan_src[le.out0] = &c.ch[0].output;
+                    if (le.nch == 2 and le.out0 + 1 < chn and chan_src[le.out0 + 1] == null)
+                        chan_src[le.out0 + 1] = &c.ch[1].output;
                 }
+            }
+        }
+        const dst = self.out_buf.addManyAsSliceAssumeCapacity(n * chn * 2);
+        var w: usize = 0;
+        for (0..n) |i| {
+            // 按 out0 升序输出各声道（FL FR FC LFE BL BR ...）
+            for (chan_src[0..chn]) |sp| {
+                const v: i16 = if (sp) |p| floatToS16(p[i]) else 0;
                 const vu: u16 = @bitCast(v);
-                self.out_buf.appendSliceAssumeCapacity(&.{ @truncate(vu), @truncate(vu >> 8) });
+                dst[2 * w] = @truncate(vu);
+                dst[2 * w + 1] = @truncate(vu >> 8);
+                w += 1;
             }
         }
         self.pos_samples += n;
@@ -1902,7 +1923,14 @@ extern "c" fn lrintf(x: f32) c_long;
 
 inline fn floatToS16(v: f32) i16 {
     // 对齐 FFmpeg swresample：av_clip_int16(lrintf(x*32768))（lrintf = 最近偶数舍入）
-    const r: c_long = lrintf(v * 32768.0);
+    const x = v * 32768.0;
+    // 最近偶数舍入快路径：|x| < 2^22 时 (x + 1.5·2^23) − 1.5·2^23 在 IEEE 默认舍入下
+    // 与 lrintf 逐位一致（2^23 ≤ 和 < 2^24 ⇒ ulp=1，加法即舍入到整数）。
+    // 越界（含 NaN/Inf）回退 libc，语义不变。
+    const r: c_long = if (@abs(x) < 4194304.0)
+        @intFromFloat((x + 12582912.0) - 12582912.0)
+    else
+        lrintf(x);
     return @intCast(std.math.clamp(r, -32768, 32767));
 }
 

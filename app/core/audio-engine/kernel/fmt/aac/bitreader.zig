@@ -168,6 +168,30 @@ pub const Vlc = struct {
     /// 规范表走 O(1)/长度查表（first_code + 区间判定），非规范表退回二分（语义一致）。
     pub fn decode(self: *const Vlc, br: *BitReader) Error!u16 {
         if (self.canonical) {
+            if (self.max_len == 0) return error.Corrupt;
+            // 快路径：距末尾 ≥8 字节时一次大端 u64 加载（≥57 位可用，覆盖 max_len≤19），
+            // 按长度直接匹配；与逐位累积完全等价（仅省去每符号 len 次 readBits(1)）。
+            const bp = br.bit_pos;
+            const byte_pos = bp >> 3;
+            if (byte_pos + 8 <= br.data.len) {
+                const word = std.mem.readInt(u64, br.data[byte_pos..][0..8], .big);
+                const off: u6 = @intCast(bp & 7);
+                const bits: u32 = @truncate((word << @intCast(off)) >> @intCast(64 - self.max_len));
+                var len: usize = 1;
+                while (len <= self.max_len) : (len += 1) {
+                    const cnt = self.count[len];
+                    if (cnt != 0) {
+                        const acc: u32 = bits >> @intCast(self.max_len - len);
+                        const fc = self.first_code[len];
+                        if (acc >= fc and acc < fc + cnt) {
+                            br.bit_pos = bp + len;
+                            return self.entries[self.start[len] + @as(u16, @intCast(acc - fc))].sym;
+                        }
+                    }
+                }
+                return error.Corrupt;
+            }
+            // 尾部慢路径（不足 8 字节）：逐位，语义与截断处理保持一致
             var acc: u32 = 0;
             var len: usize = 1;
             while (len <= self.max_len) : (len += 1) {
