@@ -16,7 +16,7 @@ DIST="${1:-dist/linux}"
 fail=0
 for f in "$DIST"/*.tar.gz "$DIST"/*.tar.xz "$DIST"/*.deb "$DIST"/*.rpm \
          "$DIST"/*.AppImage "$DIST"/*.pkg.tar.zst "$DIST"/*.zip "$DIST"/*.exe \
-         "$DIST"/SHA256SUMS; do
+         "$DIST"/*.flatpak "$DIST"/SHA256SUMS; do
   [ -f "$f" ] || continue
   if [ -f "$f.sig1" ] && openssl dgst -sha256 -verify "$PUB1" -signature "$f.sig1" "$f" >/dev/null 2>&1; then
     echo "OK   $f"
