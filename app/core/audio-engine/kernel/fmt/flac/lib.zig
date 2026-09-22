@@ -320,6 +320,9 @@ fn deinitImpl(ctx: *anyopaque) void {
 /// 返回帧样本数与首样本编号；EOF（剩余不足一帧）→ null。
 fn decodeOneFrame(f: *FlacCtx) Error!?FrameResult {
     var br = BitReader.init(&f.reader);
+    // 帧末（含错误路径）把位游标已消费字节推进 reader.pos：peek 预读的下一帧
+    // 字节不消费、不计 CRC，错误重同步也不会跳过下一帧。
+    defer br.drain() catch {};
     const remaining = try br.remainingBits();
     if (remaining < min_frame_bits) return null;
 

@@ -215,3 +215,66 @@ python3 scorecard.py --corpus /tmp/eng2 --csv data/SCORE_$(date +%F).csv \
 > 机器/工具/口径与已知抖动见 `archive/benchmark-industry-2026-09-05.md` §4/§7（i9-13980HX、
 > zig 0.16.0、ReleaseFast kernel、单轮 RSS/wall 采样抖动 ±0.5–4 分——看 era vs Stable
 > 的**分差方向**而非个别行绝对分）。
+
+## 9. 2026-09-22：公共 PCM 地板 + 任务节点池（方向④ P1/P3）
+
+对应 `audio-kernel-expansion-plan.md` §5.2 的 P1/P3。口径：`taskset -c 2` 固定核、200s 语料；
+主指标为 `tests/bench/insn_count.c`（`perf_event_open` 统计子进程用户态指令数，本机无 `perf`）。
+
+### 9.1 P1 公共 PCM / convert 地板（一改全格式受益）
+
+- `io.Reader.seek` 仅 `whence=end` 才 `fstat`（start/current 是位置读常态，此前每 chunk 白付一次）；
+- `io.readFile` 命中前瞻缓存改**整段 memcpy**（PCM 每 chunk 8KB，原为逐字节循环）；新增 `Reader.readAt`；
+- `pcm/convert.zig` 的 `endian` 由运行期参数**下沉为 comptime**（消除每样本 `@byteSwap` 分支）；
+- `fmt/wav/lib.zig` `readData` 走 `readAt`（按段定位批量读，免 16KB 预读 + 二次拷贝）。
+
+| 格式 | era 前 | era 后 | Δ | FFmpeg(Stable) | era/stable 前→后 |
+|---|---|---|---|---|---|
+| **wav** | 874.7M | **214.7M** | **−75.4%** | 413.0M | 2.12× → **0.52×** |
+| flac | 10.752G | 10.670G | −0.8% | 1.724G | 6.24× → 6.19× |
+| **mp3** | 3.296G | **2.196G** | **−33.4%** | 1.380G | 2.39× → 1.59× |
+
+> flac 提升小：其热路径走 `readByte`/自建位缓冲，不经过被修的 `readFile` 字节循环，仅吃到
+> `convert` 的无分支化收益。
+
+### 9.2 P3 实例内存池（任务节点自由表）
+
+`runtime.zig`：worker 完工把任务节点归池、`submit` 优先复用（与任务队列同一 mutex，不引入新原语），
+容量有界 `node_pool_cap=512`（≈12KB）。`bench_era_pool` 128 路混合格式：
+
+| 指标 | 无池(cap=0) | 有池(512) | Δ |
+|---|---|---|---|
+| malloc | 9205 | **1940** | **−78.9%** |
+| free | 9217 | **1943** | **−78.9%** |
+
+即消除 128 并发下「每 chunk 一次任务节点 malloc/free」风暴（解码主导，故指令数指标不敏感）。
+
+### 9.3 精度与次帧（门禁复核）
+
+- **精度中性**：无损（wav/flac）逐位一致；有损（mp3）输出 md5 前==后，对 ffmpeg f32 `corr=1.0`、`max 1 LSB`。
+- 首帧 `bench_coldstart` p50 µs：wav 25→**13**（FFmpeg 13）、mp3 118→**101**（FFmpeg 37）均改善；
+  **flac 首帧 220µs 属既有编解码开销（`git stash` A/B 证实非本次引入）**，open/create 段远快于 FFmpeg。
+- 仍未做：按格式实例 ctx arena / Reader 缓冲复用（跨 `fmt/**` 的较大重构）。
+
+## 10. 2026-09-22：FLAC 专修（无损，bit-exact 强制）
+
+前置调研与计划见 `flac-optimization.md`。FLAC 未吃到 §9 的 P1（其热路径走 `readByte`/自建位缓冲），
+故专攻**位流 + CRC**。**无损 → 全程 bit-exact。**
+
+保留改动（FL-1 + FL-5）：
+- **位流**：u64 位缓存 + `io.Reader.peek`（不消费 `pos`）批量 refill（复用既有 16 KiB 缓冲、零新增缓冲）；
+  **懒 CRC**（只对已载入位流的字节累加，有效帧绝不载入下一帧字节）；帧末 `drain()` 推进已消费字节；
+  `readUnary1` 改 u64 `@clz`。
+- **CRC**：逐位循环 → comptime 256 项查表（`era_crc8_table`/`era_crc16_table`）+ word 级 4 字节 unrolled。
+
+| 状态 | insn | cycles |
+|---|---|---|
+| 改前 | 7.599G | 1.880G |
+| FL-1 单独（旧逐位 CRC） | 7.489G（−1.4%） | 1.74G |
+| FL-5 单独（旧逐字节 reader） | 5.197G（−31.6%） | 1.27G |
+| **FL-1 + FL-5** | **5.001G（−34.2%）** | **1.357G（−27.8%）** |
+
+精度：引擎 f32 payload md5 改前==改后，且 `cmp` FFmpeg 参考**逐位一致**。
+首帧（p50 µs）：hot 196→120、cold 195→117、create 22→19、cold begin+create 245→157。
+回退（如实）：FL-2（LLVM 已内联）、FL-3（`@Vector(4,i64)` 点积 cycles +12%）、
+FL-4（去相关已被 LLVM 自动向量化）。验证：`zig build test` 679/679（5 seed）；ctest 22/22；Windows 交叉通过。

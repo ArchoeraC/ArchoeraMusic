@@ -20,10 +20,10 @@
 const std = @import("std");
 const tables = @import("tables.zig");
 
-pub const SBLIMIT = 32;
-pub const SAMPLES_PER_BAND = 36;
-pub const MPC_FRAME_SIZE = SBLIMIT * SAMPLES_PER_BAND;
-pub const MPA_MAX_CHANNELS = 2;
+pub const era_sblimit = 32;
+pub const era_samples_per_band = 36;
+pub const era_mpc_frame_size = era_sblimit * era_samples_per_band;
+pub const era_mpa_max_channels = 2;
 /// FFmpeg 的 FRAC_BITS=23 / WFRAC_BITS=16，合成输出移位 = 16+23-15
 const OUT_SHIFT: u6 = 24;
 
@@ -71,7 +71,7 @@ var window_ready = false;
 fn mpa_synth_init() void {
     var i: usize = 0;
     while (i < 257) : (i += 1) {
-        var v: i32 = tables.enwindow[i];
+        var v: i32 = tables.era_era_enwindow[i];
         synth_window[i] = v;
         if ((i & 63) != 0) v = -v;
         if (i != 0) synth_window[512 - i] = v;
@@ -113,9 +113,9 @@ inline fn mulh(a: u32, b: i32) i32 {
 
 /// dct32_fixed 输出 out[32]，输入 tab 视为 u32 模算术（SUINT），
 /// val 均按 u32 维护、位宽回绕；写回 out 时以 i32 位模式解释。
-pub fn dct32Fixed(out: *[SBLIMIT]i32, tab_in: *const [SBLIMIT]i32) void {
+pub fn dct32Fixed(out: *[era_sblimit]i32, tab_in: *const [era_sblimit]i32) void {
     var val = [_]u32{0} ** 32;
-    for (0..SBLIMIT) |i| val[i] = @bitCast(tab_in[i]);
+    for (0..era_sblimit) |i| val[i] = @bitCast(tab_in[i]);
 
     // BF0(a,b,c,s): tmp0=tab[a]+tab[b]; tmp1=tab[a]-tab[b]; val[a]=tmp0; val[b]=MULH((1<<s)*tmp1, c)
     // BF(a,b,c,s): 同但基于 val
@@ -465,52 +465,52 @@ fn applyWindowFixed(synth_buf_ptr: []i32, window: *const [512 + 256]i32, dither_
 /// synth_buf 指向该通道 1024 缓冲（含 offset 前移），sb_samples 为 32 子带输入，
 /// 输出 32 个 s16 到 samples。
 pub fn mpaSynthFilterFixed(
-    synth_buf_all: *[MPA_MAX_CHANNELS][1024]i32,
-    synth_buf_offset: *[MPA_MAX_CHANNELS]usize,
+    synth_buf_all: *[era_mpa_max_channels][1024]i32,
+    era_synth_buf_offset: *[era_mpa_max_channels]usize,
     ch: usize,
     window: *const [512 + 256]i32,
     dither_state: *i32,
     samples: *[32]i16,
-    sb_samples: *const [SBLIMIT]i32,
+    era_sb_samples: *const [era_sblimit]i32,
 ) void {
-    const offset: usize = synth_buf_offset[ch];
+    const offset: usize = era_synth_buf_offset[ch];
     const sbuf = synth_buf_all[ch][offset..];
-    var dct_out: [SBLIMIT]i32 = undefined;
-    dct32Fixed(&dct_out, sb_samples);
-    @memcpy(sbuf[0..SBLIMIT], &dct_out);
+    var dct_out: [era_sblimit]i32 = undefined;
+    dct32Fixed(&dct_out, era_sb_samples);
+    @memcpy(sbuf[0..era_sblimit], &dct_out);
     applyWindowFixed(synth_buf_all[ch][offset..], window, dither_state, samples);
-    synth_buf_offset[ch] = (offset -% 32) & 511;
+    era_synth_buf_offset[ch] = (offset -% 32) & 511;
 }
 
 // ---------------------------------------------------------------------------
 // 子带参数与去量化（mpc.c / mpc.h）
 // ---------------------------------------------------------------------------
 
-pub const Band = struct {
-    msf: bool = false,
-    res: [2]i32 = .{ 0, 0 },
-    scfi: [2]i32 = .{ 0, 0 },
-    scf_idx: [2][3]i32 = .{ .{ 0, 0, 0 }, .{ 0, 0, 0 } },
+pub const EraBand = struct {
+    era_msf: bool = false,
+    era_res: [2]i32 = .{ 0, 0 },
+    era_scfi: [2]i32 = .{ 0, 0 },
+    era_scf_idx: [2][3]i32 = .{ .{ 0, 0, 0 }, .{ 0, 0, 0 } },
 };
 
-pub const MpcCore = struct {
+pub const EraMpcCore = struct {
     /// oldDSCF[ch][band]（帧间持久）
-    oldDSCF: [2][32]i32 = [_][32]i32{[_]i32{0} ** 32} ** 2,
-    bands: [32]Band = [_]Band{.{}} ** 32,
+    era_old_dscf: [2][32]i32 = [_][32]i32{[_]i32{0} ** 32} ** 2,
+    era_bands: [32]EraBand = [_]EraBand{.{}} ** 32,
     /// Q[ch][0..1152]
-    Q: [2][MPC_FRAME_SIZE]i32 = [_][MPC_FRAME_SIZE]i32{[_]i32{0} ** MPC_FRAME_SIZE} ** 2,
+    era_q: [2][era_mpc_frame_size]i32 = [_][era_mpc_frame_size]i32{[_]i32{0} ** era_mpc_frame_size} ** 2,
     /// 去量化后的 子带样本 [ch][36][32]
-    sb_samples: [2][36][32]i32 = undefined,
+    era_sb_samples: [2][36][32]i32 = undefined,
     /// 合成滤波器状态
-    synth_buf: [2][1024]i32 = [_][1024]i32{[_]i32{0} ** 1024} ** 2,
-    synth_buf_offset: [2]usize = .{ 0, 0 },
-    rnd: Lfg = .{},
+    era_synth_buf: [2][1024]i32 = [_][1024]i32{[_]i32{0} ** 1024} ** 2,
+    era_synth_buf_offset: [2]usize = .{ 0, 0 },
+    era_rnd: Lfg = .{},
 
-    pub fn init(self: *MpcCore) void {
-        self.oldDSCF = [_][32]i32{[_]i32{0} ** 32} ** 2;
-        self.synth_buf = [_][1024]i32{[_]i32{0} ** 1024} ** 2;
-        self.synth_buf_offset = .{ 0, 0 };
-        self.rnd.init(0xDEADBEEF);
+    pub fn init(self: *EraMpcCore) void {
+        self.era_old_dscf = [_][32]i32{[_]i32{0} ** 32} ** 2;
+        self.era_synth_buf = [_][1024]i32{[_]i32{0} ** 1024} ** 2;
+        self.era_synth_buf_offset = .{ 0, 0 };
+        self.era_rnd.init(0xDEADBEEF);
     }
 };
 
@@ -529,9 +529,9 @@ inline fn clipfToI32(a: f32) i32 {
 /// ff_mpc_dequantize_and_synth(c, maxband, out, channels)（mpc.c）
 /// maxband 为“最高有效子带号”（调用处传 frame 的 maxband-1）。out 为各通道 1152 输出。
 pub fn dequantizeAndSynth(
-    c: *MpcCore,
-    maxband: i32,
-    out: *[MPA_MAX_CHANNELS][MPC_FRAME_SIZE]i16,
+    c: *EraMpcCore,
+    era_maxband: i32,
+    out: *[era_mpa_max_channels][era_mpc_frame_size]i16,
     channels: usize,
 ) void {
     const window = synthWindow();
@@ -541,40 +541,40 @@ pub fn dequantizeAndSynth(
         while (ch < 2) : (ch += 1) {
             var i: usize = 0;
             while (i < 36) : (i += 1) {
-                for (0..32) |b| c.sb_samples[ch][i][b] = 0;
+                for (0..32) |b| c.era_sb_samples[ch][i][b] = 0;
             }
         }
     }
 
     var off: i32 = 0;
     var i: i32 = 0;
-    while (i <= maxband) : (i += 1) {
+    while (i <= era_maxband) : (i += 1) {
         const bi: usize = @intCast(i);
         for (0..2) |ch| {
-            const res = c.bands[bi].res[ch];
-            if (res != 0) {
+            const era_res = c.era_bands[bi].era_res[ch];
+            if (era_res != 0) {
                 var j: usize = 0;
-                var mul: f32 = tables.mpc_CC[@intCast(res + 1)] * tables.mpc_SCF[@as(u8, @truncate(@as(u32, @bitCast(c.bands[bi].scf_idx[ch][0]))))];
+                var mul: f32 = tables.era_era_mpc_CC[@intCast(era_res + 1)] * tables.era_era_mpc_SCF[@as(u8, @truncate(@as(u32, @bitCast(c.era_bands[bi].era_scf_idx[ch][0]))))];
                 while (j < 12) : (j += 1) {
-                    c.sb_samples[ch][j][bi] = clipfToI32(mul * @as(f32, @floatFromInt(c.Q[ch][j + @as(usize, @intCast(off))])));
+                    c.era_sb_samples[ch][j][bi] = clipfToI32(mul * @as(f32, @floatFromInt(c.era_q[ch][j + @as(usize, @intCast(off))])));
                 }
-                mul = tables.mpc_CC[@intCast(res + 1)] * tables.mpc_SCF[@as(u8, @truncate(@as(u32, @bitCast(c.bands[bi].scf_idx[ch][1]))))];
+                mul = tables.era_era_mpc_CC[@intCast(era_res + 1)] * tables.era_era_mpc_SCF[@as(u8, @truncate(@as(u32, @bitCast(c.era_bands[bi].era_scf_idx[ch][1]))))];
                 while (j < 24) : (j += 1) {
-                    c.sb_samples[ch][j][bi] = clipfToI32(mul * @as(f32, @floatFromInt(c.Q[ch][j + @as(usize, @intCast(off))])));
+                    c.era_sb_samples[ch][j][bi] = clipfToI32(mul * @as(f32, @floatFromInt(c.era_q[ch][j + @as(usize, @intCast(off))])));
                 }
-                mul = tables.mpc_CC[@intCast(res + 1)] * tables.mpc_SCF[@as(u8, @truncate(@as(u32, @bitCast(c.bands[bi].scf_idx[ch][2]))))];
+                mul = tables.era_era_mpc_CC[@intCast(era_res + 1)] * tables.era_era_mpc_SCF[@as(u8, @truncate(@as(u32, @bitCast(c.era_bands[bi].era_scf_idx[ch][2]))))];
                 while (j < 36) : (j += 1) {
-                    c.sb_samples[ch][j][bi] = clipfToI32(mul * @as(f32, @floatFromInt(c.Q[ch][j + @as(usize, @intCast(off))])));
+                    c.era_sb_samples[ch][j][bi] = clipfToI32(mul * @as(f32, @floatFromInt(c.era_q[ch][j + @as(usize, @intCast(off))])));
                 }
             }
         }
-        if (c.bands[bi].msf) {
+        if (c.era_bands[bi].era_msf) {
             var j: usize = 0;
             while (j < 36) : (j += 1) {
-                const t1: u32 = @bitCast(c.sb_samples[0][j][bi]);
-                const t2: u32 = @bitCast(c.sb_samples[1][j][bi]);
-                c.sb_samples[0][j][bi] = @bitCast(t1 +% t2);
-                c.sb_samples[1][j][bi] = @bitCast(t1 -% t2);
+                const t1: u32 = @bitCast(c.era_sb_samples[0][j][bi]);
+                const t2: u32 = @bitCast(c.era_sb_samples[1][j][bi]);
+                c.era_sb_samples[0][j][bi] = @bitCast(t1 +% t2);
+                c.era_sb_samples[1][j][bi] = @bitCast(t1 -% t2);
             }
         }
         off += 36;
@@ -584,8 +584,8 @@ pub fn dequantizeAndSynth(
 }
 
 fn mpcSynth(
-    c: *MpcCore,
-    out: *[MPA_MAX_CHANNELS][MPC_FRAME_SIZE]i16,
+    c: *EraMpcCore,
+    out: *[era_mpa_max_channels][era_mpc_frame_size]i16,
     channels: usize,
     window: *const [512 + 256]i32,
 ) void {
@@ -593,11 +593,11 @@ fn mpcSynth(
     var ch: usize = 0;
     while (ch < channels) : (ch += 1) {
         var i: usize = 0;
-        while (i < SAMPLES_PER_BAND) : (i += 1) {
+        while (i < era_samples_per_band) : (i += 1) {
             var row: [32]i32 = undefined;
-            for (0..32) |b| row[b] = c.sb_samples[ch][i][b];
+            for (0..32) |b| row[b] = c.era_sb_samples[ch][i][b];
             var smp: [32]i16 = undefined;
-            mpaSynthFilterFixed(&c.synth_buf, &c.synth_buf_offset, ch, window, &dither_state, &smp, &row);
+            mpaSynthFilterFixed(&c.era_synth_buf, &c.era_synth_buf_offset, ch, window, &dither_state, &smp, &row);
             const dst = out[ch][32 * i ..][0..32];
             @memcpy(dst, &smp);
         }

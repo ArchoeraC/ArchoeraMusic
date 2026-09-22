@@ -28,50 +28,50 @@ const Error = @import("../../error.zig").Error;
 
 // ---- shorten.c 常量 ----
 
-pub const MAX_CHANNELS: usize = 8;
-pub const MAX_BLOCKSIZE: usize = 65535;
+pub const era_max_channels: usize = 8;
+pub const era_max_blocksize: usize = 65535;
 
-const ULONGSIZE: u32 = 2;
-const WAVE_FORMAT_PCM: u16 = 0x0001;
-const DEFAULT_BLOCK_SIZE: usize = 256;
+const era_ulong_size: u32 = 2;
+const era_wave_format_pcm: u16 = 0x0001;
+const era_default_block_size: usize = 256;
 
-const TYPESIZE: u32 = 4;
-const CHANSIZE: u32 = 0;
-const LPCQSIZE: u32 = 2;
-const ENERGYSIZE: u32 = 3;
-const BITSHIFTSIZE: u32 = 2;
+const era_type_size: u32 = 4;
+const era_chan_size: u32 = 0;
+const era_lpcq_size: u32 = 2;
+const era_energy_size: u32 = 3;
+const era_bitshift_size: u32 = 2;
 
-const TYPE_U8: u32 = 2;
-const TYPE_S16HL: u32 = 3;
-const TYPE_S16LH: u32 = 5;
+const era_type_u8: u32 = 2;
+const era_type_s16hl: u32 = 3;
+const era_type_s16lh: u32 = 5;
 
-const NWRAP: usize = 3;
-const NSKIPSIZE: u32 = 1;
-const LPCQUANT: u5 = 5;
-const V2LPCQOFFSET: i32 = 1 << LPCQUANT;
+const era_nwrap_min: usize = 3;
+const era_skip_size: u32 = 1;
+const era_lpc_quant: u5 = 5;
+const era_v2_lpcq_offset: i32 = 1 << era_lpc_quant;
 
-const FNSIZE: u32 = 2;
-const FN_DIFF0: u32 = 0;
-const FN_DIFF1: u32 = 1;
-const FN_DIFF2: u32 = 2;
-const FN_DIFF3: u32 = 3;
-const FN_QUIT: u32 = 4;
-const FN_BLOCKSIZE: u32 = 5;
-const FN_BITSHIFT: u32 = 6;
-const FN_QLPC: u32 = 7;
-const FN_ZERO: u32 = 8;
-const FN_VERBATIM: u32 = 9;
+const era_fn_size: u32 = 2;
+const era_fn_diff0: u32 = 0;
+const era_fn_diff1: u32 = 1;
+const era_fn_diff2: u32 = 2;
+const era_fn_diff3: u32 = 3;
+const era_fn_quit: u32 = 4;
+const era_fn_blocksize: u32 = 5;
+const era_fn_bitshift: u32 = 6;
+const era_fn_qlpc: u32 = 7;
+const era_fn_zero: u32 = 8;
+const era_fn_verbatim: u32 = 9;
 
 /// indicates if the FN_* command is audio or non-audio（shorten.c 静态表）
-const is_audio_command = [10]u1{ 1, 1, 1, 1, 0, 0, 0, 1, 1, 0 };
+const era_is_audio_command = [10]u1{ 1, 1, 1, 1, 0, 0, 0, 1, 1, 0 };
 
-const VERBATIM_CKSIZE_SIZE: u32 = 5;
-const VERBATIM_BYTE_SIZE: u32 = 8;
-const CANONICAL_HEADER_SIZE: usize = 44;
-const OUT_BUFFER_SIZE: usize = 16384;
+const era_verbatim_cksize_size: u32 = 5;
+const era_verbatim_byte_size: u32 = 8;
+const era_canonical_header_size: usize = 44;
+const era_out_buffer_size: usize = 16384;
 
 /// fixed_coeffs[4][3]（shorten.c 静态表：阶 0-3 固定预测系数）
-const fixed_coeffs = [4][3]i32{
+const era_fixed_coeffs = [4][3]i32{
     .{ 0, 0, 0 },
     .{ 1, 0, 0 },
     .{ 2, -1, 0 },
@@ -167,21 +167,21 @@ pub const Decoder = struct {
     // ShortenContext 等价状态
     channels: usize = 0,
     version: i32 = 0,
-    internal_ftype: u32 = 0,
-    nmean: i32 = -1,
-    nwrap: usize = NWRAP,
-    blocksize: usize = DEFAULT_BLOCK_SIZE,
+    era_internal_ftype: u32 = 0,
+    era_nmean: i32 = -1,
+    era_nwrap: usize = era_nwrap_min,
+    blocksize: usize = era_default_block_size,
     bitshift: i32 = 0,
-    cur_chan: usize = 0,
-    lpcqoffset: i32 = 0,
-    got_header: bool = false,
-    got_quit_command: bool = false,
+    era_cur_chan: usize = 0,
+    era_lpcqoffset: i32 = 0,
+    era_got_header: bool = false,
+    era_got_quit_command: bool = false,
     swap: bool = false,
     sample_type: SampleType = .s16,
     sample_rate: u32 = 0,
 
-    decoded_base: [MAX_CHANNELS]?[]i32 = [_]?[]i32{null} ** MAX_CHANNELS,
-    offset: [MAX_CHANNELS]?[]i32 = [_]?[]i32{null} ** MAX_CHANNELS,
+    era_decoded_base: [era_max_channels]?[]i32 = [_]?[]i32{null} ** era_max_channels,
+    offset: [era_max_channels]?[]i32 = [_]?[]i32{null} ** era_max_channels,
     coeffs: []i32 = &.{},
 
     phase: enum { need_header, decoding, done, failed } = .need_header,
@@ -201,7 +201,7 @@ pub const Decoder = struct {
     }
 
     pub fn deinit(self: *Decoder) void {
-        for (&self.decoded_base) |*d| {
+        for (&self.era_decoded_base) |*d| {
             if (d.*) |buf| self.a.free(buf);
             d.* = null;
         }
@@ -219,7 +219,7 @@ pub const Decoder = struct {
     fn getUint(self: *Decoder, k: u32) Error!u32 {
         var kk = k;
         if (self.version != 0) {
-            kk = self.br.getURShorten(ULONGSIZE);
+            kk = self.br.getURShorten(era_ulong_size);
             if (kk > 31) return error.Corrupt;
         }
         return self.br.getURShorten(kk);
@@ -228,35 +228,35 @@ pub const Decoder = struct {
     /// allocate_buffers（shorten.c；blocksize 经 FN_BLOCKSIZE 只缩不增，
     /// 按头内初始 blocksize 分配一次）
     fn allocateBuffers(self: *Decoder) Error!void {
-        const nblock: usize = @intCast(@max(1, self.nmean));
+        const nblock: usize = @intCast(@max(1, self.era_nmean));
         for (0..self.channels) |chan| {
-            if (self.decoded_base[chan] == null) {
-                self.decoded_base[chan] = self.a.alloc(i32, self.blocksize + self.nwrap) catch return error.OutOfMemory;
-                @memset(self.decoded_base[chan].?[0..self.nwrap], 0);
+            if (self.era_decoded_base[chan] == null) {
+                self.era_decoded_base[chan] = self.a.alloc(i32, self.blocksize + self.era_nwrap) catch return error.OutOfMemory;
+                @memset(self.era_decoded_base[chan].?[0..self.era_nwrap], 0);
             }
             if (self.offset[chan] == null) {
                 self.offset[chan] = self.a.alloc(i32, nblock) catch return error.OutOfMemory;
             }
         }
         if (self.coeffs.len == 0) {
-            self.coeffs = self.a.alloc(i32, self.nwrap) catch return error.OutOfMemory;
+            self.coeffs = self.a.alloc(i32, self.era_nwrap) catch return error.OutOfMemory;
         }
     }
 
     /// init_offset（shorten.c）：均值初始化 + 样本类型判定
     fn initOffset(self: *Decoder) Error!void {
         var mean: i32 = 0;
-        switch (self.internal_ftype) {
-            TYPE_U8 => {
+        switch (self.era_internal_ftype) {
+            era_type_u8 => {
                 self.sample_type = .u8;
                 mean = 0x80;
             },
-            TYPE_S16HL, TYPE_S16LH => {
+            era_type_s16hl, era_type_s16lh => {
                 self.sample_type = .s16;
             },
             else => return error.UnsupportedFormat, // "unknown audio type"（PATCHWELCOME）
         }
-        const nblock: usize = @intCast(@max(1, self.nmean));
+        const nblock: usize = @intCast(@max(1, self.era_nmean));
         for (0..self.channels) |chan| {
             const off = self.offset[chan].?;
             for (0..nblock) |i| off[i] = mean;
@@ -348,7 +348,7 @@ pub const Decoder = struct {
         if (gb.len < 2 + 2 + 4 + 4 + 2 + 2) return error.Corrupt;
         const wave_format = std.mem.readInt(u16, gb[0..2], .little);
         gb = gb[2..]; // wave_format
-        if (wave_format != WAVE_FORMAT_PCM) return error.UnsupportedFormat; // unsupported wave format
+        if (wave_format != era_wave_format_pcm) return error.UnsupportedFormat; // unsupported wave format
         gb = gb[2..]; // skip channels（已从 shorten 头取得）
         self.sample_rate = std.mem.readInt(u32, gb[0..4], .little);
         gb = gb[4..]; // sample_rate
@@ -365,51 +365,51 @@ pub const Decoder = struct {
         if (self.br.readBits(32) != std.mem.readInt(u32, "ajkg", .big))
             return error.Corrupt; // missing shorten magic 'ajkg'
 
-        self.lpcqoffset = 0;
-        self.blocksize = DEFAULT_BLOCK_SIZE;
-        self.nmean = -1;
+        self.era_lpcqoffset = 0;
+        self.blocksize = era_default_block_size;
+        self.era_nmean = -1;
         self.version = @bitCast(self.br.readBits(8));
-        self.internal_ftype = try self.getUint(TYPESIZE);
+        self.era_internal_ftype = try self.getUint(era_type_size);
 
-        self.channels = try self.getUint(CHANSIZE);
+        self.channels = try self.getUint(era_chan_size);
         if (self.channels == 0) return error.Corrupt; // No channels reported
-        if (self.channels > MAX_CHANNELS) return error.Corrupt; // too many channels
+        if (self.channels > era_max_channels) return error.Corrupt; // too many channels
 
         // get blocksize if version > 0
         var maxnlpc: usize = 0;
         if (self.version > 0) {
-            const blocksize = try self.getUint(avLog2(DEFAULT_BLOCK_SIZE));
-            if (blocksize == 0 or blocksize > MAX_BLOCKSIZE) return error.Corrupt; // invalid block size
+            const blocksize = try self.getUint(avLog2(era_default_block_size));
+            if (blocksize == 0 or blocksize > era_max_blocksize) return error.Corrupt; // invalid block size
             self.blocksize = blocksize;
 
-            maxnlpc = try self.getUint(LPCQSIZE);
+            maxnlpc = try self.getUint(era_lpcq_size);
             if (maxnlpc > 1024) return error.Corrupt; // maxnlpc too large
-            self.nmean = @bitCast(try self.getUint(0));
+            self.era_nmean = @bitCast(try self.getUint(0));
             // C: if (s->nmean > 32768U) —— int 提升为 unsigned 比较
-            if (@as(u32, @bitCast(self.nmean)) > 32768) return error.Corrupt; // nmean too large
+            if (@as(u32, @bitCast(self.era_nmean)) > 32768) return error.Corrupt; // nmean too large
 
-            const skip_bytes = try self.getUint(NSKIPSIZE);
+            const skip_bytes = try self.getUint(era_skip_size);
             // C: (unsigned)skip_bytes > FFMAX(get_bits_left, 0)/8
             if (@as(u64, skip_bytes) > (self.br.totalBits() -| self.br.bit_pos) / 8)
                 return error.Corrupt; // invalid skip_bytes
             self.br.bit_pos += @as(u64, skip_bytes) * 8;
         }
-        self.nwrap = @max(NWRAP, maxnlpc);
+        self.era_nwrap = @max(era_nwrap_min, maxnlpc);
 
         if (self.version > 1)
-            self.lpcqoffset = V2LPCQOFFSET;
+            self.era_lpcqoffset = era_v2_lpcq_offset;
 
         // verbatim section at beginning of stream
-        if (self.br.getURShorten(FNSIZE) != FN_VERBATIM)
+        if (self.br.getURShorten(era_fn_size) != era_fn_verbatim)
             return error.Corrupt; // missing verbatim section
 
-        const header_size = self.br.getURShorten(VERBATIM_CKSIZE_SIZE);
-        if (header_size >= OUT_BUFFER_SIZE or header_size < CANONICAL_HEADER_SIZE)
+        const header_size = self.br.getURShorten(era_verbatim_cksize_size);
+        if (header_size >= era_out_buffer_size or header_size < era_canonical_header_size)
             return error.Corrupt; // header is wrong size
 
-        var header: [OUT_BUFFER_SIZE]u8 = undefined;
+        var header: [era_out_buffer_size]u8 = undefined;
         for (0..header_size) |i|
-            header[i] = @truncate(self.br.getURShorten(VERBATIM_BYTE_SIZE));
+            header[i] = @truncate(self.br.getURShorten(era_verbatim_byte_size));
 
         const hdr = header[0..header_size];
         // C: AV_RL32(s->header) == MKTAG('R','I','F','F')（内存序 LE 比较）
@@ -424,9 +424,9 @@ pub const Decoder = struct {
         try self.allocateBuffers();
         try self.initOffset();
 
-        self.cur_chan = 0;
+        self.era_cur_chan = 0;
         self.bitshift = 0;
-        self.got_header = true;
+        self.era_got_header = true;
         self.phase = .decoding;
     }
 
@@ -437,43 +437,43 @@ pub const Decoder = struct {
         var coeffs: []const i32 = &.{};
         var coeffs_buf: [3]i32 = undefined;
 
-        if (command == FN_QLPC) {
+        if (command == era_fn_qlpc) {
             // read/validate prediction order
-            const po = self.br.getURShorten(LPCQSIZE);
-            if (po > self.nwrap) return error.Corrupt; // invalid pred_order
+            const po = self.br.getURShorten(era_lpcq_size);
+            if (po > self.era_nwrap) return error.Corrupt; // invalid pred_order
             pred_order = po;
             // read LPC coefficients
             for (0..pred_order) |i|
-                self.coeffs[i] = self.br.getSRShorten(LPCQUANT);
+                self.coeffs[i] = self.br.getSRShorten(era_lpc_quant);
             coeffs = self.coeffs[0..pred_order];
-            qshift = LPCQUANT;
+            qshift = era_lpc_quant;
         } else {
             // fixed LPC coeffs
             pred_order = command;
-            if (pred_order >= fixed_coeffs.len) return error.Corrupt; // invalid pred_order
-            coeffs_buf[0] = fixed_coeffs[pred_order][0];
-            coeffs_buf[1] = fixed_coeffs[pred_order][1];
-            coeffs_buf[2] = fixed_coeffs[pred_order][2];
+            if (pred_order >= era_fixed_coeffs.len) return error.Corrupt; // invalid pred_order
+            coeffs_buf[0] = era_fixed_coeffs[pred_order][0];
+            coeffs_buf[1] = era_fixed_coeffs[pred_order][1];
+            coeffs_buf[2] = era_fixed_coeffs[pred_order][2];
             coeffs = coeffs_buf[0..pred_order];
             qshift = 0;
         }
 
-        const dec = self.decoded_base[channel].?; // decoded = base + nwrap
-        const nwrap = self.nwrap;
+        const dec = self.era_decoded_base[channel].?; // decoded = base + nwrap
+        const era_nwrap = self.era_nwrap;
         const coffset_u: u32 = @bitCast(coffset);
 
         // subtract offset from previous samples to use in prediction
         // C: for (i = -pred_order; i < 0; i++) decoded[i] -= (unsigned)coffset
-        if (command == FN_QLPC and coffset != 0) {
-            var i: usize = nwrap - pred_order;
-            while (i < nwrap) : (i += 1)
+        if (command == era_fn_qlpc and coffset != 0) {
+            var i: usize = era_nwrap - pred_order;
+            while (i < era_nwrap) : (i += 1)
                 dec[i] = @bitCast(@as(u32, @bitCast(dec[i])) -% coffset_u);
         }
 
         // decode residual and do LPC prediction
         // init_sum = pred_order ? (QLPC ? lpcqoffset : 0) : coffset
         const init_sum: i32 = if (pred_order != 0)
-            (if (command == FN_QLPC) self.lpcqoffset else 0)
+            (if (command == era_fn_qlpc) self.era_lpcqoffset else 0)
         else
             coffset;
         var i: usize = 0;
@@ -481,20 +481,20 @@ pub const Decoder = struct {
             // sum += coeffs[j] * (unsigned)decoded[i-j-1]：uint32 回绕域
             var sum: u32 = @bitCast(init_sum);
             for (0..pred_order) |j|
-                sum = sum +% @as(u32, @bitCast(coeffs[j])) *% @as(u32, @bitCast(dec[nwrap + i - j - 1]));
+                sum = sum +% @as(u32, @bitCast(coeffs[j])) *% @as(u32, @bitCast(dec[era_nwrap + i - j - 1]));
             const residual = self.br.getSRShorten(residual_size);
             // decoded[i] = residual + (unsigned)(sum >> qshift)：
             // sum 为 int32_t，`sum >> qshift` 是**算术**右移（负和符号扩展），
             // 再转 unsigned 与 residual 回绕相加
             const sum_i: i32 = @bitCast(sum);
-            dec[nwrap + i] = @bitCast(@as(u32, @bitCast(residual)) +% @as(u32, @bitCast(sum_i >> qshift)));
+            dec[era_nwrap + i] = @bitCast(@as(u32, @bitCast(residual)) +% @as(u32, @bitCast(sum_i >> qshift)));
         }
 
         // add offset to current samples
         // C: for (i = 0; i < blocksize; i++) decoded[i] += (unsigned)coffset
-        if (command == FN_QLPC and coffset != 0) {
+        if (command == era_fn_qlpc and coffset != 0) {
             for (0..self.blocksize) |k|
-                dec[nwrap + k] = @bitCast(@as(u32, @bitCast(dec[nwrap + k])) +% coffset_u);
+                dec[era_nwrap + k] = @bitCast(@as(u32, @bitCast(dec[era_nwrap + k])) +% coffset_u);
         }
     }
 
@@ -512,78 +512,78 @@ pub const Decoder = struct {
         if (self.phase != .decoding)
             return false;
 
-        while (self.cur_chan < self.channels) {
-            if (self.br.bitsLeft() < 3 + FNSIZE) {
+        while (self.era_cur_chan < self.channels) {
+            if (self.br.bitsLeft() < 3 + era_fn_size) {
                 // 位流耗尽且块不完整 → 无更多输出（EOF）
                 self.phase = .done;
                 return false;
             }
 
-            const cmd = self.br.getURShorten(FNSIZE);
+            const cmd = self.br.getURShorten(era_fn_size);
 
-            if (cmd > FN_VERBATIM) {
+            if (cmd > era_fn_verbatim) {
                 // unknown shorten function：本块中止，复位通道重来
-                self.cur_chan = 0;
+                self.era_cur_chan = 0;
                 continue;
             }
 
-            if (is_audio_command[cmd] == 0) {
+            if (era_is_audio_command[cmd] == 0) {
                 // process non-audio command
                 switch (cmd) {
-                    FN_VERBATIM => {
-                        const len = self.br.getURShorten(VERBATIM_CKSIZE_SIZE);
+                    era_fn_verbatim => {
+                        const len = self.br.getURShorten(era_verbatim_cksize_size);
                         // C: len < 0 || len > get_bits_left（BITS）
                         if (@as(i64, len) > self.br.bitsLeft()) return error.Corrupt; // verbatim length invalid
                         var n = len;
                         while (n > 0) : (n -= 1)
-                            _ = self.br.getURShorten(VERBATIM_BYTE_SIZE);
+                            _ = self.br.getURShorten(era_verbatim_byte_size);
                     },
-                    FN_BITSHIFT => {
-                        const bs = self.br.getURShorten(BITSHIFTSIZE);
+                    era_fn_bitshift => {
+                        const bs = self.br.getURShorten(era_bitshift_size);
                         if (bs > 32) return error.Corrupt; // bitshift invalid
                         self.bitshift = @bitCast(bs);
                     },
-                    FN_BLOCKSIZE => {
+                    era_fn_blocksize => {
                         const bs = try self.getUint(avLog2(self.blocksize));
                         if (bs > self.blocksize)
                             return error.UnsupportedFormat; // Increasing blocksize（missing feature）
-                        if (bs == 0 or bs > MAX_BLOCKSIZE) return error.Corrupt; // invalid block size
+                        if (bs == 0 or bs > era_max_blocksize) return error.Corrupt; // invalid block size
                         self.blocksize = bs;
                     },
-                    FN_QUIT => {
-                        self.got_quit_command = true;
+                    era_fn_quit => {
+                        self.era_got_quit_command = true;
                     },
                     else => {},
                 }
-                if (cmd == FN_QUIT) {
+                if (cmd == era_fn_quit) {
                     self.phase = .done;
                     return false;
                 }
             } else {
                 // process audio command
                 var residual_size: u32 = 0;
-                const channel = self.cur_chan;
+                const channel = self.era_cur_chan;
                 var coffset: i32 = undefined;
 
                 // get Rice code parameter for residual decoding
-                if (cmd != FN_ZERO) {
-                    residual_size = self.br.getURShorten(ENERGYSIZE);
+                if (cmd != era_fn_zero) {
+                    residual_size = self.br.getURShorten(era_energy_size);
                     // version 0 的 get_sr_golomb_shorten 定义差异 hack
                     if (self.version == 0) residual_size -%= 1;
                     if (residual_size > 30) return error.Corrupt; // residual size unsupported
                 }
 
                 // calculate sample offset using means from previous blocks
-                if (self.nmean == 0) {
+                if (self.era_nmean == 0) {
                     coffset = self.offset[channel].?[0];
                 } else {
                     // sum 为 int32：unsigned 加法回绕
-                    var sum: i32 = if (self.version < 2) 0 else @divTrunc(self.nmean, 2);
+                    var sum: i32 = if (self.version < 2) 0 else @divTrunc(self.era_nmean, 2);
                     const off = self.offset[channel].?;
                     var mi: usize = 0;
-                    while (mi < self.nmean) : (mi += 1)
+                    while (mi < self.era_nmean) : (mi += 1)
                         sum = @bitCast(@as(u32, @bitCast(sum)) +% @as(u32, @bitCast(off[mi])));
-                    coffset = @divTrunc(sum, self.nmean);
+                    coffset = @divTrunc(sum, self.era_nmean);
                     if (self.version >= 2) {
                         // C: coffset = bitshift == 0 ? coffset : coffset >> bitshift-1 >> 1
                         if (self.bitshift != 0) {
@@ -594,30 +594,30 @@ pub const Decoder = struct {
                 }
 
                 // decode samples for this channel
-                if (cmd == FN_ZERO) {
-                    const dec = self.decoded_base[channel].?;
-                    @memset(dec[self.nwrap .. self.nwrap + self.blocksize], 0);
+                if (cmd == era_fn_zero) {
+                    const dec = self.era_decoded_base[channel].?;
+                    @memset(dec[self.era_nwrap .. self.era_nwrap + self.blocksize], 0);
                 } else {
                     try self.decodeSubframeLpc(cmd, channel, residual_size, coffset);
                 }
 
                 // update means with info from the current block
-                if (self.nmean > 0) {
+                if (self.era_nmean > 0) {
                     var sum: i64 = if (self.version < 2) 0 else @as(i64, @intCast(self.blocksize / 2));
-                    const dec = self.decoded_base[channel].?;
+                    const dec = self.era_decoded_base[channel].?;
                     for (0..self.blocksize) |si|
-                        sum += dec[self.nwrap + si];
+                        sum += dec[self.era_nwrap + si];
 
                     const off = self.offset[channel].?;
                     var mi: usize = 1;
-                    while (mi < self.nmean) : (mi += 1)
+                    while (mi < self.era_nmean) : (mi += 1)
                         off[mi - 1] = off[mi];
 
                     if (self.version < 2) {
-                        off[@intCast(self.nmean - 1)] = @truncate(@divTrunc(sum, @as(i64, @intCast(self.blocksize))));
+                        off[@intCast(self.era_nmean - 1)] = @truncate(@divTrunc(sum, @as(i64, @intCast(self.blocksize))));
                     } else {
                         // C: (sum / blocksize) * (1LL << bitshift)，bitshift==32 → 0
-                        off[@intCast(self.nmean - 1)] = if (self.bitshift == 32)
+                        off[@intCast(self.era_nmean - 1)] = if (self.bitshift == 32)
                             0
                         else
                             @truncate(@divTrunc(sum, @as(i64, @intCast(self.blocksize))) * (@as(i64, 1) << @intCast(self.bitshift)));
@@ -628,19 +628,19 @@ pub const Decoder = struct {
                 // C: for (i = -nwrap; i < 0; i++) decoded[i] = decoded[i + blocksize]
                 //   即 base[i] = base[blocksize + i]（升序，源索引恒大于目标）
                 {
-                    const dec = self.decoded_base[channel].?;
-                    for (0..self.nwrap) |wi|
+                    const dec = self.era_decoded_base[channel].?;
+                    for (0..self.era_nwrap) |wi|
                         dec[wi] = dec[self.blocksize + wi];
                 }
 
                 // shift samples to add in unused zero bits
-                self.fixBitshift(self.decoded_base[channel].?[self.nwrap..]);
+                self.fixBitshift(self.era_decoded_base[channel].?[self.era_nwrap..]);
 
                 // if this is the last channel in the block, output the samples
-                self.cur_chan += 1;
-                if (self.cur_chan == self.channels) {
+                self.era_cur_chan += 1;
+                if (self.era_cur_chan == self.channels) {
                     self.emitFrame(out);
-                    self.cur_chan = 0; // 下一「decode 调用」复位
+                    self.era_cur_chan = 0; // 下一「decode 调用」复位
                     return true;
                 }
             }
@@ -657,7 +657,7 @@ pub const Decoder = struct {
             .u8 => {
                 for (0..bs) |i| {
                     for (0..chs) |chan| {
-                        const v = self.decoded_base[chan].?[self.nwrap + i];
+                        const v = self.era_decoded_base[chan].?[self.era_nwrap + i];
                         out[i * chs + chan] = clipU8(v);
                     }
                 }
@@ -665,7 +665,7 @@ pub const Decoder = struct {
             .s16 => {
                 for (0..bs) |i| {
                     for (0..chs) |chan| {
-                        const v = clipS16(self.decoded_base[chan].?[self.nwrap + i]);
+                        const v = clipS16(self.era_decoded_base[chan].?[self.era_nwrap + i]);
                         const sv: u16 = if (self.swap) @byteSwap(@as(u16, @bitCast(v))) else @bitCast(v);
                         std.mem.writeInt(u16, out[(i * chs + chan) * 2 ..][0..2], sv, .little);
                     }

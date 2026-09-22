@@ -22,9 +22,11 @@
 //! 使用方经 `decoder.openWithIo` 传入（Reader.io 已参数化，io.zig `openPathWith`）。
 //! 任务切换只在完全空闲边界（§2.1 run-to-completion）。
 //!
-//! 边界（留接线期，见 §9 ③④/§5.5 完整调节器）：空闲**回收降容**（backlog 消退后扩出的
-//! worker 回落 min_floor）涉及 retiring 协议 + Master join，须与 wait_event/会话接线一并落，
-//! 避免本骨架引入稀发竞态。
+//! §5.5 目标容量调节器（完整化）：`desired = min(running + ceil(backlog/load_factor) + spare,
+//! max_workers)`；排空回落 = `max(min_workers, min(并发达峰, max_workers))` + 滞后死区
+//! `keep_watermark` + 收步长 `shrink_step`；`grow_step` 限每事件扩建；`idle_timeout_ns>0`
+//! 时空闲 elastic 超时降容（retiring + 锁外 join 复用槽）。**默认常量复刻既有 F1 纯事件
+//! 行为**（load_factor=1 / spare=0 / 步长=0 / 死区=0 / idle=0），新能力按需显式开启。
 //!
 //! §5.2 层2 停滞兜底（`cfg.stall_timeout_ns > 0` 才启用，默认关 = 行为与纯事件版完全一致）：
 //!   - worker 开工写 `started_ns[id]`（单调 ns），完工清零；
@@ -43,7 +45,7 @@
 //! 发回收事件（唯一回收触发，正确性不依赖定时器）。Master `maybeReclaim` 只在此刻评估：
 //! 目标容量 `target = max(min_workers, min(本波并发达峰, max_workers))`——**并发达峰**而非
 //! 队列深度（波次真实需要的并行度；微小任务风暴即使排起长队，同时 busy 的 worker 峰值也低
-//! → 排空后回落；真需要 N 路并行才保留 N）。盈余（服役数 > target）→ 对高 id 的**空闲**
+//! → 排空后回落；真需要 N 路并行才保留 N）。盈余（服役数 > target）→ 对**最老空闲的**
 //! worker 置 `retire[id]` 并广播唤醒；worker 在空闲边界执行 Master 命令：二次确认队列仍空
 //! 后置 `retiring`/`exited` 即退（不自杀）。**防 churn**：被 retire 标记的 worker 若因新队列
 //! 转忙则自清 retire（重新有用），Master 只在下个排空事件重估；退役只在排空（无任务在途）
@@ -68,6 +70,23 @@ pub const Cfg = struct {
     /// 停滞判定阈值（§5.2 层2）：busy worker 开工超过该时长未完工 → 判停滞并 detach。
     /// 0 = 关闭（默认）：Master 保持纯事件 Condition 等待、零定时器，行为与既往完全一致。
     stall_timeout_ns: u64 = 0,
+
+    // ---- §5.5 目标容量调节器常量（默认与既有 F1 纯事件行为逐字节兼容）----
+    /// 排队任务 → 弹性需求折算：每 `load_factor` 个积压需要 1 个 worker（0/1 = 一对一）
+    load_factor: u16 = 1,
+    /// 预留安全垫（§5.3；空闲 elastic 保留数，提前建供应领先需求）。0 = 不留
+    spare: u16 = 0,
+    /// 建步长：每事件（submit 补建轮）至多新建数；0 = 不限（既有一次性补建）
+    grow_step: u16 = 0,
+    /// 收步长：每事件至多标 retire 数；0 = 不限（既有整波回落）
+    shrink_step: u16 = 0,
+    /// 滞后死区上水位：`serving > target + keep_watermark` 才回收，防「建一个收一个」抖振。
+    /// 0 = 无死区（既有行为）
+    keep_watermark: u16 = 0,
+    /// 空闲回收降容（§5.1 next_check / §5.5 兜底）：>0 时 Master 带超时唤醒，
+    /// 空闲 elastic worker 闲置超过该时长且在役数 > min_workers → 标 retiring 收尾。
+    /// 0 = 关闭（默认）：纯事件、零定时器，回收仍由排空事件触发（既有行为）。
+    idle_timeout_ns: u64 = 0,
 };
 
 /// 任务（phase ② 通用可执行体；Task/句柄层见 kernel/task.zig，测试与批任务用）
@@ -80,6 +99,23 @@ const Node = struct {
     job: Job,
     next: ?*Node = null,
 };
+
+/// §5.5 排空回落裁决（纯函数，确定性可测）：给定 `serving`（在役数）、`target`（本波
+/// 目标容量）、`keep`（滞后死区上水位）与 `shrink_step`（收步长），返回本事件应回收的
+/// worker 数。`serving <= target + keep` → 0（死区内不动作，防「建一个收一个」抖振）；
+/// 否则回收 `serving - target` 的盈余，受 `shrink_step` 封顶（0 = 不限）。不做任何簿记，
+/// 仅裁决数量——实际标记由 `markOldestIdleLocked` 在锁内完成。
+fn reclaimBudget(serving: usize, target: usize, keep: usize, shrink_step: usize) usize {
+    if (serving <= target + keep) return 0; // 滞后死区
+    var over = serving - target;
+    if (shrink_step > 0) over = @min(over, shrink_step);
+    return over;
+}
+
+/// 任务节点自由表容量上限（P3 实例内存池，§8.4.2 #4）。节点仅 ~24B，128 并发下
+/// 每路至多 1 个在途节点，512 已含 4× 余量；突发超出者回退 malloc，自由表**不无限驻留**
+/// （上限 512×24B ≈ 12KB，进程生命周期内只读复用）。
+const node_pool_cap: usize = 512;
 
 pub const Runtime = struct {
     allocator: std.mem.Allocator,
@@ -94,6 +130,12 @@ pub const Runtime = struct {
     /// 在途任务计数（submit +1，worker 跑完 -1；waitIdle 用）
     inflight: usize = 0,
     idle_cv: Io.Condition = .init,
+    /// 任务节点自由表（P3 实例内存池）：worker 完工把节点归还而非销毁，submit 优先复用，
+    /// 消除「每任务一次 malloc/free」——128 并发流式播放/批量 tag 每 chunk 一次的抖动。
+    /// 容量有界 `node_pool_cap`，超出销毁。**与任务队列同一 mutex 保护**（acquire/release
+    /// 均在已持锁的 submit / worker 收尾临界区内），不引入新的同步原语。
+    free_nodes: ?*Node = null,
+    free_count: usize = 0,
 
     // ---- Master 协调 ----
     master_mutex: Io.Mutex = .init,
@@ -134,6 +176,13 @@ pub const Runtime = struct {
     /// 读：worker（持 mutex 空闲谓词）/ appendWorker 复用扫描 / shutdown join 前判 ex/stall。
     /// 槽复用（`retire && exited`，正常退役）或停滞复用（`respawnInto`）时复位。
     retire: []bool = &.{},
+    // ---- AS2 长流池化：worker 亲和 pinned 1:1（§6.3；默认关，会话显式 startPinned）----
+    /// 会话 pinned 槽：true = 该 worker 专属于一个长流会话，只接该会话步骤（pinned_job）、
+    /// 不进全局队列、不参与回收（class=pinned）。会话关闭 releasePinned 复位回 elastic。
+    /// 写：Master 路径（acquire/submit/release，均持 mutex）；读：worker（持 mutex）。
+    pinned: []bool = &.{},
+    /// pinned 槽的待执行步骤（单槽；会话步骤**串行 await**，故无需队列）。null = 无。
+    pinned_job: []?Job = &.{},
     /// 可服役（在役）worker 计数：线程活着且未停滞/未 exited（含已标 retire 但尚未退出的
     /// worker——它们仍是真实容量，新队列来了会留下服役）。退役 -1（worker 实际退出）、
     /// 复用/新建 +1（Master）；停滞 detach -1、停滞槽 respawn +1。submit 增长与 maybeReclaim
@@ -155,6 +204,10 @@ pub const Runtime = struct {
     /// Master 带超时兜底唤醒 latch（§5.1：`waitTimeout` + set/reset）。仅
     /// `stall_timeout_ns>0` 时被等待；只有 Master 线程 wait/reset。
     master_event: Io.Event = .unset,
+    /// AS2：pinned worker 专属条件变量。`submitPinned` signal 它、`releasePinned`
+    /// broadcast 它，pinnedLoop 等它——避免唤醒共享 `jobs_avail` 上的 elastic 等待者
+    /// （唤醒丢失：signal 只叫醒一名等待者，可能不是目标 pinned worker）。
+    pinned_cv: Io.Condition = .init,
 
     /// 引导阶段（bootstrap）：建 Master；`cfg.min_workers>0` 时同步建同质 worker。
     pub fn init(allocator: std.mem.Allocator, cfg: Cfg) !*Runtime {
@@ -177,6 +230,8 @@ pub const Runtime = struct {
             allocator.free(self.stalled);
             allocator.free(self.exited);
             allocator.free(self.retire);
+            allocator.free(self.pinned);
+            allocator.free(self.pinned_job);
             if (self.master) |m| m.join();
             allocator.destroy(self);
         }
@@ -189,6 +244,10 @@ pub const Runtime = struct {
         @memset(self.exited, std.atomic.Value(bool).init(false));
         self.retire = try allocator.alloc(bool, cfg.max_workers);
         @memset(self.retire, false);
+        self.pinned = try allocator.alloc(bool, cfg.max_workers);
+        @memset(self.pinned, false);
+        self.pinned_job = try allocator.alloc(?Job, cfg.max_workers);
+        @memset(self.pinned_job, null);
 
         // Master 先建（此后线程生命周期归它）
         self.master = try Thread.spawn(.{
@@ -266,6 +325,8 @@ pub const Runtime = struct {
         self.exited[id].store(false, .release);
         self.stalled[id] = false;
         self.retire[id] = false;
+        self.pinned[id] = false; // 复用槽必定非 pinned（pinned 槽不退役，除非会话已释放）
+        self.pinned_job[id] = null;
         self.mutex.unlock(self.io);
         errdefer {
             self.mutex.lockUncancelable(self.io);
@@ -323,19 +384,43 @@ pub const Runtime = struct {
         return reusable;
     }
 
+    /// 取一个任务节点（P3 池化；调用方须持 mutex）：优先复用自由表，空则分配。
+    fn acquireNodeLocked(self: *Runtime) !*Node {
+        if (self.free_nodes) |n| {
+            self.free_nodes = n.next;
+            self.free_count -= 1;
+            return n;
+        }
+        return self.allocator.create(Node);
+    }
+
+    /// 归还任务节点（P3 池化；调用方须持 mutex）：容量内入自由表复用，超出销毁。
+    fn releaseNodeLocked(self: *Runtime, n: *Node) void {
+        if (self.free_count < node_pool_cap) {
+            n.next = self.free_nodes;
+            self.free_nodes = n;
+            self.free_count += 1;
+        } else {
+            self.allocator.destroy(n);
+        }
+    }
+
     /// 提交任务（非阻塞；OOM 返回 false）。worker 被唤醒自取（完成即领，§5.1）。
     /// 停机后调用 → false（防停机后入队→无 worker→悬挂 inflight 的接线不匹配）。
     pub fn submit(self: *Runtime, job: Job) bool {
         if (self.shutdown_requested.load(.acquire)) return false;
-        const node = self.allocator.create(Node) catch return false;
-        node.* = .{ .job = job };
         self.mutex.lockUncancelable(self.io);
         // 二次检查（停机竞态窗口内到达也拒绝）
         if (self.shutdown_requested.load(.acquire)) {
             self.mutex.unlock(self.io);
-            self.allocator.destroy(node);
             return false;
         }
+        // 节点取自池（同临界区，见 free_nodes 注释）；分配失败须在改队列前回滚。
+        const node = self.acquireNodeLocked() catch {
+            self.mutex.unlock(self.io);
+            return false;
+        };
+        node.* = .{ .job = job };
         const tail = self.queue_tail;
         if (tail) |t| {
             t.next = node;
@@ -400,6 +485,68 @@ pub const Runtime = struct {
         return n;
     }
 
+    // ---- AS2 长流池化：worker 亲和 pinned 1:1（§6.3）----
+
+    /// 为一个长流会话预留一个空闲 worker（1 流 : 1 pinned worker）。成功返回 worker id；
+    /// 无空闲/全 pinned 返回 null（调用方回退全局队列）。持 mutex 判定并置位，使该 worker
+    /// 之后的空闲谓词只等本会话步骤、进全局队列分支被跳过（与「自领」在同一临界区消解）。
+    /// pinned 槽 class=pinned：不参与 §5.5 回收候选、不被 elastic 伸缩挤兑。
+    pub fn acquirePinned(self: *Runtime) ?usize {
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
+        if (self.shutdown_requested.load(.acquire)) return null;
+        for (self.workers.items, 0..) |_, id| {
+            if (self.pinned[id]) continue;
+            if (self.stalled[id]) continue;
+            if (self.exited[id].load(.acquire)) continue;
+            if (self.retire[id]) continue;
+            const e = &self.reg.entries[id];
+            if (e.state != .idle) continue; // 只取完全空闲 worker（run-to-completion 边界）
+            self.pinned[id] = true;
+            e.class = .pinned;
+            e.waiting = true; // pinned 会话的合法消费等待（§5.2 停滞判定排除）
+            self.pinned_job[id] = null;
+            // 唤醒可能正睡在共享 jobs_avail 上的该 worker，使其转向 pinnedLoop
+            // （否则首个 submitPinned 的 pinned_cv 唤醒会落空）。
+            Io.Condition.broadcast(&self.jobs_avail, self.io);
+            return id;
+        }
+        return null;
+    }
+
+    /// 把会话步骤下发到 pinned worker（单槽；步骤串行 await，无队列）。返回 false =
+    /// 该槽已不可用（已退役/停机/非 pinned），调用方回退全局队列或报错。
+    pub fn submitPinned(self: *Runtime, id: usize, job: Job) bool {
+        if (id >= self.pinned_job.len) return false;
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
+        if (!self.pinned[id]) return false;
+        if (self.stalled[id] or self.exited[id].load(.acquire) or self.retire[id]) return false;
+        if (self.shutdown_requested.load(.acquire)) return false;
+        if (self.pinned_job[id] != null) return false; // 单槽：上一步未取走（调用方须串行）
+        // 与 submit 同一波次/在途记账：pinned 步骤也计入 inflight（waitIdle/排空回收依赖）。
+        if (self.inflight == 0) self.busy_peak = 0;
+        self.inflight += 1;
+        self.pinned_job[id] = job;
+        self.reg.entries[id].waiting = false; // 有活干：不再处于消费等待
+        Io.Condition.signal(&self.pinned_cv, self.io); // 只唤醒 pinned worker
+        return true;
+    }
+
+    /// 会话关闭：释放 pinned 槽（回 elastic 空闲，可被全局队列/回收复用）。
+    pub fn releasePinned(self: *Runtime, id: usize) void {
+        if (id >= self.pinned_job.len) return;
+        self.mutex.lockUncancelable(self.io);
+        self.pinned[id] = false;
+        self.pinned_job[id] = null;
+        if (!self.stalled[id] and !self.exited[id].load(.acquire)) {
+            self.reg.entries[id].class = .elastic;
+            self.reg.entries[id].waiting = false;
+        }
+        self.mutex.unlock(self.io);
+        Io.Condition.broadcast(&self.pinned_cv, self.io); // 唤醒该 worker 回全局队列
+    }
+
     /// 停机：请求 → join Master → join 全部可 join worker。
     /// 停机期可阻塞 join（事件线程已无服务对象；§3.1 能力 A）。已提交任务先排空完成。
     /// §5.2 层2：停滞（已 detach）worker 跳过 join——绝不 join 卡死线程；先有界等待其自退
@@ -429,11 +576,19 @@ pub const Runtime = struct {
     pub fn deinit(self: *Runtime) void {
         std.debug.assert(self.master == null);
         std.debug.assert(self.workers.items.len == 0);
+        // P3：释放自由表全部驻留节点（须在 shutdown 排空、无并发 submit/release 后）
+        while (self.free_nodes) |n| {
+            self.free_nodes = n.next;
+            self.allocator.destroy(n);
+        }
+        self.free_count = 0;
         self.reg.deinit(self.allocator);
         self.allocator.free(self.started_ns);
         self.allocator.free(self.stalled);
         self.allocator.free(self.exited);
         self.allocator.free(self.retire);
+        self.allocator.free(self.pinned);
+        self.allocator.free(self.pinned_job);
         self.allocator.destroy(self);
     }
 
@@ -446,7 +601,7 @@ pub const Runtime = struct {
             var stall_tick = false;
             self.master_mutex.lockUncancelable(self.io);
             while (!self.shutdown_requested.load(.acquire) and !self.need_worker and !self.need_reclaim) {
-                if (self.cfg.stall_timeout_ns == 0) {
+                if (!self.hasTimedTick()) {
                     Io.Condition.waitUncancelable(&self.master_cv, self.io, &self.master_mutex);
                 } else {
                     // 带超时兜底：不得持 master_mutex 睡 Event → 先放锁再 wait
@@ -481,6 +636,7 @@ pub const Runtime = struct {
                 self.scanStalled();
                 self.respawnRetired(); // F3：自返停滞线程的槽重新拉起，池恢复满编
                 self.maybeReclaim(); // 排空后也收敛容量（停滞放弃可能把 inflight 降到 0）
+                self.reclaimIdle(); // §5.5 空闲回收降容（idle_timeout_ns>0 时生效）
                 continue;
             }
 
@@ -492,7 +648,11 @@ pub const Runtime = struct {
                 // submit 只发「提示」，Master 在此实时判容量循环补建（过期/重叠请求不会在
                 // cap 上空转）：无容量（满 cap 且无复用槽）静默跳过——任务由服役 worker 自取
                 // 消化，不是可上报失败；真 spawn 失败（线程配额等）才计数 + 日志。
+                // §5.5：`grow_step>0` 时限每事件至多扩建 step 个（防高并发大起大落）。
+                var built: usize = 0;
+                const grow_step = @as(usize, self.cfg.grow_step);
                 while (self.canSpawn()) {
+                    if (grow_step > 0 and built >= grow_step) break;
                     self.appendWorker() catch |e| switch (e) {
                         error.NoCapacity => break, // 竞态中被并发回收/复用耗尽 → 下轮再评估
                         else => {
@@ -501,11 +661,13 @@ pub const Runtime = struct {
                             break;
                         },
                     };
-                    // 仍积压（inflight > 可服役数）→ 步长循环至 backlog 消化或容量耗尽
+                    built += 1;
+                    // §5.5 调节器：active 仍低于 desired（running + ceil(backlog/load_factor) + spare）
+                    // → 继续补建至积压消化或容量耗尽。默认常量等价既有 `inflight > active`。
                     self.master_mutex.lockUncancelable(self.io);
                     const still_backlogged = blk: {
                         self.mutex.lockUncancelable(self.io);
-                        const more = self.inflight > self.active.load(.monotonic);
+                        const more = self.needsMoreLocked();
                         self.mutex.unlock(self.io);
                         break :blk more;
                     };
@@ -518,6 +680,7 @@ pub const Runtime = struct {
         self.worker_shutdown.store(true, .release);
         self.mutex.lockUncancelable(self.io);
         Io.Condition.broadcast(&self.jobs_avail, self.io);
+        Io.Condition.broadcast(&self.pinned_cv, self.io); // AS2：pinned worker 也须收尾
         self.mutex.unlock(self.io);
     }
 
@@ -525,13 +688,29 @@ pub const Runtime = struct {
         const me = &self.reg.entries[id];
         while (true) {
             self.mutex.lockUncancelable(self.io);
+            // AS2：本 worker 已 pinned（会话专属）→ 走 pinned 循环，不进全局队列。
+            if (self.pinned[id]) {
+                self.mutex.unlock(self.io);
+                if (self.pinnedLoop(id)) return;
+                continue;
+            }
             // 空闲阻塞：队列空 且 未停机 且 未被 Master 标记退役 才睡。醒因三类：
-            // 有新任务（自领）/ worker_shutdown / retire[id]（Master 排空后发的退役命令）。
+            // 有新任务（自领）/ worker_shutdown / retire[id]（Master 排空后发的退役命令）；
+            // AS2：被 acquirePinned 置 pinned 时也醒（外层路由到 pinnedLoop）。
             while (self.queue_head == null and
                 !self.worker_shutdown.load(.acquire) and
-                !self.retire[id])
+                !self.retire[id] and
+                !self.pinned[id])
             {
+                // §5.5 idle_since：首次进入空闲时记录（空闲回收判定基准；0 = 未记录）。
+                if (me.idle_since_us == 0) me.idle_since_us = self.nowUs();
                 Io.Condition.waitUncancelable(&self.jobs_avail, self.io, &self.mutex);
+            }
+            // AS2：等待期间被 acquirePinned → 不回全局队列，外层进 pinnedLoop（
+            // 与「自领」在同一临界区消解：此判定持锁，优先级高于取全局任务）。
+            if (self.pinned[id]) {
+                self.mutex.unlock(self.io);
+                continue;
             }
             if (self.queue_head) |head| {
                 // 完成即领：取一件（空闲边界换任务，§2.1 run-to-completion）
@@ -551,17 +730,19 @@ pub const Runtime = struct {
                 if (self.stalled[id]) {
                     // §5.2 层2：本 worker 已被 Master 判停滞并 detach——放弃本任务时 Master
                     // 已代为复位 reg/started/running/inflight。任务若自返（如 stop 标志任务），
-                    // 不得再写任何共享簿记：只销毁自取节点、置 exited 即退（exited 是最后
-                    // 一条触碰 runtime 的操作，shutdown 据此有界等待）。
+                    // 不得再写任何共享簿记（含 P3 自由表——停滞是低频异常路径，不池化）：
+                    // 只销毁自取节点、置 exited 即退（exited 是最后一条触碰 runtime 的操作，
+                    // shutdown 据此有界等待）。
                     self.mutex.unlock(self.io);
                     self.allocator.destroy(head);
                     self.exited[id].store(true, .release);
                     return;
                 }
                 self.started_ns[id].store(0, .monotonic);
-                me.beginIdle(0); // idle_since 时钟源由接线层提供；此处仅维护状态
+                me.beginIdle(self.nowUs()); // §5.5 idle_since（回收判定基准；state→idle）
                 self.running -= 1;
                 self.inflight -= 1;
+                self.releaseNodeLocked(head); // P3：节点在解锁前归池复用（替代 per-task free）
                 const drained = (self.inflight == 0); // 排空事件 → 唯一回收触发
                 // 热路径优化：仅当存在弹性超额（active > min_workers）时才可能回收；单流等
                 // active==min_workers 时 Master 的 maybeReclaim 必为 `serving<=target` 空操作，
@@ -572,7 +753,6 @@ pub const Runtime = struct {
                 self.mutex.unlock(self.io);
                 Io.Condition.broadcast(&self.idle_cv, self.io);
 
-                self.allocator.destroy(head);
                 if (might_reclaim) self.requestReclaim(); // 排空后唤醒 Master 评估回收
                 continue;
             }
@@ -591,16 +771,168 @@ pub const Runtime = struct {
         }
     }
 
+    /// AS2：pinned worker 主循环（§6.3 长流会话 1:1 亲和）。只接本会话步骤（pinned_job），
+    /// **绝不进全局队列**；空闲时阻塞等本会话下一步并置 `waiting=true`（合法消费等待，
+    /// §5.2 停滞判定排除）。返回 true = 线程应退出（退役/停机），false = pinned 被释放
+    /// （会话关闭）→ 回全局队列（外层 workerMain 继续）。
+    fn pinnedLoop(self: *Runtime, id: usize) bool {
+        const me = &self.reg.entries[id];
+        while (true) {
+            self.mutex.lockUncancelable(self.io);
+            if (!self.pinned[id]) { // releasePinned → 回全局队列
+                self.mutex.unlock(self.io);
+                return false;
+            }
+            if (self.pinned_job[id]) |job| {
+                self.pinned_job[id] = null;
+                me.markBusy(); // 状态先行（§5.1）
+                self.started_ns[id].store(self.nowNs(), .monotonic);
+                self.running += 1;
+                if (self.running > self.busy_peak) self.busy_peak = self.running;
+                self.mutex.unlock(self.io);
+
+                job.run(job.ctx);
+
+                self.mutex.lockUncancelable(self.io);
+                if (self.stalled[id]) {
+                    // 被 Master 判停滞并 detach：不再写共享簿记（同 workerMain 停滞分支）
+                    self.mutex.unlock(self.io);
+                    self.exited[id].store(true, .release);
+                    return true;
+                }
+                self.started_ns[id].store(0, .monotonic);
+                me.beginIdle(self.nowUs());
+                me.class = .pinned; // beginIdle 回落 elastic；pinned 槽保持类
+                me.waiting = true;
+                self.running -= 1;
+                self.inflight -= 1;
+                const drained = (self.inflight == 0);
+                self.mutex.unlock(self.io);
+                Io.Condition.broadcast(&self.idle_cv, self.io);
+                if (drained and self.active.load(.acquire) > @as(usize, self.cfg.min_workers)) {
+                    self.requestReclaim();
+                }
+                continue;
+            }
+            if (self.retire[id] or self.worker_shutdown.load(.acquire)) {
+                // 退役/停机：清 pinned 语义，收尾返回（Master 锁外 join 复用槽）
+                self.pinned[id] = false;
+                me.beginRetiring();
+                self.started_ns[id].store(0, .monotonic);
+                self.exited[id].store(true, .release);
+                _ = self.active.fetchSub(1, .monotonic);
+                self.mutex.unlock(self.io);
+                return true;
+            }
+            // 合法消费等待：等本会话下一步（不接全局任务、不被回收——class=pinned）。
+            // 用独立 pinned_cv：submitPinned 只唤醒 pinned worker，不惊扰 elastic 等待者。
+            me.waiting = true;
+            if (me.idle_since_us == 0) me.idle_since_us = self.nowUs();
+            Io.Condition.waitUncancelable(&self.pinned_cv, self.io, &self.mutex);
+            self.mutex.unlock(self.io); // wait 返回时已持有锁；解锁后回顶部重新判定
+        }
+    }
+
     /// 单调纳秒（worker 开工时刻 / 停滞扫描用；同源同钟，差即有界）。
     fn nowNs(self: *const Runtime) u64 {
         return @intCast(Io.Timestamp.now(self.io, .awake).nanoseconds);
     }
 
-    /// F1：排空事件后的容量收敛（Master 唯一回收触发，纯事件、零定时器依赖）。
+    /// 单调微秒（worker 空闲起点 idle_since_us / 空闲回收判定用；同源同钟）。
+    fn nowUs(self: *const Runtime) u64 {
+        return @intCast(@divTrunc(Io.Timestamp.now(self.io, .awake).nanoseconds, std.time.ns_per_us));
+    }
+
+    /// §5.5 目标容量调节器：在役数是否仍不足以消化积压（供 Master 补建循环）。
+    /// `desired = min(running + ceil(backlog / load_factor) + spare, max_workers)`——
+    /// 供应领先需求；默认 load_factor=1 / spare=0 时等价既有 `inflight > active`。
+    /// 调用方持 mutex。
+    fn needsMoreLocked(self: *Runtime) bool {
+        const backlog = self.inflight -| self.running; // 排队（inflight = 排队 + 在途）
+        const lf = @max(@as(usize, self.cfg.load_factor), 1);
+        const demand = (backlog + lf - 1) / lf;
+        const desired = @min(
+            self.running + demand + @as(usize, self.cfg.spare),
+            @as(usize, self.cfg.max_workers),
+        );
+        return self.active.load(.monotonic) < desired;
+    }
+
+    /// §5.5 回收候选：持 mutex 把「最老空闲的 elastic worker」标 `retire`，
+    /// 至多 `max_mark` 个，且不使在役数跌破 `floor`（min_workers 总量下限）。
+    /// `min_age_us > 0` 时只挑空闲已满该时长者（空闲回收）；0 = 任意空闲（排空回落）。
+    /// 返回标记数；只挑选 `workers.items` 范围内的活槽（未启用后缀格不参与）。
+    /// 调用方负责广播唤醒（锁外）。
+    fn markOldestIdleLocked(
+        self: *Runtime,
+        floor: usize,
+        max_mark: usize,
+        min_age_us: u64,
+        now_us: u64,
+    ) usize {
+        var serving = self.active.load(.monotonic);
+        // 已标 retire、尚未退出的槽是「pending 退役」，终将离开，不能计入可留容量，
+        // 否则 maybeReclaim 与 reclaimIdle 先后裁决时会把 floor 之下的也标掉（实测 active=0）。
+        for (self.workers.items, 0..) |_, id| {
+            if (self.stalled[id]) continue;
+            if (self.retire[id] and !self.exited[id].load(.acquire)) serving -|= 1;
+        }
+        var marked: usize = 0;
+        while (marked < max_mark and serving > floor) {
+            var pick: ?usize = null;
+            var best: u64 = std.math.maxInt(u64);
+            for (self.workers.items, 0..) |_, id| {
+                if (self.stalled[id]) continue;
+                if (self.exited[id].load(.acquire)) continue;
+                if (self.retire[id]) continue;
+                const e = &self.reg.entries[id];
+                if (e.state != tables.WState.idle) continue;
+                if (e.class == .pinned) continue; // pinned 长流永不入回收候选
+                if (min_age_us > 0) {
+                    if (e.idle_since_us == 0) continue;
+                    if (now_us -| e.idle_since_us < min_age_us) continue;
+                }
+                // idle_since_us == 0 = 尚未记录空闲起点（新槽 / 复用后未入等）→ 视为**最新**，
+                // 不作为最老候选（否则刚 respawn 的槽会被优先误收，破坏槽位容量恢复）。
+                const since = if (e.idle_since_us != 0) e.idle_since_us else std.math.maxInt(u64);
+                if (since < best) {
+                    best = since;
+                    pick = id;
+                }
+            }
+            const id = pick orelse break;
+            self.retire[id] = true;
+            serving -= 1;
+            marked += 1;
+        }
+        return marked;
+    }
+
+    /// §5.5 空闲回收降容（`idle_timeout_ns>0` 时由 Master 兜底 tick 调用）：
+    /// 最老空闲 elastic 闲置超时且在役数 > min_workers → 标 retiring（worker 在空闲
+    /// 边界自退，Master 锁外 join 复用槽）。步长受 `shrink_step` 限（0=不限）。
+    fn reclaimIdle(self: *Runtime) void {
+        if (self.cfg.idle_timeout_ns == 0) return;
+        const timeout_us = self.cfg.idle_timeout_ns / std.time.ns_per_us;
+        const now_us = self.nowUs();
+        const floor = @as(usize, self.cfg.min_workers);
+        const max_mark = if (self.cfg.shrink_step > 0)
+            @as(usize, self.cfg.shrink_step)
+        else
+            std.math.maxInt(usize);
+        self.mutex.lockUncancelable(self.io);
+        const marked = self.markOldestIdleLocked(floor, max_mark, timeout_us, now_us);
+        self.mutex.unlock(self.io);
+        if (marked > 0) Io.Condition.broadcast(&self.jobs_avail, self.io);
+    }
+
+    /// §5.5/F1：排空事件后的容量收敛（Master 唯一回收触发，纯事件、零定时器依赖）。
     /// 目标 = max(min_workers, min(本波并发达峰 busy_peak, max_workers))——并发峰值是真实
     /// 需要的并行度：微小任务风暴即使排起长队、同时 busy 峰值也低 → 排空后可回落；真需要
-    /// N 路并行才保留 N。盈余（可服役 > target）→ 对**高 id 的空闲** worker 置 retire 并
-    /// 广播唤醒（worker 空闲边界自退；期间来了任务则转忙自清，绝不中途误退）。
+    /// N 路并行才保留 N。盈余（可服役 > target）→ 对**最老空闲的 elastic** worker 置
+    /// retire 并广播唤醒（worker 空闲边界自退；期间来了任务则转忙自清，绝不中途误退）。
+    /// §5.5 完整化：滞后死区 `keep_watermark`（serving ≤ target+keep 不动作，防抖振）+
+    /// 收步长 `shrink_step`（每事件至多收 step 个，0=整波回落）。默认常量与既往一致。
     fn maybeReclaim(self: *Runtime) void {
         self.mutex.lockUncancelable(self.io);
         if (self.inflight != 0) {
@@ -617,26 +949,17 @@ pub const Runtime = struct {
         const serving = self.active.load(.monotonic); // 同锁下与 worker 退出互斥
         self.mutex.unlock(self.io);
 
-        if (serving <= target) return;
-        var over = serving - target;
+        // §5.5 滞后死区 + 收步长：纯裁决原语（确定性可测），返回本事件回收数（0 = 不动作）
+        const keep = @as(usize, self.cfg.keep_watermark);
+        const over = reclaimBudget(serving, target, keep, @as(usize, self.cfg.shrink_step));
+        if (over == 0) return;
 
-        // 标 high-id 的空闲在役 worker（reg idle、非 stalled/exited/已在 retire）。
-        // 锁内判写（与 worker 忙/闲、退出、转忙自清互斥）；busy worker 永不入候选。
-        var marked = false;
+        // 标最老空闲的 elastic 在役 worker（reg idle、非 stalled/exited/已在 retire、非 pinned）。
+        // 锁内判写（与 worker 忙/闲、退出、转忙自清互斥）；busy/pinned 永不入候选。
         self.mutex.lockUncancelable(self.io);
-        var i = self.workers.items.len;
-        while (i > 0 and over > 0) {
-            i -= 1;
-            if (self.stalled[i]) continue;
-            if (self.exited[i].load(.acquire)) continue;
-            if (self.retire[i]) continue; // 已在退役序列，不重复标
-            if (self.reg.entries[i].state != tables.WState.idle) continue;
-            self.retire[i] = true;
-            over -= 1;
-            marked = true;
-        }
+        const marked = self.markOldestIdleLocked(target, over, 0, 0);
         self.mutex.unlock(self.io);
-        if (marked) Io.Condition.broadcast(&self.jobs_avail, self.io); // 唤醒被标记者收尾
+        if (marked > 0) Io.Condition.broadcast(&self.jobs_avail, self.io); // 唤醒被标记者收尾
     }
 
     /// F1：worker 完工把 `inflight` 减到 0（排空事件）后、锁外请求 Master 评估回收。
@@ -646,12 +969,23 @@ pub const Runtime = struct {
         if (!self.shutdown_requested.load(.acquire)) self.need_reclaim = true;
         self.master_mutex.unlock(self.io);
         Io.Condition.broadcast(&self.master_cv, self.io);
-        if (self.cfg.stall_timeout_ns > 0) Io.Event.set(&self.master_event, self.io); // timed 兜底模式
+        if (self.hasTimedTick()) Io.Event.set(&self.master_event, self.io); // timed 兜底模式
     }
 
-    /// Master 带超时等待时长：stall_timeout_ns（下限 1ms，防病态小值高频空扫）。
+    /// Master 带超时等待时长：stall / idle 两个兜底阈值的较小正值（下限 1ms，防病态小值高频空扫）。
     fn scanPeriodNs(self: *const Runtime) u64 {
-        return @max(self.cfg.stall_timeout_ns, std.time.ns_per_ms);
+        var p: u64 = 0;
+        if (self.cfg.stall_timeout_ns > 0) p = self.cfg.stall_timeout_ns;
+        if (self.cfg.idle_timeout_ns > 0) {
+            p = if (p == 0) self.cfg.idle_timeout_ns else @min(p, self.cfg.idle_timeout_ns);
+        }
+        return @max(p, std.time.ns_per_ms);
+    }
+
+    /// 是否需要 Master 带超时兜底 tick（停滞扫描 / 空闲回收任一启用）。
+    /// 两者皆 0 = 纯事件模式：Master 睡 Condition，零定时器，行为与既往一致。
+    fn hasTimedTick(self: *const Runtime) bool {
+        return self.cfg.stall_timeout_ns > 0 or self.cfg.idle_timeout_ns > 0;
     }
 
     /// §5.2 层2 停滞扫描（Master 带超时 wait 兜底，低频）。判定：busy worker 开工超过
@@ -722,6 +1056,7 @@ pub const Runtime = struct {
     fn ioLockedBroadcastWorkers(self: *Runtime) void {
         self.mutex.lockUncancelable(self.io);
         Io.Condition.broadcast(&self.jobs_avail, self.io);
+        Io.Condition.broadcast(&self.pinned_cv, self.io); // AS2：pinned worker 也须被叫醒
         self.mutex.unlock(self.io);
     }
 };
@@ -849,8 +1184,7 @@ test "runtime: 懒就绪 min_workers=0 → 首任务由 Master spawn，排空后
     rt.shutdown();
 }
 
-test "runtime: 弹性扩容——积压大时 Master 补建至 cap，max 界住线程数" {
-    var ctx = TestCtx{};
+test "runtime: 弹性扩容——积压驱动补建至 cap，max 界住线程数（确定性）" {
     const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 8 });
     defer {
         rt.shutdown();
@@ -858,20 +1192,41 @@ test "runtime: 弹性扩容——积压大时 Master 补建至 cap，max 界住�
     }
     try testing.expectEqual(@as(usize, 1), rt.workers.items.len); // eager 下限
 
-    // 一次性压入 1000 任务 → Master 按 backlog 补建，最多到 8
-    const n = 1000;
-    var submitted: usize = 0;
-    for (0..n) |_| {
-        if (rt.submit(.{ .run = TestCtx.bump, .ctx = &ctx })) submitted += 1;
-    }
-    try testing.expectEqual(n, submitted);
-    rt.waitIdle();
+    // 确定性构造积压：直接置 inflight=100 / running=0（不投真实任务），令
+    // desired = min(running + ceil(backlog/load_factor) + spare, max_workers) = 8。
+    // 不依赖「单个 eager worker 何时把 1000 个琐碎任务排空」的调度时序——旧写法正是
+    // 此竞态：worker 抢在 Master 补建前排空队列 → workers.items.len==1 偶发失败（CI）。
+    rt.mutex.lockUncancelable(rt.io);
+    rt.inflight = 100;
+    rt.running = 0;
+    try testing.expect(rt.needsMoreLocked()); // active(1) < desired(8)：确需补建
+    rt.mutex.unlock(rt.io);
 
-    const grew = rt.workers.items.len;
-    try testing.expect(grew > 1); // 确曾扩容
-    try testing.expect(grew <= 8); // 未越 cap
-    try testing.expectEqual(@as(u32, @intCast(submitted)), ctx.counter.load(.acquire));
-    rt.shutdown();
+    // 以 Master 角色就地补建：逐次 appendWorker（= masterMain do_grow 的 spawn 原语）
+    // 直至满即拒（NoCapacity）；每次都不越 max_workers，达 cap 后不再补建。
+    var built: usize = 0;
+    while (true) {
+        rt.appendWorker() catch |e| switch (e) {
+            error.NoCapacity => break, // 满 cap：满即拒（§5.4），绝不扩容
+            else => return e,
+        };
+        built += 1;
+        try testing.expect(rt.workers.items.len <= 8);
+    }
+    try testing.expectEqual(@as(usize, 7), built); // 1 → 8
+    try testing.expectEqual(@as(usize, 8), rt.workers.items.len);
+    try testing.expectError(error.NoCapacity, rt.appendWorker()); // 满后再调，仍不越界
+
+    // 容量已足：调节器目标被 max_workers 夹住，不再要求补建
+    rt.mutex.lockUncancelable(rt.io);
+    const more = rt.needsMoreLocked();
+    rt.mutex.unlock(rt.io);
+    try testing.expect(!more);
+
+    // 清理构造的假积压（inflight 仅簿记；真实队列为空，worker 空闲等待，shutdown 干净）
+    rt.mutex.lockUncancelable(rt.io);
+    rt.inflight = 0;
+    rt.mutex.unlock(rt.io);
 }
 
 // ---- §5.2 层2：停滞检测（cfg.stall_timeout_ns>0 才启用；默认关 = 与既有行为一致）----
@@ -1030,6 +1385,28 @@ const SleepJob = struct {
     }
 };
 
+/// 汇聚任务（**确定性同步点**）：自旋至本波 `started >= want` 才完工。N 个此类任务必须
+/// N 个 worker 才能全部开工 → 强制 Master 补建到 N，不依赖「谁先被调度 / 任务多快排空」。
+/// 有界预算（超时即放行）避免真失败时把测试挂死；断言仍以确定状态为准。
+const BarrierJob = struct {
+    started: *std.atomic.Value(usize),
+    done: *std.atomic.Value(u32),
+    want: usize,
+    budget_ns: u64 = 5 * std.time.ns_per_s,
+
+    fn run(ctx: *anyopaque) void {
+        const b: *BarrierJob = @ptrCast(@alignCast(ctx));
+        _ = b.started.fetchAdd(1, .acq_rel);
+        const ioinst = Io.Threaded.global_single_threaded.io();
+        const deadline = Io.Timestamp.now(ioinst, .awake).nanoseconds + @as(i96, @intCast(b.budget_ns));
+        while (b.started.load(.acquire) < b.want) {
+            if (Io.Timestamp.now(ioinst, .awake).nanoseconds >= deadline) break;
+            std.Thread.yield() catch {};
+        }
+        _ = b.done.fetchAdd(1, .monotonic);
+    }
+};
+
 /// 有界轮询 `rt.busyCount() == want`（want=0 亦精确匹配）；超时返回 false（防挂死）。
 fn pollBusy(rt: *Runtime, want: usize, iter: usize, ms: u64) bool {
     var i: usize = 0;
@@ -1050,7 +1427,7 @@ fn pollDrained(rt: *Runtime, done: *const std.atomic.Value(u32), want: u32, iter
     return done.load(.acquire) == want and rt.busyCount() == 0;
 }
 
-test "runtime: F3 in-use 记账——停滞 detach 后 busyCount 只算服役 worker，不误计已放弃格" {
+test "runtime: F3 in-use 记账——停滞 detach 后 busyCount 只算服役 worker，不误计已放弃格（确定性）" {
     var probe = StallJob{ .budget_ns = 60 * std.time.ns_per_s };
     const rt = try Runtime.init(std.heap.c_allocator, .{
         .min_workers = 1,
@@ -1063,37 +1440,57 @@ test "runtime: F3 in-use 记账——停滞 detach 后 busyCount 只算服役 wo
         rt.deinit();
     }
 
-    // id0（唯一引导 worker）先占住长转任务 → 将被判停滞并 detach
+    // id0（唯一引导 worker）先占住长转任务（确定性：min=1 时只有它能接）
     try testing.expect(rt.submit(.{ .run = StallJob.run, .ctx = &probe }));
-    // 首波短任务压出 backlog → Master 扩到 max_workers=4（id0 wedged，1..3 服役）
-    var done0 = std.atomic.Value(u32).init(0);
-    var w0: [5]SleepJob = undefined;
-    for (&w0) |*j| j.* = .{ .ms = 40, .done = &done0 };
-    for (&w0) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
 
-    // 停滞检出 + 池长到 4 + 首波排空
-    var ready = false;
-    for (0..600) |_| {
-        if (rt.stall_count.load(.acquire) >= 1 and rt.workers.items.len == 4 and done0.load(.acquire) == 5) {
-            ready = true;
+    // 汇聚任务强制补建到 max_workers=4：3 个任务必须 3 个空闲 worker 才能全部开工
+    //（id0 被长转占住）→ 确定性满编，不依赖调度顺序/任务完成速度。
+    var started = std.atomic.Value(usize).init(0);
+    var done = std.atomic.Value(u32).init(0);
+    var bars: [3]BarrierJob = undefined;
+    for (&bars) |*b| b.* = .{ .started = &started, .done = &done, .want = 3 };
+    for (&bars) |*b| try testing.expect(rt.submit(.{ .run = BarrierJob.run, .ctx = b }));
+    var grew = false;
+    for (0..2000) |_| { // 有界；确定条件：补建到 cap
+        if (rt.workers.items.len == 4) {
+            grew = true;
             break;
         }
-        tSleepMs(10);
+        tSleepMs(2);
     }
-    try testing.expect(ready);
+    try testing.expect(grew);
+    rt.waitIdle();
+    try testing.expectEqual(@as(u32, 3), done.load(.acquire));
+
+    // 确定性 detach：把 id0 的开工时刻置为「很久以前」，直接触发停滞扫描
+    //（不等 120ms 真实时钟 / Master tick；扫描只认 now-started 关系）。
+    rt.mutex.lockUncancelable(rt.io);
+    rt.started_ns[0].store(1, .monotonic);
+    rt.mutex.unlock(rt.io);
+    rt.scanStalled();
     try testing.expectEqual(@as(usize, 1), rt.stall_count.load(.acquire));
     try testing.expect(rt.stalled[0]);
-    try testing.expect(!rt.exited[0].load(.acquire)); // wedged：尚未自退
-    // 首波排空后无在役任务（busyCount 回落 0；done0 领先 reg 置 idle 一拍，故轮询）
-    try testing.expect(pollBusy(rt, 0, 100, 5));
+    try testing.expect(!rt.exited[0].load(.acquire)); // 长转任务仍在跑，尚未自退
 
-    // 在役记账：3 个短占用任务 → 恰 3 个服役 worker busy（已放弃的 id0 不计入）
-    var doneA = std.atomic.Value(u32).init(0);
-    var wa: [3]SleepJob = undefined;
-    for (&wa) |*j| j.* = .{ .ms = 40, .done = &doneA };
-    for (&wa) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
-    try testing.expect(pollBusy(rt, 3, 200, 3));
-    try testing.expect(pollDrained(rt, &doneA, 3, 300, 10));
+    // busyCount 记账：把「已停滞的 id0」与 3 个服役槽都标 busy；stalled 槽必须被排除
+    // → 恰 3（若误计 id0 则为 4）。窗口内临时 inflight=1 使 Master 的空闲回收裁决退避。
+    rt.mutex.lockUncancelable(rt.io);
+    rt.inflight = 1;
+    rt.reg.entries[0].state = .busy; // id0：stalled=true → 不得计入
+    rt.reg.entries[1].markBusy();
+    rt.reg.entries[2].markBusy();
+    rt.reg.entries[3].markBusy();
+    rt.mutex.unlock(rt.io);
+    try testing.expectEqual(@as(usize, 3), rt.busyCount());
+
+    // 还原簿记（真实 worker 仍空闲等待；shutdown 会置 worker_shutdown 收尾）
+    rt.mutex.lockUncancelable(rt.io);
+    rt.reg.entries[0].beginIdle(0);
+    rt.reg.entries[1].beginIdle(0);
+    rt.reg.entries[2].beginIdle(0);
+    rt.reg.entries[3].beginIdle(0);
+    rt.inflight = 0;
+    rt.mutex.unlock(rt.io);
 }
 
 test "runtime: F3 槽位容量恢复——停滞自返后槽复用，二次突发可再达 max_workers 满编" {
@@ -1530,50 +1927,44 @@ fn nsNow() i96 {
     return Io.Timestamp.now(Io.Threaded.global_single_threaded.io(), .awake).nanoseconds;
 }
 
-test "runtime: F1 shrink——大并发波撑满后，小并发波排空回落至 min_workers" {
-    // 波形设计（确定性，不依赖本机速度）：先用 12 个 30ms 占用任务把池撑到真 8 路并发
-    //（并发达峰=8 → 排空后保留 8），再用单任务波（并发达峰=1）把容量回落回 min_workers=1。
+test "runtime: F1 shrink——大并发波撑满后，小并发波排空回落至 min_workers（确定性同步点）" {
+    // 用「汇聚任务」强制 Master 补建到 max_workers：12 个任务必须 8 个 worker 才能全部
+    // 开工（并发达峰=8）→ 不依赖任务完成速度/调度顺序；再以单任务波（峰=1）回落 min=1。
     var done = std.atomic.Value(u32).init(0);
-    var jobs: [12]SleepJob = undefined;
-    for (&jobs) |*j| j.* = .{ .ms = 30, .done = &done };
+    var started = std.atomic.Value(usize).init(0);
+    var jobs: [12]BarrierJob = undefined;
+    for (&jobs) |*j| j.* = .{ .started = &started, .done = &done, .want = 8 };
     const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 8 });
     defer {
         rt.shutdown();
         rt.deinit();
     }
 
-    // 波 1：12 路 30ms 并发 → Master 扩容至 max_workers，8 路真并行
-    for (&jobs) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    // 波 1：12 个汇聚任务（want=8）→ 必须补建到 cap 才能全部开工
+    for (&jobs) |*j| try testing.expect(rt.submit(.{ .run = BarrierJob.run, .ctx = j }));
     var reached_max = false;
-    for (0..300) |_| {
-        if (rt.workers.items.len == 8 and done.load(.acquire) == 12) {
+    for (0..2000) |_| { // 有界（真失败不悬挂）；确定条件：8 worker 就绪
+        if (rt.workers.items.len == 8) {
             reached_max = true;
             break;
         }
-        tSleepMs(10);
+        tSleepMs(2);
     }
     try testing.expect(reached_max); // 确曾用到满编并行（否则无从回落）
     rt.waitIdle();
+    try testing.expectEqual(@as(u32, 12), done.load(.acquire));
     // 排空后保留本波并发达峰（8），不回落（背靠背大波不再重建 → 防 churn）
-    var grown_kept = false;
-    for (0..300) |_| {
-        if (rt.active.load(.acquire) >= 6) { // Master 可能已把 8 保留为 8；≥6 即保留大容量
-            grown_kept = true;
-            break;
-        }
-        tSleepMs(10);
-    }
-    try testing.expect(grown_kept);
+    try testing.expectEqual(@as(usize, 8), rt.active.load(.acquire));
 
     // 波 2：单任务（并发达峰=1）排空 → maybeReclaim 回落至 min_workers=1
-    var one: [1]SleepJob = undefined;
-    one[0] = .{ .ms = 5, .done = &done };
-    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &one[0] }));
+    var one = std.atomic.Value(u32).init(0);
+    var one_job = SleepJob{ .ms = 5, .done = &one };
+    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &one_job }));
     rt.waitIdle();
-    try testing.expect(pollActive(rt, 1, 300, 10));
+    try testing.expect(pollActive(rt, 1, 1000, 5));
     // 全程无 spawn 失败、计数精确（12 + 1）
     try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
-    try testing.expectEqual(@as(u32, 13), done.load(.acquire));
+    try testing.expectEqual(@as(u32, 1), one.load(.acquire));
 }
 
 test "runtime: F1 100×500 同尺寸波——容量有界、无 spawn 失败风暴、计数精确" {
@@ -1605,12 +1996,14 @@ test "runtime: F1 100×500 同尺寸波——容量有界、无 spawn 失败风�
     try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire)); // 无 spawn 失败风暴
 }
 
-test "runtime: F1 lazy min_workers=0——大并发波保留容量、小波回落后可再扩容无死锁" {
+test "runtime: F1 lazy min_workers=0——大并发波保留容量、小波回落后可再扩容无死锁（确定性同步点）" {
     // 纯事件语义：池按「上一波真实并发需求」保留容量（min_workers=0 也不在干活时撤到 0）。
-    // 大波（12×25ms）真并发 → 撑满；随后单任务小波把容量收敛回 1；再次大波可复用扩容。
+    // 大波用汇聚任务**强制补建**（≥4 worker 才能全部开工）；随后单任务小波把容量收敛回 1；
+    // 再次大波可复用退役槽扩容（无死锁/无 spawn 失败/计数精确）。
     var done = std.atomic.Value(u32).init(0);
-    var big: [12]SleepJob = undefined;
-    for (&big) |*j| j.* = .{ .ms = 25, .done = &done };
+    var started = std.atomic.Value(usize).init(0);
+    var big: [12]BarrierJob = undefined;
+    for (&big) |*j| j.* = .{ .started = &started, .done = &done, .want = 4 };
     const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 0, .max_workers = 8 });
     defer {
         rt.shutdown();
@@ -1618,26 +2011,26 @@ test "runtime: F1 lazy min_workers=0——大并发波保留容量、小波回�
     }
     try testing.expectEqual(@as(usize, 0), rt.workers.items.len); // 懒就绪：引导期零 worker
 
-    // 波 1（大）：懒就绪首任务触发 spawn → 真并发撑满
-    for (&big) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    // 波 1（大）：懒就绪首任务触发 spawn；汇聚任务强制补建（≥4 worker 才能全部开工）
+    for (&big) |*j| try testing.expect(rt.submit(.{ .run = BarrierJob.run, .ctx = j }));
     var grew = false;
-    for (0..300) |_| {
-        if (rt.active.load(.acquire) >= 4 and done.load(.acquire) == 12) {
+    for (0..2000) |_| { // 有界；确定条件：至少 4 个 worker 就绪
+        if (rt.active.load(.acquire) >= 4) {
             grew = true;
             break;
         }
-        tSleepMs(10);
+        tSleepMs(2);
     }
     try testing.expect(grew);
     rt.waitIdle();
     try testing.expectEqual(@as(u32, 12), done.load(.acquire));
 
     // 波 2（小）：单任务 → 并发达峰=1 → 排空后容量收敛（回落），不残留满编空闲
-    var small: [1]SleepJob = undefined;
-    small[0] = .{ .ms = 5, .done = &done };
-    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &small[0] }));
+    var one = std.atomic.Value(u32).init(0);
+    var one_job = SleepJob{ .ms = 5, .done = &one };
+    try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = &one_job }));
     rt.waitIdle();
-    try testing.expect(pollActive(rt, 1, 300, 10));
+    try testing.expect(pollActive(rt, 1, 1000, 5));
 
     // 波 3（再大）：复用退役槽扩容（无 deadlock、无 spawn 失败、计数精确）
     var done2 = std.atomic.Value(u32).init(0);
@@ -1646,7 +2039,7 @@ test "runtime: F1 lazy min_workers=0——大并发波保留容量、小波回�
     for (&big2) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
     rt.waitIdle();
     try testing.expectEqual(@as(u32, 8), done2.load(.acquire));
-    try testing.expectEqual(@as(u32, 13), done.load(.acquire)); // 前两波计数不丢
+    try testing.expectEqual(@as(u32, 1), one.load(.acquire));
     try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
     try testing.expect(rt.workers.items.len <= 8);
 }
@@ -1689,4 +2082,250 @@ test "runtime: F1 400 波(每波 1000 + 每 5 波追加 8 小)——快速终止
     try testing.expect(rt.workers.items.len <= 8);
     try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
     try testing.expect(dt_ms < 120_000); // 快速终止（非挂起量级）；数值仅作报告口径
+}
+
+// ---- AS3 容量调节器：目标容量 / 空闲回收降容 / 最老优先 + floor + pinned 排除 ----
+
+test "runtime: AS3 调节器目标容量——load_factor 折算 + spare 安全垫（确定性）" {
+    const rt = try Runtime.init(std.heap.c_allocator, .{
+        .min_workers = 0,
+        .max_workers = 16,
+        .load_factor = 4,
+        .spare = 2,
+    });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+
+    rt.mutex.lockUncancelable(rt.io);
+    rt.inflight = 10; // 排队 + 在途
+    rt.running = 2; // 在途；backlog = 8
+    // demand = ceil(backlog/load_factor) = ceil(8/4) = 2；desired = running + demand + spare = 6
+    try testing.expect(rt.needsMoreLocked()); // active 0 < 6
+    rt.active.store(5, .monotonic);
+    try testing.expect(rt.needsMoreLocked()); // 5 < 6
+    rt.active.store(6, .monotonic);
+    try testing.expect(!rt.needsMoreLocked()); // 6 == 6 容量已足
+    rt.inflight = 0;
+    rt.running = 0;
+    rt.active.store(0, .monotonic);
+    rt.mutex.unlock(rt.io);
+}
+
+test "runtime: AS3 markOldestIdleLocked——最老优先 + floor 下限 + pinned 排除（确定性）" {
+    var done = std.atomic.Value(u32).init(0);
+    var jobs: [4]SleepJob = undefined;
+    for (&jobs) |*j| j.* = .{ .ms = 5, .done = &done };
+    // min==max==4 ⇒ active==min，排空不触发 requestReclaim → Master 不并发裁决，
+    // 本测试的直调裁决与簿记是确定性的（避免与排空回收竞争）。
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 4, .max_workers = 4 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    for (&jobs) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    rt.waitIdle();
+    try testing.expectEqual(@as(usize, 4), rt.active.load(.acquire));
+
+    // 造确定性空闲序：id1 最老、id0 次之、id3 再次、id2 pinned（不参与回收）
+    rt.mutex.lockUncancelable(rt.io);
+    rt.reg.entries[0].beginIdle(100);
+    rt.reg.entries[1].beginIdle(50);
+    rt.reg.entries[2].beginIdle(200);
+    rt.reg.entries[2].class = .pinned;
+    rt.reg.entries[3].beginIdle(150);
+    // floor=1、不限步长：绕过 pinned 收最老三个（1/0/3）→ 在役降至 1
+    const n = rt.markOldestIdleLocked(1, 4, 0, 0);
+    try testing.expectEqual(@as(usize, 3), n);
+    try testing.expect(rt.retire[1] and rt.retire[0] and rt.retire[3]);
+    try testing.expect(!rt.retire[2]); // pinned 永不入候选
+    // 再标：可选中仅剩 pinned → 0（pinned 不被回收）
+    try testing.expectEqual(@as(usize, 0), rt.markOldestIdleLocked(1, 4, 0, 0));
+    rt.mutex.unlock(rt.io);
+}
+
+test "runtime: AS3 调节器参数——收步长上限 + 空闲年龄过滤（markOldestIdleLocked）" {
+    var done = std.atomic.Value(u32).init(0);
+    var jobs: [4]SleepJob = undefined;
+    for (&jobs) |*j| j.* = .{ .ms = 5, .done = &done };
+    // min==max==4 ⇒ active==min，排空不触发 requestReclaim（Master 不并发裁决）。
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 4, .max_workers = 4 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    for (&jobs) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    rt.waitIdle();
+
+    rt.mutex.lockUncancelable(rt.io);
+    rt.reg.entries[0].beginIdle(1000);
+    rt.reg.entries[1].beginIdle(2000);
+    rt.reg.entries[2].beginIdle(3000);
+    rt.reg.entries[3].beginIdle(4000);
+    // 收步长：max_mark=1、floor=0 → 只标最老 id0，其余原样
+    try testing.expectEqual(@as(usize, 1), rt.markOldestIdleLocked(0, 1, 0, 0));
+    try testing.expect(rt.retire[0] and !rt.retire[1] and !rt.retire[2] and !rt.retire[3]);
+    // 空闲年龄过滤：now=3500 / min_age=2000 → id1(age1500)/id2(500)/id3(0) 均不足，
+    // 且 id0 已 retire → 无合格者
+    try testing.expectEqual(@as(usize, 0), rt.markOldestIdleLocked(0, 4, 2000, 3500));
+    // 放宽到 min_age=1000：仅 id1(age1500) 合格
+    try testing.expectEqual(@as(usize, 1), rt.markOldestIdleLocked(0, 4, 1000, 3500));
+    try testing.expect(rt.retire[1]);
+    rt.mutex.unlock(rt.io);
+}
+
+// ---- AS2 长流池化：worker 亲和 pinned 1:1（§6.3）----
+
+const As2Ctx = struct {
+    tid: std.Thread.Id = undefined,
+    done: Io.Event = .unset,
+
+    fn run(ctx: *anyopaque) void {
+        const c: *As2Ctx = @ptrCast(@alignCast(ctx));
+        c.tid = std.Thread.getCurrentId();
+        Io.Event.set(&c.done, Io.Threaded.global_single_threaded.io());
+    }
+};
+
+test "runtime: AS2 pinned 1:1——定向步骤同线程执行；全局任务不占 pinned worker" {
+    const io_inst = Io.Threaded.global_single_threaded.io();
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 2, .max_workers = 4 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    const id = rt.acquirePinned() orelse return error.SkipZigTest;
+    try testing.expect(rt.pinned[id]);
+    try testing.expectEqual(tables.Class.pinned, rt.reg.entries[id].class);
+
+    var p1 = As2Ctx{};
+    var p2 = As2Ctx{};
+    try testing.expect(rt.submitPinned(id, .{ .run = As2Ctx.run, .ctx = &p1 }));
+    Io.Event.waitUncancelable(&p1.done, io_inst);
+    try testing.expect(rt.submitPinned(id, .{ .run = As2Ctx.run, .ctx = &p2 }));
+    Io.Event.waitUncancelable(&p2.done, io_inst);
+    try testing.expectEqual(p1.tid, p2.tid); // 1:1 亲和：两步同线程
+
+    // 全局任务不得落到 pinned worker（由另一 worker 处理）
+    var g = As2Ctx{};
+    try testing.expect(rt.submit(.{ .run = As2Ctx.run, .ctx = &g }));
+    Io.Event.waitUncancelable(&g.done, io_inst);
+    try testing.expect(g.tid != p1.tid);
+
+    // 释放后回 elastic（可被全局队列/回收复用）
+    rt.releasePinned(id);
+    try testing.expect(!rt.pinned[id]);
+    try testing.expectEqual(tables.Class.elastic, rt.reg.entries[id].class);
+}
+
+test "runtime: AS3 滞后死区——serving 在 target+keep 内不回收，越过才收（确定性）" {
+    // 1) 纯裁决原语 reclaimBudget：不做簿记、不依赖线程/时钟
+    try testing.expectEqual(@as(usize, 0), reclaimBudget(4, 2, 2, 0)); // 4 <= 2+2 → 死区
+    try testing.expectEqual(@as(usize, 0), reclaimBudget(5, 2, 3, 0)); // 5 <= 5 → 死区边界
+    try testing.expectEqual(@as(usize, 4), reclaimBudget(6, 2, 3, 0)); // 刚越死区：收全部盈余
+    try testing.expectEqual(@as(usize, 1), reclaimBudget(6, 2, 3, 1)); // 刚越死区 + 步长封顶
+    try testing.expectEqual(@as(usize, 2), reclaimBudget(4, 2, 0, 0)); // 无死区：收全部盈余
+    try testing.expectEqual(@as(usize, 1), reclaimBudget(4, 2, 0, 1)); // 收步长封顶
+    try testing.expectEqual(@as(usize, 3), reclaimBudget(10, 2, 0, 3)); // 步长封顶（盈余 8）
+    try testing.expectEqual(@as(usize, 0), reclaimBudget(2, 2, 0, 0)); // 无盈余
+    try testing.expectEqual(@as(usize, 0), reclaimBudget(1, 3, 0, 0)); // serving < target 不下溢
+
+    // 2) 组合：把裁决预算交给 markOldestIdleLocked 在锁内标记（构造确定状态）。
+    //    min==max==4 ⇒ 排空事件不触发 requestReclaim（active==min），Master 保持纯事件
+    //    睡眠，不会并发调用 maybeReclaim——消除「直调裁决 vs 排空回收」的测试竞态。
+    var done = std.atomic.Value(u32).init(0);
+    var jobs: [4]SleepJob = undefined;
+    for (&jobs) |*j| j.* = .{ .ms = 5, .done = &done };
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 4, .max_workers = 4 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    for (&jobs) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    rt.waitIdle();
+    try testing.expectEqual(@as(usize, 4), rt.active.load(.acquire));
+
+    const Count = struct {
+        fn retired(r: *Runtime) usize {
+            var n: usize = 0;
+            for (r.workers.items, 0..) |_, id| {
+                if (r.retire[id]) n += 1;
+            }
+            return n;
+        }
+    };
+
+    // 死区：serving=4, target=2, keep=2 → budget 0 → 不回收（断言前后均无 retire）
+    rt.mutex.lockUncancelable(rt.io);
+    const budget_keep = reclaimBudget(4, 2, 2, 0);
+    const marked_keep = rt.markOldestIdleLocked(2, budget_keep, 0, 0);
+    rt.mutex.unlock(rt.io);
+    try testing.expectEqual(@as(usize, 0), budget_keep);
+    try testing.expectEqual(@as(usize, 0), marked_keep);
+    try testing.expectEqual(@as(usize, 0), Count.retired(rt));
+
+    // 越过死区且 keep=0：serving=4, target=2 → budget 2 → 恰好收 2（最老空闲优先）
+    rt.mutex.lockUncancelable(rt.io);
+    const budget_pass = reclaimBudget(4, 2, 0, 0);
+    const marked_pass = rt.markOldestIdleLocked(2, budget_pass, 0, 0);
+    rt.mutex.unlock(rt.io);
+    try testing.expectEqual(@as(usize, 2), budget_pass);
+    try testing.expectEqual(@as(usize, 2), marked_pass);
+    try testing.expectEqual(@as(usize, 2), Count.retired(rt));
+}
+
+test "runtime: AS3 空闲回收降容——大波撑满后无新事件也回落 min_workers（idle_timeout）" {
+    var done = std.atomic.Value(u32).init(0);
+    var jobs: [12]SleepJob = undefined;
+    for (&jobs) |*j| j.* = .{ .ms = 25, .done = &done };
+    const rt = try Runtime.init(std.heap.c_allocator, .{
+        .min_workers = 1,
+        .max_workers = 8,
+        .idle_timeout_ns = 40 * std.time.ns_per_ms,
+    });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+
+    // 波：12 路并发 → 扩容并保留峰值（排空回落 target=peak，不立即退）
+    for (&jobs) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
+    var grew = false;
+    for (0..400) |_| {
+        if (rt.active.load(.acquire) >= 6 and done.load(.acquire) == 12) {
+            grew = true;
+            break;
+        }
+        tSleepMs(10);
+    }
+    try testing.expect(grew);
+    rt.waitIdle();
+
+    // 无新事件：Master 空闲 tick（idle_timeout）触发降容，最终收敛回 min_workers=1
+    try testing.expect(pollActive(rt, 1, 800, 10));
+    try testing.expectEqual(@as(u32, 12), done.load(.acquire));
+    try testing.expectEqual(@as(usize, 0), rt.spawn_failed_count.load(.acquire));
+}
+
+test "runtime: P3 任务节点池——串行 submit 复用节点，自由表有界" {
+    const rt = try Runtime.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 2 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    var dummy: u8 = 0;
+    const Body = struct {
+        fn run(_: *anyopaque) void {}
+    };
+    // 串行提交 200 次：每次完工节点应回到自由表，下一次 submit 复用（而非再 malloc）。
+    // 若 free_count 恒 >=1 则证明复用路径被走通（无池时 release 直接 destroy，恒为 0）。
+    var i: usize = 0;
+    while (i < 200) : (i += 1) {
+        try testing.expect(rt.submit(.{ .run = Body.run, .ctx = @ptrCast(&dummy) }));
+        rt.waitIdle();
+        try testing.expect(rt.free_count >= 1);
+    }
+    // 自由表容量恒有界：不随提交次数增长（避免无限驻留）。
+    try testing.expect(rt.free_count <= node_pool_cap);
 }

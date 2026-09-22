@@ -124,7 +124,8 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 ### 4.1 现状（见 `format-support-matrix.md`）
 
 - **L1 内核自研解码**：常见格式已全覆盖；MP4 容器 codec 面扩展、DST/TAK/ALS 已接入；
-  残余仅小众圈（Musepack **SV7**、Shorten、DTS-LBR 多声道真实样本、wmavoice 浮点对拍等）；
+  Musepack **SV7** 与 **Shorten（.shn）** 已于较早 checkpoint 接入（2026-09-22 复核：与 FFmpeg
+  逐位一致、`era_` 命名合规），残余仅小众圈（DTS-LBR 多声道真实样本、wmavoice 浮点对拍等）；
 - **L2 生产引擎接管率**：以 FFmpeg 兜底为主，Zig 已接管格式优先；接管门控（§8.4.2 #2）待验收；
 - **L3 曲库白名单**：`.mp2/.mp1/.wavpack 家族/.tta/.tta...` 等部分 TagLib 不支持或未入白名单，
   存在「能播不能收藏」的隐性缺口；「内核 Info 兜底」为**产品决策项**（未实施）。
@@ -133,8 +134,8 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 | # | 候选 | 归属 | 说明 |
 |---|---|---|---|
-| F1 | **Musepack SV7** | L1 | SV8 已完成；SV7 参考 `mpc7.c` |
-| F2 | **Shorten（.shn）** | L1 | 老无损，参考 `shorten.c` |
+| F1 | **Musepack SV7**（已完成） | L1 | ✅ 已接入（2026-09-22 复核与 FFmpeg 逐位一致；命名已 `era_` 合规；参考 `mpc7.c`） |
+| F2 | **Shorten（.shn）**（已完成） | L1 | ✅ 已接入（同上；参考 `shorten.c`） |
 | F3 | **MP2 / MP1 落库** | L3 | 内核已可解，补 scanner 白名单即可（非内核工作） |
 | F4 | **内核 Info 兜底** | L3/产品 | tta/spx/shn/dts/ac3/… 无 TagLib 元数据者，经内核 probe→Info 取时长/位深入库 |
 | F5 | **接管门控 + 接管率监控** | L2 | 静态位图 + `backend` 字段监控（`audio-kernel-zig.md` §8.4.2） |
@@ -225,17 +226,28 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 ---
 
-## 7. 优先级与执行顺序（草稿，下一步再定）
+## 7. 优先级与执行顺序（2026-09-22 执行记录）
 
-建议默认顺序（可在下一步调整）：
+建议默认顺序 + 本轮落地情况（分支 `feat/kernel-expansion`，一个 PR）：
 
-1. **方向② 应用侧接线 + Range seek 完整化**（打通非 Subsonic 在线源，收益直接可见）；
-2. **方向① 地基（DSP 下沉 Zig）** → 再叠加 D2 次声/低频管理、D1 参数化 EQ；
-3. **方向④ P1 公共地板 + P3 内存池**（与方向①/②并行、互不阻塞）；
-4. **方向⑤ AS1–AS3 接线收尾 + 调节器**（播放真正走池、批量可回落）；
-5. **方向③ F3/F4 白名单快赢 + F1/F2 长尾**（独立子项，可随时插入）。
+1. **方向② 应用侧接线 + Range seek 完整化** —— ✅ **N1–N3/N6 已落**
+   （`Reader.seek` 重写、cb 流 ogg 时长、宿主 AVIO 中断/超时/有界重连、传输错误改判
+   `ZK_IO_ERROR`、`test_native_callback_seek`；N1 做成 `ARCHOERA_STREAM_DIRECT` 灰度开关，
+   **默认未改**）。N4 仅设计说明、N5（去 FFmpeg 传输栈）未做。
+2. **方向① 地基（DSP 下沉 Zig）** —— ✅ **地基已落**（`kernel/dsp/`：EQ/限幅/响度，
+   与 C 参考**逐位一致**，17 个 `zk_dsp_*`，C 壳可路由且保留回退）；`fft/resampler/tempo`
+   仅接口占位。**D1/D2 及 D3–D8 未做**（D3–D8 属待定项）。
+3. **方向④ P1 公共地板 + P3 内存池** —— ✅ **P1/P3 已落**（wav 指令数 **−75.4%**、mp3 −33.4%；
+   128 路 malloc/free **−78.9%**；精度中性）。**P2/B 档无授权未做**；P4 采用「每次改动复测」纪律。
+4. **方向⑤ AS1–AS3 接线收尾 + 调节器** —— ✅ **AS1–AS3 已落**（结构化 `zk_submit`、
+   容量调节器完整化、长流 pinned 亲和门控；headless `sync==stream==decode_once` 逐位一致）。
+   **AS4–AS7 未做**；AS2 的 ring 直推宿主 / 替换 C 壳「1 会话 1 引擎线程」未做。
+5. **方向③ F3/F4 白名单快赢 + F1/F2 长尾** —— ✅ **F1/F2 复核为「早已接入」并做命名合规化**
+   （`era_` 前缀）；✅ **F3 已落**（补 `mp1` 白名单）；**F4/F5/F6 未做**。
 
-> 待定项：D3–D8 功能取舍、B 档是否授权、F4 是否把影视音轨当曲目、方向⑤ 的 AS4–AS7 排期。
+> 仍待定/未做：D3–D8 功能取舍、方向① D1/D2、B 档是否授权、F4 是否把影视音轨当曲目、
+> 方向⑤ AS4–AS7 与 AS2 收尾、N4/N5、按格式实例 ctx arena。
+> 方向④ 实测数据回填见 `decode-optimization.md` §9。
 
 ---
 

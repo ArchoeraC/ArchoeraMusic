@@ -52,6 +52,13 @@ pub const Reader = struct {
     /// 已知总大小（未知 = 0）
     size_hint: u64 = 0,
 
+    /// 宿主是否支持**任意重定位**（绝对 start / 向后 / end）。file 与 memory 恒为
+    /// true；callback 默认 true（宿主注入的传输如 HTTP AVIO 支持 Range 重定位）。
+    /// **前向-only 合成流**（如 mka 逐块喂内层解码器的 feed）须显式置 false：
+    /// 依赖随机访问的优化（Ogg 尾页时长扫描等）会据此跳过，避免在不可重定位的
+    /// 宿主上做「跳过去再跳回来」而错位/丢失流。
+    random_access: bool = true,
+
     /// 中断标志：置位后所有 IO 操作返回 error.Aborted（§13.1）
     aborted: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
 
@@ -108,6 +115,8 @@ pub const Reader = struct {
         on_read: *const fn (ctx: *anyopaque, buf: []u8) usize,
         on_seek: *const fn (ctx: *anyopaque, off: i64, whence: i32, buffered: usize) bool,
         size_hint: u64 = 0,
+        /// 宿主是否支持任意重定位；默认 true，前向-only 合成 feed 传 false。
+        random_access: bool = true,
     };
 
     pub fn openCallback(cb: Callback, peek_buffer: []u8) Reader {
@@ -117,6 +126,7 @@ pub const Reader = struct {
             .on_seek = cb.on_seek,
             .ctx = cb.ctx,
             .size_hint = cb.size_hint,
+            .random_access = cb.random_access,
             .buffer = peek_buffer,
         };
     }
@@ -138,6 +148,33 @@ pub const Reader = struct {
             .memory => self.peekMem(buf),
             .file => self.peekFile(buf),
             .callback => self.peekBuffered(buf),
+        };
+    }
+
+    /// 从**绝对偏移**读取，不消耗 `pos`、不使用/不改动 file 前瞻缓存。
+    ///   - file：一次 `readPositionalAll` 直达（无 16KB 预读、无缓存二次拷贝）；
+    ///   - memory：目标切片直接 `memcpy`；
+    ///   - callback：无绝对偏移原语，退化为 `seek(offset,.start)` + 普通 `read`
+    ///     （pos 与底层流同步，语义与既有逐段 seek+read 一致）。
+    /// 供**按段/按绝对偏移定位的批量 PCM 读取**（如 wav `readData`）：这类读取每次
+    /// 都显式定位，file 前瞻缓存在每次定位时已被 invalidate、永不会命中，走缓存只会
+    /// 多付一次满块预读 + 一整块二次拷贝。调用方须自行按逻辑游标记账。
+    /// 返回实际读入字节数（0 = EOF）。
+    pub fn readAt(self: *Reader, buf: []u8, offset: u64) Error!usize {
+        if (self.aborted.load(.acquire)) return error.Aborted;
+        return switch (self.kind) {
+            .file => self.readFileAt(buf, offset),
+            .memory => blk: {
+                const data = self.data.?;
+                const p = @min(offset, data.len);
+                const n = @min(buf.len, data.len - p);
+                @memcpy(buf[0..n], data[p .. p + n]);
+                break :blk n;
+            },
+            .callback => blk: {
+                try self.seek(@intCast(offset), .start);
+                break :blk try self.read(buf);
+            },
         };
     }
 
@@ -187,36 +224,28 @@ pub const Reader = struct {
         if (self.aborted.load(.acquire)) return error.Aborted;
         switch (self.kind) {
             .memory, .file => {
-                const end_size = if (self.kind == .file) (try self.size()) else self.data.?.len;
+                // size() 仅 end 定位需要；file 形态 size() 是一次 fstat 系统调用，
+                // start/current（位置读常态）不得为它付费（wav/PCM 每次 readData 都
+                // 先 seek(start)，此前每个 chunk 白付一次 fstat）。语义不变。
                 const base: i64 = switch (whence) {
                     .start => 0,
                     .current => @intCast(self.pos),
-                    .end => @intCast(end_size),
+                    .end => if (self.kind == .file)
+                        @intCast(try self.size())
+                    else
+                        @intCast(self.data.?.len),
                 };
                 const new_pos = base + off;
                 if (new_pos < 0) return error.SeekFailed;
                 self.pos = @intCast(new_pos);
                 if (self.kind == .file) self.invalidateFileCache();
             },
-            // 流式形态：委托回调定位；成功后同步逻辑游标（pos 须与底层流一致，
-            // 否则 seek 后位置报道/相对定位全部偏移）。
+            // 流式形态：委托回调定位。逻辑目标位置在触碰宿主/缓冲**之前**算好，
+            // 任一失败路径都不留「宿主已动、内核游标未同步」或「缓冲已丢」的中间态
+            // （此前先清缓冲再委托宿主，宿主 seek 失败/end 大小未知时游标会与底层
+            //  流错位，后续读取跳字节）。
             .callback => {
                 const buffered = self.buf_len - self.buf_pos;
-                // seek 目标落在已缓冲但未消费的范围内 → 仅前移缓冲游标，
-                // 避免清空缓冲丢失已读数据（如 metadata 小块跳过）。
-                if (whence == .current and off >= 0 and @as(u64, @intCast(off)) <= buffered) {
-                    self.buf_pos += @intCast(off);
-                    self.pos += @intCast(off);
-                    return;
-                }
-                self.buf_pos = 0;
-                self.buf_len = 0;
-                const w: i32 = switch (whence) {
-                    .start => 0,
-                    .current => 1,
-                    .end => 2,
-                };
-                if (!self.on_seek.?(self.ctx.?, off, w, buffered)) return error.SeekFailed;
                 const base: i64 = switch (whence) {
                     .start => 0,
                     .current => @intCast(self.pos),
@@ -224,6 +253,32 @@ pub const Reader = struct {
                 };
                 const np = base + off;
                 if (np < 0) return error.SeekFailed;
+
+                // 目标落在**当前缓冲窗口** [base, base+buf_len]（base = pos − buf_pos，
+                // 含已消费但仍在缓冲内的字节）→ 仅移动缓冲游标（start/current/end
+                // 均可；宿主不动，免一次网络 Range 往返）。不少解码器每帧做
+                // 小幅负向 current 定位（AC3/MP3 回退数个字节以重同步），窗口内
+                // 本地命中可避免这种高频宿主重定位。
+                // 不变量：底层流位置恒 = pos + buffered，故跨缓冲的相对定位
+                // （whence=current, off−buffered）在窗口外仍正确。
+                const base_abs: i64 = @as(i64, @intCast(self.pos)) - @as(i64, @intCast(self.buf_pos));
+                if (np >= base_abs and np <= base_abs + @as(i64, @intCast(self.buf_len))) {
+                    self.buf_pos = @intCast(np - base_abs);
+                    self.pos = @intCast(np);
+                    return;
+                }
+
+                // 窗口外：委托宿主重定位。**成功后才**丢弃预读缓冲并同步游标；
+                // 失败原样保留（宿主与内核游标一致，读到的仍是正确字节）。
+                const on_seek = self.on_seek orelse return error.SeekFailed;
+                const w: i32 = switch (whence) {
+                    .start => 0,
+                    .current => 1,
+                    .end => 2,
+                };
+                if (!on_seek(self.ctx.?, off, w, buffered)) return error.SeekFailed;
+                self.buf_pos = 0;
+                self.buf_len = 0;
                 self.pos = @intCast(np);
             },
         }
@@ -278,9 +333,14 @@ pub const Reader = struct {
         var written: usize = 0;
         while (written < buf.len) {
             const abs = start + written;
+            // 缓存覆盖部分**整段 memcpy**（此前逐字节循环：小请求预读一满块后要
+            // 走 buf.len 次单字节拷贝，PCM 每 chunk 8KB → 8K 次迭代，是公共
+            // PCM 地板的指令大头）。缓存内容/系统调用次数/pos 语义均不变。
             if (abs >= self.file_cache_start and abs < self.file_cache_start + self.file_cache_len) {
-                buf[written] = self.file_cache[abs - self.file_cache_start];
-                written += 1;
+                const rel = abs - self.file_cache_start;
+                const take = @min(self.file_cache_len - rel, buf.len - written);
+                @memcpy(buf[written .. written + take], self.file_cache[rel .. rel + take]);
+                written += take;
             } else {
                 const remain = buf.len - written;
                 if (remain >= self.file_cache.len) {
@@ -291,7 +351,7 @@ pub const Reader = struct {
                     if (n == 0) break;
                     written += n;
                 } else {
-                    // 缓存空且请求小 → 预读一满块，随后逐字节从缓存服务
+                    // 缓存空且请求小 → 预读一满块，随后从缓存服务（下一轮整段拷贝）
                     const n = try self.readFileAt(self.file_cache[0..], abs);
                     self.file_cache_start = abs;
                     self.file_cache_len = n;
@@ -330,7 +390,9 @@ pub const Reader = struct {
     fn readBuffered(self: *Reader, buf: []u8) Error!usize {
         // 大请求：先把 peek 缓冲中**未消费**的字节交还本次读取（否则直接穿透
         // 底层会丢弃已预读数据 → 数据缺失/损坏），余量再直接穿透底层避免二次拷贝。
-        if (buf.len >= peek_buffer_size) {
+        // 仅当「未消费缓冲可被本次请求全部取走」时才直接穿透——否则余量会被跳过
+        // （丢字节）；此时退回下方通用小请求循环（逐块消费缓冲后按需续读底层）。
+        if (buf.len >= peek_buffer_size and (self.buf_len - self.buf_pos) <= buf.len) {
             var written: usize = 0;
             const avail = self.buf_len - self.buf_pos;
             if (avail > 0) {
@@ -424,6 +486,42 @@ test "openMem: seek 三种 origin" {
     try testing.expectEqualStrings("67", &buf);
     // 越界前 seek 失败
     try testing.expectError(error.SeekFailed, r.seek(-1, .start));
+}
+
+test "readAt: memory 绝对偏移读取，不改 pos" {
+    var r = Reader.openMem("0123456789");
+    var buf: [4]u8 = undefined;
+    try testing.expectEqual(@as(usize, 4), try r.readAt(&buf, 3));
+    try testing.expectEqualStrings("3456", &buf);
+    try testing.expectEqual(@as(u64, 0), r.pos); // 不消耗位置
+    // 越界偏移 clamp 到 EOF（返回 0），不越界
+    try testing.expectEqual(@as(usize, 0), try r.readAt(&buf, 999));
+}
+
+test "readAt: file 绝对偏移读取，不改 pos；与 read 交错一致" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const data = "abcdefghijklmnop";
+    const f = try tmp.dir.createFile(io, "ra.bin", .{});
+    try std.Io.File.writeStreamingAll(f, io, data);
+    std.Io.File.close(f, io);
+    const full = try std.fs.path.join(testing.allocator, &.{ ".zig-cache", "tmp", tmp.sub_path[0..], "ra.bin" });
+    defer testing.allocator.free(full);
+
+    var r = try Reader.openPath(full);
+    defer r.deinit();
+    var buf: [5]u8 = undefined;
+    try testing.expectEqual(@as(usize, 5), try r.readAt(&buf, 4));
+    try testing.expectEqualStrings("efghi", &buf);
+    try testing.expectEqual(@as(u64, 0), r.pos);
+    // 随后普通 read 仍从 pos=0 起（readAt 不触碰游标/缓存）
+    try testing.expectEqual(@as(usize, 3), try r.read(buf[0..3]));
+    try testing.expectEqualStrings("abc", buf[0..3]);
+    // 大偏移直达（不经前瞻缓存，一次位置读）
+    var big: [8]u8 = undefined;
+    try testing.expectEqual(@as(usize, 8), try r.readAt(&big, 8));
+    try testing.expectEqualStrings("ijklmnop", &big);
 }
 
 test "openMem: abort 后 read/peek/seek 返回 Aborted" {
@@ -641,4 +739,175 @@ test "openCallback: 大请求先交还已预读字节（不丢数据）" {
     try testing.expectEqualStrings(payload, big[0..payload.len]);
     // 之后到 EOF
     try testing.expectEqual(@as(usize, 0), try r.read(big));
+}
+
+/// 回调流测试夹具：内存字节 + 精确 seek；记录宿主 seek 次数与可选「注入失败点」。
+/// 语义与 zk_read_cb / zk_seek_cb 契约一致（current 按 off - buffered 前移底层流）。
+const CbHarness = struct {
+    data: []const u8,
+    pos: usize = 0,
+    /// 宿主被调用 on_seek 的次数（证明窗口内定位未触碰宿主）。
+    seeks: usize = 0,
+    /// 非 0：宿主 seek 到此绝对位置时返回失败（模拟不可重定位/断流）。
+    fail_at: i64 = -1,
+    /// 单次 on_read 返回上限（模拟网络分块；0 = 不限）。
+    max_read: usize = 0,
+
+    fn readFn(ctx: *anyopaque, buf: []u8) usize {
+        const self: *@This() = @ptrCast(@alignCast(ctx));
+        if (self.pos >= self.data.len) return 0; // EOF
+        var n = @min(buf.len, self.data.len - self.pos);
+        if (self.max_read != 0 and n > self.max_read) n = self.max_read;
+        @memcpy(buf[0..n], self.data[self.pos .. self.pos + n]);
+        self.pos += n;
+        return n;
+    }
+
+    fn seekFn(ctx: *anyopaque, off: i64, whence: i32, buffered: usize) bool {
+        const self: *@This() = @ptrCast(@alignCast(ctx));
+        self.seeks += 1;
+        const base: i64 = switch (whence) {
+            0 => 0,
+            1 => @as(i64, @intCast(self.pos)) - @as(i64, @intCast(buffered)),
+            2 => @intCast(self.data.len),
+            else => return false,
+        };
+        const np = base + off;
+        if (np < 0 or np > @as(i64, @intCast(self.data.len))) return false;
+        if (self.fail_at >= 0 and np == self.fail_at) return false; // 注入失败
+        self.pos = @intCast(np);
+        return true;
+    }
+};
+
+fn cbReader(h: *CbHarness, peek_buf: []u8) Reader {
+    return Reader.openCallback(.{
+        .ctx = @ptrCast(h),
+        .on_read = CbHarness.readFn,
+        .on_seek = CbHarness.seekFn,
+        .size_hint = h.data.len,
+    }, peek_buf);
+}
+
+test "openCallback: EOF 后 seek 回起点逐字节一致" {
+    const payload = "0123456789abcdefghij"; // 20 字节
+    var h = CbHarness{ .data = payload };
+    const peek_buf = try testing.allocator.alloc(u8, peek_buffer_size);
+    defer testing.allocator.free(peek_buf);
+    var r = cbReader(&h, peek_buf);
+
+    var buf: [64]u8 = undefined;
+    // 先读满整段，再读到 EOF（EOF 后底层流位于末尾、内核缓冲为空）
+    try testing.expectEqual(@as(usize, payload.len), try r.read(&buf));
+    try testing.expectEqualStrings(payload, buf[0..payload.len]);
+    try testing.expectEqual(@as(usize, 0), try r.read(&buf));
+    try testing.expectEqual(@as(usize, 0), try r.read(&buf)); // EOF 可重复
+
+    // EOF 后 seek 回起点：缓冲为空 → 必走宿主重定位
+    try r.seek(0, .start);
+    try testing.expectEqual(@as(u64, 0), r.pos);
+    try testing.expectEqual(@as(usize, payload.len), try r.read(&buf));
+    try testing.expectEqualStrings(payload, buf[0..payload.len]);
+
+    // 再 EOF、再 seek 到中间（覆盖「EOF 后任意重定位」）
+    try testing.expectEqual(@as(usize, 0), try r.read(&buf));
+    try r.seek(7, .start);
+    var one: [4]u8 = undefined;
+    try testing.expectEqual(@as(usize, 4), try r.read(&one));
+    try testing.expectEqualStrings("789a", &one);
+}
+
+test "openCallback: 缓冲窗口内 start/end/current 定位不触碰宿主" {
+    const payload = "0123456789abcdefghij"; // 20 字节
+    // 分块 5：peek 10 只把 [0,10) 读进缓冲（宿主 pos=10），窗口之外才会碰宿主。
+    var h = CbHarness{ .data = payload, .max_read = 5 };
+    const peek_buf = try testing.allocator.alloc(u8, peek_buffer_size);
+    defer testing.allocator.free(peek_buf);
+    var r = cbReader(&h, peek_buf);
+
+    // peek 10 → 宿主 pos 领先 10（缓冲 [0,10)），内核 pos=0；peek 不调用 on_seek。
+    var pre: [10]u8 = undefined;
+    try testing.expectEqual(@as(usize, 10), try r.peek(&pre));
+    try testing.expectEqualStrings("0123456789", &pre);
+    try testing.expectEqual(@as(usize, 0), h.seeks);
+    try testing.expectEqual(@as(u64, 0), r.pos);
+
+    // start 窗口内前进 / 回退均纯内存定位
+    try r.seek(4, .start);
+    try testing.expectEqual(@as(usize, 0), h.seeks);
+    try testing.expectEqual(@as(u8, '4'), (try r.readByte()).?);
+    try testing.expectEqual(@as(u64, 5), r.pos);
+    try r.seek(1, .start); // 回退
+    try testing.expectEqual(@as(usize, 0), h.seeks);
+    try testing.expectEqual(@as(u8, '1'), (try r.readByte()).?);
+
+    // current 窗口内前进
+    try r.seek(3, .current);
+    try testing.expectEqual(@as(usize, 0), h.seeks);
+    try testing.expectEqual(@as(u8, '5'), (try r.readByte()).?); // pos 2 → +3 → 5
+
+    // end 定位落在窗口内（size=20，off=-16 → 4）
+    try r.seek(-16, .end);
+    try testing.expectEqual(@as(usize, 0), h.seeks);
+    try testing.expectEqual(@as(u8, '4'), (try r.readByte()).?);
+
+    // 窗口外 → 才委托宿主
+    try r.seek(15, .start);
+    try testing.expectEqual(@as(usize, 1), h.seeks);
+    try testing.expectEqual(@as(u8, 'f'), (try r.readByte()).?);
+}
+
+test "openCallback: 宿主 seek 失败时保留预读与游标（不跳字节）" {
+    const payload = "0123456789"; // 10 字节
+    // 分块 5：peek 5 只驻留 [0,5)，窗口外的目标（7）必然委托宿主。
+    var h = CbHarness{ .data = payload, .max_read = 5 };
+    const peek_buf = try testing.allocator.alloc(u8, peek_buffer_size);
+    defer testing.allocator.free(peek_buf);
+    var r = cbReader(&h, peek_buf);
+
+    // peek 5 → 缓冲 [0,5) 已读入宿主，内核 pos=0
+    var pre: [5]u8 = undefined;
+    try testing.expectEqual(@as(usize, 5), try r.peek(&pre));
+    // 消费 2 → 内核 pos=2，未消费缓冲 [2,5)
+    var two: [2]u8 = undefined;
+    try testing.expectEqual(@as(usize, 2), try r.read(&two));
+    try testing.expectEqualStrings("01", &two);
+
+    // 注入：宿主 seek 到 7 失败（窗口外 → 走宿主）
+    h.fail_at = 7;
+    try testing.expectError(error.SeekFailed, r.seek(7, .start));
+    // 失败后游标与预读必须原样保留：继续读仍是正确字节（此前会丢掉缓冲并从
+    // 宿主当前位置读 → 跳字节，读到 "567" 而非 "234"）。
+    try testing.expectEqual(@as(u64, 2), r.pos);
+    var three: [3]u8 = undefined;
+    try testing.expectEqual(@as(usize, 3), try r.read(&three));
+    try testing.expectEqualStrings("234", &three);
+
+    // 宿主恢复正常后可再次定位
+    h.fail_at = -1;
+    try r.seek(7, .start);
+    try testing.expectEqual(@as(u8, '7'), (try r.readByte()).?);
+}
+
+test "openCallback: current 负向 seek 跨缓冲由宿主回退且位置正确" {
+    const payload = "0123456789abcdefghijklmnopqrstuvwxyzABCD"; // 40 字节
+    // 分块 8：读 20 字节后缓冲窗口 base=16（[16,24)），回退到 12 必须委托宿主。
+    var h = CbHarness{ .data = payload, .max_read = 8 };
+    const peek_buf = try testing.allocator.alloc(u8, peek_buffer_size);
+    defer testing.allocator.free(peek_buf);
+    var r = cbReader(&h, peek_buf);
+
+    var twenty: [20]u8 = undefined;
+    try testing.expectEqual(@as(usize, 20), try r.read(&twenty));
+    try testing.expectEqualStrings(payload[0..20], &twenty);
+    try testing.expectEqual(@as(u64, 20), r.pos);
+    try testing.expectEqual(@as(usize, 0), h.seeks); // 顺序读未触发宿主定位
+
+    // current 回退 -8 → 12：目标在当前缓冲窗口 [16,24) 之前 → 宿主回退
+    try r.seek(-8, .current);
+    try testing.expectEqual(@as(u64, 12), r.pos);
+    try testing.expectEqual(@as(usize, 1), h.seeks);
+    var four: [4]u8 = undefined;
+    try testing.expectEqual(@as(usize, 4), try r.read(&four));
+    try testing.expectEqualStrings("cdef", &four);
 }
