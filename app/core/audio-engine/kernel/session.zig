@@ -59,6 +59,11 @@ pub const Session = struct {
     dec: ?decoder.Decoder = null,
     info: decoder.Info = undefined,
 
+    /// AS2：专属 worker 槽（pinned 1:1；null = 全局队列模式）。释放见 releasePin/close。
+    pinned_id: ?usize = null,
+    /// 会话运行所在的 runtime（pinned close 步骤内释放专属 worker 用；start 时记录）。
+    rt: ?*runtime.Runtime = null,
+
     /// 当前步的完工槽（open/read/seek/close 复用同一会话级事件）
     step: task.Task = .{ .run = noopBody },
 
@@ -114,7 +119,45 @@ pub const Session = struct {
     /// 在池 worker 上建实例（probe+open，一次）
     pub fn start(self: *Session, rt: *runtime.Runtime) bool {
         std.debug.assert(self.state == .new);
+        self.rt = rt;
         self.state = .playing;
+        self.prepareStart();
+        return self.dispatch(rt);
+    }
+
+    /// AS2：pinned 启动——先预留一个专属 worker（1 流 : 1 pinned worker，§6.3），
+    /// 该会话的所有步骤只在此 worker 上串行执行（不进全局队列、不被回收）。无空闲
+    /// worker 时返回 false（调用方回退 `start`/全局队列；默认路径不受影响）。
+    pub fn startPinned(self: *Session, rt: *runtime.Runtime) bool {
+        std.debug.assert(self.state == .new);
+        const id = rt.acquirePinned() orelse return false;
+        self.pinned_id = id;
+        self.rt = rt;
+        self.state = .playing;
+        self.prepareStart();
+        if (!self.dispatch(rt)) {
+            rt.releasePinned(id);
+            self.pinned_id = null;
+            self.state = .new;
+            return false;
+        }
+        return true;
+    }
+
+    /// 会话是否绑定专属 worker（AS2）。
+    pub fn isPinned(self: *const Session) bool {
+        return self.pinned_id != null;
+    }
+
+    /// 显式释放专属 worker（幂等；供停机等非 close-step 路径调用）。
+    pub fn releasePin(self: *Session, rt: *runtime.Runtime) void {
+        if (self.pinned_id) |id| {
+            rt.releasePinned(id);
+            self.pinned_id = null;
+        }
+    }
+
+    fn prepareStart(self: *Session) void {
         self.resetStep();
         self.step.run = struct {
             fn f(t: *task.Task) void {
@@ -137,6 +180,14 @@ pub const Session = struct {
                 sess.state = .playing;
             }
         }.f;
+    }
+
+    /// 步骤派发：pinned 会话定向到专属 worker；否则（或 pinned 槽失效）走全局队列。
+    fn dispatch(self: *Session, rt: *runtime.Runtime) bool {
+        if (self.pinned_id) |id| {
+            if (rt.submitPinned(id, task.jobFor(&self.step))) return true;
+            self.pinned_id = null; // 槽失效 → 退化全局（会话仍可继续，仅失去亲和）
+        }
         return task.spawnInto(rt, &self.step);
     }
 
@@ -159,7 +210,7 @@ pub const Session = struct {
                 sess.req_frames = 0;
             }
         }.f;
-        return task.spawnInto(rt, &self.step);
+        return self.dispatch(rt);
     }
 
     /// 跳到毫秒位置
@@ -177,7 +228,7 @@ pub const Session = struct {
                 };
             }
         }.f;
-        return task.spawnInto(rt, &self.step);
+        return self.dispatch(rt);
     }
 
     /// 关闭实例（释放 ctx/文件句柄）
@@ -190,9 +241,11 @@ pub const Session = struct {
                 if (sess.dec) |*d| d.deinit();
                 sess.dec = null;
                 sess.state = .closed;
+                // AS2：会话收尾即释放专属 worker（回全局队列，可被回收复用）
+                if (sess.rt) |r| sess.releasePin(r);
             }
         }.f;
-        return task.spawnInto(rt, &self.step);
+        return self.dispatch(rt);
     }
 };
 
@@ -287,6 +340,53 @@ test "session: 分块长流解码 == 一次性解码（帧数/顺序一致，逐
     try testing.expect(sess.close(rt));
     task.wait(&sess.step);
     try testing.expectEqual(SessState.closed, sess.state);
+}
+
+test "session: AS2 pinned 启动——专属 worker 串行分块解码 == 一次性；close 归还" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const path = try writeGold(&tmp, io, "gp.wav");
+    defer testing.allocator.free(path);
+
+    const rt = try runtime.Runtime.init(std.heap.c_allocator, .{ .min_workers = 2, .max_workers = 4 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+
+    const sess = try Session.create(std.heap.c_allocator, path);
+    defer {
+        std.debug.assert(sess.state == .closed);
+        sess.deinit();
+    }
+    try testing.expect(sess.startPinned(rt));
+    try testing.expect(sess.isPinned());
+    task.wait(&sess.step);
+    try testing.expectEqual(SessState.playing, sess.state);
+
+    // 分块串行（全程同一 pinned worker）：6+6+4 == 16 帧
+    var buf: [64]u8 = undefined;
+    var total: usize = 0;
+    for ([_]usize{ 6, 6, 4 }) |sz| {
+        try testing.expect(sess.read(rt, buf[0 .. sz * 2], sz));
+        task.wait(&sess.step);
+        try testing.expectEqual(SessState.playing, sess.state);
+        total += sess.got_frames;
+    }
+    try testing.expectEqual(@as(usize, 16), total);
+
+    try testing.expect(sess.seekMs(rt, 0));
+    task.wait(&sess.step);
+    try testing.expect(sess.read(rt, buf[0..16], 8));
+    task.wait(&sess.step);
+    try testing.expectEqual(@as(usize, 8), sess.got_frames);
+
+    // close 在 pinned worker 上收尾并归还专属 worker
+    try testing.expect(sess.close(rt));
+    task.wait(&sess.step);
+    try testing.expectEqual(SessState.closed, sess.state);
+    try testing.expect(!sess.isPinned());
 }
 
 test "session: 不可解码文件 start → failed（error 收尾，不 panic）" {
