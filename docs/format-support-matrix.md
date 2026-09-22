@@ -4,6 +4,9 @@
 > 元数据列由 **TagLibSharp 2.3.0（scanner 实际引用版本）实测**：对真实或 ffmpeg 自造样本执行
 > `TagLib.File.Create` 探测（见 `archive/format-gap-analysis.md` 历史与下方测量方法）。
 > 内核列对应 `app/core/audio-engine/kernel/fmt/*`（自研解码，`zig build test` 现 434/434 绿）。
+>
+> 2026-09-22（方向③ F3）· L3 白名单补 `.mp1`（与 `.mp2` 同族），并按内核元数据直桥现状校正
+> L3 条目；`.mp2` 实际已于 2026-09-04 入库，本次核对确认。
 
 ## 1. 三维支持模型（务必区分）
 
@@ -11,7 +14,7 @@
 |---|---|---|---|
 | **L1 内核自研解码** | `kernel/fmt/*`（Zig，434 单测全绿） | 该格式**能否脱离 FFmpeg 解码** | 常见格式已全覆盖（见 §2 内核列 ✅） |
 | **L2 生产引擎** | `app/core/audio-engine`（C/CMake） | 播放时实际解码器 | 以 **FFmpeg 兜底**为主（`avformat/avcodec` 全量），内核逐步接管 |
-| **L3 曲库扫描** | `app/core/scanner`（C#）`ScannerEngine.cs` `AudioExt` 白名单 **16 种** + TagLibSharp 提元数据 | 文件**能否入库显示** | 白名单 = mp3 flac ogg opus oga m4a aac wav ape wv dsf dsd dff mp4 aiff aif |
+| **L3 曲库扫描** | `app/core/scanner`（C#）`ScannerEngine.cs` `AudioExt` 白名单 **29 种** + 内核元数据直桥（`zk_metadata_*`，probe-only，优先）/ TagLibSharp 提元数据 | 文件**能否入库显示** | 白名单 = mp3 mp2 mp1 flac ogg oga opus m4a m4b mp4 aac wav aiff aif aifc ape wv dsf dsd dff wma mka mpc mpp mp+ webm spx tta tak |
 
 **推论**：某格式「能播」≠「能被收藏」。文件即使 L1/L2 都能解，只要扩展名不在 L3 白名单，
 scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的扩展 = 本轮最大隐性缺口。
@@ -23,7 +26,7 @@ scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的
 
 | 扩展 / 格式 | 内核 fmt（自研） | 引擎 FFmpeg | L3 白名单 | TagLib 实测 | 备注 / 落库建议 |
 |---|---|---|---|---|---|
-| mp3 / mp2 / mp1 | ✅（Layer I/II/III） | ✅ | mp3 在，**mp2/mp1 不在** | mp3 OK、**mp2 OK（MPEG L2）**、mp1 按同族可解 | 加 mp2（+mp1）进白名单，TagLib 可直提 |
+| mp3 / mp2 / mp1 | ✅（Layer I/II/III） | ✅ | ✅（mp3/mp2/mp1；mp1 于 2026-09-22 补） | mp3 OK、**mp2/mp1 OK（TagLib 按内容解析，不校验扩展名）** | 2026-09-22 完成：`.mp1` 入白名单（`.mp2` 已于 2026-09-04 入）；内核侧同走 fmt/mp3 layer12 |
 | flac | ✅ | ✅ | ✅ | OK | — |
 | ogg / oga | ✅（Opus/Vorbis/FLAC） | ✅ | ✅（ogg/oga） | OK（vorbis/opus） | ogg 内 Speex 轨未实现（见 §4） |
 | opus | ✅ | ✅ | ✅ | OK | — |
@@ -45,12 +48,12 @@ scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的
 | amrwb / awb | ✅（全 9 mode） | ✅ | ❌ | raw UNSUP（3gp/mp4 包装需另测） | 决策项 |
 | **mka**（Matroska 纯音频） | ✅（fmt/mka，2026-09-04） | ✅ | ✅（2026-09-04） | **mka OK（AAC/AC3/Opus 内轨均可提时长）** | 容器+白名单完成 |
 | mpc / mpp / mp+（Musepack SV7/8） | ✅ SV8+SV7 均 bit-exact（fmt/mpc） | ✅ | ✅（2026-09-04） | **mpc OK（SV7/SV8 实测）** | 全部完成（2026-09-04） |
-| tta（TrueAudio） | ✅（fmt/tta，bps 8/16/24、mono/stereo，100% bit-exact） | ✅ | ❌ | **UNSUP（实测）** | 内核已接入；不入库（待 Info 兜底） |
-| spx（Ogg-Speex） | ✅（fmt/spx，NB/WB/UWB/VBR，100% bit-exact） | ✅ | ❌ | **UNSUP（实测）** | 内核已接入（2026-09-04）；不入库（待 Info 兜底） |
+| tta（TrueAudio） | ✅（fmt/tta，bps 8/16/24、mono/stereo，100% bit-exact） | ✅ | ✅（2026-09-10） | UNSUP（TagLib 无元数据） | 已入库：走内核 `zk_metadata_*` probe-only 直桥 |
+| spx（Ogg-Speex） | ✅（fmt/spx，NB/WB/UWB/VBR，100% bit-exact） | ✅ | ✅（2026-09-10） | UNSUP（TagLib 无元数据） | 已入库：走内核 `zk_metadata_*` probe-only 直桥 |
 | **mka 内 Vorbis** | ✅（Ogg 合成复用 stb_vorbis，容器层 0 差异；codec 层 ±1 LSB 既有） | ✅ | ✅（随 mka） | mka OK | 2026-09-04 接入 |
 | **mka 内 DTS-HD MA/XBR/XXCH** | ✅（合成 .dtshd 容器复用 fmt/dts 全管线；XLL/XBR+XXCH 均逐位） | ✅ | ✅（随 mka） | mka OK | 2026-09-04 接入 |
 | **DTS XBR / LBR（DTS Express）/ DTS:X** | ✅ XBR bit-exact；✅ LBR 已移植（子组件与 FFmpeg C 逐位，无公开真实样本）；DTS:X 对齐 ffmpeg（解 MA 部分+profile 标注，对象渲染同 ffmpeg 不做） | ✅ | — | — | 2026-09-04 补齐 |
-| shn（Shorten） | ✅（fmt/shn，bit-exact，v0/v1/v2 U8/S16） | ✅ | ❌ | **UNSUP（实测）** | 内核已接入（2026-09-04）；不入库（待 Info 兜底） |
+| shn（Shorten） | ✅（fmt/shn，bit-exact，v0/v1/v2 U8/S16） | ✅ | ❌ | **UNSUP（实测）** | 内核已接入（2026-09-04）；内核元数据桥未覆盖 → 仍未入库（待 Info 兜底 / F4） |
 | ofr（OptimFROG） | ❌ | ✅ | ❌ | 未测 | 极罕见 |
 | ra / rm（RealAudio cook/sipr/atrc/ra144/288） | ❌ | ✅ | ❌ | 未测 | 老网络音频；维持 FFmpeg 兜底 |
 | oma / aa3 / at3（ATRAC） | ❌ | ✅ | ❌ | 未测 | Sony 设备音频；兜底 |
@@ -60,16 +63,21 @@ scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的
 | mid/kar/rmi（MIDI） | ❌（需合成器渲染） | ✅（部分） | ❌ | — | 非音频文件解码，一般不作为曲目 |
 | xwma / xma1/2、hca、bink、playstation 等游戏音轨 | ❌ | ✅ | ❌ | — | 游戏专用；P2 维持 FFmpeg 兜底 |
 
-## 3. 决策记录（2026-09-04）
+## 3. 决策记录（2026-09-04 起；含 09-10 / 09-22 更新）
 
 1. **P0 内核层：补 MKA（Matroska）纯音频容器解复用**。收益最高——容器内 AAC / AC3 / DTS /
    FLAC / Opus / WavPack / TrueHD 等 codec 内核已全部自研，只缺容器层把轨道解出来；
    且 TagLib 实测对 mka（内 AAC/AC3/Opus）可提元数据 → 白名单可安全加入 `.mka`，用户文件
    「既能入库也能自研解码」一步到位。
-2. **L3 白名单扩容（✅ 已完成 2026-09-04）**：`ScannerEngine.AudioExt` 加入内核可解 **且
-   TagLib 实测支持** 的扩展：`.wma`、`.mka`、`.mpc`/`.mpp`/`.mp+`、`.mp2`、`.aifc`
-   （scanner `dotnet build` 0 错误）。实测 **TagLib UNSUP 而未入者**：`.tta`、`.mp1`、`.asf`、
-   `.caf`、`.w64`、`.dts/.dtshd/.dca`、`.ac3/.ec3`、`.mlp/.thd`、`.amr/.awb`、`.latm`。
+2. **L3 白名单扩容（2026-09-04 / 09-10 / 09-22）**：`ScannerEngine.AudioExt` 加入内核可解的扩展——
+   - **2026-09-04**：`.wma`、`.mka`、`.mpc`/`.mpp`/`.mp+`、`.mp2`、`.aifc`（TagLib 实测可提元数据）；
+   - **2026-09-10**：`.spx`、`.tta`、`.tak`（TagLib 无元数据，改走内核 `zk_metadata_*` probe-only 直桥）；
+   - **2026-09-22（方向③ F3）**：`.mp1`——经实测 `.mp1` 扩展名 **TagLibSharp 2.3.0 亦按内容**
+     （MPEG Audio Layer I/II）解析、可直提时长（并非旧记录所称 UNSUP），故 `.mp2`/`.mp1` 双双在位。
+   - scanner `dotnet build` 0 错误；`scan` 端到端实测 `.mp1`/`.mp2` 均入库。
+   > 修正旧记录：`.tta`/`.spx` 已于 2026-09-10 经内核元数据桥入库（不再“待 Info 兜底”）。
+   > 仍 **TagLib UNSUP 且内核元数据桥未覆盖** 而未入者：`.shn`、`.asf`、`.caf`、`.w64`、
+   > `.dts/.dtshd/.dca`、`.ac3/.ec3`、`.mlp/.thd`、`.amr/.awb`、`.latm`。
 3. **元数据兜底（决策项，需产品确认）**：dts/dtshd、ac3/ec3、mlp/thd、amr/awb、latm、
    au/caf/w64 等 TagLib 无元数据、但内核能解的裸流/影视音轨，若要在曲库可见，需在 scanner
    增加「内核 Info 兜底」（调用 audio-engine/kernel 的 probe→Info 取时长/位深，替代 TagLib），
@@ -85,9 +93,9 @@ scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的
 |---|---|---|---|
 | ~~P1~~ **Musepack（.mpc/.mpp，SV7/SV8）** | SV8 已接入（2026-09-04，fmt/mpc，100% bit-exact）；SV7 待做 | `mpc8.c`（已完成）/ `mpc7.c`（待） |
 | ~~P1~~ **TTA（.tta）** | 已接入（2026-09-04，fmt/tta，bps 8/16/24，100% bit-exact） | `tta.c`（已完成） |
-| P2 | **Ogg-Speex（.spx）** | 老 VoIP；复用 ogg 解复用 + 新增 Speex 子解码 | `speexdec.c`、`celt`/`speex` 表 |
-| P2 | **Shorten（.shn）** | 2000 年代无损老物 | `shorten.c` |
-| P2 | **MPEG-1 裸流 mp1/mp2 落库** | 内核已可解，补白名单即可（非内核工作） | — |
+| ~~P2~~ **Ogg-Speex（.spx）** | 已接入（fmt/spx，NB/WB/UWB/VBR，100% bit-exact）；L3 经内核元数据桥入库（2026-09-10） | `speexdec.c`、`celt`/`speex` 表（已完成） |
+| ~~P2~~ **Shorten（.shn）** | 已接入（2026-09-04，fmt/shn，v0/v1/v2 U8/S16，bit-exact）；L3 仍未入库（内核元数据桥未覆盖） | `shorten.c`（已完成） |
+| ~~P2~~ **已完成（2026-09-22）** | **MPEG 裸流 mp2/mp1 落库** | `ScannerEngine.AudioExt` 已收录（mp2 2026-09-04、mp1 2026-09-22；非内核工作） | — |
 | P3 | OptimFROG / TAK / .ofr / realaudio cook | 极罕见/老旧，维持 FFmpeg 兜底即可，暂缓 | — |
 | P3 | MIDI / tracker / 游戏音轨 | 定位外（非压缩音频解码），维持 FFmpeg 兜底 | — |
 
@@ -120,10 +128,13 @@ scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的
    HCA/XMA/Bink（游戏）、APTX/SBC（蓝牙）、语音族(G.722-729/iLBC/QCELP/EVRC/Nellymoser/…)、游戏 ADPCM 变体。
    注：`aac_fixed/ac3_fixed/mp3float/libopus/libvorbis` 等为 ffmpeg 内部别名/双实现，非独立格式。
 
-**B. L3 白名单/曲库快赢（✅ 已完成 2026-09-04）**
+**B. L3 白名单/曲库快赢（✅ 已完成）**
 - `ScannerEngine.AudioExt` 已加 `.m4b`、`.webm`（TagLib 实测可提时长；`.weba` TagLib 不映射故未加）。
+- 2026-09-22（方向③ F3）：补 `.mp1`（与 `.mp2` 同族）；已实测 TagLibSharp 2.3.0 与内核元数据桥
+  均支持，端到端 `scan` 入库成功。
 
 **C. 产品决策项（未实施）**
-- 「内核 Info 兜底」：tta/spx/shn/dts/dtshd/ac3/ec3/mlp/thd/amr/awb/latm/caf/au/w64 等内核可解但
-  TagLib 无元数据的格式，若要进曲库需 scanner 接内核 probe→Info（时长/位深）；否则保持「文件系统直放、
-  不入库」。
+- 「内核 Info 兜底」：shn/dts/dtshd/ac3/ec3/mlp/thd/amr/awb/latm/caf/au/w64 等内核可解但
+  TagLib 无元数据、且内核元数据直桥未覆盖的格式，若要进曲库需 scanner 接内核 probe→Info
+  （时长/位深）；否则保持「文件系统直放、不入库」。（tta/spx/tak 已由 `zk_metadata_*` probe-only
+  直桥入库，不在此列。）
