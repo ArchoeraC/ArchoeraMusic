@@ -33,7 +33,9 @@ public sealed class ScannerEngine
     /// <remarks>
     /// 2026-09-04 扩容：wma/mka/mpc/mpp/mp2/aifc——均为「内核可自研解码」
     /// 且 TagLibSharp 2.3.0 实测可提元数据/时长（见 docs/format-support-matrix.md §2）。
-    /// 注：tta/asf/mp1/dts/ac3/mlp/amr/awb/latm/caf/au/w64 内核可解但 TagLib 无元数据，
+    /// 2026-09-22（方向③ F3）：补 mp1——MPEG Audio Layer I，与 mp2 同族；内核
+    /// fmt/mp3 的 layer12 路径与 TagLibSharp 2.3.0 **均按内容解析**、可直提时长。
+    /// 注：asf/dts/ac3/mlp/amr/awb/latm/caf/au/w64/shn 内核可解但 TagLib 无元数据，
     /// 若需收录须走「内核 Info 兜底」（产品决策项），暂不进白名单。
     /// </remarks>
     private static readonly HashSet<string> AudioExt = new(StringComparer.OrdinalIgnoreCase)
@@ -42,6 +44,8 @@ public sealed class ScannerEngine
         "ape", "wv", "dsf", "dsd", "dff", "mp4", "aiff", "aif",
         // 2026-09-04：自研解码族（TagLib 实测可提元数据）
         "wma", "mka", "mpc", "mpp", "mp+", "mp2", "aifc",
+        // 2026-09-22：MPEG Audio Layer I（与 mp2 同族；TagLib/内核均按内容解析）
+        "mp1",
         // 2026-09-04 追加：m4b（音频书=mp4 容器）/ webm（音频，内核 matroska 已认）
         "m4b", "webm",
         // 2026-09-10：Speex（Ogg 容器，内核可解；probe-only 元数据）
