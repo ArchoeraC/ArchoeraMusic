@@ -30,6 +30,7 @@ import '../playback/play_source_resolver.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/data_dir.dart';
 import '../../stores/providers.dart';
+import 'download_platform.dart';
 import 'downloader_engine.dart';
 
 part 'download_controller/download_controller_core.dart';

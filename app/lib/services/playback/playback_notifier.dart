@@ -22,6 +22,7 @@ import 'engine_bindings.dart';
 import 'play_source_resolver.dart';
 import 'playback_session.dart';
 import 'playback_state.dart';
+import '../source/source_platform.dart';
 import 'store_source.dart';
 
 export 'fft_frame.dart' show FftFrame;
