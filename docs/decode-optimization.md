@@ -255,3 +255,26 @@ python3 scorecard.py --corpus /tmp/eng2 --csv data/SCORE_$(date +%F).csv \
 - 首帧 `bench_coldstart` p50 µs：wav 25→**13**（FFmpeg 13）、mp3 118→**101**（FFmpeg 37）均改善；
   **flac 首帧 220µs 属既有编解码开销（`git stash` A/B 证实非本次引入）**，open/create 段远快于 FFmpeg。
 - 仍未做：按格式实例 ctx arena / Reader 缓冲复用（跨 `fmt/**` 的较大重构）。
+
+## 10. 2026-09-22：FLAC 专修（无损，bit-exact 强制）
+
+前置调研与计划见 `flac-optimization.md`。FLAC 未吃到 §9 的 P1（其热路径走 `readByte`/自建位缓冲），
+故专攻**位流 + CRC**。**无损 → 全程 bit-exact。**
+
+保留改动（FL-1 + FL-5）：
+- **位流**：u64 位缓存 + `io.Reader.peek`（不消费 `pos`）批量 refill（复用既有 16 KiB 缓冲、零新增缓冲）；
+  **懒 CRC**（只对已载入位流的字节累加，有效帧绝不载入下一帧字节）；帧末 `drain()` 推进已消费字节；
+  `readUnary1` 改 u64 `@clz`。
+- **CRC**：逐位循环 → comptime 256 项查表（`era_crc8_table`/`era_crc16_table`）+ word 级 4 字节 unrolled。
+
+| 状态 | insn | cycles |
+|---|---|---|
+| 改前 | 7.599G | 1.880G |
+| FL-1 单独（旧逐位 CRC） | 7.489G（−1.4%） | 1.74G |
+| FL-5 单独（旧逐字节 reader） | 5.197G（−31.6%） | 1.27G |
+| **FL-1 + FL-5** | **5.001G（−34.2%）** | **1.357G（−27.8%）** |
+
+精度：引擎 f32 payload md5 改前==改后，且 `cmp` FFmpeg 参考**逐位一致**。
+首帧（p50 µs）：hot 196→120、cold 195→117、create 22→19、cold begin+create 245→157。
+回退（如实）：FL-2（LLVM 已内联）、FL-3（`@Vector(4,i64)` 点积 cycles +12%）、
+FL-4（去相关已被 LLVM 自动向量化）。验证：`zig build test` 679/679（5 seed）；ctest 22/22；Windows 交叉通过。
