@@ -48,18 +48,9 @@ extension _LikedPageActions on _LikedPageState {
     if (_resolving) return;
     setState(() => _resolving = true);
     try {
-      final String? url;
-      if (track.source == 'kugou' && track.kugou != null) {
-        url = await ref.read(kugouApiProvider).resolvePlayUrl(track.kugou!);
-      } else if (track.source == 'netease') {
-        url = await ref.read(neteaseApiProvider).resolvePlayUrl(track.id);
-      } else if (track.source == 'qqmusic') {
-        url = await ref.read(qqMusicApiProvider).resolvePlayUrl(track);
-      } else if (track.source == 'neko') {
-        url = await ref.read(nekoApiProvider).resolvePlayUrl(track);
-      } else {
-        url = null;
-      }
+      final String? url = await sourcePlatform(
+        track.source,
+      ).resolvePlayUrl(ref, track, quality: 'hq');
       if (!mounted) return;
       if (url == null || url.isEmpty) {
         _toast(context.l10n.trackListNoPlayableSource);

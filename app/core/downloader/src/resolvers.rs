@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // ============================================================
-// §9.6 第 3 层防御：PlatformUrlResolver trait 抽象
+// §9.6 第 3 层防御：SourceResolver trait 抽象 + 注册表
 //
 // 戒律 13.2：Dart 绝不参与 URL 解析签名，全在 Rust 内部。
 // 自研优先（§9.6 第 1 层）：Kugou/Netease 签名算法为 crate::crypto
@@ -12,6 +12,10 @@
 // v2 相对设计稿变更（2026-08-09）：因编译环境不得访问 GitHub，第三方 SDK
 // 备胎（kugou_sdk / ncm-api-rs）已整体移除，仅保留自研实现 + trait 抽象
 // （未来如需要 SDK 备胎，按同一 trait 新增 impl 即可，业务代码零改动）。
+//
+// 可插拔（2026-09）：音源 → 解析器经 [resolver_for] 注册表分发，
+// 中央 match 仅按「有无自研解析」二分；新增自研音源只需新增 impl +
+// 注册表加一条，业务代码（lib.rs）零改动。
 // ============================================================
 
 use std::collections::BTreeMap;
@@ -30,13 +34,54 @@ use crate::models::*;
 // trait 定义（第 3 层隔离）
 // ============================================================
 
-pub trait PlatformUrlResolver: Send + Sync {
+/// 音源 URL 解析器：把 enqueue 请求解析为可下载 URL。
+///
+/// 只有**具备 Rust 自研解析**的音源才实现本 trait；直传/预解析音源
+/// （QQ、Neko、Streaming、未来未知音源）不在注册表中，调用方据此走
+/// Dart 播放管线预解析 URL 回退（§12.1），行为与历史一致。
+pub trait SourceResolver: Send + Sync {
     /// 解析可下载 URL；[cancel] 为任务取消标志（解析阶段也响应取消）。
     fn resolve_play_url<'a>(
         &'a self,
         request: &'a EnqueueRequest,
         cancel: &'a Arc<AtomicBool>,
     ) -> Pin<Box<dyn Future<Output = Result<ResolvedUrl>> + Send + 'a>>;
+}
+
+/// 兼容别名：§9.6 设计文档与既有探测示例沿用 `PlatformUrlResolver` 名称。
+pub use self::SourceResolver as PlatformUrlResolver;
+
+// ============================================================
+// 注册表：音源 → 解析器
+// ============================================================
+
+/// Kugou 解析器进程级单例（trait object 引用需 `'static`）。
+static KUGOU_RESOLVER: KugouResolver = KugouResolver;
+/// Netease 解析器进程级单例。
+static NETEASE_RESOLVER: NeteaseResolver = NeteaseResolver;
+
+/// 按音源取自研 URL 解析器（`None` = 无 Rust 解析，走 Dart 预解析直链）。
+///
+/// 这是本模块唯一的音源分发点：新增自研音源只需 ① `impl SourceResolver`；
+/// ② 在 [resolver_for_platform] 加一条匹配。业务侧无需改动中央 match。
+///
+/// - Kugou / Netease → `Some(..)`
+/// - Qqmusic / Neko / Streaming 及未来未知音源 → `None`（行为不变）
+pub fn resolver_for(source: &str) -> Option<&'static dyn SourceResolver> {
+    resolver_for_platform(SourcePlatform::from_wire(source))
+}
+
+/// [resolver_for] 的强类型入口（已持有 [SourcePlatform] 时避免重复解析字符串）。
+pub fn resolver_for_platform(source: SourcePlatform) -> Option<&'static dyn SourceResolver> {
+    match source {
+        SourcePlatform::Kugou => Some(&KUGOU_RESOLVER),
+        SourcePlatform::Netease => Some(&NETEASE_RESOLVER),
+        // QQ / Neko / Streaming / 未知：Rust 无自研解析 → Dart 预解析直链。
+        SourcePlatform::Qqmusic
+        | SourcePlatform::Neko
+        | SourcePlatform::Streaming
+        | SourcePlatform::Unknown => None,
+    }
 }
 
 // ============================================================
@@ -398,7 +443,7 @@ fn quality_param_to_key(qp: &str) -> String {
     }
 }
 
-impl PlatformUrlResolver for KugouResolver {
+impl SourceResolver for KugouResolver {
     fn resolve_play_url<'a>(
         &'a self,
         request: &'a EnqueueRequest,
@@ -780,7 +825,7 @@ async fn nm_player_url(
     }))
 }
 
-impl PlatformUrlResolver for NeteaseResolver {
+impl SourceResolver for NeteaseResolver {
     fn resolve_play_url<'a>(
         &'a self,
         request: &'a EnqueueRequest,
@@ -811,5 +856,30 @@ impl PlatformUrlResolver for NeteaseResolver {
             }
             bail!("Netease 所有音质档位均无法获取 URL")
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registry_resolves_self_hosted_sources() {
+        assert!(resolver_for("kugou").is_some());
+        assert!(resolver_for("netease").is_some());
+        // 大小写不敏感（from_wire 归一）
+        assert!(resolver_for("Kugou").is_some());
+    }
+
+    #[test]
+    fn registry_returns_none_for_preresolved_and_unknown() {
+        // 预解析/直链音源：无自研解析 → None（走 Dart 预解析 URL）。
+        for s in ["qqmusic", "neko", "streaming"] {
+            assert!(resolver_for(s).is_none(), "source={s} 应无注册解析器");
+            assert!(resolver_for_platform(SourcePlatform::from_wire(s)).is_none());
+        }
+        // 未来未知音源同样 None，不再硬报错。
+        assert!(resolver_for("bilibili").is_none());
+        assert!(resolver_for_platform(SourcePlatform::Unknown).is_none());
     }
 }

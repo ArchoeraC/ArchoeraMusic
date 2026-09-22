@@ -109,36 +109,20 @@ extension _SearchPageFetch on _SearchPageState {
     }
   }
 
-  /// 单个平台搜索单曲（[loaded] = 该平台已累计条数，append 时据此取下一页；
-  /// netease 用 offset，kugou/qqmusic 用 page）。
+  /// 单个平台搜索单曲：游标与分页差异由注册表适配器封装（[loaded] = 该平台
+  /// 已累计条数，append 时据此取下一页；netease 用 offset，kugou/qqmusic 用
+  /// page，neko 无分页）。
   Future<SearchResult<Track>> _searchSongsFrom(
     String platform, {
     required bool append,
     required int loaded,
-  }) {
-    final page = append ? (loaded ~/ _SearchPageState._pageSize) + 1 : 1;
-    if (platform == 'neko') {
-      // Neko：服务端无分页（上限约 50），一次给全，hasMore=false。
-      return ref.read(nekoApiProvider).searchSongs(_query, page: 1);
-    }
-    if (platform == 'kugou') {
-      return ref
-          .read(kugouApiProvider)
-          .searchSongs(_query, page: page, limit: _SearchPageState._pageSize);
-    }
-    if (platform == 'qqmusic') {
-      return ref
-          .read(qqMusicApiProvider)
-          .searchSongs(_query, page: page, limit: _SearchPageState._pageSize);
-    }
-    return ref
-        .read(neteaseApiProvider)
-        .searchSongs(
-          _query,
-          offset: append ? loaded : 0,
-          limit: _SearchPageState._pageSize,
-        );
-  }
+  }) => sourcePlatform(platform).searchSongs(
+    ref,
+    _query,
+    append: append,
+    loaded: loaded,
+    limit: _SearchPageState._pageSize,
+  );
 
   /// 聚合搜索（'all'）单曲：网易 + KG + QQ **三方并行、各源独立容错**。
   ///
@@ -282,87 +266,23 @@ extension _SearchPageFetch on _SearchPageState {
     }
   }
 
-  /// KG分类搜索 type（album / author / special）。
-  static String _kugouCoverType(_SearchTab tab) => switch (tab) {
-    _SearchTab.albums => 'album',
-    _SearchTab.artists => 'author',
-    _ => 'special',
-  };
-
   /// 单个平台专辑/歌手/歌单下一页（[loaded] = 该平台已累计条数）。
+  ///
+  /// 分页游标、KG 分类参数、QQ 歌手单页上限、Neko 无分页等差异均由注册表
+  /// 适配器封装（见 [SourcePlatform.searchCover]）。
   Future<SearchResult<CoverItem>> _searchCoversFrom(
     String platform, {
     required _SearchTab tab,
     required bool append,
     required int loaded,
-  }) {
-    // QQ 歌手搜索单页上限 30（>30 服务端返回空），其余 50：分页除数跟随
-    // 实际请求量，避免页号漂移。
-    final qqArtists = platform == 'qqmusic' && tab == _SearchTab.artists;
-    final requestSize = qqArtists ? 30 : _SearchPageState._pageSize;
-    final page = append ? (loaded ~/ requestSize) + 1 : 1;
-    if (platform == 'neko') {
-      // Neko：歌单/歌手搜索均无分页；专辑无接口（返回空）。
-      final api = ref.read(nekoApiProvider);
-      return switch (tab) {
-        _SearchTab.playlists => api.searchPlaylists(_query),
-        _SearchTab.artists => api.searchArtists(_query),
-        _ => api.searchAlbums(_query),
-      };
-    }
-    if (platform == 'kugou') {
-      return () async {
-        final raw = await ref
-            .read(kugouApiProvider)
-            .searchByType(
-              _query,
-              type: _kugouCoverType(tab),
-              page: page,
-              pagesize: _SearchPageState._pageSize,
-            );
-        return SearchResult<CoverItem>(
-          items: raw.items.whereType<CoverItem>().toList(),
-          total: raw.total,
-          hasMore: raw.hasMore,
-        );
-      }();
-    }
-    if (platform == 'qqmusic') {
-      final api = ref.read(qqMusicApiProvider);
-      return switch (tab) {
-        _SearchTab.albums => api.searchAlbums(
-          _query,
-          page: page,
-          limit: requestSize,
-        ),
-        _SearchTab.artists => api.searchArtists(
-          _query,
-          page: page,
-          limit: requestSize,
-        ),
-        _ => api.searchPlaylists(_query, page: page, limit: requestSize),
-      };
-    }
-    final api = ref.read(neteaseApiProvider);
-    final offset = append ? loaded : 0;
-    return switch (tab) {
-      _SearchTab.albums => api.searchAlbums(
-        _query,
-        offset: offset,
-        limit: _SearchPageState._pageSize,
-      ),
-      _SearchTab.artists => api.searchArtists(
-        _query,
-        offset: offset,
-        limit: _SearchPageState._pageSize,
-      ),
-      _ => api.searchPlaylists(
-        _query,
-        offset: offset,
-        limit: _SearchPageState._pageSize,
-      ),
-    };
-  }
+  }) => sourcePlatform(platform).searchCover(
+    ref,
+    _query,
+    kind: _sourceSearchKind(tab),
+    append: append,
+    loaded: loaded,
+    limit: _SearchPageState._pageSize,
+  );
 
   /// 聚合专辑/歌手/歌单（'all'）：三方并行、各源独立容错（见 _fetchSongsAll）。
   Future<void> _fetchCoversAll({required bool append}) async {

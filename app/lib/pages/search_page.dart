@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../apis/qqmusic/core/request.dart' show QmErrorKind;
 import '../services/netease/netease_api.dart';
 import '../services/netease/track.dart';
+import '../services/source/source_platform.dart';
 import '../utils/search_relevance.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/qqmusic/qqmusic_api.dart' show QqApiException;
@@ -24,7 +25,6 @@ import '../widgets/dialogs/s_context_menu.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/list/song_list.dart';
 import '../widgets/dialogs/track_context_menu.dart';
-import '../widgets/dialogs/track_list_dialog.dart';
 import '../widgets/search/search_empty_state.dart';
 import '../widgets/search/search_error_state.dart';
 import '../widgets/search/search_source_state.dart';
@@ -73,8 +73,9 @@ class _SearchPageState extends ConsumerState<SearchPage>
   late String _platform;
 
   /// 聚合搜索（'all'）：**songs** tab 各平台分页游标。
+  /// 键全集来自注册表（含当前关闭的实验源，预留避免启用后缺键）。
   final Map<String, _AggState> _songAgg = {
-    for (final p in _aggAllPlatforms) p: _AggState(),
+    for (final p in aggregateSourceKeys()) p: _AggState(),
   };
 
   /// 聚合搜索（'all'）：**albums/artists/playlists** tab 各平台分页游标。
@@ -83,15 +84,12 @@ class _SearchPageState extends ConsumerState<SearchPage>
   /// 来源失败后的退避闸门（防连打触发更强风控）。
   final SearchSourceCooldown _sourceCooldown = SearchSourceCooldown();
 
-  /// 本次参与聚合的平台：固定三方 + 启用实验性音源时的 `neko`。
-  List<String> get _aggActive => [
-    ..._aggPlatforms,
-    if (ref.read(appPrefsProvider).nekoEnabled) 'neko',
-  ];
+  /// 本次参与聚合的平台：注册表中已启用且参与 `'all'` 的源。
+  List<String> get _aggActive => aggregateSources(ref);
 
   Map<String, _AggState> _coverAggFor(_SearchTab tab) =>
       _coverAgg.putIfAbsent(tab, () {
-        return {for (final p in _aggAllPlatforms) p: _AggState()};
+        return {for (final p in aggregateSourceKeys()) p: _AggState()};
       });
 
   /// 是否正在解析播放源（防连点）。

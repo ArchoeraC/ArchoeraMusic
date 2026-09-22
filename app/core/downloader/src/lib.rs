@@ -40,7 +40,7 @@ use zeroize::Zeroizing;
 use crate::crypto::kugou as kg;
 use crate::memsec::MlockSecret;
 use crate::models::*;
-use crate::resolvers::{KugouResolver, NeteaseResolver, PlatformUrlResolver};
+use crate::resolvers::resolver_for;
 
 // ============================================================
 // 全局单例状态（戒律 13.2：登录态以 Rust 内部为准，Dart 仅注入）
@@ -703,13 +703,11 @@ async fn run_task(
             extra_headers: request.pre_resolved_headers.clone(),
         }
     } else {
-        let resolved_result = match request.source {
-            SourcePlatform::Kugou => KugouResolver.resolve_play_url(&request, &cancel).await,
-            SourcePlatform::Netease => NeteaseResolver.resolve_play_url(&request, &cancel).await,
-            // QQ / Neko / Streaming：Rust 无自研解析 → 直接失败，交由 Dart 播放管线回退。
-            SourcePlatform::Qqmusic | SourcePlatform::Neko | SourcePlatform::Streaming => {
-                Err(anyhow::anyhow!("执行部分操作时发生错误"))
-            }
+        let resolved_result = match resolver_for(request.source.as_str()) {
+            Some(resolver) => resolver.resolve_play_url(&request, &cancel).await,
+            // QQ / Neko / Streaming / 未知音源：Rust 无自研解析 → 直接失败，
+            // 交由 Dart 播放管线回退（§12.1）。
+            None => Err(anyhow::anyhow!("执行部分操作时发生错误")),
         };
         match resolved_result {
             Ok(r) => r,

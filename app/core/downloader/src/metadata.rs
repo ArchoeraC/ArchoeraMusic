@@ -23,8 +23,10 @@
 // crate::netease_cookie()（setNeteaseCookie 注入）。无登录态时退化为匿名请求。
 // ============================================================
 
+use std::future::Future;
 use std::io::Read;
 use std::path::Path;
+use std::pin::Pin;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -115,10 +117,10 @@ pub async fn enrich_file(
     };
     meta.fill_from(&platform);
     meta.fill_from(&embedded.meta);
-    // Neko 等直传源：其内嵌/平台歌词常为站点广告或非标准格式，不可信——
+    // 不可信歌词源（Neko 等直传源：内嵌/平台歌词常为站点广告或非标准格式）——
     // 强制丢弃内嵌歌词，仅保留 enqueue 传入的标准 LRC；为空则留给下方
-    // LRCLIB 兜底（绝不再回落到广告词）。
-    if request.source == SourcePlatform::Neko {
+    // LRCLIB 兜底（绝不再回落到广告词）。可信度来自能力注册表。
+    if !metadata_capability_for(request.source).trusted_lyrics {
         meta.lyrics = request.lyrics.clone().filter(|s| !s.trim().is_empty());
     }
     if meta.lyrics.is_none() {
@@ -194,30 +196,136 @@ pub fn extract_embedded(path: &Path) -> EmbeddedMeta {
     EmbeddedMeta { meta, has_cover }
 }
 
-/// ② 平台信息拉取（分发）
+/// 平台元数据能力契约（能力表注册点，与 URL 解析注册表 [crate::resolvers::resolver_for] 解耦）。
+///
+/// 每个音源可按需实现；未实现（注册表中 `provider = None`）的音源返回默认
+/// 元数据 / 无平台歌词，交由 enqueue 传入字段 + 兜底源（MusicBrainz / LRCLIB）补全。
+pub trait PlatformMetadataProvider: Send + Sync {
+    /// 平台元数据（标题 / 歌手 / 专辑 / 封面 URL）。
+    fn fetch_info<'a>(
+        &'a self,
+        client: &'a reqwest::Client,
+        request: &'a EnqueueRequest,
+    ) -> Pin<Box<dyn Future<Output = TrackMetadata> + Send + 'a>>;
+
+    /// 平台歌词（标准 LRC）。
+    fn fetch_lyrics<'a>(
+        &'a self,
+        client: &'a reqwest::Client,
+        request: &'a EnqueueRequest,
+    ) -> Pin<Box<dyn Future<Output = Option<String>> + Send + 'a>>;
+}
+
+/// Kugou 平台元数据实现（mobilecdn 搜索 + lyrics 两步走）。
+struct KugouMetadataProvider;
+/// Netease 平台元数据实现（weapi song/detail + song/lyric）。
+struct NeteaseMetadataProvider;
+
+impl PlatformMetadataProvider for KugouMetadataProvider {
+    fn fetch_info<'a>(
+        &'a self,
+        client: &'a reqwest::Client,
+        request: &'a EnqueueRequest,
+    ) -> Pin<Box<dyn Future<Output = TrackMetadata> + Send + 'a>> {
+        Box::pin(kugou_info(client, request))
+    }
+
+    fn fetch_lyrics<'a>(
+        &'a self,
+        client: &'a reqwest::Client,
+        request: &'a EnqueueRequest,
+    ) -> Pin<Box<dyn Future<Output = Option<String>> + Send + 'a>> {
+        Box::pin(kugou_lyrics(client, request))
+    }
+}
+
+impl PlatformMetadataProvider for NeteaseMetadataProvider {
+    fn fetch_info<'a>(
+        &'a self,
+        client: &'a reqwest::Client,
+        request: &'a EnqueueRequest,
+    ) -> Pin<Box<dyn Future<Output = TrackMetadata> + Send + 'a>> {
+        Box::pin(netease_info(client, request))
+    }
+
+    fn fetch_lyrics<'a>(
+        &'a self,
+        client: &'a reqwest::Client,
+        request: &'a EnqueueRequest,
+    ) -> Pin<Box<dyn Future<Output = Option<String>> + Send + 'a>> {
+        Box::pin(netease_lyrics(client, request))
+    }
+}
+
+/// 单音源元数据能力项。
+pub struct SourceMetadataCapability {
+    /// 平台实现；`None` = 无平台接口（元数据/歌词返回默认）。
+    pub provider: Option<&'static dyn PlatformMetadataProvider>,
+    /// 平台 / 内嵌歌词是否可信。Neko 等直传源的歌词常为站点广告，置 `false`：
+    /// 仅保留 enqueue 传入的标准 LRC，其余留给 LRCLIB 兜底。
+    pub trusted_lyrics: bool,
+}
+
+static KUGOU_META_IMPL: KugouMetadataProvider = KugouMetadataProvider;
+static NETEASE_META_IMPL: NeteaseMetadataProvider = NeteaseMetadataProvider;
+
+static KUGOU_META: SourceMetadataCapability = SourceMetadataCapability {
+    provider: Some(&KUGOU_META_IMPL),
+    trusted_lyrics: true,
+};
+static NETEASE_META: SourceMetadataCapability = SourceMetadataCapability {
+    provider: Some(&NETEASE_META_IMPL),
+    trusted_lyrics: true,
+};
+/// Neko 直传源：无平台接口，且内嵌/平台歌词不可信。
+static NEKO_META: SourceMetadataCapability = SourceMetadataCapability {
+    provider: None,
+    trusted_lyrics: false,
+};
+/// QQ / Streaming 及未来未知音源：无平台接口，歌词沿用内嵌/平台默认（可信）。
+static DEFAULT_META: SourceMetadataCapability = SourceMetadataCapability {
+    provider: None,
+    trusted_lyrics: true,
+};
+
+/// 音源元数据能力注册表：新增音源只需在此追加一项（或复用 [DEFAULT_META]）。
+///
+/// - Kugou / Netease → 各自平台实现
+/// - Neko → 无平台实现 + 歌词不可信
+/// - Qqmusic / Streaming / 未知 → [DEFAULT_META]
+pub fn metadata_capability_for(source: SourcePlatform) -> &'static SourceMetadataCapability {
+    match source {
+        SourcePlatform::Kugou => &KUGOU_META,
+        SourcePlatform::Netease => &NETEASE_META,
+        SourcePlatform::Neko => &NEKO_META,
+        SourcePlatform::Qqmusic | SourcePlatform::Streaming | SourcePlatform::Unknown => {
+            &DEFAULT_META
+        }
+    }
+}
+
+/// ② 平台信息拉取（按能力注册表分发）
 pub async fn fetch_platform_info(
     client: &reqwest::Client,
     request: &EnqueueRequest,
 ) -> TrackMetadata {
-    match request.source {
-        SourcePlatform::Kugou => kugou_info(client, request).await,
-        SourcePlatform::Netease => netease_info(client, request).await,
-        // QQ / Neko / Streaming 无 Rust 侧平台接口：用 enqueue 传入元数据 + 兜底源
-        // （MusicBrainz / CAA）补全。
-        SourcePlatform::Qqmusic | SourcePlatform::Neko | SourcePlatform::Streaming => TrackMetadata::default(),
+    match metadata_capability_for(request.source).provider {
+        Some(provider) => provider.fetch_info(client, request).await,
+        // QQ / Neko / Streaming / 未知：无 Rust 侧平台接口，用 enqueue 传入元数据
+        // + 兜底源（MusicBrainz / CAA）补全。
+        None => TrackMetadata::default(),
     }
 }
 
-/// ② 平台歌词拉取（分发）
+/// ② 平台歌词拉取（按能力注册表分发）
 pub async fn fetch_platform_lyrics(
     client: &reqwest::Client,
     request: &EnqueueRequest,
 ) -> Option<String> {
-    match request.source {
-        SourcePlatform::Kugou => kugou_lyrics(client, request).await,
-        SourcePlatform::Netease => netease_lyrics(client, request).await,
+    match metadata_capability_for(request.source).provider {
+        Some(provider) => provider.fetch_lyrics(client, request).await,
         // 歌词兜底：enqueue 未带歌词时走 LRCLIB（见 enrich_file）。
-        SourcePlatform::Qqmusic | SourcePlatform::Neko | SourcePlatform::Streaming => None,
+        None => None,
     }
 }
 
@@ -1039,5 +1147,29 @@ mod tests {
         let t0 = Instant::now();
         mb_throttle();
         assert!(t0.elapsed() >= Duration::from_millis(950));
+    }
+
+    #[test]
+    fn capability_registry_matches_platforms() {
+        // Kugou / Netease 有平台实现，歌词可信。
+        for src in [SourcePlatform::Kugou, SourcePlatform::Netease] {
+            let cap = metadata_capability_for(src);
+            assert!(cap.provider.is_some(), "{src:?} 应有平台元数据实现");
+            assert!(cap.trusted_lyrics, "{src:?} 歌词应可信");
+        }
+        // Neko：无平台实现 + 歌词不可信（仅用 enqueue 标准 LRC）。
+        let neko = metadata_capability_for(SourcePlatform::Neko);
+        assert!(neko.provider.is_none());
+        assert!(!neko.trusted_lyrics);
+        // QQ / Streaming / 未知：无平台实现，歌词可信（沿用内嵌/平台默认）。
+        for src in [
+            SourcePlatform::Qqmusic,
+            SourcePlatform::Streaming,
+            SourcePlatform::Unknown,
+        ] {
+            let cap = metadata_capability_for(src);
+            assert!(cap.provider.is_none(), "{src:?} 不应有平台实现");
+            assert!(cap.trusted_lyrics, "{src:?} 歌词应可信");
+        }
     }
 }
