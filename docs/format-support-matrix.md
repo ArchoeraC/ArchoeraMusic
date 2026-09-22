@@ -91,10 +91,10 @@ scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的
 
 | 优先 | 格式 | 价值 / 说明 | 对应 ffmpeg 参考 |
 |---|---|---|---|
-| ~~P1~~ **Musepack（.mpc/.mpp，SV7/SV8）** | SV8 已接入（2026-09-04，fmt/mpc，100% bit-exact）；SV7 待做 | `mpc8.c`（已完成）/ `mpc7.c`（待） |
+| ~~P1~~ **Musepack（.mpc/.mpp，SV7/SV8）** | **SV8 + SV7 均已接入**（fmt/mpc，100% bit-exact；SV7 逐位对齐 `ffmpeg -i inside-mp7.mpc`，含 seek 对拍）；上述内核符号已按纪律改为 `era_` 前缀（不照搬上游标识符） | `mpc8.c` / `mpc7.c`（均已完成） |
 | ~~P1~~ **TTA（.tta）** | 已接入（2026-09-04，fmt/tta，bps 8/16/24，100% bit-exact） | `tta.c`（已完成） |
 | ~~P2~~ **Ogg-Speex（.spx）** | 已接入（fmt/spx，NB/WB/UWB/VBR，100% bit-exact）；L3 经内核元数据桥入库（2026-09-10） | `speexdec.c`、`celt`/`speex` 表（已完成） |
-| ~~P2~~ **Shorten（.shn）** | 已接入（2026-09-04，fmt/shn，v0/v1/v2 U8/S16，bit-exact）；L3 仍未入库（内核元数据桥未覆盖） | `shorten.c`（已完成） |
+| ~~P2~~ **Shorten（.shn）** | 已接入（2026-09-04，fmt/shn，v0/v1/v2 U8/S16，bit-exact；内核符号已 `era_` 前缀化，不照搬上游标识符）；L3 仍未入库（内核元数据桥未覆盖） | `shorten.c`（已完成） |
 | ~~P2~~ **已完成（2026-09-22）** | **MPEG 裸流 mp2/mp1 落库** | `ScannerEngine.AudioExt` 已收录（mp2 2026-09-04、mp1 2026-09-22；非内核工作） | — |
 | P3 | OptimFROG / TAK / .ofr / realaudio cook | 极罕见/老旧，维持 FFmpeg 兜底即可，暂缓 | — |
 | P3 | MIDI / tracker / 游戏音轨 | 定位外（非压缩音频解码），维持 FFmpeg 兜底 | — |

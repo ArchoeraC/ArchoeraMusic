@@ -339,7 +339,7 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
             const fresh = try sv7.Decoder7.init(f.allocator, f.data);
             d.deinit();
             d.* = fresh;
-            const warmup: u64 = @min(frame_idx, sv7.DELAY_FRAMES);
+            const warmup: u64 = @min(frame_idx, sv7.era_mpc_delay_frames);
             // 直接跳到预热起点帧（不解码之前的内容：LFG/oldDSCF 状态按
             // "全新会话 + flush" 语义重建，与 ffmpeg -ss 一致）
             d.resetTo(@intCast(frame_idx - warmup));
