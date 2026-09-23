@@ -19,6 +19,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
@@ -88,8 +89,12 @@ abstract class CollectionPlatform {
   /// 登录动作（弹对应平台登录框）。
   Future<void> login(BuildContext context);
 
-  /// 登录态信号（页面据此监听并在变化时重置/重载）。
-  dynamic get authSignal;
+  /// 登录态信号（页面据此监听并在变化时重置/重载）；无登录态的源返回 null。
+  ///
+  /// 类型明确为 [ProviderListenable]（而非 dynamic）：dynamic 实参会让
+  /// `ref.listen` 以 `T=dynamic` 调用，Riverpod 内部的订阅实现类型判定失败 →
+  /// 运行时 NoSuchMethodError（收藏/我喜欢页白屏）。
+  ProviderListenable<Object?>? get authSignal;
 
   /// 红心操作失败时的提示文案。
   String likeFailedText(AppLocalizations l10n);
@@ -232,7 +237,7 @@ class _NeteaseCollection extends CollectionPlatform {
   String label(AppLocalizations l10n) => l10n.platformNetease;
 
   @override
-  dynamic get authSignal =>
+  ProviderListenable<Object?>? get authSignal =>
       neteaseAuthProvider.select<Object?>((a) => a?.userId);
 
   @override
@@ -408,7 +413,7 @@ class _KugouCollection extends CollectionPlatform {
   String label(AppLocalizations l10n) => l10n.platformKugou;
 
   @override
-  dynamic get authSignal =>
+  ProviderListenable<Object?>? get authSignal =>
       kugouApiProvider.select<Object?>((s) => s.session?.userid);
 
   @override
@@ -587,7 +592,7 @@ class _QqCollection extends CollectionPlatform {
   String label(AppLocalizations l10n) => l10n.platformQQMusic;
 
   @override
-  dynamic get authSignal =>
+  ProviderListenable<Object?>? get authSignal =>
       qqMusicApiProvider.select<Object?>((s) => s.isLoggedIn);
 
   @override
@@ -842,7 +847,7 @@ class _NekoCollection extends CollectionPlatform {
   String label(AppLocalizations l10n) => l10n.platformNeko;
 
   @override
-  dynamic get authSignal =>
+  ProviderListenable<Object?>? get authSignal =>
       nekoApiProvider.select<Object?>((s) => s.isLoggedIn);
 
   @override
@@ -856,7 +861,13 @@ class _NekoCollection extends CollectionPlatform {
   List<String> get tabIds => const ['created', 'collectedPlaylist', 'liked'];
 
   @override
-  bool enabled(dynamic ref) => ref.read(appPrefsProvider).nekoEnabled;
+  bool enabled(dynamic ref) {
+    // `ref` 为 dynamic（注册表同时被 WidgetRef / Ref 调用）：dynamic 调用不走
+    // 扩展方法（extension getter 无法动态派发），必须显式转回 AppPrefs 再读，
+    // 否则运行时 NoSuchMethodError → 「我喜欢 / 收藏 / 搜索」整页白屏。
+    final prefs = ref.read(appPrefsProvider) as AppPrefs;
+    return prefs.nekoEnabled;
+  }
 
   @override
   bool loggedIn(dynamic ref) => ref.read(nekoApiProvider).isLoggedIn;

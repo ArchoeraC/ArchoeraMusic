@@ -16,7 +16,10 @@ extension _LikedPageView on _LikedPageState {
 
     // 各平台登录态变化 → 重置/重载（信号由注册表适配器提供）。
     for (final p in collectionPlatforms(ref)) {
-      ref.listen(p.authSignal, (_, _) => _onAuthChanged(p.source));
+      final signal = p.authSignal;
+      if (signal != null) {
+        ref.listen(signal, (_, _) => _onAuthChanged(p.source));
+      }
     }
     // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
     ref.watch(appPrefsProvider.select((p) => p.nekoEnabled));
