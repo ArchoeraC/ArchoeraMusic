@@ -262,18 +262,25 @@ class _QqCommentPlatform extends CommentPlatform {
 
 // ── NK ─────────────────────────────────────────────────────────────────
 
-/// NK评论 → 通用展示模型（服务端不返回头像，走首字母占位）。
-NeteaseComment _ToTile(Comment c) => NeteaseComment(
+/// NK评论 → 通用展示模型。
+///
+/// 服务端不在评论里带头像，但提供 `GET /api/user/avatar/{userId}`；这里用
+/// [avatarOf] 按 userId 拼出头像地址（为空则走首字母占位）。
+NeteaseComment _ToTile(
+  Comment c, {
+  required String? Function(String? userId) avatarOf,
+}) => NeteaseComment(
   id: c.id,
   userId: c.userId,
   userName: c.userName,
+  avatar: avatarOf(c.userId),
   text: c.text,
   location: c.location,
   replyTotal: c.replyTotal,
   time: c.time,
   canDelete: c.canDelete,
   replyToName: c.replyToName,
-  reply: c.replies.map(_ToTile).toList(),
+  reply: c.replies.map((r) => _ToTile(r, avatarOf: avatarOf)).toList(),
 );
 
 class _CommentPlatform extends CommentPlatform {
@@ -309,11 +316,12 @@ class _CommentPlatform extends CommentPlatform {
     required bool hot,
     required int page,
   }) async {
-    final p = await ref
-        .read(ApiProvider)
-        .songComments(targetId, page: page);
+    final api = ref.read(ApiProvider);
+    final p = await api.songComments(targetId, page: page);
     return NeteaseCommentPage(
-      list: p.list.map(_ToTile).toList(),
+      list: p.list
+          .map((Comment c) => _ToTile(c, avatarOf: api.userAvatarUrl))
+          .toList(),
       total: p.total,
       page: p.page,
       limit: p.pageSize,
