@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/netease/track.dart';
+import '../../easter_egg/mouse_dodge.dart';
 import '../../stores/app_prefs.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
@@ -148,7 +149,7 @@ class _SongRowState extends ConsumerState<SongRow> {
   }
 
   @override
-  Widget build(BuildContext context) => _buildSongRow(context);
+  Widget build(BuildContext context) => MouseDodge(child: _buildSongRow(context));
 
   void _setHover(bool value) {
     setState(() => _hover = value);

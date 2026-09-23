@@ -1684,20 +1684,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsFontMiSans => 'MiSans (default)';
 
   @override
-  String get settingsFontNoto => 'Noto Sans SC (standard metrics)';
-
-  @override
-  String get settingsFontHarmony =>
-      'HarmonyOS Sans SC (free for commercial use)';
-
-  @override
   String get settingsFontMiSansLabel => 'MiSans';
-
-  @override
-  String get settingsFontNotoLabel => 'Noto Sans SC';
-
-  @override
-  String get settingsFontHarmonyLabel => 'HarmonyOS Sans';
 
   @override
   String get settingsSectionLanguage => 'Interface language';
@@ -3162,6 +3149,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Self-developed player: local library, direct sources, self-hosted Subsonic, native audio engine.';
 
   @override
+  String get settingsNeverTap => 'Never tap';
+
+  @override
+  String get easterEggGateTitle => 'Warning';
+
+  @override
+  String get easterEggGateBody =>
+      'Run this program? If it causes irreversible consequences, you may choose to close the software.';
+
+  @override
   String get settingsSectionDeclaration => 'Software declaration';
 
   @override
@@ -3268,7 +3265,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      'This software bundles the following fonts:\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, used under the MiSans Font Intellectual Property License Agreement)\n· HarmonyOS Sans SC (© Huawei, used under the HarmonyOS Sans Font License Agreement)';
+      'This software bundles the following font:\n· MiSans (© Xiaomi, used under the MiSans Font Intellectual Property License Agreement)';
 
   @override
   String get commonNoLyrics => 'No lyrics';
@@ -3455,8 +3452,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Floating capsule at bottom · Full-width docked';
 
   @override
-  String get settingsSearchFontSubtitle =>
-      'MiSans · Noto Sans · HarmonyOS Sans';
+  String get settingsSearchFontSubtitle => 'MiSans';
 
   @override
   String get settingsSearchLanguageSubtitle =>

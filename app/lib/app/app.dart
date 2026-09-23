@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../apis/runtime.dart';
+import '../easter_egg/easter_egg.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/l10n.dart';
 import '../services/platform/media_session.dart';
@@ -136,6 +137,9 @@ class ArchoeraMusicApp extends ConsumerWidget {
               // 此前置于 MaterialApp 之上 → context.l10n 空引用崩溃
               // （2026-08-15 修复实录）。
               gate = VaultCrashGate(child: gate);
+              // 彩蛋视觉（缩放/镜像/反转/位移）包在最外层：作用于整棵 UI
+              // （Navigator 及以下，含弹窗）；除 #2 外永久生效、不还原。
+              gate = EasterEggVisualHost(child: gate);
               if (performanceMode) {
                 gate = MediaQuery(
                   data: MediaQuery.of(

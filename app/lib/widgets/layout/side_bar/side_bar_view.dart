@@ -119,7 +119,14 @@ extension _SideBarView on _SideBarState {
                       else
                         const SizedBox(height: 12),
                       for (final item in items)
-                        _buildNavItem(theme, item, collapsed, animated),
+                        MouseDodge(
+                          child: _buildNavItem(
+                            theme,
+                            item,
+                            collapsed,
+                            animated,
+                          ),
+                        ),
                     ],
                   ],
                 ),

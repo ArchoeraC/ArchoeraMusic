@@ -35,7 +35,7 @@ class SettingTile extends StatelessWidget {
     final subFg = enabled
         ? scheme.onSurfaceVariant.withValues(alpha: 0.75)
         : scheme.onSurfaceVariant.withValues(alpha: 0.35);
-    return Padding(
+    final Widget tile = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
@@ -76,6 +76,7 @@ class SettingTile extends StatelessWidget {
         ],
       ),
     );
+    return MouseDodge(child: tile);
   }
 }
 

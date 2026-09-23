@@ -273,23 +273,8 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
             SettingTile(
               icon: EtaIcons.fontOutline,
               title: l10n.settingsFontTitle,
-              subtitle: switch (prefs.fontFamily) {
-                'MiSans' => l10n.settingsFontMiSans,
-                'Noto Sans SC' => l10n.settingsFontNoto,
-                _ => l10n.settingsFontHarmony,
-              },
-              trailing: SSegmented<String>(
-                options: [
-                  SSegmentedOption('MiSans', l10n.settingsFontMiSansLabel),
-                  SSegmentedOption('Noto Sans SC', l10n.settingsFontNotoLabel),
-                  SSegmentedOption(
-                    'HarmonyOS Sans SC',
-                    l10n.settingsFontHarmonyLabel,
-                  ),
-                ],
-                selected: prefs.fontFamily,
-                onChanged: (family) => notifier.setFontFamily(family),
-              ),
+              subtitle: l10n.settingsFontMiSans,
+              trailing: const SizedBox.shrink(),
             ),
           ],
         ),

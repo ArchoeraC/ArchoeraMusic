@@ -5,6 +5,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
+import '../../easter_egg/mouse_dodge.dart';
 import '../../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/toast.dart';

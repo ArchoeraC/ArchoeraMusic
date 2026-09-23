@@ -156,8 +156,9 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
   /// 开 = 底部居中圆角胶囊悬浮条（玻璃面板 + 阴影）；关 = 全宽停靠条。
   bool get floatingPlayerBar => data[floatingBarKey] as bool? ?? false;
 
-  /// 界面字体（内置字体族名；默认 MiSans）。
-  String get fontFamily => data[fontFamilyKey] as String? ?? 'MiSans';
+  /// 界面字体：仅内置 MiSans（旧版本可能存过 Noto/HarmonyOS，这里统一归一到
+  /// MiSans，避免引用已移除的字体族）。
+  String get fontFamily => 'MiSans';
 
   /// 封面圆角（px；0/8/12，对齐原版 CoverList 观感，默认 10）。
   double get coverRadius {

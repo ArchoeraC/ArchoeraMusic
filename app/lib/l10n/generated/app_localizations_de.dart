@@ -1701,19 +1701,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsFontMiSans => 'MiSans（Standard）';
 
   @override
-  String get settingsFontNoto => 'Noto Sans SC（Standardmetriken）';
-
-  @override
-  String get settingsFontHarmony => 'HarmonyOS Sans SC（kostenlos kommerziell）';
-
-  @override
   String get settingsFontMiSansLabel => 'MiSans';
-
-  @override
-  String get settingsFontNotoLabel => 'Noto Sans SC';
-
-  @override
-  String get settingsFontHarmonyLabel => 'HarmonyOS Sans';
 
   @override
   String get settingsSectionLanguage => 'Oberflächensprache';
@@ -3198,6 +3186,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Eigener Musikplayer: lokale Bibliothek, direkte Quellen, selbst gehostetes Subsonic, native Audio-Engine';
 
   @override
+  String get settingsNeverTap => 'Nicht antippen';
+
+  @override
+  String get easterEggGateTitle => 'Warnung';
+
+  @override
+  String get easterEggGateBody =>
+      'Dieses Programm ausführen? Falls es irreversible Folgen hat, kannst du die Software schließen.';
+
+  @override
   String get settingsSectionDeclaration => 'Software-Erklärung';
 
   @override
@@ -3303,7 +3301,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      'Diese Software enthält die folgenden Schriftarten:\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, verwendet gemäß der MiSans Font Intellectual Property License Agreement)\n· HarmonyOS Sans SC (© Huawei, verwendet gemäß der HarmonyOS Sans Font License Agreement)';
+      'Diese Software enthält die folgende Schriftart:\n· MiSans (© Xiaomi, verwendet gemäß der MiSans Font Intellectual Property License Agreement)';
 
   @override
   String get commonNoLyrics => 'Keine Songtexte';
@@ -3490,8 +3488,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Fließende Kapsel unten · Breit angedockt';
 
   @override
-  String get settingsSearchFontSubtitle =>
-      'MiSans · Noto Sans · HarmonyOS Sans';
+  String get settingsSearchFontSubtitle => 'MiSans';
 
   @override
   String get settingsSearchLanguageSubtitle =>
