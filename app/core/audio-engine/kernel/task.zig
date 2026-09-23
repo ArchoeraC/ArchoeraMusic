@@ -37,6 +37,10 @@ pub const Task = struct {
     err: ?kerr.Error = null,
     event: std.Io.Event = .unset,
 
+    /// AS5：协作式取消请求（原子）。任务体在 chunk 边界 `isCancelled()` 观察到后
+    /// 中途收尾（`fail(error.Aborted)`）；无抢占——只在完全空闲/块边界响应。
+    cancel_requested: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+
     /// 体函数内调用：报可分类错误（→ error）
     pub fn fail(self: *Task, e: kerr.Error) void {
         self.err = e;
@@ -46,6 +50,16 @@ pub const Task = struct {
     /// 体函数内调用：FATAL 逃生舱（§5.2 层1）——不可预知输入，会话级收尾
     pub fn fatal(self: *Task) void {
         self.outcome = .fatal;
+    }
+
+    /// AS5：请求取消（任意线程可调用；任务体在 chunk 边界响应，不抢占运行中的块）。
+    pub fn cancel(self: *Task) void {
+        self.cancel_requested.store(true, .release);
+    }
+
+    /// AS5：是否已请求取消（acquire 语义，与 cancel 的 release 配对）。
+    pub fn isCancelled(self: *const Task) bool {
+        return self.cancel_requested.load(.acquire);
     }
 
     pub fn isDone(self: *const Task) bool {
@@ -207,3 +221,27 @@ test "task: 体函数报 error / fatal → wait 读到对应 outcome" {
     try testing.expectEqual(Outcome.fatal, t_fatal.outcome);
 }
 
+
+test "AS5 task: cancel 置位；体在开工前观察到 → fail(Aborted)" {
+    var rt = try runtime.Runtime.init(std.heap.c_allocator, .{ .min_workers = 1 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    const Ctx = struct {
+        fn body(t: *Task) void {
+            if (t.isCancelled()) {
+                t.fail(error.Aborted);
+                return;
+            }
+        }
+    };
+    var t = Task{ .run = Ctx.body };
+    try testing.expect(!t.isCancelled());
+    t.cancel();
+    try testing.expect(t.isCancelled());
+    try testing.expect(spawnInto(rt, &t));
+    wait(&t);
+    try testing.expectEqual(Outcome.failed, t.outcome);
+    try testing.expectEqual(error.Aborted, t.err.?);
+}

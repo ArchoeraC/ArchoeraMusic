@@ -438,9 +438,75 @@ int zk_task_wait_timeout(ZkTask *t, long long timeout_ms);
  * 说明：以下四行是并行分支的**互不重叠**插入点，避免同一文件合并冲突。
  * 实现分支只替换属于自己的那一个锚点，禁止改动其他锚点。 */
 /* __BRIDGE_DSP_EXT__ */
-/* __BRIDGE_STREAM_BUDGET__ */
+/* ---- N4 流式 Reader 缓冲预算（__BRIDGE_STREAM_BUDGET__）----
+ *
+ * 每路 callback Reader 自持一个 peek 缓冲；内核按进程预算记账。
+ * 默认预算 = 0（不限）、每路 16 KiB（与既有行为逐字节一致）。
+ */
+/** 当前所有 callback Reader peek 缓冲已用字节。 */
+unsigned long long zk_stream_mem_used(void);
+/** 设置目标内存预算（字节）；0 = 不限（默认）。仅影响之后新分配的缓冲。 */
+void zk_stream_mem_set_budget(unsigned long long bytes);
+/** 设置每路 callback Reader 缓冲目标大小（夹取到 [16 KiB, 64 KiB]）。 */
+void zk_stream_peek_set_bytes(unsigned int bytes);
+/** 当前每路 callback Reader 缓冲目标大小（默认 16 KiB）。 */
+unsigned int zk_stream_peek_bytes(void);
 /* __BRIDGE_TAKEOVER__ */
-/* __BRIDGE_ENGINE_STATS__ */
+/* ---- AS6 可观测聚合 + AS5 取消（__BRIDGE_ENGINE_STATS__）---- */
+/** 内核池 + 流式会话聚合计数（只读快照）。 */
+typedef struct ZkEngineStats {
+    unsigned long long active;              /**< 可服役 worker 数 */
+    unsigned long long running;             /**< 当前在跑任务数 */
+    unsigned long long idle;                /**< 在役空闲 worker 数 */
+    unsigned long long pinned;              /**< pinned（长流专属）槽数 */
+    unsigned long long inflight;            /**< 排队 + 在途任务数 */
+    unsigned long long stall_count;         /**< 停滞放弃累计 */
+    unsigned long long spawn_count;         /**< 成功创建 worker 累计 */
+    unsigned long long spawn_failed_count;  /**< spawn 失败累计 */
+    unsigned long long stream_count;        /**< 当前流式会话数 */
+} ZkEngineStats;
+
+/** AS6：聚合 [zk_engine_init] 的池计数写入 out（h/out 为空时空操作）。 */
+void zk_engine_stats(const ZkEngine *h, ZkEngineStats *out);
+
+/**
+ * AS5：请求取消池内结构化任务（t 为空时空操作）。任务在 chunk 边界协作响应：
+ * [zk_task_wait] 返回 -ZK_ABORTED，[zk_task_outcome] 返回 ZK_SUBMIT_ERROR。
+ */
+void zk_task_cancel(ZkTask *t);
+
+/* ---- AS4 格式提示（稳定数值；0 = unknown/auto）----
+ * 与 kernel/probe.zig 的 FormatHint 逐值对齐，一经发布不得重排。
+ * [ZkSubmitReq.format_hint] 携带该值：非 0 时内核免 probe 直分派，失败回退 probe。
+ */
+enum ZkFormatHint {
+    ZK_FMT_UNKNOWN    = 0,
+    ZK_FMT_WAV        = 1,
+    ZK_FMT_FLAC       = 2,
+    ZK_FMT_MP3        = 3,
+    ZK_FMT_OGG_OPUS   = 4,
+    ZK_FMT_OGG_VORBIS = 5,
+    ZK_FMT_OGG_FLAC   = 6,
+    ZK_FMT_OGG_SPEEX  = 7,
+    ZK_FMT_M4A        = 8,
+    ZK_FMT_AAC        = 9,
+    ZK_FMT_LATM       = 10,
+    ZK_FMT_APE        = 11,
+    ZK_FMT_WV         = 12,
+    ZK_FMT_SHN        = 13,
+    ZK_FMT_TAK        = 14,
+    ZK_FMT_DSD        = 15,
+    ZK_FMT_AMR        = 16,
+    ZK_FMT_AMRWB      = 17,
+    ZK_FMT_AC3        = 18,
+    ZK_FMT_MLP        = 19,
+    ZK_FMT_TRUEHD     = 20,
+    ZK_FMT_WMA        = 21,
+    ZK_FMT_DTS        = 22,
+    ZK_FMT_MKA        = 23,
+    ZK_FMT_MPC        = 24,
+    ZK_FMT_TTA        = 25
+};
 
 #ifdef __cplusplus
 }
