@@ -450,6 +450,56 @@ target_include_directories(test_lowfreq PRIVATE
 add_test(NAME test_lowfreq COMMAND test_lowfreq)
 set_tests_properties(test_lowfreq PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
-# __TESTS_STREAM_BUDGET__
+
+# N4 流式 Reader 缓冲预算（zk_stream_*）：默认/夹取/超预算拒绝/记账归零
+add_executable(test_stream_budget test_stream_budget.c)
+target_link_libraries(test_stream_budget PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_stream_budget PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_stream_budget PRIVATE m)
+endif()
+target_include_directories(test_stream_budget PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_stream_budget COMMAND test_stream_budget)
+set_tests_properties(test_stream_budget PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# AS6 可观测聚合（zk_engine_stats）：固定容量计数精确 + stream_count 归并
+add_executable(test_engine_stats test_engine_stats.c)
+target_link_libraries(test_engine_stats PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_engine_stats PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_engine_stats PRIVATE m)
+endif()
+target_include_directories(test_engine_stats PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_engine_stats COMMAND test_engine_stats)
+set_tests_properties(test_engine_stats PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# AS5 取消（zk_task_cancel）：排队任务取消 → -ZK_ABORTED / ERROR（FIFO 编排，POSIX）
+add_executable(test_task_cancel test_task_cancel.c)
+target_link_libraries(test_task_cancel PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_task_cancel PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_task_cancel PRIVATE m)
+endif()
+target_include_directories(test_task_cancel PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_task_cancel COMMAND test_task_cancel)
+set_tests_properties(test_task_cancel PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # __TESTS_TAKEOVER__
-# __TESTS_ENGINE_STATS__
