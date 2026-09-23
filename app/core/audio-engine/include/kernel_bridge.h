@@ -439,7 +439,15 @@ int zk_task_wait_timeout(ZkTask *t, long long timeout_ms);
  * 实现分支只替换属于自己的那一个锚点，禁止改动其他锚点。 */
 /* __BRIDGE_DSP_EXT__ */
 /* __BRIDGE_STREAM_BUDGET__ */
-/* __BRIDGE_TAKEOVER__ */
+/* 方向③ F5 接管门控（静态位图 + 格式/扩展名判定）。
+ *   - zk_takeover_bitmap()：bit i（i = probe.Format 枚举序）为 1 = 该格式已接管；
+ *   - zk_takeover_of_format(fmt)：给定 Format 枚举序 → 1/0（越界 0）；
+ *   - zk_takeover_of_ext(ext)：扩展名（可带/不带 '.'，大小写不敏感）→
+ *       1 = 已接管（优先 native）、0 = 明确未接管（C 壳可跳过无效 native open）、
+ *       -1 = 未知（保留 try-then-fallback，交给 probe 按内容判定）。 */
+unsigned long long zk_takeover_bitmap(void);
+int zk_takeover_of_format(int fmt);
+int zk_takeover_of_ext(const char *ext);
 /* __BRIDGE_ENGINE_STATS__ */
 
 #ifdef __cplusplus
