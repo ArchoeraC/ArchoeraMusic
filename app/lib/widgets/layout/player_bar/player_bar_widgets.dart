@@ -125,8 +125,8 @@ Rect? _anchorOf(BuildContext context) {
   return box.localToGlobal(Offset.zero) & box.size;
 }
 
-class _BarInfoArea extends ConsumerWidget {
-  const _BarInfoArea();
+class _BarInfoSlot extends ConsumerWidget {
+  const _BarInfoSlot();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -134,16 +134,29 @@ class _BarInfoArea extends ConsumerWidget {
     final groups = ref
         .watch(currentLyricsProvider)
         .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
-    if (prefs.barLyrics && groups.isNotEmpty) {
-      return BarLyricText(height: 12);
-    }
-    return SpectrumView(
-      enabled: prefs.barSpectrum,
-      height: 12,
-      barWidth: 2,
-      radius: 1,
-      color: Theme.of(context).colorScheme.primary,
-      opacity: 0.15,
+    // 迷你歌词优先；无歌词（或关闭播放条歌词）时退化为迷你频谱；两者都
+    // 不可用 → 零尺寸（父级 AnimatedSize 收起占位，时间随之上移居中）。
+    final showLyrics = prefs.barLyrics && groups.isNotEmpty;
+    final showSpectrum = !showLyrics && prefs.barSpectrum && !prefs.performanceMode;
+    if (!showLyrics && !showSpectrum) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: SizedBox(
+        width: 120,
+        height: 12,
+        child: RepaintBoundary(
+          child: showLyrics
+              ? BarLyricText(height: 12)
+              : SpectrumView(
+                  enabled: true,
+                  height: 12,
+                  barWidth: 2,
+                  radius: 1,
+                  color: Theme.of(context).colorScheme.primary,
+                  opacity: 0.15,
+                ),
+        ),
+      ),
     );
   }
 }
