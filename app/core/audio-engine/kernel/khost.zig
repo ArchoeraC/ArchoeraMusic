@@ -300,6 +300,11 @@ test "khost: AS6 stats 固定容量已知波次后计数精确；流计数并入
     for (&holders) |*x| task.wait(&x.task);
     try testing.expectEqual(@as(u32, 4), counter.load(.acquire));
 
+    // task.wait 在任务体 signal 时即返回，可能早于 worker 收尾（beginIdle /
+    // running-- / inflight--）。先等池排空（inflight==0 时 worker 已在持锁下
+    // 置 idle），再读 stats，否则会偶发 idle=1/running=1（CI 上曾抖动）。
+    h.rt.waitIdle();
+
     // 固定容量 (min==max==2)、无停机/无停滞/无回收 → 计数精确可断言
     const st = h.stats();
     try testing.expectEqual(@as(usize, 2), st.rt.spawn_count);
