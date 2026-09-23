@@ -59,9 +59,9 @@ const double kDefaultGapPx = 8;
 
 /// 按组实测每行高度（逻辑像素）。
 ///
-/// 单组行高 = 主行原文 [TextPainter] 实测高；若 [showRomanization] 且该组
-/// 带音译，再加一行小字号音译；若 [showTranslation] 且该组带翻译，再加
-/// 一行小字号译文（绘制顺序与 painter 一致：音译在上、译文在下）。
+/// 单组行高 = 主行原文 [TextPainter] 实测高；若 [showTranslation] 且该组
+/// 带翻译，再加一行小字号译文；若 [showRomanization] 且该组带音译，再加
+/// 一行小字号音译（绘制顺序与 painter / AMLL 一致：**译文在上、音译在下**）。
 /// 文本按 [fontSize] / [fontFamily] / [fontWeight] 在 [maxWidth] 内排版，
 /// [TextPainter] 统一使用 `textDirection: TextDirection.ltr`。
 ///
@@ -155,23 +155,23 @@ double _measureGroup(
     lineHeightEm: kLyricLineHeightEm,
   );
   final subFs = lyricTranslationFontSize(fontSize);
-  // 音译（罗马音）在主行下方、翻译之上（与 painter 的绘制顺序一致）。
-  if (!g.isBG && showRomanization && (g.romaji?.isNotEmpty ?? false)) {
+  // 翻译在主行下方、音译（罗马音）在翻译之下（与 painter / AMLL 子行顺序一致）。
+  if (!g.isBG && showTranslation && (g.translation?.isNotEmpty ?? false)) {
     h +=
         fontSize * kLyricTranslationGapEm +
         _textHeight(
-          g.romaji!,
+          g.translation!,
           subFs,
           fontFamily,
           maxWidth,
           lineHeightEm: kLyricTranslationLineHeightEm,
         );
   }
-  if (!g.isBG && showTranslation && (g.translation?.isNotEmpty ?? false)) {
+  if (!g.isBG && showRomanization && (g.romaji?.isNotEmpty ?? false)) {
     h +=
         fontSize * kLyricTranslationGapEm +
         _textHeight(
-          g.translation!,
+          g.romaji!,
           subFs,
           fontFamily,
           maxWidth,
