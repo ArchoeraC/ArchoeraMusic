@@ -382,6 +382,38 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置参数化 EQ（开关 / 段列表 / 预增益；方向① D1）。
+  void setPeq({
+    bool? enabled,
+    List<ParametricBand>? bands,
+    double? preampDb,
+  }) {
+    state = state.copyWithPeq(
+      enabled: enabled,
+      bands: bands,
+      preampDb: preampDb,
+    );
+    state.save();
+  }
+
+  /// 设置次声/低频管理（方向① D2）。
+  void setLowFreq({
+    bool? enabled,
+    double? hpfFreq,
+    int? hpfOrder,
+    double? bassGainDb,
+    double? bassFreq,
+  }) {
+    state = state.copyWithLowFreq(
+      enabled: enabled,
+      hpfFreq: hpfFreq,
+      hpfOrder: hpfOrder,
+      bassGainDb: bassGainDb,
+      bassFreq: bassFreq,
+    );
+    state.save();
+  }
+
   /// 设置播放速度（0.5~2.0；变速不变调）。
   void setPlaybackSpeed(double value) {
     state = state.copyWithPlaybackSpeed(value);
