@@ -278,3 +278,19 @@ python3 scorecard.py --corpus /tmp/eng2 --csv data/SCORE_$(date +%F).csv \
 首帧（p50 µs）：hot 196→120、cold 195→117、create 22→19、cold begin+create 245→157。
 回退（如实）：FL-2（LLVM 已内联）、FL-3（`@Vector(4,i64)` 点积 cycles +12%）、
 FL-4（去相关已被 LLVM 自动向量化）。验证：`zig build test` 679/679（5 seed）；ctest 22/22；Windows 交叉通过。
+
+## 11. 2026-09-23：FLAC 惰性 33-bit 缓冲 + P4 守卫（方向④）
+
+- **FLAC 惰性缓冲**：`kernel/fmt/flac/lib.zig` 原**无条件**分配 `decoded33_buf`
+  （`i64 × 2 × max_blocksize`，如 2×4096×8 ≈ 64 KiB），但仅在 **32-bit FLAC**
+  （`bits_per_sample == 32` 且非独立声道，走 33-bit 宽解码路径）才使用。改为按该条件分配：
+  16/24-bit（绝大多数）路径每实例省下该缓冲；`destroyCtx` 已有 `len>0` 守卫，
+  `openMeta` 零长语义不变，全量 FLAC **逐位测试不回退**。
+- **P4 守卫**：`tests/bench/guard_release.py`（+ `guard_baseline.json`）对固定语料跑
+  `bench_coldstart` / `bench_era_pool`，断言 era 冷/热首帧 p50 不劣于 FFmpeg 基线（带容差）
+  且峰值 RSS 不超基线；语料缺失时优雅 SKIP（退出 0），默认不入 ctest（时序敏感）。
+  把「每次改动复测」纪律落成可执行守卫。
+
+> **未做（明确记录）**：按格式实例 **ctx arena / Reader 缓冲复用**——跨 `fmt/**` 的较大重构
+> （25 个模块各自的 ctx 与 alloc/realloc 语义，含运行期 realloc，arena 会破坏内存收口目标），
+> 留待独立专项（见 §9.3）。

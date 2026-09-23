@@ -84,6 +84,10 @@ scanner 直接忽略，用户曲库不显示。内核已实现但白名单缺的
    否则保持不进曲库（文件仍可经文件系统直接播放）。优先级取决于产品是否把「电影音轨/录音」当曲目。
 4. 低优残余（L1 内核）：DTS LBR/DTS:X、AMR-WB 6k60 1-f32-ulp、wmavoice 逐函数浮点对拍等，按
    `archive/format-gap-analysis.md` §3/P2 处理。
+5. **接管门控与可观测（F5，2026-09-23）**：内核导出静态接管位图（`zk_takeover_bitmap` /
+   `of_format` / `of_ext`），C 壳对**明确未接管**的扩展名跳过无效 native open、直进 FFmpeg
+   （未知扩展仍 try-then-fallback）；ready 事件新增 `backend` 字段（`"zig"`/`"ffmpeg"`）+
+   接管 hit/miss 计数，用于监控 L2 实际接管率。**不改变**任何格式的现有可播/可入库结论。
 
 ## 4. 旧版 / 小众格式「参考价值」清单（下一批内核实现候选）
 
