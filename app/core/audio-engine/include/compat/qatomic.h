@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /**
- * compat/qatomic.h — 跨平台 SPSC ring 原子计数 shim（仅 PlayerCtx 用）
+ * compat/qatomic.h — 跨平台 C11 原子 shim（SPSC ring 计数 / 跨线程标志 /
+ * 单调统计计数；PlayerCtx、mediaengine_lib、native_decoder 共用）
  *
  * 背景：Windows(MSVC) 在 /std:c11 下仍无 conforming 原子支持（C11 只做了
  * 核心语言；<stdatomic.h> 落到 vcruntime_c11_stdatomic.h 直接
@@ -15,9 +16,11 @@
  *     _InterlockedExchangeAdd（underrun 计数），不触碰 stdatomic。
  *
  * 正确性前提（保留此注释约束使用方）：
- *   1. 这些字段是 SPSC 环形缓冲计数 —— 每个变量至多一个写者、另一线程只
- *      读（写侧独占：ring_w 仅引擎线程、ring_r 仅设备音频回调、eof/stop/
- *      underrun 亦单写者），无需 CAS/锁；
+ *   1. SPSC 环形缓冲计数——每个变量至多一个写者、另一线程只读（写侧独占：
+ *      ring_w 仅引擎线程、ring_r 仅设备音频回调、eof/stop/underrun 亦单写者），
+ *      无需 CAS/锁；多写者的单调统计计数（native_decoder g_*）用
+ *      QA_FETCH_ADD_RELAXED（fetch-add 本身原子）；跨线程 0/1 标志用
+ *      QA_STORE_REL/QA_LOAD_ACQ；
  *   2. x86/x64 硬件是 TSO：load→load、store→store 不会被硬件重排，唯一能
  *      破坏顺序的是编译器 —— 故 MSVC 侧只在 acquire load 之后 / release
  *      store 之前各放一道 _ReadWriteBarrier()（编译期屏障，x64 零指令开销）
