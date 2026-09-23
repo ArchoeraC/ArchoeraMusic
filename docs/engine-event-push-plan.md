@@ -29,7 +29,7 @@ PlaybackNotifier._onEngineEvent → state.copyWith(position) → _pollSpectrum()
 
 | 层次 | 机制 | 目标 |
 |---|---|---|
-| 渲染帧节流 | `PowerSavingFrameBinding` 覆写 `scheduleFrame`，最小化 5FPS / 失焦、熄屏 1FPS | 压 GPU 渲染开销 |
+| 渲染帧节流 | `PowerSavingFrameBinding` 覆写 `scheduleFrame`：最小化/托盘**直接停帧（0 帧）**、失焦/熄屏 1FPS | 压 GPU 渲染开销 |
 | FFT 取帧节流 | `_pollSpectrum` 时间戳节流，100ms 基线 / 节能 300ms | 压 FFT 磁盘 IO + 计算 |
 | FFT 异常帧防御 | `_finite()` 归一化 NaN/Inf/负值 | 防绘制崩溃 |
 

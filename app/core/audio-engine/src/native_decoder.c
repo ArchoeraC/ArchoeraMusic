@@ -25,6 +25,8 @@
 #include <string.h>
 #include <pthread.h>
 
+#include "compat/qatomic.h"
+
 #define LOG_TAG "[audio-engine:native-decoder]"
 
 #if defined(HAS_ARCHOERA_KERNEL)
@@ -49,7 +51,46 @@ static void pool_lock(void) {
     pthread_mutex_lock(&g_pool_mu);
 }
 static void pool_unlock(void) { pthread_mutex_unlock(&g_pool_mu); }
-static long long g_stream_opens; /* 池路径 open 累计（测试访问器，单调递增） */
+
+/* 加锁读取 g_pool。返回非 NULL 时调用方「必须已持有一份池引用」
+ * （native_decoder_pool_begin 之后、native_decoder_pool_end 之前，引擎线程的
+ * open 均落在该区间内）：池仅在引用计数归零时 shutdown 并置 g_pool=NULL，故
+ * 只要本调用方持引用，返回的指针在本次解引用期间不会被 shutdown。*/
+static ZkEngine *pool_acquire(void)
+{
+    ZkEngine *p;
+    pool_lock();
+    p = g_pool;
+    pool_unlock();
+    return p;
+}
+
+static qa_size g_stream_opens; /* 池路径 open 累计（测试访问器，单调递增） */
+/* F5 接管门控统计：attempts = native_decoder_open 调用次数；hits = 成功接管
+ * （status==0）；misses = 明确未接管（status==ZK_UNSUPPORTED）。进程级、单调；
+ * 可被多个引擎线程并发递增 → 原子（relaxed 递增 / 原子读回）。 */
+static qa_size g_takeover_attempts;
+static qa_size g_takeover_hits;
+static qa_size g_takeover_misses;
+
+int native_decoder_taken_over_by_ext(const char *path)
+{
+    if (!path) return -1;
+    const char *dot = strrchr(path, '.');
+    if (!dot) return -1;
+    /* 点号后若含路径分隔符/查询串/片段，则不是扩展名（如 URL 目录点、?v=1.2）→ 未知 */
+    for (const char *c = dot; *c; c++) {
+        if (*c == '/' || *c == '\\' || *c == '?' || *c == '#') return -1;
+    }
+    return zk_takeover_of_ext(dot);
+}
+
+void native_decoder_stats(long long *attempts, long long *hits, long long *unsupported)
+{
+    if (attempts) *attempts = (long long)QA_LOAD_RELAXED(&g_takeover_attempts);
+    if (hits) *hits = (long long)QA_LOAD_RELAXED(&g_takeover_hits);
+    if (unsupported) *unsupported = (long long)QA_LOAD_RELAXED(&g_takeover_misses);
+}
 
 struct NativeDecoder {
     ZkDecoder *zk;
@@ -66,6 +107,12 @@ int native_decoder_pool_begin(int min_w, int max_w, int cap)
         pool_unlock();
         return 0;
     }
+    /* N4：进程级流缓冲策略经宿主 env 注入（与既有 ARCHOERA_* 读取同法；失败不影响打开）。
+     * 0/未设 = 默认（预算不限、每路 16 KiB），行为与既往逐字节一致。 */
+    const char *sb = getenv("ARCHOERA_STREAM_BUDGET");
+    if (sb && sb[0]) zk_stream_mem_set_budget(strtoull(sb, NULL, 10));
+    const char *sp = getenv("ARCHOERA_STREAM_PEEK_BYTES");
+    if (sp && sp[0]) zk_stream_peek_set_bytes((unsigned)strtoul(sp, NULL, 10));
     g_pool = zk_engine_init(min_w, max_w, cap);
     if (!g_pool) {
         pool_unlock();
@@ -93,12 +140,12 @@ void native_decoder_pool_end(void)
 
 int native_decoder_pool_active(void)
 {
-    return g_pool ? 1 : 0;
+    return pool_acquire() ? 1 : 0;
 }
 
 long long native_decoder_stream_opens(void)
 {
-    return g_stream_opens;
+    return (long long)QA_LOAD_RELAXED(&g_stream_opens);
 }
 
 /* AS2：门控的 worker 亲和（pinned 1:1）。默认关（未设 / != "1"），保持既有全局队列
@@ -126,39 +173,47 @@ NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
                                    char *errbuf, int errbuf_size)
 {
     if (!path) return NULL;
+    QA_FETCH_ADD_RELAXED(&g_takeover_attempts, 1);
 
     ZkInfo zinfo;
     char eb[512];
     ZkDecoder *zk = NULL;
     ZkEngineStream *st = NULL;
     NativeDecoder *d;
+    ZkEngine *pool;
     memset(&zinfo, 0, sizeof(zinfo));
     memset(eb, 0, sizeof(eb));
 
-    if (g_pool) {
+    pool = pool_acquire();
+    if (pool) {
         /* S1 池路径：流式 seam（同一 errbuf 契约：errbuf[0..4] LE int32 状态码）。
          * AS2：ARCHOERA_ERA_POOL_PINNED=1 时优先专属 worker（pinned 1:1）。 */
         st = pool_pinned_enabled()
-                 ? zk_engine_open_pinned(g_pool, path, &zinfo, eb, sizeof(eb))
-                 : zk_engine_open(g_pool, path, &zinfo, eb, sizeof(eb));
+                 ? zk_engine_open_pinned(pool, path, &zinfo, eb, sizeof(eb))
+                 : zk_engine_open(pool, path, &zinfo, eb, sizeof(eb));
         if (!st) {
-            if (status_out) *status_out = read_le32_status(eb);
+            int fs = read_le32_status(eb);
+            if (fs == 1) QA_FETCH_ADD_RELAXED(&g_takeover_misses, 1); /* ZK_UNSUPPORTED */
+            if (status_out) *status_out = fs;
             if (errbuf && errbuf_size > 0) {
                 snprintf(errbuf, errbuf_size, "%s", eb + 4);
             }
             return NULL;
         }
-        g_stream_opens++;
+        QA_FETCH_ADD_RELAXED(&g_stream_opens, 1);
     } else {
         zk = zk_decoder_open(path, &zinfo, eb, (int)sizeof(eb));
         if (!zk) {
-            if (status_out) *status_out = read_le32_status(eb);
+            int fs = read_le32_status(eb);
+            if (fs == 1) QA_FETCH_ADD_RELAXED(&g_takeover_misses, 1); /* ZK_UNSUPPORTED */
+            if (status_out) *status_out = fs;
             if (errbuf && errbuf_size > 0) {
                 snprintf(errbuf, errbuf_size, "%s", eb + 4);
             }
             return NULL;
         }
     }
+    QA_FETCH_ADD_RELAXED(&g_takeover_hits, 1); /* 打开成功 = 接管命中 */
 
     d = (NativeDecoder *)calloc(1, sizeof(*d));
     if (!d) {
@@ -199,12 +254,14 @@ NativeDecoder *native_decoder_open_mem(const void *data, size_t len, NativeInfo 
     NativeDecoder *d;
     ZkDecoder *zk = NULL;
     ZkEngineStream *st = NULL;
+    ZkEngine *pool;
     memset(&zinfo, 0, sizeof(zinfo));
     memset(eb, 0, sizeof(eb));
 
     /* 池启用时走 zk_engine 流式 seam（与路径打开同法）；否则直连 decoder。 */
-    if (g_pool) {
-        st = zk_engine_open_mem(g_pool, (const unsigned char *)data, len,
+    pool = pool_acquire();
+    if (pool) {
+        st = zk_engine_open_mem(pool, (const unsigned char *)data, len,
                                 &zinfo, eb, sizeof(eb));
         if (!st) {
             if (status_out) *status_out = read_le32_status(eb);
@@ -213,7 +270,7 @@ NativeDecoder *native_decoder_open_mem(const void *data, size_t len, NativeInfo 
             }
             return NULL;
         }
-        g_stream_opens++;
+        QA_FETCH_ADD_RELAXED(&g_stream_opens, 1);
     } else {
         zk = zk_decoder_open_mem((const unsigned char *)data, len,
                                  &zinfo, eb, (int)sizeof(eb));
@@ -268,12 +325,14 @@ NativeDecoder *native_decoder_open_cb(void *ctx,
     NativeDecoder *d;
     ZkDecoder *zk = NULL;
     ZkEngineStream *st = NULL;
+    ZkEngine *pool;
     memset(&zinfo, 0, sizeof(zinfo));
     memset(eb, 0, sizeof(eb));
 
     /* 池启用时走 zk_engine 流式 seam；否则直连 decoder（ctx 归调用方）。 */
-    if (g_pool) {
-        st = zk_engine_open_cb(g_pool, ctx, on_read, on_seek, size_hint,
+    pool = pool_acquire();
+    if (pool) {
+        st = zk_engine_open_cb(pool, ctx, on_read, on_seek, size_hint,
                                &zinfo, eb, sizeof(eb));
         if (!st) {
             if (status_out) *status_out = read_le32_status(eb);
@@ -282,7 +341,7 @@ NativeDecoder *native_decoder_open_cb(void *ctx,
             }
             return NULL;
         }
-        g_stream_opens++;
+        QA_FETCH_ADD_RELAXED(&g_stream_opens, 1);
     } else {
         zk = zk_decoder_open_cb(ctx, on_read, on_seek, size_hint,
                                 &zinfo, eb, (int)sizeof(eb));
@@ -410,6 +469,19 @@ long long native_decoder_stream_opens(void)
 bool native_decoder_available(void)
 {
     return false;
+}
+
+int native_decoder_taken_over_by_ext(const char *path)
+{
+    (void)path;
+    return -1; /* 无内核：未知 → 调用方保留 try-then-fallback */
+}
+
+void native_decoder_stats(long long *attempts, long long *hits, long long *unsupported)
+{
+    if (attempts) *attempts = 0;
+    if (hits) *hits = 0;
+    if (unsupported) *unsupported = 0;
 }
 
 NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,

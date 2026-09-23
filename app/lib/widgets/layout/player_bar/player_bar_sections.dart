@@ -222,12 +222,16 @@ extension _PlayerBarSections on _PlayerBarState {
                       },
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  // 迷你歌词/频谱逐帧刷新：独立重绘层
-                  const SizedBox(
-                    width: 120,
-                    height: 12,
-                    child: RepaintBoundary(child: _BarInfoArea()),
+                  // 迷你歌词/频谱逐帧刷新：独立重绘层。两者都不可用时收起为
+                  // 零高度，让上方「时间」在播放条内垂直居中（AnimatedSize 过渡）。
+                  AnimatedSize(
+                    duration: animDuration(
+                      context,
+                      const Duration(milliseconds: 300),
+                    ),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: const _BarInfoSlot(),
                   ),
                 ],
               ),

@@ -27,7 +27,9 @@ extension _BarLyricTextView on _BarLyricTextState {
     final scheme = Theme.of(context).colorScheme;
     final style = TextStyle(
       fontSize: 11,
-      height: 1,
+      // 1.0 行高会把拉丁字母的升部/降部（b/g/y 及重音）裁掉；1.2 与
+      // 迷你区高度（见 _barInfoHeight）配合，中英日文字形都能完整显示。
+      height: 1.2,
       color: scheme.primary,
       fontWeight: FontWeight.w500,
     );

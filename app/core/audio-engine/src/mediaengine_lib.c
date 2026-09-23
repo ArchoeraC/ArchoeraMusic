@@ -24,6 +24,7 @@
 #include "player.h"
 #include "archoera_mediaengine.h"
 #include "native_decoder.h"
+#include "compat/qatomic.h"
 
 /* ── UTF-8 安全 fopen（Windows 宽字符边界）──────────────────────
    会话目录 / 临时文件路径由 Dart 以 UTF-8 传入（%TEMP% 可能含中文用户名）。
@@ -99,8 +100,11 @@ typedef struct ArchoeraMediaEngine {
 
     pthread_t thread;
     int thread_created;
-    volatile int stop_requested;
-    volatile int done;      /* 引擎线程已退出 */
+    /* 跨线程停止/完成标志：C11 原子（经 compat/qatomic.h，MSVC 走 volatile +
+     * 屏障）。engine 线程 run 循环读 stop_requested；Dart/FFI 线程经
+     * archoera_mediaengine_destroy / is_done 读写。 */
+    qa_size stop_requested;
+    qa_size done;           /* 引擎线程已退出 */
 
     /* 事件 FIFO */
     pthread_mutex_t ev_mutex;
@@ -162,6 +166,10 @@ typedef struct ArchoeraMediaEngine {
     PcmMemBlock *mem_blocks;   /* 块数组（下标 0 最早，队尾最新） */
     int     mem_block_cap;
     int     mem_block_count;
+    /* 保护全部 mem_* 字段：写侧为引擎解码线程（mem_append/reset/free），
+     * 读侧为 Dart/FFI 线程（pcm_window/pcm_epoch）。mem_window 持锁期间仅做
+     * 纯计算与定长拷贝，不调用任何可重入引擎的回调。 */
+    pthread_mutex_t mem_lock;
 } ArchoeraMediaEngine;
 
 /* ── 内存播放模式：cap / append / 保留 / 窗口（对齐 pcm_analyzer 语义）──
@@ -219,7 +227,8 @@ static int64_t mem_resolve_cap(ArchoeraMediaEngine *e)
     }
 }
 
-/* append 后记账：超过 cap 即自队头逐最旧淘汰，直至 ≤ cap（音频超量也不越过）。 */
+/* append 后记账：超过 cap 即自队头逐最旧淘汰，直至 ≤ cap（音频超量也不越过）。
+   调用方须持 mem_lock。 */
 static void mem_enforce_cap(ArchoeraMediaEngine *e)
 {
     if (e->mem_cap_bytes == INT64_MAX) return;
@@ -234,23 +243,31 @@ static void mem_enforce_cap(ArchoeraMediaEngine *e)
     }
 }
 
-/* 追加一块解码 PCM（内存播放模式取代 fwrite）；OOM 丢弃本块并返回 -1。 */
+/* 追加一块解码 PCM（内存播放模式取代 fwrite）；OOM 丢弃本块并返回 -1。
+   内部持 mem_lock（Dart/FFI 线程正读 mem_window）。 */
 static int mem_append(ArchoeraMediaEngine *e, const float *pcm,
                       int samples, int channels, double pos_ms)
 {
     PcmMemBlock *b;
     if (samples <= 0 || channels <= 0 || !pcm) return 0;
+    pthread_mutex_lock(&e->mem_lock);
     if (e->mem_block_count == e->mem_block_cap) {
         int ncap = e->mem_block_cap ? e->mem_block_cap * 2 : 64;
         PcmMemBlock *nb = (PcmMemBlock *)realloc(
             e->mem_blocks, (size_t)ncap * sizeof(*nb));
-        if (!nb) return -1; /* OOM：丢弃本块（解码继续，仅频谱可能缺块） */
+        if (!nb) { /* OOM：丢弃本块（解码继续，仅频谱可能缺块） */
+            pthread_mutex_unlock(&e->mem_lock);
+            return -1;
+        }
         e->mem_blocks = nb;
         e->mem_block_cap = ncap;
     }
     b = &e->mem_blocks[e->mem_block_count];
     b->data = (float *)malloc((size_t)samples * (size_t)channels * sizeof(float));
-    if (!b->data) return -1;
+    if (!b->data) {
+        pthread_mutex_unlock(&e->mem_lock);
+        return -1;
+    }
     memcpy(b->data, pcm,
            (size_t)samples * (size_t)channels * sizeof(float));
     b->pos_ms = (int32_t)pos_ms;
@@ -263,11 +280,12 @@ static int mem_append(ArchoeraMediaEngine *e, const float *pcm,
     e->mem_block_count++;
     e->mem_bytes += (int64_t)samples * channels * 4 + 16;
     mem_enforce_cap(e);
+    pthread_mutex_unlock(&e->mem_lock);
     return 0;
 }
 
-/* seek 重建：整表清空（对齐文件「截断重建 stream.pcm」）+ epoch++ */
-static void mem_reset(ArchoeraMediaEngine *e)
+/* mem_reset 的核心（调用方须持 mem_lock）：整表清空 + epoch++。 */
+static void mem_reset_locked(ArchoeraMediaEngine *e)
 {
     int i;
     for (i = 0; i < e->mem_block_count; i++) free(e->mem_blocks[i].data);
@@ -276,13 +294,23 @@ static void mem_reset(ArchoeraMediaEngine *e)
     e->mem_epoch++;
 }
 
+/* seek 重建：整表清空（对齐文件「截断重建 stream.pcm」）+ epoch++ */
+static void mem_reset(ArchoeraMediaEngine *e)
+{
+    pthread_mutex_lock(&e->mem_lock);
+    mem_reset_locked(e);
+    pthread_mutex_unlock(&e->mem_lock);
+}
+
 /* 会话结束：释放块数组（destroy 调；epoch 不再递增无妨） */
 static void mem_free(ArchoeraMediaEngine *e)
 {
-    mem_reset(e);
+    pthread_mutex_lock(&e->mem_lock);
+    mem_reset_locked(e);
     free(e->mem_blocks);
     e->mem_blocks = NULL;
     e->mem_block_cap = 0;
+    pthread_mutex_unlock(&e->mem_lock);
 }
 
 /* 单样本下混 L/R（对齐 pcm_analyzer BS.775；1~6ch，超出退化取前两声道） */
@@ -779,6 +807,38 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
         if (json_get_number(line, "preamp", &preamp) == 0) {
             pipeline_set_preamp(e->p, (float)preamp);
         }
+    } else if (strcmp(type, "set_peq") == 0) {
+        /* 方向① D1：参数化 EQ（扁平 [kind,freq,q,gain,...]，长度须 % 4 == 0） */
+        float bands[PARAMETRIC_EQ_MAX_BANDS * 4] = {0};
+        int n = json_get_float_array(line, "bands", bands,
+                                     PARAMETRIC_EQ_MAX_BANDS * 4);
+        if (n > 0 && n % 4 == 0) {
+            pipeline_set_peq_bands(e->p, bands, n / 4);
+        }
+        bool peq_enabled = true;
+        if (json_get_bool(line, "enabled", &peq_enabled) == 0) {
+            pipeline_set_peq_enabled(e->p, peq_enabled);
+        }
+        double peq_preamp = 0;
+        if (json_get_number(line, "preamp", &peq_preamp) == 0) {
+            pipeline_set_peq_preamp(e->p, (float)peq_preamp);
+        }
+    } else if (strcmp(type, "set_lowfreq") == 0) {
+        /* 方向① D2：次声/低频管理 */
+        bool lf_enabled = true;
+        if (json_get_bool(line, "enabled", &lf_enabled) == 0) {
+            pipeline_set_lowfreq_enabled(e->p, lf_enabled);
+        }
+        double hpf_freq = -1.0, hpf_order = 2.0;
+        if (json_get_number(line, "hpf_freq", &hpf_freq) == 0) {
+            if (json_get_number(line, "hpf_order", &hpf_order) != 0) hpf_order = 2.0;
+            pipeline_set_lowfreq_hpf(e->p, (float)hpf_freq, (int)hpf_order);
+        }
+        double bass_gain = 0.0, bass_freq = 100.0;
+        if (json_get_number(line, "bass_gain", &bass_gain) == 0) {
+            if (json_get_number(line, "bass_freq", &bass_freq) != 0) bass_freq = 100.0;
+            pipeline_set_lowfreq_bass(e->p, (float)bass_gain, (float)bass_freq);
+        }
     } else if (strcmp(type, "set_volume") == 0) {
         double vol = 1.0;
         if (json_get_number(line, "gain", &vol) == 0) {
@@ -883,7 +943,7 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
             ev_enqueue(e, buf);
         }
     } else if (strcmp(type, "stop") == 0) {
-        e->stop_requested = 1;
+        QA_STORE_REL(&e->stop_requested, 1);
     }
 }
 
@@ -1003,7 +1063,7 @@ static int mediaengine_stream_run(ArchoeraMediaEngine *e)
 {
     int code = 0;
 
-    while (!e->stop_requested) {
+    while (!QA_LOAD_ACQ(&e->stop_requested)) {
         char line[CMD_LINE + 1];
         int playing = 1;
 
@@ -1052,7 +1112,7 @@ static int mediaengine_stream_run(ArchoeraMediaEngine *e)
         }
 
         /* n == 0（本段 EOF）或解码错误：flush 残留 → 标记解码流结束 → 缓冲尾段播完自然结束 */
-        if (e->stop_requested) break;
+        if (QA_LOAD_ACQ(&e->stop_requested)) break;
         {
             int ret = pipeline_run(e->p); /* flush 残留（最后喂入缓冲） */
             if (ret < 0) {
@@ -1069,7 +1129,7 @@ static int mediaengine_stream_run(ArchoeraMediaEngine *e)
                 player_stream_end(e->player);
                 /* 排空期间持续响应命令：seek（重建出新管线）→ 回到解码循环续播 */
                 for (;;) {
-                    if (e->stop_requested) break;
+                    if (QA_LOAD_ACQ(&e->stop_requested)) break;
                     while (cmd_dequeue(e, line, sizeof(line))) {
                         handle_command(e, line);
                     }
@@ -1078,7 +1138,7 @@ static int mediaengine_stream_run(ArchoeraMediaEngine *e)
                     struct timespec ts = {0, 20 * 1000000L};
                     nanosleep(&ts, NULL);
                 }
-                if (e->stop_requested) break;
+                if (QA_LOAD_ACQ(&e->stop_requested)) break;
                 if (e->p == eof_pipe) {
                     break; /* 自然结束（无重建） */
                 }
@@ -1140,15 +1200,19 @@ static void *engine_thread(void *arg)
         }
         ev_enqueue(e, err);
         ev_enqueue(e, "{\"type\":\"exited\",\"code\":-1}");
-        e->done = 1;
+        QA_STORE_REL(&e->done, 1);
         if (pool_on) native_decoder_pool_end(); /* 无流打开，可直接停池 */
         return NULL;
     }
 
     if (e->mem_mode) {
-        /* 内存播放模式：不开 stream.wav / stream.pcm（PCM 入内存块列表） */
-        e->mem_sr = pipeline_get_output_sample_rate(e->p);
-        if (e->mem_sr <= 0) e->mem_sr = pipeline_get_source_sample_rate(e->p);
+        /* 内存播放模式：不开 stream.wav / stream.pcm（PCM 入内存块列表）。
+           mem_sr 供 Dart 线程 pcm_window 换算，写入持 mem_lock。 */
+        int sr = pipeline_get_output_sample_rate(e->p);
+        if (sr <= 0) sr = pipeline_get_source_sample_rate(e->p);
+        pthread_mutex_lock(&e->mem_lock);
+        e->mem_sr = sr;
+        pthread_mutex_unlock(&e->mem_lock);
         pipeline_set_pcm_out_cb(e->p, on_pcm_out, e);
     } else {
         if (e->player_file) {
@@ -1160,16 +1224,18 @@ static void *engine_thread(void *arg)
         }
     }
 
-    /* ready 事件 */
-    char ready[320];
+    /* ready 事件（backend：F5 实际解码后端 "zig"/"ffmpeg"） */
+    char ready[384];
     snprintf(ready, sizeof(ready),
         "{\"type\":\"ready\",\"version\":\"%s\",\"duration_ms\":%.0f,"
-        "\"sample_rate\":%d,\"channels\":%d,\"out_sample_rate\":%d}",
+        "\"sample_rate\":%d,\"channels\":%d,\"out_sample_rate\":%d,"
+        "\"backend\":\"%s\"}",
         audio_engine_version(),
         pipeline_get_duration(e->p) * 1000.0,
         pipeline_get_source_sample_rate(e->p),
         pipeline_get_source_channels(e->p),
-        pipeline_get_output_sample_rate(e->p));
+        pipeline_get_output_sample_rate(e->p),
+        pipeline_backend(e->p));
     ev_enqueue(e, ready);
 
     int code = 0;
@@ -1184,7 +1250,7 @@ static void *engine_thread(void *arg)
             fprintf(stderr,
                 "[mediaengine] 内存播放模式 headless（无设备，解码入内存块列表）\n");
             for (;;) {
-                if (e->stop_requested) break;
+                if (QA_LOAD_ACQ(&e->stop_requested)) break;
                 ssize_t n = pipeline_process(e->p);
                 if (n < 0) {
                     char err[160];
@@ -1200,7 +1266,7 @@ static void *engine_thread(void *arg)
                     handle_command(e, line);
                 }
             }
-            if (!e->stop_requested) {
+            if (!QA_LOAD_ACQ(&e->stop_requested)) {
                 int ret = pipeline_run(e->p); /* flush 残留 */
                 if (ret < 0) {
                     char err[160];
@@ -1237,7 +1303,7 @@ static void *engine_thread(void *arg)
         /* ── 旧路径：全速解码 → 转码完成 → 文件播放器（无声设备/流不可用回退） ── */
         /* 转码主循环（全速；命令队列非阻塞消费） */
         for (;;) {
-            if (e->stop_requested) break;
+            if (QA_LOAD_ACQ(&e->stop_requested)) break;
             ssize_t n = pipeline_process(e->p);
             if (n < 0) {
                 char err[160];
@@ -1255,7 +1321,7 @@ static void *engine_thread(void *arg)
             }
         }
 
-        if (!e->stop_requested) {
+        if (!QA_LOAD_ACQ(&e->stop_requested)) {
             int ret = pipeline_run(e->p); /* flush 残留 */
             if (ret < 0) {
                 char err[160];
@@ -1267,7 +1333,7 @@ static void *engine_thread(void *arg)
             }
 
             if (e->wav) wav_finalize(e); /* 转码完成，WAV 头回填后供播放器加载 */
-            if (e->player_file && !e->stop_requested) {
+            if (e->player_file && !QA_LOAD_ACQ(&e->stop_requested)) {
                 fprintf(stderr, "[mediaengine] 播放器启动 sink=\"%s\" (env/上次选择；"
                         "播放原生适配见 [player] 日志)\n",
                         e->sink_id && e->sink_id[0] ? e->sink_id : "(系统默认)");
@@ -1288,7 +1354,7 @@ static void *engine_thread(void *arg)
                     player_command(e->player, "seek", &e->pending_seek_ms, NULL);
                 }
                 /* 播放循环（50ms 节拍；播放自然结束 / stop 退出） */
-                while (!e->stop_requested) {
+                while (!QA_LOAD_ACQ(&e->stop_requested)) {
                     if (e->player && player_poll(e->player)) {
                         break; /* 播放结束 */
                     }
@@ -1322,7 +1388,7 @@ mem_exit:
     ev_enqueue(e, exited);
     if (pool_on) native_decoder_pool_end();
 
-    e->done = 1;
+    QA_STORE_REL(&e->done, 1);
     return NULL;
 }
 
@@ -1371,6 +1437,7 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
 
     pthread_mutex_init(&e->ev_mutex, NULL);
     pthread_mutex_init(&e->cmd_mutex, NULL);
+    pthread_mutex_init(&e->mem_lock, NULL);
     pthread_cond_init(&e->cmd_cond, NULL);
     pthread_cond_init(&e->ev_cond, NULL);
     pthread_cond_init(&e->ev_drain_cond, NULL);
@@ -1399,6 +1466,7 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
         free(e->sink_id);
         pthread_mutex_destroy(&e->ev_mutex);
         pthread_mutex_destroy(&e->cmd_mutex);
+        pthread_mutex_destroy(&e->mem_lock);
         pthread_cond_destroy(&e->cmd_cond);
         pthread_cond_destroy(&e->ev_cond);
         pthread_cond_destroy(&e->ev_drain_cond);
@@ -1537,7 +1605,7 @@ const char *archoera_mediaengine_session_dir(ArchoeraMediaEngine *e)
 
 int archoera_mediaengine_is_done(ArchoeraMediaEngine *e)
 {
-    return e ? e->done : 1;
+    return e ? (int)QA_LOAD_ACQ(&e->done) : 1;
 }
 
 /* 内存播放模式：以 end_pos_ms 为终点取最近 frames 样本（L/R）写 out_l/out_r。
@@ -1546,14 +1614,25 @@ int archoera_mediaengine_is_done(ArchoeraMediaEngine *e)
 int archoera_mediaengine_pcm_window(ArchoeraMediaEngine *e, int end_pos_ms,
                                     int frames, float *out_l, float *out_r)
 {
+    int r;
     if (!e) return -2;
-    return mem_window(e, end_pos_ms, frames, out_l, out_r);
+    /* 与引擎解码线程的 mem_append/reset 互斥；mem_window 持锁期间只做纯计算
+     * 与（至多 frames 样本的）结果拷贝，不做任何回调/重入。 */
+    pthread_mutex_lock(&e->mem_lock);
+    r = mem_window(e, end_pos_ms, frames, out_l, out_r);
+    pthread_mutex_unlock(&e->mem_lock);
+    return r;
 }
 
 /* 会话重建计数（seek 重建即 +1）：Dart 凭此丢弃旧帧索引（对齐文件截断语义）。 */
 int archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e)
 {
-    return e ? e->mem_epoch : -1;
+    int epoch;
+    if (!e) return -1;
+    pthread_mutex_lock(&e->mem_lock);
+    epoch = e->mem_epoch;
+    pthread_mutex_unlock(&e->mem_lock);
+    return epoch;
 }
 
 /* M3（§6.2/§6.1）：当前可用内存（MB），供 Dart 预算管理器算 auto ceiling/
@@ -1569,7 +1648,7 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
 
     /* 1) 置销毁标志并唤醒全部阻塞中的 wait_event（立即返 -1）。
         先于 join：阻塞的接收线程尽快退场，不被慢 join（网络 IO 中断）拖住。 */
-    e->stop_requested = 1;
+    QA_STORE_REL(&e->stop_requested, 1);
     if (e->p) {
         pipeline_signal_shutdown(e->p); /* 转码中 → 优雅中断退出 */
     }
@@ -1604,7 +1683,7 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
     }
     pthread_mutex_unlock(&e->ev_mutex);
 
-    mem_free(e); /* 内存播放模式的块列表 */
+    mem_free(e); /* 内存播放模式的块列表（自持 mem_lock） */
 
     free(e->source);
     free(e->player_file);
@@ -1612,6 +1691,7 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
     free(e->wav_file);
     free(e->pcm_file);
     free(e->sink_id);
+    pthread_mutex_destroy(&e->mem_lock);
     pthread_mutex_destroy(&e->ev_mutex);
     pthread_mutex_destroy(&e->cmd_mutex);
     pthread_cond_destroy(&e->cmd_cond);

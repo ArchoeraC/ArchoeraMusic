@@ -131,7 +131,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPowerSaverOn =>
-      'Throttle rendering in background (5 FPS minimized, 1 FPS unfocused or screen off)';
+      'Throttle rendering in background (rendering stops when minimized; 1 FPS unfocused or screen off)';
 
   @override
   String get settingsPowerSaverOff => 'Always render at full frame rate';

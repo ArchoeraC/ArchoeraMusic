@@ -37,7 +37,7 @@
   "settingsSectionClose": "Cerrar aplicación",
   "settingsSectionPower": "Ahorro de energía",
   "settingsPowerSaver": "Modo de ahorro de energía",
-  "settingsPowerSaverOn": "Reducir el renderizado en segundo plano (5 FPS minimizado, 1 FPS sin foco o pantalla apagada)",
+  "settingsPowerSaverOn": "Reducir el renderizado en segundo plano (se detiene al minimizar; 1 FPS sin foco o pantalla apagada)",
   "settingsPowerSaverOff": "Renderizar siempre a máxima frecuencia",
   "settingsSuppressSleep": "Evitar la suspensión del sistema",
   "settingsSuppressSleepOn": "Mantener el sistema despierto durante la reproducción para no interrumpir la reproducción en segundo plano",

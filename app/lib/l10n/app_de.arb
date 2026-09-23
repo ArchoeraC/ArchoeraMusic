@@ -37,7 +37,7 @@
   "settingsSectionClose": "App schließen",
   "settingsSectionPower": "Energiesparen",
   "settingsPowerSaver": "Energiesparmodus",
-  "settingsPowerSaverOn": "Rendering im Hintergrund drosseln (5 FPS minimiert, 1 FPS bei Fokusverlust oder ausgeschaltetem Bildschirm)",
+  "settingsPowerSaverOn": "Rendering im Hintergrund drosseln (beim Minimieren angehalten, 1 FPS bei Fokusverlust oder ausgeschaltetem Bildschirm)",
   "settingsPowerSaverOff": "Immer mit voller Bildrate rendern",
   "settingsSuppressSleep": "Systemschlaf verhindern",
   "settingsSuppressSleepOn": "System während der Wiedergabe wach halten, damit die Hintergrundwiedergabe nicht unterbrochen wird",

@@ -18,6 +18,7 @@
 //! 验证目标：与 `ffmpeg -i x.mpc -f s16le` 逐样本位一致。
 
 const std = @import("std");
+const once = @import("../../once.zig");
 const tables = @import("tables.zig");
 
 pub const era_sblimit = 32;
@@ -66,7 +67,7 @@ pub const Lfg = struct {
 
 /// [512+256]；本实现（C 标量路径）只用前 512。含延伸段以对齐 FFmpeg 布局。
 pub var synth_window: [512 + 256]i32 = undefined;
-var window_ready = false;
+var window_once: once.Once = .{};
 
 fn mpa_synth_init() void {
     var i: usize = 0;
@@ -86,12 +87,11 @@ fn mpa_synth_init() void {
         var j: usize = 0;
         while (j < 16) : (j += 1) synth_window[512 + 128 + 16 * i + j] = synth_window[64 * i + 48 - j];
     }
-    window_ready = true;
 }
 
-/// 线程安全初始化（模拟 ff_mpa_synth_init_fixed 的 once）
+/// 线程安全初始化（恰好一次；并发首次解码不打架）
 pub fn synthWindow() *const [512 + 256]i32 {
-    if (!window_ready) mpa_synth_init();
+    window_once.call(mpa_synth_init);
     return &synth_window;
 }
 

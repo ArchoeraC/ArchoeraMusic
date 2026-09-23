@@ -131,7 +131,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsPowerSaverOn =>
-      'Rendering im Hintergrund drosseln (5 FPS minimiert, 1 FPS bei Fokusverlust oder ausgeschaltetem Bildschirm)';
+      'Rendering im Hintergrund drosseln (beim Minimieren angehalten, 1 FPS bei Fokusverlust oder ausgeschaltetem Bildschirm)';
 
   @override
   String get settingsPowerSaverOff => 'Immer mit voller Bildrate rendern';
