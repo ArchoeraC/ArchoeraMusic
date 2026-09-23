@@ -128,9 +128,13 @@ pub const Session = struct {
     }
 
     fn resetStep(self: *Session) void {
-        self.step = .{ .run = noopBody };
-        self.step.event = .unset;
+        // 逐字段复位，**不整struct覆写**：`cancel()` 可从任意线程原子写
+        // `step.cancel_requested`，整struct赋值会与之竞争并可能清掉取消请求（A3）。
+        self.step.run = noopBody;
         self.step.outcome = .pending;
+        self.step.err = null;
+        self.step.event = .unset;
+        // 保留 cancel_requested（会话级取消由 cancel_flag + 本字段共同承载）。
     }
 
     /// 在池 worker 上建实例（probe+open，一次）

@@ -17,6 +17,7 @@ const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");
 const decoder = @import("../../decoder.zig");
+const once = @import("../../once.zig");
 
 const c = @import("ctx.zig");
 const t = @import("tables.zig");
@@ -80,6 +81,8 @@ const DecoderCtx = struct {
     frames_done: u64 = 0,
 };
 
+var tables_once: once.Once = .{};
+
 fn initTables() void {
     for (0..256) |i| {
         const v: i32 = @as(i32, @intCast(i >> 5)) - (@as(i32, @intCast(i >> 7)) << 3) - 5;
@@ -97,7 +100,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     errdefer allocator.destroy(f);
     f.* = .{ .allocator = allocator, .reader = reader.* };
     errdefer f.reader.deinit();
-    initTables();
+    tables_once.call(initTables);
     f.s.jitter.init(0);
     f.mdct_256 = mdct.Mdct(f32).init(256);
     f.mdct_128 = mdct.Mdct(f32).init(128);

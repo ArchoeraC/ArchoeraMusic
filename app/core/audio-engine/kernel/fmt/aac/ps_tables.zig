@@ -9,6 +9,7 @@
 
 const std = @import("std");
 const huff = @import("ps_huff.zig");
+const once = @import("../../once.zig");
 
 // ---------------- 常量 ----------------
 
@@ -154,7 +155,14 @@ fn makeFiltersFromProto(comptime NB: usize, filter: *[NB][8][2]f32, proto: []con
 }
 
 /// 生成全部运行时表（对应 ps_tableinit）
+var ps_tables_once: once.Once = .{};
+
+/// 线程安全：PS 全局表恰好初始化一次。
 pub fn psTableInit() void {
+    ps_tables_once.call(psTableInitImpl);
+}
+
+fn psTableInitImpl() void {
     // 相位平滑表
     var pd0: usize = 0;
     while (pd0 < 8) : (pd0 += 1) {
