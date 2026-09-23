@@ -124,18 +124,8 @@ flutter:
     - shaders/fluid.frag
 
   # 自带字体（统一中英混排度量，消除系统兜底字体的错位）：
-  #   Noto Sans SC（主字体，Google 开源 OFL，从系统 NotoSansCJK SC face 提取）——
-  #     字形度量最标准，全局观感统一；
-  #   MiSans / HarmonyOS Sans SC（回退，OFL 1.1 / 华为免费商用）。
+  #   MiSans（唯一内置界面字体；© Xiaomi，MiSans 字体知识产权许可协议）。
   fonts:
-    - family: Noto Sans SC
-      fonts:
-        - asset: assets/fonts/NotoSC-Regular.otf
-          weight: 400
-        - asset: assets/fonts/NotoSC-Medium.otf
-          weight: 500
-        - asset: assets/fonts/NotoSC-Bold.otf
-          weight: 700
     - family: MiSans
       fonts:
         - asset: assets/fonts/MiSans-Regular.ttf
@@ -144,14 +134,6 @@ flutter:
           weight: 500
         - asset: assets/fonts/MiSans-Semibold.ttf
           weight: 600
-    - family: HarmonyOS Sans SC
-      fonts:
-        - asset: assets/fonts/HarmonyOS_Sans_SC_Regular.ttf
-          weight: 400
-        - asset: assets/fonts/HarmonyOS_Sans_SC_Medium.ttf
-          weight: 500
-        - asset: assets/fonts/HarmonyOS_Sans_SC_Bold.ttf
-          weight: 700
     # 自建图标字体（eta.icon 体系，EtaIcons.* 引用）
     # 单字体族单文件：描边(regular)与实心(filled)以不同 codepoint 区段共存。
     # 生成与替换映射见 app/eta-tools/eta_icons/（来源 mingcute icons，Apache-2.0 / Tabler MIT）。
@@ -165,7 +147,7 @@ flutter:
         - asset: assets/fonts/EtaMark.ttf
     # 启动页品牌字标专用显示字体（Manrope，OFL-1.1，可变字重）：
     # 现代几何、内敛不浮夸，仅用于 Splash 的「ArchoeraMusic」字标，
-    # 不参与全局界面字体（后者仍走设置项 MiSans/Noto/HarmonyOS）。
+    # 不参与全局界面字体（界面字体固定为内置 MiSans）。
     - family: Manrope
       fonts:
         - asset: assets/fonts/Manrope.ttf

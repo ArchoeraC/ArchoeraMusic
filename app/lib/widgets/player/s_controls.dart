@@ -7,6 +7,7 @@ library;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../easter_egg/mouse_dodge.dart';
 import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../common/anim.dart';
@@ -94,7 +95,7 @@ class SButton extends StatelessWidget {
         ),
     };
 
-    return MouseRegion(
+    final Widget button = MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       child: Semantics(
         button: true,
@@ -160,6 +161,7 @@ class SButton extends StatelessWidget {
         ),
       ),
     );
+    return MouseDodge(child: button);
   }
 }
 
@@ -214,7 +216,7 @@ class _SInputState extends State<SInput> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SizedBox(
+    final Widget field = SizedBox(
       width: widget.width,
       child: TextField(
         controller: _controller,
@@ -259,6 +261,7 @@ class _SInputState extends State<SInput> {
         ),
       ),
     );
+    return MouseDodge(child: field);
   }
 }
 
@@ -307,7 +310,7 @@ class SSegmented<T> extends StatelessWidget {
   Widget _buildItem(BuildContext context, ColorScheme scheme, SSegmentedOption<T> o) {
     final isSelected = selected == o.value;
     final fg = isSelected ? scheme.primary : scheme.onSurfaceVariant;
-    return MouseRegion(
+    final Widget item = MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -333,6 +336,7 @@ class SSegmented<T> extends StatelessWidget {
         ),
       ),
     );
+    return MouseDodge(child: item);
   }
 }
 
@@ -376,7 +380,7 @@ class SDropdown<T> extends StatelessWidget {
     final value = options.any((o) => o.value == selected)
         ? selected
         : (options.isEmpty ? null : options.first.value);
-    return Container(
+    final Widget bar = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: scheme.onSurface.withValues(alpha: 0.06),
@@ -427,6 +431,7 @@ class SDropdown<T> extends StatelessWidget {
         ),
       ),
     );
+    return MouseDodge(child: bar);
   }
 }
 

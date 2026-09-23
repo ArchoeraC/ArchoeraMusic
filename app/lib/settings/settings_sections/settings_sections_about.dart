@@ -263,6 +263,18 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
             ),
           ],
         ),
+        const SizedBox(height: 20),
+        // ── 彩蛋入口：底部居中「千万别点」按钮 → 弹出警告门 ──────────
+        // 纯属整活；三个「确定」按钮执行同一批彩蛋（见 easter_egg/）。
+        Center(
+          child: SButton(
+            label: l10n.settingsNeverTap,
+            icon: EtaIcons.alert,
+            variant: SButtonVariant.error,
+            onPressed: () => showEasterEggGate(context, ref: ref),
+          ),
+        ),
+        const SizedBox(height: 4),
       ],
     );
   }

@@ -3082,35 +3082,11 @@ abstract class AppLocalizations {
   /// **'MiSans（默认）'**
   String get settingsFontMiSans;
 
-  /// No description provided for @settingsFontNoto.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'Noto Sans SC（标准度量）'**
-  String get settingsFontNoto;
-
-  /// No description provided for @settingsFontHarmony.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'HarmonyOS Sans SC（免费商用）'**
-  String get settingsFontHarmony;
-
   /// No description provided for @settingsFontMiSansLabel.
   ///
   /// In zh_CN, this message translates to:
   /// **'MiSans'**
   String get settingsFontMiSansLabel;
-
-  /// No description provided for @settingsFontNotoLabel.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'Noto Sans SC'**
-  String get settingsFontNotoLabel;
-
-  /// No description provided for @settingsFontHarmonyLabel.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'鸿蒙黑体'**
-  String get settingsFontHarmonyLabel;
 
   /// No description provided for @settingsSectionLanguage.
   ///
@@ -5614,6 +5590,24 @@ abstract class AppLocalizations {
   /// **'自研音乐播放器：本地曲库、直连音源、自托管 Subsonic、原生音频引擎。'**
   String get settingsAboutDesc;
 
+  /// No description provided for @settingsNeverTap.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'千万别点'**
+  String get settingsNeverTap;
+
+  /// No description provided for @easterEggGateTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'警告'**
+  String get easterEggGateTitle;
+
+  /// No description provided for @easterEggGateBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确定执行此程序？如果造成了不可逆后果，你可以选择关闭软件'**
+  String get easterEggGateBody;
+
   /// No description provided for @settingsSectionDeclaration.
   ///
   /// In zh_CN, this message translates to:
@@ -5803,7 +5797,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsFontCreditsText.
   ///
   /// In zh_CN, this message translates to:
-  /// **'本软件内置以下字体：\n· Noto Sans CJK SC（SIL Open Font License 1.1）\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· HarmonyOS Sans SC（© Huawei，依据《HarmonyOS Sans 字体许可协议》授权使用）'**
+  /// **'本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）'**
   String get settingsFontCreditsText;
 
   /// No description provided for @commonNoLyrics.
@@ -6127,7 +6121,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSearchFontSubtitle.
   ///
   /// In zh_CN, this message translates to:
-  /// **'MiSans · HarmonyOS Sans SC'**
+  /// **'MiSans'**
   String get settingsSearchFontSubtitle;
 
   /// No description provided for @settingsSearchLanguageSubtitle.

@@ -1622,19 +1622,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsFontMiSans => 'MiSans（默认）';
 
   @override
-  String get settingsFontNoto => 'Noto Sans SC（标准度量）';
-
-  @override
-  String get settingsFontHarmony => 'HarmonyOS Sans SC（免费商用）';
-
-  @override
   String get settingsFontMiSansLabel => 'MiSans';
-
-  @override
-  String get settingsFontNotoLabel => 'Noto Sans SC';
-
-  @override
-  String get settingsFontHarmonyLabel => '鸿蒙黑体';
 
   @override
   String get settingsSectionLanguage => '界面语言';
@@ -3024,6 +3012,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAboutDesc => '自研音乐播放器：本地曲库、直连音源、自托管 Subsonic、原生音频引擎。';
 
   @override
+  String get settingsNeverTap => '千万别点';
+
+  @override
+  String get easterEggGateTitle => '警告';
+
+  @override
+  String get easterEggGateBody => '确定执行此程序？如果造成了不可逆后果，你可以选择关闭软件';
+
+  @override
   String get settingsSectionDeclaration => '软件声明';
 
   @override
@@ -3128,7 +3125,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      '本软件内置以下字体：\n· Noto Sans CJK SC（SIL Open Font License 1.1）\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· HarmonyOS Sans SC（© Huawei，依据《HarmonyOS Sans 字体许可协议》授权使用）';
+      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）';
 
   @override
   String get commonNoLyrics => '暂无歌词';
@@ -3298,7 +3295,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSearchFloatingBarSubtitle => '底部悬浮胶囊 · 全宽停靠';
 
   @override
-  String get settingsSearchFontSubtitle => 'MiSans · HarmonyOS Sans SC';
+  String get settingsSearchFontSubtitle => 'MiSans';
 
   @override
   String get settingsSearchLanguageSubtitle => '跟随系统 · 简体中文 · English · 日本語';
@@ -6251,19 +6248,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsFontMiSans => 'MiSans（默认）';
 
   @override
-  String get settingsFontNoto => 'Noto Sans SC（标准度量）';
-
-  @override
-  String get settingsFontHarmony => 'HarmonyOS Sans SC（免费商用）';
-
-  @override
   String get settingsFontMiSansLabel => 'MiSans';
-
-  @override
-  String get settingsFontNotoLabel => 'Noto Sans SC';
-
-  @override
-  String get settingsFontHarmonyLabel => '鸿蒙黑体';
 
   @override
   String get settingsSectionLanguage => '界面语言';
@@ -7653,6 +7638,15 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsAboutDesc => '自研音乐播放器：本地曲库、直连音源、自托管 Subsonic、原生音频引擎。';
 
   @override
+  String get settingsNeverTap => '千万别点';
+
+  @override
+  String get easterEggGateTitle => '警告';
+
+  @override
+  String get easterEggGateBody => '确定执行此程序？如果造成了不可逆后果，你可以选择关闭软件';
+
+  @override
   String get settingsSectionDeclaration => '软件声明';
 
   @override
@@ -7757,7 +7751,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsFontCreditsText =>
-      '本软件内置以下字体：\n· Noto Sans CJK SC（SIL Open Font License 1.1）\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· HarmonyOS Sans SC（© Huawei，依据《HarmonyOS Sans 字体许可协议》授权使用）';
+      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）';
 
   @override
   String get commonNoLyrics => '暂无歌词';
@@ -7927,7 +7921,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSearchFloatingBarSubtitle => '底部悬浮胶囊 · 全宽停靠';
 
   @override
-  String get settingsSearchFontSubtitle => 'MiSans · HarmonyOS Sans SC';
+  String get settingsSearchFontSubtitle => 'MiSans';
 
   @override
   String get settingsSearchLanguageSubtitle => '跟随系统 · 简体中文 · English · 日本語';
@@ -10880,19 +10874,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsFontMiSans => 'MiSans（預設）';
 
   @override
-  String get settingsFontNoto => 'Noto Sans TC（標準度量）';
-
-  @override
-  String get settingsFontHarmony => 'HarmonyOS Sans TC（免費商用）';
-
-  @override
   String get settingsFontMiSansLabel => 'MiSans';
-
-  @override
-  String get settingsFontNotoLabel => 'Noto Sans TC';
-
-  @override
-  String get settingsFontHarmonyLabel => 'HarmonyOS Sans';
 
   @override
   String get settingsSectionLanguage => '介面語言';
@@ -12282,6 +12264,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsAboutDesc => '自研音樂播放器：本機曲庫、直連音源、自託管 Subsonic、原生音訊引擎。';
 
   @override
+  String get settingsNeverTap => '千萬別點';
+
+  @override
+  String get easterEggGateTitle => '警告';
+
+  @override
+  String get easterEggGateBody => '確定執行此程式？如果造成了不可逆後果，你可以選擇關閉軟體';
+
+  @override
   String get settingsSectionDeclaration => '軟體聲明';
 
   @override
@@ -12386,7 +12377,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsFontCreditsText =>
-      '本軟體內建以下字體：\n· Noto Sans CJK SC（SIL Open Font License 1.1）\n· MiSans（© Xiaomi，依據《MiSans 字體知識產權許可協議》授權使用）\n· HarmonyOS Sans SC（© Huawei，依據《HarmonyOS Sans 字體許可協議》授權使用）';
+      '本軟體內建以下字體：\n· MiSans（© Xiaomi，依據《MiSans 字體知識產權許可協議》授權使用）';
 
   @override
   String get commonNoLyrics => '暫無歌詞';
@@ -12556,7 +12547,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSearchFloatingBarSubtitle => '底部懸浮膠囊 · 全寬停靠';
 
   @override
-  String get settingsSearchFontSubtitle => 'MiSans · HarmonyOS Sans TC';
+  String get settingsSearchFontSubtitle => 'MiSans';
 
   @override
   String get settingsSearchLanguageSubtitle => '跟隨系統 · 简体中文 · English · 日本語';
