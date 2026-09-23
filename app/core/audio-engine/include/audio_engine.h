@@ -183,6 +183,8 @@ int pipeline_get_source_sample_rate(const AudioPipeline *p);
 /** 获取管线实际输出采样率（跟随源或用户指定；0 = 未知） */
 int pipeline_get_output_sample_rate(const AudioPipeline *p);
 
+/* __H_PIPELINE_BACKEND__ */
+
 /** 获取管线实际输出声道数（cfg.output_channels） */
 int pipeline_get_output_channels(const AudioPipeline *p);
 
@@ -217,6 +219,8 @@ void pipeline_set_normalization_enabled(AudioPipeline *p, bool enabled);
 
 /** 运行时启用/禁用限幅器 */
 void pipeline_set_limiter_enabled(AudioPipeline *p, bool enabled);
+
+/* __H_PIPELINE_DSP_EXT__ */
 
 /** 运行时启用/禁用 FFT */
 void pipeline_set_fft_enabled(AudioPipeline *p, bool enabled);

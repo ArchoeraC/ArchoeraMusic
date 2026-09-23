@@ -434,6 +434,14 @@ long long zk_task_frames(ZkTask *t);
 /** 带超时 wait（毫秒）：1=已完工，0=超时；t 为 NULL → 0。 */
 int zk_task_wait_timeout(ZkTask *t, long long timeout_ms);
 
+/* ---- 能力扩张 ABI 扩展锚点（并行开发占位；各方向实现时替换本行下方锚点）----
+ * 说明：以下四行是并行分支的**互不重叠**插入点，避免同一文件合并冲突。
+ * 实现分支只替换属于自己的那一个锚点，禁止改动其他锚点。 */
+/* __BRIDGE_DSP_EXT__ */
+/* __BRIDGE_STREAM_BUDGET__ */
+/* __BRIDGE_TAKEOVER__ */
+/* __BRIDGE_ENGINE_STATS__ */
+
 #ifdef __cplusplus
 }
 #endif

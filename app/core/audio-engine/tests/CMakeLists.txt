@@ -410,3 +410,9 @@ target_include_directories(bench_coldstart PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
 )
+
+# ---- 能力扩张测试锚点（并行开发占位；各方向实现时替换属于自己的锚点）----
+# __TESTS_DSP_EXT__
+# __TESTS_STREAM_BUDGET__
+# __TESTS_TAKEOVER__
+# __TESTS_ENGINE_STATS__
