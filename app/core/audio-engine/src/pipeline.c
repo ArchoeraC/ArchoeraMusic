@@ -66,6 +66,7 @@ struct AudioPipeline {
     NativeDecoder *native;      /* 自研 Zig 内核（engine_mode==EraAudio 且接管成功）；
                                   非 NULL 时为本解码源（FFmpeg 不再打开） */
     bool         native_active; /* 解码源是否为自研内核 */
+    const char  *backend;       /* 实际解码后端："zig" / "ffmpeg"（F5 ready 事件上报） */
     int          native_status; /* native open 失败状态码（ZkStatus；成功=0） */
     char         native_err[256]; /* native open 失败诊断（仅日志） */
     float       *native_buf;    /* native 读缓冲（float 交错） */
@@ -344,12 +345,21 @@ static AudioPipeline* pipeline_create_impl(const char *source,
         /* 在线 URL → 宿主 AVIO 回调流（内核零网络栈）；本地路径 → 直接打开。
          * 两者失败均回退 FFmpeg（Stable 行为零回退）。 */
         if (source_is_url(source)) {
-            if (pipeline_era_url_open(p, source) != 0) {
+            /* F5 门控：扩展名对应格式在内核开关下明确未接管 → 跳过无效 native open。 */
+            if (native_decoder_taken_over_by_ext(source) == 0) {
+                p->native_status = 1; /* ZK_UNSUPPORTED */
+                fprintf(stderr, "%s EraAudio: 扩展名未接管 → 直接 FFmpeg\n", LOG_TAG);
+            } else if (pipeline_era_url_open(p, source) != 0) {
                 fprintf(stderr, "%s EraAudio: 在线源不可用/未接管"
                                 " (status=%d %s) → 回退 FFmpeg\n",
                         LOG_TAG, p->native_status,
                         p->native_err[0] ? p->native_err : "");
             }
+        } else if (native_decoder_taken_over_by_ext(source) == 0) {
+            /* F5 门控：扩展名明确未接管 → 跳过无效 native open，直接 FFmpeg。
+             * 返回 -1（未知扩展名）时保留 try-then-fallback（probe 按内容判定）。 */
+            p->native_status = 1; /* ZK_UNSUPPORTED */
+            fprintf(stderr, "%s EraAudio: 扩展名未接管 → 直接 FFmpeg\n", LOG_TAG);
         } else {
             NativeInfo ninfo;
             int st = 1; /* 默认 unsupported */
@@ -396,6 +406,10 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             goto fail;
         }
     }
+
+    /* F5：记录实际解码后端（"zig" = 自研内核接管；"ffmpeg" = 兜底/未接管）。
+     * 在解码器选定后立即落定，供 ready 事件上报与接管率监控。 */
+    p->backend = p->native_active ? "zig" : "ffmpeg";
 
     int src_rate = p->native_active ? native_decoder_sample_rate(p->native)
                                     : decoder_sample_rate(p->dec);
@@ -964,6 +978,12 @@ int pipeline_get_source_sample_rate(const AudioPipeline *p)
 int pipeline_get_output_sample_rate(const AudioPipeline *p)
 {
     return p ? p->cfg.output_sample_rate : 0;
+}
+
+const char *pipeline_backend(const AudioPipeline *p)
+{
+    if (!p || !p->backend) return "unknown";
+    return p->backend;
 }
 
 int pipeline_get_output_channels(const AudioPipeline *p)

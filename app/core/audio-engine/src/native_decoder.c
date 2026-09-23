@@ -50,6 +50,30 @@ static void pool_lock(void) {
 }
 static void pool_unlock(void) { pthread_mutex_unlock(&g_pool_mu); }
 static long long g_stream_opens; /* 池路径 open 累计（测试访问器，单调递增） */
+/* F5 接管门控统计：attempts = native_decoder_open 调用次数；hits = 成功接管
+ * （status==0）；misses = 明确未接管（status==ZK_UNSUPPORTED）。进程级、单调。 */
+static long long g_takeover_attempts;
+static long long g_takeover_hits;
+static long long g_takeover_misses;
+
+int native_decoder_taken_over_by_ext(const char *path)
+{
+    if (!path) return -1;
+    const char *dot = strrchr(path, '.');
+    if (!dot) return -1;
+    /* 点号后若含路径分隔符/查询串/片段，则不是扩展名（如 URL 目录点、?v=1.2）→ 未知 */
+    for (const char *c = dot; *c; c++) {
+        if (*c == '/' || *c == '\\' || *c == '?' || *c == '#') return -1;
+    }
+    return zk_takeover_of_ext(dot);
+}
+
+void native_decoder_stats(long long *attempts, long long *hits, long long *unsupported)
+{
+    if (attempts) *attempts = g_takeover_attempts;
+    if (hits) *hits = g_takeover_hits;
+    if (unsupported) *unsupported = g_takeover_misses;
+}
 
 struct NativeDecoder {
     ZkDecoder *zk;
@@ -126,6 +150,7 @@ NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
                                    char *errbuf, int errbuf_size)
 {
     if (!path) return NULL;
+    g_takeover_attempts++;
 
     ZkInfo zinfo;
     char eb[512];
@@ -142,7 +167,9 @@ NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
                  ? zk_engine_open_pinned(g_pool, path, &zinfo, eb, sizeof(eb))
                  : zk_engine_open(g_pool, path, &zinfo, eb, sizeof(eb));
         if (!st) {
-            if (status_out) *status_out = read_le32_status(eb);
+            int fs = read_le32_status(eb);
+            if (fs == 1) g_takeover_misses++; /* ZK_UNSUPPORTED */
+            if (status_out) *status_out = fs;
             if (errbuf && errbuf_size > 0) {
                 snprintf(errbuf, errbuf_size, "%s", eb + 4);
             }
@@ -152,13 +179,16 @@ NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
     } else {
         zk = zk_decoder_open(path, &zinfo, eb, (int)sizeof(eb));
         if (!zk) {
-            if (status_out) *status_out = read_le32_status(eb);
+            int fs = read_le32_status(eb);
+            if (fs == 1) g_takeover_misses++; /* ZK_UNSUPPORTED */
+            if (status_out) *status_out = fs;
             if (errbuf && errbuf_size > 0) {
                 snprintf(errbuf, errbuf_size, "%s", eb + 4);
             }
             return NULL;
         }
     }
+    g_takeover_hits++; /* 打开成功 = 接管命中 */
 
     d = (NativeDecoder *)calloc(1, sizeof(*d));
     if (!d) {
@@ -410,6 +440,19 @@ long long native_decoder_stream_opens(void)
 bool native_decoder_available(void)
 {
     return false;
+}
+
+int native_decoder_taken_over_by_ext(const char *path)
+{
+    (void)path;
+    return -1; /* 无内核：未知 → 调用方保留 try-then-fallback */
+}
+
+void native_decoder_stats(long long *attempts, long long *hits, long long *unsupported)
+{
+    if (attempts) *attempts = 0;
+    if (hits) *hits = 0;
+    if (unsupported) *unsupported = 0;
 }
 
 NativeDecoder *native_decoder_open(const char *path, NativeInfo *info,
