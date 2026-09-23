@@ -147,7 +147,8 @@ echo             安装 Zig 0.16（https://ziglang.org/download）后重跑可�
 echo [build_windows] 编译 archoera_mediaengine.dll...
 cl /nologo /O2 /std:c11 /MD /LD /I include /I src /I include\compat /I "%VCPKG_PREFIX%\include" ^
     src\mediaengine_lib.c src\tempo.c src\decoder.c src\resampler.c ^
-    src\encoder.c src\equalizer.c src\loudness.c src\limiter.c ^
+    src\encoder.c src\equalizer.c src\parametric_eq.c src\lowfreq.c ^
+    src\loudness.c src\limiter.c ^
     src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
     src\audio_output.c src\audio_output_platform.c src\audio_output_windows.c ^
     src\segstore.c ^
