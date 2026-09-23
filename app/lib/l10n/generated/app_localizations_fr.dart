@@ -131,7 +131,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsPowerSaverOn =>
-      'Réduire le rendu en arrière-plan (5 FPS en réduction, 1 FPS sans focus ou écran éteint)';
+      'Réduire le rendu en arrière-plan (arrêt lors de la réduction ; 1 FPS sans focus ou écran éteint)';
 
   @override
   String get settingsPowerSaverOff => 'Toujours rendre à pleine fréquence';

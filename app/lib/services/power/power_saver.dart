@@ -18,12 +18,12 @@ import '../playback/playback_notifier.dart';
 import '../../widgets/common/toast.dart';
 import 'frame_governor.dart';
 
-/// 节能原因（决定目标帧率上限）。
+/// 节能原因（决定目标帧率上限 / 是否停帧）。
 enum PowerSaverReason {
   /// 前台正常渲染（不限制帧率）。
   none,
 
-  /// 窗口最小化 / 隐藏到托盘：5 FPS。
+  /// 窗口最小化 / 隐藏到托盘：**直接停止渲染**（0 帧）。
   minimized,
 
   /// 窗口失焦（同桌面其他应用被聚焦）：1 FPS。
@@ -33,10 +33,33 @@ enum PowerSaverReason {
   screenOff,
 }
 
+/// 非停帧档位的目标最小帧间隔（最小化不在此表：直接停帧）。
+const Map<PowerSaverReason, Duration> _intervalByReason = {
+  PowerSaverReason.unfocused: Duration(seconds: 1), // 1 FPS
+  PowerSaverReason.screenOff: Duration(seconds: 1), // 1 FPS
+};
+
+/// 节能档位 → 渲染策略：
+/// - 最小化 / 隐藏到托盘 → [stopRendering] = true（**直接停止渲染**，0 帧）；
+/// - 其余档位 → 按 [interval] 降频（失焦/熄屏 1 FPS，前台 zero=满帧）。
+///
+/// 纯函数（无副作用），便于单测；实际应用在 `PowerSaverService._apply`。
+({bool stopRendering, Duration interval}) powerSaverRenderPolicy(
+  PowerSaverReason reason,
+) {
+  if (reason == PowerSaverReason.minimized) {
+    return (stopRendering: true, interval: Duration.zero);
+  }
+  return (
+    stopRendering: false,
+    interval: _intervalByReason[reason] ?? Duration.zero,
+  );
+}
+
 /// 全局节能模式服务。
 ///
-/// - 窗口最小化 / 失焦 / 屏幕关闭时，通过 [PowerSavingFrameBinding] 自动
-///   降低渲染帧率（最小化 5 FPS，失焦 / 熄屏 1 FPS）；
+/// - 窗口最小化 / 隐藏到托盘时**直接停止渲染**（0 帧）；失焦 / 熄屏时
+///   降帧到 1 FPS；均通过 [PowerSavingFrameBinding] 生效；
 /// - 「禁用系统休眠」仅**在媒体播放中**通过平台能力外观（原生桥接）保持系统
 ///   唤醒，暂停 / 停止时立即释放，后台播放不中断。
 ///
@@ -73,12 +96,6 @@ class PowerSaverService with WindowListener {
   StreamSubscription<bool>? _screenSub;
   StreamSubscription<PlatformCapabilityFailure>? _failSub;
   StreamSubscription<SystemWindowState>? _windowSub;
-
-  static const Map<PowerSaverReason, Duration> _intervalByReason = {
-    PowerSaverReason.minimized: Duration(milliseconds: 200), // 5 FPS
-    PowerSaverReason.unfocused: Duration(seconds: 1), // 1 FPS
-    PowerSaverReason.screenOff: Duration(seconds: 1), // 1 FPS
-  };
 
   /// 引擎位置事件间隔（ms）按档位映射（engine-event-push-plan §4.1）：
   /// 前台 normal 50ms（与现状等价）/ 最小化 minimized 500ms（2Hz 保底）/
@@ -233,7 +250,12 @@ class PowerSaverService with WindowListener {
     final binding = WidgetsBinding.instance;
     if (binding is! PowerSavingFrameBinding) return;
     final reason = _reason;
-    binding.setFrameInterval(_intervalByReason[reason] ?? Duration.zero);
+    // 渲染策略：最小化 / 托盘 → 直接停帧（0 帧）；其余档位按最小帧间隔降频。
+    final policy = powerSaverRenderPolicy(reason);
+    binding.setRenderingEnabled(!policy.stopRendering);
+    if (!policy.stopRendering) {
+      binding.setFrameInterval(policy.interval);
+    }
     // 降频协商（engine-event-push-plan §4.1）：档位变化时向引擎请求位置事件
     // 间隔——事件源头减量，Dart 侧无需在降频期高频消费 position。引擎未
     // 就绪时由 PlaybackNotifier 忽略（转码期协商被 C 侧记录，播放器启动即
@@ -266,9 +288,10 @@ class PowerSaverService with WindowListener {
       _sleepActive = false;
       unawaited(_power.setSleepInhibit(false));
     }
-    // 兜底恢复满帧
+    // 兜底恢复渲染（解除停帧）与满帧
     final binding = WidgetsBinding.instance;
     if (binding is PowerSavingFrameBinding) {
+      binding.setRenderingEnabled(true);
       binding.setFrameInterval(Duration.zero);
     }
   }

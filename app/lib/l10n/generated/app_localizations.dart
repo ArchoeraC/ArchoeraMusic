@@ -335,7 +335,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPowerSaverOn.
   ///
   /// In zh_CN, this message translates to:
-  /// **'后台自动降帧（最小化 5 FPS，失焦/熄屏 1 FPS）'**
+  /// **'后台自动降帧（最小化时停止渲染，失焦/熄屏 1 FPS）'**
   String get settingsPowerSaverOn;
 
   /// No description provided for @settingsPowerSaverOff.

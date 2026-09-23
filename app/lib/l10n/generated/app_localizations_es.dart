@@ -131,7 +131,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsPowerSaverOn =>
-      'Reducir el renderizado en segundo plano (5 FPS minimizado, 1 FPS sin foco o pantalla apagada)';
+      'Reducir el renderizado en segundo plano (se detiene al minimizar; 1 FPS sin foco o pantalla apagada)';
 
   @override
   String get settingsPowerSaverOff => 'Renderizar siempre a máxima frecuencia';
