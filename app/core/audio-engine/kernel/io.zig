@@ -284,6 +284,29 @@ pub const Reader = struct {
         }
     }
 
+    /// AS4：把 Reader 复位到源起点（hinted open 失败后回退 probe 前用）。
+    ///   - memory/file：游标清零、file 前瞻缓存失效；
+    ///   - callback：先委托宿主 seek 到绝对 0（须支持重定位），成功后再清本地
+    ///     peek 缓冲并同步游标；宿主拒绝 → error.SeekFailed（调用方放弃回退）。
+    pub fn rewind(self: *Reader) Error!void {
+        if (self.aborted.load(.acquire)) return error.Aborted;
+        switch (self.kind) {
+            .memory => self.pos = 0,
+            .file => {
+                self.pos = 0;
+                self.invalidateFileCache();
+            },
+            .callback => {
+                const buffered = self.buf_len - self.buf_pos;
+                const on_seek = self.on_seek orelse return error.SeekFailed;
+                if (!on_seek(self.ctx.?, 0, 0, buffered)) return error.SeekFailed;
+                self.buf_pos = 0;
+                self.buf_len = 0;
+                self.pos = 0;
+            },
+        }
+    }
+
     /// 已知输入总大小（字节）
     pub fn size(self: *Reader) Error!u64 {
         return switch (self.kind) {
@@ -392,7 +415,8 @@ pub const Reader = struct {
         // 底层会丢弃已预读数据 → 数据缺失/损坏），余量再直接穿透底层避免二次拷贝。
         // 仅当「未消费缓冲可被本次请求全部取走」时才直接穿透——否则余量会被跳过
         // （丢字节）；此时退回下方通用小请求循环（逐块消费缓冲后按需续读底层）。
-        if (buf.len >= peek_buffer_size and (self.buf_len - self.buf_pos) <= buf.len) {
+        // N4：以本 Reader 实际缓冲长度判断（支持变长缓冲；默认 = peek_buffer_size）。
+        if (buf.len >= self.buffer.len and (self.buf_len - self.buf_pos) <= buf.len) {
             var written: usize = 0;
             const avail = self.buf_len - self.buf_pos;
             if (avail > 0) {

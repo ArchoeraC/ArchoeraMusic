@@ -32,6 +32,7 @@ pub const session = @import("session.zig");
 pub const khost = @import("khost.zig");
 pub const runtime = @import("runtime.zig");
 pub const decoder = @import("decoder.zig");
+pub const streambuf = @import("streambuf.zig");
 pub const gsm = @import("fmt/wav/gsm.zig");
 pub const mace = @import("fmt/wav/mace.zig");
 pub const wav = @import("fmt/wav/lib.zig");
@@ -290,7 +291,7 @@ fn decodeInto(
     ch_out: *u8,
 ) isize {
     // path 源 + 空 cb 缓冲 → 与结构化面的 decodeIntoSource 单一实现（避免双份漂移）
-    return decodeIntoSource(.{ .path = path }, &.{}, out, cap_frames, info_out, ch_out);
+    return decodeIntoSource(.{ .path = path }, &.{}, out, cap_frames, info_out, ch_out, 0, null);
 }
 
 /// 由 codec_name（如 "pcm_s16be"）推断原生字节序（与 engine.endianOf 同语义）
@@ -436,7 +437,10 @@ const SourceBuild = struct {
 
     fn release(self: *SourceBuild) void {
         if (self.cb_owner) |o| o.destroy(o.ctx, std.heap.c_allocator);
-        if (self.cb_buffer.len > 0) std.heap.c_allocator.free(self.cb_buffer);
+        if (self.cb_buffer.len > 0) {
+            streambuf.release(self.cb_buffer.len); // N4：归还预算记账（与 buildSource 成对）
+            std.heap.c_allocator.free(self.cb_buffer);
+        }
         self.cb_owner = null;
         self.cb_buffer = &.{};
     }
@@ -460,7 +464,14 @@ fn buildSource(req: *const CSubmitReq) ?SourceBuild {
             const sk = req.on_seek orelse return null;
             const adapter = std.heap.c_allocator.create(engine.CbAdapter) catch return null;
             adapter.* = .{ .ctx = c, .c_read = rd, .c_seek = sk };
-            const buf = std.heap.c_allocator.alloc(u8, io.peek_buffer_size) catch {
+            // N4：cb peek 缓冲大小取 `streambuf.peek()`（默认 16 KiB）并向预算记账。
+            const peek = streambuf.peek();
+            streambuf.acquire(peek) catch {
+                std.heap.c_allocator.destroy(adapter);
+                return null;
+            };
+            const buf = std.heap.c_allocator.alloc(u8, peek) catch {
+                streambuf.release(peek);
                 std.heap.c_allocator.destroy(adapter);
                 return null;
             };
@@ -476,6 +487,9 @@ fn buildSource(req: *const CSubmitReq) ?SourceBuild {
 
 /// 从任意源形态（path/mem/cb）打开解码器并解至多 cap_frames 帧到 out。
 /// 与 `decodeInto` 共用同一解码/转换语义（返回 >=0 帧数 / <0 = -ZkStatus）。
+/// `format_hint`（AS4）：非 0 时按提示免 probe 直分派（失败回退 probe）。
+/// `cancel`（AS5）：非 null 时在解码开始与每个 chunk 边界检查，置位则返回
+/// `-ZkStatus.aborted`（协作式取消，不抢占运行中的块）。
 fn decodeIntoSource(
     src: session.Source,
     cb_buf: []u8,
@@ -483,15 +497,31 @@ fn decodeIntoSource(
     cap_frames: usize,
     info_out: ?*engine.ZkInfo,
     ch_out: *u8,
+    format_hint: u32,
+    cancel: ?*const std.atomic.Value(bool),
 ) isize {
+    if (cancel) |c| {
+        if (c.load(.acquire)) return -@as(isize, @intFromEnum(err.Status.aborted));
+    }
     var zinfo: decoder.Info = undefined;
+    const hint: ?probe.Format = if (format_hint != 0) probe.hintToFormat(format_hint) else null;
     var dec: decoder.Decoder = switch (src) {
-        .path => |p| decoder.open(std.heap.c_allocator, p, &zinfo) catch |e|
-            return -@as(isize, @intFromEnum(err.statusOf(e))),
-        .mem => |d| decoder.openMem(std.heap.c_allocator, d, &zinfo) catch |e|
-            return -@as(isize, @intFromEnum(err.statusOf(e))),
+        .path => |p| blk: {
+            if (hint) |f| break :blk decoder.openHinted(std.heap.c_allocator, p, f, &zinfo) catch |e|
+                return -@as(isize, @intFromEnum(err.statusOf(e)));
+            break :blk decoder.open(std.heap.c_allocator, p, &zinfo) catch |e|
+                return -@as(isize, @intFromEnum(err.statusOf(e)));
+        },
+        .mem => |d| blk: {
+            if (hint) |f| break :blk decoder.openHintedMem(std.heap.c_allocator, d, f, &zinfo) catch |e|
+                return -@as(isize, @intFromEnum(err.statusOf(e)));
+            break :blk decoder.openMem(std.heap.c_allocator, d, &zinfo) catch |e|
+                return -@as(isize, @intFromEnum(err.statusOf(e)));
+        },
         .cb => |cb| blk: {
             var reader = io.Reader.openCallback(cb, cb_buf);
+            if (hint) |f| break :blk decoder.openHintedReader(std.heap.c_allocator, &reader, f, &zinfo) catch |e|
+                return -@as(isize, @intFromEnum(err.statusOf(e)));
             break :blk decoder.openReader(std.heap.c_allocator, &reader, &zinfo) catch |e|
                 return -@as(isize, @intFromEnum(err.statusOf(e)));
         },
@@ -508,6 +538,10 @@ fn decodeIntoSource(
     var raw: [65536]u8 = undefined;
     var produced: usize = 0;
     while (produced < cap_frames) {
+        // AS5：chunk 边界协作取消（每个块 ≤4096 帧，最长延迟有界）。
+        if (cancel) |c| {
+            if (c.load(.acquire)) return -@as(isize, @intFromEnum(err.Status.aborted));
+        }
         const room_frames = raw.len / frame_bytes;
         const chunk = @min(@min(room_frames, cap_frames - produced), @as(usize, 4096));
         if (chunk == 0) break;
@@ -539,6 +573,8 @@ const SubmitTask = struct {
     // kind=decode
     out: [*]f32 = undefined,
     cap_frames: usize = 0,
+    /// AS4：格式提示（CSubmitReq.format_hint 原样带入；0=auto）。
+    format_hint: u32 = 0,
     out_channels: ?*c_int = null,
     info_out: ?*engine.ZkInfo = null,
     ch: u8 = 0,
@@ -552,6 +588,13 @@ const SubmitTask = struct {
 
     fn run(t: *task.Task) void {
         const d: *SubmitTask = @fieldParentPtr("task", t);
+        // AS5：开工前已请求取消 → fail-fast，直接以 Aborted 收尾（不打开/解码）。
+        if (t.isCancelled()) {
+            d.frames = -@as(isize, @intFromEnum(err.Status.aborted));
+            d.status = @intFromEnum(err.Status.aborted);
+            t.fail(error.Aborted);
+            return;
+        }
         switch (d.kind) {
             .decode => {
                 d.frames = decodeIntoSource(
@@ -561,6 +604,8 @@ const SubmitTask = struct {
                     d.cap_frames,
                     d.info_out,
                     &d.ch,
+                    d.format_hint,
+                    &d.task.cancel_requested,
                 );
                 if (d.out_channels) |oc| oc.* = @intCast(d.ch);
                 if (d.frames < 0) {
@@ -641,6 +686,7 @@ fn zkSubmitImpl(h: ?*khost.Host, req: ?*const CSubmitReq) ?*SubmitTask {
         .build = build,
         .out = r.out orelse undefined,
         .cap_frames = r.max_frames,
+        .format_hint = r.format_hint,
         .out_channels = r.out_channels,
         .info_out = r.info,
         .meta_out = r.meta,
@@ -1107,9 +1153,65 @@ export fn zk_engine_close(st: ?*Stream) void {
 // 说明：以下四行互不重叠，避免同一文件合并冲突；只替换自己那一个。
 // ---------------------------------------------------------------------------
 // __KERNEL_DSP_EXT__
-// __KERNEL_STREAM_BUDGET__
+// ---- N4 流式 Reader 缓冲预算 ABI（__KERNEL_STREAM_BUDGET__）----
+/// 当前所有 callback Reader peek 缓冲已用字节（N4 预算记账）。
+export fn zk_stream_mem_used() c_ulonglong {
+    return @intCast(streambuf.usedBytes());
+}
+
+/// 设置流式缓冲目标预算；0 = 不限（默认）。仅影响之后新分配的缓冲。
+export fn zk_stream_mem_set_budget(bytes: c_ulonglong) void {
+    streambuf.setBudget(@intCast(bytes));
+}
+
+/// 设置每路 callback Reader 缓冲目标大小（夹取到 [16 KiB, 64 KiB]）。
+export fn zk_stream_peek_set_bytes(bytes: c_uint) void {
+    streambuf.setPeekBytes(bytes);
+}
+
+/// 当前每路 callback Reader 缓冲目标大小（默认 16 KiB）。
+export fn zk_stream_peek_bytes() c_uint {
+    return @intCast(streambuf.peek());
+}
 // __KERNEL_TAKEOVER__
-// __KERNEL_ENGINE_STATS__
+// ---- AS6 可观测聚合 + AS5 取消 ABI（__KERNEL_ENGINE_STATS__）----
+/// 与 include/kernel_bridge.h `ZkEngineStats` 逐字段对齐（extern struct 保证 C ABI）。
+const CEngineStats = extern struct {
+    active: c_ulonglong,
+    running: c_ulonglong,
+    idle: c_ulonglong,
+    pinned: c_ulonglong,
+    inflight: c_ulonglong,
+    stall_count: c_ulonglong,
+    spawn_count: c_ulonglong,
+    spawn_failed_count: c_ulonglong,
+    stream_count: c_ulonglong,
+};
+
+/// AS6：聚合内核池计数（runtime.Stats）+ 流式会话数写入 out；h/out 为空时空操作。
+export fn zk_engine_stats(h: ?*khost.Host, out: ?*CEngineStats) void {
+    const host = h orelse return;
+    const o = out orelse return;
+    const st = host.stats();
+    o.* = .{
+        .active = @intCast(st.rt.active),
+        .running = @intCast(st.rt.running),
+        .idle = @intCast(st.rt.idle),
+        .pinned = @intCast(st.rt.pinned),
+        .inflight = @intCast(st.rt.inflight),
+        .stall_count = @intCast(st.rt.stall_count),
+        .spawn_count = @intCast(st.rt.spawn_count),
+        .spawn_failed_count = @intCast(st.rt.spawn_failed_count),
+        .stream_count = @intCast(st.stream_count),
+    };
+}
+
+/// AS5：请求取消池内结构化任务（t 为空时空操作）。任务体在 chunk 边界协作响应：
+/// `zk_task_wait` 返回 -ZkStatus.aborted、outcome=ERROR、status=-aborted。
+export fn zk_task_cancel(t: ?*SubmitTask) void {
+    const d = t orelse return;
+    d.task.cancel();
+}
 
 // ---------------------------------------------------------------------------
 // 结构化任务提交面测试（zk_submit_decode / zk_task_wait / zk_task_free）
@@ -1474,6 +1576,7 @@ test {
     std.testing.refAllDecls(@This());
     _ = @import("error.zig");
     _ = @import("io.zig");
+    _ = @import("streambuf.zig");
     _ = @import("registry.zig");
     _ = @import("tables.zig");
     _ = @import("task.zig");
@@ -1602,4 +1705,238 @@ test {
     _ = @import("pcm/convert.zig");
     _ = @import("engine.zig");
     _ = @import("dsp/lib.zig");
+}
+
+// ---------------------------------------------------------------------------
+// 能力扩张测试（AS4 格式提示 / AS5 取消 / N4 流缓冲预算）
+// ---------------------------------------------------------------------------
+
+/// 造 n 帧 8kHz mono i16 WAV（值循环 0..127），返回堆分配字节（调用方 free）。
+fn bigWavBytes(allocator: std.mem.Allocator, nframes: usize) ![]u8 {
+    const data_len = nframes * 2;
+    const total = 44 + data_len;
+    const b = try allocator.alloc(u8, total);
+    @memset(b, 0);
+    @memcpy(b[0..4], "RIFF");
+    std.mem.writeInt(u32, b[4..8], @intCast(total - 8), .little);
+    @memcpy(b[8..12], "WAVE");
+    @memcpy(b[12..16], "fmt ");
+    std.mem.writeInt(u32, b[16..20], 16, .little);
+    std.mem.writeInt(u16, b[20..22], 1, .little);
+    std.mem.writeInt(u16, b[22..24], 1, .little);
+    std.mem.writeInt(u32, b[24..28], 8000, .little);
+    std.mem.writeInt(u32, b[28..32], 16000, .little);
+    std.mem.writeInt(u16, b[32..34], 2, .little);
+    std.mem.writeInt(u16, b[34..36], 16, .little);
+    @memcpy(b[36..40], "data");
+    std.mem.writeInt(u32, b[40..44], @intCast(data_len), .little);
+    for (0..nframes) |i| {
+        std.mem.writeInt(i16, b[44 + 2 * i ..][0..2], @intCast(i % 128), .little);
+    }
+    return b;
+}
+
+test "AS4 zk_submit format_hint: 正确提示免 probe；错误提示回退；均与 decode_once 逐位一致" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io_inst = std.Io.Threaded.global_single_threaded.io();
+    const full = try engine.writeTestWav(&tmp, io_inst, "hint.wav");
+    defer testing.allocator.free(full);
+
+    const h = try khost.Host.init(std.heap.c_allocator, .{ .min_workers = 2, .max_workers = 4, .cap_tasks = 8 });
+    defer {
+        h.shutdown();
+        h.deinit();
+    }
+
+    // 参考：常规 probe（decode_once）
+    var ref: [16]f32 = undefined;
+    var rc: c_int = 0;
+    try testing.expectEqual(@as(isize, 8), zk_engine_decode_once(h, full.ptr, &ref, 8, &rc, null));
+
+    // 正确提示（wav=1）→ 免 probe 直分派
+    {
+        var out: [16]f32 = undefined;
+        var oc: c_int = 0;
+        var req = submitReq(0, 0);
+        req.path = full.ptr;
+        req.out = &out;
+        req.max_frames = 8;
+        req.out_channels = &oc;
+        req.format_hint = @intFromEnum(probe.FormatHint.wav);
+        const t = zk_submit(h, &req);
+        try testing.expect(t != null);
+        try testing.expectEqual(@as(c_longlong, 8), zk_task_wait(t));
+        try testing.expectEqual(@as(c_int, 1), zk_task_outcome(t));
+        for (0..8) |i| try testing.expectEqual(ref[i], out[i]);
+        zk_task_free(t);
+    }
+
+    // 错误提示（flac=2）→ 直分派失败 → 回退 probe → 仍逐位一致
+    {
+        var out: [16]f32 = undefined;
+        var oc: c_int = 0;
+        var req = submitReq(0, 0);
+        req.path = full.ptr;
+        req.out = &out;
+        req.max_frames = 8;
+        req.out_channels = &oc;
+        req.format_hint = @intFromEnum(probe.FormatHint.flac);
+        const t = zk_submit(h, &req);
+        try testing.expect(t != null);
+        try testing.expectEqual(@as(c_longlong, 8), zk_task_wait(t));
+        for (0..8) |i| try testing.expectEqual(ref[i], out[i]);
+        zk_task_free(t);
+    }
+}
+
+test "AS5 zk_task_cancel: 排队任务未开工即取消 → wait=-aborted、outcome=ERROR、status=aborted" {
+    const h = try khost.Host.init(std.heap.c_allocator, .{ .min_workers = 1, .max_workers = 1, .cap_tasks = 2 });
+    var gate = std.atomic.Value(bool).init(false);
+    defer {
+        gate.store(true, .release);
+        h.shutdown();
+        h.deinit();
+    }
+    const Blocker = struct {
+        task: task.Task,
+        gate: *std.atomic.Value(bool),
+        fn body(t: *task.Task) void {
+            const self: *@This() = @fieldParentPtr("task", t);
+            while (!self.gate.load(.acquire)) std.Thread.yield() catch {};
+        }
+    };
+    var blocker = Blocker{ .task = .{ .run = Blocker.body }, .gate = &gate };
+    try testing.expect(h.submit(&blocker.task) != null);
+
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io_inst = std.Io.Threaded.global_single_threaded.io();
+    const full = try engine.writeTestWav(&tmp, io_inst, "cancel.wav");
+    defer testing.allocator.free(full);
+
+    var out: [16]f32 = undefined;
+    var req = submitReq(0, 0);
+    req.path = full.ptr;
+    req.out = &out;
+    req.max_frames = 8;
+    const t = zk_submit(h, &req);
+    try testing.expect(t != null);
+    zk_task_cancel(t); // 唯一 worker 被占 → 任务仍在排队
+    zk_task_cancel(null); // NULL 空操作
+
+    gate.store(true, .release);
+    task.wait(&blocker.task);
+    try testing.expectEqual(
+        @as(c_longlong, -@as(c_longlong, @intFromEnum(err.Status.aborted))),
+        zk_task_wait(t),
+    );
+    try testing.expectEqual(@as(c_int, 2), zk_task_outcome(t)); // ERROR
+    try testing.expectEqual(@as(c_int, @intFromEnum(err.Status.aborted)), zk_task_status(t));
+    zk_task_free(t);
+}
+
+test "AS5 decodeIntoSource: 取消标志在解码中被观察到 → -aborted（chunk 边界协作）" {
+    const NFRAMES = 20000;
+    const wav_bytes = try bigWavBytes(testing.allocator, NFRAMES);
+    defer testing.allocator.free(wav_bytes);
+
+    const Ctx = struct {
+        data: []const u8,
+        pos: usize = 0,
+        calls: usize = 0,
+        flag: *std.atomic.Value(bool),
+
+        fn read(a: *anyopaque, buf: []u8) usize {
+            const self: *@This() = @ptrCast(@alignCast(a));
+            self.calls += 1;
+            if (self.calls >= 2) self.flag.store(true, .release); // 第二次底层读 → 请求取消
+            if (self.pos >= self.data.len) return 0;
+            const n = @min(self.data.len - self.pos, buf.len);
+            @memcpy(buf[0..n], self.data[self.pos..][0..n]);
+            self.pos += n;
+            return n;
+        }
+        fn seek(a: *anyopaque, off: i64, whence: i32, buffered: usize) bool {
+            const self: *@This() = @ptrCast(@alignCast(a));
+            const base: i64 = switch (whence) {
+                0 => 0,
+                1 => @as(i64, @intCast(self.pos)) - @as(i64, @intCast(buffered)),
+                2 => @intCast(self.data.len),
+                else => return false,
+            };
+            const np = base + off;
+            if (np < 0 or np > @as(i64, @intCast(self.data.len))) return false;
+            self.pos = @intCast(np);
+            return true;
+        }
+    };
+
+    var flag = std.atomic.Value(bool).init(false);
+    var ctx = Ctx{ .data = wav_bytes, .flag = &flag };
+    var cbuf: [io.peek_buffer_size]u8 = undefined;
+    const cb = io.Reader.Callback{
+        .ctx = @ptrCast(&ctx),
+        .on_read = Ctx.read,
+        .on_seek = Ctx.seek,
+        .size_hint = wav_bytes.len,
+    };
+
+    var out: [NFRAMES]f32 = undefined;
+    var ch: u8 = 0;
+    const n = decodeIntoSource(.{ .cb = cb }, &cbuf, &out, NFRAMES, null, &ch, 0, &flag);
+    try testing.expectEqual(-@as(isize, @intFromEnum(err.Status.aborted)), n);
+
+    // 对照：不取消 → 全量解出 NFRAMES 帧（证明取消是唯一差异）
+    var flag2 = std.atomic.Value(bool).init(false);
+    var ctx2 = Ctx{ .data = wav_bytes, .flag = &flag2 };
+    var cbuf2: [io.peek_buffer_size]u8 = undefined;
+    const cb2 = io.Reader.Callback{
+        .ctx = @ptrCast(&ctx2),
+        .on_read = Ctx.read,
+        .on_seek = Ctx.seek,
+        .size_hint = wav_bytes.len,
+    };
+    var out2: [NFRAMES]f32 = undefined;
+    const n2 = decodeIntoSource(.{ .cb = cb2 }, &cbuf2, &out2, NFRAMES, null, &ch, 0, null);
+    try testing.expectEqual(@as(isize, NFRAMES), n2);
+}
+
+test "N4 流缓冲预算: 超预算 cb 源拒绝打开；变长缓冲真实生效；释放后账目归零" {
+    defer {
+        streambuf.setBudget(0);
+        streambuf.setPeekBytes(@intCast(streambuf.default_peek_bytes));
+    }
+    streambuf.setBudget(0);
+    streambuf.setPeekBytes(@intCast(streambuf.default_peek_bytes));
+    const base = streambuf.usedBytes();
+
+    var cbctx = SubmitCbCtx{ .data = &[_]u8{} };
+    var req = submitReq(0, 2);
+    req.ctx = @ptrCast(&cbctx);
+    req.on_read = SubmitCbCtx.read;
+    req.on_seek = SubmitCbCtx.seek;
+
+    // 预算 < 每路缓冲 → acquire 失败 → buildSource 返回 null（不分配）
+    streambuf.setBudget(4096);
+    try testing.expect(buildSource(&req) == null);
+
+    // 预算不限 + 非默认缓冲大小（32 KiB）→ 真实分配该大小并记账
+    streambuf.setBudget(0);
+    try testing.expectEqual(@as(c_uint, streambuf.default_peek_bytes), zk_stream_peek_bytes());
+    zk_stream_peek_set_bytes(32768);
+    try testing.expectEqual(@as(c_uint, 32768), zk_stream_peek_bytes());
+    var b = buildSource(&req) orelse return error.TestUnexpectedResult;
+    try testing.expectEqual(@as(usize, 32768), b.cb_buffer.len);
+    try testing.expectEqual(base + 32768, zk_stream_mem_used());
+    b.release();
+    try testing.expectEqual(base, zk_stream_mem_used());
+
+    // 夹取：低于下限 → 16 KiB
+    zk_stream_peek_set_bytes(1024);
+    try testing.expectEqual(@as(c_uint, 16384), zk_stream_peek_bytes());
+
+    // 预算 0 = 不限：记账仍为基线
+    zk_stream_mem_set_budget(0);
+    try testing.expectEqual(base, zk_stream_mem_used());
 }
