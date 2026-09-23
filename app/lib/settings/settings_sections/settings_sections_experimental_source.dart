@@ -75,10 +75,20 @@ class _ExperimentalSourceSectionState
                   : l10n.settingsNekoNotLoggedIn,
               enabled: enabled,
               trailing: loggedIn
-                  ? SButton(
-                      label: l10n.settingsNekoLogout,
-                      variant: SButtonVariant.secondary,
-                      onPressed: _logout,
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _NekoAvatar(
+                          url: neko.userAvatarUrl(account?.id),
+                          name: account?.displayName ?? '',
+                        ),
+                        const SizedBox(width: 10),
+                        SButton(
+                          label: l10n.settingsNekoLogout,
+                          variant: SButtonVariant.secondary,
+                          onPressed: _logout,
+                        ),
+                      ],
                     )
                   : SButton(
                       label: l10n.settingsNekoLogin,
@@ -88,6 +98,47 @@ class _ExperimentalSourceSectionState
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Neko 登录用户头像（`GET /api/user/avatar/{userId}`）；无 URL 时回退首字母占位。
+class _NekoAvatar extends StatelessWidget {
+  const _NekoAvatar({required this.url, required this.name});
+
+  final String? url;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    const double size = 28;
+    final placeholder = CircleAvatar(
+      radius: size / 2,
+      backgroundColor: scheme.primaryContainer,
+      child: Text(
+        name.isNotEmpty ? name.characters.first : '?',
+        style: TextStyle(
+          fontSize: 12,
+          color: scheme.primary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+    final u = url;
+    if (u == null || u.isEmpty) return placeholder;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final px = (size * dpr).round();
+    return ClipOval(
+      child: Image.network(
+        u,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        cacheWidth: px,
+        cacheHeight: px,
+        errorBuilder: (_, _, _) => placeholder,
+      ),
     );
   }
 }
