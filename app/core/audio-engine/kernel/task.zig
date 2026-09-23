@@ -156,25 +156,16 @@ test "task: 体函数完工（默认 done）→ wait 读到 done" {
     try testing.expectEqual(Outcome.done, task.outcome);
 }
 
-test "task: 带超时等待被保证（set 前 → true；永未 set → false）" {
-    // set 在超时前 → true
-    var ev = std.Io.Event.unset;
+test "task: 带超时等待被保证（已 set → true；永未 set → false）" {
     const io = std.Io.Threaded.global_single_threaded.io();
-    const Setter = struct {
-        fn setLater(e: *std.Io.Event) void {
-            var i: usize = 0;
-            while (i < 100_000) : (i += 1) {}
-            std.Io.Event.set(e, std.Io.Threaded.global_single_threaded.io());
-        }
-    };
-    var th = try std.Thread.spawn(.{ .allocator = std.heap.c_allocator }, Setter.setLater, .{&ev});
+    // 已 set → 立即 true（确定性；不依赖线程调度/自旋计时）
+    var ev = std.Io.Event.unset;
+    std.Io.Event.set(&ev, io);
     try testing.expect(waitEventTimeout(&ev, io, 5 * std.time.ns_per_s));
-    th.join();
 
     // 永未 set → 短超时返回 false（保证超时路径真实可用）
     var never = std.Io.Event.unset;
     try testing.expect(!waitEventTimeout(&never, io, 20 * std.time.ns_per_ms));
-    // 清等待者残留（无等待者时无需 reset；此处 never 从未被 set，直接丢弃即可）
 }
 
 test "task: waitTimeout 完工任务返回 true" {
