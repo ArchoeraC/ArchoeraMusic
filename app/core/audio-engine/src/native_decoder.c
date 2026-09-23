@@ -66,6 +66,12 @@ int native_decoder_pool_begin(int min_w, int max_w, int cap)
         pool_unlock();
         return 0;
     }
+    /* N4：进程级流缓冲策略经宿主 env 注入（与既有 ARCHOERA_* 读取同法；失败不影响打开）。
+     * 0/未设 = 默认（预算不限、每路 16 KiB），行为与既往逐字节一致。 */
+    const char *sb = getenv("ARCHOERA_STREAM_BUDGET");
+    if (sb && sb[0]) zk_stream_mem_set_budget(strtoull(sb, NULL, 10));
+    const char *sp = getenv("ARCHOERA_STREAM_PEEK_BYTES");
+    if (sp && sp[0]) zk_stream_peek_set_bytes((unsigned)strtoul(sp, NULL, 10));
     g_pool = zk_engine_init(min_w, max_w, cap);
     if (!g_pool) {
         pool_unlock();

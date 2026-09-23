@@ -95,6 +95,18 @@ pub const Job = struct {
     ctx: *anyopaque,
 };
 
+/// AS6：内核池可观测聚合快照（`stats()` 单次只读返回；字段语义见该函数）。
+pub const Stats = struct {
+    active: usize = 0,
+    running: usize = 0,
+    idle: usize = 0,
+    pinned: usize = 0,
+    inflight: usize = 0,
+    stall_count: usize = 0,
+    spawn_count: usize = 0,
+    spawn_failed_count: usize = 0,
+};
+
 const Node = struct {
     job: Job,
     next: ?*Node = null,
@@ -483,6 +495,36 @@ pub const Runtime = struct {
         }
         self.mutex.unlock(self.io);
         return n;
+    }
+
+    /// AS6：内核池可观测聚合（只读快照；单次续锁保证队列派生字段一致）。
+    ///   - `active`：可服役 worker 数（原子）；
+    ///   - `running` / `inflight`：当前在跑 / 排队+在途（mutex 保护）；
+    ///   - `idle`：在役且 reg==idle 的 worker 数（不含停滞/已退出槽）；
+    ///   - `pinned`：当前 pinned 槽数；
+    ///   - `stall_count` / `spawn_count` / `spawn_failed_count`：累计计数（原子）。
+    pub fn stats(self: *Runtime) Stats {
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
+        var idle: usize = 0;
+        var pin: usize = 0;
+        for (self.reg.entries, 0..) |*e, id| {
+            if (id >= self.workers.items.len) break; // 未启用后缀格不计
+            if (self.stalled[id]) continue;
+            if (self.exited[id].load(.acquire)) continue;
+            if (self.pinned[id]) pin += 1;
+            if (e.state == tables.WState.idle) idle += 1;
+        }
+        return .{
+            .active = self.active.load(.monotonic),
+            .running = self.running,
+            .idle = idle,
+            .pinned = pin,
+            .inflight = self.inflight,
+            .stall_count = self.stall_count.load(.monotonic),
+            .spawn_count = self.spawn_count.load(.monotonic),
+            .spawn_failed_count = self.spawn_failed_count.load(.monotonic),
+        };
     }
 
     // ---- AS2 长流池化：worker 亲和 pinned 1:1（§6.3）----
