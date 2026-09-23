@@ -25,6 +25,8 @@
 #include "resampler.h"
 #include "encoder.h"
 #include "equalizer.h"
+#include "parametric_eq.h"
+#include "lowfreq.h"
 #include "loudness.h"
 #include "limiter.h"
 #include "fft.h"
@@ -88,6 +90,8 @@ struct AudioPipeline {
 
     /* 音频处理模块 */
     Equalizer   *equalizer;
+    ParametricEq *peq;          /* 方向① D1：参数化 EQ（默认旁通） */
+    LowFreq     *lowfreq;       /* 方向① D2：次声/低频管理（默认旁通） */
     Loudness    *loudness;
     Limiter     *limiter;
     Tempo       *tempo;
@@ -427,6 +431,19 @@ static AudioPipeline* pipeline_create_impl(const char *source,
         goto fail;
     }
 
+    /* 2.5 方向① D1/D2：次声/低频管理 + 参数化 EQ（默认旁通，运行时命令启用）。
+     * 串联顺序：subsonic HPF/low-freq → 参数化 EQ → 固定 10 段 EQ → … */
+    p->lowfreq = lowfreq_create(out_rate, out_channels);
+    if (!p->lowfreq) {
+        fprintf(stderr, "%s 次声/低频管理创建失败\n", LOG_TAG);
+        goto fail;
+    }
+    p->peq = parametric_eq_create(out_rate, out_channels, PEQ_MAX_BANDS);
+    if (!p->peq) {
+        fprintf(stderr, "%s 参数化 EQ 创建失败\n", LOG_TAG);
+        goto fail;
+    }
+
     /* 3. 音频处理模块 */
 
     /* 3.1 均衡器 */
@@ -580,14 +597,24 @@ AudioPipeline* pipeline_create_store(SegStore *store,
     return pipeline_create_impl(NULL, store, cfg, output, user);
 }
 
-/* DSP 处理链：重采样后的 float 交错 PCM → eq → loudness → limiter → tempo → fft
- * → PCM 流出回调 → 编码器。返回编码器写入帧数或 out_samples（skip_encoder 时）。
- * pcm 为 out_rate/out_channels 的重采样输出；samples 为其帧数。 */
-static int process_dsp_chain(AudioPipeline *p, float *pcm, int samples)
+/* 处理链前段（不含 tempo/fft）：低频管理 → 参数化 EQ → 固定 EQ → 响度 → 限幅。
+ * 供 process_dsp_chain 与 pipeline_run 的 flush 路径共用，保证两条路径一致。 */
+static void process_pre_tempo(AudioPipeline *p, float *pcm, int samples)
 {
+    lowfreq_process(p->lowfreq, pcm, samples);
+    parametric_eq_process(p->peq, pcm, samples);
     equalizer_process(p->equalizer, pcm, samples);
     loudness_process(p->loudness, pcm, samples);
     limiter_process(p->limiter, pcm, samples);
+}
+
+/* DSP 处理链：重采样后的 float 交错 PCM → lowfreq → peq → eq → loudness →
+ * limiter → tempo → fft → PCM 流出回调 → 编码器。返回编码器写入帧数或
+ * out_samples（skip_encoder 时）。pcm 为 out_rate/out_channels 的重采样输出；
+ * samples 为其帧数。 */
+static int process_dsp_chain(AudioPipeline *p, float *pcm, int samples)
+{
+    process_pre_tempo(p, pcm, samples);
 
     /* tempo: 变速变调（改变样本数，就地写回 pcm） */
     if (!tempo_is_bypass(p->tempo)) {
@@ -774,9 +801,7 @@ int pipeline_run(AudioPipeline *p)
     if (!p->flushed) {
         int out = resampler_flush(p->resampler, p->pcm_temp, p->pcm_temp_capacity);
         if (out > 0) {
-            equalizer_process(p->equalizer, p->pcm_temp, out);
-            loudness_process(p->loudness, p->pcm_temp, out);
-            limiter_process(p->limiter, p->pcm_temp, out);
+            process_pre_tempo(p, p->pcm_temp, out);
 
             if (!tempo_is_bypass(p->tempo)) {
                 int t_samples = out;
@@ -820,6 +845,44 @@ void pipeline_set_preamp(AudioPipeline *p, float preamp_db)
 {
     if (!p || !p->equalizer) return;
     equalizer_set_preamp(p->equalizer, preamp_db);
+}
+
+/* 方向① D1：参数化 EQ（运行时命令；默认旁通）。flat = [kind,freq,q,gain,...] */
+void pipeline_set_peq_bands(AudioPipeline *p, const float *bands, int count)
+{
+    if (!p || !p->peq) return;
+    parametric_eq_set_bands(p->peq, bands, count);
+}
+
+void pipeline_set_peq_enabled(AudioPipeline *p, bool enabled)
+{
+    if (!p || !p->peq) return;
+    parametric_eq_set_enabled(p->peq, enabled);
+}
+
+void pipeline_set_peq_preamp(AudioPipeline *p, float preamp_db)
+{
+    if (!p || !p->peq) return;
+    parametric_eq_set_preamp(p->peq, preamp_db);
+}
+
+/* 方向① D2：次声/低频管理（运行时命令；默认旁通）。 */
+void pipeline_set_lowfreq_enabled(AudioPipeline *p, bool enabled)
+{
+    if (!p || !p->lowfreq) return;
+    lowfreq_set_enabled(p->lowfreq, enabled);
+}
+
+void pipeline_set_lowfreq_hpf(AudioPipeline *p, float freq, int order)
+{
+    if (!p || !p->lowfreq) return;
+    lowfreq_set_hpf(p->lowfreq, freq, order);
+}
+
+void pipeline_set_lowfreq_bass(AudioPipeline *p, float gain_db, float freq)
+{
+    if (!p || !p->lowfreq) return;
+    lowfreq_set_bass(p->lowfreq, gain_db, freq);
 }
 
 void pipeline_set_volume(AudioPipeline *p, float volume)
@@ -1000,6 +1063,8 @@ void pipeline_destroy(AudioPipeline *p)
     if (p->encoder) encoder_destroy(p->encoder);
 
     if (p->equalizer) equalizer_destroy(p->equalizer);
+    if (p->peq) parametric_eq_destroy(p->peq);
+    if (p->lowfreq) lowfreq_destroy(p->lowfreq);
     if (p->loudness) loudness_destroy(p->loudness);
     if (p->limiter) limiter_destroy(p->limiter);
     if (p->tempo) tempo_destroy(p->tempo);

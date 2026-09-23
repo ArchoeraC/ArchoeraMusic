@@ -437,7 +437,83 @@ int zk_task_wait_timeout(ZkTask *t, long long timeout_ms);
 /* ---- 能力扩张 ABI 扩展锚点（并行开发占位；各方向实现时替换本行下方锚点）----
  * 说明：以下四行是并行分支的**互不重叠**插入点，避免同一文件合并冲突。
  * 实现分支只替换属于自己的那一个锚点，禁止改动其他锚点。 */
-/* __BRIDGE_DSP_EXT__ */
+/* ---- 方向① D1/D2：参数化 EQ + 次声低频管理（kernel/dsp/parametric.zig / lowfreq.zig）----
+ *
+ * 与既有 10 段 EQ 并列的加法式能力：C 壳 `parametric_eq.c` / `lowfreq.c` 在
+ * HAS_ARCHOERA_KERNEL 时优先路由本组内核实现，create 失败或内核库缺失时回退
+ * 各自纯 C 实现——对外 C API 行为一致。
+ *
+ * 契约（与 zk_dsp_eq_* 一致）：
+ *   - create：非法参数 / OOM 返回 NULL（调用方回退）；
+ *   - process：就地处理**交错 float32**，`samples` 为每声道帧数
+ *     （总样本 = samples × channels，由 create 时给定 channels 决定）；
+ *   - destroy：NULL 空操作；其余 setter：句柄为 NULL 时空操作。
+ *
+ * 旁通纪律：整链未启用 / 无有效段 / 全零增益且 preamp=0 时逐位不变。
+ */
+
+/** 参数 EQ 段类型（数值与 Zig `EraBandKind` 对齐，禁止重排） */
+enum ZkBandKind {
+    ZK_BAND_PEAK       = 0, /**< 峰值（peaking） */
+    ZK_BAND_LOW_SHELF  = 1, /**< 低架（low-shelf） */
+    ZK_BAND_HIGH_SHELF = 2  /**< 高架（high-shelf） */
+};
+
+/** 参数化 EQ 句柄（内核 Biquad；不透明） */
+typedef struct ZkDspPeq ZkDspPeq;
+
+/**
+ * 创建参数化 EQ（sample_rate>0，channels 1..64，max_bands 夹取 [1,16]）；
+ * 失败返回 NULL（调用方回退纯 C 实现）。初始无段 = 直通。
+ */
+ZkDspPeq *zk_dsp_peq_create(int sample_rate, int channels, int max_bands);
+
+/**
+ * 设置单段（index < max_bands；kind 见 enum ZkBandKind）。
+ * freq 夹取到 (0, Nyquist)，Q 夹取到合理范围，非有限增益按 0 dB；
+ * 越界 index 空操作，未知 kind 使该段禁用。活动段数 = max(活动段数, index+1)。
+ */
+void zk_dsp_peq_set_band(ZkDspPeq *eq, int index, int kind,
+                         float freq, float q, float gain_db);
+
+/** 启用（enabled != 0）/ 禁用整链。 */
+void zk_dsp_peq_set_enabled(ZkDspPeq *eq, int enabled);
+
+/** 设置前级增益（dB）。 */
+void zk_dsp_peq_set_preamp(ZkDspPeq *eq, float preamp_db);
+
+/** 复位段表（活动段数归零）与滤波器状态；preamp 保留。 */
+void zk_dsp_peq_clear(ZkDspPeq *eq);
+
+/** 就地处理交错 float32 PCM（samples = 每声道帧数）。 */
+void zk_dsp_peq_process(ZkDspPeq *eq, float *pcm, int samples);
+
+/** 释放参数化 EQ；NULL 空操作。 */
+void zk_dsp_peq_destroy(ZkDspPeq *eq);
+
+/** 次声/低频管理句柄（HPF + bass shelf；不透明） */
+typedef struct ZkDspLowFreq ZkDspLowFreq;
+
+/** 创建次声低频管理块（sample_rate>0，channels 1..64）；失败返回 NULL。 */
+ZkDspLowFreq *zk_dsp_lowfreq_create(int sample_rate, int channels);
+
+/** 整块启用（enabled != 0）/ 禁用（默认禁用 = 逐位旁通）。 */
+void zk_dsp_lowfreq_set_enabled(ZkDspLowFreq *lf, int enabled);
+
+/**
+ * 设置高通（subsonic）：freq<=0 或非有限 → 关闭 HPF；
+ * order 夹取到 1 / 2（二阶为 Butterworth Q=0.7071）。
+ */
+void zk_dsp_lowfreq_set_hpf(ZkDspLowFreq *lf, float freq, int order);
+
+/** 设置 bass shelf（gain_db 为 0 时自然旁通；freq 夹取到 (0, Nyquist)）。 */
+void zk_dsp_lowfreq_set_bass(ZkDspLowFreq *lf, float gain_db, float freq);
+
+/** 就地处理交错 float32 PCM（samples = 每声道帧数）。 */
+void zk_dsp_lowfreq_process(ZkDspLowFreq *lf, float *pcm, int samples);
+
+/** 释放次声低频管理块；NULL 空操作。 */
+void zk_dsp_lowfreq_destroy(ZkDspLowFreq *lf);
 /* __BRIDGE_STREAM_BUDGET__ */
 /* __BRIDGE_TAKEOVER__ */
 /* __BRIDGE_ENGINE_STATS__ */
