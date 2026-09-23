@@ -220,7 +220,32 @@ void pipeline_set_normalization_enabled(AudioPipeline *p, bool enabled);
 /** 运行时启用/禁用限幅器 */
 void pipeline_set_limiter_enabled(AudioPipeline *p, bool enabled);
 
-/* __H_PIPELINE_DSP_EXT__ */
+/* ---- 方向① D1/D2：参数化 EQ + 次声/低频管理（运行时命令；默认旁通）---- */
+
+/** 参数化 EQ 最大段数（与内核 `era_peq_max_bands` / C `PEQ_MAX_BANDS` 一致） */
+#define PARAMETRIC_EQ_MAX_BANDS 16
+
+/**
+ * 运行时设置参数化 EQ 段（先复位段表与状态，再逐段设置）。
+ * @param bands 扁平数组 [kind, freq, q, gain, ...]（kind 0=peak / 1=low-shelf / 2=high-shelf）
+ * @param count 段数（bands 长度 = count × 4）
+ */
+void pipeline_set_peq_bands(AudioPipeline *p, const float *bands, int count);
+
+/** 运行时启用/禁用参数化 EQ（禁用 = 逐位旁通）。 */
+void pipeline_set_peq_enabled(AudioPipeline *p, bool enabled);
+
+/** 运行时设置参数化 EQ 前级增益（dB）。 */
+void pipeline_set_peq_preamp(AudioPipeline *p, float preamp_db);
+
+/** 运行时启用/禁用次声/低频管理（默认禁用 = 逐位旁通）。 */
+void pipeline_set_lowfreq_enabled(AudioPipeline *p, bool enabled);
+
+/** 运行时设置 HPF（freq<=0 / 非有限 → 关闭）；order 1 或 2。 */
+void pipeline_set_lowfreq_hpf(AudioPipeline *p, float freq, int order);
+
+/** 运行时设置 bass shelf（gain_db / freq）。 */
+void pipeline_set_lowfreq_bass(AudioPipeline *p, float gain_db, float freq);
 
 /** 运行时启用/禁用 FFT */
 void pipeline_set_fft_enabled(AudioPipeline *p, bool enabled);

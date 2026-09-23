@@ -12,6 +12,9 @@
 //!   - `eq.zig`       10 段 Biquad 均衡器（`era_eq_*`）
 //!   - `limiter.zig`  输出限幅器（`era_limiter_*`）
 //!   - `loudness.zig` 响度归一化（`era_loudness_*`）
+//!   - `biquad.zig`   共享 Biquad 系数/状态（`era_biquad_*`）
+//!   - `parametric.zig` 参数化 EQ（`era_peq_*`；方向① D1）
+//!   - `lowfreq.zig`  次声/低频管理（`era_lowfreq_*`；方向① D2）
 //!   - `fft.zig` / `resampler.zig` / `tempo.zig`  移植计划占位（未导出）
 //!
 //! 已移植块经 `kernel/kernel.zig` 的 `zk_dsp_*` C ABI 暴露给 C 壳；
@@ -25,6 +28,9 @@ pub const math = @import("dspmath.zig");
 pub const eq = @import("eq.zig");
 pub const limiter = @import("limiter.zig");
 pub const loudness = @import("loudness.zig");
+pub const biquad = @import("biquad.zig");
+pub const parametric = @import("parametric.zig");
+pub const lowfreq = @import("lowfreq.zig");
 
 /// 未移植模块的接口占位与移植计划（本轮不导出 C ABI）。
 pub const fft = @import("fft.zig");
@@ -38,6 +44,9 @@ test {
     _ = @import("eq.zig");
     _ = @import("limiter.zig");
     _ = @import("loudness.zig");
+    _ = @import("biquad.zig");
+    _ = @import("parametric.zig");
+    _ = @import("lowfreq.zig");
     _ = @import("fft.zig");
     _ = @import("resampler.zig");
     _ = @import("tempo.zig");

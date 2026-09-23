@@ -412,7 +412,44 @@ target_include_directories(bench_coldstart PRIVATE
 )
 
 # ---- 能力扩张测试锚点（并行开发占位；各方向实现时替换属于自己的锚点）----
-# __TESTS_DSP_EXT__
+# ---- 能力扩张测试：方向① D1/D2（参数化 EQ + 次声低频管理）----
+# dsp_ref/*.c 以重命名符号再编译一份生产线 C 源码作为纯 C 参考，与内核
+# zk_dsp_peq_* / zk_dsp_lowfreq_* 对拍（内核缺失时仅测 C API，不链接内核符号）。
+add_executable(test_parametric_eq test_parametric_eq.c
+    dsp_ref/parametric_eq_ref.c
+)
+target_link_libraries(test_parametric_eq PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_parametric_eq PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_parametric_eq PRIVATE m)
+endif()
+target_include_directories(test_parametric_eq PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_parametric_eq COMMAND test_parametric_eq)
+set_tests_properties(test_parametric_eq PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+add_executable(test_lowfreq test_lowfreq.c
+    dsp_ref/lowfreq_ref.c
+)
+target_link_libraries(test_lowfreq PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_lowfreq PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_lowfreq PRIVATE m)
+endif()
+target_include_directories(test_lowfreq PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_lowfreq COMMAND test_lowfreq)
+set_tests_properties(test_lowfreq PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
 # __TESTS_STREAM_BUDGET__
 # __TESTS_TAKEOVER__
 # __TESTS_ENGINE_STATS__

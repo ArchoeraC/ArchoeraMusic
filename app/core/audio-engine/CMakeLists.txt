@@ -150,7 +150,9 @@ set(AUDIO_ENGINE_SOURCES
     src/loudness.c
     src/limiter.c
     src/fft.c
-    # __SOURCES_DSP_EXT__
+    # 方向① D1/D2：参数化 EQ + 次声/低频管理
+    src/parametric_eq.c
+    src/lowfreq.c
     src/pipeline.c
     src/pcm_uds.c
     src/player.c
