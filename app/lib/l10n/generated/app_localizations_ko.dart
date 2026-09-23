@@ -1638,19 +1638,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsFontMiSans => 'MiSans（기본）';
 
   @override
-  String get settingsFontNoto => 'Noto Sans KR（Google 표준 메트릭）';
-
-  @override
-  String get settingsFontHarmony => 'HarmonyOS Sans（Huawei 무료 상업용）';
-
-  @override
   String get settingsFontMiSansLabel => 'MiSans';
-
-  @override
-  String get settingsFontNotoLabel => 'Noto Sans KR';
-
-  @override
-  String get settingsFontHarmonyLabel => 'HarmonyOS Sans';
 
   @override
   String get settingsSectionLanguage => '인터페이스 언어';
@@ -3063,6 +3051,16 @@ class AppLocalizationsKo extends AppLocalizations {
       '자체 개발 플레이어: 로컬 라이브러리 스캔, 음악 소스 직결, 자체 호스팅 Subsonic, 네이티브 오디오 엔진.';
 
   @override
+  String get settingsNeverTap => '절대 누르지 마세요';
+
+  @override
+  String get easterEggGateTitle => '경고';
+
+  @override
+  String get easterEggGateBody =>
+      '이 프로그램을 실행하시겠습니까? 되돌릴 수 없는 결과가 발생하면 소프트웨어를 종료할 수 있습니다.';
+
+  @override
   String get settingsSectionDeclaration => '소프트웨어 고지';
 
   @override
@@ -3166,7 +3164,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      '이 소프트웨어에는 다음 글꼴이 포함되어 있습니다.\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, MiSans 글꼴 지식재산권 허락 계약에 따라 사용)\n· HarmonyOS Sans SC (© Huawei, HarmonyOS Sans 글꼴 허락 계약에 따라 사용)';
+      '이 소프트웨어에는 다음 글꼴이 포함되어 있습니다.\n· MiSans (© Xiaomi, MiSans 글꼴 지식재산권 허락 계약에 따라 사용)';
 
   @override
   String get commonNoLyrics => '가사 없음';
@@ -3339,8 +3337,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsSearchFloatingBarSubtitle => '하단 플로팅 캡슐 · 전체 너비 도킹';
 
   @override
-  String get settingsSearchFontSubtitle =>
-      'MiSans · Noto Sans · HarmonyOS Sans';
+  String get settingsSearchFontSubtitle => 'MiSans';
 
   @override
   String get settingsSearchLanguageSubtitle => '시스템 따르기 · 简体中文 · English · 日本語';

@@ -1705,20 +1705,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsFontMiSans => 'MiSans（par défaut）';
 
   @override
-  String get settingsFontNoto => 'Noto Sans SC（métriques standard）';
-
-  @override
-  String get settingsFontHarmony =>
-      'HarmonyOS Sans SC（usage commercial gratuit）';
-
-  @override
   String get settingsFontMiSansLabel => 'MiSans';
-
-  @override
-  String get settingsFontNotoLabel => 'Noto Sans SC';
-
-  @override
-  String get settingsFontHarmonyLabel => 'HarmonyOS Sans';
 
   @override
   String get settingsSectionLanguage => 'Langue de l\'interface';
@@ -3228,6 +3215,16 @@ class AppLocalizationsFr extends AppLocalizations {
       'Lecteur maison : bibliothèque locale, sources musicales directes, Subsonic auto-hébergé, moteur audio natif.';
 
   @override
+  String get settingsNeverTap => 'Ne pas appuyer';
+
+  @override
+  String get easterEggGateTitle => 'Avertissement';
+
+  @override
+  String get easterEggGateBody =>
+      'Exécuter ce programme ? En cas de conséquences irréversibles, vous pouvez fermer le logiciel.';
+
+  @override
   String get settingsSectionDeclaration => 'Déclaration logicielle';
 
   @override
@@ -3335,7 +3332,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      'Ce logiciel intègre les polices suivantes :\n· Noto Sans CJK SC (SIL Open Font License 1.1)\n· MiSans (© Xiaomi, utilisée conformément à l\'accord de licence de propriété intellectuelle de la police MiSans)\n· HarmonyOS Sans SC (© Huawei, utilisée conformément à l\'accord de licence de la police HarmonyOS Sans)';
+      'Ce logiciel intègre la police suivante :\n· MiSans (© Xiaomi, utilisée conformément à l\'accord de licence de propriété intellectuelle de la police MiSans)';
 
   @override
   String get commonNoLyrics => 'Pas de paroles';
@@ -3522,8 +3519,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'Capsule flottante en bas · Ancré pleine largeur';
 
   @override
-  String get settingsSearchFontSubtitle =>
-      'MiSans · Noto Sans · HarmonyOS Sans';
+  String get settingsSearchFontSubtitle => 'MiSans';
 
   @override
   String get settingsSearchLanguageSubtitle =>

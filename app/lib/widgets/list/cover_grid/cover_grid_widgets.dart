@@ -205,7 +205,7 @@ class CoverCard extends StatelessWidget {
                   ? l10n.commonTrackCount(count: item.trackCount)
                   : '')
             : item.subtitle);
-    return MouseRegion(
+    final Widget card = MouseRegion(
       cursor: onTap == null
           ? SystemMouseCursors.basic
           : SystemMouseCursors.click,
@@ -267,6 +267,7 @@ class CoverCard extends StatelessWidget {
         ),
       ),
     );
+    return MouseDodge(child: card);
   }
 
   Widget _coverBody(
