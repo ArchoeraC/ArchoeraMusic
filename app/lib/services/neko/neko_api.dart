@@ -531,6 +531,15 @@ class NekoApi extends ChangeNotifier {
     return out;
   }
 
+  /// 用户头像地址（`GET /api/user/avatar/{userId}`，返回图片文件、无需鉴权）。
+  ///
+  /// [userId] 为空返回 null（调用方走首字母占位）。
+  String? userAvatarUrl(String? userId) {
+    final id = userId?.trim() ?? '';
+    if (id.isEmpty) return null;
+    return resolveUrl('/api/user/avatar/$id');
+  }
+
   /// 封面路径 → 绝对地址；默认头像/空路径返回 null。
   String? _coverOf(String? path) {
     if (path == null || path.isEmpty) return null;
