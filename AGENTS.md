@@ -13,7 +13,7 @@
   `user.signingkey <GPG key id>`、`commit.gpgsign true`、`tag.gpgsign true`；
   remote 使用 SSH，推送无需 token。
 - **验证**：`ssh -T git@github.com`（应回显用户名）；`git log --show-signature -1`（签名有效）。
-- **红线**：禁止把 token、私钥写入仓库、脚本或 remote URL；凭据只保存在本地密钥环。
+- **红线**：禁止把 token、私钥写入仓库、脚本或 remote URL；凭据只保存在本地密钥环；禁止使用pkill -x自杀
 
 ## 构建与测试（提交前必跑）
 ```bash
@@ -98,6 +98,17 @@ zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseFast   # Zig 内核；�
   单 pass 着色器完成折射/饱和/波峰高光/压暗，封面模糊与饱和在 Dart 侧**预烘焙一次**
   （不每帧全屏模糊），每帧只更新 uniform；**着色器不可用时才回退 CPU 网格自绘**。
   设计/性能预算见 `docs/player-render-optimization.md`。
+
+### 内核并发与测试（禁止等待式竞态判定）
+- 内核（`app/core/audio-engine/kernel`，Zig）是**同步 / run-to-completion** 模型：
+  不得引入 `await`/异步等待语义；线程原语统一走 `std.Io` 条件变量/事件（持锁配对）。
+- **禁止用等待去“凑”竞态观测值**：不以 `sleep`/`waitIdle`/超时轮询让本质不确定的断言
+  （如 worker 瞬时 `idle/running/inflight`、内存 RSS、调度顺序）变得“看起来稳”。
+  断言只允许两类：**完成后稳定**（原子计数 / 明确边界写入值）或**任意时刻成立的不变量**；
+  瞬时并发状态只作遥测输出，不作断言。
+- 并发行为的确定性验证放到**不共享线程的状态机单测**（如 `tables.WorkerTable` 的纯函数
+  聚合），而非在活体线程池上观测瞬时状态。
+- 偶发失败不得当“抖动”重试掩盖：发现即定位并确定性化（固定 seed、明确同步点或改断言）。
 
 ## 发布与签名
 
