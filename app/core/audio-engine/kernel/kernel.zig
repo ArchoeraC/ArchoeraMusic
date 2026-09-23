@@ -1298,7 +1298,6 @@ export fn zk_stream_peek_bytes() c_uint {
     return @intCast(streambuf.peek());
 }
 
-// __KERNEL_TAKEOVER__
 // ---- AS6 可观测聚合 + AS5 取消 ABI（__KERNEL_ENGINE_STATS__）----
 /// 与 include/kernel_bridge.h `ZkEngineStats` 逐字段对齐（extern struct 保证 C ABI）。
 const CEngineStats = extern struct {
@@ -1336,6 +1335,28 @@ export fn zk_engine_stats(h: ?*khost.Host, out: ?*CEngineStats) void {
 export fn zk_task_cancel(t: ?*SubmitTask) void {
     const d = t orelse return;
     d.task.cancel();
+}
+
+// ==== 方向③ F5：接管门控（静态位图 + 格式/扩展名判定）====
+const takeover = @import("takeover.zig");
+
+/// 静态接管位图：bit i（i = probe.Format 枚举序）= 该格式是否已接管。
+/// C 壳据此在 native open 前跳过「明确未接管」格式的无效尝试。
+export fn zk_takeover_bitmap() c_ulonglong {
+    return @intCast(takeover.bitmap);
+}
+
+/// 给定 probe.Format 枚举序 → 1（已接管）/ 0（未接管或越界）。
+export fn zk_takeover_of_format(fmt: c_int) c_int {
+    if (fmt < 0 or fmt >= @as(c_int, @intCast(std.meta.fields(probe.Format).len))) return 0;
+    const f: probe.Format = @enumFromInt(@as(u8, @intCast(fmt)));
+    return if (takeover.ofFormat(f)) 1 else 0;
+}
+
+/// 给定扩展名（可带/不带 '.'，大小写不敏感）→ 1/0/-1（见 takeover.Verdict）。
+/// 空/未知扩展名返回 -1，让 C 壳保留 try-then-fallback。
+export fn zk_takeover_of_ext(ext: [*:0]const u8) c_int {
+    return @intFromEnum(takeover.ofExt(std.mem.span(ext)));
 }
 
 // ---------------------------------------------------------------------------

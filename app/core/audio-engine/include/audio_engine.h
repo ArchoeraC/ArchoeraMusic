@@ -183,7 +183,11 @@ int pipeline_get_source_sample_rate(const AudioPipeline *p);
 /** 获取管线实际输出采样率（跟随源或用户指定；0 = 未知） */
 int pipeline_get_output_sample_rate(const AudioPipeline *p);
 
-/* __H_PIPELINE_BACKEND__ */
+/**
+ * 获取管线实际解码后端（方向③ F5）："zig" = 自研内核接管，"ffmpeg" = FFmpeg 兜底；
+ * 管线为空/未定 → "unknown"。生命周期与管线一致，调用方只读。
+ */
+const char *pipeline_backend(const AudioPipeline *p);
 
 /** 获取管线实际输出声道数（cfg.output_channels） */
 int pipeline_get_output_channels(const AudioPipeline *p);

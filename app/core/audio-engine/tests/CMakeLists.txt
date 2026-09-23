@@ -502,4 +502,27 @@ add_test(NAME test_task_cancel COMMAND test_task_cancel)
 set_tests_properties(test_task_cancel PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
-# __TESTS_TAKEOVER__
+# 方向③ F5 接管门控：静态位图/格式/扩展名判定 + 门控计数 + backend 字段。
+# 依赖 HAS_ARCHOERA_KERNEL（zk_takeover_* 来自内核静态库）。
+if(HAS_ARCHOERA_KERNEL)
+    add_executable(test_takeover_gate test_takeover_gate.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src/tempo.c
+    )
+    target_link_libraries(test_takeover_gate PRIVATE audio_engine_static)
+    if(TARGET Threads::Threads)
+        target_link_libraries(test_takeover_gate PRIVATE Threads::Threads)
+    endif()
+    if(UNIX)
+        target_link_libraries(test_takeover_gate PRIVATE m)
+    endif()
+    target_include_directories(test_takeover_gate PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    )
+    add_test(NAME test_takeover_gate
+             COMMAND test_takeover_gate
+                     ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac
+                     ${CMAKE_CURRENT_SOURCE_DIR}/fallback_pcm.mov)
+    set_tests_properties(test_takeover_gate PROPERTIES
+        PASS_REGULAR_EXPRESSION "ALL PASS")
+endif()

@@ -1192,16 +1192,18 @@ static void *engine_thread(void *arg)
         }
     }
 
-    /* ready 事件 */
-    char ready[320];
+    /* ready 事件（backend：F5 实际解码后端 "zig"/"ffmpeg"） */
+    char ready[384];
     snprintf(ready, sizeof(ready),
         "{\"type\":\"ready\",\"version\":\"%s\",\"duration_ms\":%.0f,"
-        "\"sample_rate\":%d,\"channels\":%d,\"out_sample_rate\":%d}",
+        "\"sample_rate\":%d,\"channels\":%d,\"out_sample_rate\":%d,"
+        "\"backend\":\"%s\"}",
         audio_engine_version(),
         pipeline_get_duration(e->p) * 1000.0,
         pipeline_get_source_sample_rate(e->p),
         pipeline_get_source_channels(e->p),
-        pipeline_get_output_sample_rate(e->p));
+        pipeline_get_output_sample_rate(e->p),
+        pipeline_backend(e->p));
     ev_enqueue(e, ready);
 
     int code = 0;

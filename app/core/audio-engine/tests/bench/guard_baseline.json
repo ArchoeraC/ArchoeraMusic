@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "note": "P4 发布看护基线（guard_release.py --update-baseline 生成/刷新）。first_frame_ratio 为各语料可接受的 era/stable 首帧比上限（默认 1.0 = era 不得慢于 FFmpeg）；first_frame_tolerance 为额外抖动容忍；stable_p50_us/era_p50_us 为上次基线观测值（本轮不可用时兜底/回归参照）；rss_kib 为各 bench 子进程峰值 RSS 上限（KiB，/proc VmHWM 采样），rss_tolerance 为采样抖动容忍。在已知良好机器上跑 `--update-baseline` 记录后，本 guard 即成为回归门。",
+  "first_frame_tolerance": 0.25,
+  "rss_tolerance": 0.1,
+  "first_frame_ratio": {},
+  "rss_kib": {
+    "bench_coldstart": 262144,
+    "bench_era_pool": 262144
+  },
+  "stable_p50_us": {},
+  "era_p50_us": {}
+}

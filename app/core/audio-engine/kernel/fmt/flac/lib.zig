@@ -145,10 +145,15 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     const buf = try allocator.alloc(i32, buf_len * si.channels);
     ctx.decoded_buf = buf;
     for (0..si.channels) |c| ctx.decoded[c] = buf[c * buf_len ..][0..buf_len];
-    const buf33 = try allocator.alloc(i64, 2 * buf_len);
-    ctx.decoded33_buf = buf33;
-    ctx.decoded33[0] = buf33[0..buf_len];
-    ctx.decoded33[1] = buf33[buf_len..][0..buf_len];
+    // 33 位宽式侧声道缓冲仅 32-bit FLAC 需要（use_33 = stream_bps==32 + 耦合；
+    // 见 decodeOneFrame）。其余位深不分配，省下 2×max_blocksize×8 字节常驻；
+    // decoded33_buf 保持零长，destroyCtx 按 len>0 释放（openMeta 同零长语义）。
+    if (si.bits_per_sample == 32) {
+        const buf33 = try allocator.alloc(i64, 2 * buf_len);
+        ctx.decoded33_buf = buf33;
+        ctx.decoded33[0] = buf33[0..buf_len];
+        ctx.decoded33[1] = buf33[buf_len..][0..buf_len];
+    }
 
     info.* = buildInfo(ctx);
     // 接管 reader（按值拷贝解析后状态）
