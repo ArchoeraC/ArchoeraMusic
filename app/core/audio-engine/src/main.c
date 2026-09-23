@@ -442,6 +442,38 @@ static void handle_command(AudioPipeline *p, const char *line) {
         if (json_get_number(line, "preamp", &preamp) == 0) {
             pipeline_set_preamp(p, (float)preamp);
         }
+    } else if (strcmp(type, "set_peq") == 0) {
+        /* 方向① D1：参数化 EQ（扁平 [kind,freq,q,gain,...]，长度须 % 4 == 0） */
+        float bands[PARAMETRIC_EQ_MAX_BANDS * 4] = {0};
+        int n = json_get_float_array(line, "bands", bands,
+                                     PARAMETRIC_EQ_MAX_BANDS * 4);
+        if (n > 0 && n % 4 == 0) {
+            pipeline_set_peq_bands(p, bands, n / 4);
+        }
+        bool peq_enabled = true;
+        if (json_get_bool(line, "enabled", &peq_enabled) == 0) {
+            pipeline_set_peq_enabled(p, peq_enabled);
+        }
+        double peq_preamp = 0;
+        if (json_get_number(line, "preamp", &peq_preamp) == 0) {
+            pipeline_set_peq_preamp(p, (float)peq_preamp);
+        }
+    } else if (strcmp(type, "set_lowfreq") == 0) {
+        /* 方向① D2：次声/低频管理 */
+        bool lf_enabled = true;
+        if (json_get_bool(line, "enabled", &lf_enabled) == 0) {
+            pipeline_set_lowfreq_enabled(p, lf_enabled);
+        }
+        double hpf_freq = -1.0, hpf_order = 2.0;
+        if (json_get_number(line, "hpf_freq", &hpf_freq) == 0) {
+            if (json_get_number(line, "hpf_order", &hpf_order) != 0) hpf_order = 2.0;
+            pipeline_set_lowfreq_hpf(p, (float)hpf_freq, (int)hpf_order);
+        }
+        double bass_gain = 0.0, bass_freq = 100.0;
+        if (json_get_number(line, "bass_gain", &bass_gain) == 0) {
+            if (json_get_number(line, "bass_freq", &bass_freq) != 0) bass_freq = 100.0;
+            pipeline_set_lowfreq_bass(p, (float)bass_gain, (float)bass_freq);
+        }
     } else if (strcmp(type, "set_volume") == 0) {
         double vol = 1.0;
         if (json_get_number(line, "gain", &vol) == 0) {

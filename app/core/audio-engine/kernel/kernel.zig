@@ -1106,7 +1106,130 @@ export fn zk_engine_close(st: ?*Stream) void {
 // 能力扩张 export 扩展锚点（并行开发占位；各方向实现时替换属于自己的锚点）
 // 说明：以下四行互不重叠，避免同一文件合并冲突；只替换自己那一个。
 // ---------------------------------------------------------------------------
-// __KERNEL_DSP_EXT__
+// ---------------------------------------------------------------------------
+// 能力扩张 export 扩展：方向① D1/D2（参数化 EQ + 次声低频管理）
+//
+// 契约见 include/kernel_bridge.h（enum ZkBandKind / ZkDspPeq / ZkDspLowFreq）。
+// 非法参数返回 NULL / 空操作，与既有 zk_dsp_eq_* 风格一致。
+// ---------------------------------------------------------------------------
+
+/// 参数化 EQ 句柄（C 侧 `ZkDspPeq`）；非法参数 / OOM 返回 NULL（C 壳回退）。
+export fn zk_dsp_peq_create(
+    sample_rate: c_int,
+    channels: c_int,
+    max_bands: c_int,
+) ?*dsp.parametric.EraParamEq {
+    if (sample_rate <= 0 or channels <= 0 or channels > 64) return null;
+    const cap: usize = if (max_bands <= 0) 1 else @intCast(max_bands);
+    return dsp.parametric.era_peq_create(
+        std.heap.c_allocator,
+        @intCast(sample_rate),
+        @intCast(channels),
+        cap,
+    ) catch null;
+}
+
+/// 设置单段（index < max_bands；kind 见 enum ZkBandKind，越界 kind 置为禁用）。
+export fn zk_dsp_peq_set_band(
+    eq: ?*dsp.parametric.EraParamEq,
+    index: c_int,
+    kind: c_int,
+    freq: f32,
+    q: f32,
+    gain_db: f32,
+) void {
+    const e = eq orelse return;
+    if (index < 0) return;
+    const k: u8 = if (kind >= 0 and kind <= 2) @intCast(kind) else 0xFF;
+    dsp.parametric.era_peq_set_band(e, @intCast(index), k, freq, q, gain_db);
+}
+
+/// 启用（enabled != 0）/ 禁用整链。
+export fn zk_dsp_peq_set_enabled(eq: ?*dsp.parametric.EraParamEq, enabled: c_int) void {
+    const e = eq orelse return;
+    dsp.parametric.era_peq_set_enabled(e, enabled != 0);
+}
+
+/// 设置前级增益（dB）。
+export fn zk_dsp_peq_set_preamp(eq: ?*dsp.parametric.EraParamEq, preamp_db: f32) void {
+    const e = eq orelse return;
+    dsp.parametric.era_peq_set_preamp(e, preamp_db);
+}
+
+/// 复位段表与滤波器状态（preamp 保留）。
+export fn zk_dsp_peq_clear(eq: ?*dsp.parametric.EraParamEq) void {
+    const e = eq orelse return;
+    dsp.parametric.era_peq_clear(e);
+}
+
+/// 就地处理交错 float32 PCM（samples = 每声道帧数）。
+export fn zk_dsp_peq_process(eq: ?*dsp.parametric.EraParamEq, pcm: ?[*]f32, samples: c_int) void {
+    const e = eq orelse return;
+    const p = pcm orelse return;
+    if (samples <= 0) return;
+    const frames: usize = @intCast(samples);
+    dsp.parametric.era_peq_process(e, p[0 .. frames * @as(usize, e.channels)], frames);
+}
+
+/// 释放参数化 EQ；NULL 空操作。
+export fn zk_dsp_peq_destroy(eq: ?*dsp.parametric.EraParamEq) void {
+    const e = eq orelse return;
+    dsp.parametric.era_peq_destroy(e);
+}
+
+/// 次声低频管理句柄（C 侧 `ZkDspLowFreq`）；非法参数 / OOM 返回 NULL。
+export fn zk_dsp_lowfreq_create(
+    sample_rate: c_int,
+    channels: c_int,
+) ?*dsp.lowfreq.EraLowFreq {
+    if (sample_rate <= 0 or channels <= 0 or channels > 64) return null;
+    return dsp.lowfreq.era_lowfreq_create(
+        std.heap.c_allocator,
+        @intCast(sample_rate),
+        @intCast(channels),
+    ) catch null;
+}
+
+/// 整块启用（enabled != 0）/ 禁用（默认禁用 = 逐位旁通）。
+export fn zk_dsp_lowfreq_set_enabled(lf: ?*dsp.lowfreq.EraLowFreq, enabled: c_int) void {
+    const x = lf orelse return;
+    dsp.lowfreq.era_lowfreq_set_enabled(x, enabled != 0);
+}
+
+/// 设置 HPF（freq<=0 / 非有限 → 关闭）；order 夹取到 1 / 2。
+export fn zk_dsp_lowfreq_set_hpf(
+    lf: ?*dsp.lowfreq.EraLowFreq,
+    freq: f32,
+    order: c_int,
+) void {
+    const x = lf orelse return;
+    dsp.lowfreq.era_lowfreq_set_hpf(x, freq, order);
+}
+
+/// 设置 bass shelf（gain_db / freq）。
+export fn zk_dsp_lowfreq_set_bass(
+    lf: ?*dsp.lowfreq.EraLowFreq,
+    gain_db: f32,
+    freq: f32,
+) void {
+    const x = lf orelse return;
+    dsp.lowfreq.era_lowfreq_set_bass(x, gain_db, freq);
+}
+
+/// 就地处理交错 float32 PCM（samples = 每声道帧数）。
+export fn zk_dsp_lowfreq_process(lf: ?*dsp.lowfreq.EraLowFreq, pcm: ?[*]f32, samples: c_int) void {
+    const x = lf orelse return;
+    const p = pcm orelse return;
+    if (samples <= 0) return;
+    const frames: usize = @intCast(samples);
+    dsp.lowfreq.era_lowfreq_process(x, p[0 .. frames * @as(usize, x.channels)], frames);
+}
+
+/// 释放次声低频管理块；NULL 空操作。
+export fn zk_dsp_lowfreq_destroy(lf: ?*dsp.lowfreq.EraLowFreq) void {
+    const x = lf orelse return;
+    dsp.lowfreq.era_lowfreq_destroy(x);
+}
 // __KERNEL_STREAM_BUDGET__
 // __KERNEL_TAKEOVER__
 // __KERNEL_ENGINE_STATS__

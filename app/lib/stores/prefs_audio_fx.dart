@@ -13,6 +13,16 @@ const limiterEnabledKey = 'audio.limiter';
 const normalizationEnabledKey = 'audio.normalization';
 const playbackSpeedKey = 'audio.speed';
 
+// 参数化 EQ（方向① D1）与次声/低频管理（方向① D2）键。
+const peqEnabledKey = 'audio.peq.enabled';
+const peqBandsKey = 'audio.peq.bands';
+const peqPreampKey = 'audio.peq.preamp';
+const lowfreqEnabledKey = 'audio.lowfreq.enabled';
+const lowfreqHpfFreqKey = 'audio.lowfreq.hpf.freq';
+const lowfreqHpfOrderKey = 'audio.lowfreq.hpf.order';
+const lowfreqBassGainKey = 'audio.lowfreq.bass.gain';
+const lowfreqBassFreqKey = 'audio.lowfreq.bass.freq';
+
 /// 均衡器频段数（对齐引擎 `EQ_BANDS = 10`）。
 const int eqBandCount = 10;
 
@@ -140,4 +150,166 @@ extension AudioFxPrefs on AppPrefs {
       playbackSpeedKey: value.clamp(speedMin, speedMax),
     },
   );
+
+  // ── 参数化 EQ（方向① D1）──────────────────────────────────────
+
+  /// 参数化 EQ 总开关（默认关）。
+  bool get peqEnabled => data[peqEnabledKey] as bool? ?? false;
+
+  /// 参数化段列表（默认空；最多 [peqMaxBands] 段）。
+  List<ParametricBand> get peqBands => _normalizePeqBands(data[peqBandsKey]);
+
+  /// 参数化 EQ 预增益（dB，默认 0）。
+  double get peqPreampDb =>
+      ((data[peqPreampKey] as num?)?.toDouble() ?? 0).clamp(
+        peqPreampMinDb,
+        peqPreampMaxDb,
+      );
+
+  /// 设置参数化 EQ（开关 / 段列表 / 预增益）。
+  AppPrefs copyWithPeq({
+    bool? enabled,
+    List<ParametricBand>? bands,
+    double? preampDb,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      peqEnabledKey: ?enabled,
+      if (bands != null) peqBandsKey: _peqBandsToData(bands),
+      peqPreampKey: ?preampDb?.clamp(peqPreampMinDb, peqPreampMaxDb),
+    },
+  );
+
+  // ── 次声 / 低频管理（方向① D2）────────────────────────────────
+
+  /// 低频管理总开关（默认关）。
+  bool get lowfreqEnabled => data[lowfreqEnabledKey] as bool? ?? false;
+
+  /// HPF 截止频率（Hz，默认 20）。
+  double get lowfreqHpfFreq =>
+      ((data[lowfreqHpfFreqKey] as num?)?.toDouble() ?? lowfreqHpfFreqDefault)
+          .clamp(lowfreqHpfFreqMin, lowfreqHpfFreqMax);
+
+  /// HPF 阶数（1 或 2，默认 2）。
+  int get lowfreqHpfOrder =>
+      ((data[lowfreqHpfOrderKey] as num?)?.toInt() ?? 2) == 1 ? 1 : 2;
+
+  /// bass shelf 增益（dB，默认 0）。
+  double get lowfreqBassGainDb =>
+      ((data[lowfreqBassGainKey] as num?)?.toDouble() ?? 0).clamp(
+        lowfreqBassGainMinDb,
+        lowfreqBassGainMaxDb,
+      );
+
+  /// bass shelf 转折频率（Hz，默认 100）。
+  double get lowfreqBassFreq =>
+      ((data[lowfreqBassFreqKey] as num?)?.toDouble() ?? lowfreqBassFreqDefault)
+          .clamp(lowfreqBassFreqMin, lowfreqBassFreqMax);
+
+  /// 设置次声/低频管理。
+  AppPrefs copyWithLowFreq({
+    bool? enabled,
+    double? hpfFreq,
+    int? hpfOrder,
+    double? bassGainDb,
+    double? bassFreq,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      lowfreqEnabledKey: ?enabled,
+      lowfreqHpfFreqKey: ?hpfFreq?.clamp(lowfreqHpfFreqMin, lowfreqHpfFreqMax),
+      if (hpfOrder != null) lowfreqHpfOrderKey: hpfOrder == 1 ? 1 : 2,
+      lowfreqBassGainKey: ?bassGainDb?.clamp(
+        lowfreqBassGainMinDb,
+        lowfreqBassGainMaxDb,
+      ),
+      lowfreqBassFreqKey: ?bassFreq?.clamp(
+        lowfreqBassFreqMin,
+        lowfreqBassFreqMax,
+      ),
+    },
+  );
 }
+
+// ── 参数化 EQ 数据模型与归一化（方向① D1）────────────────────────
+
+/// 参数化 EQ 最大段数（对齐引擎 `PARAMETRIC_EQ_MAX_BANDS = 16`）。
+const int peqMaxBands = 16;
+
+/// 段类型（对齐引擎 enum ZkBandKind）。
+const int peqKindPeak = 0;
+const int peqKindLowShelf = 1;
+const int peqKindHighShelf = 2;
+
+/// 全部可选段类型（UI 下拉用）。
+const List<int> peqKinds = [peqKindPeak, peqKindLowShelf, peqKindHighShelf];
+
+const double peqFreqMin = 20;
+const double peqFreqMax = 20000;
+const double peqQMin = 0.1;
+const double peqQMax = 12;
+const double peqGainMinDb = -24;
+const double peqGainMaxDb = 24;
+const double peqPreampMinDb = -24;
+const double peqPreampMaxDb = 24;
+
+/// 单个参数化段 {kind, freq, Q, gain}。
+class ParametricBand {
+  const ParametricBand({
+    this.kind = peqKindPeak,
+    this.freq = 1000,
+    this.q = 1.0,
+    this.gainDb = 0,
+  });
+
+  final int kind;
+  final double freq;
+  final double q;
+  final double gainDb;
+
+  ParametricBand copyWith({int? kind, double? freq, double? q, double? gainDb}) =>
+      ParametricBand(
+        kind: kind ?? this.kind,
+        freq: freq ?? this.freq,
+        q: q ?? this.q,
+        gainDb: gainDb ?? this.gainDb,
+      );
+
+  /// 引擎扁平编码 [kind, freq, q, gain]。
+  List<double> toFlat() => [kind.toDouble(), freq, q, gainDb];
+}
+
+/// 归一化参数化段列表（兼容扁平 [kind,freq,q,gain] 存储；长度/范围收敛）。
+List<ParametricBand> _normalizePeqBands(Object? value) {
+  final list = value is List ? value : const [];
+  final out = <ParametricBand>[];
+  for (final e in list) {
+    if (out.length >= peqMaxBands) break;
+    if (e is List && e.length >= 4) {
+      out.add(
+        ParametricBand(
+          kind: (e[0] as num).toInt().clamp(peqKindPeak, peqKindHighShelf),
+          freq: (e[1] as num).toDouble().clamp(peqFreqMin, peqFreqMax),
+          q: (e[2] as num).toDouble().clamp(peqQMin, peqQMax),
+          gainDb: (e[3] as num).toDouble().clamp(peqGainMinDb, peqGainMaxDb),
+        ),
+      );
+    }
+  }
+  return out;
+}
+
+List<List<double>> _peqBandsToData(List<ParametricBand> bands) => [
+  for (final b in bands) b.toFlat(),
+];
+
+// ── 次声 / 低频管理常量（方向① D2）──────────────────────────────
+
+const double lowfreqHpfFreqDefault = 20;
+const double lowfreqHpfFreqMin = 10;
+const double lowfreqHpfFreqMax = 200;
+const double lowfreqBassFreqDefault = 100;
+const double lowfreqBassFreqMin = 40;
+const double lowfreqBassFreqMax = 500;
+const double lowfreqBassGainMinDb = -24;
+const double lowfreqBassGainMaxDb = 24;
