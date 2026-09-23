@@ -12,7 +12,10 @@ extension _FavoritesPageView on _FavoritesPageState {
 
     // 各平台登录态变化 → 清缓存并按需刷新（信号由注册表提供）。
     for (final p in collectionPlatforms(ref)) {
-      ref.listen(p.authSignal, (_, _) => _onAuthChanged());
+      final signal = p.authSignal;
+      if (signal != null) {
+        ref.listen(signal, (_, _) => _onAuthChanged());
+      }
     }
     // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
     ref.watch(appPrefsProvider.select((p) => p.nekoEnabled));

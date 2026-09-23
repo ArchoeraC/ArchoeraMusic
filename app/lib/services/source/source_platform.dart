@@ -22,6 +22,7 @@ library;
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/generated/app_localizations.dart';
@@ -74,7 +75,7 @@ abstract class SourcePlatform {
   Future<void> login(BuildContext context) async {}
 
   /// 登录态信号（页面据此监听并在变化时重置/重载）。
-  dynamic get authSignal => null;
+  ProviderListenable<Object?>? get authSignal => null;
 
   /// 是否出现在「搜索音源下拉」中（local / streaming 无搜索能力 → false）。
   bool get searchable => true;
@@ -319,7 +320,7 @@ class _NeteaseSource extends SourcePlatform {
   String label(AppLocalizations l10n) => l10n.platformNetease;
 
   @override
-  dynamic get authSignal =>
+  ProviderListenable<Object?>? get authSignal =>
       neteaseAuthProvider.select<Object?>((a) => a?.userId);
 
   @override
@@ -472,7 +473,7 @@ class _KugouSource extends SourcePlatform {
   }
 
   @override
-  dynamic get authSignal =>
+  ProviderListenable<Object?>? get authSignal =>
       kugouApiProvider.select<Object?>((s) => s.session?.userid);
 
   @override
@@ -632,7 +633,7 @@ class _QqSource extends SourcePlatform {
   String label(AppLocalizations l10n) => l10n.platformQQMusic;
 
   @override
-  dynamic get authSignal =>
+  ProviderListenable<Object?>? get authSignal =>
       qqMusicApiProvider.select<Object?>((s) => s.isLoggedIn);
 
   @override
@@ -776,10 +777,15 @@ class _NekoSource extends SourcePlatform {
   String label(AppLocalizations l10n) => l10n.platformNeko;
 
   @override
-  bool enabled(dynamic ref) => ref.read(appPrefsProvider).nekoEnabled;
+  bool enabled(dynamic ref) {
+    // 同 collection_platform.dart：`ref` 为 dynamic，扩展 getter 须显式转
+    // AppPrefs 读取，否则动态派发抛 NoSuchMethodError（搜索页白屏）。
+    final prefs = ref.read(appPrefsProvider) as AppPrefs;
+    return prefs.nekoEnabled;
+  }
 
   @override
-  dynamic get authSignal =>
+  ProviderListenable<Object?>? get authSignal =>
       nekoApiProvider.select<Object?>((s) => s.isLoggedIn);
 
   @override
@@ -943,8 +949,8 @@ class _StreamingSource extends SourcePlatform {
       log?.call('流媒体服务器不存在: $serverId（${track.title}）');
       return null;
     }
-    final sq =
-        streamingQuality ?? ref.read(appPrefsProvider).streamingQuality;
+    final prefs = ref.read(appPrefsProvider) as AppPrefs;
+    final sq = streamingQuality ?? prefs.streamingQuality;
     final client = StreamingClient(cfg);
     final url = await client.getStreamUrl(
       originalId,
