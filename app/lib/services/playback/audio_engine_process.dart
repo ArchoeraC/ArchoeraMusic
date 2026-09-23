@@ -28,6 +28,7 @@ class EngineReady extends EngineEvent {
     required this.sampleRate,
     required this.outSampleRate,
     required this.channels,
+    this.backend,
   });
 
   final String version;
@@ -39,6 +40,10 @@ class EngineReady extends EngineEvent {
   /// 管线实际输出采样率（player 模式跟随源时即源采样率；PCM/FFT 分析据此建频轴）。
   final int outSampleRate;
   final int channels;
+
+  /// 实际解码后端（方向③ F5）：`'zig'` = 自研内核接管，`'ffmpeg'` = 兜底/未接管；
+  /// 旧版引擎无该字段时为 null。
+  final String? backend;
 }
 
 /// 引擎状态（get_status 响应；播放模式含 playing 字段）。
@@ -508,6 +513,7 @@ class AudioEngineProcess {
               sampleRate: (map['sample_rate'] as num?)?.toInt() ?? 0,
               outSampleRate: outRate,
               channels: (map['channels'] as num?)?.toInt() ?? 0,
+              backend: map['backend'] as String?,
             ),
           );
           // PCM 分析器按管线实际输出采样率打开（FFI 频轴正确）

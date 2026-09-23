@@ -38,6 +38,17 @@ typedef struct NativeInfo {
 bool native_decoder_available(void);
 
 /**
+ * 扩展名接管判定（方向③ F5 门控；内部走 zk_takeover_of_ext）。
+ *
+ * @param path 文件路径或 URL（取最后一个 '.' 后的扩展名；路径/查询串中的点忽略）
+ * @return 1 = 该扩展名明确已接管（优先 native）；
+ *         0 = 明确未接管（调用方可跳过无效 native open，直接 FFmpeg）；
+ *        -1 = 未知扩展名/无扩展名/内核未链接（保留 try-then-fallback）。
+ * 仅看扩展名，不读取文件内容；格式开关由内核编译期常量决定。
+ */
+int native_decoder_taken_over_by_ext(const char *path);
+
+/**
  * 打开自研内核解码器。
  *
  * @param path          输入文件路径
@@ -123,6 +134,15 @@ int native_decoder_pool_active(void);
 /** 测试访问器：进程内累计走 stream seam 的 open 次数（池启用的 open 命中即 +1，
  *  一直累加不回落；供测试证明 gated 引擎路径确实执行、env 关闭时不增加）。 */
 long long native_decoder_stream_opens(void);
+
+/**
+ * 接管命中/未命中统计（方向③ F5 监控；进程级单调递增）。
+ * @param attempts    可空；native_decoder_open 的累计尝试次数
+ * @param hits        可空；返回成功接管的次数（status == 0）
+ * @param unsupported 可空；返回明确未接管的次数（status == ZK_UNSUPPORTED == 1）
+ */
+void native_decoder_stats(long long *attempts, long long *hits,
+                          long long *unsupported);
 
 #ifdef __cplusplus
 }
