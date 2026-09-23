@@ -150,6 +150,7 @@ set(AUDIO_ENGINE_SOURCES
     src/loudness.c
     src/limiter.c
     src/fft.c
+    # __SOURCES_DSP_EXT__
     src/pipeline.c
     src/pcm_uds.c
     src/player.c
