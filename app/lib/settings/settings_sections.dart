@@ -22,6 +22,7 @@ import '../../l10n/l10n.dart';
 import '../app/app_quit.dart';
 import '../app/theme_provider.dart';
 import '../app/watermark.dart';
+import '../easter_egg/easter_egg.dart';
 import '../services/downloader/download_controller.dart';
 import '../services/platform/platform_capabilities.dart';
 import '../services/playback/engine_bindings.dart';

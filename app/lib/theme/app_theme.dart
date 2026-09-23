@@ -166,13 +166,10 @@ class AppChromeColors extends ThemeExtension<AppChromeColors> {
 
 /// CJK 字体回退链。
 ///
-/// 主字体为内置 Noto Sans SC（Google 开源，字形度量最标准）；回退链
-/// 优先内置 MiSans 与系统 Noto CJK SC 同族，其余为跨平台系统中文无衬线
-/// 体兜底，避免混排时的基线/字高错位。
+/// 界面主字体为内置 MiSans（唯一内置字体）；回退链为系统中文无衬线体，
+/// 用于 MiSans 未覆盖的字形，避免混排时的基线/字高错位。
 const List<String> _cjkFontFallback = [
-  'MiSans',
   'Noto Sans CJK SC',
-  'HarmonyOS Sans SC',
   'PingFang SC',
   'Microsoft YaHei',
   'WenQuanYi Micro Hei',
@@ -331,7 +328,7 @@ ThemeData buildAppTheme(
     useMaterial3: true,
     colorScheme: scheme,
     brightness: brightness,
-    // 界面字体（内置 MiSans 默认 / HarmonyOS Sans SC 可选）+ CJK 回退链，
+    // 界面字体（内置 MiSans）+ CJK 回退链，
     // 统一中英混排度量（消除字体错位）
     fontFamily: fontFamily,
     fontFamilyFallback: _cjkFontFallback,
