@@ -50,6 +50,12 @@ void main() {
       sourcePlatforms(c).map((p) => p.source),
       containsAll(<String>['netease', 'kugou', 'qqmusic']),
     );
+    // 聚合搜索同样遍历 enabled(ref)。
+    expect(() => aggregateSources(c), returnsNormally);
+    expect(
+      aggregateSources(c),
+      containsAll(<String>['netease', 'kugou', 'qqmusic']),
+    );
   });
 
   test('authSignal 以 ProviderListenable 暴露，可被容器 listen', () {
