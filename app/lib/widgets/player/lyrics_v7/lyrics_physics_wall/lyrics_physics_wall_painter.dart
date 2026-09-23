@@ -515,8 +515,11 @@ class _Painter extends CustomPainter {
     });
   }
 
-  /// 主行下方的附属小字：音译（罗马音）在上、翻译在下（对齐 AMLL
-  /// `.lyricSubLine` 的堆叠顺序与 `gap: .3em`）。
+  /// 主行下方的附属小字：**翻译在上、音译（罗马音）在下**。
+  ///
+  /// 对齐 AMLL `lyric-line` 子节点顺序（`lyric-line.ts`：children =
+  /// [main, translation, romanization]）与 `gap: .3em`；音译直接贴主行会让
+  /// 罗马注音出现在译文上方，与原设计不符。
   void _drawSubLines(
     Canvas canvas,
     int index,
@@ -528,18 +531,19 @@ class _Painter extends CustomPainter {
     required double maxWidth}) {
     final gap = fs * kLyricTranslationGapEm;
     var below = mainBottom;
+    final tr = g.translation;
+    if (c.showTranslation && tr != null && tr.isNotEmpty) {
+      final sub = _translationParagraph(index, tr, active, alpha, fs, maxWidth);
+      below += gap;
+      canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
+      below += sub.height;
+    }
     final ro = g.romaji;
     if (c.showRomanization && ro != null && ro.isNotEmpty) {
       final sub = _romajiParagraph(index, ro, active, alpha, fs, maxWidth);
       below += gap;
       canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
       below += sub.height;
-    }
-    final tr = g.translation;
-    if (c.showTranslation && tr != null && tr.isNotEmpty) {
-      final sub = _translationParagraph(index, tr, active, alpha, fs, maxWidth);
-      below += gap;
-      canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
     }
   }
 

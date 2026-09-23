@@ -126,7 +126,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsPowerSaverOn =>
-      '백그라운드에서 렌더링 감소（최소화 시 5 FPS, 포커스 아님/화면 꺼짐 시 1 FPS）';
+      '백그라운드에서 렌더링 감소(최소화 시 렌더링 중지, 포커스 아님/화면 꺼짐 시 1 FPS)';
 
   @override
   String get settingsPowerSaverOff => '항상 최대 프레임으로 렌더링';

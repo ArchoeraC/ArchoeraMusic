@@ -20,6 +20,7 @@ const std = @import("std");
 const err = @import("error.zig");
 const decoder = @import("decoder.zig");
 const kernel_io = @import("io.zig");
+const streambuf = @import("streambuf.zig");
 const convert = @import("pcm/convert.zig");
 
 const Allocator = std.mem.Allocator;
@@ -237,7 +238,15 @@ pub fn zkOpenCallback(
         return null;
     };
     adapter.* = .{ .ctx = ctx, .c_read = on_read, .c_seek = on_seek };
-    const buf = gpa.alloc(u8, kernel_io.peek_buffer_size) catch {
+    // N4：每路 callback 缓冲向进程预算记账（默认预算不限 → 行为不变）。
+    const peek = streambuf.peek();
+    streambuf.acquire(peek) catch {
+        gpa.destroy(adapter);
+        fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
+        return null;
+    };
+    const buf = gpa.alloc(u8, peek) catch {
+        streambuf.release(peek);
         gpa.destroy(adapter);
         fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
         return null;
@@ -251,6 +260,7 @@ pub fn zkOpenCallback(
 
     var zinfo: decoder.Info = undefined;
     var dec = decoder.openReader(gpa, &reader, &zinfo) catch |e| {
+        streambuf.release(buf.len);
         gpa.free(buf);
         gpa.destroy(adapter);
         fillErrBuf(errbuf, errbuf_size, e);
@@ -258,6 +268,7 @@ pub fn zkOpenCallback(
     };
     const eng = gpa.create(Engine) catch {
         dec.deinit();
+        streambuf.release(buf.len);
         gpa.free(buf);
         gpa.destroy(adapter);
         fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
@@ -370,7 +381,10 @@ pub fn zkClose(d: *Engine) void {
     const gpa = d.allocator;
     if (d.raw.len > 0) gpa.free(d.raw);
     d.dec.deinit();
-    if (d.cb_buffer.len > 0) gpa.free(d.cb_buffer);
+    if (d.cb_buffer.len > 0) {
+        streambuf.release(d.cb_buffer.len); // N4：归还预算记账（与 zkOpenCallback 成对）
+        gpa.free(d.cb_buffer);
+    }
     if (d.cb_adapter) |a| gpa.destroy(a);
     gpa.destroy(d);
 }

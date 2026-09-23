@@ -18,6 +18,7 @@
 const std = @import("std");
 const Error = @import("../../../error.zig").Error;
 const T = @import("tables.zig");
+const once = @import("../../../once.zig");
 const wmdct = @import("mdct.zig");
 
 pub const WMAPRO_MAX_CHANNELS: usize = 8;
@@ -211,7 +212,19 @@ fn buildVlc(comptime count: usize, comptime lenf: fn (usize) u8, comptime symf: 
     return .{ .entries = list, .maxbits = maxb };
 }
 
+var vlc_tables: VlcTables = undefined;
+var vlc_once: once.Once = .{};
+fn fillVlcTables() void {
+    vlc_tables = buildVlcTables();
+}
+
+/// 线程安全：`vlc_store` 全局表恰好初始化一次（并发首次解码不打架）。
 pub fn initVlc() VlcTables {
+    vlc_once.call(fillVlcTables);
+    return vlc_tables;
+}
+
+fn buildVlcTables() VlcTables {
     const Ls = struct {
         fn len(i: usize) u8 {
             return T.scale_table[i * 2 + 1];

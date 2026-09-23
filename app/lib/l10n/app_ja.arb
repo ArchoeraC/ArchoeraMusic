@@ -37,7 +37,7 @@
   "settingsSectionClose": "アプリを閉じる",
   "settingsSectionPower": "省電力",
   "settingsPowerSaver": "省電力モード",
-  "settingsPowerSaverOn": "バックグラウンドで描画を抑止（最小化時 5 FPS、非フォーカス/画面オフ時 1 FPS）",
+  "settingsPowerSaverOn": "バックグラウンドで描画を抑制（最小化時は描画停止、非フォーカス/画面オフ時 1 FPS）",
   "settingsPowerSaverOff": "常にフルレートで描画",
   "settingsSuppressSleep": "システムのスリープを無効化",
   "settingsSuppressSleepOn": "再生中はシステムを起動状態に保ち、バックグラウンド再生の中断を防ぐ",

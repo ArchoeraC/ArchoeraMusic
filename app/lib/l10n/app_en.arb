@@ -37,7 +37,7 @@
   "settingsSectionClose": "Closing app",
   "settingsSectionPower": "Power saving",
   "settingsPowerSaver": "Power Saving Mode",
-  "settingsPowerSaverOn": "Throttle rendering in background (5 FPS minimized, 1 FPS unfocused or screen off)",
+  "settingsPowerSaverOn": "Throttle rendering in background (rendering stops when minimized; 1 FPS unfocused or screen off)",
   "settingsPowerSaverOff": "Always render at full frame rate",
   "settingsSuppressSleep": "Prevent system sleep",
   "settingsSuppressSleepOn": "Keep system awake during playback so background playback isn''t interrupted",

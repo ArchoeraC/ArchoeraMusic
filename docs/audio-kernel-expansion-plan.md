@@ -1,6 +1,6 @@
 # 音频内核能力扩张规划（五方向）
 
-> 状态：**规划稿 v1 · 2026-09-22**
+> 状态：**规划稿 v1 · 2026-09-22；批次二执行记录 2026-09-23（五方向并行，一个 PR）**
 > 定位：在 `docs/audio-kernel-zig.md`（内核权威设计 / 逐格式接管路线）既有的「解码接管」主线之外，
 > 规划下一阶段要扩张的**五项内和能力**——**① 可听频段 DSP · ② 在线流/非本地源 · ③ 更多格式接管 ·
 > ④ 性能/内存 · ⑤ A/Sync 执行模型**。本文只定**目标、现状、候选清单与验收门**；具体排期与优先级在下一步再定。
@@ -57,7 +57,7 @@
 | 频谱 | C，`libfft.so`，Dart 经 FFI 拉窗 | `src/fft.c/.h` |
 | 变速变调 | Rust `tempo-rs`（signalsmith-stretch）过渡 | `src/tempo.c/.h` |
 | 重采样 | FFmpeg `libswresample` | `src/resampler.c/.h` |
-| 内核侧 | **未移植**：无 `kernel/dsp/`；`zk_dsp_*` 仅预留 | `include/kernel_bridge.h:15` |
+| 内核侧 | ✅ **地基 + D1/D2 已落**：`kernel/dsp/`（EQ/limiter/loudness 逐位一致）+ 参数化 EQ（`parametric.zig`，peak/low-shelf/high-shelf、freq/Q/gain）+ 次声低频管理（`lowfreq.zig`，HPF + bass shelf）；经 `zk_dsp_peq_*` / `zk_dsp_lowfreq_*` 被 C 壳调用 | `include/kernel_bridge.h`、`src/parametric_eq.c` / `src/lowfreq.c` |
 
 App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_audio_fx.dart`），链路为
 解码 → EQ → 变速 → 响度 → 限幅 → 输出。
@@ -72,8 +72,8 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 | # | 候选 | 说明 | 价值 | 备选参考 |
 |---|---|---|---|---|
-| D1 | **参数化 EQ** | 频点/Q/增益可配，支持峰值/低架/高架，替代固定 10 段 | 用户可调空间大、对齐主流播放器 | WebAudio BiquadFilter / SoX |
-| D2 | **次声/低频管理** | 高通（subsonic）去隆隆 + bass shelf；**这是方向①的「打底」** | 保护扬声器、清理低频泥 | 通用一阶/二阶高通 |
+| D1 | **参数化 EQ**（已完成） | ✅ 已落（2026-09-23）：`kernel/dsp/parametric.zig` + `src/parametric_eq.c`，peak/low-shelf/high-shelf + Q；与 C 参考对拍 | 用户可调空间大、对齐主流播放器 | 自研（RBJ Cookbook） |
+| D2 | **次声/低频管理**（已完成） | ✅ 已落（2026-09-23）：`kernel/dsp/lowfreq.zig` + `src/lowfreq.c`，HPF（1/2 阶，默认 20 Hz）+ bass shelf；**方向①的「打底」** | 保护扬声器、清理低频泥 | 通用一阶/二阶高通 |
 | D3 | **动态/DRC** | 压缩器（阈值/比率/起停）+ makeup；扩展响度链 | 小音量听感、夜间模式 | EBU R128 动态门限 |
 | D4 | **耳机 crossfeed** | 交叉馈送，改善耳机声场 | 耳机用户常用 | Bauer / BS2B |
 | D5 | **立体声宽度 / M-S** | 中侧宽度调节、声道平衡 | 简单、听感明显 | 通用 M/S |
@@ -248,6 +248,35 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 > 仍待定/未做：D3–D8 功能取舍、方向① D1/D2、B 档是否授权、F4 是否把影视音轨当曲目、
 > 方向⑤ AS4–AS7 与 AS2 收尾、N4/N5、按格式实例 ctx arena。
 > 方向④ 实测数据回填见 `decode-optimization.md` §9。
+
+### 7.1 批次二（2026-09-23，五方向并行，一个 PR）
+
+在批次一地基之上，按「五方向并行铺开一批」补齐可执行项（三轨并行开发 + 汇总验证）：
+
+1. **方向① D1/D2 已落** —— 参数化 EQ（peak/low-shelf/high-shelf + Q + preamp）+ 次声低频管理
+   （HPF 1/2 阶，默认 20 Hz；bass shelf）；新增 13 个 `zk_dsp_peq_*` / `zk_dsp_lowfreq_*`；
+   C 壳 `parametric_eq.c` / `lowfreq.c` 内核路由 + 纯 C 回退（镜像 `equalizer.c`）；
+   管线链 `lowfreq → peq → 固定 EQ → loudness → limiter → tempo → FFT`
+   （`process_dsp_chain` 与 `pipeline_run` flush 两路共用 `process_pre_tempo`）；
+   `set_peq` / `set_lowfreq` 运行时命令 + 设置页/偏好/下发接线。禁用/零增益**逐位旁通**；
+   内核 vs C 参考对拍（`dsp_ref/` 重命名再编译）。既有 10 段 EQ 路径保持不变。
+2. **方向⑤ AS4/AS5/AS6 已落** —— AS6 聚合计数 `zk_engine_stats`（runtime/khost/C ABI）；
+   AS5 协作取消 `zk_task_cancel`（chunk 边界 → `error.Aborted`，未启动任务 fail-fast）；
+   AS4 稳定 `ZkFormatHint` + `hintToFormat` + `decoder.openHinted`，`CSubmitReq.format_hint`
+   非 0 时免 probe（失败回退 probe，逐位一致）。
+3. **方向② N4 已落** —— `kernel/streambuf.zig` 原子记账 + 预算 + 每路 peek 尺寸
+   （默认 16 KiB、夹取 [16,64] KiB）；三处 callback 缓冲 alloc/free 接线；
+   `zk_stream_mem_used/set_budget/peek_set_bytes/peek_bytes`；宿主经
+   `ARCHOERA_STREAM_BUDGET` / `ARCHOERA_STREAM_PEEK_BYTES` 注入。**默认路径逐字节不变**。
+4. **方向③ F5 已落** —— `kernel/takeover.zig` 静态位图 + `ofFormat`/`ofExt`；
+   `zk_takeover_bitmap/of_format/of_ext`；C 壳对「明确未接管」跳过无效 native open +
+   接管 hit/miss 计数；ready 事件 `backend` 字段（`"zig"`/`"ffmpeg"`）与 Dart 解析。
+5. **方向④ 部分已落** —— FLAC `decoded33_buf` 惰性分配（仅 32-bit 流）；
+   P4 `tests/bench/guard_release.py` 冷/热首帧 + RSS 守卫（默认不入 ctest）。
+
+仍待定/未做：D3–D8 功能取舍、B 档是否授权、F4 是否把影视音轨当曲目与 F6 长尾真实样本、
+方向⑤ AS2 ring 直推/去「1 会话 1 引擎线程」与 AS7 混杂压测、N5 去 FFmpeg 传输栈、
+方向④ 按格式实例 ctx arena（跨 `fmt/**` 大重构，见 `decode-optimization.md` §11）。
 
 ---
 

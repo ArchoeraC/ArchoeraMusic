@@ -16,6 +16,9 @@ import 'package:flutter/widgets.dart';
 ///
 /// 事件驱动（Timer 合并，非轮询）；`scheduleForcedFrame`（窗口缩放、系统
 /// 事件）不经过 [scheduleFrame]，仍即时渲染，不会被节流吞掉。
+///
+/// 另有 [setRenderingEnabled]：窗口最小化/隐藏到托盘时**直接停止出帧**
+/// （0 帧，而非降帧），恢复可见时补一帧。
 class PowerSavingFrameBinding extends WidgetsFlutterBinding {
   /// 本 binding 单例（构造函数继承框架逻辑，会写入全局 `_instance`）。
   static PowerSavingFrameBinding? _powerSavingInstance;
@@ -32,6 +35,10 @@ class PowerSavingFrameBinding extends WidgetsFlutterBinding {
   /// 当前最小帧间隔；`Duration.zero` = 不限制（满帧）。
   Duration _minFrameInterval = Duration.zero;
 
+  /// 是否允许出帧。`false` = 直接停止渲染（窗口最小化/隐藏到托盘时），
+  /// 所有 [scheduleFrame] 请求被丢弃，直到重新可见。
+  bool _renderingEnabled = true;
+
   /// 上次真正派发帧的时刻（节流基准）。
   DateTime _lastThrottledFrame = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -40,6 +47,25 @@ class PowerSavingFrameBinding extends WidgetsFlutterBinding {
 
   /// 是否处于节流状态。
   bool get isThrottled => _minFrameInterval > Duration.zero;
+
+  /// 当前是否允许出帧（false = 渲染已停止）。
+  bool get renderingEnabled => _renderingEnabled;
+
+  /// 停止 / 恢复渲染。
+  ///
+  /// 最小化 / 隐藏到托盘时窗口不可见，直接停帧比降帧更彻底（0 帧，动画
+  /// Ticker 因无帧回调而自然静止）；恢复时立即补一帧，避免 UI 停在旧帧。
+  /// 注意：**只影响渲染**，音频引擎照常播放。
+  void setRenderingEnabled(bool enabled) {
+    if (_renderingEnabled == enabled) return;
+    _renderingEnabled = enabled;
+    _pendingFrameTimer?.cancel();
+    _pendingFrameTimer = null;
+    if (enabled) {
+      // 恢复：立即补一帧（同时走一遍帧间隔节流逻辑）。
+      scheduleFrame();
+    }
+  }
 
   /// 设置最小帧间隔（如 5 FPS = 200ms）。[Duration.zero] 恢复满帧，
   /// 并立即补一帧，避免 UI 停留在节流前的最后一帧。
@@ -60,6 +86,8 @@ class PowerSavingFrameBinding extends WidgetsFlutterBinding {
 
   @override
   void scheduleFrame() {
+    // 渲染已停止（最小化 / 托盘）：丢弃所有帧请求，不向引擎要帧。
+    if (!_renderingEnabled) return;
     final interval = _minFrameInterval;
     if (interval == Duration.zero) {
       super.scheduleFrame();

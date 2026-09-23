@@ -212,6 +212,56 @@ pub fn openReader(allocator: std.mem.Allocator, reader: *io.Reader, info: *Info)
     return registry.dispatch(fmt, allocator, reader, info);
 }
 
+/// AS4：**按格式提示**免 probe 打开（Reader 已由调用方定位到源起点）。
+/// 直接 `registry.dispatch(fmt, …)`；失败（不匹配 / 不支持 / 解析失败）时
+/// **回退**常规 probe：先把 Reader 复位到起点再 `openReader`。OOM / Aborted
+/// 不掩盖、原样返回。`allocator` 供各格式模块分配上下文。
+pub fn openHintedReader(
+    allocator: std.mem.Allocator,
+    reader: *io.Reader,
+    fmt: probe.Format,
+    info: *Info,
+) Error!Decoder {
+    if (registry.dispatch(fmt, allocator, reader, info)) |d| {
+        return d;
+    } else |e| switch (e) {
+        error.OutOfMemory, error.Aborted => return e,
+        else => {},
+    }
+    // 回退：分派可能已消费若干字节且留下半构造状态；复位到源起点后按常规 probe 重开。
+    try reader.rewind();
+    return openReader(allocator, reader, info);
+}
+
+/// AS4：path 源的提示打开（带显式 Io，供 Pool worker / 测试）。
+pub fn openHintedWithIo(
+    io_inst: std.Io,
+    allocator: std.mem.Allocator,
+    path: []const u8,
+    fmt: probe.Format,
+    info: *Info,
+) Error!Decoder {
+    var reader = try io.Reader.openPathWith(io_inst, path);
+    errdefer reader.deinit();
+    return openHintedReader(allocator, &reader, fmt, info);
+}
+
+/// AS4：path 源的提示打开（便捷入口，进程全局单线程 Io）。
+pub fn openHinted(allocator: std.mem.Allocator, path: []const u8, fmt: probe.Format, info: *Info) Error!Decoder {
+    return openHintedWithIo(std.Io.Threaded.global_single_threaded.io(), allocator, path, fmt, info);
+}
+
+/// AS4：内存源的提示打开（字节所有权与生命周期契约同 [openMem]）。
+pub fn openHintedMem(
+    allocator: std.mem.Allocator,
+    data: []const u8,
+    fmt: probe.Format,
+    info: *Info,
+) Error!Decoder {
+    var reader = io.Reader.openMem(data);
+    return openHintedReader(allocator, &reader, fmt, info);
+}
+
 /// 元数据打开结果：优先 probe-only 会话（§8.4.2①），无 `meta` 工厂的格式回退完整
 /// 解码器。两者均持有 `info` 指向内存；`deinit` 释放。
 pub const OpenedMeta = struct {
@@ -527,4 +577,60 @@ test "open: .tta(mono 44.1k) 经 probe → 工厂分发端到端（逐位对齐 
     }
     try testing.expectEqual(tta_mono_s16.len, out.items.len);
     try testing.expectEqualSlices(u8, tta_mono_s16, out.items);
+}
+
+test "AS4 openHinted: 正确提示免 probe 直分派；错误提示回退 probe；均与 sync 逐位一致" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const ioinst = std.Io.Threaded.global_single_threaded.io();
+    const f = try tmp.dir.createFile(ioinst, "t.latm", .{});
+    try std.Io.File.writeStreamingAll(f, ioinst, latm_tiny);
+    std.Io.File.close(f, ioinst);
+    const full = try std.fs.path.join(testing.allocator, &.{ ".zig-cache", "tmp", tmp.sub_path[0..], "t.latm" });
+    defer testing.allocator.free(full);
+
+    // 参考：常规 probe 路径全量解码
+    var ref_info: Info = undefined;
+    var ref = try open(testing.allocator, full, &ref_info);
+    var ref_out = std.ArrayList(u8).empty;
+    defer ref_out.deinit(testing.allocator);
+    var buf: [65536]u8 = undefined;
+    while (true) {
+        var ch: u8 = 0;
+        const n = try ref.read(&buf, 4096, &ch);
+        if (n == 0) break;
+        try ref_out.appendSlice(testing.allocator, buf[0 .. n * @as(usize, ch) * 2]);
+    }
+    ref.deinit();
+    try testing.expect(ref_out.items.len > 0);
+
+    // 正确提示：直接分派（免 probe），输出逐位一致
+    var hi: Info = undefined;
+    var hd = try openHinted(testing.allocator, full, .latm, &hi);
+    var hint_out = std.ArrayList(u8).empty;
+    defer hint_out.deinit(testing.allocator);
+    while (true) {
+        var ch: u8 = 0;
+        const n = try hd.read(&buf, 4096, &ch);
+        if (n == 0) break;
+        try hint_out.appendSlice(testing.allocator, buf[0 .. n * @as(usize, ch) * 2]);
+    }
+    hd.deinit();
+    try testing.expectEqualSlices(u8, ref_out.items, hint_out.items);
+    try testing.expectEqual(ref_info.channels, hi.channels);
+
+    // 错误提示（wav）：分派失败 → rewind → 回退 probe，仍逐位一致
+    var wi: Info = undefined;
+    var wd = try openHinted(testing.allocator, full, .wav, &wi);
+    var wrong_out = std.ArrayList(u8).empty;
+    defer wrong_out.deinit(testing.allocator);
+    while (true) {
+        var ch: u8 = 0;
+        const n = try wd.read(&buf, 4096, &ch);
+        if (n == 0) break;
+        try wrong_out.appendSlice(testing.allocator, buf[0 .. n * @as(usize, ch) * 2]);
+    }
+    wd.deinit();
+    try testing.expectEqualSlices(u8, ref_out.items, wrong_out.items);
+    try testing.expectEqual(ref_info.sample_rate, wi.sample_rate);
 }

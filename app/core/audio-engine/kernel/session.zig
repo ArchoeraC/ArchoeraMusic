@@ -25,6 +25,8 @@ const task = @import("task.zig");
 const decoder = @import("decoder.zig");
 const kio = @import("io.zig");
 const kerr = @import("error.zig");
+const streambuf = @import("streambuf.zig");
+const probe = @import("probe.zig");
 
 pub const SessState = enum(u8) {
     new, // 已 open 壳，未 start
@@ -63,6 +65,11 @@ pub const Session = struct {
     pinned_id: ?usize = null,
     /// 会话运行所在的 runtime（pinned close 步骤内释放专属 worker 用；start 时记录）。
     rt: ?*runtime.Runtime = null,
+    /// AS4：格式提示（C ABI ZkFormatHint 数值；0=auto → 常规 probe）。
+    /// start 前设置；prepareStart 据此免 probe 直分派（失败回退 probe）。
+    format_hint: u32 = 0,
+    /// AS5：会话级取消请求（原子；read 步首观察到 → failed(error.Aborted)，不抢占运行中的块）。
+    cancel_flag: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
 
     /// 当前步的完工槽（open/read/seek/close 复用同一会话级事件）
     step: task.Task = .{ .run = noopBody },
@@ -90,10 +97,17 @@ pub const Session = struct {
     }
 
     /// 宿主回调流会话（peek 缓冲本会话分配并释放；`owner` 回调上下文析构可空）。
+    /// N4：缓冲大小取 `streambuf.peek()`（默认 16 KiB），并向进程预算记账；
+    /// 超预算 → `error.OutOfMemory`（调用方拒绝打开，不静默超配）。
     pub fn createCallback(allocator: std.mem.Allocator, cb: kio.Reader.Callback, owner: ?CallbackOwner) !*Session {
         const s = try allocator.create(Session);
         errdefer allocator.destroy(s);
-        const buf = try allocator.alloc(u8, kio.peek_buffer_size);
+        const peek = streambuf.peek();
+        try streambuf.acquire(peek);
+        const buf = allocator.alloc(u8, peek) catch |e| {
+            streambuf.release(peek);
+            return e;
+        };
         s.* = .{ .allocator = allocator, .source = .{ .cb = cb }, .cb_buffer = buf, .cb_owner = owner };
         return s;
     }
@@ -106,14 +120,21 @@ pub const Session = struct {
     /// 释放会话壳与自有缓冲（不要求 `state==closed`；用于 start 失败清理）。
     pub fn destroy(self: *Session) void {
         if (self.cb_owner) |o| o.destroy(o.ctx, self.allocator);
-        if (self.cb_buffer.len > 0) self.allocator.free(self.cb_buffer);
+        if (self.cb_buffer.len > 0) {
+            streambuf.release(self.cb_buffer.len); // N4：归还预算记账（与 createCallback 成对）
+            self.allocator.free(self.cb_buffer);
+        }
         self.allocator.destroy(self);
     }
 
     fn resetStep(self: *Session) void {
-        self.step = .{ .run = noopBody };
-        self.step.event = .unset;
+        // 逐字段复位，**不整struct覆写**：`cancel()` 可从任意线程原子写
+        // `step.cancel_requested`，整struct赋值会与之竞争并可能清掉取消请求（A3）。
+        self.step.run = noopBody;
         self.step.outcome = .pending;
+        self.step.err = null;
+        self.step.event = .unset;
+        // 保留 cancel_requested（会话级取消由 cancel_flag + 本字段共同承载）。
     }
 
     /// 在池 worker 上建实例（probe+open，一次）
@@ -149,6 +170,18 @@ pub const Session = struct {
         return self.pinned_id != null;
     }
 
+    /// AS5：请求取消本会话后续步骤（任意线程可调用）。`read` 在步首观察到后把
+    /// 会话置 failed 并以 `error.Aborted` 收尾；不抢占正在执行的块（run-to-completion）。
+    pub fn cancel(self: *Session) void {
+        self.cancel_flag.store(true, .release);
+        self.step.cancel();
+    }
+
+    /// AS5：是否已请求取消。
+    pub fn isCancelled(self: *const Session) bool {
+        return self.cancel_flag.load(.acquire);
+    }
+
     /// 显式释放专属 worker（幂等；供停机等非 close-step 路径调用）。
     pub fn releasePin(self: *Session, rt: *runtime.Runtime) void {
         if (self.pinned_id) |id| {
@@ -163,11 +196,23 @@ pub const Session = struct {
             fn f(t: *task.Task) void {
                 const sess: *Session = @fieldParentPtr("step", t);
                 var info: decoder.Info = undefined;
+                // AS4：仅 hint != 0 时走免 probe 直分派（失败内部回退 probe）。
+                const hint: ?probe.Format = if (sess.format_hint != 0)
+                    probe.hintToFormat(sess.format_hint)
+                else
+                    null;
                 const opened: kerr.Error!decoder.Decoder = switch (sess.source) {
-                    .path => |p| decoder.open(sess.allocator, p, &info),
-                    .mem => |d| decoder.openMem(sess.allocator, d, &info),
+                    .path => |p| if (hint) |hf|
+                        decoder.openHinted(sess.allocator, p, hf, &info)
+                    else
+                        decoder.open(sess.allocator, p, &info),
+                    .mem => |d| if (hint) |hf|
+                        decoder.openHintedMem(sess.allocator, d, hf, &info)
+                    else
+                        decoder.openMem(sess.allocator, d, &info),
                     .cb => |cb| blk: {
                         var reader = kio.Reader.openCallback(cb, sess.cb_buffer);
+                        if (hint) |hf| break :blk decoder.openHintedReader(sess.allocator, &reader, hf, &info);
                         break :blk decoder.openReader(sess.allocator, &reader, &info);
                     },
                 };
@@ -200,6 +245,12 @@ pub const Session = struct {
         self.step.run = struct {
             fn f(t: *task.Task) void {
                 const sess: *Session = @fieldParentPtr("step", t);
+                // AS5：步首 fail-fast——已取消（会话级或本步 Task）→ Aborted 收尾。
+                if (sess.isCancelled() or t.isCancelled()) {
+                    sess.state = .failed;
+                    t.fail(error.Aborted);
+                    return;
+                }
                 var ch: u8 = 0;
                 const n = (&sess.dec.?).read(sess.out, sess.req_frames, &ch) catch |e| {
                     sess.state = .failed;
@@ -413,4 +464,88 @@ test "session: 不可解码文件 start → failed（error 收尾，不 panic）
     task.wait(&sess.step);
     try testing.expectEqual(SessState.failed, sess.state);
     try testing.expectEqual(task.Outcome.failed, sess.step.outcome);
+}
+
+test "AS5 session: cancel 后 read 步首观察到 → failed(error.Aborted；不抢占运行中块)" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const path = try writeGold(&tmp, io, "gc.wav");
+    defer testing.allocator.free(path);
+
+    const rt = try runtime.Runtime.init(std.heap.c_allocator, .{ .min_workers = 1 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    const sess = try Session.create(std.heap.c_allocator, path);
+    defer {
+        // failed 态：手动释放实例与会话壳
+        if (sess.dec) |*d| d.deinit();
+        sess.destroy();
+    }
+    try testing.expect(sess.start(rt));
+    task.wait(&sess.step);
+    try testing.expectEqual(SessState.playing, sess.state);
+
+    sess.cancel();
+    try testing.expect(sess.isCancelled());
+    var buf: [64]u8 = undefined;
+    try testing.expect(sess.read(rt, buf[0..16], 8));
+    task.wait(&sess.step);
+    try testing.expectEqual(SessState.failed, sess.state);
+    try testing.expectEqual(task.Outcome.failed, sess.step.outcome);
+    try testing.expectEqual(error.Aborted, sess.step.err.?);
+}
+
+test "AS4 session: format_hint 路由——正确提示免 probe；错误提示回退 probe；均 start 成功" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const path = try writeGold(&tmp, io, "gh.wav");
+    defer testing.allocator.free(path);
+
+    const rt = try runtime.Runtime.init(std.heap.c_allocator, .{ .min_workers = 2 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+
+    // 正确提示（wav=1）
+    {
+        const sess = try Session.create(std.heap.c_allocator, path);
+        defer {
+            std.debug.assert(sess.state == .closed);
+            sess.deinit();
+        }
+        sess.format_hint = 1;
+        try testing.expect(sess.start(rt));
+        task.wait(&sess.step);
+        try testing.expectEqual(SessState.playing, sess.state);
+        var buf: [64]u8 = undefined;
+        try testing.expect(sess.read(rt, buf[0..16], 8));
+        task.wait(&sess.step);
+        try testing.expectEqual(@as(usize, 8), sess.got_frames);
+        try testing.expect(sess.close(rt));
+        task.wait(&sess.step);
+    }
+
+    // 错误提示（flac=2）：分派失败 → 回退 probe → 仍能 start/read
+    {
+        const sess = try Session.create(std.heap.c_allocator, path);
+        defer {
+            std.debug.assert(sess.state == .closed);
+            sess.deinit();
+        }
+        sess.format_hint = 2;
+        try testing.expect(sess.start(rt));
+        task.wait(&sess.step);
+        try testing.expectEqual(SessState.playing, sess.state);
+        var buf: [64]u8 = undefined;
+        try testing.expect(sess.read(rt, buf[0..16], 8));
+        task.wait(&sess.step);
+        try testing.expectEqual(@as(usize, 8), sess.got_frames);
+        try testing.expect(sess.close(rt));
+        task.wait(&sess.step);
+    }
 }

@@ -37,7 +37,7 @@
   "settingsSectionClose": "关闭应用",
   "settingsSectionPower": "节能",
   "settingsPowerSaver": "节能模式",
-  "settingsPowerSaverOn": "后台自动降帧（最小化 5 FPS，失焦/熄屏 1 FPS）",
+  "settingsPowerSaverOn": "后台自动降帧（最小化时停止渲染，失焦/熄屏 1 FPS）",
   "settingsPowerSaverOff": "始终满帧渲染",
   "settingsSuppressSleep": "禁用系统休眠",
   "settingsSuppressSleepOn": "播放时保持系统唤醒，防止后台播放中断",

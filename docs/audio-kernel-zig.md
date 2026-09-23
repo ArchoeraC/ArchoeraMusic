@@ -1673,6 +1673,11 @@ pub const Error = error{
 > **能力扩张（2026-09-22）**：本节只定「把现有 C DSP 下沉 Zig」的地基；移植完成后的
 > **可听频段功能扩张**（参数化 EQ / 次声低频管理 / DRC / crossfeed / 等响度…）见
 > [`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md) §2（方向①）。
+>
+> **状态（2026-09-23）**：地基 + **D1/D2 已落**——`kernel/dsp/parametric.zig`
+> （参数化 EQ）与 `kernel/dsp/lowfreq.zig`（次声 HPF + bass shelf）经
+> `zk_dsp_peq_*` / `zk_dsp_lowfreq_*` 被 C 壳调用，C 回退保留；`fft/resampler/tempo`
+> 仍为接口占位（`libfft.so` ABI 不变）。
 
 - `equalizer/loudness/limiter/fft` 四个 DSP 模块把现状 C 实现**逐函数移植到 Zig**
   （现有 C 共 ~1200 行，语义对照移植，配套测试直接复用 `tests/test_equalizer.c` 等黄金断言）；

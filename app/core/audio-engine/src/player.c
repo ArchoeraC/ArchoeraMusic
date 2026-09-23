@@ -47,7 +47,7 @@ struct PlayerCtx {
     ma_engine engine;
     ma_sound sound;
     int has_sound;
-    int playing;
+    qa_size playing;            /* 跨线程：设备结束回调(on_sound_end)置 0，引擎/FFI 读 */
     double duration_ms;
     ma_uint64 sample_rate;
     /* “优质”sink 选择：自建 context（engine 不拥有），engine 生命周期内有效 */
@@ -56,8 +56,8 @@ struct PlayerCtx {
     ma_device_id device_id;   /* 选中 sink 的 id（决定用默认时忽略） */
     /* 位置事件间隔（ms，运行期可调，替代编译期常量） */
     int position_interval_ms;
-    ma_uint64 last_pos_frame;
-    int ended_reported;
+    qa_size last_pos_frame;   /* 跨线程：设备回调/引擎线程读写（原子，ma_uint64 计数） */
+    qa_size ended_reported;   /* 跨线程：设备结束回调置位，引擎线程读/清（原子） */
     int poll_count;
     /* seek 保护窗口：seek 后游标可能滞后/短暂回退（音频线程未同步），
        pending 期间不推送位置事件，避免旧游标值把 UI 刷回原进度 */
@@ -71,13 +71,13 @@ struct PlayerCtx {
     int stream_mode;            /* 1 = 流式（非文件播放） */
     ma_device stream_device;    /* raw 输出设备 */
     int stream_dev_inited;      /* ma_device 已 init */
-    int stream_dev_started;     /* ma_device 已 start */
-    int stream_active;          /* 有喂入过 PCM（首包后为 1，供 playing 事件判定） */
+    qa_size stream_dev_started; /* ma_device 已 start（跨线程标志） */
+    qa_size stream_active;      /* 有喂入过 PCM（首包后为 1，供 playing 事件判定） */
     unsigned stream_dev_rate;   /* 设备采样率（原生适配/原生 sink） */
     unsigned stream_dev_ch;     /* 设备声道数 */
     unsigned stream_feed_rate;  /* 喂入内容采样率 */
     unsigned stream_feed_ch;    /* 喂入内容声道数 */
-    unsigned stream_volume_bits; /* 音量（float 位模式，设备回调无锁读） */
+    qa_size stream_volume_bits; /* 音量（float 位模式；设备回调无锁原子读） */
     /* 线程安全环形缓冲（SPSC）：生产者=引擎线程，消费者=设备音频回调 */
     float *ring;                /* 容量 ring_cap*stream_dev_ch 个 float */
     size_t ring_cap;            /* 帧容量（2 的幂） */
@@ -87,7 +87,7 @@ struct PlayerCtx {
     qa_size  stream_stop;        /* 设备回调置位：EOF 且缓冲空 → 请求停止 */
     qa_size stream_underrun;    /* 统计（诊断） */
     /* 播放位置游标：已消费内容时间基（ms）+ 设备已消费帧（非流式文件模式不用） */
-    double stream_pos_base_ms;
+    qa_size stream_pos_base_ms; /* double 位模式（原子）；引擎写 / FFI 读 */
     ma_uint64 stream_consumed_frames; /* 累计设备消费帧数（本设备） */
     /* 流式诊断日志（ARCHOERA_DEBUG_STREAM=1，回调零开销时禁用） */
     int stream_debug;
@@ -104,8 +104,8 @@ static void on_sound_end(void *p_user_data, ma_sound *p_sound)
     (void)p_sound;
     PlayerCtx *p = (PlayerCtx *)p_user_data;
     if (!p) return;
-    p->playing = 0;
-    p->ended_reported = 1;
+    QA_STORE_REL(&p->playing, 0);
+    QA_STORE_REL(&p->ended_reported, 1);
 }
 
 /* ── “优质” sink 选择 ──────────────────────────────────────────────
@@ -530,7 +530,7 @@ PlayerCtx *player_start_opts(const char *ogg_path,
                 frame = (len_frames > 0) ? len_frames - 1 : 0;
             }
             ma_sound_seek_to_pcm_frame(&p->sound, frame);
-            p->last_pos_frame = frame;
+            QA_STORE_REL(&p->last_pos_frame, frame);
         }
     }
 
@@ -545,9 +545,9 @@ PlayerCtx *player_start_opts(const char *ogg_path,
 
     if (!st_opts.start_paused) {
         ma_sound_start(&p->sound);
-        p->playing = 1;
+        QA_STORE_REL(&p->playing, 1);
     } else {
-        p->playing = 0;
+        QA_STORE_REL(&p->playing, 0);
     }
     return p;
 }
@@ -574,14 +574,33 @@ PlayerCtx *player_start(const char *ogg_path,
 
 static float stream_volume_get(const PlayerCtx *p)
 {
+    qa_size b = QA_LOAD_ACQ(&p->stream_volume_bits);
     float v;
-    memcpy(&v, &p->stream_volume_bits, sizeof(v));
+    memcpy(&v, &b, sizeof(v));
     return v;
 }
 
 static void stream_volume_set(PlayerCtx *p, float v)
 {
-    memcpy(&p->stream_volume_bits, &v, sizeof(v));
+    qa_size b = 0; /* 高 32 位留零，仅低 4 字节为 float 位模式 */
+    memcpy(&b, &v, sizeof(v));
+    QA_STORE_REL(&p->stream_volume_bits, b);
+}
+
+/* double 跨线程：以 qa_size 位模式原子存取（引擎线程写 / FFI 读）。 */
+static double stream_pos_base_get(const PlayerCtx *p)
+{
+    qa_size b = QA_LOAD_ACQ(&p->stream_pos_base_ms);
+    double d;
+    memcpy(&d, &b, sizeof(d));
+    return d;
+}
+
+static void stream_pos_base_set(PlayerCtx *p, double d)
+{
+    qa_size b;
+    memcpy(&b, &d, sizeof(b));
+    QA_STORE_REL(&p->stream_pos_base_ms, b);
 }
 
 /* 设备数据回调（音频线程）：从 ring 取 frameCount 帧到输出，不足补零静音 */
@@ -632,16 +651,16 @@ static void stream_data_cb(ma_device *pDevice, void *pOutput, const void *pInput
 /* 从底层 ma_device 停止设备（在音频回调线程之外调用） */
 static void stream_device_stop(PlayerCtx *p)
 {
-    if (!p->stream_dev_inited || !p->stream_dev_started) return;
+    if (!p->stream_dev_inited || !QA_LOAD_ACQ(&p->stream_dev_started)) return;
     ma_device_stop(&p->stream_device);
-    p->stream_dev_started = 0;
+    QA_STORE_REL(&p->stream_dev_started, 0);
 }
 
 static void stream_device_start(PlayerCtx *p)
 {
-    if (!p->stream_dev_inited || p->stream_dev_started) return;
+    if (!p->stream_dev_inited || QA_LOAD_ACQ(&p->stream_dev_started)) return;
     if (ma_device_start(&p->stream_device) == MA_SUCCESS) {
-        p->stream_dev_started = 1;
+        QA_STORE_REL(&p->stream_dev_started, 1);
     }
 }
 
@@ -663,9 +682,9 @@ static void stream_teardown(PlayerCtx *p)
         ma_device_uninit(&p->stream_device);
         p->stream_dev_inited = 0;
     }
-    p->stream_dev_started = 0;
+    QA_STORE_REL(&p->stream_dev_started, 0);
     stream_free_ring(p);
-    p->stream_active = 0;
+    QA_STORE_REL(&p->stream_active, 0);
     QA_STORE_REL(&p->stream_eof, 0);
     QA_STORE_REL(&p->stream_stop, 0);
     QA_STORE_RELAXED(&p->stream_underrun, 0);
@@ -706,7 +725,7 @@ PlayerCtx *player_stream_open(const char *sink_id,
     p->stream_feed_ch = (unsigned)content_channels;
     p->stream_debug = (getenv("ARCHOERA_DEBUG_STREAM") != NULL);
     stream_volume_set(p, st_opts.volume);
-    p->playing = st_opts.start_paused ? 0 : 1;
+    QA_STORE_REL(&p->playing, st_opts.start_paused ? 0 : 1);
 
     /* ── sink 选择（与 player_start_opts 同语义）────────────────── */
     if (sink_id != NULL) {
@@ -855,8 +874,8 @@ PlayerCtx *player_stream_open(const char *sink_id,
             return NULL;
         }
         p->stream_dev_inited = 1;
-        p->stream_dev_started = 0;
-        p->stream_active = 0;
+        QA_STORE_REL(&p->stream_dev_started, 0);
+        QA_STORE_REL(&p->stream_active, 0);
     }
 
     {
@@ -889,7 +908,7 @@ PlayerCtx *player_stream_open(const char *sink_id,
     if (!st_opts.start_paused) {
         stream_device_start(p);
     } else {
-        p->playing = 0;
+        QA_STORE_REL(&p->playing, 0);
     }
     return p;
 }
@@ -948,10 +967,10 @@ int player_stream_write(PlayerCtx *p, const float *pcm, int samples)
     }
 
     /* 首包后启动设备（此前可能 start_paused / 等待首数据） */
-    if (!p->stream_active) {
-        p->stream_active = 1;
+    if (!QA_LOAD_ACQ(&p->stream_active)) {
+        QA_STORE_REL(&p->stream_active, 1);
     }
-    if (p->playing && !p->stream_dev_started) {
+    if (QA_LOAD_ACQ(&p->playing) && !QA_LOAD_ACQ(&p->stream_dev_started)) {
         stream_device_start(p);
     }
     return 0;
@@ -965,14 +984,14 @@ void player_stream_end(PlayerCtx *p)
 
 int player_stream_active(const PlayerCtx *p)
 {
-    return p && p->stream_mode && p->stream_active;
+    return p && p->stream_mode && QA_LOAD_ACQ(&p->stream_active);
 }
 
 double player_stream_played_ms(const PlayerCtx *p)
 {
     if (!p || !p->stream_mode) return 0.0;
     const size_t r = QA_LOAD_RELAXED(&p->ring_r);
-    return p->stream_pos_base_ms + (double)r * 1000.0 / (double)p->stream_dev_rate;
+    return stream_pos_base_get(p) + (double)r * 1000.0 / (double)p->stream_dev_rate;
 }
 
 double player_stream_buffered_ms(const PlayerCtx *p)
@@ -986,8 +1005,8 @@ double player_stream_buffered_ms(const PlayerCtx *p)
 void player_stream_set_pos_base(PlayerCtx *p, double base_ms)
 {
     if (!p || !p->stream_mode) return;
-    p->stream_pos_base_ms = base_ms;
-    p->last_pos_frame = 0;
+    stream_pos_base_set(p, base_ms);
+    QA_STORE_REL(&p->last_pos_frame, 0);
 }
 
 void player_stream_seek_reset(PlayerCtx *p)
@@ -1016,9 +1035,9 @@ void player_stream_seek_reset(PlayerCtx *p)
     QA_STORE_REL(&p->ring_r, 0);
     QA_STORE_REL(&p->stream_eof, 0);
     QA_STORE_REL(&p->stream_stop, 0);
-    p->stream_pos_base_ms = 0.0;
-    p->stream_active = 0;
-    p->ended_reported = 0;
+    stream_pos_base_set(p, 0.0);
+    QA_STORE_REL(&p->stream_active, 0);
+    QA_STORE_REL(&p->ended_reported, 0);
 }
 
 int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
@@ -1042,7 +1061,7 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
         ma_device_uninit(&p->stream_device);
         p->stream_dev_inited = 0;
         /* 保留 ring 计数并平移位置基：ring 清空后位置从已播放点延续 */
-        p->stream_pos_base_ms = played;
+        stream_pos_base_set(p, played);
     }
 
     ctx_inited = p->context_initialized ? 1 : 0;
@@ -1146,9 +1165,9 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
             return -1;
         }
         p->stream_dev_inited = 1;
-        p->stream_dev_started = 0;
+        QA_STORE_REL(&p->stream_dev_started, 0);
     }
-    if (p->playing) {
+    if (QA_LOAD_ACQ(&p->playing)) {
         stream_device_start(p);
     }
     return 0;
@@ -1162,7 +1181,7 @@ void player_get_state(PlayerCtx *p, int *playing, double *pos_ms, float *volume)
     if (!p) return;
 
     if (p->stream_mode) {
-        if (playing) *playing = p->playing ? 1 : 0;
+        if (playing) *playing = QA_LOAD_ACQ(&p->playing) ? 1 : 0;
         if (volume)  *volume = stream_volume_get(p);
         if (pos_ms)  *pos_ms = player_stream_played_ms(p);
         return;
@@ -1170,7 +1189,7 @@ void player_get_state(PlayerCtx *p, int *playing, double *pos_ms, float *volume)
 
     if (!p->has_sound) return;
 
-    if (playing) *playing = p->playing ? 1 : 0;
+    if (playing) *playing = QA_LOAD_ACQ(&p->playing) ? 1 : 0;
     if (volume)  *volume = ma_sound_get_volume(&p->sound);
     if (pos_ms && p->sample_rate > 0) {
         ma_uint64 cur = 0;
@@ -1188,24 +1207,24 @@ void player_command(PlayerCtx *p, const char *type,
     if (p->stream_mode) {
         if (!p->stream_dev_inited) return; /* 无声路径：命令无效 */
         if (strcmp(type, "play") == 0) {
-            p->playing = 1;
-            if (p->stream_active) stream_device_start(p);
+            QA_STORE_REL(&p->playing, 1);
+            if (QA_LOAD_ACQ(&p->stream_active)) stream_device_start(p);
         } else if (strcmp(type, "pause") == 0) {
             stream_device_stop(p);
-            p->playing = 0;
+            QA_STORE_REL(&p->playing, 0);
         } else if (strcmp(type, "set_playing") == 0 && gain) {
             if (*gain != 0.0) {
-                p->playing = 1;
-                if (p->stream_active) stream_device_start(p);
+                QA_STORE_REL(&p->playing, 1);
+                if (QA_LOAD_ACQ(&p->stream_active)) stream_device_start(p);
             } else {
                 stream_device_stop(p);
-                p->playing = 0;
+                QA_STORE_REL(&p->playing, 0);
             }
         } else if (strcmp(type, "seek") == 0 && pos_ms) {
             /* 流式 seek 由调用方“停流 + 重建管线 + seek_reset”处理；
                这里仅立即确认位置，避免 UI 等待位置事件 */
             p->seek_pending = 0;
-            p->last_pos_frame = 0;
+            QA_STORE_REL(&p->last_pos_frame, 0);
             if (p->on_event) {
                 char buf[128];
                 snprintf(buf, sizeof(buf),
@@ -1220,7 +1239,7 @@ void player_command(PlayerCtx *p, const char *type,
             snprintf(buf, sizeof(buf),
                      "{\"type\":\"status\",\"position_ms\":%.0f,"
                      "\"duration_ms\":%.0f,\"playing\":%s}",
-                     ms, p->duration_ms, p->playing ? "true" : "false");
+                     ms, p->duration_ms, QA_LOAD_ACQ(&p->playing) ? "true" : "false");
             p->on_event(buf, p->user_data);
         }
         return;
@@ -1230,23 +1249,23 @@ void player_command(PlayerCtx *p, const char *type,
 
     if (strcmp(type, "play") == 0) {
         ma_sound_start(&p->sound);
-        p->playing = 1;
+        QA_STORE_REL(&p->playing, 1);
     } else if (strcmp(type, "pause") == 0) {
         ma_sound_stop(&p->sound);
-        p->playing = 0;
+        QA_STORE_REL(&p->playing, 0);
     } else if (strcmp(type, "set_playing") == 0 && gain) {
         if (*gain != 0.0) {
             ma_sound_start(&p->sound);
-            p->playing = 1;
+            QA_STORE_REL(&p->playing, 1);
         } else {
             ma_sound_stop(&p->sound);
-            p->playing = 0;
+            QA_STORE_REL(&p->playing, 0);
         }
     } else if (strcmp(type, "seek") == 0 && pos_ms && p->sample_rate > 0) {
         ma_uint64 frame =
             (ma_uint64)(*pos_ms / 1000.0 * (double)p->sample_rate);
         ma_sound_seek_to_pcm_frame(&p->sound, frame);
-        p->last_pos_frame = frame;
+        QA_STORE_REL(&p->last_pos_frame, frame);
         /* 开启保护窗口：游标同步期间不推送位置事件（防旧值刷回 UI） */
         p->seek_pending = 1;
         p->seek_target_frame = frame;
@@ -1272,7 +1291,7 @@ void player_command(PlayerCtx *p, const char *type,
         snprintf(buf, sizeof(buf),
                  "{\"type\":\"status\",\"position_ms\":%.0f,"
                  "\"duration_ms\":%.0f,\"playing\":%s}",
-                 ms, p->duration_ms, p->playing ? "true" : "false");
+                 ms, p->duration_ms, QA_LOAD_ACQ(&p->playing) ? "true" : "false");
         p->on_event(buf, p->user_data);
     }
 }
@@ -1291,7 +1310,7 @@ int player_poll(PlayerCtx *p)
     if (p->stream_mode) {
         if (!p->stream_dev_inited) return 0;
         /* 位置事件：按设备已消费位置驱动（与文件模式游标语义一致） */
-        if (p->playing && p->stream_dev_rate > 0) {
+        if (QA_LOAD_ACQ(&p->playing) && p->stream_dev_rate > 0) {
             double cur_ms = player_stream_played_ms(p);
             int interval = p->position_interval_ms;
             if (interval < 20) interval = 20;
@@ -1299,8 +1318,8 @@ int player_poll(PlayerCtx *p)
             if (step == 0) step = 1;
             /* 以 ms 步长近似（消费帧数换算） */
             double step_ms = (double)step * 1000.0 / (double)p->stream_dev_rate;
-            if (cur_ms - (double)p->last_pos_frame >= step_ms) {
-                p->last_pos_frame = (ma_uint64)cur_ms;
+            if (cur_ms - (double)QA_LOAD_ACQ(&p->last_pos_frame) >= step_ms) {
+                QA_STORE_REL(&p->last_pos_frame, cur_ms);
                 char buf[128];
                 snprintf(buf, sizeof(buf),
                          "{\"type\":\"position\",\"position_ms\":%.0f}", cur_ms);
@@ -1310,30 +1329,31 @@ int player_poll(PlayerCtx *p)
 
         /* 结束：解码流 EOF 且缓冲耗尽且设备已停止请求 */
         if (QA_LOAD_ACQ(&p->stream_stop) &&
-            p->stream_dev_started) {
+            QA_LOAD_ACQ(&p->stream_dev_started)) {
             stream_device_stop(p);
         }
         if (QA_LOAD_ACQ(&p->stream_eof)) {
             size_t w = QA_LOAD_ACQ(&p->ring_w);
             size_t r = QA_LOAD_ACQ(&p->ring_r);
-            if (w == r && !p->stream_dev_started && !p->ended_reported) {
-                p->ended_reported = 1;
-                p->playing = 0;
+            if (w == r && !QA_LOAD_ACQ(&p->stream_dev_started) &&
+                !QA_LOAD_ACQ(&p->ended_reported)) {
+                QA_STORE_REL(&p->ended_reported, 1);
+                QA_STORE_REL(&p->playing, 0);
             }
         }
-        if (p->ended_reported) {
-            p->ended_reported = 0;
+        if (QA_LOAD_ACQ(&p->ended_reported)) {
+            QA_STORE_REL(&p->ended_reported, 0);
             if (p->on_event) p->on_event("{\"type\":\"player:ended\"}", p->user_data);
             return 1;
         }
         if (p->stream_debug) {
             size_t w = QA_LOAD_RELAXED(&p->ring_w);
             size_t r = QA_LOAD_RELAXED(&p->ring_r);
-            fprintf(stderr, "[stream-dbg] poll eof=%zu stop=%zu dev_started=%d "
+            fprintf(stderr, "[stream-dbg] poll eof=%zu stop=%zu dev_started=%zu "
                             "w=%zu r=%zu play=%.1f\n",
                     QA_LOAD_RELAXED(&p->stream_eof),
                     QA_LOAD_RELAXED(&p->stream_stop),
-                    p->stream_dev_started, w, r, player_stream_played_ms(p));
+                    QA_LOAD_RELAXED(&p->stream_dev_started), w, r, player_stream_played_ms(p));
         }
         return 0;
     }
@@ -1341,7 +1361,7 @@ int player_poll(PlayerCtx *p)
     if (!p || !p->has_sound) return 0;
 
     /* 位置事件：按音频位置驱动（每 position_interval_ms 音频 1 帧） */
-    if (p->playing && p->sample_rate > 0) {
+    if (QA_LOAD_ACQ(&p->playing) && p->sample_rate > 0) {
         ma_uint64 cur = 0;
         if (ma_sound_get_cursor_in_pcm_frames(&p->sound, &cur) == MA_SUCCESS) {
             int interval = p->position_interval_ms;
@@ -1357,13 +1377,13 @@ int player_poll(PlayerCtx *p)
                 if (cur >= p->seek_target_frame &&
                     cur <= p->seek_target_frame + step * 4) {
                     p->seek_pending = 0;
-                    p->last_pos_frame = cur;
+                    QA_STORE_REL(&p->last_pos_frame, cur);
                 } else if (++p->seek_poll_count > 60) {
                     p->seek_pending = 0;
-                    p->last_pos_frame = cur;
+                    QA_STORE_REL(&p->last_pos_frame, cur);
                 }
-            } else if (cur >= p->last_pos_frame + step) {
-                p->last_pos_frame = cur;
+            } else if (cur >= QA_LOAD_ACQ(&p->last_pos_frame) + step) {
+                QA_STORE_REL(&p->last_pos_frame, cur);
                 double ms = (double)cur * 1000.0 / (double)p->sample_rate;
                 char buf[128];
                 snprintf(buf, sizeof(buf),
@@ -1374,8 +1394,8 @@ int player_poll(PlayerCtx *p)
     }
 
     /* 自然结束事件（只报一次） */
-    if (p->ended_reported) {
-        p->ended_reported = 0;
+    if (QA_LOAD_ACQ(&p->ended_reported)) {
+        QA_STORE_REL(&p->ended_reported, 0);
         if (p->on_event) p->on_event("{\"type\":\"player:ended\"}", p->user_data);
         return 1;
     }

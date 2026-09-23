@@ -233,6 +233,26 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
         'gains': p.eqEnabled ? p.eqGains : List<double>.filled(eqBandCount, 0),
         'preamp': p.eqEnabled ? p.eqPreampDb : 0.0,
       });
+      // 方向① D1：参数化 EQ（扁平 [kind,freq,q,gain,...]；禁用时下发空段）
+      final peqEnabled = p.peqEnabled;
+      await engine.sendCommand('set_peq', {
+        'enabled': peqEnabled,
+        'preamp': peqEnabled ? p.peqPreampDb : 0.0,
+        'bands': peqEnabled
+            ? [
+                for (final b in p.peqBands) ...[b.kind, b.freq, b.q, b.gainDb],
+              ]
+            : const <double>[],
+      });
+      // 方向① D2：次声/低频管理（HPF 频率 <= 0 表示关闭）
+      final lfEnabled = p.lowfreqEnabled;
+      await engine.sendCommand('set_lowfreq', {
+        'enabled': lfEnabled,
+        'hpf_freq': lfEnabled ? p.lowfreqHpfFreq : -1.0,
+        'hpf_order': p.lowfreqHpfOrder,
+        'bass_gain': lfEnabled ? p.lowfreqBassGainDb : 0.0,
+        'bass_freq': p.lowfreqBassFreq,
+      });
       await engine.sendCommand('set_limiter', {'enabled': p.limiterEnabled});
       await engine.sendCommand('set_normalization', {
         'enabled': p.normalizationEnabled,

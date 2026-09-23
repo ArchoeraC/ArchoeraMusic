@@ -83,6 +83,106 @@ pub const formats = .{
     .tak = true, // TAK：已验收接管（bit-exact 对齐 ffmpeg native tak）
 };
 
+/// AS4：格式提示（C ABI `enum ZkFormatHint`）与内核 `Format` 的双向映射。
+/// 调用方在 `ZkSubmitReq.format_hint` 里携带**跨语言稳定**的数值，内核据此
+/// **免 probe** 直接分派；映射不上（0=unknown / 未来值）或分派失败则回退 probe。
+/// 数值一经发布不得重排（与 include/kernel_bridge.h 同步维护）。
+pub const FormatHint = enum(u32) {
+    unknown = 0,
+    wav = 1,
+    flac = 2,
+    mp3 = 3,
+    ogg_opus = 4,
+    ogg_vorbis = 5,
+    ogg_flac = 6,
+    ogg_speex = 7,
+    m4a = 8,
+    aac = 9,
+    latm = 10,
+    ape = 11,
+    wv = 12,
+    shn = 13,
+    tak = 14,
+    dsd = 15,
+    amr = 16,
+    amrwb = 17,
+    ac3 = 18,
+    mlp = 19,
+    truehd = 20,
+    wma = 21,
+    dts = 22,
+    mka = 23,
+    mpc = 24,
+    tta = 25,
+};
+
+/// 稳定提示数值 → 内核 Format（0=unknown/未知数值 → null，调用方回退 probe）。
+/// **纯函数**，不读源、不分配、不阻塞。
+pub fn hintToFormat(hint: u32) ?Format {
+    if (hint > @intFromEnum(FormatHint.tta)) return null; // 越界/未知数值
+    const h: FormatHint = @enumFromInt(hint); // 0..25 均为已定义标签
+    return switch (h) {
+        .unknown => null,
+        .wav => .wav,
+        .flac => .flac,
+        .mp3 => .mp3,
+        .ogg_opus => .ogg_opus,
+        .ogg_vorbis => .ogg_vorbis,
+        .ogg_flac => .ogg_flac,
+        .ogg_speex => .ogg_speex,
+        .m4a => .m4a,
+        .aac => .aac,
+        .latm => .latm,
+        .ape => .ape,
+        .wv => .wv,
+        .shn => .shn,
+        .tak => .tak,
+        .dsd => .dsd,
+        .amr => .amr,
+        .amrwb => .amrwb,
+        .ac3 => .ac3,
+        .mlp => .mlp,
+        .truehd => .truehd,
+        .wma => .wma,
+        .dts => .dts,
+        .mka => .mka,
+        .mpc => .mpc,
+        .tta => .tta,
+    };
+}
+
+/// 内核 Format → 稳定提示数值（`.unknown` 及任何未映射标签 → `.unknown`(0)）。
+pub fn formatHint(fmt: Format) FormatHint {
+    return switch (fmt) {
+        .wav => .wav,
+        .flac => .flac,
+        .mp3 => .mp3,
+        .ogg_opus => .ogg_opus,
+        .ogg_vorbis => .ogg_vorbis,
+        .ogg_flac => .ogg_flac,
+        .ogg_speex => .ogg_speex,
+        .m4a => .m4a,
+        .aac => .aac,
+        .latm => .latm,
+        .ape => .ape,
+        .wv => .wv,
+        .shn => .shn,
+        .tak => .tak,
+        .dsd => .dsd,
+        .amr => .amr,
+        .amrwb => .amrwb,
+        .ac3 => .ac3,
+        .mlp => .mlp,
+        .truehd => .truehd,
+        .wma => .wma,
+        .dts => .dts,
+        .mka => .mka,
+        .mpc => .mpc,
+        .tta => .tta,
+        .unknown => .unknown,
+    };
+}
+
 /// 探测：读取前 64 字节（自动跳过 ID3v2 头）做魔数嗅探。
 /// ID3v2 标签超出窗口时 seek 到标签后判定 payload（保持位置不变，probe 不消耗）。
 /// 未识别或格式未开启 → error.UnsupportedFormat；IO/中断错误原样透传。
@@ -580,4 +680,21 @@ test "probe: abort 透传 Aborted" {
     var r = io.Reader.openMem("RIFF\x24\x00\x00\x00WAVEfmt ");
     r.abort();
     try testing.expectError(error.Aborted, probe(&r));
+}
+
+test "AS4 format hint: 稳定数值 ↔ Format 双向映射（unknown/越界 → null）" {
+    // 每个已登记标签都有稳定数值，且往返一致
+    for (std.enums.values(Format)) |f| {
+        if (f == .unknown) continue;
+        const h = formatHint(f);
+        try testing.expect(h != .unknown);
+        try testing.expectEqual(f, hintToFormat(@intFromEnum(h)).?);
+    }
+    // unknown / 越界数值 → null（调用方回退 probe）
+    try testing.expectEqual(@as(?Format, null), hintToFormat(0));
+    try testing.expectEqual(@as(?Format, null), hintToFormat(999));
+    // 明确锚定若干跨语言稳定值（与 kernel_bridge.h 同步；重排即测试失败）
+    try testing.expectEqual(Format.wav, hintToFormat(1).?);
+    try testing.expectEqual(Format.flac, hintToFormat(2).?);
+    try testing.expectEqual(Format.tta, hintToFormat(25).?);
 }

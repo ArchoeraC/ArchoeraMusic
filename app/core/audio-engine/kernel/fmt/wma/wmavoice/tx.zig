@@ -14,6 +14,7 @@
 
 const std = @import("std");
 const dsp = @import("dsp.zig");
+const once = @import("../../../once.zig");
 
 const pi: f64 = std.math.pi;
 
@@ -293,21 +294,21 @@ fn srCombineZ(z: []f32, cos: []const f32, len: usize) void {
 }
 
 var tab32_c: [9]f32 = undefined;
-var tab32_c_ready = false;
+var tab32_once: once.Once = .{};
+fn initTab32C() void {
+    for (0..9) |k| tab32_c[k] = tabCosFR(32, k);
+}
 fn tab32C() *const [9]f32 {
-    if (!tab32_c_ready) {
-        for (0..9) |k| tab32_c[k] = tabCosFR(32, k);
-        tab32_c_ready = true;
-    }
+    tab32_once.call(initTab32C);
     return &tab32_c;
 }
 var tab64_c: [17]f32 = undefined;
-var tab64_c_ready = false;
+var tab64_once: once.Once = .{};
+fn initTab64C() void {
+    for (0..17) |k| tab64_c[k] = tabCosFR(64, k);
+}
 fn tab64C() *const [17]f32 {
-    if (!tab64_c_ready) {
-        for (0..17) |k| tab64_c[k] = tabCosFR(64, k);
-        tab64_c_ready = true;
-    }
+    tab64_once.call(initTab64C);
     return &tab64_c;
 }
 
@@ -501,10 +502,11 @@ fn mulinv(x: u32, m: u32) u32 {
 var tab53: [12]f32 = undefined;
 var tab7: [6]f32 = undefined;
 var tab9: [8]f32 = undefined;
-var tabs_ready = false;
+var tabs_once: once.Once = .{};
 fn initTabs() void {
-    if (tabs_ready) return;
-    tabs_ready = true;
+    tabs_once.call(initTabsImpl);
+}
+fn initTabsImpl() void {
     tab53[0] = @floatCast(dsp.cosD(2.0 * pi / 5.0));
     tab53[1] = tab53[0];
     tab53[2] = @floatCast(dsp.cosD(2.0 * pi / 10.0));

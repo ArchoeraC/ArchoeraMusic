@@ -136,6 +136,22 @@ pub const Host = struct {
         return n;
     }
 
+    /// AS6：Host 层可观测聚合 = runtime 池统计 + 当前流式会话数（§6.3）。
+    /// 顺序取锁（先 rt 后 host mutex）——rt.stats 内部先释放自身锁再返回，无嵌套。
+    pub const Stats = struct {
+        rt: runtime.Stats = .{},
+        stream_count: usize = 0,
+    };
+
+    pub fn stats(self: *Host) Stats {
+        const rs = self.rt.stats();
+        const io = std.Io.Threaded.global_single_threaded.io();
+        self.mutex.lockUncancelable(io);
+        const sc = self.stream_count;
+        self.mutex.unlock(io);
+        return .{ .rt = rs, .stream_count = sc };
+    }
+
     /// §6.3 max_streams 硬计数（F9）：尝试登记一个流式会话。达到上限 → false（拒绝，
     /// 语义 = InstanceLimit）；成功 → stream_count+1 并返回 true。与 cap_tasks 槽
     /// **分开记账**——流各持一个 session，不占/不复用任务槽。Host.mutex 保护。
@@ -269,6 +285,41 @@ test "khost: 128 任务（cap 128）全部排空；active 回落 0" {
     for (&holders) |*x| task.wait(&x.task);
     try testing.expectEqual(@as(usize, 0), h.active());
     try testing.expectEqual(@as(u32, 128), counter.load(.acquire));
+}
+
+test "khost: AS6 stats 固定容量已知波次后计数精确；流计数并入聚合" {
+    const h = try Host.init(std.heap.c_allocator, .{ .min_workers = 2, .max_workers = 2, .cap_tasks = 8 });
+    defer {
+        h.shutdown();
+        h.deinit();
+    }
+    var counter = std.atomic.Value(u32).init(0);
+    var holders: [4]Holder = undefined;
+    for (&holders) |*x| x.* = .{ .task = .{ .run = Holder.bump }, .counter = &counter };
+    for (&holders) |*x| try testing.expect(h.submit(&x.task) != null);
+    for (&holders) |*x| task.wait(&x.task);
+    try testing.expectEqual(@as(u32, 4), counter.load(.acquire));
+
+    // 只断言**稳定**计数：spawn/active/pinned/stall 由原子/注册表在明确边界
+    // 写入，wave 完成后不再变化。idle/running/inflight 是 worker 收尾的瞬时
+    // 状态（task.wait 在任务体 signal 时即返回，早于 beginIdle/running--
+    // /inflight--），属竞态观测值——**不得用等待去凑**，也不在此断言；其计数
+    // 聚合逻辑由 tables.WorkerTable.summarize 的确定性单测覆盖。
+    const st = h.stats();
+    try testing.expectEqual(@as(usize, 2), st.rt.spawn_count);
+    try testing.expectEqual(@as(usize, 0), st.rt.spawn_failed_count);
+    try testing.expectEqual(@as(usize, 0), st.rt.stall_count);
+    try testing.expectEqual(@as(usize, 2), st.rt.active);
+    try testing.expectEqual(@as(usize, 0), st.rt.pinned);
+    try testing.expectEqual(@as(usize, 0), st.stream_count);
+    // 非竞态不变量（任意时刻成立，读在锁内）：在役 = 闲 + 忙（pinned 亦计忙）。
+    try testing.expect(st.rt.idle + st.rt.running <= st.rt.active);
+
+    // 流计数并入聚合：开一个流观察 stream_count，关后回落
+    try testing.expect(h.streamOpen());
+    try testing.expectEqual(@as(usize, 1), h.stats().stream_count);
+    h.streamClose();
+    try testing.expectEqual(@as(usize, 0), h.stats().stream_count);
 }
 
 test "khost: F9 max_streams 硬计数——超限拒开（streamOpen false），关闭后恢复" {

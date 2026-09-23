@@ -91,11 +91,23 @@ SegStore *segstore_new(uint64_t total_hint, size_t seg_size, uint64_t budget)
 
 int segstore_fill(SegStore *s, uint64_t off, const void *data, size_t len)
 {
-    if (!s || !data || (len && off != s->head)) return SEGSTORE_ERR_IO;
-    if (s->aborted) return SEGSTORE_ERR_ABORTED;
-    if (len == 0) return 0;
-
+    if (!s || !data) return SEGSTORE_ERR_IO;
+    /* head/aborted 是跨线程可变字段（abort 可来自其它线程），先持锁再读，
+       保持原有判定顺序：越序 → aborted → len==0 直返。 */
     pthread_mutex_lock(&s->mu);
+    if (len && off != s->head) {
+        pthread_mutex_unlock(&s->mu);
+        return SEGSTORE_ERR_IO;
+    }
+    if (s->aborted) {
+        pthread_mutex_unlock(&s->mu);
+        return SEGSTORE_ERR_ABORTED;
+    }
+    if (len == 0) {
+        pthread_mutex_unlock(&s->mu);
+        return 0;
+    }
+
     uint64_t base = off;
     const uint8_t *src = (const uint8_t *)data;
     size_t left = len;
@@ -201,19 +213,33 @@ void segstore_set_total(SegStore *s, uint64_t total)
 
 uint64_t segstore_used(const SegStore *s)
 {
-    return s ? s->used : 0;
+    uint64_t v;
+    if (!s) return 0;
+    pthread_mutex_lock((pthread_mutex_t *)&s->mu);
+    v = s->used;
+    pthread_mutex_unlock((pthread_mutex_t *)&s->mu);
+    return v;
 }
 
 uint64_t segstore_head(const SegStore *s)
 {
-    return s ? s->head : 0;
+    uint64_t v;
+    if (!s) return 0;
+    pthread_mutex_lock((pthread_mutex_t *)&s->mu);
+    v = s->head;
+    pthread_mutex_unlock((pthread_mutex_t *)&s->mu);
+    return v;
 }
 
 const uint8_t *segstore_base(const SegStore *s, uint64_t *out_len)
 {
     if (out_len) *out_len = 0;
-    if (!s || !s->segs || !s->segs[0]) return NULL;
+    if (!s) return NULL;
     pthread_mutex_lock((pthread_mutex_t *)&s->mu);
+    if (!s->segs || !s->segs[0]) {
+        pthread_mutex_unlock((pthread_mutex_t *)&s->mu);
+        return NULL;
+    }
     uint64_t head = s->head;
     if (s->total > 0 && head > s->total) head = s->total;
     /* 仅当整个已填充内容落在段 0（seg_size 覆盖全长）且无其它段时，才是连续视图。 */
@@ -269,12 +295,22 @@ void segstore_release_all(SegStore *s)
 
 uint64_t segstore_freelist_reuses(const SegStore *s)
 {
-    return s ? s->reuse_count : 0;
+    uint64_t v;
+    if (!s) return 0;
+    pthread_mutex_lock((pthread_mutex_t *)&s->mu);
+    v = s->reuse_count;
+    pthread_mutex_unlock((pthread_mutex_t *)&s->mu);
+    return v;
 }
 
 uint64_t segstore_freelist_len(const SegStore *s)
 {
-    return s ? (uint64_t)s->free_len : 0;
+    uint64_t v;
+    if (!s) return 0;
+    pthread_mutex_lock((pthread_mutex_t *)&s->mu);
+    v = (uint64_t)s->free_len;
+    pthread_mutex_unlock((pthread_mutex_t *)&s->mu);
+    return v;
 }
 
 uint64_t segstore_memory_needed_for(const SegStore *s, uint64_t length)

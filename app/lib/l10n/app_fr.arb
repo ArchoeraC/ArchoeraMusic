@@ -37,7 +37,7 @@
   "settingsSectionClose": "Fermer l''application",
   "settingsSectionPower": "Économie d''énergie",
   "settingsPowerSaver": "Mode d''économie d''énergie",
-  "settingsPowerSaverOn": "Réduire le rendu en arrière-plan (5 FPS en réduction, 1 FPS sans focus ou écran éteint)",
+  "settingsPowerSaverOn": "Réduire le rendu en arrière-plan (arrêt lors de la réduction ; 1 FPS sans focus ou écran éteint)",
   "settingsPowerSaverOff": "Toujours rendre à pleine fréquence",
   "settingsSuppressSleep": "Empêcher la mise en veille du système",
   "settingsSuppressSleepOn": "Garder le système éveillé pendant la lecture pour ne pas interrompre la lecture en arrière-plan",

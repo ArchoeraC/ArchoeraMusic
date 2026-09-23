@@ -127,7 +127,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsPowerSaverOn =>
-      'バックグラウンドで描画を抑止（最小化時 5 FPS、非フォーカス/画面オフ時 1 FPS）';
+      'バックグラウンドで描画を抑制（最小化時は描画停止、非フォーカス/画面オフ時 1 FPS）';
 
   @override
   String get settingsPowerSaverOff => '常にフルレートで描画';

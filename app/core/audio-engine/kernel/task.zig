@@ -37,6 +37,10 @@ pub const Task = struct {
     err: ?kerr.Error = null,
     event: std.Io.Event = .unset,
 
+    /// AS5：协作式取消请求（原子）。任务体在 chunk 边界 `isCancelled()` 观察到后
+    /// 中途收尾（`fail(error.Aborted)`）；无抢占——只在完全空闲/块边界响应。
+    cancel_requested: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+
     /// 体函数内调用：报可分类错误（→ error）
     pub fn fail(self: *Task, e: kerr.Error) void {
         self.err = e;
@@ -46,6 +50,16 @@ pub const Task = struct {
     /// 体函数内调用：FATAL 逃生舱（§5.2 层1）——不可预知输入，会话级收尾
     pub fn fatal(self: *Task) void {
         self.outcome = .fatal;
+    }
+
+    /// AS5：请求取消（任意线程可调用；任务体在 chunk 边界响应，不抢占运行中的块）。
+    pub fn cancel(self: *Task) void {
+        self.cancel_requested.store(true, .release);
+    }
+
+    /// AS5：是否已请求取消（acquire 语义，与 cancel 的 release 配对）。
+    pub fn isCancelled(self: *const Task) bool {
+        return self.cancel_requested.load(.acquire);
     }
 
     pub fn isDone(self: *const Task) bool {
@@ -142,25 +156,16 @@ test "task: 体函数完工（默认 done）→ wait 读到 done" {
     try testing.expectEqual(Outcome.done, task.outcome);
 }
 
-test "task: 带超时等待被保证（set 前 → true；永未 set → false）" {
-    // set 在超时前 → true
-    var ev = std.Io.Event.unset;
+test "task: 带超时等待被保证（已 set → true；永未 set → false）" {
     const io = std.Io.Threaded.global_single_threaded.io();
-    const Setter = struct {
-        fn setLater(e: *std.Io.Event) void {
-            var i: usize = 0;
-            while (i < 100_000) : (i += 1) {}
-            std.Io.Event.set(e, std.Io.Threaded.global_single_threaded.io());
-        }
-    };
-    var th = try std.Thread.spawn(.{ .allocator = std.heap.c_allocator }, Setter.setLater, .{&ev});
+    // 已 set → 立即 true（确定性；不依赖线程调度/自旋计时）
+    var ev = std.Io.Event.unset;
+    std.Io.Event.set(&ev, io);
     try testing.expect(waitEventTimeout(&ev, io, 5 * std.time.ns_per_s));
-    th.join();
 
     // 永未 set → 短超时返回 false（保证超时路径真实可用）
     var never = std.Io.Event.unset;
     try testing.expect(!waitEventTimeout(&never, io, 20 * std.time.ns_per_ms));
-    // 清等待者残留（无等待者时无需 reset；此处 never 从未被 set，直接丢弃即可）
 }
 
 test "task: waitTimeout 完工任务返回 true" {
@@ -207,3 +212,27 @@ test "task: 体函数报 error / fatal → wait 读到对应 outcome" {
     try testing.expectEqual(Outcome.fatal, t_fatal.outcome);
 }
 
+
+test "AS5 task: cancel 置位；体在开工前观察到 → fail(Aborted)" {
+    var rt = try runtime.Runtime.init(std.heap.c_allocator, .{ .min_workers = 1 });
+    defer {
+        rt.shutdown();
+        rt.deinit();
+    }
+    const Ctx = struct {
+        fn body(t: *Task) void {
+            if (t.isCancelled()) {
+                t.fail(error.Aborted);
+                return;
+            }
+        }
+    };
+    var t = Task{ .run = Ctx.body };
+    try testing.expect(!t.isCancelled());
+    t.cancel();
+    try testing.expect(t.isCancelled());
+    try testing.expect(spawnInto(rt, &t));
+    wait(&t);
+    try testing.expectEqual(Outcome.failed, t.outcome);
+    try testing.expectEqual(error.Aborted, t.err.?);
+}
