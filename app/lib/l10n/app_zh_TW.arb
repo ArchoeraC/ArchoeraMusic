@@ -37,7 +37,7 @@
   "settingsSectionClose": "關閉應用",
   "settingsSectionPower": "節能",
   "settingsPowerSaver": "節能模式",
-  "settingsPowerSaverOn": "背景自動降幀（最小化 5 FPS，失焦/熄屏 1 FPS）",
+  "settingsPowerSaverOn": "背景自動降幀（最小化時停止渲染，失焦/熄屏 1 FPS）",
   "settingsPowerSaverOff": "始終滿幀渲染",
   "settingsSuppressSleep": "停用系統休眠",
   "settingsSuppressSleepOn": "播放時保持系統喚醒，防止背景播放中斷",

@@ -37,7 +37,7 @@
   "settingsSectionClose": "앱 닫기",
   "settingsSectionPower": "절전",
   "settingsPowerSaver": "절전 모드",
-  "settingsPowerSaverOn": "백그라운드에서 렌더링 감소（최소화 시 5 FPS, 포커스 아님/화면 꺼짐 시 1 FPS）",
+  "settingsPowerSaverOn": "백그라운드에서 렌더링 감소(최소화 시 렌더링 중지, 포커스 아님/화면 꺼짐 시 1 FPS)",
   "settingsPowerSaverOff": "항상 최대 프레임으로 렌더링",
   "settingsSuppressSleep": "시스템 절전 비활성화",
   "settingsSuppressSleepOn": "재생 중에는 시스템을 깨운 상태로 유지하여 백그라운드 재생이 중단되지 않게 합니다",

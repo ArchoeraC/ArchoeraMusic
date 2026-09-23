@@ -124,7 +124,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPowerSaver => '节能模式';
 
   @override
-  String get settingsPowerSaverOn => '后台自动降帧（最小化 5 FPS，失焦/熄屏 1 FPS）';
+  String get settingsPowerSaverOn => '后台自动降帧（最小化时停止渲染，失焦/熄屏 1 FPS）';
 
   @override
   String get settingsPowerSaverOff => '始终满帧渲染';
@@ -4753,7 +4753,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsPowerSaver => '节能模式';
 
   @override
-  String get settingsPowerSaverOn => '后台自动降帧（最小化 5 FPS，失焦/熄屏 1 FPS）';
+  String get settingsPowerSaverOn => '后台自动降帧（最小化时停止渲染，失焦/熄屏 1 FPS）';
 
   @override
   String get settingsPowerSaverOff => '始终满帧渲染';
@@ -9382,7 +9382,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsPowerSaver => '節能模式';
 
   @override
-  String get settingsPowerSaverOn => '背景自動降幀（最小化 5 FPS，失焦/熄屏 1 FPS）';
+  String get settingsPowerSaverOn => '背景自動降幀（最小化時停止渲染，失焦/熄屏 1 FPS）';
 
   @override
   String get settingsPowerSaverOff => '始終滿幀渲染';
