@@ -1343,13 +1343,23 @@ fn tSleepMs(ms: u64) void {
     Io.Timeout.sleep(.{ .duration = dur }, Io.Threaded.global_single_threaded.io()) catch {};
 }
 
-test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用、停机干净" {
-    var probe = StallJob{ .budget_ns = 3 * std.time.ns_per_s };
+test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用、停机干净（确定性）" {
+    // 长转探针：进入即置 entered，自旋至 stop（稳定态；不依赖 sleep/真实 tick）。
+    const Probe = struct {
+        entered: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+        stop: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+        fn run(ctx: *anyopaque) void {
+            const s: *@This() = @ptrCast(@alignCast(ctx));
+            s.entered.store(true, .release);
+            while (!s.stop.load(.acquire)) std.Thread.yield() catch {};
+        }
+    };
+    var probe = Probe{};
     var normal = TestCtx{};
     const rt = try Runtime.init(std.heap.c_allocator, .{
-        .min_workers = 2,
+        .min_workers = 1, // id0 确定性承接首个（长转）任务
         .max_workers = 4,
-        .stall_timeout_ns = 50 * std.time.ns_per_ms,
+        .stall_timeout_ns = 50 * std.time.ns_per_ms, // >0 才允许停滞扫描
     });
     defer {
         probe.stop.store(true, .release); // 无论走到哪都先放停靠标志，防滞留
@@ -1357,9 +1367,20 @@ test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用
         rt.deinit();
     }
 
-    // 一个蓄意长转任务占住一个 worker（远大于 stall_timeout）
-    try testing.expect(rt.submit(.{ .run = StallJob.run, .ctx = &probe }));
-    // 若干正常任务由其余 worker 完成
+    // 长转任务先占住 id0（min=1 时确定性只有它可接）
+    try testing.expect(rt.submit(.{ .run = Probe.run, .ctx = &probe }));
+    // 等它真正开工（有界自旋 yield，不用 sleep / 轮询）
+    {
+        const ioinst = Io.Threaded.global_single_threaded.io();
+        const deadline = Io.Timestamp.now(ioinst, .awake).nanoseconds + @as(i96, 5 * std.time.ns_per_s);
+        while (!probe.entered.load(.acquire)) {
+            if (Io.Timestamp.now(ioinst, .awake).nanoseconds >= deadline) break;
+            std.Thread.yield() catch {};
+        }
+        try testing.expect(probe.entered.load(.acquire));
+    }
+
+    // 正常任务由扩容出的其余 worker 完成
     const n_normal: usize = 12;
     var submitted: usize = 0;
     for (0..n_normal) |_| {
@@ -1380,54 +1401,28 @@ test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用
     var waiter = Waiter{ .rt = rt };
     const wth = try std.Thread.spawn(.{ .allocator = std.heap.c_allocator }, Waiter.run, .{&waiter});
 
-    // 有界轮询：停滞被检出（长转 worker 被 detach 并放弃其任务）
-    var seen_stall = false;
-    for (0..120) |_| {
-        if (rt.stall_count.load(.acquire) >= 1) {
-            seen_stall = true;
-            break;
-        }
-        tSleepMs(5);
-    }
-    try testing.expect(seen_stall);
+    // 确定性停滞：把 id0 开工时刻置为「很久以前」，**直调**扫描（不等真实 tick / sleep）。
+    rt.mutex.lockUncancelable(rt.io);
+    rt.started_ns[0].store(1, .monotonic);
+    rt.mutex.unlock(rt.io);
+    rt.scanStalled();
+    try testing.expectEqual(@as(usize, 1), rt.stall_count.load(.acquire));
+    try testing.expect(rt.slotStalled(0));
+    try testing.expect(!rt.exited[0].load(.acquire)); // 长转任务仍在跑，尚未自退
 
-    // 正常任务全部完成（不能 waitIdle 阻塞：长转任务已被放弃、由 scan 计回 inflight）
-    var done = false;
-    for (0..120) |_| {
-        if (normal.counter.load(.acquire) == @as(u32, @intCast(submitted))) {
-            done = true;
-            break;
-        }
-        tSleepMs(5);
-    }
-    try testing.expect(done);
-
-    // waitIdle 等待者也已返回（停滞放弃触发 inflight→0 + idle_cv 广播）
-    done = false;
-    for (0..120) |_| {
-        if (waiter.done.load(.acquire)) {
-            done = true;
-            break;
-        }
-        tSleepMs(5);
-    }
-    try testing.expect(done);
+    // 排空（probe 已被放弃、正常任务完成）→ 本线程 waitIdle 返回；join 等待者（确定性，无轮询）
+    rt.waitIdle();
+    try testing.expectEqual(@as(u32, @intCast(submitted)), normal.counter.load(.acquire));
     wth.join();
+    try testing.expect(waiter.done.load(.acquire));
 
     // 停掉长转任务 → 其自行退场（停滞分支：销毁自取节点、置 exited，不写任何簿记）；
     // 池仍可接受并完成新任务（shutdown 的停滞有界等待保证 deinit 前其已真正退出）
     probe.stop.store(true, .release);
     var after = TestCtx{};
     try testing.expect(rt.submit(.{ .run = TestCtx.bump, .ctx = &after }));
-    done = false;
-    for (0..120) |_| {
-        if (after.counter.load(.acquire) == 1) {
-            done = true;
-            break;
-        }
-        tSleepMs(5);
-    }
-    try testing.expect(done);
+    rt.waitIdle();
+    try testing.expectEqual(@as(u32, 1), after.counter.load(.acquire));
     // defer 的 shutdown：跳过已 detach 停滞 worker 的 join，干净返回即证明无悬挂
 }
 
