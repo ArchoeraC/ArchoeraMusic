@@ -530,7 +530,7 @@ PlayerCtx *player_start_opts(const char *ogg_path,
                 frame = (len_frames > 0) ? len_frames - 1 : 0;
             }
             ma_sound_seek_to_pcm_frame(&p->sound, frame);
-            QA_STORE_REL(&p->last_pos_frame, (qa_size)frame);
+            QA_STORE_REL(&p->last_pos_frame, frame);
         }
     }
 
@@ -1265,7 +1265,7 @@ void player_command(PlayerCtx *p, const char *type,
         ma_uint64 frame =
             (ma_uint64)(*pos_ms / 1000.0 * (double)p->sample_rate);
         ma_sound_seek_to_pcm_frame(&p->sound, frame);
-        QA_STORE_REL(&p->last_pos_frame, (qa_size)frame);
+        QA_STORE_REL(&p->last_pos_frame, frame);
         /* 开启保护窗口：游标同步期间不推送位置事件（防旧值刷回 UI） */
         p->seek_pending = 1;
         p->seek_target_frame = frame;
@@ -1319,7 +1319,7 @@ int player_poll(PlayerCtx *p)
             /* 以 ms 步长近似（消费帧数换算） */
             double step_ms = (double)step * 1000.0 / (double)p->stream_dev_rate;
             if (cur_ms - (double)QA_LOAD_ACQ(&p->last_pos_frame) >= step_ms) {
-                QA_STORE_REL(&p->last_pos_frame, (qa_size)cur_ms);
+                QA_STORE_REL(&p->last_pos_frame, cur_ms);
                 char buf[128];
                 snprintf(buf, sizeof(buf),
                          "{\"type\":\"position\",\"position_ms\":%.0f}", cur_ms);
