@@ -8,6 +8,38 @@ mixin _StreamingNotifierFetchActions on Notifier<StreamingState>, _StreamingNoti
   bool get _fetching;
   set _fetching(bool value);
 
+  /// 单次请求条数：Subsonic `getAlbumList2.size` / `search3.songCount` 上限 500，
+  /// Jellyfin `Limit` 同理兼容。
+  static const int _kPageSize = 500;
+
+  /// 单次刷新最多翻页数（防止服务端忽略 offset 时死循环；500×200=10 万条封顶）。
+  static const int _kMaxPages = 200;
+
+  /// 翻页拉全量歌曲（服务端单次上限 [_kPageSize]，需按 offset 循环取完）。
+  Future<List<Track>> _allSongs(StreamingClient client) async {
+    final out = <Track>[];
+    for (var page = 0; page < _kMaxPages; page++) {
+      final batch = await client.listSongs(limit: _kPageSize, offset: out.length);
+      out.addAll(batch);
+      if (batch.length < _kPageSize) break;
+    }
+    return out;
+  }
+
+  /// 翻页拉全量专辑（同上）。
+  Future<List<StreamingAlbum>> _allAlbums(StreamingClient client) async {
+    final out = <StreamingAlbum>[];
+    for (var page = 0; page < _kMaxPages; page++) {
+      final batch = await client.listAlbums(
+        limit: _kPageSize,
+        offset: out.length,
+      );
+      out.addAll(batch);
+      if (batch.length < _kPageSize) break;
+    }
+    return out;
+  }
+
   /// 拉歌曲列表（懒加载：首次或显式刷新才请求）。
   Future<void> _fetchSongsImpl({bool force = false}) async {
     final client = _client;
@@ -16,7 +48,7 @@ mixin _StreamingNotifierFetchActions on Notifier<StreamingState>, _StreamingNoti
     _fetching = true;
     _setLoading(true);
     try {
-      final songs = await client.listSongs();
+      final songs = await _allSongs(client);
       state = state.copyWith(songs: songs);
       _songsLoaded = true;
     } catch (_) {
@@ -34,7 +66,7 @@ mixin _StreamingNotifierFetchActions on Notifier<StreamingState>, _StreamingNoti
     _fetching = true;
     _setLoading(true);
     try {
-      final albums = await client.listAlbums();
+      final albums = await _allAlbums(client);
       state = state.copyWith(albums: albums);
       _albumsLoaded = true;
     } catch (_) {
