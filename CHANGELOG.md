@@ -4,7 +4,7 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
-## [0.9.2] - 2026-09-28
+## [0.9.20] - 2026-09-28
 
 > [!NOTE]
 > 当你在看这个note时，你就在看这个note
