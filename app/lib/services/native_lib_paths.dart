@@ -73,6 +73,14 @@ enum NativeModule {
       'native/platform/zig-out/lib',
       'native/platform/zig-out/bin',
     ],
+  ),
+
+  /// 统一日志核心库（libarchoera_log.{so,dylib} / archoera_log.dll）。
+  /// Dart 载入本库后，把 archoera_log_write 指针注入各原生组件的 set_log_sink。
+  log(
+    'archoera_log',
+    envName: 'ARCHOERA_LOG_LIB',
+    candidates: ['native', 'native/log/build/out', 'native/platform/build/out'],
   );
 
   const NativeModule(

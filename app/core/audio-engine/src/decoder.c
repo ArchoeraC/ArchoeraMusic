@@ -9,6 +9,7 @@
  * 兼容 FFmpeg 5.x/6.x/7.x（Fedora 42 提供 7.x）。
  */
 #include "decoder.h"
+#include "era_log.h"
 
 #include <libavutil/opt.h>
 #include <libavutil/log.h>
@@ -41,9 +42,13 @@ static int interrupt_callback(void *opaque)
     return g_decoder_interrupted;
 }
 
-/* FFmpeg 日志过滤：抑制已知的无害警告 */
+/* FFmpeg 日志过滤 + 统一收口：抑制已知无害警告，其余按 AV_LOG_* 映射到
+ * 统一级别并归入 "ffmpeg" 标签（不再直写 stderr）。 */
 static void decoder_log_callback(void *ptr, int level, const char *fmt, va_list vl)
 {
+    char buf[1024];
+    int lvl, era_level;
+    (void)ptr;
     /* flac: 帧级同步码错误，解码器会跳过该帧继续解码下一帧 */
     if (strstr(fmt, "invalid sync code") != NULL) return;
     if (strstr(fmt, "invalid frame header") != NULL) return;
@@ -51,7 +56,31 @@ static void decoder_log_callback(void *ptr, int level, const char *fmt, va_list 
     if (strstr(fmt, "dropping low score") != NULL) return;
     /* mp3float: 品质 >= 源品质时的时间戳跟踪警告，完全无害 */
     if (strstr(fmt, "Could not update timestamps") != NULL) return;
-    av_log_default_callback(ptr, level, fmt, vl);
+
+    vsnprintf(buf, sizeof(buf), fmt, vl);
+    /* level 可能带 AV_LOG_SKIP_REPEATED / AV_LOG_PRINT_LEVEL 标志位，先掩掉。 */
+    lvl = level & ~(AV_LOG_SKIP_REPEATED | AV_LOG_PRINT_LEVEL);
+    if (lvl <= AV_LOG_FATAL) {
+        era_level = ERA_LOG_FATAL;
+    } else if (lvl <= AV_LOG_ERROR) {
+        era_level = ERA_LOG_ERROR;
+    } else if (lvl <= AV_LOG_WARNING) {
+        era_level = ERA_LOG_WARN;
+    } else if (lvl <= AV_LOG_INFO) {
+        era_level = ERA_LOG_INFO;
+    } else {
+        era_level = ERA_LOG_DEBUG;
+    }
+    era_log_emit(era_level, "ffmpeg", "%s", buf);
+}
+
+/* 进程级幂等安装统一 FFmpeg 日志回调（见 decoder.h）。 */
+void decoder_install_log_callback(void)
+{
+    static int installed = 0;
+    if (installed) return;
+    installed = 1;
+    av_log_set_callback(decoder_log_callback);
 }
 
 struct Decoder {
@@ -105,7 +134,7 @@ Decoder* decoder_open(const char *url)
     if (!d->pkt || !d->frame) goto fail;
 
     /* 安装 FFmpeg 日志过滤，抑制已知无害警告 */
-    av_log_set_callback(decoder_log_callback);
+    decoder_install_log_callback();
 
     /* 1. 打开输入 — 限制探测大小以加速首帧产出（对 192kHz 大 FLAC 尤为重要） */
     AVDictionary *fmt_opts = NULL;
@@ -116,7 +145,7 @@ Decoder* decoder_open(const char *url)
     int ret = avformat_open_input(&d->fmt_ctx, url, NULL, &fmt_opts);
     av_dict_free(&fmt_opts);
     if (ret < 0) {
-        fprintf(stderr, "%s avformat_open_input 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s avformat_open_input 失败: %s\n", LOG_TAG, av_err2str(ret));
         goto fail;
     }
 
@@ -127,14 +156,14 @@ Decoder* decoder_open(const char *url)
     /* 2. 获取流信息 */
     ret = avformat_find_stream_info(d->fmt_ctx, NULL);
     if (ret < 0) {
-        fprintf(stderr, "%s avformat_find_stream_info 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s avformat_find_stream_info 失败: %s\n", LOG_TAG, av_err2str(ret));
         goto fail;
     }
 
     /* 3. 找到最佳音频流 */
     ret = av_find_best_stream(d->fmt_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
     if (ret < 0) {
-        fprintf(stderr, "%s 未找到音频流: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s 未找到音频流: %s\n", LOG_TAG, av_err2str(ret));
         goto fail;
     }
     d->stream_index = ret;
@@ -143,7 +172,7 @@ Decoder* decoder_open(const char *url)
     const AVCodec *codec = avcodec_find_decoder(
         d->fmt_ctx->streams[d->stream_index]->codecpar->codec_id);
     if (!codec) {
-        fprintf(stderr, "%s 未找到解码器\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s 未找到解码器\n", LOG_TAG);
         goto fail;
     }
 
@@ -153,7 +182,7 @@ Decoder* decoder_open(const char *url)
     ret = avcodec_parameters_to_context(d->dec_ctx,
             d->fmt_ctx->streams[d->stream_index]->codecpar);
     if (ret < 0) {
-        fprintf(stderr, "%s avcodec_parameters_to_context 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s avcodec_parameters_to_context 失败: %s\n", LOG_TAG, av_err2str(ret));
         goto fail;
     }
 
@@ -164,7 +193,7 @@ Decoder* decoder_open(const char *url)
     ret = avcodec_open2(d->dec_ctx, codec, &opts);
     av_dict_free(&opts);
     if (ret < 0) {
-        fprintf(stderr, "%s avcodec_open2 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s avcodec_open2 失败: %s\n", LOG_TAG, av_err2str(ret));
         goto fail;
     }
 
@@ -196,7 +225,7 @@ Decoder* decoder_open_mem(AVIOContext *avio)
     d->frame = av_frame_alloc();
     if (!d->pkt || !d->frame) goto fail;
 
-    av_log_set_callback(decoder_log_callback);
+    decoder_install_log_callback();
 
     /* 自定义 IO：CUSTOM_IO 使 avformat_close_input 不释放我们的 pb/avio */
     d->fmt_ctx = avformat_alloc_context();
@@ -211,7 +240,7 @@ Decoder* decoder_open_mem(AVIOContext *avio)
     int ret = avformat_open_input(&d->fmt_ctx, "", NULL, &fmt_opts);
     av_dict_free(&fmt_opts);
     if (ret < 0) {
-        fprintf(stderr, "%s avformat_open_input(自定义IO) 失败: %s\n",
+        ERA_LOGE(NULL, "%s avformat_open_input(自定义IO) 失败: %s\n",
                 LOG_TAG, av_err2str(ret));
         goto fail;
     }
@@ -317,12 +346,12 @@ int decoder_read_frame(Decoder *d, AVFrame **out_frame)
              * 注意：不能 continue，否则会无限循环调用 avcodec_receive_frame
              * （解码器内部状态未改变，仍返回相同错误） */
             if (consecutive_errors == 0) {
-                fprintf(stderr, "%s avcodec_receive_frame 错误: %s — 跳过\n",
+                ERA_LOGW(NULL, "%s avcodec_receive_frame 错误: %s — 跳过\n",
                         LOG_TAG, av_err2str(ret));
             }
             consecutive_errors++;
             if (consecutive_errors >= MAX_CONSECUTIVE_ERRORS) {
-                fprintf(stderr, "%s 连续 %d 次解码失败，放弃\n",
+                ERA_LOGE(NULL, "%s 连续 %d 次解码失败，放弃\n",
                         LOG_TAG, consecutive_errors);
                 return ret;
             }
@@ -344,7 +373,7 @@ int decoder_read_frame(Decoder *d, AVFrame **out_frame)
                 if (ret == AVERROR_EXIT) {
                     return 0;
                 }
-                fprintf(stderr, "%s av_read_frame 错误: %s\n", LOG_TAG, av_err2str(ret));
+                ERA_LOGE(NULL, "%s av_read_frame 错误: %s\n", LOG_TAG, av_err2str(ret));
                 return ret;
             }
 
@@ -358,7 +387,7 @@ int decoder_read_frame(Decoder *d, AVFrame **out_frame)
             av_packet_unref(d->pkt);
             if (ret < 0 && ret != AVERROR(EAGAIN)) {
                 /* 坏包 — 跳过继续 */
-                fprintf(stderr, "%s avcodec_send_packet 错误: %s — 跳过该包\n", LOG_TAG, av_err2str(ret));
+                ERA_LOGW(NULL, "%s avcodec_send_packet 错误: %s — 跳过该包\n", LOG_TAG, av_err2str(ret));
                 d->packet_sent = false;
                 continue;
             }
@@ -376,7 +405,7 @@ int decoder_seek_ms(Decoder *d, int64_t offset_ms)
     /* 用 AVSEEK_FLAG_BACKWARD 保证跳到 offset_ms 之前的关键帧 */
     int ret = av_seek_frame(d->fmt_ctx, -1, ts, AVSEEK_FLAG_BACKWARD);
     if (ret < 0) {
-        fprintf(stderr, "%s av_seek_frame 失败 (offset=%ldms): %s\n",
+        ERA_LOGE(NULL, "%s av_seek_frame 失败 (offset=%ldms): %s\n",
                 LOG_TAG, (long)offset_ms, av_err2str(ret));
         return ret;
     }
@@ -390,7 +419,7 @@ int decoder_seek_ms(Decoder *d, int64_t offset_ms)
        起（跨容器帧长差异时拼接不出现内容回退）。 */
     d->seek_trim_us = offset_ms * 1000;
 
-    fprintf(stderr, "%s 跳过 %ldms\n", LOG_TAG, (long)offset_ms);
+    ERA_LOGW(NULL, "%s 跳过 %ldms\n", LOG_TAG, (long)offset_ms);
     return 0;
 }
 

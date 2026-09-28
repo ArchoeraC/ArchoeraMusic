@@ -36,7 +36,10 @@
 ///   interval: int            daemon 间隔秒（默认 60）
 
 #include "scraper_engine.h"
+#include "scraper_log.h"
 #include <nlohmann/json.hpp>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -57,6 +60,63 @@
 using json = nlohmann::json;
 namespace scraper = archoera::scraper;
 
+// ---------------------------------------------------------------------------
+// 统一日志收口实现（见 include/scraper_log.h）
+//
+// 无动态分配、无内存驻留：单次调用栈缓冲格式化后立即交 sink（或 stderr）。
+// 启动期注入一次；此后读多写少。volatile 保证可见性（指针读写原子）。
+// ---------------------------------------------------------------------------
+namespace archoera::scraper {
+
+#define SCRAPER_LOG_BODY_MAX 2048
+
+static ScraperLogFn volatile g_scraper_sink = nullptr;
+static int volatile g_scraper_min_level = SCRAPER_LOG_INFO;
+
+void scraper_log_set_sink(ScraperLogFn fn, int min_level)
+{
+    g_scraper_min_level = min_level;
+    g_scraper_sink = fn;
+}
+
+ScraperLogFn scraper_log_sink()
+{
+    ScraperLogFn fn = g_scraper_sink;
+    return fn;
+}
+
+void scraper_log_emit(int level, const char *tag, const char *fmt, ...)
+{
+    char body[SCRAPER_LOG_BODY_MAX];
+    va_list ap;
+    ScraperLogFn sink;
+
+    if (level < g_scraper_min_level) return;
+    if (fmt == nullptr) return;
+
+    va_start(ap, fmt);
+    vsnprintf(body, sizeof(body), fmt, ap);
+    va_end(ap);
+
+    // 去掉末尾换行（统一日志核心自行补 '\n'），避免产生空行。
+    {
+        size_t n = strlen(body);
+        while (n > 0 && (body[n - 1] == '\n' || body[n - 1] == '\r')) {
+            body[--n] = '\0';
+        }
+    }
+
+    sink = g_scraper_sink;
+    if (sink != nullptr) {
+        sink(level, tag, body);
+        return;
+    }
+    // 未注入：stderr 兜底（纯文本，避免刮削器完全静默）。
+    fprintf(stderr, "[%s] %s\n", tag != nullptr ? tag : "scraper", body);
+}
+
+} // namespace archoera::scraper
+
 #ifdef _WIN32
 #define ARCHOERA_SCRAPER_API __declspec(dllexport)
 #else
@@ -64,6 +124,15 @@ namespace scraper = archoera::scraper;
 #endif
 
 extern "C" {
+
+/* ── 统一日志 sink（宿主注入；见 scraper_log.h）─────────────────────
+ * 宿主 Dart 载入 libarchoera_log 后，把其 archoera_log_write 指针注入本
+ * 刮削器，内部日志即走统一格式/落盘；fn=NULL 注销并回退 stderr。
+ * level 取值同 archoera_log.h（0=DEBUG 1=INFO 2=WARN 3=ERROR 4=FATAL）；
+ * 低于 min_level 的日志在刮削器侧即丢弃（避免无谓格式化）。 */
+void archoera_scraper_set_log_sink(::archoera::scraper::ScraperLogFn fn, int min_level) {
+    scraper::scraper_log_set_sink(fn, min_level);
+}
 
 /// 事件队列：固定容量环形缓冲（互斥保护）+ 阻塞等待（wait_event 语义）。
 ///
@@ -546,8 +615,8 @@ ARCHOERA_SCRAPER_API void* archoera_scraper_create(const char* configJson) {
         std::string err = h->errbuf;
         delete h;
         errno = 0;  // 不依赖 errno
-        // 将错误留在静态缓冲不可行；改为抛给调用方：返回 NULL 前打印到 stderr
-        std::cerr << "[archoera_scraper] " << err << std::endl;
+        // 将错误留在静态缓冲不可行；改为抛给调用方：返回 NULL 前记统一日志
+        SCRAPER_LOGE(NULL, "[archoera_scraper] %s", err.c_str());
         return nullptr;
     }
     return h;

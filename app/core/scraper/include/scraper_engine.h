@@ -14,6 +14,7 @@
 ///    适用于已扫描入库的曲目需要重新刮削的场景。
 
 #include "scraper.h"
+#include "scraper_log.h"
 #include "sanitize.h"
 #include "api_client.h"
 #include "db_client.h"
@@ -64,30 +65,28 @@ public:
             throw std::runtime_error("ARCHOERA_SCRAPER_DB_PATH 未设置或 config.scraperDbPath 为空，无法创建直写队列");
         }
         scraperDb_.reset(new ScraperDb(scraperDbPath));
-        std::cerr << "[scraper] 队列直写模式: " << scraperDbPath << std::endl;
+        SCRAPER_LOGI(NULL, "[scraper] 队列直写模式: %s", scraperDbPath.c_str());
 
-        std::cerr << "[scraper] 初始化完成" << std::endl;
-        std::cerr << "[scraper] API: " << cfg.apiUrl << std::endl;
-        std::cerr << "[scraper] 批量大小: " << cfg.batchSize << std::endl;
-        std::cerr << "[scraper] 最大重试: " << cfg.maxRetries << std::endl;
-        std::cerr << "[scraper] 嵌入元数据: " << (cfg.embedMetadata ? "是" : "否") << std::endl;
-        std::cerr << "[scraper] 嵌入封面: " << (cfg.embedCover ? "是" : "否") << std::endl;
-        std::cerr << "[scraper] 嵌入歌词: " << (cfg.embedLyrics ? "是" : "否") << std::endl;
-        std::cerr << "[scraper] 数据源: MusicBrainz=" << (cfg.useMusicBrainz ? "是" : "否")
-                  << ", Deezer=" << (cfg.useDeezer ? "是" : "否")
-                  << ", iTunes=" << (cfg.useItunes ? "是" : "否")
-                  << ", Netease=" << (cfg.useNetease ? "是" : "否")
-                  << ", QQMusic=" << (cfg.useQQMusic ? "是" : "否")
-                  << ", Kugou=" << (cfg.useKugou ? "是" : "否")
-                  << ", Kuwo=" << (cfg.useKuwo ? "是" : "否")
-                  << ", Migu=" << (cfg.useMigu ? "是" : "否") << std::endl;
+        SCRAPER_LOGI(NULL, "[scraper] 初始化完成");
+        SCRAPER_LOGI(NULL, "[scraper] API: %s", cfg.apiUrl.c_str());
+        SCRAPER_LOGI(NULL, "[scraper] 批量大小: %d", cfg.batchSize);
+        SCRAPER_LOGI(NULL, "[scraper] 最大重试: %d", cfg.maxRetries);
+        SCRAPER_LOGI(NULL, "[scraper] 嵌入元数据: %s", cfg.embedMetadata ? "是" : "否");
+        SCRAPER_LOGI(NULL, "[scraper] 嵌入封面: %s", cfg.embedCover ? "是" : "否");
+        SCRAPER_LOGI(NULL, "[scraper] 嵌入歌词: %s", cfg.embedLyrics ? "是" : "否");
+        SCRAPER_LOGI(NULL,
+            "[scraper] 数据源: MusicBrainz=%s, Deezer=%s, iTunes=%s, Netease=%s, QQMusic=%s, Kugou=%s, Kuwo=%s, Migu=%s",
+            cfg.useMusicBrainz ? "是" : "否", cfg.useDeezer ? "是" : "否",
+            cfg.useItunes ? "是" : "否", cfg.useNetease ? "是" : "否",
+            cfg.useQQMusic ? "是" : "否", cfg.useKugou ? "是" : "否",
+            cfg.useKuwo ? "是" : "否", cfg.useMigu ? "是" : "否");
         if (!cfg.scrapeDirs.empty()) {
-            std::cerr << "[scraper] 工作模式: 目录扫描" << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper] 工作模式: 目录扫描");
             for (const auto& d : cfg.scrapeDirs) {
-                std::cerr << "[scraper]   刮削目录: " << d << std::endl;
+                SCRAPER_LOGI(NULL, "[scraper]   刮削目录: %s", d.c_str());
             }
         } else {
-            std::cerr << "[scraper] 工作模式: DB 队列" << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper] 工作模式: DB 队列");
         }
     }
 
@@ -107,7 +106,7 @@ public:
         int total = static_cast<int>(tracks.size());
 
         if (tracks.empty()) {
-            std::cerr << "[scraper] 目录中无音频文件" << std::endl;
+            SCRAPER_LOGW(NULL, "[scraper] 目录中无音频文件");
             emitStatus("empty", { {"message", "目录中无音频文件"} });
             emitStatus("done", {
                 {"total", 0}, {"scraped", 0}, {"success", 0},
@@ -116,7 +115,7 @@ public:
             return 0;
         }
 
-        std::cerr << "[scraper] 取到 " << total << " 个待处理文件" << std::endl;
+        SCRAPER_LOGI(NULL, "[scraper] 取到 %d 个待处理文件", total);
         emitStatus("progress", {
             {"total", total}, {"scraped", 0}, {"success", 0},
             {"failed", 0}, {"skipped", 0}, {"notFound", 0},
@@ -131,8 +130,7 @@ public:
 
         for (int i = 0; i < total; ++i) {
             if (cancelFlag().load(std::memory_order_relaxed)) {
-                std::cerr << "[scraper] 收到取消信号，已处理 " << i << "/" << total
-                          << "，安全退出" << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper] 收到取消信号，已处理 %d/%d，安全退出", i, total);
                 canceled = true;
                 break;
             }
@@ -140,14 +138,14 @@ public:
             const auto& track = tracks[i];
             std::string current = track.artist + " - " + track.title;
 
-            // 输出进度（TS 层解析 stderr 中的进度信息）
-            std::cerr << "[scraper] [" << (i + 1) << "/" << total << "] "
-                      << track.artist << " - " << track.title
-                      << " (" << track.album << ")" << std::endl;
+            // 输出进度（经统一日志 sink 上报）
+            SCRAPER_LOGI(NULL, "[scraper] [%d/%d] %s - %s (%s)",
+                         i + 1, total, track.artist.c_str(),
+                         track.title.c_str(), track.album.c_str());
 
             // 跳过已刮削的文件（如果启用）
             if (cfg_.skipScraped && isLikelyScraped(track)) {
-                std::cerr << "[scraper]   ⚠ 跳过（已有完整元数据）" << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper]   ⚠ 跳过（已有完整元数据）");
                 skipped++;
                 scraperDb_->updateQueueStatus(track.filePath, "skipped");
                 emitStatus("progress", {
@@ -167,7 +165,7 @@ public:
             bool haveIdentifier = result.mbid.has_value() || result.isrc.has_value();
             bool haveMetadata = result.title.has_value() && result.artist.has_value();
             if (!haveIdentifier && !haveMetadata) {
-                std::cerr << "[scraper]   - 未找到匹配" << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper]   - 未找到匹配");
                 notFoundCount++;
                 scraperDb_->updateQueueStatus(track.filePath, "not_found");
                 emitStatus("progress", {
@@ -180,10 +178,10 @@ public:
 
             // 输出数据源与封面/歌词状态
             if (cfg_.embedCover && !result.coverData.empty()) {
-                std::cerr << "[scraper]   ✓ 封面: " << result.coverData.size() << " bytes" << std::endl;
+                SCRAPER_LOGI(NULL, "[scraper]   ✓ 封面: %zu bytes", result.coverData.size());
             }
             if (cfg_.embedLyrics && result.lyrics) {
-                std::cerr << "[scraper]   ✓ 歌词" << std::endl;
+                SCRAPER_LOGI(NULL, "[scraper]   ✓ 歌词");
             }
 
             // 5. 写入音频文件标签（立即写入——本地文件 I/O，开销低）
@@ -191,17 +189,18 @@ public:
             if (cfg_.embedMetadata || cfg_.embedCover || cfg_.embedLyrics) {
                 if (!track.filePath.empty()) {
                     if (tagWriter_.writeToFile(track.filePath, result, cfg_)) {
-                        std::cerr << "[scraper]   ✓ 标签写入成功" << std::endl;
+                        SCRAPER_LOGI(NULL, "[scraper]   ✓ 标签写入成功");
                         // 同步写入封面缓存，使 Subsonic 等服务能立即读取
                         if (cfg_.embedCover && !result.coverData.empty() && !cfg_.coverCacheDir.empty()) {
                             writeCoverCache(track.id, result.coverData);
                         }
                     } else {
-                        std::cerr << "[scraper]   ✗ 标签写入失败: " << tagWriter_.lastError() << std::endl;
+                        SCRAPER_LOGE(NULL, "[scraper]   ✗ 标签写入失败: %s",
+                                     tagWriter_.lastError().c_str());
                         tagWritten = false;
                     }
                 } else {
-                    std::cerr << "[scraper]   ⚠ 无文件路径，跳过标签写入" << std::endl;
+                    SCRAPER_LOGW(NULL, "[scraper]   ⚠ 无文件路径，跳过标签写入");
                 }
             }
 
@@ -229,8 +228,8 @@ public:
             });
         }
 
-        std::cerr << "[scraper] 本轮完成: " << success << " 成功, "
-                  << failed << " 失败, " << skipped << " 跳过" << std::endl;
+        SCRAPER_LOGI(NULL, "[scraper] 本轮完成: %d 成功, %d 失败, %d 跳过",
+                     success, failed, skipped);
         emitStatus("done", {
             {"total", total}, {"scraped", success + failed + skipped + notFoundCount}, {"success", success},
             {"failed", failed}, {"skipped", skipped}, {"notFound", notFoundCount}, {"canceled", canceled}
@@ -243,14 +242,14 @@ public:
         // 启动时重置卡住的任务（上次崩溃遗留的 running 状态）
         int reset = scraperDb_->resetStuck(120); // 120min timeout
         if (reset > 0) {
-            std::cerr << "[scraper] 重置 " << reset << " 个卡住的任务" << std::endl;
+            SCRAPER_LOGW(NULL, "[scraper] 重置 %d 个卡住的任务", reset);
         }
 
         auto queue = scraperDb_->claimQueue(cfg_.batchSize);
         int total = static_cast<int>(queue.size());
 
         if (queue.empty()) {
-            std::cerr << "[scraper] 队列为空，无需处理" << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper] 队列为空，无需处理");
             emitStatus("empty", { {"message", "队列为空，无需处理"} });
             emitStatus("done", {
                 {"total", 0}, {"scraped", 0}, {"success", 0},
@@ -259,7 +258,7 @@ public:
             return 0;
         }
 
-        std::cerr << "[scraper] 取到 " << total << " 个待刮削项" << std::endl;
+        SCRAPER_LOGI(NULL, "[scraper] 取到 %d 个待刮削项", total);
         emitStatus("progress", {
             {"total", total}, {"scraped", 0}, {"success", 0},
             {"failed", 0}, {"skipped", 0}, {"notFound", 0},
@@ -279,8 +278,7 @@ public:
             if (cancelFlag().load(std::memory_order_relaxed)) {
                 canceledAt = i;
                 canceled = true;
-                std::cerr << "[scraper] 收到取消信号，已处理 " << i << "/" << total
-                          << "，安全退出" << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper] 收到取消信号，已处理 %d/%d，安全退出", i, total);
                 break;
             }
 
@@ -288,12 +286,12 @@ public:
             std::string current = "trackId=" + item.trackId;
 
             // 输出进度
-            std::cerr << "[scraper] [" << (i + 1) << "/" << total << "] "
-                      << "trackId=" << item.trackId << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper] [%d/%d] trackId=%s",
+                         i + 1, total, item.trackId.c_str());
 
             if (item.retries >= cfg_.maxRetries) {
-                std::cerr << "[scraper] 跳过 " << item.trackId
-                          << "（重试次数已达上限）" << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper] 跳过 %s（重试次数已达上限）",
+                             item.trackId.c_str());
                 skipped++;
                 updateStatus(item.trackId, "skipped", "max retries exceeded");
                 emitStatus("progress", {
@@ -306,7 +304,7 @@ public:
 
             auto track = db_.getTrack(item.trackId);
             if (!track) {
-                std::cerr << "[scraper] 获取曲目失败: " << item.trackId << std::endl;
+                SCRAPER_LOGE(NULL, "[scraper] 获取曲目失败: %s", item.trackId.c_str());
                 failed++;
                 updateStatus(item.trackId, "failed", db_.lastError());
                 emitStatus("progress", {
@@ -317,13 +315,14 @@ public:
                 continue;
             }
 
-            std::cerr << "[scraper] 刮削: " << track->artist << " - "
-                      << track->title << " (" << track->album << ")" << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper] 刮削: %s - %s (%s)",
+                         track->artist.c_str(), track->title.c_str(),
+                         track->album.c_str());
             current = track->artist + " - " + track->title;
 
             // 跳过已刮削的文件（如果启用）
             if (cfg_.skipScraped && isLikelyScraped(*track)) {
-                std::cerr << "[scraper]   ⚠ 跳过（已有完整元数据）" << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper]   ⚠ 跳过（已有完整元数据）");
                 skipped++;
                 updateStatus(item.trackId, "skipped", "already scraped");
                 emitStatus("progress", {
@@ -344,7 +343,7 @@ public:
             if (!haveIdentifier && !haveMetadata) {
                 notFoundCount++;
                 updateStatus(item.trackId, "not_found", "no source matched");
-                std::cerr << "[scraper]   - 未找到匹配" << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper]   - 未找到匹配");
                 emitStatus("progress", {
                     {"total", total}, {"scraped", i + 1}, {"success", success},
                     {"failed", failed}, {"skipped", skipped}, {"notFound", notFoundCount},
@@ -355,10 +354,10 @@ public:
 
             // 输出数据源与封面/歌词状态
             if (cfg_.embedCover && !result.coverData.empty()) {
-                std::cerr << "[scraper]   ✓ 封面: " << result.coverData.size() << " bytes" << std::endl;
+                SCRAPER_LOGI(NULL, "[scraper]   ✓ 封面: %zu bytes", result.coverData.size());
             }
             if (cfg_.embedLyrics && result.lyrics) {
-                std::cerr << "[scraper]   ✓ 歌词" << std::endl;
+                SCRAPER_LOGI(NULL, "[scraper]   ✓ 歌词");
             }
 
             // 4. 写入音频文件标签
@@ -366,17 +365,18 @@ public:
             if (cfg_.embedMetadata || cfg_.embedCover || cfg_.embedLyrics) {
                 if (!track->filePath.empty()) {
                     if (tagWriter_.writeToFile(track->filePath, result, cfg_)) {
-                        std::cerr << "[scraper]   ✓ 标签写入成功" << std::endl;
+                        SCRAPER_LOGI(NULL, "[scraper]   ✓ 标签写入成功");
                         // 同步写入封面缓存，使 Subsonic 等服务能立即读取
                         if (cfg_.embedCover && !result.coverData.empty() && !cfg_.coverCacheDir.empty()) {
                             writeCoverCache(track->id, result.coverData);
                         }
                     } else {
-                        std::cerr << "[scraper]   ✗ 标签写入失败: " << tagWriter_.lastError() << std::endl;
+                        SCRAPER_LOGE(NULL, "[scraper]   ✗ 标签写入失败: %s",
+                                     tagWriter_.lastError().c_str());
                         tagWritten = false;
                     }
                 } else {
-                    std::cerr << "[scraper]   ⚠ 无文件路径，跳过标签写入" << std::endl;
+                    SCRAPER_LOGW(NULL, "[scraper]   ⚠ 无文件路径，跳过标签写入");
                 }
             }
 
@@ -403,14 +403,13 @@ public:
                 unprocessed.push_back(queue[j].trackId);
             }
             if (!unprocessed.empty()) {
-                std::cerr << "[scraper] 取消中，释放 " << unprocessed.size() << " 个未处理任务" << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper] 取消中，释放 %zu 个未处理任务", unprocessed.size());
                 scraperDb_->releaseItems(unprocessed);
             }
         }
 
         if (failed > 0) {
-            std::cerr << "[scraper] 本轮完成: " << success << " 成功, "
-                      << failed << " 失败" << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper] 本轮完成: %d 成功, %d 失败", success, failed);
         }
 
         emitStatus("done", {
@@ -422,12 +421,12 @@ public:
 
     /// 持续运行模式
     void runDaemon(int intervalSec = 60) {
-        std::cerr << "[scraper] 守护模式启动，间隔 " << intervalSec << " 秒" << std::endl;
+        SCRAPER_LOGI(NULL, "[scraper] 守护模式启动，间隔 %d 秒", intervalSec);
         while (!cancelFlag().load(std::memory_order_relaxed)) {
             try {
                 runOnce();
             } catch (const std::exception& e) {
-                std::cerr << "[scraper] 异常: " << e.what() << std::endl;
+                SCRAPER_LOGE(NULL, "[scraper] 异常: %s", e.what());
             }
             // 可中断的等待：每秒检查一次取消标志
             for (int s = 0; s < intervalSec && !cancelFlag().load(std::memory_order_relaxed); ++s) {
@@ -437,7 +436,7 @@ public:
 
         // 收到取消信号后：确保所有异步结果写入完毕
         shutdown();
-        std::cerr << "[scraper] 守护模式安全退出" << std::endl;
+        SCRAPER_LOGI(NULL, "[scraper] 守护模式安全退出");
     }
 
     /// 显式清理：等待异步提交全部完成，释放所有待处理资源
@@ -497,14 +496,14 @@ private:
                 ofs.write(reinterpret_cast<const char*>(coverData.data()),
                           static_cast<std::streamsize>(coverData.size()));
                 ofs.close();
-                std::cerr << "[scraper]   ✓ 封面缓存写入: "
-                          << pathToUtf8(coverFile) << std::endl;
+                SCRAPER_LOGI(NULL, "[scraper]   ✓ 封面缓存写入: %s",
+                             pathToUtf8(coverFile).c_str());
             } else {
-                std::cerr << "[scraper]   ⚠ 无法写入封面缓存: "
-                          << pathToUtf8(coverFile) << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper]   ⚠ 无法写入封面缓存: %s",
+                             pathToUtf8(coverFile).c_str());
             }
         } catch (const std::exception& e) {
-            std::cerr << "[scraper]   ⚠ 封面缓存写入异常: " << e.what() << std::endl;
+            SCRAPER_LOGW(NULL, "[scraper]   ⚠ 封面缓存写入异常: %s", e.what());
         }
     }
 

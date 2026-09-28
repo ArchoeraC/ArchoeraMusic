@@ -26,7 +26,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -195,9 +195,19 @@ static GLOBAL: Lazy<Mutex<GlobalState>> = Lazy::new(|| Mutex::new(GlobalState::d
 // stderr 日志器：log::* 在未注册 logger 时是 no-op（此前 resolvers 的
 // debug 日志全部不可见），注册后 `flutter run -d linux` 控制台即可看到
 // Rust 下载引擎的日志（write_tags 失败、Kugou 档位降级原因等）。
+//
+// 统一日志：宿主（Dart）可经 archoera_downloader_set_log_sink 注入
+// libarchoera_log 的 archoera_log_write 指针，Rust 日志即走统一格式/落盘；
+// 未注入时回退 eprintln!。级别数值对齐 archoera_log.h：0..4。
 // ============================================================
 
 static LOGGER_ONCE: std::sync::Once = std::sync::Once::new();
+
+/// 注入的日志 sink 函数指针（0 = 未注入）。参数：level, tag, message。
+type LogSink = unsafe extern "C" fn(c_int, *const c_char, *const c_char);
+static LOG_SINK: AtomicUsize = AtomicUsize::new(0);
+/// 最小级别（低于此级别直接丢弃，避免无谓格式化）。
+static LOG_MIN_LEVEL: AtomicUsize = AtomicUsize::new(1); // INFO
 
 struct StderrLogger;
 
@@ -206,9 +216,37 @@ impl log::Log for StderrLogger {
         true
     }
     fn log(&self, record: &log::Record<'_>) {
+        let level: i32 = match record.level() {
+            log::Level::Error => 3,
+            log::Level::Warn => 2,
+            log::Level::Info => 1,
+            log::Level::Debug | log::Level::Trace => 0,
+        };
+        if (level as usize) < LOG_MIN_LEVEL.load(Ordering::Acquire) {
+            return;
+        }
+        let raw = LOG_SINK.load(Ordering::Acquire);
+        if raw != 0 {
+            let sink: LogSink = unsafe { std::mem::transmute(raw) };
+            let tag = CString::new(record.target());
+            let msg = CString::new(format!("{}", record.args()));
+            if let (Ok(t), Ok(m)) = (tag, msg) {
+                unsafe { sink(level, t.as_ptr(), m.as_ptr()) };
+                return;
+            }
+        }
         eprintln!("[downloader] {}: {}", record.level(), record.args());
     }
     fn flush(&self) {}
+}
+
+/// 注入统一日志 sink（宿主 Dart 传入 libarchoera_log 的 archoera_log_write）。
+/// fn_ptr=NULL 注销并回退 eprintln!。幂等；可在 init 前后调用。
+#[no_mangle]
+pub extern "C" fn archoera_downloader_set_log_sink(fn_ptr: *const c_void, min_level: c_int) {
+    let lvl = if min_level < 0 { 0usize } else { min_level as usize };
+    LOG_MIN_LEVEL.store(lvl.min(4), Ordering::Release);
+    LOG_SINK.store(fn_ptr as usize, Ordering::Release);
 }
 
 // ============================================================

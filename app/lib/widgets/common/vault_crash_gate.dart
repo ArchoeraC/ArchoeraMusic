@@ -5,6 +5,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/l10n.dart';
+import '../../services/log/log.dart';
 import '../../services/security/vault_process.dart';
 import '../../stores/data_dir.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -69,7 +70,7 @@ class _VaultCrashGateState extends State<VaultCrashGate> {
     try {
       VaultProcess.destroy(resolveDataDir());
     } catch (e) {
-      debugPrint('[vault] 销毁失败：$e');
+      Log.e('vault', '销毁失败：$e');
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

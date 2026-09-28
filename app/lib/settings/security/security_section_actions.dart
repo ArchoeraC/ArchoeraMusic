@@ -484,7 +484,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
         mode: ProcessStartMode.detached,
       );
     } catch (e) {
-      debugPrint('[vault] 重启应用失败（请手动重启）：$e');
+      Log.e('vault', '重启应用失败（请手动重启）：$e');
     }
     await quitApplication(ref);
   }

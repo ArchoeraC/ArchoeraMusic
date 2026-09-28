@@ -108,9 +108,10 @@ rem （Dart DynamicLibrary lookup；segstore.c 源见下，.so 内 segstore 函�
 >> build\fft.def echo     fft_get_spectrum_norm_stereo
 >> build\fft.def echo     fft_take_beat_strength
 >> build\fft.def echo     fft_destroy
+>> build\fft.def echo     fft_set_log_sink
 
 echo [build_windows] 编译 fft.dll...
-cl /nologo /O2 /std:c11 /MD /LD /I include /I src src\fft.c /Fe:build\fft.dll /link /DEF:build\fft.def
+cl /nologo /O2 /std:c11 /MD /LD /I include /I src src\fft.c src\era_log.c /Fe:build\fft.dll /link /DEF:build\fft.def
 if errorlevel 1 exit /b 1
 
 rem --- 自研解码内核（EraAudio, Zig 静态库, windows-msvc ReleaseFast）---
@@ -150,6 +151,7 @@ cl /nologo /O2 /std:c11 /MD /LD /I include /I src /I include\compat /I "%VCPKG_P
     src\encoder.c src\equalizer.c src\parametric_eq.c src\lowfreq.c ^
     src\loudness.c src\limiter.c ^
     src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
+    src\era_log.c ^
     src\audio_output.c src\audio_output_platform.c src\audio_output_windows.c ^
     src\segstore.c ^
     "%VCPKG_PREFIX%\lib\avformat.lib" "%VCPKG_PREFIX%\lib\avcodec.lib" ^
@@ -281,6 +283,26 @@ popd
 echo [build_windows] ERROR: 平台桥接构建失败
 exit /b 1
 :platform_done
+
+rem =====================================================================
+rem  9. log core：统一日志核心（app/native/log，CMake C/纯 C11）
+rem     产物 build\out\archoera_log.dll，由 app/windows/CMakeLists install
+rem     引用（其内嵌 archoera_log_cmake target 亦会构建）。Dart 载入后把
+rem     archoera_log_write 指针注入桥接/引擎/下载器/内核。
+rem =====================================================================
+echo [build_windows] ===== log core =====
+pushd "%ROOT%..\native\log"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+if errorlevel 1 goto log_fail
+cmake --build build --config Release -j
+if errorlevel 1 goto log_fail
+popd
+goto log_done
+:log_fail
+popd
+echo [build_windows] ERROR: 统一日志核心构建失败
+exit /b 1
+:log_done
 
 echo [build_windows] 全部模块构建完成
 exit /b 0

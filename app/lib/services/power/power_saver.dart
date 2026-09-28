@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/l10n.dart';
 import '../../stores/app_prefs.dart';
+import '../log/log.dart';
 import '../platform/platform_capabilities.dart';
 import '../platform/platform_failure.dart';
 import '../platform/system_power.dart';
@@ -124,7 +125,7 @@ class PowerSaverService with WindowListener {
     if (_windowSub != null) return;
     final ok = await _window.setEvents(true);
     if (!ok) {
-      debugPrint('[power] 桥接窗口状态不可用（回退 window_manager）');
+      Log.w('power', '桥接窗口状态不可用（回退 window_manager）');
       return;
     }
     _windowSub = _window.state.listen((s) {
@@ -143,14 +144,14 @@ class PowerSaverService with WindowListener {
     if (_screenSub != null) return;
     final ok = await _power.setScreenEvents(true);
     if (!ok) {
-      debugPrint('[power] 熄屏状态订阅不可用（忽略熄屏场景）');
+      Log.w('power', '熄屏状态订阅不可用（忽略熄屏场景）');
     }
     _screenSub = _power.screenState.listen((active) {
       _screenOff = active;
       _apply();
     });
     _failSub = _power.failures.listen((f) {
-      debugPrint('[power] 平台能力失败: $f');
+      Log.e('power', '平台能力失败: $f');
     });
   }
 
@@ -188,7 +189,7 @@ class PowerSaverService with WindowListener {
     final ok = await _power.setSleepInhibit(want);
     if (!ok) {
       _sleepActive = !want;
-      debugPrint('[power] 禁用系统休眠切换失败');
+      Log.e('power', '禁用系统休眠切换失败');
       if (want) {
         toast(_ref.read(l10nProvider).toastSleepInhibitFailed,
             type: ToastType.warning);

@@ -66,8 +66,8 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                     try { work(); }
                     catch (Exception ex)
                     {
-                        // 写失败不可静默（否则数据丢失无感知）：输出到 stderr，继续处理后续
-                        Console.Error.WriteLine($"[scanner][sqlite] 写操作失败: {ex}");
+                        // 写失败不可静默（否则数据丢失无感知）：路由统一日志，继续处理后续
+                        Log.LogError("scanner", $"sqlite 写操作失败: {ex}");
                     }
                 }
             }

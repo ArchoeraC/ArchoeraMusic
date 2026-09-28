@@ -8,6 +8,7 @@
  * 使用 Audio EQ Cookbook 公式实现 Biquad 滤波器
  */
 #include "equalizer.h"
+#include "era_log.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -108,7 +109,7 @@ Equalizer* equalizer_create(int sample_rate, int channels)
     }
 #endif
 
-    fprintf(stderr, "%s 创建: %dHz / %dch / %d 频段\n",
+    ERA_LOGI(NULL, "%s 创建: %dHz / %dch / %d 频段\n",
             LOG_TAG, sample_rate, channels, EQ_BANDS);
     return eq;
 }

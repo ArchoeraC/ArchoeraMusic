@@ -29,6 +29,9 @@ namespace Archoera.Scanner.Ffi;
 ///       int* out_len)                // 结果字节数
 ///   int  scanner_cancel()            // 请求取消进行中的扫描（0=已请求，1=无进行中扫描）
 ///   void scanner_free(const char* ptr)  // 释放本模块 NativeMemory.Alloc 分配的内存
+///   void scanner_set_log_sink(       // 注入统一日志 sink（libarchoera_log 的 archoera_log_write）
+///       void (*sink)(int level, const char* tag, const char* message),
+///       int minLevel)                // 0=DEBUG..4=FATAL；sink=NULL 注销并回退 stderr
 /// </summary>
 public static unsafe class ScannerFfi
 {
@@ -180,6 +183,18 @@ public static unsafe class ScannerFfi
     public static void Free(byte* ptr)
     {
         if (ptr != null) NativeMemory.Free(ptr);
+    }
+
+    /// <summary>
+    /// 注入统一日志 sink（宿主 Dart 传入 libarchoera_log 的 archoera_log_write 指针）。
+    /// 调用约定 C：void (*)(int level, const char* tag, const char* message)。
+    /// sink=NULL 注销并回退 stderr；[minLevel] 数值对齐 archoera_log.h：0..4。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "scanner_set_log_sink")]
+    public static void SetLogSink(
+        delegate* unmanaged[Cdecl]<int, byte*, byte*, void> sink, int minLevel)
+    {
+        Log.SetSink(sink, minLevel);
     }
 
     /* ------------------------------------------------------------------ */

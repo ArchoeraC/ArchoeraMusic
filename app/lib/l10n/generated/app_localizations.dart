@@ -4834,6 +4834,30 @@ abstract class AppLocalizations {
   /// **'已清空全部缓存'**
   String get toastCacheAllCleared;
 
+  /// No description provided for @settingsLogToFile.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'日志写入磁盘'**
+  String get settingsLogToFile;
+
+  /// No description provided for @settingsLogToFileOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'日志会写入 logs/ 目录'**
+  String get settingsLogToFileOn;
+
+  /// No description provided for @settingsLogToFileOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅输出到控制台，不写入磁盘'**
+  String get settingsLogToFileOff;
+
+  /// No description provided for @settingsLogToFileNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'单文件，上限 4 MiB（原地截断，不产生额外文件）。'**
+  String get settingsLogToFileNote;
+
   /// No description provided for @settingsSecuritySection.
   ///
   /// In zh_CN, this message translates to:

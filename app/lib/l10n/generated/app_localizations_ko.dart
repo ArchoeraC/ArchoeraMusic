@@ -2617,6 +2617,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toastCacheAllCleared => '모든 캐시가 삭제되었습니다';
 
   @override
+  String get settingsLogToFile => '로그를 파일에 기록';
+
+  @override
+  String get settingsLogToFileOn => '로그가 logs/ 폴더에 기록됩니다';
+
+  @override
+  String get settingsLogToFileOff => '콘솔에만 출력되며 디스크에 기록되지 않습니다';
+
+  @override
+  String get settingsLogToFileNote => '단일 파일, 최대 4 MiB (제자리에서 잘라냄, 추가 파일 없음).';
+
+  @override
   String get settingsSecuritySection => '안전 파기';
 
   @override

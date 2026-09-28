@@ -7,6 +7,7 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
+import '../log/log.dart';
 import '../native_lib_paths.dart';
 
 /// archoera-downloader cdylib 的定位、加载与 FFI 绑定。
@@ -41,7 +42,7 @@ class DownloaderLibrary {
   static DownloaderLibrary load({String? soPath}) {
     final path = soPath ?? resolveSoPath();
     final lib = DynamicLibrary.open(path);
-    return DownloaderLibrary._(lib);
+    return DownloaderLibrary._(lib)..installLogSink();
   }
 
   // ---------------------------------------------------------------- FFI 绑定（§8.1）
@@ -121,6 +122,21 @@ class DownloaderLibrary {
       .lookupFunction<_DestroyNative, _DestroyDart>(
         'archoera_downloader_destroy',
       );
+
+  /// 注入统一日志 sink（缺失符号时静默跳过，兼容旧版库）。
+  void installLogSink() {
+    final sink = Log.nativeWritePointer;
+    if (sink == null) return;
+    try {
+      final setLogSink = _lib
+          .lookupFunction<_SetLogSinkNative, _SetLogSinkDart>(
+            'archoera_downloader_set_log_sink',
+          );
+      setLogSink(sink, Log.effectiveLevel);
+    } catch (_) {
+      // 旧版库无此符号：保持 eprintln! 回退。
+    }
+  }
 
   /// 初始化下载引擎（启动时一次，唯一允许注册回调指针的入口）。
   ///
@@ -379,6 +395,11 @@ typedef _ClearIdentityDart = int Function();
 
 typedef _FreeNative = Void Function(Pointer<Void>);
 typedef _FreeDart = void Function(Pointer<Void>);
+
+typedef _SetLogSinkNative =
+    Void Function(Pointer<NativeFunction<LogWriteNative>> fn, Int32 minLevel);
+typedef _SetLogSinkDart = void Function(
+    Pointer<NativeFunction<LogWriteNative>> fn, int minLevel);
 
 typedef _DestroyNative = Void Function();
 typedef _DestroyDart = void Function();

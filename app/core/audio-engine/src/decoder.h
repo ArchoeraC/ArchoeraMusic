@@ -64,6 +64,13 @@ void decoder_close(Decoder *d);
  */
 void decoder_interrupt(void);
 
+/**
+ * 安装 FFmpeg 统一日志回调（av_log → era_log）。进程级幂等；应在引擎初始化/
+ * 首次使用 FFmpeg 前调用，使 URL 传输（AVIO）等早期日志也归入统一 sink
+ * （否则它们会走 FFmpeg 默认回调直写 stderr）。
+ */
+void decoder_install_log_callback(void);
+
 #ifdef __cplusplus
 }
 #endif

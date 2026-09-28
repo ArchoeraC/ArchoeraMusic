@@ -4,6 +4,8 @@
 
 #include "core.h"
 
+#include <atomic>
+#include <cstdio>
 #include <mutex>
 
 namespace archoera {
@@ -13,6 +15,9 @@ std::mutex g_mutex;
 bool g_initialized = false;
 AplEventCallback g_callback = nullptr;
 void* g_user_data = nullptr;
+
+// 统一日志 sink：宿主注入后由各后端经 log() 调用；原子读写避免与分发竞争。
+std::atomic<AplLogFn> g_log_sink{nullptr};
 
 // 进程级事件槽：回调可能是异步 NativeCallable.listener，Dart 稍后读取指针，
 // 若指向栈内存届时已失效。事件低速率，覆盖竞争可接受（至多读到更新的一条，
@@ -35,6 +40,21 @@ void setEventCallback(AplEventCallback cb, void* user_data) {
     std::lock_guard<std::mutex> lock(g_mutex);
     g_callback = cb;
     g_user_data = user_data;
+}
+
+void setLogSink(AplLogFn fn) { g_log_sink.store(fn, std::memory_order_release); }
+
+AplLogFn logSink() { return g_log_sink.load(std::memory_order_acquire); }
+
+void log(int level, const char* tag, const char* message) {
+    AplLogFn fn = g_log_sink.load(std::memory_order_acquire);
+    if (fn != nullptr) {
+        fn(level, tag, message);
+        return;
+    }
+    // 未注入：stderr 兜底（避免静默丢失桥接诊断）。
+    std::fprintf(stderr, "[%s] %s\n", tag != nullptr ? tag : "platform",
+                 message != nullptr ? message : "");
 }
 
 void dispatch(const AplEvent& event) {

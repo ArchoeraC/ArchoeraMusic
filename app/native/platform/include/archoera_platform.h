@@ -62,6 +62,13 @@ APL_API int32_t apl_init(void);          /* 进程级一次；重复调用幂等
 APL_API int32_t apl_shutdown(void);      /* join 线程、释放抑制、注销媒体会话；幂等 */
 APL_API uint32_t apl_capabilities(void); /* 能力位图；未 init 亦可查询 */
 
+/* ── 统一日志 sink（宿主注入）───────────────────────────────────── */
+/* 宿主（Dart）载入 archoera_log 后，把其 archoera_log_write 指针注入本模块，
+ * 桥接内部日志（如 Windows SMTC 诊断）即走统一格式/落盘；fn=NULL 注销并回退
+ * stderr。level 取值同 archoera_log.h（0=DEBUG 1=INFO 2=WARN 3=ERROR 4=FATAL）。 */
+typedef void (*AplLogFn)(int level, const char *tag, const char *message);
+APL_API void apl_set_log_sink(AplLogFn fn);
+
 /* ── 字符串与曲目元数据（零 JSON）───────────────────────────────── */
 typedef struct AplString {
     const char *data; /* UTF-8；NULL = 缺失 */

@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/l10n.dart';
 import '../../stores/app_prefs.dart';
 import '../../widgets/common/toast.dart';
+import '../log/log.dart';
 import '../playback/playback_notifier.dart';
 import '../playback/playback_state.dart';
 import 'platform_capabilities.dart';
@@ -59,7 +60,7 @@ class _MediaSessionHostState extends ConsumerState<MediaSessionHost> {
           type: ToastType.warning,
         );
       } else if (!f.lost) {
-        debugPrint('[media] 平台能力失败: $f');
+        Log.e('media', '平台能力失败: $f');
       }
     });
     // 初始同步（应用启动即恢复的播放状态）

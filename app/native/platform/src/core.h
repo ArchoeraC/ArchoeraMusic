@@ -61,6 +61,15 @@ void setInitialized(bool v);
 // 注册/注销（NULL）事件回调；线程安全、幂等。
 void setEventCallback(AplEventCallback cb, void* user_data);
 
+// ── 统一日志 ──────────────────────────────────────────────────────
+// 宿主注入的 sink（见 archoera_platform.h 的 AplLogFn）；原子读写，可在任意
+// 线程调用 log()。未注入时回退 stderr（纯文本，无时间戳约定）。
+void setLogSink(AplLogFn fn);
+AplLogFn logSink();
+
+// 写一条日志：有 sink 交 sink，否则 fprintf(stderr)。level: 0..4。
+void log(int level, const char* tag, const char* message);
+
 // 把事件投递给 Dart 回调（任意线程可调；回调期间不持锁）。
 // 无回调 / 未注册时静默丢弃。事件写入进程级静态槽再传其地址：回调可能是
 // 异步 NativeCallable.listener，Dart 稍后读取指针，故不能用栈内存。

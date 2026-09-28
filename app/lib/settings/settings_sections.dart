@@ -24,6 +24,7 @@ import '../app/theme_provider.dart';
 import '../app/watermark.dart';
 import '../easter_egg/easter_egg.dart';
 import '../services/downloader/download_controller.dart';
+import '../services/log/log.dart';
 import '../services/platform/platform_capabilities.dart';
 import '../services/playback/engine_bindings.dart';
 import '../services/playback/playback_notifier.dart';

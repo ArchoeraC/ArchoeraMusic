@@ -31,6 +31,7 @@
 #include "limiter.h"
 #include "fft.h"
 #include "tempo.h"
+#include "era_log.h"
 
 #include <libavutil/samplefmt.h>
 #include <libavutil/mem.h>
@@ -250,6 +251,8 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
 {
     EraUrlCb *cb = (EraUrlCb *)calloc(1, sizeof(*cb));
     if (!cb) return -1;
+    /* 确保 FFmpeg 日志回调已装（URL 传输可能先于任何 decoder_open 发生）。 */
+    decoder_install_log_callback();
     cb->interrupt.callback = era_url_interrupt;
     cb->interrupt.opaque = cb;
     /* 宿主传输超时/重连（N3）：rw_timeout 为通用协议选项；reconnect* 仅 HTTP
@@ -265,6 +268,7 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
     int oret = avio_open2(&cb->avio, url, AVIO_FLAG_READ, &cb->interrupt, &opts);
     av_dict_free(&opts);
     if (oret < 0) {
+        p->native_status = 8; /* ZK_IO_ERROR：宿主传输打开失败（非未接管） */
         free(cb);
         return -1;
     }
@@ -283,8 +287,8 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
     }
     p->era_url_cb = cb;
     p->native_active = true;
-    fprintf(stderr,
-            "%s EraAudio: 接管在线流（%s）— codec=%s / fmt=%s\n",
+    ERA_LOGI(NULL,
+            "%s EraAudio: 接管在线流（%s）— codec=%s / fmt=%s [transport=ffmpeg-avio]\n",
             LOG_TAG, url, ninfo.codec_name ? ninfo.codec_name : "?",
             ninfo.format_name ? ninfo.format_name : "?");
     return 0;
@@ -325,24 +329,24 @@ static AudioPipeline* pipeline_create_impl(const char *source,
                 p->native_status = st;
                 if (p->native) {
                     p->native_active = true;
-                    fprintf(stderr,
+                    ERA_LOGI(NULL,
                             "%s EraAudio: 接管内存源（%llu 字节）— codec=%s / fmt=%s\n",
                             LOG_TAG, (unsigned long long)blen,
                             ninfo.codec_name ? ninfo.codec_name : "?",
                             ninfo.format_name ? ninfo.format_name : "?");
                 } else {
-                    fprintf(stderr,
+                    ERA_LOGW(NULL,
                             "%s EraAudio: 内存源未接管 (status=%d %s)"
                             " → 回退 FFmpeg-mem\n",
                             LOG_TAG, st, p->native_err[0] ? p->native_err : "");
                 }
             } else {
-                fprintf(stderr,
+                ERA_LOGW(NULL,
                         "%s EraAudio: 内存源非连续（分段）→ 回退 FFmpeg-mem\n", LOG_TAG);
             }
         }
         if (!p->native_active && pipeline_store_avio_open(p, store) != 0) {
-            fprintf(stderr, "%s SegStore 内存源 AVIO 构造失败\n", LOG_TAG);
+            ERA_LOGE(NULL, "%s SegStore 内存源 AVIO 构造失败\n", LOG_TAG);
             goto fail;
         }
     } else if (cfg->engine_mode == ENGINE_MODE_ERAUDIO) {
@@ -352,10 +356,10 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             /* F5 门控：扩展名对应格式在内核开关下明确未接管 → 跳过无效 native open。 */
             if (native_decoder_taken_over_by_ext(source) == 0) {
                 p->native_status = 1; /* ZK_UNSUPPORTED */
-                fprintf(stderr, "%s EraAudio: 扩展名未接管 → 直接 FFmpeg\n", LOG_TAG);
+                ERA_LOGW(NULL, "%s EraAudio: 扩展名未接管 → 直接 FFmpeg\n", LOG_TAG);
             } else if (pipeline_era_url_open(p, source) != 0) {
-                fprintf(stderr, "%s EraAudio: 在线源不可用/未接管"
-                                " (status=%d %s) → 回退 FFmpeg\n",
+                ERA_LOGW(NULL, "%s EraAudio: 在线源不可用/未接管"
+                                " (status=%d %s) → 回退 FFmpeg（将重新发起 HTTP 请求）\n",
                         LOG_TAG, p->native_status,
                         p->native_err[0] ? p->native_err : "");
             }
@@ -363,7 +367,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             /* F5 门控：扩展名明确未接管 → 跳过无效 native open，直接 FFmpeg。
              * 返回 -1（未知扩展名）时保留 try-then-fallback（probe 按内容判定）。 */
             p->native_status = 1; /* ZK_UNSUPPORTED */
-            fprintf(stderr, "%s EraAudio: 扩展名未接管 → 直接 FFmpeg\n", LOG_TAG);
+            ERA_LOGW(NULL, "%s EraAudio: 扩展名未接管 → 直接 FFmpeg\n", LOG_TAG);
         } else {
             NativeInfo ninfo;
             int st = 1; /* 默认 unsupported */
@@ -372,17 +376,17 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             p->native_status = st;
             if (p->native) {
                 p->native_active = true;
-                fprintf(stderr, "%s EraAudio: 接管 — codec=%s / fmt=%s\n",
+                ERA_LOGI(NULL, "%s EraAudio: 接管 — codec=%s / fmt=%s\n",
                         LOG_TAG, ninfo.codec_name ? ninfo.codec_name : "?",
                         ninfo.format_name ? ninfo.format_name : "?");
             } else {
-                fprintf(stderr, "%s EraAudio: 不可用/未接管 (status=%d %s)"
+                ERA_LOGW(NULL, "%s EraAudio: 不可用/未接管 (status=%d %s)"
                                 " → 回退 FFmpeg\n",
                         LOG_TAG, st, p->native_err[0] ? p->native_err : "");
             }
         }
     } else {
-        fprintf(stderr, "%s engine_mode=%d（Stable=FFmpeg 默认路径）\n",
+        ERA_LOGI(NULL, "%s engine_mode=%d（Stable=FFmpeg 默认路径）\n",
                 LOG_TAG, cfg->engine_mode);
     }
 
@@ -390,7 +394,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
         /* 原生路径：分配读缓冲（float 交错，按源声道数，每帧 1 个 float/ch） */
         int src_ch = native_decoder_channels(p->native);
         if (src_ch <= 0 || src_ch > 16) {
-            fprintf(stderr, "%s EraAudio 源声道数异常: %d\n", LOG_TAG, src_ch);
+            ERA_LOGE(NULL, "%s EraAudio 源声道数异常: %d\n", LOG_TAG, src_ch);
             goto fail;
         }
         p->native_buf_frames = NATIVE_CHUNK_FRAMES;
@@ -400,13 +404,13 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     } else if (store) {
         p->dec = decoder_open_mem(p->store_avio); /* decoder 不接管 avio */
         if (!p->dec) {
-            fprintf(stderr, "%s 无法从 SegStore 内存源打开解码器\n", LOG_TAG);
+            ERA_LOGE(NULL, "%s 无法从 SegStore 内存源打开解码器\n", LOG_TAG);
             goto fail;
         }
     } else {
         p->dec = decoder_open(source);
         if (!p->dec) {
-            fprintf(stderr, "%s 无法打开源: %s\n", LOG_TAG, source);
+            ERA_LOGE(NULL, "%s 无法打开源: %s\n", LOG_TAG, source);
             goto fail;
         }
     }
@@ -425,7 +429,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     int64_t src_dur_us = p->native_active
                          ? native_decoder_duration_us(p->native)
                          : decoder_duration_us(p->dec);
-    fprintf(stderr, "%s 源: %dHz / %dch / %s / 时长 %.1fs\n",
+    ERA_LOGI(NULL, "%s 源: %dHz / %dch / %s / 时长 %.1fs\n",
             LOG_TAG, src_rate, src_channels,
             src_codec, src_dur_us / 1e6);
 
@@ -441,7 +445,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     p->resampler = resampler_create(src_rate, src_channels, AV_SAMPLE_FMT_NONE,
                                      out_rate, out_channels);
     if (!p->resampler) {
-        fprintf(stderr, "%s 重采样器创建失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s 重采样器创建失败\n", LOG_TAG);
         goto fail;
     }
 
@@ -449,12 +453,12 @@ static AudioPipeline* pipeline_create_impl(const char *source,
      * 串联顺序：subsonic HPF/low-freq → 参数化 EQ → 固定 10 段 EQ → … */
     p->lowfreq = lowfreq_create(out_rate, out_channels);
     if (!p->lowfreq) {
-        fprintf(stderr, "%s 次声/低频管理创建失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s 次声/低频管理创建失败\n", LOG_TAG);
         goto fail;
     }
     p->peq = parametric_eq_create(out_rate, out_channels, PEQ_MAX_BANDS);
     if (!p->peq) {
-        fprintf(stderr, "%s 参数化 EQ 创建失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s 参数化 EQ 创建失败\n", LOG_TAG);
         goto fail;
     }
 
@@ -463,7 +467,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     /* 3.1 均衡器 */
     p->equalizer = equalizer_create(out_rate, out_channels);
     if (!p->equalizer) {
-        fprintf(stderr, "%s 均衡器创建失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s 均衡器创建失败\n", LOG_TAG);
         goto fail;
     }
     bool has_eq = false;
@@ -473,13 +477,13 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     if (has_eq || cfg->eq_preamp_db != 0.0f) {
         equalizer_set_gains(p->equalizer, cfg->eq_gains);
         equalizer_set_preamp(p->equalizer, cfg->eq_preamp_db);
-        fprintf(stderr, "%s EQ 启用: preamp=%.1fdB\n", LOG_TAG, cfg->eq_preamp_db);
+        ERA_LOGI(NULL, "%s EQ 启用: preamp=%.1fdB\n", LOG_TAG, cfg->eq_preamp_db);
     }
 
     /* 3.2 响度归一化 */
     p->loudness = loudness_create(out_rate, out_channels);
     if (!p->loudness) {
-        fprintf(stderr, "%s 响度归一化创建失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s 响度归一化创建失败\n", LOG_TAG);
         goto fail;
     }
     if (cfg->normalization && cfg->normalization_gain != 0.0f) {
@@ -490,7 +494,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     /* 3.3 限幅器 */
     p->limiter = limiter_create(out_rate, out_channels);
     if (!p->limiter) {
-        fprintf(stderr, "%s 限幅器创建失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s 限幅器创建失败\n", LOG_TAG);
         goto fail;
     }
     limiter_set_enabled(p->limiter, cfg->limiter_enabled);
@@ -499,7 +503,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     /* 3.4 变速变调 */
     p->tempo = tempo_create(out_rate, out_channels);
     if (!p->tempo) {
-        fprintf(stderr, "%s 变速变调创建失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s 变速变调创建失败\n", LOG_TAG);
         goto fail;
     }
     if (cfg->tempo_enabled) {
@@ -514,7 +518,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     /* 3.5 FFT 分析器 */
     p->fft = fft_create(out_rate, cfg->fft_size);
     if (!p->fft) {
-        fprintf(stderr, "%s FFT 分析器创建失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s FFT 分析器创建失败\n", LOG_TAG);
         goto fail;
     }
     fft_set_enabled(p->fft, cfg->fft_enabled);
@@ -525,7 +529,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
                                      cfg->bitrate, cfg->frame_size_ms,
                                      output, user);
         if (!p->encoder) {
-            fprintf(stderr, "%s 编码器创建失败\n", LOG_TAG);
+            ERA_LOGE(NULL, "%s 编码器创建失败\n", LOG_TAG);
             goto fail;
         }
     }
@@ -536,7 +540,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
      *    因「原生不会跳」而失败（断点续播/播放中跳转的兜底）。 */
     if (cfg->start_offset_ms > 0 && p->native_active) {
         if (native_decoder_seek_ms(p->native, cfg->start_offset_ms) != 0) {
-            fprintf(stderr, "%s EraAudio: seek 到 %ldms 失败"
+            ERA_LOGW(NULL, "%s EraAudio: seek 到 %ldms 失败"
                             " → 回退 FFmpeg 解码器（offset 起播兜底）\n",
                     LOG_TAG, (long)cfg->start_offset_ms);
             native_decoder_close(p->native);
@@ -553,7 +557,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             p->native_buf_frames = 0;
             p->dec = decoder_open(source);
             if (!p->dec) {
-                fprintf(stderr, "%s 回退 FFmpeg 也无法打开源: %s\n",
+                ERA_LOGE(NULL, "%s 回退 FFmpeg 也无法打开源: %s\n",
                         LOG_TAG, source);
                 goto fail;
             }
@@ -565,7 +569,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
         } else {
             int ret = decoder_seek_ms(p->dec, cfg->start_offset_ms);
             if (ret < 0) {
-                fprintf(stderr, "%s seek 到 %ldms 失败\n",
+                ERA_LOGE(NULL, "%s seek 到 %ldms 失败\n",
                         LOG_TAG, (long)cfg->start_offset_ms);
                 goto fail;
             }
@@ -582,9 +586,11 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     p->tempo_buf = malloc(p->tempo_buf_capacity * cfg->output_channels * sizeof(float));
     if (!p->tempo_buf) goto fail;
 
-    fprintf(stderr, "%s 管线就绪: → %dHz / %dch / %s\n",
+    ERA_LOGI(NULL, "%s 管线就绪: → %dHz / %dch / %s [backend=%s transport=%s]\n",
             LOG_TAG, out_rate, out_channels,
-            p->cfg.skip_encoder ? "PCM(无编码)" : "Opus 编码");
+            p->cfg.skip_encoder ? "PCM(无编码)" : "Opus 编码",
+            p->native_active ? "zig" : "ffmpeg",
+            p->era_url_cb ? "ffmpeg-avio" : (p->native_active ? "direct" : "ffmpeg"));
     return p;
 
 fail:
@@ -758,7 +764,7 @@ ssize_t pipeline_process(AudioPipeline *p)
             int ret = native_process_chunk(p);
             if (ret <= 0) {
                 if (ret < 0) {
-                    fprintf(stderr, "%s EraAudio 解码错误: %d\n", LOG_TAG, ret);
+                    ERA_LOGF(NULL, "%s EraAudio 解码错误: %d\n", LOG_TAG, ret);
                     return ret;
                 }
                 /* 0 = 内核读到 EOF。但在线回调流里「传输错误」也被内核契约折叠成
@@ -768,7 +774,7 @@ ssize_t pipeline_process(AudioPipeline *p)
                 if (ioerr != 0) {
                     char eb[AV_ERROR_MAX_STRING_SIZE];
                     av_strerror(ioerr, eb, sizeof(eb));
-                    fprintf(stderr, "%s EraAudio 在线流中断/超时: %s\n", LOG_TAG, eb);
+                    ERA_LOGE(NULL, "%s EraAudio 在线流中断/超时: %s\n", LOG_TAG, eb);
                     return -8; /* ZK_IO_ERROR（见 include/kernel_bridge.h） */
                 }
                 p->eof = true; /* 0 = EOF */
@@ -783,7 +789,7 @@ ssize_t pipeline_process(AudioPipeline *p)
         if (ret <= 0) {
             p->eof = true;
             if (ret < 0) {
-                fprintf(stderr, "%s 解码错误: %d\n", LOG_TAG, ret);
+                ERA_LOGE(NULL, "%s 解码错误: %d\n", LOG_TAG, ret);
                 return ret;
             }
             break;

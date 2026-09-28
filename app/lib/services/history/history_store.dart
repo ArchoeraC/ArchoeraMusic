@@ -19,12 +19,12 @@
 library;
 
 import 'dart:convert';
-import 'dart:developer' as dev;
 import 'dart:io';
 
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../stores/event_bus.dart';
+import '../log/log.dart';
 import '../netease/track.dart';
 import '../scanner/library_scanner.dart';
 
@@ -72,7 +72,7 @@ class HistoryStore {
   static bool _legacyMigrated = false;
 
   static void _log(String line) {
-    dev.log(line, name: 'HistoryStore');
+    Log.e('history', line);
   }
 
   /// 打开并初始化（幂等建表 + 一次性旧库迁移），回调内使用后关闭。

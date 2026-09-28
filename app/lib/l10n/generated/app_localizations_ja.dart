@@ -2617,6 +2617,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get toastCacheAllCleared => 'すべてのキャッシュを削除しました';
 
   @override
+  String get settingsLogToFile => 'ログをファイルに書き込む';
+
+  @override
+  String get settingsLogToFileOn => 'ログは logs/ フォルダーに書き込まれます';
+
+  @override
+  String get settingsLogToFileOff => 'コンソールのみ。ディスクには書き込みません';
+
+  @override
+  String get settingsLogToFileNote => '単一ファイル、上限 4 MiB（その場で切り詰め。追加ファイルは作りません）。';
+
+  @override
   String get settingsSecuritySection => '安全な破棄';
 
   @override

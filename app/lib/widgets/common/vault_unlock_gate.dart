@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../apis/runtime.dart';
 import '../../l10n/l10n.dart';
 import '../../services/downloader/download_controller.dart';
+import '../../services/log/log.dart';
 import '../../services/streaming/streaming_store.dart';
 import '../../stores/providers.dart';
 import '../../stores/vault_session_store.dart';
@@ -84,7 +85,7 @@ class _VaultUnlockGateState extends ConsumerState<VaultUnlockGate> {
       try {
         await ref.read(neteaseAuthProvider.notifier).init();
       } catch (e) {
-        debugPrint('[vault] 解锁后登录态刷新失败：$e');
+        Log.e('vault', '解锁后登录态刷新失败：$e');
       }
       ref.read(downloadControllerProvider.notifier).syncSessions();
       if (mounted) setState(() => _needsUnlock = false);

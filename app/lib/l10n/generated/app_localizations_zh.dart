@@ -2590,6 +2590,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastCacheAllCleared => '已清空全部缓存';
 
   @override
+  String get settingsLogToFile => '日志写入磁盘';
+
+  @override
+  String get settingsLogToFileOn => '日志会写入 logs/ 目录';
+
+  @override
+  String get settingsLogToFileOff => '仅输出到控制台，不写入磁盘';
+
+  @override
+  String get settingsLogToFileNote => '单文件，上限 4 MiB（原地截断，不产生额外文件）。';
+
+  @override
   String get settingsSecuritySection => '安全销毁';
 
   @override
@@ -7216,6 +7228,18 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get toastCacheAllCleared => '已清空全部缓存';
 
   @override
+  String get settingsLogToFile => '日志写入磁盘';
+
+  @override
+  String get settingsLogToFileOn => '日志会写入 logs/ 目录';
+
+  @override
+  String get settingsLogToFileOff => '仅输出到控制台，不写入磁盘';
+
+  @override
+  String get settingsLogToFileNote => '单文件，上限 4 MiB（原地截断，不产生额外文件）。';
+
+  @override
   String get settingsSecuritySection => '安全销毁';
 
   @override
@@ -11840,6 +11864,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get toastCacheAllCleared => '已全部清空快取';
+
+  @override
+  String get settingsLogToFile => '日誌寫入磁碟';
+
+  @override
+  String get settingsLogToFileOn => '日誌會寫入 logs/ 目錄';
+
+  @override
+  String get settingsLogToFileOff => '僅輸出到主控台，不寫入磁碟';
+
+  @override
+  String get settingsLogToFileNote => '單一檔案，上限 4 MiB（原地截斷，不產生額外檔案）。';
 
   @override
   String get settingsSecuritySection => '安全銷毀';

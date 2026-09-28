@@ -833,7 +833,7 @@ public sealed class ScannerEngine
         Console.WriteLine(ScannerJson.Progress(p));
     }
 
-    private static void LogInfo(string msg) => Console.Error.WriteLine($"[scanner] {msg}");
-    private static void LogWarn(string msg) => Console.Error.WriteLine($"[scanner] WARN: {msg}");
-    private static void LogError(string msg) => Console.Error.WriteLine($"[scanner] ERROR: {msg}");
+    private static void LogInfo(string msg) => Log.LogInfo("scanner", msg);
+    private static void LogWarn(string msg) => Log.LogWarn("scanner", msg);
+    private static void LogError(string msg) => Log.LogError("scanner", msg);
 }

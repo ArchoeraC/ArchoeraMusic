@@ -12,6 +12,7 @@
 /// 这样刮削器不再依赖 DB tracks 表 —— 刮削目录可以不在扫描路径中。
 
 #include "scraper.h"
+#include "scraper_log.h"
 #include <unordered_set>
 #include <taglib/tag.h>
 #include <taglib/fileref.h>
@@ -94,15 +95,15 @@ public:
         for (const auto& dir : dirs) {
             const auto dirPath = utf8ToPath(dir);
             if (!std::filesystem::exists(dirPath)) {
-                std::cerr << "[scanner] 目录不存在: " << dir << std::endl;
+                SCRAPER_LOGW(NULL, "[scanner] 目录不存在: %s", dir.c_str());
                 continue;
             }
             if (!std::filesystem::is_directory(dirPath)) {
-                std::cerr << "[scanner] 不是目录: " << dir << std::endl;
+                SCRAPER_LOGW(NULL, "[scanner] 不是目录: %s", dir.c_str());
                 continue;
             }
 
-            std::cerr << "[scanner] 扫描目录: " << dir << std::endl;
+            SCRAPER_LOGI(NULL, "[scanner] 扫描目录: %s", dir.c_str());
 
             try {
                 if (recursive) {
@@ -139,14 +140,13 @@ public:
                     }
                 }
             } catch (const std::filesystem::filesystem_error& e) {
-                std::cerr << "[scanner] 扫描失败 " << dir << ": " << e.what() << std::endl;
+                SCRAPER_LOGE(NULL, "[scanner] 扫描失败 %s: %s", dir.c_str(), e.what());
             } catch (const std::exception& e) {
-                std::cerr << "[scanner] 扫描异常 " << dir << ": " << e.what() << std::endl;
+                SCRAPER_LOGE(NULL, "[scanner] 扫描异常 %s: %s", dir.c_str(), e.what());
             }
         }
 
-        std::cerr << "[scanner] 扫描完成: " << scanned << " 个文件, "
-                  << skipped << " 个跳过" << std::endl;
+        SCRAPER_LOGI(NULL, "[scanner] 扫描完成: %d 个文件, %d 个跳过", scanned, skipped);
         return results;
     }
 
