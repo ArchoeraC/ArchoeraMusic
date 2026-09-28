@@ -58,8 +58,13 @@ abstract class DownloadPlatform {
   String? fileExtensionOverride(Track track, String quality) => null;
 
   /// 异步探测扩展名（直链无扩展名的源，如 Neko 按文件头魔数嗅探）；
-  /// 默认 null（调用方回退通用推断）。
-  Future<String?> probeExtension(dynamic ref, Track track) async => null;
+  /// 默认 null（调用方回退通用推断）。[quality] 与取流档位一致（Neko 不同档
+  /// 位容器可能不同：转码档为 MP3，原始档可能为 FLAC）。
+  Future<String?> probeExtension(
+    dynamic ref,
+    Track track, {
+    String quality = 'hq',
+  }) async => null;
 
   /// 实际品质 key（供 done 事件 actualQuality 展示；近似，以扩展名为准）。
   String qualityKey(String quality, String ext) => ext == 'flac'
@@ -231,16 +236,44 @@ class _NekoDownloadPlatform extends DownloadPlatform {
   bool get nativeResolver => false;
 
   @override
-  Future<String?> probeExtension(dynamic ref, Track track) async {
-    // Neko 直传原文件、直链无扩展名：按文件头魔数嗅探真实容器（对齐官方
-    // PC 客户端），失败再回退 `fileFormat`，避免落盘扩展名错配。
+  Future<String?> probeExtension(
+    dynamic ref,
+    Track track, {
+    String quality = 'hq',
+  }) async {
+    // Neko 直链无扩展名：按文件头魔数嗅探真实容器（对齐官方 PC 客户端），
+    // 且与所选音质同档（standard/hq 为转码 MP3，sq/hires 为原始容器）。
     try {
-      return await ref.read(nekoApiProvider).probeAudioExtension(track.id);
+      return await ref
+          .read(nekoApiProvider)
+          .probeAudioExtension(track.id, quality: quality);
     } catch (_) {
       // 探测失败回退通用扩展名推断
       return null;
     }
   }
+
+  @override
+  String qualityKey(String quality, String ext) {
+    // Neko：standard/hq 为服务端转码 MP3；sq/hires 为原始音源，容器可能是
+    // FLAC/WAV/OGG/M4A（以探测为准）。仅用于下载任务 actualQuality 展示。
+    if (ext == 'mp3') return quality == 'lq' ? '128k' : '320k';
+    return quality == 'hi-res' ? 'flac24bit' : 'flac';
+  }
+
+  @override
+  String resolveExtension(
+    Track track, {
+    required String url,
+    required String quality,
+    String? probed,
+  }) =>
+      // 跳过 `_extFromCodec`：Neko 入队前元数据可能被其它音源重写
+      //（`neko_metadata` 会带上匹配源的 codec），用它推断会与实际容器错配。
+      fileExtensionOverride(track, quality) ??
+      probed ??
+      DownloadPlatform._extFromUrl(url) ??
+      ((quality == 'lossless' || quality == 'hi-res') ? 'flac' : 'mp3');
 }
 
 // ── Streaming（Subsonic / Jellyfin） ────────────────────────────────────

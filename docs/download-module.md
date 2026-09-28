@@ -251,7 +251,7 @@ Rust 内置解析仅覆盖 KG/NT；其余源在 Rust `resolving` 阶段恒失败
 | source | Rust 解析 | Dart 解析 | 说明 |
 |---|---|---|---|
 | `qqmusic` | 无 | `resolvePlaySource`（vkey 直链 + UA/Referer/Cookie） | 免费曲免登录 |
-| `neko` | 无 | Neko 直链（无音质档） | 入队前补元数据/歌词；扩展名按文件头嗅探 |
+| `neko` | 无 | Neko 取流（`?quality=` 四档，服务端 302 → `/media/music/...`） | 入队前补元数据/歌词；扩展名按**同档位**文件头嗅探 |
 | `streaming` | 无（`SourcePlatform::Streaming`） | Subsonic/Jellyfin `/rest/stream?format=raw`（原文件，鉴权在 URL） | 扩展名取 `Track.quality.codec`（Subsonic `suffix` / Jellyfin codec） |
 
 **流媒体下载策略**（增强能力 + 明确提示 + 入口收敛）：
@@ -823,8 +823,10 @@ URL 兜底下载，提升可用性。
 **编排（Dart `DownloadController`）**：
 
 1. 收到 error 事件且 `stage == "resolving"`、`retryable == true`（非取消）；
-2. 任务源为 `kugou` / `netease` / `qqmusic`：KG/NT 为 Rust 自研解析失败后回退；
-   **QQMusic Rust 侧无自研解析，enqueue 后即失败并直接走本条回退**（播放管线解析）；
+2. 任务源为 `kugou` / `netease` / `qqmusic` / `neko` / `streaming`：KG/NT 为 Rust
+   自研解析失败后回退；**QQMusic/Neko/流媒体 Rust 侧无自研解析，enqueue 后即失败
+   并直接走本条回退**（播放管线解析）；Neko 回退 URL 带所选档位 `?quality=`，
+   流媒体取 `format=raw` 原文件、Neko 由服务端 302 到实际媒体；
 3. 调播放管线共用解析器 `resolvePlaySource(ref, track, quality, allowQqMusic: true)`
    拿到 URL；QQ 带 Cookie/UA/Referer；
 4. 组装 `resolvedJson` 调 `archoera_downloader_retry_with_url(taskId, resolvedJson)`；

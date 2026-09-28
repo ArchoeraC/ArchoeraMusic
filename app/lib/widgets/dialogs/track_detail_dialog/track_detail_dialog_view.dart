@@ -4,20 +4,30 @@
 
 part of '../track_detail_dialog.dart';
 
-class _TrackDetailBody extends StatelessWidget {
+class _TrackDetailBody extends ConsumerWidget {
   const _TrackDetailBody({required this.track});
 
   final Track track;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
     final t = track;
 
     final platform = sourcePlatform(t.source);
-    final qualityLabel = platform.qualityLabel(l10n, t);
+    // 异步源（Neko）的实际最高档：注册表提供 provider，加载完成自动重建；
+    // 同步源（KG 等）为 null，直接由 [qualityLabel] 从元数据推断。
+    final maxAsync = platform.maxQualityProvider(t);
+    final maxQuality = maxAsync == null
+        ? null
+        : ref.watch(maxAsync).maybeWhen(data: (v) => v, orElse: () => null);
+    final qualityLabel = platform.qualityLabel(
+      l10n,
+      t,
+      maxQuality: maxQuality,
+    );
     final q = t.quality;
     final fileSize = t.fileSize ?? platform.estimatedFileSize(t);
     final localPath = t.localPath;

@@ -12,6 +12,9 @@ library;
 String withPicSize(String? url, [int size = 300]) {
   if (url == null || url.isEmpty) return '';
   if (url.contains('?param=')) return url;
+  // 已带其它查询参数（如 Neko 头像 `?v=`）→ 不再追加，避免出现第二个 `?`
+  // 造成畸形 URL（`...?v=1?param=100y100`）。
+  if (url.contains('?')) return url;
   return '$url?param=${size}y$size';
 }
 

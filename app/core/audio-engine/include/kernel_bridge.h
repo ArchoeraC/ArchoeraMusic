@@ -122,6 +122,17 @@ int zk_decoder_seek_ms(ZkDecoder *d, long long ms);
 /** 当前播放位置（毫秒，自文件开头计） */
 long long zk_decoder_position_ms(ZkDecoder *d);
 
+/**
+ * 当前解码位置（**样本**，自文件开头计）；仅样本级位置已知的格式返回有效值。
+ *
+ * 语义：seek 后 = 下一次 [zk_decoder_read] 将输出的首个样本的绝对样本号。
+ * 该值可能 **小于** seek 目标样本（目标落在当前帧内），调用方据此裁剪
+ * (target_sample - landing_samples) 个前导样本即可实现样本级对齐拼接。
+ * 返回 -1 = 该格式未提供样本级位置（调用方不得按毫秒换算裁剪，以免引入
+ * 舍入误差；此时保持既有行为）。
+ */
+long long zk_decoder_position_samples(ZkDecoder *d);
+
 /** 释放解码会话（含底层文件句柄与全部缓冲）；d 为 NULL 时为空操作 */
 void zk_decoder_close(ZkDecoder *d);
 
@@ -310,6 +321,10 @@ int zk_engine_seek_ms(ZkEngineStream *s, long long ms);
 
 /** 当前播放位置（毫秒） */
 long long zk_engine_position_ms(ZkEngineStream *s);
+
+/** 当前解码位置（样本，自文件开头计）；语义同 [zk_decoder_position_samples]，
+ *  返回 -1 = 未提供。 */
+long long zk_engine_position_samples(ZkEngineStream *s);
 
 /** 关闭会话（池内释放实例）；s 为 NULL 时空操作 */
 void zk_engine_close(ZkEngineStream *s);

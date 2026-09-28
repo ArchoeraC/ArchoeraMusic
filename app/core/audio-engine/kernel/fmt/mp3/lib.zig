@@ -44,6 +44,8 @@ const Reader = io.Reader;
 const max_frame_samples = 1152 * 2;
 /// 单帧最大字节（320kbps MPEG1 128k 帧 417B；此处留足余量）
 const max_frame_bytes = 8192;
+/// 帧索引扫描块大小（64KiB：块内解析多个帧头，避免逐帧 seek+read 系统调用）
+const scan_chunk_bytes = 64 * 1024;
 
 const Ctx = struct {
     allocator: Allocator,
@@ -75,6 +77,13 @@ const Ctx = struct {
     frame_samples: usize = 0,
     /// Xing/Info header 提供的精确总帧数（无 = 0，时长用首帧参数估算）
     total_frames: u64 = 0,
+    /// Xing/Info `bytes` 字段（音频数据总字节；精确字节寻址/估算用，无 = 0）
+    xing_bytes: u64 = 0,
+    /// Xing/Info TOC（100 字节，8-bit 量化）。保留供粗略定位/诊断；**不用于
+    /// 精确帧寻址**——8-bit 量化误差可达 file_size/512 字节（多帧），无法唯一
+    /// 确定落点帧号，故精确索引走分块帧头扫描（见 `frames`）。
+    toc: [100]u8 = [_]u8{0} ** 100,
+    has_toc: bool = false,
     /// Xing 提供的总样本数（无 = 0）
     total_samples_xing: u64 = 0,
     /// 解码起点偏移（= 首帧或其后一帧；Xing 首帧整体跳过，对齐 ffmpeg mp3dec）
@@ -86,12 +95,30 @@ const Ctx = struct {
     out_limit: u64 = std.math.maxInt(u64),
     /// 当前尚待丢弃的解码流头部样本（open / seek(0) 后填充，跨帧丢弃后归零）
     drop_rem: u64 = 0,
+    /// seek 回退前导段标志：为 true 时，解码失败帧按标称帧长计入 drop_rem
+    /// （保持绝对样本记账；open / seek(0) 的顺序解码为 false）。
+    seek_lead: bool = false,
     /// 标签元数据（open 解析；生命周期与 Decoder 一致）
     meta: decoder.Metadata = .{},
     /// 附加图片（ID3v2 APIC）
     pictures: []decoder.Picture = &.{},
     /// 音量增益（REPLAYGAIN_* 标签）
     replay_gain: decoder.ReplayGain = .{},
+    /// 精确帧索引（帧号 → 绝对字节偏移）：`frames.items[i]` = 自 stream_start 起
+    /// 第 i 个可解码帧的绝对字节起点。惰性按需构建：顺序分块扫描帧头，精确适配
+    /// VBR / MPEG2-LSF / 无 Xing（比例估算在 VBR 下不可靠、且无法给出精确帧号）。
+    /// 首次 seek 可能扫描至目标帧（上限 O(总帧数)，块级读取），此后每次 seek O(1)。
+    frames: std.ArrayList(u64) = .empty,
+    /// 帧扫描下一块的读取偏移（EOF 后 = file_size）
+    scan_byte: u64 = 0,
+    /// 扫描已到文件尾（无更多帧）
+    scan_eof: bool = false,
+    /// 顺序回放增量建索引：从 stream_start 连续解码时同步记录帧起点，后续 seek
+    /// 可直接命中（无需从头扫描）；遇 seek/重同步即停（idx_ok=false）。
+    idx_ok: bool = true,
+    idx_next: u64 = 0,
+    /// 帧扫描块缓冲（64KiB；避免逐帧 seek+read）
+    scan_buf: [scan_chunk_bytes]u8 = undefined,
     eof: bool = false,
 };
 
@@ -99,6 +126,7 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
 
@@ -148,12 +176,17 @@ inline fn be24(b: []const u8) u32 {
 const Xing = struct {
     /// 总帧数（不含 Xing 帧自身；无 frames 位 = 0）
     frames: u64 = 0,
+    /// Xing `bytes` 字段（音频数据总字节，无 bytes 位 = 0）
+    bytes: u64 = 0,
     /// 是否含 LAME/Lavf/Lavc 编码扩展（其 delay/padding 具 gapless 语义）
     has_enc: bool = false,
     /// encoder_delay（样本）
     delay: u32 = 0,
     /// encoder_padding（样本）
     padding: u32 = 0,
+    /// 100 字节 TOC（存在 = has_toc；值经 8-bit 量化，仅作粗略定位提示）
+    toc: [100]u8 = [_]u8{0} ** 100,
+    has_toc: bool = false,
 };
 
 /// 解析首帧内的 Xing/Info header。无 Xing → null（时长用首帧参数估算）。
@@ -188,9 +221,15 @@ fn parseXing(reader: *Reader, first: u64, h: *const [4]u8, frame_bytes: usize) E
     }
     if (flags & 0x2 != 0) { // bytes
         if (p + 4 > data.len) return null;
+        xing.bytes = be32(data[p .. p + 4]);
         p += 4;
     }
-    if (flags & 0x4 != 0) p += 100; // TOC
+    if (flags & 0x4 != 0) { // TOC
+        if (p + 100 > data.len) return null;
+        @memcpy(&xing.toc, data[p .. p + 100]);
+        xing.has_toc = true;
+        p += 100;
+    }
     if (flags & 0x8 != 0) { // VBR scale
         if (p + 4 > data.len) return null;
         p += 4;
@@ -266,6 +305,9 @@ pub fn open(allocator: Allocator, reader: *Reader, info: *decoder.Info) Error!de
         xing = try parseXing(&ctx.reader, first, &h, ctx.frame_bytes);
         if (xing) |xg| {
             ctx.total_frames = xg.frames;
+            ctx.xing_bytes = xg.bytes;
+            ctx.toc = xg.toc;
+            ctx.has_toc = xg.has_toc;
             // ffmpeg mp3dec：存在 Xing/Info 且含 frames/bytes → 首帧（Xing 帧）整体跳过
             ctx.stream_start = first + @as(u64, @intCast(ctx.frame_bytes));
             if (xg.has_enc) {
@@ -285,6 +327,8 @@ pub fn open(allocator: Allocator, reader: *Reader, info: *decoder.Info) Error!de
     }
     if (ctx.stream_start == 0) ctx.stream_start = first;
     ctx.next_offset = ctx.stream_start;
+    ctx.scan_byte = ctx.stream_start;
+    ctx.idx_next = ctx.stream_start;
     ctx.drop_rem = ctx.gapless_skip;
 
     // 解析 ID3v1 文件尾（补齐未覆盖的标准字段）
@@ -392,6 +436,7 @@ fn buildInfo(ctx: anytype) decoder.Info {
 fn destroyCtx(ctx: *Ctx) void {
     id3.freeMeta(ctx.allocator, &ctx.meta);
     id3.freePictures(ctx.allocator, &ctx.pictures);
+    ctx.frames.deinit(ctx.allocator);
     ctx.allocator.destroy(ctx);
 }
 
@@ -521,10 +566,36 @@ fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) E
             f.eof = true;
             break;
         }
+        // 顺序回放增量建索引（几乎零成本）：帧头有效且与预期衔接时记录帧起点，
+        // 并把 scan_byte 推进到下一帧，使后续 seek 的惰性扫描从此处续接，而不是
+        // 每次都从头扫前缀。遇 seek（next_offset 跳变）或重同步（帧头无效）即停。
+        if (f.idx_ok) {
+            const hb: usize = if (header.hdrValid(f.frame_buf[0..4]))
+                header.hdrFrameBytes(f.frame_buf[0..4], 0)
+            else
+                0;
+            if (hb == 0 or f.next_offset != f.idx_next or
+                f.frames.items.len >= 1_048_576)
+            {
+                f.idx_ok = false;
+            } else {
+                try f.frames.append(f.allocator, f.next_offset);
+                f.idx_next = f.next_offset +
+                    @as(u64, hb + header.hdrPadding(f.frame_buf[0..4]));
+                f.scan_byte = f.idx_next;
+            }
+        }
         var info: layer3.FrameInfo = .{};
         const samples = layer3.decodeFrame(&f.dec, f.frame_buf[0..n], &f.pcm, &info);
         if (samples == 0) {
-            // 本帧不可解码：前进一帧继续（对齐 minimp3 重同步语义）
+            // 本帧不可解码：前进一帧继续（对齐 minimp3 重同步语义）。
+            // seek 回退前导段：起点 reservoir 为空时首帧（可能数帧）会解码失败，
+            // 它们仍占据标称 `frame_samples` 的绝对样本位。按标称帧长计入
+            // drop_rem，否则失败帧会使其后首个成功帧整体后移（拼接处整帧顿挫）。
+            if (f.seek_lead and f.drop_rem > 0) {
+                const d: u64 = @min(f.drop_rem, @as(u64, @intCast(f.frame_samples)));
+                f.drop_rem -= d;
+            }
             if (info.frame_bytes > 0) {
                 f.next_offset += @intCast(info.frame_bytes);
             } else {
@@ -589,9 +660,55 @@ fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) E
     return produced;
 }
 
+/// 构建精确帧索引至第 `target` 帧（含）。返回 false = 文件提前结束或无法索引
+/// （free-format 无固定帧长）。惰性增量：自上次扫描停止处分块续扫，块内解析多个
+/// 帧头（避免逐帧 seek+read）。精确适配 VBR / MPEG2-LSF / 无 Xing。
+fn indexToFrame(f: *Ctx, target: u64) Error!bool {
+    if (f.frames.items.len > target) return true;
+    while (f.frames.items.len <= target) {
+        if (f.scan_eof) return false;
+        try f.reader.seek(@intCast(f.scan_byte), .start);
+        const n = try f.reader.read(f.scan_buf[0..]);
+        if (n < 4) {
+            f.scan_eof = true;
+            break;
+        }
+        var i: usize = 0;
+        while (i + 4 <= n) {
+            const h = f.scan_buf[i .. i + 4];
+            if (!header.hdrValid(h)) {
+                i += 1; // 重同步：跳过无效字节（对齐解码器 findFrame 语义）
+                continue;
+            }
+            const fb = header.hdrFrameBytes(h, 0);
+            if (fb == 0) return false; // free-format：无固定帧长，索引不可用
+            try f.frames.append(f.allocator, f.scan_byte + i);
+            i += fb + header.hdrPadding(h);
+            if (f.frames.items.len > target) {
+                f.scan_byte += i;
+                return true;
+            }
+        }
+        if (i == 0) {
+            f.scan_eof = true;
+            break;
+        }
+        f.scan_byte += i;
+    }
+    return f.frames.items.len > target;
+}
+
+/// 帧号 → 绝对字节偏移（帧 0 = stream_start）。越界 / 无法索引（free-format）→ null。
+fn frameByteOffset(f: *Ctx, frame: u64) Error!?u64 {
+    if (frame == 0) return f.stream_start;
+    if (!try indexToFrame(f, frame)) return null;
+    return f.frames.items[@intCast(frame)];
+}
+
 fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
     const f: *Ctx = @ptrCast(@alignCast(ctx));
     if (f.sample_rate == 0) return;
+    f.idx_ok = false; // seek 后回放不再顺序衔接，停止增量建索引
     if (ms <= 0) {
         // 回到开头：重置解码状态（含 Xing 首帧跳过与 gapless 头丢，重新从流起点解码）
         f.dec = .{};
@@ -601,12 +718,12 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
         f.tail_frames = 0;
         f.tail_off = 0;
         f.drop_rem = f.gapless_skip;
+        f.seek_lead = false;
         return;
     }
     const target_sample: u64 = @intCast((@as(u128, @intCast(ms)) * f.sample_rate) / 1000);
-    // 无 seek 表：按总帧数（Xing 精确 / 首帧估算）比例估算字节偏移
+    if (f.frame_bytes == 0 or f.frame_samples == 0) return;
     const audio_bytes = f.file_size -| f.audio_start;
-    if (audio_bytes == 0 or f.frame_bytes == 0 or f.frame_samples == 0) return;
     const frames_total: u128 = if (f.total_frames > 0) f.total_frames else audio_bytes / f.frame_bytes;
     const total_samples: u128 = frames_total * f.frame_samples;
     // 越界 seek：目标样本 ≥ 总输出样本 → 直接置流尾（避免病态扫描/挂起）
@@ -617,51 +734,66 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
     if (target_sample >= total_out) {
         f.dec = .{};
         f.next_offset = f.file_size;
-        f.samples_done = target_sample;
+        f.samples_done = @intCast(total_out);
         f.drop_rem = 0;
         f.eof = false;
         f.tail_frames = 0;
         f.tail_off = 0;
+        f.seek_lead = false;
         return;
     }
-    var est_rel: u128 = 0;
-    if (total_samples > 0) {
-        est_rel = @as(u128, audio_bytes) * target_sample / total_samples;
+
+    // 样本级对齐（对齐 FLAC/ADTS 设计）：目标输出样本 T 对应解码位置
+    // d0 = T + gapless_skip；其所在帧 j = d0 / fs。回退 back_frames 帧到
+    // 更早帧边界解码（重建 bit reservoir + 合成滤波历史），再丢弃 back..d0 的
+    // 解码样本。这样首个输出样本恰为 T（samples_done = T），position_samples
+    // 报告真实落点，C 壳无需（也不应）再做前向裁剪。
+    const fs: u64 = f.frame_samples;
+    const d0: u64 = target_sample + f.gapless_skip;
+    const j: u64 = d0 / fs;
+    // 回退帧数须同时满足：(a) 重建 bit reservoir（≤511 字节主数据，低码率下可达
+    // ~10 帧）；(b) 重建合成多相滤波历史（qmf_state 为 15 个 granule；MPEG1 每帧
+    // 2 granule（≈8 帧），MPEG2/LSF 每帧 1 granule（≈15 帧））。回退段起始
+    // reservoir 为空、若干帧会解码失败（失败帧不推进 qmf_state），故再留余量。
+    // 32 帧对最低码率 LSF 仍覆盖（≤10 失败 + 15 成功 granule）。
+    const back_frames: u64 = 32;
+    const back: u64 = if (j > back_frames) j - back_frames else 0;
+    if (try frameByteOffset(f, back)) |off| {
+        f.dec = .{}; // 重置解码状态（帧间 bit reservoir 从回退点重建）
+        f.next_offset = off;
+        f.samples_done = target_sample;
+        f.drop_rem = d0 - back * fs;
+        f.eof = false;
+        f.tail_frames = 0;
+        f.tail_off = 0;
+        f.seek_lead = true;
+        return;
     }
+
+    // 兜底（free-format 等无法建立精确帧索引）：比例估算 + 同步扫描。
+    // 无法保证样本级精确，仅保证不晚于目标（C 壳按 position_samples 裁剪前导）。
+    if (audio_bytes == 0) return;
+    var est_rel: u128 = 0;
+    if (total_samples > 0) est_rel = @as(u128, audio_bytes) * target_sample / total_samples;
     const est = f.audio_start + @min(@as(u64, @intCast(est_rel)), audio_bytes);
-    // 估算落点可能落在帧内或略超前：从 est 往前回退一帧再同步扫描，
-    // 避免错过目标附近的真实帧边界
     const scan_from = est -| f.frame_bytes;
     var pos = (try findFrameSync(&f.reader, scan_from, f.file_size)) orelse f.audio_start;
-    // 不早于流起点（Xing 帧整体跳过，其中不含可听的已 trim 样本）
     pos = @max(pos, f.stream_start);
-    // bit reservoir：MP3 帧的 main_data_begin 指向之前最多 511 字节的主数据。
-    // 若直接从目标帧解码，reservoir 为空 → 目标帧（及随后若干帧）损坏。
-    // 修复：回退 K 帧到更早的帧边界解码（其主数据字节仍取自真实文件），
-    // 丢弃到目标位置的样本；K 帧足以覆盖最大 reservoir（≈2 帧）。
-    // bit reservoir：MP3 帧的 main_data_begin 指向之前最多 511 字节主数据；
-    // 直接解目标帧会因 reservoir 为空而损坏。回退 K 帧到更早帧边界解码，
-    // 其主数据取自真实文件，丢弃到目标；K 帧覆盖最大 reservoir（≈2 帧）。
-    const reservoir_frames: u64 = 3;
-    const back_bytes = @min(f.frame_bytes * reservoir_frames, pos - f.stream_start);
-    var back = pos;
+    const back_bytes = @min(f.frame_bytes * back_frames, pos - f.stream_start);
+    var bpos = pos;
     if (back_bytes > 0) {
-        back = (try findFrameSync(&f.reader, pos - back_bytes, f.file_size)) orelse pos;
-        if (back < f.stream_start) back = f.stream_start;
-        if (back > pos) back = pos;
+        bpos = (try findFrameSync(&f.reader, pos - back_bytes, f.file_size)) orelse pos;
+        if (bpos < f.stream_start) bpos = f.stream_start;
+        if (bpos > pos) bpos = pos;
     }
-    f.dec = .{}; // 重置解码状态（帧间 bit reservoir 从回退点重建）
-    f.next_offset = back;
-    // 位置语义：seek 目标即当前位置；回退段样本经 drop_rem 丢弃（不计入输出）
-    const back_samples: u64 = if (f.frame_bytes > 0)
-        ((pos - back) / f.frame_bytes) * f.frame_samples
-    else
-        0;
+    f.dec = .{};
+    f.next_offset = bpos;
     f.samples_done = target_sample;
-    f.drop_rem = back_samples;
+    f.drop_rem = d0 -| back * fs;
     f.eof = false;
     f.tail_frames = 0;
     f.tail_off = 0;
+    f.seek_lead = true;
 }
 
 fn positionMsImpl(ctx: *anyopaque) i64 {
@@ -670,11 +802,20 @@ fn positionMsImpl(ctx: *anyopaque) i64 {
     return @intCast((@as(u128, f.samples_done) * 1000) / f.sample_rate);
 }
 
+/// 样本级位置：seek 后为首个待输出样本号（精确 = seek 目标样本 T，因为 seek 已
+/// 在解码流中丢弃 back..d0 的前导样本；目标落在帧内时也已按样本偏移丢弃）。
+/// 顺序读取时 = 已输出样本数。供 C 壳校验/对齐（此处 trim 应为 0）。
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *Ctx = @ptrCast(@alignCast(ctx));
+    return @intCast(f.samples_done);
+}
+
 fn deinitImpl(ctx: *anyopaque) void {
     const f: *Ctx = @ptrCast(@alignCast(ctx));
     f.reader.deinit();
     id3.freeMeta(f.allocator, &f.meta);
     id3.freePictures(f.allocator, &f.pictures);
+    f.frames.deinit(f.allocator);
     f.allocator.destroy(f);
 }
 
@@ -796,6 +937,99 @@ test "mp3 无 Xing：全帧解码不裁剪，与 ffmpeg 对齐" {
     try expectGaplessMatch("noxing/big", s_noxing, s_noxing_s16, 65536 / 4, 44100, 2, .estimate);
 }
 
+// ---- seek 样本级对齐（byteOffsetOfFrame + 回退 reservoir + 精确丢弃）----
+
+/// 对每个目标毫秒：seek 后首个输出样本必须 == 整曲顺序解码在目标样本处的样本，
+/// 且 position_samples == 目标样本（seek 后无需上层裁剪）。maxdiff 断言 ≤1 LSB。
+fn expectSeekMatch(label: []const u8, file: []const u8, rate: u32, ch: u8, targets_ms: []const i64) !void {
+    const ref = try decodeMemSample(testing.allocator, file, 4096);
+    defer testing.allocator.free(ref.bytes);
+    const fb: usize = @as(usize, ch) * 2;
+    const probe_frames: usize = 512;
+
+    for (targets_ms) |ms| {
+        const target: u64 = @intCast((@as(u128, @intCast(ms)) * rate) / 1000);
+        var reader = io.Reader.openMem(file);
+        var info: decoder.Info = undefined;
+        var dec = try open(testing.allocator, &reader, &info);
+        defer dec.deinit();
+        try dec.seekMs(ms);
+        try testing.expectEqual(@as(i64, @intCast(target)), dec.positionSamples());
+
+        var out: [probe_frames * 2 * 2]u8 = undefined;
+        var oc: u8 = 0;
+        const n = try dec.read(&out, probe_frames, &oc);
+        try testing.expectEqual(@as(usize, probe_frames), n);
+        const got = out[0 .. n * fb];
+        const want = ref.bytes[@as(usize, @intCast(target)) * fb ..][0 .. n * fb];
+        var maxd: i32 = 0;
+        for (0..n * ch) |i| {
+            const a = std.mem.readInt(i16, got[i * 2 ..][0..2], .little);
+            const b = std.mem.readInt(i16, want[i * 2 ..][0..2], .little);
+            const d: i32 = @as(i32, a) - @as(i32, b);
+            const ad: i32 = if (d < 0) -d else d;
+            if (ad > maxd) maxd = ad;
+        }
+        std.debug.print("mp3 seek {s}: ms={d} target={d} landing={d} maxdiff={d}\n", .{
+            label, ms, target, dec.positionSamples() - probe_frames, maxd,
+        });
+        try testing.expect(maxd <= 1);
+    }
+}
+
+test "mp3 seek 样本级对齐: Info/CBR mono 44.1k" {
+    try expectSeekMatch("cbr_mono", s_cbr_mono, 44100, 1, &.{ 120, 300, 480, 1500 });
+}
+
+test "mp3 seek 样本级对齐: LAME mono 44.1k" {
+    try expectSeekMatch("lame_mono", s_lame_mono, 44100, 1, &.{ 120, 300, 480, 4000 });
+}
+
+test "mp3 seek 样本级对齐: LAME MPEG2/LSF stereo 22.05k" {
+    try expectSeekMatch("lame_lsf", s_lame_lsf, 22050, 2, &.{ 120, 300, 480, 4000 });
+}
+
+test "mp3 seek 样本级对齐: 无 Xing（VBR 扫描路径）stereo 44.1k" {
+    try expectSeekMatch("noxing", s_noxing, 44100, 2, &.{ 120, 300, 480, 4000 });
+}
+
+// ---- byteOffsetOfFrame（精确帧索引）----
+
+test "mp3 帧索引: 帧 0 = stream_start 且相邻帧偏移差 = 帧字节数" {
+    const cases = [_]struct { file: []const u8, sr: u32, frames: u64 }{
+        .{ .file = s_cbr_mono, .sr = 44100, .frames = 78 },
+        .{ .file = s_lame_mono, .sr = 44100, .frames = 193 },
+        .{ .file = s_lame_lsf, .sr = 22050, .frames = 194 },
+        .{ .file = s_noxing, .sr = 44100, .frames = 193 },
+    };
+    for (cases) |c| {
+        var reader = io.Reader.openMem(c.file);
+        var info: decoder.Info = undefined;
+        var dec = try open(testing.allocator, &reader, &info);
+        defer dec.deinit();
+        const f: *Ctx = @ptrCast(@alignCast(dec.ctx));
+        try testing.expectEqual(f.stream_start, (try frameByteOffset(f, 0)).?);
+        // 扫描全量并在每个索引处校验帧头有效、偏移单调、与头内帧长一致
+        var prev: u64 = 0;
+        var i: u64 = 0;
+        while (i < c.frames) : (i += 1) {
+            const off = (try frameByteOffset(f, i)) orelse return error.TestUnexpectedResult;
+            if (i > 0) try testing.expect(off > prev);
+            prev = off;
+            var h: [4]u8 = undefined;
+            try f.reader.seek(@intCast(off), .start);
+            _ = try f.reader.read(&h);
+            try testing.expect(header.hdrValid(&h));
+            if (i + 1 < c.frames) {
+                const next = (try frameByteOffset(f, i + 1)).?;
+                const fb = header.hdrFrameBytes(&h, 0) + header.hdrPadding(&h);
+                try testing.expectEqual(off + fb, next);
+            }
+        }
+        try testing.expect((try frameByteOffset(f, c.frames)) == null); // 越界
+    }
+}
+
 // ---- parseXing（Xing/Info 结构 + LAME/Lavf/Lavc 24-bit delay/padding）----
 
 /// 构造一帧含 Xing/Info 标记与编码扩展的 synthetic 首帧（MPEG1 L3 44100 st，
@@ -830,6 +1064,8 @@ test "parseXing: Info(Lavc) CBR → frames + encoder delay/padding" {
     const buf = buildXingFrame(.{ 'I', 'n', 'f', 'o' }, .{ 'L', 'a', 'v', 'c' }, 576, 864);
     const xing = (try parseXingOf(&buf)).?;
     try testing.expectEqual(@as(u64, 4595), xing.frames);
+    try testing.expectEqual(@as(u64, 0x00BC614E), xing.bytes); // bytes 字段已解析
+    try testing.expect(xing.has_toc); // TOC 位存在 → 100B 已存入（synthetic 全 0）
     try testing.expect(xing.has_enc);
     try testing.expectEqual(@as(u32, 576), xing.delay);
     try testing.expectEqual(@as(u32, 864), xing.padding);

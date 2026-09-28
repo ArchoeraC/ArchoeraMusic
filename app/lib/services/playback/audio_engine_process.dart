@@ -117,6 +117,25 @@ class EngineExited extends EngineEvent {
   final int code;
 }
 
+/// 暂存源就绪（`prepare_source` 已打开新源并可开始预解码）。
+class EngineSourceReady extends EngineEvent {
+  const EngineSourceReady();
+}
+
+/// 暂存源已接管（`commit_source` 完成，切换点 position_ms）。
+class EngineSourceSwitched extends EngineEvent {
+  const EngineSourceSwitched(this.positionMs);
+
+  final int positionMs;
+}
+
+/// 暂存源失败（打开/切换失败；当前源不受影响）。
+class EngineSourceError extends EngineEvent {
+  const EngineSourceError(this.message);
+
+  final String message;
+}
+
 /// 音频引擎会话（桌面端 FFI 直连 libarchoera_mediaengine，替代进程 spawn + UDS）。
 ///
 /// 生命周期：start（FFI create + 引擎线程转码）→ [started]（收到 ready，管线
@@ -143,6 +162,9 @@ class EngineExited extends EngineEvent {
 /// 事件驱动失败/调试可用 `ARCHOERA_EVENT_POLL_FALLBACK=1` 切回旧的 50ms
 /// `pollEvent` 轮询（[AudioEngineProcess.start] 时读取，需冷启动生效）。
 class AudioEngineProcess {
+  /// 会话目录序号：与微秒时间戳共同保证并发会话目录唯一（无缝切换会短时并存两会话）。
+  static int _sessionSeq = 0;
+
   AudioEngineProcess._({
     required this.handle,
     required this.sockDir,
@@ -292,8 +314,11 @@ class AudioEngineProcess {
     // 会话目录统一走系统临时目录（Windows %TEMP% / POSIX /tmp）。
     // 文件模式：引擎 WAV/PCM 落盘 + PcmAnalyzer 按需读取在此；
     // 内存模式：仅作会话句柄目录（引擎不落盘，PCM 走 pcm_window FFI）。
+    // 无缝切换会短时并存两个会话，故目录名用「微秒 + 单调序号」保证唯一
+    //（避免同毫秒并发导致互相删目录/写同一 stream.wav）。
     final sockDir = Directory(
-      '${Directory.systemTemp.path}/archoera-${Platform.localHostname}-$pid-${DateTime.now().millisecondsSinceEpoch}',
+      '${Directory.systemTemp.path}/archoera-${Platform.localHostname}-$pid-'
+      '${DateTime.now().microsecondsSinceEpoch}-${_sessionSeq++}',
     )..createSync(recursive: true);
     final playerFile = '${sockDir.path}/stream.wav';
 
@@ -560,6 +585,18 @@ class AudioEngineProcess {
               err: map['err'] as String?,
             ),
           );
+        case 'source_ready':
+          _emit(const EngineSourceReady());
+        case 'source_switched':
+          _emit(
+            EngineSourceSwitched(
+              (map['position_ms'] as num?)?.toInt() ?? 0,
+            ),
+          );
+        case 'source_error':
+          _emit(
+            EngineSourceError(map['message'] as String? ?? 'unknown'),
+          );
         case 'done':
           if (!_doneCompleter.isCompleted) {
             _doneCompleter.complete();
@@ -646,6 +683,16 @@ class AudioEngineProcess {
 
   /// 拉取一次精确播放位置（恢复前台时进度/歌词立即对齐）。
   Future<void> requestStatus() => sendCommand('get_status', {});
+
+  /// 无缝音质切换：**同一会话内**预打开新源并预解码到暂存缓冲（当前源不受影响）。
+  /// 就绪以 [EngineSourceReady] 事件通知，失败以 [EngineSourceError] 通知。
+  Future<void> prepareSource(String url) =>
+      sendCommand('prepare_source', {'url': url});
+
+  /// 无缝音质切换：在旧源解码游标处把暂存源接管为当前源并丢弃旧源
+  /// （环形缓冲已有旧 PCM 兜底，无需停/重启播放器）。完成以
+  /// [EngineSourceSwitched] 通知。
+  Future<void> commitSource() => sendCommand('commit_source', {});
 
   /// 停止：destroy（join 引擎线程；唤醒事件泵自退）→ 收尾事件泵 → 清理
   /// 会话目录与本地通道。

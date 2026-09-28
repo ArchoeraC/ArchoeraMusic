@@ -45,6 +45,7 @@ import '../lyrics/sources/qqmusic_lyric_source.dart';
 import '../lyrics/sources/streaming_lyric_source.dart';
 import '../netease/netease_api.dart';
 import '../netease/track.dart';
+import '../neko/neko_quality.dart';
 import '../../utils/format.dart';
 import '../streaming/streaming_client.dart';
 import '../streaming/streaming_http.dart';
@@ -56,6 +57,9 @@ import '../streaming/streaming_session.dart';
 ///
 /// 用公开枚举替代搜索页私有的 `_SearchTab`，让适配器无需依赖页面实现。
 enum SourceSearchKind { song, album, artist, playlist }
+
+/// 统一音质档位（低 → 高）；各源共享的词表，注册表按源裁剪。
+const audioQualityLevels = <String>['lq', 'sq', 'hq', 'lossless', 'hi-res'];
 
 /// 单个音源的统一适配器。
 abstract class SourcePlatform {
@@ -196,11 +200,31 @@ abstract class SourcePlatform {
 
   // ── 媒体信息（右键「媒体详细信息」弹窗） ──────────────────────────
 
-  /// 该源特有的音质描述（如 KG 品质链 + 体积）；无 → null。
-  String? qualityLabel(AppLocalizations l10n, Track t) => null;
+  /// 该源特有的音质描述（如 KG 品质链 + 体积、Neko 实际最高档）；无 → null。
+  ///
+  /// [maxQuality] 为已归一化的「实际最高档」（异步源由 [maxQualityProvider]
+  /// 预取后回填）；null = 未知 / 不适用。
+  String? qualityLabel(AppLocalizations l10n, Track t, {String? maxQuality}) =>
+      null;
 
   /// 由曲目元数据估算的文件体积（如 KG 各档 sizes 的最优项）；无 → null。
   int? estimatedFileSize(Track t) => null;
+
+  // ── 音质选择注册表 ────────────────────────────────────────────────
+
+  /// 本源声明的可选音质档位（低 → 高）；默认全档，特殊源覆写。
+  List<String> get supportedQualities => audioQualityLevels;
+
+  /// 本源针对 [t] 的可选档位（在 [supportedQualities] 基础上按曲目实际能力
+  /// 裁剪，如 KG 按品质 hash、Neko 按 `maxQuality`）。[maxQuality] 为已归一化的
+  /// 实际最高档（未知 → null，按全档展示）。
+  List<String> availableQualities(Track t, {String? maxQuality}) =>
+      supportedQualities;
+
+  /// 本源「实际最高档」的异步来源（Neko → `nekoMaxQualityProvider`）；同步
+  /// 可得的源返回 null。播放页 / 详情弹窗据此预取后回填 [availableQualities]
+  /// 与 [qualityLabel]，调用方无需感知具体音源。
+  ProviderListenable<AsyncValue<String?>>? maxQualityProvider(Track t) => null;
 
   // ── 组合能力访问器 ────────────────────────────────────────────────
 
@@ -456,7 +480,16 @@ class _KugouSource extends SourcePlatform {
   }
 
   @override
-  String? qualityLabel(AppLocalizations l10n, Track t) {
+  List<String> availableQualities(Track t, {String? maxQuality}) {
+    final k = t.kugou;
+    if (k == null) return audioQualityLevels;
+    return audioQualityLevels
+        .where((l) => k.hashFor(l) != null)
+        .toList(growable: false);
+  }
+
+  @override
+  String? qualityLabel(AppLocalizations l10n, Track t, {String? maxQuality}) {
     final k = t.kugou;
     if (k == null) return null;
     const chain = ['hi-res', 'lossless', 'hq', 'sq', 'lq'];
@@ -775,6 +808,27 @@ class _NekoSource extends SourcePlatform {
 
   @override
   String label(AppLocalizations l10n) => l10n.platformNeko;
+
+  // ── 音质选择注册表（Neko 服务端四档；`sq` 与服务端 `hq` 同档，去重） ──
+
+  @override
+  List<String> get supportedQualities =>
+      const ['lq', 'hq', 'lossless', 'hi-res'];
+
+  @override
+  ProviderListenable<AsyncValue<String?>>? maxQualityProvider(Track t) =>
+      nekoMaxQualityProvider(t.id);
+
+  @override
+  List<String> availableQualities(Track t, {String? maxQuality}) =>
+      nekoLevelsForMaxQuality(maxQuality);
+
+  @override
+  String? qualityLabel(AppLocalizations l10n, Track t, {String? maxQuality}) {
+    final max = normalizeNekoQuality(maxQuality);
+    if (max == null) return null; // 未知最高档：不展示（避免误导）
+    return l10nQualityLabel(l10n, nekoLevelsForMaxQuality(max).last);
+  }
 
   @override
   bool enabled(dynamic ref) {

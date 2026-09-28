@@ -11,6 +11,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../services/netease/track.dart';
+import '../services/source/source_platform.dart';
 import '../services/lyrics/lyric_line.dart';
 import '../services/playback/sleep_timer.dart';
 import '../utils/format.dart';
@@ -197,17 +198,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     super.dispose();
   }
 
-  /// 当前曲目可选的音质档（KG按实际 hash 过滤；NT全档位，
-  /// VIP 限制由解析层决定）。
-  static List<String> _availableLevels(Track? track) {
-    const levels = ['lq', 'sq', 'hq', 'lossless', 'hi-res'];
+  /// 当前曲目可选的音质档（**由音源注册表裁剪**）：KG 按品质 hash、Neko 按
+  /// `maxQuality`、其余源全档；差异全部封装在 [SourcePlatform.availableQualities]
+  /// 及其异步 `maxQualityProvider` 内。
+  List<String> _availableLevels(Track? track) {
     if (track == null) return const ['hq'];
-    if (track.source == 'kugou' && track.kugou != null) {
-      return levels.where((l) => track.kugou!.hashFor(l) != null).toList();
-    }
-    // Neko 直链无音质档（服务端单一文件），不展示无意义的档位切换。
-    if (track.source == 'neko') return const ['hq'];
-    return levels;
+    final platform = sourcePlatform(track.source);
+    final maxAsync = platform.maxQualityProvider(track);
+    final maxQuality = maxAsync == null
+        ? null
+        : ref
+              .watch(maxAsync)
+              .maybeWhen(data: (v) => v, orElse: () => null);
+    return platform.availableQualities(track, maxQuality: maxQuality);
   }
 
   /// 红心切换（当前曲目；失败提示）。

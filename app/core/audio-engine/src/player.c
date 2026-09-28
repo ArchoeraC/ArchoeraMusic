@@ -982,6 +982,27 @@ void player_stream_end(PlayerCtx *p)
     QA_STORE_REL(&p->stream_eof, 1);
 }
 
+/* 无缝切档：旧源在曲尾排空（EOF）后，commit_source 会把新源 PCM 续喂同一 ring。
+   此处清 EOF/停止/结束标志、恢复播放态并重启已停设备，使续喂 PCM 继续播出
+   （否则尾部切档会因设备已停而静默失效）。仅用于「曲尾排空」而非用户暂停。 */
+void player_stream_resume(PlayerCtx *p)
+{
+    if (!p || !p->stream_mode) return;
+    QA_STORE_REL(&p->stream_eof, 0);
+    QA_STORE_REL(&p->stream_stop, 0);
+    QA_STORE_REL(&p->ended_reported, 0);
+    QA_STORE_REL(&p->playing, 1);
+    if (p->stream_dev_inited && !QA_LOAD_ACQ(&p->stream_dev_started)) {
+        stream_device_start(p);
+    }
+}
+
+/* 解码流是否已到 EOF（曲尾排空判定；用户暂停不置位）。 */
+int player_stream_eof(const PlayerCtx *p)
+{
+    return (p && p->stream_mode && QA_LOAD_ACQ(&p->stream_eof)) ? 1 : 0;
+}
+
 int player_stream_active(const PlayerCtx *p)
 {
     return p && p->stream_mode && QA_LOAD_ACQ(&p->stream_active);

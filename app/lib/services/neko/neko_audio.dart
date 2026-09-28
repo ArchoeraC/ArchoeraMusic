@@ -4,9 +4,10 @@
 
 /// NekoMusic 音频容器嗅探。
 ///
-/// Neko 音频是**直传原文件**（无音质档），且直链 `/api/music/file/{id}`
-/// 无扩展名——只能按内容判断容器格式，与官方 PC 客户端
-/// `musicdownloadmanager.cpp` 的 `extensionFromBuffer` 保持一致：
+/// Neko 音频直链 `/api/music/file/{id}?quality=` 无扩展名（默认按 `hq` 请求；
+/// `standard`/`hq` 为服务端转码 MP3，`sq`/`hires` 为原始音源）——只能按内容
+/// 判断容器格式，与官方 PC 客户端 `musicdownloadmanager.cpp` 的
+/// `extensionFromBuffer` 保持一致：
 ///
 ///   `fLaC` → flac；`RIFF....WAVE` → wav；`OggS` → ogg；`ID3` → mp3；
 ///   `0xFFEx`（MPEG 帧同步）→ mp3；`....ftyp`（ISO BMFF）→ m4a。

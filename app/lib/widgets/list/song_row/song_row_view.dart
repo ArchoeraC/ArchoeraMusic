@@ -13,7 +13,15 @@ extension _SongRowView on _SongRowState {
     final primary = theme.colorScheme.primary;
     // 强迫症预设：列表标签与副标题显示开关（对齐原项目 preset）
     final prefs = ref.watch(appPrefsProvider);
-    final bestQuality = _bestQuality(item, l10n);
+    // 音质角标：同步源（KG/QQ/NT）由元数据推断；异步源（Neko）经注册表
+    // provider 取 `maxQuality`（按 id 缓存，滚动不重发；并发受限）。
+    final maxAsync = sourcePlatform(item.source).maxQualityProvider(item);
+    final maxQuality = maxAsync == null
+        ? null
+        : ref
+              .watch(maxAsync)
+              .maybeWhen(data: (v) => v, orElse: () => null);
+    final bestQuality = _bestQuality(item, l10n, maxQuality: maxQuality);
 
     return Listener(
       // 右键 → 自绘上下文菜单（PointerEvent.position 为全局坐标）；
@@ -448,9 +456,15 @@ class _SourceBadge extends StatelessWidget {
 
 /// 可用最高音质标签（label + 是否无损档）：
 /// - KG：按 hash 链判断（Hi-Res/无损/HQ/SQ/LQ，见 KugouTrackInfo）；
-/// - NT：由 [Track.quality] 反推等级。
+/// - QQ：由各档文件大小推断；
+/// - NT/本地：由 [Track.quality] 反推等级；
+/// - Neko：由服务端 `maxQuality`（异步，经注册表 provider 回填 [maxQuality]）。
 /// 返回 null 表示无可用信息（列表不显示音质标签）。
-({String label, bool lossless})? _bestQuality(Track t, AppLocalizations l10n) {
+({String label, bool lossless})? _bestQuality(
+  Track t,
+  AppLocalizations l10n, {
+  String? maxQuality,
+}) {
   final k = t.kugou;
   if (k != null) {
     if (k.hashFor('hi-res') != null) return (label: 'Hi-Res', lossless: true);
@@ -473,6 +487,8 @@ class _SourceBadge extends StatelessWidget {
     if ((q.sizes['128'] ?? 0) > 0) return (label: 'SQ', lossless: false);
     return null;
   }
+  // Neko：服务端实际最高档（未取到 → 不显示，避免误导）。
+  if (t.source == 'neko') return nekoQualityBadge(maxQuality);
   return _qualityLevel(t.quality, l10n);
 }
 

@@ -8,8 +8,10 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/apis/neko/neko_client.dart';
+import 'package:archoera_music/services/neko/neko_api.dart';
 import 'package:archoera_music/services/neko/neko_audio.dart';
 import 'package:archoera_music/services/neko/neko_lyrics.dart';
+import 'package:archoera_music/services/neko/neko_quality.dart';
 import 'package:archoera_music/services/neko/neko_types.dart';
 import 'package:archoera_music/services/netease/track.dart';
 
@@ -378,6 +380,114 @@ void main() {
       expect(p.list, isEmpty);
       expect(p.total, 0);
       expect(p.hasMore, isFalse);
+    });
+  });
+
+  group('Neko 音质档映射', () {
+    test('统一档位 → 服务端 quality 参数', () {
+      expect(nekoQualityParam('lq'), 'standard');
+      expect(nekoQualityParam('sq'), 'hq');
+      expect(nekoQualityParam('hq'), 'hq');
+      expect(nekoQualityParam('lossless'), 'sq');
+      expect(nekoQualityParam('hi-res'), 'hires');
+      // 未知档回退服务端默认 hq
+      expect(nekoQualityParam('???'), 'hq');
+    });
+
+    test('normalizeNekoQuality 归一化（含旧别名）', () {
+      expect(normalizeNekoQuality('standard'), 'standard');
+      expect(normalizeNekoQuality('lq'), 'standard');
+      expect(normalizeNekoQuality('128'), 'standard');
+      expect(normalizeNekoQuality('hq'), 'hq');
+      expect(normalizeNekoQuality('mq'), 'hq');
+      expect(normalizeNekoQuality('320'), 'hq');
+      expect(normalizeNekoQuality('sq'), 'sq');
+      expect(normalizeNekoQuality('lossless'), 'sq');
+      expect(normalizeNekoQuality('无损'), 'sq');
+      expect(normalizeNekoQuality('hires'), 'hires');
+      expect(normalizeNekoQuality('hi-res'), 'hires');
+      expect(normalizeNekoQuality(' Hi_Res '), 'hires');
+      expect(normalizeNekoQuality(''), isNull);
+      expect(normalizeNekoQuality(null), isNull);
+      expect(normalizeNekoQuality('unknown'), isNull);
+    });
+
+    test('nekoQualityRank 排序（standard < hq < sq < hires；未知按 hq）', () {
+      expect(nekoQualityRank('standard'), 0);
+      expect(nekoQualityRank('hq'), 1);
+      expect(nekoQualityRank('sq'), 2);
+      expect(nekoQualityRank('hires'), 3);
+      expect(nekoQualityRank('unknown'), 1);
+      expect(nekoQualityRank(null), 1);
+    });
+
+    test('nekoQualityBadge 列表音质角标映射', () {
+      expect(nekoQualityBadge(null), isNull);
+      expect(nekoQualityBadge('???'), isNull);
+      expect(nekoQualityBadge('standard'), (label: 'LQ', lossless: false));
+      expect(nekoQualityBadge('hq'), (label: 'HQ', lossless: false));
+      expect(nekoQualityBadge('sq'), (label: 'Lossless', lossless: true));
+      expect(nekoQualityBadge('hires'), (label: 'Hi-Res', lossless: true));
+      expect(nekoQualityBadge('无损'), (label: 'Lossless', lossless: true));
+    });
+
+    test('nekoLevelsForMaxQuality 按 maxQuality 裁剪可选档位', () {
+      // 未知 / 未升级 → 全档位（服务端取流仍按原始最高封顶）
+      expect(nekoLevelsForMaxQuality(null), ['lq', 'hq', 'lossless', 'hi-res']);
+      expect(nekoLevelsForMaxQuality('???'), ['lq', 'hq', 'lossless', 'hi-res']);
+      // standard（有损最低档）→ 仅 LQ
+      expect(nekoLevelsForMaxQuality('standard'), ['lq']);
+      // hq → 标准转码档封顶
+      expect(nekoLevelsForMaxQuality('hq'), ['lq', 'hq']);
+      // sq（无损）→ 到无损为止
+      expect(nekoLevelsForMaxQuality('sq'), ['lq', 'hq', 'lossless']);
+      // hires → 全档位
+      expect(nekoLevelsForMaxQuality('hires'), ['lq', 'hq', 'lossless', 'hi-res']);
+      // 别名同样识别
+      expect(nekoLevelsForMaxQuality('无损'), ['lq', 'hq', 'lossless']);
+    });
+  });
+
+  group('NekoApi.resolvePlayUrl / userAvatarUrl', () {
+    test('播放 URL 带服务端 quality 参数', () async {
+      final api = NekoApi();
+      final t = Track.fromNekoSong({'id': 42, 'title': 'x'});
+      expect(
+        await api.resolvePlayUrl(t, quality: 'lossless'),
+        '$kDefaultNekoBaseUrl/api/music/file/42?quality=sq',
+      );
+      expect(
+        await api.resolvePlayUrl(t, quality: 'hi-res'),
+        '$kDefaultNekoBaseUrl/api/music/file/42?quality=hires',
+      );
+      expect(await api.resolvePlayUrl(t), contains('quality=hq'));
+      expect(await api.resolvePlayUrl(Track.fromNekoSong(const {})), isNull);
+    });
+
+    test('头像 URL 带缓存破坏版本；空 userId 返回 null', () {
+      final api = NekoApi();
+      final url = api.userAvatarUrl('7');
+      expect(url, startsWith('$kDefaultNekoBaseUrl/api/user/avatar/7?v='));
+      expect(api.userAvatarUrl('  '), isNull);
+      expect(api.userAvatarUrl(null), isNull);
+    });
+  });
+
+  group('withPicSize 查询参数保护', () {
+    test('无查询追加 param；已有查询（如 Neko 头像 ?v=）不再追加', () {
+      expect(
+        withPicSize('https://x/y.jpg', 100),
+        'https://x/y.jpg?param=100y100',
+      );
+      expect(
+        withPicSize('https://x/y.jpg?param=50y50', 100),
+        'https://x/y.jpg?param=50y50',
+      );
+      expect(
+        withPicSize('https://music.cnmsb.xin/api/user/avatar/7?v=123', 100),
+        'https://music.cnmsb.xin/api/user/avatar/7?v=123',
+      );
+      expect(withPicSize('', 100), '');
     });
   });
 }

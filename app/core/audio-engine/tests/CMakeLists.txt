@@ -113,6 +113,81 @@ add_test(NAME test_memory_mode COMMAND test_memory_mode)
 set_tests_properties(test_memory_mode PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# 单会话「暂存源」无缝音质切换（prepare_source/commit_source）回归：
+# 交叠丢弃公式纯函数 + headless 引擎真链路（同源既作旧源又作新源；无设备）。
+# 直接编译 mediaengine_lib.c + tempo.c stub（与 test_memory_mode 同法）。
+add_executable(test_source_switch test_source_switch.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/mediaengine_lib.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tempo.c
+)
+target_link_libraries(test_source_switch PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_source_switch PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_source_switch PRIVATE m)
+endif()
+target_include_directories(test_source_switch PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_source_switch COMMAND test_source_switch)
+set_tests_properties(test_source_switch PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# FFmpeg 解码器 seek 样本级对齐（跨档无缝切换拼接）：fixture = 真实 FLAC 帧，
+# 断言 seek 后输出严格从目标样本起（未裁剪时会命中关键帧，差可达数千样本）。
+add_executable(test_decoder_seek_trim test_decoder_seek_trim.c)
+target_link_libraries(test_decoder_seek_trim PRIVATE audio_engine_static)
+target_include_directories(test_decoder_seek_trim PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_decoder_seek_trim
+         COMMAND test_decoder_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac)
+set_tests_properties(test_decoder_seek_trim PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# EraAudio 自研内核 seek 样本级对齐（跨档无缝切换拼接，native 路径）：fixture =
+# 同一真实 FLAC。内核 seek 只到帧边界且方向随格式而异，C 壳按内核报告的样本级
+# 落点裁剪前导样本，断言 seek 后输出严格从目标样本起（未裁剪时会整体偏移一帧）。
+add_executable(test_native_seek_trim test_native_seek_trim.c)
+target_link_libraries(test_native_seek_trim PRIVATE audio_engine_static)
+target_include_directories(test_native_seek_trim PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_native_seek_trim
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac)
+set_tests_properties(test_native_seek_trim PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# MP3 seek 样本级对齐：Xing/Info CBR、真 LAME、MPEG2-LSF、无 Xing（VBR 扫描路径）
+# 四种 fixture 同一断言（seek 后首个输出样本严格从目标样本起）——覆盖精确帧索引
+# （byteOffsetOfFrame）的 TOC/估算/分块扫描各路径与 MPEG1/LSF 帧长差异。
+add_test(NAME test_native_seek_trim_mp3_cbr
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/mp3/samples/cbr_mono.mp3)
+set_tests_properties(test_native_seek_trim_mp3_cbr PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+add_test(NAME test_native_seek_trim_mp3_lame
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/mp3/samples/lame_mono.mp3)
+set_tests_properties(test_native_seek_trim_mp3_lame PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+add_test(NAME test_native_seek_trim_mp3_lsf
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/mp3/samples/lame_lsf.mp3)
+set_tests_properties(test_native_seek_trim_mp3_lsf PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+add_test(NAME test_native_seek_trim_mp3_noxing
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/mp3/samples/noxing.mp3)
+set_tests_properties(test_native_seek_trim_mp3_noxing PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # SegmentStore（在线纯内存源，M1，docs/audio-memory-source.md）：单调填充 +
 # 阻塞 pread 对照 / 随机读 / EOF / abort 唤醒。编译 segstore.c 本体。
 find_package(Threads QUIET)
