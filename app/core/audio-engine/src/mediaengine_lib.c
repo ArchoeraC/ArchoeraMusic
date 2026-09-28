@@ -919,9 +919,13 @@ static void handle_prepare_source(ArchoeraMediaEngine *e, const char *line)
     base_ms = (double)e->p_start_ms + pipeline_get_position(e->p) * 1000.0;
     cfg = e->cfg;
     cfg.start_offset_ms = (int64_t)base_ms;
-    /* 暂存源**沿用会话引擎**（尊重用户的 EraAudio / Stable 选择），不强制 FFmpeg。
-       两条解码路径的 seek 都已样本级对齐（FFmpeg 走 decoder.c 的 PTS 裁剪；
-       自研内核走 position_samples 裁剪），因此切档拼接对两种引擎都兼容且精确。 */
+    /* 暂存源**沿用会话引擎**（尊重用户的 EraAudio / Stable 选择）。
+       「单会话暂存源 + 独立预取线程」的无缝切档本质是**自研内核（EraAudio）的
+       切档增强**：内核可并发解码、且 seek 能报告样本级落点（position_samples）。
+       FFmpeg 原生没有这套能力，因此 C 层为其提供**兼容实现**：同样用暂存源续喂
+       同一 ring，并用 decoder.c 的 PTS 裁剪把 FFmpeg seek 对齐到样本级，使选
+       Stable 的用户也能无缝切换。两条路径共用同一套 prepare/commit/尾部续播
+       逻辑，仅解码后端与「样本级对齐手段」不同。 */
     /* 输出采样率/声道锁定为**当前活动管线的实际输出**：passthrough 下
        cfg.output_sample_rate=0（各管线跟随各自源采样率），新旧源采样率不同
        （如转码 MP3 44.1k ↔ 无损 48k/96k）时，切档后新源会以不同速率喂入
