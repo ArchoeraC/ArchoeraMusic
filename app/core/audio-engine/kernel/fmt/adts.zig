@@ -223,6 +223,13 @@ fn positionMsImpl(opaque_ctx: *anyopaque) i64 {
     return @intCast(ms);
 }
 
+/// 样本级位置：ADTS seek 按帧头推进到 ≤ 目标的帧边界（pos_samples = 帧起点）；
+/// 上层裁剪前导样本即可样本级对齐。
+fn positionSamplesImpl(opaque_ctx: *anyopaque) i64 {
+    const ctx: *AdtsCtx = @ptrCast(@alignCast(opaque_ctx));
+    return @intCast(ctx.aac.pos_samples);
+}
+
 fn seekMsImpl(opaque_ctx: *anyopaque, ms: i64) Error!void {
     const ctx: *AdtsCtx = @ptrCast(@alignCast(opaque_ctx));
     if (ms <= 0) {
@@ -249,9 +256,10 @@ fn seekMsImpl(opaque_ctx: *anyopaque, ms: i64) Error!void {
         ctx.aac.out_buf.clearRetainingCapacity();
     }
 
-    // 逐帧头推进到目标帧边界
+    // 逐帧头推进到「包含目标的帧」起点（≤ 目标）：若再跳过一帧就会越过目标则
+    // 停在当前帧，由上层按 position_samples 裁剪前导样本实现样本级对齐。
     var guard: u32 = 0;
-    while (@as(u128, ctx.aac.pos_samples) < target_sample) {
+    while (@as(u128, ctx.aac.pos_samples) + @as(u128, ctx.aac.frame_samples) <= target_sample) {
         guard += 1;
         if (guard > 10_000_000) return error.SeekFailed;
         const fi = (try fillNextFrame(ctx)) orelse break;
@@ -276,6 +284,7 @@ const vtable = decoder.Decoder.VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
 

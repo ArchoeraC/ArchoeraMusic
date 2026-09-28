@@ -376,6 +376,12 @@ pub fn zkPositionMs(d: *Engine) i64 {
     return d.dec.positionMs();
 }
 
+/// 当前解码位置（**样本**，自文件开头计）；-1 = 该格式未提供样本级位置。
+/// seek 后为首个待输出样本号（可能 < seek 目标，供 C 壳裁剪前导样本）。
+pub fn zkPositionSamples(d: *Engine) i64 {
+    return d.dec.positionSamples();
+}
+
 /// 释放会话全部资源（含 decoder、raw 缓冲与回调适配器）
 pub fn zkClose(d: *Engine) void {
     const gpa = d.allocator;

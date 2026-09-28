@@ -151,6 +151,13 @@ int player_stream_write(PlayerCtx *p, const float *pcm, int samples);
 /** 标记解码流结束（最后一块喂完后调用）；缓冲残余播完即自然结束。 */
 void player_stream_end(PlayerCtx *p);
 
+/** 曲尾排空（EOF）后再续喂新源 PCM（无缝切档）：清 EOF/停止/结束标志，
+ *  恢复播放态并重启已停设备，使续喂 PCM 继续播出。 */
+void player_stream_resume(PlayerCtx *p);
+
+/** 解码流是否已到 EOF（曲尾排空判定；用户暂停不置位）。 */
+int player_stream_eof(const PlayerCtx *p);
+
 /** 流设备已启动（ring 建立 / 首块喂入后）。0 = 流不可用（无声路径）。 */
 int player_stream_active(const PlayerCtx *p);
 

@@ -178,6 +178,18 @@ ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_pcm_epoch(
     ArchoeraMediaEngine *e);
 
 /**
+ * 单会话暂存源切换（prepare_source / commit_source）的纯计算辅助：commit 时
+ * 需从暂存缓冲头部丢弃的交叠 float 样本数（供确定性单测；运行期由引擎内部
+ * 用同一函数）：
+ *   drop_ms = old_ms - next_start_ms（clamp >= 0）
+ *   frames  = llround(drop_ms * rate / 1000)
+ *   samples = frames * stage_ch（夹取到 [0, staged]）
+ * 参数非法 / 无交叠 → 0。
+ */
+ARCHOERA_MEDIAENGINE_API size_t archoera_mediaengine_stage_drop_samples(
+    size_t staged, int stage_ch, int rate, double old_ms, double next_start_ms);
+
+/**
  * M3（docs/audio-memory-source.md §6.1/§6.2）：当前可用内存（MB），供 Dart
  * 预算管理器计算 auto ceiling / requiredCeiling。失败返回 -1（回落保守下限）。
  */
