@@ -34,7 +34,7 @@ class _FakePlayback extends PlaybackNotifier {
 /// 可变播放态（用于验证「暂停即停表」）。
 class _MutablePlayback extends PlaybackNotifier {
   _MutablePlayback(this._s);
-  PlaybackState _s;
+  final PlaybackState _s;
   @override
   PlaybackState build() => _s;
   void set(PlaybackState s) => state = s;
