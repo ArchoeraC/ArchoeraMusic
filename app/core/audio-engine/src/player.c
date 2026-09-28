@@ -27,6 +27,7 @@
 
 #include "resampler.h"
 #include "era_log.h"
+#include <time.h>
 #include <libavutil/samplefmt.h>
 
 #include <stdio.h>
@@ -97,6 +98,11 @@ struct PlayerCtx {
     float *stream_conv_buf;     /* 重采样输出缓冲 */
     int     stream_conv_cap_frames;
     double  stream_dev_ratio;   /* 内容秒 → 设备帧 换算 = dev_rate/feed_rate */
+    /* 输出设备停摆检测：playing 且有数据待消费、但消费指针长时间不前进
+     * （典型：蓝牙 HFP 已连接但不可用 / 耳机充电 / 设备未就绪）。 */
+    volatile long stream_stall_anchor_s; /* 消费指针上次变化的秒级时间戳 */
+    volatile long stream_stall_last_r;   /* 上次消费指针值 */
+    volatile int  stream_stall_warned;   /* 本会话是否已告警（一次性） */
 };
 
 /* 播放自然结束回调（设备线程） */
@@ -1034,6 +1040,10 @@ void player_stream_set_pos_base(PlayerCtx *p, double base_ms)
 void player_stream_seek_reset(PlayerCtx *p)
 {
     if (!p || !p->stream_mode) return;
+    /* 复位停摆检测基线（seek 后重新计时，允许再次告警）。 */
+    p->stream_stall_anchor_s = 0;
+    p->stream_stall_last_r = 0;
+    p->stream_stall_warned = 0;
     stream_device_stop(p);
     stream_free_ring(p);
     /* 重新分配空 ring（容量随设备率；seek 后解码重新喂入） */
@@ -1346,6 +1356,38 @@ int player_poll(PlayerCtx *p)
                 snprintf(buf, sizeof(buf),
                          "{\"type\":\"position\",\"position_ms\":%.0f}", cur_ms);
                 p->on_event(buf, p->user_data);
+            }
+        }
+
+        /* 输出设备停摆检测：playing 且有数据待消费，但消费指针超过阈值不前进
+         * → 设备未实际消费（蓝牙 HFP 已连接但不可用 / 耳机充电 / 设备未就绪）。
+         * 一次性告警 + 事件（Dart 侧可据此提示用户切换输出设备）。 */
+        if (QA_LOAD_ACQ(&p->playing) && QA_LOAD_ACQ(&p->stream_dev_started)) {
+            long now_s = (long)time(NULL);
+            size_t r = QA_LOAD_RELAXED(&p->ring_r);
+            size_t w = QA_LOAD_RELAXED(&p->ring_w);
+            if (p->stream_stall_anchor_s == 0) {
+                /* 首次观测：建立基线（否则 anchor=0 会算出巨大的「已 Ns」）。 */
+                p->stream_stall_anchor_s = now_s;
+                p->stream_stall_last_r = (long)r;
+            } else if ((long)r != p->stream_stall_last_r) {
+                p->stream_stall_last_r = (long)r;
+                p->stream_stall_anchor_s = now_s;
+            } else if (w > r && !p->stream_stall_warned &&
+                       now_s - p->stream_stall_anchor_s >= 5) {
+                /* 每会话只告警一次，避免刷屏（消费指针偶发微动不重置告警）。 */
+                p->stream_stall_warned = 1;
+                ERA_LOGE(NULL,
+                         "[player:stream] 输出设备无消费：已 %lds 无进展"
+                         "（设备可能未就绪 / 蓝牙 HFP / 耳机充电等）"
+                         "—— 请切换系统默认输出设备\n",
+                         now_s - p->stream_stall_anchor_s);
+                if (p->on_event) {
+                    p->on_event(
+                        "{\"type\":\"sink_stall\",\"message\":"
+                        "\"输出设备无消费（可能不可用/未就绪），请切换系统默认输出设备\"}",
+                        p->user_data);
+                }
             }
         }
 
