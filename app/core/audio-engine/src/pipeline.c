@@ -717,7 +717,8 @@ static int native_process_chunk(AudioPipeline *p)
     int ch = 0;
     int frames = native_decoder_read(p->native, p->native_buf,
                                      p->native_buf_frames, &ch);
-    if (frames < 0) return -1;
+    /* 透传内核真实错误码（负值 = -ZkStatus；勿吞成 -1，否则无法定位根因）。 */
+    if (frames < 0) return frames;
     if (frames == 0) return 0; /* EOF */
     if (ch <= 0 || ch > src_ch) ch = src_ch; /* 容错：首帧声道缺失用源声道数 */
 
@@ -750,6 +751,21 @@ static int native_process_chunk(AudioPipeline *p)
     return r < 0 ? r : 1;
 }
 
+/* 内核负状态码（-ZkStatus，见 include/kernel_bridge.h）的可读释义。 */
+static const char *era_zk_status_hint(int ret) {
+    switch (ret) {
+        case -1: return "参数错误";
+        case -2: return "打开失败";
+        case -3: return "损坏";
+        case -4: return "解码失败";
+        case -5: return "中止";
+        case -6: return "seek 失败";
+        case -7: return "内存不足";
+        case -8: return "IO 错误";
+        default: return "未知";
+    }
+}
+
 ssize_t pipeline_process(AudioPipeline *p)
 {
     if (!p || p->eof) return 0;
@@ -764,7 +780,8 @@ ssize_t pipeline_process(AudioPipeline *p)
             int ret = native_process_chunk(p);
             if (ret <= 0) {
                 if (ret < 0) {
-                    ERA_LOGF(NULL, "%s EraAudio 解码错误: %d\n", LOG_TAG, ret);
+                    ERA_LOGF(NULL, "%s EraAudio 解码错误: %d（%s）\n", LOG_TAG, ret,
+                             era_zk_status_hint(ret));
                     return ret;
                 }
                 /* 0 = 内核读到 EOF。但在线回调流里「传输错误」也被内核契约折叠成

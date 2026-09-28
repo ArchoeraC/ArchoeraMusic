@@ -137,6 +137,14 @@ class EngineSourceError extends EngineEvent {
   final String message;
 }
 
+/// 输出设备停摆（长时间无消费；典型：蓝牙 HFP 已连接但不可用 / 设备未就绪）。
+/// 播放不会自行恢复，交由 UI 提示用户切换系统默认输出设备。
+class EngineSinkStall extends EngineEvent {
+  const EngineSinkStall(this.message);
+
+  final String message;
+}
+
 /// 音频引擎会话（桌面端 FFI 直连 libarchoera_mediaengine，替代进程 spawn + UDS）。
 ///
 /// 生命周期：start（FFI create + 引擎线程转码）→ [started]（收到 ready，管线
@@ -597,6 +605,10 @@ class AudioEngineProcess {
         case 'source_error':
           _emit(
             EngineSourceError(map['message'] as String? ?? 'unknown'),
+          );
+        case 'sink_stall':
+          _emit(
+            EngineSinkStall(map['message'] as String? ?? '输出设备无消费'),
           );
         case 'done':
           if (!_doneCompleter.isCompleted) {
