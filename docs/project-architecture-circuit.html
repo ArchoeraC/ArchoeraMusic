@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ArchoeraMusic 项目架构与通讯图</title>
+  <style>
+    :root {
+      --bg: #071018;
+      --panel: rgba(10, 20, 30, 0.88);
+      --panel-strong: rgba(8, 16, 24, 0.96);
+      --node: rgba(13, 26, 38, 0.94);
+      --line: rgba(91, 141, 181, 0.55);
+      --grid: rgba(71, 112, 141, 0.14);
+      --text: #e7f4ff;
+      --muted: #8ea7bb;
+      --accent: #6ef2ff;
+      --dart: #5db6ff;
+      --state: #88b4ff;
+      --api: #a4ff9d;
+      --ffi: #ffd36b;
+      --native: #ff936a;
+      --storage: #d09cff;
+      --process: #ff7ab8;
+      --edge-call: #6ef2ff;
+      --edge-event: #ffb870;
+      --edge-store: #c69cff;
+      --edge-net: #88f7a1;
+      --edge-process: #ff7ab8;
+      --shadow: 0 0 0 1px rgba(110, 242, 255, 0.18), 0 0 24px rgba(50, 123, 168, 0.18);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top, rgba(31, 78, 112, 0.28), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(87, 34, 97, 0.2), transparent 28%),
+        linear-gradient(180deg, #071018 0%, #050b11 100%);
+      font: 14px/1.5 "JetBrains Mono", "Cascadia Code", "PingFang SC", "Microsoft YaHei", monospace;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      opacity: 0.65;
+    }
+
+    .shell {
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 500px);
+      gap: 22px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 18px 22px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(101, 147, 182, 0.28);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+      line-height: 1.2;
+      letter-spacing: 0.04em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      max-width: 80ch;
+      margin: 0;
+    }
+
+    .badge-row,
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .topbar .badge-row {
+      justify-content: flex-end;
+      row-gap: 8px;
+    }
+
+    .badge,
+    .legend-item,
+    .chip,
+    .tab {
+      border: 1px solid rgba(115, 165, 196, 0.28);
+      border-radius: 999px;
+      background: rgba(10, 19, 28, 0.7);
+      color: var(--muted);
+      padding: 6px 11px;
+    }
+
+    .badge strong,
+    .legend-item strong {
+      color: var(--text);
+    }
+
+    .sidebar h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: #d8f6ff;
+    }
+
+    .sidebar p,
+    .sidebar li {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .sidebar li + li {
+      margin-top: 6px;
+    }
+
+    .sidebar ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 14px;
+      padding: 14px 16px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      cursor: pointer;
+      user-select: none;
+      transition: 160ms ease;
+    }
+
+    .tab.active {
+      color: #061018;
+      background: linear-gradient(135deg, #8af7ff, #5caeff);
+      border-color: transparent;
+      box-shadow: 0 0 16px rgba(93, 182, 255, 0.35);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 16px;
+    }
+
+    .board-wrap {
+      position: relative;
+      overflow: hidden;
+      min-height: 600px;
+      height: clamp(600px, calc(100vh - 250px), 1060px);
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--panel-strong);
+    }
+
+    .board-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(86, 127, 153, 0.22);
+      background: rgba(7, 15, 22, 0.72);
+      z-index: 5;
+    }
+
+    .zoom-btn {
+      font: inherit;
+      font-size: 12px;
+      line-height: 1.2;
+      color: #d7eeff;
+      background: rgba(13, 24, 34, 0.9);
+      border: 1px solid rgba(92, 133, 160, 0.35);
+      border-radius: 9px;
+      padding: 5px 11px;
+      cursor: pointer;
+      transition: 150ms ease;
+    }
+
+    .zoom-btn:hover {
+      border-color: rgba(110, 242, 255, 0.55);
+      color: #f1fbff;
+    }
+
+    .zoom-readout {
+      min-width: 52px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    .board-hint {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+    }
+
+    .board-viewport {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      cursor: grab;
+      touch-action: none;
+      background:
+        radial-gradient(circle at 20% 18%, rgba(46, 98, 127, 0.18), transparent 30%),
+        radial-gradient(circle at 84% 80%, rgba(120, 44, 130, 0.15), transparent 28%),
+        rgba(6, 12, 18, 0.88);
+    }
+
+    .board-viewport.dragging {
+      cursor: grabbing;
+    }
+
+    .board {
+      position: absolute;
+      left: 0;
+      top: 0;
+      border-radius: 14px;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+
+    .board-title {
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      z-index: 3;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(7, 17, 24, 0.86);
+      border: 1px solid rgba(108, 160, 190, 0.22);
+      color: #d4f6ff;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    .node-layer,
+    .edge-layer {
+      position: absolute;
+      inset: 0;
+    }
+
+    .edge-layer {
+      pointer-events: none;
+    }
+
+    .edge-layer svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .edge-hit-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .edge-hotspot {
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: auto;
+      cursor: pointer;
+      background: transparent;
+      border: 1px dashed transparent;
+    }
+
+    .edge-hotspot:hover,
+    .edge-hotspot.active {
+      border-color: rgba(255, 255, 255, 0.24);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .node {
+      position: absolute;
+      width: 210px;
+      min-height: 92px;
+      padding: 12px 13px 10px;
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(17, 30, 43, 0.94), rgba(9, 20, 30, 0.98));
+      border: 1px solid rgba(108, 160, 190, 0.2);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 0 26px rgba(11, 24, 34, 0.55);
+      cursor: pointer;
+      z-index: 3;
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+
+    .node:hover,
+    .node.active {
+      transform: translateY(-2px);
+      border-color: currentColor;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, currentColor 40%, transparent),
+        0 0 22px color-mix(in srgb, currentColor 24%, transparent);
+    }
+
+    .node .type {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .node .title {
+      font-size: 15px;
+      color: var(--text);
+      margin-bottom: 6px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+
+    .node .meta {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .group-dart { color: var(--dart); }
+    .group-state { color: var(--state); }
+    .group-api { color: var(--api); }
+    .group-ffi { color: var(--ffi); }
+    .group-native { color: var(--native); }
+    .group-storage { color: var(--storage); }
+    .group-process { color: var(--process); }
+
+    .edge-label {
+      font-size: 11px;
+      letter-spacing: 0.03em;
+    }
+
+    .edge-call { stroke: var(--edge-call); fill: var(--edge-call); }
+    .edge-event { stroke: var(--edge-event); fill: var(--edge-event); }
+    .edge-store { stroke: var(--edge-store); fill: var(--edge-store); }
+    .edge-net { stroke: var(--edge-net); fill: var(--edge-net); }
+    .edge-process { stroke: var(--edge-process); fill: var(--edge-process); }
+
+    .sidebar {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      overflow: auto;
+    }
+
+    .sidebar .card {
+      padding: 13px;
+      border-radius: 14px;
+      background: rgba(8, 18, 26, 0.72);
+      border: 1px solid rgba(96, 140, 171, 0.18);
+    }
+
+    .sidebar .title-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .sidebar .title-line strong {
+      font-size: 16px;
+      color: var(--text);
+    }
+
+    .code-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .code-link {
+      display: block;
+      padding: 8px 10px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: #d7eeff;
+      background: rgba(13, 24, 34, 0.82);
+      border: 1px solid rgba(92, 133, 160, 0.2);
+      word-break: break-all;
+    }
+
+    .code-link:hover {
+      border-color: rgba(110, 242, 255, 0.45);
+      color: #f1fbff;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .small {
+      font-size: 12px;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(8, 18, 26, 0.7);
+      border: 1px solid rgba(91, 132, 158, 0.18);
+      color: var(--muted);
+    }
+
+    @media (max-width: 1420px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 1240px) {
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar .badge-row {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .board-hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="panel topbar">
+      <div class="brand">
+        <h1>ArchoeraMusic 半自动架构与通讯图</h1>
+        <p class="subtitle">
+          这张图只按当前源码快照绘制，不依赖仓库里的架构文档。现在改成了“模块注册表 + 视图配方 + 自动布局”的半自动版本，后续主要维护模块定义和关系，不再手摆节点坐标。
+        </p>
+      </div>
+      <div class="badge-row">
+        <div class="badge"><strong>来源</strong> 当前代码目录与实现文件</div>
+        <div class="badge"><strong>风格</strong> 电路图 / PCB 走线</div>
+        <div class="badge"><strong>维护方式</strong> 半自动布局，手工维护关系</div>
+        <div class="badge"><strong>重点</strong> Dart 业务层、FFI 边界、原生模块、存储与唯一子进程</div>
+      </div>
+    </header>
+
+    <section class="panel controls">
+      <div class="tabs" id="tabs"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section class="layout">
+      <div class="panel board-wrap">
+        <div class="board-toolbar">
+          <button class="zoom-btn" id="zoomOut" title="缩小">－</button>
+          <span class="zoom-readout" id="zoomReadout">100%</span>
+          <button class="zoom-btn" id="zoomIn" title="放大">＋</button>
+          <button class="zoom-btn" id="zoomFit" title="缩放到完整显示整张图">适应窗口</button>
+          <button class="zoom-btn" id="zoomReset" title="回到 100%">重置</button>
+          <span class="board-hint">拖动空白处平移 · 滚轮缩放 · 双击节点居中，双击空白处适应窗口</span>
+        </div>
+        <div class="board-viewport" id="boardViewport">
+          <div class="board" id="board">
+            <div class="board-title" id="boardTitle"></div>
+            <div class="edge-layer" id="edgeLayer"></div>
+            <div class="edge-hit-layer" id="edgeHitLayer"></div>
+            <div class="node-layer" id="nodeLayer"></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel sidebar">
+        <div class="card">
+          <div class="title-line">
+            <strong id="infoTitle">代码派生视图</strong>
+            <span class="chip small" id="infoType">overview</span>
+          </div>
+          <p id="infoText">
+            当前展示的是源码快照的可视化摘要。点击左侧任意模块或连线，可以查看它的职责、通讯方式，以及我用来判断的真实文件路径。
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>源码入口</h2>
+          <div class="code-list" id="codeList">
+            <div class="muted small">选择模块后显示</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>阅读方式</h2>
+          <ul>
+            <li>上方切换两种视图：总架构 / 模块通讯。</li>
+            <li>拖动图上空白处平移，滚轮缩放，双击节点可居中放大查看。</li>
+            <li>点击模块或连线，这里会显示职责、通信方式和源码入口。</li>
+            <li>颜色区分语言和边界，不同颜色的连线表示调用、事件、存储、网络或子进程。</li>
+            <li>后续新增模块时，优先补 `MODULES` 和 `VIEW_RECIPES`，不用再改坐标。</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h2>从代码里确认到的几个事实</h2>
+          <ul>
+            <li>播放是 Dart 通过 FFI 直连 `libarchoera_mediaengine`。</li>
+            <li>平台能力统一走 `libarchoera_platform`，不是 Dart 直调系统 API。</li>
+            <li>扫描 / 刮削 / 下载 / Subsonic 都是独立原生模块。</li>
+            <li>唯一显式子进程例外是 `archoera-vault`。</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h2>颜色说明</h2>
+          <ul>
+            <li>蓝色系节点：Flutter / Dart 应用层。</li>
+            <li>黄色到橙色节点：FFI 边界与原生实现。</li>
+            <li>紫色节点：数据库、日志、文件与缓存。</li>
+            <li>粉色节点：额外进程或服务边界。</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h2>看图建议</h2>
+          <p>
+            先看“项目架构图”理解层次，再切到“模块通讯图”看真实数据流。对接播放、扫描、下载或平台桥时，这两张图可以互相对照。
+          </p>
+        </div>
+      </aside>
+    </section>
+
+    <div class="footer-note">
+      本页按当前仓库代码绘制，重点参考了 `app/lib/main.dart`、`app/lib/app/*`、`app/lib/services/*`、
+      `app/native/platform/*`、`app/core/*` 下的实际实现文件。
+    </div>
+  </div>
+
+  <script>
+    const legendItems = [
+      { label: "Dart / Flutter", color: "var(--dart)" },
+      { label: "状态 / 路由 / App 壳", color: "var(--state)" },
+      { label: "纯 Dart API / 远端适配", color: "var(--api)" },
+      { label: "FFI 边界", color: "var(--ffi)" },
+      { label: "原生模块", color: "var(--native)" },
+      { label: "存储 / 文件 / SQLite", color: "var(--storage)" },
+      { label: "子进程 / 服务边界", color: "var(--process)" }
+    ];
+
+    const MODULES = {
+      main: {
+        group: "dart",
+        type: "entry",
+        title: "Flutter 入口",
+        meta: "main.dart 初始化窗口、日志、单实例、vault、SQLite 预加载",
+        description: "应用总入口。这里把窗口管理、平台能力、vault 会话、日志和 StreamingStore 初始化串起来，然后把 ProviderScope 和 AppShell 跑起来。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/main.dart"
+        ]
+      },
+      app_shell: {
+        group: "state",
+        type: "app-shell",
+        title: "App 壳与路由",
+        meta: "MaterialApp.router + GoRouter + AppShell + PlayerPage",
+        description: "应用壳负责 MaterialApp、主题、路由、侧边栏、底部播放条和全屏播放器入口，是真正承接页面的 UI 外框。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/app/app.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/app/router.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/app/shell.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/app/bootstrap.dart"
+        ]
+      },
+      pages: {
+        group: "dart",
+        type: "ui-pages",
+        title: "页面层",
+        meta: "home / library / liked / history / download / search / streaming / player",
+        description: "页面目录按业务拆分，搜索、流媒体详情、下载、曲库和全屏播放页各自有独立视图文件。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/home_page.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/library_page.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/download_page.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/search_page.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/player_page.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/streaming/streaming_page.dart"
+        ]
+      },
+      playback: {
+        group: "dart",
+        type: "service",
+        title: "播放服务",
+        meta: "PlaybackNotifier / AudioEngineProcess / source resolver / FFT",
+        description: "播放层由 PlaybackNotifier 驱动，负责队列、切歌、状态持久化、音效命令、FFT 和引擎事件消费，是整个项目最核心的业务服务之一。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/playback_notifier.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/audio_engine_process.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/engine_bindings.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/play_source_resolver.dart"
+        ]
+      },
+      source_registry: {
+        group: "api",
+        type: "service",
+        title: "音源注册表与纯 Dart API",
+        meta: "SourcePlatform 把 netease / kugou / qqmusic / neko / streaming / local 统一起来",
+        description: "SourcePlatform 把搜索、播放解析、歌词、收藏和详情能力统一成一套接口，播放和搜索页面不直接写平台分支。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/source/source_platform.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/netease/netease_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/kugou/kugou_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/qqmusic/qqmusic_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/neko/neko_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/streaming/streaming_client.dart"
+        ]
+      },
+      platform_facade: {
+        group: "ffi",
+        type: "service",
+        title: "平台能力门面",
+        meta: "PlatformCapabilities / SystemMedia / SystemPower / SystemWindow / DeepLink",
+        description: "Dart 侧统一门面，负责决定是否启用 FFI 实现或者静默降级为 Noop。主程序依赖的是接口，不直接依赖 OS 细节。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/platform/platform_capabilities.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/platform/platform_bindings.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/platform/ffi_system_media.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/platform/ffi_system_power.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/platform/ffi_system_window.dart"
+        ]
+      },
+      state_storage: {
+        group: "storage",
+        type: "state",
+        title: "状态与本地存储",
+        meta: "Riverpod providers / AppPrefs / history / cache / TracksDb / library.db",
+        description: "应用状态由 Riverpod 驱动，本地持久化分散在 AppPrefs、历史、歌曲缓存和 SQLite 曲库中。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/stores/app_prefs.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/stores/providers.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/history/history_store.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/cache/song_cache.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scanner/tracks_db.dart"
+        ]
+      },
+      scanner_service: {
+        group: "ffi",
+        type: "service",
+        title: "扫描服务",
+        meta: "LibraryScanner -> ScannerLibrary -> 子 isolate 阻塞 FFI",
+        description: "扫描服务在 Dart 里主要做两件事：把阻塞 FFI 放到 isolate 里，以及把 C# 进度回调转成广播流。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scanner/library_scanner.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scanner/scanner_ffi.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scanner/library_store.dart"
+        ]
+      },
+      scraper_service: {
+        group: "ffi",
+        type: "service",
+        title: "刮削服务",
+        meta: "ScraperController / scraper_bindings / 队列式曲目注入",
+        description: "刮削器是另一条独立 FFI 链路，Dart 负责组装配置、入队曲目、拉取进度事件和生命周期管理。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scraper/scraper_client.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scraper/scraper_bindings.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scraper/scrape_controller.dart"
+        ]
+      },
+      downloader_service: {
+        group: "ffi",
+        type: "service",
+        title: "下载服务",
+        meta: "DownloaderEngine / Rust push callback / 下载任务控制器",
+        description: "下载层明确禁止 Dart 轮询进度，所有状态都由 Rust 主动回调推送，Dart 只是接收、派发和提供控制命令。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_engine.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_ffi.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/download_controller.dart"
+        ]
+      },
+      audio_native: {
+        group: "native",
+        type: "native",
+        title: "音频引擎",
+        meta: "C 壳 + Zig kernel + miniaudio + FFT 共享库",
+        description: "播放引擎是 `libarchoera_mediaengine`，由 C 壳承接 FFI ABI，底下再接内核、PCM/FFT 与实际输出。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/audio-engine/include",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/audio-engine/src",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/audio-engine/kernel",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/audio-engine/CMakeLists.txt"
+        ]
+      },
+      native_suite: {
+        group: "native",
+        type: "native",
+        title: "原生模块组",
+        meta: "scanner(C#) / scraper(C++) / downloader(Rust) / subsonic(Go) / log(C)",
+        description: "除了音频引擎外，仓库里还存在多个语言各异但边界清晰的原生模块，它们分别做扫描、刮削、下载、Subsonic 服务和统一日志。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/scanner/ScannerEngine.cs",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/scraper/src/scraper_lib.cpp",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/downloader/src",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/subsonic/main_ffi.go",
+          "/home/betastudio2/文档/ArchoeraMusic/app/native/log/src"
+        ]
+      },
+      platform_native: {
+        group: "native",
+        type: "native",
+        title: "平台桥原生实现",
+        meta: "backend_windows / backend_linux / backend_macos + apl.cpp",
+        description: "平台能力桥接的真正实现都在 `app/native/platform`。Dart 看到的是统一 ABI，具体 OS 适配在这里分平台完成。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/native/platform/src/apl.cpp",
+          "/home/betastudio2/文档/ArchoeraMusic/app/native/platform/src/backend_windows.cpp",
+          "/home/betastudio2/文档/ArchoeraMusic/app/native/platform/src/backend_linux.cpp",
+          "/home/betastudio2/文档/ArchoeraMusic/app/native/platform/src/backend_macos.mm"
+        ]
+      },
+      vault: {
+        group: "process",
+        type: "process",
+        title: "凭据保险库子进程",
+        meta: "唯一显式子进程：archoera-vault",
+        description: "和大多数模块不同，vault 不是 FFI 动态库，而是被 Dart 通过 Process 启动和握手的独立可执行程序。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/security/vault_process.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/vault/src"
+        ]
+      },
+      ui: {
+        group: "dart",
+        type: "ui",
+        title: "UI 与页面动作",
+        meta: "PlayerPage / LibraryPage / SearchPage / DownloadPage",
+        description: "用户操作基本都从页面层发起：点播放、点下载、进曲库扫描、切设置、打开全屏播放器。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/player/player_page_view.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/library/library_page_view.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/search/search_page_view.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/download/download_page_view.dart"
+        ]
+      },
+      playback_core: {
+        group: "dart",
+        type: "service",
+        title: "PlaybackNotifier",
+        meta: "队列 / 切歌 / seek / 音效 / 频谱 / 会话恢复",
+        description: "播放主控制器，接住页面动作后决定选曲、切源、会话恢复、FFT 采样和引擎命令。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/playback_notifier.dart"
+        ]
+      },
+      source_core: {
+        group: "api",
+        type: "service",
+        title: "SourcePlatform 注册表",
+        meta: "统一搜索、播放 URL 解析、歌词与收藏能力",
+        description: "播放控制器不会直接碰 `netease` 或 `kugou` 这些具体服务，而是先通过统一注册表分派。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/source/source_platform.dart"
+        ]
+      },
+      remote_apis: {
+        group: "api",
+        type: "remote",
+        title: "纯 Dart 平台 API",
+        meta: "netease / kugou / qqmusic / neko / streaming",
+        description: "这里是远端平台适配层，负责请求在线平台、拿搜索结果、解析歌曲地址和登录态相关能力。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/netease/netease_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/kugou/kugou_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/qqmusic/qqmusic_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/neko/neko_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/streaming/streaming_client.dart"
+        ]
+      },
+      audio_process: {
+        group: "ffi",
+        type: "ffi",
+        title: "AudioEngineProcess",
+        meta: "start / stop / sendCommand / 事件泵 isolate",
+        description: "播放控制器不直接写 FFI 细节，而是通过 AudioEngineProcess 管理引擎句柄、等待事件和生命周期。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/audio_engine_process.dart"
+        ]
+      },
+      engine_bindings: {
+        group: "ffi",
+        type: "ffi",
+        title: "engine_bindings / fft_bindings",
+        meta: "archoera_mediaengine_* / pcm_window / segstore / libfft",
+        description: "真正的 C ABI 定义在这里，包含创建引擎、命令发送、事件等待、内存 PCM 取窗和 FFT 绑定。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/engine_bindings.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/fft_bindings.dart"
+        ]
+      },
+      audio_engine_native: {
+        group: "native",
+        type: "native",
+        title: "libarchoera_mediaengine",
+        meta: "C 壳 / 内核 / miniaudio / 事件 FIFO",
+        description: "原生音频引擎负责解码、播放、PCM 输出和事件回传，是播放通信链的最终执行者。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/audio-engine/src",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/audio-engine/kernel"
+        ]
+      },
+      scanner_ui: {
+        group: "dart",
+        type: "service",
+        title: "LibraryScanner / LibraryStore",
+        meta: "扫描编排 / 进度流 / 曲库刷新",
+        description: "曲库扫描入口在 Dart 侧会协调参数、进度流和结果刷新，避免 UI 卡死。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scanner/library_scanner.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scanner/library_store.dart"
+        ]
+      },
+      scanner_ffi: {
+        group: "ffi",
+        type: "ffi",
+        title: "ScannerLibrary",
+        meta: "scanner_scan / cancel / free / set_options",
+        description: "扫描 FFI 层本身很薄，主要负责加载动态库、配置扫描参数、调用阻塞扫描接口和释放内存。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scanner/scanner_ffi.dart"
+        ]
+      },
+      scanner_native: {
+        group: "native",
+        type: "native",
+        title: "scanner-ffi / C# ScannerEngine",
+        meta: "NativeAOT / 回调进度 / 直写 SQLite",
+        description: "真正的扫描执行器。它在后台并行扫描媒体文件，回调进度，并把结果直接写进 SQLite。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/scanner/ScannerEngine.cs",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/scanner/scanner-ffi/Ffi.cs",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/scanner/SqliteDirectWriter.cs"
+        ]
+      },
+      library_db: {
+        group: "storage",
+        type: "storage",
+        title: "library.db / covers / quarantine",
+        meta: "TracksDb 读取，scanner 直写",
+        description: "本地曲库数据库和几个附属目录构成扫描链最终落点：tracks 表、封面缓存以及隔离区。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scanner/tracks_db.dart"
+        ]
+      },
+      download_ui: {
+        group: "dart",
+        type: "service",
+        title: "DownloadController / DownloaderEngine",
+        meta: "任务控制 / 会话同步 / 事件流",
+        description: "下载控制器负责初始化引擎、同步登录态、管理任务和把 Rust 回调转成上层可消费的事件流。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/download_controller.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_engine.dart"
+        ]
+      },
+      download_ffi: {
+        group: "ffi",
+        type: "ffi",
+        title: "downloader_ffi",
+        meta: "init / enqueue / pause / retry / free",
+        description: "下载 FFI 层定义的是命令和回调边界，明确要求 Dart 不做轮询、不自己写下载文件。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_ffi.dart"
+        ]
+      },
+      download_native: {
+        group: "native",
+        type: "native",
+        title: "Rust 下载引擎",
+        meta: "主动 push 事件 / 管理历史与下载文件",
+        description: "Rust 侧才是真正解析 URL、控制并发、恢复历史和写文件的地方，Dart 不越界代劳。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/downloader/src",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/downloader/Cargo.toml"
+        ]
+      },
+      download_files: {
+        group: "storage",
+        type: "storage",
+        title: "下载历史与文件",
+        meta: "historyPath / 下载目录 / 临时文件",
+        description: "下载链的最终落点是下载根目录、任务历史文件和临时断点续传文件。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_engine.dart"
+        ]
+      },
+      platform_dart: {
+        group: "ffi",
+        type: "service",
+        title: "PlatformCapabilities",
+        meta: "media / power / window / deep link 门面",
+        description: "主程序通过这里拿平台能力实例；它会决定启用 FFI 还是 Noop 降级。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/platform/platform_capabilities.dart"
+        ]
+      },
+      platform_bind: {
+        group: "ffi",
+        type: "ffi",
+        title: "platform_bindings",
+        meta: "apl_* C ABI / NativeCallable.listener",
+        description: "平台桥 FFI 层镜像了头文件结构体、错误码和事件枚举，负责把任意原生线程事件送回 Dart。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/platform/platform_bindings.dart"
+        ]
+      },
+      platform_native_impl: {
+        group: "native",
+        type: "native",
+        title: "libarchoera_platform",
+        meta: "Windows / Linux / macOS 后端",
+        description: "平台桥真正的实现落在 C++ / ObjC++ 后端里，负责媒体键、电源抑制、窗口状态、Deep Link 等能力。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/native/platform/src"
+        ]
+      },
+      os: {
+        group: "native",
+        type: "system",
+        title: "桌面系统能力",
+        meta: "SMTC / D-Bus / AppKit / 单实例 / 文件定位",
+        description: "平台桥最终对接的是操作系统原生能力，而不是 Flutter plugin 或 Dart 直接调系统命令。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/native/platform/src/backend_windows.cpp",
+          "/home/betastudio2/文档/ArchoeraMusic/app/native/platform/src/backend_linux.cpp",
+          "/home/betastudio2/文档/ArchoeraMusic/app/native/platform/src/backend_macos.mm"
+        ]
+      },
+      vault_proc: {
+        group: "process",
+        type: "process",
+        title: "VaultProcess -> archoera-vault",
+        meta: "独立进程握手 / 命令 / crash 标记",
+        description: "凭据保险库不是动态库，而是一条单独的进程通信链路；它负责密文存取、崩溃联动和版本校验。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/security/vault_process.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/vault/src"
+        ]
+      },
+      subsonic_dart: {
+        group: "ffi",
+        type: "service",
+        title: "SubsonicController",
+        meta: "create / pollEvent / encrypt / decrypt / shred",
+        description: "Subsonic 在 Dart 侧是一条独立控制链，事件通过轮询拿，能力包括启动服务、加解密和文件 shred。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/subsonic/subsonic_controller.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/subsonic/subsonic_bindings.dart"
+        ]
+      },
+      subsonic_go: {
+        group: "native",
+        type: "native",
+        title: "Go Subsonic 库",
+        meta: "c-shared / HTTP server / goroutine / transcoder",
+        description: "Go 侧以 c-shared 形式嵌入主进程，内部起 HTTP server 和 goroutine 处理外部请求。",
+        files: [
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/subsonic/main_ffi.go",
+          "/home/betastudio2/文档/ArchoeraMusic/app/core/subsonic/endpoints"
+        ]
+      }
+    };
+
+    const VIEW_RECIPES = {
+      architecture: {
+        title: "半自动项目架构图 · 模块注册表 + 自动分层布局",
+        tab: "项目架构图",
+        overview: "这一页更适合看分层：入口、App 壳、页面、服务、FFI、原生模块、存储与唯一子进程怎么拼起来。现在节点位置由 layer 自动计算，后续维护主要改模块注册表和关系。",
+        layers: [
+          { id: "entry", label: "入口 / UI", nodeIds: ["main", "app_shell", "pages"] },
+          { id: "service", label: "Dart 服务", nodeIds: ["playback", "source_registry", "platform_facade", "scanner_service", "scraper_service", "downloader_service"] },
+          { id: "state", label: "状态 / 存储", nodeIds: ["state_storage"] },
+          { id: "native", label: "原生实现", nodeIds: ["audio_native", "native_suite", "platform_native"] },
+          { id: "process", label: "子进程例外", nodeIds: ["vault"] }
+        ],
+        edges: [
+          { from: "main", to: "app_shell", kind: "call", label: "runApp / ProviderScope", description: "入口把初始化后的运行时交给 App 壳和路由系统。" },
+          { from: "main", to: "platform_facade", kind: "call", label: "平台能力初始化", description: "main.dart 启动时会拿平台能力实例并做单实例与 deep link 处理。" },
+          { from: "main", to: "vault", kind: "process", label: "spawn / handshake", description: "vault 会话通过子进程启动与握手，不走 FFI。" },
+          { from: "app_shell", to: "pages", kind: "call", label: "页面承载", description: "AppShell 和 Router 决定页面布局、分支和全屏播放器入口。" },
+          { from: "pages", to: "playback", kind: "call", label: "播放状态消费", description: "页面层通过 provider 观察播放状态并发出控制命令。" },
+          { from: "pages", to: "scanner_service", kind: "call", label: "曲库触发", description: "曲库页和相关 store 会触发自动刷新与扫描。" },
+          { from: "pages", to: "downloader_service", kind: "call", label: "下载任务", description: "下载页与搜索/播放入口通过控制器操作下载任务。" },
+          { from: "playback", to: "source_registry", kind: "net", label: "解析音源 / 搜索 / 歌词", description: "播放和搜索依赖 SourcePlatform 统一分派到各纯 Dart 平台实现。" },
+          { from: "playback", to: "audio_native", kind: "call", label: "FFI create / command / wait_event", description: "播放通过 engine_bindings.dart 调用音频引擎的 C ABI。" },
+          { from: "playback", to: "state_storage", kind: "store", label: "会话 / 历史 / 缓存", description: "播放状态、偏好、歌曲缓存和历史会写入本地存储。" },
+          { from: "platform_facade", to: "platform_native", kind: "call", label: "apl_* ABI", description: "平台门面通过 libarchoera_platform 统一调到各系统后端。" },
+          { from: "scanner_service", to: "native_suite", kind: "call", label: "scanner-ffi", description: "扫描器通过 NativeAOT 共享库被调用。" },
+          { from: "scanner_service", to: "state_storage", kind: "store", label: "library.db", description: "扫描结果最终进入 SQLite 曲库和封面缓存目录。" },
+          { from: "scraper_service", to: "native_suite", kind: "call", label: "scraper FFI", description: "刮削逻辑通过 C++ 动态库执行。" },
+          { from: "downloader_service", to: "native_suite", kind: "call", label: "Rust FFI + callback", description: "下载任务控制命令进 Rust，状态再由 Rust 回调推回 Dart。" },
+          { from: "downloader_service", to: "state_storage", kind: "store", label: "下载文件 / 历史", description: "下载器会读写历史文件和落地下载内容。" }
+        ]
+      },
+      communication: {
+        title: "半自动模块通讯图 · 关系手写，位置自动生成",
+        tab: "模块通讯图",
+        overview: "这一页更适合看数据怎么流动：谁发命令、谁回事件、谁写 SQLite、谁通过 FFI 或子进程跨边界。视图只维护层和关系，不再维护 x/y 坐标。",
+        layers: [
+          { id: "ui", label: "UI / Dart 控制层", nodeIds: ["ui", "playback_core", "scanner_ui", "download_ui", "subsonic_dart"] },
+          { id: "api", label: "远端 API / 服务门面", nodeIds: ["source_core", "remote_apis", "platform_dart"] },
+          { id: "ffi", label: "FFI 边界", nodeIds: ["audio_process", "engine_bindings", "scanner_ffi", "download_ffi", "platform_bind"] },
+          { id: "native", label: "原生执行层", nodeIds: ["audio_engine_native", "scanner_native", "download_native", "subsonic_go", "platform_native_impl", "os"] },
+          { id: "storage", label: "文件 / 数据库 / 进程", nodeIds: ["library_db", "download_files", "vault_proc"] }
+        ],
+        edges: [
+          { from: "ui", to: "playback_core", kind: "call", label: "用户操作 -> 播放命令", description: "点击播放、切歌、seek、切页时，页面把动作交给 PlaybackNotifier。" },
+          { from: "playback_core", to: "source_core", kind: "call", label: "resolve / search / lyric", description: "播放控制器通过 SourcePlatform 统一请求在线平台能力。" },
+          { from: "source_core", to: "remote_apis", kind: "net", label: "HTTP / cookie / 远端平台", description: "注册表内部再分发到网易、酷狗、QQ 音乐、Neko 和流媒体客户端。" },
+          { from: "playback_core", to: "audio_process", kind: "call", label: "start / stop / command", description: "PlaybackNotifier 通过 AudioEngineProcess 管理引擎会话。" },
+          { from: "audio_process", to: "engine_bindings", kind: "call", label: "FFI 句柄调用", description: "AudioEngineProcess 再把操作落到 engine_bindings 定义的 C ABI 上。" },
+          { from: "engine_bindings", to: "audio_engine_native", kind: "call", label: "archoera_mediaengine_*", description: "实际的 C 接口调用进入原生音频引擎。" },
+          { from: "audio_engine_native", to: "audio_process", kind: "event", label: "ready / playing / position / ended", description: "音频引擎通过 wait_event 和事件 FIFO 把状态推回 Dart。" },
+          { from: "ui", to: "platform_dart", kind: "call", label: "媒体会话 / 电源 / 窗口", description: "UI 和应用壳使用平台能力门面访问系统功能。" },
+          { from: "platform_dart", to: "platform_bind", kind: "call", label: "bindings", description: "PlatformCapabilities 通过 platform_bindings 调用 ABI。" },
+          { from: "platform_bind", to: "platform_native_impl", kind: "call", label: "apl_*", description: "FFI 层把命令和回调送进平台桥原生实现。" },
+          { from: "platform_native_impl", to: "os", kind: "call", label: "SMTC / D-Bus / AppKit", description: "平台桥最后再对接各桌面系统原生能力。" },
+          { from: "os", to: "platform_bind", kind: "event", label: "媒体键 / 主题 / 窗口事件", description: "系统回调会再经 NativeCallable.listener 反向进入 Dart。" },
+          { from: "ui", to: "scanner_ui", kind: "call", label: "触发扫描", description: "曲库页面和 store 发起扫描或刷新动作。" },
+          { from: "scanner_ui", to: "scanner_ffi", kind: "call", label: "scanner_scan", description: "Dart 把阻塞扫描放进 isolate 后调用 scanner FFI。" },
+          { from: "scanner_ffi", to: "scanner_native", kind: "call", label: "NativeAOT FFI", description: "扫描共享库进入 C# ScannerEngine 执行。" },
+          { from: "scanner_native", to: "scanner_ui", kind: "event", label: "进度回调", description: "C# 扫描器把 JSON 进度回调给 Dart。" },
+          { from: "scanner_native", to: "library_db", kind: "store", label: "直写 SQLite / covers", description: "扫描器执行完成后把曲库和封面数据写到文件系统。" },
+          { from: "ui", to: "download_ui", kind: "call", label: "下载操作", description: "页面层发起入队、暂停、恢复和删除。" },
+          { from: "download_ui", to: "download_ffi", kind: "call", label: "init / enqueue / retry", description: "Dart 通过 downloader_ffi 发命令。" },
+          { from: "download_ffi", to: "download_native", kind: "call", label: "Rust FFI", description: "下载引擎真实逻辑在 Rust 实现。" },
+          { from: "download_native", to: "download_ui", kind: "event", label: "push 事件回调", description: "下载进度和状态变化由 Rust 主动推回 Dart，不允许 Dart 轮询。" },
+          { from: "download_native", to: "download_files", kind: "store", label: "文件 / 历史 / tmp", description: "Rust 管理下载目录、历史记录和断点续传文件。" },
+          { from: "ui", to: "subsonic_dart", kind: "call", label: "启动本地服务", description: "Subsonic 功能通过控制器创建和管理。" },
+          { from: "subsonic_dart", to: "subsonic_go", kind: "call", label: "create / pollEvent", description: "Dart 调进 Go c-shared 库并轮询服务事件。" },
+          { from: "ui", to: "vault_proc", kind: "process", label: "密文存取 / 会话", description: "登录态、凭据方案和解锁过程都要通过 vault 子进程。" }
+        ]
+      }
+    };
+
+    const infoTitle = document.getElementById("infoTitle");
+    const infoType = document.getElementById("infoType");
+    const infoText = document.getElementById("infoText");
+    const codeList = document.getElementById("codeList");
+    const tabs = document.getElementById("tabs");
+    const legend = document.getElementById("legend");
+    const board = document.getElementById("board");
+    const boardTitle = document.getElementById("boardTitle");
+    const nodeLayer = document.getElementById("nodeLayer");
+    const edgeLayer = document.getElementById("edgeLayer");
+    const edgeHitLayer = document.getElementById("edgeHitLayer");
+    const boardViewport = document.getElementById("boardViewport");
+    const zoomReadout = document.getElementById("zoomReadout");
+    const zoomInBtn = document.getElementById("zoomIn");
+    const zoomOutBtn = document.getElementById("zoomOut");
+    const zoomFitBtn = document.getElementById("zoomFit");
+    const zoomResetBtn = document.getElementById("zoomReset");
+
+    const LAYOUT = {
+      columnWidth: 244,
+      columnGap: 200,
+      rowGap: 44,
+      paddingX: 70,
+      paddingTop: 100,
+      paddingBottom: 72,
+      laneLabelTop: 58,
+      nodeMinHeight: 104,
+      busGap: 44,
+      busSpacing: 34,
+      labelHeight: 26,
+      labelMinWidth: 88,
+      labelMaxWidth: 184,
+      boardMinWidth: 1280,
+      boardMinHeight: 900
+    };
+
+    const MIN_SCALE = 0.3;
+    const MAX_SCALE = 2.4;
+
+    let currentView = "architecture";
+    let activeNodeId = null;
+    let activeEdgeIndex = null;
+
+    let viewScale = 1;
+    let viewTranslateX = 0;
+    let viewTranslateY = 0;
+    let currentBoardWidth = LAYOUT.boardMinWidth;
+    let currentBoardHeight = LAYOUT.boardMinHeight;
+    let panState = null;
+
+    legend.innerHTML = legendItems.map(item =>
+      `<div class="legend-item"><strong style="color:${item.color}">${item.label}</strong></div>`
+    ).join("");
+
+    Object.entries(VIEW_RECIPES).forEach(([key, recipe]) => {
+      const tab = document.createElement("button");
+      tab.className = "tab";
+      tab.textContent = recipe.tab;
+      tab.addEventListener("click", () => {
+        currentView = key;
+        activeNodeId = null;
+        activeEdgeIndex = null;
+        render({ fit: true });
+      });
+      tabs.appendChild(tab);
+    });
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function kindColor(kind) {
+      return {
+        call: "var(--edge-call)",
+        event: "var(--edge-event)",
+        store: "var(--edge-store)",
+        net: "var(--edge-net)",
+        process: "var(--edge-process)"
+      }[kind] || "var(--edge-call)";
+    }
+
+    function renderTabs() {
+      [...tabs.children].forEach((tab, index) => {
+        const key = Object.keys(VIEW_RECIPES)[index];
+        tab.classList.toggle("active", key === currentView);
+      });
+    }
+
+    function withNodeDefaults(id) {
+      const base = MODULES[id];
+      if (!base) throw new Error(`Unknown module: ${id}`);
+      return { id, ...base };
+    }
+
+    function nodeHeight(node) {
+      const metaLines = Math.max(2, Math.ceil((node.meta || "").length / 28));
+      return Math.max(LAYOUT.nodeMinHeight, 62 + metaLines * 17);
+    }
+
+    function textWidth(text) {
+      let width = 0;
+      for (const ch of String(text)) {
+        const wide = /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/.test(ch);
+        width += wide ? 11.5 : 6.8;
+      }
+      return width;
+    }
+
+    function buildView(key) {
+      const recipe = VIEW_RECIPES[key];
+      const layers = recipe.layers.map((layer, layerIndex) => ({
+        ...layer,
+        index: layerIndex,
+        nodes: layer.nodeIds.map(withNodeDefaults)
+      }));
+
+      const boardWidth = Math.max(
+        LAYOUT.boardMinWidth,
+        LAYOUT.paddingX * 2 + layers.length * LAYOUT.columnWidth + Math.max(0, layers.length - 1) * LAYOUT.columnGap
+      );
+
+      let maxBottom = LAYOUT.paddingTop;
+      const placedNodes = [];
+
+      layers.forEach(layer => {
+        const x = LAYOUT.paddingX + layer.index * (LAYOUT.columnWidth + LAYOUT.columnGap);
+        let y = LAYOUT.paddingTop;
+        layer.nodes.forEach((node, order) => {
+          const h = nodeHeight(node);
+          placedNodes.push({
+            ...node,
+            x,
+            y,
+            w: LAYOUT.columnWidth,
+            h,
+            layerId: layer.id,
+            layerIndex: layer.index,
+            orderInLayer: order,
+            layerSize: layer.nodes.length
+          });
+          y += h + LAYOUT.rowGap;
+        });
+        maxBottom = Math.max(maxBottom, y - LAYOUT.rowGap);
+      });
+
+      const edgeLayouts = buildEdgeLayouts(placedNodes, recipe.edges);
+      const lowestBus = edgeLayouts.reduce(
+        (acc, layout) => (layout && layout.bus ? Math.max(acc, layout.labelY + LAYOUT.labelHeight / 2) : acc),
+        maxBottom
+      );
+
+      const boardHeight = Math.max(LAYOUT.boardMinHeight, lowestBus + LAYOUT.paddingBottom);
+      return { ...recipe, key, layers, nodes: placedNodes, edges: recipe.edges, edgeLayouts, boardWidth, boardHeight };
+    }
+
+    // 正交（PCB 走线）布线：相邻层走两列间的通道，跨层走节点下方的总线通道，
+    // 同层节点之间走竖直短线。标签统一放在通道上，避免压住节点按钮。
+    function routeEdge(from, to, labelWidth, bus) {
+      const fromCy = from.y + from.h / 2;
+      const toCy = to.y + to.h / 2;
+      const fromCx = from.x + from.w / 2;
+
+      if (from.layerIndex === to.layerIndex) {
+        if (Math.abs(from.orderInLayer - to.orderInLayer) === 1) {
+          const downward = toCy >= fromCy;
+          const startY = downward ? from.y + from.h : from.y;
+          const endY = downward ? to.y : to.y + to.h;
+          return {
+            path: `M ${fromCx} ${startY} L ${fromCx} ${endY}`,
+            labelX: fromCx,
+            labelY: (startY + endY) / 2,
+            labelWidth,
+            bus: false
+          };
+        }
+        const sideX = from.x + from.w + LAYOUT.columnGap / 2;
+        return {
+          path: [
+            `M ${from.x + from.w} ${fromCy}`,
+            `L ${sideX} ${fromCy}`,
+            `L ${sideX} ${toCy}`,
+            `L ${to.x + to.w} ${toCy}`
+          ].join(" "),
+          labelX: sideX,
+          labelY: (fromCy + toCy) / 2,
+          labelWidth,
+          bus: false
+        };
+      }
+
+      const forward = to.layerIndex > from.layerIndex;
+      const startX = forward ? from.x + from.w : from.x;
+      const endX = forward ? to.x : to.x + to.w;
+
+      if (Math.abs(to.layerIndex - from.layerIndex) === 1) {
+        const corridorX = forward
+          ? (from.x + from.w + to.x) / 2
+          : (from.x + to.x + to.w) / 2;
+        return {
+          path: `M ${startX} ${fromCy} L ${corridorX} ${fromCy} L ${corridorX} ${toCy} L ${endX} ${toCy}`,
+          labelX: corridorX,
+          labelY: (fromCy + toCy) / 2,
+          labelWidth,
+          bus: false
+        };
+      }
+
+      const busY = bus.nextBusY();
+      const exitX = forward ? from.x + from.w + LAYOUT.columnGap / 2 : from.x - LAYOUT.columnGap / 2;
+      const enterX = forward ? to.x - LAYOUT.columnGap / 2 : to.x + to.w + LAYOUT.columnGap / 2;
+      return {
+        path: [
+          `M ${startX} ${fromCy}`,
+          `L ${exitX} ${fromCy}`,
+          `L ${exitX} ${busY}`,
+          `L ${enterX} ${busY}`,
+          `L ${enterX} ${toCy}`,
+          `L ${endX} ${toCy}`
+        ].join(" "),
+        labelX: (exitX + enterX) / 2,
+        labelY: busY,
+        labelWidth,
+        bus: true
+      };
+    }
+
+    function buildEdgeLayouts(nodes, edges) {
+      const nodeById = new Map(nodes.map(node => [node.id, node]));
+      const nodeBottom = nodes.reduce((acc, node) => Math.max(acc, node.y + node.h), LAYOUT.paddingTop);
+      const labelRects = [];
+      let busLane = 0;
+
+      return edges.map(edge => {
+        const from = nodeById.get(edge.from);
+        const to = nodeById.get(edge.to);
+        if (!from || !to) return null;
+
+        const labelWidth = Math.max(
+          LAYOUT.labelMinWidth,
+          Math.min(LAYOUT.labelMaxWidth, textWidth(edge.label) + 26)
+        );
+        const layout = routeEdge(from, to, labelWidth, {
+          nextBusY() {
+            busLane += 1;
+            return nodeBottom + LAYOUT.busGap + (busLane - 1) * LAYOUT.busSpacing;
+          }
+        });
+        layout.from = from;
+        layout.to = to;
+        layout.labelY = resolveLabelY(layout, labelRects);
+        return layout;
+      });
+    }
+
+    function resolveLabelY(layout, labelRects) {
+      const halfWidth = layout.labelWidth / 2;
+      const halfHeight = LAYOUT.labelHeight / 2 + 2;
+      const offsets = layout.bus
+        ? [0, LAYOUT.busSpacing, -LAYOUT.busSpacing]
+        : [0, 38, -38, 76, -76, 114, -114, 152, -152];
+      for (const dy of offsets) {
+        const y = layout.labelY + dy;
+        const rect = {
+          x1: layout.labelX - halfWidth,
+          x2: layout.labelX + halfWidth,
+          y1: y - halfHeight,
+          y2: y + halfHeight
+        };
+        const clash = labelRects.some(other =>
+          other.x2 > rect.x1 && other.x1 < rect.x2 && other.y2 > rect.y1 && other.y1 < rect.y2
+        );
+        if (!clash) {
+          labelRects.push(rect);
+          return y;
+        }
+      }
+      labelRects.push({
+        x1: layout.labelX - halfWidth,
+        x2: layout.labelX + halfWidth,
+        y1: layout.labelY - halfHeight,
+        y2: layout.labelY + halfHeight
+      });
+      return layout.labelY;
+    }
+
+    function renderEdges(view) {
+      const defs = `
+        <defs>
+          <marker id="arrow-call" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-call').trim()}"></path>
+          </marker>
+          <marker id="arrow-event" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-event').trim()}"></path>
+          </marker>
+          <marker id="arrow-store" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-store').trim()}"></path>
+          </marker>
+          <marker id="arrow-net" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-net').trim()}"></path>
+          </marker>
+          <marker id="arrow-process" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-process').trim()}"></path>
+          </marker>
+        </defs>
+      `;
+
+      let svg = `<svg viewBox="0 0 ${view.boardWidth} ${view.boardHeight}" preserveAspectRatio="none">${defs}`;
+      edgeHitLayer.innerHTML = "";
+
+      view.edges.forEach((edge, index) => {
+        const layout = view.edgeLayouts[index];
+        if (!layout) return;
+
+        const color = kindColor(edge.kind);
+        const active = activeEdgeIndex === index;
+        const { labelX, labelY, labelWidth } = layout;
+        const labelBg = active ? "rgba(255,255,255,0.08)" : "rgba(7,17,24,0.92)";
+        const labelStroke = active ? "rgba(255,255,255,0.34)" : "rgba(109,160,190,0.22)";
+
+        svg += `
+          <path d="${layout.path}" fill="none" stroke="${color}" stroke-width="${active ? 3.2 : 2.1}"
+            opacity="${active ? 1 : 0.8}" marker-end="url(#arrow-${edge.kind})"
+            stroke-linejoin="round" stroke-linecap="round"
+            stroke-dasharray="${edge.kind === "event" ? "8 8" : edge.kind === "process" ? "3 8" : "0"}"></path>
+          <rect x="${labelX - labelWidth / 2}" y="${labelY - 13}" width="${labelWidth}" height="26" rx="13"
+            fill="${labelBg}" stroke="${labelStroke}"></rect>
+          <text x="${labelX}" y="${labelY + 4}" text-anchor="middle" class="edge-label" fill="${color}">
+            ${escapeHtml(edge.label)}
+          </text>
+        `;
+
+        const hotspot = document.createElement("button");
+        hotspot.className = "edge-hotspot" + (active ? " active" : "");
+        hotspot.style.left = `${labelX - labelWidth / 2 - 8}px`;
+        hotspot.style.top = `${labelY - 18}px`;
+        hotspot.style.width = `${labelWidth + 16}px`;
+        hotspot.style.height = "36px";
+        hotspot.addEventListener("click", () => {
+          activeNodeId = null;
+          activeEdgeIndex = index;
+          updateInfoFromEdge(edge, layout.from, layout.to);
+          render();
+        });
+        edgeHitLayer.appendChild(hotspot);
+      });
+
+      svg += "</svg>";
+      edgeLayer.innerHTML = svg;
+    }
+
+    function updateInfoFromNode(node) {
+      infoTitle.textContent = node.title;
+      infoType.textContent = node.type;
+      infoText.textContent = node.description;
+      codeList.innerHTML = node.files.map(file =>
+        `<a class="code-link" href="file://${encodeURI(file)}">${escapeHtml(file)}</a>`
+      ).join("");
+    }
+
+    function updateInfoFromEdge(edge, from, to) {
+      infoTitle.textContent = `${from.title} -> ${to.title}`;
+      infoType.textContent = `${edge.kind} edge`;
+      infoText.textContent = edge.description;
+      const files = [...new Set([...(from.files || []), ...(to.files || [])])];
+      codeList.innerHTML = files.map(file =>
+        `<a class="code-link" href="file://${encodeURI(file)}">${escapeHtml(file)}</a>`
+      ).join("");
+    }
+
+    function renderNodes(view) {
+      nodeLayer.innerHTML = view.layers.map(layer => {
+        const x = LAYOUT.paddingX + layer.index * (LAYOUT.columnWidth + LAYOUT.columnGap);
+        return `
+          <div style="
+            position:absolute;
+            left:${x}px;
+            top:${LAYOUT.laneLabelTop}px;
+            width:${LAYOUT.columnWidth}px;
+            text-align:center;
+            z-index:1;">
+            <div style="
+              display:inline-block;
+              padding:6px 10px;
+              border-radius:999px;
+              background:rgba(8,18,26,0.86);
+              border:1px solid rgba(108,160,190,0.16);
+              color:#cdefff;
+              font-size:11px;
+              letter-spacing:.04em;">
+              ${escapeHtml(layer.label)}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      view.nodes.forEach(node => {
+        const el = document.createElement("button");
+        el.className = `node group-${node.group}` + (activeNodeId === node.id ? " active" : "");
+        el.style.left = `${node.x}px`;
+        el.style.top = `${node.y}px`;
+        el.style.width = `${node.w}px`;
+        el.style.height = `${node.h}px`;
+        el.innerHTML = `
+          <div class="type">${escapeHtml(node.type)}</div>
+          <div class="title">${escapeHtml(node.title)}</div>
+          <div class="meta">${escapeHtml(node.meta)}</div>
+        `;
+        el.addEventListener("click", () => {
+          activeEdgeIndex = null;
+          activeNodeId = node.id;
+          updateInfoFromNode(node);
+          render();
+        });
+        el.addEventListener("dblclick", event => {
+          event.stopPropagation();
+          centerNode(node);
+        });
+        nodeLayer.appendChild(el);
+      });
+    }
+
+    function updateOverview(view) {
+      infoTitle.textContent = view.key === "architecture" ? "半自动总架构" : "半自动通讯图";
+      infoType.textContent = "overview";
+      infoText.textContent = view.overview;
+      codeList.innerHTML = `
+        <div class="muted small">后续维护主要改两块：模块注册表 <code>MODULES</code>，以及视图配方 <code>VIEW_RECIPES</code>。</div>
+      `;
+    }
+
+    function applyViewTransform() {
+      board.style.transform = `translate(${viewTranslateX}px, ${viewTranslateY}px) scale(${viewScale})`;
+      zoomReadout.textContent = `${Math.round(viewScale * 100)}%`;
+    }
+
+    function zoomAt(clientX, clientY, factor) {
+      const rect = boardViewport.getBoundingClientRect();
+      const pointerX = clientX - rect.left;
+      const pointerY = clientY - rect.top;
+      const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, viewScale * factor));
+      const ratio = nextScale / viewScale;
+      viewTranslateX = pointerX - (pointerX - viewTranslateX) * ratio;
+      viewTranslateY = pointerY - (pointerY - viewTranslateY) * ratio;
+      viewScale = nextScale;
+      applyViewTransform();
+    }
+
+    function fitView() {
+      const viewportWidth = boardViewport.clientWidth || LAYOUT.boardMinWidth;
+      const viewportHeight = boardViewport.clientHeight || LAYOUT.boardMinHeight;
+      const padding = 32;
+      const scale = Math.min(
+        (viewportWidth - padding * 2) / currentBoardWidth,
+        (viewportHeight - padding * 2) / currentBoardHeight,
+        1.15
+      );
+      viewScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+      viewTranslateX = Math.max(padding, (viewportWidth - currentBoardWidth * viewScale) / 2);
+      viewTranslateY = Math.max(padding, (viewportHeight - currentBoardHeight * viewScale) / 2);
+      applyViewTransform();
+    }
+
+    function resetView() {
+      viewScale = 1;
+      viewTranslateX = 24;
+      viewTranslateY = 24;
+      applyViewTransform();
+    }
+
+    function centerNode(node) {
+      viewScale = Math.max(viewScale, 1);
+      viewTranslateX = boardViewport.clientWidth / 2 - (node.x + node.w / 2) * viewScale;
+      viewTranslateY = boardViewport.clientHeight / 2 - (node.y + node.h / 2) * viewScale;
+      applyViewTransform();
+    }
+
+    function zoomByCenter(factor) {
+      const rect = boardViewport.getBoundingClientRect();
+      zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
+    }
+
+    boardViewport.addEventListener("pointerdown", event => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (event.target.closest(".node, .edge-hotspot")) return;
+      panState = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startTranslateX: viewTranslateX,
+        startTranslateY: viewTranslateY
+      };
+      boardViewport.classList.add("dragging");
+      boardViewport.setPointerCapture(event.pointerId);
+    });
+
+    boardViewport.addEventListener("pointermove", event => {
+      if (!panState || event.pointerId !== panState.pointerId) return;
+      viewTranslateX = panState.startTranslateX + (event.clientX - panState.startX);
+      viewTranslateY = panState.startTranslateY + (event.clientY - panState.startY);
+      applyViewTransform();
+    });
+
+    function endPan(event) {
+      if (!panState || event.pointerId !== panState.pointerId) return;
+      panState = null;
+      boardViewport.classList.remove("dragging");
+      if (boardViewport.hasPointerCapture(event.pointerId)) {
+        boardViewport.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    boardViewport.addEventListener("pointerup", endPan);
+    boardViewport.addEventListener("pointercancel", endPan);
+
+    boardViewport.addEventListener("wheel", event => {
+      event.preventDefault();
+      zoomAt(event.clientX, event.clientY, Math.exp(-event.deltaY * 0.0016));
+    }, { passive: false });
+
+    boardViewport.addEventListener("dblclick", event => {
+      if (event.target.closest(".node, .edge-hotspot")) return;
+      fitView();
+    });
+
+    zoomInBtn.addEventListener("click", () => zoomByCenter(1.2));
+    zoomOutBtn.addEventListener("click", () => zoomByCenter(1 / 1.2));
+    zoomFitBtn.addEventListener("click", fitView);
+    zoomResetBtn.addEventListener("click", resetView);
+
+    function render(options = {}) {
+      const view = buildView(currentView);
+      currentBoardWidth = view.boardWidth;
+      currentBoardHeight = view.boardHeight;
+      boardTitle.textContent = view.title;
+      board.style.width = `${view.boardWidth}px`;
+      board.style.height = `${view.boardHeight}px`;
+      renderTabs();
+      renderEdges(view);
+      renderNodes(view);
+
+      if (activeNodeId) {
+        const node = view.nodes.find(item => item.id === activeNodeId);
+        if (node) updateInfoFromNode(node);
+        else updateOverview(view);
+      } else if (activeEdgeIndex !== null) {
+        const edge = view.edges[activeEdgeIndex];
+        const layout = view.edgeLayouts[activeEdgeIndex];
+        if (edge && layout) updateInfoFromEdge(edge, layout.from, layout.to);
+        else updateOverview(view);
+      } else {
+        updateOverview(view);
+      }
+
+      if (options.fit) fitView();
+      else applyViewTransform();
+    }
+
+    window.addEventListener("resize", () => render({ fit: true }));
+    render({ fit: true });
+  </script>
+</body>
+</html>
