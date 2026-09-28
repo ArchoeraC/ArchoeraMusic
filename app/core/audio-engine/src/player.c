@@ -1040,6 +1040,10 @@ void player_stream_set_pos_base(PlayerCtx *p, double base_ms)
 void player_stream_seek_reset(PlayerCtx *p)
 {
     if (!p || !p->stream_mode) return;
+    /* 复位停摆检测基线（seek 后重新计时，允许再次告警）。 */
+    p->stream_stall_anchor_s = 0;
+    p->stream_stall_last_r = 0;
+    p->stream_stall_warned = 0;
     stream_device_stop(p);
     stream_free_ring(p);
     /* 重新分配空 ring（容量随设备率；seek 后解码重新喂入） */
@@ -1362,12 +1366,16 @@ int player_poll(PlayerCtx *p)
             long now_s = (long)time(NULL);
             size_t r = QA_LOAD_RELAXED(&p->ring_r);
             size_t w = QA_LOAD_RELAXED(&p->ring_w);
-            if ((long)r != p->stream_stall_last_r) {
+            if (p->stream_stall_anchor_s == 0) {
+                /* 首次观测：建立基线（否则 anchor=0 会算出巨大的「已 Ns」）。 */
+                p->stream_stall_anchor_s = now_s;
+                p->stream_stall_last_r = (long)r;
+            } else if ((long)r != p->stream_stall_last_r) {
                 p->stream_stall_last_r = (long)r;
                 p->stream_stall_anchor_s = now_s;
-                p->stream_stall_warned = 0;
             } else if (w > r && !p->stream_stall_warned &&
                        now_s - p->stream_stall_anchor_s >= 5) {
+                /* 每会话只告警一次，避免刷屏（消费指针偶发微动不重置告警）。 */
                 p->stream_stall_warned = 1;
                 ERA_LOGE(NULL,
                          "[player:stream] 输出设备无消费：已 %lds 无进展"
