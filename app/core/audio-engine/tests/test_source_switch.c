@@ -208,13 +208,17 @@ static int dummy_output(const uint8_t *data, size_t size, void *user)
     return 0;
 }
 
-/* 参考解码：同一配置，从 start_ms 起整曲连续解码到内存块列表（窗口真值）。 */
-static int build_ref(const char *wav, int64_t start_ms, BlockList *out)
+/* 参考解码：同一引擎配置（engine_mode 决定 FFmpeg / 自研内核），从 start_ms 起
+   整曲连续解码到内存块列表（窗口真值）。两种引擎解码输出可能不同，必须用同一
+   引擎的参考对照。 */
+static int build_ref(const char *wav, int64_t start_ms, BlockList *out,
+                     int engine_mode)
 {
     EngineConfig c = ENGINE_CONFIG_DEFAULT;
     AudioPipeline *p;
     c.skip_encoder = true;
     c.start_offset_ms = start_ms;
+    c.engine_mode = engine_mode;
     p = pipeline_create(wav, &c, dummy_output, NULL);
     if (!p) return -1;
     pipeline_set_pcm_out_cb(p, ref_capture, out);
@@ -327,11 +331,13 @@ static int wait_done(ArchoeraMediaEngine *e, int budget_ms)
 }
 
 static void run_engine_switch(const char *wav, const char *sdir, int sr,
-                              const BlockList *ref)
+                              const BlockList *ref, int engine_mode)
 {
     EngineConfig cfg = ENGINE_CONFIG_DEFAULT;
     ArchoeraMediaEngine *e;
     BlockList eng;
+    BlockList kref;
+    const BlockList *base_ref = ref;
     char errbuf[256];
     char pcm_path[640];
     char ev[4096];
@@ -341,7 +347,18 @@ static void run_engine_switch(const char *wav, const char *sdir, int sr,
     int done;
 
     memset(&eng, 0, sizeof(eng));
+    memset(&kref, 0, sizeof(kref));
     cfg.skip_encoder = true; /* 纯 PCM 直出，无 Opus 编码 */
+    cfg.engine_mode = engine_mode; /* 0=FFmpeg / 1=EraAudio 自研内核：两条路径都应精确 */
+
+    /* EraAudio 模式：两种引擎解码输出不同，必须用同一引擎（内核）的参考对照。 */
+    if (engine_mode != 0) {
+        if (build_ref(wav, 0, &kref, engine_mode) == 0 && kref.n > 0) {
+            base_ref = &kref;
+        } else {
+            CHECK(0, "D EraAudio 参考解码（内核）");
+        }
+    }
 
     e = archoera_mediaengine_create(wav, &cfg, NULL, sdir, errbuf, sizeof(errbuf));
     CHECK(e != NULL, "B 引擎会话可创建（player_file=NULL，headless）");
@@ -380,7 +397,7 @@ static void run_engine_switch(const char *wav, const char *sdir, int sr,
     CHECK(!saw_error, "B 无 error/source_error 事件");
 
     snprintf(pcm_path, sizeof(pcm_path), "%s/stream.pcm", sdir);
-    ref_total = bl_total_frames(ref);
+    ref_total = bl_total_frames(base_ref);
     CHECK(ref_total > 0, "B 参考整曲解码产出 PCM");
     CHECK(parse_stream_pcm(pcm_path, &eng) == 0 && eng.n > 0,
           "B stream.pcm 可解析且非空");
@@ -418,14 +435,14 @@ static void run_engine_switch(const char *wav, const char *sdir, int sr,
         int ok = 1, i;
 
         memset(&ref2, 0, sizeof(ref2));
-        if (build_ref(wav, start_ms, &ref2) != 0 || ref2.n <= 0) {
+        if (build_ref(wav, start_ms, &ref2, engine_mode) != 0 || ref2.n <= 0) {
             CHECK(0, "B 新源区参考解码");
         } else {
             probes[0] = 100;
             probes[1] = start_ms - 250;
             probes[2] = start_ms + 250;
             probes[3] = total_ms - 200;
-            cmp[0] = ref; cmp[1] = ref; cmp[2] = &ref2; cmp[3] = &ref2;
+            cmp[0] = base_ref; cmp[1] = base_ref; cmp[2] = &ref2; cmp[3] = &ref2;
             for (i = 0; i < 4 && ok; i++) {
                 double md = 0.0;
                 int k;
@@ -453,6 +470,7 @@ static void run_engine_switch(const char *wav, const char *sdir, int sr,
     }
 
     bl_free(&eng);
+    bl_free(&kref);
     archoera_mediaengine_destroy(e);
 }
 
@@ -510,6 +528,7 @@ int main(void)
     char base[] = "/tmp/archoera-srcswitch-test-XXXXXX";
     char wav_path[512], sdir[512];
     char wav2_path[512], sdir2[512];
+    char sdir3[512];
     BlockList ref;
     int sr;
 
@@ -536,10 +555,20 @@ int main(void)
     if (sr != 44100) return 2;
 
     /* 参考：同一配置整曲连续解码（窗口真值 + 总帧数） */
-    CHECK(build_ref(wav_path, 0, &ref) == 0, "参考 pipeline_create");
+    CHECK(build_ref(wav_path, 0, &ref, 0) == 0, "参考 pipeline_create");
     CHECK(ref.n > 0, "参考整曲解码产出 PCM 块");
 
-    run_engine_switch(wav_path, sdir, sr, &ref);
+    run_engine_switch(wav_path, sdir, sr, &ref, 0);
+
+    /* D. 同一流程但走自研内核（engine_mode=1）：验证「暂存源沿用会话引擎」时
+       并发解码 + 样本级切档仍精确（不强制 FFmpeg）。 */
+    snprintf(sdir3, sizeof(sdir3), "%s/session3", base);
+    if (mkdir(sdir3, 0700) == 0) {
+        run_engine_switch(wav_path, sdir3, sr, &ref, 1);
+    } else {
+        perror("mkdir session3");
+        g_fail = 1;
+    }
 
     /* C. 跨采样率切档：旧 44.1k 源 + 新 48k 源 → 暂存输出必须锁定 44.1k。 */
     snprintf(wav2_path, sizeof(wav2_path), "%s/src48.wav", base);
@@ -562,9 +591,12 @@ int main(void)
         unlink(p);
         snprintf(p, sizeof(p), "%s/stream.pcm", sdir2);
         unlink(p);
+        snprintf(p, sizeof(p), "%s/stream.pcm", sdir3);
+        unlink(p);
     }
     rmdir(sdir);
     rmdir(sdir2);
+    rmdir(sdir3);
     rmdir(base);
 
     if (g_fail) {
