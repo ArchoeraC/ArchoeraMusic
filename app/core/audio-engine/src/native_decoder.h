@@ -111,6 +111,16 @@ int native_decoder_channels(const NativeDecoder *d);
 int64_t native_decoder_duration_us(const NativeDecoder *d);
 const char *native_decoder_codec_name(const NativeDecoder *d);
 
+/** 当前解码位置（毫秒，内核值；未做 seek 前导裁剪修正）。无内核/无效时返回 0。 */
+int64_t native_decoder_position_ms(const NativeDecoder *d);
+
+/**
+ * 当前解码位置（**样本**，自文件开头计；seek 后为首个待输出样本号）。
+ * 返回 -1 = 该格式未提供样本级位置。用于诊断/测试；normal read 路径已在
+ * [native_decoder_seek_ms] 后自动裁剪前导样本，调用方通常无需自行处理。
+ */
+int64_t native_decoder_position_samples(NativeDecoder *d);
+
 /** 关闭并释放（d 为 NULL 时为空操作） */
 void native_decoder_close(NativeDecoder *d);
 

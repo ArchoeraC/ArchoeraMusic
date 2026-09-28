@@ -94,6 +94,7 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
 
@@ -312,6 +313,13 @@ fn positionMsImpl(ctx: *anyopaque) i64 {
     return @intCast((@as(u128, f.samples_done) * 1000) / f.sample_rate);
 }
 
+/// 样本级位置：seek 后 = 首个待输出样本号（≤ seek 目标样本，目标落在该帧内时
+/// 由上层裁剪前导样本）。FLAC 全帧解码、样本号可由帧头精确推算，故精确可用。
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *FlacCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(f.samples_done);
+}
+
 fn deinitImpl(ctx: *anyopaque) void {
     const f: *FlacCtx = @ptrCast(@alignCast(ctx));
     destroyCtx(f);
@@ -517,7 +525,10 @@ fn seekToSample(f: *FlacCtx, target: u64) Error!void {
         f.samples_done = 0; // 由解码帧头回填
     }
 
-    // 解码丢弃至目标样本（坏帧 → 重同步跳过继续，与 readImpl 容错语义一致）
+    // 解码定位至目标样本（坏帧 → 重同步跳过继续，与 readImpl 容错语义一致）：
+    // 停在**包含目标的帧**起点（该帧起点 ≤ target）：保留该帧，位置记为该帧
+    // 起点，由上层裁剪 (target − 帧起点) 个前导样本，实现样本级对齐拼接；
+    // 目标恰在帧边界时丢弃前一帧、下次 read 从目标帧起点解码。
     while (f.samples_done < target) {
         const r = (decodeOneFrame(f) catch |err| switch (err) {
             error.Corrupt => {
@@ -526,8 +537,14 @@ fn seekToSample(f: *FlacCtx, target: u64) Error!void {
             },
             else => return err,
         }) orelse break;
-        f.samples_done = r.sample_index + r.blocksize;
         f.cur_blocksize = r.blocksize;
+        if (r.sample_index + r.blocksize > target) {
+            // 目标落在本帧内：保留本帧（run-to-completion 已解码），帧起点 ≤ target
+            f.samples_done = r.sample_index;
+            f.frame_cursor = 0;
+            return;
+        }
+        f.samples_done = r.sample_index + r.blocksize;
     }
     f.frame_cursor = f.cur_blocksize;
 }
@@ -995,13 +1012,15 @@ test "flac 集成: seektable 定位 + 帧对齐 seek" {
     var dec = try openMem(testing.allocator, file, &info);
     defer dec.deinit();
 
-    // seek 到样本 ~13979（≈317ms）→ 定位到帧 3（样本 12288）后解码丢弃，帧对齐落在帧 4（值 16385）
+    // seek 到样本 ~13979（≈317ms）→ 停在包含目标的帧 3 起点（样本 12288，值 12289）；
+    // 上层按 position_samples 裁剪 (13979−12288) 个前导样本即可样本级对齐。
     try dec.seekMs(317);
+    try testing.expectEqual(@as(i64, 12288), dec.positionSamples());
     var out: [2]u8 = undefined;
     var ch: u8 = 0;
     const n = try dec.read(&out, 1, &ch);
     try testing.expectEqual(@as(usize, 1), n);
-    try testing.expectEqualSlices(u8, &.{ 0x01, 0x40 }, &out); // 16385 LE
+    try testing.expectEqualSlices(u8, &.{ 0x01, 0x30 }, &out); // 12289 LE（帧 3 起点）
 
     // seek 回开头
     try dec.seekMs(0);
@@ -1059,13 +1078,13 @@ test "flac 集成: SEEKTABLE 规范相对偏移（音频起点 + 表中偏移）
     var dec = try openMem(testing.allocator, file, &info);
     defer dec.deinit();
 
-    // seek ~317ms → 定位帧 3（样本 12288）后解码丢弃，帧对齐落在帧 4（值 16385）
+    // seek ~317ms → 停在包含目标的帧 3 起点（样本 12288，值 12289）
     try dec.seekMs(317);
     var out: [2]u8 = undefined;
     var ch: u8 = 0;
     const n = try dec.read(&out, 1, &ch);
     try testing.expectEqual(@as(usize, 1), n);
-    try testing.expectEqualSlices(u8, &.{ 0x01, 0x40 }, &out); // 16385 LE（帧 4 起点）
+    try testing.expectEqualSlices(u8, &.{ 0x01, 0x30 }, &out); // 12289 LE（帧 3 起点）
 
     // seek 回开头 & 再跳 317ms（重复 seek 不漂移、不报 Corrupt）
     try dec.seekMs(0);
@@ -1075,7 +1094,7 @@ test "flac 集成: SEEKTABLE 规范相对偏移（音频起点 + 表中偏移）
     try dec.seekMs(317);
     const n2 = try dec.read(&out, 1, &ch);
     try testing.expectEqual(@as(usize, 1), n2);
-    try testing.expectEqualSlices(u8, &.{ 0x01, 0x40 }, &out); // 16385 LE
+    try testing.expectEqualSlices(u8, &.{ 0x01, 0x30 }, &out); // 12289 LE
 }
 
 test "flac 集成: 无 seektable 时估算 + sync 扫描 seek" {

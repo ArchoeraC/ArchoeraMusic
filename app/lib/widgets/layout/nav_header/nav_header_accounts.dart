@@ -29,12 +29,20 @@ class _AccountsMenu extends ConsumerWidget {
         final primaryNetease = netease != null;
         final primaryKugou = !primaryNetease && kugou != null;
         final primaryQq = !primaryNetease && !primaryKugou && qqLogged;
-        final anyLoggedIn = primaryNetease || primaryKugou || primaryQq;
+        final primary =
+            !primaryNetease &&
+            !primaryKugou &&
+            !primaryQq &&
+            Enabled &&
+            Api.isLoggedIn;
+        final anyLoggedIn =
+            primaryNetease || primaryKugou || primaryQq || primary;
 
         final avatarUrl = netease?.avatarUrl?.trim();
         final neteaseNick = netease?.nickname.trim() ?? '';
         final kugouNick = kugou?.nickname?.trim() ?? '';
         final qqNick = qqProfile?.nickname.trim() ?? '';
+        final AvatarUrl = Api.userAvatarUrl(Api.account?.id);
 
         Widget primary;
         if (primaryNetease) {
@@ -48,6 +56,11 @@ class _AccountsMenu extends ConsumerWidget {
           primary = _AccountAvatar(
             avatarUrl: qqProfile?.avatarUrl,
             nickname: qqNick.isEmpty ? qqApi.uin : qqNick,
+          );
+        } else if (primary) {
+          primary = _AccountAvatar(
+            avatarUrl: AvatarUrl,
+            nickname: Api.account?.displayName ?? '',
           );
         } else {
           primary = Container(
@@ -146,6 +159,7 @@ class _AccountsMenu extends ConsumerWidget {
                 loginValue: 'login_',
                 logoutValue: 'logout_',
                 nameValue: 'name_',
+                avatarUrl: Api.userAvatarUrl(Api.account?.id),
                 avatarName: Api.account?.displayName ?? '',
                 displayName:
                     Api.account?.displayName ??

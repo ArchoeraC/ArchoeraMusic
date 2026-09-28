@@ -12,6 +12,8 @@
 
 #include <libavutil/opt.h>
 #include <libavutil/log.h>
+#include <libavutil/samplefmt.h>
+#include <libavutil/mathematics.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,9 +63,36 @@ struct Decoder {
     /* 解码缓冲：send_packet 后可能产生多帧 */
     bool             packet_sent;
 
+    /* seek 样本级对齐：seek 后丢弃首个 PTS 早于目标的样本，使输出严格从
+       offset_ms 起。不同容器帧长差异巨大（FLAC 4096 / MP3 1152 / AAC 1024），
+       av_seek_frame 只回退到关键帧、不裁剪目标前的样本；若不裁剪，跨档拼接
+       （如 MP3→无损）会回退近一帧内容，音量大时可闻「顿挫」。 */
+    int64_t          seek_trim_us; /* >0 = 正在对齐到该 AV_TIME_BASE 目标 */
+
     AVPacket        *pkt;
     AVFrame         *frame;
 };
+
+/* 丢弃帧头部 n 个样本（就地平移 data 指针并缩减 nb_samples；缓冲引用不变，
+ * av_frame_unref 仍能正确释放）。 */
+static void frame_skip_samples(AVFrame *f, int n)
+{
+    int bps, planar, ch, i;
+    if (!f || n <= 0) return;
+    if (n >= f->nb_samples) { f->nb_samples = 0; return; }
+    bps = av_get_bytes_per_sample((enum AVSampleFormat)f->format);
+    planar = av_sample_fmt_is_planar((enum AVSampleFormat)f->format);
+    ch = f->ch_layout.nb_channels;
+    if (bps <= 0) { f->nb_samples -= n; return; }
+    if (planar) {
+        for (i = 0; i < ch && i < AV_NUM_DATA_POINTERS && f->data[i]; i++) {
+            f->data[i] += (size_t)n * (size_t)bps;
+        }
+    } else if (f->data[0]) {
+        f->data[0] += (size_t)n * (size_t)bps * (size_t)ch;
+    }
+    f->nb_samples -= n;
+}
 
 Decoder* decoder_open(const char *url)
 {
@@ -239,6 +268,40 @@ int decoder_read_frame(Decoder *d, AVFrame **out_frame)
         /* 先尝试从解码器取出已缓存的帧 */
         int ret = avcodec_receive_frame(d->dec_ctx, d->frame);
         if (ret == 0) {
+            /* seek 样本级对齐：丢弃目标前的整帧 / 裁剪跨界帧的前导样本 */
+            if (d->seek_trim_us > 0) {
+                if (d->frame->pts == AV_NOPTS_VALUE) {
+                    d->seek_trim_us = 0; /* 无 PTS：放弃裁剪，避免死循环 */
+                } else {
+                    AVStream *st = d->fmt_ctx->streams[d->stream_index];
+                    int sr = d->frame->sample_rate > 0
+                                 ? d->frame->sample_rate : d->dec_ctx->sample_rate;
+                    int64_t pts_us = av_rescale_q(d->frame->pts, st->time_base,
+                                                  (AVRational){1, AV_TIME_BASE});
+                    int64_t dur_us = (sr > 0)
+                        ? (int64_t)d->frame->nb_samples * 1000000 / sr : 0;
+                    if (dur_us > 0 && pts_us + dur_us <= d->seek_trim_us) {
+                        av_frame_unref(d->frame);
+                        continue; /* 整帧早于目标：丢弃继续 */
+                    }
+                    if (pts_us < d->seek_trim_us) {
+                        int skip = sr > 0
+                            ? (int)av_rescale(d->seek_trim_us - pts_us, sr, 1000000)
+                            : 0;
+                        if (skip >= d->frame->nb_samples) {
+                            av_frame_unref(d->frame);
+                            continue;
+                        }
+                        frame_skip_samples(d->frame, skip);
+                        /* pts 同步前移到裁剪后的首个样本 */
+                        if (sr > 0) {
+                            d->frame->pts += av_rescale_q(skip,
+                                (AVRational){1, sr}, st->time_base);
+                        }
+                    }
+                    d->seek_trim_us = 0; /* 对齐完成 */
+                }
+            }
             *out_frame = d->frame;
             consecutive_errors = 0;  /* 成功解码，重置计数器 */
             return 1;
@@ -321,6 +384,11 @@ int decoder_seek_ms(Decoder *d, int64_t offset_ms)
     /* flush 解码器 */
     avcodec_flush_buffers(d->dec_ctx);
     d->packet_sent = false;
+
+    /* 记录样本级对齐目标：av_seek_frame 只回退到关键帧，解码输出可能早于
+       offset_ms；decoder_read_frame 会丢弃/裁剪到该目标，保证严格从 offset
+       起（跨容器帧长差异时拼接不出现内容回退）。 */
+    d->seek_trim_us = offset_ms * 1000;
 
     fprintf(stderr, "%s 跳过 %ldms\n", LOG_TAG, (long)offset_ms);
     return 0;
