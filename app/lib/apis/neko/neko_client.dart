@@ -5,9 +5,11 @@
 /// NekoMusic REST 传输层（实验性音源）。
 ///
 /// 与 NT/KG/QM 的签名加密协议不同：Neko 是**统一 REST + 不透明 token**
-/// （64 位十六进制，`Authorization: <token>` 或 `Bearer <token>` 均可）。
-/// 本文件只做「HTTP + JSON + SSE」且与宿主无关（无 Riverpod / 无状态），
-/// 由 `services/neko/neko_api.dart` 组织业务并注入 token。
+/// （64 位十六进制）。请求头按当前服务端 / 官方客户端规范使用
+/// `Authorization: Bearer <token>`（服务端同时兼容裸 token，见
+/// `RequestAuthUtil` / `RedisTokenStore`）。本文件只做「HTTP + JSON + SSE」
+/// 且与宿主无关（无 Riverpod / 无状态），由 `services/neko/neko_api.dart`
+/// 组织业务并注入 token。
 ///
 /// 注意：Neko 业务层大量使用 HTTP 200 + `{"success": false, "message": ...}`
 /// 表达失败，故传输层**只在 HTTP 非 2xx 时抛错**，业务成败由上层判 `success`。
@@ -108,7 +110,7 @@ class NekoClient {
     }
     final t = token;
     if (t != null && t.isNotEmpty) {
-      req.headers.set(HttpHeaders.authorizationHeader, t);
+      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $t');
     }
   }
 
@@ -223,7 +225,7 @@ class NekoClient {
       req.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
       final t = token;
       if (t != null && t.isNotEmpty) {
-        req.headers.set(HttpHeaders.authorizationHeader, t);
+        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $t');
       }
       final res = await req.close();
       if (res.statusCode != 200) {

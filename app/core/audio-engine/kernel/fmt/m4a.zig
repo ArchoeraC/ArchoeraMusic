@@ -233,6 +233,7 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
 
@@ -1833,6 +1834,14 @@ fn positionMsImpl(ctx: *anyopaque) i64 {
     const sr = sampleRateOf(f);
     if (sr == 0) return 0;
     return @intCast((@as(u128, f.samples_done) * 1000) / sr);
+}
+
+/// 样本级位置：ALAC/AAC 轨 seek 到 ≤ 目标的帧边界（samples_done = 帧起点），
+/// 委托轨 seek 逐样本丢弃到目标（samples_done = target）。两种情形均 ≤ 目标，
+/// 上层裁剪前导样本即可样本级对齐。
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *M4aCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(f.samples_done);
 }
 
 fn deinitImpl(ctx: *anyopaque) void {

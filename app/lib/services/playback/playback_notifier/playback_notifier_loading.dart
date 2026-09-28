@@ -292,33 +292,4 @@ mixin _PlaybackNotifierLoading
     );
   }
 
-  Future<void> setQuality(String quality) async {
-    final track = state.track;
-    if (track == null || state.source == null) return;
-    if (quality == state.quality) return;
-    _log('切换音质 → ${qualityLabels[quality] ?? quality}');
-    try {
-      final String? url = await resolvePlaySource(
-        ref,
-        track,
-        quality: quality,
-        log: _log,
-      );
-      if (url == null || url.isEmpty) {
-        _log('音质切换失败：无可用播放源（可能为 VIP / 版权限制）');
-        return;
-      }
-      await load(
-        url,
-        bitrate: qualityBitrate[quality] ?? 128000,
-        title: track.title,
-        subtitle: track.artistNames,
-        trackId: track.id,
-        track: track,
-        quality: quality,
-      );
-    } catch (e) {
-      _log('音质切换失败: $e');
-    }
-  }
 }

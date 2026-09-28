@@ -39,11 +39,9 @@ Future<void> downloadTracks(
   if (!context.mounted) return;
   final l10n = context.l10n;
   final defaultQuality = ref.read(appPrefsProvider).downloadQuality;
-  // 直传/流媒体无音质档（Neko 原文件；流媒体服务端 format=raw 原文件）：
-  // 整批均为直传源时跳过音质选择，直接用默认。
-  final directOnly = online.every(
-    (t) => t.source == 'neko' || t.source == 'streaming',
-  );
+  // 流媒体服务端 format=raw 恒取原文件，无音质档；Neko 自「可选音质流」起
+  // 有 standard/hq/sq/hires 四档，需弹音质选择。
+  final directOnly = online.every((t) => t.source == 'streaming');
   final quality = directOnly
       ? defaultQuality
       : await _pickDownloadQuality(context, defaultQuality);

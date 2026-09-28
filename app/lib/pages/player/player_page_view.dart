@@ -21,6 +21,8 @@ extension _PlayerPageView on _PlayerPageState {
     final subtitle =
         ref.watch(playbackProvider.select((s) => s.subtitle)) ?? '';
     final quality = ref.watch(playbackProvider.select((s) => s.quality));
+    // 可选档位（KG hash / Neko maxQuality 等差异由 _availableLevels 封装）。
+    final qualityLevels = _availableLevels(current);
     final buffering = ref.watch(playbackProvider.select((s) => s.buffering));
     final playing = ref.watch(playbackProvider.select((s) => s.playing));
     final shuffle = ref.watch(playbackProvider.select((s) => s.shuffle));
@@ -130,6 +132,7 @@ extension _PlayerPageView on _PlayerPageState {
                               colorScheme: colorScheme,
                               current: current,
                               quality: quality,
+                              qualityLevels: qualityLevels,
                               isFullScreen: _isFullScreen,
                               onClose: () => context.pop(),
                               onToggleLyrics: hasLyrics
@@ -220,6 +223,7 @@ class _PlayerTopBar extends StatelessWidget {
     required this.colorScheme,
     required this.current,
     required this.quality,
+    required this.qualityLevels,
     required this.isFullScreen,
     required this.onClose,
     required this.onToggleLyrics,
@@ -233,6 +237,7 @@ class _PlayerTopBar extends StatelessWidget {
   final ColorScheme colorScheme;
   final Track? current;
   final String quality;
+  final List<String> qualityLevels;
   final bool isFullScreen;
   final VoidCallback onClose;
   final VoidCallback? onToggleLyrics;
@@ -275,10 +280,10 @@ class _PlayerTopBar extends StatelessWidget {
           ),
           const Spacer(),
           const _SleepTimerButton(),
-          // Neko 为直传原文件、无音质档：不展示无意义的音质切换。
-          if (current != null && current!.source != 'neko')
+          // 当前曲目可切音质档位（Neko 自可选音质流起同样支持）。
+          if (current != null)
             QualityMenu(
-              levels: _PlayerPageState._availableLevels(current),
+              levels: qualityLevels,
               current: quality,
               onSelected: onSelectQuality,
             ),

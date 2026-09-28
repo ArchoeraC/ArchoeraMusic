@@ -116,6 +116,11 @@ export fn zk_decoder_position_ms(d: *engine.Engine) i64 {
     return engine.zkPositionMs(d);
 }
 
+/// 当前解码位置（样本，自文件开头计）；-1 = 未提供（调用方不应裁剪）。
+export fn zk_decoder_position_samples(d: *engine.Engine) i64 {
+    return engine.zkPositionSamples(d);
+}
+
 /// 释放解码会话（含底层文件句柄与全部缓冲）；d 为 NULL 时为空操作（头契约）。
 export fn zk_decoder_close(d: ?*engine.Engine) void {
     if (d) |e| engine.zkClose(e);
@@ -1120,6 +1125,13 @@ export fn zk_engine_position_ms(st: ?*Stream) i64 {
     const s = st orelse return 0;
     if (s.s.dec) |*d| return d.positionMs();
     return 0;
+}
+
+/// 当前解码位置（样本，自文件开头计）；-1 = 未提供（调用方不应裁剪）。
+export fn zk_engine_position_samples(st: ?*Stream) i64 {
+    const s = st orelse return -1;
+    if (s.s.dec) |*d| return d.positionSamples();
+    return -1;
 }
 
 /// AS2：该流式会话是否命中专属 worker（pinned 1:1）；1 = 是，0 = 否/NULL。

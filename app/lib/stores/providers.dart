@@ -107,6 +107,45 @@ final nekoMetadataEnricherProvider = Provider<NekoMetadataEnricher>(
   (ref) => NekoMetadataEnricher(ref),
 );
 
+/// 列表逐行读取最高音质时的并发限制器（避免瞬时几十个 `/api/music/info` 并发）。
+class _AsyncLimiter {
+  _AsyncLimiter(this.maxConcurrent);
+
+  final int maxConcurrent;
+  int _active = 0;
+  final List<Completer<void>> _waiters = [];
+
+  Future<T> run<T>(Future<T> Function() task) async {
+    if (_active >= maxConcurrent) {
+      final waiter = Completer<void>();
+      _waiters.add(waiter);
+      await waiter.future;
+    }
+    _active++;
+    try {
+      return await task();
+    } finally {
+      _active--;
+      if (_waiters.isNotEmpty) _waiters.removeAt(0).complete();
+    }
+  }
+}
+
+final _nekoMaxQualityLimiterProvider = Provider<_AsyncLimiter>(
+  (ref) => _AsyncLimiter(3),
+);
+
+/// Neko 曲目实际最高音质（`/api/music/info/{id}` 的 `maxQuality`，已归一化为
+/// 服务端四档 `standard`/`hq`/`sq`/`hires`）。
+///
+/// 播放页 / 详情弹窗 / 歌曲列表角标据此裁剪与展示；失败 / 未升级 / 无字段
+/// → null。按曲目 id 缓存（非 autoDispose：一次请求终身命中，列表滚动不重发）。
+final nekoMaxQualityProvider = FutureProvider.family<String?, String>(
+  (ref, id) => ref
+      .read(_nekoMaxQualityLimiterProvider)
+      .run(() => ref.read(nekoApiProvider).fetchMaxQuality(id)),
+);
+
 // ── 顶栏微型天气 ────────────────────────────────────────────────
 
 /// 天气状态（默认关闭，见 `appearance.weatherEnabled`；关闭时不发请求）。

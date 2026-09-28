@@ -10,6 +10,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/netease/track.dart';
+import '../../services/source/source_platform.dart';
+import '../../services/neko/neko_quality.dart';
 import '../../easter_egg/mouse_dodge.dart';
 import '../../stores/app_prefs.dart';
 import '../../l10n/generated/app_localizations.dart';

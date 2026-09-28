@@ -26,6 +26,7 @@ import '../../apis/runtime.dart';
 import '../netease/netease_api.dart' show CoverItem, SearchResult;
 import '../netease/track.dart';
 import 'neko_audio.dart';
+import 'neko_quality.dart';
 import 'neko_types.dart';
 
 /// 会话存储平台键（vault）。
@@ -37,6 +38,9 @@ class NekoApi extends ChangeNotifier {
 
   String? _token;
   NekoUser? _account;
+
+  /// 头像缓存破坏版本（进程内唯一；换图后 URL 变化以绕过 CDN/HTTP 缓存）。
+  final int _avatarVersion = DateTime.now().millisecondsSinceEpoch;
 
   /// 当前登录账号（null = 未登录）。
   NekoUser? get account => _account;
@@ -137,6 +141,9 @@ class NekoApi extends ChangeNotifier {
         : NekoUser(id: '', nickname: '', email: email);
     _persistSession();
     notifyListeners();
+    // 资料（昵称 / VIP / userId）以服务端为准；头像地址依赖 userId，
+    // 登录响应缺 id 时靠这里补齐。
+    unawaited(refreshAccount());
   }
 
   /// 创建二维码登录会话。
@@ -175,6 +182,8 @@ class NekoApi extends ChangeNotifier {
         if (status.user != null) _account = status.user;
         _persistSession();
         notifyListeners();
+        // 资料（昵称 / VIP）以服务端为准；含 userId 的头像地址依赖它。
+        unawaited(refreshAccount());
       }
       yield status;
       if (status.state == NekoQrState.confirmed ||
@@ -409,20 +418,44 @@ class NekoApi extends ChangeNotifier {
   // ── 播放 / 歌词 ──────────────────────────────────────────────
 
   /// 解析播放 URL（Neko 音频直链，服务端支持 Range/206 拖动）。
+  ///
+  /// 自服务端「可选音质流」起 `/api/music/file/{id}` 返回 **302** 重定向到
+  /// 站内固定媒体地址（`/media/music/...`），并由 `?quality=` 决定目标档位；
+  /// 引擎 / 下载器需能跟随重定向（HTTP 客户端默认行为）。
+  /// [quality] 为本项目统一档位键，经 [nekoQualityParam] 映射到服务端四档；
+  /// 请求高于歌曲实际最高音质时服务端按原始最高音质封顶。
   Future<String?> resolvePlayUrl(Track track, {String quality = 'hq'}) async {
     if (track.id.isEmpty) return null;
-    return '$baseUrl/api/music/file/${track.id}';
+    return '$baseUrl/api/music/file/${track.id}'
+        '?quality=${nekoQualityParam(quality)}';
+  }
+
+  /// 歌曲实际最高音质（`/api/music/info/{id}` 的 `maxQuality`）。
+  ///
+  /// 服务端自「可选音质流」起返回该字段；未升级 / 无字段 / 请求失败 / 离线
+  /// 一律返回 null（调用方按全档位展示，实际取流时仍由服务端按原始最高封顶）。
+  Future<String?> fetchMaxQuality(String id) async {
+    if (id.isEmpty) return null;
+    try {
+      final body = await _client().getJson('/api/music/info/$id');
+      final data = body['data'];
+      final raw = data is Map ? data['maxQuality'] : null;
+      return normalizeNekoQuality(raw?.toString());
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 探测音频真实扩展名（下载落盘用）。
   ///
-  /// Neko 直链无扩展名且为直传原文件：按**文件头魔数**嗅探（对齐官方 PC
-  /// 客户端的扩展名判定）。注意 `/api/music/info` 自服务端 `de96358` 起
-  /// 已不再返回 `fileFormat`，故不再做字段回退——无法判定返回 null，
-  /// 调用方回退默认 `mp3`。
-  Future<String?> probeAudioExtension(String id) async {
+  /// Neko 直链无扩展名：按**文件头魔数**嗅探（对齐官方 PC 客户端的扩展名
+  /// 判定）。[quality] 与取流档位一致——`standard`/`hq` 为服务端转码 MP3，
+  /// `sq`/`hires` 为原始容器（可能 FLAC），档位不同扩展名可能不同。
+  Future<String?> probeAudioExtension(String id, {String quality = 'hq'}) async {
     if (id.isEmpty) return null;
-    final head = await _client().getLeadingBytes('/api/music/file/$id');
+    final head = await _client().getLeadingBytes(
+      '/api/music/file/$id?quality=${nekoQualityParam(quality)}',
+    );
     return sniffAudioExtension(head);
   }
 
@@ -533,11 +566,13 @@ class NekoApi extends ChangeNotifier {
 
   /// 用户头像地址（`GET /api/user/avatar/{userId}`，返回图片文件、无需鉴权）。
   ///
-  /// [userId] 为空返回 null（调用方走首字母占位）。
+  /// [userId] 为空返回 null（调用方走首字母占位）。服务端头像地址固定、换图后
+  /// URL 不变，会命中 CDN/HTTP 缓存显示旧图；这里附加**每次启动唯一**的版本
+  /// 参数（对齐官方 Web 端 `?v=` 做法），保证新头像能取回。
   String? userAvatarUrl(String? userId) {
     final id = userId?.trim() ?? '';
     if (id.isEmpty) return null;
-    return resolveUrl('/api/user/avatar/$id');
+    return resolveUrl('/api/user/avatar/$id?v=$_avatarVersion');
   }
 
   /// 封面路径 → 绝对地址；默认头像/空路径返回 null。

@@ -97,6 +97,10 @@ struct NativeDecoder {
     ZkInfo info;
     ZkEngineStream *stream; /* 池 stream seam 句柄（is_stream 时使用） */
     int is_stream;
+    /* seek 样本级对齐：seek 后待丢弃的前导样本数（自内核报告的首个输出样本到
+     * 请求目标之间）。仅当内核提供样本级位置（zk_*_position_samples >= 0）时
+     * 非零；read 路径按交错声道丢弃，跨块保持。 */
+    int64_t trim_samples;
 };
 
 int native_decoder_pool_begin(int min_w, int max_w, int cap)
@@ -382,14 +386,11 @@ NativeDecoder *native_decoder_open_cb(void *ctx,
     return d;
 }
 
-int native_decoder_read(NativeDecoder *d, float *out, int max_frames,
-                        int *out_channels)
+/* 内核单次读取（>=0 帧数 / <0 错误码），不做前导裁剪。 */
+static long long native_read_raw(NativeDecoder *d, float *out, int max_frames,
+                                 int *out_channels)
 {
-    if (!d || !out || !out_channels || max_frames <= 0) return -1;
     int oc = 0;
-    /* zk_*_read：>=0 为帧数（0=EOF），<0 为错误（负 ZkStatus 状态码）。
-     * 错误经负值上报（zk 不再把解码错误吞成 0），C 壳据此让 pipeline 报错，
-     * 而非把坏帧静默当 EOF 截断。 */
     long long frames;
     if (d->is_stream) {
         frames = zk_engine_read(d->stream, out, (size_t)max_frames, &oc);
@@ -397,17 +398,71 @@ int native_decoder_read(NativeDecoder *d, float *out, int max_frames,
         frames = zk_decoder_read(d->zk, out, (size_t)max_frames, &oc);
     }
     *out_channels = oc;
-    if (frames < 0) return (int)frames; /* <0：解码错误（-ZkStatus），与 EOF 区分 */
-    return (int)frames;
+    return frames;
+}
+
+int native_decoder_read(NativeDecoder *d, float *out, int max_frames,
+                        int *out_channels)
+{
+    if (!d || !out || !out_channels || max_frames <= 0) return -1;
+    int ch = d->info.channels > 0 ? d->info.channels : 1;
+    int total = 0;
+    /* zk_*_read：>=0 为帧数（0=EOF），<0 为错误（负 ZkStatus 状态码）。
+     * 错误经负值上报（zk 不再把解码错误吞成 0），C 壳据此让 pipeline 报错，
+     * 而非把坏帧静默当 EOF 截断。
+     *
+     * seek 样本级对齐：seek 后可能出现内核落点 < 请求目标（目标落在解码帧内），
+     * 此时按 trim_samples 丢弃前导样本（跨块保持），使首帧严格从目标样本起
+     * （跨档无缝切换拼接不产生一帧内的内容前移）。整块被裁剪时继续读下一块，
+     * 不得返回 0（0 对调用方 = EOF）。 */
+    while (total < max_frames) {
+        long long frames = native_read_raw(d,
+            out + (size_t)total * (size_t)ch,
+            max_frames - total, out_channels);
+        if (frames < 0) return (int)frames; /* <0：解码错误（-ZkStatus） */
+        if (frames == 0) break;             /* EOF（正常文件尾） */
+        if (d->trim_samples > 0) {
+            if (d->trim_samples >= frames) {
+                d->trim_samples -= frames;  /* 整块丢弃，继续读下一块 */
+                continue;
+            }
+            int drop = (int)d->trim_samples;
+            d->trim_samples = 0;
+            memmove(out + (size_t)total * (size_t)ch,
+                    out + (size_t)(total + drop) * (size_t)ch,
+                    (size_t)(frames - drop) * (size_t)ch * sizeof(float));
+            frames -= drop;
+        }
+        total += (int)frames;
+    }
+    return total;
 }
 
 int native_decoder_seek_ms(NativeDecoder *d, int64_t ms)
 {
     if (!d) return -1;
+    d->trim_samples = 0;
+    int rc;
     if (d->is_stream) {
-        return zk_engine_seek_ms(d->stream, (long long)ms) == 0 ? 0 : -1;
+        rc = zk_engine_seek_ms(d->stream, (long long)ms) == 0 ? 0 : -1;
+    } else {
+        rc = zk_decoder_seek_ms(d->zk, (long long)ms) == 0 ? 0 : -1;
     }
-    return zk_decoder_seek_ms(d->zk, (long long)ms) == 0 ? 0 : -1;
+    if (rc != 0) return -1;
+    /* 样本级裁剪：目标样本 = ms×sr/1000（与内核取整一致）；落点 = kernel
+     * position_samples（首个待输出样本号）。仅当内核提供样本级位置且落点
+     * 不晚于目标时裁剪；否则保持既有行为（不做毫秒近似换算，避免舍入误差）。 */
+    if (ms > 0 && d->info.sample_rate > 0) {
+        unsigned long long sr = (unsigned long long)d->info.sample_rate;
+        unsigned long long tms = (unsigned long long)ms;
+        unsigned long long target = tms * sr / 1000ULL;
+        long long landing = d->is_stream ? zk_engine_position_samples(d->stream)
+                                         : zk_decoder_position_samples(d->zk);
+        if (landing >= 0 && target > (unsigned long long)landing) {
+            d->trim_samples = (int64_t)(target - (unsigned long long)landing);
+        }
+    }
+    return 0;
 }
 
 int native_decoder_sample_rate(const NativeDecoder *d)
@@ -423,6 +478,21 @@ int native_decoder_channels(const NativeDecoder *d)
 int64_t native_decoder_duration_us(const NativeDecoder *d)
 {
     return d ? (int64_t)d->info.duration_us : 0;
+}
+
+int64_t native_decoder_position_ms(const NativeDecoder *d)
+{
+    if (!d) return 0;
+    long long ms = d->is_stream ? zk_engine_position_ms(d->stream)
+                                : zk_decoder_position_ms(d->zk);
+    return (int64_t)ms;
+}
+
+int64_t native_decoder_position_samples(NativeDecoder *d)
+{
+    if (!d) return -1;
+    return d->is_stream ? (int64_t)zk_engine_position_samples(d->stream)
+                        : (int64_t)zk_decoder_position_samples(d->zk);
 }
 
 const char *native_decoder_codec_name(const NativeDecoder *d)
@@ -553,6 +623,18 @@ int64_t native_decoder_duration_us(const NativeDecoder *d)
 {
     (void)d;
     return 0;
+}
+
+int64_t native_decoder_position_ms(const NativeDecoder *d)
+{
+    (void)d;
+    return 0;
+}
+
+int64_t native_decoder_position_samples(NativeDecoder *d)
+{
+    (void)d;
+    return -1;
 }
 
 const char *native_decoder_codec_name(const NativeDecoder *d)

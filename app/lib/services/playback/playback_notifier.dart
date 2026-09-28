@@ -16,6 +16,7 @@ import '../../l10n/l10n.dart';
 import '../cache/song_cache.dart';
 import 'audio_engine_process.dart';
 import 'dj_mode.dart';
+import 'fft_frame.dart';
 import '../../widgets/common/toast.dart';
 import '../../widgets/dialogs/memory_alert.dart';
 import 'engine_bindings.dart';
@@ -44,6 +45,9 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
 
   /// M2.3b：在途整首下载（新 load 取代时 cancel，避免浪费拉流）。
   WholeTrackFetch? _storeFetch;
+
+  /// 无缝音质切换（引擎内暂存源）进行中：忽略再次切档，避免并发 prepare/commit。
+  bool _qualitySwitchBusy = false;
 
   /// 输出设备切换失败通知（set_sink 回执 !ok）：设置页订阅后弹错误 toast。
   ///
@@ -117,6 +121,11 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// EnginePosition 事件 → 更新 position 后立即按当前位置从本地 PCM
   /// 分析器缓冲取一帧。暂停/seek 时位置事件天然对齐，无独立 Timer。
   bool _fftActive = false;
+
+  /// 无缝音质切换进行中：若取帧位置样本不足（pcm_window 越界/未解码），
+  /// 先推一帧全零频谱，避免可视化在切换空档「冻住」；切换结束即恢复。
+  bool _fftZeroOnMiss = false;
+  FftFrame? _fftZeroFrame;
 
   /// 诊断计数：无帧可取时周期性打印 PCM 状态。
   int _diagCounter = 0;
@@ -404,6 +413,13 @@ class PlaybackNotifier extends _PlaybackNotifierBase
     await engine.sendCommand('set_sink', {'id': sinkId});
   }
 
+  /// 切换空档用的全零频谱帧（懒建一次；bins 与 C 契约一致 = 128）。
+  FftFrame _zeroFftFrame() =>
+      _fftZeroFrame ??= FftFrame(
+        ldata: List<double>.filled(128, 0),
+        rdata: List<double>.filled(128, 0),
+      );
+
   @override
   void _pollSpectrum() {
     if (!_fftActive) return;
@@ -426,6 +442,11 @@ class PlaybackNotifier extends _PlaybackNotifierBase
           'FFT 诊断: pos=${state.position.inMilliseconds}ms '
           '块=${pcm.blockCount} 字节=${pcm.bytesIn} epoch=${pcm.epoch}',
         );
+      }
+      // 无缝切换造成的采样空档：推全零帧让可视化落零（而非停在上帧冻住）。
+      // 仅切换期间生效，正常起播/seek 的取帧失败仍保持原语义（静默）。
+      if (_fftZeroOnMiss) {
+        state = state.copyWith(fft: _zeroFftFrame());
       }
       return;
     }

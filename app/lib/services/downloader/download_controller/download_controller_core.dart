@@ -339,8 +339,9 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
     if (current == null || current.status != 'failed') return;
 
     final platform = downloadPlatform(track.source);
-    // 直链无扩展名的源（如 Neko）由适配器探测真实容器；失败回退通用推断。
-    final probed = await platform.probeExtension(ref, track);
+    // 直链无扩展名的源（如 Neko）由适配器按**取流档位**探测真实容器；
+    // 失败回退通用推断。
+    final probed = await platform.probeExtension(ref, track, quality: quality);
     final resolved = _buildPreResolved(
       platform,
       track,

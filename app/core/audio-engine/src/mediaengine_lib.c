@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 #include <pthread.h>
 #include <time.h>
 
@@ -166,6 +167,37 @@ typedef struct ArchoeraMediaEngine {
     PcmMemBlock *mem_blocks;   /* 块数组（下标 0 最早，队尾最新） */
     int     mem_block_cap;
     int     mem_block_count;
+    /* ── 单会话「暂存源」无缝切换（staged source swap）────────────
+       音质切换：旧源照常出声，新源在**独立预取线程**内预开 + 预解码进 stage；
+       commit_source 丢弃交叠段后把 stage 余量续喂同一 ring（设备/会话不重建）。
+       未使用 prepare/commit 时全部为 0，行为与旧版逐位一致（惰性）。 */
+    AudioPipeline *p_next;      /* 暂存新源（NULL = 无） */
+    int     next_ready;         /* 新源已就绪（source_ready 已发） */
+    double  next_start_ms;      /* 新源解码起点（= 建源时旧源 decode cursor，绝对 ms） */
+    double  stage_origin_ms;    /* stage[0] 真实媒体时间（首回调反推，消 ms 截断误差） */
+    int     stage_have_origin;  /* stage_origin_ms 已捕获 */
+    int     stage_rate;         /* 暂存 PCM 采样率（管线输出采样率） */
+    int64_t p_start_ms;         /* 当前管线解码起点的绝对 ms（pipeline_get_position 相对它） */
+    float  *stage;              /* 暂存 PCM（交织 float） */
+    size_t  stage_len;          /* 已暂存 float 个数 */
+    size_t  stage_cap;          /* 容量（float 个数） */
+    int     stage_ch;           /* 暂存声道数 */
+    int     stage_full;         /* 达容量上限，暂停预解码 */
+
+    /* 预取线程：新源解码放到独立线程，避免与实时引擎线程争抢解码/IO 造成旧源
+       喂环欠载（音量高时可闻的轻微顿挫）。stage_lock/stage_cv 同步三态：
+       线程在 stage_busy=1 期间独占 p_next；commit/discard 置 stage_stop 后 join。 */
+    pthread_t       stage_thread;
+    int             stage_thread_on;
+    int             stage_stop;      /* 请求预取线程退出 */
+    int             stage_busy;      /* 预取线程正在 pipeline_process(p_next) */
+    int             stage_eof;       /* 预取已到新源 EOF（无法再填） */
+    int             stage_ready_sent;/* source_ready 已发（一次） */
+    int64_t         stage_t0_ms;     /* 预取起点墙钟 ms（ready 阈值/超时判定） */
+    int             carry_pending;   /* commit 时暂停：stage 余量待恢复后续喂 */
+    pthread_mutex_t stage_lock;
+    pthread_cond_t  stage_cv;
+
     /* 保护全部 mem_* 字段：写侧为引擎解码线程（mem_append/reset/free），
      * 读侧为 Dart/FFI 线程（pcm_window/pcm_epoch）。mem_window 持锁期间仅做
      * 纯计算与定长拷贝，不调用任何可重入引擎的回调。 */
@@ -649,6 +681,420 @@ static int dummy_output(const uint8_t *data, size_t size, void *user)
     return 0;
 }
 
+/* ── 单会话暂存源（staged source swap）────────────────────────── */
+
+/* 前向声明（json_escape_str 定义于本节之后；prepare 失败事件需转义消息） */
+static void json_escape_str(const char *in, char *out, size_t cap);
+
+/* 墙钟毫秒（timespec_get，跨平台，与 destroy 既有用法一致）。仅用于取相对
+   时长（预取 ready 阈值/超时），系统时间跳变影响可忽略。 */
+static int64_t me_now_ms(void)
+{
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+    return (int64_t)ts.tv_sec * 1000 + (int64_t)(ts.tv_nsec / 1000000);
+}
+
+/* 暂存源 PCM 回调：新源预解码 PCM 追加进 stage（交织 float），达容量上限即
+   置 stage_full。首个回调反推 stage[0] 的真实媒体时间（= 本块末位置 - 本块
+   时长）——pipeline 的 start_offset 被截断到整 ms，用真实起点才能与旧源
+   decode cursor 做样本级对齐，消除切换瞬间的亚毫秒错位（高音量可闻的顿挫）。
+   仅预取线程调用（p_next 独占），无需持锁。 */
+static void on_stage_out(const float *pcm, int samples, int channels,
+                         double position_ms, void *user_data)
+{
+    ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)user_data;
+    size_t add;
+    if (!e || !pcm || samples <= 0 || channels <= 0) return;
+    if (!e->stage_have_origin && e->stage_rate > 0) {
+        e->stage_origin_ms = position_ms
+            - (double)samples * 1000.0 / (double)e->stage_rate;
+        e->stage_have_origin = 1;
+    }
+    if (e->stage_ch <= 0) e->stage_ch = channels;
+    if (e->stage_full || !e->stage) return;
+    add = (size_t)samples * (size_t)channels;
+    if (add > e->stage_cap - e->stage_len) {
+        add = (e->stage_cap > e->stage_len) ? (e->stage_cap - e->stage_len) : 0;
+        e->stage_full = 1; /* 只填入剩余容量，其后丢弃 */
+    }
+    if (add > 0) {
+        memcpy(e->stage + e->stage_len, pcm, add * sizeof(float));
+        e->stage_len += add;
+    }
+    if (e->stage_len >= e->stage_cap) e->stage_full = 1;
+}
+
+/* 暂存富余达标：已暂存媒体时长 - 距 prepare 的墙钟时长 ≥ lead，即 commit
+   裁剪掉实时追赶段后仍有 lead 秒新源 PCM 兜底（防切换后新源网络/解码抖动
+   → ring 欠载顿挫）；满/EOF/超时兜底放行，绝不挂死。 */
+#define STAGE_READY_LEAD_MS    1500   /* commit 后保留的新源缓冲下限 */
+#define STAGE_READY_TIMEOUT_MS 10000  /* 网络慢也最多等这么久即放行 */
+#define STAGE_CAP_MS           20000  /* stage 容量上限（内存兜底，remain≈lead） */
+
+static int stage_target_reached(ArchoeraMediaEngine *e)
+{
+    double staged_ms, elapsed_ms;
+    if (e->stage_full || e->stage_eof) return 1;
+    if (!e->stage || e->stage_ch <= 0 || e->stage_rate <= 0) return 1;
+    staged_ms = (double)(e->stage_len / (size_t)e->stage_ch) * 1000.0
+                / (double)e->stage_rate;
+    elapsed_ms = (double)(me_now_ms() - e->stage_t0_ms);
+    if (elapsed_ms >= (double)STAGE_READY_TIMEOUT_MS) return 1;
+    return staged_ms - elapsed_ms >= (double)STAGE_READY_LEAD_MS;
+}
+
+/* 发 source_ready 事件（含暂存管线的输出格式，供调用方校验/诊断）。调用方
+   须已置 stage_ready_sent，并自行处理锁（引擎线程 commit 路径无锁）。 */
+static void stage_emit_ready_event(ArchoeraMediaEngine *e)
+{
+    char buf[128];
+    snprintf(buf, sizeof(buf),
+             "{\"type\":\"source_ready\",\"out_sample_rate\":%d,\"channels\":%d}",
+             e->stage_rate, e->stage_ch);
+    ev_enqueue(e, buf);
+}
+
+/* 预取线程：边播旧源边在另一核上预解码新源，维持「领先实时 lead 秒」的缓冲。
+   stage 仅在本线程 stage_busy=1 期间被独占；commit/discard 置 stage_stop 并
+   join 后由引擎线程接管。 */
+static void *stage_prefetch_thread(void *arg)
+{
+    ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)arg;
+    pthread_mutex_lock(&e->stage_lock);
+    while (!e->stage_stop) {
+        if (stage_target_reached(e)) {
+            struct timespec ts;
+            timespec_get(&ts, TIME_UTC);
+            ts.tv_nsec += 200 * 1000000L;
+            if (ts.tv_nsec >= 1000000000L) {
+                ts.tv_sec += ts.tv_nsec / 1000000000L;
+                ts.tv_nsec %= 1000000000L;
+            }
+            pthread_cond_timedwait(&e->stage_cv, &e->stage_lock, &ts);
+            continue;
+        }
+        e->stage_busy = 1;
+        pthread_mutex_unlock(&e->stage_lock);
+        ssize_t n = pipeline_process(e->p_next);
+        pthread_mutex_lock(&e->stage_lock);
+        e->stage_busy = 0;
+        if (e->stage_stop) break; /* 已被 discard/commit 接管，勿再发事件 */
+        if (n <= 0) {
+            e->stage_eof = 1;
+            if (!e->stage_ready_sent) {
+                e->stage_ready_sent = 1;
+                pthread_mutex_unlock(&e->stage_lock);
+                stage_emit_ready_event(e);
+                pthread_mutex_lock(&e->stage_lock);
+            }
+            pthread_cond_broadcast(&e->stage_cv);
+            pthread_cond_wait(&e->stage_cv, &e->stage_lock);
+            continue;
+        }
+        if (!e->stage_ready_sent && stage_target_reached(e)) {
+            e->stage_ready_sent = 1;
+            pthread_mutex_unlock(&e->stage_lock);
+            stage_emit_ready_event(e);
+            pthread_mutex_lock(&e->stage_lock);
+            pthread_cond_broadcast(&e->stage_cv);
+        }
+    }
+    pthread_mutex_unlock(&e->stage_lock);
+    return NULL;
+}
+
+/* 停止并汇合预取线程（幂等）。interrupt_next!=0 时先 signal_shutdown 打断
+   线程可能阻塞的网络读（用于彻底丢弃 p_next 的场景；commit 需保留 p_next
+   以接力续播，故传 0）。 */
+static void mediaengine_stage_stop_join(ArchoeraMediaEngine *e, int interrupt_next)
+{
+    if (!e->stage_thread_on) return;
+    if (interrupt_next && e->p_next) pipeline_signal_shutdown(e->p_next);
+    pthread_mutex_lock(&e->stage_lock);
+    e->stage_stop = 1;
+    pthread_cond_broadcast(&e->stage_cv);
+    pthread_mutex_unlock(&e->stage_lock);
+    pthread_join(e->stage_thread, NULL);
+    e->stage_thread_on = 0;
+}
+
+/* 计算 commit 时需从 stage 头部丢弃的交叠 float 样本数：
+     drop_ms = old_ms - next_start_ms（clamp >= 0）
+     frames  = llround(drop_ms * rate / 1000)
+     samples = frames * stage_ch（夹取到 [0, staged]）
+   参数非法 / 无交叠 → 0。纯函数，供测试直接调用。 */
+size_t archoera_mediaengine_stage_drop_samples(size_t staged, int stage_ch,
+                                               int rate, double old_ms,
+                                               double next_start_ms)
+{
+    double drop_ms;
+    long long frames;
+    unsigned long long max_frames;
+    size_t samples;
+    if (staged == 0 || stage_ch <= 0 || rate <= 0) return 0;
+    drop_ms = old_ms - next_start_ms;
+    if (!(drop_ms > 0.0)) return 0; /* 含 NaN → 不丢弃 */
+    frames = llround(drop_ms * (double)rate / 1000.0);
+    if (frames <= 0) return 0;
+    /* 防乘法溢出：所需帧数超过暂存帧数 → 全丢 */
+    max_frames = (unsigned long long)(staged / (size_t)stage_ch);
+    if ((unsigned long long)frames > max_frames) return staged;
+    samples = (size_t)frames * (size_t)stage_ch;
+    return samples > staged ? staged : samples;
+}
+
+/* 丢弃暂存新源 + 释放 stage（幂等；未使用则空操作）。引擎线程/destroy 调用。 */
+static void mediaengine_discard_next(ArchoeraMediaEngine *e)
+{
+    mediaengine_stage_stop_join(e, 1); /* 先停预取线程（打断阻塞读），再销毁管线 */
+    if (e->p_next) {
+        pipeline_signal_shutdown(e->p_next); /* 优雅中断（若正阻塞 IO） */
+        pipeline_destroy(e->p_next);
+        e->p_next = NULL;
+    }
+    free(e->stage);
+    e->stage = NULL;
+    e->stage_len = 0;
+    e->stage_cap = 0;
+    e->stage_ch = 0;
+    e->stage_rate = 0;
+    e->stage_full = 0;
+    e->stage_eof = 0;
+    e->stage_ready_sent = 0;
+    e->stage_have_origin = 0;
+    e->stage_origin_ms = 0.0;
+    e->carry_pending = 0;
+    e->next_ready = 0;
+    e->next_start_ms = 0.0;
+}
+
+/* 暂存余量延迟续喂：把 e->stage 里剩余的新源 PCM 喂完再继续解码新源，保证
+   「旧已排队 PCM → 新源」连续。流式走 ring（背压=实时），无设备（headless/
+   文件）直接写出。用于 commit 时设备未消费（暂停）的 deferred 场景。 */
+static void mediaengine_flush_carry(ArchoeraMediaEngine *e)
+{
+    int ch, frames;
+    if (!e->stage || e->stage_len == 0) {
+        e->carry_pending = 0;
+        return;
+    }
+    ch = e->stage_ch > 0 ? e->stage_ch : 2;
+    frames = (int)(e->stage_len / (size_t)ch);
+    if (frames > 0) {
+        if (e->player && e->player_stream_mode) {
+            player_stream_write(e->player, e->stage, frames);
+        } else {
+            on_pcm_out(e->stage, frames, ch, (double)e->p_start_ms, e);
+        }
+    }
+    e->stage_len = 0;
+    e->carry_pending = 0;
+}
+
+/* prepare_source：为旧源当前 decode cursor（绝对 ms）预开新源并预解码进 stage。
+   已有暂存源则先销毁（幂等重发覆盖）。失败 emit source_error 且旧源原样保留。 */
+static void handle_prepare_source(ArchoeraMediaEngine *e, const char *line)
+{
+    char url[2048] = {0};
+    EngineConfig cfg;
+    double base_ms;
+    int rate, ch;
+    size_t cap;
+
+    if (json_get_string(line, "url", url, sizeof(url)) < 0 || url[0] == '\0') {
+        ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"missing url\"}");
+        return;
+    }
+    if (!e->p) {
+        ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"no active source\"}");
+        return;
+    }
+
+    mediaengine_discard_next(e); /* 已有暂存源：先丢弃 */
+
+    /* 旧源 decode cursor（写头，绝对 ms）：pipeline_get_position 相对本管线
+       start_offset，故须加回 p_start_ms，跨 seek/CUE 偏移亦正确。
+       新源从此处续，commit 时按交叠裁剪。 */
+    base_ms = (double)e->p_start_ms + pipeline_get_position(e->p) * 1000.0;
+    cfg = e->cfg;
+    cfg.start_offset_ms = (int64_t)base_ms;
+    /* 暂存/预取解码一律走 C（FFmpeg）路径，**不交给自研内核**：内核是常驻
+       worker 池（max=2），与实时源并发会争抢唯一 worker，也会把缓冲流交给内核；
+       预取在 C 侧独立解码更稳、且保持 FFmpeg 全格式兼容（内存源亦然）。 */
+    cfg.engine_mode = 0; /* ENGINE_MODE_STABLE */
+    /* 输出采样率/声道锁定为**当前活动管线的实际输出**：passthrough 下
+       cfg.output_sample_rate=0（各管线跟随各自源采样率），新旧源采样率不同
+       （如转码 MP3 44.1k ↔ 无损 48k/96k）时，切档后新源会以不同速率喂入
+       **未重建**的 player → 变调/变速（默认 passthrough 下必现）。锁定后
+       新源必要时做一次重采样，ring/设备格式始终不变。 */
+    cfg.output_sample_rate = pipeline_get_output_sample_rate(e->p);
+    if (cfg.output_sample_rate <= 0) cfg.output_sample_rate = e->cfg.output_sample_rate;
+    cfg.output_channels = pipeline_get_output_channels(e->p);
+    if (cfg.output_channels <= 0) cfg.output_channels = e->cfg.output_channels;
+
+    e->p_next = pipeline_create(url, &cfg, dummy_output, NULL);
+    if (!e->p_next) {
+        char msg[320], esc[384], buf[512];
+        snprintf(msg, sizeof(msg), "prepare create failed: %s", url);
+        json_escape_str(msg, esc, sizeof(esc));
+        snprintf(buf, sizeof(buf),
+                 "{\"type\":\"source_error\",\"message\":\"%s\"}", esc);
+        ev_enqueue(e, buf);
+        return;
+    }
+    pipeline_set_playback_streaming(e->p_next, true);
+
+    rate = pipeline_get_output_sample_rate(e->p_next);
+    if (rate <= 0) rate = pipeline_get_output_sample_rate(e->p);
+    if (rate <= 0) rate = 48000;
+    ch = pipeline_get_output_channels(e->p_next);
+    if (ch <= 0) ch = e->cfg.output_channels > 0 ? e->cfg.output_channels : 2;
+    cap = (size_t)((double)rate * (STAGE_CAP_MS / 1000.0)) * (size_t)ch;
+    if (cap == 0) cap = (size_t)rate * (size_t)ch;
+    e->stage = (float *)malloc(cap * sizeof(float));
+    if (!e->stage) {
+        pipeline_signal_shutdown(e->p_next);
+        pipeline_destroy(e->p_next);
+        e->p_next = NULL;
+        ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"stage alloc failed\"}");
+        return;
+    }
+    e->stage_cap = cap;
+    e->stage_len = 0;
+    e->stage_ch = ch;
+    e->stage_rate = rate;
+    e->stage_full = 0;
+    e->stage_eof = 0;
+    e->stage_ready_sent = 0;
+    e->stage_have_origin = 0;
+    e->stage_origin_ms = 0.0;
+    e->next_start_ms = base_ms;
+    e->next_ready = 1;
+    e->stage_t0_ms = me_now_ms();
+    e->stage_stop = 0;
+    e->stage_busy = 0;
+    pipeline_set_pcm_out_cb(e->p_next, on_stage_out, e);
+
+    /* 独立预取线程：把新源解码从实时引擎线程剥离（旧源照常喂环），避免争抢
+       造成旧源欠载顿挫。source_ready 由该线程在「缓冲富余达标/EOF/超时」异步发。 */
+    if (pthread_create(&e->stage_thread, NULL, stage_prefetch_thread, e) != 0) {
+        pipeline_signal_shutdown(e->p_next);
+        pipeline_destroy(e->p_next);
+        e->p_next = NULL;
+        free(e->stage);
+        e->stage = NULL;
+        e->stage_cap = 0;
+        e->stage_ch = 0;
+        e->stage_rate = 0;
+        e->next_ready = 0;
+        ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"stage thread failed\"}");
+        return;
+    }
+    e->stage_thread_on = 1;
+}
+
+/* commit_source：停止并汇合预取线程后，把已预解码的 stage 续喂同一 ring，新源
+   转正（设备/会话不重建）。交叠按「旧源当前 decode cursor − stage[0] 真实媒体
+   时间」样本级裁剪（亚毫秒对齐，消除切换瞬间错位）。余量续喂：播放中立即喂完
+   （背压=实时）；暂停时挂起为 carry，由主循环在恢复后先喂（不阻塞引擎线程）；
+   无设备（headless/文件）直接写出保持连续；若旧源已在曲尾排空（EOF），先清
+   EOF/停止标志并重启设备，保证新源被播出（尾部切档不失效）。 */
+static void handle_commit_source(ArchoeraMediaEngine *e)
+{
+    double old_ms, origin_ms;
+    int rate, ch;
+    size_t drop, remain;
+
+    if (!e->p_next || !e->stage || !e->next_ready) {
+        ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"no staged source\"}");
+        return;
+    }
+    /* 停止并汇合预取线程：此后 p_next/stage 独占归引擎线程（不打断 p_next，
+       保留其解码位置以便接力续播）。 */
+    mediaengine_stage_stop_join(e, 0);
+    /* 调用方可能在预取线程发出 source_ready 前就 commit（如测试同批下发）：
+       补发一次，保证 ready→switched 事件握手始终完整。 */
+    if (!e->stage_ready_sent) {
+        e->stage_ready_sent = 1;
+        stage_emit_ready_event(e);
+    }
+
+    old_ms = (double)e->p_start_ms + pipeline_get_position(e->p) * 1000.0;
+    rate = e->stage_rate > 0 ? e->stage_rate
+                             : pipeline_get_output_sample_rate(e->p_next);
+    if (rate <= 0) rate = pipeline_get_output_sample_rate(e->p);
+    if (rate <= 0) rate = 48000;
+    ch = e->stage_ch > 0 ? e->stage_ch : e->cfg.output_channels;
+    if (ch <= 0) ch = 2;
+    /* stage[0] 真实媒体时间（首回调反推）；未跑预解码则退化为建源起点。 */
+    origin_ms = e->stage_have_origin ? e->stage_origin_ms : e->next_start_ms;
+
+    drop = archoera_mediaengine_stage_drop_samples(e->stage_len, ch, rate,
+                                                   old_ms, origin_ms);
+    remain = e->stage_len - drop;
+
+    /* 把剩余新源 PCM 移到 stage 头部作为「待喂余量」。 */
+    if (remain > 0 && drop > 0) {
+        memmove(e->stage, e->stage + drop, remain * sizeof(float));
+    }
+    e->stage_len = remain;
+
+    /* 新源转正：回调切回正常输出（内存/文件/ring），保持流式小块语义。 */
+    pipeline_set_pcm_out_cb(e->p_next, on_pcm_out, e);
+    pipeline_set_playback_streaming(e->p_next, true);
+    pipeline_signal_shutdown(e->p);
+    pipeline_destroy(e->p);
+    e->p = e->p_next;
+    e->p_next = NULL;
+    /* p_start_ms 跟随新管线 cfg.start_offset（= (int64_t)base_ms，截断值，故用
+       (int64_t) 而非 llround 保持一致）；session_offset_ms 是 rel 事件零点
+       （= cfg.start_offset_ms），切档不改变，后续 seek 仍正确。 */
+    e->p_start_ms = (int64_t)e->next_start_ms;
+    e->next_ready = 0;
+    e->next_start_ms = 0.0;
+    e->stage_cap = 0;
+    e->stage_rate = 0;
+    e->stage_full = 0;
+    e->stage_eof = 0;
+    e->stage_ready_sent = 0;
+    e->stage_have_origin = 0;
+    e->stage_origin_ms = 0.0;
+
+    /* 余量续喂：播放中立即喂完（背压=实时，旧已排队 PCM 播完自然接上新源）；
+       暂停时挂起为 carry，恢复播放后由主循环先喂（绝不在此阻塞引擎线程）；
+       曲尾排空（EOF）先 resume 让设备继续消费，保证尾部切档不失效。 */
+    if (e->stage_len > 0) {
+        int playing = 1;
+        if (e->player && e->player_stream_mode) {
+            if (player_stream_eof(e->player)) {
+                player_stream_resume(e->player); /* 曲尾排空：清 EOF/重启设备 */
+            }
+            player_get_state(e->player, &playing, NULL, NULL);
+        }
+        if (playing) {
+            mediaengine_flush_carry(e);
+        } else {
+            e->carry_pending = 1;
+        }
+    }
+    if (e->stage_len == 0) {
+        free(e->stage);
+        e->stage = NULL;
+        e->stage_cap = 0;
+        e->stage_ch = 0;
+        e->stage_rate = 0;
+        e->carry_pending = 0;
+    }
+
+    {
+        char buf[160];
+        snprintf(buf, sizeof(buf),
+                 "{\"type\":\"source_switched\",\"position_ms\":%.0f}", old_ms);
+        ev_enqueue(e, buf);
+    }
+}
+
 /* 播放器事件 → 事件 FIFO（player_event_fn 签名） */
 static void player_event_cb(const char *json, void *user_data)
 {
@@ -942,6 +1388,12 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
                 "{\"type\":\"event_interval\",\"interval_ms\":%d}", interval);
             ev_enqueue(e, buf);
         }
+    } else if (strcmp(type, "prepare_source") == 0) {
+        /* 无缝音质切换：旧源照常播放，预开 + 预解码新源进 stage（同会话同设备）。 */
+        handle_prepare_source(e, line);
+    } else if (strcmp(type, "commit_source") == 0) {
+        /* 提交暂存源：丢弃交叠段后续喂同一 ring，新源转正（会话不重建）。 */
+        handle_commit_source(e);
     } else if (strcmp(type, "stop") == 0) {
         QA_STORE_REL(&e->stop_requested, 1);
     }
@@ -958,6 +1410,9 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
 {
     EngineConfig cfg2 = e->cfg;
     AudioPipeline *np;
+
+    /* seek/重建会使暂存新源的解码起点失效：先整体丢弃，避免悬垂/错位续喂。 */
+    mediaengine_discard_next(e);
 
     cfg2.start_offset_ms = abs_start_ms;
     /* 1) 先建新管线（含解码 seek；native 失败内部已回退 FFmpeg）——旧会话不动。
@@ -979,6 +1434,7 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
     if (e->mem_mode) mem_reset(e); /* 内存模式：清块列表 + epoch++（对齐文件截断） */
 
     e->p = np;
+    e->p_start_ms = abs_start_ms; /* 新管线起点绝对 ms（prepare 的绝对 cursor 基准） */
     if (e->mem_mode) {
         pipeline_set_pcm_out_cb(e->p, on_pcm_out, e);
     } else {
@@ -1079,6 +1535,13 @@ static int mediaengine_stream_run(ArchoeraMediaEngine *e)
             continue;
         }
 
+        /* 暂停期间 commit 的暂存余量：恢复播放后先把新源余量喂完再解码新源
+           （背压=实时），保证拼接连续。 */
+        if (e->carry_pending) {
+            mediaengine_flush_carry(e);
+            continue;
+        }
+
         /* 缓冲水位软门（≈1.4s，< ring 上限）：解码≈实时推进，位置事件/命令
            轮询保持 ~20ms 节拍（而非在 ring 满处长时间阻塞） */
         if (e->player && e->player_stream_mode) {
@@ -1153,6 +1616,7 @@ static int mediaengine_stream_run(ArchoeraMediaEngine *e)
         e->player = NULL;
         e->player_stream_mode = 0;
     }
+    mediaengine_discard_next(e); /* 会话结束：丢弃未提交的暂存源/暂存缓冲 */
     return code;
 }
 
@@ -1251,6 +1715,7 @@ static void *engine_thread(void *arg)
                 "[mediaengine] 内存播放模式 headless（无设备，解码入内存块列表）\n");
             for (;;) {
                 if (QA_LOAD_ACQ(&e->stop_requested)) break;
+                if (e->carry_pending) mediaengine_flush_carry(e);
                 ssize_t n = pipeline_process(e->p);
                 if (n < 0) {
                     char err[160];
@@ -1304,6 +1769,7 @@ static void *engine_thread(void *arg)
         /* 转码主循环（全速；命令队列非阻塞消费） */
         for (;;) {
             if (QA_LOAD_ACQ(&e->stop_requested)) break;
+            if (e->carry_pending) mediaengine_flush_carry(e);
             ssize_t n = pipeline_process(e->p);
             if (n < 0) {
                 char err[160];
@@ -1375,6 +1841,7 @@ static void *engine_thread(void *arg)
 
     if (e->wav) { fclose(e->wav); e->wav = NULL; }
     if (e->pcm) { fclose(e->pcm); e->pcm = NULL; }
+    mediaengine_discard_next(e); /* 丢弃未提交的暂存源（管线/缓冲） */
     if (e->p) { pipeline_destroy(e->p); e->p = NULL; }
 
 mem_exit:
@@ -1382,6 +1849,7 @@ mem_exit:
      * 处、其上未销毁管线（非池会话保持既有行为不动），池会话在此补销毁，保证
      * native_decoder_close（→zk_engine_close）先于 native_decoder_pool_end
      * （→zk_engine_shutdown）。非池会话此处 e->p 已在上方销毁，恒为空操作。 */
+    mediaengine_discard_next(e); /* 暂存源（若仍未提交）同样先于 pool_end 关闭 */
     if (pool_on && e->p) { pipeline_destroy(e->p); e->p = NULL; }
     char exited[64];
     snprintf(exited, sizeof(exited), "{\"type\":\"exited\",\"code\":%d}", code);
@@ -1417,6 +1885,7 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
         e->cfg.skip_encoder = true; /* 播放模式：仅 PCM 落盘，无 Opus 编码 */
     }
     e->session_offset_ms = e->cfg.start_offset_ms;
+    e->p_start_ms = e->cfg.start_offset_ms;
 
     /* 内存播放模式：cfg.no_disk_cache=1 且为 player 会话 → mem_mode。
        cap 按配置解析：auto（0.8 GiB 硬上限）/ 用户上限 / 无上限（见 mem_resolve_cap）。 */
@@ -1438,9 +1907,11 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
     pthread_mutex_init(&e->ev_mutex, NULL);
     pthread_mutex_init(&e->cmd_mutex, NULL);
     pthread_mutex_init(&e->mem_lock, NULL);
+    pthread_mutex_init(&e->stage_lock, NULL);
     pthread_cond_init(&e->cmd_cond, NULL);
     pthread_cond_init(&e->ev_cond, NULL);
     pthread_cond_init(&e->ev_drain_cond, NULL);
+    pthread_cond_init(&e->stage_cv, NULL);
 
     /* 播放输出 sink 初始选择：env ARCHOERA_AUDIO_SINK 显式覆盖 → 否则系统默认。
        仅播放模式有意义；后续 set_sink 命令会覆盖此值。 */
@@ -1467,9 +1938,11 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
         pthread_mutex_destroy(&e->ev_mutex);
         pthread_mutex_destroy(&e->cmd_mutex);
         pthread_mutex_destroy(&e->mem_lock);
+        pthread_mutex_destroy(&e->stage_lock);
         pthread_cond_destroy(&e->cmd_cond);
         pthread_cond_destroy(&e->ev_cond);
         pthread_cond_destroy(&e->ev_drain_cond);
+        pthread_cond_destroy(&e->stage_cv);
         free(e);
         if (errbuf && errbuf_size > 0) {
             snprintf(errbuf, errbuf_size, "pthread_create failed");
@@ -1663,6 +2136,10 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
         e->thread_created = 0;
     }
 
+    /* 2.5) 引擎线程已退出：防御性丢弃暂存源（正常路径已在其收尾处释放，
+       此处兜底 pthread 提前返回等异常，确保无泄漏/UAF）。 */
+    mediaengine_discard_next(e);
+
     /* 3) drain：等仍在 wait_event 内的线程退出（看到 destroyed → -1 后
         自行归还）。有界等待作防御兜底——正常 wait_event 见 destroyed 即
         立即返回，此处只差一个调度周期。 */
@@ -1694,9 +2171,11 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
     pthread_mutex_destroy(&e->mem_lock);
     pthread_mutex_destroy(&e->ev_mutex);
     pthread_mutex_destroy(&e->cmd_mutex);
+    pthread_mutex_destroy(&e->stage_lock);
     pthread_cond_destroy(&e->cmd_cond);
     pthread_cond_destroy(&e->ev_cond);
     pthread_cond_destroy(&e->ev_drain_cond);
+    pthread_cond_destroy(&e->stage_cv);
     free(e);
 }
 
