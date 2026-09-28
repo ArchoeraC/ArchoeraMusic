@@ -919,10 +919,9 @@ static void handle_prepare_source(ArchoeraMediaEngine *e, const char *line)
     base_ms = (double)e->p_start_ms + pipeline_get_position(e->p) * 1000.0;
     cfg = e->cfg;
     cfg.start_offset_ms = (int64_t)base_ms;
-    /* 暂存/预取解码一律走 C（FFmpeg）路径，**不交给自研内核**：内核是常驻
-       worker 池（max=2），与实时源并发会争抢唯一 worker，也会把缓冲流交给内核；
-       预取在 C 侧独立解码更稳、且保持 FFmpeg 全格式兼容（内存源亦然）。 */
-    cfg.engine_mode = 0; /* ENGINE_MODE_STABLE */
+    /* 暂存源**沿用会话引擎**（尊重用户的 EraAudio / Stable 选择），不强制 FFmpeg。
+       两条解码路径的 seek 都已样本级对齐（FFmpeg 走 decoder.c 的 PTS 裁剪；
+       自研内核走 position_samples 裁剪），因此切档拼接对两种引擎都兼容且精确。 */
     /* 输出采样率/声道锁定为**当前活动管线的实际输出**：passthrough 下
        cfg.output_sample_rate=0（各管线跟随各自源采样率），新旧源采样率不同
        （如转码 MP3 44.1k ↔ 无损 48k/96k）时，切档后新源会以不同速率喂入
