@@ -10,6 +10,7 @@
 #include <string.h>
 
 #if defined(_WIN32)
+#include <windows.h>
 #include <io.h>
 #include <direct.h>
 #define ERA_TEST_SEP '\\'
@@ -59,20 +60,36 @@ static void join(char *out, size_t cap, const char *dir, const char *name) {
 }
 
 int main(void) {
-    char tmpl[] = "/tmp/archoera-log-test-XXXXXX";
+    char tmpl[4096];
     char *dir;
     char path[4096];
     char *text;
 
 #if defined(_WIN32)
-    /* Windows：退化到当前目录下的固定名，避免依赖 mkdtemp。 */
-    dir = "_archoera_log_test";
-    _mkdir(dir);
+    /* Windows：系统临时目录（%TEMP%），附进程号避免并发冲突。 */
+    {
+        char base[MAX_PATH];
+        DWORD n = GetTempPathA(MAX_PATH, base);
+        if (n == 0 || n >= MAX_PATH) {
+            fprintf(stderr, "GetTempPath failed\n");
+            return 2;
+        }
+        snprintf(tmpl, sizeof(tmpl), "%sarchoera-log-test-%lu", base,
+                 (unsigned long)GetCurrentProcessId());
+        _mkdir(tmpl);
+        dir = tmpl;
+    }
 #else
-    dir = mkdtemp(tmpl);
-    if (dir == NULL) {
-        fprintf(stderr, "mkdtemp failed\n");
-        return 2;
+    /* POSIX：系统临时目录（$TMPDIR，缺省 /tmp）。 */
+    {
+        const char *base = getenv("TMPDIR");
+        if (base == NULL || base[0] == '\0') base = "/tmp";
+        snprintf(tmpl, sizeof(tmpl), "%s/archoera-log-test-XXXXXX", base);
+        dir = mkdtemp(tmpl);
+        if (dir == NULL) {
+            fprintf(stderr, "mkdtemp failed\n");
+            return 2;
+        }
     }
 #endif
 
