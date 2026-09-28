@@ -13,6 +13,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 
+import '../../../services/log/log.dart';
+
 /// 着色器资产路径（pubspec `flutter: shaders:`）。
 const String kRippleShaderAsset = 'shaders/ripple.frag';
 
@@ -83,7 +85,7 @@ class RippleShaderLoader {
     try {
       _program = await ui.FragmentProgram.fromAsset(kRippleShaderAsset);
     } catch (e) {
-      debugPrint('[ripple] GLSL 着色器不可用，回退 CPU 自绘: $e');
+      Log.w('ripple', 'GLSL 着色器不可用，回退 CPU 自绘: $e');
       _program = null;
     }
     return _program;

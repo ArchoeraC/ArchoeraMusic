@@ -5,7 +5,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"strings"
 
@@ -131,7 +130,7 @@ func dispatch(w http.ResponseWriter, r *http.Request) {
 		endpoints.Scrobble(w, r)
 
 	default:
-		log.Printf("[subsonic] 未实现的端点: %s", ep)
+		logWarn("subsonic", "未实现的端点: %s", ep)
 		xmlutil.Send(w, r, map[string]any{}, &xmlutil.SubError{
 			Code:    0,
 			Message: "Endpoint " + ep + " not implemented",

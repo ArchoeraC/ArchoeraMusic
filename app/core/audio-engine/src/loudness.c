@@ -12,6 +12,7 @@
  * create 失败回退下方纯 C 实现；对外 API/行为不变。
  */
 #include "loudness.h"
+#include "era_log.h"
 #include <stdlib.h>
 #include <math.h>
 
@@ -55,7 +56,7 @@ Loudness* loudness_create(int sample_rate, int channels)
     }
 #endif
 
-    fprintf(stderr, "%s 创建: %dHz / %dch / 目标 %.1f LUFS\n",
+    ERA_LOGI(NULL, "%s 创建: %dHz / %dch / 目标 %.1f LUFS\n",
             LOG_TAG, sample_rate, channels, loud->target_lufs);
     return loud;
 }
@@ -67,7 +68,7 @@ void loudness_set_enabled(Loudness *loud, bool enabled)
 #if defined(HAS_ARCHOERA_KERNEL)
     if (loud->zk) zk_dsp_loudness_set_enabled(loud->zk, enabled ? 1 : 0);
 #endif
-    fprintf(stderr, "%s %s\n", LOG_TAG, enabled ? "启用" : "禁用");
+    ERA_LOGI(NULL, "%s %s\n", LOG_TAG, enabled ? "启用" : "禁用");
 }
 
 void loudness_set_target(Loudness *loud, float target_lufs)
@@ -87,7 +88,7 @@ void loudness_set_gain(Loudness *loud, float gain_db)
 #if defined(HAS_ARCHOERA_KERNEL)
     if (loud->zk) zk_dsp_loudness_set_gain(loud->zk, gain_db);
 #endif
-    fprintf(stderr, "%s 设置增益: %.2f dB (%.3fx)\n",
+    ERA_LOGI(NULL, "%s 设置增益: %.2f dB (%.3fx)\n",
             LOG_TAG, gain_db, loud->gain_linear);
 }
 

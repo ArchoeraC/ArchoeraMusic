@@ -25,7 +25,12 @@
 #include "player.h"
 #include "archoera_mediaengine.h"
 #include "native_decoder.h"
+#include "decoder.h"
+#include "era_log.h"
 #include "compat/qatomic.h"
+#if defined(HAS_ARCHOERA_KERNEL)
+#include "kernel_bridge.h"
+#endif
 
 /* ── UTF-8 安全 fopen（Windows 宽字符边界）──────────────────────
    会话目录 / 临时文件路径由 Dart 以 UTF-8 传入（%TEMP% 可能含中文用户名）。
@@ -70,6 +75,19 @@ static FILE *fopen_utf8(const char *path, const char *mode) {
     return fopen(path, mode);
 }
 #endif
+
+/* ── 统一日志 sink（宿主注入；见 archoera_mediaengine.h）───────────── */
+void archoera_mediaengine_set_log_sink(ArchoeraMediaEngineLogFn fn,
+                                       int min_level) {
+    era_log_set_sink((EraLogSink)fn, min_level);
+    /* 立即安装 FFmpeg 统一日志回调：URL 传输（AVIO）等早期日志也归入 sink，
+     * 否则会走 FFmpeg 默认回调直写 stderr（见 decoder.h）。 */
+    decoder_install_log_callback();
+#if defined(HAS_ARCHOERA_KERNEL)
+    /* 同步把 sink 注入 Zig 内核（内核两条生产日志走同一格式）。 */
+    zk_set_log_sink((ZkLogFn)fn, min_level);
+#endif
+}
 
 /* ── 队列容量 ────────────────────────────────────────────────── */
 #define EV_CAP 512      /* 事件队列条数 */
@@ -1208,7 +1226,7 @@ static void handle_set_sink(ArchoeraMediaEngine *e, const char *id)
     const char *old = e->sink_id ? e->sink_id : "";
 
     err[0] = '\0';
-    fprintf(stderr, "[mediaengine] set_sink id=\"%s\" (playing=%s)\n",
+    ERA_LOGI(NULL, "[mediaengine] set_sink id=\"%s\" (playing=%s)\n",
             req, e->player ? "yes" : "no");
 
     if (strcmp(req, old) == 0) {
@@ -1486,7 +1504,7 @@ static int mediaengine_stream_begin(ArchoeraMediaEngine *e)
     }
     double v = (double)e->last_volume;
     player_command(e->player, "set_volume", NULL, &v);
-    fprintf(stderr,
+    ERA_LOGI(NULL,
         "[mediaengine] 流式播放启动（首块 PCM 即出声，解码按设备消费节奏推进）\n");
     return 1;
 }
@@ -1639,10 +1657,10 @@ static void *engine_thread(void *arg)
         if (pool_env == NULL || pool_env[0] != '0') {
             if (native_decoder_pool_begin(1, 2, 16) == 0) {
                 pool_on = 1;
-                fprintf(stderr,
+                ERA_LOGI(NULL,
                     "[mediaengine] EraAudio 常驻内核池已启用 (ARCHOERA_ERA_POOL)\n");
             } else {
-                fprintf(stderr,
+                ERA_LOGE(NULL,
                     "[mediaengine] EraAudio 常驻内核池启用失败 → 沿用旧 zk_decoder 路径\n");
             }
         }
@@ -1714,7 +1732,7 @@ static void *engine_thread(void *arg)
              EOF，PCM 仅入内存块列表（pcm_window 可验证内容），不落盘、不播放；
            - 否则先尝试 raw 设备流；失败直接 error（不做文件回退）。 */
         if (getenv("ARCHOERA_MEMORY_HEADLESS")) {
-            fprintf(stderr,
+            ERA_LOGI(NULL,
                 "[mediaengine] 内存播放模式 headless（无设备，解码入内存块列表）\n");
             for (;;) {
                 if (QA_LOAD_ACQ(&e->stop_requested)) break;
@@ -1803,7 +1821,7 @@ static void *engine_thread(void *arg)
 
             if (e->wav) wav_finalize(e); /* 转码完成，WAV 头回填后供播放器加载 */
             if (e->player_file && !QA_LOAD_ACQ(&e->stop_requested)) {
-                fprintf(stderr, "[mediaengine] 播放器启动 sink=\"%s\" (env/上次选择；"
+                ERA_LOGI(NULL, "[mediaengine] 播放器启动 sink=\"%s\" (env/上次选择；"
                         "播放原生适配见 [player] 日志)\n",
                         e->sink_id && e->sink_id[0] ? e->sink_id : "(系统默认)");
                 player_start_options popts = PLAYER_START_OPTIONS_DEFAULT;
@@ -1895,7 +1913,7 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
     if (e->player_file && e->cfg.no_disk_cache) {
         e->mem_mode = 1;
         e->mem_cap_bytes = mem_resolve_cap(e);
-        fprintf(stderr,
+        ERA_LOGI(NULL,
                 "[mediaengine] 内存播放模式（不落盘）：cap=%lld bytes (cfg=%lld KB)\n",
                 (long long)e->mem_cap_bytes,
                 (long long)e->cfg.pcm_mem_cap_kb);
@@ -1923,7 +1941,7 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
         e->sink_id = strdup((env && env[0]) ? env : "");
         e->sink_user_set = (env && env[0]) ? 1 : 0;
         e->last_volume = 1.0f;
-        fprintf(stderr, "[mediaengine] 初始 sink=%s (%s)\n",
+        ERA_LOGI(NULL, "[mediaengine] 初始 sink=%s (%s)\n",
                 e->sink_id && e->sink_id[0] ? e->sink_id : "(系统默认)",
                 e->sink_user_set ? "env 显式指定" : "系统默认");
     }

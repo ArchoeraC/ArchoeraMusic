@@ -58,6 +58,7 @@ const std = @import("std");
 const Thread = std.Thread;
 const Io = std.Io;
 const tables = @import("tables.zig");
+const era_log = @import("log.zig");
 
 /// runtime 配置
 pub const Cfg = struct {
@@ -386,7 +387,7 @@ pub const Runtime = struct {
             if (self.stalled[id] and self.exited[id].load(.acquire)) {
                 self.respawnInto(id) catch {
                     _ = self.spawn_failed_count.fetchAdd(1, .monotonic);
-                    std.debug.print("runtime: worker respawn failed (OOM/线程配额/cap)\n", .{});
+                    era_log.emit(2, "kernel:runtime", "worker respawn failed (OOM/线程配额/cap)", .{});
                 };
                 return; // 低频逐个恢复
             }
@@ -741,7 +742,7 @@ pub const Runtime = struct {
                         error.NoCapacity => break, // 竞态中被并发回收/复用耗尽 → 下轮再评估
                         else => {
                             _ = self.spawn_failed_count.fetchAdd(1, .monotonic);
-                            std.debug.print("runtime: worker spawn failed (OOM/线程配额)\n", .{});
+                            era_log.emit(2, "kernel:runtime", "worker spawn failed (OOM/线程配额)", .{});
                             break;
                         },
                     };

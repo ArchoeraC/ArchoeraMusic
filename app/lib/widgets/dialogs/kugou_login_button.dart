@@ -21,6 +21,7 @@ import '../common/glass_blur.dart';
 import '../common/qr_image_view.dart';
 
 import '../../services/kugou/kugou_api.dart';
+import '../../services/log/log.dart';
 import '../../services/kugou/kugou_request.dart';
 import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -300,7 +301,7 @@ class _KgQrLoginDialogState extends ConsumerState<KgQrLoginDialog> {
           setState(() => _status = status);
         }
       } catch (e) {
-        debugPrint('[kugou] 检查登录异常: $e');
+        Log.e('kugou', '检查登录异常: $e');
         if (mounted) setState(() => _error = '$e');
       }
     });

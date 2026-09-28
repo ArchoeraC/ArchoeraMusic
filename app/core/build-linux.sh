@@ -74,4 +74,9 @@ echo "[build-linux] ===== platform bridge (CMake C++) ====="
 cmake -S "$ROOT/../native/platform" -B "$ROOT/../native/platform/build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$ROOT/../native/platform/build" -j"$JOBS"
 
+# 统一日志核心（libarchoera_log，C；Dart 载入后注入各原生层的 sink）。
+echo "[build-linux] ===== log core (CMake C) ====="
+cmake -S "$ROOT/../native/log" -B "$ROOT/../native/log/build" -DCMAKE_BUILD_TYPE=Release
+cmake --build "$ROOT/../native/log/build" -j"$JOBS"
+
 echo "[build-linux] 全部模块构建完成"

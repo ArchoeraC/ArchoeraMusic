@@ -100,12 +100,12 @@ public static class Program
         var dbPath = Environment.GetEnvironmentVariable("ARCHOERA_DB_PATH");
         if (string.IsNullOrEmpty(dbPath))
         {
-            Console.Error.WriteLine("[scanner] 错误: 未设置 ARCHOERA_DB_PATH 环境变量。直写模式需要数据库路径。");
+            Log.LogError("scanner", "未设置 ARCHOERA_DB_PATH 环境变量。直写模式需要数据库路径。");
             return 1;
         }
 
         // 直写模式：扫描器直接操作 SQLite，数据不经过 Node.js / V8 堆
-        Console.Error.WriteLine($"[scanner] 直写模式: {dbPath}");
+        Log.LogInfo("scanner", $"直写模式: {dbPath}");
         using var db = new SqliteDirectWriter(dbPath);
         var engine = new ScannerEngine(db, coverCacheDir, quarantineDir, batch, !full,
             maxFileSizeBytes: maxFileSizeMb * 1024L * 1024L,
@@ -124,7 +124,7 @@ public static class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[scanner] FATAL: {ex}");
+            Log.LogFatal("scanner", $"FATAL: {ex}");
             return 1;
         }
     }
@@ -144,7 +144,7 @@ public static class Program
             Console.WriteLine(ScannerJson.Track(track));
             return 0;
         }
-        Console.Error.WriteLine($"[scanner] 解析失败: {file}");
+        Log.LogError("scanner", $"解析失败: {file}");
         return 1;
     }
 
@@ -178,7 +178,7 @@ public static class Program
 
     private static int UnknownCommand(string command)
     {
-        Console.Error.WriteLine($"未知命令: {command}");
+        Log.LogError("scanner", $"未知命令: {command}");
         PrintUsage();
         return 1;
     }
@@ -197,7 +197,7 @@ public static class Program
         try { tag = TagLibFile.Create(filePath); }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[scanner] 解析失败 {filePath}: {ex.Message}");
+            Log.LogError("scanner", $"解析失败 {filePath}: {ex.Message}");
             return null;
         }
 
@@ -243,7 +243,7 @@ public static class Program
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[scanner] 封面写入失败 {filePath}: {ex.Message}");
+                Log.LogWarn("scanner", $"封面写入失败 {filePath}: {ex.Message}");
             }
         }
 

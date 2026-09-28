@@ -17,6 +17,7 @@ package endpoints
 #include <windows.h>
 #include <stdlib.h>
 typedef int (*archoera_transcode_fn)(const char*, const char*, int, int, int, int);
+typedef void (*archoera_set_log_sink_fn)(void*, int);
 // path 为 UTF-8 字节（Go C.CString）。LoadLibraryA 按 ANSI 代码页解释，非 ASCII
 // 目录（如 AppData 中文用户名下）会加载失败 → 转 UTF-16 用 LoadLibraryW。
 static void* archoera_dlopen(const char* path) {
@@ -39,16 +40,32 @@ static int archoera_call_transcode(void* h, const char* in, const char* out, int
     if (!fn) return -100;
     return fn(in, out, br, sr, ch, skip);
 }
+// 解析并转发统一日志 sink（转码器符号缺失时返回 -100，静默跳过）。
+static int archoera_apply_log_sink(void* h, void* sink, int min) {
+    archoera_set_log_sink_fn fn = (archoera_set_log_sink_fn)(void*)GetProcAddress((HMODULE)h, "archoera_transcoder_set_log_sink");
+    if (!fn) return -100;
+    fn(sink, min);
+    return 0;
+}
 */
 import "C"
 
-import "unsafe"
+import (
+	"unsafe"
+
+	"github.com/betastudio2/archoera-subsonic/logging"
+)
 
 // openTranscoder 打开转码器动态库，失败返回 nil
 func openTranscoder(path string) unsafe.Pointer {
 	cPath := C.CString(path)
 	defer C.free(unsafe.Pointer(cPath))
-	return C.archoera_dlopen(cPath)
+	h := C.archoera_dlopen(cPath)
+	if h != nil {
+		// 统一日志：把本进程 Go 侧保存的 sink 指针转发给转码器。
+		C.archoera_apply_log_sink(h, logging.SinkPtr(), C.int(logging.MinLevel()))
+	}
+	return h
 }
 
 // closeTranscoder 关闭转码器句柄

@@ -19,6 +19,7 @@ import 'dart:ui' show Color;
 
 import 'package:ffi/ffi.dart';
 
+import '../log/log.dart';
 import '../native_lib_paths.dart';
 import 'system_media.dart';
 
@@ -167,9 +168,12 @@ typedef _AplDeepLinkForwardC = Int32 Function();
 typedef _AplWindowActivateC = Int32 Function();
 typedef _SetEventCallbackC = Int32 Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
+typedef _SetLogSinkC = Void Function(Pointer<NativeFunction<AplLogFnC>> fn);
 
 typedef AplEventCallbackC = Void Function(
     Pointer<AplEventFfi> event, Pointer<Void> userData);
+typedef AplLogFnC = Void Function(
+    Int32 level, Pointer<Utf8> tag, Pointer<Utf8> message);
 
 typedef _AplVersionD = int Function();
 typedef _AplInitD = int Function();
@@ -195,6 +199,7 @@ typedef _AplDeepLinkForwardD = int Function();
 typedef _AplWindowActivateD = int Function();
 typedef _SetEventCallbackD = int Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
+typedef _SetLogSinkD = void Function(Pointer<NativeFunction<AplLogFnC>> fn);
 
 // ── 绑定 ───────────────────────────────────────────────────────────
 
@@ -290,7 +295,9 @@ class PlatformBindings {
         _windowActivateFn = lib.lookupFunction<_AplWindowActivateC, _AplWindowActivateD>(
             'apl_window_activate'),
         _setCallback = lib
-            .lookupFunction<_SetEventCallbackC, _SetEventCallbackD>('apl_set_event_callback') {
+            .lookupFunction<_SetEventCallbackC, _SetEventCallbackD>('apl_set_event_callback'),
+        _setLogSink =
+            lib.lookupFunction<_SetLogSinkC, _SetLogSinkD>('apl_set_log_sink') {
     // 事件回调：listener 可从任意 OS 线程触发，事件按到达序进入 Dart 端口
     _eventCallable = NativeCallable<AplEventCallbackC>.listener(_onNativeEvent);
     _setCallback(_eventCallable.nativeFunction, nullptr);
@@ -324,6 +331,7 @@ class PlatformBindings {
   final _AplDeepLinkForwardD _deepLinkForwardFn;
   final _AplWindowActivateD _windowActivateFn;
   final _SetEventCallbackD _setCallback;
+  final _SetLogSinkD _setLogSink;
 
   // 四类事件广播流（ffi_* 实现订阅转译）
   final _commandCtrl = StreamController<MediaCommandEvent>.broadcast();
@@ -391,6 +399,11 @@ class PlatformBindings {
       final b = PlatformBindings._(lib);
       if (b._version() != aplAbiVersion) return null; // 契约版本不符 → Noop
       if (b._init() != aplOk) return null;
+      // 注入统一日志 sink：桥接内部诊断走 libarchoera_log（格式/落盘统一）。
+      final sink = Log.nativeWritePointer;
+      if (sink != null) {
+        b._setLogSink(sink.cast<NativeFunction<AplLogFnC>>());
+      }
       _instance = b;
       return b;
     } catch (_) {

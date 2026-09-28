@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../services/log/log.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../stores/app_prefs.dart';
 import '../../l10n/l10n.dart';

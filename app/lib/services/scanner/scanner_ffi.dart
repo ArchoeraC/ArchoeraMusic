@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
+import '../log/log.dart';
 import '../native_lib_paths.dart';
 import 'sqlite_preload.dart';
 
@@ -60,7 +61,20 @@ class ScannerLibrary {
       }
     }
     final lib = DynamicLibrary.open(path);
-    return ScannerLibrary._(lib);
+    return ScannerLibrary._(lib)..installLogSink();
+  }
+
+  /// 注入统一日志 sink（缺失符号时静默跳过，兼容旧版库）。
+  void installLogSink() {
+    final sink = Log.nativeWritePointer;
+    if (sink == null) return;
+    try {
+      _lib.lookupFunction<_SetLogSinkNative, _SetLogSinkDart>(
+        'scanner_set_log_sink',
+      )(sink, Log.effectiveLevel);
+    } catch (_) {
+      // 旧版库无此符号：保持 Console 兜底。
+    }
   }
 
   // ---------------------------------------------------------------- FFI
@@ -204,3 +218,8 @@ typedef _FreeDart = void Function(Pointer<Void>);
 
 typedef _SetOptionsNative = Int32 Function(Pointer<Utf8> optionsJson);
 typedef _SetOptionsDart = int Function(Pointer<Utf8>);
+
+typedef _SetLogSinkNative =
+    Void Function(Pointer<NativeFunction<LogWriteNative>> fn, Int32 minLevel);
+typedef _SetLogSinkDart = void Function(
+    Pointer<NativeFunction<LogWriteNative>> fn, int minLevel);

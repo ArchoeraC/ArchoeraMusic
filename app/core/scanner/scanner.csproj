@@ -12,6 +12,8 @@
     <SelfContained>false</SelfContained>
     <PublishTrimmed>false</PublishTrimmed>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Log.cs 经函数指针 / NativeMemory 走统一日志 sink，需 unsafe -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- 启用 .NET 自带分析器（与 IDE 一致，构建期即暴露警告） -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>

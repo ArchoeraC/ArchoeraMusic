@@ -4,6 +4,22 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [0.9.18+8] - 2026-09-28
+
+> [!NOTE]
+> 于是日志终于有了个正经的家了喵。
+
+你好喵～
+
+一、新增全层统一日志：Dart / 平台桥接 / C 引擎 / 刮削器 / 扫描器 / Go Subsonic / Rust / Zig 内核 / vault，统一 `[HH:mm:ss LEVEL] [tag] msg`，INFO/WARN/ERROR/FATAL 各自颜色
+两、日志落盘改成单文件、硬上限 4MiB，超限原地截断，不再堆积 `.1/.2/.3`（旧的残留启动时自动清理）
+三、设置 →「缓存」新增「日志写入磁盘」开关，可完全关闭落盘（只留控制台）
+四、FFmpeg 自己的日志（含直链 URL 传输早/晚各阶段）也纳入统一日志；EraAudio 解码错误改标 FATAL
+五、直链 URL「管线就绪」会标注 `backend=… transport=…`，一眼看出是自研内核解码还是回退 FFmpeg
+六、修了日志核心被误打包进 git 的行李（`build/` 与 `*.obj` 已加入忽略）
+
+我喜欢你！
+
 ## [0.9.18+7] - 2026-09-23
 
 > [!NOTE]

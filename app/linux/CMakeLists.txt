@@ -284,3 +284,19 @@ add_dependencies(${BINARY_NAME} platform_bridge_cmake)
 install(FILES "${PLATFORM_BRIDGE_BUILD_DIR}/out/libarchoera_platform.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
 
+# === ArchoeraMusic 统一日志核心：内嵌 CMake 构建链（一键构建）===
+# 产出 libarchoera_log.so 到 app/native/log/build/out/；Dart 载入后把其
+# archoera_log_write 指针注入桥接/引擎/下载器/内核，全层日志走统一格式。
+set(ARCHOERA_LOG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../native/log")
+set(ARCHOERA_LOG_BUILD_DIR "${ARCHOERA_LOG_DIR}/build")
+add_custom_target(archoera_log_cmake ALL
+  COMMAND ${CMAKE_COMMAND} -S "${ARCHOERA_LOG_DIR}" -B "${ARCHOERA_LOG_BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
+  COMMAND ${CMAKE_COMMAND} --build "${ARCHOERA_LOG_BUILD_DIR}" -j
+  COMMENT "cmake build archoera_log core"
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} archoera_log_cmake)
+
+install(FILES "${ARCHOERA_LOG_BUILD_DIR}/out/libarchoera_log.so"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
+

@@ -26,6 +26,7 @@ import 'package:window_manager/window_manager.dart';
 import '../app/app_quit.dart';
 import '../app/theme_provider.dart';
 import '../l10n/l10n.dart';
+import '../services/log/log.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/playback/playback_state.dart';
 import '../widgets/dialogs/s_dialog.dart';

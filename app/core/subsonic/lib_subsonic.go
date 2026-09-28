@@ -15,6 +15,11 @@ package main
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+
+// 统一日志 sink 函数指针类型（对齐 archoera_log.h 的 ArchoeraLogFn）。
+typedef void (*archoera_log_fn)(int level, const char *tag, const char *message);
+// C 函数指针 → void*（Go 侧不便直接做该转换，借 C 中转）。
+static void* archoera_subsonic_fn_ptr(archoera_log_fn f) { return (void*)f; }
 */
 import "C"
 
@@ -22,7 +27,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -32,6 +36,7 @@ import (
 	"github.com/betastudio2/archoera-subsonic/config"
 	"github.com/betastudio2/archoera-subsonic/crypto"
 	"github.com/betastudio2/archoera-subsonic/db"
+	"github.com/betastudio2/archoera-subsonic/logging"
 	"github.com/betastudio2/archoera-subsonic/middleware"
 	"github.com/go-chi/chi/v5"
 )
@@ -62,6 +67,11 @@ func copyToBuf(buf *C.char, bufLen C.int, s string) C.int {
 	copy(dst[:n], s[:n])
 	dst[n] = 0
 	return C.int(n)
+}
+
+//export archoera_subsonic_set_log_sink
+func archoera_subsonic_set_log_sink(fn C.archoera_log_fn, minLevel C.int) {
+	logging.SetSink(C.archoera_subsonic_fn_ptr(fn), int(minLevel))
 }
 
 //export archoera_subsonic_create
@@ -139,9 +149,9 @@ func runServer(st *serverState, cfg config.Config) error {
 	}
 
 	if dedupCount, err := db.RemoveDuplicatePaths(); err != nil {
-		log.Printf("[subsonic] 路径去重失败: %v", err)
+		logWarn("subsonic", "路径去重失败: %v", err)
 	} else if dedupCount > 0 {
-		log.Printf("[subsonic] 路径去重: 清理 %d 条重复行", dedupCount)
+		logInfo("subsonic", "路径去重: 清理 %d 条重复行", dedupCount)
 	}
 
 	r := chi.NewRouter()
@@ -157,11 +167,11 @@ func runServer(st *serverState, cfg config.Config) error {
 	actual := ln.Addr().String()
 	st.srv = &http.Server{Addr: actual, Handler: r}
 	st.events <- fmt.Sprintf(`{"type":"started","addr":%q,"dbPath":%q}`, actual, cfg.DBPath)
-	log.Printf("[subsonic] Subsonic API 监听 %s", actual)
+	logInfo("subsonic", "Subsonic API 监听 %s", actual)
 	if err := st.srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 		return err
 	}
-	log.Printf("[subsonic] 已安全退出")
+	logInfo("subsonic", "已安全退出")
 	return nil
 }
 

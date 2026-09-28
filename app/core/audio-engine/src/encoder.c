@@ -16,6 +16,7 @@
  *   5. flush 时写完尾页
  */
 #include "encoder.h"
+#include "era_log.h"
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -85,7 +86,7 @@ Encoder* encoder_create(int sample_rate, int channels, int bitrate,
     /* 1. 创建 OGG 输出格式上下文 */
     int ret = avformat_alloc_output_context2(&e->fmt_ctx, NULL, "ogg", NULL);
     if (ret < 0 || !e->fmt_ctx) {
-        fprintf(stderr, "%s avformat_alloc_output_context2 失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s avformat_alloc_output_context2 失败\n", LOG_TAG);
         goto fail;
     }
 
@@ -103,7 +104,7 @@ Encoder* encoder_create(int sample_rate, int channels, int bitrate,
     /* 3. 查找 Opus 编码器 */
     const AVCodec *codec = avcodec_find_encoder(AV_CODEC_ID_OPUS);
     if (!codec) {
-        fprintf(stderr, "%s 未找到 Opus 编码器\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s 未找到 Opus 编码器\n", LOG_TAG);
         goto fail;
     }
 
@@ -132,13 +133,13 @@ Encoder* encoder_create(int sample_rate, int channels, int bitrate,
 
     ret = avcodec_open2(e->enc_ctx, codec, NULL);
     if (ret < 0) {
-        fprintf(stderr, "%s avcodec_open2 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s avcodec_open2 失败: %s\n", LOG_TAG, av_err2str(ret));
         goto fail;
     }
 
     ret = avcodec_parameters_from_context(e->stream->codecpar, e->enc_ctx);
     if (ret < 0) {
-        fprintf(stderr, "%s avcodec_parameters_from_context 失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s avcodec_parameters_from_context 失败\n", LOG_TAG);
         goto fail;
     }
     e->stream->time_base = e->enc_ctx->time_base;
@@ -146,7 +147,7 @@ Encoder* encoder_create(int sample_rate, int channels, int bitrate,
     /* 6. 写 OGG 头 */
     ret = avformat_write_header(e->fmt_ctx, NULL);
     if (ret < 0) {
-        fprintf(stderr, "%s avformat_write_header 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s avformat_write_header 失败: %s\n", LOG_TAG, av_err2str(ret));
         goto fail;
     }
     e->header_written = true;
@@ -171,7 +172,7 @@ Encoder* encoder_create(int sample_rate, int channels, int bitrate,
     e->enc_frame->sample_rate = sample_rate;
     ret = av_frame_get_buffer(e->enc_frame, 0);
     if (ret < 0) {
-        fprintf(stderr, "%s av_frame_get_buffer 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s av_frame_get_buffer 失败: %s\n", LOG_TAG, av_err2str(ret));
         goto fail;
     }
 
@@ -190,7 +191,7 @@ static int write_packet(Encoder *e)
     int ret = av_interleaved_write_frame(e->fmt_ctx, e->enc_pkt);
     av_packet_unref(e->enc_pkt);
     if (ret < 0) {
-        fprintf(stderr, "%s av_interleaved_write_frame 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s av_interleaved_write_frame 失败: %s\n", LOG_TAG, av_err2str(ret));
     }
     return ret;
 }
@@ -202,7 +203,7 @@ static int drain_packets(Encoder *e)
         int ret = avcodec_receive_packet(e->enc_ctx, e->enc_pkt);
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) return 0;
         if (ret < 0) {
-            fprintf(stderr, "%s avcodec_receive_packet 失败: %s\n", LOG_TAG, av_err2str(ret));
+            ERA_LOGE(NULL, "%s avcodec_receive_packet 失败: %s\n", LOG_TAG, av_err2str(ret));
             return ret;
         }
         ret = write_packet(e);
@@ -229,7 +230,7 @@ static int encode_frame(Encoder *e, const float *pcm, int samples)
             continue;
         }
         /* 真正的错误 */
-        fprintf(stderr, "%s avcodec_send_frame 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s avcodec_send_frame 失败: %s\n", LOG_TAG, av_err2str(ret));
         return ret;
     }
 

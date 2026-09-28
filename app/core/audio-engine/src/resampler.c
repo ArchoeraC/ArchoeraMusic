@@ -8,6 +8,7 @@
  * 将解码器输出的任意格式 PCM 转换为 48kHz float 交错格式。
  */
 #include "resampler.h"
+#include "era_log.h"
 
 #include <libswresample/swresample.h>
 #include <libavutil/channel_layout.h>
@@ -81,13 +82,13 @@ static int swr_init_real(Resampler *r)
     int ret = r->swr ? 0 : -1;
 #endif
     if (ret < 0 || !r->swr) {
-        fprintf(stderr, "%s swr_alloc_set_opts2 失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s swr_alloc_set_opts2 失败\n", LOG_TAG);
         return -1;
     }
 
     ret = swr_init(r->swr);
     if (ret < 0) {
-        fprintf(stderr, "%s swr_init 失败: %s\n", LOG_TAG, av_err2str(ret));
+        ERA_LOGE(NULL, "%s swr_init 失败: %s\n", LOG_TAG, av_err2str(ret));
         swr_free(&r->swr);
         return -1;
     }
@@ -134,7 +135,7 @@ int resampler_process(Resampler *r,
         (uint8_t **)&out_buf, max_out,
         in_data, in_samples);
     if (out_samples < 0) {
-        fprintf(stderr, "%s swr_convert 失败\n", LOG_TAG);
+        ERA_LOGE(NULL, "%s swr_convert 失败\n", LOG_TAG);
         return -1;
     }
     r->output_sample_count += out_samples;

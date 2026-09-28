@@ -10,6 +10,7 @@
  */
 #define _POSIX_C_SOURCE 200809L
 #include "pcm_uds.h"
+#include "era_log.h"
 
 #ifdef _WIN32
 /* Windows 无 AF_UNIX：stub（create 返回 NULL，其余无操作），
@@ -52,7 +53,7 @@ PcmUds* pcm_uds_create(const char *path)
 
     u->listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (u->listen_fd < 0) {
-        fprintf(stderr, "%s socket 创建失败: %s\n", LOG_TAG, strerror(errno));
+        ERA_LOGE(NULL, "%s socket 创建失败: %s\n", LOG_TAG, strerror(errno));
         free(u);
         return NULL;
     }
@@ -63,13 +64,13 @@ PcmUds* pcm_uds_create(const char *path)
     snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path);
 
     if (bind(u->listen_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        fprintf(stderr, "%s bind %s 失败: %s\n", LOG_TAG, path, strerror(errno));
+        ERA_LOGE(NULL, "%s bind %s 失败: %s\n", LOG_TAG, path, strerror(errno));
         close(u->listen_fd);
         free(u);
         return NULL;
     }
     if (listen(u->listen_fd, 1) < 0) {
-        fprintf(stderr, "%s listen 失败: %s\n", LOG_TAG, strerror(errno));
+        ERA_LOGE(NULL, "%s listen 失败: %s\n", LOG_TAG, strerror(errno));
         close(u->listen_fd);
         unlink(path);
         free(u);
@@ -80,7 +81,7 @@ PcmUds* pcm_uds_create(const char *path)
     int flags = fcntl(u->listen_fd, F_GETFL, 0);
     fcntl(u->listen_fd, F_SETFL, flags | O_NONBLOCK);
 
-    fprintf(stderr, "%s 监听 %s\n", LOG_TAG, path);
+    ERA_LOGI(NULL, "%s 监听 %s\n", LOG_TAG, path);
     return u;
 }
 
@@ -98,7 +99,7 @@ static void try_accept(PcmUds *u)
     int fd = accept(u->listen_fd, NULL, NULL);
     if (fd >= 0) {
         u->conn_fd = fd; /* accept 返回的 socket 为阻塞模式 */
-        fprintf(stderr, "%s 客户端已连接\n", LOG_TAG);
+        ERA_LOGI(NULL, "%s 客户端已连接\n", LOG_TAG);
     }
 }
 

@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,12 +13,14 @@ import 'package:window_manager/window_manager.dart';
 import 'apis/runtime.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'theme/app_theme.dart';
+import 'services/log/log.dart';
 import 'services/platform/platform_capabilities.dart';
 import 'services/deeplink/deep_link_router.dart';
 import 'services/power/frame_governor.dart';
 import 'services/scanner/sqlite_preload.dart';
 import 'services/streaming/streaming_store.dart';
 import 'stores/app_prefs.dart';
+import 'stores/data_dir.dart';
 import 'stores/vault_session_store.dart';
 import 'app/app.dart';
 import 'app/watermark.dart';
@@ -37,6 +40,26 @@ Future<void> main() async {
   // 防伪锚点：把 'ARCHOERA DESIGNED' 编译进内核/AOT 快照字符串表
   // （见 app/watermark.dart；勿删，反编译识别非官方重新打包）。
   archoeraWatermarkAnchor();
+  // 偏好先读一次（后面复用同一实例）：其中 `logToFile` 控制日志是否落盘。
+  final prefs = AppPrefs.load();
+  // 统一日志：尽早初始化。原生核心（libarchoera_log）写穿 stderr（带色）
+  // 与 `<dataDir>/logs/archoera.log`（单文件、硬上限 4 MiB、超限原地截断，
+  // 不生成 .1/.2/.3；可在设置页关闭落盘）。Dart 与各原生层共用同一格式与
+  // 落盘路径；核心缺失时降级为 Dart 等价格式化输出。
+  Log.init(
+    dir: '${resolveDataDir()}/logs',
+    level: _logLevelFromEnv(),
+    fileEnabled: prefs.logToFile,
+  );
+  // 未捕获异常纳入 ERROR（含 isolate/Flutter 框架错误）。不再调 presentError：
+  // 完整异常+栈已由统一日志输出，presentError 会经 debugPrint 再打一遍造成重复。
+  FlutterError.onError = (details) {
+    Log.e('flutter', '${details.exceptionAsString()}\n${details.stack}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    Log.e('isolate', '$error\n$stack');
+    return true;
+  };
   // 单实例守卫（经 Zig 平台桥接文件锁/命名互斥体，禁止多开）：已有实例则用应用
   // 自身对话框提示后退出（第二实例的 Flutter 引擎已由原生 runner 起好，直接
   // runApp 最小页）。桥接缺失时不再静默放行（旧 Dart 兜底不可靠）——显式失败。
@@ -81,14 +104,13 @@ Future<void> main() async {
   // 会话存储：vault 加密持久化（先加载/迁移旧明文，再注入宿主运行时，
   // 保证 kugou/netease 提供者首次读取时已就绪）。默认加密方案（crypto
   // 推荐 / vault 实验性）来自设置页偏好，控制惰性重建时初始化哪种方案。
-  final prefs = AppPrefs.load();
   StreamingStore.defaultScheme = prefs.credentialScheme;
   final sessionStore =
       VaultSessionStore(defaultScheme: prefs.credentialScheme);
   await sessionStore.initialize();
   if (!sessionStore.vaultAvailable) {
     // 凭据保险库不可用：登录态仅内存保留（不静默降级为明文持久化）
-    debugPrint('[vault] 凭据保险库不可用，登录态将不持久化（重启需重新登录）');
+    Log.w('vault', '凭据保险库不可用，登录态将不持久化（重启需重新登录）');
   }
   // 流媒体服务器凭据从 vault 预取进内存缓存（[load] 同步接口的凭据来源，
   // 首帧读取前完成，避免同步接口依赖异步会话）
@@ -111,6 +133,18 @@ Future<void> main() async {
   final deepLinkRouter = DeepLinkRouter(platformCaps.deepLink);
   deepLinkRouter.start();
   WidgetsBinding.instance.addPostFrameCallback((_) => deepLinkRouter.markReady());
+}
+
+/// 读取 `ARCHOERA_LOG_LEVEL`（debug/info/warn/error/fatal），非法/缺省为 info。
+LogLevel _logLevelFromEnv() {
+  final raw = Platform.environment['ARCHOERA_LOG_LEVEL']?.toLowerCase().trim();
+  return switch (raw) {
+    'debug' => LogLevel.debug,
+    'warn' || 'warning' => LogLevel.warn,
+    'error' => LogLevel.error,
+    'fatal' => LogLevel.fatal,
+    _ => LogLevel.info,
+  };
 }
 
 /// 让所有 HttpClient（含 Flutter Image.network 共享 client）默认携带浏览器 UA。

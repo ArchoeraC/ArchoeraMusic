@@ -16,6 +16,7 @@ import 'dart:typed_data';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/log/log.dart';
 import '../../services/qqmusic/qqmusic_api.dart';
 import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -133,7 +134,7 @@ class _QqMusicLoginDialogState extends ConsumerState<_QqMusicLoginDialog> {
         });
       }
     } catch (e) {
-      debugPrint('[qqmusic] 检查登录异常: $e');
+      Log.e('qqmusic', '检查登录异常: $e');
       if (mounted) setState(() => _hint = '${context.l10n.loginFailed}: $e');
     } finally {
       _checking = false;

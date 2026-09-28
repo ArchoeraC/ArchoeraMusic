@@ -51,7 +51,7 @@ class _EasterEggVisualHostState extends ConsumerState<EasterEggVisualHost> {
       }
     }
     if (effect == null) return;
-    debugPrint('[easter-egg] AUTO 启动触发 ${effect.id}');
+    Log.i('easter-egg', 'AUTO 启动触发 ${effect.id}');
     runEasterEgg(
       EasterEggContext(context: context, effect: effect, ref: ref),
     );

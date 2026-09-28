@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/downloader/download_controller.dart';
+import '../services/log/log.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
 import '../stores/app_prefs.dart';
@@ -41,7 +42,7 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       } catch (e, s) {
         // 现场恢复 / 登录态初始化异常不阻塞后续初始化（下载引擎等），
         // 恢复失败时现场保留暂停态，用户点播放即可重试。
-        debugPrint('[bootstrap] 初始化异常: $e\n$s');
+        Log.e('bootstrap', '初始化异常: $e\n$s');
       }
       // 各平台昵称/头像不持久化（只持久化凭据）：启动恢复登录态后
       // 显式拉取一次，保证头部账号资料每次启动都刷新（失败静默）。
@@ -112,7 +113,7 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       // 并入红心 songmid 集合（add-only），搜索等场景红心与列表同步点亮
       ref.read(likeControllerProvider).mergeOnlineQq(online);
     } catch (e) {
-      debugPrint('[qq_liked] 登录后在线收藏并入失败（不影响本机红心）: $e');
+      Log.w('qq_liked', '登录后在线收藏并入失败（不影响本机红心）: $e');
     }
   }
 }

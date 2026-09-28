@@ -57,6 +57,7 @@
 #include "decoder.h"
 #include "pcm_uds.h"
 #include "player.h"
+#include "era_log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -172,7 +173,7 @@ static void on_pcm_out(const float *pcm, int samples, int channels,
 
     if (!first_logged && g_stream_playback) {
         first_logged = 1;
-        fprintf(stderr, "[audio-engine] 首块 PCM 到达 t=%.0fms（流式出声点）\n",
+        ERA_LOGI(NULL, "[audio-engine] 首块 PCM 到达 t=%.0fms（流式出声点）\n",
                 now_mono_ms());
     }
 
@@ -701,7 +702,7 @@ static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
             streaming = 1;
             g_stream_playback = 1;
             pipeline_set_playback_streaming(p, true);
-            fprintf(stderr, "[audio-engine] 流式播放启动（首块 PCM 即出声）\n");
+            ERA_LOGI(NULL, "[audio-engine] 流式播放启动（首块 PCM 即出声）\n");
         } else {
             g_stream_playback = 0;
         }
@@ -835,7 +836,7 @@ static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
             player_stop(g_player);
             g_player = NULL;
         }
-        fprintf(stderr, "[audio-engine] 转码后阶段结束: %s\n",
+        ERA_LOGI(NULL, "[audio-engine] 转码后阶段结束: %s\n",
                 g_sigterm_received ? "SIGTERM"
                 : (g_want_exit ? "stop/播放结束" : "超时"));
     }
@@ -943,7 +944,7 @@ static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
                 control_send_line("{\"type\":\"done\"}");
                 if (g_wav_file) wav_finalize();
                 if (g_player) player_stream_end(g_player);
-                fprintf(stderr,
+                ERA_LOGI(NULL,
                     "[audio-engine] 流式解码完成 t=%.0fms（会话开始 %.0fms 后）\n",
                     now_mono_ms(), now_mono_ms() - t_start);
             }
@@ -984,7 +985,7 @@ static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
             g_player = NULL;
         }
         g_stream_playback = 0;
-        fprintf(stderr, "[audio-engine] 流式会话结束: %s\n",
+        ERA_LOGI(NULL, "[audio-engine] 流式会话结束: %s\n",
                 g_sigterm_received ? "SIGTERM" : "播放结束/stop");
         return result;
     }
@@ -1077,13 +1078,13 @@ int main(int argc, char *argv[])
         case 'M': cfg.engine_mode = atoi(optarg); break;
         /* 通用 */
         case 'h': print_usage(argv[0]); return 0;
-        case 'v': fprintf(stderr, "%s\n", audio_engine_version()); return 0;
+        case 'v': ERA_LOGI(NULL, "%s\n", audio_engine_version()); return 0;
         default:  print_usage(argv[0]); return 1;
         }
     }
 
     if (optind >= argc) {
-        fprintf(stderr, "错误：缺少输入文件\n\n");
+        ERA_LOGE(NULL, "错误：缺少输入文件\n\n");
         print_usage(argv[0]);
         return 1;
     }
@@ -1092,7 +1093,7 @@ int main(int argc, char *argv[])
 
     /* engine_mode 合法值 0(Stable)/1(EraAudio)；其它值按 Stable 处理 */
     if (cfg.engine_mode != 0 && cfg.engine_mode != 1) {
-        fprintf(stderr, "[audio-engine] 警告：非法 engine_mode=%d，已回退 Stable(0)\n",
+        ERA_LOGW(NULL, "[audio-engine] 警告：非法 engine_mode=%d，已回退 Stable(0)\n",
                 cfg.engine_mode);
         cfg.engine_mode = 0;
     }
@@ -1113,25 +1114,36 @@ int main(int argc, char *argv[])
      *   - player 模式（--player-file，miniaudio 播放）保持用户指定值，
      *     未指定时跟随源采样率（原生 Hi-Res 直通，§10.8） */
     if (!player_file && cfg.output_sample_rate != 48000) {
-        fprintf(stderr, "[audio-engine] 警告：Opus 固定使用 48000Hz，已自动调整\n");
+        ERA_LOGW(NULL, "[audio-engine] 警告：Opus 固定使用 48000Hz，已自动调整\n");
         cfg.output_sample_rate = 48000;
     }
 
-    fprintf(stderr, "[audio-engine] 开始转码: %s\n", source);
-    if (player_file && cfg.output_sample_rate <= 0) {
-        fprintf(stderr, "[audio-engine] 输出: 原生采样率(跟随源) / %dch / %dbps / %dms",
-                cfg.output_channels, cfg.bitrate, cfg.frame_size_ms);
-    } else {
-        fprintf(stderr, "[audio-engine] 输出: %dHz / %dch / %dbps / %dms",
-                cfg.output_sample_rate, cfg.output_channels,
-                cfg.bitrate, cfg.frame_size_ms);
+    ERA_LOGI(NULL, "[audio-engine] 开始转码: %s\n", source);
+    {
+        char out_line[512];
+        if (player_file && cfg.output_sample_rate <= 0) {
+            snprintf(out_line, sizeof(out_line),
+                    "[audio-engine] 输出: 原生采样率(跟随源) / %dch / %dbps / %dms",
+                    cfg.output_channels, cfg.bitrate, cfg.frame_size_ms);
+        } else {
+            snprintf(out_line, sizeof(out_line),
+                    "[audio-engine] 输出: %dHz / %dch / %dbps / %dms",
+                    cfg.output_sample_rate, cfg.output_channels,
+                    cfg.bitrate, cfg.frame_size_ms);
+        }
+        if (cfg.start_offset_ms > 0) {
+            size_t used = strlen(out_line);
+            snprintf(out_line + used, sizeof(out_line) - used, " / offset=%ldms",
+                    (long)cfg.start_offset_ms);
+        }
+        if (interactive) {
+            size_t used = strlen(out_line);
+            snprintf(out_line + used, sizeof(out_line) - used,
+                    " / interactive(ctl_fd=%d)", control_fd);
+        }
+        ERA_LOGI(NULL, "%s", out_line);
     }
-    if (cfg.start_offset_ms > 0) {
-        fprintf(stderr, " / offset=%ldms", (long)cfg.start_offset_ms);
-    }
-    if (interactive) fprintf(stderr, " / interactive(ctl_fd=%d)", control_fd);
-    fprintf(stderr, "\n");
-    fprintf(stderr, "[audio-engine] 解码引擎: %s\n",
+    ERA_LOGI(NULL, "[audio-engine] 解码引擎: %s\n",
             cfg.engine_mode == 1
                 ? "EraAudio（原生优先，失败回退 FFmpeg）"
                 : "Stable（FFmpeg）");
@@ -1149,14 +1161,17 @@ int main(int argc, char *argv[])
         if (cfg.eq_gains[i] != 0.0f) { has_eq = true; break; }
     }
     if (has_eq || cfg.eq_preamp_db != 0.0f) {
-        fprintf(stderr, "[audio-engine] EQ: preamp=%.1fdB, gains=[", cfg.eq_preamp_db);
-        for (int i = 0; i < EQ_BANDS; i++)
-            fprintf(stderr, "%.1f%s", cfg.eq_gains[i], i < 9 ? "," : "");
-        fprintf(stderr, "]\n");
+        char eq_line[512];
+        size_t eq_len = (size_t)snprintf(eq_line, sizeof(eq_line),
+                "[audio-engine] EQ: preamp=%.1fdB, gains=[", cfg.eq_preamp_db);
+        for (int i = 0; i < EQ_BANDS && eq_len < sizeof(eq_line); i++)
+            eq_len += (size_t)snprintf(eq_line + eq_len, sizeof(eq_line) - eq_len,
+                    "%.1f%s", cfg.eq_gains[i], i < 9 ? "," : "");
+        ERA_LOGI(NULL, "%s]", eq_line);
     }
-    if (cfg.normalization) fprintf(stderr, "[audio-engine] 响度归一化: %.1fdB\n", cfg.normalization_gain);
-    if (cfg.limiter_enabled) fprintf(stderr, "[audio-engine] 限幅器: %.1fdB\n", cfg.limiter_threshold_db);
-    if (cfg.fft_enabled) fprintf(stderr, "[audio-engine] FFT: %d 点\n", cfg.fft_size);
+    if (cfg.normalization) ERA_LOGI(NULL, "[audio-engine] 响度归一化: %.1fdB\n", cfg.normalization_gain);
+    if (cfg.limiter_enabled) ERA_LOGI(NULL, "[audio-engine] 限幅器: %.1fdB\n", cfg.limiter_threshold_db);
+    if (cfg.fft_enabled) ERA_LOGI(NULL, "[audio-engine] FFT: %d 点\n", cfg.fft_size);
 
     /* UDS 服务器统一创建（listen fd 非阻塞，连接惰性 accept）。
      * 桌面端（Flutter 直连）三路：
@@ -1168,19 +1183,19 @@ int main(int argc, char *argv[])
     if (stream_uds_path) {
         g_stream_uds = pcm_uds_create(stream_uds_path);
         if (!g_stream_uds) {
-            fprintf(stderr, "[audio-engine] 警告: 流 UDS 创建失败，回退 stdout 输出\n");
+            ERA_LOGW(NULL, "[audio-engine] 警告: 流 UDS 创建失败，回退 stdout 输出\n");
         }
     }
     if (control_uds_path) {
         g_ctl_uds = pcm_uds_create(control_uds_path);
         if (!g_ctl_uds) {
-            fprintf(stderr, "[audio-engine] 警告: 控制 UDS 创建失败，控制事件不可用\n");
+            ERA_LOGW(NULL, "[audio-engine] 警告: 控制 UDS 创建失败，控制事件不可用\n");
         }
     }
     if (pcm_uds_path) {
         g_pcm_uds = pcm_uds_create(pcm_uds_path);
         if (!g_pcm_uds) {
-            fprintf(stderr, "[audio-engine] 警告: PCM UDS 创建失败，继续转码（无频谱流出）\n");
+            ERA_LOGW(NULL, "[audio-engine] 警告: PCM UDS 创建失败，继续转码（无频谱流出）\n");
         }
     }
 
@@ -1188,11 +1203,11 @@ int main(int argc, char *argv[])
      * 无消费者/超时则继续转码，数据经 UDS 丢弃——兼容 Web/CLI 场景）。
      * 注意：SIGTERM 期间此处最多阻塞 STREAM_WAIT_MS，Flutter 停止走 SIGKILL 兜底。 */
     if (g_stream_uds) {
-        fprintf(stderr, "[audio-engine] 等待流消费者连接 %s ...\n", stream_uds_path);
+        ERA_LOGI(NULL, "[audio-engine] 等待流消费者连接 %s ...\n", stream_uds_path);
         if (pcm_uds_wait_conn(g_stream_uds, STREAM_WAIT_MS) == 0) {
-            fprintf(stderr, "[audio-engine] 流消费者已连接，开始转码\n");
+            ERA_LOGI(NULL, "[audio-engine] 流消费者已连接，开始转码\n");
         } else {
-            fprintf(stderr, "[audio-engine] 等待流消费者超时，继续转码（无消费者则数据丢弃）\n");
+            ERA_LOGW(NULL, "[audio-engine] 等待流消费者超时，继续转码（无消费者则数据丢弃）\n");
         }
     }
 
@@ -1207,7 +1222,7 @@ int main(int argc, char *argv[])
     AudioPipeline *p = pipeline_create(source, &cfg,
         g_stream_uds ? write_to_stream_uds : write_to_stdout, NULL);
     if (!p) {
-        fprintf(stderr, "[audio-engine] 管线创建失败\n");
+        ERA_LOGE(NULL, "[audio-engine] 管线创建失败\n");
         return 2;
     }
 
@@ -1218,7 +1233,7 @@ int main(int argc, char *argv[])
         /* WAV 头用实际输出采样率/声道（跟随源时即源采样率，原生直通） */
         wav_begin(player_file, pipeline_get_output_sample_rate(p),
                   cfg.output_channels);
-        fprintf(stderr, "[audio-engine] 播放模式: PCM 落盘 %s (%dHz)\n",
+        ERA_LOGI(NULL, "[audio-engine] 播放模式: PCM 落盘 %s (%dHz)\n",
                 player_file, pipeline_get_output_sample_rate(p));
     }
     if (g_pcm_uds || g_wav_file) {
@@ -1228,9 +1243,9 @@ int main(int argc, char *argv[])
     /* 注册全局指针，供 SIGTERM 处理器访问 */
     g_pipeline = p;
 
-    fprintf(stderr, "[audio-engine] 会话开始 t=%.0fms\n", now_mono_ms());
+    ERA_LOGI(NULL, "[audio-engine] 会话开始 t=%.0fms\n", now_mono_ms());
 
-    fprintf(stderr, "[audio-engine] 源: %dHz / %dch / 时长 %.1fs\n",
+    ERA_LOGI(NULL, "[audio-engine] 源: %dHz / %dch / 时长 %.1fs\n",
             pipeline_get_source_sample_rate(p),
             pipeline_get_source_channels(p),
             pipeline_get_duration(p));
@@ -1245,7 +1260,7 @@ int main(int argc, char *argv[])
     }
 
     if (ret < 0) {
-        fprintf(stderr, "[audio-engine] 转码错误: %d\n", ret);
+        ERA_LOGE(NULL, "[audio-engine] 转码错误: %d\n", ret);
         if (g_pcm_uds) { pcm_uds_destroy(g_pcm_uds); g_pcm_uds = NULL; }
         if (g_stream_uds) { pcm_uds_destroy(g_stream_uds); g_stream_uds = NULL; }
         if (g_ctl_uds) { pcm_uds_destroy(g_ctl_uds); g_ctl_uds = NULL; }
@@ -1253,7 +1268,7 @@ int main(int argc, char *argv[])
         return 3;
     }
 
-    fprintf(stderr, "[audio-engine] 转码完成\n");
+    ERA_LOGI(NULL, "[audio-engine] 转码完成\n");
     if (g_pcm_uds) { pcm_uds_destroy(g_pcm_uds); g_pcm_uds = NULL; }
     if (g_stream_uds) { pcm_uds_destroy(g_stream_uds); g_stream_uds = NULL; }
     if (g_ctl_uds) { pcm_uds_destroy(g_ctl_uds); g_ctl_uds = NULL; }
