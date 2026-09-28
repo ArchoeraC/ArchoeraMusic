@@ -208,6 +208,12 @@ mixin _PlaybackNotifierSession
             _sinkFailureCtrl.add(err);
           }
         }
+      case EngineSinkStall():
+        // 设备长时间无消费（如蓝牙 HFP 已连接但不可用/耳机充电）：提示用户切换。
+        _log('输出设备无消费: ${event.message}');
+        if (!_sinkFailureCtrl.isClosed) {
+          _sinkFailureCtrl.add(event.message);
+        }
       case EngineExited():
         if (_engine != null) {
           if (_autoResumeInFlight) {
