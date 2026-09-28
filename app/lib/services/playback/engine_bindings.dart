@@ -6,6 +6,7 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
+import '../log/log.dart';
 import '../native_lib_paths.dart';
 
 /// C 侧 `EngineConfig` 结构体映射（对齐 audio_engine.h，标准 ABI 布局）。
@@ -154,6 +155,12 @@ typedef _CreateStoreDart =
       int,
     );
 
+// 统一日志 sink 注入（archoera_mediaengine_set_log_sink）。
+typedef _SetLogSinkNative =
+    Void Function(Pointer<NativeFunction<LogWriteNative>> fn, Int32 minLevel);
+typedef _SetLogSinkDart = void Function(
+    Pointer<NativeFunction<LogWriteNative>> fn, int minLevel);
+
 /// C 侧 `SegStore*` 句柄（引擎地址；仅 Dart 会话持有，随引擎 destroy 后释放）。
 typedef SegStoreHandle = int;
 
@@ -167,7 +174,8 @@ class EngineBindings {
   /// 加载动态库并绑定全部函数（懒加载）。
   static EngineBindings? _instance;
   static EngineBindings get instance =>
-      _instance ??= EngineBindings._(DynamicLibrary.open(_libPath()));
+      _instance ??= (EngineBindings._(DynamicLibrary.open(_libPath()))
+        ..installLogSink());
 
   static String _libPath() {
     return NativeLibPaths.resolveRequired(
@@ -234,6 +242,21 @@ class EngineBindings {
       .lookupFunction<_CreateStoreNative, _CreateStoreDart>(
         'archoera_mediaengine_create_store',
       );
+
+  /// 注入统一日志 sink（缺失符号时静默跳过，兼容旧版库）。
+  void installLogSink() {
+    final sink = Log.nativeWritePointer;
+    if (sink == null) return;
+    try {
+      final setLogSink = _lib
+          .lookupFunction<_SetLogSinkNative, _SetLogSinkDart>(
+            'archoera_mediaengine_set_log_sink',
+          );
+      setLogSink(sink, Log.effectiveLevel);
+    } catch (_) {
+      // 旧版库无此符号：引擎保持 stderr 兜底。
+    }
+  }
 
   /// 创建引擎会话（失败抛 [StateError]，错误信息取引擎 errbuf）。
   ///

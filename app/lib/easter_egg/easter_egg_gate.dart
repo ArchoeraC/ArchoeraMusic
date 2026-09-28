@@ -33,7 +33,7 @@ Future<void> showEasterEggGate(
 
   final EasterEggEffect? target = effect ?? pickEasterEgg();
   if (target == null) {
-    debugPrint('[easter-egg] 本次未触发（概率未命中）');
+    Log.i('easter-egg', '本次未触发（概率未命中）');
     return;
   }
   await runEasterEgg(

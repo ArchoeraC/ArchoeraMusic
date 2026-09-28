@@ -7,8 +7,8 @@ import 'dart:convert';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-import 'package:flutter/foundation.dart';
 
+import '../log/log.dart';
 import 'downloader_ffi.dart';
 
 /// 下载引擎高层封装：持有 [DownloaderLibrary] + NativeCallable 回调。
@@ -240,7 +240,7 @@ class DownloaderEngine {
         _eventController.add(json);
       }
     } catch (e, st) {
-      debugPrint('DownloaderEngine 事件解析失败: $e\n$st');
+      Log.e('downloader', 'DownloaderEngine 事件解析失败: $e\n$st');
     }
   }
 

@@ -13,6 +13,7 @@
  * create 失败回退下方纯 C 实现；内核库缺失则纯 C。
  */
 #include "parametric_eq.h"
+#include "era_log.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -226,7 +227,7 @@ ParametricEq* parametric_eq_create(int sample_rate, int channels, int max_bands)
     if (!eq->filters) { free(eq); return NULL; }
 #endif
 
-    fprintf(stderr, "%s 创建: %dHz / %dch / 最多 %d 段\n",
+    ERA_LOGI(NULL, "%s 创建: %dHz / %dch / 最多 %d 段\n",
             LOG_TAG, sample_rate, channels, max_bands);
     return eq;
 }

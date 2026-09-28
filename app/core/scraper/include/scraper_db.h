@@ -21,6 +21,7 @@
 #include <cstdio>
 
 #include "scraper.h"
+#include "scraper_log.h"
 
 namespace archoera::scraper {
 
@@ -115,18 +116,18 @@ public:
             int retries = getRetries(trackId) + 1;
             execUpsert(trackId, "quarantined", retries, lastError, now);
             exec("COMMIT");
-            std::fprintf(stderr, "[scraper-db] %s 无匹配隔离\n", trackId.c_str());
+            SCRAPER_LOGW(NULL, "[scraper-db] %s 无匹配隔离", trackId.c_str());
         } else if (status == "failed") {
             // 标签写入失败 → 允许重试（最多 5 次）
             exec("BEGIN IMMEDIATE");
             int retries = getRetries(trackId) + 1;
             if (retries < 5) {
                 execUpsert(trackId, "pending", retries, lastError, now);
-                std::fprintf(stderr, "[scraper-db] %s 失败后归位 pending (retry=%d/5)\n",
+                SCRAPER_LOGW(NULL, "[scraper-db] %s 失败后归位 pending (retry=%d/5)",
                              trackId.c_str(), retries);
             } else {
                 execUpsert(trackId, "quarantined", retries, lastError, now);
-                std::fprintf(stderr, "[scraper-db] %s 已隔离 (retry=%d)\n",
+                SCRAPER_LOGE(NULL, "[scraper-db] %s 已隔离 (retry=%d)",
                              trackId.c_str(), retries);
             }
             exec("COMMIT");
@@ -164,7 +165,7 @@ public:
             while (sqlite3_step(selStmt) == SQLITE_ROW) {
                 std::string tid = colText(selStmt, 0);
                 std::string err = colText(selStmt, 1);
-                std::fprintf(stderr, "[scraper-db] 清理隔离项: %s (原因: %s)\n", tid.c_str(), err.c_str());
+                SCRAPER_LOGI(NULL, "[scraper-db] 清理隔离项: %s (原因: %s)", tid.c_str(), err.c_str());
             }
             sqlite3_finalize(selStmt);
 

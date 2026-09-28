@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../common/glass_blur.dart';
 import '../common/qr_image_view.dart';
 
+import '../../services/log/log.dart';
 import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
@@ -164,7 +165,7 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
         });
       }
     } catch (e) {
-      debugPrint('[netease] 检查登录异常: $e');
+      Log.e('netease', '检查登录异常: $e');
       if (mounted) setState(() => _status = '${context.l10n.loginFailed}: $e');
     } finally {
       _checking = false;

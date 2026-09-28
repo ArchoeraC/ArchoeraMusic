@@ -2702,6 +2702,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toastCacheAllCleared => 'All caches cleared';
 
   @override
+  String get settingsLogToFile => 'Write logs to file';
+
+  @override
+  String get settingsLogToFileOn => 'Logs are written to the logs/ folder';
+
+  @override
+  String get settingsLogToFileOff =>
+      'Logs are console-only; nothing is written to disk';
+
+  @override
+  String get settingsLogToFileNote =>
+      'Single file, capped at 4 MiB (truncated in place; no extra files).';
+
+  @override
   String get settingsSecuritySection => 'Secure wipe';
 
   @override

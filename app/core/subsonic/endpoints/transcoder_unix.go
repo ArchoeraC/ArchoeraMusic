@@ -17,6 +17,7 @@ package endpoints
 #include <dlfcn.h>
 #include <stdlib.h>
 typedef int (*archoera_transcode_fn)(const char*, const char*, int, int, int, int);
+typedef void (*archoera_set_log_sink_fn)(void*, int);
 static void* archoera_dlopen(const char* path) { return dlopen(path, RTLD_NOW); }
 static int archoera_dlclose(void* h) { return dlclose(h); }
 static int archoera_call_transcode(void* h, const char* in, const char* out, int br, int sr, int ch, int skip) {
@@ -24,16 +25,33 @@ static int archoera_call_transcode(void* h, const char* in, const char* out, int
     if (!fn) return -100;
     return fn(in, out, br, sr, ch, skip);
 }
+// 解析并转发统一日志 sink（转码器符号缺失时返回 -100，静默跳过）。
+static int archoera_apply_log_sink(void* h, void* sink, int min) {
+    archoera_set_log_sink_fn fn = (archoera_set_log_sink_fn)dlsym(h, "archoera_transcoder_set_log_sink");
+    if (!fn) return -100;
+    fn(sink, min);
+    return 0;
+}
 */
 import "C"
 
-import "unsafe"
+import (
+	"unsafe"
+
+	"github.com/betastudio2/archoera-subsonic/logging"
+)
 
 // openTranscoder 打开转码器动态库，失败返回 nil
 func openTranscoder(path string) unsafe.Pointer {
 	cPath := C.CString(path)
 	defer C.free(unsafe.Pointer(cPath))
-	return C.archoera_dlopen(cPath)
+	h := C.archoera_dlopen(cPath)
+	if h != nil {
+		// 统一日志：把本进程 Go 侧保存的 sink 指针转发给转码器
+		//（转码器经 dlopen 在同进程内运行，可直接回调 archoera_log_write）。
+		C.archoera_apply_log_sink(h, logging.SinkPtr(), C.int(logging.MinLevel()))
+	}
+	return h
 }
 
 // closeTranscoder 关闭转码器句柄

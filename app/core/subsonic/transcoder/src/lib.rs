@@ -8,10 +8,11 @@
 // 原本为 CLI（stdout 输出 MP3 流），按用户决策改为动态库 + FFI：
 // Go 侧经 dlopen 调用本符号，规避子进程与 stdin/stdout。
 use anyhow::{anyhow, Context, Result};
-use std::ffi::{c_char, c_int, CStr};
+use std::ffi::{c_char, c_int, c_void, CStr, CString};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use symphonia::core::audio::{AudioBufferRef, Signal};
 use symphonia::core::codecs::{DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error as SymphoniaError;
@@ -19,6 +20,61 @@ use symphonia::core::formats::FormatOptions;
 use symphonia::core::io::{MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
+
+// ============================================================
+// 统一日志 sink（对齐 downloader）：宿主经
+// archoera_transcoder_set_log_sink 注入 libarchoera_log 的
+// archoera_log_write 指针；未注入时回退 eprintln!。
+// 级别数值对齐 archoera_log.h：0=DEBUG 1=INFO 2=WARN 3=ERROR 4=FATAL。
+// ============================================================
+
+/// 注入的日志 sink 函数指针（0 = 未注入）。参数：level, tag, message。
+type LogSink = unsafe extern "C" fn(c_int, *const c_char, *const c_char);
+static LOG_SINK: AtomicUsize = AtomicUsize::new(0);
+/// 最小级别（低于此级别直接丢弃，避免无谓格式化）。
+static LOG_MIN_LEVEL: AtomicUsize = AtomicUsize::new(1); // INFO
+
+/// 注入统一日志 sink（宿主 Dart→Go 经 dlopen 转发）。fn_ptr=NULL 注销并回退
+/// eprintln!。幂等；可在转码前后调用。
+#[no_mangle]
+pub extern "C" fn archoera_transcoder_set_log_sink(fn_ptr: *const c_void, min_level: c_int) {
+    let lvl = if min_level < 0 { 0usize } else { min_level as usize };
+    LOG_MIN_LEVEL.store(lvl.min(4), Ordering::Release);
+    LOG_SINK.store(fn_ptr as usize, Ordering::Release);
+}
+
+fn level_name(level: i32) -> &'static str {
+    match level {
+        0 => "DEBUG",
+        2 => "WARN",
+        3 => "ERROR",
+        4 => "FATAL",
+        _ => "INFO",
+    }
+}
+
+/// 统一输出：已注入 sink 时经其回调（tag=transcoder），否则 eprintln 回退。
+fn log_emit(level: i32, args: std::fmt::Arguments<'_>) {
+    if (level as usize) < LOG_MIN_LEVEL.load(Ordering::Acquire) {
+        return;
+    }
+    let raw = LOG_SINK.load(Ordering::Acquire);
+    if raw != 0 {
+        let sink: LogSink = unsafe { std::mem::transmute(raw) };
+        if let (Ok(tag), Ok(msg)) = (CString::new("transcoder"), CString::new(format!("{}", args))) {
+            unsafe { sink(level, tag.as_ptr(), msg.as_ptr()) };
+            return;
+        }
+    }
+    eprintln!("[transcoder] {}: {}", level_name(level), args);
+}
+
+macro_rules! tlog_warn {
+    ($($arg:tt)*) => { log_emit(2, format_args!($($arg)*)) };
+}
+macro_rules! tlog_error {
+    ($($arg:tt)*) => { log_emit(3, format_args!($($arg)*)) };
+}
 
 /// C 入口：把 input 转码为 MP3 写入 output。
 /// bitrate: kbps（0 表示默认 192）；max_sample_rate: Hz（0 默认 48000）；
@@ -34,20 +90,20 @@ pub extern "C" fn archoera_transcode_mp3(
     skip_seconds: c_int,
 ) -> c_int {
     if input_path.is_null() || output_path.is_null() {
-        eprintln!("[archoera-transcoder] null 参数");
+        tlog_error!("null 参数");
         return 1;
     }
     let input = match unsafe { CStr::from_ptr(input_path) }.to_str() {
         Ok(s) => s.to_string(),
         Err(_) => {
-            eprintln!("[archoera-transcoder] 非法输入路径");
+            tlog_error!("非法输入路径");
             return 1;
         }
     };
     let output = match unsafe { CStr::from_ptr(output_path) }.to_str() {
         Ok(s) => s.to_string(),
         Err(_) => {
-            eprintln!("[archoera-transcoder] 非法输出路径");
+            tlog_error!("非法输出路径");
             return 1;
         }
     };
@@ -55,7 +111,7 @@ pub extern "C" fn archoera_transcode_mp3(
     match transcode_to_file(&input, &output, bitrate, max_sample_rate, channels, skip_seconds) {
         Ok(()) => 0,
         Err(e) => {
-            eprintln!("[archoera-transcoder] 转码失败: {:#}", e);
+            tlog_error!("转码失败: {:#}", e);
             2
         }
     }
@@ -193,7 +249,7 @@ fn transcode(args: &Params, out: &mut impl Write) -> Result<()> {
                 break;
             }
             Err(SymphoniaError::ResetRequired) => {
-                eprintln!("[archoera-transcoder] 解码器需要重置，跳过");
+                tlog_warn!("解码器需要重置，跳过");
                 continue;
             }
             Err(e) => {
@@ -204,7 +260,7 @@ fn transcode(args: &Params, out: &mut impl Write) -> Result<()> {
         let decoded = match decoder.decode(&packet) {
             Ok(buf) => buf,
             Err(e) => {
-                eprintln!("[archoera-transcoder] 跳过坏包: {}", e);
+                tlog_warn!("跳过坏包: {}", e);
                 continue;
             }
         };

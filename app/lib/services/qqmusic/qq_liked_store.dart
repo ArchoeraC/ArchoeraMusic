@@ -23,6 +23,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../log/log.dart';
 import '../netease/track.dart';
 import '../../stores/data_dir.dart';
 
@@ -130,7 +131,7 @@ class QqLikedStore extends ChangeNotifier {
           }),
         );
       } catch (e) {
-        debugPrint('[qq_liked] 写盘失败（不影响内存红心）: $e');
+        Log.w('qq_liked', '写盘失败（不影响内存红心）: $e');
       }
     });
   }

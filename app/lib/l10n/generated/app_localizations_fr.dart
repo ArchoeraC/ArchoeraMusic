@@ -2753,6 +2753,21 @@ class AppLocalizationsFr extends AppLocalizations {
   String get toastCacheAllCleared => 'Tous les caches vidés';
 
   @override
+  String get settingsLogToFile => 'Écrire les journaux dans un fichier';
+
+  @override
+  String get settingsLogToFileOn =>
+      'Les journaux sont écrits dans le dossier logs/';
+
+  @override
+  String get settingsLogToFileOff =>
+      'Console uniquement ; rien n\'est écrit sur le disque';
+
+  @override
+  String get settingsLogToFileNote =>
+      'Fichier unique, plafonné à 4 Mio (tronqué sur place ; aucun fichier supplémentaire).';
+
+  @override
   String get settingsSecuritySection => 'Destruction sécurisée';
 
   @override

@@ -74,10 +74,10 @@ EasterEggEffect? pickEasterEgg({double? chance, math.Random? random}) {
 
 /// 执行单个彩蛋：统一兜底异常（彩蛋不应把应用弄崩）。
 Future<void> runEasterEgg(EasterEggContext ctx) async {
-  debugPrint('[easter-egg] 执行 ${ctx.effect.id}');
+  Log.i('easter-egg', '执行 ${ctx.effect.id}');
   try {
     await ctx.effect.run(ctx);
   } catch (error, stack) {
-    debugPrint('[easter-egg] 效果 ${ctx.effect.id} 执行失败：$error\n$stack');
+    Log.e('easter-egg', '效果 ${ctx.effect.id} 执行失败：$error\n$stack');
   }
 }

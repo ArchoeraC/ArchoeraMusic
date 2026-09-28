@@ -8,6 +8,7 @@
  * 当 HAS_TEMPO 未定义时（无 Rust/cargo），提供 stub 实现，tempo 始终 bypass。
  */
 #include "tempo.h"
+#include "era_log.h"
 
 #include <stdlib.h>
 
@@ -68,7 +69,7 @@ Tempo* tempo_create(int sample_rate, int channels)
         return NULL;
     }
 
-    fprintf(stderr, "%s 创建: %dHz / %dch (signalsmith-stretch)\n", LOG_TAG, sample_rate, channels);
+    ERA_LOGI(NULL, "%s 创建: %dHz / %dch (signalsmith-stretch)\n", LOG_TAG, sample_rate, channels);
     return t;
 }
 
@@ -163,7 +164,7 @@ struct Tempo {
 Tempo* tempo_create(int sample_rate, int channels)
 {
     (void)sample_rate; (void)channels;
-    fprintf(stderr, "%s 创建: %dHz / %dch (stub, 未链接 Rust tempo 库)\n",
+    ERA_LOGW(NULL, "%s 创建: %dHz / %dch (stub, 未链接 Rust tempo 库)\n",
             LOG_TAG, sample_rate, channels);
     Tempo *t = calloc(1, sizeof(*t));
     return t;

@@ -448,6 +448,23 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
             ),
           ],
         ),
+        const SizedBox(height: 20),
+        // 日志落盘：本机写入开关（与缓存同属「存储」分类，但非缓存）。
+        SettingSection(
+          title: l10n.settingsLogToFile,
+          note: l10n.settingsLogToFileNote,
+          children: [
+            SettingSwitchTile(
+              icon: EtaIcons.fileOutline,
+              title: l10n.settingsLogToFile,
+              subtitle: prefs.logToFile
+                  ? l10n.settingsLogToFileOn
+                  : l10n.settingsLogToFileOff,
+              value: prefs.logToFile,
+              onChanged: (v) => notifier.setLogToFile(v),
+            ),
+          ],
+        ),
       ],
     );
   }

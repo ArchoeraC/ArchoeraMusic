@@ -10,6 +10,8 @@ import 'dart:math';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart';
 
+import '../log/log.dart';
+
 /// 凭据保险库进程（`archoera-vault` NativeAOT 可执行）封装。
 ///
 /// 会话模式（credential-vault-plan §3.8）：每次操作 spawn `serve` 会话——
@@ -504,7 +506,7 @@ class VaultProcess {
   /// fail-closed：非预期退出 → 连带终止主进程（物理内存随系统回收）。
   /// `ARCHOERA_VAULT_NO_ABORT=1`（测试/CI）仅写标记不终止。
   static void _abort(String dataDir) {
-    stderr.writeln('[vault] 凭据模块异常退出，fail-closed 终止主进程（$dataDir）');
+    Log.f('vault', '凭据模块异常退出，fail-closed 终止主进程（$dataDir）');
     if (Platform.environment[envNoAbort] == '1') return;
     exit(86);
   }
@@ -577,14 +579,14 @@ class VaultProcess {
   ///    展示文案由 UI 层按枚举映射 l10n（本层只写技术日志，不承载展示文案）。
   static void _failVersion(VaultFatalReason reason,
       {required String log, String? deletePath}) {
-    stderr.writeln('[vault] $log');
+    Log.e('vault', log);
     final target = deletePath ?? _binary;
     if (!_binaryFromEnv && target != null) {
       try {
         final f = File(target);
         if (f.existsSync()) f.deleteSync();
       } catch (_) {
-        stderr.writeln('[vault] 删除异常 vault 副本失败，请手动清理 $target');
+        Log.e('vault', '删除异常 vault 副本失败，请手动清理 $target');
       }
     }
     _binary = null;
@@ -646,9 +648,11 @@ class _VaultSession {
     s._reader.attach(p.stdout
         .transform(const Utf8Decoder(allowMalformed: true))
         .transform(const LineSplitter()));
-    // stderr 仅作日志（不解析协议）
+    // stderr 仅作日志（不解析协议）：按内容分级后并入统一日志。
     p.stderr.transform(utf8.decoder).listen((l) {
-      stderr.write('[vault] $l');
+      final line = l.trimRight();
+      if (line.isEmpty) return;
+      Log.at(_vaultStderrLevel(line), 'vault', line);
     }, onError: (_) {});
 
     final h = VaultProcess._randomB64(32);
@@ -850,4 +854,19 @@ class VaultVersionException extends VaultException {
 
   @override
   String toString() => 'VaultVersionException: $message';
+}
+
+/// vault 子进程 stderr 行的级别推断（无结构化级别，按关键字粗分）：
+/// vault 作为独立进程无法共享进程内 sink，故由 Dart 侧转发并并入统一日志。
+LogLevel _vaultStderrLevel(String line) {
+  final l = line.toLowerCase();
+  if (l.contains('error') ||
+      l.contains('fail') ||
+      line.contains('错误') ||
+      line.contains('失败') ||
+      line.contains('异常')) {
+    return LogLevel.error;
+  }
+  if (l.contains('warn') || line.contains('警告')) return LogLevel.warn;
+  return LogLevel.debug;
 }

@@ -41,6 +41,16 @@ typedef struct ArchoeraMediaEngine ArchoeraMediaEngine;
 #define ARCHOERA_MEDIAENGINE_API __attribute__((visibility("default")))
 #endif
 
+/* ── 统一日志 sink（宿主注入）───────────────────────────────────────
+ * 宿主 Dart 载入 libarchoera_log 后，把其 archoera_log_write 指针注入本引擎，
+ * 引擎内部日志即走统一格式/落盘；fn=NULL 注销并回退 stderr。
+ * level 取值同 archoera_log.h（0=DEBUG 1=INFO 2=WARN 3=ERROR 4=FATAL）；
+ * 低于 min_level 的日志在引擎侧即丢弃（避免无谓格式化）。 */
+typedef void (*ArchoeraMediaEngineLogFn)(int level, const char *tag,
+                                        const char *message);
+ARCHOERA_MEDIAENGINE_API void archoera_mediaengine_set_log_sink(
+    ArchoeraMediaEngineLogFn fn, int min_level);
+
 /**
  * 创建引擎会话并启动引擎线程（立即开始转码）。
  *

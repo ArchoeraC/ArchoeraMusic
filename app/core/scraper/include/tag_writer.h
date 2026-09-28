@@ -16,6 +16,7 @@
 ///   这些标识符是判断文件是否已刮削的可靠依据
 
 #include "scraper.h"
+#include "scraper_log.h"
 #include "sanitize.h"
 #include <taglib/tag.h>
 #include <taglib/fileref.h>
@@ -785,8 +786,8 @@ private:
         std::string coverMime = normalizedMime(result.coverMime);
 
         if (coverMime != "image/png" && coverMime != "image/jpeg") {
-            std::cerr << "[tag_writer] MP4 不支持 " << result.coverMime
-                      << " 格式封面，跳过封面嵌入（仅 JPEG/PNG 支持）" << std::endl;
+            SCRAPER_LOGW(NULL, "[tag_writer] MP4 不支持 %s 格式封面，跳过封面嵌入（仅 JPEG/PNG 支持）",
+                         result.coverMime.c_str());
             return true;  // 返回 true 表示标签写入成功（仅是封面没嵌入，元数据仍可正常写入）
         }
 

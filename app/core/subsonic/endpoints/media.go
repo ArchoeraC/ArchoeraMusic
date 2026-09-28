@@ -15,7 +15,6 @@ import (
 	"image/jpeg"
 	_ "image/png"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -316,14 +315,14 @@ func serveRangeContent(w http.ResponseWriter, r *http.Request, f *os.File, size 
 func serveTranscoded(w http.ResponseWriter, r *http.Request, srcPath string, mime, suffix string, asDownload bool, opts TranscodeOpts) {
 	libPath := transcoderBin()
 	if libPath == "" {
-		log.Printf("[subsonic] 未配置转码器库路径")
+		logError("subsonic", "未配置转码器库路径")
 		http.Error(w, "transcode unavailable", 500)
 		return
 	}
 
 	handle := openTranscoder(libPath)
 	if handle == nil {
-		log.Printf("[subsonic] 加载转码器失败: %s", libPath)
+		logError("subsonic", "加载转码器失败: %s", libPath)
 		http.Error(w, "transcode unavailable", 500)
 		return
 	}
@@ -332,7 +331,7 @@ func serveTranscoded(w http.ResponseWriter, r *http.Request, srcPath string, mim
 	// 转码输出到临时文件（Rust 端全量转码）
 	tmp, err := os.CreateTemp("", "archoera-transcode-*."+suffix)
 	if err != nil {
-		log.Printf("[subsonic] 创建临时文件失败: %v", err)
+		logError("subsonic", "创建临时文件失败: %v", err)
 		http.Error(w, "transcode failed", 500)
 		return
 	}
@@ -343,14 +342,14 @@ func serveTranscoded(w http.ResponseWriter, r *http.Request, srcPath string, mim
 	rc := callTranscode(handle, srcPath, tmpName,
 		opts.Bitrate, opts.MaxSampleRate, opts.Channels, opts.SkipSeconds)
 	if rc != 0 {
-		log.Printf("[subsonic] 转码失败: rc=%d", rc)
+		logError("subsonic", "转码失败: rc=%d", rc)
 		http.Error(w, "transcode failed", 500)
 		return
 	}
 
 	f, err := os.Open(tmpName)
 	if err != nil {
-		log.Printf("[subsonic] 打开转码结果失败: %v", err)
+		logError("subsonic", "打开转码结果失败: %v", err)
 		http.Error(w, "transcode failed", 500)
 		return
 	}
@@ -442,7 +441,7 @@ func ServeCoverArt(w http.ResponseWriter, r *http.Request) {
 func serveResizedCover(w http.ResponseWriter, r *http.Request, src *os.File, size int) {
 	img, _, err := image.Decode(src)
 	if err != nil {
-		log.Printf("[subsonic] 封面解码失败，回退原图: %v", err)
+		logWarn("subsonic", "封面解码失败，回退原图: %v", err)
 		_, _ = src.Seek(0, io.SeekStart)
 		fi, _ := src.Stat()
 		w.Header().Set("Content-Type", "image/jpeg")

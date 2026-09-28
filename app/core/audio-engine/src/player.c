@@ -26,6 +26,7 @@
 #include "audio_output.h"
 
 #include "resampler.h"
+#include "era_log.h"
 #include <libavutil/samplefmt.h>
 
 #include <stdio.h>
@@ -400,7 +401,7 @@ PlayerCtx *player_start_opts(const char *ogg_path,
         }
         if (probes) player_probe_free(probes);
     } else {
-        fprintf(stderr, "[player] 自建 pulse/alsa context 失败，回退默认 context\n");
+        ERA_LOGW(NULL, "[player] 自建 pulse/alsa context 失败，回退默认 context\n");
     }
 
     /* ── 原生格式适配判定 ────────────────────────────────────────
@@ -429,7 +430,7 @@ PlayerCtx *player_start_opts(const char *ogg_path,
         r = ma_engine_init(&econfig, &p->engine);
         if (r != MA_SUCCESS && ctx_inited) {
             /* 选中 sink 已消失 / 绑定 context 的引擎 init 失败 → 重试默认路径 */
-            fprintf(stderr,
+            ERA_LOGW(NULL,
                 "[player] 自建 context + 选中 sink 的 engine init 失败 %d，"
                 "回退默认设备\n", (int)r);
             ma_engine_config fcfg = ma_engine_config_init();
@@ -437,7 +438,7 @@ PlayerCtx *player_start_opts(const char *ogg_path,
         }
         p->context_initialized = (r == MA_SUCCESS && ctx_inited) ? 1 : 0;
         if (r != MA_SUCCESS) {
-            fprintf(stderr, "[player] ma_engine_init 失败: %d\n", (int)r);
+            ERA_LOGE(NULL, "[player] ma_engine_init 失败: %d\n", (int)r);
             if (ctx_inited) ma_context_uninit(&p->context);
             free(p);
             return NULL;
@@ -459,7 +460,7 @@ PlayerCtx *player_start_opts(const char *ogg_path,
             dev_rate = p->engine.pDevice->sampleRate;
             dev_ch   = p->engine.pDevice->playback.channels;
         }
-        fprintf(stderr,
+        ERA_LOGI(NULL,
             "[player] sink=%s(%s) backend=%s native=%uhz/%uch "
             "native_adapt=%d engine_dev=%uhz/%uch reason=%s\n",
             (sink_name[0] ? sink_name : "<default>"),
@@ -498,7 +499,7 @@ PlayerCtx *player_start_opts(const char *ogg_path,
                                 MA_SOUND_FLAG_DECODE, NULL, NULL, &p->sound);
 #endif
     if (r != MA_SUCCESS) {
-        fprintf(stderr, "[player] 加载 %s 失败: %d\n", ogg_path, (int)r);
+        ERA_LOGE(NULL, "[player] 加载 %s 失败: %d\n", ogg_path, (int)r);
         ma_engine_uninit(&p->engine);
         free(p);
         return NULL;
@@ -642,7 +643,7 @@ static void stream_data_cb(ma_device *pDevice, void *pOutput, const void *pInput
         QA_LOAD_ACQ(&p->stream_eof)) {
         QA_STORE_REL(&p->stream_stop, 1);
         if (p->stream_debug) {
-            fprintf(stderr, "[stream-dbg] cb set stop (frameCount=%u)\n",
+            ERA_LOGD(NULL, "[stream-dbg] cb set stop (frameCount=%u)\n",
                     frameCount);
         }
     }
@@ -854,7 +855,7 @@ PlayerCtx *player_stream_open(const char *sink_id,
             /* 以请求格式开默认设备失败 → 重试（默认 context，等价文件模式回退） */
         } else if (r != MA_SUCCESS) {
             /* 回退：无 context 默认路径 */
-            fprintf(stderr,
+            ERA_LOGW(NULL,
                 "[player] 流设备 init 失败 %d（自建 context），回退默认设备\n",
                 (int)r);
             ma_device_config fcfg = ma_device_config_init(ma_device_type_playback);
@@ -866,7 +867,7 @@ PlayerCtx *player_stream_open(const char *sink_id,
             r = ma_device_init(NULL, &fcfg, &p->stream_device);
         }
         if (r != MA_SUCCESS) {
-            fprintf(stderr, "[player] 流设备 init 失败: %d（无声路径，继续转码落盘）\n",
+            ERA_LOGW(NULL, "[player] 流设备 init 失败: %d（无声路径，继续转码落盘）\n",
                     (int)r);
             if (ctx_inited) ma_context_uninit(&p->context);
             stream_free_ring(p);
@@ -887,7 +888,7 @@ PlayerCtx *player_stream_open(const char *sink_id,
             used_backend = p->stream_device.pContext->backend;
             backend_name = ma_get_backend_name(used_backend);
         }
-        fprintf(stderr,
+        ERA_LOGI(NULL,
             "[player:stream] sink=%s backend=%s native=%uhz/%uch "
             "native_adapt=%d device=%uhz/%uch feed=%uhz/%uch ring=%zu帧(%.1fs) "
             "reason=%s\n",
@@ -1181,7 +1182,7 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
         r = ma_device_init(ctx_inited ? &p->context : NULL, &dcfg,
                            &p->stream_device);
         if (r != MA_SUCCESS) {
-            fprintf(stderr, "[player] 流设备切 sink init 失败 %d\n", (int)r);
+            ERA_LOGE(NULL, "[player] 流设备切 sink init 失败 %d\n", (int)r);
             p->stream_dev_inited = 0;
             return -1;
         }
@@ -1370,7 +1371,7 @@ int player_poll(PlayerCtx *p)
         if (p->stream_debug) {
             size_t w = QA_LOAD_RELAXED(&p->ring_w);
             size_t r = QA_LOAD_RELAXED(&p->ring_r);
-            fprintf(stderr, "[stream-dbg] poll eof=%zu stop=%zu dev_started=%zu "
+            ERA_LOGD(NULL, "[stream-dbg] poll eof=%zu stop=%zu dev_started=%zu "
                             "w=%zu r=%zu play=%.1f\n",
                     QA_LOAD_RELAXED(&p->stream_eof),
                     QA_LOAD_RELAXED(&p->stream_stop),

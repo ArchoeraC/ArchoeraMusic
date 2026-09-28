@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/router.dart';
 import '../../eta/icon/eta_icons.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../services/log/log.dart';
 import '../../services/platform/platform_capabilities.dart';
 import '../../services/playback/store_source.dart';
 import '../../theme/app_theme.dart';
@@ -85,7 +86,7 @@ Future<bool> confirmMemoryFallback(
       l10n.memoryAlertTitle,
       '$reason\n${l10n.memoryAlertOnlineDesc}',
     );
-    debugPrint('[M3] 后台内存不足 → 系统通知并自动在线直连回退（$raw）');
+    Log.w('M3', '后台内存不足 → 系统通知并自动在线直连回退（$raw）');
     return true;
   }
   final proceed = await showDialog<bool>(

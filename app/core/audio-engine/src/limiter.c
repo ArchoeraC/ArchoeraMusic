@@ -11,6 +11,7 @@
  * create 失败回退下方纯 C 实现；对外 API/行为不变。
  */
 #include "limiter.h"
+#include "era_log.h"
 #include <stdlib.h>
 #include <math.h>
 
@@ -51,7 +52,7 @@ Limiter* limiter_create(int sample_rate, int channels)
     }
 #endif
 
-    fprintf(stderr, "%s 创建: %dHz / %dch / 阈值 %.1f dB\n",
+    ERA_LOGI(NULL, "%s 创建: %dHz / %dch / 阈值 %.1f dB\n",
             LOG_TAG, sample_rate, channels, lim->threshold_db);
     return lim;
 }

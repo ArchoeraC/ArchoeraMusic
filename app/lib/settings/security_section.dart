@@ -26,6 +26,7 @@ import '../../apis/runtime.dart' show getRuntime;
 import '../../app/app_quit.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../../services/log/log.dart';
 import '../../services/security/data_destroyer.dart';
 import '../../services/security/vault_process.dart';
 import '../../services/streaming/streaming_provider.dart';

@@ -39,6 +39,7 @@ pub const wav = @import("fmt/wav/lib.zig");
 pub const convert = @import("pcm/convert.zig");
 pub const engine = @import("engine.zig");
 pub const dsp = @import("dsp/lib.zig");
+pub const log = @import("log.zig");
 
 /// 内核版本（语义化版本，与 build.zig.zon 保持同步）
 pub const version: std.SemanticVersion = .{ .major = 0, .minor = 1, .patch = 0 };
@@ -124,6 +125,12 @@ export fn zk_decoder_position_samples(d: *engine.Engine) i64 {
 /// 释放解码会话（含底层文件句柄与全部缓冲）；d 为 NULL 时为空操作（头契约）。
 export fn zk_decoder_close(d: ?*engine.Engine) void {
     if (d) |e| engine.zkClose(e);
+}
+
+/// 注入统一日志 sink（宿主 C 壳把 libarchoera_log 的 archoera_log_write 指针传来；
+/// fn=NULL 注销回退 std.debug.print）。头契约见 include/kernel_bridge.h。
+export fn zk_set_log_sink(fn_ptr: ?log.Sink, min_level: c_int) void {
+    log.setSink(fn_ptr, min_level);
 }
 
 // ---------------------------------------------------------------------------

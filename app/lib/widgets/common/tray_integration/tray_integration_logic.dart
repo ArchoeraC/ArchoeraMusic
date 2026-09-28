@@ -12,7 +12,7 @@ extension _TrayIntegrationLogic on _TrayIntegrationState {
       await windowManager.setPreventClose(true);
       _trayReady = true;
     } catch (e) {
-      debugPrint('[tray] 初始化失败，降级为正常关闭退出: $e');
+      Log.w('tray', '初始化失败，降级为正常关闭退出: $e');
       _trayReady = false;
       try {
         await trayManager.destroy();
