@@ -30,7 +30,7 @@ Future<void> _quitNow(EasterEggContext ctx) async {
   final ref = ctx.ref;
   if (ref == null) return;
   if (kEasterEggSafeMode) {
-    debugPrint('[easter-egg] quit_now 跳过（安全模式）');
+    Log.w('easter-egg', 'quit_now 跳过（安全模式）');
     return;
   }
   await quitApplication(ref);

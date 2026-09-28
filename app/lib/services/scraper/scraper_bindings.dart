@@ -14,6 +14,7 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
+import '../log/log.dart';
 import '../native_lib_paths.dart';
 
 typedef ScraperCreateNative = Pointer<Void> Function(Pointer<Utf8> configJson);
@@ -38,6 +39,10 @@ typedef ScraperWaitEventDart =
     int Function(Pointer<Void> handle, Pointer<Uint8> buf, int cap, int timeoutMs);
 typedef ScraperDestroyNative = Void Function(Pointer<Void> handle);
 typedef ScraperDestroyDart = void Function(Pointer<Void> handle);
+typedef ScraperSetLogSinkNative =
+    Void Function(Pointer<NativeFunction<LogWriteNative>> fn, Int32 minLevel);
+typedef ScraperSetLogSinkDart = void Function(
+    Pointer<NativeFunction<LogWriteNative>> fn, int minLevel);
 
 /// 刮削库句柄：持有 DynamicLibrary + 各函数指针，防止 GC 回收库。
 class ScraperBindings {
@@ -100,7 +105,20 @@ class ScraperBindings {
   void destroy(Pointer<Void> handle) => _destroy(handle);
 
   static ScraperBindings get instance =>
-      _instance ??= ScraperBindings._(load());
+      _instance ??= (ScraperBindings._(load())..installLogSink());
+
+  /// 注入统一日志 sink（缺失符号时静默跳过，兼容旧版库）。
+  void installLogSink() {
+    final sink = Log.nativeWritePointer;
+    if (sink == null) return;
+    try {
+      _lib.lookupFunction<ScraperSetLogSinkNative, ScraperSetLogSinkDart>(
+        'archoera_scraper_set_log_sink',
+      )(sink, Log.effectiveLevel);
+    } catch (_) {
+      // 旧版库无此符号：保持 stderr 兜底。
+    }
+  }
 
   /// 定位并加载共享库（失败抛 StateError 附搜索过程）。
   static DynamicLibrary load() {

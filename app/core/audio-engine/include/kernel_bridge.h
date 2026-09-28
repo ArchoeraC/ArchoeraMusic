@@ -38,6 +38,12 @@ enum ZkStatus {
     ZK_IO_ERROR         = 8
 };
 
+/** ── 统一日志 sink（宿主注入，见 app/native/log/include/archoera_log.h）──
+ * 宿主 C 壳把 libarchoera_log 的 archoera_log_write 指针注入内核；fn=NULL
+ * 注销回退 std.debug.print。level 0..4（DEBUG..FATAL）。可在任意线程调用。 */
+typedef void (*ZkLogFn)(int level, const char *tag, const char *message);
+void zk_set_log_sink(ZkLogFn fn, int min_level);
+
 /** 解码会话不透明句柄 */
 typedef struct ZkDecoder ZkDecoder;
 

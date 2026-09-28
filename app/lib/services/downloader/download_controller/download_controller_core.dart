@@ -324,14 +324,14 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
         allowQqMusic: true,
         // 下载流媒体一律取原文件（服务端转码会改变容器/扩展名，与标签/文件名不符）。
         streamingQuality: 'original',
-        log: (m) => debugPrint('下载回退解析: $m'),
+        log: (m) => Log.d('download', '下载回退解析: $m'),
       );
     } catch (e) {
-      debugPrint('下载回退解析异常: ${track.title}: $e');
+      Log.e('download', '下载回退解析异常: ${track.title}: $e');
       return;
     }
     if (url == null || url.isEmpty) {
-      debugPrint('下载回退无可用播放源: ${track.title}');
+      Log.e('download', '下载回退无可用播放源: ${track.title}');
       return;
     }
     if (_removedIds.contains(taskId)) return;
@@ -350,7 +350,11 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
       probed: probed,
     );
     final code = engine.retryWithUrl(taskId, resolved);
-    debugPrint('下载回退${code == 0 ? '已提交' : '提交失败(code=$code)'}: ${track.title}');
+    if (code == 0) {
+      Log.i('download', '下载回退已提交: ${track.title}');
+    } else {
+      Log.e('download', '下载回退提交失败(code=$code): ${track.title}');
+    }
   }
 
   /// 构造 Rust `archoera_downloader_retry_with_url` 的 resolvedJson（camelCase）。

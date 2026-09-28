@@ -15,6 +15,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 
+import '../../../services/log/log.dart';
+
 /// 着色器资产路径（pubspec `flutter: shaders:`）。
 const String kFluidShaderAsset = 'shaders/fluid.frag';
 
@@ -66,7 +68,7 @@ class FluidShaderLoader {
     try {
       _program = await ui.FragmentProgram.fromAsset(kFluidShaderAsset);
     } catch (e) {
-      debugPrint('[fluid] GLSL 着色器不可用，回退封面直铺: $e');
+      Log.w('fluid', 'GLSL 着色器不可用，回退封面直铺: $e');
       _program = null;
     }
     return _program;

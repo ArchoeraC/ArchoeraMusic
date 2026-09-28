@@ -65,79 +65,25 @@ namespace archoera {
 namespace {
 
 // ── 诊断日志 ──────────────────────────────────────────────────────
-// 同时写 OutputDebugStringA（DebugView）与多个日志文件：
-//   <exe 同级>\archoera_smtc.log / %TEMP%\archoera_smtc.log /
-//   %USERPROFILE%\archoera_smtc.log / C:\archoera_smtc.log
-constexpr int kLogMaxPaths = 4;
-char g_log_paths[kLogMaxPaths][MAX_PATH] = {};
-int g_log_path_count = 0;
-
-void tryAddLogPath(const char* full) {
-    if (g_log_path_count >= kLogMaxPaths) return;
-    FILE* f = nullptr;
-    if (fopen_s(&f, full, "a") == 0 && f != nullptr) {
-        std::fclose(f);
-        std::snprintf(g_log_paths[g_log_path_count], MAX_PATH, "%s", full);
-        g_log_path_count++;
-    }
+// 统一走宿主注入的 sink（libarchoera_log：格式/颜色/落盘/轮转），同时经
+// OutputDebugStringA 供 DebugView 观察；不再自建 SMTC 日志文件。
+void logAt(int level, const char* msg) {
+    ::OutputDebugStringA(msg);
+    archoera::log(level, "platform/smtc", msg);
 }
 
-void initLogPath() {
-    if (g_log_path_count > 0) return;
-    char buf[MAX_PATH];
-    if (::GetModuleFileNameA(nullptr, buf, MAX_PATH) > 0) {
-        char* slash = nullptr;
-        for (char* p = buf; *p; ++p) {
-            if (*p == '\\' || *p == '/') slash = p;
-        }
-        if (slash != nullptr) *slash = 0;
-        char p2[MAX_PATH];
-        std::snprintf(p2, MAX_PATH, "%s\\archoera_smtc.log", buf);
-        tryAddLogPath(p2);
-    }
-    if (::GetTempPathA(MAX_PATH, buf) > 0) {
-        char p2[MAX_PATH];
-        std::snprintf(p2, MAX_PATH, "%sarchoera_smtc.log", buf);
-        tryAddLogPath(p2);
-    }
-    const DWORD n = ::GetEnvironmentVariableA("USERPROFILE", buf, MAX_PATH);
-    if (n > 0 && n < MAX_PATH) {
-        char p2[MAX_PATH];
-        std::snprintf(p2, MAX_PATH, "%s\\archoera_smtc.log", buf);
-        tryAddLogPath(p2);
-    }
-    tryAddLogPath("C:\\archoera_smtc.log");
-}
+void logRaw(const char* line) { logAt(1 /* INFO */, line); }
 
-void logRaw(const char* line) {
-    ::OutputDebugStringA(line);
-    if (g_log_path_count == 0) initLogPath();
-    SYSTEMTIME st;
-    ::GetLocalTime(&st);
-    for (int i = 0; i < g_log_path_count; i++) {
-        FILE* f = nullptr;
-        if (fopen_s(&f, g_log_paths[i], "a") != 0 || f == nullptr) continue;
-        std::fprintf(f, "[%02d:%02d:%02d.%03d] %s\n", st.wHour, st.wMinute,
-                     st.wSecond, st.wMilliseconds, line);
-        std::fclose(f);
-    }
-}
-
-void log(const char* msg) { logRaw(msg); }
+void log(const char* msg) { logAt(1 /* INFO */, msg); }
 void logHr(const char* prefix, int32_t hr) {
     char buf[160];
     std::snprintf(buf, sizeof(buf), "%s hr=0x%08X", prefix,
                   static_cast<unsigned>(hr));
-    logRaw(buf);
+    logAt(3 /* ERROR */, buf);
 }
 
-void logReset() {
-    initLogPath();
-    for (int i = 0; i < g_log_path_count; i++) {
-        FILE* f = nullptr;
-        if (fopen_s(&f, g_log_paths[i], "w") == 0 && f != nullptr) std::fclose(f);
-    }
-}
+// 统一日志核心自行轮转；此处保留为 no-op（兼容既有调用点）。
+void logReset() {}
 
 // ── AppUserModelID + Toast 快捷方式 ──────────────────────────────
 // Windows Toast 前提（官方文档 enable-desktop-toast-with-appusermodelid）：

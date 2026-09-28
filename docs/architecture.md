@@ -310,7 +310,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 | 平台会话 cookie / 下载任务 | Dart 本地层（drift/Hive + vault） | 登录态与下载任务本地持久化（原侧车 `sessions`/`downloads` 表方案已废弃） |
 | 配置 | `config/settings.json`（原子写 + 迁移）| Dart |
 | 队列 / 播放历史 / UI 偏好 | Dart 本地（drift 或 Hive）| Flutter |
-| 日志 | `logs/` | 各进程各自 |
+| 日志 | `logs/archoera.log`（单文件，硬上限 4 MiB，超限原地截断）| 全层统一（Dart/桥接/引擎/Rust/Zig）经 `app/native/log` 核心写穿；可在设置页关闭落盘；格式与分级见 `docs/unified-logging.md` |
 
 **拆分原则**：媒体库（高频读写、多进程共享、无敏感数据）与用户数据（低频、含凭据、需加密）物理隔离——
 - 用户库路径 `dataDir/database/user.db`，与媒体库同目录独立文件，密钥自举到 `dataDir/secret.key`；

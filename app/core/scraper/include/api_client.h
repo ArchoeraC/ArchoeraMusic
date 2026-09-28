@@ -15,6 +15,7 @@
 ///   中文音乐源（多源并发 + 评分匹配），对中文音乐匹配率更高
 
 #include "scraper.h"
+#include "scraper_log.h"
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <openssl/evp.h>
@@ -299,9 +300,10 @@ public:
                 titleOK = isSimilar(track.title, mbTitle);
             }
             if (!artistOK || !titleOK) {
-                std::cerr << "[scraper]   ⚠ MusicBrainz 匹配结果可疑，放弃覆盖元数据: "
-                          << "原始=" << track.artist << " - " << track.title
-                          << ", MB=" << mbArtist << " - " << mbTitle << std::endl;
+                SCRAPER_LOGW(NULL,
+                    "[scraper]   ⚠ MusicBrainz 匹配结果可疑，放弃覆盖元数据: 原始=%s - %s, MB=%s - %s",
+                    track.artist.c_str(), track.title.c_str(),
+                    mbArtist.c_str(), mbTitle.c_str());
                 // 仅保留 MusicBrainz 标识符，其余元数据字段置空
                 result.title.reset();
                 result.artist.reset();
@@ -387,12 +389,12 @@ public:
         if (httpGetBinary(url, data, &code) && code == 200 && !data.empty()) {
             result.coverData = std::move(data);
             result.coverMime = detectImageMime(result.coverData);
-            std::cerr << "[scraper]   Cover Art Archive 封面下载成功: " << result.coverData.size()
-                      << " bytes, mime=" << result.coverMime << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   Cover Art Archive 封面下载成功: %zu bytes, mime=%s",
+                         result.coverData.size(), result.coverMime.c_str());
             return true;
         }
-        std::cerr << "[scraper]   Cover Art Archive 下载失败: HTTP " << code
-                  << ", 数据大小=" << data.size() << std::endl;
+        SCRAPER_LOGE(NULL, "[scraper]   Cover Art Archive 下载失败: HTTP %ld, 数据大小=%zu",
+                     code, data.size());
         return false;
     }
 
@@ -589,12 +591,12 @@ public:
         if (httpGetBinary(coverUrl, data, &code) && code == 200 && !data.empty()) {
             result.coverData = std::move(data);
             result.coverMime = detectImageMime(result.coverData);
-            std::cerr << "[scraper]   Deezer 封面下载成功: " << result.coverData.size()
-                      << " bytes, mime=" << result.coverMime << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   Deezer 封面下载成功: %zu bytes, mime=%s",
+                         result.coverData.size(), result.coverMime.c_str());
             return true;
         }
-        std::cerr << "[scraper]   Deezer 封面下载失败: HTTP " << code
-                  << ", 数据大小=" << data.size() << std::endl;
+        SCRAPER_LOGE(NULL, "[scraper]   Deezer 封面下载失败: HTTP %ld, 数据大小=%zu",
+                     code, data.size());
         return false;
     }
 
@@ -711,12 +713,12 @@ public:
         if (httpGetBinary(coverUrl, data, &code) && code == 200 && !data.empty()) {
             result.coverData = std::move(data);
             result.coverMime = detectImageMime(result.coverData);
-            std::cerr << "[scraper]   iTunes 封面下载成功: " << result.coverData.size()
-                      << " bytes, mime=" << result.coverMime << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   iTunes 封面下载成功: %zu bytes, mime=%s",
+                         result.coverData.size(), result.coverMime.c_str());
             return true;
         }
-        std::cerr << "[scraper]   iTunes 封面下载失败: HTTP " << code
-                  << ", 数据大小=" << data.size() << std::endl;
+        SCRAPER_LOGE(NULL, "[scraper]   iTunes 封面下载失败: HTTP %ld, 数据大小=%zu",
+                     code, data.size());
         return false;
     }
 
@@ -804,14 +806,14 @@ public:
         if (httpGetBinaryWithHeaders(coverUrl, data, &code, hdrs) && code == 200 && !data.empty()) {
             result.coverData = std::move(data);
             result.coverMime = ::archoera::scraper::detectImageMime(result.coverData);
-            std::cerr << "[scraper]   中文源封面下载成功: " << result.coverData.size()
-                      << " bytes, mime=" << result.coverMime << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   中文源封面下载成功: %zu bytes, mime=%s",
+                         result.coverData.size(), result.coverMime.c_str());
             return true;
         }
-        std::cerr << "[scraper]   中文源封面下载失败: HTTP " << code
-                  << ", 数据大小=" << data.size()
-                  << (referer.empty() ? "" : ", referer=" + referer)
-                  << std::endl;
+        SCRAPER_LOGE(NULL, "[scraper]   中文源封面下载失败: HTTP %ld, 数据大小=%zu%s",
+                     code, data.size(),
+                     (referer.empty() ? std::string()
+                                      : (", referer=" + referer)).c_str());
         return false;
     }
 
@@ -995,15 +997,14 @@ public:
         };
         if (httpGet(url, body, &code, pubHdrs) && code == 200) {
             parsePublicSearch(body, songs);
-            std::cerr << "[scraper]   网易云公开 API 返回 " << songs.size() << " 条结果" << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   网易云公开 API 返回 %zu 条结果", songs.size());
         } else {
-            std::cerr << "[scraper]   网易云公开 API 失败: HTTP " << code
-                      << "，尝试 weapi..." << std::endl;
+            SCRAPER_LOGW(NULL, "[scraper]   网易云公开 API 失败: HTTP %ld，尝试 weapi...", code);
         }
 
         // 公开 API 无结果时回退到 weapi 加密搜索
         if (songs.empty() && encryptedSearch(title, songs)) {
-            std::cerr << "[scraper]   网易云 weapi 搜索返回 " << songs.size() << " 条结果" << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   网易云 weapi 搜索返回 %zu 条结果", songs.size());
         }
         // weapi 失败时回退到 linuxapi（AES-128-ECB，无需 RSA，更可靠）
         if (songs.empty()) {
@@ -1023,8 +1024,8 @@ public:
                         }
                     }
                 }
-                std::cerr << "[scraper]   网易云 linuxapi 回填封面: "
-                          << lsongs.size() << " 条结果" << std::endl;
+                SCRAPER_LOGI(NULL, "[scraper]   网易云 linuxapi 回填封面: %zu 条结果",
+                             lsongs.size());
             }
         }
 
@@ -1130,8 +1131,8 @@ private:
         };
         if (!httpPost("https://music.163.com/api/linux/forward",
                        postData, body, &code, hdrs) || code != 200) {
-            std::cerr << "[scraper]   网易云 linuxapi 失败: HTTP " << code
-                      << ", body=" << body.substr(0, 200) << std::endl;
+            SCRAPER_LOGE(NULL, "[scraper]   网易云 linuxapi 失败: HTTP %ld, body=%s",
+                         code, body.substr(0, 200).c_str());
             return false;
         }
 
@@ -1154,10 +1155,10 @@ private:
                 cs.resource = "netease";
                 songs.push_back(std::move(cs));
             }
-            std::cerr << "[scraper]   网易云 linuxapi 返回 " << songs.size() << " 条结果" << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   网易云 linuxapi 返回 %zu 条结果", songs.size());
             return !songs.empty();
         } catch (const json::exception& e) {
-            std::cerr << "[scraper]   网易云 linuxapi 解析失败: " << e.what() << std::endl;
+            SCRAPER_LOGE(NULL, "[scraper]   网易云 linuxapi 解析失败: %s", e.what());
             return false;
         }
     }
@@ -1182,13 +1183,14 @@ private:
         };
         if (!httpPost("https://music.163.com/weapi/cloudsearch/get/web",
                        formData, body, &code, hdrs) || code != 200) {
-            std::cerr << "[scraper]   网易云 weapi POST 失败: HTTP " << code
-                      << ", body=" << body.substr(0, 200) << std::endl;
+            SCRAPER_LOGE(NULL, "[scraper]   网易云 weapi POST 失败: HTTP %ld, body=%s",
+                         code, body.substr(0, 200).c_str());
             return false;
         }
         parseWeapiSearch(body, songs);
         if (songs.empty()) {
-            std::cerr << "[scraper]   网易云 weapi 返回 0 条结果, body=" << body.substr(0, 300) << std::endl;
+            SCRAPER_LOGW(NULL, "[scraper]   网易云 weapi 返回 0 条结果, body=%s",
+                         body.substr(0, 300).c_str());
         }
         return !songs.empty();
     }
@@ -1393,15 +1395,16 @@ private:
                 // picId 无法构造有效封面 URL，albumImg 为空时由 linuxapi 回退填充
                 // 首个结果输出调试信息
                 if (songs.empty()) {
-                    std::cerr << "[scraper]   网易云公开 API 首个结果: name=" << cs.name
-                              << ", artist=" << cs.artist
-                              << ", album=" << cs.album
-                              << ", albumImg=" << (cs.albumImg.empty() ? "(空，需要linuxapi回填)" : cs.albumImg)
-                              << ", album.keys=";
+                    std::string albumKeys;
                     for (auto& [k, v] : album.items()) {
-                        std::cerr << k << ",";
+                        albumKeys += k;
+                        albumKeys += ",";
                     }
-                    std::cerr << std::endl;
+                    SCRAPER_LOGD(NULL,
+                        "[scraper]   网易云公开 API 首个结果: name=%s, artist=%s, album=%s, albumImg=%s, album.keys=%s",
+                        cs.name.c_str(), cs.artist.c_str(), cs.album.c_str(),
+                        (cs.albumImg.empty() ? "(空，需要linuxapi回填)" : cs.albumImg.c_str()),
+                        albumKeys.c_str());
                 }
                 cs.resource = "netease";
                 songs.push_back(std::move(cs));
@@ -1431,10 +1434,10 @@ private:
                 cs.albumImg = al.value("picUrl", "");
                 // 首个结果输出调试信息
                 if (songs.empty()) {
-                    std::cerr << "[scraper]   网易云 weapi 首个结果: name=" << cs.name
-                              << ", artist=" << cs.artist
-                              << ", album=" << cs.album
-                              << ", albumImg=" << cs.albumImg << std::endl;
+                    SCRAPER_LOGD(NULL,
+                        "[scraper]   网易云 weapi 首个结果: name=%s, artist=%s, album=%s, albumImg=%s",
+                        cs.name.c_str(), cs.artist.c_str(), cs.album.c_str(),
+                        cs.albumImg.c_str());
                 }
                 // 从毫秒时间戳提取年份
                 if (entry.contains("publishTime") && entry["publishTime"].is_number()) {
@@ -1528,7 +1531,7 @@ public:
             {"User-Agent", "QQ%E9%9F%B3%E4%B9%90/73222 CFNetwork/1406.0.3 Darwin/22.4.0"},
         };
         if (!httpPost(url, jsonBody, body, &code, hdrs) || code != 200) {
-            std::cerr << "[scraper]   QQ音乐 POST 失败: HTTP " << code << std::endl;
+            SCRAPER_LOGE(NULL, "[scraper]   QQ音乐 POST 失败: HTTP %ld", code);
             return songs;
         }
 
@@ -1561,9 +1564,9 @@ public:
                 cs.resource = "qmusic";
                 songs.push_back(std::move(cs));
             }
-            std::cerr << "[scraper]   QQ音乐返回 " << songs.size() << " 条结果"
-                      << (songs.empty() ? "" : ", 首个albumImg=" + songs[0].albumImg)
-                      << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   QQ音乐返回 %zu 条结果%s", songs.size(),
+                         (songs.empty() ? std::string()
+                                        : (", 首个albumImg=" + songs[0].albumImg)).c_str());
         } catch (const json::exception& e) {
             lastError_ = std::string("QQ音乐 JSON 解析失败: ") + e.what();
         }
@@ -1706,7 +1709,7 @@ private:
             {"User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
         };
         if (!httpGet(url, body, &code, hdrs) || code != 200) {
-            std::cerr << "[scraper]   酷狗签名 API 失败: HTTP " << code << std::endl;
+            SCRAPER_LOGE(NULL, "[scraper]   酷狗签名 API 失败: HTTP %ld", code);
             return false;
         }
 
@@ -1726,9 +1729,9 @@ private:
                 cs.resource = "kugou";
                 songs.push_back(std::move(cs));
             }
-            std::cerr << "[scraper]   酷狗返回 " << songs.size() << " 条结果"
-                      << (songs.empty() ? "" : ", 首个albumImg=" + songs[0].albumImg)
-                      << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   酷狗返回 %zu 条结果%s", songs.size(),
+                         (songs.empty() ? std::string()
+                                        : (", 首个albumImg=" + songs[0].albumImg)).c_str());
         } catch (const json::exception& e) {
             lastError_ = std::string("酷狗 JSON 解析失败: ") + e.what();
         }
@@ -1834,7 +1837,7 @@ public:
         long code = 0;
         auto hdrs = buildHeaders();
         if (!httpGet(url, body, &code, hdrs) || code != 200) {
-            std::cerr << "[scraper]   酷我 API 失败: HTTP " << code << std::endl;
+            SCRAPER_LOGE(NULL, "[scraper]   酷我 API 失败: HTTP %ld", code);
             return songs;
         }
 
@@ -1852,9 +1855,9 @@ public:
                 cs.resource = "kuwo";
                 songs.push_back(std::move(cs));
             }
-            std::cerr << "[scraper]   酷我返回 " << songs.size() << " 条结果"
-                      << (songs.empty() ? "" : ", 首个albumImg=" + songs[0].albumImg)
-                      << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   酷我返回 %zu 条结果%s", songs.size(),
+                         (songs.empty() ? std::string()
+                                        : (", 首个albumImg=" + songs[0].albumImg)).c_str());
         } catch (const json::exception& e) {
             lastError_ = std::string("酷我 JSON 解析失败: ") + e.what();
         }
@@ -1942,7 +1945,7 @@ public:
             {"User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:80.0) Gecko/20100101 Firefox/80.0"},
         };
         if (!httpGet(url, body, &code, hdrs) || code != 200) {
-            std::cerr << "[scraper]   咪咕 API 失败: HTTP " << code << std::endl;
+            SCRAPER_LOGE(NULL, "[scraper]   咪咕 API 失败: HTTP %ld", code);
             return songs;
         }
 
@@ -1958,9 +1961,9 @@ public:
                 cs.resource = "migu";
                 songs.push_back(std::move(cs));
             }
-            std::cerr << "[scraper]   咪咕返回 " << songs.size() << " 条结果"
-                      << (songs.empty() ? "" : ", 首个albumImg=" + songs[0].albumImg)
-                      << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   咪咕返回 %zu 条结果%s", songs.size(),
+                         (songs.empty() ? std::string()
+                                        : (", 首个albumImg=" + songs[0].albumImg)).c_str());
         } catch (const json::exception& e) {
             lastError_ = std::string("咪咕 JSON 解析失败: ") + e.what();
         }
@@ -2452,10 +2455,11 @@ public:
                                     result.artistMbid = j["artist-credit"][0]["artist"]["id"].get<std::string>();
                             }
                             result.scrapedSources.push_back("acoustid");
-                            std::cerr << "[scraper]   🔍 音频指纹识别成功 (score="
-                                      << static_cast<int>(ar.score * 100) << "%): "
-                                      << result.artist.value_or("?") << " - "
-                                      << result.title.value_or("?") << std::endl;
+                            SCRAPER_LOGI(NULL,
+                                "[scraper]   🔍 音频指纹识别成功 (score=%d%%): %s - %s",
+                                static_cast<int>(ar.score * 100),
+                                result.artist.value_or("?").c_str(),
+                                result.title.value_or("?").c_str());
                             break;  // 找到第一个高分匹配即停止
                         } catch (const json::exception&) {}
                     }
@@ -2544,8 +2548,8 @@ public:
                     bestChineseSource = cr.name;
                 }
             }
-            std::cerr << "[scraper]   " << cr.name << ": " << cr.songs.size()
-                      << " 结果, " << srcPassed << " 通过评分" << std::endl;
+            SCRAPER_LOGD(NULL, "[scraper]   %s: %zu 结果, %d 通过评分",
+                         cr.name.c_str(), cr.songs.size(), srcPassed);
         }
 
         // 按评分降序排序中文封面候选
@@ -2555,12 +2559,13 @@ public:
             });
 
         if (!chineseCoverCandidates.empty()) {
-            std::cerr << "[scraper]   中文源封面候选: " << chineseCoverCandidates.size() << " 个"
-                      << " (最佳: " << chineseCoverCandidates[0].source
-                      << " score=" << chineseCoverCandidates[0].score << ")" << std::endl;
+            SCRAPER_LOGI(NULL, "[scraper]   中文源封面候选: %zu 个 (最佳: %s score=%d)",
+                         chineseCoverCandidates.size(),
+                         chineseCoverCandidates[0].source.c_str(),
+                         chineseCoverCandidates[0].score);
         } else {
-            std::cerr << "[scraper]   中文源未返回有效封面 URL（"
-                      << chineseResults.size() << " 个源）" << std::endl;
+            SCRAPER_LOGW(NULL, "[scraper]   中文源未返回有效封面 URL（%zu 个源）",
+                         chineseResults.size());
         }
 
         // ====================================================================
@@ -2588,44 +2593,48 @@ public:
         // 阶段 3：封面获取（按优先级：Cover Art Archive → Deezer → iTunes → 中文源）
         // ====================================================================
         if (cfg_.embedCover && result.coverData.empty()) {
-            std::cerr << "[scraper]   封面来源状态: albumMbid=" << (result.albumMbid ? *result.albumMbid : "(无)")
-                      << ", dzCoverUrl=" << (dzCoverUrl.empty() ? "(空)" : dzCoverUrl)
-                      << ", itCoverUrl=" << (itCoverUrl.empty() ? "(空)" : itCoverUrl)
-                      << ", chineseCandidates=" << chineseCoverCandidates.size() << " 个"
-                      << std::endl;
+            SCRAPER_LOGD(NULL,
+                "[scraper]   封面来源状态: albumMbid=%s, dzCoverUrl=%s, itCoverUrl=%s, chineseCandidates=%zu 个",
+                (result.albumMbid ? *result.albumMbid : std::string("(无)")).c_str(),
+                (dzCoverUrl.empty() ? std::string("(空)") : dzCoverUrl).c_str(),
+                (itCoverUrl.empty() ? std::string("(空)") : itCoverUrl).c_str(),
+                chineseCoverCandidates.size());
             bool gotCover = false;
             if (result.albumMbid) {
                 gotCover = cover_.fetchCover(*result.albumMbid, result);
                 if (!gotCover) {
-                    std::cerr << "[scraper]   ⚠ Cover Art Archive 获取失败 (albumMbid=" << *result.albumMbid << ")" << std::endl;
+                    SCRAPER_LOGW(NULL, "[scraper]   ⚠ Cover Art Archive 获取失败 (albumMbid=%s)",
+                                 result.albumMbid->c_str());
                 }
             }
             if (!gotCover && !dzCoverUrl.empty()) {
-                std::cerr << "[scraper]   尝试 Deezer 封面: " << dzCoverUrl << std::endl;
+                SCRAPER_LOGD(NULL, "[scraper]   尝试 Deezer 封面: %s", dzCoverUrl.c_str());
                 gotCover = dz_.fetchCover(dzCoverUrl, result);
                 if (!gotCover) {
-                    std::cerr << "[scraper]   ⚠ Deezer 封面下载失败" << std::endl;
+                    SCRAPER_LOGW(NULL, "[scraper]   ⚠ Deezer 封面下载失败");
                 }
             }
             if (!gotCover && !itCoverUrl.empty()) {
-                std::cerr << "[scraper]   尝试 iTunes 封面: " << itCoverUrl << std::endl;
+                SCRAPER_LOGD(NULL, "[scraper]   尝试 iTunes 封面: %s", itCoverUrl.c_str());
                 gotCover = it_.fetchCover(itCoverUrl, result);
                 if (!gotCover) {
-                    std::cerr << "[scraper]   ⚠ iTunes 封面下载失败" << std::endl;
+                    SCRAPER_LOGW(NULL, "[scraper]   ⚠ iTunes 封面下载失败");
                 }
             }
             // 中文源：按评分降序逐个尝试，任一成功即停止
             for (const auto& cc : chineseCoverCandidates) {
                 if (gotCover) break;
-                std::cerr << "[scraper]   尝试 " << cc.source << " 封面 (score=" << cc.score << "): "
-                          << cc.url.substr(0, 80) << (cc.url.size() > 80 ? "..." : "") << std::endl;
+                SCRAPER_LOGD(NULL, "[scraper]   尝试 %s 封面 (score=%d): %s%s",
+                             cc.source.c_str(), cc.score,
+                             cc.url.substr(0, 80).c_str(),
+                             cc.url.size() > 80 ? "..." : "");
                 gotCover = fetchChineseCover(cc.source, cc.url, result);
                 if (!gotCover) {
-                    std::cerr << "[scraper]   ⚠ " << cc.source << " 封面下载失败" << std::endl;
+                    SCRAPER_LOGW(NULL, "[scraper]   ⚠ %s 封面下载失败", cc.source.c_str());
                 }
             }
             if (!gotCover) {
-                std::cerr << "[scraper]   ⚠ 未获取到封面（所有源均失败或 URL 为空）" << std::endl;
+                SCRAPER_LOGW(NULL, "[scraper]   ⚠ 未获取到封面（所有源均失败或 URL 为空）");
             }
         }
 

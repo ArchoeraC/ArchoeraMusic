@@ -12,6 +12,7 @@
  * zk_dsp_lowfreq_*，create 失败回退下方纯 C 实现；内核库缺失则纯 C。
  */
 #include "lowfreq.h"
+#include "era_log.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -173,7 +174,7 @@ LowFreq* lowfreq_create(int sample_rate, int channels)
     }
 #endif
 
-    fprintf(stderr, "%s 创建: %dHz / %dch\n", LOG_TAG, sample_rate, channels);
+    ERA_LOGI(NULL, "%s 创建: %dHz / %dch\n", LOG_TAG, sample_rate, channels);
     return lf;
 }
 

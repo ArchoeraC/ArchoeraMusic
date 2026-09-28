@@ -43,6 +43,8 @@ int32_t apl_set_event_callback(AplEventCallback cb, void* user_data) {
     return archoera::OK;
 }
 
+void apl_set_log_sink(AplLogFn fn) { archoera::setLogSink(fn); }
+
 int32_t apl_power_set_sleep_inhibit(int32_t on) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     return archoera::powerSetSleepInhibit(on);

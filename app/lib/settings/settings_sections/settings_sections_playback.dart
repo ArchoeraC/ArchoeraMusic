@@ -391,7 +391,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         mode: ProcessStartMode.detached,
       );
     } catch (e) {
-      debugPrint('[engine] 重启应用失败（请手动重启）：$e');
+      Log.e('engine', '重启应用失败（请手动重启）：$e');
     }
     await quitApplication(ref);
   }

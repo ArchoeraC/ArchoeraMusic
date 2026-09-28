@@ -7,7 +7,6 @@ package endpoints
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -340,7 +339,7 @@ func GetScanStatus(w http.ResponseWriter, r *http.Request) {
 // 发 scan-request 事件通知宿主（Dart）执行扫描（扫描由 C# scanner FFI 执行），立即返回
 func StartScan(w http.ResponseWriter, r *http.Request) {
 	config.EmitEvent(`{"type":"scan-request"}`)
-	log.Printf("[subsonic] 已请求宿主执行扫描")
+	logInfo("subsonic", "已请求宿主执行扫描")
 	xmlutil.Send(w, r, map[string]any{
 		"scanStatus": map[string]any{
 			"scanning": true,

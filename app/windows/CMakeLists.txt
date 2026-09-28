@@ -178,6 +178,21 @@ add_dependencies(${BINARY_NAME} platform_bridge_cmake)
 install(FILES "${PLATFORM_BRIDGE_BUILD_DIR}/out/archoera_platform.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
 
+# === ArchoeraMusic 统一日志核心：内嵌 CMake 构建链（一键构建，纯 C）===
+# 产出 archoera_log.dll 到 app/native/log/build/out/；Dart 载入后注入各原生层。
+set(ARCHOERA_LOG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../native/log")
+set(ARCHOERA_LOG_BUILD_DIR "${ARCHOERA_LOG_DIR}/build")
+add_custom_target(archoera_log_cmake ALL
+  COMMAND ${CMAKE_COMMAND} -S "${ARCHOERA_LOG_DIR}" -B "${ARCHOERA_LOG_BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
+  COMMAND ${CMAKE_COMMAND} --build "${ARCHOERA_LOG_BUILD_DIR}" --config Release -j
+  COMMENT "cmake build archoera_log core"
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} archoera_log_cmake)
+
+install(FILES "${ARCHOERA_LOG_BUILD_DIR}/out/archoera_log.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
+
 # === vcpkg 运行时 DLL（FFmpeg 等动态依赖）===
 # audio-engine（archoera_mediaengine.dll / scraper）经 vcpkg import libs 动态链接
 # ffmpeg/taglib/curl 等（triplet x64-windows-release 为动态构建）；运行时必须把

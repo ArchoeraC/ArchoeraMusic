@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/log/log.dart';
 import '../services/playback/playback_session.dart';
 import 'data_dir.dart';
 import 'prefs_app.dart';
@@ -109,6 +110,13 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   void setPassthrough(bool value) {
     state = state.copyWithPassthrough(value);
     state.save();
+  }
+
+  /// 设置「日志写入磁盘」开关（关闭后仅控制台）；即时对原生核心生效。
+  void setLogToFile(bool value) {
+    state = state.copyWithLogToFile(value);
+    state.save();
+    Log.setFileEnabled(value);
   }
 
   /// 设置解码引擎（'stable' = FFmpeg 稳定默认 / 'eraudio' = 自研实验性）。

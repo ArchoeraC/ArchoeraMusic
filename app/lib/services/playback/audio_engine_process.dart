@@ -12,6 +12,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../../stores/app_prefs.dart';
+import '../log/log.dart';
 import 'engine_bindings.dart';
 import 'pcm_analyzer.dart';
 
@@ -649,8 +650,7 @@ class AudioEngineProcess {
     } catch (e) {
       // PCM 源不可用：频谱不可用，不影响播放。记录根因便于排查
       // （如 libfft.so 缺失/符号隐藏导致的 FftAnalyzer 构造失败）。
-      // ignore: avoid_print
-      print('[audio-engine] PCM 分析器打开失败（频谱不可用）: $e');
+      Log.w('audio-engine', 'PCM 分析器打开失败（频谱不可用）: $e');
     }
   }
 

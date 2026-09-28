@@ -150,6 +150,8 @@ set(AUDIO_ENGINE_SOURCES
     src/loudness.c
     src/limiter.c
     src/fft.c
+    # 统一日志收口（sink 注入 + stderr 兜底）
+    src/era_log.c
     # 方向① D1/D2：参数化 EQ + 次声/低频管理
     src/parametric_eq.c
     src/lowfreq.c
@@ -226,7 +228,7 @@ endif()
 # 独立编译 src/fft.c（无外部依赖，仅 libm）。注意全局 -fvisibility=hidden
 # 会隐藏所有导出符号，此目标需恢复 default 可见性，否则 Dart 侧
 # DynamicLibrary.lookup('fft_create') 等将找不到符号。
-add_library(fft SHARED src/fft.c)
+add_library(fft SHARED src/fft.c src/era_log.c)
 set_target_properties(fft PROPERTIES C_VISIBILITY_PRESET default)
 # 全局 add_compile_options(-fvisibility=hidden) 位于编译参数末尾，会覆盖
 # C_VISIBILITY_PRESET；需在此目标显式追加 default（GCC/Clang 后者生效）。

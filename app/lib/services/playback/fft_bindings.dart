@@ -7,11 +7,16 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import '../log/log.dart';
 import '../native_lib_paths.dart';
 import 'fft_frame.dart';
 
 typedef _FftCreateNative = Pointer<Opaque> Function(Int32, Int32);
 typedef _FftCreateDart = Pointer<Opaque> Function(int, int);
+typedef _FftSetLogSinkNative =
+    Void Function(Pointer<NativeFunction<LogWriteNative>> fn, Int32 minLevel);
+typedef _FftSetLogSinkDart = void Function(
+    Pointer<NativeFunction<LogWriteNative>> fn, int minLevel);
 typedef _FftSetEnabledNative = Void Function(Pointer<Opaque>, Int32);
 typedef _FftSetEnabledDart = void Function(Pointer<Opaque>, int);
 typedef _FftProcessFrameNative =
@@ -62,6 +67,16 @@ class FftAnalyzer {
     _destroy = lib.lookupFunction<_FftDestroyNative, _FftDestroyDart>(
       'fft_destroy',
     );
+
+    // 注入统一日志 sink（旧库缺符号时忽略，保持 stderr 兜底）。
+    final logSink = Log.nativeWritePointer;
+    if (logSink != null) {
+      try {
+        lib.lookupFunction<_FftSetLogSinkNative, _FftSetLogSinkDart>(
+          'fft_set_log_sink',
+        )(logSink, Log.effectiveLevel);
+      } catch (_) {}
+    }
 
     _handle = _create(sampleRate, fftSize);
     if (_handle == nullptr) {

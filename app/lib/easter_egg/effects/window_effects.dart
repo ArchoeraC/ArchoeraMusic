@@ -9,10 +9,10 @@ part of '../easter_egg.dart';
 /// 音频引擎跑在原生线程，界面卡死后音乐仍会继续播放。
 Future<void> _notResponding(EasterEggContext ctx) async {
   if (kEasterEggSafeMode) {
-    debugPrint('[easter-egg] not_responding 跳过（安全模式）');
+    Log.w('easter-egg', 'not_responding 跳过（安全模式）');
     return;
   }
-  debugPrint('[easter-egg] not_responding：界面将永久卡住（强杀进程方可退出）');
+  Log.w('easter-egg', 'not_responding：界面将永久卡住（强杀进程方可退出）');
   // ignore: literal_only_boolean_expressions
   while (true) {
     sleep(const Duration(seconds: 30));

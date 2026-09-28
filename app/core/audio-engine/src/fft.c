@@ -17,12 +17,21 @@
  *     频谱输出保持立体声兼容（ldata/rdata）
  */
 #include "fft.h"
+#include "era_log.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
 #define LOG_TAG "[audio-engine:fft]"
 #include <stdio.h>
+
+/* ── 统一日志 sink（宿主注入；见 era_log.h）───────────────────────────
+ * libfft 为独立共享库（Dart 频谱分析直连），Dart 载入后注入
+ * libarchoera_log 的 archoera_log_write 指针，使本库日志并入统一 sink。 */
+void fft_set_log_sink(EraLogSink fn, int min_level)
+{
+    era_log_set_sink(fn, min_level);
+}
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -333,7 +342,7 @@ static void detect_beat(FFTAnalyzer *fft, int half)
 FFTAnalyzer* fft_create(int sample_rate, int fft_size)
 {
     if (!is_power_of_two(fft_size)) {
-        fprintf(stderr, "%s 错误: fft_size 必须是 2 的幂，收到 %d\n",
+        ERA_LOGE(NULL, "%s 错误: fft_size 必须是 2 的幂，收到 %d\n",
                 LOG_TAG, fft_size);
         return NULL;
     }
@@ -397,7 +406,7 @@ FFTAnalyzer* fft_create(int sample_rate, int fft_size)
     memset(fft->peak_spectrum, 0, half * sizeof(float));
     memset(fft->peak_spectrum_r, 0, half * sizeof(float));
 
-    fprintf(stderr, "%s 创建: %dHz / FFT %d 点 (order=%d)\n",
+    ERA_LOGI(NULL, "%s 创建: %dHz / FFT %d 点 (order=%d)\n",
             LOG_TAG, sample_rate, fft_size, fft->fft_order);
     return fft;
 }

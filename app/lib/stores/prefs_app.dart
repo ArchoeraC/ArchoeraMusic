@@ -7,6 +7,7 @@ import 'app_prefs.dart';
 // ── 应用级键（app. 前缀）──────────────────────────────────────
 const closeBehaviorKey = 'app.closeBehavior';
 const developerModeKey = 'app.developerMode';
+const logToFileKey = 'app.logToFile';
 
 /// 开发者组件开关键（会话级，默认全关）：
 /// 「FPS/内存监控浮层」独立开关，跟随开发者模式，关闭应用后一并重置。
@@ -59,4 +60,11 @@ extension AppLevelPrefs on AppPrefs {
 
   AppPrefs copyWithDevDownloadModule(bool value) =>
       AppPrefs(initialData: {...data, devDownloadModuleKey: value});
+
+  /// 是否把日志写入磁盘（默认开）。关闭后仅输出到控制台（stderr）；
+  /// 落盘为单文件、硬上限 4 MiB、超限原地截断，不生成 .1/.2/.3。
+  bool get logToFile => data[logToFileKey] as bool? ?? true;
+
+  AppPrefs copyWithLogToFile(bool value) =>
+      AppPrefs(initialData: {...data, logToFileKey: value});
 }

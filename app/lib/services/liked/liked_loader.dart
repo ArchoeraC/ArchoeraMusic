@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../stores/providers.dart';
 import '../../widgets/dialogs/collection_platform.dart';
+import '../log/log.dart';
 import '../netease/track.dart';
 import 'liked_cache.dart';
 
@@ -78,7 +79,7 @@ class LikedStore extends ChangeNotifier {
     try {
       await _hydrateFromCache(platform);
     } catch (e) {
-      debugPrint('[liked] 缓存读取失败（降级直接加载）: $e');
+      Log.w('liked', '缓存读取失败（降级直接加载）: $e');
     }
     await refresh(platform);
   }
@@ -111,7 +112,7 @@ class LikedStore extends ChangeNotifier {
         try {
           await LikedCacheStore.shared.replace(platform, key, tracks);
         } catch (e) {
-          debugPrint('[liked] 缓存写回失败（不影响展示）: $e');
+          Log.w('liked', '缓存写回失败（不影响展示）: $e');
         }
       }
     } catch (e) {
@@ -139,7 +140,7 @@ class LikedStore extends ChangeNotifier {
             .read(likeControllerProvider)
             .reconcileFromAuthoritative(platform, tracks);
       } catch (e) {
-        debugPrint('[liked] 红心对账失败（不影响列表展示）: $e');
+        Log.w('liked', '红心对账失败（不影响列表展示）: $e');
       }
     }
   }
@@ -163,7 +164,7 @@ class LikedStore extends ChangeNotifier {
     try {
       await LikedCacheStore.shared.replace(platform, key, s.tracks);
     } catch (e) {
-      debugPrint('[liked] 缓存增量写入失败: $e');
+      Log.e('liked', '缓存增量写入失败: $e');
     }
   }
 
@@ -183,7 +184,7 @@ class LikedStore extends ChangeNotifier {
     try {
       await LikedCacheStore.shared.replace(platform, key, s.tracks);
     } catch (e) {
-      debugPrint('[liked] 缓存移除失败: $e');
+      Log.e('liked', '缓存移除失败: $e');
     }
   }
 
