@@ -112,9 +112,25 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   bool get _wantsClock =>
       widget.playing && widget.animate && widget.groups.isNotEmpty;
 
-  double get _userExtent {
-    if (_c.centers.isEmpty) return 4000;
-    return _c.centers.last + _c.h;
+  /// 浏览偏移的锚点行（缺省回退首行）。
+  int get _browseAnchor =>
+      (_anchorIdx >= 0 && _anchorIdx < _c.centers.length) ? _anchorIdx : 0;
+
+  /// 用户浏览偏移的上界：首行居中时的偏移。
+  ///
+  /// 再往正方向（内容继续下移）只会在顶部堆出空白，正是上游原版
+  /// `userScrollOffset` 无界累加导致的「可无限上下滚动」——此处封顶。
+  double get _userMax {
+    final c = _c.centers;
+    if (c.isEmpty) return 0;
+    return c[_browseAnchor] - c.first;
+  }
+
+  /// 用户浏览偏移的下界：末行居中时的偏移（≤ 0）。
+  double get _userMin {
+    final c = _c.centers;
+    if (c.isEmpty) return 0;
+    return c[_browseAnchor] - c.last;
   }
 
   @override
@@ -924,10 +940,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
             onPointerSignal: (e) {
               if (e is PointerScrollEvent) {
                 _beginUserScroll();
-                _user = (_user - e.scrollDelta.dy).clamp(
-                  -_userExtent,
-                  _userExtent,
-                );
+                _user = (_user - e.scrollDelta.dy).clamp(_userMin, _userMax);
                 _pushUserTargets();
                 _armUserReset();
               }
@@ -946,7 +959,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
                 // 不能用起点 + 单次增量，否则多事件拖拽几乎不动。
                 // 触摸拖拽直接跟手（对齐 AMLL ContinuousScroll 的 snapPosY）。
                 final delta = d.primaryDelta ?? d.delta.dy;
-                _user = (_user + delta).clamp(-_userExtent, _userExtent);
+                _user = (_user + delta).clamp(_userMin, _userMax);
                 _pushUserTargets(snap: true);
                 _armUserReset();
               },
@@ -972,6 +985,14 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 当前布局锚点索引。
   @visibleForTesting
   int debugAnchor() => _anchorIdx;
+
+  /// 当前用户浏览偏移（0 = 未浏览，回弹后归零）。
+  @visibleForTesting
+  double debugUser() => _user;
+
+  /// 当前浏览偏移的允许范围（下界, 上界）。
+  @visibleForTesting
+  (double, double) debugUserBounds() => (_userMin, _userMax);
 
   /// 当前高亮行索引（无覆盖为 -1）。
   @visibleForTesting
