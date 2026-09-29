@@ -193,72 +193,42 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
           ],
         ),
         const SizedBox(height: 12),
+        // ── 法律与声明（软件声明 / 隐私政策 / 字体署名；长文收进弹窗）──
+        // 一行内以引导语衔接三个文字链接，点击打开对应弹窗，避免撑开关于页；
+        // 空间不足时 Wrap 自动折行。
         SettingSection(
-          title: l10n.settingsSectionFontCredits,
+          title: l10n.settingsSectionLegal,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Text(
-                l10n.settingsFontCreditsText,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.6,
-                  color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SettingSection(
-          title: l10n.settingsSectionDeclaration,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Text.rich(
-                TextSpan(
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.6,
-                    color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                runSpacing: 4,
+                children: [
+                  Text(
+                    l10n.settingsLegalIntro,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.6,
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+                    ),
                   ),
-                  children: [
-                    TextSpan(text: l10n.settingsDeclineText),
-                    _dense(
-                      l10n.settingsDecline1Title,
-                      l10n.settingsDecline1Body,
-                    ),
-                    _dense(
-                      l10n.settingsDecline2Title,
-                      l10n.settingsDecline2Body,
-                    ),
-                    _dense(
-                      l10n.settingsDecline3Title,
-                      l10n.settingsDecline3Body,
-                    ),
-                    _dense(
-                      l10n.settingsDecline4Title,
-                      l10n.settingsDecline4Body,
-                    ),
-                    _dense(
-                      l10n.settingsDeclineLoginTitle,
-                      l10n.settingsDeclineLoginBody,
-                    ),
-                    _dense(
-                      l10n.settingsDeclinePrivacyTitle,
-                      l10n.settingsDeclinePrivacyBody,
-                    ),
-                    _dense(
-                      l10n.settingsDeclineThirdPartyTitle,
-                      l10n.settingsDeclineThirdPartyBody,
-                    ),
-                    _dense(
-                      l10n.settingsDecline5Title,
-                      l10n.settingsDecline5Body,
-                    ),
-                    TextSpan(text: l10n.settingsDeclineFooter),
-                  ],
-                ),
+                  const SizedBox(width: 4),
+                  _legalLink(
+                    l10n.settingsSectionDeclaration,
+                    () => showSoftwareDeclarationDialog(context),
+                  ),
+                  _legalLink(
+                    l10n.settingsSectionPrivacy,
+                    () => showPrivacyPolicyDialog(context),
+                    separated: true,
+                  ),
+                  _legalLink(
+                    l10n.settingsSectionFontCredits,
+                    () => showFontCreditsDialog(context),
+                    separated: true,
+                  ),
+                ],
               ),
             ),
           ],
@@ -279,14 +249,48 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
     );
   }
 
-  TextSpan _dense(String title, String body) {
-    return TextSpan(
-      children: [
-        TextSpan(
-          text: title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+  /// 长文链接：下划线加粗文字，点击打开对应弹窗。
+  ///
+  /// [separated] 为真时在本链接前加一个「·」分隔符；分隔符与链接包在同一
+  /// 子节点中，避免 Wrap 折行时分隔符被单独留在行尾。
+  Widget _legalLink(
+    String label,
+    VoidCallback onTap, {
+    bool separated = false,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final link = InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            decoration: TextDecoration.underline,
+            decorationColor: scheme.primary.withValues(alpha: 0.6),
+            color: scheme.primary,
+          ),
         ),
-        TextSpan(text: body),
+      ),
+    );
+    if (!separated) return link;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 7),
+          child: Text(
+            '·',
+            style: TextStyle(
+              fontSize: 13,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+        link,
       ],
     );
   }

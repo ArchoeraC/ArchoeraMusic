@@ -3224,6 +3224,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diese Software ist ein Drittanbieter-Client ohne Zugehörigkeit, Zusammenarbeit oder Autorisierung mit irgendeiner Musikplattform.\n\n';
 
   @override
+  String get settingsDeclineLicenseTitle =>
+      '2. Open-Source-Lizenz & Quellcode\n';
+
+  @override
+  String get settingsDeclineLicenseBody =>
+      'Diese Software wird unter der GNU Affero General Public License Version 3 (AGPL-3.0) veröffentlicht. Im Rahmen dieser Lizenz dürfen Sie diese Software frei ausführen, untersuchen, verändern und weiterverbreiten, sofern Sie: die Urheberrechts- und Lizenzhinweise beibehalten; Ihre abgeleiteten Werke unter derselben Lizenz veröffentlichen; und, wenn Sie die Funktionalität dieser Software (einschließlich geänderter Versionen) Nutzern über ein Netzwerk bereitstellen, diesen Nutzern den entsprechenden vollständigen Quellcode zur Verfügung stellen. Dieses Projekt bietet keine Closed-Source-kommerzielle Lizenzierung außerhalb der AGPL-Pflichten an. Die vollständigen Bedingungen richten sich nach der beiliegenden LICENSE-Datei und https://www.gnu.org/licenses/agpl-3.0.html.\n\n';
+
+  @override
   String get settingsDecline2Title => '2. Inhaltsquellen & Urheberrecht\n';
 
   @override
@@ -3253,18 +3261,18 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diese Software bietet QR-Code-Anmeldung (scannen Sie den von dieser Software angezeigten QR-Code mit der offiziellen App der jeweiligen Plattform) und Anmeldung mit Zugangsdaten, um Favoriten und Wiedergabelisten zu synchronisieren und Funktionen freizuschalten. Bitte beachten Sie:\n· Der QR-Code wird von der offiziellen Schnittstelle der jeweiligen Plattform erzeugt; diese Software erfasst, analysiert oder übermittelt Ihren Anmelde-QR-Code, Ihr Konto, Ihr Passwort oder Ihren SMS-Bestätigungscode nicht an Dritte;\n· Nach der Anmeldung erhaltene Sitzungsnachweise (Cookies / Token usw.) werden nur lokal gespeichert (verschlüsselt im Anmeldedaten-Tresor) und niemals an den Entwickler oder einen Nicht-Plattform-Server hochgeladen;\n· Die QR-Anmeldung bedeutet, dass Sie dieser Software erlauben, mit Ihrem Konto auf die Plattform zuzugreifen; Aktionen wie Favorisieren, Abspielen und Kommentieren wirken sich tatsächlich auf Ihr Konto aus;\n· Bewahren Sie Gerät und Systemkonto sicher auf; melden Sie sich auf öffentlichen oder gemeinsam genutzten Geräten anschließend umgehend ab und löschen Sie die Anmeldedaten;\n· Die Plattform kann gegenüber Anmeldungen von Drittanbieter-Clients Risikokontrollen, Einschränkungen oder Sperren verhängen; daraus entstehende Kontoanomalien oder eingeschränkte Funktionen liegen in Ihrer Verantwortung.\n\n';
 
   @override
-  String get settingsDeclinePrivacyTitle => '6. Datenschutz & lokale Daten\n';
-
-  @override
-  String get settingsDeclinePrivacyBody =>
-      'Diese Software betreibt keinen Entwicklerserver und erfasst oder übermittelt keine personenbezogenen Daten, kein Nutzungsverhalten, keine Bibliotheksinhalte und keine Anmeldedaten; Ihre Bibliothek, Ihr Verlauf, Ihre Favoriten, Downloads, Einstellungen und Anmeldestatus werden im lokalen Datenverzeichnis gespeichert und können durch Deinstallation oder die Löschfunktion unter „Sicherheit“ entfernt werden; bei der Interaktion mit Online-Plattformen werden Anfragen direkt von Ihrem Gerät an die jeweilige Plattform gesendet und unterliegen deren Datenschutzrichtlinie und Nutzungsbedingungen.\n\n';
-
-  @override
   String get settingsDeclineThirdPartyTitle => '7. Dienste Dritter & Risiken\n';
 
   @override
   String get settingsDeclineThirdPartyBody =>
       'Die Schnittstellen, Authentifizierungsmethoden und die Verfügbarkeit von Online-Musikplattformen werden allein von den Plattformen bestimmt und können sich jederzeit ändern, eingeschränkt oder eingestellt werden, was zu Anmeldefehlern, nicht verfügbaren Funktionen oder nicht synchronisierten Daten führen kann; diese Software wird wie besehen bereitgestellt und übernimmt keine Zusicherung hinsichtlich der fortgesetzten Verfügbarkeit, Stabilität oder Datenintegrität von Diensten Dritter.\n\n';
+
+  @override
+  String get settingsDeclineMinorTitle => '8. Nutzung durch Minderjährige\n';
+
+  @override
+  String get settingsDeclineMinorBody =>
+      'Diese Software ist ein Allzweckwerkzeug und nicht für Minderjährige konzipiert, noch erhebt sie personenbezogene Daten von ihnen. Wenn Sie minderjährig sind, lesen Sie diese Erklärung bitte in Begleitung und unter Anleitung eines Erziehungsberechtigten, holen Sie deren Einwilligung ein und verwenden Sie diese Software erst danach; planen Sie Ihre Zeit bitte vernünftig und vermeiden Sie übermäßige Nutzung.\n\n';
 
   @override
   String get settingsDecline5Title => '8. Haftungsausschluss\n';
@@ -3276,6 +3284,95 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsDeclineFooter =>
       'Diese Software dient nur der technischen Erforschung und Forschung.';
+
+  @override
+  String get settingsDeclarationEntryDesc =>
+      'Art, Open-Source-Lizenz, Nutzungsbeschränkungen und Haftungsausschlüsse';
+
+  @override
+  String get settingsSectionLegal => 'Rechtliches & Hinweise';
+
+  @override
+  String get settingsLegalIntro => 'Bitte vor der Nutzung lesen:';
+
+  @override
+  String get settingsSectionPrivacy => 'Datenschutzrichtlinie';
+
+  @override
+  String get settingsPrivacyEntryDesc =>
+      'Wie wir Ihre Informationen verarbeiten und schützen';
+
+  @override
+  String get settingsPrivacyIntro =>
+      'Willkommen bei ArchoeraMusic (nachfolgend „die Software\" oder „wir\"). Wir wissen um die Bedeutung Ihrer personenbezogenen Daten und setzen uns stets für den Schutz Ihrer Privatsphäre und Datensicherheit ein. Diese Richtlinie erläutert, wie wir Ihre Informationen während der Nutzung der Software verarbeiten, speichern und schützen und welche Rechte Ihnen zustehen.\n\nBitte lesen und verstehen Sie diese Richtlinie sorgfältig. Mit der Nutzung der Software bestätigen Sie, dass Sie alle ihre Inhalte gelesen, verstanden und ihnen zugestimmt haben.\n\n';
+
+  @override
+  String get settingsPrivacy1Title => '1. Grundprinzipien\n';
+
+  @override
+  String get settingsPrivacy1Body =>
+      '1. Minimale Notwendigkeit: Wir verarbeiten nur die Daten, die zur Bereitstellung der Kernfunktionen, zur Gewährleistung der Sicherheit und zur Verbesserung des Erlebnisses erforderlich sind, und erheben keine personenbezogenen sensiblen Daten, die nicht mit dem Dienst zusammenhängen.\n2. Lokal zuerst: Ihre Bibliotheksmetadaten, Ihr Wiedergabeverlauf und Ihre Einstellungen werden standardmäßig auf Ihrem Gerät gespeichert und bleiben vollständig unter Ihrer Kontrolle.\n3. Transparent & kontrollierbar: Diese Software enthält keine Werbung, kein Tracking und keine Nutzerprofile; die Datenverarbeitung ist offen und transparent und kann von Ihnen jederzeit gelöscht werden.\n\n';
+
+  @override
+  String get settingsPrivacy2Title => '2. Informationen, die wir verarbeiten\n';
+
+  @override
+  String get settingsPrivacy2Body =>
+      '· Von Ihnen bereitgestellte Informationen: Zugangsdaten für Musikplattformen Dritter (Cookies / Token aus der QR-Anmeldung, Konto und Passwort usw.), die Adresse und das Konto selbst gehosteter oder autorisierter Medienserver wie Subsonic sowie die von Ihnen gewählten lokalen Musikverzeichnisse. Zugangsdaten werden verschlüsselt im lokalen „Tresor\" gespeichert (v1 Systemsicherer Speicher / v2 Passphrasenschutz / v3 Gerätebindung) und niemals an den Entwickler oder einen Nicht-Plattform-Server hochgeladen.\n· Lokale Laufzeit- und Cache-Daten: Bibliotheksmetadaten (Titel, Künstler, Alben usw.), Wiedergabeverlauf, Favoriten, Downloadaufzeichnungen, Liedtext- und Cover-Caches sowie Einstellungen wie Oberflächensprache und Design.\n· Lokale Laufzeitprotokolle: Zur Fehlerbehebung erzeugt die Software Laufzeitprotokolle auf Ihrem Gerät (Dateigrößenlimit 4 MiB, bei Überschreitung wird die Datei an Ort und Stelle gekürzt). Protokolle verbleiben ausschließlich auf Ihrem Gerät und werden nur dann automatisch hochgeladen, wenn Sie sie aktiv entnehmen und dem Entwickler bereitstellen.\n\n';
+
+  @override
+  String get settingsPrivacy3Title => '3. Zwecke der Verwendung\n';
+
+  @override
+  String get settingsPrivacy3Body =>
+      'Wir verarbeiten die oben genannten Informationen ausschließlich zu folgenden Zwecken: Bereitstellung von Kernfunktionen wie Musikdekodierung, Wiedergabe, Liedtextanzeige und Steueroberfläche; Wiederherstellung Ihrer persönlichen Einstellungen nach einem Neustart der Software; und Gewährleistung eines sicheren und stabilen Betriebs der Software auf Ihrem Gerät. Wir verwenden Ihre Daten niemals für Werbung, Nutzerprofile oder kommerzielles Marketing und verkaufen oder vermieten sie niemals an Dritte.\n\n';
+
+  @override
+  String get settingsPrivacy4Title => '4. Dienste Dritter\n';
+
+  @override
+  String get settingsPrivacy4Body =>
+      '· Online-Musikplattformen und experimentelle Quellen: Wenn Sie sich anmelden oder entsprechende Funktionen nutzen, werden Anfragen direkt von Ihrem Gerät an die jeweilige Plattform gesendet (oder über deren öffentliche HTTP-Schnittstellen interagiert), und die Verarbeitung der zugehörigen Daten unterliegt zugleich den Nutzungsbedingungen und Datenschutzrichtlinien dieser Plattform.\n· Selbst gehostete oder persönliche Medienserver: Die Kommunikation mit Servern wie Subsonic erfolgt direkt zwischen Ihrem Client und Ihrem Server; die Datensicherheit und der Datenschutz auf der Serverseite liegen in Ihrer und der Verantwortung des Serverbetreibers.\n· Diese Software übernimmt keine Zusicherung hinsichtlich der fortgesetzten Verfügbarkeit, Stabilität oder Datenverarbeitungspraktiken von Diensten Dritter.\n\n';
+
+  @override
+  String get settingsPrivacy5Title =>
+      '5. Speicherung, Aufbewahrung & Sicherheit\n';
+
+  @override
+  String get settingsPrivacy5Body =>
+      'Der überwiegende Teil Ihrer Daten wird im lokalen Datenverzeichnis gespeichert (Linux: ~/.local/share/ArchoeraMusic; macOS: ~/Library/Application Support/ArchoeraMusic; Windows: %LOCALAPPDATA%\\ArchoeraMusic, überschreibbar über die Umgebungsvariable ARCHOERA_DATA_DIR), bis Sie sie selbst löschen. Sensible Zugangsdaten werden nach Möglichkeit mit dem nativen sicheren Speicher des Betriebssystems verschlüsselt und im Tresor isoliert; die Netzwerkübertragung nutzt HTTPS / TLS, sofern das Ziel dies unterstützt.\nObwohl wir angemessene Sicherheitsmaßnahmen ergreifen, kann aufgrund inhärenter Grenzen der Rechen- und Speichertechnik kein System absolute 100%ige Sicherheit garantieren; bewahren Sie Ihr Gerät und Ihre Zugangsdaten zu Konten Dritter sicher auf.\n\n';
+
+  @override
+  String get settingsPrivacy6Title => '6. Ihre Rechte & Datenverwaltung\n';
+
+  @override
+  String get settingsPrivacy6Body =>
+      'Sie können Ihre Einstellungen, Ihre Streaming-Server-Informationen und Ihren Anmeldestatus jederzeit in den Einstellungen einsehen und ändern; Sie können unter „Speicher / Sicherheit / Verlauf\" Caches, Verlauf und festgelegte Daten löschen; Sie können das lokale Datenverzeichnis in den Einstellungen einsehen und selbst löschen oder es nach der Deinstallation manuell bereinigen, um alle von dieser Software auf Ihrem Gerät hinterlassenen Daten dauerhaft zu vernichten. Bitte beachten Sie: Das Deinstallieren der ausführbaren Datei löscht das Datenverzeichnis nicht zwangsläufig automatisch.\n\n';
+
+  @override
+  String get settingsPrivacy7Title => '7. Datenschutz Minderjähriger\n';
+
+  @override
+  String get settingsPrivacy7Body =>
+      'Diese Software ist ein Allzweckwerkzeug und erhebt keinerlei personenbezogene Daten von Minderjährigen. Wenn Sie minderjährig sind, lesen Sie diese Richtlinie bitte in Begleitung und unter Anleitung eines Erziehungsberechtigten und verwenden Sie diese Software erst nach Einholung von deren Einwilligung.\n\n';
+
+  @override
+  String get settingsPrivacy8Title => '8. Aktualisierungen dieser Richtlinie\n';
+
+  @override
+  String get settingsPrivacy8Body =>
+      'Wir können diese Richtlinie von Zeit zu Zeit anpassen, wenn sich Funktionen weiterentwickeln, sich die technische Architektur ändert oder Gesetze und Vorschriften aktualisiert werden. Aktualisierte Versionen werden mit der Software oder im offiziellen Repository veröffentlicht und gelten ab dem oben angegebenen Datum „Zuletzt aktualisiert\"; wenn Sie die Software nach einer Aktualisierung weiterhin nutzen, gilt dies als Ihr Lesen, Verstehen und Zustimmen zur aktualisierten Richtlinie.\n\n';
+
+  @override
+  String get settingsPrivacy9Title => '9. Kontakt\n';
+
+  @override
+  String get settingsPrivacy9Body =>
+      'Bei Fragen, Anmerkungen oder Beschwerden zu dieser Richtlinie, Ihrer Informationssicherheit oder damit zusammenhängenden Angelegenheiten können Sie den Entwickler wie folgt kontaktieren:\n· GitHub-Repository & Issues: https://github.com/BetaStudio2/ArchoeraMusic\nWir antworten schnellstmöglich nach Eingang Ihres Feedbacks.\n\n';
+
+  @override
+  String get settingsPrivacyFooter =>
+      'Diese Richtlinie wurde zuletzt am 29. September 2026 aktualisiert.';
 
   @override
   String get settingsSectionEnvInfo => 'Umgebung';
@@ -3312,6 +3409,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsSectionFontCredits => 'Schriftartennennung';
+
+  @override
+  String get settingsFontCreditsEntryDesc =>
+      'Eingebundene Schriftarten und Lizenzinformationen anzeigen';
 
   @override
   String get settingsFontCreditsText =>

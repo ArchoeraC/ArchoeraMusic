@@ -525,6 +525,24 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.informationOutline,
       ),
       _SearchEntry(
+        SettingsCategory.about,
+        l10n.settingsSectionDeclaration,
+        l10n.settingsDeclarationEntryDesc,
+        EtaIcons.bookOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.about,
+        l10n.settingsSectionPrivacy,
+        l10n.settingsPrivacyEntryDesc,
+        EtaIcons.shieldOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.about,
+        l10n.settingsSectionFontCredits,
+        l10n.settingsFontCreditsEntryDesc,
+        EtaIcons.fontOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.developer,
         l10n.settingsDevFpsMonitor,
         l10n.settingsDevFpsMonitorDesc,
