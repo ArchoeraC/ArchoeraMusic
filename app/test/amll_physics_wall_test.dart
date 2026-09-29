@@ -252,6 +252,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('手动浏览有界：不会无限上下滚出内容（上游历史遗留）', (tester) async {
+    final groups = buildGroups(20);
+    await tester.pumpWidget(buildWall(groups, 10 * 1000));
+    await settle(tester);
+    final s = stateOf(tester);
+    expect(s.debugAnchor(), 10);
+    final centers = s.debugCenters() as List<double>;
+
+    // 允许范围 = 首行居中 ↔ 末行居中，均相对当前（播放）锚点行。
+    final bounds = s.debugUserBounds() as (double, double);
+    expect(bounds.$2, closeTo(centers[10] - centers.first, 0.01));
+    expect(bounds.$1, closeTo(centers[10] - centers.last, 0.01));
+
+    // 向下猛滚（内容下移，看更早的行）：封顶于首行居中，不再外溢成空白。
+    await tester.drag(find.byType(AmllPhysicsWall), const Offset(0, 20000));
+    await tester.pump();
+    expect(s.debugUser(), closeTo(bounds.$2, 0.01));
+    expect((s.debugY() as List<double>).first, closeTo(250, 1.0));
+
+    // 向上猛滚（内容上移，看更晚的行）：封底于末行居中。
+    await tester.drag(find.byType(AmllPhysicsWall), const Offset(0, -40000));
+    await tester.pump();
+    expect(s.debugUser(), closeTo(bounds.$1, 0.01));
+    expect((s.debugY() as List<double>).last, closeTo(250, 1.0));
+    expect(tester.takeException(), isNull);
+  });
+
   group('Spring1D 延迟语义', () {
     test('延迟期间继续朝当前目标运动，不冻结', () {
       final s = Spring1D();
