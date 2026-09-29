@@ -67,33 +67,11 @@ extension _BarLyricTextView on _BarLyricTextState {
 
     return SizedBox(
       height: widget.height,
-      child: AnimatedSwitcher(
-        duration: animDuration(context, const Duration(milliseconds: 250)),
-        reverseDuration: animDuration(
-          context,
-          const Duration(milliseconds: 150),
-        ),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.4),
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
+      child: _LyricRoll(
+        index: idx,
+        lineKey: '$idx:${g.original.text}:$transText',
+        duration: animDuration(context, const Duration(milliseconds: 220)),
         child: LayoutBuilder(
-          key: ValueKey('$idx:${g.original.text}:$transText'),
           builder: (context, constraints) {
             final painter = TextPainter(
               text: span,
@@ -132,6 +110,129 @@ extension _BarLyricTextView on _BarLyricTextState {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// 歌词换行过渡：旧行滚出、新行滚入（竖向平移）。
+///
+/// 与「淡入淡出切换」不同，这里两行沿**同一方向**同时平移（旧行滚出视口、
+/// 新行从另一侧滚入），形成「整条歌词滚动一行」的观感。前进时向上滚
+/// （新行自下方滚入），后退 seek 时方向相反。
+///
+/// 每次换行只播放**一次性** [AnimationController.forward]（`from: 0`），
+/// 不 `repeat`；性能模式（时长归零）下直接交换、不保留旧行。
+class _LyricRoll extends StatefulWidget {
+  const _LyricRoll({
+    required this.child,
+    required this.lineKey,
+    required this.index,
+    required this.duration,
+  });
+
+  /// 当前行的渲染体。
+  final Widget child;
+
+  /// 当前行身份（行号 + 文本）；变化即触发滚动过渡。
+  final Object lineKey;
+
+  /// 当前行序号，用于判定滚动方向（前进 / 倒退）。
+  final int index;
+
+  /// 一次性滚动时长；[Duration.zero] 表示直接切换（性能模式）。
+  final Duration duration;
+
+  @override
+  State<_LyricRoll> createState() => _LyricRollState();
+}
+
+class _LyricRollState extends State<_LyricRoll>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  /// 正在滚出的旧行（连同其身份键）；为 null 表示停在当前行。
+  Widget? _outgoing;
+  Object? _outgoingKey;
+
+  /// true：向上滚（新行自下方入）；false：向下滚（新行自上方入）。
+  bool _rollUp = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // 初值 1（已完成）：首帧即停在当前行，不做入场动画。
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: widget.duration,
+      value: 1,
+    )..addStatusListener(_onStatus);
+  }
+
+  void _onStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && mounted && _outgoing != null) {
+      setState(() => _outgoing = null);
+    }
+  }
+
+  @override
+  void didUpdateWidget(_LyricRoll oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.lineKey == oldWidget.lineKey) return;
+    if (widget.duration == Duration.zero) {
+      // 性能模式：直接交换，不保留旧行，也不启动动画。
+      _outgoing = null;
+      _outgoingKey = null;
+      return;
+    }
+    // 旧行交给过渡；新行从另一侧滚入。方向按行号增减判定。
+    _outgoing = oldWidget.child;
+    _outgoingKey = oldWidget.lineKey;
+    _rollUp = widget.index >= oldWidget.index;
+    _ctrl
+      ..duration = widget.duration
+      ..forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, _) {
+          // easeOutCubic：起步快、收尾稳，读起来像「滚过去」而非「弹过去」。
+          final t = Curves.easeOutCubic.transform(_ctrl.value);
+          // 新行位移：前进时 1→0（自下方上移入位），倒退时 -1→0。
+          final incoming = _rollUp ? 1 - t : t - 1;
+          // 旧行位移：前进时 0→-1（向上滚出），倒退时 0→1。
+          final outgoing = _rollUp ? -t : t;
+          return Stack(
+            fit: StackFit.passthrough,
+            children: [
+              if (_outgoing != null)
+                KeyedSubtree(
+                  key: ValueKey(_outgoingKey),
+                  child: FractionalTranslation(
+                    translation: Offset(0, outgoing),
+                    child: _outgoing,
+                  ),
+                ),
+              KeyedSubtree(
+                key: ValueKey(widget.lineKey),
+                child: FractionalTranslation(
+                  translation: Offset(0, incoming),
+                  child: widget.child,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
