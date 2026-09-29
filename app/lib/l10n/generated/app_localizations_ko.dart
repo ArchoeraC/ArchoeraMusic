@@ -3087,6 +3087,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 소프트웨어는 서드파티 클라이언트로, 각 음악 플랫폼 및 공식 클라이언트와 어떠한 관련, 협력 또는 권한 관계가 없습니다.\n\n';
 
   @override
+  String get settingsDeclineLicenseTitle => '2. 오픈 소스 라이선스 및 소스 코드\n';
+
+  @override
+  String get settingsDeclineLicenseBody =>
+      '이 소프트웨어는 GNU Affero 일반 공중 사용 허가서 제3판(AGPL-3.0)에 따라 배포됩니다. 해당 라이선스의 범위 내에서 이 소프트웨어를 자유롭게 실행, 연구, 수정 및 재배포할 수 있으나 다음 사항을 함께 준수해야 합니다: 저작권 및 라이선스 고지를 유지할 것; 파생 저작물을 동일한 라이선스로 배포할 것; 이 소프트웨어(수정본 포함)의 기능을 네트워크를 통해 사용자에게 제공하는 경우 해당 사용자에게 대응하는 전체 소스 코드를 제공할 것. 이 프로젝트는 AGPL 의무를 벗어난 클로즈드 소스 상업 라이선스를 제공하지 않습니다. 전체 조항은 동봉된 LICENSE 파일 및 https://www.gnu.org/licenses/agpl-3.0.html 을 기준으로 합니다.\n\n';
+
+  @override
   String get settingsDecline2Title => '2. 콘텐츠 출처 및 저작권\n';
 
   @override
@@ -3115,18 +3122,18 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 소프트웨어는 QR 코드 로그인(각 음악 플랫폼의 공식 앱으로 이 소프트웨어가 표시하는 QR 코드를 스캔)과 자격 증명 로그인을 제공하여 즐겨찾기와 재생목록을 동기화하고 관련 기능을 해제합니다. 유의하십시오:\n· QR 코드는 해당 플랫폼의 공식 인터페이스가 생성하며, 이 소프트웨어는 로그인 QR 코드, 계정, 비밀번호 또는 SMS 인증 코드를 수집·분석·제3자에게 전송하지 않습니다;\n· 로그인 후 획득한 세션 자격 증명(Cookie / 토큰 등)은 로컬에만 저장되며(자격 증명 금고에 암호화 저장), 개발자나 플랫폼 이외의 서버로 업로드되지 않습니다;\n· QR 로그인은 귀하의 계정으로 이 소프트웨어가 해당 플랫폼에 접근하도록 허가하는 것을 의미하며, 즐겨찾기·재생·댓글 등의 작업은 실제로 귀하의 계정에 반영됩니다;\n· 기기와 시스템 계정을 안전하게 관리하고, 공용 또는 공유 기기에서 로그인한 후에는 즉시 로그아웃하고 자격 증명을 삭제하십시오;\n· 플랫폼은 제3자 클라이언트 로그인에 대해 위험 관리·제한·차단을 적용할 수 있으며, 이로 인한 계정 이상이나 기능 제한의 위험은 귀하가 부담합니다.\n\n';
 
   @override
-  String get settingsDeclinePrivacyTitle => '6. 개인정보 및 로컬 데이터\n';
-
-  @override
-  String get settingsDeclinePrivacyBody =>
-      '이 소프트웨어는 개발자 서버를 운영하지 않으며 개인정보, 사용 행태, 라이브러리 내용 또는 로그인 자격 증명을 수집·전송하지 않습니다; 라이브러리, 기록, 즐겨찾기, 다운로드, 설정 및 로그인 상태는 로컬 데이터 디렉터리에 저장되며, 제거하거나 「보안」의 삭제 기능으로 지울 수 있습니다; 온라인 플랫폼과 상호작용할 때 요청은 귀하의 기기에서 해당 플랫폼으로 직접 전송되며 해당 플랫폼의 개인정보 처리방침과 서비스 약관의 적용을 받습니다.\n\n';
-
-  @override
   String get settingsDeclineThirdPartyTitle => '7. 제3자 서비스 및 위험\n';
 
   @override
   String get settingsDeclineThirdPartyBody =>
       '온라인 음악 플랫폼의 인터페이스, 인증 방식 및 가용성은 플랫폼이 단독으로 결정하며 언제든지 변경·제한·종료될 수 있어 로그인 실패, 기능 사용 불가 또는 데이터 동기화 불가를 초래할 수 있습니다; 이 소프트웨어는 현상태 그대로 제공되며 제3자 서비스의 지속적 가용성, 안정성 또는 데이터 완전성에 대해 어떠한 보증도 하지 않습니다.\n\n';
+
+  @override
+  String get settingsDeclineMinorTitle => '8. 미성년자의 이용\n';
+
+  @override
+  String get settingsDeclineMinorBody =>
+      '이 소프트웨어는 범용 도구 소프트웨어로, 미성년자를 대상으로 설계되지 않았으며 미성년자로부터 개인정보를 수집하지 않습니다. 미성년자인 경우 보호자의 동반과 지도 아래 이 고지를 읽고 보호자의 동의를 받은 후 이 소프트웨어를 사용하십시오; 또한 이용 시간을 합리적으로 관리하고 과도한 이용을 피하십시오.\n\n';
 
   @override
   String get settingsDecline5Title => '8. 면책 조항\n';
@@ -3137,6 +3144,92 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsDeclineFooter => '이 소프트웨어는 기술적 탐구와 연구만을 목적으로 합니다.';
+
+  @override
+  String get settingsDeclarationEntryDesc =>
+      '소프트웨어 성격, 오픈 소스 라이선스, 사용 제한 및 면책 조항';
+
+  @override
+  String get settingsSectionLegal => '법률 및 고지';
+
+  @override
+  String get settingsLegalIntro => '사용 전에 읽어 보십시오:';
+
+  @override
+  String get settingsSectionPrivacy => '개인정보 처리방침';
+
+  @override
+  String get settingsPrivacyEntryDesc => '귀하의 정보를 어떻게 처리하고 보호하는지';
+
+  @override
+  String get settingsPrivacyIntro =>
+      'ArchoeraMusic(이하 「본 소프트웨어」 또는 「당사」)을 이용해 주셔서 감사합니다. 당사는 귀하의 개인정보가 지니는 중요성을 잘 알고 있으며, 귀하의 개인정보와 데이터 보안을 보호하기 위해 항상 노력하고 있습니다. 본 방침은 귀하가 본 소프트웨어를 사용하는 과정에서 당사가 귀하의 정보를 어떻게 처리, 저장 및 보호하는지와 귀하가 누리는 관련 권리를 설명합니다.\n\n본 방침을 반드시 주의 깊게 읽고 충분히 이해하십시오. 본 소프트웨어를 사용하기 시작하면 귀하는 본 방침의 모든 내용을 읽고 이해하였으며 이에 동의한 것으로 간주됩니다.\n\n';
+
+  @override
+  String get settingsPrivacy1Title => '1. 기본 원칙\n';
+
+  @override
+  String get settingsPrivacy1Body =>
+      '1. 최소 필요: 기본 기능 제공, 보안 확보 및 경험 개선에 필요한 데이터만 처리하며, 서비스와 무관한 개인 민감정보는 수집하지 않습니다.\n2. 로컬 우선: 귀하의 라이브러리 메타데이터, 재생 기록 및 환경 설정은 기본적으로 로컬에 저장되며 귀하가 전적으로 관리합니다.\n3. 투명하고 통제 가능: 본 소프트웨어에는 광고, 추적, 사용자 프로파일링이 포함되지 않으며, 데이터 처리 방식은 공개적이고 투명하고 언제든지 귀하가 삭제할 수 있습니다.\n\n';
+
+  @override
+  String get settingsPrivacy2Title => '2. 당사가 처리하는 정보\n';
+
+  @override
+  String get settingsPrivacy2Body =>
+      '· 귀하가 직접 제공하는 정보: 제3자 음악 플랫폼의 계정 자격 증명(QR 로그인으로 획득한 Cookie / 토큰, 계정과 비밀번호 등), 자체 구축 또는 접근 권한이 있는 Subsonic 등 미디어 서버의 주소와 계정, 귀하가 선택한 로컬 음악 디렉터리 등. 자격 증명은 로컬 「자격 증명 금고」에 암호화되어 저장되며(v1 시스템 보안 저장소 / v2 암호 보호 / v3 기기 바인딩), 개발자나 플랫폼 이외의 서버로 업로드되지 않습니다.\n· 로컬 실행 및 캐시 데이터: 라이브러리 메타데이터(곡명, 아티스트, 앨범 등), 재생 기록, 즐겨찾기, 다운로드 기록, 가사와 커버 캐시, 인터페이스 언어와 테마 등 환경 설정.\n· 로컬 실행 로그: 장애 해결을 돕기 위해 소프트웨어는 로컬에 실행 로그를 생성합니다(단일 파일 상한 4 MiB, 초과 시 제자리에서 잘림). 로그는 로컬에만 보관되며, 귀하가 직접 추출하여 개발자에게 제공하지 않는 한 자동으로 업로드되지 않습니다.\n\n';
+
+  @override
+  String get settingsPrivacy3Title => '3. 정보의 사용 목적\n';
+
+  @override
+  String get settingsPrivacy3Body =>
+      '당사는 위 정보를 다음 목적으로만 처리합니다: 음악 디코딩, 재생, 가사 표시, 제어 인터페이스 등 핵심 기능을 제공하는 것; 소프트웨어 재시작 후 귀하의 개인 설정을 복원하는 것; 소프트웨어가 귀하의 기기에서 안전하고 안정적으로 실행되도록 보장하는 것. 당사는 귀하의 데이터를 광고 전송, 사용자 프로파일링 또는 상업적 마케팅에 절대 사용하지 않으며, 어떠한 제3자에게도 판매하거나 대여하지 않습니다.\n\n';
+
+  @override
+  String get settingsPrivacy4Title => '4. 제3자 서비스\n';
+
+  @override
+  String get settingsPrivacy4Body =>
+      '· 온라인 음악 플랫폼과 실험적 음원: 귀하가 로그인하거나 관련 기능을 사용할 때 요청은 귀하의 기기에서 해당 플랫폼으로 직접 전송되며(또는 그 공개 HTTP 인터페이스를 통해 상호 운용되며), 관련 데이터의 처리는 해당 플랫폼 자체의 서비스 약관과 개인정보 처리방침의 적용도 함께 받습니다.\n· 자체 구축 또는 개인 미디어 서버: Subsonic 등 서버와의 통신은 귀하의 클라이언트와 서버 사이에서 직접 이루어지며, 서버 측의 데이터 보안과 개인정보 보호는 귀하와 해당 서버 운영자가 스스로 책임집니다.\n· 본 소프트웨어는 제3자 서비스의 지속적 가용성, 안정성 또는 데이터 처리 방식에 대해 어떠한 약속도 하지 않습니다.\n\n';
+
+  @override
+  String get settingsPrivacy5Title => '5. 저장, 보존 기간 및 보안 보호\n';
+
+  @override
+  String get settingsPrivacy5Body =>
+      '귀하의 데이터 대부분은 귀하가 직접 삭제할 때까지 로컬 데이터 디렉터리(Linux: ~/.local/share/ArchoeraMusic; macOS: ~/Library/Application Support/ArchoeraMusic; Windows: %LOCALAPPDATA%\\ArchoeraMusic, 환경 변수 ARCHOERA_DATA_DIR로 재정의 가능)에 저장됩니다. 민감한 자격 증명은 운영체제 기본 보안 저장소를 우선 사용해 암호화하고 자격 증명 금고 내에 격리 보관합니다; 네트워크 전송이 관련된 부분은 대상이 지원하는 경우 HTTPS / TLS를 우선 사용합니다.\n당사는 합리적인 보안 조치를 취하고 있으나, 컴퓨터 및 저장 기술의 고유한 한계로 인해 100% 절대적 보안을 보장할 수 있는 시스템은 없습니다. 귀하의 기기와 제3자 계정 자격 증명을 잘 보관하십시오.\n\n';
+
+  @override
+  String get settingsPrivacy6Title => '6. 귀하의 권리와 데이터 관리\n';
+
+  @override
+  String get settingsPrivacy6Body =>
+      '귀하는 언제든지 설정에서 환경 설정, 스트리밍 서버 정보 및 로그인 상태를 확인하고 수정할 수 있습니다; 「저장 / 보안 / 기록」에서 캐시, 기록 및 지정 데이터를 삭제할 수 있습니다; 설정에서 로컬 데이터 디렉터리를 확인하고 직접 삭제하거나, 제거 후 수동으로 그 디렉터리를 정리하여 본 소프트웨어가 로컬에 남긴 모든 데이터를 영구적으로 파기할 수 있습니다. 유의하십시오: 실행 파일을 제거하더라도 데이터 디렉터리가 자동으로 삭제된다고 보장할 수 없습니다.\n\n';
+
+  @override
+  String get settingsPrivacy7Title => '7. 미성년자 개인정보 보호\n';
+
+  @override
+  String get settingsPrivacy7Body =>
+      '이 소프트웨어는 범용 도구 소프트웨어로, 미성년자로부터 어떠한 개인정보도 수집하지 않습니다. 미성년자인 경우 보호자의 동반과 지도 아래 본 방침을 읽고 보호자의 동의를 받은 후 본 소프트웨어를 사용하십시오.\n\n';
+
+  @override
+  String get settingsPrivacy8Title => '8. 개인정보 처리방침의 업데이트\n';
+
+  @override
+  String get settingsPrivacy8Body =>
+      '당사는 기능 반복, 기술 아키텍처 진화 또는 법령 변경에 따라 본 방침을 적시에 개정할 수 있습니다. 업데이트된 버전은 소프트웨어 또는 공식 저장소와 함께 배포되며, 문서 상단에 표시된 「최근 업데이트」 날짜부터 효력이 발생합니다; 업데이트 후에도 본 소프트웨어를 계속 사용하는 경우 귀하는 업데이트된 방침을 읽고 이해하고 동의한 것으로 간주됩니다.\n\n';
+
+  @override
+  String get settingsPrivacy9Title => '9. 문의하기\n';
+
+  @override
+  String get settingsPrivacy9Body =>
+      '본 방침의 내용, 귀하의 정보 보안 또는 관련 사항에 대해 문의, 의견 또는 이의가 있는 경우 다음 방법으로 개발자에게 연락해 주십시오:\n· GitHub 저장소 및 Issue: https://github.com/BetaStudio2/ArchoeraMusic\n피드백을 받은 후 최대한 빠르게 답변드리겠습니다.\n\n';
+
+  @override
+  String get settingsPrivacyFooter => '본 방침 최종 업데이트: 2026년 9월 29일.';
 
   @override
   String get settingsSectionEnvInfo => '환경 정보';
@@ -3173,6 +3266,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSectionFontCredits => '글꼴 저작권 고지';
+
+  @override
+  String get settingsFontCreditsEntryDesc => '내장 글꼴 및 라이선스 정보 보기';
 
   @override
   String get settingsFontCreditsText =>
