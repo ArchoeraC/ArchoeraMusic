@@ -5653,25 +5653,37 @@ abstract class AppLocalizations {
   /// No description provided for @settingsDecline1Body.
   ///
   /// In zh_CN, this message translates to:
-  /// **'本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。\n\n'**
+  /// **'本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。本软件按现状提供，作者不保证其适用性、稳定性或适法性，请您在遵守所在地法律法规的前提下自行决定是否使用。\n\n'**
   String get settingsDecline1Body;
+
+  /// No description provided for @settingsDeclineLicenseTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'二、开源许可与源代码\n'**
+  String get settingsDeclineLicenseTitle;
+
+  /// No description provided for @settingsDeclineLicenseBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本软件以 GNU Affero 通用公共许可证第 3 版（AGPL-3.0）发布。在该许可证范围内，您可以自由运行、研究、修改与再分发本软件，但须一并遵守：保留版权与许可声明；以同一许可证发布您的衍生作品；若通过网络向用户提供本软件（含修改版）的功能，须向这些用户提供对应的完整源代码。本项目不提供任何脱离 AGPL 义务的闭源商业授权。完整条款以随附的 LICENSE 文件及 https://www.gnu.org/licenses/agpl-3.0.html 为准。\n\n'**
+  String get settingsDeclineLicenseBody;
 
   /// No description provided for @settingsDecline2Title.
   ///
   /// In zh_CN, this message translates to:
-  /// **'二、内容来源与版权\n'**
+  /// **'三、内容来源与版权\n'**
   String get settingsDecline2Title;
 
   /// No description provided for @settingsDecline2Body.
   ///
   /// In zh_CN, this message translates to:
-  /// **'本软件自身不提供、不存储、不分发任何音乐内容。音频、歌词、封面等均来自您的本地文件或各音乐平台公开接口，其版权归原权利人及平台所有，本软件不主张任何所有权。\n\n'**
+  /// **'本软件自身不提供、不存储、不分发任何音乐内容。音频、歌词、封面等均来自您的本地文件、您自建或有权访问的媒体服务器，或各音乐平台公开接口，其版权归原权利人及平台所有，本软件不主张任何所有权。您应自行确保对相关内容拥有合法访问与使用权。\n\n'**
   String get settingsDecline2Body;
 
   /// No description provided for @settingsDecline3Title.
   ///
   /// In zh_CN, this message translates to:
-  /// **'三、版权数据处理义务\n'**
+  /// **'四、版权数据处理义务\n'**
   String get settingsDecline3Title;
 
   /// No description provided for @settingsDecline3Body.
@@ -5683,19 +5695,19 @@ abstract class AppLocalizations {
   /// No description provided for @settingsDecline4Title.
   ///
   /// In zh_CN, this message translates to:
-  /// **'四、使用限制\n'**
+  /// **'五、使用限制\n'**
   String get settingsDecline4Title;
 
   /// No description provided for @settingsDecline4Body.
   ///
   /// In zh_CN, this message translates to:
-  /// **'请勿利用本软件从事商业行为、批量抓取、爬取或转售内容；请勿在违反当地法律法规或相关平台服务条款的情况下使用本软件；请勿绕过在线平台的技术保护措施、访问控制或服务条款。\n\n'**
+  /// **'请勿利用本软件从事商业行为、批量抓取、爬取或转售内容；请勿在违反当地法律法规或相关平台服务条款的情况下使用本软件；请勿绕过在线平台的技术保护措施、访问控制或服务条款；请勿将本软件用于任何侵害他人合法权益的用途。\n\n'**
   String get settingsDecline4Body;
 
   /// No description provided for @settingsDeclineLoginTitle.
   ///
   /// In zh_CN, this message translates to:
-  /// **'五、登录与账号\n'**
+  /// **'六、登录与账号\n'**
   String get settingsDeclineLoginTitle;
 
   /// No description provided for @settingsDeclineLoginBody.
@@ -5703,18 +5715,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'本软件提供扫码登录（用各音乐平台官方 App 扫描本软件展示的二维码）与账号凭据登录，用于同步收藏、歌单并解锁相应功能。请注意：\n· 二维码由对应平台官方接口生成，本软件不收集、不解析、不向任何第三方发送您的登录二维码、账号、密码或短信验证码；\n· 登录成功后获得的会话凭据（Cookie / Token 等）仅保存在本机（凭据保险库加密存储），不会上传至开发者或任何非平台服务器；\n· 扫码登录等同于您授权本软件以您的账号访问对应平台，收藏、播放、评论等操作会真实作用于您的账号；\n· 请妥善保管设备与系统账户，在公共或共享设备上登录后请及时退出登录并清理凭据；\n· 平台可能对第三方客户端登录进行风控、限制或封禁，由此产生的账号异常、功能受限等风险由您自行承担。\n\n'**
   String get settingsDeclineLoginBody;
-
-  /// No description provided for @settingsDeclinePrivacyTitle.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'六、隐私与本地数据\n'**
-  String get settingsDeclinePrivacyTitle;
-
-  /// No description provided for @settingsDeclinePrivacyBody.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'本软件不设开发者服务器，不收集、不上传您的个人信息、使用行为、曲库内容或登录凭据；您的曲库、历史、收藏、下载、设置与登录态均保存在本机数据目录，卸载或使用「安全」中的删除功能可清除；与在线平台交互时，请求由您的设备直接发往对应平台，受该平台隐私政策与服务条款约束。\n\n'**
-  String get settingsDeclinePrivacyBody;
 
   /// No description provided for @settingsDeclineThirdPartyTitle.
   ///
@@ -5725,13 +5725,25 @@ abstract class AppLocalizations {
   /// No description provided for @settingsDeclineThirdPartyBody.
   ///
   /// In zh_CN, this message translates to:
-  /// **'各在线音乐平台的接口、鉴权方式与可用性由平台单方决定，可能随时变更、限制或关闭，导致登录失效、功能不可用或数据无法同步；本软件按现状提供，不对第三方服务的持续可用性、稳定性或数据完整性作出任何承诺。\n\n'**
+  /// **'各在线音乐平台的接口、鉴权方式与可用性由平台单方决定，可能随时变更、限制或关闭，导致登录失效、功能不可用或数据无法同步；本软件按现状提供，不对第三方服务的持续可用性、稳定性或数据完整性作出任何承诺。\n与您自建或有权访问的媒体服务器（如 Subsonic / Navidrome）通信时，请求直接发生于您的客户端与服务器之间，其数据安全与隐私由您及该服务器运营方自行负责。\n\n'**
   String get settingsDeclineThirdPartyBody;
+
+  /// No description provided for @settingsDeclineMinorTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'八、未成年人使用\n'**
+  String get settingsDeclineMinorTitle;
+
+  /// No description provided for @settingsDeclineMinorBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本软件为通用工具类软件，不针对未成年人设计或收集个人信息。若您是未成年人，请在监护人的陪同与指导下阅读本声明并在取得监护人同意后使用本软件；请合理安排使用时间，避免沉迷。\n\n'**
+  String get settingsDeclineMinorBody;
 
   /// No description provided for @settingsDecline5Title.
   ///
   /// In zh_CN, this message translates to:
-  /// **'八、免责声明\n'**
+  /// **'九、免责声明\n'**
   String get settingsDecline5Title;
 
   /// No description provided for @settingsDecline5Body.
@@ -5745,6 +5757,156 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。'**
   String get settingsDeclineFooter;
+
+  /// No description provided for @settingsDeclarationEntryDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'软件性质、开源许可、使用限制与免责条款'**
+  String get settingsDeclarationEntryDesc;
+
+  /// No description provided for @settingsSectionLegal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'法律与声明'**
+  String get settingsSectionLegal;
+
+  /// No description provided for @settingsLegalIntro.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'使用前请阅读：'**
+  String get settingsLegalIntro;
+
+  /// No description provided for @settingsSectionPrivacy.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'隐私政策'**
+  String get settingsSectionPrivacy;
+
+  /// No description provided for @settingsPrivacyEntryDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我们如何处理与保护您的信息'**
+  String get settingsPrivacyEntryDesc;
+
+  /// No description provided for @settingsPrivacyIntro.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'欢迎使用 ArchoeraMusic（以下简称「本软件」或「我们」）。我们深知个人信息对您的重要性，并始终致力于保护您的隐私与数据安全。本政策向您说明在您使用本软件的过程中，我们如何处理、存储与保护您的信息，以及您所享有的相关权利。\n\n请务必仔细阅读并充分理解本政策。一旦您开始使用本软件，即表示您已阅读、理解并同意本政策所述全部内容。\n\n'**
+  String get settingsPrivacyIntro;
+
+  /// No description provided for @settingsPrivacy1Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'一、基本原则\n'**
+  String get settingsPrivacy1Title;
+
+  /// No description provided for @settingsPrivacy1Body.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'1. 最小必要：仅处理实现基础功能、保障安全及改善体验所必需的数据，不收集与服务无关的个人敏感信息。\n2. 本地优先：您的曲库元数据、播放历史与偏好配置默认保存在本机，由您本人完全掌控。\n3. 透明可控：本软件不含广告、埋点或用户画像，数据处理方式公开透明，并可随时由您清除。\n\n'**
+  String get settingsPrivacy1Body;
+
+  /// No description provided for @settingsPrivacy2Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'二、我们处理的信息\n'**
+  String get settingsPrivacy2Title;
+
+  /// No description provided for @settingsPrivacy2Body.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'· 您主动提供的信息：登录第三方音乐平台的账号凭据（扫码登录所得 Cookie / Token、账号密码等）、自建或有权访问的 Subsonic 等媒体服务器的地址与账号、您选择的本地音乐目录等。凭据由本机「凭据保险库」加密保存（v1 系统安全存储 / v2 口令保护 / v3 设备绑定），不会上传至开发者或任何非平台服务器。\n· 本地运行与缓存数据：曲库元数据（曲名、歌手、专辑等）、播放历史、收藏、下载记录、歌词与封面缓存、界面语言与主题等偏好设置。\n· 本地运行日志：为便于排查故障，软件在本机生成运行日志（单文件上限 4 MiB，超限原地截断）。日志仅保存在本机，除非您主动提取并提供给开发者，否则不会被自动上传。\n\n'**
+  String get settingsPrivacy2Body;
+
+  /// No description provided for @settingsPrivacy3Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'三、信息的使用目的\n'**
+  String get settingsPrivacy3Title;
+
+  /// No description provided for @settingsPrivacy3Body.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我们仅在以下目的处理上述信息：提供音乐解码、播放、歌词显示与控制界面等核心功能；在您重新启动软件后恢复您的个性化配置；保障软件在您的设备上安全、稳定地运行。我们绝不会将您的数据用于广告推送、用户画像或商业营销，也绝不会将其出售或出租给任何第三方。\n\n'**
+  String get settingsPrivacy3Body;
+
+  /// No description provided for @settingsPrivacy4Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'四、第三方服务\n'**
+  String get settingsPrivacy4Title;
+
+  /// No description provided for @settingsPrivacy4Body.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'· 在线音乐平台与实验性音源：当您登录或使用相关功能时，请求由您的设备直接发往对应平台（或经其公开 HTTP 接口互操作），相关数据的处理同时受该平台自身的服务条款与隐私政策约束。\n· 自建或个人媒体服务器：与 Subsonic 等服务器之间的通信直接发生于您的客户端与服务器之间，服务器侧的数据安全与隐私保护由您及该服务器运营方自行负责。\n· 本软件不对第三方服务的持续可用性、稳定性或数据处理方式作出任何承诺。\n\n'**
+  String get settingsPrivacy4Body;
+
+  /// No description provided for @settingsPrivacy5Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'五、存储、保存期限与安全防护\n'**
+  String get settingsPrivacy5Title;
+
+  /// No description provided for @settingsPrivacy5Body.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'您的绝大部分数据保存在本机数据目录（Linux：~/.local/share/ArchoeraMusic；macOS：~/Library/Application Support/ArchoeraMusic；Windows：%LOCALAPPDATA%\\ArchoeraMusic，可用环境变量 ARCHOERA_DATA_DIR 覆盖），直至您主动清除或删除。敏感凭据优先采用操作系统原生安全存储加密，并在凭据保险库内隔离保管；涉及网络传输的环节在目标支持时优先使用 HTTPS / TLS。\n尽管我们采取了合理的安全措施，但受计算机与存储技术固有局限，没有任何系统能保证 100% 绝对安全，请妥善保管您的设备与第三方账号凭据。\n\n'**
+  String get settingsPrivacy5Body;
+
+  /// No description provided for @settingsPrivacy6Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'六、您的权利与数据管理\n'**
+  String get settingsPrivacy6Title;
+
+  /// No description provided for @settingsPrivacy6Body.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'您可以随时在设置中查看与修改偏好、流媒体服务器信息与登录状态；可在「存储 / 安全 / 历史」中清除缓存、历史与指定数据；可在设置中查看本机数据目录并自行删除，或在卸载后手动清理该目录，以永久销毁本软件在本机留下的全部数据。请注意：卸载可执行文件不一定会自动删除数据目录。\n\n'**
+  String get settingsPrivacy6Body;
+
+  /// No description provided for @settingsPrivacy7Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'七、未成年人隐私保护\n'**
+  String get settingsPrivacy7Title;
+
+  /// No description provided for @settingsPrivacy7Body.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本软件为通用工具类软件，不针对未成年人收集任何个人信息。若您是未成年人，请在监护人的陪同与指导下阅读本政策，并在取得监护人同意后使用本软件。\n\n'**
+  String get settingsPrivacy7Body;
+
+  /// No description provided for @settingsPrivacy8Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'八、隐私政策的更新\n'**
+  String get settingsPrivacy8Title;
+
+  /// No description provided for @settingsPrivacy8Body.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我们可能随功能迭代、技术架构演进或法律法规变更适时修订本政策。更新后的版本随软件或官方仓库发布，并自文首标注的「最近更新」日期起生效；若您在更新后继续使用本软件，即视为您已阅读、理解并同意更新后的政策。\n\n'**
+  String get settingsPrivacy8Body;
+
+  /// No description provided for @settingsPrivacy9Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'九、联系我们\n'**
+  String get settingsPrivacy9Title;
+
+  /// No description provided for @settingsPrivacy9Body.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：\n· GitHub 仓库与 Issue：https://github.com/BetaStudio2/ArchoeraMusic\n我们将在收到反馈后尽快答复。\n\n'**
+  String get settingsPrivacy9Body;
+
+  /// No description provided for @settingsPrivacyFooter.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本政策最近更新：2026 年 9 月 29 日。'**
+  String get settingsPrivacyFooter;
 
   /// No description provided for @settingsSectionEnvInfo.
   ///
@@ -5818,10 +5980,16 @@ abstract class AppLocalizations {
   /// **'字体署名'**
   String get settingsSectionFontCredits;
 
+  /// No description provided for @settingsFontCreditsEntryDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'查看内置字体与许可信息'**
+  String get settingsFontCreditsEntryDesc;
+
   /// No description provided for @settingsFontCreditsText.
   ///
   /// In zh_CN, this message translates to:
-  /// **'本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）'**
+  /// **'本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n\n上述字体仅用于界面文字渲染。若您再分发本软件，请一并遵守相应字体的许可条款。'**
   String get settingsFontCreditsText;
 
   /// No description provided for @commonNoLyrics.

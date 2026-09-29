@@ -3047,6 +3047,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。\n\n';
 
   @override
+  String get settingsDeclineLicenseTitle => '二、开源许可与源代码\n';
+
+  @override
+  String get settingsDeclineLicenseBody =>
+      '本软件以 GNU Affero 通用公共许可证第 3 版（AGPL-3.0）发布。在该许可证范围内，您可以自由运行、研究、修改与再分发本软件，但须一并遵守：保留版权与许可声明；以同一许可证发布您的衍生作品；若通过网络向用户提供本软件（含修改版）的功能，须向这些用户提供对应的完整源代码。本项目不提供任何脱离 AGPL 义务的闭源商业授权。完整条款以随附的 LICENSE 文件及 https://www.gnu.org/licenses/agpl-3.0.html 为准。\n\n';
+
+  @override
   String get settingsDecline2Title => '二、内容来源与版权\n';
 
   @override
@@ -3075,18 +3082,18 @@ class AppLocalizationsZh extends AppLocalizations {
       '本软件提供扫码登录（用各音乐平台官方 App 扫描本软件展示的二维码）与账号凭据登录，用于同步收藏、歌单并解锁相应功能。请注意：\n· 二维码由对应平台官方接口生成，本软件不收集、不解析、不向任何第三方发送您的登录二维码、账号、密码或短信验证码；\n· 登录成功后获得的会话凭据（Cookie / Token 等）仅保存在本机（凭据保险库加密存储），不会上传至开发者或任何非平台服务器；\n· 扫码登录等同于您授权本软件以您的账号访问对应平台，收藏、播放、评论等操作会真实作用于您的账号；\n· 请妥善保管设备与系统账户，在公共或共享设备上登录后请及时退出登录并清理凭据；\n· 平台可能对第三方客户端登录进行风控、限制或封禁，由此产生的账号异常、功能受限等风险由您自行承担。\n\n';
 
   @override
-  String get settingsDeclinePrivacyTitle => '六、隐私与本地数据\n';
-
-  @override
-  String get settingsDeclinePrivacyBody =>
-      '本软件不设开发者服务器，不收集、不上传您的个人信息、使用行为、曲库内容或登录凭据；您的曲库、历史、收藏、下载、设置与登录态均保存在本机数据目录，卸载或使用「安全」中的删除功能可清除；与在线平台交互时，请求由您的设备直接发往对应平台，受该平台隐私政策与服务条款约束。\n\n';
-
-  @override
   String get settingsDeclineThirdPartyTitle => '七、第三方服务与风险\n';
 
   @override
   String get settingsDeclineThirdPartyBody =>
       '各在线音乐平台的接口、鉴权方式与可用性由平台单方决定，可能随时变更、限制或关闭，导致登录失效、功能不可用或数据无法同步；本软件按现状提供，不对第三方服务的持续可用性、稳定性或数据完整性作出任何承诺。\n\n';
+
+  @override
+  String get settingsDeclineMinorTitle => '八、未成年人使用\n';
+
+  @override
+  String get settingsDeclineMinorBody =>
+      '本软件为通用工具类软件，不针对未成年人设计或收集个人信息。若您是未成年人，请在监护人的陪同与指导下阅读本声明并在取得监护人同意后使用本软件；请合理安排使用时间，避免沉迷。\n\n';
 
   @override
   String get settingsDecline5Title => '八、免责声明\n';
@@ -3098,6 +3105,91 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsDeclineFooter =>
       '本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。';
+
+  @override
+  String get settingsDeclarationEntryDesc => '软件性质、开源许可、使用限制与免责条款';
+
+  @override
+  String get settingsSectionLegal => '法律与声明';
+
+  @override
+  String get settingsLegalIntro => '使用前请阅读：';
+
+  @override
+  String get settingsSectionPrivacy => '隐私政策';
+
+  @override
+  String get settingsPrivacyEntryDesc => '我们如何处理与保护您的信息';
+
+  @override
+  String get settingsPrivacyIntro =>
+      '欢迎使用 ArchoeraMusic（以下简称「本软件」或「我们」）。我们深知个人信息对您的重要性，并始终致力于保护您的隐私与数据安全。本政策向您说明在您使用本软件的过程中，我们如何处理、存储与保护您的信息，以及您所享有的相关权利。\n\n请务必仔细阅读并充分理解本政策。一旦您开始使用本软件，即表示您已阅读、理解并同意本政策所述全部内容。\n\n';
+
+  @override
+  String get settingsPrivacy1Title => '一、基本原则\n';
+
+  @override
+  String get settingsPrivacy1Body =>
+      '1. 最小必要：仅处理实现基础功能、保障安全及改善体验所必需的数据，不收集与服务无关的个人敏感信息。\n2. 本地优先：您的曲库元数据、播放历史与偏好配置默认保存在本机，由您本人完全掌控。\n3. 透明可控：本软件不含广告、埋点或用户画像，数据处理方式公开透明，并可随时由您清除。\n\n';
+
+  @override
+  String get settingsPrivacy2Title => '二、我们处理的信息\n';
+
+  @override
+  String get settingsPrivacy2Body =>
+      '· 您主动提供的信息：登录第三方音乐平台的账号凭据（扫码登录所得 Cookie / Token、账号密码等）、自建或有权访问的 Subsonic 等媒体服务器的地址与账号、您选择的本地音乐目录等。凭据由本机「凭据保险库」加密保存（v1 系统安全存储 / v2 口令保护 / v3 设备绑定），不会上传至开发者或任何非平台服务器。\n· 本地运行与缓存数据：曲库元数据（曲名、歌手、专辑等）、播放历史、收藏、下载记录、歌词与封面缓存、界面语言与主题等偏好设置。\n· 本地运行日志：为便于排查故障，软件在本机生成运行日志（单文件上限 4 MiB，超限原地截断）。日志仅保存在本机，除非您主动提取并提供给开发者，否则不会被自动上传。\n\n';
+
+  @override
+  String get settingsPrivacy3Title => '三、信息的使用目的\n';
+
+  @override
+  String get settingsPrivacy3Body =>
+      '我们仅在以下目的处理上述信息：提供音乐解码、播放、歌词显示与控制界面等核心功能；在您重新启动软件后恢复您的个性化配置；保障软件在您的设备上安全、稳定地运行。我们绝不会将您的数据用于广告推送、用户画像或商业营销，也绝不会将其出售或出租给任何第三方。\n\n';
+
+  @override
+  String get settingsPrivacy4Title => '四、第三方服务\n';
+
+  @override
+  String get settingsPrivacy4Body =>
+      '· 在线音乐平台与实验性音源：当您登录或使用相关功能时，请求由您的设备直接发往对应平台（或经其公开 HTTP 接口互操作），相关数据的处理同时受该平台自身的服务条款与隐私政策约束。\n· 自建或个人媒体服务器：与 Subsonic 等服务器之间的通信直接发生于您的客户端与服务器之间，服务器侧的数据安全与隐私保护由您及该服务器运营方自行负责。\n· 本软件不对第三方服务的持续可用性、稳定性或数据处理方式作出任何承诺。\n\n';
+
+  @override
+  String get settingsPrivacy5Title => '五、存储、保存期限与安全防护\n';
+
+  @override
+  String get settingsPrivacy5Body =>
+      '您的绝大部分数据保存在本机数据目录（Linux：~/.local/share/ArchoeraMusic；macOS：~/Library/Application Support/ArchoeraMusic；Windows：%LOCALAPPDATA%\\ArchoeraMusic，可用环境变量 ARCHOERA_DATA_DIR 覆盖），直至您主动清除或删除。敏感凭据优先采用操作系统原生安全存储加密，并在凭据保险库内隔离保管；涉及网络传输的环节在目标支持时优先使用 HTTPS / TLS。\n尽管我们采取了合理的安全措施，但受计算机与存储技术固有局限，没有任何系统能保证 100% 绝对安全，请妥善保管您的设备与第三方账号凭据。\n\n';
+
+  @override
+  String get settingsPrivacy6Title => '六、您的权利与数据管理\n';
+
+  @override
+  String get settingsPrivacy6Body =>
+      '您可以随时在设置中查看与修改偏好、流媒体服务器信息与登录状态；可在「存储 / 安全 / 历史」中清除缓存、历史与指定数据；可在设置中查看本机数据目录并自行删除，或在卸载后手动清理该目录，以永久销毁本软件在本机留下的全部数据。请注意：卸载可执行文件不一定会自动删除数据目录。\n\n';
+
+  @override
+  String get settingsPrivacy7Title => '七、未成年人隐私保护\n';
+
+  @override
+  String get settingsPrivacy7Body =>
+      '本软件为通用工具类软件，不针对未成年人收集任何个人信息。若您是未成年人，请在监护人的陪同与指导下阅读本政策，并在取得监护人同意后使用本软件。\n\n';
+
+  @override
+  String get settingsPrivacy8Title => '八、隐私政策的更新\n';
+
+  @override
+  String get settingsPrivacy8Body =>
+      '我们可能随功能迭代、技术架构演进或法律法规变更适时修订本政策。更新后的版本随软件或官方仓库发布，并自文首标注的「最近更新」日期起生效；若您在更新后继续使用本软件，即视为您已阅读、理解并同意更新后的政策。\n\n';
+
+  @override
+  String get settingsPrivacy9Title => '九、联系我们\n';
+
+  @override
+  String get settingsPrivacy9Body =>
+      '如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：\n· GitHub 仓库与 Issue：https://github.com/BetaStudio2/ArchoeraMusic\n我们将在收到反馈后尽快答复。\n\n';
+
+  @override
+  String get settingsPrivacyFooter => '本政策最近更新：2026 年 9 月 29 日。';
 
   @override
   String get settingsSectionEnvInfo => '环境信息';
@@ -3134,6 +3226,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSectionFontCredits => '字体署名';
+
+  @override
+  String get settingsFontCreditsEntryDesc => '查看内置字体与许可信息';
 
   @override
   String get settingsFontCreditsText =>
@@ -7682,52 +7777,59 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsDecline1Body =>
-      '本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。\n\n';
+      '本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。本软件按现状提供，作者不保证其适用性、稳定性或适法性，请您在遵守所在地法律法规的前提下自行决定是否使用。\n\n';
 
   @override
-  String get settingsDecline2Title => '二、内容来源与版权\n';
+  String get settingsDeclineLicenseTitle => '二、开源许可与源代码\n';
+
+  @override
+  String get settingsDeclineLicenseBody =>
+      '本软件以 GNU Affero 通用公共许可证第 3 版（AGPL-3.0）发布。在该许可证范围内，您可以自由运行、研究、修改与再分发本软件，但须一并遵守：保留版权与许可声明；以同一许可证发布您的衍生作品；若通过网络向用户提供本软件（含修改版）的功能，须向这些用户提供对应的完整源代码。本项目不提供任何脱离 AGPL 义务的闭源商业授权。完整条款以随附的 LICENSE 文件及 https://www.gnu.org/licenses/agpl-3.0.html 为准。\n\n';
+
+  @override
+  String get settingsDecline2Title => '三、内容来源与版权\n';
 
   @override
   String get settingsDecline2Body =>
-      '本软件自身不提供、不存储、不分发任何音乐内容。音频、歌词、封面等均来自您的本地文件或各音乐平台公开接口，其版权归原权利人及平台所有，本软件不主张任何所有权。\n\n';
+      '本软件自身不提供、不存储、不分发任何音乐内容。音频、歌词、封面等均来自您的本地文件、您自建或有权访问的媒体服务器，或各音乐平台公开接口，其版权归原权利人及平台所有，本软件不主张任何所有权。您应自行确保对相关内容拥有合法访问与使用权。\n\n';
 
   @override
-  String get settingsDecline3Title => '三、版权数据处理义务\n';
+  String get settingsDecline3Title => '四、版权数据处理义务\n';
 
   @override
   String get settingsDecline3Body =>
       '使用过程中产生的版权数据（播放链接、歌词、封面等）仅供您个人试听与学习研究，请勿用于商业或公开传播；建议在产生后 24 小时内清除。如需长期欣赏，请通过正版渠道购买或订阅，支持正版音乐。\n\n';
 
   @override
-  String get settingsDecline4Title => '四、使用限制\n';
+  String get settingsDecline4Title => '五、使用限制\n';
 
   @override
   String get settingsDecline4Body =>
-      '请勿利用本软件从事商业行为、批量抓取、爬取或转售内容；请勿在违反当地法律法规或相关平台服务条款的情况下使用本软件；请勿绕过在线平台的技术保护措施、访问控制或服务条款。\n\n';
+      '请勿利用本软件从事商业行为、批量抓取、爬取或转售内容；请勿在违反当地法律法规或相关平台服务条款的情况下使用本软件；请勿绕过在线平台的技术保护措施、访问控制或服务条款；请勿将本软件用于任何侵害他人合法权益的用途。\n\n';
 
   @override
-  String get settingsDeclineLoginTitle => '五、登录与账号\n';
+  String get settingsDeclineLoginTitle => '六、登录与账号\n';
 
   @override
   String get settingsDeclineLoginBody =>
       '本软件提供扫码登录（用各音乐平台官方 App 扫描本软件展示的二维码）与账号凭据登录，用于同步收藏、歌单并解锁相应功能。请注意：\n· 二维码由对应平台官方接口生成，本软件不收集、不解析、不向任何第三方发送您的登录二维码、账号、密码或短信验证码；\n· 登录成功后获得的会话凭据（Cookie / Token 等）仅保存在本机（凭据保险库加密存储），不会上传至开发者或任何非平台服务器；\n· 扫码登录等同于您授权本软件以您的账号访问对应平台，收藏、播放、评论等操作会真实作用于您的账号；\n· 请妥善保管设备与系统账户，在公共或共享设备上登录后请及时退出登录并清理凭据；\n· 平台可能对第三方客户端登录进行风控、限制或封禁，由此产生的账号异常、功能受限等风险由您自行承担。\n\n';
 
   @override
-  String get settingsDeclinePrivacyTitle => '六、隐私与本地数据\n';
-
-  @override
-  String get settingsDeclinePrivacyBody =>
-      '本软件不设开发者服务器，不收集、不上传您的个人信息、使用行为、曲库内容或登录凭据；您的曲库、历史、收藏、下载、设置与登录态均保存在本机数据目录，卸载或使用「安全」中的删除功能可清除；与在线平台交互时，请求由您的设备直接发往对应平台，受该平台隐私政策与服务条款约束。\n\n';
-
-  @override
   String get settingsDeclineThirdPartyTitle => '七、第三方服务与风险\n';
 
   @override
   String get settingsDeclineThirdPartyBody =>
-      '各在线音乐平台的接口、鉴权方式与可用性由平台单方决定，可能随时变更、限制或关闭，导致登录失效、功能不可用或数据无法同步；本软件按现状提供，不对第三方服务的持续可用性、稳定性或数据完整性作出任何承诺。\n\n';
+      '各在线音乐平台的接口、鉴权方式与可用性由平台单方决定，可能随时变更、限制或关闭，导致登录失效、功能不可用或数据无法同步；本软件按现状提供，不对第三方服务的持续可用性、稳定性或数据完整性作出任何承诺。\n与您自建或有权访问的媒体服务器（如 Subsonic / Navidrome）通信时，请求直接发生于您的客户端与服务器之间，其数据安全与隐私由您及该服务器运营方自行负责。\n\n';
 
   @override
-  String get settingsDecline5Title => '八、免责声明\n';
+  String get settingsDeclineMinorTitle => '八、未成年人使用\n';
+
+  @override
+  String get settingsDeclineMinorBody =>
+      '本软件为通用工具类软件，不针对未成年人设计或收集个人信息。若您是未成年人，请在监护人的陪同与指导下阅读本声明并在取得监护人同意后使用本软件；请合理安排使用时间，避免沉迷。\n\n';
+
+  @override
+  String get settingsDecline5Title => '九、免责声明\n';
 
   @override
   String get settingsDecline5Body =>
@@ -7736,6 +7838,91 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   @override
   String get settingsDeclineFooter =>
       '本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。';
+
+  @override
+  String get settingsDeclarationEntryDesc => '软件性质、开源许可、使用限制与免责条款';
+
+  @override
+  String get settingsSectionLegal => '法律与声明';
+
+  @override
+  String get settingsLegalIntro => '使用前请阅读：';
+
+  @override
+  String get settingsSectionPrivacy => '隐私政策';
+
+  @override
+  String get settingsPrivacyEntryDesc => '我们如何处理与保护您的信息';
+
+  @override
+  String get settingsPrivacyIntro =>
+      '欢迎使用 ArchoeraMusic（以下简称「本软件」或「我们」）。我们深知个人信息对您的重要性，并始终致力于保护您的隐私与数据安全。本政策向您说明在您使用本软件的过程中，我们如何处理、存储与保护您的信息，以及您所享有的相关权利。\n\n请务必仔细阅读并充分理解本政策。一旦您开始使用本软件，即表示您已阅读、理解并同意本政策所述全部内容。\n\n';
+
+  @override
+  String get settingsPrivacy1Title => '一、基本原则\n';
+
+  @override
+  String get settingsPrivacy1Body =>
+      '1. 最小必要：仅处理实现基础功能、保障安全及改善体验所必需的数据，不收集与服务无关的个人敏感信息。\n2. 本地优先：您的曲库元数据、播放历史与偏好配置默认保存在本机，由您本人完全掌控。\n3. 透明可控：本软件不含广告、埋点或用户画像，数据处理方式公开透明，并可随时由您清除。\n\n';
+
+  @override
+  String get settingsPrivacy2Title => '二、我们处理的信息\n';
+
+  @override
+  String get settingsPrivacy2Body =>
+      '· 您主动提供的信息：登录第三方音乐平台的账号凭据（扫码登录所得 Cookie / Token、账号密码等）、自建或有权访问的 Subsonic 等媒体服务器的地址与账号、您选择的本地音乐目录等。凭据由本机「凭据保险库」加密保存（v1 系统安全存储 / v2 口令保护 / v3 设备绑定），不会上传至开发者或任何非平台服务器。\n· 本地运行与缓存数据：曲库元数据（曲名、歌手、专辑等）、播放历史、收藏、下载记录、歌词与封面缓存、界面语言与主题等偏好设置。\n· 本地运行日志：为便于排查故障，软件在本机生成运行日志（单文件上限 4 MiB，超限原地截断）。日志仅保存在本机，除非您主动提取并提供给开发者，否则不会被自动上传。\n\n';
+
+  @override
+  String get settingsPrivacy3Title => '三、信息的使用目的\n';
+
+  @override
+  String get settingsPrivacy3Body =>
+      '我们仅在以下目的处理上述信息：提供音乐解码、播放、歌词显示与控制界面等核心功能；在您重新启动软件后恢复您的个性化配置；保障软件在您的设备上安全、稳定地运行。我们绝不会将您的数据用于广告推送、用户画像或商业营销，也绝不会将其出售或出租给任何第三方。\n\n';
+
+  @override
+  String get settingsPrivacy4Title => '四、第三方服务\n';
+
+  @override
+  String get settingsPrivacy4Body =>
+      '· 在线音乐平台与实验性音源：当您登录或使用相关功能时，请求由您的设备直接发往对应平台（或经其公开 HTTP 接口互操作），相关数据的处理同时受该平台自身的服务条款与隐私政策约束。\n· 自建或个人媒体服务器：与 Subsonic 等服务器之间的通信直接发生于您的客户端与服务器之间，服务器侧的数据安全与隐私保护由您及该服务器运营方自行负责。\n· 本软件不对第三方服务的持续可用性、稳定性或数据处理方式作出任何承诺。\n\n';
+
+  @override
+  String get settingsPrivacy5Title => '五、存储、保存期限与安全防护\n';
+
+  @override
+  String get settingsPrivacy5Body =>
+      '您的绝大部分数据保存在本机数据目录（Linux：~/.local/share/ArchoeraMusic；macOS：~/Library/Application Support/ArchoeraMusic；Windows：%LOCALAPPDATA%\\ArchoeraMusic，可用环境变量 ARCHOERA_DATA_DIR 覆盖），直至您主动清除或删除。敏感凭据优先采用操作系统原生安全存储加密，并在凭据保险库内隔离保管；涉及网络传输的环节在目标支持时优先使用 HTTPS / TLS。\n尽管我们采取了合理的安全措施，但受计算机与存储技术固有局限，没有任何系统能保证 100% 绝对安全，请妥善保管您的设备与第三方账号凭据。\n\n';
+
+  @override
+  String get settingsPrivacy6Title => '六、您的权利与数据管理\n';
+
+  @override
+  String get settingsPrivacy6Body =>
+      '您可以随时在设置中查看与修改偏好、流媒体服务器信息与登录状态；可在「存储 / 安全 / 历史」中清除缓存、历史与指定数据；可在设置中查看本机数据目录并自行删除，或在卸载后手动清理该目录，以永久销毁本软件在本机留下的全部数据。请注意：卸载可执行文件不一定会自动删除数据目录。\n\n';
+
+  @override
+  String get settingsPrivacy7Title => '七、未成年人隐私保护\n';
+
+  @override
+  String get settingsPrivacy7Body =>
+      '本软件为通用工具类软件，不针对未成年人收集任何个人信息。若您是未成年人，请在监护人的陪同与指导下阅读本政策，并在取得监护人同意后使用本软件。\n\n';
+
+  @override
+  String get settingsPrivacy8Title => '八、隐私政策的更新\n';
+
+  @override
+  String get settingsPrivacy8Body =>
+      '我们可能随功能迭代、技术架构演进或法律法规变更适时修订本政策。更新后的版本随软件或官方仓库发布，并自文首标注的「最近更新」日期起生效；若您在更新后继续使用本软件，即视为您已阅读、理解并同意更新后的政策。\n\n';
+
+  @override
+  String get settingsPrivacy9Title => '九、联系我们\n';
+
+  @override
+  String get settingsPrivacy9Body =>
+      '如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：\n· GitHub 仓库与 Issue：https://github.com/BetaStudio2/ArchoeraMusic\n我们将在收到反馈后尽快答复。\n\n';
+
+  @override
+  String get settingsPrivacyFooter => '本政策最近更新：2026 年 9 月 29 日。';
 
   @override
   String get settingsSectionEnvInfo => '环境信息';
@@ -7774,8 +7961,11 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSectionFontCredits => '字体署名';
 
   @override
+  String get settingsFontCreditsEntryDesc => '查看内置字体与许可信息';
+
+  @override
   String get settingsFontCreditsText =>
-      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）';
+      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n\n上述字体仅用于界面文字渲染。若您再分发本软件，请一并遵守相应字体的许可条款。';
 
   @override
   String get commonNoLyrics => '暂无歌词';
@@ -12323,6 +12513,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '本軟體為第三方用戶端，與各音樂平台及其官方用戶端無任何關聯、合作或授權關係；不以營利為目的，不接受任何商業合作、廣告或捐贈。如需更完善的功能，請下載官方用戶端體驗。\n\n';
 
   @override
+  String get settingsDeclineLicenseTitle => '二、開源授權與原始碼\n';
+
+  @override
+  String get settingsDeclineLicenseBody =>
+      '本軟體以 GNU Affero 通用公共授權條款第 3 版（AGPL-3.0）發布。在該授權條款範圍內，您可以自由執行、研究、修改與再散布本軟體，但須一併遵守：保留著作權與授權聲明；以同一授權條款發布您的衍生作品；若透過網路向使用者提供本軟體（含修改版）的功能，須向這些使用者提供對應的完整原始碼。本專案不提供任何脫離 AGPL 義務的閉源商業授權。完整條款以隨附的 LICENSE 檔案及 https://www.gnu.org/licenses/agpl-3.0.html 為準。\n\n';
+
+  @override
   String get settingsDecline2Title => '二、內容來源與版權\n';
 
   @override
@@ -12351,18 +12548,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       '本軟體提供掃碼登入（以各音樂平台官方 App 掃描本軟體顯示的 QR Code）與帳號憑證登入，用於同步收藏、歌單並解鎖相應功能。請注意：\n· QR Code 由對應平台官方介面產生，本軟體不收集、不解析、不向任何第三方傳送您的登入 QR Code、帳號、密碼或簡訊驗證碼；\n· 登入成功後取得的會話憑證（Cookie / Token 等）僅保存在本機（憑證保險庫加密儲存），不會上傳至開發者或任何非平台伺服器；\n· 掃碼登入等同於您授權本軟體以您的帳號存取對應平台，收藏、播放、評論等操作會實際作用於您的帳號；\n· 請妥善保管裝置與系統帳戶，在公共或共用裝置上登入後請及時登出並清除憑證；\n· 平台可能對第三方用戶端登入進行風控、限制或封禁，由此產生的帳號異常、功能受限等風險由您自行承擔。\n\n';
 
   @override
-  String get settingsDeclinePrivacyTitle => '六、隱私與本機資料\n';
-
-  @override
-  String get settingsDeclinePrivacyBody =>
-      '本軟體不設開發者伺服器，不收集、不上傳您的個人資訊、使用行為、曲庫內容或登入憑證；您的曲庫、歷史、收藏、下載、設定與登入狀態均保存在本機資料目錄，解除安裝或使用「安全」中的刪除功能可清除；與線上平台互動時，請求由您的裝置直接發往對應平台，受該平台隱私政策與服務條款約束。\n\n';
-
-  @override
   String get settingsDeclineThirdPartyTitle => '七、第三方服務與風險\n';
 
   @override
   String get settingsDeclineThirdPartyBody =>
       '各線上音樂平台的介面、驗證方式與可用性由平台單方決定，可能隨時變更、限制或關閉，導致登入失效、功能無法使用或資料無法同步；本軟體按現狀提供，不對第三方服務的持續可用性、穩定性或資料完整性作出任何承諾。\n\n';
+
+  @override
+  String get settingsDeclineMinorTitle => '八、未成年人使用\n';
+
+  @override
+  String get settingsDeclineMinorBody =>
+      '本軟體為通用工具類軟體，不針對未成年人設計或收集個人資訊。若您是未成年人，請在監護人的陪同與指導下閱讀本聲明並在取得監護人同意後使用本軟體；請合理安排使用時間，避免沉迷。\n\n';
 
   @override
   String get settingsDecline5Title => '八、免責聲明\n';
@@ -12374,6 +12571,91 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get settingsDeclineFooter =>
       '本軟體僅用於技術探索與研究。如相關平台認為本軟體不妥，可隨時聯繫開發者進行調整或移除。';
+
+  @override
+  String get settingsDeclarationEntryDesc => '軟體性質、開源授權、使用限制與免責條款';
+
+  @override
+  String get settingsSectionLegal => '法律與聲明';
+
+  @override
+  String get settingsLegalIntro => '使用前請閱讀：';
+
+  @override
+  String get settingsSectionPrivacy => '隱私政策';
+
+  @override
+  String get settingsPrivacyEntryDesc => '我們如何處理與保護您的資訊';
+
+  @override
+  String get settingsPrivacyIntro =>
+      '歡迎使用 ArchoeraMusic（以下簡稱「本軟體」或「我們」）。我們深知個人資訊對您的重要性，並始終致力於保護您的隱私與資料安全。本政策向您說明在您使用本軟體的過程中，我們如何處理、儲存與保護您的資訊，以及您所享有的相關權利。\n\n請務必仔細閱讀並充分理解本政策。一旦您開始使用本軟體，即表示您已閱讀、理解並同意本政策所述全部內容。\n\n';
+
+  @override
+  String get settingsPrivacy1Title => '一、基本原則\n';
+
+  @override
+  String get settingsPrivacy1Body =>
+      '1. 最小必要：僅處理實現基礎功能、保障安全及改善體驗所必需的資料，不收集與服務無關的個人敏感資訊。\n2. 本機優先：您的曲庫中繼資料、播放歷史與偏好設定預設保存在本機，由您本人完全掌控。\n3. 透明可控：本軟體不含廣告、埋點或使用者側寫，資料處理方式公開透明，並可隨時由您清除。\n\n';
+
+  @override
+  String get settingsPrivacy2Title => '二、我們處理的資訊\n';
+
+  @override
+  String get settingsPrivacy2Body =>
+      '· 您主動提供的資訊：登入第三方音樂平台的帳號憑證（掃碼登入所得 Cookie / Token、帳號密碼等）、自建或自有權限存取的 Subsonic 等媒體伺服器位址與帳號、您選擇的本機音樂目錄等。憑證由本機「憑證保險庫」加密保存（v1 系統安全儲存 / v2 口令保護 / v3 裝置綁定），不會上傳至開發者或任何非平台伺服器。\n· 本機執行與快取資料：曲庫中繼資料（曲名、歌手、專輯等）、播放歷史、收藏、下載紀錄、歌詞與封面快取、介面語言與主題等偏好設定。\n· 本機執行紀錄：為便於排查故障，軟體在本機產生執行紀錄（單一檔案上限 4 MiB，超限原地截斷）。紀錄僅保存在本機，除非您主動提取並提供給開發者，否則不會被自動上傳。\n\n';
+
+  @override
+  String get settingsPrivacy3Title => '三、資訊的使用目的\n';
+
+  @override
+  String get settingsPrivacy3Body =>
+      '我們僅在以下目的處理上述資訊：提供音樂解碼、播放、歌詞顯示與控制介面等核心功能；在您重新啟動軟體後還原您的個人化設定；保障軟體在您的裝置上安全、穩定地執行。我們絕不會將您的資料用於廣告推送、使用者側寫或商業行銷，也絕不會將其出售或出租給任何第三方。\n\n';
+
+  @override
+  String get settingsPrivacy4Title => '四、第三方服務\n';
+
+  @override
+  String get settingsPrivacy4Body =>
+      '· 線上音樂平台與實驗性音源：當您登入或使用相關功能時，請求由您的裝置直接發往對應平台（或經其公開 HTTP 介面互通），相關資料的處理同時受該平台自身的服務條款與隱私政策約束。\n· 自建或個人媒體伺服器：與 Subsonic 等伺服器之間的通訊直接發生於您的用戶端與伺服器之間，伺服器側的資料安全與隱私保護由您及該伺服器營運方自行負責。\n· 本軟體不對第三方服務的持續可用性、穩定性或資料處理方式作出任何承諾。\n\n';
+
+  @override
+  String get settingsPrivacy5Title => '五、儲存、保存期限與安全防護\n';
+
+  @override
+  String get settingsPrivacy5Body =>
+      '您的絕大部分資料保存在本機資料目錄（Linux：~/.local/share/ArchoeraMusic；macOS：~/Library/Application Support/ArchoeraMusic；Windows：%LOCALAPPDATA%\\ArchoeraMusic，可用環境變數 ARCHOERA_DATA_DIR 覆寫），直到您主動清除或刪除。敏感憑證優先採用作業系統原生安全儲存加密，並在憑證保險庫內隔離保管；涉及網路傳輸的環節在目標支援時優先使用 HTTPS / TLS。\n儘管我們採取了合理的安全措施，但受電腦與儲存技術固有侷限，沒有任何系統能保證 100% 絕對安全，請妥善保管您的裝置與第三方帳號憑證。\n\n';
+
+  @override
+  String get settingsPrivacy6Title => '六、您的權利與資料管理\n';
+
+  @override
+  String get settingsPrivacy6Body =>
+      '您可以隨時在設定中查看與修改偏好、串流伺服器資訊與登入狀態；可在「儲存 / 安全 / 歷史」中清除快取、歷史與指定資料；可在設定中查看本機資料目錄並自行刪除，或在解除安裝後手動清理該目錄，以永久銷毀本軟體在本機留下的全部資料。請注意：解除安裝執行檔不一定會自動刪除資料目錄。\n\n';
+
+  @override
+  String get settingsPrivacy7Title => '七、未成年人隱私保護\n';
+
+  @override
+  String get settingsPrivacy7Body =>
+      '本軟體為通用工具類軟體，不針對未成年人收集任何個人資訊。若您是未成年人，請在監護人的陪同與指導下閱讀本政策，並在取得監護人同意後使用本軟體。\n\n';
+
+  @override
+  String get settingsPrivacy8Title => '八、隱私政策的更新\n';
+
+  @override
+  String get settingsPrivacy8Body =>
+      '我們可能隨功能迭代、技術架構演進或法律法規變更適時修訂本政策。更新後的版本隨軟體或官方倉庫發布，並自文首標註的「最近更新」日期起生效；若您在更新後繼續使用本軟體，即視為您已閱讀、理解並同意更新後的政策。\n\n';
+
+  @override
+  String get settingsPrivacy9Title => '九、聯絡我們\n';
+
+  @override
+  String get settingsPrivacy9Body =>
+      '如對本政策的內容、您的資訊安全或相關事項有任何疑問、意見或申訴，歡迎透過以下方式與開發者聯絡：\n· GitHub 倉庫與 Issue：https://github.com/BetaStudio2/ArchoeraMusic\n我們將在收到回饋後儘快答覆。\n\n';
+
+  @override
+  String get settingsPrivacyFooter => '本政策最近更新：2026 年 9 月 29 日。';
 
   @override
   String get settingsSectionEnvInfo => '環境資訊';
@@ -12410,6 +12692,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSectionFontCredits => '字體署名';
+
+  @override
+  String get settingsFontCreditsEntryDesc => '查看內建字型與授權資訊';
 
   @override
   String get settingsFontCreditsText =>

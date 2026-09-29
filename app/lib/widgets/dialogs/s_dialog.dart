@@ -60,6 +60,12 @@ class SDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dialog = Theme.of(context).dialogTheme;
+    // 内容区最大高度：常规窗口取 480；窗口较矮时按可用高度收敛，
+    // 避免「标题 + 内容 + 按钮」总高超出弹窗可用空间而溢出。
+    final maxContent = (MediaQuery.sizeOf(context).height - 240).clamp(
+      140.0,
+      480.0,
+    );
     return Dialog(
       insetPadding: const EdgeInsets.all(48),
       backgroundColor: Colors.transparent,
@@ -96,7 +102,7 @@ class SDialog extends StatelessWidget {
                 ],
                 const SizedBox(height: 16),
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 480),
+                  constraints: BoxConstraints(maxHeight: maxContent),
                   child: SingleChildScrollView(
                     child: child,
                   ),
