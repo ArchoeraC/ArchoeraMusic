@@ -3,7 +3,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /// 播放进度条：默认简化细条，悬停展开完整 Slider；buffering 时叠加
-/// 「缓冲流动」动效。
+/// 「缓冲流动」动效。悬停/拖动时在轨道上方显示时间提示，若提供
+/// [PlaybackSlider.tooltipLyric]，则在时间旁一并显示该位置的歌词行。
+///
+/// 时间提示渲染在**最近 Overlay** 中（而非进度条自身盒内），因此可以
+/// 溢出播放条容器、与轨道拉开间距，且不改变容器高度/宽度（气泡经指针
+/// 位置换算后在 Overlay 内定位，见 `_PlaybackSliderState`）。
 ///
 /// 交互：简化细条状态即可直接点按/水平拖动 seek（鼠标与触摸通用，映射
 /// 几何与完整 Slider 一致）；鼠标进入细条后再切换为完整 [Slider]
@@ -37,6 +42,7 @@ class PlaybackSlider extends StatefulWidget {
     required this.max,
     required this.buffering,
     this.showTooltip = true,
+    this.tooltipLyric,
     this.onChanged,
     this.onChangeEnd,
   });
@@ -49,6 +55,12 @@ class PlaybackSlider extends StatefulWidget {
 
   /// 悬停时在轨道上方显示对应时间提示（默认开）。
   final bool showTooltip;
+
+  /// 悬停/拖动时，在时间提示旁一并显示的歌词行。
+  ///
+  /// 入参为指针/拖动位置对应的毫秒数；返回 null 表示该位置没有可显示的
+  /// 歌词（无歌词、行首之前或空行），此时仅显示时间。默认 null（不显示歌词）。
+  final String? Function(double ms)? tooltipLyric;
 
   final ValueChanged<double>? onChanged;
   final ValueChanged<double>? onChangeEnd;

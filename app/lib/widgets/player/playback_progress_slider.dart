@@ -51,8 +51,9 @@ class PlaybackProgressSlider extends ConsumerWidget {
       playbackProvider.select((s) => (pos: s.position, dur: s.duration)),
     );
     final prefs = ref.watch(appPrefsProvider);
-    // 吸附到歌词：仅在启用且当前曲目有歌词时生效。
-    final groups = prefs.snapToLyric
+    // 歌词仅在「吸附到歌词」或「悬停/拖动显示歌词」启用时才需要读取。
+    final needLyrics = prefs.snapToLyric || prefs.showProgressTooltip;
+    final groups = needLyrics
         ? ref
               .watch(currentLyricsProvider)
               .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[])
@@ -66,6 +67,10 @@ class PlaybackProgressSlider extends ConsumerWidget {
       max: durMs < 1 ? 1 : durMs.toDouble(),
       buffering: buffering,
       showTooltip: prefs.showProgressTooltip,
+      // 悬停/拖动：时间提示旁一并显示该位置的歌词行（时间显示的歌词定位）。
+      tooltipLyric: prefs.showProgressTooltip
+          ? (ms) => _lyricAt(groups, ms)
+          : null,
       onChanged: enabled ? onDragChanged : null,
       onChangeEnd: enabled
           ? (v) async {
@@ -86,10 +91,25 @@ class PlaybackProgressSlider extends ConsumerWidget {
     return Row(
       children: [
         Text(left, style: textStyle),
+        // 时间与滑块之间留白：贴太近会与轨道两端视觉粘连。
+        const SizedBox(width: _timeGap),
         Expanded(child: slider),
+        const SizedBox(width: _timeGap),
         Text(right, style: textStyle),
       ],
     );
+  }
+
+  /// 时间标签与进度条之间的水平留白。
+  static const double _timeGap = 12;
+
+  /// 指针/拖动毫秒对应的歌词行文本；无歌词、行首之前或空行返回 null。
+  static String? _lyricAt(List<LyricGroup> groups, double ms) {
+    if (groups.isEmpty) return null;
+    final i = lyricIndexAt(groups, ms.round());
+    if (i < 0 || i >= groups.length) return null;
+    final text = groups[i].original.text.trim();
+    return text.isEmpty ? null : text;
   }
 
   /// 最近歌词行起始毫秒（用于拖动松手吸附）。
