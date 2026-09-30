@@ -74,6 +74,12 @@
 | **图片外观背景**（`appearanceStyle=image`） | 全屏封面 + 模糊 | 静态层缓存 + 降采样（同背景主线） | 3.6 / 4.1 |
 | **播放页**（背景/歌词/频谱） | 见专项文档 | 静态/动态分层、损坏区、批处理 | 3.3–3.9 |
 
+> **已落地（2026-09-30）**：播放页 `blur` 背景（全屏 `ImageFiltered(σ=45)`）改为
+> 封面/尺寸变化时**一次性烘焙** `ui.Image`（分辨率长边 ≤2048），每帧只贴图；
+> 并把背景包进 `RepaintBoundary` 独立成层（歌词/频谱/进度重绘时不再随父层重放
+> 光栅化，Skia 后端可缓存为纹理）。见 `player-render-optimization.md` §4.1。
+> 此前的每帧全屏高斯在 Windows（WDDM/ANGLE 记账）是播放页内存/GPU 的主要来源之一。
+
 > 全应用通用的四个杠杆与 §0 一致：**图层缓存 / 只画变化 / 降分辨率 / 不可见即停**。
 > 列表与图片是除播放页之外**收益最大的两块**（解码内存 + 滚动帧时间）。
 
@@ -725,6 +731,48 @@
   避免首帧同时构建背景 + 歌词 + 频谱。
 - **暂停/后台**：`power_saver.dart` 已按最小化/失焦/熄屏压帧率；需确保**连 ticker 一起停**
   （`TickerMode`/`Visibility(maintainAnimation:false)`），而非仅降帧。
+
+> **已落地（2026-10-01）**：
+> 1. **后台清缓存（默认开）**：最小化/托盘隐藏/熄屏时，`power_saver.dart` 释放
+>    `ImageCache`（`clear` + `clearLiveImages`）、歌词三件套、封面色缓存、Netease 接口
+>    LRU——返回前台按需重载，不影响播放。
+> 2. **根级后台卸载门（`app/background_unload_gate.dart`）**：开启
+>    `power.unloadBackgroundPages`（播放设置 · 电源，默认关）或强迫症
+>    `preset.unloadAllMemory` 且应用进入不可见后台时，把**整棵路由子树**
+>    （`MaterialApp.router` 的 Navigator：全部页面 / 弹窗 / 播放页）卸为纯色，
+>    恢复后重建。`MaterialApp`/Splash/Vault 门保持挂载（恢复不重放 Splash）。
+>    强迫症档额外 `appRouter.go('/')` 复位导航，丢弃分支/Tab/嵌套路由。
+> 3. **强迫症「最小化时卸载全部内存状态」（`preset.unloadAllMemory`，默认关）**：在 1+2
+>    基础上 `invalidate` 页面数据 provider（音乐库窗口 / 首页聚光 / 每日推荐 /
+>    流媒体库 / 当前歌词），恢复前台后从零重建；播放/认证/偏好/平台能力不在其列。
+>
+> **关键时序（修复「最小化后内存不释放」）**：隐藏/最小化时引擎**可能不出帧**
+> （GTK 隐藏窗口不派发 drawFrame），故**释放绝不能挂在 `addPostFrameCallback` 上**
+> ——实测 timer 已触发却无任何释放。现改为：进入后台 **同步释放**缓存/页面数据
+> （不需要帧，立刻生效）。另加 **30s 去抖**：只有「持续后台」达阈值才释放一次，
+> 快速 hide/show 完全不触发（避免反复卸载/重建的 churn）。
+>
+> **UI 卸载默认关闭，收进强迫症可选（`preset.unloadAllMemory`）**：默认档只做
+> **同步数据/缓存释放**，**不卸载 UI 子树**。原因（实测）：卸载/重建整棵路由子树会
+> **涨内存且不释放**——① 引擎/驱动在重建时重新分配表面/图层/纹理，旧资源归还到
+> 驱动池但**不还给 OS**（glibc arena 高水位 + Mesa/D3D 资源缓存）；② 卸载期
+> `ImageCache.clear()`，恢复时全量**重新解码**封面；③ 隐藏期不出帧时“卸载”要到
+> 恢复首帧才发生，收益滞后。净效果是**水位抬高、不回退**。故仅在强迫症档由用户
+> 自行承担这一代价。
+>
+> **minimize/show 本身的内存增长（非本应用代码）**：实测在**关闭节能与全部卸载
+> 开关**后，仅反复 `hide()/show()` 6 次，进程 RSS 也从 631MB 涨到 729MB 后平台期
+> ——这是窗口隐藏/显示时渲染表面（GTK/Mesa；Windows 上为 D3D/DXGI swapchain）被
+> 销毁重建、驱动内存只涨不缩的平台行为，**不是应用的 Dart/FFI 泄漏**。故「后台释放」
+> 只在**持续后台**做一次（去抖），避免把这种平台 churn 放大。
+>
+> 另：平台桥接的窗口状态流对 minimized 改为**只置位、不清除**（部分合成器把
+> GTK hide 报告为 minimized=false，会闪回前台并取消后台释放）；清除交给显式
+> show/restore 事件。这样后台判定不再被系统误报打断（对齐“自己判定后台”）。
+> 4. 实测后台常驻基线（release，Linux）：重模块（mediaengine/kernel/downloader/scraper/
+>    scanner/ffmpeg）**均已按需未加载**；~290MB 主要由 GPU 驱动（~67MB）、Flutter 引擎
+>    （~27MB）、字体（Noto CJK + MiSans ~22MB）、原生 heap（~58MB）、Dart heap（~29MB）
+>    构成——即 Flutter/驱动/字形地板，进程内无可卸载 API。
 
 ### 4.5 自适应画质
 

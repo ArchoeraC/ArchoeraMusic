@@ -19,12 +19,16 @@ class LyricProcessContext {
     this.excludeKeywords = const [],
     this.excludeRegexes = const [],
     this.uncensor = false,
+    this.syntheticSweep = true,
   });
 
   final bool excludeEnabled;
   final List<String> excludeKeywords;
   final List<String> excludeRegexes;
   final bool uncensor;
+
+  /// 为无逐字时间的整行歌词（含翻译/音译）合成扫亮片段（默认开）。
+  final bool syntheticSweep;
 }
 
 /// 歌词后处理器。
@@ -100,7 +104,9 @@ class UncensorLyricProcessor implements LyricPostProcessor {
           translation: g.translation == null
               ? null
               : unmaskProfanity(g.translation!),
+          translationFragments: g.translationFragments,
           romaji: g.romaji,
+          romajiFragments: g.romajiFragments,
           fragments: g.fragments == null
               ? null
               : [
@@ -109,6 +115,7 @@ class UncensorLyricProcessor implements LyricPostProcessor {
                       text: unmaskProfanity(f.text),
                       startMs: f.startMs,
                       durationMs: f.durationMs,
+                      synthetic: f.synthetic,
                     ),
                 ],
           // 必须保留行结束时间：AMLL 引擎用 endMs 判定严格覆盖范围。
@@ -120,19 +127,76 @@ class UncensorLyricProcessor implements LyricPostProcessor {
   }
 }
 
+/// 为「无逐字时间」的整行歌词（含翻译 / 音译）按行窗口合成扫亮片段。
+///
+/// 传统单行 LRC 只有行时间，AMLL 引擎对无片段的行走整行模式（不扫亮）；
+/// 本处理器用 [synthesizeSweepFragments] 按行窗口推算逐字时间，让扫亮动效
+/// 对普通歌词同样生效（翻译 / 音译小字同理）。
+///
+/// 已有真实逐字片段的行不改动；窗口不足 / 文本为空的行走整行回退。
+class SyntheticSweepProcessor implements LyricPostProcessor {
+  const SyntheticSweepProcessor();
+
+  @override
+  List<LyricGroup> process(List<LyricGroup> groups, LyricProcessContext ctx) {
+    if (!ctx.syntheticSweep) return groups;
+
+    final out = <LyricGroup>[];
+    for (var i = 0; i < groups.length; i++) {
+      final g = groups[i];
+      final start = g.original.timeMs;
+      final end = g.endMs ??
+          (i + 1 < groups.length
+              ? groups[i + 1].original.timeMs
+              : start + 3000);
+
+      final frags = g.fragments ??
+          synthesizeSweepFragments(g.original.text, start, end);
+      final trFrags = g.translationFragments ??
+          (g.translation == null
+              ? null
+              : synthesizeSweepFragments(g.translation!, start, end));
+      final roFrags = g.romajiFragments ??
+          (g.romaji == null
+              ? null
+              : synthesizeSweepFragments(g.romaji!, start, end));
+
+      if (identical(frags, g.fragments) &&
+          identical(trFrags, g.translationFragments) &&
+          identical(roFrags, g.romajiFragments)) {
+        out.add(g);
+        continue;
+      }
+      out.add(LyricGroup(
+        original: g.original,
+        translation: g.translation,
+        translationFragments: trFrags,
+        romaji: g.romaji,
+        romajiFragments: roFrags,
+        fragments: frags,
+        endMs: g.endMs,
+        isBG: g.isBG,
+      ));
+    }
+    return out;
+  }
+}
+
 /// 后处理管线：按顺序应用处理器。
 class LyricPipeline {
   const LyricPipeline(this.processors);
 
   final List<LyricPostProcessor> processors;
 
-  /// 标准管线（广告清洗 → 排除 → 脏话还原）。
+  /// 标准管线（广告清洗 → 排除 → 脏话还原 → 合成扫亮）。
   ///
   /// 广告清洗置于最前：先把站点推广行删掉，再走用户排除规则/脏话还原。
+  /// 合成扫亮放最后：基于最终文本与行窗口推算，避免被前序重建丢弃。
   static const LyricPipeline standard = LyricPipeline([
     AdLyricProcessor(),
     ExcludeLyricProcessor(),
     UncensorLyricProcessor(),
+    SyntheticSweepProcessor(),
   ]);
 
   List<LyricGroup> process(List<LyricGroup> groups, LyricProcessContext ctx) {

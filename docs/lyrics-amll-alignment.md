@@ -302,3 +302,121 @@ headless 基准：无失焦 **6.3ms**、逐行失焦 **28.5ms**、整层 1/4 重
   （以及任何其它重建 `LyricGroup` 的位置）；
 - 我们上一轮在旧 `stores/lyrics_provider.dart` 里加的 `isBG` 保留逻辑已失效
   （main 把后处理挪进了 `LyricPipeline`），改为在 `UncensorLyricProcessor` 中保留。
+
+---
+
+## 7. 解析格式补齐 + AMLL DB TTML 覆盖（2026-09-30）
+
+> 起因：部分歌词（尤其 QQ 音乐逐字）显示异常。对照 SPlayer-Next / AMLL 的
+> `parseQRC` / `parseLRC` / `bg.ts` / `parseTTML` 补齐解析层。
+
+### 7.1 QRC（QQ 音乐逐字）
+
+云端 QRC 是 **XML 外壳**（`<Lyric_1 LyricContent="[0,2250]晴(0,160)天…"/>`），
+且字级为 `字(绝对起始,时长)`（文字在前、时间为绝对毫秒）。此前
+`parseLyricGroups` 只认 `[mm:ss.xxx]` + `<相对,时长>`，QRC 解析为 **0 行**，
+引擎随即把 QQ 当成「无歌词」回退到别的平台（或空）——即「部分歌词显示异常」。
+
+- 新增 `convertQrcToYrc`：解 XML 外壳（含实体还原）→ 归一化为
+  `[m:ss.xxx]<相对起始,时长>字`，复用既有逐字管线；对齐 AMLL `parseQRC`
+  的字级切分（裸括号仅在 `(` 后紧跟数字时才算时间标记）。
+- 归一化放在**解码器**（`parseLyricGroups`）而非抓取层：历史缓存里未解包的
+  QRC 也能恢复。
+- QQ 的 **罗马音同样是 QRC**（`romajiFormat` 标为 qrc）：`_parseSubLines`
+  按 `translationFormat` / `romajiFormat` 解析子行并剥残留字级标签。
+
+### 7.2 增强 LRC / ESLRC
+
+- **ESLRC**：`[mm:ss.xx]<mm:ss.xxx>字`（尖括号内为时间；末尾空标签 = 行尾）；
+- **增强 LRC**：行内 `[mm:ss.xx]字[mm:ss.xx]字`（标签之间的文本归属前一个标签）；
+  仅当「标签之间确有文本」才视为逐字，`[t1][t2]重复行` 这类纯多标签仍按重复行展开。
+
+### 7.3 行内尾随和声（对齐 AMLL `splitTrailingBackground`）
+
+`主歌词（和声）` 拆成主行 + 紧随的 `isBG` 子行：
+
+- 整行括号包裹仍走原有整行 `isBG`；日文注音「漢字（かんじ）」不拆；
+- 普通行：子行与主行**同时间**，引擎同时覆盖时优先高亮非背景行（主行不丢高亮）；
+- 逐字行：子行取背景段首字时间为起点，片段重基到子行时间（可独立扫亮）；
+- `endMs` 后置计算中，同时间背景子行不占用主行的「下一行」边界。
+
+`lyrics_physics_wall_state.dart` 的 `_activeIdxAt` / `_scrollActiveAt` 改为
+「同时覆盖时优先非背景行；仅无主行覆盖时（独立和声段）背景行才接管」。
+
+### 7.4 AMLL DB 在线 TTML 覆盖
+
+- 抓取：`apis/lyric/ttml.dart` 原已具备 `fetchTTML` + 缓存；补
+  `fetchTTMLOverlay` 作为渲染端入口（与 `prefetchTTML` 共享 inflight）；
+- 解析：新增 `services/lyrics/ttml_parser.dart`（自带容错 XML 扫描器，零新增
+  依赖）→ `List<LyricGroup>`，支持逐词 `<span begin end>`、`x-translation` /
+  `x-roman`（按语言择优）、`x-bg` 背景行；
+- 引擎：`LyricsEngine.resolve(enableTtmlOverlay:)` 先试 TTML，命中即返回，
+  否则照常平台来源回退（对齐 AMLL 把 `ttml` 排格式首位）；
+- 设置：`lyric.enableOnlineTTMLLyric` / `lyric.amllDbServer`（默认关 / 默认
+  官方模板），UI 在「设置 → 歌词」；
+- **偏好实时读取**：`AppPrefs` 快照由根组件刷新，经 `setRuntime(getSetting:)`
+  暴露给 apis 层（此前 `getRuntime().getSetting` 恒返回 null，TTML 开关永远
+  不生效）；
+- 修复 `_fetchOne` 的**自等待死锁**：`whenComplete` 回调此前返回
+  `_inflight.remove(key)` 的结果（即该 Future 自身），会让完成回调等待自己而
+  永久挂起。该 bug 因功能未接通从未暴露，接通后即触发。
+
+### 7.5 测试
+
+- `lyrics_amll_engine_test.dart`：QRC（XML/纯文本/裸括号/罗马音）、增强 LRC /
+  ESLRC、尾随和声（普通行 / 逐字行 / 日文注音保护）、同时间背景子行不抢高亮、
+  独立和声段仍可高亮；
+- `lyrics_ttml_parser_test.dart`：真实 62 行样例 + 角色 / 语言 / 背景 / 时间
+  推断 / 容错；
+- `lyrics_engine_test.dart`：TTML 覆盖优先 / 未启用回退 / 非 TTML 平台不请求；
+- `lyrics_prefs_test.dart`：TTML 偏好默认值 / 写入读回 / 非法模板回落。
+
+---
+
+## 8. 合成扫亮：传统单行歌词也「滚动」（2026-09-30 第二增强）
+
+> 动机：传统单行 LRC 只有行时间，AMLL 引擎对无逐字片段的行走「整行模式」
+> （不扫亮）；长行看起来是「啪」地整行点亮。按行窗口推算逐字时间即可获得
+> 连续扫亮，且翻译 / 音译小字同样适用。
+
+### 8.1 推算规则（`synthesizeSweepFragments`）
+
+- 切分原子：CJK（汉字/假名/谚文）逐字、拉丁/其它按空白分词；空白附于前一个
+  原子，保证**拼接结果与原文逐字一致**（满足逐字渲染的 join 校验）。对齐
+  SPlayer-Next `split-words.ts`。
+- 权重 = 原子的非空白字符数；按权重把时长分摊到各原子。
+- 时长估算：`总权重 × kSyntheticSweepPerUnitMs(240)`，钳制到
+  `[600, 10000]ms`；实际扫亮 = `min(行窗口, 估算)`——**长间奏不会拖得极慢**
+  （估算时长内扫完、余下保持全亮），快歌也不会晚于窗口。
+- 片段带 `synthetic: true` 标记，`resolveWordAnim` 据此**跳过长音强调**
+  （估算是位置信息，不是源数据的「长音」语义）。
+
+### 8.2 管线与开关
+
+- `SyntheticSweepProcessor` 追加在 `LyricPipeline.standard` 末尾（广告 → 排除
+  → 脏话还原 → 合成扫亮），对**所有来源**统一生效（平台 / TTML / 本地）。
+- 已有真实逐字片段的行原样透传（`identical` 短路），仅补齐翻译 / 音译。
+- `LyricProcessContext.syntheticSweep`（默认开）← 偏好 `amll.syntheticSweep`
+  （设置 → 歌词 → 歌词墙，默认开）。
+
+### 8.3 翻译 / 音译扫亮（超出 AMLL）
+
+AMLL 的 `.lp-sub`（翻译 / 音译）恒为静态整行（仅透明度）；我们把同一套合成
+片段用于附属小字：
+
+- `LyricGroup.translationFragments` / `romajiFragments`（可空）；
+  `UncensorLyricProcessor` 等重建点一并透传。
+- 画笔 `_subFragRender` 复用 `buildLyricsFragmentRender`，分别用翻译（lit
+  0.8）/ 音译（lit 0.65）配色与 `kLyricTranslationLineHeightEm`（1.5，保证
+  与段落路径同高不跳行）；翻译 / 音译各用一个独立的 `LyricsFragmentCache`
+  （同索引不互相覆盖），随可见窗口 prune、切歌/字号变化 clear。
+- 重绘门控 `_sweepActiveFor` 纳入翻译 / 音译片段：只有翻译扫亮时也保持
+  60fps 推进。
+
+### 8.4 测试
+
+- `lyrics_synthetic_sweep_test.dart`：切分 / 权重 / 钳制 / join 一致、
+  处理器补齐与透传、`synthetic` 抑制强调；
+- `lyrics_amll_engine_test.dart`：翻译合成扫亮走逐字路径 + 像素级「已唱翻译
+  亮于未唱」；
+- `lyrics_prefs_test.dart`：`amll.syntheticSweep` 默认 / 写入读回。

@@ -158,7 +158,7 @@ mixin _PlaybackNotifierSession
         final absMs = event.positionMs + _sessionOffsetMs;
         state = state.copyWith(position: Duration(milliseconds: absMs));
         _pollSpectrum();
-        if (Platform.environment['ARCHOERA_AUTOPLAY'] == '1' &&
+        if (_autoPlayLog &&
             absMs > 0 &&
             (_lastPosLogMs == null || absMs - _lastPosLogMs! >= 5000)) {
           _lastPosLogMs = absMs;

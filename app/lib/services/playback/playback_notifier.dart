@@ -59,6 +59,16 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// 最近一次播放位置诊断日志（AUTOPLAY，验证用）。
   int? _lastPosLogMs;
 
+  /// ARCHOERA_AUTOPLAY 诊断开关：环境变量在进程启动后固定，缓存一次即可，
+  /// 避免位置事件（~50ms/条）与每次 [_log] 都读 `Platform.environment`
+  /// （该 getter 会构造环境 map，属位置热路径上的无谓分配）。
+  final bool _autoPlayLog = Platform.environment['ARCHOERA_AUTOPLAY'] == '1';
+
+  /// 播放日志复用缓冲（最新在前，长度 ≤200，见 [_log]）：避免每次记日志都用
+  /// `['新', ...旧]` 新建整表并 removeRange 的分配 churn。内容与顺序与旧实现
+  /// 完全一致；仅内部复用，不向外提供可变语义（外部无 logs 消费者）。
+  final List<String> _logBuffer = <String>[];
+
   /// 本会话是否已收到 FFT 帧（仅记录一次，诊断用）。
   bool _fftStarted = false;
 
@@ -519,6 +529,9 @@ class PlaybackNotifier extends _PlaybackNotifierBase
     _autoResumeInFlight = false;
     _retryableSnapshot = null;
     await _stopEngine();
+    // 显式停止（无后续会话）：释放本 isolate 对引擎库的会话引用，令 mediaengine
+    // 在所有 isolate 引用归零后真正卸载（播放中/切歌不释放，避免 unmap 引擎线程）。
+    EngineBindings.release();
     state = state.copyWith(
       source: null,
       title: null,
@@ -545,7 +558,15 @@ class PlaybackNotifier extends _PlaybackNotifierBase
       prefs.energySavingMode ? 300 : 100,
       _engineIntervalMs,
     );
-    _fftActive = !prefs.performanceMode && _engine != null && state.playing;
+    // 无任何频谱消费者（播放页大频谱 enableSpectrum + 播放条迷你频谱
+    // barSpectrum 两者皆关）时不再取帧——旧实现只认 performanceMode，频谱全关
+    // 后仍每 100ms 拉一次 pcm_window 做无用 FFT。
+    final spectrumWanted = prefs.enableSpectrum || prefs.barSpectrum;
+    _fftActive =
+        !prefs.performanceMode &&
+        spectrumWanted &&
+        _engine != null &&
+        state.playing;
   }
 
   /// 降频协商（engine-event-push-plan §4.1）：按节能档位向引擎请求位置事件
@@ -613,11 +634,16 @@ class PlaybackNotifier extends _PlaybackNotifierBase
   @override
   void _log(String line) {
     final ts = DateTime.now().toString().substring(11, 19);
-    final logs = ['$ts $line', ...state.logs];
-    if (logs.length > 200) logs.removeRange(200, logs.length);
-    state = state.copyWith(logs: logs);
+    // 复用有界缓冲：头插最新一条，超过 200 条截尾。与旧实现
+    // `['$ts $line', ...logs]` + removeRange(200, …) 的内容/顺序完全一致，
+    // 但不再每次新建整表，削减日志路径的分配 churn。
+    _logBuffer.insert(0, '$ts $line');
+    if (_logBuffer.length > 200) {
+      _logBuffer.removeRange(200, _logBuffer.length);
+    }
+    state = state.copyWith(logs: _logBuffer);
     // 诊断：镜像到 stdout（ARCHOERA_AUTOPLAY=1 时）
-    if (Platform.environment['ARCHOERA_AUTOPLAY'] == '1') {
+    if (_autoPlayLog) {
       stdout.writeln('[app:log] $ts $line');
     }
   }

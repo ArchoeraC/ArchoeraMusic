@@ -17,7 +17,7 @@ import '../widgets/player/s_controls.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/dialogs/track_list_dialog.dart';
 import '../widgets/home/action_card.dart';
-import '../widgets/home/daily_hero.dart';
+import '../widgets/home/spotlight_card.dart';
 import '../widgets/home/section_title.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 

@@ -16,6 +16,7 @@ import 'package:ffi/ffi.dart';
 
 import '../log/log.dart';
 import '../native_lib_paths.dart';
+import '../native_library_registry.dart' as ffi_registry;
 
 typedef SubsonicCreateNative = IntPtr Function(Pointer<Utf8> configJson);
 typedef SubsonicCreateDart = int Function(Pointer<Utf8> configJson);
@@ -120,13 +121,22 @@ class SubsonicBindings {
     }
   }
 
-  /// 定位并加载共享库（失败抛 StateError 附搜索过程）。
+  /// 定位并加载共享库（失败抛 StateError 附搜索过程）。经统一注册表引用计数。
   static DynamicLibrary load() {
     final path = resolveSoPath();
     if (path == null) {
       throw StateError('未找到 libarchoera_subsonic（已按 ancestors 链与 dev 目录查找）');
     }
-    return DynamicLibrary.open(path);
+    return ffi_registry.acquire(NativeModule.subsonic, path: path);
+  }
+
+  /// 释放本 isolate 对 subsonic 库的引用并作废单例（用后归零即真正卸载）。
+  static void release() {
+    final inst = _instance;
+    _instance = null;
+    if (inst != null) {
+      ffi_registry.release(NativeModule.subsonic);
+    }
   }
 
   /// 查找共享库路径：统一走 [NativeLibPaths]（祖先链 + dev 兜底）。

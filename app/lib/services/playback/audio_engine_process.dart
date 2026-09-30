@@ -346,6 +346,9 @@ class AudioEngineProcess {
       memCapKb = 0; // auto
     }
 
+    // 会话开始前在本 isolate 保持对 mediaengine 的引用（会话存续期间不卸载；
+    // stop() 收尾时 release）。create/destroy/事件泵 isolate 各自配对 release。
+    EngineBindings.pin();
     // FFI create 在后台 isolate 执行：pipeline_create 打开解码器/网络 IO 可能
     // 耗时数百 ms，避免阻塞 UI isolate。config 参数以标量值跨 isolate 传递。
     final handleAddr = await Isolate.run<int>(() {
@@ -382,6 +385,8 @@ class AudioEngineProcess {
         return h.address;
       } finally {
         calloc.free(cfg);
+        // 本 isolate 的 open 必须配对 close，否则引用计数不归零、引擎库不卸载。
+        EngineBindings.release();
       }
     });
 
@@ -732,7 +737,11 @@ class AudioEngineProcess {
       await Isolate.run<void>(() {
         // destroy join 引擎线程（最长数百 ms），后台 isolate 避免阻塞 UI；
         // 内部唤醒阻塞中的 wait_event → 接收 isolate 收到 -1 自行退出。
-        EngineBindings.instance.destroy(Pointer<Opaque>.fromAddress(h));
+        try {
+          EngineBindings.instance.destroy(Pointer<Opaque>.fromAddress(h));
+        } finally {
+          EngineBindings.release(); // 配对本 isolate 的 open
+        }
       });
       // 事件泵自退（已收 -1）：有界等其完全退场，避免停用后还有事件串在途
       await _awaitPumpExit();
@@ -768,5 +777,7 @@ void _engineEventPumpEntry(List<Object?> args) {
     }
   } finally {
     calloc.free(buf);
+    // 事件泵 isolate 退出前配对本 isolate 的 open（否则引擎库永不卸载）。
+    EngineBindings.release();
   }
 }

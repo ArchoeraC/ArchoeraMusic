@@ -340,4 +340,8 @@ class _PaintCtx {
 
   /// 激活行的逐字渲染缓存（逐字盒 + 逐字段落）。见 [LyricsFragmentCache]。
   final LyricsFragmentCache fragCache = LyricsFragmentCache();
+
+  /// 翻译 / 音译小字的合成扫亮缓存（各自独立，避免同索引互相覆盖）。
+  final LyricsFragmentCache transFragCache = LyricsFragmentCache();
+  final LyricsFragmentCache romaFragCache = LyricsFragmentCache();
 }

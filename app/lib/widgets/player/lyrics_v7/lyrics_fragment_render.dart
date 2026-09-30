@@ -46,6 +46,7 @@ class LyricsFragmentRender {
     required this.startMs,
     required this.durationMs,
     required this.texts,
+    required this.synthetic,
     required this.width,
     required this.height,
   });
@@ -67,6 +68,9 @@ class LyricsFragmentRender {
 
   /// 每个字/词的绘制文本（强调辉光需按帧重建段落）。
   final List<String> texts;
+
+  /// 每个字/词是否为推算的合成片段（合成片段不做长音强调）。
+  final List<bool> synthetic;
 
   /// 整行布局段落的宽度（用于居中定位）。
   final double width;
@@ -135,6 +139,7 @@ LyricsFragmentRender? buildLyricsFragmentRender({
   required Color played,
   required double unsungAlpha,
   required double litAlpha,
+  double lineHeightEm = kLyricLineHeightEm,
 }) {
   if (maxWidth <= 0) return null;
   final joined = StringBuffer();
@@ -149,8 +154,8 @@ LyricsFragmentRender? buildLyricsFragmentRender({
   final lead = joinedText.length - joinedText.trimLeft().length;
 
   final layoutBuilder = ui.ParagraphBuilder(
-    _pStyleCenter(fontFamily, fontSize, weight),
-  )..pushStyle(_uStyle(fontFamily, fontSize, weight, played));
+    _pStyleCenter(fontFamily, fontSize, weight, lineHeightEm),
+  )..pushStyle(_uStyle(fontFamily, fontSize, weight, played, height: lineHeightEm));
   layoutBuilder.addText(joinedText.trim());
   layoutBuilder.pop();
   final layout = layoutBuilder.build()
@@ -162,6 +167,7 @@ LyricsFragmentRender? buildLyricsFragmentRender({
   final startMs = <int>[];
   final durationMs = <int>[];
   final texts = <String>[];
+  final synthetic = <bool>[];
 
   var charIndex = 0;
   for (final f in fragments) {
@@ -190,6 +196,7 @@ LyricsFragmentRender? buildLyricsFragmentRender({
     final d = f.durationMs;
     durationMs.add(d == null || d <= 0 ? 1 : d);
     texts.add(sub);
+    synthetic.add(f.synthetic);
     dim.add(
       _fragParagraph(
         fontFamily: fontFamily,
@@ -198,6 +205,7 @@ LyricsFragmentRender? buildLyricsFragmentRender({
         maxWidth: maxWidth,
         color: played.withValues(alpha: unsungAlpha),
         text: sub,
+        lineHeightEm: lineHeightEm,
       ),
     );
     lit.add(
@@ -208,6 +216,7 @@ LyricsFragmentRender? buildLyricsFragmentRender({
         maxWidth: maxWidth,
         color: played.withValues(alpha: litAlpha),
         text: sub,
+        lineHeightEm: lineHeightEm,
       ),
     );
   }
@@ -220,6 +229,7 @@ LyricsFragmentRender? buildLyricsFragmentRender({
     startMs: startMs,
     durationMs: durationMs,
     texts: texts,
+    synthetic: synthetic,
     width: layout.width,
     height: layout.height,
   );
@@ -233,10 +243,13 @@ ui.Paragraph _fragParagraph({
   required double maxWidth,
   required Color color,
   required String text,
+  double lineHeightEm = kLyricLineHeightEm,
   List<ui.Shadow>? shadows,
 }) {
-  final b = ui.ParagraphBuilder(_pStyle(fontFamily, fontSize, weight));
-  b.pushStyle(_uStyle(fontFamily, fontSize, weight, color, shadows: shadows));
+  final b = ui.ParagraphBuilder(_pStyle(fontFamily, fontSize, weight, lineHeightEm));
+  b.pushStyle(
+    _uStyle(fontFamily, fontSize, weight, color, height: lineHeightEm, shadows: shadows),
+  );
   b.addText(text);
   b.pop();
   return b.build()..layout(ui.ParagraphConstraints(width: maxWidth));
@@ -252,6 +265,7 @@ ui.Paragraph buildGlowFragment({
   required String text,
   required double glowAlpha,
   required double blurRadius,
+  double lineHeightEm = kLyricLineHeightEm,
 }) {
   return _fragParagraph(
     fontFamily: fontFamily,
@@ -260,6 +274,7 @@ ui.Paragraph buildGlowFragment({
     maxWidth: maxWidth,
     color: color,
     text: text,
+    lineHeightEm: lineHeightEm,
     shadows: [
       ui.Shadow(
         color: const Color(0xFFFFFFFF).withValues(alpha: glowAlpha.clamp(0.0, 1.0)),
@@ -269,37 +284,46 @@ ui.Paragraph buildGlowFragment({
   );
 }
 
-ui.ParagraphStyle _pStyleCenter(String? family, double fs, FontWeight w) =>
-    ui.ParagraphStyle(
-      textAlign: ui.TextAlign.center,
-      textDirection: ui.TextDirection.ltr,
-      fontFamily: family,
-      fontSize: fs,
-      fontWeight: w,
-      height: kLyricLineHeightEm,
-    );
+ui.ParagraphStyle _pStyleCenter(
+  String? family,
+  double fs,
+  FontWeight w, [
+  double height = kLyricLineHeightEm,
+]) => ui.ParagraphStyle(
+  textAlign: ui.TextAlign.center,
+  textDirection: ui.TextDirection.ltr,
+  fontFamily: family,
+  fontSize: fs,
+  fontWeight: w,
+  height: height,
+);
 
-ui.ParagraphStyle _pStyle(String? family, double fs, FontWeight w) =>
-    ui.ParagraphStyle(
-      textAlign: ui.TextAlign.left,
-      textDirection: ui.TextDirection.ltr,
-      fontFamily: family,
-      fontSize: fs,
-      fontWeight: w,
-      height: kLyricLineHeightEm,
-    );
+ui.ParagraphStyle _pStyle(
+  String? family,
+  double fs,
+  FontWeight w, [
+  double height = kLyricLineHeightEm,
+]) => ui.ParagraphStyle(
+  textAlign: ui.TextAlign.left,
+  textDirection: ui.TextDirection.ltr,
+  fontFamily: family,
+  fontSize: fs,
+  fontWeight: w,
+  height: height,
+);
 
 ui.TextStyle _uStyle(
   String? family,
   double fs,
   FontWeight w,
   Color color, {
+  double height = kLyricLineHeightEm,
   List<ui.Shadow>? shadows,
 }) => ui.TextStyle(
   color: color,
   fontFamily: family,
   fontSize: fs,
   fontWeight: w,
-  height: kLyricLineHeightEm,
+  height: height,
   shadows: shadows,
 );

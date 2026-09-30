@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:sqlite3/sqlite3.dart';
 
@@ -165,9 +166,43 @@ class TracksDb {
     return rows.map(TrackRow.fromRow).toList();
   }
 
+  /// 随机抽 [limit] 首（首页「随便听听」/ 聚光用，不含 lyrics）。
+  ///
+  /// 中小曲库（≤4000）一次性 `ORDER BY RANDOM()` 取样；大曲库改用随机 offset
+  /// 采样（按 `title` 稳定序、去重），避免整表随机排序的开销。
+  List<TrackRow> randomTracks(int limit) {
+    if (limit <= 0) return const [];
+    final total = count();
+    if (total == 0) return const [];
+    if (total <= limit) return allTracks();
+    if (total <= 4000) {
+      return _db
+          .select(
+            'SELECT $_trackColumns FROM tracks ORDER BY RANDOM() LIMIT ?',
+            [limit],
+          )
+          .map(TrackRow.fromRow)
+          .toList();
+    }
+    final rnd = Random();
+    final seen = <int>{};
+    final out = <TrackRow>[];
+    final want = limit.clamp(1, total);
+    var guard = want * 4 + 16;
+    while (out.length < want && guard-- > 0) {
+      final offset = rnd.nextInt(total);
+      if (!seen.add(offset)) continue;
+      final rows = _db.select(
+        'SELECT $_trackColumns FROM tracks ORDER BY title LIMIT 1 OFFSET ?',
+        [offset],
+      );
+      if (rows.isNotEmpty) out.add(TrackRow.fromRow(rows.first));
+    }
+    return out;
+  }
+
   /// 按路径查单曲（watcher/播放定位用，不含 lyrics）。
-  TrackRow? trackByPath(String path) {
-    final rows =
+  TrackRow? trackByPath(String path) {    final rows =
         _db.select('SELECT $_trackColumns FROM tracks WHERE path = ?', [path]);
     return rows.isEmpty ? null : TrackRow.fromRow(rows.first);
   }

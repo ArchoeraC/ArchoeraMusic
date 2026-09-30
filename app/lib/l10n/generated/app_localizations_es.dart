@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -146,6 +147,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsSuppressSleepOff =>
       'El sistema puede suspender según el plan de inactividad';
+
+  @override
+  String get settingsBackgroundUnload =>
+      'Descargar páginas visitadas en segundo plano';
+
+  @override
+  String get settingsBackgroundUnloadSubtitle =>
+      'Libera listas e imágenes al minimizar/bandeja/pantalla apagada; se reconstruye al volver (puede perder la posición de desplazamiento)';
 
   @override
   String get settingsCloseBehavior => 'Al cerrar la aplicación';
@@ -1380,9 +1389,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get pageHomeDaily => 'Recomendación diaria';
 
   @override
-  String get pageHomeDailyLoggedIn => 'Seleccionado para ti';
-
-  @override
   String get pageHomeDailyLoginHint =>
       'Inicia sesión en NT para recibir actualizaciones diarias';
 
@@ -1391,6 +1397,22 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get pageHomeDailyLogin => 'Inicia sesión para desbloquear';
+
+  @override
+  String pageHomeSpotlightTitle({required Object song}) {
+    return 'Empezar con $song';
+  }
+
+  @override
+  String pageHomeSpotlightSubtitle({required Object count}) {
+    return 'Se eligieron $count canciones al azar';
+  }
+
+  @override
+  String get pageHomeSpotlightShuffle => 'Cambiar';
+
+  @override
+  String get pageHomeSpotlightEmpty => 'Nada para reproducir';
 
   @override
   String pageHomeGreeting({required Object greeting, required Object name}) {
@@ -1918,7 +1940,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsMemoryPolicyAutoSub =>
-      'Límite estricto de 0,8 GiB; se adapta a la RAM libre';
+      'Límite estricto de 32 MiB; se adapta a la RAM libre';
 
   @override
   String get settingsMemoryPolicyLimit => 'Límite personalizado';
@@ -2371,6 +2393,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Actualmente en modo estándar';
+
+  @override
+  String get settingsUnloadAllMemory =>
+      'Descargar todo el estado de memoria al minimizar';
+
+  @override
+  String get settingsUnloadAllMemorySubtitle =>
+      'En segundo plano (minimizar/bandeja/pantalla apagada) descarta datos de página y cachés; reconstruye al volver (puede volver al inicio, perder el desplazamiento). La reproducción no se ve afectada';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>
@@ -4435,6 +4465,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAmllWordSweep => 'Barrido por palabra';
 
   @override
+  String get settingsAmllSyntheticSweep =>
+      'Barrido sintético para letras simples';
+
+  @override
+  String get settingsAmllSyntheticSweepDesc =>
+      'Estima el tiempo por palabra según la duración de la línea (también traducciones).';
+
+  @override
   String get settingsAmllHidePassed => 'Ocultar líneas ya cantadas';
 
   @override
@@ -4807,6 +4845,39 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsLyricExcludeClear => 'Clear';
+
+  @override
+  String get settingsLyricTtml => 'Letras TTML en línea (Beta)';
+
+  @override
+  String get settingsLyricTtmlDesc =>
+      'Obtén letras TTML palabra por palabra de AMLL DB y sobrescribe las de la plataforma cuando haya coincidencia; requiere conexión. Esta función aún está en pruebas.';
+
+  @override
+  String get settingsLyricTtmlEnable => 'Activar letras TTML en línea';
+
+  @override
+  String get settingsLyricTtmlEnableDesc =>
+      'Preferir las letras palabra por palabra de AMLL DB cuando estén disponibles';
+
+  @override
+  String get settingsLyricTtmlServer => 'Servidor de AMLL DB';
+
+  @override
+  String get settingsLyricTtmlServerDesc =>
+      'Plantilla de URL para solicitar letras; puede apuntar a un servidor propio o espejo';
+
+  @override
+  String get settingsLyricTtmlServerDialogTitle =>
+      'Plantilla del servidor de AMLL DB';
+
+  @override
+  String get settingsLyricTtmlServerHint =>
+      'La plantilla debe contener %p (plataforma) y %s (id de pista)';
+
+  @override
+  String get settingsLyricTtmlServerInvalid =>
+      'La plantilla debe contener tanto %p como %s';
 
   @override
   String get commonConfigure => 'Configure';

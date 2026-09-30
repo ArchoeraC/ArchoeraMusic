@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -137,6 +138,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSuppressSleepOff => '系统可能按空闲计划休眠';
+
+  @override
+  String get settingsBackgroundUnload => '后台卸载已访问页面';
+
+  @override
+  String get settingsBackgroundUnloadSubtitle =>
+      '最小化/托盘/熄屏时释放列表与图片，恢复窗口后重建（可能丢滚动位置）';
 
   @override
   String get settingsCloseBehavior => '关闭应用时';
@@ -1310,9 +1318,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pageHomeDaily => '每日推荐';
 
   @override
-  String get pageHomeDailyLoggedIn => '根据你的口味，为你精心挑选';
-
-  @override
   String get pageHomeDailyLoginHint => '登录NT账号后，每天为你更新';
 
   @override
@@ -1320,6 +1325,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pageHomeDailyLogin => '登录解锁每日推荐';
+
+  @override
+  String pageHomeSpotlightTitle({required Object song}) {
+    return '从「$song」开始听';
+  }
+
+  @override
+  String pageHomeSpotlightSubtitle({required Object count}) {
+    return '为你随机抽了 $count 首';
+  }
+
+  @override
+  String get pageHomeSpotlightShuffle => '换一批';
+
+  @override
+  String get pageHomeSpotlightEmpty => '暂无可推荐的歌曲';
 
   @override
   String pageHomeGreeting({required Object greeting, required Object name}) {
@@ -1813,7 +1834,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsMemoryPolicyAuto => '自动（按可用内存均衡）';
 
   @override
-  String get settingsMemoryPolicyAutoSub => '0.8 GiB 硬上限，随空闲内存自适应';
+  String get settingsMemoryPolicyAutoSub => '32 MiB 硬上限，随空闲内存自适应';
 
   @override
   String get settingsMemoryPolicyLimit => '自定义上限';
@@ -2228,6 +2249,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => '当前为标准模式';
+
+  @override
+  String get settingsUnloadAllMemory => '最小化时卸载全部内存状态';
+
+  @override
+  String get settingsUnloadAllMemorySubtitle =>
+      '后台（最小化/托盘/熄屏）丢弃页面数据与缓存，恢复后从零重建（可能回到首页、丢滚动位置）；播放不受影响';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '降低频谱取帧频率以节省 CPU';
@@ -4154,6 +4182,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAmllWordSweep => '逐字扫亮';
 
   @override
+  String get settingsAmllSyntheticSweep => '单行歌词合成扫亮';
+
+  @override
+  String get settingsAmllSyntheticSweepDesc => '没有逐字时间的歌词按行时长推算扫亮（翻译 / 音译同样生效）';
+
+  @override
   String get settingsAmllHidePassed => '隐藏已唱行';
 
   @override
@@ -4501,6 +4535,34 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsLyricExcludeClear => '清空';
+
+  @override
+  String get settingsLyricTtml => '在线 TTML 歌词（Beta）';
+
+  @override
+  String get settingsLyricTtmlDesc =>
+      '从 AMLL DB 拉取逐字 TTML 歌词，命中后覆盖平台歌词；需联网。此功能仍在测试。';
+
+  @override
+  String get settingsLyricTtmlEnable => '启用在线 TTML 歌词';
+
+  @override
+  String get settingsLyricTtmlEnableDesc => '命中 AMLL DB 时优先使用其逐字歌词';
+
+  @override
+  String get settingsLyricTtmlServer => 'AMLL DB 服务端';
+
+  @override
+  String get settingsLyricTtmlServerDesc => '歌词请求地址模板，可改为自建或镜像';
+
+  @override
+  String get settingsLyricTtmlServerDialogTitle => 'AMLL DB 服务端模板';
+
+  @override
+  String get settingsLyricTtmlServerHint => '模板须同时包含 %p（平台）与 %s（曲目 id）';
+
+  @override
+  String get settingsLyricTtmlServerInvalid => '模板必须同时包含 %p 与 %s';
 
   @override
   String get commonConfigure => '配置';
@@ -4870,6 +4932,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSuppressSleepOff => '系统可能按空闲计划休眠';
+
+  @override
+  String get settingsBackgroundUnload => '后台卸载已访问页面';
+
+  @override
+  String get settingsBackgroundUnloadSubtitle =>
+      '最小化/托盘/熄屏时释放列表与图片，恢复窗口后重建（可能丢滚动位置）';
 
   @override
   String get settingsCloseBehavior => '关闭应用时';
@@ -6043,9 +6112,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get pageHomeDaily => '每日推荐';
 
   @override
-  String get pageHomeDailyLoggedIn => '根据你的口味，为你精心挑选';
-
-  @override
   String get pageHomeDailyLoginHint => '登录NT账号后，每天为你更新';
 
   @override
@@ -6053,6 +6119,22 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get pageHomeDailyLogin => '登录解锁每日推荐';
+
+  @override
+  String pageHomeSpotlightTitle({required Object song}) {
+    return '从「$song」开始听';
+  }
+
+  @override
+  String pageHomeSpotlightSubtitle({required Object count}) {
+    return '为你随机抽了 $count 首';
+  }
+
+  @override
+  String get pageHomeSpotlightShuffle => '换一批';
+
+  @override
+  String get pageHomeSpotlightEmpty => '暂无可推荐的歌曲';
 
   @override
   String pageHomeGreeting({required Object greeting, required Object name}) {
@@ -6546,7 +6628,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsMemoryPolicyAuto => '自动（按可用内存均衡）';
 
   @override
-  String get settingsMemoryPolicyAutoSub => '0.8 GiB 硬上限，随空闲内存自适应';
+  String get settingsMemoryPolicyAutoSub => '32 MiB 硬上限，随空闲内存自适应';
 
   @override
   String get settingsMemoryPolicyLimit => '自定义上限';
@@ -6961,6 +7043,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsEnergySavingOff => '当前为标准模式';
+
+  @override
+  String get settingsUnloadAllMemory => '最小化时卸载全部内存状态';
+
+  @override
+  String get settingsUnloadAllMemorySubtitle =>
+      '后台（最小化/托盘/熄屏）丢弃页面数据与缓存，恢复后从零重建（可能回到首页、丢滚动位置）；播放不受影响';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '降低频谱取帧频率以节省 CPU';
@@ -8887,6 +8976,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsAmllWordSweep => '逐字扫亮';
 
   @override
+  String get settingsAmllSyntheticSweep => '单行歌词合成扫亮';
+
+  @override
+  String get settingsAmllSyntheticSweepDesc => '没有逐字时间的歌词按行时长推算扫亮（翻译 / 音译同样生效）';
+
+  @override
   String get settingsAmllHidePassed => '隐藏已唱行';
 
   @override
@@ -9234,6 +9329,34 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsLyricExcludeClear => '清空';
+
+  @override
+  String get settingsLyricTtml => '在线 TTML 歌词（Beta）';
+
+  @override
+  String get settingsLyricTtmlDesc =>
+      '从 AMLL DB 拉取逐字 TTML 歌词，命中后覆盖平台歌词；需联网。此功能仍在测试。';
+
+  @override
+  String get settingsLyricTtmlEnable => '启用在线 TTML 歌词';
+
+  @override
+  String get settingsLyricTtmlEnableDesc => '命中 AMLL DB 时优先使用其逐字歌词';
+
+  @override
+  String get settingsLyricTtmlServer => 'AMLL DB 服务端';
+
+  @override
+  String get settingsLyricTtmlServerDesc => '歌词请求地址模板，可改为自建或镜像';
+
+  @override
+  String get settingsLyricTtmlServerDialogTitle => 'AMLL DB 服务端模板';
+
+  @override
+  String get settingsLyricTtmlServerHint => '模板须同时包含 %p（平台）与 %s（曲目 id）';
+
+  @override
+  String get settingsLyricTtmlServerInvalid => '模板必须同时包含 %p 与 %s';
 
   @override
   String get commonConfigure => '配置';
@@ -9603,6 +9726,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSuppressSleepOff => '系統可能依閒置計畫休眠';
+
+  @override
+  String get settingsBackgroundUnload => '背景卸載已瀏覽頁面';
+
+  @override
+  String get settingsBackgroundUnloadSubtitle =>
+      '最小化/系統匣/關螢幕時釋放清單與圖片，恢復視窗後重建（可能遺失捲動位置）';
 
   @override
   String get settingsCloseBehavior => '關閉應用程式時';
@@ -10776,9 +10906,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get pageHomeDaily => '每日推薦';
 
   @override
-  String get pageHomeDailyLoggedIn => '根據你的口味，為你精心挑選';
-
-  @override
   String get pageHomeDailyLoginHint => '登入網易雲帳號後，每天為你更新';
 
   @override
@@ -10786,6 +10913,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get pageHomeDailyLogin => '登入解鎖每日推薦';
+
+  @override
+  String pageHomeSpotlightTitle({required Object song}) {
+    return '從「$song」開始聽';
+  }
+
+  @override
+  String pageHomeSpotlightSubtitle({required Object count}) {
+    return '為你隨機抽了 $count 首';
+  }
+
+  @override
+  String get pageHomeSpotlightShuffle => '換一批';
+
+  @override
+  String get pageHomeSpotlightEmpty => '暫無可推薦的歌曲';
 
   @override
   String pageHomeGreeting({required Object greeting, required Object name}) {
@@ -11279,7 +11422,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsMemoryPolicyAuto => '自動（依可用記憶體均衡）';
 
   @override
-  String get settingsMemoryPolicyAutoSub => '0.8 GiB 硬上限，隨閒置記憶體自動調整';
+  String get settingsMemoryPolicyAutoSub => '32 MiB 硬上限，隨閒置記憶體自動調整';
 
   @override
   String get settingsMemoryPolicyLimit => '自訂上限';
@@ -11694,6 +11837,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsEnergySavingOff => '目前為標準模式';
+
+  @override
+  String get settingsUnloadAllMemory => '最小化時卸載全部記憶體狀態';
+
+  @override
+  String get settingsUnloadAllMemorySubtitle =>
+      '背景（最小化/系統匣/關螢幕）丟棄頁面資料與快取，恢復後從零重建（可能回到首頁、遺失捲動位置）；播放不受影響';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '降低頻譜取幀頻率以節省 CPU';
@@ -13620,6 +13770,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsAmllWordSweep => '逐字掃亮';
 
   @override
+  String get settingsAmllSyntheticSweep => '單行歌詞合成掃亮';
+
+  @override
+  String get settingsAmllSyntheticSweepDesc => '沒有逐字時間的歌詞按行時長推算掃亮（翻譯 / 音譯同樣生效）';
+
+  @override
   String get settingsAmllHidePassed => '隱藏已唱行';
 
   @override
@@ -13967,6 +14123,34 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsLyricExcludeClear => '清空';
+
+  @override
+  String get settingsLyricTtml => '線上 TTML 歌詞（Beta）';
+
+  @override
+  String get settingsLyricTtmlDesc =>
+      '從 AMLL DB 取得逐字 TTML 歌詞，命中後覆蓋平台歌詞；需連網。此功能仍在測試。';
+
+  @override
+  String get settingsLyricTtmlEnable => '啟用線上 TTML 歌詞';
+
+  @override
+  String get settingsLyricTtmlEnableDesc => '命中 AMLL DB 時優先使用其逐字歌詞';
+
+  @override
+  String get settingsLyricTtmlServer => 'AMLL DB 伺服器';
+
+  @override
+  String get settingsLyricTtmlServerDesc => '歌詞請求網址範本，可改為自建或鏡像';
+
+  @override
+  String get settingsLyricTtmlServerDialogTitle => 'AMLL DB 伺服器範本';
+
+  @override
+  String get settingsLyricTtmlServerHint => '範本須同時包含 %p（平台）與 %s（曲目 id）';
+
+  @override
+  String get settingsLyricTtmlServerInvalid => '範本必須同時包含 %p 與 %s';
 
   @override
   String get commonConfigure => '配置';

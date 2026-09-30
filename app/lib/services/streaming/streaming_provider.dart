@@ -159,44 +159,68 @@ class StreamingNotifier extends Notifier<StreamingState>
     );
   }
 
-  Future<void> init() => _initImpl();
+  /// autoDispose 保活包装：这些操作由页面 / 设置以 `ref.read(notifier)` 触发，
+  /// 且多在网络 await 之后写 `state`；若页面在其间卸载，provider 会被释放、后续
+  /// `state=` 将抛 UnmountedRefException。操作期间持有保活链接，完成后再交还释放
+  /// （此时若无监听才真正卸载）。
+  Future<T> _keepAliveDuring<T>(Future<T> Function() run) async {
+    final link = ref.keepAlive();
+    try {
+      return await run();
+    } finally {
+      link.close();
+    }
+  }
 
-  Future<void> addServer(StreamingServerInput input) => _addServerImpl(input);
+  Future<void> init() => _keepAliveDuring(_initImpl);
+
+  Future<void> addServer(StreamingServerInput input) =>
+      _keepAliveDuring(() => _addServerImpl(input));
 
   Future<void> updateServer(String id, StreamingServerInput input) =>
-      _updateServerImpl(id, input);
+      _keepAliveDuring(() => _updateServerImpl(id, input));
 
-  Future<void> removeServer(String id) => _removeServerImpl(id);
+  Future<void> removeServer(String id) =>
+      _keepAliveDuring(() => _removeServerImpl(id));
 
   Future<StreamingPingResult> testConnection(StreamingServerInput input) =>
-      _testConnectionImpl(input);
+      _keepAliveDuring(() => _testConnectionImpl(input));
 
-  Future<void> setActiveServer(String id) => _setActiveServerImpl(id);
+  Future<void> setActiveServer(String id) =>
+      _keepAliveDuring(() => _setActiveServerImpl(id));
 
-  Future<void> connect() => _connectImpl();
+  Future<void> connect() => _keepAliveDuring(_connectImpl);
 
-  Future<void> disconnect() => _disconnectImpl();
+  Future<void> disconnect() => _keepAliveDuring(_disconnectImpl);
 
-  Future<void> clearAll() => _clearAllImpl();
+  Future<void> clearAll() => _keepAliveDuring(_clearAllImpl);
 
   StreamingServerConfig? serverConfigById(String id) => state.serverById(id);
 
   Future<void> fetchSongs({bool force = false}) =>
-      _fetchSongsImpl(force: force);
+      _keepAliveDuring(() => _fetchSongsImpl(force: force));
 
   Future<void> fetchAlbums({bool force = false}) =>
-      _fetchAlbumsImpl(force: force);
+      _keepAliveDuring(() => _fetchAlbumsImpl(force: force));
 
   Future<void> fetchArtists({bool force = false}) =>
-      _fetchArtistsImpl(force: force);
+      _keepAliveDuring(() => _fetchArtistsImpl(force: force));
 
   Future<void> fetchPlaylists({bool force = false}) =>
-      _fetchPlaylistsImpl(force: force);
+      _keepAliveDuring(() => _fetchPlaylistsImpl(force: force));
 
-  Future<void> refresh({String? tab}) => _refreshImpl(tab: tab);
+  Future<void> refresh({String? tab}) =>
+      _keepAliveDuring(() => _refreshImpl(tab: tab));
 }
 
 /// 流媒体控制器 Provider。
-final streamingProvider = NotifierProvider<StreamingNotifier, StreamingState>(
-  StreamingNotifier.new,
-);
+///
+/// autoDispose：状态（服务器列表 / 连接态 / 四个 Tab 的懒加载缓存）由流媒体页
+/// 与设置面板按需 `ref.watch` 持有；页面子树卸载（后台卸载页面 / 播放页展开）后
+/// 释放内存。播放中的服务器配置与鉴权 token 已落盘（`StreamingStore`），播放
+/// 途中的 `resolvePlayUrl` / 歌词来源仅同步读取 `serverConfigById`，按需从磁盘
+/// 重建即可，不依赖内存连接态跨页常驻。
+final streamingProvider =
+    NotifierProvider.autoDispose<StreamingNotifier, StreamingState>(
+      StreamingNotifier.new,
+    );

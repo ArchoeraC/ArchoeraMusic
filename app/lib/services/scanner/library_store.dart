@@ -9,10 +9,13 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'library_scanner.dart';
+import 'local_track.dart';
 import 'tracks_db.dart';
 import '../../stores/app_prefs.dart';
+import '../netease/track.dart';
 
 part 'library_store/library_store_core.dart';
+part 'library_store/library_store_pager.dart';
 part 'library_store/library_store_scan.dart';
 
 /// 本地音乐库状态。
@@ -27,7 +30,7 @@ class LibraryState {
     this.total = 0,
     this.scanErrors = 0,
     this.scanCanceled = false,
-    this.tracks = const [],
+    this.trackPages = const {},
     this.totalCount = 0,
     this.totalSizeBytes = 0,
     this.totalDurationMs = 0,
@@ -55,11 +58,14 @@ class LibraryState {
   final int scanErrors;
   final bool scanCanceled;
 
-  /// 已载入的曲目窗口（按标题排序；分页追加，**不含 lyrics**）。
+  /// 已驻留页缓存：页号 → 该页曲目（每页 ≤ 分页大小，按标题排序）。
   ///
-  /// 不再是全量：滚动触底经 [LibraryNotifier.loadMore] 续拉；搜索经 SQL 下推
-  /// 后同样只驻留当前窗口。
-  final List<TrackRow> tracks;
+  /// **不再是全量窗口**：此前每页 append 后永不淘汰，大曲库滚到底会让数万条
+  /// [TrackRow] 常驻 Dart 堆。现在列表按全局 index → 页号（index ~/ 分页大小）
+  /// → 页内行号映射，仅保留视口附近的少量页（见 [_LibraryStorePager.maxResidentPages]），
+  /// 远端页按 LRU 淘汰、滚回时按需重查 SQL。搜索经 SQL 下推后同样只驻留当前页集合。
+  /// 「播放全部 / 全选」经 [LibraryNotifier.allTracks] 取 DB 全量，不受此窗口影响。
+  final Map<int, List<TrackRow>> trackPages;
 
   /// 当前搜索条件下的曲目总数（无搜索时等于曲库总数）。
   final int totalCount;
@@ -70,10 +76,10 @@ class LibraryState {
   /// 曲库总时长（毫秒，来自 DB 聚合，非窗口求和）。
   final int totalDurationMs;
 
-  /// 是否还有未载入的曲目（窗口 < [totalCount]）。
+  /// 是否还有未驻留的页（驻留页数 < 总页数；小曲库一次性驻留时为 false）。
   final bool hasMore;
 
-  /// 是否正在加载下一页。
+  /// 是否有取页请求在途（用于列表尾部的加载指示）。
   final bool loadingMore;
 
   final String searchQuery;
@@ -90,7 +96,7 @@ class LibraryState {
     int? total,
     int? scanErrors,
     bool? scanCanceled,
-    List<TrackRow>? tracks,
+    Map<int, List<TrackRow>>? trackPages,
     int? totalCount,
     int? totalSizeBytes,
     int? totalDurationMs,
@@ -109,7 +115,7 @@ class LibraryState {
       total: total ?? this.total,
       scanErrors: scanErrors ?? this.scanErrors,
       scanCanceled: scanCanceled ?? this.scanCanceled,
-      tracks: tracks ?? this.tracks,
+      trackPages: trackPages ?? this.trackPages,
       totalCount: totalCount ?? this.totalCount,
       totalSizeBytes: totalSizeBytes ?? this.totalSizeBytes,
       totalDurationMs: totalDurationMs ?? this.totalDurationMs,
@@ -124,9 +130,9 @@ class LibraryState {
 /// 本地音乐库控制器：扫描目录持久化 + 扫描（FFI 直连）+ 曲库查询。
 ///
 /// 曲目数据单一事实源是 scanner 直写的 library.db（sqlite3），
-/// 本 store 只读缓存（[LibraryState.tracks]），写操作一律走扫描。
+/// 本 store 只读缓存（[LibraryState.trackPages]，有界页缓存），写操作一律走扫描。
 class LibraryNotifier extends Notifier<LibraryState>
-    with _LibraryStoreCore, _LibraryStoreScan {
+    with _LibraryStoreCore, _LibraryStorePager, _LibraryStoreScan {
   @override
   LibraryState build() {
     ref.onDispose(() {
@@ -185,11 +191,28 @@ class LibraryNotifier extends Notifier<LibraryState>
   /// 重新载入曲目（从 library.db，回到第一页）。
   Future<void> reloadTracks() => _reloadTracks();
 
-  /// 滚动触底续拉下一页（无更多 / 加载中时忽略）。
+  /// 滚动触底续拉下一页（预取当前最高驻留页之后的一页；已在途 / 已到末页则忽略）。
   Future<void> loadMore() => _loadMore();
+
+  /// 按全局 index 取已驻留行；未驻留返回 null（UI 渲染占位并调用 [ensureIndex]）。
+  ///
+  /// 供窗口化列表按「全局 index → 页 → 行」映射；只读、不触发取页，
+  /// 可安全在 build 期间调用。
+  TrackRow? rowAt(int index) => _rowAt(index);
+
+  /// 声明视口需要全局 [index] 所在页：未驻留则异步取页（build 期间调用安全）。
+  void ensureIndex(int index) => _ensureIndex(index);
+
+  /// 当前播放曲目在**全库**的全局 index（按各驻留页扫描）；不在已驻留页返回 -1。
+  ///
+  /// 窗口模式下 [LibraryState.trackPages] 非全量，定位播放按钮据此计算滚动目标。
+  int playingIndexOf(String? id) => _playingIndexOf(id);
 
   /// 按当前搜索条件取全量曲目（不含 lyrics，供「播放全部」建队列）。
   Future<List<TrackRow>> allTracks() => _allTracks();
+
+  /// 随机抽取 [limit] 首本地曲目（首页聚光 / 随便听听；不含 lyrics）。
+  Future<List<Track>> randomTracks(int limit) => _randomTracks(limit);
 
   void setSearchQuery(String q) => _setSearchQuery(q);
 

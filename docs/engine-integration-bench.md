@@ -359,7 +359,7 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
 
 > 规格：`docs/audio-memory-playback.md`（S1 引擎 C / S2 Dart 接线+设置 已实现；S3 本文定稿）。
 > 用户开关「内存播放」（`audio.engineMemory`，默认**开**）；策略 `audio.pcmMemPolicy`
-> （auto / limit / unlimited，无上限须显式警告）。PCM 驻留进程内块列表（0.8 GiB 硬上限 /
+> （auto / limit / unlimited，无上限须显式警告）。PCM 驻留进程内块列表（auto 32 MiB 硬上限 /
 > 用户上限优先 / 查询故障回落 / append 记账强制淘汰），频谱经 `pcm_window` FFI 拉窗，
 > 不再写 `stream.wav/.pcm`；无设备 + 内存模式 → error（不文件回退）。
 
@@ -392,4 +392,4 @@ headless 驱动：引擎内存模式 `ARCHOERA_MEMORY_HEADLESS=1` 走「无设�
 
 - `tests/bench/run_bench.py`（CLI/pipeline 解码基准）不涉及 player 落盘/内存形态，无需改动；
 - 需要回放路径内存形态的指标（会话 RSS / 长播内存有界性）见 `docs/audio-memory-playback.md` §8
-  验收：auto 模式 RSS 增量 ≈ cap（不整曲驻留、≤0.8 GiB），`cap=-1` 用户显式知悉（含警告）。
+  验收：auto 模式 RSS 增量 ≈ cap + 池（不整曲驻留、≤40 MiB），`cap=-1` 用户显式知悉（含警告）。
