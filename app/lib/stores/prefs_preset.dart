@@ -18,6 +18,7 @@ const songCacheEnabledKey = 'preset.songCacheEnabled';
 const songCacheLimitMiBKey = 'preset.songCacheLimitMiB';
 const lyricCacheLimitMiBKey = 'preset.lyricCacheLimitMiB';
 const imageCacheLimitMiBKey = 'preset.imageCacheLimitMiB';
+const unloadAllMemoryKey = 'preset.unloadAllMemory';
 
 /// 歌曲磁盘缓存下限（MiB）：按现代流媒体数据方案计算——
 /// 320kbps 高品 ≈ 2.4 MiB/分钟，一首标准 4 分钟曲目 ≈ 10 MiB；
@@ -99,6 +100,14 @@ extension PresetPrefs on AppPrefs {
     return n.clamp(lyricCacheLimitMinMiB, lyricCacheLimitMaxMiB);
   }
 
+  /// 最小化时卸载全部内存状态（强迫症，默认关）。
+  ///
+  /// 开启后应用进入后台（最小化 / 托盘隐藏 / 熄屏）时，除清缓存外还会
+  /// **丢弃页面数据 provider**（音乐库窗口 / 首页聚光与每日推荐等），并把
+  /// 整个壳内容卸为纯色；恢复窗口后从零重建（列表重新加载、首页重新拉取）。
+  /// 播放不受影响（引擎/播放状态不在此列）。用「恢复即重建」换后台常驻内存。
+  bool get unloadAllMemory => data[unloadAllMemoryKey] as bool? ?? false;
+
   /// 封面图片缓存上限（MiB，进程内 ImageCache）。
   ///
   /// **恒有上限**（封面是内存大户，不提供「无上限」）：取值恒在
@@ -125,6 +134,7 @@ extension PresetPrefs on AppPrefs {
     bool? hideVipTag,
     bool? hideQualityTag,
     bool? showSubtitle,
+    bool? unloadAllMemory,
   }) {
     final d = Map<String, dynamic>.of(data);
     if (djCustomKeywords != null) {
@@ -150,6 +160,7 @@ extension PresetPrefs on AppPrefs {
         hideVipTagKey: ?hideVipTag,
         hideQualityTagKey: ?hideQualityTag,
         showSubtitleKey: ?showSubtitle,
+        unloadAllMemoryKey: ?unloadAllMemory,
       },
     );
   }

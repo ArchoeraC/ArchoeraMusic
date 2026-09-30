@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -145,6 +146,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSuppressSleepOff => 'System may sleep on idle schedule';
+
+  @override
+  String get settingsBackgroundUnload => 'Unload visited pages in background';
+
+  @override
+  String get settingsBackgroundUnloadSubtitle =>
+      'Free lists and images when minimized/tray/screen-off; rebuild on restore (may lose scroll position)';
 
   @override
   String get settingsCloseBehavior => 'When closing the app';
@@ -1363,9 +1371,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pageHomeDaily => 'Daily recommend';
 
   @override
-  String get pageHomeDailyLoggedIn => 'Hand-picked for your taste';
-
-  @override
   String get pageHomeDailyLoginHint =>
       'Updates daily after you sign in with your NT account';
 
@@ -1374,6 +1379,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pageHomeDailyLogin => 'Sign in to unlock daily recommend';
+
+  @override
+  String pageHomeSpotlightTitle({required Object song}) {
+    return 'Start with $song';
+  }
+
+  @override
+  String pageHomeSpotlightSubtitle({required Object count}) {
+    return 'Randomly picked $count tracks for you';
+  }
+
+  @override
+  String get pageHomeSpotlightShuffle => 'Shuffle';
+
+  @override
+  String get pageHomeSpotlightEmpty => 'Nothing to play yet';
 
   @override
   String pageHomeGreeting({required Object greeting, required Object name}) {
@@ -1887,7 +1908,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMemoryPolicyAutoSub =>
-      '0.8 GiB hard cap; adapts to free RAM';
+      '32 MiB hard cap; adapts to free RAM';
 
   @override
   String get settingsMemoryPolicyLimit => 'Custom limit';
@@ -2330,6 +2351,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Currently in standard mode';
+
+  @override
+  String get settingsUnloadAllMemory =>
+      'Unload all memory state when minimized';
+
+  @override
+  String get settingsUnloadAllMemorySubtitle =>
+      'In background (minimize/tray/screen-off), drop page data and caches; rebuild from scratch on restore (may return home, lose scroll). Playback unaffected';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>
@@ -4358,6 +4387,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAmllWordSweep => 'Word sweep';
 
   @override
+  String get settingsAmllSyntheticSweep => 'Synthetic sweep for plain lyrics';
+
+  @override
+  String get settingsAmllSyntheticSweepDesc =>
+      'Estimate per-word timing from the duration of each line for karaoke sweep (also applies to translations).';
+
+  @override
   String get settingsAmllHidePassed => 'Hide passed lines';
 
   @override
@@ -4727,6 +4763,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLyricExcludeClear => 'Clear';
+
+  @override
+  String get settingsLyricTtml => 'Online TTML lyrics (Beta)';
+
+  @override
+  String get settingsLyricTtmlDesc =>
+      'Fetch word-by-word TTML lyrics from AMLL DB and override platform lyrics on a hit; requires network access. This feature is still in testing.';
+
+  @override
+  String get settingsLyricTtmlEnable => 'Enable online TTML lyrics';
+
+  @override
+  String get settingsLyricTtmlEnableDesc =>
+      'Prefer AMLL DB word-by-word lyrics when available';
+
+  @override
+  String get settingsLyricTtmlServer => 'AMLL DB server';
+
+  @override
+  String get settingsLyricTtmlServerDesc =>
+      'Lyric request URL template; can point to a self-hosted mirror';
+
+  @override
+  String get settingsLyricTtmlServerDialogTitle => 'AMLL DB server template';
+
+  @override
+  String get settingsLyricTtmlServerHint =>
+      'Template must contain both %p (platform) and %s (track id)';
+
+  @override
+  String get settingsLyricTtmlServerInvalid =>
+      'Template must contain both %p and %s';
 
   @override
   String get commonConfigure => 'Configure';

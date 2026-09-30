@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-use aes::cipher::{Block, BlockDecrypt, KeyInit};
+use aes::cipher::{BlockCipherDecrypt, KeyInit};
 #[cfg(test)]
-use aes::cipher::BlockEncrypt;
+use aes::cipher::BlockCipherEncrypt;
 use aes::Aes128;
 use anyhow::{anyhow, bail, Result};
 use base64::Engine as _;
@@ -24,7 +24,7 @@ fn aes_ecb_decrypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
     let cipher = aes128(key)?;
     let mut out = data.to_vec();
     for chunk in out.chunks_exact_mut(16) {
-        cipher.decrypt_block(Block::<Aes128>::from_mut_slice(chunk));
+        cipher.decrypt_block(chunk.try_into().expect("16 字节 AES 块"));
     }
     Ok(out)
 }
@@ -37,7 +37,7 @@ fn aes_ecb_encrypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
     let cipher = aes128(key)?;
     let mut out = data.to_vec();
     for chunk in out.chunks_exact_mut(16) {
-        cipher.encrypt_block(Block::<Aes128>::from_mut_slice(chunk));
+        cipher.encrypt_block(chunk.try_into().expect("16 字节 AES 块"));
     }
     Ok(out)
 }

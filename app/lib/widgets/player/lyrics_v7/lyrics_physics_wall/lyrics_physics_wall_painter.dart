@@ -66,6 +66,8 @@ class _Painter extends CustomPainter {
     // 只缓存可见窗口 → 常驻内存 O(视口)，与歌长无关（§3.4）。
     c.cache.pruneTo(visible);
     c.fragCache.pruneTo(keepFrag);
+    c.transFragCache.pruneTo(keepFrag);
+    c.romaFragCache.pruneTo(keepFrag);
   }
 
   /// 间奏三点（对齐 AMLL interlude-dots：依次点亮 + 呼吸缩放 + 两段式退场）。
@@ -336,8 +338,9 @@ class _Painter extends CustomPainter {
     LyricGroup g,
     LyricsFragmentRender fr,
     double fs,
-    double maxWidth,
-  ) {
+    double maxWidth, {
+    double lineHeightEm = kLyricLineHeightEm,
+  }) {
     final lineStart = g.original.timeMs;
     final pos = c.positionMs;
     final n = fr.length;
@@ -358,14 +361,14 @@ class _Painter extends CustomPainter {
       }
       if (t >= dur) {
         canvas.drawParagraph(
-          _litParagraph(fr, k, fs, maxWidth, anim),
+          _litParagraph(fr, k, fs, maxWidth, anim, lineHeightEm),
           Offset(box.left, box.top),
         );
       } else if (t <= 0) {
         canvas.drawParagraph(fr.dim[k], Offset(box.left, box.top));
       } else {
         canvas.drawParagraph(fr.dim[k], Offset(box.left, box.top));
-        _drawSweepLit(canvas, fr, k, box, t / dur, fs, maxWidth, anim);
+        _drawSweepLit(canvas, fr, k, box, t / dur, fs, maxWidth, anim, lineHeightEm);
       }
       canvas.restore();
     }
@@ -381,8 +384,9 @@ class _Painter extends CustomPainter {
     double fs,
     double maxWidth,
     WordAnim anim,
+    double lineHeightEm,
   ) {
-    final lit = _litParagraph(fr, k, fs, maxWidth, anim);
+    final lit = _litParagraph(fr, k, fs, maxWidth, anim, lineHeightEm);
     final rect = Rect.fromLTWH(
       box.left - 1,
       box.top - 1,
@@ -419,6 +423,7 @@ class _Painter extends CustomPainter {
     double fs,
     double maxWidth,
     WordAnim anim,
+    double lineHeightEm,
   ) {
     if (anim.glowAlpha <= 0.01) return fr.lit[k];
     return buildGlowFragment(
@@ -430,6 +435,7 @@ class _Painter extends CustomPainter {
       text: fr.texts[k],
       glowAlpha: anim.glowAlpha,
       blurRadius: anim.glowBlur,
+      lineHeightEm: lineHeightEm,
     );
   }
 
@@ -449,6 +455,7 @@ class _Painter extends CustomPainter {
     durationMs: dur,
     lineRelMs: tRel,
     fontSize: fs,
+    synthetic: k < fr.synthetic.length && fr.synthetic[k],
   );
 
   LyricsFragmentRender? _fragRender(
@@ -531,20 +538,104 @@ class _Painter extends CustomPainter {
     required double maxWidth}) {
     final gap = fs * kLyricTranslationGapEm;
     var below = mainBottom;
+    final subFs = lyricTranslationFontSize(fs);
     final tr = g.translation;
     if (c.showTranslation && tr != null && tr.isNotEmpty) {
-      final sub = _translationParagraph(index, tr, active, alpha, fs, maxWidth);
       below += gap;
-      canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
-      below += sub.height;
+      final fr = active
+          ? _subFragRender(index, g, roman: false, fs: fs, maxWidth: maxWidth)
+          : null;
+      if (fr != null) {
+        canvas.save();
+        canvas.translate(c.w / 2 - fr.width / 2, below);
+        _drawFragments(
+          canvas,
+          g,
+          fr,
+          subFs,
+          maxWidth,
+          lineHeightEm: kLyricTranslationLineHeightEm,
+        );
+        canvas.restore();
+        below += fr.height;
+      } else {
+        final sub = _translationParagraph(index, tr, active, alpha, fs, maxWidth);
+        canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
+        below += sub.height;
+      }
     }
     final ro = g.romaji;
     if (c.showRomanization && ro != null && ro.isNotEmpty) {
-      final sub = _romajiParagraph(index, ro, active, alpha, fs, maxWidth);
       below += gap;
-      canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
-      below += sub.height;
+      final fr = active
+          ? _subFragRender(index, g, roman: true, fs: fs, maxWidth: maxWidth)
+          : null;
+      if (fr != null) {
+        canvas.save();
+        canvas.translate(c.w / 2 - fr.width / 2, below);
+        _drawFragments(
+          canvas,
+          g,
+          fr,
+          subFs,
+          maxWidth,
+          lineHeightEm: kLyricTranslationLineHeightEm,
+        );
+        canvas.restore();
+        below += fr.height;
+      } else {
+        final sub = _romajiParagraph(index, ro, active, alpha, fs, maxWidth);
+        canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
+        below += sub.height;
+      }
     }
+  }
+
+  /// 翻译 / 音译小字的合成扫亮渲染（无片段 / 关闭逐字时返回 null 回退段落）。
+  LyricsFragmentRender? _subFragRender(
+    int index,
+    LyricGroup g, {
+    required bool roman,
+    required double fs,
+    required double maxWidth,
+  }) {
+    if (!c.wordSweep) return null;
+    final frags = roman ? g.romajiFragments : g.translationFragments;
+    final text = roman ? g.romaji : g.translation;
+    if (frags == null || frags.isEmpty || text == null || text.isEmpty) {
+      return null;
+    }
+    final subFs = lyricTranslationFontSize(fs);
+    // 与 _translationParagraph / _romajiParagraph 的激活色一致：
+    // 翻译 lit 0.8 / 音译 lit 0.65，未唱取 lit × 0.4（对齐主行 0.4 比例）。
+    final litAlpha = roman ? 0.65 : 0.8;
+    final unsungAlpha = litAlpha * _unsungAlpha;
+    final cache = roman ? c.romaFragCache : c.transFragCache;
+    final key = (
+      text,
+      c.fontFamily,
+      subFs,
+      maxWidth,
+      c.played.toARGB32(),
+      unsungAlpha,
+      litAlpha,
+    );
+    return cache.obtain(
+      index,
+      key,
+      () => buildLyricsFragmentRender(
+        fragments: frags,
+        lineText: text,
+        fontFamily: c.fontFamily,
+        fontSize: subFs,
+        weight: FontWeight.w400,
+        maxWidth: maxWidth,
+        played: c.played,
+        unsungAlpha: unsungAlpha,
+        litAlpha: litAlpha,
+        lineHeightEm: kLyricTranslationLineHeightEm,
+      ),
+    );
   }
 
   /// 音译（罗马音）小字段落（颜色含透明度，替代 saveLayer）。

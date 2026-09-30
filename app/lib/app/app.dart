@@ -21,6 +21,7 @@ import '../widgets/common/toast.dart';
 import '../widgets/common/vault_crash_gate.dart';
 import '../widgets/common/vault_unlock_gate.dart';
 import '../widgets/common/vault_version_gate.dart';
+import 'background_unload_gate.dart';
 import 'bootstrap.dart';
 import 'router.dart';
 import 'theme_provider.dart';
@@ -36,6 +37,9 @@ class ArchoeraMusicApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final prefs = ref.watch(appPrefsProvider);
+    // 偏好实时快照 → apis 层 getSetting（TTML 开关 / 服务端模板等）。
+    // 本组件 watch 了 appPrefsProvider，偏好变化即重建并刷新快照。
+    appPrefsSnapshot = prefs;
     final locale = ref.watch(localeProvider);
     // 主色种子（对齐原版 theme.ts generatePalette + trackedColorForCover）：
     // custom → 自定义主色；cover → 当前播放封面提取；default → 跟随系统主题色
@@ -120,6 +124,10 @@ class ArchoeraMusicApp extends ConsumerWidget {
               // 影响 SplashGate 及以下（Navigator/路由/浮层），隐式 Animated*
               // 组件会自动按 disableAnimations 退化为 0 时长（Flutter 内建支持）。
               var appChild = child ?? const SizedBox.shrink();
+              // 后台卸载门：开启后台卸载设置且进入后台时，把整棵路由子树
+              // （Navigator/所有页面/弹窗）卸为纯色；MaterialApp 与各启动门
+              // （Splash/Vault）保持挂载，恢复时不会重放 Splash。
+              appChild = BackgroundUnloadGate(child: appChild);
               Widget gate = SplashGate(
                 engine: prefs.engine,
                 child: SchemeIntroGate(
@@ -142,9 +150,8 @@ class ArchoeraMusicApp extends ConsumerWidget {
               gate = EasterEggVisualHost(child: gate);
               if (performanceMode) {
                 gate = MediaQuery(
-                  data: MediaQuery.of(
-                    context,
-                  ).copyWith(disableAnimations: true),
+                  data: MediaQuery.of(context)
+                      .copyWith(disableAnimations: true),
                   child: gate,
                 );
               }

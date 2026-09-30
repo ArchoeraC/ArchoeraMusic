@@ -60,6 +60,10 @@ class ScannerLibrary {
         // 系统库/已加载时忽略
       }
     }
+    // 注：scanner-ffi 为 .NET NativeAOT（C# runtime），`scanner_scan` 返回后
+    // 仍可能有后台线程（写库/线程池）在运行，且**无模块级 destroy/join**；
+    // 立即 `DynamicLibrary.close()` 会 unmap 其代码段导致进程崩溃（实测）。
+    // 故 scanner 保持常驻（不做 unload），仅本文件的 registry 引用计数不启用。
     final lib = DynamicLibrary.open(path);
     return ScannerLibrary._(lib)..installLogSink();
   }

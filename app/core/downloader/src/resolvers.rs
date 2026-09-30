@@ -554,16 +554,20 @@ fn netease_level_for_key(key: &str, quality: Quality) -> &'static str {
 
 /// 随机小写字母（WNMCID 前缀）
 fn rand_letters(n: usize) -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    (0..n).map(|_| (b'a' + rng.gen_range(0..26)) as char).collect()
+    use rand::RngExt;
+    let mut rng = rand::rng();
+    (0..n)
+        .map(|_| (b'a' + rng.random_range(0..26)) as char)
+        .collect()
 }
 
 /// 随机 hex 字节串（_ntes_nuid 等）
 fn rand_hex_bytes(n: usize) -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    (0..n).map(|_| format!("{:02x}", rng.gen_range(0..=255u8))).collect()
+    use rand::RngExt;
+    let mut rng = rand::rng();
+    (0..n)
+        .map(|_| format!("{:02x}", rng.random_range(0..=255u8)))
+        .collect()
 }
 
 /// 对齐 Dart _processCookieObject：补齐 cookie 必备字段（跳过需网络注册的
@@ -596,10 +600,10 @@ pub(crate) fn build_netease_cookie(user_cookie: Option<&str>) -> String {
         .cloned()
         .unwrap_or_else(|| format!("{}.{now}.01.0", rand_letters(6)));
     let device_id = c.get("deviceId").cloned().or(ident.nm_device_id).unwrap_or_else(|| {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::RngExt;
+        let mut rng = rand::rng();
         (0..26)
-            .map(|_| format!("{:X}", rng.gen_range(0..16)))
+            .map(|_| format!("{:X}", rng.random_range(0..16)))
             .collect::<String>()
     });
 

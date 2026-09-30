@@ -9,6 +9,7 @@ import 'package:ffi/ffi.dart';
 
 import '../log/log.dart';
 import '../native_lib_paths.dart';
+import '../native_library_registry.dart' as ffi_registry;
 
 /// archoera-downloader cdylib 的定位、加载与 FFI 绑定。
 ///
@@ -41,8 +42,14 @@ class DownloaderLibrary {
 
   static DownloaderLibrary load({String? soPath}) {
     final path = soPath ?? resolveSoPath();
-    final lib = DynamicLibrary.open(path);
+    // 经统一注册表按需加载（引用计数）；用后 [dispose] 归零即真正卸载。
+    final lib = ffi_registry.acquire(NativeModule.downloader, path: path);
     return DownloaderLibrary._(lib)..installLogSink();
+  }
+
+  /// 释放对 downloader 库的引用（须在 destroy 且无在途任务后调用）。
+  void dispose() {
+    ffi_registry.release(NativeModule.downloader);
   }
 
   // ---------------------------------------------------------------- FFI 绑定（§8.1）

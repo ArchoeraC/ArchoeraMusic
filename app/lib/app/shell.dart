@@ -85,39 +85,40 @@ class AppShell extends ConsumerWidget {
         ),
       ],
     );
-    return Scaffold(
-      body: Stack(
-        children: [
-          if (imageStyle) Positioned.fill(child: _AppBackground(prefs: prefs)),
-          // 内容层（停靠模式且播放条可见时底部让位；悬浮模式占满全高）
-          Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: !floating && showBar ? 82 : 0),
-              child: ShellExpandTransition(
-                animation: playerRouteAnim,
-                disableAnimations: noAnim(context),
-                // 完全展开后壳内容卸载，仅保留一层纯色背景（无列表/图片）。
-                placeholder: ColoredBox(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                ),
-                child: content,
+    final body = Stack(
+      children: [
+        if (imageStyle) Positioned.fill(child: _AppBackground(prefs: prefs)),
+        // 内容层（停靠模式且播放条可见时底部让位；悬浮模式占满全高）
+        Positioned.fill(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: !floating && showBar ? 82 : 0),
+            child: ShellExpandTransition(
+              animation: playerRouteAnim,
+              disableAnimations: noAnim(context),
+              // 完全展开后壳内容卸载，仅保留一层纯色背景（无列表/图片）。
+              placeholder: ColoredBox(
+                color: Theme.of(context).scaffoldBackgroundColor,
               ),
+              child: content,
             ),
           ),
-          // 底部播放条（悬浮层，不占布局空间——对齐原版 MainLayout 的
-          // fixed 播放条：悬浮模式侧边栏可占满侧边；播放条从侧边栏
-          // 右侧开始，避免盖住侧边栏底部）
-          Positioned(
-            left: floating ? (collapsed ? 64.0 : 240.0) + 1 : 0,
-            right: 0,
-            bottom: 0,
-            child: const PlayerBar(),
-          ),
-          // Dev 模式性能监控（右上角小窗；默认 SizedBox.shrink 零开销）
-          const Positioned(top: 10, right: 10, child: FpsMonitorHost()),
-        ],
-      ),
+        ),
+        // 底部播放条（悬浮层，不占布局空间——对齐原版 MainLayout 的
+        // fixed 播放条：悬浮模式侧边栏可占满侧边；播放条从侧边栏
+        // 右侧开始，避免盖住侧边栏底部）
+        Positioned(
+          left: floating ? (collapsed ? 64.0 : 240.0) + 1 : 0,
+          right: 0,
+          bottom: 0,
+          child: const PlayerBar(),
+        ),
+        // Dev 模式性能监控（右上角小窗；默认 SizedBox.shrink 零开销）
+        const Positioned(top: 10, right: 10, child: FpsMonitorHost()),
+      ],
     );
+    // 后台卸载（最小化/托盘/熄屏）在根级 `BackgroundUnloadGate`（app.dart）统一
+    // 处理：整棵路由子树被卸为纯色，覆盖包括本壳在内的所有页面。
+    return Scaffold(body: body);
   }
 }
 

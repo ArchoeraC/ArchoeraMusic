@@ -395,6 +395,167 @@ void main() {
     });
   });
 
+  group('QRC（QQ 音乐逐字）解析', () {
+    test('XML 外壳解开 + 绝对字级时间转相对偏移', () {
+      const xml = '<?xml version="1.0" encoding="utf-8"?>\n'
+          '<QrcInfos>\n<QrcHeadInfo SaveTime="1" Version="100"/>\n'
+          '<LyricInfo LyricCount="1">\n'
+          '<Lyric_1 LyricType="1" LyricContent="[ti:测试]\n'
+          '[0,1000]看(0,500)清(500,500)\n'
+          '[1000,1000]了(1000,1000)"/>\n'
+          '</LyricInfo>\n</QrcInfos>\n';
+      final groups = parseLyricGroups(content: xml, format: 'qrc');
+      expect(groups, hasLength(2));
+      expect(groups[0].original.timeMs, 0);
+      expect(groups[0].original.text, '看清');
+      expect(groups[1].original.timeMs, 1000);
+      expect(groups[1].original.text, '了');
+      // 字级时间为绝对毫秒 → 片段必须是行内相对偏移。
+      final frags = groups[0].fragments!;
+      expect(frags.map((f) => f.text).join(), '看清');
+      expect(frags[0].startMs, 0);
+      expect(frags[0].durationMs, 500);
+      expect(frags[1].startMs, 500);
+      expect(groups[1].fragments!.single.startMs, 0);
+    });
+
+    test('纯文本 QRC（无 XML）同样解析', () {
+      final groups = parseLyricGroups(
+        content: '[0,1000]看(0,500)清(500,500)\n',
+        format: 'qrc',
+      );
+      expect(groups.single.original.text, '看清');
+      expect(groups.single.fragments, hasLength(2));
+    });
+
+    test('字级文本里的裸括号按正文保留（仅"("后紧跟数字才算时间）', () {
+      // 时间标记后的 ")" 是正文；被跳过的裸 "(" 也是正文。
+      final a = parseLyricGroups(
+        content: '[0,2000]a(0,500))(500,500)b(1000,500)\n',
+        format: 'qrc',
+      );
+      expect(a.single.original.text, 'a)b');
+      expect(
+        a.single.fragments!.map((f) => f.text).toList(),
+        ['a', ')', 'b'],
+      );
+      final b = parseLyricGroups(
+        content: '[0,2000]a((0,500)(b(500,500)\n',
+        format: 'qrc',
+      );
+      expect(b.single.original.text, '(a(b');
+    });
+
+    test('非 QRC 内容（format 标错）不会误吞普通 LRC', () {
+      final groups = parseLyricGroups(
+        content: '[00:01.000]Hello\n[00:03.000]World\n',
+        format: 'lrc',
+      );
+      expect(groups.map((g) => g.original.text).toList(), ['Hello', 'World']);
+    });
+
+    test('罗马音子行为 QRC XML 时按 romajiFormat 解析', () {
+      const roma = '<?xml version="1.0" encoding="utf-8"?>\n'
+          '<QrcInfos><LyricInfo><Lyric_1 LyricType="1" '
+          'LyricContent="[ti:x]\n[0,1000]kimi(0,500)no(500,500)"/>'
+          '</LyricInfo></QrcInfos>';
+      final groups = parseLyricGroups(
+        content: '[0,1000]君(0,500)の(500,500)\n',
+        format: 'qrc',
+        romaji: roma,
+        romajiFormat: 'qrc',
+      );
+      expect(groups.single.original.text, '君の');
+      expect(groups.single.romaji, 'kimino');
+    });
+  });
+
+  group('增强 LRC / ESLRC / 行内和声', () {
+    test('ESLRC：<mm:ss.xxx>字 解析为逐字片段（相对行首）', () {
+      final groups = parseLyricGroups(
+        content: '[00:00.00]<00:00.00>A<00:01.00>B<00:02.00>',
+        format: 'lrc',
+      );
+      final g = groups.single;
+      expect(g.original.timeMs, 0);
+      expect(g.original.text, 'AB');
+      final f = g.fragments!;
+      expect(f.map((e) => e.text).join(), 'AB');
+      expect(f[0].startMs, 0);
+      expect(f[0].durationMs, 1000);
+      expect(f[1].startMs, 1000);
+      expect(g.endMs, 2000);
+    });
+
+    test('增强 LRC：行内 [mm:ss]字 解析为逐字片段', () {
+      final groups = parseLyricGroups(
+        content: '[00:01.00]你[00:01.40]好[00:01.80]吗\n[00:03.00]下一句\n',
+        format: 'lrc',
+      );
+      expect(groups, hasLength(2));
+      final g = groups.first;
+      expect(g.original.timeMs, 1000);
+      expect(g.original.text, '你好吗');
+      expect(g.fragments!.map((f) => f.text).join(), '你好吗');
+      expect(g.fragments!.map((f) => f.startMs).toList(), [0, 400, 800]);
+      expect(groups[1].fragments, isNull);
+    });
+
+    test('纯多时间戳（标签间无文本）仍是重复行', () {
+      final groups = parseLyricGroups(
+        content: '[00:01.00][00:03.00]重复行\n[00:02.00]第二行\n',
+        format: 'lrc',
+      );
+      expect(groups.map((g) => g.original.timeMs).toList(), [1000, 2000, 3000]);
+      expect(groups.map((g) => g.original.text).toList(), ['重复行', '第二行', '重复行']);
+      expect(groups.every((g) => g.fragments == null), isTrue);
+    });
+
+    test('行内尾随和声（普通行）拆为同时间背景子行', () {
+      final groups = parseLyricGroups(
+        content: '[00:10.00]主歌词（和声）\n[00:20.00]下一句\n',
+        format: 'lrc',
+      );
+      expect(groups, hasLength(3));
+      final main = groups[0];
+      final bg = groups[1];
+      expect(main.isBG, isFalse);
+      expect(main.original.text, '主歌词');
+      expect(main.endMs, 20000); // 同时间背景子行不截断主行窗口
+      expect(bg.isBG, isTrue);
+      expect(bg.original.text, '和声');
+      expect(bg.original.timeMs, 10000);
+      expect(groups[2].original.text, '下一句');
+    });
+
+    test('行内尾随和声（逐字行）背景子行带相对片段', () {
+      final groups = parseLyricGroups(
+        content: '[00:10.000]<0,500>主<500,500>歌'
+            '<1000,500>（<1500,500>和<2000,500>声<2500,500>）\n',
+        format: 'yrc',
+      );
+      expect(groups, hasLength(2));
+      final main = groups[0];
+      final bg = groups[1];
+      expect(main.original.text, '主歌');
+      expect(main.endMs, 11500);
+      expect(bg.isBG, isTrue);
+      expect(bg.original.timeMs, 11500);
+      expect(bg.original.text, '和声');
+      // 背景片段相对背景行自身时间。
+      expect(bg.fragments!.map((f) => f.startMs).toList(), [0, 500]);
+    });
+
+    test('日文注音（汉字＋假名）不拆为和声', () {
+      final groups = parseLyricGroups(
+        content: '[00:10.00]漢字（かんじ）のうた\n',
+        format: 'lrc',
+      );
+      expect(groups.single.isBG, isFalse);
+      expect(groups.single.original.text, '漢字（かんじ）のうた');
+    });
+  });
+
   group('逐字渲染几何', () {
     test('逐字盒按整行居中布局、按文本顺序递增', () {
       final r = buildLyricsFragmentRender(
@@ -839,6 +1000,112 @@ void main() {
       expect(left, greaterThan(150), reason: '已唱部分应明亮 ($left)');
       expect(right, lessThan(130), reason: '未唱部分应压暗 ($right)');
       expect(left - right, greaterThan(60));
+    });
+
+    testWidgets('翻译合成扫亮：激活行翻译走逐字渲染路径', (tester) async {
+      final groups = [
+        LyricGroup(
+          original: const LyricLine(timeMs: 0, text: '主行'),
+          translation: 'AAAA BBBB CCCC DDDD',
+          translationFragments: const [
+            LyricFragment(text: 'AAAA ', startMs: 0, durationMs: 1000),
+            LyricFragment(text: 'BBBB ', startMs: 1000, durationMs: 1000),
+            LyricFragment(text: 'CCCC ', startMs: 2000, durationMs: 1000),
+            LyricFragment(text: 'DDDD', startMs: 3000, durationMs: 1000),
+          ],
+          endMs: 4000,
+        ),
+      ];
+      await tester.pumpWidget(buildWall(groups, 500, showTranslation: true));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      expect(s.debugSubFragCacheEntries(), greaterThan(0));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('翻译羽化扫亮：已唱翻译明显亮于未唱', (tester) async {
+      tester.view.physicalSize = const Size(420, 260);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      const key = ValueKey('trans-sweep');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RepaintBoundary(
+            key: key,
+            child: Container(
+              color: const Color(0xFF101018),
+              child: SizedBox(
+                width: 420,
+                height: 260,
+                child: AmllPhysicsWall(
+                  groups: [
+                    LyricGroup(
+                      original: const LyricLine(timeMs: 0, text: '主行'),
+                      translation: 'AAAA BBBB CCCC DDDD',
+                      translationFragments: const [
+                        LyricFragment(
+                          text: 'AAAA ',
+                          startMs: 0,
+                          durationMs: 1000,
+                        ),
+                        LyricFragment(
+                          text: 'BBBB ',
+                          startMs: 1000,
+                          durationMs: 1000,
+                        ),
+                        LyricFragment(
+                          text: 'CCCC ',
+                          startMs: 2000,
+                          durationMs: 1000,
+                        ),
+                        LyricFragment(
+                          text: 'DDDD',
+                          startMs: 3000,
+                          durationMs: 1000,
+                        ),
+                      ],
+                      endMs: 4000,
+                    ),
+                  ],
+                  positionMs: 500,
+                  fontSize: 22,
+                  blurQuality: LyricsBlurQuality.off,
+                  enableScale: false,
+                  alignFraction: 0.5,
+                  onSeek: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final boundary = tester.renderObject<RenderRepaintBoundary>(
+        find.byKey(key),
+      );
+      var left = 0;
+      var right = 0;
+      await tester.runAsync(() async {
+        final img = await boundary.toImage(pixelRatio: 1);
+        final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+        final b = raw!.buffer.asUint8List();
+        int lum(int x, int y) => b[(y * img.width + x) * 4];
+        // 翻译行在主行下方（主行 y≈118..134，翻译 y≈150..160）；
+        // 已唱的 'AAAA ' 在左侧，其余在右侧。
+        for (var y = 148; y <= 162; y++) {
+          for (var x = 108; x <= 140; x++) {
+            if (lum(x, y) > left) left = lum(x, y);
+          }
+          for (var x = 220; x <= 300; x++) {
+            if (lum(x, y) > right) right = lum(x, y);
+          }
+        }
+      });
+      expect(left, greaterThan(150), reason: '已唱翻译应明亮 ($left)');
+      expect(right, lessThan(110), reason: '未唱翻译应压暗 ($right)');
+      expect(left - right, greaterThan(40));
     });
 
     testWidgets('音译行计入行高并正常渲染（含译文，来自 main 的罗马音能力）', (tester) async {
@@ -1297,6 +1564,53 @@ void main() {
       // 背景行挂在主行下方（间距明显小于两个主行之间的距离）。
       expect(centers[1], greaterThan(centers[0]));
       expect(bgGap, lessThan(mainGap));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('同时间行内和声子行不抢主行高亮', (tester) async {
+      final groups = [
+        LyricGroup(
+          original: const LyricLine(timeMs: 0, text: '主歌词'),
+          endMs: 3000,
+        ),
+        LyricGroup(
+          original: const LyricLine(timeMs: 0, text: '和声'),
+          endMs: 3000,
+          isBG: true,
+        ),
+        LyricGroup(
+          original: const LyricLine(timeMs: 3000, text: '下一句'),
+          endMs: 6000,
+        ),
+      ];
+      await tester.pumpWidget(buildWall(groups, 1500));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      // 同时间的背景子行不参与激活判定 → 主行保持高亮。
+      expect(s.debugActive(), 0);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('独立和声段（不与主行重叠）仍可成为激活行', (tester) async {
+      final groups = [
+        LyricGroup(
+          original: const LyricLine(timeMs: 0, text: '主句'),
+          endMs: 1000,
+        ),
+        LyricGroup(
+          original: const LyricLine(timeMs: 1000, text: '和声段'),
+          endMs: 4000,
+          isBG: true,
+        ),
+        LyricGroup(
+          original: const LyricLine(timeMs: 4000, text: '下一句'),
+          endMs: 7000,
+        ),
+      ];
+      await tester.pumpWidget(buildWall(groups, 2500));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      expect(s.debugActive(), 1);
       expect(tester.takeException(), isNull);
     });
   });

@@ -5,11 +5,13 @@
 part of '../library_store.dart';
 
 mixin _LibraryStoreCore on Notifier<LibraryState> {
-  /// 每页载入曲目数（分页窗口）。
-  static const int _pageSize = 300;
-
   /// 搜索去抖延时（SQL 下推前合并连续输入）。
   static const Duration _searchDebounceDelay = Duration(milliseconds: 250);
+
+  /// 重新载入曲库（清空页缓存 + 载入第一页 + 聚合统计）。
+  ///
+  /// 由 [_LibraryStorePager] 实现；core / scan 仅通过本契约调用。
+  Future<void> _reloadTracks();
 
   Timer? get _searchDebounce;
   set _searchDebounce(Timer? value);
@@ -36,63 +38,6 @@ mixin _LibraryStoreCore on Notifier<LibraryState> {
     await _reloadTracks();
   }
 
-  /// 载入第一页（含当前搜索条件）+ 曲库聚合统计，替换窗口。
-  Future<void> _reloadTracks() async {
-    try {
-      final db = TracksDb.open();
-      final query = state.searchQuery;
-      final tracks = db.listTracks(limit: _pageSize, query: query);
-      final count = db.countTracks(query: query);
-      final stats = db.stats();
-      db.close();
-      state = state.copyWith(
-        tracks: tracks,
-        totalCount: count,
-        totalSizeBytes: stats.totalSize,
-        totalDurationMs: stats.totalDurationMs,
-        hasMore: tracks.length < count,
-        loadingMore: false,
-        error: null,
-      );
-    } catch (_) {
-      state = state.copyWith(
-        tracks: const [],
-        totalCount: 0,
-        totalSizeBytes: 0,
-        totalDurationMs: 0,
-        hasMore: false,
-        loadingMore: false,
-        error: null,
-      );
-    }
-  }
-
-  /// 续拉下一页并追加到窗口。
-  Future<void> _loadMore() async {
-    if (state.loadingMore || !state.hasMore) return;
-    final query = state.searchQuery;
-    final offset = state.tracks.length;
-    state = state.copyWith(loadingMore: true);
-    try {
-      final db = TracksDb.open();
-      final next = db.listTracks(limit: _pageSize, offset: offset, query: query);
-      db.close();
-      // 查询期间搜索条件/窗口已变（如新一次 reload）：丢弃本次结果。
-      if (state.searchQuery != query || state.tracks.length != offset) {
-        state = state.copyWith(loadingMore: false);
-        return;
-      }
-      final merged = <TrackRow>[...state.tracks, ...next];
-      state = state.copyWith(
-        tracks: merged,
-        hasMore: merged.length < state.totalCount,
-        loadingMore: false,
-      );
-    } catch (_) {
-      state = state.copyWith(loadingMore: false);
-    }
-  }
-
   /// 按当前搜索条件取全量（不含 lyrics），供「播放全部」建队列。
   Future<List<TrackRow>> _allTracks() async {
     try {
@@ -100,6 +45,19 @@ mixin _LibraryStoreCore on Notifier<LibraryState> {
       final rows = db.allTracks(query: state.searchQuery);
       db.close();
       return rows;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// 随机抽取 [limit] 首本地曲目（首页聚光 / 随便听听；不含 lyrics）。
+  Future<List<Track>> _randomTracks(int limit) async {
+    if (limit <= 0) return const [];
+    try {
+      final db = TracksDb.open();
+      final rows = db.randomTracks(limit);
+      db.close();
+      return rows.map(trackFromRow).toList();
     } catch (_) {
       return const [];
     }

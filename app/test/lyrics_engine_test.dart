@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/apis/lyric/format.dart';
 import 'package:archoera_music/apis/lyric/types.dart';
+import 'package:archoera_music/apis/runtime.dart';
 import 'package:archoera_music/services/lyrics/engine/lyric_pipeline.dart';
 import 'package:archoera_music/services/lyrics/engine/lyric_source.dart';
 import 'package:archoera_music/services/lyrics/engine/lyrics_engine.dart';
@@ -179,6 +180,88 @@ void main() {
         preferRich: true,
       );
       expect(onlineGroups, isEmpty);
+    });
+
+    test('启用后 AMLL DB TTML 覆盖优先于平台来源（命中缓存）', () async {
+      final prev = getRuntime();
+      setRuntime(
+        runtime: ApisRuntime(
+          getSetting: (k) =>
+              k == 'lyric.enableOnlineTTMLLyric' ? true : null,
+        ),
+      );
+      const ttml = '<tt xmlns="http://www.w3.org/ns/ttml"><body><div>'
+          '<p begin="00:01.000" end="00:02.000">'
+          '<span begin="00:01.000" end="00:02.000">TTML</span></p>'
+          '</div></body></tt>';
+      getRuntime().lyricTtmlCache.set('netease', 't1', ttml);
+      try {
+        final src = _FakeSource('netease', result: _match('[00:01.000]platform'));
+        final engine = LyricsEngine([src]);
+        final groups = await engine.resolve(
+          _track('netease'),
+          trackId: 't1',
+          sourceOrder: const [],
+          preferRich: true,
+          enableTtmlOverlay: true,
+        );
+        expect(groups.single.original.text, 'TTML');
+        // 覆盖与平台歌词并行抓取（平台结果被 TTML 覆盖压过，但不阻塞）。
+        expect(src.calls, 1);
+      } finally {
+        setRuntime(runtime: prev);
+      }
+    });
+
+    test('未启用时忽略 TTML 覆盖、照常走平台来源', () async {
+      final prev = getRuntime();
+      setRuntime(runtime: ApisRuntime(getSetting: (_) => null));
+      getRuntime().lyricTtmlCache.set(
+        'netease',
+        't1',
+        '<tt xmlns="http://www.w3.org/ns/ttml"><body><div>'
+            '<p begin="00:01.000" end="00:02.000">TTML</p>'
+            '</div></body></tt>',
+      );
+      try {
+        final src = _FakeSource('netease', result: _match('[00:01.000]platform'));
+        final engine = LyricsEngine([src]);
+        final groups = await engine.resolve(
+          _track('netease'),
+          trackId: 't1',
+          sourceOrder: const [],
+          preferRich: true,
+        );
+        expect(groups.single.original.text, 'platform');
+        expect(src.calls, 1);
+      } finally {
+        setRuntime(runtime: prev);
+      }
+    });
+
+    test('非 TTML 平台启用覆盖也不请求（直接平台回退）', () async {
+      final prev = getRuntime();
+      setRuntime(
+        runtime: ApisRuntime(
+          getSetting: (k) =>
+              k == 'lyric.enableOnlineTTMLLyric' ? true : null,
+        ),
+      );
+      try {
+        final src = _FakeSource('kugou', result: _match('[00:01.000]kg'));
+        final engine = LyricsEngine([src]);
+        final groups = await engine.resolve(
+          _track('kugou'),
+          trackId: 'k1',
+          sourceOrder: const [],
+          preferRich: true,
+          enableTtmlOverlay: true,
+        );
+        expect(groups.single.original.text, 'kg');
+        expect(src.calls, 1);
+      } finally {
+        setRuntime(runtime: prev);
+      }
     });
   });
 

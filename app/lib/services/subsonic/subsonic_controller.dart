@@ -155,6 +155,8 @@ class SubsonicController {
     if (_disposed) return;
     _disposed = true;
     _bindings.destroy(_h);
+    // 注：subsonic/transcoder 为 Go c-shared（Go runtime 线程进程级常驻），
+    // dlclose 不安全，故**不卸载**（SubsonicBindings.release 不调用）。
   }
 
   void _checkNotDisposed() {

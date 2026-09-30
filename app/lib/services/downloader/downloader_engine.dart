@@ -100,6 +100,8 @@ class DownloaderEngine {
     } catch (_) {}
     _eventController.close();
     _initialized = false;
+    // 注：downloader 为 Rust（tokio 运行时常驻进程），destroy 是否 join 全部
+    // 线程未做运行时验证；为避免 dlclose 后线程仍在跑导致崩溃，暂**不卸载**。
   }
 
   // ---------------------------------------------------------------- 操作接口

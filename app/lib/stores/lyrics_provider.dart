@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/l10n.dart';
 import '../services/lyrics/engine/lyric_pipeline.dart';
 import '../services/lyrics/engine/lyrics_engine.dart';
 import '../services/lyrics/lyric_line.dart';
@@ -31,9 +32,16 @@ final lyricsEngineProvider = Provider<LyricsEngine>(
 );
 
 /// 按当前播放曲目解析出的歌词组；曲目变化时自动重新拉取。
-final currentLyricsProvider = FutureProvider<List<LyricGroup>>((ref) async {
+///
+/// autoDispose：由播放页与迷你播放条按需 `ref.watch` 持有——播放中（迷你条
+/// 常驻）一直存活，停止播放 / 页面子树卸载后释放内存，重新播放时对当前曲目
+/// 重新解析。
+final currentLyricsProvider = FutureProvider.autoDispose<List<LyricGroup>>((
+  ref,
+) async {
   // watch 建立依赖：偏好 / 曲目变化时自动重算歌词。
   final prefs = ref.watch(appPrefsProvider);
+  final locale = ref.watch(localeProvider);
   final track = ref.watch(playbackProvider.select((s) => s.track));
   final trackId = ref.watch(playbackProvider.select((s) => s.trackId));
   if (track == null) return const [];
@@ -45,6 +53,8 @@ final currentLyricsProvider = FutureProvider<List<LyricGroup>>((ref) async {
         trackId: trackId,
         sourceOrder: prefs.lyricSourceOrder,
         preferRich: prefs.preferWordByWord,
+        enableTtmlOverlay: prefs.lyricEnableOnlineTtml,
+        preferredLang: locale.toLanguageTag(),
       );
 
   return LyricPipeline.standard.process(
@@ -54,6 +64,7 @@ final currentLyricsProvider = FutureProvider<List<LyricGroup>>((ref) async {
       excludeKeywords: prefs.lyricExcludeKeywords,
       excludeRegexes: prefs.lyricExcludeRegexes,
       uncensor: prefs.uncensorProfanity,
+      syntheticSweep: prefs.amllSyntheticSweep,
     ),
   );
 });

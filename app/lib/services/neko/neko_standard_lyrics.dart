@@ -57,7 +57,9 @@ String? _toStandardLrc(LyricMatchResult? match) {
     content: content,
     format: match.format,
     translation: match.translation,
+    translationFormat: match.translationFormat,
     romaji: match.romaji,
+    romajiFormat: match.romajiFormat,
   );
   if (groups.isEmpty) return null;
 

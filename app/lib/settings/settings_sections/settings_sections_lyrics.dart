@@ -246,6 +246,37 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
         ),
         const SizedBox(height: 20),
         SettingSection(
+          title: l10n.settingsLyricTtml,
+          note: l10n.settingsLyricTtmlDesc,
+          children: [
+            SettingSwitchTile(
+              icon: prefs.lyricEnableOnlineTtml
+                  ? EtaIcons.cloud
+                  : EtaIcons.cloudOutline,
+              title: l10n.settingsLyricTtmlEnable,
+              subtitle: l10n.settingsLyricTtmlEnableDesc,
+              value: prefs.lyricEnableOnlineTtml,
+              onChanged: (v) =>
+                  ref.read(appPrefsProvider.notifier).setLyricTtml(enable: v),
+            ),
+            SettingTile(
+              icon: EtaIcons.serverOutline,
+              title: l10n.settingsLyricTtmlServer,
+              subtitle: prefs.lyricAmllDbServer,
+              enabled: prefs.lyricEnableOnlineTtml,
+              trailing: SButton(
+                label: l10n.commonConfigure,
+                variant: SButtonVariant.secondary,
+                size: SButtonSize.small,
+                onPressed: prefs.lyricEnableOnlineTtml
+                    ? () => _editTtmlServer(context, prefs)
+                    : null,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SettingSection(
           title: l10n.settingsSectionLyricExclude,
           children: [
             SettingSwitchTile(
@@ -326,6 +357,17 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
     }
   }
 
+  /// 编辑 AMLL DB 服务端模板（校验须同时含 `%p` 与 `%s`）。
+  Future<void> _editTtmlServer(BuildContext context, AppPrefs prefs) async {
+    final result = await _showTtmlServerDialog(
+      context,
+      initial: prefs.lyricAmllDbServer,
+    );
+    if (result != null) {
+      ref.read(appPrefsProvider.notifier).setLyricTtml(server: result);
+    }
+  }
+
   /// 平台 id → 显示名。
   String _platformLabel(AppLocalizations l10n, String id) => switch (id) {
     'netease' => l10n.platformNetease,
@@ -379,6 +421,13 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
           subtitle: '',
           value: prefs.amllWordSweep,
           onChanged: (v) => notifier.setLyricAmll(wordSweep: v),
+        ),
+        SettingSwitchTile(
+          icon: EtaIcons.magic2Outline,
+          title: l10n.settingsAmllSyntheticSweep,
+          subtitle: l10n.settingsAmllSyntheticSweepDesc,
+          value: prefs.amllSyntheticSweep,
+          onChanged: (v) => notifier.setLyricAmll(syntheticSweep: v),
         ),
         SettingSwitchTile(
           icon: EtaIcons.eyeCloseOutline,
@@ -522,6 +571,103 @@ Future<(List<String>, List<String>)?> _showExcludeDialog(
       initialRegexes: initialRegexes,
     ),
   );
+}
+
+/// 弹出「AMLL DB 服务端模板」编辑对话框。返回确认后的模板，取消返回 null。
+Future<String?> _showTtmlServerDialog(
+  BuildContext context, {
+  required String initial,
+}) {
+  final l10n = context.l10n;
+  return SDialog.show<String>(
+    context,
+    title: l10n.settingsLyricTtmlServerDialogTitle,
+    description: l10n.settingsLyricTtmlServerHint,
+    width: 560,
+    child: _TtmlServerEditor(initial: initial),
+  );
+}
+
+/// AMLL DB 服务端模板编辑器：模板须同时含 `%p`（平台目录）与 `%s`（曲目 id）。
+class _TtmlServerEditor extends StatefulWidget {
+  const _TtmlServerEditor({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_TtmlServerEditor> createState() => _TtmlServerEditorState();
+}
+
+class _TtmlServerEditorState extends State<_TtmlServerEditor> {
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.initial,
+  );
+  String? _error;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  /// 校验模板：必须同时包含 `%p` 与 `%s`；非法时置内联错误并返回 false。
+  bool _validate(String value) {
+    final t = value.trim();
+    final ok = t.contains('%p') && t.contains('%s');
+    setState(
+      () => _error = ok ? null : context.l10n.settingsLyricTtmlServerInvalid,
+    );
+    return ok;
+  }
+
+  void _save() {
+    final v = _ctrl.text.trim();
+    if (!_validate(v)) return;
+    Navigator.of(context).pop(v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _ctrl,
+          autofocus: true,
+          style: const TextStyle(fontSize: 13),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: defaultAmllDbServer,
+            errorText: _error,
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (_) => _save(),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            SButton(
+              label: l10n.settingsRestoreDefault,
+              variant: SButtonVariant.secondary,
+              onPressed: () => setState(() {
+                _ctrl.text = defaultAmllDbServer;
+                _error = null;
+              }),
+            ),
+            const Spacer(),
+            SButton(
+              label: l10n.commonCancel,
+              variant: SButtonVariant.secondary,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            const SizedBox(width: 10),
+            SButton(label: l10n.commonSave, onPressed: _save),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 /// 拖拽排序编辑器（固定高度 + 拖拽手柄；底部为重置/取消/保存）。
