@@ -24,6 +24,7 @@ const amllEnableScaleKey = 'amll.enableScale';
 const amllBlurQualityKey = 'amll.blurQuality'; // auto | fast | quality | off
 const amllEnableBlurKey = 'amll.enableBlur'; // 旧键（仅用于迁移）
 const amllSpringPresetKey = 'amll.springPreset';
+const amllSyntheticSweepKey = 'amll.syntheticSweep'; // 无逐字歌词按行窗口推算扫亮
 
 // ── 歌词来源 / 格式顺序（强迫症）─────────────────────────────────
 const lyricSourceOrderKey = 'lyrics.sourceOrder';
@@ -33,6 +34,15 @@ const lyricFormatOrderKey = 'lyrics.formatOrder';
 const lyricExcludeEnabledKey = 'lyrics.excludeEnabled';
 const lyricExcludeKeywordsKey = 'lyrics.excludeKeywords';
 const lyricExcludeRegexesKey = 'lyrics.excludeRegexes';
+
+// ── AMLL DB 在线 TTML 歌词（覆盖主歌词；键名沿用 apis 层的 `lyric.*`）──
+const lyricEnableOnlineTtmlKey = 'lyric.enableOnlineTTMLLyric';
+const lyricAmllDbServerKey = 'lyric.amllDbServer';
+
+/// 默认 AMLL DB 服务端模板（`%p` = 平台目录，`%s` = 曲目 id）。
+///
+/// 与 SPlayer-Next / AMLL 生态一致；用户可在设置里改为自建/镜像。
+const defaultAmllDbServer = 'https://amlldb.bikonoo.com/%p/%s.ttml';
 
 /// 支持的在线歌词平台（与 Track.source 一致）；数组顺序即回退优先级。
 const List<String> lyricPlatforms = ['netease', 'qqmusic', 'kugou'];
@@ -195,6 +205,10 @@ extension AmllLyricsPrefs on AppPrefs {
   String get amllSpringPreset =>
       data[amllSpringPresetKey] as String? ?? 'default';
 
+  /// 合成扫亮（默认开）：无逐字时间的整行歌词（含翻译 / 音译）按行窗口推算
+  /// 逐字时间以呈现卡拉OK 扫亮。
+  bool get amllSyntheticSweep => data[amllSyntheticSweepKey] as bool? ?? true;
+
   AppPrefs copyWithAmll({
     String? engine,
     double? alignFraction,
@@ -204,6 +218,7 @@ extension AmllLyricsPrefs on AppPrefs {
     bool? enableScale,
     String? blurQuality,
     String? springPreset,
+    bool? syntheticSweep,
   }) => AppPrefs(
     initialData: {
       ...data,
@@ -218,6 +233,7 @@ extension AmllLyricsPrefs on AppPrefs {
           ? blurQuality
           : null),
       amllSpringPresetKey: ?springPreset,
+      amllSyntheticSweepKey: ?syntheticSweep,
     },
   );
 }
@@ -295,6 +311,34 @@ extension LyricPipelinePrefs on AppPrefs {
         lyricExcludeKeywordsKey: _normalizeStringList(keywords),
       if (regexes != null)
         lyricExcludeRegexesKey: _normalizeStringList(regexes),
+    },
+  );
+}
+
+/// AMLL DB 在线 TTML 覆盖歌词偏好（默认关；开启后优先于平台歌词）。
+///
+/// 存键名沿用 apis 层的 `lyric.enableOnlineTTMLLyric` / `lyric.amllDbServer`，
+/// 由 [getRuntime] 的 `getSetting` 读取（见 [readAppPref]）。
+extension LyricTtmlPrefs on AppPrefs {
+  /// 是否启用 AMLL DB 在线 TTML 歌词（默认关）。
+  bool get lyricEnableOnlineTtml =>
+      data[lyricEnableOnlineTtmlKey] as bool? ?? false;
+
+  /// AMLL DB 服务端模板（须含 `%p` 与 `%s`；为空/非法回退默认）。
+  String get lyricAmllDbServer {
+    final v = data[lyricAmllDbServerKey];
+    if (v is String) {
+      final t = v.trim();
+      if (t.contains('%p') && t.contains('%s')) return t;
+    }
+    return defaultAmllDbServer;
+  }
+
+  AppPrefs copyWithLyricTtml({bool? enable, String? server}) => AppPrefs(
+    initialData: {
+      ...data,
+      lyricEnableOnlineTtmlKey: ?enable,
+      if (server != null) lyricAmllDbServerKey: server.trim(),
     },
   );
 }

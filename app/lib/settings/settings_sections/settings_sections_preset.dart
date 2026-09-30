@@ -54,6 +54,13 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
               value: prefs.energySavingMode,
               onChanged: notifier.setEnergySaving,
             ),
+            SettingSwitchTile(
+              icon: EtaIcons.memoryStickOutline,
+              title: l10n.settingsUnloadAllMemory,
+              subtitle: l10n.settingsUnloadAllMemorySubtitle,
+              value: prefs.unloadAllMemory,
+              onChanged: (v) => notifier.setPreset(unloadAllMemory: v),
+            ),
           ],
         ),
         const SizedBox(height: 20),

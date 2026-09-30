@@ -34,15 +34,7 @@ extension _HomePageView on _HomePageState {
                   name: name,
                 ),
                 const SizedBox(height: 20),
-                HomeDailyHero(
-                  loggedIn: account != null,
-                  title: l10n.pageHomeDaily,
-                  subtitleLoggedIn: l10n.pageHomeDailyLoggedIn,
-                  subtitleLoginHint: l10n.pageHomeDailyLoginHint,
-                  playLabel: l10n.pageHomeDailyPlay,
-                  loginLabel: l10n.pageHomeDailyLogin,
-                  onPlay: _openDaily,
-                ),
+                HomeSpotlightCard(onOpenDaily: _openDaily),
                 const SizedBox(height: 20),
                 _HomeQuickActions(
                   l10n: l10n,

@@ -36,12 +36,20 @@ class TrayIntegration extends ConsumerStatefulWidget {
 }
 
 class _TrayIntegrationState extends ConsumerState<TrayIntegration>
-    with WindowListener, TrayListener {
+    with WindowListener {
   /// 托盘是否就绪（决定关闭窗口是否隐藏到托盘）。
   bool _trayReady = false;
 
   /// 关闭确认弹窗中「记住我的选择」复选框状态（每次弹窗前重置）。
   bool _closeRemember = false;
+
+  /// 托盘图标句柄。必须持有引用：包装对象一旦被 GC，原生句柄即被释放、
+  /// 图标随之消失（nativeapi 的 Finalizer 语义）。
+  TrayIcon? _trayIcon;
+
+  /// 当前上下文菜单及其菜单项。同样需持有引用，避免被 GC 释放。
+  Menu? _trayMenu;
+  final List<MenuItem> _trayMenuItems = <MenuItem>[];
 
   @override
   void initState() {
@@ -50,13 +58,14 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
   }
 
   @override
+  void dispose() {
+    windowManager.removeListener(this);
+    _disposeTray();
+    super.dispose();
+  }
+
+  @override
   Future<void> onWindowClose() => _handleWindowClose();
-
-  @override
-  void onTrayIconMouseDown() => _handleTrayIconMouseDown();
-
-  @override
-  void onTrayIconRightMouseDown() => _handleTrayIconRightMouseDown();
 
   @override
   Widget build(BuildContext context) => _buildTrayIntegration(context);

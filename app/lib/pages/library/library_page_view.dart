@@ -7,12 +7,12 @@ part of '../library_page.dart';
 extension _LibraryPageView on _LibraryPageState {
   Widget _buildLibraryPage(BuildContext context) {
     final state = ref.watch(libraryStoreProvider);
+    final notifier = ref.read(libraryStoreProvider.notifier);
     // 选择性订阅（播放位置/FFT 50ms 更新不重建列表）
     final playingId = ref.watch(playbackProvider.select((s) => s.trackId));
     final isPlaying = ref.watch(playbackProvider.select((s) => s.playing));
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
-    final tracks = state.tracks.map(trackFromRow).toList();
 
     return Scaffold(
       body: Column(
@@ -55,7 +55,7 @@ extension _LibraryPageView on _LibraryPageState {
                 onAddFolder: () => _handleEmptyAddFolder(state),
               ),
             )
-          else if (tracks.isEmpty && state.searchQuery.isNotEmpty)
+          else if (state.totalCount == 0 && state.searchQuery.isNotEmpty)
             Expanded(
               child: Center(
                 child: Text(
@@ -68,23 +68,29 @@ extension _LibraryPageView on _LibraryPageState {
             Expanded(
               child: SongList(
                 key: const PageStorageKey('page.library'),
-                items: tracks,
+                // 窗口模式：items 传空，由 totalCount + itemAt 按全局 index
+                // 映射到有界页缓存；未驻留页渲染占位并触发异步取页。
+                items: const [],
+                totalCount: state.totalCount,
+                itemAt: (index) {
+                  final row = notifier.rowAt(index);
+                  return row == null ? null : trackFromRow(row);
+                },
+                onMissingIndex: notifier.ensureIndex,
+                playingIndexOverride: notifier.playingIndexOf(playingId),
                 playingId: playingId,
                 isPlaying: isPlaying,
                 showAlbum: true,
                 showDuration: true,
                 onPlay: _play,
                 onContextMenu: _onTrackMenu,
-                onReachBottom: () =>
-                    ref.read(libraryStoreProvider.notifier).loadMore(),
+                onReachBottom: () => notifier.loadMore(),
                 hasMore: state.hasMore,
                 loadingMore: state.loadingMore,
                 // 「全选」= 全库（当前搜索条件），批量操作按全量执行；
                 // UI 仍只渲染分页窗口，全量仅在批量模式期间驻留。
                 loadAllItems: () async {
-                  final rows = await ref
-                      .read(libraryStoreProvider.notifier)
-                      .allTracks();
+                  final rows = await notifier.allTracks();
                   return rows.map(trackFromRow).toList();
                 },
               ),

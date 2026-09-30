@@ -7,7 +7,7 @@
 part of '../song_list.dart';
 
 extension _SongListActions on _SongListState {
-  void _toggleSelect(Track t) {
+  void _toggleSelect(Track t, int index) {
     final key = songLikeKey(t);
     setState(() {
       if (_selectAllActive) {
@@ -17,9 +17,16 @@ extension _SongListActions on _SongListState {
           ..clear()
           ..addAll((_allItems ?? const <Track>[]).map(songLikeKey));
         _selectAllActive = false;
+        _picked.clear();
       }
-      if (!_selected.remove(key)) {
+      if (_selected.remove(key)) {
+        _picked.remove(key);
+      } else {
         _selected.add(key);
+        if (widget.totalCount != null) {
+          // 窗口模式：记下 Track 本体，页淘汰后仍可解析（见 _selectedTracks）。
+          _picked[key] = (track: t, index: index);
+        }
       }
     });
   }
@@ -51,30 +58,50 @@ extension _SongListActions on _SongListState {
     _selectAllActive = false;
     _allItems = null;
     _selected.clear();
+    _picked.clear();
   });
 
-  void _invertSelection() => setState(() {
+  /// 反选。
+  ///
+  /// 窗口模式且全量未载入时，先经 [SongList.loadAllItems] 载入全库再反选
+  /// （窗口只有部分页，无法仅凭 [SongList.items] 构造全集）。
+  Future<void> _invertSelection() async {
     // 全量全选的反选 = 全部取消。
     if (_selectAllActive) {
-      _selectAllActive = false;
-      _selected.clear();
+      setState(() {
+        _selectAllActive = false;
+        _selected.clear();
+        _picked.clear();
+      });
       return;
     }
-    final source = _allItems ?? widget.items;
-    final inverted = {
-      for (final t in source)
-        if (!_selected.contains(songLikeKey(t))) songLikeKey(t),
-    };
-    _selected
-      ..clear()
-      ..addAll(inverted);
-  });
+    var source = _allItems ?? widget.items;
+    if (widget.totalCount != null && _allItems == null) {
+      final loader = widget.loadAllItems;
+      if (loader == null) return;
+      final all = await loader();
+      if (!mounted) return;
+      setState(() => _allItems = all);
+      source = all;
+    }
+    setState(() {
+      final inverted = {
+        for (final t in source)
+          if (!_selected.contains(songLikeKey(t))) songLikeKey(t),
+      };
+      _selected
+        ..clear()
+        ..addAll(inverted);
+      _picked.clear();
+    });
+  }
 
   void _enterBatch() => setState(() => _batchActive = true);
 
   void _exitBatch() => setState(() {
     _batchActive = false;
     _selected.clear();
+    _picked.clear();
     _selectAllActive = false;
     _allItems = null;
   });

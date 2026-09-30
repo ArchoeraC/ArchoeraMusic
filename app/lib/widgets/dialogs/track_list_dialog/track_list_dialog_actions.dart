@@ -38,6 +38,21 @@ extension _TrackListDialogActions on _TrackListDialogState {
     }
   }
 
+  /// 刷新：先执行调用方的刷新回调（如强制刷新日推），再重新加载列表。
+  Future<void> _refresh() async {
+    final fn = widget.onRefresh;
+    if (fn == null || _refreshing) return;
+    setState(() => _refreshing = true);
+    try {
+      await fn(ref);
+    } catch (_) {
+      // 刷新失败仍回读缓存列表
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+    if (mounted) await _reload();
+  }
+
   void _onTrackMenu(Track track, Offset global) {
     showTrackContextMenu(
       context,

@@ -9,6 +9,7 @@ import 'package:ffi/ffi.dart';
 
 import '../log/log.dart';
 import '../native_lib_paths.dart';
+import '../native_library_registry.dart' as ffi_registry;
 import 'fft_frame.dart';
 
 typedef _FftCreateNative = Pointer<Opaque> Function(Int32, Int32);
@@ -44,9 +45,9 @@ typedef _FftDestroyDart = void Function(Pointer<Opaque>);
 /// （fft_process_multi 供实时播放线程持续喂样本用）。
 class FftAnalyzer {
   FftAnalyzer({this.sampleRate = 48000, this.fftSize = 2048, this.bins = 128}) {
-    final lib = DynamicLibrary.open(
-      NativeLibPaths.resolveRequired(NativeModule.fft),
-    );
+    // 经统一注册表按需加载（引用计数）：最后一个 FftAnalyzer 销毁后
+    // libfft 才真正 dlclose 卸载。
+    final lib = ffi_registry.acquire(NativeModule.fft);
     _create = lib.lookupFunction<_FftCreateNative, _FftCreateDart>(
       'fft_create',
     );
@@ -80,6 +81,7 @@ class FftAnalyzer {
 
     _handle = _create(sampleRate, fftSize);
     if (_handle == nullptr) {
+      ffi_registry.release(NativeModule.fft); // 失败不滞留引用
       throw StateError(
         'fft_create 失败 (sampleRate=$sampleRate, fftSize=$fftSize)',
       );
@@ -158,5 +160,7 @@ class FftAnalyzer {
     calloc.free(_inR);
     calloc.free(_outL);
     calloc.free(_outR);
+    // 释放对 libfft 的引用（最后一个持有者销毁时真正卸载）。
+    ffi_registry.release(NativeModule.fft);
   }
 }

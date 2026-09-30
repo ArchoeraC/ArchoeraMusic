@@ -93,6 +93,7 @@ WordAnim resolveWordAnim({
   required int lineRelMs,
   required double fontSize,
   bool isBG = false,
+  bool synthetic = false,
 }) {
   final t = lineRelMs - relStartMs;
   // 普通上浮：0 → up，ease-out，之后保持。
@@ -106,7 +107,9 @@ WordAnim resolveWordAnim({
   var glowAlpha = 0.0;
   var glowBlur = 0.0;
 
-  final emphasize = shouldEmphasizeWord(text: text, durationMs: durationMs);
+  // 合成片段（按行窗口推算的时长）不触发长音强调：那是源数据的「长音」语义。
+  final emphasize =
+      !synthetic && shouldEmphasizeWord(text: text, durationMs: durationMs);
   if (emphasize) {
     var du = math.max(1000, durationMs).toDouble();
     var amount = du / 2000;

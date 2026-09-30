@@ -16,6 +16,7 @@ import 'package:ffi/ffi.dart';
 
 import '../log/log.dart';
 import '../native_lib_paths.dart';
+import '../native_library_registry.dart' as ffi_registry;
 
 typedef ScraperCreateNative = Pointer<Void> Function(Pointer<Utf8> configJson);
 typedef ScraperCreateDart = Pointer<Void> Function(Pointer<Utf8> configJson);
@@ -120,13 +121,24 @@ class ScraperBindings {
     }
   }
 
-  /// 定位并加载共享库（失败抛 StateError 附搜索过程）。
+  /// 定位并加载共享库（失败抛 StateError 附搜索过程）。经统一注册表引用计数。
   static DynamicLibrary load() {
     final path = resolveSoPath();
     if (path == null) {
       throw StateError('未找到 libarchoera_scraper（已按 ancestors 链与 dev 目录查找）');
     }
-    return DynamicLibrary.open(path);
+    return ffi_registry.acquire(NativeModule.scraper, path: path);
+  }
+
+  /// 释放本 isolate 对 scraper 库的引用并作废单例（用后归零即真正卸载）。
+  ///
+  /// 仅在确认本 isolate 无在途调用（含事件泵 isolate 已退出）时调用。
+  static void release() {
+    final inst = _instance;
+    _instance = null;
+    if (inst != null) {
+      ffi_registry.release(NativeModule.scraper);
+    }
   }
 
   /// 查找共享库路径：统一走 [NativeLibPaths]（祖先链 + dev 兜底）。

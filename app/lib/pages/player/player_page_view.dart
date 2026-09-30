@@ -105,9 +105,14 @@ extension _PlayerPageView on _PlayerPageState {
                 Positioned.fill(child: ColoredBox(color: playerBg)),
                 if (contentMounted)
                   Positioned.fill(
-                    child: PlayerBackground(
-                      cover: current?.cover,
-                      playing: playing,
+                    // 背景独立成层：歌词/频谱/进度持续重绘时，背景（已烘焙的
+                    // 静态贴图 + 压暗）不再随父层重放光栅化；Skia 后端可将其
+                    // 缓存为纹理复用（对齐 runtime-resource-optimization §4）。
+                    child: RepaintBoundary(
+                      child: PlayerBackground(
+                        cover: current?.cover,
+                        playing: playing,
+                      ),
                     ),
                   ),
                 SafeArea(
@@ -601,15 +606,20 @@ class _PlayerBottomOverlay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (showProgressLyric) _ProgressLyric(dragMs: dragMs),
-                PlaybackProgressSlider(
-                  showTimes: true,
-                  textStyle: theme.textTheme.bodySmall,
-                  dragMs: dragMs,
-                  buffering: buffering,
-                  enabled: hasSource,
-                  onDragChanged: onDragChanged,
-                  onSeekEnd: onSeekEnd,
+                // 进度行/当前歌词行每 50ms 随位置重绘：各自独立重绘层，避免
+                // 带动顶栏/控制行等兄弟节点一起重放光栅化（对齐播放条做法）。
+                if (showProgressLyric)
+                  RepaintBoundary(child: _ProgressLyric(dragMs: dragMs)),
+                RepaintBoundary(
+                  child: PlaybackProgressSlider(
+                    showTimes: true,
+                    textStyle: theme.textTheme.bodySmall,
+                    dragMs: dragMs,
+                    buffering: buffering,
+                    enabled: hasSource,
+                    onDragChanged: onDragChanged,
+                    onSeekEnd: onSeekEnd,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Padding(

@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -140,6 +141,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSuppressSleepOff => '시스템이 유휴 시 절전될 수 있습니다';
+
+  @override
+  String get settingsBackgroundUnload => '백그라운드에서 방문한 페이지 해제';
+
+  @override
+  String get settingsBackgroundUnloadSubtitle =>
+      '최소화/트레이/화면 꺼짐 시 목록과 이미지를 해제하고 복귀 시 재구성(스크롤 위치가 사라질 수 있음)';
 
   @override
   String get settingsCloseBehavior => '앱을 닫을 때';
@@ -1323,9 +1331,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get pageHomeDaily => '일일 추천';
 
   @override
-  String get pageHomeDailyLoggedIn => '당신의 취향에 맞춰 엄선';
-
-  @override
   String get pageHomeDailyLoginHint => 'NT 계정에 로그인하면 매일 업데이트됩니다';
 
   @override
@@ -1333,6 +1338,22 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get pageHomeDailyLogin => '로그인하여 일일 추천 잠금 해제';
+
+  @override
+  String pageHomeSpotlightTitle({required Object song}) {
+    return '$song부터 듣기';
+  }
+
+  @override
+  String pageHomeSpotlightSubtitle({required Object count}) {
+    return '$count곡을 무작위로 골랐어요';
+  }
+
+  @override
+  String get pageHomeSpotlightShuffle => '다른 곡';
+
+  @override
+  String get pageHomeSpotlightEmpty => '재생할 곡이 없습니다';
 
   @override
   String pageHomeGreeting({required Object greeting, required Object name}) {
@@ -1833,7 +1854,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsMemoryPolicyAuto => '자동(사용 가능한 메모리에 맞춰 조정)';
 
   @override
-  String get settingsMemoryPolicyAutoSub => '0.8 GiB 하드 상한, 여유 RAM에 맞춰 자동 조정';
+  String get settingsMemoryPolicyAutoSub => '32 MiB 하드 상한, 여유 RAM에 맞춰 자동 조정';
 
   @override
   String get settingsMemoryPolicyLimit => '사용자 지정 상한';
@@ -2251,6 +2272,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => '현재 표준 모드';
+
+  @override
+  String get settingsUnloadAllMemory => '최소화 시 모든 메모리 상태 해제';
+
+  @override
+  String get settingsUnloadAllMemorySubtitle =>
+      '백그라운드(최소화/트레이/화면 꺼짐)에서 페이지 데이터와 캐시를 버리고 복귀 시 재구축(홈으로 돌아가거나 스크롤 위치 상실 가능). 재생에는 영향 없음';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '스펙트럼 캡처 빈도를 낮춰 CPU 절약';
@@ -4205,6 +4233,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsAmllWordSweep => '단어 스윕';
 
   @override
+  String get settingsAmllSyntheticSweep => '일반 가사 합성 스윕';
+
+  @override
+  String get settingsAmllSyntheticSweepDesc =>
+      '단어 타이밍이 없는 가사를 행 길이로 추정해 스윕합니다(번역·발음도 적용).';
+
+  @override
   String get settingsAmllHidePassed => '지난 행 숨기기';
 
   @override
@@ -4572,6 +4607,35 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsLyricExcludeClear => 'Clear';
+
+  @override
+  String get settingsLyricTtml => '온라인 TTML 가사 (Beta)';
+
+  @override
+  String get settingsLyricTtmlDesc =>
+      'AMLL DB에서 단어별 TTML 가사를 가져와 일치하면 플랫폼 가사를 덮어씁니다. 네트워크 연결이 필요합니다. 이 기능은 아직 테스트 중입니다.';
+
+  @override
+  String get settingsLyricTtmlEnable => '온라인 TTML 가사 사용';
+
+  @override
+  String get settingsLyricTtmlEnableDesc => 'AMLL DB에 일치하는 가사가 있으면 우선 사용';
+
+  @override
+  String get settingsLyricTtmlServer => 'AMLL DB 서버';
+
+  @override
+  String get settingsLyricTtmlServerDesc => '가사 요청 URL 템플릿(자체 호스팅/미러로 변경 가능)';
+
+  @override
+  String get settingsLyricTtmlServerDialogTitle => 'AMLL DB 서버 템플릿';
+
+  @override
+  String get settingsLyricTtmlServerHint =>
+      '템플릿에 %p(플랫폼)와 %s(곡 ID)가 모두 포함되어야 합니다';
+
+  @override
+  String get settingsLyricTtmlServerInvalid => '템플릿에 %p와 %s가 모두 포함되어야 합니다';
 
   @override
   String get commonConfigure => 'Configure';

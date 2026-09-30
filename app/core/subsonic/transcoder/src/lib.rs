@@ -13,13 +13,13 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use symphonia::core::audio::{AudioBufferRef, Signal};
-use symphonia::core::codecs::{DecoderOptions, CODEC_TYPE_NULL};
+use symphonia::core::audio::GenericAudioBufferRef;
+use symphonia::core::codecs::audio::AudioDecoderOptions;
 use symphonia::core::errors::Error as SymphoniaError;
-use symphonia::core::formats::FormatOptions;
+use symphonia::core::formats::probe::Hint;
+use symphonia::core::formats::{FormatOptions, TrackType};
 use symphonia::core::io::{MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
-use symphonia::core::probe::Hint;
 
 // ============================================================
 // 统一日志 sink（对齐 downloader）：宿主经
@@ -168,32 +168,32 @@ fn transcode(args: &Params, out: &mut impl Write) -> Result<()> {
         hint.with_extension(ext);
     }
 
-    let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+    let mut format = symphonia::default::get_probe()
+        .probe(&hint, mss, FormatOptions::default(), MetadataOptions::default())
         .map_err(|e| anyhow!("探测容器失败: {}", e))?;
 
-    let mut format = probed.format;
-
     let track = format
-        .tracks()
-        .iter()
-        .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
-        .cloned()
+        .default_track(TrackType::Audio)
         .ok_or_else(|| anyhow!("未找到可用音轨"))?;
+    let track_id = track.id;
+    let audio_params = track
+        .codec_params
+        .as_ref()
+        .and_then(|p| p.audio())
+        .ok_or_else(|| anyhow!("音轨缺少音频参数"))?;
 
     let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &DecoderOptions::default())
+        .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
         .map_err(|e| anyhow!("创建解码器失败: {}", e))?;
 
-    let in_sample_rate = track
-        .codec_params
+    let in_sample_rate = audio_params
         .sample_rate
         .ok_or_else(|| anyhow!("无法获取采样率"))?;
-    let in_channels = track
-        .codec_params
+    let in_channels = audio_params
         .channels
-        .ok_or_else(|| anyhow!("无法获取声道数"))?
-        .count() as u16;
+        .as_ref()
+        .map(|c| c.count())
+        .ok_or_else(|| anyhow!("无法获取声道数"))? as u16;
 
     // 输出参数：必要时降采样
     let out_sample_rate = in_sample_rate.min(args.max_sample_rate);
@@ -242,12 +242,8 @@ fn transcode(args: &Params, out: &mut impl Write) -> Result<()> {
 
     loop {
         let packet = match format.next_packet() {
-            Ok(p) => p,
-            Err(SymphoniaError::IoError(ref e))
-                if e.kind() == std::io::ErrorKind::UnexpectedEof =>
-            {
-                break;
-            }
+            Ok(Some(p)) => p,
+            Ok(None) => break,
             Err(SymphoniaError::ResetRequired) => {
                 tlog_warn!("解码器需要重置，跳过");
                 continue;
@@ -256,6 +252,11 @@ fn transcode(args: &Params, out: &mut impl Write) -> Result<()> {
                 return Err(anyhow!("解码读取失败: {}", e));
             }
         };
+
+        // 只解码选中的音轨（容器可能含视频/字幕等其它轨）
+        if packet.track_id != track_id {
+            continue;
+        }
 
         let decoded = match decoder.decode(&packet) {
             Ok(buf) => buf,
@@ -321,67 +322,34 @@ fn transcode(args: &Params, out: &mut impl Write) -> Result<()> {
     Ok(())
 }
 
-/// 将 symphonia 的 AudioBufferRef 转换为交错 i16 PCM
-fn collect_pcm_i16(buf: AudioBufferRef, target_channels: usize) -> Vec<i16> {
-    use symphonia::core::audio::AudioBufferRef::*;
+/// 将 symphonia 的通用音频缓冲转换为交错 i16 PCM。
+///
+/// symphonia 负责把 u8/s16/s24/s32/f32/f64 统一转换到目标 i16；这里只需按其
+/// 规范复制交错样本，并在必要时仅保留每帧前 [target_channels] 个声道。
+fn collect_pcm_i16(buf: GenericAudioBufferRef<'_>, target_channels: usize) -> Vec<i16> {
     let frames = buf.frames();
-    let channels = buf.spec().channels.count();
+    if frames == 0 {
+        return Vec::new();
+    }
+    let channels = buf.spec().channels().count();
+    if channels == 0 {
+        return Vec::new();
+    }
     let out_channels = target_channels.min(channels);
 
-    let mut out = Vec::with_capacity(frames * out_channels);
+    let mut interleaved = vec![0i16; frames * channels];
+    buf.copy_to_slice_interleaved(&mut interleaved);
 
-    match buf {
-        U8(b) => {
-            for i in 0..frames {
-                for ch in 0..out_channels {
-                    let s = *b.chan(ch).get(i).unwrap_or(&0) as i32 - 128;
-                    let v = (s * 256).clamp(i32::MIN, i32::MAX) as i16;
-                    out.push(v);
-                }
-            }
-        }
-        S16(b) => {
-            for i in 0..frames {
-                for ch in 0..out_channels {
-                    out.push(*b.chan(ch).get(i).unwrap_or(&0));
-                }
-            }
-        }
-        S32(b) => {
-            for i in 0..frames {
-                for ch in 0..out_channels {
-                    let s = b.chan(ch).get(i).copied().unwrap_or(0);
-                    out.push((s >> 16).clamp(i16::MIN as i32, i16::MAX as i32) as i16);
-                }
-            }
-        }
-        F32(b) => {
-            for i in 0..frames {
-                for ch in 0..out_channels {
-                    let s = b.chan(ch).get(i).copied().unwrap_or(0.0);
-                    out.push(float_to_i16(s as f64));
-                }
-            }
-        }
-        F64(b) => {
-            for i in 0..frames {
-                for ch in 0..out_channels {
-                    let s = b.chan(ch).get(i).copied().unwrap_or(0.0);
-                    out.push(float_to_i16(s));
-                }
-            }
-        }
-        _ => {
-            // S24（打包 24-bit/i24 类型）极少见，跳过
-            let _ = frames;
-        }
+    if out_channels == channels {
+        return interleaved;
+    }
+
+    // 丢弃多余声道：每帧仅保留前 out_channels 个样本
+    let mut out = Vec::with_capacity(frames * out_channels);
+    for frame in interleaved.chunks_exact(channels) {
+        out.extend_from_slice(&frame[..out_channels]);
     }
     out
-}
-
-fn float_to_i16(s: f64) -> i16 {
-    let v = (s * 32767.0).clamp(-32768.0, 32767.0);
-    v as i16
 }
 
 /// 简单线性抽取降采样：每 step 个样本取一个

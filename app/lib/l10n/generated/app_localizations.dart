@@ -362,6 +362,18 @@ abstract class AppLocalizations {
   /// **'系统可能按空闲计划休眠'**
   String get settingsSuppressSleepOff;
 
+  /// No description provided for @settingsBackgroundUnload.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'后台卸载已访问页面'**
+  String get settingsBackgroundUnload;
+
+  /// No description provided for @settingsBackgroundUnloadSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'最小化/托盘/熄屏时释放列表与图片，恢复窗口后重建（可能丢滚动位置）'**
+  String get settingsBackgroundUnloadSubtitle;
+
   /// No description provided for @settingsCloseBehavior.
   ///
   /// In zh_CN, this message translates to:
@@ -2514,12 +2526,6 @@ abstract class AppLocalizations {
   /// **'每日推荐'**
   String get pageHomeDaily;
 
-  /// No description provided for @pageHomeDailyLoggedIn.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'根据你的口味，为你精心挑选'**
-  String get pageHomeDailyLoggedIn;
-
   /// No description provided for @pageHomeDailyLoginHint.
   ///
   /// In zh_CN, this message translates to:
@@ -2537,6 +2543,30 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'登录解锁每日推荐'**
   String get pageHomeDailyLogin;
+
+  /// No description provided for @pageHomeSpotlightTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'从「{song}」开始听'**
+  String pageHomeSpotlightTitle({required Object song});
+
+  /// No description provided for @pageHomeSpotlightSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'为你随机抽了 {count} 首'**
+  String pageHomeSpotlightSubtitle({required Object count});
+
+  /// No description provided for @pageHomeSpotlightShuffle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'换一批'**
+  String get pageHomeSpotlightShuffle;
+
+  /// No description provided for @pageHomeSpotlightEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂无可推荐的歌曲'**
+  String get pageHomeSpotlightEmpty;
 
   /// No description provided for @pageHomeGreeting.
   ///
@@ -3430,7 +3460,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMemoryPolicyAutoSub.
   ///
   /// In zh_CN, this message translates to:
-  /// **'0.8 GiB 硬上限，随空闲内存自适应'**
+  /// **'32 MiB 硬上限，随空闲内存自适应'**
   String get settingsMemoryPolicyAutoSub;
 
   /// No description provided for @settingsMemoryPolicyLimit.
@@ -4197,6 +4227,18 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'当前为标准模式'**
   String get settingsEnergySavingOff;
+
+  /// No description provided for @settingsUnloadAllMemory.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'最小化时卸载全部内存状态'**
+  String get settingsUnloadAllMemory;
+
+  /// No description provided for @settingsUnloadAllMemorySubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'后台（最小化/托盘/熄屏）丢弃页面数据与缓存，恢复后从零重建（可能回到首页、丢滚动位置）；播放不受影响'**
+  String get settingsUnloadAllMemorySubtitle;
 
   /// No description provided for @settingsSearchEnergySavingSubtitle.
   ///
@@ -7688,6 +7730,18 @@ abstract class AppLocalizations {
   /// **'逐字扫亮'**
   String get settingsAmllWordSweep;
 
+  /// No description provided for @settingsAmllSyntheticSweep.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'单行歌词合成扫亮'**
+  String get settingsAmllSyntheticSweep;
+
+  /// No description provided for @settingsAmllSyntheticSweepDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'没有逐字时间的歌词按行时长推算扫亮（翻译 / 音译同样生效）'**
+  String get settingsAmllSyntheticSweepDesc;
+
   /// No description provided for @settingsAmllHidePassed.
   ///
   /// In zh_CN, this message translates to:
@@ -8383,6 +8437,60 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'清空'**
   String get settingsLyricExcludeClear;
+
+  /// No description provided for @settingsLyricTtml.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在线 TTML 歌词（Beta）'**
+  String get settingsLyricTtml;
+
+  /// No description provided for @settingsLyricTtmlDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'从 AMLL DB 拉取逐字 TTML 歌词，命中后覆盖平台歌词；需联网。此功能仍在测试。'**
+  String get settingsLyricTtmlDesc;
+
+  /// No description provided for @settingsLyricTtmlEnable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用在线 TTML 歌词'**
+  String get settingsLyricTtmlEnable;
+
+  /// No description provided for @settingsLyricTtmlEnableDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'命中 AMLL DB 时优先使用其逐字歌词'**
+  String get settingsLyricTtmlEnableDesc;
+
+  /// No description provided for @settingsLyricTtmlServer.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'AMLL DB 服务端'**
+  String get settingsLyricTtmlServer;
+
+  /// No description provided for @settingsLyricTtmlServerDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词请求地址模板，可改为自建或镜像'**
+  String get settingsLyricTtmlServerDesc;
+
+  /// No description provided for @settingsLyricTtmlServerDialogTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'AMLL DB 服务端模板'**
+  String get settingsLyricTtmlServerDialogTitle;
+
+  /// No description provided for @settingsLyricTtmlServerHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'模板须同时包含 %p（平台）与 %s（曲目 id）'**
+  String get settingsLyricTtmlServerHint;
+
+  /// No description provided for @settingsLyricTtmlServerInvalid.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'模板必须同时包含 %p 与 %s'**
+  String get settingsLyricTtmlServerInvalid;
 
   /// No description provided for @commonConfigure.
   ///

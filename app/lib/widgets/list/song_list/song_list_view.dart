@@ -8,6 +8,8 @@ extension _SongListView on _SongListState {
   Widget _buildSongList(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
+    // 窗口模式总行数（含未驻留页）；非窗口模式即 items 长度。
+    final listCount = widget.totalCount ?? widget.items.length;
     return Stack(
       children: [
         Column(
@@ -27,7 +29,7 @@ extension _SongListView on _SongListState {
               onEnterBatch: _enterBatch,
               onSelectAll: () => unawaited(_selectAll()),
               onClearAll: _clearAll,
-              onInvert: _invertSelection,
+              onInvert: () => unawaited(_invertSelection()),
               onBatchPlay: _batchPlay,
               onBatchAddQueue: _batchAddQueue,
               onBatchDownload: _batchDownload,
@@ -40,25 +42,39 @@ extension _SongListView on _SongListState {
                 child: ListView.builder(
                   controller: _scrollCtrl,
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: widget.items.length + 1,
+                  itemCount: listCount + 1,
                   // 固定行高虚拟化：每行按 O(index) 定位，免去逐子项测量。
                   // 歌曲行恒为 _songRowExtent；尾项为空列表时 0，否则高度。
-                  itemExtentBuilder: (index, _) => index == widget.items.length
-                      ? (widget.items.isEmpty
+                  itemExtentBuilder: (index, _) => index == listCount
+                      ? (listCount == 0
                             ? 0.0
                             : _SongListState._songFooterExtent)
                       : _SongListState._songRowExtent,
                   itemBuilder: (context, index) {
-                    if (index == widget.items.length) {
+                    if (index == listCount) {
                       return _SongListFooter(
-                        visible: widget.items.isNotEmpty,
+                        visible: listCount > 0,
                         loadingMore: widget.loadingMore,
                         hasMore: widget.hasMore,
                       );
                     }
-                    final item = widget.items[index];
+                    final Track? item;
+                    if (widget.totalCount != null) {
+                      // 窗口模式：全局 index 映射到页缓存；未驻留返回 null。
+                      item = widget.itemAt?.call(index);
+                    } else {
+                      item = widget.items[index];
+                    }
+                    if (item == null) {
+                      // 该行所在页尚未驻留：轻量占位并触发异步取页，
+                      // 页到位后 rebuild 用真实行替换（驻留内存 O(视口)）。
+                      widget.onMissingIndex?.call(index);
+                      return const SizedBox.shrink();
+                    }
+                    // 提升为非空局部量，供闭包内引用（闭包中不再保留提升）。
+                    final Track track = item;
                     return SongRow(
-                      item: item,
+                      item: track,
                       index: index,
                       showIndex: widget.showIndex,
                       showAlbum: widget.showAlbum,
@@ -73,7 +89,7 @@ extension _SongListView on _SongListState {
                       onContextMenu: widget.onContextMenu,
                       batchActive: _batchActive,
                       selected: _selected.contains(songLikeKey(item)),
-                      onToggleSelect: () => _toggleSelect(item),
+                      onToggleSelect: () => _toggleSelect(track, index),
                     );
                   },
                 ),

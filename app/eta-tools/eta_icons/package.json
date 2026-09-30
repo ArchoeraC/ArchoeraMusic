@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "paper": "^0.12.18",
-    "paperjs-offset": "^1.0.8",
+    "paperjs-offset": "^2.2.1",
     "svgtofont": "^6.5.3"
   }
 }

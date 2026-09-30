@@ -9,6 +9,7 @@ import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/source/source_platform.dart';
+import '../../stores/daily_shelf_provider.dart';
 import '../../stores/providers.dart';
 import '../../l10n/l10n.dart';
 import '../common/glass_surface.dart';
@@ -29,6 +30,7 @@ Future<void> showKugouTracksDialog(
   String? subtitle,
   String? cover,
   required Future<List<Track>> Function(WidgetRef ref) loadTracks,
+  Future<void> Function(WidgetRef ref)? onRefresh,
 }) {
   return showDialog<void>(
     context: context,
@@ -39,6 +41,7 @@ Future<void> showKugouTracksDialog(
       subtitle: subtitle,
       cover: cover,
       loadTracks: loadTracks,
+      onRefresh: onRefresh,
     ),
   );
 }
@@ -256,6 +259,7 @@ Future<void> showDailyRecommendDialog(BuildContext context) {
     title: l10n.trackListDailyRecommend,
     subtitle: l10n.trackListDailyRecommendSubtitle,
     loadTracks: _loadDailyRecommend,
+    onRefresh: (ref) => ref.read(dailyShelfProvider.notifier).refresh(),
   );
 }
 
@@ -263,7 +267,9 @@ Future<List<Track>> _loadDailyRecommend(WidgetRef ref) async {
   // 每日推荐需登录态；未登录时不请求（避免报错），返回空
   final account = ref.read(neteaseAuthProvider);
   if (account == null) return const [];
-  return ref.read(neteaseApiProvider).recommendSongs();
+  // 走按逻辑日缓存的书架（当日已拉取则直接命中，支持「刷新日推」）。
+  await ref.read(dailyShelfProvider.notifier).ensure();
+  return ref.read(dailyShelfProvider).today;
 }
 
 /// 曲目列表弹窗：歌单详情 / 每日推荐共用。
@@ -276,6 +282,7 @@ class TrackListDialog extends ConsumerStatefulWidget {
     this.subtitle,
     this.cover,
     required this.loadTracks,
+    this.onRefresh,
   });
 
   final String title;
@@ -285,6 +292,9 @@ class TrackListDialog extends ConsumerStatefulWidget {
   /// 加载曲目列表（由调用方决定数据源）。
   final Future<List<Track>> Function(WidgetRef ref) loadTracks;
 
+  /// 可选「刷新」动作：点击后先执行本回调（如强制刷新日推），再重新加载列表。
+  final Future<void> Function(WidgetRef ref)? onRefresh;
+
   @override
   ConsumerState<TrackListDialog> createState() => _TrackListDialogState();
 }
@@ -292,6 +302,7 @@ class TrackListDialog extends ConsumerStatefulWidget {
 class _TrackListDialogState extends ConsumerState<TrackListDialog> {
   late Future<List<Track>> _future;
   bool _resolving = false;
+  bool _refreshing = false;
 
   @override
   void initState() {

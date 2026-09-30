@@ -149,7 +149,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version: '1.26'
           cache-dependency-path: app/core/subsonic/go.sum
       - uses: actions/setup-dotnet@v5
         with:
@@ -417,7 +417,7 @@ jobs:
             build-essential ninja-build pkg-config clang \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
-            libdbus-1-dev libayatana-appindicator3-dev libopus-dev \
+            libdbus-1-dev libx11-dev libxi-dev libopus-dev \
             patchelf nasm
       - uses: actions/checkout@v5
       - uses: ./.github/actions/build-linux
@@ -475,7 +475,7 @@ jobs:
             ca-certificates build-essential cmake ninja-build pkg-config clang sudo \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libopus-dev \
-            libdbus-1-dev libayatana-appindicator3-dev \
+            libdbus-1-dev libx11-dev libxi-dev \
             patchelf nasm git curl wget xz-utils unzip zip jq file
       - uses: actions/checkout@v5
       - name: Git safe directory (容器属主)
@@ -517,9 +517,8 @@ jobs:
             patchelf nasm \
             taglib-devel libcurl-devel openssl-devel sqlite-devel \
             json-devel gtk3-devel dbus-devel libstdc++-devel libicu \
-            opus-devel \
-            rpm-build zstd libarchive \
-            libayatana-appindicator-gtk3-devel
+            opus-devel libX11-devel libXi-devel \
+            rpm-build zstd libarchive
           # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
       - uses: actions/checkout@v5
       - name: Git safe directory (容器属主)
@@ -561,7 +560,7 @@ jobs:
             git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
             cmake ninja clang pkgconf patchelf nasm \
             taglib curl openssl sqlite nlohmann-json opus \
-            gtk3 dbus libayatana-appindicator
+            gtk3 dbus libx11 libxi
           # 不装系统 ffmpeg：引擎改用自建最小 FFmpeg（见 build-linux action）
       - uses: actions/checkout@v5
       - name: Git safe directory (容器属主)
@@ -619,12 +618,12 @@ jobs:
       - name: Install AppImage tooling
         run: |
           sudo apt-get update
-          # linuxdeploy 按 ldd 解析并收拢 app 的动态依赖：GTK / appindicator / dbus /
+          # linuxdeploy 按 ldd 解析并收拢 app 的动态依赖：GTK / X11 / Xi / dbus /
           # curl / ssl / sqlite / taglib 等运行时库必须存在，否则报
           # "Could not find dependency: libXXX.so.N" 直接失败；patchelf 供其改写 RUNPATH。
           # binutils：package.sh 的 BUILD-INFO 用 objdump 探测最低 glibc。
           sudo apt-get install -y binutils file patchelf \
-            libgtk-3-dev libayatana-appindicator3-dev libdbus-1-dev \
+            libgtk-3-dev libx11-dev libxi-dev libdbus-1-dev \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev
           # appimagetool（CI 无 FUSE，运行时用 --appimage-extract-and-run）
           wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage

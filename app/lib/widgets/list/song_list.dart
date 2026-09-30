@@ -34,6 +34,10 @@ class SongList extends ConsumerStatefulWidget {
     super.key,
     required this.items,
     required this.onPlay,
+    this.totalCount,
+    this.itemAt,
+    this.onMissingIndex,
+    this.playingIndexOverride,
     this.playingId,
     this.isPlaying = false,
     this.onReachBottom,
@@ -50,6 +54,23 @@ class SongList extends ConsumerStatefulWidget {
   });
 
   final List<Track> items;
+
+  /// 窗口模式：总行数（含未驻留页）。非 null 时列表按「全局 index 0..totalCount-1」
+  /// 渲染，[items] 退化为非窗口模式的回退；为 null 时按 [items] 全量渲染（默认）。
+  final int? totalCount;
+
+  /// 窗口模式：按全局 index 取行；未驻留返回 null（UI 渲染轻量占位）。
+  final Track? Function(int index)? itemAt;
+
+  /// 窗口模式：全局 index 未驻留时回调（用于异步取页）。
+  ///
+  /// 由 itemBuilder 在 build 期间调用；实现方需自行把状态变更延后
+  /// （如 `scheduleMicrotask`），不得在 build 中同步修改 provider。
+  final void Function(int index)? onMissingIndex;
+
+  /// 窗口模式：覆盖定位播放按钮所需的全局 index（此时 [items] 非全量）。
+  final int? playingIndexOverride;
+
   final VoidCallback? onReachBottom;
   final bool hasMore;
   final bool loadingMore;
@@ -108,13 +129,17 @@ class _SongListState extends ConsumerState<SongList> {
   /// 已选曲目 id 集合（键与 [songLikeKey] 一致：KG hash / NT id）。
   final Set<String> _selected = {};
 
+  /// 窗口模式下已选曲目（键 → 行 + 全局 index）。
+  ///
+  /// 页缓存会淘汰远端页，仅靠 [SongList.items] 无法解析已滚出视口的选中项；
+  /// 记下 Track 本体后，物化选择 / 批量操作不再随淘汰丢失。
+  final Map<String, ({Track track, int index})> _picked = {};
+
   /// 「全选」覆盖全量（经 [SongList.loadAllItems] 载入）而非仅窗口。
   bool _selectAllActive = false;
 
   /// 全选模式下缓存的全部匹配曲目（退出批量 / 物化选择后释放）。
   List<Track>? _allItems;
-
-
 
   @override
   void dispose() {
@@ -123,7 +148,12 @@ class _SongListState extends ConsumerState<SongList> {
   }
 
   /// 当前播放曲目在本列表中的索引（不在列表中则为 -1）。
+  ///
+  /// 窗口模式下 [SongList.items] 非全量，由宿主的 [SongList.playingIndexOverride]
+  /// 提供全局 index。
   int get _playingIndex {
+    final override = widget.playingIndexOverride;
+    if (override != null) return override;
     final id = widget.playingId;
     if (id == null) return -1;
     return widget.items.indexWhere((t) => t.id == id);
@@ -136,17 +166,29 @@ class _SongListState extends ConsumerState<SongList> {
     return false;
   }
 
-  /// 当前选中的曲目（按源顺序）。
+  /// 当前选中的曲目（按全局 index / 源顺序）。
   ///
   /// - 全选进行中（全量未就绪）：空，避免误触批量操作；
   /// - 全选模式：全量；
-  /// - 显式集合：在 [SongList.loadAllItems] 缓存的全量（若已载入）或窗口内命中项。
+  /// - 显式集合：在 [SongList.loadAllItems] 缓存的全量（若已载入）或窗口内命中项；
+  ///   窗口模式（[SongList.totalCount] 非空）下用 [_picked] 解析，避免页淘汰丢选择。
   List<Track> get _selectedTracks {
     if (_selectAllActive && _allItems == null) return const [];
-    final source = _allItems ?? widget.items;
+    if (_allItems != null) {
+      final all = _allItems!;
+      return [
+        for (final t in all)
+          if (_selectAllActive || _selected.contains(songLikeKey(t))) t,
+      ];
+    }
+    if (widget.totalCount != null) {
+      final picks = _picked.values.toList()
+        ..sort((a, b) => a.index.compareTo(b.index));
+      return [for (final p in picks) p.track];
+    }
     return [
-      for (final t in source)
-        if (_selectAllActive || _selected.contains(songLikeKey(t))) t,
+      for (final t in widget.items)
+        if (_selected.contains(songLikeKey(t))) t,
     ];
   }
 
@@ -156,7 +198,8 @@ class _SongListState extends ConsumerState<SongList> {
   /// 表头全选态：全量已选，或当前比对范围内全部命中。
   bool get _allSelected {
     if (_selectAllActive) return _allItems != null;
-    final total = _allItems?.length ?? widget.items.length;
+    // 窗口模式下 items 非全量，用全局 totalCount 判定全选态。
+    final total = _allItems?.length ?? widget.totalCount ?? widget.items.length;
     return total > 0 && _selectedCount == total;
   }
 

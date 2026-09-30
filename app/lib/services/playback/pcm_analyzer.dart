@@ -338,13 +338,31 @@ class MemoryPcmAnalyzer implements PcmFftSource {
     required this.handle,
     required int sampleRate,
     this.fftSize = 2048,
-  }) : _fft = FftAnalyzer(sampleRate: sampleRate, fftSize: fftSize);
+  }) : _fft = FftAnalyzer(sampleRate: sampleRate, fftSize: fftSize) {
+    // 预分配并复用 FFI 窗口缓冲与下混输入缓冲（对齐文件版 [PcmAnalyzer]）：
+    // 取帧时不再 calloc/free 指针，也不再每次新建两个 Float64List，削减频谱
+    // 热路径（随位置事件 ~10Hz 取帧）的分配 churn。窗口缓冲由引擎同步写入，
+    // 本次调用内即被 processFrame 同步消费，不逃逸给调用方。
+    _lBuf = calloc<Float>(fftSize);
+    _rBuf = calloc<Float>(fftSize);
+    _l = Float64List(fftSize);
+    _r = Float64List(fftSize);
+  }
 
   /// C 侧引擎句柄地址（ArchoeraMediaEngine*）。
   final int handle;
   final int fftSize;
   final FftAnalyzer _fft;
   bool _disposed = false;
+
+  /// 复用的引擎窗口缓冲（`pcm_window` 输出 L/R，fftSize 个 float）。
+  late final Pointer<Float> _lBuf;
+  late final Pointer<Float> _rBuf;
+
+  /// 复用的下混输入缓冲（Float64，喂给 [FftAnalyzer.processFrame]；
+  /// 同步消费后即返回，不逃逸）。
+  late final Float64List _l;
+  late final Float64List _r;
 
   /// 引擎侧解码会话 epoch（首次 frameAt 前为 -1；seek 重建后随引擎递增）。
   int _epoch = -1;
@@ -371,28 +389,22 @@ class MemoryPcmAnalyzer implements PcmFftSource {
       _epoch = ep;
     }
     final size = fftSize;
-    final lBuf = calloc<Float>(size);
-    final rBuf = calloc<Float>(size);
-    try {
-      final rc = bindings.pcmWindow(ptr, posMs, size, lBuf, rBuf);
-      if (rc != 0) return null; // 越出保留窗 / 未解码：频谱静默（对齐文件版 null）
-      final l = Float64List(size);
-      final r = Float64List(size);
-      for (var i = 0; i < size; i++) {
-        l[i] = lBuf[i].toDouble();
-        r[i] = rBuf[i].toDouble();
-      }
-      return _fft.processFrame(l, r, size);
-    } finally {
-      calloc.free(lBuf);
-      calloc.free(rBuf);
+    final rc = bindings.pcmWindow(ptr, posMs, size, _lBuf, _rBuf);
+    if (rc != 0) return null; // 越出保留窗 / 未解码：频谱静默（对齐文件版 null）
+    for (var i = 0; i < size; i++) {
+      _l[i] = _lBuf[i].toDouble();
+      _r[i] = _rBuf[i].toDouble();
     }
+    // processFrame 同步拷贝入 C 缓冲并复用其内部输出缓冲，_l/_r 不逃逸。
+    return _fft.processFrame(_l, _r, size);
   }
 
   @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    calloc.free(_lBuf);
+    calloc.free(_rBuf);
     _fft.dispose();
   }
 }

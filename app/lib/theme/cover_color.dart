@@ -4,7 +4,7 @@
 
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data' show ByteData, Uint8List;
+import 'dart:typed_data' show ByteData, BytesBuilder, Uint8List;
 import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
@@ -55,7 +55,13 @@ Future<Color?> extractDominantColor(String cover) async {
         final req = await client.getUrl(Uri.parse(cover));
         final res = await req.close();
         if (res.statusCode != 200) return null;
-        bytes = await res.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
+        // BytesBuilder 线性累积（旧实现 fold + addAll 是 O(n²) 且产生巨量
+        // 中间 int 列表；封面可达数百 KB～数 MB）。
+        final bb = BytesBuilder(copy: false);
+        await for (final chunk in res) {
+          bb.add(chunk);
+        }
+        bytes = bb.takeBytes();
       } finally {
         client.close();
       }
@@ -204,6 +210,14 @@ final coverColorProvider =
 class CoverColorNotifier extends Notifier<Color?> {
   int _token = 0;
 
+  /// 封面 → 主色结果缓存（含 null 负结果）。切歌来回跳时避免重复下载+解码
+  /// （旧实现每次 track 变化都整幅重下并重新量化）。LRU 近似：超限删最旧。
+  static const int _cacheMax = 64;
+  final Map<String, Color?> _cache = <String, Color?>{};
+
+  /// 清空取色缓存（应用进入后台时释放；下次取色重新计算）。
+  void clearCache() => _cache.clear();
+
   @override
   Color? build() {
     // 切歌 → 重新提取封面主色（幂等，重复触发无副作用）
@@ -232,9 +246,19 @@ class CoverColorNotifier extends Notifier<Color?> {
     if (prefs.themeSource != 'cover' && !prefs.followCoverColor) return;
     // 竞态 token：只认最后一次取色结果
     final token = ++_token;
-    final color = cover == null || cover.isEmpty
-        ? null
-        : await extractDominantColor(cover);
+    if (cover == null || cover.isEmpty) {
+      state = null;
+      return;
+    }
+    if (_cache.containsKey(cover)) {
+      final hit = _cache.remove(cover); // 值可能为 null（负结果）
+      _cache[cover] = hit; // LRU 保活
+      if (token == _token) state = hit;
+      return;
+    }
+    final color = await extractDominantColor(cover);
+    if (_cache.length >= _cacheMax) _cache.remove(_cache.keys.first);
+    _cache[cover] = color;
     if (token == _token) state = color;
   }
 }

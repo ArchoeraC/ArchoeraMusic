@@ -22,8 +22,6 @@ RDEPEND="
 	>=x11-libs/gtk+-3.24:3
 	dev-libs/glib:2
 	dev-libs/atk
-	dev-libs/dbusmenu-glib
-	dev-libs/libayatana-appindicator
 	media-libs/fontconfig
 	media-libs/fribidi
 	x11-libs/libX11
