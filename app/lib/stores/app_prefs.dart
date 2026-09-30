@@ -86,6 +86,15 @@ class AppPrefs {
   }
 }
 
+/// 当前偏好实时快照（由根组件 [ArchoeraMusicApp] 在偏好变化时刷新）。
+///
+/// 供 apis 层经 [readAppPref]（宿主运行时 `getSetting`）读取设置，避免
+/// 启动期注入的偏好快照导致设置开关不生效。
+AppPrefs? appPrefsSnapshot;
+
+/// 按 key 读取当前偏好值（未就绪返回 null）；作为 [setRuntime] 的 getSetting。
+dynamic readAppPref(String key) => appPrefsSnapshot?.data[key];
+
 /// 偏好控制器（UI 读写入口；设置页切换后即时持久化）。
 class AppPrefsNotifier extends Notifier<AppPrefs> {
   @override
@@ -263,6 +272,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置歌词显示音译（罗马音）开关。
   void setShowRomanization(bool value) {
     state = state.copyWithShowRomanization(value);
+    state.save();
+  }
+
+  /// 设置 AMLL DB 在线 TTML 覆盖歌词（开关 / 服务端模板）。
+  void setLyricTtml({bool? enable, String? server}) {
+    state = state.copyWithLyricTtml(enable: enable, server: server);
     state.save();
   }
 
@@ -589,6 +604,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     bool? enableScale,
     String? blurQuality,
     String? springPreset,
+    bool? syntheticSweep,
   }) {
     state = state.copyWithAmll(
       engine: engine,
@@ -599,6 +615,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       enableScale: enableScale,
       blurQuality: blurQuality,
       springPreset: springPreset,
+      syntheticSweep: syntheticSweep,
     );
     state.save();
   }
@@ -797,6 +814,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     bool? hideVipTag,
     bool? hideQualityTag,
     bool? showSubtitle,
+    bool? unloadAllMemory,
   }) {
     state = state.copyWithPreset(
       performanceMode: performanceMode,
@@ -807,6 +825,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       hideVipTag: hideVipTag,
       hideQualityTag: hideQualityTag,
       showSubtitle: showSubtitle,
+      unloadAllMemory: unloadAllMemory,
     );
     state.save();
   }
@@ -905,6 +924,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置「禁用系统休眠」。
   void setSuppressSleep(bool value) {
     state = state.copyWithPower(suppressSleep: value);
+    state.save();
+  }
+
+  /// 设置「后台卸载已访问页面」。
+  void setUnloadBackgroundPages(bool value) {
+    state = state.copyWithPower(unloadBackgroundPages: value);
     state.save();
   }
 

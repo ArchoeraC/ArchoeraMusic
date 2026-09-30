@@ -1,6 +1,16 @@
 # 模块按需加载规划（Module On-Demand Loading）
 
-> 状态：**规划中（2026-08-15 立项，未实施）**
+> 状态：**部分实施（2026-10-01，含实测安全边界）**——统一可关闭注册表
+> `lib/services/native_library_registry.dart` 已上线。
+> **实际 unload：仅 mediaengine（停止播放后）与 libfft（释放后）**，均已运行时验证且进程存活。
+> 其余模块经实测/推断**不可安全 dlclose**，保持常驻：
+> - **scanner-ffi（.NET NativeAOT）**：`scanner_scan` 返回后仍有后台线程（写库/线程池）且无
+>   模块级 join —— 实测扫描后 `close()` **导致进程崩溃**，故不卸载；
+> - **subsonic/transcoder（Go c-shared）**：Go runtime 线程进程级常驻，dlclose 不安全，不卸载；
+> - **scraper/downloader（Rust，含 tokio）**：`destroy` 是否 join 全部线程未做运行时验证，
+>   为避免同样崩溃，暂不卸载（注册表 acquire/release 已就位，验证后再接）。
+> §3 已于 2026-10-01 更正：`DynamicLibrary.close()` 自 Dart 3.1 起可用且能真正卸载（但对
+> 上述常驻 runtime 的库不可用）。
 > 定位：为自研 FFI 模块建立统一的「按需加载 + 依赖 preload + 使用完释放」生命周期
 > 管理，避免把全部原生模块一次性载入内存；需要什么、加载什么，用后归还。
 
@@ -38,18 +48,33 @@
 
 ---
 
-## 3. 关键技术约束：dart:ffi 无法 unload
+## 3. 关键技术约束：dart:ffi 的 unload 能力（2026-10-01 更正）
 
-`dart:ffi` 的 `DynamicLibrary` **没有 close/unload API**（设计限制，公开接口只有
-`open / process / executable`）。因此：
-- 用 `DynamicLibrary.open` 加载的库，Dart 侧无法 dlclose；
-- FFI `lookupFunction` 返回的**函数指针在 dlclose 后悬垂**（再调用即崩溃）；
-- 绕开方案都不干净：经 libc 手动 `dlopen/dlclose` 拿不到 Dart 打开的内部句柄，
-  且双开句柄的引用计数无法正确归零。
+> **更正**：本节此前写「`DynamicLibrary` 没有 close/unload API」——**已过时**。
+> 自 Dart 3.1 起 `dart:ffi` 提供 **`DynamicLibrary.close()`**
+> （`@Since('3.1')`，见 SDK `lib/ffi/dynamic_library.dart`）：`open()` 对应
+> `dlopen`，`close()` 转发给操作系统，**在无其它引用时真正卸载**。
 
-由此确立**两档释放策略**（见 §4.3）：模块自身资源销毁（安全基线）与
-子进程隔离（真正归还内存；audio-engine 已于 2026-08-07 迁走该范式改 FFI 直连，
-子进程化仅作 scanner / downloader 的备选）。
+本机实测（Dart 3.13.4，临时 `.so`）：
+- `open()` → `/proc/self/maps` 出现该库；`close()` → maps 归零（**真的卸载**）；
+- **引用计数**：同一路径 `open` 两次得到 `==` 但非 `identical` 的对象；关闭其一
+  仍保持映射，**两个都关闭才卸载**——即**每次 `open` 必须配对一次 `close`**。
+
+约束（close 后仍须遵守）：
+- `lookup` / `lookupFunction` 返回的**指针在 close 后失效**（再调用即 UAF）→
+  释放时必须**作废该绑定实例**（置空单例，后续调用重新 open）；
+- 多 isolate 各自 `open`（引用计数 +1）→ **各自须在退出前 `close`**，否则计数
+  不归零、库不卸载；释放前必须确保**无在途调用**。
+
+因此**不再需要子进程隔离**来做「归还内存」——FFI 直连 + 有引用计数的
+`open/close` 即可（子进程化仍可选，但非必需）。
+
+> **收益实测（2026-10-01）**：本应用播放→停止后仍驻留的模块**仅约 4 MB**
+> （mediaengine 1.8 / avcodec 0.8 / avutil 0.6 / avformat 0.4 / swresample 0.2），
+> 因为 RSS 只计**已触碰的代码页**，且重库在冷启动时本就未加载（见
+> `runtime-resource-optimization.md` §4.4）。故 `close()` 的真实回收量是
+> 「单~两位数 MB」，适合 downloader/scanner 这类「触碰面大、用后长期闲置」的
+> 模块，**不是**后台基线的杠杆（基线是 Flutter/驱动/字形/堆）。
 
 ---
 
@@ -75,11 +100,11 @@ mediaEngine→ fft / ffmpeg（同一库内依赖，产物平铺于 `native/`，�
 ### 4.3 释放策略（两档）
 - **Tier 1（默认 · 安全）**：调用模块自带销毁（`scanner_free` / `downloader_destroy` /
   `scraper_destroy` / subsonic 销毁）归还 native 堆内存；Dart 侧绑定位空、GC 回收；
-  库句柄保留（dart:ffi 限制，.so 代码段常驻——各模块均很小，可接受）。
+  **并按 §3 用 `DynamicLibrary.close()`（每次 open 配对一次 close、无在途调用）真正
+  `dlclose` 卸载 `.so` 代码段**——不再只是「句柄常驻」。
 - **Tier 2（激进 · 可选）**：重量级模块（scanner 的 C# runtime、downloader 的 Rust）
-  改造为**子进程隔离**，「释放」= 终止子进程，真实归还全部内存。进度事件经 stdout/管道
-  或 IPC 回传。（audio-engine 的历史 spawn/stop 范式已于 2026-08-07 迁移到 FFI 直连，
-  子进程化仅作上述重量级模块的备选方案。）
+  如需进程边界隔离（崩溃隔离/强终止），可改为子进程；但这**不再是归还内存的必要手段**
+  （`close()` 已可 unload）。audio-engine 已于 2026-08-07 迁到 FFI 直连。
 
 ### 4.4 与既有机制的关系
 - `preloadBundledSqlite`（RTLD_GLOBAL\|DEEPBIND）：保留为 sqlite 常驻加载的唯一入口；
@@ -151,8 +176,9 @@ mediaEngine→ fft / ffmpeg（同一库内依赖，产物平铺于 `native/`，�
 
 ## 6. 风险与注意
 - **共享实例契约**：sqlite 永远不可卸载（dart sqlite3 与 scanner 同库同实例）；
-- **悬垂指针**：任何 dlclose 路线在 FFI 函数指针仍被引用时都会崩溃——Tier 1
-  不做 dlclose，Tier 2 用进程边界隔离而非进程内 dlclose；
+- **悬垂指针**：`close()` 后原 `lookup`/`lookupFunction` 指针失效并崩溃——释放必须
+  与「无在途调用」互斥，且**作废绑定实例**（置空单例，下次调用重新 open）；多 isolate
+  各自 `open` 的须各自 `close`，否则引用计数不归零；
 - **释放时机误判**：模块释放须与「进行中任务」互斥（如扫描中不可释放 scanner），
   由引用计数 + 任务态双重保证；
 - 各模块加载点迁移为纯行为等价重构，风险低，可分模块逐个切换验证。

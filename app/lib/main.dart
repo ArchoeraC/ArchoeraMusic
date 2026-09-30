@@ -115,7 +115,15 @@ Future<void> main() async {
   // 流媒体服务器凭据从 vault 预取进内存缓存（[load] 同步接口的凭据来源，
   // 首帧读取前完成，避免同步接口依赖异步会话）
   await StreamingStore.preloadSecrets();
-  setRuntime(runtime: ApisRuntime(sessionStore: sessionStore));
+  // 偏好实时快照 → apis 层 getSetting（TTML 开关、服务端模板等）；根组件会
+  // 在偏好变化时刷新该快照，保证设置页改动即时生效（无需重启）。
+  appPrefsSnapshot = prefs;
+  setRuntime(
+    runtime: ApisRuntime(
+      sessionStore: sessionStore,
+      getSetting: readAppPref,
+    ),
+  );
   // 全局图片解码缓存：张数上限固定（防内存碎片）；字节上限由设置
   // 「封面图片缓存上限」动态控制（默认下限 8 MiB，见 ArchoeraMusicApp，
   // null = 无上限仅按张数约束）。

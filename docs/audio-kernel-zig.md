@@ -2198,8 +2198,8 @@ void        zk_dsp_destroy(ZkDspChain *d);
     与 Stable/EraAudio、SongCache 均独立）。解码 PCM 驻留进程内**全量块列表**（与 stream.pcm
     文件块同构；达 cap 才滚动淘汰），频谱经新 FFI `archoera_mediaengine_pcm_window` / `_epoch`
     拉窗，**不写 `stream.wav/.pcm`**；无设备 + 内存模式 → error（不文件回退）；`cap`：
-    auto（按可用内存均衡，**0.8 GiB 硬上限**：查询故障回落、append 后记账强制淘汰、绝不越过
-    用户设限）/ 自定义上限 / 无上限（须显式警告内存过载后果）。
+    auto（按可用内存均衡，**32 MiB 硬上限**：查询故障回落、append 后记账强制淘汰、绝不越过
+    用户设限；驻留仅供频谱 pcm_window，配 8 MiB 缓冲复用池）/ 自定义上限 / 无上限（须显式警告内存过载后果）。
     文件模式（设置关 / `ARCHOERA_ENGINE_FILE_MODE=1`）保留现状字节级行为（PARITY 基准在
     文件模式下执行；内存模式按窗口比对）。规格与验收：`docs/audio-memory-playback.md`。
 16. **进程内模块化引擎（2026-09-08，用户决策；HTTP 直连并行开展）**：引擎向"1 主控 Registry →

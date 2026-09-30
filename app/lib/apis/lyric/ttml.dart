@@ -68,12 +68,17 @@ Future<String?> _doFetch(String platform, String id) async {
   }
 }
 
-/// 单 id 抓取 + inflight 去重，仅内部使用
+/// 单 id 抓取 + inflight 去重，仅内部使用。
+///
+/// 注意：`whenComplete` 回调**不能返回** `_inflight.remove` 的结果——该值是
+/// 本 promise 自身，回调返回 Future 会让 whenComplete 等待自己而永久挂起。
 Future<String?> _fetchOne(String platform, String id) {
   final key = '$platform:$id';
   final existing = _inflight[key];
   if (existing != null) return existing;
-  final promise = _doFetch(platform, id).whenComplete(() => _inflight.remove(key));
+  final promise = _doFetch(platform, id).whenComplete(() {
+    _inflight.remove(key);
+  });
   _inflight[key] = promise;
   return promise;
 }
@@ -97,3 +102,10 @@ void prefetchTTML(String platform, List<String> ids) {
   // ignore: unawaited_futures
   fetchTTML(platform, ids);
 }
+
+/// 渲染端消费入口：取 AMLL DB TTML 覆盖歌词文本（未命中返回 null）。
+///
+/// 与 [prefetchTTML] 共享 inflight Future，因此与平台歌词请求并行发起的
+/// 预热请求会被直接复用，不产生第二次网络往返。
+Future<String?> fetchTTMLOverlay(String platform, List<String> ids) =>
+    fetchTTML(platform, ids);

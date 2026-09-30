@@ -72,4 +72,45 @@ void main() {
       );
     });
   });
+
+  group('AMLL DB 在线 TTML 歌词偏好', () {
+    test('默认关闭 + 默认服务端模板', () {
+      final p = AppPrefs();
+      expect(p.lyricEnableOnlineTtml, isFalse);
+      expect(p.lyricAmllDbServer, defaultAmllDbServer);
+    });
+
+    test('开关与服务端可写入读回', () {
+      final p = AppPrefs()
+          .copyWithLyricTtml(enable: true, server: 'https://x/%p/%s.ttml');
+      expect(p.lyricEnableOnlineTtml, isTrue);
+      expect(p.lyricAmllDbServer, 'https://x/%p/%s.ttml');
+      expect(p.copyWithLyricTtml(enable: false).lyricEnableOnlineTtml, isFalse);
+    });
+
+    test('非法模板（缺 %p/%s 或空）回落默认，不写入脏值', () {
+      expect(
+        AppPrefs(initialData: {lyricAmllDbServerKey: 'https://x/%s.ttml'})
+            .lyricAmllDbServer,
+        defaultAmllDbServer,
+      );
+      expect(
+        AppPrefs(initialData: {lyricAmllDbServerKey: '   '}).lyricAmllDbServer,
+        defaultAmllDbServer,
+      );
+      expect(
+        AppPrefs().copyWithLyricTtml(server: 'nope').lyricAmllDbServer,
+        defaultAmllDbServer,
+      );
+    });
+  });
+
+  group('amllSyntheticSweep（合成扫亮）', () {
+    test('默认开启，可关闭并读回', () {
+      expect(AppPrefs().amllSyntheticSweep, isTrue);
+      final off = AppPrefs().copyWithAmll(syntheticSweep: false);
+      expect(off.amllSyntheticSweep, isFalse);
+      expect(off.copyWithAmll(syntheticSweep: true).amllSyntheticSweep, isTrue);
+    });
+  });
 }

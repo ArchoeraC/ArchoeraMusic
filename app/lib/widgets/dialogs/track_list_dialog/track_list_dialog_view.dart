@@ -36,6 +36,7 @@ extension _TrackListDialogView on _TrackListDialogState {
                 future: _future,
                 l10n: l10n,
                 onPlayAll: _playAll,
+                onRefresh: widget.onRefresh == null ? null : _refresh,
               ),
               const SizedBox(height: 12),
               const Divider(height: 1),
@@ -183,6 +184,7 @@ class _TrackListHeader extends StatelessWidget {
     required this.future,
     required this.l10n,
     required this.onPlayAll,
+    this.onRefresh,
   });
 
   final String title;
@@ -191,6 +193,7 @@ class _TrackListHeader extends StatelessWidget {
   final Future<List<Track>> future;
   final dynamic l10n;
   final Future<void> Function(List<Track>) onPlayAll;
+  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -230,11 +233,25 @@ class _TrackListHeader extends StatelessWidget {
                   future: future,
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                      return SButton(
-                        label: l10n.trackListPlayAll,
-                        icon: EtaIcons.play,
-                        variant: SButtonVariant.primary,
-                        onPressed: () => onPlayAll(snapshot.data!),
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SButton(
+                            label: l10n.trackListPlayAll,
+                            icon: EtaIcons.play,
+                            variant: SButtonVariant.primary,
+                            onPressed: () => onPlayAll(snapshot.data!),
+                          ),
+                          if (onRefresh != null) ...[
+                            const SizedBox(width: 10),
+                            SButton(
+                              label: l10n.commonRefresh,
+                              icon: EtaIcons.refresh,
+                              variant: SButtonVariant.secondary,
+                              onPressed: onRefresh,
+                            ),
+                          ],
+                        ],
                       );
                     }
                     return const SizedBox.shrink();

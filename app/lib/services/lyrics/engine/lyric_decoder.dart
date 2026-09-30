@@ -19,7 +19,9 @@ List<LyricGroup> decodeLyricGroups(
     content: match.content,
     format: match.format,
     translation: match.translation,
+    translationFormat: match.translationFormat,
     romaji: match.romaji,
+    romajiFormat: match.romajiFormat,
   );
   if (groups.isNotEmpty) return groups;
   if (!plainTextFallback) return const [];

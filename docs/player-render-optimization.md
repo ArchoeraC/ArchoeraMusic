@@ -166,6 +166,15 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
   （活动涟漪波带）+ 降采样」三段组合，并给出 A/B/C 三种实现选型（§8.1）与回退阶梯。
   重开 `kEnableRippleShader` 不再是前提，而由 R1 实测决定。
 
+- **`blur` 档同样预烘焙一次（2026-09-30）**：`blur` 背景原先用
+  `ColorFiltered(ImageFiltered(blur σ=45))` 实时包裹封面——Impeller 已把 `flow`
+  的图层光栅缓存编译掉（仅 Skia 有），播放页每帧重绘（歌词/频谱/进度）都会
+  **全屏重算高斯**；Windows 上这些离屏缓冲按进程内存计账（WDDM/ANGLE），是
+  「播放页吃内存」的主要来源之一。现改为 `BlurredCover` 在封面/尺寸变化时把
+  「cover 适配 → 放大 1.5 → 模糊 → 饱和」**烘焙成一张 `ui.Image`**（分辨率长边
+  封顶 2048），每帧只 `RawImage` 贴图；切歌仍保留两层交叉淡入（各烘焙一次）。
+  实时滤镜仅在烘焙不可用（`flutter test` 软渲染 / `toImageSync` 失败）时回退。
+
 ### 4.1b 流体背景（对齐上游 AMLL `MeshGradientRenderer`，P2 已实现）
 
 上游 SPlayer-Next 的 `playerBgType: 'animation'` 是 AMLL 的 WebGL 网格渐变：每首歌随机

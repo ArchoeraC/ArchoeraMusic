@@ -8,6 +8,7 @@ import 'package:ffi/ffi.dart';
 
 import '../log/log.dart';
 import '../native_lib_paths.dart';
+import '../native_library_registry.dart' as ffi_registry;
 
 /// C 侧 `EngineConfig` 结构体映射（对齐 audio_engine.h，标准 ABI 布局）。
 final class EngineConfigC extends Struct {
@@ -171,17 +172,40 @@ typedef SegStoreHandle = int;
 class EngineBindings {
   EngineBindings._(this._lib);
 
-  /// 加载动态库并绑定全部函数（懒加载）。
+  /// 加载动态库并绑定全部函数（懒加载；经统一注册表引用计数）。
   static EngineBindings? _instance;
   static EngineBindings get instance =>
-      _instance ??= (EngineBindings._(DynamicLibrary.open(_libPath()))
-        ..installLogSink());
+      _instance ??= (EngineBindings._(
+        ffi_registry.acquire(NativeModule.mediaEngine, path: _libPath()),
+      )..installLogSink());
 
   static String _libPath() {
     return NativeLibPaths.resolveRequired(
       NativeModule.mediaEngine,
       hint: '请设置 ARCHOERA_AUDIO_ENGINE 环境变量',
     );
+  }
+
+  /// 显式保持本 isolate 的引用（会话开始前调用）：确保单例已 open，避免
+  /// create 的短命 isolate 释放自身引用后、本 isolate 尚未 use 时引用计数归零
+  /// 导致库在引擎线程存活期间被卸载。
+  static void pin() {
+    // ignore: unnecessary_statements
+    instance;
+  }
+
+  /// 释放本 isolate 对 mediaengine 的引用并作废单例（下次 [instance] 重新 open）。
+  ///
+  /// **仅在确认本 isolate 已无在途调用、且没有存活引擎会话时调用**：mediaengine
+  /// 的 C 引擎线程运行在库代码段上，若在会话存活期间 dlclose 会 unmap 其代码。
+  /// 短生命周期 isolate（create/destroy 的 `Isolate.run`、事件泵、store worker）
+  /// 在退出前调用本方法配对自身的 open。
+  static void release() {
+    final inst = _instance;
+    _instance = null;
+    if (inst != null) {
+      ffi_registry.release(NativeModule.mediaEngine);
+    }
   }
 
   final DynamicLibrary _lib;

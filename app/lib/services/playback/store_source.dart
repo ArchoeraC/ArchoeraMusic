@@ -6,7 +6,6 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data' show BytesBuilder;
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -253,6 +252,9 @@ void _downloadEntry(_DownloadReq req) async {
   } finally {
     client.close(force: true);
     ctrl.close();
+    // 本 worker isolate 若打开过引擎库（segstore_new/fill/destroy），退出前配对
+    // 释放，否则该引用会让 mediaengine 永不卸载。
+    EngineBindings.release();
   }
 }
 
@@ -351,56 +353,70 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
         ),
       );
     }
-    final b = BytesBuilder(copy: false);
+    // 单块 staging（去掉整曲多份拷贝）：Content-Length 已知时按全长一次分配、
+    // 边收边写；未知时先收集分块、结束再按实际长度一次性分配。相比旧的
+    // BytesBuilder 收集 + takeBytes 拼接 + calloc 再拷贝，去掉了「拼接」那
+    // 一整份拷贝，峰值由 ~3-4× 降到 ~2×（staging + SegStore）。
+    final knownLen = known > 0 ? known : 0;
+    Pointer<Uint8>? staging = knownLen > 0 ? calloc<Uint8>(knownLen) : null;
+    final chunks = staging == null ? <List<int>>[] : null;
     var got = 0;
-    await for (final chunk in resp) {
-      if (isCancelled?.call() ?? false) {
-        return WholeTrackPrepareResult.cancelled();
+    try {
+      await for (final chunk in resp) {
+        if (isCancelled?.call() ?? false) {
+          return WholeTrackPrepareResult.cancelled();
+        }
+        got += chunk.length;
+        if (got > limit || (knownLen > 0 && got > knownLen)) {
+          return WholeTrackPrepareResult.fail(
+            '下载超过纯内存整首驻留上限（$got > $limit），中止（回退 URL 路径）',
+            fail: MemorySourceFailDetail(
+              MemorySourceFailKind.grewOverCeiling,
+              got: got,
+              limit: limit,
+            ),
+          );
+        }
+        if (staging != null) {
+          staging.asTypedList(knownLen).setRange(got - chunk.length, got, chunk);
+        } else {
+          chunks!.add(chunk);
+        }
       }
-      got += chunk.length;
-      if (got > limit) {
+      if (got == 0) {
         return WholeTrackPrepareResult.fail(
-          '下载超过纯内存整首驻留上限（$got > $limit），中止（回退 URL 路径）',
-          fail: MemorySourceFailDetail(
-            MemorySourceFailKind.grewOverCeiling,
-            got: got,
-            limit: limit,
+          '空内容（0 字节）',
+          fail: const MemorySourceFailDetail(
+            MemorySourceFailKind.emptyContent,
           ),
         );
       }
-      b.add(chunk);
-    }
-    final bytes = b.takeBytes();
-    if (bytes.isEmpty) {
-      return WholeTrackPrepareResult.fail(
-        '空内容（0 字节）',
-        fail: const MemorySourceFailDetail(
-          MemorySourceFailKind.emptyContent,
-        ),
-      );
-    }
-    final bindings = EngineBindings.instance;
-    // segSize = 整曲长度：整首驻留场景下让 Store 成为**单一连续段**，使
-    // EraAudio 自研内核可经 segstore_base 直接对连续内存解码（docs/audio-memory-source.md
-    // §7）；FFmpeg-mem 路径按段读取，行为不变。超上限曲本就不会走到这里。
-    final store = bindings.segstoreNew(
-      totalHint: bytes.length,
-      segSize: bytes.length,
-    );
-    if (store == 0) {
-      return WholeTrackPrepareResult.fail(
-        'segstore_new 分配失败（OOM）',
-        fail: const MemorySourceFailDetail(
-          MemorySourceFailKind.segstoreNewOom,
-        ),
-      );
-    }
-    try {
-      bindings.segstoreSetTotal(store, bytes.length);
-      final ptr = calloc<Uint8>(bytes.length);
+      if (staging == null) {
+        staging = calloc<Uint8>(got);
+        final view = staging.asTypedList(got);
+        var off = 0;
+        for (final c in chunks!) {
+          view.setRange(off, off + c.length, c);
+          off += c.length;
+        }
+      }
+      final bytes = staging;
+      final bindings = EngineBindings.instance;
+      // segSize = 整曲长度：整首驻留场景下让 Store 成为**单一连续段**，使
+      // EraAudio 自研内核可经 segstore_base 直接对连续内存解码（docs/audio-memory-source.md
+      // §7）；FFmpeg-mem 路径按段读取，行为不变。超上限曲本就不会走到这里。
+      final store = bindings.segstoreNew(totalHint: got, segSize: got);
+      if (store == 0) {
+        return WholeTrackPrepareResult.fail(
+          'segstore_new 分配失败（OOM）',
+          fail: const MemorySourceFailDetail(
+            MemorySourceFailKind.segstoreNewOom,
+          ),
+        );
+      }
       try {
-        ptr.asTypedList(bytes.length).setAll(0, bytes);
-        if (bindings.segstoreFill(store, 0, ptr, bytes.length) != 0) {
+        bindings.segstoreSetTotal(store, got);
+        if (bindings.segstoreFill(store, 0, bytes, got) != 0) {
           bindings.segstoreDestroy(store);
           return WholeTrackPrepareResult.fail(
             'segstore_fill 返回错误',
@@ -409,19 +425,19 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
             ),
           );
         }
-      } finally {
-        calloc.free(ptr);
+        return WholeTrackPrepareResult.ok(store: store, bytes: got);
+      } catch (e) {
+        bindings.segstoreDestroy(store);
+        return WholeTrackPrepareResult.fail(
+          'store 填充异常: $e',
+          fail: MemorySourceFailDetail(
+            MemorySourceFailKind.segstoreFillException,
+            error: '$e',
+          ),
+        );
       }
-      return WholeTrackPrepareResult.ok(store: store, bytes: bytes.length);
-    } catch (e) {
-      bindings.segstoreDestroy(store);
-      return WholeTrackPrepareResult.fail(
-        'store 填充异常: $e',
-        fail: MemorySourceFailDetail(
-          MemorySourceFailKind.segstoreFillException,
-          error: '$e',
-        ),
-      );
+    } finally {
+      if (staging != null) calloc.free(staging);
     }
   } catch (e) {
     return WholeTrackPrepareResult.fail(

@@ -32,6 +32,13 @@
 #include "kernel_bridge.h"
 #endif
 
+/* 会话结束把空闲堆归还 OS（仅 glibc 提供 malloc_trim；其它 libc/Windows 无此
+ * 能力，直接跳过——内存仍由 allocator 正常复用，只是 RSS 不主动收缩）。 */
+#if defined(__GLIBC__) && !defined(_WIN32)
+#include <malloc.h>
+#define ERA_HAS_MALLOC_TRIM 1
+#endif
+
 /* ── UTF-8 安全 fopen（Windows 宽字符边界）──────────────────────
    会话目录 / 临时文件路径由 Dart 以 UTF-8 传入（%TEMP% 可能含中文用户名）。
    MSVC CRT fopen 把窄路径按 ANSI 代码页解释 → 非 ASCII 乱码/失败（同
@@ -95,14 +102,25 @@ void archoera_mediaengine_set_log_sink(ArchoeraMediaEngineLogFn fn,
 #define CMD_CAP 256     /* 命令队列条数 */
 #define CMD_LINE 4095   /* 命令行上限 */
 
-/* ── 内存播放模式：PCM 块列表（与 stream.pcm 文件块同构）────────── */
+/* ── 内存播放模式：PCM 块列表（与 stream.pcm 文件块同构）──────────
+ * 缓冲复用池（docs/audio-memory-playback.md §3.2）：淘汰/重建交还的块缓冲进入
+ * 同会话池，后续 append 优先取「容量够用的最小缓冲」复用，替代逐块 malloc/free
+ * ——避免解码过程中数千个 16 KiB 小块反复分配造成的堆碎片与 RSS 只涨不缩。
+ * 池字节数有界（见 mem_pool_limit），destroy 时清空并 malloc_trim 归还 OS。 */
 typedef struct PcmMemBlock {
     int32_t pos_ms;     /* 块起始音频时间（ms，与文件块头一致） */
     int32_t frames;     /* 每声道帧数 */
     int32_t channels;   /* 交织声道数 */
     int64_t start;      /* 全局样本起点（跨块累积） */
-    float  *data;       /* frames*channels 个交织 float（malloc） */
+    int32_t cap_samples;/* 缓冲容量（交织 float 个数；≥ frames*channels） */
+    float  *data;       /* frames*channels 个交织 float（自池复用 / malloc） */
 } PcmMemBlock;
+
+/* 池内单个可复用缓冲：交织 float 缓冲 + 其容量（float 个数）。 */
+typedef struct PcmPoolBuf {
+    float *buf;
+    int32_t cap_samples;
+} PcmPoolBuf;
 
 typedef struct ArchoeraMediaEngine {
     char *source;
@@ -185,6 +203,10 @@ typedef struct ArchoeraMediaEngine {
     PcmMemBlock *mem_blocks;   /* 块数组（下标 0 最早，队尾最新） */
     int     mem_block_cap;
     int     mem_block_count;
+    PcmPoolBuf *mem_pool;      /* 块缓冲复用池（见 mem_pool_*；mem_lock 保护） */
+    int     mem_pool_cap;
+    int     mem_pool_len;
+    int64_t mem_pool_bytes;    /* 池驻留字节（cap_samples×4 累计） */
     /* ── 单会话「暂存源」无缝切换（staged source swap）────────────
        音质切换：旧源照常出声，新源在**独立预取线程**内预开 + 预解码进 stage；
        commit_source 丢弃交叠段后把 stage 余量续喂同一 ring（设备/会话不重建）。
@@ -223,8 +245,8 @@ typedef struct ArchoeraMediaEngine {
 } ArchoeraMediaEngine;
 
 /* ── 内存播放模式：cap / append / 保留 / 窗口（对齐 pcm_analyzer 语义）──
-   规格见 docs/audio-memory-playback.md：0.8 GiB 硬上限 + 用户上限优先 + 查询
-   故障回落 + append 后记账强制淘汰（绝不越过 cap）。 */
+   规格见 docs/audio-memory-playback.md：auto 有界分析窗口（32 MiB 硬上限）+
+   用户上限优先 + 查询故障回落 + append 后记账强制淘汰（绝不越过 cap）。 */
 
 /* 可用内存（MB）。失败返回 -1（调用方回落保守下限）。 */
 static long long mem_avail_mb(void)
@@ -254,12 +276,15 @@ static long long mem_avail_mb(void)
 }
 
 /* 解析内存保留上限（字节）。pcm_mem_cap_kb 语义见 audio_engine.h：
-   0=auto（0.8 GiB 硬上限，查询故障回落下限）；>0=用户上限（绝不越过）；
-   <0=无上限。 */
+   0=auto（有界分析窗口：8 MiB ~ 32 MiB，查询故障回落下限）；>0=用户上限
+   （绝不越过）；<0=无上限。
+   说明：驻留 PCM 仅服务 pcm_window（频谱取帧，实际只需最近 fftSize≈2048 样本
+   ≈46ms），全量整曲驻留没有消费者；auto 因而收敛到「覆盖解码前瞻 + 少量回访」
+   的小窗口，把单会话原生内存从数百 MB 压到有界 ≤32 MiB。 */
 static int64_t mem_resolve_cap(ArchoeraMediaEngine *e)
 {
-    const int64_t floor_bytes = 32LL * 1024LL * 1024LL; /* 32 MiB 下限 */
-    const int64_t hard_bytes  = 858993459LL;            /* 0.8 GiB 硬上限 */
+    const int64_t floor_bytes = 8LL * 1024LL * 1024LL;  /* 8 MiB 下限 */
+    const int64_t hard_bytes  = 32LL * 1024LL * 1024LL; /* 32 MiB 硬上限 */
     if (e->cfg.pcm_mem_cap_kb < 0) return INT64_MAX;            /* 无上限 */
     if (e->cfg.pcm_mem_cap_kb > 0) return e->cfg.pcm_mem_cap_kb * 1024LL; /* 用户 */
     {
@@ -272,9 +297,85 @@ static int64_t mem_resolve_cap(ArchoeraMediaEngine *e)
         } else {
             bytes = floor_bytes; /* 计算故障 → 保守下限，绝不放大 */
         }
-        if (bytes > hard_bytes) bytes = hard_bytes; /* 硬封顶（≤0.8 GiB） */
+        if (bytes > hard_bytes) bytes = hard_bytes; /* 硬封顶（≤32 MiB） */
         return bytes;
     }
+}
+
+/* 会话结束把空闲堆归还 OS（glibc 专用；其它 libc 无操作）。 */
+static void mem_heap_trim(void)
+{
+#if defined(ERA_HAS_MALLOC_TRIM)
+    malloc_trim(0);
+#endif
+}
+
+/* 缓冲复用池字节上限（固定 8 MiB，与 cap 无关）：池只用于「免逐块 malloc/free
+   的少量在途缓冲」，稳态深度仅 1~2 块；封顶 8 MiB 足以覆盖且让「驻留块列表 +
+   池」总原生内存 ≤ cap + 8 MiB（auto 下 ≤40 MiB）。调用方须持 mem_lock。 */
+static int64_t mem_pool_limit(const ArchoeraMediaEngine *e)
+{
+    (void)e;
+    return 8LL * 1024LL * 1024LL;
+}
+
+/* 归还缓冲到池（持锁）。池满/超限/扩容失败 → 直接 free。 */
+static void mem_pool_put(ArchoeraMediaEngine *e, float *buf, int32_t cap_samples)
+{
+    int64_t need;
+    if (!buf) return;
+    need = (int64_t)cap_samples * 4;
+    if (e->mem_pool_bytes + need > mem_pool_limit(e)) {
+        free(buf);
+        return;
+    }
+    if (e->mem_pool_len == e->mem_pool_cap) {
+        int ncap = e->mem_pool_cap ? e->mem_pool_cap * 2 : 64;
+        PcmPoolBuf *np = (PcmPoolBuf *)realloc(
+            e->mem_pool, (size_t)ncap * sizeof(*np));
+        if (!np) { /* 扩容失败：直接回收，防泄漏 */
+            free(buf);
+            return;
+        }
+        e->mem_pool = np;
+        e->mem_pool_cap = ncap;
+    }
+    e->mem_pool[e->mem_pool_len].buf = buf;
+    e->mem_pool[e->mem_pool_len].cap_samples = cap_samples;
+    e->mem_pool_len++;
+    e->mem_pool_bytes += need;
+}
+
+/* 取一个容量 ≥ needed（float 个数）的最小池缓冲（best-fit）；无则 NULL。
+   取出即从池移除，所有权归调用方。持锁。 */
+static float *mem_pool_get(ArchoeraMediaEngine *e, int needed,
+                           int32_t *out_cap)
+{
+    int best = -1;
+    float *buf;
+    int32_t cap;
+    for (int i = 0; i < e->mem_pool_len; i++) {
+        int32_t c = e->mem_pool[i].cap_samples;
+        if (c >= needed && (best < 0 || c < e->mem_pool[best].cap_samples)) {
+            best = i;
+        }
+    }
+    if (best < 0) return NULL;
+    buf = e->mem_pool[best].buf;
+    cap = e->mem_pool[best].cap_samples;
+    e->mem_pool[best] = e->mem_pool[e->mem_pool_len - 1]; /* swap-remove */
+    e->mem_pool_len--;
+    e->mem_pool_bytes -= (int64_t)cap * 4;
+    if (out_cap) *out_cap = cap;
+    return buf;
+}
+
+/* 清空池并释放全部缓冲（reset/free 用）。持锁。 */
+static void mem_pool_clear(ArchoeraMediaEngine *e)
+{
+    for (int i = 0; i < e->mem_pool_len; i++) free(e->mem_pool[i].buf);
+    e->mem_pool_len = 0;
+    e->mem_pool_bytes = 0;
 }
 
 /* append 后记账：超过 cap 即自队头逐最旧淘汰，直至 ≤ cap（音频超量也不越过）。
@@ -285,7 +386,7 @@ static void mem_enforce_cap(ArchoeraMediaEngine *e)
     while (e->mem_block_count > 0 && e->mem_bytes > e->mem_cap_bytes) {
         PcmMemBlock *h = &e->mem_blocks[0];
         int64_t sz = (int64_t)h->frames * h->channels * 4 + 16;
-        free(h->data);
+        mem_pool_put(e, h->data, h->cap_samples); /* 交还缓冲复用，避免碎片 */
         memmove(&e->mem_blocks[0], &e->mem_blocks[1],
                 (size_t)(e->mem_block_count - 1) * sizeof(*h));
         e->mem_block_count--;
@@ -313,10 +414,19 @@ static int mem_append(ArchoeraMediaEngine *e, const float *pcm,
         e->mem_block_cap = ncap;
     }
     b = &e->mem_blocks[e->mem_block_count];
-    b->data = (float *)malloc((size_t)samples * (size_t)channels * sizeof(float));
-    if (!b->data) {
-        pthread_mutex_unlock(&e->mem_lock);
-        return -1;
+    {
+        int needed = samples * channels; /* 交织 float 个数 */
+        int32_t cap = 0;
+        b->data = mem_pool_get(e, needed, &cap); /* 复用优先 */
+        if (!b->data) {
+            b->data = (float *)malloc((size_t)needed * sizeof(float));
+            if (!b->data) {
+                pthread_mutex_unlock(&e->mem_lock);
+                return -1;
+            }
+            cap = needed;
+        }
+        b->cap_samples = cap;
     }
     memcpy(b->data, pcm,
            (size_t)samples * (size_t)channels * sizeof(float));
@@ -334,11 +444,14 @@ static int mem_append(ArchoeraMediaEngine *e, const float *pcm,
     return 0;
 }
 
-/* mem_reset 的核心（调用方须持 mem_lock）：整表清空 + epoch++。 */
+/* mem_reset 的核心（调用方须持 mem_lock）：整表清空 + epoch++。
+   缓冲交还复用池（而非 free）——seek 重建/无缝切换后立即可复用，免重新分配。 */
 static void mem_reset_locked(ArchoeraMediaEngine *e)
 {
     int i;
-    for (i = 0; i < e->mem_block_count; i++) free(e->mem_blocks[i].data);
+    for (i = 0; i < e->mem_block_count; i++) {
+        mem_pool_put(e, e->mem_blocks[i].data, e->mem_blocks[i].cap_samples);
+    }
     e->mem_block_count = 0;
     e->mem_bytes = 0;
     e->mem_epoch++;
@@ -352,15 +465,22 @@ static void mem_reset(ArchoeraMediaEngine *e)
     pthread_mutex_unlock(&e->mem_lock);
 }
 
-/* 会话结束：释放块数组（destroy 调；epoch 不再递增无妨） */
+/* 会话结束：释放块数组与复用池（destroy 调；epoch 不再递增无妨）。
+   释放后 malloc_trim 把空闲堆归还 OS——否则跨曲累积的保留区在 glibc 下
+   只涨不缩（实测 stop 后 RSS 不回退）。 */
 static void mem_free(ArchoeraMediaEngine *e)
 {
     pthread_mutex_lock(&e->mem_lock);
     mem_reset_locked(e);
+    mem_pool_clear(e);
+    free(e->mem_pool);
+    e->mem_pool = NULL;
+    e->mem_pool_cap = 0;
     free(e->mem_blocks);
     e->mem_blocks = NULL;
     e->mem_block_cap = 0;
     pthread_mutex_unlock(&e->mem_lock);
+    mem_heap_trim();
 }
 
 /* 单样本下混 L/R（对齐 pcm_analyzer BS.775；1~6ch，超出退化取前两声道） */
@@ -1909,7 +2029,8 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
     e->p_start_ms = e->cfg.start_offset_ms;
 
     /* 内存播放模式：cfg.no_disk_cache=1 且为 player 会话 → mem_mode。
-       cap 按配置解析：auto（0.8 GiB 硬上限）/ 用户上限 / 无上限（见 mem_resolve_cap）。 */
+       cap 按配置解析：auto（有界分析窗口 ≤32 MiB）/ 用户上限 / 无上限
+       （见 mem_resolve_cap）。 */
     if (e->player_file && e->cfg.no_disk_cache) {
         e->mem_mode = 1;
         e->mem_cap_bytes = mem_resolve_cap(e);

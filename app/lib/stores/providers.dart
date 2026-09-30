@@ -174,6 +174,12 @@ final likeControllerProvider = ChangeNotifierProvider<LikeController>(
 
 /// 全局「我喜欢」列表数据源（KG / NT全量 Track + 缓存秒开；
 /// 红心状态由 LikeController 独立轻量同步，不由此派生）。
+///
+/// **非 autoDispose**：跨页共享——[LikeController.toggle] 在任意页面成功后据此
+/// 维护列表增量（`_applyStoreDelta`），设置弹窗（collection_platform）也以
+/// `ref.read` 触发异步刷新/写入；autoDispose 会在这些异步 `await` 期间释放
+/// ChangeNotifier，触发已释放实例上的 `notifyListeners`。内存释放由
+/// 「最小化时卸载全部内存状态」的 invalidate 路径负责。
 final likedStoreProvider = ChangeNotifierProvider<LikedStore>(
   (ref) => LikedStore(ref),
 );
@@ -181,6 +187,10 @@ final likedStoreProvider = ChangeNotifierProvider<LikedStore>(
 /// QM红心收藏本机数据源（见 QqLikedStore：本机主源 + 在线实验并入）。
 /// 构造即异步加载本地 `qq_liked.json`；登录 QQ 后 LikeController 同步会把
 /// 在线「我喜欢」并入红心集合，「我喜欢」页刷新时把在线 Track 并入本列表。
+///
+/// **非 autoDispose**：启动流程（bootstrap 登录 QQ 后并入在线收藏）与设置弹窗
+/// 均以 `ref.read` + 异步 `await` 使用本 store（`mergeOnline` 内部 await 加载、
+/// 再 notify）；autoDispose 会在页外释放它并导致已释放实例继续被写。
 final qqLikedStoreProvider = ChangeNotifierProvider<QqLikedStore>(
   (ref) => QqLikedStore(),
 );

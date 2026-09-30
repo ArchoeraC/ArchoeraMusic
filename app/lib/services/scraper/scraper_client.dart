@@ -190,6 +190,8 @@ class ScraperController {
     if (_disposed) return;
     _disposed = true;
     _bindings.destroy(_h);
+    // 注：scraper 为 Rust，其 destroy 是否 join 全部后台线程未做运行时验证；
+    // 为避免 scanner/Go 那样「dlclose 后线程仍在跑 → 崩溃」，暂**不卸载**。
   }
 
   void _checkNotDisposed() {

@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -140,6 +141,13 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSuppressSleepOff => 'システムはアイドル時にスリープする可能性があります';
+
+  @override
+  String get settingsBackgroundUnload => 'バックグラウンドで閲覧済みページを解放';
+
+  @override
+  String get settingsBackgroundUnloadSubtitle =>
+      '最小化/トレイ/画面オフ時にリストと画像を解放し、復帰時に再構築（スクロール位置が失われる場合あり）';
 
   @override
   String get settingsCloseBehavior => 'アプリを閉じるとき';
@@ -1321,9 +1329,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pageHomeDaily => 'デイリーおすすめ';
 
   @override
-  String get pageHomeDailyLoggedIn => 'あなたの好みに合わせて厳選';
-
-  @override
   String get pageHomeDailyLoginHint => 'NTアカウントにログインすると毎日更新されます';
 
   @override
@@ -1331,6 +1336,22 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get pageHomeDailyLogin => 'ログインしてデイリーおすすめを解禁';
+
+  @override
+  String pageHomeSpotlightTitle({required Object song}) {
+    return '「$song」から聴く';
+  }
+
+  @override
+  String pageHomeSpotlightSubtitle({required Object count}) {
+    return 'ランダムに $count 曲選びました';
+  }
+
+  @override
+  String get pageHomeSpotlightShuffle => 'シャッフル';
+
+  @override
+  String get pageHomeSpotlightEmpty => '再生できる曲がありません';
 
   @override
   String pageHomeGreeting({required Object greeting, required Object name}) {
@@ -1832,7 +1853,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsMemoryPolicyAuto => '自動（空きメモリに応じて調整）';
 
   @override
-  String get settingsMemoryPolicyAutoSub => '0.8 GiBのハード上限。空きRAMに応じて自動調整';
+  String get settingsMemoryPolicyAutoSub => '32 MiBのハード上限。空きRAMに応じて自動調整';
 
   @override
   String get settingsMemoryPolicyLimit => 'カスタム上限';
@@ -2250,6 +2271,13 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => '現在標準モード';
+
+  @override
+  String get settingsUnloadAllMemory => '最小化時に全メモリ状態を解放';
+
+  @override
+  String get settingsUnloadAllMemorySubtitle =>
+      'バックグラウンド（最小化/トレイ/画面オフ）でページデータとキャッシュを破棄し、復帰時に再構築（ホームに戻る/スクロール位置が失われる場合あり）。再生には影響なし';
 
   @override
   String get settingsSearchEnergySavingSubtitle => 'スペクトル取得頻度を下げて CPU を節約';
@@ -4200,6 +4228,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAmllWordSweep => 'ワードスイープ';
 
   @override
+  String get settingsAmllSyntheticSweep => '通常歌詞の合成スイープ';
+
+  @override
+  String get settingsAmllSyntheticSweepDesc =>
+      '逐字タイミングの無い歌詞を行の長さから推定してスイープ（翻訳・ルビにも適用）';
+
+  @override
   String get settingsAmllHidePassed => '歌い終わった行を隠す';
 
   @override
@@ -4568,6 +4603,36 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsLyricExcludeClear => 'Clear';
+
+  @override
+  String get settingsLyricTtml => 'オンライン TTML 歌詞（Beta）';
+
+  @override
+  String get settingsLyricTtmlDesc =>
+      'AMLL DB から単語ごとの TTML 歌詞を取得し、ヒット時はプラットフォームの歌詞を上書きします（ネット接続が必要）。この機能はテスト中です。';
+
+  @override
+  String get settingsLyricTtmlEnable => 'オンライン TTML 歌詞を有効化';
+
+  @override
+  String get settingsLyricTtmlEnableDesc => 'AMLL DB に一致する歌詞があれば優先的に使用';
+
+  @override
+  String get settingsLyricTtmlServer => 'AMLL DB サーバー';
+
+  @override
+  String get settingsLyricTtmlServerDesc => '歌詞リクエストの URL テンプレート（自前・ミラーに変更可能）';
+
+  @override
+  String get settingsLyricTtmlServerDialogTitle => 'AMLL DB サーバーテンプレート';
+
+  @override
+  String get settingsLyricTtmlServerHint =>
+      'テンプレートには %p（プラットフォーム）と %s（曲 ID）の両方が必要です';
+
+  @override
+  String get settingsLyricTtmlServerInvalid =>
+      'テンプレートには %p と %s の両方を含める必要があります';
 
   @override
   String get commonConfigure => 'Configure';

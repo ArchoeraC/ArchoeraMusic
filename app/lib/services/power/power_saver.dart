@@ -8,9 +8,17 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../apis/netease/core/cache.dart' show nmCacheClear;
+import '../../apis/runtime.dart' show getRuntime;
 import '../../l10n/l10n.dart';
 import '../../stores/app_prefs.dart';
+import '../../stores/daily_shelf_provider.dart' show dailyShelfProvider;
+import '../../stores/lyrics_provider.dart' show currentLyricsProvider;
+import '../../stores/spotlight_provider.dart' show spotlightProvider;
+import '../../theme/cover_color.dart' show coverColorProvider;
 import '../log/log.dart';
+import '../scanner/library_store.dart' show libraryStoreProvider;
+import '../streaming/streaming_provider.dart' show streamingProvider;
 import '../platform/platform_capabilities.dart';
 import '../platform/platform_failure.dart';
 import '../platform/system_power.dart';
@@ -111,6 +119,71 @@ class PowerSaverService with WindowListener {
   /// 最近一次已发送的引擎事件间隔（避免每个窗口事件都重复刷命令）。
   int? _lastEngineIntervalMs;
 
+  /// 进入后台后延迟执行「释放/卸载」的阈值。
+  ///
+  /// 关键：**不**在每次 hide/minimize 立即卸载界面——反复「隐藏→显示」会不断
+  /// 卸载/重建路由子树，churn 掉渲染资源（实测每次 hide/show 进程 RSS/原生堆
+  /// 增长数 MB，Windows 上表现为“内存泄漏”）。改为持续后台达阈值才释放一次；
+  /// 快速切换（< 阈值）完全不做释放，避免 churn。取较大值（30s）：只有真正
+  /// 「长时间挂后台」才释放，最大化避免表面/图层重建。
+  static const Duration _unloadDelay = Duration(seconds: 30);
+  Timer? _unloadTimer;
+
+  /// 是否已执行过后台释放/卸载（恢复时据此复位标志与重新挂载）。
+  bool _unloadApplied = false;
+
+  /// 强迫症「最小化时卸载全部内存状态」（设置项，默认关）。
+  bool _unloadAll = false;
+
+  /// 同步设置「最小化时卸载全部内存状态」；开启且当前已在后台 → 立即卸载。
+  void setUnloadAll(bool value) {
+    if (_unloadAll == value) return;
+    _unloadAll = value;
+    // 若在后台期间开启，按当前档位重新评估（会走一次延迟释放）。
+    _apply();
+  }
+
+  /// 丢弃**可重建的页面数据 provider**（音乐库窗口 / 首页聚光 / 每日推荐 /
+  /// 流媒体库 / 当前歌词）。
+  ///
+  /// 只在「后台卸载帧」跑完之后调用：此时根级卸载门已把整个路由子树（含这些
+  /// provider 的监听者）卸下，invalidate 不会立即触发网络重取——重取发生在
+  /// 恢复前台、页面重新挂载时。播放/认证/偏好/平台能力一律不动。
+  void _dropRebuildableState() {
+    if (!_unloadAll) return;
+    try {
+      _ref.invalidate(libraryStoreProvider);
+      _ref.invalidate(spotlightProvider);
+      _ref.invalidate(dailyShelfProvider);
+      _ref.invalidate(currentLyricsProvider);
+      _ref.invalidate(streamingProvider);
+    } catch (_) {}
+    Log.i('power', '后台：已卸载页面数据（库 / 聚光 / 每日推荐 / 流媒体 / 歌词）');
+  }
+
+  /// 进入后台时释放可重建的缓存（图片 / 歌词三件套 / 封面色 / 接口响应），
+  /// 减少后台常驻；恢复前台后按需重新加载。纯安全清理，不影响播放。
+  void _releaseCaches() {
+    try {
+      final cache = PaintingBinding.instance.imageCache;
+      cache.clear();
+      cache.clearLiveImages();
+    } catch (_) {}
+    try {
+      final rt = getRuntime();
+      rt.lyricCache.clear();
+      rt.lyricMatchCache.clear();
+      rt.lyricTtmlCache.clear();
+    } catch (_) {}
+    try {
+      _ref.read(coverColorProvider.notifier).clearCache();
+    } catch (_) {}
+    try {
+      nmCacheClear();
+    } catch (_) {}
+    Log.i('power', '后台：已释放图片/歌词/取色/接口缓存');
+  }
+
   /// 开始监听窗口状态（并异步订阅平台熄屏/窗口状态）。
   /// window_manager 监听保留：托盘 hide/show 事件 + 桥接未覆盖时的兜底。
   void attach() {
@@ -129,7 +202,11 @@ class PowerSaverService with WindowListener {
       return;
     }
     _windowSub = _window.state.listen((s) {
-      _minimized = s.minimized;
+      // **只置位、不清除** minimized：部分合成器把「GTK hide 到托盘」报告为
+      // minimized=false，若在此覆盖会把后台态闪回前台，导致后台释放/停帧被
+      // 立刻取消（并让「持续后台才释放」的判定永不成立）。清除交给显式的
+      // show/restore 事件（onWindowEvent('show') / onWindowRestore）。
+      if (s.minimized) _minimized = true;
       _focused = s.focused;
       // 重新聚焦窗口 ⇒ **强制重建**：屏幕必然点亮/未锁屏。修正解锁后丢失的
       // 熄屏复位（否则残留 screenOff → 永久 1 FPS，重启才恢复）。
@@ -249,9 +326,59 @@ class PowerSaverService with WindowListener {
 
   void _apply() {
     final binding = WidgetsBinding.instance;
+    final inBg = _minimized || _screenOff;
+
+    if (!inBg) {
+      // 恢复前台：取消待执行的释放；若已卸载则复位标志（卸载门重新挂载路由），
+      // 立即恢复出帧/满帧。
+      _unloadTimer?.cancel();
+      _unloadTimer = null;
+      if (_unloadApplied) {
+        _unloadApplied = false;
+        _ref.read(appInBackgroundProvider.notifier).set(false);
+      }
+      _applyRenderPolicy(binding);
+      return;
+    }
+
+    // 后台：立即停帧/降频（廉价、必要；无 churn）。
+    _applyRenderPolicy(binding);
+
+    // 仅在「持续后台」达到阈值后释放一次；快速 hide/show 不做任何释放。
+    if (!_unloadApplied && _unloadTimer == null) {
+      _unloadTimer = Timer(_unloadDelay, () {
+        _unloadTimer = null;
+        _doUnload();
+      });
+    }
+  }
+
+  /// 持续后台达阈值后的**一次性同步释放**。不依赖系统/帧：
+  ///
+  /// 隐藏/最小化时引擎可能**不出帧**，`addPostFrameCallback` 永不执行（实测：
+  /// timer 触发了却没有任何释放）——所以缓存/页面数据的释放必须**同步**做掉，
+  /// 唯一需要重建的部分（路由子树卸载）交给下一帧（或恢复前台的首帧）由
+  /// `BackgroundUnloadGate` 依据 [appInBackgroundProvider] 自行处理。
+  void _doUnload() {
+    if (!(_minimized || _screenOff)) return; // 已恢复
+    // ① 同步释放可重建的缓存与页面数据（不需要帧，后台立刻见效）。
+    _releaseCaches();
+    _dropRebuildableState();
+    // ② UI 子树卸载：**仅强迫症档显式开启时**才做。默认**不卸载 UI**——
+    //    实测卸载/重建路由子树会 churn 渲染资源（表面/图层/驱动缓存只涨不缩），
+    //    且隐藏期不出帧时「卸载」在恢复首帧才发生，收益远小于代价。默认只做
+    //    ① 的同步数据/缓存释放（安全、无 GPU churn）。
+    final prefs = _ref.read(appPrefsProvider);
+    if (prefs.unloadAllMemory) {
+      _unloadApplied = true;
+      _ref.read(appInBackgroundProvider.notifier).set(true);
+    }
+  }
+
+  /// 应用渲染策略（最小化/托盘 → 停帧；失焦/熄屏 → 降频）+ 引擎事件降频协商。
+  void _applyRenderPolicy(WidgetsBinding binding) {
     if (binding is! PowerSavingFrameBinding) return;
     final reason = _reason;
-    // 渲染策略：最小化 / 托盘 → 直接停帧（0 帧）；其余档位按最小帧间隔降频。
     final policy = powerSaverRenderPolicy(reason);
     binding.setRenderingEnabled(!policy.stopRendering);
     if (!policy.stopRendering) {
@@ -278,6 +405,8 @@ class PowerSaverService with WindowListener {
   }
 
   Future<void> dispose() async {
+    _unloadTimer?.cancel();
+    _unloadTimer = null;
     windowManager.removeListener(this);
     await _screenSub?.cancel();
     await _failSub?.cancel();
@@ -297,6 +426,26 @@ class PowerSaverService with WindowListener {
     }
   }
 }
+
+/// 应用是否处于「不可见后台」（最小化 / 托盘隐藏 / 熄屏）。
+///
+/// 由 [PowerSaverService] 更新，驱动 `app.dart` 的 `BackgroundUnloadGate`：
+/// 仅当强迫症档 `unloadAllMemory` 开启且为 true 时，整个路由子树被卸为纯色
+/// 占位（释放页面/图片内存），恢复后重建。默认档只做同步数据/缓存释放，不卸载 UI。
+class AppInBackgroundNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  /// 更新后台标志（值不变不通知）。
+  void set(bool value) {
+    if (state != value) state = value;
+  }
+}
+
+final appInBackgroundProvider =
+    NotifierProvider<AppInBackgroundNotifier, bool>(
+      AppInBackgroundNotifier.new,
+    );
 
 /// 节能模式服务（应用级单例；随 ProviderScope 释放）。
 final powerSaverProvider = Provider<PowerSaverService>((ref) {
@@ -324,6 +473,7 @@ class _PowerSaverHostState extends ConsumerState<PowerSaverHost> {
     final svc = ref.read(powerSaverProvider);
     svc.setEnabled(prefs.powerSaver);
     svc.setSuppressSleep(prefs.suppressSleep);
+    svc.setUnloadAll(prefs.unloadAllMemory);
     // 唤醒锁只注册在播放下：以当前播放状态起步
     svc.setPlaying(ref.read(playbackProvider).playing);
     svc.attach();
@@ -336,6 +486,7 @@ class _PowerSaverHostState extends ConsumerState<PowerSaverHost> {
       final svc = ref.read(powerSaverProvider);
       svc.setEnabled(next.powerSaver);
       svc.setSuppressSleep(next.suppressSleep);
+      svc.setUnloadAll(next.unloadAllMemory);
     });
     // 播放 / 暂停联动唤醒锁：仅播放中且开关打开时才持有
     ref.listen(playbackProvider.select((s) => s.playing), (prev, next) {

@@ -269,13 +269,21 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   int _activeIdxAt(int pos) {
     final g = _c.groups;
     if (g.isEmpty) return -1;
+    // 同时覆盖时优先非背景行（同时间的背景子行挂在主行上，不应抢高亮）；
+    // 仅当没有任何非背景行覆盖时（独立和声段），才让背景行成为激活行。
     var res = -1;
+    var bgRes = -1;
     for (var i = 0; i < g.length; i++) {
       if (pos < g[i].original.timeMs) break;
       final end = g[i].endMs;
-      if (end == null || pos < end) res = i;
+      if (end != null && pos >= end) continue;
+      if (g[i].isBG) {
+        bgRes = i;
+      } else {
+        res = i;
+      }
     }
-    return res;
+    return res >= 0 ? res : bgRes;
   }
 
   /// 播放位置是否落在某段间奏内；返回间奏下标，否则 -1。
@@ -317,6 +325,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     // 切歌 / 字号 / 字体 / 宽度变化 → 段落缓存整体失效。
     _c.cache.clear();
     _c.fragCache.clear();
+    _c.transFragCache.clear();
+    _c.romaFragCache.clear();
     _maxWidth = math.max(40, w - 24);
     final n = groups.length;
     // 先全部用**估算**行高，只对进入视口的行做真实排版（见 _ensureMeasured）。
@@ -457,13 +467,20 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   int _scrollActiveAt(int pos) {
     final g = _c.groups;
     if (g.isEmpty || _scrollStart.length != g.length) return _activeIdxAt(pos);
+    // 与非滚动版一致：同时覆盖时优先非背景行，背景行只在独立时段接管。
     var res = -1;
+    var bgRes = -1;
     for (var i = 0; i < g.length; i++) {
       if (pos < _scrollStart[i]) break;
       final end = g[i].endMs;
-      if (end == null || pos < end) res = i;
+      if (end != null && pos >= end) continue;
+      if (g[i].isBG) {
+        bgRes = i;
+      } else {
+        res = i;
+      }
     }
-    return res;
+    return res >= 0 ? res : bgRes;
   }
 
   /// 计算各行「滚动起点」（预滚后的起始时间，单位 ms）。对齐 AMLL `applyScrollPreroll`：
@@ -822,9 +839,15 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         _c.active >= 0 &&
         _c.active < _c.groups.length &&
         _c.wordSweep &&
-        (_c.groups[_c.active].fragments?.isNotEmpty ?? false);
+        _sweepActiveFor(_c.groups[_c.active]);
     if (moving || sweeping || _c.dots.visible) _repaint.notify();
   }
+
+  /// 该行是否有会随播放推进的扫亮（主行逐字，或显示中的翻译 / 音译合成扫亮）。
+  bool _sweepActiveFor(LyricGroup g) =>
+      (g.fragments?.isNotEmpty ?? false) ||
+      (_c.showTranslation && (g.translationFragments?.isNotEmpty ?? false)) ||
+      (_c.showRomanization && (g.romajiFragments?.isNotEmpty ?? false));
 
   /// 平滑「点亮 / 熄灭 / 缩放 / 失焦」过渡态（只处理视口窗口内的行）。
   ///
@@ -1070,6 +1093,11 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 当前逐字渲染缓存条目数（有界）。
   @visibleForTesting
   int debugFragCacheEntries() => _c.fragCache.entryCount;
+
+  /// 翻译 / 音译合成扫亮缓存的条目数（测试用）。
+  @visibleForTesting
+  int debugSubFragCacheEntries() =>
+      _c.transFragCache.entryCount + _c.romaFragCache.entryCount;
 
   /// 间奏三点是否可见。
   @visibleForTesting
