@@ -18,8 +18,7 @@ depends=(
   'glibc'
   'gcc-libs'
   'gtk3'
-  'libayatana-appindicator'
-  'libdbusmenu-glib'
+  # 托盘/窗口原生桥（nativeapi）走 StatusNotifierItem over D-Bus，依赖 gtk3 + libx11 + libxi
   # platform bridge（native/libarchoera_platform.so）链接 libdbus-1.so.3
   'dbus'
   'libepoxy'

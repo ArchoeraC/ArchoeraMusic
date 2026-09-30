@@ -16,7 +16,7 @@
 // ============================================================
 
 use aes::Aes128;
-use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
+use cbc::cipher::{block_padding::Pkcs7, BlockModeDecrypt, BlockModeEncrypt, KeyIvInit};
 use cbc::{Decryptor, Encryptor};
 use md5::{Digest, Md5};
 use rsa::pkcs8::DecodePublicKey;
@@ -39,7 +39,7 @@ fn b64_decode(s: &str) -> Result<Vec<u8>, base64::DecodeError> {
 /// AES-128-CBC + PKCS7 padding → base64
 fn aes_cbc_encrypt_base64(plain: &[u8], key: &[u8], iv: &[u8]) -> String {
     let cipher = Aes128CbcEnc::new_from_slices(key, iv).expect("key/iv 长度必须为 16");
-    b64_encode(&cipher.encrypt_padded_vec_mut::<Pkcs7>(plain))
+    b64_encode(&cipher.encrypt_padded_vec::<Pkcs7>(plain))
 }
 
 /// AES-128-CBC + PKCS7 padding 解密
@@ -47,7 +47,7 @@ fn aes_cbc_decrypt_string(cipher_b64: &str, key: &[u8], iv: &[u8]) -> Result<Str
     let cipher = Aes128CbcDec::new_from_slices(key, iv).expect("key/iv 长度必须为 16");
     let bytes = b64_decode(cipher_b64)?;
     let dec = cipher
-        .decrypt_padded_vec_mut::<Pkcs7>(&bytes)
+        .decrypt_padded_vec::<Pkcs7>(&bytes)
         .map_err(|e| anyhow::anyhow!("AES 解密失败: {e:?}"))?;
     Ok(String::from_utf8_lossy(&dec).into_owned())
 }
@@ -88,10 +88,10 @@ pub mod kugou {
 
     /// 生成随机字符串（dfid 24 位、device uuid 等），对齐 Dart kgRandomString
     pub fn kg_random_string(len: usize) -> String {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::RngExt;
+        let mut rng = rand::rng();
         (0..len)
-            .map(|_| KG_POOL[rng.gen_range(0..KG_POOL.len())] as char)
+            .map(|_| KG_POOL[rng.random_range(0..KG_POOL.len())] as char)
             .collect()
     }
 
@@ -138,7 +138,8 @@ pub mod kugou {
     /// RSA-PKCS1v1.5 加密 → 小写 hex。对齐 Dart kgRsaPkcs1EncryptHex
     /// （node-forge 默认 padding；注意输出带随机填充，不可逐字节对拍）。
     pub fn kg_rsa_pkcs1_encrypt_hex(json_str: &str, public_key_pem: &str) -> String {
-        use rand::rngs::OsRng;
+        // rsa 0.9 基于 rand_core 0.6：用其自带的 OS 熵源（见 Cargo.toml getrandom）。
+        use rsa::rand_core::OsRng;
         let key = RsaPublicKey::from_public_key_pem(public_key_pem)
             .expect("SPKI PEM 解析失败");
         let enc = key
@@ -227,11 +228,11 @@ pub mod netease {
 
     /// 生成 16 字节随机字符串（base62），对齐 Dart nmWeapi 内 secretKey
     pub fn create_secret_key() -> String {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::RngExt;
+        let mut rng = rand::rng();
         let pool = NM_BASE62.as_bytes();
         (0..16)
-            .map(|_| pool[rng.gen_range(0..pool.len())] as char)
+            .map(|_| pool[rng.random_range(0..pool.len())] as char)
             .collect()
     }
 

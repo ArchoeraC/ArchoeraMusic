@@ -417,7 +417,6 @@ NUGETCFG
           libopus
           gtk3
           glib
-          libayatana-appindicator
           libepoxy
           fontconfig
           fribidi

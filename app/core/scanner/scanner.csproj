@@ -28,12 +28,13 @@
     <!-- TagLibSharp: 音频元数据解析（MP3/FLAC/OGG/M4A/APE/WAV/DSF 等） -->
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <!-- Microsoft.Data.Sqlite: 直写 SQLite，绕过 Node.js V8 堆 -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <!-- CVE-2025-6965 (GHSA-2m69-gcr7-jv3q, High): SQLitePCLRaw.lib.e_sqlite3
-         <= 2.1.11 捆绑的 SQLite < 3.50.2 存在聚合项内存损坏，且无 2.1.x 补丁。
-         显式 pin 原生库到 3.50.3（纯静态库包、无 managed 依赖），仅升级原生
-         SQLite 二进制，managed 核心保持 2.x 与 Microsoft.Data.Sqlite 9 兼容。 -->
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+         <= 2.1.11 捆绑的 SQLite < 3.50.2 存在聚合项内存损坏。
+         Microsoft.Data.Sqlite 10 起 managed 核心为 SQLitePCLRaw 3.0.x，原生库版本
+         号跟随 SQLite 版本；显式 pin 到最新的纯原生静态库包 3.53.3（无 managed
+         依赖），消除该 CVE 并避免回落到捆绑的旧原生 SQLite。 -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
   </ItemGroup>
 
   <ItemGroup>

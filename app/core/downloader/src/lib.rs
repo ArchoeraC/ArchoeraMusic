@@ -467,9 +467,9 @@ pub(crate) async fn failure_backoff() {
     let base = FAILURE_BACKOFF_BASE_MS.saturating_mul(1u64 << exp);
     let delay = base.min(FAILURE_BACKOFF_CAP_MS);
     let jitter = {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        rng.gen_range(0..=delay / 2)
+        use rand::RngExt;
+        let mut rng = rand::rng();
+        rng.random_range(0..=delay / 2)
     };
     tokio::time::sleep(Duration::from_millis(delay + jitter)).await;
 }
@@ -493,11 +493,11 @@ pub(crate) async fn request_pacing() {
                 0
             } else {
                 // 最旧请求滑出窗口还需的时间（+随机抖动，避免集体同拍）
-                use rand::Rng;
+                use rand::RngExt;
                 let elapsed = now.duration_since(*w.front().unwrap()).as_millis() as u64;
                 let base = REQUEST_WINDOW_SECS * 1000;
-                let mut jr = rand::thread_rng();
-                let jitter = jr.gen_range(0..1000u64);
+                let mut jr = rand::rng();
+                let jitter = jr.random_range(0..1000u64);
                 base.saturating_sub(elapsed).saturating_add(jitter) as u64
             }
         };
