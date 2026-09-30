@@ -7,69 +7,126 @@ part of '../tray_integration.dart';
 extension _TrayIntegrationLogic on _TrayIntegrationState {
   Future<void> _setup() async {
     try {
-      await _initTray();
+      _initTray();
       windowManager.addListener(this);
       await windowManager.setPreventClose(true);
       _trayReady = true;
     } catch (e) {
       Log.w('tray', '初始化失败，降级为正常关闭退出: $e');
       _trayReady = false;
-      try {
-        await trayManager.destroy();
-      } catch (_) {}
+      _disposeTray();
     }
   }
 
-  Future<void> _initTray() async {
-    trayManager.addListener(this);
+  void _initTray() {
+    final trayIcon = TrayIcon.create();
+    if (trayIcon == null) {
+      throw StateError('无法创建系统托盘图标');
+    }
+    _trayIcon = trayIcon;
+
     final iconAsset = Platform.isWindows
         ? 'assets/icons/tray.ico'
         : 'assets/icons/tray.png';
-    await trayManager.setIcon(iconAsset);
-    try {
-      await trayManager.setToolTip('ArchoeraMusic');
-    } catch (_) {}
-    await trayManager.setContextMenu(_buildMenu());
+    final icon = ImageAsset.fromAsset(iconAsset);
+    if (icon == null) {
+      throw ArgumentError.value(iconAsset, 'iconAsset', '无法加载托盘图标资源');
+    }
+    trayIcon.icon = icon;
+    trayIcon.setTooltip('ArchoeraMusic');
+    // 菜单唤出方式：
+    // - Linux 的 StatusNotifierItem 只有 Trigger=clicked 时才会把菜单暴露给面板
+    //   （面板自行打开菜单，托盘点击事件不上报）；
+    // - Windows / macOS 用右键唤出菜单，左键留给「显示主窗口」。
+    trayIcon.setContextMenuTrigger(
+      Platform.isLinux
+          ? ContextMenuTrigger.clicked
+          : ContextMenuTrigger.rightClicked,
+    );
+    trayIcon.addListener(_onTrayIconEvent);
+    _trayMenu = _buildMenu();
+    trayIcon.setContextMenu(_trayMenu);
+    trayIcon.setVisible(true);
+  }
+
+  void _onTrayIconEvent(TrayIconEvent event) {
+    switch (event) {
+      case TrayIconClickedEvent():
+        unawaited(_showWindow());
+      case TrayIconDoubleClickedEvent():
+        unawaited(_showWindow());
+      case TrayIconRightClickedEvent():
+        // Windows / macOS 已由 contextMenuTrigger 自动弹出菜单，无需手动处理。
+        break;
+    }
   }
 
   Menu _buildMenu() {
     final l10n = ref.read(l10nProvider);
-    return Menu(
-      items: [
-        MenuItem(
-          key: 'show',
-          label: l10n.trayShow,
-          onClick: (_) => _showWindow(),
-        ),
-        MenuItem.separator(),
-        MenuItem(
-          key: 'toggle',
-          label: l10n.trayPlayPause,
-          onClick: (_) => ref.read(playbackProvider.notifier).toggle(),
-        ),
-        MenuItem(
-          key: 'prev',
-          label: l10n.trayPrevious,
-          onClick: (_) {
-            unawaited(ref.read(playbackProvider.notifier).playPrevious());
-          },
-        ),
-        MenuItem(
-          key: 'next',
-          label: l10n.trayNext,
-          onClick: (_) {
-            unawaited(ref.read(playbackProvider.notifier).playNext());
-          },
-        ),
-        MenuItem.separator(),
-        MenuItem(key: 'quit', label: l10n.trayQuit, onClick: (_) => _quit()),
-      ],
+    final menu = Menu.create();
+    if (menu == null) {
+      throw StateError('无法创建托盘菜单');
+    }
+    _trayMenuItems.clear();
+
+    _addMenuItem(menu, l10n.trayShow, () => unawaited(_showWindow()));
+    menu.addSeparator();
+    _addMenuItem(
+      menu,
+      l10n.trayPlayPause,
+      () => ref.read(playbackProvider.notifier).toggle(),
     );
+    _addMenuItem(
+      menu,
+      l10n.trayPrevious,
+      () => unawaited(ref.read(playbackProvider.notifier).playPrevious()),
+    );
+    _addMenuItem(
+      menu,
+      l10n.trayNext,
+      () => unawaited(ref.read(playbackProvider.notifier).playNext()),
+    );
+    menu.addSeparator();
+    _addMenuItem(menu, l10n.trayQuit, () => unawaited(_quit()));
+    return menu;
   }
 
-  Future<void> _rebuildMenu() async {
+  void _addMenuItem(Menu menu, String label, void Function() onTap) {
+    final item = MenuItem.createWithLabelAndType(label, MenuItemType.normal);
+    if (item == null) return;
+    item.addListener((event) {
+      if (event is MenuItemClickedEvent) onTap();
+    });
+    menu.addItem(item);
+    _trayMenuItems.add(item);
+  }
+
+  void _rebuildMenu() {
     if (!_trayReady) return;
-    await trayManager.setContextMenu(_buildMenu());
+    final trayIcon = _trayIcon;
+    if (trayIcon == null) return;
+
+    final previousItems = List<MenuItem>.of(_trayMenuItems);
+    final previousMenu = _trayMenu;
+    final menu = _buildMenu();
+    trayIcon.setContextMenu(menu);
+    _trayMenu = menu;
+    // 旧菜单已从托盘解绑：释放其菜单项监听与句柄（原生侧仍持共享引用，安全）。
+    for (final item in previousItems) {
+      item.dispose();
+    }
+    previousMenu?.dispose();
+  }
+
+  void _disposeTray() {
+    for (final item in _trayMenuItems) {
+      item.dispose();
+    }
+    _trayMenuItems.clear();
+    _trayMenu?.dispose();
+    _trayMenu = null;
+    _trayIcon?.dispose();
+    _trayIcon = null;
   }
 
   Future<void> _showWindow() async {
@@ -217,19 +274,9 @@ extension _TrayIntegrationLogic on _TrayIntegrationState {
     );
   }
 
-  void _handleTrayIconMouseDown() {
-    unawaited(_showWindow());
-  }
-
-  void _handleTrayIconRightMouseDown() {
-    if (Platform.isWindows) {
-      unawaited(trayManager.popUpContextMenu());
-    }
-  }
-
   Widget _buildTrayIntegration(BuildContext context) {
     ref.listen(localeProvider, (prev, next) {
-      if (prev != next) unawaited(_rebuildMenu());
+      if (prev != next) _rebuildMenu();
     });
     return widget.child;
   }
