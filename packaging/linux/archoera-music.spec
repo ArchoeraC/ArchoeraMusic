@@ -14,7 +14,7 @@ Group:          Applications/Multimedia
 AutoReqProv:    no
 # 引擎/ scraper 的运行库已随 bundle 内嵌并带 RUNPATH=$ORIGIN：引擎用自建最小
 # FFmpeg（不依赖系统 ffmpeg-libs），scraper 的 TagLib 也一并内嵌。
-Requires:       glibc, libstdc++, zlib, gtk3, libayatana-appindicator, libdbusmenu-glib, dbus-libs, libepoxy, fontconfig, fribidi, libX11, libXi, at-spi2-atk, libcloudproviders, taglib, libcurl, openssl-libs, sqlite-libs, xz-libs
+Requires:       glibc, libstdc++, zlib, gtk3, dbus-libs, libepoxy, fontconfig, fribidi, libX11, libXi, at-spi2-atk, libcloudproviders, taglib, libcurl, openssl-libs, sqlite-libs, xz-libs
 
 %description
 ArchoeraMusic is an open-source music player that connects to alternative

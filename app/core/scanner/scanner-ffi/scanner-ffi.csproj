@@ -41,10 +41,11 @@
     <!-- TagLibSharp: 音频元数据解析（MP3/FLAC/OGG/M4A/APE/WAV/DSF 等） -->
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <!-- Microsoft.Data.Sqlite: 直写 SQLite（与 CLI 一致） -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <!-- CVE-2025-6965 (GHSA-2m69-gcr7-jv3q, High): 同 scanner.csproj，
-         pin 原生 SQLite 到 3.50.3 消除 NU1903，managed 核心保持 2.x -->
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+         pin 原生 SQLite 到 3.53.3 消除 NU1903；managed 核心随
+         Microsoft.Data.Sqlite 10 升级到 SQLitePCLRaw 3.0.x -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
   </ItemGroup>
 
   <ItemGroup>

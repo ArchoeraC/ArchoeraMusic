@@ -158,19 +158,17 @@ pub fn write_tags(path: &Path, content: &TagContent) -> Result<(), String> {
             let lrc = lyrics.trim();
             if !lrc.is_empty() {
                 // 先删旧歌词项，避免与源文件夹带的（可能是广告的）歌词并存。
-                tag.remove_key(&ItemKey::Lyrics);
+                tag.remove_key(ItemKey::Lyrics);
                 tag.insert_text(ItemKey::Lyrics, lrc.to_string());
             }
         }
         if let Some((data, mime)) = content.cover {
             if !data.is_empty() {
                 tag.remove_picture_type(PictureType::CoverFront);
-                let picture = Picture::new_unchecked(
-                    PictureType::CoverFront,
-                    Some(MimeType::from_str(mime)),
-                    None,
-                    data.to_vec(),
-                );
+                let picture = Picture::unchecked(data.to_vec())
+                    .pic_type(PictureType::CoverFront)
+                    .mime_type(MimeType::from_str(mime))
+                    .build();
                 tag.push_picture(picture);
             }
         }
@@ -190,7 +188,7 @@ pub fn write_tags(path: &Path, content: &TagContent) -> Result<(), String> {
             .map(|it| it.key().clone())
             .collect();
         for key in ad_keys {
-            tag.remove_key(&key);
+            tag.remove_key(key);
         }
     } // 结束 tag 借用
 
@@ -207,7 +205,7 @@ pub fn write_tags(path: &Path, content: &TagContent) -> Result<(), String> {
                 t.title(),
                 t.artist(),
                 t.album(),
-                t.get_string(&ItemKey::Lyrics).is_some(),
+                t.get_string(ItemKey::Lyrics).is_some(),
                 t.pictures().len(),
             ),
             None => log::warn!("写标签复查: 未找到任何标签: {}", path.display()),
@@ -348,7 +346,7 @@ mod tests {
         assert_eq!(t.title().as_deref(), Some("端到端标题"));
         assert_eq!(t.artist().as_deref(), Some("端到端歌手"));
         assert_eq!(t.album().as_deref(), Some("端到端专辑"));
-        assert!(t.get_string(&ItemKey::Lyrics).is_some());
+        assert!(t.get_string(ItemKey::Lyrics).is_some());
         eprintln!("端到端写标签成功: {:?}", t.title());
         let _ = std::fs::remove_file(&prefixed);
     }
@@ -426,11 +424,11 @@ mod tests {
             t.title(),
             t.artist(),
             t.album(),
-            t.get_string(&ItemKey::Lyrics).is_some(),
+            t.get_string(ItemKey::Lyrics).is_some(),
             t.pictures().len(),
         );
         assert_eq!(t.title().as_deref(), Some("真实文件标题"));
-        assert!(t.get_string(&ItemKey::Lyrics).is_some());
+        assert!(t.get_string(ItemKey::Lyrics).is_some());
         assert!(!t.pictures().is_empty(), "封面必须写入");
         let _ = std::fs::remove_file(&p);
     }
