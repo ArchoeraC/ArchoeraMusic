@@ -19,9 +19,13 @@
  * Windows（MSVC）无 POSIX socket：打印 SKIP 并以 ALL PASS 结束（成功路径已由
  * Zig 侧 `zig build test` 的 kernel/net.zig 单测覆盖）。
  */
-#if !defined(_WIN32)
-/* clock_gettime / CLOCK_MONOTONIC / nanosleep 需 POSIX 2008 特性宏（须在首个
- * 系统头之前定义）。 */
+#if defined(__APPLE__)
+/* macOS：启用 Darwin 扩展，使 clock_gettime / nanosleep / INADDR_LOOPBACK 等可见
+ * （严格 POSIX 宏会在 Darwin 上隐藏这些 BSD 符号）。 */
+#define _DARWIN_C_SOURCE
+#elif !defined(_WIN32)
+/* glibc：`-std=c11` 下 POSIX 2008 需显式声明（clock_gettime / nanosleep）。
+ * 须在首个系统头之前定义。 */
 #define _POSIX_C_SOURCE 200809L
 #endif
 #include <stdio.h>
