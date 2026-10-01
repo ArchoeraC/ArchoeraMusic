@@ -89,6 +89,18 @@ NativeDecoder *native_decoder_open_cb(void *ctx,
                                       char *errbuf, int errbuf_size);
 
 /**
+ * 从 **EraAudio 原生 HTTP(S)** 打开自研内核解码器（在线直链；内核自研请求/
+ * 响应解析，不依赖宿主 FFmpeg AVIO 传输，见 kernel/net.zig）。
+ *
+ * 契约同 [native_decoder_open]；`url` 仅在调用内被读取。失败（非 http(s) /
+ * 连接 / TLS / 状态码 / 未接管格式 / 内核未链接）返回 NULL 且 status_out 写
+ * 稳定状态码，调用方据此回退宿主 AVIO 路径或 FFmpeg 主后端。
+ */
+NativeDecoder *native_decoder_open_url(const char *url, NativeInfo *info,
+                                       int *status_out,
+                                       char *errbuf, int errbuf_size);
+
+/**
  * 解码最多 max_frames 帧 float32 交错 PCM。
  * @return >=0：实际帧数（每声道）；0 = EOF（正常文件尾）；
  *         <0：错误——-1 参数错误，其余为负 ZkStatus 状态码
@@ -123,6 +135,13 @@ int64_t native_decoder_position_samples(NativeDecoder *d);
 
 /** 关闭并释放（d 为 NULL 时为空操作） */
 void native_decoder_close(NativeDecoder *d);
+
+/**
+ * 中断解码：仅对 [native_decoder_open_url] 打开的原生 HTTP(S) 源有效——置位
+ * 中断标志并尽力 shutdown 底层连接以解除阻塞读（供 stop/SIGTERM 路径调用）；
+ * 其它源为空操作。线程安全：可与解码线程并发调用。
+ */
+void native_decoder_abort(NativeDecoder *d);
 
 /* ── 常驻内核池接入（S1，opt-in：mediaengine_lib 引擎线程在
  *   engine_mode==EraAudio 且 getenv("ARCHOERA_ERA_POOL") 时调用；池启用后

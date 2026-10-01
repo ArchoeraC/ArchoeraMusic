@@ -8,7 +8,10 @@
 //! `Reader` 提供统一的只读字节流视图，三种形态：
 //!   - file     ：本地文件（std.Io，跨平台：Linux/macOS/Windows）
 //!   - memory   ：内存切片（零拷贝、零分配，探针/测试主力）
-//!   - callback ：预留的流式输入（fd / 管道 / 未来网络流，§4.3 网络走预下载临时文件）
+//!   - callback ：宿主注入的流式输入（fd / 管道 / 宿主传输如 FFmpeg AVIO）
+//!
+//! 网络直链：另有 EraAudio 原生 HTTP(S)（`kernel/net.zig`，经 [openCallback] 桥接），
+//! 内核自研请求/响应解析；本节 callback 仍为零网络栈的宿主注入形态（回退路径）。
 //!
 //! 实现说明（Zig 0.16 std.Io 模型）：
 //!   - File 采用**位置读取**（readPositionalAll），无隐式文件位置状态，

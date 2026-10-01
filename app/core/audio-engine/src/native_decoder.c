@@ -26,6 +26,7 @@
 #include <pthread.h>
 
 #include "compat/qatomic.h"
+#include "era_log.h"
 
 #define LOG_TAG "[audio-engine:native-decoder]"
 
@@ -97,6 +98,7 @@ struct NativeDecoder {
     ZkInfo info;
     ZkEngineStream *stream; /* 池 stream seam 句柄（is_stream 时使用） */
     int is_stream;
+    int is_http; /* 原生 HTTP(S) 源（zk_decoder_open_url；abort 需 shutdown 连接） */
     /* seek 样本级对齐：seek 后待丢弃的前导样本数（自内核报告的首个输出样本到
      * 请求目标之间）。仅当内核提供样本级位置（zk_*_position_samples >= 0）时
      * 非零；read 路径按交错声道丢弃，跨块保持。 */
@@ -386,6 +388,79 @@ NativeDecoder *native_decoder_open_cb(void *ctx,
     return d;
 }
 
+/* 从 EraAudio 原生 HTTP(S) 打开（内核自研请求/响应解析，不经宿主 FFmpeg AVIO）。
+ * 池启用时走 zk_engine_open_url 流式 seam（与 path/mem/cb 一致）；否则直连
+ * decoder（zk_decoder_open_url）。失败返回 NULL 并由 status_out 写稳定状态码，
+ * 调用方据此回退宿主 AVIO 路径 / FFmpeg 主后端。 */
+NativeDecoder *native_decoder_open_url(const char *url, NativeInfo *info,
+                                       int *status_out,
+                                       char *errbuf, int errbuf_size)
+{
+    if (!url) return NULL;
+
+    ZkInfo zinfo;
+    char eb[512];
+    NativeDecoder *d;
+    ZkDecoder *zk = NULL;
+    ZkEngineStream *st = NULL;
+    ZkEngine *pool;
+    memset(&zinfo, 0, sizeof(zinfo));
+    memset(eb, 0, sizeof(eb));
+
+    /* 池启用时走 zk_engine 流式 seam；否则直连 decoder。 */
+    pool = pool_acquire();
+    if (pool) {
+        st = zk_engine_open_url(pool, url, &zinfo, eb, sizeof(eb));
+        if (!st) {
+            if (status_out) *status_out = read_le32_status(eb);
+            if (errbuf && errbuf_size > 0) {
+                snprintf(errbuf, errbuf_size, "%s", eb + 4);
+            }
+            return NULL;
+        }
+        QA_FETCH_ADD_RELAXED(&g_stream_opens, 1);
+        ERA_LOGD(NULL, "%s 原生 URL 经常驻池 seam 打开: %s\n", LOG_TAG, url);
+    } else {
+        zk = zk_decoder_open_url(url, &zinfo, eb, (int)sizeof(eb));
+        if (!zk) {
+            if (status_out) *status_out = read_le32_status(eb);
+            if (errbuf && errbuf_size > 0) {
+                snprintf(errbuf, errbuf_size, "%s", eb + 4);
+            }
+            return NULL;
+        }
+        ERA_LOGD(NULL, "%s 原生 URL 直连 decoder 打开: %s\n", LOG_TAG, url);
+    }
+
+    d = (NativeDecoder *)calloc(1, sizeof(*d));
+    if (!d) {
+        if (zk) zk_decoder_close(zk);
+        if (st) zk_engine_close(st);
+        if (status_out) *status_out = 7; /* ZK_OUT_OF_MEMORY */
+        if (errbuf && errbuf_size > 0) {
+            snprintf(errbuf, errbuf_size, "out of memory");
+        }
+        return NULL;
+    }
+    d->zk = zk;
+    d->stream = st;
+    d->is_stream = (st != NULL);
+    d->is_http = 1;
+    d->info = zinfo;
+
+    if (status_out) *status_out = 0;
+    if (info) {
+        info->sample_rate = zinfo.sample_rate;
+        info->channels = zinfo.channels;
+        info->bits_per_sample = zinfo.bits_per_sample;
+        info->duration_us = zinfo.duration_us;
+        info->duration_known = zinfo.duration_known;
+        info->codec_name = zinfo.codec_name;
+        info->format_name = zinfo.format_name;
+    }
+    return d;
+}
+
 /* 内核单次读取（>=0 帧数 / <0 错误码），不做前导裁剪。 */
 static long long native_read_raw(NativeDecoder *d, float *out, int max_frames,
                                  int *out_channels)
@@ -501,6 +576,17 @@ const char *native_decoder_codec_name(const NativeDecoder *d)
     return d->info.codec_name;
 }
 
+void native_decoder_abort(NativeDecoder *d)
+{
+    if (!d) return;
+    if (!d->is_http) return;
+    if (d->is_stream && d->stream) {
+        zk_engine_abort(d->stream); /* 池化 URL 流：解阻塞 + 会话取消 */
+    } else if (d->zk) {
+        zk_decoder_abort(d->zk); /* 直连 URL 流 */
+    }
+}
+
 void native_decoder_close(NativeDecoder *d)
 {
     if (!d) return;
@@ -593,6 +679,18 @@ NativeDecoder *native_decoder_open_cb(void *ctx,
     return NULL;
 }
 
+NativeDecoder *native_decoder_open_url(const char *url, NativeInfo *info,
+                                       int *status_out,
+                                       char *errbuf, int errbuf_size)
+{
+    (void)url; (void)info;
+    if (status_out) *status_out = 1; /* ZK_UNSUPPORTED */
+    if (errbuf && errbuf_size > 0) {
+        snprintf(errbuf, errbuf_size, "archoera_kernel 未链接（构建时无 zig）");
+    }
+    return NULL;
+}
+
 int native_decoder_read(NativeDecoder *d, float *out, int max_frames,
                         int *out_channels)
 {
@@ -641,6 +739,11 @@ const char *native_decoder_codec_name(const NativeDecoder *d)
 {
     (void)d;
     return "unknown";
+}
+
+void native_decoder_abort(NativeDecoder *d)
+{
+    (void)d;
 }
 
 void native_decoder_close(NativeDecoder *d)
