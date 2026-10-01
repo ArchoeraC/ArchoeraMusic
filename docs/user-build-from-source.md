@@ -188,7 +188,7 @@ makepkg -f --skipinteg --nocheck --nodeps                      # 产出 *.pkg.ta
 - **AUR makepkg 失败**：确认在 `packaging/linux/work/arch/` 内、`bundle.tar.zst` 存在、非 root 用户
   执行；跳过依赖检查用 `--nodeps`。
 - **本手册不是法律意见**：源码分发、第三方许可与授权边界详见根 `LICENSE`、各模块
-  `THIRD-PARTY-LICENSES.md` 与 README「使用声明」。
+  `THIRD-PARTY-LICENSES.md` 与 [docs/licensing.md](licensing.md) 的「使用声明」。
 
 ## 8. 相关文件速查
 

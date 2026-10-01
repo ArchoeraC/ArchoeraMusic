@@ -3,7 +3,7 @@
 > **温馨提醒**：开发者可能呆但不傻，请在完整阅读完贡献条款，确认您可以接受后，再进行 fork、PR 等操作。
 
 > **太长不看版**：
-> 1. 向本仓库提交代码即表示接受 [README「贡献者授权」](README.md#22-贡献者授权contributor-license-grant)（AGPL-3.0-or-later 不可撤销再许可授权）；
+> 1. 向本仓库提交代码即表示接受 [贡献者授权](docs/licensing.md#22-贡献者授权contributor-license-grant)（AGPL-3.0-or-later 不可撤销再许可授权）；
 > 2. 提交前本地跑通 `flutter analyze` + `flutter test`（改动原生模块时另跑对应构建/测试）；
 > 3. Commit 遵循 `type(scope): 中文描述`（Conventional Commits，见 §7）；
 > 4. 新增第三方依赖必须 AGPL 兼容，并在对应模块 `THIRD-PARTY-LICENSES.md` 逐项登记（§9）；
@@ -13,7 +13,7 @@
 > 8. **权限公平（§2.6）**：维护者不得借仓库权限威胁、设隐性合并门槛或无故拒绝合并；贡献不得附带隐性要求 / 强制许可要求；谩骂等违规 PR / Issue 无解释直接关闭。
 > 9. **安全漏洞私密上报**（[SECURITY.md](SECURITY.md)）：禁止公开 Issue / PR / Discussion 讨论漏洞细节；正常缺陷（UI Bug / 调用 bug / 通讯异常 / 崩溃等）照常走公开 Issue / PR。
 >
-> 本规范对所有协作者、贡献者生效；与 README 许可条款冲突时以 README / LICENSE 为准。
+> 本规范对所有协作者、贡献者生效；与许可条款冲突时以 [docs/licensing.md](docs/licensing.md) / LICENSE 为准。
 
 ---
 
@@ -38,7 +38,7 @@
 ## 1. 许可与贡献者授权（先读这个）
 
 - 本项目整体以 **AGPL-3.0-or-later** 发布（仓库根 `LICENSE`）。任何 PR / patch / 直接推送均视为
-  已接受 [README §2.2 贡献者授权](README.md#22-贡献者授权contributor-license-grant)：
+  已接受 [§2.2 贡献者授权](docs/licensing.md#22-贡献者授权contributor-license-grant)：
   授权版权持有者 BetaStudio2 将贡献代码连同项目整体以「AGPL-3.0 及任何更高版本」再许可、分发与修改。
   **PR 合入前需要通过签名或显式确认接受该条款**。
 - 贡献者署名权保留（git author / changelog），署名请使用真实可追溯的身份标识。
@@ -54,7 +54,7 @@
 
 - **禁止广告**：任何形式的广告 SDK、开屏 / 横幅 / 信息流广告、推广位、赞助内容注入均不得引入。
 - **禁止任何「付费才能解锁」模块**：会员墙、内购、订阅、限时限次解锁、功能付费等一律不得出现在
-  播放器内——内容与功能的完整体验不得与付费挂钩；本项目不提供闭源商业授权（README 使用声明）。
+  播放器内——内容与功能的完整体验不得与付费挂钩；本项目不提供闭源商业授权（[docs/licensing.md](docs/licensing.md) 使用声明）。
 - **禁止内网穿透 / 隧道类模块**：frp、ngrok 及同类反向隧道 / 内网上线工具一律禁止，包括为其预留的
   接口、配置项或「可选依赖」（与既有的本地 Subsonic 服务端无关，后者不涉及公网穿透）。
 - **禁止遥测 / 埋点 / 数据上报**：应用内统计、用户行为追踪、云端崩溃上报 SaaS 均不得引入；
@@ -116,7 +116,7 @@
   FFmpeg vs EraAudio**：比较口径以仓库内基准文档为准（`docs/archive/benchmark-industry-2026-09-05.md` 等），
   其「实验性参考、非发布承诺」定位与**已知短板声明**（如 flac 直解仍落后 FFmpeg 约 20×、
   tta/dts 内存峰值偏高等）必须一并呈现，**不得选择性引用有利数据**；FFmpeg 是本项目默认主引擎与
-  最大依赖，对其保持尊重与致谢（见 README 致谢节）。
+  最大依赖，对其保持尊重与致谢（见 [docs/acknowledgements.md](docs/acknowledgements.md)）。
 - **禁止谩骂**：任何 Issue / PR / 代码批注（review comments / 代码注释 / 文档措辞）/ 讨论中，
   对任何项目、作者、贡献者的侮辱、人身攻击、嘲讽一律禁止；对其他项目有意见走其官方渠道
   （Issue / 邮件列表）理性反馈，不借本仓库发泄。
@@ -282,13 +282,14 @@ cd app && flutter run -d linux      # 本地调试
 ### 5.3 C#（`app/core/scanner/`、`app/core/vault/`）
 
 - NativeAOT 约束：避免重型反射 / `dynamic` / 未注解的序列化，发布模式必须可 AOT。
-- vault 属安全边界：修改握手协议 / marker / 份额存储逻辑需同步更新 README 安全说明节，
+- vault 属安全边界：修改握手协议 / marker / 份额存储逻辑需同步更新
+  [docs/vault-security-notes.md](docs/vault-security-notes.md)，
   且测试改动不得把测试后门（`VAULT_TESTING` 条件编译）引入生产构建路径。
 
 ### 5.4 C++（`app/core/scraper/`）
 
 - CMake ≥ 3.16；新增依赖优先 header-only 并登记 `THIRD-PARTY-LICENSES.md`；
-  多源刮削新增数据源时同步更新 README 数据源列表与设置页文案（i18n）。
+  多源刮削新增数据源时同步更新 [docs/local-library.md](docs/local-library.md) 数据源列表与设置页文案（i18n）。
 
 ### 5.5 Rust（`app/core/downloader/`、`tempo-rs/`、`subsonic/transcoder/`）
 
@@ -394,8 +395,8 @@ PR 描述需包含：
   `> 状态：<稿次> · <日期>` 头部；决策变更用「修订块」注明日期与结论，不无痕改写历史结论
   （对齐 `docs/architecture.md` 的写法）。
 - **影响架构决策的 PR 必须同步文档**：`docs/architecture.md`（含「附：已确认决策记录」追加条目）、
-  受影响的专题文档、README 相应章节。
-- **面向用户的功能**（设置项、扫描/刮削行为、快捷操作）同步更新 README 功能描述。
+  受影响的专题文档、README / docs 相应章节。
+- **面向用户的功能**（设置项、扫描/刮削行为、快捷操作）同步更新 docs/ 对应功能文档（如 [docs/local-library.md](docs/local-library.md)）。
 - 模块内约定写模块 `README.md`（如 `app/lib/eta/README.md` 图标体系），不堆进根文档。
 - 文档语言：中文为主，代码 / 符号 / 命令保留原文。
 - **基准与性能文档**：性能 / 基准结论必须可复现——附环境、语料、方法与复现命令，
@@ -404,7 +405,7 @@ PR 描述需包含：
 
 ## 9. 第三方依赖与许可合规
 
-> 详见 [README「许可证」§2.5](README.md#25-第三方代码的约束)，本节为执行清单。
+> 详见 [许可与授权 §2.5](docs/licensing.md#25-第三方代码的约束)，本节为执行清单。
 
 - **许可白名单基线**：MIT / BSD / Apache-2.0 / ISC / MIT-0 / CC0 / OFL，以及 weak-copyleft
   （LGPL-2.1+ / MPL-2.0）在逐项登记后可引入。
@@ -418,7 +419,7 @@ PR 描述需包含：
   升级依赖须在 PR 说明动机与 diff 审查结论；构建期不得联网拉取未登记产物。
 - **登记义务**：每个引入的第三方依赖（直接与间接）必须在**对应模块**的
   `THIRD-PARTY-LICENSES.md` 逐项列明：上游来源、许可证、版权、涉及文件范围。
-- **字体 / 图标资源**同样受管：新字形来源与改作说明进 `app/eta-tools/` 对应 README 与根 README 致谢节；
+- **字体 / 图标资源**同样受管：新字形来源与改作说明进 `app/eta-tools/` 对应 README 与 [docs/acknowledgements.md](docs/acknowledgements.md)；
   非 OFL 字体（MiSans / HarmonyOS Sans）不得二次分发源文件或改编。
 - **品牌与 fork（品牌未授权）**：AGPL 授予的是**代码**自由，不含品牌——项目名 ArchoeraMusic、logo、
   自有品牌标识字体 EtaMark、官方发布渠道与签名，不得被 fork 用于暗示官方背书。fork 再分发须：
@@ -439,11 +440,11 @@ PR 描述需包含：
 - **漏洞私密上报**：**安全漏洞**（触及 vault / 凭据与会话、注入 / 提权 / 数据泄露、供应链投毒）
   一律按 [SECURITY.md](SECURITY.md) 走私密渠道（GitHub 私密漏洞报告），禁止公开 Issue / PR / Discussion
   讨论；修复发布前不公开细节。**正常缺陷**（UI Bug / 调用 bug / 通讯异常 / 崩溃等）仍走公开 Issue（§12）。
-- **vault 边界**（README 安全说明节为规范文本）：
+- **vault 边界**（[docs/vault-security-notes.md](docs/vault-security-notes.md) 为规范文本）：
   - 测试后门 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 仅存在于 `build-test.sh` 产物，
     绝不允许出现在生产构建路径或发布产物；
-  - PROD marker 双重校验（`--version` + 握手 marker）逻辑不得削弱，改动需同步 README 与
-    `docs/credential-vault-plan.md`；
+  - PROD marker 双重校验（`--version` + 握手 marker）逻辑不得削弱，改动需同步
+    `docs/vault-security-notes.md` 与 `docs/credential-vault-plan.md`；
   - 新增 env 开关遵循同一信任边界思路：显式 env 只服务测试/CI，生产路径不得设置。
 - **凭据落盘**一律走 vault（2-of-2）或 `enc:v1:` 字段级加密，禁止明文写配置 / 数据库 / 日志。
 - 涉及网络请求的改动注意：桌面端零 TCP 端口（戒律 1），不出网请求只允许既有平台 API / 刮削源 /
@@ -464,7 +465,7 @@ PR 描述需包含：
 - 功能开发用特性分支（`feat/xxx`、`fix/xxx`），PR 合入，不直接推主干（维护者小修可直接推但需符合 commit 规范）。
 - **历史保护**：`main` 禁止 force push 与已推送历史的改写 / rebase；纠错走新提交（优先 `revert`）。
 - **签名要求**：维护者的敏感提交——LICENSE 变更、版本发布（`chore(version)`）、本规范与 CI 变更——
-  必须 GPG / SSH 签名（许可升级的签名要求见 [README §2.4](README.md#24-升级流程预先约定)）。
+  必须 GPG / SSH 签名（许可升级的签名要求见 [§2.4 升级流程](docs/licensing.md#24-升级流程预先约定)）。
 
 ## 12. Issue 与缺陷报告
 
@@ -496,4 +497,4 @@ PR 描述需包含：
   追加编号条目 + 修订相关专题文档 + 在 PR 中显著标注，必要时开公告 Issue 收集反馈。
 - **评审纪律（§2.6）**：禁止借权限威胁、禁止设隐性合并门槛、禁止无故搁置合格 PR；
   拒绝合并须给出书面理由（红线命中除外，按无解释直接关闭执行）。
-- **许可升级**：仅按 [README §2.4 流程](README.md#24-升级流程预先约定) 执行（公告期 ≥ 30 天 + 签名提交）。
+- **许可升级**：仅按 [§2.4 升级流程](docs/licensing.md#24-升级流程预先约定) 执行（公告期 ≥ 30 天 + 签名提交）。

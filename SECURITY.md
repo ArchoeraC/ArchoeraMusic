@@ -48,7 +48,7 @@
 - **属于**：应用本体与全部原生模块（audio-engine / scanner / scraper / downloader / subsonic / vault）、
   FFI 边界、打包与升级路径（含二进制替换防护）。
 - **不属于**：自托管服务端（Subsonic / Jellyfin）自身的配置不当、第三方音乐平台 API 侧的问题、
-  需要物理接触设备或 OS 信任根已被攻破的场景（威胁模型边界见 README「安全说明」节）。
+  需要物理接触设备或 OS 信任根已被攻破的场景（威胁模型边界见 [docs/vault-security-notes.md](docs/vault-security-notes.md)）。
 
 ## 红线提醒
 
