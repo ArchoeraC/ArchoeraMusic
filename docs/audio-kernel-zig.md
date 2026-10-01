@@ -31,7 +31,7 @@
 > 时长/seek、容错、测试护栏等结论仍适用，冲突处以本文为准）。
 >
 > 依据：AGPL-3.0 项目，任何引入的第三方必须为 Permissive（MIT / Apache-2.0 / BSD / ISC / OFL /
-> MIT-0 / 公有领域）且与 AGPL 兼容（README「许可证」章节）。FFmpeg（LGPL-2.1+）以**动态链接 +
+> MIT-0 / 公有领域）且与 AGPL 兼容（[docs/licensing.md](licensing.md)）。FFmpeg（LGPL-2.1+）以**动态链接 +
 > RUNPATH=$ORIGIN 内嵌运行库**形式保留为**默认主引擎**（替换/重链权利见
 > `app/core/audio-engine/THIRD-PARTY-LICENSES.md` 特别声明）。
 
@@ -168,7 +168,7 @@
 4. 每个 vendored 组件必须登记"是否可自研"的裁决结论（§3.7），新格式一律先按自研评估（AAC 依此由 🔴 改 ✅ 自研，§9.5）
 5. FFmpeg（LGPL-2.1+）：**保持为默认主解码引擎**（`-Duse-ffmpeg` 默认开启，动态链接 + 内嵌运行库），
    保证现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（§8.3），发布版默认带（LGPL 合规说明同现状）；
-   明确不引入：faad2（GPL）、libfdk-aac（非自由）、任何 GPL/SSPL/商业源可用（README 红线）
+   明确不引入：faad2（GPL）、libfdk-aac（非自由）、任何 GPL/SSPL/商业源可用（[docs/licensing.md §2.5](licensing.md#25-第三方代码的约束)）
 ```
 
 ### 3.4 与已归档 C 方案（`archive/audio-kernel-no-ffmpeg.md`）的差异
@@ -623,8 +623,57 @@ pub const Reader = struct {
      形态接入——`on_read` 读 socket / 解 chunked，`on_seek` 发 Range 重定位（`whence` 见 io.zig 头注释），
      `ctx` 由宿主提供。每路一个 callback Reader = 一路轻量实例，128 路共享同一格式模块，开销仅为
      每路私有缓冲 + 解码状态（几十 KiB 级），不再为每路拉起一整套引擎；
-- **零网络栈原则（P2 不变）**：传输层（socket / TLS / Range / 重定向）全部由 C 壳 / 宿主注入，
-  内核经 `callback` 只消费字节流——内核仍零 curl/openssl 依赖；不支持网络栈时退回路径 1。
+- **网络栈边界（P2，2026-10-01 修订）**：默认可由宿主注入传输（`callback` 形态，内核零
+  curl/openssl 依赖）；**新增 EraAudio 原生 HTTP(S) 传输**（`kernel/net.zig`，见下方 2026-10-01
+  落地）——内核自带 URL 解析 / TCP / TLS / Range / 重定向 / chunked，经 `zk_decoder_open_url`
+  直连打开。原生路径优先、失败回退宿主 AVIO 传输与 FFmpeg 主后端（行为可用性不变）；
+  可用 `ARCHOERA_ERA_NATIVE_HTTP=0` 关闭原生路径。TLS 密码学原语复用 Zig std（非 FFmpeg），
+  请求/响应解析完全自研。
+
+> **落地（2026-10-01）：EraAudio 原生 HTTP(S) 传输（方向② 网络直连增强）**
+> - 内核：新增 `kernel/net.zig`——`HttpStream` 自持 `std.Io.Threaded` 与连接，完成
+>   URL 解析、TCP（`std.Io.net`）/ TLS（`std.crypto.tls.Client`，系统 CA）握手、
+>   HTTP/1.1 GET + `Range` + `Connection: close` 请求、响应头解析（`Content-Length` /
+>   `Content-Range` / `Transfer-Encoding: chunked` / `Location`）、重定向跟随（≤6 跳）、
+>   chunked 正文解码、以及以 `Range` 重发实现的随机 `seek`（服务端忽略 Range 时前向丢弃兜底）。
+> - ABI：新增 `zk_decoder_open_url` / `zk_decoder_abort`（`include/kernel_bridge.h`，加法式）；
+>   `engine.zkOpenUrl` 经 `io.Reader.openCallback` 把 `HttpStream` 桥接为内核 Reader。
+> - 断流重连 / 读超时（对齐 FFmpeg AVIO 的 `rw_timeout` / `reconnect*`）：瞬时读错误 /
+>   长度内提前 EOF / 读超时 → 自 `net_pos` 以 `Range` **续传**，重试上限 + 指数退避；
+>   读超时经独立 watchdog 线程（`std.Io.net` 不暴露 socket 超时且 std 阻塞读不允许
+>   EAGAIN，故不能用 `SO_RCVTIMEO`）：超时即 `shutdown(.both)` 解阻塞，读线程据 `wd_fired`
+>   判为瞬时超时并重连。配置 env：`ARCHOERA_ERA_HTTP_TIMEOUT_MS`（默认 15000；0 关闭）、
+>   `..._RECONNECT`（默认开）、`..._RECONNECT_MAX`（默认 3）、`..._RECONNECT_DELAY_MS`（默认 500）。
+> - C 壳：`native_decoder_open_url` + `pipeline_era_url_open` **优先**走原生 HTTP，
+>   失败回退既有 FFmpeg AVIO 宿主传输、再回退 FFmpeg 主后端；`pipeline_signal_shutdown` /
+>   `pipeline_destroy` 经 `native_decoder_abort` 置位并 shutdown 连接，保证 stop/SIGTERM
+>   不被阻塞网络读拖住（对齐 AVIOInterruptCB 语义）。`builder` 日志标记 `transport=native-http`。
+> - 日志口径（统一词表）：`[backend=zig|ffmpeg transport=native-http|ffmpeg-avio|direct|ffmpeg]`
+>   —— `native-http`（原生 HTTP 直链）/ `ffmpeg-avio`（宿主 AVIO 回调解码）/ `direct`
+>   （本地文件或 SegStore 内存源直解码）/ `ffmpeg`（FFmpeg 主后端）。同一会话"接管…"与
+>   "管线就绪"两行 transport 必须一致（2026-10-02 修正：此前原生 HTTP 被误标 `direct`）。
+> - 常驻池 seam：新增 `zk_engine_open_url` / `zk_engine_abort`（复用 session 的 cb seam，
+>   ctx=HttpStream、`cb_owner` 关流）；`ARCHOERA_ERA_POOL` 启用时 `native_decoder_open_url`
+>   优先走 `zk_engine_open_url`（与 path/mem/cb 一致），未启用回退直连 `zk_decoder_open_url`。
+>   池化 URL 的中断同样经 `zk_engine_abort`（`HttpStream.abort` + `Session.cancel`）。
+> - 验收：`kernel/net.zig` 单测 13 项（URL/重定向解析；本地并发 HTTP 服务端端到端：
+>   顺序读 + sizeHint / seek(start/current/end) / 跟随重定向 / chunked / 恒 200 前向 seek /
+>   **断流续传** / **读超时 watchdog 重连** / 关闭重连后按 EOF / **低进展连击上限** /
+>   **多路并存 + 关闭其一不影响另一路**）；
+>   C 级 `tests/test_native_http.c` 端到端（URL 打开解码 == 路径后端逐字节、seek、**断流续传**、
+>   **池化 URL seam**（`stream_opens` 增长证明命中）、**stop/SIGTERM 中断停滞读 <3s**、
+>   失败回退契约）；HTTPS 对 `example.com` 实测 TLS 握手 + Range 读 + seek 通过；
+>   `zig build test` 726 项全绿、C 壳 ctest 36 项全绿；Windows（`x86_64-windows-gnu`）
+>   内核交叉编译含 `zk_decoder_open_url` / `zk_decoder_abort` / `zk_engine_open_url`
+>   / `zk_engine_abort` 导出。
+> - 附带修复：`zk_engine_close` 对 `.failed`/`.fatal` 会话就地释放解码器并标记 closed
+>   （此前会落空到 `Session.deinit` 的 `state==closed` 断言）——池化 URL 流被 abort 后
+>   可能进入 failed，关闭不得崩。
+> - 附带修复（2026-10-02）：原生 HTTP 的 Io 由「每路一个 `std.Io.Threaded`」改为
+>   **全进程单一常驻 Io**（`net.zig :: globalIo`，从不 deinit）。每路独立 Threaded 的
+>   `deinit` 会恢复**旧 SIGIO handler**：跳转/切会话重建实例时旧实例先 deinit → handler
+>   还原为 `SIG_DFL` → 之后仍活跃实例触发 SIGIO 即令进程被信号终止（实机表现：跳转后
+>   进程退出，shell 报 "I/O possible"）。
 
 > **落地（2026-09-21）：callback 形态已从「预留」转为「已接入」**
 > - 内核：`io.Reader.openCallback` + `decoder.openReader`；新导出 `zk_decoder_open_cb`
@@ -2142,7 +2191,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
 | **Web 兼容路径存废** | 桌面不编码 | Phase A 临时禁用；确认废弃则删 `encode/` |
 | **高并发资源失控** | 128+ 路同时 open，fd/内存/CPU 被打满 | §8.4 主控簿记 + `cap` 上限（fd/内存双护栏）报 `error.InstanceLimit`；宿主 worker 池并发限流；HTTP 直连每实例极轻（几十 KiB 级） |
 | **多路状态污染** | 共享模块被某实例改写 → 杂音/崩溃 | 模块只含函数指针 + `comptime const` 表（零可变成员）；一切运行时状态存实例 ctx；主控强制模块只读约定（§8.4 不变量 1） |
-| **HTTP 直连依赖边界漂移** | 网络能力被误塞回内核，破坏 P2 零网络栈 | 传输（socket/TLS/Range/重定向）一律宿主注入，内核仅 `callback` 消费字节流；不支持网络栈退回预下载（§6.1） |
+| **HTTP 直连依赖边界漂移** | 网络能力边界在 2026-10-01 主动扩展（原生 HTTP(S)）；风险转为「内核网络栈可靠性/安全」 | 原生传输集中在单一 `kernel/net.zig`（可整体替换/关闭）；TLS 仅用 std 密码学、系统 CA 校验、失败 fail-closed；`ARCHOERA_ERA_NATIVE_HTTP=0` 关闭并回退宿主 AVIO；宿主 AVIO 与 FFmpeg 回退路径保留（§6.1） |
 
 ---
 
@@ -2208,7 +2257,8 @@ void        zk_dsp_destroy(ZkDspChain *d);
     资源上限（原子计数，超 `cap` 报错），**仍不持线程**——执行调度在宿主 worker 池。目标支撑
     **128 路并发**（HTTP 直连 / 批量 tag / 扫描等），规避 FFmpeg"N 路 = N×(完整引擎上下文)"开销爆炸；
     仅覆盖 Zig 接管格式，FFmpeg per-context 兜底不变（§8.3）。零拷贝仅限单线程 Sync-Direct；
-    HTTP 直连经 `io.Reader.callback`（on_read/on_seek + Range），传输由宿主注入，内核保持零网络栈（P2）。
+    HTTP 直连经 `io.Reader.callback`（on_read/on_seek + Range）；另有 EraAudio 原生 HTTP(S)
+    （`kernel/net.zig` + `zk_decoder_open_url`，2026-10-01 落地，见 §6.1），宿主注入路径保留为回退。
      依据：FFmpeg 模型对高并发资源放大 + 用户对 FFmpeg 多线程/实例化开销不满（详见 §8.4 动机）。
      修订 2026-09-09：本项"主控不持线程、执行调度在宿主 worker 池"已被
      `docs/engine-master-pool-design.md` 取代——执行调度线程（Master 事件线程 + Pool worker）
