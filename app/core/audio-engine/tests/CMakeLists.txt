@@ -342,6 +342,27 @@ add_test(NAME test_native_callback_seek
 set_tests_properties(test_native_callback_seek PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# EraAudio 原生 HTTP(S) 端到端（kernel/net.zig + native_decoder_open_url）：
+# 内起最小 Range 服务端提供本地音频，经 URL 打开解码，流参数/PCM 与路径后端
+# 逐字节一致；覆盖 seek 与失败回退契约。Windows（无 POSIX socket）打印 SKIP。
+add_executable(test_native_http test_native_http.c)
+target_link_libraries(test_native_http PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_native_http PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_native_http PRIVATE m)
+endif()
+target_include_directories(test_native_http PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_native_http
+         COMMAND test_native_http
+                 ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac)
+set_tests_properties(test_native_http PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # 集成测试（需要输入文件的跳过 CTEST，仅通过手动运行）
 # add_engine_test(test_pipeline test_pipeline.c)
 

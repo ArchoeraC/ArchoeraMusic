@@ -33,6 +33,7 @@ pub const khost = @import("khost.zig");
 pub const runtime = @import("runtime.zig");
 pub const decoder = @import("decoder.zig");
 pub const streambuf = @import("streambuf.zig");
+pub const net = @import("net.zig");
 pub const gsm = @import("fmt/wav/gsm.zig");
 pub const mace = @import("fmt/wav/mace.zig");
 pub const wav = @import("fmt/wav/lib.zig");
@@ -96,6 +97,19 @@ export fn zk_decoder_open_cb(
     return engine.zkOpenCallback(ctx, read_fn, seek_fn, @intCast(size_hint), info, errbuf, errbuf_size);
 }
 
+/// 从 **EraAudio 原生 HTTP(S)** 打开解码器（在线直链；内核自研请求/响应解析，
+/// 不经宿主 FFmpeg AVIO）。契约同 [zk_decoder_open]；失败（非 http(s)/连接/
+/// TLS/状态码/未接管格式）返回 null 并写 errbuf，C 壳据此回退 AVIO/FFmpeg。
+/// URL 仅在本调用内存活；成功后网络流归 Engine，[zk_decoder_close] 自动关闭。
+export fn zk_decoder_open_url(
+    url: [*:0]const u8,
+    info: *engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: c_int,
+) ?*engine.Engine {
+    return engine.zkOpenUrl(std.mem.span(url), info, errbuf, errbuf_size);
+}
+
 /// 解码最多 max_frames 帧 float32 交错到 out。
 /// 返回 >=0 帧数（0 = EOF）；错误返回负值（-err.Status，见 include/kernel_bridge.h）。
 export fn zk_decoder_read(
@@ -125,6 +139,12 @@ export fn zk_decoder_position_samples(d: *engine.Engine) i64 {
 /// 释放解码会话（含底层文件句柄与全部缓冲）；d 为 NULL 时为空操作（头契约）。
 export fn zk_decoder_close(d: ?*engine.Engine) void {
     if (d) |e| engine.zkClose(e);
+}
+
+/// 中断解码：仅对 EraAudio 原生 HTTP(S) 源有效（置位 + 尽力 shutdown 连接以
+/// 解除阻塞读）；其它源为空操作。d 为 NULL 时为空操作。
+export fn zk_decoder_abort(d: ?*engine.Engine) void {
+    if (d) |e| engine.zkAbort(e);
 }
 
 /// 注入统一日志 sink（宿主 C 壳把 libarchoera_log 的 archoera_log_write 指针传来；
@@ -924,6 +944,10 @@ export fn zk_metadata_get_concurrency() c_int {
 const Stream = struct {
     host: *khost.Host,
     s: *session.Session,
+    /// 原生 URL 流的网络句柄（非 URL 源为 null）。仅供 [zk_engine_abort] 解阻塞；
+    /// **不拥有生命周期**——所有权在会话 cb_owner，[zk_engine_close] 经
+    /// `Session.destroy` 调用 `urlStreamDestroy` 关闭。
+    http: ?*net.HttpStream = null,
 };
 
 fn fillErrStatus(buf: [*]u8, buf_size: usize, status: c_int) void {
@@ -950,7 +974,7 @@ export fn zk_engine_open(
         host.streamClose();
         return null;
     };
-    return streamAdopt(host, sess, info, errbuf, errbuf_size, false);
+    return streamAdopt(host, sess, info, errbuf, errbuf_size, false, null);
 }
 
 /// AS2：打开**专属 worker（pinned 1:1）**流式会话（契约同 [zk_engine_open]）。
@@ -969,7 +993,7 @@ export fn zk_engine_open_pinned(
         host.streamClose();
         return null;
     };
-    return streamAdopt(host, sess, info, errbuf, errbuf_size, true);
+    return streamAdopt(host, sess, info, errbuf, errbuf_size, true, null);
 }
 
 /// 打开**内存源**流式会话（契约同 [zk_engine_open]）；`data` 所有权归调用方，
@@ -988,7 +1012,7 @@ export fn zk_engine_open_mem(
         host.streamClose();
         return null;
     };
-    return streamAdopt(host, sess, info, errbuf, errbuf_size, false);
+    return streamAdopt(host, sess, info, errbuf, errbuf_size, false, null);
 }
 
 /// 打开**宿主回调流**流式会话（契约同 [zk_engine_open]）。`ctx`/回调生命周期归
@@ -1022,7 +1046,61 @@ export fn zk_engine_open_cb(
         host.streamClose();
         return null;
     };
-    return streamAdopt(host, sess, info, errbuf, errbuf_size, false);
+    return streamAdopt(host, sess, info, errbuf, errbuf_size, false, null);
+}
+
+/// URL 流源上下文的析构（会话销毁时经 `Session.destroy` 调用；关闭网络连接并释放）。
+/// allocator 由会话传入，但 HttpStream 自持 gpa（c_allocator），此处忽略。
+fn urlStreamDestroy(ctx: *anyopaque, allocator: std.mem.Allocator) void {
+    _ = allocator;
+    (@as(*net.HttpStream, @ptrCast(@alignCast(ctx)))).close();
+}
+
+/// 打开**EraAudio 原生 HTTP(S)** 流式会话（契约同 [zk_engine_open]）。内核自研
+/// 请求/响应解析（net.zig）；URL 仅在本调用内被读取。会话复用回调 seam：ctx 即
+/// HttpStream，on_read/on_seek 指向其回调，cb_owner 在会话销毁时关闭网络流。
+/// 失败（非 http(s)/连接/TLS/状态码/重定向/格式未接管/OOM）返回 NULL，
+/// 调用方可回退 [zk_decoder_open_url]（再回退宿主 FFmpeg/AVIO）。
+export fn zk_engine_open_url(
+    h: ?*khost.Host,
+    url: [*:0]const u8,
+    info: ?*engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: usize,
+) ?*Stream {
+    const host = h orelse return null;
+    if (!host.streamOpen()) return null; // max_streams 满 → InstanceLimit（errbuf 语义不变）
+    const hs = net.HttpStream.open(std.heap.c_allocator, std.mem.span(url)) catch |e| {
+        host.streamClose();
+        engine.fillErrBuf(errbuf, @intCast(errbuf_size), e);
+        return null;
+    };
+    const cb = io.Reader.Callback{
+        .ctx = @ptrCast(hs),
+        .on_read = net.HttpStream.readCb,
+        .on_seek = net.HttpStream.seekCb,
+        .size_hint = hs.sizeHint(),
+    };
+    const sess = session.Session.createCallback(
+        std.heap.c_allocator,
+        cb,
+        .{ .ctx = @ptrCast(hs), .destroy = urlStreamDestroy },
+    ) catch {
+        hs.close();
+        host.streamClose();
+        engine.fillErrBuf(errbuf, @intCast(errbuf_size), error.OutOfMemory);
+        return null;
+    };
+    return streamAdopt(host, sess, info, errbuf, errbuf_size, false, hs);
+}
+
+/// 中断流式会话（供 stop/SIGTERM 路径）：原生 URL 源置位中断标志并尽力
+/// `shutdown` 连接以解除阻塞网络读（best-effort），同时标记会话取消；其它源为
+/// 空操作。线程安全：可与池 worker 的解码并发调用；st 为 NULL 时空操作。
+export fn zk_engine_abort(st: ?*Stream) void {
+    const s = st orelse return;
+    if (s.http) |h| h.abort(); // 解阻塞网络读（HttpStream 自持连接锁）
+    s.s.cancel(); // 标记会话：后续拉块步首观察到 → failed(error.Aborted)
 }
 
 /// 会话建成后的公共收尾：挂 Stream 壳 → 池内 start → 等完工 → info/errbuf。
@@ -1035,13 +1113,14 @@ fn streamAdopt(
     errbuf: [*]u8,
     errbuf_size: usize,
     pinned: bool,
+    http: ?*net.HttpStream,
 ) ?*Stream {
     const st = std.heap.c_allocator.create(Stream) catch {
         sess.destroy();
         host.streamClose();
         return null;
     };
-    st.* = .{ .host = host, .s = sess };
+    st.* = .{ .host = host, .s = sess, .http = http };
     var started = false;
     if (pinned) started = sess.startPinned(host.rt);
     if (!started) started = sess.start(host.rt);
@@ -1161,6 +1240,13 @@ export fn zk_engine_close(st: ?*Stream) void {
     } else if (s.s.state == session.SessState.playing or s.s.state == session.SessState.new) {
         _ = s.s.close(s.host.rt);
         task.wait(&s.s.step);
+    } else if (s.s.state == session.SessState.failed or s.s.state == session.SessState.fatal) {
+        // 失败/致命会话（如原生 URL 流被 abort）：state 已非 playing，不再派发
+        // close 步骤，就地释放解码器与会话壳（否则 deinit 断言 state==closed 会崩）。
+        s.s.releasePin(s.host.rt); // AS2：归还专属 worker（幂等）
+        if (s.s.dec) |*d| d.deinit();
+        s.s.dec = null;
+        s.s.state = .closed;
     }
     s.s.deinit(); // Session.deinit 自释放会话壳
     s.host.streamClose(); // 最后一个流关闭时若停机待收尾 → 释放 host/rt

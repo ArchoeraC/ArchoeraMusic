@@ -31,7 +31,7 @@
 
 ## 检查清单
 
-- [ ] 接受贡献者授权（README §2.2，AGPL-3.0-or-later 不可撤销再许可）
+- [ ] 接受贡献者授权（[docs/licensing.md §2.2](../docs/licensing.md#22-贡献者授权contributor-license-grant)，AGPL-3.0-or-later 不可撤销再许可）
 - [ ] 未触碰红线（CONTRIBUTING §2.1–2.6：广告 / 付费墙 / frp / 遥测 / 非 FFI 运行时 / 平台歧视 / 舞弊 / 注入 / 供应链投毒 / 非公开依赖 / 个人数据）
 - [ ] 新增依赖已登记 `THIRD-PARTY-LICENSES.md` 且许可合规（§9）；锁定文件已更新
 - [ ] 新增数据存储已在描述中注明存储位置与访问方（§2.5）
