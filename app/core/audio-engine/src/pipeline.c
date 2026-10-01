@@ -69,6 +69,7 @@ struct AudioPipeline {
     NativeDecoder *native;      /* 自研 Zig 内核（engine_mode==EraAudio 且接管成功）；
                                   非 NULL 时为本解码源（FFmpeg 不再打开） */
     bool         native_active; /* 解码源是否为自研内核 */
+    bool         native_http;   /* native 源是否为 EraAudio 原生 HTTP(S)（transport 口径） */
     const char  *backend;       /* 实际解码后端："zig" / "ffmpeg"（F5 ready 事件上报） */
     int          native_status; /* native open 失败状态码（ZkStatus；成功=0） */
     char         native_err[256]; /* native open 失败诊断（仅日志） */
@@ -245,10 +246,40 @@ static int era_url_take_error(AudioPipeline *p)
     return ((EraUrlCb *)p->era_url_cb)->io_error;
 }
 
-/* 打开 URL → 构造 AVIO 宿主传输 → 回调式自研内核解码。
- * 成功置 p->native / p->native_active / p->era_url_cb；失败不残留资源。 */
+/* 打开 URL → 优先 EraAudio 原生 HTTP(S)，失败回退 FFmpeg AVIO 宿主传输。
+ * 成功置 p->native / p->native_active（+ native-http 时无 era_url_cb）；失败不残留资源。 */
 static int pipeline_era_url_open(AudioPipeline *p, const char *url)
 {
+    /* 0) EraAudio 原生 HTTP(S)：内核自研请求/响应解析（连接/TLS/Range/重定向），
+     *    不经宿主 FFmpeg AVIO（docs/audio-kernel-zig.md §6.1/§7 增强）。
+     *    ARCHOERA_ERA_NATIVE_HTTP=0 可显式关闭（回退下方 AVIO），便于对照/排障。 */
+#if defined(HAS_ARCHOERA_KERNEL)
+    {
+        const char *nv = getenv("ARCHOERA_ERA_NATIVE_HTTP");
+        const int enabled = !(nv && nv[0] == '0' && nv[1] == '\0');
+        if (enabled) {
+            NativeInfo ninfo;
+            int nst = 1; /* 默认 unsupported */
+            p->native = native_decoder_open_url(
+                url, &ninfo, &nst, p->native_err, sizeof(p->native_err));
+            p->native_status = nst;
+            if (p->native) {
+                p->native_active = true;
+                p->native_http = true; /* transport 口径统一为 native-http */
+                ERA_LOGI(NULL,
+                        "%s EraAudio: 接管在线流（%s）— codec=%s / fmt=%s"
+                        " [transport=native-http]\n",
+                        LOG_TAG, url, ninfo.codec_name ? ninfo.codec_name : "?",
+                        ninfo.format_name ? ninfo.format_name : "?");
+                return 0;
+            }
+            ERA_LOGW(NULL,
+                    "%s EraAudio: 原生 HTTP 未接管 (status=%d %s)"
+                    " → 回退 FFmpeg AVIO 宿主传输（将重新发起 HTTP 请求）\n",
+                    LOG_TAG, nst, p->native_err[0] ? p->native_err : "");
+        }
+    }
+#endif
     EraUrlCb *cb = (EraUrlCb *)calloc(1, sizeof(*cb));
     if (!cb) return -1;
     /* 确保 FFmpeg 日志回调已装（URL 传输可能先于任何 decoder_open 发生）。 */
@@ -546,6 +577,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             native_decoder_close(p->native);
             p->native = NULL;
             p->native_active = false;
+            p->native_http = false; /* 已回退 FFmpeg：transport 口径同步复位 */
             if (p->era_url_cb) { /* 在线回调流：native 已关，释放宿主 AVIO 传输 */
                 EraUrlCb *cb = (EraUrlCb *)p->era_url_cb;
                 cb->aborted = 1; /* 打断任何在途阻塞 IO 后再关闭 */
@@ -590,7 +622,9 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             LOG_TAG, out_rate, out_channels,
             p->cfg.skip_encoder ? "PCM(无编码)" : "Opus 编码",
             p->native_active ? "zig" : "ffmpeg",
-            p->era_url_cb ? "ffmpeg-avio" : (p->native_active ? "direct" : "ffmpeg"));
+            p->native_http ? "native-http"
+                           : (p->era_url_cb ? "ffmpeg-avio"
+                                            : (p->native_active ? "direct" : "ffmpeg")));
     return p;
 
 fail:
@@ -780,6 +814,13 @@ ssize_t pipeline_process(AudioPipeline *p)
             int ret = native_process_chunk(p);
             if (ret <= 0) {
                 if (ret < 0) {
+                    if (ret == -5) {
+                        /* -5 = ZK_ABORTED：stop/SIGTERM/切歌/跳转重建触发的主动中止，
+                         * 属**预期收尾**，非解码错误——不打 FATAL、不产生 error 事件。 */
+                        ERA_LOGI(NULL, "%s EraAudio 会话中止（预期）\n", LOG_TAG);
+                        p->eof = true;
+                        return 0;
+                    }
                     ERA_LOGF(NULL, "%s EraAudio 解码错误: %d（%s）\n", LOG_TAG, ret,
                              era_zk_status_hint(ret));
                     return ret;
@@ -1035,6 +1076,10 @@ void pipeline_signal_shutdown(AudioPipeline *p)
     if (p->era_url_cb) {
         ((EraUrlCb *)p->era_url_cb)->aborted = 1;
     }
+    /* 原生 HTTP 源（无 era_url_cb）：请求内核置位并 shutdown 连接解阻塞。 */
+    if (p->native_active && !p->era_url_cb && p->native) {
+        native_decoder_abort(p->native);
+    }
 }
 
 double pipeline_get_duration(const AudioPipeline *p)
@@ -1089,6 +1134,7 @@ void pipeline_destroy(AudioPipeline *p)
     if (!p) return;
     /* 先请求中断：若 native 关闭/AVIO 关闭会等待在途阻塞 IO，中断标志让其尽快返回 */
     if (p->era_url_cb) ((EraUrlCb *)p->era_url_cb)->aborted = 1;
+    if (p->native_active && !p->era_url_cb && p->native) native_decoder_abort(p->native);
     if (!p->flushed && p->encoder) {
         encoder_flush(p->encoder);
         p->flushed = true;

@@ -114,6 +114,17 @@ ZkDecoder *zk_decoder_open_cb(void *ctx, zk_read_cb on_read, zk_seek_cb on_seek,
                               ZkInfo *info, char *errbuf, int errbuf_size);
 
 /**
+ * 从 **EraAudio 原生 HTTP(S)** 打开解码器（在线直链；内核自研请求/响应解析，
+ * 不经宿主 FFmpeg AVIO 传输）。契约与 [zk_decoder_open] 完全一致；`url` 仅在
+ * 本调用内被读取，成功后网络流由 ZkDecoder 持有，[zk_decoder_close] 自动关闭。
+ *
+ * 仅接受 `http://` / `https://`；连接/TLS/状态码/重定向失败或格式未接管时
+ * 返回 NULL，C 壳据此回退宿主 AVIO / FFmpeg 主后端。
+ */
+ZkDecoder *zk_decoder_open_url(const char *url, ZkInfo *info,
+                               char *errbuf, int errbuf_size);
+
+/**
  * 解码最多 max_frames 帧 float32 交错 PCM。
  * @return >=0：实际输出帧数（0 = EOF，正常文件尾）；
  *         <0：解码错误，返回值 = -（enum ZkStatus 状态码），
@@ -141,6 +152,13 @@ long long zk_decoder_position_samples(ZkDecoder *d);
 
 /** 释放解码会话（含底层文件句柄与全部缓冲）；d 为 NULL 时为空操作 */
 void zk_decoder_close(ZkDecoder *d);
+
+/**
+ * 中断解码：仅对 [zk_decoder_open_url] 打开的原生 HTTP(S) 源有效——置位中断
+ * 标志并尽力 shutdown 底层连接以解除阻塞读（best-effort，供 stop/SIGTERM 路径
+ * 调用）；其它源为空操作。线程安全：可与解码线程并发调用。
+ */
+void zk_decoder_abort(ZkDecoder *d);
 
 /* ---- DSP 下沉（kernel/dsp；docs/audio-kernel-zig.md §14，扩张计划方向① 地基）----
  *
@@ -314,6 +332,27 @@ ZkEngineStream *zk_engine_open_cb(ZkEngine *h, void *ctx,
                                   zk_read_cb on_read, zk_seek_cb on_seek,
                                   unsigned long long size_hint,
                                   ZkInfo *info, char *errbuf, size_t errbuf_size);
+
+/**
+ * 同上，但从 **EraAudio 原生 HTTP(S)** 打开（在线直链；内核自研请求/响应解析，
+ * 见 kernel/net.zig），与 path/mem/cb 源一致走常驻池 seam。契约同
+ * [zk_engine_open]：失败返回 NULL 并写 errbuf 稳定状态码；`url` 仅在调用内被读取，
+ * 成功后网络流归会话，[zk_engine_close] 自动关闭。
+ *
+ * 失败语义：非 http(s) / 连接 / TLS / 状态码 / 重定向 / 格式未接管 / OOM /
+ * 流计数满（InstanceLimit）→ NULL。池未启用（`ARCHOERA_ERA_POOL` 关闭）时调用方
+ * 回退 [zk_decoder_open_url]（直连，再回退宿主 FFmpeg/AVIO），与既有 URL 路径一致。
+ */
+ZkEngineStream *zk_engine_open_url(ZkEngine *h, const char *url,
+                                   ZkInfo *info, char *errbuf, size_t errbuf_size);
+
+/**
+ * 中断流式会话（供 stop/SIGTERM 路径调用）：仅对 [zk_engine_open_url] 打开的
+ * 原生 URL 源置位中断标志并尽力 `shutdown` 底层连接以解除阻塞网络读
+ * （best-effort），同时标记会话取消（后续拉块步首观察到 → Aborted）；其它源
+ * 为空操作。线程安全：可与池 worker 的解码并发调用；s 为 NULL 时空操作。
+ */
+void zk_engine_abort(ZkEngineStream *s);
 
 /**
  * 逐步拉块解码到 out（float32 交错，最多 max_frames 帧）。

@@ -21,6 +21,7 @@ const err = @import("error.zig");
 const decoder = @import("decoder.zig");
 const kernel_io = @import("io.zig");
 const streambuf = @import("streambuf.zig");
+const net = @import("net.zig");
 const convert = @import("pcm/convert.zig");
 
 const Allocator = std.mem.Allocator;
@@ -88,6 +89,8 @@ pub const Engine = struct {
     cb_buffer: []u8 = &.{},
     /// 回调流形态的 C 回调适配器（非回调打开时为 null；close 时释放）
     cb_adapter: ?*CbAdapter = null,
+    /// EraAudio 原生 HTTP(S) 源（zk_open_url；close 时释放并关闭连接）
+    http: ?*net.HttpStream = null,
 };
 
 /// C ABI 回调函数指针（与 `include/kernel_bridge.h` 的 zk_read_cb / zk_seek_cb 对齐）
@@ -310,9 +313,98 @@ pub fn openMetadata(path: []const u8, info: *decoder.Info) !decoder.OpenedMeta {
     return decoder.openMeta(std.heap.c_allocator, path, info);
 }
 
+/// 从 **EraAudio 原生 HTTP(S)** 打开解码器（在线直链；本内核自研请求/响应解析，
+/// 不再依赖宿主 FFmpeg AVIO 传输，见 net.zig 头注）。
+///
+/// 与 [zkOpenCallback] 的差异：传输（连接/TLS/Range/重定向/chunked）完全由内核
+/// 自主发起与持有，`url` 生命周期仅在本次调用内；成功后由 Engine 持有网络流，
+/// [zkClose] 自动关闭。失败返回 null 并写 errbuf（供 C 壳回退 FFmpeg/AVIO）。
+pub fn zkOpenUrl(
+    url: []const u8,
+    info: *ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: c_int,
+) ?*Engine {
+    const gpa = std.heap.c_allocator;
+    const hs = net.HttpStream.open(gpa, url) catch |e| {
+        fillErrBuf(errbuf, errbuf_size, e);
+        return null;
+    };
+    // N4：peek 缓冲向进程预算记账（与 zkOpenCallback 同法，默认预算不限）。
+    const peek = streambuf.peek();
+    streambuf.acquire(peek) catch {
+        hs.close();
+        fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
+        return null;
+    };
+    const buf = gpa.alloc(u8, peek) catch {
+        streambuf.release(peek);
+        hs.close();
+        fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
+        return null;
+    };
+    var reader = kernel_io.Reader.openCallback(.{
+        .ctx = @ptrCast(hs),
+        .on_read = net.HttpStream.readCb,
+        .on_seek = net.HttpStream.seekCb,
+        .size_hint = hs.sizeHint(),
+    }, buf);
+
+    var zinfo: decoder.Info = undefined;
+    var dec = decoder.openReader(gpa, &reader, &zinfo) catch |e| {
+        streambuf.release(buf.len);
+        gpa.free(buf);
+        hs.close();
+        fillErrBuf(errbuf, errbuf_size, e);
+        return null;
+    };
+    const eng = gpa.create(Engine) catch {
+        dec.deinit();
+        streambuf.release(buf.len);
+        gpa.free(buf);
+        hs.close();
+        fillErrBuf(errbuf, errbuf_size, error.OutOfMemory);
+        return null;
+    };
+    eng.* = .{
+        .allocator = gpa,
+        .dec = dec,
+        .info = zinfo,
+        .raw = &.{},
+        .cb_buffer = buf,
+        .http = hs,
+    };
+    info.* = .{
+        .sample_rate = @intCast(zinfo.sample_rate),
+        .channels = @intCast(zinfo.channels),
+        .bits_per_sample = @intCast(zinfo.bits_per_sample),
+        .duration_us = zinfo.duration_us,
+        .duration_known = switch (zinfo.duration_known) {
+            .exact => 0,
+            .estimate => 1,
+            .unknown => 2,
+        },
+        .codec_name = zinfo.codec_name.ptr,
+        .format_name = zinfo.format_name.ptr,
+        .title = metaPtr(zinfo.metadata.title),
+        .artist = metaPtr(zinfo.metadata.artist),
+        .album = metaPtr(zinfo.metadata.album),
+        .date = metaPtr(zinfo.metadata.date),
+        .genre = metaPtr(zinfo.metadata.genre),
+        .comment = metaPtr(zinfo.metadata.comment),
+    };
+    return eng;
+}
+
 /// 可空 NUL 终止切片 → C 指针（null 直传）
 fn metaPtr(s: ?[:0]const u8) ?[*:0]const u8 {
     return if (s) |v| v.ptr else null;
+}
+
+/// 中断解码（在线原生 HTTP 源）：置位并尽力关闭连接以解除阻塞读（best-effort）。
+/// 非 URL 源为空操作。供 C 壳 stop/SIGTERM 路径调用（对应 AVIO 的中断回调）。
+pub fn zkAbort(d: *Engine) void {
+    if (d.http) |h| h.abort();
 }
 
 /// 解码最多 `max_frames` 帧到 `out`（float32 交错），返回实际帧数。
@@ -382,11 +474,12 @@ pub fn zkPositionSamples(d: *Engine) i64 {
     return d.dec.positionSamples();
 }
 
-/// 释放会话全部资源（含 decoder、raw 缓冲与回调适配器）
+/// 释放会话全部资源（含 decoder、raw 缓冲、回调适配器与原生 HTTP 源）
 pub fn zkClose(d: *Engine) void {
     const gpa = d.allocator;
     if (d.raw.len > 0) gpa.free(d.raw);
     d.dec.deinit();
+    if (d.http) |h| h.close();
     if (d.cb_buffer.len > 0) {
         streambuf.release(d.cb_buffer.len); // N4：归还预算记账（与 zkOpenCallback 成对）
         gpa.free(d.cb_buffer);

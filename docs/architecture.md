@@ -559,7 +559,7 @@ ArchoeraMusic/
 
 | 环节 | 做法 |
 |---|---|
-| 原生二进制 | 各模块 CMake / cargo / dotnet / go 构建（README「构建与运行」与 CI workflows；Windows 一站式 `app/core/build_windows.bat`） |
+| 原生二进制 | 各模块 CMake / cargo / dotnet / go 构建（[docs/user-build-from-source.md](user-build-from-source.md) 与 CI workflows；Windows 一站式 `app/core/build_windows.bat`） |
 | Flutter 构建 | `flutter build linux/windows/macos`；平台壳负责 FFI 库定位与资源路径 |
 | 产物结构 | `ArchoeraMusic + resources/{bin/*, lib/*}`（原生依赖按平台裁剪；无 Node 运行时） |
 | 分发 | Linux AppImage/tar；Windows zip（无签名 → SmartScreen 提示，自用接受）；macOS 未签名（Gatekeeper 右键打开；必要时 ad-hoc 签名） |
