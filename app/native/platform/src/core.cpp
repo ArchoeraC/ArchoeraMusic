@@ -130,4 +130,18 @@ AplEvent makeDeepLink() {
     return e;
 }
 
+AplEvent makeTrayClick(int32_t type) {
+    AplEvent e{};
+    e.type = type;
+    e.u.tray = 1;
+    return e;
+}
+
+AplEvent makeTrayMenuCommand(int32_t id) {
+    AplEvent e{};
+    e.type = APL_EVENT_TRAY_MENU_COMMAND;
+    e.u.tray_command.id = id;
+    return e;
+}
+
 }  // namespace archoera

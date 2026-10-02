@@ -18,8 +18,9 @@ depends=(
   'glibc'
   'gcc-libs'
   'gtk3'
-  # 托盘/窗口原生桥（nativeapi）走 StatusNotifierItem over D-Bus，依赖 gtk3 + libx11 + libxi
-  # platform bridge（native/libarchoera_platform.so）链接 libdbus-1.so.3
+  # 平台桥接（native/libarchoera_platform.so）：托盘走 StatusNotifierItem +
+  # dbusmenu（libdbus-1.so.3），窗口状态经 dlopen GTK/GDK（gtk3 + libx11 + libxi）。
+  # 均为既有依赖，无额外系统包。
   'dbus'
   'libepoxy'
   'fontconfig'

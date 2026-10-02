@@ -34,13 +34,17 @@
 #include <shellapi.h>
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
+#include <deque>
 #include <mutex>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 #if defined(__has_include)
 #if __has_include(<winrt/base.h>)
@@ -1047,6 +1051,311 @@ int32_t deepLinkForwardWin() {
     return 1;
 }
 
+// ── 系统托盘（Shell_NotifyIconW + 隐藏消息窗口线程）───────────────
+// Dart 可从任意线程调用 tray*；所有 Win32 窗口/菜单操作都投递到独立托盘窗口
+// 线程执行（PostMessage 自定义消息 + 队列），避免跨线程直接碰 HWND/HMENU。
+constexpr wchar_t kTrayClass[] = L"ArchoeraMusic.Tray";
+constexpr UINT kTrayCallback = WM_APP + 0x64;  // NOTIFYICONDATAW::uCallbackMessage
+constexpr UINT kTrayTask = WM_APP + 0x65;      // 投递到窗口线程的任务
+constexpr UINT kTrayQuit = WM_APP + 0x66;      // 请求窗口线程退出
+constexpr UINT kTrayIconId = 1;
+
+// 菜单项（桥接持有 label 拷贝，Dart 调用返回后即释放原内存）。
+struct TrayMenuItem {
+    int32_t id = 0;
+    bool enabled = true;
+    int32_t checked = -1;
+    std::wstring label;
+};
+
+enum class TrayOp { SetIcon, SetTooltip, SetVisible, SetMenu, SetTrigger };
+
+struct TrayTask {
+    TrayOp op = TrayOp::SetTooltip;
+    std::wstring text;               // SetIcon 的路径 / SetTooltip 文本
+    bool visible = true;             // SetVisible
+    int32_t trigger = 1;             // SetTrigger
+    std::vector<TrayMenuItem> menu;  // SetMenu
+};
+
+enum class TrayInit { Pending, Ok, Failed };
+
+std::mutex g_tray_mutex;
+std::condition_variable g_tray_cv;
+std::deque<TrayTask> g_tray_tasks;             // 待窗口线程执行（互斥保护）
+std::atomic<HWND> g_tray_hwnd{nullptr};        // 托盘窗口（就绪后置位）
+std::thread* g_tray_thread = nullptr;          // 堆指针，避免静态析构 terminate
+TrayInit g_tray_init = TrayInit::Pending;
+std::atomic<bool> g_tray_stop{false};          // 线程启动期请求退出
+
+// ── 以下仅托盘窗口线程访问 ────────────────────────────────────────
+NOTIFYICONDATAW g_tray_nid{};
+HMENU g_tray_menu = nullptr;
+HICON g_tray_icon = nullptr;
+bool g_tray_icon_owned = false;
+bool g_tray_icon_added = false;
+bool g_tray_visible = true;
+std::wstring g_tray_tooltip;
+int32_t g_tray_trigger = 1;  // 0=左键唤菜单 1=右键唤菜单（默认）
+UINT g_tray_taskbar_created = 0;
+
+LRESULT CALLBACK trayWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+
+// 按路径加载 .ico：失败回退系统默认图标（非自有，不销毁）。
+HICON loadTrayIcon(const std::wstring& path, bool* owned) {
+    HICON icon = nullptr;
+    if (!path.empty()) {
+        const int cx = ::GetSystemMetrics(SM_CXSMICON);
+        const int cy = ::GetSystemMetrics(SM_CYSMICON);
+        icon = reinterpret_cast<HICON>(::LoadImageW(
+            nullptr, path.c_str(), IMAGE_ICON, cx, cy, LR_LOADFROMFILE));
+    }
+    if (icon != nullptr) {
+        *owned = true;
+        return icon;
+    }
+    *owned = false;
+    // IDI_APPLICATION 的 ANSI 展开依赖 UNICODE 宏；显式用宽字符资源。
+    return ::LoadIconW(nullptr, MAKEINTRESOURCEW(32512));
+}
+
+// 依据当前状态同步托盘图标（新增/修改/删除）。
+void traySync() {
+    if (g_tray_hwnd.load(std::memory_order_relaxed) == nullptr) return;
+    g_tray_nid.cbSize = sizeof(NOTIFYICONDATAW);
+    g_tray_nid.hWnd = g_tray_hwnd.load(std::memory_order_relaxed);
+    g_tray_nid.uID = kTrayIconId;
+    g_tray_nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+    g_tray_nid.uCallbackMessage = kTrayCallback;
+    g_tray_nid.hIcon = g_tray_icon != nullptr
+                           ? g_tray_icon
+                           : ::LoadIconW(nullptr, MAKEINTRESOURCEW(32512));
+    ::lstrcpynW(g_tray_nid.szTip, g_tray_tooltip.c_str(),
+                static_cast<int>(ARRAYSIZE(g_tray_nid.szTip)));
+    if (g_tray_visible) {
+        if (g_tray_icon_added) {
+            ::Shell_NotifyIconW(NIM_MODIFY, &g_tray_nid);
+        } else if (::Shell_NotifyIconW(NIM_ADD, &g_tray_nid)) {
+            g_tray_icon_added = true;
+        }
+    } else if (g_tray_icon_added) {
+        ::Shell_NotifyIconW(NIM_DELETE, &g_tray_nid);
+        g_tray_icon_added = false;
+    }
+}
+
+void trayApplyIcon(const std::wstring& path) {
+    bool owned = false;
+    HICON icon = loadTrayIcon(path, &owned);
+    if (g_tray_icon_owned && g_tray_icon != nullptr) {
+        ::DestroyIcon(g_tray_icon);
+    }
+    g_tray_icon = icon;
+    g_tray_icon_owned = owned;
+    traySync();
+}
+
+void trayRebuildMenu(const std::vector<TrayMenuItem>& items) {
+    if (g_tray_menu != nullptr) {
+        ::DestroyMenu(g_tray_menu);
+        g_tray_menu = nullptr;
+    }
+    if (items.empty()) return;  // count==0 清除
+    HMENU menu = ::CreatePopupMenu();
+    if (menu == nullptr) return;
+    for (const auto& item : items) {
+        if (item.id == 0) {
+            ::AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+            continue;
+        }
+        UINT flags = MF_STRING;
+        if (!item.enabled) flags |= MF_GRAYED;
+        if (item.checked == 1) flags |= MF_CHECKED;
+        ::AppendMenuW(menu, flags, static_cast<UINT_PTR>(item.id),
+                      item.label.c_str());
+    }
+    g_tray_menu = menu;
+}
+
+void trayShowMenu(HWND hwnd) {
+    if (g_tray_menu == nullptr) return;
+    POINT pt{};
+    if (!::GetCursorPos(&pt)) return;
+    ::SetForegroundWindow(hwnd);  // TrackPopupMenu 前台要求
+    ::TrackPopupMenu(g_tray_menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
+    ::PostMessageW(hwnd, WM_NULL, 0, 0);  // 收起菜单
+}
+
+void trayExec(const TrayTask& task) {
+    switch (task.op) {
+        case TrayOp::SetIcon:
+            trayApplyIcon(task.text);
+            break;
+        case TrayOp::SetTooltip:
+            g_tray_tooltip = task.text;
+            traySync();
+            break;
+        case TrayOp::SetVisible:
+            g_tray_visible = task.visible;
+            traySync();
+            break;
+        case TrayOp::SetMenu:
+            trayRebuildMenu(task.menu);
+            break;
+        case TrayOp::SetTrigger:
+            g_tray_trigger = task.trigger;
+            break;
+    }
+}
+
+// 仅窗口线程：取出并执行所有已入队任务。
+void trayDrain() {
+    std::deque<TrayTask> tasks;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mutex);
+        tasks.swap(g_tray_tasks);
+    }
+    for (const auto& task : tasks) trayExec(task);
+}
+
+LRESULT CALLBACK trayWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+    if (g_tray_taskbar_created != 0 && msg == g_tray_taskbar_created) {
+        // 资源管理器重启：重新添加图标（否则托盘项消失）。
+        g_tray_icon_added = false;
+        traySync();
+        return 0;
+    }
+    if (msg == kTrayTask) {
+        trayDrain();
+        return 0;
+    }
+    if (msg == kTrayQuit) {
+        ::PostQuitMessage(0);
+        return 0;
+    }
+    if (msg == kTrayCallback) {
+        switch (static_cast<UINT>(lparam)) {
+            case WM_LBUTTONUP:
+                if (g_tray_trigger == 0) {
+                    trayShowMenu(hwnd);  // 左键唤菜单（不再发 CLICK）
+                } else {
+                    dispatch(makeTrayClick(EVENT_TRAY_CLICK));
+                }
+                return 0;
+            case WM_LBUTTONDBLCLK:
+                if (g_tray_trigger == 0) {
+                    trayShowMenu(hwnd);
+                } else {
+                    dispatch(makeTrayClick(EVENT_TRAY_DOUBLE_CLICK));
+                }
+                return 0;
+            case WM_RBUTTONUP:
+                if (g_tray_trigger == 1) {
+                    trayShowMenu(hwnd);  // 右键唤菜单（不再发 RIGHT_CLICK）
+                } else {
+                    dispatch(makeTrayClick(EVENT_TRAY_RIGHT_CLICK));
+                }
+                return 0;
+            default:
+                return 0;
+        }
+    }
+    if (msg == WM_COMMAND) {
+        const int32_t id = static_cast<int32_t>(LOWORD(wparam));
+        if (id > 0) dispatch(makeTrayMenuCommand(id));
+        return 0;
+    }
+    return ::DefWindowProcW(hwnd, msg, wparam, lparam);
+}
+
+void trayThreadProc() {
+    const HINSTANCE inst = ::GetModuleHandleW(nullptr);
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof(wc);
+    wc.style = CS_DBLCLKS;
+    wc.lpfnWndProc = trayWndProc;
+    wc.hInstance = inst;
+    wc.lpszClassName = kTrayClass;
+    ::RegisterClassExW(&wc);  // 已注册返回 0，忽略
+
+    g_tray_trigger = 1;
+    g_tray_visible = true;
+    g_tray_icon_added = false;
+    g_tray_taskbar_created = ::RegisterWindowMessageW(L"TaskbarCreated");
+
+    const HWND hwnd = ::CreateWindowExW(
+        WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, kTrayClass, L"ArchoeraMusic.Tray",
+        WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, inst, nullptr);
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mutex);
+        g_tray_hwnd.store(hwnd, std::memory_order_release);
+        g_tray_init = hwnd != nullptr ? TrayInit::Ok : TrayInit::Failed;
+    }
+    g_tray_cv.notify_all();
+    if (hwnd == nullptr) return;
+
+    trayDrain();  // 处理窗口就绪前入队的任务
+
+    // stop 覆盖「窗口尚未创建时 trayDestroy 已到达」的启动期竞态。
+    if (!g_tray_stop.load(std::memory_order_acquire)) {
+        MSG msg;
+        while (::GetMessageW(&msg, nullptr, 0, 0) > 0) {
+            ::TranslateMessage(&msg);
+            ::DispatchMessageW(&msg);
+        }
+    }
+
+    if (g_tray_icon_added) {
+        ::Shell_NotifyIconW(NIM_DELETE, &g_tray_nid);
+        g_tray_icon_added = false;
+    }
+    if (g_tray_menu != nullptr) {
+        ::DestroyMenu(g_tray_menu);
+        g_tray_menu = nullptr;
+    }
+    if (g_tray_icon_owned && g_tray_icon != nullptr) {
+        ::DestroyIcon(g_tray_icon);
+    }
+    g_tray_icon = nullptr;
+    g_tray_icon_owned = false;
+    g_tray_tooltip.clear();
+    ::DestroyWindow(hwnd);
+    ::UnregisterClassW(kTrayClass, inst);
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mutex);
+        g_tray_hwnd.store(nullptr, std::memory_order_release);
+        g_tray_tasks.clear();
+        g_tray_init = TrayInit::Pending;
+    }
+}
+
+// UTF-8（带长度，不要求 NUL 结尾）→ 宽字符。
+std::wstring utf8ToWideLen(const char* data, size_t len) {
+    if (data == nullptr || len == 0) return std::wstring();
+    const int n = ::MultiByteToWideChar(CP_UTF8, 0, data,
+                                        static_cast<int>(len), nullptr, 0);
+    if (n <= 0) return std::wstring();
+    std::wstring out(static_cast<size_t>(n), L'\0');
+    ::MultiByteToWideChar(CP_UTF8, 0, data, static_cast<int>(len), out.data(), n);
+    return out;
+}
+
+// 入队并唤醒窗口线程（窗口未就绪时任务留待线程启动后 drain）。
+void trayEnqueue(TrayTask task) {
+    HWND hwnd = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mutex);
+        g_tray_tasks.push_back(std::move(task));
+        hwnd = g_tray_hwnd.load(std::memory_order_acquire);
+    }
+    if (hwnd != nullptr) ::PostMessageW(hwnd, kTrayTask, 0, 0);
+}
+
+bool trayAlive() {
+    std::lock_guard<std::mutex> lock(g_tray_mutex);
+    return g_tray_thread != nullptr;
+}
+
 }  // namespace
 
 // ── 后端接口 ──────────────────────────────────────────────────────
@@ -1054,7 +1363,7 @@ int32_t deepLinkForwardWin() {
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
-           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH;
+           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY;
 }
 
 int32_t init() {
@@ -1100,6 +1409,7 @@ int32_t shutdown() {
         g_instance_mutex = nullptr;
     }
     destroyDeepLinkWindow();
+    trayDestroy();  // 移除托盘图标并回收窗口线程（幂等）
     g_screen_events.store(false, std::memory_order_release);
     g_window_events.store(false, std::memory_order_release);
     return OK;
@@ -1294,6 +1604,119 @@ int32_t revealPath(const char* path) {
     const HRESULT hr = ::SHOpenFolderAndSelectItems(pidl, 0, nullptr, 0);
     ::ILFree(pidl);
     return SUCCEEDED(hr) ? OK : ERR_BACKEND;
+}
+
+// ── 系统托盘接口 ──────────────────────────────────────────────────
+
+int32_t trayCreate(const char* icon_path) {
+    if (icon_path == nullptr || *icon_path == '\0') return ERR_STATE;
+    std::thread* fresh = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mutex);
+        if (g_tray_thread == nullptr) {
+            g_tray_init = TrayInit::Pending;
+            g_tray_stop.store(false, std::memory_order_release);
+            try {
+                fresh = new std::thread(trayThreadProc);
+            } catch (...) {
+                g_tray_init = TrayInit::Failed;
+                return ERR_BACKEND;
+            }
+            g_tray_thread = fresh;
+        }
+    }
+    if (fresh != nullptr) {
+        // 等待窗口就绪（同步返回真实成败）；后续调用异步投递即可。
+        std::unique_lock<std::mutex> lock(g_tray_mutex);
+        g_tray_cv.wait_for(lock, std::chrono::seconds(3),
+                           [] { return g_tray_init != TrayInit::Pending; });
+        if (g_tray_init != TrayInit::Ok) {
+            g_tray_thread = nullptr;
+            lock.unlock();
+            if (fresh->joinable()) fresh->join();
+            delete fresh;
+            return ERR_BACKEND;
+        }
+    }
+    TrayTask task;
+    task.op = TrayOp::SetIcon;
+    task.text = utf8ToWideLocal(icon_path);
+    trayEnqueue(std::move(task));
+    return OK;
+}
+
+int32_t trayDestroy() {
+    std::thread* th = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mutex);
+        th = g_tray_thread;
+        g_tray_thread = nullptr;
+    }
+    if (th == nullptr) return OK;  // 幂等
+    g_tray_stop.store(true, std::memory_order_release);
+    const HWND hwnd = g_tray_hwnd.load(std::memory_order_acquire);
+    if (hwnd != nullptr) ::PostMessageW(hwnd, kTrayQuit, 0, 0);
+    if (th->joinable()) th->join();
+    delete th;
+    return OK;
+}
+
+int32_t traySetIcon(const char* icon_path) {
+    if (icon_path == nullptr || *icon_path == '\0') return ERR_STATE;
+    if (!trayAlive()) return ERR_STATE;
+    TrayTask task;
+    task.op = TrayOp::SetIcon;
+    task.text = utf8ToWideLocal(icon_path);
+    trayEnqueue(std::move(task));
+    return OK;
+}
+
+int32_t traySetTooltip(const char* tooltip) {
+    if (!trayAlive()) return ERR_STATE;
+    TrayTask task;
+    task.op = TrayOp::SetTooltip;
+    if (tooltip != nullptr) task.text = utf8ToWideLocal(tooltip);
+    trayEnqueue(std::move(task));
+    return OK;
+}
+
+int32_t traySetVisible(bool visible) {
+    if (!trayAlive()) return ERR_STATE;
+    TrayTask task;
+    task.op = TrayOp::SetVisible;
+    task.visible = visible;
+    trayEnqueue(std::move(task));
+    return OK;
+}
+
+int32_t traySetMenu(const AplTrayMenuItem* items, int32_t count) {
+    if (count < 0 || (count > 0 && items == nullptr)) return ERR_STATE;
+    if (!trayAlive()) return ERR_STATE;
+    TrayTask task;
+    task.op = TrayOp::SetMenu;
+    task.menu.reserve(static_cast<size_t>(count));
+    for (int32_t i = 0; i < count; ++i) {
+        TrayMenuItem item;
+        item.id = items[i].id;
+        item.enabled = items[i].enabled != 0;
+        item.checked = items[i].checked;
+        if (items[i].id != 0) {
+            item.label =
+                utf8ToWideLen(items[i].label.data, items[i].label.len);
+        }
+        task.menu.push_back(std::move(item));
+    }
+    trayEnqueue(std::move(task));
+    return OK;
+}
+
+int32_t traySetMenuTrigger(int32_t trigger) {
+    if (!trayAlive()) return ERR_STATE;
+    TrayTask task;
+    task.op = TrayOp::SetTrigger;
+    task.trigger = trigger != 0 ? 1 : 0;
+    trayEnqueue(std::move(task));
+    return OK;
 }
 
 }  // namespace archoera

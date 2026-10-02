@@ -41,6 +41,7 @@ const int aplCapSystemAccent = 1 << 7;
 const int aplCapSystemTheme = 1 << 8;
 const int aplCapDeepLink = 1 << 9;
 const int aplCapRevealPath = 1 << 10;
+const int aplCapTray = 1 << 11;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -50,8 +51,27 @@ const int aplEventBackendState = 5;
 const int aplEventSystemAccent = 6;
 const int aplEventSystemTheme = 7;
 const int aplEventDeepLink = 8;
+const int aplEventTrayClick = 9;
+const int aplEventTrayDoubleClick = 10;
+const int aplEventTrayRightClick = 11;
+const int aplEventTrayMenuCommand = 12;
 
-const int aplAbiVersion = 2;
+const int aplAbiVersion = 3;
+
+/// 托盘菜单项（对齐 `AplTrayMenuItem`）：id==0 为分隔符；checked==-1 非复选。
+class AplTrayMenuItem {
+  const AplTrayMenuItem({
+    required this.id,
+    this.label,
+    this.enabled = true,
+    this.checked = -1,
+  });
+
+  final int id;
+  final String? label;
+  final bool enabled;
+  final int checked;
+}
 
 // ── 结构体镜像 ─────────────────────────────────────────────────────
 
@@ -110,6 +130,25 @@ final class AplThemePayload extends Struct {
   external int dark;
 }
 
+final class AplTrayCommandPayload extends Struct {
+  @Int32()
+  external int id;
+}
+
+/// 托盘菜单项镜像（对齐 `AplTrayMenuItem`）。
+final class AplTrayMenuItemFfi extends Struct {
+  @Int32()
+  external int id;
+
+  @Int32()
+  external int enabled;
+
+  @Int32()
+  external int checked;
+
+  external AplStringFfi label;
+}
+
 final class AplEventPayload extends Union {
   @Int32()
   external int command;
@@ -130,6 +169,11 @@ final class AplEventPayload extends Union {
 
   @Int32()
   external int deepLink;
+
+  @Int32()
+  external int tray;
+
+  external AplTrayCommandPayload trayCommand;
 }
 
 final class AplEventFfi extends Struct {
@@ -166,6 +210,13 @@ typedef _AplProtocolUnregisterC = Int32 Function(Pointer<Utf8> scheme);
 typedef _AplDeepLinkTakeC = Int32 Function(Pointer<AplStringFfi> out);
 typedef _AplDeepLinkForwardC = Int32 Function();
 typedef _AplWindowActivateC = Int32 Function();
+typedef _AplTrayCreateC = Int32 Function(Pointer<Utf8> iconPath);
+typedef _AplTrayDestroyC = Int32 Function();
+typedef _AplTraySetIconC = Int32 Function(Pointer<Utf8> iconPath);
+typedef _AplTraySetTooltipC = Int32 Function(Pointer<Utf8> tooltip);
+typedef _AplTraySetVisibleC = Int32 Function(Int32 visible);
+typedef _AplTraySetMenuC = Int32 Function(Pointer<AplTrayMenuItemFfi> items, Int32 count);
+typedef _AplTraySetMenuTriggerC = Int32 Function(Int32 trigger);
 typedef _SetEventCallbackC = Int32 Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
 typedef _SetLogSinkC = Void Function(Pointer<NativeFunction<AplLogFnC>> fn);
@@ -197,6 +248,13 @@ typedef _AplProtocolUnregisterD = int Function(Pointer<Utf8> scheme);
 typedef _AplDeepLinkTakeD = int Function(Pointer<AplStringFfi> out);
 typedef _AplDeepLinkForwardD = int Function();
 typedef _AplWindowActivateD = int Function();
+typedef _AplTrayCreateD = int Function(Pointer<Utf8> iconPath);
+typedef _AplTrayDestroyD = int Function();
+typedef _AplTraySetIconD = int Function(Pointer<Utf8> iconPath);
+typedef _AplTraySetTooltipD = int Function(Pointer<Utf8> tooltip);
+typedef _AplTraySetVisibleD = int Function(int visible);
+typedef _AplTraySetMenuD = int Function(Pointer<AplTrayMenuItemFfi> items, int count);
+typedef _AplTraySetMenuTriggerD = int Function(int trigger);
 typedef _SetEventCallbackD = int Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
 typedef _SetLogSinkD = void Function(Pointer<NativeFunction<AplLogFnC>> fn);
@@ -254,6 +312,27 @@ final class AplDeepLinkEvent extends AplNativeEvent {
   const AplDeepLinkEvent();
 }
 
+/// 托盘左键单击。
+final class AplTrayClickEvent extends AplNativeEvent {
+  const AplTrayClickEvent();
+}
+
+/// 托盘左键双击。
+final class AplTrayDoubleClickEvent extends AplNativeEvent {
+  const AplTrayDoubleClickEvent();
+}
+
+/// 托盘右键。
+final class AplTrayRightClickEvent extends AplNativeEvent {
+  const AplTrayRightClickEvent();
+}
+
+/// 托盘菜单项点击（id 为菜单项 id）。
+final class AplTrayMenuCommandEvent extends AplNativeEvent {
+  const AplTrayMenuCommandEvent(this.id);
+  final int id;
+}
+
 /// libarchoera_platform 绑定（进程级单例，[tryLoad] 失败返回 null → Noop）。
 class PlatformBindings {
   PlatformBindings._(DynamicLibrary lib)
@@ -294,6 +373,20 @@ class PlatformBindings {
             'apl_deep_link_forward'),
         _windowActivateFn = lib.lookupFunction<_AplWindowActivateC, _AplWindowActivateD>(
             'apl_window_activate'),
+        _trayCreateFn =
+            lib.lookupFunction<_AplTrayCreateC, _AplTrayCreateD>('apl_tray_create'),
+        _trayDestroyFn =
+            lib.lookupFunction<_AplTrayDestroyC, _AplTrayDestroyD>('apl_tray_destroy'),
+        _traySetIconFn =
+            lib.lookupFunction<_AplTraySetIconC, _AplTraySetIconD>('apl_tray_set_icon'),
+        _traySetTooltipFn = lib.lookupFunction<_AplTraySetTooltipC, _AplTraySetTooltipD>(
+            'apl_tray_set_tooltip'),
+        _traySetVisibleFn = lib.lookupFunction<_AplTraySetVisibleC, _AplTraySetVisibleD>(
+            'apl_tray_set_visible'),
+        _traySetMenuFn =
+            lib.lookupFunction<_AplTraySetMenuC, _AplTraySetMenuD>('apl_tray_set_menu'),
+        _traySetMenuTriggerFn = lib.lookupFunction<_AplTraySetMenuTriggerC,
+            _AplTraySetMenuTriggerD>('apl_tray_set_menu_trigger'),
         _setCallback = lib
             .lookupFunction<_SetEventCallbackC, _SetEventCallbackD>('apl_set_event_callback'),
         _setLogSink =
@@ -330,6 +423,13 @@ class PlatformBindings {
   final _AplDeepLinkTakeD _deepLinkTakeFn;
   final _AplDeepLinkForwardD _deepLinkForwardFn;
   final _AplWindowActivateD _windowActivateFn;
+  final _AplTrayCreateD _trayCreateFn;
+  final _AplTrayDestroyD _trayDestroyFn;
+  final _AplTraySetIconD _traySetIconFn;
+  final _AplTraySetTooltipD _traySetTooltipFn;
+  final _AplTraySetVisibleD _traySetVisibleFn;
+  final _AplTraySetMenuD _traySetMenuFn;
+  final _AplTraySetMenuTriggerD _traySetMenuTriggerFn;
   final _SetEventCallbackD _setCallback;
   final _SetLogSinkD _setLogSink;
 
@@ -342,6 +442,10 @@ class PlatformBindings {
   final _accentCtrl = StreamController<AplAccentEvent>.broadcast();
   final _themeCtrl = StreamController<AplThemeEvent>.broadcast();
   final _deepLinkCtrl = StreamController<AplDeepLinkEvent>.broadcast();
+  final _trayClickCtrl = StreamController<AplTrayClickEvent>.broadcast();
+  final _trayDoubleClickCtrl = StreamController<AplTrayDoubleClickEvent>.broadcast();
+  final _trayRightClickCtrl = StreamController<AplTrayRightClickEvent>.broadcast();
+  final _trayMenuCtrl = StreamController<AplTrayMenuCommandEvent>.broadcast();
 
   /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
   int acquireInstance() => _instanceAcquire();
@@ -421,6 +525,10 @@ class PlatformBindings {
   Stream<AplAccentEvent> get accentEvents => _accentCtrl.stream;
   Stream<AplThemeEvent> get themeEvents => _themeCtrl.stream;
   Stream<AplDeepLinkEvent> get deepLinkEvents => _deepLinkCtrl.stream;
+  Stream<AplTrayClickEvent> get trayClickEvents => _trayClickCtrl.stream;
+  Stream<AplTrayDoubleClickEvent> get trayDoubleClickEvents => _trayDoubleClickCtrl.stream;
+  Stream<AplTrayRightClickEvent> get trayRightClickEvents => _trayRightClickCtrl.stream;
+  Stream<AplTrayMenuCommandEvent> get trayMenuEvents => _trayMenuCtrl.stream;
 
   /// 注册/注销当前用户的 URI scheme 处理程序（免提权）；[aplOk]=成功。
   int protocolRegister(String scheme) {
@@ -460,6 +568,65 @@ class PlatformBindings {
   /// 置前/激活主窗口（<0=失败）。
   int activateWindow() => _windowActivateFn();
 
+  // ── 托盘正向调用 ──
+
+  /// 创建托盘（[iconPath] 绝对路径；Windows .ico，其余 .png）。返回 0=成功。
+  int trayCreate(String iconPath) {
+    final p = iconPath.toNativeUtf8();
+    try {
+      return _trayCreateFn(p);
+    } finally {
+      malloc.free(p);
+    }
+  }
+
+  int trayDestroy() => _trayDestroyFn();
+
+  int traySetIcon(String iconPath) {
+    final p = iconPath.toNativeUtf8();
+    try {
+      return _traySetIconFn(p);
+    } finally {
+      malloc.free(p);
+    }
+  }
+
+  int traySetTooltip(String tooltip) {
+    final p = tooltip.toNativeUtf8();
+    try {
+      return _traySetTooltipFn(p);
+    } finally {
+      malloc.free(p);
+    }
+  }
+
+  int traySetVisible(bool visible) => _traySetVisibleFn(visible ? 1 : 0);
+
+  /// 菜单唤出方式：true=左键点击（Linux SNI），false=右键。
+  int traySetMenuTrigger(bool leftClick) => _traySetMenuTriggerFn(leftClick ? 0 : 1);
+
+  /// 设置扁平上下文菜单；空列表清除。label 拷贝到原生内存，调用后释放。
+  int traySetMenu(List<AplTrayMenuItem> items) {
+    if (items.isEmpty) return _traySetMenuFn(nullptr, 0);
+    final arr = calloc<AplTrayMenuItemFfi>(items.length);
+    final pointers = <Pointer<Uint8>>[];
+    try {
+      for (var i = 0; i < items.length; i++) {
+        final it = items[i];
+        arr[i].id = it.id;
+        arr[i].enabled = it.enabled ? 1 : 0;
+        arr[i].checked = it.checked;
+        _fillString(arr[i].label, it.label, pointers);
+      }
+      return _traySetMenuFn(arr, items.length);
+    } finally {
+      for (final p in pointers) {
+        malloc.free(p);
+      }
+      calloc.free(arr);
+    }
+  }
+
   /// 栈上指针仅在回调期间有效——同步取值后立即投递。
   static void _onNativeEvent(Pointer<AplEventFfi> event, Pointer<Void> userData) {
     final b = _instance;
@@ -489,6 +656,14 @@ class PlatformBindings {
         b._themeCtrl.add(AplThemeEvent(ref.u.theme.dark != 0));
       case aplEventDeepLink:
         b._deepLinkCtrl.add(const AplDeepLinkEvent());
+      case aplEventTrayClick:
+        b._trayClickCtrl.add(const AplTrayClickEvent());
+      case aplEventTrayDoubleClick:
+        b._trayDoubleClickCtrl.add(const AplTrayDoubleClickEvent());
+      case aplEventTrayRightClick:
+        b._trayRightClickCtrl.add(const AplTrayRightClickEvent());
+      case aplEventTrayMenuCommand:
+        b._trayMenuCtrl.add(AplTrayMenuCommandEvent(ref.u.trayCommand.id));
     }
   }
 
@@ -588,6 +763,10 @@ class PlatformBindings {
     _windowCtrl.close();
     _backendCtrl.close();
     _deepLinkCtrl.close();
+    _trayClickCtrl.close();
+    _trayDoubleClickCtrl.close();
+    _trayRightClickCtrl.close();
+    _trayMenuCtrl.close();
     _instance = null;
   }
 }

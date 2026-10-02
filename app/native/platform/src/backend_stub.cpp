@@ -43,4 +43,12 @@ int32_t notify(const char*, const char*) { return ERR_UNSUPPORTED; }
 
 int32_t revealPath(const char*) { return ERR_UNSUPPORTED; }
 
+int32_t trayCreate(const char*) { return ERR_UNSUPPORTED; }
+int32_t trayDestroy() { return ERR_UNSUPPORTED; }
+int32_t traySetIcon(const char*) { return ERR_UNSUPPORTED; }
+int32_t traySetTooltip(const char*) { return ERR_UNSUPPORTED; }
+int32_t traySetVisible(bool) { return ERR_UNSUPPORTED; }
+int32_t traySetMenu(const AplTrayMenuItem*, int32_t) { return ERR_UNSUPPORTED; }
+int32_t traySetMenuTrigger(int32_t) { return ERR_UNSUPPORTED; }
+
 }  // namespace archoera
