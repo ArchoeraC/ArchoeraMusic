@@ -20,11 +20,13 @@ import 'ffi_system_media.dart';
 import 'ffi_system_power.dart';
 import 'ffi_system_deep_link.dart';
 import 'ffi_system_window.dart';
+import 'ffi_system_tray.dart';
 import 'platform_bindings.dart';
 import 'system_deep_link.dart';
 import 'system_media.dart';
 import 'system_power.dart';
 import 'system_window.dart';
+import 'system_tray.dart';
 
 class PlatformCapabilities {
   PlatformCapabilities._(
@@ -33,6 +35,7 @@ class PlatformCapabilities {
     required this.media,
     required this.window,
     required this.deepLink,
+    required this.tray,
     required this.caps,
   });
 
@@ -45,6 +48,7 @@ class PlatformCapabilities {
   final SystemMedia media;
   final SystemWindow window;
   final SystemDeepLink deepLink;
+  final SystemTray tray;
 
   bool get powerInhibitAvailable => caps & aplCapPowerInhibit != 0;
   bool get screenStateAvailable => caps & aplCapPowerScreenState != 0;
@@ -53,6 +57,7 @@ class PlatformCapabilities {
   bool get appInstanceAvailable => caps & aplCapAppInstance != 0;
   bool get systemAccentAvailable => caps & aplCapSystemAccent != 0;
   bool get deepLinkAvailable => caps & aplCapDeepLink != 0;
+  bool get trayAvailable => caps & aplCapTray != 0;
   bool get bridgeLoaded => _bindings != null;
 
   /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
@@ -144,6 +149,9 @@ class PlatformCapabilities {
       deepLink: (b != null && caps & aplCapDeepLink != 0)
           ? FfiSystemDeepLink(b)
           : NoopSystemDeepLink.instance,
+      tray: (b != null && caps & aplCapTray != 0)
+          ? FfiSystemTray(b)
+          : NoopSystemTray.instance,
     );
     _instance = built;
     return built;
@@ -155,6 +163,7 @@ class PlatformCapabilities {
     await media.dispose();
     await window.dispose();
     await deepLink.dispose();
+    await tray.dispose();
     _bindings?.dispose();
     _instance = null;
   }

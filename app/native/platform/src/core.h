@@ -36,6 +36,7 @@ constexpr uint32_t CAP_SYSTEM_ACCENT = 1u << 7;
 constexpr uint32_t CAP_SYSTEM_THEME = 1u << 8;
 constexpr uint32_t CAP_DEEP_LINK = 1u << 9;
 constexpr uint32_t CAP_REVEAL_PATH = 1u << 10;
+constexpr uint32_t CAP_TRAY = 1u << 11;
 
 // ── 事件类型 / 命令 ───────────────────────────────────────────────
 constexpr int32_t EVENT_MEDIA_COMMAND = 1;
@@ -46,6 +47,10 @@ constexpr int32_t EVENT_BACKEND_STATE = 5;
 constexpr int32_t EVENT_SYSTEM_ACCENT = 6;
 constexpr int32_t EVENT_SYSTEM_THEME = 7;
 constexpr int32_t EVENT_DEEP_LINK = 8;
+constexpr int32_t EVENT_TRAY_CLICK = 9;
+constexpr int32_t EVENT_TRAY_DOUBLE_CLICK = 10;
+constexpr int32_t EVENT_TRAY_RIGHT_CLICK = 11;
+constexpr int32_t EVENT_TRAY_MENU_COMMAND = 12;
 
 constexpr int32_t CMD_PLAY = 0;
 constexpr int32_t CMD_PAUSE = 1;
@@ -86,6 +91,10 @@ AplEvent makeSystemTheme(bool dark);
 
 // deep link 待取信号（u.deep_link=1）。
 AplEvent makeDeepLink();
+
+// 托盘：点击事件（左键单击/双击/右键）与菜单项命令。
+AplEvent makeTrayClick(int32_t type /* EVENT_TRAY_* */);
+AplEvent makeTrayMenuCommand(int32_t id);
 
 }  // namespace archoera
 

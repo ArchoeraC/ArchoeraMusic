@@ -26,6 +26,7 @@
 ```
 Dart（app/lib/services/platform/）
   system_power.dart / system_media.dart     ← 契约（已建，保持不变，主程序仅依赖这层）
+  system_window.dart / system_deep_link.dart / system_tray.dart   ← 契约（窗口/协议/托盘）
   platform_capabilities.dart                ← 工厂：FFI 实现 ⇄ Noop 空实现（按能力位图）
   platform_bindings.dart                    ← dart:ffi 绑定（apl_* 符号 + NativeCallable.listener）
         │  DynamicLibrary.open('libarchoera_platform')   同进程，无子进程、无 JSON
@@ -33,11 +34,12 @@ Dart（app/lib/services/platform/）
 原生桥接库（app/native/platform/ → libarchoera_platform.{so,dylib} / archoera_platform.dll）
   core.cpp        生命周期 / 能力位图 / 事件槽 → Dart 回调（C++，共享）
   apl.cpp         apl_* C ABI 导出（C++，共享）
-  backend_windows.cpp   Win32（SetThreadExecutionState/窗口子类化/单实例/主题色）+
+  backend_windows.cpp   Win32（SetThreadExecutionState/窗口子类化/单实例/主题色/托盘）+ 
                         WinRT SMTC/Toast（C++/WinRT，MSVC）
   backend_linux.cpp     libdbus MPRIS2 + ScreenSaver.Inhibit + 熄屏/锁屏信号 + dlopen GTK 窗口
+                        + StatusNotifierItem/dbusmenu 托盘（纯 libdbus）
   backend_macos.mm      NSProcessInfo + NSWorkspace/NSWindow + MPRemoteCommandCenter /
-                        MPNowPlayingInfoCenter（ObjC++）
+                        MPNowPlayingInfoCenter + NSStatusItem 托盘（ObjC++）
         ▼
 OS：D-Bus 会话总线 / WinRT 媒体会话 / macOS Now Playing
 ```
@@ -123,6 +125,7 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_SYSTEM_THEME       (1u << 8)   /* 系统深浅色（light/dark） */
 #define APL_CAP_DEEP_LINK          (1u << 9)   /* archoera:// 协议唤醒（ABI v2） */
 #define APL_CAP_REVEAL_PATH        (1u << 10)  /* 文件管理器定位路径（免提权、零子进程） */
+#define APL_CAP_TRAY               (1u << 11)  /* 系统托盘图标 + 上下文菜单（ABI v3） */
 ```
 
 协议唤醒（`APL_CAP_DEEP_LINK`，ABI v2 起）：`apl_protocol_register/unregister`
@@ -136,6 +139,26 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 **不再起 `xdg-open`/`explorer` 等子进程**。Linux 走 `org.freedesktop.FileManager1`
 D-Bus（回退 GIO 默认应用打开所在目录）；Windows 走 `SHOpenFolderAndSelectItems` /
 `ShellExecute`；macOS 走 `NSWorkspace`。
+
+系统托盘（`APL_CAP_TRAY`，ABI v3 起）：`apl_tray_create(icon_path)` /
+`apl_tray_destroy` / `apl_tray_set_icon` / `apl_tray_set_tooltip` /
+`apl_tray_set_visible` / `apl_tray_set_menu(items,count)` /
+`apl_tray_set_menu_trigger(0=左键 1=右键)`——图标以**文件路径**传入（Windows `.ico`，
+其余 `.png`；Dart 侧把资源落到临时文件），菜单为**扁平**列表（`AplTrayMenuItem`，
+`id==0` 分隔符、`id>0` 可点击）。点击回传事件：`APL_EVENT_TRAY_CLICK` /
+`_DOUBLE_CLICK` / `_RIGHT_CLICK`、菜单项 `APL_EVENT_TRAY_MENU_COMMAND`
+（`u.tray_command.id`）。实现：Windows `Shell_NotifyIconW` + 专属消息窗口线程；
+Linux `org.kde.StatusNotifierItem` + `com.canonical.dbusmenu`（纯 libdbus，
+**不依赖 GTK**）；macOS `NSStatusItem`/`NSMenu`（主线程编组）。该能力用于替代
+Flutter 插件 `tray_manager`（其 0.6+ 引入 `nativeapi`/`cnativeapi` 依赖），
+Dart 侧经 `SystemTray`（`lib/services/platform/`）统一访问。
+
+> **行为差异 / 已知限制（相对 tray_manager 0.7）**：① Windows/macOS 的 `traySet*`
+> 走 UI 线程异步编组，入队即返回 `OK`（真实失败仅落日志）；Linux 返回真实码。
+> ② macOS 的 `NSStatusItem.button` 每次 mouseUp 都会发 action，**双击会先到一次
+> `TRAY_CLICK` 再到 `TRAY_DOUBLE_CLICK`**（消费方按需合并）；图标按菜单栏模板图
+> （template）渲染，彩色 logo 需改 `NO`。③ 缺 StatusNotifierWatcher / 无会话总线
+> （或纯 Wayland 无 SNI 托管）时 Linux 返回错误并降级（不影响其它能力）。
 
 ### 3.2 字符串与元数据（零 JSON）
 

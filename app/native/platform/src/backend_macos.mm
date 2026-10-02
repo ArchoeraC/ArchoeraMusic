@@ -4,7 +4,8 @@
 
 //! macOS 后端（ObjC++）：NSProcessInfo 防休眠抑制、NSWorkspace 熄屏通知、
 //! NSWindow 窗口状态、MPNowPlayingInfoCenter + MPRemoteCommandCenter 媒体会话、
-//! NSColor 系统主题色、文件锁单实例、NSUserNotification 系统提示。
+//! NSColor 系统主题色、文件锁单实例、NSUserNotification 系统提示、
+//! NSStatusItem 系统托盘（菜单栏图标 + 上下文菜单）。
 //!
 //! 由 CMake 以 clang++（-fobjc-arc）编译，直接链接 AppKit/MediaPlayer/Foundation。
 
@@ -27,6 +28,10 @@
 #include <cstring>
 #include <mutex>
 #include <string>
+
+// 系统托盘 target 前置声明（定义见文件后部；全局强引用避免 target 被释放，
+// 因为 NSControl.target / NSMenuItem.target 均为弱引用）。
+@class ArchoeraTrayTarget;
 
 namespace archoera {
 
@@ -53,6 +58,14 @@ std::atomic<bool> g_focused{true};
 id g_activity = nil;
 bool g_remote_registered = false;
 
+// ── 系统托盘状态（所有 AppKit 访问均编组到主线程）────────────────────
+NSStatusItem* g_tray_item = nil;    // 菜单栏状态项
+NSMenu* g_tray_menu = nil;          // 当前上下文菜单
+ArchoeraTrayTarget* g_tray_target = nil;  // 按钮/菜单项 action 目标
+NSString* g_tray_tooltip = nil;     // 最近提示文本（重建时复用）
+int32_t g_tray_trigger = 1;         // 0=左键唤出菜单；1=右键唤出菜单（默认）
+bool g_tray_visible = true;         // 状态项可见性
+
 void emitWindow() {
     if (!g_window_events.load(std::memory_order_acquire)) return;
     dispatch(makeWindowState(g_minimized.load(std::memory_order_acquire),
@@ -61,6 +74,74 @@ void emitWindow() {
 
 }  // namespace
 }  // namespace archoera
+
+// ── 系统托盘 action 目标 ──────────────────────────────────────────
+// 不设置 statusItem.menu（否则任何点击都被系统吞去弹菜单、拿不到 CLICK）；
+// 改为给 statusItem.button 设 target/action，在 action 内读 [NSApp currentEvent]
+// 区分左右键与单击/双击。
+//
+// popUpStatusItemMenu: 自 10.14 起被标记废弃（官方推荐改用 menu 属性），但设置
+// menu 属性会让系统自动吞掉所有点击，与「区分左右键」相冲突；此处仍需手动弹出，
+// 故局部关闭该弃用告警。
+static void popUpTrayMenu(NSStatusItem* item, NSMenu* menu) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    [item popUpStatusItemMenu:menu];
+#pragma clang diagnostic pop
+}
+
+@interface ArchoeraTrayTarget : NSObject
+- (void)onTrayButton:(id)sender;
+- (void)onTrayMenuItem:(id)sender;
+@end
+
+@implementation ArchoeraTrayTarget
+
+- (void)onTrayButton:(id)sender {
+    (void)sender;
+    NSStatusItem* item = archoera::g_tray_item;
+    if (item == nil) return;
+    NSEvent* event = [NSApp currentEvent];
+    const NSEventType type =
+        event != nil ? event.type : NSEventTypeLeftMouseUp;
+    const bool right =
+        type == NSEventTypeRightMouseUp || type == NSEventTypeRightMouseDown;
+    const bool left =
+        type == NSEventTypeLeftMouseUp || type == NSEventTypeLeftMouseDown;
+    NSMenu* menu = archoera::g_tray_menu;
+    if (archoera::g_tray_trigger == 0) {
+        // 0：左键唤出菜单（左键不再发 CLICK）；右键单独上报。
+        if (left) {
+            if (menu != nil && menu.numberOfItems > 0) {
+                popUpTrayMenu(item, menu);
+            }
+        } else if (right) {
+            archoera::dispatch(
+                archoera::makeTrayClick(archoera::EVENT_TRAY_RIGHT_CLICK));
+        }
+        return;
+    }
+    // 1（默认）：右键唤出菜单；左键上报单击/双击。
+    if (right) {
+        if (menu != nil && menu.numberOfItems > 0) {
+            popUpTrayMenu(item, menu);
+        }
+    } else if (left) {
+        const NSInteger clicks = event != nil ? event.clickCount : 1;
+        archoera::dispatch(archoera::makeTrayClick(
+            clicks >= 2 ? archoera::EVENT_TRAY_DOUBLE_CLICK
+                        : archoera::EVENT_TRAY_CLICK));
+    }
+}
+
+- (void)onTrayMenuItem:(id)sender {
+    if (![sender isKindOfClass:[NSMenuItem class]]) return;
+    NSNumber* ident = [(NSMenuItem*)sender representedObject];
+    if (![ident isKindOfClass:[NSNumber class]]) return;
+    archoera::dispatch(archoera::makeTrayMenuCommand(ident.intValue));
+}
+
+@end
 
 // ── 观察者（通知 + 远程命令目标）──────────────────────────────────
 @interface ArchoeraPlatformObserver : NSObject
@@ -265,7 +346,7 @@ void setPendingDeepLink(const char* uri) {
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
-           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH;
+           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY;
 }
 
 int32_t init() {
@@ -296,6 +377,7 @@ int32_t shutdown() {
     }
     g_screen_events.store(false, std::memory_order_release);
     g_window_events.store(false, std::memory_order_release);
+    trayDestroy();
     return OK;
 }
 
@@ -582,6 +664,167 @@ int32_t revealPath(const char* path) {
             [ws activateFileViewerSelectingURLs:@[ url ]];
         }
     }
+    return OK;
+}
+
+// ── SystemTray（菜单栏状态项 + 扁平上下文菜单）──────────────────────
+namespace {
+
+// 应用图标：18x18 菜单栏模板图（随系统主题自动明暗）；加载失败保留旧图。
+void applyTrayIcon(NSStatusItem* item, NSString* path) {
+    if (item == nil || item.button == nil) return;
+    if (path == nil || path.length == 0) return;
+    NSImage* image = [[NSImage alloc] initWithContentsOfFile:path];
+    if (image == nil) {
+        log(2, "platform", "tray: 图标加载失败");
+        return;
+    }
+    image.size = NSMakeSize(18.0, 18.0);
+    // template 在 ObjC++ 里是 C++ 保留字（点语法不可用），改用 setter。
+    [image setTemplate:YES];  // 菜单栏模板图，随主题变色（彩色图标应改 NO）
+    item.button.image = image;
+}
+
+// 主线程：按 [specs] 重建菜单（扁平；id==0 为分隔符）。
+void applyTrayMenu(NSArray<NSDictionary*>* specs) {
+    ArchoeraTrayTarget* target = g_tray_target;
+    if (target == nil) {
+        target = [[ArchoeraTrayTarget alloc] init];
+        g_tray_target = target;
+    }
+    NSMenu* menu = [[NSMenu alloc] initWithTitle:@""];
+    menu.autoenablesItems = NO;  // 以显式 enabled 为准
+    for (NSDictionary* spec in specs) {
+        NSNumber* ident = spec[@"id"];
+        if (ident == nil) continue;
+        const int32_t mid = ident.intValue;
+        if (mid == 0) {
+            [menu addItem:[NSMenuItem separatorItem]];
+            continue;
+        }
+        NSString* label = spec[@"label"];
+        NSMenuItem* item =
+            [[NSMenuItem alloc] initWithTitle:(label != nil ? label : @"")
+                                      action:@selector(onTrayMenuItem:)
+                               keyEquivalent:@""];
+        item.target = target;
+        item.representedObject = ident;
+        NSNumber* enabled = spec[@"enabled"];
+        item.enabled = enabled == nil ? YES : enabled.boolValue;
+        NSNumber* checked = spec[@"checked"];
+        if (checked != nil && checked.intValue >= 0) {
+            item.state = checked.intValue != 0 ? NSControlStateValueOn
+                                               : NSControlStateValueOff;
+        }
+        [menu addItem:item];
+    }
+    g_tray_menu = menu;
+}
+
+}  // namespace
+
+int32_t trayCreate(const char* icon_path) {
+    NSString* path =
+        nsstr(icon_path, icon_path != nullptr ? strlen(icon_path) : 0);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (g_tray_item == nil) {
+          NSStatusBar* bar = [NSStatusBar systemStatusBar];
+          if (bar == nil) {
+              log(3, "platform", "trayCreate: systemStatusBar 不可用");
+              return;
+          }
+          NSStatusItem* item =
+              [bar statusItemWithLength:NSVariableStatusItemLength];
+          NSStatusBarButton* button = item != nil ? item.button : nil;
+          if (item == nil || button == nil) {
+              log(3, "platform", "trayCreate: statusItem 创建失败");
+              if (item != nil) [bar removeStatusItem:item];
+              return;
+          }
+          ArchoeraTrayTarget* target = [[ArchoeraTrayTarget alloc] init];
+          button.target = target;
+          button.action = @selector(onTrayButton:);
+          // 同时接收左右键 mouseUp，action 内再按 trigger 分派。
+          [button
+              sendActionOn:(NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp)];
+          item.visible = g_tray_visible;
+          if (g_tray_tooltip != nil) button.toolTip = g_tray_tooltip;
+          g_tray_item = item;
+          g_tray_target = target;
+      }
+      applyTrayIcon(g_tray_item, path);
+    });
+    return OK;
+}
+
+int32_t trayDestroy() {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (g_tray_item != nil) {
+          [[NSStatusBar systemStatusBar] removeStatusItem:g_tray_item];
+          g_tray_item = nil;
+      }
+      g_tray_menu = nil;
+      g_tray_target = nil;
+      g_tray_tooltip = nil;
+      g_tray_trigger = 1;
+      g_tray_visible = true;
+    });
+    return OK;
+}
+
+int32_t traySetIcon(const char* icon_path) {
+    NSString* path =
+        nsstr(icon_path, icon_path != nullptr ? strlen(icon_path) : 0);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      applyTrayIcon(g_tray_item, path);
+    });
+    return OK;
+}
+
+int32_t traySetTooltip(const char* tooltip) {
+    NSString* tip = nsstr(tooltip, tooltip != nullptr ? strlen(tooltip) : 0);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      g_tray_tooltip = tip;
+      if (g_tray_item != nil && g_tray_item.button != nil) {
+          g_tray_item.button.toolTip = tip;
+      }
+    });
+    return OK;
+}
+
+int32_t traySetVisible(bool visible) {
+    const bool v = visible;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      g_tray_visible = v;
+      if (g_tray_item != nil) g_tray_item.visible = v;
+    });
+    return OK;
+}
+
+int32_t traySetMenu(const AplTrayMenuItem* items, int32_t count) {
+    NSMutableArray<NSDictionary*>* specs =
+        [NSMutableArray arrayWithCapacity:(NSUInteger)(count > 0 ? count : 0)];
+    for (int32_t i = 0; i < count; ++i) {
+        const AplTrayMenuItem& src = items[i];
+        NSString* label = nsstr(src.label.data, src.label.len);
+        [specs addObject:@{
+            @"id" : @(src.id),
+            @"enabled" : @(src.enabled != 0),
+            @"checked" : @(src.checked),
+            @"label" : label != nil ? label : @"",
+        }];
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+      applyTrayMenu(specs);
+    });
+    return OK;
+}
+
+int32_t traySetMenuTrigger(int32_t trigger) {
+    const int32_t t = trigger != 0 ? 1 : 0;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      g_tray_trigger = t;
+    });
     return OK;
 }
 
