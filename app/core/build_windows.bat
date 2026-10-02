@@ -146,6 +146,9 @@ echo             安装 Zig 0.16（https://ziglang.org/download）后重跑可�
 :zig_done
 
 echo [build_windows] 编译 archoera_mediaengine.dll...
+rem Zig 内核（EraAudio 原生 HTTP(S)/TLS）在 Windows 依赖系统库：crypt32（系统根证书
+rem 枚举/校验）、ws2_32（Winsock）、bcrypt（std.crypto.random）；MSVC 不会自动带上，
+rem 须在最终链接显式补齐（FFmpeg 覆盖了 ws2_32/bcrypt，但不含 crypt32）。
 cl /nologo /O2 /std:c11 /MD /LD /I include /I src /I include\compat /I "%VCPKG_PREFIX%\include" ^
     src\mediaengine_lib.c src\tempo.c src\decoder.c src\resampler.c ^
     src\encoder.c src\equalizer.c src\parametric_eq.c src\lowfreq.c ^
@@ -157,6 +160,7 @@ cl /nologo /O2 /std:c11 /MD /LD /I include /I src /I include\compat /I "%VCPKG_P
     "%VCPKG_PREFIX%\lib\avformat.lib" "%VCPKG_PREFIX%\lib\avcodec.lib" ^
     "%VCPKG_PREFIX%\lib\avutil.lib" "%VCPKG_PREFIX%\lib\swresample.lib" ^
     build\libaudio_tempo.lib %KERNEL_FLAG% %KERNEL_LIB% ntdll.lib ole32.lib ^
+    crypt32.lib ws2_32.lib bcrypt.lib ^
     /Fe:build\archoera_mediaengine.dll /link /DEF:build\archoera_mediaengine.def
 if errorlevel 1 exit /b 1
 popd
