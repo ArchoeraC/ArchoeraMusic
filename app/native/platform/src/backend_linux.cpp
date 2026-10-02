@@ -1095,6 +1095,788 @@ int32_t setEvents(bool on) {
 
 }  // namespace gtkwin
 
+// ── 系统托盘（StatusNotifierItem + com.canonical.dbusmenu）─────────
+// 纯 libdbus，不依赖 GTK/Qt。对象 `/StatusNotifierItem` 提供图标/状态/工具提示与
+// 点击方法，`/MenuBar` 提供 com.canonical.dbusmenu 菜单；向会话总线的
+// org.kde.StatusNotifierWatcher 注册后由面板托管。
+//
+// 连接独立性：托盘使用**私有** DBusConnection（dbus_bus_get_private）。MPRIS 的
+// 连接过滤器对所有方法调用返回 HANDLED（libdbus 先于对象路径回调调用过滤器），
+// 若共用连接会遮蔽托盘的对象路径回调，故必须另开连接（关闭时 close 便于唤醒泵）。
+//
+// 线程模型：Dart 的 tray* 可在任意线程调用，泵线程分发 DBus 方法。共享状态
+// （菜单/图标/可见性/trigger）由 g_tray_mtx 保护；DBus 发送经
+// dbus_threads_init_default 保证并发安全。绝不在持锁时 dispatch 回 Dart。
+constexpr const char* kSniPath = "/StatusNotifierItem";
+constexpr const char* kSniIface = "org.kde.StatusNotifierItem";
+constexpr const char* kSniWatcherIface = "org.kde.StatusNotifierWatcher";
+constexpr const char* kSniWatcherPath = "/StatusNotifierWatcher";
+constexpr const char* kMenuPath = "/MenuBar";
+constexpr const char* kMenuIface = "com.canonical.dbusmenu";
+
+struct TrayItem {
+    int32_t id = 0;      // 0=分隔符
+    bool enabled = true;
+    int32_t checked = -1;  // -1=非复选
+    std::string label;     // UTF-8 拷贝
+};
+
+std::mutex g_tray_mtx;
+DBusConnection* g_tray_conn = nullptr;
+// 堆指针：未 shutdown 即退出时不触发静态 std::thread 析构终止（仅泄漏）。
+std::thread* g_tray_pump = nullptr;
+std::atomic<bool> g_tray_running{false};
+bool g_tray_created = false;
+std::string g_tray_bus_name;
+std::string g_tray_tooltip = "ArchoeraMusic";
+bool g_tray_visible = true;
+int32_t g_tray_trigger = 0;  // 0=左键展开菜单；1=右键
+uint32_t g_tray_revision = 0;
+std::vector<TrayItem> g_tray_menu;
+
+bool g_tray_has_pixmap = false;
+int32_t g_tray_icon_w = 0;
+int32_t g_tray_icon_h = 0;
+std::vector<uint8_t> g_tray_pixmap;  // ARGB32，网络字节序
+std::string g_tray_icon_name;        // 回退 IconName
+
+// 一次性快照：泵线程取快照后在锁外构造回复/分发，避免持锁回调 Dart。
+struct TraySnapshot {
+    bool visible = true;
+    int32_t trigger = 0;
+    uint32_t revision = 0;
+    std::string tooltip;
+    std::vector<TrayItem> menu;
+    bool hasPixmap = false;
+    int32_t iconW = 0;
+    int32_t iconH = 0;
+    std::vector<uint8_t> pixmap;
+    std::string iconName;
+};
+
+TraySnapshot traySnapshot() {
+    std::lock_guard<std::mutex> lock(g_tray_mtx);
+    TraySnapshot s;
+    s.visible = g_tray_visible;
+    s.trigger = g_tray_trigger;
+    s.revision = g_tray_revision;
+    s.tooltip = g_tray_tooltip;
+    s.menu = g_tray_menu;
+    s.hasPixmap = g_tray_has_pixmap;
+    s.iconW = g_tray_icon_w;
+    s.iconH = g_tray_icon_h;
+    s.pixmap = g_tray_pixmap;
+    s.iconName = g_tray_icon_name;
+    return s;
+}
+
+DBusConnection* trayConn() {
+    std::lock_guard<std::mutex> lock(g_tray_mtx);
+    return g_tray_conn;
+}
+
+// 释放 setter 在锁内取得的额外连接引用（见各 traySet*：锁内 ref、锁外发送后
+// unref，以免并发 trayDestroy 关闭连接时发生释放后使用）。
+void trayConnUnref(DBusConnection* c) {
+    if (c != nullptr) dbus_connection_unref(c);
+}
+
+// ── 图标解码（dlopen gdk-pixbuf，无需 GTK 主循环）──────────────────
+struct PixbufApi {
+    void* pixbuf = nullptr;
+    void* gobject = nullptr;
+    void* (*new_from_file)(const char*, void**) = nullptr;
+    int (*get_width)(const void*) = nullptr;
+    int (*get_height)(const void*) = nullptr;
+    int (*get_n_channels)(const void*) = nullptr;
+    int (*get_rowstride)(const void*) = nullptr;
+    unsigned char* (*get_pixels)(const void*) = nullptr;
+    int (*get_has_alpha)(const void*) = nullptr;
+    void (*object_unref)(void*) = nullptr;
+
+    bool ok() const {
+        return pixbuf != nullptr && new_from_file != nullptr &&
+               get_width != nullptr && get_height != nullptr &&
+               get_n_channels != nullptr && get_rowstride != nullptr &&
+               get_pixels != nullptr && get_has_alpha != nullptr &&
+               object_unref != nullptr;
+    }
+};
+
+const PixbufApi& pixbufApi() {
+    static const PixbufApi api = [] {
+        PixbufApi a;
+        a.pixbuf = dlopen("libgdk_pixbuf-2.0.so.0", RTLD_NOW);
+        a.gobject = dlopen("libgobject-2.0.so.0", RTLD_NOW);
+        if (a.pixbuf == nullptr || a.gobject == nullptr) {
+            if (a.pixbuf != nullptr) dlclose(a.pixbuf);
+            if (a.gobject != nullptr) dlclose(a.gobject);
+            return PixbufApi{};
+        }
+        a.new_from_file = reinterpret_cast<decltype(a.new_from_file)>(
+            dlsym(a.pixbuf, "gdk_pixbuf_new_from_file"));
+        a.get_width = reinterpret_cast<decltype(a.get_width)>(
+            dlsym(a.pixbuf, "gdk_pixbuf_get_width"));
+        a.get_height = reinterpret_cast<decltype(a.get_height)>(
+            dlsym(a.pixbuf, "gdk_pixbuf_get_height"));
+        a.get_n_channels = reinterpret_cast<decltype(a.get_n_channels)>(
+            dlsym(a.pixbuf, "gdk_pixbuf_get_n_channels"));
+        a.get_rowstride = reinterpret_cast<decltype(a.get_rowstride)>(
+            dlsym(a.pixbuf, "gdk_pixbuf_get_rowstride"));
+        a.get_pixels = reinterpret_cast<decltype(a.get_pixels)>(
+            dlsym(a.pixbuf, "gdk_pixbuf_get_pixels"));
+        a.get_has_alpha = reinterpret_cast<decltype(a.get_has_alpha)>(
+            dlsym(a.pixbuf, "gdk_pixbuf_get_has_alpha"));
+        a.object_unref = reinterpret_cast<decltype(a.object_unref)>(
+            dlsym(a.gobject, "g_object_unref"));
+        if (!a.ok()) {
+            dlclose(a.pixbuf);
+            dlclose(a.gobject);
+            return PixbufApi{};
+        }
+        return a;
+    }();
+    return api;
+}
+
+// PNG → ARGB32（网络字节序：A,R,G,B）；无 alpha 时 alpha=0xFF。
+bool decodePng(const char* path, int32_t* outW, int32_t* outH,
+               std::vector<uint8_t>* out) {
+    const PixbufApi& api = pixbufApi();
+    if (!api.ok()) return false;
+    void* px = api.new_from_file(path, nullptr);
+    if (px == nullptr) return false;
+    const int w = api.get_width(px);
+    const int h = api.get_height(px);
+    const int n = api.get_n_channels(px);
+    const int stride = api.get_rowstride(px);
+    const unsigned char* pixels =
+        static_cast<const unsigned char*>(api.get_pixels(px));
+    const bool alpha = api.get_has_alpha(px) != 0;
+    bool ok = false;
+    if (w > 0 && h > 0 && n >= 3 && pixels != nullptr) {
+        out->resize(static_cast<size_t>(w) * static_cast<size_t>(h) * 4u);
+        size_t o = 0;
+        for (int y = 0; y < h; y++) {
+            const unsigned char* row =
+                pixels + static_cast<size_t>(y) * static_cast<size_t>(stride);
+            for (int x = 0; x < w; x++) {
+                const unsigned char* p =
+                    row + static_cast<size_t>(x) * static_cast<size_t>(n);
+                (*out)[o++] = alpha ? p[3] : 0xFFu;
+                (*out)[o++] = p[0];
+                (*out)[o++] = p[1];
+                (*out)[o++] = p[2];
+            }
+        }
+        *outW = w;
+        *outH = h;
+        ok = true;
+    }
+    api.object_unref(px);
+    return ok;
+}
+
+void ensureDirs(const std::string& path) {
+    std::string cur;
+    for (char ch : path) {
+        cur.push_back(ch);
+        if (ch == '/' && cur.size() > 1) ::mkdir(cur.c_str(), 0700);
+    }
+    ::mkdir(path.c_str(), 0700);
+}
+
+// dlopen 失败时的回退：把 PNG 拷到用户图标主题目录并返回 IconName。
+std::string installIconFallback(const char* srcPath) {
+    const char* home = std::getenv("HOME");
+    if (home == nullptr || *home == '\0') return std::string();
+    const std::string dir =
+        std::string(home) + "/.local/share/icons/hicolor/48x48/apps";
+    ensureDirs(dir);
+    const std::string dst = dir + "/archoeramusic.png";
+    FILE* in = ::fopen(srcPath, "rb");
+    if (in == nullptr) return std::string();
+    FILE* out = ::fopen(dst.c_str(), "wb");
+    if (out == nullptr) {
+        std::fclose(in);
+        return std::string();
+    }
+    char buf[8192];
+    size_t r;
+    while ((r = std::fread(buf, 1, sizeof(buf), in)) > 0) {
+        std::fwrite(buf, 1, r, out);
+    }
+    std::fclose(in);
+    std::fclose(out);
+    return std::string("archoeramusic");
+}
+
+struct IconData {
+    bool hasPixmap = false;
+    int32_t w = 0;
+    int32_t h = 0;
+    std::vector<uint8_t> pixels;
+    std::string name;
+};
+
+IconData loadIcon(const char* path) {
+    IconData d;
+    if (decodePng(path, &d.w, &d.h, &d.pixels)) {
+        d.hasPixmap = true;
+        return d;
+    }
+    d.name = installIconFallback(path);
+    return d;
+}
+
+// ── 信号 ──────────────────────────────────────────────────────────
+void emitSimpleSignal(DBusConnection* c, const char* path, const char* iface,
+                      const char* member) {
+    DBusMessage* sig = dbus_message_new_signal(path, iface, member);
+    send(c, sig);
+}
+
+void emitNewStatus(DBusConnection* c, bool visible) {
+    const char* st = visible ? "Active" : "Passive";
+    DBusMessage* sig = dbus_message_new_signal(kSniPath, kSniIface, "NewStatus");
+    if (sig == nullptr) return;
+    dbus_message_append_args(sig, DBUS_TYPE_STRING, &st, DBUS_TYPE_INVALID);
+    send(c, sig);
+}
+
+void emitLayoutUpdated(DBusConnection* c, uint32_t rev) {
+    DBusMessage* sig =
+        dbus_message_new_signal(kMenuPath, kMenuIface, "LayoutUpdated");
+    if (sig == nullptr) return;
+    int32_t parent = 0;
+    dbus_message_append_args(sig, DBUS_TYPE_UINT32, &rev, DBUS_TYPE_INT32,
+                             &parent, DBUS_TYPE_INVALID);
+    send(c, sig);
+}
+
+// ── 属性 ──────────────────────────────────────────────────────────
+void appendSvInt32(DBusMessageIter* arr, const char* key, int32_t value) {
+    DBusMessageIter entry, var;
+    dbus_message_iter_open_container(arr, DBUS_TYPE_DICT_ENTRY, nullptr, &entry);
+    dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key);
+    dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "i", &var);
+    dbus_message_iter_append_basic(&var, DBUS_TYPE_INT32, &value);
+    dbus_message_iter_close_container(&entry, &var);
+    dbus_message_iter_close_container(arr, &entry);
+}
+
+void appendIconPixmap(DBusMessageIter* it, const TraySnapshot& s) {
+    DBusMessageIter arr;
+    dbus_message_iter_open_container(it, DBUS_TYPE_ARRAY, "(iiay)", &arr);
+    if (s.hasPixmap && !s.pixmap.empty()) {
+        DBusMessageIter st, bytes;
+        dbus_message_iter_open_container(&arr, DBUS_TYPE_STRUCT, nullptr, &st);
+        dbus_message_iter_append_basic(&st, DBUS_TYPE_INT32, &s.iconW);
+        dbus_message_iter_append_basic(&st, DBUS_TYPE_INT32, &s.iconH);
+        // 注意：本机 libdbus 1.16.2 的 append_fixed_array 对 `ay` 会段错误，
+        // 故逐字节 append_basic（图标数据量小，循环开销可忽略）。
+        dbus_message_iter_open_container(&st, DBUS_TYPE_ARRAY, "y", &bytes);
+        for (uint8_t b : s.pixmap) {
+            dbus_message_iter_append_basic(&bytes, DBUS_TYPE_BYTE, &b);
+        }
+        dbus_message_iter_close_container(&st, &bytes);
+        dbus_message_iter_close_container(&arr, &st);
+    }
+    dbus_message_iter_close_container(it, &arr);
+}
+
+// ToolTip 签名 (sa(iiay)ss)：图标名、图标位图、标题、副标题。
+void appendToolTip(DBusMessageIter* it, const TraySnapshot& s) {
+    DBusMessageIter st;
+    dbus_message_iter_open_container(it, DBUS_TYPE_STRUCT, nullptr, &st);
+    const char* iconName = s.iconName.c_str();
+    dbus_message_iter_append_basic(&st, DBUS_TYPE_STRING, &iconName);
+    appendIconPixmap(&st, s);
+    const char* title = "ArchoeraMusic";
+    const char* subtitle = s.tooltip.c_str();
+    dbus_message_iter_append_basic(&st, DBUS_TYPE_STRING, &title);
+    dbus_message_iter_append_basic(&st, DBUS_TYPE_STRING, &subtitle);
+    dbus_message_iter_close_container(it, &st);
+}
+
+const char* sniPropSig(const char* name) {
+    if (std::strcmp(name, "Category") == 0 || std::strcmp(name, "Id") == 0 ||
+        std::strcmp(name, "Title") == 0 || std::strcmp(name, "Status") == 0 ||
+        std::strcmp(name, "IconName") == 0) {
+        return "s";
+    }
+    if (std::strcmp(name, "IconPixmap") == 0) return "a(iiay)";
+    if (std::strcmp(name, "ToolTip") == 0) return "(sa(iiay)ss)";
+    if (std::strcmp(name, "ItemIsMenu") == 0) return "b";
+    if (std::strcmp(name, "Menu") == 0) return "o";
+    if (std::strcmp(name, "WindowId") == 0) return "i";
+    return nullptr;
+}
+
+void writeSniProp(DBusMessageIter* it, const char* name,
+                  const TraySnapshot& s) {
+    if (std::strcmp(name, "Category") == 0) {
+        const char* v = "ApplicationStatus";
+        dbus_message_iter_append_basic(it, DBUS_TYPE_STRING, &v);
+    } else if (std::strcmp(name, "Id") == 0) {
+        const char* v = "archoeramusic";
+        dbus_message_iter_append_basic(it, DBUS_TYPE_STRING, &v);
+    } else if (std::strcmp(name, "Title") == 0) {
+        const char* v = s.tooltip.empty() ? "ArchoeraMusic" : s.tooltip.c_str();
+        dbus_message_iter_append_basic(it, DBUS_TYPE_STRING, &v);
+    } else if (std::strcmp(name, "Status") == 0) {
+        const char* v = s.visible ? "Active" : "Passive";
+        dbus_message_iter_append_basic(it, DBUS_TYPE_STRING, &v);
+    } else if (std::strcmp(name, "IconName") == 0) {
+        const char* v = s.iconName.c_str();
+        dbus_message_iter_append_basic(it, DBUS_TYPE_STRING, &v);
+    } else if (std::strcmp(name, "IconPixmap") == 0) {
+        appendIconPixmap(it, s);
+    } else if (std::strcmp(name, "ToolTip") == 0) {
+        appendToolTip(it, s);
+    } else if (std::strcmp(name, "ItemIsMenu") == 0) {
+        dbus_bool_t v = TRUE;
+        dbus_message_iter_append_basic(it, DBUS_TYPE_BOOLEAN, &v);
+    } else if (std::strcmp(name, "Menu") == 0) {
+        const char* v = kMenuPath;
+        dbus_message_iter_append_basic(it, DBUS_TYPE_OBJECT_PATH, &v);
+    } else if (std::strcmp(name, "WindowId") == 0) {
+        int32_t v = 0;
+        dbus_message_iter_append_basic(it, DBUS_TYPE_INT32, &v);
+    }
+}
+
+const char* menuPropSig(const char* name) {
+    if (std::strcmp(name, "Version") == 0) return "u";
+    if (std::strcmp(name, "Status") == 0) return "s";
+    if (std::strcmp(name, "TextDirection") == 0) return "s";
+    if (std::strcmp(name, "IconThemePath") == 0) return "as";
+    return nullptr;
+}
+
+void writeMenuProp(DBusMessageIter* it, const char* name) {
+    if (std::strcmp(name, "Version") == 0) {
+        uint32_t v = 3;
+        dbus_message_iter_append_basic(it, DBUS_TYPE_UINT32, &v);
+    } else if (std::strcmp(name, "Status") == 0) {
+        const char* v = "normal";
+        dbus_message_iter_append_basic(it, DBUS_TYPE_STRING, &v);
+    } else if (std::strcmp(name, "TextDirection") == 0) {
+        const char* v = "ltr";
+        dbus_message_iter_append_basic(it, DBUS_TYPE_STRING, &v);
+    } else if (std::strcmp(name, "IconThemePath") == 0) {
+        DBusMessageIter arr;
+        dbus_message_iter_open_container(it, DBUS_TYPE_ARRAY, "s", &arr);
+        dbus_message_iter_close_container(it, &arr);
+    }
+}
+
+void trayPropGet(DBusConnection* c, DBusMessage* msg) {
+    DBusError err;
+    dbus_error_init(&err);
+    const char* iface = nullptr;
+    const char* name = nullptr;
+    if (!dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &iface,
+                               DBUS_TYPE_STRING, &name, DBUS_TYPE_INVALID)) {
+        dbus_error_free(&err);
+        return replyError(c, msg, DBUS_ERROR_INVALID_ARGS, "Get");
+    }
+    dbus_error_free(&err);
+    const char* sig = nullptr;
+    if (std::strcmp(iface, kSniIface) == 0) {
+        sig = sniPropSig(name);
+    } else if (std::strcmp(iface, kMenuIface) == 0) {
+        sig = menuPropSig(name);
+    }
+    if (sig == nullptr) {
+        return replyError(c, msg, "org.freedesktop.DBus.Error.UnknownProperty",
+                          name);
+    }
+    const TraySnapshot s = traySnapshot();
+    DBusMessage* reply = dbus_message_new_method_return(msg);
+    if (reply == nullptr) return;
+    DBusMessageIter it, var;
+    dbus_message_iter_init_append(reply, &it);
+    dbus_message_iter_open_container(&it, DBUS_TYPE_VARIANT, sig, &var);
+    if (std::strcmp(iface, kSniIface) == 0) {
+        writeSniProp(&var, name, s);
+    } else {
+        writeMenuProp(&var, name);
+    }
+    dbus_message_iter_close_container(&it, &var);
+    send(c, reply);
+}
+
+void trayPropGetAll(DBusConnection* c, DBusMessage* msg) {
+    DBusError err;
+    dbus_error_init(&err);
+    const char* iface = nullptr;
+    if (!dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &iface,
+                               DBUS_TYPE_INVALID)) {
+        dbus_error_free(&err);
+        return replyError(c, msg, DBUS_ERROR_INVALID_ARGS, "GetAll");
+    }
+    dbus_error_free(&err);
+    const char* const* names = nullptr;
+    size_t count = 0;
+    static const char* const kSniNames[] = {
+        "Category",  "Id",     "Title",   "Status",   "IconName",
+        "IconPixmap", "ToolTip", "ItemIsMenu", "Menu", "WindowId"};
+    static const char* const kMenuNames[] = {"Version", "Status",
+                                             "TextDirection", "IconThemePath"};
+    const bool isSni = std::strcmp(iface, kSniIface) == 0;
+    if (isSni) {
+        names = kSniNames;
+        count = sizeof(kSniNames) / sizeof(kSniNames[0]);
+    } else if (std::strcmp(iface, kMenuIface) == 0) {
+        names = kMenuNames;
+        count = sizeof(kMenuNames) / sizeof(kMenuNames[0]);
+    } else {
+        return replyError(c, msg, DBUS_ERROR_UNKNOWN_INTERFACE, iface);
+    }
+    const TraySnapshot s = traySnapshot();
+    DBusMessage* reply = dbus_message_new_method_return(msg);
+    if (reply == nullptr) return;
+    DBusMessageIter it, arr;
+    dbus_message_iter_init_append(reply, &it);
+    dbus_message_iter_open_container(&it, DBUS_TYPE_ARRAY, "{sv}", &arr);
+    for (size_t i = 0; i < count; i++) {
+        const char* sig =
+            isSni ? sniPropSig(names[i]) : menuPropSig(names[i]);
+        if (sig == nullptr) continue;
+        DBusMessageIter entry, var;
+        dbus_message_iter_open_container(&arr, DBUS_TYPE_DICT_ENTRY, nullptr,
+                                         &entry);
+        dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &names[i]);
+        dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, sig, &var);
+        if (isSni) {
+            writeSniProp(&var, names[i], s);
+        } else {
+            writeMenuProp(&var, names[i]);
+        }
+        dbus_message_iter_close_container(&entry, &var);
+        dbus_message_iter_close_container(&arr, &entry);
+    }
+    dbus_message_iter_close_container(&it, &arr);
+    send(c, reply);
+}
+
+// ── dbusmenu 布局 ─────────────────────────────────────────────────
+// 属性：label/enabled/visible/type；复选项补 toggle-type/toggle-state。
+void appendMenuProps(DBusMessageIter* props, const TrayItem& item) {
+    const bool sep = item.id == 0;
+    appendSvString(props, "label", sep ? "" : item.label.c_str());
+    appendSvBool(props, "enabled",
+                 (!sep && item.enabled) ? static_cast<dbus_bool_t>(TRUE)
+                                        : static_cast<dbus_bool_t>(FALSE));
+    appendSvBool(props, "visible", TRUE);
+    appendSvString(props, "type", sep ? "separator" : "standard");
+    if (!sep && item.checked >= 0) {
+        appendSvString(props, "toggle-type", "checkmark");
+        appendSvInt32(props, "toggle-state", item.checked != 0 ? 1 : 0);
+    }
+}
+
+// 向 it 追加一个 `(ia{sv}av)` 结构；root 时 children 为主菜单。
+void appendMenuStruct(DBusMessageIter* it, int32_t id, const TrayItem* item,
+                      const std::vector<TrayItem>* children, bool root) {
+    DBusMessageIter st, props, kids;
+    dbus_message_iter_open_container(it, DBUS_TYPE_STRUCT, nullptr, &st);
+    dbus_message_iter_append_basic(&st, DBUS_TYPE_INT32, &id);
+    dbus_message_iter_open_container(&st, DBUS_TYPE_ARRAY, "{sv}", &props);
+    if (root) {
+        appendSvString(&props, "children-display", "submenu");
+    } else if (item != nullptr) {
+        appendMenuProps(&props, *item);
+    }
+    dbus_message_iter_close_container(&st, &props);
+    dbus_message_iter_open_container(&st, DBUS_TYPE_ARRAY, "v", &kids);
+    if (children != nullptr) {
+        for (const TrayItem& child : *children) {
+            DBusMessageIter var;
+            dbus_message_iter_open_container(&kids, DBUS_TYPE_VARIANT,
+                                             "(ia{sv}av)", &var);
+            appendMenuStruct(&var, child.id, &child, nullptr, false);
+            dbus_message_iter_close_container(&kids, &var);
+        }
+    }
+    dbus_message_iter_close_container(&st, &kids);
+    dbus_message_iter_close_container(it, &st);
+}
+
+void appendMenuPropsStruct(DBusMessageIter* arr, int32_t id,
+                           const TrayItem* item, bool root) {
+    DBusMessageIter st, props;
+    dbus_message_iter_open_container(arr, DBUS_TYPE_STRUCT, nullptr, &st);
+    dbus_message_iter_append_basic(&st, DBUS_TYPE_INT32, &id);
+    dbus_message_iter_open_container(&st, DBUS_TYPE_ARRAY, "{sv}", &props);
+    if (root) {
+        appendSvString(&props, "children-display", "submenu");
+    } else if (item != nullptr) {
+        appendMenuProps(&props, *item);
+    }
+    dbus_message_iter_close_container(&st, &props);
+    dbus_message_iter_close_container(arr, &st);
+}
+
+void menuGetLayout(DBusConnection* c, DBusMessage* msg) {
+    int32_t parentId = 0;
+    DBusMessageIter it;
+    if (dbus_message_iter_init(msg, &it)) {
+        if (dbus_message_iter_get_arg_type(&it) == DBUS_TYPE_INT32) {
+            dbus_message_iter_get_basic(&it, &parentId);
+        }
+    }
+    const TraySnapshot s = traySnapshot();
+    DBusMessage* reply = dbus_message_new_method_return(msg);
+    if (reply == nullptr) return;
+    DBusMessageIter out;
+    dbus_message_iter_init_append(reply, &out);
+    dbus_message_iter_append_basic(&out, DBUS_TYPE_UINT32, &s.revision);
+    if (parentId == 0) {
+        appendMenuStruct(&out, 0, nullptr, &s.menu, true);
+    } else {
+        const TrayItem* found = nullptr;
+        for (const TrayItem& item : s.menu) {
+            if (item.id == parentId) {
+                found = &item;
+                break;
+            }
+        }
+        appendMenuStruct(&out, parentId, found, nullptr, false);
+    }
+    send(c, reply);
+}
+
+void menuEvent(DBusConnection* c, DBusMessage* msg) {
+    DBusMessageIter it;
+    if (!dbus_message_iter_init(msg, &it) ||
+        dbus_message_iter_get_arg_type(&it) != DBUS_TYPE_INT32) {
+        return replyError(c, msg, DBUS_ERROR_INVALID_ARGS, "Event");
+    }
+    int32_t id = 0;
+    dbus_message_iter_get_basic(&it, &id);
+    dbus_message_iter_next(&it);
+    if (dbus_message_iter_get_arg_type(&it) != DBUS_TYPE_STRING) {
+        return replyError(c, msg, DBUS_ERROR_INVALID_ARGS, "Event");
+    }
+    const char* eventId = nullptr;
+    dbus_message_iter_get_basic(&it, &eventId);
+    if (eventId != nullptr && std::strcmp(eventId, "clicked") == 0 && id > 0) {
+        dispatch(makeTrayMenuCommand(id));
+    }
+    replyEmpty(c, msg);
+}
+
+void menuAboutToShow(DBusConnection* c, DBusMessage* msg) {
+    dbus_bool_t yes = TRUE;
+    DBusMessage* reply = dbus_message_new_method_return(msg);
+    if (reply == nullptr) return;
+    dbus_message_append_args(reply, DBUS_TYPE_BOOLEAN, &yes, DBUS_TYPE_INVALID);
+    send(c, reply);
+}
+
+void menuGetGroupProperties(DBusConnection* c, DBusMessage* msg) {
+    std::vector<int32_t> ids;
+    DBusMessageIter it;
+    if (dbus_message_iter_init(msg, &it) &&
+        dbus_message_iter_get_arg_type(&it) == DBUS_TYPE_ARRAY) {
+        DBusMessageIter arr;
+        dbus_message_iter_recurse(&it, &arr);
+        while (dbus_message_iter_get_arg_type(&arr) == DBUS_TYPE_INT32) {
+            int32_t v = 0;
+            dbus_message_iter_get_basic(&arr, &v);
+            ids.push_back(v);
+            dbus_message_iter_next(&arr);
+        }
+    }
+    const TraySnapshot s = traySnapshot();
+    DBusMessage* reply = dbus_message_new_method_return(msg);
+    if (reply == nullptr) return;
+    DBusMessageIter out, arr;
+    dbus_message_iter_init_append(reply, &out);
+    dbus_message_iter_open_container(&out, DBUS_TYPE_ARRAY, "(ia{sv})", &arr);
+    if (ids.empty()) {
+        appendMenuPropsStruct(&arr, 0, nullptr, true);
+        for (const TrayItem& item : s.menu) {
+            appendMenuPropsStruct(&arr, item.id, &item, false);
+        }
+    } else {
+        for (int32_t id : ids) {
+            const TrayItem* found = nullptr;
+            for (const TrayItem& item : s.menu) {
+                if (item.id == id) {
+                    found = &item;
+                    break;
+                }
+            }
+            appendMenuPropsStruct(&arr, id, found, id == 0);
+        }
+    }
+    dbus_message_iter_close_container(&out, &arr);
+    send(c, reply);
+}
+
+const char* trayIntrospect(const char* path) {
+    if (std::strcmp(path, kSniPath) == 0) {
+        return "<node><interface name=\"org.kde.StatusNotifierItem\">"
+               "<method name=\"Activate\"><arg direction=\"in\" type=\"i\"/>"
+               "<arg direction=\"in\" type=\"i\"/></method>"
+               "<method name=\"SecondaryActivate\"><arg direction=\"in\" "
+               "type=\"i\"/><arg direction=\"in\" type=\"i\"/></method>"
+               "<method name=\"ContextMenu\"><arg direction=\"in\" type=\"i\"/>"
+               "<arg direction=\"in\" type=\"i\"/></method>"
+               "<method name=\"Scroll\"><arg direction=\"in\" type=\"i\"/>"
+               "<arg direction=\"in\" type=\"s\"/></method>"
+               "<signal name=\"NewIcon\"/><signal name=\"NewToolTip\"/>"
+               "<signal name=\"NewStatus\"><arg type=\"s\"/></signal>"
+               "</interface></node>";
+    }
+    return "<node><interface name=\"com.canonical.dbusmenu\">"
+           "<method name=\"GetLayout\"><arg direction=\"in\" type=\"i\"/>"
+           "<arg direction=\"in\" type=\"i\"/><arg direction=\"in\" type=\"as\"/>"
+           "<arg direction=\"out\" type=\"u\"/>"
+           "<arg direction=\"out\" type=\"(ia{sv}av)\"/></method>"
+           "<method name=\"Event\"><arg direction=\"in\" type=\"i\"/>"
+           "<arg direction=\"in\" type=\"s\"/><arg direction=\"in\" type=\"v\"/>"
+           "<arg direction=\"in\" type=\"u\"/></method>"
+           "<method name=\"AboutToShow\"><arg direction=\"in\" type=\"i\"/>"
+           "<arg direction=\"out\" type=\"b\"/></method>"
+           "</interface></node>";
+}
+
+// ── 对象路径分发 ──────────────────────────────────────────────────
+DBusHandlerResult trayObjectHandler(DBusConnection* c, DBusMessage* msg, void*) {
+    if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_METHOD_CALL) {
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    }
+    const char* path = dbus_message_get_path(msg);
+    const char* iface = dbus_message_get_interface(msg);
+    const char* member = dbus_message_get_member(msg);
+    if (path == nullptr || iface == nullptr || member == nullptr) {
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    }
+    if (std::strcmp(iface, kIfaceProps) == 0) {
+        if (std::strcmp(member, "Get") == 0) {
+            trayPropGet(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        if (std::strcmp(member, "GetAll") == 0) {
+            trayPropGetAll(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        if (std::strcmp(member, "Set") == 0) {
+            replyError(c, msg, "org.freedesktop.DBus.Error.PropertyReadOnly",
+                       "");
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    }
+    if (std::strcmp(iface, kIfaceIntrospect) == 0 &&
+        std::strcmp(member, "Introspect") == 0) {
+        replyString(c, msg, trayIntrospect(path));
+        return DBUS_HANDLER_RESULT_HANDLED;
+    }
+    if (std::strcmp(path, kSniPath) == 0 &&
+        std::strcmp(iface, kSniIface) == 0) {
+        if (std::strcmp(member, "Activate") == 0) {
+            // trigger==1（右键唤菜单）时左键才作为单击事件回传；trigger==0 交由
+            // 面板自行展开 dbusmenu。
+            if (traySnapshot().trigger == 1) {
+                dispatch(makeTrayClick(EVENT_TRAY_CLICK));
+            }
+            replyEmpty(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        if (std::strcmp(member, "SecondaryActivate") == 0) {
+            dispatch(makeTrayClick(EVENT_TRAY_DOUBLE_CLICK));
+            replyEmpty(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        if (std::strcmp(member, "ContextMenu") == 0) {
+            dispatch(makeTrayClick(EVENT_TRAY_RIGHT_CLICK));
+            replyEmpty(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        if (std::strcmp(member, "Scroll") == 0) {
+            replyEmpty(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    }
+    if (std::strcmp(path, kMenuPath) == 0 &&
+        std::strcmp(iface, kMenuIface) == 0) {
+        if (std::strcmp(member, "GetLayout") == 0) {
+            menuGetLayout(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        if (std::strcmp(member, "Event") == 0) {
+            menuEvent(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        if (std::strcmp(member, "AboutToShow") == 0) {
+            menuAboutToShow(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        if (std::strcmp(member, "GetGroupProperties") == 0) {
+            menuGetGroupProperties(c, msg);
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    }
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+}
+
+// ── 生命周期 ──────────────────────────────────────────────────────
+void trayPumpLoop() {
+    while (g_tray_running.load(std::memory_order_acquire)) {
+        DBusConnection* c = trayConn();
+        if (c == nullptr) break;
+        // 用有限超时（而非 -1）：让泵线程周期性检查 g_tray_running，使 trayDestroy
+        // 能可靠 join；同时每轮把 Dart 侧排队的信号 flush 出去。
+        dbus_connection_read_write_dispatch(c, 50);
+    }
+}
+
+// 幂等销毁：注销对象路径/总线名、等待并 join 泵线程、释放连接与菜单拷贝。
+void trayTeardownInternal() {
+    DBusConnection* c = nullptr;
+    std::string bus;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mtx);
+        c = g_tray_conn;
+        bus = g_tray_bus_name;
+        g_tray_conn = nullptr;
+        g_tray_bus_name.clear();
+        g_tray_created = false;
+        g_tray_has_pixmap = false;
+        g_tray_pixmap.clear();
+        g_tray_icon_name.clear();
+        g_tray_menu.clear();
+        g_tray_revision = 0;
+    }
+    g_tray_running.store(false, std::memory_order_release);
+    if (c != nullptr) {
+        dbus_connection_unregister_object_path(c, kSniPath);
+        dbus_connection_unregister_object_path(c, kMenuPath);
+        if (!bus.empty()) {
+            DBusError err;
+            dbus_error_init(&err);
+            dbus_bus_release_name(c, bus.c_str(), &err);
+            dbus_error_free(&err);
+        }
+    }
+    if (g_tray_pump != nullptr) {
+        if (g_tray_pump->joinable()) g_tray_pump->join();
+        delete g_tray_pump;
+        g_tray_pump = nullptr;
+    }
+    if (c != nullptr) {
+        dbus_connection_close(c);
+        dbus_connection_unref(c);
+    }
+}
+
 // ── 系统提示 ──────────────────────────────────────────────────────
 bool notifyViaDbus(const char* title, const char* body) {
     DBusConnection* c = conn();
@@ -1138,7 +1920,7 @@ uint32_t caps() {
     uint32_t c = CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_MEDIA_SESSION |
                  CAP_MEDIA_SEEK | CAP_MEDIA_ARTWORK | CAP_APP_INSTANCE |
                  CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME | CAP_DEEP_LINK |
-                 CAP_REVEAL_PATH;
+                 CAP_REVEAL_PATH | CAP_TRAY;
     const bool hasDisplay = std::getenv("WAYLAND_DISPLAY") != nullptr ||
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
@@ -1159,6 +1941,7 @@ int32_t init() {
 }
 
 int32_t shutdown() {
+    trayDestroy();  // 注销 SNI/dbusmenu 对象并 join 托盘泵线程
     g_running.store(false, std::memory_order_release);
     if (g_pump != nullptr) {
         if (g_pump->joinable()) g_pump->join();
@@ -1646,6 +2429,198 @@ int32_t revealPath(const char* path) {
     const std::string dir = isDir ? p : parentDir(p);
     if (!dir.empty() && gioOpenDir(dir)) return OK;
     return ERR_BACKEND;
+}
+
+// ── 系统托盘后端接口 ──────────────────────────────────────────────
+int32_t trayCreate(const char* icon_path) {
+    if (icon_path == nullptr || *icon_path == '\0') return ERR_STATE;
+    bool already = false;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mtx);
+        already = g_tray_created;
+    }
+    if (already) return traySetIcon(icon_path);  // 幂等：已存在则更新图标
+
+    const IconData ic = loadIcon(icon_path);
+
+    dbus_threads_init_default();
+    DBusError err;
+    dbus_error_init(&err);
+    // 私有连接：与 MPRIS 共享连接隔离（见上方过滤器遮蔽说明）。
+    DBusConnection* c = dbus_bus_get_private(DBUS_BUS_SESSION, &err);
+    if (c == nullptr) {
+        log(2, "platform", "系统托盘：无法连接会话总线，能力降级");
+        dbus_error_free(&err);
+        return ERR_BACKEND;
+    }
+    dbus_error_free(&err);
+    dbus_connection_set_exit_on_disconnect(c, FALSE);
+
+    char busName[96];
+    std::snprintf(busName, sizeof(busName), "org.kde.StatusNotifierItem-%d-1",
+                  static_cast<int>(::getpid()));
+    if (!tryRequestName(c, busName)) {
+        log(2, "platform", "系统托盘：申请 StatusNotifierItem 总线名失败");
+        dbus_connection_close(c);
+        dbus_connection_unref(c);
+        return ERR_BACKEND;
+    }
+
+    static const DBusObjectPathVTable vtable = {
+        nullptr, trayObjectHandler, nullptr, nullptr, nullptr, nullptr};
+    const bool regSni =
+        dbus_connection_register_object_path(c, kSniPath, &vtable, nullptr);
+    const bool regMenu =
+        regSni &&
+        dbus_connection_register_object_path(c, kMenuPath, &vtable, nullptr);
+    if (!regSni || !regMenu) {
+        log(2, "platform", "系统托盘：注册 D-Bus 对象路径失败");
+        dbus_connection_unregister_object_path(c, kSniPath);
+        dbus_connection_unregister_object_path(c, kMenuPath);
+        dbus_bus_release_name(c, busName, nullptr);
+        dbus_connection_close(c);
+        dbus_connection_unref(c);
+        return ERR_BACKEND;
+    }
+
+    // 向 Watcher 注册；不存在则整体失败（能力降级）。
+    bool watcherOk = false;
+    DBusMessage* reg = dbus_message_new_method_call(
+        kSniWatcherIface, kSniWatcherPath, kSniWatcherIface,
+        "RegisterStatusNotifierItem");
+    if (reg != nullptr) {
+        const char* svc = busName;
+        dbus_message_append_args(reg, DBUS_TYPE_STRING, &svc,
+                                 DBUS_TYPE_INVALID);
+        DBusError e2;
+        dbus_error_init(&e2);
+        DBusMessage* reply =
+            dbus_connection_send_with_reply_and_block(c, reg, 2000, &e2);
+        watcherOk = reply != nullptr;
+        if (reply != nullptr) dbus_message_unref(reply);
+        dbus_error_free(&e2);
+        dbus_message_unref(reg);
+    }
+    if (!watcherOk) {
+        log(2, "platform", "系统托盘：StatusNotifierWatcher 不可用，能力降级");
+        dbus_connection_unregister_object_path(c, kSniPath);
+        dbus_connection_unregister_object_path(c, kMenuPath);
+        dbus_bus_release_name(c, busName, nullptr);
+        dbus_connection_close(c);
+        dbus_connection_unref(c);
+        return ERR_BACKEND;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mtx);
+        g_tray_conn = c;
+        g_tray_bus_name = busName;
+        g_tray_created = true;
+        g_tray_has_pixmap = ic.hasPixmap;
+        g_tray_pixmap = ic.pixels;
+        g_tray_icon_w = ic.w;
+        g_tray_icon_h = ic.h;
+        g_tray_icon_name = ic.name;
+    }
+    g_tray_running.store(true, std::memory_order_release);
+    g_tray_pump = new std::thread(trayPumpLoop);
+    log(1, "platform", "系统托盘已创建（StatusNotifierItem + dbusmenu）");
+    return OK;
+}
+
+int32_t trayDestroy() {
+    trayTeardownInternal();
+    return OK;
+}
+
+int32_t traySetIcon(const char* icon_path) {
+    if (icon_path == nullptr || *icon_path == '\0') return ERR_STATE;
+    const IconData ic = loadIcon(icon_path);
+    DBusConnection* c = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mtx);
+        g_tray_has_pixmap = ic.hasPixmap;
+        g_tray_pixmap = ic.pixels;
+        g_tray_icon_w = ic.w;
+        g_tray_icon_h = ic.h;
+        g_tray_icon_name = ic.name;
+        c = g_tray_conn;
+        if (c != nullptr) dbus_connection_ref(c);
+    }
+    if (c != nullptr) {
+        emitSimpleSignal(c, kSniPath, kSniIface, "NewIcon");
+        trayConnUnref(c);
+    }
+    return OK;
+}
+
+int32_t traySetTooltip(const char* tooltip) {
+    DBusConnection* c = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mtx);
+        g_tray_tooltip = tooltip != nullptr ? tooltip : "";
+        c = g_tray_conn;
+        if (c != nullptr) dbus_connection_ref(c);
+    }
+    if (c != nullptr) {
+        emitSimpleSignal(c, kSniPath, kSniIface, "NewToolTip");
+        trayConnUnref(c);
+    }
+    return OK;
+}
+
+int32_t traySetVisible(bool visible) {
+    DBusConnection* c = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mtx);
+        g_tray_visible = visible;
+        c = g_tray_conn;
+        if (c != nullptr) dbus_connection_ref(c);
+    }
+    if (c != nullptr) {
+        emitNewStatus(c, visible);
+        trayConnUnref(c);
+    }
+    return OK;
+}
+
+int32_t traySetMenu(const AplTrayMenuItem* items, int32_t count) {
+    if (count < 0 || (count > 0 && items == nullptr)) return ERR_STATE;
+    DBusConnection* c = nullptr;
+    uint32_t rev = 0;
+    {
+        std::lock_guard<std::mutex> lock(g_tray_mtx);
+        g_tray_menu.clear();
+        if (count > 0) {
+            g_tray_menu.reserve(static_cast<size_t>(count));
+            for (int32_t i = 0; i < count; i++) {
+                TrayItem item;
+                item.id = items[i].id;
+                item.enabled = items[i].enabled != 0;
+                item.checked = items[i].checked;
+                const AplString& label = items[i].label;
+                if (label.data != nullptr && label.len > 0) {
+                    item.label.assign(label.data, label.len);
+                }
+                g_tray_menu.push_back(std::move(item));
+            }
+        }
+        g_tray_revision++;
+        rev = g_tray_revision;
+        c = g_tray_conn;
+        if (c != nullptr) dbus_connection_ref(c);
+    }
+    if (c != nullptr) {
+        emitLayoutUpdated(c, rev);
+        trayConnUnref(c);
+    }
+    return OK;
+}
+
+int32_t traySetMenuTrigger(int32_t trigger) {
+    std::lock_guard<std::mutex> lock(g_tray_mtx);
+    g_tray_trigger = trigger;
+    return OK;
 }
 
 }  // namespace archoera

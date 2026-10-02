@@ -23,7 +23,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 0.9.20+3
 
 environment:
-  # tray_manager 0.7（nativeapi 0.3）要求 Dart ^3.13.0 / Flutter >=3.47.0
+  # 桌面平台能力经自研桥接（apl_*）；Flutter 3.47+ 为依赖链下限。
   sdk: ^3.13.0
   flutter: ">=3.47.0"
 
@@ -55,7 +55,6 @@ dependencies:
   qr: ^4.0.0
   sqlite3: ^3.5.1
   file_selector: ^1.1.0
-  tray_manager: ^0.7.0
   window_manager: ^0.5.2
   geolocator: ^14.0.3
 dev_dependencies:

@@ -4,10 +4,17 @@
 
 part of '../tray_integration.dart';
 
+/// 托盘菜单项 id（>0 可点击；0 为分隔符）。
+const int _menuShow = 1;
+const int _menuPlayPause = 2;
+const int _menuPrevious = 3;
+const int _menuNext = 4;
+const int _menuQuit = 5;
+
 extension _TrayIntegrationLogic on _TrayIntegrationState {
   Future<void> _setup() async {
     try {
-      _initTray();
+      await _initTray();
       windowManager.addListener(this);
       await windowManager.setPreventClose(true);
       _trayReady = true;
@@ -18,115 +25,91 @@ extension _TrayIntegrationLogic on _TrayIntegrationState {
     }
   }
 
-  void _initTray() {
-    final trayIcon = TrayIcon.create();
-    if (trayIcon == null) {
-      throw StateError('无法创建系统托盘图标');
-    }
-    _trayIcon = trayIcon;
+  Future<void> _initTray() async {
+    final tray = ref.read(platformCapabilitiesProvider).tray;
+    _tray = tray;
 
+    // 图标资源 → 临时文件（桥接按文件路径加载；Windows 用 .ico）。
     final iconAsset = Platform.isWindows
         ? 'assets/icons/tray.ico'
         : 'assets/icons/tray.png';
-    final icon = ImageAsset.fromAsset(iconAsset);
-    if (icon == null) {
-      throw ArgumentError.value(iconAsset, 'iconAsset', '无法加载托盘图标资源');
-    }
-    trayIcon.icon = icon;
-    trayIcon.setTooltip('ArchoeraMusic');
-    // 菜单唤出方式：
-    // - Linux 的 StatusNotifierItem 只有 Trigger=clicked 时才会把菜单暴露给面板
-    //   （面板自行打开菜单，托盘点击事件不上报）；
-    // - Windows / macOS 用右键唤出菜单，左键留给「显示主窗口」。
-    trayIcon.setContextMenuTrigger(
-      Platform.isLinux
-          ? ContextMenuTrigger.clicked
-          : ContextMenuTrigger.rightClicked,
+    final ext = Platform.isWindows ? 'ico' : 'png';
+    final data = await rootBundle.load(iconAsset);
+    final path =
+        '${Directory.systemTemp.path}/archoera-tray-$pid-'
+        '${DateTime.now().microsecondsSinceEpoch}.$ext';
+    await File(path).writeAsBytes(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      flush: true,
     );
-    trayIcon.addListener(_onTrayIconEvent);
-    _trayMenu = _buildMenu();
-    trayIcon.setContextMenu(_trayMenu);
-    trayIcon.setVisible(true);
+    _iconTempPath = path;
+
+    if (tray.create(path) != 0) {
+      throw StateError('无法创建系统托盘图标');
+    }
+    tray.setTooltip('ArchoeraMusic');
+    // 菜单唤出方式：Linux 的 StatusNotifierItem 由面板在左键时展开菜单；
+    // Windows / macOS 用右键唤出，左键留给「显示主窗口」。
+    tray.setMenuTrigger(Platform.isLinux);
+    _traySubs.add(tray.clicks.listen((_) => unawaited(_showWindow())));
+    _traySubs.add(tray.doubleClicks.listen((_) => unawaited(_showWindow())));
+    _traySubs.add(tray.menuCommands.listen(_onMenuCommand));
+    _trayFailures = tray.failures.listen((f) => Log.w('tray', f.toString()));
+    tray.setMenu(_buildMenuItems());
+    tray.setVisible(true);
   }
 
-  void _onTrayIconEvent(TrayIconEvent event) {
-    switch (event) {
-      case TrayIconClickedEvent():
+  void _onMenuCommand(int id) {
+    switch (id) {
+      case _menuShow:
         unawaited(_showWindow());
-      case TrayIconDoubleClickedEvent():
-        unawaited(_showWindow());
-      case TrayIconRightClickedEvent():
-        // Windows / macOS 已由 contextMenuTrigger 自动弹出菜单，无需手动处理。
-        break;
+      case _menuPlayPause:
+        ref.read(playbackProvider.notifier).toggle();
+      case _menuPrevious:
+        unawaited(ref.read(playbackProvider.notifier).playPrevious());
+      case _menuNext:
+        unawaited(ref.read(playbackProvider.notifier).playNext());
+      case _menuQuit:
+        unawaited(_quit());
     }
   }
 
-  Menu _buildMenu() {
+  List<SystemTrayMenuItem> _buildMenuItems() {
     final l10n = ref.read(l10nProvider);
-    final menu = Menu.create();
-    if (menu == null) {
-      throw StateError('无法创建托盘菜单');
-    }
-    _trayMenuItems.clear();
-
-    _addMenuItem(menu, l10n.trayShow, () => unawaited(_showWindow()));
-    menu.addSeparator();
-    _addMenuItem(
-      menu,
-      l10n.trayPlayPause,
-      () => ref.read(playbackProvider.notifier).toggle(),
-    );
-    _addMenuItem(
-      menu,
-      l10n.trayPrevious,
-      () => unawaited(ref.read(playbackProvider.notifier).playPrevious()),
-    );
-    _addMenuItem(
-      menu,
-      l10n.trayNext,
-      () => unawaited(ref.read(playbackProvider.notifier).playNext()),
-    );
-    menu.addSeparator();
-    _addMenuItem(menu, l10n.trayQuit, () => unawaited(_quit()));
-    return menu;
-  }
-
-  void _addMenuItem(Menu menu, String label, void Function() onTap) {
-    final item = MenuItem.createWithLabelAndType(label, MenuItemType.normal);
-    if (item == null) return;
-    item.addListener((event) {
-      if (event is MenuItemClickedEvent) onTap();
-    });
-    menu.addItem(item);
-    _trayMenuItems.add(item);
+    return <SystemTrayMenuItem>[
+      SystemTrayMenuItem(id: _menuShow, label: l10n.trayShow),
+      const SystemTrayMenuItem(id: 0),
+      SystemTrayMenuItem(id: _menuPlayPause, label: l10n.trayPlayPause),
+      SystemTrayMenuItem(id: _menuPrevious, label: l10n.trayPrevious),
+      SystemTrayMenuItem(id: _menuNext, label: l10n.trayNext),
+      const SystemTrayMenuItem(id: 0),
+      SystemTrayMenuItem(id: _menuQuit, label: l10n.trayQuit),
+    ];
   }
 
   void _rebuildMenu() {
     if (!_trayReady) return;
-    final trayIcon = _trayIcon;
-    if (trayIcon == null) return;
-
-    final previousItems = List<MenuItem>.of(_trayMenuItems);
-    final previousMenu = _trayMenu;
-    final menu = _buildMenu();
-    trayIcon.setContextMenu(menu);
-    _trayMenu = menu;
-    // 旧菜单已从托盘解绑：释放其菜单项监听与句柄（原生侧仍持共享引用，安全）。
-    for (final item in previousItems) {
-      item.dispose();
-    }
-    previousMenu?.dispose();
+    _tray?.setMenu(_buildMenuItems());
   }
 
   void _disposeTray() {
-    for (final item in _trayMenuItems) {
-      item.dispose();
+    for (final s in _traySubs) {
+      unawaited(s.cancel());
     }
-    _trayMenuItems.clear();
-    _trayMenu?.dispose();
-    _trayMenu = null;
-    _trayIcon?.dispose();
-    _trayIcon = null;
+    _traySubs.clear();
+    unawaited(_trayFailures?.cancel());
+    _trayFailures = null;
+    _tray?.destroy();
+    _tray = null;
+    final path = _iconTempPath;
+    if (path != null) {
+      try {
+        File(path).deleteSync();
+      } catch (_) {
+        // 临时文件清理失败可忽略。
+      }
+      _iconTempPath = null;
+    }
   }
 
   Future<void> _showWindow() async {

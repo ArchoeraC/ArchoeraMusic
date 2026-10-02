@@ -3,14 +3,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show Directory, File, Platform, pid;
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../services/log/log.dart';
+import '../../services/platform/platform_capabilities.dart';
+import '../../services/platform/platform_failure.dart';
+import '../../services/platform/system_tray.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../stores/app_prefs.dart';
 import '../../l10n/l10n.dart';
@@ -21,7 +24,13 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'tray_integration/tray_integration_logic.dart';
 
-/// 后台常驻：系统托盘集成。
+/// 后台常驻：系统托盘集成（自研平台桥接 `apl_tray_*`）。
+///
+/// 2026-10-02 由 Flutter 插件 `tray_manager` 迁至自研桥接：`tray_manager` 0.6+
+/// 引入 `nativeapi`/`cnativeapi` 依赖，其第三方 C++ 在 MSVC 下有告警
+/// （`strcpy` 弃用 C4996 / `size_t→unsigned long` 收窄 C4267），且按仓库约定
+/// 「平台/系统能力一律在 app/native/platform 实现、Dart 只经 apl_* 调用」，
+/// 故改由桥接承载托盘并移除该依赖。
 ///
 /// 关闭窗口按「关闭应用时」偏好处理（后台播放 / 直接退出；默认每次询问，
 /// 弹确认框含记忆勾选）。托盘菜单：显示主窗口 / 播放暂停 / 上一首 / 下一首 /
@@ -43,13 +52,15 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
   /// 关闭确认弹窗中「记住我的选择」复选框状态（每次弹窗前重置）。
   bool _closeRemember = false;
 
-  /// 托盘图标句柄。必须持有引用：包装对象一旦被 GC，原生句柄即被释放、
-  /// 图标随之消失（nativeapi 的 Finalizer 语义）。
-  TrayIcon? _trayIcon;
+  /// 托盘能力实现（进程级单例；本组件只 create/destroy，不 dispose 服务）。
+  SystemTray? _tray;
 
-  /// 当前上下文菜单及其菜单项。同样需持有引用，避免被 GC 释放。
-  Menu? _trayMenu;
-  final List<MenuItem> _trayMenuItems = <MenuItem>[];
+  /// 托盘事件订阅与失败订阅。
+  final List<StreamSubscription<void>> _traySubs = <StreamSubscription<void>>[];
+  StreamSubscription<PlatformCapabilityFailure>? _trayFailures;
+
+  /// 落到临时文件的图标路径（销毁时清理）。
+  String? _iconTempPath;
 
   @override
   void initState() {

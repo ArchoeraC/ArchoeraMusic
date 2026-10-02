@@ -17,8 +17,8 @@
 , stdenv
 , autoPatchelfHook
 , gtk3
-  # 托盘/窗口原生桥（nativeapi，tray_manager 0.7）在 Linux 走 StatusNotifierItem
-  # over D-Bus，直接依赖 GTK3 + X11 + Xi，不再需要 libayatana-appindicator 链。
+  # 平台桥接：托盘走 StatusNotifierItem + dbusmenu（libdbus-1.so.3，由 gtk3 传递引入），
+  # 窗口状态经 dlopen GTK/GDK（gtk3 + X11 + Xi）。无额外系统包。
 , libepoxy
 , fontconfig
 , fribidi

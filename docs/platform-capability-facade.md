@@ -39,6 +39,13 @@
 > 窗口最小化/失焦/隐藏探测收进原生桥接（`platform-native-bridge.md` §3.4）——Linux X11 /
 > Windows WndProc 子类化 / macOS NSWindow 通知；纯 Wayland 等不支持场景由 Dart 回退
 > window_manager 监听（既有路径）。
+>
+> **SystemTray（2026-10-02 新增）**：`create/setIcon/setTooltip/setVisible/setMenu/
+> setMenuTrigger` + `Stream`（点击/双击/右键/菜单命令）——系统托盘图标与扁平上下文菜单
+> 收进原生桥接（`platform-native-bridge.md` §3）：Windows `Shell_NotifyIcon` / Linux
+> `org.kde.StatusNotifierItem`+`com.canonical.dbusmenu`（纯 libdbus）/ macOS
+> `NSStatusItem`。用于替代 Flutter 插件 `tray_manager`（其 0.6+ 引入 `nativeapi`/
+> `cnativeapi` 依赖，且第三方 C++ 在 MSVC 下有告警）。
 
 ### 2.2 不属于本层（边界标注）
 

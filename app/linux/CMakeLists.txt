@@ -41,8 +41,8 @@ endif()
 # of modifying this function.
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_14)
-  # -Wno-deprecated-declarations：托盘/窗口原生桥（nativeapi）调用的部分
-  # GTK/GDK API 在新版库中被标记 G_DEPRECATED，-Werror 会把该弃用告警升级为
+  # -Wno-deprecated-declarations：平台桥接经 dlopen 调用的部分 GTK/GDK API
+  # （窗口状态轻轮询）在新版库中被标记 G_DEPRECATED，-Werror 会把该弃用告警升级为
   # 错误，这里显式关闭该告警类（不影响其它告警）。
   target_compile_options(${TARGET} PRIVATE -Wall -Werror -Wno-deprecated-declarations)
   target_compile_options(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:-O3>")
