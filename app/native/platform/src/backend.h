@@ -48,6 +48,15 @@ int32_t notify(const char* title, const char* body);
 // 文件管理器定位路径（文件 → 打开所在目录并选中；目录 → 打开）。
 int32_t revealPath(const char* path);
 
+// 系统托盘（见 include/archoera_platform.h）。
+int32_t trayCreate(const char* icon_path);
+int32_t trayDestroy();
+int32_t traySetIcon(const char* icon_path);
+int32_t traySetTooltip(const char* tooltip);
+int32_t traySetVisible(bool visible);
+int32_t traySetMenu(const AplTrayMenuItem* items, int32_t count);
+int32_t traySetMenuTrigger(int32_t trigger);
+
 }  // namespace archoera
 
 #endif  // ARCHOERA_BACKEND_H

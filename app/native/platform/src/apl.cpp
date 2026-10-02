@@ -12,7 +12,7 @@
 #include "core.h"
 
 namespace {
-constexpr int32_t kAbiVersion = 2;
+constexpr int32_t kAbiVersion = 3;
 }  // namespace
 
 extern "C" {
@@ -136,6 +136,44 @@ int32_t apl_reveal_path(const char* path) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     if (path == nullptr || *path == '\0') return archoera::ERR_STATE;
     return archoera::revealPath(path);
+}
+
+int32_t apl_tray_create(const char* icon_path) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (icon_path == nullptr || *icon_path == '\0') return archoera::ERR_STATE;
+    return archoera::trayCreate(icon_path);
+}
+
+int32_t apl_tray_destroy(void) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::trayDestroy();
+}
+
+int32_t apl_tray_set_icon(const char* icon_path) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (icon_path == nullptr || *icon_path == '\0') return archoera::ERR_STATE;
+    return archoera::traySetIcon(icon_path);
+}
+
+int32_t apl_tray_set_tooltip(const char* tooltip) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::traySetTooltip(tooltip != nullptr ? tooltip : "");
+}
+
+int32_t apl_tray_set_visible(int32_t visible) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::traySetVisible(visible != 0);
+}
+
+int32_t apl_tray_set_menu(const AplTrayMenuItem* items, int32_t count) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (count < 0 || (count > 0 && items == nullptr)) return archoera::ERR_STATE;
+    return archoera::traySetMenu(items, count);
+}
+
+int32_t apl_tray_set_menu_trigger(int32_t trigger) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::traySetMenuTrigger(trigger);
 }
 
 }  // extern "C"

@@ -55,6 +55,7 @@ extern "C" {
 #define APL_CAP_SYSTEM_THEME       (1u << 8) /* 系统深浅色（light/dark） */
 #define APL_CAP_DEEP_LINK          (1u << 9) /* 自定义 URI scheme 唤醒（archoera://） */
 #define APL_CAP_REVEAL_PATH        (1u << 10) /* 文件管理器定位路径（定位文件/打开所在目录） */
+#define APL_CAP_TRAY               (1u << 11) /* 系统托盘图标 + 上下文菜单 */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -151,6 +152,31 @@ APL_API int32_t apl_system_accent_set_events(int32_t on);
  * 事件 APL_EVENT_SYSTEM_THEME 携带 u.theme.dark（1=深色，0=浅色）。 */
 APL_API int32_t apl_system_theme_set_events(int32_t on);
 
+/* ── SystemTray（系统托盘图标 + 扁平上下文菜单）────────────────────
+ * 图标以**文件路径**传入（Windows 用 .ico，其余平台 .png）；调用方（Dart）负责把
+ * 资源落到临时文件后传绝对路径。菜单为**扁平**列表：id>0 可点击、id==0 分隔符；
+ * 菜单点击经 APL_EVENT_TRAY_MENU_COMMAND（u.tray_command.id）回传。图标点击（在非
+ * 菜单触发方式下）经 APL_EVENT_TRAY_CLICK/_DOUBLE_CLICK/_RIGHT_CLICK 回传。
+ * 三端均在各自 UI 线程操作（桥接内部调度），调用线程不敏感；未 init 返回 ERR_STATE。 */
+typedef struct AplTrayMenuItem {
+    int32_t id;       /* 0=分隔符；>0=可点击项（事件携带此 id） */
+    int32_t enabled;  /* 1（默认）/0 禁用 */
+    int32_t checked;  /* 1=勾选 0=未勾选 -1=非复选（默认） */
+    AplString label;  /* UTF-8；id==0 时忽略 */
+} AplTrayMenuItem;
+
+/* 创建托盘（幂等：已存在则更新图标）；icon_path 为绝对路径。 */
+APL_API int32_t apl_tray_create(const char* icon_path);
+/* 销毁托盘并释放菜单/图标；幂等。 */
+APL_API int32_t apl_tray_destroy(void);
+APL_API int32_t apl_tray_set_icon(const char* icon_path);
+APL_API int32_t apl_tray_set_tooltip(const char* tooltip);
+APL_API int32_t apl_tray_set_visible(int32_t visible);
+/* 设置上下文菜单（扁平）；count==0 清除。桥接持有 label 拷贝。 */
+APL_API int32_t apl_tray_set_menu(const AplTrayMenuItem* items, int32_t count);
+/* 菜单唤出方式：0=左键点击（Linux SNI 需此值才会把菜单暴露给面板）；1=右键。 */
+APL_API int32_t apl_tray_set_menu_trigger(int32_t trigger);
+
 /* ── 反向事件（OS → Dart）──────────────────────────────────────── */
 typedef enum {
     APL_EVENT_MEDIA_COMMAND = 1,
@@ -161,6 +187,10 @@ typedef enum {
     APL_EVENT_SYSTEM_ACCENT = 6, /* 系统主题色（u.accent：r/g/b 0-255，平台推送） */
     APL_EVENT_SYSTEM_THEME  = 7, /* 系统深浅色（u.theme.dark：1=深色，平台推送） */
     APL_EVENT_DEEP_LINK     = 8, /* 收到 deep link（u.deep_link=1；Dart 调 apl_deep_link_take 取） */
+    APL_EVENT_TRAY_CLICK        = 9,  /* 托盘左键单击（u.tray=1） */
+    APL_EVENT_TRAY_DOUBLE_CLICK = 10, /* 托盘左键双击（u.tray=1） */
+    APL_EVENT_TRAY_RIGHT_CLICK  = 11, /* 托盘右键（u.tray=1） */
+    APL_EVENT_TRAY_MENU_COMMAND = 12, /* 菜单项点击（u.tray_command.id） */
 } AplEventType;
 
 typedef enum {
@@ -180,6 +210,8 @@ typedef struct AplEvent {
         struct { int32_t r; int32_t g; int32_t b; } accent; /* SYSTEM_ACCENT：0-255 */
         struct { int32_t dark; } theme; /* SYSTEM_THEME：1=深色 0=浅色 */
         int32_t deep_link;  /* DEEP_LINK：1=有 pending（Dart 再取） */
+        int32_t tray;       /* TRAY_CLICK/DOUBLE_CLICK/RIGHT_CLICK：=1 */
+        struct { int32_t id; } tray_command; /* TRAY_MENU_COMMAND：菜单项 id */
     } u;
 } AplEvent;
 
