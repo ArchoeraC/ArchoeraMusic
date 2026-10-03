@@ -65,14 +65,14 @@ for size in 32 48 64 128 256 512; do
 done
 
 # 4) finish：网络（媒体服务）、音频、图形（X11/Wayland/DRI）、home（本地曲库）、
-#    系统托盘（StatusNotifierItem over D-Bus：向 Watcher 注册并拥有自己的 SNI 名）
+#    系统托盘（StatusNotifierItem over D-Bus：以对象路径形式向 Watcher 注册，
+#    由面板按调用者唯一连接名定位，无需 --own-name=org.kde.*）
 flatpak build-finish \
   --command=$BIN \
   --share=ipc --share=network \
   --socket=x11 --socket=wayland --socket=pulseaudio \
   --device=dri --filesystem=home \
   --talk-name=org.kde.StatusNotifierWatcher \
-  --own-name=org.kde.StatusNotifierItem-\* \
   "$appdir"
 
 # 5) 导出 + 打包为单文件 .flatpak
