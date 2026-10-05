@@ -33,7 +33,7 @@ inline const std::vector<std::string>& adMarkers() {
         "http://",
         "https://",
         "www.",
-        "music.cnmsb.xin",
+        "music.nekocore.cn",
         "neko云音乐",
         "neko cloud music",
         "neko music",

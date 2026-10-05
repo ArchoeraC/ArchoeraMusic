@@ -56,10 +56,10 @@ fn enqueue_without_lyrics_is_backward_compatible() {
 fn neko_pre_resolved_fallback_parses() {
     // Dart 回退路径注入的 camelCase 预解析 JSON 必须可解析。
     let pre = r#"{
-        "url": "https://music.cnmsb.xin/api/music/file/13751",
+        "url": "https://music.nekocore.cn/api/music/file/13751",
         "qualityKey": "320k",
         "fileExt": "flac",
-        "headers": [["Referer", "https://music.cnmsb.xin"]]
+        "headers": [["Referer", "https://music.nekocore.cn"]]
     }"#;
     let parsed: archoera_downloader::models::PreResolvedUrl =
         serde_json::from_str(pre).expect("neko 预解析反序列化失败");

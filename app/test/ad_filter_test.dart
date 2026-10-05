@@ -13,7 +13,7 @@ import 'package:archoera_music/services/lyrics/lyric_line.dart';
 void main() {
   test('isAdMetadataText：命中站点推广，放过正规歌词', () {
     expect(isAdMetadataText('资源来自Neko云音乐 Resources from Neko Cloud Music'), isTrue);
-    expect(isAdMetadataText('获取更多无损音乐https://music.cnmsb.xin/'), isTrue);
+    expect(isAdMetadataText('获取更多无损音乐https://music.nekocore.cn/'), isTrue);
     expect(isAdMetadataText('更多免费无损音乐就来Neko云音乐'), isTrue);
     expect(isAdMetadataText('关注公众号：xxx'), isTrue);
     expect(isAdMetadataText('[00:12.34]晴天'), isFalse);
@@ -32,7 +32,7 @@ void main() {
       LyricGroup(
         original: LyricLine(
           timeMs: 100,
-          text: '获取更多无损音乐https://music.cnmsb.xin/',
+          text: '获取更多无损音乐https://music.nekocore.cn/',
         ),
       ),
       LyricGroup(original: LyricLine(timeMs: 12340, text: '故事的小黄花')),

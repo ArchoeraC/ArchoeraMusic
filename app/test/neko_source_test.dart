@@ -24,8 +24,8 @@ void main() {
 
     test('补 scheme 并去除尾斜杠', () {
       expect(
-        normalizeNekoBaseUrl('music.cnmsb.xin/'),
-        'https://music.cnmsb.xin',
+        normalizeNekoBaseUrl('music.nekocore.cn/'),
+        'https://music.nekocore.cn',
       );
       expect(
         normalizeNekoBaseUrl('http://127.0.0.1:65535//'),
@@ -60,16 +60,16 @@ void main() {
           'duration': 269,
           'lrc': true,
         },
-        baseUrl: 'https://music.cnmsb.xin',
+        baseUrl: 'https://music.nekocore.cn',
       );
       expect(t.source, 'neko');
       expect(t.id, '42');
       expect(t.title, '晴天');
       expect(t.artistNames, '周杰伦');
       expect(t.album?.name, '叶惠美');
-      expect(t.album?.cover, 'https://music.cnmsb.xin/api/music/cover/42');
+      expect(t.album?.cover, 'https://music.nekocore.cn/api/music/cover/42');
       expect(t.duration, 269000);
-      expect(t.cover, 'https://music.cnmsb.xin/api/music/cover/42');
+      expect(t.cover, 'https://music.nekocore.cn/api/music/cover/42');
     });
 
     test('多歌手分隔 / 无 baseUrl 不产生封面 / 缺字段安全默认', () {
@@ -484,8 +484,8 @@ void main() {
         'https://x/y.jpg?param=50y50',
       );
       expect(
-        withPicSize('https://music.cnmsb.xin/api/user/avatar/7?v=123', 100),
-        'https://music.cnmsb.xin/api/user/avatar/7?v=123',
+        withPicSize('https://music.nekocore.cn/api/user/avatar/7?v=123', 100),
+        'https://music.nekocore.cn/api/user/avatar/7?v=123',
       );
       expect(withPicSize('', 100), '');
     });
