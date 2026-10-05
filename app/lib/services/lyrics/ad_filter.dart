@@ -17,7 +17,7 @@ const List<String> kAdMarkers = [
   'http://',
   'https://',
   'www.',
-  'music.cnmsb.xin',
+  'music.core.cn',
   '云音乐',
   ' cloud music',
   ' music',

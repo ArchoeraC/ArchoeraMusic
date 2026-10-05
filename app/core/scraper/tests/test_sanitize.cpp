@@ -16,7 +16,7 @@ using namespace archoera::scraper::sanitize;
 int main() {
     // 1) 判定：命中站点推广，放过正规歌词。
     assert(isAdText("资源来自云音乐 Resources from  Cloud Music"));
-    assert(isAdText("获取更多无损音乐https://music.cnmsb.xin/"));
+    assert(isAdText("获取更多无损音乐https://music.core.cn/"));
     assert(isAdText("更多免费无损音乐就来云音乐"));
     assert(isAdText("关注公众号：xxx"));
     assert(!isAdText("[00:12.34]晴天"));
@@ -27,11 +27,11 @@ int main() {
     ScrapeResult r;
     r.title = "三拜红尘凉";
     r.artist = "尹昔眠";
-    r.album = "更多免费无损音乐就来云音乐 https://music.cnmsb.xin";
+    r.album = "更多免费无损音乐就来云音乐 https://music.core.cn";
     r.label = " Music";
     r.lyrics = std::string(
         "[00:00.05]资源来自云音乐 Resources from  Cloud Music\n"
-        "[00:00.10]获取更多无损音乐https://music.cnmsb.xin/\n"
+        "[00:00.10]获取更多无损音乐https://music.core.cn/\n"
         "[00:12.34]故事的小黄花\n"
         "[00:15.00]从出生那年就飘着");
     sanitizeResult(r);
@@ -45,7 +45,7 @@ int main() {
 
     // 3) 全为广告的歌词 → 删除。
     ScrapeResult onlyAds;
-    onlyAds.lyrics = std::string("资源来自云音乐\n更多免费无损音乐https://music.cnmsb.xin");
+    onlyAds.lyrics = std::string("资源来自云音乐\n更多免费无损音乐https://music.core.cn");
     sanitizeResult(onlyAds);
     assert(!onlyAds.lyrics.has_value());
 
