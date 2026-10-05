@@ -1100,6 +1100,11 @@ int32_t setEvents(bool on) {
 // 点击方法，`/MenuBar` 提供 com.canonical.dbusmenu 菜单；向会话总线的
 // org.kde.StatusNotifierWatcher 注册后由面板托管。
 //
+// 注册方式（标准路径形式）：不申请 org.kde.StatusNotifierItem-<pid>-<id> 这类
+// well-known 名，而是把对象路径 `/StatusNotifierItem` 传给
+// RegisterStatusNotifierItem——监听方据此改用调用者的唯一连接名（:1.x）定位本项。
+// 因此沙箱无需 --own-name=org.kde.*（见 Flatpak 桌面集成文档 StatusNotifier 一节）。
+//
 // 连接独立性：托盘使用**私有** DBusConnection（dbus_bus_get_private）。MPRIS 的
 // 连接过滤器对所有方法调用返回 HANDLED（libdbus 先于对象路径回调调用过滤器），
 // 若共用连接会遮蔽托盘的对象路径回调，故必须另开连接（关闭时 close 便于唤醒泵）。
@@ -1127,7 +1132,6 @@ DBusConnection* g_tray_conn = nullptr;
 std::thread* g_tray_pump = nullptr;
 std::atomic<bool> g_tray_running{false};
 bool g_tray_created = false;
-std::string g_tray_bus_name;
 std::string g_tray_tooltip = "ArchoeraMusic";
 bool g_tray_visible = true;
 int32_t g_tray_trigger = 0;  // 0=左键展开菜单；1=右键
@@ -1838,16 +1842,13 @@ void trayPumpLoop() {
     }
 }
 
-// 幂等销毁：注销对象路径/总线名、等待并 join 泵线程、释放连接与菜单拷贝。
+// 幂等销毁：注销对象路径、等待并 join 泵线程、释放连接与菜单拷贝。
 void trayTeardownInternal() {
     DBusConnection* c = nullptr;
-    std::string bus;
     {
         std::lock_guard<std::mutex> lock(g_tray_mtx);
         c = g_tray_conn;
-        bus = g_tray_bus_name;
         g_tray_conn = nullptr;
-        g_tray_bus_name.clear();
         g_tray_created = false;
         g_tray_has_pixmap = false;
         g_tray_pixmap.clear();
@@ -1859,12 +1860,6 @@ void trayTeardownInternal() {
     if (c != nullptr) {
         dbus_connection_unregister_object_path(c, kSniPath);
         dbus_connection_unregister_object_path(c, kMenuPath);
-        if (!bus.empty()) {
-            DBusError err;
-            dbus_error_init(&err);
-            dbus_bus_release_name(c, bus.c_str(), &err);
-            dbus_error_free(&err);
-        }
     }
     if (g_tray_pump != nullptr) {
         if (g_tray_pump->joinable()) g_tray_pump->join();
@@ -2456,16 +2451,6 @@ int32_t trayCreate(const char* icon_path) {
     dbus_error_free(&err);
     dbus_connection_set_exit_on_disconnect(c, FALSE);
 
-    char busName[96];
-    std::snprintf(busName, sizeof(busName), "org.kde.StatusNotifierItem-%d-1",
-                  static_cast<int>(::getpid()));
-    if (!tryRequestName(c, busName)) {
-        log(2, "platform", "系统托盘：申请 StatusNotifierItem 总线名失败");
-        dbus_connection_close(c);
-        dbus_connection_unref(c);
-        return ERR_BACKEND;
-    }
-
     static const DBusObjectPathVTable vtable = {
         nullptr, trayObjectHandler, nullptr, nullptr, nullptr, nullptr};
     const bool regSni =
@@ -2477,19 +2462,19 @@ int32_t trayCreate(const char* icon_path) {
         log(2, "platform", "系统托盘：注册 D-Bus 对象路径失败");
         dbus_connection_unregister_object_path(c, kSniPath);
         dbus_connection_unregister_object_path(c, kMenuPath);
-        dbus_bus_release_name(c, busName, nullptr);
         dbus_connection_close(c);
         dbus_connection_unref(c);
         return ERR_BACKEND;
     }
 
-    // 向 Watcher 注册；不存在则整体失败（能力降级）。
+    // 向 Watcher 注册；不存在则整体失败（能力降级）。以对象路径形式注册，
+    // Watcher 改用本连接的唯一名定位（因此不需要任何 --own-name 权限）。
     bool watcherOk = false;
     DBusMessage* reg = dbus_message_new_method_call(
         kSniWatcherIface, kSniWatcherPath, kSniWatcherIface,
         "RegisterStatusNotifierItem");
     if (reg != nullptr) {
-        const char* svc = busName;
+        const char* svc = kSniPath;  // 路径形式：Watcher 改用调用者唯一连接名
         dbus_message_append_args(reg, DBUS_TYPE_STRING, &svc,
                                  DBUS_TYPE_INVALID);
         DBusError e2;
@@ -2505,7 +2490,6 @@ int32_t trayCreate(const char* icon_path) {
         log(2, "platform", "系统托盘：StatusNotifierWatcher 不可用，能力降级");
         dbus_connection_unregister_object_path(c, kSniPath);
         dbus_connection_unregister_object_path(c, kMenuPath);
-        dbus_bus_release_name(c, busName, nullptr);
         dbus_connection_close(c);
         dbus_connection_unref(c);
         return ERR_BACKEND;
@@ -2514,7 +2498,6 @@ int32_t trayCreate(const char* icon_path) {
     {
         std::lock_guard<std::mutex> lock(g_tray_mtx);
         g_tray_conn = c;
-        g_tray_bus_name = busName;
         g_tray_created = true;
         g_tray_has_pixmap = ic.hasPixmap;
         g_tray_pixmap = ic.pixels;
