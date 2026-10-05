@@ -20,7 +20,7 @@ import 'dart:convert';
 import 'dart:io';
 
 /// 默认服务器地址（可在设置中修改）。
-const String kDefaultNekoBaseUrl = 'https://music.cnmsb.xin';
+const String kDefaultNekoBaseUrl = 'https://music.nekocore.cn';
 
 /// 归一化服务器地址：补 scheme、去尾部 `/`；空值回退默认地址。
 String normalizeNekoBaseUrl(String? raw) {
