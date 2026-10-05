@@ -19,7 +19,7 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，桌面为主（Li
 - 内置统一 C 音频引擎：EQ / 响度归一化 / 限幅器 / FFT 频谱 / 变速变调 / Opus 转码管线
 - 可选 Subsonic 兼容服务端，并支持 Subsonic / Jellyfin 流媒体服务器聚合
 
-> 本项目自研代码以 **AGPL-3.0-or-later** 开源（认可开源商业化，不提供闭源商业授权）。
+> 本项目以 **AGPL-3.0-or-later** 开源（认可开源商业化，不提供闭源商业授权）。
 > 授权边界见 [docs/licensing.md](docs/licensing.md)，用户可读声明见 [docs/software-declaration.md](docs/software-declaration.md)。
 
 ## 快速开始
