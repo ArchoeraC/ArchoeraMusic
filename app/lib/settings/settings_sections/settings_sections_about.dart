@@ -450,7 +450,7 @@ const List<_ThanksItem> _kThanksDesign = [
 
 const List<_ThanksItem> _kThanksCore = [
   _ThanksItem('Flutter', 'BSD-3-Clause', 'https://flutter.dev'),
-  _ThanksItem('FFmpeg', 'LGPL-2.1+', 'https://ffmpeg.org'),
+  _ThanksItem('FFmpeg', 'LGPL-3.0+ / LGPL-2.1+', 'https://ffmpeg.org'),
   _ThanksItem('libopus', 'BSD-3-Clause', 'https://opus-codec.org'),
   _ThanksItem('TagLib', 'LGPL-2.1+ / MPL-1.1', 'https://taglib.org'),
   _ThanksItem(
