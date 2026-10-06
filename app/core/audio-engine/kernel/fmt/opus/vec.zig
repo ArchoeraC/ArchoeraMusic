@@ -52,6 +52,14 @@ pub inline fn store16i16(p: [*]i16, v: V16i16) void {
     p[0..16].* = @bitCast(v);
 }
 
+pub inline fn load8i16(p: [*]const i16) V8i16 {
+    return p[0..8].*;
+}
+
+pub inline fn store8i16(p: [*]i16, v: V8i16) void {
+    p[0..8].* = @bitCast(v);
+}
+
 /// 就地缩放：x[i] *= g（逐 lane 一次乘法，位级等同标量）。
 pub inline fn scaleInPlace(x: []f32, g: f32) void {
     const vg: V8 = @splat(g);

@@ -407,7 +407,15 @@ fn decodeSilkFrame(f: *OpusCtx, data: []const u8, hybrid: bool) Error!void {
         const n_ch = celt.decodeFrame(&f.celt_f, &rc, .{ out_f[0][0..f.frame_size], out_f[1][0..f.frame_size] }, @intCast(@as(usize, 1) + @intFromBool(f.stereo)), f.frame_size, 17, end_band, true) catch |e| return e;
 
         for (0..@intCast(n_ch)) |c| {
-            for (0..out_len) |i| {
+            const cscale: opus_vec.V8 = @splat(1.0 / 32768.0);
+            var i: usize = 0;
+            while (i + 8 <= out_len) : (i += 8) {
+                const iv = opus_vec.load8i16(f.ch48[c][i..].ptr);
+                const fv: opus_vec.V8 = @floatFromInt(iv);
+                const sum_f = fv * cscale + opus_vec.load8(out_f[c][i..].ptr);
+                opus_vec.store8i16(f.ch48[c][i..].ptr, opus_vec.f32ToS16x8(sum_f));
+            }
+            while (i < out_len) : (i += 1) {
                 const sum_f = @as(f32, @floatFromInt(f.ch48[c][i])) * (1.0 / 32768.0) + out_f[c][i];
                 f.ch48[c][i] = f32ToS16(sum_f);
             }
@@ -579,10 +587,33 @@ fn decodeCeltPacket(f: *OpusCtx, pp: *const opus_packet.Packet) Error!void {
 /// 输出声道 = f.channels（OpusHead）；流为 mono（stereo=false）时复制 ch0 到全部输出声道。
 fn interleaveOut(f: *OpusCtx, out_len: usize) void {
     const nch: usize = if (f.stereo) 2 else 1;
+    const base = f.pcm_len * f.channels;
+    if (f.channels == 2) {
+        if (nch == 2) {
+            var i: usize = 0;
+            while (i + 8 <= out_len) : (i += 8) {
+                const l = opus_vec.load8i16(f.ch48[0][i..].ptr);
+                const r = opus_vec.load8i16(f.ch48[1][i..].ptr);
+                opus_vec.store16i16(f.pcm_buf[base + i * 2 ..].ptr, opus_vec.interleave8(l, r));
+            }
+            while (i < out_len) : (i += 1) {
+                f.pcm_buf[base + i * 2] = f.ch48[0][i];
+                f.pcm_buf[base + i * 2 + 1] = f.ch48[1][i];
+            }
+        } else {
+            for (0..out_len) |i| {
+                const v = f.ch48[0][i];
+                f.pcm_buf[base + i * 2] = v;
+                f.pcm_buf[base + i * 2 + 1] = v;
+            }
+        }
+        f.pcm_len += out_len;
+        return;
+    }
     for (0..out_len) |i| {
         for (0..f.channels) |c| {
             const src: usize = if (c < nch) c else 0;
-            f.pcm_buf[f.pcm_len * f.channels + i * f.channels + c] = f.ch48[src][i];
+            f.pcm_buf[base + i * f.channels + c] = f.ch48[src][i];
         }
     }
     f.pcm_len += out_len;
