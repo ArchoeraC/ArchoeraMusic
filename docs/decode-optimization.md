@@ -379,5 +379,25 @@ Ogg + mka + m4a(Opus) 共 9 个语料，改动前后引擎输出 WAV **md5 完�
   实测 **+0.17%（略降）**，整数 `imul`+`u64` 加与额外溢出判断不比 `cvtsi2ss`+`mulss` 划算，回退。
 - `iirFir`/`up2HQ`（SILK 重采样）为整数串行 IIR/FIR，跨样本/相位无独立 lane，未动。
 
+### 12.5 续：区间解码器 `rc.zig`（位读取批量取位 + 整数开方）
+
+- **`BitReader.readBits`**：原逐位循环（每读 1 字节约 170 条指令）改**内联热路径**——
+  一次 64 位大端加载跨字节取位段（`peekBits`）；帧尾不足 8 字节 / 越界补零 / `n==0`
+  走 `readBitsSlow` 冷路径，逐位语义不变。`decNormalize` 每轮 `readBits(8)` 由此大幅提速。
+- **`ffSqrt`**：整数平方根由逐位逼近（每次约 80 条指令）改
+  `@intFromFloat(@sqrt(f64))`——a ≤ 2³²−1 时 ⌊√a⌋ ≤ 65535，f64 正确舍入且结果距整数
+  边界 ≫ ulp，截断即精确 floor（`decUintTri` 热点）。
+- 回退：128 位倒数乘法替换 `decUint` 除法（+0.05%）、`tellFrac` 比较选移位（+0.04%），
+  均因硬件 `div` 本就单指令而不划算。
+
+叠加到 §12.4 之上（同口径）：ind.opus **3.514G → 3.203G（−8.9%）**、
+mono 2.269G → 2.087G、silk 2.650G → 2.567G、hybrid 3.347G → 3.131G；
+`rc.decUint` 自占 6.1% → 2.6%。9 语料 md5 逐位一致、730/730、ctest 36/36、
+Windows 交叉通过。
+
+> **累计（对改动前引擎）**：ind.opus **5.113G → 3.203G（−37.4%）**，
+> cycles 2.012G → ~1.30G；era/FFmpeg(libopus) 指令比约 **1.85× → 1.16×**。
+
+
 
 
