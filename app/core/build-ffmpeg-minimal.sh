@@ -100,6 +100,7 @@ if [[ ! -f "$MBEDTLS_PREFIX/lib/libmbedtls.a" || ! -f "$MBEDTLS_PREFIX/.pic" ]];
   cmake -S "$work/mbedtls-$MBEDTLS_VER" -B "$work/mbedtls-build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$MBEDTLS_PREFIX" \
+    -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DUSE_SHARED_MBEDTLS_LIBRARY=OFF \
     -DUSE_STATIC_MBEDTLS_LIBRARY=ON \
