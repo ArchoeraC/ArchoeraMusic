@@ -331,6 +331,7 @@ class _AccountAvatar extends StatelessWidget {
           fit: BoxFit.cover,
           cacheWidth: avatarPx,
           cacheHeight: avatarPx,
+          headers: mediaHeadersForUrl(url),
           errorBuilder: (_, _, _) => _fallback(colorScheme),
         ),
       );

@@ -331,7 +331,7 @@ int main(int argc, char **argv)
     /* 原生 HTTP 打开 */
     NativeInfo uinfo;
     int ust = 0;
-    NativeDecoder *ud = native_decoder_open_url(url, &uinfo, &ust, eb, (int)sizeof(eb));
+    NativeDecoder *ud = native_decoder_open_url(url, NULL, &uinfo, &ust, eb, (int)sizeof(eb));
     CHECK(ud != NULL, "native_decoder_open_url 打开成功");
     if (ud) {
         CHECK(uinfo.sample_rate == pinfo.sample_rate, "URL 后端采样率一致");
@@ -366,7 +366,7 @@ int main(int argc, char **argv)
         snprintf(urld, sizeof(urld), "http://127.0.0.1:%d/drop", srv.port);
         NativeInfo dinfo;
         int dst = 0;
-        NativeDecoder *dd = native_decoder_open_url(urld, &dinfo, &dst, eb, (int)sizeof(eb));
+        NativeDecoder *dd = native_decoder_open_url(urld, NULL, &dinfo, &dst, eb, (int)sizeof(eb));
         CHECK(dd != NULL, "断流续传：URL 打开成功");
         if (dd) {
             Pcm pd2 = {0};
@@ -386,7 +386,7 @@ int main(int argc, char **argv)
             long b2 = native_decoder_stream_opens();
             NativeInfo uinfo2;
             int ust2 = 0;
-            NativeDecoder *dp = native_decoder_open_url(url, &uinfo2, &ust2, eb, (int)sizeof(eb));
+            NativeDecoder *dp = native_decoder_open_url(url, NULL, &uinfo2, &ust2, eb, (int)sizeof(eb));
             CHECK(dp != NULL, "池 URL 打开成功");
             if (dp) {
                 CHECK(uinfo2.sample_rate == pinfo.sample_rate, "池 URL 后端采样率一致");
@@ -420,7 +420,7 @@ int main(int argc, char **argv)
             snprintf(urls, sizeof(urls), "http://127.0.0.1:%d/stall", srv.port);
             NativeInfo ainfo;
             int ast = 0;
-            NativeDecoder *ap = native_decoder_open_url(urls, &ainfo, &ast, eb, (int)sizeof(eb));
+            NativeDecoder *ap = native_decoder_open_url(urls, NULL, &ainfo, &ast, eb, (int)sizeof(eb));
             CHECK(ap != NULL, "停滞 URL 池打开成功");
             if (!ap) fprintf(stderr, "  stall open status=%d err=%s\n", ast, eb + 4);
             if (ap) {
@@ -455,7 +455,7 @@ int main(int argc, char **argv)
         NativeInfo bad;
         int bst = 0;
         NativeDecoder *bd = native_decoder_open_url(
-            "http://127.0.0.1:1/none", &bad, &bst, eb, (int)sizeof(eb));
+            "http://127.0.0.1:1/none", NULL, &bad, &bst, eb, (int)sizeof(eb));
         CHECK(bd == NULL, "不可达地址返回 NULL");
         CHECK(bst != 0, "不可达地址写非 0 状态码");
         if (bd) native_decoder_close(bd);
@@ -465,7 +465,7 @@ int main(int argc, char **argv)
         NativeInfo bad;
         int bst = 0;
         NativeDecoder *bd = native_decoder_open_url(
-            "ftp://127.0.0.1/x", &bad, &bst, eb, (int)sizeof(eb));
+            "ftp://127.0.0.1/x", NULL, &bad, &bst, eb, (int)sizeof(eb));
         CHECK(bd == NULL, "非 http(s) 协议返回 NULL");
         if (bd) native_decoder_close(bd);
     }

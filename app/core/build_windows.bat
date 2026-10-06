@@ -146,6 +146,8 @@ echo             安装 Zig 0.16（https://ziglang.org/download）后重跑可�
 :zig_done
 
 echo [build_windows] 编译 archoera_mediaengine.dll...
+rem FFmpeg https：vcpkg 的 ffmpeg 端口在 **未启用 openssl 特性** 时会对 Windows 自动
+rem   加 `--enable-schannel`（系统原生 TLS，无额外 DLL；亦保持 LGPL-2.1+）。见 app/vcpkg.json。
 rem Zig 内核（EraAudio 原生 HTTP(S)/TLS）在 Windows 依赖系统库：crypt32（系统根证书
 rem 枚举/校验）、ws2_32（Winsock）、bcrypt（std.crypto.random）；MSVC 不会自动带上，
 rem 须在最终链接显式补齐（FFmpeg 覆盖了 ws2_32/bcrypt，但不含 crypt32）。

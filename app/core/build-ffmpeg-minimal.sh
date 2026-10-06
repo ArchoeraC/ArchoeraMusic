@@ -10,7 +10,9 @@
 #   2. 许可证：本项目 AGPL-3.0，THIRD-PARTY-LICENSES 明确要求 FFmpeg 为
 #      **纯 LGPL 构建**（CONFIG_GPL=0 / CONFIG_NONFREE=0）且仅动态链接。
 #      Homebrew ffmpeg 默认 --enable-gpl（GPL-3.0），会破坏该「GPL 防火墙」；
-#      这里显式 --disable-gpl --disable-nonfree，保持 LGPL-2.1+。
+#      这里显式 --disable-gpl --disable-nonfree。自包含 TLS 用 mbedTLS
+#      （Apache-2.0，FFmpeg 将其列入 version3 依赖），故需 --enable-version3，
+#      产物许可为 **LGPL-3.0-or-later**（仍无 GPL，GPL 防火墙不受影响）。
 #   3. 仅音频：本软件只做音频解码 + 标签/元数据读取 + Opus/OGG 转码，
 #      完全不碰视频/图像/字幕。故用 --disable-everything 后只白名单启用
 #      **全部内部音频解码器** + 所需 demuxer/parser/protocol + OGG 封装，
@@ -26,16 +28,22 @@
 #  环境变量：
 #    FFMPEG_VERSION  源码版本（默认 9.0.1）
 #    FFMPEG_PREFIX   安装前缀（默认 $HOME/.local/ffmpeg-minimal）
+#    MBEDTLS_VERSION 自包含 TLS 后端版本（默认 3.6.2）
+#    MBEDTLS_PREFIX  mbedTLS 安装前缀（默认 $HOME/.local/mbedtls-minimal）
 #  用法: build-ffmpeg-minimal.sh
 # =====================================================================
 set -euo pipefail
 
 VER="${FFMPEG_VERSION:-9.0.1}"
 PREFIX="${FFMPEG_PREFIX:-$HOME/.local/ffmpeg-minimal}"
+MBEDTLS_VER="${MBEDTLS_VERSION:-3.6.2}"
+MBEDTLS_PREFIX="${MBEDTLS_PREFIX:-$HOME/.local/mbedtls-minimal}"
 if command -v nproc >/dev/null 2>&1; then JOBS="$(nproc)"; else JOBS="$(sysctl -n hw.ncpu)"; fi
 
-if [[ -f "$PREFIX/lib/libavformat.so" || -f "$PREFIX/lib/libavformat.dylib" ]]; then
-  echo "[build-ffmpeg-minimal] 已存在，跳过：$PREFIX"
+# TLS 标记：旧前缀（无 TLS）需重建，否则 https 仍不可用。
+TLS_MARKER="$PREFIX/.mbedtls-tls"
+if [[ -f "$TLS_MARKER" && ( -f "$PREFIX/lib/libavformat.so" || -f "$PREFIX/lib/libavformat.dylib" ) ]]; then
+  echo "[build-ffmpeg-minimal] 已存在（含 TLS），跳过：$PREFIX"
   exit 0
 fi
 
@@ -74,16 +82,46 @@ AUDIO_DEMUXERS="aac,ac3,ac4,acm,adx,aiff,amr,amrnb,amrwb,ape,asf,au,caf,dsf,dts,
 # 解析器：音频解析器（提升流探测与首帧准确度）。
 AUDIO_PARSERS="aac,aac_latm,ac3,adx,amr,cook,dca,dolby_e,dvaudio,flac,ftr,g723_1,g729,gsm,misc4,mlp,mpegaudio,opus,sbc,sipr,tak,vorbis,xma"
 
-# 协议：本地文件 + 网络流。不含 https/tls：本构建无 TLS 后端（与原构建一致，
-#   在线源由 Dart 侧下载/缓存后交给引擎，或平台返回 http 直链）。
-PROTOCOLS="file,pipe,http,httpproxy,tcp,udp,rtp,srtp,crypto,data,cache,concat"
+# 协议：本地文件 + 网络流。https/tls 由**自包含 mbedTLS**（下方构建，静态链接，
+#   不依赖系统 OpenSSL/gnutls）支撑；在线源直连由 EraAudio 原生 HTTP(S) 或 FFmpeg
+#   AVIO 承担（宿主按源注入客户端标识头）。
+PROTOCOLS="file,pipe,http,https,tls,httpproxy,tcp,udp,rtp,srtp,crypto,data,cache,concat"
 
-echo "[build-ffmpeg-minimal] configure（纯 LGPL · 仅音频 · 共享库）…"
+# ── 自包含 TLS 后端：mbedTLS（Apache-2.0；静态库随 FFmpeg 一起分发）──────────
+# 必须 PIC：mbedTLS 静态库要链进 FFmpeg 的**共享** libav*，非 PIC 会报
+# "relocation R_X86_64_PC32 ... recompile with -fPIC" 而链接失败。
+# .pic 标记用于让先前「非 PIC」旧前缀失效重建。
+if [[ ! -f "$MBEDTLS_PREFIX/lib/libmbedtls.a" || ! -f "$MBEDTLS_PREFIX/.pic" ]]; then
+  echo "[build-ffmpeg-minimal] 构建自包含 mbedTLS ${MBEDTLS_VER}（PIC 静态库）→ $MBEDTLS_PREFIX"
+  # 注意：Mbed TLS 的 release tag 形如 `mbedtls-3.6.2`（无 `v` 前缀），资产名同。
+  curl -fsSL "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-$MBEDTLS_VER/mbedtls-$MBEDTLS_VER.tar.bz2" \
+    -o "$work/mbedtls.tar.bz2"
+  tar -C "$work" -xf "$work/mbedtls.tar.bz2"
+  cmake -S "$work/mbedtls-$MBEDTLS_VER" -B "$work/mbedtls-build" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$MBEDTLS_PREFIX" \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DUSE_SHARED_MBEDTLS_LIBRARY=OFF \
+    -DUSE_STATIC_MBEDTLS_LIBRARY=ON \
+    -DENABLE_TESTING=OFF \
+    -DENABLE_PROGRAMS=OFF \
+    -DMBEDTLS_FATAL_WARNINGS=OFF
+  cmake --build "$work/mbedtls-build" -j"$JOBS"
+  cmake --install "$work/mbedtls-build"
+  touch "$MBEDTLS_PREFIX/.pic"
+fi
+
+echo "[build-ffmpeg-minimal] configure（纯 LGPL · 仅音频 · 共享库 · 自包含 TLS）…"
+# 自包含 TLS：优先经 mbedTLS pkg-config 探测（静态库链接进 libav*，无运行期外部依赖）。
+export PKG_CONFIG_PATH="$MBEDTLS_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 # --disable-autodetect：关闭所有外部库自动探测（zlib 除外，显式开启）
-# --disable-gpl/nonfree：显式声明。注意 FFmpeg **没有** --enable-lgpl 选项：
-#   LGPL-2.1+ 本就是默认（仅 --enable-gpl 会转 GPL，--enable-version3 会升
-#   LGPLv3/GPLv3）。此配置产出 license="LGPL version 2.1 or later"
-#   （可用 avutil_license() 验证），满足 AGPL-3.0 聚合分发的「GPL 防火墙」。
+# --disable-gpl/nonfree + --enable-version3：FFmpeg 把 mbedtls 列入
+#   EXTERNAL_LIBRARY_VERSION3_LIST（mbedTLS 为 Apache-2.0），缺 --enable-version3
+#   时 configure 直接报 "mbedtls is version3 and --enable-version3 is not specified."。
+#   故此配置产出 license="LGPL version 3 or later"（可用 avutil_license() 验证）。
+#   因 --disable-gpl 不启用 GPL，仍满足 AGPL-3.0 聚合分发的「GPL 防火墙」
+#   （LGPL-3.0-or-later 与 AGPL-3.0 兼容）。
 # --disable-programs   ：不出 ffmpeg/ffprobe 可执行文件，只出库
 # --disable-swscale/avfilter/avdevice：音频管线用不到，直接不编译
 #   （FFmpeg 9 已移除 postproc 库，无需/不可再传 --disable-postproc）
@@ -92,6 +130,8 @@ echo "[build-ffmpeg-minimal] configure（纯 LGPL · 仅音频 · 共享库）�
   --prefix="$PREFIX" \
   --disable-autodetect \
   --enable-zlib \
+  --enable-mbedtls \
+  --enable-version3 \
   --disable-gpl \
   --disable-nonfree \
   --disable-programs \
@@ -110,20 +150,28 @@ echo "[build-ffmpeg-minimal] configure（纯 LGPL · 仅音频 · 共享库）�
   --enable-parser="$AUDIO_PARSERS" \
   --enable-protocol="$PROTOCOLS" \
   "${x86asm[@]}" \
-  --extra-ldflags="$extra_ldflags"
+  --extra-cflags="-I$MBEDTLS_PREFIX/include" \
+  --extra-ldflags="$extra_ldflags -L$MBEDTLS_PREFIX/lib -lmbedtls -lmbedx509 -lmbedcrypto"
 
 echo "[build-ffmpeg-minimal] make -j$JOBS …"
 make -j"$JOBS"
 make install
 
-# LGPL 合规：随库附上 FFmpeg 许可文本（打包时一并分发）
+# LGPL 合规：随库附上 FFmpeg 许可文本（打包时一并分发）。
+# 因 --enable-version3，产物为 LGPL-3.0-or-later → 附 LGPLv3 文本（LGPLv2.1 一并保留备查）。
 mkdir -p "$PREFIX/share/licenses/ffmpeg"
+cp -f COPYING.LGPLv3 "$PREFIX/share/licenses/ffmpeg/" 2>/dev/null || true
 cp -f COPYING.LGPLv2.1 "$PREFIX/share/licenses/ffmpeg/" 2>/dev/null || true
 cp -f LICENSE.md "$PREFIX/share/licenses/ffmpeg/" 2>/dev/null || true
 {
-  echo "FFmpeg $VER — 纯 LGPL · 仅音频构建（--disable-gpl --disable-nonfree --disable-autodetect --disable-everything）"
+  echo "FFmpeg $VER — 纯 LGPL · 仅音频构建（--disable-gpl --disable-nonfree --enable-version3 --disable-autodetect --disable-everything）"
+  echo "许可：LGPL version 3 or later（mbedTLS 为 Apache-2.0，FFmpeg 要求 --enable-version3）"
+  echo "TLS：自包含 mbedTLS ${MBEDTLS_VER}（静态链接，无系统 OpenSSL/gnutls 依赖）"
   echo "源码：https://ffmpeg.org/releases/ffmpeg-$VER.tar.xz"
 } > "$PREFIX/share/licenses/ffmpeg/BUILD-CONFIG.txt"
+
+# TLS 标记：供下次运行判断前缀是否为「含 TLS」新构建。
+touch "$TLS_MARKER"
 
 echo "[build-ffmpeg-minimal] 安装完成：$PREFIX"
 ls -1 "$PREFIX/lib"/libav*.so* "$PREFIX/lib"/libswresample.so* 2>/dev/null \

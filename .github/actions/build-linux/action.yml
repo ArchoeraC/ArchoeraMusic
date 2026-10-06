@@ -61,7 +61,9 @@ runs:
       uses: actions/cache@v5
       with:
         path: ~/.local/ffmpeg-minimal
-        key: ffmpeg-minimal-9.0.1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_key_suffix }}
+        # tls 段：自包含 mbedTLS 引入后旧缓存（无 .mbedtls-tls 标记）必须失效重建，
+        # 否则命中旧前缀会导致每次运行都原地重编 FFmpeg。
+        key: ffmpeg-minimal-9.0.1-tls-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_key_suffix }}
 
     - name: Build minimal FFmpeg
       if: steps.ffmpeg-cache.outputs.cache-hit != 'true'

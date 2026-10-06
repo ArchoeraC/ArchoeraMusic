@@ -13,13 +13,13 @@ library;
 import 'dart:async' show Timer;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../stores/app_prefs.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_version.dart';
 import '../widgets/common/anim.dart';
 import '../widgets/common/glass_surface.dart';
 import '../widgets/common/toast.dart';

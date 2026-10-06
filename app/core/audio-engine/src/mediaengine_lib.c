@@ -124,6 +124,7 @@ typedef struct PcmPoolBuf {
 
 typedef struct ArchoeraMediaEngine {
     char *source;
+    char *headers; /* 在线源额外请求头（`\n` 分行；可空）；随会话存活 */
     EngineConfig cfg;
     char *player_file;
     char *session_dir;
@@ -1074,7 +1075,7 @@ static void handle_prepare_source(ArchoeraMediaEngine *e, const char *line)
     cfg.output_channels = pipeline_get_output_channels(e->p);
     if (cfg.output_channels <= 0) cfg.output_channels = e->cfg.output_channels;
 
-    e->p_next = pipeline_create(url, &cfg, dummy_output, NULL);
+    e->p_next = pipeline_create_with_headers(url, e->headers, &cfg, dummy_output, NULL);
     if (!e->p_next) {
         char msg[320], esc[384], buf[512];
         snprintf(msg, sizeof(msg), "prepare create failed: %s", url);
@@ -1561,7 +1562,7 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
        游标从目标偏移继续从同一 store 解码。 */
     np = e->store
         ? pipeline_create_store(e->store, &cfg2, dummy_output, NULL)
-        : pipeline_create(e->source, &cfg2, dummy_output, NULL);
+        : pipeline_create_with_headers(e->source, e->headers, &cfg2, dummy_output, NULL);
     if (!np) return -1;
     pipeline_set_playback_streaming(np, true);
 
@@ -1792,7 +1793,7 @@ static void *engine_thread(void *arg)
        store 会话（整曲已驻留内存）经 pipeline_create_store → AVIO-mem 解码。 */
     e->p = e->store
         ? pipeline_create_store(e->store, &e->cfg, dummy_output, NULL)
-        : pipeline_create(e->source, &e->cfg, dummy_output, NULL);
+        : pipeline_create_with_headers(e->source, e->headers, &e->cfg, dummy_output, NULL);
     if (!e->p) {
         char err[320];
         if (e->store) {
@@ -2006,6 +2007,7 @@ mem_exit:
 /* create / create_store 共用实现：store 非空 → 内存源会话（source 置空，引擎
  * 线程 pipeline_create_store 解码）；store 空 → 磁盘/URL 源会话（create）。 */
 static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
+                                     const char *headers,
                                      SegStore *store,
                                      const EngineConfig *cfg,
                                      const char *player_file,
@@ -2019,6 +2021,7 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
 
     e->store = store; /* 非空 = store 内存源会话；生命周期归调用方，destroy 不释放 */
     e->source = source ? strdup(source) : NULL;
+    e->headers = (headers && headers[0]) ? strdup(headers) : NULL;
     if (player_file) e->player_file = strdup(player_file);
     e->session_dir = strdup(session_dir);
     e->cfg = cfg ? *cfg : ENGINE_CONFIG_DEFAULT;
@@ -2072,6 +2075,7 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
        阻塞系统调用；详见 engine_thread 注释）。错误经 error 事件上报。 */
     if (pthread_create(&e->thread, NULL, engine_thread, e) != 0) {
         free(e->source);
+        free(e->headers);
         free(e->player_file);
         free(e->session_dir);
         free(e->wav_file);
@@ -2101,7 +2105,18 @@ ArchoeraMediaEngine *archoera_mediaengine_create(const char *source,
                                      const char *session_dir,
                                      char *errbuf, int errbuf_size)
 {
-    return mediaengine_create_impl(source, NULL, cfg, player_file, session_dir,
+    return mediaengine_create_impl(source, NULL, NULL, cfg, player_file, session_dir,
+                                   errbuf, errbuf_size);
+}
+
+ArchoeraMediaEngine *archoera_mediaengine_create_with_headers(const char *source,
+                                     const char *headers,
+                                     const EngineConfig *cfg,
+                                     const char *player_file,
+                                     const char *session_dir,
+                                     char *errbuf, int errbuf_size)
+{
+    return mediaengine_create_impl(source, headers, NULL, cfg, player_file, session_dir,
                                    errbuf, errbuf_size);
 }
 
@@ -2111,7 +2126,7 @@ ArchoeraMediaEngine *archoera_mediaengine_create_store(SegStore *store,
                                      const char *session_dir,
                                      char *errbuf, int errbuf_size)
 {
-    return mediaengine_create_impl(NULL, store, cfg, player_file, session_dir,
+    return mediaengine_create_impl(NULL, NULL, store, cfg, player_file, session_dir,
                                    errbuf, errbuf_size);
 }
 
@@ -2305,6 +2320,7 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
     mem_free(e); /* 内存播放模式的块列表（自持 mem_lock） */
 
     free(e->source);
+    free(e->headers);
     free(e->player_file);
     free(e->session_dir);
     free(e->wav_file);

@@ -32,7 +32,7 @@
 | 下载引擎（Rust） | `app/core/downloader/THIRD-PARTY-LICENSES.md` | reqwest / lofty / RustCrypto |
 | Subsonic（Go + Rust） | `app/core/subsonic/THIRD-PARTY-LICENSES.md` | 转码器 / Go 依赖 |
 
-第三方依赖按各自许可证引入（含 Permissive 与 LGPL-2.1+/MPL-2.0 等 weak-copyleft，逐项见上表各模块 `THIRD-PARTY-LICENSES.md`），并在各自条款下与本项目 AGPL-3.0 代码共存。本声明为项目维护者的合理努力整理，不构成法律意见。
+第三方依赖按各自许可证引入（含 Permissive 与 LGPL-2.1+/LGPL-3.0+/MPL-2.0 等 weak-copyleft，逐项见上表各模块 `THIRD-PARTY-LICENSES.md`），并在各自条款下与本项目 AGPL-3.0 代码共存。本声明为项目维护者的合理努力整理，不构成法律意见。
 
 ## 2. 未来许可证升级策略（AGPL-v4 及以后）
 

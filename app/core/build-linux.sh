@@ -40,8 +40,9 @@ fi
 # x265/vpx/aom/jxl/rsvg/icu…），bundle-linux-runtime.sh 会把其依赖闭包整体
 # 内嵌进 native/（实测 +126MB，deb 膨胀到数百 MB），必须避免。
 FFMPEG_PREFIX="${FFMPEG_PREFIX:-$HOME/.local/ffmpeg-minimal}"
-if [[ ! -f "$FFMPEG_PREFIX/lib/libavformat.so" ]]; then
-  echo "[build-linux] ===== 构建最小 FFmpeg（纯 LGPL·仅音频）====="
+# 需同时具备共享库与 TLS 标记（旧的无 TLS 前缀要经 build-ffmpeg-minimal.sh 重建）。
+if [[ ! -f "$FFMPEG_PREFIX/lib/libavformat.so" || ! -f "$FFMPEG_PREFIX/.mbedtls-tls" ]]; then
+  echo "[build-linux] ===== 构建最小 FFmpeg（纯 LGPL·仅音频·自包含 TLS）====="
   bash "$ROOT/build-ffmpeg-minimal.sh"
 fi
 export PKG_CONFIG_PATH="$FFMPEG_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"

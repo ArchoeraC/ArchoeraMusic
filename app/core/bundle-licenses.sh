@@ -3,7 +3,7 @@
 #  把随包内嵌的第三方运行库许可文本收进 <bundle>/licenses/（LGPL 合规）。
 #
 #  覆盖：
-#   - FFmpeg（自建最小纯 LGPL）→ 从自建 prefix 拷 COPYING.LGPLv2.1 / LICENSE.md
+#   - FFmpeg（自建最小纯 LGPL）→ 从自建 prefix 拷 COPYING.LGPLv3 / COPYING.LGPLv2.1 / LICENSE.md
 #   - TagLib（LGPL-2.1 / MPL-1.1）→ 各发行版放置位置不同，逐一探测；找不到时
 #     依 FFmpeg 的 COPYING.LGPLv2.1（同一 LGPL-2.1 文本）覆盖
 #   - THIRD-PARTY-NOTICES.md（根目录，聚合声明 + 源码/替换权）
@@ -22,7 +22,7 @@ mkdir -p "$dest"
 # 1) 聚合声明
 [[ -f "$root/THIRD-PARTY-NOTICES.md" ]] && cp -f "$root/THIRD-PARTY-NOTICES.md" "$dest/"
 
-# 2) FFmpeg（自建最小纯 LGPL）：许可文本在我们自己的 prefix
+# 2) FFmpeg（自建最小纯 LGPL；因 mbedTLS 带 --enable-version3 → 附 LGPLv3 文本）：许可文本在我们自己的 prefix
 ff_lic="$prefix/share/licenses/ffmpeg"
 if [[ -d "$ff_lic" ]]; then
   cp -f "$ff_lic"/* "$dest/" 2>/dev/null || true
@@ -48,7 +48,7 @@ if [[ -z "$tag_src" ]]; then
   if [[ -f "$dest/COPYING.LGPLv2.1" ]]; then
     {
       echo "TagLib（https://github.com/taglib/taglib）以 LGPL-2.1-or-later / MPL-1.1 双许可发布。"
-      echo "本文件为 LGPL-2.1 标准文本（与 FFmpeg 同许可）。"
+      echo "本文件为 LGPL-2.1 标准文本。"
       echo "------------------------------------------------------------------------"
       cat "$dest/COPYING.LGPLv2.1"
     } > "$dest/TagLib-LICENSE.txt"

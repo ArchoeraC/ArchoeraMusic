@@ -321,12 +321,13 @@ pub fn openMetadata(path: []const u8, info: *decoder.Info) !decoder.OpenedMeta {
 /// [zkClose] 自动关闭。失败返回 null 并写 errbuf（供 C 壳回退 FFmpeg/AVIO）。
 pub fn zkOpenUrl(
     url: []const u8,
+    headers: ?[]const u8,
     info: *ZkInfo,
     errbuf: [*]u8,
     errbuf_size: c_int,
 ) ?*Engine {
     const gpa = std.heap.c_allocator;
-    const hs = net.HttpStream.open(gpa, url) catch |e| {
+    const hs = net.HttpStream.openWith(gpa, url, .{ .headers = headers }) catch |e| {
         fillErrBuf(errbuf, errbuf_size, e);
         return null;
     };
