@@ -83,6 +83,15 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
+    // 所有平台登录入口会先弹「登录风险提示」（见 login_risk_notice.dart）：
+    // 点「同意」后才进入登录页；KG 用例直接展示登录控件，无此提示。
+    final l10n = await AppLocalizations.delegate.load(const Locale('zh'));
+    final agree = find.text(l10n.loginRiskAgree);
+    if (agree.evaluate().isNotEmpty) {
+      await tester.tap(agree);
+      await tester.pumpAndSettle();
+    }
+
     expect(
       find.byType(AlertDialog),
       findsNothing,

@@ -25,6 +25,11 @@ import 'package:archoera_music/stores/vault_session_store.dart';
 ///   测试二进制只能经显式 ARCHOERA_VAULT_BIN 供测试/CI 使用。）
 /// 二进制经 dev 兜底解析：cwd=app/ → app/core/vault/build/archoera-vault。
 void main() {
+  // 测试二进制标记校验需要 ARCHOERA_VAULT_BIN 指向 TEST 构建（见文件头运行前提）；
+  // 未设置时 dev 兜底会解析到 PROD 二进制 → 标记断言必然失败，跳过该用例（CI 会设）。
+  final skipNoTestBin = Platform.environment['ARCHOERA_VAULT_BIN'] == null
+      ? '需要 ARCHOERA_VAULT_BIN 指向测试构建（见文件头运行前提）'
+      : null;
   test('save/clear 持久化 + 重建回读一致', () async {
     final tmp = await Directory.systemTemp.createTemp('vault_store_test');
     addTearDown(() => tmp.deleteSync(recursive: true));
@@ -507,5 +512,5 @@ void main() {
     // 测试构建须为 TEST 标记；生产标记校验（contains PROD）据此拒绝测试二进制
     expect(out, contains('ARCHOERA-VAULT-TEST'));
     expect(out, isNot(contains('ARCHOERA-VAULT-PROD')));
-  });
+  }, skip: skipNoTestBin);
 }
