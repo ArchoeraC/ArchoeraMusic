@@ -10,7 +10,9 @@
 #   2. 许可证：本项目 AGPL-3.0，THIRD-PARTY-LICENSES 明确要求 FFmpeg 为
 #      **纯 LGPL 构建**（CONFIG_GPL=0 / CONFIG_NONFREE=0）且仅动态链接。
 #      Homebrew ffmpeg 默认 --enable-gpl（GPL-3.0），会破坏该「GPL 防火墙」；
-#      这里显式 --disable-gpl --disable-nonfree，保持 LGPL-2.1+。
+#      这里显式 --disable-gpl --disable-nonfree。自包含 TLS 用 mbedTLS
+#      （Apache-2.0，FFmpeg 将其列入 version3 依赖），故需 --enable-version3，
+#      产物许可为 **LGPL-3.0-or-later**（仍无 GPL，GPL 防火墙不受影响）。
 #   3. 仅音频：本软件只做音频解码 + 标签/元数据读取 + Opus/OGG 转码，
 #      完全不碰视频/图像/字幕。故用 --disable-everything 后只白名单启用
 #      **全部内部音频解码器** + 所需 demuxer/parser/protocol + OGG 封装，
@@ -86,8 +88,11 @@ AUDIO_PARSERS="aac,aac_latm,ac3,adx,amr,cook,dca,dolby_e,dvaudio,flac,ftr,g723_1
 PROTOCOLS="file,pipe,http,https,tls,httpproxy,tcp,udp,rtp,srtp,crypto,data,cache,concat"
 
 # ── 自包含 TLS 后端：mbedTLS（Apache-2.0；静态库随 FFmpeg 一起分发）──────────
-if [[ ! -f "$MBEDTLS_PREFIX/lib/libmbedtls.a" ]]; then
-  echo "[build-ffmpeg-minimal] 构建自包含 mbedTLS $MBEDTLS_VER → $MBEDTLS_PREFIX"
+# 必须 PIC：mbedTLS 静态库要链进 FFmpeg 的**共享** libav*，非 PIC 会报
+# "relocation R_X86_64_PC32 ... recompile with -fPIC" 而链接失败。
+# .pic 标记用于让先前「非 PIC」旧前缀失效重建。
+if [[ ! -f "$MBEDTLS_PREFIX/lib/libmbedtls.a" || ! -f "$MBEDTLS_PREFIX/.pic" ]]; then
+  echo "[build-ffmpeg-minimal] 构建自包含 mbedTLS $MBEDTLS_VER（PIC 静态库）→ $MBEDTLS_PREFIX"
   # 注意：Mbed TLS 的 release tag 形如 `mbedtls-3.6.2`（无 `v` 前缀），资产名同。
   curl -fsSL "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-$MBEDTLS_VER/mbedtls-$MBEDTLS_VER.tar.bz2" \
     -o "$work/mbedtls.tar.bz2"
@@ -95,6 +100,7 @@ if [[ ! -f "$MBEDTLS_PREFIX/lib/libmbedtls.a" ]]; then
   cmake -S "$work/mbedtls-$MBEDTLS_VER" -B "$work/mbedtls-build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$MBEDTLS_PREFIX" \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DUSE_SHARED_MBEDTLS_LIBRARY=OFF \
     -DUSE_STATIC_MBEDTLS_LIBRARY=ON \
     -DENABLE_TESTING=OFF \
@@ -102,16 +108,19 @@ if [[ ! -f "$MBEDTLS_PREFIX/lib/libmbedtls.a" ]]; then
     -DMBEDTLS_FATAL_WARNINGS=OFF
   cmake --build "$work/mbedtls-build" -j"$JOBS"
   cmake --install "$work/mbedtls-build"
+  touch "$MBEDTLS_PREFIX/.pic"
 fi
 
 echo "[build-ffmpeg-minimal] configure（纯 LGPL · 仅音频 · 共享库 · 自包含 TLS）…"
 # 自包含 TLS：优先经 mbedTLS pkg-config 探测（静态库链接进 libav*，无运行期外部依赖）。
 export PKG_CONFIG_PATH="$MBEDTLS_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 # --disable-autodetect：关闭所有外部库自动探测（zlib 除外，显式开启）
-# --disable-gpl/nonfree：显式声明。注意 FFmpeg **没有** --enable-lgpl 选项：
-#   LGPL-2.1+ 本就是默认（仅 --enable-gpl 会转 GPL，--enable-version3 会升
-#   LGPLv3/GPLv3）。此配置产出 license="LGPL version 2.1 or later"
-#   （可用 avutil_license() 验证），满足 AGPL-3.0 聚合分发的「GPL 防火墙」。
+# --disable-gpl/nonfree + --enable-version3：FFmpeg 把 mbedtls 列入
+#   EXTERNAL_LIBRARY_VERSION3_LIST（mbedTLS 为 Apache-2.0），缺 --enable-version3
+#   时 configure 直接报 "mbedtls is version3 and --enable-version3 is not specified."。
+#   故此配置产出 license="LGPL version 3 or later"（可用 avutil_license() 验证）。
+#   因 --disable-gpl 不启用 GPL，仍满足 AGPL-3.0 聚合分发的「GPL 防火墙」
+#   （LGPL-3.0-or-later 与 AGPL-3.0 兼容）。
 # --disable-programs   ：不出 ffmpeg/ffprobe 可执行文件，只出库
 # --disable-swscale/avfilter/avdevice：音频管线用不到，直接不编译
 #   （FFmpeg 9 已移除 postproc 库，无需/不可再传 --disable-postproc）
@@ -121,6 +130,7 @@ export PKG_CONFIG_PATH="$MBEDTLS_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CO
   --disable-autodetect \
   --enable-zlib \
   --enable-mbedtls \
+  --enable-version3 \
   --disable-gpl \
   --disable-nonfree \
   --disable-programs \
@@ -146,12 +156,15 @@ echo "[build-ffmpeg-minimal] make -j$JOBS …"
 make -j"$JOBS"
 make install
 
-# LGPL 合规：随库附上 FFmpeg 许可文本（打包时一并分发）
+# LGPL 合规：随库附上 FFmpeg 许可文本（打包时一并分发）。
+# 因 --enable-version3，产物为 LGPL-3.0-or-later → 附 LGPLv3 文本（LGPLv2.1 一并保留备查）。
 mkdir -p "$PREFIX/share/licenses/ffmpeg"
+cp -f COPYING.LGPLv3 "$PREFIX/share/licenses/ffmpeg/" 2>/dev/null || true
 cp -f COPYING.LGPLv2.1 "$PREFIX/share/licenses/ffmpeg/" 2>/dev/null || true
 cp -f LICENSE.md "$PREFIX/share/licenses/ffmpeg/" 2>/dev/null || true
 {
-  echo "FFmpeg $VER — 纯 LGPL · 仅音频构建（--disable-gpl --disable-nonfree --disable-autodetect --disable-everything）"
+  echo "FFmpeg $VER — 纯 LGPL · 仅音频构建（--disable-gpl --disable-nonfree --enable-version3 --disable-autodetect --disable-everything）"
+  echo "许可：LGPL version 3 or later（mbedTLS 为 Apache-2.0，FFmpeg 要求 --enable-version3）"
   echo "TLS：自包含 mbedTLS $MBEDTLS_VER（静态链接，无系统 OpenSSL/gnutls 依赖）"
   echo "源码：https://ffmpeg.org/releases/ffmpeg-$VER.tar.xz"
 } > "$PREFIX/share/licenses/ffmpeg/BUILD-CONFIG.txt"

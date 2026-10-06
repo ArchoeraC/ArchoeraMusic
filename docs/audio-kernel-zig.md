@@ -7,7 +7,7 @@
 >
 > **架构调整（2026-08-16，用户决策）**：
 > - **FFmpeg 保持默认主引擎**：`-Duse-ffmpeg` 默认开启，FFmpeg 解码能力与现状完全一致，
->   发布版默认带 FFmpeg（LGPL-2.1+ 动态链接 + 合规说明，同现状）；用户/构建方始终可选 FFmpeg 为主；
+>   发布版默认带 FFmpeg（LGPL 动态链接 + 合规说明；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）；用户/构建方始终可选 FFmpeg 为主；
 > - **C 调用壳保留**：`mediaengine_lib.c`（FFI）/ `main.c`（CLI）/ `pipeline.c` / `player.c`
 >   不作重写，`archoera_mediaengine.h` 符号面与 JSON 协议不变，Dart FFI 零改动；
 > - **Zig 内核渐进替换**：每个格式的 Zig 实现经 bit-exact/对照验收后**按格式接管**（格式级
@@ -31,7 +31,7 @@
 > 时长/seek、容错、测试护栏等结论仍适用，冲突处以本文为准）。
 >
 > 依据：AGPL-3.0 项目，任何引入的第三方必须为 Permissive（MIT / Apache-2.0 / BSD / ISC / OFL /
-> MIT-0 / 公有领域）且与 AGPL 兼容（[docs/licensing.md](licensing.md)）。FFmpeg（LGPL-2.1+）以**动态链接 +
+> MIT-0 / 公有领域）且与 AGPL 兼容（[docs/licensing.md](licensing.md)）。FFmpeg（LGPL；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）以**动态链接 +
 > RUNPATH=$ORIGIN 内嵌运行库**形式保留为**默认主引擎**（替换/重链权利见
 > `app/core/audio-engine/THIRD-PARTY-LICENSES.md` 特别声明）。
 
@@ -127,7 +127,7 @@
 > 仅"数学复杂度确实无法自研"的 Opus 引入 Permissive 实现；
 > **C 壳（`mediaengine_lib.c` / `main.c` / `pipeline.c` / `player.c`）保留**为 FFI/CLI 边界；
 > **FFmpeg 保持为默认主解码引擎**（`-Duse-ffmpeg` 默认开启，§8.3），Zig 内核逐格式验收后按格式接管。
-> 全项目**默认构建**含 FFmpeg（LGPL-2.1+ 动态链接）一个"正式第三方库"，Zig 接管全部 T0/T1 后
+> 全项目**默认构建**含 FFmpeg（LGPL 动态链接；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）一个"正式第三方库"，Zig 接管全部 T0/T1 后
 > 可选 `-Dzig-main=true` 使 Zig 升为主（默认仍 FFmpeg）。
 
 ### 3.2 依赖账本
@@ -152,7 +152,7 @@
 | **AAC 解码** | **自研 Zig**（`fmt/aac/`，AAC-LC + SBR + PS） | AGPL | 参考 FFmpeg `aacdec*.c`/`aacsbr_template.c`/`aacps*.c` 对照（§17.2）；**LC/PS 100% bit-exact、SBR 内容帧 bit-exact**（2026-09-01 运算顺序对齐后；整体 corr 0.9996，首尾为探测/flush 对齐假象），LC/5.1 100% 逐位 |
 | 音频输出（播放设备） | **自研 Zig `device.zig`**（目标）；miniaudio 过渡兜底 | AGPL / MIT-0-PD | 三平台设备 API 自研可控（§15），逐步替换 player.c 内的 miniaudio 调用 |
 | 变速变调 | **自研 Zig WSOLA**（目标）；tempo-rs 过渡兜底 | AGPL / MIT | WSOLA 自研可行（§9.6）；tempo-rs 仅作迁移期参考 |
-| **FFmpeg（默认主引擎）** | **默认开启**（`-Duse-ffmpeg` 默认 true，链接 `libav*` / `libsw*`） | LGPL-2.1+ | 保持现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（格式级开关，§8.3）；发布版默认带（LGPL 动态链接 + 合规说明，同现状） |
+| **FFmpeg（默认主引擎）** | **默认开启**（`-Duse-ffmpeg` 默认 true，链接 `libav*` / `libsw*`） | LGPL-3.0+ / LGPL-2.1+ | 保持现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（格式级开关，§8.3）；发布版默认带（LGPL 动态链接 + 合规说明，同现状） |
 
 ### 3.3 "自研 vs 引入"决策规则（P2 落地方案）
 
@@ -166,7 +166,7 @@
    c. 许可证 ∈ { MIT / MIT-0 / PD / BSD / Apache-2.0 } 且与 AGPL 兼容
    （MP3 已从本类移出：Layer I/II/III 全链可逐位对照 minimp3（CC0）验收，见 §3.7 裁决变更）
 4. 每个 vendored 组件必须登记"是否可自研"的裁决结论（§3.7），新格式一律先按自研评估（AAC 依此由 🔴 改 ✅ 自研，§9.5）
-5. FFmpeg（LGPL-2.1+）：**保持为默认主解码引擎**（`-Duse-ffmpeg` 默认开启，动态链接 + 内嵌运行库），
+5. FFmpeg（LGPL；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）：**保持为默认主解码引擎**（`-Duse-ffmpeg` 默认开启，动态链接 + 内嵌运行库），
    保证现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（§8.3），发布版默认带（LGPL 合规说明同现状）；
    明确不引入：faad2（GPL）、libfdk-aac（非自由）、任何 GPL/SSPL/商业源可用（[docs/licensing.md §2.5](licensing.md#25-第三方代码的约束)）
 ```
