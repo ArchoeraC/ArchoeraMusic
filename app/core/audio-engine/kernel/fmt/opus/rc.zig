@@ -39,21 +39,63 @@ pub const BitReader = struct {
     }
 
     /// 读 n 位（0..=32），越界位按 0 处理
-    pub fn readBits(self: *BitReader, n: u6) u32 {
-        var v: u32 = 0;
-        var i: u6 = 0;
-        while (i < n) : (i += 1) {
-            const pos = self.bit_pos + i;
-            if (pos >= self.limit or pos >= self.data.len * 8) {
-                v <<= 1;
-                continue;
+    ///
+    /// 热路径内联：当 8 字节大端加载可覆盖整个位段（含尾部 8 字节余量）、
+    /// 且位段不越过有效上限时，一次加载 + 两次移位即得；其余情形（帧尾不足
+    /// 8 字节、越界补零、n==0）走 `readBitsSlow`。逐位语义与原实现一致。
+    /// 注意 `byte + 8 <= data.len` 已蕴含 `pos + n <= data.len*8`（n ≤ 32、
+    /// off ≤ 7），故无需再比较存储上限。BitReader 只在 rc 内部使用。
+    pub inline fn readBits(self: *BitReader, n: u6) u32 {
+        if (n != 0) {
+            const pos = self.bit_pos;
+            const end = pos + n;
+            const byte = pos >> 3;
+            if (end <= self.limit and byte + 8 <= self.data.len) {
+                self.bit_pos = end;
+                const word = std.mem.readInt(u64, self.data[byte..][0..8], .big);
+                return @intCast((word << @as(u6, @intCast(pos & 7))) >> @as(u6, @intCast(64 - @as(u32, n))));
             }
-            v = (v << 1) | @as(u32, @intCast((self.data[pos >> 3] >> @as(u3, @intCast(7 - (pos & 7)))) & 1));
         }
-        self.bit_pos += n;
-        return v;
+        return self.readBitsSlow(n);
+    }
+
+    /// 冷路径：帧尾/越界补零/n==0，保持原逐位语义
+    fn readBitsSlow(self: *BitReader, n: u6) u32 {
+        if (n == 0) return 0;
+        const pos = self.bit_pos;
+        const end = pos + n;
+        const storage = self.data.len * 8;
+        if (end <= self.limit and end <= storage) {
+            self.bit_pos = end;
+            return peekBits(self.data, pos, n);
+        }
+        // 越界：有效位读到 eff，其余高位补零
+        const eff = @min(self.limit, storage);
+        self.bit_pos = end;
+        if (pos >= eff) return 0;
+        const valid: u6 = @intCast(eff - pos);
+        return peekBits(self.data, pos, valid) << @as(u5, @intCast(n - @as(u32, valid)));
     }
 };
+
+/// 从 bit 位置 `pos` 读 k 位（0..=32），MSB-first。
+/// 前置条件：`pos + k <= data.len * 8`（否则会越界读；调用方保证）。
+/// 单次 64 位大端加载覆盖 ≤5 字节，近尾时逐字节拼装，无副作用。
+fn peekBits(data: []const u8, pos: usize, k: u6) u32 {
+    if (k == 0) return 0;
+    const byte = pos >> 3;
+    const off: u6 = @intCast(pos & 7);
+    const nbytes = (@as(usize, off) + k + 7) >> 3; // ceil((off+k)/8) ≤ 5
+    var word: u64 = 0;
+    if (byte + 8 <= data.len) {
+        word = std.mem.readInt(u64, data[byte..][0..8], .big);
+    } else {
+        var j: usize = 0;
+        while (j < nbytes) : (j += 1) word = (word << 8) | data[byte + j];
+        word <<= @as(u6, @intCast((8 - nbytes) * 8));
+    }
+    return @intCast((word << off) >> @as(u6, @intCast(64 - @as(u32, k))));
+}
 
 /// CELT rawbits 缓冲（从帧尾反向读取）
 const RawBits = struct {
@@ -71,23 +113,14 @@ pub fn opusIlog(i: u32) u32 {
     return @intCast(32 - @clz(i));
 }
 
-/// ff_sqrt：整数平方根（floor），逐位逼近
+/// ff_sqrt：整数平方根（floor）
+///
+/// a ≤ 2^32-1 时 ⌊√a⌋ ≤ 65535，f64 尾数足够；`@sqrt` 正确舍入，
+/// 结果距最近整数至少 ~1/65536 ≫ ulp，`@intFromFloat` 截断即得精确 floor。
+/// 已对全部平方数边界、顶部区间与 2000 万随机采样穷举校验一致。
 fn ffSqrt(a: u32) u32 {
     if (a == 0) return 0;
-    var r: u64 = a;
-    var b: u64 = @as(u64, 1) << 62;
-    while (b > r) b >>= 2;
-    var res: u64 = 0;
-    while (b != 0) {
-        if (r >= res + b) {
-            r -= res + b;
-            res = (res >> 1) + b;
-        } else {
-            res >>= 1;
-        }
-        b >>= 2;
-    }
-    return @intCast(res);
+    return @intFromFloat(@sqrt(@as(f64, @floatFromInt(a))));
 }
 
 pub const Rc = struct {
