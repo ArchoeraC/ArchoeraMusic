@@ -30,15 +30,66 @@
 #  zig-<arch>-<os>；GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
 #
 #  ┌─ release job ─────────────────────────────────────────────────────
-#  │  needs: [build, linux-deb, linux-rpm, linux-arch, linux-deepin,
+#  │  needs: [preflight, build, linux-deb, linux-rpm, linux-arch, linux-deepin,
 #  │          linux-appimage, linux-flatpak, linux-nix]；仅 push tag v* 触发；
 #  │  下载全部 artifact 后聚合为 GitHub Release。release 需要 contents: write，
 #  │  故在 job 级覆盖顶层 permissions。tag 名即版本（沿用仓库现有 v* 标签）。
 #  └──────────────────────────────────────────────────────────────────
+#
+#  ┌─ preflight（点菜）────────────────────────────────────────────────
+#  │  workflow_dispatch 可勾选构建哪些平台（默认全选）：macos / windows /
+#  │  linux_deb / linux_deepin / linux_rpm / linux_arch / linux_appimage /
+#  │  linux_flatpak / linux_nix。preflight 将其解析为各 job 的开关 + build
+#  │  matrix（macos/windows 按选择动态生成）；勾选 AppImage/Flatpak 会自动
+#  │  带上 linux_deb（其依赖原始 bundle）。push tag v* 忽略选择、强制全选。
+#  │  **九项全选才允许 release**：未全选的手动运行永远不会有 release。
+#  └──────────────────────────────────────────────────────────────────
 name: Build all platforms & release
 
 on:
+  # ── 「点菜」：手动触发时按勾选平台构建（默认全选）─────────────────────────
+  #  push tag v* 时忽略选择、强制全选（发版必须全平台）；且 release 仅在
+  #  「九项全选」时才放行（未全选的 workflow_dispatch 永远不会有 release）。
+  #  AppImage / Flatpak 依赖 Ubuntu .deb 的原始 bundle → 勾选它们会自动带上
+  #  linux_deb（见 preflight）。
   workflow_dispatch:
+    inputs:
+      macos:
+        description: 'macOS（.app，arm64）'
+        type: boolean
+        default: true
+      windows:
+        description: 'Windows（Inno Setup 安装器 + 便携 zip）'
+        type: boolean
+        default: true
+      linux_deb:
+        description: 'Linux .deb（Ubuntu 24.04；AppImage/Flatpak 依赖它）'
+        type: boolean
+        default: true
+      linux_deepin:
+        description: 'Linux .deb（Deepin 25）'
+        type: boolean
+        default: true
+      linux_rpm:
+        description: 'Linux .rpm（Fedora）'
+        type: boolean
+        default: true
+      linux_arch:
+        description: 'Linux .pkg.tar.zst（Arch）'
+        type: boolean
+        default: true
+      linux_appimage:
+        description: 'Linux AppImage（勾选会自动带上 .deb）'
+        type: boolean
+        default: true
+      linux_flatpak:
+        description: 'Linux Flatpak（勾选会自动带上 .deb）'
+        type: boolean
+        default: true
+      linux_nix:
+        description: 'Linux NixOS（源码 flake）'
+        type: boolean
+        default: true
   push:
     tags: ['v*']
 
@@ -46,18 +97,100 @@ permissions:
   contents: read
 
 jobs:
+  # =====================================================================
+  #  preflight：解析「点菜」选择 → 各 job 开关 + build(macos/windows) matrix。
+  #  - push tag v*：忽略选择、强制全选（发版必须全平台）。
+  #  - workflow_dispatch：按勾选；AppImage/Flatpak 自动带上 linux_deb。
+  #  - all_selected：九项全选才为 true（release 的放行条件之一）。
+  # =====================================================================
+  preflight:
+    name: Preflight (platform selection)
+    runs-on: ubuntu-latest
+    outputs:
+      macos: ${{ steps.sel.outputs.macos }}
+      windows: ${{ steps.sel.outputs.windows }}
+      linux_deb: ${{ steps.sel.outputs.linux_deb }}
+      linux_deepin: ${{ steps.sel.outputs.linux_deepin }}
+      linux_rpm: ${{ steps.sel.outputs.linux_rpm }}
+      linux_arch: ${{ steps.sel.outputs.linux_arch }}
+      linux_appimage: ${{ steps.sel.outputs.linux_appimage }}
+      linux_flatpak: ${{ steps.sel.outputs.linux_flatpak }}
+      linux_nix: ${{ steps.sel.outputs.linux_nix }}
+      build_matrix: ${{ steps.sel.outputs.build_matrix }}
+      all_selected: ${{ steps.sel.outputs.all_selected }}
+    steps:
+      - id: sel
+        shell: bash
+        env:
+          EV: ${{ github.event_name }}
+          IN_MACOS: ${{ inputs.macos }}
+          IN_WINDOWS: ${{ inputs.windows }}
+          IN_LINUX_DEB: ${{ inputs.linux_deb }}
+          IN_LINUX_DEEPIN: ${{ inputs.linux_deepin }}
+          IN_LINUX_RPM: ${{ inputs.linux_rpm }}
+          IN_LINUX_ARCH: ${{ inputs.linux_arch }}
+          IN_LINUX_APPIMAGE: ${{ inputs.linux_appimage }}
+          IN_LINUX_FLATPAK: ${{ inputs.linux_flatpak }}
+          IN_LINUX_NIX: ${{ inputs.linux_nix }}
+        run: |
+          set -euo pipefail
+          truthy() { case "${1:-}" in true|TRUE|True|1|yes|YES) echo true ;; *) echo false ;; esac; }
+          if [ "$EV" = "push" ]; then
+            # tag 发版：忽略点菜、强制全选（发版必须全平台）。
+            MACOS=true; WINDOWS=true; DEB=true; DEEPIN=true; RPM=true
+            ARCH=true; APPIMAGE=true; FLATPAK=true; NIX=true
+          else
+            MACOS=$(truthy "$IN_MACOS"); WINDOWS=$(truthy "$IN_WINDOWS")
+            DEB=$(truthy "$IN_LINUX_DEB"); DEEPIN=$(truthy "$IN_LINUX_DEEPIN")
+            RPM=$(truthy "$IN_LINUX_RPM"); ARCH=$(truthy "$IN_LINUX_ARCH")
+            APPIMAGE=$(truthy "$IN_LINUX_APPIMAGE"); FLATPAK=$(truthy "$IN_LINUX_FLATPAK")
+            NIX=$(truthy "$IN_LINUX_NIX")
+          fi
+          # AppImage / Flatpak 消费 Ubuntu .deb 的原始 bundle → 自动带上 deb。
+          if [ "$APPIMAGE" = true ] || [ "$FLATPAK" = true ]; then DEB=true; fi
+
+          {
+            echo "macos=$MACOS"
+            echo "windows=$WINDOWS"
+            echo "linux_deb=$DEB"
+            echo "linux_deepin=$DEEPIN"
+            echo "linux_rpm=$RPM"
+            echo "linux_arch=$ARCH"
+            echo "linux_appimage=$APPIMAGE"
+            echo "linux_flatpak=$FLATPAK"
+            echo "linux_nix=$NIX"
+          } >> "$GITHUB_OUTPUT"
+
+          # build（macos/windows matrix）：按选择组装，供 build 动态 matrix 使用。
+          ENTRIES=""
+          add() { ENTRIES="${ENTRIES}${ENTRIES:+,}{\"os\":\"$1\",\"runner\":\"$2\",\"zig_archive\":\"$3\"}"; }
+          if [ "$MACOS" = true ]; then add macos macos-15 aarch64-macos; fi
+          if [ "$WINDOWS" = true ]; then add windows windows-latest x86_64-windows; fi
+          # 全不选时给一个占位条目（build 的 job 级 if 会把它跳过），避免空矩阵。
+          if [ -z "$ENTRIES" ]; then
+            ENTRIES='{"os":"none","runner":"ubuntu-latest","zig_archive":""}'
+          fi
+          echo "build_matrix=[$ENTRIES]" >> "$GITHUB_OUTPUT"
+
+          # 九项全选才允许 release。
+          if [ "$MACOS" = true ] && [ "$WINDOWS" = true ] && [ "$DEB" = true ] \
+             && [ "$DEEPIN" = true ] && [ "$RPM" = true ] && [ "$ARCH" = true ] \
+             && [ "$APPIMAGE" = true ] && [ "$FLATPAK" = true ] && [ "$NIX" = true ]; then
+            echo "all_selected=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "all_selected=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "── 点菜结果 ── macos=$MACOS windows=$WINDOWS deb=$DEB deepin=$DEEPIN rpm=$RPM arch=$ARCH appimage=$APPIMAGE flatpak=$FLATPAK nix=$NIX"
+
   build:
     name: Build ${{ matrix.os }}
+    needs: preflight
+    if: needs.preflight.outputs.macos == 'true' || needs.preflight.outputs.windows == 'true'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos
-            runner: macos-15
-            zig_archive: aarch64-macos
-          - os: windows
-            runner: windows-latest
-            zig_archive: x86_64-windows
+        include: ${{ fromJSON(needs.preflight.outputs.build_matrix) }}
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -405,6 +538,8 @@ jobs:
   # ── Debian/Ubuntu：.deb + tar.gz（并上传原始 bundle 供 AppImage/Flatpak/Nix）──
   linux-deb:
     name: Linux deb (Ubuntu 24.04)
+    needs: preflight
+    if: needs.preflight.outputs.linux_deb == 'true'
     runs-on: ubuntu-24.04
     env:
       BUILD_BASE: ubuntu-24.04
@@ -457,6 +592,8 @@ jobs:
   # Deepin 运行且不可解决，则放弃该 job 与 Deepin 支持。
   linux-deepin:
     name: Linux deb (Deepin 25)
+    needs: preflight
+    if: needs.preflight.outputs.linux_deepin == 'true'
     runs-on: ubuntu-24.04
     # 在官方 Deepin 25 容器内构建（linuxdeepin/deepin:25，merged-/usr，glibc 2.38）。
     # 注意：Deepin 的 beige(23)/crimson(25) 仓库现在都发 glibc 2.38，故本产物
@@ -504,6 +641,8 @@ jobs:
   # ── Fedora/RHEL：.rpm（fedora 容器内从源码构建）───────────────────────
   linux-rpm:
     name: Linux rpm (Fedora)
+    needs: preflight
+    if: needs.preflight.outputs.linux_rpm == 'true'
     runs-on: ubuntu-24.04
     container: fedora:latest
     env:
@@ -546,6 +685,8 @@ jobs:
   # ── Arch Linux：.pkg.tar.zst（archlinux 容器内从源码构建）─────────────
   linux-arch:
     name: Linux pkg.tar.zst (Arch)
+    needs: preflight
+    if: needs.preflight.outputs.linux_arch == 'true'
     runs-on: ubuntu-24.04
     container: archlinux:latest
     env:
@@ -600,7 +741,8 @@ jobs:
   # FFmpeg / TagLib 等动态依赖收进镜像并改写 RUNPATH，才能跨发行版运行。
   linux-appimage:
     name: Linux AppImage (通用)
-    needs: linux-deb
+    needs: [preflight, linux-deb]
+    if: needs.preflight.outputs.linux_appimage == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -657,7 +799,8 @@ jobs:
   # ── Flatpak：消费 linux-deb 的原始 bundle（包装预构建方式，无需 flatpak-builder）──
   linux-flatpak:
     name: Linux Flatpak (通用)
-    needs: linux-deb
+    needs: [preflight, linux-deb]
+    if: needs.preflight.outputs.linux_flatpak == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -699,6 +842,8 @@ jobs:
   # 构建需联网（pub / NuGet / crates.io / go modules / FFmpeg 源码），故关沙箱。
   linux-nix:
     name: Linux NixOS (source flake)
+    needs: preflight
+    if: needs.preflight.outputs.linux_nix == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -738,8 +883,12 @@ jobs:
   # =====================================================================
   release:
     name: Release ${{ github.ref_name }}
-    needs: [build, linux-deb, linux-rpm, linux-arch, linux-deepin, linux-appimage, linux-flatpak, linux-nix]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [preflight, build, linux-deb, linux-rpm, linux-arch, linux-deepin, linux-appimage, linux-flatpak, linux-nix]
+    # 仅 push tag v*；且「点菜」必须九项全选（未全选绝不放行 release）。
+    if: >-
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/') &&
+      needs.preflight.outputs.all_selected == 'true'
     runs-on: ubuntu-latest
     # 受保护 Environment：需 Required reviewers 手动批准后才运行；
     # 两把签名私钥作为 Environment secret 存放（仅本作业可见，非仓库级缓存）。
