@@ -68,9 +68,9 @@ class PlayerLyricsBlock extends ConsumerWidget {
     final drag = dragMs;
     final effPos = drag?.round() ?? pos;
     final effPlaying = drag == null && playing;
-    final groups = ref
-        .watch(currentLyricsProvider)
-        .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
+    final groups =
+        ref.watch(currentLyricsProvider).value ??
+        const <LyricGroup>[];
     final prefs = ref.watch(appPrefsProvider);
     // 自适应字号：随窗口高度缩放（关闭则固定 px）。
     final scale = prefs.lyricAdaptiveFontSize ? lyricScale : 1.0;
