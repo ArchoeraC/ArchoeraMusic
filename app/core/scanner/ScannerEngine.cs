@@ -269,7 +269,7 @@ public sealed class ScannerEngine
                     return;
                 }
 
-                var track = ParseFile(file);
+                var track = ParseFile(file, out var parseReason);
                 if (track != null)
                 {
                     if (errorSnapshot.ContainsKey(file))
@@ -290,7 +290,7 @@ public sealed class ScannerEngine
                     // 记录解析失败到 _scanner_errors 表（含具体原因）
                     try
                     {
-                        var fileFailCount = _db.RecordParseErrorAsync(file, "parse_failed", ct).GetAwaiter().GetResult();
+                        var fileFailCount = _db.RecordParseErrorAsync(file, parseReason ?? "parse_failed", ct).GetAwaiter().GetResult();
                         if (fileFailCount >= 3)
                         {
                             LogWarn($"异常文件达到隔离阈值，加入 trained: {file}");
@@ -567,10 +567,15 @@ public sealed class ScannerEngine
     }
 
     /// <summary>
-    /// 解析单个音频文件
+    /// 解析单个音频文件。
+    ///
+    /// [failReason]：失败原因（写入 _scanner_errors）；成功返回非 null 时为 null。
+    /// 明确区分的原因：`bad_size`（空/超大）、`taglib_error`（TagLib 打不开）、
+    /// `empty_audio`（有体积但无实际音频内容，疑似伪造/空壳）。
     /// </summary>
-    private TrackMetadata? ParseFile(string filePath)
+    private TrackMetadata? ParseFile(string filePath, out string? failReason)
     {
+        failReason = null;
         var info = SafeFileInfo(filePath);
         if (info == null || !info.Exists) return null;
 
@@ -578,6 +583,7 @@ public sealed class ScannerEngine
         if (info.Length == 0 || info.Length > _maxFileSizeBytes)
         {
             LogWarn($"跳过异常文件 {filePath}: size={info.Length}");
+            failReason = "bad_size";
             return null;
         }
 
@@ -585,16 +591,50 @@ public sealed class ScannerEngine
 
         // 优先自研内核元数据快路径（结构化 C ABI，无 JSON，不解码 PCM）；
         // 内核不可用 / 不支持该格式 / 打开失败 → 回退 TagLibSharp。
+        TrackMetadata? track = null;
         if (KernelMetadata.Supported(filePath))
         {
             var km = KernelMetadata.TryOpen(filePath);
-            if (km != null)
+            if (km != null) track = FromKernel(km, filePath, info, id);
+        }
+
+        // 内核未接管、或未取到有效时长（疑似空壳/伪造）→ 用 TagLib 复核后再判定；
+        // 内核时长缺失但 TagLib 拿到时长时以 TagLib 为准（避免误杀合法文件）。
+        if (track == null || track.Duration <= 0)
+        {
+            var tagTrack = ParseWithTagLib(filePath, info, id, out var tagReason);
+            if (tagTrack != null && tagTrack.Duration > 0)
+                track = tagTrack;
+            else if (track == null)
             {
-                var built = FromKernel(km, filePath, info, id);
-                if (built != null) return built;
+                failReason = tagReason;
+                return null;
             }
         }
 
+        if (track == null) return null;
+
+        // 内容有效性校验：文件有体积但**无实际音频内容**（时长为 0）→ 拒绝入库。
+        // 记入 _scanner_errors（reason=empty_audio），达到隔离阈值后移入 quarantine，
+        // 防止伪造/空壳音频（如仅有容器头、无音频帧）污染曲库。
+        if (track.Duration <= 0)
+        {
+            LogWarn($"跳过无实际音频内容的文件（疑似伪造/空壳）: {filePath} " +
+                    $"(size={info.Length}, codec={track.Codec ?? "?"})");
+            failReason = "empty_audio";
+            return null;
+        }
+        return track;
+    }
+
+    /// <summary>
+    /// TagLibSharp 解析路径（内核未接管，或作为空壳文件的复核回退）。
+    /// [failReason] 在 TagLib 打开异常时给出 `taglib_error`。
+    /// </summary>
+    private TrackMetadata? ParseWithTagLib(string filePath, FileInfo info, string id,
+                                           out string? failReason)
+    {
+        failReason = null;
         TagLibFile tag;
         try
         {
@@ -603,6 +643,7 @@ public sealed class ScannerEngine
         catch (Exception ex)
         {
             LogWarn($"解析失败 {filePath}: {ex.Message}");
+            failReason = "taglib_error";
             return null;
         }
 

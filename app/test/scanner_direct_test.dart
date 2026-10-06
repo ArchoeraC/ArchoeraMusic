@@ -91,6 +91,33 @@ void main() {
     expect(result2.upserted, 0);
   });
 
+  test('伪造/空壳音频（有体积但无实际内容）被拒绝入库', () async {
+    final tmp = await Directory.systemTemp.createTemp('scanner_fake');
+    addTearDown(() => tmp.deleteSync(recursive: true));
+
+    final musicDir = '${tmp.path}/music';
+    Directory(musicDir).createSync(recursive: true);
+    // 合法样本 + 两类「有体积但实际内容为 0」的伪造/空壳：
+    File('$musicDir/ok.wav').writeAsBytesSync(makeWav());
+    // 1) 全 0 字节内容、伪装成 .mp3（无任何音频帧）
+    File('$musicDir/zero.mp3').writeAsBytesSync(Uint8List(64 * 1024));
+    // 2) 合法 RIFF/fmt 头但 data 段长度为 0（无音频帧）
+    File('$musicDir/empty.wav').writeAsBytesSync(makeWav(seconds: 0));
+
+    final dbPath = '${tmp.path}/data/library.db';
+    final scanner = LibraryScanner(soPath: soPath);
+    addTearDown(scanner.dispose);
+
+    final result = await scanner.scan([musicDir], dbPath: dbPath);
+    expect(result.total, 3, reason: '三个 .wav/.mp3 均被发现');
+    expect(result.upserted, 1, reason: '仅合法样本入库');
+    expect(result.errors, 2, reason: '伪造/空壳文件按解析失败拒绝（empty_audio/taglib_error）');
+
+    final db = TracksDb.open(dbPath);
+    addTearDown(db.close);
+    expect(db.count(), 1, reason: '曲库不含伪造内容');
+  });
+
   test('DB 不存在时打开抛错', () {
     final tmp = Directory.systemTemp.createTempSync('scanner_test_nodb');
     final dbPath = '${tmp.path}/missing/library.db';
