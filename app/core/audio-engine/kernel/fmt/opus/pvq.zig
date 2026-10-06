@@ -291,7 +291,18 @@ fn stereoMerge(x: []f32, y: []f32, mid_in: f32, n: usize) void {
     }
     const g0: f32 = 1.0 / @sqrt(e0);
     const g1: f32 = 1.0 / @sqrt(e1);
-    for (0..n) |i| {
+    const vmid: opus_vec.V8 = @splat(mid);
+    const vg0: opus_vec.V8 = @splat(g0);
+    const vg1: opus_vec.V8 = @splat(g1);
+    var i: usize = 0;
+    while (i + 8 <= n) : (i += 8) {
+        const xv = opus_vec.load8(x.ptr + i);
+        const yv = opus_vec.load8(y.ptr + i);
+        const v0 = vmid * xv;
+        opus_vec.store8(x.ptr + i, vg0 * (v0 - yv));
+        opus_vec.store8(y.ptr + i, vg1 * (v0 + yv));
+    }
+    while (i < n) : (i += 1) {
         const v0 = mid * x[i];
         const v1 = y[i];
         x[i] = g0 * (v0 - v1);
@@ -334,7 +345,7 @@ fn renormalizeVector(x: []f32, gain: f32) void {
     for (x) |vv| s += vv * vv;
     const e = 1e-15 + s;
     const g = (1.0 / @sqrt(e)) * gain;
-    for (x) |*vv| vv.* = g * vv.*;
+    opus_vec.scaleInPlace(x, g);
 }
 
 pub const Pvq = struct {

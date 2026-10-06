@@ -763,7 +763,22 @@ fn postfilterApply(f: *CeltFrame, block: *CeltBlock, out_syn: usize) void {
 fn deemphasis(y: []f32, x: []const f32, coeff_in: f32, len: usize, accum: bool) f32 {
     var mem = coeff_in;
     const c = 0.850006103515625; // libopus float build coef0 = QCONST16(0.850006103515625,15)
-    for (0..len) |i| {
+    var i: usize = 0;
+    // 快路径（CELT-only）：IIR 仍串行，但把 `r → f32` 的转换与存储 8 lane 一起做，
+    // 消去逐样本 `cvtsi2ss`+`mulss`。逐 lane 运算顺序与标量相同，位级一致。
+    if (!accum) {
+        const inv: f32 = 1.0 / 8388608.0;
+        while (i + 8 <= len) : (i += 8) {
+            var ri: [8]i32 = undefined;
+            for (0..8) |k| {
+                const tmp = x[i + k] + 1e-30 + mem;
+                mem = c * tmp;
+                ri[k] = lrintfEven(tmp * 256.0);
+            }
+            opus_vec.intToFloatScale(ri[0..8], y[i..][0..8], inv);
+        }
+    }
+    while (i < len) : (i += 1) {
         // libopus deemphasis_stereo_simple (float)：tmp = x + VERY_SMALL + m
         const tmp = x[i] + 1e-30 + mem;
         mem = c * tmp;
