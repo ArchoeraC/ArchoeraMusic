@@ -241,11 +241,16 @@ class _SpotlightPreviewRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         child: Row(
           children: [
-            SizedBox(
-              width: 22,
+            // 序号按位数自适应宽度：随机抽取的池子可能很大（如收藏上千首），
+            // 序号可达 3–4 位甚至更多；固定 22px 会让编号溢出。minWidth 保持
+            // 1–2 位时的对齐，超宽时随内容增长。
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 22),
               child: Text(
                 ordinal.toString().padLeft(2, '0'),
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                softWrap: false,
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
                 ),
