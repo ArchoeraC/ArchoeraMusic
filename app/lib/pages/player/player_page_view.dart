@@ -386,6 +386,10 @@ class _SleepTimerButton extends ConsumerWidget {
 }
 
 class _PlayerMainBody extends StatelessWidget {
+  /// 歌词子项 / 空占位键：AnimatedSwitcher 依据键变化触发滑入/滑出并卸载旧子项。
+  static const Key _kLyricsKey = ValueKey<String>('player-lyrics');
+  static const Key _kLyricsHiddenKey = ValueKey<String>('player-lyrics-hidden');
+
   const _PlayerMainBody({
     required this.source,
     required this.current,
@@ -514,18 +518,43 @@ class _PlayerMainBody extends StatelessWidget {
                 bottom: 0,
                 right: 0,
                 width: c.maxWidth * lyricsFraction,
-                child: IgnorePointer(
-                  ignoring: !showLyrics || !hasLyrics,
-                  child: AnimatedOpacity(
-                    duration: animDuration(
-                      context,
-                      const Duration(milliseconds: 600),
-                    ),
-                    curve: Curves.easeOutCubic,
-                    opacity: (showLyrics && hasLyrics) ? 1 : 0,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 64),
-                      child: RepaintBoundary(child: lyricsBlock),
+                // 关闭歌词：整块**向下滑出并在动画结束后卸载**（不再保留一层
+                // 透明的歌词墙继续跑），也不会出现「闪一下」——进场自下而上滑入。
+                child: ClipRect(
+                  child: IgnorePointer(
+                    ignoring: !showLyrics || !hasLyrics,
+                    child: AnimatedSwitcher(
+                      duration: animDuration(
+                        context,
+                        const Duration(milliseconds: 480),
+                      ),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        // 歌词子项：进场自下而上滑入（begin=(0,1)→0）；反向播放
+                        // 即为退场向下滑出。空占位不动。
+                        final isLyrics = child.key == _kLyricsKey;
+                        return SlideTransition(
+                          position: animation.drive(
+                            Tween<Offset>(
+                              begin: isLyrics
+                                  ? const Offset(0, 1)
+                                  : Offset.zero,
+                              end: Offset.zero,
+                            ),
+                          ),
+                          child: child,
+                        );
+                      },
+                      child: (showLyrics && hasLyrics)
+                          ? SizedBox.expand(
+                              key: _kLyricsKey,
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 64),
+                                child: RepaintBoundary(child: lyricsBlock),
+                              ),
+                            )
+                          : const SizedBox.shrink(key: _kLyricsHiddenKey),
                     ),
                   ),
                 ),
