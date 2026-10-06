@@ -92,7 +92,7 @@ PROTOCOLS="file,pipe,http,https,tls,httpproxy,tcp,udp,rtp,srtp,crypto,data,cache
 # "relocation R_X86_64_PC32 ... recompile with -fPIC" 而链接失败。
 # .pic 标记用于让先前「非 PIC」旧前缀失效重建。
 if [[ ! -f "$MBEDTLS_PREFIX/lib/libmbedtls.a" || ! -f "$MBEDTLS_PREFIX/.pic" ]]; then
-  echo "[build-ffmpeg-minimal] 构建自包含 mbedTLS $MBEDTLS_VER（PIC 静态库）→ $MBEDTLS_PREFIX"
+  echo "[build-ffmpeg-minimal] 构建自包含 mbedTLS ${MBEDTLS_VER}（PIC 静态库）→ $MBEDTLS_PREFIX"
   # 注意：Mbed TLS 的 release tag 形如 `mbedtls-3.6.2`（无 `v` 前缀），资产名同。
   curl -fsSL "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-$MBEDTLS_VER/mbedtls-$MBEDTLS_VER.tar.bz2" \
     -o "$work/mbedtls.tar.bz2"
@@ -166,7 +166,7 @@ cp -f LICENSE.md "$PREFIX/share/licenses/ffmpeg/" 2>/dev/null || true
 {
   echo "FFmpeg $VER — 纯 LGPL · 仅音频构建（--disable-gpl --disable-nonfree --enable-version3 --disable-autodetect --disable-everything）"
   echo "许可：LGPL version 3 or later（mbedTLS 为 Apache-2.0，FFmpeg 要求 --enable-version3）"
-  echo "TLS：自包含 mbedTLS $MBEDTLS_VER（静态链接，无系统 OpenSSL/gnutls 依赖）"
+  echo "TLS：自包含 mbedTLS ${MBEDTLS_VER}（静态链接，无系统 OpenSSL/gnutls 依赖）"
   echo "源码：https://ffmpeg.org/releases/ffmpeg-$VER.tar.xz"
 } > "$PREFIX/share/licenses/ffmpeg/BUILD-CONFIG.txt"
 
