@@ -267,9 +267,10 @@ Future<List<Track>> _loadDailyRecommend(WidgetRef ref) async {
   // 每日推荐需登录态；未登录时不请求（避免报错），返回空
   final account = ref.read(neteaseAuthProvider);
   if (account == null) return const [];
-  // 走按逻辑日缓存的书架（当日已拉取则直接命中，支持「刷新日推」）。
-  await ref.read(dailyShelfProvider.notifier).ensure();
-  return ref.read(dailyShelfProvider).today;
+  // 直接使用 ensure() 的返回值。dailyShelfProvider 为 autoDispose 且此处不建立
+  // 监听，ensure() 结束后再 `ref.read(...).today` 可能拿到已被释放并重建的空态
+  // （曾导致日推弹窗列表为空）。
+  return ref.read(dailyShelfProvider.notifier).ensure();
 }
 
 /// 曲目列表弹窗：歌单详情 / 每日推荐共用。
