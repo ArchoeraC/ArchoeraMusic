@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme_provider.dart';
 import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
+import '../../services/source/media_request_headers.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/weather/weather_notifier.dart';
 import '../../settings/settings_dialog.dart';

@@ -334,7 +334,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.local/ffmpeg-minimal
-          key: ffmpeg-minimal-9.0.1-${{ runner.os }}-${{ runner.arch }}
+          # tls 段：自包含 mbedTLS 引入后旧缓存（无 .mbedtls-tls 标记）必须失效重建。
+          key: ffmpeg-minimal-9.0.1-tls-${{ runner.os }}-${{ runner.arch }}
 
       - name: Build minimal FFmpeg (macOS, LGPL)
         if: matrix.os == 'macos' && steps.ffmpeg-cache-macos.outputs.cache-hit != 'true'

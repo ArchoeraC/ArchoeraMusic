@@ -7,7 +7,7 @@
 >
 > **架构调整（2026-08-16，用户决策）**：
 > - **FFmpeg 保持默认主引擎**：`-Duse-ffmpeg` 默认开启，FFmpeg 解码能力与现状完全一致，
->   发布版默认带 FFmpeg（LGPL-2.1+ 动态链接 + 合规说明，同现状）；用户/构建方始终可选 FFmpeg 为主；
+>   发布版默认带 FFmpeg（LGPL 动态链接 + 合规说明；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）；用户/构建方始终可选 FFmpeg 为主；
 > - **C 调用壳保留**：`mediaengine_lib.c`（FFI）/ `main.c`（CLI）/ `pipeline.c` / `player.c`
 >   不作重写，`archoera_mediaengine.h` 符号面与 JSON 协议不变，Dart FFI 零改动；
 > - **Zig 内核渐进替换**：每个格式的 Zig 实现经 bit-exact/对照验收后**按格式接管**（格式级
@@ -31,7 +31,7 @@
 > 时长/seek、容错、测试护栏等结论仍适用，冲突处以本文为准）。
 >
 > 依据：AGPL-3.0 项目，任何引入的第三方必须为 Permissive（MIT / Apache-2.0 / BSD / ISC / OFL /
-> MIT-0 / 公有领域）且与 AGPL 兼容（[docs/licensing.md](licensing.md)）。FFmpeg（LGPL-2.1+）以**动态链接 +
+> MIT-0 / 公有领域）且与 AGPL 兼容（[docs/licensing.md](licensing.md)）。FFmpeg（LGPL；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）以**动态链接 +
 > RUNPATH=$ORIGIN 内嵌运行库**形式保留为**默认主引擎**（替换/重链权利见
 > `app/core/audio-engine/THIRD-PARTY-LICENSES.md` 特别声明）。
 
@@ -127,7 +127,7 @@
 > 仅"数学复杂度确实无法自研"的 Opus 引入 Permissive 实现；
 > **C 壳（`mediaengine_lib.c` / `main.c` / `pipeline.c` / `player.c`）保留**为 FFI/CLI 边界；
 > **FFmpeg 保持为默认主解码引擎**（`-Duse-ffmpeg` 默认开启，§8.3），Zig 内核逐格式验收后按格式接管。
-> 全项目**默认构建**含 FFmpeg（LGPL-2.1+ 动态链接）一个"正式第三方库"，Zig 接管全部 T0/T1 后
+> 全项目**默认构建**含 FFmpeg（LGPL 动态链接；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）一个"正式第三方库"，Zig 接管全部 T0/T1 后
 > 可选 `-Dzig-main=true` 使 Zig 升为主（默认仍 FFmpeg）。
 
 ### 3.2 依赖账本
@@ -152,7 +152,7 @@
 | **AAC 解码** | **自研 Zig**（`fmt/aac/`，AAC-LC + SBR + PS） | AGPL | 参考 FFmpeg `aacdec*.c`/`aacsbr_template.c`/`aacps*.c` 对照（§17.2）；**LC/PS 100% bit-exact、SBR 内容帧 bit-exact**（2026-09-01 运算顺序对齐后；整体 corr 0.9996，首尾为探测/flush 对齐假象），LC/5.1 100% 逐位 |
 | 音频输出（播放设备） | **自研 Zig `device.zig`**（目标）；miniaudio 过渡兜底 | AGPL / MIT-0-PD | 三平台设备 API 自研可控（§15），逐步替换 player.c 内的 miniaudio 调用 |
 | 变速变调 | **自研 Zig WSOLA**（目标）；tempo-rs 过渡兜底 | AGPL / MIT | WSOLA 自研可行（§9.6）；tempo-rs 仅作迁移期参考 |
-| **FFmpeg（默认主引擎）** | **默认开启**（`-Duse-ffmpeg` 默认 true，链接 `libav*` / `libsw*`） | LGPL-2.1+ | 保持现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（格式级开关，§8.3）；发布版默认带（LGPL 动态链接 + 合规说明，同现状） |
+| **FFmpeg（默认主引擎）** | **默认开启**（`-Duse-ffmpeg` 默认 true，链接 `libav*` / `libsw*`） | LGPL-3.0+ / LGPL-2.1+ | 保持现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（格式级开关，§8.3）；发布版默认带（LGPL 动态链接 + 合规说明，同现状） |
 
 ### 3.3 "自研 vs 引入"决策规则（P2 落地方案）
 
@@ -166,7 +166,7 @@
    c. 许可证 ∈ { MIT / MIT-0 / PD / BSD / Apache-2.0 } 且与 AGPL 兼容
    （MP3 已从本类移出：Layer I/II/III 全链可逐位对照 minimp3（CC0）验收，见 §3.7 裁决变更）
 4. 每个 vendored 组件必须登记"是否可自研"的裁决结论（§3.7），新格式一律先按自研评估（AAC 依此由 🔴 改 ✅ 自研，§9.5）
-5. FFmpeg（LGPL-2.1+）：**保持为默认主解码引擎**（`-Duse-ffmpeg` 默认开启，动态链接 + 内嵌运行库），
+5. FFmpeg（LGPL；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）：**保持为默认主解码引擎**（`-Duse-ffmpeg` 默认开启，动态链接 + 内嵌运行库），
    保证现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（§8.3），发布版默认带（LGPL 合规说明同现状）；
    明确不引入：faad2（GPL）、libfdk-aac（非自由）、任何 GPL/SSPL/商业源可用（[docs/licensing.md §2.5](licensing.md#25-第三方代码的约束)）
 ```
@@ -674,6 +674,28 @@ pub const Reader = struct {
 >   `deinit` 会恢复**旧 SIGIO handler**：跳转/切会话重建实例时旧实例先 deinit → handler
 >   还原为 `SIG_DFL` → 之后仍活跃实例触发 SIGIO 即令进程被信号终止（实机表现：跳转后
 >   进程退出，shell 报 "I/O possible"）。
+
+> **落地（2026-10-07）：在线源请求头透传 + FFmpeg 在线 TLS**
+> - 背景：NekoMusic 等站点的 `/api/*` 防爬要求客户端标识；内核原生 HTTP 固定发
+>   `ArchoeraMusic/0.9 (EraAudio)` 会被判爬虫 → 302 到 SEO HTML → 探测失败
+>   `status=1`；而 FFmpeg 回退因最小构建无 TLS 直接 `Protocol not found`。
+> - 内核：`HttpStream` 新增自有 `headers`（`Options.headers`）；`writeRequest` 规范化追加、
+>   自带 `User-Agent` 时不追加默认 UA（避免双头）、**重定向原样保留**；新增导出
+>   `zk_engine_open_url_headers` / `zk_decoder_open_url_headers`（旧符号保留，委托空头）。
+> - C 壳：`native_decoder_open_url(url, headers, …)`；`pipeline_create_with_headers`；
+>   `archoera_mediaengine_create_with_headers`（会话持有头串）；新增公共
+>   `decoder_apply_http_headers`（`User-Agent`→`user_agent`，其余→`headers`）供
+>   `decoder_open_headers` 与 AVIO 路径复用。
+> - Dart：`EngineBindings.create(headers)` → `AudioEngineProcess.start(headers)` →
+>   `engineHeadersForTrack(track)`（取自 `SourcePlatform.mediaHeaders`，Neko 源为
+>   `X-Neko-Client: archoera+<版本>` + `User-Agent: ArchoeraMusic/<版本>`，版本启动时自
+>   `pubspec.yaml` 读取，**不硬编码**）。旧库缺 `_with_headers` 符号时自动回退。
+> - FFmpeg 在线 TLS：Linux/macOS 由 `build-ffmpeg-minimal.sh` 构建**自包含 mbedTLS**
+>   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-tls` 标记重建）；
+>   Windows 经 vcpkg ffmpeg 端口的 **Schannel**（未启用 `openssl` 特性时自动
+>   `--enable-schannel`，无额外 DLL，保持 LGPL-2.1+）。
+> - 验收：`kernel/net.zig` 新增「自定义请求头随请求发送」用例，`zig build test` 731 项全绿；
+>   C 壳增量编译 + `ctest` 36 项全绿；Dart `analyze` 0 issue、`flutter test` 全绿。
 
 > **落地（2026-09-21）：callback 形态已从「预留」转为「已接入」**
 > - 内核：`io.Reader.openCallback` + `decoder.openReader`；新导出 `zk_decoder_open_cb`

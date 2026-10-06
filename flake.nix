@@ -100,6 +100,7 @@ NUGETCFG
           bash
           curl
           cacert
+          cmake          # 自建 mbedTLS（build-ffmpeg-minimal.sh 内 cmake 构建）
           nasm
           yasm
           pkg-config

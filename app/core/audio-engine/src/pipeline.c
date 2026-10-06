@@ -70,6 +70,7 @@ struct AudioPipeline {
                                   非 NULL 时为本解码源（FFmpeg 不再打开） */
     bool         native_active; /* 解码源是否为自研内核 */
     bool         native_http;   /* native 源是否为 EraAudio 原生 HTTP(S)（transport 口径） */
+    const char  *headers;       /* 在线源额外请求头（借用宿主内存；可空） */
     const char  *backend;       /* 实际解码后端："zig" / "ffmpeg"（F5 ready 事件上报） */
     int          native_status; /* native open 失败状态码（ZkStatus；成功=0） */
     char         native_err[256]; /* native open 失败诊断（仅日志） */
@@ -261,7 +262,7 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
             NativeInfo ninfo;
             int nst = 1; /* 默认 unsupported */
             p->native = native_decoder_open_url(
-                url, &ninfo, &nst, p->native_err, sizeof(p->native_err));
+                url, p->headers, &ninfo, &nst, p->native_err, sizeof(p->native_err));
             p->native_status = nst;
             if (p->native) {
                 p->native_active = true;
@@ -296,6 +297,8 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
     av_dict_set(&opts, "reconnect_streamed", "1", 0);
     av_dict_set(&opts, "reconnect_max_retries", "3", 0);
     av_dict_set(&opts, "reconnect_delay_max", "5", 0);
+    /* 按源注入客户端标识头（如 NekoMusic）；FFmpeg http 仅认这些选项。 */
+    decoder_apply_http_headers(&opts, p->headers);
     int oret = avio_open2(&cb->avio, url, AVIO_FLAG_READ, &cb->interrupt, &opts);
     av_dict_free(&opts);
     if (oret < 0) {
@@ -329,6 +332,7 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
  * 内存源（整曲已驻留，可 seek），经 AVIO + decoder_open_mem 解码；store 为空
  * → 磁盘/URL 源，完全走现状（engine_mode==EraAudio 优先自研内核，回退 FFmpeg）。 */
 static AudioPipeline* pipeline_create_impl(const char *source,
+                                            const char *headers,
                                             SegStore *store,
                                             const EngineConfig *cfg,
                                             OutputCallback output,
@@ -341,6 +345,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     if (!p) return NULL;
 
     p->cfg = *cfg;
+    p->headers = headers;
     p->max_frames_per_call = 64;
 
     /* 1. 打开解码器：
@@ -439,7 +444,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             goto fail;
         }
     } else {
-        p->dec = decoder_open(source);
+        p->dec = decoder_open_headers(source, p->headers);
         if (!p->dec) {
             ERA_LOGE(NULL, "%s 无法打开源: %s\n", LOG_TAG, source);
             goto fail;
@@ -587,7 +592,7 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             }
             if (p->native_buf) { free(p->native_buf); p->native_buf = NULL; }
             p->native_buf_frames = 0;
-            p->dec = decoder_open(source);
+            p->dec = decoder_open_headers(source, p->headers);
             if (!p->dec) {
                 ERA_LOGE(NULL, "%s 回退 FFmpeg 也无法打开源: %s\n",
                         LOG_TAG, source);
@@ -638,7 +643,16 @@ AudioPipeline* pipeline_create(const char *source,
                                 OutputCallback output,
                                 void *user)
 {
-    return pipeline_create_impl(source, NULL, cfg, output, user);
+    return pipeline_create_impl(source, NULL, NULL, cfg, output, user);
+}
+
+AudioPipeline* pipeline_create_with_headers(const char *source,
+                                            const char *headers,
+                                            const EngineConfig *cfg,
+                                            OutputCallback output,
+                                            void *user)
+{
+    return pipeline_create_impl(source, headers, NULL, cfg, output, user);
 }
 
 /* SegStore 内存源（docs/audio-memory-source.md §7）：整曲已在 store、可 seek；
@@ -648,7 +662,7 @@ AudioPipeline* pipeline_create_store(SegStore *store,
                                       OutputCallback output,
                                       void *user)
 {
-    return pipeline_create_impl(NULL, store, cfg, output, user);
+    return pipeline_create_impl(NULL, NULL, store, cfg, output, user);
 }
 
 /* 处理链前段（不含 tempo/fft）：低频管理 → 参数化 EQ → 固定 EQ → 响度 → 限幅。

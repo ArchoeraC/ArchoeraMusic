@@ -108,9 +108,6 @@ String memoryGateExplain(int contentLength, {Map<String, String>? env}) {
 /// 连接/请求超时（下载整首；超过按失败回退 URL 路径）。
 const Duration _downloadTimeout = Duration(seconds: 30);
 
-/// 通用 UA（多数在线直链无鉴权；个别平台校验 UA 的源失败即回退，见文件头）。
-const String _userAgent = 'ArchoeraMusic/0.9';
-
 /// 内存源失败的结构化类别（供弹窗 l10n 渲染；`.error` raw 串仅供日志/测试）。
 enum MemorySourceFailKind {
   /// 非 http(s) 源（不尝试拉流）。
@@ -230,8 +227,12 @@ class WholeTrackFetch {
 }
 
 class _DownloadReq {
-  _DownloadReq(this.url, this.gateEnv, this.reply);
+  _DownloadReq(this.url, this.headers, this.gateEnv, this.reply);
   final String url;
+
+  /// 出站请求头（如 NekoMusic 需要的客户端标识；主 isolate 组装后随消息传入，
+  /// 因为新建 isolate 不继承主 isolate 的全局状态）。
+  final Map<String, String> headers;
   final Map<String, String>? gateEnv;
   final SendPort reply;
 }
@@ -246,8 +247,8 @@ void _downloadEntry(_DownloadReq req) async {
   });
   final client = HttpClient()..connectionTimeout = _downloadTimeout;
   try {
-    final result =
-        await _downloadIntoStore(client, req.url, req.gateEnv, () => cancelled);
+    final result = await _downloadIntoStore(
+        client, req.url, req.headers, req.gateEnv, () => cancelled);
     req.reply.send(result);
   } finally {
     client.close(force: true);
@@ -267,6 +268,7 @@ void _downloadEntry(_DownloadReq req) async {
 /// [gateEnv]：内存门禁 env（测试/观测用，缺省读进程 env；§6.1/§6.2）。
 WholeTrackFetch prepareWholeTrackStore(
   String url, {
+  Map<String, String> headers = const {},
   Map<String, String>? gateEnv,
 }) {
   final reply = ReceivePort();
@@ -290,9 +292,11 @@ WholeTrackFetch prepareWholeTrackStore(
     reply.close();
   } else {
     // Isolate.spawn 为异步：失败以 fail 收尾（不悬挂）。
+    // 请求头在此（主 isolate）组装后随消息传入：新建 isolate 不继承主 isolate
+    // 的全局状态（如版本 / HttpOverrides）。
     Isolate.spawn(
       _downloadEntry,
-      _DownloadReq(url, gateEnv, reply.sendPort),
+      _DownloadReq(url, headers, gateEnv, reply.sendPort),
     ).then(
       (_) {},
       onError: (Object e) {
@@ -320,15 +324,17 @@ WholeTrackFetch prepareWholeTrackStore(
 /// store 段内存归引擎侧 C 所有，Dart 仅 fill 拷贝，见 §4/§12）。
 Future<WholeTrackPrepareResult> _downloadIntoStore(
   HttpClient client,
-  String url, [
+  String url,
+  Map<String, String> headers, [
   Map<String, String>? gateEnv,
   bool Function()? isCancelled,
 ]) async {
   try {
     final req = await client.getUrl(Uri.parse(url)).timeout(_downloadTimeout);
-    // 通用请求：不注入平台专属 referer/UA（qqmusic 个别源失败即回退 URL 路径）。
-    req.headers.set(HttpHeaders.userAgentHeader, _userAgent);
+    // 通用请求：不注入平台专属 referer/UA（qqmusic 个别源失败即回退 URL 路径）；
+    // [headers] 由调用方按源提供（如 NekoMusic 的客户端标识）。
     req.headers.set(HttpHeaders.acceptHeader, '*/*');
+    headers.forEach(req.headers.set);
     final resp = await req.close().timeout(_downloadTimeout);
     if (resp.statusCode != HttpStatus.ok) {
       return WholeTrackPrepareResult.fail(

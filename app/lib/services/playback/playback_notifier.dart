@@ -32,6 +32,17 @@ part 'playback_notifier/playback_notifier_queue.dart';
 part 'playback_notifier/playback_notifier_loading.dart';
 part 'playback_notifier/playback_notifier_session.dart';
 
+/// 在线源请求头（如 NekoMusic 的 `X-Neko-Client`）→ 引擎请求头块（`\n` 分行）。
+///
+/// 供 `AudioEngineProcess.create` 透传给 native HTTP(S) 与 FFmpeg http/tls；
+/// 无附加头时返回 null（引擎用内置默认头）。
+String? engineHeadersForTrack(Track? track) {
+  if (track == null) return null;
+  final headers = sourcePlatform(track.source).mediaHeaders;
+  if (headers.isEmpty) return null;
+  return headers.entries.map((e) => '${e.key}: ${e.value}').join('\n');
+}
+
 abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   final List<StreamSubscription<EngineEvent>> _engineSubs = [];
 
@@ -192,6 +203,7 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
 
   Future<void> _startSession(
     String source, {
+    String? headers,
     required int offsetMs,
     required int bitrate,
     bool passthrough = true,
@@ -497,6 +509,7 @@ class PlaybackNotifier extends _PlaybackNotifierBase
         final passthrough = ref.read(appPrefsProvider).passthrough;
         await _startSession(
           src,
+          headers: engineHeadersForTrack(state.track),
           offsetMs: math.max(0, targetMs),
           bitrate: qualityBitrate[state.quality] ?? 128000,
           passthrough: passthrough,

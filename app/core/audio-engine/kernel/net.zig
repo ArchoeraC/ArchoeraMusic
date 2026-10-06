@@ -64,7 +64,10 @@ const max_backoff_ms: u32 = 5000;
 const watchdog_poll_ms: u32 = 50;
 
 /// 单个 User-Agent
-const user_agent = "ArchoeraMusic/0.9 (EraAudio)";
+/// 默认 User-Agent：**不带版本号**（版本由宿主经请求头注入，见宿主 pipeline/
+/// Dart `engineHeadersForTrack`，避免在原生内核里硬编码应用版本）。仅当调用方
+/// 未在额外请求头里提供 `User-Agent` 时使用。
+const user_agent = "ArchoeraMusic (EraAudio)";
 
 /// 读取宿主环境变量（内核经宿主 CRT getenv；缺失返回 null）。
 fn envStr(name: [*:0]const u8) ?[]const u8 {
@@ -275,6 +278,10 @@ pub const HttpStream = struct {
     /// 迭代用临时缓冲（重定向解析）
     url_scratch: std.ArrayList(u8),
 
+    /// 额外请求头（owned；`\n` 或 `\r\n` 分行，可空）。随重定向原样重发。
+    /// 由宿主按源注入（如 NekoMusic 的 `X-Neko-Client` / `User-Agent`）。
+    headers: []u8,
+
     // IO 实例（全进程单一常驻；见 globalIo）
     io: Io,
 
@@ -350,6 +357,8 @@ pub const HttpStream = struct {
         min_progress_kb: ?u32 = null,
         /// 低进展连击上限（超出即停止重连，防逐字节滴流）。
         max_low_progress_streak: ?u32 = null,
+        /// 额外请求头（`\n`/`\r\n` 分行；null = 仅内置默认头）。
+        headers: ?[]const u8 = null,
     };
 
     /// 打开 URL（连接 + 首个请求 + 响应头解析由 [start] 完成）。
@@ -357,7 +366,7 @@ pub const HttpStream = struct {
         return openWith(gpa, url, .{});
     }
 
-    /// 同 [open]，另指定 [Options] 覆盖（用于测试/宿主定向配置）。
+    /// 同 [open]，另指定 [Options] 覆盖（用于测试/宿主定向配置，含额外请求头）。
     pub fn openWith(gpa: Allocator, url: []const u8, opts: Options) NetError!*HttpStream {
         const self = gpa.create(HttpStream) catch return error.OutOfMemory;
         self.* = .{
@@ -367,6 +376,11 @@ pub const HttpStream = struct {
                 return error.OutOfMemory;
             },
             .url_scratch = .empty,
+            .headers = gpa.dupe(u8, opts.headers orelse "") catch {
+                gpa.free(self.cur_url);
+                gpa.destroy(self);
+                return error.OutOfMemory;
+            },
             .io = undefined,
         };
         self.io = globalIo();
@@ -377,6 +391,7 @@ pub const HttpStream = struct {
             self.disconnect();
             self.ca.deinit(gpa);
             self.url_scratch.deinit(gpa);
+            gpa.free(self.headers);
             gpa.free(self.cur_url);
             gpa.destroy(self);
         }
@@ -416,6 +431,7 @@ pub const HttpStream = struct {
         self.disconnect();
         self.ca.deinit(self.gpa);
         self.url_scratch.deinit(self.gpa);
+        self.gpa.free(self.headers);
         self.gpa.free(self.cur_url);
         const gpa = self.gpa;
         gpa.destroy(self);
@@ -702,34 +718,63 @@ pub const HttpStream = struct {
 
     fn sendGet(self: *HttpStream, host_header: []const u8, target: []const u8, range_start: u64) NetError!void {
         if (self.using_tls) {
-            writeRequest(&self.tls.writer, host_header, target, range_start) catch return error.IoError;
+            writeRequest(&self.tls.writer, host_header, target, range_start, self.headers) catch return error.IoError;
             self.tls.writer.flush() catch return error.IoError;
             self.stream_writer.interface.flush() catch return error.IoError;
         } else {
-            writeRequest(&self.stream_writer.interface, host_header, target, range_start) catch return error.IoError;
+            writeRequest(&self.stream_writer.interface, host_header, target, range_start, self.headers) catch return error.IoError;
             self.stream_writer.interface.flush() catch return error.IoError;
         }
     }
 
+    /// 写 HTTP/1.1 GET 请求。内置最小必备头（Host/Accept/Range/Connection），
+    /// 另有 [extra]（`\n` 或 `\r\n` 分行的附加头，如 `X-Neko-Client` / `User-Agent`）。
+    /// 若 [extra] 已自带 `User-Agent`，则不再追加内置默认 UA（避免双 UA）。
     fn writeRequest(
         w: *Io.Writer,
         host_header: []const u8,
         target: []const u8,
         range_start: u64,
+        extra: []const u8,
     ) !void {
-        var buf: [target_max + host_max + 256]u8 = undefined;
-        const head = std.fmt.bufPrint(
-            &buf,
-            "GET {s} HTTP/1.1\r\n" ++
-                "Host: {s}\r\n" ++
-                "User-Agent: {s}\r\n" ++
-                "Accept: */*\r\n" ++
-                "Range: bytes={d}-\r\n" ++
-                "Connection: close\r\n" ++
-                "\r\n",
-            .{ target, host_header, user_agent, range_start },
-        ) catch return error.IoError;
-        try w.writeAll(head);
+        try w.writeAll("GET ");
+        try w.writeAll(target);
+        try w.writeAll(" HTTP/1.1\r\n");
+        try w.writeAll("Host: ");
+        try w.writeAll(host_header);
+        try w.writeAll("\r\n");
+        if (!hasHeader(extra, "user-agent")) {
+            try w.writeAll("User-Agent: ");
+            try w.writeAll(user_agent);
+            try w.writeAll("\r\n");
+        }
+        try w.writeAll("Accept: */*\r\n");
+        var range_buf: [40]u8 = undefined;
+        const range = std.fmt.bufPrint(&range_buf, "Range: bytes={d}-\r\n", .{range_start}) catch
+            return error.IoError;
+        try w.writeAll(range);
+        // 附加头逐行规范化（统一 CRLF、跳过空行），原样保留调用方顺序。
+        var it = std.mem.splitScalar(u8, extra, '\n');
+        while (it.next()) |raw| {
+            const line = std.mem.trim(u8, raw, " \t\r");
+            if (line.len == 0) continue;
+            try w.writeAll(line);
+            try w.writeAll("\r\n");
+        }
+        try w.writeAll("Connection: close\r\n");
+        try w.writeAll("\r\n");
+    }
+
+    /// [headers] 中是否存在名为 [name] 的头（大小写不敏感；行分隔 `\n`/`\r\n`）。
+    fn hasHeader(headers: []const u8, name: []const u8) bool {
+        var it = std.mem.splitScalar(u8, headers, '\n');
+        while (it.next()) |raw| {
+            const line = std.mem.trim(u8, raw, " \t\r");
+            const colon = std.mem.indexOfScalar(u8, line, ':') orelse continue;
+            const key = std.mem.trim(u8, line[0..colon], " \t");
+            if (std.ascii.eqlIgnoreCase(key, name)) return true;
+        }
+        return false;
     }
 
     /// 解析状态行 + 响应头（不含正文）。`location` 切片指向内部读缓冲，
@@ -1122,9 +1167,10 @@ fn handleConn(ts: *TestServer, stream: std.Io.net.Stream) void {
         target = it.next() orelse "/";
     }
 
-    // 头（收集 Range / 首个空行结束）
+    // 头（收集 Range / X-Neko-Client / 首个空行结束）
     var range_start: u64 = 0;
     var has_range = false;
+    var neko_header: []const u8 = "";
     while (true) {
         const raw = r.takeDelimiterInclusive('\n') catch return;
         if (raw.len <= 2) break; // "\r\n"
@@ -1138,6 +1184,8 @@ fn handleConn(ts: *TestServer, stream: std.Io.net.Stream) void {
             const dash = std.mem.indexOfScalarPos(u8, value, eq + 1, '-') orelse continue;
             range_start = std.fmt.parseInt(u64, value[eq + 1 .. dash], 10) catch 0;
             has_range = true;
+        } else if (std.ascii.eqlIgnoreCase(name, "x-neko-client")) {
+            neko_header = value;
         }
     }
 
@@ -1147,6 +1195,16 @@ fn handleConn(ts: *TestServer, stream: std.Io.net.Stream) void {
 
     if (std.mem.eql(u8, target, "/redir")) {
         w.writeAll("HTTP/1.1 302 Found\r\nLocation: /payload\r\nContent-Length: 0\r\nConnection: close\r\n\r\n") catch return;
+        w.flush() catch {};
+        return;
+    }
+
+    // 自定义请求头回显：以收到的 X-Neko-Client 值作为正文（供请求头测试断言）。
+    if (std.mem.eql(u8, target, "/echoheader")) {
+        var echo_hdr: [128]u8 = undefined;
+        const hs_echo = std.fmt.bufPrint(&echo_hdr, "HTTP/1.1 200 OK\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n", .{neko_header.len}) catch return;
+        w.writeAll(hs_echo) catch return;
+        w.writeAll(neko_header) catch return;
         w.flush() catch {};
         return;
     }
@@ -1260,6 +1318,26 @@ test "HttpStream: 顺序读取 + sizeHint" {
     const n = try readAllInto(hs, got);
     try testing.expectEqual(payload.len, n);
     try testing.expectEqualSlices(u8, payload, got);
+}
+
+test "HttpStream: 自定义请求头随请求发送（X-Neko-Client）" {
+    const payload = try makeTestPayload(testing.allocator, 16);
+    defer testing.allocator.free(payload);
+    const ts = try TestServer.start(payload);
+    defer ts.stopAndDestroy();
+
+    const url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/echoheader", .{ts.port});
+    defer testing.allocator.free(url);
+
+    // 测试夹具仅需一个可辨识的值（真实版本由宿主按 ArchoeraMusic 版本注入）。
+    const hs = try HttpStream.openWith(testing.allocator, url, .{
+        .headers = "X-Neko-Client: test-client\r\nUser-Agent: test-agent",
+    });
+    defer hs.close();
+
+    var buf: [64]u8 = undefined;
+    const n = try readAllInto(hs, &buf);
+    try testing.expectEqualStrings("test-client", buf[0..n]);
 }
 
 test "HttpStream: seek start/current/end（Range 重连）" {

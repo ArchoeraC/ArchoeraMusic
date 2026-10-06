@@ -24,6 +24,20 @@ typedef struct Decoder Decoder;
 Decoder* decoder_open(const char *url);
 
 /**
+ * 同 [decoder_open]，另按源注入 HTTP 请求头 [headers]（`\n`/`\r\n` 分行的
+ * `Name: value`；NULL = 无）。仅对 FFmpeg 的 http/tls 协议生效：`User-Agent`
+ * 映射到 `user_agent`，其余拼接到 `headers`。供在线源携带客户端标识（如
+ * NekoMusic 的 `X-Neko-Client`）。
+ */
+Decoder* decoder_open_headers(const char *url, const char *headers);
+
+/**
+ * 把 [headers] 映射进 FFmpeg 输入选项 [opts]（`user_agent` + `headers`）。
+ * 供 pipeline 的 AVIO 路径与 [decoder_open_headers] 共用，避免逻辑漂移。
+ */
+void decoder_apply_http_headers(AVDictionary **opts, const char *headers);
+
+/**
  * 从自定义 AVIO（如内存源 SegStore 的 avio_alloc_context）打开解码器。
  * 不接管 avio 生命周期：调用方在 decoder_close 后自行释放 avio 与底层源。
  */

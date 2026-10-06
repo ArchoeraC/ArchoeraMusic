@@ -125,6 +125,63 @@ static void frame_skip_samples(AVFrame *f, int n)
 
 Decoder* decoder_open(const char *url)
 {
+    return decoder_open_headers(url, NULL);
+}
+
+/* 大小写不敏感的头名比较（免平台 strcasecmp 依赖）。 */
+static int decoder_header_name_is(const char *a, const char *b)
+{
+    while (*a && *b) {
+        unsigned char ca = (unsigned char)*a;
+        unsigned char cb = (unsigned char)*b;
+        if (ca >= 'A' && ca <= 'Z') ca = (unsigned char)(ca - 'A' + 'a');
+        if (cb >= 'A' && cb <= 'Z') cb = (unsigned char)(cb - 'A' + 'a');
+        if (ca != cb) return 0;
+        a++;
+        b++;
+    }
+    return *a == '\0' && *b == '\0';
+}
+
+void decoder_apply_http_headers(AVDictionary **opts, const char *headers)
+{
+    if (!opts || !headers || !headers[0]) return;
+    char ua[256] = {0};
+    char extra[1024] = {0};
+    const char *cur = headers;
+    while (*cur) {
+        const char *eol = strpbrk(cur, "\r\n");
+        size_t len = eol ? (size_t)(eol - cur) : strlen(cur);
+        if (len > 0 && len < 220) {
+            char line[256];
+            memcpy(line, cur, len);
+            line[len] = '\0';
+            char *colon = strchr(line, ':');
+            if (colon) {
+                *colon = '\0';
+                const char *name = line;
+                const char *val = colon + 1;
+                while (*val == ' ' || *val == '\t') val++;
+                if (decoder_header_name_is(name, "User-Agent")) {
+                    snprintf(ua, sizeof(ua), "%s", val);
+                } else {
+                    size_t used = strlen(extra);
+                    if (used + 4 < sizeof(extra)) {
+                        snprintf(extra + used, sizeof(extra) - used, "%s: %s\r\n", name, val);
+                    }
+                }
+            }
+        }
+        if (!eol) break;
+        cur = eol;
+        while (*cur == '\r' || *cur == '\n') cur++;
+    }
+    if (ua[0]) av_dict_set(opts, "user_agent", ua, 0);
+    if (extra[0]) av_dict_set(opts, "headers", extra, 0);
+}
+
+Decoder* decoder_open_headers(const char *url, const char *headers)
+{
     Decoder *d = calloc(1, sizeof(*d));
     if (!d) return NULL;
 
@@ -142,6 +199,8 @@ Decoder* decoder_open(const char *url)
     av_dict_set(&fmt_opts, "probesize", "1048576", 0);
     /* 分析时长 0.5 秒足够（默认 5 秒，对大文件导致首帧延迟数秒） */
     av_dict_set(&fmt_opts, "analyzeduration", "500000", 0);
+    /* 按源注入客户端标识头（如 NekoMusic；FFmpeg http 仅认 user_agent/headers）。 */
+    decoder_apply_http_headers(&fmt_opts, headers);
     int ret = avformat_open_input(&d->fmt_ctx, url, NULL, &fmt_opts);
     av_dict_free(&fmt_opts);
     if (ret < 0) {

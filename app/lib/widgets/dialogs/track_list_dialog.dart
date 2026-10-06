@@ -9,6 +9,7 @@ import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/source/source_platform.dart';
+import '../../services/source/media_request_headers.dart';
 import '../../stores/daily_shelf_provider.dart';
 import '../../stores/providers.dart';
 import '../../l10n/l10n.dart';

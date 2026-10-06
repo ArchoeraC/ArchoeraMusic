@@ -30,7 +30,8 @@ miniaudio 播放 + Rust tempo + Zig 解码内核）。其**自研代码**随本�
 
 | 组件 | 版本 | 许可证 | 说明 |
 |---|---|---|---|
-| **FFmpeg**（libavformat/libavcodec/libavutil/libswresample） | 9.0.1（自建，`app/core/build-ffmpeg-minimal.sh`） | LGPL-2.1+（纯 LGPL · 仅音频构建，无 GPL/nonfree） | 解码 / 重采样（`swr_convert`）。Linux/macOS 用自建**最小纯 LGPL · 仅音频** FFmpeg（`--disable-gpl --disable-nonfree --disable-autodetect --disable-everything` 后仅启用音频组件）动态链接，运行库随包内嵌（`RUNPATH=$ORIGIN`；macOS `@loader_path`），与系统 FFmpeg 解耦；Windows 经 vcpkg（默认无 gpl 特性）由 `build_windows.bat` 构建，DLL 随包分发 |
+| **FFmpeg**（libavformat/libavcodec/libavutil/libswresample） | 9.0.1（Linux/macOS 自建，`app/core/build-ffmpeg-minimal.sh`）；Windows 经 vcpkg | Linux/macOS **LGPL-3.0-or-later**；Windows **LGPL-2.1+**（均纯 LGPL · 仅音频 · 无 GPL/nonfree） | 解码 / 重采样（`swr_convert`）。Linux/macOS 用自建**最小纯 LGPL · 仅音频** FFmpeg（`--disable-gpl --disable-nonfree --disable-autodetect --disable-everything` 后仅启用音频组件）动态链接，运行库随包内嵌（`RUNPATH=$ORIGIN`；macOS `@loader_path`），与系统 FFmpeg 解耦；Windows 经 vcpkg（`app/vcpkg.json`，不开 gpl/nonfree/openssl 特性）由 `build_windows.bat` 构建，DLL 随包分发。**https/TLS**：Linux/macOS 靠自包含 mbedTLS；**Windows 靠系统原生 Schannel**（vcpkg ffmpeg 端口在未启用 openssl 时自动 `--enable-schannel`，无额外 DLL）。**许可差异**：FFmpeg 将 mbedTLS（Apache-2.0）列入 version3 依赖，Linux/macOS 必须 `--enable-version3`，故为 **LGPL-3.0-or-later**；Windows 用 Schannel 不带 `version3`，维持 **LGPL-2.1+**。二者均无 GPL，AGPL-3.0 聚合分发兼容 |
+| **mbedTLS** | 3.6.2（自建，`app/core/build-ffmpeg-minimal.sh` 内构建） | Apache-2.0 | 为自建 FFmpeg（Linux/macOS）提供 **https/tls** 协议能力（`--enable-mbedtls`）。**静态链接**进 libavformat，故不依赖系统 OpenSSL/gnutls、保持自包含；FFmpeg 将 mbedTLS 列入 version3 依赖，故须 `--enable-version3`（FFmpeg 相应升为 LGPL-3.0-or-later）。与 AGPL-3.0 兼容，随包附许可与源码来源（https://github.com/Mbed-TLS/mbedtls）。Windows 不用它（走 Schannel）。 |
 | **libopus** | 1.5+（系统/vcpkg） | BSD-3-Clause | Opus 编码（FFmpeg `libopus` 编码器，`src/encoder.c` 输出 OGG/Opus）。FFmpeg 自带 `opus` 编码器为 experimental 且仅支持 planar fltp，故改用外部 libopus；Linux/macOS 经 pkg-config 引入、Windows 经 vcpkg `opus` 特性，DLL/dylib 随包内嵌 |
 | `miniaudio` | v0.11.25 | MIT-0 / 公有领域（Public Domain）双许可 | 跨平台音频输出（ALSA/PulseAudio/PipeWire/WASAPI/CoreAudio），`include/miniaudio.h` 单头文件 |
 | `signalsmith-stretch` | 0.1.3 | MIT | 变速变调（经 `tempo-rs` Rust staticlib `libaudio_tempo.a` 封装） |
@@ -49,12 +50,16 @@ FFmpeg 以**动态库**形式链接（未静态合并），所用为**纯 LGPL �
 
 - **Linux / macOS**：不用系统 / Homebrew 的 FFmpeg（后者默认 `--enable-gpl`，
   会破坏 AGPL-3.0 的「GPL 防火墙」），而是用 `app/core/build-ffmpeg-minimal.sh`
-  自建**最小纯 LGPL** 构建（`--disable-gpl --disable-nonfree --disable-autodetect`，
-  仅内部编解码器，只依赖 libc/libm/libz）；共享库随包内嵌并带 `RUNPATH=$ORIGIN`
-  （macOS 为 `@loader_path`），与系统 FFmpeg 版本完全解耦。
-- **Windows**：经 vcpkg 构建（默认特性不含 gpl/nonfree），运行时 DLL 随包分发到 exe 根。
+  自建**最小纯 LGPL** 构建（`--disable-gpl --disable-nonfree --disable-autodetect
+  --enable-version3`，仅内部编解码器，只依赖 libc/libm/libz）；共享库随包内嵌并带
+  `RUNPATH=$ORIGIN`（macOS 为 `@loader_path`），与系统 FFmpeg 版本完全解耦。
+  因自包含 TLS 用 mbedTLS（Apache-2.0，被 FFmpeg 列入 version3 依赖），必须
+  `--enable-version3`，产物许可为 **LGPL-3.0-or-later**（无 GPL，GPL 防火墙不变）。
+- **Windows**：经 vcpkg 构建（`app/vcpkg.json`，默认特性不含 gpl/nonfree），运行时 DLL 随包分发到 exe 根。
+  为支持 **https/tls**，**不开** vcpkg ffmpeg 的 `openssl` 特性——该端口在未启用 openssl 时会自动
+  `--enable-schannel`，即用 **Windows 原生 Schannel**（无额外 TLS 依赖 DLL，且保持 LGPL-2.1+，不带 `version3`）。
 
-依据 LGPL-2.1，使用者享有以下权利：
+依据 LGPL（Linux/macOS 为 LGPL-3.0-or-later、Windows 为 LGPL-2.1-or-later），使用者享有以下权利：
 
 1. 获得 FFmpeg 对应源代码的自由（官方：https://ffmpeg.org/ ；本仓库构建脚本
    `app/core/build-ffmpeg-minimal.sh` 给出确切版本与配置）；
@@ -164,7 +169,7 @@ GPL 参考源；后续若需变更实现方式，应先做许可评估。任何 
 
 以下为项目维护者的合理努力评估（非法律意见）：
 
-- **来源构成**：FFmpeg 动态链接（纯 LGPL-2.1+ 构建）；Zig 内核 = 自研 AGPL + vendored
+- **来源构成**：FFmpeg 动态链接（纯 LGPL 构建：Linux/macOS LGPL-3.0-or-later、Windows LGPL-2.1-or-later）；Zig 内核 = 自研 AGPL + vendored
   PD/Apache-2.0 + LGPL-2.1+ 移植（FFmpeg 通道）+ BSD-3-Clause（libopus/WavPack 等）+
   CC0/PD（minimp3/stb_vorbis 等）+ MIT/Apache 依赖，**无已知** GPL 系或未许可源码并入
   （如有出入欢迎指正）。

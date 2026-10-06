@@ -51,6 +51,12 @@
     - macOS：`brew install ffmpeg`
   - **发布/自包含构建（推荐，与 CI 一致）**：改用 `bash app/core/build-ffmpeg-minimal.sh`
     自建**最小纯 LGPL** FFmpeg，再 `export PKG_CONFIG_PATH=$HOME/.local/ffmpeg-minimal/lib/pkgconfig`。
+    该脚本同时构建**自包含 mbedTLS**（Apache-2.0）并 `--enable-mbedtls` + `--enable-version3` +
+    `https,tls`（mbedTLS 被 FFmpeg 列为 version3 依赖，故产物许可为 **LGPL-3.0-or-later**），
+    使 FFmpeg 能直连 https（首次运行会联网下载并编译 mbedTLS/FFmpeg；旧的无 TLS 前缀会被
+    自动重建，判定标记 `$HOME/.local/ffmpeg-minimal/.mbedtls-tls`）。
+    Windows 侧走 vcpkg（`app/vcpkg.json`）：FFmpeg 未启用 `openssl` 特性时由端口自动
+    `--enable-schannel`，用 **Windows 原生 Schannel** 提供 https，无额外 DLL。
     引擎只链自建库（内嵌后仅依赖 libc/libm/libz），跨发行版可运行，且满足 LGPL 合规。
     ⚠️ **不要用 Homebrew 的 ffmpeg**（默认 `--enable-gpl`，违反 `THIRD-PARTY-LICENSES.md` 的 GPL 防火墙）。
   - Windows：依赖由 `app/vcpkg.json` 经 vcpkg（manifest 模式）安装，`build_windows.bat` 里缺头文件会自动
