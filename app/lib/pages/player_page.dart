@@ -30,6 +30,7 @@ import '../widgets/player/player_controls_row.dart';
 import '../widgets/player/background/player_background.dart';
 import '../widgets/player/player_cover.dart';
 import '../widgets/player/player_lyrics_block.dart';
+import '../widgets/player/player_lyrics_slot.dart';
 import '../widgets/player/quality_menu.dart';
 import '../widgets/player/spectrum_view.dart';
 import '../widgets/common/toast.dart';
