@@ -88,7 +88,8 @@ PROTOCOLS="file,pipe,http,https,tls,httpproxy,tcp,udp,rtp,srtp,crypto,data,cache
 # ── 自包含 TLS 后端：mbedTLS（Apache-2.0；静态库随 FFmpeg 一起分发）──────────
 if [[ ! -f "$MBEDTLS_PREFIX/lib/libmbedtls.a" ]]; then
   echo "[build-ffmpeg-minimal] 构建自包含 mbedTLS $MBEDTLS_VER → $MBEDTLS_PREFIX"
-  curl -fsSL "https://github.com/Mbed-TLS/mbedtls/releases/download/v$MBEDTLS_VER/mbedtls-$MBEDTLS_VER.tar.bz2" \
+  # 注意：Mbed TLS 的 release tag 形如 `mbedtls-3.6.2`（无 `v` 前缀），资产名同。
+  curl -fsSL "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-$MBEDTLS_VER/mbedtls-$MBEDTLS_VER.tar.bz2" \
     -o "$work/mbedtls.tar.bz2"
   tar -C "$work" -xf "$work/mbedtls.tar.bz2"
   cmake -S "$work/mbedtls-$MBEDTLS_VER" -B "$work/mbedtls-build" \
