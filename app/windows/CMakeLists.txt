@@ -214,8 +214,9 @@ if(VCPKG_RUNTIME_DLLS)
 endif()
 
 # LGPL 合规：随包附 FFmpeg / TagLib 许可文本（vcpkg 的 copyright 文件）。
-# vcpkg 的 ffmpeg 默认不开 gpl/nonfree 特性 → 纯 LGPL-2.1+，与 AGPL-3.0
-# 聚合分发兼容（见 app/core/audio-engine/THIRD-PARTY-LICENSES.md）。
+# vcpkg 的 ffmpeg 不开 openssl 特性 → Windows 自动走系统 **Schannel** 提供 https/tls，
+# 且保持纯 LGPL-2.1+（不带 version3），与 AGPL-3.0 聚合分发兼容
+# （见 app/core/audio-engine/THIRD-PARTY-LICENSES.md）。
 set(VCPKG_SHARE_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}/../vcpkg_installed/${VCPKG_TARGET_TRIPLET}/share")
 foreach(_dep IN ITEMS ffmpeg taglib)

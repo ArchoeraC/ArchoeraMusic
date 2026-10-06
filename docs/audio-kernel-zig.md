@@ -675,6 +675,28 @@ pub const Reader = struct {
 >   还原为 `SIG_DFL` → 之后仍活跃实例触发 SIGIO 即令进程被信号终止（实机表现：跳转后
 >   进程退出，shell 报 "I/O possible"）。
 
+> **落地（2026-10-07）：在线源请求头透传 + FFmpeg 在线 TLS**
+> - 背景：NekoMusic 等站点的 `/api/*` 防爬要求客户端标识；内核原生 HTTP 固定发
+>   `ArchoeraMusic/0.9 (EraAudio)` 会被判爬虫 → 302 到 SEO HTML → 探测失败
+>   `status=1`；而 FFmpeg 回退因最小构建无 TLS 直接 `Protocol not found`。
+> - 内核：`HttpStream` 新增自有 `headers`（`Options.headers`）；`writeRequest` 规范化追加、
+>   自带 `User-Agent` 时不追加默认 UA（避免双头）、**重定向原样保留**；新增导出
+>   `zk_engine_open_url_headers` / `zk_decoder_open_url_headers`（旧符号保留，委托空头）。
+> - C 壳：`native_decoder_open_url(url, headers, …)`；`pipeline_create_with_headers`；
+>   `archoera_mediaengine_create_with_headers`（会话持有头串）；新增公共
+>   `decoder_apply_http_headers`（`User-Agent`→`user_agent`，其余→`headers`）供
+>   `decoder_open_headers` 与 AVIO 路径复用。
+> - Dart：`EngineBindings.create(headers)` → `AudioEngineProcess.start(headers)` →
+>   `engineHeadersForTrack(track)`（取自 `SourcePlatform.mediaHeaders`，Neko 源为
+>   `X-Neko-Client: archoera+<版本>` + `User-Agent: ArchoeraMusic/<版本>`，版本启动时自
+>   `pubspec.yaml` 读取，**不硬编码**）。旧库缺 `_with_headers` 符号时自动回退。
+> - FFmpeg 在线 TLS：Linux/macOS 由 `build-ffmpeg-minimal.sh` 构建**自包含 mbedTLS**
+>   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-tls` 标记重建）；
+>   Windows 经 vcpkg ffmpeg 端口的 **Schannel**（未启用 `openssl` 特性时自动
+>   `--enable-schannel`，无额外 DLL，保持 LGPL-2.1+）。
+> - 验收：`kernel/net.zig` 新增「自定义请求头随请求发送」用例，`zig build test` 731 项全绿；
+>   C 壳增量编译 + `ctest` 36 项全绿；Dart `analyze` 0 issue、`flutter test` 全绿。
+
 > **落地（2026-09-21）：callback 形态已从「预留」转为「已接入」**
 > - 内核：`io.Reader.openCallback` + `decoder.openReader`；新导出 `zk_decoder_open_cb`
 >   （`include/kernel_bridge.h`，加法式，不改既有 `zk_decoder_open[_mem]`）。C 回调经
