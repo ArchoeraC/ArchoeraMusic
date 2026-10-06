@@ -21,6 +21,7 @@ const std = @import("std");
 const rcmod = @import("rc.zig");
 const tables = @import("celt_tables.zig");
 const celt_types = @import("celt_types.zig");
+const opus_vec = @import("vec.zig");
 
 const CeltFrame = celt_types.CeltFrame;
 
@@ -290,7 +291,18 @@ fn stereoMerge(x: []f32, y: []f32, mid_in: f32, n: usize) void {
     }
     const g0: f32 = 1.0 / @sqrt(e0);
     const g1: f32 = 1.0 / @sqrt(e1);
-    for (0..n) |i| {
+    const vmid: opus_vec.V8 = @splat(mid);
+    const vg0: opus_vec.V8 = @splat(g0);
+    const vg1: opus_vec.V8 = @splat(g1);
+    var i: usize = 0;
+    while (i + 8 <= n) : (i += 8) {
+        const xv = opus_vec.load8(x.ptr + i);
+        const yv = opus_vec.load8(y.ptr + i);
+        const v0 = vmid * xv;
+        opus_vec.store8(x.ptr + i, vg0 * (v0 - yv));
+        opus_vec.store8(y.ptr + i, vg1 * (v0 + yv));
+    }
+    while (i < n) : (i += 1) {
         const v0 = mid * x[i];
         const v1 = y[i];
         x[i] = g0 * (v0 - v1);
@@ -322,7 +334,7 @@ fn algUnquant(rc: *Rc, x: []f32, n: usize, k: u32, spread: u8, blocks: u32, gain
     const norm = decodePulses(rc, pvq_scratch[0..n], @intCast(n), k);
     // libopus：g = MULT32_32_Q31(celt_rsqrt_norm32(Ryy), gain) = (1/sqrt(Ryy))*gain
     const g = (1.0 / @sqrt(norm)) * gain;
-    for (0..n) |i| x[i] = g * @as(f32, @floatFromInt(pvq_scratch[i]));
+    opus_vec.intToFloatScale(pvq_scratch[0..n], x[0..n], g);
     expRotation(x, n, blocks, k, spread);
     return extractCollapseMask(pvq_scratch[0..n], n, @intCast(blocks));
 }
@@ -333,7 +345,7 @@ fn renormalizeVector(x: []f32, gain: f32) void {
     for (x) |vv| s += vv * vv;
     const e = 1e-15 + s;
     const g = (1.0 / @sqrt(e)) * gain;
-    for (x) |*vv| vv.* = g * vv.*;
+    opus_vec.scaleInPlace(x, g);
 }
 
 pub const Pvq = struct {
@@ -642,7 +654,7 @@ pub fn quantBand(
         blocks <<= @intCast(recombine);
         if (lowband_out) |lo| {
             const s: f32 = @floatCast(@sqrt(@as(f64, @floatFromInt(n0))));
-            for (0..n0) |i| lo[i] = s * x[i];
+            opus_vec.scaleCopy(lo[0..n0], x[0..n0], s);
         }
         cm &= (@as(u32, 1) << @intCast(blocks)) - 1;
     }

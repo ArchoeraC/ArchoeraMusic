@@ -49,6 +49,123 @@ inline fn half(x: f32) f32 {
     return x * 0.5;
 }
 
+// ---------------------------------------------------------------------------
+// 可移植 SIMD 辅助（仅 @Vector / @shuffle / @splat / @bitCast）
+//
+// 语义约束：向量只打包**相互独立**的 lane，且每条 lane 的浮点运算顺序与标量
+// 逐条相同（严格浮点、不重结合）。这里所有复数乘都保持 `a.r*b.r - a.i*b.i` /
+// `a.r*b.i + a.i*b.r` 的先乘后减/加次序，与标量 cmul 位级一致。
+// ---------------------------------------------------------------------------
+const V8 = @Vector(8, f32);
+const V4 = @Vector(4, f32);
+
+inline fn ldV8(p: [*]const f32) V8 {
+    return @as(*align(1) const V8, @ptrCast(p)).*;
+}
+
+inline fn stV8(p: [*]f32, v: V8) void {
+    @as(*align(1) V8, @ptrCast(p)).* = v;
+}
+
+inline fn ldV4(p: [*]const f32) V4 {
+    return @as(*align(1) const V4, @ptrCast(p)).*;
+}
+
+inline fn stV4(p: [*]f32, v: V4) void {
+    @as(*align(1) V4, @ptrCast(p)).* = v;
+}
+
+/// 4 组复数乘（A、B 均为 4 个 [r,i] 交错复数）。逐 lane 与 cmul 同序：
+/// real = a.r*b.r - a.i*b.i（P + Q*(-1)），imag = a.i*b.r + a.r*b.i。
+inline fn cmulV8(a: V8, b: V8) V8 {
+    const a_sw = @shuffle(f32, a, a, [8]i32{ 1, 0, 3, 2, 5, 4, 7, 6 });
+    const b_rr = @shuffle(f32, b, b, [8]i32{ 0, 0, 2, 2, 4, 4, 6, 6 });
+    const b_ii = @shuffle(f32, b, b, [8]i32{ 1, 1, 3, 3, 5, 5, 7, 7 });
+    const sgn: V8 = .{ -1, 1, -1, 1, -1, 1, -1, 1 };
+    return a * b_rr + a_sw * b_ii * sgn;
+}
+
+/// [r,i] -> [i,-r]（用于 radix-5 中 s6/s12 的旋转）。
+inline fn swapSign(p: V8) V8 {
+    const sw = @shuffle(f32, p, p, [8]i32{ 1, 0, 3, 2, 5, 4, 7, 6 });
+    const sgn: V8 = .{ 1, -1, 1, -1, 1, -1, 1, -1 };
+    return sw * sgn;
+}
+
+/// 把 4 个标量复数打包成 [r,i] 交错的 V8（twiddle 跨步 gather）。
+inline fn pack4(a: Complex, b: Complex, c: Complex, d: Complex) V8 {
+    return .{ a.r, a.i, b.r, b.i, c.r, c.i, d.r, d.i };
+}
+
+/// 4 lane：复数 [2u, 2u+2, 2u+4, 2u+6]（radix-5 的 tw[2u] 跨步 2）。
+inline fn gather2(tw: [*]const f32, u: usize) V8 {
+    const b = tw + 4 * u;
+    return @shuffle(f32, ldV8(b), ldV8(b + 8), [8]i32{ 0, 1, 4, 5, -1, -2, -5, -6 });
+}
+
+/// 4 lane：复数 [3u, 3u+3, 3u+6, 3u+9]（tw[3u] 跨步 3）。
+inline fn gather3(tw: [*]const f32, u: usize) V8 {
+    const b = tw + 6 * u;
+    const lo = @shuffle(f32, ldV8(b), ldV8(b + 8), [8]i32{ 0, 1, 6, 7, -5, -6, 0, 0 });
+    const hi_v = ldV8(b + 16);
+    const hi = @shuffle(f32, hi_v, hi_v, [8]i32{ 2, 3, 0, 0, 0, 0, 0, 0 });
+    return @shuffle(f32, lo, hi, [8]i32{ 0, 1, 2, 3, 4, 5, -1, -2 });
+}
+
+/// 4 lane：复数 [4u, 4u+4, 4u+8, 4u+12]（tw[4u] 跨步 4）。
+inline fn gather4(tw: [*]const f32, u: usize) V8 {
+    const b = tw + 8 * u;
+    const lo = @shuffle(f32, ldV8(b), ldV8(b + 8), [8]i32{ 0, 1, -1, -2, 0, 0, 0, 0 });
+    const hi = @shuffle(f32, ldV8(b + 16), ldV8(b + 24), [8]i32{ 0, 1, -1, -2, 0, 0, 0, 0 });
+    return @shuffle(f32, lo, hi, [8]i32{ 0, 1, 2, 3, -1, -2, -3, -4 });
+}
+
+/// radix-5 的 N==1 向量路径：4 个连续 u 并行。
+/// fs==1 时用连续/跨步向量加载；fs>1 用 pack4 标量 gather（仍逐 lane 同序）。
+/// 仅当 m 为 4 的倍数时调用。
+fn kfBfly5Vec(comptime contig: bool, fout: [*]f32, tw: [*]const Complex, twf: [*]const f32, fs: usize, ya: Complex, yb: Complex, m: usize) void {
+    const ya_r: V8 = @splat(ya.r);
+    const ya_i: V8 = @splat(ya.i);
+    const yb_r: V8 = @splat(yb.r);
+    const yb_i: V8 = @splat(yb.i);
+    var u: usize = 0;
+    while (u < m) : (u += 4) {
+        const off = 2 * u;
+        const x0 = ldV8(fout + off);
+        const x1 = ldV8(fout + 2 * m + off);
+        const x2 = ldV8(fout + 4 * m + off);
+        const x3 = ldV8(fout + 6 * m + off);
+        const x4 = ldV8(fout + 8 * m + off);
+
+        const t1 = if (contig) ldV8(twf + off) else pack4(tw[u * fs], tw[(u + 1) * fs], tw[(u + 2) * fs], tw[(u + 3) * fs]);
+        const t2 = if (contig) gather2(twf, u) else pack4(tw[2 * u * fs], tw[2 * (u + 1) * fs], tw[2 * (u + 2) * fs], tw[2 * (u + 3) * fs]);
+        const t3 = if (contig) gather3(twf, u) else pack4(tw[3 * u * fs], tw[3 * (u + 1) * fs], tw[3 * (u + 2) * fs], tw[3 * (u + 3) * fs]);
+        const t4 = if (contig) gather4(twf, u) else pack4(tw[4 * u * fs], tw[4 * (u + 1) * fs], tw[4 * (u + 2) * fs], tw[4 * (u + 3) * fs]);
+
+        const s1 = cmulV8(x1, t1);
+        const s2 = cmulV8(x2, t2);
+        const s3 = cmulV8(x3, t3);
+        const s4 = cmulV8(x4, t4);
+
+        const s7 = s1 + s4;
+        const s10 = s1 - s4;
+        const s8 = s2 + s3;
+        const s9 = s2 - s3;
+
+        stV8(fout + off, x0 + (s7 + s8));
+
+        const s5 = x0 + (s7 * ya_r + s8 * yb_r);
+        const s6 = swapSign(s10 * ya_i + s9 * yb_i);
+        stV8(fout + 2 * m + off, s5 - s6);
+        stV8(fout + 8 * m + off, s5 + s6);
+
+        const s11 = x0 + (s7 * yb_r + s8 * ya_r);
+        const s12 = swapSign(s9 * ya_i - s10 * yb_i);
+        stV8(fout + 4 * m + off, s11 + s12);
+        stV8(fout + 6 * m + off, s11 - s12);
+    }
+}
+
 /// kf_factor：因子分解（p,m 对；含 radix4/2/3/5 与 p==2 特例、反转）。
 fn kfFactor(n_in: i32, fac: *[MAX_FACTORS]u16) bool {
     var n: i32 = n_in;
@@ -214,6 +331,187 @@ fn kfBfly2(fout: []Complex, m_in: usize, n: usize) void {
     }
 }
 
+/// radix-4 一般分支的向量路径：4 个连续 j 并行（m 为 4 的倍数）。
+fn kfBfly4Vec(fout: [*]f32, tw: [*]const Complex, fstride: usize, m: usize, n: usize, mm: usize) void {
+    const m2 = 2 * m;
+    const m3 = 3 * m;
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        const fb = i * mm;
+        var j: usize = 0;
+        while (j < m) : (j += 4) {
+            const f0 = fb + j;
+            const a0 = ldV8(fout + 2 * f0);
+            const a1 = ldV8(fout + 2 * (f0 + m));
+            const a2 = ldV8(fout + 2 * (f0 + m2));
+            const a3 = ldV8(fout + 2 * (f0 + m3));
+            const t0 = pack4(tw[j * fstride], tw[(j + 1) * fstride], tw[(j + 2) * fstride], tw[(j + 3) * fstride]);
+            const t1 = pack4(tw[2 * j * fstride], tw[2 * (j + 1) * fstride], tw[2 * (j + 2) * fstride], tw[2 * (j + 3) * fstride]);
+            const t2 = pack4(tw[3 * j * fstride], tw[3 * (j + 1) * fstride], tw[3 * (j + 2) * fstride], tw[3 * (j + 3) * fstride]);
+
+            const s0 = cmulV8(a1, t0);
+            const s1 = cmulV8(a2, t1);
+            const s2 = cmulV8(a3, t2);
+            const s5 = a0 - s1;
+            const b0 = a0 + s1;
+            const s3 = s0 + s2;
+            const s4 = s0 - s2;
+            stV8(fout + 2 * (f0 + m2), b0 - s3);
+            stV8(fout + 2 * f0, b0 + s3);
+            stV8(fout + 2 * (f0 + m), s5 + swapSign(s4));
+            stV8(fout + 2 * (f0 + m3), s5 - swapSign(s4));
+        }
+    }
+}
+
+/// radix-3 的向量路径：4 个连续 j 并行（m 为 4 的倍数）。
+fn kfBfly3Vec(fout: [*]f32, tw: [*]const Complex, fstride: usize, epi3_i: f32, m: usize, n: usize, mm: usize) void {
+    const m2 = 2 * m;
+    const epi3: V8 = @splat(epi3_i);
+    const hlf: V8 = @splat(0.5);
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        const fb = i * mm;
+        var j: usize = 0;
+        while (j < m) : (j += 4) {
+            const f0 = fb + j;
+            const a0 = ldV8(fout + 2 * f0);
+            const a1 = ldV8(fout + 2 * (f0 + m));
+            const a2 = ldV8(fout + 2 * (f0 + m2));
+            const t0 = pack4(tw[j * fstride], tw[(j + 1) * fstride], tw[(j + 2) * fstride], tw[(j + 3) * fstride]);
+            const t1 = pack4(tw[2 * j * fstride], tw[2 * (j + 1) * fstride], tw[2 * (j + 2) * fstride], tw[2 * (j + 3) * fstride]);
+
+            const s1 = cmulV8(a1, t0);
+            const s2 = cmulV8(a2, t1);
+            const s3 = s1 + s2;
+            const s0v = s1 - s2;
+            const a1p = a0 - s3 * hlf;
+            const s0 = s0v * epi3;
+            stV8(fout + 2 * f0, a0 + s3);
+            stV8(fout + 2 * (f0 + m2), a1p + swapSign(s0));
+            stV8(fout + 2 * (f0 + m), a1p - swapSign(s0));
+        }
+    }
+}
+
+/// 后旋转向量路径：4 个连续 i 并行，两端就地。语义与标量逐条一致。
+/// 标量输出映射：out[yp0]=yr0, out[yp0+1]=yi1, out[yp1]=yr1, out[yp1+1]=yi0。
+fn mdctPostRotate(out: [*]f32, trig: [*]const f32, n2: usize, n4: usize, yp: usize) void {
+    const total = (n4 + 1) >> 1;
+    var i: usize = 0;
+    while (i + 4 <= total) : (i += 4) {
+        const yp0 = yp + 2 * i;
+        const yp1 = yp + n2 - 2 - 2 * i;
+        const a0 = ldV8(out + yp0);
+        const a1r = ldV8(out + yp1 - 6);
+        const a1 = @shuffle(f32, a1r, a1r, [8]i32{ 6, 7, 4, 5, 2, 3, 0, 1 });
+
+        const t0 = ldV4(trig + i);
+        const t1 = ldV4(trig + n4 + i);
+        const im0 = @shuffle(f32, a0, a0, [4]i32{ 0, 2, 4, 6 });
+        const re0 = @shuffle(f32, a0, a0, [4]i32{ 1, 3, 5, 7 });
+        const yr0 = re0 * t0 + im0 * t1;
+        const yi0 = re0 * t1 - im0 * t0;
+
+        const t0v = ldV4(trig + n4 - i - 4);
+        const t1v = ldV4(trig + n2 - i - 4);
+        const t0r = @shuffle(f32, t0v, t0v, [4]i32{ 3, 2, 1, 0 });
+        const t1r = @shuffle(f32, t1v, t1v, [4]i32{ 3, 2, 1, 0 });
+        const im1 = @shuffle(f32, a1, a1, [4]i32{ 0, 2, 4, 6 });
+        const re1 = @shuffle(f32, a1, a1, [4]i32{ 1, 3, 5, 7 });
+        const yr1 = re1 * t0r + im1 * t1r;
+        const yi1 = re1 * t1r - im1 * t0r;
+
+        stV8(out + yp0, @shuffle(f32, yr0, yi1, [8]i32{ 0, -1, 1, -2, 2, -3, 3, -4 }));
+        const d = @shuffle(f32, yr1, yi0, [8]i32{ 0, -1, 1, -2, 2, -3, 3, -4 });
+        stV8(out + yp1 - 6, @shuffle(f32, d, d, [8]i32{ 6, 7, 4, 5, 2, 3, 0, 1 }));
+    }
+    while (i < total) : (i += 1) {
+        const yp0 = yp + 2 * i;
+        const yp1 = yp + n2 - 2 - 2 * i;
+        var re: f32 = out[yp0 + 1];
+        var im: f32 = out[yp0];
+        var t0 = trig[i];
+        var t1 = trig[n4 + i];
+        var yr = re * t0 + im * t1;
+        var yi = re * t1 - im * t0;
+        re = out[yp1 + 1];
+        im = out[yp1];
+        out[yp0] = yr;
+        out[yp1 + 1] = yi;
+        t0 = trig[n4 - i - 1];
+        t1 = trig[n2 - i - 1];
+        yr = re * t0 + im * t1;
+        yi = re * t1 - im * t0;
+        out[yp1] = yr;
+        out[yp0 + 1] = yi;
+    }
+}
+
+/// 预旋转向量路径（stride==1 快路径，4 个连续 i 并行 + 标量尾部/通用 stride）。
+fn mdctPreRotate(in_: [*]const f32, out: [*]f32, trig: [*]const f32, bitrev: [*]const u16, n2: usize, n4: usize, yp: usize, stride: usize) void {
+    var i: usize = 0;
+    if (stride == 1) {
+        while (i + 4 <= n4) : (i += 4) {
+            const px1 = ldV8(in_ + 2 * i);
+            const x1v = @shuffle(f32, px1, px1, [4]i32{ 0, 2, 4, 6 });
+            const px2 = ldV8(in_ + n2 - 8 - 2 * i);
+            const x2v = @shuffle(f32, px2, px2, [4]i32{ 7, 5, 3, 1 });
+            const t0 = ldV4(trig + i);
+            const t1 = ldV4(trig + n4 + i);
+            const yr = x2v * t0 + x1v * t1;
+            const yi = x1v * t0 - x2v * t1;
+            // 复数对 (yi,yr) 打包成 64bit 一次落盘（位级等价于两次 32bit 写）
+            const pu: @Vector(4, u64) = @bitCast(@shuffle(f32, yi, yr, [8]i32{ 0, -1, 1, -2, 2, -3, 3, -4 }));
+            inline for (0..4) |k| {
+                const rev = bitrev[i + k];
+                @as(*align(1) u64, @ptrCast(out + yp + 2 * rev)).* = pu[k];
+            }
+        }
+    }
+    while (i < n4) : (i += 1) {
+        const rev = bitrev[i];
+        const x1 = in_[2 * i * stride];
+        const x2 = in_[stride * (n2 - 1 - 2 * i)];
+        const yr = x2 * trig[i] + x1 * trig[n4 + i];
+        const yi = x1 * trig[i] - x2 * trig[n4 + i];
+        out[yp + 2 * rev + 1] = yr;
+        out[yp + 2 * rev] = yi;
+    }
+}
+
+/// TDAC 镜像向量路径（4 个连续 i 并行 + 标量尾部）。
+fn mdctTdac(out: [*]f32, window: [*]const f32, overlap: usize) void {
+    const nhalf = overlap / 2;
+    var i: usize = 0;
+    while (i + 4 <= nhalf) : (i += 4) {
+        const x2v = ldV4(out + i);
+        const x1r = ldV4(out + overlap - 4 - i);
+        const x1v = @shuffle(f32, x1r, x1r, [4]i32{ 3, 2, 1, 0 });
+        const w1v = ldV4(window + i);
+        const w2r = ldV4(window + overlap - 4 - i);
+        const w2v = @shuffle(f32, w2r, w2r, [4]i32{ 3, 2, 1, 0 });
+        stV4(out + i, x2v * w2v - x1v * w1v);
+        const o2 = x2v * w1v + x1v * w2v;
+        const o2r = @shuffle(f32, o2, o2, [4]i32{ 3, 2, 1, 0 });
+        stV4(out + overlap - 4 - i, o2r);
+    }
+    var xp1: usize = overlap - 1 - i;
+    var yp1: usize = i;
+    var wp1: usize = i;
+    var wp2: usize = overlap - 1 - i;
+    while (i < nhalf) : (i += 1) {
+        const x1 = out[xp1];
+        const x2 = out[yp1];
+        out[yp1] = x2 * window[wp2] - x1 * window[wp1];
+        out[xp1] = x2 * window[wp1] + x1 * window[wp2];
+        wp1 += 1;
+        wp2 -= 1;
+        yp1 += 1;
+        xp1 -= 1;
+    }
+}
+
 /// kf_bfly4（FLOAT；m==1 退化分支 + 一般分支）。
 fn kfBfly4(fout: []Complex, fstride: usize, st: *const FftState, m_in: usize, n: usize, mm: usize) void {
     if (m_in == 1) {
@@ -231,6 +529,10 @@ fn kfBfly4(fout: []Complex, fstride: usize, st: *const FftState, m_in: usize, n:
         }
     } else {
         const m = m_in;
+        if ((m & 3) == 0) {
+            kfBfly4Vec(@ptrCast(fout.ptr), @ptrCast(&st.twiddles), fstride, m, n, mm);
+            return;
+        }
         const m2 = 2 * m;
         const m3 = 3 * m;
         var i: usize = 0;
@@ -266,6 +568,10 @@ fn kfBfly3(fout: []Complex, fstride: usize, st: *const FftState, m_in: usize, n:
     const m = m_in;
     const m2 = 2 * m;
     const epi3_i = st.twiddles[fstride * m].i;
+    if ((m & 3) == 0) {
+        kfBfly3Vec(@ptrCast(fout.ptr), @ptrCast(&st.twiddles), fstride, epi3_i, m, n, mm);
+        return;
+    }
     var i: usize = 0;
     while (i < n) : (i += 1) {
         const fb = i * mm;
@@ -291,6 +597,14 @@ fn kfBfly5(fout: []Complex, fstride: usize, st: *const FftState, m_in: usize, n:
     const m = m_in;
     const ya = st.twiddles[fstride * m];
     const yb = st.twiddles[fstride * 2 * m];
+    if (n == 1 and (m & 3) == 0) {
+        if (fstride == 1) {
+            kfBfly5Vec(true, @ptrCast(fout.ptr), @ptrCast(&st.twiddles), @ptrCast(&st.twiddles), fstride, ya, yb, m);
+        } else {
+            kfBfly5Vec(false, @ptrCast(fout.ptr), @ptrCast(&st.twiddles), @ptrCast(&st.twiddles), fstride, ya, yb, m);
+        }
+        return;
+    }
     var i: usize = 0;
     while (i < n) : (i += 1) {
         const fb = i * mm;
@@ -415,70 +729,14 @@ pub fn cltMdctBackward(
     const st = &l.kfft[shift];
 
     // 预旋转（bitrev 顺序写入 out+overlap/2）
-    {
-        const yp: usize = overlap >> 1;
-        var i: usize = 0;
-        while (i < n4) : (i += 1) {
-            const rev = st.bitrev[i];
-            const x1 = in_[2 * i * stride];
-            const x2 = in_[stride * (n2 - 1 - 2 * i)];
-            const yr = x2 * trig[i] + x1 * trig[n4 + i];
-            const yi = x1 * trig[i] - x2 * trig[n4 + i];
-            out[yp + 2 * rev + 1] = yr;
-            out[yp + 2 * rev] = yi;
-        }
-        var pr0: usize = 0;
-        if (pr0 < 2) {
-            pr0 += 1;
-        }
-    }
+    mdctPreRotate(in_.ptr, out.ptr, trig.ptr, &st.bitrev, n2, n4, overlap >> 1, stride);
 
     opusFft(st, @as([*]Complex, @ptrCast(out.ptr + (overlap >> 1)))[0..n4]);
 
     // 后旋转（两端同时就地）
-    {
-        var yp0: usize = overlap >> 1;
-        var yp1: usize = (overlap >> 1) + n2 - 2;
-        var i: usize = 0;
-        while (i < (n4 + 1) >> 1) : (i += 1) {
-            var re: f32 = out[yp0 + 1];
-            var im: f32 = out[yp0];
-            var t0 = trig[i];
-            var t1 = trig[n4 + i];
-            var yr = re * t0 + im * t1;
-            var yi = re * t1 - im * t0;
-            re = out[yp1 + 1];
-            im = out[yp1];
-            out[yp0] = yr;
-            out[yp1 + 1] = yi;
-            t0 = trig[n4 - i - 1];
-            t1 = trig[n2 - i - 1];
-            yr = re * t0 + im * t1;
-            yi = re * t1 - im * t0;
-            out[yp1] = yr;
-            out[yp0 + 1] = yi;
-            yp0 += 2;
-            yp1 -= 2;
-        }
-    }
+    mdctPostRotate(out.ptr, trig.ptr, n2, n4, overlap >> 1);
 
     // TDAC 镜像
-    {
-        var xp1: usize = overlap - 1;
-        var yp1: usize = 0;
-        var wp1: usize = 0;
-        var wp2: usize = overlap - 1;
-        var i: usize = 0;
-        while (i < overlap / 2) : (i += 1) {
-            const x1 = out[xp1];
-            const x2 = out[yp1];
-            out[yp1] = x2 * window[wp2] - x1 * window[wp1];
-            out[xp1] = x2 * window[wp1] + x1 * window[wp2];
-            wp1 += 1;
-            wp2 -= 1;
-            yp1 += 1;
-            xp1 -= 1;
-        }
-    }
+    mdctTdac(out.ptr, window.ptr, overlap);
 }
 

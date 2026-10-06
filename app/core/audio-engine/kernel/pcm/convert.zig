@@ -68,7 +68,16 @@ fn toFloatEndian(
                 }
             } else {
                 const inv = 1.0 / 32768.0;
-                for (0..n) |i| {
+                const V8 = @Vector(8, f32);
+                const I8 = @Vector(8, i16);
+                const vinv: V8 = @splat(inv);
+                var i: usize = 0;
+                while (i + 8 <= n) : (i += 8) {
+                    var iv: I8 = @bitCast(src[i * 2 ..][0..16].*);
+                    if (endian == .big) iv = @byteSwap(iv);
+                    out[i..][0..8].* = @as(V8, @floatFromInt(iv)) * vinv;
+                }
+                while (i < n) : (i += 1) {
                     const v = std.mem.readInt(i16, src[i * 2 ..][0..2], endian);
                     out[i] = @as(f32, @floatFromInt(v)) * inv;
                 }
@@ -88,7 +97,16 @@ fn toFloatEndian(
                 }
             } else {
                 const inv = 1.0 / 2147483648.0; // 2^31
-                for (0..n) |i| {
+                const V8 = @Vector(8, f32);
+                const I8 = @Vector(8, i32);
+                const vinv: V8 = @splat(inv);
+                var i: usize = 0;
+                while (i + 8 <= n) : (i += 8) {
+                    var iv: I8 = @bitCast(src[i * 4 ..][0..32].*);
+                    if (endian == .big) iv = @byteSwap(iv);
+                    out[i..][0..8].* = @as(V8, @floatFromInt(iv)) * vinv;
+                }
+                while (i < n) : (i += 1) {
                     const v = std.mem.readInt(i32, src[i * 4 ..][0..4], endian);
                     out[i] = @as(f32, @floatFromInt(v)) * inv;
                 }

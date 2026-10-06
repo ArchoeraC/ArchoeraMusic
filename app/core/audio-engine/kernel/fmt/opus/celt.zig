@@ -20,6 +20,7 @@ const pvqmod = @import("pvq.zig");
 const kiss = @import("kissfft.zig");
 const tables = @import("celt_tables.zig");
 const ct = @import("celt_types.zig");
+const opus_vec = @import("vec.zig");
 
 const Rc = rcmod.Rc;
 const Pvq = pvqmod.Pvq;
@@ -587,10 +588,8 @@ fn quantBands(f: *CeltFrame, pvq: *Pvq, rc: *Rc) void {
 
         if (f.dual_stereo and i == f.intensity_stereo) {
             f.dual_stereo = false;
-            var j = @as(usize, tables.era_celt_freq_bands[f.start_band]) << @intCast(f.size);
-            while (j < band_offset) : (j += 1) {
-                norm1[j] = (norm1[j] + norm2[j]) / 2;
-            }
+            const j = @as(usize, tables.era_celt_freq_bands[f.start_band]) << @intCast(f.size);
+            opus_vec.avgHalfInPlace(norm1[j..band_offset], norm2[j..band_offset]);
         }
 
         const norm_loc1_slice = if (effective_lowband != -1) norm_loc1 else null;
@@ -657,9 +656,8 @@ fn denormalize(f: *CeltFrame, block: *CeltBlock, data: []f32) void {
         // libopus FLOAT celt_exp2_db：celt_exp2(PSHR32(x, DB_SHIFT-10))，float 下 PSHR32=恒等，
         // celt_exp2(x)=exp(0.6931471805599453094·x)（double 计算后截断 f32）。
         const norm: f32 = @floatCast(@exp(0.6931471805599453094 * @as(f64, @min(log_norm, 32.0))));
-        for (0..@as(usize, tables.era_celt_freq_range[i]) << @intCast(f.size)) |j| {
-            dst[j] *= norm;
-        }
+        const count = @as(usize, tables.era_celt_freq_range[i]) << @intCast(f.size);
+        opus_vec.scaleInPlace(dst[0..count], norm);
     }
 }
 
@@ -765,7 +763,22 @@ fn postfilterApply(f: *CeltFrame, block: *CeltBlock, out_syn: usize) void {
 fn deemphasis(y: []f32, x: []const f32, coeff_in: f32, len: usize, accum: bool) f32 {
     var mem = coeff_in;
     const c = 0.850006103515625; // libopus float build coef0 = QCONST16(0.850006103515625,15)
-    for (0..len) |i| {
+    var i: usize = 0;
+    // 快路径（CELT-only）：IIR 仍串行，但把 `r → f32` 的转换与存储 8 lane 一起做，
+    // 消去逐样本 `cvtsi2ss`+`mulss`。逐 lane 运算顺序与标量相同，位级一致。
+    if (!accum) {
+        const inv: f32 = 1.0 / 8388608.0;
+        while (i + 8 <= len) : (i += 8) {
+            var ri: [8]i32 = undefined;
+            for (0..8) |k| {
+                const tmp = x[i + k] + 1e-30 + mem;
+                mem = c * tmp;
+                ri[k] = lrintfEven(tmp * 256.0);
+            }
+            opus_vec.intToFloatScale(ri[0..8], y[i..][0..8], inv);
+        }
+    }
+    while (i < len) : (i += 1) {
         // libopus deemphasis_stereo_simple (float)：tmp = x + VERY_SMALL + m
         const tmp = x[i] + 1e-30 + mem;
         mem = c * tmp;
@@ -773,27 +786,29 @@ fn deemphasis(y: []f32, x: []const f32, coeff_in: f32, len: usize, accum: bool) 
             // accum=1：SIG2RES(tmp)=(1/32768)*tmp，float 域累加（不量化）
             y[i] += (1.0 / 32768.0) * tmp;
         } else {
-            // accum=0：参考输出 SIG2RES(tmp)，RES2INT24=lrintf(8388608*sig)
-            const sig = (1.0 / 32768.0) * tmp;
-            const r: i32 = lrintf(sig * 8388608.0);
+            // accum=0：参考输出 RES2INT24(SIG2RES(tmp)) 再 RES2FLOAT。
+            // SIG2RES=×2^-15、RES2INT24=float2int(×2^23) —— 两次乘 2 的幂、逐级精确，
+            // 合并为 tmp×2^8（消一次 mulss）；量化用无分支就近偶数舍入（位级等同 C
+            // lrintf）；回写 r×2^-23 亦精确。输出与旧实现逐位一致。
+            const r: i32 = lrintfEven(tmp * 256.0);
             y[i] = @as(f32, @floatFromInt(r)) / 8388608.0;
         }
     }
     return mem;
 }
 
-/// C99 lrintf：round-to-nearest-even（Zig @round 是 ties-away，需修正）
-fn lrintf(x: f32) i32 {
-    const t: i32 = @intFromFloat(@trunc(x));
-    const frac = x - @trunc(x);
-    const sign: i32 = if (x < 0) -1 else 1;
-    var r = t;
-    if (@abs(frac) > 0.5) {
-        r += sign;
-    } else if (@abs(frac) == 0.5) {
-        if (@mod(@abs(t), 2) != 0) r += sign;
-    }
-    return r;
+/// C99 lrintf 等价：round-to-nearest-even，**无分支、无 libm 调用**。
+///
+/// double magic：`x + 1.5·2^52` 把结果抬到 ulp=1 的区间，加法按当前舍入模式
+/// （就近偶数）取整，再减回 magic 得精确整数。对 |x| < 2^51 全程精确（音频路径远
+/// 小于此），与 C `lrintf`（IEEE 就近偶数）位级一致。
+///
+/// 动机：Zig 的 `@trunc`/`@round` 在无 SSE4.1 的基线目标下会降级为 libm
+/// `truncf`/`roundf` **每样本一次调用**（见 decode-optimization 热区），此实现规避之。
+inline fn lrintfEven(x: f32) i32 {
+    const magic: f64 = 6755399441055744.0; // 1.5 * 2^52
+    const xd: f64 = x;
+    return @intFromFloat((xd + magic) - magic);
 }
 
 // ---------------------------------------------------------------------------
@@ -904,7 +919,7 @@ if (f.silence) {
 for (0..@intCast(f.output_channels)) |i| {
     const block = &f.block[i];
     // OPUS_MOVE(decode_mem, decode_mem+N, 2048-N+overlap)
-    for (0..2048 - frame_size + CELT_OVERLAP) |k| block.buf[k] = block.buf[k + frame_size];
+    opus_vec.copyForwardsGap8(block.buf[0..].ptr, block.buf[frame_size..].ptr, 2048 - frame_size + CELT_OVERLAP);
     const out_syn = 2048 - frame_size;
     var j: usize = 0;
     while (j < f.blocks) : (j += 1) {
