@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // 实验性音源 NekoMusic（`neko`）纯函数 / 模型单测：服务器地址归一化、
-// Track 映射、用户会话往返、二维码状态解析。
+// Track 映射、用户会话往返、二维码图片解码与状态解析。
+
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -260,6 +262,26 @@ void main() {
         '{中文翻译}\n',
       );
       expect(p.translation, '[00:01.00]中文翻译');
+    });
+  });
+
+  group('NekoQrSession 二维码图片解码', () {
+    test('解析服务端 qrImage data URL → PNG 字节', () {
+      final png = <int>[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A];
+      final s = NekoQrSession(
+        sessionId: 'sid',
+        qrImage: 'data:image/png;base64,${base64Encode(png)}',
+      );
+      expect(s.sessionId, 'sid');
+      expect(s.qrImageBytes, png);
+    });
+
+    test('非图片 / 非法 base64 / 空值返回 null', () {
+      expect(decodeQrImageDataUrl(null), isNull);
+      expect(decodeQrImageDataUrl(''), isNull);
+      expect(decodeQrImageDataUrl('https://x/y.png'), isNull);
+      expect(decodeQrImageDataUrl('data:image/png,notbase64'), isNull);
+      expect(decodeQrImageDataUrl('data:image/png;base64,@@@'), isNull);
     });
   });
 

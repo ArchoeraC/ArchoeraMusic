@@ -8,6 +8,9 @@
 /// `musicList` 等），解析集中在此，业务层只消费强类型。
 library;
 
+import 'dart:convert';
+import 'dart:typed_data';
+
 /// Neko 登录用户（`/api/user/login` 与 `/api/user/info` 的 `data.user`）。
 ///
 /// 服务端自 `d6a0117` 起把用户昵称字段统一为 **`nickname`**（旧版为 `username`），
@@ -109,18 +112,39 @@ class NekoUserLibrary {
 }
 
 /// 二维码登录会话（`/api/user/qrlogin/create`）。
+///
+/// 服务端「21.1 破坏性变更」起**不再返回**可自绘二维码的 `qrContent`，改为直接
+/// 返回渲染好的 PNG（[qrImage]，正中已合成软件图标）；客户端只展示、不再自行编码。
 class NekoQrSession {
-  const NekoQrSession({
+  NekoQrSession({
     required this.sessionId,
-    required this.qrContent,
+    this.qrImage = '',
     this.expiresIn = 180,
   });
 
   final String sessionId;
 
-  /// `nekomusic://qrlogin?sid=...`（Neko 手机 App 扫码解析）。
-  final String qrContent;
+  /// 服务端渲染好的二维码 PNG data URL（`data:image/png;base64,...`）；空 = 无图。
+  final String qrImage;
   final int expiresIn;
+
+  /// 解码后的 PNG 字节（懒解析并缓存；非法 / 空图返回 null）。
+  late final Uint8List? qrImageBytes = decodeQrImageDataUrl(qrImage);
+}
+
+/// 解码服务端二维码 data URL（`data:image/png;base64,...`）→ PNG 字节；
+/// 空值 / 非图片 data URL / 非法 base64 一律返回 null。
+Uint8List? decodeQrImageDataUrl(String? dataUrl) {
+  if (dataUrl == null || dataUrl.isEmpty) return null;
+  final comma = dataUrl.indexOf(',');
+  if (comma < 0) return null;
+  final meta = dataUrl.substring(0, comma);
+  if (!meta.startsWith('data:image/') || !meta.contains(';base64')) return null;
+  try {
+    return base64Decode(dataUrl.substring(comma + 1));
+  } catch (_) {
+    return null;
+  }
 }
 
 /// 二维码登录状态。

@@ -147,6 +147,9 @@ class NekoApi extends ChangeNotifier {
   }
 
   /// 创建二维码登录会话。
+  ///
+  /// 服务端「21.1 破坏性变更」起返回**渲染好的 [NekoQrSession.qrImage]**，
+  /// 不再返回可自绘的 `qrContent`。
   Future<NekoQrSession> qrCreate() async {
     final body = await _client().postJson('/api/user/qrlogin/create');
     _ensureSuccess(body);
@@ -155,7 +158,7 @@ class NekoApi extends ChangeNotifier {
     final map = Map<String, dynamic>.from(data);
     return NekoQrSession(
       sessionId: map['sessionId']?.toString() ?? '',
-      qrContent: map['qrContent']?.toString() ?? '',
+      qrImage: map['qrImage']?.toString() ?? '',
       expiresIn: (map['expiresIn'] as num?)?.toInt() ?? 180,
     );
   }

@@ -8,8 +8,9 @@
 /// Tab 切换走「旧内容整体淡出 → 换内容并平滑动画高度 → 新内容淡入」
 /// （AnimatedSize + AnimatedOpacity），点击卡片以外任意处关闭、无关闭键。
 ///
-/// - 扫码：`/api/user/qrlogin/create` 取 `nekomusic://...`，本地自绘二维码；
-///   状态经 SSE `/api/user/qrlogin/status` 推送，confirmed 即落盘并关闭。
+/// - 扫码：`/api/user/qrlogin/create` 取**服务端渲染好的二维码 PNG**（`qrImage`
+///   data URL，无须本地自绘）；状态经 SSE `/api/user/qrlogin/status` 推送，
+///   confirmed 即落盘并关闭。
 /// - 账号密码：`/api/user/login`（请求体字段 `email` + `password`）。
 ///
 /// **不含注册 / 邮箱验证码 / 滑块验证**（本项目不接入注册）。
@@ -26,7 +27,6 @@ import '../../services/neko/neko_api.dart';
 import '../../services/neko/neko_types.dart';
 import '../../stores/providers.dart';
 import '../common/glass_blur.dart';
-import '../common/qr_image_view.dart';
 import '../common/toast.dart';
 import 'login_risk_notice.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -293,6 +293,7 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   // ── 扫码 tab ──────────────────────────────────────────────────────
   Widget _qrTab(ThemeData theme, ColorScheme scheme, AppLocalizations l10n) {
     final session = _session;
+    final qrBytes = session?.qrImageBytes;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -316,11 +317,14 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
                 : Stack(
                     alignment: Alignment.center,
                     children: [
-                      if (session != null && session.qrContent.isNotEmpty)
-                        QrImageView(
-                          data: session.qrContent,
-                          size: 248,
-                          backgroundColor: Colors.white,
+                      if (qrBytes != null && qrBytes.isNotEmpty)
+                        Image.memory(
+                          qrBytes,
+                          width: 248,
+                          height: 248,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.medium,
+                          gaplessPlayback: true,
                         ),
                       if (_qrTerminal)
                         _qrOverlay(
