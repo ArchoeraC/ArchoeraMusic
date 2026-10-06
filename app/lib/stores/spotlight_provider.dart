@@ -105,8 +105,9 @@ class SpotlightNotifier extends Notifier<SpotlightState> {
     final pools = <SpotlightSource, List<Track>>{};
 
     if (ref.read(neteaseAuthProvider) != null) {
-      await ref.read(dailyShelfProvider.notifier).ensure();
-      final daily = ref.read(dailyShelfProvider).today;
+      // 直接用 ensure() 的返回值（dailyShelfProvider 为 autoDispose，ensure 后
+      // 再 ref.read 可能拿到重建的空态）。
+      final daily = await ref.read(dailyShelfProvider.notifier).ensure();
       if (daily.isNotEmpty) pools[SpotlightSource.daily] = daily;
     }
 
