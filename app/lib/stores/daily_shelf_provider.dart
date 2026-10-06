@@ -75,20 +75,25 @@ class DailyShelfNotifier extends Notifier<DailyShelfState> {
 
   /// 确保今日推荐可用：命中当日归档直接返回，否则（登录态下）拉取并落盘。
   ///
+  /// 返回**当日曲目**（未登录 / 拉取失败为空）。返回值在 `keepAlive` 关闭前
+  /// 已捕获，调用方应直接使用它——**切勿** `ensure()` 后再
+  /// `ref.read(dailyShelfProvider)`：本 provider 为 autoDispose 且调用方多以
+  /// `ref.read`（不建立监听）触发，`ensure` 结束即可能被释放并重建为空态
+  /// （曾导致「每日推荐」弹窗/聚光一直空白）。
+  ///
   /// [force] 为真时忽略当日缓存强制刷新（「刷新日推」）。
-  Future<void> ensure({bool force = false}) async {
+  Future<List<Track>> ensure({bool force = false}) async {
     // autoDispose：调用方普遍以 `ref.read(dailyShelfProvider.notifier).ensure()`
     // 触发（读取不建立监听），必须在本次异步操作期间持有保活链接，否则 provider
-    // 会在首个事件循环后被释放，结果写进已释放实例、调用方随后读到空态。
-    // 每次调用各持一条链接（并发/重入时全部关闭才释放），操作结束即闭链，
-    // 状态随后由磁盘书架按需重建。
+    // 会在首个事件循环后被释放，结果写进已释放实例。操作结束即闭链；状态随后
+    // 由磁盘书架按需重建。
     final keepAlive = ref.keepAlive();
     try {
       final account = ref.read(neteaseAuthProvider);
       final nowKey = dailyShelfDayKey(DateTime.now());
       if (account == null) {
         state = DailyShelfState(dayKey: nowKey, ready: true);
-        return;
+        return state.today;
       }
       final uid = account.userId;
       if (state.userId != uid) {
@@ -97,9 +102,9 @@ class DailyShelfNotifier extends Notifier<DailyShelfState> {
       }
       if (!force && state.dayKey == nowKey && state.today.isNotEmpty) {
         state = state.copyWith(ready: true, loading: false, clearError: true);
-        return;
+        return state.today;
       }
-      if (_inflight) return;
+      if (_inflight) return state.today;
       _inflight = true;
       state = state.copyWith(loading: true, dayKey: nowKey, clearError: true);
       try {
@@ -114,19 +119,31 @@ class DailyShelfNotifier extends Notifier<DailyShelfState> {
             ),
           );
         }
-        state = _fromDays(uid, nowKey, const DailyShelfStore().days(uid));
+        // 以本次网络结果为准构造状态（不依赖磁盘回读：put 失败 / 磁盘不可写
+        // 时不至于把当天推荐显示为空）；历史仍从磁盘归档取。
+        final shelf = _fromDays(uid, nowKey, const DailyShelfStore().days(uid));
+        state = (tracks.isNotEmpty && shelf.today.isEmpty)
+            ? DailyShelfState(
+                userId: uid,
+                dayKey: nowKey,
+                today: tracks,
+                history: shelf.history,
+                ready: true,
+              )
+            : shelf;
       } catch (e) {
         state = state.copyWith(loading: false, ready: true, error: '$e');
       } finally {
         _inflight = false;
       }
+      return state.today;
     } finally {
       keepAlive.close();
     }
   }
 
-  /// 强制刷新今日推荐。
-  Future<void> refresh() => ensure(force: true);
+  /// 强制刷新今日推荐；返回刷新后的当日曲目。
+  Future<List<Track>> refresh() => ensure(force: true);
 
   DailyShelfState _fromDays(String uid, String nowKey, List<DailyShelfDay> days) {
     DailyShelfDay? today;
