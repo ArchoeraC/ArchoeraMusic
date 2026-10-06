@@ -20,6 +20,11 @@ import 'package:archoera_music/services/security/vault_process.dart';
 ///   （指向测试构建 + 显式启用其明文存储；先跑 core/vault/build-test.sh）。
 ///   crash 用例建议 ARCHOERA_VAULT_NO_ABORT=1（否则 fail-closed 会终止测试进程）。
 void main() {
+  // 标记校验类用例要求 ARCHOERA_VAULT_BIN 指向 TEST 构建（见文件头运行前提）；
+  // 未设置时 dev 兜底会解析到 PROD 二进制 → 标记断言必然失败，跳过（CI 会设）。
+  final skipNoTestBin = Platform.environment['ARCHOERA_VAULT_BIN'] == null
+      ? '需要 ARCHOERA_VAULT_BIN 指向测试构建（见文件头运行前提）'
+      : null;
   test('正常会话：set/get 中文往返 + marker=ok', () async {
     final tmp = await Directory.systemTemp.createTemp('vault_v4_normal');
     addTearDown(() => tmp.deleteSync(recursive: true));
@@ -113,7 +118,7 @@ void main() {
         reason: 'crash 标记应被消费');
     expect(VaultProcess.consumeCrashMarker(tmp.path), isFalse,
         reason: '消费后文件应删除');
-  });
+  }, skip: skipNoTestBin);
 
   test('v4 后端指纹不配对 → serve 报 SHARE_BACKEND_MISMATCH（明确错误码）', () async {
     final tmp = await Directory.systemTemp.createTemp('vault_v4_backend');
@@ -165,5 +170,5 @@ void main() {
     expect(resp2, startsWith('ok handshake'), reason: '配对后端应解锁');
     p2.stdin.close();
     await p2.exitCode.timeout(const Duration(seconds: 5));
-  });
+  }, skip: skipNoTestBin);
 }

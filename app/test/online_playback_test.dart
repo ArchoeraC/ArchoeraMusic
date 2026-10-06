@@ -18,6 +18,9 @@ import 'package:archoera_music/services/playback/pcm_analyzer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // 端到端在线用例：需真实网络 + 已构建的引擎 .so + 可匿名播放的样本，非默认
+  // 口径（CI 仅跑 widget_test.dart）。默认跳过，设 ARCHOERA_ONLINE_TEST=1 启用。
+  final onlineEnabled = Platform.environment['ARCHOERA_ONLINE_TEST'] == '1';
   test(
     '在线歌曲直连播放链路（取 URL → C 引擎完整转码 → WAV）',
     () async {
@@ -78,6 +81,9 @@ void main() {
         await engine.stop();
       }
     },
+    skip: onlineEnabled
+        ? null
+        : '端到端在线测试：需网络+引擎，设 ARCHOERA_ONLINE_TEST=1 启用',
     timeout: const Timeout(Duration(seconds: 200)),
   );
 }
