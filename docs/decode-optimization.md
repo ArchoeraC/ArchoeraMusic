@@ -356,3 +356,28 @@ Ogg + mka + m4a(Opus) 共 9 个语料，改动前后引擎输出 WAV **md5 完�
 > 受「与 libopus 逐位一致」约束，暂不融合。回退（实测无收益/负收益）：尝试把
 > `norm` 归约改为向量累加——会改变浮点累加顺序，**破坏逐位一致**，不做。
 
+### 12.4 续（同日）：去加重批量 / SILK·Hybrid 输出路径 / 公共地板
+
+在 §12 基础上继续（仍全程逐位一致），逐条实测：
+
+| 改动 | 位置 | 说明 |
+|---|---|---|
+| 去加重批量转换 | `celt.deemphasis`（accum=0） | IIR 仍串行，8 个 `r` 攒起来一次性做 f32 转换+存储，消逐样本 `cvtsi2ss`/`mulss` |
+| 立体声合并 / 归一化缩放 | `pvq.stereoMerge` / `renormalizeVector` | 独立 lane 向量化 |
+| SILK·Hybrid 输出 | `lib.interleaveOut` / `decodeSilkFrame` | i16 交错、`f32(ch48)·2⁻¹⁵+out_f`→s16 叠加改 8-lane 批量 |
+| 公共 PCM 地板 | `pcm/convert.zig` | 16/32-bit 整型→f32 归一化改 8-lane 向量（小端直载、大端 `@byteSwap`） |
+
+| 语料 | 改动前（本轮） | 最终 | Δ |
+|---|---|---|---|
+| ind.opus（CELT） | 5.113G | **3.514G** | **−31.3%**（cycles 2.012G → 1.33G） |
+| op_mono | 2.949G | 2.269G | −23.1% |
+| op_silk | 3.303G | 2.650G | −19.8% |
+| op_hybrid | 4.886G | 3.347G | −31.5% |
+
+**回退（实测无收益/负收益，不留代码）**：
+- `cwrsi` 的 `norm` 由 f32 顺序累加改整数累加（理论上 Σval²≤K²<2²⁴ 可精确等价）——
+  实测 **+0.17%（略降）**，整数 `imul`+`u64` 加与额外溢出判断不比 `cvtsi2ss`+`mulss` 划算，回退。
+- `iirFir`/`up2HQ`（SILK 重采样）为整数串行 IIR/FIR，跨样本/相位无独立 lane，未动。
+
+
+
