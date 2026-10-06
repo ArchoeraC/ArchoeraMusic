@@ -260,18 +260,21 @@ mixin _PlaybackNotifierLoading
   /// `engineMemoryPlay`（内存播放偏好）开且 [source] 为 http(s) 在线 URL
   /// （非本地文件 / SongCache 命中路径）时才尝试 Dart 下载 → SegStore 纯内存会话。
   ///
-  /// **直传 / 流媒体源（Neko、Subsonic/Jellyfin）跳过整首内存门禁**：其文件多为
-  /// 大体积无损（>64 MiB 会触发内存门禁弹窗），且没有平台直链缓存路径（NT/KG 有
-  /// SongCache 兜底），于是每次播放都要整首拉流——起播慢、大文件还会弹确认框。
-  /// 改为引擎 URL 直连流式（直链支持 Range/206，FFmpeg 按需拉流，起播快且同样不落盘）。
+  /// **Neko 与 NT/KG/QQ 同等对待**：同样走「Dart 整首拉流 → C 侧 SegStore →
+  /// 引擎内存源解码」；Neko 直链自带 302→站内媒体、支持 Range/静态直传，整首
+  /// 驻留后引擎从内存解码，不再由 FFmpeg 自联网。
   ///
-  /// **N1 开关**：[_preferStreamDirect] 开启时，其余在线源（NT/KG/QQ 等注册表源）
+  /// **仅流媒体源（Subsonic/Jellyfin）跳过整首内存门禁**：其文件多为大体积无损
+  /// 且无平台直链缓存兜底，改走引擎 URL 直连流式（直链自带鉴权、支持 Range/206，
+  /// FFmpeg 按需拉流，起播快且同样不落盘）。
+  ///
+  /// **N1 开关**：[_preferStreamDirect] 开启时，其余在线源（NT/KG/QQ/Neko 等注册表源）
   /// 同样跳过整首预下载 → 引擎直连（内核经宿主回调消费字节，零网络栈不变）。
   bool _memorySourceEligible(String source, Track? track) {
     if (source.isEmpty) return false;
     final src = track?.source;
     if (_preferStreamDirect(src)) return false;
-    if (src == 'neko' || src == 'streaming') return false;
+    if (src == 'streaming') return false;
     if (!ref.read(appPrefsProvider).engineMemoryPlay) return false;
     return source.startsWith('http://') || source.startsWith('https://');
   }

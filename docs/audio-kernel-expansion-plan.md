@@ -99,6 +99,10 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
   传输，EraAudio 模式下的 **http(s) 源**直接进自研内核（此前一律回退 FFmpeg）；
 - `Reader.callback` 两处缺陷（大请求丢预读、seek 后游标不同步）已修并有单测；
 - EraSync 常驻池覆盖 path/mem/cb 三源（`zk_engine_open_mem/_cb`）；
+- **（2026-10-01 追加）内核原生 HTTP(S)**：`kernel/net.zig` 自带 URL 解析 / TCP / TLS /
+  Range / 重定向 / chunked；在线直链在 EraAudio 模式下**优先**走原生 HTTP（`native-http`），
+  失败回退宿主 AVIO（`ffmpeg-avio`）、再回退 FFmpeg。宿主注入由「唯一路径」变为「回退路径」。
+  常驻池覆盖 path/mem/cb/**url**（`zk_engine_open_url`）；`ARCHOERA_ERA_NATIVE_HTTP=0` 可关闭；
 - 详见 `audio-kernel-zig.md` §6.1 落地块。
 
 ### 3.2 待做
@@ -109,12 +113,17 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 | N2 | **Range seek 完整化** | `on_seek` 发 Range 重定位；验证远端 seek 与本地逐样本一致（含 EOF 后 seek） |
 | N3 | **断流 / 超时 / 重连** | `Reader.abort()` 中断、缓冲欠载、宿主重试的语义与错误上报 |
 | N4 | **缓冲策略** | 每路 callback Reader 私有缓冲与目标内存预算（对齐 `audio-memory-source.md`） |
-| N5 | **去 FFmpeg 传输依赖（可选）** | 传输层由宿主注入是 P2 允许的；评估是否用纯宿主实现替代 FFmpeg AVIO，彻底摆脱 FFmpeg 传输栈 |
+| N5 | **去 FFmpeg 传输依赖（可选）** | ✅ **在线直链部分已落（2026-10-01）**：改由**内核原生 HTTP(S)**（`kernel/net.zig`）优先传输（非“纯宿主”方案），不再经 FFmpeg AVIO；宿主 AVIO 保留为回退。可选后续：本地/封装侧是否也摆脱 FFmpeg 传输栈 |
 | N6 | **格式覆盖** | 确认 cb 路径下各接管格式（flac/wav/mp3/opus…）seek/时长语义一致 |
 
 ### 3.3 红线
 
-- **P2 零网络栈不变**：socket/TLS/Range/重定向**一律宿主注入**，内核只经 `callback` 消费字节流；
+- **宿主注入是回退基线**：`Reader.callback`（on_read/on_seek + Range）由宿主（C 壳 FFmpeg AVIO）
+  注入字节流，任何组合都不丢播放能力——这是**必须保留**的兜底；
+- **内核原生网络已主动扩展（2026-10-01，非红线）**：`kernel/net.zig` 自带 URL 解析 / TCP / TLS /
+  Range / 重定向 / chunked（`zk_decoder_open_url` / `zk_engine_open_url`），在线直链**优先**走它；
+  故早期 P2「内核零网络栈、传输一律宿主注入」**不再是硬红线**，改为「宿主注入为默认回退、原生 HTTP 为可选优先」；
+  `ARCHOERA_ERA_NATIVE_HTTP=0` 可关闭并完全回到宿主注入（详见 `audio-kernel-zig.md` §6.1）；
 - 不支持网络栈时退回「预下载本地」（现状默认路径），任何组合不丢播放能力。
 
 ---
@@ -233,7 +242,8 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 1. **方向② 应用侧接线 + Range seek 完整化** —— ✅ **N1–N3/N6 已落**
    （`Reader.seek` 重写、cb 流 ogg 时长、宿主 AVIO 中断/超时/有界重连、传输错误改判
    `ZK_IO_ERROR`、`test_native_callback_seek`；N1 做成 `ARCHOERA_STREAM_DIRECT` 灰度开关，
-   **默认未改**）。N4 仅设计说明、N5（去 FFmpeg 传输栈）未做。
+   **默认未改**）。N4 仅设计说明；N5（去 FFmpeg 传输栈）~~未做~~ **后于 2026-10-01
+   部分落地**（在线直链改由内核原生 HTTP 优先，见 §3.1/§3.3）。
 2. **方向① 地基（DSP 下沉 Zig）** —— ✅ **地基已落**（`kernel/dsp/`：EQ/限幅/响度，
    与 C 参考**逐位一致**，17 个 `zk_dsp_*`，C 壳可路由且保留回退）；`fft/resampler/tempo`
    仅接口占位。**D1/D2 及 D3–D8 未做**（D3–D8 属待定项）。
@@ -283,7 +293,7 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 ## 8. 不变量与红线（汇总）
 
 - `archoera_mediaengine.h` 导出符号 / JSON 协议 / `libfft.so` ABI / `stream.wav/.pcm` 格式**不变**（P5）；
-- 内核**零网络栈**，传输宿主注入（P2）；视频解码不做（P4）；
+- 在线传输：宿主注入（FFmpeg AVIO）为**回退基线**，内核原生 HTTP(S)（`kernel/net.zig`，2026-10-01）为**可选优先**，`ARCHOERA_ERA_NATIVE_HTTP=0` 可关闭；视频解码不做（P4）；
 - 无损逐位、有损 corr 门禁；零新增缓冲；B 档需授权；
 - 内核符号 `era_` 前缀，不照搬上游标识符；
 - 系统调用走 `app/native/platform` 桥接，Dart 不直连平台。

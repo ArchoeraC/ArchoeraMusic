@@ -59,8 +59,8 @@
         <li><div class="node"><span class="d">Dart 编排</span>：PlaybackNotifier · <code>resolvePlaySource</code>
           <span class="tag">SourcePlatform 注册表：NT/KG/QQ/Neko/local/streaming</span></div></li>
         <li><div class="node"><span class="d">C 壳</span> <code>pipeline.c</code>：会话 · PCM 落盘或内存 · miniaudio 自播 · 事件 FIFO</div></li>
-        <li><div class="node"><span class="d">传输（宿主注入）</span>：本地文件 · <code>mem</code> · <code>cb</code>（FFmpeg AVIO / HTTP Range）
-          <span class="tag">内核零网络栈</span></div></li>
+        <li><div class="node"><span class="d">传输</span>：本地路径 · <code>mem</code>（SegStore 内存源） · <code>cb</code>（宿主 AVIO） · <b>原生 HTTP(S)</b>（<code>kernel/net.zig</code>，在线直链优先）
+          <span class="tag">宿主注入为回退基线</span></div></li>
         <li><div class="node"><span class="d">解码</span>：EraAudio（已接管格式 flac/mp3/aac/opus/vorbis/mka/dts/tta/spx/shn/mpc…） ↔ FFmpeg 兜底</div></li>
         <li><div class="node"><span class="d">DSP</span>：EQ / limiter / loudness（<code>kernel/dsp</code>；B 档向量化，与 C 逐位一致）</div></li>
         <li><div class="node"><span class="d">频谱</span>：<code>libfft.so</code>（Dart 拉窗）</div></li>
@@ -107,7 +107,7 @@
     <li class="edge">
       <div class="node"><span class="k">③ 边界与红线</span></div>
       <ul class="tree">
-        <li><div class="node"><b>内核零网络栈</b>：socket/TLS/Range/重定向一律宿主注入，内核只消费字节</div></li>
+        <li><div class="node"><b>在线传输</b>：宿主注入（FFmpeg AVIO，<code>cb</code>）为<b>回退基线</b>；内核<b>原生 HTTP(S)</b>（<code>kernel/net.zig</code>，2026-10-01）为<b>可选优先</b>——socket/TLS/Range/重定向由 <code>zk_decoder_open_url</code> 自持，失败回退宿主 → FFmpeg；<code>ARCHOERA_ERA_NATIVE_HTTP=0</code> 可关闭</div></li>
         <li><div class="node"><b>扫描元数据不进池</b>：同步直桥 → 不占 EraSync 槽；与播放仅 CPU/内存/磁盘/网络竞争</div></li>
         <li><div class="node"><b>播放池有界</b>：线程 ≤ <code>max_workers</code>(+1 Master)；快速任务要么早停、要么到 cap 即拒</div></li>
         <li><div class="node"><b>QoS 缺口</b>：全局队列 FCFS、无优先级/无抢占 → 批量可能拖累播放；<span class="warn">AS4（播放优先/保留 worker/批量节流）未做</span></div></li>

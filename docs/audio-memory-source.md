@@ -1,12 +1,16 @@
 # 在线播放内存源（Dart 拉流 → 引擎内存源）设计定稿
 
-> 状态：**设计定稿（2026-09-08），未实现**
+> 状态：**设计定稿（2026-09-08）；主体已落地**（M2.2 整首内存源 + M3 门禁/弹窗，
+> 未竟项见文末附录）
 >
 > 背景修正：应用层请求（含音频 URL 解析）本来就在 Dart；音频字节的“取”也应回到
-> Dart（不再让引擎自建联网）。2026-09-08 决策：**撤销/搁置**独立 HTTP 模块与
-> EraAudio URL 内核方向（C++ BearSSL/TLS、代理、URL gate、Workflow 步骤均不作，
-> 已回滚至 3 提交基线）。在线纯内存播放改为「Dart 分段拉流 → C 层内存源
-> SegmentStore → FFmpeg/EraAudio 从同一 Store 解码」。
+> Dart。2026-09-08 决策曾**撤销/搁置**当时那版独立的 C++ HTTP 模块与 EraAudio URL
+> 内核方向（C++ BearSSL/TLS、代理、URL gate、Workflow 步骤均不作，已回滚至 3 提交基线）。
+> **注意（2026-10-01）**：该“搁置”只针对上述 C++ 尝试——其后以 Zig 标准库另起的
+> **内核原生 HTTP(S)**（`kernel/net.zig`，`zk_decoder_open_url` / `zk_engine_open_url`）
+> 已落地，并成为在线直链的**优先**传输（详见 `audio-kernel-zig.md` §6.1）。本稿的
+> 「Dart 分段拉流 → C 层内存源 SegmentStore → 引擎从同一 Store 解码」是与之**并行、
+> 且内核侧零网络**的另一条在线路径（整曲驻留、PCM 不落盘），不是唯一在线方案。
 >
 > 关联：`docs/audio-memory-playback.md`（解码 PCM 内存播放语义）、
 > `docs/audio-kernel-zig.md` §4.3/§16（kernel 不变式，本稿不改文件解码路径）。
@@ -31,12 +35,14 @@
 |---|---|
 | 本地文件 | 本地路径 → `create(source)`（现状不变） |
 | 在线 + SongCache 命中（kugou/netease） | 本地缓存路径 → `create(source)` |
-| 在线 + 缓存关 / 未命中 / qqmusic | **Dart 拉流 → SegmentStore → 引擎内存源**（本稿） |
-| **直传 / 流媒体在线**（`neko` / `streaming`(Subsonic/Jellyfin)） | **引擎 URL 直连流式**（不经 SegmentStore）：直链自带鉴权、支持 Range/206，FFmpeg 按需拉流，起播快且 PCM 同样不落盘 |
+| 在线 + 缓存关 / 未命中 / qqmusic / neko | **Dart 拉流 → SegmentStore → 引擎内存源**（本稿） |
+| **流媒体在线**（`streaming`(Subsonic/Jellyfin)） | **引擎 URL 直连流式**（不经 SegmentStore）：直链自带鉴权、支持 Range/206，引擎按需拉流（EraAudio 原生 HTTP / FFmpeg），起播快且 PCM 同样不落盘 |
 
-> 直传/流媒体源跳过整首内存门的理由：其文件多为大体积无损，且无平台直链缓存兜底；
+> 流媒体源跳过整首内存门的理由：其文件多为大体积无损，且无平台直链缓存兜底；
 > 若先整首拉进 SegmentStore 再解码，起播慢、大文件还会触发内存门禁弹窗。改为 URL 直连后
 > 与「不落盘」语义一致（`engineMemoryPlay` 只约束 PCM 是否落盘，与源形态正交）。
+> **Neko 已与 NT/KG/QQ 同等对待**（2026-10-06）：其直链 302→站内媒体、支持 Range/静态直传，
+> 走整首 SegmentStore 后引擎从内存解码，不再由引擎自联网（FFmpeg 或内核原生 HTTP）。
 >
 > **流媒体转码档位（2026-09-21）**：设置「媒体源」页可选 **原文件（默认）/ 高 320k / 中 192k / 低 128k**。
 > 仅使用**标准参数**以保证兼容——Subsonic 系（Navidrome/Airsonic/Subsonic…）用

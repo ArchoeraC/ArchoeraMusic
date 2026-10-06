@@ -179,11 +179,11 @@
   </div>
 
   <ul>
-    <li><b>内核零网络栈</b>：socket/TLS/Range/重定向一律<b>宿主注入</b>（播放抓流由 FFmpeg AVIO；回调只消费字节）。</li>
+    <li><b>在线传输</b>：宿主注入（FFmpeg AVIO，回调只消费字节）为<b>回退基线</b>；内核<b>原生 HTTP(S)</b>（<code>kernel/net.zig</code>，2026-10-01）为<b>可选优先</b>——socket/TLS/Range/重定向由内核自持，失败回退宿主 → FFmpeg，<code>ARCHOERA_ERA_NATIVE_HTTP=0</code> 可关闭。</li>
     <li><b>扫描元数据不进池</b>：<code>zk_metadata_open</code> 是同步直桥 → 不占 EraSync 槽；与播放的耦合只是 <b>CPU/内存/磁盘/网络</b> 竞争。</li>
     <li><b>播放池有界</b>：线程数 ≤ <code>max_workers</code>(+1 Master)；`submit` 只发提示、Master 异步补建；满 cap 即拒、积压消失早停。</li>
     <li><b>QoS 缺口</b>：全局队列 FCFS、无优先级/无抢占 → 批量可能拖累播放；<b>AS4</b>（播放优先 / 保留 worker / 批量节流）尚未实现。</li>
-    <li>其它未做：AS2 的 ring 直推与「C 壳 1 会话 1 引擎线程」替换、N4 每路 Reader 缓冲预算。</li>
+    <li>其它未做：AS2 的 ring 直推与「C 壳 1 会话 1 引擎线程」替换（N4 每路 Reader 缓冲预算已于 2026-09-23 落地）。</li>
   </ul>
 </div>
 
