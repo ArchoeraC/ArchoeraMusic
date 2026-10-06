@@ -34,6 +34,7 @@ const silk = @import("silk.zig");
 const celt = @import("celt.zig");
 const celt_types = @import("celt_types.zig");
 const tables = @import("celt_tables.zig");
+const opus_vec = @import("vec.zig");
 
 const VTable = decoder.Decoder.VTable;
 const OpusHead = opus_header.Head;
@@ -251,22 +252,32 @@ fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) E
             if (!try decodeNextPacket(f)) break;
         }
         while (produced < cap and f.pcm_pos < f.pcm_len) {
+            // 批量丢弃 pre-skip（整段，而非逐样本）
             if (f.pre_skip_left > 0) {
-                f.pre_skip_left -= 1;
-                f.pcm_pos += 1;
+                const drop = @min(f.pre_skip_left, f.pcm_len - f.pcm_pos);
+                f.pre_skip_left -= drop;
+                f.pcm_pos += drop;
                 continue;
             }
             if (f.total_valid != 0 and f.samples_done >= f.total_valid) {
                 f.pcm_pos = f.pcm_len;
                 break;
             }
+            // 批量拷贝 `pcm_buf` 连续段 → out（整段 @memcpy，替代逐样本）
+            var n = @min(cap - produced, f.pcm_len - f.pcm_pos);
+            if (f.total_valid != 0) n = @min(n, @as(usize, @intCast(f.total_valid - f.samples_done)));
+            if (n == 0) {
+                if (f.total_valid != 0 and f.samples_done >= f.total_valid) f.pcm_pos = f.pcm_len;
+                break;
+            }
             const si = f.pcm_pos * @as(usize, f.channels);
-
-            const dst = out[produced * frame_bytes ..][0..frame_bytes];
-            @memcpy(dst, std.mem.sliceAsBytes(f.pcm_buf[si .. si + f.channels]));
-            f.pcm_pos += 1;
-            f.samples_done += 1;
-            produced += 1;
+            @memcpy(
+                out[produced * frame_bytes ..][0 .. n * frame_bytes],
+                std.mem.sliceAsBytes(f.pcm_buf[si .. si + n * f.channels]),
+            );
+            f.pcm_pos += n;
+            f.samples_done += n;
+            produced += n;
         }
     }
     return produced;
@@ -537,10 +548,25 @@ fn decodeCeltPacket(f: *OpusCtx, pp: *const opus_packet.Packet) Error!void {
         var out_f: [2][960]f32 = std.mem.zeroes([2][960]f32);
         const n_ch = celt.decodeFrame(&f.celt_f, &rc, .{ out_f[0][0..pp.frame_size], out_f[1][0..pp.frame_size] }, @intCast(@as(usize, 1) + @intFromBool(pp.stereo)), pp.frame_size, 0, end_band, false) catch |e| return e;
 
-        for (0..pp.frame_size) |i| {
-            for (0..f.channels) |c| {
-                const src: usize = if (c < n_ch) c else 0;
-                f.pcm_buf[(written + i) * f.channels + c] = f32ToS16(out_f[src][i]);
+        if (f.channels == 2 and n_ch == 2) {
+            // 常见路径（CELT 立体声）：f32→s16 批量转换 + 立体声交错（逐 lane 独立，
+            // 位级等同标量 f32ToS16）。
+            var i: usize = 0;
+            while (i + 8 <= pp.frame_size) : (i += 8) {
+                const l = opus_vec.f32ToS16x8(opus_vec.load8(out_f[0][i..].ptr));
+                const r = opus_vec.f32ToS16x8(opus_vec.load8(out_f[1][i..].ptr));
+                opus_vec.store16i16(f.pcm_buf[(written + i) * 2 ..].ptr, opus_vec.interleave8(l, r));
+            }
+            while (i < pp.frame_size) : (i += 1) {
+                f.pcm_buf[(written + i) * 2 + 0] = f32ToS16(out_f[0][i]);
+                f.pcm_buf[(written + i) * 2 + 1] = f32ToS16(out_f[1][i]);
+            }
+        } else {
+            for (0..pp.frame_size) |i| {
+                for (0..f.channels) |c| {
+                    const src: usize = if (c < n_ch) c else 0;
+                    f.pcm_buf[(written + i) * f.channels + c] = f32ToS16(out_f[src][i]);
+                }
             }
         }
 
