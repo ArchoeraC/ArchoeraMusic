@@ -229,6 +229,15 @@ public static class Program
 
         var duration = (long)Math.Round(tag.Properties.Duration.TotalMilliseconds);
 
+        // 内容有效性：有体积但无实际音频内容（时长为 0）→ 视为伪造/空壳，拒绝
+        // （与 ScannerEngine.ParseFile 的 empty_audio 判定一致，且避免写出无主封面）。
+        if (duration <= 0)
+        {
+            Log.LogWarn("scanner",
+                $"跳过无实际音频内容的文件（疑似伪造/空壳）: {filePath} (size={info.Length})");
+            return null;
+        }
+
         string? cover = null;
         var pictures = tag.Tag.Pictures;
         if (pictures != null && pictures.Length > 0)
