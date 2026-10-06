@@ -300,6 +300,7 @@ class _HeaderCover extends StatelessWidget {
         fit: BoxFit.cover,
         cacheWidth: (96 * MediaQuery.devicePixelRatioOf(context)).round(),
         cacheHeight: (96 * MediaQuery.devicePixelRatioOf(context)).round(),
+        headers: mediaHeadersForUrl(c),
         errorBuilder: (_, _, _) => placeholder,
         loadingBuilder: (context, child, progress) =>
             progress == null ? child : placeholder,

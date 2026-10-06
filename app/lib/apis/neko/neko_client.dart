@@ -19,6 +19,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../services/neko/neko_identity.dart';
+
 /// 默认服务器地址（可在设置中修改）。
 const String kDefaultNekoBaseUrl = 'https://music.nekocore.cn';
 
@@ -105,6 +107,7 @@ class NekoClient {
 
   void _applyHeaders(HttpClientRequest req, String? contentType) {
     req.headers.set(HttpHeaders.acceptHeader, 'application/json');
+    nekoRequestHeaders.forEach(req.headers.set);
     if (contentType != null) {
       req.headers.set(HttpHeaders.contentTypeHeader, contentType);
     }
@@ -199,6 +202,7 @@ class NekoClient {
     try {
       final req = await client.getUrl(_uri(path)).timeout(_timeout);
       req.headers.set(HttpHeaders.rangeHeader, 'bytes=0-${maxBytes - 1}');
+      nekoRequestHeaders.forEach(req.headers.set);
       final res = await req.close().timeout(_timeout);
       if (res.statusCode != 200 && res.statusCode != 206) {
         return const [];
@@ -223,6 +227,7 @@ class NekoClient {
     try {
       final req = await client.getUrl(_uri(path)).timeout(_timeout);
       req.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
+      nekoRequestHeaders.forEach(req.headers.set);
       final t = token;
       if (t != null && t.isNotEmpty) {
         req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $t');

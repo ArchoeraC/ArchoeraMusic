@@ -45,6 +45,7 @@ import '../lyrics/sources/qqmusic_lyric_source.dart';
 import '../lyrics/sources/streaming_lyric_source.dart';
 import '../netease/netease_api.dart';
 import '../netease/track.dart';
+import '../neko/neko_identity.dart';
 import '../neko/neko_quality.dart';
 import '../../utils/format.dart';
 import '../streaming/streaming_client.dart';
@@ -187,6 +188,12 @@ abstract class SourcePlatform {
 
   /// 歌曲缓存落盘时携带的 Referer（可空串）。
   String get songCacheReferer => '';
+
+  /// 本源音频拉流（内存源 / 缓存下载）需附加的请求头。
+  ///
+  /// 默认空；NekoMusic 走本站 `/api/*`，需带客户端标识头以通过防爬（见
+  /// `services/neko/neko_identity.dart`）。
+  Map<String, String> get mediaHeaders => const {};
 
   /// 播放失败时是否允许自动换源（搜索另一平台同名曲重试）。
   /// local / streaming 不参与。
@@ -784,6 +791,10 @@ class _QqSource extends SourcePlatform {
 class _NekoSource extends SourcePlatform {
   @override
   String get source => 'neko';
+
+  /// NekoMusic 走本站 `/api/*`：音频拉流带客户端标识头（UA + X-Neko-Client）。
+  @override
+  Map<String, String> get mediaHeaders => nekoRequestHeaders;
 
   @override
   Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async {

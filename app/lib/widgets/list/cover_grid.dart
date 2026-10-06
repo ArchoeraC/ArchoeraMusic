@@ -5,6 +5,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../services/netease/netease_api.dart';
+import '../../services/source/media_request_headers.dart';
 import '../../easter_egg/mouse_dodge.dart';
 import '../../l10n/l10n.dart';
 import '../common/anim.dart';

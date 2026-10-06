@@ -94,6 +94,27 @@ typedef _CreateDart =
       Pointer<Utf8>,
       int,
     );
+// 带头部的创建（archoera_mediaengine_create_with_headers：source, headers, cfg, …）
+typedef _CreateHeadersNative =
+    Pointer<Opaque> Function(
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<EngineConfigC>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Int32,
+    );
+typedef _CreateHeadersDart =
+    Pointer<Opaque> Function(
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<EngineConfigC>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      int,
+    );
 typedef _CommandNative = Int32 Function(Pointer<Opaque>, Pointer<Utf8>);
 typedef _CommandDart = int Function(Pointer<Opaque>, Pointer<Utf8>);
 typedef _PollEventNative =
@@ -214,6 +235,20 @@ class EngineBindings {
       .lookupFunction<_CreateNative, _CreateDart>(
         'archoera_mediaengine_create',
       );
+  /// `archoera_mediaengine_create_with_headers`（在线源请求头）；旧库缺符号 → null，
+  /// [create] 自动回退不带头的 `archoera_mediaengine_create`。
+  late final _CreateHeadersDart? _createWithHeaders =
+      _tryLookupCreateWithHeaders();
+
+  _CreateHeadersDart? _tryLookupCreateWithHeaders() {
+    try {
+      return _lib.lookupFunction<_CreateHeadersNative, _CreateHeadersDart>(
+        'archoera_mediaengine_create_with_headers',
+      );
+    } catch (_) {
+      return null;
+    }
+  }
   late final _CommandDart _command = _lib
       .lookupFunction<_CommandNative, _CommandDart>(
         'archoera_mediaengine_command',
@@ -286,28 +321,46 @@ class EngineBindings {
   ///
   /// [config] 为 [EngineConfigC.fromParams] 分配的指针，本调用不负责释放，
   /// 由调用方在返回后 `calloc.free(config)`。
+  ///
+  /// [headers]：在线 URL 的额外请求头（`\n` 分行的 `Name: value`；null/空 = 无）。
+  /// 由引擎透传给 native HTTP(S) 与 FFmpeg http/tls，用于携带客户端标识。
   Pointer<Opaque> create({
     required String source,
+    String? headers,
     required String sessionDir,
     String? playerFile,
     required Pointer<EngineConfigC> config,
   }) {
     final src = source.toNativeUtf8();
+    final hasHeaders = headers != null && headers.isNotEmpty;
+    final hdr = hasHeaders ? headers.toNativeUtf8() : nullptr;
     final dir = sessionDir.toNativeUtf8();
     final pf = (playerFile ?? '').toNativeUtf8();
     final errBuf = calloc<Uint8>(128);
-    final h = _create(
-      src,
-      config,
-      playerFile == null ? nullptr : pf,
-      dir,
-      errBuf.cast(),
-      128,
-    );
+    final withHeaders = _createWithHeaders;
+    final h = (hasHeaders && withHeaders != null)
+        ? withHeaders(
+            src,
+            hdr,
+            config,
+            playerFile == null ? nullptr : pf,
+            dir,
+            errBuf.cast(),
+            128,
+          )
+        : _create(
+            src,
+            config,
+            playerFile == null ? nullptr : pf,
+            dir,
+            errBuf.cast(),
+            128,
+          );
     final errMsg = h == nullptr
         ? errBuf.cast<Utf8>().toDartString().trim()
         : '';
     calloc.free(src);
+    if (hasHeaders) calloc.free(hdr);
     calloc.free(dir);
     calloc.free(pf);
     calloc.free(errBuf);

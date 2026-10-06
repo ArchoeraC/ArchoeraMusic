@@ -125,6 +125,14 @@ ZkDecoder *zk_decoder_open_url(const char *url, ZkInfo *info,
                                char *errbuf, int errbuf_size);
 
 /**
+ * 同 [zk_decoder_open_url]，另附带自定义请求头 [headers]（`\n`/`\r\n` 分行；
+ * NULL = 无）。供宿主按源注入 `X-Neko-Client` / `User-Agent` 等标识（如
+ * NekoMusic 防爬）。headers 生命周期仅本调用内。
+ */
+ZkDecoder *zk_decoder_open_url_headers(const char *url, const char *headers, ZkInfo *info,
+                                       char *errbuf, int errbuf_size);
+
+/**
  * 解码最多 max_frames 帧 float32 交错 PCM。
  * @return >=0：实际输出帧数（0 = EOF，正常文件尾）；
  *         <0：解码错误，返回值 = -（enum ZkStatus 状态码），
@@ -345,6 +353,14 @@ ZkEngineStream *zk_engine_open_cb(ZkEngine *h, void *ctx,
  */
 ZkEngineStream *zk_engine_open_url(ZkEngine *h, const char *url,
                                    ZkInfo *info, char *errbuf, size_t errbuf_size);
+
+/**
+ * 同 [zk_engine_open_url]，另附带自定义请求头 [headers]（`\n`/`\r\n` 分行；
+ * NULL = 无）。供宿主按源注入 `X-Neko-Client` / `User-Agent` 等标识。headers
+ * 生命周期仅本调用内（内核会复制保留至会话关闭）。
+ */
+ZkEngineStream *zk_engine_open_url_headers(ZkEngine *h, const char *url, const char *headers,
+                                           ZkInfo *info, char *errbuf, size_t errbuf_size);
 
 /**
  * 中断流式会话（供 stop/SIGTERM 路径调用）：仅对 [zk_engine_open_url] 打开的

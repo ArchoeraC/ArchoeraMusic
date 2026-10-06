@@ -70,6 +70,20 @@ ARCHOERA_MEDIAENGINE_API ArchoeraMediaEngine *archoera_mediaengine_create(
                                      char *errbuf, int errbuf_size);
 
 /**
+ * 同 [archoera_mediaengine_create]，另按源注入在线 URL 的额外请求头 [headers]
+ * （`\n`/`\r\n` 分行的 `Name: value`；NULL = 无）。原生 HTTP(S) 与 FFmpeg
+ * http/tls 路径均会带上，用于携带客户端标识（如 NekoMusic 的 `X-Neko-Client`）；
+ * 字符串会复制保存至会话销毁。
+ */
+ARCHOERA_MEDIAENGINE_API ArchoeraMediaEngine *archoera_mediaengine_create_with_headers(
+                                     const char *source,
+                                     const char *headers,
+                                     const EngineConfig *cfg,
+                                     const char *player_file,
+                                     const char *session_dir,
+                                     char *errbuf, int errbuf_size);
+
+/**
  * 从 SegStore 内存源创建引擎会话（docs/audio-memory-source.md M2：Dart 整曲
  * 拉流预填 → 引擎经 AVIO-mem 从同一 store 解码，source 置空）。
  *

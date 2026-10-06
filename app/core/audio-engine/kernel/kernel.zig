@@ -107,7 +107,20 @@ export fn zk_decoder_open_url(
     errbuf: [*]u8,
     errbuf_size: c_int,
 ) ?*engine.Engine {
-    return engine.zkOpenUrl(std.mem.span(url), info, errbuf, errbuf_size);
+    return engine.zkOpenUrl(std.mem.span(url), null, info, errbuf, errbuf_size);
+}
+
+/// 同 [zk_decoder_open_url]，但附带自定义请求头（`\n`/`\r\n` 分行；空指针 = 无）。
+/// 供宿主按源注入 `X-Neko-Client` / `User-Agent` 等标识。
+export fn zk_decoder_open_url_headers(
+    url: [*:0]const u8,
+    headers: ?[*:0]const u8,
+    info: *engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: c_int,
+) ?*engine.Engine {
+    const h: ?[]const u8 = if (headers) |p| std.mem.span(p) else null;
+    return engine.zkOpenUrl(std.mem.span(url), h, info, errbuf, errbuf_size);
 }
 
 /// 解码最多 max_frames 帧 float32 交错到 out。
@@ -1068,9 +1081,34 @@ export fn zk_engine_open_url(
     errbuf: [*]u8,
     errbuf_size: usize,
 ) ?*Stream {
+    return engineOpenUrl(h, std.mem.span(url), null, info, errbuf, errbuf_size);
+}
+
+/// 同 [zk_engine_open_url]，但附带自定义请求头（`\n`/`\r\n` 分行；空指针 = 无）。
+/// 供宿主按源注入 `X-Neko-Client` / `User-Agent` 等标识。
+export fn zk_engine_open_url_headers(
+    h: ?*khost.Host,
+    url: [*:0]const u8,
+    headers: ?[*:0]const u8,
+    info: ?*engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: usize,
+) ?*Stream {
+    const hs: ?[]const u8 = if (headers) |p| std.mem.span(p) else null;
+    return engineOpenUrl(h, std.mem.span(url), hs, info, errbuf, errbuf_size);
+}
+
+fn engineOpenUrl(
+    h: ?*khost.Host,
+    url: []const u8,
+    headers: ?[]const u8,
+    info: ?*engine.ZkInfo,
+    errbuf: [*]u8,
+    errbuf_size: usize,
+) ?*Stream {
     const host = h orelse return null;
     if (!host.streamOpen()) return null; // max_streams 满 → InstanceLimit（errbuf 语义不变）
-    const hs = net.HttpStream.open(std.heap.c_allocator, std.mem.span(url)) catch |e| {
+    const hs = net.HttpStream.openWith(std.heap.c_allocator, url, .{ .headers = headers }) catch |e| {
         host.streamClose();
         engine.fillErrBuf(errbuf, @intCast(errbuf_size), e);
         return null;

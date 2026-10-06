@@ -133,6 +133,17 @@ AudioPipeline* pipeline_create(const char *source,
                                 void *user);
 
 /**
+ * 同 [pipeline_create]，另按源注入在线 URL 的额外请求头 [headers]
+ * （`\n`/`\r\n` 分行的 `Name: value`；NULL = 无）。原生 HTTP(S) 与 FFmpeg
+ * http/tls 路径均会带上，用于携带客户端标识（如 NekoMusic 的 `X-Neko-Client`）。
+ */
+AudioPipeline* pipeline_create_with_headers(const char *source,
+                                            const char *headers,
+                                            const EngineConfig *cfg,
+                                            OutputCallback output,
+                                            void *user);
+
+/**
  * 从 SegStore 内存源（整首已在 store，可 seek）创建管线实例
  *
  * 语义对齐 pipeline_create，仅解码源不同：store 非空时为其构造一个

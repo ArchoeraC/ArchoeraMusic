@@ -137,6 +137,7 @@ class _NekoAvatar extends StatelessWidget {
         fit: BoxFit.cover,
         cacheWidth: px,
         cacheHeight: px,
+        headers: mediaHeadersForUrl(u),
         errorBuilder: (_, _, _) => placeholder,
       ),
     );

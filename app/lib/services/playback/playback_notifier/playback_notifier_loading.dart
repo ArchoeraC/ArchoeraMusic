@@ -118,6 +118,7 @@ mixin _PlaybackNotifierLoading
     int offsetMs = 0,
   }) {
     final gen = ++_loadGen;
+    final engineHeaders = engineHeadersForTrack(track);
     // M2.3b：新 load 取代旧 → 取消上一在途整首下载（避免浪费拉流）。
     _storeFetch?.cancel();
     _storeFetch = null;
@@ -149,7 +150,10 @@ mixin _PlaybackNotifierLoading
         if (_memorySourceEligible(source, track)) {
           memoryTried = true;
           try {
-            final fetch = prepareWholeTrackStore(source);
+            final mediaHeaders = track == null
+                ? const <String, String>{}
+                : sourcePlatform(track.source).mediaHeaders;
+            final fetch = prepareWholeTrackStore(source, headers: mediaHeaders);
             _storeFetch = fetch;
             final r = await fetch.done;
             if (_storeFetch == fetch) _storeFetch = null;
@@ -194,6 +198,7 @@ mixin _PlaybackNotifierLoading
         try {
           await _startSession(
             source,
+            headers: engineHeaders,
             offsetMs: offsetMs,
             bitrate: useBitrate,
             passthrough: passthrough,
@@ -209,6 +214,7 @@ mixin _PlaybackNotifierLoading
             _log('内存源会话启动失败，回退 URL 直连重试一次: $e');
             await _startSession(
               source,
+              headers: engineHeaders,
               offsetMs: offsetMs,
               bitrate: useBitrate,
               passthrough: passthrough,

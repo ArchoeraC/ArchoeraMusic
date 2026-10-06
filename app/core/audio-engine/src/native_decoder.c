@@ -392,7 +392,7 @@ NativeDecoder *native_decoder_open_cb(void *ctx,
  * 池启用时走 zk_engine_open_url 流式 seam（与 path/mem/cb 一致）；否则直连
  * decoder（zk_decoder_open_url）。失败返回 NULL 并由 status_out 写稳定状态码，
  * 调用方据此回退宿主 AVIO 路径 / FFmpeg 主后端。 */
-NativeDecoder *native_decoder_open_url(const char *url, NativeInfo *info,
+NativeDecoder *native_decoder_open_url(const char *url, const char *headers, NativeInfo *info,
                                        int *status_out,
                                        char *errbuf, int errbuf_size)
 {
@@ -410,7 +410,9 @@ NativeDecoder *native_decoder_open_url(const char *url, NativeInfo *info,
     /* 池启用时走 zk_engine 流式 seam；否则直连 decoder。 */
     pool = pool_acquire();
     if (pool) {
-        st = zk_engine_open_url(pool, url, &zinfo, eb, sizeof(eb));
+        st = (headers && headers[0])
+                 ? zk_engine_open_url_headers(pool, url, headers, &zinfo, eb, sizeof(eb))
+                 : zk_engine_open_url(pool, url, &zinfo, eb, sizeof(eb));
         if (!st) {
             if (status_out) *status_out = read_le32_status(eb);
             if (errbuf && errbuf_size > 0) {
@@ -421,7 +423,9 @@ NativeDecoder *native_decoder_open_url(const char *url, NativeInfo *info,
         QA_FETCH_ADD_RELAXED(&g_stream_opens, 1);
         ERA_LOGD(NULL, "%s 原生 URL 经常驻池 seam 打开: %s\n", LOG_TAG, url);
     } else {
-        zk = zk_decoder_open_url(url, &zinfo, eb, (int)sizeof(eb));
+        zk = (headers && headers[0])
+                 ? zk_decoder_open_url_headers(url, headers, &zinfo, eb, (int)sizeof(eb))
+                 : zk_decoder_open_url(url, &zinfo, eb, (int)sizeof(eb));
         if (!zk) {
             if (status_out) *status_out = read_le32_status(eb);
             if (errbuf && errbuf_size > 0) {
@@ -679,11 +683,11 @@ NativeDecoder *native_decoder_open_cb(void *ctx,
     return NULL;
 }
 
-NativeDecoder *native_decoder_open_url(const char *url, NativeInfo *info,
+NativeDecoder *native_decoder_open_url(const char *url, const char *headers, NativeInfo *info,
                                        int *status_out,
                                        char *errbuf, int errbuf_size)
 {
-    (void)url; (void)info;
+    (void)url; (void)info; (void)headers;
     if (status_out) *status_out = 1; /* ZK_UNSUPPORTED */
     if (errbuf && errbuf_size > 0) {
         snprintf(errbuf, errbuf_size, "archoera_kernel 未链接（构建时无 zig）");

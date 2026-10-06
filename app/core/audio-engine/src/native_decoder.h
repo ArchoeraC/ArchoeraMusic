@@ -95,8 +95,11 @@ NativeDecoder *native_decoder_open_cb(void *ctx,
  * 契约同 [native_decoder_open]；`url` 仅在调用内被读取。失败（非 http(s) /
  * 连接 / TLS / 状态码 / 未接管格式 / 内核未链接）返回 NULL 且 status_out 写
  * 稳定状态码，调用方据此回退宿主 AVIO 路径或 FFmpeg 主后端。
+ *
+ * [headers]：额外请求头（`\n`/`\r\n` 分行；NULL = 无），如 `X-Neko-Client`
+ * 与 `User-Agent`，供后端按客户端标识放行；仅本调用内读取。
  */
-NativeDecoder *native_decoder_open_url(const char *url, NativeInfo *info,
+NativeDecoder *native_decoder_open_url(const char *url, const char *headers, NativeInfo *info,
                                        int *status_out,
                                        char *errbuf, int errbuf_size);
 

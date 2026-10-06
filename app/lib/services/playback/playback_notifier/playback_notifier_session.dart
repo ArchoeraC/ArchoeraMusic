@@ -9,6 +9,7 @@ mixin _PlaybackNotifierSession
   @override
   Future<void> _startSession(
     String source, {
+    String? headers,
     required int offsetMs,
     required int bitrate,
     bool passthrough = true,
@@ -21,6 +22,7 @@ mixin _PlaybackNotifierSession
     try {
       engine = await AudioEngineProcess.start(
         source: source,
+        headers: headers,
         store: store,
         memoryStore: memoryStore,
         offsetMs: offsetMs,
