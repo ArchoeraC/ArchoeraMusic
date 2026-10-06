@@ -21,6 +21,7 @@ const std = @import("std");
 const rcmod = @import("rc.zig");
 const tables = @import("celt_tables.zig");
 const celt_types = @import("celt_types.zig");
+const opus_vec = @import("vec.zig");
 
 const CeltFrame = celt_types.CeltFrame;
 
@@ -322,7 +323,7 @@ fn algUnquant(rc: *Rc, x: []f32, n: usize, k: u32, spread: u8, blocks: u32, gain
     const norm = decodePulses(rc, pvq_scratch[0..n], @intCast(n), k);
     // libopus：g = MULT32_32_Q31(celt_rsqrt_norm32(Ryy), gain) = (1/sqrt(Ryy))*gain
     const g = (1.0 / @sqrt(norm)) * gain;
-    for (0..n) |i| x[i] = g * @as(f32, @floatFromInt(pvq_scratch[i]));
+    opus_vec.intToFloatScale(pvq_scratch[0..n], x[0..n], g);
     expRotation(x, n, blocks, k, spread);
     return extractCollapseMask(pvq_scratch[0..n], n, @intCast(blocks));
 }
@@ -642,7 +643,7 @@ pub fn quantBand(
         blocks <<= @intCast(recombine);
         if (lowband_out) |lo| {
             const s: f32 = @floatCast(@sqrt(@as(f64, @floatFromInt(n0))));
-            for (0..n0) |i| lo[i] = s * x[i];
+            opus_vec.scaleCopy(lo[0..n0], x[0..n0], s);
         }
         cm &= (@as(u32, 1) << @intCast(blocks)) - 1;
     }

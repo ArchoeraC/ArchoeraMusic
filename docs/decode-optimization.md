@@ -294,3 +294,65 @@ FL-4（去相关已被 LLVM 自动向量化）。验证：`zig build test` 679/6
 > **未做（明确记录）**：按格式实例 **ctx arena / Reader 缓冲复用**——跨 `fmt/**` 的较大重构
 > （25 个模块各自的 ctx 与 alloc/realloc 语义，含运行期 realloc，arena 会破坏内存收口目标），
 > 留待独立专项（见 §9.3）。
+
+## 12. 2026-10-06：Opus 解码砍指令（方向④ B 档，有损，全程逐位一致）
+
+> 参考实现经本机代理克隆对照：`xiph/opus`（libopus `celt/*`、`silk/*`）与
+> `FFmpeg`（`libavcodec/opus/*`）。口径：`tests/bench/insn_count.c`
+> （`perf_event_open` 用户态指令数），`taskset -c 2`，语料 `/tmp/eng2/ind.opus`
+> （200s 立体声 128k CELT）。**基线为新工具链重建的改动前内核**（同一二进制口径 A/B）。
+
+### 12.1 定位（`perf record/report` + 行号级 `perf annotate`）
+
+本机 `perf` 可用后，热区一目了然（自占比）：`celt.decodeFrame` ~36%、
+`pvq.quantBand` ~29%、`lib.decodeNextPacket` ~10%（其中 f32→s16 写出）、
+`rc.decUint` ~4%、`readImpl` ~4%。行号级进一步指认：
+
+- **去加重量化**：`celt.deemphasis` 的手写 `lrintf`（为复刻 C `lrintf` 就近偶数）
+  在无 SSE4.1 的基线目标下把 `@trunc` 降级为 **每样本一次 libm `truncf@plt` 调用**，
+  加分支/`cmov`，单样本 ~35 条指令，占 `decodeFrame` 自身约 **1/3**。
+- **f32→s16 + 立体声交错**：`decodeNextPacket` 自身几乎全是逐样本 `f32ToS16` 与 2 字节拷贝。
+- **连续 PCM 拷贝**：`readImpl` 逐样本 `@memcpy(2~4B)`；`celt` 的 `buf` 前移逐元素拷贝。
+- **归一化/缩放**：`denormalize`、PVQ `algUnquant`/`lowband_out`、双声道 `(a+b)/2` 等
+  逐样本乘加。
+
+### 12.2 改动（A 档 + B 档「逐 lane 独立」SIMD，零新增缓冲）
+
+- **`lrintfEven`**（`celt.zig`）：`(x + 1.5·2^52) - 1.5·2^52` 无分支就近偶数舍入，
+  位级等同 C `lrintf`，**不再产生 libm 调用**；同时把 `SIG2RES×2^-15` 与
+  `RES2INT24×2^23` 两次 2 的幂缩放合并为 `tmp×2^8`（消一次 `mulss`）。
+- **`fmt/opus/vec.zig`**（新增）：可移植 SIMD——`f32ToS16x8`（含有限性掩码 + f32 域
+  clamp，避免 inf/NaN 的 `@intFromFloat`）、`interleave8`、`scaleInPlace`/`scaleCopy`/
+  `avgHalfInPlace`/`intToFloatScale`/`copyForwardsGap8`。**只打包相互独立的 lane**，
+  每 lane 运算顺序与标量逐条相同（不重结合、不引 FMA），故输出逐位一致。
+- **CELT 立体声 f32→s16 批量转换 + 交错**（`lib.zig`）：`out_f` 两声道 ×8 lane
+  一次性转换、交错写入 `pcm_buf`；非 2ch/2ch 走标量兜底。
+- **`denormalize` / PVQ `algUnquant` / `lowband_out` / 双声道 `(a+b)/2`**：就地 SIMD。
+- **`buf` 前移**（`celt.zig`）：`copyForwardsGap8`（前置 `src-dst ≥ 8`，CELT 恒成立），
+  语义与逐元素正向 memmove 一致。
+- **`readImpl`**（`lib.zig`）：pre-skip 整段丢弃、`pcm_buf` 连续段整段 `@memcpy` 到 `out`，
+  替代逐样本拷贝。
+
+### 12.3 结果
+
+| 语料（200s） | 改前 | 改后 | Δ 指令 | Δ cycles |
+|---|---|---|---|---|
+| ind.opus（立体声 128k，CELT） | 5.113G | **3.702G** | **−27.6%** | 2.012G → **1.365G（−32.2%）** |
+| op_mono.opus（单声道 64k） | 2.949G | **2.325G** | −21.2% | — |
+| op_silk.opus（单声道 16k，SILK） | 3.303G | **2.823G** | −14.5% | — |
+| op_hybrid.opus（立体声 10ms，Hybrid） | 4.886G | **3.633G** | −25.6% | — |
+
+同口径 FFmpeg（内嵌 libopus，`-f null -`）ind.opus 约 2.76G：era/FFmpeg 指令比由
+**1.85× → 1.34×**。
+
+**正确性（逐位）**：`ind`（CELT）/`mono`/`SILK`/`Hybrid`/`speech`/`tiny`/`multi`
+Ogg + mka + m4a(Opus) 共 9 个语料，改动前后引擎输出 WAV **md5 完全一致**；
+`zig build test` **730/730**（含新增 4 个 SIMD 位级一致性用例）、ctest **36/36**、
+`-Dtarget=x86_64-windows-gnu` 交叉编译通过。
+
+> **未做（明确记录）**：`pvq.cwrsi`（组合数索引→脉冲向量，逐元素串行、含表查找）与
+> kissfft 蝶形（复数乘、twiddle 跨步 gather/scatter）为剩余最大单体（各约占总指令
+> 7~8%），SIMD 收益/风险比低，留待后续专项；`deemphasis` 的 int24→f32→s16 回环
+> 受「与 libopus 逐位一致」约束，暂不融合。回退（实测无收益/负收益）：尝试把
+> `norm` 归约改为向量累加——会改变浮点累加顺序，**破坏逐位一致**，不做。
+
