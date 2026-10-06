@@ -39,8 +39,24 @@ final lyricsEngineProvider = Provider<LyricsEngine>(
 final currentLyricsProvider = FutureProvider.autoDispose<List<LyricGroup>>((
   ref,
 ) async {
-  // watch 建立依赖：偏好 / 曲目变化时自动重算歌词。
-  final prefs = ref.watch(appPrefsProvider);
+  // 只依赖**影响歌词内容**的偏好（逐项 select）：字号 / 配色 / 歌词显隐
+  // （`showLyricsInPlayer`）等无关偏好变化时**不重算**歌词。否则切换歌词显隐
+  // 会先写偏好 → 本 provider 进入 loading → 渲染端（全屏歌词 / 播放条）闪
+  // 「暂无歌词」，且可能重复联网。列表以分隔符 join 成字符串参与结构化相等。
+  final cfg = ref.watch(
+    appPrefsProvider.select(
+      (p) => (
+        p.lyricSourceOrder.join(','),
+        p.preferWordByWord,
+        p.lyricEnableOnlineTtml,
+        p.lyricExcludeEnabled,
+        p.lyricExcludeKeywords.join('\u0000'),
+        p.lyricExcludeRegexes.join('\u0000'),
+        p.uncensorProfanity,
+        p.amllSyntheticSweep,
+      ),
+    ),
+  );
   final locale = ref.watch(localeProvider);
   final track = ref.watch(playbackProvider.select((s) => s.track));
   final trackId = ref.watch(playbackProvider.select((s) => s.trackId));
@@ -51,20 +67,20 @@ final currentLyricsProvider = FutureProvider.autoDispose<List<LyricGroup>>((
       .resolve(
         track,
         trackId: trackId,
-        sourceOrder: prefs.lyricSourceOrder,
-        preferRich: prefs.preferWordByWord,
-        enableTtmlOverlay: prefs.lyricEnableOnlineTtml,
+        sourceOrder: cfg.$1.isEmpty ? const [] : cfg.$1.split(','),
+        preferRich: cfg.$2,
+        enableTtmlOverlay: cfg.$3,
         preferredLang: locale.toLanguageTag(),
       );
 
   return LyricPipeline.standard.process(
     groups,
     LyricProcessContext(
-      excludeEnabled: prefs.lyricExcludeEnabled,
-      excludeKeywords: prefs.lyricExcludeKeywords,
-      excludeRegexes: prefs.lyricExcludeRegexes,
-      uncensor: prefs.uncensorProfanity,
-      syntheticSweep: prefs.amllSyntheticSweep,
+      excludeEnabled: cfg.$4,
+      excludeKeywords: cfg.$5.isEmpty ? const [] : cfg.$5.split('\u0000'),
+      excludeRegexes: cfg.$6.isEmpty ? const [] : cfg.$6.split('\u0000'),
+      uncensor: cfg.$7,
+      syntheticSweep: cfg.$8,
     ),
   );
 });

@@ -63,9 +63,11 @@ extension _PlayerPageView on _PlayerPageState {
     final contentMounted =
         _contentMounted ||
         (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
-    final hasLyrics = ref
-        .watch(currentLyricsProvider)
-        .maybeWhen(data: (l) => l.isNotEmpty, orElse: () => false);
+    // 用 valueOrNull 保留上一份歌词：即使 provider 因（歌词相关）偏好变化重算
+    // 而短暂 loading，也不闪「暂无歌词」。
+    final hasLyrics =
+        (ref.watch(currentLyricsProvider).value ?? const <LyricGroup>[])
+            .isNotEmpty;
 
     // 播放页常驻不透明底色：重内容（背景）延迟挂载期间也保证整页不透明，
     // 避免透出下方壳层（进入动画那 500ms 出现白/黑空档）。
@@ -657,9 +659,9 @@ class _ProgressLyric extends ConsumerWidget {
     final pos = ref.watch(
       playbackProvider.select((s) => s.position.inMilliseconds),
     );
-    final groups = ref
-        .watch(currentLyricsProvider)
-        .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
+    final groups =
+        ref.watch(currentLyricsProvider).value ??
+        const <LyricGroup>[];
     if (groups.isEmpty) return const SizedBox.shrink();
     final i = lyricIndexAt(groups, dragMs?.round() ?? pos);
     if (i < 0 || i >= groups.length) return const SizedBox.shrink();

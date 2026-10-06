@@ -12,9 +12,9 @@ extension _BarLyricTextView on _BarLyricTextState {
     final playing = ref.watch(playbackProvider.select((s) => s.playing));
     final prefs = ref.watch(appPrefsProvider);
     final showTranslation = prefs.showTranslation;
-    final groups = ref
-        .watch(currentLyricsProvider)
-        .maybeWhen(data: (l) => l, orElse: () => const <LyricGroup>[]);
+    final groups =
+        ref.watch(currentLyricsProvider).value ??
+        const <LyricGroup>[];
 
     final idx = lyricIndexAt(groups, positionMs);
     if (idx < 0) return SizedBox(height: widget.height);
