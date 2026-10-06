@@ -7,6 +7,8 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
+import '../../services/source/media_request_headers.dart';
+
 /// 网络封面浏览器 UA（NT封面 CDN `p1.music.126.net` 对 Dart 默认 UA 403）。
 ///
 /// 通过 [HttpOverrides] 设为全局 HttpClient 默认 UA：Flutter [Image.network]
@@ -89,6 +91,7 @@ class CoverImage extends StatelessWidget {
         fit: BoxFit.cover,
         cacheWidth: targetW,
         cacheHeight: targetH,
+        headers: mediaHeadersForUrl(c),
         errorBuilder: (_, _, _) => placeholder,
         loadingBuilder: (context, child, progress) =>
             progress == null ? child : placeholder,
@@ -117,7 +120,7 @@ ImageProvider? coverImageProvider(
   if (c.startsWith('//')) c = 'https:$c';
   final ImageProvider base;
   if (c.startsWith('http')) {
-    base = NetworkImage(c);
+    base = NetworkImage(c, headers: mediaHeadersForUrl(c));
   } else {
     final path = c.startsWith('file://') ? c.substring(7) : c;
     final file = File(path);

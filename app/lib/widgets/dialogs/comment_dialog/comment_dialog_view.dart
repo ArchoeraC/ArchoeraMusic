@@ -631,14 +631,16 @@ class _Avatar extends StatelessWidget {
     if (url == null || url.isEmpty) return placeholder;
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final avatarPx = (radius * 2 * dpr).round();
+    final picUrl = withPicSize(url, 100);
     return ClipOval(
       child: Image.network(
-        withPicSize(url, 100),
+        picUrl,
         width: radius * 2,
         height: radius * 2,
         fit: BoxFit.cover,
         cacheWidth: avatarPx,
         cacheHeight: avatarPx,
+        headers: mediaHeadersForUrl(picUrl),
         errorBuilder: (_, _, _) => placeholder,
       ),
     );

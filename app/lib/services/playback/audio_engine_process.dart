@@ -309,6 +309,7 @@ class AudioEngineProcess {
   /// 纯内存源（PCM 走 MemoryPcmAnalyzer）；EngineConfig.noDisk 仍由 prefs 注入。
   static Future<AudioEngineProcess> start({
     required String source,
+    String? headers,
     SegStoreHandle store = 0,
     bool memoryStore = false,
     int offsetMs = 0,
@@ -378,6 +379,7 @@ class AudioEngineProcess {
               )
             : EngineBindings.instance.create(
                 source: source,
+                headers: headers,
                 sessionDir: sockDir.path,
                 playerFile: playerFile,
                 config: cfg,

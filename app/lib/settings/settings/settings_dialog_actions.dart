@@ -12,13 +12,9 @@ const Duration _kDevHoldDuration = Duration(seconds: 10);
 
 extension _SettingsDialogActions on _SettingsDialogState {
   Future<void> _loadVersion() async {
+    await loadAppVersion();
     try {
-      final data = await rootBundle.loadString('pubspec.yaml');
-      final match = RegExp(
-        r'^version:\s*([0-9][^\s#]*)(?:\s*#.*)?$',
-        multiLine: true,
-      ).firstMatch(data);
-      var v = match?.group(1) ?? '';
+      var v = appVersion;
       // Dart 版本号中 '-' 预发布、'+' 构建号 → 显示时转回 '.' 分段；
       // 构建号 'rev.N' 归一为 'revN'（如 0.9.11+rev.4 → 0.9.11.rev4），
       // 纯数字/其它构建号仍按 '+'→'.'（如 0.8.7-pre.2+1 → 0.8.7.pre.2.1）。

@@ -290,6 +290,7 @@ class CoverCard extends StatelessWidget {
               fit: BoxFit.cover,
               cacheWidth: 320,
               cacheHeight: 320,
+              headers: mediaHeadersForUrl(item.cover!),
               errorBuilder: (_, _, _) => placeholder,
               loadingBuilder: (context, child, progress) =>
                   progress == null ? child : placeholder,
