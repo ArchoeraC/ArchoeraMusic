@@ -519,6 +519,12 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.flaskOutline,
       ),
       _SearchEntry(
+        SettingsCategory.mcp,
+        l10n.settingsMcpTitle,
+        l10n.settingsMcpSubtitle,
+        EtaIcons.chipOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.about,
         l10n.settingsVersion,
         l10n.settingsSearchAboutSubtitle,
@@ -685,6 +691,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                 SettingsCategory.mediaSource => StreamingServerList(),
                 SettingsCategory.experimentalSource =>
                   const ExperimentalSourceSection(),
+                SettingsCategory.mcp => const McpSection(),
                 SettingsCategory.about => AboutSection(
                   version: _version,
                   devHolding: _devHolding,
@@ -731,9 +738,9 @@ extension _SettingsDialogView on _SettingsDialogState {
     final q = _query.trim().toLowerCase();
     final devMode = ref.watch(appPrefsProvider).developerMode;
     final downloadModule = ref.watch(appPrefsProvider).downloadModuleEnabled;
-    final index = _buildSearchIndex(
-      l10n,
-    ).where((e) => e.category.visible(devMode, downloadModule)).toList();
+    final index = _buildSearchIndex(l10n)
+        .where((e) => e.category.visible(devMode, downloadModule))
+        .toList();
     final matches = index.where((e) => _searchMatch(e, q, l10n)).toList();
     if (matches.isEmpty) {
       return Center(

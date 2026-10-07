@@ -404,6 +404,24 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     return at;
   }
 
+  /// 追加到队尾（AI 控制 / 批量入队用；与 [insertToQueue] 的「当前曲之后」
+  /// 语义互补）。空队列时仅建立队列、不触发播放。
+  int appendToQueue(Track track) {
+    final q = List.of(state.queue);
+    if (q.isEmpty) {
+      q.add(track);
+      state = state.copyWith(queue: q, queueIndex: 0);
+      _originalQueue = List.of(q);
+      return 0;
+    }
+    final existing = _indexOfTrack(q, track);
+    if (existing != -1) return existing;
+    q.add(track);
+    state = state.copyWith(queue: q);
+    _originalQueue?.add(track);
+    return q.length - 1;
+  }
+
   void moveInQueue(int from, int to) {
     final q = List.of(state.queue);
     if (from == to ||

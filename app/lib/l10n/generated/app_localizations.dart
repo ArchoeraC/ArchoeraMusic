@@ -8953,6 +8953,366 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'协议注册失败'**
   String get settingsRegisterProtocolFailed;
+
+  /// No description provided for @settingsCatMcp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'MCP 接入'**
+  String get settingsCatMcp;
+
+  /// No description provided for @settingsMcpSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本地 MCP 控制接口（默认关闭）'**
+  String get settingsMcpSubtitle;
+
+  /// No description provided for @settingsMcpTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'MCP 控制服务'**
+  String get settingsMcpTitle;
+
+  /// No description provided for @settingsMcpNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启后仅监听本机回环地址 127.0.0.1，普通用户即可运行，无需管理员权限。所有能力默认关闭，按需逐组开启；关闭总开关即停止监听。'**
+  String get settingsMcpNote;
+
+  /// No description provided for @settingsMcpEnable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用 MCP 控制'**
+  String get settingsMcpEnable;
+
+  /// No description provided for @settingsMcpEnableOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开启，端口正在监听'**
+  String get settingsMcpEnableOn;
+
+  /// No description provided for @settingsMcpEnableOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'默认关闭'**
+  String get settingsMcpEnableOff;
+
+  /// No description provided for @settingsMcpPort.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'监听端口'**
+  String get settingsMcpPort;
+
+  /// No description provided for @settingsMcpPortDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'1024~65535；修改后自动重启监听'**
+  String get settingsMcpPortDesc;
+
+  /// No description provided for @settingsMcpKey.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'访问密钥'**
+  String get settingsMcpKey;
+
+  /// No description provided for @settingsMcpKeyCopy.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'复制'**
+  String get settingsMcpKeyCopy;
+
+  /// No description provided for @settingsMcpKeyRegenerate.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重新生成密钥'**
+  String get settingsMcpKeyRegenerate;
+
+  /// No description provided for @settingsMcpKeyCopied.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'访问密钥已复制'**
+  String get settingsMcpKeyCopied;
+
+  /// No description provided for @settingsMcpKeyRegenerated.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'访问密钥已重新生成'**
+  String get settingsMcpKeyRegenerated;
+
+  /// No description provided for @settingsMcpAllowKeyless.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'允许免密钥访问'**
+  String get settingsMcpAllowKeyless;
+
+  /// No description provided for @settingsMcpAllowKeylessDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭更安全；开启后本机任意程序均可直接访问'**
+  String get settingsMcpAllowKeylessDesc;
+
+  /// No description provided for @settingsMcpCapsTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'能力开关'**
+  String get settingsMcpCapsTitle;
+
+  /// No description provided for @settingsMcpCapsNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'每组能力独立控制；未开启的能力不会出现在 MCP 工具列表与 REST 接口中。'**
+  String get settingsMcpCapsNote;
+
+  /// No description provided for @settingsMcpCapRead.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'读取状态'**
+  String get settingsMcpCapRead;
+
+  /// No description provided for @settingsMcpCapReadDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放状态、当前曲目、队列、服务信息与音源列表'**
+  String get settingsMcpCapReadDesc;
+
+  /// No description provided for @settingsMcpCapPlayback.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放控制'**
+  String get settingsMcpCapPlayback;
+
+  /// No description provided for @settingsMcpCapPlaybackDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放/暂停/停止、切歌、跳转、音量、循环/随机、音质、播放指定曲目'**
+  String get settingsMcpCapPlaybackDesc;
+
+  /// No description provided for @settingsMcpCapQueue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'队列操作'**
+  String get settingsMcpCapQueue;
+
+  /// No description provided for @settingsMcpCapQueueDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'添加/移除/移动队列项、播放指定队列项、清空队列'**
+  String get settingsMcpCapQueueDesc;
+
+  /// No description provided for @settingsMcpCapSearch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在线搜索'**
+  String get settingsMcpCapSearch;
+
+  /// No description provided for @settingsMcpCapSearchDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在网易云/酷狗/QQ 音乐等音源搜索歌曲'**
+  String get settingsMcpCapSearchDesc;
+
+  /// No description provided for @settingsMcpCapLibrary.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本地曲库'**
+  String get settingsMcpCapLibrary;
+
+  /// No description provided for @settingsMcpCapLibraryDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'搜索本地曲库、随机抽曲、曲库统计'**
+  String get settingsMcpCapLibraryDesc;
+
+  /// No description provided for @settingsMcpCapPreferences.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'读取偏好'**
+  String get settingsMcpCapPreferences;
+
+  /// No description provided for @settingsMcpCapPreferencesDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'只读返回应用偏好（敏感字段自动剔除）'**
+  String get settingsMcpCapPreferencesDesc;
+
+  /// No description provided for @settingsMcpEndpointsTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'连接地址'**
+  String get settingsMcpEndpointsTitle;
+
+  /// No description provided for @settingsMcpStatusRunning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'运行中 · 端口 {port}'**
+  String settingsMcpStatusRunning({required int port});
+
+  /// No description provided for @settingsMcpStatusStopped.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未运行'**
+  String get settingsMcpStatusStopped;
+
+  /// No description provided for @settingsMcpStatusError.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启动失败（端口可能被占用）'**
+  String get settingsMcpStatusError;
+
+  /// No description provided for @settingsMcpStatusDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'MCP 面向智能体客户端；REST / WebSocket 供脚本与其它程序接入'**
+  String get settingsMcpStatusDesc;
+
+  /// No description provided for @settingsMcpEndpointMcp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'MCP（Streamable HTTP）'**
+  String get settingsMcpEndpointMcp;
+
+  /// No description provided for @settingsMcpEndpointRest.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'REST API'**
+  String get settingsMcpEndpointRest;
+
+  /// No description provided for @settingsMcpEndpointWs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'WebSocket（JSON-RPC 2.0）'**
+  String get settingsMcpEndpointWs;
+
+  /// No description provided for @settingsMcpCapAppearance.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'外观'**
+  String get settingsMcpCapAppearance;
+
+  /// No description provided for @settingsMcpCapAppearanceDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换亮色 / 暗色 / 跟随系统主题'**
+  String get settingsMcpCapAppearanceDesc;
+
+  /// No description provided for @settingsMcpCapCollection.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'收藏'**
+  String get settingsMcpCapCollection;
+
+  /// No description provided for @settingsMcpCapCollectionDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'查询与切换曲目收藏（红心）状态'**
+  String get settingsMcpCapCollectionDesc;
+
+  /// No description provided for @settingsMcpCapHistory.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放历史'**
+  String get settingsMcpCapHistory;
+
+  /// No description provided for @settingsMcpCapHistoryDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'查询与清空播放历史'**
+  String get settingsMcpCapHistoryDesc;
+
+  /// No description provided for @settingsMcpCapLyrics.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词'**
+  String get settingsMcpCapLyrics;
+
+  /// No description provided for @settingsMcpCapLyricsDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'只读返回当前曲目的歌词行'**
+  String get settingsMcpCapLyricsDesc;
+
+  /// No description provided for @settingsMcpCapDownload.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下载'**
+  String get settingsMcpCapDownload;
+
+  /// No description provided for @settingsMcpCapDownloadDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'查询下载任务、把曲目加入下载、取消任务'**
+  String get settingsMcpCapDownloadDesc;
+
+  /// No description provided for @settingsMcpAllowLan.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'允许局域网访问'**
+  String get settingsMcpAllowLan;
+
+  /// No description provided for @settingsMcpAllowLanDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'默认关闭；开启后绑定 0.0.0.0，局域网内其它设备可连接（仍要求访问密钥）'**
+  String get settingsMcpAllowLanDesc;
+
+  /// No description provided for @settingsMcpAllowLanWarning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'警告：局域网访问会扩大暴露面。请确保访问密钥保密，仅在可信网络中使用。'**
+  String get settingsMcpAllowLanWarning;
+
+  /// No description provided for @settingsMcpAllowLanWarningTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启局域网访问？'**
+  String get settingsMcpAllowLanWarningTitle;
+
+  /// No description provided for @settingsMcpAllowLanWarningBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'开启后，同一局域网内的其它设备可访问本控制服务（仍需访问密钥）。请仅在可信网络中开启，并妥善保管密钥。'**
+  String get settingsMcpAllowLanWarningBody;
+
+  /// No description provided for @settingsMcpAllowLanWarningAgree.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我了解风险，开启'**
+  String get settingsMcpAllowLanWarningAgree;
+
+  /// No description provided for @settingsMcpLanAddress.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'局域网地址'**
+  String get settingsMcpLanAddress;
+
+  /// No description provided for @settingsMcpShell.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'命令行 shell'**
+  String get settingsMcpShell;
+
+  /// No description provided for @settingsMcpShellDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用后可在终端用 `<exe> archoerashell …` 操作（不打开窗口）；关闭后该子命令直接报错退出'**
+  String get settingsMcpShellDesc;
+
+  /// No description provided for @settingsMcpShellUsage.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'命令示例'**
+  String get settingsMcpShellUsage;
+
+  /// No description provided for @settingsMcpShellCopy.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'复制'**
+  String get settingsMcpShellCopy;
+
+  /// No description provided for @settingsMcpShellCopied.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'命令示例已复制'**
+  String get settingsMcpShellCopied;
 }
 
 class _AppLocalizationsDelegate

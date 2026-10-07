@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'apis/runtime.dart';
+import 'cli/mcp_shell.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'theme/app_theme.dart';
 import 'services/log/log.dart';
@@ -34,7 +35,26 @@ import 'widgets/list/cover_image.dart';
 /// vault 加密落盘，登录态跨重启保留；vault 不可用时降级内存并告警）
 /// + 窗口/托盘后台常驻。播放链路由 C 引擎内置 miniaudio 承担
 /// （无 libmpv/media_kit 依赖）。
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  // CLI 模式：`archoera_music archoerashell ...`（类 Unix 子命令）。
+  // 在 Binding / 窗口 / Flutter 初始化之前处理并退出，不进入 GUI 流程。
+  final shellArgs = _resolveShellArgs(args);
+  if (shellArgs != null) {
+    final prefs = AppPrefs.load();
+    if (!prefs.mcpShellEnabled) {
+      stderr.writeln('archoerashell 已在设置中禁用（设置 → MCP 接入 → 命令行 shell）。');
+      exit(2);
+    }
+    final code = await runMcpShell(
+      shellArgs,
+      defaults: McpShellOptions(port: prefs.mcpPort, key: prefs.mcpAccessKey),
+      clientFactory: HttpMcpShellClient.new,
+    );
+    await stdout.flush();
+    await stderr.flush();
+    exit(code);
+  }
+
   // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化——既是 Flutter
   // binding，也让后续 windowManager（MethodChannel）可用（单实例分支要用）。
   PowerSavingFrameBinding.ensureInitialized();
@@ -79,18 +99,23 @@ Future<void> main() async {
       if (forwarded == 1) exit(0);
     }
     final parts = Platform.localeName.replaceAll('-', '_').split('_');
-    final locale = parts.length >= 2 ? Locale(parts[0], parts[1]) : Locale(parts[0]);
+    final locale = parts.length >= 2
+        ? Locale(parts[0], parts[1])
+        : Locale(parts[0]);
     // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。
     await windowManager.ensureInitialized();
     await windowManager.setSize(const Size(420, 260));
     await windowManager.center();
     await windowManager.show();
     final l10n = lookupAppLocalizations(locale);
-    runApp(_AlreadyRunningApp(
+    runApp(
+      _AlreadyRunningApp(
         title: l10n.instanceAlreadyRunningTitle,
         message: l10n.instanceAlreadyRunning,
         okLabel: l10n.vaultCrashDismiss,
-        locale: locale));
+        locale: locale,
+      ),
+    );
     return;
   }
   // 预加载内置 SQLite（libe_sqlite3）：dart sqlite3 包经 hooks 配置
@@ -109,8 +134,7 @@ Future<void> main() async {
   // 保证 kugou/netease 提供者首次读取时已就绪）。默认加密方案（crypto
   // 推荐 / vault 实验性）来自设置页偏好，控制惰性重建时初始化哪种方案。
   StreamingStore.defaultScheme = prefs.credentialScheme;
-  final sessionStore =
-      VaultSessionStore(defaultScheme: prefs.credentialScheme);
+  final sessionStore = VaultSessionStore(defaultScheme: prefs.credentialScheme);
   await sessionStore.initialize();
   if (!sessionStore.vaultAvailable) {
     // 凭据保险库不可用：登录态仅内存保留（不静默降级为明文持久化）
@@ -123,10 +147,7 @@ Future<void> main() async {
   // 在偏好变化时刷新该快照，保证设置页改动即时生效（无需重启）。
   appPrefsSnapshot = prefs;
   setRuntime(
-    runtime: ApisRuntime(
-      sessionStore: sessionStore,
-      getSetting: readAppPref,
-    ),
+    runtime: ApisRuntime(sessionStore: sessionStore, getSetting: readAppPref),
   );
   // 全局图片解码缓存：张数上限固定（防内存碎片）；字节上限由设置
   // 「封面图片缓存上限」动态控制（默认下限 8 MiB，见 ArchoeraMusicApp，
@@ -144,7 +165,9 @@ Future<void> main() async {
   // 订阅 deep link 并派发（启动期链接先缓冲，首帧后统一处理）。
   final deepLinkRouter = DeepLinkRouter(platformCaps.deepLink);
   deepLinkRouter.start();
-  WidgetsBinding.instance.addPostFrameCallback((_) => deepLinkRouter.markReady());
+  WidgetsBinding.instance.addPostFrameCallback(
+    (_) => deepLinkRouter.markReady(),
+  );
 }
 
 /// 读取 `ARCHOERA_LOG_LEVEL`（debug/info/warn/error/fatal），非法/缺省为 info。
@@ -157,6 +180,21 @@ LogLevel _logLevelFromEnv() {
     'fatal' => LogLevel.fatal,
     _ => LogLevel.info,
   };
+}
+
+/// 若本次启动带 `archoerashell` 子命令，返回其后的参数；否则 null。
+///
+/// Linux/Windows 的 Flutter runner 会把 argv 传给 Dart 入口（`main(args)`）；
+/// macOS 不传，故同时回退 `Platform.executableArguments`。
+List<String>? _resolveShellArgs(List<String> entrypointArgs) {
+  for (final source in <List<String>>[
+    entrypointArgs,
+    Platform.executableArguments,
+  ]) {
+    final index = source.indexOf('archoerashell');
+    if (index >= 0) return source.sublist(index + 1);
+  }
+  return null;
 }
 
 /// 让所有 HttpClient（含 Flutter Image.network 共享 client）默认携带浏览器 UA
@@ -174,11 +212,12 @@ class _BrowserUserAgentOverrides extends HttpOverrides {
 
 /// 二次启动提示：自绘对话框卡片（无页面包裹感），窗口已缩为对话框尺寸。
 class _AlreadyRunningApp extends StatelessWidget {
-  const _AlreadyRunningApp(
-      {required this.title,
-      required this.message,
-      required this.okLabel,
-      required this.locale});
+  const _AlreadyRunningApp({
+    required this.title,
+    required this.message,
+    required this.okLabel,
+    required this.locale,
+  });
 
   final String title;
   final String message;
@@ -196,14 +235,21 @@ class _AlreadyRunningApp extends StatelessWidget {
         AppLocalizations.delegate,
         ...GlobalMaterialLocalizations.delegates,
       ],
-      home: _AlreadyRunningCard(title: title, message: message, okLabel: okLabel),
+      home: _AlreadyRunningCard(
+        title: title,
+        message: message,
+        okLabel: okLabel,
+      ),
     );
   }
 }
 
 class _AlreadyRunningCard extends StatelessWidget {
-  const _AlreadyRunningCard(
-      {required this.title, required this.message, required this.okLabel});
+  const _AlreadyRunningCard({
+    required this.title,
+    required this.message,
+    required this.okLabel,
+  });
 
   final String title;
   final String message;
@@ -232,16 +278,22 @@ class _AlreadyRunningCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Center(
-                child: Text(title,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600)),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: scheme.onSurfaceVariant)),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 16),
               Center(
                 child: FilledButton(
@@ -282,8 +334,11 @@ class _WarnPainter extends CustomPainter {
       ..strokeWidth = 2.6
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(Offset(w / 2, h * 0.40), Offset(w / 2, h * 0.64), mark);
-    canvas.drawCircle(Offset(w / 2, h * 0.75), 1.6,
-        Paint()..color = const Color(0xFFFFB300));
+    canvas.drawCircle(
+      Offset(w / 2, h * 0.75),
+      1.6,
+      Paint()..color = const Color(0xFFFFB300),
+    );
   }
 
   @override
