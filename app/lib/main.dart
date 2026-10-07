@@ -41,14 +41,16 @@ Future<void> main(List<String> args) async {
   final shellArgs = _resolveShellArgs(args);
   if (shellArgs != null) {
     final prefs = AppPrefs.load();
+    final l10n = _shellL10n(prefs);
     if (!prefs.mcpShellEnabled) {
-      stderr.writeln('archoerashell 已在设置中禁用（设置 → MCP 接入 → 命令行 shell）。');
+      stderr.writeln(l10n.mcpShellDisabled);
       exit(2);
     }
     final code = await runMcpShell(
       shellArgs,
       defaults: McpShellOptions(port: prefs.mcpPort, key: prefs.mcpAccessKey),
       clientFactory: HttpMcpShellClient.new,
+      l10n: l10n,
     );
     await stdout.flush();
     await stderr.flush();
@@ -195,6 +197,26 @@ List<String>? _resolveShellArgs(List<String> entrypointArgs) {
     if (index >= 0) return source.sublist(index + 1);
   }
   return null;
+}
+
+/// CLI 文案：跟随应用语言设置（`prefs.locale`），否则系统区域；不支持则回退英文。
+AppLocalizations _shellL10n(AppPrefs prefs) {
+  final code = prefs.locale;
+  final Locale requested;
+  if (code != null && code.isNotEmpty) {
+    final parts = code.replaceAll('_', '-').split('-');
+    requested = Locale(parts.first, parts.length > 1 ? parts[1] : null);
+  } else {
+    final parts = Platform.localeName.replaceAll('-', '_').split('_');
+    requested = parts.length >= 2
+        ? Locale(parts[0], parts[1])
+        : Locale(parts[0]);
+  }
+  try {
+    return lookupAppLocalizations(requested);
+  } catch (_) {
+    return lookupAppLocalizations(const Locale('en'));
+  }
 }
 
 /// 让所有 HttpClient（含 Flutter Image.network 共享 client）默认携带浏览器 UA

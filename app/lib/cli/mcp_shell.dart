@@ -15,6 +15,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../l10n/generated/app_localizations.dart';
+
 /// 默认可连接目标（来自应用偏好：端口 + 访问密钥）。
 class McpShellOptions {
   const McpShellOptions({
@@ -128,12 +130,14 @@ Future<int> runMcpShell(
   List<String> args, {
   required McpShellOptions defaults,
   required McpShellClient Function(McpShellTarget target) clientFactory,
+  required AppLocalizations l10n,
   StringSink? out,
   StringSink? err,
 }) async {
   final context = _ShellContext(
     defaults: defaults,
     clientFactory: clientFactory,
+    l10n: l10n,
     out: out ?? stdout,
     err: err ?? stderr,
   );
@@ -146,12 +150,14 @@ class _ShellContext {
   _ShellContext({
     required this.defaults,
     required this.clientFactory,
+    required this.l10n,
     required this.out,
     required this.err,
   });
 
   final McpShellOptions defaults;
   final McpShellClient Function(McpShellTarget target) clientFactory;
+  final AppLocalizations l10n;
   final StringSink out;
   final StringSink err;
 
@@ -202,7 +208,7 @@ class _ShellContext {
       if (t == '--host' || t.startsWith('--host=')) {
         final value = _optionValue(t, tokens, i, '--host');
         if (value == null) {
-          return _usageError('选项 --host 需要参数');
+          return _optionError(l10n.mcpShellErrNeedValue(option: '--host'));
         }
         host = value.value;
         i += value.consumed;
@@ -216,11 +222,11 @@ class _ShellContext {
           '--port',
         );
         if (value == null) {
-          return _usageError('选项 --port 需要参数');
+          return _optionError(l10n.mcpShellErrNeedValue(option: '--port'));
         }
         final parsed = int.tryParse(value.value);
         if (parsed == null || parsed < 1 || parsed > 65535) {
-          return _usageError('端口非法: ${value.value}');
+          return _optionError(l10n.mcpShellErrBadPort(value: value.value));
         }
         port = parsed;
         i += value.consumed;
@@ -229,14 +235,14 @@ class _ShellContext {
       if (t == '-k' || t == '--key' || t.startsWith('--key=')) {
         final value = _optionValue(t == '-k' ? '--key' : t, tokens, i, '--key');
         if (value == null) {
-          return _usageError('选项 --key 需要参数');
+          return _optionError(l10n.mcpShellErrNeedValue(option: '--key'));
         }
         key = value.value;
         i += value.consumed;
         continue;
       }
       if (t.startsWith('-') && t.length > 1) {
-        return _usageError('未知选项: $t');
+        return _optionError(l10n.mcpShellErrUnknownOption(option: t));
       }
       break;
     }
@@ -248,8 +254,9 @@ class _ShellContext {
       return 2;
     }
     if (command == 'help') {
-      if (rest.isNotEmpty && _commandHelp.containsKey(rest.first)) {
-        out.writeln(_commandHelp[rest.first]);
+      final help = rest.isNotEmpty ? _commandHelp(rest.first) : null;
+      if (help != null) {
+        out.writeln(help);
       } else {
         _usage(out);
       }
@@ -257,7 +264,7 @@ class _ShellContext {
     }
     // 子命令级帮助（Unix 惯例）：`<命令> --help` / `<命令> -h`。
     if (rest.any((a) => a == '-h' || a == '--help')) {
-      final help = _commandHelp[command];
+      final help = _commandHelp(command);
       if (help != null) {
         out.writeln(help);
         return 0;
@@ -268,15 +275,21 @@ class _ShellContext {
       return await _dispatch(command, rest);
     } on SocketException catch (e) {
       err.writeln(
-        '无法连接 ${target.host}:${target.port}（${e.osError?.message ?? e.message}）',
+        l10n.mcpShellErrConnect(
+          host: target.host,
+          port: target.port,
+          reason: e.osError?.message ?? e.message,
+        ),
       );
-      err.writeln('请确认应用正在运行，且已在「设置 → MCP 接入」中启用服务。');
+      err.writeln(l10n.mcpShellErrConnectHint);
       return 1;
     } on HttpException catch (e) {
-      err.writeln('HTTP 错误: ${e.message}');
+      err.writeln(l10n.mcpShellErrHttp(message: e.message));
       return 1;
     } on TimeoutException {
-      err.writeln('连接超时: ${target.host}:${target.port}');
+      err.writeln(
+        l10n.mcpShellErrTimeout(host: target.host, port: target.port),
+      );
       return 1;
     } finally {
       _client?.close();
@@ -354,7 +367,7 @@ class _ShellContext {
       case 'call':
         return _cmdCall(args);
       default:
-        return _usageError('未知命令: $command');
+        return _unknownCommand(command);
     }
   }
 
@@ -362,15 +375,15 @@ class _ShellContext {
 
   Future<int> _cmdSeek(List<String> args) async {
     final ms = _firstInt(args);
-    if (ms == null) return _usageError('seek 需要毫秒位置，如 `seek 30000`');
+    if (ms == null) return _usageError('seek');
     return _emitSend('POST', '/api/player/seek', {'positionMs': ms});
   }
 
   Future<int> _cmdVolume(List<String> args) async {
-    if (args.isEmpty) return _usageError('volume 需要 0~1 的数值');
+    if (args.isEmpty) return _usageError('volume');
     final value = double.tryParse(args.first);
     if (value == null || value < 0 || value > 1) {
-      return _usageError('音量必须是 0~1 的数值');
+      return _usageError('volume');
     }
     return _emitSend('PUT', '/api/player/volume', {'volume': value});
   }
@@ -378,39 +391,39 @@ class _ShellContext {
   Future<int> _cmdRepeat(List<String> args) async {
     const allowed = ['off', 'list', 'one'];
     if (args.isEmpty || !allowed.contains(args.first)) {
-      return _usageError('repeat 需要 off / list / one');
+      return _usageError('repeat');
     }
     return _emitSend('PUT', '/api/player/repeat', {'mode': args.first});
   }
 
   Future<int> _cmdShuffle(List<String> args) async {
-    if (args.isEmpty) return _usageError('shuffle 需要 on / off');
+    if (args.isEmpty) return _usageError('shuffle');
     final enabled = _parseOnOff(args.first);
-    if (enabled == null) return _usageError('shuffle 需要 on / off');
+    if (enabled == null) return _usageError('shuffle');
     return _emitSend('PUT', '/api/player/shuffle', {'enabled': enabled});
   }
 
   Future<int> _cmdQuality(List<String> args) async {
     const allowed = ['lq', 'sq', 'hq', 'lossless', 'hi-res'];
     if (args.isEmpty || !allowed.contains(args.first)) {
-      return _usageError('quality 需要 ${allowed.join(' / ')}');
+      return _usageError('quality');
     }
     return _emitSend('PUT', '/api/player/quality', {'quality': args.first});
   }
 
   Future<int> _cmdPlayTrack(List<String> args) async {
-    if (args.isEmpty) return _usageError('play-track 需要一个曲目 ref');
+    if (args.isEmpty) return _usageError('play-track');
     return _emitSend('POST', '/api/player/track', {'ref': args.first});
   }
 
   Future<int> _cmdSearch(List<String> args) async {
-    if (args.isEmpty) return _usageError('search 需要 <音源> <关键词>');
+    if (args.isEmpty) return _usageError('search');
     final source = args.first;
     final rest = args.sublist(1);
     final limit = _flagInt(rest, const ['-n', '--limit'], 20);
     final page = _flagInt(rest, const ['-p', '--page'], 1);
     final query = _joinQuery(_stripFlags(rest));
-    if (query.isEmpty) return _usageError('search 缺少关键词');
+    if (query.isEmpty) return _usageError('search');
     return _emitGet('/api/search', {
       'source': source,
       'q': query,
@@ -422,7 +435,7 @@ class _ShellContext {
   Future<int> _cmdSearchAll(List<String> args) async {
     final limit = _flagInt(args, const ['-n', '--limit'], 10);
     final query = _joinQuery(args);
-    if (query.isEmpty) return _usageError('search-all 缺少关键词');
+    if (query.isEmpty) return _usageError('search-all');
     return _cmdTool('search_all', {'query': query, 'limitPerSource': limit});
   }
 
@@ -434,11 +447,11 @@ class _ShellContext {
         return _emitGet('/api/queue');
       case 'play':
         final index = _firstInt(rest);
-        if (index == null) return _usageError('queue play 需要索引');
+        if (index == null) return _usageError('queue');
         return _emitSend('POST', '/api/queue/play', {'index': index});
       case 'add':
         final refs = _stripFlags(rest);
-        if (refs.isEmpty) return _usageError('queue add 需要曲目 ref');
+        if (refs.isEmpty) return _usageError('queue');
         final position = _flagValue(args, const ['--position']) ?? 'next';
         return _emitSend('POST', '/api/queue/add', {
           'tracks': refs,
@@ -447,14 +460,14 @@ class _ShellContext {
       case 'rm':
       case 'remove':
         final index = _firstInt(rest);
-        if (index == null) return _usageError('queue rm 需要索引');
+        if (index == null) return _usageError('queue');
         return _emitSend('DELETE', '/api/queue/tracks/$index');
       case 'move':
-        if (rest.length < 2) return _usageError('queue move 需要 from 与 to');
+        if (rest.length < 2) return _usageError('queue');
         final from = int.tryParse(rest[0]);
         final to = int.tryParse(rest[1]);
         if (from == null || to == null) {
-          return _usageError('queue move 的 from/to 必须是整数');
+          return _usageError('queue');
         }
         return _emitSend('PUT', '/api/queue/tracks/move', {
           'from': from,
@@ -463,7 +476,7 @@ class _ShellContext {
       case 'clear':
         return _emitSend('DELETE', '/api/queue');
       default:
-        return _usageError('未知 queue 子命令: $sub');
+        return _usageError('queue');
     }
   }
 
@@ -488,13 +501,13 @@ class _ShellContext {
   Future<int> _cmdTheme(List<String> args) async {
     const allowed = ['light', 'dark', 'system'];
     if (args.isEmpty || !allowed.contains(args.first)) {
-      return _usageError('theme 需要 light / dark / system');
+      return _usageError('theme');
     }
     return _cmdTool('set_theme_mode', {'mode': args.first});
   }
 
   Future<int> _cmdLike(String command, List<String> args) async {
-    if (args.isEmpty) return _usageError('$command 需要一个曲目 ref');
+    if (args.isEmpty) return _usageError(command);
     const tool = {
       'like': 'like_track',
       'unlike': 'unlike_track',
@@ -504,7 +517,7 @@ class _ShellContext {
   }
 
   Future<int> _cmdListLiked(List<String> args) async {
-    if (args.isEmpty) return _usageError('list-liked 需要 <音源>');
+    if (args.isEmpty) return _usageError('list-liked');
     final limit = _flagInt(args, const ['-n', '--limit'], 100);
     return _cmdTool('list_liked', {'source': args.first, 'limit': limit});
   }
@@ -517,7 +530,7 @@ class _ShellContext {
         return _cmdTool('download_list', _limitArgs(rest, fallback: 50));
       case 'add':
         final refs = _stripFlags(rest);
-        if (refs.isEmpty) return _usageError('download add 需要曲目 ref');
+        if (refs.isEmpty) return _usageError('download');
         final quality = _flagValue(rest, const ['--quality']);
         var code = 0;
         for (final ref in refs) {
@@ -529,30 +542,30 @@ class _ShellContext {
         }
         return code;
       case 'cancel':
-        if (rest.isEmpty) return _usageError('download cancel 需要任务 id');
+        if (rest.isEmpty) return _usageError('download');
         return _cmdTool('download_cancel', {'taskId': rest.first});
       case 'remove':
-        if (rest.isEmpty) return _usageError('download remove 需要任务 id');
+        if (rest.isEmpty) return _usageError('download');
         return _cmdTool('download_remove', {'taskId': rest.first});
       default:
-        return _usageError('未知 download 子命令: $sub');
+        return _usageError('download');
     }
   }
 
   Future<int> _cmdSleep(List<String> args) async {
-    if (args.isEmpty) return _usageError('sleep 需要 <分钟> 或 --end');
+    if (args.isEmpty) return _usageError('sleep');
     if (args.first == '--end' || args.first == 'end') {
       return _cmdTool('set_sleep_timer', {'endOfTrack': true});
     }
     final minutes = int.tryParse(args.first);
     if (minutes == null || minutes <= 0) {
-      return _usageError('sleep 分钟数必须是正整数');
+      return _usageError('sleep');
     }
     return _cmdTool('set_sleep_timer', {'minutes': minutes});
   }
 
   Future<int> _cmdCall(List<String> args) async {
-    if (args.isEmpty) return _usageError('call 需要 <工具名> [--json <参数>]');
+    if (args.isEmpty) return _usageError('call');
     final name = args.first;
     final rest = args.sublist(1);
     final raw = _flagValue(rest, const ['--json', '--body', '-d']);
@@ -561,11 +574,11 @@ class _ShellContext {
       try {
         final decoded = jsonDecode(raw);
         if (decoded is! Map) {
-          return _usageError('--json 必须是 JSON 对象');
+          return _usageError('call');
         }
         body = Map<String, dynamic>.from(decoded);
       } catch (_) {
-        return _usageError('--json 不是合法 JSON');
+        return _usageError('call');
       }
     }
     return _emitSend('POST', '/api/tools/$name', body);
@@ -813,9 +826,25 @@ class _ShellContext {
 
   // ── 参数解析辅助 ──────────────────────────────────────────────
 
-  int _usageError(String message) {
-    err.writeln('用法错误: $message');
-    err.writeln('运行 `archoerashell --help` 查看用法。');
+  /// 命令用法错误：打印本地化提示 + 该命令用法 + 通用提示。
+  int _usageError(String command) {
+    err.writeln(l10n.mcpShellUsageError);
+    final help = _commandHelp(command);
+    if (help != null) err.writeln(help);
+    err.writeln(l10n.mcpShellHint);
+    return 2;
+  }
+
+  /// 全局选项错误（缺值 / 端口非法 / 未知选项）。
+  int _optionError(String message) {
+    err.writeln(message);
+    return 2;
+  }
+
+  /// 未知命令。
+  int _unknownCommand(String command) {
+    err.writeln(l10n.mcpShellErrUnknownCommand(command: command));
+    err.writeln(l10n.mcpShellHint);
     return 2;
   }
 
@@ -906,146 +935,49 @@ class _ShellContext {
 
   // ── 用法 ─────────────────────────────────────────────────────
 
-  /// 各命令的用法（`<命令> --help` / `help <命令>`）。
-  static const Map<String, String> _commandHelp = {
-    'status': '用法: archoerashell status\n\n显示当前播放状态：播放/暂停、当前曲目、进度、音量、循环/随机。',
-    'now-playing': '用法: archoerashell now-playing\n\n只显示当前曲目与进度。',
-    'play': '用法: archoerashell play\n\n开始/继续播放。',
-    'pause': '用法: archoerashell pause\n\n暂停播放。',
-    'toggle': '用法: archoerashell toggle\n\n播放/暂停切换。',
-    'stop': '用法: archoerashell stop\n\n停止播放。',
-    'next': '用法: archoerashell next\n\n切到下一首。',
-    'prev': '用法: archoerashell prev\n\n切到上一首（同 previous）。',
-    'previous': '用法: archoerashell previous\n\n切到上一首（同 prev）。',
-    'seek':
-        '用法: archoerashell seek <毫秒>\n\n跳转到指定位置。\n示例: archoerashell seek 30000',
-    'volume': '用法: archoerashell volume <0..1>\n\n设置音量。\n示例: archoerashell volume 0.6',
-    'repeat': '用法: archoerashell repeat <off|list|one>\n\n设置循环模式。',
-    'shuffle': '用法: archoerashell shuffle <on|off>\n\n开关随机播放。',
-    'quality':
-        '用法: archoerashell quality <lq|sq|hq|lossless|hi-res>\n\n切换音质档位。',
-    'play-track': '用法: archoerashell play-track <ref>\n\n播放指定曲目（ref 形如 source:id）。\n示例: archoerashell play-track netease:186016',
-    'search':
-        '用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n'
-        '在指定音源搜索歌曲。\n'
-        '  音源: netease | kugou | qqmusic | neko\n'
-        '  -n, --limit <n>   返回条数（1~50，默认 20）\n'
-        '  -p, --page <n>    页码（从 1 开始）\n'
-        '示例: archoerashell search netease 周杰伦 -n 10',
-    'search-all':
-        '用法: archoerashell search-all <关键词> [-n 每源条数]\n\n'
-        '在全部已启用音源同时搜索，并按音源分组展示。\n'
-        '  -n, --limit <n>   每个音源条数（1~30，默认 10）',
-    'queue':
-        '用法: archoerashell queue [子命令]\n\n'
-        '  queue                     查看队列\n'
-        '  queue play <index>        播放指定队列项\n'
-        '  queue add <ref>...        入队（--position next|end，默认 next）\n'
-        '  queue rm <index>          移除队列项\n'
-        '  queue move <from> <to>    调整顺序\n'
-        '  queue clear               清空队列',
-    'library': '用法: archoerashell library [关键词] [-n 条数] [--offset n]\n\n搜索本地曲库；省略关键词则列出全部。',
-    'library-random':
-        '用法: archoerashell library-random [-n 条数]\n\n随机抽取本地曲目（默认 20）。',
-    'library-stats':
-        '用法: archoerashell library-stats\n\n本地曲库统计：曲目数 / 总大小 / 总时长。',
-    'prefs': '用法: archoerashell prefs [键...]\n\n读取应用偏好（只读，敏感键剔除）；省略键则返回全部。',
-    'theme': '用法: archoerashell theme <light|dark|system>\n\n切换主题模式。',
-    'like': '用法: archoerashell like <ref>\n\n收藏（红心）指定曲目。',
-    'unlike': '用法: archoerashell unlike <ref>\n\n取消收藏指定曲目。',
-    'like-status': '用法: archoerashell like-status <ref>\n\n查询指定曲目的收藏状态。',
-    'list-liked':
-        '用法: archoerashell list-liked <音源> [-n 条数]\n\n列出该音源「我喜欢的」（未登录为空）。',
-    'history': '用法: archoerashell history [-n 条数]\n\n播放历史（最近在前，默认 50）。',
-    'history-clear': '用法: archoerashell history-clear\n\n清空播放历史。',
-    'lyrics': '用法: archoerashell lyrics\n\n当前曲目的歌词行。',
-    'download':
-        '用法: archoerashell download [子命令]\n\n'
-        '  download [list] [-n 条数]           下载任务列表\n'
-        '  download add <ref>... [--quality]    加入下载\n'
-        '  download cancel <taskId>             取消任务\n'
-        '  download remove <taskId>             移除记录（不删文件）',
-    'sleep': '用法: archoerashell sleep <分钟> | sleep --end\n\n设置睡眠定时：倒计时分钟数，或 --end 在当前曲播完后暂停。',
-    'sleep-cancel': '用法: archoerashell sleep-cancel\n\n取消睡眠定时。',
-    'info': '用法: archoerashell info\n\n服务信息：应用版本、端口、端点、已启用能力。',
-    'tools': '用法: archoerashell tools\n\n列出已启用的工具（名称 / 能力组 / 说明）。',
-    'call':
-        '用法: archoerashell call <工具名> [--json \'<参数对象>\']\n\n'
-        '直接调用任意已启用工具，参数为 JSON 对象。\n'
-        '示例: archoerashell call set_theme_mode --json \'{"mode":"dark"}\'',
+  /// 各命令的用法（`<命令> --help` / `help <命令>`），跟随应用语言。
+  String? _commandHelp(String command) => switch (command) {
+    'status' => l10n.mcpShellHelpStatus,
+    'now-playing' => l10n.mcpShellHelpNowPlaying,
+    'play' => l10n.mcpShellHelpPlay,
+    'pause' => l10n.mcpShellHelpPause,
+    'toggle' => l10n.mcpShellHelpToggle,
+    'stop' => l10n.mcpShellHelpStop,
+    'next' => l10n.mcpShellHelpNext,
+    'prev' => l10n.mcpShellHelpPrev,
+    'previous' => l10n.mcpShellHelpPrevious,
+    'seek' => l10n.mcpShellHelpSeek,
+    'volume' => l10n.mcpShellHelpVolume,
+    'repeat' => l10n.mcpShellHelpRepeat,
+    'shuffle' => l10n.mcpShellHelpShuffle,
+    'quality' => l10n.mcpShellHelpQuality,
+    'play-track' => l10n.mcpShellHelpPlayTrack,
+    'search' => l10n.mcpShellHelpSearch,
+    'search-all' => l10n.mcpShellHelpSearchAll,
+    'queue' => l10n.mcpShellHelpQueue,
+    'library' => l10n.mcpShellHelpLibrary,
+    'library-random' => l10n.mcpShellHelpLibraryRandom,
+    'library-stats' => l10n.mcpShellHelpLibraryStats,
+    'prefs' => l10n.mcpShellHelpPrefs,
+    'theme' => l10n.mcpShellHelpTheme,
+    'like' => l10n.mcpShellHelpLike,
+    'unlike' => l10n.mcpShellHelpUnlike,
+    'like-status' => l10n.mcpShellHelpLikeStatus,
+    'list-liked' => l10n.mcpShellHelpListLiked,
+    'history' => l10n.mcpShellHelpHistory,
+    'history-clear' => l10n.mcpShellHelpHistoryClear,
+    'lyrics' => l10n.mcpShellHelpLyrics,
+    'download' => l10n.mcpShellHelpDownload,
+    'sleep' => l10n.mcpShellHelpSleep,
+    'sleep-cancel' => l10n.mcpShellHelpSleepCancel,
+    'info' => l10n.mcpShellHelpInfo,
+    'tools' => l10n.mcpShellHelpTools,
+    'call' => l10n.mcpShellHelpCall,
+    _ => null,
   };
 
   void _usage(StringSink sink) {
-    sink.writeln('''
-archoerashell — ArchoeraMusic 命令行控制（类 Unix 语法）
-
-用法:
-  archoera_music archoerashell [全局选项] <命令> [参数...]
-
-提示:
-  「<命令> --help」或「help <命令>」查看单命令用法，如 `archoerashell search --help`。
-
-全局选项:
-  -h, --help            显示本帮助
-  -V, --version         显示版本
-  -j, --json            以 JSON 输出（便于脚本处理）
-  -q, --quiet           只输出错误
-      --host <host>     服务地址（默认 127.0.0.1）
-  -p, --port <port>     服务端口（默认取应用设置）
-  -k, --key  <key>      访问密钥（默认取应用设置）
-
-播放:
-  status                播放状态
-  now-playing           当前曲目
-  play | pause | toggle | stop | next | prev
-  seek <ms>             跳转毫秒位置
-  volume <0..1>         设置音量
-  repeat <off|list|one> 循环模式
-  shuffle <on|off>      随机播放
-  quality <lq|sq|hq|lossless|hi-res>
-  play-track <ref>      播放指定曲目
-
-队列:
-  queue [list]          查看队列
-  queue play <index>    播放队列项
-  queue add <ref>...    入队（--position next|end）
-  queue rm <index>      移除队列项
-  queue move <from> <to>
-  queue clear           清空队列
-
-搜索 / 曲库:
-  search <source> <关键词> [-n 条数] [-p 页码]
-  search-all <关键词> [-n 每源条数]
-  library [关键词] [-n 条数] [--offset n]
-  library-random [-n 条数]
-  library-stats
-
-收藏 / 历史 / 歌词:
-  like <ref> | unlike <ref> | like-status <ref>
-  list-liked <source> [-n 条数]
-  history [-n 条数] | history-clear
-  lyrics
-
-下载:
-  download [list] [-n 条数]
-  download add <ref>... [--quality <档位>]
-  download cancel <taskId>
-  download remove <taskId>
-
-其它:
-  theme <light|dark|system>
-  sleep <分钟> | sleep --end | sleep-cancel
-  prefs [键...]          读取应用偏好
-  tools                  列出已启用工具
-  info                   服务信息
-  call <工具名> [--json '<参数对象>']
-
-示例:
-  archoera_music archoerashell status
-  archoera_music archoerashell search netease 周杰伦 -n 10
-  archoera_music archoerashell play-track netease:186016
-  archoera_music archoerashell --json library 周杰伦
-''');
+    sink.writeln(l10n.mcpShellUsage);
   }
 }
 

@@ -9313,6 +9313,304 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'命令示例已复制'**
   String get settingsMcpShellCopied;
+
+  /// No description provided for @mcpShellUsage.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'archoerashell — ArchoeraMusic 命令行控制（类 Unix 语法）\n\n用法:\n  archoera_music archoerashell [全局选项] <命令> [参数...]\n\n提示:\n  「<命令> --help」或「help <命令>」查看单命令用法。\n\n全局选项:\n  -h, --help            显示本帮助\n  -V, --version         显示版本\n  -j, --json            以 JSON 输出（便于脚本处理）\n  -q, --quiet           只输出错误\n      --host <host>     服务地址（默认 127.0.0.1）\n  -p, --port <port>     服务端口（默认取应用设置）\n  -k, --key  <key>      访问密钥（默认取应用设置）\n\n播放:\n  status / now-playing / play|pause|toggle|stop|next|prev\n  seek <ms> / volume <0..1> / repeat <off|list|one> / shuffle <on|off>\n  quality <lq|sq|hq|lossless|hi-res> / play-track <ref>\n\n队列:\n  queue [list|play <index>|add <ref>...|rm <index>|move <from> <to>|clear]\n\n搜索 / 曲库:\n  search <source> <关键词> [-n n] [-p page]\n  search-all <关键词> [-n n]\n  library [关键词] [-n n] [--offset n] / library-random / library-stats\n\n收藏 / 历史 / 歌词:\n  like|unlike|like-status <ref> / list-liked <source> [-n n]\n  history [-n n] / history-clear / lyrics\n\n下载:\n  download [list|add <ref>... [--quality <档>]|cancel <id>|remove <id>]\n\n其它:\n  theme <light|dark|system> / sleep <分钟>|--end / sleep-cancel\n  prefs [键...] / tools / info / call <工具名> [--json <参数JSON>]\n\n示例:\n  archoera_music archoerashell status\n  archoera_music archoerashell search netease 周杰伦 -n 10\n  archoera_music archoerashell play-track netease:186016\n  archoera_music archoerashell --json library 周杰伦'**
+  String get mcpShellUsage;
+
+  /// No description provided for @mcpShellHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'「<命令> --help」或「help <命令>」查看单命令用法，如 archoerashell search --help。'**
+  String get mcpShellHint;
+
+  /// No description provided for @mcpShellUsageError.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法错误'**
+  String get mcpShellUsageError;
+
+  /// No description provided for @mcpShellErrorPrefix.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'错误'**
+  String get mcpShellErrorPrefix;
+
+  /// No description provided for @mcpShellDisabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'archoerashell 已在设置中禁用（设置 → MCP 接入 → 命令行 shell）。'**
+  String get mcpShellDisabled;
+
+  /// No description provided for @mcpShellHelpStatus.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell status\n\n显示当前播放状态：播放/暂停、当前曲目、进度、音量、循环/随机。'**
+  String get mcpShellHelpStatus;
+
+  /// No description provided for @mcpShellHelpNowPlaying.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell now-playing\n\n只显示当前曲目与进度。'**
+  String get mcpShellHelpNowPlaying;
+
+  /// No description provided for @mcpShellHelpPlay.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell play\n\n开始/继续播放。'**
+  String get mcpShellHelpPlay;
+
+  /// No description provided for @mcpShellHelpPause.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell pause\n\n暂停播放。'**
+  String get mcpShellHelpPause;
+
+  /// No description provided for @mcpShellHelpToggle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell toggle\n\n播放/暂停切换。'**
+  String get mcpShellHelpToggle;
+
+  /// No description provided for @mcpShellHelpStop.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell stop\n\n停止播放。'**
+  String get mcpShellHelpStop;
+
+  /// No description provided for @mcpShellHelpNext.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell next\n\n切到下一首。'**
+  String get mcpShellHelpNext;
+
+  /// No description provided for @mcpShellHelpPrev.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell prev\n\n切到上一首（同 previous）。'**
+  String get mcpShellHelpPrev;
+
+  /// No description provided for @mcpShellHelpPrevious.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell previous\n\n切到上一首（同 prev）。'**
+  String get mcpShellHelpPrevious;
+
+  /// No description provided for @mcpShellHelpSeek.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell seek <毫秒>\n\n跳转到指定位置。\n示例: archoerashell seek 30000'**
+  String get mcpShellHelpSeek;
+
+  /// No description provided for @mcpShellHelpVolume.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell volume <0..1>\n\n设置音量。\n示例: archoerashell volume 0.6'**
+  String get mcpShellHelpVolume;
+
+  /// No description provided for @mcpShellHelpRepeat.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell repeat <off|list|one>\n\n设置循环模式。'**
+  String get mcpShellHelpRepeat;
+
+  /// No description provided for @mcpShellHelpShuffle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell shuffle <on|off>\n\n开关随机播放。'**
+  String get mcpShellHelpShuffle;
+
+  /// No description provided for @mcpShellHelpQuality.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell quality <lq|sq|hq|lossless|hi-res>\n\n切换音质档位。'**
+  String get mcpShellHelpQuality;
+
+  /// No description provided for @mcpShellHelpPlayTrack.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell play-track <ref>\n\n播放指定曲目（ref 形如 source:id）。\n示例: archoerashell play-track netease:186016'**
+  String get mcpShellHelpPlayTrack;
+
+  /// No description provided for @mcpShellHelpSearch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n在指定音源搜索歌曲。\n  音源: netease | kugou | qqmusic | neko\n  -n, --limit <n>   返回条数（1~50，默认 20）\n  -p, --page <n>    页码（从 1 开始）\n示例: archoerashell search netease 周杰伦 -n 10'**
+  String get mcpShellHelpSearch;
+
+  /// No description provided for @mcpShellHelpSearchAll.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell search-all <关键词> [-n 每源条数]\n\n在全部已启用音源同时搜索，并按音源分组展示。\n  -n, --limit <n>   每个音源条数（1~30，默认 10）'**
+  String get mcpShellHelpSearchAll;
+
+  /// No description provided for @mcpShellHelpQueue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell queue [子命令]\n\n  queue                     查看队列\n  queue play <index>        播放指定队列项\n  queue add <ref>...        入队（--position next|end，默认 next）\n  queue rm <index>          移除队列项\n  queue move <from> <to>    调整顺序\n  queue clear               清空队列'**
+  String get mcpShellHelpQueue;
+
+  /// No description provided for @mcpShellHelpLibrary.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell library [关键词] [-n 条数] [--offset n]\n\n搜索本地曲库；省略关键词则列出全部。'**
+  String get mcpShellHelpLibrary;
+
+  /// No description provided for @mcpShellHelpLibraryRandom.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell library-random [-n 条数]\n\n随机抽取本地曲目（默认 20）。'**
+  String get mcpShellHelpLibraryRandom;
+
+  /// No description provided for @mcpShellHelpLibraryStats.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell library-stats\n\n本地曲库统计：曲目数 / 总大小 / 总时长。'**
+  String get mcpShellHelpLibraryStats;
+
+  /// No description provided for @mcpShellHelpPrefs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell prefs [键...]\n\n读取应用偏好（只读，敏感键剔除）；省略键则返回全部。'**
+  String get mcpShellHelpPrefs;
+
+  /// No description provided for @mcpShellHelpTheme.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell theme <light|dark|system>\n\n切换主题模式。'**
+  String get mcpShellHelpTheme;
+
+  /// No description provided for @mcpShellHelpLike.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell like <ref>\n\n收藏（红心）指定曲目。'**
+  String get mcpShellHelpLike;
+
+  /// No description provided for @mcpShellHelpUnlike.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell unlike <ref>\n\n取消收藏指定曲目。'**
+  String get mcpShellHelpUnlike;
+
+  /// No description provided for @mcpShellHelpLikeStatus.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell like-status <ref>\n\n查询指定曲目的收藏状态。'**
+  String get mcpShellHelpLikeStatus;
+
+  /// No description provided for @mcpShellHelpListLiked.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell list-liked <音源> [-n 条数]\n\n列出该音源「我喜欢的」（未登录为空）。'**
+  String get mcpShellHelpListLiked;
+
+  /// No description provided for @mcpShellHelpHistory.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell history [-n 条数]\n\n播放历史（最近在前，默认 50）。'**
+  String get mcpShellHelpHistory;
+
+  /// No description provided for @mcpShellHelpHistoryClear.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell history-clear\n\n清空播放历史。'**
+  String get mcpShellHelpHistoryClear;
+
+  /// No description provided for @mcpShellHelpLyrics.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell lyrics\n\n当前曲目的歌词行。'**
+  String get mcpShellHelpLyrics;
+
+  /// No description provided for @mcpShellHelpDownload.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell download [子命令]\n\n  download [list] [-n 条数]           下载任务列表\n  download add <ref>... [--quality]    加入下载\n  download cancel <taskId>             取消任务\n  download remove <taskId>             移除记录（不删文件）'**
+  String get mcpShellHelpDownload;
+
+  /// No description provided for @mcpShellHelpSleep.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell sleep <分钟> | sleep --end\n\n设置睡眠定时：倒计时分钟数，或 --end 在当前曲播完后暂停。'**
+  String get mcpShellHelpSleep;
+
+  /// No description provided for @mcpShellHelpSleepCancel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell sleep-cancel\n\n取消睡眠定时。'**
+  String get mcpShellHelpSleepCancel;
+
+  /// No description provided for @mcpShellHelpInfo.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell info\n\n服务信息：应用版本、端口、端点、已启用能力。'**
+  String get mcpShellHelpInfo;
+
+  /// No description provided for @mcpShellHelpTools.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell tools\n\n列出已启用的工具（名称 / 能力组 / 说明）。'**
+  String get mcpShellHelpTools;
+
+  /// No description provided for @mcpShellHelpCall.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'用法: archoerashell call <工具名> [--json <参数JSON>]\n\n直接调用任意已启用工具，参数为 JSON 对象。'**
+  String get mcpShellHelpCall;
+
+  /// No description provided for @mcpShellErrUnknownCommand.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未知命令: {command}'**
+  String mcpShellErrUnknownCommand({required String command});
+
+  /// No description provided for @mcpShellErrUnknownOption.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未知选项: {option}'**
+  String mcpShellErrUnknownOption({required String option});
+
+  /// No description provided for @mcpShellErrNeedValue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'选项 {option} 需要参数'**
+  String mcpShellErrNeedValue({required String option});
+
+  /// No description provided for @mcpShellErrBadPort.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'端口非法: {value}'**
+  String mcpShellErrBadPort({required String value});
+
+  /// No description provided for @mcpShellErrConnect.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无法连接 {host}:{port}（{reason}）'**
+  String mcpShellErrConnect({
+    required String host,
+    required int port,
+    required String reason,
+  });
+
+  /// No description provided for @mcpShellErrConnectHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请确认应用正在运行，且已在「设置 → MCP 接入」中启用服务。'**
+  String get mcpShellErrConnectHint;
+
+  /// No description provided for @mcpShellErrHttp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'HTTP 错误: {message}'**
+  String mcpShellErrHttp({required String message});
+
+  /// No description provided for @mcpShellErrTimeout.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'连接超时: {host}:{port}'**
+  String mcpShellErrTimeout({required String host, required int port});
 }
 
 class _AppLocalizationsDelegate

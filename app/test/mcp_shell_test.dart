@@ -4,6 +4,8 @@
 
 // archoerashell CLI 单测：命令解析、全局选项、REST/tool 映射与输出格式。
 import 'package:archoera_music/cli/mcp_shell.dart';
+import 'package:archoera_music/l10n/generated/app_localizations.dart';
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_test/flutter_test.dart';
 
 typedef _Handler = McpShellResponse Function(
@@ -46,6 +48,7 @@ class _FakeClient implements McpShellClient {
 Future<({int code, String out, String err, _FakeClient? client})> _runShell(
   List<String> args, {
   _Handler? handler,
+  AppLocalizations? l10n,
 }) async {
   final out = StringBuffer();
   final err = StringBuffer();
@@ -55,6 +58,7 @@ Future<({int code, String out, String err, _FakeClient? client})> _runShell(
     defaults: const McpShellOptions(port: 14559, key: 'secret'),
     clientFactory: (target) =>
         client = _FakeClient(target, handler ?? _okHandler),
+    l10n: l10n ?? lookupAppLocalizations(const Locale('zh')),
     out: out,
     err: err,
   );
@@ -97,6 +101,25 @@ void main() {
     final d = await _runShell(const ['help']);
     expect(d.code, 0);
     expect(d.out, contains('提示'));
+  });
+
+  test('文案跟随语言设置（en）', () async {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final help = await _runShell(const ['search', '--help'], l10n: en);
+    expect(help.code, 0);
+    expect(help.out, contains('Usage: archoerashell search'));
+
+    final unknown = await _runShell(const ['bogus'], l10n: en);
+    expect(unknown.code, 2);
+    expect(unknown.err, contains('Unknown command'));
+
+    final usage = await _runShell(const ['seek'], l10n: en);
+    expect(usage.code, 2);
+    expect(usage.err, contains('Usage error'));
+    expect(usage.err, contains('Usage: archoerashell seek'));
+
+    final total = await _runShell(const ['--help'], l10n: en);
+    expect(total.out, contains('Global options'));
   });
 
   test('无命令 / 未知命令为用法错误（退出码 2）', () async {
