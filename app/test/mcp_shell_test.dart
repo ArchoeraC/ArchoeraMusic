@@ -79,6 +79,26 @@ void main() {
     expect(result.out, contains('MCP'));
   });
 
+  test('子命令 --help / help <命令>', () async {
+    final a = await _runShell(const ['search', '--help']);
+    expect(a.code, 0);
+    expect(a.client, isNull);
+    expect(a.out, contains('archoerashell search'));
+    expect(a.out, contains('--limit'));
+
+    final b = await _runShell(const ['help', 'queue']);
+    expect(b.code, 0);
+    expect(b.out, contains('queue add'));
+
+    final c = await _runShell(const ['download', '-h']);
+    expect(c.code, 0);
+    expect(c.out, contains('download add'));
+
+    final d = await _runShell(const ['help']);
+    expect(d.code, 0);
+    expect(d.out, contains('提示'));
+  });
+
   test('无命令 / 未知命令为用法错误（退出码 2）', () async {
     expect((await _runShell(const [])).code, 2);
     final unknown = await _runShell(const ['bogus']);
