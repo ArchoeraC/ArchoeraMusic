@@ -21,13 +21,18 @@ void main() {
       // 0.9.20+5 → 0.9.20
       expect(clientVersion, appVersion.split('+').first);
       expect(clientVersion.contains('+'), isFalse);
-      expect(nekoUserAgent, 'ArchoeraMusic/$clientVersion');
       expect(nekoClientValue, 'archoera+$clientVersion');
+    });
+
+    test('请求头：UA 置空（服务端空 UA 放行）+ 携带 X-Neko-Client', () {
+      final h = nekoRequestHeaders;
+      expect(h['User-Agent'], '');
+      expect(h[kNekoClientHeader], 'archoera+$clientVersion');
     });
   });
 
   group('mediaHeadersForUrl', () {
-    test('NekoMusic 封面 / 头像附加 X-Neko-Client（不含 UA）', () {
+    test('NekoMusic 封面 / 头像附加标识头与浏览器特征头（不含 UA）', () {
       for (final url in const [
         'https://music.nekocore.cn/api/music/cover/42',
         'https://music.nekocore.cn/api/user/avatar/7?v=123',
@@ -35,8 +40,11 @@ void main() {
         final h = mediaHeadersForUrl(url);
         expect(h, isNotNull, reason: url);
         expect(h![kNekoClientHeader], startsWith('archoera+'));
-        // 站点图片只加标识头，避免与全局浏览器 UA 叠成双头。
+        // 站点图片走全局浏览器 UA、无法清空 UA；补齐 Accept + Accept-Language
+        // 以通过服务端「浏览器完整性」放行（见 neko_identity.dart 注释）。
         expect(h.containsKey('User-Agent'), isFalse);
+        expect(h['Accept'], isNotEmpty);
+        expect(h['Accept-Language'], isNotEmpty);
       }
     });
 

@@ -373,13 +373,26 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
           return WholeTrackPrepareResult.cancelled();
         }
         got += chunk.length;
-        if (got > limit || (knownLen > 0 && got > knownLen)) {
+        if (got > limit) {
           return WholeTrackPrepareResult.fail(
             '下载超过纯内存整首驻留上限（$got > $limit），中止（回退 URL 路径）',
             fail: MemorySourceFailDetail(
               MemorySourceFailKind.grewOverCeiling,
               got: got,
               limit: limit,
+            ),
+          );
+        }
+        // 实际收到的字节超过声明的 Content-Length（常见于响应被 gzip 后由
+        // `dart:io` 自动解压，或服务端声明有误）：这是「内容与声明不符」，
+        // **并非内存不足**——单独归类，避免弹出「5.4KiB > 787MiB」这类
+        // 自相矛盾的告警（下载失败的告警文案见 memorySourceFailDownload）。
+        if (knownLen > 0 && got > knownLen) {
+          return WholeTrackPrepareResult.fail(
+            '服务器返回内容超过声明的 Content-Length（$got > $knownLen），中止',
+            fail: MemorySourceFailDetail(
+              MemorySourceFailKind.downloadFailed,
+              error: '服务器返回内容与 Content-Length 不符',
             ),
           );
         }

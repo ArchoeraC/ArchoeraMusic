@@ -147,6 +147,10 @@ void decoder_apply_http_headers(AVDictionary **opts, const char *headers)
 {
     if (!opts || !headers || !headers[0]) return;
     char ua[256] = {0};
+    /* 是否显式提供了 User-Agent（即使值为空）：空值也要设进 user_agent，
+     * 否则 FFmpeg http 会用默认 `Lavf/…`（会被按客户端区分的服务端拦截）。
+     * 空 UA 是 NekoMusic 服务端「直接放行」的合法路径（见其防爬专项文档）。 */
+    int has_ua = 0;
     char extra[1024] = {0};
     const char *cur = headers;
     while (*cur) {
@@ -164,6 +168,7 @@ void decoder_apply_http_headers(AVDictionary **opts, const char *headers)
                 while (*val == ' ' || *val == '\t') val++;
                 if (decoder_header_name_is(name, "User-Agent")) {
                     snprintf(ua, sizeof(ua), "%s", val);
+                    has_ua = 1;
                 } else {
                     size_t used = strlen(extra);
                     if (used + 4 < sizeof(extra)) {
@@ -176,7 +181,7 @@ void decoder_apply_http_headers(AVDictionary **opts, const char *headers)
         cur = eol;
         while (*cur == '\r' || *cur == '\n') cur++;
     }
-    if (ua[0]) av_dict_set(opts, "user_agent", ua, 0);
+    if (has_ua) av_dict_set(opts, "user_agent", ua, 0);
     if (extra[0]) av_dict_set(opts, "headers", extra, 0);
 }
 

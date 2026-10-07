@@ -4,14 +4,23 @@
 
 /// NekoMusic 音源的客户端标识。
 ///
-/// NekoMusic 走统一 REST；服务端防爬对 `/api/*` 会区分客户端。我们**仅对发往
-/// NekoMusic 的请求**附加标识：
-/// - REST / SSE / 音频下载：`User-Agent: ArchoeraMusic/<版本>` + `X-Neko-Client`；
-/// - 站点图片（封面 / 头像，经全局 HttpClient）：仅 `X-Neko-Client`（`Image.network`
-///   以 `headers.add` 追加，再带 UA 会与全局浏览器 UA 叠成双头）。
+/// NekoMusic 服务端对 `/api/*` 的**防爬 / 客户端区分只看 `User-Agent`**
+/// （见专项文档《防爬与客户端识别》）：
+/// - 未知 UA：`POST` → `403`；`GET` → 直出对应 **SEO HTML**（非 JSON / 音频）；
+/// - **空 `User-Agent` → 直接放行**（为不发 UA 的桌面端保留的路径）；
+/// - 命中内置白名单（`okhttp` / `qt` / `ffmpeg` / `nekomusic` …）或
+///   「像真浏览器 + 特征头」亦放行。
 ///
-/// 全局 HttpClient 默认 UA 仍是浏览器 UA（第三方 CDN 需要，见 main.dart），
-/// **不在此覆盖**；服务端亦不针对本客户端做品牌白名单，放行完全靠通用标识头。
+/// 我们既不在其内置品牌白名单、也不冒名官方客户端，故按文档的**空 UA 放行**
+/// 路径走：把 `User-Agent` 显式置空（`dart:io` 默认 UA `Dart/…` 同样会被拦），
+/// 客户端身份改由 [kNekoClientHeader] 表达。FFmpeg AVIO 侧需同样发空 UA
+/// （见 `app/core/audio-engine/src/decoder.c` 的 `decoder_apply_http_headers`）。
+///
+/// 例外是**站点图片**（封面 / 头像）：它们经全局 HttpClient（浏览器 UA，见
+/// `main.dart` 的 `_BrowserUserAgentOverrides`）发起，`Image` / `NetworkImage`
+/// 以 `add` 语义追加请求头、**无法清空 UA**，故改走「浏览器完整性」放行路径——
+/// 补齐 `Accept` + `Accept-Language`（`dart:io` 默认不发 `Accept`），配合全局
+/// 浏览器 UA 即可放行。
 library;
 
 import '../../utils/app_version.dart';
@@ -19,31 +28,32 @@ import '../../utils/app_version.dart';
 /// 端名：客户端标识 `<端>+<版本>` 的前半段。
 const String kClientName = 'archoera';
 
-/// 产品名：Neko 请求 UA `ArchoeraMusic/<版本>` 的前缀（与实际产品名一致）。
-const String kProductName = 'ArchoeraMusic';
-
-/// 客户端标识头名（见后端 `API-防爬与客户端识别.md`）。
+/// 客户端标识头名（见后端《防爬与客户端识别》专项文档；供服务端识别来源）。
 const String kNekoClientHeader = 'X-Neko-Client';
 
-/// 版本占位：读取失败时用 `unknown`（后端按标识放行，不依赖版本）。
+/// 版本占位：读取失败时用 `unknown`（服务端放行不依赖版本）。
 String get _versionOrUnknown =>
     clientVersion.isEmpty ? 'unknown' : clientVersion;
-
-/// NekoMusic 请求专用 User-Agent：`ArchoeraMusic/<版本>`（非全局）。
-String get nekoUserAgent => '$kProductName/$_versionOrUnknown';
 
 /// 客户端标识值：`archoera+<版本>`。
 String get nekoClientValue => '$kClientName+$_versionOrUnknown';
 
-/// 发往 NekoMusic 的完整请求头（REST / SSE / 音频下载）。
+/// 发往 NekoMusic 的完整请求头（REST / SSE / 音频下载 / 引擎 AVIO / 原生 HTTP）。
+///
+/// `User-Agent` 显式置空 = 服务端「空 UA 放行」路径（详见库注释）。
 Map<String, String> get nekoRequestHeaders => {
-      'User-Agent': nekoUserAgent,
+      'User-Agent': '',
       kNekoClientHeader: nekoClientValue,
     };
 
-/// 发往 NekoMusic 的标识头（仅 [kNekoClientHeader]，供站点图片附加）。
+/// 发往 NekoMusic 站点图片（封面 / 头像）的请求头。
+///
+/// 图片经全局浏览器 UA 发起、无法清空 UA；补齐 `Accept` + `Accept-Language`
+/// 走服务端「浏览器完整性」放行路径（详见库注释）。
 Map<String, String> get nekoClientHeaderOnly => {
       kNekoClientHeader: nekoClientValue,
+      'Accept': 'image/*',
+      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     };
 
 /// 媒体请求头解析器：命中 NekoMusic 站点的图片资源（封面 / 头像）时返回标识头。
