@@ -264,4 +264,34 @@ void main() {
     expect(result.out, contains('T — A'));
     expect(result.out, isNot(contains('null')));
   });
+
+  test('search-all 按源分组展示（不再甩 JSON）', () async {
+    final result = await _runShell(
+      const ['search-all', 'hazy'],
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'query': 'hazy',
+        'results': [
+          {
+            'source': 'netease',
+            'total': 300,
+            'hasMore': true,
+            'tracks': [
+              {
+                'ref': 'netease:1',
+                'title': 'Hazy',
+                'artists': ['A'],
+              },
+            ],
+          },
+          {'source': 'kugou', 'error': 'boom', 'tracks': <Object?>[]},
+        ],
+      }),
+    );
+    expect(result.code, 0);
+    expect(result.out, contains('query: hazy'));
+    expect(result.out, contains('── netease（300+）'));
+    expect(result.out, contains('Hazy — A'));
+    expect(result.out, contains('── kugou：错误 boom'));
+    expect(result.out, isNot(contains('"source"')));
+  });
 }
