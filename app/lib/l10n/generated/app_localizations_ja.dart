@@ -5063,4 +5063,200 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsMcpShellCopied => '命令示例已复制';
+
+  @override
+  String get mcpShellUsage =>
+      'archoerashell — ArchoeraMusic 命令行控制（类 Unix 语法）\n\n用法:\n  archoera_music archoerashell [全局选项] <命令> [参数...]\n\n提示:\n  「<命令> --help」或「help <命令>」查看单命令用法。\n\n全局选项:\n  -h, --help            显示本帮助\n  -V, --version         显示版本\n  -j, --json            以 JSON 输出（便于脚本处理）\n  -q, --quiet           只输出错误\n      --host <host>     服务地址（默认 127.0.0.1）\n  -p, --port <port>     服务端口（默认取应用设置）\n  -k, --key  <key>      访问密钥（默认取应用设置）\n\n播放:\n  status / now-playing / play|pause|toggle|stop|next|prev\n  seek <ms> / volume <0..1> / repeat <off|list|one> / shuffle <on|off>\n  quality <lq|sq|hq|lossless|hi-res> / play-track <ref>\n\n队列:\n  queue [list|play <index>|add <ref>...|rm <index>|move <from> <to>|clear]\n\n搜索 / 曲库:\n  search <source> <关键词> [-n n] [-p page]\n  search-all <关键词> [-n n]\n  library [关键词] [-n n] [--offset n] / library-random / library-stats\n\n收藏 / 历史 / 歌词:\n  like|unlike|like-status <ref> / list-liked <source> [-n n]\n  history [-n n] / history-clear / lyrics\n\n下载:\n  download [list|add <ref>... [--quality <档>]|cancel <id>|remove <id>]\n\n其它:\n  theme <light|dark|system> / sleep <分钟>|--end / sleep-cancel\n  prefs [键...] / tools / info / call <工具名> [--json <参数JSON>]\n\n示例:\n  archoera_music archoerashell status\n  archoera_music archoerashell search netease 周杰伦 -n 10\n  archoera_music archoerashell play-track netease:186016\n  archoera_music archoerashell --json library 周杰伦';
+
+  @override
+  String get mcpShellHint =>
+      '「<命令> --help」或「help <命令>」查看单命令用法，如 archoerashell search --help。';
+
+  @override
+  String get mcpShellUsageError => '用法错误';
+
+  @override
+  String get mcpShellErrorPrefix => '错误';
+
+  @override
+  String get mcpShellDisabled =>
+      'archoerashell 已在设置中禁用（设置 → MCP 接入 → 命令行 shell）。';
+
+  @override
+  String get mcpShellHelpStatus =>
+      '用法: archoerashell status\n\n显示当前播放状态：播放/暂停、当前曲目、进度、音量、循环/随机。';
+
+  @override
+  String get mcpShellHelpNowPlaying =>
+      '用法: archoerashell now-playing\n\n只显示当前曲目与进度。';
+
+  @override
+  String get mcpShellHelpPlay => '用法: archoerashell play\n\n开始/继续播放。';
+
+  @override
+  String get mcpShellHelpPause => '用法: archoerashell pause\n\n暂停播放。';
+
+  @override
+  String get mcpShellHelpToggle => '用法: archoerashell toggle\n\n播放/暂停切换。';
+
+  @override
+  String get mcpShellHelpStop => '用法: archoerashell stop\n\n停止播放。';
+
+  @override
+  String get mcpShellHelpNext => '用法: archoerashell next\n\n切到下一首。';
+
+  @override
+  String get mcpShellHelpPrev => '用法: archoerashell prev\n\n切到上一首（同 previous）。';
+
+  @override
+  String get mcpShellHelpPrevious =>
+      '用法: archoerashell previous\n\n切到上一首（同 prev）。';
+
+  @override
+  String get mcpShellHelpSeek =>
+      '用法: archoerashell seek <毫秒>\n\n跳转到指定位置。\n示例: archoerashell seek 30000';
+
+  @override
+  String get mcpShellHelpVolume =>
+      '用法: archoerashell volume <0..1>\n\n设置音量。\n示例: archoerashell volume 0.6';
+
+  @override
+  String get mcpShellHelpRepeat =>
+      '用法: archoerashell repeat <off|list|one>\n\n设置循环模式。';
+
+  @override
+  String get mcpShellHelpShuffle =>
+      '用法: archoerashell shuffle <on|off>\n\n开关随机播放。';
+
+  @override
+  String get mcpShellHelpQuality =>
+      '用法: archoerashell quality <lq|sq|hq|lossless|hi-res>\n\n切换音质档位。';
+
+  @override
+  String get mcpShellHelpPlayTrack =>
+      '用法: archoerashell play-track <ref>\n\n播放指定曲目（ref 形如 source:id）。\n示例: archoerashell play-track netease:186016';
+
+  @override
+  String get mcpShellHelpSearch =>
+      '用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n在指定音源搜索歌曲。\n  音源: netease | kugou | qqmusic | neko\n  -n, --limit <n>   返回条数（1~50，默认 20）\n  -p, --page <n>    页码（从 1 开始）\n示例: archoerashell search netease 周杰伦 -n 10';
+
+  @override
+  String get mcpShellHelpSearchAll =>
+      '用法: archoerashell search-all <关键词> [-n 每源条数]\n\n在全部已启用音源同时搜索，并按音源分组展示。\n  -n, --limit <n>   每个音源条数（1~30，默认 10）';
+
+  @override
+  String get mcpShellHelpQueue =>
+      '用法: archoerashell queue [子命令]\n\n  queue                     查看队列\n  queue play <index>        播放指定队列项\n  queue add <ref>...        入队（--position next|end，默认 next）\n  queue rm <index>          移除队列项\n  queue move <from> <to>    调整顺序\n  queue clear               清空队列';
+
+  @override
+  String get mcpShellHelpLibrary =>
+      '用法: archoerashell library [关键词] [-n 条数] [--offset n]\n\n搜索本地曲库；省略关键词则列出全部。';
+
+  @override
+  String get mcpShellHelpLibraryRandom =>
+      '用法: archoerashell library-random [-n 条数]\n\n随机抽取本地曲目（默认 20）。';
+
+  @override
+  String get mcpShellHelpLibraryStats =>
+      '用法: archoerashell library-stats\n\n本地曲库统计：曲目数 / 总大小 / 总时长。';
+
+  @override
+  String get mcpShellHelpPrefs =>
+      '用法: archoerashell prefs [键...]\n\n读取应用偏好（只读，敏感键剔除）；省略键则返回全部。';
+
+  @override
+  String get mcpShellHelpTheme =>
+      '用法: archoerashell theme <light|dark|system>\n\n切换主题模式。';
+
+  @override
+  String get mcpShellHelpLike => '用法: archoerashell like <ref>\n\n收藏（红心）指定曲目。';
+
+  @override
+  String get mcpShellHelpUnlike =>
+      '用法: archoerashell unlike <ref>\n\n取消收藏指定曲目。';
+
+  @override
+  String get mcpShellHelpLikeStatus =>
+      '用法: archoerashell like-status <ref>\n\n查询指定曲目的收藏状态。';
+
+  @override
+  String get mcpShellHelpListLiked =>
+      '用法: archoerashell list-liked <音源> [-n 条数]\n\n列出该音源「我喜欢的」（未登录为空）。';
+
+  @override
+  String get mcpShellHelpHistory =>
+      '用法: archoerashell history [-n 条数]\n\n播放历史（最近在前，默认 50）。';
+
+  @override
+  String get mcpShellHelpHistoryClear =>
+      '用法: archoerashell history-clear\n\n清空播放历史。';
+
+  @override
+  String get mcpShellHelpLyrics => '用法: archoerashell lyrics\n\n当前曲目的歌词行。';
+
+  @override
+  String get mcpShellHelpDownload =>
+      '用法: archoerashell download [子命令]\n\n  download [list] [-n 条数]           下载任务列表\n  download add <ref>... [--quality]    加入下载\n  download cancel <taskId>             取消任务\n  download remove <taskId>             移除记录（不删文件）';
+
+  @override
+  String get mcpShellHelpSleep =>
+      '用法: archoerashell sleep <分钟> | sleep --end\n\n设置睡眠定时：倒计时分钟数，或 --end 在当前曲播完后暂停。';
+
+  @override
+  String get mcpShellHelpSleepCancel =>
+      '用法: archoerashell sleep-cancel\n\n取消睡眠定时。';
+
+  @override
+  String get mcpShellHelpInfo =>
+      '用法: archoerashell info\n\n服务信息：应用版本、端口、端点、已启用能力。';
+
+  @override
+  String get mcpShellHelpTools =>
+      '用法: archoerashell tools\n\n列出已启用的工具（名称 / 能力组 / 说明）。';
+
+  @override
+  String get mcpShellHelpCall =>
+      '用法: archoerashell call <工具名> [--json <参数JSON>]\n\n直接调用任意已启用工具，参数为 JSON 对象。';
+
+  @override
+  String mcpShellErrUnknownCommand({required String command}) {
+    return '未知命令: $command';
+  }
+
+  @override
+  String mcpShellErrUnknownOption({required String option}) {
+    return '未知选项: $option';
+  }
+
+  @override
+  String mcpShellErrNeedValue({required String option}) {
+    return '选项 $option 需要参数';
+  }
+
+  @override
+  String mcpShellErrBadPort({required String value}) {
+    return '端口非法: $value';
+  }
+
+  @override
+  String mcpShellErrConnect({
+    required String host,
+    required int port,
+    required String reason,
+  }) {
+    return '无法连接 $host:$port（$reason）';
+  }
+
+  @override
+  String get mcpShellErrConnectHint => '请确认应用正在运行，且已在「设置 → MCP 接入」中启用服务。';
+
+  @override
+  String mcpShellErrHttp({required String message}) {
+    return 'HTTP 错误: $message';
+  }
+
+  @override
+  String mcpShellErrTimeout({required String host, required int port}) {
+    return '连接超时: $host:$port';
+  }
 }

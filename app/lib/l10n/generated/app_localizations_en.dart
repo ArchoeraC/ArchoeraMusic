@@ -5238,4 +5238,208 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMcpShellCopied => 'Example command copied';
+
+  @override
+  String get mcpShellUsage =>
+      'archoerashell — ArchoeraMusic command-line control (Unix-like)\n\nUsage:\n  archoera_music archoerashell [global options] <command> [args...]\n\nHint:\n  <command> --help or help <command> for per-command usage.\n\nGlobal options:\n  -h, --help            Show this help\n  -V, --version         Show version\n  -j, --json            JSON output (for scripts)\n  -q, --quiet           Only print errors\n      --host <host>     Server host (default 127.0.0.1)\n  -p, --port <port>     Server port (default from app settings)\n  -k, --key  <key>      Access key (default from app settings)\n\nPlayback:\n  status / now-playing / play|pause|toggle|stop|next|prev\n  seek <ms> / volume <0..1> / repeat <off|list|one> / shuffle <on|off>\n  quality <lq|sq|hq|lossless|hi-res> / play-track <ref>\n\nQueue:\n  queue [list|play <index>|add <ref>...|rm <index>|move <from> <to>|clear]\n\nSearch / library:\n  search <source> <query> [-n n] [-p page]\n  search-all <query> [-n n]\n  library [query] [-n n] [--offset n] / library-random / library-stats\n\nFavourites / history / lyrics:\n  like|unlike|like-status <ref> / list-liked <source> [-n n]\n  history [-n n] / history-clear / lyrics\n\nDownloads:\n  download [list|add <ref>... [--quality <q>]|cancel <id>|remove <id>]\n\nOther:\n  theme <light|dark|system> / sleep <minutes>|--end / sleep-cancel\n  prefs [keys...] / tools / info / call <tool> [--json <json>]';
+
+  @override
+  String get mcpShellHint =>
+      'Run <command> --help or help <command> for per-command usage, e.g. archoerashell search --help.';
+
+  @override
+  String get mcpShellUsageError => 'Usage error';
+
+  @override
+  String get mcpShellErrorPrefix => 'Error';
+
+  @override
+  String get mcpShellDisabled =>
+      'archoerashell is disabled in Settings (MCP access → Command-line shell).';
+
+  @override
+  String get mcpShellHelpStatus =>
+      'Usage: archoerashell status\n\nShow current playback status: playing/paused, track, position, volume, repeat/shuffle.';
+
+  @override
+  String get mcpShellHelpNowPlaying =>
+      'Usage: archoerashell now-playing\n\nShow only the current track and position.';
+
+  @override
+  String get mcpShellHelpPlay =>
+      'Usage: archoerashell play\n\nStart/resume playback.';
+
+  @override
+  String get mcpShellHelpPause =>
+      'Usage: archoerashell pause\n\nPause playback.';
+
+  @override
+  String get mcpShellHelpToggle =>
+      'Usage: archoerashell toggle\n\nToggle play/pause.';
+
+  @override
+  String get mcpShellHelpStop => 'Usage: archoerashell stop\n\nStop playback.';
+
+  @override
+  String get mcpShellHelpNext =>
+      'Usage: archoerashell next\n\nSkip to the next track.';
+
+  @override
+  String get mcpShellHelpPrev =>
+      'Usage: archoerashell prev\n\nSkip to the previous track (same as previous).';
+
+  @override
+  String get mcpShellHelpPrevious =>
+      'Usage: archoerashell previous\n\nSkip to the previous track (same as prev).';
+
+  @override
+  String get mcpShellHelpSeek =>
+      'Usage: archoerashell seek <ms>\n\nSeek to the given position.\nExample: archoerashell seek 30000';
+
+  @override
+  String get mcpShellHelpVolume =>
+      'Usage: archoerashell volume <0..1>\n\nSet volume.\nExample: archoerashell volume 0.6';
+
+  @override
+  String get mcpShellHelpRepeat =>
+      'Usage: archoerashell repeat <off|list|one>\n\nSet repeat mode.';
+
+  @override
+  String get mcpShellHelpShuffle =>
+      'Usage: archoerashell shuffle <on|off>\n\nToggle shuffle.';
+
+  @override
+  String get mcpShellHelpQuality =>
+      'Usage: archoerashell quality <lq|sq|hq|lossless|hi-res>\n\nSwitch quality level.';
+
+  @override
+  String get mcpShellHelpPlayTrack =>
+      'Usage: archoerashell play-track <ref>\n\nPlay the given track (ref is source:id).\nExample: archoerashell play-track netease:186016';
+
+  @override
+  String get mcpShellHelpSearch =>
+      'Usage: archoerashell search <source> <query> [-n limit] [-p page]\n\nSearch songs on a source.\n  source: netease | kugou | qqmusic | neko\n  -n, --limit <n>   result count (1-50, default 20)\n  -p, --page <n>    page (1-based)\nExample: archoerashell search netease Jay -n 10';
+
+  @override
+  String get mcpShellHelpSearchAll =>
+      'Usage: archoerashell search-all <query> [-n per-source]\n\nSearch all enabled sources and group results by source.\n  -n, --limit <n>   results per source (1-30, default 10)';
+
+  @override
+  String get mcpShellHelpQueue =>
+      'Usage: archoerashell queue [subcommand]\n\n  queue                     Show the queue\n  queue play <index>        Play a queue item\n  queue add <ref>...        Enqueue (--position next|end, default next)\n  queue rm <index>          Remove a queue item\n  queue move <from> <to>    Reorder\n  queue clear               Clear the queue';
+
+  @override
+  String get mcpShellHelpLibrary =>
+      'Usage: archoerashell library [query] [-n limit] [--offset n]\n\nSearch the local library; omit query to list all.';
+
+  @override
+  String get mcpShellHelpLibraryRandom =>
+      'Usage: archoerashell library-random [-n limit]\n\nPick random local tracks (default 20).';
+
+  @override
+  String get mcpShellHelpLibraryStats =>
+      'Usage: archoerashell library-stats\n\nLocal library stats: track count / total size / total duration.';
+
+  @override
+  String get mcpShellHelpPrefs =>
+      'Usage: archoerashell prefs [keys...]\n\nRead app preferences (read-only; sensitive keys stripped); omit keys to return all.';
+
+  @override
+  String get mcpShellHelpTheme =>
+      'Usage: archoerashell theme <light|dark|system>\n\nSwitch theme mode.';
+
+  @override
+  String get mcpShellHelpLike =>
+      'Usage: archoerashell like <ref>\n\nFavourite (heart) the given track.';
+
+  @override
+  String get mcpShellHelpUnlike =>
+      'Usage: archoerashell unlike <ref>\n\nRemove the given track from favourites.';
+
+  @override
+  String get mcpShellHelpLikeStatus =>
+      'Usage: archoerashell like-status <ref>\n\nQuery whether the given track is favourited.';
+
+  @override
+  String get mcpShellHelpListLiked =>
+      'Usage: archoerashell list-liked <source> [-n limit]\n\nList liked tracks of the given source (empty when not signed in).';
+
+  @override
+  String get mcpShellHelpHistory =>
+      'Usage: archoerashell history [-n limit]\n\nPlay history (most recent first, default 50).';
+
+  @override
+  String get mcpShellHelpHistoryClear =>
+      'Usage: archoerashell history-clear\n\nClear the play history.';
+
+  @override
+  String get mcpShellHelpLyrics =>
+      'Usage: archoerashell lyrics\n\nLyric lines of the current track.';
+
+  @override
+  String get mcpShellHelpDownload =>
+      'Usage: archoerashell download [subcommand]\n\n  download [list] [-n limit]           List download tasks\n  download add <ref>... [--quality]     Enqueue a download\n  download cancel <taskId>              Cancel a task\n  download remove <taskId>              Remove the record (keeps the file)';
+
+  @override
+  String get mcpShellHelpSleep =>
+      'Usage: archoerashell sleep <minutes> | sleep --end\n\nSet a sleep timer: countdown minutes, or --end to pause after the current track.';
+
+  @override
+  String get mcpShellHelpSleepCancel =>
+      'Usage: archoerashell sleep-cancel\n\nCancel the sleep timer.';
+
+  @override
+  String get mcpShellHelpInfo =>
+      'Usage: archoerashell info\n\nService info: app version, port, endpoints, enabled capabilities.';
+
+  @override
+  String get mcpShellHelpTools =>
+      'Usage: archoerashell tools\n\nList enabled tools (name / capability / description).';
+
+  @override
+  String get mcpShellHelpCall =>
+      'Usage: archoerashell call <tool> [--json <json>]\n\nCall any enabled tool directly; arguments are a JSON object.';
+
+  @override
+  String mcpShellErrUnknownCommand({required String command}) {
+    return 'Unknown command: $command';
+  }
+
+  @override
+  String mcpShellErrUnknownOption({required String option}) {
+    return 'Unknown option: $option';
+  }
+
+  @override
+  String mcpShellErrNeedValue({required String option}) {
+    return 'Option $option requires a value';
+  }
+
+  @override
+  String mcpShellErrBadPort({required String value}) {
+    return 'Invalid port: $value';
+  }
+
+  @override
+  String mcpShellErrConnect({
+    required String host,
+    required int port,
+    required String reason,
+  }) {
+    return 'Cannot connect to $host:$port ($reason)';
+  }
+
+  @override
+  String get mcpShellErrConnectHint =>
+      'Make sure the app is running and MCP access is enabled in Settings.';
+
+  @override
+  String mcpShellErrHttp({required String message}) {
+    return 'HTTP error: $message';
+  }
+
+  @override
+  String mcpShellErrTimeout({required String host, required int port}) {
+    return 'Connection timed out: $host:$port';
+  }
 }
