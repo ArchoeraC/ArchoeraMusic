@@ -29,9 +29,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
 
+  // CLI 模式（archoerashell）：不显示窗口，仅让引擎运行 Dart 后退出。
+  bool headless = false;
+  for (const std::string& argument : command_line_arguments) {
+    if (argument == "archoerashell") {
+      headless = true;
+      break;
+    }
+  }
+
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
-  FlutterWindow window(project);
+  FlutterWindow window(project, headless);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
   if (!window.Create(L"archoera_music", origin, size)) {
