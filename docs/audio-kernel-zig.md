@@ -688,8 +688,15 @@ pub const Reader = struct {
 >   `decoder_open_headers` 与 AVIO 路径复用。
 > - Dart：`EngineBindings.create(headers)` → `AudioEngineProcess.start(headers)` →
 >   `engineHeadersForTrack(track)`（取自 `SourcePlatform.mediaHeaders`，Neko 源为
->   `X-Neko-Client: archoera+<版本>` + `User-Agent: ArchoeraMusic/<版本>`，版本启动时自
->   `pubspec.yaml` 读取，**不硬编码**）。旧库缺 `_with_headers` 符号时自动回退。
+>   `X-Neko-Client: archoera+<版本>` + **空 `User-Agent`**，版本启动时自 `pubspec.yaml`
+>   读取，**不硬编码**）。旧库缺 `_with_headers` 符号时自动回退。
+> - **修正（2026-10-07，后续）**：NekoMusic 服务端 `/api/*` 防爬**只看 `User-Agent`**，
+>   未知 UA 的 `POST` → 403、`GET` → 直出 SEO HTML（非 302，也不认 `X-Neko-Client`）；
+>   其文档为不发 UA 的桌面端保留「**空 UA 直接放行**」。客户端据此改走空 UA：REST/SSE/
+>   下载/引擎 AVIO/内核原生 HTTP 一律显式置空 `User-Agent`（`dart:io` 默认 `Dart/…`
+>   会被拦）。故 `decoder_apply_http_headers` 对**空值**也须写入 `user_agent`，否则 FFmpeg
+>   回落默认 `Lavf/…` 同样被拦。封面/头像经全局浏览器 UA 的图片请求无法清空 UA，改补
+>   `Accept` + `Accept-Language` 走其「浏览器完整性」放行。
 > - FFmpeg 在线 TLS：Linux/macOS 由 `build-ffmpeg-minimal.sh` 构建**自包含 mbedTLS**
 >   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-tls` 标记重建）；
 >   Windows 经 vcpkg ffmpeg 端口的 **Schannel**（未启用 `openssl` 特性时自动
