@@ -4,6 +4,23 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [0.9.20+6] - 2026-10-07
+
+> [!NOTE]
+> 猫猫从此有了自己的身份证，也学会了走 https 喵
+
+你好喵～
+本次带来了以下的更新喵：
+
+1、NekoMusic 接入客户端标识——在线播放会带上 `X-Neko-Client` 与对应 `User-Agent`（版本从 `pubspec.yaml` 读，不硬编码），不再被后端当成脚本丢进 HTML 页面，探测失败的问题修好了
+2、在线播放的自定义请求头现在能一路透传到解码内核（Zig 原生 HTTP → C 壳 → Dart 全打通），重定向也会保留；老引擎缺符号会自动回退
+3、给自建的最小 FFmpeg 补上了**在线 TLS**：Linux/macOS 静态内嵌 mbedTLS，Windows 走系统原生 Schannel，https 直链不再「Protocol not found」
+4、Opus 解码砍了一大波指令：CELT 去加重、PVQ、位读取、KissFFT、PCM 整型转 f32 都做了逐 lane 向量化 / 无分支化，**输出逐位一致**，立体声 CELT 指令数 −47.5%，同口径已略微快过内嵌 libopus 的 FFmpeg
+5、刷了一版依赖锁文件
+6、顺手把自包含 TLS 链子上的几个坑填平（mbedTLS 下载地址、FFmpeg `--enable-version3`、静态库 PIC、Nix 装 lib64、macOS 自带 bash 3.2 的全角字符），三端构建恢复全绿
+
+我喜欢你！
+
 ## [0.9.20+5] - 2026-10-06
 
 > [!NOTE]
