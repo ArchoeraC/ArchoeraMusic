@@ -4797,6 +4797,194 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsRegisterProtocolFailed => '协议注册失败';
+
+  @override
+  String get settingsCatMcp => 'MCP 接入';
+
+  @override
+  String get settingsMcpSubtitle => '本地 MCP 控制接口（默认关闭）';
+
+  @override
+  String get settingsMcpTitle => 'MCP 控制服务';
+
+  @override
+  String get settingsMcpNote =>
+      '开启后仅监听本机回环地址 127.0.0.1，普通用户即可运行，无需管理员权限。所有能力默认关闭，按需逐组开启；关闭总开关即停止监听。';
+
+  @override
+  String get settingsMcpEnable => '启用 MCP 控制';
+
+  @override
+  String get settingsMcpEnableOn => '已开启，端口正在监听';
+
+  @override
+  String get settingsMcpEnableOff => '默认关闭';
+
+  @override
+  String get settingsMcpPort => '监听端口';
+
+  @override
+  String get settingsMcpPortDesc => '1024~65535；修改后自动重启监听';
+
+  @override
+  String get settingsMcpKey => '访问密钥';
+
+  @override
+  String get settingsMcpKeyCopy => '复制';
+
+  @override
+  String get settingsMcpKeyRegenerate => '重新生成密钥';
+
+  @override
+  String get settingsMcpKeyCopied => '访问密钥已复制';
+
+  @override
+  String get settingsMcpKeyRegenerated => '访问密钥已重新生成';
+
+  @override
+  String get settingsMcpAllowKeyless => '允许免密钥访问';
+
+  @override
+  String get settingsMcpAllowKeylessDesc => '关闭更安全；开启后本机任意程序均可直接访问';
+
+  @override
+  String get settingsMcpCapsTitle => '能力开关';
+
+  @override
+  String get settingsMcpCapsNote => '每组能力独立控制；未开启的能力不会出现在 MCP 工具列表与 REST 接口中。';
+
+  @override
+  String get settingsMcpCapRead => '读取状态';
+
+  @override
+  String get settingsMcpCapReadDesc => '播放状态、当前曲目、队列、服务信息与音源列表';
+
+  @override
+  String get settingsMcpCapPlayback => '播放控制';
+
+  @override
+  String get settingsMcpCapPlaybackDesc => '播放/暂停/停止、切歌、跳转、音量、循环/随机、音质、播放指定曲目';
+
+  @override
+  String get settingsMcpCapQueue => '队列操作';
+
+  @override
+  String get settingsMcpCapQueueDesc => '添加/移除/移动队列项、播放指定队列项、清空队列';
+
+  @override
+  String get settingsMcpCapSearch => '在线搜索';
+
+  @override
+  String get settingsMcpCapSearchDesc => '在网易云/酷狗/QQ 音乐等音源搜索歌曲';
+
+  @override
+  String get settingsMcpCapLibrary => '本地曲库';
+
+  @override
+  String get settingsMcpCapLibraryDesc => '搜索本地曲库、随机抽曲、曲库统计';
+
+  @override
+  String get settingsMcpCapPreferences => '读取偏好';
+
+  @override
+  String get settingsMcpCapPreferencesDesc => '只读返回应用偏好（敏感字段自动剔除）';
+
+  @override
+  String get settingsMcpEndpointsTitle => '连接地址';
+
+  @override
+  String settingsMcpStatusRunning({required int port}) {
+    return '运行中 · 端口 $port';
+  }
+
+  @override
+  String get settingsMcpStatusStopped => '未运行';
+
+  @override
+  String get settingsMcpStatusError => '启动失败（端口可能被占用）';
+
+  @override
+  String get settingsMcpStatusDesc =>
+      'MCP 面向智能体客户端；REST / WebSocket 供脚本与其它程序接入';
+
+  @override
+  String get settingsMcpEndpointMcp => 'MCP（Streamable HTTP）';
+
+  @override
+  String get settingsMcpEndpointRest => 'REST API';
+
+  @override
+  String get settingsMcpEndpointWs => 'WebSocket（JSON-RPC 2.0）';
+
+  @override
+  String get settingsMcpCapAppearance => '外观';
+
+  @override
+  String get settingsMcpCapAppearanceDesc => '切换亮色 / 暗色 / 跟随系统主题';
+
+  @override
+  String get settingsMcpCapCollection => '收藏';
+
+  @override
+  String get settingsMcpCapCollectionDesc => '查询与切换曲目收藏（红心）状态';
+
+  @override
+  String get settingsMcpCapHistory => '播放历史';
+
+  @override
+  String get settingsMcpCapHistoryDesc => '查询与清空播放历史';
+
+  @override
+  String get settingsMcpCapLyrics => '歌词';
+
+  @override
+  String get settingsMcpCapLyricsDesc => '只读返回当前曲目的歌词行';
+
+  @override
+  String get settingsMcpCapDownload => '下载';
+
+  @override
+  String get settingsMcpCapDownloadDesc => '查询下载任务、把曲目加入下载、取消任务';
+
+  @override
+  String get settingsMcpAllowLan => '允许局域网访问';
+
+  @override
+  String get settingsMcpAllowLanDesc =>
+      '默认关闭；开启后绑定 0.0.0.0，局域网内其它设备可连接（仍要求访问密钥）';
+
+  @override
+  String get settingsMcpAllowLanWarning =>
+      '警告：局域网访问会扩大暴露面。请确保访问密钥保密，仅在可信网络中使用。';
+
+  @override
+  String get settingsMcpAllowLanWarningTitle => '开启局域网访问？';
+
+  @override
+  String get settingsMcpAllowLanWarningBody =>
+      '开启后，同一局域网内的其它设备可访问本控制服务（仍需访问密钥）。请仅在可信网络中开启，并妥善保管密钥。';
+
+  @override
+  String get settingsMcpAllowLanWarningAgree => '我了解风险，开启';
+
+  @override
+  String get settingsMcpLanAddress => '局域网地址';
+
+  @override
+  String get settingsMcpShell => '命令行 shell';
+
+  @override
+  String get settingsMcpShellDesc =>
+      '启用后可在终端用 `<exe> archoerashell …` 操作（不打开窗口）；关闭后该子命令直接报错退出';
+
+  @override
+  String get settingsMcpShellUsage => '命令示例';
+
+  @override
+  String get settingsMcpShellCopy => '复制';
+
+  @override
+  String get settingsMcpShellCopied => '命令示例已复制';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -9591,6 +9779,194 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsRegisterProtocolFailed => '协议注册失败';
+
+  @override
+  String get settingsCatMcp => 'MCP 接入';
+
+  @override
+  String get settingsMcpSubtitle => '本地 MCP 控制接口（默认关闭）';
+
+  @override
+  String get settingsMcpTitle => 'MCP 控制服务';
+
+  @override
+  String get settingsMcpNote =>
+      '开启后仅监听本机回环地址 127.0.0.1，普通用户即可运行，无需管理员权限。所有能力默认关闭，按需逐组开启；关闭总开关即停止监听。';
+
+  @override
+  String get settingsMcpEnable => '启用 MCP 控制';
+
+  @override
+  String get settingsMcpEnableOn => '已开启，端口正在监听';
+
+  @override
+  String get settingsMcpEnableOff => '默认关闭';
+
+  @override
+  String get settingsMcpPort => '监听端口';
+
+  @override
+  String get settingsMcpPortDesc => '1024~65535；修改后自动重启监听';
+
+  @override
+  String get settingsMcpKey => '访问密钥';
+
+  @override
+  String get settingsMcpKeyCopy => '复制';
+
+  @override
+  String get settingsMcpKeyRegenerate => '重新生成密钥';
+
+  @override
+  String get settingsMcpKeyCopied => '访问密钥已复制';
+
+  @override
+  String get settingsMcpKeyRegenerated => '访问密钥已重新生成';
+
+  @override
+  String get settingsMcpAllowKeyless => '允许免密钥访问';
+
+  @override
+  String get settingsMcpAllowKeylessDesc => '关闭更安全；开启后本机任意程序均可直接访问';
+
+  @override
+  String get settingsMcpCapsTitle => '能力开关';
+
+  @override
+  String get settingsMcpCapsNote => '每组能力独立控制；未开启的能力不会出现在 MCP 工具列表与 REST 接口中。';
+
+  @override
+  String get settingsMcpCapRead => '读取状态';
+
+  @override
+  String get settingsMcpCapReadDesc => '播放状态、当前曲目、队列、服务信息与音源列表';
+
+  @override
+  String get settingsMcpCapPlayback => '播放控制';
+
+  @override
+  String get settingsMcpCapPlaybackDesc => '播放/暂停/停止、切歌、跳转、音量、循环/随机、音质、播放指定曲目';
+
+  @override
+  String get settingsMcpCapQueue => '队列操作';
+
+  @override
+  String get settingsMcpCapQueueDesc => '添加/移除/移动队列项、播放指定队列项、清空队列';
+
+  @override
+  String get settingsMcpCapSearch => '在线搜索';
+
+  @override
+  String get settingsMcpCapSearchDesc => '在网易云/酷狗/QQ 音乐等音源搜索歌曲';
+
+  @override
+  String get settingsMcpCapLibrary => '本地曲库';
+
+  @override
+  String get settingsMcpCapLibraryDesc => '搜索本地曲库、随机抽曲、曲库统计';
+
+  @override
+  String get settingsMcpCapPreferences => '读取偏好';
+
+  @override
+  String get settingsMcpCapPreferencesDesc => '只读返回应用偏好（敏感字段自动剔除）';
+
+  @override
+  String get settingsMcpEndpointsTitle => '连接地址';
+
+  @override
+  String settingsMcpStatusRunning({required int port}) {
+    return '运行中 · 端口 $port';
+  }
+
+  @override
+  String get settingsMcpStatusStopped => '未运行';
+
+  @override
+  String get settingsMcpStatusError => '启动失败（端口可能被占用）';
+
+  @override
+  String get settingsMcpStatusDesc =>
+      'MCP 面向智能体客户端；REST / WebSocket 供脚本与其它程序接入';
+
+  @override
+  String get settingsMcpEndpointMcp => 'MCP（Streamable HTTP）';
+
+  @override
+  String get settingsMcpEndpointRest => 'REST API';
+
+  @override
+  String get settingsMcpEndpointWs => 'WebSocket（JSON-RPC 2.0）';
+
+  @override
+  String get settingsMcpCapAppearance => '外观';
+
+  @override
+  String get settingsMcpCapAppearanceDesc => '切换亮色 / 暗色 / 跟随系统主题';
+
+  @override
+  String get settingsMcpCapCollection => '收藏';
+
+  @override
+  String get settingsMcpCapCollectionDesc => '查询与切换曲目收藏（红心）状态';
+
+  @override
+  String get settingsMcpCapHistory => '播放历史';
+
+  @override
+  String get settingsMcpCapHistoryDesc => '查询与清空播放历史';
+
+  @override
+  String get settingsMcpCapLyrics => '歌词';
+
+  @override
+  String get settingsMcpCapLyricsDesc => '只读返回当前曲目的歌词行';
+
+  @override
+  String get settingsMcpCapDownload => '下载';
+
+  @override
+  String get settingsMcpCapDownloadDesc => '查询下载任务、把曲目加入下载、取消任务';
+
+  @override
+  String get settingsMcpAllowLan => '允许局域网访问';
+
+  @override
+  String get settingsMcpAllowLanDesc =>
+      '默认关闭；开启后绑定 0.0.0.0，局域网内其它设备可连接（仍要求访问密钥）';
+
+  @override
+  String get settingsMcpAllowLanWarning =>
+      '警告：局域网访问会扩大暴露面。请确保访问密钥保密，仅在可信网络中使用。';
+
+  @override
+  String get settingsMcpAllowLanWarningTitle => '开启局域网访问？';
+
+  @override
+  String get settingsMcpAllowLanWarningBody =>
+      '开启后，同一局域网内的其它设备可访问本控制服务（仍需访问密钥）。请仅在可信网络中开启，并妥善保管密钥。';
+
+  @override
+  String get settingsMcpAllowLanWarningAgree => '我了解风险，开启';
+
+  @override
+  String get settingsMcpLanAddress => '局域网地址';
+
+  @override
+  String get settingsMcpShell => '命令行 shell';
+
+  @override
+  String get settingsMcpShellDesc =>
+      '启用后可在终端用 `<exe> archoerashell …` 操作（不打开窗口）；关闭后该子命令直接报错退出';
+
+  @override
+  String get settingsMcpShellUsage => '命令示例';
+
+  @override
+  String get settingsMcpShellCopy => '复制';
+
+  @override
+  String get settingsMcpShellCopied => '命令示例已复制';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).

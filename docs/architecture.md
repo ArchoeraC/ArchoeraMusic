@@ -334,6 +334,15 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 
 **为何不需要媒体口**：桌面端转码与播放都在库内（PCM 落盘 `stream.wav` + miniaudio 自播），无进程间媒体通道、无 EOF 问题，loopback 端口与 UDS 均不再需要。
 
+> **MCP 控制服务（2026-10-07，可选）**：设置 →「MCP 接入」可显式开启一个
+> **默认仅绑定回环 `127.0.0.1`** 的本地控制服务（MCP / REST / WebSocket，
+> 默认关闭、默认要求访问密钥；`dart:io` 事件循环驱动、无轮询），供 MCP 客户端
+> 查询与控制播放。可手动开启「**允许局域网访问**」（绑定 `0.0.0.0`，默认关、
+> 需确认且仍要求密钥）。另内置命令行客户端 `archoera_music archoerashell ...`
+> （类 Unix 语法，不启动 GUI，经 REST 与运行实例通信）。它不参与播放链路
+> （播放仍为进程内 FFI），是对本节「零 TCP 端口」原则的**显式可选例外**；
+> 详见 [mcp.md](mcp.md)。
+
 ---
 
 ## 10. Flutter 层设计
@@ -615,3 +624,4 @@ ArchoeraMusic/
 19. **桌面端 FFI 直连引擎（2026-08-07，取代 08-06 spawn+UDS 与更早侧车播放链路）**：Dart 加载 `libarchoera_mediaengine`，库内线程**全速完整转码 PCM 落盘 `stream.wav` → miniaudio 自播**（player 模式 `skip_encoder=true`，不再 Opus 编码）——「完整时长 + 任意 seek」语义；seek 走 miniaudio 即时 seek（不重启引擎、不重转码）；事件 FIFO 50ms 轮询 `pollEvent`（position 只留最新，`set_event_interval` 降频协商）；FFT 为拉模式（按播放位置从本地 PCM 索引读帧 + FFI libfft.so）
 20. ~~sidecar 播放路径收窄~~（已随 2026-09-06 去侧车化整体废弃）
 21. **内存播放（不落盘）模式（2026-09-08 决策；S1 引擎 C / S2 Dart 接线与设置已实现，S3 基准收尾待办）**：桌面播放**默认内存模式**（独立开关，与 Stable/EraAudio、SongCache 均独立）；解码 PCM 驻留进程内「全量块列表」（与 `stream.pcm` 文件块同构，达 cap 才滚动淘汰），频谱经新 FFI `archoera_mediaengine_pcm_window`/`_epoch` 拉窗，不写 `stream.wav/.pcm`；无设备 + 内存模式 → error（不文件回退）；`cap`：auto（按可用内存均衡，**32 MiB 硬上限**，查询故障回落、append 后记账强制淘汰、绝不越过用户设限；驻留仅供频谱 `pcm_window`，另配 8 MiB 块缓冲复用池，`destroy` 时 `malloc_trim` 归还 OS）/ 自定义 / 无上限（须显式警告内存过载后果）。文件模式（设置关 / `ARCHOERA_ENGINE_FILE_MODE=1`）保留现状字节级行为。规格与验收：`docs/audio-memory-playback.md`。
+22. **MCP 控制服务（2026-10-07，可选）**：默认关闭；开启后默认仅绑定回环 `127.0.0.1`（非特权端口），可手动开启「允许局域网访问」绑定 `0.0.0.0`（默认关、需用户确认 + 仍要求密钥）。以标准协议（MCP Streamable HTTP / REST / WebSocket，均 JSON-RPC 2.0 / HTTP+JSON）暴露播放/队列/搜索/曲库/偏好只读/外观/收藏/历史/歌词/下载能力；默认要求访问密钥、能力组默认全关。纯 Dart 实现（`dart:io`，事件循环驱动、无轮询），不参与播放链路（仍为进程内 FFI），是对「桌面端零 TCP 端口」的显式可选例外。另随二进制内置命令行客户端 `archoera_music archoerashell ...`（类 Unix 语法，经 REST 与运行实例通信，不启动 GUI）。详见 `docs/mcp.md`。

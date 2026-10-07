@@ -8,9 +8,16 @@
 /// 草稿值 / 私有辅助方法，仅在 build 内从 ref 读取偏好与 l10n。
 library;
 
-import 'dart:async' show StreamSubscription;
+import 'dart:async' show StreamSubscription, unawaited;
 import 'dart:convert' show jsonDecode, jsonEncode;
-import 'dart:io' show File, Platform, Process, ProcessStartMode;
+import 'dart:io'
+    show
+        File,
+        InternetAddressType,
+        NetworkInterface,
+        Platform,
+        Process,
+        ProcessStartMode;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:material_ui/material_ui.dart';
@@ -23,6 +30,8 @@ import '../app/app_quit.dart';
 import '../app/theme_provider.dart';
 import '../app/watermark.dart';
 import '../easter_egg/easter_egg.dart';
+import '../services/mcp/mcp_models.dart';
+import '../services/mcp/mcp_service.dart';
 import '../services/downloader/download_controller.dart';
 import '../services/log/log.dart';
 import '../services/platform/platform_capabilities.dart';
@@ -44,6 +53,7 @@ import '../widgets/dialogs/sleep_timer_dialogs.dart';
 import '../widgets/player/s_controls.dart';
 import 'settings_color_picker.dart';
 import 'settings_widgets.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'settings_sections/settings_sections_appearance.dart';
@@ -57,6 +67,7 @@ part 'settings_sections/settings_sections_download.dart';
 part 'settings_sections/settings_sections_scrape.dart';
 part 'settings_sections/settings_sections_storage.dart';
 part 'settings_sections/settings_sections_experimental_source.dart';
+part 'settings_sections/settings_sections_mcp.dart';
 part 'settings_sections/settings_sections_about.dart';
 part 'settings_sections/settings_sections_developer.dart';
 

@@ -5,6 +5,7 @@
 import 'package:material_ui/material_ui.dart' show IconData;
 
 import '../../l10n/generated/app_localizations.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 设置分类（公开：流媒体页「前往设置」需指定媒体源分类）。
@@ -24,6 +25,9 @@ enum SettingsCategory {
 
   /// 实验性音源（第三方音源接入，默认关闭）。
   experimentalSource(EtaIcons.flaskOutline),
+
+  /// MCP 接入（本地 MCP / REST / WebSocket 控制服务，默认关闭）。
+  mcp(EtaIcons.chipOutline),
   about(EtaIcons.informationOutline),
 
   /// 开发者（隐藏分类：仅开启开发者模式后可见；开启方式为关于页
@@ -47,6 +51,7 @@ enum SettingsCategory {
     scanner => l10n.settingsCatScanner,
     mediaSource => l10n.settingsCatMediaSource,
     experimentalSource => l10n.settingsCatExperimentalSource,
+    mcp => l10n.settingsCatMcp,
     about => l10n.settingsCatAbout,
     developer => l10n.settingsCatDeveloper,
   };
@@ -65,6 +70,7 @@ enum SettingsCategory {
     scanner => l10n.settingsScannerSubtitle,
     mediaSource => l10n.settingsMediaSourceSubtitle,
     experimentalSource => l10n.settingsExperimentalSourceSubtitle,
+    mcp => l10n.settingsMcpSubtitle,
     about => l10n.settingsAboutSubtitle,
     developer => l10n.settingsDeveloperSubtitle,
   };
