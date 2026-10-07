@@ -609,6 +609,10 @@ class _ShellContext {
   }
 
   void _printMap(Map<Object?, Object?> map) {
+    if (map['results'] is List) {
+      _printSearchAll(map);
+      return;
+    }
     if (map['tracks'] is List) {
       _printTracks(map['tracks'] as List, total: map['total']);
       return;
@@ -645,10 +649,55 @@ class _ShellContext {
       _printStatus(map);
       return;
     }
-    map.forEach((k, v) {
-      if (v == null) return;
-      out.writeln('$k: ${(v is Map || v is List) ? jsonEncode(v) : v}');
-    });
+    _printIndented(map, '');
+  }
+
+  /// 跨音源搜索（`search_all`）按源分组展示。
+  void _printSearchAll(Map<Object?, Object?> map) {
+    final query = map['query'];
+    if (query != null) out.writeln('query: $query');
+    for (final item in map['results'] as List) {
+      if (item is! Map) continue;
+      final source = item['source'] ?? '?';
+      final error = item['error'];
+      if (error != null) {
+        out.writeln('── $source：错误 $error');
+        continue;
+      }
+      final total = item['total'];
+      final more = item['hasMore'] == true ? '+' : '';
+      out.writeln('── $source（$total$more）');
+      final tracks = item['tracks'];
+      if (tracks is List) _printTracks(tracks);
+    }
+  }
+
+  /// 未知结构的兜底：缩进递归（Map/List），避免直接甩 JSON 难以阅读。
+  void _printIndented(Object? value, String indent) {
+    if (value is Map) {
+      value.forEach((k, v) {
+        if (v == null) return;
+        if (v is Map || v is List) {
+          out.writeln('$indent$k:');
+          _printIndented(v, '$indent  ');
+        } else {
+          out.writeln('$indent$k: $v');
+        }
+      });
+      return;
+    }
+    if (value is List) {
+      for (final item in value) {
+        if (item is Map || item is List) {
+          out.writeln('$indent-');
+          _printIndented(item, '$indent  ');
+        } else {
+          out.writeln('$indent- $item');
+        }
+      }
+      return;
+    }
+    out.writeln('$indent$value');
   }
 
   void _printStatus(Map<Object?, Object?> map) {
