@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/log/log.dart';
 import '../services/playback/playback_session.dart';
 import 'data_dir.dart';
+import 'prefs_mcp.dart';
 import 'prefs_app.dart';
 import 'prefs_appearance.dart';
 import 'prefs_audio_fx.dart';
@@ -28,6 +29,7 @@ import 'prefs_security.dart';
 import 'prefs_streaming.dart';
 import 'prefs_shortcuts.dart';
 
+export 'prefs_mcp.dart';
 export 'prefs_app.dart';
 export 'prefs_appearance.dart';
 export 'prefs_audio_fx.dart';
@@ -406,11 +408,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   }
 
   /// 设置参数化 EQ（开关 / 段列表 / 预增益；方向① D1）。
-  void setPeq({
-    bool? enabled,
-    List<ParametricBand>? bands,
-    double? preampDb,
-  }) {
+  void setPeq({bool? enabled, List<ParametricBand>? bands, double? preampDb}) {
     state = state.copyWithPeq(
       enabled: enabled,
       bands: bands,
@@ -950,6 +948,50 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 清除全部覆盖（恢复所有默认绑定）。
   void resetAllShortcuts() {
     state = state.copyWithShortcutsCleared();
+    state.save();
+  }
+
+  // ── MCP 接入（本地控制服务）──────────────────────────────────
+
+  /// 设置 MCP 控制服务总开关（默认关；关闭即停止监听）。
+  void setMcpEnabled(bool value) {
+    state = state.copyWithMcpEnabled(value);
+    state.save();
+  }
+
+  /// 设置监听端口（收敛 1024~65535；端口变更由宿主重启服务生效）。
+  void setMcpPort(int value) {
+    state = state.copyWithMcpPort(value);
+    state.save();
+  }
+
+  /// 写入访问密钥（首次开启时由服务生成 128-bit 十六进制）。
+  void setMcpAccessKey(String value) {
+    state = state.copyWithMcpAccessKey(value);
+    state.save();
+  }
+
+  /// 设置是否允许免密钥访问（默认关）。
+  void setMcpAllowKeyless(bool value) {
+    state = state.copyWithMcpAllowKeyless(value);
+    state.save();
+  }
+
+  /// 设置是否允许局域网访问（默认关；开启后绑定 0.0.0.0）。
+  void setMcpAllowLan(bool value) {
+    state = state.copyWithMcpAllowLan(value);
+    state.save();
+  }
+
+  /// 设置命令行 shell 是否可用（默认可用）。
+  void setMcpShellEnabled(bool value) {
+    state = state.copyWithMcpShellEnabled(value);
+    state.save();
+  }
+
+  /// 设置某能力组开关（默认全关）。
+  void setMcpCapability(String id, bool value) {
+    state = state.copyWithMcpCapability(id, value);
     state.save();
   }
 }

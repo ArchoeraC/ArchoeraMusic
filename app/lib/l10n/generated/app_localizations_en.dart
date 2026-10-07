@@ -5037,4 +5037,205 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsRegisterProtocolFailed => 'Failed to register protocol';
+
+  @override
+  String get settingsCatMcp => 'MCP access';
+
+  @override
+  String get settingsMcpSubtitle =>
+      'Local MCP control interfaces (off by default)';
+
+  @override
+  String get settingsMcpTitle => 'MCP control service';
+
+  @override
+  String get settingsMcpNote =>
+      'Listens only on the loopback address 127.0.0.1 and needs no administrator rights. All capabilities are off by default; enable them group by group. Turning the master switch off stops the listener.';
+
+  @override
+  String get settingsMcpEnable => 'Enable MCP control';
+
+  @override
+  String get settingsMcpEnableOn => 'On, listening on the port';
+
+  @override
+  String get settingsMcpEnableOff => 'Off by default';
+
+  @override
+  String get settingsMcpPort => 'Listen port';
+
+  @override
+  String get settingsMcpPortDesc =>
+      '1024-65535; the listener restarts automatically on change';
+
+  @override
+  String get settingsMcpKey => 'Access key';
+
+  @override
+  String get settingsMcpKeyCopy => 'Copy';
+
+  @override
+  String get settingsMcpKeyRegenerate => 'Regenerate key';
+
+  @override
+  String get settingsMcpKeyCopied => 'Access key copied';
+
+  @override
+  String get settingsMcpKeyRegenerated => 'Access key regenerated';
+
+  @override
+  String get settingsMcpAllowKeyless => 'Allow keyless access';
+
+  @override
+  String get settingsMcpAllowKeylessDesc =>
+      'Safer when off; when on, any local program can connect without a key';
+
+  @override
+  String get settingsMcpCapsTitle => 'Capabilities';
+
+  @override
+  String get settingsMcpCapsNote =>
+      'Each group is independent; disabled capabilities are not exposed in the MCP tool list or REST routes.';
+
+  @override
+  String get settingsMcpCapRead => 'Read state';
+
+  @override
+  String get settingsMcpCapReadDesc =>
+      'Playback status, current track, queue, service info and source list';
+
+  @override
+  String get settingsMcpCapPlayback => 'Playback control';
+
+  @override
+  String get settingsMcpCapPlaybackDesc =>
+      'Play/pause/stop, next/previous, seek, volume, repeat/shuffle, quality, play a given track';
+
+  @override
+  String get settingsMcpCapQueue => 'Queue operations';
+
+  @override
+  String get settingsMcpCapQueueDesc =>
+      'Add/remove/move queue items, play a queue index, clear the queue';
+
+  @override
+  String get settingsMcpCapSearch => 'Online search';
+
+  @override
+  String get settingsMcpCapSearchDesc =>
+      'Search songs on NetEase/KuGou/QQ Music and more';
+
+  @override
+  String get settingsMcpCapLibrary => 'Local library';
+
+  @override
+  String get settingsMcpCapLibraryDesc =>
+      'Search the local library, pick random tracks, library stats';
+
+  @override
+  String get settingsMcpCapPreferences => 'Read preferences';
+
+  @override
+  String get settingsMcpCapPreferencesDesc =>
+      'Read-only app preferences (sensitive fields stripped)';
+
+  @override
+  String get settingsMcpEndpointsTitle => 'Connection addresses';
+
+  @override
+  String settingsMcpStatusRunning({required int port}) {
+    return 'Running · port $port';
+  }
+
+  @override
+  String get settingsMcpStatusStopped => 'Stopped';
+
+  @override
+  String get settingsMcpStatusError => 'Failed to start (port may be in use)';
+
+  @override
+  String get settingsMcpStatusDesc =>
+      'MCP for agent clients; REST / WebSocket for scripts and other programs';
+
+  @override
+  String get settingsMcpEndpointMcp => 'MCP (Streamable HTTP)';
+
+  @override
+  String get settingsMcpEndpointRest => 'REST API';
+
+  @override
+  String get settingsMcpEndpointWs => 'WebSocket (JSON-RPC 2.0)';
+
+  @override
+  String get settingsMcpCapAppearance => 'Appearance';
+
+  @override
+  String get settingsMcpCapAppearanceDesc =>
+      'Switch light / dark / follow-system theme';
+
+  @override
+  String get settingsMcpCapCollection => 'Collection';
+
+  @override
+  String get settingsMcpCapCollectionDesc =>
+      'Query and toggle track favourites (hearts)';
+
+  @override
+  String get settingsMcpCapHistory => 'Play history';
+
+  @override
+  String get settingsMcpCapHistoryDesc => 'Query and clear the play history';
+
+  @override
+  String get settingsMcpCapLyrics => 'Lyrics';
+
+  @override
+  String get settingsMcpCapLyricsDesc => 'Read-only current track lyrics lines';
+
+  @override
+  String get settingsMcpCapDownload => 'Downloads';
+
+  @override
+  String get settingsMcpCapDownloadDesc =>
+      'List download tasks, enqueue a track, cancel a task';
+
+  @override
+  String get settingsMcpAllowLan => 'Allow LAN access';
+
+  @override
+  String get settingsMcpAllowLanDesc =>
+      'Off by default; when on it binds 0.0.0.0 so other devices on the LAN can connect (key still required)';
+
+  @override
+  String get settingsMcpAllowLanWarning =>
+      'Warning: LAN access widens the attack surface. Keep the access key secret and use it only on trusted networks.';
+
+  @override
+  String get settingsMcpAllowLanWarningTitle => 'Enable LAN access?';
+
+  @override
+  String get settingsMcpAllowLanWarningBody =>
+      'Other devices on the same LAN will be able to reach this control service (the access key is still required). Enable it only on trusted networks and keep the key safe.';
+
+  @override
+  String get settingsMcpAllowLanWarningAgree => 'I understand, enable';
+
+  @override
+  String get settingsMcpLanAddress => 'LAN address';
+
+  @override
+  String get settingsMcpShell => 'Command-line shell';
+
+  @override
+  String get settingsMcpShellDesc =>
+      'When on, use `<exe> archoerashell …` from a terminal (no window); when off the subcommand exits with an error';
+
+  @override
+  String get settingsMcpShellUsage => 'Example command';
+
+  @override
+  String get settingsMcpShellCopy => 'Copy';
+
+  @override
+  String get settingsMcpShellCopied => 'Example command copied';
 }
