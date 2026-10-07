@@ -4880,365 +4880,370 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsRegisterProtocolFailed => 'Failed to register protocol';
 
   @override
-  String get settingsCatMcp => 'MCP 接入';
+  String get settingsCatMcp => 'MCP 연동';
 
   @override
-  String get settingsMcpSubtitle => '本地 MCP 控制接口（默认关闭）';
+  String get settingsMcpSubtitle => '로컬 MCP 제어 인터페이스(기본 꺼짐)';
 
   @override
-  String get settingsMcpTitle => 'MCP 控制服务';
+  String get settingsMcpTitle => 'MCP 제어 서비스';
 
   @override
   String get settingsMcpNote =>
-      '开启后仅监听本机回环地址 127.0.0.1，普通用户即可运行，无需管理员权限。所有能力默认关闭，按需逐组开启；关闭总开关即停止监听。';
+      '루프백 주소 127.0.0.1에서만 수신하며 관리자 권한이 필요 없습니다. 모든 기능은 기본적으로 꺼져 있고 그룹별로 켭니다. 메인 스위치를 끄면 수신을 중지합니다.';
 
   @override
-  String get settingsMcpEnable => '启用 MCP 控制';
+  String get settingsMcpEnable => 'MCP 제어 사용';
 
   @override
-  String get settingsMcpEnableOn => '已开启，端口正在监听';
+  String get settingsMcpEnableOn => '켜짐, 포트에서 수신 중';
 
   @override
-  String get settingsMcpEnableOff => '默认关闭';
+  String get settingsMcpEnableOff => '기본 꺼짐';
 
   @override
-  String get settingsMcpPort => '监听端口';
+  String get settingsMcpPort => '수신 포트';
 
   @override
-  String get settingsMcpPortDesc => '1024~65535；修改后自动重启监听';
+  String get settingsMcpPortDesc => '1024~65535; 변경 시 수신이 재시작됩니다';
 
   @override
-  String get settingsMcpKey => '访问密钥';
+  String get settingsMcpKey => '접근 키';
 
   @override
-  String get settingsMcpKeyCopy => '复制';
+  String get settingsMcpKeyCopy => '복사';
 
   @override
-  String get settingsMcpKeyRegenerate => '重新生成密钥';
+  String get settingsMcpKeyRegenerate => '키 재생성';
 
   @override
-  String get settingsMcpKeyCopied => '访问密钥已复制';
+  String get settingsMcpKeyCopied => '접근 키를 복사했습니다';
 
   @override
-  String get settingsMcpKeyRegenerated => '访问密钥已重新生成';
+  String get settingsMcpKeyRegenerated => '접근 키를 재생성했습니다';
 
   @override
-  String get settingsMcpAllowKeyless => '允许免密钥访问';
+  String get settingsMcpAllowKeyless => '키 없는 접근 허용';
 
   @override
-  String get settingsMcpAllowKeylessDesc => '关闭更安全；开启后本机任意程序均可直接访问';
+  String get settingsMcpAllowKeylessDesc =>
+      '끄는 것이 더 안전합니다. 켜면 로컬의 모든 프로그램이 바로 접근할 수 있습니다';
 
   @override
-  String get settingsMcpCapsTitle => '能力开关';
+  String get settingsMcpCapsTitle => '기능';
 
   @override
-  String get settingsMcpCapsNote => '每组能力独立控制；未开启的能力不会出现在 MCP 工具列表与 REST 接口中。';
+  String get settingsMcpCapsNote =>
+      '각 그룹은 독립적입니다. 꺼진 기능은 MCP 도구 목록이나 REST 경로에 나타나지 않습니다.';
 
   @override
-  String get settingsMcpCapRead => '读取状态';
+  String get settingsMcpCapRead => '상태 읽기';
 
   @override
-  String get settingsMcpCapReadDesc => '播放状态、当前曲目、队列、服务信息与音源列表';
+  String get settingsMcpCapReadDesc => '재생 상태, 현재 곡, 대기열, 서비스 정보, 소스 목록';
 
   @override
-  String get settingsMcpCapPlayback => '播放控制';
+  String get settingsMcpCapPlayback => '재생 제어';
 
   @override
-  String get settingsMcpCapPlaybackDesc => '播放/暂停/停止、切歌、跳转、音量、循环/随机、音质、播放指定曲目';
+  String get settingsMcpCapPlaybackDesc =>
+      '재생/일시정지/정지, 다음/이전, 탐색, 볼륨, 반복/셔플, 음질, 곡 재생';
 
   @override
-  String get settingsMcpCapQueue => '队列操作';
+  String get settingsMcpCapQueue => '대기열';
 
   @override
-  String get settingsMcpCapQueueDesc => '添加/移除/移动队列项、播放指定队列项、清空队列';
+  String get settingsMcpCapQueueDesc => '항목 추가/제거/이동, 항목 재생, 대기열 비우기';
 
   @override
-  String get settingsMcpCapSearch => '在线搜索';
+  String get settingsMcpCapSearch => '온라인 검색';
 
   @override
-  String get settingsMcpCapSearchDesc => '在网易云/酷狗/QQ 音乐等音源搜索歌曲';
+  String get settingsMcpCapSearchDesc => 'NetEase/KuGou/QQ Music 등에서 곡 검색';
 
   @override
-  String get settingsMcpCapLibrary => '本地曲库';
+  String get settingsMcpCapLibrary => '로컬 라이브러리';
 
   @override
-  String get settingsMcpCapLibraryDesc => '搜索本地曲库、随机抽曲、曲库统计';
+  String get settingsMcpCapLibraryDesc => '로컬 라이브러리 검색, 무작위 곡, 통계';
 
   @override
-  String get settingsMcpCapPreferences => '读取偏好';
+  String get settingsMcpCapPreferences => '환경설정 읽기';
 
   @override
-  String get settingsMcpCapPreferencesDesc => '只读返回应用偏好（敏感字段自动剔除）';
+  String get settingsMcpCapPreferencesDesc => '앱 환경설정을 읽기 전용으로 반환(민감 필드 제외)';
 
   @override
-  String get settingsMcpEndpointsTitle => '连接地址';
+  String get settingsMcpEndpointsTitle => '연결 주소';
 
   @override
   String settingsMcpStatusRunning({required int port}) {
-    return '运行中 · 端口 $port';
+    return '실행 중 · 포트 $port';
   }
 
   @override
-  String get settingsMcpStatusStopped => '未运行';
+  String get settingsMcpStatusStopped => '중지됨';
 
   @override
-  String get settingsMcpStatusError => '启动失败（端口可能被占用）';
+  String get settingsMcpStatusError => '시작 실패(포트가 사용 중일 수 있음)';
 
   @override
   String get settingsMcpStatusDesc =>
-      'MCP 面向智能体客户端；REST / WebSocket 供脚本与其它程序接入';
+      'MCP는 에이전트 클라이언트용, REST / WebSocket은 스크립트와 다른 프로그램용';
 
   @override
-  String get settingsMcpEndpointMcp => 'MCP（Streamable HTTP）';
+  String get settingsMcpEndpointMcp => 'MCP(Streamable HTTP)';
 
   @override
   String get settingsMcpEndpointRest => 'REST API';
 
   @override
-  String get settingsMcpEndpointWs => 'WebSocket（JSON-RPC 2.0）';
+  String get settingsMcpEndpointWs => 'WebSocket(JSON-RPC 2.0)';
 
   @override
-  String get settingsMcpCapAppearance => '外观';
+  String get settingsMcpCapAppearance => '모양';
 
   @override
-  String get settingsMcpCapAppearanceDesc => '切换亮色 / 暗色 / 跟随系统主题';
+  String get settingsMcpCapAppearanceDesc => '라이트 / 다크 / 시스템 테마 전환';
 
   @override
-  String get settingsMcpCapCollection => '收藏';
+  String get settingsMcpCapCollection => '즐겨찾기';
 
   @override
-  String get settingsMcpCapCollectionDesc => '查询与切换曲目收藏（红心）状态';
+  String get settingsMcpCapCollectionDesc => '곡 즐겨찾기(하트) 상태 조회 및 전환';
 
   @override
-  String get settingsMcpCapHistory => '播放历史';
+  String get settingsMcpCapHistory => '재생 기록';
 
   @override
-  String get settingsMcpCapHistoryDesc => '查询与清空播放历史';
+  String get settingsMcpCapHistoryDesc => '재생 기록 조회 및 지우기';
 
   @override
-  String get settingsMcpCapLyrics => '歌词';
+  String get settingsMcpCapLyrics => '가사';
 
   @override
-  String get settingsMcpCapLyricsDesc => '只读返回当前曲目的歌词行';
+  String get settingsMcpCapLyricsDesc => '현재 곡의 가사 줄 읽기 전용 반환';
 
   @override
-  String get settingsMcpCapDownload => '下载';
+  String get settingsMcpCapDownload => '다운로드';
 
   @override
-  String get settingsMcpCapDownloadDesc => '查询下载任务、把曲目加入下载、取消任务';
+  String get settingsMcpCapDownloadDesc => '다운로드 목록, 곡 추가, 작업 취소';
 
   @override
-  String get settingsMcpAllowLan => '允许局域网访问';
+  String get settingsMcpAllowLan => 'LAN 접근 허용';
 
   @override
   String get settingsMcpAllowLanDesc =>
-      '默认关闭；开启后绑定 0.0.0.0，局域网内其它设备可连接（仍要求访问密钥）';
+      '기본 꺼짐; 켜면 0.0.0.0에 바인딩되어 같은 LAN의 다른 기기가 연결 가능(키는 여전히 필요)';
 
   @override
   String get settingsMcpAllowLanWarning =>
-      '警告：局域网访问会扩大暴露面。请确保访问密钥保密，仅在可信网络中使用。';
+      '경고: LAN 접근은 공격 표면을 넓힙니다. 접근 키를 비밀로 유지하고 신뢰할 수 있는 네트워크에서만 사용하세요.';
 
   @override
-  String get settingsMcpAllowLanWarningTitle => '开启局域网访问？';
+  String get settingsMcpAllowLanWarningTitle => 'LAN 접근을 켤까요?';
 
   @override
   String get settingsMcpAllowLanWarningBody =>
-      '开启后，同一局域网内的其它设备可访问本控制服务（仍需访问密钥）。请仅在可信网络中开启，并妥善保管密钥。';
+      '켜면 같은 LAN의 다른 기기가 이 제어 서비스에 접근할 수 있습니다(키는 여전히 필요). 신뢰할 수 있는 네트워크에서만 켜고 키를 안전하게 보관하세요.';
 
   @override
-  String get settingsMcpAllowLanWarningAgree => '我了解风险，开启';
+  String get settingsMcpAllowLanWarningAgree => '이해했습니다, 켜기';
 
   @override
-  String get settingsMcpLanAddress => '局域网地址';
+  String get settingsMcpLanAddress => 'LAN 주소';
 
   @override
-  String get settingsMcpShell => '命令行 shell';
+  String get settingsMcpShell => '명령줄 shell';
 
   @override
   String get settingsMcpShellDesc =>
-      '启用后可在终端用 `<exe> archoerashell …` 操作（不打开窗口）；关闭后该子命令直接报错退出';
+      '켜면 터미널에서 `<exe> archoerashell …` 사용(창을 열지 않음). 끄면 하위 명령은 오류로 종료됩니다';
 
   @override
-  String get settingsMcpShellUsage => '命令示例';
+  String get settingsMcpShellUsage => '명령 예시';
 
   @override
-  String get settingsMcpShellCopy => '复制';
+  String get settingsMcpShellCopy => '복사';
 
   @override
-  String get settingsMcpShellCopied => '命令示例已复制';
+  String get settingsMcpShellCopied => '명령 예시를 복사했습니다';
 
   @override
   String get mcpShellUsage =>
-      'archoerashell — ArchoeraMusic 命令行控制（类 Unix 语法）\n\n用法:\n  archoera_music archoerashell [全局选项] <命令> [参数...]\n\n提示:\n  「<命令> --help」或「help <命令>」查看单命令用法。\n\n全局选项:\n  -h, --help            显示本帮助\n  -V, --version         显示版本\n  -j, --json            以 JSON 输出（便于脚本处理）\n  -q, --quiet           只输出错误\n      --host <host>     服务地址（默认 127.0.0.1）\n  -p, --port <port>     服务端口（默认取应用设置）\n  -k, --key  <key>      访问密钥（默认取应用设置）\n\n播放:\n  status / now-playing / play|pause|toggle|stop|next|prev\n  seek <ms> / volume <0..1> / repeat <off|list|one> / shuffle <on|off>\n  quality <lq|sq|hq|lossless|hi-res> / play-track <ref>\n\n队列:\n  queue [list|play <index>|add <ref>...|rm <index>|move <from> <to>|clear]\n\n搜索 / 曲库:\n  search <source> <关键词> [-n n] [-p page]\n  search-all <关键词> [-n n]\n  library [关键词] [-n n] [--offset n] / library-random / library-stats\n\n收藏 / 历史 / 歌词:\n  like|unlike|like-status <ref> / list-liked <source> [-n n]\n  history [-n n] / history-clear / lyrics\n\n下载:\n  download [list|add <ref>... [--quality <档>]|cancel <id>|remove <id>]\n\n其它:\n  theme <light|dark|system> / sleep <分钟>|--end / sleep-cancel\n  prefs [键...] / tools / info / call <工具名> [--json <参数JSON>]\n\n示例:\n  archoera_music archoerashell status\n  archoera_music archoerashell search netease 周杰伦 -n 10\n  archoera_music archoerashell play-track netease:186016\n  archoera_music archoerashell --json library 周杰伦';
+      'archoerashell — ArchoeraMusic 명령줄 제어(Unix 스타일)\n\n사용법:\n  archoera_music archoerashell [전역 옵션] <명령> [인수...]\n\n안내:\n  <명령> --help 또는 help <명령> 으로 개별 사용법을 봅니다.\n\n전역 옵션:\n  -h, --help            이 도움말 표시\n  -V, --version         버전 표시\n  -j, --json            JSON 출력(스크립트용)\n  -q, --quiet           오류만 출력\n      --host <host>     서버 주소(기본 127.0.0.1)\n  -p, --port <port>     서버 포트(기본: 앱 설정)\n  -k, --key  <key>      접근 키(기본: 앱 설정)\n\n재생:\n  status / now-playing / play|pause|toggle|stop|next|prev\n  seek <ms> / volume <0..1> / repeat <off|list|one> / shuffle <on|off>\n  quality <lq|sq|hq|lossless|hi-res> / play-track <ref>\n\n대기열:\n  queue [list|play <index>|add <ref>...|rm <index>|move <from> <to>|clear]\n\n검색 / 라이브러리:\n  search <source> <검색어> [-n n] [-p page]\n  search-all <검색어> [-n n]\n  library [검색어] [-n n] [--offset n] / library-random / library-stats\n\n즐겨찾기 / 기록 / 가사:\n  like|unlike|like-status <ref> / list-liked <source> [-n n]\n  history [-n n] / history-clear / lyrics\n\n다운로드:\n  download [list|add <ref>... [--quality <q>]|cancel <id>|remove <id>]\n\n기타:\n  theme <light|dark|system> / sleep <분>|--end / sleep-cancel\n  prefs [키...] / tools / info / call <도구> [--json <json>]\n\n예:\n  archoera_music archoerashell status\n  archoera_music archoerashell search netease 아이유 -n 10\n  archoera_music archoerashell play-track netease:186016\n  archoera_music archoerashell --json library 아이유';
 
   @override
   String get mcpShellHint =>
-      '「<命令> --help」或「help <命令>」查看单命令用法，如 archoerashell search --help。';
+      '<명령> --help 또는 help <명령> 으로 개별 사용법을 봅니다(예: archoerashell search --help).';
 
   @override
-  String get mcpShellUsageError => '用法错误';
+  String get mcpShellUsageError => '사용법 오류';
 
   @override
-  String get mcpShellErrorPrefix => '错误';
+  String get mcpShellErrorPrefix => '오류';
 
   @override
   String get mcpShellDisabled =>
-      'archoerashell 已在设置中禁用（设置 → MCP 接入 → 命令行 shell）。';
+      'archoerashell이 설정에서 꺼져 있습니다(MCP 연동 → 명령줄 shell).';
 
   @override
   String get mcpShellHelpStatus =>
-      '用法: archoerashell status\n\n显示当前播放状态：播放/暂停、当前曲目、进度、音量、循环/随机。';
+      '사용법: archoerashell status\n\n재생 상태를 표시: 재생/일시정지, 곡, 위치, 볼륨, 반복/셔플.';
 
   @override
   String get mcpShellHelpNowPlaying =>
-      '用法: archoerashell now-playing\n\n只显示当前曲目与进度。';
+      '사용법: archoerashell now-playing\n\n현재 곡과 위치만 표시.';
 
   @override
-  String get mcpShellHelpPlay => '用法: archoerashell play\n\n开始/继续播放。';
+  String get mcpShellHelpPlay => '사용법: archoerashell play\n\n재생 시작/재개.';
 
   @override
-  String get mcpShellHelpPause => '用法: archoerashell pause\n\n暂停播放。';
+  String get mcpShellHelpPause => '사용법: archoerashell pause\n\n일시정지.';
 
   @override
-  String get mcpShellHelpToggle => '用法: archoerashell toggle\n\n播放/暂停切换。';
+  String get mcpShellHelpToggle => '사용법: archoerashell toggle\n\n재생/일시정지 전환.';
 
   @override
-  String get mcpShellHelpStop => '用法: archoerashell stop\n\n停止播放。';
+  String get mcpShellHelpStop => '사용법: archoerashell stop\n\n재생 정지.';
 
   @override
-  String get mcpShellHelpNext => '用法: archoerashell next\n\n切到下一首。';
+  String get mcpShellHelpNext => '사용법: archoerashell next\n\n다음 곡으로.';
 
   @override
-  String get mcpShellHelpPrev => '用法: archoerashell prev\n\n切到上一首（同 previous）。';
+  String get mcpShellHelpPrev =>
+      '사용법: archoerashell prev\n\n이전 곡으로(previous와 동일).';
 
   @override
   String get mcpShellHelpPrevious =>
-      '用法: archoerashell previous\n\n切到上一首（同 prev）。';
+      '사용법: archoerashell previous\n\n이전 곡으로(prev와 동일).';
 
   @override
   String get mcpShellHelpSeek =>
-      '用法: archoerashell seek <毫秒>\n\n跳转到指定位置。\n示例: archoerashell seek 30000';
+      '사용법: archoerashell seek <ms>\n\n지정 위치로 이동.\n예: archoerashell seek 30000';
 
   @override
   String get mcpShellHelpVolume =>
-      '用法: archoerashell volume <0..1>\n\n设置音量。\n示例: archoerashell volume 0.6';
+      '사용법: archoerashell volume <0..1>\n\n볼륨 설정.\n예: archoerashell volume 0.6';
 
   @override
   String get mcpShellHelpRepeat =>
-      '用法: archoerashell repeat <off|list|one>\n\n设置循环模式。';
+      '사용법: archoerashell repeat <off|list|one>\n\n반복 모드 설정.';
 
   @override
   String get mcpShellHelpShuffle =>
-      '用法: archoerashell shuffle <on|off>\n\n开关随机播放。';
+      '사용법: archoerashell shuffle <on|off>\n\n셔플 전환.';
 
   @override
   String get mcpShellHelpQuality =>
-      '用法: archoerashell quality <lq|sq|hq|lossless|hi-res>\n\n切换音质档位。';
+      '사용법: archoerashell quality <lq|sq|hq|lossless|hi-res>\n\n음질 전환.';
 
   @override
   String get mcpShellHelpPlayTrack =>
-      '用法: archoerashell play-track <ref>\n\n播放指定曲目（ref 形如 source:id）。\n示例: archoerashell play-track netease:186016';
+      '사용법: archoerashell play-track <ref>\n\n지정한 곡 재생(ref는 source:id).\n예: archoerashell play-track netease:186016';
 
   @override
   String get mcpShellHelpSearch =>
-      '用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n在指定音源搜索歌曲。\n  音源: netease | kugou | qqmusic | neko\n  -n, --limit <n>   返回条数（1~50，默认 20）\n  -p, --page <n>    页码（从 1 开始）\n示例: archoerashell search netease 周杰伦 -n 10';
+      '사용법: archoerashell search <소스> <검색어> [-n 개수] [-p 페이지]\n\n지정 소스에서 곡 검색.\n  소스: netease | kugou | qqmusic | neko\n  -n, --limit <n>   결과 수(1-50, 기본 20)\n  -p, --page <n>    페이지(1부터)\n예: archoerashell search netease 아이유 -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>
-      '用法: archoerashell search-all <关键词> [-n 每源条数]\n\n在全部已启用音源同时搜索，并按音源分组展示。\n  -n, --limit <n>   每个音源条数（1~30，默认 10）';
+      '사용법: archoerashell search-all <검색어> [-n 소스당]\n\n활성화된 모든 소스를 검색하고 소스별로 묶어 표시.\n  -n, --limit <n>   소스당 결과(1-30, 기본 10)';
 
   @override
   String get mcpShellHelpQueue =>
-      '用法: archoerashell queue [子命令]\n\n  queue                     查看队列\n  queue play <index>        播放指定队列项\n  queue add <ref>...        入队（--position next|end，默认 next）\n  queue rm <index>          移除队列项\n  queue move <from> <to>    调整顺序\n  queue clear               清空队列';
+      '사용법: archoerashell queue [하위 명령]\n\n  queue                     대기열 보기\n  queue play <index>        항목 재생\n  queue add <ref>...        추가(--position next|end, 기본 next)\n  queue rm <index>          항목 제거\n  queue move <from> <to>    순서 변경\n  queue clear               대기열 비우기';
 
   @override
   String get mcpShellHelpLibrary =>
-      '用法: archoerashell library [关键词] [-n 条数] [--offset n]\n\n搜索本地曲库；省略关键词则列出全部。';
+      '사용법: archoerashell library [검색어] [-n 개수] [--offset n]\n\n로컬 라이브러리 검색. 검색어 생략 시 전체.';
 
   @override
   String get mcpShellHelpLibraryRandom =>
-      '用法: archoerashell library-random [-n 条数]\n\n随机抽取本地曲目（默认 20）。';
+      '사용법: archoerashell library-random [-n 개수]\n\n로컬 곡 무작위 추출(기본 20).';
 
   @override
   String get mcpShellHelpLibraryStats =>
-      '用法: archoerashell library-stats\n\n本地曲库统计：曲目数 / 总大小 / 总时长。';
+      '사용법: archoerashell library-stats\n\n로컬 라이브러리 통계: 곡 수 / 총 크기 / 총 재생 시간.';
 
   @override
   String get mcpShellHelpPrefs =>
-      '用法: archoerashell prefs [键...]\n\n读取应用偏好（只读，敏感键剔除）；省略键则返回全部。';
+      '사용법: archoerashell prefs [키...]\n\n앱 환경설정 읽기(읽기 전용, 민감 키 제외). 키 생략 시 전체.';
 
   @override
   String get mcpShellHelpTheme =>
-      '用法: archoerashell theme <light|dark|system>\n\n切换主题模式。';
+      '사용법: archoerashell theme <light|dark|system>\n\n테마 모드 전환.';
 
   @override
-  String get mcpShellHelpLike => '用法: archoerashell like <ref>\n\n收藏（红心）指定曲目。';
+  String get mcpShellHelpLike =>
+      '사용법: archoerashell like <ref>\n\n지정한 곡을 즐겨찾기에 추가.';
 
   @override
   String get mcpShellHelpUnlike =>
-      '用法: archoerashell unlike <ref>\n\n取消收藏指定曲目。';
+      '사용법: archoerashell unlike <ref>\n\n지정한 곡을 즐겨찾기에서 제거.';
 
   @override
   String get mcpShellHelpLikeStatus =>
-      '用法: archoerashell like-status <ref>\n\n查询指定曲目的收藏状态。';
+      '사용법: archoerashell like-status <ref>\n\n지정한 곡의 즐겨찾기 여부 조회.';
 
   @override
   String get mcpShellHelpListLiked =>
-      '用法: archoerashell list-liked <音源> [-n 条数]\n\n列出该音源「我喜欢的」（未登录为空）。';
+      '사용법: archoerashell list-liked <소스> [-n 개수]\n\n해당 소스의 즐겨찾기 목록(미로그인 시 비어 있음).';
 
   @override
   String get mcpShellHelpHistory =>
-      '用法: archoerashell history [-n 条数]\n\n播放历史（最近在前，默认 50）。';
+      '사용법: archoerashell history [-n 개수]\n\n재생 기록(최신순, 기본 50).';
 
   @override
   String get mcpShellHelpHistoryClear =>
-      '用法: archoerashell history-clear\n\n清空播放历史。';
+      '사용법: archoerashell history-clear\n\n재생 기록 지우기.';
 
   @override
-  String get mcpShellHelpLyrics => '用法: archoerashell lyrics\n\n当前曲目的歌词行。';
+  String get mcpShellHelpLyrics => '사용법: archoerashell lyrics\n\n현재 곡의 가사 줄.';
 
   @override
   String get mcpShellHelpDownload =>
-      '用法: archoerashell download [子命令]\n\n  download [list] [-n 条数]           下载任务列表\n  download add <ref>... [--quality]    加入下载\n  download cancel <taskId>             取消任务\n  download remove <taskId>             移除记录（不删文件）';
+      '사용법: archoerashell download [하위 명령]\n\n  download [list] [-n 개수]            다운로드 목록\n  download add <ref>... [--quality]     다운로드 추가\n  download cancel <taskId>              작업 취소\n  download remove <taskId>              기록 제거(파일은 유지)';
 
   @override
   String get mcpShellHelpSleep =>
-      '用法: archoerashell sleep <分钟> | sleep --end\n\n设置睡眠定时：倒计时分钟数，或 --end 在当前曲播完后暂停。';
+      '사용법: archoerashell sleep <분> | sleep --end\n\n수면 타이머: 분 단위 또는 --end 로 현재 곡 후 일시정지.';
 
   @override
   String get mcpShellHelpSleepCancel =>
-      '用法: archoerashell sleep-cancel\n\n取消睡眠定时。';
+      '사용법: archoerashell sleep-cancel\n\n수면 타이머 해제.';
 
   @override
   String get mcpShellHelpInfo =>
-      '用法: archoerashell info\n\n服务信息：应用版本、端口、端点、已启用能力。';
+      '사용법: archoerashell info\n\n서비스 정보: 앱 버전, 포트, 엔드포인트, 활성 기능.';
 
   @override
   String get mcpShellHelpTools =>
-      '用法: archoerashell tools\n\n列出已启用的工具（名称 / 能力组 / 说明）。';
+      '사용법: archoerashell tools\n\n활성 도구 목록(이름 / 기능 / 설명).';
 
   @override
   String get mcpShellHelpCall =>
-      '用法: archoerashell call <工具名> [--json <参数JSON>]\n\n直接调用任意已启用工具，参数为 JSON 对象。';
+      '사용법: archoerashell call <도구> [--json <json>]\n\n활성 도구를 직접 호출. 인수는 JSON 객체.';
 
   @override
   String mcpShellErrUnknownCommand({required String command}) {
-    return '未知命令: $command';
+    return '알 수 없는 명령: $command';
   }
 
   @override
   String mcpShellErrUnknownOption({required String option}) {
-    return '未知选项: $option';
+    return '알 수 없는 옵션: $option';
   }
 
   @override
   String mcpShellErrNeedValue({required String option}) {
-    return '选项 $option 需要参数';
+    return '옵션 $option에 값이 필요합니다';
   }
 
   @override
   String mcpShellErrBadPort({required String value}) {
-    return '端口非法: $value';
+    return '잘못된 포트: $value';
   }
 
   @override
@@ -5247,19 +5252,19 @@ class AppLocalizationsKo extends AppLocalizations {
     required int port,
     required String reason,
   }) {
-    return '无法连接 $host:$port（$reason）';
+    return '$host:$port에 연결할 수 없습니다($reason)';
   }
 
   @override
-  String get mcpShellErrConnectHint => '请确认应用正在运行，且已在「设置 → MCP 接入」中启用服务。';
+  String get mcpShellErrConnectHint => '앱이 실행 중이고 설정에서 MCP 접근이 켜져 있는지 확인하세요.';
 
   @override
   String mcpShellErrHttp({required String message}) {
-    return 'HTTP 错误: $message';
+    return 'HTTP 오류: $message';
   }
 
   @override
   String mcpShellErrTimeout({required String host, required int port}) {
-    return '连接超时: $host:$port';
+    return '연결 시간 초과: $host:$port';
   }
 }
