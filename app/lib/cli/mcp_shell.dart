@@ -248,8 +248,20 @@ class _ShellContext {
       return 2;
     }
     if (command == 'help') {
-      _usage(out);
+      if (rest.isNotEmpty && _commandHelp.containsKey(rest.first)) {
+        out.writeln(_commandHelp[rest.first]);
+      } else {
+        _usage(out);
+      }
       return 0;
+    }
+    // 子命令级帮助（Unix 惯例）：`<命令> --help` / `<命令> -h`。
+    if (rest.any((a) => a == '-h' || a == '--help')) {
+      final help = _commandHelp[command];
+      if (help != null) {
+        out.writeln(help);
+        return 0;
+      }
     }
 
     try {
@@ -894,12 +906,84 @@ class _ShellContext {
 
   // ── 用法 ─────────────────────────────────────────────────────
 
+  /// 各命令的用法（`<命令> --help` / `help <命令>`）。
+  static const Map<String, String> _commandHelp = {
+    'status': '用法: archoerashell status\n\n显示当前播放状态：播放/暂停、当前曲目、进度、音量、循环/随机。',
+    'now-playing': '用法: archoerashell now-playing\n\n只显示当前曲目与进度。',
+    'play': '用法: archoerashell play\n\n开始/继续播放。',
+    'pause': '用法: archoerashell pause\n\n暂停播放。',
+    'toggle': '用法: archoerashell toggle\n\n播放/暂停切换。',
+    'stop': '用法: archoerashell stop\n\n停止播放。',
+    'next': '用法: archoerashell next\n\n切到下一首。',
+    'prev': '用法: archoerashell prev\n\n切到上一首（同 previous）。',
+    'previous': '用法: archoerashell previous\n\n切到上一首（同 prev）。',
+    'seek':
+        '用法: archoerashell seek <毫秒>\n\n跳转到指定位置。\n示例: archoerashell seek 30000',
+    'volume': '用法: archoerashell volume <0..1>\n\n设置音量。\n示例: archoerashell volume 0.6',
+    'repeat': '用法: archoerashell repeat <off|list|one>\n\n设置循环模式。',
+    'shuffle': '用法: archoerashell shuffle <on|off>\n\n开关随机播放。',
+    'quality':
+        '用法: archoerashell quality <lq|sq|hq|lossless|hi-res>\n\n切换音质档位。',
+    'play-track': '用法: archoerashell play-track <ref>\n\n播放指定曲目（ref 形如 source:id）。\n示例: archoerashell play-track netease:186016',
+    'search':
+        '用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n'
+        '在指定音源搜索歌曲。\n'
+        '  音源: netease | kugou | qqmusic | neko\n'
+        '  -n, --limit <n>   返回条数（1~50，默认 20）\n'
+        '  -p, --page <n>    页码（从 1 开始）\n'
+        '示例: archoerashell search netease 周杰伦 -n 10',
+    'search-all':
+        '用法: archoerashell search-all <关键词> [-n 每源条数]\n\n'
+        '在全部已启用音源同时搜索，并按音源分组展示。\n'
+        '  -n, --limit <n>   每个音源条数（1~30，默认 10）',
+    'queue':
+        '用法: archoerashell queue [子命令]\n\n'
+        '  queue                     查看队列\n'
+        '  queue play <index>        播放指定队列项\n'
+        '  queue add <ref>...        入队（--position next|end，默认 next）\n'
+        '  queue rm <index>          移除队列项\n'
+        '  queue move <from> <to>    调整顺序\n'
+        '  queue clear               清空队列',
+    'library': '用法: archoerashell library [关键词] [-n 条数] [--offset n]\n\n搜索本地曲库；省略关键词则列出全部。',
+    'library-random':
+        '用法: archoerashell library-random [-n 条数]\n\n随机抽取本地曲目（默认 20）。',
+    'library-stats':
+        '用法: archoerashell library-stats\n\n本地曲库统计：曲目数 / 总大小 / 总时长。',
+    'prefs': '用法: archoerashell prefs [键...]\n\n读取应用偏好（只读，敏感键剔除）；省略键则返回全部。',
+    'theme': '用法: archoerashell theme <light|dark|system>\n\n切换主题模式。',
+    'like': '用法: archoerashell like <ref>\n\n收藏（红心）指定曲目。',
+    'unlike': '用法: archoerashell unlike <ref>\n\n取消收藏指定曲目。',
+    'like-status': '用法: archoerashell like-status <ref>\n\n查询指定曲目的收藏状态。',
+    'list-liked':
+        '用法: archoerashell list-liked <音源> [-n 条数]\n\n列出该音源「我喜欢的」（未登录为空）。',
+    'history': '用法: archoerashell history [-n 条数]\n\n播放历史（最近在前，默认 50）。',
+    'history-clear': '用法: archoerashell history-clear\n\n清空播放历史。',
+    'lyrics': '用法: archoerashell lyrics\n\n当前曲目的歌词行。',
+    'download':
+        '用法: archoerashell download [子命令]\n\n'
+        '  download [list] [-n 条数]           下载任务列表\n'
+        '  download add <ref>... [--quality]    加入下载\n'
+        '  download cancel <taskId>             取消任务\n'
+        '  download remove <taskId>             移除记录（不删文件）',
+    'sleep': '用法: archoerashell sleep <分钟> | sleep --end\n\n设置睡眠定时：倒计时分钟数，或 --end 在当前曲播完后暂停。',
+    'sleep-cancel': '用法: archoerashell sleep-cancel\n\n取消睡眠定时。',
+    'info': '用法: archoerashell info\n\n服务信息：应用版本、端口、端点、已启用能力。',
+    'tools': '用法: archoerashell tools\n\n列出已启用的工具（名称 / 能力组 / 说明）。',
+    'call':
+        '用法: archoerashell call <工具名> [--json \'<参数对象>\']\n\n'
+        '直接调用任意已启用工具，参数为 JSON 对象。\n'
+        '示例: archoerashell call set_theme_mode --json \'{"mode":"dark"}\'',
+  };
+
   void _usage(StringSink sink) {
     sink.writeln('''
 archoerashell — ArchoeraMusic 命令行控制（类 Unix 语法）
 
 用法:
   archoera_music archoerashell [全局选项] <命令> [参数...]
+
+提示:
+  「<命令> --help」或「help <命令>」查看单命令用法，如 `archoerashell search --help`。
 
 全局选项:
   -h, --help            显示本帮助
