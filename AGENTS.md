@@ -41,11 +41,14 @@ cargo build --release --manifest-path app/core/shell/Cargo.toml   # 产 libarcho
 # 交叉静态检查（staticlib 无需目标链接器，可在本机验证 cfg 分支）：
 cargo build --release --target x86_64-pc-windows-msvc --manifest-path app/core/shell/Cargo.toml
 cargo build --release --target aarch64-apple-darwin   --manifest-path app/core/shell/Cargo.toml
+cargo build --release --target x86_64-apple-darwin    --manifest-path app/core/shell/Cargo.toml
 ```
 > 三端 runner 均在 Flutter 初始化前拦截 `archoerashell` 子命令并直调 Rust 入口：
 > Linux `app/linux/runner/main.cc`（CMake 链入）、Windows
 > `app/windows/runner/main.cpp`（runner CMake 链入 `archoera_shell.lib`）、macOS
-> `app/macos/Runner/main.swift`（Xcode “Build archoerashell (cargo)” 阶段链入）。
+> `app/macos/Runner/main.swift`（Xcode “Build archoerashell (cargo)” 阶段按 `$ARCHS`
+> 逐架构编译并 `lipo` 成 `target/universal/release/libarchoera_shell.a` 链入；
+> 需 `rustup target add aarch64-apple-darwin x86_64-apple-darwin`）。
 > Windows 侧控制台接管/UTF-8/ANSI 由 `app/core/shell/src/console.rs` 自理（标准流可能被重定向）。
 > `flutter build` 会经各自内嵌 cargo 目标自动编译该 staticlib，故常规构建无需单独 cargo；
 > 但**改了 Rust 单测/逻辑或 `lib/l10n` 下的 ARB** 时应先跑上面的 `cargo test`

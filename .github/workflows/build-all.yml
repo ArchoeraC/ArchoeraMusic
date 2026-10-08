@@ -284,6 +284,11 @@ jobs:
       # 不引入 actions-setup-cmake：其版本解析走 GitHub releases 分页，
       # 旧版本号（如 v3.28.7）超出分页范围会报 Unable to find version
       - uses: dtolnay/rust-toolchain@stable
+      - name: Add macOS Rust targets (universal archoerashell staticlib)
+        if: matrix.os == 'macos'
+        # Release 下 Xcode 按 ARCHS（arm64 x86_64）构建通用二进制，静态库需双架构
+        # slice；脚本阶段亦会幂等 rustup target add 兜底（本地开发用）。
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - uses: actions/setup-go@v6
         with:
           go-version: '1.26'

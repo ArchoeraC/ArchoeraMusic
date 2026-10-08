@@ -203,8 +203,9 @@ Dart**，命令行调用即时返回：
   CMake 编译并链入 `archoera_shell.lib`。GUI 子系统进程被终端调用时，由
   `app/core/shell/src/console.rs` 接管/补齐标准流、切 UTF-8 并开启 ANSI。
 - **macOS**：`app/macos/Runner/main.swift` 在 `NSApplicationMain` 之前检测子命令；
-  `Runner.xcodeproj` 的 “Build archoerashell (cargo)” 阶段编译并链入
-  `libarchoera_shell.a`（`-liconv` 为 Rust std 的系统依赖）。
+  `Runner.xcodeproj` 的 “Build archoerashell (cargo)” 阶段按 `$ARCHS`（Release 为
+  `arm64 x86_64`）逐架构编译并 `lipo` 成 `target/universal/release/libarchoera_shell.a`
+  链入（`-liconv` 为 Rust std 的系统依赖）。
 
 实现自包含：参数解析、回环 REST（`std::net`）、TUI 渲染；帮助文案由 `build.rs`
 从 Flutter 的 ARB（`mcpShell*`）生成，与 Dart 端同源。（Dart 版
