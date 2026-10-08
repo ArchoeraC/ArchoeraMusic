@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! 终端能力探测：是否交互式、列数、是否启用 ANSI。
+//! 终端能力探测：是否交互式、列数、是否启用 ANSI；以及 Unix 侧原始输入模式。
 
 use std::io::IsTerminal;
 
@@ -54,3 +54,71 @@ pub fn columns() -> usize {
     }
     80
 }
+
+/// Unix 原始（未见行）输入：关闭规范模式与回显，逐字节阻塞读取。
+///
+/// Windows 侧由 [`crate::console::RawInput`] 提供同签名实现（三端在 `lineedit` 中
+/// 统一使用）。Drop 时恢复原终端设置，正常退出与 panic 展开都不留下脏状态。
+#[cfg(unix)]
+mod raw {
+    pub struct RawInput {
+        saved: libc::termios,
+    }
+
+    impl RawInput {
+        /// 尝试进入原始模式；`stdin` 非交互终端或设置失败返回 `None`（调用方回退）。
+        pub fn enable() -> Option<Self> {
+            if !super::stdin_is_tty() {
+                return None;
+            }
+            unsafe {
+                let mut t: libc::termios = std::mem::zeroed();
+                if libc::tcgetattr(libc::STDIN_FILENO, &mut t) != 0 {
+                    return None;
+                }
+                let saved = t;
+                // 关闭规范/回显/扩展/信号：Ctrl-C 等以字节形式交付，由行编辑器自行处理。
+                t.c_lflag &= !(libc::ICANON | libc::ECHO | libc::IEXTEN | libc::ISIG);
+                t.c_iflag &=
+                    !(libc::IXON | libc::ICRNL | libc::BRKINT | libc::INPCK | libc::ISTRIP);
+                t.c_cc[libc::VMIN] = 1;
+                t.c_cc[libc::VTIME] = 0;
+                if libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &t) != 0 {
+                    return None;
+                }
+                Some(RawInput { saved })
+            }
+        }
+
+        /// 阻塞读取一个字节；EOF/错误返回 `None`。
+        pub fn read_byte(&mut self) -> Option<u8> {
+            let mut b = 0u8;
+            let n = unsafe {
+                libc::read(
+                    libc::STDIN_FILENO,
+                    &mut b as *mut u8 as *mut libc::c_void,
+                    1,
+                )
+            };
+            if n == 1 {
+                Some(b)
+            } else {
+                None
+            }
+        }
+    }
+
+    impl Drop for RawInput {
+        fn drop(&mut self) {
+            unsafe {
+                libc::tcsetattr(libc::STDIN_FILENO, libc::TCSADRAIN, &self.saved);
+            }
+        }
+    }
+}
+
+#[cfg(unix)]
+pub use raw::RawInput;
+
+#[cfg(windows)]
+pub use crate::console::RawInput;

@@ -13,6 +13,7 @@ mod cli;
 mod console;
 mod http;
 mod l10n;
+mod lineedit;
 mod prefs;
 mod render;
 mod style;

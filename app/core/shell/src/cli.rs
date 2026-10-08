@@ -802,6 +802,36 @@ fn repl(globals: &mut Globals, l10n: &L10n) -> i32 {
     let style = Style::new(term::use_style());
     println!("{}", style.dim(VERSION));
     println!("{}", style.dim(&l10n.raw("mcpShellHint")));
+
+    // 交互式终端：进入原始模式，用自带行编辑器启用 ←/→ 与 ↑/↓ 历史。
+    if let Some(mut raw) = term::RawInput::enable() {
+        let prompt = format!("{} ", style.cyan("archoerashell›"));
+        let mut editor = crate::lineedit::Editor::new(prompt, term::columns());
+        loop {
+            match editor.read_line(&mut raw) {
+                crate::lineedit::Outcome::Line(line) => {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    if trimmed == "exit" || trimmed == "quit" || trimmed == ":q" {
+                        break;
+                    }
+                    editor.remember(&line);
+                    let argv = shell_split(&line);
+                    if argv.is_empty() {
+                        continue;
+                    }
+                    let _ = execute(globals, l10n, &argv);
+                }
+                crate::lineedit::Outcome::Cancel => continue,
+                crate::lineedit::Outcome::Eof => break,
+            }
+        }
+        return 0;
+    }
+
+    // 回退：原始模式不可用（罕见）时退回逐行读取。
     let stdin = std::io::stdin();
     let mut lines = stdin.lock().lines();
     loop {
