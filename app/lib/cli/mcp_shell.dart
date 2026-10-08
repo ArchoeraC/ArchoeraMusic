@@ -639,7 +639,12 @@ class _ShellContext {
   int _finish(McpShellResponse response) {
     if (!response.ok) {
       final text = response.errorText;
-      err.writeln(text == null ? 'HTTP ${response.status}' : '错误: $text');
+      // 用本地化的错误前缀（mcpShellErrorPrefix），不再硬编码中文。
+      err.writeln(
+        text == null
+            ? 'HTTP ${response.status}'
+            : '${l10n.mcpShellErrorPrefix}: $text',
+      );
       return 1;
     }
     if (!quiet) _print(response.body);
