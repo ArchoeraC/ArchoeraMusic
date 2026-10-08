@@ -23,6 +23,8 @@ import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../../services/kugou/kugou_api.dart';
+import '../../services/neko/neko_api.dart';
 import '../../services/neko/neko_types.dart';
 import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
@@ -337,7 +339,10 @@ class _NeteaseCollection extends CollectionPlatform {
     String tabId,
   ) async {
     final account = ref.read(neteaseAuthProvider);
-    final api = ref.read(neteaseApiProvider);
+    // ref 为 dynamic：必须显式标注 api 的静态类型，否则 read 返回 dynamic，
+    // 后续 .where/.map 走动态派发，闭包参数退化为 dynamic → 运行时
+    // `(dynamic) => dynamic` 不匹配 `(PlaylistItem) => bool` 而抛错。
+    final NeteaseApi api = ref.read(neteaseApiProvider);
     final items = switch (tabId) {
       'album' => await api.albumSublist(),
       'artist' => await api.artistSublist(),
@@ -520,7 +525,10 @@ class _KugouCollection extends CollectionPlatform {
     dynamic ref,
     String tabId,
   ) async {
-    final lib = await ref.read(kugouApiProvider).userLibrary();
+    // 同 NT：显式类型避免动态派发把 map 结果退化成 List<dynamic>
+    // （List<dynamic> 不是 List<CoverItem> 的子类型 → 运行时类型错误）。
+    final KugouApi api = ref.read(kugouApiProvider);
+    final lib = await api.userLibrary();
     // 一次 `/v7/get_all_list` 拉全部分类（切 tab 不再重复请求）。
     return {
       tabKey('created'): lib.createdPlaylists
@@ -772,7 +780,9 @@ class _QqCollection extends CollectionPlatform {
     dynamic ref,
     String tabId,
   ) async {
-    final lib = await ref.read(qqMusicApiProvider).userLibrary();
+    // 同 NT/KG：显式类型，保持 userLibrary 返回的 List<CoverItem> 静态类型。
+    final QqMusicApi api = ref.read(qqMusicApiProvider);
+    final lib = await api.userLibrary();
     return {
       tabKey('created'): lib.created,
       tabKey('collectedPlaylist'): lib.collected,
@@ -953,7 +963,7 @@ class _NekoCollection extends CollectionPlatform {
     dynamic ref,
     String tabId,
   ) async {
-    final api = ref.read(nekoApiProvider);
+    final NekoApi api = ref.read(nekoApiProvider);
     final lib = await api.userLibrary();
     String? cover(String? path) {
       if (path == null || path.isEmpty || path.contains('/avatar/default')) {

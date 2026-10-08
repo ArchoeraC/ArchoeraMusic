@@ -68,6 +68,47 @@ Future<({int code, String out, String err, _FakeClient? client})> _runShell(
 McpShellResponse _okHandler(String method, Uri uri, Object? body) =>
     const McpShellResponse(200, {'ok': true});
 
+/// 强制 TUI 渲染（模拟交互式终端），用于校验面板/表格/进度条版式。
+Future<({int code, String out, String err})> _runStyled(
+  List<String> args, {
+  _Handler? handler,
+  int columns = 80,
+}) async {
+  final out = StringBuffer();
+  final err = StringBuffer();
+  final code = await runMcpShell(
+    args,
+    defaults: const McpShellOptions(port: 14559, key: 'secret'),
+    clientFactory: (target) => _FakeClient(target, handler ?? _okHandler),
+    l10n: lookupAppLocalizations(const Locale('zh')),
+    out: out,
+    err: err,
+    styled: true,
+    columns: columns,
+  );
+  return (code: code, out: out.toString(), err: err.toString());
+}
+
+/// 测试用显示宽度（与渲染器同口径：CJK 宽字符 2 列、暗色为 0）。
+int _width(String s) {
+  final plain = s.replaceAll(RegExp(r'\x1b\[[0-9;]*m'), '');
+  var w = 0;
+  for (final rune in plain.runes) {
+    if ((rune >= 0x1100 && rune <= 0x115f) ||
+        (rune >= 0x2e80 && rune <= 0x303e) ||
+        (rune >= 0x3041 && rune <= 0x33ff) ||
+        (rune >= 0x3400 && rune <= 0x4dbf) ||
+        (rune >= 0x4e00 && rune <= 0x9fff) ||
+        (rune >= 0xac00 && rune <= 0xd7a3) ||
+        (rune >= 0xff00 && rune <= 0xff60)) {
+      w += 2;
+    } else {
+      w += 1;
+    }
+  }
+  return w;
+}
+
 void main() {
   test('--help 输出用法且不建立连接', () async {
     final result = await _runShell(const ['--help']);
@@ -336,5 +377,332 @@ void main() {
     expect(result.out, contains('Hazy — A'));
     expect(result.out, contains('── kugou：错误 boom'));
     expect(result.out, isNot(contains('"source"')));
+  });
+
+  test('TUI status 渲染面板 + 进度条 + 元信息', () async {
+    final result = await _runStyled(
+      const ['status'],
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'playing': true,
+        'positionMs': 61000,
+        'durationMs': 180000,
+        'volume': 0.8,
+        'repeatMode': 'list',
+        'shuffle': false,
+        'track': {
+          'title': 'Song',
+          'artists': ['A', 'B'],
+          'ref': 'netease:1',
+        },
+      }),
+    );
+    expect(result.code, 0);
+    expect(result.out, contains('╭─'));
+    expect(result.out, contains('╰'));
+    expect(result.out, contains('Playing'));
+    expect(result.out, contains('Song'));
+    expect(result.out, contains('A / B'));
+    expect(result.out, contains('█')); // 已播放部分
+    expect(result.out, contains('░')); // 未播放部分
+    expect(result.out, contains('01:01 / 03:00'));
+    expect(result.out, contains('netease:1'));
+    expect(result.out, contains('vol 80%'));
+    expect(result.out, contains('repeat list'));
+    expect(result.out, isNot(contains('[playing]')));
+  });
+
+  test('TUI 面板各行等宽（含中文标题也不越界）', () async {
+    final result = await _runStyled(
+      const ['status'],
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'playing': true,
+        'positionMs': 148000,
+        'durationMs': 252000,
+        'track': {
+          'title': '我恨明月不照我',
+          'artists': ['阿YueYue'],
+          'ref': 'neko:25880',
+        },
+      }),
+      columns: 80,
+    );
+    final panel = result.out
+        .split('\n')
+        .where((l) => l.contains('│') || l.contains('╭') || l.contains('╰'))
+        .toList();
+    expect(panel.length, greaterThanOrEqualTo(4));
+    final widths = panel.map(_width).toSet();
+    expect(widths, hasLength(1));
+  });
+
+  test('TUI 队列用 ▶ 标记当前曲目', () async {
+    final result = await _runStyled(
+      const ['queue'],
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'tracks': [
+          {'index': 0, 'isCurrent': false, 'title': 'Intro', 'artists': ['A'], 'ref': 'n:1'},
+          {'index': 1, 'isCurrent': true, 'title': 'Now', 'artists': ['B'], 'ref': 'n:2'},
+        ],
+      }),
+    );
+    expect(result.out, contains('▶'));
+    expect(result.out, contains('Intro'));
+    expect(result.out, contains('Now'));
+    expect(result.out, contains('Title'));
+    // 非当前行保留序号。
+    expect(result.out, contains('1'));
+  });
+
+  test('TUI 列表为空时给出占位', () async {
+    final result = await _runStyled(
+      const ['library'],
+      handler: (m, u, b) =>
+          const McpShellResponse(200, {'tracks': <Object?>[], 'total': 0}),
+    );
+    expect(result.out, contains('total 0'));
+    expect(result.out, contains('empty'));
+  });
+
+  test('TUI 未启用时回退纯文本（无 ANSI 转义）', () async {
+    final result = await _runShell(
+      const ['status'],
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'playing': false,
+        'positionMs': 0,
+        'durationMs': 0,
+        'track': {'title': 'T', 'artists': ['A']},
+      }),
+    );
+    expect(result.out, contains('[paused]'));
+    expect(result.out, isNot(contains('\x1b[')));
+  });
+
+  test('--json 优先于 TUI（输出原始 JSON）', () async {
+    final result = await _runStyled(
+      const ['--json', 'info'],
+      handler: (m, u, b) =>
+          const McpShellResponse(200, {'name': 'ArchoeraMusic'}),
+    );
+    expect(result.out.trim(), '{"name":"ArchoeraMusic"}');
+    expect(result.out, isNot(contains('\x1b[')));
+  });
+
+  test('TUI info 渲染服务信息与能力组面板', () async {
+    final result = await _runStyled(
+      const ['info'],
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'name': 'ArchoeraMusic',
+        'version': '0.9.20+7',
+        'platform': 'linux',
+        'service': {
+          'port': 14559,
+          'lan': false,
+          'protocolVersion': '2025-11-25',
+          'endpoints': {'mcp': '/mcp', 'rest': '/api', 'websocket': '/ws'},
+          'capabilities': ['read', 'playback', 'download'],
+        },
+      }),
+    );
+    expect(result.out, contains('╭─'));
+    expect(result.out, contains('ArchoeraMusic'));
+    expect(result.out, contains('version'));
+    expect(result.out, contains('0.9.20+7'));
+    expect(result.out, contains('loopback'));
+    expect(result.out, contains('/mcp'));
+    expect(result.out, contains('caps'));
+    expect(result.out, contains('download'));
+  });
+
+  test('TUI library-stats 使用人类可读单位', () async {
+    final result = await _runStyled(
+      const ['library-stats'],
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'tracks': 1287,
+        'totalSizeBytes': 16437698560,
+        'totalDurationMs': 20523000,
+      }),
+    );
+    expect(result.out, contains('Library'));
+    expect(result.out, contains('1287'));
+    expect(result.out, contains('GiB'));
+    expect(result.out, contains('5h 42m'));
+  });
+
+  test('TUI 动作结果渲染为勾号摘要', () async {
+    final volume = await _runStyled(
+      const ['volume', '0.5'],
+      handler: (m, u, b) =>
+          const McpShellResponse(200, {'ok': true, 'volume': 0.5}),
+    );
+    expect(volume.out, contains('✓'));
+    expect(volume.out, contains('vol 50%'));
+
+    final sleep = await _runStyled(
+      const ['sleep', '30'],
+      handler: (m, u, b) =>
+          const McpShellResponse(200, {'ok': true, 'mode': 'duration', 'minutes': 30}),
+    );
+    expect(sleep.out, contains('sleep'));
+    expect(sleep.out, contains('30m'));
+
+    final liked = await _runStyled(
+      const ['like-status', 'neko:1'],
+      handler: (m, u, b) =>
+          const McpShellResponse(200, {'ref': 'neko:1', 'liked': true}),
+    );
+    expect(liked.out, contains('♥'));
+    expect(liked.out, contains('liked'));
+  });
+
+  test('TUI 搜索/队列/历史带上下文头部', () async {
+    final search = await _runStyled(
+      const ['search', 'netease', 'x'],
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'source': 'netease',
+        'query': 'Assumptions',
+        'page': 1,
+        'total': 30,
+        'tracks': [
+          {'ref': 'netease:1', 'title': 'Assumptions', 'artists': ['A']},
+        ],
+      }),
+    );
+    expect(search.out, contains('search'));
+    expect(search.out, contains('Assumptions'));
+    expect(search.out, contains('page 1'));
+    expect(search.out, contains('total 30'));
+
+    final queue = await _runStyled(
+      const ['queue'],
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'index': 1,
+        'repeatMode': 'one',
+        'shuffle': true,
+        'tracks': [
+          {'index': 0, 'isCurrent': false, 'title': 'A', 'artists': ['x'], 'ref': 'n:1'},
+          {'index': 1, 'isCurrent': true, 'title': 'B', 'artists': ['y'], 'ref': 'n:2'},
+        ],
+      }),
+    );
+    expect(queue.out, contains('index 2/2'));
+    expect(queue.out, contains('repeat one'));
+    expect(queue.out, contains('shuffle on'));
+
+    final history = await _runStyled(
+      const ['history'],
+      handler: (m, u, b) => McpShellResponse(200, {
+        'total': 1,
+        'entries': [
+          {
+            'title': 'Hazy',
+            'artists': ['A'],
+            'ref': 'n:1',
+            'playedAt': DateTime.now().millisecondsSinceEpoch - 7200000,
+          },
+        ],
+      }),
+    );
+    expect(history.out, contains('When'));
+    expect(history.out, contains('ago'));
+  });
+
+  test('TUI ref 列优先完整显示（长标题也不截断 ref）', () async {
+    final result = await _runStyled(
+      const ['search', 'netease', 'x'],
+      columns: 60,
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'source': 'netease',
+        'query': 'q',
+        'tracks': [
+          {
+            'ref': 'netease:1843699265',
+            'title': '这是一个相当长的歌曲标题用来挤占列宽应该被截断',
+            'artists': ['An artist name'],
+          },
+        ],
+      }),
+    );
+    // ref 完整保留，未被 `…` 截断。
+    expect(result.out, contains('netease:1843699265'));
+    expect(result.out, isNot(contains('netease:1843699…')));
+    // 被挤占的应是标题列。
+    expect(result.out, contains('…'));
+  });
+
+  test('TUI 窄终端下所有行不越界（含超长文本）', () async {
+    const columns = 30;
+    final longTitle = '这是一个非常非常非常非常非常非常长的歌曲标题应该被截断';
+    final status = await _runStyled(
+      const ['status'],
+      columns: columns,
+      handler: (m, u, b) => McpShellResponse(200, {
+        'playing': true,
+        'positionMs': 148000,
+        'durationMs': 252000,
+        'volume': 1.0,
+        'repeatMode': 'off',
+        'quality': 'lossless',
+        'track': {
+          'title': longTitle,
+          'artists': ['一个也很长很长的歌手名字组合'],
+          'ref': 'neko:25880',
+        },
+      }),
+    );
+    final tracks = await _runStyled(
+      const ['search', 'netease', 'x'],
+      columns: columns,
+      handler: (m, u, b) => McpShellResponse(200, {
+        'source': 'netease',
+        'query': longTitle,
+        'page': 1,
+        'total': 1,
+        'tracks': [
+          {
+            'ref': 'netease:1843699265',
+            'title': longTitle,
+            'artists': ['A very very very long artist name that overflows'],
+          },
+        ],
+      }),
+    );
+    final info = await _runStyled(
+      const ['info'],
+      columns: columns,
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'name': 'ArchoeraMusic',
+        'version': '0.9.20+7',
+        'platform': 'linux',
+        'service': {
+          'port': 14559,
+          'lan': true,
+          'protocolVersion': '2025-11-25',
+          'endpoints': {'mcp': '/mcp', 'rest': '/api', 'websocket': '/ws'},
+          'capabilities': [
+            'read',
+            'playback',
+            'queue',
+            'search',
+            'library',
+            'preferences',
+            'appearance',
+            'collection',
+            'history',
+            'lyrics',
+            'download',
+          ],
+        },
+      }),
+    );
+    for (final out in [status.out, tracks.out, info.out]) {
+      for (final line in out.split('\n')) {
+        expect(
+          _width(line),
+          lessThanOrEqualTo(columns),
+          reason: '越界行: ${line.replaceAll(RegExp(r'\x1b\[[0-9;]*m'), '')}',
+        );
+      }
+    }
+    expect(tracks.out, contains('…'));
   });
 }
