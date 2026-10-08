@@ -34,6 +34,17 @@ cd build && ctest
 cmake -S app/native/platform -B app/native/platform/build -DCMAKE_BUILD_TYPE=Release
 cmake --build app/native/platform/build -j
 ```
+改动内嵌原生 CLI（`app/core/shell`，Rust `staticlib`，Linux `archoerashell`）时另跑：
+```bash
+cargo test --release --manifest-path app/core/shell/Cargo.toml    # 全绿
+cargo build --release --manifest-path app/core/shell/Cargo.toml   # 产 libarchoera_shell.a
+```
+> `flutter build linux` 会经 `app/linux/CMakeLists.txt` 的内嵌 cargo 目标自动编译该
+> staticlib 并链入 runner，故常规构建无需单独 cargo；但**改了 Rust 单测/逻辑或 `lib/l10n`
+> 下的 ARB** 时应先跑上面的 `cargo test`（`build.rs` 从 ARB 生成帮助/标签，会随 ARB 变化重编）。
+> 改动 ARB 后另跑 `flutter gen-l10n`（`flutter build/test` 也会自动生成）以刷新生成代码。
+> Windows/macOS 尚未接入该原生 CLI（仍走 Dart 回退路径），故 `build_windows.bat` / `build-macos.sh`
+> 暂不含此模块；接入时需同步这两处与各自 runner。
 
 Windows/MSVC 兼容自检（本机可交叉，无需 Windows SDK）：
 ```bash
