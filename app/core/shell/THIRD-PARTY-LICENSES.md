@@ -1,9 +1,11 @@
 # Shell 第三方许可证声明（archoera-shell）
 
 本目录 `app/core/shell` 为 ArchoeraMusic 的**内嵌原生命令行客户端**（`archoerashell`）：
-以 Rust `staticlib`（`libarchoera_shell.a`）**静态链入** Linux runner 主可执行文件
-（`app/linux/CMakeLists.txt`）。其自研代码随本软件以 AGPL-3.0 授权，第三方 crate 按
-各自许可使用（逐项登记见下）。静态链接的 crate 代码会进入发布二进制的文本段。
+以 Rust `staticlib` **静态链入**各平台 runner 主可执行文件（Linux
+`app/linux/CMakeLists.txt` → `libarchoera_shell.a`、Windows runner CMake →
+`archoera_shell.lib`、macOS `Runner.xcodeproj` → `libarchoera_shell.a`）。其自研代码随
+本软件以 AGPL-3.0 授权，第三方 crate 按各自许可使用（逐项登记见下）。静态链接的
+crate 代码会进入发布二进制的文本段。
 
 ## 运行期依赖（静态链入二进制）
 

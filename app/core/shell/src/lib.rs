@@ -9,6 +9,8 @@
 //! 从而在命令行调用时完全不加载 Flutter 引擎。
 
 mod cli;
+#[cfg(windows)]
+mod console;
 mod http;
 mod l10n;
 mod prefs;
@@ -53,7 +55,15 @@ pub unsafe extern "C" fn archoera_shell_main(
         Some(i) => args[i + 1..].to_vec(),
         None => return 2,
     };
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| cli::run(sub))).unwrap_or(70)
+    // Windows：GUI 子系统进程被终端调用时接管/补齐标准流与 UTF-8/ANSI。
+    #[cfg(windows)]
+    let console_state = console::ensure();
+    let code =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| cli::run(sub))).unwrap_or(70);
+    // 复位被改写的控制台代码页，保持调用方终端状态。
+    #[cfg(windows)]
+    console::restore(console_state);
+    code
 }
 
 /// 供集成测试/嵌入调用的纯 Rust 入口。

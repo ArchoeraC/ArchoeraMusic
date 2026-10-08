@@ -48,5 +48,9 @@ pub fn columns() -> usize {
             return ws.ws_col as usize;
         }
     }
+    #[cfg(windows)]
+    if let Some(cols) = crate::console::columns() {
+        return cols;
+    }
     80
 }

@@ -26,6 +26,10 @@
 #  cargo test（archoerashell）→ pub get/analyze/test → vault 端到端 →
 #  flutter build linux。发行版专属的系统依赖安装与打包由各 job 负责。
 #
+#  macOS/Windows job：工具链 → 一站式原生构建（build-macos.sh / build_windows.bat，
+#  含 archoerashell staticlib）→ cargo test（archoerashell）→ pub get/analyze/test
+#  → flutter build（经内嵌 cargo/脚本阶段链入 archoerashell）→ 打包。
+#
 #  Zig 0.16 安装沿用已修复逻辑（f99266b / 7116dfc）：归档名按 0.15.1+ 新规则
 #  zig-<arch>-<os>；GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
 #
@@ -391,6 +395,13 @@ jobs:
             app/vcpkg-install.log
             app/core/build_windows.log
           if-no-files-found: ignore
+
+      # ───────────── Rust 原生 CLI（archoerashell）单测（各桌面端）─────────
+      - name: Rust tests (archoerashell 原生 CLI)
+        if: matrix.os == 'macos' || matrix.os == 'windows'
+        # 与 Linux 共享同一 crate；build.rs 从 ARB 生成帮助/标签文案。
+        # 交叉/本机构建由随后的 flutter build 经各自内嵌 cargo 目标完成。
+        run: cargo test --release --manifest-path app/core/shell/Cargo.toml
 
       # ───────────── Flutter pub get / analyze / test（统一在 app/）─────
       - name: Flutter pub get
