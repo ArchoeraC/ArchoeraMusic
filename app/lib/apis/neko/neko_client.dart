@@ -76,6 +76,146 @@ class NekoSseEvent {
   final String data;
 }
 
+/// ── 请求防重放 nonce 池（对齐官方 PC 端 `ReplayNonceStore`）──────────────
+///
+/// 服务端对全部动态接口（`/api/*`、`/loser/*`）强制要求一次性 `X-Neko-Nonce`：
+/// 缺失/重放/过期返回 `409`（`X-Neko-Replay-Status: missing|invalid`）。
+/// 这里按站点批量预取读/写两类 nonce，用后即弃；本地 90s 提前作废（服务端 120s）。
+/// nonce 绑定领取时的出口 IP，故换 IP/代理时可能 `invalid`，由调用方换新重试一次兜住。
+class _NekoNonce {
+  const _NekoNonce(this.value, this.issuedAt);
+
+  final String value;
+  final DateTime issuedAt;
+}
+
+class _NekoNoncePool {
+  _NekoNoncePool(this.baseUrl);
+
+  final String baseUrl;
+
+  static const int _batch = 16; // 服务端上限 64；官方 PC 端取 16
+  static const int _lowWater = 4;
+  static const Duration _localMaxAge = Duration(seconds: 90);
+
+  final List<_NekoNonce> _read = [];
+  final List<_NekoNonce> _write = [];
+  Future<void>? _refilling;
+
+  bool get _isLow => _read.length < _lowWater || _write.length < _lowWater;
+
+  /// 取一个 nonce（[write] = 写类别，否则读类别）；池空时先补领，仍无则 null。
+  Future<String?> take({required bool write}) async {
+    var nonce = _pop(write);
+    if (nonce != null) {
+      if (_isLow) unawaited(_refill());
+      return nonce;
+    }
+    await _refill();
+    nonce = _pop(write);
+    return nonce;
+  }
+
+  /// 服务端判定重放/失效：清空并补领（下次请求用新 nonce）。
+  void noteRejected() {
+    _read.clear();
+    _write.clear();
+    unawaited(_refill());
+  }
+
+  String? _pop(bool write) {
+    final pool = write ? _write : _read;
+    final now = DateTime.now();
+    while (pool.isNotEmpty) {
+      final entry = pool.removeAt(0);
+      if (now.difference(entry.issuedAt) < _localMaxAge) return entry.value;
+    }
+    return null;
+  }
+
+  Future<void> _refill() {
+    final pending = _refilling;
+    if (pending != null) return pending;
+    final future = _fetch();
+    _refilling = future;
+    return future.whenComplete(() {
+      if (identical(_refilling, future)) _refilling = null;
+    });
+  }
+
+  Future<void> _fetch() async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
+    try {
+      final uri = Uri.parse(baseUrl).resolve(
+        '/api/replay/nonce?read=$_batch&write=$_batch',
+      );
+      final req = await client.getUrl(uri).timeout(const Duration(seconds: 12));
+      // 领取接口自身豁免 nonce，但仍走客户端标识（防爬过滤器按空 UA 放行）。
+      nekoRequestHeaders.forEach(req.headers.set);
+      final res = await req.close().timeout(const Duration(seconds: 12));
+      if (res.statusCode < 200 || res.statusCode >= 300) return;
+      final text = await res.transform(utf8.decoder).join();
+      final json = jsonDecode(text);
+      if (json is! Map) return;
+      final data = json['data'];
+      final nonces = data is Map ? data['nonces'] : null;
+      if (nonces is! Map) return;
+      final now = DateTime.now();
+      void append(List<_NekoNonce> pool, Object? raw) {
+        if (raw is! List) return;
+        for (final value in raw) {
+          final s = value?.toString() ?? '';
+          if (s.isNotEmpty) pool.add(_NekoNonce(s, now));
+        }
+      }
+
+      append(_read, nonces['read']);
+      append(_write, nonces['write']);
+    } catch (_) {
+      // 领取失败：按无 nonce 继续，由上层收到 409 后兜底
+    } finally {
+      client.close(force: true);
+    }
+  }
+}
+
+final Map<String, _NekoNoncePool> _noncePools = {};
+_NekoNoncePool _noncePoolFor(String baseUrl) =>
+    _noncePools.putIfAbsent(baseUrl, () => _NekoNoncePool(baseUrl));
+
+/// 路径是否需要防重放 nonce（与后端 `ReplayProtectionFilter` 豁免清单一致）。
+bool nekoNeedsNonce(String path, String method) {
+  var p = path;
+  final q = p.indexOf('?');
+  if (q >= 0) p = p.substring(0, q);
+  if (p.length > 1 && p.endsWith('/')) p = p.substring(0, p.length - 1);
+  final verb = method.toUpperCase();
+  if (verb == 'OPTIONS' || verb == 'HEAD') return false;
+  const exemptPaths = {
+    '/api/replay/nonce',
+    '/api/music/latest',
+    '/api/music/ranking',
+    '/api/payment/zpay/notify',
+    '/api/user/qrlogin/status',
+  };
+  if (exemptPaths.contains(p)) return false;
+  const exemptPrefixes = ['/api/music/cover/', '/api/user/avatar/'];
+  for (final prefix in exemptPrefixes) {
+    if (p.startsWith(prefix)) return false;
+  }
+  if (p.endsWith('/pull')) return false;
+  return p.startsWith('/api/') || p.startsWith('/loser/');
+}
+
+/// 单次 Neko 请求的原始结果（供 [NekoClient._send] 判断是否换 nonce 重试）。
+class _NekoRawResponse {
+  const _NekoRawResponse(this.status, this.decoded, this.replayRejected);
+
+  final int status;
+  final Map<String, dynamic>? decoded;
+  final bool replayRejected;
+}
+
 /// Neko REST 客户端（不可变：baseUrl / token 变化时重新构造）。
 class NekoClient {
   NekoClient({String? baseUrl, this.token})
@@ -90,9 +230,16 @@ class NekoClient {
   static const Duration _timeout = Duration(seconds: 12);
 
   Uri _uri(String path, [Map<String, String>? query]) {
-    final base = Uri.parse(baseUrl);
-    // path 以 `/` 开头 → resolve 直接替换路径。
-    final u = base.resolve(path.startsWith('/') ? path : '/$path');
+    final parsed = Uri.parse(path);
+    final Uri u;
+    if (parsed.hasScheme) {
+      // 已是绝对地址（如解析后的媒体直链）→ 原样使用。
+      u = parsed;
+    } else {
+      final base = Uri.parse(baseUrl);
+      // path 以 `/` 开头 → resolve 直接替换路径。
+      u = base.resolve(path.startsWith('/') ? path : '/$path');
+    }
     if (query == null || query.isEmpty) return u;
     return u.replace(queryParameters: {...u.queryParameters, ...query});
   }
@@ -136,6 +283,52 @@ class NekoClient {
     Map<String, String>? query,
     Object? body,
   }) async {
+    final protected = nekoNeedsNonce(path, method);
+    final write = method.toUpperCase() != 'GET';
+    _NekoRawResponse? last;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final nonce = protected
+          ? await _noncePoolFor(baseUrl).take(write: write)
+          : null;
+      final res = await _sendOnce(
+        method,
+        path,
+        query: query,
+        body: body,
+        nonce: nonce,
+      );
+      last = res;
+      if (res.replayRejected && attempt == 0) {
+        // 缺 nonce / 已失效：换新 nonce 重试一次（被拒请求不会执行，无重复副作用）。
+        _noncePoolFor(baseUrl).noteRejected();
+        continue;
+      }
+      break;
+    }
+    final res = last!;
+    if (res.status < 200 || res.status >= 300) {
+      throw NekoApiException(
+        res.decoded?['message']?.toString() ??
+            res.decoded?['error']?.toString() ??
+            'HTTP ${res.status}',
+        statusCode: res.status,
+        kind: switch (res.status) {
+          401 => NekoErrorKind.auth,
+          404 => NekoErrorKind.notFound,
+          _ => NekoErrorKind.api,
+        },
+      );
+    }
+    return res.decoded ?? <String, dynamic>{};
+  }
+
+  Future<_NekoRawResponse> _sendOnce(
+    String method,
+    String path, {
+    Map<String, String>? query,
+    Object? body,
+    String? nonce,
+  }) async {
     final client = HttpClient()..connectionTimeout = _timeout;
     try {
       final req = await client
@@ -145,10 +338,14 @@ class NekoClient {
         req,
         body == null ? null : 'application/json; charset=utf-8',
       );
+      if (nonce != null && nonce.isNotEmpty) {
+        req.headers.set(kNekoNonceHeader, nonce);
+      }
       if (body != null) {
         req.add(utf8.encode(jsonEncode(body)));
       }
       final res = await req.close().timeout(_timeout);
+      final replayStatus = res.headers.value(kNekoReplayStatusHeader);
       final bytes = await res
           .fold<List<int>>(<int>[], (a, b) => a..addAll(b))
           .timeout(_timeout);
@@ -159,25 +356,13 @@ class NekoClient {
           final json = jsonDecode(text);
           if (json is Map<String, dynamic>) decoded = json;
         } catch (_) {
-          // 非 JSON（如纯文本错误页）：下方按状态码处理
+          // 非 JSON（如纯文本错误页）：按状态码处理
         }
       }
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        throw NekoApiException(
-          decoded?['message']?.toString() ??
-              decoded?['error']?.toString() ??
-              'HTTP $res.statusCode',
-          statusCode: res.statusCode,
-          kind: switch (res.statusCode) {
-            401 => NekoErrorKind.auth,
-            404 => NekoErrorKind.notFound,
-            _ => NekoErrorKind.api,
-          },
-        );
-      }
-      return decoded ?? <String, dynamic>{};
-    } on NekoApiException {
-      rethrow;
+      final rejected =
+          res.statusCode == 409 &&
+          (replayStatus == 'missing' || replayStatus == 'invalid');
+      return _NekoRawResponse(res.statusCode, decoded, rejected);
     } on TimeoutException {
       throw NekoApiException('请求超时', kind: NekoErrorKind.network);
     } on SocketException catch (e) {
@@ -186,6 +371,7 @@ class NekoClient {
         kind: NekoErrorKind.network,
       );
     } catch (e) {
+      if (e is NekoApiException) rethrow;
       throw NekoApiException('$e', kind: NekoErrorKind.network);
     } finally {
       client.close(force: true);

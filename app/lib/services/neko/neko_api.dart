@@ -34,7 +34,13 @@ const String kNekoSessionPlatform = 'neko';
 
 /// Neko 音源服务。
 class NekoApi extends ChangeNotifier {
-  NekoApi();
+  NekoApi({NekoClient Function(String baseUrl, String? token)? clientFactory})
+    : _clientFactory = clientFactory ?? _defaultClient;
+
+  final NekoClient Function(String baseUrl, String? token) _clientFactory;
+
+  static NekoClient _defaultClient(String baseUrl, String? token) =>
+      NekoClient(baseUrl: baseUrl, token: token);
 
   String? _token;
   NekoUser? _account;
@@ -58,7 +64,7 @@ class NekoApi extends ChangeNotifier {
   String resolveUrl(String pathOrUrl) =>
       NekoClient(baseUrl: baseUrl).resolveUrl(pathOrUrl);
 
-  NekoClient _client() => NekoClient(baseUrl: baseUrl, token: _token);
+  NekoClient _client() => _clientFactory(baseUrl, _token);
 
   static void _ensureSuccess(Map<String, dynamic> body) {
     if (body['success'] == true) return;
@@ -420,17 +426,50 @@ class NekoApi extends ChangeNotifier {
 
   // ── 播放 / 歌词 ──────────────────────────────────────────────
 
-  /// 解析播放 URL（Neko 音频直链，服务端支持 Range/206 拖动）。
+  /// 音质解析结果缓存（`/api/music/file/{id}` → 站内固定媒体地址）。
   ///
-  /// 自服务端「可选音质流」起 `/api/music/file/{id}` 返回 **302** 重定向到
-  /// 站内固定媒体地址（`/media/music/...`），并由 `?quality=` 决定目标档位；
-  /// 引擎 / 下载器需能跟随重定向（HTTP 客户端默认行为）。
+  /// 后端该接口已由 `302` 改为 `200 + JSON data.url`，且受防重放保护：真实
+  /// 媒体地址固定、可被 CDN 缓存，解析一次即可供播放 / seek / 重试复用
+  /// （对齐官方 PC 端 `MusicUrlResolver` 的进程内缓存）。
+  final Map<String, _NekoMediaUrl> _mediaUrls = {};
+  static const Duration _mediaUrlTtl = Duration(minutes: 10);
+
+  /// 用带 nonce 的普通请求换取真实媒体直链；失败 / 无地址返回 null。
+  Future<String?> _resolveMediaUrl(String id, String quality) async {
+    if (id.isEmpty) return null;
+    final key = '$id|$quality';
+    final cached = _mediaUrls[key];
+    if (cached != null && DateTime.now().isBefore(cached.expiresAt)) {
+      return cached.url;
+    }
+    final body = await _client().getJson(
+      '/api/music/file/$id',
+      query: {'quality': nekoQualityParam(quality)},
+    );
+    if (body['success'] != true) return null;
+    final data = body['data'];
+    final raw = data is Map ? data['url']?.toString() : null;
+    if (raw == null || raw.isEmpty) return null;
+    final url = resolveUrl(raw);
+    _mediaUrls[key] = _NekoMediaUrl(url, DateTime.now().add(_mediaUrlTtl));
+    return url;
+  }
+
+  /// 解析播放 URL（真实媒体直链，服务端支持 Range/206 拖动）。
+  ///
+  /// 服务端「可选音质流」起 `/api/music/file/{id}` 不再 302，而是返回
+  /// `200 + JSON data.url`（且需防重放 nonce）；因此这里先用带 nonce 的请求
+  /// 换取站内固定媒体地址，再交给引擎 / 下载器拉流（媒体地址可重复访问、
+  /// 不需要 nonce）。
   /// [quality] 为本项目统一档位键，经 [nekoQualityParam] 映射到服务端四档；
   /// 请求高于歌曲实际最高音质时服务端按原始最高音质封顶。
   Future<String?> resolvePlayUrl(Track track, {String quality = 'hq'}) async {
     if (track.id.isEmpty) return null;
-    return '$baseUrl/api/music/file/${track.id}'
-        '?quality=${nekoQualityParam(quality)}';
+    try {
+      return await _resolveMediaUrl(track.id, quality);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 歌曲实际最高音质（`/api/music/info/{id}` 的 `maxQuality`）。
@@ -452,14 +491,19 @@ class NekoApi extends ChangeNotifier {
   /// 探测音频真实扩展名（下载落盘用）。
   ///
   /// Neko 直链无扩展名：按**文件头魔数**嗅探（对齐官方 PC 客户端的扩展名
-  /// 判定）。[quality] 与取流档位一致——`standard`/`hq` 为服务端转码 MP3，
-  /// `sq`/`hires` 为原始容器（可能 FLAC），档位不同扩展名可能不同。
+  /// 判定）。先换取真实媒体地址（`/api/music/file` 已改为 JSON），再对该媒体
+  /// 直链做 Range 嗅探。[quality] 与取流档位一致——`standard`/`hq` 为服务端
+  /// 转码 MP3，`sq`/`hires` 为原始容器（可能 FLAC），档位不同扩展名可能不同。
   Future<String?> probeAudioExtension(String id, {String quality = 'hq'}) async {
     if (id.isEmpty) return null;
-    final head = await _client().getLeadingBytes(
-      '/api/music/file/$id?quality=${nekoQualityParam(quality)}',
-    );
-    return sniffAudioExtension(head);
+    try {
+      final url = await _resolveMediaUrl(id, quality);
+      if (url == null) return null;
+      final head = await _client().getLeadingBytes(url);
+      return sniffAudioExtension(head);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 歌词（LRC 文本；无歌词返回 null）。
@@ -586,9 +630,16 @@ class NekoApi extends ChangeNotifier {
   }
 }
 
+/// 内部：媒体直链缓存项（`/api/music/file` 解析结果，进程内短 TTL）。
+class _NekoMediaUrl {
+  const _NekoMediaUrl(this.url, this.expiresAt);
+
+  final String url;
+  final DateTime expiresAt;
+}
+
 /// 内部：歌手搜索结果（name + 曲目）。
-class _NekoArtist {
-  const _NekoArtist({
+class _NekoArtist {  const _NekoArtist({
     required this.name,
     required this.musicCount,
     required this.tracks,

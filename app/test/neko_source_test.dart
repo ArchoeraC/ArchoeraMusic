@@ -471,18 +471,24 @@ void main() {
   });
 
   group('NekoApi.resolvePlayUrl / userAvatarUrl', () {
-    test('播放 URL 带服务端 quality 参数', () async {
-      final api = NekoApi();
+    test('音质解析：/api/music/file JSON → 媒体直链并缓存', () async {
+      final fake = _FakeNekoClient();
+      final api = NekoApi(clientFactory: (baseUrl, token) => fake);
       final t = Track.fromNekoSong({'id': 42, 'title': 'x'});
+
+      final url = await api.resolvePlayUrl(t, quality: 'lossless');
+      expect(fake.lastPath, '/api/music/file/42');
+      expect(fake.lastQuery?['quality'], 'sq');
+      expect(url, '$kDefaultNekoBaseUrl/media/music/42/sq.flac');
+
+      // 二次调用命中进程内缓存，不再请求
+      fake.calls = 0;
       expect(
         await api.resolvePlayUrl(t, quality: 'lossless'),
-        '$kDefaultNekoBaseUrl/api/music/file/42?quality=sq',
+        contains('/media/'),
       );
-      expect(
-        await api.resolvePlayUrl(t, quality: 'hi-res'),
-        '$kDefaultNekoBaseUrl/api/music/file/42?quality=hires',
-      );
-      expect(await api.resolvePlayUrl(t), contains('quality=hq'));
+      expect(fake.calls, 0);
+
       expect(await api.resolvePlayUrl(Track.fromNekoSong(const {})), isNull);
     });
 
@@ -512,4 +518,27 @@ void main() {
       expect(withPicSize('', 100), '');
     });
   });
+}
+
+/// 假 NekoClient：只覆盖 `getJson`，用于确定性验证音质解析后的媒体直链。
+class _FakeNekoClient extends NekoClient {
+  _FakeNekoClient() : super(baseUrl: kDefaultNekoBaseUrl);
+
+  int calls = 0;
+  String? lastPath;
+  Map<String, String>? lastQuery;
+
+  @override
+  Future<Map<String, dynamic>> getJson(
+    String path, {
+    Map<String, String>? query,
+  }) async {
+    calls++;
+    lastPath = path;
+    lastQuery = query;
+    return <String, dynamic>{
+      'success': true,
+      'data': const <String, dynamic>{'url': '/media/music/42/sq.flac'},
+    };
+  }
 }
