@@ -7,6 +7,7 @@
 //! 同一套代码在 `styled` 开关下产出 TUI（面板/表格/进度条）或纯文本；
 //! 所有输出行都经 [`Renderer::w`] 按终端列数兜底截断，保证不撑破排版。
 
+use crate::l10n::L10n;
 use crate::style::Style;
 use crate::width::{display_width, pad_right, truncate};
 use serde_json::Value;
@@ -16,15 +17,22 @@ pub struct Renderer {
     pub out: String,
     pub columns: usize,
     pub style: Style,
+    pub l10n: L10n,
 }
 
 impl Renderer {
-    pub fn new(columns: usize, styled: bool) -> Self {
+    pub fn new(columns: usize, styled: bool, l10n: L10n) -> Self {
         Renderer {
             out: String::new(),
             columns,
             style: Style::new(styled),
+            l10n,
         }
+    }
+
+    /// 取本地化标签（`mcpShellLbl*`，与 Dart 端同一份 ARB 文案）。
+    fn lbl(&self, key: &str) -> String {
+        self.l10n.raw(key)
     }
 
     fn w(&mut self, line: &str) {
@@ -128,7 +136,11 @@ impl Renderer {
 
     fn plain_status(&mut self, map: &serde_json::Map<String, Value>) {
         let playing = map.get("playing").and_then(Value::as_bool).unwrap_or(false);
-        self.w(if playing { "[playing]" } else { "[paused]" });
+        self.w(&if playing {
+            self.lbl("mcpShellLblTagPlaying")
+        } else {
+            self.lbl("mcpShellLblTagPaused")
+        });
         if let Some(track) = map.get("track").and_then(Value::as_object) {
             let title = track
                 .get("title")
@@ -138,21 +150,25 @@ impl Renderer {
             let line = format!("{title} — {artists}");
             self.w(&line);
             if let Some(r) = track.get("ref").filter(|v| !v.is_null()) {
-                let line = format!("  ref: {}", plain_value(r));
+                let line = format!("  {}: {}", self.lbl("mcpShellLblRef"), plain_value(r));
                 self.w(&line);
             }
         }
+        let (lbl_volume, lbl_repeat) = (
+            self.lbl("mcpShellLblVolume"),
+            self.lbl("mcpShellLblRepeat"),
+        );
         let pos = format_ms(map.get("positionMs"));
         let dur = format_ms(map.get("durationMs"));
         let mut parts = vec![format!("{pos} / {dur}")];
         if let Some(v) = map.get("volume") {
-            parts.push(format!("volume: {}", plain_value(v)));
+            parts.push(format!("{lbl_volume}: {}", plain_value(v)));
         }
         if let Some(v) = map.get("repeatMode") {
-            parts.push(format!("repeat: {}", plain_value(v)));
+            parts.push(format!("{lbl_repeat}: {}", plain_value(v)));
         }
         if map.get("shuffle").and_then(Value::as_bool).unwrap_or(false) {
-            parts.push("shuffle".to_string());
+            parts.push(self.lbl("mcpShellLblShuffleOn"));
         }
         let line = parts.join(" · ");
         self.w(&line);
@@ -165,7 +181,7 @@ impl Renderer {
         tag: Option<&str>,
     ) {
         if let Some(t) = total {
-            let line = format!("# total: {}", plain_value(t));
+            let line = format!("# {}: {}", self.lbl("mcpShellLblTotal"), plain_value(t));
             self.w(&line);
         }
         for (i, item) in list.iter().enumerate() {
@@ -201,7 +217,7 @@ impl Renderer {
 
     fn plain_search_all(&mut self, map: &serde_json::Map<String, Value>) {
         if let Some(q) = map.get("query").filter(|v| !v.is_null()) {
-            let line = format!("query: {}", plain_value(q));
+            let line = format!("{}: {}", self.lbl("mcpShellLblQuery"), plain_value(q));
             self.w(&line);
         }
         let Some(results) = map.get("results").and_then(Value::as_array) else {
@@ -211,7 +227,11 @@ impl Renderer {
             let Some(m) = item.as_object() else { continue };
             let source = m.get("source").map(str_value).unwrap_or_else(|| "?".into());
             if let Some(err) = m.get("error").filter(|v| !v.is_null()) {
-                let line = format!("── {source}：错误 {}", plain_value(err));
+                let line = format!(
+                    "── {source}: {} {}",
+                    self.lbl("mcpShellLblError"),
+                    plain_value(err)
+                );
                 self.w(&line);
                 continue;
             }
@@ -235,7 +255,7 @@ impl Renderer {
         total: Option<&Value>,
     ) {
         if let Some(t) = total {
-            let line = format!("# total: {}", plain_value(t));
+            let line = format!("# {}: {}", self.lbl("mcpShellLblTotal"), plain_value(t));
             self.w(&line);
         }
         for item in list {
@@ -288,9 +308,9 @@ impl Renderer {
         for item in list {
             let Some(m) = item.as_object() else { continue };
             let logged = if m.get("loggedIn").and_then(Value::as_bool).unwrap_or(false) {
-                "logged-in"
+                self.lbl("mcpShellLblLoggedIn")
             } else {
-                "logged-out"
+                self.lbl("mcpShellLblLoggedOut")
             };
             let line = format!(
                 "{}  {}  ({logged})",
@@ -365,7 +385,7 @@ impl Renderer {
             self.styled_tracks(
                 list,
                 map.get("total"),
-                Some(("playedAt", "When")),
+                Some("playedAt"),
             );
             return;
         }
@@ -448,11 +468,11 @@ impl Renderer {
         };
 
         let state_word = if buffering {
-            "Buffering"
+            self.lbl("mcpShellLblBuffering")
         } else if playing {
-            "Playing"
+            self.lbl("mcpShellLblPlaying")
         } else {
-            "Paused"
+            self.lbl("mcpShellLblPaused")
         };
         let icon = if buffering {
             "◌"
@@ -469,16 +489,28 @@ impl Renderer {
             meta.push(self.style.dim(&str_value(r)));
         }
         if let Some(v) = map.get("volume").and_then(Value::as_f64) {
-            meta.push(self.style.dim(&format!("vol {}%", (v * 100.0).round() as i64)));
+            meta.push(self.style.dim(&format!(
+                "{} {}%",
+                self.lbl("mcpShellLblVolume"),
+                (v * 100.0).round() as i64
+            )));
         }
         if let Some(q) = map.get("quality").filter(|v| !v.is_null()) {
-            meta.push(self.style.dim(&format!("quality {}", str_value(q))));
+            meta.push(self.style.dim(&format!(
+                "{} {}",
+                self.lbl("mcpShellLblQuality"),
+                str_value(q)
+            )));
         }
         if let Some(r) = map.get("repeatMode").filter(|v| !v.is_null()) {
-            meta.push(self.style.dim(&format!("repeat {}", str_value(r))));
+            meta.push(self.style.dim(&format!(
+                "{} {}",
+                self.lbl("mcpShellLblRepeat"),
+                str_value(r)
+            )));
         }
         if map.get("shuffle").and_then(Value::as_bool).unwrap_or(false) {
-            meta.push(self.style.dim("shuffle on"));
+            meta.push(self.style.dim(&self.lbl("mcpShellLblShuffleOn")));
         }
         let meta_line = meta.join(&self.style.dim(" · "));
 
@@ -530,7 +562,7 @@ impl Renderer {
         let title_line = format!(
             "{} {}",
             self.style.cyan("♪"),
-            self.style.bold(state_word)
+            self.style.bold(&state_word)
         );
         self.panel(&title_line, &body, PAD, Some(need));
     }
@@ -538,7 +570,14 @@ impl Renderer {
     fn styled_info(&mut self, map: &serde_json::Map<String, Value>) {
         const PAD: usize = 2;
         let name = map.get("name").map(str_value).unwrap_or_else(|| "ArchoeraMusic".into());
-        let labels = ["version", "platform", "port", "protocol", "endpoints", "caps"];
+        let labels = [
+            self.lbl("mcpShellLblVersion"),
+            self.lbl("mcpShellLblPlatform"),
+            self.lbl("mcpShellLblPort"),
+            self.lbl("mcpShellLblProtocol"),
+            self.lbl("mcpShellLblEndpoints"),
+            self.lbl("mcpShellLblCaps"),
+        ];
         let label_w = labels.iter().map(|l| display_width(l)).max().unwrap_or(0);
         let target = std::cmp::max(
             28,
@@ -551,21 +590,25 @@ impl Renderer {
 
         let mut body: Vec<String> = Vec::new();
         if let Some(v) = map.get("version").filter(|v| !v.is_null()) {
-            body.push(kv(self, "version", &str_value(v)));
+            body.push(kv(self, &labels[0], &str_value(v)));
         }
         if let Some(v) = map.get("platform").filter(|v| !v.is_null()) {
-            body.push(kv(self, "platform", &str_value(v)));
+            body.push(kv(self, &labels[1], &str_value(v)));
         }
         if let Some(service) = map.get("service").and_then(Value::as_object) {
             body.push(String::new());
             if let Some(port) = service.get("port").filter(|v| !v.is_null()) {
                 let lan = service.get("lan").and_then(Value::as_bool).unwrap_or(false);
-                let scope = if lan { "LAN" } else { "loopback" };
+                let scope = if lan {
+                    self.lbl("mcpShellLblLan")
+                } else {
+                    self.lbl("mcpShellLblLoopback")
+                };
                 let value = format!("{}  {}", str_value(port), self.style.dim(&format!("({scope})")));
-                body.push(kv(self, "port", &value));
+                body.push(kv(self, &labels[2], &value));
             }
             if let Some(p) = service.get("protocolVersion").filter(|v| !v.is_null()) {
-                body.push(kv(self, "protocol", &str_value(p)));
+                body.push(kv(self, &labels[3], &str_value(p)));
             }
             if let Some(endpoints) = service.get("endpoints").and_then(Value::as_object) {
                 let parts: Vec<String> = endpoints
@@ -578,12 +621,12 @@ impl Renderer {
                         )
                     })
                     .collect();
-                body.push(kv(self, "endpoints", &parts.join(&self.style.dim("  ·  "))));
+                body.push(kv(self, &labels[4], &parts.join(&self.style.dim("  ·  "))));
             }
             if let Some(caps) = service.get("capabilities").and_then(Value::as_array) {
                 if !caps.is_empty() {
                     let items: Vec<String> = caps.iter().map(str_value).collect();
-                    body.extend(self.chip_lines("caps", &items, label_w, target));
+                    body.extend(self.chip_lines(&labels[5], &items, label_w, target));
                 }
             }
         }
@@ -594,29 +637,42 @@ impl Renderer {
 
     fn styled_library_stats(&mut self, map: &serde_json::Map<String, Value>) {
         const PAD: usize = 2;
-        let labels = ["tracks", "size", "duration"];
+        let labels = [
+            self.lbl("mcpShellLblTracks"),
+            self.lbl("mcpShellLblSize"),
+            self.lbl("mcpShellLblDuration"),
+        ];
         let label_w = labels.iter().map(|l| display_width(l)).max().unwrap_or(0);
         let kv = |r: &Renderer, label: &str, value: &str| {
             format!("{}  {value}", r.style.dim(&Renderer::fit_cell(label, label_w)))
         };
         let mut body: Vec<String> = Vec::new();
         if let Some(v) = map.get("tracks") {
-            body.push(kv(self, "tracks", &self.style.bold(&str_value(v))));
+            body.push(kv(self, &labels[0], &self.style.bold(&str_value(v))));
         }
         if let Some(v) = map.get("totalSizeBytes").and_then(Value::as_i64) {
-            body.push(kv(self, "size", &format_bytes(v)));
+            body.push(kv(self, &labels[1], &format_bytes(v)));
         }
         if let Some(v) = map.get("totalDurationMs").and_then(Value::as_i64) {
-            body.push(kv(self, "duration", &format_duration(v)));
+            body.push(kv(self, &labels[2], &format_duration(v)));
         }
         if body.is_empty() {
-            body.push(self.style.dim("· empty"));
+            body.push(format!("· {}", self.lbl("mcpShellLblEmpty")));
         }
-        let title = format!("{} {}", self.style.cyan("♪"), self.style.bold("Library"));
+        let title = format!(
+            "{} {}",
+            self.style.cyan("♪"),
+            self.style.bold(&self.lbl("mcpShellLblLibrary"))
+        );
         self.panel(&title, &body, PAD, None);
     }
 
     fn styled_search_header(&mut self, map: &serde_json::Map<String, Value>) {
+        let (lbl_page, lbl_total, lbl_search) = (
+            self.lbl("mcpShellLblPage"),
+            self.lbl("mcpShellLblTotal"),
+            self.lbl("mcpShellLblSearch"),
+        );
         let mut segs: Vec<String> = Vec::new();
         if let Some(s) = map.get("source").filter(|v| !v.is_null()) {
             segs.push(self.style.cyan(&self.style.bold(&str_value(s))));
@@ -625,13 +681,13 @@ impl Renderer {
             segs.push(format!("“{}”", self.style.bold(&str_value(q))));
         }
         if let Some(p) = map.get("page").filter(|v| !v.is_null()) {
-            segs.push(self.style.dim(&format!("page {}", str_value(p))));
+            segs.push(self.style.dim(&format!("{lbl_page} {}", str_value(p))));
         }
         if let Some(t) = map.get("total").filter(|v| !v.is_null()) {
-            segs.push(self.style.dim(&format!("total {}", str_value(t))));
+            segs.push(self.style.dim(&format!("{lbl_total} {}", str_value(t))));
         }
         let sep = self.style.dim("  ·  ");
-        let line = format!("  {}  {}", self.style.dim("search"), segs.join(&sep));
+        let line = format!("  {}  {}", self.style.dim(&lbl_search), segs.join(&sep));
         self.w(&line);
     }
 
@@ -640,31 +696,42 @@ impl Renderer {
         map: &serde_json::Map<String, Value>,
         len: usize,
     ) {
+        let (lbl_index, lbl_repeat, lbl_queue, lbl_on, lbl_off) = (
+            self.lbl("mcpShellLblIndex"),
+            self.lbl("mcpShellLblRepeat"),
+            self.lbl("mcpShellLblQueue"),
+            self.lbl("mcpShellLblShuffleOn"),
+            self.lbl("mcpShellLblShuffleOff"),
+        );
         let mut segs: Vec<String> = Vec::new();
         if let Some(idx) = map.get("index").and_then(Value::as_i64) {
             if len > 0 {
-                segs.push(self.style.dim(&format!("index {}/{}", idx + 1, len)));
+                segs.push(self.style.dim(&format!("{lbl_index} {}/{}", idx + 1, len)));
             }
         }
         if let Some(r) = map.get("repeatMode").filter(|v| !v.is_null()) {
-            segs.push(self.style.dim(&format!("repeat {}", str_value(r))));
+            segs.push(self.style.dim(&format!("{lbl_repeat} {}", str_value(r))));
         }
         let shuffle = map.get("shuffle").and_then(Value::as_bool).unwrap_or(false);
-        segs.push(self.style.dim(&format!("shuffle {}", if shuffle { "on" } else { "off" })));
+        segs.push(self.style.dim(if shuffle { &lbl_on } else { &lbl_off }));
         let sep = self.style.dim("  ·  ");
-        let line = format!("  {}  {}", self.style.dim("queue"), segs.join(&sep));
+        let line = format!("  {}  {}", self.style.dim(&lbl_queue), segs.join(&sep));
         self.w(&line);
     }
 
     fn styled_liked_header(&mut self, map: &serde_json::Map<String, Value>) {
+        let (lbl_liked, lbl_total) = (
+            self.lbl("mcpShellLblLiked"),
+            self.lbl("mcpShellLblTotal"),
+        );
         let source = map.get("source").map(str_value).unwrap_or_default();
         let total = match map.get("total").filter(|v| !v.is_null()) {
-            Some(t) => self.style.dim(&format!("  ·  total {}", str_value(t))),
+            Some(t) => self.style.dim(&format!("  ·  {lbl_total} {}", str_value(t))),
             None => String::new(),
         };
         let line = format!(
             "  {}  {}{total}",
-            self.style.dim("liked"),
+            self.style.dim(&lbl_liked),
             self.style.cyan(&self.style.bold(&source))
         );
         self.w(&line);
@@ -672,7 +739,11 @@ impl Renderer {
 
     fn styled_search_all(&mut self, map: &serde_json::Map<String, Value>) {
         if let Some(q) = map.get("query").filter(|v| !v.is_null()) {
-            let line = format!("  {}  {}", self.style.dim("query"), self.style.bold(&str_value(q)));
+            let line = format!(
+                "  {}  {}",
+                self.style.dim(&self.lbl("mcpShellLblQuery")),
+                self.style.bold(&str_value(q))
+            );
             self.w(&line);
         }
         let Some(results) = map.get("results").and_then(Value::as_array) else {
@@ -686,7 +757,8 @@ impl Renderer {
                     "  {} {}  {}",
                     self.style.dim("──"),
                     self.style.red(&self.style.bold(&source)),
-                    self.style.red(&str_value(err))
+                    self.style
+                        .red(&format!("{}: {}", self.lbl("mcpShellLblError"), str_value(err)))
                 );
                 self.w(&line);
                 continue;
@@ -713,7 +785,7 @@ impl Renderer {
         &mut self,
         list: &[Value],
         total: Option<&Value>,
-        extra: Option<(&str, &str)>,
+        extra: Option<&str>,
     ) {
         struct Row {
             index: String,
@@ -726,13 +798,13 @@ impl Renderer {
         let mut rows: Vec<Row> = Vec::new();
         for (i, item) in list.iter().enumerate() {
             let Some(m) = item.as_object() else { continue };
-            let raw_extra = extra.and_then(|(tag, _)| m.get(tag));
+            let raw_extra = extra.and_then(|tag| m.get(tag));
             rows.push(Row {
                 index: (i + 1).to_string(),
                 title: m.get("title").map(str_value).unwrap_or_default(),
                 artist: artists(item),
                 reference: m.get("ref").map(str_value).unwrap_or_default(),
-                extra: extra.map(|(_, _)| match raw_extra {
+                extra: extra.map(|_| match raw_extra {
                     Some(v) => relative_time(v),
                     None => String::new(),
                 }),
@@ -741,11 +813,15 @@ impl Renderer {
         }
 
         if let Some(t) = total {
-            let line = format!("  {}", self.style.dim(&format!("total {}", str_value(t))));
+            let line = format!(
+                "  {}",
+                self.style
+                    .dim(&format!("{} {}", self.lbl("mcpShellLblTotal"), str_value(t)))
+            );
             self.w(&line);
         }
         if rows.is_empty() {
-            let line = format!("  {}", self.style.dim("· empty"));
+            let line = format!("  · {}", self.lbl("mcpShellLblEmpty"));
             self.w(&line);
             return;
         }
@@ -796,19 +872,24 @@ impl Renderer {
             shrunk_ref = 0;
         }
 
-        let extra_header = extra.map(|(_, h)| h).unwrap_or("When");
+        let (col_title, col_artist, col_ref, col_when) = (
+            self.lbl("mcpShellLblColTitle"),
+            self.lbl("mcpShellLblColArtist"),
+            self.lbl("mcpShellLblColRef"),
+            self.lbl("mcpShellLblColWhen"),
+        );
         let mut header = format!("{}{}", " ".repeat(MARGIN), self.style.dim(&pad_index_w(&"#", idx_w)));
         if title_w > 0 {
-            header.push_str(&format!("{}{}", " ".repeat(GAP), self.style.dim(&Renderer::fit_cell("Title", title_w))));
+            header.push_str(&format!("{}{}", " ".repeat(GAP), self.style.dim(&Renderer::fit_cell(&col_title, title_w))));
         }
         if shrunk_artist > 0 {
-            header.push_str(&format!("{}{}", " ".repeat(GAP), self.style.dim(&Renderer::fit_cell("Artist", shrunk_artist))));
+            header.push_str(&format!("{}{}", " ".repeat(GAP), self.style.dim(&Renderer::fit_cell(&col_artist, shrunk_artist))));
         }
         if shrunk_ref > 0 {
-            header.push_str(&format!("{}{}", " ".repeat(GAP), self.style.dim(&Renderer::fit_cell("Ref", shrunk_ref))));
+            header.push_str(&format!("{}{}", " ".repeat(GAP), self.style.dim(&Renderer::fit_cell(&col_ref, shrunk_ref))));
         }
         if shrunk_extra > 0 {
-            header.push_str(&format!("{}{}", " ".repeat(GAP), self.style.dim(&Renderer::fit_cell(extra_header, shrunk_extra))));
+            header.push_str(&format!("{}{}", " ".repeat(GAP), self.style.dim(&Renderer::fit_cell(&col_when, shrunk_extra))));
         }
         self.w(&header);
 
@@ -853,11 +934,15 @@ impl Renderer {
         total: Option<&Value>,
     ) {
         if let Some(t) = total {
-            let line = format!("  {}", self.style.dim(&format!("total {}", str_value(t))));
+            let line = format!(
+                "  {}",
+                self.style
+                    .dim(&format!("{} {}", self.lbl("mcpShellLblTotal"), str_value(t)))
+            );
             self.w(&line);
         }
         if list.is_empty() {
-            let line = format!("  {}", self.style.dim("· empty"));
+            let line = format!("  · {}", self.lbl("mcpShellLblEmpty"));
             self.w(&line);
             return;
         }
@@ -926,13 +1011,30 @@ impl Renderer {
         if rows.is_empty() {
             return;
         }
-        let name_w = std::cmp::min(28, rows.iter().map(|r| display_width(&r.0)).max().unwrap_or(4));
-        let cap_w = std::cmp::min(14, rows.iter().map(|r| display_width(&r.1)).max().unwrap_or(10));
+        let (lbl_name, lbl_cap, lbl_title) = (
+            self.lbl("mcpShellLblToolName"),
+            self.lbl("mcpShellLblToolCap"),
+            self.lbl("mcpShellLblToolTitle"),
+        );
+        let name_w = std::cmp::min(
+            28,
+            std::cmp::max(
+                display_width(&lbl_name),
+                rows.iter().map(|r| display_width(&r.0)).max().unwrap_or(0),
+            ),
+        );
+        let cap_w = std::cmp::min(
+            14,
+            std::cmp::max(
+                display_width(&lbl_cap),
+                rows.iter().map(|r| display_width(&r.1)).max().unwrap_or(0),
+            ),
+        );
         let hdr = format!(
             "  {}  {}  {}",
-            self.style.dim(&pad_right("name", name_w)),
-            self.style.dim(&pad_right("capability", cap_w)),
-            self.style.dim("title")
+            self.style.dim(&pad_right(&lbl_name, name_w)),
+            self.style.dim(&pad_right(&lbl_cap, cap_w)),
+            self.style.dim(&lbl_title)
         );
         self.w(&hdr);
         for (name, capability, title) in &rows {
@@ -962,9 +1064,17 @@ impl Renderer {
         }
         let label_w = std::cmp::min(20, rows.iter().map(|r| display_width(&r.1)).max().unwrap_or(5));
         let source_w = std::cmp::min(16, rows.iter().map(|r| display_width(&r.0)).max().unwrap_or(6));
+        let (lbl_in, lbl_out) = (
+            self.lbl("mcpShellLblLoggedIn"),
+            self.lbl("mcpShellLblLoggedOut"),
+        );
         for (source, label, logged) in &rows {
             let dot = if *logged { self.style.green("●") } else { self.style.dim("○") };
-            let state = if *logged { self.style.dim("logged in") } else { self.style.dim("logged out") };
+            let state = if *logged {
+                self.style.dim(&lbl_in)
+            } else {
+                self.style.dim(&lbl_out)
+            };
             let line = format!(
                 "  {dot}  {}  {}  {state}",
                 self.style.cyan(&Renderer::fit_cell(source, source_w)),
@@ -976,7 +1086,7 @@ impl Renderer {
 
     fn styled_values(&mut self, map: &serde_json::Map<String, Value>) {
         if map.is_empty() {
-            let line = format!("  {}", self.style.dim("· empty"));
+            let line = format!("  · {}", self.lbl("mcpShellLblEmpty"));
             self.w(&line);
             return;
         }
@@ -1002,7 +1112,11 @@ impl Renderer {
         if let Some(liked) = map.get("liked").and_then(Value::as_bool) {
             if map.get("ok").and_then(Value::as_bool) != Some(true) {
                 let mark = if liked { self.style.red("♥") } else { self.style.dim("♡") };
-                let state = if liked { "liked" } else { "not liked" };
+                let state = if liked {
+                    self.lbl("mcpShellLblLiked")
+                } else {
+                    self.lbl("mcpShellLblNotLiked")
+                };
                 let refpart = match reference {
                     Some(r) => format!("  {}", self.style.dim(&str_value(r))),
                     None => String::new(),
@@ -1012,19 +1126,37 @@ impl Renderer {
                 return;
             }
         }
+        let lbl_sleep = self.lbl("mcpShellLblSleep");
         if map.get("mode").map(str_value).as_deref() == Some("endOfTrack") {
-            let line = format!("  {}  {}  end of track", self.style.green("✓"), self.style.dim("sleep"));
+            let line = format!(
+                "  {}  {}  {}",
+                self.style.green("✓"),
+                self.style.dim(&lbl_sleep),
+                self.lbl("mcpShellLblEndOfTrack")
+            );
             self.w(&line);
             return;
         }
         if map.get("mode").map(str_value).as_deref() == Some("duration") {
             if let Some(m) = map.get("minutes").and_then(Value::as_i64) {
-                let line = format!("  {}  {}  {m}m", self.style.green("✓"), self.style.dim("sleep"));
+                let line = format!("  {}  {}  {m}m", self.style.green("✓"), self.style.dim(&lbl_sleep));
                 self.w(&line);
                 return;
             }
         }
 
+        let lbl_volume = self.lbl("mcpShellLblVolume");
+        let lbl_repeat = self.lbl("mcpShellLblRepeat");
+        let lbl_on = self.lbl("mcpShellLblShuffleOn");
+        let lbl_off = self.lbl("mcpShellLblShuffleOff");
+        let lbl_quality = self.lbl("mcpShellLblQuality");
+        let lbl_playing = self.lbl("mcpShellLblNowPlaying");
+        let lbl_task = self.lbl("mcpShellLblTask");
+        let lbl_liked = self.lbl("mcpShellLblLiked");
+        let lbl_unliked = self.lbl("mcpShellLblUnliked");
+        let lbl_queued = self.lbl("mcpShellLblQueued");
+        let lbl_count = self.lbl("mcpShellLblCount");
+        let lbl_theme = self.lbl("mcpShellLblTheme");
         let mut parts: Vec<String> = Vec::new();
         for (k, v) in map {
             if k == "ok" || k == "startIndex" || v.is_null() {
@@ -1033,36 +1165,37 @@ impl Renderer {
             match k.as_str() {
                 "volume" => {
                     if let Some(n) = v.as_f64() {
-                        parts.push(format!("vol {}%", (n * 100.0).round() as i64));
+                        parts.push(format!("{lbl_volume} {}%", (n * 100.0).round() as i64));
                     }
                 }
-                "repeatMode" => parts.push(format!("repeat {}", str_value(v))),
-                "shuffle" => parts.push(format!(
-                    "shuffle {}",
-                    if v.as_bool().unwrap_or(false) { "on" } else { "off" }
-                )),
-                "quality" => parts.push(format!("quality {}", str_value(v))),
-                "ref" => parts.push(format!("playing {}", str_value(v))),
-                "taskId" => parts.push(format!("task {}", str_value(v))),
-                "liked" => parts.push(if v.as_bool().unwrap_or(false) {
-                    "liked".to_string()
+                "repeatMode" => parts.push(format!("{lbl_repeat} {}", str_value(v))),
+                "shuffle" => parts.push(if v.as_bool().unwrap_or(false) {
+                    lbl_on.clone()
                 } else {
-                    "unliked".to_string()
+                    lbl_off.clone()
+                }),
+                "quality" => parts.push(format!("{lbl_quality} {}", str_value(v))),
+                "ref" => parts.push(format!("{lbl_playing} {}", str_value(v))),
+                "taskId" => parts.push(format!("{lbl_task} {}", str_value(v))),
+                "liked" => parts.push(if v.as_bool().unwrap_or(false) {
+                    lbl_liked.clone()
+                } else {
+                    lbl_unliked.clone()
                 }),
                 "count" => {
                     if map.contains_key("position") {
-                        parts.push(format!("queued {}", str_value(v)));
+                        parts.push(format!("{lbl_queued} {}", str_value(v)));
                     } else {
-                        parts.push(format!("count {}", str_value(v)));
+                        parts.push(format!("{lbl_count} {}", str_value(v)));
                     }
                 }
                 "position" => parts.push(format!("→ {}", str_value(v))),
-                "mode" => parts.push(format!("theme {}", str_value(v))),
+                "mode" => parts.push(format!("{lbl_theme} {}", str_value(v))),
                 _ => parts.push(format!("{k} {}", str_value(v))),
             }
         }
         let detail = if parts.is_empty() {
-            "ok".to_string()
+            self.lbl("mcpShellLblOk")
         } else {
             parts.join(&self.style.dim("  ·  "))
         };
@@ -1428,13 +1561,13 @@ mod tests {
     use serde_json::json;
 
     fn render_styled(v: Value, columns: usize) -> String {
-        let mut r = Renderer::new(columns, true);
+        let mut r = Renderer::new(columns, true, L10n::english());
         r.render(&v);
         crate::width::strip_ansi(&r.out)
     }
 
     fn render_plain(v: Value) -> String {
-        let mut r = Renderer::new(80, false);
+        let mut r = Renderer::new(80, false, L10n::english());
         r.render(&v);
         r.out
     }
@@ -1523,6 +1656,18 @@ mod tests {
         assert!(out.contains("loopback"));
         assert!(out.contains("caps"));
         assert!(out.contains("download"));
+    }
+
+    #[test]
+    fn labels_follow_locale() {
+        let v = json!({
+            "playing": true, "positionMs": 1, "durationMs": 2,
+            "track": {"title": "歌", "artists": ["手"], "ref": "n:1"}
+        });
+        let mut zh = Renderer::new(80, true, L10n::new(Some("zh".to_string())));
+        zh.render(&v);
+        let out = crate::width::strip_ansi(&zh.out);
+        assert!(out.contains("播放中"), "zh 标签未生效: {out}");
     }
 
     #[test]

@@ -16,17 +16,26 @@ library;
 
 import 'dart:math' as math;
 
+import '../l10n/generated/app_localizations.dart';
+
 /// 仅匹配 SGR 序列；宽度计算时先剔除，得到真实显示列数。
 final RegExp _sgr = RegExp(r'\x1b\[[0-9;]*m');
 
 /// 将结构化输出渲染为 TUI 文本并写入 [out]。
 class McpShellRenderer {
-  const McpShellRenderer({required this.out, required this.columns});
+  const McpShellRenderer({
+    required this.out,
+    required this.columns,
+    required this.l10n,
+  });
 
   final StringSink out;
 
   /// 终端可用列数（用于面板/表格/进度条宽度预算）。
   final int columns;
+
+  /// 命令行本地化（标签与帮助同源）。
+  final AppLocalizations l10n;
 
   // ── 样式 ──────────────────────────────────────────────────────
 
@@ -90,7 +99,7 @@ class McpShellRenderer {
   /// 偏好键值（`key = value`，键列对齐）。
   void values(Map<Object?, Object?> map) {
     if (map.isEmpty) {
-      _write(_dim('  · empty'));
+      _write(_dim('  · ${l10n.mcpShellLblEmpty}'));
       return;
     }
     final keyW = map.keys
@@ -115,8 +124,8 @@ class McpShellRenderer {
     final artists = _artists(track.isEmpty ? map : track);
 
     final stateWord = buffering
-        ? 'Buffering'
-        : (playing ? 'Playing' : 'Paused');
+        ? l10n.mcpShellLblBuffering
+        : (playing ? l10n.mcpShellLblPlaying : l10n.mcpShellLblPaused);
     final icon = buffering
         ? '◌'
         : (playing ? '▶' : '⏸');
@@ -128,12 +137,18 @@ class McpShellRenderer {
     final ref = track['ref'];
     if (ref != null) meta.add(_dim(ref.toString()));
     final volume = map['volume'];
-    if (volume is num) meta.add(_dim('vol ${(volume * 100).round()}%'));
+    if (volume is num) {
+      meta.add(_dim('${l10n.mcpShellLblVolume} ${(volume * 100).round()}%'));
+    }
     final quality = map['quality'];
-    if (quality != null) meta.add(_dim('quality $quality'));
+    if (quality != null) {
+      meta.add(_dim('${l10n.mcpShellLblQuality} $quality'));
+    }
     final repeat = map['repeatMode'];
-    if (repeat != null) meta.add(_dim('repeat $repeat'));
-    if (map['shuffle'] == true) meta.add(_dim('shuffle on'));
+    if (repeat != null) {
+      meta.add(_dim('${l10n.mcpShellLblRepeat} $repeat'));
+    }
+    if (map['shuffle'] == true) meta.add(_dim(l10n.mcpShellLblShuffleOn));
     final metaLine = meta.join(_dim(' · '));
 
     final pos = _formatMs(map['positionMs']);
@@ -183,7 +198,14 @@ class McpShellRenderer {
   void info(Map<Object?, Object?> map) {
     const pad = 2;
     final name = (map['name'] ?? 'ArchoeraMusic').toString();
-    const labels = ['version', 'platform', 'port', 'protocol', 'endpoints', 'caps'];
+    final labels = [
+      l10n.mcpShellLblVersion,
+      l10n.mcpShellLblPlatform,
+      l10n.mcpShellLblPort,
+      l10n.mcpShellLblProtocol,
+      l10n.mcpShellLblEndpoints,
+      l10n.mcpShellLblCaps,
+    ];
     final labelW = labels.map(_displayWidth).reduce(math.max);
     final target = math.max(28, math.min(columns - 2, 68)) - pad * 2;
 
@@ -192,10 +214,10 @@ class McpShellRenderer {
 
     final body = <String>[];
     if (map['version'] != null) {
-      body.add(kv('version', map['version'].toString()));
+      body.add(kv(labels[0], map['version'].toString()));
     }
     if (map['platform'] != null) {
-      body.add(kv('platform', map['platform'].toString()));
+      body.add(kv(labels[1], map['platform'].toString()));
     }
 
     final service = map['service'] is Map
@@ -205,11 +227,13 @@ class McpShellRenderer {
       body.add('');
       final port = service['port'];
       if (port != null) {
-        final scope = service['lan'] == true ? 'LAN' : 'loopback';
-        body.add(kv('port', '$port  ${_dim('($scope)')}'));
+        final scope = service['lan'] == true
+            ? l10n.mcpShellLblLan
+            : l10n.mcpShellLblLoopback;
+        body.add(kv(labels[2], '$port  ${_dim('($scope)')}'));
       }
       if (service['protocolVersion'] != null) {
-        body.add(kv('protocol', service['protocolVersion'].toString()));
+        body.add(kv(labels[3], service['protocolVersion'].toString()));
       }
       final endpoints = service['endpoints'];
       if (endpoints is Map) {
@@ -217,13 +241,13 @@ class McpShellRenderer {
           for (final e in endpoints.entries)
             '${_dim('${e.key} ')}${_cyan(e.value.toString())}',
         ];
-        body.add(kv('endpoints', parts.join(_dim('  ·  '))));
+        body.add(kv(labels[4], parts.join(_dim('  ·  '))));
       }
       final caps = service['capabilities'];
       if (caps is List && caps.isNotEmpty) {
         body.addAll(
           _chipLines(
-            'caps',
+            labels[5],
             [for (final c in caps) c.toString()],
             labelW,
             target,
@@ -238,24 +262,32 @@ class McpShellRenderer {
   /// 曲库统计面板（`library-stats`）：曲目数 / 占用空间 / 总时长。
   void libraryStats(Map<Object?, Object?> map) {
     const pad = 2;
-    const labels = ['tracks', 'size', 'duration'];
+    final labels = [
+      l10n.mcpShellLblTracks,
+      l10n.mcpShellLblSize,
+      l10n.mcpShellLblDuration,
+    ];
     final labelW = labels.map(_displayWidth).reduce(math.max);
     String kv(String label, String value) =>
         '${_dim(_fit(label, labelW))}  $value';
 
     final body = <String>[];
     if (map['tracks'] != null) {
-      body.add(kv('tracks', _bold(map['tracks'].toString())));
+      body.add(kv(labels[0], _bold(map['tracks'].toString())));
     }
     final size = map['totalSizeBytes'];
-    if (size is num) body.add(kv('size', _formatBytes(size.toInt())));
+    if (size is num) body.add(kv(labels[1], _formatBytes(size.toInt())));
     final duration = map['totalDurationMs'];
     if (duration is num) {
-      body.add(kv('duration', _formatDuration(duration.toInt())));
+      body.add(kv(labels[2], _formatDuration(duration.toInt())));
     }
-    if (body.isEmpty) body.add(_dim('· empty'));
+    if (body.isEmpty) body.add(_dim('· ${l10n.mcpShellLblEmpty}'));
 
-    _panel(title: '${_cyan('♪')} ${_bold('Library')}', body: body, pad: pad);
+    _panel(
+      title: '${_cyan('♪')} ${_bold(l10n.mcpShellLblLibrary)}',
+      body: body,
+      pad: pad,
+    );
   }
 
   /// 搜索头部 + 结果表（`search`）。`total` 并入头部，表格不再重复计数。
@@ -263,10 +295,11 @@ class McpShellRenderer {
     final segments = <String>[
       if (map['source'] != null) _cyan(_bold(map['source'].toString())),
       if (map['query'] != null) '“${_bold(map['query'].toString())}”',
-      if (map['page'] != null) _dim('page ${map['page']}'),
-      if (map['total'] != null) _dim('total ${map['total']}'),
+      if (map['page'] != null) _dim('${l10n.mcpShellLblPage} ${map['page']}'),
+      if (map['total'] != null)
+        _dim('${l10n.mcpShellLblTotal} ${map['total']}'),
     ];
-    _write('  ${_dim('search')}  ${segments.join(_dim('  ·  '))}');
+    _write('  ${_dim(l10n.mcpShellLblSearch)}  ${segments.join(_dim('  ·  '))}');
     final tracks = map['tracks'];
     if (tracks is List) this.tracks(tracks);
   }
@@ -279,11 +312,16 @@ class McpShellRenderer {
     final index = map['index'];
     final segments = <String>[
       if (index is num && list.isNotEmpty)
-        _dim('index ${index + 1}/${list.length}'),
-      if (map['repeatMode'] != null) _dim('repeat ${map['repeatMode']}'),
-      _dim('shuffle ${map['shuffle'] == true ? 'on' : 'off'}'),
+        _dim('${l10n.mcpShellLblIndex} ${index + 1}/${list.length}'),
+      if (map['repeatMode'] != null)
+        _dim('${l10n.mcpShellLblRepeat} ${map['repeatMode']}'),
+      _dim(
+        map['shuffle'] == true
+            ? l10n.mcpShellLblShuffleOn
+            : l10n.mcpShellLblShuffleOff,
+      ),
     ];
-    _write('  ${_dim('queue')}  ${segments.join(_dim('  ·  '))}');
+    _write('  ${_dim(l10n.mcpShellLblQueue)}  ${segments.join(_dim('  ·  '))}');
     tracks(list);
   }
 
@@ -291,8 +329,9 @@ class McpShellRenderer {
   void likedResult(Map<Object?, Object?> map) {
     final total = map['total'];
     _write(
-      '  ${_dim('liked')}  ${_cyan(_bold(map['source']?.toString() ?? ''))}'
-      '${total == null ? '' : _dim('  ·  total $total')}',
+      '  ${_dim(l10n.mcpShellLblLiked)}  '
+      '${_cyan(_bold(map['source']?.toString() ?? ''))}'
+      '${total == null ? '' : _dim('  ·  ${l10n.mcpShellLblTotal} $total')}',
     );
     final tracks = map['tracks'];
     if (tracks is List) this.tracks(tracks);
@@ -305,17 +344,23 @@ class McpShellRenderer {
       final liked = map['liked'] == true;
       _write(
         '  ${liked ? _red('♥') : _dim('♡')}  '
-        '${liked ? 'liked' : 'not liked'}'
+        '${liked ? l10n.mcpShellLblLiked : l10n.mcpShellLblNotLiked}'
         '${ref == null ? '' : '  ${_dim(ref.toString())}'}',
       );
       return;
     }
     if (map['mode'] == 'endOfTrack') {
-      _write('  ${_green('✓')}  ${_dim('sleep')}  end of track');
+      _write(
+        '  ${_green('✓')}  ${_dim(l10n.mcpShellLblSleep)}  '
+        '${l10n.mcpShellLblEndOfTrack}',
+      );
       return;
     }
     if (map['mode'] == 'duration' && map['minutes'] is num) {
-      _write('  ${_green('✓')}  ${_dim('sleep')}  ${map['minutes']}m');
+      _write(
+        '  ${_green('✓')}  ${_dim(l10n.mcpShellLblSleep)}  '
+        '${map['minutes']}m',
+      );
       return;
     }
 
@@ -325,30 +370,42 @@ class McpShellRenderer {
       if (key == 'ok' || key == 'startIndex' || v == null) return;
       switch (key) {
         case 'volume':
-          if (v is num) parts.add('vol ${(v * 100).round()}%');
+          if (v is num) parts.add('${l10n.mcpShellLblVolume} ${(v * 100).round()}%');
         case 'repeatMode':
-          parts.add('repeat $v');
+          parts.add('${l10n.mcpShellLblRepeat} $v');
         case 'shuffle':
-          parts.add('shuffle ${v == true ? 'on' : 'off'}');
+          parts.add(
+            v == true
+                ? l10n.mcpShellLblShuffleOn
+                : l10n.mcpShellLblShuffleOff,
+          );
         case 'quality':
-          parts.add('quality $v');
+          parts.add('${l10n.mcpShellLblQuality} $v');
         case 'ref':
-          parts.add('playing $v');
+          parts.add('${l10n.mcpShellLblNowPlaying} $v');
         case 'taskId':
-          parts.add('task $v');
+          parts.add('${l10n.mcpShellLblTask} $v');
         case 'liked':
-          parts.add(v == true ? 'liked' : 'unliked');
+          parts.add(
+            v == true ? l10n.mcpShellLblLiked : l10n.mcpShellLblUnliked,
+          );
         case 'count':
-          parts.add(map['position'] != null ? 'queued $v' : 'count $v');
+          parts.add(
+            map['position'] != null
+                ? '${l10n.mcpShellLblQueued} $v'
+                : '${l10n.mcpShellLblCount} $v',
+          );
         case 'position':
           parts.add('→ $v');
         case 'mode':
-          parts.add('theme $v');
+          parts.add('${l10n.mcpShellLblTheme} $v');
         default:
           parts.add('$key $v');
       }
     });
-    final detail = parts.isEmpty ? 'ok' : parts.join(_dim('  ·  '));
+    final detail = parts.isEmpty
+        ? l10n.mcpShellLblOk
+        : parts.join(_dim('  ·  '));
     _write('  ${_green('✓')}  $detail');
   }
 
@@ -388,9 +445,11 @@ class McpShellRenderer {
       );
     }
 
-    if (total != null) _write(_dim('  total $total'));
+    if (total != null) {
+      _write(_dim('  ${l10n.mcpShellLblTotal} $total'));
+    }
     if (rows.isEmpty) {
-      _write(_dim('  · empty'));
+      _write(_dim('  · ${l10n.mcpShellLblEmpty}'));
       return;
     }
 
@@ -445,12 +504,30 @@ class McpShellRenderer {
 
     final header = StringBuffer(' ' * margin)
       ..write(_dim('#'.padLeft(idxW)))
-      ..write(titleW > 0 ? ' ' * gap + _dim(_fit('Title', titleW)) : '')
-      ..write(shrunkArtist > 0 ? ' ' * gap + _dim(_fit('Artist', shrunkArtist)) : '')
-      ..write(shrunkRef > 0 ? ' ' * gap + _dim(_fit('Ref', shrunkRef)) : '')
+      ..write(
+        titleW > 0
+            ? ' ' * gap + _dim(_fit(l10n.mcpShellLblColTitle, titleW))
+            : '',
+      )
+      ..write(
+        shrunkArtist > 0
+            ? ' ' * gap + _dim(_fit(l10n.mcpShellLblColArtist, shrunkArtist))
+            : '',
+      )
+      ..write(
+        shrunkRef > 0
+            ? ' ' * gap + _dim(_fit(l10n.mcpShellLblColRef, shrunkRef))
+            : '',
+      )
       ..write(
         shrunkExtra > 0
-            ? ' ' * gap + _dim(_fit(extraHeader ?? 'When', shrunkExtra))
+            ? ' ' * gap +
+                  _dim(
+                    _fit(
+                      extraHeader ?? l10n.mcpShellLblColWhen,
+                      shrunkExtra,
+                    ),
+                  )
             : '',
       );
     _write(header.toString());
@@ -492,7 +569,7 @@ class McpShellRenderer {
   void searchAll(Map<Object?, Object?> map) {
     final query = map['query'];
     if (query != null) {
-      _write('  ${_dim('query')}  ${_bold(query.toString())}');
+      _write('  ${_dim(l10n.mcpShellLblQuery)}  ${_bold(query.toString())}');
     }
     final results = map['results'];
     if (results is! List) return;
@@ -503,7 +580,8 @@ class McpShellRenderer {
       final error = m['error'];
       if (error != null) {
         _write(
-          '  ${_dim('──')} ${_red(_bold(source))}  ${_red(error.toString())}',
+          '  ${_dim('──')} ${_red(_bold(source))}  '
+          '${_red('${l10n.mcpShellLblError}: $error')}',
         );
         continue;
       }
@@ -517,9 +595,11 @@ class McpShellRenderer {
 
   /// 下载任务：状态图标 + 进度条 + 百分比 + 曲目。
   void downloadTasks(List<Object?> list, {Object? total}) {
-    if (total != null) _write(_dim('  total $total'));
+    if (total != null) {
+      _write(_dim('  ${l10n.mcpShellLblTotal} $total'));
+    }
     if (list.isEmpty) {
-      _write(_dim('  · empty'));
+      _write(_dim('  · ${l10n.mcpShellLblEmpty}'));
       return;
     }
     for (final item in list) {
@@ -581,15 +661,20 @@ class McpShellRenderer {
     if (rows.isEmpty) return;
     final nameW = math.min(
       28,
-      rows.map((r) => _displayWidth(r.$1)).fold(4, math.max),
+      rows
+          .map((r) => _displayWidth(r.$1))
+          .fold(_displayWidth(l10n.mcpShellLblToolName), math.max),
     );
     final capW = math.min(
       14,
-      rows.map((r) => _displayWidth(r.$2)).fold(10, math.max),
+      rows
+          .map((r) => _displayWidth(r.$2))
+          .fold(_displayWidth(l10n.mcpShellLblToolCap), math.max),
     );
     _write(
-      '  ${_dim(_padRight('name', nameW))}  '
-      '${_dim(_padRight('capability', capW))}  ${_dim('title')}',
+      '  ${_dim(_padRight(l10n.mcpShellLblToolName, nameW))}  '
+      '${_dim(_padRight(l10n.mcpShellLblToolCap, capW))}  '
+      '${_dim(l10n.mcpShellLblToolTitle)}',
     );
     for (final (name, capability, title) in rows) {
       _write(
@@ -621,7 +706,9 @@ class McpShellRenderer {
     );
     for (final (source, label, loggedIn) in rows) {
       final dot = loggedIn ? _green('●') : _dim('○');
-      final state = loggedIn ? _dim('logged in') : _dim('logged out');
+      final state = loggedIn
+          ? _dim(l10n.mcpShellLblLoggedIn)
+          : _dim(l10n.mcpShellLblLoggedOut);
       _write(
         '  $dot  ${_cyan(_fit(source, sourceW))}  '
         '${_fit(label, labelW)}  $state',

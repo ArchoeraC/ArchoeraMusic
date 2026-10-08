@@ -5265,4 +5265,157 @@ class AppLocalizationsJa extends AppLocalizations {
   String mcpShellErrTimeout({required String host, required int port}) {
     return '接続がタイムアウトしました: $host:$port';
   }
+
+  @override
+  String get mcpShellLblPlaying => '再生中';
+
+  @override
+  String get mcpShellLblPaused => '一時停止中';
+
+  @override
+  String get mcpShellLblBuffering => 'バッファリング中';
+
+  @override
+  String get mcpShellLblVolume => '音量';
+
+  @override
+  String get mcpShellLblQuality => '音質';
+
+  @override
+  String get mcpShellLblRepeat => 'リピート';
+
+  @override
+  String get mcpShellLblShuffleOn => 'シャッフルON';
+
+  @override
+  String get mcpShellLblShuffleOff => 'シャッフルOFF';
+
+  @override
+  String get mcpShellLblNowPlaying => '再生';
+
+  @override
+  String get mcpShellLblTotal => '合計';
+
+  @override
+  String get mcpShellLblEmpty => 'なし';
+
+  @override
+  String get mcpShellLblColTitle => 'タイトル';
+
+  @override
+  String get mcpShellLblColArtist => 'アーティスト';
+
+  @override
+  String get mcpShellLblColRef => '参照';
+
+  @override
+  String get mcpShellLblColWhen => '日時';
+
+  @override
+  String get mcpShellLblSearch => '検索';
+
+  @override
+  String get mcpShellLblQuery => 'クエリ';
+
+  @override
+  String get mcpShellLblPage => 'ページ';
+
+  @override
+  String get mcpShellLblQueue => 'キュー';
+
+  @override
+  String get mcpShellLblIndex => 'インデックス';
+
+  @override
+  String get mcpShellLblLiked => 'お気に入り';
+
+  @override
+  String get mcpShellLblNotLiked => 'お気に入り未登録';
+
+  @override
+  String get mcpShellLblUnliked => 'お気に入り解除';
+
+  @override
+  String get mcpShellLblVersion => 'バージョン';
+
+  @override
+  String get mcpShellLblPlatform => 'プラットフォーム';
+
+  @override
+  String get mcpShellLblPort => 'ポート';
+
+  @override
+  String get mcpShellLblProtocol => 'プロトコル';
+
+  @override
+  String get mcpShellLblEndpoints => 'エンドポイント';
+
+  @override
+  String get mcpShellLblCaps => '機能';
+
+  @override
+  String get mcpShellLblLoopback => 'ループバック';
+
+  @override
+  String get mcpShellLblLan => 'LAN';
+
+  @override
+  String get mcpShellLblLibrary => 'ライブラリ';
+
+  @override
+  String get mcpShellLblTracks => 'トラック';
+
+  @override
+  String get mcpShellLblSize => 'サイズ';
+
+  @override
+  String get mcpShellLblDuration => '再生時間';
+
+  @override
+  String get mcpShellLblSleep => 'スリープ';
+
+  @override
+  String get mcpShellLblEndOfTrack => '再生後停止';
+
+  @override
+  String get mcpShellLblTask => 'タスク';
+
+  @override
+  String get mcpShellLblQueued => 'キュー追加済み';
+
+  @override
+  String get mcpShellLblCount => '件数';
+
+  @override
+  String get mcpShellLblTheme => 'テーマ';
+
+  @override
+  String get mcpShellLblOk => '完了';
+
+  @override
+  String get mcpShellLblToolName => '名前';
+
+  @override
+  String get mcpShellLblToolCap => '機能';
+
+  @override
+  String get mcpShellLblToolTitle => '説明';
+
+  @override
+  String get mcpShellLblLoggedIn => 'ログイン済み';
+
+  @override
+  String get mcpShellLblLoggedOut => '未ログイン';
+
+  @override
+  String get mcpShellLblRef => '参照';
+
+  @override
+  String get mcpShellLblError => 'エラー';
+
+  @override
+  String get mcpShellLblTagPlaying => '[再生中]';
+
+  @override
+  String get mcpShellLblTagPaused => '[一時停止]';
 }
