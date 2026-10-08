@@ -35,19 +35,28 @@ String qmCredentialMusicId(Map<String, dynamic> credential,
   return s.startsWith('o') ? s.substring(1) : s;
 }
 
-/// 将登录凭据转换为可持久化的会话字段（QQ 扫码登录，tmeLoginType=2）。
+/// 将登录凭据转换为可持久化的会话字段。
+///
+/// [loginType] 1=微信 / 2=QQ；缺省时读凭据里的 `loginType`，再回退 2。
+/// 微信登录需把 openid/refresh_token 映射到 `wx*` 字段（对齐 credential.ts）。
 Map<String, String> qmCredentialToSession(
   Map<String, dynamic> credential, {
   String fallbackMusicId = '',
+  int? loginType,
 }) {
   final musicId = qmCredentialMusicId(credential, fallbackMusicId);
+  final rawType = loginType ?? credential['loginType'];
+  final type = rawType is num
+      ? rawType.toInt()
+      : int.tryParse('$rawType') ?? 2;
   final session = <String, String>{
     'uin': musicId,
     'qm_str_musicid': musicId,
     'qm_keyst': '${credential['musickey'] ?? ''}',
     'qqmusic_key': '${credential['musickey'] ?? ''}',
-    'tmeLoginType': '${credential['loginType'] ?? 2}',
+    'tmeLoginType': '$type',
   };
+  if (type == 1) session['wxuin'] = musicId;
 
   void put(String key, String dest) {
     final v = credential[key];
@@ -55,9 +64,16 @@ Map<String, String> qmCredentialToSession(
   }
 
   put('encryptUin', 'euin');
-  put('openid', 'psrf_qqopenid');
+  final openid = credential['openid'];
+  if (openid != null && '$openid'.isNotEmpty) {
+    session[type == 1 ? 'wxopenid' : 'psrf_qqopenid'] = '$openid';
+  }
   put('unionid', 'psrf_qqunionid');
-  put('refresh_token', 'psrf_qqrefresh_token');
+  final refreshToken = credential['refresh_token'];
+  if (refreshToken != null && '$refreshToken'.isNotEmpty) {
+    session[type == 1 ? 'wxrefresh_token' : 'psrf_qqrefresh_token'] =
+        '$refreshToken';
+  }
   put('access_token', 'psrf_qqaccess_token');
   put('refresh_key', 'qm_refresh_key');
   put('expired_at', 'psrf_access_token_expiresAt');

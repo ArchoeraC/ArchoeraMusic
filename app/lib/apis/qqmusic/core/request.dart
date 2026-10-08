@@ -144,10 +144,23 @@ String qmGetQQMusicUin() {
   final raw =
       (cookies['qm_str_musicid'] ??
           cookies['uin'] ??
+          cookies['wxuin'] ??
           cookies['p_uin'] ??
           '')
           .trim();
   return raw.startsWith('o') ? raw.substring(1) : (raw.isEmpty ? '0' : raw);
+}
+
+/// 当前登录类型：1=微信 / 2=QQ。优先读 cookie，其次按 musickey 前缀推断。
+int qmLoginType() {
+  final cookies = qmGetQQMusicCookies();
+  final raw = cookies['tmeLoginType'];
+  if (raw != null && raw.isNotEmpty) {
+    final v = int.tryParse(raw);
+    if (v != null && (v == 1 || v == 2)) return v;
+  }
+  final musickey = cookies['qm_keyst'] ?? cookies['qqmusic_key'] ?? '';
+  return musickey.startsWith('W_X') ? 1 : 2;
 }
 
 /// 当前是否有可用登录 key（影响 song_url / 会员接口行为）。
@@ -362,6 +375,120 @@ Future<void> _ensureSession() {
   return p;
 }
 
+/// 刷新 QM 凭据（并发安全：同一时刻只发一次实际刷新）。
+///
+/// 对齐上游 `refreshQMCredential`：musickey 过期后 LoginServer.Login
+/// (loginMode=2) 会下发新 key，写回 cookie 后重试原请求。
+Future<bool>? _refreshPromise;
+Future<bool> refreshQMCredential() {
+  final pending = _refreshPromise;
+  if (pending != null) return pending;
+  final p = _performRefreshCredential();
+  _refreshPromise = p;
+  p.whenComplete(() {
+    if (identical(_refreshPromise, p)) _refreshPromise = null;
+  });
+  return p;
+}
+
+Future<bool> _performRefreshCredential() async {
+  final cookies = qmGetQQMusicCookies();
+  final uin = qmGetQQMusicUin();
+  final musickey = cookies['qm_keyst'] ?? cookies['qqmusic_key'] ?? '';
+  if (uin.isEmpty || uin == '0' || musickey.isEmpty) return false;
+
+  final loginType = qmLoginType();
+  final refreshKey = cookies['qm_refresh_key'] ?? '';
+
+  final Map<String, dynamic> param;
+  if (loginType == 1) {
+    param = {
+      'openid': cookies['wxopenid'] ?? cookies['psrf_qqopenid'] ?? '',
+      'refresh_token':
+          cookies['wxrefresh_token'] ?? cookies['psrf_qqrefresh_token'] ?? '',
+      'str_musicid': cookies['qm_str_musicid'] ?? uin,
+      'musickey': musickey,
+      'unionid': cookies['psrf_qqunionid'] ?? '',
+      'refresh_key': refreshKey,
+      'loginMode': 2,
+    };
+  } else {
+    param = {
+      'openid': cookies['psrf_qqopenid'] ?? cookies['wxopenid'] ?? '',
+      'access_token': cookies['psrf_qqaccess_token'] ?? '',
+      'refresh_token':
+          cookies['psrf_qqrefresh_token'] ?? cookies['wxrefresh_token'] ?? '',
+      'expired_in':
+          int.tryParse(cookies['psrf_access_token_expiresAt'] ?? '') ?? 0,
+      'musicid': int.tryParse(uin) ?? 0,
+      'musickey': musickey,
+      'refresh_key': refreshKey,
+      'loginMode': 2,
+    };
+  }
+
+  try {
+    // 直连而不走 qmRequest：避免业务码非零时的无意义重试。
+    final resp = await qmPostRaw({
+      'comm': {
+        ...qmGetCommonParams(),
+        if (uin != '0') ...{'uin': uin, 'qq': uin},
+        'authst': musickey,
+        'tmeLoginType': loginType,
+      },
+      'request': {
+        'module': 'music.login.LoginServer',
+        'method': 'Login',
+        'param': param,
+      },
+    });
+    final inner = resp['request'];
+    final innerCode = inner is Map ? _codeOf(inner['code']) : 0;
+    if (_codeOf(resp['code']) != 0 || innerCode != 0) return false;
+    final data = inner is Map ? inner['data'] : null;
+    if (data is! Map) return false;
+    final newKey = data['musickey'];
+    if (newKey is! String || newKey.isEmpty) return false;
+
+    final refreshed = <String, String>{
+      'qm_keyst': newKey,
+      'qqmusic_key': newKey,
+      'tmeLoginType': '${data['loginType'] ?? loginType}',
+    };
+    final strMusicId = data['str_musicid'] ?? data['musicid'];
+    if (strMusicId != null) {
+      final mid = '$strMusicId'.replaceFirst(RegExp(r'^o'), '');
+      refreshed['qm_str_musicid'] = mid;
+      refreshed['uin'] = mid;
+      if (loginType == 1) refreshed['wxuin'] = mid;
+    }
+    void put(String src, String dest) {
+      final v = data[src];
+      if (v != null && '$v'.isNotEmpty) refreshed[dest] = '$v';
+    }
+
+    put('encryptUin', 'euin');
+    if (data['openid'] != null) {
+      refreshed[loginType == 1 ? 'wxopenid' : 'psrf_qqopenid'] =
+          '${data['openid']}';
+    }
+    put('unionid', 'psrf_qqunionid');
+    if (data['refresh_token'] != null) {
+      refreshed[loginType == 1 ? 'wxrefresh_token' : 'psrf_qqrefresh_token'] =
+          '${data['refresh_token']}';
+    }
+    put('access_token', 'psrf_qqaccess_token');
+    put('expired_at', 'psrf_access_token_expiresAt');
+    put('musickeyCreateTime', 'psrf_musickey_createtime');
+    put('refresh_key', 'qm_refresh_key');
+
+    qmMergeQQMusicCookies(refreshed);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// 发送一次 musicu.fcg 请求，返回 request.data 的业务数据段。
 ///
 /// [session] 为 false 时不先取匿名 session（热搜/评论/搜索等非必要接口）；
@@ -375,37 +502,40 @@ Future<T> qmRequest<T>(
 }) async {
   if (session) await _ensureSession();
 
-  final uin = qmGetQQMusicUin();
-  final cookies = qmGetQQMusicCookies();
-  final musickey = cookies['qm_keyst'] ?? cookies['qqmusic_key'];
-
-  final baseComm = <String, Object>{
-    ...qmGetCommonParams(),
-    if (uin.isNotEmpty && uin != '0') ...{'uin': uin, 'qq': uin},
-    if (musickey != null && musickey.isNotEmpty) ...{
-      'authst': musickey,
-      // QQ-only：登录凭据一律按 QQ 扫码（tmeLoginType=2）发送。
-      'tmeLoginType': 2,
-    },
-    if (session && _session.uid != null) 'uid': _session.uid!,
-    if (session && _session.sid != null) 'sid': _session.sid!,
-    if (session && _session.userip != null) 'userip': _session.userip!,
-    ...?comm,
-  };
-
-  final body = <String, dynamic>{
-    'comm': baseComm,
-    'request': {'module': module, 'method': method, 'param': param},
-  };
+  Map<String, dynamic> buildBody() {
+    final uin = qmGetQQMusicUin();
+    final cookies = qmGetQQMusicCookies();
+    final musickey = cookies['qm_keyst'] ?? cookies['qqmusic_key'];
+    final loginType = qmLoginType();
+    final baseComm = <String, Object>{
+      ...qmGetCommonParams(),
+      if (uin.isNotEmpty && uin != '0') ...{'uin': uin, 'qq': uin},
+      if (musickey != null && musickey.isNotEmpty) ...{
+        'authst': musickey,
+        // 按实际登录类型（1=微信 / 2=QQ）发送，而不是一律按 QQ。
+        'tmeLoginType': loginType,
+      },
+      if (session && _session.uid != null) 'uid': _session.uid!,
+      if (session && _session.sid != null) 'sid': _session.sid!,
+      if (session && _session.userip != null) 'userip': _session.userip!,
+      ...?comm,
+    };
+    return {
+      'comm': baseComm,
+      'request': {'module': module, 'method': method, 'param': param},
+    };
+  }
 
   // 瞬时网络错误自动重试（带退避）；业务码错误：
   // - inner/outer = 2001（风控/限流）或 `meta.is_filter<0`（额外验证/风控过滤）
   //   **均不自动重试**，直接抛 risk，避免刷高风控；
+  // - 鉴权失败（1000 未登录 / 2001 会话异常）先尝试刷新 musickey 重试一次；
   // - 其余非零业务码按上游做法退避重试后再抛 code。
   Object? lastErr;
+  var triedRefresh = false;
   for (var attempt = 0; attempt <= _maxRetry; attempt++) {
     try {
-      final data = await qmPostRaw(body);
+      final data = await qmPostRaw(buildBody());
       final outerCode = _codeOf(data['code']);
       final request = data['request'];
       final innerCode =
@@ -426,6 +556,18 @@ Future<T> qmRequest<T>(
           );
         }
         return reqData as T;
+      }
+      // 鉴权失败：刷新凭据后重试一次（对齐上游 autoRefresh 语义）
+      final isAuthError = qmGetQQMusicUin() != '0' &&
+          outerCode == 0 &&
+          (innerCode == 1000 || innerCode == qmRiskInnerCode);
+      if (isAuthError && !triedRefresh) {
+        triedRefresh = true;
+        _invalidateSession();
+        if (await refreshQMCredential()) {
+          attempt = -1;
+          continue;
+        }
       }
       final risk =
           outerCode == qmRiskInnerCode || innerCode == qmRiskInnerCode;

@@ -129,6 +129,15 @@ class KugouApi extends ChangeNotifier {
     return _dfid!;
   }
 
+  /// 网关请求用 dfid：优先真实注册值，注册失败回退 '-'（不阻断请求）。
+  Future<String> _safeDfid() async {
+    try {
+      return await _getDfid();
+    } catch (_) {
+      return '-';
+    }
+  }
+
   // ─── 扫码登录 ─────────────────────────────────────────────────────
 
   /// 生成登录二维码 key（UI 用它拼 `$kgQrLoginPage?qrcode=$key` 出图）。
@@ -679,7 +688,7 @@ class KugouApi extends ChangeNotifier {
 
   // ─── 网关模块（对齐 KuGouMusicApi module/*.js，概念版 lite） ───────
 
-  /// 网关请求快捷入口（注入设备与登录态，缺省 dfid='-'）。
+  /// 网关请求快捷入口（注入设备与登录态；dfid 用真实注册值，失败回退 '-'）。
   Future<dynamic> _gateway(
     String path, {
     required String method,
@@ -688,7 +697,7 @@ class KugouApi extends ChangeNotifier {
     Map<String, String>? headers,
     String baseUrl = 'https://gateway.kugou.com',
     bool encryptKey = false,
-  }) => kgGateway(
+  }) async => kgGateway(
     path,
     method: method,
     query: query,
@@ -696,6 +705,7 @@ class KugouApi extends ChangeNotifier {
     headers: headers,
     baseUrl: baseUrl,
     encryptKey: encryptKey,
+    dfid: await _safeDfid(),
     mid: _mid,
     token: session?.token,
     userid: session?.userid,

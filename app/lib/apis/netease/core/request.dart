@@ -95,10 +95,17 @@ String _generateRequestId() {
   return '${DateTime.now().millisecondsSinceEpoch}_$rand';
 }
 
+/// 缓存的服务端下发的合法 NMTID（对齐 request.ts cachedNmtid）
+String _cachedNmtid = '';
+
+/// 未携带 NMTID 的探测重试次数：服务端仅在**不带 NMTID** 的 eapi 请求
+/// 下发 `Set-Cookie: NMTID=...`，探测数次后仍无则自行生成。
+int _nmtidRetriesLeft = 3;
+
 /// 补齐 cookie：注入 _ntes_nuid/_ntes_nnid/WNMCID/deviceId/appver 等客户端必备字段
 Map<String, String> _processCookieObject(
   Map<String, String> cookie,
-  String uri,
+  String crypto,
 ) {
   final rng = Random.secure();
   String hexBytes(int n) => List.generate(n, (_) => rng.nextInt(256))
@@ -123,9 +130,15 @@ Map<String, String> _processCookieObject(
     'appver': cookie['appver'] ?? os['appver']!,
   };
 
-  // 登录类接口不带 NMTID（服务端要求）
-  if (!uri.contains('login')) {
-    processed['NMTID'] = hexBytes(8);
+  // NMTID 生命周期（对齐 request.ts）：
+  // 1) 已有则沿用；2) 服务端下发过则复用；3) 探测次数用尽或非 eapi 才自行生成。
+  // 不带 NMTID 的 eapi 请求会让服务端下发真实 NMTID（见 createRequest 的 Set-Cookie 解析）。
+  if ((cookie['NMTID'] ?? '').isNotEmpty) {
+    processed['NMTID'] = cookie['NMTID']!;
+  } else if (_cachedNmtid.isNotEmpty) {
+    processed['NMTID'] = _cachedNmtid;
+  } else if (_nmtidRetriesLeft <= 0 || crypto != 'eapi') {
+    processed['NMTID'] = '00O${hexBytes(19)}';
   }
 
   if (processed['MUSIC_U'] == null) {
@@ -169,16 +182,17 @@ Future<NeteaseResponse> createRequest(
     headers['X-Forwarded-For'] = ip;
   }
 
-  // 归一化 cookie 到对象并做一次补全
+  final cryptoMode = options.crypto.isEmpty ? 'eapi' : options.crypto;
+
+  // 归一化 cookie 到对象并做一次补全（NMTID 生命周期依赖 crypto 模式）
   final cookieObj = options.cookie is String
       ? nmCookieToJson(options.cookie as String)
       : (options.cookie is Map
           ? Map<String, String>.from(options.cookie as Map)
           : <String, String>{});
-  final cookie = _processCookieObject(cookieObj, uri);
+  final cookie = _processCookieObject(cookieObj, cryptoMode);
   headers['Cookie'] = nmCookieObjToString(cookie);
 
-  final cryptoMode = options.crypto.isEmpty ? 'eapi' : options.crypto;
   final csrfToken = cookie['__csrf'] ?? '';
   final useER = _toBoolean(
       options.eR ?? data['e_r'] ?? nmEncryptResponse);
@@ -267,11 +281,17 @@ Future<NeteaseResponse> createRequest(
       };
       if (cookie['MUSIC_U'] != null) header['MUSIC_U'] = cookie['MUSIC_U'];
       if (cookie['MUSIC_A'] != null) header['MUSIC_A'] = cookie['MUSIC_A'];
+      // NMTID 仅 eapi 携带（对齐 request.ts：crypto === 'eapi' && cookie.NMTID）
+      if (cryptoMode == 'eapi' && (cookie['NMTID'] ?? '').isNotEmpty) {
+        header['NMTID'] = cookie['NMTID'];
+      }
       headers['Cookie'] = nmCookieObjToString(header);
       headers['User-Agent'] = options.ua.isNotEmpty
           ? options.ua
           : (cookie['os'] == 'osx' ? _osxUserAgent : _chooseUserAgent('api', 'iphone'));
-      final domain = options.domain.isEmpty ? nmApiDomain : options.domain;
+      final domain = options.domain.isEmpty
+          ? (cryptoMode == 'eapi' ? nmEapiDomain : nmApiDomain)
+          : options.domain;
       if (cryptoMode == 'eapi') {
         data['header'] = header;
         encryptData = {'params': nm.nmEapi(uri, data)};
@@ -285,65 +305,89 @@ Future<NeteaseResponse> createRequest(
       throw StateError('Unknown crypto: $cryptoMode');
   }
 
-  final body = Uri(queryParameters: encryptData.map((k, v) => MapEntry(k, '$v'))).query;
+  // 需要解密响应：xeapi 始终；eapi/weapi 仅在请求 e_r=true 时（对齐 request.ts）
+  needDecrypt = isXeapi ||
+      ((cryptoMode == 'eapi' || cryptoMode == 'weapi') && useER);
+
+  final body = nm.nmFormUrlEncode(encryptData);
   headers['Content-Type'] = 'application/x-www-form-urlencoded';
 
   // 响应预处理
   final answer = NeteaseResponse(status: 500, body: {}, cookie: []);
 
-  HttpClientRequest httpRequest;
-  try {
-    httpRequest = await _client.postUrl(Uri.parse(url)).timeout(const Duration(seconds: 12));
-    headers.forEach(httpRequest.headers.set);
-    httpRequest.write(body);
-  } catch (err) {
+  // 发送：最多 3 次尝试，间隔 attempt*200ms（对齐 request.ts）
+  HttpClientResponse? res;
+  Object? lastErr;
+  const maxAttempts = 3;
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      final httpRequest = await _client
+          .postUrl(Uri.parse(url))
+          .timeout(const Duration(seconds: 8));
+      headers.forEach(httpRequest.headers.set);
+      httpRequest.write(body);
+      res = await httpRequest.close().timeout(const Duration(seconds: 8));
+      break;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxAttempts) {
+        await Future<void>.delayed(Duration(milliseconds: attempt * 200));
+      }
+    }
+  }
+  if (res == null) {
     answer.status = 502;
-    answer.body = {'code': 502, 'msg': '$err'};
+    answer.body = {'code': 502, 'msg': '$lastErr'};
     throw NeteaseRequestError(answer);
   }
-
-  HttpClientResponse res;
-  try {
-    res = await httpRequest.close().timeout(const Duration(seconds: 12));
-  } catch (err) {
-    answer.status = 502;
-    answer.body = {'code': 502, 'msg': '$err'};
-    throw NeteaseRequestError(answer);
-  }
+  final response = res;
 
   // 收集 set-cookie（多值头），去除 Domain 属性
-  final setCookieRaw = res.headers[HttpHeaders.setCookieHeader];
-  answer.cookie = (setCookieRaw ?? [])
-      .map((x) => x.replaceAll(RegExp(r'\s*Domain=[^(;|$)]+;*'), ''))
-      .toList();
+  String cleanCookie(String x) =>
+      x.replaceAll(RegExp(r'\s*Domain=[^(;|$)]+;*'), '');
+  final setCookieRaw = response.headers[HttpHeaders.setCookieHeader];
+  // eapi 首次不带 NMTID 时，服务端会下发 Set-Cookie: NMTID=...，解析并缓存复用
+  if (cryptoMode == 'eapi' &&
+      _cachedNmtid.isEmpty &&
+      _nmtidRetriesLeft > 0 &&
+      (cookie['NMTID'] ?? '').isEmpty) {
+    _nmtidRetriesLeft--;
+    answer.cookie = (setCookieRaw ?? []).map((x) {
+      final m = RegExp(r'(?:^|;\s*)NMTID=([^;]+)').firstMatch(x);
+      if (m != null) _cachedNmtid = m.group(1)!;
+      return cleanCookie(x);
+    }).toList();
+  } else {
+    answer.cookie = (setCookieRaw ?? []).map(cleanCookie).toList();
+  }
 
   // xeapi 会话密钥由响应头下发，缓存供后续请求复用
   if (isXeapi) {
-    final ssid = res.headers.value('x-encr-ssid');
-    final sskey = res.headers.value('x-encr-sskey');
+    final ssid = response.headers.value('x-encr-ssid');
+    final sskey = response.headers.value('x-encr-sskey');
     if (ssid != null && sskey != null) xeapi.nmUpdateXeapiSession(ssid, sskey);
   }
 
   Map<String, dynamic> parsed;
   try {
     if (needDecrypt) {
-      final raw = await res.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
+      final raw = await response.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
       final bytes = Uint8List.fromList(raw);
       final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join().toUpperCase();
       final decrypted = isXeapi
           ? nm.nmXeapiResDecrypt(bytes)
           : nm.nmEapiResDecrypt(hex, aeapi: headers['x-aeapi'] == 'true');
-      parsed = (decrypted is Map<String, dynamic>) ? decrypted : {'code': res.statusCode};
+      parsed = (decrypted is Map<String, dynamic>) ? decrypted : {'code': response.statusCode};
     } else {
-      final text = await res.transform(utf8.decoder).join();
+      final text = await response.transform(utf8.decoder).join();
       try {
         parsed = jsonDecode(text) as Map<String, dynamic>;
       } catch (_) {
-        parsed = {'code': res.statusCode, 'raw': text};
+        parsed = {'code': response.statusCode, 'raw': text};
       }
     }
   } catch (_) {
-    parsed = {'code': res.statusCode, 'msg': 'parse failed'};
+    parsed = {'code': response.statusCode, 'msg': 'parse failed'};
   }
 
   if (parsed['code'] != null) parsed['code'] = (parsed['code'] as num).toInt();
