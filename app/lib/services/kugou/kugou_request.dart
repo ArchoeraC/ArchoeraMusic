@@ -112,6 +112,14 @@ const _kgDevice = <String, dynamic>{
   'temperatureValue': '',
 };
 
+/// 清洗 KG 响应文本：剥离 `<!--KG_TAG_RES_START-->` / `<!--KG_TAG_RES_END-->`
+/// 包裹注释（网关/部分 CDN 会加，直接 jsonDecode 会 FormatException）。
+/// 对齐 KuGouMusicApi `cleanKgResponse`。
+String kgCleanResponse(String text) => text
+    .trim()
+    .replaceFirst(RegExp(r'^<!--KG_TAG_RES_START-->'), '')
+    .replaceFirst(RegExp(r'<!--KG_TAG_RES_END-->$'), '');
+
 /// 一次 KG GET 请求 → 解析 JSON body；失败抛 [KgApiException] 由上层兜底
 Future<dynamic> kgGet(
   Uri uri, {
@@ -130,7 +138,9 @@ Future<dynamic> kgGet(
     await for (final chunk in res) {
       bytes.addAll(chunk);
     }
-    return jsonDecode(utf8.decode(bytes, allowMalformed: true));
+    return jsonDecode(
+      kgCleanResponse(utf8.decode(bytes, allowMalformed: true)),
+    );
   } finally {
     client.close(force: true);
   }
@@ -556,7 +566,8 @@ Future<String> kgRegisterDevice({String? mid}) async {
   return dfid;
 }
 
-/// 校验网关响应：`status:0` / `error_code != 0` 视为业务失败（抛异常）。
+/// 校验网关响应：`status:0` / `error_code` 非 0/200 视为业务失败（抛异常）。
+/// 成功码约定不统一：多数网关接口用 0，部分通道（歌词系）用 200，两值均放行。
 void _checkKgStatus(dynamic body) {
   if (body is! Map) return;
   final status = body['status'];
@@ -565,9 +576,10 @@ void _checkKgStatus(dynamic body) {
       'KG status=0: ${body['error_msg'] ?? body['msg'] ?? body}',
     );
   }
-  final ec = body['error_code'];
-  if (ec is num && ec != 0) {
-    throw KgApiException('KG error_code=$ec: ${body['error_msg'] ?? body}');
+  final raw = body['error_code'] ?? body['errcode'] ?? body['err_code'] ?? 0;
+  final code = raw is num ? raw.toInt() : int.tryParse('$raw') ?? 0;
+  if (code != 0 && code != 200) {
+    throw KgApiException('KG error_code=$code: ${body['error_msg'] ?? body}');
   }
 }
 
@@ -659,7 +671,9 @@ Future<dynamic> kgGateway(
       },
       timeout: timeout,
     );
-    resp = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+    resp = jsonDecode(
+      kgCleanResponse(utf8.decode(bytes, allowMalformed: true)),
+    );
   }
   _checkKgStatus(resp);
   return resp;

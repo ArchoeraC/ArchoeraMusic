@@ -122,7 +122,7 @@ extension _FavoritesPageView on _FavoritesPageState {
                       child: CircularProgressIndicator(strokeWidth: 2.5),
                     ),
                   )
-                : error.isNotEmpty && !_loaded.contains(_cacheKey)
+                : error.isNotEmpty && items.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,

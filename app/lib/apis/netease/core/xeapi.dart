@@ -55,7 +55,7 @@ Future<NmXeapiPublicKey> _fetchPublicKey(String deviceId, String currentKeyVersi
     req.headers.set('User-Agent', nmUaMap['api']!['android']!);
     req.headers.set('Content-Type', 'application/x-www-form-urlencoded');
     req.headers.set('Cookie', deviceId.isEmpty ? '' : 'deviceId=${Uri.encodeComponent(deviceId)}');
-    req.write(Uri(queryParameters: data).query);
+    req.write(nmFormUrlEncode(data));
     final res = await req.close().timeout(const Duration(seconds: 8));
     final text = await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 8));
 

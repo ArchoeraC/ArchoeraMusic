@@ -43,10 +43,13 @@ extension _FavoritesPageActions on _FavoritesPageState {
       });
     } catch (e) {
       if (!mounted) return;
+      Log.e('favorites', '拉取收藏失败 ($key): $e');
       setState(() {
         _error[key] = '$e';
         _loading.remove(key);
-        _loaded.add(key);
+        // 失败不计入已加载：否则视图会把错误态当「已加载的空列表」显示
+        // （error 分支要求 !_loaded.contains(key)），错误被静默吞掉。
+        _loaded.remove(key);
       });
     }
   }

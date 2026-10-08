@@ -209,13 +209,27 @@ dynamic nmEapiResDecrypt(String encryptedHex, {bool aeapi = false}) {
 
 // ─── xeapi 反爬加密（对齐 crypto.ts 末尾 xeapi 段） ──────────────────────
 
-/// xeapi 签名密钥
-const nmXeapiSignKey = 'b1ced3e7b84e4c3f9c1ef8a7d6b2e4f1';
+/// URL 表单编码：`k=v` 连接，**保留空值**（`k=`）。
+///
+/// 与 JS `new URLSearchParams(obj).toString()` 语义一致——Dart 的
+/// `Uri(queryParameters:)` 会把空值退化成裸键（丢 `=`），网易反爬接口会
+/// 因此返回 400（实测）。所有 form body 统一走这里。
+String nmFormUrlEncode(Map<String, dynamic> data) => data.entries
+    .map((e) =>
+        '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent('${e.value}')}')
+    .join('&');
 
-/// xeapi 静态密钥（密文外层 AES 加密）
-final Uint8List _xeapiStaticKey = Uint8List.fromList(
-  utf8.encode('0CoJUm6Qyw8W8jud'),
-);
+/// xeapi 签名密钥（HMAC-SHA256，按字符串原样作为 key，不解码）
+const nmXeapiSignKey =
+    'mUHCwVNWJbunMqAHf5MImuirT6plvs6VSFW62MGHstFQxhBGdEoIhLItH3djc4+FB/OKty3+lL2rGeoFBpVe5g==';
+
+/// xeapi 固定对称密钥（AES-256-ECB，32 字节）
+final Uint8List _xeapiStaticKey = Uint8List.fromList(<int>[
+  0xab, 0x1d, 0x5a, 0x43, 0x0f, 0x6b, 0xb0, 0x4a,
+  0x3f, 0x01, 0xe8, 0x1d, 0xdd, 0x72, 0xbd, 0x91,
+  0x6d, 0x5c, 0xe5, 0x91, 0x24, 0x8a, 0xc1, 0x28,
+  0x71, 0x48, 0x06, 0xd7, 0xf8, 0xfb, 0x1b, 0x84,
+]);
 
 /// X25519 基点（u 坐标 = 9）
 final Uint8List _x25519BasePoint = Uint8List(32)..[0] = 9;
@@ -422,9 +436,7 @@ String _buildXeapiPlaintext(
   if (uriObj.hasQuery) fields['queryString'] = uriObj.query;
 
   final bodyData = Map<String, dynamic>.from(data)..remove('e_r');
-  final form = Uri(
-    queryParameters: bodyData.map((k, v) => MapEntry(k, '$v')),
-  ).query;
+  final form = nmFormUrlEncode(bodyData);
   fields['body'] = base64.encode(utf8.encode(form));
 
   fields['queryString'] = fields.containsKey('queryString')
