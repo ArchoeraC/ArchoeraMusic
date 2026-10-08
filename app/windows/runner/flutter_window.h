@@ -12,9 +12,7 @@
 class FlutterWindow : public Win32Window {
  public:
   // Creates a new FlutterWindow hosting a Flutter view running |project|.
-  // |headless| = CLI 模式（archoerashell）：不显示窗口，仅让引擎运行 Dart 后退出。
-  explicit FlutterWindow(const flutter::DartProject& project,
-                         bool headless = false);
+  explicit FlutterWindow(const flutter::DartProject& project);
   virtual ~FlutterWindow();
 
  protected:
@@ -27,9 +25,6 @@ class FlutterWindow : public Win32Window {
  private:
   // The project to run.
   flutter::DartProject project_;
-
-  // CLI 模式：首帧回调不 Show 窗口（Dart 执行完命令即退出）。
-  bool headless_ = false;
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;

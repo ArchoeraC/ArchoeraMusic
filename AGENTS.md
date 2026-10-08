@@ -34,17 +34,24 @@ cd build && ctest
 cmake -S app/native/platform -B app/native/platform/build -DCMAKE_BUILD_TYPE=Release
 cmake --build app/native/platform/build -j
 ```
-改动内嵌原生 CLI（`app/core/shell`，Rust `staticlib`，Linux `archoerashell`）时另跑：
+改动内嵌原生 CLI（`app/core/shell`，Rust `staticlib`，三端 `archoerashell`）时另跑：
 ```bash
 cargo test --release --manifest-path app/core/shell/Cargo.toml    # 全绿
 cargo build --release --manifest-path app/core/shell/Cargo.toml   # 产 libarchoera_shell.a
+# 交叉静态检查（staticlib 无需目标链接器，可在本机验证 cfg 分支）：
+cargo build --release --target x86_64-pc-windows-msvc --manifest-path app/core/shell/Cargo.toml
+cargo build --release --target aarch64-apple-darwin   --manifest-path app/core/shell/Cargo.toml
 ```
-> `flutter build linux` 会经 `app/linux/CMakeLists.txt` 的内嵌 cargo 目标自动编译该
-> staticlib 并链入 runner，故常规构建无需单独 cargo；但**改了 Rust 单测/逻辑或 `lib/l10n`
-> 下的 ARB** 时应先跑上面的 `cargo test`（`build.rs` 从 ARB 生成帮助/标签，会随 ARB 变化重编）。
-> 改动 ARB 后另跑 `flutter gen-l10n`（`flutter build/test` 也会自动生成）以刷新生成代码。
-> Windows/macOS 尚未接入该原生 CLI（仍走 Dart 回退路径），故 `build_windows.bat` / `build-macos.sh`
-> 暂不含此模块；接入时需同步这两处与各自 runner。
+> 三端 runner 均在 Flutter 初始化前拦截 `archoerashell` 子命令并直调 Rust 入口：
+> Linux `app/linux/runner/main.cc`（CMake 链入）、Windows
+> `app/windows/runner/main.cpp`（runner CMake 链入 `archoera_shell.lib`）、macOS
+> `app/macos/Runner/main.swift`（Xcode “Build archoerashell (cargo)” 阶段链入）。
+> Windows 侧控制台接管/UTF-8/ANSI 由 `app/core/shell/src/console.rs` 自理（标准流可能被重定向）。
+> `flutter build` 会经各自内嵌 cargo 目标自动编译该 staticlib，故常规构建无需单独 cargo；
+> 但**改了 Rust 单测/逻辑或 `lib/l10n` 下的 ARB** 时应先跑上面的 `cargo test`
+> （`build.rs` 从 ARB 生成帮助/标签，会随 ARB 变化重编）。改动 ARB 后另跑
+> `flutter gen-l10n`（`flutter build/test` 也会自动生成）以刷新生成代码。
+> `build_windows.bat` / `build-macos.sh` 已含该模块的预构建（幂等）。
 
 Windows/MSVC 兼容自检（本机可交叉，无需 Windows SDK）：
 ```bash

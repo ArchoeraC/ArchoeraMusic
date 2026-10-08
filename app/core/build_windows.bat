@@ -10,6 +10,7 @@ rem    4. scanner      : dotnet publish (NativeAOT) + e_sqlite3.dll
 rem    5. downloader   : cargo build --release (cdylib)
 rem    6. subsonic     : cargo transcoder + go c-shared + go standalone
 rem    7. vault        : dotnet publish (NativeAOT 凭据保险库)
+rem    8. shell        : cargo staticlib（内嵌原生 CLI archoerashell，链入 Windows runner）
 rem
 rem  依赖（vcpkg FFmpeg、MSVC、Rust、Go、.NET、CMake）由 CI workflow 提前安装，
 rem  本脚本只做编译引导；vcpkg FFmpeg headers 缺失时会自动 install 兜底
@@ -309,6 +310,18 @@ popd
 echo [build_windows] ERROR: 统一日志核心构建失败
 exit /b 1
 :log_done
+
+rem =====================================================================
+rem  10. shell：内嵌原生 CLI（archoerashell，Rust staticlib）
+rem     产物 target\release\archoera_shell.lib，由 runner CMake（app/windows/
+rem     runner/CMakeLists.txt 的 shell_cargo 目标）链入主可执行文件；此处预构建
+rem     一次（幂等），独立跑本脚本时也能得到 .lib。
+rem =====================================================================
+echo [build_windows] ===== shell (Rust staticlib, archoerashell) =====
+pushd "%ROOT%shell"
+cargo build --release
+if errorlevel 1 exit /b 1
+popd
 
 echo [build_windows] 全部模块构建完成
 exit /b 0

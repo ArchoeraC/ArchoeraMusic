@@ -193,22 +193,29 @@
 archoera_music archoerashell [全局选项] <命令> [参数...]
 ```
 
-它**不启动 GUI**。实现分两条路径：
+它**不启动 GUI**。三端均由 runner 在 Flutter 初始化之前拦截 `archoerashell` 子命令，
+直接调用原生 Rust 入口（`app/core/shell`，`staticlib`）——**完全不加载 Flutter 引擎 /
+Dart**，命令行调用即时返回：
 
-- **原生 CLI（Linux 起）**：`app/core/shell`（Rust，`staticlib`）链入 Linux runner；
-  `main()` 在 GTK/Flutter 初始化**之前**检测到 `archoerashell` 即直接调用
-  `archoera_shell_main`——**完全不加载 Flutter 引擎 / Dart**，命令行调用即时返回。
-  自包含实现：参数解析、回环 REST（`std::net`）、TUI 渲染，帮助文案由 `build.rs`
-  从 Flutter 的 ARB（`mcpShell*`）生成，与 Dart 端同源。
-- **Dart 回退（Windows/macOS 暂沿用）**：runner 把 argv 传给 Dart 入口，Dart 侧
-  识别子命令后执行（Linux/Windows 显式转发；macOS 由 `FlutterDartProject` 默认
-  转发，去掉可执行名，Dart 侧另以 `Platform.executableArguments` 兜底）。
-  Linux runner（`my_application.cc`）与 Windows runner（`flutter_window.cpp` 的
-  `headless` 标志）在 CLI 模式下都**不显示窗口**；macOS 的窗口本就由 Dart 启动后
-  经 `windowManager.show()` 显示，CLI 模式不 `runApp`。
+- **Linux**：`app/linux/runner/main.cc` 检测子命令后调用 `archoera_shell_main`；由
+  `app/linux/CMakeLists.txt` 的内嵌 cargo 目标编译 `libarchoera_shell.a` 链入。
+- **Windows**：`app/windows/runner/main.cpp` 在 `wWinMain` 起始处检测子命令；runner
+  CMake 编译并链入 `archoera_shell.lib`。GUI 子系统进程被终端调用时，由
+  `app/core/shell/src/console.rs` 接管/补齐标准流、切 UTF-8 并开启 ANSI。
+- **macOS**：`app/macos/Runner/main.swift` 在 `NSApplicationMain` 之前检测子命令；
+  `Runner.xcodeproj` 的 “Build archoerashell (cargo)” 阶段编译并链入
+  `libarchoera_shell.a`（`-liconv` 为 Rust std 的系统依赖）。
 
-两条路径都通过本机 MCP 服务的 REST 接口与**运行中的实例**通信——目标端口/密钥
+实现自包含：参数解析、回环 REST（`std::net`）、TUI 渲染；帮助文案由 `build.rs`
+从 Flutter 的 ARB（`mcpShell*`）生成，与 Dart 端同源。（Dart 版
+`app/lib/cli/mcp_shell.dart` 保留为参考与单测对象，不再参与桌面端运行时。）
+
+三端都通过本机 MCP 服务的 REST 接口与**运行中的实例**通信——目标端口/密钥
 取自应用设置（`prefs.json`），可用全局选项覆盖。
+
+> **Windows 终端注意**：主程序是 GUI 子系统可执行文件，`cmd`/PowerShell 默认**不等待**
+> 其退出，输出会送到同一控制台但可能晚于提示符返回。需要严格同步（脚本/管道）时用
+> `start /wait archoera_music archoerashell …`；`stdout` 被重定向/管道时输出自动回退纯文本。
 
 **交互式终端（REPL）**：`archoerashell` 后**不带命令**时，若 `stdin` 为交互式
 终端则进入提示符模式，可连续输入命令（`exit`/`quit`/`Ctrl-D` 退出，空行忽略）；
@@ -265,6 +272,9 @@ archoera_music archoerashell --json library 周杰伦 | jq '.tracks[].title'
 - CLI 实现（Dart 回退）：`app/lib/cli/mcp_shell.dart`（纯 `dart:io`，可注入客户端便于单测）；
   TUI 版式独立在 `app/lib/cli/mcp_shell_render.dart`（CJK 感知宽度、面板/表格/进度条）；
   `app/lib/main.dart` 在 GUI 初始化前识别 `archoerashell` 子命令。
-- CLI 实现（原生，Linux）：`app/core/shell/`（Rust `staticlib`，`cargo test` 自测；
+- CLI 实现（原生，三端）：`app/core/shell/`（Rust `staticlib`，`cargo test` 自测；
   `width.rs` 显示宽度、`render.rs` TUI、`http.rs` 回环 HTTP、`cli.rs` 解析/分派/REPL、
-  `build.rs` 从 ARB 生成帮助文案）；由 `app/linux/{runner/main.cc,CMakeLists.txt}` 链入。
+  `console.rs` Windows 控制台引导、`build.rs` 从 ARB 生成帮助文案）；Linux
+  `app/linux/{runner/main.cc,CMakeLists.txt}`、Windows
+  `app/windows/runner/{main.cpp,CMakeLists.txt}`、macOS
+  `app/macos/Runner/{main.swift,Runner.xcodeproj}` 分别链入。
