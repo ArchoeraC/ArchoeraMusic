@@ -5497,4 +5497,157 @@ class AppLocalizationsDe extends AppLocalizations {
   String mcpShellErrTimeout({required String host, required int port}) {
     return 'Verbindungszeitüberschreitung: $host:$port';
   }
+
+  @override
+  String get mcpShellLblPlaying => 'Wiedergabe';
+
+  @override
+  String get mcpShellLblPaused => 'Pausiert';
+
+  @override
+  String get mcpShellLblBuffering => 'Puffern';
+
+  @override
+  String get mcpShellLblVolume => 'Lautstärke';
+
+  @override
+  String get mcpShellLblQuality => 'Qualität';
+
+  @override
+  String get mcpShellLblRepeat => 'Wiederholen';
+
+  @override
+  String get mcpShellLblShuffleOn => 'Shuffle an';
+
+  @override
+  String get mcpShellLblShuffleOff => 'Shuffle aus';
+
+  @override
+  String get mcpShellLblNowPlaying => 'spielt';
+
+  @override
+  String get mcpShellLblTotal => 'Gesamt';
+
+  @override
+  String get mcpShellLblEmpty => 'leer';
+
+  @override
+  String get mcpShellLblColTitle => 'Titel';
+
+  @override
+  String get mcpShellLblColArtist => 'Künstler';
+
+  @override
+  String get mcpShellLblColRef => 'Referenz';
+
+  @override
+  String get mcpShellLblColWhen => 'Zeitpunkt';
+
+  @override
+  String get mcpShellLblSearch => 'Suche';
+
+  @override
+  String get mcpShellLblQuery => 'Suchbegriff';
+
+  @override
+  String get mcpShellLblPage => 'Seite';
+
+  @override
+  String get mcpShellLblQueue => 'Warteschlange';
+
+  @override
+  String get mcpShellLblIndex => 'Index';
+
+  @override
+  String get mcpShellLblLiked => 'Favorisiert';
+
+  @override
+  String get mcpShellLblNotLiked => 'Nicht favorisiert';
+
+  @override
+  String get mcpShellLblUnliked => 'Favorit entfernt';
+
+  @override
+  String get mcpShellLblVersion => 'Version';
+
+  @override
+  String get mcpShellLblPlatform => 'Plattform';
+
+  @override
+  String get mcpShellLblPort => 'Port';
+
+  @override
+  String get mcpShellLblProtocol => 'Protokoll';
+
+  @override
+  String get mcpShellLblEndpoints => 'Endpunkte';
+
+  @override
+  String get mcpShellLblCaps => 'Funktionen';
+
+  @override
+  String get mcpShellLblLoopback => 'Loopback';
+
+  @override
+  String get mcpShellLblLan => 'LAN';
+
+  @override
+  String get mcpShellLblLibrary => 'Bibliothek';
+
+  @override
+  String get mcpShellLblTracks => 'Stücke';
+
+  @override
+  String get mcpShellLblSize => 'Größe';
+
+  @override
+  String get mcpShellLblDuration => 'Dauer';
+
+  @override
+  String get mcpShellLblSleep => 'Schlaf-Timer';
+
+  @override
+  String get mcpShellLblEndOfTrack => 'nach Titel stoppen';
+
+  @override
+  String get mcpShellLblTask => 'Aufgabe';
+
+  @override
+  String get mcpShellLblQueued => 'In Warteschlange';
+
+  @override
+  String get mcpShellLblCount => 'Anzahl';
+
+  @override
+  String get mcpShellLblTheme => 'Design';
+
+  @override
+  String get mcpShellLblOk => 'OK';
+
+  @override
+  String get mcpShellLblToolName => 'Name';
+
+  @override
+  String get mcpShellLblToolCap => 'Fähigkeit';
+
+  @override
+  String get mcpShellLblToolTitle => 'Beschreibung';
+
+  @override
+  String get mcpShellLblLoggedIn => 'angemeldet';
+
+  @override
+  String get mcpShellLblLoggedOut => 'abgemeldet';
+
+  @override
+  String get mcpShellLblRef => 'Referenz';
+
+  @override
+  String get mcpShellLblError => 'Fehler';
+
+  @override
+  String get mcpShellLblTagPlaying => '[Wiedergabe]';
+
+  @override
+  String get mcpShellLblTagPaused => '[pausiert]';
 }

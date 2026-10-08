@@ -193,14 +193,48 @@
 archoera_music archoerashell [全局选项] <命令> [参数...]
 ```
 
-它**不启动 GUI**：在 `main` 最前面识别 `archoerashell` 子命令并直接执行后退出。
-argv 由各平台 runner 传给 Dart 入口（Linux/Windows 显式转发；macOS 由
-`FlutterDartProject` 默认转发，去掉可执行名），Dart 侧另以
-`Platform.executableArguments` 兜底。窗口显示：Linux runner（`my_application.cc`）与 Windows runner（`flutter_window.cpp`
-的 `headless` 标志）在 CLI 模式下都**不显示窗口**；macOS 的窗口本就由 Dart
-启动后经 `windowManager.show()` 显示，CLI 模式不 `runApp`，故三端都不会出现
-窗口。它通过本机 MCP 服务的 REST 接口与**运行中的实例**通信——目标端口/密钥
+它**不启动 GUI**。三端均由 runner 在 Flutter 初始化之前拦截 `archoerashell` 子命令，
+直接调用原生 Rust 入口（`app/core/shell`，`staticlib`）——**完全不加载 Flutter 引擎 /
+Dart**，命令行调用即时返回：
+
+- **Linux**：`app/linux/runner/main.cc` 检测子命令后调用 `archoera_shell_main`；由
+  `app/linux/CMakeLists.txt` 的内嵌 cargo 目标编译 `libarchoera_shell.a` 链入。
+- **Windows**：两种入口共享同一 Rust staticlib——
+  - `archoera_music.exe archoerashell …`（`app/windows/runner/main.cpp` 在 `wWinMain`
+    起始处分派）：适合**一次性命令**。GUI 子系统进程被终端调用时由
+    `app/core/shell/src/console.rs` 接管/补齐标准流、切 UTF-8 并开启 ANSI，但它与
+    调用方 shell 争抢同一控制台输入，**不适合交互式 REPL**。
+  - `archoerashell.exe`（`app/windows/runner/shell_main.cpp`，**控制台子系统**伴生
+    程序）：cmd/PowerShell 会等待其退出且独占控制台输入，**推荐**用于交互式 REPL 与
+    脚本。
+- **macOS**：`app/macos/Runner/main.swift` 在 `NSApplicationMain` 之前检测子命令；
+  `Runner.xcodeproj` 的 “Build archoerashell (cargo)” 阶段按 `$ARCHS`（Release 为
+  `arm64 x86_64`）逐架构编译并 `lipo` 成 `target/universal/release/libarchoera_shell.a`
+  链入（`-liconv` 为 Rust std 的系统依赖）。
+
+实现自包含：参数解析、回环 REST（`std::net`）、TUI 渲染；帮助文案由 `build.rs`
+从 Flutter 的 ARB（`mcpShell*`）生成，与 Dart 端同源。（Dart 版
+`app/lib/cli/mcp_shell.dart` 保留为参考与单测对象，不再参与桌面端运行时。）
+
+三端都通过本机 MCP 服务的 REST 接口与**运行中的实例**通信——目标端口/密钥
 取自应用设置（`prefs.json`），可用全局选项覆盖。
+
+> **Windows 用法**：推荐直接用控制台子系统伴生程序 `archoerashell.exe`（会等待退出、
+> 独占控制台输入，REPL 与脚本都稳）：
+> ```
+> archoerashell --help
+> archoerashell status
+> archoerashell            # 进入交互式 REPL
+> ```
+> 主程序子命令 `archoera_music archoerashell …` 仅适合一次性命令（GUI 子系统，
+> PowerShell 默认不等待且会与它争抢输入）；需要严格同步时用
+> `Start-Process … -Wait -NoNewWindow`（或 `start /wait`）。`stdout` 被重定向/管道时
+> 输出自动回退纯文本。
+
+**交互式终端（REPL）**：`archoerashell` 后**不带命令**时，若 `stdin` 为交互式
+终端则进入提示符模式，可连续输入命令（`exit`/`quit`/`Ctrl-D` 退出，空行忽略）；
+若 `stdin` 被管道/重定向，则按行批处理（每行一条命令，`#` 开头为注释）。这与
+双击/直接运行程序启动 GUI **不冲突**：GUI 启动路径的 argv 里没有 `archoerashell`。
 
 ```
 全局选项:  -h/--help  -V/--version  -j/--json  -q/--quiet
@@ -220,6 +254,10 @@ argv 由各平台 runner 传给 Dart 入口（Linux/Windows 显式转发；macOS
 ```
 
 - 默认输出人类可读文本；`--json` 输出原始 JSON（便于脚本 `jq` 处理）。
+- **输出风格自动探测**：`stdout` 为交互式终端且支持 ANSI 时启用 TUI 渲染
+  （配色、圆角面板、进度条、对齐表格，风格贴近 OpenCode 等 Agent 终端）；
+  被管道/重定向时自动回退纯文本，保证脚本解析与 `--json` 输出稳定
+  （宽度按终端显示列计算，中文等宽字符同样对齐）。
 - 退出码：`0` 成功 / `1` 运行期错误（连接失败、服务端错误）/ `2` 用法错误。
 - 需要应用正在运行且已启用 MCP 服务；否则提示先开启。
 
@@ -245,5 +283,13 @@ archoera_music archoerashell --json library 周杰伦 | jq '.tracks[].title'
   MCP 握手/会话/工具列举与调用、工具目录完整性）、
   `app/test/mcp_http_test.dart`（真实回环 HTTP：鉴权 / Origin / REST / MCP 往返）、
   `app/test/mcp_shell_test.dart`（CLI 命令解析、全局选项、REST/tool 映射与输出）。
-- CLI 实现：`app/lib/cli/mcp_shell.dart`（纯 `dart:io`，可注入客户端便于单测）；
+- CLI 实现（Dart 回退）：`app/lib/cli/mcp_shell.dart`（纯 `dart:io`，可注入客户端便于单测）；
+  TUI 版式独立在 `app/lib/cli/mcp_shell_render.dart`（CJK 感知宽度、面板/表格/进度条）；
   `app/lib/main.dart` 在 GUI 初始化前识别 `archoerashell` 子命令。
+- CLI 实现（原生，三端）：`app/core/shell/`（Rust `staticlib`，`cargo test` 自测；
+  `width.rs` 显示宽度、`render.rs` TUI、`http.rs` 回环 HTTP、`cli.rs` 解析/分派/REPL、
+  `console.rs` Windows 控制台引导、`build.rs` 从 ARB 生成帮助文案）；Linux
+  `app/linux/{runner/main.cc,CMakeLists.txt}`、Windows
+  `app/windows/runner/{main.cpp,CMakeLists.txt}`、macOS
+  `app/macos/Runner/{main.swift,Runner.xcodeproj}` 分别链入；Windows 另提供
+  控制台子系统伴生程序 `app/windows/runner/shell_main.cpp`（`archoerashell.exe`）。

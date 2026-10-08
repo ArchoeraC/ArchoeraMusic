@@ -1,7 +1,8 @@
 name: Build ArchoeraMusic (Linux)
 description: >-
   各发行版共用的 Linux 构建：安装工具链（Rust/Go/.NET/Flutter/Zig）→
-  编译全部原生模块 → Zig 内核回归 → Flutter analyze/test → flutter build linux。
+  编译全部原生模块 → Zig 内核回归 + archoerashell Rust 单测 → Flutter analyze/test
+  → flutter build linux。
   发行版专属的系统依赖安装与打包步骤由调用方 job 负责（复合 action 在调用方
   job 的容器/runner 内执行，因此天然复用各发行版的本地库）。
 inputs:
@@ -86,6 +87,12 @@ runs:
     - name: Zig kernel tests (EraAudio 解码回归)
       shell: bash
       run: cd app/core/audio-engine && zig build test
+
+    - name: Rust unit tests (archoerashell 原生 CLI)
+      shell: bash
+      # 内嵌原生 CLI 的单测（宽度/渲染/HTTP/参数解析/本地化），build.rs 从 ARB 生成
+      # 帮助与标签文案。构建期由 flutter build 的 CMake 目标再编译为 staticlib 链入 runner。
+      run: cargo test --release --manifest-path app/core/shell/Cargo.toml
 
     - name: Flutter pub get
       shell: bash

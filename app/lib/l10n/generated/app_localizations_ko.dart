@@ -5267,4 +5267,157 @@ class AppLocalizationsKo extends AppLocalizations {
   String mcpShellErrTimeout({required String host, required int port}) {
     return '연결 시간 초과: $host:$port';
   }
+
+  @override
+  String get mcpShellLblPlaying => '재생 중';
+
+  @override
+  String get mcpShellLblPaused => '일시정지';
+
+  @override
+  String get mcpShellLblBuffering => '버퍼링 중';
+
+  @override
+  String get mcpShellLblVolume => '볼륨';
+
+  @override
+  String get mcpShellLblQuality => '음질';
+
+  @override
+  String get mcpShellLblRepeat => '반복';
+
+  @override
+  String get mcpShellLblShuffleOn => '셔플 켜짐';
+
+  @override
+  String get mcpShellLblShuffleOff => '셔플 꺼짐';
+
+  @override
+  String get mcpShellLblNowPlaying => '재생';
+
+  @override
+  String get mcpShellLblTotal => '합계';
+
+  @override
+  String get mcpShellLblEmpty => '없음';
+
+  @override
+  String get mcpShellLblColTitle => '제목';
+
+  @override
+  String get mcpShellLblColArtist => '아티스트';
+
+  @override
+  String get mcpShellLblColRef => '참조';
+
+  @override
+  String get mcpShellLblColWhen => '시각';
+
+  @override
+  String get mcpShellLblSearch => '검색';
+
+  @override
+  String get mcpShellLblQuery => '쿼리';
+
+  @override
+  String get mcpShellLblPage => '페이지';
+
+  @override
+  String get mcpShellLblQueue => '대기열';
+
+  @override
+  String get mcpShellLblIndex => '색인';
+
+  @override
+  String get mcpShellLblLiked => '좋아요';
+
+  @override
+  String get mcpShellLblNotLiked => '좋아요 안 함';
+
+  @override
+  String get mcpShellLblUnliked => '좋아요 취소';
+
+  @override
+  String get mcpShellLblVersion => '버전';
+
+  @override
+  String get mcpShellLblPlatform => '플랫폼';
+
+  @override
+  String get mcpShellLblPort => '포트';
+
+  @override
+  String get mcpShellLblProtocol => '프로토콜';
+
+  @override
+  String get mcpShellLblEndpoints => '엔드포인트';
+
+  @override
+  String get mcpShellLblCaps => '기능';
+
+  @override
+  String get mcpShellLblLoopback => '루프백';
+
+  @override
+  String get mcpShellLblLan => 'LAN';
+
+  @override
+  String get mcpShellLblLibrary => '라이브러리';
+
+  @override
+  String get mcpShellLblTracks => '트랙';
+
+  @override
+  String get mcpShellLblSize => '크기';
+
+  @override
+  String get mcpShellLblDuration => '재생 시간';
+
+  @override
+  String get mcpShellLblSleep => '슬립';
+
+  @override
+  String get mcpShellLblEndOfTrack => '재생 후 중지';
+
+  @override
+  String get mcpShellLblTask => '작업';
+
+  @override
+  String get mcpShellLblQueued => '대기열에 추가됨';
+
+  @override
+  String get mcpShellLblCount => '개수';
+
+  @override
+  String get mcpShellLblTheme => '테마';
+
+  @override
+  String get mcpShellLblOk => '완료';
+
+  @override
+  String get mcpShellLblToolName => '이름';
+
+  @override
+  String get mcpShellLblToolCap => '기능';
+
+  @override
+  String get mcpShellLblToolTitle => '설명';
+
+  @override
+  String get mcpShellLblLoggedIn => '로그인됨';
+
+  @override
+  String get mcpShellLblLoggedOut => '로그아웃됨';
+
+  @override
+  String get mcpShellLblRef => '참조';
+
+  @override
+  String get mcpShellLblError => '오류';
+
+  @override
+  String get mcpShellLblTagPlaying => '[재생 중]';
+
+  @override
+  String get mcpShellLblTagPaused => '[일시정지]';
 }

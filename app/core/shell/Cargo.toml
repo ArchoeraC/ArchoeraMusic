@@ -1,0 +1,28 @@
+[package]
+name        = "archoera-shell"
+version     = "0.1.0"
+edition     = "2021"
+license     = "AGPL-3.0-or-later"
+description = "ArchoeraMusic 内嵌原生命令行客户端（archoerashell）：不经 Flutter/Dart 直连 MCP REST"
+publish     = false
+build       = "build.rs"
+
+[lib]
+name       = "archoera_shell"
+# staticlib 供 C++ runner 直接链入主可执行文件；rlib 供 cargo test 使用。
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }
+
+# 仅 Unix 需要：`TIOCGWINSZ` 探测终端列数（Windows 走 console 模块的 Win32 API）。
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[build-dependencies]
+serde_json = "1"
+
+[profile.release]
+lto       = true
+strip     = "symbols"
+opt-level = "s"

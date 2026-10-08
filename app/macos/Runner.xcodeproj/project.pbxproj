@@ -27,6 +27,7 @@
 		33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F22044A3C60003C045 /* Assets.xcassets */; };
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
+		A11CE0A100000000000000A1 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0A100000000000000A2 /* main.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
 /* End PBXBuildFile section */
 
@@ -71,6 +72,8 @@
 		33CC10F52044A3C60003C045 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		33CC10F72044A3C60003C045 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Runner/Info.plist; sourceTree = "<group>"; };
 		33CC11122044BFA00003C045 /* MainFlutterWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFlutterWindow.swift; sourceTree = "<group>"; };
+		A11CE0A100000000000000A2 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A11CE0A100000000000000A3 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		33CEB47222A05771004F2AC0 /* Flutter-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Debug.xcconfig"; sourceTree = "<group>"; };
 		33CEB47422A05771004F2AC0 /* Flutter-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Release.xcconfig"; sourceTree = "<group>"; };
 		33CEB47722A0578A004F2AC0 /* Flutter-Generated.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "Flutter-Generated.xcconfig"; path = "ephemeral/Flutter-Generated.xcconfig"; sourceTree = "<group>"; };
@@ -167,7 +170,9 @@
 			isa = PBXGroup;
 			children = (
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
+				A11CE0A100000000000000A2 /* main.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
+				A11CE0A100000000000000A3 /* Runner-Bridging-Header.h */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
@@ -208,6 +213,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 33CC10FB2044A3C60003C045 /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
+				A11CE0A100000000000000A4 /* Build archoerashell (cargo) */,
 				33CC10E92044A3C60003C045 /* Sources */,
 				33CC10EA2044A3C60003C045 /* Frameworks */,
 				33CC10EB2044A3C60003C045 /* Resources */,
@@ -358,6 +364,26 @@
 			shellPath = /bin/sh;
 			shellScript = "\"$FLUTTER_ROOT\"/packages/flutter_tools/bin/macos_assemble.sh && touch Flutter/ephemeral/tripwire";
 		};
+		A11CE0A100000000000000A4 /* Build archoerashell (cargo) */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build archoerashell (cargo)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/../core/shell/target/universal/release/libarchoera_shell.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n# 原生 archoerashell（Rust staticlib，见 app/core/shell）：链入 Runner，供\n# main.swift 在 Flutter 初始化前分派子命令。Release 下 ARCHS 通常为\n# \"arm64 x86_64\"，故按 ARCHS 逐架构静态编译并用 lipo 合成 fat 库。\nCRATE=\"$SRCROOT/../core/shell\"\nOUT=\"$CRATE/target/universal/release\"\nmkdir -p \"$OUT\"\nARCHS_RESOLVED=\"${ARCHS:-${NATIVE_ARCH_ACTUAL:-arm64}}\"\nSLICES=\"\"\nCOUNT=0\nfor arch in $ARCHS_RESOLVED; do\n  case \"$arch\" in\n    arm64) triple=aarch64-apple-darwin ;;\n    x86_64) triple=x86_64-apple-darwin ;;\n    *) echo \"warning: 跳过未知架构 $arch\" >&2; continue ;;\n  esac\n  if command -v rustup >/dev/null 2>&1; then rustup target add \"$triple\" >/dev/null 2>&1 || true; fi\n  cargo build --release --target \"$triple\" --manifest-path \"$CRATE/Cargo.toml\"\n  SLICES=\"$SLICES $CRATE/target/$triple/release/libarchoera_shell.a\"\n  COUNT=$((COUNT+1))\ndone\nif [ \"$COUNT\" -eq 0 ]; then echo \"error: 无可用架构（ARCHS=$ARCHS_RESOLVED）\" >&2; exit 1; fi\nif [ \"$COUNT\" -gt 1 ]; then lipo -create $SLICES -output \"$OUT/libarchoera_shell.a\"; else cp $SLICES \"$OUT/libarchoera_shell.a\"; fi\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -373,6 +399,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A11CE0A100000000000000A1 /* main.swift in Sources */,
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,

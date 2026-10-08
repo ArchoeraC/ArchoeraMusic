@@ -4,8 +4,8 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
-FlutterWindow::FlutterWindow(const flutter::DartProject& project, bool headless)
-    : project_(project), headless_(headless) {}
+FlutterWindow::FlutterWindow(const flutter::DartProject& project)
+    : project_(project) {}
 
 FlutterWindow::~FlutterWindow() {}
 
@@ -27,12 +27,9 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  // CLI 模式不显示窗口（Dart 侧执行完命令后退出）。
-  if (!headless_) {
-    flutter_controller_->engine()->SetNextFrameCallback([&]() {
-      this->Show();
-    });
-  }
+  flutter_controller_->engine()->SetNextFrameCallback([&]() {
+    this->Show();
+  });
 
   // Flutter can complete the first frame before the "show window" callback is
   // registered. The following call ensures a frame is pending to ensure the

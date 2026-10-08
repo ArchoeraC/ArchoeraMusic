@@ -23,8 +23,12 @@
 #
 #  各发行版 Linux job 共用 .github/actions/build-linux（复合 action）：工具链
 #  (rust/go/dotnet/flutter) → Zig 0.16 → build-linux.sh → zig build test →
-#  pub get/analyze/test → vault 端到端 → flutter build linux。发行版专属的
-#  系统依赖安装与打包由各 job 负责。
+#  cargo test（archoerashell）→ pub get/analyze/test → vault 端到端 →
+#  flutter build linux。发行版专属的系统依赖安装与打包由各 job 负责。
+#
+#  macOS/Windows job：工具链 → 一站式原生构建（build-macos.sh / build_windows.bat，
+#  含 archoerashell staticlib）→ cargo test（archoerashell）→ pub get/analyze/test
+#  → flutter build（经内嵌 cargo/脚本阶段链入 archoerashell）→ 打包。
 #
 #  Zig 0.16 安装沿用已修复逻辑（f99266b / 7116dfc）：归档名按 0.15.1+ 新规则
 #  zig-<arch>-<os>；GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
@@ -280,6 +284,11 @@ jobs:
       # 不引入 actions-setup-cmake：其版本解析走 GitHub releases 分页，
       # 旧版本号（如 v3.28.7）超出分页范围会报 Unable to find version
       - uses: dtolnay/rust-toolchain@stable
+      - name: Add macOS Rust targets (universal archoerashell staticlib)
+        if: matrix.os == 'macos'
+        # Release 下 Xcode 按 ARCHS（arm64 x86_64）构建通用二进制，静态库需双架构
+        # slice；脚本阶段亦会幂等 rustup target add 兜底（本地开发用）。
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - uses: actions/setup-go@v6
         with:
           go-version: '1.26'
@@ -391,6 +400,13 @@ jobs:
             app/vcpkg-install.log
             app/core/build_windows.log
           if-no-files-found: ignore
+
+      # ───────────── Rust 原生 CLI（archoerashell）单测（各桌面端）─────────
+      - name: Rust tests (archoerashell 原生 CLI)
+        if: matrix.os == 'macos' || matrix.os == 'windows'
+        # 与 Linux 共享同一 crate；build.rs 从 ARB 生成帮助/标签文案。
+        # 交叉/本机构建由随后的 flutter build 经各自内嵌 cargo 目标完成。
+        run: cargo test --release --manifest-path app/core/shell/Cargo.toml
 
       # ───────────── Flutter pub get / analyze / test（统一在 app/）─────
       - name: Flutter pub get
