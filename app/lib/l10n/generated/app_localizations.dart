@@ -9611,6 +9611,312 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'连接超时: {host}:{port}'**
   String mcpShellErrTimeout({required String host, required int port});
+
+  /// No description provided for @mcpShellLblPlaying.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播放中'**
+  String get mcpShellLblPlaying;
+
+  /// No description provided for @mcpShellLblPaused.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已暂停'**
+  String get mcpShellLblPaused;
+
+  /// No description provided for @mcpShellLblBuffering.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'缓冲中'**
+  String get mcpShellLblBuffering;
+
+  /// No description provided for @mcpShellLblVolume.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音量'**
+  String get mcpShellLblVolume;
+
+  /// No description provided for @mcpShellLblQuality.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音质'**
+  String get mcpShellLblQuality;
+
+  /// No description provided for @mcpShellLblRepeat.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'循环'**
+  String get mcpShellLblRepeat;
+
+  /// No description provided for @mcpShellLblShuffleOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'随机开'**
+  String get mcpShellLblShuffleOn;
+
+  /// No description provided for @mcpShellLblShuffleOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'随机关'**
+  String get mcpShellLblShuffleOff;
+
+  /// No description provided for @mcpShellLblNowPlaying.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在播放'**
+  String get mcpShellLblNowPlaying;
+
+  /// No description provided for @mcpShellLblTotal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'总计'**
+  String get mcpShellLblTotal;
+
+  /// No description provided for @mcpShellLblEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'空'**
+  String get mcpShellLblEmpty;
+
+  /// No description provided for @mcpShellLblColTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'标题'**
+  String get mcpShellLblColTitle;
+
+  /// No description provided for @mcpShellLblColArtist.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌手'**
+  String get mcpShellLblColArtist;
+
+  /// No description provided for @mcpShellLblColRef.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'引用'**
+  String get mcpShellLblColRef;
+
+  /// No description provided for @mcpShellLblColWhen.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'时间'**
+  String get mcpShellLblColWhen;
+
+  /// No description provided for @mcpShellLblSearch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'搜索'**
+  String get mcpShellLblSearch;
+
+  /// No description provided for @mcpShellLblQuery.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'查询'**
+  String get mcpShellLblQuery;
+
+  /// No description provided for @mcpShellLblPage.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'页码'**
+  String get mcpShellLblPage;
+
+  /// No description provided for @mcpShellLblQueue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'队列'**
+  String get mcpShellLblQueue;
+
+  /// No description provided for @mcpShellLblIndex.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'序号'**
+  String get mcpShellLblIndex;
+
+  /// No description provided for @mcpShellLblLiked.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已收藏'**
+  String get mcpShellLblLiked;
+
+  /// No description provided for @mcpShellLblNotLiked.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未收藏'**
+  String get mcpShellLblNotLiked;
+
+  /// No description provided for @mcpShellLblUnliked.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已取消收藏'**
+  String get mcpShellLblUnliked;
+
+  /// No description provided for @mcpShellLblVersion.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'版本'**
+  String get mcpShellLblVersion;
+
+  /// No description provided for @mcpShellLblPlatform.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'平台'**
+  String get mcpShellLblPlatform;
+
+  /// No description provided for @mcpShellLblPort.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'端口'**
+  String get mcpShellLblPort;
+
+  /// No description provided for @mcpShellLblProtocol.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'协议'**
+  String get mcpShellLblProtocol;
+
+  /// No description provided for @mcpShellLblEndpoints.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'端点'**
+  String get mcpShellLblEndpoints;
+
+  /// No description provided for @mcpShellLblCaps.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'能力'**
+  String get mcpShellLblCaps;
+
+  /// No description provided for @mcpShellLblLoopback.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'回环'**
+  String get mcpShellLblLoopback;
+
+  /// No description provided for @mcpShellLblLan.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'局域网'**
+  String get mcpShellLblLan;
+
+  /// No description provided for @mcpShellLblLibrary.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'曲库'**
+  String get mcpShellLblLibrary;
+
+  /// No description provided for @mcpShellLblTracks.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'曲目'**
+  String get mcpShellLblTracks;
+
+  /// No description provided for @mcpShellLblSize.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'大小'**
+  String get mcpShellLblSize;
+
+  /// No description provided for @mcpShellLblDuration.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'时长'**
+  String get mcpShellLblDuration;
+
+  /// No description provided for @mcpShellLblSleep.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'睡眠'**
+  String get mcpShellLblSleep;
+
+  /// No description provided for @mcpShellLblEndOfTrack.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'播完暂停'**
+  String get mcpShellLblEndOfTrack;
+
+  /// No description provided for @mcpShellLblTask.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'任务'**
+  String get mcpShellLblTask;
+
+  /// No description provided for @mcpShellLblQueued.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已入队'**
+  String get mcpShellLblQueued;
+
+  /// No description provided for @mcpShellLblCount.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'数量'**
+  String get mcpShellLblCount;
+
+  /// No description provided for @mcpShellLblTheme.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'主题'**
+  String get mcpShellLblTheme;
+
+  /// No description provided for @mcpShellLblOk.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'完成'**
+  String get mcpShellLblOk;
+
+  /// No description provided for @mcpShellLblToolName.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'名称'**
+  String get mcpShellLblToolName;
+
+  /// No description provided for @mcpShellLblToolCap.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'能力'**
+  String get mcpShellLblToolCap;
+
+  /// No description provided for @mcpShellLblToolTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'说明'**
+  String get mcpShellLblToolTitle;
+
+  /// No description provided for @mcpShellLblLoggedIn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已登录'**
+  String get mcpShellLblLoggedIn;
+
+  /// No description provided for @mcpShellLblLoggedOut.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未登录'**
+  String get mcpShellLblLoggedOut;
+
+  /// No description provided for @mcpShellLblRef.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'引用'**
+  String get mcpShellLblRef;
+
+  /// No description provided for @mcpShellLblError.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'错误'**
+  String get mcpShellLblError;
+
+  /// No description provided for @mcpShellLblTagPlaying.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'[播放]'**
+  String get mcpShellLblTagPlaying;
+
+  /// No description provided for @mcpShellLblTagPaused.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'[暂停]'**
+  String get mcpShellLblTagPaused;
 }
 
 class _AppLocalizationsDelegate

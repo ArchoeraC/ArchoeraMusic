@@ -177,7 +177,11 @@ class _ShellContext {
     required this.err,
     required this.styled,
     required this.columns,
-  }) : renderer = McpShellRenderer(out: out, columns: columns);
+  }) : renderer = McpShellRenderer(
+         out: out,
+         columns: columns,
+         l10n: l10n,
+       );
 
   final McpShellOptions defaults;
   final McpShellClient Function(McpShellTarget target) clientFactory;
@@ -688,7 +692,6 @@ class _ShellContext {
           map['entries'] as List,
           total: map['total'],
           tag: 'playedAt',
-          extraHeader: 'When',
           fmtExtra: renderer.relativeTime,
         );
         return;
@@ -800,13 +803,13 @@ class _ShellContext {
   /// 跨音源搜索（`search_all`）按源分组展示。
   void _printSearchAll(Map<Object?, Object?> map) {
     final query = map['query'];
-    if (query != null) out.writeln('query: $query');
+    if (query != null) out.writeln('${l10n.mcpShellLblQuery}: $query');
     for (final item in map['results'] as List) {
       if (item is! Map) continue;
       final source = item['source'] ?? '?';
       final error = item['error'];
       if (error != null) {
-        out.writeln('── $source：错误 $error');
+        out.writeln('── $source: ${l10n.mcpShellLblError} $error');
         continue;
       }
       final total = item['total'];
@@ -850,25 +853,27 @@ class _ShellContext {
     final track = map['track'] is Map
         ? (map['track'] as Map).cast<Object?, Object?>()
         : null;
-    out.writeln(playing ? '[playing]' : '[paused]');
+    out.writeln(
+      playing ? l10n.mcpShellLblTagPlaying : l10n.mcpShellLblTagPaused,
+    );
     if (track != null) {
       out.writeln('${track['title']} — ${_artists(track)}');
       final ref = track['ref'];
-      if (ref != null) out.writeln('  ref: $ref');
+      if (ref != null) out.writeln('  ${l10n.mcpShellLblRef}: $ref');
     }
     final pos = _formatMs(map['positionMs']);
     final dur = _formatMs(map['durationMs']);
     final parts = <String>['$pos / $dur'];
     final volume = map['volume'];
-    if (volume != null) parts.add('volume: $volume');
+    if (volume != null) parts.add('${l10n.mcpShellLblVolume}: $volume');
     final repeat = map['repeatMode'];
-    if (repeat != null) parts.add('repeat: $repeat');
-    if (map['shuffle'] == true) parts.add('shuffle');
+    if (repeat != null) parts.add('${l10n.mcpShellLblRepeat}: $repeat');
+    if (map['shuffle'] == true) parts.add(l10n.mcpShellLblShuffleOn);
     out.writeln(parts.join(' · '));
   }
 
   void _printTracks(List<Object?> list, {Object? total, String? tag}) {
-    if (total != null) out.writeln('# total: $total');
+    if (total != null) out.writeln('# ${l10n.mcpShellLblTotal}: $total');
     for (var i = 0; i < list.length; i++) {
       final item = list[i];
       if (item is! Map) continue;
@@ -885,7 +890,7 @@ class _ShellContext {
   }
 
   void _printDownloadTasks(List<Object?> list, {Object? total}) {
-    if (total != null) out.writeln('# total: $total');
+    if (total != null) out.writeln('# ${l10n.mcpShellLblTotal}: $total');
     for (final item in list) {
       if (item is! Map) continue;
       final progress = item['progress'];
@@ -924,7 +929,9 @@ class _ShellContext {
   void _printSources(List<Object?> list) {
     for (final item in list) {
       if (item is! Map) continue;
-      final logged = item['loggedIn'] == true ? 'logged-in' : 'logged-out';
+      final logged = item['loggedIn'] == true
+          ? l10n.mcpShellLblLoggedIn
+          : l10n.mcpShellLblLoggedOut;
       out.writeln('${item['source']}  ${item['label']}  ($logged)');
     }
   }

@@ -58,7 +58,8 @@ Future<({int code, String out, String err, _FakeClient? client})> _runShell(
     defaults: const McpShellOptions(port: 14559, key: 'secret'),
     clientFactory: (target) =>
         client = _FakeClient(target, handler ?? _okHandler),
-    l10n: l10n ?? lookupAppLocalizations(const Locale('zh')),
+    // 默认 en：渲染标签断言用英文；需要测其它语言时显式传 l10n。
+    l10n: l10n ?? lookupAppLocalizations(const Locale('en')),
     out: out,
     err: err,
   );
@@ -73,6 +74,7 @@ Future<({int code, String out, String err})> _runStyled(
   List<String> args, {
   _Handler? handler,
   int columns = 80,
+  AppLocalizations? l10n,
 }) async {
   final out = StringBuffer();
   final err = StringBuffer();
@@ -80,7 +82,7 @@ Future<({int code, String out, String err})> _runStyled(
     args,
     defaults: const McpShellOptions(port: 14559, key: 'secret'),
     clientFactory: (target) => _FakeClient(target, handler ?? _okHandler),
-    l10n: lookupAppLocalizations(const Locale('zh')),
+    l10n: l10n ?? lookupAppLocalizations(const Locale('en')),
     out: out,
     err: err,
     styled: true,
@@ -114,7 +116,7 @@ void main() {
     final result = await _runShell(const ['--help']);
     expect(result.code, 0);
     expect(result.out, contains('archoerashell'));
-    expect(result.out, contains('用法'));
+    expect(result.out, contains('Usage'));
     expect(result.client, isNull);
   });
 
@@ -141,7 +143,7 @@ void main() {
 
     final d = await _runShell(const ['help']);
     expect(d.code, 0);
-    expect(d.out, contains('提示'));
+    expect(d.out, contains('per-command'));
   });
 
   test('文案跟随语言设置（en）', () async {
@@ -167,7 +169,12 @@ void main() {
     expect((await _runShell(const [])).code, 2);
     final unknown = await _runShell(const ['bogus']);
     expect(unknown.code, 2);
-    expect(unknown.err, contains('未知命令'));
+    expect(unknown.err, contains('Unknown command'));
+
+    // 跟随应用语言（中文）时文案切换。
+    final zh = lookupAppLocalizations(const Locale('zh'));
+    final unknownZh = await _runShell(const ['bogus'], l10n: zh);
+    expect(unknownZh.err, contains('未知命令'));
   });
 
   test('status 走 /api/status 并格式化', () async {
@@ -323,17 +330,17 @@ void main() {
     );
     expect(result.code, 1);
     expect(result.err, contains('not_found'));
-    // 本地化错误前缀（不再硬编码中文）。
-    expect(result.err, contains('错误'));
+    // 本地化错误前缀（默认 en；不再硬编码中文）。
+    expect(result.err, contains('Error: not_found'));
 
-    final en = await _runShell(
+    final zh = await _runShell(
       const ['status'],
-      l10n: lookupAppLocalizations(const Locale('en')),
+      l10n: lookupAppLocalizations(const Locale('zh')),
       handler: (m, u, b) => const McpShellResponse(404, {
         'error': {'code': 'not_found', 'message': 'x'},
       }),
     );
-    expect(en.err, contains('Error: not_found'));
+    expect(zh.err, contains('错误'));
   });
 
   test('queue list 为缺省子命令', () async {
@@ -386,7 +393,7 @@ void main() {
     expect(result.out, contains('query: hazy'));
     expect(result.out, contains('── netease（300+）'));
     expect(result.out, contains('Hazy — A'));
-    expect(result.out, contains('── kugou：错误 boom'));
+    expect(result.out, contains('── kugou: error boom'));
     expect(result.out, isNot(contains('"source"')));
   });
 
@@ -715,5 +722,53 @@ void main() {
       }
     }
     expect(tracks.out, contains('…'));
+  });
+
+  test('渲染标签跟随语言（zh 纯文本 + TUI）', () async {
+    final zh = lookupAppLocalizations(const Locale('zh'));
+    final plain = await _runShell(
+      const ['status'],
+      l10n: zh,
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'playing': false,
+        'positionMs': 1000,
+        'durationMs': 2000,
+        'volume': 0.8,
+        'repeatMode': 'off',
+        'track': {'title': 'T', 'artists': ['A'], 'ref': 'n:1'},
+      }),
+    );
+    expect(plain.out, contains('[暂停]'));
+    expect(plain.out, contains('音量: 0.8'));
+    expect(plain.out, contains('循环: off'));
+
+    final tui = await _runStyled(
+      const ['status'],
+      l10n: zh,
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'playing': true,
+        'positionMs': 1000,
+        'durationMs': 2000,
+        'volume': 1.0,
+        'track': {'title': 'T', 'artists': ['A'], 'ref': 'n:1'},
+      }),
+    );
+    expect(tui.out, contains('播放中'));
+    expect(tui.out, contains('音量 100%'));
+
+    final queue = await _runStyled(
+      const ['queue'],
+      l10n: zh,
+      handler: (m, u, b) => const McpShellResponse(200, {
+        'index': 0,
+        'repeatMode': 'off',
+        'shuffle': false,
+        'tracks': [
+          {'index': 0, 'isCurrent': true, 'title': 'A', 'artists': ['x'], 'ref': 'n:1'},
+        ],
+      }),
+    );
+    expect(queue.out, contains('队列'));
+    expect(queue.out, contains('序号 1/1'));
   });
 }

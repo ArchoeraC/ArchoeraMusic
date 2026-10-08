@@ -5442,4 +5442,157 @@ class AppLocalizationsEn extends AppLocalizations {
   String mcpShellErrTimeout({required String host, required int port}) {
     return 'Connection timed out: $host:$port';
   }
+
+  @override
+  String get mcpShellLblPlaying => 'Playing';
+
+  @override
+  String get mcpShellLblPaused => 'Paused';
+
+  @override
+  String get mcpShellLblBuffering => 'Buffering';
+
+  @override
+  String get mcpShellLblVolume => 'vol';
+
+  @override
+  String get mcpShellLblQuality => 'quality';
+
+  @override
+  String get mcpShellLblRepeat => 'repeat';
+
+  @override
+  String get mcpShellLblShuffleOn => 'shuffle on';
+
+  @override
+  String get mcpShellLblShuffleOff => 'shuffle off';
+
+  @override
+  String get mcpShellLblNowPlaying => 'playing';
+
+  @override
+  String get mcpShellLblTotal => 'total';
+
+  @override
+  String get mcpShellLblEmpty => 'empty';
+
+  @override
+  String get mcpShellLblColTitle => 'Title';
+
+  @override
+  String get mcpShellLblColArtist => 'Artist';
+
+  @override
+  String get mcpShellLblColRef => 'Ref';
+
+  @override
+  String get mcpShellLblColWhen => 'When';
+
+  @override
+  String get mcpShellLblSearch => 'search';
+
+  @override
+  String get mcpShellLblQuery => 'query';
+
+  @override
+  String get mcpShellLblPage => 'page';
+
+  @override
+  String get mcpShellLblQueue => 'queue';
+
+  @override
+  String get mcpShellLblIndex => 'index';
+
+  @override
+  String get mcpShellLblLiked => 'liked';
+
+  @override
+  String get mcpShellLblNotLiked => 'not liked';
+
+  @override
+  String get mcpShellLblUnliked => 'unliked';
+
+  @override
+  String get mcpShellLblVersion => 'version';
+
+  @override
+  String get mcpShellLblPlatform => 'platform';
+
+  @override
+  String get mcpShellLblPort => 'port';
+
+  @override
+  String get mcpShellLblProtocol => 'protocol';
+
+  @override
+  String get mcpShellLblEndpoints => 'endpoints';
+
+  @override
+  String get mcpShellLblCaps => 'caps';
+
+  @override
+  String get mcpShellLblLoopback => 'loopback';
+
+  @override
+  String get mcpShellLblLan => 'LAN';
+
+  @override
+  String get mcpShellLblLibrary => 'Library';
+
+  @override
+  String get mcpShellLblTracks => 'tracks';
+
+  @override
+  String get mcpShellLblSize => 'size';
+
+  @override
+  String get mcpShellLblDuration => 'duration';
+
+  @override
+  String get mcpShellLblSleep => 'sleep';
+
+  @override
+  String get mcpShellLblEndOfTrack => 'end of track';
+
+  @override
+  String get mcpShellLblTask => 'task';
+
+  @override
+  String get mcpShellLblQueued => 'queued';
+
+  @override
+  String get mcpShellLblCount => 'count';
+
+  @override
+  String get mcpShellLblTheme => 'theme';
+
+  @override
+  String get mcpShellLblOk => 'ok';
+
+  @override
+  String get mcpShellLblToolName => 'name';
+
+  @override
+  String get mcpShellLblToolCap => 'capability';
+
+  @override
+  String get mcpShellLblToolTitle => 'title';
+
+  @override
+  String get mcpShellLblLoggedIn => 'logged in';
+
+  @override
+  String get mcpShellLblLoggedOut => 'logged out';
+
+  @override
+  String get mcpShellLblRef => 'ref';
+
+  @override
+  String get mcpShellLblError => 'error';
+
+  @override
+  String get mcpShellLblTagPlaying => '[playing]';
+
+  @override
+  String get mcpShellLblTagPaused => '[paused]';
 }

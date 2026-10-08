@@ -29,7 +29,7 @@ struct Ctx {
 
 impl Ctx {
     fn renderer(&self) -> Renderer {
-        Renderer::new(self.columns, self.styled && !self.json)
+        Renderer::new(self.columns, self.styled && !self.json, self.l10n.clone())
     }
 
     fn request(

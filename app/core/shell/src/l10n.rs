@@ -56,6 +56,14 @@ pub struct L10n {
 }
 
 impl L10n {
+    /// 固定英文（测试用），与 Dart 端 en 文案一致。
+    #[cfg(test)]
+    pub fn english() -> Self {
+        L10n {
+            locale: "en".to_string(),
+        }
+    }
+
     pub fn new(pref_locale: Option<String>) -> Self {
         static SYS: OnceLock<String> = OnceLock::new();
         let locale = pref_locale
