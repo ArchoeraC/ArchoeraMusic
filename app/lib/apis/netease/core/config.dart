@@ -22,8 +22,10 @@ MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDgtQn2JZ34ZC28NWYpAUd98iZ37BUrX/aKzmFbt7cl
 
 /// web 域名（weapi）
 const nmDomain = 'https://music.163.com';
-/// 客户端接口域名（api/eapi）
+/// 客户端接口域名（api）
 const nmApiDomain = 'https://interface.music.163.com';
+/// 客户端 eapi 加密接口专用域名
+const nmEapiDomain = 'https://interfacepc.music.163.com';
 /// xeapi 域名（反爬加密接口，如游客注册）
 const nmXeapiDomain = 'https://interface3.music.163.com';
 /// 客户端日志域名

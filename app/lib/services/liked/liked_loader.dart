@@ -116,9 +116,17 @@ class LikedStore extends ChangeNotifier {
         }
       }
     } catch (e) {
-      // 有缓存时静默保留缓存展示；无缓存才报错
-      if (s.tracks.isEmpty) s.error = '$e';
-      s.loaded = true;
+      Log.e('liked', '拉取「我喜欢」失败 ($platform): $e');
+      // 有缓存时保留旧数据展示；无缓存则显示错误态并允许下次重试
+      // （不能无条件 loaded=true：否则视图的 error 分支永不触发，失败被
+      // 当成「空列表」显示，与收藏页同款静默问题）。
+      if (s.tracks.isEmpty) {
+        s.error = '$e';
+        s.loaded = false;
+        s.initialized = false;
+      } else {
+        s.loaded = true;
+      }
     } finally {
       s.refreshing = false;
       s.loading = false;
