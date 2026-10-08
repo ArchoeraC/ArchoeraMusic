@@ -61,5 +61,14 @@ target_link_libraries(${BINARY_NAME} PRIVATE "${SHELL_STATIC_LIB}")
 # Rust std 的 MSVC 系统依赖（staticlib 内已带 /DEFAULTLIB，此处显式补齐更稳）。
 target_link_libraries(${BINARY_NAME} PRIVATE ntdll userenv ws2_32 dbghelp)
 
+# 控制台子系统伴生程序：cmd / PowerShell 会等待其退出且独占控制台输入，交互式
+# REPL 可用（GUI 子系统主程序的同子命令会与调用方 shell 争抢输入）。
+add_executable(archoerashell "shell_main.cpp")
+apply_standard_settings(archoerashell)
+target_compile_definitions(archoerashell PRIVATE "NOMINMAX")
+target_link_libraries(archoerashell PRIVATE "${SHELL_STATIC_LIB}")
+target_link_libraries(archoerashell PRIVATE ntdll userenv ws2_32 dbghelp)
+add_dependencies(archoerashell shell_cargo)
+
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
