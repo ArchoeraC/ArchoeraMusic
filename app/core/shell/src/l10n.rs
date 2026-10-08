@@ -26,21 +26,28 @@ fn system_locale() -> String {
     "en".to_string()
 }
 
+fn find(locale: &str, key: &str) -> Option<&'static str> {
+    STRINGS
+        .iter()
+        .find(|(c, k, _)| *c == locale && *k == key)
+        .map(|(_, _, v)| *v)
+}
+
+/// 解析顺序与 Flutter 生成代码一致：精确 `zh_CN`/`zh_TW` → 语言前缀（`zh`、`de`
+/// 等）→ **回退英文**（Dart 侧 `lookupAppLocalizations` 对不支持语言抛错后回退
+/// `en`，故这里也必须是 en，不能回退中文）。
 fn lookup_raw(locale: &str, key: &str) -> Option<&'static str> {
     let want = locale.replace('-', "_");
-    // 精确 → 语言前缀 → zh → en。
+    if let Some(v) = find(&want, key) {
+        return Some(v);
+    }
     let lang = want.split('_').next().unwrap_or(&want);
-    let matches = |code: &str| STRINGS.iter().find(|(c, k, _)| *c == code && *k == key);
-    if let Some((_, _, v)) = STRINGS.iter().find(|(c, k, _)| *c == want && *k == key) {
-        return Some(v);
+    if lang != want {
+        if let Some(v) = find(lang, key) {
+            return Some(v);
+        }
     }
-    if let Some((_, _, v)) = STRINGS.iter().find(|(c, k, _)| *c == lang && *k == key) {
-        return Some(v);
-    }
-    if let Some((_, _, v)) = matches("zh") {
-        return Some(v);
-    }
-    matches("en").map(|(_, _, v)| *v)
+    find("en", key)
 }
 
 #[derive(Clone)]
@@ -70,5 +77,26 @@ impl L10n {
             s = s.replace(&format!("{{{name}}}"), value);
         }
         s
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exact_region_then_language_prefix() {
+        assert!(lookup_raw("zh_TW", "mcpShellHelpSearch").unwrap().contains("關鍵字"));
+        assert!(lookup_raw("zh_CN", "mcpShellHelpSearch").unwrap().contains("关键词"));
+        // 未特化的地区回退到语言：zh_HK → app_zh（简体 base），与 Flutter 生成代码一致。
+        assert!(lookup_raw("zh_HK", "mcpShellHelpSearch").unwrap().contains("关键词"));
+        assert!(lookup_raw("de_AT", "mcpShellHelpSearch").unwrap().contains("archoerashell search"));
+    }
+
+    #[test]
+    fn unsupported_language_falls_back_to_english() {
+        // 与 Dart `_shellL10n` 一致：不支持语言回退 en，而非中文。
+        assert!(lookup_raw("ru", "mcpShellHelpSearch").unwrap().starts_with("Usage:"));
+        assert!(lookup_raw("xx_YY", "mcpShellHelpSearch").unwrap().starts_with("Usage:"));
     }
 }

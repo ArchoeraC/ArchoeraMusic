@@ -323,6 +323,17 @@ void main() {
     );
     expect(result.code, 1);
     expect(result.err, contains('not_found'));
+    // 本地化错误前缀（不再硬编码中文）。
+    expect(result.err, contains('错误'));
+
+    final en = await _runShell(
+      const ['status'],
+      l10n: lookupAppLocalizations(const Locale('en')),
+      handler: (m, u, b) => const McpShellResponse(404, {
+        'error': {'code': 'not_found', 'message': 'x'},
+      }),
+    );
+    expect(en.err, contains('Error: not_found'));
   });
 
   test('queue list 为缺省子命令', () async {
