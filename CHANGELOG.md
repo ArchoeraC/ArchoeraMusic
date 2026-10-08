@@ -4,6 +4,23 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [0.9.20+8] - 2026-10-08
+
+> [!NOTE]
+> 门被拆了，我们改从窗户递名片喵
+
+你好喵～
+本次带来了以下的更新喵：
+
+1、NekoMusic 音源修好了——服务端把「空 UA 放行」这道门拆了，之前那套直接失效（搜索 403、封面 / 音频拿回来的是网页）。现在改成**分层身份**：优先用 ArchoeraMusic 本体自报，被服务端按爬虫拦下时自动回退成 NekoMusic 桌面 UA 形状；不冒名安卓、不伪装浏览器、不跟反爬对着干。识别到被降级会换姿态重试一次，再不行就明确报错，不会再拿网页当数据
+2、archoerashell 原生 CLI：Linux 上不再经 Flutter/Dart，GTK 起来之前就分派，命令行启动即时；REPL 支持方向键行编辑、会话内历史、CJK 宽度重排
+3、Windows 多了个控制台子系统的 `archoerashell.exe`：cmd / PowerShell 里跑交互式 REPL 不再被抢走输入
+4、macOS 静态库按 `ARCHS` 合成通用二进制（arm64 + x86_64），x86_64 链接不再缺符号
+5、原生 CLI 渲染层补齐 9 语言标签；语言回退修正（不支持的语言回退英文而不是中文），错误前缀也一起本地化
+6、修了干净检出 / Nix 沙箱构建时的链接报错：archoerashell 的 staticlib 没声明成 CMake 产物，Ninja 找不到产出规则
+
+我喜欢你！
+
 ## [0.9.20+7] - 2026-10-07
 
 > [!NOTE]
