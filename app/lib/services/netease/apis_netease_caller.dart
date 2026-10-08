@@ -11,6 +11,7 @@
 library;
 
 import '../../apis/netease/api.dart';
+import '../log/log.dart';
 import 'netease_api.dart';
 
 class ApisNeteaseCaller implements NeteaseCaller {
@@ -19,8 +20,10 @@ class ApisNeteaseCaller implements NeteaseCaller {
     try {
       final res = await nmCallNetease(name, params);
       return res.body;
-    } catch (_) {
-      // 非 200 / 网络错误统一返回 null，由 NeteaseApi 解析层兜底
+    } catch (e) {
+      // 非 200 / 网络错误统一返回 null，由 NeteaseApi 解析层兜底。
+      // 但必须留痕：否则搜索/收藏失败会被吞成「空列表」，无法排查。
+      Log.w('netease', 'call $name 失败: $e');
       return null;
     }
   }

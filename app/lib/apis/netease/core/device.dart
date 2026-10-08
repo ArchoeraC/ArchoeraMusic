@@ -12,7 +12,11 @@ import 'dart:math';
 
 String _generate() {
   final rng = Random.secure();
-  return List.generate(26, (_) => rng.nextInt(16).toRadixString(16)).join().toUpperCase();
+  // 52 位大写十六进制（26 字节）——与服务端期望的设备标识一致
+  // （对齐 device.ts `randomBytes(26).toString("hex").toUpperCase()`）。
+  return List.generate(52, (_) => rng.nextInt(16).toRadixString(16))
+      .join()
+      .toUpperCase();
 }
 
 String _deviceId = _generate();

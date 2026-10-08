@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/netease/netease_api.dart' show CoverItem;
+import '../services/log/log.dart';
 import '../stores/app_prefs.dart';
 import '../stores/shell_page_state.dart';
 import '../../l10n/l10n.dart';

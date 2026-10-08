@@ -9,10 +9,13 @@ import '../core/option.dart';
 import '../core/types.dart';
 
 NeteaseModule nmLike = (query, request) {
+  final raw = query['like'];
+  final isLike = raw != false && raw != 'false';
   final data = <String, dynamic>{
-    'trackId': query['id'],
-    'like': query['like'] == true || query['like'] == 'true',
-    'time': 3,
+    'alg': 'itembased',
+    'trackId': '${query['id']}',
+    'like': isLike,
+    'time': '3',
   };
-  return request('/api/song/like', data, nmCreateOption(query, 'weapi'));
+  return request('/api/radio/like', data, nmCreateOption(query, 'weapi'));
 };
