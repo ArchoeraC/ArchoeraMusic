@@ -319,7 +319,8 @@ cd app && flutter run -d linux      # 本地调试
 |---|---|---|
 | Dart 静态检查 | `cd app && flutter analyze` | 每次 PR |
 | Dart 单元 / Widget | `cd app && flutter test`（`app/test/`） | 每次 PR |
-| C 引擎 / C++ / Rust / Go 原生测试 | 各模块 `tests/`；Zig `zig build test`；CI workflow 内置 | 改动对应模块时 |
+| C 引擎 / C++ / Rust / Go 原生测试 | 各模块 `tests/`；Zig `zig build test`；Rust `cargo test --manifest-path app/core/<mod>/Cargo.toml`（downloader / shell）；CI workflow 内置 | 改动对应模块时 |
+| 内嵌原生 CLI | `cargo test --manifest-path app/core/shell/Cargo.toml`；ARB 改动后 `flutter gen-l10n` | 改动 `app/core/shell` 或 `app/lib/l10n/*.arb` 时 |
 | vault 端到端 | CI 内置；本地 `app/core/vault/` 测试脚本 | 改动 vault / 会话存储时 |
 | 三端构建 | `.github/workflows/build-all.yml`（tag `v*` 或手动触发） | 合入主干后由维护者触发 |
 | 手动回归 | 播放 / seek / 切歌 / 登录 / 下载 / 扫描 / 刮削核心路径 | 涉及播放链路与数据面改动时 |

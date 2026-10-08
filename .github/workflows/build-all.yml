@@ -23,8 +23,8 @@
 #
 #  各发行版 Linux job 共用 .github/actions/build-linux（复合 action）：工具链
 #  (rust/go/dotnet/flutter) → Zig 0.16 → build-linux.sh → zig build test →
-#  pub get/analyze/test → vault 端到端 → flutter build linux。发行版专属的
-#  系统依赖安装与打包由各 job 负责。
+#  cargo test（archoerashell）→ pub get/analyze/test → vault 端到端 →
+#  flutter build linux。发行版专属的系统依赖安装与打包由各 job 负责。
 #
 #  Zig 0.16 安装沿用已修复逻辑（f99266b / 7116dfc）：归档名按 0.15.1+ 新规则
 #  zig-<arch>-<os>；GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
