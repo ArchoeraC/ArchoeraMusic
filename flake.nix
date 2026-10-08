@@ -399,9 +399,10 @@ NUGETCFG
           cmake
           ninja
           pkg-config
-          # app/linux/CMakeLists.txt 内嵌构建链：cargo（downloader）、
-          # cmake 目标 audio_engine_cmake / subsonic_go 会在 Flutter 构建期重编
-          # audio-engine 与 subsonic，故需 zig / go / rust 工具链与 FFmpeg。
+          # app/linux/CMakeLists.txt 内嵌构建链：cargo（downloader /
+          # core/shell 原生 CLI staticlib）、cmake 目标 audio_engine_cmake /
+          # subsonic_go 会在 Flutter 构建期重编 audio-engine 与 subsonic，
+          # 故需 zig / go / rust 工具链与 FFmpeg。
           zig
           go
           rustc

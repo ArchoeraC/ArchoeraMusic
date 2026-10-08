@@ -12,3 +12,13 @@ PRODUCT_BUNDLE_IDENTIFIER = com.archoera.archoeraMusic
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.archoera. All rights reserved.
+
+// Swift ⇄ C：暴露原生 archoerashell 入口（app/core/shell 的 Rust staticlib）。
+SWIFT_OBJC_BRIDGING_HEADER = Runner/Runner-Bridging-Header.h
+
+// 链入 archoerashell staticlib：cargo 由 Runner.xcodeproj 的
+// “Build archoerashell (cargo)” 构建阶段生成（按 ARCHS 逐架构 lipo 成 fat 库，
+// 见 app/core/shell/target/universal/release）。
+// -liconv 为 Rust std 在 macOS 上的系统依赖（`cargo rustc --print native-static-libs`）。
+LIBRARY_SEARCH_PATHS = $(inherited) "$(SRCROOT)/../core/shell/target/universal/release"
+OTHER_LDFLAGS = $(inherited) -larchoera_shell -liconv

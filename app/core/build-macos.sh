@@ -11,6 +11,7 @@
 #    5. downloader   : cargo build --release (cdylib)
 #    6. subsonic     : cargo transcoder + go c-shared + go standalone
 #    7. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
+#    8. shell        : cargo staticlib（内嵌原生 CLI archoerashell，链入 macOS Runner）
 #
 #  依赖（Homebrew FFmpeg/taglib/openssl、CMake、Rust、Go、.NET）由 CI
 #  workflow 提前安装或由本地开发环境提供，本脚本只做编译引导（幂等）。
@@ -87,5 +88,11 @@ cmake --build "$ROOT/../native/platform/build" -j"$JOBS"
 echo "[build-macos] ===== log core (CMake C) ====="
 cmake -S "$ROOT/../native/log" -B "$ROOT/../native/log/build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$ROOT/../native/log/build" -j"$JOBS"
+
+# 内嵌原生 CLI（archoerashell）：Rust staticlib，由 Runner.xcodeproj 的
+# “Build archoerashell (cargo)” 阶段链入 .app；此处预构建一次（幂等），
+# 独立跑本脚本时也能得到 libarchoera_shell.a。
+echo "[build-macos] ===== shell (Rust staticlib, archoerashell) ====="
+cargo build --release --manifest-path "$ROOT/shell/Cargo.toml"
 
 echo "[build-macos] 全部模块构建完成"

@@ -93,6 +93,29 @@ add_custom_target(downloader_cargo ALL
 # 二进制 target 构建/安装前先完成 Rust 编译。
 add_dependencies(${BINARY_NAME} downloader_cargo)
 
+# === ArchoeraMusic archoerashell：内嵌 cargo staticlib（一键构建） ===
+# 以 staticlib 形式链入 runner：main() 检测到 `archoerashell` 子命令时直接调用
+# Rust 入口，命令行调用完全不初始化 Flutter/Dart（见 app/core/shell）。
+set(SHELL_CRATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/shell")
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+  set(SHELL_TARGET_DIR "${SHELL_CRATE_DIR}/target/debug")
+  set(SHELL_CARGO_FLAGS "")
+else()
+  set(SHELL_TARGET_DIR "${SHELL_CRATE_DIR}/target/release")
+  set(SHELL_CARGO_FLAGS "--release")
+endif()
+set(SHELL_STATIC_LIB "${SHELL_TARGET_DIR}/libarchoera_shell.a")
+add_custom_target(shell_cargo ALL
+  COMMAND ${CARGO} build ${SHELL_CARGO_FLAGS}
+  WORKING_DIRECTORY "${SHELL_CRATE_DIR}"
+  COMMENT "cargo build archoera-shell"
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} shell_cargo)
+target_link_libraries(${BINARY_NAME} PRIVATE "${SHELL_STATIC_LIB}")
+# Rust std 在 Linux 上的系统依赖。
+target_link_libraries(${BINARY_NAME} PRIVATE pthread dl m rt util)
+
 # === ArchoeraMusic subsonic：内嵌 Go + cargo 构建链（一键构建）===
 # flutter build / flutter run 时自动调用 build.sh（cargo cdylib 转码器 +
 # go build -buildmode=c-shared 服务端库 + 产物拷贝到 subsonic/build/），

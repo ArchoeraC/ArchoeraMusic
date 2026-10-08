@@ -5181,6 +5181,159 @@ class AppLocalizationsZh extends AppLocalizations {
   String mcpShellErrTimeout({required String host, required int port}) {
     return '连接超时: $host:$port';
   }
+
+  @override
+  String get mcpShellLblPlaying => '播放中';
+
+  @override
+  String get mcpShellLblPaused => '已暂停';
+
+  @override
+  String get mcpShellLblBuffering => '缓冲中';
+
+  @override
+  String get mcpShellLblVolume => '音量';
+
+  @override
+  String get mcpShellLblQuality => '音质';
+
+  @override
+  String get mcpShellLblRepeat => '循环';
+
+  @override
+  String get mcpShellLblShuffleOn => '随机开';
+
+  @override
+  String get mcpShellLblShuffleOff => '随机关';
+
+  @override
+  String get mcpShellLblNowPlaying => '正在播放';
+
+  @override
+  String get mcpShellLblTotal => '总计';
+
+  @override
+  String get mcpShellLblEmpty => '空';
+
+  @override
+  String get mcpShellLblColTitle => '标题';
+
+  @override
+  String get mcpShellLblColArtist => '歌手';
+
+  @override
+  String get mcpShellLblColRef => '引用';
+
+  @override
+  String get mcpShellLblColWhen => '时间';
+
+  @override
+  String get mcpShellLblSearch => '搜索';
+
+  @override
+  String get mcpShellLblQuery => '查询';
+
+  @override
+  String get mcpShellLblPage => '页码';
+
+  @override
+  String get mcpShellLblQueue => '队列';
+
+  @override
+  String get mcpShellLblIndex => '序号';
+
+  @override
+  String get mcpShellLblLiked => '已收藏';
+
+  @override
+  String get mcpShellLblNotLiked => '未收藏';
+
+  @override
+  String get mcpShellLblUnliked => '已取消收藏';
+
+  @override
+  String get mcpShellLblVersion => '版本';
+
+  @override
+  String get mcpShellLblPlatform => '平台';
+
+  @override
+  String get mcpShellLblPort => '端口';
+
+  @override
+  String get mcpShellLblProtocol => '协议';
+
+  @override
+  String get mcpShellLblEndpoints => '端点';
+
+  @override
+  String get mcpShellLblCaps => '能力';
+
+  @override
+  String get mcpShellLblLoopback => '回环';
+
+  @override
+  String get mcpShellLblLan => '局域网';
+
+  @override
+  String get mcpShellLblLibrary => '曲库';
+
+  @override
+  String get mcpShellLblTracks => '曲目';
+
+  @override
+  String get mcpShellLblSize => '大小';
+
+  @override
+  String get mcpShellLblDuration => '时长';
+
+  @override
+  String get mcpShellLblSleep => '睡眠';
+
+  @override
+  String get mcpShellLblEndOfTrack => '播完暂停';
+
+  @override
+  String get mcpShellLblTask => '任务';
+
+  @override
+  String get mcpShellLblQueued => '已入队';
+
+  @override
+  String get mcpShellLblCount => '数量';
+
+  @override
+  String get mcpShellLblTheme => '主题';
+
+  @override
+  String get mcpShellLblOk => '完成';
+
+  @override
+  String get mcpShellLblToolName => '名称';
+
+  @override
+  String get mcpShellLblToolCap => '能力';
+
+  @override
+  String get mcpShellLblToolTitle => '说明';
+
+  @override
+  String get mcpShellLblLoggedIn => '已登录';
+
+  @override
+  String get mcpShellLblLoggedOut => '未登录';
+
+  @override
+  String get mcpShellLblRef => '引用';
+
+  @override
+  String get mcpShellLblError => '错误';
+
+  @override
+  String get mcpShellLblTagPlaying => '[播放]';
+
+  @override
+  String get mcpShellLblTagPaused => '[暂停]';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -10359,6 +10512,159 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String mcpShellErrTimeout({required String host, required int port}) {
     return '连接超时: $host:$port';
   }
+
+  @override
+  String get mcpShellLblPlaying => '播放中';
+
+  @override
+  String get mcpShellLblPaused => '已暂停';
+
+  @override
+  String get mcpShellLblBuffering => '缓冲中';
+
+  @override
+  String get mcpShellLblVolume => '音量';
+
+  @override
+  String get mcpShellLblQuality => '音质';
+
+  @override
+  String get mcpShellLblRepeat => '循环';
+
+  @override
+  String get mcpShellLblShuffleOn => '随机开';
+
+  @override
+  String get mcpShellLblShuffleOff => '随机关';
+
+  @override
+  String get mcpShellLblNowPlaying => '正在播放';
+
+  @override
+  String get mcpShellLblTotal => '总计';
+
+  @override
+  String get mcpShellLblEmpty => '空';
+
+  @override
+  String get mcpShellLblColTitle => '标题';
+
+  @override
+  String get mcpShellLblColArtist => '歌手';
+
+  @override
+  String get mcpShellLblColRef => '引用';
+
+  @override
+  String get mcpShellLblColWhen => '时间';
+
+  @override
+  String get mcpShellLblSearch => '搜索';
+
+  @override
+  String get mcpShellLblQuery => '查询';
+
+  @override
+  String get mcpShellLblPage => '页码';
+
+  @override
+  String get mcpShellLblQueue => '队列';
+
+  @override
+  String get mcpShellLblIndex => '序号';
+
+  @override
+  String get mcpShellLblLiked => '已收藏';
+
+  @override
+  String get mcpShellLblNotLiked => '未收藏';
+
+  @override
+  String get mcpShellLblUnliked => '已取消收藏';
+
+  @override
+  String get mcpShellLblVersion => '版本';
+
+  @override
+  String get mcpShellLblPlatform => '平台';
+
+  @override
+  String get mcpShellLblPort => '端口';
+
+  @override
+  String get mcpShellLblProtocol => '协议';
+
+  @override
+  String get mcpShellLblEndpoints => '端点';
+
+  @override
+  String get mcpShellLblCaps => '能力';
+
+  @override
+  String get mcpShellLblLoopback => '回环';
+
+  @override
+  String get mcpShellLblLan => '局域网';
+
+  @override
+  String get mcpShellLblLibrary => '曲库';
+
+  @override
+  String get mcpShellLblTracks => '曲目';
+
+  @override
+  String get mcpShellLblSize => '大小';
+
+  @override
+  String get mcpShellLblDuration => '时长';
+
+  @override
+  String get mcpShellLblSleep => '睡眠';
+
+  @override
+  String get mcpShellLblEndOfTrack => '播完暂停';
+
+  @override
+  String get mcpShellLblTask => '任务';
+
+  @override
+  String get mcpShellLblQueued => '已入队';
+
+  @override
+  String get mcpShellLblCount => '数量';
+
+  @override
+  String get mcpShellLblTheme => '主题';
+
+  @override
+  String get mcpShellLblOk => '完成';
+
+  @override
+  String get mcpShellLblToolName => '名称';
+
+  @override
+  String get mcpShellLblToolCap => '能力';
+
+  @override
+  String get mcpShellLblToolTitle => '说明';
+
+  @override
+  String get mcpShellLblLoggedIn => '已登录';
+
+  @override
+  String get mcpShellLblLoggedOut => '未登录';
+
+  @override
+  String get mcpShellLblRef => '引用';
+
+  @override
+  String get mcpShellLblError => '错误';
+
+  @override
+  String get mcpShellLblTagPlaying => '[播放]';
+
+  @override
+  String get mcpShellLblTagPaused => '[暂停]';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -15537,4 +15843,157 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String mcpShellErrTimeout({required String host, required int port}) {
     return '連線逾時: $host:$port';
   }
+
+  @override
+  String get mcpShellLblPlaying => '播放中';
+
+  @override
+  String get mcpShellLblPaused => '已暫停';
+
+  @override
+  String get mcpShellLblBuffering => '緩衝中';
+
+  @override
+  String get mcpShellLblVolume => '音量';
+
+  @override
+  String get mcpShellLblQuality => '音質';
+
+  @override
+  String get mcpShellLblRepeat => '循環';
+
+  @override
+  String get mcpShellLblShuffleOn => '隨機開';
+
+  @override
+  String get mcpShellLblShuffleOff => '隨機關';
+
+  @override
+  String get mcpShellLblNowPlaying => '正在播放';
+
+  @override
+  String get mcpShellLblTotal => '總計';
+
+  @override
+  String get mcpShellLblEmpty => '空';
+
+  @override
+  String get mcpShellLblColTitle => '標題';
+
+  @override
+  String get mcpShellLblColArtist => '歌手';
+
+  @override
+  String get mcpShellLblColRef => '引用';
+
+  @override
+  String get mcpShellLblColWhen => '時間';
+
+  @override
+  String get mcpShellLblSearch => '搜尋';
+
+  @override
+  String get mcpShellLblQuery => '查詢';
+
+  @override
+  String get mcpShellLblPage => '頁碼';
+
+  @override
+  String get mcpShellLblQueue => '佇列';
+
+  @override
+  String get mcpShellLblIndex => '序號';
+
+  @override
+  String get mcpShellLblLiked => '已收藏';
+
+  @override
+  String get mcpShellLblNotLiked => '未收藏';
+
+  @override
+  String get mcpShellLblUnliked => '已取消收藏';
+
+  @override
+  String get mcpShellLblVersion => '版本';
+
+  @override
+  String get mcpShellLblPlatform => '平台';
+
+  @override
+  String get mcpShellLblPort => '連接埠';
+
+  @override
+  String get mcpShellLblProtocol => '協定';
+
+  @override
+  String get mcpShellLblEndpoints => '端點';
+
+  @override
+  String get mcpShellLblCaps => '能力';
+
+  @override
+  String get mcpShellLblLoopback => '回環';
+
+  @override
+  String get mcpShellLblLan => '區域網路';
+
+  @override
+  String get mcpShellLblLibrary => '曲庫';
+
+  @override
+  String get mcpShellLblTracks => '曲目';
+
+  @override
+  String get mcpShellLblSize => '大小';
+
+  @override
+  String get mcpShellLblDuration => '時長';
+
+  @override
+  String get mcpShellLblSleep => '睡眠';
+
+  @override
+  String get mcpShellLblEndOfTrack => '播完暫停';
+
+  @override
+  String get mcpShellLblTask => '任務';
+
+  @override
+  String get mcpShellLblQueued => '已入列';
+
+  @override
+  String get mcpShellLblCount => '數量';
+
+  @override
+  String get mcpShellLblTheme => '主題';
+
+  @override
+  String get mcpShellLblOk => '完成';
+
+  @override
+  String get mcpShellLblToolName => '名稱';
+
+  @override
+  String get mcpShellLblToolCap => '能力';
+
+  @override
+  String get mcpShellLblToolTitle => '說明';
+
+  @override
+  String get mcpShellLblLoggedIn => '已登入';
+
+  @override
+  String get mcpShellLblLoggedOut => '未登入';
+
+  @override
+  String get mcpShellLblRef => '引用';
+
+  @override
+  String get mcpShellLblError => '錯誤';
+
+  @override
+  String get mcpShellLblTagPlaying => '[播放]';
+
+  @override
+  String get mcpShellLblTagPaused => '[暫停]';
 }
