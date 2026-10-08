@@ -150,7 +150,7 @@ class _NekoNoncePool {
         '/api/replay/nonce?read=$_batch&write=$_batch',
       );
       final req = await client.getUrl(uri).timeout(const Duration(seconds: 12));
-      // 领取接口自身豁免 nonce，但仍走客户端标识（防爬过滤器按空 UA 放行）。
+      // 领取接口自身豁免 nonce，但仍需携带分层客户端身份（防爬过滤器按 UA 判定）。
       nekoRequestHeaders.forEach(req.headers.set);
       final res = await req.close().timeout(const Duration(seconds: 12));
       if (res.statusCode < 200 || res.statusCode >= 300) return;
@@ -207,13 +207,48 @@ bool nekoNeedsNonce(String path, String method) {
   return p.startsWith('/api/') || p.startsWith('/loser/');
 }
 
-/// 单次 Neko 请求的原始结果（供 [NekoClient._send] 判断是否换 nonce 重试）。
+/// 单次 Neko 请求的原始结果（供 [NekoClient._send] 判断换 nonce / 换身份重试）。
 class _NekoRawResponse {
-  const _NekoRawResponse(this.status, this.decoded, this.replayRejected);
+  const _NekoRawResponse(
+    this.status,
+    this.decoded,
+    this.replayRejected,
+    this.degraded,
+  );
 
   final int status;
   final Map<String, dynamic>? decoded;
   final bool replayRejected;
+
+  /// 被服务端按爬虫降级（SEO HTML / 403 拒绝），而非真实业务响应。
+  final bool degraded;
+}
+
+/// 判断响应是否为服务端「防爬降级」的表现，而非真实业务响应。
+///
+/// 服务端对判定为爬虫的请求：`GET`/`HEAD` 返回 **SEO HTML**（HTTP 200，
+/// `text/html`），其它方法返回 **403** `{"success":false,"message":"请求已拒绝"}`。
+/// 客户端据此把「本体标识被降级」与「真实业务失败 / 未登录」区分开：前者切换
+/// 到回退身份重试一次，后者照常按业务错误处理——绝不把 SEO HTML 当成空业务结果。
+bool nekoIsDegradedResponse({
+  required int status,
+  String? contentType,
+  required String body,
+}) {
+  final ct = (contentType ?? '').toLowerCase();
+  final trimmed = body.trim();
+  final looksHtml = ct.contains('text/html') ||
+      trimmed.startsWith('<') ||
+      trimmed.startsWith('<!');
+  if (status == 200 || status == 304) {
+    // 200 + SEO HTML：GET 被降级直出页面。
+    return looksHtml;
+  }
+  if (status == 403) {
+    // 非 GET 被拒：优先看空体 / HTML；JSON 403 只认服务端统一的拒绝文案。
+    return looksHtml || trimmed.isEmpty || body.contains('请求已拒绝');
+  }
+  return false;
 }
 
 /// Neko REST 客户端（不可变：baseUrl / token 变化时重新构造）。
@@ -286,7 +321,8 @@ class NekoClient {
     final protected = nekoNeedsNonce(path, method);
     final write = method.toUpperCase() != 'GET';
     _NekoRawResponse? last;
-    for (var attempt = 0; attempt < 2; attempt++) {
+    var switchedIdentity = false;
+    for (var attempt = 0; attempt < 3; attempt++) {
       final nonce = protected
           ? await _noncePoolFor(baseUrl).take(write: write)
           : null;
@@ -298,14 +334,29 @@ class NekoClient {
         nonce: nonce,
       );
       last = res;
-      if (res.replayRejected && attempt == 0) {
-        // 缺 nonce / 已失效：换新 nonce 重试一次（被拒请求不会执行，无重复副作用）。
+      // 本体标识被服务端按爬虫降级：切到回退身份并重试一次（进程内粘滞）。
+      if (res.degraded && !switchedIdentity && !nekoIdentityUsesFallback) {
+        switchedIdentity = true;
+        nekoNoteIdentityRejected();
+        _noncePools.remove(baseUrl); // 旧标识下领到的 nonce 一并作废
+        continue;
+      }
+      // 缺 nonce / 已失效：换新 nonce 重试一次（被拒请求不会执行，无重复副作用）。
+      if (res.replayRejected && attempt < 2) {
         _noncePoolFor(baseUrl).noteRejected();
         continue;
       }
       break;
     }
     final res = last!;
+    // 回退后仍被降级：明确报错，绝不把 SEO HTML / 拒绝体当成业务成功。
+    if (res.degraded) {
+      throw NekoApiException(
+        'NekoMusic 拒绝本次请求（客户端标识未获放行）',
+        statusCode: res.status,
+        kind: NekoErrorKind.api,
+      );
+    }
     if (res.status < 200 || res.status >= 300) {
       throw NekoApiException(
         res.decoded?['message']?.toString() ??
@@ -362,7 +413,12 @@ class NekoClient {
       final rejected =
           res.statusCode == 409 &&
           (replayStatus == 'missing' || replayStatus == 'invalid');
-      return _NekoRawResponse(res.statusCode, decoded, rejected);
+      final degraded = nekoIsDegradedResponse(
+        status: res.statusCode,
+        contentType: res.headers.contentType?.mimeType,
+        body: text,
+      );
+      return _NekoRawResponse(res.statusCode, decoded, rejected, degraded);
     } on TimeoutException {
       throw NekoApiException('请求超时', kind: NekoErrorKind.network);
     } on SocketException catch (e) {
@@ -426,6 +482,15 @@ class NekoClient {
           kind: res.statusCode == 401
               ? NekoErrorKind.auth
               : NekoErrorKind.api,
+        );
+      }
+      // 被降级为 SEO HTML：标记回退身份，并抛错让调用方（下一轮）以回退身份重连。
+      if ((res.headers.contentType?.mimeType ?? '').contains('text/html')) {
+        nekoNoteIdentityRejected();
+        throw NekoApiException(
+          'NekoMusic 拒绝本次请求（客户端标识未获放行）',
+          statusCode: res.statusCode,
+          kind: NekoErrorKind.api,
         );
       }
       var event = 'message';

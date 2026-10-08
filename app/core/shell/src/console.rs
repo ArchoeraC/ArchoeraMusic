@@ -29,6 +29,15 @@ const INVALID_HANDLE_VALUE: isize = -1;
 const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
 const CP_UTF8: u32 = 65001;
 
+// 控制台**输入**模式位：关闭行输入/回显/信号处理并打开 VT 输入，使方向键等以
+// `ESC [ A` 形式交付，与 Unix 原始模式口径一致（行编辑器共用同一套转义解析）。
+const ENABLE_PROCESSED_INPUT: u32 = 0x0001;
+const ENABLE_LINE_INPUT: u32 = 0x0002;
+const ENABLE_ECHO_INPUT: u32 = 0x0004;
+const ENABLE_QUICK_EDIT_MODE: u32 = 0x0040;
+const ENABLE_EXTENDED_FLAGS: u32 = 0x0080;
+const ENABLE_VIRTUAL_TERMINAL_INPUT: u32 = 0x0200;
+
 #[repr(C)]
 struct Coord {
     x: i16,
@@ -71,6 +80,13 @@ extern "system" {
     fn SetConsoleMode(handle: *mut c_void, mode: u32) -> c_int;
     fn GetConsoleScreenBufferInfo(handle: *mut c_void, info: *mut ConsoleScreenBufferInfo)
         -> c_int;
+    fn ReadFile(
+        handle: *mut c_void,
+        buffer: *mut c_void,
+        to_read: u32,
+        read: *mut u32,
+        overlapped: *mut c_void,
+    ) -> c_int;
     fn GetConsoleOutputCP() -> u32;
     fn SetConsoleOutputCP(cp: u32) -> c_int;
     fn GetConsoleCP() -> u32;
@@ -191,5 +207,72 @@ pub fn columns() -> Option<usize> {
             }
         }
         None
+    }
+}
+
+/// 原始（未见行）控制台输入：关闭行输入/回显/处理并打开 VT 输入。
+///
+/// 与 Unix `term::RawInput` 同签名，供 `lineedit` 跨平台使用。Drop 时恢复原
+/// 控制台模式。
+pub struct RawInput {
+    handle: *mut c_void,
+    saved: u32,
+}
+
+impl RawInput {
+    /// 尝试进入原始输入模式；`stdin` 不是控制台或设置失败返回 `None`。
+    pub fn enable() -> Option<Self> {
+        unsafe {
+            let handle = GetStdHandle(STD_INPUT_HANDLE);
+            if !is_valid(handle) {
+                return None;
+            }
+            let mut mode: u32 = 0;
+            if GetConsoleMode(handle, &mut mode) == 0 {
+                return None;
+            }
+            let want = (mode
+                & !(ENABLE_LINE_INPUT
+                    | ENABLE_ECHO_INPUT
+                    | ENABLE_PROCESSED_INPUT
+                    | ENABLE_QUICK_EDIT_MODE))
+                | ENABLE_VIRTUAL_TERMINAL_INPUT
+                | ENABLE_EXTENDED_FLAGS;
+            if SetConsoleMode(handle, want) == 0 {
+                return None;
+            }
+            Some(RawInput {
+                handle,
+                saved: mode,
+            })
+        }
+    }
+
+    /// 阻塞读取一个字节；EOF/错误返回 `None`。
+    pub fn read_byte(&mut self) -> Option<u8> {
+        unsafe {
+            let mut byte: u8 = 0;
+            let mut read: u32 = 0;
+            let ok = ReadFile(
+                self.handle,
+                &mut byte as *mut u8 as *mut c_void,
+                1,
+                &mut read,
+                std::ptr::null_mut(),
+            );
+            if ok == 0 || read == 0 {
+                None
+            } else {
+                Some(byte)
+            }
+        }
+    }
+}
+
+impl Drop for RawInput {
+    fn drop(&mut self) {
+        unsafe {
+            SetConsoleMode(self.handle, self.saved);
+        }
     }
 }
