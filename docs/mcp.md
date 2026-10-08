@@ -193,14 +193,27 @@
 archoera_music archoerashell [全局选项] <命令> [参数...]
 ```
 
-它**不启动 GUI**：在 `main` 最前面识别 `archoerashell` 子命令并直接执行后退出。
-argv 由各平台 runner 传给 Dart 入口（Linux/Windows 显式转发；macOS 由
-`FlutterDartProject` 默认转发，去掉可执行名），Dart 侧另以
-`Platform.executableArguments` 兜底。窗口显示：Linux runner（`my_application.cc`）与 Windows runner（`flutter_window.cpp`
-的 `headless` 标志）在 CLI 模式下都**不显示窗口**；macOS 的窗口本就由 Dart
-启动后经 `windowManager.show()` 显示，CLI 模式不 `runApp`，故三端都不会出现
-窗口。它通过本机 MCP 服务的 REST 接口与**运行中的实例**通信——目标端口/密钥
+它**不启动 GUI**。实现分两条路径：
+
+- **原生 CLI（Linux 起）**：`app/core/shell`（Rust，`staticlib`）链入 Linux runner；
+  `main()` 在 GTK/Flutter 初始化**之前**检测到 `archoerashell` 即直接调用
+  `archoera_shell_main`——**完全不加载 Flutter 引擎 / Dart**，命令行调用即时返回。
+  自包含实现：参数解析、回环 REST（`std::net`）、TUI 渲染，帮助文案由 `build.rs`
+  从 Flutter 的 ARB（`mcpShell*`）生成，与 Dart 端同源。
+- **Dart 回退（Windows/macOS 暂沿用）**：runner 把 argv 传给 Dart 入口，Dart 侧
+  识别子命令后执行（Linux/Windows 显式转发；macOS 由 `FlutterDartProject` 默认
+  转发，去掉可执行名，Dart 侧另以 `Platform.executableArguments` 兜底）。
+  Linux runner（`my_application.cc`）与 Windows runner（`flutter_window.cpp` 的
+  `headless` 标志）在 CLI 模式下都**不显示窗口**；macOS 的窗口本就由 Dart 启动后
+  经 `windowManager.show()` 显示，CLI 模式不 `runApp`。
+
+两条路径都通过本机 MCP 服务的 REST 接口与**运行中的实例**通信——目标端口/密钥
 取自应用设置（`prefs.json`），可用全局选项覆盖。
+
+**交互式终端（REPL）**：`archoerashell` 后**不带命令**时，若 `stdin` 为交互式
+终端则进入提示符模式，可连续输入命令（`exit`/`quit`/`Ctrl-D` 退出，空行忽略）；
+若 `stdin` 被管道/重定向，则按行批处理（每行一条命令，`#` 开头为注释）。这与
+双击/直接运行程序启动 GUI **不冲突**：GUI 启动路径的 argv 里没有 `archoerashell`。
 
 ```
 全局选项:  -h/--help  -V/--version  -j/--json  -q/--quiet
@@ -249,6 +262,9 @@ archoera_music archoerashell --json library 周杰伦 | jq '.tracks[].title'
   MCP 握手/会话/工具列举与调用、工具目录完整性）、
   `app/test/mcp_http_test.dart`（真实回环 HTTP：鉴权 / Origin / REST / MCP 往返）、
   `app/test/mcp_shell_test.dart`（CLI 命令解析、全局选项、REST/tool 映射与输出）。
-- CLI 实现：`app/lib/cli/mcp_shell.dart`（纯 `dart:io`，可注入客户端便于单测）；
+- CLI 实现（Dart 回退）：`app/lib/cli/mcp_shell.dart`（纯 `dart:io`，可注入客户端便于单测）；
   TUI 版式独立在 `app/lib/cli/mcp_shell_render.dart`（CJK 感知宽度、面板/表格/进度条）；
   `app/lib/main.dart` 在 GUI 初始化前识别 `archoerashell` 子命令。
+- CLI 实现（原生，Linux）：`app/core/shell/`（Rust `staticlib`，`cargo test` 自测；
+  `width.rs` 显示宽度、`render.rs` TUI、`http.rs` 回环 HTTP、`cli.rs` 解析/分派/REPL、
+  `build.rs` 从 ARB 生成帮助文案）；由 `app/linux/{runner/main.cc,CMakeLists.txt}` 链入。
