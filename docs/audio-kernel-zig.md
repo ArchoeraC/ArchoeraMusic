@@ -688,7 +688,7 @@ pub const Reader = struct {
 >   `decoder_open_headers` 与 AVIO 路径复用。
 > - Dart：`EngineBindings.create(headers)` → `AudioEngineProcess.start(headers)` →
 >   `engineHeadersForTrack(track)`（取自 `SourcePlatform.mediaHeaders`，Neko 源为
->   `X-Neko-Client: archoera+<版本>` + **空 `User-Agent`**，版本启动时自 `pubspec.yaml`
+>   **分层身份 UA** + `X-Neko-Client: archoera+<版本>`，版本启动时自 `pubspec.yaml`
 >   读取，**不硬编码**）。旧库缺 `_with_headers` 符号时自动回退。
 > - **修正（2026-10-07，后续）**：NekoMusic 服务端 `/api/*` 防爬**只看 `User-Agent`**，
 >   未知 UA 的 `POST` → 403、`GET` → 直出 SEO HTML（非 302，也不认 `X-Neko-Client`）；
@@ -697,6 +697,11 @@ pub const Reader = struct {
 >   会被拦）。故 `decoder_apply_http_headers` 对**空值**也须写入 `user_agent`，否则 FFmpeg
 >   回落默认 `Lavf/…` 同样被拦。封面/头像经全局浏览器 UA 的图片请求无法清空 UA，改补
 >   `Accept` + `Accept-Language` 走其「浏览器完整性」放行。
+> - **修正（2026-10-08）**：NekoMusic 服务端已**拆除「空 UA 直接放行」**（空 / 缺失 UA
+>   一律按爬虫处理）。改走**分层客户端身份**：主路径以本体自报 `ArchoeraMusic/<版本> (<平台>)`
+>   + `X-Neko-Client: archoera+<版本>`；被服务端按爬虫降级时，进程内回退为纯 NekoMusic 桌面 UA
+>   形状 `NekoMusic-<平台>/<版本>`（不冒名 Android、不伪装浏览器）。`decoder_apply_http_headers`
+>   仍对空值写 `user_agent`，但 Neko 源不再发空 UA。详见 `docs/neko-source-identity.md`。
 > - FFmpeg 在线 TLS：Linux/macOS 由 `build-ffmpeg-minimal.sh` 构建**自包含 mbedTLS**
 >   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-tls` 标记重建）；
 >   Windows 经 vcpkg ffmpeg 端口的 **Schannel**（未启用 `openssl` 特性时自动

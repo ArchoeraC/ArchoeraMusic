@@ -43,6 +43,64 @@ void main() {
     });
   });
 
+  group('nekoIsDegradedResponse（防爬降级判定）', () {
+    test('GET 200 + SEO HTML / 空体 → 降级', () {
+      expect(
+        nekoIsDegradedResponse(
+          status: 200,
+          contentType: 'text/html;charset=UTF-8',
+          body: '<!DOCTYPE html><html>...</html>',
+        ),
+        isTrue,
+      );
+      expect(
+        nekoIsDegradedResponse(status: 200, body: '  <html>x</html>'),
+        isTrue,
+      );
+    });
+
+    test('正常 JSON 200 → 不降级', () {
+      expect(
+        nekoIsDegradedResponse(
+          status: 200,
+          contentType: 'application/json',
+          body: '{"success":true,"data":{}}',
+        ),
+        isFalse,
+      );
+    });
+
+    test('非 GET 403：空体 / HTML / 统一拒绝文案 → 降级；其它 403 不降级', () {
+      expect(nekoIsDegradedResponse(status: 403, body: ''), isTrue);
+      expect(
+        nekoIsDegradedResponse(
+          status: 403,
+          contentType: 'application/json',
+          body: '{"success":false,"message":"请求已拒绝"}',
+        ),
+        isTrue,
+      );
+      expect(
+        nekoIsDegradedResponse(
+          status: 403,
+          contentType: 'application/json',
+          body: '{"success":false,"message":"无权限"}',
+        ),
+        isFalse,
+      );
+    });
+
+    test('其它状态（401 / 409 / 404）不判定为降级', () {
+      for (final s in const [401, 404, 409, 429, 500]) {
+        expect(
+          nekoIsDegradedResponse(status: s, body: '{"success":false}'),
+          isFalse,
+          reason: '$s',
+        );
+      }
+    });
+  });
+
   group('NekoClient.resolveUrl', () {
     test('相对路径拼接为绝对地址；绝对地址原样返回', () {
       final c = NekoClient(baseUrl: 'https://x.y');
