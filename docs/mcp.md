@@ -236,6 +236,16 @@ Dart**，命令行调用即时返回：
 若 `stdin` 被管道/重定向，则按行批处理（每行一条命令，`#` 开头为注释）。这与
 双击/直接运行程序启动 GUI **不冲突**：GUI 启动路径的 argv 里没有 `archoerashell`。
 
+REPL 自带行编辑器（原始模式，三端一致），方向键与快捷键在 Linux/macOS/Windows
+均可用——不再依赖宿主终端（Windows 的 PowerShell/cmd 自带行编辑，Unix 的规范
+模式则没有，故过去只有 Windows「看起来能用」）：
+
+- ←/→ 移动光标，Home/End（`Ctrl-A`/`Ctrl-E`）行首/行尾；
+- ↑/↓ 在**本次会话**的命令历史中前后翻阅（跨会话不持久化）；
+- `Ctrl-U` 删至行首、`Ctrl-K` 删至行尾、`Ctrl-W` 删前一个词、`Delete` 删光标处字符；
+- `Ctrl-L` 清屏重绘，`Ctrl-C` 放弃当前行（不退出），`Ctrl-D` 空行时退出；
+- 长行横向滚动、CJK 宽字符按显示列对齐，始终单行不折行。
+
 ```
 全局选项:  -h/--help  -V/--version  -j/--json  -q/--quiet
            --host <host>  -p/--port <port>  -k/--key <key>
@@ -288,7 +298,8 @@ archoera_music archoerashell --json library 周杰伦 | jq '.tracks[].title'
   `app/lib/main.dart` 在 GUI 初始化前识别 `archoerashell` 子命令。
 - CLI 实现（原生，三端）：`app/core/shell/`（Rust `staticlib`，`cargo test` 自测；
   `width.rs` 显示宽度、`render.rs` TUI、`http.rs` 回环 HTTP、`cli.rs` 解析/分派/REPL、
-  `console.rs` Windows 控制台引导、`build.rs` 从 ARB 生成帮助文案）；Linux
+  `lineedit.rs` 行编辑（原始模式按键解析、会话历史、CJK 感知重绘）、
+  `console.rs` Windows 控制台/原始输入引导、`build.rs` 从 ARB 生成帮助文案）；Linux
   `app/linux/{runner/main.cc,CMakeLists.txt}`、Windows
   `app/windows/runner/{main.cpp,CMakeLists.txt}`、macOS
   `app/macos/Runner/{main.swift,Runner.xcodeproj}` 分别链入；Windows 另提供
