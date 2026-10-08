@@ -16,6 +16,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../l10n/generated/app_localizations.dart';
+import 'mcp_shell_render.dart';
 
 /// 默认可连接目标（来自应用偏好：端口 + 访问密钥）。
 class McpShellOptions {
@@ -126,6 +127,10 @@ class HttpMcpShellClient implements McpShellClient {
 /// 入口：执行一次 shell 调用，返回进程退出码。
 ///
 /// 退出码约定：0 成功 / 1 运行期错误（连接、服务端错误）/ 2 用法错误。
+///
+/// 输出风格：默认自动探测——`out`（缺省 `stdout`）为交互式终端且支持 ANSI
+/// 时启用 TUI 渲染（色板/面板/进度条/对齐列），否则回退纯文本，保证管道、
+/// 重定向与 `--json` 输出稳定。可显式传 [styled]/[columns] 覆盖（单测用）。
 Future<int> runMcpShell(
   List<String> args, {
   required McpShellOptions defaults,
@@ -133,13 +138,30 @@ Future<int> runMcpShell(
   required AppLocalizations l10n,
   StringSink? out,
   StringSink? err,
+  bool? styled,
+  int? columns,
 }) async {
+  final sink = out ?? stdout;
+  final Stdout? term = sink is Stdout ? sink : null;
+  final tty = term != null && term.hasTerminal;
+  final useStyled = styled ?? (tty && term.supportsAnsiEscapes);
+  final int width;
+  if (columns != null) {
+    width = columns;
+  } else if (tty) {
+    final detected = term.terminalColumns;
+    width = detected > 0 ? detected : 80;
+  } else {
+    width = 80;
+  }
   final context = _ShellContext(
     defaults: defaults,
     clientFactory: clientFactory,
     l10n: l10n,
-    out: out ?? stdout,
+    out: sink,
     err: err ?? stderr,
+    styled: useStyled,
+    columns: width,
   );
   return context.run(args);
 }
@@ -153,13 +175,24 @@ class _ShellContext {
     required this.l10n,
     required this.out,
     required this.err,
-  });
+    required this.styled,
+    required this.columns,
+  }) : renderer = McpShellRenderer(out: out, columns: columns);
 
   final McpShellOptions defaults;
   final McpShellClient Function(McpShellTarget target) clientFactory;
   final AppLocalizations l10n;
   final StringSink out;
   final StringSink err;
+
+  /// 是否使用 TUI 渲染（交互式终端且支持 ANSI）。
+  final bool styled;
+
+  /// 终端可用列数（TUI 布局预算）。
+  final int columns;
+
+  /// TUI 渲染器（仅 [styled] 时使用）。
+  final McpShellRenderer renderer;
 
   bool json = false;
   bool quiet = false;
@@ -620,6 +653,10 @@ class _ShellContext {
       out.writeln(jsonEncode(value));
       return;
     }
+    if (styled) {
+      _render(value);
+      return;
+    }
     if (value is Map) {
       _printMap(value.cast<Object?, Object?>());
       return;
@@ -631,6 +668,84 @@ class _ShellContext {
       return;
     }
     out.writeln(value ?? '');
+  }
+
+  /// TUI 渲染分派（结构识别与纯文本分支保持一致）。
+  void _render(Object? value) {
+    if (value is Map) {
+      final map = value.cast<Object?, Object?>();
+      if (map['results'] is List) {
+        renderer.searchAll(map);
+        return;
+      }
+      if (map['entries'] is List) {
+        renderer.tracks(
+          map['entries'] as List,
+          total: map['total'],
+          tag: 'playedAt',
+          extraHeader: 'When',
+          fmtExtra: renderer.relativeTime,
+        );
+        return;
+      }
+      if (map['tasks'] is List) {
+        renderer.downloadTasks(map['tasks'] as List, total: map['total']);
+        return;
+      }
+      if (map['lines'] is List) {
+        renderer.lyrics(map['lines'] as List);
+        return;
+      }
+      if (map['values'] is Map) {
+        renderer.values((map['values'] as Map).cast<Object?, Object?>());
+        return;
+      }
+      if (map['tools'] is List) {
+        renderer.tools(map['tools'] as List);
+        return;
+      }
+      if (map['sources'] is List) {
+        renderer.sources(map['sources'] as List);
+        return;
+      }
+      if (map['service'] is Map) {
+        renderer.info(map);
+        return;
+      }
+      if (map['tracks'] is num && map['totalSizeBytes'] != null) {
+        renderer.libraryStats(map);
+        return;
+      }
+      if (map['tracks'] is List) {
+        if (map['query'] != null) {
+          renderer.searchResult(map);
+        } else if (map['repeatMode'] != null ||
+            map['shuffle'] != null ||
+            map['index'] != null) {
+          renderer.queueResult(map);
+        } else if (map['source'] != null) {
+          renderer.likedResult(map);
+        } else {
+          renderer.tracks(map['tracks'] as List, total: map['total']);
+        }
+        return;
+      }
+      if (map.containsKey('playing')) {
+        renderer.status(map);
+        return;
+      }
+      if (map.containsKey('ok') || map.containsKey('liked')) {
+        renderer.confirm(map);
+        return;
+      }
+      renderer.indented(map);
+      return;
+    }
+    if (value is List) {
+      renderer.listed(value);
+      return;
+    }
+    renderer.scalar(value);
   }
 
   void _printMap(Map<Object?, Object?> map) {

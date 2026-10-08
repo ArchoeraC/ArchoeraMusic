@@ -220,6 +220,10 @@ argv 由各平台 runner 传给 Dart 入口（Linux/Windows 显式转发；macOS
 ```
 
 - 默认输出人类可读文本；`--json` 输出原始 JSON（便于脚本 `jq` 处理）。
+- **输出风格自动探测**：`stdout` 为交互式终端且支持 ANSI 时启用 TUI 渲染
+  （配色、圆角面板、进度条、对齐表格，风格贴近 OpenCode 等 Agent 终端）；
+  被管道/重定向时自动回退纯文本，保证脚本解析与 `--json` 输出稳定
+  （宽度按终端显示列计算，中文等宽字符同样对齐）。
 - 退出码：`0` 成功 / `1` 运行期错误（连接失败、服务端错误）/ `2` 用法错误。
 - 需要应用正在运行且已启用 MCP 服务；否则提示先开启。
 
@@ -246,4 +250,5 @@ archoera_music archoerashell --json library 周杰伦 | jq '.tracks[].title'
   `app/test/mcp_http_test.dart`（真实回环 HTTP：鉴权 / Origin / REST / MCP 往返）、
   `app/test/mcp_shell_test.dart`（CLI 命令解析、全局选项、REST/tool 映射与输出）。
 - CLI 实现：`app/lib/cli/mcp_shell.dart`（纯 `dart:io`，可注入客户端便于单测）；
+  TUI 版式独立在 `app/lib/cli/mcp_shell_render.dart`（CJK 感知宽度、面板/表格/进度条）；
   `app/lib/main.dart` 在 GUI 初始化前识别 `archoerashell` 子命令。
