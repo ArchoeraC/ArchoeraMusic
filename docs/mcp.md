@@ -199,9 +199,14 @@ Dart**，命令行调用即时返回：
 
 - **Linux**：`app/linux/runner/main.cc` 检测子命令后调用 `archoera_shell_main`；由
   `app/linux/CMakeLists.txt` 的内嵌 cargo 目标编译 `libarchoera_shell.a` 链入。
-- **Windows**：`app/windows/runner/main.cpp` 在 `wWinMain` 起始处检测子命令；runner
-  CMake 编译并链入 `archoera_shell.lib`。GUI 子系统进程被终端调用时，由
-  `app/core/shell/src/console.rs` 接管/补齐标准流、切 UTF-8 并开启 ANSI。
+- **Windows**：两种入口共享同一 Rust staticlib——
+  - `archoera_music.exe archoerashell …`（`app/windows/runner/main.cpp` 在 `wWinMain`
+    起始处分派）：适合**一次性命令**。GUI 子系统进程被终端调用时由
+    `app/core/shell/src/console.rs` 接管/补齐标准流、切 UTF-8 并开启 ANSI，但它与
+    调用方 shell 争抢同一控制台输入，**不适合交互式 REPL**。
+  - `archoerashell.exe`（`app/windows/runner/shell_main.cpp`，**控制台子系统**伴生
+    程序）：cmd/PowerShell 会等待其退出且独占控制台输入，**推荐**用于交互式 REPL 与
+    脚本。
 - **macOS**：`app/macos/Runner/main.swift` 在 `NSApplicationMain` 之前检测子命令；
   `Runner.xcodeproj` 的 “Build archoerashell (cargo)” 阶段按 `$ARCHS`（Release 为
   `arm64 x86_64`）逐架构编译并 `lipo` 成 `target/universal/release/libarchoera_shell.a`
@@ -214,9 +219,17 @@ Dart**，命令行调用即时返回：
 三端都通过本机 MCP 服务的 REST 接口与**运行中的实例**通信——目标端口/密钥
 取自应用设置（`prefs.json`），可用全局选项覆盖。
 
-> **Windows 终端注意**：主程序是 GUI 子系统可执行文件，`cmd`/PowerShell 默认**不等待**
-> 其退出，输出会送到同一控制台但可能晚于提示符返回。需要严格同步（脚本/管道）时用
-> `start /wait archoera_music archoerashell …`；`stdout` 被重定向/管道时输出自动回退纯文本。
+> **Windows 用法**：推荐直接用控制台子系统伴生程序 `archoerashell.exe`（会等待退出、
+> 独占控制台输入，REPL 与脚本都稳）：
+> ```
+> archoerashell --help
+> archoerashell status
+> archoerashell            # 进入交互式 REPL
+> ```
+> 主程序子命令 `archoera_music archoerashell …` 仅适合一次性命令（GUI 子系统，
+> PowerShell 默认不等待且会与它争抢输入）；需要严格同步时用
+> `Start-Process … -Wait -NoNewWindow`（或 `start /wait`）。`stdout` 被重定向/管道时
+> 输出自动回退纯文本。
 
 **交互式终端（REPL）**：`archoerashell` 后**不带命令**时，若 `stdin` 为交互式
 终端则进入提示符模式，可连续输入命令（`exit`/`quit`/`Ctrl-D` 退出，空行忽略）；
@@ -278,4 +291,5 @@ archoera_music archoerashell --json library 周杰伦 | jq '.tracks[].title'
   `console.rs` Windows 控制台引导、`build.rs` 从 ARB 生成帮助文案）；Linux
   `app/linux/{runner/main.cc,CMakeLists.txt}`、Windows
   `app/windows/runner/{main.cpp,CMakeLists.txt}`、macOS
-  `app/macos/Runner/{main.swift,Runner.xcodeproj}` 分别链入。
+  `app/macos/Runner/{main.swift,Runner.xcodeproj}` 分别链入；Windows 另提供
+  控制台子系统伴生程序 `app/windows/runner/shell_main.cpp`（`archoerashell.exe`）。

@@ -45,7 +45,8 @@ cargo build --release --target x86_64-apple-darwin    --manifest-path app/core/s
 ```
 > 三端 runner 均在 Flutter 初始化前拦截 `archoerashell` 子命令并直调 Rust 入口：
 > Linux `app/linux/runner/main.cc`（CMake 链入）、Windows
-> `app/windows/runner/main.cpp`（runner CMake 链入 `archoera_shell.lib`）、macOS
+> `app/windows/runner/main.cpp`（runner CMake 链入 `archoera_shell.lib`；另有控制台
+> 子系统的 `archoerashell.exe` 伴生程序 `runner/shell_main.cpp`，REPL/脚本应使用它）、macOS
 > `app/macos/Runner/main.swift`（Xcode “Build archoerashell (cargo)” 阶段按 `$ARCHS`
 > 逐架构编译并 `lipo` 成 `target/universal/release/libarchoera_shell.a` 链入；
 > 需 `rustup target add aarch64-apple-darwin x86_64-apple-darwin`）。
