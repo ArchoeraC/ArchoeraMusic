@@ -164,6 +164,396 @@ abstract class AppLocalizations {
   /// **'媒体详细信息'**
   String get menuTrackDetail;
 
+  /// No description provided for @menuEditTags.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'编辑元数据'**
+  String get menuEditTags;
+
+  /// No description provided for @tagEditorTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'编辑元数据'**
+  String get tagEditorTitle;
+
+  /// No description provided for @tagEditorLoading.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在读取标签…'**
+  String get tagEditorLoading;
+
+  /// No description provided for @tagEditorLoadFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'读取标签失败'**
+  String get tagEditorLoadFailed;
+
+  /// No description provided for @tagEditorFieldTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'标题'**
+  String get tagEditorFieldTitle;
+
+  /// No description provided for @tagEditorFieldArtist.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'艺术家'**
+  String get tagEditorFieldArtist;
+
+  /// No description provided for @tagEditorFieldAlbum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'专辑'**
+  String get tagEditorFieldAlbum;
+
+  /// No description provided for @tagEditorFieldAlbumArtist.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'专辑艺术家'**
+  String get tagEditorFieldAlbumArtist;
+
+  /// No description provided for @tagEditorFieldComposer.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'作曲家'**
+  String get tagEditorFieldComposer;
+
+  /// No description provided for @tagEditorFieldGenre.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'流派'**
+  String get tagEditorFieldGenre;
+
+  /// No description provided for @tagEditorFieldTrackNumber.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音轨号'**
+  String get tagEditorFieldTrackNumber;
+
+  /// No description provided for @tagEditorFieldDiscNumber.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'碟片号'**
+  String get tagEditorFieldDiscNumber;
+
+  /// No description provided for @tagEditorFieldYear.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'年份'**
+  String get tagEditorFieldYear;
+
+  /// No description provided for @tagEditorFieldLyrics.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词'**
+  String get tagEditorFieldLyrics;
+
+  /// No description provided for @tagEditorFieldCover.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'封面'**
+  String get tagEditorFieldCover;
+
+  /// No description provided for @tagEditorCoverChange.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'更换封面'**
+  String get tagEditorCoverChange;
+
+  /// No description provided for @tagEditorCoverRemove.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'移除封面'**
+  String get tagEditorCoverRemove;
+
+  /// No description provided for @tagEditorSave.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'保存'**
+  String get tagEditorSave;
+
+  /// No description provided for @tagEditorSaving.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'保存中…'**
+  String get tagEditorSaving;
+
+  /// No description provided for @tagEditorSaved.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已保存元数据'**
+  String get tagEditorSaved;
+
+  /// No description provided for @tagEditorSaveFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'保存失败'**
+  String get tagEditorSaveFailed;
+
+  /// No description provided for @tagEditorNoPath.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'缺少本地文件路径'**
+  String get tagEditorNoPath;
+
+  /// No description provided for @tagEditorUnsupportedFormat.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不支持的文件格式'**
+  String get tagEditorUnsupportedFormat;
+
+  /// No description provided for @tagEditorDuration.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'时长'**
+  String get tagEditorDuration;
+
+  /// No description provided for @menuBatchEditMetadata.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'批量编辑元数据'**
+  String get menuBatchEditMetadata;
+
+  /// No description provided for @tagEditorBatchTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'批量编辑元数据'**
+  String get tagEditorBatchTitle;
+
+  /// No description provided for @tagEditorBatchHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅填写需要修改的字段；留空表示保持原值'**
+  String get tagEditorBatchHint;
+
+  /// No description provided for @tagEditorBatchCoverKeep.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'保持封面'**
+  String get tagEditorBatchCoverKeep;
+
+  /// No description provided for @tagEditorBatchCoverReplace.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'更换封面'**
+  String get tagEditorBatchCoverReplace;
+
+  /// No description provided for @tagEditorBatchCoverRemove.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'移除封面'**
+  String get tagEditorBatchCoverRemove;
+
+  /// No description provided for @tagEditorBatchApply.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'应用到所选'**
+  String get tagEditorBatchApply;
+
+  /// No description provided for @tagEditorBatchApplying.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在应用…'**
+  String get tagEditorBatchApplying;
+
+  /// No description provided for @tagEditorBatchNoEditable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'所选曲目均不支持编辑元数据'**
+  String get tagEditorBatchNoEditable;
+
+  /// No description provided for @tagEditorBatchDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已更新 {success} 首，失败 {failed} 首'**
+  String tagEditorBatchDone({required int success, required int failed});
+
+  /// No description provided for @tagEditorBatchStop.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'停止'**
+  String get tagEditorBatchStop;
+
+  /// No description provided for @tagEditorBatchRules.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'标题 / 艺术家规则'**
+  String get tagEditorBatchRules;
+
+  /// No description provided for @tagEditorBatchTitleRule.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'标题'**
+  String get tagEditorBatchTitleRule;
+
+  /// No description provided for @tagEditorBatchArtistRule.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'艺术家'**
+  String get tagEditorBatchArtistRule;
+
+  /// No description provided for @tagEditorBatchRuleNone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不修改'**
+  String get tagEditorBatchRuleNone;
+
+  /// No description provided for @tagEditorBatchRuleFindReplace.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'查找替换'**
+  String get tagEditorBatchRuleFindReplace;
+
+  /// No description provided for @tagEditorBatchRulePrefix.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'加前缀'**
+  String get tagEditorBatchRulePrefix;
+
+  /// No description provided for @tagEditorBatchRuleSuffix.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'加后缀'**
+  String get tagEditorBatchRuleSuffix;
+
+  /// No description provided for @tagEditorBatchFindLabel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'查找'**
+  String get tagEditorBatchFindLabel;
+
+  /// No description provided for @tagEditorBatchReplaceLabel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'替换为'**
+  String get tagEditorBatchReplaceLabel;
+
+  /// No description provided for @tagEditorBatchAffixLabel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'内容'**
+  String get tagEditorBatchAffixLabel;
+
+  /// No description provided for @tagEditorBatchTokensHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'可用占位符：[index] [track] [title] [artist] [album] [year]'**
+  String get tagEditorBatchTokensHint;
+
+  /// No description provided for @tagEditorRuleApply.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'应用规则'**
+  String get tagEditorRuleApply;
+
+  /// No description provided for @tagEditorRuleTargetBoth.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'两者'**
+  String get tagEditorRuleTargetBoth;
+
+  /// No description provided for @tagEditorRulePreview.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'预览'**
+  String get tagEditorRulePreview;
+
+  /// No description provided for @tagEditorRuleRegex.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正则表达式'**
+  String get tagEditorRuleRegex;
+
+  /// No description provided for @tagEditorRuleCaseSensitive.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'区分大小写'**
+  String get tagEditorRuleCaseSensitive;
+
+  /// No description provided for @tagEditorRulePresets.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'预设'**
+  String get tagEditorRulePresets;
+
+  /// No description provided for @tagEditorRulePresetTrim.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'去除首尾空白'**
+  String get tagEditorRulePresetTrim;
+
+  /// No description provided for @tagEditorRulePresetStripBrackets.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'去除结尾括号'**
+  String get tagEditorRulePresetStripBrackets;
+
+  /// No description provided for @tagEditorRulePresetStripLive.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'去除 Live 标注'**
+  String get tagEditorRulePresetStripLive;
+
+  /// No description provided for @tagEditorRulePresetIndexSuffix.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'追加 [index] 后缀'**
+  String get tagEditorRulePresetIndexSuffix;
+
+  /// No description provided for @tagEditorRulePresetStripFeat.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'去除 feat. 部分'**
+  String get tagEditorRulePresetStripFeat;
+
+  /// No description provided for @tagEditorRulePresetSave.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'保存为预设'**
+  String get tagEditorRulePresetSave;
+
+  /// No description provided for @tagEditorRulePresetName.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'预设名称'**
+  String get tagEditorRulePresetName;
+
+  /// No description provided for @tagEditorRulePresetDelete.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除预设'**
+  String get tagEditorRulePresetDelete;
+
+  /// No description provided for @tagEditorRulePresetSaved.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已保存预设'**
+  String get tagEditorRulePresetSaved;
+
+  /// No description provided for @tagEditorRulePresetRename.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重命名'**
+  String get tagEditorRulePresetRename;
+
+  /// No description provided for @tagEditorRulePresetMoveUp.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'上移'**
+  String get tagEditorRulePresetMoveUp;
+
+  /// No description provided for @tagEditorRulePresetMoveDown.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'下移'**
+  String get tagEditorRulePresetMoveDown;
+
+  /// No description provided for @tagEditorBatchProgress.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在处理 {done}/{total}'**
+  String tagEditorBatchProgress({required int done, required int total});
+
   /// No description provided for @trackDetailDuration.
   ///
   /// In zh_CN, this message translates to:

@@ -130,4 +130,15 @@ extension _SongListActions on _SongListState {
     await downloadTracks(context, ref, tracks);
     if (mounted) _exitBatch();
   }
+
+  /// 批量编辑元数据：委托宿主回调（本地库页接入音源注册表的编辑能力）。
+  /// 宿主未提供则按钮不显示（见 [SongList.onBatchEditMetadata]）。
+  Future<void> _batchEditMetadata() async {
+    final handler = widget.onBatchEditMetadata;
+    if (handler == null) return;
+    final tracks = _selectedTracks;
+    if (tracks.isEmpty) return;
+    await handler(tracks);
+    if (mounted) _exitBatch();
+  }
 }

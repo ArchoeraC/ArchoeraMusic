@@ -41,6 +41,209 @@ class AppLocalizationsDe extends AppLocalizations {
   String get menuTrackDetail => 'Mediadetails';
 
   @override
+  String get menuEditTags => 'Metadaten bearbeiten';
+
+  @override
+  String get tagEditorTitle => 'Metadaten bearbeiten';
+
+  @override
+  String get tagEditorLoading => 'Tags werden gelesen…';
+
+  @override
+  String get tagEditorLoadFailed => 'Tags konnten nicht gelesen werden';
+
+  @override
+  String get tagEditorFieldTitle => 'Titel';
+
+  @override
+  String get tagEditorFieldArtist => 'Künstler';
+
+  @override
+  String get tagEditorFieldAlbum => 'Album';
+
+  @override
+  String get tagEditorFieldAlbumArtist => 'Albumkünstler';
+
+  @override
+  String get tagEditorFieldComposer => 'Komponist';
+
+  @override
+  String get tagEditorFieldGenre => 'Genre';
+
+  @override
+  String get tagEditorFieldTrackNumber => 'Titelnummer';
+
+  @override
+  String get tagEditorFieldDiscNumber => 'CD-Nummer';
+
+  @override
+  String get tagEditorFieldYear => 'Jahr';
+
+  @override
+  String get tagEditorFieldLyrics => 'Songtext';
+
+  @override
+  String get tagEditorFieldCover => 'Cover';
+
+  @override
+  String get tagEditorCoverChange => 'Cover ändern';
+
+  @override
+  String get tagEditorCoverRemove => 'Cover entfernen';
+
+  @override
+  String get tagEditorSave => 'Speichern';
+
+  @override
+  String get tagEditorSaving => 'Wird gespeichert…';
+
+  @override
+  String get tagEditorSaved => 'Metadaten gespeichert';
+
+  @override
+  String get tagEditorSaveFailed => 'Speichern fehlgeschlagen';
+
+  @override
+  String get tagEditorNoPath => 'Lokaler Dateipfad fehlt';
+
+  @override
+  String get tagEditorUnsupportedFormat => 'Nicht unterstütztes Dateiformat';
+
+  @override
+  String get tagEditorDuration => 'Dauer';
+
+  @override
+  String get menuBatchEditMetadata => 'Metadaten stapelweise bearbeiten';
+
+  @override
+  String get tagEditorBatchTitle => 'Metadaten stapelweise bearbeiten';
+
+  @override
+  String get tagEditorBatchHint =>
+      'Nur Felder ausfüllen, die geändert werden sollen; leer lassen, um Originalwerte zu behalten';
+
+  @override
+  String get tagEditorBatchCoverKeep => 'Cover behalten';
+
+  @override
+  String get tagEditorBatchCoverReplace => 'Cover ersetzen';
+
+  @override
+  String get tagEditorBatchCoverRemove => 'Cover entfernen';
+
+  @override
+  String get tagEditorBatchApply => 'Auf Auswahl anwenden';
+
+  @override
+  String get tagEditorBatchApplying => 'Wird angewendet…';
+
+  @override
+  String get tagEditorBatchNoEditable =>
+      'Keiner der ausgewählten Titel unterstützt das Bearbeiten von Metadaten';
+
+  @override
+  String tagEditorBatchDone({required int success, required int failed}) {
+    return '$success aktualisiert, $failed fehlgeschlagen';
+  }
+
+  @override
+  String get tagEditorBatchStop => 'Stoppen';
+
+  @override
+  String get tagEditorBatchRules => 'Regeln für Titel / Künstler';
+
+  @override
+  String get tagEditorBatchTitleRule => 'Titel';
+
+  @override
+  String get tagEditorBatchArtistRule => 'Künstler';
+
+  @override
+  String get tagEditorBatchRuleNone => 'Nicht ändern';
+
+  @override
+  String get tagEditorBatchRuleFindReplace => 'Suchen und ersetzen';
+
+  @override
+  String get tagEditorBatchRulePrefix => 'Präfix hinzufügen';
+
+  @override
+  String get tagEditorBatchRuleSuffix => 'Suffix hinzufügen';
+
+  @override
+  String get tagEditorBatchFindLabel => 'Suchen';
+
+  @override
+  String get tagEditorBatchReplaceLabel => 'Ersetzen durch';
+
+  @override
+  String get tagEditorBatchAffixLabel => 'Inhalt';
+
+  @override
+  String get tagEditorBatchTokensHint =>
+      'Verfügbare Platzhalter: [index] [track] [title] [artist] [album] [year]';
+
+  @override
+  String get tagEditorRuleApply => 'Regel anwenden';
+
+  @override
+  String get tagEditorRuleTargetBoth => 'Beide';
+
+  @override
+  String get tagEditorRulePreview => 'Vorschau';
+
+  @override
+  String get tagEditorRuleRegex => 'Regulärer Ausdruck';
+
+  @override
+  String get tagEditorRuleCaseSensitive => 'Groß-/Kleinschreibung beachten';
+
+  @override
+  String get tagEditorRulePresets => 'Voreinstellungen';
+
+  @override
+  String get tagEditorRulePresetTrim => 'Leerzeichen entfernen';
+
+  @override
+  String get tagEditorRulePresetStripBrackets =>
+      'Abschließende Klammern entfernen';
+
+  @override
+  String get tagEditorRulePresetStripLive => '„Live“-Kennzeichnung entfernen';
+
+  @override
+  String get tagEditorRulePresetIndexSuffix => '[index]-Suffix anhängen';
+
+  @override
+  String get tagEditorRulePresetStripFeat => 'feat.-Teil entfernen';
+
+  @override
+  String get tagEditorRulePresetSave => 'Als Voreinstellung speichern';
+
+  @override
+  String get tagEditorRulePresetName => 'Name der Voreinstellung';
+
+  @override
+  String get tagEditorRulePresetDelete => 'Voreinstellung löschen';
+
+  @override
+  String get tagEditorRulePresetSaved => 'Voreinstellung gespeichert';
+
+  @override
+  String get tagEditorRulePresetRename => 'Umbenennen';
+
+  @override
+  String get tagEditorRulePresetMoveUp => 'Nach oben';
+
+  @override
+  String get tagEditorRulePresetMoveDown => 'Nach unten';
+
+  @override
+  String tagEditorBatchProgress({required int done, required int total}) {
+    return 'Verarbeite $done/$total';
+  }
+
+  @override
   String get trackDetailDuration => 'Dauer';
 
   @override

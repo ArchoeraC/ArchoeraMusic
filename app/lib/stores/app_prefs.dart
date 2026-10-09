@@ -28,6 +28,7 @@ import 'prefs_search.dart';
 import 'prefs_security.dart';
 import 'prefs_streaming.dart';
 import 'prefs_shortcuts.dart';
+import 'prefs_tag_rules.dart';
 
 export 'prefs_mcp.dart';
 export 'prefs_app.dart';
@@ -47,6 +48,7 @@ export 'prefs_search.dart';
 export 'prefs_security.dart';
 export 'prefs_streaming.dart';
 export 'prefs_shortcuts.dart';
+export 'prefs_tag_rules.dart';
 
 /// 应用偏好（轻量 JSON 文件持久化，存数据目录 `prefs.json`）。
 ///
@@ -192,6 +194,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 记忆最近一次自定义睡眠定时（分钟）。
   void setSleepTimerCustomMinutes(int minutes) {
     state = state.copyWithSleepTimerCustomMinutes(minutes);
+    state.save();
+  }
+
+  /// 设置标签文本规则「自定义预设」列表（编辑元数据弹窗保存/删除）。
+  void setTagRuleCustomPresets(List<Map<String, dynamic>> presets) {
+    state = state.copyWithTagRuleCustomPresets(presets);
     state.save();
   }
 

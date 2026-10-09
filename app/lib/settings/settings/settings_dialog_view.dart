@@ -81,20 +81,22 @@ extension _SettingsDialogView on _SettingsDialogState {
                             // 隐藏侧栏滚动条（保留滚轮 / 拖拽滚动）。
                             ScrollConfiguration(
                               behavior: const _NoScrollbarBehavior(),
-                              child: ListView(
-                                padding: EdgeInsets.zero,
-                                // 每项恒为 40 高 + 上下各 1.5 的 padding。
-                                itemExtent: 43,
-                                children: [
-                                  for (final cat in SettingsCategory.values)
-                                    if (cat.visible(devMode, downloadModule))
-                                      _buildCategoryItem(
-                                        scheme,
-                                        cat,
-                                        l10n,
-                                        animated,
-                                      ),
-                                ],
+                              child: InkClip(
+                                child: ListView(
+                                  padding: EdgeInsets.zero,
+                                  // 每项恒为 40 高 + 上下各 1.5 的 padding。
+                                  itemExtent: 43,
+                                  children: [
+                                    for (final cat in SettingsCategory.values)
+                                      if (cat.visible(devMode, downloadModule))
+                                        _buildCategoryItem(
+                                          scheme,
+                                          cat,
+                                          l10n,
+                                          animated,
+                                        ),
+                                  ],
+                                ),
                               ),
                             ),
                             if (animated && _catIndicatorReady)
@@ -667,44 +669,46 @@ extension _SettingsDialogView on _SettingsDialogState {
           ),
           const SizedBox(height: 18),
           Expanded(
-            child: SingleChildScrollView(
-              child: switch (_category) {
-                SettingsCategory.appearance => const AppearanceSection(),
-                SettingsCategory.playback => const PlaybackSection(),
-                SettingsCategory.audioEffects => const AudioEffectsSection(),
-                SettingsCategory.shortcuts => const ShortcutsSection(),
-                SettingsCategory.lyrics => const LyricsSection(),
-                SettingsCategory.preset => const PresetSection(),
-                SettingsCategory.render => const RenderSection(),
-                SettingsCategory.download => const DownloadSection(),
-                SettingsCategory.storage => const Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    CacheSection(),
-                    HistorySection(),
-                    StorageSection(),
-                    SecuritySection(),
-                  ],
-                ),
-                SettingsCategory.scrape => const ScrapeSection(),
-                SettingsCategory.scanner => const ScansSection(),
-                SettingsCategory.mediaSource => StreamingServerList(),
-                SettingsCategory.experimentalSource =>
-                  const ExperimentalSourceSection(),
-                SettingsCategory.mcp => const McpSection(),
-                SettingsCategory.about => AboutSection(
-                  version: _version,
-                  devHolding: _devHolding,
-                  devHoldProgress: _devHoldProgress,
-                  onDevHoldStart: _startDevHold,
-                  onDevHoldCancel: _cancelDevHold,
-                ),
-                SettingsCategory.developer => DeveloperSection(
-                  onDeveloperDisabled: () {
-                    if (mounted) _setCategory(SettingsCategory.about);
-                  },
-                ),
-              },
+            child: InkClip(
+              child: SingleChildScrollView(
+                child: switch (_category) {
+                  SettingsCategory.appearance => const AppearanceSection(),
+                  SettingsCategory.playback => const PlaybackSection(),
+                  SettingsCategory.audioEffects => const AudioEffectsSection(),
+                  SettingsCategory.shortcuts => const ShortcutsSection(),
+                  SettingsCategory.lyrics => const LyricsSection(),
+                  SettingsCategory.preset => const PresetSection(),
+                  SettingsCategory.render => const RenderSection(),
+                  SettingsCategory.download => const DownloadSection(),
+                  SettingsCategory.storage => const Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      CacheSection(),
+                      HistorySection(),
+                      StorageSection(),
+                      SecuritySection(),
+                    ],
+                  ),
+                  SettingsCategory.scrape => const ScrapeSection(),
+                  SettingsCategory.scanner => const ScansSection(),
+                  SettingsCategory.mediaSource => StreamingServerList(),
+                  SettingsCategory.experimentalSource =>
+                    const ExperimentalSourceSection(),
+                  SettingsCategory.mcp => const McpSection(),
+                  SettingsCategory.about => AboutSection(
+                    version: _version,
+                    devHolding: _devHolding,
+                    devHoldProgress: _devHoldProgress,
+                    onDevHoldStart: _startDevHold,
+                    onDevHoldCancel: _cancelDevHold,
+                  ),
+                  SettingsCategory.developer => DeveloperSection(
+                    onDeveloperDisabled: () {
+                      if (mounted) _setCategory(SettingsCategory.about);
+                    },
+                  ),
+                },
+              ),
             ),
           ),
         ],
@@ -764,42 +768,44 @@ extension _SettingsDialogView on _SettingsDialogState {
         ),
       );
     }
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            l10n.settingsSearchMatchCount(count: matches.length),
-            style: TextStyle(
-              fontSize: 11,
-              color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
-            ),
-          ),
-          const SizedBox(height: 8),
-          for (final cat in SettingsCategory.values)
-            if (cat.visible(devMode, downloadModule) &&
-                matches.any((e) => e.category == cat)) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Icon(cat.icon, size: 13, color: scheme.primary),
-                    const SizedBox(width: 6),
-                    Text(
-                      cat.label(l10n),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: scheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
+    return InkClip(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.settingsSearchMatchCount(count: matches.length),
+              style: TextStyle(
+                fontSize: 11,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
-              for (final e in matches.where((e) => e.category == cat))
-                _buildSearchResultTile(scheme, e, q),
-            ],
-        ],
+            ),
+            const SizedBox(height: 8),
+            for (final cat in SettingsCategory.values)
+              if (cat.visible(devMode, downloadModule) &&
+                  matches.any((e) => e.category == cat)) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Icon(cat.icon, size: 13, color: scheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        cat.label(l10n),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                for (final e in matches.where((e) => e.category == cat))
+                  _buildSearchResultTile(scheme, e, q),
+              ],
+          ],
+        ),
       ),
     );
   }

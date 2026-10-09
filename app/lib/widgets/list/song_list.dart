@@ -12,10 +12,12 @@ import '../../services/playback/playback_notifier.dart';
 import '../../stores/app_prefs.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../common/ink_clip.dart';
 import '../common/toast.dart';
 import '../dialogs/track_context_menu.dart';
 import 'scroll_float_actions.dart';
 import 'song_row.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'song_list/song_list_actions.dart';
@@ -51,6 +53,7 @@ class SongList extends ConsumerStatefulWidget {
     this.likedIds,
     this.onToggleLike,
     this.loadAllItems,
+    this.onBatchEditMetadata,
   });
 
   final List<Track> items;
@@ -104,6 +107,13 @@ class SongList extends ConsumerStatefulWidget {
 
   /// 行内红心切换（null 则不显示红心按钮）。
   final Future<void> Function(Track)? onToggleLike;
+
+  /// 批量模式「编辑元数据」回调（null 则不显示该按钮）。
+  ///
+  /// 宿主实现弹窗与落盘（本地库页经音源注册表能力接入，见
+  /// `services/source/metadata_editor.dart` 的 `MetadataEditor`）；通用列表
+  /// （我喜欢 / 搜索结果）不传 → 不显示，避免对在线曲目误暴露能力。
+  final Future<void> Function(List<Track> tracks)? onBatchEditMetadata;
 
   @override
   ConsumerState<SongList> createState() => _SongListState();
