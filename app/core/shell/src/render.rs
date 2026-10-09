@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! `archoerashell` 输出渲染器（Dart `mcp_shell_render.dart` 的 Rust 移植）。
+//! `archoerashell` 输出渲染器（TUI 版式：面板/表格/进度条）。
 //!
 //! 同一套代码在 `styled` 开关下产出 TUI（面板/表格/进度条）或纯文本；
 //! 所有输出行都经 [`Renderer::w`] 按终端列数兜底截断，保证不撑破排版。

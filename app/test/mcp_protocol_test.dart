@@ -7,7 +7,9 @@
 import 'package:archoera_music/services/mcp/mcp_tools.dart';
 import 'package:archoera_music/services/mcp/mcp_protocol.dart';
 import 'package:archoera_music/services/mcp/mcp_models.dart';
+import 'package:archoera_music/services/mcp/mcp_service.dart';
 import 'package:archoera_music/services/netease/track.dart';
+import 'package:archoera_music/stores/app_prefs.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -71,6 +73,43 @@ void main() {
       // allowLan 参与值语义。
       expect(a == a.copyWith(allowLan: true), isFalse);
       expect(a.copyWith(allowLan: true) == a.copyWith(allowLan: true), isTrue);
+    });
+  });
+
+  group('mcpConfigOf 能力门槛', () {
+    AppPrefs prefs({bool dev = false, bool module = false, bool cap = true}) =>
+        AppPrefs(
+          initialData: {
+            mcpEnabledKey: true,
+            '$mcpCapabilityPrefix${McpCapability.download.id}': cap,
+            developerModeKey: dev,
+            devDownloadModuleKey: module,
+          },
+        );
+
+    test('download 能力需开发者模式 + 下载模块', () {
+      // 勾选了下载能力，但未开开发者模式 → 不暴露。
+      expect(mcpConfigOf(prefs()).has(McpCapability.download), isFalse);
+      // 仅开发者模式、未开下载模块 → 不暴露。
+      expect(mcpConfigOf(prefs(dev: true)).has(McpCapability.download), isFalse);
+      // 开发者模式 + 下载模块 → 暴露。
+      expect(
+        mcpConfigOf(prefs(dev: true, module: true)).has(McpCapability.download),
+        isTrue,
+      );
+      // 未勾选能力 → 即使模块开启也不暴露。
+      expect(
+        mcpConfigOf(prefs(dev: true, module: true, cap: false))
+            .has(McpCapability.download),
+        isFalse,
+      );
+    });
+
+    test('其它能力组不受下载门槛影响', () {
+      final p = AppPrefs(
+        initialData: {mcpEnabledKey: true, '${mcpCapabilityPrefix}read': true},
+      );
+      expect(mcpConfigOf(p).has(McpCapability.read), isTrue);
     });
   });
 
