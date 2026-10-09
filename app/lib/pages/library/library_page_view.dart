@@ -84,6 +84,7 @@ extension _LibraryPageView on _LibraryPageState {
                 showDuration: true,
                 onPlay: _play,
                 onContextMenu: _onTrackMenu,
+                onBatchEditMetadata: _batchEditMetadata,
                 onReachBottom: () => notifier.loadMore(),
                 hasMore: state.hasMore,
                 loadingMore: state.loadingMore,

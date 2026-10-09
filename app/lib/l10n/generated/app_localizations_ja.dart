@@ -39,6 +39,206 @@ class AppLocalizationsJa extends AppLocalizations {
   String get menuTrackDetail => 'メディア詳細';
 
   @override
+  String get menuEditTags => 'メタデータを編集';
+
+  @override
+  String get tagEditorTitle => 'メタデータを編集';
+
+  @override
+  String get tagEditorLoading => 'タグを読み込み中…';
+
+  @override
+  String get tagEditorLoadFailed => 'タグの読み込みに失敗しました';
+
+  @override
+  String get tagEditorFieldTitle => 'タイトル';
+
+  @override
+  String get tagEditorFieldArtist => 'アーティスト';
+
+  @override
+  String get tagEditorFieldAlbum => 'アルバム';
+
+  @override
+  String get tagEditorFieldAlbumArtist => 'アルバムアーティスト';
+
+  @override
+  String get tagEditorFieldComposer => '作曲者';
+
+  @override
+  String get tagEditorFieldGenre => 'ジャンル';
+
+  @override
+  String get tagEditorFieldTrackNumber => 'トラック番号';
+
+  @override
+  String get tagEditorFieldDiscNumber => 'ディスク番号';
+
+  @override
+  String get tagEditorFieldYear => '年';
+
+  @override
+  String get tagEditorFieldLyrics => '歌詞';
+
+  @override
+  String get tagEditorFieldCover => 'カバー';
+
+  @override
+  String get tagEditorCoverChange => 'カバーを変更';
+
+  @override
+  String get tagEditorCoverRemove => 'カバーを削除';
+
+  @override
+  String get tagEditorSave => '保存';
+
+  @override
+  String get tagEditorSaving => '保存中…';
+
+  @override
+  String get tagEditorSaved => 'メタデータを保存しました';
+
+  @override
+  String get tagEditorSaveFailed => '保存に失敗しました';
+
+  @override
+  String get tagEditorNoPath => 'ローカルファイルのパスがありません';
+
+  @override
+  String get tagEditorUnsupportedFormat => '未対応のファイル形式';
+
+  @override
+  String get tagEditorDuration => '再生時間';
+
+  @override
+  String get menuBatchEditMetadata => 'メタデータを一括編集';
+
+  @override
+  String get tagEditorBatchTitle => 'メタデータを一括編集';
+
+  @override
+  String get tagEditorBatchHint => '変更したいフィールドのみ入力してください。空欄は元の値を保持します';
+
+  @override
+  String get tagEditorBatchCoverKeep => 'カバーを保持';
+
+  @override
+  String get tagEditorBatchCoverReplace => 'カバーを変更';
+
+  @override
+  String get tagEditorBatchCoverRemove => 'カバーを削除';
+
+  @override
+  String get tagEditorBatchApply => '選択項目に適用';
+
+  @override
+  String get tagEditorBatchApplying => '適用中…';
+
+  @override
+  String get tagEditorBatchNoEditable => '選択した曲はいずれもメタデータの編集に対応していません';
+
+  @override
+  String tagEditorBatchDone({required int success, required int failed}) {
+    return '$success 件更新、$failed 件失敗';
+  }
+
+  @override
+  String get tagEditorBatchStop => '停止';
+
+  @override
+  String get tagEditorBatchRules => 'タイトル / アーティストのルール';
+
+  @override
+  String get tagEditorBatchTitleRule => 'タイトル';
+
+  @override
+  String get tagEditorBatchArtistRule => 'アーティスト';
+
+  @override
+  String get tagEditorBatchRuleNone => '変更しない';
+
+  @override
+  String get tagEditorBatchRuleFindReplace => '検索と置換';
+
+  @override
+  String get tagEditorBatchRulePrefix => '接頭辞を追加';
+
+  @override
+  String get tagEditorBatchRuleSuffix => '接尾辞を追加';
+
+  @override
+  String get tagEditorBatchFindLabel => '検索';
+
+  @override
+  String get tagEditorBatchReplaceLabel => '置換後';
+
+  @override
+  String get tagEditorBatchAffixLabel => '内容';
+
+  @override
+  String get tagEditorBatchTokensHint =>
+      '使用可能なプレースホルダー：[index] [track] [title] [artist] [album] [year]';
+
+  @override
+  String get tagEditorRuleApply => 'ルールを適用';
+
+  @override
+  String get tagEditorRuleTargetBoth => '両方';
+
+  @override
+  String get tagEditorRulePreview => 'プレビュー';
+
+  @override
+  String get tagEditorRuleRegex => '正規表現';
+
+  @override
+  String get tagEditorRuleCaseSensitive => '大文字と小文字を区別';
+
+  @override
+  String get tagEditorRulePresets => 'プリセット';
+
+  @override
+  String get tagEditorRulePresetTrim => '前後の空白を削除';
+
+  @override
+  String get tagEditorRulePresetStripBrackets => '末尾の括弧を削除';
+
+  @override
+  String get tagEditorRulePresetStripLive => 'Live 表記を削除';
+
+  @override
+  String get tagEditorRulePresetIndexSuffix => '[index] の接尾辞を追加';
+
+  @override
+  String get tagEditorRulePresetStripFeat => 'feat. 部分を削除';
+
+  @override
+  String get tagEditorRulePresetSave => 'プリセットとして保存';
+
+  @override
+  String get tagEditorRulePresetName => 'プリセット名';
+
+  @override
+  String get tagEditorRulePresetDelete => 'プリセットを削除';
+
+  @override
+  String get tagEditorRulePresetSaved => 'プリセットを保存しました';
+
+  @override
+  String get tagEditorRulePresetRename => '名前を変更';
+
+  @override
+  String get tagEditorRulePresetMoveUp => '上へ移動';
+
+  @override
+  String get tagEditorRulePresetMoveDown => '下へ移動';
+
+  @override
+  String tagEditorBatchProgress({required int done, required int total}) {
+    return '処理中 $done/$total';
+  }
+
+  @override
   String get trackDetailDuration => '再生時間';
 
   @override

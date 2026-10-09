@@ -37,6 +37,206 @@ class AppLocalizationsZh extends AppLocalizations {
   String get menuTrackDetail => '媒体详细信息';
 
   @override
+  String get menuEditTags => '编辑元数据';
+
+  @override
+  String get tagEditorTitle => '编辑元数据';
+
+  @override
+  String get tagEditorLoading => '正在读取标签…';
+
+  @override
+  String get tagEditorLoadFailed => '读取标签失败';
+
+  @override
+  String get tagEditorFieldTitle => '标题';
+
+  @override
+  String get tagEditorFieldArtist => '艺术家';
+
+  @override
+  String get tagEditorFieldAlbum => '专辑';
+
+  @override
+  String get tagEditorFieldAlbumArtist => '专辑艺术家';
+
+  @override
+  String get tagEditorFieldComposer => '作曲家';
+
+  @override
+  String get tagEditorFieldGenre => '流派';
+
+  @override
+  String get tagEditorFieldTrackNumber => '音轨号';
+
+  @override
+  String get tagEditorFieldDiscNumber => '碟片号';
+
+  @override
+  String get tagEditorFieldYear => '年份';
+
+  @override
+  String get tagEditorFieldLyrics => '歌词';
+
+  @override
+  String get tagEditorFieldCover => '封面';
+
+  @override
+  String get tagEditorCoverChange => '更换封面';
+
+  @override
+  String get tagEditorCoverRemove => '移除封面';
+
+  @override
+  String get tagEditorSave => '保存';
+
+  @override
+  String get tagEditorSaving => '保存中…';
+
+  @override
+  String get tagEditorSaved => '已保存元数据';
+
+  @override
+  String get tagEditorSaveFailed => '保存失败';
+
+  @override
+  String get tagEditorNoPath => '缺少本地文件路径';
+
+  @override
+  String get tagEditorUnsupportedFormat => '不支持的文件格式';
+
+  @override
+  String get tagEditorDuration => '时长';
+
+  @override
+  String get menuBatchEditMetadata => '批量编辑元数据';
+
+  @override
+  String get tagEditorBatchTitle => '批量编辑元数据';
+
+  @override
+  String get tagEditorBatchHint => '仅填写需要修改的字段；留空表示保持原值';
+
+  @override
+  String get tagEditorBatchCoverKeep => '保持封面';
+
+  @override
+  String get tagEditorBatchCoverReplace => '更换封面';
+
+  @override
+  String get tagEditorBatchCoverRemove => '移除封面';
+
+  @override
+  String get tagEditorBatchApply => '应用到所选';
+
+  @override
+  String get tagEditorBatchApplying => '正在应用…';
+
+  @override
+  String get tagEditorBatchNoEditable => '所选曲目均不支持编辑元数据';
+
+  @override
+  String tagEditorBatchDone({required int success, required int failed}) {
+    return '已更新 $success 首，失败 $failed 首';
+  }
+
+  @override
+  String get tagEditorBatchStop => '停止';
+
+  @override
+  String get tagEditorBatchRules => '标题 / 艺术家规则';
+
+  @override
+  String get tagEditorBatchTitleRule => '标题';
+
+  @override
+  String get tagEditorBatchArtistRule => '艺术家';
+
+  @override
+  String get tagEditorBatchRuleNone => '不修改';
+
+  @override
+  String get tagEditorBatchRuleFindReplace => '查找替换';
+
+  @override
+  String get tagEditorBatchRulePrefix => '加前缀';
+
+  @override
+  String get tagEditorBatchRuleSuffix => '加后缀';
+
+  @override
+  String get tagEditorBatchFindLabel => '查找';
+
+  @override
+  String get tagEditorBatchReplaceLabel => '替换为';
+
+  @override
+  String get tagEditorBatchAffixLabel => '内容';
+
+  @override
+  String get tagEditorBatchTokensHint =>
+      '可用占位符：[index] [track] [title] [artist] [album] [year]';
+
+  @override
+  String get tagEditorRuleApply => '应用规则';
+
+  @override
+  String get tagEditorRuleTargetBoth => '两者';
+
+  @override
+  String get tagEditorRulePreview => '预览';
+
+  @override
+  String get tagEditorRuleRegex => '正则表达式';
+
+  @override
+  String get tagEditorRuleCaseSensitive => '区分大小写';
+
+  @override
+  String get tagEditorRulePresets => '预设';
+
+  @override
+  String get tagEditorRulePresetTrim => '去除首尾空白';
+
+  @override
+  String get tagEditorRulePresetStripBrackets => '去除结尾括号';
+
+  @override
+  String get tagEditorRulePresetStripLive => '去除 Live 标注';
+
+  @override
+  String get tagEditorRulePresetIndexSuffix => '追加 [index] 后缀';
+
+  @override
+  String get tagEditorRulePresetStripFeat => '去除 feat. 部分';
+
+  @override
+  String get tagEditorRulePresetSave => '保存为预设';
+
+  @override
+  String get tagEditorRulePresetName => '预设名称';
+
+  @override
+  String get tagEditorRulePresetDelete => '删除预设';
+
+  @override
+  String get tagEditorRulePresetSaved => '已保存预设';
+
+  @override
+  String get tagEditorRulePresetRename => '重命名';
+
+  @override
+  String get tagEditorRulePresetMoveUp => '上移';
+
+  @override
+  String get tagEditorRulePresetMoveDown => '下移';
+
+  @override
+  String tagEditorBatchProgress({required int done, required int total}) {
+    return '正在处理 $done/$total';
+  }
+
+  @override
   String get trackDetailDuration => '时长';
 
   @override
@@ -5368,6 +5568,206 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get menuTrackDetail => '媒体详细信息';
 
   @override
+  String get menuEditTags => '编辑元数据';
+
+  @override
+  String get tagEditorTitle => '编辑元数据';
+
+  @override
+  String get tagEditorLoading => '正在读取标签…';
+
+  @override
+  String get tagEditorLoadFailed => '读取标签失败';
+
+  @override
+  String get tagEditorFieldTitle => '标题';
+
+  @override
+  String get tagEditorFieldArtist => '艺术家';
+
+  @override
+  String get tagEditorFieldAlbum => '专辑';
+
+  @override
+  String get tagEditorFieldAlbumArtist => '专辑艺术家';
+
+  @override
+  String get tagEditorFieldComposer => '作曲家';
+
+  @override
+  String get tagEditorFieldGenre => '流派';
+
+  @override
+  String get tagEditorFieldTrackNumber => '音轨号';
+
+  @override
+  String get tagEditorFieldDiscNumber => '碟片号';
+
+  @override
+  String get tagEditorFieldYear => '年份';
+
+  @override
+  String get tagEditorFieldLyrics => '歌词';
+
+  @override
+  String get tagEditorFieldCover => '封面';
+
+  @override
+  String get tagEditorCoverChange => '更换封面';
+
+  @override
+  String get tagEditorCoverRemove => '移除封面';
+
+  @override
+  String get tagEditorSave => '保存';
+
+  @override
+  String get tagEditorSaving => '保存中…';
+
+  @override
+  String get tagEditorSaved => '已保存元数据';
+
+  @override
+  String get tagEditorSaveFailed => '保存失败';
+
+  @override
+  String get tagEditorNoPath => '缺少本地文件路径';
+
+  @override
+  String get tagEditorUnsupportedFormat => '不支持的文件格式';
+
+  @override
+  String get tagEditorDuration => '时长';
+
+  @override
+  String get menuBatchEditMetadata => '批量编辑元数据';
+
+  @override
+  String get tagEditorBatchTitle => '批量编辑元数据';
+
+  @override
+  String get tagEditorBatchHint => '仅填写需要修改的字段；留空表示保持原值';
+
+  @override
+  String get tagEditorBatchCoverKeep => '保持封面';
+
+  @override
+  String get tagEditorBatchCoverReplace => '更换封面';
+
+  @override
+  String get tagEditorBatchCoverRemove => '移除封面';
+
+  @override
+  String get tagEditorBatchApply => '应用到所选';
+
+  @override
+  String get tagEditorBatchApplying => '正在应用…';
+
+  @override
+  String get tagEditorBatchNoEditable => '所选曲目均不支持编辑元数据';
+
+  @override
+  String tagEditorBatchDone({required int success, required int failed}) {
+    return '已更新 $success 首，失败 $failed 首';
+  }
+
+  @override
+  String get tagEditorBatchStop => '停止';
+
+  @override
+  String get tagEditorBatchRules => '标题 / 艺术家规则';
+
+  @override
+  String get tagEditorBatchTitleRule => '标题';
+
+  @override
+  String get tagEditorBatchArtistRule => '艺术家';
+
+  @override
+  String get tagEditorBatchRuleNone => '不修改';
+
+  @override
+  String get tagEditorBatchRuleFindReplace => '查找替换';
+
+  @override
+  String get tagEditorBatchRulePrefix => '加前缀';
+
+  @override
+  String get tagEditorBatchRuleSuffix => '加后缀';
+
+  @override
+  String get tagEditorBatchFindLabel => '查找';
+
+  @override
+  String get tagEditorBatchReplaceLabel => '替换为';
+
+  @override
+  String get tagEditorBatchAffixLabel => '内容';
+
+  @override
+  String get tagEditorBatchTokensHint =>
+      '可用占位符：[index] [track] [title] [artist] [album] [year]';
+
+  @override
+  String get tagEditorRuleApply => '应用规则';
+
+  @override
+  String get tagEditorRuleTargetBoth => '两者';
+
+  @override
+  String get tagEditorRulePreview => '预览';
+
+  @override
+  String get tagEditorRuleRegex => '正则表达式';
+
+  @override
+  String get tagEditorRuleCaseSensitive => '区分大小写';
+
+  @override
+  String get tagEditorRulePresets => '预设';
+
+  @override
+  String get tagEditorRulePresetTrim => '去除首尾空白';
+
+  @override
+  String get tagEditorRulePresetStripBrackets => '去除结尾括号';
+
+  @override
+  String get tagEditorRulePresetStripLive => '去除 Live 标注';
+
+  @override
+  String get tagEditorRulePresetIndexSuffix => '追加 [index] 后缀';
+
+  @override
+  String get tagEditorRulePresetStripFeat => '去除 feat. 部分';
+
+  @override
+  String get tagEditorRulePresetSave => '保存为预设';
+
+  @override
+  String get tagEditorRulePresetName => '预设名称';
+
+  @override
+  String get tagEditorRulePresetDelete => '删除预设';
+
+  @override
+  String get tagEditorRulePresetSaved => '已保存预设';
+
+  @override
+  String get tagEditorRulePresetRename => '重命名';
+
+  @override
+  String get tagEditorRulePresetMoveUp => '上移';
+
+  @override
+  String get tagEditorRulePresetMoveDown => '下移';
+
+  @override
+  String tagEditorBatchProgress({required int done, required int total}) {
+    return '正在处理 $done/$total';
+  }
+
+  @override
   String get trackDetailDuration => '时长';
 
   @override
@@ -10697,6 +11097,206 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get menuTrackDetail => '媒體詳細資訊';
+
+  @override
+  String get menuEditTags => '編輯中繼資料';
+
+  @override
+  String get tagEditorTitle => '編輯中繼資料';
+
+  @override
+  String get tagEditorLoading => '正在讀取標籤…';
+
+  @override
+  String get tagEditorLoadFailed => '讀取標籤失敗';
+
+  @override
+  String get tagEditorFieldTitle => '標題';
+
+  @override
+  String get tagEditorFieldArtist => '演出者';
+
+  @override
+  String get tagEditorFieldAlbum => '專輯';
+
+  @override
+  String get tagEditorFieldAlbumArtist => '專輯演出者';
+
+  @override
+  String get tagEditorFieldComposer => '作曲者';
+
+  @override
+  String get tagEditorFieldGenre => '曲風';
+
+  @override
+  String get tagEditorFieldTrackNumber => '曲目編號';
+
+  @override
+  String get tagEditorFieldDiscNumber => '唱片編號';
+
+  @override
+  String get tagEditorFieldYear => '年份';
+
+  @override
+  String get tagEditorFieldLyrics => '歌詞';
+
+  @override
+  String get tagEditorFieldCover => '封面';
+
+  @override
+  String get tagEditorCoverChange => '更換封面';
+
+  @override
+  String get tagEditorCoverRemove => '移除封面';
+
+  @override
+  String get tagEditorSave => '儲存';
+
+  @override
+  String get tagEditorSaving => '儲存中…';
+
+  @override
+  String get tagEditorSaved => '已儲存中繼資料';
+
+  @override
+  String get tagEditorSaveFailed => '儲存失敗';
+
+  @override
+  String get tagEditorNoPath => '缺少本機檔案路徑';
+
+  @override
+  String get tagEditorUnsupportedFormat => '不支援的檔案格式';
+
+  @override
+  String get tagEditorDuration => '時長';
+
+  @override
+  String get menuBatchEditMetadata => '批次編輯中繼資料';
+
+  @override
+  String get tagEditorBatchTitle => '批次編輯中繼資料';
+
+  @override
+  String get tagEditorBatchHint => '僅填寫需要修改的欄位；留空表示保持原值';
+
+  @override
+  String get tagEditorBatchCoverKeep => '保持封面';
+
+  @override
+  String get tagEditorBatchCoverReplace => '更換封面';
+
+  @override
+  String get tagEditorBatchCoverRemove => '移除封面';
+
+  @override
+  String get tagEditorBatchApply => '套用到所選';
+
+  @override
+  String get tagEditorBatchApplying => '正在套用…';
+
+  @override
+  String get tagEditorBatchNoEditable => '所選曲目均不支援編輯中繼資料';
+
+  @override
+  String tagEditorBatchDone({required int success, required int failed}) {
+    return '已更新 $success 首，失敗 $failed 首';
+  }
+
+  @override
+  String get tagEditorBatchStop => '停止';
+
+  @override
+  String get tagEditorBatchRules => '標題 / 演出者規則';
+
+  @override
+  String get tagEditorBatchTitleRule => '標題';
+
+  @override
+  String get tagEditorBatchArtistRule => '演出者';
+
+  @override
+  String get tagEditorBatchRuleNone => '不修改';
+
+  @override
+  String get tagEditorBatchRuleFindReplace => '尋找取代';
+
+  @override
+  String get tagEditorBatchRulePrefix => '加前綴';
+
+  @override
+  String get tagEditorBatchRuleSuffix => '加後綴';
+
+  @override
+  String get tagEditorBatchFindLabel => '尋找';
+
+  @override
+  String get tagEditorBatchReplaceLabel => '取代為';
+
+  @override
+  String get tagEditorBatchAffixLabel => '內容';
+
+  @override
+  String get tagEditorBatchTokensHint =>
+      '可用佔位符：[index] [track] [title] [artist] [album] [year]';
+
+  @override
+  String get tagEditorRuleApply => '套用規則';
+
+  @override
+  String get tagEditorRuleTargetBoth => '兩者';
+
+  @override
+  String get tagEditorRulePreview => '預覽';
+
+  @override
+  String get tagEditorRuleRegex => '正規表達式';
+
+  @override
+  String get tagEditorRuleCaseSensitive => '區分大小寫';
+
+  @override
+  String get tagEditorRulePresets => '預設';
+
+  @override
+  String get tagEditorRulePresetTrim => '去除首尾空白';
+
+  @override
+  String get tagEditorRulePresetStripBrackets => '去除結尾括號';
+
+  @override
+  String get tagEditorRulePresetStripLive => '去除 Live 標註';
+
+  @override
+  String get tagEditorRulePresetIndexSuffix => '追加 [index] 後綴';
+
+  @override
+  String get tagEditorRulePresetStripFeat => '去除 feat. 部分';
+
+  @override
+  String get tagEditorRulePresetSave => '儲存為預設';
+
+  @override
+  String get tagEditorRulePresetName => '預設名稱';
+
+  @override
+  String get tagEditorRulePresetDelete => '刪除預設';
+
+  @override
+  String get tagEditorRulePresetSaved => '已儲存預設';
+
+  @override
+  String get tagEditorRulePresetRename => '重新命名';
+
+  @override
+  String get tagEditorRulePresetMoveUp => '上移';
+
+  @override
+  String get tagEditorRulePresetMoveDown => '下移';
+
+  @override
+  String tagEditorBatchProgress({required int done, required int total}) {
+    return '正在處理 $done/$total';
+  }
 
   @override
   String get trackDetailDuration => '時長';

@@ -33,65 +33,74 @@ extension _SongListView on _SongListState {
               onBatchPlay: _batchPlay,
               onBatchAddQueue: _batchAddQueue,
               onBatchDownload: _batchDownload,
+              onBatchEditMetadata: widget.onBatchEditMetadata == null
+                  ? null
+                  : () => unawaited(_batchEditMetadata()),
               onExitBatch: _exitBatch,
             ),
             const Divider(height: 1),
             Expanded(
               child: NotificationListener<ScrollNotification>(
                 onNotification: _onScroll,
-                child: ListView.builder(
-                  controller: _scrollCtrl,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: listCount + 1,
-                  // 固定行高虚拟化：每行按 O(index) 定位，免去逐子项测量。
-                  // 歌曲行恒为 _songRowExtent；尾项为空列表时 0，否则高度。
-                  itemExtentBuilder: (index, _) => index == listCount
-                      ? (listCount == 0
-                            ? 0.0
-                            : _SongListState._songFooterExtent)
-                      : _SongListState._songRowExtent,
-                  itemBuilder: (context, index) {
-                    if (index == listCount) {
-                      return _SongListFooter(
-                        visible: listCount > 0,
-                        loadingMore: widget.loadingMore,
-                        hasMore: widget.hasMore,
+                // InkClip：将行内 InkWell 的 ink（悬停 overlay / 水波纹）裁剪到
+                // 列表视口内。否则 ink 由外层 Material 绘制、不受 ListView 视口
+                // 裁剪，半露出视口的行其悬停高亮会越界画到列表上下边界之外。
+                child: InkClip(
+                  child: ListView.builder(
+                    controller: _scrollCtrl,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: listCount + 1,
+                    // 固定行高虚拟化：每行按 O(index) 定位，免去逐子项测量。
+                    // 歌曲行恒为 _songRowExtent；尾项为空列表时 0，否则高度。
+                    itemExtentBuilder: (index, _) => index == listCount
+                        ? (listCount == 0
+                              ? 0.0
+                              : _SongListState._songFooterExtent)
+                        : _SongListState._songRowExtent,
+                    itemBuilder: (context, index) {
+                      if (index == listCount) {
+                        return _SongListFooter(
+                          visible: listCount > 0,
+                          loadingMore: widget.loadingMore,
+                          hasMore: widget.hasMore,
+                        );
+                      }
+                      final Track? item;
+                      if (widget.totalCount != null) {
+                        // 窗口模式：全局 index 映射到页缓存；未驻留返回 null。
+                        item = widget.itemAt?.call(index);
+                      } else {
+                        item = widget.items[index];
+                      }
+                      if (item == null) {
+                        // 该行所在页尚未驻留：轻量占位并触发异步取页，
+                        // 页到位后 rebuild 用真实行替换（驻留内存 O(视口)）。
+                        widget.onMissingIndex?.call(index);
+                        return const SizedBox.shrink();
+                      }
+                      // 提升为非空局部量，供闭包内引用（闭包中不再保留提升）。
+                      final Track track = item;
+                      return SongRow(
+                        item: track,
+                        index: index,
+                        showIndex: widget.showIndex,
+                        showAlbum: widget.showAlbum,
+                        showDuration: widget.showDuration,
+                        showSource: widget.showSource,
+                        isPlaying: widget.playingId == item.id,
+                        playingNow: widget.isPlaying,
+                        liked:
+                            widget.likedIds?.contains(songLikeKey(item)) ??
+                            false,
+                        onPlay: widget.onPlay,
+                        onToggleLike: widget.onToggleLike,
+                        onContextMenu: widget.onContextMenu,
+                        batchActive: _batchActive,
+                        selected: _selected.contains(songLikeKey(item)),
+                        onToggleSelect: () => _toggleSelect(track, index),
                       );
-                    }
-                    final Track? item;
-                    if (widget.totalCount != null) {
-                      // 窗口模式：全局 index 映射到页缓存；未驻留返回 null。
-                      item = widget.itemAt?.call(index);
-                    } else {
-                      item = widget.items[index];
-                    }
-                    if (item == null) {
-                      // 该行所在页尚未驻留：轻量占位并触发异步取页，
-                      // 页到位后 rebuild 用真实行替换（驻留内存 O(视口)）。
-                      widget.onMissingIndex?.call(index);
-                      return const SizedBox.shrink();
-                    }
-                    // 提升为非空局部量，供闭包内引用（闭包中不再保留提升）。
-                    final Track track = item;
-                    return SongRow(
-                      item: track,
-                      index: index,
-                      showIndex: widget.showIndex,
-                      showAlbum: widget.showAlbum,
-                      showDuration: widget.showDuration,
-                      showSource: widget.showSource,
-                      isPlaying: widget.playingId == item.id,
-                      playingNow: widget.isPlaying,
-                      liked:
-                          widget.likedIds?.contains(songLikeKey(item)) ?? false,
-                      onPlay: widget.onPlay,
-                      onToggleLike: widget.onToggleLike,
-                      onContextMenu: widget.onContextMenu,
-                      batchActive: _batchActive,
-                      selected: _selected.contains(songLikeKey(item)),
-                      onToggleSelect: () => _toggleSelect(track, index),
-                    );
-                  },
+                    },
+                  ),
                 ),
               ),
             ),
@@ -133,6 +142,7 @@ class _SongListHeader extends StatelessWidget {
     required this.onBatchPlay,
     required this.onBatchAddQueue,
     required this.onBatchDownload,
+    required this.onBatchEditMetadata,
     required this.onExitBatch,
   });
 
@@ -154,6 +164,9 @@ class _SongListHeader extends StatelessWidget {
   final Future<void> Function() onBatchPlay;
   final VoidCallback onBatchAddQueue;
   final Future<void> Function() onBatchDownload;
+
+  /// 批量「编辑元数据」回调（null → 不显示该按钮）。
+  final VoidCallback? onBatchEditMetadata;
   final VoidCallback onExitBatch;
 
   @override
@@ -206,6 +219,13 @@ class _SongListHeader extends StatelessWidget {
                 icon: EtaIcons.downloadOutline,
                 enabled: !none,
                 onTap: () => onBatchDownload(),
+              ),
+            if (onBatchEditMetadata != null)
+              _SongListIconButton(
+                tooltip: l10n.menuBatchEditMetadata,
+                icon: EtaIcons.editOutline,
+                enabled: !none,
+                onTap: onBatchEditMetadata!,
               ),
             _SongListIconButton(
               tooltip: l10n.batchExit,

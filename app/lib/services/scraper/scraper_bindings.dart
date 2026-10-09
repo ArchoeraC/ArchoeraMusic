@@ -20,10 +20,14 @@ import '../native_library_registry.dart' as ffi_registry;
 
 typedef ScraperCreateNative = Pointer<Void> Function(Pointer<Utf8> configJson);
 typedef ScraperCreateDart = Pointer<Void> Function(Pointer<Utf8> configJson);
-typedef ScraperEnqueueNative =
-    Int32 Function(Pointer<Void> handle, Pointer<Utf8> trackJson);
-typedef ScraperEnqueueDart =
-    int Function(Pointer<Void> handle, Pointer<Utf8> trackJson);
+typedef ScraperEnqueueNative = Int32 Function(
+  Pointer<Void> handle,
+  Pointer<Utf8> trackJson,
+);
+typedef ScraperEnqueueDart = int Function(
+  Pointer<Void> handle,
+  Pointer<Utf8> trackJson,
+);
 typedef ScraperRunNative = Int32 Function(Pointer<Void> handle);
 typedef ScraperRunDart = int Function(Pointer<Void> handle);
 typedef ScraperIsDoneNative = Int32 Function(Pointer<Void> handle);
@@ -34,16 +38,40 @@ typedef ScraperCancelNative = Void Function(Pointer<Void> handle);
 typedef ScraperCancelDart = void Function(Pointer<Void> handle);
 typedef ScraperPollEventNative = Pointer<Utf8> Function(Pointer<Void> handle);
 typedef ScraperPollEventDart = Pointer<Utf8> Function(Pointer<Void> handle);
-typedef ScraperWaitEventNative =
-    Int32 Function(Pointer<Void> handle, Pointer<Uint8> buf, Int32 cap, Int32 timeoutMs);
-typedef ScraperWaitEventDart =
-    int Function(Pointer<Void> handle, Pointer<Uint8> buf, int cap, int timeoutMs);
+typedef ScraperWaitEventNative = Int32 Function(
+  Pointer<Void> handle,
+  Pointer<Uint8> buf,
+  Int32 cap,
+  Int32 timeoutMs,
+);
+typedef ScraperWaitEventDart = int Function(
+  Pointer<Void> handle,
+  Pointer<Uint8> buf,
+  int cap,
+  int timeoutMs,
+);
 typedef ScraperDestroyNative = Void Function(Pointer<Void> handle);
 typedef ScraperDestroyDart = void Function(Pointer<Void> handle);
-typedef ScraperSetLogSinkNative =
-    Void Function(Pointer<NativeFunction<LogWriteNative>> fn, Int32 minLevel);
+typedef ScraperSetLogSinkNative = Void Function(
+  Pointer<NativeFunction<LogWriteNative>> fn,
+  Int32 minLevel,
+);
 typedef ScraperSetLogSinkDart = void Function(
-    Pointer<NativeFunction<LogWriteNative>> fn, int minLevel);
+  Pointer<NativeFunction<LogWriteNative>> fn,
+  int minLevel,
+);
+typedef ScraperReadTagsNative = Pointer<Utf8> Function(Pointer<Utf8> filePath);
+typedef ScraperReadTagsDart = Pointer<Utf8> Function(Pointer<Utf8> filePath);
+typedef ScraperWriteTagsNative = Pointer<Utf8> Function(
+  Pointer<Utf8> filePath,
+  Pointer<Utf8> tagsJson,
+);
+typedef ScraperWriteTagsDart = Pointer<Utf8> Function(
+  Pointer<Utf8> filePath,
+  Pointer<Utf8> tagsJson,
+);
+typedef ScraperFreeStringNative = Void Function(Pointer<Utf8> s);
+typedef ScraperFreeStringDart = void Function(Pointer<Utf8> s);
 
 /// 刮削库句柄：持有 DynamicLibrary + 各函数指针，防止 GC 回收库。
 class ScraperBindings {
@@ -86,6 +114,48 @@ class ScraperBindings {
       .lookupFunction<ScraperDestroyNative, ScraperDestroyDart>(
         'archoera_scraper_destroy',
       );
+  late final ScraperReadTagsDart _readTags = _lib
+      .lookupFunction<ScraperReadTagsNative, ScraperReadTagsDart>(
+        'archoera_scraper_read_tags',
+      );
+  late final ScraperWriteTagsDart _writeTags = _lib
+      .lookupFunction<ScraperWriteTagsNative, ScraperWriteTagsDart>(
+        'archoera_scraper_write_tags',
+      );
+  late final ScraperFreeStringDart _freeString = _lib
+      .lookupFunction<ScraperFreeStringNative, ScraperFreeStringDart>(
+        'archoera_scraper_free_string',
+      );
+
+  /// 读取单文件标签 → JSON 字符串（空字符串表示无结果）。
+  String readTagsJson(String filePath) {
+    final pathPtr = filePath.toNativeUtf8();
+    Pointer<Utf8> result = nullptr;
+    try {
+      result = _readTags(pathPtr);
+      if (result.address == 0) return '';
+      return result.toDartString();
+    } finally {
+      calloc.free(pathPtr);
+      if (result.address != 0) _freeString(result);
+    }
+  }
+
+  /// 写入单文件标签 → JSON 字符串。
+  String writeTagsJson(String filePath, String tagsJson) {
+    final pathPtr = filePath.toNativeUtf8();
+    final jsonPtr = tagsJson.toNativeUtf8();
+    Pointer<Utf8> result = nullptr;
+    try {
+      result = _writeTags(pathPtr, jsonPtr);
+      if (result.address == 0) return '';
+      return result.toDartString();
+    } finally {
+      calloc.free(pathPtr);
+      calloc.free(jsonPtr);
+      if (result.address != 0) _freeString(result);
+    }
+  }
 
   /// 取一条事件 JSON（poll 回退）；无则返回 null。
   Pointer<Utf8> pollEvent(Pointer<Void> handle) => _pollEvent(handle);
@@ -100,8 +170,7 @@ class ScraperBindings {
     Pointer<Uint8> buf,
     int cap,
     int timeoutMs,
-  ) =>
-      _waitEvent(handle, buf, cap, timeoutMs);
+  ) => _waitEvent(handle, buf, cap, timeoutMs);
 
   void destroy(Pointer<Void> handle) => _destroy(handle);
 

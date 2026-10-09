@@ -94,41 +94,44 @@ extension _SideBarView on _SideBarState {
             child: Stack(
               key: _navHostKey,
               children: [
-                ListView(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: collapsed ? 10 : 10,
-                    vertical: 8,
-                  ),
-                  children: [
-                    for (final (groupTitle, items) in _navGroups(l10n)) ...[
-                      if (!collapsed)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 5),
-                          child: Text(
-                            groupTitle,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.5,
-                              color: colorScheme.onSurfaceVariant.withValues(
-                                alpha: 0.6,
+                // InkClip：把导航项 InkWell 的悬停/水波纹 ink 裁剪到导航视口内。
+                InkClip(
+                  child: ListView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: collapsed ? 10 : 10,
+                      vertical: 8,
+                    ),
+                    children: [
+                      for (final (groupTitle, items) in _navGroups(l10n)) ...[
+                        if (!collapsed)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 5),
+                            child: Text(
+                              groupTitle,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.5,
+                                color: colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.6,
+                                ),
                               ),
                             ),
+                          )
+                        else
+                          const SizedBox(height: 12),
+                        for (final item in items)
+                          MouseDodge(
+                            child: _buildNavItem(
+                              theme,
+                              item,
+                              collapsed,
+                              animated,
+                            ),
                           ),
-                        )
-                      else
-                        const SizedBox(height: 12),
-                      for (final item in items)
-                        MouseDodge(
-                          child: _buildNavItem(
-                            theme,
-                            item,
-                            collapsed,
-                            animated,
-                          ),
-                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
                 // 滑动高亮指示条（SMenu animated：绝对定位左 3px 圆角主色条，
                 // AnimatedPositioned 平滑更新 top/height，对齐 transition-[top,height] duration-250）

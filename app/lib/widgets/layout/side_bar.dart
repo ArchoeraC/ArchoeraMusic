@@ -12,6 +12,8 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import 'app_logo.dart';
 import '../common/anim.dart';
+import '../common/ink_clip.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'side_bar/side_bar_view.dart';

@@ -42,6 +42,18 @@ extension _LibraryPageActions on _LibraryPageState {
         ),
         SContextMenuItem.divider(),
         SContextMenuItem(
+          label: l10n.menuTrackDetail,
+          icon: EtaIcons.informationOutline,
+          onTap: () => showTrackDetailDialog(context, track: track),
+        ),
+        // 元数据编辑入口由音源注册表决定（本地文件源支持；见 SourcePlatform.metadataEditor）。
+        if (sourcePlatform(track.source).canEditMetadata(track))
+          SContextMenuItem(
+            label: l10n.menuEditTags,
+            icon: EtaIcons.editOutline,
+            onTap: () => showTagEditorDialog(context, track: track),
+          ),
+        SContextMenuItem(
           label: l10n.menuComment,
           icon: EtaIcons.chatOutline,
           onTap: () => showCommentDialog(context, track: track),
@@ -71,6 +83,12 @@ extension _LibraryPageActions on _LibraryPageState {
         ),
       ],
     );
+  }
+
+  /// 批量编辑所选曲目的元数据（经音源注册表能力接入；本地库全为本地文件）。
+  Future<void> _batchEditMetadata(List<Track> tracks) async {
+    if (tracks.isEmpty) return;
+    await showBatchTagEditorDialog(context, tracks: tracks);
   }
 
   /// 删除曲目文件（磁盘）并从曲库移除（危险操作，需确认）。

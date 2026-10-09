@@ -41,6 +41,208 @@ class AppLocalizationsEn extends AppLocalizations {
   String get menuTrackDetail => 'Media details';
 
   @override
+  String get menuEditTags => 'Edit metadata';
+
+  @override
+  String get tagEditorTitle => 'Edit metadata';
+
+  @override
+  String get tagEditorLoading => 'Reading tags…';
+
+  @override
+  String get tagEditorLoadFailed => 'Failed to read tags';
+
+  @override
+  String get tagEditorFieldTitle => 'Title';
+
+  @override
+  String get tagEditorFieldArtist => 'Artist';
+
+  @override
+  String get tagEditorFieldAlbum => 'Album';
+
+  @override
+  String get tagEditorFieldAlbumArtist => 'Album artist';
+
+  @override
+  String get tagEditorFieldComposer => 'Composer';
+
+  @override
+  String get tagEditorFieldGenre => 'Genre';
+
+  @override
+  String get tagEditorFieldTrackNumber => 'Track number';
+
+  @override
+  String get tagEditorFieldDiscNumber => 'Disc number';
+
+  @override
+  String get tagEditorFieldYear => 'Year';
+
+  @override
+  String get tagEditorFieldLyrics => 'Lyrics';
+
+  @override
+  String get tagEditorFieldCover => 'Cover';
+
+  @override
+  String get tagEditorCoverChange => 'Change cover';
+
+  @override
+  String get tagEditorCoverRemove => 'Remove cover';
+
+  @override
+  String get tagEditorSave => 'Save';
+
+  @override
+  String get tagEditorSaving => 'Saving…';
+
+  @override
+  String get tagEditorSaved => 'Metadata saved';
+
+  @override
+  String get tagEditorSaveFailed => 'Failed to save';
+
+  @override
+  String get tagEditorNoPath => 'Missing local file path';
+
+  @override
+  String get tagEditorUnsupportedFormat => 'Unsupported file format';
+
+  @override
+  String get tagEditorDuration => 'Duration';
+
+  @override
+  String get menuBatchEditMetadata => 'Batch edit metadata';
+
+  @override
+  String get tagEditorBatchTitle => 'Batch edit metadata';
+
+  @override
+  String get tagEditorBatchHint =>
+      'Only fill in fields you want to change; leave blank to keep original values';
+
+  @override
+  String get tagEditorBatchCoverKeep => 'Keep cover';
+
+  @override
+  String get tagEditorBatchCoverReplace => 'Replace cover';
+
+  @override
+  String get tagEditorBatchCoverRemove => 'Remove cover';
+
+  @override
+  String get tagEditorBatchApply => 'Apply to selected';
+
+  @override
+  String get tagEditorBatchApplying => 'Applying…';
+
+  @override
+  String get tagEditorBatchNoEditable =>
+      'None of the selected tracks support metadata editing';
+
+  @override
+  String tagEditorBatchDone({required int success, required int failed}) {
+    return '$success updated, $failed failed';
+  }
+
+  @override
+  String get tagEditorBatchStop => 'Stop';
+
+  @override
+  String get tagEditorBatchRules => 'Title / artist rules';
+
+  @override
+  String get tagEditorBatchTitleRule => 'Title';
+
+  @override
+  String get tagEditorBatchArtistRule => 'Artist';
+
+  @override
+  String get tagEditorBatchRuleNone => 'No change';
+
+  @override
+  String get tagEditorBatchRuleFindReplace => 'Find & replace';
+
+  @override
+  String get tagEditorBatchRulePrefix => 'Add prefix';
+
+  @override
+  String get tagEditorBatchRuleSuffix => 'Add suffix';
+
+  @override
+  String get tagEditorBatchFindLabel => 'Find';
+
+  @override
+  String get tagEditorBatchReplaceLabel => 'Replace with';
+
+  @override
+  String get tagEditorBatchAffixLabel => 'Content';
+
+  @override
+  String get tagEditorBatchTokensHint =>
+      'Available placeholders: [index] [track] [title] [artist] [album] [year]';
+
+  @override
+  String get tagEditorRuleApply => 'Apply rule';
+
+  @override
+  String get tagEditorRuleTargetBoth => 'Both';
+
+  @override
+  String get tagEditorRulePreview => 'Preview';
+
+  @override
+  String get tagEditorRuleRegex => 'Regular expression';
+
+  @override
+  String get tagEditorRuleCaseSensitive => 'Match case';
+
+  @override
+  String get tagEditorRulePresets => 'Presets';
+
+  @override
+  String get tagEditorRulePresetTrim => 'Trim whitespace';
+
+  @override
+  String get tagEditorRulePresetStripBrackets => 'Remove trailing brackets';
+
+  @override
+  String get tagEditorRulePresetStripLive => 'Remove \"Live\" tag';
+
+  @override
+  String get tagEditorRulePresetIndexSuffix => 'Append [index] suffix';
+
+  @override
+  String get tagEditorRulePresetStripFeat => 'Remove feat. part';
+
+  @override
+  String get tagEditorRulePresetSave => 'Save as preset';
+
+  @override
+  String get tagEditorRulePresetName => 'Preset name';
+
+  @override
+  String get tagEditorRulePresetDelete => 'Delete preset';
+
+  @override
+  String get tagEditorRulePresetSaved => 'Preset saved';
+
+  @override
+  String get tagEditorRulePresetRename => 'Rename';
+
+  @override
+  String get tagEditorRulePresetMoveUp => 'Move up';
+
+  @override
+  String get tagEditorRulePresetMoveDown => 'Move down';
+
+  @override
+  String tagEditorBatchProgress({required int done, required int total}) {
+    return 'Processing $done/$total';
+  }
+
+  @override
   String get trackDetailDuration => 'Duration';
 
   @override
