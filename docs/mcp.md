@@ -164,6 +164,10 @@
 | `lyrics` | `get_lyrics` |
 | `download` | `download_list`、`download_add`、`download_cancel`、`download_remove` |
 
+> `download` 能力组额外要求**开启开发者模式 + 下载模块**（与 GUI 隐藏入口同门槛，
+> 见 `AppPrefs.downloadModuleEnabled`）：未开启时该能力组即使勾选也不会暴露，
+> 调用返回 `unsupported`（GUI 设置中该能力行也会隐藏）。
+
 **曲目引用**：搜索 / 曲库 / 历史结果都带稳定 `ref`（`source:id`），
 `play_track` / `play_tracks` / `queue_add` / 收藏类工具优先用 `ref`
 （服务端有界缓存命中），也接受完整 `track` 对象或 `source` + `id`。
@@ -190,31 +194,32 @@
 随桌面端二进制内置一个命令行客户端，采用类 Unix 语法：
 
 ```bash
-archoera_music archoerashell [全局选项] <命令> [参数...]
+archoera_music archoerashell [全局选项] <命令> [参数...]   # Linux / macOS
+archoera_music archoerashell [全局选项] <命令> ...         # Windows（主程序子命令）
+archoerashell.exe [全局选项] <命令> [参数...]             # Windows（控制台伴生程序，推荐）
 ```
 
-它**不启动 GUI**。三端均由 runner 在 Flutter 初始化之前拦截 `archoerashell` 子命令，
-直接调用原生 Rust 入口（`app/core/shell`，`staticlib`）——**完全不加载 Flutter 引擎 /
-Dart**，命令行调用即时返回：
+它**不启动 GUI**：主 GUI 程序在 Flutter 初始化前拦截 `archoerashell` 子命令，直接调用
+原生 Rust 入口（`app/core/shell`，`staticlib`），**完全不加载 Flutter 引擎 / Dart**，
+命令行调用即时返回：
 
 - **Linux**：`app/linux/runner/main.cc` 检测子命令后调用 `archoera_shell_main`；由
   `app/linux/CMakeLists.txt` 的内嵌 cargo 目标编译 `libarchoera_shell.a` 链入。
 - **Windows**：两种入口共享同一 Rust staticlib——
+  - `archoerashell.exe`（`app/windows/runner/shell_main.cpp`，**控制台子系统**伴生
+    程序）：cmd/PowerShell 会等待其退出且独占控制台输入，**推荐**用于交互式 REPL 与
+    脚本。
   - `archoera_music.exe archoerashell …`（`app/windows/runner/main.cpp` 在 `wWinMain`
     起始处分派）：适合**一次性命令**。GUI 子系统进程被终端调用时由
     `app/core/shell/src/console.rs` 接管/补齐标准流、切 UTF-8 并开启 ANSI，但它与
     调用方 shell 争抢同一控制台输入，**不适合交互式 REPL**。
-  - `archoerashell.exe`（`app/windows/runner/shell_main.cpp`，**控制台子系统**伴生
-    程序）：cmd/PowerShell 会等待其退出且独占控制台输入，**推荐**用于交互式 REPL 与
-    脚本。
 - **macOS**：`app/macos/Runner/main.swift` 在 `NSApplicationMain` 之前检测子命令；
   `Runner.xcodeproj` 的 “Build archoerashell (cargo)” 阶段按 `$ARCHS`（Release 为
   `arm64 x86_64`）逐架构编译并 `lipo` 成 `target/universal/release/libarchoera_shell.a`
   链入（`-liconv` 为 Rust std 的系统依赖）。
 
 实现自包含：参数解析、回环 REST（`std::net`）、TUI 渲染；帮助文案由 `build.rs`
-从 Flutter 的 ARB（`mcpShell*`）生成，与 Dart 端同源。（Dart 版
-`app/lib/cli/mcp_shell.dart` 保留为参考与单测对象，不再参与桌面端运行时。）
+从 Flutter 的 ARB（`mcpShell*`）生成，与 Dart 端同源（ARB 仍由 Dart 本地化体系维护）。
 
 三端都通过本机 MCP 服务的 REST 接口与**运行中的实例**通信——目标端口/密钥
 取自应用设置（`prefs.json`），可用全局选项覆盖。
@@ -274,11 +279,17 @@ REPL 自带行编辑器（原始模式，三端一致），方向键与快捷键
 示例：
 
 ```bash
-archoera_music archoerashell status
-archoera_music archoerashell search netease 周杰伦 -n 10
-archoera_music archoerashell play-track netease:186016
-archoera_music archoerashell --json library 周杰伦 | jq '.tracks[].title'
+archoerashell status
+archoerashell search netease 周杰伦 -n 10
+archoerashell play-track netease:186016
+archoerashell --json library 周杰伦 | jq '.tracks[].title'
 ```
+
+> **macOS**：独立 CLI 位于 app bundle 内，未加入 `PATH`；可直接调用或自行软链：
+> ```bash
+> /Applications/ArchoeraMusic.app/Contents/MacOS/archoerashell status
+> ln -s /Applications/ArchoeraMusic.app/Contents/MacOS/archoerashell ~/.local/bin/archoerashell
+> ```
 
 ---
 
@@ -291,16 +302,15 @@ archoera_music archoerashell --json library 周杰伦 | jq '.tracks[].title'
 - 有界曲目缓存（默认 500 条，LRU）供跨请求的 `ref` 引用。
 - 单测：`app/test/mcp_protocol_test.dart`（配置值语义、恒定时间比较、缓存、
   MCP 握手/会话/工具列举与调用、工具目录完整性）、
-  `app/test/mcp_http_test.dart`（真实回环 HTTP：鉴权 / Origin / REST / MCP 往返）、
-  `app/test/mcp_shell_test.dart`（CLI 命令解析、全局选项、REST/tool 映射与输出）。
-- CLI 实现（Dart 回退）：`app/lib/cli/mcp_shell.dart`（纯 `dart:io`，可注入客户端便于单测）；
-  TUI 版式独立在 `app/lib/cli/mcp_shell_render.dart`（CJK 感知宽度、面板/表格/进度条）；
-  `app/lib/main.dart` 在 GUI 初始化前识别 `archoerashell` 子命令。
+  `app/test/mcp_http_test.dart`（真实回环 HTTP：鉴权 / Origin / REST / MCP 往返）。
 - CLI 实现（原生，三端）：`app/core/shell/`（Rust `staticlib`，`cargo test` 自测；
   `width.rs` 显示宽度、`render.rs` TUI、`http.rs` 回环 HTTP、`cli.rs` 解析/分派/REPL、
   `lineedit.rs` 行编辑（原始模式按键解析、会话历史、CJK 感知重绘）、
-  `console.rs` Windows 控制台/原始输入引导、`build.rs` 从 ARB 生成帮助文案）；Linux
-  `app/linux/{runner/main.cc,CMakeLists.txt}`、Windows
-  `app/windows/runner/{main.cpp,CMakeLists.txt}`、macOS
-  `app/macos/Runner/{main.swift,Runner.xcodeproj}` 分别链入；Windows 另提供
-  控制台子系统伴生程序 `app/windows/runner/shell_main.cpp`（`archoerashell.exe`）。
+  `console.rs` Windows 控制台/原始输入引导、`build.rs` 从 ARB 生成帮助文案）。
+  staticlib 由各平台主 GUI 程序链入，在 Flutter 初始化前分派 `archoera_music
+  archoerashell …`（Linux `app/linux/runner/main.cc`、macOS
+  `app/macos/Runner/main.swift`、Windows `app/windows/runner/main.cpp`）；Windows 另
+  提供控制台子系统伴生程序 `app/windows/runner/shell_main.cpp`（`archoerashell.exe`，
+  REPL/脚本首选）。
+- **实现唯一**：Dart 版 CLI（`app/lib/cli/`）已删除，命令行实现只有原生 Rust
+  一份（`app/core/shell`），避免两套逻辑漂移。

@@ -43,15 +43,18 @@ cargo build --release --target x86_64-pc-windows-msvc --manifest-path app/core/s
 cargo build --release --target aarch64-apple-darwin   --manifest-path app/core/shell/Cargo.toml
 cargo build --release --target x86_64-apple-darwin    --manifest-path app/core/shell/Cargo.toml
 ```
-> 三端 runner 均在 Flutter 初始化前拦截 `archoerashell` 子命令并直调 Rust 入口：
-> Linux `app/linux/runner/main.cc`（CMake 链入）、Windows
-> `app/windows/runner/main.cpp`（runner CMake 链入 `archoera_shell.lib`；另有控制台
-> 子系统的 `archoerashell.exe` 伴生程序 `runner/shell_main.cpp`，REPL/脚本应使用它）、macOS
-> `app/macos/Runner/main.swift`（Xcode “Build archoerashell (cargo)” 阶段按 `$ARCHS`
-> 逐架构编译并 `lipo` 成 `target/universal/release/libarchoera_shell.a` 链入；
-> 需 `rustup target add aarch64-apple-darwin x86_64-apple-darwin`）。
+> 主 GUI 程序在 Flutter 初始化前拦截 `archoera_music archoerashell …` 子命令并直调 Rust
+> 入口（不加载 Flutter/Dart/GTK/AppKit）：Linux `app/linux/runner/main.cc`（CMake 链入
+> `libarchoera_shell.a`）、macOS `app/macos/Runner/main.swift`（Xcode “Build archoerashell
+> (cargo)” 阶段按 `$ARCHS` 逐架构编译并 `lipo` 成
+> `target/universal/release/libarchoera_shell.a` 链入；需
+> `rustup target add aarch64-apple-darwin x86_64-apple-darwin`）、Windows
+> `app/windows/runner/main.cpp`（runner CMake 链入 `archoera_shell.lib`）。Windows 另提供
+> **控制台子系统**伴生程序 `archoerashell.exe`（`app/windows/runner/shell_main.cpp`），
+> REPL/脚本应优先使用它（GUI 子系统主程序不等待、争抢控制台输入）。
 > Windows 侧控制台接管/UTF-8/ANSI 由 `app/core/shell/src/console.rs` 自理（标准流可能被重定向）。
-> `flutter build` 会经各自内嵌 cargo 目标自动编译该 staticlib，故常规构建无需单独 cargo；
+> Dart 版 CLI（`app/lib/cli/`）已删除，命令行实现只有原生 Rust 一份。
+> `flutter build` 会经各自内嵌 cargo/Xcode 目标自动编译该 staticlib，故常规构建无需单独 cargo；
 > 但**改了 Rust 单测/逻辑或 `lib/l10n` 下的 ARB** 时应先跑上面的 `cargo test`
 > （`build.rs` 从 ARB 生成帮助/标签，会随 ARB 变化重编）。改动 ARB 后另跑
 > `flutter gen-l10n`（`flutter build/test` 也会自动生成）以刷新生成代码。

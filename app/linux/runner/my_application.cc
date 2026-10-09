@@ -74,20 +74,6 @@ static gboolean destroy_splash_cb(gpointer user_data) {
   return G_SOURCE_REMOVE;
 }
 
-// CLI 模式（argv 含 "archoerashell"）：不显示窗口，只让引擎运行 Dart 入口
-// （命令完成后 Dart 侧 exit），避免命令行调用时闪现启动窗。
-static gboolean is_shell_mode(MyApplication* self) {
-  if (self->dart_entrypoint_arguments == nullptr) {
-    return FALSE;
-  }
-  for (int i = 0; self->dart_entrypoint_arguments[i] != nullptr; i++) {
-    if (g_strcmp0(self->dart_entrypoint_arguments[i], "archoerashell") == 0) {
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
-
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   // 引擎首帧就绪：切换到 Flutter 视图，原生启动画面稍后销毁（让出 crossfade）。
@@ -103,7 +89,6 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
-  const gboolean shell_mode = is_shell_mode(self);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
@@ -179,10 +164,7 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_show(stack);
   // 立即显示窗口：原生启动画面已就绪，覆盖 Flutter 引擎加载期；
   // 首帧后由 first_frame_cb 切换到 Flutter 视图。
-  // CLI 模式不显示窗口（引擎仍由下方 realize 启动，Dart 执行完命令即退出）。
-  if (!shell_mode) {
-    gtk_widget_show(GTK_WIDGET(window));
-  }
+  gtk_widget_show(GTK_WIDGET(window));
 
   // Show the window when Flutter renders.
   // Requires the view to be realized so we can start rendering.

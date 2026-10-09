@@ -29,6 +29,10 @@ import 'mcp_protocol.dart';
 import 'mcp_models.dart';
 
 /// 由偏好派生服务配置（供宿主与设置页复用）。
+///
+/// 注意：`download` 能力组额外要求「开发者模式 + 下载模块」开启——下载模块在 GUI
+/// 中同样是隐藏能力（见 [AppPrefs.downloadModuleEnabled]），MCP/CLI 必须同一门槛，
+/// 否则会出现「界面隐藏、接口却能入队」的越权。
 McpConfig mcpConfigOf(AppPrefs prefs) => McpConfig(
   enabled: prefs.mcpEnabled,
   port: prefs.mcpPort,
@@ -37,7 +41,9 @@ McpConfig mcpConfigOf(AppPrefs prefs) => McpConfig(
   allowLan: prefs.mcpAllowLan,
   capabilities: {
     for (final capability in McpCapability.values)
-      if (prefs.mcpCapabilityEnabled(capability.id)) capability,
+      if (prefs.mcpCapabilityEnabled(capability.id))
+        if (capability != McpCapability.download || prefs.downloadModuleEnabled)
+          capability,
   },
 );
 
