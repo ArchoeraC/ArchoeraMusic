@@ -37,6 +37,7 @@
 
 #include "scraper_engine.h"
 #include "scraper_log.h"
+#include "tag_editor.h"
 #include <nlohmann/json.hpp>
 #include <cstdarg>
 #include <cstdio>
@@ -790,6 +791,180 @@ ARCHOERA_SCRAPER_API void archoera_scraper_destroy(void* handle) {
     //    归还，wait_event 已不触碰本句柄）才允许释放内存。
     h->events.drainWaiters();
     delete h;
+}
+
+// ---------------------------------------------------------------------------
+// 单文件标签读取 / 写入（标签编辑器，Dart 编辑界面用）
+//
+// 复用 header-only 的 archoera::scraper::TagEditor：读取原始标签（不套用
+// 文件名优先启发式），写入时对受管字段做完整覆盖（空串/<=0 清除），
+// 未列出的字段（MBID、自定义 TXXX 等）原样保留。封面经 base64 传输。
+// 返回的 JSON 由 malloc 分配，调用方必须 archoera_scraper_free_string。
+// ---------------------------------------------------------------------------
+
+/// Base64 字母表（标准，含填充）。
+static const char kTagB64Alphabet[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/// 将 JSON 序列化为 malloc 分配的 NUL 结尾字符串；分配失败返回 NULL。
+static const char* tagJsonDup(const json& j) {
+    const std::string s = j.dump();
+    char* buf = static_cast<char*>(std::malloc(s.size() + 1));
+    if (!buf) return nullptr;
+    std::memcpy(buf, s.data(), s.size() + 1);
+    return buf;
+}
+
+/// 构造 {"ok":false,"error":...} 返回串。
+static const char* tagJsonError(const std::string& message) {
+    return tagJsonDup(json{{"ok", false}, {"error", message}});
+}
+
+/// 标准 Base64 编码（含 '=' 填充）。
+static std::string tagB64Encode(const std::vector<uint8_t>& data) {
+    std::string out;
+    out.reserve(((data.size() + 2) / 3) * 4);
+    size_t i = 0;
+    for (; i + 3 <= data.size(); i += 3) {
+        const uint32_t n = (static_cast<uint32_t>(data[i]) << 16) |
+                           (static_cast<uint32_t>(data[i + 1]) << 8) |
+                           static_cast<uint32_t>(data[i + 2]);
+        out.push_back(kTagB64Alphabet[(n >> 18) & 0x3F]);
+        out.push_back(kTagB64Alphabet[(n >> 12) & 0x3F]);
+        out.push_back(kTagB64Alphabet[(n >> 6) & 0x3F]);
+        out.push_back(kTagB64Alphabet[n & 0x3F]);
+    }
+    if (i < data.size()) {
+        const bool two = (i + 1 < data.size());
+        uint32_t n = static_cast<uint32_t>(data[i]) << 16;
+        if (two) n |= static_cast<uint32_t>(data[i + 1]) << 8;
+        out.push_back(kTagB64Alphabet[(n >> 18) & 0x3F]);
+        out.push_back(kTagB64Alphabet[(n >> 12) & 0x3F]);
+        out.push_back(two ? kTagB64Alphabet[(n >> 6) & 0x3F] : '=');
+        out.push_back('=');
+    }
+    return out;
+}
+
+/// 单字符 Base64 值；非法返回 -1。
+static int tagB64Value(char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+/// 标准 Base64 解码（容忍空白/换行；遇 '=' 终止）。非法字符返回 false。
+static bool tagB64Decode(const std::string& in, std::vector<uint8_t>& out) {
+    out.clear();
+    out.reserve((in.size() / 4) * 3);
+    uint32_t buf = 0;
+    int bits = 0;
+    for (char c : in) {
+        if (c == '=') break;
+        if (c == '\n' || c == '\r' || c == ' ' || c == '\t') continue;
+        const int v = tagB64Value(c);
+        if (v < 0) return false;
+        buf = (buf << 6) | static_cast<uint32_t>(v);
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            out.push_back(static_cast<uint8_t>((buf >> bits) & 0xFF));
+        }
+    }
+    return true;
+}
+
+/* 读取单文件标签 → JSON（malloc 分配；调用方必须 archoera_scraper_free_string）：
+ * {"ok":true,"filePath":..,"title":..,"artist":..,"album":..,"albumArtist":..,
+ *  "composer":..,"genre":..,"trackNumber":int,"discNumber":int,"year":int,
+ *  "lyrics":..,"durationMs":int,"hasCover":bool,"coverMime":..,"coverBase64":..}
+ * 失败：{"ok":false,"error":"..."} */
+ARCHOERA_SCRAPER_API const char* archoera_scraper_read_tags(const char* filePath) {
+    if (!filePath) return tagJsonError("filePath 为空");
+
+    scraper::EditTags tags;
+    int durationMs = 0;
+    std::string err;
+    if (!scraper::TagEditor::read(filePath, tags, durationMs, err)) {
+        SCRAPER_LOGW(NULL, "[tag_editor] 读取标签失败 %s: %s", filePath, err.c_str());
+        return tagJsonError(err.empty() ? std::string("读取标签失败") : err);
+    }
+
+    json j;
+    j["ok"] = true;
+    j["filePath"] = filePath;
+    j["title"] = tags.title;
+    j["artist"] = tags.artist;
+    j["album"] = tags.album;
+    j["albumArtist"] = tags.albumArtist;
+    j["composer"] = tags.composer;
+    j["genre"] = tags.genre;
+    j["trackNumber"] = tags.trackNumber;
+    j["discNumber"] = tags.discNumber;
+    j["year"] = tags.year;
+    j["lyrics"] = tags.lyrics;
+    j["durationMs"] = durationMs;
+    j["hasCover"] = !tags.coverData.empty();
+    j["coverMime"] = tags.coverMime;
+    j["coverBase64"] = tags.coverData.empty() ? std::string() : tagB64Encode(tags.coverData);
+    return tagJsonDup(j);
+}
+
+/* 写入单文件标签。tagsJson 字段同读取（title/artist/album/albumArtist/composer/
+ * genre/trackNumber/discNumber/year/lyrics）。"coverSet":true 时按
+ * coverBase64/coverMime 覆盖封面（coverBase64 空 = 清除）。返回 {"ok":true}
+ * 或 {"ok":false,"error":..}。字符串同样由 malloc 分配。 */
+ARCHOERA_SCRAPER_API const char* archoera_scraper_write_tags(const char* filePath,
+                                                             const char* tagsJson) {
+    if (!filePath) return tagJsonError("filePath 为空");
+    if (!tagsJson) return tagJsonError("tagsJson 为空");
+
+    json j;
+    try {
+        j = json::parse(tagsJson);
+    } catch (const json::exception& e) {
+        return tagJsonError(std::string("tags JSON 解析失败: ") + e.what());
+    }
+    if (!j.is_object()) return tagJsonError("tags JSON 必须为对象");
+
+    scraper::EditTags tags;
+    tags.title = parseStr(j, "title", "");
+    tags.artist = parseStr(j, "artist", "");
+    tags.album = parseStr(j, "album", "");
+    tags.albumArtist = parseStr(j, "albumArtist", "");
+    tags.composer = parseStr(j, "composer", "");
+    tags.genre = parseStr(j, "genre", "");
+    tags.trackNumber = parseInt(j, "trackNumber", 0);
+    tags.discNumber = parseInt(j, "discNumber", 0);
+    tags.year = parseInt(j, "year", 0);
+    tags.lyrics = parseStr(j, "lyrics", "");
+    tags.coverSet = parseBool(j, "coverSet", false);
+    tags.coverMime = parseStr(j, "coverMime", "");
+
+    if (tags.coverSet) {
+        const std::string b64 = parseStr(j, "coverBase64", "");
+        if (!b64.empty() && !tagB64Decode(b64, tags.coverData)) {
+            return tagJsonError("coverBase64 解码失败");
+        }
+    }
+
+    scraper::TagEditor editor;
+    std::string err;
+    if (!editor.write(filePath, tags, err)) {
+        SCRAPER_LOGW(NULL, "[tag_editor] 写入标签失败 %s: %s", filePath,
+                     err.empty() ? editor.lastError().c_str() : err.c_str());
+        return tagJsonError(err.empty() ? std::string("写入标签失败") : err);
+    }
+
+    return tagJsonDup(json{{"ok", true}});
+}
+
+/* 释放上面两函数返回的 JSON 字符串。 */
+ARCHOERA_SCRAPER_API void archoera_scraper_free_string(const char* s) {
+    std::free(const_cast<char*>(s));
 }
 
 } // extern "C"

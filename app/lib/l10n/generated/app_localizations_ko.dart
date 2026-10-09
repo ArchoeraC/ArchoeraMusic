@@ -38,6 +38,206 @@ class AppLocalizationsKo extends AppLocalizations {
   String get menuTrackDetail => '미디어 상세';
 
   @override
+  String get menuEditTags => '메타데이터 편집';
+
+  @override
+  String get tagEditorTitle => '메타데이터 편집';
+
+  @override
+  String get tagEditorLoading => '태그 읽는 중…';
+
+  @override
+  String get tagEditorLoadFailed => '태그를 읽지 못했습니다';
+
+  @override
+  String get tagEditorFieldTitle => '제목';
+
+  @override
+  String get tagEditorFieldArtist => '아티스트';
+
+  @override
+  String get tagEditorFieldAlbum => '앨범';
+
+  @override
+  String get tagEditorFieldAlbumArtist => '앨범 아티스트';
+
+  @override
+  String get tagEditorFieldComposer => '작곡가';
+
+  @override
+  String get tagEditorFieldGenre => '장르';
+
+  @override
+  String get tagEditorFieldTrackNumber => '트랙 번호';
+
+  @override
+  String get tagEditorFieldDiscNumber => '디스크 번호';
+
+  @override
+  String get tagEditorFieldYear => '연도';
+
+  @override
+  String get tagEditorFieldLyrics => '가사';
+
+  @override
+  String get tagEditorFieldCover => '커버';
+
+  @override
+  String get tagEditorCoverChange => '커버 변경';
+
+  @override
+  String get tagEditorCoverRemove => '커버 제거';
+
+  @override
+  String get tagEditorSave => '저장';
+
+  @override
+  String get tagEditorSaving => '저장 중…';
+
+  @override
+  String get tagEditorSaved => '메타데이터를 저장했습니다';
+
+  @override
+  String get tagEditorSaveFailed => '저장 실패';
+
+  @override
+  String get tagEditorNoPath => '로컬 파일 경로 없음';
+
+  @override
+  String get tagEditorUnsupportedFormat => '지원하지 않는 파일 형식';
+
+  @override
+  String get tagEditorDuration => '재생 시간';
+
+  @override
+  String get menuBatchEditMetadata => '메타데이터 일괄 편집';
+
+  @override
+  String get tagEditorBatchTitle => '메타데이터 일괄 편집';
+
+  @override
+  String get tagEditorBatchHint => '변경할 필드만 입력하세요. 비워 두면 원래 값을 유지합니다';
+
+  @override
+  String get tagEditorBatchCoverKeep => '커버 유지';
+
+  @override
+  String get tagEditorBatchCoverReplace => '커버 교체';
+
+  @override
+  String get tagEditorBatchCoverRemove => '커버 제거';
+
+  @override
+  String get tagEditorBatchApply => '선택 항목에 적용';
+
+  @override
+  String get tagEditorBatchApplying => '적용 중…';
+
+  @override
+  String get tagEditorBatchNoEditable => '선택한 곡 중 메타데이터 편집을 지원하는 곡이 없습니다';
+
+  @override
+  String tagEditorBatchDone({required int success, required int failed}) {
+    return '$success곡 업데이트, $failed곡 실패';
+  }
+
+  @override
+  String get tagEditorBatchStop => '중지';
+
+  @override
+  String get tagEditorBatchRules => '제목 / 아티스트 규칙';
+
+  @override
+  String get tagEditorBatchTitleRule => '제목';
+
+  @override
+  String get tagEditorBatchArtistRule => '아티스트';
+
+  @override
+  String get tagEditorBatchRuleNone => '변경 안 함';
+
+  @override
+  String get tagEditorBatchRuleFindReplace => '찾아 바꾸기';
+
+  @override
+  String get tagEditorBatchRulePrefix => '접두사 추가';
+
+  @override
+  String get tagEditorBatchRuleSuffix => '접미사 추가';
+
+  @override
+  String get tagEditorBatchFindLabel => '찾기';
+
+  @override
+  String get tagEditorBatchReplaceLabel => '바꿀 내용';
+
+  @override
+  String get tagEditorBatchAffixLabel => '내용';
+
+  @override
+  String get tagEditorBatchTokensHint =>
+      '사용 가능한 자리 표시자: [index] [track] [title] [artist] [album] [year]';
+
+  @override
+  String get tagEditorRuleApply => '규칙 적용';
+
+  @override
+  String get tagEditorRuleTargetBoth => '둘 다';
+
+  @override
+  String get tagEditorRulePreview => '미리보기';
+
+  @override
+  String get tagEditorRuleRegex => '정규식';
+
+  @override
+  String get tagEditorRuleCaseSensitive => '대소문자 구분';
+
+  @override
+  String get tagEditorRulePresets => '프리셋';
+
+  @override
+  String get tagEditorRulePresetTrim => '앞뒤 공백 제거';
+
+  @override
+  String get tagEditorRulePresetStripBrackets => '끝 괄호 제거';
+
+  @override
+  String get tagEditorRulePresetStripLive => 'Live 표기 제거';
+
+  @override
+  String get tagEditorRulePresetIndexSuffix => '[index] 접미사 추가';
+
+  @override
+  String get tagEditorRulePresetStripFeat => 'feat. 부분 제거';
+
+  @override
+  String get tagEditorRulePresetSave => '프리셋으로 저장';
+
+  @override
+  String get tagEditorRulePresetName => '프리셋 이름';
+
+  @override
+  String get tagEditorRulePresetDelete => '프리셋 삭제';
+
+  @override
+  String get tagEditorRulePresetSaved => '프리셋 저장됨';
+
+  @override
+  String get tagEditorRulePresetRename => '이름 바꾸기';
+
+  @override
+  String get tagEditorRulePresetMoveUp => '위로 이동';
+
+  @override
+  String get tagEditorRulePresetMoveDown => '아래로 이동';
+
+  @override
+  String tagEditorBatchProgress({required int done, required int total}) {
+    return '처리 중 $done/$total';
+  }
+
+  @override
   String get trackDetailDuration => '재생 시간';
 
   @override

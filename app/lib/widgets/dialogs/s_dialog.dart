@@ -17,6 +17,7 @@ class SDialog extends StatelessWidget {
     this.description,
     this.actions = const [],
     this.width = 480,
+    this.maxContentHeight,
     required this.child,
   });
 
@@ -27,6 +28,9 @@ class SDialog extends StatelessWidget {
   /// 底部按钮行（通常为 SButton）。
   final List<Widget> actions;
   final double width;
+
+  /// 内容区最大高度覆盖（null = 默认按窗口自适应，见 [build]）。
+  final double? maxContentHeight;
 
   /// 弹出对话框（默认 barrier 点击不关闭）。
   ///
@@ -60,12 +64,12 @@ class SDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dialog = Theme.of(context).dialogTheme;
-    // 内容区最大高度：常规窗口取 480；窗口较矮时按可用高度收敛，
-    // 避免「标题 + 内容 + 按钮」总高超出弹窗可用空间而溢出。
-    final maxContent = (MediaQuery.sizeOf(context).height - 240).clamp(
-      140.0,
-      480.0,
-    );
+    // 布局：标题/描述（固定）+ 内容（Flexible，可滚动）+ 按钮行（固定）。
+    //
+    // 内容区用 Flexible + 滚动，确保**矮窗口下按钮行（保存/取消）始终可见**：
+    // 此前内容固定高、超出部分整体不滚动，矮窗或长表单会把按钮推出可视区导致
+    // 点不到。可用 [maxContentHeight] 追加内容区高度上限（null = 不额外限制，
+    // 仅受窗口高度约束）。
     return Dialog(
       insetPadding: const EdgeInsets.all(48),
       backgroundColor: Colors.transparent,
@@ -82,45 +86,60 @@ class SDialog extends StatelessWidget {
         color: dialog.backgroundColor ?? scheme.surfaceContainerLow,
         child: SizedBox(
           width: width,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).dialogTheme.titleTextStyle),
-                if (description != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    description!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: scheme.onSurfaceVariant,
-                      height: 1.4,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).dialogTheme.titleTextStyle,
                     ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: maxContent),
-                  child: SingleChildScrollView(
-                    child: child,
+                    if (description != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        description!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: scheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: maxContentHeight ?? double.infinity,
+                    ),
+                    child: SingleChildScrollView(child: child),
                   ),
                 ),
-                if (actions.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      for (var i = 0; i < actions.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 10),
-                        actions[i],
-                      ],
-                    ],
-                  ),
-                ],
-              ],
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: actions.isEmpty
+                    ? const SizedBox.shrink()
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          for (var i = 0; i < actions.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 10),
+                            actions[i],
+                          ],
+                        ],
+                      ),
+              ),
+            ],
           ),
         ),
       ),

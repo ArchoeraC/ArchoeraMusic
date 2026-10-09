@@ -44,37 +44,39 @@ class CoverGrid extends StatelessWidget {
     if (items.isEmpty && !loading) {
       return const SizedBox.shrink();
     }
-    final grid = GridView.builder(
-      shrinkWrap: shrinkWrap,
-      physics: physics,
-      padding: const EdgeInsets.all(20),
-      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: maxCrossAxisExtent,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: childAspectRatio,
-      ),
-      itemCount: items.length + (loading || hasMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == items.length) {
-          return const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+    final grid = InkClip(
+      child: GridView.builder(
+        shrinkWrap: shrinkWrap,
+        physics: physics,
+        padding: const EdgeInsets.all(20),
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: maxCrossAxisExtent,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: childAspectRatio,
+        ),
+        itemCount: items.length + (loading || hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == items.length) {
+            return const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          }
+          final item = items[index];
+          return CoverCard(
+            item: item,
+            radius: radius,
+            artist: artist,
+            showSource: showSource,
+            onTap: () => onTap(item),
+            onPlay: onPlay == null ? null : () => onPlay!(item),
           );
-        }
-        final item = items[index];
-        return CoverCard(
-          item: item,
-          radius: radius,
-          artist: artist,
-          showSource: showSource,
-          onTap: () => onTap(item),
-          onPlay: onPlay == null ? null : () => onPlay!(item),
-        );
-      },
+        },
+      ),
     );
     if (onReachBottom == null) return grid;
     return NotificationListener<ScrollNotification>(
@@ -117,49 +119,51 @@ class CoverRail extends StatelessWidget {
     }
     return SizedBox(
       height: height,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: items.length + (loading ? 1 : 0),
-        // 固定宽度虚拟化：卡片槽宽恒为 cardWidth + 14（尾项无间隔），
-        // 走带按 O(index) 定位，仅构建可见卡片；间隔并入槽内右侧留白，
-        // 与原先 separated 的 14 间隔几何一致。
-        itemExtentBuilder: (index, _) {
-          if (index == items.length) return 40;
-          return index == items.length - 1 && !loading
-              ? cardWidth
-              : cardWidth + 14;
-        },
-        itemBuilder: (context, index) {
-          if (index == items.length) {
-            return const SizedBox(
-              width: 40,
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+      child: InkClip(
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: items.length + (loading ? 1 : 0),
+          // 固定宽度虚拟化：卡片槽宽恒为 cardWidth + 14（尾项无间隔），
+          // 走带按 O(index) 定位，仅构建可见卡片；间隔并入槽内右侧留白，
+          // 与原先 separated 的 14 间隔几何一致。
+          itemExtentBuilder: (index, _) {
+            if (index == items.length) return 40;
+            return index == items.length - 1 && !loading
+                ? cardWidth
+                : cardWidth + 14;
+          },
+          itemBuilder: (context, index) {
+            if (index == items.length) {
+              return const SizedBox(
+                width: 40,
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 ),
+              );
+            }
+            final item = items[index];
+            final card = SizedBox(
+              width: cardWidth,
+              child: CoverCard(
+                item: item,
+                radius: radius,
+                artist: artist,
+                onTap: () => onTap(item),
+                onPlay: onPlay == null ? null : () => onPlay!(item),
               ),
             );
-          }
-          final item = items[index];
-          final card = SizedBox(
-            width: cardWidth,
-            child: CoverCard(
-              item: item,
-              radius: radius,
-              artist: artist,
-              onTap: () => onTap(item),
-              onPlay: onPlay == null ? null : () => onPlay!(item),
-            ),
-          );
-          if (index == items.length - 1 && !loading) return card;
-          return Padding(
-            padding: const EdgeInsets.only(right: 14),
-            child: card,
-          );
-        },
+            if (index == items.length - 1 && !loading) return card;
+            return Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: card,
+            );
+          },
+        ),
       ),
     );
   }
