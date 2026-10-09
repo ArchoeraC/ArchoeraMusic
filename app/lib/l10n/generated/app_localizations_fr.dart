@@ -41,6 +41,209 @@ class AppLocalizationsFr extends AppLocalizations {
   String get menuTrackDetail => 'Détails du média';
 
   @override
+  String get menuEditTags => 'Modifier les métadonnées';
+
+  @override
+  String get tagEditorTitle => 'Modifier les métadonnées';
+
+  @override
+  String get tagEditorLoading => 'Lecture des balises…';
+
+  @override
+  String get tagEditorLoadFailed => 'Échec de la lecture des balises';
+
+  @override
+  String get tagEditorFieldTitle => 'Titre';
+
+  @override
+  String get tagEditorFieldArtist => 'Artiste';
+
+  @override
+  String get tagEditorFieldAlbum => 'Album';
+
+  @override
+  String get tagEditorFieldAlbumArtist => 'Artiste de l\'album';
+
+  @override
+  String get tagEditorFieldComposer => 'Compositeur';
+
+  @override
+  String get tagEditorFieldGenre => 'Genre';
+
+  @override
+  String get tagEditorFieldTrackNumber => 'Numéro de piste';
+
+  @override
+  String get tagEditorFieldDiscNumber => 'Numéro de disque';
+
+  @override
+  String get tagEditorFieldYear => 'Année';
+
+  @override
+  String get tagEditorFieldLyrics => 'Paroles';
+
+  @override
+  String get tagEditorFieldCover => 'Pochette';
+
+  @override
+  String get tagEditorCoverChange => 'Changer la pochette';
+
+  @override
+  String get tagEditorCoverRemove => 'Supprimer la pochette';
+
+  @override
+  String get tagEditorSave => 'Enregistrer';
+
+  @override
+  String get tagEditorSaving => 'Enregistrement…';
+
+  @override
+  String get tagEditorSaved => 'Métadonnées enregistrées';
+
+  @override
+  String get tagEditorSaveFailed => 'Échec de l\'enregistrement';
+
+  @override
+  String get tagEditorNoPath => 'Chemin du fichier local manquant';
+
+  @override
+  String get tagEditorUnsupportedFormat =>
+      'Format de fichier non pris en charge';
+
+  @override
+  String get tagEditorDuration => 'Durée';
+
+  @override
+  String get menuBatchEditMetadata => 'Modifier les métadonnées par lot';
+
+  @override
+  String get tagEditorBatchTitle => 'Modifier les métadonnées par lot';
+
+  @override
+  String get tagEditorBatchHint =>
+      'Ne remplissez que les champs à modifier ; laissez vide pour conserver les valeurs d\'origine';
+
+  @override
+  String get tagEditorBatchCoverKeep => 'Conserver la pochette';
+
+  @override
+  String get tagEditorBatchCoverReplace => 'Remplacer la pochette';
+
+  @override
+  String get tagEditorBatchCoverRemove => 'Supprimer la pochette';
+
+  @override
+  String get tagEditorBatchApply => 'Appliquer à la sélection';
+
+  @override
+  String get tagEditorBatchApplying => 'Application…';
+
+  @override
+  String get tagEditorBatchNoEditable =>
+      'Aucune des pistes sélectionnées ne prend en charge l\'édition des métadonnées';
+
+  @override
+  String tagEditorBatchDone({required int success, required int failed}) {
+    return '$success mis à jour, $failed échoués';
+  }
+
+  @override
+  String get tagEditorBatchStop => 'Arrêter';
+
+  @override
+  String get tagEditorBatchRules => 'Règles de titre / artiste';
+
+  @override
+  String get tagEditorBatchTitleRule => 'Titre';
+
+  @override
+  String get tagEditorBatchArtistRule => 'Artiste';
+
+  @override
+  String get tagEditorBatchRuleNone => 'Ne rien modifier';
+
+  @override
+  String get tagEditorBatchRuleFindReplace => 'Rechercher et remplacer';
+
+  @override
+  String get tagEditorBatchRulePrefix => 'Ajouter un préfixe';
+
+  @override
+  String get tagEditorBatchRuleSuffix => 'Ajouter un suffixe';
+
+  @override
+  String get tagEditorBatchFindLabel => 'Rechercher';
+
+  @override
+  String get tagEditorBatchReplaceLabel => 'Remplacer par';
+
+  @override
+  String get tagEditorBatchAffixLabel => 'Contenu';
+
+  @override
+  String get tagEditorBatchTokensHint =>
+      'Espaces réservés disponibles : [index] [track] [title] [artist] [album] [year]';
+
+  @override
+  String get tagEditorRuleApply => 'Appliquer la règle';
+
+  @override
+  String get tagEditorRuleTargetBoth => 'Les deux';
+
+  @override
+  String get tagEditorRulePreview => 'Aperçu';
+
+  @override
+  String get tagEditorRuleRegex => 'Expression régulière';
+
+  @override
+  String get tagEditorRuleCaseSensitive => 'Respecter la casse';
+
+  @override
+  String get tagEditorRulePresets => 'Préréglages';
+
+  @override
+  String get tagEditorRulePresetTrim => 'Supprimer les espaces';
+
+  @override
+  String get tagEditorRulePresetStripBrackets => 'Retirer les crochets finaux';
+
+  @override
+  String get tagEditorRulePresetStripLive => 'Retirer la mention « Live »';
+
+  @override
+  String get tagEditorRulePresetIndexSuffix => 'Ajouter le suffixe [index]';
+
+  @override
+  String get tagEditorRulePresetStripFeat => 'Retirer la partie feat.';
+
+  @override
+  String get tagEditorRulePresetSave => 'Enregistrer comme préréglage';
+
+  @override
+  String get tagEditorRulePresetName => 'Nom du préréglage';
+
+  @override
+  String get tagEditorRulePresetDelete => 'Supprimer le préréglage';
+
+  @override
+  String get tagEditorRulePresetSaved => 'Préréglage enregistré';
+
+  @override
+  String get tagEditorRulePresetRename => 'Renommer';
+
+  @override
+  String get tagEditorRulePresetMoveUp => 'Monter';
+
+  @override
+  String get tagEditorRulePresetMoveDown => 'Descendre';
+
+  @override
+  String tagEditorBatchProgress({required int done, required int total}) {
+    return 'Traitement de $done/$total';
+  }
+
+  @override
   String get trackDetailDuration => 'Durée';
 
   @override

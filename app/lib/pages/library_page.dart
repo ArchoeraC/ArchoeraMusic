@@ -11,16 +11,21 @@ import '../services/platform/platform_bindings.dart' show aplOk;
 import '../services/platform/platform_capabilities.dart';
 import '../services/scanner/library_store.dart';
 import '../services/scanner/local_track.dart';
+import '../services/source/source_platform.dart';
 import '../../l10n/l10n.dart';
+import '../widgets/dialogs/batch_tag_editor_dialog.dart';
 import '../widgets/dialogs/comment_dialog.dart';
 import '../widgets/dialogs/folder_manager.dart';
 import '../widgets/dialogs/s_context_menu.dart';
 import '../widgets/dialogs/s_dialog.dart';
+import '../widgets/dialogs/tag_editor_dialog.dart';
+import '../widgets/dialogs/track_detail_dialog.dart';
 import '../widgets/library/library_empty_state.dart';
 import '../widgets/library/library_header.dart';
 import '../widgets/list/song_list.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/common/toast.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'library/library_page_actions.dart';

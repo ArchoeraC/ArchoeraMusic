@@ -43,6 +43,7 @@ import '../lyrics/sources/neko_lyric_source.dart';
 import '../lyrics/sources/netease_lyric_source.dart';
 import '../lyrics/sources/qqmusic_lyric_source.dart';
 import '../lyrics/sources/streaming_lyric_source.dart';
+import 'metadata_editor.dart';
 import '../netease/netease_api.dart';
 import '../netease/track.dart';
 import '../neko/neko_identity.dart';
@@ -111,7 +112,8 @@ abstract class SourcePlatform {
     required bool append,
     required int loaded,
     required int limit,
-  }) async => const SearchResult<CoverItem>(items: [], total: 0, hasMore: false);
+  }) async =>
+      const SearchResult<CoverItem>(items: [], total: 0, hasMore: false);
 
   Future<SearchResult<CoverItem>> searchArtists(
     dynamic ref,
@@ -119,7 +121,8 @@ abstract class SourcePlatform {
     required bool append,
     required int loaded,
     required int limit,
-  }) async => const SearchResult<CoverItem>(items: [], total: 0, hasMore: false);
+  }) async =>
+      const SearchResult<CoverItem>(items: [], total: 0, hasMore: false);
 
   Future<SearchResult<CoverItem>> searchPlaylists(
     dynamic ref,
@@ -127,7 +130,8 @@ abstract class SourcePlatform {
     required bool append,
     required int loaded,
     required int limit,
-  }) async => const SearchResult<CoverItem>(items: [], total: 0, hasMore: false);
+  }) async =>
+      const SearchResult<CoverItem>(items: [], total: 0, hasMore: false);
 
   /// 按 [kind] 分派的封面搜索（专辑 / 歌手 / 歌单）。
   Future<SearchResult<CoverItem>> searchCover(
@@ -200,7 +204,8 @@ abstract class SourcePlatform {
   bool get autoFallback => true;
 
   /// 自动换源的候选曲目（搜索另一平台）。[autoFallback] 为 false 时不调用。
-  Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async => const [];
+  Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async =>
+      const [];
 
   /// 播放前的展示元数据补齐（NK 用其它源补全）；默认原样返回。
   Future<Track> enrichMetadata(dynamic ref, Track t) async => t;
@@ -242,6 +247,16 @@ abstract class SourcePlatform {
   /// `widgets/dialogs/comment_platform.dart`）；无 → null。
   CommentPlatform? get comments => null;
 
+  /// 该源的「元数据（标签）编辑」适配器（`MetadataEditor`，来自
+  /// `services/source/metadata_editor.dart`）；无 → null。
+  ///
+  /// 目前只有本地文件源实现。UI（右键菜单 / 详情弹窗 / 批量编辑）据此决定
+  /// 是否暴露编辑入口，不写 `source == 'local'` 分支。
+  MetadataEditor? get metadataEditor => null;
+
+  /// 便捷判定：本源是否支持编辑 [t] 的元数据（本地文件需有路径）。
+  bool canEditMetadata(Track t) => metadataEditor?.supports(t) ?? false;
+
   /// 该源对应的歌词来源（复用现有 `services/lyrics` 管线）；无 → 空列表。
   List<LyricSource> lyricSources(dynamic ref) => const [];
 
@@ -262,9 +277,8 @@ SourcePlatform sourcePlatform(String source) =>
     _registry[source] ?? _UnknownSourcePlatform(source);
 
 /// 已启用且可搜索的平台（顺序即搜索音源下拉顺序）。
-List<SourcePlatform> sourcePlatforms(dynamic ref) => _all
-    .where((p) => p.searchable && p.enabled(ref))
-    .toList(growable: false);
+List<SourcePlatform> sourcePlatforms(dynamic ref) =>
+    _all.where((p) => p.searchable && p.enabled(ref)).toList(growable: false);
 
 /// 全部已注册平台（含 local / streaming；歌词管线等内部枚举用）。
 List<SourcePlatform> allSourcePlatforms() => List.unmodifiable(_all);
@@ -338,13 +352,9 @@ class _NeteaseSource extends SourcePlatform {
       t.title,
       if (t.artistNames.trim().isNotEmpty) t.artistNames.trim(),
     ].join(' ');
-    return (await sourcePlatform('kugou').searchSongs(
-      ref,
-      keyword,
-      append: false,
-      loaded: 0,
-      limit: 20,
-    )).items;
+    return (await sourcePlatform(
+      'kugou',
+    ).searchSongs(ref, keyword, append: false, loaded: 0, limit: 20)).items;
   }
 
   @override
@@ -358,8 +368,7 @@ class _NeteaseSource extends SourcePlatform {
   bool loggedIn(dynamic ref) => ref.read(neteaseAuthProvider) != null;
 
   @override
-  Future<void> login(BuildContext context) =>
-      showNeteaseLoginDialog(context);
+  Future<void> login(BuildContext context) => showNeteaseLoginDialog(context);
 
   @override
   CollectionPlatform? get collections => collectionPlatform(source);
@@ -462,13 +471,9 @@ class _KugouSource extends SourcePlatform {
       t.title,
       if (t.artistNames.trim().isNotEmpty) t.artistNames.trim(),
     ].join(' ');
-    return (await sourcePlatform('netease').searchSongs(
-      ref,
-      keyword,
-      append: false,
-      loaded: 0,
-      limit: 20,
-    )).items;
+    return (await sourcePlatform(
+      'netease',
+    ).searchSongs(ref, keyword, append: false, loaded: 0, limit: 20)).items;
   }
 
   @override
@@ -660,13 +665,9 @@ class _QqSource extends SourcePlatform {
       t.title,
       if (t.artistNames.trim().isNotEmpty) t.artistNames.trim(),
     ].join(' ');
-    return (await sourcePlatform('netease').searchSongs(
-      ref,
-      keyword,
-      append: false,
-      loaded: 0,
-      limit: 20,
-    )).items;
+    return (await sourcePlatform(
+      'netease',
+    ).searchSongs(ref, keyword, append: false, loaded: 0, limit: 20)).items;
   }
 
   @override
@@ -688,8 +689,7 @@ class _QqSource extends SourcePlatform {
   bool get downloadFallbackSupported => false;
 
   @override
-  String downloadUnsupportedLog(Track t) =>
-      '下载回退不支持 QQMusic: ${t.title}';
+  String downloadUnsupportedLog(Track t) => '下载回退不支持 QQMusic: ${t.title}';
 
   @override
   CollectionPlatform? get collections => collectionPlatform(source);
@@ -802,13 +802,9 @@ class _NekoSource extends SourcePlatform {
       t.title,
       if (t.artistNames.trim().isNotEmpty) t.artistNames.trim(),
     ].join(' ');
-    return (await sourcePlatform('netease').searchSongs(
-      ref,
-      keyword,
-      append: false,
-      loaded: 0,
-      limit: 20,
-    )).items;
+    return (await sourcePlatform(
+      'netease',
+    ).searchSongs(ref, keyword, append: false, loaded: 0, limit: 20)).items;
   }
 
   @override
@@ -823,8 +819,12 @@ class _NekoSource extends SourcePlatform {
   // ── 音质选择注册表（Neko 服务端四档；`sq` 与服务端 `hq` 同档，去重） ──
 
   @override
-  List<String> get supportedQualities =>
-      const ['lq', 'hq', 'lossless', 'hi-res'];
+  List<String> get supportedQualities => const [
+    'lq',
+    'hq',
+    'lossless',
+    'hi-res',
+  ];
 
   @override
   ProviderListenable<AsyncValue<String?>>? maxQualityProvider(Track t) =>
@@ -954,6 +954,10 @@ class _LocalSource extends SourcePlatform {
   @override
   bool get inAggregate => false;
 
+  /// 本地文件源唯一具备标签编辑能力（经 libarchoera_scraper 的 C ABI）。
+  @override
+  MetadataEditor? get metadataEditor => const LocalFileMetadataEditor();
+
   @override
   List<LyricSource> lyricSources(dynamic ref) => const [LocalLyricSource()];
 
@@ -1063,7 +1067,9 @@ Future<bool> _probeAudioUrl(String url) async {
       if (buf.length >= 64) break;
     }
     final ct = res.headers.contentType?.mimeType.toLowerCase() ?? '';
-    if (ct.startsWith('audio/') || ct == 'application/octet-stream') return true;
+    if (ct.startsWith('audio/') || ct == 'application/octet-stream') {
+      return true;
+    }
     return _looksLikeAudio(buf.takeBytes());
   } catch (_) {
     return false;
