@@ -110,10 +110,11 @@ else()
   set(SHELL_CARGO_FLAGS "--release")
 endif()
 set(SHELL_STATIC_LIB "${SHELL_TARGET_DIR}/libarchoera_shell.a")
-# Rust 源码 / 清单 / build.rs / ARB 文案（build.rs 从中生成 help_strings.rs）
-# 任一变化都要重编（Cargo 自身增量，无变更时仅 ~0.1s）。
+# Rust 源码 / 清单 / build.rs / ARB 文案（build.rs 从中生成 help_strings.rs）/ 内置素材
+# （`assets/` 经 include_str! 编入，任一变化都要重编；Cargo 自身增量，无变更时仅 ~0.1s）。
 file(GLOB_RECURSE SHELL_RUST_SOURCES CONFIGURE_DEPENDS "${SHELL_CRATE_DIR}/src/*.rs")
 file(GLOB SHELL_ARB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../lib/l10n/*.arb")
+file(GLOB_RECURSE SHELL_ASSET_SOURCES CONFIGURE_DEPENDS "${SHELL_CRATE_DIR}/assets/*")
 add_custom_command(
   OUTPUT "${SHELL_STATIC_LIB}"
   COMMAND ${CARGO} build ${SHELL_CARGO_FLAGS}
@@ -124,6 +125,7 @@ add_custom_command(
     "${SHELL_CRATE_DIR}/build.rs"
     ${SHELL_RUST_SOURCES}
     ${SHELL_ARB_SOURCES}
+    ${SHELL_ASSET_SOURCES}
   COMMENT "cargo build archoera-shell"
   VERBATIM
 )

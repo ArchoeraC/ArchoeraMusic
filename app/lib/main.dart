@@ -11,7 +11,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'apis/runtime.dart';
-import 'cli/mcp_shell.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'theme/app_theme.dart';
 import 'services/log/log.dart';
@@ -36,27 +35,10 @@ import 'widgets/list/cover_image.dart';
 /// + 窗口/托盘后台常驻。播放链路由 C 引擎内置 miniaudio 承担
 /// （无 libmpv/media_kit 依赖）。
 Future<void> main(List<String> args) async {
-  // CLI 模式：`archoera_music archoerashell ...`（类 Unix 子命令）。
-  // 在 Binding / 窗口 / Flutter 初始化之前处理并退出，不进入 GUI 流程。
-  final shellArgs = _resolveShellArgs(args);
-  if (shellArgs != null) {
-    final prefs = AppPrefs.load();
-    final l10n = _shellL10n(prefs);
-    if (!prefs.mcpShellEnabled) {
-      stderr.writeln(l10n.mcpShellDisabled);
-      exit(2);
-    }
-    final code = await runMcpShell(
-      shellArgs,
-      defaults: McpShellOptions(port: prefs.mcpPort, key: prefs.mcpAccessKey),
-      clientFactory: HttpMcpShellClient.new,
-      l10n: l10n,
-    );
-    await stdout.flush();
-    await stderr.flush();
-    exit(code);
-  }
-
+  // 说明：CLI（`archoerashell`）由各平台 runner 在 Flutter 初始化前拦截
+  // `archoera_music archoerashell …` 子命令并直调原生 Rust 入口（见 app/core/shell），
+  // 不经过本 Dart 入口（Dart 版 CLI 已删除）。
+  //
   // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化——既是 Flutter
   // binding，也让后续 windowManager（MethodChannel）可用（单实例分支要用）。
   PowerSavingFrameBinding.ensureInitialized();
@@ -182,41 +164,6 @@ LogLevel _logLevelFromEnv() {
     'fatal' => LogLevel.fatal,
     _ => LogLevel.info,
   };
-}
-
-/// 若本次启动带 `archoerashell` 子命令，返回其后的参数；否则 null。
-///
-/// Linux/Windows 的 Flutter runner 会把 argv 传给 Dart 入口（`main(args)`）；
-/// macOS 不传，故同时回退 `Platform.executableArguments`。
-List<String>? _resolveShellArgs(List<String> entrypointArgs) {
-  for (final source in <List<String>>[
-    entrypointArgs,
-    Platform.executableArguments,
-  ]) {
-    final index = source.indexOf('archoerashell');
-    if (index >= 0) return source.sublist(index + 1);
-  }
-  return null;
-}
-
-/// CLI 文案：跟随应用语言设置（`prefs.locale`），否则系统区域；不支持则回退英文。
-AppLocalizations _shellL10n(AppPrefs prefs) {
-  final code = prefs.locale;
-  final Locale requested;
-  if (code != null && code.isNotEmpty) {
-    final parts = code.replaceAll('_', '-').split('-');
-    requested = Locale(parts.first, parts.length > 1 ? parts[1] : null);
-  } else {
-    final parts = Platform.localeName.replaceAll('-', '_').split('_');
-    requested = parts.length >= 2
-        ? Locale(parts[0], parts[1])
-        : Locale(parts[0]);
-  }
-  try {
-    return lookupAppLocalizations(requested);
-  } catch (_) {
-    return lookupAppLocalizations(const Locale('en'));
-  }
 }
 
 /// 让所有 HttpClient（含 Flutter Image.network 共享 client）默认携带浏览器 UA

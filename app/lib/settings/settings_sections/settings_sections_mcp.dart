@@ -291,14 +291,18 @@ class _McpSectionState extends ConsumerState<McpSection> {
           note: l10n.settingsMcpCapsNote,
           children: [
             for (final capability in McpCapability.values)
-              SettingSwitchTile(
-                icon: _mcpCapabilityIcon(capability),
-                title: _mcpCapabilityTitle(l10n, capability),
-                subtitle: _mcpCapabilityDesc(l10n, capability),
-                value: prefs.mcpCapabilityEnabled(capability.id),
-                enabled: enabled,
-                onChanged: (v) => notifier.setMcpCapability(capability.id, v),
-              ),
+              // 下载能力组需「开发者模式 + 下载模块」开启（与 GUI 入口同门槛，
+              // 见 mcpConfigOf）；未开启时整行隐藏，避免开关看似有效实则被丢弃。
+              if (capability != McpCapability.download ||
+                  prefs.downloadModuleEnabled)
+                SettingSwitchTile(
+                  icon: _mcpCapabilityIcon(capability),
+                  title: _mcpCapabilityTitle(l10n, capability),
+                  subtitle: _mcpCapabilityDesc(l10n, capability),
+                  value: prefs.mcpCapabilityEnabled(capability.id),
+                  enabled: enabled,
+                  onChanged: (v) => notifier.setMcpCapability(capability.id, v),
+                ),
           ],
         ),
         const SizedBox(height: 20),

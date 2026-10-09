@@ -4,8 +4,8 @@
 
 //! 终端显示宽度（CJK 感知）与对齐辅助。
 //!
-//! 与 Dart 端 `mcp_shell_render.dart` 同口径：East Asian 宽字符按 2 列、
-//! 组合符/零宽字符按 0 列；ANSI SGR 序列不计宽。用于面板/表格对齐与窄终端截断。
+//! East Asian 宽字符按 2 列、组合符/零宽字符按 0 列；ANSI SGR 序列不计宽。
+//! 用于面板/表格对齐与窄终端截断。
 
 /// 单个码点的显示列宽。
 pub fn char_width(c: char) -> usize {

@@ -4,8 +4,7 @@
 
 //! `archoerashell` 原生 CLI：参数解析、命令分派、REST 调用与 REPL。
 //!
-//! 与 Dart `mcp_shell.dart` 行为对齐（同一 REST 协议、同一退出码约定），
-//! 但不加载 Flutter/Dart。
+//! 经本机 MCP 服务的 REST 接口通信（同一退出码约定），不加载 Flutter/Dart。
 
 use crate::http::{request, RequestError, Target};
 use crate::l10n::L10n;
@@ -442,6 +441,8 @@ fn dispatch(ctx: &Ctx, command: &str, args: &[String]) -> i32 {
         "sleep" => cmd_sleep(ctx, args),
         "sleep-cancel" => ctx.send("POST", "/api/tools/cancel_sleep_timer", None),
         "call" => cmd_call(ctx, args),
+        // 彩蛋：`awa` 显示字符表情（见 cmd_awa）。
+        "awa" => cmd_awa(ctx),
         _ => {
             eprintln!(
                 "{}",
@@ -709,6 +710,55 @@ fn cmd_call(ctx: &Ctx, args: &[String]) -> i32 {
     ctx.tool(name, body)
 }
 
+// ── 彩蛋：awa ───────────────────────────────────────────────────
+
+/// `awa` 字符表情素材（**编译进二进制**，随三端分发，无需外部文件）。
+///
+/// 素材用**字面量** `\033[38;5;Nm` 记录颜色（便于版本管理与 `printf '%b'`）。
+const AWA_ART: &str = include_str!("../assets/emoji-2-256.ansi");
+
+/// 彩蛋：`awa` —— 打印字符表情。
+///
+/// 支持 ANSI 的交互终端下解释字面量转义、保留颜色；否则（`NO_COLOR` /
+/// `TERM=dumb` / 非 TTY）剥掉颜色只留字符——该画本身以字符密度成像，去掉颜色
+/// 即得黑白版。
+fn cmd_awa(ctx: &Ctx) -> i32 {
+    let rendered = if ctx.styled {
+        AWA_ART.replace("\\033", "\x1b")
+    } else {
+        strip_sgr(AWA_ART)
+    };
+    print!("{rendered}");
+    if !rendered.ends_with('\n') {
+        println!();
+    }
+    0
+}
+
+/// 把字面量 `\033[`…`m`（SGR 序列）从字符串中剥除，保留其余字符与换行。
+fn strip_sgr(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            let lookahead: String = chars.clone().take(4).collect();
+            if lookahead.starts_with("033[") {
+                for _ in 0..4 {
+                    chars.next();
+                }
+                for d in chars.by_ref() {
+                    if d == 'm' {
+                        break;
+                    }
+                }
+                continue;
+            }
+        }
+        out.push(c);
+    }
+    out
+}
+
 // ── 参数解析辅助 ─────────────────────────────────────────────────
 
 fn first_int(args: &[String]) -> Option<i64> {
@@ -925,5 +975,26 @@ mod tests {
             assert!(help_key(cmd).is_some(), "缺少 {cmd} 的帮助键");
         }
         assert!(help_key("bogus").is_none());
+    }
+
+    #[test]
+    fn strip_sgr_drops_literal_color_codes() {
+        // 字面量 `\033[...m`（素材格式）应被整体剥除，只留字符。
+        assert_eq!(strip_sgr("\\033[38;5;168m=+\\033[0m"), "=+");
+        assert_eq!(strip_sgr("\\033[38;5;168m\\033[0m"), "");
+        assert_eq!(strip_sgr("plain text"), "plain text");
+        // 单独的反斜杠不是 SGR，保留原样（含换行）。
+        assert_eq!(strip_sgr("a\\nb"), "a\\nb");
+    }
+
+    #[test]
+    fn awa_art_is_embedded_with_color() {
+        assert!(!AWA_ART.is_empty());
+        // 素材应含字面量 SGR 颜色序列。
+        assert!(AWA_ART.contains("\\033["));
+        // 剥掉颜色后仍应是可打印的字符画。
+        let mono = strip_sgr(AWA_ART);
+        assert!(mono.contains('@'));
+        assert!(!mono.contains("\\033["));
     }
 }
