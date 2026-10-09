@@ -14,9 +14,6 @@ import 'package:archoera_music/utils/app_version.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(nekoResetIdentity);
-  tearDown(nekoResetIdentity);
-
   group('版本读取', () {
     test('自 pubspec 读取并截断构建号为语义版本', () async {
       await loadAppVersion();
@@ -27,26 +24,17 @@ void main() {
       expect(nekoClientValue, 'archoera+$clientVersion');
     });
 
-    test('请求头（主路径）：ArchoeraMusic 本体 UA + X-Neko-Client，UA 非空', () {
-      final h = nekoRequestHeaders;
-      expect(nekoIdentityUsesFallback, isFalse);
-      // 主路径：ArchoeraMusic 本体自报。
-      expect(h['User-Agent'], startsWith('ArchoeraMusic/'));
-      expect(h['User-Agent'], isNotEmpty);
-      expect(h[kNekoClientHeader], 'archoera+$clientVersion');
-    });
-
-    test('请求头（回退）：纯 NekoMusic 桌面 UA 形状 + 仍带 X-Neko-Client', () {
-      nekoNoteIdentityRejected();
-      expect(nekoIdentityUsesFallback, isTrue);
+    test('请求头：官方锚定桌面 UA 形状 + X-Neko-Client，不冒名 Android / 浏览器', () {
       final h = nekoRequestHeaders;
       // 官方锚定正则：NekoMusic-(windows|macos|linux)/<数字开头的版本>。
       expect(
         h['User-Agent'],
         matches(RegExp(r'^NekoMusic-(windows|macos|linux)/\d')),
       );
+      expect(h['User-Agent'], isNotEmpty);
       expect(h[kNekoClientHeader], 'archoera+$clientVersion');
-      // 不冒名 Android、也不伪装浏览器。
+      // 不再使用本体自报 UA；不冒名 Android、也不伪装浏览器。
+      expect(h['User-Agent'], isNot(startsWith('ArchoeraMusic')));
       expect(h['User-Agent'], isNot(contains('android')));
       expect(h['User-Agent'], isNot(contains('Mozilla')));
     });

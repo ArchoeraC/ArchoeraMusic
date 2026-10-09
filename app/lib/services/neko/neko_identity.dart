@@ -2,36 +2,26 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// NekoMusic 音源的客户端标识（分层身份）。
+/// NekoMusic 音源的客户端标识。
 ///
-/// NekoMusic 服务端有两道与身份相关的校验：
+/// NekoMusic 服务端的客户端校验（见后端《防爬与客户端识别》专项文档）：
+/// - 空 / 缺失 `User-Agent` → 一律按爬虫处理（`GET` 直出 SEO HTML、其它方法
+///   `403`），**旧版「空 UA 放行」旁路已拆除**；
+/// - 官方原生客户端 UA 为**整体锚定**的 `NekoMusic-<平台>/<版本>`
+///   （平台限 `android|pc|ios|macos|windows|linux|qt`，版本必须以数字开头）；
+/// - 未知 UA（既非浏览器完整性、也非官方 UA）同样被降级为 SEO HTML。
 ///
-/// 1. **防爬 / 客户端区分**——见《防爬与客户端识别》：
-///    - 空 / 缺失 `User-Agent` → 一律按爬虫处理（`GET` 直出 SEO HTML、
-///      其它方法 `403`），**旧版「空 UA 放行」旁路已拆除**，不能再依赖；
-///    - 官方原生客户端 UA 为**整体锚定**的 `NekoMusic-<平台>/<版本>`
-///      （平台限 `android|pc|ios|macos|windows|linux|qt`，版本必须以数字开头）；
-///    - 未知 UA（既非浏览器完整性、也非官方 UA）同样被降级为 SEO HTML。
-///    我们既不是官方客户端、也不冒名 Android，因此采用**分层身份**：
-///    - **主路径（优雅）**：以 ArchoeraMusic 本体自报
-///      `User-Agent: ArchoeraMusic/<版本> (<平台>)` + `X-Neko-Client: archoera+<版本>`。
-///      服务端一旦落地「自报标识放行」（`X-Neko-Client` 作为正向证据），
-///      或把 `ArchoeraMusic` 纳入放行名单，即自动生效。
-///    - **回退（暴力）**：当前线上服务端尚不认该本体 UA，主路径会被降级；此时改发
-///      **纯 NekoMusic 桌面 UA 形状** `NekoMusic-<平台>/<版本>`，命中服务端
-///      `isNativeClient` 锚定正则。回退**只换 UA 形状、不改其它语义**，
-///      且绝不伪装 Android、绝不补浏览器特征头（不做反爬对抗）。
-///      切换由 [NekoClient] 在检测到「响应被降级」时自动触发（见
-///      `apis/neko/neko_client.dart` 的 [nekoIsDegradedResponse]），进程内粘滞。
-/// 2. **请求防重放**——见《请求防重放》：全部动态接口（`/api/*`、`/loser/*`）
-///    需一次性 `X-Neko-Nonce`（绑定 IP + 读/写、短时有效、用后即废），缺失/
-///    重放返回 `409`。由 `apis/neko/neko_client.dart` 的 nonce 池自动领取并注入。
+/// 经实测，服务端**不认** `ArchoeraMusic/<版本>` 这类自报 UA：在换题等动态接口上
+/// 会被降级为 SEO HTML。因此本客户端**不再保留「本体 UA 主路径」**——所有 Neko
+/// 出站请求一律使用官方锚定的桌面 UA **形状** `NekoMusic-<平台>/<版本>`，并始终携带
+/// `X-Neko-Client: archoera+<版本>` 作为**来源声明**：复用其公开形状只为通过
+/// `isNativeClient` 正则，**不冒名官方品牌、不伪装 Android、不做浏览器对抗**；
+/// 服务端一旦落地「自报标识 `X-Neko-Client` 作为正向证据」的放行逻辑，该头即自动生效。
 ///
 /// 例外是**站点图片**（封面 / 头像）：它们经全局 HttpClient（浏览器 UA，见
 /// `main.dart` 的 `_BrowserUserAgentOverrides`）发起，`Image` / `NetworkImage`
-/// 以 `add` 语义追加请求头、**无法清空 / 覆盖 UA**，因此图片侧无法换用上述
-/// 分层 UA，保持「标识头 + 浏览器特征头」：新服务端靠 `X-Neko-Client` 放行，
-/// 现存服务端靠浏览器完整性放行（封面 / 头像本身也在防重放豁免清单内）。
+/// 以 `add` 语义追加请求头、**无法清空 / 覆盖 UA**，因此图片侧只补标识头与浏览器
+/// 特征头（封面 / 头像本身也在防重放豁免清单内）。
 library;
 
 import 'dart:io';
@@ -53,7 +43,7 @@ const String kNekoNonceHeader = 'X-Neko-Nonce';
 /// 防重放失败原因响应头（`missing` / `invalid`；据此决定换 nonce 重试一次）。
 const String kNekoReplayStatusHeader = 'X-Neko-Replay-Status';
 
-/// 版本占位：读取失败时用 `unknown`（服务端放行不依赖版本）。
+/// 版本占位：读取失败时用 `unknown`（`X-Neko-Client` 里表达真实来源）。
 String get _versionOrUnknown =>
     clientVersion.isEmpty ? 'unknown' : clientVersion;
 
@@ -71,51 +61,24 @@ String get nekoPlatformName {
   return 'linux';
 }
 
-/// 优先身份 UA（主路径）：以 ArchoeraMusic 本体直接自报。
-String get nekoPrimaryUserAgent =>
-    'ArchoeraMusic/$_versionOrUnknown ($nekoPlatformName)';
-
-/// 兼容回退 UA（暴力路径）：纯 NekoMusic 桌面 UA 形状 `NekoMusic-<平台>/<版本>`。
+/// 出站 UA：官方锚定的桌面 UA 形状 `NekoMusic-<平台>/<版本>`。
 ///
-/// 仅在服务端把本体标识按爬虫降级时启用；用于在服务端尚未接受
-/// `ArchoeraMusic` 前仍能拿到 JSON。**不是**冒名官方客户端品牌，
-/// 只是复用其公开的 UA 形状以通过锚定正则；`X-Neko-Client` 始终保留本应用标识。
-String get nekoFallbackUserAgent =>
-    'NekoMusic-$nekoPlatformName/$_versionWithLeadingDigit';
-
-/// 是否已切换到回退身份（本体标识被服务端拒绝后由 [NekoClient] 置位，进程内粘滞）。
-bool _useFallbackIdentity = false;
-
-/// 当前是否处于回退身份（UI / 诊断可用）。
-bool get nekoIdentityUsesFallback => _useFallbackIdentity;
-
-/// 标记「本体标识被服务端按爬虫降级」→ 后续请求改用 [nekoFallbackUserAgent]。
-void nekoNoteIdentityRejected() {
-  _useFallbackIdentity = true;
-}
-
-/// 复位回退身份（测试 / 服务器地址切换时调用）。
-void nekoResetIdentity() {
-  _useFallbackIdentity = false;
-}
+/// 只复用其公开形状以通过服务端 `isNativeClient` 锚定正则；来源声明由
+/// [nekoClientValue] 的 `X-Neko-Client` 承担，不冒名官方品牌、不伪装 Android。
+String get nekoUserAgent => 'NekoMusic-$nekoPlatformName/$_versionWithLeadingDigit';
 
 /// 发往 NekoMusic 的完整请求头（REST / SSE / 音频下载 / 引擎 AVIO / 原生 HTTP）。
 ///
-/// 分层身份：默认以 ArchoeraMusic 本体自报；被降级后自动回退为纯
-/// `NekoMusic-<平台>/<版本>`（详见库注释）。两种情形都带 `X-Neko-Client`，
-/// 且 `User-Agent` 始终非空。
+/// `User-Agent` 始终为官方锚定的桌面形状（非空）；`X-Neko-Client` 始终表达真实来源。
 Map<String, String> get nekoRequestHeaders => {
-      'User-Agent': _useFallbackIdentity
-          ? nekoFallbackUserAgent
-          : nekoPrimaryUserAgent,
+      'User-Agent': nekoUserAgent,
       kNekoClientHeader: nekoClientValue,
     };
 
 /// 发往 NekoMusic 站点图片（封面 / 头像）的请求头。
 ///
 /// 图片经全局浏览器 UA 发起、无法覆盖 UA，故只补标识头与浏览器特征头：
-/// 新服务端靠 `X-Neko-Client` 放行，现存服务端靠浏览器完整性放行
-/// （详见库注释）。
+/// 服务端靠 `X-Neko-Client` 或浏览器完整性放行（详见库注释）。
 Map<String, String> get nekoClientHeaderOnly => {
       kNekoClientHeader: nekoClientValue,
       'Accept': 'image/*',

@@ -20,6 +20,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../services/neko/neko_identity.dart';
+import 'neko_replay.dart';
 
 /// 默认服务器地址（可在设置中修改）。
 const String kDefaultNekoBaseUrl = 'https://music.nekocore.cn';
@@ -80,13 +81,74 @@ class NekoSseEvent {
 ///
 /// 服务端对全部动态接口（`/api/*`、`/loser/*`）强制要求一次性 `X-Neko-Nonce`：
 /// 缺失/重放/过期返回 `409`（`X-Neko-Replay-Status: missing|invalid`）。
-/// 这里按站点批量预取读/写两类 nonce，用后即弃；本地 90s 提前作废（服务端 120s）。
-/// nonce 绑定领取时的出口 IP，故换 IP/代理时可能 `invalid`，由调用方换新重试一次兜住。
+///
+/// 领取 nonce **必须先换题再兑换**：`GET /api/replay/challenge` 换题 → 后台 isolate
+/// 解出 `proof` → `GET /api/replay/nonce?challenge=&proof=` 兑换读 / 写两类 nonce。
+/// 不带挑战的裸领取会被新服务端拒绝（`409`）；为兼容尚未提供挑战接口的旧服务端，
+/// 换题返回 `404` 时回退为不带挑战的领取（对齐官方 PC 端）。
+///
+/// 这里按站点批量预取，用后即弃；本地 90s 提前作废（服务端 120s）。nonce 绑定领取时的
+/// 出口 IP，故换 IP/代理时可能 `invalid`，由调用方换新重试一次兜住。
 class _NekoNonce {
   const _NekoNonce(this.value, this.issuedAt);
 
   final String value;
   final DateTime issuedAt;
+}
+
+/// 换题得到的挑战：`id` 为 `challenge`，`seed` + `difficulty` 用于在后台解出 `proof`。
+class _NekoChallenge {
+  const _NekoChallenge({
+    required this.id,
+    required this.seed,
+    required this.difficulty,
+  });
+
+  final String id;
+  final String seed;
+  final int difficulty;
+}
+
+/// 换题结果。
+sealed class _ChallengeFetch {
+  const _ChallengeFetch();
+}
+
+/// 换题成功，得到一道待解的挑战。
+class _ChallengeReady extends _ChallengeFetch {
+  const _ChallengeReady(this.challenge);
+
+  final _NekoChallenge challenge;
+}
+
+/// 换题失败（网络错误 / 非 2xx / 响应无法识别）：本轮放弃，交给下次补领。
+class _ChallengeUnavailable extends _ChallengeFetch {
+  const _ChallengeUnavailable();
+}
+
+/// 服务端未提供挑战接口（HTTP 404）：回退为不带挑战的旧领取方式。
+class _ChallengeNotSupported extends _ChallengeFetch {
+  const _ChallengeNotSupported();
+}
+
+/// 兑换 nonce 的结果。
+enum _ClaimOutcome {
+  /// 已领取到 nonce（列表可能为空）。
+  done,
+
+  /// 挑战失效 / 解答不合格（`400` / `409`）：换新题重解一次。
+  retry,
+
+  /// 限额（`429`）/ 服务不可用（`503`）/ 网络错误：本轮打住，不紧循环撞限额。
+  abort,
+}
+
+/// 单次 GET 的原始结果（状态码 + 解析出的 JSON）。
+class _NekoHttpGet {
+  const _NekoHttpGet(this.status, this.json);
+
+  final int status;
+  final Map<String, dynamic>? json;
 }
 
 class _NekoNoncePool {
@@ -97,6 +159,10 @@ class _NekoNoncePool {
   static const int _batch = 16; // 服务端上限 64；官方 PC 端取 16
   static const int _lowWater = 4;
   static const Duration _localMaxAge = Duration(seconds: 90);
+  static const Duration _timeout = Duration(seconds: 12);
+
+  /// 一轮领取里「换题 → 解题 → 兑换」的最大尝试次数（对齐官方 PC 端）。
+  static const int _maxClaimAttempts = 2;
 
   final List<_NekoNonce> _read = [];
   final List<_NekoNonce> _write = [];
@@ -143,36 +209,120 @@ class _NekoNoncePool {
     });
   }
 
+  /// 一轮领取：换题 → 解题 → 兑换；被拒（`400` / `409`）换新题重解一次。
   Future<void> _fetch() async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
+    for (var attempt = 0; attempt < _maxClaimAttempts; attempt++) {
+      final fetched = await _requestChallenge();
+      switch (fetched) {
+        case _ChallengeUnavailable():
+          return;
+        case _ChallengeNotSupported():
+          // 旧服务端（无挑战接口）：回退为不带挑战直接领取。
+          await _claim(challenge: null, proof: null);
+          return;
+        case _ChallengeReady(challenge: final challenge):
+          final proof = await nekoSolveProof(
+            challenge.seed,
+            challenge.difficulty,
+          );
+          if (proof == null) return;
+          final outcome = await _claim(challenge: challenge, proof: proof);
+          if (outcome == _ClaimOutcome.retry) continue;
+          return;
+      }
+    }
+  }
+
+  /// 换题：`GET /api/replay/challenge`，区分「成功 / 失败 / 旧服务端（404）」。
+  Future<_ChallengeFetch> _requestChallenge() async {
+    final res = await _getJson('/api/replay/challenge', {
+      'read': '$_batch',
+      'write': '$_batch',
+    });
+    if (res == null) return const _ChallengeUnavailable();
+    // 旧服务端还没有挑战接口：回退为不带挑战的领取（新服务端会拒绝，无副作用）。
+    if (res.status == 404) return const _ChallengeNotSupported();
+    if (res.status < 200 || res.status >= 300) {
+      return const _ChallengeUnavailable();
+    }
+    final data = res.json?['data'];
+    if (data is! Map) return const _ChallengeUnavailable();
+    final algorithm = data['algorithm']?.toString() ?? '';
+    final id = data['challenge']?.toString() ?? '';
+    final seed = data['seed']?.toString() ?? '';
+    final difficulty = (data['difficulty'] as num?)?.toInt() ?? -1;
+    // 算法不认识就不盲解（服务端换算法时下个版本再适配）。
+    if (algorithm != kNekoPowAlgorithm ||
+        id.isEmpty ||
+        seed.isEmpty ||
+        difficulty < 0) {
+      return const _ChallengeUnavailable();
+    }
+    return _ChallengeReady(
+      _NekoChallenge(id: id, seed: seed, difficulty: difficulty),
+    );
+  }
+
+  /// 兑换 nonce：带 `challenge` / `proof`（旧服务端回退时改带 `read` / `write`）。
+  Future<_ClaimOutcome> _claim({
+    required _NekoChallenge? challenge,
+    required String? proof,
+  }) async {
+    final res = await _getJson('/api/replay/nonce', {
+      if (challenge != null) 'challenge': challenge.id,
+      if (challenge != null && proof != null) 'proof': proof,
+      if (challenge == null) 'read': '$_batch',
+      if (challenge == null) 'write': '$_batch',
+    });
+    if (res == null) return _ClaimOutcome.abort;
+    // 领取被拒（挑战缺失 / 失效 / 解答不合格统一回 409）：换题重解一次。
+    if (res.status == 400 || res.status == 409) return _ClaimOutcome.retry;
+    if (res.status < 200 || res.status >= 300) return _ClaimOutcome.abort;
+    final data = res.json?['data'];
+    final nonces = data is Map ? data['nonces'] : null;
+    if (nonces is! Map) return _ClaimOutcome.abort;
+    final now = DateTime.now();
+    void append(List<_NekoNonce> pool, Object? raw) {
+      if (raw is! List) return;
+      for (final value in raw) {
+        final s = value?.toString() ?? '';
+        if (s.isNotEmpty) pool.add(_NekoNonce(s, now));
+      }
+    }
+
+    append(_read, nonces['read']);
+    append(_write, nonces['write']);
+    return _ClaimOutcome.done;
+  }
+
+  /// 单次 GET（自动带分层客户端身份头）；网络错误 / 非 JSON 返回 null。
+  Future<_NekoHttpGet?> _getJson(
+    String path,
+    Map<String, String> query,
+  ) async {
+    final client = HttpClient()..connectionTimeout = _timeout;
     try {
-      final uri = Uri.parse(baseUrl).resolve(
-        '/api/replay/nonce?read=$_batch&write=$_batch',
-      );
-      final req = await client.getUrl(uri).timeout(const Duration(seconds: 12));
+      final uri = Uri.parse(baseUrl)
+          .resolve(path)
+          .replace(queryParameters: query);
+      final req = await client.getUrl(uri).timeout(_timeout);
       // 领取接口自身豁免 nonce，但仍需携带分层客户端身份（防爬过滤器按 UA 判定）。
       nekoRequestHeaders.forEach(req.headers.set);
-      final res = await req.close().timeout(const Duration(seconds: 12));
-      if (res.statusCode < 200 || res.statusCode >= 300) return;
-      final text = await res.transform(utf8.decoder).join();
-      final json = jsonDecode(text);
-      if (json is! Map) return;
-      final data = json['data'];
-      final nonces = data is Map ? data['nonces'] : null;
-      if (nonces is! Map) return;
-      final now = DateTime.now();
-      void append(List<_NekoNonce> pool, Object? raw) {
-        if (raw is! List) return;
-        for (final value in raw) {
-          final s = value?.toString() ?? '';
-          if (s.isNotEmpty) pool.add(_NekoNonce(s, now));
+      final res = await req.close().timeout(_timeout);
+      final text = await res.transform(utf8.decoder).join().timeout(_timeout);
+      Map<String, dynamic>? json;
+      if (text.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(text);
+          if (decoded is Map<String, dynamic>) json = decoded;
+        } catch (_) {
+          // 非 JSON 响应：按状态码处理
         }
       }
-
-      append(_read, nonces['read']);
-      append(_write, nonces['write']);
+      return _NekoHttpGet(res.statusCode, json);
     } catch (_) {
       // 领取失败：按无 nonce 继续，由上层收到 409 后兜底
+      return null;
     } finally {
       client.close(force: true);
     }
@@ -192,6 +342,7 @@ bool nekoNeedsNonce(String path, String method) {
   final verb = method.toUpperCase();
   if (verb == 'OPTIONS' || verb == 'HEAD') return false;
   const exemptPaths = {
+    '/api/replay/challenge',
     '/api/replay/nonce',
     '/api/music/latest',
     '/api/music/ranking',
@@ -321,7 +472,6 @@ class NekoClient {
     final protected = nekoNeedsNonce(path, method);
     final write = method.toUpperCase() != 'GET';
     _NekoRawResponse? last;
-    var switchedIdentity = false;
     for (var attempt = 0; attempt < 3; attempt++) {
       final nonce = protected
           ? await _noncePoolFor(baseUrl).take(write: write)
@@ -334,13 +484,6 @@ class NekoClient {
         nonce: nonce,
       );
       last = res;
-      // 本体标识被服务端按爬虫降级：切到回退身份并重试一次（进程内粘滞）。
-      if (res.degraded && !switchedIdentity && !nekoIdentityUsesFallback) {
-        switchedIdentity = true;
-        nekoNoteIdentityRejected();
-        _noncePools.remove(baseUrl); // 旧标识下领到的 nonce 一并作废
-        continue;
-      }
       // 缺 nonce / 已失效：换新 nonce 重试一次（被拒请求不会执行，无重复副作用）。
       if (res.replayRejected && attempt < 2) {
         _noncePoolFor(baseUrl).noteRejected();
@@ -349,7 +492,7 @@ class NekoClient {
       break;
     }
     final res = last!;
-    // 回退后仍被降级：明确报错，绝不把 SEO HTML / 拒绝体当成业务成功。
+    // 被防爬降级（SEO HTML / 拒绝体）：明确报错，绝不把 SEO HTML 当成业务成功。
     if (res.degraded) {
       throw NekoApiException(
         'NekoMusic 拒绝本次请求（客户端标识未获放行）',
@@ -484,9 +627,8 @@ class NekoClient {
               : NekoErrorKind.api,
         );
       }
-      // 被降级为 SEO HTML：标记回退身份，并抛错让调用方（下一轮）以回退身份重连。
+      // 被降级为 SEO HTML：明确报错，绝不把 SEO HTML 当成业务成功。
       if ((res.headers.contentType?.mimeType ?? '').contains('text/html')) {
-        nekoNoteIdentityRejected();
         throw NekoApiException(
           'NekoMusic 拒绝本次请求（客户端标识未获放行）',
           statusCode: res.statusCode,
