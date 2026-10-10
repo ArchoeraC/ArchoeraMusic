@@ -69,29 +69,14 @@ Future<bool> _ensureLoggedIn(
   WidgetRef ref,
   String source,
 ) async {
-  if (source == 'kugou') {
-    final s = ref.read(kugouApiProvider).session;
-    if (s != null && s.userid.isNotEmpty && s.token.isNotEmpty) return true;
-    if (!context.mounted) return false;
-    final go = await _showLoginPrompt(context, context.l10n.brandKugou);
-    if (!go || !context.mounted) return false;
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      barrierDismissible: false,
-      builder: (_) => const KgQrLoginDialog(),
-    );
-    return ok == true;
-  }
-  if (source == 'netease') {
-    if (getRuntime().sessionStore.get('netease').isNotEmpty) return true;
-    if (!context.mounted) return false;
-    final go = await _showLoginPrompt(context, context.l10n.brandNetease);
-    if (!go || !context.mounted) return false;
-    await showNeteaseLoginDialog(context);
-    return getRuntime().sessionStore.get('netease').isNotEmpty;
-  }
-  return true;
+  // 登录态与登录动作由音源注册表提供（不再硬编码 KG / NT 分支）。
+  final sp = sourcePlatform(source);
+  if (sp.loggedIn(ref)) return true;
+  if (!context.mounted) return false;
+  final go = await _showLoginPrompt(context, sp.label(context.l10n));
+  if (!go || !context.mounted) return false;
+  await sp.login(context);
+  return sp.loggedIn(ref);
 }
 
 Future<bool> _showLoginPrompt(BuildContext context, String platform) async {

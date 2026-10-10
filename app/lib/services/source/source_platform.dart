@@ -122,6 +122,15 @@ abstract class SourcePlatform {
   /// 通用曲目右键菜单是否显示「查看歌手 / 媒体详情 / 下载」（NT / KG / QQ / Neko）。
   bool get trackMenuArtistDownload => false;
 
+  /// 播放时是否必须以「引擎直连流式」处理（跳过整首内存门禁）。流媒体为真。
+  bool get streamDirectOnly => false;
+
+  /// 下载前该曲目是否已具备所需信息（KG 需品质 hash）；默认 true。
+  bool downloadTrackReady(Track t) => true;
+
+  /// 聚合搜索建议中是否显示来源标点（KG 为真）。
+  bool get suggestBadge => false;
+
   // ── 搜索能力 ──────────────────────────────────────────────────────
 
   /// 搜索单曲。[append] 追加下一页；[loaded] 为该源已累计条数；[limit] 每页条数。
@@ -645,6 +654,12 @@ class _KugouSource extends SourcePlatform {
 
   @override
   bool get trackMenuArtistDownload => true;
+
+  @override
+  bool downloadTrackReady(Track t) => t.kugou != null;
+
+  @override
+  bool get suggestBadge => true;
 
   @override
   Future<Track> prepareForDownload(dynamic ref, Track t) async {
@@ -1282,6 +1297,9 @@ class _StreamingSource extends SourcePlatform {
 
   @override
   bool get downloadDirectOnly => true;
+
+  @override
+  bool get streamDirectOnly => true;
 
   @override
   bool get autoFallback => false;

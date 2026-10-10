@@ -238,7 +238,8 @@ class LikeController extends ChangeNotifier {
     // 注：QQ 红心以本机库为主源，登出 QQ 不清空其分桶（sync 会按登录态重算——
     // 未登录时仍保留本机 songmid）。
     for (final entry in _sets.entries) {
-      if (entry.key == 'qqmusic') continue;
+      // 本机红心库（QQ）以本机为主源，登出不清空。
+      if (collectionPlatform(entry.key).localLikedStore) continue;
       entry.value.clear();
     }
     // 登出后旧账号的缓冲标记不再适用（对账由重登后新一轮 sync 重算）

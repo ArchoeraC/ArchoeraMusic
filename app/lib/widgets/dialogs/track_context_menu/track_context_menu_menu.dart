@@ -128,7 +128,7 @@ Future<void> _startDownload(
   WidgetRef ref,
   Track track,
 ) async {
-  if (track.source == 'kugou' && track.kugou == null) {
+  if (!sourcePlatform(track.source).downloadTrackReady(track)) {
     toast(context.l10n.toastNoQualityInfo);
     return;
   }
