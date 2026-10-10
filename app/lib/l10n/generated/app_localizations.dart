@@ -308,6 +308,48 @@ abstract class AppLocalizations {
   /// **'时长'**
   String get tagEditorDuration;
 
+  /// No description provided for @tagEditorScrape.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在线刮削'**
+  String get tagEditorScrape;
+
+  /// No description provided for @tagEditorScraping.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刮削中…'**
+  String get tagEditorScraping;
+
+  /// No description provided for @tagEditorScrapeHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'从已启用的音乐源在线匹配，结果填入下方供确认后保存'**
+  String get tagEditorScrapeHint;
+
+  /// No description provided for @tagEditorScrapeDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已填入刮削结果'**
+  String get tagEditorScrapeDone;
+
+  /// No description provided for @tagEditorScrapeNotFound.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未找到匹配的在线元数据'**
+  String get tagEditorScrapeNotFound;
+
+  /// No description provided for @tagEditorScrapeFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'刮削失败'**
+  String get tagEditorScrapeFailed;
+
+  /// No description provided for @tagEditorScrapeNeedQuery.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请先填写标题或艺术家'**
+  String get tagEditorScrapeNeedQuery;
+
   /// No description provided for @menuBatchEditMetadata.
   ///
   /// In zh_CN, this message translates to:
