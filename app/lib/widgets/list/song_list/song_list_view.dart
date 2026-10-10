@@ -36,6 +36,9 @@ extension _SongListView on _SongListState {
               onBatchEditMetadata: widget.onBatchEditMetadata == null
                   ? null
                   : () => unawaited(_batchEditMetadata()),
+              onBatchAddToPlaylist: widget.onBatchAddToPlaylist == null
+                  ? null
+                  : () => unawaited(_batchAddToPlaylist()),
               onExitBatch: _exitBatch,
             ),
             const Divider(height: 1),
@@ -143,6 +146,7 @@ class _SongListHeader extends StatelessWidget {
     required this.onBatchAddQueue,
     required this.onBatchDownload,
     required this.onBatchEditMetadata,
+    this.onBatchAddToPlaylist,
     required this.onExitBatch,
   });
 
@@ -167,6 +171,9 @@ class _SongListHeader extends StatelessWidget {
 
   /// 批量「编辑元数据」回调（null → 不显示该按钮）。
   final VoidCallback? onBatchEditMetadata;
+
+  /// 批量「添加到歌单」回调（null → 不显示该按钮）。
+  final VoidCallback? onBatchAddToPlaylist;
   final VoidCallback onExitBatch;
 
   @override
@@ -219,6 +226,13 @@ class _SongListHeader extends StatelessWidget {
                 icon: EtaIcons.downloadOutline,
                 enabled: !none,
                 onTap: () => onBatchDownload(),
+              ),
+            if (onBatchAddToPlaylist != null)
+              _SongListIconButton(
+                tooltip: l10n.playlistPickTitle,
+                icon: EtaIcons.add,
+                enabled: !none,
+                onTap: onBatchAddToPlaylist!,
               ),
             if (onBatchEditMetadata != null)
               _SongListIconButton(

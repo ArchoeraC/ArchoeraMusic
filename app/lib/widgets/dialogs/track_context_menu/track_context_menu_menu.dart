@@ -56,6 +56,13 @@ void showTrackContextMenu(
           icon: EtaIcons.chatOutline,
           onTap: () => showCommentDialog(context, track: track),
         ),
+        // 添加到歌单：仅网易云曲目（目标为用户自建 NT 歌单）。
+        if (track.source == 'netease')
+          SContextMenuItem(
+            label: l10n.playlistPickTitle,
+            icon: EtaIcons.add,
+            onTap: () => showPlaylistPickerDialog(context, tracks: [track]),
+          ),
       ],
       // 查看歌手 / 媒体详情：在线来源通用（含 QQ）。
       if (canViewArtist) ...[

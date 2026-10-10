@@ -37,6 +37,13 @@ extension _TrackListDialogView on _TrackListDialogState {
                 l10n: l10n,
                 onPlayAll: _playAll,
                 onRefresh: widget.onRefresh == null ? null : _refresh,
+                actions: widget.neteasePlaylistId == null
+                    ? null
+                    : PlaylistHeaderActions(
+                        playlistId: widget.neteasePlaylistId!,
+                        playlistName: widget.title,
+                        onDeleted: () => Navigator.of(context).pop(),
+                      ),
               ),
               const SizedBox(height: 12),
               const Divider(height: 1),
@@ -54,7 +61,9 @@ extension _TrackListDialogView on _TrackListDialogState {
                       return SizedBox(
                         height: listHeight,
                         child: _DialogErrorView(
-                          message: l10n.commonLoadFailed(msg: '${snapshot.error}'),
+                          message: l10n.commonLoadFailed(
+                            msg: '${snapshot.error}',
+                          ),
                           onRetry: _reload,
                         ),
                       );
@@ -74,6 +83,9 @@ extension _TrackListDialogView on _TrackListDialogState {
                         isPlaying: isPlaying,
                         onPlay: _playTrack,
                         onContextMenu: _onTrackMenu,
+                        onBatchAddToPlaylist: widget.neteasePlaylistId == null
+                            ? null
+                            : _batchAddToPlaylist,
                       ),
                     );
                   },
@@ -140,7 +152,9 @@ extension _BrowseDialogView on _KugouBrowseDialogState {
                     }
                     if (snapshot.hasError) {
                       return _DialogErrorView(
-                        message: l10n.commonLoadFailed(msg: '${snapshot.error}'),
+                        message: l10n.commonLoadFailed(
+                          msg: '${snapshot.error}',
+                        ),
                         onRetry: _reloadBrowse,
                       );
                     }
@@ -185,6 +199,7 @@ class _TrackListHeader extends StatelessWidget {
     required this.l10n,
     required this.onPlayAll,
     this.onRefresh,
+    this.actions,
   });
 
   final String title;
@@ -194,6 +209,9 @@ class _TrackListHeader extends StatelessWidget {
   final dynamic l10n;
   final Future<void> Function(List<Track>) onPlayAll;
   final VoidCallback? onRefresh;
+
+  /// 头部额外动作（歌单收藏 / 管理），显示在关闭按钮左侧。
+  final Widget? actions;
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +278,7 @@ class _TrackListHeader extends StatelessWidget {
               ],
             ),
           ),
+          if (actions != null) ...[actions!, const SizedBox(width: 4)],
           IconButton(
             tooltip: l10n.commonClose,
             visualDensity: VisualDensity.compact,
