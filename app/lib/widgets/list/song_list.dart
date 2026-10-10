@@ -54,6 +54,7 @@ class SongList extends ConsumerStatefulWidget {
     this.onToggleLike,
     this.loadAllItems,
     this.onBatchEditMetadata,
+    this.onBatchAddToPlaylist,
   });
 
   final List<Track> items;
@@ -114,6 +115,11 @@ class SongList extends ConsumerStatefulWidget {
   /// `services/source/metadata_editor.dart` 的 `MetadataEditor`）；通用列表
   /// （我喜欢 / 搜索结果）不传 → 不显示，避免对在线曲目误暴露能力。
   final Future<void> Function(List<Track> tracks)? onBatchEditMetadata;
+
+  /// 批量「添加到歌单」回调（null → 不显示该按钮）。
+  ///
+  /// 仅网易云曲目场景由宿主接入（目标为 NT 自建歌单）；其余来源不传。
+  final Future<void> Function(List<Track> tracks)? onBatchAddToPlaylist;
 
   @override
   ConsumerState<SongList> createState() => _SongListState();

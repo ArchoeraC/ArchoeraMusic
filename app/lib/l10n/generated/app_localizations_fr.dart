@@ -5929,4 +5929,109 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get mcpShellLblTagPaused => '[en pause]';
+
+  @override
+  String get playlistCreateTitle => 'Créer une playlist';
+
+  @override
+  String get playlistCreateName => 'Nom de la playlist';
+
+  @override
+  String get playlistCreateNameHint => 'Donnez un nom à la playlist';
+
+  @override
+  String get playlistCreatePrivacy => 'Définir comme privée';
+
+  @override
+  String get playlistCreatePrivacyHint =>
+      'Les playlists privées ne sont visibles que par vous';
+
+  @override
+  String get playlistCreateSubmit => 'Créer';
+
+  @override
+  String get playlistCreateDone => 'Playlist créée';
+
+  @override
+  String get playlistCreateFailed => 'Échec de la création de la playlist';
+
+  @override
+  String get playlistCollect => 'Ajouter aux favoris';
+
+  @override
+  String get playlistCollected => 'Dans les favoris';
+
+  @override
+  String get playlistCollectDone => 'Playlist ajoutée aux favoris';
+
+  @override
+  String get playlistUncollectDone => 'Retirée des favoris';
+
+  @override
+  String get playlistCollectFailed => 'Échec de l\'action favoris';
+
+  @override
+  String get playlistEditTitle => 'Modifier la playlist';
+
+  @override
+  String get playlistEditName => 'Nom de la playlist';
+
+  @override
+  String get playlistEditDesc => 'Description de la playlist';
+
+  @override
+  String get playlistEditDescHint => 'Décrivez cette playlist (facultatif)';
+
+  @override
+  String get playlistEditDone => 'Playlist mise à jour';
+
+  @override
+  String get playlistEditFailed => 'Échec de la mise à jour de la playlist';
+
+  @override
+  String get playlistDeleteTitle => 'Supprimer la playlist';
+
+  @override
+  String playlistDeleteConfirm({required Object name}) {
+    return 'Supprimer la playlist « $name » ? Cette action est irréversible.';
+  }
+
+  @override
+  String get playlistDeleteDone => 'Playlist supprimée';
+
+  @override
+  String get playlistDeleteFailed => 'Échec de la suppression de la playlist';
+
+  @override
+  String get playlistPickTitle => 'Ajouter à une playlist';
+
+  @override
+  String get playlistPickEmpty => 'Aucune playlist créée pour l\'instant';
+
+  @override
+  String get playlistPickEmptyHint =>
+      'Créez une playlist et ajoutez-y vos chansons préférées';
+
+  @override
+  String get playlistPickNew => 'Nouvelle playlist';
+
+  @override
+  String playlistAdded({required Object count}) {
+    return '$count titres ajoutés à la playlist';
+  }
+
+  @override
+  String get playlistAlreadyIn => 'Le titre est déjà dans cette playlist';
+
+  @override
+  String get playlistAddFailed => 'Échec de l\'ajout à la playlist';
+
+  @override
+  String get playlistRemoveTrack => 'Retirer de la playlist';
+
+  @override
+  String get playlistRemoveDone => 'Retiré de la playlist';
+
+  @override
+  String get playlistRemoveFailed => 'Échec du retrait';
 }

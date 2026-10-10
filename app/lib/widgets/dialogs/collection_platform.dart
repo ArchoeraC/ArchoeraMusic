@@ -39,6 +39,7 @@ import 'neko_login_dialog.dart';
 import 'netease_login_dialog.dart';
 import 'qqmusic_login_dialog.dart';
 import 'track_list_dialog.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 收藏页的一个分类 Tab。
@@ -172,7 +173,10 @@ abstract class CollectionPlatform {
 
   /// 拉取某分类；返回「tabKey → 数据」映射（一次请求可填充多个分类，
   /// 如 KG/QQ/NK 的曲库接口）。key 形如 `'$source.$tabId'`。
-  Future<Map<String, List<CoverItem>>> fetchFavorites(dynamic ref, String tabId);
+  Future<Map<String, List<CoverItem>>> fetchFavorites(
+    dynamic ref,
+    String tabId,
+  );
 
   /// 点击某个封面项的打开动作。
   void openFavorite(
@@ -251,14 +255,13 @@ class _NeteaseCollection extends CollectionPlatform {
       favoritesNeteaseTabProvider;
 
   @override
-  List<String> get tabIds => const ['playlist', 'album', 'artist'];
+  List<String> get tabIds => const ['created', 'playlist', 'album', 'artist'];
 
   @override
   bool loggedIn(dynamic ref) => ref.read(neteaseAuthProvider) != null;
 
   @override
-  Future<void> login(BuildContext context) =>
-      showNeteaseLoginDialog(context);
+  Future<void> login(BuildContext context) => showNeteaseLoginDialog(context);
 
   @override
   String likeKey(Track t) => t.id;
@@ -325,13 +328,24 @@ class _NeteaseCollection extends CollectionPlatform {
 
   @override
   List<CollectionTab> tabs(AppLocalizations l10n) => [
-    CollectionTab('playlist', (l) => l.commonPlaylists, EtaIcons.playlist),
+    // 自建歌单（可编辑 / 删除 / 加歌）+ 收藏的歌单（只读收藏视图）。
+    CollectionTab('created', (l) => l.pageFavKgCreated, EtaIcons.music2Outline),
+    CollectionTab(
+      'playlist',
+      (l) => l.pageFavKgCollectedPlaylist,
+      EtaIcons.playlist,
+    ),
     CollectionTab('album', (l) => l.commonAlbums, EtaIcons.albumOutline),
-    CollectionTab('artist', (l) => l.commonArtists, EtaIcons.userOutline, extent: 150),
+    CollectionTab(
+      'artist',
+      (l) => l.commonArtists,
+      EtaIcons.userOutline,
+      extent: 150,
+    ),
   ];
 
   @override
-  String get defaultTabId => 'playlist';
+  String get defaultTabId => 'created';
 
   @override
   Future<Map<String, List<CoverItem>>> fetchFavorites(
@@ -343,22 +357,30 @@ class _NeteaseCollection extends CollectionPlatform {
     // 后续 .where/.map 走动态派发，闭包参数退化为 dynamic → 运行时
     // `(dynamic) => dynamic` 不匹配 `(PlaylistItem) => bool` 而抛错。
     final NeteaseApi api = ref.read(neteaseApiProvider);
+    // 歌单两类（自建 / 收藏）由一次 user_playlist 同时填充，切 tab 不再重复请求。
+    if (tabId == 'created' || tabId == 'playlist') {
+      final list = await api.userPlaylists(account!.userId);
+      List<CoverItem> toItems(bool subscribed) => list
+          .where((p) => p.subscribed == subscribed)
+          .map(
+            (p) => CoverItem(
+              id: p.id,
+              title: p.name,
+              cover: p.cover,
+              subtitle: p.owner ?? '',
+              trackCount: p.trackCount,
+            ),
+          )
+          .toList();
+      return {
+        tabKey('created'): toItems(false),
+        tabKey('playlist'): toItems(true),
+      };
+    }
     final items = switch (tabId) {
       'album' => await api.albumSublist(),
       'artist' => await api.artistSublist(),
-      _ =>
-        (await api.userPlaylists(account!.userId))
-            .where((p) => p.subscribed)
-            .map(
-              (p) => CoverItem(
-                id: p.id,
-                title: p.name,
-                cover: p.cover,
-                subtitle: p.owner ?? '',
-                trackCount: p.trackCount,
-              ),
-            )
-            .toList(),
+      _ => const <CoverItem>[],
     };
     return {tabKey(tabId): items};
   }
@@ -389,12 +411,14 @@ class _NeteaseCollection extends CollectionPlatform {
   ) {
     if (!loggedIn) {
       return switch (tabId) {
+        'created' => l10n.pageFavKgCreatedLoginHint,
         'album' => l10n.pageFavAlbumLoginHint,
         'artist' => l10n.pageFavArtistLoginHint,
         _ => l10n.pageFavPlaylistLoginHint,
       };
     }
     return switch (tabId) {
+      'created' => l10n.pageFavKgCreatedCount(count: count),
       'album' => l10n.pageFavAlbumCount(count: count),
       'artist' => l10n.pageFavArtistCount(count: count),
       _ => l10n.pageFavPlaylistCount(count: count),
@@ -422,16 +446,18 @@ class _KugouCollection extends CollectionPlatform {
       kugouApiProvider.select<Object?>((s) => s.session?.userid);
 
   @override
-  String likeFailedText(AppLocalizations l10n) =>
-      l10n.toastLoginRequiredKugou;
+  String likeFailedText(AppLocalizations l10n) => l10n.toastLoginRequiredKugou;
 
   @override
   NotifierProvider<ShellPageSelection<String>, String?> get tabSelection =>
       favoritesKugouTabProvider;
 
   @override
-  List<String> get tabIds =>
-      const ['created', 'collectedPlaylist', 'collectedAlbum'];
+  List<String> get tabIds => const [
+    'created',
+    'collectedPlaylist',
+    'collectedAlbum',
+  ];
 
   @override
   bool loggedIn(dynamic ref) => ref.read(kugouApiProvider).session != null;
@@ -450,7 +476,8 @@ class _KugouCollection extends CollectionPlatform {
   String likeKey(Track t) => (t.kugou?.hash ?? t.id).toLowerCase();
 
   @override
-  String? likedUserKey(dynamic ref) => ref.read(kugouApiProvider).session?.userid;
+  String? likedUserKey(dynamic ref) =>
+      ref.read(kugouApiProvider).session?.userid;
 
   @override
   Future<Set<String>> fetchLikedIds(dynamic ref) =>
@@ -700,8 +727,7 @@ class _QqCollection extends CollectionPlatform {
   }
 
   @override
-  String likedRefreshLabel(AppLocalizations l10n) =>
-      l10n.pageLikedQqSyncOnline;
+  String likedRefreshLabel(AppLocalizations l10n) => l10n.pageLikedQqSyncOnline;
 
   @override
   bool likedShowRefresh(dynamic ref, LikedView view) =>

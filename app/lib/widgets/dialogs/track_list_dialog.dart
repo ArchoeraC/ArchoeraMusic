@@ -11,6 +11,7 @@ import '../../services/playback/playback_notifier.dart';
 import '../../services/source/source_platform.dart';
 import '../../services/source/media_request_headers.dart';
 import '../../stores/daily_shelf_provider.dart';
+import '../../stores/netease_user_playlists.dart';
 import '../../stores/providers.dart';
 import '../../l10n/l10n.dart';
 import '../common/glass_surface.dart';
@@ -18,7 +19,11 @@ import '../player/s_controls.dart';
 import '../list/song_list.dart';
 import '../list/cover_grid.dart';
 import '../common/toast.dart';
+import 'playlist_manage.dart';
+import 'playlist_picker_dialog.dart';
+import 's_context_menu.dart';
 import 'track_context_menu.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'track_list_dialog/track_list_dialog_actions.dart';
@@ -32,6 +37,7 @@ Future<void> showKugouTracksDialog(
   String? cover,
   required Future<List<Track>> Function(WidgetRef ref) loadTracks,
   Future<void> Function(WidgetRef ref)? onRefresh,
+  String? neteasePlaylistId,
 }) {
   return showDialog<void>(
     context: context,
@@ -43,6 +49,7 @@ Future<void> showKugouTracksDialog(
       cover: cover,
       loadTracks: loadTracks,
       onRefresh: onRefresh,
+      neteasePlaylistId: neteasePlaylistId,
     ),
   );
 }
@@ -165,6 +172,7 @@ Future<void> showPlaylistDetailDialog(
     title: playlist.title,
     subtitle: playlist.subtitle,
     cover: playlist.cover,
+    neteasePlaylistId: playlist.id,
     loadTracks: (ref) async {
       final detail = await ref
           .read(neteaseApiProvider)
@@ -221,8 +229,7 @@ Future<void> showNekoPlaylistDetailDialog(
     title: playlist.title,
     subtitle: playlist.subtitle,
     cover: playlist.cover,
-    loadTracks: (ref) =>
-        ref.read(nekoApiProvider).playlistTracks(playlist.id),
+    loadTracks: (ref) => ref.read(nekoApiProvider).playlistTracks(playlist.id),
   );
 }
 
@@ -285,6 +292,7 @@ class TrackListDialog extends ConsumerStatefulWidget {
     this.cover,
     required this.loadTracks,
     this.onRefresh,
+    this.neteasePlaylistId,
   });
 
   final String title;
@@ -296,6 +304,9 @@ class TrackListDialog extends ConsumerStatefulWidget {
 
   /// 可选「刷新」动作：点击后先执行本回调（如强制刷新日推），再重新加载列表。
   final Future<void> Function(WidgetRef ref)? onRefresh;
+
+  /// 网易云歌单 id：非空时头部显示收藏 / 编辑 / 删除动作，曲目菜单支持移除。
+  final String? neteasePlaylistId;
 
   @override
   ConsumerState<TrackListDialog> createState() => _TrackListDialogState();
