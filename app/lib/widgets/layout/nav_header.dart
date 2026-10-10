@@ -13,6 +13,7 @@ import '../../app/theme_provider.dart';
 import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
 import '../../services/source/media_request_headers.dart';
+import '../../services/source/source_platform.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/weather/weather_notifier.dart';
 import '../../settings/settings_dialog.dart';
@@ -374,12 +375,15 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   /// albumid 不能跨平台混用，对齐搜索页 `_onCoverTap` 的平台分发）。
   void _openSuggestAlbum(SuggestSimpleItem album) {
     _searchFocus.unfocus();
-    final cover = CoverItem(id: album.id, title: album.name);
-    if (album.source == 'kugou') {
-      showKugouAlbumDialog(context, cover);
-    } else {
-      showNeteaseAlbumDialog(context, cover);
-    }
+    final cover = CoverItem(
+      id: album.id,
+      title: album.name,
+      source: album.source,
+    );
+    // 按来源经注册表分发专辑详情（不再硬编码 KG / NT 分支）。
+    sourcePlatform(
+      album.source,
+    ).openCover(context, ref, SourceSearchKind.album, cover);
   }
 
   /// 建议歌手：NT歌手热门歌曲弹窗。

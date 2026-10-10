@@ -422,23 +422,15 @@ class _SourceBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (source) {
-      'netease' => ('云', const Color(0xFFC20C0C)),
-      // KG徽标为蓝底白字
-      'kugou' => ('酷', const Color(0xFF00A7E0)),
-      // QM徽标（品牌绿）
-      'qqmusic' => ('Q', const Color(0xFF31C27C)),
-      // 实验性音源 NekoMusic（紫；聚合搜索徽标用 K）
-      'neko' => ('K', const Color(0xFF8B5CF6)),
-      _ => ('', Colors.transparent),
-    };
+    final sp = sourcePlatform(source);
+    final label = sp.badgeLabel;
     if (label.isEmpty) return const SizedBox.shrink();
     return Container(
       width: 16,
       height: 16,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: color,
+        color: sp.badgeColor,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -454,71 +446,14 @@ class _SourceBadge extends StatelessWidget {
   }
 }
 
-/// 可用最高音质标签（label + 是否无损档）：
-/// - KG：按 hash 链判断（Hi-Res/无损/HQ/SQ/LQ，见 KugouTrackInfo）；
-/// - QQ：由各档文件大小推断；
-/// - NT/本地：由 [Track.quality] 反推等级；
-/// - Neko：由服务端 `maxQuality`（异步，经注册表 provider 回填 [maxQuality]）。
-/// 返回 null 表示无可用信息（列表不显示音质标签）。
+/// 可用最高音质标签（label + 是否无损档）：由「音源注册表」适配器按来源给出
+/// （KG hash 链 / QQ 文件大小 / Neko 服务端 `maxQuality` / 其余按
+/// [Track.quality] 反推）。返回 null 表示无可用信息（列表不显示音质标签）。
 ({String label, bool lossless})? _bestQuality(
   Track t,
   AppLocalizations l10n, {
   String? maxQuality,
-}) {
-  final k = t.kugou;
-  if (k != null) {
-    if (k.hashFor('hi-res') != null) return (label: 'Hi-Res', lossless: true);
-    if (k.hashFor('lossless') != null) {
-      return (label: 'Lossless', lossless: true);
-    }
-    if (k.hashFor('hq') != null) return (label: 'HQ', lossless: false);
-    if (k.hashFor('sq') != null) return (label: 'SQ', lossless: false);
-    if (k.hashFor('lq') != null) return (label: 'LQ', lossless: false);
-    return null;
-  }
-  // QM：由搜索/专辑等返回的各档文件大小推断（hires/flac/320/128）。
-  final q = t.qqmusic;
-  if (q != null && q.sizes.isNotEmpty) {
-    if ((q.sizes['hires'] ?? 0) > 0) return (label: 'Hi-Res', lossless: true);
-    if ((q.sizes['flac'] ?? 0) > 0) {
-      return (label: 'Lossless', lossless: true);
-    }
-    if ((q.sizes['320'] ?? 0) > 0) return (label: 'HQ', lossless: false);
-    if ((q.sizes['128'] ?? 0) > 0) return (label: 'SQ', lossless: false);
-    return null;
-  }
-  // Neko：服务端实际最高档（未取到 → 不显示，避免误导）。
-  if (t.source == 'neko') return nekoQualityBadge(maxQuality);
-  return _qualityLevel(t.quality, l10n);
-}
-
-/// 由 [TrackQuality] 反推等级短码：无损编解码器 → Hi-Res（sr≥96k 且
-/// 24bit）/ 无损；否则按 bitrate 分档（≥320k HQ / ≥192k SQ / LQ）。
-({String label, bool lossless})? _qualityLevel(
-  TrackQuality? q,
-  AppLocalizations l10n,
-) {
-  if (q == null || q.codec.isEmpty || q.codec == 'unknown') return null;
-  const losslessCodecs = {
-    'flac',
-    'alac',
-    'ape',
-    'wav',
-    'aiff',
-    'wavpack',
-    'tta',
-  };
-  if (losslessCodecs.contains(q.codec.toLowerCase())) {
-    if (q.sampleRate >= 96000 && q.bitsPerSample >= 24) {
-      return (label: 'Hi-Res', lossless: true);
-    }
-    return (label: 'Lossless', lossless: true);
-  }
-  final kbps = q.bitRate / 1000;
-  if (kbps >= 320) return (label: 'HQ', lossless: false);
-  if (kbps >= 192) return (label: 'SQ', lossless: false);
-  return (label: 'LQ', lossless: false);
-}
+}) => sourcePlatform(t.source).qualityBadge(t, l10n, maxQuality: maxQuality);
 
 /// 文本小徽标（付费 / 音质角标共用：圆角底 + 小字标签）。
 class _Badge extends StatelessWidget {

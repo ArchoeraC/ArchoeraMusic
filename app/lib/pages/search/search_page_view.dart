@@ -91,7 +91,7 @@ extension _SearchPageView on _SearchPageState {
           platformLabel: _platformLabel,
           failureDetail: _failureDetail,
           isCooling: (source) =>
-              source == 'qqmusic' && _sourceCooldown.cooling('qqmusic'),
+              _coolable(source) && _sourceCooldown.cooling(source),
           onRetry: _tab == _SearchTab.songs
               ? _retrySongsSource
               : (source) => _retryCoversSource(_tab, source),
