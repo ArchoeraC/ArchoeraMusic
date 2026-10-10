@@ -19,7 +19,12 @@ class _WeatherMiniState extends ConsumerState<_WeatherMini> {
   @override
   void initState() {
     super.initState();
-    _sync();
+    // 延后到首帧之后：refresh() 会同步 notifyListeners（修改 provider），
+    // 在 initState（构建期）调用会触发 Riverpod「Tried to modify a provider
+    // while the widget tree was building」断言。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _sync();
+    });
   }
 
   @override
