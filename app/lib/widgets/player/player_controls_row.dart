@@ -13,6 +13,7 @@ library;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../easter_egg/april_fools_state.dart';
 import '../../../l10n/l10n.dart';
 import '../../../services/netease/track.dart';
 import '../../../services/playback/playback_notifier.dart';
@@ -60,45 +61,52 @@ class PlayerControlsRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = context.l10n;
-    final notifier = ref.read(playbackProvider.notifier);
-    return Row(
-      children: [
-        Expanded(
-          child: _PlayerControlsLeftGroup(
-            canLike: canLike,
-            liked: liked,
-            current: current,
-            l10n: l10n,
-            colorScheme: colorScheme,
-            onToggleLike: onToggleLike,
-            onShowComments: onShowComments,
-          ),
-        ),
-        SizedBox(
-          width: 380,
-          child: _PlayerControlsCenterGroup(
-            hasContent: hasContent,
-            hasQueue: hasQueue,
-            shuffle: shuffle,
-            repeatMode: repeatMode,
-            playing: playing,
-            buffering: buffering,
-            l10n: l10n,
-            colorScheme: colorScheme,
-            notifier: notifier,
-          ),
-        ),
-        Expanded(
-          child: _PlayerControlsRightGroup(
-            hasQueue: hasQueue,
-            l10n: l10n,
-            onShowQueue: () =>
-                QueuePanel.show(context, style: QueuePanelStyle.slide),
-          ),
-        ),
-      ],
+    // 奇怪的特效激活时重建（下一首/上一首互换、循环反向）。
+    return ValueListenableBuilder<bool>(
+      valueListenable: aprilFoolsActiveNotifier,
+      builder: (BuildContext context, bool prank, Widget? _) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final l10n = context.l10n;
+        final notifier = ref.read(playbackProvider.notifier);
+        return Row(
+          children: [
+            Expanded(
+              child: _PlayerControlsLeftGroup(
+                canLike: canLike,
+                liked: liked,
+                current: current,
+                l10n: l10n,
+                colorScheme: colorScheme,
+                onToggleLike: onToggleLike,
+                onShowComments: onShowComments,
+              ),
+            ),
+            SizedBox(
+              width: 380,
+              child: _PlayerControlsCenterGroup(
+                hasContent: hasContent,
+                hasQueue: hasQueue,
+                shuffle: shuffle,
+                repeatMode: repeatMode,
+                playing: playing,
+                buffering: buffering,
+                l10n: l10n,
+                colorScheme: colorScheme,
+                notifier: notifier,
+                prank: prank,
+              ),
+            ),
+            Expanded(
+              child: _PlayerControlsRightGroup(
+                hasQueue: hasQueue,
+                l10n: l10n,
+                onShowQueue: () =>
+                    QueuePanel.show(context, style: QueuePanelStyle.slide),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

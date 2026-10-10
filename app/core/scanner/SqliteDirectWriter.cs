@@ -51,6 +51,7 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
         // schema 与 sidecar database/index.ts 完全一致，已有表时无副作用
         EnsureTracksTable();
         EnsureStageTable();
+        EnsureLoudnessColumns(); // 旧库补列（幂等；新建库已在 CREATE 中含列）
 
         // 读连接（WAL 下可并发读）
         _readConn = new SqliteConnection($"Data Source={dbPath}");
@@ -221,11 +222,13 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                 INSERT INTO tracks
                     (id, path, title, track, artists, album, duration, cover,
                      codec, sample_rate, bit_rate, channels, bits_per_sample,
-                     file_size, file_mtime, file_ctime, scanned_at, lyrics)
+                     file_size, file_mtime, file_ctime, scanned_at, lyrics,
+                     loudness_lufs, loudness_peak)
                 SELECT
                     id, path, title, track, artists, album, duration, cover,
                     codec, sample_rate, bit_rate, channels, bits_per_sample,
-                    file_size, file_mtime, file_ctime, scanned_at, lyrics
+                    file_size, file_mtime, file_ctime, scanned_at, lyrics,
+                    loudness_lufs, loudness_peak
                 FROM _scanner_stage_tracks
                 WHERE true
                 ON CONFLICT(id) DO UPDATE SET
@@ -245,7 +248,10 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                     file_mtime = excluded.file_mtime,
                     file_ctime = excluded.file_ctime,
                     scanned_at = excluded.scanned_at,
-                    lyrics = excluded.lyrics;
+                    lyrics = excluded.lyrics,
+                    -- 普通扫描（未开 --analyze-loudness）staging 为 NULL：保留已分析值。
+                    loudness_lufs = COALESCE(excluded.loudness_lufs, tracks.loudness_lufs),
+                    loudness_peak = COALESCE(excluded.loudness_peak, tracks.loudness_peak);
                 DELETE FROM _scanner_stage_tracks;
             ";
             cmd.ExecuteNonQuery();
@@ -427,7 +433,9 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                 file_mtime INTEGER,
                 file_ctime INTEGER,
                 scanned_at INTEGER NOT NULL,
-                lyrics TEXT
+                lyrics TEXT,
+                loudness_lufs REAL,
+                loudness_peak REAL
             );
             CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
             CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album);
@@ -457,7 +465,9 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                 file_mtime INTEGER,
                 file_ctime INTEGER,
                 scanned_at INTEGER NOT NULL,
-                lyrics TEXT
+                lyrics TEXT,
+                loudness_lufs REAL,
+                loudness_peak REAL
             )
         ";
         cmd.ExecuteNonQuery();
@@ -471,11 +481,13 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
             INSERT INTO _scanner_stage_tracks
                 (id, path, title, track, artists, album, duration, cover,
                  codec, sample_rate, bit_rate, channels, bits_per_sample,
-                 file_size, file_mtime, file_ctime, scanned_at, lyrics)
+                 file_size, file_mtime, file_ctime, scanned_at, lyrics,
+                 loudness_lufs, loudness_peak)
             VALUES
                 (@id, @path, @title, @track, @artists, @album, @duration, @cover,
                  @codec, @sampleRate, @bitRate, @channels, @bitsPerSample,
-                 @fileSize, @fileMtime, @fileCtime, @scannedAt, @lyrics)
+                 @fileSize, @fileMtime, @fileCtime, @scannedAt, @lyrics,
+                 @loudnessLufs, @loudnessPeak)
         ";
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -506,6 +518,8 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
             cmd.Parameters.AddWithValue("@fileCtime", t.Ctime);
             cmd.Parameters.AddWithValue("@scannedAt", now);
             cmd.Parameters.AddWithValue("@lyrics", (object?)t.Lyrics ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@loudnessLufs", (object?)t.LoudnessLufs ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@loudnessPeak", (object?)t.LoudnessPeak ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
         }
@@ -557,6 +571,38 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
             )";
         cmd.ExecuteNonQuery();
     }
+
+    /// <summary>
+    /// 幂等迁移：为**已存在**的 tracks / staging 表补 `loudness_lufs` /
+    /// `loudness_peak` 列（新建库已在 CREATE TABLE 中带列）。以 PRAGMA table_info
+    /// 判定缺失后再 ALTER TABLE ADD COLUMN，重复运行无副作用。
+    /// </summary>
+    private void EnsureLoudnessColumns()
+    {
+        EnsureLoudnessColumnsOn(_conn, "tracks");
+        EnsureLoudnessColumnsOn(_conn, "_scanner_stage_tracks");
+    }
+
+    private static void EnsureLoudnessColumnsOn(SqliteConnection c, string table)
+    {
+        var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var probe = c.CreateCommand())
+        {
+            probe.CommandText = $"PRAGMA table_info({table})";
+            using var reader = probe.ExecuteReader();
+            while (reader.Read()) existing.Add(reader.GetString(1)); // 列 1 = name
+        }
+        foreach (var col in LoudnessColumns)
+        {
+            if (existing.Contains(col)) continue;
+            using var alter = c.CreateCommand();
+            alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {col} REAL";
+            alter.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>响度分析列（顺序固定；迁移/CREATE 共用）。</summary>
+    private static readonly string[] LoudnessColumns = { "loudness_lufs", "loudness_peak" };
 
     private static FileInfo? SafeFileInfo(string path)
     {

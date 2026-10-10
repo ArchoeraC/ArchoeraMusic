@@ -149,6 +149,21 @@ add_test(NAME test_decoder_seek_trim
 set_tests_properties(test_decoder_seek_trim PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# FFmpeg 解码器 ReplayGain 元数据提取：含标签 fixture 命中 track/album 增益+峰值，
+# 无标签 fixture 掩码为 0（不误报）。
+add_executable(test_replaygain test_replaygain.c)
+target_link_libraries(test_replaygain PRIVATE audio_engine_static)
+target_include_directories(test_replaygain PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_replaygain
+         COMMAND test_replaygain
+                 ${CMAKE_CURRENT_SOURCE_DIR}/rg_fixture.flac
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tagged_fixture.flac)
+set_tests_properties(test_replaygain PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # EraAudio 自研内核 seek 样本级对齐（跨档无缝切换拼接，native 路径）：fixture =
 # 同一真实 FLAC。内核 seek 只到帧边界且方向随格式而异，C 壳按内核报告的样本级
 # 落点裁剪前导样本，断言 seek 后输出严格从目标样本起（未裁剪时会整体偏移一帧）。

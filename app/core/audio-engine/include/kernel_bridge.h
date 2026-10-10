@@ -245,6 +245,28 @@ void zk_dsp_loudness_process(ZkDspLoudness *l, float *pcm, int samples);
 /** 释放响度实例；NULL 空操作。 */
 void zk_dsp_loudness_destroy(ZkDspLoudness *l);
 
+/* ---- 离线 EBU R128 集成响度测量（scanner 直桥；ITU-R BS.1770-4）----
+ *
+ * 供 scanner 离线分析本地文件，把集成响度 + 线性采样峰值写入曲库
+ * （loudness_lufs / loudness_peak），作为无 ReplayGain 标签文件的兜底归一化
+ * 增益来源。解码走内核 decoder，按有界块喂入测量器，不保留整文件 PCM。
+ *
+ * 契约：
+ *   - 成功返回 0，并按测量结果填 *out；
+ *   - 失败返回 <0 = -（enum ZkStatus，如 ZK_OPEN_FAILED / ZK_CORRUPT /
+ *     ZK_OUT_OF_MEMORY / ZK_UNSUPPORTED）；
+ *   - 静音 / 时长不足 400ms 等**无通过绝对门限的块**时仍返回 0，但
+ *     out->valid = 0（integrated_lufs 保持 0，out->peak 仍为有效采样峰值）。
+ */
+typedef struct ZkLoudnessResult {
+    double integrated_lufs; /**< EBU R128 集成响度（LUFS）；valid=0 时无意义 */
+    double peak;            /**< 线性采样峰值（全声道 max |sample|，非 true peak） */
+    int    valid;           /**< 1 = 集成响度有效；0 = 无通过门限的块 */
+} ZkLoudnessResult;
+
+/* 解码 `path` 并测量集成响度 + 采样峰值。@return 0 成功，<0 见上。 */
+int zk_loudness_measure(const char *path, ZkLoudnessResult *out);
+
 /* ---- 常驻内核接入 seam（§7 async 主干；加法式，不改动既有路径）---- */
 
 /** 常驻内核句柄（不透明；内核池 + 定容任务槽，见 docs/engine-master-pool-design.md） */

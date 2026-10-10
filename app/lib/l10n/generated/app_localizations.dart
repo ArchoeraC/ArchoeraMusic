@@ -272,12 +272,6 @@ abstract class AppLocalizations {
   /// **'保存'**
   String get tagEditorSave;
 
-  /// No description provided for @tagEditorSaving.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'保存中…'**
-  String get tagEditorSaving;
-
   /// No description provided for @tagEditorSaved.
   ///
   /// In zh_CN, this message translates to:
@@ -295,12 +289,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'缺少本地文件路径'**
   String get tagEditorNoPath;
-
-  /// No description provided for @tagEditorUnsupportedFormat.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'不支持的文件格式'**
-  String get tagEditorUnsupportedFormat;
 
   /// No description provided for @tagEditorDuration.
   ///
@@ -391,12 +379,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'应用到所选'**
   String get tagEditorBatchApply;
-
-  /// No description provided for @tagEditorBatchApplying.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'正在应用…'**
-  String get tagEditorBatchApplying;
 
   /// No description provided for @tagEditorBatchNoEditable.
   ///
@@ -793,18 +775,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'系统可能按空闲计划休眠'**
   String get settingsSuppressSleepOff;
-
-  /// No description provided for @settingsBackgroundUnload.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'后台卸载已访问页面'**
-  String get settingsBackgroundUnload;
-
-  /// No description provided for @settingsBackgroundUnloadSubtitle.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'最小化/托盘/熄屏时释放列表与图片，恢复窗口后重建（可能丢滚动位置）'**
-  String get settingsBackgroundUnloadSubtitle;
 
   /// No description provided for @settingsCloseBehavior.
   ///
@@ -2544,12 +2514,6 @@ abstract class AppLocalizations {
   /// **'查看歌手'**
   String get menuViewArtist;
 
-  /// No description provided for @pageSearchArtistComingSoon.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'歌手页 Phase 2 接入'**
-  String get pageSearchArtistComingSoon;
-
   /// No description provided for @pageSearchInputHint.
   ///
   /// In zh_CN, this message translates to:
@@ -3313,7 +3277,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLyricsSubtitle.
   ///
   /// In zh_CN, this message translates to:
-  /// **'播放器歌词 · 桌面歌词'**
+  /// **'播放器 / 播放条歌词与样式'**
   String get settingsLyricsSubtitle;
 
   /// No description provided for @settingsPresetSubtitle.
@@ -3543,12 +3507,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'MiSans（默认）'**
   String get settingsFontMiSans;
-
-  /// No description provided for @settingsFontMiSansLabel.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'MiSans'**
-  String get settingsFontMiSansLabel;
 
   /// No description provided for @settingsSectionLanguage.
   ///
@@ -4455,12 +4413,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'{size}px（当前行放大高亮）'**
   String settingsLyricFontSizeDesc({required Object size});
-
-  /// No description provided for @settingsLyricLineHeight.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'歌词行距'**
-  String get settingsLyricLineHeight;
 
   /// No description provided for @settingsLyricPlayedColor.
   ///
@@ -6106,6 +6058,36 @@ abstract class AppLocalizations {
   /// **'确定执行此程序？如果造成了不可逆后果，你可以选择关闭软件'**
   String get easterEggGateBody;
 
+  /// No description provided for @settingsWeirdEffects.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'奇怪的特效'**
+  String get settingsWeirdEffects;
+
+  /// No description provided for @settingsWeirdEffectsOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开启「倒放」整活，点「我投降」可恢复'**
+  String get settingsWeirdEffectsOn;
+
+  /// No description provided for @settingsWeirdEffectsOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅愚人节当天出现，开启一次后消失，直到下一次愚人节'**
+  String get settingsWeirdEffectsOff;
+
+  /// No description provided for @aprilFoolsSurrender.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我投降'**
+  String get aprilFoolsSurrender;
+
+  /// No description provided for @aprilFoolsSurrenderToast.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'愚人节快乐，一切都恢复正常啦～'**
+  String get aprilFoolsSurrenderToast;
+
   /// No description provided for @settingsSectionDeclaration.
   ///
   /// In zh_CN, this message translates to:
@@ -6463,7 +6445,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsFontCreditsText.
   ///
   /// In zh_CN, this message translates to:
-  /// **'本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n\n上述字体仅用于界面文字渲染。若您再分发本软件，请一并遵守相应字体的许可条款。'**
+  /// **'本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建图标字体，字形来自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌标识字体）\n\n下方为各字体与字形的官方许可正文原文。'**
   String get settingsFontCreditsText;
 
   /// No description provided for @commonNoLyrics.
@@ -6489,18 +6471,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'歌词行高亮与普通行颜色'**
   String get settingsSearchColorSubtitle;
-
-  /// No description provided for @settingsSearchDesktopLyricsTitle.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'桌面歌词'**
-  String get settingsSearchDesktopLyricsTitle;
-
-  /// No description provided for @settingsSearchDesktopLyricsSubtitle.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'置顶独立歌词窗'**
-  String get settingsSearchDesktopLyricsSubtitle;
 
   /// No description provided for @settingsSearchDjModeTitle.
   ///
@@ -6981,12 +6951,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'14~28px 播放器歌词字号'**
   String get settingsSearchLyricFontSizeSubtitle;
-
-  /// No description provided for @settingsSearchLyricLineHeightSubtitle.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'42~64px 行高调节'**
-  String get settingsSearchLyricLineHeightSubtitle;
 
   /// No description provided for @settingsSearchUncensorSubtitle.
   ///
@@ -7982,6 +7946,24 @@ abstract class AppLocalizations {
   /// **'数据库批量写入上限（0=自动，当前 {value}）'**
   String settingsScanBatchDesc({required Object value});
 
+  /// No description provided for @settingsScanAnalyzeLoudness.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫描时分析响度'**
+  String get settingsScanAnalyzeLoudness;
+
+  /// No description provided for @settingsScanAnalyzeLoudnessOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开启：逐曲解码测量（较慢）；已入库曲目需全量扫描'**
+  String get settingsScanAnalyzeLoudnessOn;
+
+  /// No description provided for @settingsScanAnalyzeLoudnessOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭：不测量（响度归一化仅用文件内 ReplayGain 标签）'**
+  String get settingsScanAnalyzeLoudnessOff;
+
   /// No description provided for @settingsSectionScanLimits.
   ///
   /// In zh_CN, this message translates to:
@@ -8900,12 +8882,6 @@ abstract class AppLocalizations {
   /// **'AMLL DB 服务端'**
   String get settingsLyricTtmlServer;
 
-  /// No description provided for @settingsLyricTtmlServerDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'歌词请求地址模板，可改为自建或镜像'**
-  String get settingsLyricTtmlServerDesc;
-
   /// No description provided for @settingsLyricTtmlServerDialogTitle.
   ///
   /// In zh_CN, this message translates to:
@@ -9320,6 +9296,30 @@ abstract class AppLocalizations {
   /// **'已关闭'**
   String get settingsNormalizationOff;
 
+  /// No description provided for @settingsNormalizationMode.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'ReplayGain 取用口径'**
+  String get settingsNormalizationMode;
+
+  /// No description provided for @settingsNormalizationModeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'文件含 ReplayGain 标签时的取用口径（本地离线分析仅按曲目）'**
+  String get settingsNormalizationModeDesc;
+
+  /// No description provided for @settingsNormalizationModeTrack.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'单曲'**
+  String get settingsNormalizationModeTrack;
+
+  /// No description provided for @settingsNormalizationModeAlbum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'专辑'**
+  String get settingsNormalizationModeAlbum;
+
   /// No description provided for @settingsSectionSpeed.
   ///
   /// In zh_CN, this message translates to:
@@ -9343,6 +9343,36 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'恢复正常速度'**
   String get settingsPlaybackSpeedNormal;
+
+  /// No description provided for @settingsSectionPitch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'变调'**
+  String get settingsSectionPitch;
+
+  /// No description provided for @settingsPitch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'音调'**
+  String get settingsPitch;
+
+  /// No description provided for @settingsPitchDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'独立改变音调而不影响播放速度'**
+  String get settingsPitchDesc;
+
+  /// No description provided for @settingsPitchNormal.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'恢复原调'**
+  String get settingsPitchNormal;
+
+  /// No description provided for @settingsPitchUnit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'半音'**
+  String get settingsPitchUnit;
 
   /// No description provided for @settingsSectionSystem.
   ///

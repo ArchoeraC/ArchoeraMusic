@@ -92,7 +92,6 @@ rem .def 导出表（Dart FFI lookup 符号）
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_poll_event
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_wait_event
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_list_sinks
->> build\archoera_mediaengine.def echo     archoera_mediaengine_session_dir
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_is_done
 >> build\archoera_mediaengine.def echo     archoera_mediaengine_destroy
 rem M2 内存源（Dart→SegStore→引擎）：create_store FFI 入口 + segstore 句柄函数
@@ -112,7 +111,9 @@ rem （Dart DynamicLibrary lookup；segstore.c 源见下，.so 内 segstore 函�
 >> build\fft.def echo     fft_set_log_sink
 
 echo [build_windows] 编译 fft.dll...
-cl /nologo /O2 /std:c11 /MD /LD /I include /I src src\fft.c src\era_log.c /Fe:build\fft.dll /link /DEF:build\fft.def
+:: /utf-8：源码为无 BOM 的 UTF-8，含中文字符串字面量；不带该开关时 MSVC 按本地
+:: 代码页（非 UTF-8 环境，如英文 CI）解析会报 C2001（与 native/platform 一致）。
+cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src src\fft.c src\era_log.c /Fe:build\fft.dll /link /DEF:build\fft.def
 if errorlevel 1 exit /b 1
 
 rem --- 自研解码内核（EraAudio, Zig 静态库, windows-msvc ReleaseFast）---
@@ -152,7 +153,8 @@ rem   加 `--enable-schannel`（系统原生 TLS，无额外 DLL；亦保持 LGP
 rem Zig 内核（EraAudio 原生 HTTP(S)/TLS）在 Windows 依赖系统库：crypt32（系统根证书
 rem 枚举/校验）、ws2_32（Winsock）、bcrypt（std.crypto.random）；MSVC 不会自动带上，
 rem 须在最终链接显式补齐（FFmpeg 覆盖了 ws2_32/bcrypt，但不含 crypt32）。
-cl /nologo /O2 /std:c11 /MD /LD /I include /I src /I include\compat /I "%VCPKG_PREFIX%\include" ^
+:: /utf-8：见上方 fft.dll 说明（源码含中文字符串字面量，须显式声明 UTF-8）。
+cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src /I include\compat /I "%VCPKG_PREFIX%\include" ^
     src\mediaengine_lib.c src\tempo.c src\decoder.c src\resampler.c ^
     src\encoder.c src\equalizer.c src\parametric_eq.c src\lowfreq.c ^
     src\loudness.c src\limiter.c ^

@@ -156,12 +156,16 @@ extension _PlayerBarSections on _PlayerBarState {
     required bool hasContent,
   }) {
     final l10n = context.l10n;
+    // 奇怪的特效：上一首 / 下一首按钮互换（仅 UI 处理层，内部自动续播不受影响）。
+    final prank = aprilFoolsActiveNotifier.value;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
           tooltip: l10n.commonPrevious,
-          onPressed: hasQueue ? notifier.playPrevious : null,
+          onPressed: hasQueue
+              ? (prank ? notifier.playNext : notifier.playPrevious)
+              : null,
           icon: const Icon(EtaIcons.skipPrevious),
         ),
         IconButton(
@@ -177,7 +181,9 @@ extension _PlayerBarSections on _PlayerBarState {
         ),
         IconButton(
           tooltip: l10n.commonNext,
-          onPressed: hasQueue ? notifier.playNext : null,
+          onPressed: hasQueue
+              ? (prank ? notifier.playPrevious : notifier.playNext)
+              : null,
           icon: const Icon(EtaIcons.skipForward),
         ),
       ],

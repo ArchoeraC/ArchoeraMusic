@@ -18,11 +18,15 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__MINGW32__)
 /* MSVC 无 sys/types.h 的 ssize_t：用 Windows SDK 的 SSIZE_T */
 #include <BaseTsd.h>
 typedef SSIZE_T ssize_t;
 #else
+/* POSIX / MinGW：sys/types.h 提供 ssize_t。
+   （MinGW 的头名是小写 `basetsd.h`，MSVC SDK 为 `BaseTsd.h`；在大小写敏感的
+   交叉编译文件系统上二者不可混用，故 MinGW 走本分支。类型同为 64 位有符号，
+   与本文件导出的 ssize_t ABI 一致。） */
 #include <sys/types.h> /* ssize_t */
 #endif
 
@@ -47,7 +51,9 @@ typedef struct {
     float eq_gains[EQ_BANDS]; /**< 10 段 EQ 增益（dB），-12 ~ +12 */
     float eq_preamp_db;       /**< 前级增益（dB），-12 ~ +12 */
     bool  normalization;      /**< 响度归一化开关 */
-    float normalization_gain; /**< 预计算响度增益（dB），0 = 不补偿 */
+    float normalization_gain; /**< 预计算响度增益（dB），0 = 不补偿（兜底；文件含
+                                   ReplayGain 标签时优先用标签） */
+    int   normalization_album;/**< ReplayGain 取用口径：0=track（默认）/ 1=album */
     bool  limiter_enabled;    /**< 限幅器开关 */
     float limiter_threshold_db; /**< 限幅器阈值（dB），默认 -1.0 */
     bool  fft_enabled;        /**< FFT 频谱分析开关 */
@@ -81,6 +87,7 @@ typedef struct {
     .eq_preamp_db = 0.0f, \
     .normalization = false, \
     .normalization_gain = 0.0f, \
+    .normalization_album = 0, \
     .limiter_enabled = true, \
     .limiter_threshold_db = -1.0f, \
     .fft_enabled = false, \
@@ -230,8 +237,19 @@ void pipeline_set_preamp(AudioPipeline *p, float preamp_db);
 /** 运行时设置音量增益（0~1.5，1.0 为原音量） */
 void pipeline_set_volume(AudioPipeline *p, float volume);
 
-/** 运行时启用/禁用响度归一化 */
+/** 运行时启用/禁用响度归一化（保留文件内 ReplayGain 标签的当前取值）。 */
 void pipeline_set_normalization_enabled(AudioPipeline *p, bool enabled);
+
+/**
+ * 运行时设置响度归一化的兜底增益（dB）。
+ *
+ * 仅当文件**不含** ReplayGain 标签时使用；调用方（Dart / 扫描器）应已
+ * 按峰值做好削波保护。文件含标签时标签优先。
+ */
+void pipeline_set_normalization_gain(AudioPipeline *p, float gain_db);
+
+/** 运行时切换 ReplayGain 取用口径（0=track / 1=album）。 */
+void pipeline_set_normalization_album(AudioPipeline *p, int album);
 
 /** 运行时启用/禁用限幅器 */
 void pipeline_set_limiter_enabled(AudioPipeline *p, bool enabled);

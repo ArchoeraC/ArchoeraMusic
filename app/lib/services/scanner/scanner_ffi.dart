@@ -98,7 +98,7 @@ class ScannerLibrary {
   ///
   /// 选项经单个 JSON 字符串传入，避免扩展 scanner_scan 的 ABI 签名：
   ///   { maxFileSizeMb?, maxScanFiles?, maxScanErrors?, parallelism?,
-  ///     extraExts?: string[] }
+  ///     extraExts?: string[], analyzeLoudness?: bool }
   /// 0/空 = 引擎默认。符号缺失（旧 .so）时静默忽略，不影响扫描。
   bool setScanOptions({
     int maxFileSizeMb = 0,
@@ -106,6 +106,7 @@ class ScannerLibrary {
     int maxScanErrors = 0,
     int parallelism = 0,
     List<String> extraExts = const [],
+    bool analyzeLoudness = false,
   }) {
     final json = <String, Object>{
       if (maxFileSizeMb > 0) 'maxFileSizeMb': maxFileSizeMb,
@@ -117,6 +118,8 @@ class ScannerLibrary {
             .map((e) => e.trim().toLowerCase().replaceFirst('.', ''))
             .where((e) => e.isNotEmpty)
             .toList(),
+      // 显式下发布尔值（true/false 都发），使关闭也能覆盖引擎上一次的开启态。
+      'analyzeLoudness': analyzeLoudness,
     };
     if (json.isEmpty) return false;
     final jsonStr = jsonEncode(json).toNativeUtf8();

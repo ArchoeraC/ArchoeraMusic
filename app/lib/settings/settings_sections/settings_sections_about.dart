@@ -498,5 +498,4 @@ const List<_ThanksItem> _kThanksIcons = [
   ),
   _ThanksItem('Tabler Icons', 'MIT', 'https://tabler.io/icons'),
   _ThanksItem('Lucide', 'ISC', 'https://lucide.dev'),
-  _ThanksItem('line-md', 'MIT', 'https://github.com/cyberalien/line-md'),
 ];

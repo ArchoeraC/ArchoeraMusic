@@ -7,8 +7,7 @@
 项目内所有图标引用统一归一化为 `EtaIcons.*`（见 `app/lib/eta/icon/eta_icons.dart`），
 不再直接引用 Material `Icons.*`。字形源为 **mingcute icons**（Apache-2.0，见
 `source/LICENSE-mingcute.txt`），缺口由 **Tabler Icons**（MIT，`added/`）与
-**Lucide**（ISC，`added/`，如 `memory_stick`）补齐，
-`line-md`（MIT）仅作播放器动画离线参考，本工具链不消费它。
+**Lucide**（ISC，`added/`，如 `memory_stick`）补齐。
 
 ## 产物与落点
 
@@ -52,7 +51,7 @@ python3 4_replace_icons.py
 
 ## 许可注意
 
-- 随 app 分发需遵守各自许可：mingcute Apache-2.0、Tabler/line-md MIT、Lucide ISC；
+- 随 app 分发需遵守各自许可：mingcute Apache-2.0、Tabler MIT、Lucide ISC；
   源 SVG 与字体二进制的声明见本目录 `source/LICENSE-*`。
 - 字形源中 `regular/` 是描边式（`fill=none`+`stroke`），字体字形为「填充」渲染，
   因此本工具用 `paperjs-offset` 做描边扩轮廓（与 mingcute 官方字体生成同法）。

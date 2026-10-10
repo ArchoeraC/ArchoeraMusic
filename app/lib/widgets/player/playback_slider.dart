@@ -31,6 +31,7 @@ library;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../easter_egg/april_fools_state.dart';
 import '../../utils/format.dart';
 
 part 'playback_slider/playback_slider_state.dart';

@@ -65,9 +65,14 @@ void main() {
     expect(find.textContaining('GitHub 仓库与 Issue'), findsOneWidget);
   });
 
-  testWidgets('字体署名弹窗：含 MiSans 许可信息', (tester) async {
+  testWidgets('字体署名弹窗：含各内置字体与官方许可正文', (tester) async {
     await openDialog(tester, showFontCreditsDialog);
     expect(find.text('字体署名'), findsOneWidget);
-    expect(find.textContaining('MiSans'), findsOneWidget);
+    // 简介列出全部内置字体（MiSans / Manrope 等）。
+    expect(find.textContaining('MiSans'), findsWidgets);
+    expect(find.textContaining('Manrope'), findsWidgets);
+    // 随弹窗内嵌展示官方许可正文原文。
+    expect(find.textContaining('SIL OPEN FONT LICENSE'), findsWidgets);
+    expect(find.textContaining('MiSans字体知识产权许可协议'), findsWidgets);
   });
 }

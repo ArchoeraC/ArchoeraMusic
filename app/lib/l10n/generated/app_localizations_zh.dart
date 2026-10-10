@@ -91,9 +91,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tagEditorSave => '保存';
 
   @override
-  String get tagEditorSaving => '保存中…';
-
-  @override
   String get tagEditorSaved => '已保存元数据';
 
   @override
@@ -101,9 +98,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get tagEditorNoPath => '缺少本地文件路径';
-
-  @override
-  String get tagEditorUnsupportedFormat => '不支持的文件格式';
 
   @override
   String get tagEditorDuration => '时长';
@@ -149,9 +143,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get tagEditorBatchApply => '应用到所选';
-
-  @override
-  String get tagEditorBatchApplying => '正在应用…';
 
   @override
   String get tagEditorBatchNoEditable => '所选曲目均不支持编辑元数据';
@@ -359,13 +350,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSuppressSleepOff => '系统可能按空闲计划休眠';
-
-  @override
-  String get settingsBackgroundUnload => '后台卸载已访问页面';
-
-  @override
-  String get settingsBackgroundUnloadSubtitle =>
-      '最小化/托盘/熄屏时释放列表与图片，恢复窗口后重建（可能丢滚动位置）';
 
   @override
   String get settingsCloseBehavior => '关闭应用时';
@@ -1318,9 +1302,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get menuViewArtist => '查看歌手';
 
   @override
-  String get pageSearchArtistComingSoon => '歌手页 Phase 2 接入';
-
-  @override
   String get pageSearchInputHint => '输入关键词开始搜索';
 
   @override
@@ -1741,7 +1722,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlaybackSubtitle => '音频引擎 · 播放行为';
 
   @override
-  String get settingsLyricsSubtitle => '播放器歌词 · 桌面歌词';
+  String get settingsLyricsSubtitle => '播放器 / 播放条歌词与样式';
 
   @override
   String get settingsPresetSubtitle => '播放过滤 · 歌词还原 · 列表标签';
@@ -1862,9 +1843,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsFontMiSans => 'MiSans（默认）';
-
-  @override
-  String get settingsFontMiSansLabel => 'MiSans';
 
   @override
   String get settingsSectionLanguage => '界面语言';
@@ -2366,9 +2344,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（当前行放大高亮）';
   }
-
-  @override
-  String get settingsLyricLineHeight => '歌词行距';
 
   @override
   String get settingsLyricPlayedColor => '已唱颜色';
@@ -3282,6 +3257,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get easterEggGateBody => '确定执行此程序？如果造成了不可逆后果，你可以选择关闭软件';
 
   @override
+  String get settingsWeirdEffects => '奇怪的特效';
+
+  @override
+  String get settingsWeirdEffectsOn => '已开启「倒放」整活，点「我投降」可恢复';
+
+  @override
+  String get settingsWeirdEffectsOff => '仅愚人节当天出现，开启一次后消失，直到下一次愚人节';
+
+  @override
+  String get aprilFoolsSurrender => '我投降';
+
+  @override
+  String get aprilFoolsSurrenderToast => '愚人节快乐，一切都恢复正常啦～';
+
+  @override
   String get settingsSectionDeclaration => '软件声明';
 
   @override
@@ -3481,7 +3471,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）';
+      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建图标字体，字形来自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌标识字体）\n\n下方为各字体与字形的官方许可正文原文。';
 
   @override
   String get commonNoLyrics => '暂无歌词';
@@ -3496,12 +3486,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSearchColorSubtitle => '歌词行高亮与普通行颜色';
-
-  @override
-  String get settingsSearchDesktopLyricsTitle => '桌面歌词';
-
-  @override
-  String get settingsSearchDesktopLyricsSubtitle => '置顶独立歌词窗';
 
   @override
   String get settingsSearchDjModeTitle => 'Fuck DJ Mode';
@@ -3752,9 +3736,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSearchLyricFontSizeSubtitle => '14~28px 播放器歌词字号';
-
-  @override
-  String get settingsSearchLyricLineHeightSubtitle => '42~64px 行高调节';
 
   @override
   String get settingsSearchUncensorSubtitle => '还原歌词中被星号遮盖的词';
@@ -4309,6 +4290,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsScanAnalyzeLoudness => '扫描时分析响度';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOn => '已开启：逐曲解码测量（较慢）；已入库曲目需全量扫描';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOff =>
+      '关闭：不测量（响度归一化仅用文件内 ReplayGain 标签）';
+
+  @override
   String get settingsSectionScanLimits => '安全上限';
 
   @override
@@ -4774,9 +4765,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLyricTtmlServer => 'AMLL DB 服务端';
 
   @override
-  String get settingsLyricTtmlServerDesc => '歌词请求地址模板，可改为自建或镜像';
-
-  @override
   String get settingsLyricTtmlServerDialogTitle => 'AMLL DB 服务端模板';
 
   @override
@@ -4987,6 +4975,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsNormalizationOff => '已关闭';
 
   @override
+  String get settingsNormalizationMode => 'ReplayGain 取用口径';
+
+  @override
+  String get settingsNormalizationModeDesc =>
+      '文件含 ReplayGain 标签时的取用口径（本地离线分析仅按曲目）';
+
+  @override
+  String get settingsNormalizationModeTrack => '单曲';
+
+  @override
+  String get settingsNormalizationModeAlbum => '专辑';
+
+  @override
   String get settingsSectionSpeed => '播放速度';
 
   @override
@@ -4997,6 +4998,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsPlaybackSpeedNormal => '恢复正常速度';
+
+  @override
+  String get settingsSectionPitch => '变调';
+
+  @override
+  String get settingsPitch => '音调';
+
+  @override
+  String get settingsPitchDesc => '独立改变音调而不影响播放速度';
+
+  @override
+  String get settingsPitchNormal => '恢复原调';
+
+  @override
+  String get settingsPitchUnit => '半音';
 
   @override
   String get settingsSectionSystem => '系统集成';
@@ -5643,9 +5659,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get tagEditorSave => '保存';
 
   @override
-  String get tagEditorSaving => '保存中…';
-
-  @override
   String get tagEditorSaved => '已保存元数据';
 
   @override
@@ -5653,9 +5666,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get tagEditorNoPath => '缺少本地文件路径';
-
-  @override
-  String get tagEditorUnsupportedFormat => '不支持的文件格式';
 
   @override
   String get tagEditorDuration => '时长';
@@ -5701,9 +5711,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get tagEditorBatchApply => '应用到所选';
-
-  @override
-  String get tagEditorBatchApplying => '正在应用…';
 
   @override
   String get tagEditorBatchNoEditable => '所选曲目均不支持编辑元数据';
@@ -5911,13 +5918,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSuppressSleepOff => '系统可能按空闲计划休眠';
-
-  @override
-  String get settingsBackgroundUnload => '后台卸载已访问页面';
-
-  @override
-  String get settingsBackgroundUnloadSubtitle =>
-      '最小化/托盘/熄屏时释放列表与图片，恢复窗口后重建（可能丢滚动位置）';
 
   @override
   String get settingsCloseBehavior => '关闭应用时';
@@ -6870,9 +6870,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get menuViewArtist => '查看歌手';
 
   @override
-  String get pageSearchArtistComingSoon => '歌手页 Phase 2 接入';
-
-  @override
   String get pageSearchInputHint => '输入关键词开始搜索';
 
   @override
@@ -7293,7 +7290,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsPlaybackSubtitle => '音频引擎 · 播放行为';
 
   @override
-  String get settingsLyricsSubtitle => '播放器歌词 · 桌面歌词';
+  String get settingsLyricsSubtitle => '播放器 / 播放条歌词与样式';
 
   @override
   String get settingsPresetSubtitle => '播放过滤 · 歌词还原 · 列表标签';
@@ -7414,9 +7411,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsFontMiSans => 'MiSans（默认）';
-
-  @override
-  String get settingsFontMiSansLabel => 'MiSans';
 
   @override
   String get settingsSectionLanguage => '界面语言';
@@ -7918,9 +7912,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（当前行放大高亮）';
   }
-
-  @override
-  String get settingsLyricLineHeight => '歌词行距';
 
   @override
   String get settingsLyricPlayedColor => '已唱颜色';
@@ -8834,6 +8825,21 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get easterEggGateBody => '确定执行此程序？如果造成了不可逆后果，你可以选择关闭软件';
 
   @override
+  String get settingsWeirdEffects => '奇怪的特效';
+
+  @override
+  String get settingsWeirdEffectsOn => '已开启「倒放」整活，点「我投降」可恢复';
+
+  @override
+  String get settingsWeirdEffectsOff => '仅愚人节当天出现，开启一次后消失，直到下一次愚人节';
+
+  @override
+  String get aprilFoolsSurrender => '我投降';
+
+  @override
+  String get aprilFoolsSurrenderToast => '愚人节快乐，一切都恢复正常啦～';
+
+  @override
   String get settingsSectionDeclaration => '软件声明';
 
   @override
@@ -9033,7 +9039,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsFontCreditsText =>
-      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n\n上述字体仅用于界面文字渲染。若您再分发本软件，请一并遵守相应字体的许可条款。';
+      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建图标字体，字形来自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌标识字体）\n\n下方为各字体与字形的官方许可正文原文。';
 
   @override
   String get commonNoLyrics => '暂无歌词';
@@ -9048,12 +9054,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSearchColorSubtitle => '歌词行高亮与普通行颜色';
-
-  @override
-  String get settingsSearchDesktopLyricsTitle => '桌面歌词';
-
-  @override
-  String get settingsSearchDesktopLyricsSubtitle => '置顶独立歌词窗';
 
   @override
   String get settingsSearchDjModeTitle => 'Fuck DJ Mode';
@@ -9304,9 +9304,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSearchLyricFontSizeSubtitle => '14~28px 播放器歌词字号';
-
-  @override
-  String get settingsSearchLyricLineHeightSubtitle => '42~64px 行高调节';
 
   @override
   String get settingsSearchUncensorSubtitle => '还原歌词中被星号遮盖的词';
@@ -9861,6 +9858,16 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
+  String get settingsScanAnalyzeLoudness => '扫描时分析响度';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOn => '已开启：逐曲解码测量（较慢）；已入库曲目需全量扫描';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOff =>
+      '关闭：不测量（响度归一化仅用文件内 ReplayGain 标签）';
+
+  @override
   String get settingsSectionScanLimits => '安全上限';
 
   @override
@@ -10326,9 +10333,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsLyricTtmlServer => 'AMLL DB 服务端';
 
   @override
-  String get settingsLyricTtmlServerDesc => '歌词请求地址模板，可改为自建或镜像';
-
-  @override
   String get settingsLyricTtmlServerDialogTitle => 'AMLL DB 服务端模板';
 
   @override
@@ -10539,6 +10543,19 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsNormalizationOff => '已关闭';
 
   @override
+  String get settingsNormalizationMode => 'ReplayGain 取用口径';
+
+  @override
+  String get settingsNormalizationModeDesc =>
+      '文件含 ReplayGain 标签时的取用口径（本地离线分析仅按曲目）';
+
+  @override
+  String get settingsNormalizationModeTrack => '单曲';
+
+  @override
+  String get settingsNormalizationModeAlbum => '专辑';
+
+  @override
   String get settingsSectionSpeed => '播放速度';
 
   @override
@@ -10549,6 +10566,21 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsPlaybackSpeedNormal => '恢复正常速度';
+
+  @override
+  String get settingsSectionPitch => '变调';
+
+  @override
+  String get settingsPitch => '音调';
+
+  @override
+  String get settingsPitchDesc => '独立改变音调而不影响播放速度';
+
+  @override
+  String get settingsPitchNormal => '恢复原调';
+
+  @override
+  String get settingsPitchUnit => '半音';
 
   @override
   String get settingsSectionSystem => '系统集成';
@@ -11195,9 +11227,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get tagEditorSave => '儲存';
 
   @override
-  String get tagEditorSaving => '儲存中…';
-
-  @override
   String get tagEditorSaved => '已儲存中繼資料';
 
   @override
@@ -11205,9 +11234,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get tagEditorNoPath => '缺少本機檔案路徑';
-
-  @override
-  String get tagEditorUnsupportedFormat => '不支援的檔案格式';
 
   @override
   String get tagEditorDuration => '時長';
@@ -11253,9 +11279,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get tagEditorBatchApply => '套用到所選';
-
-  @override
-  String get tagEditorBatchApplying => '正在套用…';
 
   @override
   String get tagEditorBatchNoEditable => '所選曲目均不支援編輯中繼資料';
@@ -11463,13 +11486,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSuppressSleepOff => '系統可能依閒置計畫休眠';
-
-  @override
-  String get settingsBackgroundUnload => '背景卸載已瀏覽頁面';
-
-  @override
-  String get settingsBackgroundUnloadSubtitle =>
-      '最小化/系統匣/關螢幕時釋放清單與圖片，恢復視窗後重建（可能遺失捲動位置）';
 
   @override
   String get settingsCloseBehavior => '關閉應用程式時';
@@ -12422,9 +12438,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get menuViewArtist => '檢視歌手';
 
   @override
-  String get pageSearchArtistComingSoon => '歌手頁 Phase 2 接入';
-
-  @override
   String get pageSearchInputHint => '輸入關鍵字開始搜尋';
 
   @override
@@ -12845,7 +12858,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsPlaybackSubtitle => '音訊引擎 · 播放行為';
 
   @override
-  String get settingsLyricsSubtitle => '播放器歌詞 · 桌面歌詞';
+  String get settingsLyricsSubtitle => '播放器 / 播放條歌詞與樣式';
 
   @override
   String get settingsPresetSubtitle => '播放過濾 · 歌詞還原 · 列表標籤';
@@ -12966,9 +12979,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsFontMiSans => 'MiSans（預設）';
-
-  @override
-  String get settingsFontMiSansLabel => 'MiSans';
 
   @override
   String get settingsSectionLanguage => '介面語言';
@@ -13470,9 +13480,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（目前行放大高亮）';
   }
-
-  @override
-  String get settingsLyricLineHeight => '歌詞行距';
 
   @override
   String get settingsLyricPlayedColor => '已唱顏色';
@@ -14386,6 +14393,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get easterEggGateBody => '確定執行此程式？如果造成了不可逆後果，你可以選擇關閉軟體';
 
   @override
+  String get settingsWeirdEffects => '奇怪的特效';
+
+  @override
+  String get settingsWeirdEffectsOn => '已開啟「倒放」整活，點「我投降」可恢復';
+
+  @override
+  String get settingsWeirdEffectsOff => '僅愚人節當天出現，開啟一次後消失，直到下一次愚人節';
+
+  @override
+  String get aprilFoolsSurrender => '我投降';
+
+  @override
+  String get aprilFoolsSurrenderToast => '愚人節快樂，一切都恢復正常啦～';
+
+  @override
   String get settingsSectionDeclaration => '軟體聲明';
 
   @override
@@ -14585,7 +14607,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsFontCreditsText =>
-      '本軟體內建以下字體：\n· MiSans（© Xiaomi，依據《MiSans 字體知識產權許可協議》授權使用）';
+      '本軟體內建以下字體：\n· MiSans（© Xiaomi，依據《MiSans 字體知識產權許可協議》授權使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建圖示字體，字形來自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌標識字體）\n\n下方為各字體與字形的官方授權條款原文。';
 
   @override
   String get commonNoLyrics => '暫無歌詞';
@@ -14600,12 +14622,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSearchColorSubtitle => '歌詞行高亮與普通行顏色';
-
-  @override
-  String get settingsSearchDesktopLyricsTitle => '桌面歌詞';
-
-  @override
-  String get settingsSearchDesktopLyricsSubtitle => '置頂獨立歌詞視窗';
 
   @override
   String get settingsSearchDjModeTitle => 'Fuck DJ Mode';
@@ -14856,9 +14872,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSearchLyricFontSizeSubtitle => '14~28px 播放器歌詞字級';
-
-  @override
-  String get settingsSearchLyricLineHeightSubtitle => '42~64px 行高調節';
 
   @override
   String get settingsSearchUncensorSubtitle => '還原歌詞中被星號遮蓋的詞';
@@ -15413,6 +15426,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get settingsScanAnalyzeLoudness => '掃描時分析響度';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOn => '已開啟：逐曲解碼測量（較慢）；已入庫曲目需完整掃描';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOff =>
+      '關閉：不測量（響度歸一化僅用檔案內 ReplayGain 標籤）';
+
+  @override
   String get settingsSectionScanLimits => '安全上限';
 
   @override
@@ -15878,9 +15901,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsLyricTtmlServer => 'AMLL DB 伺服器';
 
   @override
-  String get settingsLyricTtmlServerDesc => '歌詞請求網址範本，可改為自建或鏡像';
-
-  @override
   String get settingsLyricTtmlServerDialogTitle => 'AMLL DB 伺服器範本';
 
   @override
@@ -16091,6 +16111,19 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsNormalizationOff => '已关闭';
 
   @override
+  String get settingsNormalizationMode => 'ReplayGain 取用口徑';
+
+  @override
+  String get settingsNormalizationModeDesc =>
+      '檔案含 ReplayGain 標籤時的取用口徑（本機離線分析僅按曲目）';
+
+  @override
+  String get settingsNormalizationModeTrack => '單曲';
+
+  @override
+  String get settingsNormalizationModeAlbum => '專輯';
+
+  @override
   String get settingsSectionSpeed => '播放速度';
 
   @override
@@ -16101,6 +16134,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsPlaybackSpeedNormal => '恢复正常速度';
+
+  @override
+  String get settingsSectionPitch => '變調';
+
+  @override
+  String get settingsPitch => '音調';
+
+  @override
+  String get settingsPitchDesc => '獨立改變音調而不影響播放速度';
+
+  @override
+  String get settingsPitchNormal => '恢復原調';
+
+  @override
+  String get settingsPitchUnit => '半音';
 
   @override
   String get settingsSectionSystem => '系统集成';

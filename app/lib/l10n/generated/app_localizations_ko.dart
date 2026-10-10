@@ -92,9 +92,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get tagEditorSave => '저장';
 
   @override
-  String get tagEditorSaving => '저장 중…';
-
-  @override
   String get tagEditorSaved => '메타데이터를 저장했습니다';
 
   @override
@@ -102,9 +99,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get tagEditorNoPath => '로컬 파일 경로 없음';
-
-  @override
-  String get tagEditorUnsupportedFormat => '지원하지 않는 파일 형식';
 
   @override
   String get tagEditorDuration => '재생 시간';
@@ -151,9 +145,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get tagEditorBatchApply => '선택 항목에 적용';
-
-  @override
-  String get tagEditorBatchApplying => '적용 중…';
 
   @override
   String get tagEditorBatchNoEditable => '선택한 곡 중 메타데이터 편집을 지원하는 곡이 없습니다';
@@ -363,13 +354,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSuppressSleepOff => '시스템이 유휴 시 절전될 수 있습니다';
-
-  @override
-  String get settingsBackgroundUnload => '백그라운드에서 방문한 페이지 해제';
-
-  @override
-  String get settingsBackgroundUnloadSubtitle =>
-      '최소화/트레이/화면 꺼짐 시 목록과 이미지를 해제하고 복귀 시 재구성(스크롤 위치가 사라질 수 있음)';
 
   @override
   String get settingsCloseBehavior => '앱을 닫을 때';
@@ -1329,9 +1313,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get menuViewArtist => '아티스트 보기';
 
   @override
-  String get pageSearchArtistComingSoon => '아티스트 페이지는 Phase 2 예정';
-
-  @override
   String get pageSearchInputHint => '검색어를 입력하세요';
 
   @override
@@ -1756,7 +1737,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsPlaybackSubtitle => '오디오 엔진 · 재생 동작';
 
   @override
-  String get settingsLyricsSubtitle => '플레이어 가사 · 데스크톱 가사';
+  String get settingsLyricsSubtitle => '플레이어/바 가사 · 스타일 · 소스';
 
   @override
   String get settingsPresetSubtitle => '재생 필터 · 가사 복원 · 목록 태그';
@@ -1879,9 +1860,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsFontMiSans => 'MiSans（기본）';
-
-  @override
-  String get settingsFontMiSansLabel => 'MiSans';
 
   @override
   String get settingsSectionLanguage => '인터페이스 언어';
@@ -2390,9 +2368,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（현재 줄은 +3px로 확대 하이라이트）';
   }
-
-  @override
-  String get settingsLyricLineHeight => '가사 줄 높이';
 
   @override
   String get settingsLyricPlayedColor => '재생된 색상';
@@ -3323,6 +3298,21 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 프로그램을 실행하시겠습니까? 되돌릴 수 없는 결과가 발생하면 소프트웨어를 종료할 수 있습니다.';
 
   @override
+  String get settingsWeirdEffects => '이상한 효과';
+
+  @override
+  String get settingsWeirdEffectsOn => '거꾸로 장난 활성화 — 항복합니다를 누르면 복구됩니다';
+
+  @override
+  String get settingsWeirdEffectsOff => '만우절 당일에만 나타나며, 한 번 켜면 다음 만우절까지 사라집니다';
+
+  @override
+  String get aprilFoolsSurrender => '항복합니다';
+
+  @override
+  String get aprilFoolsSurrenderToast => '만우절 축하해요! 모든 것이 정상으로 돌아왔어요.';
+
+  @override
   String get settingsSectionDeclaration => '소프트웨어 고지';
 
   @override
@@ -3522,7 +3512,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      '이 소프트웨어에는 다음 글꼴이 포함되어 있습니다.\n· MiSans (© Xiaomi, MiSans 글꼴 지식재산권 허락 계약에 따라 사용)';
+      '이 소프트웨어에는 다음 글꼴이 포함되어 있습니다:\n· MiSans (© Xiaomi, MiSans 글꼴 지식재산권 허락 계약에 따라 사용)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (자체 제작 아이콘 글꼴; 글리프 출처 MingCute / Tabler / Lucide)\n· EtaMark (자체 제작 브랜드 마크 글꼴)\n\n아래에 각 글꼴·글리프의 공식 라이선스 전문을 수록합니다.';
 
   @override
   String get commonNoLyrics => '가사 없음';
@@ -3537,12 +3527,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSearchColorSubtitle => '현재 줄 하이라이트 및 일반 줄 색상';
-
-  @override
-  String get settingsSearchDesktopLyricsTitle => '데스크톱 가사';
-
-  @override
-  String get settingsSearchDesktopLyricsSubtitle => '항상 위 가사 창 · 재생 추적';
 
   @override
   String get settingsSearchDjModeTitle => 'Fuck DJ Mode';
@@ -3798,9 +3782,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsSearchLyricFontSizeSubtitle => '14~28px 플레이어 가사 글꼴 크기';
-
-  @override
-  String get settingsSearchLyricLineHeightSubtitle => '42~64px 줄 높이';
 
   @override
   String get settingsSearchUncensorSubtitle => '가사의 f**k 등 가려진 단어 복원';
@@ -4360,6 +4341,17 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get settingsScanAnalyzeLoudness => '스캔 시 라우드니스 분석';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOn =>
+      '켜짐: 각 파일을 디코딩해 측정(느림), 기존 곡은 전체 스캔 필요';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOff =>
+      '꺼짐: 측정하지 않음(정규화는 파일 내 ReplayGain 태그만 사용)';
+
+  @override
   String get settingsSectionScanLimits => '안전 상한';
 
   @override
@@ -4847,9 +4839,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsLyricTtmlServer => 'AMLL DB 서버';
 
   @override
-  String get settingsLyricTtmlServerDesc => '가사 요청 URL 템플릿(자체 호스팅/미러로 변경 가능)';
-
-  @override
   String get settingsLyricTtmlServerDialogTitle => 'AMLL DB 서버 템플릿';
 
   @override
@@ -5067,6 +5056,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsNormalizationOff => 'Off';
 
   @override
+  String get settingsNormalizationMode => 'ReplayGain 모드';
+
+  @override
+  String get settingsNormalizationModeDesc =>
+      'ReplayGain 태그가 있을 때 적용 기준(오프라인 분석은 트랙 단위)';
+
+  @override
+  String get settingsNormalizationModeTrack => '트랙';
+
+  @override
+  String get settingsNormalizationModeAlbum => '앨범';
+
+  @override
   String get settingsSectionSpeed => 'Playback speed';
 
   @override
@@ -5077,6 +5079,21 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsPlaybackSpeedNormal => 'Normal speed';
+
+  @override
+  String get settingsSectionPitch => '음정';
+
+  @override
+  String get settingsPitch => '피치 시프트';
+
+  @override
+  String get settingsPitchDesc => '재생 속도를 바꾸지 않고 음정을 변경';
+
+  @override
+  String get settingsPitchNormal => '원래 음정';
+
+  @override
+  String get settingsPitchUnit => '반음';
 
   @override
   String get settingsSectionSystem => 'System integration';

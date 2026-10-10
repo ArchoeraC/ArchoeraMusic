@@ -95,9 +95,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagEditorSave => 'Save';
 
   @override
-  String get tagEditorSaving => 'Saving…';
-
-  @override
   String get tagEditorSaved => 'Metadata saved';
 
   @override
@@ -105,9 +102,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagEditorNoPath => 'Missing local file path';
-
-  @override
-  String get tagEditorUnsupportedFormat => 'Unsupported file format';
 
   @override
   String get tagEditorDuration => 'Duration';
@@ -155,9 +149,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagEditorBatchApply => 'Apply to selected';
-
-  @override
-  String get tagEditorBatchApplying => 'Applying…';
 
   @override
   String get tagEditorBatchNoEditable =>
@@ -370,13 +361,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSuppressSleepOff => 'System may sleep on idle schedule';
-
-  @override
-  String get settingsBackgroundUnload => 'Unload visited pages in background';
-
-  @override
-  String get settingsBackgroundUnloadSubtitle =>
-      'Free lists and images when minimized/tray/screen-off; rebuild on restore (may lose scroll position)';
 
   @override
   String get settingsCloseBehavior => 'When closing the app';
@@ -1362,9 +1346,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get menuViewArtist => 'View artist';
 
   @override
-  String get pageSearchArtistComingSoon => 'Artist page coming in Phase 2';
-
-  @override
   String get pageSearchInputHint => 'Type a keyword to search';
 
   @override
@@ -1801,7 +1782,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPlaybackSubtitle => 'Audio engine · Playback behavior';
 
   @override
-  String get settingsLyricsSubtitle => 'Player lyrics · Desktop lyrics';
+  String get settingsLyricsSubtitle =>
+      'Player & bar lyrics, styles and sources';
 
   @override
   String get settingsPresetSubtitle =>
@@ -1927,9 +1909,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFontMiSans => 'MiSans (default)';
-
-  @override
-  String get settingsFontMiSansLabel => 'MiSans';
 
   @override
   String get settingsSectionLanguage => 'Interface language';
@@ -2465,9 +2444,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px (current line enlarged & highlighted)';
   }
-
-  @override
-  String get settingsLyricLineHeight => 'Lyrics line height';
 
   @override
   String get settingsLyricPlayedColor => 'Played color';
@@ -3426,6 +3402,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Run this program? If it causes irreversible consequences, you may choose to close the software.';
 
   @override
+  String get settingsWeirdEffects => 'Strange effects';
+
+  @override
+  String get settingsWeirdEffectsOn =>
+      'Reversed prank active — tap \'I surrender\' to restore';
+
+  @override
+  String get settingsWeirdEffectsOff =>
+      'Appears only on Apr 1; once enabled it vanishes until next April Fools';
+
+  @override
+  String get aprilFoolsSurrender => 'I surrender';
+
+  @override
+  String get aprilFoolsSurrenderToast =>
+      'Happy April Fools! Everything is back to normal.';
+
+  @override
   String get settingsSectionDeclaration => 'Software declaration';
 
   @override
@@ -3632,7 +3626,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      'This software bundles the following font:\n· MiSans (© Xiaomi, used under the MiSans Font Intellectual Property License Agreement)';
+      'This software bundles the following fonts:\n· MiSans (© Xiaomi, under the MiSans Font Intellectual Property License Agreement)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (self-built icon font; glyphs from MingCute / Tabler / Lucide)\n· EtaMark (self-built brand-mark font)\n\nFull official license texts follow below.';
 
   @override
   String get commonNoLyrics => 'No lyrics';
@@ -3648,13 +3642,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsSearchColorSubtitle =>
       'Current line highlight and regular line color';
-
-  @override
-  String get settingsSearchDesktopLyricsTitle => 'Desktop lyrics';
-
-  @override
-  String get settingsSearchDesktopLyricsSubtitle =>
-      'Always-on-top lyrics window';
 
   @override
   String get settingsSearchDjModeTitle => 'Fuck DJ Mode';
@@ -3932,9 +3919,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsSearchLyricFontSizeSubtitle =>
       '14~28px player lyrics font size';
-
-  @override
-  String get settingsSearchLyricLineHeightSubtitle => '42~64px line height';
 
   @override
   String get settingsSearchUncensorSubtitle =>
@@ -4511,6 +4495,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsScanAnalyzeLoudness => 'Analyze loudness during scan';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOn =>
+      'On: decodes each file to measure loudness (slower); existing tracks need a full scan';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOff =>
+      'Off: no measurement (normalization uses only in-file ReplayGain tags)';
+
+  @override
   String get settingsSectionScanLimits => 'Safety Caps';
 
   @override
@@ -5006,10 +5001,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLyricTtmlServer => 'AMLL DB server';
 
   @override
-  String get settingsLyricTtmlServerDesc =>
-      'Lyric request URL template; can point to a self-hosted mirror';
-
-  @override
   String get settingsLyricTtmlServerDialogTitle => 'AMLL DB server template';
 
   @override
@@ -5228,6 +5219,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsNormalizationOff => 'Off';
 
   @override
+  String get settingsNormalizationMode => 'ReplayGain mode';
+
+  @override
+  String get settingsNormalizationModeDesc =>
+      'Which ReplayGain tag to use when present (offline analysis is per-track)';
+
+  @override
+  String get settingsNormalizationModeTrack => 'Track';
+
+  @override
+  String get settingsNormalizationModeAlbum => 'Album';
+
+  @override
   String get settingsSectionSpeed => 'Playback speed';
 
   @override
@@ -5238,6 +5242,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPlaybackSpeedNormal => 'Normal speed';
+
+  @override
+  String get settingsSectionPitch => 'Pitch';
+
+  @override
+  String get settingsPitch => 'Pitch shift';
+
+  @override
+  String get settingsPitchDesc => 'Shift pitch without changing playback speed';
+
+  @override
+  String get settingsPitchNormal => 'Original pitch';
+
+  @override
+  String get settingsPitchUnit => 'st';
 
   @override
   String get settingsSectionSystem => 'System integration';

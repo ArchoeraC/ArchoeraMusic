@@ -287,14 +287,28 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
       await engine.sendCommand('set_limiter', {'enabled': p.limiterEnabled});
       await engine.sendCommand('set_normalization', {
         'enabled': p.normalizationEnabled,
+        // 兜底增益（本地扫描器离线分析）：仅当文件无 ReplayGain 标签时生效。
+        'gain_db': _normalizationGainDb(state.track),
+        'album': p.normalizationAlbum,
       });
       final speed = p.playbackSpeed;
-      await engine.sendCommand('set_tempo', {'enabled': speed != 1.0});
+      final pitch = p.pitchSemitones;
+      // 变速与变调任一非默认即启用 tempo 模块（pitch_sync=true：变速保音调）。
+      await engine.sendCommand('set_tempo', {
+        'enabled': speed != 1.0 || pitch != 0.0,
+      });
       await engine.sendCommand('set_tempo_speed', {'speed': speed});
+      await engine.sendCommand('set_tempo_pitch', {'semitones': pitch});
     } catch (e) {
       _log('下发音频效果失败: $e');
     }
   }
+
+  /// 由本地响度分析结果计算归一化兜底增益（dB）。见 [normalizationGainDb]。
+  double _normalizationGainDb(Track? track) => normalizationGainDb(
+    lufs: track?.loudnessLufs,
+    peak: track?.loudnessPeak,
+  );
 
   void _pollSpectrum();
 
