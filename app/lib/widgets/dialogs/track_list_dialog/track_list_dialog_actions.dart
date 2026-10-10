@@ -57,7 +57,12 @@ extension _TrackListDialogActions on _TrackListDialogState {
     final canRemove =
         listId != null &&
         track.source == widget.playlistSource &&
-        readUserPlaylists(ref, widget.playlistSource).isOwned(listId);
+        collectionPlatform(widget.playlistSource)
+            .playlistManageSupported(ref) &&
+        ref
+            .read(userPlaylistsProvider)
+            .view(widget.playlistSource)
+            .isOwned(listId);
     showTrackContextMenu(
       context,
       ref: ref,
@@ -88,10 +93,12 @@ extension _TrackListDialogActions on _TrackListDialogState {
 
   /// 从当前自建歌单移除该曲目并重载列表。
   Future<void> _removeFromPlaylist(String playlistId, Track track) async {
-    final ops = userPlaylistsOps(ref, widget.playlistSource);
-    if (ops == null) return;
     try {
-      await ops.removeTracks(playlistId, [track.id]);
+      await ref.read(userPlaylistsProvider).removeTracks(
+        widget.playlistSource,
+        playlistId,
+        [track.id],
+      );
       if (!mounted) return;
       toast(context.l10n.playlistRemoveDone);
       await _reload();

@@ -54,7 +54,9 @@ void main() {
             ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(body: PlaylistHeaderActions(playlistId: 'own1')),
+          home: const Scaffold(
+            body: PlaylistHeaderActions(playlistId: 'own1', source: 'netease'),
+          ),
         ),
       ),
     );
