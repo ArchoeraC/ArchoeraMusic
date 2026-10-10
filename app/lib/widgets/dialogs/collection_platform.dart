@@ -117,6 +117,9 @@ abstract class CollectionPlatform {
   /// 是否参与权威列表对账（QQ 本机列表不走对账）。
   bool get reconcileLiked => !localLikedStore;
 
+  /// 收藏成功 / 取消后是否维护共享「我喜欢」列表增量（NT / KG 覆写为 true）。
+  bool get likedLocalDelta => false;
+
   /// 缓存 user key（NT uid / KG userid / NK userId / QQ 'local'）。
   String? likedUserKey(dynamic ref);
 
@@ -266,6 +269,9 @@ CollectionPlatform collectionPlatform(String source) =>
 List<CollectionPlatform> collectionPlatforms(dynamic ref) =>
     _all.where((p) => p.enabled(ref)).toList(growable: false);
 
+/// 全部已注册平台的适配器（含当前被关闭的实验源；红心同步等全量遍历用）。
+List<CollectionPlatform> allCollectionPlatforms() => List.unmodifiable(_all);
+
 /// 默认「我喜欢」平台：优先已登录的 NT → KG → QQ，否则 NT（与历史一致；
 /// QQ 虽「本机可用」，但未登录时默认仍回 NT 引导登录）。
 String defaultLikedPlatform(dynamic ref) {
@@ -322,6 +328,9 @@ class _NeteaseCollection extends CollectionPlatform {
 
   @override
   String likeKey(Track t) => t.id;
+
+  @override
+  bool get likedLocalDelta => true;
 
   @override
   String? likedUserKey(dynamic ref) => ref.read(neteaseAuthProvider)?.userId;
@@ -623,6 +632,9 @@ class _KugouCollection extends CollectionPlatform {
 
   @override
   String likeKey(Track t) => (t.kugou?.hash ?? t.id).toLowerCase();
+
+  @override
+  bool get likedLocalDelta => true;
 
   @override
   String? likedUserKey(dynamic ref) =>
