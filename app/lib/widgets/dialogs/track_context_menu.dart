@@ -20,6 +20,7 @@ import '../../services/playback/playback_notifier.dart';
 import '../../services/source/source_platform.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
+import '../../stores/user_playlists.dart';
 import '../../l10n/l10n.dart';
 import 'comment_dialog.dart';
 import '../common/glass_surface.dart';

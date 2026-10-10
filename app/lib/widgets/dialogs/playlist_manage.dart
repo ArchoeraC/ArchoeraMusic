@@ -2,20 +2,20 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 网易云歌单详情的管理动作（对齐原项目 Collection.vue 的订阅按钮 + more 菜单）。
+/// 歌单详情的管理动作（对齐原项目 Collection.vue 的订阅按钮 + more 菜单）。
 ///
 /// - 非自建歌单：收藏 / 取消收藏按钮；
 /// - 自建歌单：更多菜单（编辑名称/简介、删除歌单）。
 ///
-/// 全部经 [neteaseUserPlaylistsProvider] 写入并联动收藏页刷新。
+/// 按 [source]（`netease` / `neko`）经统一 [UserPlaylistsOps] 写入，并联动收藏页。
 library;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/l10n.dart';
-import '../../stores/netease_user_playlists.dart';
 import '../../stores/providers.dart';
+import '../../stores/user_playlists.dart';
 import '../common/toast.dart';
 import '../player/s_controls.dart';
 import 's_context_menu.dart';
@@ -30,12 +30,16 @@ class PlaylistHeaderActions extends ConsumerStatefulWidget {
   const PlaylistHeaderActions({
     super.key,
     required this.playlistId,
+    this.source = 'netease',
     this.playlistName,
     this.onDeleted,
     this.onMetaUpdated,
   });
 
   final String playlistId;
+
+  /// 音源标识（`netease` / `neko`）。
+  final String source;
 
   /// 当前歌单名（编辑时的回退标题）。
   final String? playlistName;
@@ -50,28 +54,32 @@ class PlaylistHeaderActions extends ConsumerStatefulWidget {
 class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
   bool _busy = false;
 
+  bool _loggedIn() => switch (widget.source) {
+    'neko' => ref.watch(nekoApiProvider).isLoggedIn,
+    _ => ref.watch(neteaseAuthProvider) != null,
+  };
+
   @override
   void initState() {
     super.initState();
-    if (ref.read(neteaseAuthProvider) == null) return;
     // 延后到首帧之后：initState 期间修改 provider 会触发 Riverpod 的
     // 「Tried to modify a provider while the widget tree was building」断言。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(neteaseUserPlaylistsProvider.notifier).ensureLoaded();
+      userPlaylistsOps(ref, widget.source)?.ensureLoaded();
     });
   }
 
-  Future<void> _toggleSubscribe(bool subscribed) async {
+  Future<void> _toggleCollect(bool collected) async {
     if (_busy) return;
+    final ops = userPlaylistsOps(ref, widget.source);
+    if (ops == null) return;
     setState(() => _busy = true);
     final l10n = context.l10n;
     try {
-      await ref
-          .read(neteaseUserPlaylistsProvider.notifier)
-          .subscribe(widget.playlistId, subscribe: !subscribed);
+      await ops.setCollected(widget.playlistId, collected: !collected);
       if (!mounted) return;
-      toast(subscribed ? l10n.playlistUncollectDone : l10n.playlistCollectDone);
+      toast(collected ? l10n.playlistUncollectDone : l10n.playlistCollectDone);
     } catch (_) {
       if (mounted) toast(l10n.playlistCollectFailed);
     } finally {
@@ -82,6 +90,7 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
   Future<void> _edit() async {
     final ok = await showPlaylistEditDialog(
       context,
+      source: widget.source,
       playlistId: widget.playlistId,
       fallbackName: widget.playlistName,
     );
@@ -89,7 +98,7 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
   }
 
   Future<void> _delete() async {
-    final store = ref.read(neteaseUserPlaylistsProvider);
+    final store = readUserPlaylists(ref, widget.source);
     final name =
         store.findById(widget.playlistId)?.name ?? widget.playlistName ?? '';
     final l10n = context.l10n;
@@ -112,11 +121,11 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
       child: const SizedBox.shrink(),
     );
     if (confirmed != true || !mounted) return;
+    final ops = userPlaylistsOps(ref, widget.source);
+    if (ops == null) return;
     setState(() => _busy = true);
     try {
-      await ref
-          .read(neteaseUserPlaylistsProvider.notifier)
-          .remove(widget.playlistId);
+      await ops.remove(widget.playlistId);
       if (!mounted) return;
       toast(l10n.playlistDeleteDone);
       widget.onDeleted?.call();
@@ -154,9 +163,9 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
 
   @override
   Widget build(BuildContext context) {
-    final loggedIn = ref.watch(neteaseAuthProvider) != null;
-    if (!loggedIn) return const SizedBox.shrink();
-    final store = ref.watch(neteaseUserPlaylistsProvider);
+    if (!supportsUserPlaylists(widget.source)) return const SizedBox.shrink();
+    if (!_loggedIn()) return const SizedBox.shrink();
+    final store = watchUserPlaylists(ref, widget.source);
     // 未加载完成时不显示（避免自建歌单短暂显示为「收藏」）。
     if (!store.loaded) {
       return _busy
@@ -184,14 +193,14 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
       );
     }
 
-    final subscribed = store.isSubscribed(widget.playlistId);
+    final collected = store.isCollected(widget.playlistId);
     return SButton(
-      label: subscribed ? l10n.playlistCollected : l10n.playlistCollect,
-      icon: subscribed ? EtaIcons.heart : EtaIcons.heartOutline,
-      variant: subscribed ? SButtonVariant.secondary : SButtonVariant.primary,
+      label: collected ? l10n.playlistCollected : l10n.playlistCollect,
+      icon: collected ? EtaIcons.heart : EtaIcons.heartOutline,
+      variant: collected ? SButtonVariant.secondary : SButtonVariant.primary,
       size: SButtonSize.small,
       loading: _busy,
-      onPressed: _busy ? null : () => _toggleSubscribe(subscribed),
+      onPressed: _busy ? null : () => _toggleCollect(collected),
     );
   }
 }
@@ -200,22 +209,31 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
 Future<bool> showPlaylistEditDialog(
   BuildContext context, {
   required String playlistId,
+  String source = 'netease',
   String? fallbackName,
 }) async {
   final result = await showDialog<bool>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.5),
     useRootNavigator: false,
-    builder: (_) =>
-        _PlaylistEditDialog(playlistId: playlistId, fallbackName: fallbackName),
+    builder: (_) => _PlaylistEditDialog(
+      playlistId: playlistId,
+      source: source,
+      fallbackName: fallbackName,
+    ),
   );
   return result == true;
 }
 
 class _PlaylistEditDialog extends ConsumerStatefulWidget {
-  const _PlaylistEditDialog({required this.playlistId, this.fallbackName});
+  const _PlaylistEditDialog({
+    required this.playlistId,
+    required this.source,
+    this.fallbackName,
+  });
 
   final String playlistId;
+  final String source;
   final String? fallbackName;
 
   @override
@@ -231,9 +249,10 @@ class _PlaylistEditDialogState extends ConsumerState<_PlaylistEditDialog> {
   @override
   void initState() {
     super.initState();
-    final item = ref
-        .read(neteaseUserPlaylistsProvider)
-        .findById(widget.playlistId);
+    final item = readUserPlaylists(
+      ref,
+      widget.source,
+    ).findById(widget.playlistId);
     _nameCtrl = TextEditingController(
       text: item?.name ?? widget.fallbackName ?? '',
     );
@@ -250,15 +269,15 @@ class _PlaylistEditDialogState extends ConsumerState<_PlaylistEditDialog> {
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty || _busy) return;
+    final ops = userPlaylistsOps(ref, widget.source);
+    if (ops == null) return;
     setState(() => _busy = true);
     try {
-      await ref
-          .read(neteaseUserPlaylistsProvider.notifier)
-          .updateMeta(
-            widget.playlistId,
-            name: name,
-            description: _descCtrl.text.trim(),
-          );
+      await ops.updateMeta(
+        widget.playlistId,
+        name: name,
+        description: _descCtrl.text.trim(),
+      );
       if (!mounted) return;
       toast(context.l10n.playlistEditDone);
       Navigator.of(context).pop(true);

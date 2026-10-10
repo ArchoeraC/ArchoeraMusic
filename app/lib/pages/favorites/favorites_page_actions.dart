@@ -59,9 +59,9 @@ extension _FavoritesPageActions on _FavoritesPageState {
 
   Future<void> _login() => _adapter.login(context);
 
-  /// 新建歌单（仅 NT 收藏页歌单 tab）。创建成功后 store 会 bump 收藏修订号，
-  /// 本页监听后清缓存并重拉。
+  /// 新建歌单（NT / Neko「创建的歌单」tab）。创建成功后 store 会 bump 收藏
+  /// 修订号，本页监听后清缓存并重拉。
   Future<void> _createPlaylist() async {
-    await showPlaylistCreateDialog(context);
+    await showPlaylistCreateDialog(context, source: _platform);
   }
 }

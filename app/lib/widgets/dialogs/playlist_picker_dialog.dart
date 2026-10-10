@@ -2,10 +2,11 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 「添加到歌单」选择器（网易云，对齐原项目 PlaylistPickerDialog.vue）。
+/// 「添加到歌单」选择器（对齐原项目 PlaylistPickerDialog.vue）。
 ///
-/// 列出当前用户**自建**歌单（排除「我喜欢的音乐」与 [excludeId]），点选即加入；
-/// 顶部「新建歌单」可先建后加。加入数量按服务端确认数提示，0 视为已存在。
+/// 列出所选音源（[source]）的**自建**歌单（排除「我喜欢的音乐」与 [excludeId]），
+/// 点选即加入；顶部「新建歌单」可先建后加。加入数量按服务端确认数提示，0 视为
+/// 已存在。
 library;
 
 import 'package:material_ui/material_ui.dart';
@@ -14,10 +15,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/l10n.dart';
 import '../../services/netease/track.dart';
 import '../../services/source/media_request_headers.dart';
-import '../../stores/netease_user_playlists.dart';
 import '../../stores/providers.dart';
+import '../../stores/user_playlists.dart';
 import '../common/toast.dart';
 import '../player/s_controls.dart';
+import 'neko_login_dialog.dart';
 import 'netease_login_dialog.dart';
 import 'playlist_create_dialog.dart';
 import 's_dialog.dart';
@@ -26,10 +28,11 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 弹出「添加到歌单」选择器。
 ///
-/// [tracks] 为待加入的曲目（仅 [Track.source] == 'netease' 的会被加入）；
-/// [excludeId] 用于从某个歌单内部加入时排除该歌单自身。
+/// [source] 为音源（`netease` / `neko`）；[tracks] 中仅与该音源一致、且 id 非空
+/// 的曲目会被加入；[excludeId] 用于从某个歌单内部加入时排除该歌单自身。
 Future<void> showPlaylistPickerDialog(
   BuildContext context, {
+  required String source,
   required List<Track> tracks,
   String? excludeId,
 }) {
@@ -37,13 +40,22 @@ Future<void> showPlaylistPickerDialog(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.5),
     useRootNavigator: false,
-    builder: (_) => _PlaylistPickerDialog(tracks: tracks, excludeId: excludeId),
+    builder: (_) => _PlaylistPickerDialog(
+      source: source,
+      tracks: tracks,
+      excludeId: excludeId,
+    ),
   );
 }
 
 class _PlaylistPickerDialog extends ConsumerStatefulWidget {
-  const _PlaylistPickerDialog({required this.tracks, this.excludeId});
+  const _PlaylistPickerDialog({
+    required this.source,
+    required this.tracks,
+    this.excludeId,
+  });
 
+  final String source;
   final List<Track> tracks;
   final String? excludeId;
 
@@ -57,17 +69,21 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
 
   List<String> get _trackIds => [
     for (final t in widget.tracks)
-      if (t.source == 'netease' && t.id.isNotEmpty) t.id,
+      if (t.source == widget.source && t.id.isNotEmpty) t.id,
   ];
+
+  bool _loggedIn() => switch (widget.source) {
+    'neko' => ref.watch(nekoApiProvider).isLoggedIn,
+    _ => ref.watch(neteaseAuthProvider) != null,
+  };
 
   @override
   void initState() {
     super.initState();
-    if (ref.read(neteaseAuthProvider) == null) return;
     // 延后到首帧之后：initState 期间修改 provider 会触发 Riverpod 断言。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(neteaseUserPlaylistsProvider.notifier).ensureLoaded();
+      userPlaylistsOps(ref, widget.source)?.ensureLoaded();
     });
   }
 
@@ -75,11 +91,11 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
     if (_busy) return;
     final ids = _trackIds;
     if (ids.isEmpty) return;
+    final ops = userPlaylistsOps(ref, widget.source);
+    if (ops == null) return;
     setState(() => _busy = true);
     try {
-      final count = await ref
-          .read(neteaseUserPlaylistsProvider.notifier)
-          .addTracks(playlistId, ids);
+      final count = await ops.addTracks(playlistId, ids);
       if (!mounted) return;
       toast(
         (count == null || count > 0)
@@ -95,7 +111,11 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
   }
 
   Future<void> _createAndAdd() async {
-    final id = await showPlaylistCreateDialog(context, quietSubmit: true);
+    final id = await showPlaylistCreateDialog(
+      context,
+      source: widget.source,
+      quietSubmit: true,
+    );
     if (id == null || !mounted) return;
     await _addTo(id);
   }
@@ -103,7 +123,6 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final loggedIn = ref.watch(neteaseAuthProvider) != null;
     return SDialog(
       title: l10n.playlistPickTitle,
       width: 460,
@@ -115,7 +134,7 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
         ),
       ],
-      child: loggedIn ? _buildList(context) : _buildLoginPrompt(context),
+      child: _loggedIn() ? _buildList(context) : _buildLoginPrompt(context),
     );
   }
 
@@ -129,7 +148,9 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
         Icon(EtaIcons.alertOutline, color: scheme.onSurfaceVariant),
         const SizedBox(height: 10),
         Text(
-          l10n.toastLoginRequiredNetease,
+          widget.source == 'neko'
+              ? l10n.toastLoginRequiredNeko
+              : l10n.toastLoginRequiredNetease,
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 14),
@@ -137,9 +158,13 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
           label: l10n.commonGoLogin,
           variant: SButtonVariant.primary,
           onPressed: () async {
-            await showNeteaseLoginDialog(context);
+            if (widget.source == 'neko') {
+              await showNekoLoginDialog(context);
+            } else {
+              await showNeteaseLoginDialog(context);
+            }
             if (mounted) {
-              ref.read(neteaseUserPlaylistsProvider.notifier).refresh();
+              userPlaylistsOps(ref, widget.source)?.refresh();
             }
           },
         ),
@@ -150,7 +175,7 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
   Widget _buildList(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final store = ref.watch(neteaseUserPlaylistsProvider);
+    final store = watchUserPlaylists(ref, widget.source);
     final liked = store.likedPlaylistId;
     final items = [
       for (final p in store.created)
@@ -260,7 +285,7 @@ class _NewPlaylistRow extends StatelessWidget {
 class _PlaylistPickRow extends StatelessWidget {
   const _PlaylistPickRow({required this.playlist, this.onTap});
 
-  final PlaylistItem playlist;
+  final UserPlaylist playlist;
   final VoidCallback? onTap;
 
   @override

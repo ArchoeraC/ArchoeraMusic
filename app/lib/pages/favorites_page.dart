@@ -10,6 +10,7 @@ import '../services/log/log.dart';
 import '../stores/app_prefs.dart';
 import '../stores/favorites_revision.dart';
 import '../stores/shell_page_state.dart';
+import '../stores/user_playlists.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/list/cover_grid.dart';
 import '../widgets/dialogs/collection_platform.dart';

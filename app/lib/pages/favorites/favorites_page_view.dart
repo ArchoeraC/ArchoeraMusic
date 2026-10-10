@@ -105,8 +105,10 @@ extension _FavoritesPageView on _FavoritesPageState {
                   onChanged: _switchTab,
                 ),
                 const Spacer(),
-                // 新建歌单：仅 NT 收藏页的「创建的歌单」分类。
-                if (loggedIn && _platform == 'netease' && _tab == 'created')
+                // 新建歌单：支持歌单管理的音源（NT / Neko）「创建的歌单」分类。
+                if (loggedIn &&
+                    supportsUserPlaylists(_platform) &&
+                    _tab == 'created')
                   SButton(
                     label: l10n.playlistCreateTitle,
                     icon: EtaIcons.add,

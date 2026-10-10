@@ -37,10 +37,11 @@ extension _TrackListDialogView on _TrackListDialogState {
                 l10n: l10n,
                 onPlayAll: _playAll,
                 onRefresh: widget.onRefresh == null ? null : _refresh,
-                actions: widget.neteasePlaylistId == null
+                actions: widget.playlistId == null
                     ? null
                     : PlaylistHeaderActions(
-                        playlistId: widget.neteasePlaylistId!,
+                        playlistId: widget.playlistId!,
+                        source: widget.playlistSource,
                         playlistName: widget.title,
                         onDeleted: () => Navigator.of(context).pop(),
                       ),
@@ -83,7 +84,7 @@ extension _TrackListDialogView on _TrackListDialogState {
                         isPlaying: isPlaying,
                         onPlay: _playTrack,
                         onContextMenu: _onTrackMenu,
-                        onBatchAddToPlaylist: widget.neteasePlaylistId == null
+                        onBatchAddToPlaylist: widget.playlistId == null
                             ? null
                             : _batchAddToPlaylist,
                       ),

@@ -11,8 +11,8 @@ import '../../services/playback/playback_notifier.dart';
 import '../../services/source/source_platform.dart';
 import '../../services/source/media_request_headers.dart';
 import '../../stores/daily_shelf_provider.dart';
-import '../../stores/netease_user_playlists.dart';
 import '../../stores/providers.dart';
+import '../../stores/user_playlists.dart';
 import '../../l10n/l10n.dart';
 import '../common/glass_surface.dart';
 import '../player/s_controls.dart';
@@ -37,7 +37,8 @@ Future<void> showKugouTracksDialog(
   String? cover,
   required Future<List<Track>> Function(WidgetRef ref) loadTracks,
   Future<void> Function(WidgetRef ref)? onRefresh,
-  String? neteasePlaylistId,
+  String? playlistId,
+  String playlistSource = 'netease',
 }) {
   return showDialog<void>(
     context: context,
@@ -49,7 +50,8 @@ Future<void> showKugouTracksDialog(
       cover: cover,
       loadTracks: loadTracks,
       onRefresh: onRefresh,
-      neteasePlaylistId: neteasePlaylistId,
+      playlistId: playlistId,
+      playlistSource: playlistSource,
     ),
   );
 }
@@ -172,7 +174,8 @@ Future<void> showPlaylistDetailDialog(
     title: playlist.title,
     subtitle: playlist.subtitle,
     cover: playlist.cover,
-    neteasePlaylistId: playlist.id,
+    playlistId: playlist.id,
+    playlistSource: 'netease',
     loadTracks: (ref) async {
       final detail = await ref
           .read(neteaseApiProvider)
@@ -210,12 +213,16 @@ Future<void> showNekoTracksDialog(
   required String title,
   String? subtitle,
   String? cover,
+  String? playlistId,
+  String playlistSource = 'netease',
   required Future<List<Track>> Function(WidgetRef ref) loadTracks,
 }) => showKugouTracksDialog(
   context,
   title: title,
   subtitle: subtitle,
   cover: cover,
+  playlistId: playlistId,
+  playlistSource: playlistSource,
   loadTracks: loadTracks,
 );
 
@@ -229,6 +236,8 @@ Future<void> showNekoPlaylistDetailDialog(
     title: playlist.title,
     subtitle: playlist.subtitle,
     cover: playlist.cover,
+    playlistId: playlist.id,
+    playlistSource: 'neko',
     loadTracks: (ref) => ref.read(nekoApiProvider).playlistTracks(playlist.id),
   );
 }
@@ -243,6 +252,8 @@ Future<void> showNekoFavoritePlaylistDialog(
     title: playlist.title,
     subtitle: playlist.subtitle,
     cover: playlist.cover,
+    playlistId: playlist.id,
+    playlistSource: 'neko',
     loadTracks: (ref) =>
         ref.read(nekoApiProvider).favoritePlaylistTracks(playlist.id),
   );
@@ -292,7 +303,8 @@ class TrackListDialog extends ConsumerStatefulWidget {
     this.cover,
     required this.loadTracks,
     this.onRefresh,
-    this.neteasePlaylistId,
+    this.playlistId,
+    this.playlistSource = 'netease',
   });
 
   final String title;
@@ -305,8 +317,10 @@ class TrackListDialog extends ConsumerStatefulWidget {
   /// 可选「刷新」动作：点击后先执行本回调（如强制刷新日推），再重新加载列表。
   final Future<void> Function(WidgetRef ref)? onRefresh;
 
-  /// 网易云歌单 id：非空时头部显示收藏 / 编辑 / 删除动作，曲目菜单支持移除。
-  final String? neteasePlaylistId;
+  /// 所属歌单 id + 音源：非空且音源支持时，头部显示收藏 / 编辑 / 删除动作，
+  /// 曲目菜单支持移除、批量支持加入。
+  final String? playlistId;
+  final String playlistSource;
 
   @override
   ConsumerState<TrackListDialog> createState() => _TrackListDialogState();
