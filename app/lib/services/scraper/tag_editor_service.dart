@@ -227,3 +227,189 @@ Future<void> writeTrackTags(
     throw TagEditorException(map['error']?.toString() ?? 'write failed');
   }
 }
+
+/// 单曲在线刮削选项：数据源开关 + 抓取范围（元数据始终查询）。
+///
+/// 对应原生 `ScraperConfig` 的数据源 / 写入开关子集；不涉及队列与目录，
+/// 因此无需 `scraperDbPath`。
+class TrackScrapeOptions {
+  const TrackScrapeOptions({
+    this.musicBrainz = true,
+    this.deezer = true,
+    this.itunes = true,
+    this.netease = true,
+    this.qqMusic = true,
+    this.kugou = true,
+    this.kuwo = true,
+    this.migu = true,
+    this.acoustId = true,
+    this.fetchCover = true,
+    this.fetchLyrics = true,
+    this.workers = 0,
+  });
+
+  final bool musicBrainz;
+  final bool deezer;
+  final bool itunes;
+  final bool netease;
+  final bool qqMusic;
+  final bool kugou;
+  final bool kuwo;
+  final bool migu;
+  final bool acoustId;
+
+  /// 是否抓取封面（原生 `embedCover`）。
+  final bool fetchCover;
+
+  /// 是否抓取歌词（原生 `embedLyrics`）。
+  final bool fetchLyrics;
+
+  /// 并发查询线程数（0 = 引擎按硬件自动）。
+  final int workers;
+
+  Map<String, Object> toJson() => {
+    'useMusicBrainz': musicBrainz,
+    'useDeezer': deezer,
+    'useItunes': itunes,
+    'useNetease': netease,
+    'useQQMusic': qqMusic,
+    'useKugou': kugou,
+    'useKuwo': kuwo,
+    'useMigu': migu,
+    'useAcoustID': acoustId,
+    'embedMetadata': true,
+    'embedCover': fetchCover,
+    'embedLyrics': fetchLyrics,
+    if (workers > 0) 'concurrentWorkers': workers,
+  };
+}
+
+/// 单曲在线刮削结果（多源合并后的最佳匹配）。
+class ScrapedTrack {
+  ScrapedTrack({
+    required this.found,
+    this.title = '',
+    this.artist = '',
+    this.album = '',
+    this.albumArtist = '',
+    this.composer = '',
+    this.genre = '',
+    this.lyrics = '',
+    this.coverMime = '',
+    this.trackNumber = 0,
+    this.discNumber = 0,
+    this.year = 0,
+    this.coverBytes,
+    this.sources = const [],
+  });
+
+  /// 是否命中（有任一身份字段 / MBID）。
+  final bool found;
+
+  final String title;
+  final String artist;
+  final String album;
+  final String albumArtist;
+  final String composer;
+  final String genre;
+  final String lyrics;
+
+  /// 封面 MIME（如 `image/jpeg`）；无封面时为空。
+  final String coverMime;
+
+  final int trackNumber;
+  final int discNumber;
+  final int year;
+
+  /// 解码后的封面二进制；null 表示未抓到封面。
+  final Uint8List? coverBytes;
+
+  /// 贡献数据源名称（如 `musicbrainz`/`netease`）。
+  final List<String> sources;
+
+  static ScrapedTrack fromJson(Map<String, dynamic> json) {
+    Uint8List? cover;
+    final coverB64 = _jsonString(json['coverBase64']);
+    if (coverB64.isNotEmpty) {
+      try {
+        cover = base64Decode(coverB64);
+      } catch (_) {
+        cover = null;
+      }
+    }
+    final sources = <String>[];
+    final rawSources = json['sources'];
+    if (rawSources is List) {
+      for (final s in rawSources) {
+        if (s is String && s.isNotEmpty) sources.add(s);
+      }
+    }
+    return ScrapedTrack(
+      found: _jsonBool(json['found']),
+      title: _jsonString(json['title']),
+      artist: _jsonString(json['artist']),
+      album: _jsonString(json['album']),
+      albumArtist: _jsonString(json['albumArtist']),
+      composer: _jsonString(json['composer']),
+      genre: _jsonString(json['genre']),
+      lyrics: _jsonString(json['lyrics']),
+      coverMime: _jsonString(json['coverMime']),
+      trackNumber: _jsonInt(json['trackNumber']),
+      discNumber: _jsonInt(json['discNumber']),
+      year: _jsonInt(json['year']),
+      coverBytes: cover,
+      sources: sources,
+    );
+  }
+}
+
+/// 在线刮削单曲（多源合并）。查询依据取表单当前值（标题 / 艺术家必填其一）。
+/// 不写文件；结果供编辑界面填充审阅。失败抛 [TagEditorException]。
+Future<ScrapedTrack> scrapeTrackForEdit({
+  required String title,
+  required String artist,
+  String album = '',
+  String albumArtist = '',
+  int durationMs = 0,
+  String filePath = '',
+  TrackScrapeOptions options = const TrackScrapeOptions(),
+}) async {
+  final configJson = jsonEncode(options.toJson());
+  final trackJson = jsonEncode({
+    'title': title,
+    'artist': artist,
+    'album': album,
+    'albumArtist': albumArtist,
+    'durationMs': durationMs,
+    'filePath': filePath,
+  });
+  final json = await Isolate.run(() {
+    try {
+      return ScraperBindings.instance.scrapeTrackJson(configJson, trackJson);
+    } finally {
+      ScraperBindings.release();
+    }
+  });
+  if (json.isEmpty) throw TagEditorException('scrape failed');
+  final map = jsonDecode(json) as Map<String, dynamic>;
+  if (map['ok'] != true) {
+    throw TagEditorException(map['error']?.toString() ?? 'scrape failed');
+  }
+  return ScrapedTrack.fromJson(map);
+}
+
+String _jsonString(Object? v) => v?.toString() ?? '';
+
+int _jsonInt(Object? v) {
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v) ?? 0;
+  return 0;
+}
+
+bool _jsonBool(Object? v) {
+  if (v is bool) return v;
+  if (v is num) return v != 0;
+  if (v is String) return v == 'true' || v == '1';
+  return false;
+}

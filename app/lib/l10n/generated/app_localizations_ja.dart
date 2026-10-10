@@ -111,6 +111,27 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tagEditorDuration => '再生時間';
 
   @override
+  String get tagEditorScrape => 'オンラインで取得';
+
+  @override
+  String get tagEditorScraping => '取得中…';
+
+  @override
+  String get tagEditorScrapeHint => '有効な音楽ソースから照合し、結果を下の欄に入力します（保存前に確認できます）';
+
+  @override
+  String get tagEditorScrapeDone => '取得結果を反映しました';
+
+  @override
+  String get tagEditorScrapeNotFound => '一致するオンラインメタデータが見つかりません';
+
+  @override
+  String get tagEditorScrapeFailed => '取得に失敗しました';
+
+  @override
+  String get tagEditorScrapeNeedQuery => '先にタイトルまたはアーティストを入力してください';
+
+  @override
   String get menuBatchEditMetadata => 'メタデータを一括編集';
 
   @override

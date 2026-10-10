@@ -113,6 +113,29 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tagEditorDuration => 'Dauer';
 
   @override
+  String get tagEditorScrape => 'Online abrufen';
+
+  @override
+  String get tagEditorScraping => 'Abrufen…';
+
+  @override
+  String get tagEditorScrapeHint =>
+      'Sucht in den aktivierten Quellen; das Ergebnis füllt die Felder unten vor dem Speichern';
+
+  @override
+  String get tagEditorScrapeDone => 'Ergebnis übernommen';
+
+  @override
+  String get tagEditorScrapeNotFound =>
+      'Keine passenden Online-Metadaten gefunden';
+
+  @override
+  String get tagEditorScrapeFailed => 'Abruf fehlgeschlagen';
+
+  @override
+  String get tagEditorScrapeNeedQuery => 'Zuerst Titel oder Interpret eingeben';
+
+  @override
   String get menuBatchEditMetadata => 'Metadaten stapelweise bearbeiten';
 
   @override
