@@ -19,6 +19,7 @@ import '../player/s_controls.dart';
 import '../list/song_list.dart';
 import '../list/cover_grid.dart';
 import '../common/toast.dart';
+import 'collection_platform.dart';
 import 'playlist_manage.dart';
 import 'playlist_picker_dialog.dart';
 import 's_context_menu.dart';

@@ -33,6 +33,7 @@ import '../../services/qqmusic/qqmusic_api.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
 import '../../stores/shell_page_state.dart';
+import '../../stores/user_playlists.dart';
 import '../common/toast.dart';
 import 'kugou_login_button.dart';
 import 'neko_login_dialog.dart';
@@ -196,6 +197,62 @@ abstract class CollectionPlatform {
 
   String favLoginDesc(AppLocalizations l10n);
   String favEmptyHint(AppLocalizations l10n);
+
+  // ── 歌单管理（收藏 / 新建 / 编辑 / 删除 / 增删歌曲）──────────────
+  //
+  // 仅支持用户歌单管理的音源实现（NT / Neko）；其余默认「不支持」，UI 自动
+  // 隐藏相关入口。**新增音源只需实现这些方法**，UI 与数据面无需改动。
+
+  /// 是否支持用户歌单管理。
+  bool playlistManageSupported(dynamic ref) => false;
+
+  /// 新建歌单是否支持「私密」（privacy）选项。
+  bool playlistPrivacySupported(dynamic ref) => false;
+
+  /// 拉取用户歌单（自建 + 收藏）；不支持时返回空快照。
+  Future<UserPlaylists> fetchUserPlaylists(dynamic ref) async =>
+      const UserPlaylists(loaded: true);
+
+  /// 收藏 / 取消收藏歌单。
+  Future<void> setPlaylistCollected(
+    dynamic ref,
+    String id, {
+    required bool collected,
+  }) => throw UnsupportedError('$source 不支持收藏歌单');
+
+  /// 新建歌单；返回新歌单 id。
+  Future<String?> createPlaylist(
+    dynamic ref,
+    String name, {
+    String? description,
+    int privacy = 0,
+  }) => throw UnsupportedError('$source 不支持新建歌单');
+
+  /// 更新歌单名称 / 简介。
+  Future<void> updatePlaylist(
+    dynamic ref,
+    String id, {
+    String? name,
+    String? description,
+  }) => throw UnsupportedError('$source 不支持编辑歌单');
+
+  /// 删除歌单。
+  Future<void> deletePlaylist(dynamic ref, String id) =>
+      throw UnsupportedError('$source 不支持删除歌单');
+
+  /// 添加歌曲；返回服务端确认加入数（未知为 null）。
+  Future<int?> addTracksToPlaylist(
+    dynamic ref,
+    String id,
+    List<String> trackIds,
+  ) => throw UnsupportedError('$source 不支持歌单加歌');
+
+  /// 移除歌曲。
+  Future<void> removeTracksFromPlaylist(
+    dynamic ref,
+    String id,
+    List<String> trackIds,
+  ) => throw UnsupportedError('$source 不支持歌单移歌');
 
   /// 该分类的缓存键。
   String tabKey(String tabId) => '$source.$tabId';
@@ -430,6 +487,98 @@ class _NeteaseCollection extends CollectionPlatform {
 
   @override
   String favEmptyHint(AppLocalizations l10n) => l10n.pageFavEmptyHint;
+
+  // ── 歌单管理 ──────────────────────────────────────────────────
+
+  @override
+  bool playlistManageSupported(dynamic ref) => true;
+
+  @override
+  bool playlistPrivacySupported(dynamic ref) => true;
+
+  @override
+  Future<UserPlaylists> fetchUserPlaylists(dynamic ref) async {
+    final account = ref.read(neteaseAuthProvider);
+    if (account == null) return const UserPlaylists(loaded: true);
+    final NeteaseApi api = ref.read(neteaseApiProvider);
+    final list = await api.userPlaylists(account.userId);
+    final items = [
+      for (final p in list)
+        UserPlaylist(
+          id: p.id,
+          name: p.name,
+          cover: p.cover,
+          trackCount: p.trackCount,
+          owner: p.owner,
+          description: p.description,
+          collected: p.subscribed,
+        ),
+    ];
+    // 「我喜欢的音乐」= 首位且自建（与 likedTrackIds 的「首个歌单」约定一致）。
+    final likedId = items.isNotEmpty && !items.first.collected
+        ? items.first.id
+        : null;
+    return UserPlaylists(all: items, loaded: true, likedId: likedId);
+  }
+
+  @override
+  Future<void> setPlaylistCollected(
+    dynamic ref,
+    String id, {
+    required bool collected,
+  }) {
+    final NeteaseApi api = ref.read(neteaseApiProvider);
+    return api.subscribePlaylist(id, subscribe: collected);
+  }
+
+  @override
+  Future<String?> createPlaylist(
+    dynamic ref,
+    String name, {
+    String? description,
+    int privacy = 0,
+  }) {
+    final NeteaseApi api = ref.read(neteaseApiProvider);
+    return api.createPlaylist(name, privacy: privacy);
+  }
+
+  @override
+  Future<void> updatePlaylist(
+    dynamic ref,
+    String id, {
+    String? name,
+    String? description,
+  }) async {
+    final NeteaseApi api = ref.read(neteaseApiProvider);
+    if (name != null) await api.updatePlaylistName(id, name);
+    if (description != null) await api.updatePlaylistDesc(id, description);
+  }
+
+  @override
+  Future<void> deletePlaylist(dynamic ref, String id) {
+    final NeteaseApi api = ref.read(neteaseApiProvider);
+    return api.deletePlaylist(id);
+  }
+
+  @override
+  Future<int?> addTracksToPlaylist(
+    dynamic ref,
+    String id,
+    List<String> trackIds,
+  ) {
+    final NeteaseApi api = ref.read(neteaseApiProvider);
+    return api.playlistAddTracks(id, trackIds);
+  }
+
+  @override
+  Future<void> removeTracksFromPlaylist(
+    dynamic ref,
+    String id,
+    List<String> trackIds,
+  ) {
+    final NeteaseApi api = ref.read(neteaseApiProvider);
+    return api.playlistRemoveTracks(id, trackIds);
+  }
 }
 
 // ── KG ─────────────────────────────────────────────────────────────────
@@ -1079,4 +1228,110 @@ class _NekoCollection extends CollectionPlatform {
 
   @override
   String favEmptyHint(AppLocalizations l10n) => l10n.pageFavNekoEmptyHint;
+
+  // ── 歌单管理 ──────────────────────────────────────────────────
+
+  @override
+  bool playlistManageSupported(dynamic ref) => true;
+
+  @override
+  Future<UserPlaylists> fetchUserPlaylists(dynamic ref) async {
+    final NekoApi api = ref.read(nekoApiProvider);
+    if (!api.isLoggedIn) return const UserPlaylists(loaded: true);
+    final created = await api.userPlaylists();
+    // 收藏歌单失败不影响自建展示。
+    var collected = const <NekoPlaylist>[];
+    try {
+      collected = await api.favoritePlaylists();
+    } catch (_) {
+      // 忽略：仅收藏为空
+    }
+    String? cover(String? path) {
+      if (path == null || path.isEmpty || path.contains('/avatar/default')) {
+        return null;
+      }
+      return api.resolveUrl(path);
+    }
+
+    UserPlaylist toItem(NekoPlaylist p, bool c) => UserPlaylist(
+      id: p.id,
+      name: p.name,
+      cover: cover(p.firstMusicCover),
+      trackCount: p.musicCount,
+      owner: p.creator,
+      description: p.description,
+      collected: c,
+    );
+
+    return UserPlaylists(
+      all: [
+        for (final p in created) toItem(p, false),
+        for (final p in collected) toItem(p, true),
+      ],
+      loaded: true,
+    );
+  }
+
+  @override
+  Future<void> setPlaylistCollected(
+    dynamic ref,
+    String id, {
+    required bool collected,
+  }) async {
+    final NekoApi api = ref.read(nekoApiProvider);
+    if (collected) {
+      await api.favoritePlaylist(id);
+    } else {
+      await api.unfavoritePlaylist(id);
+    }
+  }
+
+  @override
+  Future<String?> createPlaylist(
+    dynamic ref,
+    String name, {
+    String? description,
+    int privacy = 0,
+  }) async {
+    final NekoApi api = ref.read(nekoApiProvider);
+    final created = await api.createPlaylist(name, description: description);
+    return created?.id;
+  }
+
+  @override
+  Future<void> updatePlaylist(
+    dynamic ref,
+    String id, {
+    String? name,
+    String? description,
+  }) async {
+    final NekoApi api = ref.read(nekoApiProvider);
+    await api.updatePlaylist(id, name: name, description: description);
+  }
+
+  @override
+  Future<void> deletePlaylist(dynamic ref, String id) {
+    final NekoApi api = ref.read(nekoApiProvider);
+    return api.deletePlaylist(id);
+  }
+
+  @override
+  Future<int?> addTracksToPlaylist(
+    dynamic ref,
+    String id,
+    List<String> trackIds,
+  ) {
+    final NekoApi api = ref.read(nekoApiProvider);
+    return api.addMusicToPlaylist(id, trackIds);
+  }
+
+  @override
+  Future<void> removeTracksFromPlaylist(
+    dynamic ref,
+    String id,
+    List<String> trackIds,
+  ) {
+    final NekoApi api = ref.read(nekoApiProvider);
+    return api.removeMusicFromPlaylist(id, trackIds);
+  }
 }

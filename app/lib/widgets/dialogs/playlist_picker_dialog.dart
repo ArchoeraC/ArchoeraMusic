@@ -15,12 +15,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/l10n.dart';
 import '../../services/netease/track.dart';
 import '../../services/source/media_request_headers.dart';
-import '../../stores/providers.dart';
 import '../../stores/user_playlists.dart';
 import '../common/toast.dart';
 import '../player/s_controls.dart';
-import 'neko_login_dialog.dart';
-import 'netease_login_dialog.dart';
+import 'collection_platform.dart';
 import 'playlist_create_dialog.dart';
 import 's_dialog.dart';
 
@@ -72,10 +70,7 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
       if (t.source == widget.source && t.id.isNotEmpty) t.id,
   ];
 
-  bool _loggedIn() => switch (widget.source) {
-    'neko' => ref.watch(nekoApiProvider).isLoggedIn,
-    _ => ref.watch(neteaseAuthProvider) != null,
-  };
+  bool _loggedIn() => collectionPlatform(widget.source).loggedIn(ref);
 
   @override
   void initState() {
@@ -83,7 +78,10 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
     // 延后到首帧之后：initState 期间修改 provider 会触发 Riverpod 断言。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      userPlaylistsOps(ref, widget.source)?.ensureLoaded();
+      final adapter = collectionPlatform(widget.source);
+      if (adapter.playlistManageSupported(ref) && adapter.loggedIn(ref)) {
+        ref.read(userPlaylistsProvider).ensureLoaded(widget.source);
+      }
     });
   }
 
@@ -91,11 +89,11 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
     if (_busy) return;
     final ids = _trackIds;
     if (ids.isEmpty) return;
-    final ops = userPlaylistsOps(ref, widget.source);
-    if (ops == null) return;
     setState(() => _busy = true);
     try {
-      final count = await ops.addTracks(playlistId, ids);
+      final count = await ref
+          .read(userPlaylistsProvider)
+          .addTracks(widget.source, playlistId, ids);
       if (!mounted) return;
       toast(
         (count == null || count > 0)
@@ -148,23 +146,18 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
         Icon(EtaIcons.alertOutline, color: scheme.onSurfaceVariant),
         const SizedBox(height: 10),
         Text(
-          widget.source == 'neko'
-              ? l10n.toastLoginRequiredNeko
-              : l10n.toastLoginRequiredNetease,
+          collectionPlatform(widget.source).favLoginDesc(l10n),
           style: Theme.of(context).textTheme.bodySmall,
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 14),
         SButton(
           label: l10n.commonGoLogin,
           variant: SButtonVariant.primary,
           onPressed: () async {
-            if (widget.source == 'neko') {
-              await showNekoLoginDialog(context);
-            } else {
-              await showNeteaseLoginDialog(context);
-            }
+            await collectionPlatform(widget.source).login(context);
             if (mounted) {
-              userPlaylistsOps(ref, widget.source)?.refresh();
+              ref.read(userPlaylistsProvider).refresh(widget.source);
             }
           },
         ),
@@ -175,7 +168,7 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
   Widget _buildList(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final store = watchUserPlaylists(ref, widget.source);
+    final store = ref.watch(userPlaylistsProvider).view(widget.source);
     final liked = store.likedPlaylistId;
     final items = [
       for (final p in store.created)

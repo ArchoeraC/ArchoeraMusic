@@ -7,17 +7,18 @@
 /// - 非自建歌单：收藏 / 取消收藏按钮；
 /// - 自建歌单：更多菜单（编辑名称/简介、删除歌单）。
 ///
-/// 按 [source]（`netease` / `neko`）经统一 [UserPlaylistsOps] 写入，并联动收藏页。
+/// 平台能力与读写全部经 `CollectionPlatform` 注册表适配器 + [userPlaylistsProvider]
+/// 数据源，**不含任何具体平台分支**（与「我喜欢 / 收藏页」同款机制）。
 library;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/l10n.dart';
-import '../../stores/providers.dart';
 import '../../stores/user_playlists.dart';
 import '../common/toast.dart';
 import '../player/s_controls.dart';
+import 'collection_platform.dart';
 import 's_context_menu.dart';
 import 's_dialog.dart';
 
@@ -25,20 +26,19 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 歌单详情头部动作（收藏 / 编辑 / 删除）。
 ///
-/// [onDeleted] 在删除成功后回调（详情弹窗据此关闭自身）。
+/// [source] 为音源标识（由注册表适配器提供能力）。[onDeleted] 在删除成功后
+/// 回调（详情弹窗据此关闭自身）。
 class PlaylistHeaderActions extends ConsumerStatefulWidget {
   const PlaylistHeaderActions({
     super.key,
     required this.playlistId,
-    this.source = 'netease',
+    required this.source,
     this.playlistName,
     this.onDeleted,
     this.onMetaUpdated,
   });
 
   final String playlistId;
-
-  /// 音源标识（`netease` / `neko`）。
   final String source;
 
   /// 当前歌单名（编辑时的回退标题）。
@@ -54,10 +54,7 @@ class PlaylistHeaderActions extends ConsumerStatefulWidget {
 class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
   bool _busy = false;
 
-  bool _loggedIn() => switch (widget.source) {
-    'neko' => ref.watch(nekoApiProvider).isLoggedIn,
-    _ => ref.watch(neteaseAuthProvider) != null,
-  };
+  CollectionPlatform get _adapter => collectionPlatform(widget.source);
 
   @override
   void initState() {
@@ -66,18 +63,24 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
     // 「Tried to modify a provider while the widget tree was building」断言。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      userPlaylistsOps(ref, widget.source)?.ensureLoaded();
+      if (_adapter.playlistManageSupported(ref) && _adapter.loggedIn(ref)) {
+        ref.read(userPlaylistsProvider).ensureLoaded(widget.source);
+      }
     });
   }
 
   Future<void> _toggleCollect(bool collected) async {
     if (_busy) return;
-    final ops = userPlaylistsOps(ref, widget.source);
-    if (ops == null) return;
     setState(() => _busy = true);
     final l10n = context.l10n;
     try {
-      await ops.setCollected(widget.playlistId, collected: !collected);
+      await ref
+          .read(userPlaylistsProvider)
+          .setCollected(
+            widget.source,
+            widget.playlistId,
+            collected: !collected,
+          );
       if (!mounted) return;
       toast(collected ? l10n.playlistUncollectDone : l10n.playlistCollectDone);
     } catch (_) {
@@ -98,7 +101,7 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
   }
 
   Future<void> _delete() async {
-    final store = readUserPlaylists(ref, widget.source);
+    final store = ref.read(userPlaylistsProvider).view(widget.source);
     final name =
         store.findById(widget.playlistId)?.name ?? widget.playlistName ?? '';
     final l10n = context.l10n;
@@ -121,11 +124,11 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
       child: const SizedBox.shrink(),
     );
     if (confirmed != true || !mounted) return;
-    final ops = userPlaylistsOps(ref, widget.source);
-    if (ops == null) return;
     setState(() => _busy = true);
     try {
-      await ops.remove(widget.playlistId);
+      await ref
+          .read(userPlaylistsProvider)
+          .remove(widget.source, widget.playlistId);
       if (!mounted) return;
       toast(l10n.playlistDeleteDone);
       widget.onDeleted?.call();
@@ -163,9 +166,9 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
 
   @override
   Widget build(BuildContext context) {
-    if (!supportsUserPlaylists(widget.source)) return const SizedBox.shrink();
-    if (!_loggedIn()) return const SizedBox.shrink();
-    final store = watchUserPlaylists(ref, widget.source);
+    if (!_adapter.playlistManageSupported(ref)) return const SizedBox.shrink();
+    if (!_adapter.loggedIn(ref)) return const SizedBox.shrink();
+    final store = ref.watch(userPlaylistsProvider).view(widget.source);
     // 未加载完成时不显示（避免自建歌单短暂显示为「收藏」）。
     if (!store.loaded) {
       return _busy
@@ -209,7 +212,7 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
 Future<bool> showPlaylistEditDialog(
   BuildContext context, {
   required String playlistId,
-  String source = 'netease',
+  required String source,
   String? fallbackName,
 }) async {
   final result = await showDialog<bool>(
@@ -249,10 +252,10 @@ class _PlaylistEditDialogState extends ConsumerState<_PlaylistEditDialog> {
   @override
   void initState() {
     super.initState();
-    final item = readUserPlaylists(
-      ref,
-      widget.source,
-    ).findById(widget.playlistId);
+    final item = ref
+        .read(userPlaylistsProvider)
+        .view(widget.source)
+        .findById(widget.playlistId);
     _nameCtrl = TextEditingController(
       text: item?.name ?? widget.fallbackName ?? '',
     );
@@ -269,15 +272,16 @@ class _PlaylistEditDialogState extends ConsumerState<_PlaylistEditDialog> {
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty || _busy) return;
-    final ops = userPlaylistsOps(ref, widget.source);
-    if (ops == null) return;
     setState(() => _busy = true);
     try {
-      await ops.updateMeta(
-        widget.playlistId,
-        name: name,
-        description: _descCtrl.text.trim(),
-      );
+      await ref
+          .read(userPlaylistsProvider)
+          .updateMeta(
+            widget.source,
+            widget.playlistId,
+            name: name,
+            description: _descCtrl.text.trim(),
+          );
       if (!mounted) return;
       toast(context.l10n.playlistEditDone);
       Navigator.of(context).pop(true);

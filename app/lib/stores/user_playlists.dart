@@ -2,27 +2,20 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 跨音源「用户歌单」统一模型与调度。
+/// 跨音源「用户歌单」统一模型 + 全局数据源（ChangeNotifier，Riverpod 持有）。
 ///
-/// 网易云与 Neko 的自建 / 收藏歌单形态不同（NT 用 `subscribed` 标记，Neko 分
-/// `/user/playlists` 与 `/user/favorite-playlists` 两个接口），这里归一为
-/// [UserPlaylists] + [UserPlaylist]，并给出按 `source` 分发的读写助手，供歌单
-/// 详情弹窗、歌单选择器、收藏页共用——UI 不再出现具体平台分支。
-///
-/// 写操作成功后各 store 自行刷新并 `bump` [favoritesRevisionProvider]。
+/// 仿 [LikedStore]：状态按 `source` 分档缓存，**平台差异全部由
+/// [CollectionPlatform] 适配器提供**（见 `widgets/dialogs/collection_platform.dart`
+/// 的 `fetchUserPlaylists` / `createPlaylist` 等）。本文件不含任何 `source` 分支，
+/// 新增音源只需实现适配器方法，UI 与数据面无需改动。
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 
-import 'neko_user_playlists.dart';
-import 'netease_user_playlists.dart';
-
-/// 支持歌单管理的音源（网易云 / Neko）。
-const userPlaylistSources = <String>{'netease', 'neko'};
-
-/// 该音源是否支持用户歌单管理。
-bool supportsUserPlaylists(String? source) =>
-    source != null && userPlaylistSources.contains(source);
+import '../widgets/dialogs/collection_platform.dart';
+import 'favorites_revision.dart';
 
 /// 归一化后的用户歌单条目。
 class UserPlaylist {
@@ -47,7 +40,7 @@ class UserPlaylist {
   final bool collected;
 }
 
-/// 用户歌单快照（自建 + 收藏）。
+/// 某音源的用户歌单快照（自建 + 收藏）。
 class UserPlaylists {
   const UserPlaylists({
     this.all = const [],
@@ -57,13 +50,12 @@ class UserPlaylists {
     this.likedId,
   });
 
-  /// 全部歌单（自建在前，收藏在后）。
   final List<UserPlaylist> all;
   final bool loaded;
   final bool loading;
   final String? error;
 
-  /// 「我喜欢的音乐」歌单 id（仅 NT；Neko 为 null）。
+  /// 「我喜欢的音乐」歌单 id（仅 NT；其余为 null）。
   final String? likedId;
 
   /// 自建歌单。
@@ -74,7 +66,6 @@ class UserPlaylists {
   List<UserPlaylist> get collected =>
       all.where((p) => p.collected).toList(growable: false);
 
-  /// 「我喜欢的音乐」歌单 id（无则为 null）。
   String? get likedPlaylistId => likedId;
 
   UserPlaylist? findById(String id) {
@@ -95,50 +86,143 @@ class UserPlaylists {
   }
 }
 
-/// 用户歌单读写契约（NT / Neko 各自实现）。
-abstract class UserPlaylistsOps {
-  Future<void> ensureLoaded();
-  Future<void> refresh();
-
-  /// 收藏 / 取消收藏。
-  Future<void> setCollected(String id, {required bool collected});
-
-  /// 新建歌单；返回新歌单 id。
-  Future<String?> create(String name, {String? description, int privacy = 0});
-
-  /// 删除歌单。
-  Future<void> remove(String id);
-
-  /// 重命名 / 更新简介。
-  Future<void> updateMeta(String id, {String? name, String? description});
-
-  /// 添加歌曲；返回服务端确认加入数（未知为 null）。
-  Future<int?> addTracks(String id, List<String> trackIds);
-
-  /// 移除歌曲。
-  Future<void> removeTracks(String id, List<String> trackIds);
+/// 可变的分档内部状态。
+class _SourceState {
+  List<UserPlaylist> all = const [];
+  String? likedId;
+  bool loaded = false;
+  bool loading = false;
+  String? error;
 }
 
-/// 读取指定音源的歌单快照（不支持时返回空快照）。
-UserPlaylists watchUserPlaylists(WidgetRef ref, String? source) =>
-    switch (source) {
-      'neko' => ref.watch(nekoUserPlaylistsProvider),
-      'netease' => ref.watch(neteaseUserPlaylistsProvider),
-      _ => const UserPlaylists(loaded: true),
-    };
+/// 全局「用户歌单」数据源（按 source 分档）。
+class UserPlaylistsStore extends ChangeNotifier {
+  UserPlaylistsStore(this._ref);
 
-/// 非监听读取（回调用）。
-UserPlaylists readUserPlaylists(WidgetRef ref, String? source) =>
-    switch (source) {
-      'neko' => ref.read(nekoUserPlaylistsProvider),
-      'netease' => ref.read(neteaseUserPlaylistsProvider),
-      _ => const UserPlaylists(loaded: true),
-    };
+  final Ref _ref;
+  final Map<String, _SourceState> _sources = {};
 
-/// 取指定音源的歌单读写控制器（不支持时为 null）。
-UserPlaylistsOps? userPlaylistsOps(WidgetRef ref, String? source) =>
-    switch (source) {
-      'neko' => ref.read(nekoUserPlaylistsProvider.notifier),
-      'netease' => ref.read(neteaseUserPlaylistsProvider.notifier),
-      _ => null,
-    };
+  _SourceState _state(String source) =>
+      _sources.putIfAbsent(source, _SourceState.new);
+
+  /// 某音源的歌单快照（只读视图）。
+  UserPlaylists view(String source) {
+    final s = _state(source);
+    return UserPlaylists(
+      all: s.all,
+      loaded: s.loaded,
+      loading: s.loading,
+      error: s.error,
+      likedId: s.likedId,
+    );
+  }
+
+  /// 该音源是否支持歌单管理（由适配器声明）。
+  bool supported(String source) =>
+      collectionPlatform(source).playlistManageSupported(_ref);
+
+  /// 首次进入按需加载（已加载 / 加载中跳过）。
+  Future<void> ensureLoaded(String source) async {
+    final s = _state(source);
+    if (s.loaded || s.loading) return;
+    await refresh(source);
+  }
+
+  /// 重新拉取。
+  Future<void> refresh(String source) async {
+    final s = _state(source);
+    if (s.loading) return;
+    s.loading = true;
+    s.error = null;
+    notifyListeners();
+    try {
+      final res = await collectionPlatform(source).fetchUserPlaylists(_ref);
+      s.all = res.all;
+      s.likedId = res.likedId;
+      s.loaded = true;
+    } catch (e) {
+      s.error = '$e';
+    } finally {
+      s.loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// 写操作统一收尾：刷新本档 + 通知收藏页。
+  Future<void> _afterWrite(String source, Future<void> Function() op) async {
+    await op();
+    await refresh(source);
+    _ref.read(favoritesRevisionProvider.notifier).bump();
+  }
+
+  /// 收藏 / 取消收藏。
+  Future<void> setCollected(
+    String source,
+    String id, {
+    required bool collected,
+  }) => _afterWrite(
+    source,
+    () =>
+        collectionPlatform(source)
+            .setPlaylistCollected(_ref, id, collected: collected),
+  );
+
+  /// 新建歌单；返回新歌单 id。
+  Future<String?> create(
+    String source,
+    String name, {
+    String? description,
+    int privacy = 0,
+  }) async {
+    final id = await collectionPlatform(source)
+        .createPlaylist(_ref, name, description: description, privacy: privacy);
+    await refresh(source);
+    _ref.read(favoritesRevisionProvider.notifier).bump();
+    return id;
+  }
+
+  /// 删除歌单。
+  Future<void> remove(String source, String id) => _afterWrite(
+    source,
+    () => collectionPlatform(source).deletePlaylist(_ref, id),
+  );
+
+  /// 重命名 / 更新简介。
+  Future<void> updateMeta(
+    String source,
+    String id, {
+    String? name,
+    String? description,
+  }) => _afterWrite(
+    source,
+    () =>
+        collectionPlatform(source)
+            .updatePlaylist(_ref, id, name: name, description: description),
+  );
+
+  /// 添加歌曲；返回服务端确认加入数（未知为 null）。
+  Future<int?> addTracks(
+    String source,
+    String id,
+    List<String> trackIds,
+  ) async {
+    final count = await collectionPlatform(source)
+        .addTracksToPlaylist(_ref, id, trackIds);
+    await refresh(source);
+    _ref.read(favoritesRevisionProvider.notifier).bump();
+    return count;
+  }
+
+  /// 移除歌曲。
+  Future<void> removeTracks(String source, String id, List<String> trackIds) =>
+      _afterWrite(
+        source,
+        () =>
+            collectionPlatform(source)
+                .removeTracksFromPlaylist(_ref, id, trackIds),
+      );
+}
+
+final userPlaylistsProvider = ChangeNotifierProvider<UserPlaylistsStore>(
+  (ref) => UserPlaylistsStore(ref),
+);

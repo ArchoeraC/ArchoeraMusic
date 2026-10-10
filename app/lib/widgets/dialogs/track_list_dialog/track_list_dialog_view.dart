@@ -84,7 +84,10 @@ extension _TrackListDialogView on _TrackListDialogState {
                         isPlaying: isPlaying,
                         onPlay: _playTrack,
                         onContextMenu: _onTrackMenu,
-                        onBatchAddToPlaylist: widget.playlistId == null
+                        onBatchAddToPlaylist:
+                            (widget.playlistId == null ||
+                                !collectionPlatform(widget.playlistSource)
+                                    .playlistManageSupported(ref))
                             ? null
                             : _batchAddToPlaylist,
                       ),

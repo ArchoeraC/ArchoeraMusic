@@ -15,6 +15,7 @@ import '../../l10n/l10n.dart';
 import '../../stores/user_playlists.dart';
 import '../common/toast.dart';
 import '../player/s_controls.dart';
+import 'collection_platform.dart';
 import 's_dialog.dart';
 
 /// 弹出「新建歌单」弹窗。
@@ -63,11 +64,11 @@ class _PlaylistCreateDialogState extends ConsumerState<_PlaylistCreateDialog> {
   Future<void> _submit() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty || _busy) return;
-    final ops = userPlaylistsOps(ref, widget.source);
-    if (ops == null) return;
     setState(() => _busy = true);
     try {
-      final id = await ops.create(name, privacy: _privacy ? 10 : 0);
+      final id = await ref
+          .read(userPlaylistsProvider)
+          .create(widget.source, name, privacy: _privacy ? 10 : 0);
       if (!mounted) return;
       if (!widget.quietSubmit) toast(context.l10n.playlistCreateDone);
       Navigator.of(context).pop(id);
@@ -107,8 +108,9 @@ class _PlaylistCreateDialogState extends ConsumerState<_PlaylistCreateDialog> {
             autofocus: true,
             onSubmitted: (_) => _submit(),
           ),
-          // 「私密」仅网易云支持（Neko 无该概念）。
-          if (widget.source == 'netease') ...[
+          // 「私密」由适配器声明（仅网易云支持；Neko 无该概念）。
+          if (collectionPlatform(widget.source)
+              .playlistPrivacySupported(ref)) ...[
             const SizedBox(height: 14),
             Row(
               children: [

@@ -56,8 +56,8 @@ void showTrackContextMenu(
           icon: EtaIcons.chatOutline,
           onTap: () => showCommentDialog(context, track: track),
         ),
-        // 添加到歌单：网易云 / Neko（目标为用户自建歌单）。
-        if (supportsUserPlaylists(track.source))
+        // 添加到歌单：由注册表适配器声明是否支持（网易云 / Neko）。
+        if (collectionPlatform(track.source).playlistManageSupported(ref))
           SContextMenuItem(
             label: l10n.playlistPickTitle,
             icon: EtaIcons.add,

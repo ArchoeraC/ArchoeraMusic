@@ -105,9 +105,9 @@ extension _FavoritesPageView on _FavoritesPageState {
                   onChanged: _switchTab,
                 ),
                 const Spacer(),
-                // 新建歌单：支持歌单管理的音源（NT / Neko）「创建的歌单」分类。
+                // 新建歌单：由适配器声明是否支持歌单管理（NT / Neko）。
                 if (loggedIn &&
-                    supportsUserPlaylists(_platform) &&
+                    _adapter.playlistManageSupported(ref) &&
                     _tab == 'created')
                   SButton(
                     label: l10n.playlistCreateTitle,
