@@ -109,6 +109,15 @@ class _ScansSectionState extends ConsumerState<ScansSection> {
               divisions: 40,
               onChanged: (v) => notifier.setScan(batchSize: v.round()),
             ),
+            SettingSwitchTile(
+              icon: EtaIcons.soundLine,
+              title: l10n.settingsScanAnalyzeLoudness,
+              subtitle: prefs.scanAnalyzeLoudness
+                  ? l10n.settingsScanAnalyzeLoudnessOn
+                  : l10n.settingsScanAnalyzeLoudnessOff,
+              value: prefs.scanAnalyzeLoudness,
+              onChanged: (v) => notifier.setScan(analyzeLoudness: v),
+            ),
           ],
         ),
         const SizedBox(height: 20),

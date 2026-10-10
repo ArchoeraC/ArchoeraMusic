@@ -140,6 +140,7 @@ class LibraryScanner {
     int maxScanFiles = 0,
     int maxScanErrors = 0,
     List<String> extraExts = const [],
+    bool analyzeLoudness = false,
   }) async {
     if (_scanning) {
       throw StateError('已有扫描在进行中');
@@ -161,6 +162,7 @@ class LibraryScanner {
         maxScanErrors: maxScanErrors,
         parallelism: maxParallelism,
         extraExts: extraExts,
+        analyzeLoudness: analyzeLoudness,
       );
     } catch (_) {
       // 旧 .so 无导出时静默忽略

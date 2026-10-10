@@ -95,9 +95,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tagEditorSave => 'Guardar';
 
   @override
-  String get tagEditorSaving => 'Guardando…';
-
-  @override
   String get tagEditorSaved => 'Metadatos guardados';
 
   @override
@@ -105,9 +102,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get tagEditorNoPath => 'Falta la ruta del archivo local';
-
-  @override
-  String get tagEditorUnsupportedFormat => 'Formato de archivo no compatible';
 
   @override
   String get tagEditorDuration => 'Duración';
@@ -157,9 +151,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get tagEditorBatchApply => 'Aplicar a los seleccionados';
-
-  @override
-  String get tagEditorBatchApplying => 'Aplicando…';
 
   @override
   String get tagEditorBatchNoEditable =>
@@ -373,14 +364,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsSuppressSleepOff =>
       'El sistema puede suspender según el plan de inactividad';
-
-  @override
-  String get settingsBackgroundUnload =>
-      'Descargar páginas visitadas en segundo plano';
-
-  @override
-  String get settingsBackgroundUnloadSubtitle =>
-      'Libera listas e imágenes al minimizar/bandeja/pantalla apagada; se reconstruye al volver (puede perder la posición de desplazamiento)';
 
   @override
   String get settingsCloseBehavior => 'Al cerrar la aplicación';
@@ -1378,9 +1361,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get menuViewArtist => 'Ver artista';
 
   @override
-  String get pageSearchArtistComingSoon => 'Página de artista (fase 2)';
-
-  @override
   String get pageSearchInputHint => 'Escribe palabras clave para buscar';
 
   @override
@@ -1825,7 +1805,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsLyricsSubtitle =>
-      'Letras del reproductor · Letras de escritorio';
+      'Letras del reproductor y la barra, estilos y fuentes';
 
   @override
   String get settingsPresetSubtitle =>
@@ -1956,9 +1936,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsFontMiSans => 'MiSans（predeterminada）';
-
-  @override
-  String get settingsFontMiSansLabel => 'MiSans';
 
   @override
   String get settingsSectionLanguage => 'Idioma de interfaz';
@@ -2505,9 +2482,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（línea actual agrandada）';
   }
-
-  @override
-  String get settingsLyricLineHeight => 'Altura de línea de letras';
 
   @override
   String get settingsLyricPlayedColor => 'Color reproducido';
@@ -3493,6 +3467,33 @@ class AppLocalizationsEs extends AppLocalizations {
       '¿Ejecutar este programa? Si causa consecuencias irreversibles, puedes cerrar el software.';
 
   @override
+  String get settingsSectionEasterEgg => 'Huevos de pascua';
+
+  @override
+  String get settingsAprilFools => 'Broma del Día de los Inocentes';
+
+  @override
+  String get settingsAprilFoolsOn =>
+      'Activa automáticamente el «modo broma» invertido el 1 de abril (rinde cuando quieras)';
+
+  @override
+  String get settingsAprilFoolsOff =>
+      'Nunca activa el modo broma automáticamente';
+
+  @override
+  String get aprilFoolsDisableNoMore => 'No me gastes más bromas';
+
+  @override
+  String get aprilFoolsDisabledToast => 'Vale, no más bromas.';
+
+  @override
+  String get aprilFoolsSurrender => 'Me rindo 🙌';
+
+  @override
+  String get aprilFoolsSurrenderToast =>
+      '¡Feliz Día de los Inocentes! Todo ha vuelto a la normalidad.';
+
+  @override
   String get settingsSectionDeclaration => 'Declaración de software';
 
   @override
@@ -3717,13 +3718,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsSearchColorSubtitle =>
       'Resaltado de línea actual y color de línea normal';
-
-  @override
-  String get settingsSearchDesktopLyricsTitle => 'Letras de escritorio';
-
-  @override
-  String get settingsSearchDesktopLyricsSubtitle =>
-      'Ventana de letras independiente siempre arriba';
 
   @override
   String get settingsSearchDjModeTitle => 'Fuck DJ Mode';
@@ -4003,9 +3997,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsSearchLyricFontSizeSubtitle =>
       'Tamaño de fuente de letras 14~28px';
-
-  @override
-  String get settingsSearchLyricLineHeightSubtitle => 'Altura de línea 42~64px';
 
   @override
   String get settingsSearchUncensorSubtitle =>
@@ -4590,6 +4581,17 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get settingsScanAnalyzeLoudness => 'Analizar sonoridad al escanear';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOn =>
+      'Activado: decodifica cada archivo para medir (más lento); las pistas existentes requieren un escaneo completo';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOff =>
+      'Desactivado: sin medición (la normalización usa solo las etiquetas ReplayGain del archivo)';
+
+  @override
   String get settingsSectionScanLimits => 'Límites de seguridad';
 
   @override
@@ -5090,10 +5092,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsLyricTtmlServer => 'Servidor de AMLL DB';
 
   @override
-  String get settingsLyricTtmlServerDesc =>
-      'Plantilla de URL para solicitar letras; puede apuntar a un servidor propio o espejo';
-
-  @override
   String get settingsLyricTtmlServerDialogTitle =>
       'Plantilla del servidor de AMLL DB';
 
@@ -5314,6 +5312,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsNormalizationOff => 'Off';
 
   @override
+  String get settingsNormalizationMode => 'Modo ReplayGain';
+
+  @override
+  String get settingsNormalizationModeDesc =>
+      'Qué etiqueta ReplayGain usar si existe (el análisis offline es por pista)';
+
+  @override
+  String get settingsNormalizationModeTrack => 'Pista';
+
+  @override
+  String get settingsNormalizationModeAlbum => 'Álbum';
+
+  @override
   String get settingsSectionSpeed => 'Playback speed';
 
   @override
@@ -5324,6 +5335,22 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsPlaybackSpeedNormal => 'Normal speed';
+
+  @override
+  String get settingsSectionPitch => 'Tono';
+
+  @override
+  String get settingsPitch => 'Cambio de tono';
+
+  @override
+  String get settingsPitchDesc =>
+      'Cambia el tono sin alterar la velocidad de reproducción';
+
+  @override
+  String get settingsPitchNormal => 'Tono original';
+
+  @override
+  String get settingsPitchUnit => 'st';
 
   @override
   String get settingsSectionSystem => 'System integration';

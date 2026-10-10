@@ -299,6 +299,12 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.stopwatchOutline,
       ),
       _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsPitch,
+        l10n.settingsPitchDesc,
+        EtaIcons.music2Outline,
+      ),
+      _SearchEntry(
         SettingsCategory.lyrics,
         l10n.settingsPlayerLyrics,
         l10n.settingsSearchPlayerLyricsSubtitle,
@@ -324,12 +330,6 @@ extension _SettingsDialogView on _SettingsDialogState {
       ),
       _SearchEntry(
         SettingsCategory.lyrics,
-        l10n.settingsLyricLineHeight,
-        l10n.settingsSearchLyricLineHeightSubtitle,
-        EtaIcons.lineHeight,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
         l10n.settingsSearchColorTitle,
         l10n.settingsSearchColorSubtitle,
         EtaIcons.paletteOutline,
@@ -351,12 +351,6 @@ extension _SettingsDialogView on _SettingsDialogState {
         l10n.settingsSectionLyricExclude,
         l10n.settingsLyricExcludeRulesDesc,
         EtaIcons.magic2Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
-        l10n.settingsSearchDesktopLyricsTitle,
-        l10n.settingsSearchDesktopLyricsSubtitle,
-        EtaIcons.monitorOutline,
       ),
       _SearchEntry(
         SettingsCategory.preset,
@@ -495,6 +489,12 @@ extension _SettingsDialogView on _SettingsDialogState {
         l10n.settingsCatScanner,
         l10n.settingsScannerSubtitle,
         EtaIcons.search3Outline,
+      ),
+      _SearchEntry(
+        SettingsCategory.scanner,
+        l10n.settingsScanAnalyzeLoudness,
+        l10n.settingsScanAnalyzeLoudnessOff,
+        EtaIcons.soundLine,
       ),
       _SearchEntry(
         SettingsCategory.mediaSource,

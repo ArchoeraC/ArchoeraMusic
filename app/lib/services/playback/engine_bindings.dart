@@ -42,6 +42,9 @@ final class EngineConfigC extends Struct {
   @Float()
   external double normalizationGain;
 
+  @Int32()
+  external int normalizationAlbum; // 0=track（默认）/ 1=album
+
   @Bool()
   external bool limiterEnabled;
 
@@ -521,6 +524,8 @@ Pointer<EngineConfigC> engineConfigFromParams({
   List<double>? eqGains,
   double preamp = 0,
   bool normalization = false,
+  double normalizationGainDb = 0,
+  int normalizationAlbum = 0,
   double? tempoSpeed,
   double? tempoPitch,
   int engineMode = 0,
@@ -552,5 +557,7 @@ Pointer<EngineConfigC> engineConfigFromParams({
   }
   p.ref.eqPreampDb = preamp;
   p.ref.normalization = normalization;
+  p.ref.normalizationGain = normalizationGainDb;
+  p.ref.normalizationAlbum = normalizationAlbum;
   return p;
 }

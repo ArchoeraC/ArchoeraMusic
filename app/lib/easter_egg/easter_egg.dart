@@ -20,7 +20,18 @@ import 'dart:io' show Platform, sleep;
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/gestures.dart'
+    show GestureBinding, PointerEvent, PointerScrollEvent, PointerSignalEvent;
+import 'package:flutter/rendering.dart'
+    show
+        HitTestEntry,
+        HitTestResult,
+        RendererBinding,
+        RenderViewportBase,
+        ViewportOffset;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart'
+    show StateNotifier, StateNotifierProvider;
 import 'package:window_manager/window_manager.dart';
 
 import '../app/app_quit.dart';
@@ -29,10 +40,14 @@ import '../l10n/l10n.dart';
 import '../services/log/log.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/playback/playback_state.dart';
+import '../stores/app_prefs.dart';
+import '../widgets/common/toast.dart';
 import '../widgets/dialogs/s_dialog.dart';
 import '../widgets/player/s_controls.dart';
+import 'april_fools_state.dart';
 import 'easter_egg_visual_state.dart';
 
+part 'april_fools.dart';
 part 'easter_egg_effect.dart';
 part 'easter_egg_visual.dart';
 part 'easter_egg_effects.dart';

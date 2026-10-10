@@ -302,6 +302,82 @@ export fn zk_dsp_loudness_destroy(l: ?*dsp.loudness.EraLoudness) void {
 }
 
 // ---------------------------------------------------------------------------
+// 离线 EBU R128 集成响度测量（scanner 直桥；include/kernel_bridge.h 契约）
+//
+// 同步解码 path → 有界块喂入 kernel/dsp/loudness_measure.zig 的测量器 →
+// 集成响度（含门限）+ 线性采样峰值。仅保留每块能量，不保留整文件 PCM。
+// ---------------------------------------------------------------------------
+
+/// 与 include/kernel_bridge.h `ZkLoudnessResult` 逐字段对齐（extern struct 保证 C ABI）。
+const CLoudnessResult = extern struct {
+    integrated_lufs: f64,
+    peak: f64,
+    valid: c_int,
+};
+
+/// 解码 `path` 测量 EBU R128 集成响度 + 线性采样峰值。
+/// 返回 0 成功（含 valid=0 的静音/过短情形）；<0 = -（enum ZkStatus）。
+export fn zk_loudness_measure(path: [*:0]const u8, out: ?*CLoudnessResult) c_int {
+    const o = out orelse return -@as(c_int, @intFromEnum(err.Status.io_error));
+    o.* = .{ .integrated_lufs = 0.0, .peak = 0.0, .valid = 0 };
+    return measureLoudness(std.mem.span(path), o);
+}
+
+/// [zk_loudness_measure] 的实现体：解码 → K 加权测量 → 回填结果。
+fn measureLoudness(path: []const u8, o: *CLoudnessResult) c_int {
+    const gpa = std.heap.c_allocator;
+    var info: decoder.Info = undefined;
+    var dec = decoder.open(gpa, path, &info) catch |e|
+        return -@as(c_int, @intFromEnum(err.statusOf(e)));
+    defer dec.deinit();
+
+    // 位深护栏（同 engine.zkRead：convert 只接受 8/16/24/32/64）。
+    switch (info.bits_per_sample) {
+        8, 16, 24, 32, 64 => {},
+        else => return -@as(c_int, @intFromEnum(err.Status.corrupt)),
+    }
+    const ch = info.channels;
+    const bytes_per = @as(usize, info.bits_per_sample) / 8;
+    if (ch == 0 or bytes_per == 0 or ch > dsp.loudness_measure.era_r128_max_channels)
+        return -@as(c_int, @intFromEnum(err.Status.corrupt));
+    const frame_bytes = @as(usize, ch) * bytes_per;
+
+    const meter = dsp.loudness_measure.era_loudness_meter_init(gpa, info.sample_rate, @as(usize, ch)) catch
+        return -@as(c_int, @intFromEnum(err.Status.out_of_memory));
+    defer meter.deinit();
+
+    // 有界缓冲：raw ≤ 64 KiB，float 输出 ≤ 4096 帧 × ch。
+    var raw: [65536]u8 = undefined;
+    const max_chunk = @min(raw.len / frame_bytes, @as(usize, 4096));
+    const fbuf = gpa.alloc(f32, max_chunk * @as(usize, ch)) catch
+        return -@as(c_int, @intFromEnum(err.Status.out_of_memory));
+    defer gpa.free(fbuf);
+
+    while (true) {
+        var c: u8 = 0;
+        const n = dec.read(raw[0 .. max_chunk * frame_bytes], max_chunk, &c) catch |e|
+            return -@as(c_int, @intFromEnum(err.statusOf(e)));
+        if (n == 0) break;
+        const samples = n * @as(usize, c);
+        _ = convert.toFloat(
+            fbuf[0..samples],
+            raw[0 .. n * frame_bytes],
+            info.bits_per_sample,
+            info.is_float,
+            endianOfCodec(info.codec_name),
+        );
+        dsp.loudness_measure.era_loudness_meter_push(meter, fbuf[0..samples], n);
+        if (n < max_chunk) break; // EOF
+    }
+
+    const r = dsp.loudness_measure.era_loudness_meter_finish(meter);
+    o.integrated_lufs = r.integrated_lufs;
+    o.peak = r.peak;
+    o.valid = if (r.valid) 1 else 0;
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 // 常驻内核接入 seam（§7 async 主干；加法式：不改 zk_decoder_* / C 壳现有会话）
 //
 // 表面同步、内里异步：C 壳阻塞调用 → 内核 Host 池并行解码 → 完工事件回程。
@@ -2228,4 +2304,73 @@ test "N4 流缓冲预算: 超预算 cb 源拒绝打开；变长缓冲真实生�
     // 预算 0 = 不限：记账仍为基线
     zk_stream_mem_set_budget(0);
     try testing.expectEqual(base, zk_stream_mem_used());
+}
+
+// ---------------------------------------------------------------------------
+// 离线 EBU R128 集成响度测量（zk_loudness_measure）端到端测试
+// ---------------------------------------------------------------------------
+
+/// 造 `channels` 声道、16-bit、`sample_rate` 的同相正弦 WAV 字节（振幅 amp）。
+/// 调用方 free。仅供本文件 zk_loudness_measure 端到端测试（确定性）。
+fn sineWavBytes(
+    allocator: std.mem.Allocator,
+    sample_rate: u32,
+    channels: u16,
+    frames: usize,
+    freq: f64,
+    amp: f32,
+) ![]u8 {
+    const bytes_per: u16 = 2;
+    const data_len = frames * @as(usize, channels) * @as(usize, bytes_per);
+    const total = 44 + data_len;
+    const b = try allocator.alloc(u8, total);
+    @memset(b, 0);
+    @memcpy(b[0..4], "RIFF");
+    std.mem.writeInt(u32, b[4..8], @intCast(total - 8), .little);
+    @memcpy(b[8..12], "WAVE");
+    @memcpy(b[12..16], "fmt ");
+    std.mem.writeInt(u32, b[16..20], 16, .little);
+    std.mem.writeInt(u16, b[20..22], 1, .little); // PCM
+    std.mem.writeInt(u16, b[22..24], channels, .little);
+    std.mem.writeInt(u32, b[24..28], sample_rate, .little);
+    std.mem.writeInt(u32, b[28..32], sample_rate * channels * bytes_per, .little);
+    std.mem.writeInt(u16, b[32..34], channels * bytes_per, .little);
+    std.mem.writeInt(u16, b[34..36], 16, .little);
+    @memcpy(b[36..40], "data");
+    std.mem.writeInt(u32, b[40..44], @intCast(data_len), .little);
+    const w = 2.0 * std.math.pi * freq / @as(f64, @floatFromInt(sample_rate));
+    for (0..frames) |f| {
+        const v: f32 = amp * @as(f32, @floatCast(@sin(w * @as(f64, @floatFromInt(f)))));
+        const s: i16 = @intFromFloat(v * 32767.0);
+        for (0..channels) |ch| {
+            const off = 44 + (f * @as(usize, channels) + ch) * 2;
+            std.mem.writeInt(i16, b[off..][0..2], s, .little);
+        }
+    }
+    return b;
+}
+
+test "zk_loudness_measure: 解码立体声 1kHz 正弦 WAV → 有效响应/峰值；缺失路径负码" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io_inst = std.Io.Threaded.global_single_threaded.io();
+    const bytes = try sineWavBytes(testing.allocator, 48000, 2, 48000, 1000.0, 0.5);
+    defer testing.allocator.free(bytes);
+    const f = try tmp.dir.createFile(io_inst, "loud.wav", .{});
+    try std.Io.File.writeStreamingAll(f, io_inst, bytes);
+    std.Io.File.close(f, io_inst);
+    const rel = try std.fs.path.join(testing.allocator, &.{ ".zig-cache", "tmp", tmp.sub_path[0..], "loud.wav" });
+    defer testing.allocator.free(rel);
+    const full = try testing.allocator.dupeZ(u8, rel);
+    defer testing.allocator.free(full);
+
+    var res: CLoudnessResult = undefined;
+    try testing.expectEqual(@as(c_int, 0), zk_loudness_measure(full.ptr, &res));
+    try testing.expectEqual(@as(c_int, 1), res.valid);
+    try testing.expectApproxEqAbs(@as(f64, -6.0206), res.integrated_lufs, 0.2);
+    try testing.expectApproxEqAbs(@as(f64, 0.5), res.peak, 1e-3);
+
+    // 缺失路径 / out 为空 → 负状态码。
+    try testing.expect(zk_loudness_measure("/nonexistent/loud.wav", &res) < 0);
+    try testing.expect(zk_loudness_measure("/nonexistent/loud.wav", null) < 0);
 }

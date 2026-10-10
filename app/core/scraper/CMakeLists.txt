@@ -57,6 +57,9 @@ endif()
 if(MSVC)
     # MSVC 不接受 -Wall/-Wextra 等 GCC 风格参数（D8021: invalid numeric argument）
     add_compile_options(/W3)
+    # 源码为无 BOM 的 UTF-8，含中文字符串字面量：须显式声明 UTF-8，否则非 UTF-8
+    # 代码页环境下 MSVC 报 C2001（与 app/native/platform、app/native/log 一致）。
+    add_compile_options(/utf-8)
     # MSVC 更严格的检查导致的已知无害警告：
     #   C4267: size_t → int 截断（FFI 长度参数，值域远小于 2^31）
     #   C4996: getenv/popen 等 MSVC 视为 unsafe 的 CRT 函数（沿用 POSIX 名，功能正确）

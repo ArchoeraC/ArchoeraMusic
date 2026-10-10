@@ -1446,9 +1446,15 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
         }
     } else if (strcmp(type, "set_normalization") == 0) {
         bool enabled = true;
-        if (json_get_bool(line, "enabled", &enabled) == 0) {
-            pipeline_set_normalization_enabled(e->p, enabled);
-        }
+        double gain_db = 0.0;
+        bool album = false;
+        json_get_bool(line, "enabled", &enabled);
+        json_get_number(line, "gain_db", &gain_db);
+        json_get_bool(line, "album", &album);
+        /* 先设兜底增益与取用口径，再设开关：最后一次 apply 用最终状态。 */
+        pipeline_set_normalization_gain(e->p, (float)gain_db);
+        pipeline_set_normalization_album(e->p, album ? 1 : 0);
+        pipeline_set_normalization_enabled(e->p, enabled);
     } else if (strcmp(type, "set_limiter") == 0) {
         bool enabled = true;
         if (json_get_bool(line, "enabled", &enabled) == 0) {
@@ -2226,11 +2232,6 @@ int archoera_mediaengine_wait_event(ArchoeraMediaEngine *e, char *buf, int cap,
     }
     pthread_mutex_unlock(&e->ev_mutex);
     return r;
-}
-
-const char *archoera_mediaengine_session_dir(ArchoeraMediaEngine *e)
-{
-    return e ? e->session_dir : NULL;
 }
 
 int archoera_mediaengine_is_done(ArchoeraMediaEngine *e)

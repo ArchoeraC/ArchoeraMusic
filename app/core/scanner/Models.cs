@@ -50,6 +50,10 @@ public sealed class TrackMetadata
     public int? Channels { get; set; }
     public int? BitsPerSample { get; set; }
     public long FileSize { get; set; }
+    /// <summary>离线 EBU R128 集成响度（LUFS；仅 --analyze-loudness 且测量有效时写入）。</summary>
+    public double? LoudnessLufs { get; set; }
+    /// <summary>离线线性采样峰值（仅 --analyze-loudness 且测量有效时写入）。</summary>
+    public double? LoudnessPeak { get; set; }
     [JsonConverter(typeof(LongTimestampConverter))]
     public long Mtime { get; set; } // 毫秒
     [JsonConverter(typeof(LongTimestampConverter))]

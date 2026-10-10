@@ -108,7 +108,7 @@ extension _SearchPageActions on _SearchPageState {
     sourcePlatform(src).openCover(context, ref, _sourceSearchKind(_tab), item);
   }
 
-  /// 歌曲右键菜单（通用在线曲目菜单 + 页内歌手占位）。
+  /// 歌曲右键菜单（通用在线曲目菜单；「查看歌手」由菜单内置按来源分发）。
   void _onTrackMenu(Track track, Offset global) {
     showTrackContextMenu(
       context,
@@ -116,13 +116,6 @@ extension _SearchPageActions on _SearchPageState {
       track: track,
       position: global,
       onPlay: () => _playTrack(track),
-      extra: [
-        SContextMenuItem(
-          label: context.l10n.menuViewArtist,
-          icon: EtaIcons.userOutline,
-          onTap: () => _toast(context.l10n.pageSearchArtistComingSoon),
-        ),
-      ],
     );
   }
 

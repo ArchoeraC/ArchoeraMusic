@@ -150,6 +150,9 @@ class ArchoeraMusicApp extends ConsumerWidget {
                 // 彩蛋视觉（缩放/镜像/反转/位移）包在最外层：作用于整棵 UI
                 // （Navigator 及以下，含弹窗）；除 #2 外永久生效、不还原。
                 gate = EasterEggVisualHost(child: gate);
+                // 愚人节特供「整活模式」：可逆的整屏镜像 + 操作反向 + 投降按钮。
+                // 置于彩蛋视觉之外（镜像作用于 Navigator 及以下），未激活时透传。
+                gate = AprilFoolsHost(child: gate);
                 if (performanceMode) {
                   gate = MediaQuery(
                     data: MediaQuery.of(context)
