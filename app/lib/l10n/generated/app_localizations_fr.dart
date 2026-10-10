@@ -3482,7 +3482,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'N\'apparaît que le 1ᵉʳ avril ; une fois activé, disparaît jusqu\'au prochain poisson d\'avril';
 
   @override
-  String get aprilFoolsSurrender => 'Je capitule 🙌';
+  String get aprilFoolsSurrender => 'Je capitule';
 
   @override
   String get aprilFoolsSurrenderToast =>

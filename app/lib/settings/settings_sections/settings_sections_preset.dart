@@ -37,10 +37,13 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
     final prefs = ref.watch(appPrefsProvider);
     final notifier = ref.read(appPrefsProvider.notifier);
     final now = DateTime.now();
-    // 愚人节特供「奇怪的特效」：仅 4/1 且今年尚未开启过时提供开关。
-    final showWeirdEffects = ref
-        .read(aprilFoolsProvider.notifier)
-        .shouldOffer(now);
+    // 愚人节特供「奇怪的特效」：仅 4/1 且今年尚未开启过时提供开关；
+    // 特效**已激活**时不再展示——已开启便无「开启」可提供，避免开关滞留
+    // （尤其是 `ARCHOERA_EGG_FOOL=1` 调试强制开启时，shouldOffer 会恒真）。
+    final weirdEffectsActive = ref.watch(aprilFoolsProvider);
+    final showWeirdEffects =
+        !weirdEffectsActive &&
+        ref.read(aprilFoolsProvider.notifier).shouldOffer(now);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -73,7 +76,9 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
           title: l10n.settingsPerformanceMode,
           children: [
             SettingSwitchTile(
-              icon: prefs.performanceMode ? EtaIcons.flash : EtaIcons.flashOutline,
+              icon: prefs.performanceMode
+                  ? EtaIcons.flash
+                  : EtaIcons.flashOutline,
               title: l10n.settingsPerformanceMode,
               subtitle: prefs.performanceMode
                   ? l10n.settingsPerformanceModeOn
@@ -88,9 +93,7 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
           title: l10n.settingsSectionFilter,
           children: [
             SettingSwitchTile(
-              icon: prefs.fuckDjMode
-                  ? EtaIcons.magic3
-                  : EtaIcons.magic3Outline,
+              icon: prefs.fuckDjMode ? EtaIcons.magic3 : EtaIcons.magic3Outline,
               title: l10n.settingsDjMode,
               subtitle: prefs.fuckDjMode
                   ? l10n.settingsDjModeOn
@@ -99,9 +102,7 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
               onChanged: (v) => notifier.setPreset(fuckDjMode: v),
             ),
             SettingSwitchTile(
-              icon: prefs.djEnhanced
-                  ? EtaIcons.magic3
-                  : EtaIcons.magic3Outline,
+              icon: prefs.djEnhanced ? EtaIcons.magic3 : EtaIcons.magic3Outline,
               title: l10n.settingsDjEnhanced,
               subtitle: l10n.settingsDjEnhancedDesc,
               value: prefs.djEnhanced,
@@ -120,8 +121,7 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
                     isDense: true,
                     border: InputBorder.none,
                   ),
-                  onSubmitted: (v) =>
-                      notifier.setPreset(djCustomKeywords: v),
+                  onSubmitted: (v) => notifier.setPreset(djCustomKeywords: v),
                 ),
               ),
             ),
@@ -191,7 +191,7 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
                 subtitle: prefs.aprilFoolsUsedYear == now.year
                     ? l10n.settingsWeirdEffectsOn
                     : l10n.settingsWeirdEffectsOff,
-                value: ref.watch(aprilFoolsProvider),
+                value: weirdEffectsActive,
                 onChanged: (bool v) {
                   if (v) {
                     ref.read(aprilFoolsProvider.notifier).activate(now.year);

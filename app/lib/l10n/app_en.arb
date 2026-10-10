@@ -998,7 +998,7 @@
   "settingsWeirdEffects": "Strange effects",
   "settingsWeirdEffectsOn": "Reversed prank active — tap ''I surrender'' to restore",
   "settingsWeirdEffectsOff": "Appears only on Apr 1; once enabled it vanishes until next April Fools",
-  "aprilFoolsSurrender": "I surrender 🙌",
+  "aprilFoolsSurrender": "I surrender",
   "aprilFoolsSurrenderToast": "Happy April Fools! Everything is back to normal.",
   "settingsSectionDeclaration": "Software declaration",
   "settingsDeclineText": "This software (ArchoeraMusic) is open source under AGPL-3.0: you may freely use, study, modify and redistribute it, and comply-compliant commercial use is permitted; we do not offer closed-source commercial licensing outside AGPL obligations. Please read the following before use:\n\n",

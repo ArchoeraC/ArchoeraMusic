@@ -869,7 +869,7 @@
   "settingsWeirdEffects": "奇妙なエフェクト",
   "settingsWeirdEffectsOn": "逆再生いたずら中——「降参します」で元に戻せます",
   "settingsWeirdEffectsOff": "エイプリルフール当日のみ表示。一度有効にすると次のエイプリルフールまで消えます",
-  "aprilFoolsSurrender": "降参します 🙌",
+  "aprilFoolsSurrender": "降参します",
   "aprilFoolsSurrenderToast": "エイプリルフールおめでとう！すべて元に戻りました。",
   "settingsSectionDeclaration": "ソフトウェア声明",
   "settingsDeclineText": "このソフトウェア（ArchoeraMusic）は、個人の学習・研究目的の無料・オープンソースのデスクトップ音楽プレーヤーです。\n\n",

@@ -3413,7 +3413,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Appears only on Apr 1; once enabled it vanishes until next April Fools';
 
   @override
-  String get aprilFoolsSurrender => 'I surrender 🙌';
+  String get aprilFoolsSurrender => 'I surrender';
 
   @override
   String get aprilFoolsSurrenderToast =>
