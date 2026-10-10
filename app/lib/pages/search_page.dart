@@ -7,13 +7,11 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../apis/qqmusic/core/request.dart' show QmErrorKind;
 import '../services/netease/netease_api.dart';
 import '../services/netease/track.dart';
 import '../services/source/source_platform.dart';
 import '../utils/search_relevance.dart';
 import '../services/playback/playback_notifier.dart';
-import '../services/qqmusic/qqmusic_api.dart' show QqApiException;
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../stores/shell_page_state.dart';
