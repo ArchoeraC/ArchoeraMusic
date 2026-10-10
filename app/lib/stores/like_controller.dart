@@ -26,14 +26,9 @@ class LikeController extends ChangeNotifier {
 
   final Ref _ref;
 
-  final Set<String> _neteaseIds = {};
-  final Set<String> _kugouIds = {};
-
-  /// QQ 红心 songmid 集合（本机 + 登录后并入在线；见 [QqLikedStore]）。
-  final Set<String> _qqmusicIds = {};
-
-  /// Neko 红心 id 集合（实验性音源；在线权威，未登录/未启用为空）。
-  final Set<String> _nekoIds = {};
+  /// 各平台已喜欢键集合（按 `source` 分桶）。**新增音源无需改动本文件**
+  /// （遍历/取桶都经注册表）。
+  final Map<String, Set<String>> _sets = {};
 
   bool _syncing = false;
 
@@ -83,19 +78,9 @@ class LikeController extends ChangeNotifier {
     _dirtyKeys.removeWhere((_, at) => now.difference(at) > reconcileGrace);
   }
 
-  /// 平台集合（新增音源时这里与 [_syncOnce] 的遍历列表同步即可）。
-  Set<String> _setFor(String source) {
-    switch (source) {
-      case 'kugou':
-        return _kugouIds;
-      case 'qqmusic':
-        return _qqmusicIds;
-      case 'neko':
-        return _nekoIds;
-      default:
-        return _neteaseIds;
-    }
-  }
+  /// 平台红心集合（按 `source` 分桶，缺失则建空桶）。
+  Set<String> _setFor(String source) =>
+      _sets.putIfAbsent(source, () => <String>{});
 
   /// 当前曲目是否已喜欢（按 source 路由到对应平台集合与红心键）。
   bool isLiked(Track track) {
@@ -127,13 +112,14 @@ class LikeController extends ChangeNotifier {
   /// [QqLikedStore.mergeOnline] 已并入本机列表的曲目）——使刷新后列表新增
   /// 行的红心即时点亮；缓冲期内本端刚熄灭的键不因在线写未生效而回光。
   void mergeOnlineQq(Iterable<Track> online) {
-    final prev = Set<String>.from(_qqmusicIds);
+    final qq = _setFor('qqmusic');
+    final prev = Set<String>.from(qq);
     var changed = false;
     for (final t in online) {
       final mid = qqLikeKey(t);
-      if (mid.isEmpty || _qqmusicIds.contains(mid)) continue;
+      if (mid.isEmpty || qq.contains(mid)) continue;
       if (_dirtyOf('qqmusic', mid) && !prev.contains(mid)) continue;
-      _qqmusicIds.add(mid);
+      qq.add(mid);
       changed = true;
     }
     if (changed) notifyListeners();
@@ -185,8 +171,8 @@ class LikeController extends ChangeNotifier {
   Future<void> _syncOnce() async {
     // 遍历所有已注册平台（顺序与注册表一致）。未启用（Neko 开关）或不可用
     // （未登录）的平台清空集合；其余拉轻量 id 集合对齐（网络失败保留旧集合）。
-    for (final source in const ['netease', 'kugou', 'qqmusic', 'neko']) {
-      final adapter = collectionPlatform(source);
+    for (final adapter in allCollectionPlatforms()) {
+      final source = adapter.source;
       if (!adapter.enabled(_ref) || !adapter.likedAvailable(_ref)) {
         _setFor(source).clear();
         continue;
@@ -237,7 +223,8 @@ class LikeController extends ChangeNotifier {
   /// 取消喜欢移除）并写库——与「刷新=全量重拉+写库」同一持久化语义。
   /// QQ 走 [QqLikedStore]、NK 不做本地增量（与既有行为一致）。
   void _applyStoreDelta(Track track, bool target) {
-    if (track.source != 'kugou' && track.source != 'netease') return;
+    // 仅维护共享「我喜欢」列表增量的平台（NT / KG；QQ 走本机库、NK 不增量）。
+    if (!collectionPlatform(track.source).likedLocalDelta) return;
     final store = _ref.read(likedStoreProvider);
     if (target) {
       store.addTrack(track.source, track);
@@ -248,13 +235,14 @@ class LikeController extends ChangeNotifier {
 
   /// 退出登录清理（登出回调中调用；QQ 本机红心不清空，见 [QqLikedStore]）。
   void reset() {
-    _neteaseIds.clear();
-    _kugouIds.clear();
-    _nekoIds.clear();
+    // 注：QQ 红心以本机库为主源，登出 QQ 不清空其分桶（sync 会按登录态重算——
+    // 未登录时仍保留本机 songmid）。
+    for (final entry in _sets.entries) {
+      if (entry.key == 'qqmusic') continue;
+      entry.value.clear();
+    }
     // 登出后旧账号的缓冲标记不再适用（对账由重登后新一轮 sync 重算）
     _dirtyKeys.clear();
-    // 注：QQ 红心以本机库为主源，登出 QQ 不清空 _qqmusicIds（sync 会按
-    // 登录态重算——未登录时仍保留本机 songmid）。
     _loaded = false;
     notifyListeners();
   }

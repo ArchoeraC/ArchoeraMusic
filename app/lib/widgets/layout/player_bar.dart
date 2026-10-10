@@ -10,6 +10,7 @@ import '../../services/playback/playback_notifier.dart';
 import '../../services/lyrics/lyric_line.dart';
 import '../../app/router.dart';
 import '../../easter_egg/april_fools_state.dart';
+import '../../services/source/source_platform.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
 import '../../stores/lyrics_provider.dart';

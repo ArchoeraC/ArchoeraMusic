@@ -50,9 +50,9 @@ class _LikedPageState extends ConsumerState<LikedPage> {
     // 优先恢复上次显式选择（壳内容因播放页展开被卸载后重建）；实验性音源
     // 已关闭时不保留 NK 选择。无显式选择时按登录态给默认值。
     final restored = ref.read(likedPlatformProvider);
-    _platform = (restored == 'neko' && !ref.read(appPrefsProvider).nekoEnabled)
-        ? defaultLikedPlatform(ref)
-        : (restored ?? defaultLikedPlatform(ref));
+    _platform = (restored != null && collectionPlatform(restored).enabled(ref))
+        ? restored
+        : defaultLikedPlatform(ref);
     if (_available) collectionPlatform(_platform).ensureLikedLoaded(ref);
   }
 

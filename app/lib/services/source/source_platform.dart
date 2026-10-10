@@ -295,6 +295,15 @@ List<String> aggregateSourceKeys() => [
     if (p.inAggregate) p.source,
 ];
 
+/// 该源是否有「收藏 / 我喜欢」能力（供 canLike 等判定，避免硬编码平台列表）。
+bool sourceSupportsLike(String source) =>
+    sourcePlatform(source).collections != null;
+
+/// 收藏操作失败提示文案（由该源的收藏适配器提供；无适配器回退 NT 文案）。
+String likeFailedTextFor(String source, AppLocalizations l10n) =>
+    sourcePlatform(source).collections?.likeFailedText(l10n) ??
+    l10n.toastLoginRequiredNetease;
+
 final List<SourcePlatform> _all = [
   _NeteaseSource(),
   _KugouSource(),
