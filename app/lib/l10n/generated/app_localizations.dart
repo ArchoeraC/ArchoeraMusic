@@ -6079,7 +6079,7 @@ abstract class AppLocalizations {
   /// No description provided for @aprilFoolsSurrender.
   ///
   /// In zh_CN, this message translates to:
-  /// **'我投降 🙌'**
+  /// **'我投降'**
   String get aprilFoolsSurrender;
 
   /// No description provided for @aprilFoolsSurrenderToast.

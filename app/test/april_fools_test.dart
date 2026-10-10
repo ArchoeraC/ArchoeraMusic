@@ -14,6 +14,25 @@ import 'package:archoera_music/easter_egg/april_fools_state.dart';
 import 'package:archoera_music/easter_egg/easter_egg.dart';
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
+import 'package:archoera_music/widgets/common/toast.dart';
+
+/// 位于 Navigator 之外的探针（与 ToastOverlay / 各启动门同层）。
+///
+/// 用于验证切换整活特效时不重建下游子树——否则这些非 Navigator 子树
+/// （无 GlobalKey 保护）会被销毁重建，重置 toast 与启动门状态。
+class _StateProbe extends StatefulWidget {
+  const _StateProbe({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_StateProbe> createState() => _StateProbeState();
+}
+
+class _StateProbeState extends State<_StateProbe> {
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
 
 /// 内存偏好桩：只改内存、不落盘（避免测试写真实 prefs.json）。
 class _StubPrefs extends AppPrefsNotifier {
@@ -221,7 +240,7 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('激活时整屏镜像 + 显示「我投降」按钮', (WidgetTester tester) async {
+    testWidgets('激活时整屏镜像 + 显示白旗按钮', (WidgetTester tester) async {
       await pumpHost(tester, true);
 
       final Iterable<Transform> transforms = tester.widgetList<Transform>(
@@ -232,7 +251,15 @@ void main() {
         isTrue,
         reason: '整活模式应施加左右镜像',
       );
-      expect(find.text('我投降 🙌'), findsOneWidget);
+      final surrender = find.text('🏳️');
+      expect(surrender, findsOneWidget);
+      // 投降按钮应位于上半屏（顶部居中），不得压住底部播放条的播放/切歌键。
+      final hostHeight = tester.getSize(find.byType(AprilFoolsHost)).height;
+      expect(
+        tester.getRect(surrender).center.dy,
+        lessThan(hostHeight / 2),
+        reason: '投降按钮应避开底部播放条，置于上半屏',
+      );
     });
 
     testWidgets('未激活时透传（无镜像、无按钮）', (WidgetTester tester) async {
@@ -246,7 +273,50 @@ void main() {
         isFalse,
         reason: '未激活不应镜像',
       );
-      expect(find.text('我投降 🙌'), findsNothing);
+      expect(find.text('🏳️'), findsNothing);
+    });
+
+    testWidgets('解除整活不重建下游子树（保护 toast / 启动门状态）', (WidgetTester tester) async {
+      final container = _container();
+      container.read(aprilFoolsProvider.notifier).activate(2030);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: const Locale('zh', 'CN'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            // 宿主包在 MaterialApp.builder 中（Navigator 之外），与真实
+            // app.dart 一致：探针与 ToastOverlay 同处非 Navigator 子树。
+            builder: (BuildContext context, Widget? child) => AprilFoolsHost(
+              child: _StateProbe(
+                child: ToastOverlay(child: child ?? const SizedBox.shrink()),
+              ),
+            ),
+            home: const Scaffold(body: Center(child: Text('主体'))),
+          ),
+        ),
+      );
+      await tester.pump();
+      final probe = tester.state<_StateProbeState>(find.byType(_StateProbe));
+
+      container.read(aprilFoolsProvider.notifier).surrender();
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        identical(
+          tester.state<_StateProbeState>(find.byType(_StateProbe)),
+          probe,
+        ),
+        isTrue,
+        reason: '解除整活应保持同一树形，不得重建下游子树（否则提示被重载打断）',
+      );
+      // 冲掉 surrender 弹出的 toast 定时器。
+      await tester.pump(const Duration(seconds: 4));
     });
 
     testWidgets('激活时路由内 ScrollView 滚轮方向取反', (WidgetTester tester) async {

@@ -3478,7 +3478,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Solo aparece el 1 de abril; una vez activado desaparece hasta el próximo Día de los Inocentes';
 
   @override
-  String get aprilFoolsSurrender => 'Me rindo 🙌';
+  String get aprilFoolsSurrender => 'Me rindo';
 
   @override
   String get aprilFoolsSurrenderToast =>

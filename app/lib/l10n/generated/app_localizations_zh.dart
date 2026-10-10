@@ -3266,7 +3266,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsWeirdEffectsOff => '仅愚人节当天出现，开启一次后消失，直到下一次愚人节';
 
   @override
-  String get aprilFoolsSurrender => '我投降 🙌';
+  String get aprilFoolsSurrender => '我投降';
 
   @override
   String get aprilFoolsSurrenderToast => '愚人节快乐，一切都恢复正常啦～';
@@ -8834,7 +8834,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsWeirdEffectsOff => '仅愚人节当天出现，开启一次后消失，直到下一次愚人节';
 
   @override
-  String get aprilFoolsSurrender => '我投降 🙌';
+  String get aprilFoolsSurrender => '我投降';
 
   @override
   String get aprilFoolsSurrenderToast => '愚人节快乐，一切都恢复正常啦～';
@@ -14402,7 +14402,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsWeirdEffectsOff => '僅愚人節當天出現，開啟一次後消失，直到下一次愚人節';
 
   @override
-  String get aprilFoolsSurrender => '我投降 🙌';
+  String get aprilFoolsSurrender => '我投降';
 
   @override
   String get aprilFoolsSurrenderToast => '愚人節快樂，一切都恢復正常啦～';

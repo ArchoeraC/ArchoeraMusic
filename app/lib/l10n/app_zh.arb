@@ -998,7 +998,7 @@
   "settingsWeirdEffects": "奇怪的特效",
   "settingsWeirdEffectsOn": "已开启「倒放」整活，点「我投降」可恢复",
   "settingsWeirdEffectsOff": "仅愚人节当天出现，开启一次后消失，直到下一次愚人节",
-  "aprilFoolsSurrender": "我投降 🙌",
+  "aprilFoolsSurrender": "我投降",
   "aprilFoolsSurrenderToast": "愚人节快乐，一切都恢复正常啦～",
   "settingsSectionDeclaration": "软件声明",
   "settingsDeclineText": "本软件（ArchoeraMusic）以 **AGPL-3.0** 开源：遵守其条款即可自由使用、学习、修改与再分发，**合规的开源商业使用同样被许可**；本项目不提供脱离 AGPL 义务的闭源商业授权。使用前请阅读以下声明：\n\n",

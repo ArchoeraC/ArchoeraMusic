@@ -3307,7 +3307,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsWeirdEffectsOff => '만우절 당일에만 나타나며, 한 번 켜면 다음 만우절까지 사라집니다';
 
   @override
-  String get aprilFoolsSurrender => '항복합니다 🙌';
+  String get aprilFoolsSurrender => '항복합니다';
 
   @override
   String get aprilFoolsSurrenderToast => '만우절 축하해요! 모든 것이 정상으로 돌아왔어요.';

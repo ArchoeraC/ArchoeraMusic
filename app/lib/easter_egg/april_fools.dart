@@ -73,9 +73,12 @@ final aprilFoolsProvider = StateNotifierProvider<AprilFoolsNotifier, bool>(
 ///   - 安装 `PrimaryScrollController` + [PrankScrollController]（预期机制）；
 ///   - 顶层滚轮反向层 [_AprilFoolsWheelInverter]（实际生效的滚轮反转——路由
 ///     注入的 `PrimaryScrollController` 会遮蔽外层控制器，见该类注释）；
-///   - 叠加浮动的「我投降」按钮（**在镜像之外**，不被倒放）。
+///   - 顶部居中叠加一面**白旗**按钮（**在镜像之外**，不被倒放；不含文字，
+///     投降文案仅作无障碍标签；避开底部播放条，不遮挡播放/切歌等按键）。
 ///
-/// 未激活时原样透传 [child]（无镜像、无控制器、无按钮），恢复干净界面。
+/// 未激活时保持**同一树形**、仅以恒等变换 + `PrimaryScrollController.none`
+/// 透传 [child]（无镜像、无控制器、无按钮），既恢复干净界面，又避免切换时
+/// 重建下游子树（否则解脱整活时「愚人节快乐」提示会被重载打断）。
 class AprilFoolsHost extends ConsumerStatefulWidget {
   const AprilFoolsHost({required this.child, super.key});
 
@@ -121,56 +124,75 @@ class _AprilFoolsHostState extends ConsumerState<AprilFoolsHost> {
       aprilFoolsActiveNotifier.value = next;
     });
     final active = ref.watch(aprilFoolsProvider);
+    if (!active) _releaseScroll();
 
-    if (!active) {
-      _releaseScroll();
-      return widget.child;
-    }
-
-    final mirrored = Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()..setEntry(0, 0, -1.0),
-      transformHitTests: true, // 点击跟随镜像后的视觉位置
-      child: PrimaryScrollController(
-        controller: _ensureScroll(),
-        automaticallyInheritForPlatforms: TargetPlatform.values.toSet(),
-        scrollDirection: Axis.vertical,
-        child: widget.child,
-      ),
-    );
-
+    // 未激活也保持**同一树形**（Stack > Transform > PrimaryScrollController
+    // > child），只切换属性：若把 child 移到不同层级，Flutter 会销毁重建整棵
+    // 下游子树（含 ToastOverlay 与各启动门）——解除整活时「愚人节快乐」提示会
+    // 被这次重载打断、启动门亦可能重放。恒等 Matrix4 属纯平移，
+    // RenderTransform 会短路、不产生变换层，未激活时几乎零开销。
     return Stack(
       children: [
-        Positioned.fill(child: mirrored),
+        Positioned.fill(
+          child: Transform(
+            alignment: Alignment.center,
+            // 未激活为恒等变换（镜像关闭）。
+            transform: active
+                ? (Matrix4.identity()..setEntry(0, 0, -1.0))
+                : Matrix4.identity(),
+            transformHitTests: true, // 点击跟随镜像后的视觉位置
+            child: active
+                ? PrimaryScrollController(
+                    controller: _ensureScroll(),
+                    automaticallyInheritForPlatforms: TargetPlatform.values
+                        .toSet(),
+                    scrollDirection: Axis.vertical,
+                    child: widget.child,
+                  )
+                : PrimaryScrollController.none(child: widget.child),
+          ),
+        ),
         // 滚轮反向拦截层：Navigator 的每个路由都会注入自己的
         // PrimaryScrollController（移动端平台集），在桌面上会遮蔽外层控制器，
         // 导致上方安装的 PrimaryScrollController 无法被路由内的 ScrollView
         // 继承。故在最顶层放一个命中测试最先到达的 [Listener]：抢到
         // PointerSignalResolver 后按指针位置找到 ScrollPosition 手动反向滚动。
-        const Positioned.fill(child: _AprilFoolsWheelInverter()),
-        // 「我投降」在镜像之外（Stack 顶层、不参与 Transform）。
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: SafeArea(
-            top: false,
-            minimum: const EdgeInsets.only(bottom: 16),
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Material(
-                type: MaterialType.transparency,
-                child: SButton(
-                  label: context.l10n.aprilFoolsSurrender,
-                  variant: SButtonVariant.error,
-                  size: SButtonSize.large,
-                  onPressed: () =>
-                      ref.read(aprilFoolsProvider.notifier).surrender(),
+        if (active) const Positioned.fill(child: _AprilFoolsWheelInverter()),
+        // 「投降」在镜像之外（Stack 顶层、不参与 Transform）。
+        // 只显示一面白旗（无文字，投降文案仅作无障碍标签）；置于
+        // **顶部居中**（导航栏中段空白区 / 播放页顶栏中段），避开底部播放条
+        // 的播放 / 上一首 / 下一首等按键；`heightFactor: 1` 令悬浮层只占按钮
+        // 自身高度，不覆盖整屏命中区。
+        if (active)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: SafeArea(
+              bottom: false,
+              minimum: const EdgeInsets.only(top: 12),
+              child: Align(
+                alignment: Alignment.topCenter,
+                heightFactor: 1,
+                child: Material(
+                  type: MaterialType.transparency,
+                  // 按钮本身只显示一面白旗（无文字）；投降文案仅作无障碍标签。
+                  // 不用 Tooltip：宿主位于 Navigator 之上，缺少 Overlay 祖先。
+                  child: Semantics(
+                    label: context.l10n.aprilFoolsSurrender,
+                    child: SButton(
+                      label: '🏳️',
+                      variant: SButtonVariant.secondary,
+                      size: SButtonSize.medium,
+                      round: true,
+                      onPressed: () =>
+                          ref.read(aprilFoolsProvider.notifier).surrender(),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
       ],
     );
   }

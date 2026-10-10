@@ -3304,7 +3304,7 @@ class AppLocalizationsJa extends AppLocalizations {
       'エイプリルフール当日のみ表示。一度有効にすると次のエイプリルフールまで消えます';
 
   @override
-  String get aprilFoolsSurrender => '降参します 🙌';
+  String get aprilFoolsSurrender => '降参します';
 
   @override
   String get aprilFoolsSurrenderToast => 'エイプリルフールおめでとう！すべて元に戻りました。';
