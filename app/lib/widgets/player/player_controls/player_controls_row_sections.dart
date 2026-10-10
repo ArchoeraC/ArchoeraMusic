@@ -74,7 +74,7 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
   final ColorScheme colorScheme;
   final PlaybackNotifier notifier;
 
-  /// 整活模式：上一首/下一首互换、循环反向。
+  /// 奇怪的特效：上一首/下一首互换、循环反向。
   final bool prank;
 
   @override

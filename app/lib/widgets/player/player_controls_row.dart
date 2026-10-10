@@ -61,7 +61,7 @@ class PlayerControlsRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 整活模式切换时重建（下一首/上一首互换、循环反向）。
+    // 奇怪的特效激活时重建（下一首/上一首互换、循环反向）。
     return ValueListenableBuilder<bool>(
       valueListenable: aprilFoolsActiveNotifier,
       builder: (BuildContext context, bool prank, Widget? _) {

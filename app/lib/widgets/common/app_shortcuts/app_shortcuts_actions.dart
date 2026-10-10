@@ -69,7 +69,7 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
         // ignore: discarded_futures
         pb.stop();
       case ShortcutAction.next:
-        // 整活模式：快捷键也反向（仅 UI 派发，内部自动续播不受影响）。
+        // 奇怪的特效：快捷键也反向（仅 UI 派发，内部自动续播不受影响）。
         if (aprilFoolsActiveNotifier.value) {
           // ignore: discarded_futures
           pb.playPrevious();

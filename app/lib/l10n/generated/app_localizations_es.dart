@@ -3467,24 +3467,15 @@ class AppLocalizationsEs extends AppLocalizations {
       '¿Ejecutar este programa? Si causa consecuencias irreversibles, puedes cerrar el software.';
 
   @override
-  String get settingsSectionEasterEgg => 'Huevos de pascua';
+  String get settingsWeirdEffects => 'Efectos extraños';
 
   @override
-  String get settingsAprilFools => 'Broma del Día de los Inocentes';
+  String get settingsWeirdEffectsOn =>
+      'Broma invertida activa: toca «Me rindo» para restaurar';
 
   @override
-  String get settingsAprilFoolsOn =>
-      'Activa automáticamente el «modo broma» invertido el 1 de abril (rinde cuando quieras)';
-
-  @override
-  String get settingsAprilFoolsOff =>
-      'Nunca activa el modo broma automáticamente';
-
-  @override
-  String get aprilFoolsDisableNoMore => 'No me gastes más bromas';
-
-  @override
-  String get aprilFoolsDisabledToast => 'Vale, no más bromas.';
+  String get settingsWeirdEffectsOff =>
+      'Solo aparece el 1 de abril; una vez activado desaparece hasta el próximo Día de los Inocentes';
 
   @override
   String get aprilFoolsSurrender => 'Me rindo 🙌';
@@ -3702,7 +3693,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      'Este software incluye la siguiente fuente:\n· MiSans (© Xiaomi, utilizada según el Acuerdo de Licencia de Propiedad Intelectual de la fuente MiSans)';
+      'Este software incluye las siguientes fuentes:\n· MiSans (© Xiaomi, según el Acuerdo de Licencia de Propiedad Intelectual de la fuente MiSans)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (fuente de iconos propia; glifos de MingCute / Tabler / Lucide)\n· EtaMark (fuente de marca propia)\n\nA continuación se incluyen los textos completos de las licencias oficiales.';
 
   @override
   String get commonNoLyrics => 'Sin letras';

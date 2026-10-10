@@ -38,12 +38,12 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
     }
   }
 
-  /// 整活模式是否激活（进度条反向：从右向左填充、拖点映射同步反向）。
+  /// 奇怪的特效是否激活（进度条反向：从右向左填充、拖点映射同步反向）。
   bool get _prank => aprilFoolsActiveNotifier.value;
 
   @override
   Widget build(BuildContext context) {
-    // 整活模式切换时重建整条进度条（含时间提示映射）。
+    // 奇怪的特效激活时重建整条进度条（含时间提示映射）。
     return ValueListenableBuilder<bool>(
       valueListenable: aprilFoolsActiveNotifier,
       builder: (BuildContext context, bool _, Widget? _) => _buildBody(context),
@@ -129,7 +129,7 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
       dx = _hoverDx ?? rect.center.dx;
     }
     final t = ((dx - rect.left) / rect.width).clamp(0.0, 1.0);
-    // 整活模式：指针 x 对应的实际进度 = 反向映射（与拖动/填充一致）。
+    // 奇怪的特效：指针 x 对应的实际进度 = 反向映射（与拖动/填充一致）。
     final valueT = _prank ? 1.0 - t : t;
     final ms = (valueT * widget.max).round();
     final text = formatClock(Duration(milliseconds: ms));
@@ -219,7 +219,7 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
     );
   }
 
-  /// 整活模式下水平镜像控件：填充从右缘开始、拖动方向同步反向，
+  /// 奇怪的特效下水平镜像控件：填充从右缘开始、拖动方向同步反向，
   /// 命中测试跟随镜像（[Transform.transformHitTests] = true）保证手感一致。
   Widget _maybeMirror(Widget child) {
     if (!_prank) return child;
@@ -244,7 +244,7 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
       return (_prank ? 1.0 - t : t) * max;
     }
 
-    // 进度填充矩形：整活模式下从右缘向左生长。
+    // 进度填充矩形：奇怪的特效下从右缘向左生长。
     Rect progressRect() {
       final filled = rect.width * ratio;
       final left = _prank ? rect.left + rect.width - filled : rect.left;

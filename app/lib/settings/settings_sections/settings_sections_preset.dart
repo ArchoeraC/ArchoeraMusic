@@ -36,6 +36,11 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
     final l10n = context.l10n;
     final prefs = ref.watch(appPrefsProvider);
     final notifier = ref.read(appPrefsProvider.notifier);
+    final now = DateTime.now();
+    // 愚人节特供「奇怪的特效」：仅 4/1 且今年尚未开启过时提供开关。
+    final showWeirdEffects = ref
+        .read(aprilFoolsProvider.notifier)
+        .shouldOffer(now);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -174,6 +179,28 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
             ),
           ],
         ),
+        // ── 愚人节特供：奇怪的特效（仅 4/1 出现；开启一次后消失到次年）──
+        if (showWeirdEffects) ...[
+          const SizedBox(height: 20),
+          SettingSection(
+            title: l10n.settingsWeirdEffects,
+            children: [
+              SettingSwitchTile(
+                icon: EtaIcons.flaskOutline,
+                title: l10n.settingsWeirdEffects,
+                subtitle: prefs.aprilFoolsUsedYear == now.year
+                    ? l10n.settingsWeirdEffectsOn
+                    : l10n.settingsWeirdEffectsOff,
+                value: ref.watch(aprilFoolsProvider),
+                onChanged: (bool v) {
+                  if (v) {
+                    ref.read(aprilFoolsProvider.notifier).activate(now.year);
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

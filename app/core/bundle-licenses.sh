@@ -6,6 +6,7 @@
 #   - FFmpeg（自建最小纯 LGPL）→ 从自建 prefix 拷 COPYING.LGPLv3 / COPYING.LGPLv2.1 / LICENSE.md
 #   - TagLib（LGPL-2.1 / MPL-1.1）→ 各发行版放置位置不同，逐一探测；找不到时
 #     依 FFmpeg 的 COPYING.LGPLv2.1（同一 LGPL-2.1 文本）覆盖
+#   - 字体 / 图标官方许可正文（app/assets/licenses/）→ MiSans / Manrope(OFL 1.1) / EtaIcons
 #   - THIRD-PARTY-NOTICES.md（根目录，聚合声明 + 源码/替换权）
 #
 #  用法: bundle-licenses.sh <bundle 目录>
@@ -21,6 +22,12 @@ mkdir -p "$dest"
 
 # 1) 聚合声明
 [[ -f "$root/THIRD-PARTY-NOTICES.md" ]] && cp -f "$root/THIRD-PARTY-NOTICES.md" "$dest/"
+
+# 2) 字体 / 图标官方许可正文（随包内嵌；与「设置 → 关于 → 字体署名」同源）
+font_lic="$root/app/assets/licenses"
+if [[ -d "$font_lic" ]]; then
+  cp -f "$font_lic"/* "$dest/" 2>/dev/null || true
+fi
 
 # 2) FFmpeg（自建最小纯 LGPL；因 mbedTLS 带 --enable-version3 → 附 LGPLv3 文本）：许可文本在我们自己的 prefix
 ff_lic="$prefix/share/licenses/ffmpeg"

@@ -13,11 +13,11 @@
 | `anyhow` | 1 | MIT | 错误处理 |
 | `clap` | 4 | MIT / Apache-2.0 | 命令行解析 |
 
-## LAME 静态链接特别声明（LGPL-2.1+）
+## LAME 静态链接特别声明（LGPL-2.0-or-later）
 
-本二进制通过 `mp3lame-sys` 将 **LAME（LGPL-2.1 或更高版本）** 的源代码
+本二进制通过 `mp3lame-sys` 将 **LAME（GNU Library General Public License v2 或更高版本，LGPL-2.0-or-later）** 的源代码
 编译为静态库（`libmp3lame.a`）并直接链接进 `subsonic-transcoder` 可执行文件。
-依据 LGPL-2.1 第 6 条（静态链接情形），该可执行文件被视为对 LAME 库的修改作品，
+依据 LGPL（Library GPL v2）第 6 条（静态链接情形），该可执行文件被视为对 LAME 库的修改作品，
 使用者享有以下权利：
 
 1. 获得 LAME 对应源代码的自由；
@@ -27,6 +27,7 @@
 
 - LAME 项目主页：https://lame.sourceforge.io/
 - LAME 源代码与许可证：https://sourceforge.net/projects/lame/
+- LAME 许可文本（GNU Library General Public License v2）：https://www.gnu.org/licenses/old-licenses/lgpl-2.0.html
 
 本软件构建时所采用的 LAME 版本由 `mp3lame-sys` crate 决定，
 其随 Cargo 依赖图锁定，可在对应构建环境中经 `cargo tree` 复现。
@@ -45,7 +46,7 @@
 
 ## 合规评估（非法律意见）
 
-`symphonia`（MPL-2.0，文件级 weak copyleft）与 LAME（LGPL-2.1+，静态链接，可重链/源码要求见上）在各自条款下可与本模块 AGPL-3.0 代码共存。
+`symphonia`（MPL-2.0，文件级 weak copyleft）与 LAME（LGPL-2.0-or-later，静态链接，可重链/源码要求见上）在各自条款下可与本模块 AGPL-3.0 代码共存。
 本文档为项目维护者的合理努力评估，不构成法律意见；正式依据以上游官方许可文本为准。
 
 ---

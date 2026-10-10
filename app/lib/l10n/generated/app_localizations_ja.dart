@@ -3294,22 +3294,14 @@ class AppLocalizationsJa extends AppLocalizations {
       'このプログラムを実行しますか？取り返しのつかない結果になった場合、ソフトウェアを終了することを選択できます。';
 
   @override
-  String get settingsSectionEasterEgg => 'イースターエッグ';
+  String get settingsWeirdEffects => '奇妙なエフェクト';
 
   @override
-  String get settingsAprilFools => 'エイプリルフールのいたずら';
+  String get settingsWeirdEffectsOn => '逆再生いたずら中——「降参します」で元に戻せます';
 
   @override
-  String get settingsAprilFoolsOn => '4月1日に「逆再生」いたずらモードを自動で有効化（いつでも降参できます）';
-
-  @override
-  String get settingsAprilFoolsOff => 'いたずらモードを自動で有効にしない';
-
-  @override
-  String get aprilFoolsDisableNoMore => 'もういたずらしないで';
-
-  @override
-  String get aprilFoolsDisabledToast => '了解、もういたずらしません。';
+  String get settingsWeirdEffectsOff =>
+      'エイプリルフール当日のみ表示。一度有効にすると次のエイプリルフールまで消えます';
 
   @override
   String get aprilFoolsSurrender => '降参します 🙌';
@@ -3517,7 +3509,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      '本ソフトウェアには以下のフォントが同梱されています。\n· MiSans（© Xiaomi、MiSans フォント知的財産権許諾契約に基づき使用）';
+      '本ソフトウェアには以下のフォントが同梱されています。\n· MiSans（© Xiaomi、MiSans フォント知的財産権許諾契約に基づき使用）\n· Manrope（© The Manrope Project Authors、SIL Open Font License 1.1）\n· EtaIcons（自作アイコンフォント、字形は MingCute / Tabler / Lucide 由来）\n· EtaMark（自作ブランドマークフォント）\n\n以下に各フォント・字形の公式ライセンス全文を掲載します。';
 
   @override
   String get commonNoLyrics => '歌詞がありません';

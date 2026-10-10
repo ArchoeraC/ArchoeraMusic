@@ -935,23 +935,11 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  // ── 愚人节特供 · 整活模式 ──────────────────────────────────────
+  // ── 愚人节特供 · 奇怪的特效 ────────────────────────────────────
 
-  /// 设置整活模式激活态（跨重启保留，直到用户投降）。
-  void setAprilFools(bool value) {
-    state = state.copyWithAprilFools(value);
-    state.save();
-  }
-
-  /// 记录「我投降」的年份（当年不再自动激活）。
-  void setAprilFoolsSurrenderedYear(int year) {
-    state = state.copyWithAprilFoolsSurrenderedYear(year);
-    state.save();
-  }
-
-  /// 设置是否允许愚人节整活（关闭后永不自动激活）。
-  void setAprilFoolsEnabled(bool value) {
-    state = state.copyWithAprilFoolsEnabled(value);
+  /// 记录「奇怪的特效」已被开启的年份（当年设置项不再出现）。
+  void setAprilFoolsUsedYear(int year) {
+    state = state.copyWithAprilFoolsUsedYear(year);
     state.save();
   }
 

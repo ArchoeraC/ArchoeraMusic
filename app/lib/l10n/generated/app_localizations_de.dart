@@ -3441,24 +3441,15 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dieses Programm ausführen? Falls es irreversible Folgen hat, kannst du die Software schließen.';
 
   @override
-  String get settingsSectionEasterEgg => 'Ostereier';
+  String get settingsWeirdEffects => 'Seltsame Effekte';
 
   @override
-  String get settingsAprilFools => 'Aprilscherz-Modus';
+  String get settingsWeirdEffectsOn =>
+      'Umgekehrter Scherz aktiv – „Ich gebe auf“ stellt alles wieder her';
 
   @override
-  String get settingsAprilFoolsOn =>
-      'Aktiviert am 1. April automatisch den umgekehrten „Scherzmodus“ (jederzeit aufgeben)';
-
-  @override
-  String get settingsAprilFoolsOff =>
-      'Aktiviert den Scherzmodus nie automatisch';
-
-  @override
-  String get aprilFoolsDisableNoMore => 'Mich nicht mehr reinlegen';
-
-  @override
-  String get aprilFoolsDisabledToast => 'Alles klar – keine Streiche mehr.';
+  String get settingsWeirdEffectsOff =>
+      'Erscheint nur am 1. April; einmal aktiviert verschwindet es bis zum nächsten 1. April';
 
   @override
   String get aprilFoolsSurrender => 'Ich gebe auf 🙌';
@@ -3674,7 +3665,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      'Diese Software enthält die folgende Schriftart:\n· MiSans (© Xiaomi, verwendet gemäß der MiSans Font Intellectual Property License Agreement)';
+      'Diese Software enthält die folgenden Schriftarten:\n· MiSans (© Xiaomi, gemäß der MiSans Font Intellectual Property License Agreement)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (selbst erstellte Icon-Schriftart; Glyphen von MingCute / Tabler / Lucide)\n· EtaMark (selbst erstellte Markenzeichenschrift)\n\nDie vollständigen offiziellen Lizenztexte folgen unten.';
 
   @override
   String get commonNoLyrics => 'Keine Songtexte';

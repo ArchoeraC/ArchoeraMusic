@@ -12,6 +12,7 @@ library;
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/l10n.dart';
+import '../../licenses/bundled_font_licenses.dart';
 import 's_dialog.dart';
 
 /// 打开「软件声明」弹窗。
@@ -61,14 +62,16 @@ Future<void> showPrivacyPolicyDialog(BuildContext context) {
   );
 }
 
-/// 打开「字体署名」弹窗。
-Future<void> showFontCreditsDialog(BuildContext context) {
+/// 打开「字体署名」弹窗（本地化简介 + 完整官方许可正文）。
+Future<void> showFontCreditsDialog(BuildContext context) async {
   final l10n = context.l10n;
+  final sections = await loadBundledFontLicenseSections();
+  if (!context.mounted) return;
   return _showDocument(
     context,
     title: l10n.settingsSectionFontCredits,
     intro: l10n.settingsFontCreditsText,
-    sections: const [],
+    sections: sections,
   );
 }
 
