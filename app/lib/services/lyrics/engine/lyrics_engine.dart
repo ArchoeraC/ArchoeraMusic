@@ -112,7 +112,7 @@ class LyricsEngine {
     final ids = sp.ttmlCandidateIds(track, trackId);
     if (ids.isEmpty) return null;
     try {
-      return fetchTTMLOverlay(platform, ids);
+      return fetchTTMLOverlay(platform, ids, path: sp.ttmlPath);
     } catch (_) {
       return null;
     }

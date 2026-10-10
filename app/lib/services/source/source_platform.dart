@@ -315,6 +315,9 @@ abstract class SourcePlatform {
   /// 是否支持 AMLL DB TTML 覆盖歌词（目录见 `apis/lyric/ttml.dart`）。
   bool get supportsTtml => false;
 
+  /// AMLL DB 平台目录（`%p`）：NT `ncm-lyrics` / QQ `qq-lyrics`。
+  String get ttmlPath => '';
+
   /// AMLL DB TTML 候选 id（默认 [trackId]；QQ 额外用 mid）。
   List<String> ttmlCandidateIds(Track t, String? trackId) => [
     if (trackId != null && trackId.isNotEmpty) trackId,
@@ -505,6 +508,9 @@ class _NeteaseSource extends SourcePlatform {
 
   @override
   bool get supportsTtml => true;
+
+  @override
+  String get ttmlPath => 'ncm-lyrics';
 
   @override
   Future<SearchResult<Track>> searchSongs(
@@ -974,6 +980,9 @@ class _QqSource extends SourcePlatform {
 
   @override
   bool get supportsTtml => true;
+
+  @override
+  String get ttmlPath => 'qq-lyrics';
 
   @override
   List<String> ttmlCandidateIds(Track t, String? trackId) {
