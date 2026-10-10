@@ -109,6 +109,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tagEditorDuration => '时长';
 
   @override
+  String get tagEditorScrape => '在线刮削';
+
+  @override
+  String get tagEditorScraping => '刮削中…';
+
+  @override
+  String get tagEditorScrapeHint => '从已启用的音乐源在线匹配，结果填入下方供确认后保存';
+
+  @override
+  String get tagEditorScrapeDone => '已填入刮削结果';
+
+  @override
+  String get tagEditorScrapeNotFound => '未找到匹配的在线元数据';
+
+  @override
+  String get tagEditorScrapeFailed => '刮削失败';
+
+  @override
+  String get tagEditorScrapeNeedQuery => '请先填写标题或艺术家';
+
+  @override
   String get menuBatchEditMetadata => '批量编辑元数据';
 
   @override
@@ -5640,6 +5661,27 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get tagEditorDuration => '时长';
 
   @override
+  String get tagEditorScrape => '在线刮削';
+
+  @override
+  String get tagEditorScraping => '刮削中…';
+
+  @override
+  String get tagEditorScrapeHint => '从已启用的音乐源在线匹配，结果填入下方供确认后保存';
+
+  @override
+  String get tagEditorScrapeDone => '已填入刮削结果';
+
+  @override
+  String get tagEditorScrapeNotFound => '未找到匹配的在线元数据';
+
+  @override
+  String get tagEditorScrapeFailed => '刮削失败';
+
+  @override
+  String get tagEditorScrapeNeedQuery => '请先填写标题或艺术家';
+
+  @override
   String get menuBatchEditMetadata => '批量编辑元数据';
 
   @override
@@ -11169,6 +11211,27 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get tagEditorDuration => '時長';
+
+  @override
+  String get tagEditorScrape => '線上刮削';
+
+  @override
+  String get tagEditorScraping => '刮削中…';
+
+  @override
+  String get tagEditorScrapeHint => '從已啟用的音樂來源線上比對，結果填入下方供確認後儲存';
+
+  @override
+  String get tagEditorScrapeDone => '已填入刮削結果';
+
+  @override
+  String get tagEditorScrapeNotFound => '找不到相符的線上中繼資料';
+
+  @override
+  String get tagEditorScrapeFailed => '刮削失敗';
+
+  @override
+  String get tagEditorScrapeNeedQuery => '請先填寫標題或演出者';
 
   @override
   String get menuBatchEditMetadata => '批次編輯中繼資料';

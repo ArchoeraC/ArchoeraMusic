@@ -25,6 +25,7 @@ import '../../services/netease/track.dart';
 import '../../services/scanner/library_store.dart';
 import '../../services/scraper/tag_editor_service.dart';
 import '../../services/scraper/tag_text_rule.dart';
+import '../../stores/app_prefs.dart';
 import '../../utils/format.dart';
 import '../common/tag_text_rule_editor.dart';
 import '../common/toast.dart';
@@ -79,6 +80,9 @@ class _TagEditorDialogState extends ConsumerState<TagEditorDialog> {
 
   bool _loading = true;
   bool _saving = false;
+
+  /// 是否正在在线刮削（单曲多源查询）。
+  bool _scraping = false;
 
   /// 错误文案（null = 无错误）；读取失败/缺少路径时展示并只保留关闭按钮。
   String? _error;
@@ -276,6 +280,86 @@ class _TagEditorDialogState extends ConsumerState<TagEditorDialog> {
         _artist.text = snap.apply(_artist.text, vars);
       }
     });
+  }
+
+  /// 在线刮削单曲：按当前表单值（标题 / 艺术家，缺失回退曲目模型）多源查询，
+  /// 命中后把结果填入表单供审阅（不直接写文件）。数据源与封面/歌词开关沿用
+  /// 「设置 → 刮削」的偏好。
+  Future<void> _scrape() async {
+    final l10n = ref.read(l10nProvider);
+    if (_scraping) return;
+    final queryTitle = _title.text.trim().isNotEmpty
+        ? _title.text.trim()
+        : widget.track.title;
+    final queryArtist = _artist.text.trim().isNotEmpty
+        ? _artist.text.trim()
+        : widget.track.artistNames;
+    if (queryTitle.isEmpty && queryArtist.isEmpty) {
+      toast(l10n.tagEditorScrapeNeedQuery, type: ToastType.warning);
+      return;
+    }
+    setState(() => _scraping = true);
+    final prefs = ref.read(appPrefsProvider);
+    try {
+      final result = await scrapeTrackForEdit(
+        title: queryTitle,
+        artist: queryArtist,
+        album: _album.text.trim(),
+        albumArtist: _albumArtist.text.trim(),
+        durationMs: widget.track.duration,
+        filePath: widget.track.localPath ?? '',
+        options: TrackScrapeOptions(
+          musicBrainz: prefs.scrapeUseMusicBrainz,
+          deezer: prefs.scrapeUseDeezer,
+          itunes: prefs.scrapeUseItunes,
+          netease: prefs.scrapeUseNetease,
+          qqMusic: prefs.scrapeUseQQMusic,
+          kugou: prefs.scrapeUseKugou,
+          kuwo: prefs.scrapeUseKuwo,
+          migu: prefs.scrapeUseMigu,
+          acoustId: prefs.scrapeUseAcoustID,
+          fetchCover: prefs.scrapeEmbedCover,
+          fetchLyrics: prefs.scrapeEmbedLyrics,
+          workers: prefs.scrapeWorkers,
+        ),
+      );
+      if (!mounted) return;
+      if (!result.found) {
+        setState(() => _scraping = false);
+        toast(l10n.tagEditorScrapeNotFound, type: ToastType.warning);
+        return;
+      }
+      setState(() {
+        _scraping = false;
+        _applyScraped(result);
+      });
+      toast(l10n.tagEditorScrapeDone, type: ToastType.success);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _scraping = false);
+      toast('${l10n.tagEditorScrapeFailed}: $e', type: ToastType.error);
+    }
+  }
+
+  /// 用刮削结果填充表单：只覆盖有值的字段（保守合并，保留用户已填内容）；
+  /// 封面仅在抓到新封面时替换并标记改动。
+  void _applyScraped(ScrapedTrack r) {
+    if (r.title.isNotEmpty) _title.text = r.title;
+    if (r.artist.isNotEmpty) _artist.text = r.artist;
+    if (r.album.isNotEmpty) _album.text = r.album;
+    if (r.albumArtist.isNotEmpty) _albumArtist.text = r.albumArtist;
+    if (r.composer.isNotEmpty) _composer.text = r.composer;
+    if (r.genre.isNotEmpty) _genre.text = r.genre;
+    if (r.trackNumber > 0) _trackNumber.text = '${r.trackNumber}';
+    if (r.discNumber > 0) _discNumber.text = '${r.discNumber}';
+    if (r.year > 0) _year.text = '${r.year}';
+    if (r.lyrics.isNotEmpty) _lyrics.text = r.lyrics;
+    final cover = r.coverBytes;
+    if (cover != null) {
+      _coverBytes = cover;
+      _coverMime = r.coverMime;
+      _coverDirty = true;
+    }
   }
 
   /// 保存：构造 [TrackTags] 写回文件、提示并触发增量扫描刷新曲库。

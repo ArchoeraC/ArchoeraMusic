@@ -95,6 +95,28 @@ extension _TagEditorDialogView on _TagEditorDialogState {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Row(
+          children: [
+            SButton(
+              label: _scraping ? l10n.tagEditorScraping : l10n.tagEditorScrape,
+              icon: EtaIcons.magic3,
+              variant: SButtonVariant.secondary,
+              loading: _scraping,
+              onPressed: (_scraping || _saving) ? null : _scrape,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                l10n.tagEditorScrapeHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         _TagEditorField(
           label: l10n.tagEditorFieldTitle,
           child: SInput(controller: _title, clearable: true),

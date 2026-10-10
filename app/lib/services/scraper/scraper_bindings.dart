@@ -72,6 +72,14 @@ typedef ScraperWriteTagsDart = Pointer<Utf8> Function(
 );
 typedef ScraperFreeStringNative = Void Function(Pointer<Utf8> s);
 typedef ScraperFreeStringDart = void Function(Pointer<Utf8> s);
+typedef ScraperScrapeTrackNative = Pointer<Utf8> Function(
+  Pointer<Utf8> configJson,
+  Pointer<Utf8> trackJson,
+);
+typedef ScraperScrapeTrackDart = Pointer<Utf8> Function(
+  Pointer<Utf8> configJson,
+  Pointer<Utf8> trackJson,
+);
 
 /// 刮削库句柄：持有 DynamicLibrary + 各函数指针，防止 GC 回收库。
 class ScraperBindings {
@@ -126,6 +134,10 @@ class ScraperBindings {
       .lookupFunction<ScraperFreeStringNative, ScraperFreeStringDart>(
         'archoera_scraper_free_string',
       );
+  late final ScraperScrapeTrackDart _scrapeTrack = _lib
+      .lookupFunction<ScraperScrapeTrackNative, ScraperScrapeTrackDart>(
+        'archoera_scraper_scrape_track',
+      );
 
   /// 读取单文件标签 → JSON 字符串（空字符串表示无结果）。
   String readTagsJson(String filePath) {
@@ -153,6 +165,22 @@ class ScraperBindings {
     } finally {
       calloc.free(pathPtr);
       calloc.free(jsonPtr);
+      if (result.address != 0) _freeString(result);
+    }
+  }
+
+  /// 单曲在线刮削 → JSON 字符串（多源合并结果；不写文件）。
+  String scrapeTrackJson(String configJson, String trackJson) {
+    final configPtr = configJson.toNativeUtf8();
+    final trackPtr = trackJson.toNativeUtf8();
+    Pointer<Utf8> result = nullptr;
+    try {
+      result = _scrapeTrack(configPtr, trackPtr);
+      if (result.address == 0) return '';
+      return result.toDartString();
+    } finally {
+      calloc.free(configPtr);
+      calloc.free(trackPtr);
       if (result.address != 0) _freeString(result);
     }
   }
