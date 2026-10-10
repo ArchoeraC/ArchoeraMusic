@@ -63,9 +63,12 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
   @override
   void initState() {
     super.initState();
-    if (ref.read(neteaseAuthProvider) != null) {
+    if (ref.read(neteaseAuthProvider) == null) return;
+    // 延后到首帧之后：initState 期间修改 provider 会触发 Riverpod 断言。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(neteaseUserPlaylistsProvider.notifier).ensureLoaded();
-    }
+    });
   }
 
   Future<void> _addTo(String playlistId) async {

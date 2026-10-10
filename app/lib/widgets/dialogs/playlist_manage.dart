@@ -53,9 +53,13 @@ class _PlaylistHeaderActionsState extends ConsumerState<PlaylistHeaderActions> {
   @override
   void initState() {
     super.initState();
-    if (ref.read(neteaseAuthProvider) != null) {
+    if (ref.read(neteaseAuthProvider) == null) return;
+    // 延后到首帧之后：initState 期间修改 provider 会触发 Riverpod 的
+    // 「Tried to modify a provider while the widget tree was building」断言。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(neteaseUserPlaylistsProvider.notifier).ensureLoaded();
-    }
+    });
   }
 
   Future<void> _toggleSubscribe(bool subscribed) async {
