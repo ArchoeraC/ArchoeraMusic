@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 愚人节特供「整活模式」回归测试：触发/投降语义 + 滚轮反向。
+/// 愚人节特供「奇怪的特效」回归测试：一次性开启语义 + 会话内激活 + 滚轮反向。
 library;
 
 import 'package:material_ui/material_ui.dart';
@@ -25,238 +25,143 @@ class _StubPrefs extends AppPrefsNotifier {
   AppPrefs build() => _initial;
 
   @override
-  void setAprilFools(bool value) => state = state.copyWithAprilFools(value);
+  void setAprilFoolsUsedYear(int year) =>
+      state = state.copyWithAprilFoolsUsedYear(year);
+}
 
-  @override
-  void setAprilFoolsSurrenderedYear(int year) =>
-      state = state.copyWithAprilFoolsSurrenderedYear(year);
-
-  @override
-  void setAprilFoolsEnabled(bool value) =>
-      state = state.copyWithAprilFoolsEnabled(value);
+/// 构造一个带内存偏好的容器（自动释放）。
+ProviderContainer _container([AppPrefs? prefs]) {
+  final container = ProviderContainer(
+    overrides: [
+      appPrefsProvider.overrideWith(() => _StubPrefs(prefs ?? AppPrefs())),
+    ],
+  );
+  addTearDown(container.dispose);
+  return container;
 }
 
 void main() {
-  group('shouldAutoActivate（纯函数）', () {
-    test('仅 4/1 且当年未投降时激活', () {
-      final DateTime apr1 = DateTime(2030, 4, 1);
-      final DateTime apr2 = DateTime(2030, 4, 2);
-
+  group('shouldOfferAprilFools（纯函数）', () {
+    test('仅 4/1 且今年未开启过时提供开关', () {
       expect(
-        shouldAutoActivate(
-          now: apr1,
-          active: false,
-          surrenderedYear: null,
-          safeMode: false,
-          force: null,
-        ),
+        shouldOfferAprilFools(now: DateTime(2030, 4, 1), usedYear: null),
         isTrue,
-        reason: '4/1 应激活',
+        reason: '4/1 且未用过 → 提供',
       );
       expect(
-        shouldAutoActivate(
-          now: apr2,
-          active: false,
-          surrenderedYear: null,
-          safeMode: false,
-          force: null,
-        ),
+        shouldOfferAprilFools(now: DateTime(2030, 4, 2), usedYear: null),
         isFalse,
-        reason: '非 4/1 不激活',
+        reason: '非 4/1 不提供',
       );
-    });
-
-    test('投降当年不再激活，次年恢复', () {
-      bool at(DateTime now, int? surrendered) => shouldAutoActivate(
-        now: now,
-        active: false,
-        surrenderedYear: surrendered,
-        safeMode: false,
-        force: null,
-      );
-      expect(at(DateTime(2030, 4, 1), 2030), isFalse, reason: '投降当年不激活');
-      expect(at(DateTime(2031, 4, 1), 2030), isTrue, reason: '次年恢复');
-    });
-
-    test('已激活时重申保留（跨重启）', () {
       expect(
-        shouldAutoActivate(
-          now: DateTime(2030, 4, 2),
-          active: true,
-          surrenderedYear: null,
-          safeMode: false,
-          force: null,
-        ),
+        shouldOfferAprilFools(now: DateTime(2030, 4, 1), usedYear: 2030),
+        isFalse,
+        reason: '今年已开启过 → 不再提供',
+      );
+      expect(
+        shouldOfferAprilFools(now: DateTime(2031, 4, 1), usedYear: 2030),
         isTrue,
-        reason: '持久化的激活态应保留',
+        reason: '次年 4/1 重新提供',
       );
     });
 
     test('安全模式禁用；环境覆盖优先', () {
       expect(
-        shouldAutoActivate(
+        shouldOfferAprilFools(
           now: DateTime(2030, 4, 1),
-          active: false,
-          surrenderedYear: null,
+          usedYear: null,
           safeMode: true,
-          force: null,
         ),
         isFalse,
         reason: '安全模式恒关闭',
       );
       expect(
-        shouldAutoActivate(
-          now: DateTime(2030, 4, 2),
-          active: false,
-          surrenderedYear: null,
-          safeMode: false,
+        shouldOfferAprilFools(
+          now: DateTime(2030, 6, 1),
+          usedYear: 2030,
           force: true,
         ),
         isTrue,
-        reason: 'ARCHOERA_EGG_FOOL=1 强制开启',
+        reason: 'ARCHOERA_EGG_FOOL=1 强制提供（调试）',
       );
       expect(
-        shouldAutoActivate(
+        shouldOfferAprilFools(
           now: DateTime(2030, 4, 1),
-          active: true,
-          surrenderedYear: null,
-          safeMode: false,
+          usedYear: null,
           force: false,
         ),
         isFalse,
-        reason: 'ARCHOERA_EGG_FOOL=0 强制关闭优先于已激活',
-      );
-    });
-
-    test('开关关闭后 4/1 也不激活；强制环境仍可覆盖', () {
-      expect(
-        shouldAutoActivate(
-          now: DateTime(2030, 4, 1),
-          active: false,
-          surrenderedYear: null,
-          safeMode: false,
-          force: null,
-          enabled: false,
-        ),
-        isFalse,
-        reason: '关闭开关后永不自动激活',
-      );
-      expect(
-        shouldAutoActivate(
-          now: DateTime(2030, 4, 1),
-          active: false,
-          surrenderedYear: null,
-          safeMode: false,
-          force: true,
-          enabled: false,
-        ),
-        isTrue,
-        reason: 'ARCHOERA_EGG_FOOL=1 调试覆盖优先于开关',
+        reason: 'ARCHOERA_EGG_FOOL=0 强制关闭优先',
       );
     });
   });
 
-  group('AprilFoolsNotifier', () {
-    test('4/1 自动激活并持久化；投降记录年份并关闭；次年恢复', () {
-      final container = ProviderContainer(
-        overrides: [
-          appPrefsProvider.overrideWith(() => _StubPrefs(AppPrefs())),
-        ],
-      );
-      addTearDown(container.dispose);
+  group('AprilFoolsNotifier（一次性开启）', () {
+    test('开启即激活并消耗今年机会；本年不再提供，次年恢复', () {
+      final container = _container();
       final notifier = container.read(aprilFoolsProvider.notifier);
 
-      expect(notifier.active, isFalse);
+      expect(notifier.active, isFalse, reason: '默认关闭');
 
-      notifier.maybeAutoActivate(DateTime(2030, 4, 2));
-      expect(notifier.active, isFalse, reason: '非 4/1 不激活');
-
-      notifier.maybeAutoActivate(DateTime(2030, 4, 1));
-      expect(notifier.active, isTrue);
+      notifier.activate(2030);
+      expect(notifier.active, isTrue, reason: '开启后本次运行内激活');
       expect(
-        container.read(appPrefsProvider).aprilFools,
+        container.read(appPrefsProvider).aprilFoolsUsedYear,
+        2030,
+        reason: '开启即记录消耗年份',
+      );
+
+      expect(
+        notifier.shouldOffer(DateTime(2030, 4, 1)),
+        isFalse,
+        reason: '本年已消耗 → 不再提供',
+      );
+      expect(
+        notifier.shouldOffer(DateTime(2031, 4, 1)),
         isTrue,
-        reason: '激活需持久化',
+        reason: '次年 4/1 恢复',
       );
+    });
 
+    test('投降结束特效，但不退还开启机会', () {
+      final container = _container();
+      final notifier = container.read(aprilFoolsProvider.notifier);
+
+      notifier.activate(2030);
       notifier.surrender();
-      expect(notifier.active, isFalse);
-      final AppPrefs prefs = container.read(appPrefsProvider);
-      expect(prefs.aprilFools, isFalse, reason: '投降后关闭');
+      expect(notifier.active, isFalse, reason: '投降立即恢复');
       expect(
-        prefs.aprilFoolsSurrenderedYear,
-        DateTime.now().year,
-        reason: '投降记录当前年份',
+        container.read(appPrefsProvider).aprilFoolsUsedYear,
+        2030,
+        reason: '投降不退还开启机会',
       );
-
-      notifier.maybeAutoActivate(DateTime(DateTime.now().year, 4, 1));
-      expect(notifier.active, isFalse, reason: '投降当年不再自动激活');
-
-      notifier.maybeAutoActivate(DateTime(DateTime.now().year + 1, 4, 1));
-      expect(notifier.active, isTrue, reason: '次年恢复');
+      expect(notifier.shouldOffer(DateTime(2030, 4, 1)), isFalse);
     });
 
-    test('持久化的激活态跨重启保留（非 4/1 也重申）', () {
-      final container = ProviderContainer(
-        overrides: [
-          appPrefsProvider.overrideWith(
-            () => _StubPrefs(AppPrefs().copyWithAprilFools(true)),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
+    test('特效不落盘：重启（新容器）后不激活，开关也不再出现', () {
+      final container = _container(AppPrefs().copyWithAprilFoolsUsedYear(2030));
       final notifier = container.read(aprilFoolsProvider.notifier);
 
-      expect(notifier.active, isTrue, reason: '启动即读持久化激活态');
-      notifier.maybeAutoActivate(DateTime(2030, 6, 1));
-      expect(notifier.active, isTrue, reason: '非 4/1 也重申保留');
+      expect(notifier.active, isFalse, reason: '会话内状态不跨重启保留');
+      expect(
+        notifier.shouldOffer(DateTime(2030, 4, 1)),
+        isFalse,
+        reason: '重启后开关也不恢复',
+      );
     });
 
-    test('disable 硬关闭但不写投降年份', () {
-      final container = ProviderContainer(
-        overrides: [
-          appPrefsProvider.overrideWith(
-            () => _StubPrefs(AppPrefs().copyWithAprilFools(true)),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
+    test('disable 硬关闭', () {
+      final container = _container();
       final notifier = container.read(aprilFoolsProvider.notifier);
 
+      notifier.activate(2030);
       notifier.disable();
       expect(notifier.active, isFalse);
-      final AppPrefs prefs = container.read(appPrefsProvider);
-      expect(prefs.aprilFools, isFalse);
-      expect(prefs.aprilFoolsSurrenderedYear, isNull, reason: '硬关闭不写投降年份');
-    });
-
-    test('setEnabled(false) 立即关闭；disableForever 永久禁用', () {
-      final container = ProviderContainer(
-        overrides: [
-          appPrefsProvider.overrideWith(
-            () => _StubPrefs(AppPrefs().copyWithAprilFools(true)),
-          ),
-        ],
+      expect(
+        container.read(appPrefsProvider).aprilFoolsUsedYear,
+        2030,
+        reason: '硬关闭不影响已消耗的机会',
       );
-      addTearDown(container.dispose);
-      final notifier = container.read(aprilFoolsProvider.notifier);
-
-      notifier.setEnabled(false);
-      expect(notifier.active, isFalse, reason: '关闭开关应立即恢复');
-      expect(container.read(appPrefsProvider).aprilFoolsEnabled, isFalse);
-
-      // 再开启并整活，然后「以后不再整活」应永久禁用。
-      notifier.setEnabled(true);
-      notifier.maybeAutoActivate(DateTime(2030, 4, 1));
-      expect(notifier.active, isTrue);
-      notifier.disableForever();
-      final AppPrefs prefs = container.read(appPrefsProvider);
-      expect(notifier.active, isFalse);
-      expect(prefs.aprilFoolsEnabled, isFalse, reason: '永久禁用自动激活');
-      expect(prefs.aprilFools, isFalse);
-      // 永久禁用后，即便 4/1 也不再激活。
-      notifier.maybeAutoActivate(DateTime(2030, 4, 1));
-      expect(notifier.active, isFalse);
     });
   });
 
@@ -293,14 +198,10 @@ void main() {
 
   group('AprilFoolsHost', () {
     Future<void> pumpHost(WidgetTester tester, bool active) async {
-      final container = ProviderContainer(
-        overrides: [
-          appPrefsProvider.overrideWith(
-            () => _StubPrefs(AppPrefs().copyWithAprilFools(active)),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
+      final container = _container();
+      if (active) {
+        container.read(aprilFoolsProvider.notifier).activate(2030);
+      }
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
@@ -351,14 +252,8 @@ void main() {
     testWidgets('激活时路由内 ScrollView 滚轮方向取反', (WidgetTester tester) async {
       final controller = ScrollController(initialScrollOffset: 200);
       addTearDown(controller.dispose);
-      final container = ProviderContainer(
-        overrides: [
-          appPrefsProvider.overrideWith(
-            () => _StubPrefs(AppPrefs().copyWithAprilFools(true)),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
+      final container = _container();
+      container.read(aprilFoolsProvider.notifier).activate(2030);
 
       // 真实结构：AprilFoolsHost 在 MaterialApp.builder 中包住 Navigator。
       await tester.pumpWidget(

@@ -3471,24 +3471,15 @@ class AppLocalizationsFr extends AppLocalizations {
       'Exécuter ce programme ? En cas de conséquences irréversibles, vous pouvez fermer le logiciel.';
 
   @override
-  String get settingsSectionEasterEgg => 'Œufs de Pâques';
+  String get settingsWeirdEffects => 'Effets bizarres';
 
   @override
-  String get settingsAprilFools => 'Poisson d\'avril';
+  String get settingsWeirdEffectsOn =>
+      'Blague inversée active — touchez « Je capitule » pour restaurer';
 
   @override
-  String get settingsAprilFoolsOn =>
-      'Active automatiquement le « mode blague » inversé le 1ᵉʳ avril (capitulez à tout moment)';
-
-  @override
-  String get settingsAprilFoolsOff =>
-      'N\'active jamais le mode blague automatiquement';
-
-  @override
-  String get aprilFoolsDisableNoMore => 'Ne plus me faire de blagues';
-
-  @override
-  String get aprilFoolsDisabledToast => 'D\'accord, plus de blagues.';
+  String get settingsWeirdEffectsOff =>
+      'N\'apparaît que le 1ᵉʳ avril ; une fois activé, disparaît jusqu\'au prochain poisson d\'avril';
 
   @override
   String get aprilFoolsSurrender => 'Je capitule 🙌';
@@ -3705,7 +3696,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      'Ce logiciel intègre la police suivante :\n· MiSans (© Xiaomi, utilisée conformément à l\'accord de licence de propriété intellectuelle de la police MiSans)';
+      'Ce logiciel intègre les polices suivantes :\n· MiSans (© Xiaomi, selon l\'accord de licence de propriété intellectuelle de la police MiSans)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (police d\'icônes maison ; glyphes de MingCute / Tabler / Lucide)\n· EtaMark (police de marque maison)\n\nLes textes officiels complets des licences figurent ci-dessous.';
 
   @override
   String get commonNoLyrics => 'Pas de paroles';

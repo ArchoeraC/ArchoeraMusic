@@ -3257,22 +3257,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get easterEggGateBody => '确定执行此程序？如果造成了不可逆后果，你可以选择关闭软件';
 
   @override
-  String get settingsSectionEasterEgg => '彩蛋';
+  String get settingsWeirdEffects => '奇怪的特效';
 
   @override
-  String get settingsAprilFools => '愚人节整活';
+  String get settingsWeirdEffectsOn => '已开启「倒放」整活，点「我投降」可恢复';
 
   @override
-  String get settingsAprilFoolsOn => '4 月 1 日自动开启「倒放」整活，可随时投降关闭';
-
-  @override
-  String get settingsAprilFoolsOff => '不会自动开启整活模式';
-
-  @override
-  String get aprilFoolsDisableNoMore => '以后不再整活';
-
-  @override
-  String get aprilFoolsDisabledToast => '好的，以后不再整活';
+  String get settingsWeirdEffectsOff => '仅愚人节当天出现，开启一次后消失，直到下一次愚人节';
 
   @override
   String get aprilFoolsSurrender => '我投降 🙌';
@@ -3480,7 +3471,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）';
+      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建图标字体，字形来自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌标识字体）\n\n下方为各字体与字形的官方许可正文原文。';
 
   @override
   String get commonNoLyrics => '暂无歌词';
@@ -8834,22 +8825,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get easterEggGateBody => '确定执行此程序？如果造成了不可逆后果，你可以选择关闭软件';
 
   @override
-  String get settingsSectionEasterEgg => '彩蛋';
+  String get settingsWeirdEffects => '奇怪的特效';
 
   @override
-  String get settingsAprilFools => '愚人节整活';
+  String get settingsWeirdEffectsOn => '已开启「倒放」整活，点「我投降」可恢复';
 
   @override
-  String get settingsAprilFoolsOn => '4 月 1 日自动开启「倒放」整活，可随时投降关闭';
-
-  @override
-  String get settingsAprilFoolsOff => '不会自动开启整活模式';
-
-  @override
-  String get aprilFoolsDisableNoMore => '以后不再整活';
-
-  @override
-  String get aprilFoolsDisabledToast => '好的，以后不再整活';
+  String get settingsWeirdEffectsOff => '仅愚人节当天出现，开启一次后消失，直到下一次愚人节';
 
   @override
   String get aprilFoolsSurrender => '我投降 🙌';
@@ -9057,7 +9039,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsFontCreditsText =>
-      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n\n上述字体仅用于界面文字渲染。若您再分发本软件，请一并遵守相应字体的许可条款。';
+      '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建图标字体，字形来自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌标识字体）\n\n下方为各字体与字形的官方许可正文原文。';
 
   @override
   String get commonNoLyrics => '暂无歌词';
@@ -14411,22 +14393,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get easterEggGateBody => '確定執行此程式？如果造成了不可逆後果，你可以選擇關閉軟體';
 
   @override
-  String get settingsSectionEasterEgg => '彩蛋';
+  String get settingsWeirdEffects => '奇怪的特效';
 
   @override
-  String get settingsAprilFools => '愚人節整活';
+  String get settingsWeirdEffectsOn => '已開啟「倒放」整活，點「我投降」可恢復';
 
   @override
-  String get settingsAprilFoolsOn => '4 月 1 日自動開啟「倒放」整活，可隨時投降關閉';
-
-  @override
-  String get settingsAprilFoolsOff => '不會自動開啟整活模式';
-
-  @override
-  String get aprilFoolsDisableNoMore => '以後不再整活';
-
-  @override
-  String get aprilFoolsDisabledToast => '好的，以後不再整活';
+  String get settingsWeirdEffectsOff => '僅愚人節當天出現，開啟一次後消失，直到下一次愚人節';
 
   @override
   String get aprilFoolsSurrender => '我投降 🙌';
@@ -14634,7 +14607,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsFontCreditsText =>
-      '本軟體內建以下字體：\n· MiSans（© Xiaomi，依據《MiSans 字體知識產權許可協議》授權使用）';
+      '本軟體內建以下字體：\n· MiSans（© Xiaomi，依據《MiSans 字體知識產權許可協議》授權使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建圖示字體，字形來自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌標識字體）\n\n下方為各字體與字形的官方授權條款原文。';
 
   @override
   String get commonNoLyrics => '暫無歌詞';

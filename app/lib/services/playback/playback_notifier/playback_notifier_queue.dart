@@ -324,7 +324,7 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     setRepeatMode(next);
   }
 
-  /// 反向循环切换（整活模式 UI 专用）：切到 [repeatModeCycle] 中的**前一项**。
+  /// 反向循环切换（奇怪的特效 UI 专用）：切到 [repeatModeCycle] 中的**前一项**。
   /// 不改动 [cycleRepeatMode]，自动续播等内部路径仍走正向。
   void cycleRepeatModeReverse() {
     final cycle = repeatModeCycle;

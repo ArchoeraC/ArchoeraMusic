@@ -6058,41 +6058,23 @@ abstract class AppLocalizations {
   /// **'确定执行此程序？如果造成了不可逆后果，你可以选择关闭软件'**
   String get easterEggGateBody;
 
-  /// No description provided for @settingsSectionEasterEgg.
+  /// No description provided for @settingsWeirdEffects.
   ///
   /// In zh_CN, this message translates to:
-  /// **'彩蛋'**
-  String get settingsSectionEasterEgg;
+  /// **'奇怪的特效'**
+  String get settingsWeirdEffects;
 
-  /// No description provided for @settingsAprilFools.
+  /// No description provided for @settingsWeirdEffectsOn.
   ///
   /// In zh_CN, this message translates to:
-  /// **'愚人节整活'**
-  String get settingsAprilFools;
+  /// **'已开启「倒放」整活，点「我投降」可恢复'**
+  String get settingsWeirdEffectsOn;
 
-  /// No description provided for @settingsAprilFoolsOn.
+  /// No description provided for @settingsWeirdEffectsOff.
   ///
   /// In zh_CN, this message translates to:
-  /// **'4 月 1 日自动开启「倒放」整活，可随时投降关闭'**
-  String get settingsAprilFoolsOn;
-
-  /// No description provided for @settingsAprilFoolsOff.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'不会自动开启整活模式'**
-  String get settingsAprilFoolsOff;
-
-  /// No description provided for @aprilFoolsDisableNoMore.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'以后不再整活'**
-  String get aprilFoolsDisableNoMore;
-
-  /// No description provided for @aprilFoolsDisabledToast.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'好的，以后不再整活'**
-  String get aprilFoolsDisabledToast;
+  /// **'仅愚人节当天出现，开启一次后消失，直到下一次愚人节'**
+  String get settingsWeirdEffectsOff;
 
   /// No description provided for @aprilFoolsSurrender.
   ///
@@ -6463,7 +6445,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsFontCreditsText.
   ///
   /// In zh_CN, this message translates to:
-  /// **'本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n\n上述字体仅用于界面文字渲染。若您再分发本软件，请一并遵守相应字体的许可条款。'**
+  /// **'本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建图标字体，字形来自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌标识字体）\n\n下方为各字体与字形的官方许可正文原文。'**
   String get settingsFontCreditsText;
 
   /// No description provided for @commonNoLyrics.

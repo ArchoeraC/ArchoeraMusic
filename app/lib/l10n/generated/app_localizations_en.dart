@@ -3402,23 +3402,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Run this program? If it causes irreversible consequences, you may choose to close the software.';
 
   @override
-  String get settingsSectionEasterEgg => 'Easter eggs';
+  String get settingsWeirdEffects => 'Strange effects';
 
   @override
-  String get settingsAprilFools => 'April Fools prank';
+  String get settingsWeirdEffectsOn =>
+      'Reversed prank active — tap \'I surrender\' to restore';
 
   @override
-  String get settingsAprilFoolsOn =>
-      'Auto-enables the reversed \'prank mode\' on Apr 1 (surrender any time)';
-
-  @override
-  String get settingsAprilFoolsOff => 'Never auto-enables prank mode';
-
-  @override
-  String get aprilFoolsDisableNoMore => 'Don\'t prank me again';
-
-  @override
-  String get aprilFoolsDisabledToast => 'Got it — no more pranks.';
+  String get settingsWeirdEffectsOff =>
+      'Appears only on Apr 1; once enabled it vanishes until next April Fools';
 
   @override
   String get aprilFoolsSurrender => 'I surrender 🙌';
@@ -3634,7 +3626,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      'This software bundles the following font:\n· MiSans (© Xiaomi, used under the MiSans Font Intellectual Property License Agreement)';
+      'This software bundles the following fonts:\n· MiSans (© Xiaomi, under the MiSans Font Intellectual Property License Agreement)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (self-built icon font; glyphs from MingCute / Tabler / Lucide)\n· EtaMark (self-built brand-mark font)\n\nFull official license texts follow below.';
 
   @override
   String get commonNoLyrics => 'No lyrics';

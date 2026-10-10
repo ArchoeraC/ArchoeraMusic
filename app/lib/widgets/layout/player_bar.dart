@@ -50,7 +50,7 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<bool>(
     valueListenable: aprilFoolsActiveNotifier,
-    // 整活模式切换时重建播放条（上一首/下一首按钮互换）。
+    // 奇怪的特效激活时重建播放条（上一首/下一首按钮互换）。
     builder: (BuildContext context, bool _, Widget? _) =>
         _buildPlayerBar(context),
   );

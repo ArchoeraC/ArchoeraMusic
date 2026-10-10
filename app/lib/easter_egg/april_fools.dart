@@ -1,26 +1,25 @@
 part of 'easter_egg.dart';
 
-/// 愚人节特供「整活模式」的全局开关 + 触发/投降语义。
+/// 愚人节特供「奇怪的特效」的**会话内**全局开关 + 一次性开启语义。
 ///
-/// 与十个「千万别点」不可逆彩蛋不同：本模式**可逆**——激活后应用「倒放」
-/// （整屏左右镜像 + 操作反向），并持久化保留，直到用户点击浮动的
-/// 「我投降」按钮（[surrender]）才恢复。
+/// 与十个「千万别点」不可逆彩蛋不同：本特效**可逆**（点「我投降」即恢复），但
+/// 开启机会**只有一次**——仅在 4/1 当天于设置页出现，开启后设置项立即消失；
+/// 且无论手动关闭、重启应用还是点击「我投降」，设置项都不会再出现，直到次年
+/// 4/1。特效本身不落盘：重启应用即结束（见 [shouldOfferAprilFools] 与
+/// [aprilFoolsUsedYear]，后者只记录「今年的机会是否已被消耗」）。
 class AprilFoolsNotifier extends StateNotifier<bool> {
-  AprilFoolsNotifier(this._ref) : super(_initialActive(_ref));
+  AprilFoolsNotifier(this._ref) : super(_initialActive());
 
   final Ref _ref;
 
-  /// 首次构造时的激活态：安全模式/环境覆盖优先，否则读持久化偏好。
-  static bool _initialActive(Ref ref) {
+  /// 首次构造时的激活态：仅安全模式 / 环境覆盖参与（特效跨重启不保留）。
+  static bool _initialActive() {
     if (kEasterEggSafeMode) return false;
-    final force = _forceEnv();
-    if (force != null) return force;
-    final prefs = ref.read(appPrefsProvider);
-    return prefs.aprilFoolsEnabled && prefs.aprilFools;
+    return _forceEnv() ?? false;
   }
 
   /// 环境覆盖：`ARCHOERA_EGG_FOOL=1` 强制开启 / `=0` 强制关闭；
-  /// 其它值或未设置返回 null（走正常触发逻辑）。
+  /// 其它值或未设置返回 null（走正常逻辑）。
   static bool? _forceEnv() {
     final raw = Platform.environment['ARCHOERA_EGG_FOOL'];
     if (raw == '1') return true;
@@ -28,68 +27,38 @@ class AprilFoolsNotifier extends StateNotifier<bool> {
     return null;
   }
 
-  /// 整活模式是否激活（= [state]）。
+  /// 特效是否激活（= [state]）。
   bool get active => state;
 
-  /// 依当前时间与持久化状态决定是否（重新）激活；幂等。
-  ///
-  /// 4/1 且当年未投降 → 激活；已激活 → 重申保留；投降/非 4/1 → 关闭。
-  void maybeAutoActivate(DateTime now) {
-    final prefs = _ref.read(appPrefsProvider);
-    final desired = shouldAutoActivate(
-      now: now,
-      active: state,
-      surrenderedYear: prefs.aprilFoolsSurrenderedYear,
-      safeMode: kEasterEggSafeMode,
-      force: _forceEnv(),
-      enabled: prefs.aprilFoolsEnabled,
-    );
-    if (desired == state) return;
-    state = desired;
-    _persist(active: desired);
+  /// 设置页是否应显示「奇怪的特效」开关（仅 4/1 且今年尚未开启过）。
+  bool shouldOffer(DateTime now) => shouldOfferAprilFools(
+    now: now,
+    usedYear: _ref.read(appPrefsProvider).aprilFoolsUsedYear,
+    safeMode: kEasterEggSafeMode,
+    force: _forceEnv(),
+  );
+
+  /// 用户开启「奇怪的特效」：本次运行内激活，并**消耗**今年的开启机会
+  /// （写入 [year] 后设置项立即消失；重启 / 投降都不会令其恢复）。
+  void activate(int year) {
+    if (state) return;
+    state = true;
+    _ref.read(appPrefsProvider.notifier).setAprilFoolsUsedYear(year);
   }
 
-  /// 用户点击「我投降」：关闭整活模式、记录投降年份（当年不再自动开启），
-  /// 并弹出「愚人节快乐」提示。
+  /// 用户点击「我投降」：关闭特效并弹出「愚人节快乐」提示。
+  ///
+  /// 不恢复开启机会——设置项直到次年 4/1 才会再次出现。
   void surrender() {
-    final year = DateTime.now().year;
+    if (!state) return;
     state = false;
-    _persist(active: false, surrenderedYear: year);
     toast(_ref.read(l10nProvider).aprilFoolsSurrenderToast);
   }
 
-  /// 硬关闭（不记录投降年份）：安全模式 / 内部清理用。
+  /// 硬关闭（不写偏好）：安全模式 / 内部清理用。
   void disable() {
     if (!state) return;
     state = false;
-    _persist(active: false);
-  }
-
-  /// 设置页开关：是否允许整活。关闭时若正在整活也立即恢复。
-  void setEnabled(bool value) {
-    final notifier = _ref.read(appPrefsProvider.notifier);
-    notifier.setAprilFoolsEnabled(value);
-    if (!value && state) {
-      state = false;
-      notifier.setAprilFools(false);
-    }
-  }
-
-  /// 「以后不再整活」：立即关闭并永久禁用自动激活。
-  void disableForever() {
-    state = false;
-    _ref.read(appPrefsProvider.notifier)
-      ..setAprilFools(false)
-      ..setAprilFoolsEnabled(false);
-    toast(_ref.read(l10nProvider).aprilFoolsDisabledToast);
-  }
-
-  void _persist({bool? active, int? surrenderedYear}) {
-    final notifier = _ref.read(appPrefsProvider.notifier);
-    if (active != null) notifier.setAprilFools(active);
-    if (surrenderedYear != null) {
-      notifier.setAprilFoolsSurrenderedYear(surrenderedYear);
-    }
   }
 }
 
@@ -97,7 +66,7 @@ final aprilFoolsProvider = StateNotifierProvider<AprilFoolsNotifier, bool>(
   (ref) => AprilFoolsNotifier(ref),
 );
 
-/// 整活模式的根宿主：包在整棵 UI（含 Navigator）外层。
+/// 「奇怪的特效」的根宿主：包在整棵 UI（含 Navigator）外层。
 ///
 /// 激活时：
 ///   - 整屏左右镜像（[Transform] + `transformHitTests: true`，点击跟随镜像）；
@@ -125,10 +94,6 @@ class _AprilFoolsHostState extends ConsumerState<AprilFoolsHost> {
     super.initState();
     // 与裸 notifier 初始对齐，供叶子组件在首帧即读到正确状态。
     aprilFoolsActiveNotifier.value = ref.read(aprilFoolsProvider);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ref.read(aprilFoolsProvider.notifier).maybeAutoActivate(DateTime.now());
-    });
   }
 
   @override
@@ -195,28 +160,12 @@ class _AprilFoolsHostState extends ConsumerState<AprilFoolsHost> {
               alignment: Alignment.bottomCenter,
               child: Material(
                 type: MaterialType.transparency,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SButton(
-                      label: context.l10n.aprilFoolsSurrender,
-                      variant: SButtonVariant.error,
-                      size: SButtonSize.large,
-                      onPressed: () =>
-                          ref.read(aprilFoolsProvider.notifier).surrender(),
-                    ),
-                    const SizedBox(height: 4),
-                    // 整活态下界面是反的、设置很难进；此处直接提供「永久关闭」。
-                    TextButton(
-                      onPressed: () => ref
-                          .read(aprilFoolsProvider.notifier)
-                          .disableForever(),
-                      child: Text(
-                        context.l10n.aprilFoolsDisableNoMore,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
+                child: SButton(
+                  label: context.l10n.aprilFoolsSurrender,
+                  variant: SButtonVariant.error,
+                  size: SButtonSize.large,
+                  onPressed: () =>
+                      ref.read(aprilFoolsProvider.notifier).surrender(),
                 ),
               ),
             ),
@@ -227,7 +176,7 @@ class _AprilFoolsHostState extends ConsumerState<AprilFoolsHost> {
   }
 }
 
-/// 整活模式的全局滚轮反向层（覆盖在整棵 UI 之上，命中测试最先到达）。
+/// 「奇怪的特效」的全局滚轮反向层（覆盖在整棵 UI 之上，命中测试最先到达）。
 ///
 /// 原理：`PointerSignalResolver` 只执行**第一个**注册的回调；本层位于 Stack
 /// 顶层，指针信号命中路径最先到达，注册回调即抢在下方 `Scrollable` 之前。

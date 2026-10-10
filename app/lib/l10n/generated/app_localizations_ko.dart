@@ -3298,22 +3298,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 프로그램을 실행하시겠습니까? 되돌릴 수 없는 결과가 발생하면 소프트웨어를 종료할 수 있습니다.';
 
   @override
-  String get settingsSectionEasterEgg => '이스터 에그';
+  String get settingsWeirdEffects => '이상한 효과';
 
   @override
-  String get settingsAprilFools => '만우절 장난';
+  String get settingsWeirdEffectsOn => '거꾸로 장난 활성화 — 항복합니다를 누르면 복구됩니다';
 
   @override
-  String get settingsAprilFoolsOn => '4월 1일에 거꾸로 장난 모드를 자동으로 켭니다(언제든 항복 가능)';
-
-  @override
-  String get settingsAprilFoolsOff => '장난 모드를 자동으로 켜지 않음';
-
-  @override
-  String get aprilFoolsDisableNoMore => '앞으로 장난하지 마';
-
-  @override
-  String get aprilFoolsDisabledToast => '알겠어요, 이제 장난 안 할게요.';
+  String get settingsWeirdEffectsOff => '만우절 당일에만 나타나며, 한 번 켜면 다음 만우절까지 사라집니다';
 
   @override
   String get aprilFoolsSurrender => '항복합니다 🙌';
@@ -3521,7 +3512,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      '이 소프트웨어에는 다음 글꼴이 포함되어 있습니다.\n· MiSans (© Xiaomi, MiSans 글꼴 지식재산권 허락 계약에 따라 사용)';
+      '이 소프트웨어에는 다음 글꼴이 포함되어 있습니다:\n· MiSans (© Xiaomi, MiSans 글꼴 지식재산권 허락 계약에 따라 사용)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (자체 제작 아이콘 글꼴; 글리프 출처 MingCute / Tabler / Lucide)\n· EtaMark (자체 제작 브랜드 마크 글꼴)\n\n아래에 각 글꼴·글리프의 공식 라이선스 전문을 수록합니다.';
 
   @override
   String get commonNoLyrics => '가사 없음';

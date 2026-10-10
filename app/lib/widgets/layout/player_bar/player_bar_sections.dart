@@ -156,7 +156,7 @@ extension _PlayerBarSections on _PlayerBarState {
     required bool hasContent,
   }) {
     final l10n = context.l10n;
-    // 整活模式：上一首 / 下一首按钮互换（仅 UI 处理层，内部自动续播不受影响）。
+    // 奇怪的特效：上一首 / 下一首按钮互换（仅 UI 处理层，内部自动续播不受影响）。
     final prank = aprilFoolsActiveNotifier.value;
     return Row(
       mainAxisSize: MainAxisSize.min,
