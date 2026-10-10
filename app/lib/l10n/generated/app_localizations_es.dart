@@ -113,6 +113,30 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tagEditorDuration => 'Duración';
 
   @override
+  String get tagEditorScrape => 'Buscar en línea';
+
+  @override
+  String get tagEditorScraping => 'Buscando…';
+
+  @override
+  String get tagEditorScrapeHint =>
+      'Busca en las fuentes activadas; el resultado rellena los campos de abajo antes de guardar';
+
+  @override
+  String get tagEditorScrapeDone => 'Resultado aplicado';
+
+  @override
+  String get tagEditorScrapeNotFound =>
+      'No se encontraron metadatos en línea coincidentes';
+
+  @override
+  String get tagEditorScrapeFailed => 'Error al buscar';
+
+  @override
+  String get tagEditorScrapeNeedQuery =>
+      'Introduce primero un título o artista';
+
+  @override
   String get menuBatchEditMetadata => 'Editar metadatos por lotes';
 
   @override

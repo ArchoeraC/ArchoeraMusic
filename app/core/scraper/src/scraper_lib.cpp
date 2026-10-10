@@ -266,17 +266,9 @@ static int parseInt(const json& j, const char* key, int dflt) {
     return (it != j.end() && it->is_number_integer()) ? it->get<int>() : dflt;
 }
 
-/// 解析 config JSON → ScraperConfig；失败返回 false 并写 err
-static bool parseConfig(const char* configJson, ScraperHandle* h) {
-    json j;
-    try {
-        j = json::parse(configJson);
-    } catch (const json::exception& e) {
-        h->errbuf = std::string("config JSON 解析失败: ") + e.what();
-        return false;
-    }
-
-    scraper::ScraperConfig& c = h->cfg;
+/// 解析 config JSON 的通用字段（目录 / 数据源 / 写入 / 高级参数）到 ScraperConfig。
+/// 供批量刮削句柄与单曲刮削共用；mode/organize 等句柄专用字段不在此处理。
+static void applyScraperConfigJson(const json& j, scraper::ScraperConfig& c) {
     // 目录
     if (j.contains("dirs") && j["dirs"].is_array()) {
         for (const auto& d : j["dirs"]) {
@@ -315,6 +307,20 @@ static bool parseConfig(const char* configJson, ScraperHandle* h) {
     c.maxScanFiles = parseInt(j, "maxScanFiles", c.maxScanFiles);
     c.maxFileSizeMb = parseInt(j, "maxFileSizeMb", c.maxFileSizeMb);
     c.maxScanErrors = parseInt(j, "maxScanErrors", c.maxScanErrors);
+}
+
+/// 解析 config JSON → ScraperConfig；失败返回 false 并写 err
+static bool parseConfig(const char* configJson, ScraperHandle* h) {
+    json j;
+    try {
+        j = json::parse(configJson);
+    } catch (const json::exception& e) {
+        h->errbuf = std::string("config JSON 解析失败: ") + e.what();
+        return false;
+    }
+
+    scraper::ScraperConfig& c = h->cfg;
+    applyScraperConfigJson(j, c);
 
     std::string mode = parseStr(j, "mode", "once");
     h->daemonMode = (mode == "daemon");
@@ -962,7 +968,102 @@ ARCHOERA_SCRAPER_API const char* archoera_scraper_write_tags(const char* filePat
     return tagJsonDup(json{{"ok", true}});
 }
 
-/* 释放上面两函数返回的 JSON 字符串。 */
+/* 单曲在线刮削（编辑元数据用）：多源查询并返回合并后的最佳结果。
+ *
+ * configJson：数据源 / 写入开关子集（与 archoera_scraper_create 的 config
+ *   同构；仅读取 use*、embedCover、embedLyrics、concurrentWorkers、
+ *   requestTimeoutMs、rateLimitMs、userAgent、acoustid* 等字段；不需要
+ *   scraperDbPath / dirs）。embedCover / embedLyrics 决定是否抓封面 / 歌词。
+ * trackJson：查询依据 {"id","title","artist","album","albumArtist",
+ *   "durationMs","filePath","mbid","albumMbid","artistMbid","isrc"}。
+ *
+ * 返回 JSON（malloc 分配，调用方必须 archoera_scraper_free_string）：
+ *   {"ok":true,"found":bool,"title":..,"artist":..,"album":..,"albumArtist":..,
+ *    "composer":..,"genre":..,"trackNumber":int,"discNumber":int,"year":int,
+ *    "lyrics":..,"coverMime":..,"coverBase64":..,"mbid":..,"isrc":..,
+ *    "sources":[...]}
+ *   {"ok":false,"error":..}
+ *
+ * 同步阻塞执行网络查询：不写音频文件、不依赖 scraper-state.db，宿主应在后台
+ * isolate 调用以避免阻塞 UI 线程。 */
+ARCHOERA_SCRAPER_API const char* archoera_scraper_scrape_track(
+        const char* configJson, const char* trackJson) {
+    if (!trackJson) return tagJsonError("trackJson 为空");
+
+    json cfgJ = json::object();
+    if (configJson) {
+        try {
+            cfgJ = json::parse(configJson);
+        } catch (const json::exception& e) {
+            return tagJsonError(std::string("config JSON 解析失败: ") + e.what());
+        }
+    }
+    json tJ;
+    try {
+        tJ = json::parse(trackJson);
+    } catch (const json::exception& e) {
+        return tagJsonError(std::string("track JSON 解析失败: ") + e.what());
+    }
+    if (!tJ.is_object()) return tagJsonError("track JSON 必须为对象");
+
+    scraper::ScraperConfig cfg;
+    applyScraperConfigJson(cfgJ, cfg);
+
+    scraper::TrackInfo track;
+    track.id = parseStr(tJ, "id", "");
+    track.title = parseStr(tJ, "title", "");
+    track.artist = parseStr(tJ, "artist", "");
+    track.album = parseStr(tJ, "album", "");
+    track.albumArtist = parseStr(tJ, "albumArtist", "");
+    track.durationMs = parseInt(tJ, "durationMs", 0);
+    track.filePath = parseStr(tJ, "filePath", "");
+    track.mbid = parseStr(tJ, "mbid", "");
+    track.albumMbid = parseStr(tJ, "albumMbid", "");
+    track.artistMbid = parseStr(tJ, "artistMbid", "");
+    track.isrc = parseStr(tJ, "isrc", "");
+
+    if (track.title.empty() && track.artist.empty()) {
+        return tagJsonError("曲目标题与艺术家均为空，无法查询");
+    }
+
+    scraper::ScrapeResult r;
+    try {
+        scraper::MetadataResolver resolver(cfg);
+        r = resolver.resolve(track);
+    } catch (const std::exception& e) {
+        return tagJsonError(std::string("刮削失败: ") + e.what());
+    } catch (...) {
+        return tagJsonError("刮削失败: unknown fatal error");
+    }
+    // 与批量刮削一致：写标签前统一删除站点推广字段 / 歌词行。
+    scraper::sanitize::sanitizeResult(r);
+
+    const bool found = r.title.has_value() || r.artist.has_value() ||
+                       r.album.has_value() || r.mbid.has_value();
+
+    json out;
+    out["ok"] = true;
+    out["found"] = found;
+    out["title"] = r.title.value_or("");
+    out["artist"] = r.artist.value_or("");
+    out["album"] = r.album.value_or("");
+    out["albumArtist"] = r.albumArtist.value_or("");
+    out["composer"] = r.composer.value_or("");
+    out["genre"] = r.genre.value_or("");
+    out["trackNumber"] = r.trackNumber.value_or(0);
+    out["discNumber"] = r.discNumber.value_or(0);
+    out["year"] = r.year.value_or(0);
+    out["lyrics"] = r.lyrics.value_or("");
+    out["coverMime"] = r.coverMime;
+    out["coverBase64"] =
+        r.coverData.empty() ? std::string() : tagB64Encode(r.coverData);
+    out["mbid"] = r.mbid.value_or("");
+    out["isrc"] = r.isrc.value_or("");
+    out["sources"] = r.scrapedSources;
+    return tagJsonDup(out);
+}
+
+/* 释放上面各函数返回的 JSON 字符串。 */
 ARCHOERA_SCRAPER_API void archoera_scraper_free_string(const char* s) {
     std::free(const_cast<char*>(s));
 }

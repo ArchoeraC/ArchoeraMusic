@@ -113,6 +113,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagEditorDuration => 'Duration';
 
   @override
+  String get tagEditorScrape => 'Scrape online';
+
+  @override
+  String get tagEditorScraping => 'Scraping…';
+
+  @override
+  String get tagEditorScrapeHint =>
+      'Match against enabled music sources; results fill the fields below for review before saving';
+
+  @override
+  String get tagEditorScrapeDone => 'Scrape results applied';
+
+  @override
+  String get tagEditorScrapeNotFound => 'No matching online metadata found';
+
+  @override
+  String get tagEditorScrapeFailed => 'Scrape failed';
+
+  @override
+  String get tagEditorScrapeNeedQuery => 'Enter a title or artist first';
+
+  @override
   String get menuBatchEditMetadata => 'Batch edit metadata';
 
   @override

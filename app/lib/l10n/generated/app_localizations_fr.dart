@@ -114,6 +114,30 @@ class AppLocalizationsFr extends AppLocalizations {
   String get tagEditorDuration => 'Durée';
 
   @override
+  String get tagEditorScrape => 'Récupérer en ligne';
+
+  @override
+  String get tagEditorScraping => 'Récupération…';
+
+  @override
+  String get tagEditorScrapeHint =>
+      'Recherche sur les sources activées ; le résultat remplit les champs ci-dessous avant l\'enregistrement';
+
+  @override
+  String get tagEditorScrapeDone => 'Résultat appliqué';
+
+  @override
+  String get tagEditorScrapeNotFound =>
+      'Aucune métadonnée en ligne correspondante';
+
+  @override
+  String get tagEditorScrapeFailed => 'Échec de la récupération';
+
+  @override
+  String get tagEditorScrapeNeedQuery =>
+      'Saisissez d\'abord un titre ou un artiste';
+
+  @override
   String get menuBatchEditMetadata => 'Modifier les métadonnées par lot';
 
   @override

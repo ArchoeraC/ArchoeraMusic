@@ -110,6 +110,28 @@ class AppLocalizationsKo extends AppLocalizations {
   String get tagEditorDuration => '재생 시간';
 
   @override
+  String get tagEditorScrape => '온라인 스크래핑';
+
+  @override
+  String get tagEditorScraping => '스크래핑 중…';
+
+  @override
+  String get tagEditorScrapeHint =>
+      '사용 설정된 음원에서 검색하고, 결과를 아래 입력란에 채워 저장 전에 확인합니다';
+
+  @override
+  String get tagEditorScrapeDone => '스크래핑 결과를 적용했습니다';
+
+  @override
+  String get tagEditorScrapeNotFound => '일치하는 온라인 메타데이터를 찾지 못했습니다';
+
+  @override
+  String get tagEditorScrapeFailed => '스크래핑 실패';
+
+  @override
+  String get tagEditorScrapeNeedQuery => '먼저 제목이나 아티스트를 입력하세요';
+
+  @override
   String get menuBatchEditMetadata => '메타데이터 일괄 편집';
 
   @override
