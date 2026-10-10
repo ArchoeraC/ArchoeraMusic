@@ -53,11 +53,11 @@ extension _TrackListDialogActions on _TrackListDialogState {
   }
 
   void _onTrackMenu(Track track, Offset global) {
-    final listId = widget.neteasePlaylistId;
+    final listId = widget.playlistId;
     final canRemove =
         listId != null &&
-        track.source == 'netease' &&
-        ref.read(neteaseUserPlaylistsProvider).isOwned(listId);
+        track.source == widget.playlistSource &&
+        readUserPlaylists(ref, widget.playlistSource).isOwned(listId);
     showTrackContextMenu(
       context,
       ref: ref,
@@ -81,17 +81,17 @@ extension _TrackListDialogActions on _TrackListDialogState {
   Future<void> _batchAddToPlaylist(List<Track> tracks) =>
       showPlaylistPickerDialog(
         context,
+        source: widget.playlistSource,
         tracks: tracks,
-        excludeId: widget.neteasePlaylistId,
+        excludeId: widget.playlistId,
       );
 
   /// 从当前自建歌单移除该曲目并重载列表。
   Future<void> _removeFromPlaylist(String playlistId, Track track) async {
+    final ops = userPlaylistsOps(ref, widget.playlistSource);
+    if (ops == null) return;
     try {
-      await ref.read(neteaseUserPlaylistsProvider.notifier).removeTracks(
-        playlistId,
-        [track.id],
-      );
+      await ops.removeTracks(playlistId, [track.id]);
       if (!mounted) return;
       toast(context.l10n.playlistRemoveDone);
       await _reload();

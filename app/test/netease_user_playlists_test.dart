@@ -97,11 +97,11 @@ void main() {
     final s = container.read(neteaseUserPlaylistsProvider);
 
     expect(s.created.map((p) => p.id).toList(), ['liked', 'own1']);
-    expect(s.subscribed.map((p) => p.id).toList(), ['col1']);
+    expect(s.collected.map((p) => p.id).toList(), ['col1']);
     expect(s.isOwned('own1'), isTrue);
     expect(s.isOwned('col1'), isFalse);
-    expect(s.isSubscribed('col1'), isTrue);
-    expect(s.isSubscribed('liked'), isFalse);
+    expect(s.isCollected('col1'), isTrue);
+    expect(s.isCollected('liked'), isFalse);
     expect(s.likedPlaylistId, 'liked');
   });
 
@@ -115,7 +115,7 @@ void main() {
     await notifier.ensureLoaded();
 
     final rev0 = container.read(favoritesRevisionProvider);
-    await notifier.subscribe('col1', subscribe: false);
+    await notifier.setCollected('col1', collected: false);
     expect(fake.log, contains('subscribe:col1:false'));
     expect(container.read(favoritesRevisionProvider), rev0 + 1);
   });
