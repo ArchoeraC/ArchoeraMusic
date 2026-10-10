@@ -14,15 +14,13 @@ void showTrackContextMenu(
   Future<void> Function(Track track)? onToggleLike,
   List<SContextMenuItem> extra = const [],
 }) {
-  final isOnline =
-      track.source == 'netease' ||
-      track.source == 'kugou' ||
-      track.source == 'neko';
-  // 可下载来源：KG/NT（Rust 自研）+ QQMusic/Neko（Dart 播放管线回退）。
-  final canDownload = isOnline || track.source == 'qqmusic';
-  // 可查看歌手 / 媒体详情：QQ 评论/歌手详情适配已接通，一并纳入（QQ 的
-  // 收藏/评论入口暂仍按 [isOnline] 保持既有行为）。
-  final canViewArtist = isOnline || track.source == 'qqmusic';
+  // 菜单项可见性由音源注册表声明（不再硬编码平台列表）：
+  // - 「红心 / 评论 / 添加到歌单」：NT / KG / Neko；
+  // - 「查看歌手 / 详情 / 下载」：NT / KG / QQ / Neko。
+  final sp = sourcePlatform(track.source);
+  final likeComment = sp.trackMenuLikeComment;
+  final canDownload = sp.trackMenuArtistDownload;
+  final canViewArtist = sp.trackMenuArtistDownload;
   final liked = ref.read(likeControllerProvider).isLiked(track);
   final toggle = onToggleLike ?? (t) => _defaultToggleLike(context, ref, t);
   final l10n = context.l10n;
@@ -44,7 +42,7 @@ void showTrackContextMenu(
           toast(l10n.toastAddedToQueue);
         },
       ),
-      if (isOnline) ...[
+      if (likeComment) ...[
         SContextMenuItem.divider(),
         SContextMenuItem(
           label: liked ? l10n.menuUnlike : l10n.menuLike,

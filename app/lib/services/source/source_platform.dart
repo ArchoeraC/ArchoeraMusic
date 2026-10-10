@@ -37,6 +37,7 @@ import '../../widgets/dialogs/netease_login_dialog.dart';
 import '../../widgets/dialogs/qqmusic_login_dialog.dart';
 import '../../widgets/dialogs/track_list_dialog.dart';
 import '../../apis/qqmusic/core/request.dart' show QmErrorKind;
+import '../kugou/kugou_api.dart' show KugouApi;
 import '../lyrics/engine/lyric_source.dart';
 import '../qqmusic/qqmusic_api.dart' show QqApiException;
 import '../lyrics/sources/kugou_lyric_source.dart';
@@ -112,8 +113,14 @@ abstract class SourcePlatform {
   /// 下载是否恒取原文件、无音质档（流媒体服务端 `format=raw`）。
   bool get downloadDirectOnly => false;
 
-  /// 入队前的曲目预处理（KG 补 hash / Neko 元数据补全并重写歌词）。
+  /// 入队前的曲目预处理（KG 补 hash / Neko 重写歌词）。
   Future<Track> prepareForDownload(dynamic ref, Track t) async => t;
+
+  /// 通用曲目右键菜单是否显示「红心 / 评论 / 添加到歌单」（NT / KG / Neko）。
+  bool get trackMenuLikeComment => false;
+
+  /// 通用曲目右键菜单是否显示「查看歌手 / 媒体详情 / 下载」（NT / KG / QQ / Neko）。
+  bool get trackMenuArtistDownload => false;
 
   // ── 搜索能力 ──────────────────────────────────────────────────────
 
@@ -313,6 +320,15 @@ abstract class SourcePlatform {
     SourceSearchKind kind,
     CoverItem item,
   ) {}
+
+  /// 把「搜索建议」条目解析为可播放曲目 + 直链。
+  ///
+  /// 建议条目字段精简（多为标题/歌手），播放前需按来源补齐完整曲目并解析
+  /// URL（NT 取 song_detail；KG 按歌名取 hash）。无建议能力的源返回 null。
+  Future<({Track track, String? url})?> resolveSuggestSong(
+    dynamic ref,
+    SuggestSongItem song,
+  ) async => null;
 }
 
 /// 按 `Track.source` 取适配器；未注册源回退为「未知源」（保持既有行为：
@@ -454,6 +470,12 @@ class _NeteaseSource extends SourcePlatform {
   bool get downloadRequiresLogin => true;
 
   @override
+  bool get trackMenuLikeComment => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
+
+  @override
   ProviderListenable<Object?>? get authSignal =>
       neteaseAuthProvider.select<Object?>((a) => a?.userId);
 
@@ -544,6 +566,37 @@ class _NeteaseSource extends SourcePlatform {
         showPlaylistDetailDialog(context, item);
     }
   }
+
+  @override
+  Future<({Track track, String? url})?> resolveSuggestSong(
+    dynamic ref,
+    SuggestSongItem song,
+  ) async {
+    final NeteaseApi api = ref.read(neteaseApiProvider);
+    // 建议条目只有标题/歌手（无封面）：先取详情补封面，失败回退轻量构造。
+    Track? detail;
+    try {
+      final list = await api.songsDetailByIds([song.id]);
+      if (list.isNotEmpty) detail = list.first;
+    } catch (_) {
+      // 详情失败不影响播放
+    }
+    final track =
+        detail ??
+        Track(
+          id: song.id,
+          title: song.name,
+          artists: song.artist == null
+              ? const <TrackArtist>[]
+              : song.artist!
+                    .split(' / ')
+                    .map((n) => TrackArtist(name: n))
+                    .toList(),
+          album: song.album == null ? null : TrackAlbum(name: song.album!),
+        );
+    final url = await api.resolvePlayUrl(song.id);
+    return (track: track, url: url);
+  }
 }
 
 // ── KG ─────────────────────────────────────────────────────────────────
@@ -586,6 +639,12 @@ class _KugouSource extends SourcePlatform {
 
   @override
   bool get downloadRequiresLogin => true;
+
+  @override
+  bool get trackMenuLikeComment => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
 
   @override
   Future<Track> prepareForDownload(dynamic ref, Track t) async {
@@ -784,6 +843,22 @@ class _KugouSource extends SourcePlatform {
         showKugouPlaylistDetailDialog(context, item);
     }
   }
+
+  @override
+  Future<({Track track, String? url})?> resolveSuggestSong(
+    dynamic ref,
+    SuggestSongItem song,
+  ) async {
+    final KugouApi api = ref.read(kugouApiProvider);
+    // 建议只有 songid：按歌名搜索取 hash + 封面（suggestSongToTrack）。
+    final resolved = await api.suggestSongToTrack(
+      song.name,
+      singer: song.artist,
+    );
+    if (resolved == null || resolved.kugou == null) return null;
+    final url = await api.resolvePlayUrl(resolved.kugou!);
+    return (track: resolved, url: url);
+  }
 }
 
 // ── QQ ─────────────────────────────────────────────────────────────────
@@ -814,6 +889,9 @@ class _QqSource extends SourcePlatform {
 
   @override
   bool get downloadable => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
 
   @override
   ({String label, bool lossless})? qualityBadge(
@@ -1000,12 +1078,6 @@ class _NekoSource extends SourcePlatform {
   }
 
   @override
-  Future<Track> enrichMetadata(dynamic ref, Track t) async {
-    if (!enabled(ref)) return t;
-    return ref.read(nekoMetadataEnricherProvider).enrich(t);
-  }
-
-  @override
   String label(AppLocalizations l10n) => l10n.platformNeko;
 
   @override
@@ -1018,8 +1090,14 @@ class _NekoSource extends SourcePlatform {
   bool get downloadable => true;
 
   @override
+  bool get trackMenuLikeComment => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
+
+  @override
   Future<Track> prepareForDownload(dynamic ref, Track t) =>
-      ref.read(nekoMetadataEnricherProvider).enrich(t, fetchLyrics: true);
+      ref.read(nekoLyricRewriterProvider).rewrite(t);
 
   @override
   ({String label, bool lossless})? qualityBadge(
