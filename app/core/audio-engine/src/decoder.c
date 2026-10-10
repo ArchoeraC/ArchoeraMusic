@@ -510,6 +510,91 @@ const char* decoder_codec_name(const Decoder *d)
     return d->dec_ctx->codec->name;
 }
 
+/* 从 metadata 取十进制浮点值（如 peak "0.999023"）；命中且可解析返回 1。
+ * av_dict_get 不区分大小写，故一次查表即可覆盖 REPLAYGAIN_* / replaygain_*。 */
+static int rg_get_float(AVDictionary *m, const char *key, float *out)
+{
+    if (!m) return 0;
+    AVDictionaryEntry *e = av_dict_get(m, key, NULL, 0);
+    if (!e || !e->value || !e->value[0]) return 0;
+    char *end = NULL;
+    float v = strtof(e->value, &end);
+    if (end == e->value) return 0;
+    *out = v;
+    return 1;
+}
+
+/* 增益标签形如 "  -7.89 dB" / "+2.00 dB"；strtof 自动跳过前导空白与单位。 */
+static int rg_get_gain_db(AVDictionary *m, const char *key, float *out)
+{
+    return rg_get_float(m, key, out);
+}
+
+/* Opus 的 R128_*_GAIN 为 Q7.8 定点整数（dB = value / 256）。 */
+static int rg_get_r128_db(AVDictionary *m, const char *key, float *out)
+{
+    if (!m) return 0;
+    AVDictionaryEntry *e = av_dict_get(m, key, NULL, 0);
+    if (!e || !e->value || !e->value[0]) return 0;
+    char *end = NULL;
+    long v = strtol(e->value, &end, 10);
+    if (end == e->value) return 0;
+    *out = (float)v / 256.0f;
+    return 1;
+}
+
+int decoder_replaygain(const Decoder *d,
+                       float *track_gain_db, float *track_peak,
+                       float *album_gain_db, float *album_peak)
+{
+    if (!d || !d->fmt_ctx) return 0;
+    AVDictionary *m = d->fmt_ctx->metadata;
+    AVDictionary *sm = NULL;
+    if (d->stream_index >= 0 && d->stream_index < (int)d->fmt_ctx->nb_streams) {
+        sm = d->fmt_ctx->streams[d->stream_index]->metadata;
+    }
+
+    int mask = 0;
+    float v;
+    if (track_gain_db) {
+        v = 0.0f;
+        if (rg_get_gain_db(sm, "replaygain_track_gain", &v) ||
+            rg_get_gain_db(m, "replaygain_track_gain", &v) ||
+            rg_get_r128_db(sm, "r128_track_gain", &v) ||
+            rg_get_r128_db(m, "r128_track_gain", &v)) {
+            *track_gain_db = v;
+            mask |= 1;
+        }
+    }
+    if (track_peak) {
+        v = 0.0f;
+        if (rg_get_float(sm, "replaygain_track_peak", &v) ||
+            rg_get_float(m, "replaygain_track_peak", &v)) {
+            *track_peak = v;
+            mask |= 2;
+        }
+    }
+    if (album_gain_db) {
+        v = 0.0f;
+        if (rg_get_gain_db(sm, "replaygain_album_gain", &v) ||
+            rg_get_gain_db(m, "replaygain_album_gain", &v) ||
+            rg_get_r128_db(sm, "r128_album_gain", &v) ||
+            rg_get_r128_db(m, "r128_album_gain", &v)) {
+            *album_gain_db = v;
+            mask |= 4;
+        }
+    }
+    if (album_peak) {
+        v = 0.0f;
+        if (rg_get_float(sm, "replaygain_album_peak", &v) ||
+            rg_get_float(m, "replaygain_album_peak", &v)) {
+            *album_peak = v;
+            mask |= 8;
+        }
+    }
+    return mask;
+}
+
 void decoder_close(Decoder *d)
 {
     if (!d) return;

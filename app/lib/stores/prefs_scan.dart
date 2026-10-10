@@ -11,6 +11,7 @@ const scanMaxFileSizeMbKey = 'scan.maxFileSizeMb';
 const scanMaxScanFilesKey = 'scan.maxScanFiles';
 const scanMaxScanErrorsKey = 'scan.maxScanErrors';
 const scanExtraExtsKey = 'scan.extraExts';
+const scanAnalyzeLoudnessKey = 'scan.analyzeLoudness';
 
 /// 扫描域偏好：并行度 / 批大小 / 安全上限 / 额外音频扩展名。
 ///
@@ -39,6 +40,11 @@ extension ScanPrefs on AppPrefs {
       .where((e) => e.isNotEmpty)
       .toList();
 
+  /// 扫描时离线分析 EBU R128 响度（默认关；开启会显著拖慢扫描，供响度归一化
+  /// 兜底增益使用）。
+  bool get scanAnalyzeLoudness =>
+      data[scanAnalyzeLoudnessKey] as bool? ?? false;
+
   AppPrefs copyWithScan({
     int? parallelism,
     int? batchSize,
@@ -46,6 +52,7 @@ extension ScanPrefs on AppPrefs {
     int? maxScanFiles,
     int? maxScanErrors,
     List<String>? extraExts,
+    bool? analyzeLoudness,
   }) => AppPrefs(
     initialData: {
       ...data,
@@ -55,6 +62,7 @@ extension ScanPrefs on AppPrefs {
       scanMaxScanFilesKey: ?maxScanFiles,
       scanMaxScanErrorsKey: ?maxScanErrors,
       scanExtraExtsKey: ?extraExts,
+      scanAnalyzeLoudnessKey: ?analyzeLoudness,
     },
   );
 }

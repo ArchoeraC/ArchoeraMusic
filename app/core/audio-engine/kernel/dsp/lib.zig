@@ -28,6 +28,7 @@ pub const math = @import("dspmath.zig");
 pub const eq = @import("eq.zig");
 pub const limiter = @import("limiter.zig");
 pub const loudness = @import("loudness.zig");
+pub const loudness_measure = @import("loudness_measure.zig");
 pub const biquad = @import("biquad.zig");
 pub const parametric = @import("parametric.zig");
 pub const lowfreq = @import("lowfreq.zig");
@@ -44,6 +45,7 @@ test {
     _ = @import("eq.zig");
     _ = @import("limiter.zig");
     _ = @import("loudness.zig");
+    _ = @import("loudness_measure.zig");
     _ = @import("biquad.zig");
     _ = @import("parametric.zig");
     _ = @import("lowfreq.zig");

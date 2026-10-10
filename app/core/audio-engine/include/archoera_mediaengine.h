@@ -175,10 +175,6 @@ ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_poll_event(
 ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_wait_event(
     ArchoeraMediaEngine *e, char *buf, int cap, int timeout_ms);
 
-/** 会话目录（create 时传入）。 */
-ARCHOERA_MEDIAENGINE_API const char *archoera_mediaengine_session_dir(
-    ArchoeraMediaEngine *e);
-
 /** 引擎线程是否已退出（转码+播放结束、收到 stop、或已 destroy）。 */
 ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_is_done(
     ArchoeraMediaEngine *e);

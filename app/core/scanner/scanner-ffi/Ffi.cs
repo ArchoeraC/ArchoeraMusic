@@ -49,6 +49,7 @@ public static unsafe class ScannerFfi
         public int MaxScanErrors;
         public int MaxParallelism;
         public List<string> ExtraExts = new();
+        public bool AnalyzeLoudness;
     }
 
     private static ScanOptions _scanOptions = new();
@@ -58,7 +59,7 @@ public static unsafe class ScannerFfi
     /// 兼容旧 Dart 调用方：0 / 空数组 = 引擎默认（500MB / 50000 / 50 / 自适应）。
     /// </summary>
     /// <param name="optionsJson">UTF-8 JSON：maxFileSizeMb? maxScanFiles?
-    /// maxScanErrors? parallelism? extraExts?: string[]</param>
+    /// maxScanErrors? parallelism? extraExts?: string[] analyzeLoudness?: bool</param>
     /// <returns>0 成功 / 1 失败（JSON 非法）</returns>
     [UnmanagedCallersOnly(EntryPoint = "scanner_set_options")]
     public static int SetOptions(byte* optionsJson)
@@ -88,6 +89,9 @@ public static unsafe class ScannerFfi
                     o.ExtraExts.Add(s.TrimStart('.').ToLowerInvariant());
                 }
             }
+            if (root.TryGetProperty("analyzeLoudness", out var al) &&
+                (al.ValueKind == JsonValueKind.True || al.ValueKind == JsonValueKind.False))
+                o.AnalyzeLoudness = al.GetBoolean();
             Interlocked.Exchange(ref _scanOptions, o);
             return 0;
         }
@@ -141,6 +145,7 @@ public static unsafe class ScannerFfi
                 maxParallelism: maxParallelism > 0 ? maxParallelism
                               : (opts.MaxParallelism > 0 ? opts.MaxParallelism : null),
                 extraExtensions: opts.ExtraExts.Count > 0 ? opts.ExtraExts : null,
+                analyzeLoudness: opts.AnalyzeLoudness,
                 progressSink: onProgress != null
                     ? (Action<ScanProgress>)(p => FireProgress(onProgress, p))
                     : null);

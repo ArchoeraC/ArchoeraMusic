@@ -15,6 +15,7 @@ import 'prefs_app.dart';
 import 'prefs_appearance.dart';
 import 'prefs_audio_fx.dart';
 import 'prefs_download.dart';
+import 'prefs_easter_egg.dart';
 import 'prefs_history.dart';
 import 'prefs_lyrics.dart';
 import 'prefs_neko.dart';
@@ -35,6 +36,7 @@ export 'prefs_app.dart';
 export 'prefs_appearance.dart';
 export 'prefs_audio_fx.dart';
 export 'prefs_download.dart';
+export 'prefs_easter_egg.dart';
 export 'prefs_history.dart';
 export 'prefs_lyrics.dart';
 export 'prefs_neko.dart';
@@ -409,9 +411,9 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置响度归一化开关。
-  void setNormalization(bool value) {
-    state = state.copyWithNormalization(value);
+  /// 设置响度归一化开关 / ReplayGain 取用口径（album）。
+  void setNormalization(bool value, {bool? album}) {
+    state = state.copyWithNormalization(value, album: album);
     state.save();
   }
 
@@ -446,6 +448,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置播放速度（0.5~2.0；变速不变调）。
   void setPlaybackSpeed(double value) {
     state = state.copyWithPlaybackSpeed(value);
+    state.save();
+  }
+
+  /// 设置变调（-12~+12 半音；独立于播放速度，0 = 原调）。
+  void setPitch(double value) {
+    state = state.copyWithPitch(value);
     state.save();
   }
 
@@ -537,12 +545,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置界面字体（内置字体族名）。
-  void setFontFamily(String family) {
-    state = state.copyWithAppearance(fontFamily: family);
-    state.save();
-  }
-
   /// 设置封面圆角（0~16px）。
   void setCoverRadius(double value) {
     state = state.copyWithAppearance(coverRadius: value);
@@ -577,7 +579,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置播放器歌词样式。
   void setLyricStyle({
     double? fontSize,
-    double? lineHeight,
     int? playedColor,
     int? unplayedColor,
     bool? followAccent,
@@ -585,7 +586,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   }) {
     state = state.copyWithLyricStyle(
       fontSize: fontSize,
-      lineHeight: lineHeight,
       playedColor: playedColor,
       unplayedColor: unplayedColor,
       followAccent: followAccent,
@@ -798,6 +798,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     int? maxScanFiles,
     int? maxScanErrors,
     List<String>? extraExts,
+    bool? analyzeLoudness,
   }) {
     state = state.copyWithScan(
       parallelism: parallelism,
@@ -806,6 +807,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       maxScanFiles: maxScanFiles,
       maxScanErrors: maxScanErrors,
       extraExts: extraExts,
+      analyzeLoudness: analyzeLoudness,
     );
     state.save();
   }
@@ -933,9 +935,23 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置「后台卸载已访问页面」。
-  void setUnloadBackgroundPages(bool value) {
-    state = state.copyWithPower(unloadBackgroundPages: value);
+  // ── 愚人节特供 · 整活模式 ──────────────────────────────────────
+
+  /// 设置整活模式激活态（跨重启保留，直到用户投降）。
+  void setAprilFools(bool value) {
+    state = state.copyWithAprilFools(value);
+    state.save();
+  }
+
+  /// 记录「我投降」的年份（当年不再自动激活）。
+  void setAprilFoolsSurrenderedYear(int year) {
+    state = state.copyWithAprilFoolsSurrenderedYear(year);
+    state.save();
+  }
+
+  /// 设置是否允许愚人节整活（关闭后永不自动激活）。
+  void setAprilFoolsEnabled(bool value) {
+    state = state.copyWithAprilFoolsEnabled(value);
     state.save();
   }
 

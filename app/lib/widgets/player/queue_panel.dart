@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
+import '../../easter_egg/april_fools_state.dart';
 import '../../l10n/l10n.dart';
 import '../../utils/format.dart';
 import '../list/cover_image.dart';

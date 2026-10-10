@@ -23,7 +23,6 @@ const sidebarOrderKey = 'appearance.sidebarOrder';
 const sidebarHiddenKeysKey = 'appearance.sidebarHiddenKeys';
 const localeKey = 'appearance.locale';
 const floatingBarKey = 'appearance.floatingPlayerBar';
-const fontFamilyKey = 'appearance.fontFamily';
 const coverRadiusKey = 'appearance.coverRadius';
 const weatherEnabledKey = 'appearance.weatherEnabled';
 const weatherAutoLocateKey = 'appearance.weatherAutoLocate';
@@ -310,14 +309,12 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
     },
   );
 
-  AppPrefs copyWithAppearance({String? fontFamily, double? coverRadius}) =>
-      AppPrefs(
-        initialData: {
-          ...data,
-          fontFamilyKey: ?fontFamily,
-          coverRadiusKey: ?coverRadius?.clamp(0, 16),
-        },
-      );
+  AppPrefs copyWithAppearance({double? coverRadius}) => AppPrefs(
+    initialData: {
+      ...data,
+      coverRadiusKey: ?coverRadius?.clamp(0, 16),
+    },
+  );
 
   /// 设置顶栏微型天气配置（组件开关 / 自动定位 / 定位来源 / 手动城市）。
   ///

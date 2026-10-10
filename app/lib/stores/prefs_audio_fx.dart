@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:math' as math;
+
 import 'app_prefs.dart';
 
 // ── 音频效果域键（audio. 前缀）──────────────────────────────────
@@ -11,7 +13,28 @@ const eqPreampKey = 'audio.eq.preamp';
 const eqPresetKey = 'audio.eq.preset';
 const limiterEnabledKey = 'audio.limiter';
 const normalizationEnabledKey = 'audio.normalization';
+const normalizationAlbumKey = 'audio.normalization.album';
 const playbackSpeedKey = 'audio.speed';
+const pitchSemitonesKey = 'audio.pitch';
+
+/// 归一化目标响度（LUFS）。对齐 ReplayGain 2.0 参考（−18 LUFS），
+/// 使「文件内 ReplayGain 标签」与「扫描器离线分析」两条增益来源口径一致。
+const double normalizationTargetLufs = -18.0;
+
+/// 由曲目集成响度 / 峰值计算归一化兜底增益（dB）。
+///
+/// gain = 目标 LUFS − 曲目 LUFS；若已知峰值则做削波保护
+/// （限制峰值 × 线性增益 ≤ 1，即 gain ≤ −20·log10(peak)），并收敛到
+/// [−60, +24] dB。无响度 / 非有限时返回 0（等效不补偿）。
+double normalizationGainDb({double? lufs, double? peak}) {
+  if (lufs == null || !lufs.isFinite) return 0.0;
+  var gain = normalizationTargetLufs - lufs;
+  if (peak != null && peak > 1e-6) {
+    final maxGainDb = -20.0 * (math.log(peak) / math.ln10);
+    if (gain > maxGainDb) gain = maxGainDb;
+  }
+  return gain.clamp(-60.0, 24.0);
+}
 
 // 参数化 EQ（方向① D1）与次声/低频管理（方向① D2）键。
 const peqEnabledKey = 'audio.peq.enabled';
@@ -48,6 +71,10 @@ const double eqGainMaxDb = 12;
 const double speedMin = 0.5;
 const double speedMax = 2.0;
 
+/// 变调范围（半音，-12~+12；0 = 原调）。
+const double pitchMinSemitones = -12;
+const double pitchMaxSemitones = 12;
+
 /// 均衡器预设（10 段增益，dB）。
 const Map<String, List<double>> eqPresets = {
   'flat': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -82,10 +109,10 @@ List<double> _normalizeEqGains(Object? value) {
   ];
 }
 
-/// 音频效果偏好：10 段均衡器 / 预增益 / 限幅器 / 响度归一化 / 播放速度。
+/// 音频效果偏好：10 段均衡器 / 预增益 / 限幅器 / 响度归一化 / 播放速度 / 变调。
 ///
 /// 引擎在会话内支持运行时命令（set_eq / set_normalization / set_limiter /
-/// set_tempo_speed），改动即时生效，无需重启会话。
+/// set_tempo_speed / set_tempo_pitch），改动即时生效，无需重启会话。
 extension AudioFxPrefs on AppPrefs {
   /// 均衡器总开关（默认关）。
   bool get eqEnabled => data[eqEnabledKey] as bool? ?? false;
@@ -113,11 +140,22 @@ extension AudioFxPrefs on AppPrefs {
   bool get normalizationEnabled =>
       data[normalizationEnabledKey] as bool? ?? false;
 
+  /// ReplayGain 取用口径：false=track（默认）/ true=album。
+  bool get normalizationAlbum =>
+      data[normalizationAlbumKey] as bool? ?? false;
+
   /// 播放速度（0.5~2.0，默认 1.0；变速不变调）。
   double get playbackSpeed =>
       ((data[playbackSpeedKey] as num?)?.toDouble() ?? 1.0).clamp(
         speedMin,
         speedMax,
+      );
+
+  /// 变调（半音，-12~+12，默认 0；独立于播放速度，0 = 原调）。
+  double get pitchSemitones =>
+      ((data[pitchSemitonesKey] as num?)?.toDouble() ?? 0.0).clamp(
+        pitchMinSemitones,
+        pitchMaxSemitones,
       );
 
   /// 设置均衡器（开关 / 增益 / 预增益 / 预设 / 限幅器）。
@@ -139,15 +177,28 @@ extension AudioFxPrefs on AppPrefs {
     },
   );
 
-  /// 设置响度归一化开关。
-  AppPrefs copyWithNormalization(bool value) =>
-      AppPrefs(initialData: {...data, normalizationEnabledKey: value});
+  /// 设置响度归一化开关 / ReplayGain 取用口径（album）。
+  AppPrefs copyWithNormalization(bool value, {bool? album}) => AppPrefs(
+    initialData: {
+      ...data,
+      normalizationEnabledKey: value,
+      normalizationAlbumKey: ?album,
+    },
+  );
 
   /// 设置播放速度（0.5~2.0）。
   AppPrefs copyWithPlaybackSpeed(double value) => AppPrefs(
     initialData: {
       ...data,
       playbackSpeedKey: value.clamp(speedMin, speedMax),
+    },
+  );
+
+  /// 设置变调（-12~+12 半音）。
+  AppPrefs copyWithPitch(double value) => AppPrefs(
+    initialData: {
+      ...data,
+      pitchSemitonesKey: value.clamp(pitchMinSemitones, pitchMaxSemitones),
     },
   );
 

@@ -9,6 +9,7 @@ import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/lyrics/lyric_line.dart';
 import '../../app/router.dart';
+import '../../easter_egg/april_fools_state.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
 import '../../stores/lyrics_provider.dart';
@@ -47,7 +48,12 @@ class _PlayerBarState extends ConsumerState<PlayerBar> {
   double? _dragMs;
 
   @override
-  Widget build(BuildContext context) => _buildPlayerBar(context);
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+    valueListenable: aprilFoolsActiveNotifier,
+    // 整活模式切换时重建播放条（上一首/下一首按钮互换）。
+    builder: (BuildContext context, bool _, Widget? _) =>
+        _buildPlayerBar(context),
+  );
 
   void _setDragMs(double? value) {
     setState(() => _dragMs = value);

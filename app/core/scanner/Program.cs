@@ -69,6 +69,7 @@ public static class Program
         string? dirs = null;
         var full = false;
         var batch = 0; // 0 = 不限，由 AdaptiveBatchSize 根据内存自动决定
+        var analyzeLoudness = false; // 离线 EBU R128 响度分析（默认关闭）
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -86,9 +87,12 @@ public static class Program
                 case "-b":
                     if (i + 1 < args.Length && int.TryParse(args[++i], out var b)) batch = b;
                     break;
+                case "--analyze-loudness":
+                    analyzeLoudness = true;
+                    break;
                 case "--help":
                 case "-h":
-                    Console.WriteLine("用法: archoera-scanner scan [--dirs <dir1,dir2>] [--full] [--batch <n>]");
+                    Console.WriteLine("用法: archoera-scanner scan [--dirs <dir1,dir2>] [--full] [--batch <n>] [--analyze-loudness]");
                     return 0;
             }
         }
@@ -111,7 +115,8 @@ public static class Program
             maxFileSizeBytes: maxFileSizeMb * 1024L * 1024L,
             maxScanFiles: maxScanFiles,
             maxScanErrors: maxScanErrors,
-            maxParallelism: maxParallelism);
+            maxParallelism: maxParallelism,
+            analyzeLoudness: analyzeLoudness);
 
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
@@ -154,7 +159,7 @@ public static class Program
             Archoera 音乐库扫描引擎
 
             用法:
-              archoera-scanner scan [--dirs <dir1,dir2>] [--full] [--batch <n>]
+              archoera-scanner scan [--dirs <dir1,dir2>] [--full] [--batch <n>] [--analyze-loudness]
                   扫描音乐库（默认增量）
               archoera-scanner parse <file>
                   解析单个文件元数据（调试用）
@@ -163,6 +168,9 @@ public static class Program
               --dirs, -d    扫描目录（逗号分隔，默认 $ARCHOERA_MUSIC_DIR）
               --full, -f    全量扫描（清空数据库重新构建）
               --batch, -b   批量写入上限（默认 0=不限，由系统内存自动决定）
+              --analyze-loudness
+                            离线 EBU R128 响度分析（集成响度 + 采样峰值写入曲库；
+                            默认关闭，会明显增加扫描耗时）
 
             环境变量:
               ARCHOERA_DB_PATH             SQLite 数据库路径（必需）

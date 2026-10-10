@@ -88,7 +88,7 @@ SQLite 写入经 `/api/db/*` 代理串行化），2026-09-06 随去侧车化整�
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Flutter App（单进程）                                        │
-│  · UI 层（Dart）：主窗口 / 歌词窗口（桌面歌词·动态岛·任务栏）  │
+│  · UI 层（Dart）：主窗口 / 播放器歌词（动态岛·任务栏）        │
 │  · 业务层（Dart，Riverpod）：播放控制·歌词同步·队列/历史·主题 │
 │  · 桥接层（FFI 直连，库内）：                                │
 │    ├─ libarchoera_mediaengine（C 引擎：转码+miniaudio 自播） │
@@ -347,7 +347,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 
 ## 10. Flutter 层设计
 
-- **窗口**：Phase 1 单主窗口；歌词窗口（桌面歌词/动态岛）Phase 3 用 `desktop_multi_window` / 平台壳多窗口
+- **窗口**：Phase 1 单主窗口；动态岛/任务栏歌词走系统能力（**桌面歌词独立置顶窗已放弃**，不做多窗口）
 - **状态管理**：Riverpod；**路由**：go_router
 - **i18n（Flutter 原生，非自研）**：`flutter_localizations` + `intl`/`gen_l10n`（ARB 管道）——复用原项目 8 语言文案，首期 zh-CN / en-US，其余后续补
 - **事件总线（Dart 侧统一事件通道）**：`EventBus`（StreamController 多路复用）承载两类事件——引擎事件（FFI `pollEvent` 转译，`player:*`/扫描/下载进度）与本地事件（播放队列、UI 状态）；UI 层只依赖总线，不直连传输层
@@ -554,7 +554,7 @@ ArchoeraMusic/
 | **Phase 0** 骨架 ✅ | Flutter 三端骨架 + C 引擎构建打通（2026-08-05；原「spawn 侧车 + HTTP/WS 打通」路径已废弃，见 §12.0） | App 可启动、引擎可用 |
 | **Phase 1** Netease + 播放 ✅ | **桌面 FFI 直连引擎播放**（完整转码 PCM 落盘 + miniaudio 自播 + seek 即时 + FFT 拉模式，2026-08-07）；平台 API 纯 Dart 直连；Flutter 搜索页、播放页（歌词 + 频谱）、二维码登录、队列 | 可登录、搜索、播放，歌词/频谱同步，任意 seek |
 | **Phase 2** KuGou | 移植 kugou 模块（song_url/榜单/歌单）为纯 Dart（`app/lib/core/apis/kugou/`）；Flutter 接入酷狗搜索播放 | 可搜索播放酷狗歌曲 |
-| **Phase 3** 补全 | QQ 音乐接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一管线（PCM 落盘 + miniaudio 自播，§5.4）；下载（Rust CLI）；桌面歌词窗口；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）| 核心功能达成规划子集 |
+| **Phase 3** 补全 | QQ 音乐接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一管线（PCM 落盘 + miniaudio 自播，§5.4）；下载（Rust CLI）；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）（**桌面歌词独立窗已放弃**）| 核心功能达成规划子集 |
 | **Phase 4** 优化 | C 引擎增强：进程内 seek、预加载/无缝切换；性能/内存基线（沿用原项目 memory discipline）；缓存与并发策略 | 播放体验优化，桌面集成完备 |
 
 ### 12.0 历史落地记录（简记）
@@ -591,7 +591,7 @@ ArchoeraMusic/
 | **Opus 重编码音质** | 桌面端已不再重编码（PCM 直出 + miniaudio，2026-08-07） | 库文件保持无损；FLAC 直通模式（可选）支持 bit-perfect |
 | **Seek 体验** | ~~重启引擎 seek 毛刺~~（已改 miniaudio 即时 seek，无毛刺，2026-08-07） | 进程内 seek 为 Phase 3+ 可选优化 |
 | C 引擎依赖 | 三平台需 FFmpeg 库（Windows 打包复杂，vcpkg 已打通 2026-08-11）；**Zig 路线：FFmpeg 保持默认主引擎**（`-Duse-ffmpeg` 默认开），逐格式验收后 Zig 接管（详见 audio-kernel-zig.md）| Docker 构建链已有；Windows 用 vcpkg；`-Duse-ffmpeg=false` 纯 Zig 构建为可选裁剪 |
-| Flutter 多窗口成熟度 | 桌面歌词窗依赖第三方方案 | Phase 1 单窗口；预留多窗口抽象 |
+| Flutter 多窗口成熟度 | 桌面歌词独立窗曾依赖第三方方案（**已放弃**，不做多窗口） | Phase 1 单窗口 |
 | KuGou token/平台差异 | 完整版 vs lite 版不通用 | 选定一版，modules 内封装隔离 |
 | 自动换源 | 跨平台搜索匹配可能命中不同版本 | 自用增强可关；优先展示当前平台结果 |
 | 登录态失效 | 播放中断，需重登 | 凭据持久化（vault）+ 事件总线 `player:sourceError` 提示重登 |

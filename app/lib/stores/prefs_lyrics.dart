@@ -7,7 +7,6 @@ import 'app_prefs.dart';
 // ── 歌词域键（lyrics. 前缀）────────────────────────────────────
 const showLyricsKey = 'lyrics.showInPlayer';
 const lyricFontSizeKey = 'lyrics.fontSize';
-const lyricLineHeightKey = 'lyrics.lineHeight';
 const lyricPlayedColorKey = 'lyrics.playedColor';
 const lyricUnplayedColorKey = 'lyrics.unplayedColor';
 const lyricFollowAccentKey = 'lyrics.followAccent';
@@ -135,7 +134,6 @@ extension LyricsPrefs on AppPrefs {
 
   AppPrefs copyWithLyricStyle({
     double? fontSize,
-    double? lineHeight,
     int? playedColor,
     int? unplayedColor,
     bool? followAccent,
@@ -144,7 +142,6 @@ extension LyricsPrefs on AppPrefs {
     initialData: {
       ...data,
       lyricFontSizeKey: ?fontSize?.clamp(14, 60),
-      lyricLineHeightKey: ?lineHeight?.clamp(42, 64),
       lyricPlayedColorKey: ?playedColor,
       lyricUnplayedColorKey: ?unplayedColor,
       lyricFollowAccentKey: ?followAccent,

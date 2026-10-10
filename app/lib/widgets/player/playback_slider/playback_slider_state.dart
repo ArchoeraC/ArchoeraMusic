@@ -38,8 +38,19 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
     }
   }
 
+  /// 整活模式是否激活（进度条反向：从右向左填充、拖点映射同步反向）。
+  bool get _prank => aprilFoolsActiveNotifier.value;
+
   @override
   Widget build(BuildContext context) {
+    // 整活模式切换时重建整条进度条（含时间提示映射）。
+    return ValueListenableBuilder<bool>(
+      valueListenable: aprilFoolsActiveNotifier,
+      builder: (BuildContext context, bool _, Widget? _) => _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return OverlayPortal.overlayChildLayoutBuilder(
       controller: _tipController,
@@ -118,7 +129,9 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
       dx = _hoverDx ?? rect.center.dx;
     }
     final t = ((dx - rect.left) / rect.width).clamp(0.0, 1.0);
-    final ms = (t * widget.max).round();
+    // 整活模式：指针 x 对应的实际进度 = 反向映射（与拖动/填充一致）。
+    final valueT = _prank ? 1.0 - t : t;
+    final ms = (valueT * widget.max).round();
     final text = formatClock(Duration(milliseconds: ms));
     final lyric = widget.tooltipLyric?.call(ms.toDouble());
     return Transform(
@@ -178,29 +191,43 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            activeTrackColor: widget.buffering
-                ? scheme.primary.withValues(alpha: 0.35)
-                : null,
-          ),
-          child: Slider(
-            value: widget.value,
-            max: widget.max,
-            onChangeStart: (v) {
-              setState(() => _dragging = true);
-              _syncTip();
-            },
-            onChangeEnd: (v) {
-              setState(() => _dragging = false);
-              _syncTip();
-              widget.onChangeEnd?.call(v);
-            },
-            onChanged: widget.onChanged,
+        _maybeMirror(
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: widget.buffering
+                  ? scheme.primary.withValues(alpha: 0.35)
+                  : null,
+            ),
+            child: Slider(
+              value: widget.value,
+              max: widget.max,
+              onChangeStart: (v) {
+                setState(() => _dragging = true);
+                _syncTip();
+              },
+              onChangeEnd: (v) {
+                setState(() => _dragging = false);
+                _syncTip();
+                widget.onChangeEnd?.call(v);
+              },
+              onChanged: widget.onChanged,
+            ),
           ),
         ),
         if (widget.buffering) _bufferLayer(scheme, rect),
       ],
+    );
+  }
+
+  /// 整活模式下水平镜像控件：填充从右缘开始、拖动方向同步反向，
+  /// 命中测试跟随镜像（[Transform.transformHitTests] = true）保证手感一致。
+  Widget _maybeMirror(Widget child) {
+    if (!_prank) return child;
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()..setEntry(0, 0, -1.0),
+      transformHitTests: true,
+      child: child,
     );
   }
 
@@ -214,8 +241,20 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
 
     double valueAt(double dx) {
       final t = ((dx - rect.left) / rect.width).clamp(0.0, 1.0);
-      return t * max;
+      return (_prank ? 1.0 - t : t) * max;
     }
+
+    // 进度填充矩形：整活模式下从右缘向左生长。
+    Rect progressRect() {
+      final filled = rect.width * ratio;
+      final left = _prank ? rect.left + rect.width - filled : rect.left;
+      return Rect.fromLTWH(left, rect.top, filled, rect.height);
+    }
+
+    // 当前进度的横向位置（拖动圆点用）。
+    double valueDx() => _prank
+        ? rect.left + rect.width * (1 - ratio)
+        : rect.left + rect.width * ratio;
 
     void endBarDrag(double v) {
       if (!_barDragging) return;
@@ -236,12 +275,7 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
           ),
         ),
         Positioned.fromRect(
-          rect: Rect.fromLTWH(
-            rect.left,
-            rect.top,
-            rect.width * ratio,
-            rect.height,
-          ),
+          rect: progressRect(),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(2),
             child: ColoredBox(color: progressColor),
@@ -251,10 +285,7 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
         // 触摸拖动：细条无滑块，补一个跟随的圆点（时间提示走 Overlay）。
         if (_barDragging)
           Positioned(
-            left: (rect.left + rect.width * ratio - 6).clamp(
-              0.0,
-              double.infinity,
-            ),
+            left: (valueDx() - 6).clamp(0.0, double.infinity),
             top: rect.center.dy - 6,
             child: IgnorePointer(
               child: Container(

@@ -330,6 +330,8 @@ class Track {
     this.fileSize,
     this.quality,
     this.isOriginal = false,
+    this.loudnessLufs,
+    this.loudnessPeak,
   });
 
   final String id;
@@ -382,6 +384,13 @@ class Track {
 
   /// 是否为原唱（KG `IsOriginal == 1` 时置位；翻唱/伴奏不置位）。
   final bool isOriginal;
+
+  /// 本地曲目集成响度（EBU R128，LUFS；仅 source == 'local' 且已离线分析时
+  /// 存在）。响度归一化的兜底增益来源。
+  final double? loudnessLufs;
+
+  /// 本地曲目峰值（线性；仅已离线分析时存在）。削波保护用。
+  final double? loudnessPeak;
 
   String get artistNames => artists.map((a) => a.name).join(' / ');
 

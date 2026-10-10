@@ -28,6 +28,9 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
   /// 拖动中的播放速度草稿。
   double? _draftSpeed;
 
+  /// 拖动中的变调草稿（半音）。
+  double? _draftPitch;
+
   /// 编辑中的参数化段草稿（方向① D1）；null = 跟随偏好。
   List<ParametricBand>? _draftPeqBands;
 
@@ -46,6 +49,9 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
       _draftPreamp ?? ref.read(appPrefsProvider).eqPreampDb;
 
   double get _speed => _draftSpeed ?? ref.read(appPrefsProvider).playbackSpeed;
+
+  double get _pitch =>
+      _draftPitch ?? ref.read(appPrefsProvider).pitchSemitones;
 
   List<ParametricBand> get _peqBands =>
       _draftPeqBands ?? ref.read(appPrefsProvider).peqBands;
@@ -377,6 +383,32 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
                 _apply();
               },
             ),
+            SettingTile(
+              icon: EtaIcons.albumOutline,
+              title: l10n.settingsNormalizationMode,
+              subtitle: l10n.settingsNormalizationModeDesc,
+              enabled: prefs.normalizationEnabled,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption(
+                    'track',
+                    l10n.settingsNormalizationModeTrack,
+                  ),
+                  SSegmentedOption(
+                    'album',
+                    l10n.settingsNormalizationModeAlbum,
+                  ),
+                ],
+                selected: prefs.normalizationAlbum ? 'album' : 'track',
+                onChanged: (v) {
+                  notifier.setNormalization(
+                    prefs.normalizationEnabled,
+                    album: v == 'album',
+                  );
+                  _apply();
+                },
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 20),
@@ -417,8 +449,53 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
             ),
           ],
         ),
+        const SizedBox(height: 20),
+        // 4) 变调（独立于播放速度；引擎 tempo pitch_sync=true，变速保音调）
+        SettingSection(
+          title: l10n.settingsSectionPitch,
+          children: [
+            _bandTile(
+              l10n,
+              enabled: true,
+              label: l10n.settingsPitch,
+              sub: _pitchLabel(l10n),
+              value: _pitch,
+              min: pitchMinSemitones,
+              max: pitchMaxSemitones,
+              divisions: 48,
+              onChanged: (v) => setState(() => _draftPitch = v),
+              onChangeEnd: (v) {
+                setState(() => _draftPitch = v);
+                notifier.setPitch(v);
+                _apply();
+              },
+            ),
+            SettingTile(
+              icon: EtaIcons.refresh,
+              title: l10n.settingsPitchNormal,
+              subtitle: l10n.settingsPitchDesc,
+              trailing: SButton(
+                label: '0.0 ${l10n.settingsPitchUnit}',
+                variant: SButtonVariant.secondary,
+                size: SButtonSize.small,
+                onPressed: () {
+                  setState(() => _draftPitch = null);
+                  notifier.setPitch(0);
+                  _apply();
+                },
+              ),
+            ),
+          ],
+        ),
       ],
     );
+  }
+
+  /// 变调值标签（带正负号 + 本地化单位）。
+  String _pitchLabel(AppLocalizations l10n) {
+    final v = _pitch;
+    final sign = v > 0 ? '+' : '';
+    return '$sign${v.toStringAsFixed(1)} ${l10n.settingsPitchUnit}';
   }
 
   Widget _peqBandTile(

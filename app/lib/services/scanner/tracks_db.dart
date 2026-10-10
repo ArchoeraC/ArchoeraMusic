@@ -29,6 +29,8 @@ class TrackRow {
     required this.fileSize,
     required this.fileMtime,
     required this.lyrics,
+    this.loudnessLufs,
+    this.loudnessPeak,
   });
 
   final String id;
@@ -48,6 +50,12 @@ class TrackRow {
   final int fileSize;
   final int fileMtime;
   final String? lyrics;
+
+  /// 离线 EBU R128 集成响度（LUFS；仅 `--analyze-loudness` 分析过且有效时非空）。
+  final double? loudnessLufs;
+
+  /// 离线线性采样峰值（仅分析过且有效时非空；削波保护参考）。
+  final double? loudnessPeak;
 
   /// 从查询行构造。列表/查询路径**默认不读 `lyrics`**（内嵌歌词文本可能是
   /// 每曲数 KB 的大字符串），仅按需经 [TracksDb.lyricsById] / [TracksDb.lyricsByPath]
@@ -91,6 +99,8 @@ class TrackRow {
       fileSize: row['file_size'] as int? ?? 0,
       fileMtime: row['file_mtime'] as int? ?? 0,
       lyrics: lyrics,
+      loudnessLufs: (row['loudness_lufs'] as num?)?.toDouble(),
+      loudnessPeak: (row['loudness_peak'] as num?)?.toDouble(),
     );
   }
 }
@@ -117,7 +127,8 @@ class TracksDb {
   /// 随全量/分页结果一起读入内存。歌词按需经 [lyricsById] / [lyricsByPath] 懒查。
   static const String _trackColumns =
       'id, path, title, track, artists, album, duration, cover, codec, '
-      'sample_rate, bit_rate, channels, bits_per_sample, file_size, file_mtime';
+      'sample_rate, bit_rate, channels, bits_per_sample, file_size, file_mtime, '
+      'loudness_lufs, loudness_peak';
 
   /// 搜索条件（与 UI 的 title/artist/album 过滤语义一致）。
   static const String _searchWhere =

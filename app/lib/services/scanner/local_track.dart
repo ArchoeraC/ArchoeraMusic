@@ -30,6 +30,8 @@ Track trackFromRow(TrackRow row) {
     localPath: row.path,
     lyrics: row.lyrics,
     source: 'local',
+    loudnessLufs: row.loudnessLufs,
+    loudnessPeak: row.loudnessPeak,
   );
 }
 

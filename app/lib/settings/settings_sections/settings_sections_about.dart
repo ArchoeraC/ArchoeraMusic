@@ -234,6 +234,23 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
           ],
         ),
         const SizedBox(height: 20),
+        // ── 彩蛋开关：愚人节整活（4/1 自动开；关闭后永不自动激活）────
+        SettingSection(
+          title: l10n.settingsSectionEasterEgg,
+          children: [
+            SettingSwitchTile(
+              icon: EtaIcons.flaskOutline,
+              title: l10n.settingsAprilFools,
+              subtitle: ref.watch(appPrefsProvider).aprilFoolsEnabled
+                  ? l10n.settingsAprilFoolsOn
+                  : l10n.settingsAprilFoolsOff,
+              value: ref.watch(appPrefsProvider).aprilFoolsEnabled,
+              onChanged: (bool v) =>
+                  ref.read(aprilFoolsProvider.notifier).setEnabled(v),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
         // ── 彩蛋入口：底部居中「千万别点」按钮 → 弹出警告门 ──────────
         // 纯属整活；三个「确定」按钮执行同一批彩蛋（见 easter_egg/）。
         Center(
