@@ -31,6 +31,7 @@
     <Compile Include="../IScannerDatabase.cs" Link="IScannerDatabase.cs" />
     <Compile Include="../ScannerEngine.cs" Link="ScannerEngine.cs" />
     <Compile Include="../KernelMetadata.cs" Link="KernelMetadata.cs" />
+    <Compile Include="../KernelLoudness.cs" Link="KernelLoudness.cs" />
     <Compile Include="../SqliteDirectWriter.cs" Link="SqliteDirectWriter.cs" />
     <Compile Include="../AdaptiveBatchSize.cs" Link="AdaptiveBatchSize.cs" />
     <Compile Include="../AdaptiveConcurrency.cs" Link="AdaptiveConcurrency.cs" />

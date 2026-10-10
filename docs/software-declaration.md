@@ -63,9 +63,12 @@
 
 ## 附：字体署名
 
-本软件内置以下字体：
+本软件内置以下字体，完整官方许可正文随包内嵌（`app/assets/licenses/`），并可在「设置 → 关于 → 字体署名」中完整查看：
 
-- **MiSans**（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）
+- **MiSans**（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）——界面正文字体
+- **Manrope**（© The Manrope Project Authors，**SIL Open Font License 1.1**）——启动页字标专用
+- **EtaIcons**（自建图标字体；字形来自 **MingCute（Apache-2.0）** 为主、**Tabler（MIT）** / **Lucide（ISC）** 补入）——界面图标
+- **EtaMark**（自建品牌标识字体，无第三方字体许可义务）
 
 上述字体仅用于界面文字渲染。若您再分发本软件，请一并遵守相应字体的许可条款。
 

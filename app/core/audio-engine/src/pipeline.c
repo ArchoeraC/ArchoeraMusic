@@ -101,6 +101,18 @@ struct AudioPipeline {
     Tempo       *tempo;
     FFTAnalyzer *fft;
 
+    /* 响度归一化：ReplayGain 标签（创建时读一次）+ Dart/扫描器兜底增益。
+     * 增益解析优先级：album/track 标签（按 norm_album）> 兜底增益 > 0。 */
+    bool   norm_enabled;     /* 归一化开关 */
+    int    norm_album;       /* 0=track / 1=album */
+    float  norm_fallback_db; /* 兜底增益（dB；仅无标签时使用） */
+    int    rg_has_track;     /* 1 = 文件含 track 增益标签 */
+    int    rg_has_album;     /* 1 = 文件含 album 增益标签 */
+    float  rg_track_gain_db;
+    float  rg_track_peak;
+    float  rg_album_gain_db;
+    float  rg_album_peak;
+
     EngineConfig cfg;
 
     /* 临时缓冲：存放重采样后的 float PCM */
@@ -328,6 +340,50 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
     return 0;
 }
 
+/* 解析并下发响度归一化增益（创建时读标签后、运行时改开关/增益/口径后调用）。
+ * 优先级：album 标签（按 norm_album）→ track 标签 → 兜底增益 → 0。
+ * 标签路径按 peak 做削波保护（兜底增益由调用方预削波）。 */
+static void pipeline_apply_normalization(AudioPipeline *p)
+{
+    if (!p || !p->loudness) return;
+    if (!p->norm_enabled) {
+        loudness_set_enabled(p->loudness, false);
+        return;
+    }
+
+    float gain = p->norm_fallback_db;
+    float peak = 0.0f;
+    bool  from_tag = false;
+    const char *kind = "fallback";
+    if (p->norm_album && p->rg_has_album) {
+        gain = p->rg_album_gain_db;
+        peak = p->rg_album_peak;
+        from_tag = true;
+        kind = "album(RG)";
+    } else if (p->rg_has_track) {
+        gain = p->rg_track_gain_db;
+        peak = p->rg_track_peak;
+        from_tag = true;
+        kind = "track(RG)";
+    }
+
+    /* 削波保护（仅标签路径）：peak 为线性峰值，限制 peak·10^(g/20) ≤ 1。 */
+    bool limited = false;
+    if (from_tag && peak > 1e-6f) {
+        float max_gain_db = -20.0f * log10f(peak);
+        if (gain > max_gain_db) {
+            gain = max_gain_db;
+            limited = true;
+        }
+    }
+
+    bool effective = (gain != 0.0f);
+    loudness_set_enabled(p->loudness, effective);
+    loudness_set_gain(p->loudness, gain);
+    ERA_LOGI(NULL, "%s 响度归一化: %s gain=%.2fdB%s%s\n", LOG_TAG, kind,
+            gain, limited ? " (峰限)" : "", effective ? "" : "（无增益，等效关闭）");
+}
+
 /* pipeline_create / pipeline_create_store 共用实现：store 非空 → SegStore
  * 内存源（整曲已驻留，可 seek），经 AVIO + decoder_open_mem 解码；store 为空
  * → 磁盘/URL 源，完全走现状（engine_mode==EraAudio 优先自研内核，回退 FFmpeg）。 */
@@ -522,10 +578,22 @@ static AudioPipeline* pipeline_create_impl(const char *source,
         ERA_LOGE(NULL, "%s 响度归一化创建失败\n", LOG_TAG);
         goto fail;
     }
-    if (cfg->normalization && cfg->normalization_gain != 0.0f) {
-        loudness_set_enabled(p->loudness, true);
-        loudness_set_gain(p->loudness, cfg->normalization_gain);
+    p->norm_enabled = cfg->normalization;
+    p->norm_album = cfg->normalization_album ? 1 : 0;
+    p->norm_fallback_db = cfg->normalization_gain;
+    if (p->dec) {
+        /* 文件内 ReplayGain 标签（FFmpeg 后端；native 内核路径无 FFmpeg
+         * fmt_ctx，仅用兜底增益）。 */
+        float tg = 0.0f, tp = 0.0f, ag = 0.0f, ap = 0.0f;
+        int mask = decoder_replaygain(p->dec, &tg, &tp, &ag, &ap);
+        p->rg_has_track = (mask & 0x1) ? 1 : 0;
+        p->rg_has_album = (mask & 0x4) ? 1 : 0;
+        p->rg_track_gain_db = tg;
+        p->rg_track_peak = tp;
+        p->rg_album_gain_db = ag;
+        p->rg_album_peak = ap;
     }
+    pipeline_apply_normalization(p);
 
     /* 3.3 限幅器 */
     p->limiter = limiter_create(out_rate, out_channels);
@@ -997,8 +1065,23 @@ void pipeline_set_pcm_out_cb(AudioPipeline *p, PcmOutCallback cb, void *user_dat
 
 void pipeline_set_normalization_enabled(AudioPipeline *p, bool enabled)
 {
-    if (!p || !p->loudness) return;
-    loudness_set_enabled(p->loudness, enabled);
+    if (!p) return;
+    p->norm_enabled = enabled;
+    pipeline_apply_normalization(p);
+}
+
+void pipeline_set_normalization_gain(AudioPipeline *p, float gain_db)
+{
+    if (!p) return;
+    p->norm_fallback_db = gain_db;
+    pipeline_apply_normalization(p);
+}
+
+void pipeline_set_normalization_album(AudioPipeline *p, int album)
+{
+    if (!p) return;
+    p->norm_album = album ? 1 : 0;
+    pipeline_apply_normalization(p);
 }
 
 void pipeline_set_limiter_enabled(AudioPipeline *p, bool enabled)

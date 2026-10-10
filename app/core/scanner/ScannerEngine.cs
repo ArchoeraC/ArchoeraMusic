@@ -73,6 +73,9 @@ public sealed class ScannerEngine
     private readonly int _maxScanErrors;
     private readonly int _maxParallelism;
 
+    /// <summary>是否执行离线 EBU R128 响度分析（--analyze-loudness；默认关闭）。</summary>
+    private readonly bool _analyzeLoudness;
+
     private sealed class ScanCounters
     {
         public int Scanned;
@@ -93,7 +96,8 @@ public sealed class ScannerEngine
         int? maxScanErrors = null,
         int? maxParallelism = null,
         IReadOnlyCollection<string>? extraExtensions = null,
-        Action<ScanProgress>? progressSink = null)
+        Action<ScanProgress>? progressSink = null,
+        bool analyzeLoudness = false)
     {
         _db = db;
         _coverCacheDir = coverCacheDir;
@@ -101,6 +105,7 @@ public sealed class ScannerEngine
         _adaptiveBatch = new AdaptiveBatchSize(batchSize); // batchSize = 0 不限，作为用户上限
         _incremental = incremental;
         _progressSink = progressSink;
+        _analyzeLoudness = analyzeLoudness;
 
         // 扩展名白名单：内置 + 用户额外追加（去点、小写、去重由 HashSet 保证）
         _audioExt = (extraExtensions is { Count: > 0 })
@@ -623,6 +628,18 @@ public sealed class ScannerEngine
                     $"(size={info.Length}, codec={track.Codec ?? "?"})");
             failReason = "empty_audio";
             return null;
+        }
+
+        // 可选：离线 EBU R128 响度分析（--analyze-loudness，默认关闭）。
+        // 内核不可用 / 未接管格式 / 测量无效（静音等）→ 不写列（保持 NULL）。
+        if (_analyzeLoudness)
+        {
+            var loud = KernelLoudness.TryMeasure(filePath);
+            if (loud is { Valid: true } r)
+            {
+                track.LoudnessLufs = r.IntegratedLufs;
+                track.LoudnessPeak = r.Peak;
+            }
         }
         return track;
     }

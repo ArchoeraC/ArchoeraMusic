@@ -20,6 +20,9 @@ void showTrackContextMenu(
       track.source == 'neko';
   // 可下载来源：KG/NT（Rust 自研）+ QQMusic/Neko（Dart 播放管线回退）。
   final canDownload = isOnline || track.source == 'qqmusic';
+  // 可查看歌手 / 媒体详情：QQ 评论/歌手详情适配已接通，一并纳入（QQ 的
+  // 收藏/评论入口暂仍按 [isOnline] 保持既有行为）。
+  final canViewArtist = isOnline || track.source == 'qqmusic';
   final liked = ref.read(likeControllerProvider).isLiked(track);
   final toggle = onToggleLike ?? (t) => _defaultToggleLike(context, ref, t);
   final l10n = context.l10n;
@@ -53,35 +56,28 @@ void showTrackContextMenu(
           icon: EtaIcons.chatOutline,
           onTap: () => showCommentDialog(context, track: track),
         ),
+      ],
+      // 查看歌手 / 媒体详情：在线来源通用（含 QQ）。
+      if (canViewArtist) ...[
         SContextMenuItem.divider(),
-        if (track.source == 'netease' &&
-            track.artists.isNotEmpty &&
-            track.artists.first.id != null)
+        // 查看歌手：按来源分发到各平台歌手详情（NT/KG/QQ/NK 均已接通）。
+        // Neko 无歌手 id，以名字作 id（与详情弹窗约定一致）。
+        if (track.artists.isNotEmpty)
           SContextMenuItem(
             label: l10n.menuViewArtist,
             icon: EtaIcons.userOutline,
             onTap: () {
               final artist = track.artists.first;
-              showNeteaseArtistDialog(
+              sourcePlatform(track.source).openCover(
                 context,
+                ref,
+                SourceSearchKind.artist,
                 CoverItem(
-                  id: artist.id!,
+                  id: artist.id ?? artist.name,
                   title: artist.name,
                   cover: track.cover,
+                  source: track.source,
                 ),
-              );
-            },
-          ),
-        // Neko 无歌手 id，只能用名字搜索；点击查看该歌手曲目。
-        if (track.source == 'neko' && track.artists.isNotEmpty)
-          SContextMenuItem(
-            label: l10n.menuViewArtist,
-            icon: EtaIcons.userOutline,
-            onTap: () {
-              final artist = track.artists.first;
-              showNekoArtistDialog(
-                context,
-                CoverItem(id: artist.name, title: artist.name),
               );
             },
           ),

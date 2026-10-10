@@ -127,7 +127,9 @@ extension _QueuePanelView on QueuePanel {
           theme: theme,
           l10n: l10n,
           onToggleShuffle: notifier.toggleShuffle,
-          onCycleRepeat: notifier.cycleRepeatMode,
+          onCycleRepeat: aprilFoolsActiveNotifier.value
+              ? notifier.cycleRepeatModeReverse
+              : notifier.cycleRepeatMode,
           onClear: queue.isEmpty ? null : notifier.clearQueue,
         ),
         const Divider(height: 1),

@@ -98,6 +98,8 @@ flutter:
   assets:
     - pubspec.yaml
     - assets/icons/
+    # 字体/图标官方许可正文（「关于 → 字体署名」弹窗完整展示；随包分发）
+    - assets/licenses/
 
   # GLSL 片元着色器（P2：播放页水纹背景，见 docs/player-render-optimization.md）
   shaders:

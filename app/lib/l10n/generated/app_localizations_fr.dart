@@ -95,9 +95,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get tagEditorSave => 'Enregistrer';
 
   @override
-  String get tagEditorSaving => 'Enregistrement…';
-
-  @override
   String get tagEditorSaved => 'Métadonnées enregistrées';
 
   @override
@@ -105,10 +102,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get tagEditorNoPath => 'Chemin du fichier local manquant';
-
-  @override
-  String get tagEditorUnsupportedFormat =>
-      'Format de fichier non pris en charge';
 
   @override
   String get tagEditorDuration => 'Durée';
@@ -158,9 +151,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get tagEditorBatchApply => 'Appliquer à la sélection';
-
-  @override
-  String get tagEditorBatchApplying => 'Application…';
 
   @override
   String get tagEditorBatchNoEditable =>
@@ -374,14 +364,6 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsSuppressSleepOff =>
       'Le système peut se mettre en veille après inactivité';
-
-  @override
-  String get settingsBackgroundUnload =>
-      'Décharger les pages visitées en arrière-plan';
-
-  @override
-  String get settingsBackgroundUnloadSubtitle =>
-      'Libère listes et images en réduit/barre d’état/écran éteint ; reconstruit au retour (perte possible du défilement)';
 
   @override
   String get settingsCloseBehavior => 'À la fermeture de l\'application';
@@ -1375,9 +1357,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get menuViewArtist => 'Voir l\'artiste';
 
   @override
-  String get pageSearchArtistComingSoon => 'Page artiste (phase 2)';
-
-  @override
   String get pageSearchInputHint => 'Entrez un mot-clé pour rechercher';
 
   @override
@@ -1821,7 +1800,8 @@ class AppLocalizationsFr extends AppLocalizations {
       'Moteur audio · Comportement de lecture';
 
   @override
-  String get settingsLyricsSubtitle => 'Paroles du lecteur · Paroles de bureau';
+  String get settingsLyricsSubtitle =>
+      'Paroles du lecteur et de la barre, styles et sources';
 
   @override
   String get settingsPresetSubtitle =>
@@ -1952,9 +1932,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsFontMiSans => 'MiSans（par défaut）';
-
-  @override
-  String get settingsFontMiSansLabel => 'MiSans';
 
   @override
   String get settingsSectionLanguage => 'Langue de l\'interface';
@@ -2502,9 +2479,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（ligne actuelle +3px en surbrillance）';
   }
-
-  @override
-  String get settingsLyricLineHeight => 'Hauteur de ligne des paroles';
 
   @override
   String get settingsLyricPlayedColor => 'Couleur lue';
@@ -3497,6 +3471,24 @@ class AppLocalizationsFr extends AppLocalizations {
       'Exécuter ce programme ? En cas de conséquences irréversibles, vous pouvez fermer le logiciel.';
 
   @override
+  String get settingsWeirdEffects => 'Effets bizarres';
+
+  @override
+  String get settingsWeirdEffectsOn =>
+      'Blague inversée active — touchez « Je capitule » pour restaurer';
+
+  @override
+  String get settingsWeirdEffectsOff =>
+      'N\'apparaît que le 1ᵉʳ avril ; une fois activé, disparaît jusqu\'au prochain poisson d\'avril';
+
+  @override
+  String get aprilFoolsSurrender => 'Je capitule';
+
+  @override
+  String get aprilFoolsSurrenderToast =>
+      'Joyeux poisson d\'avril ! Tout est revenu à la normale.';
+
+  @override
   String get settingsSectionDeclaration => 'Déclaration logicielle';
 
   @override
@@ -3704,7 +3696,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      'Ce logiciel intègre la police suivante :\n· MiSans (© Xiaomi, utilisée conformément à l\'accord de licence de propriété intellectuelle de la police MiSans)';
+      'Ce logiciel intègre les polices suivantes :\n· MiSans (© Xiaomi, selon l\'accord de licence de propriété intellectuelle de la police MiSans)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (police d\'icônes maison ; glyphes de MingCute / Tabler / Lucide)\n· EtaMark (police de marque maison)\n\nLes textes officiels complets des licences figurent ci-dessous.';
 
   @override
   String get commonNoLyrics => 'Pas de paroles';
@@ -3720,13 +3712,6 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsSearchColorSubtitle =>
       'Surbrillance ligne actuelle et couleur ligne normale';
-
-  @override
-  String get settingsSearchDesktopLyricsTitle => 'Paroles de bureau';
-
-  @override
-  String get settingsSearchDesktopLyricsSubtitle =>
-      'Fenêtre de paroles toujours au premier plan · Suit la lecture';
 
   @override
   String get settingsSearchDjModeTitle => 'Fuck DJ Mode';
@@ -4008,10 +3993,6 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsSearchLyricFontSizeSubtitle =>
       'Taille de police des paroles 14~28px';
-
-  @override
-  String get settingsSearchLyricLineHeightSubtitle =>
-      'Hauteur de ligne 42~64px';
 
   @override
   String get settingsSearchUncensorSubtitle =>
@@ -4596,6 +4577,17 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get settingsScanAnalyzeLoudness => 'Analyser la sonie pendant le scan';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOn =>
+      'Activé : décode chaque fichier pour mesurer (plus lent) ; les pistes existantes nécessitent un scan complet';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOff =>
+      'Désactivé : aucune mesure (la normalisation n\'utilise que les balises ReplayGain du fichier)';
+
+  @override
   String get settingsSectionScanLimits => 'Limites de sécurité';
 
   @override
@@ -5095,10 +5087,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsLyricTtmlServer => 'Serveur AMLL DB';
 
   @override
-  String get settingsLyricTtmlServerDesc =>
-      'Modèle URL pour les requêtes de paroles ; peut pointer vers un serveur personnel ou un miroir';
-
-  @override
   String get settingsLyricTtmlServerDialogTitle => 'Modèle de serveur AMLL DB';
 
   @override
@@ -5317,6 +5305,19 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsNormalizationOff => 'Off';
 
   @override
+  String get settingsNormalizationMode => 'Mode ReplayGain';
+
+  @override
+  String get settingsNormalizationModeDesc =>
+      'Quelle balise ReplayGain utiliser si présente (l\'analyse hors ligne est par piste)';
+
+  @override
+  String get settingsNormalizationModeTrack => 'Piste';
+
+  @override
+  String get settingsNormalizationModeAlbum => 'Album';
+
+  @override
   String get settingsSectionSpeed => 'Playback speed';
 
   @override
@@ -5327,6 +5328,22 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsPlaybackSpeedNormal => 'Normal speed';
+
+  @override
+  String get settingsSectionPitch => 'Hauteur';
+
+  @override
+  String get settingsPitch => 'Décalage de hauteur';
+
+  @override
+  String get settingsPitchDesc =>
+      'Modifier la hauteur sans changer la vitesse de lecture';
+
+  @override
+  String get settingsPitchNormal => 'Hauteur d\'origine';
+
+  @override
+  String get settingsPitchUnit => 'st';
 
   @override
   String get settingsSectionSystem => 'System integration';

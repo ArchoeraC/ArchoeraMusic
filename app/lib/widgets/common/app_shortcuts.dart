@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/router.dart';
+import '../../easter_egg/april_fools_state.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/shortcuts/shortcut_action.dart';
 import '../../services/shortcuts/shortcut_binding.dart';

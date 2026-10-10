@@ -60,6 +60,13 @@ MPL-1.1 / 公有领域）。
   [Neko 歌姬计划 API 文档](https://github.com/FantasyNetworkCN/NekoMusicDocs) 链接。
 - **默认状态**：**关闭**；仅用户显式开启该实验性音源后才会请求其服务。
 
+## 字体 / 图标许可
+
+随包内嵌的字体（**MiSans**、**Manrope**）与自建图标字体 **EtaIcons**（字形来自
+MingCute / Tabler / Lucide）的**官方许可正文**一并随 `licenses/` 目录分发
+（同源文件见 `app/assets/licenses/`），并在「设置 → 关于 → 字体署名」中完整展示。
+字体/图标来源与许可逐项见 `docs/acknowledgements.md`。
+
 ## 合规说明（非法律意见）
 
 - FFmpeg / TagLib 均以**动态库**形式使用，未静态合并；本仓库随源码提供构建配置，

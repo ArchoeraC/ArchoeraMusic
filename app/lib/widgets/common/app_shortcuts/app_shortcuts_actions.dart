@@ -69,11 +69,22 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
         // ignore: discarded_futures
         pb.stop();
       case ShortcutAction.next:
-        // ignore: discarded_futures
-        pb.playNext();
+        // 奇怪的特效：快捷键也反向（仅 UI 派发，内部自动续播不受影响）。
+        if (aprilFoolsActiveNotifier.value) {
+          // ignore: discarded_futures
+          pb.playPrevious();
+        } else {
+          // ignore: discarded_futures
+          pb.playNext();
+        }
       case ShortcutAction.previous:
-        // ignore: discarded_futures
-        pb.playPrevious();
+        if (aprilFoolsActiveNotifier.value) {
+          // ignore: discarded_futures
+          pb.playNext();
+        } else {
+          // ignore: discarded_futures
+          pb.playPrevious();
+        }
       case ShortcutAction.likeToggle:
         final track = s.track;
         if (track != null) {
@@ -83,7 +94,11 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
       case ShortcutAction.shuffleToggle:
         pb.toggleShuffle();
       case ShortcutAction.repeatCycle:
-        pb.cycleRepeatMode();
+        if (aprilFoolsActiveNotifier.value) {
+          pb.cycleRepeatModeReverse();
+        } else {
+          pb.cycleRepeatMode();
+        }
       case ShortcutAction.reload:
         // ignore: discarded_futures
         pb.reload();

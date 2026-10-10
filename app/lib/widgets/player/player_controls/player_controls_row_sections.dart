@@ -61,6 +61,7 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
     required this.l10n,
     required this.colorScheme,
     required this.notifier,
+    required this.prank,
   });
 
   final bool hasContent;
@@ -72,6 +73,9 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
   final dynamic l10n;
   final ColorScheme colorScheme;
   final PlaybackNotifier notifier;
+
+  /// 奇怪的特效：上一首/下一首互换、循环反向。
+  final bool prank;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +96,9 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
           icon: EtaIcons.skipPrevious,
           size: 26,
           color: colorScheme.onSurface,
-          onPressed: hasQueue ? notifier.playPrevious : null,
+          onPressed: hasQueue
+              ? (prank ? notifier.playNext : notifier.playPrevious)
+              : null,
         ),
         const SizedBox(width: 14),
         Tooltip(
@@ -134,7 +140,9 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
           icon: EtaIcons.skipForward,
           size: 26,
           color: colorScheme.onSurface,
-          onPressed: hasQueue ? notifier.playNext : null,
+          onPressed: hasQueue
+              ? (prank ? notifier.playPrevious : notifier.playNext)
+              : null,
         ),
         const SizedBox(width: 12),
         CtrlIcon(
@@ -149,7 +157,11 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
           color: repeatMode == 'off'
               ? colorScheme.onSurfaceVariant
               : colorScheme.primary,
-          onPressed: hasContent ? notifier.cycleRepeatMode : null,
+          onPressed: hasContent
+              ? (prank
+                    ? notifier.cycleRepeatModeReverse
+                    : notifier.cycleRepeatMode)
+              : null,
         ),
       ],
     );

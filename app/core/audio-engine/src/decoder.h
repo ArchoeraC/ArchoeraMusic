@@ -61,6 +61,23 @@ int decoder_read_frame(Decoder *d, AVFrame **frame);
  */
 int decoder_seek_ms(Decoder *d, int64_t offset_ms);
 
+/**
+ * 读取源内嵌的 ReplayGain 元数据（FFmpeg 后端；tags → dB / 线性峰值）。
+ *
+ * 同时查 format 级与音频流级 metadata，识别 `REPLAYGAIN_*`（大小写不敏感）
+ * 与 Opus 的 `R128_*`（Q7.8 定点）。缺失字段保持调用方初值不变。
+ *
+ * @param track_gain_db 输出：track 增益（dB）
+ * @param track_peak    输出：track 峰值（线性，0 = 未知）
+ * @param album_gain_db 输出：album 增益（dB）
+ * @param album_peak    输出：album 峰值（线性，0 = 未知）
+ * @return 位掩码：bit0 track_gain / bit1 track_peak / bit2 album_gain /
+ *         bit3 album_peak；0 = 无任何 ReplayGain 标签。
+ */
+int decoder_replaygain(const Decoder *d,
+                       float *track_gain_db, float *track_peak,
+                       float *album_gain_db, float *album_peak);
+
 /** 获取源音频流参数 */
 int decoder_sample_rate(const Decoder *d);
 int decoder_channels(const Decoder *d);

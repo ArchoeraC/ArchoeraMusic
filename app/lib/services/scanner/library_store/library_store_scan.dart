@@ -46,6 +46,7 @@ mixin _LibraryStoreScan on Notifier<LibraryState>, _LibraryStoreCore {
         maxScanFiles: ref.read(appPrefsProvider).scanMaxScanFiles,
         maxScanErrors: ref.read(appPrefsProvider).scanMaxScanErrors,
         extraExts: ref.read(appPrefsProvider).scanExtraExts,
+        analyzeLoudness: ref.read(appPrefsProvider).scanAnalyzeLoudness,
       );
       state = state.copyWith(
         scanning: false,

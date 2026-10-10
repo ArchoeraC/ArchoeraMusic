@@ -736,9 +736,8 @@
 > 1. **后台清缓存（默认开）**：最小化/托盘隐藏/熄屏时，`power_saver.dart` 释放
 >    `ImageCache`（`clear` + `clearLiveImages`）、歌词三件套、封面色缓存、Netease 接口
 >    LRU——返回前台按需重载，不影响播放。
-> 2. **根级后台卸载门（`app/background_unload_gate.dart`）**：开启
->    `power.unloadBackgroundPages`（播放设置 · 电源，默认关）或强迫症
->    `preset.unloadAllMemory` 且应用进入不可见后台时，把**整棵路由子树**
+> 2. **根级后台卸载门（`app/background_unload_gate.dart`）**：开启强迫症
+>    `preset.unloadAllMemory`（预设 · 强迫症，默认关）且应用进入不可见后台时，把**整棵路由子树**
 >    （`MaterialApp.router` 的 Navigator：全部页面 / 弹窗 / 播放页）卸为纯色，
 >    恢复后重建。`MaterialApp`/Splash/Vault 门保持挂载（恢复不重放 Splash）。
 >    强迫症档额外 `appRouter.go('/')` 复位导航，丢弃分支/Tab/嵌套路由。

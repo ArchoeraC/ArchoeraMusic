@@ -7,7 +7,6 @@ import 'app_prefs.dart';
 // ── 电源域键（power. 前缀）────────────────────────────────────
 const powerSaverKey = 'power.saver';
 const suppressSleepKey = 'power.suppressSleep';
-const unloadBackgroundPagesKey = 'power.unloadBackgroundPages';
 
 /// 电源域偏好：节能模式、禁用系统休眠与后台卸载页面。
 extension PowerPrefs on AppPrefs {
@@ -18,24 +17,15 @@ extension PowerPrefs on AppPrefs {
   /// 禁用系统休眠（默认关）：开启后保持系统唤醒，防止后台播放被休眠中断。
   bool get suppressSleep => data[suppressSleepKey] as bool? ?? false;
 
-  /// 后台卸载已访问页面（默认关）：最小化/托盘隐藏/熄屏时把壳内页面
-  /// （列表/封面/滚动状态）临时卸载为占位，恢复窗口后重建——用少量重建立
-  /// 成本换后台常驻内存（见 docs/runtime-resource-optimization.md §4）。
-  /// 关闭时页面常驻（保持滚动位置，无重建）。
-  bool get unloadBackgroundPages =>
-      data[unloadBackgroundPagesKey] as bool? ?? false;
-
-  /// 节能设置：节能模式总开关 + 禁用系统休眠 + 后台卸载页面。
-  AppPrefs copyWithPower({
-    bool? saver,
-    bool? suppressSleep,
-    bool? unloadBackgroundPages,
-  }) => AppPrefs(
+  /// 节能设置：节能模式总开关 + 禁用系统休眠。
+  ///
+  /// 注：早期「后台卸载已访问页面」独立开关已废弃——后台 UI 子树卸载统一由
+  /// 预设档 `unloadAllMemory`（[PresetPrefs]）驱动，见 `BackgroundUnloadGate`。
+  AppPrefs copyWithPower({bool? saver, bool? suppressSleep}) => AppPrefs(
     initialData: {
       ...data,
       powerSaverKey: ?saver,
       suppressSleepKey: ?suppressSleep,
-      unloadBackgroundPagesKey: ?unloadBackgroundPages,
     },
   );
 }

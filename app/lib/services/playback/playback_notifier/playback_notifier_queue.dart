@@ -324,6 +324,15 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     setRepeatMode(next);
   }
 
+  /// 反向循环切换（奇怪的特效 UI 专用）：切到 [repeatModeCycle] 中的**前一项**。
+  /// 不改动 [cycleRepeatMode]，自动续播等内部路径仍走正向。
+  void cycleRepeatModeReverse() {
+    final cycle = repeatModeCycle;
+    final i = cycle.indexOf(state.repeatMode);
+    final prev = cycle[(i - 1 + cycle.length) % cycle.length];
+    setRepeatMode(prev);
+  }
+
   void setShuffle(bool on) {
     if (state.shuffle == on) return;
     if (on) {

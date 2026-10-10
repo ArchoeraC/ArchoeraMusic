@@ -93,9 +93,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tagEditorSave => '保存';
 
   @override
-  String get tagEditorSaving => '保存中…';
-
-  @override
   String get tagEditorSaved => 'メタデータを保存しました';
 
   @override
@@ -103,9 +100,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get tagEditorNoPath => 'ローカルファイルのパスがありません';
-
-  @override
-  String get tagEditorUnsupportedFormat => '未対応のファイル形式';
 
   @override
   String get tagEditorDuration => '再生時間';
@@ -151,9 +145,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get tagEditorBatchApply => '選択項目に適用';
-
-  @override
-  String get tagEditorBatchApplying => '適用中…';
 
   @override
   String get tagEditorBatchNoEditable => '選択した曲はいずれもメタデータの編集に対応していません';
@@ -362,13 +353,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSuppressSleepOff => 'システムはアイドル時にスリープする可能性があります';
-
-  @override
-  String get settingsBackgroundUnload => 'バックグラウンドで閲覧済みページを解放';
-
-  @override
-  String get settingsBackgroundUnloadSubtitle =>
-      '最小化/トレイ/画面オフ時にリストと画像を解放し、復帰時に再構築（スクロール位置が失われる場合あり）';
 
   @override
   String get settingsCloseBehavior => 'アプリを閉じるとき';
@@ -1326,9 +1310,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get menuViewArtist => 'アーティストを表示';
 
   @override
-  String get pageSearchArtistComingSoon => 'アーティストページは Phase 2 で対応';
-
-  @override
   String get pageSearchInputHint => 'キーワードを入力して検索';
 
   @override
@@ -1754,7 +1735,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsPlaybackSubtitle => 'オーディオエンジン · 再生動作';
 
   @override
-  String get settingsLyricsSubtitle => 'プレーヤー歌詞 · デスクトップ歌詞';
+  String get settingsLyricsSubtitle => 'プレーヤー／バー歌詞・スタイル・ソース';
 
   @override
   String get settingsPresetSubtitle => '再生フィルター · 歌詞復元 · リストタグ';
@@ -1876,9 +1857,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsFontMiSans => 'MiSans（デフォルト）';
-
-  @override
-  String get settingsFontMiSansLabel => 'MiSans';
 
   @override
   String get settingsSectionLanguage => 'インターフェース言語';
@@ -2388,9 +2366,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String settingsLyricFontSizeDesc({required Object size}) {
     return '${size}px（現在行は拡大ハイライト）';
   }
-
-  @override
-  String get settingsLyricLineHeight => '歌詞行高';
 
   @override
   String get settingsLyricPlayedColor => '再生済み色';
@@ -3319,6 +3294,22 @@ class AppLocalizationsJa extends AppLocalizations {
       'このプログラムを実行しますか？取り返しのつかない結果になった場合、ソフトウェアを終了することを選択できます。';
 
   @override
+  String get settingsWeirdEffects => '奇妙なエフェクト';
+
+  @override
+  String get settingsWeirdEffectsOn => '逆再生いたずら中——「降参します」で元に戻せます';
+
+  @override
+  String get settingsWeirdEffectsOff =>
+      'エイプリルフール当日のみ表示。一度有効にすると次のエイプリルフールまで消えます';
+
+  @override
+  String get aprilFoolsSurrender => '降参します';
+
+  @override
+  String get aprilFoolsSurrenderToast => 'エイプリルフールおめでとう！すべて元に戻りました。';
+
+  @override
   String get settingsSectionDeclaration => 'ソフトウェア声明';
 
   @override
@@ -3518,7 +3509,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsFontCreditsText =>
-      '本ソフトウェアには以下のフォントが同梱されています。\n· MiSans（© Xiaomi、MiSans フォント知的財産権許諾契約に基づき使用）';
+      '本ソフトウェアには以下のフォントが同梱されています。\n· MiSans（© Xiaomi、MiSans フォント知的財産権許諾契約に基づき使用）\n· Manrope（© The Manrope Project Authors、SIL Open Font License 1.1）\n· EtaIcons（自作アイコンフォント、字形は MingCute / Tabler / Lucide 由来）\n· EtaMark（自作ブランドマークフォント）\n\n以下に各フォント・字形の公式ライセンス全文を掲載します。';
 
   @override
   String get commonNoLyrics => '歌詞がありません';
@@ -3533,12 +3524,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSearchColorSubtitle => '現在行のハイライトと通常行の色';
-
-  @override
-  String get settingsSearchDesktopLyricsTitle => 'デスクトップ歌詞';
-
-  @override
-  String get settingsSearchDesktopLyricsSubtitle => '最前面の独立歌詞ウィンドウ';
 
   @override
   String get settingsSearchDjModeTitle => 'Fuck DJ Mode';
@@ -3794,9 +3779,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSearchLyricFontSizeSubtitle => '14~28px プレーヤー歌詞フォントサイズ';
-
-  @override
-  String get settingsSearchLyricLineHeightSubtitle => '42~64px 行高';
 
   @override
   String get settingsSearchUncensorSubtitle => '歌詞の伏せ字を復元';
@@ -4354,6 +4336,17 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get settingsScanAnalyzeLoudness => 'スキャン時にラウドネスを解析';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOn =>
+      'オン：各ファイルをデコードして測定（低速）；既存曲には全スキャンが必要';
+
+  @override
+  String get settingsScanAnalyzeLoudnessOff =>
+      'オフ：測定しない（正規化はファイル内 ReplayGain タグのみ使用）';
+
+  @override
   String get settingsSectionScanLimits => '安全上限';
 
   @override
@@ -4842,9 +4835,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLyricTtmlServer => 'AMLL DB サーバー';
 
   @override
-  String get settingsLyricTtmlServerDesc => '歌詞リクエストの URL テンプレート（自前・ミラーに変更可能）';
-
-  @override
   String get settingsLyricTtmlServerDialogTitle => 'AMLL DB サーバーテンプレート';
 
   @override
@@ -5063,6 +5053,19 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsNormalizationOff => 'Off';
 
   @override
+  String get settingsNormalizationMode => 'ReplayGain モード';
+
+  @override
+  String get settingsNormalizationModeDesc =>
+      'ReplayGain タグがある場合の適用基準（オフライン解析はトラック単位）';
+
+  @override
+  String get settingsNormalizationModeTrack => 'トラック';
+
+  @override
+  String get settingsNormalizationModeAlbum => 'アルバム';
+
+  @override
   String get settingsSectionSpeed => 'Playback speed';
 
   @override
@@ -5073,6 +5076,21 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsPlaybackSpeedNormal => 'Normal speed';
+
+  @override
+  String get settingsSectionPitch => 'ピッチ';
+
+  @override
+  String get settingsPitch => 'ピッチシフト';
+
+  @override
+  String get settingsPitchDesc => '再生速度を変えずにピッチを変更';
+
+  @override
+  String get settingsPitchNormal => '原音のピッチ';
+
+  @override
+  String get settingsPitchUnit => '半音';
 
   @override
   String get settingsSectionSystem => 'System integration';

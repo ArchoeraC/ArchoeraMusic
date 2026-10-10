@@ -104,7 +104,7 @@ public static class KernelMetadata
         return ext.Length > 1 && KernelExts.Contains(ext.Substring(1));
     }
 
-    private static void EnsureResolver()
+    internal static void EnsureResolver()
     {
         if (_resolverReady) return;
         lock (Gate)
