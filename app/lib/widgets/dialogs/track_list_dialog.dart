@@ -320,7 +320,17 @@ class _TrackListDialogState extends ConsumerState<TrackListDialog> {
   @override
   void initState() {
     super.initState();
-    _future = widget.loadTracks(ref);
+    _future = _deferredLoad();
+  }
+
+  /// 让出一帧再执行 [TrackListDialog.loadTracks]：部分加载器会**同步修改
+  /// provider**（如每日推荐 `dailyShelfProvider.ensure()`）；直接在 initState
+  /// （构建期）调用会触发 Riverpod「Tried to modify a provider…」断言，其错误
+  /// 会一路冒泡成本弹窗的「加载失败」。
+  Future<List<Track>> _deferredLoad() async {
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return const [];
+    return widget.loadTracks(ref);
   }
 
   Future<void> _reload() {
@@ -382,7 +392,15 @@ class _KugouBrowseDialogState extends ConsumerState<_KugouBrowseDialog> {
   @override
   void initState() {
     super.initState();
-    _future = widget.loader(ref);
+    _future = _deferredLoad();
+  }
+
+  /// 同 [_TrackListDialogState._deferredLoad]：让出一帧再执行加载器，避免
+  /// 加载器在构建期同步修改 provider。
+  Future<List<CoverItem>> _deferredLoad() async {
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return const [];
+    return widget.loader(ref);
   }
 
   void _reloadBrowse() {
