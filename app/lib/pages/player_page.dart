@@ -219,12 +219,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final l10n = context.l10n;
     final ok = await ref.read(likeControllerProvider).toggle(track);
     if (!ok && mounted) {
-      toast(switch (track.source) {
-        'kugou' => l10n.toastLoginRequiredKugou,
-        'qqmusic' => l10n.toastQqLikeSyncFailed,
-        'neko' => l10n.toastLoginRequiredNeko,
-        _ => l10n.toastLoginRequiredNetease,
-      }, type: ToastType.error);
+      toast(likeFailedTextFor(track.source, l10n), type: ToastType.error);
     }
   }
 

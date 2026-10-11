@@ -42,12 +42,7 @@ extension _PlayerPageView on _PlayerPageState {
       _lastBeatStrength = strength;
       _coverPulse.forward(from: 0);
     });
-    final canLike =
-        current != null &&
-        (current.source == 'netease' ||
-            current.source == 'kugou' ||
-            current.source == 'qqmusic' ||
-            current.source == 'neko');
+    final canLike = current != null && sourceSupportsLike(current.source);
     final liked = canLike
         ? ref.watch(likeControllerProvider).isLiked(current)
         : false;

@@ -328,19 +328,13 @@ class _CoverSourceTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (source) {
-      'netease' => ('云', const Color(0xFFC20C0C)),
-      'kugou' => ('酷', const Color(0xFF00A7E0)),
-      'qqmusic' => ('Q', const Color(0xFF31C27C)),
-      // 实验性音源 NekoMusic（聚合搜索徽标用 K）
-      'neko' => ('K', const Color(0xFF8B5CF6)),
-      _ => ('', Colors.transparent),
-    };
+    final sp = sourcePlatform(source);
+    final label = sp.badgeLabel;
     if (label.isEmpty) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
-        color: color,
+        color: sp.badgeColor,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(

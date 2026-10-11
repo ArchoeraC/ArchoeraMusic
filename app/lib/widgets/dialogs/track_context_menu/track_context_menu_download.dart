@@ -9,39 +9,35 @@ Future<void> downloadTracks(
   WidgetRef ref,
   List<Track> tracks,
 ) async {
-  // 支持的下载来源：KG/NT（Rust 自研解析）+ QQMusic/Neko/流媒体（Dart 播放管线回退）。
-  // Neko 音频直链公开、无需登录；流媒体直链由 Dart 侧带鉴权生成（format=raw 原文件）。
+  // 支持的下载来源由注册表声明（[SourcePlatform.downloadable]）。
   final online = tracks
-      .where(
-        (t) =>
-            t.source == 'netease' ||
-            t.source == 'kugou' ||
-            t.source == 'qqmusic' ||
-            t.source == 'neko' ||
-            t.source == 'streaming',
-      )
+      .where((t) => sourcePlatform(t.source).downloadable)
       .toList();
   if (online.isEmpty) return;
   // 流媒体下载提示（可「不再提示」）：源可由使用者自行保证访问/自建，长期下载到本地
   // 并不划算。右键菜单不提供流媒体下载入口，仅批量（歌单/专辑/多选）触发本提示。
-  final hasStreaming = online.any((t) => t.source == 'streaming');
+  final hasStreaming = online.any(
+    (t) => sourcePlatform(t.source).downloadDirectOnly,
+  );
   if (hasStreaming &&
       !ref.read(appPrefsProvider).downloadStreamingNoticeDismissed) {
     final proceed = await _confirmStreamingDownload(context, ref);
     if (!proceed || !context.mounted) return;
   }
-  // 仅 KG/NT 强制登录（QQ 免费曲免登录；VIP 曲解析失败由任务错误呈现）。
-  for (final src in const ['kugou', 'netease']) {
-    if (online.any((t) => t.source == src)) {
-      if (!await _ensureLoggedIn(context, ref, src)) return;
-    }
+  // 登录门槛由注册表声明（KG / NT 需要；QQ 免费曲免登录，VIP 失败由任务错误呈现）。
+  for (final src in {
+    for (final t in online)
+      if (sourcePlatform(t.source).downloadRequiresLogin) t.source,
+  }) {
+    if (!await _ensureLoggedIn(context, ref, src)) return;
   }
   if (!context.mounted) return;
   final l10n = context.l10n;
   final defaultQuality = ref.read(appPrefsProvider).downloadQuality;
-  // 流媒体服务端 format=raw 恒取原文件，无音质档；Neko 自「可选音质流」起
-  // 有 standard/hq/sq/hires 四档，需弹音质选择。
-  final directOnly = online.every((t) => t.source == 'streaming');
+  // 流媒体服务端 format=raw 恒取原文件，无音质档；其余源按档位选择。
+  final directOnly = online.every(
+    (t) => sourcePlatform(t.source).downloadDirectOnly,
+  );
   final quality = directOnly
       ? defaultQuality
       : await _pickDownloadQuality(context, defaultQuality);
@@ -53,19 +49,8 @@ Future<void> downloadTracks(
   var ok = 0;
   for (final t in online) {
     if (!context.mounted) return;
-    var target = t;
-    if (t.source == 'kugou' && t.kugou != null) {
-      final enriched = await ref
-          .read(kugouApiProvider)
-          .enrichKugouHashes(target);
-      if (enriched != null) target = enriched;
-    } else if (t.source == 'neko') {
-      // Neko 元数据不规范：入队前用其它音源补充/重写（标签与文件名受益），
-      // 并强制重写歌词（Neko 内嵌/平台歌词常为站点广告）。
-      target = await ref
-          .read(nekoMetadataEnricherProvider)
-          .enrich(target, fetchLyrics: true);
-    }
+    // 入队前预处理由注册表提供（KG 补 hash / Neko 元数据补全并重写歌词）。
+    final target = await sourcePlatform(t.source).prepareForDownload(ref, t);
     if (controller.enqueue(target, quality: quality) != null) ok++;
   }
   if (context.mounted) {
@@ -84,29 +69,14 @@ Future<bool> _ensureLoggedIn(
   WidgetRef ref,
   String source,
 ) async {
-  if (source == 'kugou') {
-    final s = ref.read(kugouApiProvider).session;
-    if (s != null && s.userid.isNotEmpty && s.token.isNotEmpty) return true;
-    if (!context.mounted) return false;
-    final go = await _showLoginPrompt(context, context.l10n.brandKugou);
-    if (!go || !context.mounted) return false;
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      barrierDismissible: false,
-      builder: (_) => const KgQrLoginDialog(),
-    );
-    return ok == true;
-  }
-  if (source == 'netease') {
-    if (getRuntime().sessionStore.get('netease').isNotEmpty) return true;
-    if (!context.mounted) return false;
-    final go = await _showLoginPrompt(context, context.l10n.brandNetease);
-    if (!go || !context.mounted) return false;
-    await showNeteaseLoginDialog(context);
-    return getRuntime().sessionStore.get('netease').isNotEmpty;
-  }
-  return true;
+  // 登录态与登录动作由音源注册表提供（不再硬编码 KG / NT 分支）。
+  final sp = sourcePlatform(source);
+  if (sp.loggedIn(ref)) return true;
+  if (!context.mounted) return false;
+  final go = await _showLoginPrompt(context, sp.label(context.l10n));
+  if (!go || !context.mounted) return false;
+  await sp.login(context);
+  return sp.loggedIn(ref);
 }
 
 Future<bool> _showLoginPrompt(BuildContext context, String platform) async {

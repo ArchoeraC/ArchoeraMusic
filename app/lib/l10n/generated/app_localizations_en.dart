@@ -5838,4 +5838,109 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpShellLblTagPaused => '[paused]';
+
+  @override
+  String get playlistCreateTitle => 'Create playlist';
+
+  @override
+  String get playlistCreateName => 'Playlist name';
+
+  @override
+  String get playlistCreateNameHint => 'Give the playlist a name';
+
+  @override
+  String get playlistCreatePrivacy => 'Set as private';
+
+  @override
+  String get playlistCreatePrivacyHint =>
+      'Private playlists are visible only to you';
+
+  @override
+  String get playlistCreateSubmit => 'Create';
+
+  @override
+  String get playlistCreateDone => 'Playlist created';
+
+  @override
+  String get playlistCreateFailed => 'Failed to create playlist';
+
+  @override
+  String get playlistCollect => 'Favorite playlist';
+
+  @override
+  String get playlistCollected => 'Favorited';
+
+  @override
+  String get playlistCollectDone => 'Playlist favorited';
+
+  @override
+  String get playlistUncollectDone => 'Removed from favorites';
+
+  @override
+  String get playlistCollectFailed => 'Favorite action failed';
+
+  @override
+  String get playlistEditTitle => 'Edit playlist';
+
+  @override
+  String get playlistEditName => 'Playlist name';
+
+  @override
+  String get playlistEditDesc => 'Playlist description';
+
+  @override
+  String get playlistEditDescHint => 'Describe this playlist (optional)';
+
+  @override
+  String get playlistEditDone => 'Playlist updated';
+
+  @override
+  String get playlistEditFailed => 'Failed to update playlist';
+
+  @override
+  String get playlistDeleteTitle => 'Delete playlist';
+
+  @override
+  String playlistDeleteConfirm({required Object name}) {
+    return 'Delete the playlist \"$name\"? This action cannot be undone.';
+  }
+
+  @override
+  String get playlistDeleteDone => 'Playlist deleted';
+
+  @override
+  String get playlistDeleteFailed => 'Failed to delete playlist';
+
+  @override
+  String get playlistPickTitle => 'Add to playlist';
+
+  @override
+  String get playlistPickEmpty => 'No playlists created yet';
+
+  @override
+  String get playlistPickEmptyHint =>
+      'Create a playlist and collect your favorite songs';
+
+  @override
+  String get playlistPickNew => 'New playlist';
+
+  @override
+  String playlistAdded({required Object count}) {
+    return 'Added $count songs to the playlist';
+  }
+
+  @override
+  String get playlistAlreadyIn => 'Song is already in this playlist';
+
+  @override
+  String get playlistAddFailed => 'Failed to add to playlist';
+
+  @override
+  String get playlistRemoveTrack => 'Remove from playlist';
+
+  @override
+  String get playlistRemoveDone => 'Removed from playlist';
+
+  @override
+  String get playlistRemoveFailed => 'Failed to remove';
 }

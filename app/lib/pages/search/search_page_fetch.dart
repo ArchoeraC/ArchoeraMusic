@@ -101,7 +101,7 @@ extension _SearchPageFetch on _SearchPageState {
       });
     } catch (e) {
       if (!mounted) return;
-      if (_platform == 'qqmusic') _sourceCooldown.markFailed('qqmusic');
+      if (_coolable(_platform)) _sourceCooldown.markFailed(_platform);
       setState(() {
         _error = _failureDetail(_platform, e);
         _songs = _songs.copyWith(loading: false, loadingMore: false);
@@ -163,14 +163,14 @@ extension _SearchPageFetch on _SearchPageState {
             ? st.loaded + a.result!.items.length
             : a.result!.items.length;
         okGroups.add(a.result!.items);
-        if (a.source == 'qqmusic') _sourceCooldown.clear('qqmusic');
+        if (_coolable(a.source)) _sourceCooldown.clear(a.source);
       } else {
         st
           ..failed = true
           ..error = a.error
           ..failedAt = DateTime.now()
           ..hasMore = false;
-        if (a.source == 'qqmusic') _sourceCooldown.markFailed('qqmusic');
+        if (_coolable(a.source)) _sourceCooldown.markFailed(a.source);
       }
     }
     final ordered = sortByRelevance(
@@ -204,7 +204,7 @@ extension _SearchPageFetch on _SearchPageState {
     final st = _songAgg[source];
     if (st == null || !st.failed) return;
     if (_songs.loading || _songs.loadingMore) return;
-    if (source == 'qqmusic' && _sourceCooldown.cooling('qqmusic')) {
+    if (_coolable(source) && _sourceCooldown.cooling(source)) {
       _toast(context.l10n.searchWaitRetry);
       return;
     }
@@ -255,7 +255,7 @@ extension _SearchPageFetch on _SearchPageState {
       setState(() => _setCoverState(_tab, merged));
     } catch (e) {
       if (!mounted) return;
-      if (_platform == 'qqmusic') _sourceCooldown.markFailed('qqmusic');
+      if (_coolable(_platform)) _sourceCooldown.markFailed(_platform);
       setState(() {
         _error = _failureDetail(_platform, e);
         _setCoverState(
@@ -331,14 +331,14 @@ extension _SearchPageFetch on _SearchPageState {
             ? st.loaded + a.result!.items.length
             : a.result!.items.length;
         okGroups.add(a.result!.items);
-        if (a.source == 'qqmusic') _sourceCooldown.clear('qqmusic');
+        if (_coolable(a.source)) _sourceCooldown.clear(a.source);
       } else {
         st
           ..failed = true
           ..error = a.error
           ..failedAt = DateTime.now()
           ..hasMore = false;
-        if (a.source == 'qqmusic') _sourceCooldown.markFailed('qqmusic');
+        if (_coolable(a.source)) _sourceCooldown.markFailed(a.source);
       }
     }
     final ordered = sortByRelevance(
@@ -375,7 +375,7 @@ extension _SearchPageFetch on _SearchPageState {
     if (st == null || !st.failed) return;
     final cur = _coverOf(tab);
     if (cur == null || cur.loading || cur.loadingMore) return;
-    if (source == 'qqmusic' && _sourceCooldown.cooling('qqmusic')) {
+    if (_coolable(source) && _sourceCooldown.cooling(source)) {
       _toast(context.l10n.searchWaitRetry);
       return;
     }

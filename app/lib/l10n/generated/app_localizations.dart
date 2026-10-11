@@ -10379,6 +10379,204 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'[暂停]'**
   String get mcpShellLblTagPaused;
+
+  /// No description provided for @playlistCreateTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'新建歌单'**
+  String get playlistCreateTitle;
+
+  /// No description provided for @playlistCreateName.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌单名称'**
+  String get playlistCreateName;
+
+  /// No description provided for @playlistCreateNameHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'给歌单起个名字'**
+  String get playlistCreateNameHint;
+
+  /// No description provided for @playlistCreatePrivacy.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设为私密'**
+  String get playlistCreatePrivacy;
+
+  /// No description provided for @playlistCreatePrivacyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'私密歌单仅自己可见'**
+  String get playlistCreatePrivacyHint;
+
+  /// No description provided for @playlistCreateSubmit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'创建'**
+  String get playlistCreateSubmit;
+
+  /// No description provided for @playlistCreateDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌单已创建'**
+  String get playlistCreateDone;
+
+  /// No description provided for @playlistCreateFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'创建歌单失败'**
+  String get playlistCreateFailed;
+
+  /// No description provided for @playlistCollect.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'收藏歌单'**
+  String get playlistCollect;
+
+  /// No description provided for @playlistCollected.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已收藏'**
+  String get playlistCollected;
+
+  /// No description provided for @playlistCollectDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已收藏歌单'**
+  String get playlistCollectDone;
+
+  /// No description provided for @playlistUncollectDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已取消收藏'**
+  String get playlistUncollectDone;
+
+  /// No description provided for @playlistCollectFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'收藏操作失败'**
+  String get playlistCollectFailed;
+
+  /// No description provided for @playlistEditTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'编辑歌单'**
+  String get playlistEditTitle;
+
+  /// No description provided for @playlistEditName.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌单名称'**
+  String get playlistEditName;
+
+  /// No description provided for @playlistEditDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌单简介'**
+  String get playlistEditDesc;
+
+  /// No description provided for @playlistEditDescHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'介绍一下这个歌单（可选）'**
+  String get playlistEditDescHint;
+
+  /// No description provided for @playlistEditDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌单已更新'**
+  String get playlistEditDone;
+
+  /// No description provided for @playlistEditFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'更新歌单失败'**
+  String get playlistEditFailed;
+
+  /// No description provided for @playlistDeleteTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除歌单'**
+  String get playlistDeleteTitle;
+
+  /// No description provided for @playlistDeleteConfirm.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'确定删除歌单「{name}」吗？此操作不可撤销。'**
+  String playlistDeleteConfirm({required Object name});
+
+  /// No description provided for @playlistDeleteDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌单已删除'**
+  String get playlistDeleteDone;
+
+  /// No description provided for @playlistDeleteFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除歌单失败'**
+  String get playlistDeleteFailed;
+
+  /// No description provided for @playlistPickTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'添加到歌单'**
+  String get playlistPickTitle;
+
+  /// No description provided for @playlistPickEmpty.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'还没有自建歌单'**
+  String get playlistPickEmpty;
+
+  /// No description provided for @playlistPickEmptyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'新建一个歌单，把喜欢的歌收进来'**
+  String get playlistPickEmptyHint;
+
+  /// No description provided for @playlistPickNew.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'新建歌单'**
+  String get playlistPickNew;
+
+  /// No description provided for @playlistAdded.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已添加 {count} 首到歌单'**
+  String playlistAdded({required Object count});
+
+  /// No description provided for @playlistAlreadyIn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌曲已在该歌单中'**
+  String get playlistAlreadyIn;
+
+  /// No description provided for @playlistAddFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'添加到歌单失败'**
+  String get playlistAddFailed;
+
+  /// No description provided for @playlistRemoveTrack.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'从歌单中移除'**
+  String get playlistRemoveTrack;
+
+  /// No description provided for @playlistRemoveDone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已从歌单移除'**
+  String get playlistRemoveDone;
+
+  /// No description provided for @playlistRemoveFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'移除失败'**
+  String get playlistRemoveFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -5657,4 +5657,107 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get mcpShellLblTagPaused => '[一時停止]';
+
+  @override
+  String get playlistCreateTitle => 'プレイリストを作成';
+
+  @override
+  String get playlistCreateName => 'プレイリスト名';
+
+  @override
+  String get playlistCreateNameHint => 'プレイリストに名前を付けてください';
+
+  @override
+  String get playlistCreatePrivacy => '非公開に設定';
+
+  @override
+  String get playlistCreatePrivacyHint => '非公開のプレイリストは自分のみ表示されます';
+
+  @override
+  String get playlistCreateSubmit => '作成';
+
+  @override
+  String get playlistCreateDone => 'プレイリストを作成しました';
+
+  @override
+  String get playlistCreateFailed => 'プレイリストの作成に失敗しました';
+
+  @override
+  String get playlistCollect => 'プレイリストをお気に入り登録';
+
+  @override
+  String get playlistCollected => 'お気に入り登録済み';
+
+  @override
+  String get playlistCollectDone => 'プレイリストをお気に入りに追加しました';
+
+  @override
+  String get playlistUncollectDone => 'お気に入りを解除しました';
+
+  @override
+  String get playlistCollectFailed => 'お気に入り操作に失敗しました';
+
+  @override
+  String get playlistEditTitle => 'プレイリストを編集';
+
+  @override
+  String get playlistEditName => 'プレイリスト名';
+
+  @override
+  String get playlistEditDesc => 'プレイリストの説明';
+
+  @override
+  String get playlistEditDescHint => 'このプレイリストについて説明してください（任意）';
+
+  @override
+  String get playlistEditDone => 'プレイリストを更新しました';
+
+  @override
+  String get playlistEditFailed => 'プレイリストの更新に失敗しました';
+
+  @override
+  String get playlistDeleteTitle => 'プレイリストを削除';
+
+  @override
+  String playlistDeleteConfirm({required Object name}) {
+    return 'プレイリスト「$name」を削除しますか？この操作は取り消せません。';
+  }
+
+  @override
+  String get playlistDeleteDone => 'プレイリストを削除しました';
+
+  @override
+  String get playlistDeleteFailed => 'プレイリストの削除に失敗しました';
+
+  @override
+  String get playlistPickTitle => 'プレイリストに追加';
+
+  @override
+  String get playlistPickEmpty => '作成したプレイリストがまだありません';
+
+  @override
+  String get playlistPickEmptyHint => 'プレイリストを作成してお気に入りの曲を入れましょう';
+
+  @override
+  String get playlistPickNew => '新しいプレイリスト';
+
+  @override
+  String playlistAdded({required Object count}) {
+    return '$count 曲をプレイリストに追加しました';
+  }
+
+  @override
+  String get playlistAlreadyIn => '曲はすでにこのプレイリストにあります';
+
+  @override
+  String get playlistAddFailed => 'プレイリストへの追加に失敗しました';
+
+  @override
+  String get playlistRemoveTrack => 'プレイリストから削除';
+
+  @override
+  String get playlistRemoveDone => 'プレイリストから削除しました';
+
+  @override
+  String get playlistRemoveFailed => '削除に失敗しました';
 }

@@ -28,36 +28,27 @@ extension _SearchPageActions on _SearchPageState {
     if (_query.isNotEmpty) unawaited(_fetch(append: false));
   }
 
-  /// 错误态（SearchErrorState / 聚合全败）的重试入口：QQ 失败后先退避，
+  /// 该源失败后是否需要退避（能力位；QQ 为真）。
+  bool _coolable(String source) => sourcePlatform(source).searchCoolable;
+
+  /// 错误态（SearchErrorState / 聚合全败）的重试入口：可退避源失败后先等待，
   /// 避免连打把风控阈值刷得更高。
   void _retryFromError() {
-    final qqInvolved = _platform == 'qqmusic' || _platform == 'all';
-    if (qqInvolved && _sourceCooldown.cooling('qqmusic')) {
+    final cooling = _platform == 'all'
+        ? _aggActive.any(
+            (s) => _coolable(s) && _sourceCooldown.cooling(s),
+          )
+        : (_coolable(_platform) && _sourceCooldown.cooling(_platform));
+    if (cooling) {
       _toast(context.l10n.searchWaitRetry);
       return;
     }
     unawaited(_fetch(append: false));
   }
 
-  /// 单来源失败的说明文案：QQ 走本地化分类；其余平台保留原始异常。
-  String _failureDetail(String source, Object? err) {
-    if (source == 'qqmusic' && err is QqApiException) {
-      return _qqFailureText(err);
-    }
-    return '$err';
-  }
-
-  /// QQ 失败文案映射：风控 → 带内码提示；网络 → 网络提示；业务码 → 带码。
-  String _qqFailureText(QqApiException e) {
-    final l10n = context.l10n;
-    final kind = e.kind;
-    if (kind == QmErrorKind.risk) return l10n.searchQqRiskDetail(code: e.code ?? 0);
-    if (kind == QmErrorKind.transient) return l10n.searchNetworkError;
-    if (kind == QmErrorKind.code) {
-      return l10n.searchPlatformError(code: '${e.code ?? '?'}');
-    }
-    return e.message;
-  }
+  /// 单来源失败的说明文案（由源适配器提供；QQ 为分类文案，其余原始异常）。
+  String _failureDetail(String source, Object? err) =>
+      sourcePlatform(source).searchErrorDetail(context.l10n, err);
 
   /// 平台显示名（横幅「{source}」用）。
   String _platformLabel(String source) =>

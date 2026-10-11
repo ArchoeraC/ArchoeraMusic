@@ -163,7 +163,7 @@ Future<LyricMatchResult?> nmGetLyricByPlatformId(
 }) async {
   final cachePlatform = lyricCachePlatform('netease', preferRich: preferRich);
   // 立刻预热 TTML 抓取
-  prefetchTTML('netease', [id]);
+  prefetchTTML('netease', [id], path: 'ncm-lyrics');
   // 缓存命中直接返回
   final cached = getRuntime().lyricCache.get(cachePlatform, id);
   if (cached != null) return LyricMatchResult.fromJson(cached);

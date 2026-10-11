@@ -12,13 +12,19 @@ import '../../services/source/source_platform.dart';
 import '../../services/source/media_request_headers.dart';
 import '../../stores/daily_shelf_provider.dart';
 import '../../stores/providers.dart';
+import '../../stores/user_playlists.dart';
 import '../../l10n/l10n.dart';
 import '../common/glass_surface.dart';
 import '../player/s_controls.dart';
 import '../list/song_list.dart';
 import '../list/cover_grid.dart';
 import '../common/toast.dart';
+import 'collection_platform.dart';
+import 'playlist_manage.dart';
+import 'playlist_picker_dialog.dart';
+import 's_context_menu.dart';
 import 'track_context_menu.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'track_list_dialog/track_list_dialog_actions.dart';
@@ -32,6 +38,8 @@ Future<void> showKugouTracksDialog(
   String? cover,
   required Future<List<Track>> Function(WidgetRef ref) loadTracks,
   Future<void> Function(WidgetRef ref)? onRefresh,
+  String? playlistId,
+  String playlistSource = 'netease',
 }) {
   return showDialog<void>(
     context: context,
@@ -43,6 +51,8 @@ Future<void> showKugouTracksDialog(
       cover: cover,
       loadTracks: loadTracks,
       onRefresh: onRefresh,
+      playlistId: playlistId,
+      playlistSource: playlistSource,
     ),
   );
 }
@@ -165,6 +175,8 @@ Future<void> showPlaylistDetailDialog(
     title: playlist.title,
     subtitle: playlist.subtitle,
     cover: playlist.cover,
+    playlistId: playlist.id,
+    playlistSource: 'netease',
     loadTracks: (ref) async {
       final detail = await ref
           .read(neteaseApiProvider)
@@ -202,12 +214,16 @@ Future<void> showNekoTracksDialog(
   required String title,
   String? subtitle,
   String? cover,
+  String? playlistId,
+  String playlistSource = 'netease',
   required Future<List<Track>> Function(WidgetRef ref) loadTracks,
 }) => showKugouTracksDialog(
   context,
   title: title,
   subtitle: subtitle,
   cover: cover,
+  playlistId: playlistId,
+  playlistSource: playlistSource,
   loadTracks: loadTracks,
 );
 
@@ -221,8 +237,9 @@ Future<void> showNekoPlaylistDetailDialog(
     title: playlist.title,
     subtitle: playlist.subtitle,
     cover: playlist.cover,
-    loadTracks: (ref) =>
-        ref.read(nekoApiProvider).playlistTracks(playlist.id),
+    playlistId: playlist.id,
+    playlistSource: 'neko',
+    loadTracks: (ref) => ref.read(nekoApiProvider).playlistTracks(playlist.id),
   );
 }
 
@@ -236,6 +253,8 @@ Future<void> showNekoFavoritePlaylistDialog(
     title: playlist.title,
     subtitle: playlist.subtitle,
     cover: playlist.cover,
+    playlistId: playlist.id,
+    playlistSource: 'neko',
     loadTracks: (ref) =>
         ref.read(nekoApiProvider).favoritePlaylistTracks(playlist.id),
   );
@@ -285,6 +304,8 @@ class TrackListDialog extends ConsumerStatefulWidget {
     this.cover,
     required this.loadTracks,
     this.onRefresh,
+    this.playlistId,
+    this.playlistSource = 'netease',
   });
 
   final String title;
@@ -296,6 +317,11 @@ class TrackListDialog extends ConsumerStatefulWidget {
 
   /// 可选「刷新」动作：点击后先执行本回调（如强制刷新日推），再重新加载列表。
   final Future<void> Function(WidgetRef ref)? onRefresh;
+
+  /// 所属歌单 id + 音源：非空且音源支持时，头部显示收藏 / 编辑 / 删除动作，
+  /// 曲目菜单支持移除、批量支持加入。
+  final String? playlistId;
+  final String playlistSource;
 
   @override
   ConsumerState<TrackListDialog> createState() => _TrackListDialogState();
@@ -309,7 +335,17 @@ class _TrackListDialogState extends ConsumerState<TrackListDialog> {
   @override
   void initState() {
     super.initState();
-    _future = widget.loadTracks(ref);
+    _future = _deferredLoad();
+  }
+
+  /// 让出一帧再执行 [TrackListDialog.loadTracks]：部分加载器会**同步修改
+  /// provider**（如每日推荐 `dailyShelfProvider.ensure()`）；直接在 initState
+  /// （构建期）调用会触发 Riverpod「Tried to modify a provider…」断言，其错误
+  /// 会一路冒泡成本弹窗的「加载失败」。
+  Future<List<Track>> _deferredLoad() async {
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return const [];
+    return widget.loadTracks(ref);
   }
 
   Future<void> _reload() {
@@ -371,7 +407,15 @@ class _KugouBrowseDialogState extends ConsumerState<_KugouBrowseDialog> {
   @override
   void initState() {
     super.initState();
-    _future = widget.loader(ref);
+    _future = _deferredLoad();
+  }
+
+  /// 同 [_TrackListDialogState._deferredLoad]：让出一帧再执行加载器，避免
+  /// 加载器在构建期同步修改 provider。
+  Future<List<CoverItem>> _deferredLoad() async {
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return const [];
+    return widget.loader(ref);
   }
 
   void _reloadBrowse() {

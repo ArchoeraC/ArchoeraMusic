@@ -138,14 +138,11 @@ extension _PlayerBarSections on _PlayerBarState {
   }
 
   /// 播放来源显示名（仅在线平台；本地/流媒体返回 null 不显示角标）。
-  String? _sourceLabel(BuildContext context, String? source) =>
-      switch (source) {
-        'netease' => context.l10n.platformNetease,
-        'qqmusic' => context.l10n.platformQQMusic,
-        'kugou' => context.l10n.platformKugou,
-        'neko' => context.l10n.platformNeko,
-        _ => null,
-      };
+  String? _sourceLabel(BuildContext context, String? source) {
+    if (source == null) return null;
+    final sp = sourcePlatform(source);
+    return sp.collections == null ? null : sp.label(context.l10n);
+  }
 
   Widget _buildCenterControls({
     required BuildContext context,
@@ -256,10 +253,7 @@ extension _PlayerBarSections on _PlayerBarState {
                 icon: const Icon(EtaIcons.playlist),
               ),
             ),
-            if (track != null &&
-                (track.source == 'netease' ||
-                    track.source == 'kugou' ||
-                    track.source == 'neko'))
+            if (track != null && sourceSupportsLike(track.source))
               _BarLikeButton(track: track),
           ],
         ),

@@ -5895,4 +5895,115 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get mcpShellLblTagPaused => '[pausiert]';
+
+  @override
+  String get playlistCreateTitle => 'Wiedergabeliste erstellen';
+
+  @override
+  String get playlistCreateName => 'Name der Wiedergabeliste';
+
+  @override
+  String get playlistCreateNameHint => 'Gib der Wiedergabeliste einen Namen';
+
+  @override
+  String get playlistCreatePrivacy => 'Als privat festlegen';
+
+  @override
+  String get playlistCreatePrivacyHint =>
+      'Private Wiedergabelisten sind nur für dich sichtbar';
+
+  @override
+  String get playlistCreateSubmit => 'Erstellen';
+
+  @override
+  String get playlistCreateDone => 'Wiedergabeliste erstellt';
+
+  @override
+  String get playlistCreateFailed =>
+      'Wiedergabeliste konnte nicht erstellt werden';
+
+  @override
+  String get playlistCollect => 'Wiedergabeliste favorisieren';
+
+  @override
+  String get playlistCollected => 'Favorisiert';
+
+  @override
+  String get playlistCollectDone => 'Wiedergabeliste favorisiert';
+
+  @override
+  String get playlistUncollectDone => 'Aus Favoriten entfernt';
+
+  @override
+  String get playlistCollectFailed => 'Favoriten-Aktion fehlgeschlagen';
+
+  @override
+  String get playlistEditTitle => 'Wiedergabeliste bearbeiten';
+
+  @override
+  String get playlistEditName => 'Name der Wiedergabeliste';
+
+  @override
+  String get playlistEditDesc => 'Beschreibung der Wiedergabeliste';
+
+  @override
+  String get playlistEditDescHint =>
+      'Beschreibe diese Wiedergabeliste (optional)';
+
+  @override
+  String get playlistEditDone => 'Wiedergabeliste aktualisiert';
+
+  @override
+  String get playlistEditFailed =>
+      'Wiedergabeliste konnte nicht aktualisiert werden';
+
+  @override
+  String get playlistDeleteTitle => 'Wiedergabeliste löschen';
+
+  @override
+  String playlistDeleteConfirm({required Object name}) {
+    return 'Wiedergabeliste „$name“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.';
+  }
+
+  @override
+  String get playlistDeleteDone => 'Wiedergabeliste gelöscht';
+
+  @override
+  String get playlistDeleteFailed =>
+      'Wiedergabeliste konnte nicht gelöscht werden';
+
+  @override
+  String get playlistPickTitle => 'Zu Wiedergabeliste hinzufügen';
+
+  @override
+  String get playlistPickEmpty => 'Noch keine eigene Wiedergabeliste';
+
+  @override
+  String get playlistPickEmptyHint =>
+      'Erstelle eine Wiedergabeliste und sammle deine Lieblingssongs';
+
+  @override
+  String get playlistPickNew => 'Neue Wiedergabeliste';
+
+  @override
+  String playlistAdded({required Object count}) {
+    return '$count Titel zur Wiedergabeliste hinzugefügt';
+  }
+
+  @override
+  String get playlistAlreadyIn =>
+      'Der Titel ist bereits in dieser Wiedergabeliste';
+
+  @override
+  String get playlistAddFailed =>
+      'Hinzufügen zur Wiedergabeliste fehlgeschlagen';
+
+  @override
+  String get playlistRemoveTrack => 'Aus Wiedergabeliste entfernen';
+
+  @override
+  String get playlistRemoveDone => 'Aus der Wiedergabeliste entfernt';
+
+  @override
+  String get playlistRemoveFailed => 'Entfernen fehlgeschlagen';
 }

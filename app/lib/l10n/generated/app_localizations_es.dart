@@ -5927,4 +5927,109 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get mcpShellLblTagPaused => '[en pausa]';
+
+  @override
+  String get playlistCreateTitle => 'Crear lista de reproducción';
+
+  @override
+  String get playlistCreateName => 'Nombre de la lista';
+
+  @override
+  String get playlistCreateNameHint => 'Dale un nombre a la lista';
+
+  @override
+  String get playlistCreatePrivacy => 'Marcar como privada';
+
+  @override
+  String get playlistCreatePrivacyHint =>
+      'Las listas privadas solo son visibles para ti';
+
+  @override
+  String get playlistCreateSubmit => 'Crear';
+
+  @override
+  String get playlistCreateDone => 'Lista creada';
+
+  @override
+  String get playlistCreateFailed => 'No se pudo crear la lista';
+
+  @override
+  String get playlistCollect => 'Guardar en favoritos';
+
+  @override
+  String get playlistCollected => 'En favoritos';
+
+  @override
+  String get playlistCollectDone => 'Lista añadida a favoritos';
+
+  @override
+  String get playlistUncollectDone => 'Eliminada de favoritos';
+
+  @override
+  String get playlistCollectFailed => 'Error al actualizar favoritos';
+
+  @override
+  String get playlistEditTitle => 'Editar lista';
+
+  @override
+  String get playlistEditName => 'Nombre de la lista';
+
+  @override
+  String get playlistEditDesc => 'Descripción de la lista';
+
+  @override
+  String get playlistEditDescHint => 'Describe esta lista (opcional)';
+
+  @override
+  String get playlistEditDone => 'Lista actualizada';
+
+  @override
+  String get playlistEditFailed => 'No se pudo actualizar la lista';
+
+  @override
+  String get playlistDeleteTitle => 'Eliminar lista';
+
+  @override
+  String playlistDeleteConfirm({required Object name}) {
+    return '¿Eliminar la lista «$name»? Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get playlistDeleteDone => 'Lista eliminada';
+
+  @override
+  String get playlistDeleteFailed => 'No se pudo eliminar la lista';
+
+  @override
+  String get playlistPickTitle => 'Añadir a la lista';
+
+  @override
+  String get playlistPickEmpty => 'Aún no has creado listas';
+
+  @override
+  String get playlistPickEmptyHint =>
+      'Crea una lista y guarda tus canciones favoritas';
+
+  @override
+  String get playlistPickNew => 'Nueva lista';
+
+  @override
+  String playlistAdded({required Object count}) {
+    return '$count canciones añadidas a la lista';
+  }
+
+  @override
+  String get playlistAlreadyIn => 'La canción ya está en esta lista';
+
+  @override
+  String get playlistAddFailed => 'No se pudo añadir a la lista';
+
+  @override
+  String get playlistRemoveTrack => 'Quitar de la lista';
+
+  @override
+  String get playlistRemoveDone => 'Eliminada de la lista';
+
+  @override
+  String get playlistRemoveFailed => 'No se pudo quitar';
 }

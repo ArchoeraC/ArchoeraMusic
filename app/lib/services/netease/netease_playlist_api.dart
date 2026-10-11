@@ -79,9 +79,89 @@ mixin NeteasePlaylistApi on NeteaseApiBase {
   /// 成功返回；失败（未登录/接口异常）抛 [NeteaseApiError]。
   Future<void> like(String id, {required bool like}) async {
     final body = await _call('like', {'id': id, 'like': like});
+    _ensureOk(body, 'like');
+  }
+
+  // ── 歌单写操作（对齐原项目 apis/playlist/netease.ts）──────────────────
+
+  /// 收藏 / 取消收藏歌单（playlist_subscribe，eapi；`t`=1 收藏 / 2 取消）。
+  Future<void> subscribePlaylist(String id, {required bool subscribe}) async {
+    final body = await _call('playlist_subscribe', {
+      'id': id,
+      't': subscribe ? 1 : 2,
+    });
+    _ensureOk(body, 'subscribePlaylist');
+  }
+
+  /// 新建歌单（playlist_create，weapi）；成功返回新歌单 id。
+  Future<String?> createPlaylist(String name, {int privacy = 0}) async {
+    final body = await _call('playlist_create', {
+      'name': name,
+      'privacy': privacy,
+    });
+    _ensureOk(body, 'createPlaylist');
+    final direct = body?['id'];
+    if (direct != null) return direct.toString();
+    final playlist = body?['playlist'];
+    if (playlist is Map<String, dynamic> && playlist['id'] != null) {
+      return playlist['id'].toString();
+    }
+    return null;
+  }
+
+  /// 删除歌单（playlist_delete，weapi）。
+  Future<void> deletePlaylist(String id) async {
+    _ensureOk(await _call('playlist_delete', {'id': id}), 'deletePlaylist');
+  }
+
+  /// 重命名歌单（playlist_name_update，eapi）。
+  Future<void> updatePlaylistName(String id, String name) async {
+    _ensureOk(
+      await _call('playlist_name_update', {'id': id, 'name': name}),
+      'updatePlaylistName',
+    );
+  }
+
+  /// 更新歌单简介（playlist_desc_update，eapi）。
+  Future<void> updatePlaylistDesc(String id, String desc) async {
+    _ensureOk(
+      await _call('playlist_desc_update', {'id': id, 'desc': desc}),
+      'updatePlaylistDesc',
+    );
+  }
+
+  /// 添加歌曲到歌单（playlist_tracks `op=add`，eapi）。
+  ///
+  /// 返回服务端确认加入的数量（0 = 全部已存在；响应未带 `count` 时为 null）。
+  Future<int?> playlistAddTracks(String id, List<String> trackIds) async {
+    if (trackIds.isEmpty) return 0;
+    final body = await _call('playlist_tracks', {
+      'op': 'add',
+      'pid': id,
+      'tracks': trackIds.join(','),
+    });
+    _ensureOk(body, 'playlistAddTracks');
+    return (body?['count'] as num?)?.toInt();
+  }
+
+  /// 从歌单移除歌曲（playlist_tracks `op=del`，eapi）。
+  Future<void> playlistRemoveTracks(String id, List<String> trackIds) async {
+    if (trackIds.isEmpty) return;
+    _ensureOk(
+      await _call('playlist_tracks', {
+        'op': 'del',
+        'pid': id,
+        'tracks': trackIds.join(','),
+      }),
+      'playlistRemoveTracks',
+    );
+  }
+
+  /// 校验 NT 响应 `code==200`，否则抛 [NeteaseApiError]。
+  void _ensureOk(Map<String, dynamic>? body, String op) {
     final code = body?['code'];
     if (code is num && code != 200) {
-      throw NeteaseApiError('like 失败 code=$code', body);
+      throw NeteaseApiError('$op 失败 code=$code', body);
     }
   }
 

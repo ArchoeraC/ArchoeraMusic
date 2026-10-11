@@ -12,13 +12,11 @@ library;
 import '../../../apis/lyric/ttml.dart';
 import '../../../apis/lyric/types.dart';
 import '../../netease/track.dart';
+import '../../source/source_platform.dart';
 import '../lyric_line.dart';
 import '../ttml_parser.dart';
 import 'lyric_decoder.dart';
 import 'lyric_source.dart';
-
-/// AMLL DB 覆盖歌词支持的平台目录（与 `apis/lyric/ttml.dart` 的 `%p` 一致）。
-const Set<String> _ttmlPlatforms = {'netease', 'qqmusic'};
 
 /// TTML 覆盖等待预算：超时先用平台歌词，抓取在后台继续（成功即写缓存）。
 const int kTtmlOverlayBudgetMs = 4000;
@@ -109,16 +107,12 @@ class LyricsEngine {
   /// 再回落数字 id（AMLL DB 里两种 key 都可能存在）。
   Future<String?>? _fetchTtmlText(Track track, String? trackId) {
     final platform = track.source;
-    if (!_ttmlPlatforms.contains(platform)) return null;
-    final ids = <String>[];
-    if (platform == 'qqmusic') {
-      final mid = track.qqmusic?.mid;
-      if (mid != null && mid.isNotEmpty) ids.add(mid);
-    }
-    if (trackId != null && trackId.isNotEmpty) ids.add(trackId);
+    final sp = sourcePlatform(platform);
+    if (!sp.supportsTtml) return null;
+    final ids = sp.ttmlCandidateIds(track, trackId);
     if (ids.isEmpty) return null;
     try {
-      return fetchTTMLOverlay(platform, ids);
+      return fetchTTMLOverlay(platform, ids, path: sp.ttmlPath);
     } catch (_) {
       return null;
     }

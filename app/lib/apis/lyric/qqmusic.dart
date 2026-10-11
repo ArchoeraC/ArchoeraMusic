@@ -30,7 +30,11 @@ Future<LyricMatchResult?> qmGetLyricByPlatformId(
   final midValue = (mid == null || mid.isEmpty) ? null : mid;
   // 立刻预热 TTML 抓取，与本接口的 lyric 调用并行
   // AMLL DB 里 QM 条目 mid / 数字 id 都可能是 key，依次试
-  prefetchTTML('qqmusic', midValue != null ? [midValue, id] : [id]);
+  prefetchTTML(
+    'qqmusic',
+    midValue != null ? [midValue, id] : [id],
+    path: 'qq-lyrics',
+  );
 
   final cached = getRuntime().lyricCache.get(cachePlatform, id);
   if (cached != null) return LyricMatchResult.fromJson(cached);

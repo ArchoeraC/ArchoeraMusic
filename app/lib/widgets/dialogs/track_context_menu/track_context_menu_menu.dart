@@ -14,15 +14,13 @@ void showTrackContextMenu(
   Future<void> Function(Track track)? onToggleLike,
   List<SContextMenuItem> extra = const [],
 }) {
-  final isOnline =
-      track.source == 'netease' ||
-      track.source == 'kugou' ||
-      track.source == 'neko';
-  // 可下载来源：KG/NT（Rust 自研）+ QQMusic/Neko（Dart 播放管线回退）。
-  final canDownload = isOnline || track.source == 'qqmusic';
-  // 可查看歌手 / 媒体详情：QQ 评论/歌手详情适配已接通，一并纳入（QQ 的
-  // 收藏/评论入口暂仍按 [isOnline] 保持既有行为）。
-  final canViewArtist = isOnline || track.source == 'qqmusic';
+  // 菜单项可见性由音源注册表声明（不再硬编码平台列表）：
+  // - 「红心 / 评论 / 添加到歌单」：NT / KG / Neko；
+  // - 「查看歌手 / 详情 / 下载」：NT / KG / QQ / Neko。
+  final sp = sourcePlatform(track.source);
+  final likeComment = sp.trackMenuLikeComment;
+  final canDownload = sp.trackMenuArtistDownload;
+  final canViewArtist = sp.trackMenuArtistDownload;
   final liked = ref.read(likeControllerProvider).isLiked(track);
   final toggle = onToggleLike ?? (t) => _defaultToggleLike(context, ref, t);
   final l10n = context.l10n;
@@ -44,7 +42,7 @@ void showTrackContextMenu(
           toast(l10n.toastAddedToQueue);
         },
       ),
-      if (isOnline) ...[
+      if (likeComment) ...[
         SContextMenuItem.divider(),
         SContextMenuItem(
           label: liked ? l10n.menuUnlike : l10n.menuLike,
@@ -56,6 +54,17 @@ void showTrackContextMenu(
           icon: EtaIcons.chatOutline,
           onTap: () => showCommentDialog(context, track: track),
         ),
+        // 添加到歌单：由注册表适配器声明是否支持（网易云 / Neko）。
+        if (collectionPlatform(track.source).playlistManageSupported(ref))
+          SContextMenuItem(
+            label: l10n.playlistPickTitle,
+            icon: EtaIcons.add,
+            onTap: () => showPlaylistPickerDialog(
+              context,
+              source: track.source,
+              tracks: [track],
+            ),
+          ),
       ],
       // 查看歌手 / 媒体详情：在线来源通用（含 QQ）。
       if (canViewArtist) ...[
@@ -108,12 +117,7 @@ Future<void> _defaultToggleLike(
   if (!context.mounted) return;
   final l10n = context.l10n;
   if (!ok) {
-    toast(switch (track.source) {
-      'kugou' => l10n.toastLoginRequiredKugou,
-      'qqmusic' => l10n.toastQqLikeSyncFailed,
-      'neko' => l10n.toastLoginRequiredNeko,
-      _ => l10n.toastLoginRequiredNetease,
-    });
+    toast(likeFailedTextFor(track.source, l10n));
     return;
   }
   toast(controller.isLiked(track) ? l10n.toastLiked : l10n.toastUnliked);
@@ -124,7 +128,7 @@ Future<void> _startDownload(
   WidgetRef ref,
   Track track,
 ) async {
-  if (track.source == 'kugou' && track.kugou == null) {
+  if (!sourcePlatform(track.source).downloadTrackReady(track)) {
     toast(context.l10n.toastNoQualityInfo);
     return;
   }

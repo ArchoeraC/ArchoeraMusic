@@ -206,9 +206,9 @@ class QqMusicTrackInfo {
         mediaMid: json['mediaMid']?.toString() ?? '',
         sizes:
             (json['sizes'] as Map?)?.map(
-                  (k, v) => MapEntry(k.toString(), (v as num).toInt()),
-                ) ??
-                const {},
+              (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+            ) ??
+            const {},
       );
 }
 
@@ -223,9 +223,10 @@ String qqCover(String? albumMid, [int size = 300]) {
 /// KG `singername`（"A、B"）→ 歌手列表。
 List<TrackArtist> kugouArtists(String? raw) {
   if (raw == null || raw.isEmpty) return const [];
-  final names = kgDecodeName(
-    raw,
-  ).split(RegExp(r'、|,|;|/')).map((s) => s.trim()).where((s) => s.isNotEmpty);
+  final names = kgDecodeName(raw)
+      .split(RegExp(r'、|,|;|/'))
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty);
   return names.map((n) => TrackArtist(name: n)).toList();
 }
 
@@ -702,17 +703,12 @@ class Track {
           : TrackAlbum(name: albumName, cover: pic.isEmpty ? null : pic),
       duration: (song['duration'] as num?)?.toInt() ?? 0,
       cover: pic.isEmpty ? null : pic,
-      coverOriginal:
-          song['coverOriginal']?.toString().isNotEmpty == true
+      coverOriginal: song['coverOriginal']?.toString().isNotEmpty == true
           ? song['coverOriginal'].toString()
           : qqCover(albumMid, 800),
       fee: fee,
       source: 'qqmusic',
-      qqmusic: QqMusicTrackInfo(
-        mid: mid,
-        mediaMid: mediaMid,
-        sizes: sizes,
-      ),
+      qqmusic: QqMusicTrackInfo(mid: mid, mediaMid: mediaMid, sizes: sizes),
     );
   }
 
@@ -822,6 +818,7 @@ class PlaylistItem {
     this.trackCount = 0,
     this.owner,
     this.subscribed = false,
+    this.description,
   });
 
   final String id;
@@ -833,6 +830,9 @@ class PlaylistItem {
   /// 是否已收藏（user_playlist 的 subscribed 字段）。
   final bool subscribed;
 
+  /// 歌单简介（user_playlist 的 description；编辑歌单时预填）。
+  final String? description;
+
   factory PlaylistItem.fromNetease(Map<String, dynamic> json) => PlaylistItem(
     id: json['id'].toString(),
     name: json['name']?.toString() ?? '',
@@ -840,5 +840,6 @@ class PlaylistItem {
     trackCount: json['trackCount'] ?? 0,
     owner: json['creator']?['nickname']?.toString(),
     subscribed: json['subscribed'] == true,
+    description: json['description']?.toString(),
   );
 }

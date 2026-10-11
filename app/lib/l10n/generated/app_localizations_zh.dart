@@ -5571,6 +5571,109 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpShellLblTagPaused => '[暂停]';
+
+  @override
+  String get playlistCreateTitle => '新建歌单';
+
+  @override
+  String get playlistCreateName => '歌单名称';
+
+  @override
+  String get playlistCreateNameHint => '给歌单起个名字';
+
+  @override
+  String get playlistCreatePrivacy => '设为私密';
+
+  @override
+  String get playlistCreatePrivacyHint => '私密歌单仅自己可见';
+
+  @override
+  String get playlistCreateSubmit => '创建';
+
+  @override
+  String get playlistCreateDone => '歌单已创建';
+
+  @override
+  String get playlistCreateFailed => '创建歌单失败';
+
+  @override
+  String get playlistCollect => '收藏歌单';
+
+  @override
+  String get playlistCollected => '已收藏';
+
+  @override
+  String get playlistCollectDone => '已收藏歌单';
+
+  @override
+  String get playlistUncollectDone => '已取消收藏';
+
+  @override
+  String get playlistCollectFailed => '收藏操作失败';
+
+  @override
+  String get playlistEditTitle => '编辑歌单';
+
+  @override
+  String get playlistEditName => '歌单名称';
+
+  @override
+  String get playlistEditDesc => '歌单简介';
+
+  @override
+  String get playlistEditDescHint => '介绍一下这个歌单（可选）';
+
+  @override
+  String get playlistEditDone => '歌单已更新';
+
+  @override
+  String get playlistEditFailed => '更新歌单失败';
+
+  @override
+  String get playlistDeleteTitle => '删除歌单';
+
+  @override
+  String playlistDeleteConfirm({required Object name}) {
+    return '确定删除歌单「$name」吗？此操作不可撤销。';
+  }
+
+  @override
+  String get playlistDeleteDone => '歌单已删除';
+
+  @override
+  String get playlistDeleteFailed => '删除歌单失败';
+
+  @override
+  String get playlistPickTitle => '添加到歌单';
+
+  @override
+  String get playlistPickEmpty => '还没有自建歌单';
+
+  @override
+  String get playlistPickEmptyHint => '新建一个歌单，把喜欢的歌收进来';
+
+  @override
+  String get playlistPickNew => '新建歌单';
+
+  @override
+  String playlistAdded({required Object count}) {
+    return '已添加 $count 首到歌单';
+  }
+
+  @override
+  String get playlistAlreadyIn => '歌曲已在该歌单中';
+
+  @override
+  String get playlistAddFailed => '添加到歌单失败';
+
+  @override
+  String get playlistRemoveTrack => '从歌单中移除';
+
+  @override
+  String get playlistRemoveDone => '已从歌单移除';
+
+  @override
+  String get playlistRemoveFailed => '移除失败';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -11139,6 +11242,109 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get mcpShellLblTagPaused => '[暂停]';
+
+  @override
+  String get playlistCreateTitle => '新建歌单';
+
+  @override
+  String get playlistCreateName => '歌单名称';
+
+  @override
+  String get playlistCreateNameHint => '给歌单起个名字';
+
+  @override
+  String get playlistCreatePrivacy => '设为私密';
+
+  @override
+  String get playlistCreatePrivacyHint => '私密歌单仅自己可见';
+
+  @override
+  String get playlistCreateSubmit => '创建';
+
+  @override
+  String get playlistCreateDone => '歌单已创建';
+
+  @override
+  String get playlistCreateFailed => '创建歌单失败';
+
+  @override
+  String get playlistCollect => '收藏歌单';
+
+  @override
+  String get playlistCollected => '已收藏';
+
+  @override
+  String get playlistCollectDone => '已收藏歌单';
+
+  @override
+  String get playlistUncollectDone => '已取消收藏';
+
+  @override
+  String get playlistCollectFailed => '收藏操作失败';
+
+  @override
+  String get playlistEditTitle => '编辑歌单';
+
+  @override
+  String get playlistEditName => '歌单名称';
+
+  @override
+  String get playlistEditDesc => '歌单简介';
+
+  @override
+  String get playlistEditDescHint => '介绍一下这个歌单（可选）';
+
+  @override
+  String get playlistEditDone => '歌单已更新';
+
+  @override
+  String get playlistEditFailed => '更新歌单失败';
+
+  @override
+  String get playlistDeleteTitle => '删除歌单';
+
+  @override
+  String playlistDeleteConfirm({required Object name}) {
+    return '确定删除歌单「$name」吗？此操作不可撤销。';
+  }
+
+  @override
+  String get playlistDeleteDone => '歌单已删除';
+
+  @override
+  String get playlistDeleteFailed => '删除歌单失败';
+
+  @override
+  String get playlistPickTitle => '添加到歌单';
+
+  @override
+  String get playlistPickEmpty => '还没有自建歌单';
+
+  @override
+  String get playlistPickEmptyHint => '新建一个歌单，把喜欢的歌收进来';
+
+  @override
+  String get playlistPickNew => '新建歌单';
+
+  @override
+  String playlistAdded({required Object count}) {
+    return '已添加 $count 首到歌单';
+  }
+
+  @override
+  String get playlistAlreadyIn => '歌曲已在该歌单中';
+
+  @override
+  String get playlistAddFailed => '添加到歌单失败';
+
+  @override
+  String get playlistRemoveTrack => '从歌单中移除';
+
+  @override
+  String get playlistRemoveDone => '已从歌单移除';
+
+  @override
+  String get playlistRemoveFailed => '移除失败';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -16707,4 +16913,107 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mcpShellLblTagPaused => '[暫停]';
+
+  @override
+  String get playlistCreateTitle => '建立歌單';
+
+  @override
+  String get playlistCreateName => '歌單名稱';
+
+  @override
+  String get playlistCreateNameHint => '給歌單取個名字';
+
+  @override
+  String get playlistCreatePrivacy => '設為私密';
+
+  @override
+  String get playlistCreatePrivacyHint => '私密歌單僅自己可見';
+
+  @override
+  String get playlistCreateSubmit => '建立';
+
+  @override
+  String get playlistCreateDone => '歌單已建立';
+
+  @override
+  String get playlistCreateFailed => '建立歌單失敗';
+
+  @override
+  String get playlistCollect => '收藏歌單';
+
+  @override
+  String get playlistCollected => '已收藏';
+
+  @override
+  String get playlistCollectDone => '已收藏歌單';
+
+  @override
+  String get playlistUncollectDone => '已取消收藏';
+
+  @override
+  String get playlistCollectFailed => '收藏操作失敗';
+
+  @override
+  String get playlistEditTitle => '編輯歌單';
+
+  @override
+  String get playlistEditName => '歌單名稱';
+
+  @override
+  String get playlistEditDesc => '歌單簡介';
+
+  @override
+  String get playlistEditDescHint => '介紹一下這個歌單（可選）';
+
+  @override
+  String get playlistEditDone => '歌單已更新';
+
+  @override
+  String get playlistEditFailed => '更新歌單失敗';
+
+  @override
+  String get playlistDeleteTitle => '刪除歌單';
+
+  @override
+  String playlistDeleteConfirm({required Object name}) {
+    return '確定刪除歌單「$name」嗎？此操作不可撤銷。';
+  }
+
+  @override
+  String get playlistDeleteDone => '歌單已刪除';
+
+  @override
+  String get playlistDeleteFailed => '刪除歌單失敗';
+
+  @override
+  String get playlistPickTitle => '新增至歌單';
+
+  @override
+  String get playlistPickEmpty => '還沒有自建歌單';
+
+  @override
+  String get playlistPickEmptyHint => '建立一個歌單，把喜歡的歌收進來';
+
+  @override
+  String get playlistPickNew => '建立歌單';
+
+  @override
+  String playlistAdded({required Object count}) {
+    return '已新增 $count 首到歌單';
+  }
+
+  @override
+  String get playlistAlreadyIn => '歌曲已在該歌單中';
+
+  @override
+  String get playlistAddFailed => '新增至歌單失敗';
+
+  @override
+  String get playlistRemoveTrack => '從歌單中移除';
+
+  @override
+  String get playlistRemoveDone => '已從歌單移除';
+
+  @override
+  String get playlistRemoveFailed => '移除失敗';
 }
