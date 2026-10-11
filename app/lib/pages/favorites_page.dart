@@ -8,12 +8,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/netease/netease_api.dart' show CoverItem;
 import '../services/log/log.dart';
 import '../stores/app_prefs.dart';
+import '../stores/favorites_revision.dart';
 import '../stores/shell_page_state.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/list/cover_grid.dart';
 import '../widgets/dialogs/collection_platform.dart';
+import '../widgets/dialogs/playlist_create_dialog.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/streaming/empty_state.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'favorites/favorites_page_actions.dart';
@@ -56,8 +59,10 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
     // 恢复上次平台选择（壳内容因播放页展开被卸载后重建）；实验性音源已关闭
     // 时不保留 NK 选择（避免对其发请求）。
     var source = ref.read(favoritesPlatformProvider) ?? 'netease';
-    if (source == 'neko' && !ref.read(appPrefsProvider).nekoEnabled) {
-      source = 'netease';
+    // 已关闭（如实验性音源开关）的平台不保留选择：回退首个已启用平台。
+    if (!collectionPlatform(source).enabled(ref)) {
+      final enabled = collectionPlatforms(ref);
+      source = enabled.isEmpty ? 'netease' : enabled.first.source;
     }
     _platform = source;
     final adapter = collectionPlatform(source);

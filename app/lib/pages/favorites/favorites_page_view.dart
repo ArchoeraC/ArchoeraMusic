@@ -17,11 +17,19 @@ extension _FavoritesPageView on _FavoritesPageState {
         ref.listen(signal, (_, _) => _onAuthChanged());
       }
     }
+    // 收藏写操作（收藏/取消、新建/删除/改名、增删曲目）后清缓存并重拉，
+    // 避免收藏页停留在旧列表。
+    ref.listen(favoritesRevisionProvider, (_, _) {
+      _clearCacheState();
+      if (_loggedIn) _fetch();
+    });
     // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
     ref.watch(appPrefsProvider.select((p) => p.nekoEnabled));
-    // 实验性音源关闭时，若当前停留在 NK 平台则退回 NT。
+    // 已启用平台集合变化（实验性音源开关）：当前平台被关闭则退回首个可用平台。
     ref.listen(appPrefsProvider.select((p) => p.nekoEnabled), (prev, next) {
-      if (next == false && _platform == 'neko') _switchPlatform('netease');
+      if (collectionPlatform(_platform).enabled(ref)) return;
+      final enabled = collectionPlatforms(ref);
+      _switchPlatform(enabled.isEmpty ? 'netease' : enabled.first.source);
     });
 
     final adapter = _adapter;
@@ -89,16 +97,28 @@ extension _FavoritesPageView on _FavoritesPageState {
           // ── 分类 tab ────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SSegmented<String>(
-                options: [
-                  for (final t in tabs)
-                    SSegmentedOption(t.id, t.label(l10n)),
-                ],
-                selected: _tab,
-                onChanged: _switchTab,
-              ),
+            child: Row(
+              children: [
+                SSegmented<String>(
+                  options: [
+                    for (final t in tabs) SSegmentedOption(t.id, t.label(l10n)),
+                  ],
+                  selected: _tab,
+                  onChanged: _switchTab,
+                ),
+                const Spacer(),
+                // 新建歌单：由适配器声明是否支持歌单管理（NT / Neko）。
+                if (loggedIn &&
+                    _adapter.playlistManageSupported(ref) &&
+                    _tab == 'created')
+                  SButton(
+                    label: l10n.playlistCreateTitle,
+                    icon: EtaIcons.add,
+                    variant: SButtonVariant.secondary,
+                    size: SButtonSize.small,
+                    onPressed: _createPlaylist,
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 12),

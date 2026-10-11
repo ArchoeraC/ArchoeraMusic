@@ -36,7 +36,10 @@ import '../../widgets/dialogs/neko_login_dialog.dart';
 import '../../widgets/dialogs/netease_login_dialog.dart';
 import '../../widgets/dialogs/qqmusic_login_dialog.dart';
 import '../../widgets/dialogs/track_list_dialog.dart';
+import '../../apis/qqmusic/core/request.dart' show QmErrorKind;
+import '../kugou/kugou_api.dart' show KugouApi;
 import '../lyrics/engine/lyric_source.dart';
+import '../qqmusic/qqmusic_api.dart' show QqApiException;
 import '../lyrics/sources/kugou_lyric_source.dart';
 import '../lyrics/sources/local_lyric_source.dart';
 import '../lyrics/sources/neko_lyric_source.dart';
@@ -89,11 +92,44 @@ abstract class SourcePlatform {
   /// 是否参与搜索页 `'all'` 聚合。
   bool get inAggregate => true;
 
+  /// 搜索失败后是否需要退避（防连打触发风控；QQ 覆写为 true）。
+  bool get searchCoolable => false;
+
+  /// 搜索失败的用户可见说明（默认原始异常；QQ 覆写为分类文案）。
+  String searchErrorDetail(AppLocalizations l10n, Object? err) => '$err';
+
   /// 下载器（Rust）回退是否支持本源；QQMusic 明确不支持。
   bool get downloadFallbackSupported => true;
 
   /// 下载回退不支持本源时的诊断日志（仅 [downloadFallbackSupported] == false 会用到）。
   String downloadUnsupportedLog(Track t) => '下载回退不支持 $source: ${t.title}';
+
+  /// 是否支持下载到本地。
+  bool get downloadable => false;
+
+  /// 下载前是否要求登录（KG / NT）。
+  bool get downloadRequiresLogin => false;
+
+  /// 下载是否恒取原文件、无音质档（流媒体服务端 `format=raw`）。
+  bool get downloadDirectOnly => false;
+
+  /// 入队前的曲目预处理（KG 补 hash / Neko 重写歌词）。
+  Future<Track> prepareForDownload(dynamic ref, Track t) async => t;
+
+  /// 通用曲目右键菜单是否显示「红心 / 评论 / 添加到歌单」（NT / KG / Neko）。
+  bool get trackMenuLikeComment => false;
+
+  /// 通用曲目右键菜单是否显示「查看歌手 / 媒体详情 / 下载」（NT / KG / QQ / Neko）。
+  bool get trackMenuArtistDownload => false;
+
+  /// 播放时是否必须以「引擎直连流式」处理（跳过整首内存门禁）。流媒体为真。
+  bool get streamDirectOnly => false;
+
+  /// 下载前该曲目是否已具备所需信息（KG 需品质 hash）；默认 true。
+  bool downloadTrackReady(Track t) => true;
+
+  /// 聚合搜索建议中是否显示来源标点（KG 为真）。
+  bool get suggestBadge => false;
 
   // ── 搜索能力 ──────────────────────────────────────────────────────
 
@@ -222,6 +258,22 @@ abstract class SourcePlatform {
   /// 由曲目元数据估算的文件体积（如 KG 各档 sizes 的最优项）；无 → null。
   int? estimatedFileSize(Track t) => null;
 
+  /// 聚合列表来源小徽标的短标签（空 = 不显示）。
+  String get badgeLabel => '';
+
+  /// 来源小徽标底色。
+  Color get badgeColor => const Color(0x00000000);
+
+  /// 可用最高音质徽标（label + 是否无损档）；null = 无信息（不显示）。
+  ///
+  /// 默认由 [Track.quality] 反推；各源可覆写（KG hash 链 / QQ 文件大小 /
+  /// Neko 服务端 `maxQuality`）。
+  ({String label, bool lossless})? qualityBadge(
+    Track t,
+    AppLocalizations l10n, {
+    String? maxQuality,
+  }) => qualityLevelBadge(t.quality, l10n);
+
   // ── 音质选择注册表 ────────────────────────────────────────────────
 
   /// 本源声明的可选音质档位（低 → 高）；默认全档，特殊源覆写。
@@ -260,6 +312,17 @@ abstract class SourcePlatform {
   /// 该源对应的歌词来源（复用现有 `services/lyrics` 管线）；无 → 空列表。
   List<LyricSource> lyricSources(dynamic ref) => const [];
 
+  /// 是否支持 AMLL DB TTML 覆盖歌词（目录见 `apis/lyric/ttml.dart`）。
+  bool get supportsTtml => false;
+
+  /// AMLL DB 平台目录（`%p`）：NT `ncm-lyrics` / QQ `qq-lyrics`。
+  String get ttmlPath => '';
+
+  /// AMLL DB TTML 候选 id（默认 [trackId]；QQ 额外用 mid）。
+  List<String> ttmlCandidateIds(Track t, String? trackId) => [
+    if (trackId != null && trackId.isNotEmpty) trackId,
+  ];
+
   // ── 详情弹窗 ──────────────────────────────────────────────────────
 
   /// 点击搜索结果的封面项时打开对应详情弹窗（专辑 / 歌手 / 歌单）。
@@ -269,6 +332,15 @@ abstract class SourcePlatform {
     SourceSearchKind kind,
     CoverItem item,
   ) {}
+
+  /// 把「搜索建议」条目解析为可播放曲目 + 直链。
+  ///
+  /// 建议条目字段精简（多为标题/歌手），播放前需按来源补齐完整曲目并解析
+  /// URL（NT 取 song_detail；KG 按歌名取 hash）。无建议能力的源返回 null。
+  Future<({Track track, String? url})?> resolveSuggestSong(
+    dynamic ref,
+    SuggestSongItem song,
+  ) async => null;
 }
 
 /// 按 `Track.source` 取适配器；未注册源回退为「未知源」（保持既有行为：
@@ -294,6 +366,43 @@ List<String> aggregateSourceKeys() => [
   for (final p in _all)
     if (p.inAggregate) p.source,
 ];
+
+/// 该源是否有「收藏 / 我喜欢」能力（供 canLike 等判定，避免硬编码平台列表）。
+bool sourceSupportsLike(String source) =>
+    sourcePlatform(source).collections != null;
+
+/// 收藏操作失败提示文案（由该源的收藏适配器提供；无适配器回退 NT 文案）。
+String likeFailedTextFor(String source, AppLocalizations l10n) =>
+    sourcePlatform(source).collections?.likeFailedText(l10n) ??
+    l10n.toastLoginRequiredNetease;
+
+/// 由 [TrackQuality] 反推等级短码：无损编解码器 → Hi-Res（sr≥96k 且 24bit）
+/// / 无损；否则按 bitrate 分档（≥320k HQ / ≥192k SQ / LQ）。
+({String label, bool lossless})? qualityLevelBadge(
+  TrackQuality? q,
+  AppLocalizations l10n,
+) {
+  if (q == null || q.codec.isEmpty || q.codec == 'unknown') return null;
+  const losslessCodecs = {
+    'flac',
+    'alac',
+    'ape',
+    'wav',
+    'aiff',
+    'wavpack',
+    'tta',
+  };
+  if (losslessCodecs.contains(q.codec.toLowerCase())) {
+    if (q.sampleRate >= 96000 && q.bitsPerSample >= 24) {
+      return (label: 'Hi-Res', lossless: true);
+    }
+    return (label: 'Lossless', lossless: true);
+  }
+  final kbps = q.bitRate / 1000;
+  if (kbps >= 320) return (label: 'HQ', lossless: false);
+  if (kbps >= 192) return (label: 'SQ', lossless: false);
+  return (label: 'LQ', lossless: false);
+}
 
 final List<SourcePlatform> _all = [
   _NeteaseSource(),
@@ -361,6 +470,24 @@ class _NeteaseSource extends SourcePlatform {
   String label(AppLocalizations l10n) => l10n.platformNetease;
 
   @override
+  String get badgeLabel => '云';
+
+  @override
+  Color get badgeColor => const Color(0xFFC20C0C);
+
+  @override
+  bool get downloadable => true;
+
+  @override
+  bool get downloadRequiresLogin => true;
+
+  @override
+  bool get trackMenuLikeComment => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
+
+  @override
   ProviderListenable<Object?>? get authSignal =>
       neteaseAuthProvider.select<Object?>((a) => a?.userId);
 
@@ -378,6 +505,12 @@ class _NeteaseSource extends SourcePlatform {
 
   @override
   List<LyricSource> lyricSources(dynamic ref) => const [NeteaseLyricSource()];
+
+  @override
+  bool get supportsTtml => true;
+
+  @override
+  String get ttmlPath => 'ncm-lyrics';
 
   @override
   Future<SearchResult<Track>> searchSongs(
@@ -448,6 +581,37 @@ class _NeteaseSource extends SourcePlatform {
         showPlaylistDetailDialog(context, item);
     }
   }
+
+  @override
+  Future<({Track track, String? url})?> resolveSuggestSong(
+    dynamic ref,
+    SuggestSongItem song,
+  ) async {
+    final NeteaseApi api = ref.read(neteaseApiProvider);
+    // 建议条目只有标题/歌手（无封面）：先取详情补封面，失败回退轻量构造。
+    Track? detail;
+    try {
+      final list = await api.songsDetailByIds([song.id]);
+      if (list.isNotEmpty) detail = list.first;
+    } catch (_) {
+      // 详情失败不影响播放
+    }
+    final track =
+        detail ??
+        Track(
+          id: song.id,
+          title: song.name,
+          artists: song.artist == null
+              ? const <TrackArtist>[]
+              : song.artist!
+                    .split(' / ')
+                    .map((n) => TrackArtist(name: n))
+                    .toList(),
+          album: song.album == null ? null : TrackAlbum(name: song.album!),
+        );
+    final url = await api.resolvePlayUrl(song.id);
+    return (track: track, url: url);
+  }
 }
 
 // ── KG ─────────────────────────────────────────────────────────────────
@@ -478,6 +642,55 @@ class _KugouSource extends SourcePlatform {
 
   @override
   String label(AppLocalizations l10n) => l10n.platformKugou;
+
+  @override
+  String get badgeLabel => '酷';
+
+  @override
+  Color get badgeColor => const Color(0xFF00A7E0);
+
+  @override
+  bool get downloadable => true;
+
+  @override
+  bool get downloadRequiresLogin => true;
+
+  @override
+  bool get trackMenuLikeComment => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
+
+  @override
+  bool downloadTrackReady(Track t) => t.kugou != null;
+
+  @override
+  bool get suggestBadge => true;
+
+  @override
+  Future<Track> prepareForDownload(dynamic ref, Track t) async {
+    if (t.kugou == null) return t;
+    final enriched = await ref.read(kugouApiProvider).enrichKugouHashes(t);
+    return enriched ?? t;
+  }
+
+  @override
+  ({String label, bool lossless})? qualityBadge(
+    Track t,
+    AppLocalizations l10n, {
+    String? maxQuality,
+  }) {
+    final k = t.kugou;
+    if (k == null) return qualityLevelBadge(t.quality, l10n);
+    if (k.hashFor('hi-res') != null) return (label: 'Hi-Res', lossless: true);
+    if (k.hashFor('lossless') != null) {
+      return (label: 'Lossless', lossless: true);
+    }
+    if (k.hashFor('hq') != null) return (label: 'HQ', lossless: false);
+    if (k.hashFor('sq') != null) return (label: 'SQ', lossless: false);
+    if (k.hashFor('lq') != null) return (label: 'LQ', lossless: false);
+    return null;
+  }
 
   @override
   int? estimatedFileSize(Track t) {
@@ -651,6 +864,22 @@ class _KugouSource extends SourcePlatform {
         showKugouPlaylistDetailDialog(context, item);
     }
   }
+
+  @override
+  Future<({Track track, String? url})?> resolveSuggestSong(
+    dynamic ref,
+    SuggestSongItem song,
+  ) async {
+    final KugouApi api = ref.read(kugouApiProvider);
+    // 建议只有 songid：按歌名搜索取 hash + 封面（suggestSongToTrack）。
+    final resolved = await api.suggestSongToTrack(
+      song.name,
+      singer: song.artist,
+    );
+    if (resolved == null || resolved.kugou == null) return null;
+    final url = await api.resolvePlayUrl(resolved.kugou!);
+    return (track: resolved, url: url);
+  }
 }
 
 // ── QQ ─────────────────────────────────────────────────────────────────
@@ -674,6 +903,36 @@ class _QqSource extends SourcePlatform {
   String label(AppLocalizations l10n) => l10n.platformQQMusic;
 
   @override
+  String get badgeLabel => 'Q';
+
+  @override
+  Color get badgeColor => const Color(0xFF31C27C);
+
+  @override
+  bool get downloadable => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
+
+  @override
+  ({String label, bool lossless})? qualityBadge(
+    Track t,
+    AppLocalizations l10n, {
+    String? maxQuality,
+  }) {
+    // QM：由搜索/专辑等返回的各档文件大小推断（hires/flac/320/128）。
+    final q = t.qqmusic;
+    if (q == null || q.sizes.isEmpty) return qualityLevelBadge(t.quality, l10n);
+    if ((q.sizes['hires'] ?? 0) > 0) return (label: 'Hi-Res', lossless: true);
+    if ((q.sizes['flac'] ?? 0) > 0) {
+      return (label: 'Lossless', lossless: true);
+    }
+    if ((q.sizes['320'] ?? 0) > 0) return (label: 'HQ', lossless: false);
+    if ((q.sizes['128'] ?? 0) > 0) return (label: 'SQ', lossless: false);
+    return null;
+  }
+
+  @override
   ProviderListenable<Object?>? get authSignal =>
       qqMusicApiProvider.select<Object?>((s) => s.isLoggedIn);
 
@@ -692,6 +951,25 @@ class _QqSource extends SourcePlatform {
   String downloadUnsupportedLog(Track t) => '下载回退不支持 QQMusic: ${t.title}';
 
   @override
+  bool get searchCoolable => true;
+
+  @override
+  String searchErrorDetail(AppLocalizations l10n, Object? err) {
+    if (err is QqApiException) {
+      final kind = err.kind;
+      if (kind == QmErrorKind.risk) {
+        return l10n.searchQqRiskDetail(code: err.code ?? 0);
+      }
+      if (kind == QmErrorKind.transient) return l10n.searchNetworkError;
+      if (kind == QmErrorKind.code) {
+        return l10n.searchPlatformError(code: '${err.code ?? '?'}');
+      }
+      return err.message;
+    }
+    return '$err';
+  }
+
+  @override
   CollectionPlatform? get collections => collectionPlatform(source);
 
   @override
@@ -699,6 +977,22 @@ class _QqSource extends SourcePlatform {
 
   @override
   List<LyricSource> lyricSources(dynamic ref) => const [QqmusicLyricSource()];
+
+  @override
+  bool get supportsTtml => true;
+
+  @override
+  String get ttmlPath => 'qq-lyrics';
+
+  @override
+  List<String> ttmlCandidateIds(Track t, String? trackId) {
+    final ids = <String>[];
+    // AMLL DB 里 mid 与数字 id 两种 key 都可能存在：mid 优先，再回落数字 id。
+    final mid = t.qqmusic?.mid;
+    if (mid != null && mid.isNotEmpty) ids.add(mid);
+    if (trackId != null && trackId.isNotEmpty) ids.add(trackId);
+    return ids;
+  }
 
   @override
   Future<SearchResult<Track>> searchSongs(
@@ -808,13 +1102,33 @@ class _NekoSource extends SourcePlatform {
   }
 
   @override
-  Future<Track> enrichMetadata(dynamic ref, Track t) async {
-    if (!enabled(ref)) return t;
-    return ref.read(nekoMetadataEnricherProvider).enrich(t);
-  }
+  String label(AppLocalizations l10n) => l10n.platformNeko;
 
   @override
-  String label(AppLocalizations l10n) => l10n.platformNeko;
+  String get badgeLabel => 'K';
+
+  @override
+  Color get badgeColor => const Color(0xFF8B5CF6);
+
+  @override
+  bool get downloadable => true;
+
+  @override
+  bool get trackMenuLikeComment => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
+
+  @override
+  Future<Track> prepareForDownload(dynamic ref, Track t) =>
+      ref.read(nekoLyricRewriterProvider).rewrite(t);
+
+  @override
+  ({String label, bool lossless})? qualityBadge(
+    Track t,
+    AppLocalizations l10n, {
+    String? maxQuality,
+  }) => nekoQualityBadge(maxQuality);
 
   // ── 音质选择注册表（Neko 服务端四档；`sq` 与服务端 `hq` 同档，去重） ──
 
@@ -986,6 +1300,15 @@ class _StreamingSource extends SourcePlatform {
 
   @override
   String label(AppLocalizations l10n) => l10n.trackSourceStreaming;
+
+  @override
+  bool get downloadable => true;
+
+  @override
+  bool get downloadDirectOnly => true;
+
+  @override
+  bool get streamDirectOnly => true;
 
   @override
   bool get autoFallback => false;

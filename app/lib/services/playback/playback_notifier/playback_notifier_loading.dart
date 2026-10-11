@@ -280,7 +280,7 @@ mixin _PlaybackNotifierLoading
     if (source.isEmpty) return false;
     final src = track?.source;
     if (_preferStreamDirect(src)) return false;
-    if (src == 'streaming') return false;
+    if (src != null && sourcePlatform(src).streamDirectOnly) return false;
     if (!ref.read(appPrefsProvider).engineMemoryPlay) return false;
     return source.startsWith('http://') || source.startsWith('https://');
   }

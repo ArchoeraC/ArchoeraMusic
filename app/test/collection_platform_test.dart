@@ -37,6 +37,7 @@ void main() {
 
   test('分类 Tab：tabs() 与 tabIds 一致，且含默认项', () {
     expect(collectionPlatform('netease').tabIds, [
+      'created',
       'playlist',
       'album',
       'artist',
@@ -99,32 +100,29 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    final nt = await collectionPlatform(
-      'netease',
-    ).fetchFavorites(container, 'playlist');
+    final nt = await collectionPlatform('netease')
+        .fetchFavorites(container, 'playlist');
     expect(nt['netease.playlist'], isA<List<CoverItem>>());
-    // 只保留 subscribed 的收藏歌单（id '1'），过滤掉自建的 '2'。
+    // 一次 user_playlist 同时填充两类：收藏（subscribed）与自建。
     expect(nt['netease.playlist']!.map((e) => e.id).toList(), ['1']);
+    expect(nt['netease.created']!.map((e) => e.id).toList(), ['2']);
 
-    final kg = await collectionPlatform(
-      'kugou',
-    ).fetchFavorites(container, 'created');
+    final kg = await collectionPlatform('kugou')
+        .fetchFavorites(container, 'created');
     expect(kg['kugou.created'], isA<List<CoverItem>>());
     expect(kg['kugou.created']!.single.title, 'c1');
     expect(kg['kugou.collectedPlaylist']!.single.title, 'p1');
     expect(kg['kugou.collectedAlbum']!.single.title, 'a1');
 
-    final nk = await collectionPlatform(
-      'neko',
-    ).fetchFavorites(container, 'created');
+    final nk = await collectionPlatform('neko')
+        .fetchFavorites(container, 'created');
     expect(nk['neko.created'], isA<List<CoverItem>>());
     expect(nk['neko.created']!.single.title, 'n1');
     expect(nk['neko.collectedPlaylist']!.single.title, 'n2');
     expect(nk['neko.liked']!.single.title, '我喜欢');
 
-    final qq = await collectionPlatform(
-      'qqmusic',
-    ).fetchFavorites(container, 'created');
+    final qq = await collectionPlatform('qqmusic')
+        .fetchFavorites(container, 'created');
     expect(qq['qqmusic.created'], isA<List<CoverItem>>());
   });
 }
@@ -141,7 +139,10 @@ class _FakeNeteaseApi extends NeteaseApi {
   _FakeNeteaseApi() : super(ApisNeteaseCaller());
 
   @override
-  Future<List<PlaylistItem>> userPlaylists(String uid, {int limit = 200}) async {
+  Future<List<PlaylistItem>> userPlaylists(
+    String uid, {
+    int limit = 200,
+  }) async {
     return const [
       PlaylistItem(id: '1', name: 'sub', subscribed: true),
       PlaylistItem(id: '2', name: 'own'),
@@ -149,7 +150,10 @@ class _FakeNeteaseApi extends NeteaseApi {
   }
 
   @override
-  Future<List<CoverItem>> albumSublist({int limit = 100, int offset = 0}) async {
+  Future<List<CoverItem>> albumSublist({
+    int limit = 100,
+    int offset = 0,
+  }) async {
     return const [];
   }
 

@@ -7,13 +7,11 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../apis/qqmusic/core/request.dart' show QmErrorKind;
 import '../services/netease/netease_api.dart';
 import '../services/netease/track.dart';
 import '../services/source/source_platform.dart';
 import '../utils/search_relevance.dart';
 import '../services/playback/playback_notifier.dart';
-import '../services/qqmusic/qqmusic_api.dart' show QqApiException;
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../stores/shell_page_state.dart';
@@ -100,10 +98,8 @@ class _SearchPageState extends ConsumerState<SearchPage>
     _query = widget.initialQuery.trim();
     // 恢复上次的平台 / Tab 选择（壳内容因播放页展开被卸载后重建）。
     final restored = ref.read(searchPlatformProvider) ?? 'netease';
-    // 实验性音源已关闭时不保留 NK 平台选择（避免对其发请求）。
-    _platform = (restored == 'neko' && !ref.read(appPrefsProvider).nekoEnabled)
-        ? 'netease'
-        : restored;
+    // 已关闭的音源不保留选择（避免对其发请求）。
+    _platform = sourcePlatform(restored).enabled(ref) ? restored : 'netease';
     _tabs = TabController(
       length: 4,
       vsync: this,

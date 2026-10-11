@@ -85,12 +85,10 @@ class _BarLikeButtonState extends ConsumerState<_BarLikeButton> {
     try {
       final ok = await ref.read(likeControllerProvider).toggle(widget.track);
       if (!ok && mounted) {
-        toast(switch (widget.track.source) {
-          'kugou' => context.l10n.toastLoginRequiredKugou,
-          'qqmusic' => context.l10n.toastQqLikeSyncFailed,
-          'neko' => context.l10n.toastLoginRequiredNeko,
-          _ => context.l10n.toastLoginRequiredNetease,
-        }, type: ToastType.error);
+        toast(
+          likeFailedTextFor(widget.track.source, context.l10n),
+          type: ToastType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

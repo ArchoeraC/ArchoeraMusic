@@ -23,9 +23,9 @@ extension _LikedPageView on _LikedPageState {
     }
     // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
     ref.watch(appPrefsProvider.select((p) => p.nekoEnabled));
-    // 实验性音源关闭时，若当前停留在 NK 平台则退回默认。
+    // 已启用平台集合变化：当前平台被关闭则退回默认平台。
     ref.listen(appPrefsProvider.select((p) => p.nekoEnabled), (prev, next) {
-      if (next == false && _platform == 'neko') {
+      if (!collectionPlatform(_platform).enabled(ref)) {
         _switchPlatform(defaultLikedPlatform(ref));
       }
     });

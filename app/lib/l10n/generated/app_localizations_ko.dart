@@ -5659,4 +5659,107 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get mcpShellLblTagPaused => '[일시정지]';
+
+  @override
+  String get playlistCreateTitle => '재생목록 만들기';
+
+  @override
+  String get playlistCreateName => '재생목록 이름';
+
+  @override
+  String get playlistCreateNameHint => '재생목록에 이름을 지정하세요';
+
+  @override
+  String get playlistCreatePrivacy => '비공개로 설정';
+
+  @override
+  String get playlistCreatePrivacyHint => '비공개 재생목록은 나만 볼 수 있습니다';
+
+  @override
+  String get playlistCreateSubmit => '만들기';
+
+  @override
+  String get playlistCreateDone => '재생목록을 만들었습니다';
+
+  @override
+  String get playlistCreateFailed => '재생목록을 만들지 못했습니다';
+
+  @override
+  String get playlistCollect => '재생목록 즐겨찾기';
+
+  @override
+  String get playlistCollected => '즐겨찾기됨';
+
+  @override
+  String get playlistCollectDone => '재생목록을 즐겨찾기에 추가했습니다';
+
+  @override
+  String get playlistUncollectDone => '즐겨찾기를 해제했습니다';
+
+  @override
+  String get playlistCollectFailed => '즐겨찾기 작업에 실패했습니다';
+
+  @override
+  String get playlistEditTitle => '재생목록 편집';
+
+  @override
+  String get playlistEditName => '재생목록 이름';
+
+  @override
+  String get playlistEditDesc => '재생목록 설명';
+
+  @override
+  String get playlistEditDescHint => '이 재생목록을 설명하세요(선택 사항)';
+
+  @override
+  String get playlistEditDone => '재생목록을 업데이트했습니다';
+
+  @override
+  String get playlistEditFailed => '재생목록을 업데이트하지 못했습니다';
+
+  @override
+  String get playlistDeleteTitle => '재생목록 삭제';
+
+  @override
+  String playlistDeleteConfirm({required Object name}) {
+    return '재생목록 \"$name\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.';
+  }
+
+  @override
+  String get playlistDeleteDone => '재생목록을 삭제했습니다';
+
+  @override
+  String get playlistDeleteFailed => '재생목록을 삭제하지 못했습니다';
+
+  @override
+  String get playlistPickTitle => '재생목록에 추가';
+
+  @override
+  String get playlistPickEmpty => '아직 만든 재생목록이 없습니다';
+
+  @override
+  String get playlistPickEmptyHint => '재생목록을 만들어 좋아하는 노래를 담아 보세요';
+
+  @override
+  String get playlistPickNew => '새 재생목록';
+
+  @override
+  String playlistAdded({required Object count}) {
+    return '$count곡을 재생목록에 추가했습니다';
+  }
+
+  @override
+  String get playlistAlreadyIn => '노래가 이미 이 재생목록에 있습니다';
+
+  @override
+  String get playlistAddFailed => '재생목록에 추가하지 못했습니다';
+
+  @override
+  String get playlistRemoveTrack => '재생목록에서 제거';
+
+  @override
+  String get playlistRemoveDone => '재생목록에서 제거했습니다';
+
+  @override
+  String get playlistRemoveFailed => '제거하지 못했습니다';
 }

@@ -69,9 +69,7 @@ class NekoApi extends ChangeNotifier {
   static void _ensureSuccess(Map<String, dynamic> body) {
     if (body['success'] == true) return;
     throw NekoApiException(
-      body['message']?.toString() ??
-          body['error']?.toString() ??
-          '请求失败',
+      body['message']?.toString() ?? body['error']?.toString() ?? '请求失败',
     );
   }
 
@@ -424,6 +422,117 @@ class NekoApi extends ChangeNotifier {
     return _tracksFrom(body['musicList']);
   }
 
+  /// 用户自建歌单（`GET /api/user/playlists`，需登录）。
+  Future<List<NekoPlaylist>> userPlaylists() async {
+    final body = await _client().getJson('/api/user/playlists');
+    _ensureSuccess(body);
+    return _playlistsFrom(body['playlists']);
+  }
+
+  /// 收藏的歌单（`GET /api/user/favorite-playlists`，需登录）。
+  Future<List<NekoPlaylist>> favoritePlaylists() async {
+    final body = await _client().getJson('/api/user/favorite-playlists');
+    _ensureSuccess(body);
+    return _playlistsFrom(body['playlists']);
+  }
+
+  /// 新建歌单（`POST /api/user/playlist/create`）；返回新建歌单（无则 null）。
+  Future<NekoPlaylist?> createPlaylist(
+    String name, {
+    String? description,
+  }) async {
+    final body = await _client().postJson(
+      '/api/user/playlist/create',
+      body: {
+        'name': name,
+        if (description != null && description.isNotEmpty)
+          'description': description,
+      },
+    );
+    _ensureSuccess(body);
+    final raw = body['playlist'];
+    if (raw is Map) {
+      return NekoPlaylist.fromJson(Map<String, dynamic>.from(raw));
+    }
+    return null;
+  }
+
+  /// 更新歌单名称 / 简介（`POST /api/user/playlist/update`）。
+  Future<void> updatePlaylist(
+    String id, {
+    String? name,
+    String? description,
+  }) async {
+    final body = await _client().postJson(
+      '/api/user/playlist/update',
+      body: {
+        'id': int.tryParse(id) ?? id,
+        'name': ?name,
+        'description': ?description,
+      },
+    );
+    _ensureSuccess(body);
+  }
+
+  /// 删除歌单（`POST /api/user/playlist/delete`）。
+  Future<void> deletePlaylist(String id) async {
+    final body = await _client().postJson(
+      '/api/user/playlist/delete',
+      body: {'id': int.tryParse(id) ?? id},
+    );
+    _ensureSuccess(body);
+  }
+
+  /// 添加歌曲到歌单（`POST /api/user/playlist/music/add`）。
+  ///
+  /// 单曲用 `musicId`、多曲用 `musicIds`（对齐官方 PC 端两种请求形态）；
+  /// 返回服务端确认加入数（接口未返回为 null）。
+  Future<int?> addMusicToPlaylist(String id, List<String> musicIds) async {
+    final ids = <int>[
+      for (final s in musicIds)
+        if (int.tryParse(s) != null) int.parse(s),
+    ];
+    if (ids.isEmpty) return 0;
+    final body = await _client().postJson(
+      '/api/user/playlist/music/add',
+      body: {
+        'playlistId': int.tryParse(id) ?? id,
+        if (ids.length == 1) 'musicId': ids.first else 'musicIds': ids,
+      },
+    );
+    _ensureSuccess(body);
+    return (body['addedCount'] as num?)?.toInt();
+  }
+
+  /// 从歌单移除歌曲（`POST /api/user/playlist/music/remove`，逐曲移除）。
+  Future<void> removeMusicFromPlaylist(String id, List<String> musicIds) async {
+    for (final mid in musicIds) {
+      final body = await _client().postJson(
+        '/api/user/playlist/music/remove',
+        body: {
+          'playlistId': int.tryParse(id) ?? id,
+          'musicId': int.tryParse(mid) ?? mid,
+        },
+      );
+      _ensureSuccess(body);
+    }
+  }
+
+  /// 收藏歌单（`POST /api/user/favorite-playlists`）。
+  Future<void> favoritePlaylist(String id) async {
+    final body = await _client().postJson(
+      '/api/user/favorite-playlists',
+      body: {'playlistId': int.tryParse(id) ?? id},
+    );
+    _ensureSuccess(body);
+  }
+
+  /// 取消收藏歌单（`DELETE /api/user/favorite-playlists/{id}`）。
+  Future<void> unfavoritePlaylist(String id) async {
+    final body = await _client().deleteJson('/api/user/favorite-playlists/$id');
+    _ensureSuccess(body);
+  }
+
   // ── 播放 / 歌词 ──────────────────────────────────────────────
 
   /// 音质解析结果缓存（`/api/music/file/{id}` → 站内固定媒体地址）。
@@ -494,7 +603,10 @@ class NekoApi extends ChangeNotifier {
   /// 判定）。先换取真实媒体地址（`/api/music/file` 已改为 JSON），再对该媒体
   /// 直链做 Range 嗅探。[quality] 与取流档位一致——`standard`/`hq` 为服务端
   /// 转码 MP3，`sq`/`hires` 为原始容器（可能 FLAC），档位不同扩展名可能不同。
-  Future<String?> probeAudioExtension(String id, {String quality = 'hq'}) async {
+  Future<String?> probeAudioExtension(
+    String id, {
+    String quality = 'hq',
+  }) async {
     if (id.isEmpty) return null;
     try {
       final url = await _resolveMediaUrl(id, quality);
@@ -577,10 +689,7 @@ class NekoApi extends ChangeNotifier {
   /// 该楼层下的全部回复。
   Future<void> deleteComment(String id) async {
     if (id.isEmpty) throw NekoApiException('缺少评论 id');
-    final body = await _client().deleteJson(
-      '/api/comments',
-      query: {'id': id},
-    );
+    final body = await _client().deleteJson('/api/comments', query: {'id': id});
     _ensureSuccess(body);
   }
 
@@ -639,7 +748,8 @@ class _NekoMediaUrl {
 }
 
 /// 内部：歌手搜索结果（name + 曲目）。
-class _NekoArtist {  const _NekoArtist({
+class _NekoArtist {
+  const _NekoArtist({
     required this.name,
     required this.musicCount,
     required this.tracks,
