@@ -13,7 +13,7 @@ import '../services/kugou/kugou_api.dart';
 import '../services/liked/liked_cache.dart';
 import '../services/liked/liked_loader.dart';
 import '../services//_api.dart';
-import '../services//_metadata.dart';
+import '../services//_lyric_rewriter.dart';
 import '../services/netease/apis_netease_caller.dart';
 import '../services/netease/netease_api.dart';
 import '../services/platform/platform_capabilities.dart';
@@ -102,9 +102,9 @@ final qqMusicApiProvider = ChangeNotifierProvider<QqMusicApi>(
 ///  平台、也不发请求。登录态变化（token 恢复 / 登录 / 登出）时通知 UI。
 final ApiProvider = ChangeNotifierProvider<Api>((ref) => Api());
 
-///  元数据补充/重写（下载入队前用其它音源规范化标题/歌手/专辑/封面）。
-final MetadataEnricherProvider = Provider<MetadataEnricher>(
-  (ref) => MetadataEnricher(ref),
+///  下载歌词重写（ 元数据已规范，仅下载时把站点广告歌词换成标准 LRC）。
+final LyricRewriterProvider = Provider<LyricRewriter>(
+  (ref) => LyricRewriter(),
 );
 
 /// 列表逐行读取最高音质时的并发限制器（避免瞬时几十个 `/api/music/info` 并发）。

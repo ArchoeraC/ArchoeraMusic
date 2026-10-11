@@ -484,7 +484,7 @@ class _SearchDropdown extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      if (song.source == 'kugou') ...[
+                      if (sourcePlatform(song.source).suggestBadge) ...[
                         const _SourceDot(),
                         const SizedBox(width: 6),
                       ],
@@ -546,7 +546,7 @@ class _SearchDropdown extends ConsumerWidget {
             Expanded(
               child: Row(
                 children: [
-                  if (item.source == 'kugou') ...[
+                  if (sourcePlatform(item.source).suggestBadge) ...[
                     const _SourceDot(),
                     const SizedBox(width: 6),
                   ],

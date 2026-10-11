@@ -141,4 +141,15 @@ extension _SongListActions on _SongListState {
     await handler(tracks);
     if (mounted) _exitBatch();
   }
+
+  /// 批量添加到歌单：委托宿主回调（仅 NT 曲目场景接入）。
+  /// 宿主未提供则按钮不显示（见 [SongList.onBatchAddToPlaylist]）。
+  Future<void> _batchAddToPlaylist() async {
+    final handler = widget.onBatchAddToPlaylist;
+    if (handler == null) return;
+    final tracks = _selectedTracks;
+    if (tracks.isEmpty) return;
+    await handler(tracks);
+    if (mounted) _exitBatch();
+  }
 }

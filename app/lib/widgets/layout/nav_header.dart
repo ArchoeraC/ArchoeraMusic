@@ -11,8 +11,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme_provider.dart';
 import '../../services/netease/netease_api.dart';
-import '../../services/netease/track.dart';
 import '../../services/source/media_request_headers.dart';
+import '../../services/source/source_platform.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/weather/weather_notifier.dart';
 import '../../settings/settings_dialog.dart';
@@ -316,56 +316,20 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   /// - NT：song_detail 批量取详情（含封面/歌手/专辑），失败回退轻量构造；
   /// - KG：建议只有 songid，按歌名搜索取 hash + 封面（[suggestSongToTrack]）。
   Future<void> _playSuggestSong(SuggestSongItem song) async {
-    final String? url;
-    final Track track;
-    if (song.source == 'kugou') {
-      final kugouApi = ref.read(kugouApiProvider);
-      final resolved = await kugouApi.suggestSongToTrack(
-        song.name,
-        singer: song.artist,
-      );
-      if (resolved == null || resolved.kugou == null) {
-        if (mounted) toast(context.l10n.trackListNoPlayableSource);
-        return;
-      }
-      track = resolved;
-      url = await kugouApi.resolvePlayUrl(resolved.kugou!);
-    } else {
-      // NT：先取详情补封面（建议条目无封面字段），失败回退轻量构造
-      Track? detail;
-      try {
-        final list = await ref.read(neteaseApiProvider).songsDetailByIds([
-          song.id,
-        ]);
-        if (list.isNotEmpty) detail = list.first;
-      } catch (_) {
-        // 详情失败不影响播放，回退轻量 Track
-      }
-      if (detail != null) {
-        track = detail;
-      } else {
-        final artists = song.artist == null
-            ? const <TrackArtist>[]
-            : song.artist!
-                  .split(' / ')
-                  .map((n) => TrackArtist(name: n))
-                  .toList();
-        track = Track(
-          id: song.id,
-          title: song.name,
-          artists: artists,
-          album: song.album == null ? null : TrackAlbum(name: song.album!),
-        );
-      }
-      url = await ref.read(neteaseApiProvider).resolvePlayUrl(song.id);
-    }
+    // 建议条目按来源经注册表解析为完整曲目 + 直链（NT 取详情 / KG 取 hash）。
+    final resolved = await sourcePlatform(
+      song.source,
+    ).resolveSuggestSong(ref, song);
     if (!mounted) return;
-    if (url == null) {
+    final url = resolved?.url;
+    if (resolved == null || url == null || url.isEmpty) {
       toast(context.l10n.trackListNoPlayableSource);
       return;
     }
     unawaited(
-      ref.read(playbackProvider.notifier).playNow(track, resolvedUrl: url),
+      ref
+          .read(playbackProvider.notifier)
+          .playNow(resolved.track, resolvedUrl: url),
     );
     _searchFocus.unfocus();
   }
@@ -374,12 +338,15 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   /// albumid 不能跨平台混用，对齐搜索页 `_onCoverTap` 的平台分发）。
   void _openSuggestAlbum(SuggestSimpleItem album) {
     _searchFocus.unfocus();
-    final cover = CoverItem(id: album.id, title: album.name);
-    if (album.source == 'kugou') {
-      showKugouAlbumDialog(context, cover);
-    } else {
-      showNeteaseAlbumDialog(context, cover);
-    }
+    final cover = CoverItem(
+      id: album.id,
+      title: album.name,
+      source: album.source,
+    );
+    // 按来源经注册表分发专辑详情（不再硬编码 KG / NT 分支）。
+    sourcePlatform(
+      album.source,
+    ).openCover(context, ref, SourceSearchKind.album, cover);
   }
 
   /// 建议歌手：NT歌手热门歌曲弹窗。
