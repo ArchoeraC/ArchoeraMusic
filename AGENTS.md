@@ -206,4 +206,4 @@ bash app/tool/sign_watermark.sh          # 本地运行；CI 环境会拒绝执�
 - 禁止删除 `ArchoeraOS` 分支、对其强推，或把它并入 `main` 后删除（已由 ruleset
   `protect-archoeraos` 在服务端拦截；清理分支时务必排除它）。
 - "Hmm"等可能会导致死循环，尽可能不要触及
-
+- 更新提交带来的CI验证首次必须全平台CI
