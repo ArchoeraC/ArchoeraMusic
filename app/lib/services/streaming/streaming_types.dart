@@ -114,6 +114,24 @@ class StreamingServerConfig {
     );
   }
 
+  /// 剥除敏感凭据（password / accessToken），仅保留可长期驻留的元数据
+  /// （SEC-03：明文不得长驻 UI 状态；需要时经 [StreamingStore.loadSecret]
+  /// 惰性解密后临时构造带凭据配置传客户端）。
+  StreamingServerConfig withoutSecrets() => StreamingServerConfig(
+        id: id,
+        name: name,
+        type: type,
+        host: host,
+        port: port,
+        isArchoeraServer: isArchoeraServer,
+        useHttps: useHttps,
+        username: username,
+        password: '',
+        accessToken: null,
+        userId: userId,
+        lastConnected: lastConnected,
+      );
+
   /// 本机 ArchoeraMusic 内置 Subsonic 服务端配置：仅需填写主机
   /// （localhost / 局域网 IP / IPv6 / 域名均可），端口由运行时自动协商。
   factory StreamingServerConfig.ownSubsonic({

@@ -85,6 +85,23 @@ bool verifyWatermarkData({
   required String sigDerHex,
 }) => _verify(payload, pubKeyHex, sigDerHex);
 
+/// 校验任意负载的 ECDSA(P-256/SHA-256, DER) 签名是否由**内嵌官方公钥**
+/// [archoeraWatermarkPubKeyHex] 签发（纯计算、无副作用，失败一律 false）。
+///
+/// 供运行期校验随包分发的分离签名内容（如 SEC-08 原生完整性清单
+/// `ARCHOERA-NATIVE-MANIFEST.sig1`）：签名覆盖清单原文，攻击者即使替换清单
+/// 也无法在不持有私钥的情况下重新签名。
+@pragma('vm:entry-point')
+bool verifyArchoeraSignedBytes(String payload, Uint8List derSignature) =>
+    _verify(payload, archoeraWatermarkPubKeyHex, _bytesToHex(derSignature));
+
+/// 测试入口：同 [verifyArchoeraSignedBytes]，但显式指定公钥（未压缩
+/// `04||X||Y` 十六进制），供测试注入自生成密钥，避免依赖官方私钥。生产不调用。
+@visibleForTesting
+bool verifyArchoeraSignedBytesWithKey(
+        String payload, Uint8List derSignature, String pubKeyHex) =>
+    _verify(payload, pubKeyHex, _bytesToHex(derSignature));
+
 bool _verify(String payload, String pubKeyHex, String sigDerHex) {
   try {
     final msg = Uint8List.fromList(ascii.encode(payload));
@@ -141,4 +158,12 @@ Uint8List _hexToBytes(String hex) {
     out[i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
   }
   return out;
+}
+
+String _bytesToHex(List<int> bytes) {
+  final sb = StringBuffer();
+  for (final b in bytes) {
+    sb.write(b.toRadixString(16).padLeft(2, '0'));
+  }
+  return sb.toString();
 }

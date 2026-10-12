@@ -18,8 +18,9 @@ import 'package:archoera_music/services/streaming/streaming_types.dart';
 ///
 /// 运行前提（headless 无 Secret Service 时）：
 ///   ARCHOERA_VAULT_BIN=core/vault/build/archoera-vault-test
-///   ARCHOERA_VAULT_INSECURE_FILE_STORE=1
-///   （指向测试构建 + 显式启用其明文存储；先跑 core/vault/build-test.sh）。
+///   ARCHOERA_VAULT_BACKEND=file
+///   （指向测试构建 + 选择生产 FileStore 文件密钥后端；先跑
+///   core/vault/build-test.sh。SEC-19 后不再有测试明文存储后门）。
 void main() {
   late Directory tmp;
 
@@ -70,10 +71,19 @@ void main() {
       expect(text.contains('tok-123'), isFalse, reason: '${f.path} 不应含明文');
     }
 
-    // 重建（清缓存模拟重启）：先预取凭据（sync load 的凭据来源），再解密回读
+    // 重建（清缓存模拟重启）：preloadSecrets 不批量解密，凭据惰性加载
     StreamingStore.resetForTest();
     StreamingStore.dataDirOverride = tmp.path;
     await StreamingStore.preloadSecrets();
+    final before = StreamingStore.load();
+    expect(before.servers.single.password, isEmpty,
+        reason: 'preloadSecrets 不得逐服务器解密（SEC-03）');
+    expect(before.servers.single.accessToken, isNull);
+    expect(before.activeServerId, 'srv-1');
+    expect(StreamingStore.hasSecret('srv-1'), isFalse,
+        reason: '未 loadSecret 前不得有内存凭据');
+    await StreamingStore.loadSecret('srv-1');
+    expect(StreamingStore.hasSecret('srv-1'), isTrue);
     final loaded = StreamingStore.load();
     expect(loaded.servers.single.password, 'S3cr3t-密码');
     expect(loaded.servers.single.accessToken, 'tok-123');
@@ -122,10 +132,13 @@ void main() {
       expect(text.contains('legacy-token'), isFalse, reason: '${f.path} 不应含明文');
     }
 
-    // 重建（清缓存）：先预取凭据，再从 vault 回读
+    // 重建（清缓存）：preloadSecrets 不批量解密，loadSecret 按需回读
     StreamingStore.resetForTest();
     StreamingStore.dataDirOverride = tmp.path;
     await StreamingStore.preloadSecrets();
+    expect(StreamingStore.load().servers.single.password, isEmpty,
+        reason: 'preloadSecrets 不得逐服务器解密（SEC-03）');
+    await StreamingStore.loadSecret('legacy-1');
     final reloaded = StreamingStore.load();
     expect(reloaded.servers.single.password, 'legacy-pass');
     expect(reloaded.servers.single.accessToken, 'legacy-token');
@@ -146,6 +159,57 @@ void main() {
     final uid = 'streaming:srv-2';
     final raw = await VaultProcess.get(tmp.path, uid);
     expect(raw == null || raw == 'null', isTrue, reason: '已删除服务器的 vault 条目应清除');
+  });
+
+  test('save 不带凭据（改名/排序）不覆盖既有 vault 凭据', () async {
+    StreamingStore.dataDirOverride = tmp.path;
+    final orig = cfg(id: 'srv-1', password: 'keep-me', token: 'tok-keep');
+    StreamingStore.save([orig], 'srv-1');
+    await StreamingStore.flush();
+    if (!VaultProcess.available) {
+      markTestSkipped('vault 不可用，跳过断言');
+      return;
+    }
+    await StreamingStore.loadSecret('srv-1');
+    expect(StreamingStore.cachedSecret('srv-1')?['password'], 'keep-me');
+
+    // metadata-only 改动（状态中只有元数据、无凭据）：改名 + 空 password
+    final metaOnly = orig.withoutSecrets().copyWith(name: 'Renamed');
+    expect(metaOnly.password, isEmpty);
+    StreamingStore.save([metaOnly], 'srv-1');
+    await StreamingStore.flush();
+
+    // 既有条目未被空 payload 覆盖
+    final raw = await VaultProcess.get(tmp.path, 'streaming:srv-1');
+    expect(raw != null && raw != 'null', isTrue, reason: 'metadata-only 保存不得删除凭据');
+
+    // 重建回读一致（password + token 均在）
+    StreamingStore.resetForTest();
+    StreamingStore.dataDirOverride = tmp.path;
+    await StreamingStore.loadSecret('srv-1');
+    final sec = StreamingStore.cachedSecret('srv-1');
+    expect(sec?['password'], 'keep-me');
+    expect(sec?['accessToken'], 'tok-keep');
+  });
+
+  test('删除未加载凭据的服务器也删除 vault 条目', () async {
+    StreamingStore.dataDirOverride = tmp.path;
+    StreamingStore.save([cfg(id: 'srv-1'), cfg(id: 'srv-2')], 'srv-1');
+    await StreamingStore.flush();
+    if (!VaultProcess.available) {
+      markTestSkipped('vault 不可用，跳过删除断言');
+      return;
+    }
+
+    // 清缓存（模拟从未 loadSecret 的重启）后删除 srv-2：
+    // 删除须经磁盘既有 id 判定，而非仅内存缓存
+    StreamingStore.resetForTest();
+    StreamingStore.dataDirOverride = tmp.path;
+    StreamingStore.save([cfg(id: 'srv-1')], 'srv-1');
+    await StreamingStore.flush();
+    final raw = await VaultProcess.get(tmp.path, 'streaming:srv-2');
+    expect(raw == null || raw == 'null', isTrue,
+        reason: '未加载凭据的服务器删除后条目也应清除');
   });
 
   test('destroy 后 vault 文件消失', () async {

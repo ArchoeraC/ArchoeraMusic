@@ -27,7 +27,7 @@
 | `scraper` | C++ | `libarchoera_scraper.so` | 多源元数据刮削 + 仅目录整理 |
 | `downloader` | Rust（cdylib） | `libarchoera_downloader.so` | Kugou / Netease 下载引擎 |
 | `subsonic` | Go + Rust | `libarchoera_subsonic.so`、`libarchoera_transcoder.so` | 可选 Subsonic 服务端与转码器 |
-| `vault` | C#（NativeAOT） | `archoera-vault` | 凭据保险库（2-of-2） |
+| `vault` | C#（NativeAOT） | `archoera-vault` | 凭据保险库（crypto / slots m1·m2a·m2b；m2b 本机级·较弱） |
 
 > “FFT 部分”指 audio-engine 的 `libfft.so`（Dart 侧频谱分析用，纯 libm、无外部依赖）——
 > 它在 `build-linux.sh` 里随 audio-engine 一起被 CMake 编译，无需单独步骤。

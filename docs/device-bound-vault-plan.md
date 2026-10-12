@@ -1,6 +1,16 @@
 # 设备绑定 Vault 规划（BitLocker 式多封装 · 增强型可选项）
 
-> 状态：**实施中（第一步 vault 核心 v3 基础 ✅ + 第二步恢复口令管理 ✅ + 第三步 Dart 集成 · opt-in ✅ + 第四步迁移与设置页 ✅ + 第六步 v1↔v2 三档切换条 ✅，2026-08-13）** · 前提：credential-vault-plan（vault-1 ~ vault-4 + 口令模式 t9）已完成
+> **⛔ 已废弃 / 已移除（2026-10 重构）**：本方案描述的 **v3 设备绑定（多封装 / `device.seal` / 设备指纹）已随 vault 重架构回归移除**——
+> `DeviceEntropy.cs` / `Fingerprint.cs` 删除，命令 `init-device` / `upgrade-device` / `switch-mode` / `rebind` /
+> `clear-device-seal` / `set-recovery-password` / `clear-recovery-password` 全部移除，`ARCHOERA_VAULT_FINGERPRINT` 环境变量移除。
+> 「设备因子」的定位现由 **slots m2a（口令 + 本地 `device.key` + 恢复码）** 与 **slots m2b（仅 `device.key`，免密；本机级·较弱）** 承接，
+> 但**不再采集任何设备指纹**（`device.key` 为每安装随机 32B，非指纹），也不写入 `device.seal`。
+> 本文仅作**历史审计轨迹**保留，**勿依据本文实施或引用其现状描述**；现行方案见
+> [vault-enhanced-scheme.md](vault-enhanced-scheme.md) / [vault-security-notes.md](vault-security-notes.md) / [credential-vault-plan.md](credential-vault-plan.md)。
+
+---
+
+> 状态：**已废弃（原文：实施中，2026-08-13）** · 前提下文为历史记录
 > ⚠️ 已知缺口与待修复项见 [security-review-2026-10-11.md](security-review-2026-10-11.md)（设备指纹红线冲突 SEC-13 已修订口径 + 隐私披露；迁移崩溃一致性 SEC-16 已声明，见 §8/§11）。
 > 定位（用户决策，2026-08-12）：**v3 设备绑定是增强型可选项（opt-in），默认仍为 v1（OS 模式）**——v1 对普通用户已足够，设备指纹采集涉及隐私且是「暴力增强」模块，选择权交给用户
 > 方向确认：①自实现设备指纹绑定（不依赖 OS 安全存储）②v3 多封装 ③先定稿设计文档再分步实施

@@ -105,8 +105,10 @@ ARCHOERA_LOG_API int archoera_log_level(void);
 /*
  * 就地把一行文本中的敏感字段值替换为等长 '*'（SEC-09）。
  * 覆盖 `key=value`（token/cookie/password/... 见实现）与 `key: value` 两种形态；
- * 大小写不敏感。write 内部已自动对每条日志调用本函数；导出此符号供单测与
- * 需要自行预处理的宿主使用。局限（单字母短键不掩码）见安全评审 SEC-09。
+ * 并针对 Subsonic 单字母查询键 p/t/s 做上下文感知掩码——仅当紧跟 `?`/`&` 且
+ * 后接 `=` 时掩码，普通文本（`top=2`/`step=1`/`t=1`）不受影响。大小写不敏感。
+ * write 内部已自动对每条日志调用本函数；导出此符号供单测与需要自行预处理的宿主使用。
+ * 未知命名不掩码，其余局限见安全评审 SEC-09。
  */
 ARCHOERA_LOG_API void archoera_log_scrub(char *text);
 

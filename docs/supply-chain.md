@@ -1,8 +1,8 @@
 # 发布供应链与 CI 加固
 
-本文记录发布流水线（`.github/workflows/`）的供应链防护现状与**未完成项**，
+本文记录发布流水线（`.github/workflows/`）的供应链防护现状与**信任根取向**，
 对应 [security-review-2026-10-11](security-review-2026-10-11.md) 第五批
-（SEC-21 … SEC-27）。发布总流程见 [AGENTS.md §发布与签名](../AGENTS.md)。
+（SEC-21 … SEC-27）与 SEC-08（原生完整性清单）。发布总流程见 [AGENTS.md §发布与签名](../AGENTS.md)。
 
 ## 1. 已落地
 
@@ -15,22 +15,44 @@
 | SEC-25 | release 作业生成 **CycloneDX SBOM** 并写入 **构建溯源 attestation**（`actions/attest-build-provenance`，Sigstore/OIDC） | `build-all.yml` release 作业 |
 | SEC-26 | 新增 **Dependabot**（github-actions / cargo / gomod / nuget / pub）与**各生态漏洞扫描**工作流（`cargo audit` / `govulncheck` / `dotnet list package --vulnerable`） | `.github/dependabot.yml`、`security-audit.yml` |
 | SEC-27 | CI 跑**完整 `flutter test`**（不再只跑 widget 冒烟）+ vault 用例（指向测试二进制）+ downloader/subsonic 的 `cargo test` / `go test` | `actions/build-linux/action.yml` |
+| SEC-08 | release 作业对目录型产物的 `ARCHOERA-NATIVE-MANIFEST.txt` 做 **key1 ECDSA/SHA-256 分离签名**（`.sig1`），运行期内嵌公钥验签 + 摘要 | `build-all.yml` release 作业 + `app/tool/sign_native_manifest.sh` |
 
-## 2. 未完成（信任根缺口，需后续闭环）
+## 2. 信任根：应用层 key1 清单 + 分发渠道（2026-10 定稿）
 
-以下为 SEC-25 的**信任根承诺尚未兑现**部分，读者/下游不得据 §1 误判为「产物已具备 OS 信任链」：
+**OS 代码签名不推进**：Windows **Authenticode**、macOS **公证（notarization）** 因成本与步骤不可得，
+已**不再列为计划项**（不作为「待兑现承诺」）。当前的真实性机制如下：
 
-- **Windows**：未做 **Authenticode** 代码签名（安装包 / 可执行）。
-- **macOS**：仅 **ad-hoc 签名**（`CODE_SIGN_IDENTITY = "-"`），未做 **Apple 公证（notarization）**。
-  这需要 Apple Developer ID 证书与 `notarytool` 凭据（CI secret），当前未配置。
-- **每个构建作业自带溯源**：当前 provenance attestation 在 `release` 作业对**最终发布字节**
-  生成；更严格的做法是在**各构建矩阵作业**内对各自产物即时 attest（需给每个作业
+### 2.1 应用层 key1 签名的原生完整性清单（F5）
+
+- `native/` 全部文件（含 vault 二进制）在构建期生成 SHA-256 清单 `ARCHOERA-NATIVE-MANIFEST.txt`，
+  由 **key1（ECDSA P-256 / SHA-256）** 签为 `ARCHOERA-NATIVE-MANIFEST.sig1`；
+- 运行期 `NativeIntegrity` 用**二进制内嵌公钥**（`app/lib/app/watermark.dart`）**先验签、再逐文件比对摘要**，
+  **fail-closed**；vault 二进制在 spawn 前亦经该校验（取代可伪造的 `PROD-*` marker 作主防线）；
+- `release` 作业在**可被 release 控制的目录型产物**内注入签名清单——macOS / Windows tar、Linux 原始 bundle、
+  Windows 便携 zip（`.github/workflows/build-all.yml` 的「签名原生完整性清单（SEC-08）」步骤）；
+- **用户可离线核验**：用随发布分发的公钥（`ARCHOERA_PUBKEY.pem` / `watermark_pub.pem`）验 `.sig1` 与清单，
+  无需信任任何服务器。
+
+> 覆盖面边界：清单只覆盖 **release 作业能自行打包的产物**；`ARCHOERA_VAULT_BIN` 显式指定且 dev 无清单时跳过。
+
+### 2.2 分发渠道信任
+
+- **deb / rpm / AppImage / flatpak / pkg.tar.zst / nixos**：依赖**各发行版包管理器签名**，**不在 release 内重签**；
+- **Windows Inno `.exe` 安装器**：依赖**外层 `.sig1`** 在安装前的核验，不对其内部清单重签；
+- 官方产物仅以本仓库 GitHub Releases 为准；非官方渠道分发的产物官方不背书。
+
+### 2.3 残余（如实声明，勿误判为已防护）
+
+- **硬上限**：验证逻辑本身运行在**可被替换的进程**里——**替换主程序 / 同用户运行期注入主程序**无法用
+  应用层清单防住；无 OS 代码签名、无硬件根（TPM / Secure Enclave）时无解。
+- `.sig1` / 清单只证明「**key1 签了这份字节**」且「**这些文件与签名清单一致**」，**不证明构建来源可复现**。
+- **每个构建作业自带溯源**：当前 provenance attestation 在 `release` 作业对**最终发布字节**生成；
+  更严格的做法是在各构建矩阵作业内对各自产物即时 attest（需给每个作业
   `id-token: write` / `attestations: write`），属后续增强。
 - **可复现构建**：未做 bit-for-bit 可复现验证。
+- macOS 产物当前为 **ad-hoc 签名**（`CODE_SIGN_IDENTITY = "-"`），不再期待公证。
 
-> 上述缺口与 `vault-security-notes.md`「信任根边界」一致：应用层 `.sig1`（key1）只证明
-> 「该密钥签了这份字节」，**不**证明构建来源；二进制层面的「未被替换」依赖上表 OS 信任链，
-> 目前**未兑现**。
+> 与 `vault-security-notes.md`「信任根边界」一致：上述残余为**已声明的威胁模型硬上限**，非「待兑现承诺」。
 
 ## 3. 维护要点
 

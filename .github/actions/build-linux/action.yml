@@ -132,10 +132,12 @@ runs:
       working-directory: app
       env:
         # headless runner 无 D-Bus Secret Service：构建测试二进制（VAULT_TESTING
-        # 条件编译，含测试明文存储；生产 build.sh 产物不含该逻辑，绝不用于测试）。
+        # 条件编译，与生产唯一区别是构建标记为 TEST；存储行为完全一致），并经
+        # ARCHOERA_VAULT_BACKEND=file 选择**生产 FileStore**（文件密钥后端）——
+        # SEC-19 后不再有测试专用明文存储后门。
         # 指向绝对路径，避免 working-directory 相对解析。
         ARCHOERA_VAULT_BIN: ${{ github.workspace }}/app/core/vault/build/archoera-vault-test
-        ARCHOERA_VAULT_INSECURE_FILE_STORE: '1'
+        ARCHOERA_VAULT_BACKEND: 'file'
       run: |
         set -euo pipefail
         bash core/vault/build-test.sh linux-x64

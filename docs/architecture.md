@@ -76,7 +76,7 @@ SQLite 写入经 `/api/db/*` 代理串行化），2026-09-06 随去侧车化整�
 | 在线平台 API / 歌词 | **纯 Dart 移植**（`app/lib/core/apis/`：netease / kugou / qqmusic / lyric，纯 Dart 直连） |
 | 音乐库 / 扫描 / 刮削 / 下载 | **原生模块 FFI 直连进程内**（C# / C++ / Rust），直写 SQLite（§8） |
 | 播放 | **C 引擎 FFI 直连**（PCM 落盘 + miniaudio 自播，§5） |
-| 配置 / 会话 / 队列 / 缓存 | **Dart 本地**（`config/settings.json` 原子写 + vault 2-of-2 保险库 + drift/Hive） |
+| 配置 / 会话 / 队列 / 缓存 | **Dart 本地**（`config/settings.json` 原子写 + vault 保险库（crypto / slots m1·m2a·m2b，m2b 本机级·较弱） + drift/Hive） |
 | Subsonic | **Go c-shared FFI 直连**（可选启用；与独立服务端共享同一份代码，build tag 区分） |
 
 ---
@@ -328,7 +328,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - 用户库路径 `dataDir/database/user.db`，与媒体库同目录独立文件。**Subsonic 用户密码不再由 `dataDir/secret.key`
   字段级加密承载**（SEC-01）：密码经 vault 统一持久化（`uid=subsonic:<username>`，Dart `VaultSubsonicCredentialStore`），
   服务端认证经 `archoera_subsonic_set_credentials` 注入内存凭据表；`password_cipher` 仅为空串占位。
-  `secret.key` 仍**保留**——vault 的 file 模式（v4-file）以同一文件名存放主密钥，二者不再交叉；
+  `secret.key` 仍**保留**——vault 的 `file` 后端（crypto 模式的单因子文件密钥）以同一文件名存放主密钥，二者不再交叉；
 - 旧版（library.db 内嵌 subsonic_* 表）数据在服务端启动时经 `MigrateUserDB` 自动迁移到 user.db 并删除媒体库旧表（幂等，密文原样搬运不重加密）；
   更旧的 `enc:v1:` 用户密码在 `SubsonicAdmin.open` 时解密迁入 vault（成功才置空 `password_cipher`，失败保留待重试）；
 - **启动注入时序（SEC-01 落地注意）**：`SubsonicAdmin.open` 从 vault 载回密码后，须在启动流程显式调用

@@ -6,9 +6,9 @@ using System.Security.Cryptography;
 
 namespace Archoera.Vault;
 
-/// 设备熵路径解锁失败（指纹不符 / device.seal 缺失 / 熵被篡改）且 vault 具备
-/// 口令封装——主进程应转「恢复口令」流（serve 应答 `err NEED_RECOVERY`）。
-/// 不是解锁失败：不计入锁定退避（设备变更/熵损坏是恢复场景，非爆破尝试）。
+/// 设备密钥路径解锁失败（`device.key` 缺失/损坏）——主进程应转「恢复码」流
+/// （serve 应答 `err NEED_RECOVERY`；m2a 用恢复槽，m2b 无恢复则同样以该码暴露）。
+/// 不是解锁失败：不计入锁定退避（设备密钥缺失是环境/恢复场景，非爆破尝试）。
 public sealed class NeedRecoveryException : Exception
 {
     public NeedRecoveryException(string message) : base(message) { }
@@ -46,16 +46,21 @@ public sealed class VaultShareMissingException : Exception
     }
 }
 
-/// vault 服务（命令语义）：init / init-password / init-device / serve / destroy / status。
+/// vault 服务（命令语义）：init-crypto / init-file / init-m1 / init-m2a / init-m2b /
+/// serve / destroy / status。
 ///
-/// 主密钥 K 永不落盘：文件头只存 K_vault = K ⊕ S（vault 侧份额），
-/// S（授权侧份额）锚定于 OS 安全存储（默认）或 Argon2id 口令派生（高级）；
-/// 解密时两侧协同重建 K，短时持有于 [LockedBuffer]（mlock + 用后 zeroize）。
+/// 支持两种容器：
+///   - LEGACY 'C'（crypto 传统单因子）：主密钥 K 整体锚定于 OS 安全存储
+///     （DPAPI/Keychain/libsecret）或文件密钥库（file）；vault 文件不含密钥材料。
+///   - 'S'（slots）：K 由槽位表封装（口令 / 设备 / 恢复 / 口令+设备），条目以 K
+///     直接加密并以尾部 HMAC 锚定。
+/// 主密钥 K 永不落盘（file 后端与 slots 槽位密文除外），短时持有于
+/// [LockedBuffer]（mlock + 用后 zeroize）。
 public sealed class VaultService
 {
     public const string VaultFileName = "credentials.vault";
     public const string ShareKey = "master-share";
-    public const string DeviceSealFileName = "device.seal";
+    public const string DeviceKeyFileName = DeviceKeyFile.FileName;
 
     /// 会话锚点条目 uid（§3.8 握手）：vault 生成 16B 随机 T 经主密钥加密存此条目，
     /// 握手时解密回读交主进程保存——后续会话比对该值以确认「仍是同一把 K 的 vault」。
@@ -68,50 +73,79 @@ public sealed class VaultService
     public VaultService(string dataDir) : this(dataDir, null) { }
 
     /// [store] 注入用于显式选择后端（如文件密钥模式 init-file 直接给 FileStore；
-    /// null → 工厂按 vault 文件头/env/平台自动分发）。
+    /// null → 工厂按 vault 文件头/env/平台自动分发）。'S'（slots）模式自包含
+    /// （口令派生 KEK + 头部 HMAC），默认走 [NullSecretStore]——headless/无钥匙串
+    /// 也能 status/serve，不改变其他模式的后端选择行为。
     public VaultService(string dataDir, ISecretStore? store)
     {
         _dataDir = dataDir;
-        _store = store ?? SecretStoreFactory.Create(dataDir);
-        _lockout = new VaultLockout(dataDir);
+        _store = store ?? SelectDefaultStore(dataDir);
+        _lockout = new VaultLockout(_store, dataDir);
     }
+
+    /// 无显式 [store] 时的默认后端：已存在的 'S' vault → [NullSecretStore]（自包含）；
+    /// 其余（含未初始化）→ 既有工厂分发（file/dpapi/keychain/libsecret）。
+    private static ISecretStore SelectDefaultStore(string dataDir)
+    {
+        var vaultPath = Path.Combine(dataDir, VaultFileName);
+        if (File.Exists(vaultPath))
+        {
+            try
+            {
+                if (VaultFile.ReadHeader(vaultPath).Mode == VaultMode.Slots)
+                    return new NullSecretStore();
+            }
+            catch
+            {
+                // 文件头损坏：交由默认工厂（后续加载时暴露为明确错误）
+            }
+        }
+        return SecretStoreFactory.Create(dataDir);
+    }
+
+    /// 解锁失败退避（[VaultLockout]）——与份额槽位共用同一后端实例，退避状态内嵌于
+    /// `master-share` 值（[security-review SEC-05]）。serve 会话复用本实例，避免第二份
+    /// 状态视图导致读写不一致。
+    internal VaultLockout Lockout => _lockout;
 
     public string VaultPath => Path.Combine(_dataDir, VaultFileName);
 
-    public string DeviceSealPath => Path.Combine(_dataDir, DeviceSealFileName);
+    /// 设备密钥路径（`<dataDir>/device.key`，F2 设备/口令+设备槽用，0600）。
+    public string DeviceKeyPath => Path.Combine(_dataDir, DeviceKeyFileName);
 
-    /// 当前份额后端（v4 指纹：file/dpapi/keychain/libsecret/insecure…）。
+    /// 当前份额后端（v4 指纹：file/dpapi/keychain/libsecret…）。
     /// status 命令据此暴露，供主进程区分「OS 安全存储 crypto」与
     /// 「文件密钥模式（file）」——两者模式同为 crypto 但安全性不同。
     public string Backend => _store.Backend;
 
     public bool Initialized => File.Exists(VaultPath);
 
-    /// 份额锚定模式（读文件头判定；未初始化视为 OS 模式）。
-    public VaultMode Mode => Initialized ? VaultFile.ReadHeader(VaultPath).Mode : VaultMode.OsStore;
+    /// 份额锚定模式（读文件头判定；未初始化返回 [VaultMode.Crypto] 占位）。
+    public VaultMode Mode => Initialized ? VaultFile.ReadHeader(VaultPath).Mode : VaultMode.Crypto;
 
-    /// 初始化（OS 模式）：生成主密钥 K 并 2-of-2 拆分，S 存 OS 安全存储。
-    /// 失败回滚（授权侧写入失败时不残留半初始化 vault）。
-    public void Init()
+    /// 'S'（slots）容器的因子模式（m1/m2a/m2b，由槽位集合推导；非 slots → None）。
+    /// 仅读文件头（不加载/不解密任何凭据），供 status/serve 判定握手形态。
+    public SlotsMode SlotsMode
     {
-        if (Initialized) throw new InvalidOperationException("vault 已初始化，请先 destroy");
-        _lockout.Clear();
-        var (keyVault, share) = KeySplit.Split();
-        try
+        get
         {
-            _store.Store(ShareKey, share);
-            // v4：写入当前后端指纹（解锁时校验，防 PROD/TEST 混用数据目录）
-            VaultFile.Create(keyVault, _store.Backend).Save(VaultPath);
+            if (!Initialized) return SlotsMode.None;
+            var header = VaultFile.ReadHeader(VaultPath);
+            return header.Mode == VaultMode.Slots
+                ? VaultFile.DetectSlotsMode(header.SlotKinds ?? [])
+                : SlotsMode.None;
         }
-        catch
+    }
+
+    /// 当前口令承载槽（m1 口令 / m2a 口令+设备）的 Argon2id 强度参数（m/t/p）。
+    /// 仅读文件头（不解密任何凭据）——供 status 展示当前档位；crypto / m2b / 未初始化
+    /// 返回 null（无口令 KDF 可展示）。与 [ChangeKdf] 配合实现「可查看/可调强度」。
+    public Argon2id.KdfParams? CurrentKdf
+    {
+        get
         {
-            if (File.Exists(VaultPath)) File.Delete(VaultPath);
-            throw;
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(keyVault);
-            CryptographicOperations.ZeroMemory(share);
+            if (!Initialized) return null;
+            return VaultFile.ReadHeader(VaultPath).Kdf;
         }
     }
 
@@ -136,7 +170,7 @@ public sealed class VaultService
         var k = master ?? RandomNumberGenerator.GetBytes(KeySplit.KeySize);
         try
         {
-            _store.Store(ShareKey, k); // K 整体入 OS 安全存储 / 文件密钥库
+            _lockout.SetShare(k); // K 整体入 OS 安全存储 / 文件密钥库
             VaultFile.CreateCrypto(_store.Backend).Save(VaultPath);
         }
         catch
@@ -150,23 +184,45 @@ public sealed class VaultService
         }
     }
 
-    /// 初始化（口令模式，可选高级）：S 份额 = Argon2id(password, salt)。
-    /// 口令绝不落盘/落 argv；salt 与 KDF 参数随文件头存储。
+    /// 初始化（'S' slots 容器，F1 = 仅口令槽）：生成随机主密钥 K，用
+    /// KEK = Argon2id(password, salt, ad=vaultId‖kind) 包裹 K 写入槽位表；
+    /// 条目直接以 K 加密，尾部写 HMAC-SHA256(K, header‖entries)。
+    /// 口令绝不落盘/落 argv；salt 与 KDF 参数随槽位表存储。
+    /// [kdfParams] 为用户可选强度（m/t/p，非密文，经 argv 传入）；null → 默认档
+    /// （[Argon2id.KdfParams.Default]）。越界经 [VaultLimits.ValidateKdf] 快速拒绝。
     /// [password] 用后由调用方清零（本方法仅读取）。
-    public void InitPassword(byte[] password, byte[]? salt = null)
+    public void InitSlots(byte[] password, byte[]? salt = null,
+        Argon2id.KdfParams? kdfParams = null)
     {
         if (Initialized) throw new InvalidOperationException("vault 已初始化，请先 destroy");
         _lockout.Clear();
         salt ??= RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
-        var kdf = Argon2id.KdfParams.Default;
-        var share = Argon2id.Derive(password, salt, [], [], kdf.MKiB, kdf.T, kdf.P, KeySplit.KeySize);
-        var keyVault = new byte[KeySplit.KeySize];
+        var kdf = kdfParams ?? Argon2id.KdfParams.Default;
+        VaultLimits.ValidateKdf(kdf.MKiB, kdf.T, kdf.P);
+        var vaultId = RandomNumberGenerator.GetBytes(VaultFile.VaultIdSize);
+        var createdAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var master = RandomNumberGenerator.GetBytes(KeySplit.KeySize);
+        var ad = VaultFile.BuildSlotAd(vaultId, SlotKind.Password);
+        var kek = Argon2id.Derive(password, salt, [], ad, kdf.MKiB, kdf.T, kdf.P, KeySplit.KeySize);
         try
         {
-            for (var i = 0; i < KeySplit.KeySize; i++)
-                keyVault[i] = (byte)(master[i] ^ share[i]);
-            VaultFile.CreatePassword(keyVault, salt, kdf).Save(VaultPath);
+            var nonce = RandomNumberGenerator.GetBytes(VaultFile.NonceSize);
+            var wrapped = new byte[KeySplit.KeySize + VaultFile.TagSize];
+            using (var gcm = new AesGcm(kek, VaultFile.TagSize))
+            {
+                gcm.Encrypt(nonce, master, wrapped.AsSpan(0, KeySplit.KeySize),
+                    wrapped.AsSpan(KeySplit.KeySize), ad);
+            }
+            var slot = new VaultSlot
+            {
+                Kind = SlotKind.Password,
+                Kdf = kdf,
+                Salt = salt,
+                Nonce = nonce,
+                Wrapped = wrapped,
+            };
+            VaultFile.CreateSlots(vaultId, createdAt, VaultFile.AlgAes256Gcm,
+                new[] { slot }).Save(VaultPath, master);
         }
         catch
         {
@@ -175,205 +231,289 @@ public sealed class VaultService
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(keyVault);
-            CryptographicOperations.ZeroMemory(share);
+            CryptographicOperations.ZeroMemory(kek);
             CryptographicOperations.ZeroMemory(master);
         }
     }
 
-    /// 初始化（多封装模式，BitLocker 式，device-bound-vault-plan §3）：
-    /// S 份额被设备熵（kind=2）与可选恢复口令（kind=1）分别密封，任一方可解。
-    /// 熵本体存 device.seal（指纹密封）；口令仅经 stdin 传入，绝不落盘/落 argv。
-    /// [fingerprint] 为 null 时自动采集（[Fingerprint.Collect]）。
-    public void InitDevice(string? fingerprint, byte[]? recoveryPassword)
+    /// 初始化（'S' slots，m2a = 口令+设备双因子 + 恢复槽）：生成 K、
+    /// deviceSecret（写 device.key）与 32B 恢复码；两个槽位均封装同一 K：
+    ///   - kind=4（PasswordDevice）：KEK = HKDF(Argon2id(口令, salt, ad) ‖ deviceSecret)；
+    ///   - kind=3（Recovery）：KEK = HKDF(recoveryCodeBytes, salt, "…recovery")。
+    /// 解锁需「口令 + device.key」，device.key 丢失时用恢复码兜底。
+    /// [kdfParams] 为口令+设备槽的用户可选强度（非密文，经 argv）；null → 默认档。
+    /// [password] 用后由调用方清零（本方法仅读取）；返回恢复码展示串（仅此一次可展示）。
+    public string InitM2a(byte[] password, byte[]? salt = null,
+        Argon2id.KdfParams? kdfParams = null)
     {
         if (Initialized) throw new InvalidOperationException("vault 已初始化，请先 destroy");
         _lockout.Clear();
-        fingerprint ??= Fingerprint.Collect();
-        if (fingerprint == null)
-        {
-            throw new InvalidOperationException("无法采集设备指纹（设备熵路径不可用，请改用口令模式）");
-        }
-        var (keyVault, share) = KeySplit.Split();
-        var entropy = RandomNumberGenerator.GetBytes(DeviceEntropyFile.EntropySize);
-        var device = DeviceEntropyFile.Create();
+        salt ??= RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
+        var kdf = kdfParams ?? Argon2id.KdfParams.Default;
+        VaultLimits.ValidateKdf(kdf.MKiB, kdf.T, kdf.P);
+        var vaultId = RandomNumberGenerator.GetBytes(VaultFile.VaultIdSize);
+        var createdAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var master = RandomNumberGenerator.GetBytes(KeySplit.KeySize);
+        var deviceSecret = DeviceKeyFile.CreateAndSave(_dataDir);
+        var recoveryBytes = RandomNumberGenerator.GetBytes(RecoveryCode.ByteSize);
+        var recoveryCode = RecoveryCode.Encode(recoveryBytes);
+        byte[]? baseKek = null;
+        byte[]? pdKek = null;
+        byte[]? recKek = null;
         try
         {
-            device.SealAndSave(DeviceSealPath, entropy, fingerprint);
-            var kSeal = DeviceEntropyFile.ShareSealKey(entropy);
-            try
-            {
-                var seals = new List<VaultSeal>
-                {
-                    SealShareWithEntropy(share, kSeal, device.EntropyId),
-                };
-                if (recoveryPassword != null)
-                {
-                    var salt = RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
-                    seals.Insert(0, SealShareWithPassword(share, recoveryPassword, salt,
-                        Argon2id.KdfParams.Default));
-                }
-                VaultFile.CreateMultiSeal(keyVault, seals).Save(VaultPath);
-            }
-            finally
-            {
-                CryptographicOperations.ZeroMemory(kSeal);
-            }
+            // kind=4：口令+设备双因子槽（Argon2id 参数随槽存储）
+            var pdAd = VaultFile.BuildSlotAd(vaultId, SlotKind.PasswordDevice);
+            baseKek = SlotCrypto.DerivePassword(password, salt, pdAd, kdf);
+            pdKek = SlotCrypto.DerivePasswordDevice(baseKek, deviceSecret, salt);
+            var pdSlot = WrapSlot(SlotKind.PasswordDevice, kdf, salt, pdKek, master, pdAd);
+
+            // kind=3：恢复槽（独立 salt；KDF 参数占位不使用）
+            var recSalt = RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
+            var recAd = VaultFile.BuildSlotAd(vaultId, SlotKind.Recovery);
+            recKek = SlotCrypto.DeriveRecovery(recoveryBytes, recSalt);
+            var recSlot = WrapSlot(SlotKind.Recovery, null, recSalt, recKek, master, recAd);
+
+            VaultFile.CreateSlots(vaultId, createdAt, VaultFile.AlgAes256Gcm,
+                new[] { pdSlot, recSlot }).Save(VaultPath, master);
         }
         catch
         {
             if (File.Exists(VaultPath)) File.Delete(VaultPath);
-            if (File.Exists(DeviceSealPath)) File.Delete(DeviceSealPath);
+            DeviceKeyFile.Delete(_dataDir);
             throw;
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(keyVault);
-            CryptographicOperations.ZeroMemory(share);
-            CryptographicOperations.ZeroMemory(entropy);
+            if (baseKek != null) CryptographicOperations.ZeroMemory(baseKek);
+            if (pdKek != null) CryptographicOperations.ZeroMemory(pdKek);
+            if (recKek != null) CryptographicOperations.ZeroMemory(recKek);
+            CryptographicOperations.ZeroMemory(deviceSecret);
+            CryptographicOperations.ZeroMemory(recoveryBytes);
+            CryptographicOperations.ZeroMemory(master);
         }
+        return recoveryCode;
     }
 
-    // ── S 份额密封（v3 多封装）──────────────────────────────────────
-
-    /// 口令封装：key = Argon2id(口令)，KDF 参数随封装块存储。
-    public static VaultSeal SealShareWithPassword(
-        byte[] share, byte[] password, byte[] salt, Argon2id.KdfParams kdf)
+    /// 初始化（'S' slots，m2b = 仅设备槽）：生成 K 与 deviceSecret（写 device.key），
+    /// kind=2（Device）封装 K——本机免密解锁（无口令、无恢复槽）。
+    /// KEK = HKDF-SHA256(deviceSecret, slotSalt, "archoera.slot.device")。
+    public void InitM2b()
     {
-        var key = Argon2id.Derive(password, salt, [], [], kdf.MKiB, kdf.T, kdf.P, KeySplit.KeySize);
+        if (Initialized) throw new InvalidOperationException("vault 已初始化，请先 destroy");
+        _lockout.Clear();
+        var vaultId = RandomNumberGenerator.GetBytes(VaultFile.VaultIdSize);
+        var createdAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var master = RandomNumberGenerator.GetBytes(KeySplit.KeySize);
+        var deviceSecret = DeviceKeyFile.CreateAndSave(_dataDir);
+        var salt = RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
+        var ad = VaultFile.BuildSlotAd(vaultId, SlotKind.Device);
+        var kek = SlotCrypto.DeriveDevice(deviceSecret, salt);
         try
         {
-            var nonce = RandomNumberGenerator.GetBytes(VaultFile.NonceSize);
-            var ct = new byte[share.Length + VaultFile.TagSize];
-            using var gcm = new AesGcm(key, VaultFile.TagSize);
-            var tag = ct.AsSpan(share.Length);
-            gcm.Encrypt(nonce, share, ct.AsSpan(0, share.Length), tag);
-            return new VaultSeal
-            {
-                Kind = SealKind.Password, Salt = salt, Kdf = kdf, Nonce = nonce, Ciphertext = ct,
-            };
+            var slot = WrapSlot(SlotKind.Device, null, salt, kek, master, ad);
+            VaultFile.CreateSlots(vaultId, createdAt, VaultFile.AlgAes256Gcm,
+                new[] { slot }).Save(VaultPath, master);
+        }
+        catch
+        {
+            if (File.Exists(VaultPath)) File.Delete(VaultPath);
+            DeviceKeyFile.Delete(_dataDir);
+            throw;
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(key);
+            CryptographicOperations.ZeroMemory(kek);
+            CryptographicOperations.ZeroMemory(deviceSecret);
+            CryptographicOperations.ZeroMemory(master);
         }
     }
 
-    /// 设备熵封装：key = K_seal（[DeviceEntropyFile.ShareSealKey]，由熵派生）。
-    public static VaultSeal SealShareWithEntropy(byte[] share, byte[] kSeal, byte[] entropyId)
+    /// 用 [kek] 封装主密钥 [master] 为槽位（AES-256-GCM，ad=vaultId‖kind）。
+    /// [kdf] 为 null（设备/恢复槽）时写占位 (0,0,0)。
+    private static VaultSlot WrapSlot(
+        SlotKind kind, Argon2id.KdfParams? kdf, byte[] salt, byte[] kek,
+        byte[] master, byte[] ad)
     {
         var nonce = RandomNumberGenerator.GetBytes(VaultFile.NonceSize);
-        var ct = new byte[share.Length + VaultFile.TagSize];
-        using var gcm = new AesGcm(kSeal, VaultFile.TagSize);
-        var tag = ct.AsSpan(share.Length);
-        gcm.Encrypt(nonce, share, ct.AsSpan(0, share.Length), tag);
-        return new VaultSeal
+        var wrapped = new byte[KeySplit.KeySize + VaultFile.TagSize];
+        using (var gcm = new AesGcm(kek, VaultFile.TagSize))
         {
-            Kind = SealKind.DeviceEntropy, EntropyId = entropyId, Nonce = nonce, Ciphertext = ct,
+            gcm.Encrypt(nonce, master, wrapped.AsSpan(0, KeySplit.KeySize),
+                wrapped.AsSpan(KeySplit.KeySize), ad);
+        }
+        return new VaultSlot
+        {
+            Kind = kind,
+            Kdf = kdf ?? new Argon2id.KdfParams(0, 0, 0),
+            Salt = salt,
+            Nonce = nonce,
+            Wrapped = wrapped,
         };
     }
 
-    /// 解封 S 份额（返回 32B；调用方用后须 zeroize）。
-    public static byte[] UnsealShare(VaultSeal seal, byte[] key)
+    /// **重键 KDF（用户可选强度，不丢数据）**：用**当前口令**以**旧参数**解出口令承载槽
+    /// 封装的同一主密钥 K，再用**新参数**（新随机 salt + 新 nonce）重新封装回原槽——
+    /// K、条目密文与 `__auth__` 锚点均不变，仅口令槽的 `m/t/p/salt/nonce/wrapped` 更新，
+    /// 尾部 HMAC 以同一 K 重算后原子保存（保留 `.bak`）。
+    /// 边界（务必理解）：
+    ///   - **必须提供口令**：旧 KEK 只能由旧口令 + 旧参数派生；口令错误 / 槽被篡改在
+    ///     AES-GCM 认证处 fail-closed（抛 [AuthenticationTagMismatchException]）；
+    ///   - 仅 'S' 口令类槽支持：crypto（K 整体存 OS 存储，无口令 KDF）与 m2b（无口令槽）
+    ///     抛 [InvalidOperationException]；m2a 仅重键口令+设备槽，恢复槽（HKDF，无 Argon2id）
+    ///     **原样保留**；
+    ///   - m2a 需 `device.key`：缺失抛 [NeedRecoveryException]（环境缺失，非爆破），
+    ///     调用方应转恢复码流（本方法不修改恢复槽，故恢复码仍可用）。
+    /// [password] 由调用方所有（本方法仅读取，不负责清零）；[kdf] 越界经
+    /// [VaultLimits.ValidateKdf] 拒绝。
+    public void ChangeKdf(byte[] password, Argon2id.KdfParams kdf)
     {
-        var share = new byte[KeySplit.KeySize];
-        using var gcm = new AesGcm(key, VaultFile.TagSize);
-        var tag = seal.Ciphertext.AsSpan(share.Length);
-        gcm.Decrypt(seal.Nonce, seal.Ciphertext.AsSpan(0, share.Length), tag, share);
-        return share;
+        EnsureInitialized();
+        VaultLimits.ValidateKdf(kdf.MKiB, kdf.T, kdf.P);
+        var vault = VaultFile.Load(VaultPath);
+        if (vault.Mode != VaultMode.Slots || vault.VaultId == null
+            || vault.MacInput == null || vault.Trailer == null)
+        {
+            // crypto / file（无口令 KDF 可重键）——明确拒绝，不改动任何字节
+            throw new InvalidOperationException("该模式不支持更改 KDF");
+        }
+        var slotMode = VaultFile.DetectSlotsMode(vault.Slots.Select(s => s.Kind).ToList());
+        var targetKind = slotMode switch
+        {
+            SlotsMode.M1 => SlotKind.Password,
+            SlotsMode.M2a => SlotKind.PasswordDevice,
+            _ => throw new InvalidOperationException("该模式不支持更改 KDF"),
+        };
+        var index = vault.Slots.FindIndex(s => s.Kind == targetKind);
+        if (index < 0) throw new InvalidOperationException("vault 缺少口令槽位，无法更改 KDF");
+        var slot = vault.Slots[index];
+        var ad = VaultFile.BuildSlotAd(vault.VaultId, slot.Kind);
+        var newSalt = RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
+        var newNonce = RandomNumberGenerator.GetBytes(VaultFile.NonceSize);
+        var k = new byte[KeySplit.KeySize];
+        byte[]? deviceSecret = null;
+        byte[]? oldBaseKek = null;
+        byte[]? oldKek = null;
+        byte[]? newBaseKek = null;
+        byte[]? newKek = null;
+        try
+        {
+            // m2a：口令+设备槽需本机设备因子（缺失 → NeedRecoveryException）
+            if (slot.Kind == SlotKind.PasswordDevice)
+                deviceSecret = DeviceKeyFile.Load(_dataDir);
+
+            // 1) 旧参数 + 口令 → 旧 KEK → 解出 K（口令错误 → GCM 认证失败）
+            oldBaseKek = SlotCrypto.DerivePassword(password, slot.Salt, ad, slot.Kdf);
+            oldKek = slot.Kind == SlotKind.PasswordDevice
+                ? SlotCrypto.DerivePasswordDevice(oldBaseKek, deviceSecret!, slot.Salt)
+                : oldBaseKek;
+            using (var gcm = new AesGcm(oldKek, VaultFile.TagSize))
+            {
+                gcm.Decrypt(slot.Nonce, slot.Wrapped.AsSpan(0, KeySplit.KeySize),
+                    slot.Wrapped.AsSpan(KeySplit.KeySize), k, ad);
+            }
+            // 尾部 HMAC 复核（纵深防御；K 未变，Save 会以同一 K 重算）
+            if (!CryptographicOperations.FixedTimeEquals(
+                    VaultFile.ComputeSlotsMac(k, vault.MacInput), vault.Trailer))
+            {
+                throw new AuthenticationTagMismatchException(
+                    "slots vault 尾部 HMAC 校验失败（header/条目被篡改）");
+            }
+
+            // 2) 新参数 + 口令 → 新 KEK → 用新 salt/nonce 重新封装同一 K
+            newBaseKek = SlotCrypto.DerivePassword(password, newSalt, ad, kdf);
+            newKek = slot.Kind == SlotKind.PasswordDevice
+                ? SlotCrypto.DerivePasswordDevice(newBaseKek, deviceSecret!, newSalt)
+                : newBaseKek;
+            var wrapped = new byte[KeySplit.KeySize + VaultFile.TagSize];
+            using (var gcm = new AesGcm(newKek, VaultFile.TagSize))
+            {
+                gcm.Encrypt(newNonce, k, wrapped.AsSpan(0, KeySplit.KeySize),
+                    wrapped.AsSpan(KeySplit.KeySize), ad);
+            }
+
+            // 3) 仅替换该槽（其余槽/条目/锚点原样）；以同一 K 重算尾部 HMAC 后原子保存
+            vault.Slots[index] = new VaultSlot
+            {
+                Kind = slot.Kind,
+                Kdf = kdf,
+                Salt = newSalt,
+                Nonce = newNonce,
+                Wrapped = wrapped,
+            };
+            vault.Save(VaultPath, k);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(k);
+            if (deviceSecret != null) CryptographicOperations.ZeroMemory(deviceSecret);
+            if (oldBaseKek != null) CryptographicOperations.ZeroMemory(oldBaseKek);
+            if (oldKek != null && !ReferenceEquals(oldKek, oldBaseKek))
+                CryptographicOperations.ZeroMemory(oldKek);
+            if (newBaseKek != null) CryptographicOperations.ZeroMemory(newBaseKek);
+            if (newKek != null && !ReferenceEquals(newKek, newBaseKek))
+                CryptographicOperations.ZeroMemory(newKek);
+        }
     }
 
     /// 协同重建主密钥到调用方缓冲（须为 [LockedBuffer] 的 mlock 区，用后自动清零）。
-    /// OS 模式：[password] 必须为 null；口令模式（v2）：[password] 必须提供；
-    /// 多封装（v3）：[password] 提供 → 口令恢复路径，否则 → 设备熵路径
-    /// （熵失败且 vault 有口令封装 → 抛 [NeedRecoveryException]，serve 转 NEED_RECOVERY）。
+    /// 'S'（slots）：[secret] 为因子材料（口令字节 / 恢复码 UTF-8），
+    /// [slotLabel] 为可选槽位标签（`"rec"` = 恢复槽；null = 默认因子路径）；
+    /// 设备路径读 `<dataDir>/device.key`，缺失抛 [NeedRecoveryException]。
+    /// LEGACY 'C'（crypto）：[secret]/[slotLabel] 忽略，K 整体从存储后端取回。
     /// 授权侧份额（S）读入普通堆后立即清零；重建结果落于锁定内存，不进可换页堆。
-    public void LoadMasterKeyInto(Span<byte> dest, byte[]? password, string? fingerprint)
+    public void LoadMasterKeyInto(Span<byte> dest, byte[]? secret = null, string? slotLabel = null)
     {
         var vault = VaultFile.Load(VaultPath);
-        if (vault.Mode == VaultMode.Password)
+        if (vault.Mode == VaultMode.Slots)
         {
-            if (password == null)
-                throw new InvalidOperationException("口令模式：解锁需要口令（握手第 4 字段）");
-            var kdf = vault.Kdf ?? throw new InvalidDataException("口令模式 vault 缺少 KDF 参数");
-            var share = Argon2id.Derive(password, vault.Salt!, [], [],
-                kdf.MKiB, kdf.T, kdf.P, KeySplit.KeySize);
+            // 'S'（slots）：按槽位集合判定因子模式（m1/m2a/m2b），选取槽位并派生
+            // KEK 解出 K；随后**立即**校验尾部 HMAC（verify-before-decrypt）后再交付。
+            // 无份额重组合；设备路径缺 device.key → NeedRecoveryException（环境缺失）。
+            if (vault.VaultId == null || vault.MacInput == null || vault.Trailer == null)
+                throw new InvalidDataException("slots vault 头部不完整（缺 vaultId/HMAC），拒绝加载");
+            var slotMode = VaultFile.DetectSlotsMode(vault.Slots.Select(s => s.Kind).ToList());
+            var (slot, kek) = SelectSlotAndKek(vault, slotMode, secret, slotLabel);
             try
             {
-                KeySplit.Recombine(vault.KeyVault, share, dest);
-            }
-            finally
-            {
-                CryptographicOperations.ZeroMemory(share);
-            }
-            return;
-        }
-        if (vault.Mode == VaultMode.MultiSeal)
-        {
-            if (password != null)
-            {
-                // 恢复路径：口令解封（口令错误 → GCM 认证失败，serve 记退避）
-                var seal = vault.Seals.FirstOrDefault(s => s.Kind == SealKind.Password)
-                    ?? throw new InvalidOperationException("vault 无口令封装，无法用口令解锁");
-                var key = Argon2id.Derive(password, seal.Salt!, [], [],
-                    seal.Kdf!.MKiB, seal.Kdf.T, seal.Kdf.P, KeySplit.KeySize);
+                var ad = VaultFile.BuildSlotAd(vault.VaultId, slot.Kind);
+                var k = new byte[KeySplit.KeySize];
                 try
                 {
-                    var share = UnsealShare(seal, key);
-                    try { KeySplit.Recombine(vault.KeyVault, share, dest); }
-                    finally { CryptographicOperations.ZeroMemory(share); }
+                    using (var gcm = new AesGcm(kek, VaultFile.TagSize))
+                    {
+                        // 因子错误 / 槽位被篡改 → GCM 认证失败（AuthenticationTagMismatchException）
+                        gcm.Decrypt(slot.Nonce, slot.Wrapped.AsSpan(0, KeySplit.KeySize),
+                            slot.Wrapped.AsSpan(KeySplit.KeySize), k, ad);
+                    }
+                    var mac = VaultFile.ComputeSlotsMac(k, vault.MacInput);
+                    if (!CryptographicOperations.FixedTimeEquals(mac, vault.Trailer))
+                    {
+                        throw new AuthenticationTagMismatchException(
+                            "slots vault 尾部 HMAC 校验失败（header/条目被篡改）");
+                    }
+                    k.CopyTo(dest);
                 }
                 finally
                 {
-                    CryptographicOperations.ZeroMemory(key);
+                    CryptographicOperations.ZeroMemory(k);
                 }
-                return;
-            }
-
-            // 主路径：设备熵解锁（本机免密，一次 HKDF+AES-GCM，无 Argon2id）
-            fingerprint ??= Fingerprint.Collect();
-            if (fingerprint == null || !File.Exists(DeviceSealPath))
-            {
-                throw new NeedRecoveryException(
-                    "设备熵不可用（缺 device.seal 或无法采集指纹）：请输入恢复口令");
-            }
-            byte[] entropy;
-            try
-            {
-                entropy = DeviceEntropyFile.Load(DeviceSealPath).Unseal(fingerprint);
-            }
-            catch (Exception ex) when (ex is CryptographicException or InvalidDataException)
-            {
-                // 指纹不符 / 熵文件损坏 → 有口令封装则可恢复
-                if (vault.Seals.Any(s => s.Kind == SealKind.Password))
-                    throw new NeedRecoveryException("设备标识已变更或熵文件损坏：" + ex.Message);
-                throw;
-            }
-            var seal2 = vault.Seals.FirstOrDefault(s => s.Kind == SealKind.DeviceEntropy)
-                ?? throw new InvalidOperationException("vault 无设备熵封装");
-            var kSeal = DeviceEntropyFile.ShareSealKey(entropy);
-            try
-            {
-                var share = UnsealShare(seal2, kSeal);
-                try { KeySplit.Recombine(vault.KeyVault, share, dest); }
-                finally { CryptographicOperations.ZeroMemory(share); }
             }
             finally
             {
-                CryptographicOperations.ZeroMemory(kSeal);
-                CryptographicOperations.ZeroMemory(entropy);
+                CryptographicOperations.ZeroMemory(kek);
             }
             return;
         }
-        // LEGACY（crypto 传统单因子）：K 整体存 OS 安全存储，无份额配对——
-        // 后端指纹照常校验（防 PROD/TEST 混用数据目录），取回即主密钥。
+        // LEGACY（crypto 传统单因子）：K 整体存 OS 安全存储 / 文件密钥库，无份额配对——
+        // 后端指纹照常校验（防不同存储后端混用数据目录），取回即主密钥。
         if (vault.Mode == VaultMode.Crypto)
         {
             if (vault.Backend != null && vault.Backend != _store.Backend)
             {
                 throw new VaultShareBackendMismatchException(vault.Backend, _store.Backend);
             }
-            var kCrypto = _store.Load(ShareKey)
+            var kCrypto = _lockout.GetShare()
                 ?? throw new VaultShareMissingException(_store.Backend);
             try
             {
@@ -385,307 +525,78 @@ public sealed class VaultService
             }
             return;
         }
-        // v4 后端指纹校验：文件头记录的后端 ≠ 当前实际后端 → 份额不配对
-        // （PROD/TEST 混用同一数据目录的典型症状），升级为明确异常而非 GCM mismatch。
-        // 旧版 v1/v2/v3 文件 Backend=null → 跳过校验（向后兼容）。
-        if (vault.Backend != null && vault.Backend != _store.Backend)
-        {
-            throw new VaultShareBackendMismatchException(vault.Backend, _store.Backend);
-        }
-        var shareOs = _store.Load(ShareKey)
-            ?? throw new VaultShareMissingException(_store.Backend);
-        try
-        {
-            KeySplit.Recombine(vault.KeyVault, shareOs, dest);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(shareOs);
-        }
+        throw new InvalidDataException("不支持的 vault 模式，拒绝加载");
     }
 
-    /// OS 模式便捷重载（既有调用路径）。
+    /// 便捷重载（crypto 免密路径）。
     public void LoadMasterKeyInto(Span<byte> dest) => LoadMasterKeyInto(dest, null, null);
 
-    /// 多封装模式便捷重载（熵路径，本机免密）。
-    public void LoadMasterKeyInto(Span<byte> dest, string? fingerprint)
-        => LoadMasterKeyInto(dest, null, fingerprint);
-
-    // ── 恢复口令 / 设备绑定管理（须已解锁：持 K）────────────────────
-
-    /// 设置/修改恢复口令（多封装）：用新口令重密封 S，替换 kind=1 封装。
-    /// 旧口令立即失效（v3 解封是「新口令密封 S」，非多口令并存）。
-    public void SetRecoveryPassword(ReadOnlySpan<byte> master, byte[] newPassword)
+    /// 按因子模式选取槽位并派生 KEK（返回的 KEK 由调用方用后清零）。
+    /// [secret] 语义随路径：口令字节 / 恢复码 UTF-8。设备因子缺失抛
+    /// [NeedRecoveryException]（m2a 改用恢复码；m2b 无恢复则同样以该码暴露）。
+    private (VaultSlot slot, byte[] kek) SelectSlotAndKek(
+        VaultFile vault, SlotsMode slotMode, byte[]? secret, string? label)
     {
-        var vault = VaultFile.Load(VaultPath);
-        if (vault.Mode != VaultMode.MultiSeal)
-            throw new InvalidOperationException("仅多封装模式（设备绑定）支持恢复口令");
-        var salt = RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
-        var newSeal = SealShareWithPassword(RecoverShare(vault, master), newPassword, salt,
-            Argon2id.KdfParams.Default);
-        var idx = vault.Seals.FindIndex(s => s.Kind == SealKind.Password);
-        if (idx >= 0) vault.Seals[idx] = newSeal;
-        else vault.Seals.Insert(0, newSeal);
-        vault.Save(VaultPath);
-    }
-
-    /// 清除恢复口令（多封装）：删除 kind=1 封装——换机/熵丢失后不可恢复
-    /// （只能销毁重建），调用方须在 UI 明确提示该后果。
-    /// 返回是否实际清除了。
-    public bool ClearRecoveryPassword(ReadOnlySpan<byte> master)
-    {
-        var vault = VaultFile.Load(VaultPath);
-        if (vault.Mode != VaultMode.MultiSeal)
-            throw new InvalidOperationException("仅多封装模式（设备绑定）支持恢复口令");
-        var idx = vault.Seals.FindIndex(s => s.Kind == SealKind.Password);
-        if (idx < 0) return false;
-        vault.Seals.RemoveAt(idx);
-        vault.Save(VaultPath);
-        return true;
-    }
-
-    /// 关闭设备绑定（清除熵封装，回落口令模式）：删除 kind=2 封装 + device.seal，
-    /// vault 降级为 v2（口令模式）——此后每次解锁需口令（v2 语义，device-bound-vault-plan
-    /// §1.3「关闭 = 清除设备熵封装，改纯口令」）。
-    /// [password] 语义按封装状态分流：
-    ///   - 有恢复口令封装（kind=1）：须为当前恢复口令，经解密 kind=1 验证授权
-    ///     （口令错误 → GCM 认证失败即拒绝，不触发锁定退避——本命令不属爆破入口）；
-    ///   - 无恢复口令封装（纯熵绑定，开启时免密）：为调用方新设的 v2 口令，
-    ///     免授权校验——与「免密开启」对称（设备已攻破时 v3 凭据本就可读，
-    ///     关闭不额外降低安全性）。
-    /// 注意：v3 口令封装的解密密钥（Argon2id 派生）≠ 被封装的随机份额 S_rand，
-    /// 故降级 v2 后（S' = Argon2id(口令)）必须用 K' = key_vault ⊕ S' 重加密全部条目
-    /// （原条目以 K = key_vault ⊕ S_rand 加密）。
-    public bool ClearDeviceSeal(ReadOnlySpan<byte> master, byte[] password)
-    {
-        var vault = VaultFile.Load(VaultPath);
-        if (vault.Mode != VaultMode.MultiSeal)
-            throw new InvalidOperationException("非设备绑定模式，无需关闭");
-        byte[] salt;
-        Argon2id.KdfParams kdf;
-        VaultSeal? seal = vault.Seals.FirstOrDefault(s => s.Kind == SealKind.Password);
-        if (seal != null)
+        switch (slotMode)
         {
-            // 有恢复口令封装：复用其 salt/kdf，先验证口令（GCM 认证失败拒绝）
-            salt = seal.Salt!;
-            kdf = seal.Kdf!;
-        }
-        else
-        {
-            // 纯熵绑定：新 salt + 默认 KDF 构建 v2 布局
-            salt = RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
-            kdf = Argon2id.KdfParams.Default;
-        }
-        var sPrime = Argon2id.Derive(password, salt, [], [], kdf.MKiB, kdf.T, kdf.P, KeySplit.KeySize);
-        try
-        {
-            if (seal != null)
+            case SlotsMode.M1:
             {
-                // 授权校验：用派生密钥解密 kind=1 封装得原 S_rand（口令错误 → GCM 拒绝）
-                var sRand = UnsealShare(seal, sPrime);
-                CryptographicOperations.ZeroMemory(sRand);
+                if (label != null)
+                    throw new InvalidOperationException("m1：不接受槽位标签");
+                if (secret == null)
+                    throw new InvalidOperationException("slots 模式：解锁需要口令（握手第 4 字段）");
+                var slot = vault.Slots.FirstOrDefault(s => s.Kind == SlotKind.Password)
+                    ?? throw new InvalidOperationException("vault 无口令槽位，无法解锁");
+                var ad = VaultFile.BuildSlotAd(vault.VaultId!, slot.Kind);
+                return (slot, SlotCrypto.DerivePassword(secret, slot.Salt, ad, slot.Kdf));
             }
-            byte[]? k2 = null;
-            try
+            case SlotsMode.M2a:
             {
-                // 新分享关系：K' = key_vault ⊕ S'（S' = Argon2id(口令)，v2 语义）
-                k2 = new byte[KeySplit.KeySize];
-                for (var i = 0; i < KeySplit.KeySize; i++)
-                    k2[i] = (byte)(vault.KeyVault[i] ^ sPrime[i]);
-                var v2 = VaultFile.CreatePassword(vault.KeyVault, salt, kdf);
-                foreach (var e in vault.Entries)
+                if (label == "rec")
                 {
-                    var plain = vault.Decrypt(e, master);          // 用 K 解密
-                    try { v2.Entries.Add(v2.Encrypt(e.Uid, plain, k2)); } // 用 K' 重加密
-                    finally { CryptographicOperations.ZeroMemory(plain); }
+                    if (secret == null)
+                        throw new InvalidOperationException("m2a 恢复路径：需要恢复码（握手第 4 字段）");
+                    var slot = vault.Slots.FirstOrDefault(s => s.Kind == SlotKind.Recovery)
+                        ?? throw new InvalidOperationException("vault 无恢复槽位，无法用恢复码解锁");
+                    var codeBytes = RecoveryCode.DecodeUtf8(secret);
+                    try { return (slot, SlotCrypto.DeriveRecovery(codeBytes, slot.Salt)); }
+                    finally { CryptographicOperations.ZeroMemory(codeBytes); }
                 }
-                v2.Save(VaultPath);
-                if (File.Exists(DeviceSealPath)) File.Delete(DeviceSealPath);
-            }
-            finally
-            {
-                if (k2 != null) CryptographicOperations.ZeroMemory(k2);
-            }
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(sPrime);
-        }
-        return true;
-    }
-
-    /// 设备绑定（v3）是否设置了恢复口令封装（kind=1）——决定关闭绑定是
-    /// 「验证恢复口令」还是「新设 v2 口令」。非 multiseal 返回 false。
-    public bool HasRecovery =>
-        VaultFile.Load(VaultPath) is { Mode: VaultMode.MultiSeal } v
-            && v.Seals.Any(s => s.Kind == SealKind.Password);
-
-    /// 升级为设备绑定（v1/v2 → v3，§8 兼容与迁移）：
-    /// v1（OS 模式）/ v2（口令模式）已有 vault 解锁后补建 v3 多封装——
-    /// 生成熵 E 写 device.seal（当前指纹），用熵密封 S 得 kind=2 封装；
-    /// [recoveryPassword] 非 null 时另建 kind=1 口令封装（换机恢复路径）。
-    /// key_vault 与 K 均不变 → 既有条目无需重加密（与 ClearDeviceSeal 的
-    /// 降级重加密相反）。v1 的 OS 份额仍保留（§8「可选项」），v3 模式
-    /// 解锁只走熵/口令路径。
-    /// 失败回滚：vault 写入失败时删除 device.seal（防熵文件残留半升级）。
-    /// 返回新熵标识（entropy_id）。
-    public byte[] UpgradeDevice(ReadOnlySpan<byte> master, string? fingerprint, byte[]? recoveryPassword)
-    {
-        var vault = VaultFile.Load(VaultPath);
-        if (vault.Mode == VaultMode.MultiSeal)
-            throw new InvalidOperationException("已为设备绑定模式（multiseal），无需升级");
-        fingerprint ??= Fingerprint.Collect();
-        if (fingerprint == null)
-            throw new InvalidOperationException("无法采集设备指纹（设备熵路径不可用，请先启用系统标识）");
-        var share = RecoverShare(vault, master);
-        var entropy = RandomNumberGenerator.GetBytes(DeviceEntropyFile.EntropySize);
-        var device = DeviceEntropyFile.Create();
-        try
-        {
-            device.SealAndSave(DeviceSealPath, entropy, fingerprint);
-            var kSeal = DeviceEntropyFile.ShareSealKey(entropy);
-            try
-            {
-                var seals = new List<VaultSeal>
-                {
-                    SealShareWithEntropy(share, kSeal, device.EntropyId),
-                };
-                if (recoveryPassword != null)
-                {
-                    var salt = RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
-                    seals.Insert(0, SealShareWithPassword(share, recoveryPassword, salt,
-                        Argon2id.KdfParams.Default));
-                }
-                var v3 = VaultFile.CreateMultiSeal(vault.KeyVault, seals);
-                v3.Entries.AddRange(vault.Entries); // K 不变：条目原样沿用
-                v3.Save(VaultPath);
-                return device.EntropyId;
-            }
-            finally
-            {
-                CryptographicOperations.ZeroMemory(kSeal);
-            }
-        }
-        catch
-        {
-            if (File.Exists(DeviceSealPath)) File.Delete(DeviceSealPath);
-            throw;
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(share);
-            CryptographicOperations.ZeroMemory(entropy);
-        }
-    }
-
-    /// v1 ↔ v2 份额迁移（三档切换条：系统保护 ↔ 口令保护）。
-    /// 主密钥 K 不变 → 既有条目原样沿用不重加密；仅换授权份额 S：
-    ///   target=os（v2 → v1）：新随机 S_os 写入 OS 安全存储，vault 重写 v1 布局
-    ///   target=password（v1 → v2）：S_pw = Argon2id(口令)，vault 重写 v2 布局，删除 OS 份额
-    /// 调用方须已解锁（持 master）；[password] 仅 v1 → v2 需要，用后由调用方清零。
-    /// 失败回滚不残留半态（v2 → v1 先落 OS 存储、vault 写失败回滚删除；
-    /// v1 → v2 写文件成功后删 OS 份额，删除失败残留份额无害——v2 解锁走口令分支）。
-    /// 多封装（v3）不可经此切换：走 ClearDeviceSeal 回落口令模式。
-    public void SwitchMode(ReadOnlySpan<byte> master, string target, byte[]? password)
-    {
-        if (!Initialized) throw new InvalidOperationException("vault 未初始化");
-        var vault = VaultFile.Load(VaultPath);
-        var mode = vault.Mode;
-        if (mode == VaultMode.MultiSeal)
-            throw new InvalidOperationException("多封装模式不可经 switch-mode 切换：请用「关闭设备绑定」回落口令模式");
-
-        var newKeyVault = new byte[KeySplit.KeySize];
-        try
-        {
-            if (target == "os")
-            {
-                if (mode != VaultMode.Password)
-                    throw new InvalidOperationException($"当前为 {mode}，非口令模式，无需切换");
-                var sOs = RandomNumberGenerator.GetBytes(KeySplit.KeySize);
+                if (label != null)
+                    throw new InvalidOperationException($"m2a：未知槽位标签 [{label}]");
+                if (secret == null)
+                    throw new InvalidOperationException("m2a：解锁需要口令（握手第 4 字段）");
+                var pdSlot = vault.Slots.FirstOrDefault(s => s.Kind == SlotKind.PasswordDevice)
+                    ?? throw new InvalidOperationException("vault 无口令+设备槽位，无法解锁");
+                // 设备因子缺失 → NeedRecoveryException（改用恢复码；非爆破向量）
+                var deviceSecret = DeviceKeyFile.Load(_dataDir);
+                byte[]? baseKek = null;
                 try
                 {
-                    for (var i = 0; i < KeySplit.KeySize; i++)
-                        newKeyVault[i] = (byte)(master[i] ^ sOs[i]);
-                    _store.Store(ShareKey, sOs);              // 先落 OS 安全存储
-                    try
-                    {
-                        var v1 = VaultFile.Create(newKeyVault, _store.Backend);
-                        v1.Entries.AddRange(vault.Entries);   // K 不变：条目原样沿用
-                        v1.Save(VaultPath);
-                    }
-                    catch { _store.Delete(ShareKey); throw; } // vault 写失败回滚
+                    var ad = VaultFile.BuildSlotAd(vault.VaultId!, pdSlot.Kind);
+                    baseKek = SlotCrypto.DerivePassword(secret, pdSlot.Salt, ad, pdSlot.Kdf);
+                    return (pdSlot,
+                        SlotCrypto.DerivePasswordDevice(baseKek, deviceSecret, pdSlot.Salt));
                 }
-                finally { CryptographicOperations.ZeroMemory(sOs); }
-            }
-            else if (target == "password")
-            {
-                if (mode != VaultMode.OsStore)
-                    throw new InvalidOperationException($"当前为 {mode}，非 OS 模式，无需切换");
-                if (password == null)
-                    throw new InvalidOperationException("切换到口令模式需要新口令");
-                var salt = RandomNumberGenerator.GetBytes(VaultFile.SaltSize);
-                var kdf = Argon2id.KdfParams.Default;
-                var sPw = Argon2id.Derive(password, salt, [], [], kdf.MKiB, kdf.T, kdf.P, KeySplit.KeySize);
-                try
+                finally
                 {
-                    for (var i = 0; i < KeySplit.KeySize; i++)
-                        newKeyVault[i] = (byte)(master[i] ^ sPw[i]);
-                    var v2 = VaultFile.CreatePassword(newKeyVault, salt, kdf);
-                    v2.Entries.AddRange(vault.Entries);       // K 不变：条目原样沿用
-                    v2.Save(VaultPath);
-                    try { _store.Delete(ShareKey); } catch { /* 残留份额无害 */ }
+                    if (baseKek != null) CryptographicOperations.ZeroMemory(baseKek);
+                    CryptographicOperations.ZeroMemory(deviceSecret);
                 }
-                finally { CryptographicOperations.ZeroMemory(sPw); }
             }
-            else
+            case SlotsMode.M2b:
             {
-                throw new ArgumentException($"未知切换目标: {target}");
+                if (label != null)
+                    throw new InvalidOperationException("m2b：不接受槽位标签（握手仅 3 字段）");
+                var slot = vault.Slots.FirstOrDefault(s => s.Kind == SlotKind.Device)
+                    ?? throw new InvalidOperationException("vault 无设备槽位，无法解锁");
+                var deviceSecret = DeviceKeyFile.Load(_dataDir);
+                try { return (slot, SlotCrypto.DeriveDevice(deviceSecret, slot.Salt)); }
+                finally { CryptographicOperations.ZeroMemory(deviceSecret); }
             }
+            default:
+                throw new InvalidDataException("slots vault 槽位集合无法识别（无可用因子），拒绝加载");
         }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(newKeyVault);
-        }
-    }
-
-    /// 重新绑定当前设备（换机/重装后口令恢复成功 → 用新指纹重密封熵）：
-    /// 生成新熵 E' 写 device.seal（当前指纹），用 E' 重密封 S 替换 kind=2 封装；
-    /// 口令封装（kind=1）不受影响。返回新熵标识（entropy_id）。
-    public byte[] RebindDevice(ReadOnlySpan<byte> master, string? fingerprint)
-    {
-        var vault = VaultFile.Load(VaultPath);
-        if (vault.Mode != VaultMode.MultiSeal)
-            throw new InvalidOperationException("仅多封装模式（设备绑定）支持重新绑定");
-        fingerprint ??= Fingerprint.Collect();
-        if (fingerprint == null)
-            throw new InvalidOperationException("无法采集设备指纹（设备熵路径不可用）");
-        var share = RecoverShare(vault, master);
-        var entropy = RandomNumberGenerator.GetBytes(DeviceEntropyFile.EntropySize);
-        var device = DeviceEntropyFile.Create();
-        var kSeal = DeviceEntropyFile.ShareSealKey(entropy);
-        try
-        {
-            device.SealAndSave(DeviceSealPath, entropy, fingerprint);
-            var newSeal = SealShareWithEntropy(share, kSeal, device.EntropyId);
-            var idx = vault.Seals.FindIndex(s => s.Kind == SealKind.DeviceEntropy);
-            if (idx >= 0) vault.Seals[idx] = newSeal;
-            else vault.Seals.Add(newSeal);
-            vault.Save(VaultPath);
-            return device.EntropyId;
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(kSeal);
-            CryptographicOperations.ZeroMemory(entropy);
-        }
-    }
-
-    /// 会话解锁后由 K 反解 S 份额（S = K_vault ⊕ K），用于重密封/重绑定。
-    private static byte[] RecoverShare(VaultFile vault, ReadOnlySpan<byte> master)
-    {
-        var s = new byte[KeySplit.KeySize];
-        for (var i = 0; i < KeySplit.KeySize; i++) s[i] = (byte)(vault.KeyVault[i] ^ master[i]);
-        return s;
     }
 
     /// 存储凭据。**消费语义**：调用结束后 [plaintext] 数组被清零，调用方不得再持有明文。
@@ -699,7 +610,7 @@ public sealed class VaultService
             var vault = VaultFile.Load(VaultPath);
             vault.Entries.RemoveAll(e => e.Uid == uid);
             vault.Entries.Add(vault.Encrypt(uid, plaintext, master.Span));
-            vault.Save(VaultPath);
+            vault.Save(VaultPath, master.Span);
         }
         finally
         {
@@ -727,6 +638,17 @@ public sealed class VaultService
         return removed;
     }
 
+    /// 会话持钥删除：与 [Delete] 相同，但可向 'S'（slots）模式提供主密钥 K 以重算
+    /// 尾部 HMAC（会话已解锁持 K）。其余模式行为与 [Delete] 完全一致。
+    public bool DeleteWith(string uid, ReadOnlySpan<byte> master)
+    {
+        EnsureInitialized();
+        var vault = VaultFile.Load(VaultPath);
+        var removed = vault.Entries.RemoveAll(e => e.Uid == uid) > 0;
+        if (removed) vault.Save(VaultPath, master);
+        return removed;
+    }
+
     // ── 会话持钥路径（§3.8）：主密钥已由 serve 会话解锁持于 LockedBuffer，
     //    命令循环直接复用，避免每条命令重建（减少密钥在堆中出现的次数）──
 
@@ -739,7 +661,7 @@ public sealed class VaultService
         if (entry != null) return vault.Decrypt(entry, master);
         var t = RandomNumberGenerator.GetBytes(16);
         vault.Entries.Add(vault.Encrypt(AuthUid, t, master));
-        vault.Save(VaultPath);
+        vault.Save(VaultPath, master);
         return t;
     }
 
@@ -757,22 +679,25 @@ public sealed class VaultService
         var vault = VaultFile.Load(VaultPath);
         vault.Entries.RemoveAll(e => e.Uid == uid);
         vault.Entries.Add(vault.Encrypt(uid, plaintext, master));
-        vault.Save(VaultPath);
+        vault.Save(VaultPath, master);
         CryptographicOperations.ZeroMemory(plaintext);
     }
 
-    /// 全量销毁：删除授权侧份额 + vault 文件 + 设备熵文件 + 锁定状态——
-    /// 旧密文不可恢复（明文从未落盘）。
+    /// 全量销毁：删除授权侧份额 + vault 文件（含 `.bak` 备份）+ 设备密钥
+    /// （`device.key`，F2）+ 锁定状态——旧密文不可恢复（明文从未落盘）。
+    /// `.bak`/`device.key` 必须一并删除，否则"重置"后会残留可解副本。
     public void Destroy()
     {
-        _store.Delete(ShareKey);
+        _lockout.DeleteShare();
         if (File.Exists(VaultPath)) File.Delete(VaultPath);
-        if (File.Exists(DeviceSealPath)) File.Delete(DeviceSealPath);
+        var bak = VaultPath + ".bak";
+        if (File.Exists(bak)) File.Delete(bak);
+        DeviceKeyFile.Delete(_dataDir);
         _lockout.Clear();
     }
 
     private void EnsureInitialized()
     {
-        if (!Initialized) throw new InvalidOperationException("vault 未初始化，请先 init");
+        if (!Initialized) throw new InvalidOperationException("vault 未初始化，请先初始化");
     }
 }

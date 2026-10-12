@@ -2,10 +2,11 @@
 # ArchoeraMusic vault 测试构建（VAULT_TESTING 条件编译，幂等）。
 #
 # 产物：vault/build/archoera-vault-test[.exe]
-#   与生产 build.sh 唯一区别：定义 VAULT_TESTING 常量 → 编译进
-#   InsecureFileStore（测试明文存储）与对应工厂分支（SecretStores.cs）。
-#   仅测试/CI 使用（无 Secret Service 的 headless 环境），绝不发布——
-#   生产二进制由 build.sh 产出，不含任何测试明文存储逻辑。
+#   与生产 build.sh 唯一区别：定义 VAULT_TESTING 常量 → 构建标记输出 TEST
+#   （Program.cs BuildInfo.Marker），供 Dart VaultProcess 的 negative-marker
+#   测试与握手指纹断言使用。存储后端与生产完全一致（含 FileStore 文件密钥
+#   模式）——不再有测试明文存储分支（SEC-19 已删除 InsecureFileStore）。
+#   仅测试/CI 使用，绝不发布；生产二进制由 build.sh 产出。
 #
 # 依赖：.NET 10+ SDK；NativeAOT 需 clang 等 C 编译链。
 # 使用：./build-test.sh [RID]   # RID 默认 linux-x64

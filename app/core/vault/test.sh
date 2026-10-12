@@ -1,25 +1,28 @@
 #!/usr/bin/env bash
 # vault（凭据保险库）冒烟测试：对 NativeAOT 产物做端到端验证。
 #
-# 覆盖（serve 会话协议，credential-vault-plan §3.7/§3.8）：
-#   1. init 返回会话锚点 T；status 已初始化
-#   2. serve 会话全链路：血缘白名单 → 握手（HMAC 验证 + 锚点回读）→
-#      set/get/delete/status → quit
-#   3. 独立运行拒绝：无白名单 / 白名单不含父进程 → err
-#   4. 错误握手（格式/负载长度错误）→ err
-#   5. 磁盘无明文（vault 文件与份额文件均不含明文串）
-#   6. 仅 vault 侧份额无法解密（删 S → 握手即 err，fail-closed）
-#   7. 密文篡改被 GCM 认证拦截（改 1 字节 → 握手 err）
-#   8. 崩溃联动前提：会话中被 SIGSEGV → 父进程观察到非零（信号）退出
-#   9. destroy 后 status 未初始化、vault 文件删除
-#  10. selftest（Argon2id 自检，RFC 9106 向量）
-#  11. 口令模式全链路：init-password → 带口令握手 → set/get/quit
-#  12. 错误口令锁定退避 + 锁定期间拒绝（连尝试都不做）+ 退避后恢复
+# 支持的容器/模式：
+#   - LEGACY 'C'（crypto 传统单因子）：init-crypto / init-file（file 后端）
+#   - 'S'（slots）：init-m1（仅口令）/ init-m2a（口令+设备+恢复码）/ init-m2b（仅设备）
 #
-# 说明：使用测试构建 build/archoera-vault-test（VAULT_TESTING 条件编译，含
-# InsecureFileStore 测试明文存储）——headless CI 无 D-Bus Secret Service，真实
-# 平台存储（DPAPI/Keychain/libsecret）须在对应平台手动验证。
-# 生产二进制 build.sh 产物（archoera-vault）不含明文存储逻辑，本测试不用它。
+# 覆盖（serve 会话协议，credential-vault-plan §3.7/§3.8）：
+#   1. init-crypto（'C'）全链路：serve set/get/delete/quit + 磁盘无明文 +
+#      后端不配对（SHARE_BACKEND_MISMATCH）+ 篡改（SHARE_MISMATCH）+ destroy
+#   2. init-file（--key-stdin）文件密钥模式 + 缺 secret.key → SHARE_MISSING + destroy
+#   3. slots M1：init/status/serve/无明文/trailer 篡改/条目篡改/KDF 下界/.bak/destroy
+#   4. slots M2a：init/status/device.key 0600/口令+设备解锁/错误口令/缺 device.key →
+#      NEED_RECOVERY/恢复码/归一化/篡改/destroy
+#   5. slots M2b：init/status/3 字段解锁/缺 device.key
+#   6. 独立运行拒绝（父进程 exe 绑定）+ dev 布局放行
+#   7. seccomp 自保护（过滤器生效 + AF_INET socket → SIGSYS；AF_UNIX 放行）
+#   8. Argon2id 自检（RFC 9106 向量）
+#   9. 用户可选 Argon2id 强度：init-m1/--kdf-* + set-kdf 重键（不丢数据）+
+#      越界拒绝 + crypto 不支持 + m2a（含缺 device.key → NEED_RECOVERY）
+#
+# 说明：使用测试构建 build/archoera-vault-test（VAULT_TESTING 条件编译，与生产
+# 唯一区别是构建标记为 TEST，存储行为完全一致）——headless CI 无 D-Bus Secret
+# Service，故经 ARCHOERA_VAULT_BACKEND=file 选择**生产 FileStore**（文件密钥模式，
+# 密钥落 secret.key）；真实平台存储（DPAPI/Keychain/libsecret）须在对应平台手动验证。
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -27,24 +30,30 @@ VAULT="build/archoera-vault-test"
 [ -x "$VAULT" ] || { echo "缺少测试产物，先运行 ./build-test.sh" >&2; exit 1; }
 
 # 条件编译自检：测试产物须为 TEST 标记（非生产 PROD）——确保 build-test.sh 的
-# VAULT_TESTING 生效；生产 build.sh 产物不含明文存储分支（README 安全说明可查证）
+# VAULT_TESTING 生效；生产 build.sh 产物不含明文存储分支。
 case "$("$VAULT" --version)" in
   ARCHOERA-VAULT-TEST-*) : ;;
   *) echo "测试产物标记异常（非 TEST），重新运行 ./build-test.sh" >&2; exit 1;;
 esac
 
-export ARCHOERA_VAULT_INSECURE_FILE_STORE=1
-DATA="$(mktemp -d)"
-DATA2="$(mktemp -d)"
-DATA3="$(mktemp -d)"
-trap 'rm -rf "$DATA" "$DATA2" "$DATA3"' EXIT
+# headless 统一选择生产文件密钥后端（等价 init-file；无 D-Bus Secret Service）
+export ARCHOERA_VAULT_BACKEND=file
+DATA="$(mktemp -d)"       # crypto ('C')
+DATA_FILE="$(mktemp -d)"  # init-file（file 后端）
+DATA_M1="$(mktemp -d)"    # slots m1
+DATA_M2A="$(mktemp -d)"   # slots m2a
+DATA_M2B="$(mktemp -d)"   # slots m2b
+DATA_PKG="$(mktemp -d)"   # 打包布局（父进程绑定）
+DATA_KDF="$(mktemp -d)"   # slots m1：用户可选 KDF 强度 + set-kdf 重键
+DATA_KDF2A="$(mktemp -d)" # slots m2a：KDF 强度 + 重键
+DATA_KDFCR="$(mktemp -d)" # crypto：set-kdf 应不支持
+trap 'rm -rf "$DATA" "$DATA_FILE" "$DATA_M1" "$DATA_M2A" "$DATA_M2B" "$DATA_PKG" \
+  "$DATA_KDF" "$DATA_KDF2A" "$DATA_KDFCR"' EXIT
 
 PASS="S3cr3t-P@ssword-酷狗"
 B64=$(printf '%s' "$PASS" | base64 -w0)
 UID1="kugou:session"
 UID2="netease:cookie"
-# 白名单声明测试父进程（bash 管道 / python3 驱动两种 spawn 方式均可）
-export ARCHOERA_VAULT_PARENT_OK="bash,sh,python3"
 
 fail() { echo "✗ FAIL: $*" >&2; exit 1; }
 pass() { echo "✓ $*"; }
@@ -53,789 +62,48 @@ pass() { echo "✓ $*"; }
 # 仅以 stdout 内容为准（err/ok 前缀由调用方断言）。
 run() { "$VAULT" "$@" 2>&1 || true; }
 
-# ── 1. init/status/destroy（CLI，不经血缘校验）────────────────────
-ANCHOR=$(run init "$DATA")
-case "$ANCHOR" in
-  ok\ *) [ -n "${ANCHOR#ok }" ] || fail "init 应返回非空锚点";;
-  *) fail "init 失败: $ANCHOR";;
-esac
-[ -f "$DATA/credentials.vault" ] || fail "init 应生成 credentials.vault"
-run status "$DATA" | grep -q '"initialized":true' || fail "status 应为已初始化"
-pass "init 返回会话锚点 + status 已初始化"
-
-# ── 2. serve 会话全链路（python3 驱动）──────────────────────────────
-python3 - "$VAULT" "$DATA" "$B64" "$UID1" "$UID2" <<'PY' || fail "serve 会话链路失败"
-import base64, hashlib, hmac, os, subprocess, sys
-
-vault, data, b64, uid1, uid2 = sys.argv[1:6]
-env = dict(os.environ)
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-
-def cmd(line, payload=None):
-    if payload is None:
-        p.stdin.write((line + "\n").encode())
-    else:
-        p.stdin.write((line + "\n" + payload + "\n").encode())
-    p.stdin.flush()
-    return p.stdout.readline().decode().rstrip("\n")
-
-# 握手：H=32B 会话密钥，C=16B challenge；应答须含锚点 T + HMAC-SHA256(H, C) + 构建标记
-h, c = os.urandom(32), os.urandom(16)
-hb = base64.b64encode(h).decode()
-cb = base64.b64encode(c).decode()
-resp = cmd("handshake %s %s" % (hb, cb))
-parts = resp.split(" ")
-assert parts[:2] == ["ok", "handshake"], "握手应答异常: %r" % resp
-t = base64.b64decode(parts[2])
-mac = base64.b64decode(parts[3])
-assert len(t) == 16, "锚点应 16B"
-assert mac == hmac.new(h, c, hashlib.sha256).digest(), "HMAC-SHA256 校验失败"
-# 第 5 字段 = 构建标记（版本指纹）：测试构建须上报 TEST 标记（生产为 PROD）
-assert parts[4].startswith("ARCHOERA-VAULT-TEST"), "握手应上报 TEST 构建标记: %r" % resp
-
-# set（负载走 stdin 第二行）/ get / delete / status / quit
-assert cmd("set %s" % uid1, b64) == "ok", "set 失败"
-assert cmd("get %s" % uid1).startswith("ok "), "get 失败"
-assert cmd("get %s" % uid1).split(" ", 1)[1] == b64, "get 回读不一致"
-assert cmd("set %s" % uid2, base64.b64encode(b"another-secret").decode()) == "ok"
-assert cmd("get %s" % uid2).startswith("ok "), "get 2 失败"
-assert cmd("delete %s" % uid2) == "ok true", "delete 失败"
-assert cmd("get %s" % uid2) == "ok null", "删除后应无条目"
-assert cmd("status") == 'ok {"initialized":true}', "会话内 status 失败"
-assert cmd("quit") == "ok", "quit 失败"
-p.wait(timeout=5)
-assert p.returncode == 0, "quit 后应正常退出，got %r" % p.returncode
-print("ok")
-PY
-pass "serve 会话全链路（握手 HMAC + set/get/delete/quit）"
-
-# ── 3. 独立运行拒绝（血缘白名单）────────────────────────────────────
-# 说明：serve 拒绝路径退出码为 1，pipefail 下会污染管道状态，故用 $( ) 捕获 +
-# `|| true` 吞掉退出码，仅以 stdout 内容（err/ok 前缀）为准。
-OUT=$(printf 'handshake AAAA BBBB\n' \
-  | env -u ARCHOERA_VAULT_PARENT_OK "$VAULT" serve "$DATA" 2>&1) || true
-case "$OUT" in
-  err*) : ;;
-  *) fail "无白名单应拒绝独立运行（got: $OUT）";;
-esac
-pass "独立运行拒绝（无父进程白名单）"
-
-OUT=$(printf 'handshake AAAA BBBB\n' \
-  | ARCHOERA_VAULT_PARENT_OK=definitely-not-our-parent "$VAULT" serve "$DATA" 2>&1) || true
-case "$OUT" in
-  err*) : ;;
-  *) fail "白名单不含父进程应拒绝（got: $OUT）";;
-esac
-pass "独立运行拒绝（父进程不在白名单）"
-
-# ── 4. 错误握手 ─────────────────────────────────────────────────────
-OUT=$(printf 'WRONG\n' | "$VAULT" serve "$DATA" 2>&1) || true
-case "$OUT" in
-  err*) : ;;
-  *) fail "错误握手格式应拒绝（got: $OUT）";;
-esac
-OUT=$(printf 'handshake AAA BBB\n' | "$VAULT" serve "$DATA" 2>&1) || true
-case "$OUT" in
-  err*) : ;;
-  *) fail "握手负载长度错误应拒绝（got: $OUT）";;
-esac
-pass "错误握手（格式/长度）被拒"
-
-# ── 5. 磁盘无明文 ───────────────────────────────────────────────────
-if grep -rq "$PASS" "$DATA" 2>/dev/null; then fail "磁盘出现明文"; fi
-pass "磁盘无明文（vault/份额文件均不含明文串）"
-
-# ── 6. 仅 vault 侧份额无法解密（缺 S → 握手即 err，fail-closed）────
-rm -f "$DATA/insecure_master-share.bin"
-python3 - "$VAULT" "$DATA" <<'PY' || fail "缺授权侧份额应 fail-closed"
-import base64, os, subprocess, sys
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("err SHARE_MISSING"), "缺授权侧份额应 SHARE_MISSING: %r" % resp
-p.stdin.close(); p.wait(timeout=5)
-assert p.returncode != 0, "拒绝路径应非零退出"
-print("ok")
-PY
-pass "仅 vault 文件无法解密（2-of-2 生效，SHARE_MISSING）"
-
-# 恢复现场：重建
-run destroy "$DATA" >/dev/null || fail "destroy 失败"
-run init "$DATA" >/dev/null || fail "重建 init 失败"
-
-# ── 7. 篡改检测（GCM 认证失败 → 握手 err）──────────────────────────
-# 翻转密文尾字节（tag 区）——salt 等元数据不参与认证，篡改无感；tag 必须被校验
-python3 - "$DATA/credentials.vault" <<'PY' || fail "篡改脚本失败"
+# 就地改写 crypto vault 文件头 backend 指纹（等长；长度不符即失败，防字段错位）。
+rewrite_backend() {  # <vault> <old> <new>
+  python3 - "$1" "$2" "$3" <<'PY'
 import sys
-p = sys.argv[1]
+p = sys.argv[1]; old = sys.argv[2].encode(); new = sys.argv[3].encode()
+assert len(old) == len(new), "后端名须等长（保持文件布局）"
 b = bytearray(open(p, 'rb').read())
-b[-1] ^= 0xFF  # 最后 1 字节落在 AES-GCM tag 内
-open(p, 'wb').write(b)
+assert b[:4] == b'AVLT' and b[4] == ord('C'), "非 crypto 文件头"
+blen = b[40]
+assert bytes(b[41:41 + blen]) == old, "当前后端指纹 %r ≠ %r" % (bytes(b[41:41 + blen]), old)
+b[41:41 + blen] = new
+open(p, 'wb').write(bytes(b))
 PY
-python3 - "$VAULT" "$DATA" <<'PY' || fail "篡改后应认证失败"
-import base64, os, subprocess, sys
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("err SHARE_MISMATCH"), "篡改后应 SHARE_MISMATCH: %r" % resp
-p.stdin.close(); p.wait(timeout=5)
-print("ok")
-PY
-pass "密文篡改被 GCM 认证拦截（SHARE_MISMATCH）"
-
-# 恢复现场：重建（篡改文件不可复用，供后续崩溃联动测试握手成功）
-run destroy "$DATA" >/dev/null || fail "destroy 失败"
-run init "$DATA" >/dev/null || fail "重建 init 失败"
-
-# ── 8. 崩溃联动前提：父进程可感知信号退出（§3.7）───────────────────
-# 会话中 SIGKILL → 父进程 wait 观察到负 returncode（信号终止）→ Dart 侧据此
-# 写 crash 标记并联动终止（vault.marker/abort 的写入方是 Dart VaultProcess）。
-# 注：不用 SIGSEGV——NativeAOT 运行时接管 SIGSEGV 后进入挂起诊断态，不退出；
-# 信号终止的可感知性以 SIGKILL 为准（VaultProcess 对任何信号/挂起均判非预期）。
-python3 - "$VAULT" "$DATA" <<'PY' || fail "信号终止应被父进程感知"
-import base64, os, signal, subprocess, sys
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("ok handshake"), "握手应成功: %r" % resp
-os.kill(p.pid, signal.SIGKILL)
-p.wait(timeout=5)
-assert p.returncode < 0, "SIGKILL 应致信号退出，got %r" % p.returncode
-print("ok")
-PY
-pass "崩溃联动前提：会话信号终止可被父进程感知（信号退出码）"
-
-# ── 9. 销毁 ─────────────────────────────────────────────────────────
-run destroy "$DATA" | grep -q '^ok$' || fail "destroy 失败"
-run status "$DATA" | grep -q '"initialized":false' || fail "destroy 后应未初始化"
-[ ! -f "$DATA/credentials.vault" ] || fail "destroy 后 vault 文件应删除"
-pass "destroy 全量销毁（份额+vault 文件）"
-
-# ── 10. Argon2id 自检（RFC 9106 §5.3 向量）──────────────────────────
-OUT=$(run selftest)
-case "$OUT" in
-  ok*) : ;;
-  *) fail "Argon2id 自检失败: $OUT";;
-esac
-pass "Argon2id 自检（RFC 9106 向量）"
-
-# ── 11. 口令模式全链路（init-password → 带口令握手 → set/get/quit）──
-PW2="C0mpl3x-P@ss-网易"
-B64PW=$(printf '%s' "$PW2" | base64 -w0)
-OUT=$(printf '%s\n' "$PW2" | "$VAULT" init-password "$DATA2" 2>&1) || true
-case "$OUT" in
-  ok\ *) : ;;
-  *) fail "init-password 失败: $OUT";;
-esac
-[ -f "$DATA2/credentials.vault" ] || fail "init-password 应生成 credentials.vault"
-run status "$DATA2" | grep -q '"mode":"password"' || fail "口令模式 status 应为 mode=password"
-pass "init-password（口令走 stdin，不落 argv）+ status mode=password"
-
-python3 - "$VAULT" "$DATA2" "$B64PW" <<'PY' || fail "口令模式 serve 链路失败"
-import base64, hashlib, hmac, os, subprocess, sys
-
-vault, data, b64pw = sys.argv[1:4]
-env = dict(os.environ)
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-
-def cmd(line, payload=None):
-    if payload is None:
-        p.stdin.write((line + "\n").encode())
-    else:
-        p.stdin.write((line + "\n" + payload + "\n").encode())
-    p.stdin.flush()
-    return p.stdout.readline().decode().rstrip("\n")
-
-# 口令模式握手：第 4 字段为 base64 口令（H=32B / C=16B，同 OS 模式）
-h, c = os.urandom(32), os.urandom(16)
-resp = cmd("handshake %s %s %s" % (
-    base64.b64encode(h).decode(), base64.b64encode(c).decode(), b64pw))
-parts = resp.split(" ")
-assert parts[:2] == ["ok", "handshake"], "口令握手应答异常: %r" % resp
-t = base64.b64decode(parts[2])
-mac = base64.b64decode(parts[3])
-assert len(t) == 16, "锚点应 16B"
-assert mac == hmac.new(h, c, hashlib.sha256).digest(), "HMAC-SHA256 校验失败"
-assert parts[4].startswith("ARCHOERA-VAULT-TEST"), "握手应上报 TEST 构建标记: %r" % resp
-
-uid = "netease:cookie"
-secret = base64.b64encode(b"password-mode-secret").decode()
-assert cmd("set %s" % uid, secret) == "ok", "set 失败"
-assert cmd("get %s" % uid).split(" ", 1)[1] == secret, "get 回读不一致"
-assert cmd("quit") == "ok", "quit 失败"
-p.wait(timeout=10)
-assert p.returncode == 0, "quit 后应正常退出，got %r" % p.returncode
-print("ok")
-PY
-pass "口令模式 serve 全链路（正确口令握手 + set/get/quit）"
-
-# ── 12. 错误口令锁定退避 + 锁定期间拒绝 + 退避后恢复 ────────────────
-python3 - "$VAULT" "$DATA2" "$B64PW" <<'PY' || fail "口令锁定链路失败"
-import base64, os, subprocess, sys, time
-
-vault, data, b64pw = sys.argv[1:4]
-env = dict(os.environ)
-WRONG = base64.b64encode(b"totally-wrong-password").decode()
-
-def attempt(password):
-    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-    h, c = os.urandom(32), os.urandom(16)
-    p.stdin.write(("handshake %s %s %s\n" % (
-        base64.b64encode(h).decode(), base64.b64encode(c).decode(), password)).encode())
-    p.stdin.flush()
-    resp = p.stdout.readline().decode().rstrip("\n")
-    p.stdin.close()
-    p.wait(timeout=10)
-    return resp, p.returncode
-
-# 错误口令 → 解锁失败（记录退避，首败 1s）
-resp, rc = attempt(WRONG)
-assert resp.startswith("err"), "错误口令应被拒: %r" % resp
-assert rc == 1, "拒绝路径应非零退出，got %r" % rc
-# 锁定期间：正确口令也直接拒绝（连 KDF 尝试都不做），fail-closed
-resp, rc = attempt(b64pw)
-assert resp.startswith("err") and "锁定" in resp, "锁定期间应拒绝: %r" % resp
-assert rc == 1
-# 退避过期（首败 1s，等 2.5s）→ 正确口令恢复，且 lockout 清零
-time.sleep(2.5)
-resp, rc = attempt(b64pw)
-assert resp.startswith("ok handshake"), "退避过期后应可解锁: %r" % resp
-assert rc == 0, "解锁会话应正常退出，got %r" % rc
-print("ok")
-PY
-pass "错误口令锁定退避 + 锁定期间拒绝 + 退避后恢复"
-
-# ── 13. 设备熵多封装（BitLocker 式）：本机免密 / 换机落恢复 / 篡改 fail-closed ──
-PW3="Recovery-P@ss-迁移"
-B64PW3=$(printf '%s' "$PW3" | base64 -w0)
-OUT=$(ARCHOERA_VAULT_FINGERPRINT="fp-A" "$VAULT" init-device "$DATA3" --set-recovery-password \
-  <<< "$PW3" 2>&1) || true
-case "$OUT" in
-  ok\ *) : ;;
-  *) fail "init-device 失败: $OUT";;
-esac
-[ -f "$DATA3/credentials.vault" ] || fail "init-device 应生成 credentials.vault"
-[ -f "$DATA3/device.seal" ] || fail "init-device 应生成 device.seal"
-run status "$DATA3" | grep -q '"mode":"multiseal"' || fail "设备熵模式 status 应为 mode=multiseal"
-pass "init-device（熵封装 + 可选恢复口令）+ status mode=multiseal"
-
-python3 - "$VAULT" "$DATA3" "$B64PW3" <<'PY' || fail "设备熵多封装链路失败"
-import base64, os, subprocess, sys
-
-vault, data, b64pw = sys.argv[1:4]
-env = dict(os.environ)
-
-def session(fingerprint=None, password=None, cmds=()):
-    e = dict(env)
-    if fingerprint: e["ARCHOERA_VAULT_FINGERPRINT"] = fingerprint
-    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=e)
-    h, c = os.urandom(32), os.urandom(16)
-    line = "handshake %s %s" % (
-        base64.b64encode(h).decode(), base64.b64encode(c).decode())
-    if password: line += " " + base64.b64encode(password.encode()).decode()
-    p.stdin.write((line + "\n").encode())
-    for cmd in cmds:
-        p.stdin.write((cmd + "\n").encode())
-    p.stdin.close()
-    out = p.stdout.read().decode().splitlines()
-    p.wait(timeout=15)
-    return out
-
-def b64(b): return base64.b64encode(b).decode()
-SECRET = b"device-bound-secret"
-
-# ① 本机免密（熵路径）：无口令握手 set/get 全链路
-out = session(fingerprint="fp-A", cmds=[
-    "set kugou", b64(SECRET), "get kugou", "quit"])
-assert out[0].startswith("ok handshake"), "本机免密握手失败: %r" % out
-assert "ok " + b64(SECRET) in out, "本机免密 get 回读不一致: %r" % out
-
-# ② 换机（不同指纹）无口令 → NEED_RECOVERY（不计入锁定退避）
-out = session(fingerprint="fp-B", cmds=["quit"])
-assert out and out[0].startswith("err NEED_RECOVERY"), "换机应 NEED_RECOVERY: %r" % out
-
-# ③ 换机 + 恢复口令 → 解锁成功，数据一致（恢复流成功清零 lockout）
-out = session(fingerprint="fp-B", password="Recovery-P@ss-迁移", cmds=["get kugou", "quit"])
-assert out[0].startswith("ok handshake"), "恢复口令解锁失败: %r" % out
-assert "ok " + b64(SECRET) in out, "恢复后数据不一致: %r" % out
-
-# ④ 篡改 device.seal 1 字节（本机指纹）→ NEED_RECOVERY（GCM fail-closed）
-seal = os.path.join(data, "device.seal")
-raw = bytearray(open(seal, "rb").read())
-open(seal, "wb").write(bytes(raw[:-1]) + bytes([raw[-1] ^ 0x01]))
-out = session(fingerprint="fp-A", cmds=["quit"])
-assert out and out[0].startswith("err NEED_RECOVERY"), "篡改应 NEED_RECOVERY: %r" % out
-open(seal, "wb").write(bytes(raw))  # 恢复原文件，供后续用例继续使用
-
-# ⑤ 错误恢复口令 → 解锁失败（触发锁定退避，fail-closed）
-out = session(fingerprint="fp-B", password="wrong-password", cmds=["quit"])
-assert out and out[0].startswith("err"), "错误恢复口令应被拒: %r" % out
-print("ok")
-PY
-pass "设备熵多封装：本机免密 / 换机 NEED_RECOVERY / 恢复口令解锁 / 篡改 fail-closed / 错误口令锁定"
-
-# ── 14. 恢复口令管理 + 重新绑定（须已解锁）：改口令/清口令/rebind ──
-# 复用 DATA3（第 13 项遗留：multiseal + device.seal(fp-A) + 恢复口令 Recovery-P@ss-迁移）
-python3 - "$VAULT" "$DATA3" <<'PY' || fail "恢复口令管理/rebind 链路失败"
-import base64, os, subprocess, sys, time
-
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-time.sleep(2.5)  # 等第 13 项结尾错误口令触发的锁定退避过期
-
-def session(fingerprint=None, password=None, cmds=()):
-    e = dict(env)
-    if fingerprint: e["ARCHOERA_VAULT_FINGERPRINT"] = fingerprint
-    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=e)
-    h, c = os.urandom(32), os.urandom(16)
-    line = "handshake %s %s" % (
-        base64.b64encode(h).decode(), base64.b64encode(c).decode())
-    if password: line += " " + base64.b64encode(password.encode()).decode()
-    p.stdin.write((line + "\n").encode())
-    for cmd in cmds:
-        p.stdin.write((cmd + "\n").encode())
-    p.stdin.close()
-    out = p.stdout.read().decode().splitlines()
-    p.wait(timeout=15)
-    return out
-
-def b64(b): return base64.b64encode(b).decode()
-
-# ① 本机免密解锁 → 修改恢复口令（旧口令 Recovery-P@ss-迁移 立即失效）
-out = session(fingerprint="fp-A", cmds=[
-    "set-recovery-password " + b64(b"New-Recovery-2"), "quit"])
-assert out[0].startswith("ok handshake"), "本机解锁失败: %r" % out
-assert out[1] == "ok", "修改恢复口令失败: %r" % out
-
-# ② 换机 fp-B + 新口令 → 解锁成功（成功清零 lockout，为后续各步铺路）
-out = session(fingerprint="fp-B", password="New-Recovery-2", cmds=["quit"])
-assert out[0].startswith("ok handshake"), "新口令应有效: %r" % out
-
-# ③ 换机 fp-B 新口令解锁 → rebind 重绑定当前设备
-out = session(fingerprint="fp-B", password="New-Recovery-2", cmds=["rebind", "quit"])
-assert out[1].startswith("ok "), "rebind 失败: %r" % out
-
-# ④ rebind 后 fp-B 无口令免密成功；旧指纹 fp-A 无口令 → NEED_RECOVERY
-out = session(fingerprint="fp-B", cmds=["quit"])
-assert out[0].startswith("ok handshake"), "rebind 后新指纹应免密: %r" % out
-out = session(fingerprint="fp-A", cmds=["quit"])
-assert out and out[0].startswith("err NEED_RECOVERY"), "旧指纹应落恢复: %r" % out
-
-# ⑤ 本机 fp-B 无口令 → 清除恢复口令
-out = session(fingerprint="fp-B", cmds=["clear-recovery-password", "quit"])
-assert out[0].startswith("ok handshake"), "清除口令前解锁失败: %r" % out
-assert out[1] == "ok true", "清除恢复口令失败: %r" % out
-
-# ⑥ 换机 fp-C 无口令 → fail-closed（无口令封装，不是 NEED_RECOVERY）
-out = session(fingerprint="fp-C", cmds=["quit"])
-assert out and out[0].startswith("err") and "NEED_RECOVERY" not in out[0], \
-    "清除口令后换机应 fail-closed: %r" % out
-
-# ⑦ 等 ⑥ 触发的锁定退避过期后：换机 fp-B + 旧口令 → 失败（旧口令已失效）
-time.sleep(2.5)
-out = session(fingerprint="fp-B", password="Recovery-P@ss-迁移", cmds=["quit"])
-assert out and out[0].startswith("err"), "旧口令应已失效: %r" % out
-print("ok")
-PY
-pass "恢复口令管理：修改（旧口令立即失效）/ 新口令恢复 / rebind 新指纹免密旧指纹落恢复 / 清除后换机 fail-closed"
-
-# ── 15. 关闭设备绑定（clear-device-seal）：清除熵封装回落口令模式 ──
-PW4="Close-Bind-P@ss"
-DATA4="$(mktemp -d)"
-DATA5="$(mktemp -d)"
-trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5"' EXIT
-OUT=$(ARCHOERA_VAULT_FINGERPRINT="fp-D" "$VAULT" init-device "$DATA4" --set-recovery-password \
-  <<< "$PW4" 2>&1) || true
-case "$OUT" in
-  ok\ *) : ;;
-  *) fail "init-device(DATA4) 失败: $OUT";;
-esac
-
-python3 - "$VAULT" "$DATA4" <<'PY' || fail "关闭设备绑定链路失败"
-import base64, os, subprocess, sys
-
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-SECRET = b"close-bind-secret"
-
-def session(fingerprint=None, password=None, cmds=()):
-    e = dict(env)
-    if fingerprint: e["ARCHOERA_VAULT_FINGERPRINT"] = fingerprint
-    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=e)
-    h, c = os.urandom(32), os.urandom(16)
-    line = "handshake %s %s" % (
-        base64.b64encode(h).decode(), base64.b64encode(c).decode())
-    if password: line += " " + base64.b64encode(password.encode()).decode()
-    p.stdin.write((line + "\n").encode())
-    for cmd in cmds:
-        p.stdin.write((cmd + "\n").encode())
-    p.stdin.close()
-    out = p.stdout.read().decode().splitlines()
-    p.wait(timeout=15)
-    return out
-
-def b64(b): return base64.b64encode(b).decode()
-B64PW = b64(b"Close-Bind-P@ss")
-
-# ① 本机免密解锁 set 一条凭据（建立待验证数据）
-out = session(fingerprint="fp-D", cmds=["set kugou", b64(SECRET), "quit"])
-assert out[0].startswith("ok handshake"), "免密解锁失败: %r" % out
-
-# ② 错误恢复口令 → clear-device-seal 被拒（授权校验：GCM 认证失败，不降级）
-out = session(fingerprint="fp-D", cmds=["clear-device-seal " + b64(b"wrong-pw"), "quit"])
-assert out[0].startswith("ok handshake"), "关闭前解锁失败: %r" % out
-assert out[1].startswith("err"), "错误口令应被拒: %r" % out
-assert os.path.exists(os.path.join(data, "device.seal")), "拒绝不应删除 device.seal"
-
-# ③ 正确恢复口令 → clear-device-seal：关闭设备绑定（清除熵封装 + device.seal）
-out = session(fingerprint="fp-D", cmds=["clear-device-seal " + B64PW, "quit"])
-assert out[0].startswith("ok handshake"), "关闭前解锁失败: %r" % out
-assert out[1] == "ok true", "clear-device-seal 失败: %r" % out
-assert not os.path.exists(os.path.join(data, "device.seal")), "关闭后 device.seal 应删除"
-
-# ④ 关闭后无口令握手 → 拒绝（已回落口令模式，v2 语义）
-out = session(fingerprint="fp-D", cmds=["quit"])
-assert out and out[0].startswith("err"), "关闭后无口令应被拒: %r" % out
-
-# ⑤ 关闭后口令握手 → 解锁成功，数据一致（重加密以 K' 落盘，K' 由口令派生）
-out = session(password="Close-Bind-P@ss", cmds=["get kugou", "quit"])
-assert out[0].startswith("ok handshake"), "口令解锁失败: %r" % out
-assert "ok " + b64(SECRET) in out, "关闭后数据不一致: %r" % out
-print("ok")
-PY
-run status "$DATA4" | grep -q '"mode":"password"' || fail "关闭后 status 应为 mode=password"
-pass "关闭设备绑定：回落口令模式（数据一致 / 无口令被拒 / status=password）"
-
-# ── 15b. 无恢复口令的绑定 vault → clear-device-seal 以新口令免授权降级
-#      （与「免密开启」对称：纯熵绑定无口令可验，关闭即新设 v2 口令）──
-OUT=$(ARCHOERA_VAULT_FINGERPRINT="fp-E" "$VAULT" init-device "$DATA5" 2>&1) || true
-case "$OUT" in
-  ok\ *) : ;;
-  *) fail "init-device(DATA5, 无口令) 失败: $OUT";;
-esac
-python3 - "$VAULT" "$DATA5" <<'PY' || fail "无恢复口令绑定 vault 关闭回落失败"
-import base64, os, subprocess, sys
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-env["ARCHOERA_VAULT_FINGERPRINT"] = "fp-E"
-
-def session(fingerprint, cmds, password=None):
-    e = dict(env)
-    e["ARCHOERA_VAULT_FINGERPRINT"] = fingerprint
-    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=e)
-    h, c = os.urandom(32), os.urandom(16)
-    handshake = "handshake %s %s\n" % (
-        base64.b64encode(h).decode(), base64.b64encode(c).decode())
-    if password is not None:
-        handshake = handshake.rstrip("\n") + " " + base64.b64encode(password).decode() + "\n"
-    p.stdin.write(handshake.encode())
-    for cmd in cmds:
-        p.stdin.write((cmd + "\n").encode())
-    p.stdin.close()
-    out = p.stdout.read().decode().splitlines()
-    p.wait(timeout=15)
-    return out
-
-payload = base64.b64encode(b'{"t":"1"}').decode()
-# ① 免密会话写入一条凭据（set uid 后值经 stdin 下一行传入）
-out = session("fp-E", ["set kugou", payload, "quit"])
-assert out[1] == "ok", "免密 set 失败: %r" % out
-# ② 免密会话关闭绑定：以新口令直接降级（无恢复口令免授权）
-newpw = b"new-password-42"
-out = session("fp-E", ["clear-device-seal " + base64.b64encode(newpw).decode(), "quit"])
-assert out[1] == "ok true", "clear-device-seal 失败: %r" % out
-assert not os.path.exists(os.path.join(data, "device.seal")), "降级应删除 device.seal"
-# ③ 回落 password 模式：免密会话被拒；新口令解锁回读数据一致
-out = session("fp-E", ["get kugou", "quit"])
-assert out[0].startswith("err"), "降级后免密会话应被拒: %r" % out
-out = session("fp-E", ["get kugou", "quit"], password=newpw)
-assert out[1] == "ok " + payload, "新口令解锁回读失败: %r" % out
-print("ok")
-PY
-pass "无恢复口令的绑定 vault：clear-device-seal 以新口令免授权降级（对称于免密开启）"
-
-# ── 16. v1/v2 → v3 迁移（upgrade-device）：key_vault 不变条目沿用 / 熵+口令双路径 ──
-DATA6="$(mktemp -d)"
-DATA7="$(mktemp -d)"
-trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7"' EXIT
-python3 - "$VAULT" "$DATA6" "$DATA7" <<'PY' || fail "v1/v2 → v3 迁移链路失败"
-import base64, os, subprocess, sys
-
-vault, data6, data7 = sys.argv[1:4]
-env = dict(os.environ)
-
-def session(data, fingerprint=None, password=None, cmds=()):
-    e = dict(env)
-    if fingerprint: e["ARCHOERA_VAULT_FINGERPRINT"] = fingerprint
-    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=e)
-    h, c = os.urandom(32), os.urandom(16)
-    line = "handshake %s %s" % (
-        base64.b64encode(h).decode(), base64.b64encode(c).decode())
-    if password: line += " " + base64.b64encode(password.encode()).decode()
-    p.stdin.write((line + "\n").encode())
-    for cmd in cmds:
-        p.stdin.write((cmd + "\n").encode())
-    p.stdin.close()
-    out = p.stdout.read().decode().splitlines()
-    p.wait(timeout=15)
-    return out
-
-def b64(b): return base64.b64encode(b).decode()
-SECRET = b"upgraded-vault-secret"
-
-# ── v1（OS 模式）→ v3 ──────────────────────────────────────────────
-os.system("%s init %s >/dev/null" % (vault, data6))
-assert os.path.exists(os.path.join(data6, "credentials.vault")), "v1 init 失败"
-
-# ① OS 模式免密会话 set 一条数据（升级前基线）
-out = session(data6, cmds=["set kugou", b64(SECRET), "quit"])
-assert out[0].startswith("ok handshake"), "v1 免密会话失败: %r" % out
-
-# ② upgrade-device（不设恢复口令）→ mode=multiseal + device.seal 生成
-out = session(data6, fingerprint="fp-U1", cmds=["upgrade-device", "quit"])
-assert out[0].startswith("ok handshake"), "升级前解锁失败: %r" % out
-assert out[1].startswith("ok "), "upgrade-device 失败: %r" % out
-assert os.path.exists(os.path.join(data6, "device.seal")), "升级后应生成 device.seal"
-
-# ③ 升级后本机免密（熵路径）：既有数据一致（key_vault 不变，条目沿用）
-out = session(data6, fingerprint="fp-U1", cmds=["get kugou", "quit"])
-assert out[0].startswith("ok handshake"), "升级后免密解锁失败: %r" % out
-assert "ok " + b64(SECRET) in out, "v1→v3 升级后数据不一致: %r" % out
-
-# ── v2（口令模式）→ v3（带恢复口令）────────────────────────────────
-os.system("printf 'Old-Pw-密码' | %s init-password %s >/dev/null" % (vault, data7))
-assert os.path.exists(os.path.join(data7, "credentials.vault")), "v2 init 失败"
-
-# ④ v2 口令会话 set 一条数据
-out = session(data7, password="Old-Pw-密码", cmds=["set netease", b64(SECRET), "quit"])
-assert out[0].startswith("ok handshake"), "v2 口令会话失败: %r" % out
-
-# ⑤ upgrade-device --set-recovery-password（v2 解锁后补建熵+口令双封装）
-RECOVERY = "Upgrade-Recovery-P@ss"
-out = session(data7, fingerprint="fp-U2", password="Old-Pw-密码",
-              cmds=["upgrade-device --set-recovery-password " + b64(RECOVERY.encode()), "quit"])
-assert out[0].startswith("ok handshake"), "v2 升级前解锁失败: %r" % out
-assert out[1].startswith("ok "), "v2 upgrade-device 失败: %r" % out
-
-# ⑥ 升级后：本机免密数据一致
-out = session(data7, fingerprint="fp-U2", cmds=["get netease", "quit"])
-assert out[0].startswith("ok handshake"), "v2→v3 免密解锁失败: %r" % out
-assert "ok " + b64(SECRET) in out, "v2→v3 升级后数据不一致: %r" % out
-
-# ⑦ 换机（fp-U3）无口令 → NEED_RECOVERY（v2 的旧口令已不参与 v3 解锁）
-out = session(data7, fingerprint="fp-U3", cmds=["quit"])
-assert out and out[0].startswith("err NEED_RECOVERY"), "换机应 NEED_RECOVERY: %r" % out
-
-# ⑧ 换机 + 新恢复口令 → 解锁成功，数据一致
-out = session(data7, fingerprint="fp-U3", password=RECOVERY, cmds=["get netease", "quit"])
-assert out[0].startswith("ok handshake"), "恢复口令解锁失败: %r" % out
-assert "ok " + b64(SECRET) in out, "恢复口令路径数据不一致: %r" % out
-
-# ⑨ 已 multiseal → upgrade-device 拒绝
-out = session(data6, fingerprint="fp-U1", cmds=["upgrade-device", "quit"])
-assert out[0].startswith("ok handshake"), "免密解锁失败: %r" % out
-assert out[1].startswith("err"), "已 multiseal 应拒绝升级: %r" % out
-print("ok")
-PY
-run status "$DATA6" | grep -q '"mode":"multiseal"' || fail "v1→v3 后 status 应为 multiseal"
-run status "$DATA7" | grep -q '"mode":"multiseal"' || fail "v2→v3 后 status 应为 multiseal"
-pass "v1/v2 → v3 迁移（upgrade-device：数据沿用 / 熵+恢复口令双路径 / 换机恢复 / 已绑定拒绝）"
-
-# ── 17. v1 ↔ v2 份额迁移（switch-mode：OS ↔ 口令，K 不变条目沿用）──
-DATA8="$(mktemp -d)"
-trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8"' EXIT
-
-python3 - "$VAULT" "$DATA8" <<'PY' || fail "v1↔v2 互切链路失败"
-import base64, os, subprocess, sys
-
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-SECRET = b"switch-mode-secret"
-NEWPW = "V2-New-P@ss"
-
-def session(password=None, cmds=()):
-    e = dict(env)
-    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=e)
-    h, c = os.urandom(32), os.urandom(16)
-    line = "handshake %s %s" % (
-        base64.b64encode(h).decode(), base64.b64encode(c).decode())
-    if password: line += " " + base64.b64encode(password.encode()).decode()
-    p.stdin.write((line + "\n").encode())
-    for cmd in cmds:
-        p.stdin.write((cmd + "\n").encode())
-    p.stdin.close()
-    out = p.stdout.read().decode().splitlines()
-    p.wait(timeout=15)
-    return out
-
-def b64(b): return base64.b64encode(b).decode()
-
-# ① v1（OS 模式）初始化 + 免密会话 set 一条数据（切换前基线）
-os.system("%s init %s >/dev/null" % (vault, data))
-assert os.path.exists(os.path.join(data, "credentials.vault")), "v1 init 失败"
-out = session(cmds=["set kugou", b64(SECRET), "quit"])
-assert out[0].startswith("ok handshake"), "v1 免密会话失败: %r" % out
-
-# ② v1 → v2：免密会话内 switch-mode password <新口令>；数据一致（K 不变）
-out = session(cmds=["switch-mode password " + b64(NEWPW.encode()), "get kugou", "quit"])
-assert out[0].startswith("ok handshake"), "切换前解锁失败: %r" % out
-assert out[1] == "ok", "v1→v2 switch-mode 失败: %r" % out
-assert "ok " + b64(SECRET) in out, "v1→v2 后数据不一致: %r" % out
-
-# ③ 切到 v2 后：无口令握手被拒；带新口令握手成功且数据一致
-out = session(cmds=["quit"])
-assert out and out[0].startswith("err"), "v2 模式无口令应被拒: %r" % out
-out = session(password=NEWPW, cmds=["get kugou", "quit"])
-assert out[0].startswith("ok handshake"), "v2 口令解锁失败: %r" % out
-assert "ok " + b64(SECRET) in out, "v2 路径数据不一致: %r" % out
-
-# ④ v2 → v1：口令会话内 switch-mode os（无需口令，会话已解锁持 K）
-out = session(password=NEWPW, cmds=["switch-mode os", "get kugou", "quit"])
-assert out[0].startswith("ok handshake"), "v2 解锁失败: %r" % out
-assert out[1] == "ok", "v2→v1 switch-mode 失败: %r" % out
-assert "ok " + b64(SECRET) in out, "v2→v1 后数据不一致: %r" % out
-
-# ⑤ 回到 v1：免密解锁成功，数据一致
-out = session(cmds=["get kugou", "quit"])
-assert out[0].startswith("ok handshake"), "回到 v1 免密解锁失败: %r" % out
-assert "ok " + b64(SECRET) in out, "回到 v1 数据不一致: %r" % out
-print("ok")
-PY
-run status "$DATA8" | grep -q '"mode":"os"' || fail "v2→v1 后 status 应为 os"
-pass "v1 ↔ v2 互切（switch-mode：K 不变数据沿用 / 无口令被拒 / 口令切换 / 免密回归）"
-
-# ── 18. 后端指纹不配对（不同构建形态混用数据目录 → SHARE_BACKEND_MISMATCH）──
-DATA9="$(mktemp -d)"
-trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9"' EXIT
-
-# ① backend=a 初始化：'O' 代号文件头记录后端指纹 a
-OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=a "$VAULT" init "$DATA9" 2>&1) || true
-case "$OUT" in
-  ok\ *) : ;;
-  *) fail "backend=a init 失败: $OUT";;
-esac
-python3 - "$DATA9/credentials.vault" <<'PY' || fail "'O' 代号文件头应记录后端指纹"
-import sys
-d = open(sys.argv[1], 'rb').read()
-assert d[:4] == b'AVLT', "magic 不符"
-assert d[4] == ord('O'), "应为 'O' 代号（OS 模式），got %d" % d[4]
-blen = d[40]
-assert d[41:41 + blen] == b'a', "backend 指纹不符: %r" % d[41:41 + blen]
-print("ok")
-PY
-
-# ② backend=a 访问：指纹配对 → 握手解锁成功
-python3 - "$VAULT" "$DATA9" <<'PY' || fail "配对后端应解锁成功"
-import base64, os, subprocess, sys
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "a"
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("ok handshake"), "配对后端应解锁: %r" % resp
-p.stdin.close(); p.wait(timeout=5)
-print("ok")
-PY
-
-# ③ backend=b 访问同一目录（模拟另一构建形态）→ SHARE_BACKEND_MISMATCH（明确错误码）
-python3 - "$VAULT" "$DATA9" <<'PY' || fail "不配对后端应 SHARE_BACKEND_MISMATCH"
-import base64, os, subprocess, sys
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "b"
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("err SHARE_BACKEND_MISMATCH"), "应 SHARE_BACKEND_MISMATCH: %r" % resp
-p.stdin.close(); p.wait(timeout=5)
-print("ok")
-PY
-
-# ④ 回到 backend=a：仍可解锁（指纹校验只拦截不配对，不破坏配对会话）
-python3 - "$VAULT" "$DATA9" <<'PY' || fail "配对后端应始终可解锁"
-import base64, os, subprocess, sys
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "a"
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("ok handshake"), "配对后端应解锁: %r" % resp
-p.stdin.close(); p.wait(timeout=5)
-print("ok")
-PY
-pass "后端指纹不配对（a 初始化/a 解锁/b → SHARE_BACKEND_MISMATCH/a 仍可解锁）"
-
-# ── 19. LEGACY 方案（crypto 传统单因子）：K 整体存 OS 存储 / 免密 3 字段握手 ──
-DATA10="$(mktemp -d)"
-trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9" "$DATA10" "$DATA11"' EXIT
-
-# ① init-crypto：'C' 代号文件头（key_vault 零占位 = 不含密钥材料）
-OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=crypto-b "$VAULT" init-crypto "$DATA10" 2>&1) || true
+}
+
+# ════════════════════════════════════════════════════════════════════
+# 1. LEGACY crypto（'C'）：init-crypto → serve 全链路 → 无明文 → 篡改 → destroy
+# ════════════════════════════════════════════════════════════════════
+OUT=$(run init-crypto "$DATA") || true
 case "$OUT" in
   ok\ *) [ -n "${OUT#ok }" ] || fail "init-crypto 应返回非空锚点";;
   *) fail "init-crypto 失败: $OUT";;
 esac
-[ -f "$DATA10/credentials.vault" ] || fail "init-crypto 应生成 credentials.vault"
-python3 - "$DATA10/credentials.vault" <<'PY' || fail "'C' 代号文件头校验失败"
+[ -f "$DATA/credentials.vault" ] || fail "init-crypto 应生成 credentials.vault"
+python3 - "$DATA/credentials.vault" <<'PY' || fail "'C' 代号文件头校验失败"
 import sys
 d = open(sys.argv[1], 'rb').read()
 assert d[:4] == b'AVLT', "magic 不符"
 assert d[4] == ord('C'), "应为 'C' 代号（LEGACY crypto），got %d" % d[4]
 assert d[8:40] == bytes(32), "LEGACY 文件 key_vault 应为 32B 零占位（不含密钥材料）"
 blen = d[40]
-assert d[41:41 + blen] == b'crypto-b', "backend 指纹不符: %r" % d[41:41 + blen]
+assert d[41:41 + blen] == b'file', "backend 指纹应 file: %r" % d[41:41 + blen]
 print("ok")
 PY
-run status "$DATA10" | grep -q '"mode":"crypto"' || fail "LEGACY 模式 status 应为 mode=crypto"
+run status "$DATA" | grep -q '"mode":"crypto"' || fail "crypto status 应为 mode=crypto"
 pass "init-crypto：'C' 代号文件头（key_vault 零占位 + 后端指纹）+ status mode=crypto"
 
-# ② serve 全链路：免密 3 字段握手 → set/get/delete/quit
-python3 - "$VAULT" "$DATA10" "$B64" "$UID1" <<'PY' || fail "crypto serve 链路失败"
+# serve 全链路：免密 3 字段握手 → set/get/delete/quit（按文件头自动 FileStore）
+python3 - "$VAULT" "$DATA" "$B64" "$UID1" "$UID2" <<'PY' || fail "crypto serve 链路失败"
 import base64, hashlib, hmac, os, subprocess, sys
-vault, data, b64, uid1 = sys.argv[1:5]
+vault, data, b64, uid1, uid2 = sys.argv[1:6]
 env = dict(os.environ)
-env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "crypto-b"
 p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
 
@@ -853,16 +121,15 @@ resp = cmd("handshake %s %s" % (
     base64.b64encode(h).decode(), base64.b64encode(c).decode()))
 parts = resp.split(" ")
 assert parts[:2] == ["ok", "handshake"], "握手应答异常: %r" % resp
-t = base64.b64decode(parts[2])
-mac = base64.b64decode(parts[3])
-assert len(t) == 16, "锚点应 16B"
-assert mac == hmac.new(h, c, hashlib.sha256).digest(), "HMAC-SHA256 校验失败"
+assert len(base64.b64decode(parts[2])) == 16, "锚点应 16B"
+assert base64.b64decode(parts[3]) == hmac.new(h, c, hashlib.sha256).digest(), "HMAC 校验失败"
 assert parts[4].startswith("ARCHOERA-VAULT-TEST"), "握手应上报 TEST 构建标记: %r" % resp
 
 assert cmd("set %s" % uid1, b64) == "ok", "set 失败"
 assert cmd("get %s" % uid1).split(" ", 1)[1] == b64, "get 回读不一致"
-assert cmd("delete %s" % uid1) == "ok true", "delete 失败"
-assert cmd("get %s" % uid1) == "ok null", "删除后应无条目"
+assert cmd("set %s" % uid2, base64.b64encode(b"another-secret").decode()) == "ok"
+assert cmd("delete %s" % uid2) == "ok true", "delete 失败"
+assert cmd("get %s" % uid2) == "ok null", "删除后应无条目"
 assert cmd("quit") == "ok", "quit 失败"
 p.wait(timeout=5)
 assert p.returncode == 0, "quit 后应正常退出，got %r" % p.returncode
@@ -870,20 +137,15 @@ print("ok")
 PY
 pass "crypto serve 全链路（免密握手 HMAC + set/get/delete/quit）"
 
-# ②b 跨目录独立性：目录 B 的 init 不得覆盖目录 A 的 K。OS 密钥环（libsecret/
-#    Keychain）是用户级全局槽位，曾导致「任何目录 init-crypto 都覆盖其他目录
-#    同一槽位 → 每次重编译/调试后 vault 失效（SHARE_MISMATCH）」——见 SecretKeyScope。
-DATA11="$(mktemp -d)"
-OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=crypto-b "$VAULT" init-crypto "$DATA11" 2>&1) || true
-case "$OUT" in
-  ok\ *) : ;;
-  *) fail "init-crypto B 失败: $OUT";;
-esac
-python3 - "$VAULT" "$DATA10" <<'PY' || fail "跨目录 init 覆盖了 A 的 K（SHARE_MISMATCH）"
+# 磁盘无明文（vault 文件与份额/密钥文件均不含明文串）
+if grep -rq "$PASS" "$DATA" 2>/dev/null; then fail "磁盘出现明文"; fi
+pass "crypto 磁盘无明文（vault/secret.key 均不含明文串）"
+
+# 后端不配对：改写文件头 backend（file→otth）→ SHARE_BACKEND_MISMATCH
+python3 - "$VAULT" "$DATA" <<'PY' || fail "配对后端应解锁成功"
 import base64, os, subprocess, sys
 vault, data = sys.argv[1:3]
 env = dict(os.environ)
-env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "crypto-b"
 p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
 p.stdin.write(("handshake %s %s\n" % (
@@ -891,46 +153,19 @@ p.stdin.write(("handshake %s %s\n" % (
     base64.b64encode(os.urandom(16)).decode())).encode())
 p.stdin.flush()
 resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("ok handshake"), "目录 B init 不应破坏目录 A: %r" % resp
+assert resp.startswith("ok handshake"), "配对后端应解锁: %r" % resp
 p.stdin.close(); p.wait(timeout=5)
 print("ok")
 PY
-run destroy "$DATA11" >/dev/null || fail "destroy B 失败"
-pass "crypto 跨目录独立性（B init 不覆盖 A 的 K）"
-
-# ③ 缺 K（删 OS 存储条目）→ SHARE_MISSING，fail-closed（单因子同样 fail-closed）
-rm -f "$DATA10/insecure_master-share.bin"
-python3 - "$VAULT" "$DATA10" <<'PY' || fail "crypto 缺 K 应 fail-closed"
+rewrite_backend "$DATA/credentials.vault" file otth
+python3 - "$VAULT" "$DATA" <<'PY' || fail "不配对后端应 SHARE_BACKEND_MISMATCH"
 import base64, os, subprocess, sys
 vault, data = sys.argv[1:3]
 env = dict(os.environ)
-env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "crypto-b"
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("err SHARE_MISSING"), "crypto 缺 K 应 SHARE_MISSING: %r" % resp
-p.stdin.close(); p.wait(timeout=5)
-print("ok")
-PY
-pass "crypto 缺 K → SHARE_MISSING（fail-closed，无明文窗口）"
-
-# ④ 后端不配对：LEGACY 文件头指纹照常校验（防构建形态混用数据目录）
-#    重建 crypto 库后以不同后端访问 → SHARE_BACKEND_MISMATCH
-run destroy "$DATA10" >/dev/null || fail "destroy 失败"
-OUT=$(ARCHOERA_VAULT_INSECURE_BACKEND=x "$VAULT" init-crypto "$DATA10" 2>&1) || true
-case "$OUT" in
-  ok\ *) : ;;
-  *) fail "重建 init-crypto(x) 失败: $OUT";;
-esac
-python3 - "$VAULT" "$DATA10" <<'PY' || fail "crypto 不配对后端应 SHARE_BACKEND_MISMATCH"
-import base64, os, subprocess, sys
-vault, data = sys.argv[1:3]
-env = dict(os.environ)
-env["ARCHOERA_VAULT_INSECURE_BACKEND"] = "y"
+# 工厂按文件头分发：异名后端不再匹配 FileStore → 平台后端（Linux libsecret）。
+# 仅需构造成功即可（指纹校验发生于触碰存储之前）；补一个非空 session bus 地址，
+# 防「无 D-Bus」在构造期提前抛 SecretStoreUnavailable（免真实 keyring 依赖）。
+env.setdefault("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent/archoera-vault-test")
 p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
 p.stdin.write(("handshake %s %s\n" % (
@@ -942,44 +177,54 @@ assert resp.startswith("err SHARE_BACKEND_MISMATCH"), "应 SHARE_BACKEND_MISMATC
 p.stdin.close(); p.wait(timeout=5)
 print("ok")
 PY
+rewrite_backend "$DATA/credentials.vault" otth file
+pass "crypto 后端不配对（file→otth → SHARE_BACKEND_MISMATCH；还原后配对可解锁）"
 
-# ⑤ destroy：vault 文件 + K 删除，status 未初始化
-run destroy "$DATA10" | grep -q '^ok$' || fail "destroy 失败"
-run status "$DATA10" | grep -q '"initialized":false' || fail "destroy 后应未初始化"
-pass "crypto 后端不配对（SHARE_BACKEND_MISMATCH）+ destroy 全量销毁"
-
-# ── 20. 文件密钥模式（LEGACY 兼容方案）：K 落盘 secret.key，免 OS 钥匙串 ──
-#     headless/Docker 等无 Secret Service 场景；对应服务端加密形态。
-DATA12="$(mktemp -d)"
-DATA13="$(mktemp -d)"
-trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9" "$DATA10" "$DATA11" "$DATA12" "$DATA13"' EXIT
-
-# ① init-file：'C' 代号文件头 + backend=file + secret.key（0600）+ status crypto
-OUT=$("$VAULT" init-file "$DATA12" 2>&1) || true
-case "$OUT" in
-  ok\ *) [ -n "${OUT#ok }" ] || fail "init-file 应返回非空锚点";;
-  *) fail "init-file 失败: $OUT";;
-esac
-[ -f "$DATA12/credentials.vault" ] || fail "init-file 应生成 credentials.vault"
-[ -f "$DATA12/secret.key" ] || fail "init-file 应生成 secret.key"
-[ "$(stat -c %a "$DATA12/secret.key")" = "600" ] || fail "secret.key 权限应 0600"
-python3 - "$DATA12/credentials.vault" <<'PY' || fail "file 模式文件头校验失败"
-import sys
-d = open(sys.argv[1], 'rb').read()
-assert d[:4] == b'AVLT', "magic 不符"
-assert d[4] == ord('C'), "应为 'C' 代号（单因子），got %d" % d[4]
-blen = d[40]
-assert d[41:41 + blen] == b'file', "backend 指纹应 file: %r" % d[41:41 + blen]
+# 篡改份额文件 secret.key（替换为随机 32B）→ 与 vault 不配对 → 回读锚点 GCM 失败 → SHARE_MISMATCH
+python3 - "$DATA" <<'PY' || fail "篡改脚本失败"
+import os, sys
+open(os.path.join(sys.argv[1], "secret.key"), "wb").write(os.urandom(32))
+PY
+python3 - "$VAULT" "$DATA" <<'PY' || fail "篡改后应认证失败"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+env = dict(os.environ)
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("err SHARE_MISMATCH"), "篡改后应 SHARE_MISMATCH: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
 print("ok")
 PY
-run status "$DATA12" | grep -q '"mode":"crypto"' || fail "file 模式 status 应为 mode=crypto"
-run status "$DATA12" | grep -q '"backend":"file"' || fail "file 模式 status 应暴露 backend=file（UI 据此区分 OS crypto）"
-pass "init-file：'C' 代号文件头（backend=file）+ secret.key 0600 + status mode=crypto/backend=file"
+pass "crypto 密文篡改被 GCM 认证拦截（SHARE_MISMATCH）"
 
-# ② serve 全链路：免密 3 字段握手 → set/get/delete/quit（按文件头自动选 FileStore，无需 env）
-python3 - "$VAULT" "$DATA12" "$B64" "$UID1" <<'PY' || fail "file 模式 serve 链路失败"
+run destroy "$DATA" | grep -q '^ok$' || fail "crypto destroy 失败"
+run status "$DATA" | grep -q '"initialized":false' || fail "destroy 后应未初始化"
+[ ! -f "$DATA/credentials.vault" ] || fail "destroy 后 vault 文件应删除"
+[ ! -f "$DATA/secret.key" ] || fail "destroy 后 secret.key 应删除"
+pass "crypto destroy 全量销毁（份额 + vault 文件）"
+
+# ════════════════════════════════════════════════════════════════════
+# 2. 文件密钥模式（init-file --key-stdin）：file 后端 + 缺 secret.key → SHARE_MISSING
+# ════════════════════════════════════════════════════════════════════
+KEYHEX=$(python3 -c "import secrets;print(secrets.token_hex(32))")
+OUT=$(printf '%s\n' "$KEYHEX" | "$VAULT" init-file "$DATA_FILE" --key-stdin 2>&1) || true
+case "$OUT" in ok\ *) : ;; *) fail "stdin 密钥 init-file 失败: $OUT";; esac
+[ -f "$DATA_FILE/credentials.vault" ] || fail "init-file 应生成 credentials.vault"
+[ -f "$DATA_FILE/secret.key" ] || fail "init-file 应生成 secret.key"
+[ "$(stat -c %a "$DATA_FILE/secret.key")" = "600" ] || fail "secret.key 权限应 0600"
+
+# stdin 注入的 K 位于 ShareBundle.share 字段 [6:38)；serve 用该 K 解锁并往返
+python3 - "$VAULT" "$DATA_FILE" "$KEYHEX" "$B64" "$UID1" <<'PY' || fail "stdin 注入的密钥应解锁"
 import base64, hashlib, hmac, os, subprocess, sys
-vault, data, b64, uid1 = sys.argv[1:5]
+vault, data, keyhex, b64, uid1 = sys.argv[1:6]
+raw = open(os.path.join(data, "secret.key"), "rb").read()
+assert raw[:4] == b"ASTB", "secret.key 应为 ShareBundle: %r" % raw[:4]
+assert raw[6:38].hex() == keyhex, "ShareBundle 内嵌份额应为 stdin 注入的 K"
 p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -995,24 +240,20 @@ h, c = os.urandom(32), os.urandom(16)
 resp = cmd("handshake %s %s" % (
     base64.b64encode(h).decode(), base64.b64encode(c).decode()))
 parts = resp.split(" ")
-assert parts[:2] == ["ok", "handshake"], "握手应答异常: %r" % resp
-assert len(base64.b64decode(parts[2])) == 16, "锚点应 16B"
+assert parts[:2] == ["ok", "handshake"], "file 模式握手应成功: %r" % resp
 assert base64.b64decode(parts[3]) == hmac.new(h, c, hashlib.sha256).digest(), "HMAC 校验失败"
-assert parts[4].startswith("ARCHOERA-VAULT-TEST"), "应上报 TEST 标记: %r" % resp
 assert cmd("set %s" % uid1, b64) == "ok", "set 失败"
 assert cmd("get %s" % uid1).split(" ", 1)[1] == b64, "get 回读不一致"
-assert cmd("delete %s" % uid1) == "ok true", "delete 失败"
-assert cmd("get %s" % uid1) == "ok null", "删除后应无条目"
 assert cmd("quit") == "ok", "quit 失败"
 p.wait(timeout=5)
 assert p.returncode == 0, "quit 后应正常退出，got %r" % p.returncode
 print("ok")
 PY
-pass "file 模式 serve 全链路（按文件头自动 FileStore + 免密握手 HMAC + set/get/delete/quit）"
+pass "init-file（--key-stdin → ShareBundle 内嵌注入 K）+ file 后端 serve 全链路"
 
-# ③ 缺 secret.key → SHARE_MISSING（fail-closed，无明文窗口）
-mv "$DATA12/secret.key" "$DATA12/secret.key.bak"
-python3 - "$VAULT" "$DATA12" <<'PY' || fail "file 缺密钥应 SHARE_MISSING"
+# 缺 secret.key → SHARE_MISSING（fail-closed，无明文窗口）
+mv "$DATA_FILE/secret.key" "$DATA_FILE/secret.key.bak"
+python3 - "$VAULT" "$DATA_FILE" <<'PY' || fail "file 缺密钥应 SHARE_MISSING"
 import base64, os, subprocess, sys
 vault, data = sys.argv[1:3]
 p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
@@ -1026,140 +267,675 @@ assert resp.startswith("err SHARE_MISSING"), "缺 secret.key 应 SHARE_MISSING: 
 p.stdin.close(); p.wait(timeout=5)
 print("ok")
 PY
-mv "$DATA12/secret.key.bak" "$DATA12/secret.key"
+mv "$DATA_FILE/secret.key.bak" "$DATA_FILE/secret.key"
 pass "file 缺 secret.key → SHARE_MISSING（fail-closed）"
 
-# ④ stdin 密钥注入：init-file --key-stdin 指定 K（不经 argv/env）→ 解锁；篡改 secret.key → SHARE_MISMATCH
-KEYHEX=$(python3 -c "import secrets;print(secrets.token_hex(32))")
-run destroy "$DATA13" >/dev/null 2>&1 || true
-OUT=$(printf '%s\n' "$KEYHEX" | "$VAULT" init-file "$DATA13" --key-stdin 2>&1) || true
-case "$OUT" in ok\ *) : ;; *) fail "stdin 密钥 init-file 失败: $OUT";; esac
-python3 - "$VAULT" "$DATA13" "$KEYHEX" <<'PY' || fail "stdin 注入的密钥应解锁"
-import base64, os, subprocess, sys
-vault, data, keyhex = sys.argv[1:4]
-raw = open(os.path.join(data, "secret.key"), "rb").read()
-assert raw.hex() == keyhex, "secret.key 应为 stdin 注入的 K: %r" % raw.hex()
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("ok handshake"), "stdin 注入的密钥应解锁: %r" % resp
-p.stdin.close(); p.wait(timeout=5)
-print("ok")
-PY
-# 篡改 secret.key（与 vault 不配对）→ SHARE_MISMATCH（fail-closed）
-python3 - "$DATA13" <<'PY'
-import os, sys
-open(os.path.join(sys.argv[1], "secret.key"), "wb").write(os.urandom(32))
-PY
-python3 - "$VAULT" "$DATA13" <<'PY' || fail "篡改 secret.key 应 SHARE_MISMATCH"
-import base64, os, subprocess, sys
-vault, data = sys.argv[1:3]
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("err SHARE_MISMATCH"), "篡改 secret.key 应 SHARE_MISMATCH: %r" % resp
-p.stdin.close(); p.wait(timeout=5)
-print("ok")
-PY
-pass "file stdin 密钥注入（--key-stdin → 解锁；篡改 secret.key → SHARE_MISMATCH）"
-
-# ⑤ ARCHOERA_VAULT_BACKEND=file 初始化路径（等价 init-file，供主进程显式选择后端）
-run destroy "$DATA13" >/dev/null || fail "destroy DATA13 失败"
-OUT=$(ARCHOERA_VAULT_BACKEND=file "$VAULT" init-crypto "$DATA13" 2>&1) || true
-case "$OUT" in
-  ok\ *) [ -f "$DATA13/secret.key" ] || fail "env=file init-crypto 应生成 secret.key";;
-  *) fail "ARCHOERA_VAULT_BACKEND=file init-crypto 失败: $OUT";;
-esac
-pass "ARCHOERA_VAULT_BACKEND=file 初始化路径（等价 init-file）"
-
-# ⑥ 跨目录独立性：B 的 init-file 不覆盖 A 的密钥（文件按目录天然隔离，契约验证）
-#    先等 ④ 篡改密钥触发的 1s 锁定退避过期，避免误伤本用例
-sleep 2
-OUT=$("$VAULT" init-file "$DATA11" 2>&1) || true
-case "$OUT" in ok\ *) : ;; *) fail "init-file B 失败: $OUT";; esac
-python3 - "$VAULT" "$DATA12" <<'PY' || fail "目录 B init-file 不应破坏目录 A"
-import base64, os, subprocess, sys
-vault, data = sys.argv[1:3]
-p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-p.stdin.write(("handshake %s %s\n" % (
-    base64.b64encode(os.urandom(32)).decode(),
-    base64.b64encode(os.urandom(16)).decode())).encode())
-p.stdin.flush()
-resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("ok handshake"), "目录 B init-file 不应破坏目录 A: %r" % resp
-p.stdin.close(); p.wait(timeout=5)
-print("ok")
-PY
-pass "file 跨目录独立性（B init-file 不覆盖 A 的密钥）"
-
-# ⑦ destroy：secret.key + vault 文件全量删除
-run destroy "$DATA12" | grep -q '^ok$' || fail "destroy DATA12 失败"
-[ ! -f "$DATA12/secret.key" ] || fail "destroy 应删除 secret.key"
-[ ! -f "$DATA12/credentials.vault" ] || fail "destroy 应删除 credentials.vault"
+run destroy "$DATA_FILE" | grep -q '^ok$' || fail "file destroy 失败"
+[ ! -f "$DATA_FILE/credentials.vault" ] || fail "destroy 应删除 credentials.vault"
+[ ! -f "$DATA_FILE/secret.key" ] || fail "destroy 应删除 secret.key"
 pass "file destroy 全量销毁（secret.key + vault 文件）"
 
-# ── 21. KDF 参数加载上限（SEC-06）：恶意超大 m/t/p 在派生前快速拒绝 ──
-DATA14="$(mktemp -d)"
-trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9" "$DATA10" "$DATA11" "$DATA12" "$DATA13" "$DATA14"' EXIT
+# ════════════════════════════════════════════════════════════════════
+# 3. 新容器 'S'（slots，M1 仅口令）
+# ════════════════════════════════════════════════════════════════════
+M1PW="M1-P@ss-槽位"
+OUT=$(printf '%s\n' "$M1PW" | "$VAULT" init-m1 "$DATA_M1" 2>&1) || true
+case "$OUT" in ok\ *) : ;; *) fail "init-m1 失败: $OUT";; esac
 
-PW5="Kdf-Limit-P@ss"
-OUT=$(printf '%s\n' "$PW5" | "$VAULT" init-password "$DATA14" 2>&1) || true
-case "$OUT" in ok\ *) : ;; *) fail "init-password(DATA14) 失败: $OUT";; esac
-python3 - "$VAULT" "$DATA14" "$PW5" <<'PY' || fail "KDF 上限拒绝失败"
-import base64, os, struct, subprocess, sys, time
+python3 - "$DATA_M1" <<'PY' || fail "init-m1 文件格式异常"
+import os, struct, sys
+d = sys.argv[1]
+b = open(os.path.join(d, "credentials.vault"), "rb").read()
+assert b[:4] == b"AVLT", "magic 异常: %r" % b[:4]
+assert b[4] == ord("S"), "version 应为 'S': %r" % b[4]
+assert len(b) > 32 + 3 * 4, "文件过短: %d" % len(b)
+assert b[29] == 1, "algEnt 应为 1(AES-256-GCM): %r" % b[29]
+assert b[30] == 1, "F1 应为单槽: %r" % b[30]
+assert b[31] == 1, "槽位 kind 应为 1(口令): %r" % b[31]
+m, t, p = struct.unpack_from("<III", b, 32)
+assert m >= 8192 and t >= 1 and p >= 1, "KDF 参数应满足下界: m=%d t=%d p=%d" % (m, t, p)
+print("ok")
+PY
+run status "$DATA_M1" | grep -q '"mode":"m1"' || fail "slots status 应为 mode=m1"
+pass "init-m1（口令走 stdin）+ status mode=m1（magic AVLT / version 'S'）"
+
+# 原子写：init-m1 内部 GetOrCreateAuthAnchor 触发一次 re-save → 保留上一版 .bak
+[ -f "$DATA_M1/credentials.vault.bak" ] || fail "re-save 后应保留上一版 .bak"
+cmp -s "$DATA_M1/credentials.vault" "$DATA_M1/credentials.vault.bak" && fail ".bak 不应与当前版本相同"
+pass "原子写保留 .bak（重保存后可恢复上一版）"
+
+# 磁盘无明文（slots 自包含：头部 + 条目 + trailer 均不含口令/明文）
+if grep -rq "$M1PW" "$DATA_M1" 2>/dev/null; then fail "M1 磁盘出现口令明文"; fi
+if grep -rq "m1-secret" "$DATA_M1" 2>/dev/null; then fail "M1 磁盘出现凭据明文"; fi
+pass "M1 磁盘无明文（口令/凭据均不落盘）"
+
+cp "$DATA_M1/credentials.vault" "$DATA_M1/pristine.vault"
+
+python3 - "$VAULT" "$DATA_M1" "$M1PW" <<'PY' || fail "slots serve 链路失败"
+import base64, os, struct, subprocess, sys
 vault, data, pw = sys.argv[1:4]
 path = os.path.join(data, "credentials.vault")
-base = open(path, "rb").read()
-assert base[:4] == b"AVLT" and base[4] == ord("P"), "应为口令模式文件"
+pristine = open(path, "rb").read()
 
-def attempt(raw):
-    # 每次尝试前清掉 lockout（否则解锁失败退避会干扰后续正确口令用例）
+def clear_lockout():
+    # slots 无份额（NullSecretStore）→ 退避回退明文 vault.lockout（同口令模式）
     lk = os.path.join(data, "vault.lockout")
     if os.path.exists(lk):
         os.remove(lk)
-    open(path, "wb").write(raw)
+
+def handshake(password):
+    clear_lockout()
     p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    pw_b64 = base64.b64encode(pw.encode()).decode()
-    p.stdin.write(("handshake %s %s %s\n" % (
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=dict(os.environ))
+    line = "handshake %s %s %s\n" % (
         base64.b64encode(os.urandom(32)).decode(),
-        base64.b64encode(os.urandom(16)).decode(), pw_b64)).encode())
-    p.stdin.flush()
+        base64.b64encode(os.urandom(16)).decode(),
+        base64.b64encode(password.encode()).decode())
+    try:
+        p.stdin.write(line.encode()); p.stdin.flush()
+    except (BrokenPipeError, OSError):
+        pass
     resp = p.stdout.readline().decode().rstrip("\n")
-    p.stdin.close(); p.wait(timeout=5)
-    return resp
+    return p, resp
 
-# ① 超大内存 m = 2^32-1 KiB（~4 TiB）→ 快速拒绝，不得分配
-bad = bytearray(base); struct.pack_into("<I", bad, 24, 0xFFFFFFFF)
-t0 = time.time(); resp = attempt(bytes(bad)); dt = time.time() - t0
-assert resp.startswith("err"), "超大 m 应被拒: %r" % resp
-assert "KDF" in resp, "应报 KDF 参数异常: %r" % resp
-assert dt < 5, "应在派生前快速拒绝（耗时 %.1fs）" % dt
+def cmd(p, line, payload=None):
+    if payload is None:
+        p.stdin.write((line + "\n").encode())
+    else:
+        p.stdin.write((line + "\n" + payload + "\n").encode())
+    p.stdin.flush()
+    return p.stdout.readline().decode().rstrip("\n")
 
-# ② 超大迭代次数 t
-bad = bytearray(base); struct.pack_into("<I", bad, 28, 100000)
-resp = attempt(bytes(bad))
-assert resp.startswith("err") and "KDF" in resp, "超大 t 应被拒: %r" % resp
+def close(p):
+    try: p.stdin.close()
+    except OSError: pass
+    p.wait(timeout=10)
 
-# ③ 超大并行度 p
-bad = bytearray(base); struct.pack_into("<I", bad, 32, 4096)
-resp = attempt(bytes(bad))
-assert resp.startswith("err") and "KDF" in resp, "超大 p 应被拒: %r" % resp
+# ① 正确口令 → set/get/delete 往返；错误口令 → err（无明文）
+p, resp = handshake(pw)
+assert resp.startswith("ok handshake"), "正确口令应握手: %r" % resp
+sec = base64.b64encode(b"m1-secret").decode()
+assert cmd(p, "set kugou:session", sec) == "ok", "set 失败"
+assert cmd(p, "get kugou:session") == "ok " + sec, "get 回读不一致"
+assert cmd(p, "delete kugou:session") == "ok true", "delete 失败（需重算尾部 HMAC）"
+assert cmd(p, "get kugou:session") == "ok null", "删除后应无条目"
+assert cmd(p, "quit") == "ok", "quit 失败"
+p.wait(timeout=10)
+assert p.returncode == 0, "quit 后应正常退出: %r" % p.returncode
 
-# ④ 复原文件 → 合规参数口令解锁仍成功（正常路径未被误伤）
-resp = attempt(base)
-assert resp.startswith("ok handshake"), "合规参数应正常解锁: %r" % resp
+p, resp = handshake("definitely-wrong-pw")
+assert resp.startswith("err"), "错误口令应被拒: %r" % resp
+assert "m1-secret" not in resp, "错误口令应答不应含明文"
+close(p)
+
+# ② 篡改 trailer 1 字节 → 解出 K 后 HMAC 校验失败（verify-before-decrypt）
+b = bytearray(pristine); b[-1] ^= 0x01; open(path, "wb").write(bytes(b))
+p, resp = handshake(pw)
+assert resp.startswith("err"), "篡改 trailer 应被拒: %r" % resp
+assert "m1-secret" not in resp, "篡改 trailer 应答不应含明文"
+close(p)
+
+# ③ 篡改条目区 1 字节（尾部 HMAC 覆盖 header‖entries）→ 拒绝
+b = bytearray(pristine); b[-40] ^= 0x01; open(path, "wb").write(bytes(b))
+p, resp = handshake(pw)
+assert resp.startswith("err"), "篡改条目应被拒: %r" % resp
+close(p)
+
+# ④ KDF 下界：m=1024（offset 32，slot.kdfM）→ 加载即拒绝
+b = bytearray(pristine); struct.pack_into("<I", b, 32, 1024); open(path, "wb").write(bytes(b))
+p, resp = handshake(pw)
+assert resp.startswith("err"), "KDF 下界应被拒: %r" % resp
+close(p)
+
+open(path, "wb").write(pristine)  # 复原
 print("ok")
 PY
-pass "KDF 参数加载上限（SEC-06）：超大 m/t/p 派生前拒绝，合规参数正常解锁"
+pass "slots serve：正确口令 set/get/delete；错误口令/篡改 trailer/篡改条目/KDF 下界 全部拒绝"
+
+# destroy 须一并删除 vault 文件与其 .bak 备份（重置不得残留可解副本）
+run destroy "$DATA_M1" >/dev/null || fail "slots destroy 失败"
+[ ! -f "$DATA_M1/credentials.vault" ] || fail "destroy 后 vault 文件应删除"
+[ ! -f "$DATA_M1/credentials.vault.bak" ] || fail "destroy 后 .bak 备份应一并删除"
+pass "slots destroy 全量销毁（vault 文件 + .bak 备份）"
+
+# ════════════════════════════════════════════════════════════════════
+# 4. 'S' slots F2：m2a（口令+设备）双因子 + 恢复码
+# ════════════════════════════════════════════════════════════════════
+M2APW="m2a-P@ss-设备"
+# ① init-m2a：口令走 stdin，返回 `ok <b64锚点> <恢复码>`；device.key 落盘 0600
+M2AOUT=$(printf '%s\n' "$M2APW" | "$VAULT" init-m2a "$DATA_M2A" 2>&1) || true
+case "$M2AOUT" in ok\ *) : ;; *) fail "init-m2a 失败: $M2AOUT";; esac
+M2ACODE=$(printf '%s\n' "$M2AOUT" | awk '{print $3}')
+[ -n "$M2ACODE" ] || fail "init-m2a 应输出恢复码: $M2AOUT"
+# 恢复码为 Crockford Base32（32B → 52 字符 → 13 组，`-` 分隔）
+printf '%s' "$M2ACODE" | grep -Eq '^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$' \
+  || fail "恢复码分组/字符异常: $M2ACODE"
+[ -f "$DATA_M2A/device.key" ] || fail "init-m2a 应生成 device.key"
+[ "$(stat -c '%a' "$DATA_M2A/device.key")" = "600" ] || fail "device.key 权限应为 0600"
+run status "$DATA_M2A" | grep -q '"mode":"m2a"' || fail "m2a status 应为 mode=m2a"
+
+# 文件布局：slotCount=2，槽 1 kind=4（口令+设备），槽 2 kind=3（恢复）
+python3 - "$DATA_M2A" <<'PY' || fail "m2a 文件格式异常"
+import os, struct, sys
+d = sys.argv[1]
+b = open(os.path.join(d, "credentials.vault"), "rb").read()
+assert b[:4] == b"AVLT" and b[4] == ord("S"), "magic/version 异常"
+assert b[29] == 1, "algEnt 应为 1: %r" % b[29]
+assert b[30] == 2, "m2a 应为 2 个槽位: %r" % b[30]
+assert b[31] == 4, "槽 1 应为 PasswordDevice(4): %r" % b[31]
+m, t, p = struct.unpack_from("<III", b, 32)
+assert m >= 8192 and t >= 1 and p >= 1, "口令+设备槽 KDF 应满足下界"
+# 槽 1 = kind(1)+m/t/p(12)+salt(16)+nonce(12)+len(2)+wrapped(48) → 槽 2 起点 122
+assert b[122] == 3, "槽 2 应为 Recovery(3): %r" % b[122]
+rm, rt, rp = struct.unpack_from("<III", b, 123)
+assert (rm, rt, rp) == (0, 0, 0), "恢复槽 KDF 参数应为占位 0: %r" % ((rm, rt, rp),)
+print("ok")
+PY
+pass "init-m2a（口令 + device.key 0600 + 恢复码）→ status mode=m2a；槽 4/3 布局正确"
+
+# ②-⑤ m2a serve：口令/设备路径、错误口令、缺 device.key、恢复码路径、归一化、篡改
+cp "$DATA_M2A/credentials.vault" "$DATA_M2A/pristine.vault"
+python3 - "$VAULT" "$DATA_M2A" "$M2APW" "$M2ACODE" <<'PY' || fail "m2a serve 链路失败"
+import base64, os, subprocess, sys
+vault, data, pw, code = sys.argv[1:5]
+path = os.path.join(data, "credentials.vault")
+devkey = os.path.join(data, "device.key")
+pristine = open(path, "rb").read()
+pristine_dev = open(devkey, "rb").read()
+
+def clear_lockout():
+    lk = os.path.join(data, "vault.lockout")
+    if os.path.exists(lk): os.remove(lk)
+
+def handshake(secret=None, label=None, drop_device=False):
+    clear_lockout()
+    if drop_device and os.path.exists(devkey):
+        os.remove(devkey)
+    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=dict(os.environ))
+    fields = [base64.b64encode(os.urandom(32)).decode(),
+              base64.b64encode(os.urandom(16)).decode()]
+    if secret is not None: fields.append(base64.b64encode(secret.encode()).decode())
+    if label is not None: fields.append(base64.b64encode(label.encode()).decode())
+    try:
+        p.stdin.write(("handshake " + " ".join(fields) + "\n").encode()); p.stdin.flush()
+    except (BrokenPipeError, OSError):
+        pass
+    resp = p.stdout.readline().decode().rstrip("\n")
+    if drop_device:
+        open(devkey, "wb").write(pristine_dev)   # 复原 device.key
+    return p, resp
+
+def cmd(p, line, payload=None):
+    if payload is None: p.stdin.write((line + "\n").encode())
+    else: p.stdin.write((line + "\n" + payload + "\n").encode())
+    p.stdin.flush()
+    return p.stdout.readline().decode().rstrip("\n")
+
+def close(p):
+    try: p.stdin.close()
+    except OSError: pass
+    p.wait(timeout=10)
+
+# ② 正确口令 + device.key → set/get/delete 往返
+p, resp = handshake(secret=pw)
+assert resp.startswith("ok handshake"), "m2a 正确口令应握手: %r" % resp
+sec = base64.b64encode(b"m2a-secret").decode()
+assert cmd(p, "set kugou:session", sec) == "ok", "set 失败"
+assert cmd(p, "get kugou:session") == "ok " + sec, "get 回读不一致"
+assert cmd(p, "delete kugou:session") == "ok true", "delete 失败"
+assert cmd(p, "quit") == "ok"; p.wait(timeout=10)
+assert p.returncode == 0, "quit 后应正常退出"
+open(path, "wb").write(pristine)  # 复原（后续用 pristine 做篡改基线）
+
+# ③ 错误口令 → 拒绝（SHARE_MISMATCH，记退避）
+p, resp = handshake(secret="definitely-wrong-pw")
+assert resp.startswith("err") and "SHARE_MISMATCH" in resp, "m2a 错误口令应被拒: %r" % resp
+assert "m2a-secret" not in resp, "错误口令应答不应含明文"
+close(p)
+
+# ④ device.key 缺失 → 口令路径拒绝，且为 NEED_RECOVERY（非 SHARE_MISMATCH）
+p, resp = handshake(secret=pw, drop_device=True)
+assert resp.startswith("err") and "NEED_RECOVERY" in resp, \
+    "缺 device.key 应为 NEED_RECOVERY: %r" % resp
+close(p)
+
+# ⑤ 恢复码路径（不依赖 device.key）：正确 → set/get；错误 → 拒绝
+p, resp = handshake(secret=code, label="rec", drop_device=True)
+assert resp.startswith("ok handshake"), "m2a 恢复码应握手: %r" % resp
+rsec = base64.b64encode(b"m2a-recovery").decode()
+assert cmd(p, "set netease:cookie", rsec) == "ok", "恢复路径 set 失败"
+assert cmd(p, "get netease:cookie") == "ok " + rsec, "恢复路径 get 不一致"
+assert cmd(p, "quit") == "ok"; p.wait(timeout=10)
+open(path, "wb").write(pristine)
+
+# ⑤b 恢复码输入归一化（小写 + 空格代替 `-`）仍可解锁
+p, resp = handshake(secret=code.lower().replace("-", " "), label="rec", drop_device=True)
+assert resp.startswith("ok handshake"), "归一化恢复码应握手: %r" % resp
+close(p)
+
+# ⑤c 错误恢复码 → 拒绝
+p, resp = handshake(secret="-".join(["0000"] * 13), label="rec")
+assert resp.startswith("err"), "错误恢复码应被拒: %r" % resp
+close(p)
+
+# ⑤d 5 字段但标签未知 → 拒绝
+p, resp = handshake(secret=code, label="bogus")
+assert resp.startswith("err"), "未知标签应被拒: %r" % resp
+close(p)
+
+# 六 篡改 trailer 1 字节 → 解出 K 后 HMAC 校验失败（verify-before-decrypt）
+b = bytearray(pristine); b[-1] ^= 0x01; open(path, "wb").write(bytes(b))
+p, resp = handshake(secret=pw)
+assert resp.startswith("err"), "m2a 篡改 trailer 应被拒: %r" % resp
+assert "m2a-secret" not in resp, "篡改应答不应含明文"
+close(p)
+
+open(path, "wb").write(pristine)  # 复原
+print("ok")
+PY
+pass "m2a serve：口令+设备 set/get；错误口令 / 缺 device.key(NEED_RECOVERY) / 恢复码 / 归一化 / 篡改 trailer 行为正确"
+
+# destroy 一并删除 device.key
+run destroy "$DATA_M2A" >/dev/null || fail "m2a destroy 失败"
+[ ! -f "$DATA_M2A/credentials.vault" ] || fail "destroy 后 vault 文件应删除"
+[ ! -f "$DATA_M2A/credentials.vault.bak" ] || fail "destroy 后 .bak 应一并删除"
+[ ! -f "$DATA_M2A/device.key" ] || fail "destroy 后 device.key 应一并删除"
+pass "m2a destroy 全量销毁（vault + .bak + device.key）"
+
+# ════════════════════════════════════════════════════════════════════
+# 5. 'S' slots F2：m2b（仅设备槽）
+# ════════════════════════════════════════════════════════════════════
+M2BOUT=$("$VAULT" init-m2b "$DATA_M2B" 2>&1) || true
+case "$M2BOUT" in ok\ *) : ;; *) fail "init-m2b 失败: $M2BOUT";; esac
+[ -f "$DATA_M2B/device.key" ] || fail "init-m2b 应生成 device.key"
+[ "$(stat -c '%a' "$DATA_M2B/device.key")" = "600" ] || fail "m2b device.key 权限应为 0600"
+run status "$DATA_M2B" | grep -q '"mode":"m2b"' || fail "m2b status 应为 mode=m2b"
+python3 - "$DATA_M2B" <<'PY' || fail "m2b 文件格式异常"
+import os, struct, sys
+d = sys.argv[1]
+b = open(os.path.join(d, "credentials.vault"), "rb").read()
+assert b[:4] == b"AVLT" and b[4] == ord("S"), "magic/version 异常"
+assert b[30] == 1, "m2b 应为 1 个槽位: %r" % b[30]
+assert b[31] == 2, "槽应为 Device(2): %r" % b[31]
+assert struct.unpack_from("<III", b, 32) == (0, 0, 0), "设备槽 KDF 参数应为占位 0"
+print("ok")
+PY
+python3 - "$VAULT" "$DATA_M2B" <<'PY' || fail "m2b serve 链路失败"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+devkey = os.path.join(data, "device.key")
+pristine_dev = open(devkey, "rb").read()
+
+def clear_lockout():
+    lk = os.path.join(data, "vault.lockout")
+    if os.path.exists(lk): os.remove(lk)
+
+def handshake(drop_device=False):
+    clear_lockout()
+    if drop_device and os.path.exists(devkey): os.remove(devkey)
+    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=dict(os.environ))
+    line = "handshake %s %s\n" % (base64.b64encode(os.urandom(32)).decode(),
+                                  base64.b64encode(os.urandom(16)).decode())
+    try:
+        p.stdin.write(line.encode()); p.stdin.flush()
+    except (BrokenPipeError, OSError):
+        pass
+    resp = p.stdout.readline().decode().rstrip("\n")
+    if drop_device: open(devkey, "wb").write(pristine_dev)
+    return p, resp
+
+def cmd(p, line, payload=None):
+    if payload is None: p.stdin.write((line + "\n").encode())
+    else: p.stdin.write((line + "\n" + payload + "\n").encode())
+    p.stdin.flush(); return p.stdout.readline().decode().rstrip("\n")
+
+# 3 字段 + device.key → set/get 往返
+p, resp = handshake()
+assert resp.startswith("ok handshake"), "m2b 3 字段应握手: %r" % resp
+sec = base64.b64encode(b"m2b-secret").decode()
+assert cmd(p, "set netease:cookie", sec) == "ok", "m2b set 失败"
+assert cmd(p, "get netease:cookie") == "ok " + sec, "m2b get 回读不一致"
+assert cmd(p, "quit") == "ok"; p.wait(timeout=10)
+assert p.returncode == 0, "m2b quit 后应正常退出"
+
+# 缺 device.key → 拒绝（distinct err）
+p, resp = handshake(drop_device=True)
+assert resp.startswith("err"), "m2b 缺 device.key 应被拒: %r" % resp
+assert "NEED_RECOVERY" in resp or "device.key" in resp, "应给出设备密钥缺失提示: %r" % resp
+try: p.stdin.close()
+except OSError: pass
+p.wait(timeout=10)
+print("ok")
+PY
+pass "init-m2b（仅设备槽，0600）→ status mode=m2b；3 字段 set/get；缺 device.key 拒绝"
+
+# ════════════════════════════════════════════════════════════════════
+# 6. 独立运行拒绝（父进程 exe 绑定）+ dev 布局放行
+# ════════════════════════════════════════════════════════════════════
+# 打包布局：<dir>/native/<vault> + <dir>/archoera_music（预期主程序占位）。
+# vault 由自身位置推导「预期主程序」路径，并经 OS 读取父进程可执行文件路径比对——
+# 父进程非预期主程序（脚本/独立调用）即拒绝。dev 布局（build/）不作路径绑定，
+# 故上文各 serve 用例（build/ 下运行）不受影响（dev 布局放行）。
+mkdir -p "$DATA_PKG/native"
+cp "$VAULT" "$DATA_PKG/native/archoera-vault-test"
+cp "$VAULT" "$DATA_PKG/archoera_music"   # 预期主程序占位（仅路径比对，不执行）
+PKGVAULT="$DATA_PKG/native/archoera-vault-test"
+
+# 从 python3 启动（父进程 exe=python3 ≠ $DATA_PKG/archoera_music）→ 拒绝
+OUT=$(python3 - "$PKGVAULT" "$DATA_M2B" <<'PY'
+import subprocess, sys
+vault, data = sys.argv[1:3]
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+p.stdin.write(b"handshake AAAA BBBB\n"); p.stdin.flush()
+print(p.stdout.readline().decode().rstrip("\n"))
+p.stdin.close(); p.wait(timeout=5)
+PY
+) || true
+case "$OUT" in
+  err*主程序*) : ;;
+  *) fail "打包布局下父进程非预期主程序应拒绝（got: $OUT）";;
+esac
+pass "独立运行拒绝（打包布局：父进程 exe 非预期主程序）"
+
+# dev 布局放行：build/ 下 serve 握手成功（上文各 serve 用例已证；此处显式再验一次）
+python3 - "$VAULT" "$DATA_M2B" <<'PY' || fail "dev 布局应放行"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+p.stdin.write(("handshake %s %s\n" % (
+    base64.b64encode(os.urandom(32)).decode(),
+    base64.b64encode(os.urandom(16)).decode())).encode())
+p.stdin.flush()
+resp = p.stdout.readline().decode().rstrip("\n")
+assert resp.startswith("ok handshake"), "dev 布局应放行: %r" % resp
+p.stdin.close(); p.wait(timeout=5)
+print("ok")
+PY
+pass "dev 布局放行（build/ 下 serve 握手成功）"
+
+# ════════════════════════════════════════════════════════════════════
+# 6b. 加载器注入拒绝：LD_PRELOAD / LD_AUDIT 非空 → serve 在武装前拒绝
+# ════════════════════════════════════════════════════════════════════
+# Vector A：Linux 上 `LD_PRELOAD=<evil.so>` 可在动态装载期 hook vault 的 read，
+# 从 stdin 握手窃取明文口令。PlatformGuard.VerifyAndArm 在武装前检查注入变量并
+# 直接拒绝（Dart 侧 spawn 另有环境净化，双保险）。此处用**不存在**的 .so 路径，
+# 仅验证拒绝分支（不会真正加载）；上方无注入的各 serve 用例须保持绿。
+LD_PRELOAD_OUT=$(LD_PRELOAD=/nonexistent/archoera-inject-test.so \
+  "$VAULT" serve "$DATA_M2B" <<<'handshake AAAA BBBB' 2>/dev/null) || true
+case "$LD_PRELOAD_OUT" in
+  err*拒绝运行*) : ;;
+  *) fail "LD_PRELOAD 非空应被 vault 拒绝（got: $LD_PRELOAD_OUT）";;
+esac
+LD_AUDIT_OUT=$(LD_AUDIT=/nonexistent/archoera-inject-test.so \
+  "$VAULT" serve "$DATA_M2B" <<<'handshake AAAA BBBB' 2>/dev/null) || true
+case "$LD_AUDIT_OUT" in
+  err*拒绝运行*) : ;;
+  *) fail "LD_AUDIT 非空应被 vault 拒绝（got: $LD_AUDIT_OUT）";;
+esac
+pass "加载器注入拒绝（LD_PRELOAD / LD_AUDIT 非空 → serve err 拒绝运行）"
+
+# ════════════════════════════════════════════════════════════════════
+# 7. seccomp 自保护：过滤器已装载 + 违例系统调用被内核 SIGSYS 终止
+# ════════════════════════════════════════════════════════════════════
+# 隐藏子命令 selftest-seccomp：武装进程护栏后 (a) 报告 seccomp 过滤器是否生效，
+# (b) 故意触发被拒的 socket(AF_INET)。若过滤器生效，内核按 SECCOMP_RET_KILL_PROCESS
+# 以 SIGSYS 终止整个进程（父进程可感知信号退出 → Dart 侧 fail-closed）。
+python3 - "$VAULT" <<'PY' || fail "seccomp 自保护验证失败"
+import os, signal, subprocess, sys
+vault = sys.argv[1]
+env = dict(os.environ)
+
+def run(args):
+    p = subprocess.Popen([vault, "selftest-seccomp"] + args, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=env)
+    lines = [p.stdout.readline().decode().rstrip("\n") for _ in range(2)]
+    p.wait(timeout=10)
+    return lines, p.returncode
+
+# (a) 过滤器装载报告 + (b) 网络 socket(AF_INET=2) 被拒 → SIGSYS（永不返回）
+lines, rc = run([])
+assert lines[0] == "ok seccomp=true", "seccomp 过滤器未生效: %r" % lines
+assert lines[1] == "", "AF_INET socket 不应返回第二行: %r" % lines
+assert rc == -signal.SIGSYS, "被拒网络 socket 应以 SIGSYS 终止（got %r）" % rc
+
+# (c) 本地 socket(AF_UNIX=1) 放行——D-Bus/libsecret 依赖其工作，绝不能被误杀
+lines, rc = run(["1"])
+assert lines[0] == "ok seccomp=true", "seccomp 报告异常: %r" % lines
+assert lines[1].startswith("ok socket(domain=1)"), "AF_UNIX 应放行: %r" % lines
+assert rc == 0, "AF_UNIX 探测应正常退出（got %r）" % rc
+print("ok")
+PY
+pass "seccomp 自保护：过滤器生效 + AF_INET socket → SIGSYS；AF_UNIX（D-Bus）放行不误杀"
+
+# ════════════════════════════════════════════════════════════════════
+# 8. Argon2id 自检（RFC 9106 §5.3 向量）
+# ════════════════════════════════════════════════════════════════════
+OUT=$(run selftest)
+case "$OUT" in
+  ok*) : ;;
+  *) fail "Argon2id 自检失败: $OUT";;
+esac
+pass "Argon2id 自检（RFC 9106 向量）"
+
+# ════════════════════════════════════════════════════════════════════
+# 9. 用户可选 Argon2id 强度：init --kdf-* + set-kdf 重键（不丢数据）
+# ════════════════════════════════════════════════════════════════════
+KDF1_PW="kdf1-P@ss-强度"
+
+# ① init-m1 --kdf-m 32768 --kdf-t 3 --kdf-p 1 → 头部槽参数反映 32768/3/1，status 同步
+OUT=$(printf '%s\n' "$KDF1_PW" | "$VAULT" init-m1 "$DATA_KDF" --kdf-m 32768 --kdf-t 3 --kdf-p 1 2>&1) || true
+case "$OUT" in ok\ *) : ;; *) fail "init-m1 --kdf-* 失败: $OUT";; esac
+run status "$DATA_KDF" | grep -q '"kdf":{"m":32768,"t":3,"p":1}' \
+  || fail "init-m1 status 应显示 kdf 32768/3/1"
+python3 - "$DATA_KDF" <<'PY' || fail "init-m1 头部 KDF 参数不符"
+import os, struct, sys
+b = open(os.path.join(sys.argv[1], "credentials.vault"), "rb").read()
+assert b[:4] == b"AVLT" and b[4] == ord("S"), "magic/version 异常"
+assert b[31] == 1, "槽 kind 应为 1(口令): %r" % b[31]
+assert struct.unpack_from("<III", b, 32) == (32768, 3, 1), \
+    "槽 KDF 应 32768/3/1: %r" % (struct.unpack_from("<III", b, 32),)
+print("ok")
+PY
+pass "init-m1 --kdf-m 32768 --kdf-t 3 --kdf-p 1（头部槽参数 + status 同步）"
+
+# ② 重键前写入条目（供重键后回读比对）
+python3 - "$VAULT" "$DATA_KDF" "$KDF1_PW" <<'PY' || fail "重键前 serve set/get 失败"
+import base64, os, subprocess, sys
+vault, data, pw = sys.argv[1:4]
+def clear_lockout():
+    lk = os.path.join(data, "vault.lockout")
+    if os.path.exists(lk): os.remove(lk)
+def handshake():
+    clear_lockout()
+    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=dict(os.environ))
+    p.stdin.write(("handshake %s %s %s\n" % (
+        base64.b64encode(os.urandom(32)).decode(), base64.b64encode(os.urandom(16)).decode(),
+        base64.b64encode(pw.encode()).decode())).encode())
+    p.stdin.flush()
+    return p, p.stdout.readline().decode().rstrip("\n")
+def cmd(p, line, payload=None):
+    if payload is None: p.stdin.write((line + "\n").encode())
+    else: p.stdin.write((line + "\n" + payload + "\n").encode())
+    p.stdin.flush(); return p.stdout.readline().decode().rstrip("\n")
+p, resp = handshake()
+assert resp.startswith("ok handshake"), "正确口令应握手: %r" % resp
+sec = base64.b64encode(b"kdf-entry-value").decode()
+assert cmd(p, "set kugou:session", sec) == "ok", "set 失败"
+assert cmd(p, "get kugou:session") == "ok " + sec, "get 回读不一致"
+assert cmd(p, "quit") == "ok"; p.wait(timeout=10)
+print("ok")
+PY
+pass "重键前 serve set/get 往返（M1）"
+
+# ③ set-kdf --kdf-m 131072 --kdf-t 4 --kdf-p 1 → ok；头部/status 变为 131072/4/1
+OUT=$(printf '%s\n' "$KDF1_PW" | "$VAULT" set-kdf "$DATA_KDF" \
+        --kdf-m 131072 --kdf-t 4 --kdf-p 1 2>&1) || true
+[ "$OUT" = "ok" ] || fail "set-kdf 应输出 ok: $OUT"
+run status "$DATA_KDF" | grep -q '"kdf":{"m":131072,"t":4,"p":1}' \
+  || fail "set-kdf 后 status 应显示 kdf 131072/4/1"
+python3 - "$DATA_KDF" <<'PY' || fail "set-kdf 后头部 KDF 参数不符"
+import os, struct, sys
+b = open(os.path.join(sys.argv[1], "credentials.vault"), "rb").read()
+assert b[31] == 1, "重键后槽 kind 应仍为口令(1): %r" % b[31]
+assert struct.unpack_from("<III", b, 32) == (131072, 4, 1), \
+    "重键后槽 KDF 应 131072/4/1: %r" % (struct.unpack_from("<III", b, 32),)
+print("ok")
+PY
+pass "set-kdf --kdf-m 131072 --kdf-t 4 --kdf-p 1 → ok（头部/status 更新）"
+
+# ④ 重键后既有条目仍可读（同值）+ trailer 篡改仍被拒
+python3 - "$VAULT" "$DATA_KDF" "$KDF1_PW" <<'PY' || fail "重键后条目不可读 / trailer 篡改未拦截"
+import base64, os, subprocess, sys
+vault, data, pw = sys.argv[1:4]
+path = os.path.join(data, "credentials.vault")
+def clear_lockout():
+    lk = os.path.join(data, "vault.lockout")
+    if os.path.exists(lk): os.remove(lk)
+def handshake():
+    clear_lockout()
+    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=dict(os.environ))
+    p.stdin.write(("handshake %s %s %s\n" % (
+        base64.b64encode(os.urandom(32)).decode(), base64.b64encode(os.urandom(16)).decode(),
+        base64.b64encode(pw.encode()).decode())).encode())
+    p.stdin.flush()
+    return p, p.stdout.readline().decode().rstrip("\n")
+def cmd(p, line, payload=None):
+    if payload is None: p.stdin.write((line + "\n").encode())
+    else: p.stdin.write((line + "\n" + payload + "\n").encode())
+    p.stdin.flush(); return p.stdout.readline().decode().rstrip("\n")
+# 重键后同一口令可解锁，且既有条目（重键前写入）仍回读同值
+sec = base64.b64encode(b"kdf-entry-value").decode()
+p, resp = handshake()
+assert resp.startswith("ok handshake"), "重键后口令应仍可握手: %r" % resp
+assert cmd(p, "get kugou:session") == "ok " + sec, "重键后条目不应丢失/损坏"
+assert cmd(p, "quit") == "ok"; p.wait(timeout=10)
+# trailer 篡改 → 解出 K 后 HMAC 失败（verify-before-decrypt）
+pristine = open(path, "rb").read()
+b = bytearray(pristine); b[-1] ^= 0x01; open(path, "wb").write(bytes(b))
+p, resp = handshake()
+assert resp.startswith("err"), "重键后篡改 trailer 应被拒: %r" % resp
+try: p.stdin.close()
+except OSError: pass
+p.wait(timeout=10)
+open(path, "wb").write(pristine)
+print("ok")
+PY
+pass "set-kdf 不丢数据（既有条目同值可读）+ 重键后 trailer 篡改仍被拒"
+
+# ⑤ set-kdf 错误口令 → SHARE_MISMATCH；vault 文件字节不变
+cp "$DATA_KDF/credentials.vault" "$DATA_KDF/before_wrong.vault"
+OUT=$(printf '%s\n' "definitely-wrong-pw" | "$VAULT" set-kdf "$DATA_KDF" \
+        --kdf-m 65536 --kdf-t 3 --kdf-p 1 2>&1) || true
+case "$OUT" in err\ SHARE_MISMATCH*) : ;; *) fail "set-kdf 错误口令应 SHARE_MISMATCH: $OUT";; esac
+cmp -s "$DATA_KDF/credentials.vault" "$DATA_KDF/before_wrong.vault" \
+  || fail "set-kdf 失败不应改动 vault 文件"
+pass "set-kdf 错误口令 → SHARE_MISMATCH，文件不变（fail-closed 无半写）"
+
+# ⑥ 越界 --kdf-m 在 init 即被拒（下界/上界）
+for BADM in 100 99999999; do
+  OUT=$(printf '%s\n' "x" | "$VAULT" init-m1 "$DATA_KDF/bad$BADM" --kdf-m "$BADM" 2>&1) || true
+  case "$OUT" in err*) : ;; *) fail "越界 --kdf-m $BADM 应被拒: $OUT";; esac
+done
+pass "越界 --kdf-m（100 / 99999999）在 init 被快速拒绝"
+
+# ⑦ init-m2a --kdf-m ... + set-kdf：口令+设备槽重键；恢复槽保持不变
+KDF2A_PW="kdf2a-P@ss-设备"
+M2AKDFOUT=$(printf '%s\n' "$KDF2A_PW" | "$VAULT" init-m2a "$DATA_KDF2A" \
+              --kdf-m 32768 --kdf-t 3 --kdf-p 1 2>&1) || true
+case "$M2AKDFOUT" in ok\ *) : ;; *) fail "init-m2a --kdf-* 失败: $M2AKDFOUT";; esac
+KDF2A_CODE=$(printf '%s\n' "$M2AKDFOUT" | awk '{print $3}')
+run status "$DATA_KDF2A" | grep -q '"kdf":{"m":32768,"t":3,"p":1}' \
+  || fail "m2a init 后 status 应显示 kdf 32768/3/1"
+python3 - "$DATA_KDF2A" <<'PY' || fail "m2a init 头部 KDF 参数不符"
+import os, struct, sys
+b = open(os.path.join(sys.argv[1], "credentials.vault"), "rb").read()
+assert b[31] == 4, "槽 1 应为 PasswordDevice(4): %r" % b[31]
+assert struct.unpack_from("<III", b, 32) == (32768, 3, 1), "口令+设备槽 KDF 应 32768/3/1"
+assert b[122] == 3, "槽 2 应为 Recovery(3): %r" % b[122]
+assert struct.unpack_from("<III", b, 123) == (0, 0, 0), "恢复槽 KDF 应为占位 0"
+print("ok")
+PY
+OUT=$(printf '%s\n' "$KDF2A_PW" | "$VAULT" set-kdf "$DATA_KDF2A" \
+        --kdf-m 131072 --kdf-t 4 --kdf-p 1 2>&1) || true
+[ "$OUT" = "ok" ] || fail "m2a set-kdf 应 ok: $OUT"
+run status "$DATA_KDF2A" | grep -q '"kdf":{"m":131072,"t":4,"p":1}' \
+  || fail "m2a set-kdf 后 status 应显示 131072/4/1"
+python3 - "$DATA_KDF2A" <<'PY' || fail "m2a set-kdf 后头部参数/恢复槽不符"
+import os, struct, sys
+b = open(os.path.join(sys.argv[1], "credentials.vault"), "rb").read()
+assert struct.unpack_from("<III", b, 32) == (131072, 4, 1), "口令+设备槽 KDF 应 131072/4/1"
+assert b[122] == 3, "恢复槽 kind 应仍为 3"
+assert struct.unpack_from("<III", b, 123) == (0, 0, 0), "恢复槽 KDF 应保持占位 0（未改）"
+print("ok")
+PY
+pass "init-m2a --kdf-* + set-kdf：口令+设备槽重键 131072/4/1；恢复槽保持占位 0"
+
+# ⑧ m2a 重键后：口令+设备路径与恢复码路径均可解锁（同一 K，恢复槽未改）
+python3 - "$VAULT" "$DATA_KDF2A" "$KDF2A_PW" "$KDF2A_CODE" <<'PY' || fail "m2a 重键后解锁/条目失败"
+import base64, os, subprocess, sys
+vault, data, pw, code = sys.argv[1:5]
+devkey = os.path.join(data, "device.key")
+pristine_dev = open(devkey, "rb").read()
+def clear_lockout():
+    lk = os.path.join(data, "vault.lockout")
+    if os.path.exists(lk): os.remove(lk)
+def handshake(secret, label=None, drop_device=False):
+    clear_lockout()
+    if drop_device and os.path.exists(devkey): os.remove(devkey)
+    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=dict(os.environ))
+    fields = [base64.b64encode(os.urandom(32)).decode(), base64.b64encode(os.urandom(16)).decode(),
+              base64.b64encode(secret.encode()).decode()]
+    if label is not None: fields.append(base64.b64encode(label.encode()).decode())
+    try:
+        p.stdin.write(("handshake " + " ".join(fields) + "\n").encode()); p.stdin.flush()
+    except (BrokenPipeError, OSError):
+        pass
+    resp = p.stdout.readline().decode().rstrip("\n")
+    if drop_device: open(devkey, "wb").write(pristine_dev)
+    return p, resp
+def cmd(p, line, payload=None):
+    if payload is None: p.stdin.write((line + "\n").encode())
+    else: p.stdin.write((line + "\n" + payload + "\n").encode())
+    p.stdin.flush(); return p.stdout.readline().decode().rstrip("\n")
+def close(p):
+    try: p.stdin.close()
+    except OSError: pass
+    p.wait(timeout=10)
+# 口令+设备：写入
+sec = base64.b64encode(b"m2a-kdf-secret").decode()
+p, resp = handshake(pw)
+assert resp.startswith("ok handshake"), "m2a 重键后口令+设备应握手: %r" % resp
+assert cmd(p, "set netease:cookie", sec) == "ok", "m2a 重键后 set 失败"
+assert cmd(p, "quit") == "ok"; close(p)
+# 恢复码（缺 device.key）：读到同一值（证明 K 未变、恢复槽未改）
+p, resp = handshake(code, label="rec", drop_device=True)
+assert resp.startswith("ok handshake"), "m2a 重键后恢复码应握手: %r" % resp
+assert cmd(p, "get netease:cookie") == "ok " + sec, "恢复路径应读到口令路径写入的值"
+assert cmd(p, "quit") == "ok"; close(p)
+print("ok")
+PY
+pass "m2a 重键后：口令+设备 set、恢复码（缺 device.key）get 同值——恢复槽未受影响"
+
+# ⑨ m2a 缺 device.key 时 set-kdf → NEED_RECOVERY（设备因子缺失，非爆破）
+mv "$DATA_KDF2A/device.key" "$DATA_KDF2A/device.key.bak"
+OUT=$(printf '%s\n' "$KDF2A_PW" | "$VAULT" set-kdf "$DATA_KDF2A" \
+        --kdf-m 65536 --kdf-t 3 --kdf-p 1 2>&1) || true
+case "$OUT" in err\ NEED_RECOVERY*) : ;; *) fail "m2a 缺 device.key 应 NEED_RECOVERY: $OUT";; esac
+mv "$DATA_KDF2A/device.key.bak" "$DATA_KDF2A/device.key"
+pass "m2a 缺 device.key 时 set-kdf → NEED_RECOVERY（引导恢复码流）"
+
+# ⑩ crypto（含 file 后端）无常口令 KDF → set-kdf 不支持
+run init-crypto "$DATA_KDFCR" >/dev/null || fail "crypto init 失败"
+OUT=$(printf '%s\n' "pw" | "$VAULT" set-kdf "$DATA_KDFCR" \
+        --kdf-m 65536 --kdf-t 3 --kdf-p 1 2>&1) || true
+case "$OUT" in err*该模式不支持更改\ KDF*) : ;; *) fail "crypto set-kdf 应不支持: $OUT";; esac
+pass "crypto/file set-kdf → err 该模式不支持更改 KDF（无口令 KDF 可重键）"
 
 echo "全部通过 ✔"

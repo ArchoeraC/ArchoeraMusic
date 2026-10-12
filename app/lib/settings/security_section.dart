@@ -18,6 +18,7 @@ library;
 
 import 'dart:io';
 
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,7 +28,9 @@ import '../../app/app_quit.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/log/log.dart';
+import '../../services/mcp/mcp_key_store.dart';
 import '../../services/security/data_destroyer.dart';
+import '../../services/security/vault_kdf.dart';
 import '../../services/security/vault_process.dart';
 import '../../services/streaming/streaming_provider.dart';
 import '../../services/streaming/streaming_store.dart';
@@ -62,13 +65,15 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
 
   String? _vaultMode;
   String? _vaultBackend;
+
+  /// vault 实际口令槽 KDF 强度（status；仅 m1/m2a 非空）——用于回显真实
+  /// 生效值（与偏好可能因外部改动而不一致）。
+  ({int m, int t, int p})? _vaultKdf;
   bool _deviceBusy = false;
 
   bool get _hasStreaming => _streamingBytes > 0;
   bool get _hasSession => _sessionBytes > 0 || _neteaseOnline || _kugouOnline;
   bool get _hasUserDb => _userDbBytes > 0;
-
-  bool get _isDeviceBound => _vaultMode == 'multiseal';
 
   bool get _needsRecovery {
     final s = getRuntime().sessionStore;
@@ -81,29 +86,33 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     return s is VaultSessionStore && s.shareBroken;
   }
 
-  bool get _v2Unlocked {
-    final s = getRuntime().sessionStore;
-    return s is VaultSessionStore && s.isV2Unlocked;
-  }
-
-  Set<String> get _disabledModes {
-    if (_deviceBusy) return const {'os', 'password', 'multiseal'};
-    if (_vaultMode == 'password' && !_v2Unlocked) {
-      return const {'os', 'multiseal'};
-    }
-    return const {};
-  }
-
+  /// 当前生效方案（crypto/file/m1/m2a/m2b）。
+  /// 已初始化的库按 status 返回的 mode/backend 判定（真实生效值）；
+  /// 未初始化（mode=null，如全新数据目录）由 prefs 偏好兜底（默认 crypto）。
   String get _scheme {
-    if (_vaultMode == 'crypto' && _vaultBackend == 'file') return 'file';
-    if (_vaultMode == 'crypto') return 'crypto';
-    if (_vaultMode == 'os' ||
-        _vaultMode == 'password' ||
-        _vaultMode == 'multiseal') {
-      return 'vault';
+    switch (_vaultMode) {
+      case 'm1':
+        return 'm1';
+      case 'm2a':
+        return 'm2a';
+      case 'm2b':
+        return 'm2b';
+      case 'crypto':
+        return _vaultBackend == 'file' ? 'file' : 'crypto';
     }
-    return ref.read(appPrefsProvider).credentialScheme;
+    final pref = ref.read(appPrefsProvider).credentialScheme;
+    return switch (pref) {
+      'file' => 'file',
+      'm1' => 'm1',
+      'm2a' => 'm2a',
+      'm2b' => 'm2b',
+      _ => 'crypto',
+    };
   }
+
+  /// m2a 且用户尚未确认已备份恢复码 → 设置区显示持久提醒。
+  bool get _m2aRecoveryReminder =>
+      _scheme == 'm2a' && !ref.read(appPrefsProvider).m2aRecoveryAcked;
 
   Future<void> _onSchemeSelected(String target) async {
     if (_deviceBusy || target == _scheme) return;
@@ -136,15 +145,31 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
   Future<void> _refreshVault() async {
     String? mode;
     String? backend;
+    ({int m, int t, int p})? kdf;
     try {
-      mode = await VaultProcess.mode(resolveDataDir());
-      backend = await VaultProcess.backend(resolveDataDir());
+      final dir = resolveDataDir();
+      mode = await VaultProcess.mode(dir);
+      backend = await VaultProcess.backend(dir);
+      kdf = await VaultProcess.kdf(dir);
     } catch (_) {}
-    if (!mounted || (mode == _vaultMode && backend == _vaultBackend)) return;
+    if (!mounted ||
+        (mode == _vaultMode && backend == _vaultBackend && kdf == _vaultKdf)) {
+      return;
+    }
     setState(() {
       _vaultMode = mode;
       _vaultBackend = backend;
+      _vaultKdf = kdf;
     });
+  }
+
+  /// 实际 KDF 参数 → 预设 id（匹配不上返回 null，回退偏好回显）。
+  String? _presetIdForKdf(({int m, int t, int p})? kdf) {
+    if (kdf == null) return null;
+    for (final p in vaultKdfPresets) {
+      if (p.mKiB == kdf.m && p.t == kdf.t && p.p == kdf.p) return p.id;
+    }
+    return null;
   }
 
   @override

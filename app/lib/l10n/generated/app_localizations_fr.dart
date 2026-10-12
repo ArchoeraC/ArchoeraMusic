@@ -6034,4 +6034,155 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get playlistRemoveFailed => 'Échec du retrait';
+
+  @override
+  String get settingsSchemeM1Title => 'M1 Mot de passe';
+
+  @override
+  String get settingsSchemeM1Badge => 'Mot de passe';
+
+  @override
+  String get settingsSchemeM1Desc =>
+      'Emplacement mot de passe uniquement : saisissez le mot de passe à chaque démarrage (encapsulé par Argon2id, sans trousseau système).';
+
+  @override
+  String get settingsSchemeM1ModeDesc =>
+      'M1 : la clé maîtresse est encapsulée par une clé dérivée du mot de passe dans la table des emplacements du coffre : autonome, sans trousseau système. Retenez bien le mot de passe.';
+
+  @override
+  String get settingsSchemeM2aTitle => 'M2A Mot de passe + appareil';
+
+  @override
+  String get settingsSchemeM2aBadge => '2FA';
+
+  @override
+  String get settingsSchemeM2aDesc =>
+      'Mot de passe + device.key local + code de récupération à usage unique : le plus sûr ; en cas de perte de device.key, déverrouillez avec le code de récupération.';
+
+  @override
+  String get settingsSchemeM2aModeDesc =>
+      'M2A : la clé maîtresse est encapsulée par le mot de passe et la clé de cet appareil, avec un emplacement de récupération. Après avoir changé de machine, déverrouillez avec le code de récupération.';
+
+  @override
+  String get settingsSchemeM2bTitle => 'M2B Appareil uniquement';
+
+  @override
+  String get settingsSchemeM2bBadge => 'Sans mot de passe';
+
+  @override
+  String get settingsSchemeM2bDesc =>
+      'device.key local uniquement : sans mot de passe sur cette machine, sans mot de passe ni code de récupération ; en cas de perte de device.key, aucune récupération possible.';
+
+  @override
+  String get settingsSchemeM2bModeDesc =>
+      'M2B : seule la clé locale encapsule la clé maîtresse (sans mot de passe sur cette machine). Aucun emplacement de récupération : en cas de perte de la clé, aucune récupération possible.';
+
+  @override
+  String get settingsSchemeSwitchEraseWarning =>
+      'Continuer détruit le coffre de justificatifs actuel (coffre de sauvegarde et device.key inclus). Tous les identifiants de connexion et mots de passe de streaming enregistrés seront effacés ; une nouvelle connexion est requise.';
+
+  @override
+  String get settingsSchemeResetHint =>
+      'Détruire les sessions des comptes tiers supprime aussi le coffre de justificatifs, sa sauvegarde (.bak) et le device.key local.';
+
+  @override
+  String get settingsSchemeRecoveryDialogTitle =>
+      'Enregistrez le code de récupération';
+
+  @override
+  String get settingsSchemeRecoveryDialogDesc =>
+      'Le code de récupération est affiché une seule fois. Notez-le ou copiez-le dans un endroit sûr : en cas de perte, les justificatifs ne pourront plus être déverrouillés après un changement de machine.';
+
+  @override
+  String get settingsSchemeRecoveryDialogAck => 'Enregistré';
+
+  @override
+  String get settingsSchemeRecoveryCopy => 'Copier le code de récupération';
+
+  @override
+  String get settingsSchemeRecoveryCopied => 'Code de récupération copié';
+
+  @override
+  String get settingsSchemeRecoveryReminder =>
+      'Sauvegarde du code de récupération non confirmée : après un changement de machine, les justificatifs ne pourront plus être déverrouillés. Notez-le et enregistrez-le maintenant.';
+
+  @override
+  String get settingsSchemeRecoveryReminderAck => 'Enregistré';
+
+  @override
+  String get settingsSchemePasswordTitle =>
+      'Définir le mot de passe de déverrouillage';
+
+  @override
+  String get settingsSchemePasswordDesc =>
+      'Ce mot de passe déverrouille le coffre de justificatifs et est demandé à chaque démarrage. Retenez-le bien ; il ne peut pas être récupéré.';
+
+  @override
+  String get settingsSchemePasswordHint => 'Saisir le mot de passe';
+
+  @override
+  String get settingsSchemePasswordConfirmHint =>
+      'Saisir à nouveau le mot de passe';
+
+  @override
+  String get settingsSchemePasswordMismatch =>
+      'Les deux saisies ne correspondent pas';
+
+  @override
+  String get vaultUnlockRecoveryTitle =>
+      'Déverrouiller avec le code de récupération';
+
+  @override
+  String get vaultUnlockRecoveryDesc =>
+      'La clé device.key est absente ou la machine est différente. Saisissez le code de récupération enregistré lors de la création du coffre.';
+
+  @override
+  String get vaultUnlockRecoveryHint => 'Code de récupération';
+
+  @override
+  String get vaultUnlockRecoveryAction => 'Utiliser le code de récupération';
+
+  @override
+  String get vaultUnlockPasswordAction => 'Utiliser le mot de passe';
+
+  @override
+  String get vaultUnlockRecoveryFailed =>
+      'Code de récupération incorrect, réessayez';
+
+  @override
+  String get vaultUnlockNeedRecovery =>
+      'Clé device.key absente : déverrouillez avec votre code de récupération';
+
+  @override
+  String get settingsKdfTitle => 'Force d\'Argon2id';
+
+  @override
+  String get settingsKdfSubtitle =>
+      'Plus élevé = plus résistant au forçage brut mais déverrouillage plus lent (faible ≈200ms / moyen ≈400ms / élevé ≈1.5s). Seuls les schémas à mot de passe (M1/M2A) sont réglables.';
+
+  @override
+  String get settingsKdfLow => 'Faible';
+
+  @override
+  String get settingsKdfMedium => 'Moyen';
+
+  @override
+  String get settingsKdfHigh => 'Élevé';
+
+  @override
+  String get settingsKdfUnsupported =>
+      'Le schéma actuel n\'utilise pas de KDF par mot de passe ; la force ne peut pas être réglée.';
+
+  @override
+  String get settingsKdfPasswordTitle => 'Vérifier le mot de passe actuel';
+
+  @override
+  String get settingsKdfPasswordDesc =>
+      'Modifier la force d\'Argon2id réencapsule l\'emplacement du mot de passe (la clé maître et les identifiants enregistrés restent inchangés). Saisissez votre mot de passe de déverrouillage actuel.';
+
+  @override
+  String get settingsKdfPasswordHint => 'Mot de passe actuel';
+
+  @override
+  String get toastKdfRepacked => 'Réencapsulé, aucune donnée perdue';
 }

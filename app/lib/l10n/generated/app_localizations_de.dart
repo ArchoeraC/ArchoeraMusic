@@ -6006,4 +6006,153 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get playlistRemoveFailed => 'Entfernen fehlgeschlagen';
+
+  @override
+  String get settingsSchemeM1Title => 'M1 Passwort';
+
+  @override
+  String get settingsSchemeM1Badge => 'Passwort';
+
+  @override
+  String get settingsSchemeM1Desc =>
+      'Nur-Passwort-Slot: bei jedem Start das Passwort eingeben (Argon2id-umschlossen, keine OS-Schlüsselbund-Abhängigkeit).';
+
+  @override
+  String get settingsSchemeM1ModeDesc =>
+      'M1: Der Hauptschlüssel wird durch einen vom Passwort abgeleiteten Schlüssel in der Tresor-Slot-Tabelle umschlossen – eigenständig, ohne OS-Schlüsselbund. Passwort gut merken.';
+
+  @override
+  String get settingsSchemeM2aTitle => 'M2A Passwort + Gerät';
+
+  @override
+  String get settingsSchemeM2aBadge => '2FA';
+
+  @override
+  String get settingsSchemeM2aDesc =>
+      'Passwort + lokaler device.key + einmaliger Wiederherstellungscode: am stärksten; bei Verlust von device.key mit dem Wiederherstellungscode entsperren.';
+
+  @override
+  String get settingsSchemeM2aModeDesc =>
+      'M2A: Der Hauptschlüssel wird durch Passwort und Geräteschlüssel umschlossen, plus Wiederherstellungs-Slot. Nach Gerätewechsel mit dem Wiederherstellungscode entsperren.';
+
+  @override
+  String get settingsSchemeM2bTitle => 'M2B Nur Gerät';
+
+  @override
+  String get settingsSchemeM2bBadge => 'Passwortlos';
+
+  @override
+  String get settingsSchemeM2bDesc =>
+      'Nur lokaler device.key: passwortlos auf diesem Gerät, kein Passwort und kein Wiederherstellungscode; bei Verlust von device.key sind die Daten unwiederbringlich.';
+
+  @override
+  String get settingsSchemeM2bModeDesc =>
+      'M2B: Nur der Geräteschlüssel umschließt den Hauptschlüssel – passwortlos auf diesem Gerät. Kein Wiederherstellungs-Slot: bei Verlust des Geräteschlüssels sind die Daten unwiederbringlich.';
+
+  @override
+  String get settingsSchemeSwitchEraseWarning =>
+      'Fortfahren zerstört den aktuellen Tresor (einschließlich Backup-Tresor und device.key). Alle gespeicherten Anmeldedaten und Streaming-Passwörter werden gelöscht; erneute Anmeldung erforderlich.';
+
+  @override
+  String get settingsSchemeResetHint =>
+      'Das Zurücksetzen der Sitzungen von Drittanbieter-Konten löscht auch den Tresor, dessen Backup (.bak) und den lokalen device.key.';
+
+  @override
+  String get settingsSchemeRecoveryDialogTitle =>
+      'Wiederherstellungscode speichern';
+
+  @override
+  String get settingsSchemeRecoveryDialogDesc =>
+      'Der Wiederherstellungscode wird nur dieses eine Mal angezeigt. Bitte notieren oder kopieren Sie ihn an einen sicheren Ort: bei Verlust können die Anmeldedaten nach einem Gerätewechsel nicht mehr entsperrt werden.';
+
+  @override
+  String get settingsSchemeRecoveryDialogAck => 'Habe ihn gespeichert';
+
+  @override
+  String get settingsSchemeRecoveryCopy => 'Wiederherstellungscode kopieren';
+
+  @override
+  String get settingsSchemeRecoveryCopied => 'Wiederherstellungscode kopiert';
+
+  @override
+  String get settingsSchemeRecoveryReminder =>
+      'Backup des Wiederherstellungscodes nicht bestätigt: nach einem Gerätewechsel können die Anmeldedaten nicht entsperrt werden. Bitte jetzt notieren und speichern.';
+
+  @override
+  String get settingsSchemeRecoveryReminderAck => 'Habe ihn gespeichert';
+
+  @override
+  String get settingsSchemePasswordTitle => 'Entsperrpasswort festlegen';
+
+  @override
+  String get settingsSchemePasswordDesc =>
+      'Dieses Passwort entsperrt den Tresor und wird bei jedem Start benötigt. Bitte gut merken; es kann nicht wiederhergestellt werden.';
+
+  @override
+  String get settingsSchemePasswordHint => 'Passwort eingeben';
+
+  @override
+  String get settingsSchemePasswordConfirmHint => 'Passwort erneut eingeben';
+
+  @override
+  String get settingsSchemePasswordMismatch =>
+      'Die Eingaben stimmen nicht überein';
+
+  @override
+  String get vaultUnlockRecoveryTitle =>
+      'Mit Wiederherstellungscode entsperren';
+
+  @override
+  String get vaultUnlockRecoveryDesc =>
+      'Der Geräteschlüssel (device.key) fehlt oder dies ist ein anderes Gerät. Geben Sie den beim Anlegen gespeicherten Wiederherstellungscode ein.';
+
+  @override
+  String get vaultUnlockRecoveryHint => 'Wiederherstellungscode';
+
+  @override
+  String get vaultUnlockRecoveryAction => 'Wiederherstellungscode verwenden';
+
+  @override
+  String get vaultUnlockPasswordAction => 'Passwort verwenden';
+
+  @override
+  String get vaultUnlockRecoveryFailed =>
+      'Falscher Wiederherstellungscode, bitte erneut versuchen';
+
+  @override
+  String get vaultUnlockNeedRecovery =>
+      'Geräteschlüssel fehlt: bitte mit dem Wiederherstellungscode entsperren';
+
+  @override
+  String get settingsKdfTitle => 'Argon2id-Stärke';
+
+  @override
+  String get settingsKdfSubtitle =>
+      'Höher = stärker gegen Brute-Force, aber langsameres Entsperren (Niedrig ≈200ms / Mittel ≈400ms / Hoch ≈1.5s). Nur Passwort-Schemata (M1/M2A) sind anpassbar.';
+
+  @override
+  String get settingsKdfLow => 'Niedrig';
+
+  @override
+  String get settingsKdfMedium => 'Mittel';
+
+  @override
+  String get settingsKdfHigh => 'Hoch';
+
+  @override
+  String get settingsKdfUnsupported =>
+      'Das aktuelle Schema verwendet keinen Passwort-KDF; die Stärke kann nicht angepasst werden.';
+
+  @override
+  String get settingsKdfPasswordTitle => 'Aktuelles Passwort bestätigen';
+
+  @override
+  String get settingsKdfPasswordDesc =>
+      'Eine Änderung der Argon2id-Stärke umhüllt den Passwort-Slot neu (Hauptschlüssel und gespeicherte Anmeldedaten bleiben unverändert). Gib dein aktuelles Entsperrpasswort ein.';
+
+  @override
+  String get settingsKdfPasswordHint => 'Aktuelles Passwort';
+
+  @override
+  String get toastKdfRepacked => 'Neu umhüllt, keine Daten verloren';
 }

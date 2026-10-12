@@ -10577,6 +10577,264 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'移除失败'**
   String get playlistRemoveFailed;
+
+  /// No description provided for @settingsSchemeM1Title.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'M1 口令'**
+  String get settingsSchemeM1Title;
+
+  /// No description provided for @settingsSchemeM1Badge.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'口令'**
+  String get settingsSchemeM1Badge;
+
+  /// No description provided for @settingsSchemeM1Desc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅口令槽：每次启动输入口令解锁（Argon2id 封装，免 OS 钥匙串依赖）。'**
+  String get settingsSchemeM1Desc;
+
+  /// No description provided for @settingsSchemeM1ModeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'M1：主密钥由口令派生的密钥封装在保险库槽位表中，自包含、免 OS 钥匙串；请牢记口令。'**
+  String get settingsSchemeM1ModeDesc;
+
+  /// No description provided for @settingsSchemeM2aTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'M2A 口令+设备'**
+  String get settingsSchemeM2aTitle;
+
+  /// No description provided for @settingsSchemeM2aBadge.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'双因子'**
+  String get settingsSchemeM2aBadge;
+
+  /// No description provided for @settingsSchemeM2aDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'口令 + 本机 device.key + 一次性恢复码：安全性最高；device.key 丢失时用恢复码解锁。'**
+  String get settingsSchemeM2aDesc;
+
+  /// No description provided for @settingsSchemeM2aModeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'M2A：主密钥由口令与本机设备密钥双因子封装，并附带恢复槽；换机后用恢复码解锁。'**
+  String get settingsSchemeM2aModeDesc;
+
+  /// No description provided for @settingsSchemeM2bTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'M2B 仅设备'**
+  String get settingsSchemeM2bTitle;
+
+  /// No description provided for @settingsSchemeM2bBadge.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'免密'**
+  String get settingsSchemeM2bBadge;
+
+  /// No description provided for @settingsSchemeM2bDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅本机 device.key：本机免密解锁，无口令、无恢复码；device.key 丢失即无法恢复。'**
+  String get settingsSchemeM2bDesc;
+
+  /// No description provided for @settingsSchemeM2bModeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'M2B：仅设备密钥封装主密钥，本机免密；无恢复槽，设备密钥丢失后凭据不可恢复。'**
+  String get settingsSchemeM2bModeDesc;
+
+  /// No description provided for @settingsSchemeSwitchEraseWarning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'继续将销毁现有凭据保险库（含备份 vault 与 device.key），已保存的登录凭据与流媒体密码会被清空，需重新登录。'**
+  String get settingsSchemeSwitchEraseWarning;
+
+  /// No description provided for @settingsSchemeResetHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'销毁「第三方账号会话」会同时删除凭据保险库、其备份（.bak）与本机 device.key。'**
+  String get settingsSchemeResetHint;
+
+  /// No description provided for @settingsSchemeRecoveryDialogTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请保存恢复码'**
+  String get settingsSchemeRecoveryDialogTitle;
+
+  /// No description provided for @settingsSchemeRecoveryDialogDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'这是首次也是唯一一次展示恢复码。请抄写或复制到安全位置：丢失后换机将无法解锁凭据（无其他找回方式）。'**
+  String get settingsSchemeRecoveryDialogDesc;
+
+  /// No description provided for @settingsSchemeRecoveryDialogAck.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我已抄写并妥善保存'**
+  String get settingsSchemeRecoveryDialogAck;
+
+  /// No description provided for @settingsSchemeRecoveryCopy.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'复制恢复码'**
+  String get settingsSchemeRecoveryCopy;
+
+  /// No description provided for @settingsSchemeRecoveryCopied.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'恢复码已复制'**
+  String get settingsSchemeRecoveryCopied;
+
+  /// No description provided for @settingsSchemeRecoveryReminder.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'尚未确认已备份恢复码：换机后将无法解锁凭据，请立即抄写保存。'**
+  String get settingsSchemeRecoveryReminder;
+
+  /// No description provided for @settingsSchemeRecoveryReminderAck.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我已保存'**
+  String get settingsSchemeRecoveryReminderAck;
+
+  /// No description provided for @settingsSchemePasswordTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设置解锁口令'**
+  String get settingsSchemePasswordTitle;
+
+  /// No description provided for @settingsSchemePasswordDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'该口令用于解锁凭据保险库，每次启动都需输入。请务必牢记，丢失后无法找回。'**
+  String get settingsSchemePasswordDesc;
+
+  /// No description provided for @settingsSchemePasswordHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'输入口令'**
+  String get settingsSchemePasswordHint;
+
+  /// No description provided for @settingsSchemePasswordConfirmHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'再次输入口令'**
+  String get settingsSchemePasswordConfirmHint;
+
+  /// No description provided for @settingsSchemePasswordMismatch.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'两次输入不一致'**
+  String get settingsSchemePasswordMismatch;
+
+  /// No description provided for @vaultUnlockRecoveryTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'使用恢复码解锁'**
+  String get vaultUnlockRecoveryTitle;
+
+  /// No description provided for @vaultUnlockRecoveryDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备密钥（device.key）缺失或已换机：请输入创建保险库时保存的恢复码解锁。'**
+  String get vaultUnlockRecoveryDesc;
+
+  /// No description provided for @vaultUnlockRecoveryHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'恢复码'**
+  String get vaultUnlockRecoveryHint;
+
+  /// No description provided for @vaultUnlockRecoveryAction.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'使用恢复码解锁'**
+  String get vaultUnlockRecoveryAction;
+
+  /// No description provided for @vaultUnlockPasswordAction.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'使用口令解锁'**
+  String get vaultUnlockPasswordAction;
+
+  /// No description provided for @vaultUnlockRecoveryFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'恢复码错误，请重试'**
+  String get vaultUnlockRecoveryFailed;
+
+  /// No description provided for @vaultUnlockNeedRecovery.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备密钥缺失，需使用恢复码解锁'**
+  String get vaultUnlockNeedRecovery;
+
+  /// No description provided for @settingsKdfTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Argon2id 强度'**
+  String get settingsKdfTitle;
+
+  /// No description provided for @settingsKdfSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'越高越抗暴力破解，但解锁越慢（低 ≈200ms / 中 ≈400ms / 高 ≈1.5s）。仅口令方案（M1/M2A）可调。'**
+  String get settingsKdfSubtitle;
+
+  /// No description provided for @settingsKdfLow.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'低'**
+  String get settingsKdfLow;
+
+  /// No description provided for @settingsKdfMedium.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'中'**
+  String get settingsKdfMedium;
+
+  /// No description provided for @settingsKdfHigh.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高'**
+  String get settingsKdfHigh;
+
+  /// No description provided for @settingsKdfUnsupported.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前方案不使用口令 KDF，无法调整强度。'**
+  String get settingsKdfUnsupported;
+
+  /// No description provided for @settingsKdfPasswordTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'验证当前口令'**
+  String get settingsKdfPasswordTitle;
+
+  /// No description provided for @settingsKdfPasswordDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'更改 Argon2id 强度需要重新封装口令槽（主密钥与已存凭据保持不变）。请输入当前解锁口令。'**
+  String get settingsKdfPasswordDesc;
+
+  /// No description provided for @settingsKdfPasswordHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前口令'**
+  String get settingsKdfPasswordHint;
+
+  /// No description provided for @toastKdfRepacked.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已重封装，不丢数据'**
+  String get toastKdfRepacked;
 }
 
 class _AppLocalizationsDelegate

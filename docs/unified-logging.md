@@ -104,9 +104,10 @@ Dart ──▶ archoera_log_write ──▶ [HH:mm:ss LEVEL] [tag] msg ──▶
   - 覆盖键名：`token`/`access_token`/`refresh_token`/`id_token`、`cookie`/`set-cookie`、
     `password`/`passwd`/`pwd`、`secret`/`client_secret`/`secret_key`、`signature`/`sig`、
     `api_key`/`apikey`/`api-key`/`access_key`、`authorization`/`auth`、
-    `session`/`sessionid`/`session_id`/`jsessionid`、`csrf`/`xsrf`。
-- **例外（已知接受项）**：单字母短键（Subsonic `p`/`t`/`s`）**不**掩码——过短的键名
-  误报率过高；Subsonic 凭据已在源头按 SEC-01 移入 vault，日志中不出现明文口令。
+    `session`/`sessionid`/`session_id`/`jsessionid`、`csrf`/`xsrf`、`x-archoera-key`（MCP 访问密钥头）。
+  - **Subsonic 单字母查询键 `p`/`t`/`s`**：仅在**查询上下文**（左界 `?`/`&`、后接 `=`，
+    `=` 两侧容忍空白/Tab）时掩码其值；普通文本（`top=2`/`step=1`/`t=4`）不误伤。
+- **例外（已知接受项）**：未登记的命名不掩码——只能覆盖已知键名。
 - **默认行为**：脱敏**始终开启**，无独立开关；如需关闭可调用
   `archoera_log_scrub` 之外的原始写入路径（不推荐）。因此**日志中默认不应出现**
   查询串凭据或明文口令；若某模块确有需要写入原始文本，必须自行先脱敏。
