@@ -125,6 +125,38 @@ void main() {
     );
   });
 
+  test('原生库为符号链接 → 立即 fail-closed（不跟随链接、不阻塞）', () {
+    final real = File('${nativeDir.path}/real.so')..writeAsBytesSync([1, 2, 3]);
+    final link = Link('${nativeDir.path}/libx.so')..createSync(real.path);
+    manifest().writeAsStringSync('${sha256.convert([1, 2, 3])}  libx.so\n');
+    expect(
+      () => NativeIntegrity.verifyOrThrow(link.path),
+      throwsA(isA<StateError>()),
+      reason: '被校验文件是符号链接时必须判完整性失败（否则会顺着链接读别处）',
+    );
+  });
+
+  test('清单为符号链接 → 视同无清单（不阻塞）', () {
+    final real = File('${root.path}/real-manifest.txt')..writeAsStringSync('${'a' * 64}  libx.so\n');
+    Link(manifest().path).createSync(real.path);
+    final lib = File('${nativeDir.path}/libx.so')..writeAsBytesSync([1, 2, 3]);
+    expect(NativeIntegrity.manifestPresent, isFalse);
+    expect(() => NativeIntegrity.verifyOrThrow(lib.path), returnsNormally);
+  });
+
+  test('签名文件为符号链接 → 视为签名非法（fail-closed）', () {
+    final lib = File('${nativeDir.path}/libx.so')..writeAsBytesSync([1, 2, 3]);
+    final text = '${sha256.convert([1, 2, 3])}  libx.so\n';
+    manifest().writeAsStringSync(text);
+    final real = File('${root.path}/real.sig')..writeAsBytesSync([0x30, 0x00]);
+    Link('${nativeDir.path}/${NativeIntegrity.manifestSignatureName}').createSync(real.path);
+    expect(
+      () => NativeIntegrity.verifyOrThrow(lib.path),
+      throwsA(isA<StateError>()),
+      reason: '签名文件非普通文件 → 签名不合法 → fail-closed',
+    );
+  });
+
   test('无清单时跳过校验（dev）', () {
     final lib = File('${nativeDir.path}/libx.so')..writeAsBytesSync([1, 2, 3]);
     expect(NativeIntegrity.manifestPresent, isFalse);

@@ -19,13 +19,13 @@ import 'package:archoera_music/stores/vault_session_store.dart';
 ///   5. 'S' slots：m1（口令）/ m2a（口令 + 恢复码）/ m2b（本机免密）解锁 + 往返
 ///
 /// 运行前提（headless 无 Secret Service 时）：
-///   ARCHOERA_VAULT_BIN=core/vault/build/archoera-vault-test
+///   ARCHOERA_VAULT_BIN=core/vault-rs/build/archoera-vault-test
 ///   ARCHOERA_VAULT_BACKEND=file
-///   （指向测试构建 + 选择生产 FileStore 文件密钥后端；先跑 core/vault/build-test.sh。
+///   （指向测试构建 + 选择生产 FileStore 文件密钥后端；先跑 core/vault-rs/build-test.sh。
 ///   生产二进制与测试构建存储行为一致、仅构建标记不同，VaultProcess 默认路径校验
 ///   PROD 标记，测试二进制只能经显式 ARCHOERA_VAULT_BIN 供测试/CI 使用。
 ///   SEC-19 后不再有测试明文存储后门。）
-/// 二进制经 dev 兜底解析：cwd=app/ → app/core/vault/build/archoera-vault。
+/// 二进制经 dev 兜底解析：cwd=app/ → app/core/vault-rs/build/archoera-vault。
 void main() {
   // 测试二进制标记校验需要 ARCHOERA_VAULT_BIN 指向 TEST 构建（见文件头运行前提）；
   // 未设置时 dev 兜底会解析到 PROD 二进制 → 标记断言必然失败，跳过该用例（CI 会设）。

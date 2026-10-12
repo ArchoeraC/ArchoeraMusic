@@ -1,0 +1,9 @@
+{
+ "mode": "crypto",
+ "backend": "file",
+ "kdf": null,
+ "entries": {
+  "kugou:session": "golden-kugou-session-token",
+  "netease:cookie": "golden-netease-cookie-value"
+ }
+}

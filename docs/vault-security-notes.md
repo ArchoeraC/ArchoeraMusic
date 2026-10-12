@@ -71,8 +71,8 @@ KDF 参数有**上限与下限**（[VaultLimits.ValidateKdf]：`m∈[8192 KiB, 2
 ## 三端：Rust 实现（2026-10）
 
 自 2026-10 起，**三端发行包**内的 `native/archoera-vault[.exe]` 统一改为
-`app/core/vault-rs` 的 **Rust 重实现**（取代 C# NativeAOT；`app/core/vault/**` 仅
-Linux 历史保留、**不再进入任何平台产物**）：
+`app/core/vault-rs` 的 **Rust 实现**（取代 C# NativeAOT；`app/core/vault/**` 已于 2026-10-12
+**删除**，字节兼容由 `testdata/` 黄金夹具锚定）：
 
 - **Linux**：**静态链接**单文件（`+crt-static`；CI 走 musl 静态）分发。
   **免疫加载器注入**：静态二进制不依赖 `ld.so`，`LD_PRELOAD` / `LD_AUDIT` /
@@ -88,26 +88,42 @@ Linux 历史保留、**不再进入任何平台产物**）：
 - **macOS**：crypto 模式走 **Keychain**（`kSecClassGenericPassword`，service
   `archoera.vault`，account 按数据目录作用域 `{key}|{dataDir}`，原始字节值）；
   `aarch64-apple-darwin` + `x86_64-apple-darwin` 双架构经 `lipo` 合成 universal。
-- **字节 / 协议兼容**：容器格式（crypto `'C'` / slots `'S'`）与 C# 版一致，
-  `app/core/vault-rs/cross_parity.sh` 双向互解互读、`app/core/vault-rs/test.sh`
-  全链路均已通过（与 C# 版同套断言）。
+- **字节 / 协议兼容**：容器格式（crypto `'C'` / slots `'S'`）与 KDF/HKDF/AEAD 语义由
+  `app/core/vault-rs/testdata/` 的**冻结黄金夹具**锚定（`test.sh` §14 / `test-windows.sh` §11 读回固定值）；
+  C# 活体 oracle（旧 `cross_parity.sh` 双向互解互读）已于 2026-10-12 随 `app/core/vault/` 一并删除。
 - **构建 / 打包**：Linux `app/core/build-linux.sh`；Windows `app/core/build_windows.bat`
   （install 见 `app/windows/CMakeLists.txt`）；macOS `app/core/build-macos.sh` +
   `app/macos/Runner.xcodeproj` 拷贝阶段；CI macOS bundle 从 `core/vault-rs/build/` 取。
   SEC-08 完整性清单仍自动覆盖该文件。
-- **待真机 / Wine 验证（如实）**：Windows DPAPI 路径、macOS Keychain 路径、macOS
-  `proc_pidpath` 父进程校验、Windows `QueryFullProcessImageNameW` + ACG/CIG 进程缓解
-  的**运行期行为尚未在真机 / Wine 上实测**；CI 覆盖三端**原生编译**与纯函数单测，
-  Linux 端到端已实测全绿，Windows/macOS 的运行期路径以相应 runner 产物为准。
+- **真机 / Wine 验证现状**：Windows 侧**已在 Wine 上端到端实测**（`app/core/vault-rs/test-windows.sh`：
+  DPAPI 读写 `sshare.bin`、打包布局血缘校验（`NtQueryInformationProcess` +
+  `QueryFullProcessImageNameW` + 大小写不敏感比较）、握手 10s / 空闲 30s / `set` 负载 30s
+  超时、畸形与超长输入、并发多会话、destroy 全量清理、退避状态篡改，以及「Windows 写 →
+  Linux Rust 读」跨 OS 互通 + Windows 读 Linux 黄金夹具）；会话超时与空闲自退均以**内核阻塞等待**
+  实现（读线程阻塞读 + 单一截止时刻/事件唤醒，空闲实测 0.00% 单核），**不引入轮询**——
+  避免把「轮询」本身变成 CPU 空转型攻击面或可观测节拍；macOS 侧**仅完成 Linux 交叉编译与链接
+  检查**（`app/core/vault-rs/cross-macos.sh`：双架构 + `lipo` + `minos`/框架断言），
+  Keychain 读写、`proc_pidpath` 父进程校验、`DYLD_INSERT_LIBRARIES` 拒绝、`RLIMIT_CORE`
+  等**运行期行为仍待 macOS 真机**；Windows `SetProcessMitigationPolicy`（ACG/CIG 等）为
+  best-effort，Wine 下无法观测生效情况，亦待真机。CI 覆盖三端**原生编译**与纯函数单测，
+  Linux 端到端实测全绿。
+- **Wine 环境注意**：经 Unix 侧 `wine <vault>.exe` 直启时 Wine 不回填
+  `InheritedFromUniqueProcessId`（实测恒 0），血缘校验按「父进程缺失」拒绝运行；
+  故 Wine 侧测试一律经 `wine cmd /c`（或其它 Windows 侧父进程）启动。C# 版同源逻辑
+  在 Wine 下行为相同，属加载器行为而非实现缺陷。
 
 ## 测试构建（无明文后门，SEC-19 已删除）
 
-- `app/core/vault/build-test.sh`（`#if VAULT_TESTING` 条件编译）产出 `archoera-vault-test`，
-  **与生产 `build.sh` 唯一区别是构建标记为 `ARCHOERA-VAULT-TEST-*`**（供握手指纹与 negative-marker 测试）；
-  **存储行为与生产完全一致，不含任何明文存储分支**。
 - **Linux（Rust）**：`app/core/vault-rs/build-test.sh`（`vault_testing` feature 条件编译）
   产出 `archoera-vault-test`，同样**仅改构建标记、存储行为与生产一致**；套件为
-  `app/core/vault-rs/test.sh`（与 C# 版同套断言）。
+  `app/core/vault-rs/test.sh`（含内存护栏、安全落盘、沙箱完整性、黄金夹具四类回归）。
+- **Windows（Rust，Wine 交叉验证）**：`app/core/vault-rs/test-windows.sh` 用
+  msvc-wine + LLVM `lld-link` 交叉构建 `x86_64-pc-windows-msvc`（`+crt-static`，导入表
+  只有系统 DLL，无 MSVC 运行时分发依赖）后在 Wine 上跑真实 Windows 产物；含打包布局
+  血缘探针与会话超时探针。缺 wine / MSVC 布局时打印原因并跳过（可选验证）。
+- **macOS（Rust，交叉编译检查）**：`app/core/vault-rs/cross-macos.sh` 在 Linux 上用
+  macOS SDK + `clang --target=…-apple-darwin` + `ld64.lld` 双架构构建、`llvm-lipo` 合包，
+  并断言 `minos` 与 `Security.framework` 链接；**仅编译期覆盖，运行期须真机**。
 - 历史上存在测试专用明文存储开关 `ARCHOERA_VAULT_INSECURE_FILE_STORE`（C# `InsecureFileStore`）——
   **已于 SEC-19（2026-10-12）删除**。`test.sh` 与 CI 的 headless 后端改用**生产 `FileStore`**
   （`ARCHOERA_VAULT_BACKEND=file`，文件密钥模式），不再有任何明文存储代码路径；`VAULT_TESTING`
@@ -131,15 +147,27 @@ Linux 历史保留、**不再进入任何平台产物**）：
 - 现状：vault 校验由 **OS 提供**的父进程 pid + 父进程可执行文件路径，与「**由 vault 自身位置推导出的预期主程序路径**」比对：
   - 父进程 pid 由 OS 取得（Linux/macOS `getppid`；Windows `NtQueryInformationProcess`）；
   - 父进程可执行文件路径由 OS 读取（Linux `/proc/<ppid>/exe`、macOS `proc_pidpath`、Windows `QueryFullProcessImageNameW`）；
-  - **Rust（`app/core/vault-rs`）实现**：Linux `read_link("/proc/<ppid>/exe")`；macOS `proc_pidpath`（libproc 经 `dlopen`/`dlsym` 解析，优先逻辑名 `libproc.dylib`、回退 `/usr/lib/libproc.dylib`，与 C# 一致）；Windows `NtQueryInformationProcess`（父 pid）+ `OpenProcess`/`QueryFullProcessImageNameW`（父进程映像），路径比较**忽略大小写**。**Windows/macOS 运行期路径待真机 / Wine 验证**。
+  - **Rust（`app/core/vault-rs`）实现**：Linux `read_link("/proc/<ppid>/exe")`；macOS `proc_pidpath`（libproc 经 `dlopen`/`dlsym` 解析，优先逻辑名 `libproc.dylib`、回退 `/usr/lib/libproc.dylib`，与 C# 一致）；Windows `NtQueryInformationProcess`（父 pid）+ `OpenProcess`/`QueryFullProcessImageNameW`（父进程映像），路径比较**忽略大小写**。**Windows 运行期路径已在 Wine 上实测**（打包布局放行 / 非预期拒绝 / 大小写不敏感；`test-windows.sh`，唯 Wine 直启不回填父 pid 见同节注意）；**macOS 运行期仍待真机**。
   - 仅**打包布局**（vault 位于 `<dir>/native/<vault>`，预期主程序为 `<dir>/archoera_music[.exe]`）作路径绑定；dev/测试布局（目录名非 `native`）与预期主程序缺失时**放行**（仅记日志，避免自砖）。
 - **残余（如实）**：同用户攻击者若在**预期主程序路径放一个自造二进制**再 spawn vault，本校验无法与「主程序被替换」区分——这正是威胁模型声明的硬上限（见下节），属 L4 信任根范畴。
 
 ## 进程自我保护（F4 · best-effort）
 
-vault 子进程启动时自施 OS 提供的防注入 / 防转储缓解（浏览器同款做法，**不依赖启发式注入检测、不做反调试伪装**）；三端均为 `app/core/vault-rs` 的 Rust 实现（Windows/macOS 运行期行为**待真机 / Wine 验证**）：
+vault 进程**入口即硬化**（`main` 调 `guard::harden_process()`，**覆盖所有命令**，
+不只 `serve`——一次性命令 `init-*` / `set-kdf` / `destroy` / `status` 同样在内存里持有口令与主密钥，
+`init-m2a` 还会打印恢复码）：自施 OS 提供的防注入 / 防转储缓解（浏览器同款做法，**不依赖启发式注入检测、不做反调试伪装**）；三端均为 `app/core/vault-rs` 的 Rust 实现（Windows 的 `SetProcessMitigationPolicy` best-effort 降级仍待真机观测；macOS 运行期待真机）：
 
+- **内存护栏（Rust 三端，[`app/core/vault-rs/src/memguard.rs`](../app/core/vault-rs/src/memguard.rs)）**：
+  主密钥 / KEK / 单条明文（`get` 结果、`set` 负载、握手口令）一律进 **`LockedBuffer`** ——
+  Linux/Unix `mlock`、Windows `VirtualLock`、Linux 另加 `madvise(MADV_DONTDUMP)`，drop 时**先 zeroize 再解锁**；
+  启动时尽力抬高额限（`RLIMIT_MEMLOCK` 软限→硬限 / Windows 工作集下界），仍失败则**如实告警并降级为「仅 zeroize」**
+  （可用 `archoera-vault selftest-mem` 查询 `locked=true|false`）。**每缓冲独占页**（页对齐分配）——
+  否则相邻小缓冲的 `munlock` 会把仍在使用的缓冲一并解锁（实测会话期 `VmLck` 归零）。
+  配套：`get`/`set` 明文与响应串、会话主密钥、读线程行缓冲均 `Zeroizing`/`LockedBuffer` 收口；
+  stdout/stdin 走**原始句柄 + 自有可零化缓冲**（`std::io::{stdin,stdout}` 的全局缓冲会把明文留在堆上）。
 - **Linux**：`prctl(PR_SET_PDEATHSIG, SIGTERM)`（父死自动退出）、`RLIMIT_CORE=0`（崩溃不产 core）、`PR_SET_DUMPABLE=0`（禁 `/proc/pid/mem`、ptrace 读取），以及 **seccomp-BPF denylist 过滤器**：命中 `ptrace` / `process_vm_readv|writev` / `execve` / `bpf` / 内核模块 / 命名空间 / `io_uring` 等，以及 **`AF_INET` / `AF_INET6` 的 `socket()`** → `SECCOMP_RET_KILL_PROCESS`（内核以 `SIGSYS` 杀进程）。**`AF_UNIX` 一律放行**，故 libsecret / D-Bus 仍可用；`clone`/`clone3` 等线程创建路径有意放行（避免删 NativeAOT 运行时而自砖）。
+- **denylist 逐条生效性自检**（Linux）：`archoera-vault selftest-seccomp list` 对每条被拒系统调用各 fork 一个
+  子进程**实际调用一次**，内核以 `SIGSYS` 终止才算生效（过滤器「装载」≠ 名单真的拦得住）；实测 `killed=33/33`。
 - **Windows**：`SetProcessMitigationPolicy` —— ACG（禁动态码）、CIG（仅可信镜像）、ExtensionPointDisable、StrictHandle、CFG、ImageLoad 约束，**全部 best-effort**（旧系统/与运行时冲突时失败即忽略，不阻断启动）。
 - **macOS**：仅 `RLIMIT_CORE=0`。macOS 无 seccomp 等价物（完整沙箱需 entitlement / 沙箱描述文件，本仓库不引入）；`ptrace(PT_DENY_ATTACH)` 已废弃且属反调试，明确不用。
 - **边界（重要）**：
@@ -173,6 +201,10 @@ vault 子进程启动时自施 OS 提供的防注入 / 防转储缓解（浏览�
   - m2a：`device.key` 丢失可用**恢复码**解锁（恢复码仅初始化时输出一次，须妥善保存；**当前不提供「重新生成恢复码」命令**）；口令与恢复码皆丢失 → 重置重建；
   - m2b：仅本机 `device.key`，无口令无恢复——`device.key` 丢失即重置重建；**级别为本机级（较弱）**，`device.key`（同用户可读）泄露即等于凭据全泄露。
 - **恢复 / 重置**：执行 `archoera-vault destroy <数据目录>`（或设置页「清除所有本地凭据」）会一并删除 vault 文件、`.bak`、`device.key` 与份额/锁定状态；**旧密文不可恢复，需重新登录各平台账号**。
+- **销毁语义（不自毁，实测）**：**任何攻击/失败路径都不删除用户数据**——沙箱被违反（SIGSYS）、被 `SIGKILL`/`SIGSEGV`
+  打爆、vault/`device.key`/`secret.key` 被篡改或截断、加载器注入被拒、重复 `init-*` 回滚，**都只 fail-closed 拒绝服务**
+  （文件保持原样、复原后即可解锁；崩溃也不产 core）。唯一的数据销毁入口是**显式** `destroy`（或设置面板按钮）；
+  应用层非预期退出只写 `crash` 标记并 `exit(86)` 终止主进程，版本异常只删除**二进制副本**，均不触碰凭据。
 - **数据目录**：Linux `~/.local/share/ArchoeraMusic`；macOS/Windows 见应用数据目录（路径解析见 `resolveDataDir()`）。
 
 ## 环境变量与信任边界（完整清单）
@@ -206,9 +238,42 @@ vault 子进程启动时自施 OS 提供的防注入 / 防转储缓解（浏览�
   仅做 vault 惰性初始化与模式探测；凭据由 `StreamingStore.loadSecret(id)` 在真正需要时**按需单条解密**，
   且**不写回长驻 UI 状态**（`StreamingState` 只保留非敏感元数据；带凭据配置仅临时构造给客户端）。
   残余：Dart `String` 不可 zeroize、不受 mlock 保护，被解密的那一条明文在一次会话内仍会短暂存在于堆中；
-  缓解为主进程 `PR_SET_DUMPABLE=0` + `RLIMIT_CORE=0`（不覆盖同用户读 `/proc/<pid>/mem`）；
+  缓解为主进程 `PR_SET_DUMPABLE=0` + `RLIMIT_CORE=0`（**该句原为对 vault 子进程的估低**：实测 `PR_SET_DUMPABLE=0`
+  下同用户对 vault 的 `ptrace`/`process_vm_readv` 返回 `EPERM`、`/proc/<pid>/{mem,maps,smaps,environ}` 返回 `EACCES`，
+  即对 vault 进程是覆盖的；仅 Dart 主进程自身不设该标志）；
 - **PROD marker 定性过高**（SEC-04）：marker 为可伪造字符串，只能防「误用测试构建」，**不能防替换二进制本身**；
   应用层二进制完整性改由 **key1 签名清单（F5/SEC-08）** 承接；
+- **敏感文件读写规则**（SEC-37/38/44/45，`app/core/vault-rs/src/safefile.rs`）：`credentials.vault`、`.bak`、
+  `secret.key`、`device.key`、`sshare.bin`、`vault.lockout` 统一走安全原语 ——
+  **写**：`<path>.tmp.<pid>`（**进程唯一**，避免多会话并发保存互删对方 tmp）以 `O_CREAT|O_EXCL` 独占创建，
+  已存在的 tmp **仅当是普通文件**（崩溃残留）才清理重建，符号链接 / FIFO / 设备一律拒绝；`.bak` 改**原子写**
+  （旧实现 `fs::copy` 会跟随目标符号链接写到任意文件）；**容量上限在写入前校验**（单条 ≤ 4 MiB−16B、
+  整库 ≤ 16 MiB，否则拒绝且不动磁盘——否则会写出「下次加载即被拒」的自锁库）；
+  **读**：`read_regular_limited` —— 拒绝符号链接 / FIFO / 目录，且**读之前**按元数据判长度
+  （植入 FIFO 会阻塞、植入超大文件会 OOM）；退避状态读取异常一律视为「无锁定」（best-effort，绝不成为可用性攻击面）。
+  残余（如实）：同用户仍可**删除**这些文件（DoS / 退避重置）；这属已声明的同用户边界。
+- **并发语义（兼容并发，SEC-46）**：写命令（`set`/`delete`/锚点/`set-kdf`/`init`/`destroy`）以**阻塞式跨进程独占锁**
+  保护「加载 → 改 → 保存」——`flock(LOCK_EX)` / `LockFileEx`，内核事件唤醒（**非轮询**），
+  **崩溃自动释放**（无陈旧锁），锁范围=单条命令（多会话仍可交错）。锁文件 `<dataDir>/vault.lock`
+  内容为空、非敏感面、**永不删除**（删除会让持锁进程与新进程各锁不同 inode、互斥失效）。
+  此前为「最后写者获胜」= 静默丢更新（并发 `set` 互相覆盖、或把重键头部写回），不可接受。
+  注：握手路径的「取/建锚点」也取一次锁，故外部长期持锁会连带阻塞握手（由调用方超时约束）。
+- **应用层（Dart）文件访问统一收口**（SEC-47，`app/lib/utils/safe_file.dart`）：**全部**配置/状态文件
+  （`prefs.json`、`scan_dirs.json`、`streaming_servers.json`、`netease_session.json`、`last_session.json`、
+  `daily_shelf.json`、`download_history.json`、封面、`vault.auth` 锚点、`vault.marker` 标记、SEC-08 清单/签名/
+  被校验库、缓存分片）改走 `SafeFile` —— **读**要求「必须是普通文件」（`allowSymlink` 默认 true 以兼容
+  把配置软链到 dotfiles 的用户；锚点/签名/标记用 false）+ 长度上限；**写**走「同目录随机唯一临时名 → `rename`」，
+  符号链接**只被替换、不被穿透**。擦除器（`data_destroyer`）只擦**普通文件**，且不再把非普通路径交给
+  Go 代理（其覆盖写会顺链抹掉目标）。→ 此前「植入 FIFO 即冻结界面 / 顺链覆盖任意文件」的**确定性**攻击面消除。
+  **残余（如实）**：`dart:io` 无 `O_NONBLOCK`/`O_NOFOLLOW`，类型判定与真正读写之间存在极窄 TOCTOU 窗口
+  （需精确抢时）；彻底关闭需经 `app/native/platform` 走原生 `open(2)`，当前未做。
+- **Windows 内存读取面**（SEC-39，**应用层不可封闭**）：Windows 无「禁同用户读进程内存」的等价物
+  （ACG/CIG/StrictHandle 均不拦 `OpenProcess(PROCESS_VM_READ)` + `ReadProcessMemory`），故同用户进程可在会话期
+  读走主密钥与刚流经的凭据（`mlock`/`VirtualLock` 只防换页、不防读）。配套：DPAPI 份额**不带 `pOptionalEntropy`**
+  → 保护只绑定 OS 用户，**同用户任意进程**可解封出主密钥（实测：非 vault 二进制解封 + 直解 vault 条目成功）。
+  这是「同用户攻击者不在防线内」的具体化；可信边界应视为**用户账户**而非本应用。
+  **Wine 注意**：Wine 的 `CryptProtectData` 为固定密钥实现（换 `WINEPREFIX` 仍可解封），**不能**用于验证
+  「用户绑定」，该点须真机复验；「同用户可解封」的结论来自 API 语义（无 entropy），与 Wine 无关。
 - **lockout / auth / marker 同用户可写**（SEC-05）：`vault.auth` 可随 vault 一并替换（锚点失效）、
   `vault.marker` 可伪造（**注意**：伪造 `crash` 只让下次启动弹可关闭的崩溃警告，**不会**触发 `exit(86)`——
   `exit(86)` 仅由「vault 子进程真实异常退出」路径触发；伪造 `ok` 可掩盖一次真实崩溃的提示）——

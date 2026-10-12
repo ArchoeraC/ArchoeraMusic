@@ -3,7 +3,7 @@
   #
   # 拆成多个 derivation，便于**增量构建**：Nix 按输入哈希缓存成功产物，改动某一
   # 模块只重编它及其下游，已成功的阶段直接跳过。
-  #   ffmpegMinimal → kernel → audioEngine / scraper / scanner / vault /
+  #   ffmpegMinimal → kernel → audioEngine / scraper / scanner / vault(Rust) /
   #                   downloader / subsonic / platform → default(app)
   #
   # 构建需要联网（pub / NuGet / crates.io / go modules / FFmpeg 源码），故：
@@ -262,39 +262,34 @@ NUGETCFG
         meta = commonMeta // { description = "ArchoeraMusic library scanner (NativeAOT)"; };
       };
 
-      # ── 6. vault（.NET NativeAOT）────────────────────────────────────────
+      # ── 6. vault（Rust 静态单文件；C# 版已于 2026-10-12 删除）────────────
       vault = pkgs.stdenv.mkDerivation {
         pname = "archoera-vault";
         inherit version;
         src = src;
         nativeBuildInputs = with pkgs; [
-          dotnet-sdk_10
-          clang
+          rustc
+          cargo
+          git
           cacert
           curl
         ];
-        buildInputs = with pkgs; [ zlib ];
         strictDeps = false;
         dontConfigure = true;
-        dontConfigureNuget = true;
-        preBuild = netEnv + nugetSetup;
+        preBuild = netEnv;
         buildPhase = ''
           runHook preBuild
           set -euo pipefail
-          (
-            cd app/core/vault
-            dotnet publish src/Vault.csproj -c Release -r linux-x64 -o build/publish
-            cp build/publish/archoera-vault build/
-          )
+          ( cd app/core/vault-rs && bash build.sh )
           runHook postBuild
         '';
         installPhase = ''
           runHook preInstall
           mkdir -p $out
-          cp -a app/core/vault/build/archoera-vault $out/
+          cp -a app/core/vault-rs/build/archoera-vault $out/
           runHook postInstall
         '';
-        meta = commonMeta // { description = "ArchoeraMusic credential vault (NativeAOT)"; };
+        meta = commonMeta // { description = "ArchoeraMusic credential vault (Rust, static)"; };
       };
 
       # ── 7. downloader（Rust cdylib）──────────────────────────────────────
@@ -459,18 +454,18 @@ NUGETCFG
           # downloader 由 Flutter 的 CMake 内嵌 cargo 构建，无需预置）
           mkdir -p app/core/audio-engine/build app/core/audio-engine/zig-out \
             app/core/scanner/build app/core/scraper/build app/core/subsonic/build \
-            app/core/vault/build app/native/platform/build/out
+            app/core/vault-rs/build app/native/platform/build/out
           cp -a ${audioEngine}/. app/core/audio-engine/build/
           cp -a ${kernel}/. app/core/audio-engine/zig-out/
           cp -a ${scanner}/. app/core/scanner/build/
           cp -a ${scraper}/. app/core/scraper/build/
           cp -a ${subsonic}/. app/core/subsonic/build/
-          cp -a ${vault}/. app/core/vault/build/
+          cp -a ${vault}/. app/core/vault-rs/build/
           cp -a ${platform}/. app/native/platform/build/out/
           # cp -a 从只读 Nix store 拷贝会把目标目录也设成只读，导致 CMake 目标
           # （audio_engine_cmake / subsonic_go）无法创建 pkgRedirects → 递归加写权限。
           chmod -R u+w app/core/audio-engine app/core/scanner app/core/scraper \
-            app/core/subsonic app/core/vault app/native/platform
+            app/core/subsonic app/core/vault-rs app/native/platform
 
           echo "==> flutter build linux"
           (

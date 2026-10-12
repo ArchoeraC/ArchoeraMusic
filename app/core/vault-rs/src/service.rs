@@ -9,8 +9,10 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use subtle::ConstantTimeEq;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::crypto::{self, KdfParams};
+use crate::memguard::LockedBuffer;
 use crate::device;
 use crate::errors::{Result, VaultError};
 use crate::format::{
@@ -19,6 +21,7 @@ use crate::format::{
 };
 use crate::lockout::VaultLockout;
 use crate::recovery;
+use crate::safefile::DataDirLock;
 use crate::share::{self, NullSecretStore, SecretStore};
 
 pub const VAULT_FILE_NAME: &str = "credentials.vault";
@@ -130,16 +133,23 @@ impl VaultService {
         if self.initialized() {
             return Err(VaultError::invalid_operation("vault 已初始化，请先 destroy"));
         }
+        // 跨进程写锁：初始化亦是「读-改-写」，与并发会话互斥（见 DataDirLock）。
+        let _lock = DataDirLock::acquire(&self.data_dir)?;
         if let Some(m) = &master {
             if m.len() != KEY_SIZE {
                 return Err(VaultError::argument(format!("主密钥须为 {KEY_SIZE} 字节")));
             }
         }
         self.lockout.clear(self.store());
-        let k = match master {
-            Some(m) => m,
+        // K（crypto 模式即主密钥）短时持有：Zeroizing 保证用后零化。
+        let k = Zeroizing::new(match master {
+            Some(mut m) => {
+                let v = m.clone();
+                m.zeroize();
+                v
+            }
             None => crypto::random_vec(KEY_SIZE)?,
-        };
+        });
         let result = (|| -> Result<()> {
             self.lockout.set_share(self.store(), &k)?;
             let file = VaultFile {
@@ -166,20 +176,21 @@ impl VaultService {
         if self.initialized() {
             return Err(VaultError::invalid_operation("vault 已初始化，请先 destroy"));
         }
+        let _lock = DataDirLock::acquire(&self.data_dir)?;
         self.lockout.clear(self.store());
         let kdf = kdf.unwrap_or(KdfParams::DEFAULT);
         validate_kdf(kdf.m_kib, kdf.t, kdf.p)?;
         let vault_id = crypto::random_vec(format::VAULT_ID_SIZE)?;
         let created = now_ms();
-        let master = crypto::random_vec(KEY_SIZE)?;
+        let master = Zeroizing::new(crypto::random_vec(KEY_SIZE)?);
         let salt = crypto::random_vec(format::SALT_SIZE)?;
         let ad = build_slot_ad(&vault_id, SlotKind::Password);
-        let kek = crypto::argon2id(password, &salt, &ad, kdf, KEY_SIZE)?;
+        let kek = LockedBuffer::take(crypto::argon2id(password, &salt, &ad, kdf, KEY_SIZE)?);
         let slot = format::wrap_slot(
             SlotKind::Password,
             Some(kdf),
             salt,
-            &kek,
+            kek.as_slice(),
             &master,
             &ad,
         )?;
@@ -206,40 +217,53 @@ impl VaultService {
         if self.initialized() {
             return Err(VaultError::invalid_operation("vault 已初始化，请先 destroy"));
         }
+        let _lock = DataDirLock::acquire(&self.data_dir)?;
         self.lockout.clear(self.store());
         let kdf = kdf.unwrap_or(KdfParams::DEFAULT);
         validate_kdf(kdf.m_kib, kdf.t, kdf.p)?;
         let vault_id = crypto::random_vec(format::VAULT_ID_SIZE)?;
         let created = now_ms();
-        let master = crypto::random_vec(KEY_SIZE)?;
+        let master = Zeroizing::new(crypto::random_vec(KEY_SIZE)?);
         let salt = crypto::random_vec(format::SALT_SIZE)?;
-        let mut device_secret = device::create_and_save(&self.data_dir)?;
-        let recovery_bytes = crypto::random_vec(recovery::BYTE_SIZE)?;
+        let device_secret = Zeroizing::new(device::create_and_save(&self.data_dir)?);
+        let recovery_bytes = Zeroizing::new(crypto::random_vec(recovery::BYTE_SIZE)?);
         let code = recovery::encode(&recovery_bytes);
 
         let build = || -> Result<VaultFile> {
             let pd_ad = build_slot_ad(&vault_id, SlotKind::PasswordDevice);
-            let base_kek = crypto::argon2id(password, &salt, &pd_ad, kdf, KEY_SIZE)?;
-            let mut ikm = base_kek.clone();
+            let base_kek = LockedBuffer::take(crypto::argon2id(
+                password, &salt, &pd_ad, kdf, KEY_SIZE,
+            )?);
+            let mut ikm = Zeroizing::new(base_kek.as_slice().to_vec());
             ikm.extend_from_slice(&device_secret);
-            let pd_kek = crypto::hkdf_sha256(&ikm, &salt, PWDEV_INFO.as_bytes(), KEY_SIZE);
+            let pd_kek = LockedBuffer::take(crypto::hkdf_sha256(
+                &ikm,
+                &salt,
+                PWDEV_INFO.as_bytes(),
+                KEY_SIZE,
+            ));
             let pd_slot = format::wrap_slot(
                 SlotKind::PasswordDevice,
                 Some(kdf),
                 salt.clone(),
-                &pd_kek,
+                pd_kek.as_slice(),
                 &master,
                 &pd_ad,
             )?;
 
             let rec_salt = crypto::random_vec(format::SALT_SIZE)?;
             let rec_ad = build_slot_ad(&vault_id, SlotKind::Recovery);
-            let rec_kek = crypto::hkdf_sha256(&recovery_bytes, &rec_salt, RECOVERY_INFO.as_bytes(), KEY_SIZE);
+            let rec_kek = LockedBuffer::take(crypto::hkdf_sha256(
+                &recovery_bytes,
+                &rec_salt,
+                RECOVERY_INFO.as_bytes(),
+                KEY_SIZE,
+            ));
             let rec_slot = format::wrap_slot(
                 SlotKind::Recovery,
                 None,
                 rec_salt,
-                &rec_kek,
+                rec_kek.as_slice(),
                 &master,
                 &rec_ad,
             )?;
@@ -261,12 +285,10 @@ impl VaultService {
             Err(e) => {
                 let _ = std::fs::remove_file(self.vault_path());
                 let _ = device::delete(&self.data_dir);
-                zeroize::Zeroize::zeroize(&mut device_secret);
                 return Err(e);
             }
         };
         let result = format::save(&self.vault_path(), &file, Some(&master));
-        zeroize::Zeroize::zeroize(&mut device_secret);
         if result.is_err() {
             let _ = std::fs::remove_file(self.vault_path());
             let _ = device::delete(&self.data_dir);
@@ -279,16 +301,22 @@ impl VaultService {
         if self.initialized() {
             return Err(VaultError::invalid_operation("vault 已初始化，请先 destroy"));
         }
+        let _lock = DataDirLock::acquire(&self.data_dir)?;
         self.lockout.clear(self.store());
         let vault_id = crypto::random_vec(format::VAULT_ID_SIZE)?;
         let created = now_ms();
-        let master = crypto::random_vec(KEY_SIZE)?;
-        let mut device_secret = device::create_and_save(&self.data_dir)?;
+        let master = Zeroizing::new(crypto::random_vec(KEY_SIZE)?);
+        let device_secret = Zeroizing::new(device::create_and_save(&self.data_dir)?);
         let salt = crypto::random_vec(format::SALT_SIZE)?;
         let ad = build_slot_ad(&vault_id, SlotKind::Device);
-        let kek = crypto::hkdf_sha256(&device_secret, &salt, DEVICE_INFO.as_bytes(), KEY_SIZE);
+        let kek = LockedBuffer::take(crypto::hkdf_sha256(
+            &device_secret,
+            &salt,
+            DEVICE_INFO.as_bytes(),
+            KEY_SIZE,
+        ));
         let build = || -> Result<VaultFile> {
-            let slot = format::wrap_slot(SlotKind::Device, None, salt, &kek, &master, &ad)?;
+            let slot = format::wrap_slot(SlotKind::Device, None, salt, kek.as_slice(), &master, &ad)?;
             Ok(VaultFile {
                 mode: VaultMode::Slots,
                 backend: None,
@@ -306,12 +334,10 @@ impl VaultService {
             Err(e) => {
                 let _ = std::fs::remove_file(self.vault_path());
                 let _ = device::delete(&self.data_dir);
-                zeroize::Zeroize::zeroize(&mut device_secret);
                 return Err(e);
             }
         };
         let result = format::save(&self.vault_path(), &file, Some(&master));
-        zeroize::Zeroize::zeroize(&mut device_secret);
         if result.is_err() {
             let _ = std::fs::remove_file(self.vault_path());
             let _ = device::delete(&self.data_dir);
@@ -324,6 +350,8 @@ impl VaultService {
     pub fn change_kdf(&self, password: &[u8], kdf: KdfParams) -> Result<()> {
         self.ensure_initialized()?;
         validate_kdf(kdf.m_kib, kdf.t, kdf.p)?;
+        // 跨进程写锁：重键同样是「读-改-写」（耗时可达秒级，正是丢失更新最易发生的窗口）。
+        let _lock = DataDirLock::acquire(&self.data_dir)?;
         let mut vault = format::load(&self.vault_path())?;
         if vault.mode != VaultMode::Slots
             || vault.vault_id.is_none()
@@ -350,21 +378,33 @@ impl VaultService {
         let new_salt = crypto::random_vec(format::SALT_SIZE)?;
         let new_nonce = crypto::random_vec(format::NONCE_SIZE)?;
         let device_secret = if slot.kind == SlotKind::PasswordDevice {
-            Some(device::load(&self.data_dir)?)
+            Some(Zeroizing::new(device::load(&self.data_dir)?))
         } else {
             None
         };
 
-        let old_base = crypto::argon2id(password, &slot.salt, &ad, slot.kdf, KEY_SIZE)?;
+        let old_base = LockedBuffer::take(crypto::argon2id(
+            password, &slot.salt, &ad, slot.kdf, KEY_SIZE,
+        )?);
         let old_kek = match &device_secret {
             Some(ds) => {
-                let mut ikm = old_base;
+                let mut ikm = Zeroizing::new(old_base.as_slice().to_vec());
                 ikm.extend_from_slice(ds);
-                crypto::hkdf_sha256(&ikm, &slot.salt, PWDEV_INFO.as_bytes(), KEY_SIZE)
+                LockedBuffer::take(crypto::hkdf_sha256(
+                    &ikm,
+                    &slot.salt,
+                    PWDEV_INFO.as_bytes(),
+                    KEY_SIZE,
+                ))
             }
             None => old_base,
         };
-        let k = crypto::aes256gcm_decrypt(&old_kek, &slot.nonce, &slot.wrapped, &ad)?;
+        let k = Zeroizing::new(crypto::aes256gcm_decrypt(
+            old_kek.as_slice(),
+            &slot.nonce,
+            &slot.wrapped,
+            &ad,
+        )?);
 
         let mac = format::compute_slots_mac(&k, vault.mac_input.as_ref().unwrap());
         if !bool::from(mac.ct_eq(vault.trailer.as_ref().unwrap().as_slice())) {
@@ -373,16 +413,23 @@ impl VaultService {
             ));
         }
 
-        let new_base = crypto::argon2id(password, &new_salt, &ad, kdf, KEY_SIZE)?;
+        let new_base = LockedBuffer::take(crypto::argon2id(
+            password, &new_salt, &ad, kdf, KEY_SIZE,
+        )?);
         let new_kek = match &device_secret {
             Some(ds) => {
-                let mut ikm = new_base;
+                let mut ikm = Zeroizing::new(new_base.as_slice().to_vec());
                 ikm.extend_from_slice(ds);
-                crypto::hkdf_sha256(&ikm, &new_salt, PWDEV_INFO.as_bytes(), KEY_SIZE)
+                LockedBuffer::take(crypto::hkdf_sha256(
+                    &ikm,
+                    &new_salt,
+                    PWDEV_INFO.as_bytes(),
+                    KEY_SIZE,
+                ))
             }
             None => new_base,
         };
-        let wrapped = crypto::aes256gcm_encrypt(&new_kek, &new_nonce, &k, &ad)?;
+        let wrapped = crypto::aes256gcm_encrypt(new_kek.as_slice(), &new_nonce, &k, &ad)?;
         vault.slots[index] = Slot {
             kind: slot.kind,
             kdf,
@@ -395,12 +442,13 @@ impl VaultService {
 
     // ── 解锁 ────────────────────────────────────────────────────────
 
-    /// 重建主密钥到新缓冲（slots：secret/label 语义随因子模式；crypto：整体取回）。
+    /// 重建主密钥到**锁定缓冲**（mlock/VirtualLock；slots：secret/label 语义随因子模式；
+    /// crypto：整体取回）。返回的 [LockedBuffer] 在 drop 时 zeroize + 解锁。
     pub fn load_master_key_into(
         &self,
         secret: Option<&[u8]>,
         label: Option<&str>,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<LockedBuffer> {
         let vault = format::load(&self.vault_path())?;
         if vault.mode == VaultMode::Slots {
             let vault_id = vault.vault_id.clone().ok_or_else(|| {
@@ -416,8 +464,13 @@ impl VaultService {
             let slot_mode = detect_slots_mode(&kinds);
             let (slot, kek) = self.select_slot_and_kek(&vault, slot_mode, secret, label)?;
             let ad = build_slot_ad(&vault_id, slot.kind);
-            let k = crypto::aes256gcm_decrypt(&kek, &slot.nonce, &slot.wrapped, &ad)?;
-            let mac = format::compute_slots_mac(&k, &mac_input);
+            let k = LockedBuffer::take(crypto::aes256gcm_decrypt(
+                kek.as_slice(),
+                &slot.nonce,
+                &slot.wrapped,
+                &ad,
+            )?);
+            let mac = format::compute_slots_mac(k.as_slice(), &mac_input);
             if !bool::from(mac.ct_eq(trailer.as_slice())) {
                 return Err(VaultError::auth_tag(
                     "slots vault 尾部 HMAC 校验失败（header/条目被篡改）",
@@ -438,7 +491,7 @@ impl VaultService {
                 .lockout
                 .get_share(self.store())?
                 .ok_or_else(|| VaultError::ShareMissing(self.store.backend().to_string()))?;
-            return Ok(k);
+            return Ok(LockedBuffer::take(k));
         }
         Err(VaultError::invalid_data("不支持的 vault 模式，拒绝加载"))
     }
@@ -449,7 +502,7 @@ impl VaultService {
         slot_mode: SlotsMode,
         secret: Option<&[u8]>,
         label: Option<&str>,
-    ) -> Result<(Slot, Vec<u8>)> {
+    ) -> Result<(Slot, LockedBuffer)> {
         let vault_id = vault.vault_id.as_ref().unwrap();
         match slot_mode {
             SlotsMode::M1 => {
@@ -466,7 +519,9 @@ impl VaultService {
                     .ok_or_else(|| VaultError::invalid_operation("vault 无口令槽位，无法解锁"))?
                     .clone();
                 let ad = build_slot_ad(vault_id, slot.kind);
-                let kek = crypto::argon2id(secret, &slot.salt, &ad, slot.kdf, KEY_SIZE)?;
+                let kek = LockedBuffer::take(crypto::argon2id(
+                    secret, &slot.salt, &ad, slot.kdf, KEY_SIZE,
+                )?);
                 Ok((slot, kek))
             }
             SlotsMode::M2a => {
@@ -482,9 +537,13 @@ impl VaultService {
                             VaultError::invalid_operation("vault 无恢复槽位，无法用恢复码解锁")
                         })?
                         .clone();
-                    let code_bytes = recovery::decode_utf8(secret)?;
-                    let kek =
-                        crypto::hkdf_sha256(&code_bytes, &slot.salt, RECOVERY_INFO.as_bytes(), KEY_SIZE);
+                    let code_bytes = Zeroizing::new(recovery::decode_utf8(secret)?);
+                    let kek = LockedBuffer::take(crypto::hkdf_sha256(
+                        &code_bytes,
+                        &slot.salt,
+                        RECOVERY_INFO.as_bytes(),
+                        KEY_SIZE,
+                    ));
                     Ok((slot, kek))
                 } else if let Some(l) = label {
                     Err(VaultError::invalid_operation(format!("m2a：未知槽位标签 [{l}]")))
@@ -500,13 +559,19 @@ impl VaultService {
                             VaultError::invalid_operation("vault 无口令+设备槽位，无法解锁")
                         })?
                         .clone();
-                    let mut device_secret = device::load(&self.data_dir)?;
+                    let device_secret = Zeroizing::new(device::load(&self.data_dir)?);
                     let ad = build_slot_ad(vault_id, pd_slot.kind);
-                    let base = crypto::argon2id(secret, &pd_slot.salt, &ad, pd_slot.kdf, KEY_SIZE)?;
-                    let mut ikm = base;
+                    let base = LockedBuffer::take(crypto::argon2id(
+                        secret, &pd_slot.salt, &ad, pd_slot.kdf, KEY_SIZE,
+                    )?);
+                    let mut ikm = Zeroizing::new(base.as_slice().to_vec());
                     ikm.extend_from_slice(&device_secret);
-                    zeroize::Zeroize::zeroize(&mut device_secret);
-                    let kek = crypto::hkdf_sha256(&ikm, &pd_slot.salt, PWDEV_INFO.as_bytes(), KEY_SIZE);
+                    let kek = LockedBuffer::take(crypto::hkdf_sha256(
+                        &ikm,
+                        &pd_slot.salt,
+                        PWDEV_INFO.as_bytes(),
+                        KEY_SIZE,
+                    ));
                     Ok((pd_slot, kek))
                 }
             }
@@ -522,10 +587,13 @@ impl VaultService {
                     .find(|s| s.kind == SlotKind::Device)
                     .ok_or_else(|| VaultError::invalid_operation("vault 无设备槽位，无法解锁"))?
                     .clone();
-                let mut device_secret = device::load(&self.data_dir)?;
-                let kek =
-                    crypto::hkdf_sha256(&device_secret, &slot.salt, DEVICE_INFO.as_bytes(), KEY_SIZE);
-                zeroize::Zeroize::zeroize(&mut device_secret);
+                let device_secret = Zeroizing::new(device::load(&self.data_dir)?);
+                let kek = LockedBuffer::take(crypto::hkdf_sha256(
+                    &device_secret,
+                    &slot.salt,
+                    DEVICE_INFO.as_bytes(),
+                    KEY_SIZE,
+                ));
                 Ok((slot, kek))
             }
             SlotsMode::None => Err(VaultError::invalid_data(
@@ -537,15 +605,17 @@ impl VaultService {
     // ── 会话持钥路径 ────────────────────────────────────────────────
 
     pub fn get_or_create_auth_anchor(&self, master: &[u8]) -> Result<Vec<u8>> {
+        // 跨进程写锁：首次会**写入**锚点条目（读-改-写）。
+        let _lock = DataDirLock::acquire(&self.data_dir)?;
         let mut vault = format::load(&self.vault_path())?;
         if let Some(entry) = vault.entries.iter().find(|e| e.uid == AUTH_UID) {
             return format::decrypt_entry(entry, master);
         }
-        let t = crypto::random_vec(16)?;
+        let t = Zeroizing::new(crypto::random_vec(16)?);
         let entry = format::encrypt_entry(AUTH_UID, &t, master)?;
         vault.entries.push(entry);
         format::save(&self.vault_path(), &vault, Some(master))?;
-        Ok(t)
+        Ok(t.to_vec())
     }
 
     pub fn get_with(&self, uid: &str, master: &[u8]) -> Result<Option<Vec<u8>>> {
@@ -557,6 +627,8 @@ impl VaultService {
     }
 
     pub fn set_with(&self, uid: &str, plaintext: &[u8], master: &[u8]) -> Result<()> {
+        // 跨进程写锁：加载 → 改 → 保存 必须原子（否则并发会话静默丢更新）。
+        let _lock = DataDirLock::acquire(&self.data_dir)?;
         let mut vault = format::load(&self.vault_path())?;
         vault.entries.retain(|e| e.uid != uid);
         let entry = format::encrypt_entry(uid, plaintext, master)?;
@@ -565,6 +637,7 @@ impl VaultService {
     }
 
     pub fn delete_with(&self, uid: &str, master: &[u8]) -> Result<bool> {
+        let _lock = DataDirLock::acquire(&self.data_dir)?;
         let mut vault = format::load(&self.vault_path())?;
         let before = vault.entries.len();
         vault.entries.retain(|e| e.uid != uid);
@@ -577,10 +650,23 @@ impl VaultService {
 
     /// 全量销毁：份额 + vault 文件 + `.bak` + `device.key` + 锁定状态。
     pub fn destroy(&self) -> Result<()> {
+        // 跨进程写锁：销毁与其它会话的写互斥（保留 `vault.lock` 本身，见 safefile::LOCK_NAME）。
+        let _lock = DataDirLock::acquire(&self.data_dir)?;
         self.lockout.delete_share(self.store())?;
         let path = self.vault_path();
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(format!("{path}.bak"));
+        // 遗留临时文件（`<vault>.tmp` 与带 pid 的 `<vault>.tmp.<pid>`）：一并清理，
+        // 避免崩溃残留长期堆积（内容为密文，但没必要留）。
+        if let Ok(entries) = std::fs::read_dir(&self.data_dir) {
+            for e in entries.flatten() {
+                let name = e.file_name();
+                let name = name.to_string_lossy();
+                if name.starts_with(&format!("{VAULT_FILE_NAME}.tmp")) {
+                    let _ = std::fs::remove_file(e.path());
+                }
+            }
+        }
         device::delete(&self.data_dir)?;
         self.lockout.clear(self.store());
         Ok(())

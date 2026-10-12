@@ -60,10 +60,11 @@ echo "[build-macos] ===== scanner (NativeAOT, RID=$RID) ====="
 bash "$ROOT/scanner/build.sh" "$RID"
 
 echo "[build-macos] ===== vault (Rust 静态链接, vault-rs, universal) ====="
-# vault-rs：Rust 重实现（OS 授权份额存 Keychain；容器格式与 C# 版字节/协议兼容）。
+# vault-rs：Rust 实现（OS 授权份额存 Keychain；容器格式由 testdata/ 黄金夹具锚定字节兼容）。
 # 逐架构构建后 lipo 成 universal（与 archoerashell 的 universal 处理同构）；
 # Runner.xcodeproj 的拷贝阶段与 CI bundle 步骤均从 core/vault-rs/build/ 取。
-# macOS 已不再使用 C# NativeAOT vault（core/vault/**）。
+# macOS 已不再使用 C# NativeAOT vault（app/core/vault/** 已于 2026-10-12 删除，
+# 字节兼容改由 app/core/vault-rs/testdata/ 黄金夹具锚定）。
 # 目标架构已由 CI（rustup target add）或本地 rustup 预装；此处幂等兜底。
 for _t in aarch64-apple-darwin x86_64-apple-darwin; do
   rustup target add "$_t" >/dev/null 2>&1 || true

@@ -13,8 +13,6 @@
 //! slot : kind(1B) | m(u32) | t(u32) | p(u32) | salt(16B) | nonce(12B) | wrapped_len(u16) | wrapped
 //! ```
 
-use std::fs;
-use std::io::Write;
 use std::path::Path;
 
 use crate::crypto::{self, KdfParams};
@@ -305,13 +303,23 @@ fn read_entries(cur: &mut Cur, file: &mut VaultFile, raw_len: usize) -> Result<(
 }
 
 fn read_all(path: &str) -> Result<Vec<u8>> {
-    let meta = fs::metadata(path)?;
-    if meta.len() > MAX_FILE_SIZE {
+    // 拒绝符号链接 / 非普通文件（防「重定向读取」），并按上限**在读取前**判定长度
+    // （防植入超大文件把内容读进内存 → OOM）。
+    let raw = match crate::safefile::read_regular_limited(Path::new(path), MAX_FILE_SIZE)? {
+        Some(v) => v,
+        None => {
+            return Err(VaultError::from(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("vault 文件不存在：{path}"),
+            )))
+        }
+    };
+    if raw.len() as u64 > MAX_FILE_SIZE {
         return Err(VaultError::invalid_data(
             "vault 文件过大（可能被恶意填充），拒绝加载",
         ));
     }
-    Ok(fs::read(path)?)
+    Ok(raw)
 }
 
 /// 仅读文件头（serve 握手前判定模式用；不加载任何密文）。
@@ -484,12 +492,11 @@ fn write_body_core(file: &VaultFile) -> Result<Vec<u8>> {
 }
 
 /// 保存（原子写 + `.bak` 备份）。`master_key` 仅 slots 模式使用（尾部 HMAC）。
+///
+/// 走 [crate::safefile::write_atomic]：tmp 独占创建（不跟随符号链接）、FIFO/符号链接
+/// 一律拒绝；`.bak` 亦为原子写（旧实现用 `fs::copy` 会跟随目标符号链接写到任意文件）。
 pub fn save(path: &str, file: &VaultFile, master_key: Option<&[u8]>) -> Result<()> {
-    if let Some(dir) = Path::new(path).parent() {
-        if !dir.as_os_str().is_empty() {
-            fs::create_dir_all(dir)?;
-        }
-    }
+    let p = Path::new(path);
     let body = write_body_core(file)?;
     let mut content = body.clone();
     if file.mode == VaultMode::Slots {
@@ -505,23 +512,38 @@ pub fn save(path: &str, file: &VaultFile, master_key: Option<&[u8]>) -> Result<(
         content.extend_from_slice(&mac);
     }
 
-    let tmp = format!("{path}.tmp");
-    {
-        let mut f = fs::File::create(&tmp)?;
-        f.write_all(&content)?;
-        f.flush()?;
-        f.sync_all()?;
+    // 整库容量校验（写入侧）：超过 [MAX_FILE_SIZE] 会使库**此后无法加载**（同上，
+    // 属可用性自毁），故在落盘前拒绝，磁盘保持原样。
+    if content.len() as u64 > MAX_FILE_SIZE {
+        return Err(VaultError::argument(format!(
+            "凭据库已达容量上限（{} B，含尾部校验）：本次写入 {} B 会被拒绝；请删除不再需要的条目",
+            MAX_FILE_SIZE,
+            content.len()
+        )));
     }
-    // 保留上一版为 .bak（复制而非移动；失败不阻断保存）。
-    if Path::new(path).exists() {
-        let _ = fs::copy(path, format!("{path}.bak"));
+    // 保留上一版为 .bak（best-effort：备份失败不阻断保存）。
+    if p.exists() {
+        let _ = crate::safefile::backup_best_effort(p);
     }
-    fs::rename(&tmp, path)?;
-    Ok(())
+    crate::safefile::write_atomic(p, &content, false)
 }
 
 /// 加密单条凭据（独立 salt/nonce，AES-256-GCM，无 AD）。
+///
+/// **写入侧容量校验**：单条密文（明文 + 16B 认证标签）不得超过 [MAX_ENTRY_BYTES]。
+/// 加载侧同样有该上限；若只在加载侧校验，一次超限写入会「成功」却让库此后**无法加载**
+/// （fail-closed 自锁，只能靠 `.bak` 救）——实测 4096 KiB 明文即可击穿。故此处**在落盘前**
+/// 拒绝，返回明确错误且**不改动磁盘**。
 pub fn encrypt_entry(uid: &str, plaintext: &[u8], master_key: &[u8]) -> Result<Entry> {
+    if plaintext.len() + TAG_SIZE > MAX_ENTRY_BYTES as usize {
+        return Err(VaultError::argument(format!(
+            "单条凭据过大：密文上限 {} B（明文上限 {} B，含 {} B GCM 认证标签），当前明文 {} B",
+            MAX_ENTRY_BYTES,
+            MAX_ENTRY_BYTES as usize - TAG_SIZE,
+            TAG_SIZE,
+            plaintext.len()
+        )));
+    }
     let salt = crypto::random_vec(SALT_SIZE)?;
     let nonce = crypto::random_vec(NONCE_SIZE)?;
     let ciphertext = crypto::aes256gcm_encrypt(master_key, &nonce, plaintext, &[])?;

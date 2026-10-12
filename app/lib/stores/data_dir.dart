@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import '../utils/safe_file.dart';
 
 /// 应用数据根目录（按平台约定）：
 ///   - Linux：`~/.local/share/ArchoeraMusic`（XDG）
@@ -39,9 +40,9 @@ String resolveDataDir() {
 /// 「仅目录整理」等需要默认目标目录的功能使用本函数。
 String defaultMusicDir() {
   try {
-    final f = File('${resolveDataDir()}/scan_dirs.json');
-    if (f.existsSync()) {
-      final dirs = (jsonDecode(f.readAsStringSync()) as List<dynamic>)
+    final text = SafeFile.readString('${resolveDataDir()}/scan_dirs.json');
+    if (text != null) {
+      final dirs = (jsonDecode(text) as List<dynamic>)
           .whereType<String>()
           .where((d) => d.trim().isNotEmpty)
           .toList();
@@ -66,9 +67,9 @@ String defaultDownloadRoot() {
 /// 文件缺失/损坏/无有效目录时返回空列表，不抛异常。
 List<String> scanDirs() {
   try {
-    final f = File('${resolveDataDir()}/scan_dirs.json');
-    if (!f.existsSync()) return const [];
-    return (jsonDecode(f.readAsStringSync()) as List<dynamic>)
+    final text = SafeFile.readString('${resolveDataDir()}/scan_dirs.json');
+    if (text == null) return const [];
+    return (jsonDecode(text) as List<dynamic>)
         .whereType<String>()
         .map((d) => d.trim())
         .where((d) => d.isNotEmpty)

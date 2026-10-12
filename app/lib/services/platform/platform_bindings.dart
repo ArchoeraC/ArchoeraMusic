@@ -14,7 +14,6 @@ library;
 
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:io' show File;
 import 'dart:ui' show Color;
 
 import 'package:ffi/ffi.dart';
@@ -23,6 +22,7 @@ import '../log/log.dart';
 import '../native_integrity.dart';
 import '../native_lib_paths.dart';
 import 'system_media.dart';
+import '../../utils/safe_file.dart';
 
 // ── 常量（对齐 archoera_platform.h）───────────────────────────────
 
@@ -737,10 +737,8 @@ class PlatformBindings {
     if (artUrl.startsWith('http://') || artUrl.startsWith('https://')) return;
     final path = artUrl.startsWith('file://') ? artUrl.substring(7) : artUrl;
     try {
-      final f = File(path);
-      if (!f.existsSync()) return;
-      final bytes = f.readAsBytesSync();
-      if (bytes.isEmpty) return;
+      final bytes = SafeFile.readBytes(path, maxBytes: 64 << 20);
+      if (bytes == null || bytes.isEmpty) return;
       final buf = malloc.allocate<Uint8>(bytes.length);
       buf.asTypedList(bytes.length).setAll(0, bytes);
       sink.add(buf);

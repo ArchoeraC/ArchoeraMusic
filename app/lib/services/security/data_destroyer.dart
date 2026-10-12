@@ -32,6 +32,7 @@ import 'package:ffi/ffi.dart';
 
 import '../../stores/data_dir.dart';
 import '../subsonic/subsonic_bindings.dart';
+import '../../utils/safe_file.dart';
 
 /// 覆盖写入遍数（越多越难恢复，3 遍已可对抗常规数据恢复工具）。
 const int shredPasses = 3;
@@ -78,10 +79,14 @@ String userDbPath() => '${resolveDataDir()}/database/user.db';
 /// 覆盖用 [Random.secure] 随机字节分块写入，每遍 [flushSync] 落盘；
 /// 文件被占用等导致删除失败时静默（尽力而为，不抛异常）。
 ShredResult shredFile(String path, {int passes = shredPasses}) {
-  final f = File(path);
-  if (!f.existsSync()) {
-    return ShredResult(path: path, existed: false, shredded: false);
+  // 安全前置：只擦除**普通文件**（不跟随符号链接）——否则「顺链覆盖写」会把链接指向的
+  // 任意文件抹掉；FIFO / 目录 / 设备同样不得进入覆盖流程。
+  if (!SafeFile.isRegularFile(path, allowSymlink: false)) {
+    final existed = FileSystemEntity.typeSync(path, followLinks: false) !=
+        FileSystemEntityType.notFound;
+    return ShredResult(path: path, existed: existed, shredded: false);
   }
+  final f = File(path);
   final len = f.lengthSync();
   final rng = Random.secure();
   var deleted = false;
@@ -216,12 +221,22 @@ List<ShredResult> destroySensitiveFiles(
   List<String> paths, {
   int passes = shredPasses,
 }) {
-  final go = goShredFiles(paths, passes: passes);
+  // 安全前置：只把**普通文件**交给 Go 代理 —— Go 侧是「覆盖写 + 删除」，若路径被替换为
+  // 符号链接，覆盖写会**顺着链接抹掉目标文件**。非普通文件（符号链接/目录/FIFO）不走代理，
+  // 由核心 [shredFile] 逐项处理（其自身拒绝非普通文件并回报 shredded=false 供 UI 告警）。
+  bool regular(String p) => SafeFile.isRegularFile(p, allowSymlink: false);
+  final viaGo = [for (final p in paths) if (regular(p)) p];
+  final viaCore = [for (final p in paths) if (!regular(p)) p];
+
+  if (viaGo.isEmpty) {
+    return [for (final p in paths) shredFile(p, passes: passes)];
+  }
+  final go = goShredFiles(viaGo, passes: passes);
   if (go == null) {
     // Go 代理不可用：核心直接销毁全部
     return [for (final p in paths) shredFile(p, passes: passes)];
   }
-  // Go 已确认：对 failed 项核心介入兜底，成功项采纳 Go 结果
+  // Go 已确认：对 failed 项核心介入兜底，成功项采纳 Go 结果；非普通文件由核心回报。
   return [
     for (final gf in go.files)
       if (gf.existed && !gf.shredded)
@@ -233,5 +248,6 @@ List<ShredResult> destroySensitiveFiles(
           shredded: gf.shredded,
           bytes: gf.bytes,
         ),
+    for (final p in viaCore) shredFile(p, passes: passes),
   ];
 }

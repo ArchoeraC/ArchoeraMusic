@@ -4,12 +4,13 @@
 
 //! 按需会话（与 C# ServeSession.cs 协议一致）：血缘校验 → 握手 → 命令循环 → 自退。
 
-use std::io::Write;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::encoding::{b64_decode, b64_encode};
 use crate::errors::{Result, VaultError};
 use crate::format::SlotsMode;
 use crate::guard;
+use crate::memguard::LockedBuffer;
 use crate::service::{VaultService, AUTH_UID};
 use crate::MARKER;
 
@@ -22,7 +23,11 @@ pub enum ReadErr {
     Io,
 }
 
-/// 行缓冲读取器（fd 上阻塞读 + 单次超时；无忙轮询）。
+/// 行缓冲读取器（fd 上阻塞读 + 单次超时）。
+///
+/// 超时语义**不引入轮询**：每轮迭代都阻塞在 `poll(2)` 上由内核挂起，仅在
+/// 「数据到达」事件或「单一截止时刻」到期时被唤醒；`loop` 只用于把已到达的字节
+/// 拼到完整一行（无自旋、无周期性唤醒、无 CPU 空转）。
 #[cfg(unix)]
 pub struct LineReader {
     fd: i32,
@@ -45,10 +50,16 @@ impl LineReader {
         loop {
             if let Some(idx) = self.buf[self.start..].iter().position(|&b| b == b'\n') {
                 let end = self.start + idx;
-                let line = self.buf[self.start..end].to_vec();
+                // 行字节（可能含口令/明文负载）先零化再返回解码结果。
+                let decoded = {
+                    let mut line = self.buf[self.start..end].to_vec();
+                    let d = decode_line(&line);
+                    line.zeroize();
+                    d
+                };
                 self.start = end + 1;
                 self.compact();
-                return Ok(Some(decode_line(&line)));
+                return Ok(Some(decoded));
             }
             let mut pfd = libc::pollfd {
                 fd: self.fd,
@@ -69,10 +80,15 @@ impl LineReader {
             }
             if n == 0 {
                 if self.start < self.buf.len() {
-                    let line = self.buf[self.start..].to_vec();
+                    let decoded = {
+                        let mut line = self.buf[self.start..].to_vec();
+                        let d = decode_line(&line);
+                        line.zeroize();
+                        d
+                    };
                     self.start = self.buf.len();
                     self.compact();
-                    return Ok(Some(decode_line(&line)));
+                    return Ok(Some(decoded));
                 }
                 return Ok(None);
             }
@@ -81,6 +97,10 @@ impl LineReader {
     }
 
     fn compact(&mut self) {
+        // 已消费区间可能含口令/明文负载：丢弃前零化（缓冲区本身仍会被后续复用）。
+        if self.start > 0 {
+            self.buf[..self.start].zeroize();
+        }
         if self.start > 0 && self.start == self.buf.len() {
             self.buf.clear();
             self.start = 0;
@@ -91,52 +111,196 @@ impl LineReader {
     }
 }
 
-#[cfg(unix)]
+/// 行尾 `\r\n` 剥离 + 宽松 UTF-8 解码（unix / Windows 两分支共用，语义一致）。
 fn decode_line(line: &[u8]) -> String {
     let mut l = line;
-    if l.last() == Some(&b'\r') {
+    while l.last() == Some(&b'\n') || l.last() == Some(&b'\r') {
         l = &l[..l.len() - 1];
     }
     String::from_utf8_lossy(l).into_owned()
 }
 
-/// 非 unix（Windows）回退：标准输入阻塞读取（无超时；V1 最小路径，保证编译）。
+/// 非 unix（Windows）实现：专用读线程 + 事件唤醒的定时等待。
+///
+/// 语义与 C# `Console.In.ReadLineAsync().WaitAsync(seconds)` 对齐（C# 内部同样是
+/// 「工作线程阻塞读 + 定时等待」，Windows 匿名管道不支持 overlapped I/O，无法用
+/// `WaitForSingleObject` 直接等 stdin）：读线程在**原始句柄**上阻塞 `ReadFile`，主线程在
+/// 通道上按**单一截止时刻**等待——仅由「行到达」事件或「截止时刻到期」唤醒。
+/// **不引入轮询**：无自旋、无周期唤醒、无 CPU 空转（空闲实测 0.00% 单核）。
+///
+/// 为何不用 `std::io::stdin()`：`StdinLock` 内部持有**不受我们控制的 8 KiB 行缓冲**，
+/// 读过的口令/明文负载会滞留在那里（实测内存扫描可命中）；因此改为 `ReadFile` 读进
+/// **自有缓冲**，逐行切分后立即零化（与非 unix 侧一致的「原始读 + 自管缓冲」模型）。
 #[cfg(not(unix))]
 pub struct LineReader {
-    inner: std::io::BufReader<std::io::Stdin>,
+    rx: std::sync::mpsc::Receiver<LineMsg>,
+}
+
+#[cfg(not(unix))]
+enum LineMsg {
+    Line(String),
+    Eof,
+    Err,
+}
+
+/// 原始 stdin 句柄阻塞读（返回读到的字节数；0 = EOF）。
+#[cfg(windows)]
+fn read_stdin_raw(buf: &mut [u8]) -> std::io::Result<usize> {
+    use windows::Win32::Storage::FileSystem::ReadFile;
+    use windows::Win32::System::Console::{GetStdHandle, STD_INPUT_HANDLE};
+    let handle = unsafe { GetStdHandle(STD_INPUT_HANDLE) }
+        .map_err(|e| std::io::Error::other(format!("GetStdHandle 失败：{}", e.code().0)))?;
+    let handle: windows::Win32::Foundation::HANDLE = handle;
+    let mut n = 0u32;
+    unsafe {
+        ReadFile(handle, Some(buf), Some(&mut n), None)
+            .map_err(|e| std::io::Error::other(format!("ReadFile 失败：{}", e.code().0)))?;
+    }
+    Ok(n as usize)
+}
+
+#[cfg(all(not(unix), not(windows)))]
+fn read_stdin_raw(buf: &mut [u8]) -> std::io::Result<usize> {
+    use std::io::Read;
+    std::io::stdin().read(buf)
 }
 
 #[cfg(not(unix))]
 impl LineReader {
     pub fn new(_fd: i32) -> Self {
-        Self {
-            inner: std::io::BufReader::new(std::io::stdin()),
-        }
+        let (tx, rx) = std::sync::mpsc::channel();
+        // 读线程在进程生命周期内阻塞在读系统调用上（事件驱动，不轮询）；
+        // 会话结束由 main 的 process::exit 一并终止（无需唤醒/回收）。
+        let _ = std::thread::Builder::new()
+            .name("vault-stdin".into())
+            .spawn(move || {
+                let mut pending: Vec<u8> = Vec::new(); // 自管累计缓冲（消费后零化）
+                let mut chunk = [0u8; 4096]; // 读系统调用临时缓冲（用后零化）
+                loop {
+                    // 先看累计缓冲里是否已有完整行（一次读可能带回多行）。
+                    if let Some(idx) = pending.iter().position(|&b| b == b'\n') {
+                        let end = idx + 1;
+                        let emitted = {
+                            let mut line = pending[..end].to_vec();
+                            let d = decode_line(&line);
+                            line.zeroize();
+                            d
+                        };
+                        pending[..end].zeroize(); // 消费区间零化后再移除
+                        pending.drain(..end);
+                        if tx.send(LineMsg::Line(emitted)).is_err() {
+                            return;
+                        }
+                        continue;
+                    }
+                    match read_stdin_raw(&mut chunk) {
+                        Ok(0) => {
+                            // EOF：余下无换行的尾巴按一行处理（与 unix 分支一致）。
+                            if !pending.is_empty() {
+                                let emitted = {
+                                    let mut line = std::mem::take(&mut pending);
+                                    let d = decode_line(&line);
+                                    line.zeroize();
+                                    d
+                                };
+                                let _ = tx.send(LineMsg::Line(emitted));
+                            }
+                            let _ = tx.send(LineMsg::Eof);
+                            return;
+                        }
+                        Ok(n) => {
+                            pending.extend_from_slice(&chunk[..n]);
+                            chunk[..n].zeroize();
+                        }
+                        Err(_) => {
+                            let _ = tx.send(LineMsg::Err);
+                            return;
+                        }
+                    }
+                }
+            });
+        Self { rx }
     }
 
-    pub fn read_line(&mut self, _timeout_ms: i32) -> std::result::Result<Option<String>, ReadErr> {
-        use std::io::BufRead;
-        let mut s = String::new();
-        match self.inner.read_line(&mut s) {
-            Ok(0) => Ok(None),
-            Ok(_) => {
-                while s.ends_with('\n') || s.ends_with('\r') {
-                    s.pop();
-                }
-                Ok(Some(s))
+    pub fn read_line(&mut self, timeout_ms: i32) -> std::result::Result<Option<String>, ReadErr> {
+        use std::sync::mpsc::RecvTimeoutError;
+        // 定时等待走条件变量（内核挂起，由 send 事件或到期唤醒），非轮询。
+        let msg = if timeout_ms > 0 {
+            match self
+                .rx
+                .recv_timeout(std::time::Duration::from_millis(timeout_ms as u64))
+            {
+                Ok(m) => m,
+                Err(RecvTimeoutError::Timeout) => return Err(ReadErr::Timeout),
+                // 读线程已退出（EOF/错误后又到达此处）：按 EOF 处理。
+                Err(RecvTimeoutError::Disconnected) => LineMsg::Eof,
             }
-            Err(_) => Err(ReadErr::Io),
+        } else {
+            self.rx.recv().unwrap_or(LineMsg::Eof)
+        };
+        match msg {
+            LineMsg::Line(s) => Ok(Some(s)),
+            LineMsg::Eof => Ok(None),
+            LineMsg::Err => Err(ReadErr::Io),
         }
     }
 }
 
-/// 输出一行到 stdout 并 flush。
+/// 输出一行到 stdout。
+///
+/// 经 [`emit_bytes`] **直接写句柄**（不经过 `std::io::stdout()` 的全局行缓冲）：
+/// 该缓冲曾把应答明文（`get` 的 base64 值、初始化输出的恢复码）留在堆上。
 pub fn emit(s: &str) {
-    let stdout = std::io::stdout();
-    let mut lock = stdout.lock();
-    let _ = lock.write_all(s.as_bytes());
-    let _ = lock.write_all(b"\n");
-    let _ = lock.flush();
+    emit_bytes(s.as_bytes());
+    emit_bytes(b"\n");
+}
+
+/// 直接写标准输出句柄（unix fd 1 / Windows `STD_OUTPUT_HANDLE`）。
+///
+/// 只借用句柄、不接管所有权（`ManuallyDrop`），失败静默（协议层由应答缺失体现）。
+pub fn emit_bytes(buf: &[u8]) {
+    #[cfg(unix)]
+    {
+        let mut off = 0usize;
+        while off < buf.len() {
+            // SAFETY: 向 fd 1 写入 buf[off..] 的字节；返回写入量或 -1。
+            let n = unsafe {
+                libc::write(
+                    1,
+                    buf[off..].as_ptr() as *const libc::c_void,
+                    buf.len() - off,
+                )
+            };
+            if n <= 0 {
+                return;
+            }
+            off += n as usize;
+        }
+    }
+    #[cfg(windows)]
+    {
+        use std::io::Write;
+        use std::mem::ManuallyDrop;
+        use std::os::windows::io::FromRawHandle;
+        use windows::Win32::System::Console::{GetStdHandle, STD_OUTPUT_HANDLE};
+        // SAFETY: 只借用标准输出句柄（ManuallyDrop 保证不关闭它）。
+        let handle = match unsafe { GetStdHandle(STD_OUTPUT_HANDLE) } {
+            Ok(h) if !h.is_invalid() => h,
+            _ => return,
+        };
+        let mut f = ManuallyDrop::new(unsafe {
+            std::fs::File::from_raw_handle(handle.0 as *mut core::ffi::c_void)
+        });
+        let _ = f.write_all(buf);
+        let _ = f.flush();
+    }
+    #[cfg(all(not(unix), not(windows)))]
+    {
+        use std::io::Write;
+        let mut out = std::io::stdout().lock();
+        let _ = out.write_all(buf);
+        let _ = out.flush();
+    }
 }
 
 enum DispatchResult {
@@ -185,12 +349,12 @@ impl ServeSession {
         let mut reader = LineReader::new(0);
 
         // ── 握手 ──
-        let line = match reader.read_line(HANDSHAKE_TIMEOUT_SECONDS * 1000) {
+        let line = Zeroizing::new(match reader.read_line(HANDSHAKE_TIMEOUT_SECONDS * 1000) {
             Ok(Some(l)) => l,
             Ok(None) => String::new(),
             Err(ReadErr::Timeout) => return fail("握手超时"),
             Err(ReadErr::Io) => return fail("握手读取失败"),
-        };
+        });
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < min_fields || parts.len() > max_fields || parts[0] != "handshake" {
             return fail(&handshake_usage(mode, slot_mode));
@@ -205,7 +369,7 @@ impl ServeSession {
         };
         let secret = if parts.len() >= 4 {
             match b64_decode(parts[3]) {
-                Ok(v) => Some(v),
+                Ok(v) => Some(LockedBuffer::take(v)),
                 Err(_) => return fail("握手负载非 base64"),
             }
         } else {
@@ -235,11 +399,11 @@ impl ServeSession {
             return fail(&VaultError::Lockout(secs).message());
         }
 
-        let unlocked = (|| -> Result<(Vec<u8>, Vec<u8>)> {
+        let unlocked = (|| -> Result<(LockedBuffer, Vec<u8>)> {
             let master = self
                 .service
-                .load_master_key_into(secret.as_deref(), label.as_deref())?;
-            let anchor = self.service.get_or_create_auth_anchor(&master)?;
+                .load_master_key_into(secret.as_ref().map(|s| s.as_slice()), label.as_deref())?;
+            let anchor = self.service.get_or_create_auth_anchor(master.as_slice())?;
             Ok((master, anchor))
         })();
         let (master, anchor) = match unlocked {
@@ -270,13 +434,13 @@ impl ServeSession {
 
         // ── 命令循环 ──
         loop {
-            let cmd = match reader.read_line(IDLE_TIMEOUT_SECONDS * 1000) {
+            let cmd = Zeroizing::new(match reader.read_line(IDLE_TIMEOUT_SECONDS * 1000) {
                 Ok(Some(l)) => l,
                 Ok(None) => return 0,
                 Err(ReadErr::Timeout) => return 0,
                 Err(ReadErr::Io) => return 0,
-            };
-            match self.dispatch(&cmd, &master, &mut reader) {
+            });
+            match self.dispatch(&cmd, master.as_slice(), &mut reader) {
                 DispatchResult::Quit => return 0,
                 DispatchResult::Continue => {}
             }
@@ -330,7 +494,13 @@ impl ServeSession {
     fn handle_get(&self, uid: &str, master: &[u8]) -> DispatchResult {
         match self.service.get_with(uid, master) {
             Ok(None) => emit("ok null"),
-            Ok(Some(got)) => emit(&format!("ok {}", b64_encode(&got))),
+            Ok(Some(got)) => {
+                // 解出的明文进锁定缓冲（mlock/VirtualLock）；base64 响应串用零化包装。
+                // 原先两者均直接 drop，会以明文残留在堆上。
+                let got = LockedBuffer::take(got);
+                let resp = Zeroizing::new(format!("ok {}", b64_encode(got.as_slice())));
+                emit(&resp);
+            }
             Err(e) => return err(&e.message()),
         }
         DispatchResult::Continue
@@ -340,19 +510,20 @@ impl ServeSession {
         if uid == AUTH_UID {
             return err("保留 uid，拒绝写入");
         }
-        let payload = match reader.read_line(IDLE_TIMEOUT_SECONDS * 1000) {
+        // 负载行与解码后的明文都短时持有（Zeroizing 用后零化）。
+        let payload = Zeroizing::new(match reader.read_line(IDLE_TIMEOUT_SECONDS * 1000) {
             Ok(Some(p)) => p,
             Err(ReadErr::Timeout) => return err("set 负载读取超时"),
             _ => return err("set 缺少 stdin 负载行（base64）"),
-        };
+        });
         if payload.is_empty() {
             return err("set 缺少 stdin 负载行（base64）");
         }
-        let plain = match b64_decode(&payload) {
+        let plain = LockedBuffer::take(match b64_decode(&payload) {
             Ok(p) => p,
             Err(_) => return err("set 负载非 base64"),
-        };
-        match self.service.set_with(uid, &plain, master) {
+        });
+        match self.service.set_with(uid, plain.as_slice(), master) {
             Ok(()) => emit("ok"),
             Err(e) => return err(&e.message()),
         }

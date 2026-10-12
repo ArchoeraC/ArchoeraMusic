@@ -57,11 +57,6 @@ app/core/downloader/target/
 # shell（Rust 内嵌原生 CLI staticlib，链入 runner）
 app/core/shell/target/
 
-# vault（C# NativeAOT 凭据保险库；build*/ 由 build.sh / build-test.sh 产出）
-app/core/vault/build/
-app/core/vault/src/build/
-app/core/vault/src/bin/
-app/core/vault/src/obj/
 
 # vault-rs（Rust 静态凭据保险库；cargo target/ + build.sh / build-test.sh 产物）
 app/core/vault-rs/target/
@@ -81,6 +76,9 @@ packaging/linux/work/
 *.log
 
 *.key
+# 例外：vault 格式「黄金夹具」中的测试密钥（公开测试凭据，非真实凭据；
+# 见 app/core/vault-rs/testdata/README.md）——需入库冻结以锚定字节兼容性。
+!app/core/vault-rs/testdata/**/*.key
 # 防伪签名私钥（绝不入库；公钥 watermark_pub*.pem 需跟踪）
 *_priv.pem
 *_priv.key

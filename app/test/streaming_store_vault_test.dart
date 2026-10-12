@@ -17,10 +17,10 @@ import 'package:archoera_music/services/streaming/streaming_types.dart';
 ///   4. destroy 后 vault 文件消失（密文不可恢复）
 ///
 /// 运行前提（headless 无 Secret Service 时）：
-///   ARCHOERA_VAULT_BIN=core/vault/build/archoera-vault-test
+///   ARCHOERA_VAULT_BIN=core/vault-rs/build/archoera-vault-test
 ///   ARCHOERA_VAULT_BACKEND=file
 ///   （指向测试构建 + 选择生产 FileStore 文件密钥后端；先跑
-///   core/vault/build-test.sh。SEC-19 后不再有测试明文存储后门）。
+///   core/vault-rs/build-test.sh。SEC-19 后不再有测试明文存储后门）。
 void main() {
   late Directory tmp;
 

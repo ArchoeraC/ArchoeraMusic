@@ -17,12 +17,25 @@ import 'package:archoera_music/services/security/vault_process.dart';
 ///   5. v4 后端指纹不配对 → serve 报 SHARE_BACKEND_MISMATCH（明确错误码）
 ///
 /// 运行前提（headless 无 Secret Service 时）：
-///   ARCHOERA_VAULT_BIN=core/vault/build/archoera-vault-test
+///   ARCHOERA_VAULT_BIN=core/vault-rs/build/archoera-vault-test
 ///   ARCHOERA_VAULT_BACKEND=file
 ///   （指向测试构建 + 选择生产 FileStore 文件密钥后端；先跑
-///   core/vault/build-test.sh。SEC-19 后不再有测试明文存储后门）。
+///   core/vault-rs/build-test.sh。SEC-19 后不再有测试明文存储后门）。
 ///   crash 用例建议 ARCHOERA_VAULT_NO_ABORT=1（否则 fail-closed 会终止测试进程）。
 void main() {
+  // 退出码 → 标记契约（纯函数，无需 vault 二进制）：这里固化「沙箱被蓄意破坏（87）
+  // 与信号终止同等致命」——vault 侧检测到可观测的蓄意破坏即自毁退出 87，
+  // 本层据此写 crash 标记并 exit(86) 连带主程序退出；而解锁失败等「主动报错退出」
+  // 仍只记 fail（不联动，避免攻击者用坏文件逼应用自杀）。
+  test('退出码→标记：87 = 沙箱被破坏（致命）；1 = 主动报错（不联动）', () {
+    expect(VaultProcess.sandboxBreachExit, 87, reason: '须与 vault guard 侧常量对齐');
+    expect(VaultProcess.markerForExit(0, normal: true), 'ok');
+    expect(VaultProcess.markerForExit(1, normal: true), 'fail');
+    expect(VaultProcess.markerForExit(87, normal: true), 'crash');
+    expect(VaultProcess.markerForExit(-1, normal: false), 'crash');
+    expect(VaultProcess.markerForExit(0, normal: false), 'crash');
+  });
+
   // 标记校验类用例要求 ARCHOERA_VAULT_BIN 指向 TEST 构建（见文件头运行前提）；
   // 未设置时 dev 兜底会解析到 PROD 二进制 → 标记断言必然失败，跳过（CI 会设）。
   final skipNoTestBin = Platform.environment['ARCHOERA_VAULT_BIN'] == null
@@ -221,6 +234,27 @@ void main() {
       throwsA(isA<VaultException>()
           .having((e) => e.message, 'message', contains('锚点'))),
       reason: '锚点不一致应拒绝服务（vault 文件可能被替换）',
+    );
+  });
+
+  test('锚点文件被替换为符号链接 → 拒绝服务（且不阻塞）', () async {
+    final tmp = await makeTmp('vault_v4_anchor_link');
+    if (!VaultProcess.available) {
+      markTestSkipped('vault 不可用，跳过');
+      return;
+    }
+    await VaultProcess.initFile(tmp.path);
+    await VaultProcess.set(tmp.path, 'kugou:session', 'x');
+
+    final auth = File('${tmp.path}/vault.auth');
+    auth.deleteSync();
+    Link(auth.path).createSync('/dev/zero'); // 非普通文件（FIFO 走同一类型判定）
+
+    await expectLater(
+      VaultProcess.get(tmp.path, 'kugou:session'),
+      throwsA(isA<VaultException>()
+          .having((e) => e.message, 'message', contains('锚点'))),
+      reason: '锚点文件非普通文件应 fail-closed，且读取不得阻塞（FIFO/符号链接）',
     );
   });
 

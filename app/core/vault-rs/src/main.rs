@@ -15,12 +15,16 @@ mod errors;
 mod format;
 mod guard;
 mod lockout;
+mod memguard;
+mod safefile;
 mod recovery;
 mod service;
 mod share;
 mod serve;
 
 use std::io::Write;
+
+use zeroize::Zeroizing;
 
 use encoding::b64_encode;
 use errors::{Result, VaultError};
@@ -39,6 +43,14 @@ const EXIT_ERR: i32 = 1;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // 进程硬化（mlock 配额 / RLIMIT_CORE=0 / PR_SET_DUMPABLE=0 / seccomp / Windows 缓解）：
+    // **所有命令**都要武装——`init-*`/`set-kdf`/`destroy`/`status` 同样在内存里持有
+    // 口令与主密钥（`init-m2a` 还会打印恢复码），不硬化就等于「同用户可读内存 + 崩溃可写 core」。
+    // 血缘校验（父进程绑定）仅 `serve` 需要，见 guard::verify_and_arm。
+    if let Err(e) = guard::harden_process() {
+        println!("err {}", e.message());
+        std::process::exit(EXIT_ERR);
+    }
     let code = match run(&args) {
         Ok(c) => c,
         Err(VaultError::SecretStoreUnavailable(m)) => {
@@ -77,12 +89,23 @@ fn run(args: &[String]) -> Result<i32> {
             }
         }
         "selftest-seccomp" => selftest_seccomp(args),
+        "selftest-mem" => {
+            // 内存护栏自检：分配一段敏感缓冲并报告是否真的锁进物理内存
+            // （Linux 可另以 /proc/<pid>/status 的 VmLck 交叉验证）。
+            let buf = memguard::LockedBuffer::new(64);
+            println!(
+                "ok memguard locked={} len={}",
+                if buf.is_locked() { "true" } else { "false" },
+                buf.len()
+            );
+            Ok(EXIT_OK)
+        }
         "init-crypto" => {
             require_args(args, 2)?;
             let svc = VaultService::new(&args[1])?;
             svc.init_crypto(None)?;
             let master = svc.load_master_key_into(None, None)?;
-            let t = svc.get_or_create_auth_anchor(&master)?;
+            let t = svc.get_or_create_auth_anchor(master.as_slice())?;
             println!("ok {}", b64_encode(&t));
             Ok(EXIT_OK)
         }
@@ -90,47 +113,51 @@ fn run(args: &[String]) -> Result<i32> {
             require_args(args, 2)?;
             let use_stdin = args.get(2).map(|s| s == "--key-stdin").unwrap_or(false);
             let injected = if use_stdin {
-                let line = read_stdin_line("未读取到主密钥（stdin 第一行，hex64）")?;
-                let bytes = hex_decode(line.trim()).ok_or_else(|| {
+                let line = Zeroizing::new(read_stdin_line("未读取到主密钥（stdin 第一行，hex64）")?);
+                let bytes = Zeroizing::new(hex_decode(line.trim()).ok_or_else(|| {
                     VaultError::argument("主密钥非合法 hex 字符串".to_string())
-                })?;
+                })?);
                 if bytes.len() != format::KEY_SIZE {
                     return Err(VaultError::argument(format!(
                         "主密钥须为 {} 个 hex 字符",
                         format::KEY_SIZE * 2
                     )));
                 }
-                Some(bytes)
+                Some(bytes.to_vec())
             } else {
                 None
             };
             let svc = VaultService::with_store(&args[1], Box::new(FileStore::new(&args[1])));
             svc.init_crypto(injected)?;
             let master = svc.load_master_key_into(None, None)?;
-            let t = svc.get_or_create_auth_anchor(&master)?;
+            let t = svc.get_or_create_auth_anchor(master.as_slice())?;
             println!("ok {}", b64_encode(&t));
             Ok(EXIT_OK)
         }
         "init-m1" => {
             require_args(args, 2)?;
             let kdf = parse_kdf_flags(args, 2)?;
-            let password = read_stdin_line("未读取到口令（stdin 第一行）")?;
+            let password = Zeroizing::new(read_stdin_line("未读取到口令（stdin 第一行）")?);
             let svc = VaultService::with_store(&args[1], Box::new(NullSecretStore));
             svc.init_slots(password.as_bytes(), Some(kdf))?;
             let master = svc.load_master_key_into(Some(password.as_bytes()), None)?;
-            let t = svc.get_or_create_auth_anchor(&master)?;
+            let t = svc.get_or_create_auth_anchor(master.as_slice())?;
             println!("ok {}", b64_encode(&t));
             Ok(EXIT_OK)
         }
         "init-m2a" => {
             require_args(args, 2)?;
             let kdf = parse_kdf_flags(args, 2)?;
-            let password = read_stdin_line("未读取到口令（stdin 第一行）")?;
+            let password = Zeroizing::new(read_stdin_line("未读取到口令（stdin 第一行）")?);
             let svc = VaultService::with_store(&args[1], Box::new(NullSecretStore));
-            let code = svc.init_m2a(password.as_bytes(), Some(kdf))?;
+            let code = Zeroizing::new(svc.init_m2a(password.as_bytes(), Some(kdf))?);
             let master = svc.load_master_key_into(Some(password.as_bytes()), None)?;
-            let t = svc.get_or_create_auth_anchor(&master)?;
-            println!("ok {} {}", b64_encode(&t), code);
+            let t = svc.get_or_create_auth_anchor(master.as_slice())?;
+            // 恢复码仅此一次展示：**直接写句柄**（不经 std 全局行缓冲，避免明文
+            // 滞留堆上），写后随 Zeroizing 零化。
+            let line = Zeroizing::new(format!("ok {} {}", b64_encode(&t), code.as_str()));
+            serve::emit_bytes(line.as_bytes());
+            serve::emit_bytes(b"\n");
             Ok(EXIT_OK)
         }
         "init-m2b" => {
@@ -138,7 +165,7 @@ fn run(args: &[String]) -> Result<i32> {
             let svc = VaultService::with_store(&args[1], Box::new(NullSecretStore));
             svc.init_m2b()?;
             let master = svc.load_master_key_into(None, None)?;
-            let t = svc.get_or_create_auth_anchor(&master)?;
+            let t = svc.get_or_create_auth_anchor(master.as_slice())?;
             println!("ok {}", b64_encode(&t));
             Ok(EXIT_OK)
         }
@@ -165,7 +192,7 @@ fn run(args: &[String]) -> Result<i32> {
             require_args(args, 2)?;
             let kdf = parse_kdf_flags(args, 2)?;
             let svc = VaultService::new(&args[1])?;
-            let password = read_stdin_line("未读取到口令（stdin 第一行）")?;
+            let password = Zeroizing::new(read_stdin_line("未读取到口令（stdin 第一行）")?);
             match svc.change_kdf(password.as_bytes(), kdf) {
                 Ok(()) => {
                     println!("ok");
@@ -218,6 +245,20 @@ fn selftest_seccomp(args: &[String]) -> Result<i32> {
     let _ = std::io::stdout().flush();
     if !cfg!(target_os = "linux") {
         return Ok(EXIT_OK);
+    }
+    // `selftest-seccomp list`：逐条验证 denylist 生效（每项 fork 一个子进程实际调用，
+    // 被 SIGSYS 终止即生效）。用于「沙箱完整性」自检——过滤器装载 ≠ 名单真的拦得住。
+    if args.get(1).map(|s| s == "list").unwrap_or(false) {
+        let (total, killed, missed) = guard::probe_denylist();
+        println!(
+            "ok denylist killed={killed}/{total} failed={}",
+            if missed.is_empty() {
+                "-".to_string()
+            } else {
+                missed.join(",")
+            }
+        );
+        return Ok(if killed == total { EXIT_OK } else { EXIT_ERR });
     }
     let domain = args
         .get(1)
