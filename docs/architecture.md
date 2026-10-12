@@ -331,6 +331,9 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
   `secret.key` 仍**保留**——vault 的 file 模式（v4-file）以同一文件名存放主密钥，二者不再交叉；
 - 旧版（library.db 内嵌 subsonic_* 表）数据在服务端启动时经 `MigrateUserDB` 自动迁移到 user.db 并删除媒体库旧表（幂等，密文原样搬运不重加密）；
   更旧的 `enc:v1:` 用户密码在 `SubsonicAdmin.open` 时解密迁入 vault（成功才置空 `password_cipher`，失败保留待重试）；
+- **启动注入时序（SEC-01 落地注意）**：`SubsonicAdmin.open` 从 vault 载回密码后，须在启动流程显式调用
+  `pushCredentialsToServer()` 把内存凭据表注入 Go 层（server 认证优先查表）。当前本地 Subsonic 服务端管理路径
+  尚未在 UI 启用（仅 smoke/CLI 触达），**启用时须补齐此调用**，否则认证会回退到 `enc:v1:` 迁移回退分支；
 - scanner 直写媒体库、subsonic 服务端直读直写媒体库与用户库、前端读媒体库的四方访问模型保持不变。
 
 ---
