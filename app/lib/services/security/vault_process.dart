@@ -180,8 +180,9 @@ class VaultProcess {
   }
 
   /// 初始化 vault（文件密钥模式，LEGACY 兼容）：主密钥 K 整体落盘
-  /// `$dataDir/secret.key`（0600 原子写；可被 `ARCHOERA_VAULT_SECRET_KEY`
-  /// hex64 env 覆盖，env 优先不持久化）——免 OS 钥匙串，供无 Secret
+  /// `$dataDir/secret.key`（0600 原子写；若需在初始化时指定 K，须走原生 CLI
+  /// `archoera-vault init-file --key-stdin` 经 stdin 传入——**不再支持环境变量注入**，
+  /// 原 `ARCHOERA_VAULT_SECRET_KEY` 已按 SEC-02 移除）——免 OS 钥匙串，供无 Secret
   /// Service 的 headless Linux / Docker 使用（经典的服务端加密形态）。
   /// **本地文件单点：密钥文件泄露 = 凭据全泄露（弱于 OS 存储），
   /// 选用即显式接受该降级。** 复用 crypto 单因子全部配套（握手/崩溃联动/

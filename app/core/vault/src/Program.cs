@@ -17,11 +17,13 @@ using Archoera.Vault;
 //                                                                    返回会话锚点 T，主进程须保存）
 //   archoera-vault init-crypto <dataDir>             → ok <b64T>   （LEGACY 单因子：K 整体存 OS 安全存储；
 //                                                                    免密 3 字段握手，推荐）
-//   archoera-vault init-file <dataDir>               → ok <b64T>   （文件密钥模式：K 落盘 secret.key
-//                                                                    （0600）/可被 ARCHOERA_VAULT_SECRET_KEY
-//                                                                    env 覆盖，免 OS 钥匙串——headless/
+//   archoera-vault init-file <dataDir> [--key-stdin]
+//                                                    → ok <b64T>   （文件密钥模式：K 落盘 secret.key
+//                                                                    （0600），免 OS 钥匙串——headless/
 //                                                                    Docker 等无 Secret Service 场景，
-//                                                                    对应服务端加密形态）
+//                                                                    对应服务端加密形态；--key-stdin 时
+//                                                                    从 stdin 首行读取 hex64 K，不经 argv/env
+//                                                                    ——env 注入已按 SEC-02 移除）
 //   archoera-vault init-password <dataDir>           → ok <b64T>   （口令模式：S = Argon2id(password)，
 //                                                                    口令经 stdin 第一行传入，绝不落 argv）
 //   archoera-vault status <dataDir>                  → ok <json>   （{"initialized":true|false,"mode":"os"|"password"}）
@@ -178,16 +180,34 @@ try
             {
                 // LEGACY 兼容方案（文件密钥模式）：K 整体存 dataDir/secret.key（0600），
                 // 免 OS 钥匙串——无 Secret Service 的 headless Linux / Docker 可用；
-                // 等价服务端加密（secret.key / SPLAYER_SECRET_KEY）。
-                // ARCHOERA_VAULT_SECRET_KEY（hex64）可覆盖 K（env 优先，不持久化）。
-                var svc = new VaultService(args[1], new FileStore(args[1]));
-                svc.InitCrypto();
-                // 与 init-crypto 一致：返回会话锚点 T
-                using (var mk = LockedBuffer.Alloc(KeySplit.KeySize))
+                // 等价服务端加密（secret.key）。
+                // 可选 --key-stdin：从 stdin 第一行读取 hex64 主密钥 K（不使用 argv/env，
+                // 防 /proc/<pid>/environ 泄露；见 security-review SEC-02）。
+                var useStdinKey = args.Length >= 3 && args[2] == "--key-stdin";
+                byte[]? injected = null;
+                try
                 {
-                    svc.LoadMasterKeyInto(mk.Span);
-                    var t = svc.GetOrCreateAuthAnchor(mk.Span);
-                    Console.WriteLine("ok " + Convert.ToBase64String(t));
+                    if (useStdinKey)
+                    {
+                        var line = Console.ReadLine()
+                            ?? throw new ArgumentException("未读取到主密钥（stdin 第一行，hex64）");
+                        injected = Convert.FromHexString(line.Trim());
+                        if (injected.Length != KeySplit.KeySize)
+                            throw new ArgumentException($"主密钥须为 {KeySplit.KeySize * 2} 个 hex 字符");
+                    }
+                    var svc = new VaultService(args[1], new FileStore(args[1]));
+                    svc.InitCrypto(injected);
+                    // 与 init-crypto 一致：返回会话锚点 T
+                    using (var mk = LockedBuffer.Alloc(KeySplit.KeySize))
+                    {
+                        svc.LoadMasterKeyInto(mk.Span);
+                        var t = svc.GetOrCreateAuthAnchor(mk.Span);
+                        Console.WriteLine("ok " + Convert.ToBase64String(t));
+                    }
+                }
+                finally
+                {
+                    if (injected != null) CryptographicOperations.ZeroMemory(injected);
                 }
             }
             break;

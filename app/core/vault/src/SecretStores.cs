@@ -97,8 +97,10 @@ internal static class SecretKeyScope
 /// 文件密钥后端（LEGACY 兼容方案，对应服务端加密形态）：
 /// 主密钥 K 整体落盘 <dataDir>/secret.key（0600 原子写入），**无 OS 钥匙串依赖**，
 /// 适用于无 Secret Service 的 headless Linux / Docker 等场景。
-///   - `ARCHOERA_VAULT_SECRET_KEY`（hex 64 = 32B）覆盖 K（对应原项目
-///     SPLAYER_SECRET_KEY 语义：env 优先于文件，不持久化）；
+///   - **不再支持经环境变量注入 K**（原 `ARCHOERA_VAULT_SECRET_KEY` 已移除，见
+///     [security-review SEC-02]）：env 经 `/proc/<pid>/environ` 同用户可读、易进日志/
+///     崩溃转储/CI 记录。如需在初始化时指定 K，改经 **stdin**（`init-file --key-stdin`），
+///     不使用 argv/env；容器部署请改为挂载 0600 的 `secret.key`。
 ///   - 后端指纹 backend="file"：与其他后端（libsecret/dpapi/keychain/insecure…）
 ///     互不配对——文件密钥库被 OS 存储后端访问 → SHARE_BACKEND_MISMATCH；
 ///   - 安全性：本地文件单点（弱于 OS 存储），无份额配对/无口令——选用即显式
@@ -115,13 +117,6 @@ public sealed class FileStore : ISecretStore
 
     public byte[]? Load(string key)
     {
-        // env 覆盖优先（等价原项目 SPLAYER_SECRET_KEY：env 即密钥，不落盘）
-        var envKey = Environment.GetEnvironmentVariable("ARCHOERA_VAULT_SECRET_KEY");
-        if (envKey != null)
-        {
-            try { return Convert.FromHexString(envKey); }
-            catch (FormatException) { /* 非 hex64：忽略 env，回落密钥文件 */ }
-        }
         if (!File.Exists(KeyPath)) return null;
         var raw = File.ReadAllBytes(KeyPath);
         return raw.Length == KeySplit.KeySize ? raw : null;

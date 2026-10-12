@@ -11,7 +11,7 @@
 | **v1** | OS 安全存储模式（2-of-2） | 主密钥 K 拆两份：K_vault（存 vault 文件）⊕ S（存 OS 安全存储，libsecret/DPAPI/Keychain）；解锁需两者在场 |
 | **v2** | 口令模式 | S = Argon2id(主口令)，口令不落盘、经 stdin 握手传入；KDF 参数随文件头存储 |
 | **v3** | 设备绑定（多封装 MultiSeal） | S 由设备熵 E 经 HKDF 密封（指纹密封 device.seal），可选恢复口令（Password seal 备用）；支持 NEED_RECOVERY / rebind |
-| **v4-file** | 文件密钥模式（LEGACY 兼容方案） | 主密钥 K 整体落盘 `secret.key`（0600，可被 `ARCHOERA_VAULT_SECRET_KEY` env 覆盖）；**免 OS 钥匙串**，单因子、无份额配对——对应原 SPlayer-Next 服务端加密形态 |
+| **v4-file** | 文件密钥模式（LEGACY 兼容方案） | 主密钥 K 整体落盘 `secret.key`（0600）；指定 K 经 `init-file --key-stdin`（stdin，不经 argv/env——原 `ARCHOERA_VAULT_SECRET_KEY` env 已按 SEC-02 移除）；**免 OS 钥匙串**，单因子、无份额配对——对应原 SPlayer-Next 服务端加密形态 |
 | A | OS 原生钥匙串直存 | macOS Keychain / Windows DPAPI / Linux libsecret 直接存凭据明文 |
 | B | 主密码加密库 | KeePass / Bitwarden 本地库 / LastPass 本地——单一主密码派生 KEK 加密整个库 |
 | C | 云密码管理器 2-factor | 1Password（Secret Key + 主密码）/ Bitwarden（服务器 + 2FA）——服务器侧托管密文 |
@@ -57,7 +57,7 @@
 - **问题**：指纹稳定性（硬件变更/系统升级可能触发 NEED_RECOVERY）；三平台指纹实现需真机回归；熵源在 device.seal 文件被一并窃取时降级为纯口令面（与 v2 同档）。
 
 ### vault v4-file（文件密钥模式，LEGACY 兼容方案）
-- **定位**：解决「无 Secret Service 的 headless Linux / Docker 等场景」无法使用 v1（OS 存储）的问题——`init-file` 或 `ARCHOERA_VAULT_BACKEND=file` 创建，K 落盘 `secret.key`（0600 原子写，可被 `ARCHOERA_VAULT_SECRET_KEY` env 覆盖），对应原 SPlayer-Next 服务端加密（`secret.key` / `SPLAYER_SECRET_KEY`）。
+- **定位**：解决「无 Secret Service 的 headless Linux / Docker 等场景」无法使用 v1（OS 存储）的问题——`init-file` 或 `ARCHOERA_VAULT_BACKEND=file` 创建，K 落盘 `secret.key`（0600 原子写）；若需在初始化时指定 K，用 `init-file --key-stdin`（stdin 首行 hex64，不经 argv/env），对应原 SPlayer-Next 服务端加密（`secret.key`）。
 - **优势**：零外部依赖（纯文件，CI/容器可直接跑）；后端指纹 `file` 与其他后端互不配对（SHARE_BACKEND_MISMATCH 防护）；复用 crypto 单因子全部配套（握手/fail-closed/目录隔离/可销毁）。
 - **问题**：**本地文件单点**——密钥文件泄露 = 凭据全泄露（弱于 v1 OS 存储）；无份额配对/无口令面；选用即显式接受该降级（不静默，须主动 `init-file` 或设 env）。
 
