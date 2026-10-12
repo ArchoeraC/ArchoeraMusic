@@ -91,6 +91,28 @@ Dart ──▶ archoera_log_write ──▶ [HH:mm:ss LEVEL] [tag] msg ──▶
 | Dart | `Log.i/w/e/f/at(tag, msg)` | 直接调用 |
 | vault 子进程 | （跨进程无法共享 sink） | Dart 转发其 stderr：`Log.at(…)`，按关键字分级 |
 
+### 敏感信息脱敏（SEC-09）
+
+- **落点**：核心 `archoera_log_write` 在格式化后、写出前一并调用 `archoera_log_scrub`
+  （公开 API，见 `include/archoera_log.h`）；Dart 侧 `Log._emit` 亦先调用
+  `Log.scrub()`（规则与原生一致，供未注入 sink 的降级路径）。两处对同一文本
+  幂等，重复脱敏无副作用。
+- **规则**：查表命中敏感键名（大小写不敏感，键名字符为 `[A-Za-z0-9_-]`、且要求
+  左边界）后按两种分隔符掩码为等长 `*`：
+  - `key=value`：掩码到常见分隔符（`&`、空白、`"` `'` `)` `}` `]` `,` `;` `>` 等）；
+  - `key: value`（HTTP 头式）：掩码到行尾（保留 `key:` 与其后前导空白，便于阅读）。
+  - 覆盖键名：`token`/`access_token`/`refresh_token`/`id_token`、`cookie`/`set-cookie`、
+    `password`/`passwd`/`pwd`、`secret`/`client_secret`/`secret_key`、`signature`/`sig`、
+    `api_key`/`apikey`/`api-key`/`access_key`、`authorization`/`auth`、
+    `session`/`sessionid`/`session_id`/`jsessionid`、`csrf`/`xsrf`。
+- **例外（已知接受项）**：单字母短键（Subsonic `p`/`t`/`s`）**不**掩码——过短的键名
+  误报率过高；Subsonic 凭据已在源头按 SEC-01 移入 vault，日志中不出现明文口令。
+- **默认行为**：脱敏**始终开启**，无独立开关；如需关闭可调用
+  `archoera_log_scrub` 之外的原始写入路径（不推荐）。因此**日志中默认不应出现**
+  查询串凭据或明文口令；若某模块确有需要写入原始文本，必须自行先脱敏。
+- **vault 子进程**：其 stderr 经 Dart 转发时同样经过 `Log.at` → `_emit` → `scrub`，
+  且 vault 自身不打印主密钥材料（SEC-02）。
+
 ## 4. 在代码里加日志
 
 - **Dart**：`import '.../services/log/log.dart';` → `Log.w('downloader', '降级：$e')`。
