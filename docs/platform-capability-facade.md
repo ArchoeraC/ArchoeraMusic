@@ -86,6 +86,11 @@ abstract interface class SystemPower {
 
 ## 4. 实现形态
 
+> ⚠️ **本节已被 §7.3 / §7.4 取代（SEC-29）**——下方「纯 Dart + 条件导入」「插件通道」路线**已被禁止**：按
+> [AGENTS.md](../AGENTS.md) 与 [CONTRIBUTING.md](../CONTRIBUTING.md) §2，平台能力一律走
+> `app/native/platform`（C++/ObjC++）原生桥接 + `dart:ffi`（`apl_*` C ABI），**禁止 Dart 直调平台 API、
+> 禁止 MethodChannel / 平台插件、禁止 `Process.run` / 子进程**。以下保留仅作历史对照。
+
 - **位置**：`app/lib/services/platform/<capability>/`：`<capability>.dart`（接口契约）+
   `<platform>.dart`（实现）+ 工厂（条件导入 / 平台注册表），主程序仅注入接口；
 - **纯 Dart 可行的能力**（D-Bus、GeoClue）用 Dart 包 + 条件导入；必须进 OS 原生 API 的

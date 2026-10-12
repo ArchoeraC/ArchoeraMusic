@@ -1,6 +1,7 @@
 # 凭据保护方案比对：vault v1-v3 vs 业界通用方案
 
 > 2026-08-13 · 关联规划：[credential-vault-plan.md](credential-vault-plan.md)
+> ⚠️ 已知缺口与待修复项见 [security-review-2026-10-11.md](security-review-2026-10-11.md)（含 v4-file 单因子 / env 主密钥声明缺口 SEC-02）。
 > 目的：明确我们的三档实现与业界常见凭据保护方案的「优势 / 问题」，供安全决策与演进参考。
 
 ## 1. 方案速览
