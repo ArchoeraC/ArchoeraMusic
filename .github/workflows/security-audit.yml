@@ -21,10 +21,11 @@ jobs:
   cargo-audit:
     name: cargo audit (${{ matrix.dir }})
     runs-on: ubuntu-latest
-    # audit-check 对新披露的漏洞会开 issue 跟踪，故需 issues: write；
-    # fork PR 时 token 自动降为只读，此时仅做校验与失败判定（不建 issue）。
+    # audit-check 需 checks: write 才能发布 check run；对新披露漏洞会开 issue
+    # 跟踪故需 issues: write；fork PR 时 token 自动降为只读，此时仅校验/判失败。
     permissions:
       contents: read
+      checks: write
       issues: write
     strategy:
       fail-fast: false
@@ -40,6 +41,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: ${{ matrix.dir }}
+          # RUSTSEC-2023-0071（rsa Marvin 计时侧信道）仅影响**持有私钥**的一方；
+          # downloader 只用 `RsaPublicKey::encrypt`（酷狗登录公钥加密，见 src/crypto.rs），
+          # 不持私钥、不做解密，故该项不适用。待上游出补丁后再评估升级。
+          ignore: RUSTSEC-2023-0071
 
   govulncheck:
     name: govulncheck (subsonic)
