@@ -79,6 +79,7 @@
 10. **Dart 核心业务单元测试**（测试 +15，高）—— playback_notifier / 平台 API 解析 / 队列逻辑；
 11. **拆分 PlaybackNotifier**（代码质量 +10，中）—— 1274 行单文件按职责拆（播放核心 / FFT / 队列 / 事件）；
 12. **依赖安全扫描**（安全 +10，中）—— pub/cargo/go/dotnet 依赖漏洞扫描接入 CI；
+    **（已落地 2026-10-12，SEC-26）**：`.github/dependabot.yml` + `.github/workflows/security-audit.yml`（cargo audit / govulncheck / dotnet vulnerable）。
 13. **提取平台 API 公共基类**（代码质量 +10，中）—— 酷狗/网易 API 结构相似度高，抽公共基类消除重复。
 
 ## 3. 与既有计划的衔接
