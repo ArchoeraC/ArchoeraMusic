@@ -39,3 +39,7 @@
 - 新增任何 `uses:` 一律 pin SHA；`run:` 内**禁止**内插 `${{ github.* }}`（用环境变量）。
 - `release` 作业的 Environment 人工审批（`release`）是签名的最后一道人工门；SEC-23 的
   tag 祖先校验在其之前拦截「tag 指向未评审提交」。
+- **漏洞处置**：`security-audit.yml` 首次运行即发现 downloader 的
+  `rustls` RUSTSEC-2026-0285（已 `cargo update -p rustls --precise 0.23.45` 修复）。
+  确属**不适用**的公告才可经 `ignore` 放行，且须在 workflow 注释写明理由
+  （如 RUSTSEC-2023-0071：`rsa` 仅用于公钥加密、不持私钥）。
