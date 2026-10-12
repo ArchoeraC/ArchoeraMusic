@@ -57,7 +57,7 @@
 
 ## 已知安全边界与缺口（如实声明）
 
-以下为**文档层评审已登记**的边界 / 缺口，本文档如实声明，**勿视为已防护项**（其中 SEC-04 / SEC-07 的**表述定性已修正**，其余为待修复项）。完整台账（含证据、影响、修复方向、状态与批次）见
+以下为**文档层评审已登记**的边界 / 缺口，本文档如实声明，**勿视为已防护项**（其中 SEC-04 / SEC-07 的**表述定性已修正**，SEC-06 已加固，其余为待修复项）。完整台账（含证据、影响、修复方向、状态与批次）见
 [security-review-2026-10-11.md](security-review-2026-10-11.md)：
 
 - **第二套密钥体系未纳入 vault**（SEC-01）：Subsonic 敏感字段以 `enc:v1:` 落在 `database/user.db`，密钥自举到 `dataDir/secret.key`——
@@ -70,5 +70,6 @@
 - **PROD marker 定性过高**（SEC-04）：marker 为可伪造字符串，只能防「误用测试构建」，**不能防替换二进制本身**；
 - **lockout / auth / marker 同用户可写**（SEC-05）：`vault.lockout` 可删（重置退避）、`vault.auth` 可随 vault 一并替换（锚点失效）、
   `vault.marker` 可伪造（DoS 或掩盖崩溃）——**已如实声明：这些文件不构成对同用户攻击者的防线**（加固待办：状态移入 OS 安全存储 / HMAC 绑定 / 防伪造）；
-- **KDF 参数无加载上限**（SEC-06）：恶意头部的 Argon2id `m / t / p` 可致解锁前内存 / CPU DoS（`VaultLimits` 未覆盖）；
+- **KDF 参数加载上限**（SEC-06，**已修复**）：头部与封装块的 Argon2id `m / t / p` 现经 `VaultLimits.ValidateKdf` 解析校验（`m ≤256 MiB / t ≤16 / p ≤8`），越界在派生前快速拒绝（`InvalidDataException`），
+  `ReadHeader`（握手前）与 `Load`（解锁）均覆盖，`Argon2id.Derive` 另设同上限纵深防御；头部参数被篡改只会派生错误 S（条目 AEAD 认证失败），不泄露数据（2026-10-12 修复，回归 `test.sh` 第 21 项）；
 - **血缘 / 握手不防同用户**（SEC-07）：`ARCHOERA_VAULT_PARENT_OK` 由发起方注入，可自造通过。

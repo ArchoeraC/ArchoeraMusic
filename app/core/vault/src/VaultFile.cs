@@ -76,6 +76,25 @@ public static class VaultLimits
     public const long MaxFileSize = 16 * 1024 * 1024;
     public const uint MaxEntries = 100_000;
     public const int MaxEntryBytes = 4 * 1024 * 1024;
+
+    // ── KDF 参数加载上限（SEC-06）──
+    // 口令封装头部的 m/t/p 为 u32 且不受文件大小约束；恶意构造 m≈2^32 会在
+    // 任何认证之前触发巨量内存分配（解锁前 DoS）。正常档 64 MiB/3/1，
+    // 自检向量最大用到 m=65536/p=4，故上限留足余量（256 MiB / 16 轮 / 8 通道）。
+    public const int MaxKdfMemoryKiB = 256 * 1024;
+    public const int MaxKdfIterations = 16;
+    public const int MaxKdfParallelism = 8;
+
+    /// 校验 KDF 参数是否在允许区间；越界抛 [InvalidDataException]（加载/派生前快速拒绝）。
+    public static void ValidateKdf(int mKiB, int t, int p)
+    {
+        if (p < 1 || p > MaxKdfParallelism)
+            throw new InvalidDataException($"KDF 并行度参数异常（p={p}），拒绝加载");
+        if (mKiB < 8 * p || mKiB > MaxKdfMemoryKiB)
+            throw new InvalidDataException($"KDF 内存参数异常（m={mKiB} KiB），拒绝加载");
+        if (t < 1 || t > MaxKdfIterations)
+            throw new InvalidDataException($"KDF 迭代次数异常（t={t}），拒绝加载");
+    }
 }
 
 /// v3 多封装块：S 份额的单个密封（任一方解出 → K = K_vault ⊕ S）。
@@ -214,11 +233,8 @@ public sealed class VaultFile
         br.ReadBytes(2);
         if (kdf != 1) return new VaultHeader(VaultMode.OsStore, null, null);
         var salt = br.ReadBytes(SaltSize);
-        var m = br.ReadUInt32();
-        var t = br.ReadUInt32();
-        var p = br.ReadUInt32();
-        return new VaultHeader(VaultMode.Password, salt,
-            new Argon2id.KdfParams((int)m, (int)t, (int)p));
+        var kdfParsed = ReadKdf(br);
+        return new VaultHeader(VaultMode.Password, salt, kdfParsed);
     }
 
     /// 读多封装头部（跳过 K_vault，只取 seal kind 列表）。
@@ -250,6 +266,17 @@ public sealed class VaultFile
         return len == 0 ? null : Encoding.UTF8.GetString(br.ReadBytes(len));
     }
 
+    /// 读 KDF 参数（m/t/p）并立即做加载上限校验（SEC-06）：
+    /// 越界即抛 [InvalidDataException] 快速拒绝，绝不进入 Argon2id 派生/分配。
+    private static Argon2id.KdfParams ReadKdf(BinaryReader br)
+    {
+        var m = (int)br.ReadUInt32();
+        var t = (int)br.ReadUInt32();
+        var p = (int)br.ReadUInt32();
+        VaultLimits.ValidateKdf(m, t, p);
+        return new Argon2id.KdfParams(m, t, p);
+    }
+
     /// 读单个封装块（kind + 参数 + 密文）。
     private static VaultSeal ReadSeal(BinaryReader br)
     {
@@ -260,7 +287,7 @@ public sealed class VaultFile
             {
                 Kind = kind,
                 Salt = br.ReadBytes(SaltSize),
-                Kdf = new Argon2id.KdfParams((int)br.ReadUInt32(), (int)br.ReadUInt32(), (int)br.ReadUInt32()),
+                Kdf = ReadKdf(br),
                 Nonce = br.ReadBytes(NonceSize),
                 Ciphertext = br.ReadBytes((int)br.ReadUInt32()),
             },
@@ -353,19 +380,17 @@ public sealed class VaultFile
     /// 读口令模式负载（kdf 位恒 1；0 = 旧异常文件，回退 OS 语义）。
     private static VaultFile LoadPassword(BinaryReader br)
     {
-        var kdf = br.ReadByte();
+        var kdfFlag = br.ReadByte();
         br.ReadBytes(2);
-        if (kdf != 1) return new VaultFile { KeyVault = br.ReadBytes(KeySplit.KeySize) };
+        if (kdfFlag != 1) return new VaultFile { KeyVault = br.ReadBytes(KeySplit.KeySize) };
         var salt = br.ReadBytes(SaltSize);
-        var m = br.ReadUInt32();
-        var t = br.ReadUInt32();
-        var p = br.ReadUInt32();
+        var kdf = ReadKdf(br);
         return new VaultFile
         {
             KeyVault = br.ReadBytes(KeySplit.KeySize),
             Mode = VaultMode.Password,
             Salt = salt,
-            Kdf = new Argon2id.KdfParams((int)m, (int)t, (int)p),
+            Kdf = kdf,
         };
     }
 
