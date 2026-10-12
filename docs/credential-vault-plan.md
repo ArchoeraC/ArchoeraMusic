@@ -1,6 +1,7 @@
 # 凭据保险库规划
 
 > 状态：**已实施（vault-1 ~ vault-4 + 第六步口令模式全部完成，2026-08-12）** · 规划稿初稿 2026-08-12
+> ⚠️ 已知缺口与待修复项见 [security-review-2026-10-11.md](security-review-2026-10-11.md)（本计划的补强台账，含 v4-file / 第二套密钥 / 内存驻留等）。
 > 定位：把本地凭据（流媒体服务器密码、网易/酷狗 session）从「明文落盘 + 进程存活期明文」改造为
 > **静态加密存储（vault）+ 按需流式解密 + 运行时内存保护 + 一键销毁**，防磁盘泄露与「销毁即失效」。
 >
@@ -195,11 +196,13 @@ vault：  校验父进程 → 解锁主密钥（OS 安全存储，§3.2）
 ```
 
 - 双因子：**进程血缘**（父进程校验 + PDEATHSIG）与**主密钥持有**（伪造主进程无法从 OS 安全存储解锁主密钥）；
-- **握手版本指纹（marker）**：握手应答尾部携带 `BuildInfo.Marker`（PROD/TEST 构建标记）。主进程据此在**协议内**直接校验 vault 版本/构建——默认路径解析的 vault 必须为 PROD：**缺失或非 PROD（如被替换为携带 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 显式启动指令的测试二进制）→ 杀进程 + 删除默认路径副本 + 拒绝解密 + 版本异常 fatal 态（UI 仅允许退出，fail-closed）**。这是二进制替换防护的第二道（协议内）防线，防止仅绕过加载前 `--version` 校验的二次侵入；
+- **握手版本指纹（marker）**：握手应答尾部携带 `BuildInfo.Marker`（PROD/TEST 构建标记）。主进程据此在**协议内**识别 vault 构建——默认路径解析的 vault 必须为 PROD：**缺失或非 PROD（如被替换为携带 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 显式启动指令的测试二进制）→ 杀进程 + 删除默认路径副本 + 拒绝解密 + 版本异常 fatal 态（UI 仅允许退出，fail-closed）**。
+  **定位（勿高估）**：marker 只是**可自报的字符串指纹，无签名 / 无认证**——攻击者可自行编译一个输出同名 `ARCHOERA-VAULT-PROD-*` 的后门 vault 同时通过 `--version` 与握手校验，`ARCHOERA_VAULT_BIN` 显式指定更直接跳过 PROD 校验。故该机制**仅防「误用测试构建」**，**不能防「替换二进制」本身**；二进制完整性须由 OS 信任链（Authenticode / 公证 / 安装包完整性清单）承接，见 §1.2-5 与 §8.5 待办（当前发布产物尚未签名/公证，见 [security-review SEC-04/SEC-25](security-review-2026-10-11.md)）；
 - **握手前置能力**：vault 在握手完成前**不加载/不解密任何凭据**——未完成握手即崩溃/被终止，也从未产生过明文；主进程会话期间保持管道读端监听 + waitpid，异常退出（EOF）即不信任结果并触发 §3.7 fail-closed；
 - 独立运行 vault：无管道、无 H/C → 直接拒绝服务；
 - 每次会话的握手密钥一次性，防重放；会话期间所有命令仅经该管道，vault 不响应其他来源；
 - **定位（开源约束 §1.2-4）**：握手防的是「无主进程上下文的独立工具滥用与自动化」，**不承诺防「按源码重实现的攻击者」**——该威胁由口令派生/平台侧防线承担。
+  **勿高估（同用户攻击者）**：血缘白名单 `ARCHOERA_VAULT_PARENT_OK` 由**发起方（调用者）经环境变量注入**，同用户攻击者可自行 spawn vault 并自带该 env + 自选 `H/C`，血缘与握手均无法区分——因此**血缘 / 握手不构成对同用户攻击者的防线**，只防「无主进程上下文的误用与自动化」（§1.2-4/5 已定边界，此处收口表述以免误读）；
 
 通信模型（全链路事件驱动，无轮询）：
 
@@ -308,7 +311,7 @@ vault：  校验父进程 → 解锁主密钥（OS 安全存储，§3.2）
 - `PlatformGuard.cs`：
   - Linux：`getppid` 血缘 + `/proc/<ppid>/comm` 白名单 + `PR_SET_PDEATHSIG(SIGTERM)` + `RLIMIT_CORE=0` + `PR_SET_DUMPABLE=0`；
   - macOS：血缘（proc_pidpath）+ `RLIMIT_CORE=0`；Windows：ParentPid（NtQueryInformationProcess）+ 父死检测（OpenProcess/GetExitCodeProcess）；
-  - 白名单由主进程经环境变量 `ARCHOERA_VAULT_PARENT_OK`（逗号分隔可执行名）注入；无白名单 / 父进程不在白名单 → 拒绝独立运行；
+  - 白名单由主进程经环境变量 `ARCHOERA_VAULT_PARENT_OK`（逗号分隔可执行名）注入；无白名单 / 父进程不在白名单 → 拒绝独立运行（**注入方可自造，不防同用户攻击者**，见 §3.8 定位）；
 - `ServeSession.cs`（stdin/stdout 行协议，UTF-8）：
   ```
   主进程 → vault:    handshake <b64H> <b64C>        H=32B 随机会话密钥，C=16B challenge
@@ -319,7 +322,7 @@ vault：  校验父进程 → 解锁主密钥（OS 安全存储，§3.2）
   ```
   - **握手前置**：握手完成前不加载/不解密任何凭据（首个凭据访问发生在解锁主密钥的握手应答时刻）；
   - 双因子：进程血缘 + 主密钥持有（解锁成功 + 锚点回读）；会话密钥一次性防重放；
-  - **握手版本指纹**：应答尾部携带 `BuildInfo.Marker`，主进程据此在协议内校验 vault 构建（默认路径须 PROD，见 Dart 侧）；
+  - **握手版本指纹**：应答尾部携带 `BuildInfo.Marker`，主进程据此在协议内识别 vault 构建（默认路径须 PROD，见 Dart 侧）；**仅防误用测试构建，非二进制完整性防护**（定性见 §3.8）；
   - 空闲 30s 自退 / 握手超时 10s / 父死自退（事件驱动，无轮询）；
 - `Program.cs`：`init` 返回锚点 `ok <b64T>`；错误输出 `err <message>` 且退出码 1（信息不含明文/密文片段）。
 
