@@ -1,6 +1,8 @@
 # 安全评审问题台账（2026-10-11）
 
-> 状态：**修复中**——第一批（文档澄清，SEC-04/07/14/15/17/18/19/20/28/29）已完成（ed17b5f1）；其余待修复。
+> 状态：**修复中**——第一批（文档澄清，SEC-04/07/14/15/17/18/19/20/28/29）已完成（ed17b5f1）；
+> 第二批（凭据统一，SEC-02/03）已完成（bb7d5787，SEC-01 实施中）；
+> 第三批（防护加固）SEC-05/08/34 文档澄清（bb7d5787）、SEC-09 日志脱敏（be7847b4）、SEC-06 KDF 参数上限（840e6775）已完成。
 > 修复后逐项把「状态」改为「已修复」并注明提交 / 版本
 > 范围：**文档层评审**——只读仓库文档与安全相关配置（CI 工作流 / 打包 / 工具脚本 / hooks），未做代码审计、未运行程序；
 > 重点为 **vault 文档未覆盖**的风险面，第二轮（2026-10-11）扩面到 **CI / 发布供应链** 与 **平台能力 / 子系统 / 文档一致性**。
@@ -35,11 +37,11 @@
 | SEC-02 | 高 | v4-file 单因子 + `ARCHOERA_VAULT_SECRET_KEY` 主密钥走 env | vault-scheme-comparison §1/§4；vault-security-notes | ❌ 未提 | 待修复 |
 | SEC-03 | 高 | 启动预取全量明文常驻 Dart 内存，与「用后即弃」矛盾 | credential-vault-plan §8.2 | ❌ 未提 | 待修复 |
 | SEC-04 | 高 | PROD marker 被当作「二进制替换主防线」，实为可伪造字符串 | credential-vault-plan §3.8/§8.4；vault-security-notes §二进制替换防护 | ⚠️ 高估 | 已修复（文档·第一批，ed17b5f1） |
-| SEC-05 | 中 | `vault.lockout`/`vault.auth`/`vault.marker` 同用户可写 → 退避 / 锚点 / 崩溃标记可绕过 | credential-vault-plan §8.4；vault-security-notes §份额覆盖 | ❌ 未提 | 待修复 |
-| SEC-06 | 中 | Argon2id KDF 参数无加载上限 → 解锁前内存 / CPU DoS | credential-vault-plan §5/§8.6 | ❌ 未提 | 待修复 |
+| SEC-05 | 中 | `vault.lockout`/`vault.auth`/`vault.marker` 同用户可写 → 退避 / 锚点 / 崩溃标记可绕过 | credential-vault-plan §8.4；vault-security-notes §份额覆盖 | ❌ 未提 | 已修复（文档·第三批，bb7d5787） |
+| SEC-06 | 中 | Argon2id KDF 参数无加载上限 → 解锁前内存 / CPU DoS | credential-vault-plan §5/§8.6 | ❌ 未提 | 已修复（第三批，840e6775） |
 | SEC-07 | 中 | `ARCHOERA_VAULT_PARENT_OK` 由发起方注入 → 血缘 + 握手可自造绕过 | credential-vault-plan §3.8/§8.4 | ⚠️ 高估 | 已修复（文档·第一批，ed17b5f1） |
-| SEC-08 | 中 | FFI 库 / 二进制加载顺序劫持（按文件名 + 系统搜索路径） | ffi-libs-layout-plan（Dart 路径解析）；vault-security-notes §二进制替换防护 | ❌ 未提 | 待修复 |
-| SEC-09 | 中 | 全链路日志无脱敏，vault stderr 转发入明文日志 | unified-logging §2/§3；archive/robustness-improvement-plan §2 | ❌ 未提 | 待修复 |
+| SEC-08 | 中 | FFI 库 / 二进制加载顺序劫持（按文件名 + 系统搜索路径） | ffi-libs-layout-plan（Dart 路径解析）；vault-security-notes §二进制替换防护 | ❌ 未提 | 已修复（文档·第三批，bb7d5787） |
+| SEC-09 | 中 | 全链路日志无脱敏，vault stderr 转发入明文日志 | unified-logging §2/§3；archive/robustness-improvement-plan §2 | ❌ 未提 | 已修复（第三批，be7847b4） |
 | SEC-10 | 中 | MCP 密钥明文落盘；局域网模式为明文 HTTP | mcp §1/§5 | ❌ 未提 | 待修复 |
 | SEC-11 | 中 | 下载 / 整理的文件路径由元数据派生，`subDir` 未清洗 `..` | download-module §3.3；local-library §刮削 | ❌ 未提 | 待修复 |
 | SEC-12 | 中 | 原生 HTTP 客户端重定向未限制降级 / 内网 / 非官方主机 | audio-kernel-zig（2026-10-01 / 2026-10-07 落地） | ❌ 未提 | 待修复 |
@@ -64,7 +66,7 @@
 | SEC-31 | 中 | deep link 与 `apl_reveal_path` 外部输入校验未声明 | platform-native-bridge.md §3.1 | — | 待修复 |
 | SEC-32 | 中 | Subsonic 认证/传输模式未定义（token vs 明文密码、http vs https） | architecture §7；privacy §5.2 | — | 待修复 |
 | SEC-33 | 低 | 下载临时文件与已存在同名路径（符号链接）处理未定义 | download-module.md §3.3 | — | 待修复 |
-| SEC-34 | 低 | 多运行时同进程的信号处理器/全局符号冲突（DoS/稳定性） | module-on-demand-load-plan.md §2；audio-kernel-zig 2026-10-02 | — | 待修复 |
+| SEC-34 | 低 | 多运行时同进程的信号处理器/全局符号冲突（DoS/稳定性） | module-on-demand-load-plan.md §2；audio-kernel-zig 2026-10-02 | — | 已修复（文档·第三批，bb7d5787） |
 
 ---
 
