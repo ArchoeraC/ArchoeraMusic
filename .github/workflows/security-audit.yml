@@ -55,6 +55,7 @@ jobs:
         with:
           go-version-input: '1.26'
           work-dir: app/core/subsonic
+          cache-dependency-path: app/core/subsonic/go.sum
           repo-checkout: false
 
   dotnet-audit:
