@@ -165,9 +165,42 @@ class Log {
   static void at(LogLevel level, String tag, Object? message) =>
       _emit(level, tag, message);
 
+  /// 敏感字段脱敏（SEC-09）：与原生核心 `archoera_log_scrub` 规则一致。
+  /// 覆盖 `key=value` 与 `key: value`（后者掩码到行尾），大小写不敏感。
+  /// 单字母短键（Subsonic p/t/s）不掩码，属已知接受项。
+  static const List<String> _sensitiveKeys = [
+    'token', 'access_token', 'refresh_token', 'id_token', 'cookie',
+    'set-cookie', 'password', 'passwd', 'pwd', 'secret', 'client_secret',
+    'secret_key', 'signature', 'sig', 'api_key', 'apikey', 'api-key',
+    'access_key', 'authorization', 'auth', 'session', 'sessionid',
+    'session_id', 'jsessionid', 'csrf', 'xsrf',
+  ];
+
+  static final String _sensitiveAlt =
+      _sensitiveKeys.map(RegExp.escape).join('|');
+  static final RegExp _kvEq = RegExp(
+    '(?<![A-Za-z0-9_-])($_sensitiveAlt)(\\s*=\\s*)([^&\\s"\'`)\\]},;>]+)',
+    caseSensitive: false,
+  );
+  static final RegExp _kvColon = RegExp(
+    '^(\\s*)($_sensitiveAlt)(\\s*:\\s*)(.*)\$',
+    caseSensitive: false,
+  );
+
+  /// 把一行/多行文本中的敏感值替换为等长 `*`。
+  static String scrub(String text) {
+    return text.split('\n').map((line) {
+      var l = line.replaceAllMapped(
+          _kvEq, (m) => '${m[1]}${m[2]}${'*' * (m[3]!.length)}');
+      l = l.replaceAllMapped(
+          _kvColon, (m) => '${m[1]}${m[2]}${m[3]}${'*' * (m[4]!.length)}');
+      return l;
+    }).join('\n');
+  }
+
   static void _emit(LogLevel level, String? tag, Object? message) {
     if (level.value < minLevel.value) return;
-    final text = '${message ?? ''}';
+    final text = scrub('${message ?? ''}');
     final binding = _binding;
     if (binding != null) {
       try {
