@@ -11,15 +11,21 @@
 ///   - artist id  = md5(artist.name) 的 hex
 /// 反查 album/artist 时遍历名称集合匹配 md5（曲库规模下可接受）。
 ///
-/// 凭据加密复用 [SubsonicController]（FFI 调 Go crypto，格式与 TS encryptString 兼容）。
+/// 凭据（SEC-01）：用户密码不再以 user.db `password_cipher` 的字段级加密为
+/// 唯一保护，而是经 [SubsonicCredentialStore] 统一存入凭据保险库（vault，
+/// uid=`subsonic:<username>`）；user.db 该列只存空串占位。启动时把 vault 中
+/// 的密码读入内存写穿缓存（同步 list/get 的数据源），并经
+/// [SubsonicAdmin.pushCredentialsToServer] 注入 Go 服务端认证。
 library;
 
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../security/vault_process.dart';
 import 'subsonic_controller.dart';
 
 /// 计算 album/artist 稳定 ID（与 TS albumIdOf/artistIdOf 一致）。
@@ -33,6 +39,89 @@ String subsonicUserDbPath(String libraryDbPath) {
   final idx = libraryDbPath.lastIndexOf(sep);
   final dir = idx < 0 ? '.' : libraryDbPath.substring(0, idx + 1);
   return '${dir}user.db';
+}
+
+/* ------------------------------------------------------------------ */
+/* 凭据存储（vault / 可注入内存实现）                                    */
+/* ------------------------------------------------------------------ */
+
+/// Subsonic 用户密码的持久化存储抽象。
+///
+/// 默认实现 [VaultSubsonicCredentialStore] 走凭据保险库（vault）；测试/冒烟
+/// 可注入 [InMemorySubsonicCredentialStore]。写入失败必须抛异常，调用方
+/// （[SubsonicAdmin]）据此拒绝继续，绝不静默降级为明文落 user.db。
+abstract class SubsonicCredentialStore {
+  /// 读取用户名对应密码明文；无条目返回 null。
+  Future<String?> read(String username);
+
+  /// 写入/覆盖用户名对应密码明文。
+  Future<void> write(String username, String password);
+
+  /// 删除用户名对应凭据（幂等）。
+  Future<void> remove(String username);
+}
+
+/// 默认凭据存储：经凭据保险库（vault）加密持久化。
+///
+/// uid = `subsonic:<username>`；负载为 `jsonEncode({'password': ...})`
+/// 的明文（vault 自身再加密；此处仅做结构化编码）。
+class VaultSubsonicCredentialStore implements SubsonicCredentialStore {
+  VaultSubsonicCredentialStore(this.dataDir);
+
+  /// 数据目录（与 vault 的 `vault.auth` / `secret.key` 同目录）。
+  final String dataDir;
+
+  /// vault 条目前缀：`subsonic:<username>`。
+  static const String uidPrefix = 'subsonic:';
+
+  static String uidFor(String username) => '$uidPrefix$username';
+
+  @override
+  Future<String?> read(String username) async {
+    final raw = await VaultProcess.get(dataDir, uidFor(username));
+    if (raw == null) return null;
+    try {
+      final decoded = jsonDecode(utf8.decode(base64Decode(raw)));
+      if (decoded is Map && decoded['password'] != null) {
+        return decoded['password'].toString();
+      }
+    } catch (_) {
+      // 非本存储格式（损坏/异源）：视为无凭据
+    }
+    return null;
+  }
+
+  @override
+  Future<void> write(String username, String password) {
+    return VaultProcess.set(
+        dataDir, uidFor(username), jsonEncode({'password': password}));
+  }
+
+  @override
+  Future<void> remove(String username) {
+    return VaultProcess.delete(dataDir, uidFor(username));
+  }
+}
+
+/// 内存凭据存储（测试/冒烟专用；不持久化，进程退出即失）。
+class InMemorySubsonicCredentialStore implements SubsonicCredentialStore {
+  InMemorySubsonicCredentialStore([Map<String, String>? seed])
+      : _data = {...?seed};
+
+  final Map<String, String> _data;
+
+  @override
+  Future<String?> read(String username) async => _data[username];
+
+  @override
+  Future<void> write(String username, String password) async {
+    _data[username] = password;
+  }
+
+  @override
+  Future<void> remove(String username) async {
+    _data.remove(username);
+  }
 }
 
 /// 生成 UUID（对齐 TS randomUUID）。
@@ -60,7 +149,7 @@ class SubsonicUser {
   });
   final String id;
   final String username;
-  final String password; // 明文（仅运行时，落盘为密文）
+  final String password; // 明文（仅运行时；持久化于 vault，user.db 不落密文）
   final bool isAdmin;
   final int createdAt;
 }
@@ -118,19 +207,46 @@ enum SubsonicStarType { track, album, artist }
 
 /// Subsonic 服务端管理层（sqlite3 直写用户库）。
 class SubsonicAdmin {
-  SubsonicAdmin._(this._db, this._controller);
+  SubsonicAdmin._(this._db, this._controller, this._store, this._passwords);
 
   final Database _db;
   final SubsonicController _controller;
+  final SubsonicCredentialStore _store;
 
-  /// 打开独立用户库（user.db）并绑定服务控制器（凭据加解密走 FFI）。
+  /// 用户密码内存写穿缓存（username → 明文）：同步 list/get 的数据源，
+  /// 亦为 [pushCredentialsToServer] 的注入来源。启动时从 vault 载入，
+  /// 增删改时同步维护。
+  final Map<String, String> _passwords;
+
+  /// 打开独立用户库（user.db）并绑定服务控制器。
   ///
   /// 用户库路径经 [subsonicUserDbPath] 从媒体库路径推导；subsonic_* 表由
   /// Dart 侧幂等 CREATE IF NOT EXISTS 兜底（Go 侧 EnsureTables 已建过一次）。
-  static SubsonicAdmin open(SubsonicController controller, String userDbPath) {
+  ///
+  /// [dataDir] 用于构造默认 vault 凭据存储；测试可经 [store] 注入内存实现。
+  /// 启动流程（异步）：
+  ///   1) 迁移旧 `password_cipher`（`enc:v1:` 解密 / 历史明文原样）入 vault，
+  ///      成功才把该列置空串（幂等、可重入）；
+  ///   2) 从 vault 读回全部用户密码，填充内存写穿缓存；
+  ///   3) 返回已绑定的管理实例（注入服务端由调用方经
+  ///      [pushCredentialsToServer] 显式触发）。
+  static Future<SubsonicAdmin> open(
+    SubsonicController controller,
+    String userDbPath, {
+    required String dataDir,
+    SubsonicCredentialStore? store,
+  }) async {
     final db = sqlite3.open(userDbPath);
     _ensureTables(db);
-    return SubsonicAdmin._(db, controller);
+    final admin = SubsonicAdmin._(
+      db,
+      controller,
+      store ?? VaultSubsonicCredentialStore(dataDir),
+      <String, String>{},
+    );
+    await admin._migrateLegacyPasswords();
+    await admin._loadPasswords();
+    return admin;
   }
 
   static void _ensureTables(Database db) {
@@ -184,6 +300,65 @@ class SubsonicAdmin {
 
   void close() => _db.close();
 
+  /* --------------------------- 凭据（vault）--------------------------- */
+
+  /// 一次性、幂等地把旧 `password_cipher` 迁入 vault：
+  ///   - `enc:v1:` 前缀 → [SubsonicController.decrypt] 解出明文；
+  ///   - 其它非空值 → 视为历史 fail-open 遗留的明文，原样迁移。
+  /// 写入 vault 成功后才把该列置空串；解密/写入失败则保留原密文（不丢数据、
+  /// 不降级明文），下次 [open] 重试。**不删除 dataDir/secret.key**——vault
+  /// 文件模式亦使用该文件，仅停止以其承载本密钥体系。
+  Future<void> _migrateLegacyPasswords() async {
+    final rows = _db.select(
+        'SELECT id, username, password_cipher FROM subsonic_users');
+    for (final row in rows) {
+      final cipher = row['password_cipher'] as String?;
+      if (cipher == null || cipher.isEmpty) continue;
+      final id = row['id'] as String;
+      final username = row['username'] as String;
+      final String plain;
+      if (cipher.startsWith('enc:v1:')) {
+        final decrypted = _controller.decrypt(cipher);
+        if (decrypted == null) {
+          stderr.writeln('[subsonic] 旧密码密文解密失败，保留原密文待重试：$username');
+          continue;
+        }
+        plain = decrypted;
+      } else {
+        plain = cipher;
+      }
+      try {
+        await _store.write(username, plain);
+      } catch (e) {
+        stderr.writeln('[subsonic] 旧密码迁移入 vault 失败，保留原密文待重试：'
+            '$username（$e）');
+        continue;
+      }
+      _db.execute(
+          'UPDATE subsonic_users SET password_cipher = ? WHERE id = ?', ['', id]);
+    }
+  }
+
+  /// 从 vault 读回全部用户密码，填充内存写穿缓存（同步 list/get 数据源）。
+  Future<void> _loadPasswords() async {
+    final rows = _db.select('SELECT username FROM subsonic_users');
+    for (final row in rows) {
+      final username = row['username'] as String;
+      try {
+        final pw = await _store.read(username);
+        if (pw != null) _passwords[username] = pw;
+      } catch (e) {
+        stderr.writeln('[subsonic] 读取 vault 凭据失败（$username）：$e');
+      }
+    }
+  }
+
+  /// 把「user.db 全部用户 + vault 解出的密码」注入 Go 服务端认证表。
+  /// 返回是否注入成功（失败时应提示凭据不可用，不得继续以空密码认证）。
+  bool pushCredentialsToServer() {
+    return _controller.setCredentials(Map.of(_passwords));
+  }
+
   /* ------------------------------- 用户 ------------------------------- */
 
   List<SubsonicUser> listUsers() {
@@ -197,12 +372,13 @@ class SubsonicAdmin {
     return rows.isEmpty ? null : _rowToUser(rows.first);
   }
 
-  /// 创建用户（用户名唯一；密码落盘前加密）。
-  SubsonicUser createUser({
+  /// 创建用户（用户名唯一；密码写入 vault，user.db 密码列置空串占位）。
+  /// vault 写入失败时抛异常，绝不回退明文落 user.db。
+  Future<SubsonicUser> createUser({
     required String username,
     required String password,
     bool isAdmin = false,
-  }) {
+  }) async {
     if (getUserByUsername(username) != null) {
       throw StateError('username already exists');
     }
@@ -213,22 +389,39 @@ class SubsonicAdmin {
       isAdmin: isAdmin,
       createdAt: DateTime.now().millisecondsSinceEpoch,
     );
-    final cipher = _controller.encrypt(password) ?? password;
-    _db.execute(
-      'INSERT INTO subsonic_users (id, username, password_cipher, is_admin, created_at) '
-      'VALUES (?, ?, ?, ?, ?)',
-      [user.id, user.username, cipher, user.isAdmin ? 1 : 0, user.createdAt],
-    );
+    // 凭据先入 vault（失败即抛，不落明文）；DB 写入失败则回滚 vault 条目，
+    // 避免留下无 DB 行的孤儿凭据。
+    await _store.write(username, password);
+    try {
+      _db.execute(
+        'INSERT INTO subsonic_users (id, username, password_cipher, is_admin, created_at) '
+        'VALUES (?, ?, ?, ?, ?)',
+        [user.id, user.username, '', user.isAdmin ? 1 : 0, user.createdAt],
+      );
+    } catch (_) {
+      try {
+        await _store.remove(username);
+      } catch (_) {}
+      rethrow;
+    }
+    _passwords[username] = password;
     return user;
   }
 
   /// 更新用户（password/isAdmin 可选，空则不改）。
-  void updateUser(String id, {String? password, bool? isAdmin}) {
+  /// 密码写入 vault（user.db 密码列保持空串）；vault 写入失败抛异常。
+  Future<void> updateUser(String id, {String? password, bool? isAdmin}) async {
+    final rows =
+        _db.select('SELECT username FROM subsonic_users WHERE id = ?', [id]);
+    if (rows.isEmpty) throw StateError('user not found');
+    final username = rows.first['username'] as String;
     final sets = <String>[];
     final params = <Object?>[];
     if (password != null && password.isNotEmpty) {
+      await _store.write(username, password); // 失败抛异常，不落明文
       sets.add('password_cipher = ?');
-      params.add(_controller.encrypt(password) ?? password);
+      params.add('');
+      _passwords[username] = password;
     }
     if (isAdmin != null) {
       sets.add('is_admin = ?');
@@ -239,8 +432,11 @@ class SubsonicAdmin {
     _db.execute('UPDATE subsonic_users SET ${sets.join(', ')} WHERE id = ?', params);
   }
 
-  /// 删除用户（同时清理关联数据）。
-  void deleteUser(String id) {
+  /// 删除用户（同时清理关联数据 + vault 凭据条目）。
+  Future<void> deleteUser(String id) async {
+    final rows =
+        _db.select('SELECT username FROM subsonic_users WHERE id = ?', [id]);
+    final username = rows.isEmpty ? null : rows.first['username'] as String;
     _db.execute('BEGIN');
     try {
       _db.execute('DELETE FROM subsonic_starred WHERE user_id = ?', [id]);
@@ -256,14 +452,24 @@ class SubsonicAdmin {
       _db.execute('ROLLBACK');
       rethrow;
     }
+    if (username != null) {
+      _passwords.remove(username);
+      // DB 行已删（列表不再加载该用户）；vault 残留条目无害，失败仅告警。
+      try {
+        await _store.remove(username);
+      } catch (e) {
+        stderr.writeln('[subsonic] 删除 vault 凭据失败（$username）：$e');
+      }
+    }
   }
 
   SubsonicUser _rowToUser(Row row) {
-    final cipher = row['password_cipher'] as String;
+    final username = row['username'] as String;
     return SubsonicUser(
       id: row['id'] as String,
-      username: row['username'] as String,
-      password: _controller.decrypt(cipher) ?? cipher,
+      username: username,
+      // 密码来自 vault 写穿缓存（user.db 密码列仅为空串占位）
+      password: _passwords[username] ?? '',
       isAdmin: (row['is_admin'] as int?) == 1,
       createdAt: (row['created_at'] as int?) ?? 0,
     );

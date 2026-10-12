@@ -134,6 +134,18 @@ class SubsonicController {
     return _crypt(_bindings.decrypt, cipher);
   }
 
+  /// 注入用户密码内存表（服务端认证优先查表，见 Go credentials 包）。
+  /// 成功返回 true；库句柄无效/JSON 解析失败返回 false。
+  bool setCredentials(Map<String, String> credentials) {
+    _checkNotDisposed();
+    final jsonPtr = jsonEncode(credentials).toNativeUtf8();
+    try {
+      return _bindings.setCredentials(_h, jsonPtr) == 0;
+    } finally {
+      calloc.free(jsonPtr);
+    }
+  }
+
   String? _crypt(
       int Function(int handle, Pointer<Utf8> input, Pointer<Uint8> buf, int bufLen) fn,
       String input) {

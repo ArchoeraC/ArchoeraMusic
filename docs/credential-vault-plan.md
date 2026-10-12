@@ -66,6 +66,8 @@ app_config/
 - 格式：`magic(8B) | version | KDF 参数 | 条目表（每条: platform_id | salt | nonce | 密文 | 关联 uid）`；
 - 每条凭据独立 nonce/salt：支持**单条更新与删除**（重写整个 vault 或追加式日志+压缩）；
 - 统一承载：流媒体服务器密码、本地 Subsonic 账号、网易/酷狗 session（对齐「清除所有本地凭据」的覆盖面）。
+  **本地 Subsonic 用户密码**以 `uid=subsonic:<username>` 承载（SEC-01，2026-10-12）；服务端认证经
+  `archoera_subsonic_set_credentials` 注入内存表，`user.db.password_cipher` 仅空串占位。
 
 ### 3.2 主密钥管理（二选一）
 

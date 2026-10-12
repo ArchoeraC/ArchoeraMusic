@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/betastudio2/archoera-subsonic/credentials"
 	"github.com/betastudio2/archoera-subsonic/db"
 	"github.com/betastudio2/archoera-subsonic/model"
 	"github.com/betastudio2/archoera-subsonic/xmlutil"
@@ -62,9 +63,18 @@ func authenticate(u, p, t, s string) (*model.SubsonicUser, *SubError) {
 		return nil, &SubError{Code: 40, Message: "Wrong username or password"}
 	}
 
+	// 密码来源：优先内存凭据表（Dart 经 FFI 注入 / standalone 创建时写入），
+	// 未命中回退旧 user.db 密文解密结果（user.Password），保持：
+	//   - standalone/Docker：bootstrapAdmin 经 db.CreateUser 写入内存表；
+	//   - 未迁移旧库：旧密文仍可解密认证。
+	password := user.Password
+	if pw, ok := credentials.Get(u); ok {
+		password = pw
+	}
+
 	// token + salt 模式
 	if t != "" && s != "" {
-		expected := md5hex(user.Password + s)
+		expected := md5hex(password + s)
 		if expected != t {
 			return nil, &SubError{Code: 40, Message: "Wrong username or password"}
 		}
@@ -80,7 +90,7 @@ func authenticate(u, p, t, s string) (*model.SubsonicUser, *SubError) {
 				plain = string(decoded)
 			}
 		}
-		if plain != user.Password {
+		if plain != password {
 			return nil, &SubError{Code: 40, Message: "Wrong username or password"}
 		}
 		return user, nil

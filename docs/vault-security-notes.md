@@ -57,11 +57,14 @@
 
 ## 已知安全边界与缺口（如实声明）
 
-以下为**文档层评审已登记**的边界 / 缺口，本文档如实声明，**勿视为已防护项**（其中 SEC-04 / SEC-07 的**表述定性已修正**，SEC-06 已加固，其余为待修复项）。完整台账（含证据、影响、修复方向、状态与批次）见
+以下为**文档层评审已登记**的边界 / 缺口，本文档如实声明，**勿视为已防护项**（其中 SEC-04 / SEC-07 的**表述定性已修正**，SEC-01 已纳入 vault、SEC-06 已加固，其余为待修复项）。完整台账（含证据、影响、修复方向、状态与批次）见
 [security-review-2026-10-11.md](security-review-2026-10-11.md)：
 
-- **第二套密钥体系未纳入 vault**（SEC-01）：Subsonic 敏感字段以 `enc:v1:` 落在 `database/user.db`，密钥自举到 `dataDir/secret.key`——
-  vault 的 v1-v3 强度提升**不覆盖**此类凭据；
+- **Subsonic 用户密码已纳入 vault**（SEC-01，**已修复**）：用户密码不再以 `database/user.db` 的 `enc:v1:` 字段级加密 +
+  `dataDir/secret.key` 自举为唯一保护，而是经 vault 统一持久化（uid=`subsonic:<username>`，Dart `VaultSubsonicCredentialStore`）；
+  `password_cipher` 仅空串占位，服务端认证经 `archoera_subsonic_set_credentials` 注入内存凭据表。
+  旧库 `enc:v1:` 密码在 `SubsonicAdmin.open` 时解密迁入 vault（成功才置空该列，失败保留待重试）。
+  注：`secret.key` 与 v4-file 主密钥文件**同名且为同一文件**，现仅服务 vault file 模式；Subsonic 凭据不再依赖它（2026-10-12 修复）；
 - **v4-file 模式与主密钥 env**（SEC-02）：v4-file 为单因子（K 落盘 `secret.key`），选用即显式降级；
   原 `ARCHOERA_VAULT_SECRET_KEY` **env 注入已移除**，改为 `init-file --key-stdin`（不经 argv/env）——
   与 [credential-vault-plan.md](credential-vault-plan.md) §3.8「argv / 环境不携带任何凭据」一致；
