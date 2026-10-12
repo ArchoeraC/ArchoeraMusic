@@ -46,6 +46,13 @@
 > `org.kde.StatusNotifierItem`+`com.canonical.dbusmenu`（纯 libdbus）/ macOS
 > `NSStatusItem`。用于替代 Flutter 插件 `tray_manager`（其 0.6+ 引入 `nativeapi`/
 > `cnativeapi` 依赖，且第三方 C++ 在 MSVC 下有告警）。
+>
+> **SystemLocation 权限门禁（SEC-30，落地前必须满足）**：`locate()` 涉及敏感权限，实现必须满足四项——
+> ① **用户显式授权**（首次使用经系统权限对话框 / 明确 UI 提示，绝不静默采集）；② **可随时关闭**；
+> ③ **仅用于天气功能本身**；④ **不做二次利用**（不落盘、不上传、不用于定位以外目的）。
+> 未授权 / 用户关闭 / 平台无能力时 `locate()` 抛可回退错误，由天气层走「系统 → IP」回退链（§3 空实现静默降级）；
+> 禁止后台静默采集或无 UI 授权时调用。对齐 [CONTRIBUTING.md](../CONTRIBUTING.md) §2.5 与
+> [AGENTS.md](../AGENTS.md) 最小权限原则。
 
 ### 2.2 不属于本层（边界标注）
 
