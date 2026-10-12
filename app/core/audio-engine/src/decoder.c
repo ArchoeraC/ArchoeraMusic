@@ -365,13 +365,18 @@ int decoder_read_frame(Decoder *d, AVFrame **out_frame)
         if (ret == 0) {
             /* seek 样本级对齐：丢弃目标前的整帧 / 裁剪跨界帧的前导样本 */
             if (d->seek_trim_us > 0) {
-                if (d->frame->pts == AV_NOPTS_VALUE) {
-                    d->seek_trim_us = 0; /* 无 PTS：放弃裁剪，避免死循环 */
+                /* 优先 frame->pts；缺失时回退 best_effort_timestamp（FFmpeg 由
+                 * packet PTS 推导），避免个别帧无 pts 就整体放弃裁剪 → 首帧落在
+                 * 目标之前的关键帧/帧边界（听感为「seek 落点偏早、固定偏差」）。 */
+                int64_t fpts = d->frame->pts;
+                if (fpts == AV_NOPTS_VALUE) fpts = d->frame->best_effort_timestamp;
+                if (fpts == AV_NOPTS_VALUE) {
+                    d->seek_trim_us = 0; /* 无任何时间戳：放弃裁剪，避免死循环 */
                 } else {
                     AVStream *st = d->fmt_ctx->streams[d->stream_index];
                     int sr = d->frame->sample_rate > 0
                                  ? d->frame->sample_rate : d->dec_ctx->sample_rate;
-                    int64_t pts_us = av_rescale_q(d->frame->pts, st->time_base,
+                    int64_t pts_us = av_rescale_q(fpts, st->time_base,
                                                   (AVRational){1, AV_TIME_BASE});
                     int64_t dur_us = (sr > 0)
                         ? (int64_t)d->frame->nb_samples * 1000000 / sr : 0;
@@ -390,7 +395,7 @@ int decoder_read_frame(Decoder *d, AVFrame **out_frame)
                         frame_skip_samples(d->frame, skip);
                         /* pts 同步前移到裁剪后的首个样本 */
                         if (sr > 0) {
-                            d->frame->pts += av_rescale_q(skip,
+                            d->frame->pts = fpts + av_rescale_q(skip,
                                 (AVRational){1, sr}, st->time_base);
                         }
                     }

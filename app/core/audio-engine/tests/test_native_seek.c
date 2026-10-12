@@ -91,6 +91,19 @@ int main(int argc, char **argv)
     /* Stable(FFmpeg) 对照：同 offset 语义不回归 */
     CHECK(run_offset_case(path, 0, 150) == 0, "Stable  offset=150ms 解码到 EOF");
 
+#ifndef _WIN32
+    /* file:// URI 本地源：与裸路径等价（EraAudio 原生解析 file:// → 绝对路径）。
+       ctest 传入的 fixture 为绝对路径（以 '/' 开头）→ `file://` + path 即 `file:///…`。 */
+    if (path[0] == '/') {
+        char uri[8192];
+        snprintf(uri, sizeof(uri), "file://%s", path);
+        CHECK(run_offset_case(uri, 1, 0) == 0, "EraAudio file:// URI 解码到 EOF");
+        CHECK(run_offset_case(uri, 1, 150) == 0, "EraAudio file:// URI offset=150ms");
+    } else {
+        fprintf(stderr, "skip file:// case (relative fixture path)\n");
+    }
+#endif
+
     if (g_fail) {
         fprintf(stderr, "test_native_seek: FAILED\n");
         return 1;

@@ -56,6 +56,7 @@ extern "C" {
 #define APL_CAP_DEEP_LINK          (1u << 9) /* 自定义 URI scheme 唤醒（archoera://） */
 #define APL_CAP_REVEAL_PATH        (1u << 10) /* 文件管理器定位路径（定位文件/打开所在目录） */
 #define APL_CAP_TRAY               (1u << 11) /* 系统托盘图标 + 上下文菜单 */
+#define APL_CAP_SECURE_FILE        (1u << 12) /* 安全文件原语（原生 open(2)：免 TOCTOU 读/原子写） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -136,6 +137,28 @@ APL_API int32_t apl_notify(const char *title, const char *body);
  * 相对路径被拒绝（ERR_STATE）。本能力只定位/打开，不执行目标。
  * 返回 APL_OK / 负错误码（路径不存在 / 无可用文件管理器）。 */
 APL_API int32_t apl_reveal_path(const char *path);
+
+/* ── 安全文件原语（原生 open(2)，能力位 APL_CAP_SECURE_FILE）──────────
+ * 供 Dart `SafeFile`（app/lib/utils/safe_file.dart）消除纯 dart:io 的 TOCTOU 残余。
+ * 输入契约同 apl_reveal_path（SEC-31）：仅接受**绝对本地路径**，拒绝 URI（`://`）
+ * 与相对路径；实现一律以普通用户权限完成，不提权、不跟随到系统目录。
+ *
+ * [apl_file_read] 两段式（缓冲所有权归调用方；本模块永不返回需 Dart 释放的内存）：
+ *   - out == NULL ：仅探测大小，成功写 *inout_len = 文件字节数；
+ *   - out != NULL ：*inout_len 为 out 容量（须 >= 文件大小），成功读满并写回实际长度。
+ * 打开采用 `O_RDONLY|O_NONBLOCK`（allow_symlink==0 时追加 `O_NOFOLLOW`），随后按
+ * **句柄** `fstat` 判定必须是普通文件：FIFO / 设备 / 目录 / 符号链接（拒绝时）/ 超过
+ * max_bytes 一律返回负值（`O_NONBLOCK` 保证 FIFO 打开阶段不阻塞）。
+ * 返回 APL_OK / APL_ERR_STATE（参数非法 / 非普通文件 / 超限 / 缓冲不足）
+ * / APL_ERR_BACKEND（打开或读取失败）。 */
+APL_API int32_t apl_file_read(const char *path, int32_t allow_symlink, int64_t max_bytes,
+                              uint8_t *out, size_t *inout_len);
+
+/* 原子写 [len] 字节：同目录随机唯一临时名以 `O_CREAT|O_EXCL|O_NOFOLLOW` 独占创建
+ * → 写全 → fsync → `rename` 覆盖 [path]（`rename` 不跟随符号链接，符号链接**只被
+ * 替换、不被穿透**）。目录须已存在（调用方负责创建父目录）。
+ * 返回 APL_OK / APL_ERR_STATE（参数非法）/ APL_ERR_BACKEND（创建/写/改名失败）。 */
+APL_API int32_t apl_file_write_atomic(const char *path, const uint8_t *data, size_t len);
 
 /* 一次性读取系统主题色（0=成功并写 r/g/b，0-255；<0=不可得）。
  * 注：应用层不应主动轮询/查询系统色；正常路径是 apl_system_accent_set_events

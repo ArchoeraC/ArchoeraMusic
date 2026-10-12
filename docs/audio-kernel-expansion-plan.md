@@ -115,6 +115,7 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 | N4 | **缓冲策略** | 每路 callback Reader 私有缓冲与目标内存预算（对齐 `audio-memory-source.md`） |
 | N5 | **去 FFmpeg 传输依赖（可选）** | ✅ **在线直链部分已落（2026-10-01）**：改由**内核原生 HTTP(S)**（`kernel/net.zig`）优先传输（非“纯宿主”方案），不再经 FFmpeg AVIO；宿主 AVIO 保留为回退。可选后续：本地/封装侧是否也摆脱 FFmpeg 传输栈 |
 | N6 | **格式覆盖** | 确认 cb 路径下各接管格式（flac/wav/mp3/opus…）seek/时长语义一致 |
+| N7 | **`file:` URI 本地源（✅ 2026-10-12）** | 内核原生解析 `file://` → 绝对路径（`kernel/uri.zig`：百分号解码 / 盘符 / localhost / UNC），`Reader.openSource[With]` 接入 `decoder.open`/`openHinted`/`openMeta`；C 壳 `source_is_url` 仅认 http(s)，`file:` 走本地分支（native 优先，FFmpeg 兜底亦识别 `file:`） |
 
 ### 3.3 红线
 

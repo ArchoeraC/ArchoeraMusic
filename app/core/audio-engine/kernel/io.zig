@@ -22,6 +22,7 @@
 
 const std = @import("std");
 const Error = @import("error.zig").Error;
+const uri = @import("uri.zig");
 
 /// 输入形态
 pub const Kind = enum { file, memory, callback };
@@ -96,6 +97,23 @@ pub const Reader = struct {
     /// 打开本地文件（file 形态；便捷入口，使用进程全局单线程 Io 实例）
     pub fn openPath(path: []const u8) Error!Reader {
         return openPathWith(std.Io.Threaded.global_single_threaded.io(), path);
+    }
+
+    /// 打开本地源（file 形态）：接受**裸路径**或 `file:` URI（见 kernel/uri.zig）。
+    /// `file:` URI 先解析为绝对路径（百分号解码 / 盘符 / localhost），再走 openPathWith。
+    /// 解析缓冲仅覆盖本次调用（文件句柄独立于路径切片），故即时释放。
+    pub fn openSourceWith(io: std.Io, allocator: std.mem.Allocator, source: []const u8) Error!Reader {
+        if (uri.isFileUri(source)) {
+            const path = try uri.fileUriToPath(allocator, source);
+            defer allocator.free(path);
+            return openPathWith(io, path);
+        }
+        return openPathWith(io, source);
+    }
+
+    /// 打开本地源（便捷入口，使用进程全局单线程 Io 实例）。
+    pub fn openSource(allocator: std.mem.Allocator, source: []const u8) Error!Reader {
+        return openSourceWith(std.Io.Threaded.global_single_threaded.io(), allocator, source);
     }
 
     /// 以内存切片构造（零拷贝、零分配）
@@ -610,6 +628,45 @@ test "openPath: 文件 read/peek/seek/size" {
 
 test "openPath: 不存在的文件返回 OpenFailed" {
     try testing.expectError(error.OpenFailed, Reader.openPath("/nonexistent/definitely-missing.bin"));
+}
+
+test "openSource: file:// URI 与裸路径等价（含百分号解码）" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const data = "uri-content-42";
+    const f = try tmp.dir.createFile(io, "u b.bin", .{}); // 文件名含空格 → 触发百分号解码
+    try std.Io.File.writeStreamingAll(f, io, data);
+    std.Io.File.close(f, io);
+
+    const rel = try std.fs.path.join(testing.allocator,
+        &.{ ".zig-cache", "tmp", tmp.sub_path[0..], "u b.bin" });
+    defer testing.allocator.free(rel);
+    const abs = try std.Io.Dir.realPathFileAlloc(.cwd(), io, rel, testing.allocator);
+    defer testing.allocator.free(abs);
+    // 绝对路径以 '/' 开头 → `file://` + abs == `file:///…`；空格转 %20。
+    const uri_raw = try std.fmt.allocPrint(testing.allocator, "file://{s}", .{abs});
+    defer testing.allocator.free(uri_raw);
+    try testing.expect(std.mem.indexOf(u8, uri_raw, " ") != null);
+
+    // 1) 裸路径与 file:// 等价的十六进制转义：手工把空格换成 %20。
+    var enc = std.ArrayList(u8).empty;
+    defer enc.deinit(testing.allocator);
+    for (uri_raw) |c| {
+        if (c == ' ') try enc.appendSlice(testing.allocator, "%20") else try enc.append(testing.allocator, c);
+    }
+
+    var r = try Reader.openSource(testing.allocator, enc.items);
+    defer r.deinit();
+    try testing.expectEqual(@as(u64, data.len), try r.size());
+    var buf: [data.len]u8 = undefined;
+    try testing.expectEqual(@as(usize, data.len), try r.read(&buf));
+    try testing.expectEqualStrings(data, &buf);
+
+    // 2) 裸路径本身仍可用（openSource 对非 file:// 直通）。
+    var r2 = try Reader.openSource(testing.allocator, rel);
+    defer r2.deinit();
+    try testing.expectEqual(@as(u64, data.len), try r2.size());
 }
 
 test "callback 形态: 基本读取" {

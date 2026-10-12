@@ -265,8 +265,11 @@ vault 进程**入口即硬化**（`main` 调 `guard::harden_process()`，**覆�
   把配置软链到 dotfiles 的用户；锚点/签名/标记用 false）+ 长度上限；**写**走「同目录随机唯一临时名 → `rename`」，
   符号链接**只被替换、不被穿透**。擦除器（`data_destroyer`）只擦**普通文件**，且不再把非普通路径交给
   Go 代理（其覆盖写会顺链抹掉目标）。→ 此前「植入 FIFO 即冻结界面 / 顺链覆盖任意文件」的**确定性**攻击面消除。
-  **残余（如实）**：`dart:io` 无 `O_NONBLOCK`/`O_NOFOLLOW`，类型判定与真正读写之间存在极窄 TOCTOU 窗口
-  （需精确抢时）；彻底关闭需经 `app/native/platform` 走原生 `open(2)`，当前未做。
+  **残余（仅纯 Dart 回退路径，如实）**：`dart:io` 无 `O_NONBLOCK`/`O_NOFOLLOW`，类型判定与真正读写之间
+  存在极窄 TOCTOU 窗口（需精确抢时）——仅在原生后端不可用（桥接缺失 / 非桌面 / 单测）时存在。
+  **已落地（关闭该残余）**：`app/native/platform` 新增原生 `open(2)` 能力（`APL_CAP_SECURE_FILE`，ABI v4：
+  `apl_file_read` / `apl_file_write_atomic`——`O_NOFOLLOW`/`O_NONBLOCK` 打开后按**句柄** `fstat` 判普通文件；
+  写走独占临时名 + `rename`）；能力可用时 `SafeFile` 自动切到原生后端（`SafeFile.backend`）。
 - **Windows 内存读取面**（SEC-39，**应用层不可封闭**）：Windows 无「禁同用户读进程内存」的等价物
   （ACG/CIG/StrictHandle 均不拦 `OpenProcess(PROCESS_VM_READ)` + `ReadProcessMemory`），故同用户进程可在会话期
   读走主密钥与刚流经的凭据（`mlock`/`VirtualLock` 只防换页、不防读）。配套：DPAPI 份额**不带 `pOptionalEntropy`**

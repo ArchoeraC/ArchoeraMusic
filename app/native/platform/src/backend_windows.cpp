@@ -1363,7 +1363,8 @@ bool trayAlive() {
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
-           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY;
+           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY |
+           CAP_SECURE_FILE;
 }
 
 int32_t init() {
@@ -1604,6 +1605,108 @@ int32_t revealPath(const char* path) {
     const HRESULT hr = ::SHOpenFolderAndSelectItems(pidl, 0, nullptr, 0);
     ::ILFree(pidl);
     return SUCCEEDED(hr) ? OK : ERR_BACKEND;
+}
+
+// ── 安全文件原语（Win32 CreateFileW；见 APL_CAP_SECURE_FILE）────────
+// 打开后按**句柄**分类：仅普通磁盘文件放行（管道/字符设备/目录一律拒绝；
+// allow_symlink==0 时以 FILE_FLAG_OPEN_REPARSE_POINT 打开并拒绝重解析点）。
+static int32_t winClassifyHandle(HANDLE h, bool reject_reparse, int64_t max_bytes,
+                                 uint64_t* out_size) {
+    if (::GetFileType(h) != FILE_TYPE_DISK) return ERR_STATE;  // 管道/字符设备
+    BY_HANDLE_FILE_INFORMATION info{};
+    if (!::GetFileInformationByHandle(h, &info)) return ERR_BACKEND;
+    if ((info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) return ERR_STATE;
+    if (reject_reparse && (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+        return ERR_STATE;  // 符号链接/挂载点（O_NOFOLLOW 语义）
+    }
+    const uint64_t size =
+        (static_cast<uint64_t>(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
+    if (max_bytes > 0 && size > static_cast<uint64_t>(max_bytes)) return ERR_STATE;
+    if (out_size != nullptr) *out_size = size;
+    return OK;
+}
+
+int32_t fileRead(const char* path, bool allow_symlink, int64_t max_bytes, uint8_t* out,
+                 size_t* inout_len) {
+    if (path == nullptr || inout_len == nullptr || max_bytes <= 0) return ERR_STATE;
+    const std::wstring w = utf8ToWideLocal(path);
+    if (w.empty()) return ERR_STATE;
+    DWORD flags = FILE_ATTRIBUTE_NORMAL;
+    if (!allow_symlink) flags |= FILE_FLAG_OPEN_REPARSE_POINT;
+    HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                             nullptr, OPEN_EXISTING, flags, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return ERR_BACKEND;
+    uint64_t size = 0;
+    const int32_t rc = winClassifyHandle(h, !allow_symlink, max_bytes, &size);
+    if (rc != OK) {
+        ::CloseHandle(h);
+        return rc;
+    }
+    if (out == nullptr) {  // 探测大小
+        ::CloseHandle(h);
+        *inout_len = static_cast<size_t>(size);
+        return OK;
+    }
+    if (*inout_len < static_cast<size_t>(size)) {
+        ::CloseHandle(h);
+        return ERR_STATE;
+    }
+    size_t got = 0;
+    while (got < static_cast<size_t>(size)) {
+        uint64_t remain = static_cast<uint64_t>(size) - got;
+        DWORD want = remain > (1u << 20) ? (1u << 20) : static_cast<DWORD>(remain);
+        DWORD rd = 0;
+        if (!::ReadFile(h, out + got, want, &rd, nullptr)) {
+            ::CloseHandle(h);
+            return ERR_BACKEND;
+        }
+        if (rd == 0) break;  // 并发截断
+        got += rd;
+    }
+    ::CloseHandle(h);
+    *inout_len = got;
+    return OK;
+}
+
+int32_t fileWriteAtomic(const char* path, const uint8_t* data, size_t len) {
+    if (path == nullptr || (len > 0 && data == nullptr)) return ERR_STATE;
+    const std::wstring w = utf8ToWideLocal(path);
+    if (w.empty()) return ERR_STATE;
+    // 同目录随机唯一临时名（CREATE_NEW 独占；预置同名符号链接会直接失败）。
+    static std::atomic<uint64_t> counter{0};
+    const uint64_t seq = counter.fetch_add(1, std::memory_order_relaxed);
+    const std::wstring tmp = w + L".archoera-safe." +
+                             std::to_wstring(::GetCurrentProcessId()) + L"." +
+                             std::to_wstring(seq) + L".tmp";
+    HANDLE h = ::CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                             FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return ERR_BACKEND;
+    bool ok = true;
+    size_t written = 0;
+    while (written < len) {
+        size_t remain = len - written;
+        DWORD want = remain > (1u << 20) ? (1u << 20) : static_cast<DWORD>(remain);
+        DWORD wr = 0;
+        if (!::WriteFile(h, data + written, want, &wr, nullptr)) {
+            ok = false;
+            break;
+        }
+        written += wr;
+    }
+    if (ok && !::FlushFileBuffers(h)) ok = false;
+    ::CloseHandle(h);
+    if (!ok) {
+        ::DeleteFileW(tmp.c_str());
+        return ERR_BACKEND;
+    }
+    // 原子替换目标（MOVEFILE_REPLACE_EXISTING：符号链接只被替换、不被穿透）。
+    if (!::MoveFileExW(tmp.c_str(), w.c_str(),
+                       MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        ::DeleteFileW(tmp.c_str());
+        return ERR_BACKEND;
+    }
+    return OK;
 }
 
 // ── 系统托盘接口 ──────────────────────────────────────────────────
