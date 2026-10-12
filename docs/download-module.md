@@ -179,7 +179,8 @@ Step 2  Rust enqueue() 内部同步执行：
   ├─ ② 路径 & 文件名：
   │    · subDir = match strategy { Flat=>"", BySource=>"/Kugou", ByArtist=>"/周杰伦" }
   │    · filename = sanitize("{artist} - {title}.{guess_ext(quality)}")
-  │       非法字符 \/:*?"<>| → _
+  │       非法字符 \/:*?"<>| → _；ASCII 控制字符 → _；首尾空白与点号去除
+  │       （"." / ".." / 全点串 → 空 → 回退 "untitled"；歌手空 → ByArtist 平铺）
   │       已存在同路径 → 追加 " (1)" → "(2)" ...
   │    · destPath = rootDir + subDir + "/" + filename
   │    · tmpPath  = destPath + ".tmp"
@@ -189,6 +190,22 @@ Step 2  Rust enqueue() 内部同步执行：
        否则 → 状态 = queued，等待 pick_next()
        无论哪种都先 push_event({type:'state',taskId,from:'',to:'queued'|'resolving'})
 ```
+
+#### 3.3.1 路径安全契约（SEC-11 / SEC-33）
+
+- **派生路径不出根（SEC-11）**：`subDir` / 文件名 / 目录整理模板变量**一律经统一 `sanitize`**——
+  `\ / : * ? " < > |` 与 ASCII 控制字符 → `_`，并去除首尾空白与点号。故由元数据派生的
+  `..` / `...`（含全点串）、`../..`、`/etc`、`C:\` 等**不可能形成 `..` 路径段或绝对路径**；
+  `destPath` 恒落在 `rootDir` 之下（单测 `compute_base_path_stays_within_root` 覆盖三策略 ×
+  多模板 × 恶意标签组合）。空结果按各调用点回退（歌手空 → 平铺；文件名空 → `untitled`）。
+- **临时文件与同名非普通文件（SEC-33）**：
+  - 新建 `.tmp` 用 `O_CREAT|O_EXCL`（`create_new`）——**已存在同名（含预置符号链接）直接失败**，绝不跟随；
+  - 断点续传守卫：先用 `symlink_metadata`（**不跟随**）判定，仅**普通文件**可续传；符号链接 / 目录 /
+    其它非普通文件一律删除后按全新下载处理；续传打开叠加 `O_NOFOLLOW` 覆盖竞态；
+  - 落盘 `finalize`：`rename(tmp→dest)` 前拒绝「目标为目录 / 符号链接」；跨盘 copy 兜底再叠加
+    `O_NOFOLLOW`（避免 `File::create` 跟随预置链接写到链接指向处）。
+  - 平台差异：`O_NOFOLLOW` 仅 Unix 生效；Windows 创建符号链接默认需特权，风险面较小。
+  - 单测：`finalize_tests`（正常 rename / 拒绝符号链接 dest / 拒绝目录 dest / 拒绝符号链接 tmp）。
 
 ### 3.4 Rust 内部：平台 URL 解析（纯 Rust，算法下沉的核心）
 
