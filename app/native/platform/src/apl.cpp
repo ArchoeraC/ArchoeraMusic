@@ -11,8 +11,23 @@
 #include "backend.h"
 #include "core.h"
 
+#include <cstring>
+
 namespace {
 constexpr int32_t kAbiVersion = 3;
+
+// SEC-31：reveal 路径输入契约——仅接受应用内已解析的**绝对本地路径**。
+// 拒绝空串、URI（`scheme://`，含 `file://`/`http://`）与相对路径；C 串天然在 NUL 截断。
+bool isAbsoluteLocalPath(const char* p) {
+#ifdef _WIN32
+    // `X:\` / `X:/` 盘符绝对路径，或 `\\server\share` UNC。
+    if (p[0] == '\\' && p[1] == '\\') return true;
+    const bool alpha = (p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z');
+    return alpha && p[1] == ':' && (p[2] == '\\' || p[2] == '/');
+#else
+    return p[0] == '/';
+#endif
+}
 }  // namespace
 
 extern "C" {
@@ -135,6 +150,9 @@ int32_t apl_notify(const char* title, const char* body) {
 int32_t apl_reveal_path(const char* path) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     if (path == nullptr || *path == '\0') return archoera::ERR_STATE;
+    // SEC-31：仅接受应用内已解析的绝对本地路径；拒绝 URI 与相对路径。
+    if (std::strstr(path, "://") != nullptr) return archoera::ERR_STATE;
+    if (!isAbsoluteLocalPath(path)) return archoera::ERR_STATE;
     return archoera::revealPath(path);
 }
 
