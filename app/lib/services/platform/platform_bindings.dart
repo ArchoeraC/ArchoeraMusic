@@ -20,6 +20,7 @@ import 'dart:ui' show Color;
 import 'package:ffi/ffi.dart';
 
 import '../log/log.dart';
+import '../native_integrity.dart';
 import '../native_lib_paths.dart';
 import 'system_media.dart';
 
@@ -499,6 +500,7 @@ class PlatformBindings {
     final path = NativeLibPaths.resolve(NativeModule.platformBridge);
     if (path == null) return null;
     try {
+      NativeIntegrity.verifyOrThrow(path);
       final lib = DynamicLibrary.open(path);
       final b = PlatformBindings._(lib);
       if (b._version() != aplAbiVersion) return null; // 契约版本不符 → Noop

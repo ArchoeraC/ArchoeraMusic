@@ -519,6 +519,10 @@ jobs:
           # 新增/改写 dylib 会使原 ad-hoc 签名失效（Apple Silicon 拒载未签名 dylib）→ 重签整包
           codesign --force --deep --sign - "$APP"
 
+          # 原生库完整性清单（SEC-08）：必须在 dylibbundler + codesign **之后**生成——
+          # 二者都会改写 dylib 字节，早于它们生成即失效（Dart 侧将 fail-closed 拒载）。
+          sh app/tool/gen_native_manifest.sh "$NATIVE" "$APP/Contents/MacOS/archoera_music"
+
           echo "native/ 内容:"
           ls -la "$NATIVE"
 
@@ -949,6 +953,51 @@ jobs:
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           path: artifacts
+
+      # SEC-08：在目录被压缩成 assets/*.tar.gz 之前，对已打包 native/ 的
+      # ARCHOERA-NATIVE-MANIFEST.txt 做 key1 分离签名（<manifest>.sig1），
+      # 运行期 NativeIntegrity 用二进制内嵌公钥验签（防「换库+重算摘要」）。
+      # 注：Inno Setup .exe 与已构建的发行版安装包（deb/rpm/AppImage/flatpak/
+      # pkg.tar.zst/nixos）**不在此重签**——它们各自依赖包管理器签名 / 外层
+      # .sig1 校验；此处只覆盖会被运行期清单校验读取的目录型产物与便携 zip。
+      - name: 签名原生完整性清单（SEC-08）
+        shell: bash
+        env:
+          ARCHOERA_WM_KEY1_PEM: ${{ secrets.ARCHOERA_WM_KEY1_PEM }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ARCHOERA_WM_KEY1_PEM:-}" ]; then
+            echo "未配置 ARCHOERA_WM_KEY1_PEM，跳过原生清单签名（不影响出包）"
+            exit 0
+          fi
+          sign_dir() {
+            if [ -d "$1" ]; then
+              bash app/tool/sign_native_manifest.sh "$1"
+            else
+              echo "跳过（目录不存在）：$1"
+            fi
+          }
+          sign_dir artifacts/ArchoeraMusic-macos-arm64/archoera_music.app/Contents/native
+          sign_dir artifacts/ArchoeraMusic-windows-x64/native
+          sign_dir artifacts/ArchoeraMusic-linux-x64/native
+          # Windows 便携 zip：解压 → 签名其中清单 → 原地同文件名重压。
+          for z in artifacts/ArchoeraMusic-windows-extra/*.zip; do
+            [ -f "$z" ] || continue
+            tmp="$(mktemp -d)"
+            unzip -q "$z" -d "$tmp"
+            d="$(dirname "$(find "$tmp" -name ARCHOERA-NATIVE-MANIFEST.txt -print -quit)")"
+            if [ -f "$d/ARCHOERA-NATIVE-MANIFEST.txt" ]; then
+              bash app/tool/sign_native_manifest.sh "$d"
+              zabs="$(readlink -f "$z")"
+              rm -f "$zabs"
+              (cd "$tmp" && zip -q -r "$zabs" .)
+              echo "→ 重签 $z"
+            else
+              echo "跳过（zip 内无清单）：$z"
+            fi
+            rm -rf "$tmp"
+          done
+          echo "── 原生清单签名完成 ──"
 
       - name: Assemble release assets
         shell: bash

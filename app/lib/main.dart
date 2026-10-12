@@ -14,6 +14,7 @@ import 'apis/runtime.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'theme/app_theme.dart';
 import 'services/log/log.dart';
+import 'services/mcp/mcp_key_store.dart';
 import 'services/platform/platform_capabilities.dart';
 import 'services/deeplink/deep_link_router.dart';
 import 'services/power/frame_governor.dart';
@@ -127,6 +128,14 @@ Future<void> main(List<String> args) async {
   // 流媒体服务器凭据从 vault 预取进内存缓存（[load] 同步接口的凭据来源，
   // 首帧读取前完成，避免同步接口依赖异步会话）
   await StreamingStore.preloadSecrets();
+  // MCP 访问密钥（SEC-10）：权威存储于凭据保险库（uid `mcp:accessKey`），
+  // 历史明文 `prefs.json` 值一次性迁移并清除。vault 不可用时回退历史值，
+  // 绝不阻断启动（MCP 服务会在需要时按需重新生成密钥）。
+  try {
+    await McpKeyStore.load(resolveDataDir());
+  } catch (e) {
+    Log.w('mcp', 'MCP 访问密钥加载失败（将按需重新生成）：$e');
+  }
   // 偏好实时快照 → apis 层 getSetting（TTML 开关、服务端模板等）；根组件会
   // 在偏好变化时刷新该快照，保证设置页改动即时生效（无需重启）。
   appPrefsSnapshot = prefs;

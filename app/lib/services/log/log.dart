@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
+import '../native_integrity.dart';
 import '../native_lib_paths.dart';
 
 /// 统一日志级别（数值与 `app/native/log/include/archoera_log.h` 一一对应）。
@@ -69,6 +70,7 @@ class Log {
     try {
       final path = NativeLibPaths.resolve(NativeModule.log);
       if (path == null) return null;
+      NativeIntegrity.verifyOrThrow(path);
       final b = _LogBinding(DynamicLibrary.open(path));
       _binding = b;
       return b;
@@ -95,6 +97,7 @@ class Log {
     try {
       final path = NativeLibPaths.resolve(NativeModule.log);
       if (path != null) {
+        NativeIntegrity.verifyOrThrow(path);
         final binding = _LogBinding(DynamicLibrary.open(path));
         final Pointer<Utf8> dirPtr = (dir == null || dir.isEmpty)
             ? nullptr.cast<Utf8>()
@@ -167,13 +170,17 @@ class Log {
 
   /// 敏感字段脱敏（SEC-09）：与原生核心 `archoera_log_scrub` 规则一致。
   /// 覆盖 `key=value` 与 `key: value`（后者掩码到行尾），大小写不敏感。
-  /// 单字母短键（Subsonic p/t/s）不掩码，属已知接受项。
+  /// Subsonic 单字母查询键 p/t/s 仅在查询上下文（紧跟 `?`/`&` 且后接 `=`）时
+  /// 掩码，避免误伤普通文本里的 `top=2`/`step=1`/`t=1`。
   static const List<String> _sensitiveKeys = [
     'token', 'access_token', 'refresh_token', 'id_token', 'cookie',
     'set-cookie', 'password', 'passwd', 'pwd', 'secret', 'client_secret',
     'secret_key', 'signature', 'sig', 'api_key', 'apikey', 'api-key',
     'access_key', 'authorization', 'auth', 'session', 'sessionid',
     'session_id', 'jsessionid', 'csrf', 'xsrf',
+    // SEC-10：MCP 访问密钥请求头（`-` 属 key 字符，token 整体为
+    // `x-archoera-key`，故必须按整串登记，登记 `archoera-key` 不会命中）。
+    'x-archoera-key',
   ];
 
   static final String _sensitiveAlt =
@@ -186,12 +193,21 @@ class Log {
     '^(\\s*)($_sensitiveAlt)(\\s*:\\s*)(.*)\$',
     caseSensitive: false,
   );
+  /// 短查询键 p/t/s：左界为 `?`/`&`，仅掩码其值。
+  /// `=` 两侧容忍空白（与原生 `era_mask_value` 跳过空格/Tab 的行为一致，
+  /// 防 `?t =value` / `?t\t=value` 绕过）。
+  static final RegExp _shortQueryEq = RegExp(
+    '(?<=[?&])(p|t|s)(\\s*=\\s*)([^&\\s"\'`)\\]},;>]+)',
+    caseSensitive: false,
+  );
 
   /// 把一行/多行文本中的敏感值替换为等长 `*`。
   static String scrub(String text) {
     return text.split('\n').map((line) {
       var l = line.replaceAllMapped(
           _kvEq, (m) => '${m[1]}${m[2]}${'*' * (m[3]!.length)}');
+      l = l.replaceAllMapped(
+          _shortQueryEq, (m) => '${m[1]}${m[2]}${'*' * (m[3]!.length)}');
       l = l.replaceAllMapped(
           _kvColon, (m) => '${m[1]}${m[2]}${m[3]}${'*' * (m[4]!.length)}');
       return l;

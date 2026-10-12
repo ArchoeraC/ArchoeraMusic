@@ -151,11 +151,12 @@
   超出功能声明范围的数据采集（越权读文件 / 凭据 / 通讯录、绕过系统权限、隐蔽采集、
   从日志缓存提取他人数据等）一律禁止。用户显式授权的能力（如天气功能的系统定位）必须走
   平台能力外观层（`docs/platform-capability-facade.md`）：可关闭、仅用于该功能本身、不做二次利用。
-  **边界澄清（SEC-13）**：本条针对的是**上传 / 跨应用追踪 / 服务端关联**；两类**仅本机**的标识读取
-  属**列举例外**，但均须满足「仅本机使用、绝不上传、可关闭或可重置、隐私政策披露」——
-  ① v3 设备绑定（`device-bound-vault-plan.md`，**opt-in、默认关闭**）读取 `machine-id` / `MachineGuid` /
-  `IOPlatformUUID`，仅用于本机份额解封；② 下载器用户级随机指纹（`downloader-identity-plan.md`，
-  prefs `downloaderIdentity`）首次生成后本机持久化、设置页「重置设备指纹」可清除，不用于跨应用追踪。
+  **边界澄清（SEC-13）**：本条针对的是**上传 / 跨应用追踪 / 服务端关联**；**仅本机**的标识读取
+  属**列举例外**，但须满足「仅本机使用、绝不上传、可关闭或可重置、隐私政策披露」——
+  下载器用户级随机指纹（`downloader-identity-plan.md`，prefs `downloaderIdentity`）首次生成后本机持久化、
+  设置页「重置设备指纹」可清除，不用于跨应用追踪。
+  （注：旧 v3 设备绑定读取 `machine-id` / `MachineGuid` / `IOPlatformUUID` 的例外**已随 vault 重架构移除**——
+  现行 vault 设备因子为每安装随机 `device.key`，**不采集任何设备指纹**。）
   新增任何此类本机标识采集前，必须同步更新 `docs/privacy.md` 披露其来源与用途。
 - **禁止音乐平台之外的账户登录**：账户体系仅限音乐内容提供方——在线音乐平台
   （网易云 / 酷狗 / QQ 音乐）与用户自托管音乐服务端（Subsonic / Jellyfin，凭据仅在本机与该服务端间
@@ -290,7 +291,8 @@ cd app && flutter run -d linux      # 本地调试
 - NativeAOT 约束：避免重型反射 / `dynamic` / 未注解的序列化，发布模式必须可 AOT。
 - vault 属安全边界：修改握手协议 / marker / 份额存储逻辑需同步更新
   [docs/vault-security-notes.md](docs/vault-security-notes.md)，
-  且测试改动不得把测试后门（`VAULT_TESTING` 条件编译）引入生产构建路径。
+  且测试改动不得把测试专用逻辑引入生产构建路径（SEC-19 已删除测试明文存储后门 `InsecureFileStore`；
+  `VAULT_TESTING` 仅保留构建标记，存储后端与生产一致）。
 
 ### 5.4 C++（`app/core/scraper/`）
 
@@ -448,14 +450,19 @@ PR 描述需包含：
   一律按 [SECURITY.md](SECURITY.md) 走私密渠道（GitHub 私密漏洞报告），禁止公开 Issue / PR / Discussion
   讨论；修复发布前不公开细节。**正常缺陷**（UI Bug / 调用 bug / 通讯异常 / 崩溃等）仍走公开 Issue（§12）。
 - **vault 边界**（[docs/vault-security-notes.md](docs/vault-security-notes.md) 为规范文本）：
-  - 测试后门 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 仅存在于 `build-test.sh` 产物，
-    绝不允许出现在生产构建路径或发布产物；
+  - 测试构建（`build-test.sh` → `archoera-vault-test`）与生产唯一区别是构建标记（TEST）；
+    存储后端一致（SEC-19 已删除测试明文存储后门，headless 测试用生产 `FileStore`），
+    测试产物绝不允许出现在生产构建路径或发布产物；
+  - 支持的模式只有 **crypto（默认，`'C'`）** 与 **slots（`'S'`：m1 / m2a / m2b）**；其中 **m2b 为本机级·较弱**（单因子、无口令无恢复，推荐 `m1`/`m2a`）；旧 v1/v2/v3 模式与
+    `init`/`init-password`/`init-device`/`switch-mode` 等命令**已移除**，旧 vault 无迁移（重置）；
   - PROD marker 双重校验（`--version` + 握手 marker）逻辑不得削弱，改动需同步
     `docs/vault-security-notes.md` 与 `docs/credential-vault-plan.md`；
-    **注意其定位是「防误用测试构建」而非二进制完整性防护**（marker 为可自报字符串，可被自编译后门伪造，见 `docs/vault-security-notes.md` §构建标记校验）；
-  - 新增 env 开关遵循同一信任边界思路：显式 env 只服务测试/CI，生产路径不得设置。
-- **凭据落盘**一律走 vault（2-of-2），禁止明文写配置 / 数据库 / 日志；`enc:v1:` 字段级加密仅供旧库迁移回退，
-  新凭据（含本地 Subsonic 用户密码，SEC-01）不得再引入，统一以 `uid` 承载入 vault。
+    **注意其定位是「防误用测试构建」而非二进制完整性防护**（marker 为可自报字符串，可被自编译后门伪造）；
+    应用层二进制完整性由 **key1 签名的原生完整性清单（F5）** 承接；
+  - 新增 env 开关遵循同一信任边界思路：显式 env 只服务测试/CI，生产路径不得设置
+    （旧 `ARCHOERA_VAULT_PARENT_OK` 血缘白名单**已完全移除**，生产路径不得再设置任何 `ARCHOERA_VAULT_*`）。
+- **凭据落盘**一律走 vault（模式与信任边界见 `docs/vault-security-notes.md`），禁止明文写配置 / 数据库 / 日志；
+  `enc:v1:` 字段级加密仅供旧库迁移回退，新凭据（含本地 Subsonic 用户密码，SEC-01）不得再引入，统一以 `uid` 承载入 vault。
 - 涉及网络请求的改动注意：桌面端零 TCP 端口（戒律 1），不出网请求只允许既有平台 API / 刮削源 /
   下载引擎范围内的新端点。
 

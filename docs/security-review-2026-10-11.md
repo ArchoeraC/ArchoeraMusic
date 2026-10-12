@@ -7,6 +7,25 @@
 > SEC-31：57ff8c8c；SEC-10/13/16/30/32 文档：a39ffd41）。
 > 第五批（发布供应链，SEC-21/22/23/24/25/26/27）已完成（8e0aee31）——CI/签名溯源加固见
 > [supply-chain.md](supply-chain.md)；SEC-22 经 GitHub ruleset 开启 Code Owners 评审。
+> **第六批（残留代码加固，2026-10-12）**：SEC-09 单字母查询键 `p/t/s` 上下文掩码（原生 `archoera_log_scrub` + Dart `Log.scrub`）、
+> SEC-05 退避状态内嵌 `master-share` 份额槽位（[ShareBundle](../app/core/vault/src/ShareBundle.cs)）、
+> SEC-08 构建期 FFI 库 SHA-256 完整性清单 + 运行期校验（[native_integrity.dart](../app/lib/services/native_integrity.dart)）、
+> SEC-10 MCP 访问密钥改由凭据保险库承载（`prefs.json` 不再落明文）。逐项状态见 §1。
+> **第七批（架构收敛，2026-10-12）**：SEC-19 删除测试明文后端 `InsecureFileStore` / `ARCHOERA_VAULT_INSECURE_FILE_STORE`
+> （测试改用生产 `FileStore`）；SEC-03 `StreamingStore.preloadSecrets()` 不再批量解密，改 `loadSecret(id)` 按需单条、
+> 不写回长驻 UI 状态。**附带修复**：`VaultFile.ReadHeaderOs` 未跳过 `K_vault(32B)` 导致 file 后端 OS 模式 vault 被
+> 误判（`IsFileModeVault` 失败 → `SHARE_BACKEND_MISMATCH`）——已修正。
+> **本轮重构（2026-10·Vault 重架构）**：模式收敛为 **crypto（默认，`'C'`）/ slots（`'S'`：m1 / m2a / m2b）**，
+> 旧 v1（OS 2-of-2）/ v2（口令）/ v3（设备密封·多封装）**移除**（`DeviceEntropy.cs`/`Fingerprint.cs` 删除、
+> `init`/`init-password`/`init-device`/`switch-mode`/`upgrade-device`/`rebind`/`clear-device-seal`/
+> `set-recovery-password`/`clear-recovery-password` 命令移除）；旧 vault 文件报「vault 版本不兼容」，**无迁移**。
+> 本轮同时落地：**F3** 父进程身份校验（**移除** `ARCHOERA_VAULT_PARENT_OK`，改由 OS 提供 pid + 可执行文件路径比对）；
+> **F4** 进程自我保护（Linux seccomp-BPF denylist + DUMPABLE/CORE/PDEATHSIG、Windows ACG/CIG 等缓解、macOS 仅 RLIMIT_CORE，全 best-effort）；
+> **F5** **key1 签名的原生完整性清单**（取代 OS 代码签名承诺，SEC-08 升级）；slots 容器尾部 HMAC（verify-before-decrypt）、
+> KDF 上下限、`Destroy` 覆盖 `.bak` + `device.key`。逐项状态见 §1；SEC-25「OS 签名」改为**不推进**（应用层清单为信任根）。
+> **仍未关闭（已知接受 / 外部依赖）**：SEC-25 信任根硬上限（替换主程序 / 同用户运行期注入，无 OS 签名/硬件根时不可防，
+> 属已声明残余）；SEC-03 残余（Dart `String` 不可 zeroize，单条明文在一次会话内仍短暂驻留）；
+> SEC-05 slots 模式（m1/m2a/m2b）份额现场派生、退避仍回退明文 `vault.lockout`（crypto 模式已内嵌 `master-share`）。
 > 修复后逐项把「状态」改为「已修复」并注明提交 / 版本
 > 范围：**文档层评审**——只读仓库文档与安全相关配置（CI 工作流 / 打包 / 工具脚本 / hooks），未做代码审计、未运行程序；
 > 重点为 **vault 文档未覆盖**的风险面，第二轮（2026-10-11）扩面到 **CI / 发布供应链** 与 **平台能力 / 子系统 / 文档一致性**。
@@ -39,14 +58,14 @@
 |---|---|---|---|---|---|
 | SEC-01 | 高 | 第二套密钥体系 `secret.key` + `user.db` `enc:v1:` 未纳入 vault | architecture §8；credential-vault-plan §3.1/§4 | ❌ 未提 | 已修复（第二批，0ee148f2） |
 | SEC-02 | 高 | v4-file 单因子 + `ARCHOERA_VAULT_SECRET_KEY` 主密钥走 env | vault-scheme-comparison §1/§4；vault-security-notes | ❌ 未提 | 已修复（第二批，bb7d5787） |
-| SEC-03 | 高 | 启动预取全量明文常驻 Dart 内存，与「用后即弃」矛盾 | credential-vault-plan §8.2 | ❌ 未提 | 已修复（声明为已知接受项 + 缓解，bb7d5787） |
+| SEC-03 | 高 | 启动预取全量明文常驻 Dart 内存，与「用后即弃」矛盾 | credential-vault-plan §8.2 | ❌ 未提 | 已修复（声明 bb7d5787；**代码收敛·第七批 2026-10-12**：preload 不再批量解密，`loadSecret` 按需单条；**本轮重构 2026-10 复核**：模式重构未回退该收敛） |
 | SEC-04 | 高 | PROD marker 被当作「二进制替换主防线」，实为可伪造字符串 | credential-vault-plan §3.8/§8.4；vault-security-notes §二进制替换防护 | ⚠️ 高估 | 已修复（文档·第一批，ed17b5f1） |
-| SEC-05 | 中 | `vault.lockout`/`vault.auth`/`vault.marker` 同用户可写 → 退避 / 锚点 / 崩溃标记可绕过 | credential-vault-plan §8.4；vault-security-notes §份额覆盖 | ❌ 未提 | 已修复（文档·第三批，bb7d5787） |
+| SEC-05 | 中 | `vault.lockout`/`vault.auth`/`vault.marker` 同用户可写 → 退避 / 锚点 / 崩溃标记可绕过 | credential-vault-plan §8.4；vault-security-notes §份额覆盖 | ❌ 未提 | 已修复（文档·第三批 bb7d5787；**代码加固·第六批 2026-10-12**：crypto 模式退避内嵌 `master-share`；**本轮重构 2026-10**：slots 模式份额现场派生、退避仍回退明文 `vault.lockout`——已声明残余） |
 | SEC-06 | 中 | Argon2id KDF 参数无加载上限 → 解锁前内存 / CPU DoS | credential-vault-plan §5/§8.6 | ❌ 未提 | 已修复（第三批，840e6775） |
 | SEC-07 | 中 | `ARCHOERA_VAULT_PARENT_OK` 由发起方注入 → 血缘 + 握手可自造绕过 | credential-vault-plan §3.8/§8.4 | ⚠️ 高估 | 已修复（文档·第一批，ed17b5f1） |
-| SEC-08 | 中 | FFI 库 / 二进制加载顺序劫持（按文件名 + 系统搜索路径） | ffi-libs-layout-plan（Dart 路径解析）；vault-security-notes §二进制替换防护 | ❌ 未提 | 已修复（文档·第三批，bb7d5787） |
-| SEC-09 | 中 | 全链路日志无脱敏，vault stderr 转发入明文日志 | unified-logging §2/§3；archive/robustness-improvement-plan §2 | ❌ 未提 | 已修复（第三批，be7847b4） |
-| SEC-10 | 中 | MCP 密钥明文落盘；局域网模式为明文 HTTP | mcp §1/§5 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
+| SEC-08 | 中 | FFI 库 / 二进制加载顺序劫持（按文件名 + 系统搜索路径） | ffi-libs-layout-plan（Dart 路径解析）；vault-security-notes §二进制替换防护 | ❌ 未提 | 已修复（文档·第三批 bb7d5787；**代码加固·第六批 2026-10-12**：构建期 SHA-256 清单 + 运行期校验；**本轮重构 2026-10**：升级为 **key1 签名的清单**（`ARCHOERA-NATIVE-MANIFEST.sig1`，内嵌公钥验签 fail-closed），vault 二进制 spawn 前校验；残余=主程序自身无法自证） |
+| SEC-09 | 中 | 全链路日志无脱敏，vault stderr 转发入明文日志 | unified-logging §2/§3；archive/robustness-improvement-plan §2 | ❌ 未提 | 已修复（第三批 be7847b4；**第六批 2026-10-12** 补 p/t/s 单字母查询键掩码） |
+| SEC-10 | 中 | MCP 密钥明文落盘；局域网模式为明文 HTTP | mcp §1/§5 | ❌ 未提 | 已修复（文档·第四批 a39ffd41；**代码加固·第六批 2026-10-12**：密钥改存 vault，prefs.json 不落明文） |
 | SEC-11 | 中 | 下载 / 整理的文件路径由元数据派生，`subDir` 未清洗 `..` | download-module §3.3；local-library §刮削 | ❌ 未提 | 已修复（第四批，84ffd9ec） |
 | SEC-12 | 中 | 原生 HTTP 客户端重定向未限制降级 / 内网 / 非官方主机 | audio-kernel-zig（2026-10-01 / 2026-10-07 落地） | ❌ 未提 | 已修复（第四批，831a541b） |
 | SEC-13 | 中 | 设备指纹与项目自身红线（CONTRIBUTING §2.5）冲突 + 隐私政策未披露 | CONTRIBUTING §2.5；device-bound-vault-plan §5.1；downloader-identity-plan §3.1；privacy §二 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
@@ -55,13 +74,13 @@
 | SEC-16 | 低 | 迁移 / 模式切换跨存储的崩溃一致性未列风险 | device-bound-vault-plan §8；credential-vault-plan §3.4 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
 | SEC-17 | 低 | architecture 内部残留（`sessions` 表已废弃 vs cookie 落点） | architecture §7.4/§8 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-18 | 低 | 归档评分件与现行口径不一致（明文密码 / 无哈希 / GetUsers） | archive/archoera-robustness-score §6 | — | 已修复（文档·第一批，ed17b5f1） |
-| SEC-19 | 低 | 测试后门 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 无删除里程碑 | vault-security-notes §测试明文存储 | ⏳ 已声明计划 | 已修复（文档·第一批，ed17b5f1） |
+| SEC-19 | 低 | 测试后门 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 无删除里程碑 | vault-security-notes §测试明文存储 | ⏳ 已声明计划 | 已修复（文档·第一批 ed17b5f1；**后门已删除·第七批 2026-10-12**：移除 `InsecureFileStore`，测试改用生产 `FileStore`） |
 | SEC-20 | 合规 | 声明禁止绕过访问控制，实现却利用服务端 UA 旁路 | software-declaration §五；neko-source-identity；audio-kernel-zig 2026-10-07 | ❌ 未提 | 已修复（文档·第一批，ed17b5f1） |
 | SEC-21 | 中 | GitHub Actions 依赖按可变主版本标签固定、未 pin SHA（含签名作业） | build-all.yml；actions/build-linux | — | 已修复（第五批，8e0aee31，见 supply-chain.md） |
 | SEC-22 | 中 | 关键路径无强制评审（`protect-main` Required approvals=0，CODEOWNERS 不生效） | .github/CODEOWNERS；AGENTS.md §仓库保护 | — | 已修复（第五批，8e0aee31：ruleset 开启 Require review from Code Owners） |
 | SEC-23 | 高 | 发版 tag 可指向未评审提交 → CI 构建并签名攻击者代码 | build-all.yml（`on.push.tags`+release 构建 `github.ref`） | — | 已修复（第五批，8e0aee31：release 作业校验 tag 祖先） |
 | SEC-24 | 中 | 标签名直接内插进 shell（`${{ github.ref_name }}` 命令注入反模式） | build-all.yml:990 | — | 已修复（第五批，8e0aee31：改用 `$GITHUB_REF_NAME`） |
-| SEC-25 | 中 | 无构建溯源 / SBOM；macOS 仅 ad-hoc、Windows 未签名（信任根承诺未兑现） | sign_release.sh；build-all.yml（ad-hoc 注释） | — | 已修复（第五批，8e0aee31：provenance+SBOM；代码签名/公证仍缺口，见 supply-chain §2） |
+| SEC-25 | 中 | 无构建溯源 / SBOM；macOS 仅 ad-hoc、Windows 未签名（信任根承诺未兑现） | sign_release.sh；build-all.yml（ad-hoc 注释） | — | 已修复（第五批，8e0aee31：provenance+SBOM；**本轮重构 2026-10**：**OS 代码签名不推进**——应用层 **key1 签名清单（F5/SEC-08）为信任根**，分发渠道靠包管理器/外层 `.sig1`；替换主程序/同用户注入属**已声明硬上限残余**，见 supply-chain §2） |
 | SEC-26 | 中 | 无依赖漏洞扫描（无 dependabot / 各生态 audit） | .github；robustness-improvement-plan §3-12 | — | 已修复（第五批，8e0aee31：dependabot.yml + security-audit.yml） |
 | SEC-27 | 中 | CI 测试面过窄（仅 widget/vault 冒烟，非全量） | actions/build-linux §Test | — | 已修复（第五批，8e0aee31：完整 flutter test + 各模块单测） |
 | SEC-28 | 中 | 过时设计稿主张运行期提权 + JVM 核心（违反红线） | CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md | — | 已修复（文档·第一批，ed17b5f1） |
@@ -110,6 +129,10 @@
   §3.6 的 mlock / MADV_DONTDUMP / zeroize 只覆盖 C# / Rust 缓冲，**Dart 侧明文未受任何内存保护**。
 - **修复方向**：改为按需解密（注入前单次解密即弃），或明确把「预取常驻明文」作为**已知接受项**写入风险表并给出缓解
   （主进程 `PR_SET_DUMPABLE=0` / `RLIMIT_CORE=0` / 禁止 swap 的实际覆盖范围需确认）。
+- **第七批落地（2026-10-12）**：`preloadSecrets()` 已**去掉逐服务器解密循环**（仅 vault 惰性初始化 + 模式探测）；
+  新增 `StreamingStore.loadSecret(id)` 按需**单条**解密，且不写回长驻 `StreamingState`——带凭据配置仅临时构造给
+  客户端（`resolvedServer`），编辑表单按需解密预填。`save()` 改为「未知凭据跳过，绝不写空覆盖」。
+  **残余**：Dart `String` 不可 zeroize，单条明文在一次会话内仍会短暂驻留堆中（架构性，无法在 Dart 侧消除）。
 
 ### SEC-04 · PROD marker 被高估为「二进制替换主防线」
 
@@ -119,7 +142,7 @@
 - **影响**：marker 只是**字符串指纹，无签名 / 无认证**。攻击者可自行编译含后门的 vault 并输出同名 `ARCHOERA-VAULT-PROD-*`，
   同时通过 `--version` 与握手校验；`ARCHOERA_VAULT_BIN` 显式指定（notes §二进制替换防护）更直接跳过 PROD 校验。
   故该机制只能防「误用测试构建」，**不能防「替换二进制」本身**——与文档「主防线」定性不符。
-- **修复方向**：修正文档定性为「防测试构建误用」；真正的二进制完整性需 OS 代码签名 / 安装包完整性清单（§8.5 已列待办）落地后承接。
+- **修复方向**：修正文档定性为「防测试构建误用」；二进制完整性改由 **key1 签名的原生完整性清单（F5/SEC-08）** 承接（`ARCHOERA-NATIVE-MANIFEST.sig1`，内嵌公钥验签 + 逐文件摘要，vault spawn 前校验），**不再依赖 OS 代码签名**（Authenticode/公证不推进，见 SEC-25）。
 
 ---
 
@@ -150,6 +173,9 @@
 - **影响**：攻击者自行 spawn vault 时自带该 env + 自选 `H/C` 即可通过血缘与握手，随后 `get <uid>` 取走全部凭据；
   §3.8 / §8.4 将握手表述为可防「独立工具滥用与自动化」，**同用户下并不成立**（真实边界其实与 §1.2-4/5 一致，措辞过度）。
 - **修复方向**：文档收口表述——血缘 / 握手不防同用户攻击者，仅防「无主进程上下文的误用与自动化」；白名单应来自不可被调用方伪造的锚点。
+- **本轮重构（2026-10·F3）处置**：**`ARCHOERA_VAULT_PARENT_OK` 已完全移除**——父进程身份校验改由 **OS 提供**的 pid + 可执行文件路径
+  （Linux `/proc/<ppid>/exe`、macOS `proc_pidpath`、Windows `QueryFullProcessImageNameW`）与「由 vault 位置推导的预期主程序路径」比对，
+  **不读任何 env**。残余（如实）：同用户攻击者可在预期路径放置自造二进制再 spawn，**无法与「主程序被替换」区分**（L4 硬上限）。
 
 ### SEC-08 · FFI 库 / 二进制加载顺序劫持
 
@@ -223,6 +249,9 @@
   现行 `architecture.md` §8 的 `enc:v1` 口径不一致（历史件，易被误引用）。建议在归档目录标注其时效。
 - **SEC-19** `ARCHOERA_VAULT_INSECURE_FILE_STORE` 测试后门「待删除」（`vault-security-notes.md` §测试明文存储）无删除里程碑；
   建议在本文档登记一个目标版本 / 触发条件（Linux keyring CI 基建就绪）。
+  **第七批落地（2026-10-12）**：**已删除**与 `InsecureFileStore`——本机无 headless keyring 时，测试改用**生产 `FileStore`**
+  （`ARCHOERA_VAULT_BACKEND=file`），不再需要真实 Secret Service 即可跑通全链路；`VAULT_TESTING` 仅保留构建标记。
+  附带修复 `VaultFile.ReadHeaderOs` 未跳过 `K_vault` 的缺陷（file 后端 OS 模式 vault 曾被误判为后端不配对）。
 
 ---
 
@@ -275,14 +304,18 @@
 - **影响**：可推送此类标签触发 shell 命令执行（结合 SEC-23 放大）。
 - **修复方向**：改用环境变量 `$GITHUB_REF_NAME`（不经脚本模板）；**任何 `run:` 内都不要用 `${{ github.ref_name / github.event.* }}`**。
 
-### SEC-25 · 无构建溯源 / SBOM；macOS 仅 ad-hoc、Windows 未签名
+### SEC-25 · 无构建溯源 / SBOM；macOS 仅 ad-hoc、Windows 未签名（信任根承诺）
 
-- **现象**：release 作业仅用 key1 对已下载 artifact 签 `.sig1`（`app/tool/sign_release.sh`），无 provenance/SBOM；
+- **现象**：release 作业仅用 key1 对已下载 artifact 签 `.sig1`（`app/tool/sign_release.sh`）；
   macOS 构建注释明确 **ad-hoc 签名**（`CODE_SIGN_IDENTITY = "-"`），未见 Windows Authenticode。
 - **影响**：`.sig1` 只证明「该 key 签了这份字节」，不证明构建来源 / 可复现；
-  而 vault 文档（§1.2-5、§信任根边界）把 L4 信任根寄托于「OS 信任链（Authenticode / 公证 / 安装包完整性）」——**发布产物当前并未签名 / 公证，该承诺尚未兑现**。
-- **修复方向**：接入 `actions/attest-build-provenance` 与 SBOM；落地 Windows 代码签名、macOS 公证；
-  并在 vault 文档把该项标为「未完成」，避免读者误判。
+  而 vault 文档（§1.2-5、§信任根边界）曾把 L4 信任根寄托于「OS 信任链（Authenticode / 公证 / 安装包完整性）」。
+- **本轮重构（2026-10）处置**：**OS 代码签名不再推进**（Authenticode / 公证因成本与步骤不可得，不再作为待兑现承诺）。
+  应用层信任根改为 **key1 签名的原生完整性清单**（`ARCHOERA-NATIVE-MANIFEST.sig1`，SEC-08）：运行期内嵌公钥验签 + 逐文件摘要、
+  vault 二进制 spawn 前校验；分发渠道（deb/rpm/AppImage/flatpak/pkg.tar.zst/nixos）依赖**包管理器签名**，
+  Inno `.exe` 依赖**外层 `.sig1`**。用户可用分发公钥**离线核验**。
+  **残余（硬上限，如实声明）**：替换主程序 / 同用户运行期注入主程序**无法用应用层清单防住**（验证逻辑在被替换的进程里），
+  无 OS 签名 / 硬件根（TPM / Secure Enclave）时无解；清单亦不证明构建可复现。详见 [supply-chain.md §2](supply-chain.md)。
 
 ### SEC-26 · 无依赖漏洞扫描
 

@@ -133,59 +133,23 @@ extension _SecuritySectionView on _SecuritySectionState {
               onPressed: _deviceBusy ? null : _destroyBrokenVault,
             ),
           ),
+        if (_m2aRecoveryReminder)
+          _SecurityBanner(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+            icon: EtaIcons.warningOutline,
+            text: l10n.settingsSchemeRecoveryReminder,
+            scheme: scheme,
+            tone: scheme.tertiary,
+            button: SButton(
+              label: l10n.settingsSchemeRecoveryReminderAck,
+              variant: SButtonVariant.secondary,
+              size: SButtonSize.small,
+              onPressed: _deviceBusy ? null : _ackRecoveryCode,
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: _SchemeCard(
-                        value: 'crypto',
-                        selected: _scheme,
-                        busy: _deviceBusy,
-                        title: l10n.settingsSchemeCryptoTitle,
-                        badge: l10n.settingsSchemeCryptoBadge,
-                        badgeColor: scheme.primary,
-                        desc: l10n.settingsSchemeCryptoDesc,
-                        icon: EtaIcons.keyOutline,
-                        onTap: _onSchemeSelected,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _SchemeCard(
-                        value: 'file',
-                        selected: _scheme,
-                        busy: _deviceBusy,
-                        title: l10n.settingsSchemeFileTitle,
-                        badge: l10n.settingsSchemeFileBadge,
-                        badgeColor: scheme.tertiary,
-                        desc: l10n.settingsSchemeFileDesc,
-                        icon: EtaIcons.keyOutline,
-                        onTap: _onSchemeSelected,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              _SchemeCard(
-                value: 'vault',
-                selected: _scheme,
-                busy: _deviceBusy,
-                title: l10n.settingsSchemeVaultTitle,
-                badge: l10n.settingsSchemeVaultBadge,
-                badgeColor: scheme.error,
-                desc: l10n.settingsSchemeVaultDesc,
-                icon: EtaIcons.shieldOutline,
-                onTap: _onSchemeSelected,
-              ),
-            ],
-          ),
+          child: _buildSchemeGrid(l10n, scheme),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
@@ -211,91 +175,184 @@ extension _SecuritySectionView on _SecuritySectionState {
             ],
           ),
         ),
-        if (_scheme == 'vault') ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-            child: _ModeCards(
-              values: const ['os', 'password', 'multiseal'],
-              labels: [
-                l10n.settingsVaultModeV1,
-                l10n.settingsVaultModeV2,
-                l10n.settingsVaultModeV3,
-              ],
-              descriptions: [
-                l10n.settingsVaultModeDescOs,
-                l10n.settingsVaultModeDescPassword,
-                l10n.settingsVaultModeDescMultiseal,
-              ],
-              icons: const [
-                EtaIcons.shieldOutline,
-                EtaIcons.keyOutline,
-                EtaIcons.deviceOutline,
-              ],
-              selected: _vaultMode,
-              disabledValues: _disabledModes,
-              onChanged: _onModeSelected,
-            ),
+        _buildKdfSelector(l10n, scheme),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                EtaIcons.wastebasketOutline,
+                size: 14,
+                color: scheme.error.withValues(alpha: 0.8),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  l10n.settingsSchemeResetHint,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: scheme.error.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+            ],
           ),
-          if (_isDeviceBound) ...[
-            _buildChevronTile(
-              context,
-              icon: EtaIcons.keyOutline,
-              title: l10n.settingsDeviceBindChangeRecovery,
-              subtitle: l10n.settingsDeviceBindChangeRecoveryDesc,
-              onPressed: _deviceBusy ? null : _changeRecoveryPassword,
-            ),
-            _buildChevronTile(
-              context,
-              icon: EtaIcons.lockOutline,
-              title: l10n.settingsDeviceBindRebind,
-              subtitle: l10n.settingsDeviceBindRebindDesc,
-              onPressed: _deviceBusy ? null : _rebindDevice,
-            ),
-            _buildChevronTile(
-              context,
-              icon: EtaIcons.unlinkOutline,
-              title: l10n.settingsDeviceBindClose,
-              subtitle: l10n.settingsDeviceBindCloseDesc,
-              onPressed: _deviceBusy ? null : _disableDeviceBind,
-            ),
-          ],
-        ],
+        ),
       ],
     );
   }
 
-  Widget _buildChevronTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback? onPressed,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return SettingTile(
-      icon: icon,
-      title: title,
-      subtitle: subtitle,
-      trailing: IconButton(
-        tooltip: title,
-        iconSize: 18,
-        visualDensity: VisualDensity.compact,
-        onPressed: onPressed,
-        icon: Icon(EtaIcons.rightSmall, color: scheme.onSurfaceVariant),
+  /// Argon2id 强度选择器：仅 m1/m2a 可用（口令承载槽）；crypto/file/m2b
+  /// 无口令 KDF → 置灰并给出说明。切换需验证当前口令（见 [_onKdfPresetChanged]）。
+  Widget _buildKdfSelector(AppLocalizations l10n, ColorScheme scheme) {
+    // 优先回显 vault 实际生效强度（status.kdf）；读取失败/未匹配回退偏好。
+    final current = _presetIdForKdf(_vaultKdf) ??
+        ref.watch(appPrefsProvider).vaultKdfPreset;
+    final supports = _scheme == 'm1' || _scheme == 'm2a';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                EtaIcons.keyOutline,
+                size: 16,
+                color: supports
+                    ? scheme.primary
+                    : scheme.onSurfaceVariant.withValues(alpha: 0.5),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  l10n.settingsKdfTitle,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: supports
+                        ? scheme.onSurface
+                        : scheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+              Opacity(
+                opacity: supports ? 1 : 0.4,
+                child: IgnorePointer(
+                  ignoring: !supports || _deviceBusy,
+                  child: SSegmented<String>(
+                    options: [
+                      SSegmentedOption('low', l10n.settingsKdfLow),
+                      SSegmentedOption('medium', l10n.settingsKdfMedium),
+                      SSegmentedOption('high', l10n.settingsKdfHigh),
+                    ],
+                    selected: current,
+                    onChanged: _onKdfPresetChanged,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            supports ? l10n.settingsKdfSubtitle : l10n.settingsKdfUnsupported,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.35,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  /// 方案卡片响应式网格（每行两张；窄窗自动堆叠）。
+  Widget _buildSchemeGrid(AppLocalizations l10n, ColorScheme scheme) {
+    final cards = <({String value, String title, String badge, Color color,
+        String desc})>[
+      (
+        value: 'crypto',
+        title: l10n.settingsSchemeCryptoTitle,
+        badge: l10n.settingsSchemeCryptoBadge,
+        color: scheme.primary,
+        desc: l10n.settingsSchemeCryptoDesc,
+      ),
+      (
+        value: 'file',
+        title: l10n.settingsSchemeFileTitle,
+        badge: l10n.settingsSchemeFileBadge,
+        color: scheme.tertiary,
+        desc: l10n.settingsSchemeFileDesc,
+      ),
+      (
+        value: 'm1',
+        title: l10n.settingsSchemeM1Title,
+        badge: l10n.settingsSchemeM1Badge,
+        color: scheme.secondary,
+        desc: l10n.settingsSchemeM1Desc,
+      ),
+      (
+        value: 'm2a',
+        title: l10n.settingsSchemeM2aTitle,
+        badge: l10n.settingsSchemeM2aBadge,
+        color: scheme.primary,
+        desc: l10n.settingsSchemeM2aDesc,
+      ),
+      (
+        value: 'm2b',
+        title: l10n.settingsSchemeM2bTitle,
+        badge: l10n.settingsSchemeM2bBadge,
+        color: scheme.secondary,
+        desc: l10n.settingsSchemeM2bDesc,
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoCol = constraints.maxWidth >= 420;
+        final width = twoCol
+            ? (constraints.maxWidth - 10) / 2
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final c in cards)
+              SizedBox(
+                width: width,
+                child: _SchemeCard(
+                  value: c.value,
+                  selected: _scheme,
+                  busy: _deviceBusy,
+                  title: c.title,
+                  badge: c.badge,
+                  badgeColor: c.color,
+                  desc: c.desc,
+                  icon: EtaIcons.keyOutline,
+                  onTap: _onSchemeSelected,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
   String _schemeDesc(AppLocalizations l10n) {
     switch (_scheme) {
-      case 'crypto':
-        return l10n.settingsSchemeCryptoModeDesc;
       case 'file':
         return l10n.settingsSchemeFileModeDesc;
-      case 'vault':
-        return l10n.settingsSchemeVaultModeDesc;
+      case 'm1':
+        return l10n.settingsSchemeM1ModeDesc;
+      case 'm2a':
+        return l10n.settingsSchemeM2aModeDesc;
+      case 'm2b':
+        return l10n.settingsSchemeM2bModeDesc;
+      case 'crypto':
       default:
-        return l10n.settingsVaultModeDescUnknown;
+        return l10n.settingsSchemeCryptoModeDesc;
     }
   }
 
@@ -319,6 +376,7 @@ class _SecurityBanner extends StatelessWidget {
     required this.text,
     required this.scheme,
     required this.button,
+    this.tone,
   });
 
   final EdgeInsets padding;
@@ -327,27 +385,31 @@ class _SecurityBanner extends StatelessWidget {
   final ColorScheme scheme;
   final Widget button;
 
+  /// 强调色（默认危险红；恢复码提醒等警示场景可传 scheme.tertiary）。
+  final Color? tone;
+
   @override
   Widget build(BuildContext context) {
+    final color = tone ?? scheme.error;
     return Padding(
       padding: padding,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: scheme.error.withValues(alpha: 0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: scheme.error.withValues(alpha: 0.35)),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: scheme.error),
+            Icon(icon, size: 18, color: color),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 text,
                 style: TextStyle(
                   fontSize: 12,
-                  color: scheme.error,
+                  color: color,
                   height: 1.35,
                 ),
               ),

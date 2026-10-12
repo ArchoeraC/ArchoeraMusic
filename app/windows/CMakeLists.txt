@@ -197,6 +197,46 @@ add_dependencies(${BINARY_NAME} archoera_log_cmake)
 install(FILES "${ARCHOERA_LOG_BUILD_DIR}/out/archoera_log.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
 
+# === 原生库完整性清单（SEC-08）===
+# 纯 CMake 生成（不依赖 bash/sh）：对 native/ 下全部文件，以及 exe 根
+# archoera_music.exe / archoera_kernel.dll、data/app.so 计算 SHA-256，
+# 写入 native/ARCHOERA-NATIVE-MANIFEST.txt，供 Dart 在 DynamicLibrary.open
+# 前按 basename 校验（打包态 fail-closed，见 lib/services/native_integrity.dart）。
+# 该 install(CODE) 声明于全部 native/ install 之后，故执行时文件已就位。
+install(CODE "
+  set(_nativedir \"\${CMAKE_INSTALL_PREFIX}/native\")
+  file(MAKE_DIRECTORY \"\${_nativedir}\")
+  set(_manifest \"\${_nativedir}/ARCHOERA-NATIVE-MANIFEST.txt\")
+  set(_lines \"\")
+  file(GLOB _files \"\${_nativedir}/*\")
+  foreach(_f IN LISTS _files)
+    if(IS_DIRECTORY \"\${_f}\")
+      continue()
+    endif()
+    get_filename_component(_base \"\${_f}\" NAME)
+    if(_base STREQUAL \"ARCHOERA-NATIVE-MANIFEST.txt\")
+      continue()
+    endif()
+    file(SHA256 \"\${_f}\" _hash)
+    list(APPEND _lines \"\${_hash}  \${_base}\")
+  endforeach()
+  foreach(_f \"\${CMAKE_INSTALL_PREFIX}/archoera_music.exe\"
+            \"\${CMAKE_INSTALL_PREFIX}/archoera_kernel.dll\"
+            \"\${CMAKE_INSTALL_PREFIX}/data/app.so\")
+    if(EXISTS \"\${_f}\")
+      get_filename_component(_base \"\${_f}\" NAME)
+      file(SHA256 \"\${_f}\" _hash)
+      list(APPEND _lines \"\${_hash}  \${_base}\")
+    endif()
+  endforeach()
+  if(_lines)
+    list(SORT _lines)
+    string(ASCII 10 _nl)
+    string(REPLACE \";\" \"\${_nl}\" _out \"\${_lines}\")
+    file(WRITE \"\${_manifest}\" \"\${_out}\${_nl}\")
+  endif()
+" COMPONENT Runtime)
+
 # === vcpkg 运行时 DLL（FFmpeg 等动态依赖）===
 # audio-engine（archoera_mediaengine.dll / scraper）经 vcpkg import libs 动态链接
 # ffmpeg/taglib/curl 等（triplet x64-windows-release 为动态构建）；运行时必须把

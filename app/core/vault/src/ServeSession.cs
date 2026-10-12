@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Archoera.Vault;
 
@@ -10,9 +11,11 @@ namespace Archoera.Vault;
 ///
 /// 协议（stdin/stdout 行，全部 UTF-8）：
 /// ```
-/// 主进程 → vault:    handshake <b64H> <b64C>            OS 模式
-///                     handshake <b64H> <b64C> <b64password>   口令模式（v2，可选高级）
-///                     H=32B 随机会话密钥，C=16B challenge，password 经 base64 传递
+/// 主进程 → vault:    handshake <b64H> <b64C>            crypto（'C'）/ m2b（device.key）
+///                     handshake <b64H> <b64C> <b64secret> [<b64label>]
+///                     m1：secret=口令；
+///                     m2a：secret=口令（+device.key），或 label=b64("rec") + secret=恢复码
+///                     H=32B 随机会话密钥，C=16B challenge，各字段经 base64 传递
 /// vault → 主进程:    ok handshake <b64T> <b64mac> <marker>
 ///                     T=16B 会话锚点（持钥证明），mac=HMAC-SHA256(H, C)，
 ///                     marker=构建标记（BuildInfo.Marker，PROD/TEST 版本指纹——
@@ -37,12 +40,13 @@ public sealed class ServeSession
     private readonly VaultService _service;
     private readonly VaultLockout _lockout;
     private readonly int _parentPid;
-    private string? _fingerprint;
 
     public ServeSession(string dataDir)
     {
         _service = new VaultService(dataDir);
-        _lockout = new VaultLockout(dataDir);
+        // 与 VaultService 共用同一份退避实例（退避状态内嵌于份额槽位，SEC-05）：
+        // 避免第二个 VaultLockout 视图对 bundle 读写不一致。
+        _lockout = _service.Lockout;
         _parentPid = PlatformGuard.VerifyAndArm();
     }
 
@@ -50,35 +54,49 @@ public sealed class ServeSession
     {
         if (!_service.Initialized) return Fail("vault 未初始化，请先 init");
         var mode = _service.Mode;
-        var passwordMode = mode == VaultMode.Password;
-        var multiSeal = mode == VaultMode.MultiSeal;
-        _fingerprint = multiSeal ? Fingerprint.Collect() : null;
+        // 'S'（slots）因子模式由槽位集合推导（m1/m2a/m2b），决定握手字段数。
+        var slotMode = mode == VaultMode.Slots ? _service.SlotsMode : SlotsMode.None;
+
+        // 各模式接受的握手字段数（含命令名）：
+        //   crypto（'C'）: 3；
+        //   slots m1: 4；m2a: 4（口令+device.key）或 5（`rec` 标签 + 恢复码）；m2b: 3。
+        int minFields, maxFields;
+        if (mode == VaultMode.Slots)
+        {
+            (minFields, maxFields) = slotMode switch
+            {
+                SlotsMode.M2b => (3, 3),
+                SlotsMode.M2a => (4, 5),
+                _ => (4, 4),
+            };
+        }
+        else { minFields = maxFields = 3; }
 
         // ── 握手（此刻才解锁主密钥；失败即拒绝，未产生任何明文）──
         string line;
         try { line = ReadLineWithTimeout(HandshakeTimeoutSeconds) ?? ""; }
         catch (TimeoutException) { return Fail("握手超时"); }
         var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        // OS: 3 字段；口令模式(v2): 4 字段；多封装(v3): 3（熵，本机免密）或 4（恢复口令）
-        var okLen = passwordMode ? parts.Length == 4 : parts.Length is 3 or 4;
-        if (!okLen || parts[0] != "handshake")
+        if (parts.Length < minFields || parts.Length > maxFields || parts[0] != "handshake")
         {
-            return Fail(passwordMode
-                ? "握手格式错误：口令模式需要 `handshake <b64H> <b64C> <b64password>`"
-                : multiSeal
-                    ? "握手格式错误：多封装模式需要 `handshake <b64H> <b64C>` 或 `… <b64password>`（恢复）"
-                    : "握手格式错误：需要 `handshake <b64H> <b64C>`");
+            return Fail(HandshakeUsage(mode, slotMode));
         }
         byte[] h, c;
-        byte[]? password = null;
+        byte[]? secret = null;
+        string? slotLabel = null;
         try
         {
             h = Convert.FromBase64String(parts[1]);
             c = Convert.FromBase64String(parts[2]);
-            if (parts.Length == 4) password = Convert.FromBase64String(parts[3]);
+            if (parts.Length >= 4) secret = Convert.FromBase64String(parts[3]);
+            if (parts.Length >= 5)
+                slotLabel = Encoding.UTF8.GetString(Convert.FromBase64String(parts[4]));
         }
         catch (FormatException) { return Fail("握手负载非 base64"); }
         if (h.Length != 32 || c.Length != 16) return Fail("握手负载长度错误");
+        // m2a 的可选标签仅支持恢复路径（b64("rec")）
+        if (slotMode == SlotsMode.M2a && slotLabel != null && slotLabel != "rec")
+            return Fail("握手标签未知：m2a 仅支持 \"rec\"（恢复码）");
 
         // 解锁失败退避（§3.7）：锁定期间连尝试都不做（防爆破口令/OS 存储）
         try { _lockout.Check(); }
@@ -88,12 +106,12 @@ public sealed class ServeSession
         byte[] anchor;
         try
         {
-            _service.LoadMasterKeyInto(master.Span, password, _fingerprint);
+            _service.LoadMasterKeyInto(master.Span, secret, slotLabel);
             anchor = _service.GetOrCreateAuthAnchor(master.Span);
         }
         catch (NeedRecoveryException ex)
         {
-            // 设备变更/熵损坏且 vault 有口令封装 → 恢复流（不计入锁定退避）
+            // 设备因子缺失/损坏（m2a 缺 device.key）→ 恢复流（不计入锁定退避）
             return Fail("NEED_RECOVERY " + ex.Message);
         }
         catch (VaultShareBackendMismatchException ex)
@@ -122,7 +140,7 @@ public sealed class ServeSession
         }
         finally
         {
-            if (password != null) CryptographicOperations.ZeroMemory(password);
+            if (secret != null) CryptographicOperations.ZeroMemory(secret);
         }
         _lockout.Clear();
 
@@ -169,35 +187,7 @@ public sealed class ServeSession
                 return HandleSet(parts[1], master);
             case "delete":
                 if (parts.Length != 2) { return Err("delete 需要 uid 参数"); }
-                return HandleDelete(parts[1]);
-            case "set-recovery-password":
-                if (parts.Length != 2) { return Err("set-recovery-password 需要 base64 新口令参数"); }
-                return HandleSetRecoveryPassword(parts[1], master);
-            case "clear-recovery-password":
-                return HandleClearRecoveryPassword(master);
-            case "rebind":
-                return HandleRebind(master);
-            case "upgrade-device":
-                // upgrade-device [--set-recovery-password <b64新口令>]：
-                // v1/v2 → v3 迁移（§8）。[b64] 为恢复口令，用后清零。
-                if (parts.Length is not (1 or 3) || (parts.Length == 3 && parts[1] != "--set-recovery-password"))
-                {
-                    return Err("upgrade-device 参数错误：可选 `--set-recovery-password <b64>`");
-                }
-                return HandleUpgradeDevice(
-                    parts.Length == 3 ? parts[2] : null, master);
-            case "clear-device-seal":
-                if (parts.Length != 2) { return Err("clear-device-seal 需要 base64 恢复口令参数"); }
-                return HandleClearDeviceSeal(parts[1], master);
-            case "switch-mode":
-                // switch-mode <os|password> [<b64新口令>]：v1 ↔ v2 份额迁移。
-                // 新口令仅 v1 → v2 需要（v2 → v1 会话已解锁持 K 即可）。
-                if (parts.Length is < 2 or > 3
-                    || (parts[1] != "os" && parts[1] != "password"))
-                {
-                    return Err("switch-mode 参数错误：`switch-mode <os|password> [<b64口令>]`");
-                }
-                return HandleSwitchMode(parts[1], parts.Length == 3 ? parts[2] : null, master);
+                return HandleDelete(parts[1], master);
             case "destroy":
                 try { _service.Destroy(); }
                 catch (Exception ex) { return Err(ex.Message); }
@@ -248,131 +238,10 @@ public sealed class ServeSession
         return DispatchResult.Continue;
     }
 
-    private DispatchResult HandleDelete(string uid)
+    private DispatchResult HandleDelete(string uid, ReadOnlySpan<byte> master)
     {
-        try { Console.WriteLine(_service.Delete(uid) ? "ok true" : "ok false"); }
+        try { Console.WriteLine(_service.DeleteWith(uid, master) ? "ok true" : "ok false"); }
         catch (Exception ex) { return Err(ex.Message); }
-        Console.Out.Flush();
-        return DispatchResult.Continue;
-    }
-
-    /// set-recovery-password：新口令 base64 经命令行传入（不落 argv 的明文），
-    /// 用后清零；重密封 S 后旧口令立即失效。
-    private DispatchResult HandleSetRecoveryPassword(string b64, ReadOnlySpan<byte> master)
-    {
-        byte[] pw;
-        try { pw = Convert.FromBase64String(b64); }
-        catch (FormatException) { return Err("新口令非 base64"); }
-        try
-        {
-            _service.SetRecoveryPassword(master, pw);
-        }
-        catch (Exception ex)
-        {
-            CryptographicOperations.ZeroMemory(pw);
-            return Err(ex.Message);
-        }
-        CryptographicOperations.ZeroMemory(pw);
-        Console.WriteLine("ok");
-        Console.Out.Flush();
-        return DispatchResult.Continue;
-    }
-
-    private DispatchResult HandleClearRecoveryPassword(ReadOnlySpan<byte> master)
-    {
-        try { Console.WriteLine(_service.ClearRecoveryPassword(master) ? "ok true" : "ok false"); }
-        catch (Exception ex) { return Err(ex.Message); }
-        Console.Out.Flush();
-        return DispatchResult.Continue;
-    }
-
-    /// clear-device-seal：关闭设备绑定（清除熵封装 + device.seal，降级 v2 口令模式）。
-    /// [b64] = 当前恢复口令（base64，授权降级；口令错误 → GCM 认证失败拒绝）。
-    /// 用后清零，不落 argv 明文。
-    private DispatchResult HandleClearDeviceSeal(string b64, ReadOnlySpan<byte> master)
-    {
-        byte[] pw;
-        try { pw = Convert.FromBase64String(b64); }
-        catch (FormatException) { return Err("恢复口令非 base64"); }
-        try
-        {
-            Console.WriteLine(_service.ClearDeviceSeal(master, pw) ? "ok true" : "ok false");
-        }
-        catch (Exception ex)
-        {
-            CryptographicOperations.ZeroMemory(pw);
-            return Err(ex.Message);
-        }
-        CryptographicOperations.ZeroMemory(pw);
-        Console.Out.Flush();
-        return DispatchResult.Continue;
-    }
-
-    /// upgrade-device：v1/v2 → v3 迁移（§8 兼容与迁移）。
-    /// [b64] 为可选恢复口令（base64，不落 argv 明文）；用后清零。
-    /// 注意：升级发生在会话解锁之后（master 已持），熵路径解封不需要口令。
-    private DispatchResult HandleUpgradeDevice(string? b64, ReadOnlySpan<byte> master)
-    {
-        byte[]? pw = null;
-        if (b64 != null)
-        {
-            try { pw = Convert.FromBase64String(b64); }
-            catch (FormatException) { return Err("恢复口令非 base64"); }
-        }
-        try
-        {
-            var id = _service.UpgradeDevice(master, _fingerprint, pw);
-            Console.WriteLine("ok " + Convert.ToBase64String(id));
-        }
-        catch (Exception ex)
-        {
-            return Err(ex.Message);
-        }
-        finally
-        {
-            if (pw != null) CryptographicOperations.ZeroMemory(pw);
-        }
-        Console.Out.Flush();
-        return DispatchResult.Continue;
-    }
-
-    /// rebind：用当前会话指纹重密封熵（换机口令恢复后调用）；成功返回新熵标识。
-    private DispatchResult HandleRebind(ReadOnlySpan<byte> master)
-    {
-        try
-        {
-            var id = _service.RebindDevice(master, _fingerprint);
-            Console.WriteLine("ok " + Convert.ToBase64String(id));
-        }
-        catch (Exception ex) { return Err(ex.Message); }
-        Console.Out.Flush();
-        return DispatchResult.Continue;
-    }
-
-    /// switch-mode：v1 ↔ v2 份额迁移（份额源 OS ↔ 口令，K 不变条目沿用）。
-    /// [b64] 为新口令（仅 v1 → v2 需要，base64 经 stdin 行传递不落 argv 明文），用后清零。
-    /// 切换成功后本会话继续可用（master 仍持）；下次握手按新模式解锁。
-    private DispatchResult HandleSwitchMode(string target, string? b64, ReadOnlySpan<byte> master)
-    {
-        byte[]? pw = null;
-        if (b64 != null)
-        {
-            try { pw = Convert.FromBase64String(b64); }
-            catch (FormatException) { return Err("新口令非 base64"); }
-        }
-        try
-        {
-            _service.SwitchMode(master, target, pw);
-            Console.WriteLine("ok");
-        }
-        catch (Exception ex)
-        {
-            return Err(ex.Message);
-        }
-        finally
-        {
-            if (pw != null) CryptographicOperations.ZeroMemory(pw);
-        }
         Console.Out.Flush();
         return DispatchResult.Continue;
     }
@@ -389,6 +258,20 @@ public sealed class ServeSession
         Console.WriteLine("err " + message);
         Console.Out.Flush();
         return 1;
+    }
+
+    /// 握手格式错误提示（按模式/因子模式给出精确用法）。
+    private static string HandshakeUsage(VaultMode mode, SlotsMode slotMode)
+    {
+        if (mode == VaultMode.Slots)
+            return slotMode switch
+            {
+                SlotsMode.M2b => "握手格式错误：m2b 需要 `handshake <b64H> <b64C>`（device.key）",
+                SlotsMode.M2a => "握手格式错误：m2a 需要 `handshake <b64H> <b64C> <b64password>`"
+                    + " 或 `… <b64恢复码> <b64\"rec\">`",
+                _ => "握手格式错误：m1 需要 `handshake <b64H> <b64C> <b64password>`",
+            };
+        return "握手格式错误：需要 `handshake <b64H> <b64C>`";
     }
 
     /// 单次阻塞读（超时抛 [TimeoutException]；EOF 返回 null）。托管实现跨平台，无忙轮询。

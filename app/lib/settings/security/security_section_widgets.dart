@@ -189,6 +189,106 @@ class _RecoveryPasswordFieldState extends State<_RecoveryPasswordField> {
   }
 }
 
+/// 新口令输入（口令 + 二次确认）：两次一致且非空时才允许确认；
+/// 不一致或为空时确认按钮禁用并显示错误提示。返回口令字符串 / null（取消）。
+class _NewPasswordField extends StatefulWidget {
+  const _NewPasswordField({
+    required this.hint,
+    required this.confirmHint,
+    required this.mismatch,
+    required this.cancelLabel,
+    required this.confirmLabel,
+  });
+
+  final String hint;
+  final String confirmHint;
+  final String mismatch;
+  final String cancelLabel;
+  final String confirmLabel;
+
+  @override
+  State<_NewPasswordField> createState() => _NewPasswordFieldState();
+}
+
+class _NewPasswordFieldState extends State<_NewPasswordField> {
+  final TextEditingController _ctrl = TextEditingController();
+  final TextEditingController _confirm = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  bool get _valid =>
+      _ctrl.text.isNotEmpty && _ctrl.text == _confirm.text;
+
+  void _submit() {
+    if (!_valid) return;
+    Navigator.of(context).pop(_ctrl.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final mismatch = _confirm.text.isNotEmpty && _ctrl.text != _confirm.text;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SInput(
+          controller: _ctrl,
+          autofocus: true,
+          obscureText: true,
+          hintText: widget.hint,
+          prefixIcon: EtaIcons.keyOutline,
+          textInputAction: TextInputAction.next,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 10),
+        SInput(
+          controller: _confirm,
+          obscureText: true,
+          hintText: widget.confirmHint,
+          prefixIcon: EtaIcons.keyOutline,
+          textInputAction: TextInputAction.done,
+          onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _submit(),
+        ),
+        if (mismatch)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Text(
+              widget.mismatch,
+              style: TextStyle(fontSize: 11.5, color: scheme.error),
+            ),
+          ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            SButton(
+              label: widget.cancelLabel,
+              variant: SButtonVariant.secondary,
+              size: SButtonSize.small,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            const SizedBox(width: 10),
+            SButton(
+              label: widget.confirmLabel,
+              icon: EtaIcons.check,
+              variant: SButtonVariant.primary,
+              size: SButtonSize.small,
+              onPressed: _valid ? _submit : null,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _SchemeCard extends StatelessWidget {
   const _SchemeCard({
     required this.value,
@@ -290,225 +390,6 @@ class _SchemeCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ModeCards extends StatelessWidget {
-  const _ModeCards({
-    required this.values,
-    required this.labels,
-    required this.descriptions,
-    required this.icons,
-    required this.selected,
-    required this.disabledValues,
-    required this.onChanged,
-  });
-
-  final List<String> values;
-  final List<String> labels;
-  final List<String> descriptions;
-  final List<IconData> icons;
-  final String? selected;
-  final Set<String> disabledValues;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      children: [
-        for (var i = 0; i < values.length; i++)
-          Padding(
-            padding: EdgeInsets.only(bottom: i < values.length - 1 ? 8 : 0),
-            child: _buildItem(context, scheme, i),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildItem(BuildContext context, ColorScheme scheme, int i) {
-    final value = values[i];
-    final isSelected = value == selected;
-    final disabled = disabledValues.contains(value);
-    final fg = isSelected ? scheme.primary : scheme.onSurface;
-    return MouseRegion(
-      cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: disabled ? null : () => onChanged(value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? scheme.primary.withValues(alpha: 0.08)
-                : scheme.onSurface.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? scheme.primary.withValues(alpha: 0.7)
-                  : scheme.outlineVariant.withValues(alpha: 0.4),
-              width: isSelected ? 1.4 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(icons[i], size: 20, color: fg),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      labels[i],
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: disabled ? fg.withValues(alpha: 0.4) : fg,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      descriptions[i],
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        height: 1.35,
-                        color: disabled
-                            ? scheme.onSurfaceVariant.withValues(alpha: 0.3)
-                            : scheme.onSurfaceVariant.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (isSelected)
-                Icon(EtaIcons.checkCircle, size: 18, color: scheme.primary),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NewPasswordField extends StatefulWidget {
-  const _NewPasswordField({
-    required this.newHint,
-    required this.confirmHint,
-    required this.mismatchText,
-  });
-
-  final String newHint;
-  final String confirmHint;
-  final String mismatchText;
-
-  @override
-  State<_NewPasswordField> createState() => _NewPasswordFieldState();
-}
-
-class _NewPasswordFieldState extends State<_NewPasswordField> {
-  final TextEditingController _pw = TextEditingController();
-  final TextEditingController _confirm = TextEditingController();
-  bool _obscure = true;
-
-  @override
-  void dispose() {
-    _pw.dispose();
-    _confirm.dispose();
-    super.dispose();
-  }
-
-  bool get _matched => _pw.text.isNotEmpty && _pw.text == _confirm.text;
-
-  void _submit() {
-    if (_matched) Navigator.of(context).pop(_pw.text);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SInput(
-          controller: _pw,
-          autofocus: true,
-          obscureText: _obscure,
-          hintText: widget.newHint,
-          prefixIcon: EtaIcons.keyOutline,
-          clearable: true,
-          textInputAction: TextInputAction.next,
-          onChanged: (_) => setState(() {}),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SInput(
-                    controller: _confirm,
-                    obscureText: _obscure,
-                    hintText: widget.confirmHint,
-                    prefixIcon: EtaIcons.safetyCertificateOutline,
-                    clearable: true,
-                    textInputAction: TextInputAction.done,
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (_) => _submit(),
-                  ),
-                  if (_confirm.text.isNotEmpty && !_matched)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        widget.mismatchText,
-                        style: TextStyle(fontSize: 11, color: scheme.error),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: l10n.settingsDeviceBindShowPassword,
-              iconSize: 18,
-              visualDensity: VisualDensity.compact,
-              onPressed: () => setState(() => _obscure = !_obscure),
-              icon: Icon(
-                _obscure
-                    ? EtaIcons.eyeCloseOutline
-                    : EtaIcons.eyeOutline,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            SButton(
-              label: l10n.commonCancel,
-              variant: SButtonVariant.secondary,
-              size: SButtonSize.small,
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            const SizedBox(width: 10),
-            SButton(
-              label: l10n.commonConfirm,
-              icon: EtaIcons.check,
-              variant: SButtonVariant.primary,
-              size: SButtonSize.small,
-              onPressed: _matched ? _submit : null,
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

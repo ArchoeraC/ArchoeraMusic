@@ -11,6 +11,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart';
 
 import '../log/log.dart';
+import '../native_integrity.dart';
 
 /// 凭据保险库进程（`archoera-vault` NativeAOT 可执行）封装。
 ///
@@ -33,8 +34,42 @@ class VaultProcess {
   VaultProcess._();
 
   static const String envBin = 'ARCHOERA_VAULT_BIN';
-  static const String envParentOk = 'ARCHOERA_VAULT_PARENT_OK';
   static const String envNoAbort = 'ARCHOERA_VAULT_NO_ABORT';
+
+  /// 加载器注入环境变量（spawn vault 前必须剔除）：
+  /// Linux `LD_PRELOAD`/`LD_AUDIT` 可在动态装载时劫持 vault 的 `read`/握手
+  /// 从而窃取 stdin 上的口令；macOS `DYLD_INSERT_LIBRARIES` 同理。
+  /// `LD_LIBRARY_PATH` 常被合法使用，一并剔除以缩小库搜索面（同属加载路径操纵）。
+  /// 其余环境（locale / OS 钥匙串后端 / D-Bus 地址等）必须保留。
+  static const List<String> loaderInjectionVars = [
+    'LD_PRELOAD',
+    'LD_AUDIT',
+    'LD_LIBRARY_PATH',
+    'DYLD_INSERT_LIBRARIES',
+    'DYLD_LIBRARY_PATH',
+    'DYLD_FRAMEWORK_PATH',
+  ];
+
+  /// 构建 spawn vault 用的净化环境：`Platform.environment` 去掉
+  /// [loaderInjectionVars]。spawn 时必须 **同时** 传
+  /// `includeParentEnvironment: false`——Dart 默认把 `environment` 与父进程环境
+  /// 合并，仅传净化表无法真正移除注入变量（父进程的 `LD_PRELOAD` 仍会被继承）。
+  /// [from] 仅测试注入（默认取真实 [Platform.environment]）。
+  @visibleForTesting
+  static Map<String, String> sanitizedEnvironment([Map<String, String>? from]) {
+    final env = Map<String, String>.of(from ?? Platform.environment);
+    for (final key in loaderInjectionVars) {
+      env.remove(key);
+    }
+    return env;
+  }
+
+  /// 是否允许 `ARCHOERA_VAULT_BIN` 覆盖 vault 二进制路径：仅 debug/test 构建
+  /// （`kDebugMode`，含 `flutter test`），或以 `--dart-define=ARCHOERA_ALLOW_VAULT_BIN=true`
+  /// 显式放宽（默认关闭）。release 构建**忽略**该环境变量，改走默认路径解析
+  /// （经 SEC-08 清单验签 + 生产标记 + 血缘校验），防攻击者用自选二进制接收明文口令。
+  static bool get _allowEnvBin =>
+      kDebugMode || const bool.fromEnvironment('ARCHOERA_ALLOW_VAULT_BIN');
 
   static const String markerOk = 'ok';
   static const String markerCrash = 'crash';
@@ -80,14 +115,26 @@ class VaultProcess {
       Platform.isWindows ? 'archoera-vault.exe' : 'archoera-vault';
 
   static String _resolveBinary() {
-    final env = Platform.environment[envBin];
+    // Vector C：仅 debug/test 构建信任 `ARCHOERA_VAULT_BIN`（release 忽略，
+    // 走默认路径解析 → 经 SEC-08 清单校验 + 生产标记 + 血缘校验）。
+    final env = _allowEnvBin ? Platform.environment[envBin] : null;
     if (env != null && env.isNotEmpty) {
       // 显式 ARCHOERA_VAULT_BIN（测试/CI/高级用户）：信任该二进制，不做
       // 生产标记校验——设置进程环境本身即需系统权限，生产路径绝不设置；
+      // 但 SEC-08 清单校验仍适用：清单锚定可执行文件（非环境变量），
+      // 不因 env 指定二进制而被劫持；无清单时开发态跳过。
       _binaryFromEnv = true;
-      if (File(env).existsSync()) return File(env).absolute.path;
+      if (File(env).existsSync()) {
+        final p = File(env).absolute.path;
+        NativeIntegrity.verifyOrThrow(p);
+        return p;
+      }
       final inDir = File('$env/$_exeName');
-      if (inDir.existsSync()) return inDir.absolute.path;
+      if (inDir.existsSync()) {
+        final p = inDir.absolute.path;
+        NativeIntegrity.verifyOrThrow(p);
+        return p;
+      }
     }
     _binaryFromEnv = false;
     String? found;
@@ -112,6 +159,9 @@ class VaultProcess {
     if (found == null) {
       throw VaultException('未找到 $_exeName（bundle/native 或 core/vault/build）');
     }
+    // SEC-08：加载/执行（--version）前先校验原生完整性清单——签名存在则
+    // fail-closed 验签 + 摘要，避免执行可能被篡改的 vault 字节。
+    NativeIntegrity.verifyOrThrow(found);
     // 默认路径解析到官方产物后才允许加载
     _verifyProduction(found);
     return found;
@@ -125,7 +175,11 @@ class VaultProcess {
   /// 显式 `ARCHOERA_VAULT_BIN` 不校验（显式信任边界，仅测试/CI 使用）。
   static void _verifyProduction(String path) {
     if (_verifiedBinary == path) return;
-    final r = Process.runSync(path, ['--version']);
+    final r = Process.runSync(path, ['--version'],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        environment: sanitizedEnvironment(),
+        includeParentEnvironment: false);
     if (r.exitCode != 0 || !((r.stdout as String).contains(_prodMarker))) {
       // fail-closed：删除被替换副本 + 拒绝解密 + versionFatal（UI 全屏仅退出）
       _failVersion(
@@ -147,27 +201,17 @@ class VaultProcess {
 
   // ── 生命周期（单命令，不涉凭据读取）────────────────────────────────
 
-  /// 初始化 vault（2-of-2 拆分），返回并保存会话锚点 T（`vault.auth`）。
-  static Future<String> init(String dataDir) async {
-    final r = Process.runSync(binary, ['init', dataDir]);
-    final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
-    if (payload.isNotEmpty) {
-      try {
-        await File(_authFile(dataDir)).writeAsString(payload);
-      } catch (_) {
-        // 锚点保存失败不阻断初始化（后续会话将重新补建）
-      }
-    }
-    return payload;
-  }
-
   /// 初始化 vault（LEGACY：crypto 传统单因子，推荐）——主密钥 K 整体存
   /// OS 安全存储（DPAPI/Keychain/libsecret），vault 文件不含密钥材料。
   /// 无份额配对、无口令、无设备熵，稳定性高于 2-of-2（不存在份额丢失
   /// 导致的凭据整体丢失）；安全性降为单点（OS 钥匙串被攻破 = 凭据全泄露）。
   /// 返回并保存会话锚点 T（`vault.auth`）。
   static Future<String> initCrypto(String dataDir) async {
-    final r = Process.runSync(binary, ['init-crypto', dataDir]);
+    final r = Process.runSync(binary, ['init-crypto', dataDir],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        environment: sanitizedEnvironment(),
+        includeParentEnvironment: false);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     if (payload.isNotEmpty) {
       try {
@@ -188,7 +232,11 @@ class VaultProcess {
   /// 选用即显式接受该降级。** 复用 crypto 单因子全部配套（握手/崩溃联动/
   /// 目录隔离/可销毁）。返回并保存会话锚点 T（`vault.auth`）。
   static Future<String> initFile(String dataDir) async {
-    final r = Process.runSync(binary, ['init-file', dataDir]);
+    final r = Process.runSync(binary, ['init-file', dataDir],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        environment: sanitizedEnvironment(),
+        includeParentEnvironment: false);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     if (payload.isNotEmpty) {
       try {
@@ -200,197 +248,169 @@ class VaultProcess {
     return payload;
   }
 
-  /// 初始化 vault（口令模式，可选高级）：授权侧份额 = Argon2id(password)。
-  /// 口令经 stdin 首行传递，绝不落 argv；返回并保存会话锚点 T。
-  static Future<String> initPassword(String dataDir, String password) async {
-    final Process p;
-    try {
-      p = await Process.start(binary, ['init-password', dataDir]);
-    } on ProcessException catch (e) {
-      throw VaultException('vault 进程启动失败：${e.message}');
-    }
-    p.stdin.write('$password\n');
-    await p.stdin.flush();
-    await p.stdin.close();
-    final out = await p.stdout.transform(utf8.decoder).join();
-    final err = await p.stderr.transform(utf8.decoder).join();
-    final payload = _parseSync(await p.exitCode, out, err);
-    if (payload.isNotEmpty) {
-      try {
-        await File(_authFile(dataDir)).writeAsString(payload);
-      } catch (_) {}
-    }
+  /// 初始化 vault（'S' slots，m1 = 仅口令槽）：主密钥 K 由
+  /// Argon2id(password) 派生的 KEK 封装在 vault 文件槽位表中（自包含，
+  /// 无 OS 钥匙串依赖）；口令经 stdin 首行传递，绝不落 argv。
+  /// 可选 [kdfM]/[kdfT]/[kdfP] 指定 Argon2id 强度（非密文，走 argv；
+  /// 缺省由 vault 侧取默认档）。返回并保存会话锚点 T（`vault.auth`）。
+  static Future<String> initM1(String dataDir, String password,
+      {int? kdfM, int? kdfT, int? kdfP}) async {
+    final payload = await _spawnCapture(
+        ['init-m1', dataDir, ..._kdfArgs(kdfM, kdfT, kdfP)],
+        stdinLine: password);
+    await _saveAnchor(dataDir, payload);
     return payload;
   }
 
-  /// 初始化 vault（设备绑定多封装，BitLocker 式增强项，opt-in）：
-  /// 本机免密（设备熵）+ 可选恢复口令。**涉及设备指纹采集（仅本机读取、
-  /// 不上传）——调用方须先向用户明示隐私提示**（device-bound-vault-plan §1.3）。
-  /// [recoveryPassword] 非 null 时经 stdin 首行传递，绝不落 argv。
-  static Future<String> initDevice(String dataDir,
-      {String? recoveryPassword}) async {
+  /// 初始化 vault（'S' slots，m2a = 口令+设备双因子槽 + 恢复槽）：
+  /// 生成 `device.key`（0600）与 32B 恢复码；口令经 stdin 首行传递。
+  /// 可选 [kdfM]/[kdfT]/[kdfP] 指定 Argon2id 强度（作用于口令+设备槽）。
+  /// 返回会话锚点 T 与**仅此一次输出**的恢复码（调用方须提示用户妥善保存）。
+  /// 同时保存锚点。
+  static Future<VaultInitM2a> initM2a(String dataDir, String password,
+      {int? kdfM, int? kdfT, int? kdfP}) async {
+    final payload = await _spawnCapture(
+        ['init-m2a', dataDir, ..._kdfArgs(kdfM, kdfT, kdfP)],
+        stdinLine: password);
+    final sp = payload.indexOf(' ');
+    final anchor = sp < 0 ? payload : payload.substring(0, sp);
+    final recoveryCode = sp < 0 ? '' : payload.substring(sp + 1).trim();
+    if (anchor.isEmpty || recoveryCode.isEmpty) {
+      throw VaultException('m2a 初始化响应缺少锚点或恢复码');
+    }
+    await _saveAnchor(dataDir, anchor);
+    return (anchor: anchor, recoveryCode: recoveryCode);
+  }
+
+  /// 初始化 vault（'S' slots，m2b = 仅设备槽）：生成 `device.key`（0600），
+  /// 本机免密解锁（握手 3 字段）；返回并保存会话锚点 T（`vault.auth`）。
+  static Future<String> initM2b(String dataDir) async {
+    final payload = await _spawnCapture(['init-m2b', dataDir]);
+    await _saveAnchor(dataDir, payload);
+    return payload;
+  }
+
+  /// 重键口令承载槽的 Argon2id 强度（`set-kdf`，仅 m1/m2a）：以新参数重新
+  /// 封装口令槽，**保持主密钥 K 与全部条目不变**（无数据丢失），原子写 + `.bak`。
+  /// 口令经 stdin 首行传递，绝不落 argv；[password] 为当前解锁口令（m2a 设备
+  /// 因子须可用，否则 vault 返回 `NEED_RECOVERY`）。
+  /// 失败映射：`NEED_RECOVERY` / `SHARE_MISMATCH` / 不支持（crypto/file/m2b 的
+  /// `err 该模式不支持更改 KDF`）经 [_asException] 归一为既有异常类型。
+  static Future<void> setKdf(String dataDir,
+      {required int m, required int t, required int p, String? password}) async {
+    await _spawnCapture(
+      ['set-kdf', dataDir, '--kdf-m', '$m', '--kdf-t', '$t', '--kdf-p', '$p'],
+      stdinLine: password ?? '',
+    );
+  }
+
+  /// 当前口令承载槽的 Argon2id 强度（仅 m1/m2a；status JSON 的 `kdf` 字段）。
+  /// crypto/m2b（无口令 KDF）或未初始化返回 null。
+  static Future<({int m, int t, int p})?> kdf(String dataDir) async {
+    final r = Process.runSync(binary, ['status', dataDir],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        environment: sanitizedEnvironment(),
+        includeParentEnvironment: false);
+    final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
+    final match = RegExp(r'"kdf":\{"m":(\d+),"t":(\d+),"p":(\d+)\}')
+        .firstMatch(payload);
+    if (match == null) return null;
+    return (
+      m: int.parse(match.group(1)!),
+      t: int.parse(match.group(2)!),
+      p: int.parse(match.group(3)!),
+    );
+  }
+
+  /// 按需追加 `--kdf-m/--kdf-t/--kdf-p`（三者仅当 [m]/[t]/[p] 全部提供时；
+  /// 缺省不追加 → vault 取自身默认档，保持既有行为）。
+  static List<String> _kdfArgs(int? m, int? t, int? p) {
+    if (m == null || t == null || p == null) return const [];
+    return ['--kdf-m', '$m', '--kdf-t', '$t', '--kdf-p', '$p'];
+  }
+
+  /// 启动单命令 vault 进程（[stdinLine] 非 null 时作为 stdin 首行写入，
+  /// 密文/口令绝不落 argv），返回 `ok` 载荷（`err` 抛 [VaultException]）。
+  static Future<String> _spawnCapture(List<String> args,
+      {String? stdinLine}) async {
     final Process p;
     try {
-      p = await Process.start(
-          binary, ['init-device', dataDir, if (recoveryPassword != null) '--set-recovery-password']);
+      p = await Process.start(binary, args,
+          environment: sanitizedEnvironment(),
+          includeParentEnvironment: false);
     } on ProcessException catch (e) {
       throw VaultException('vault 进程启动失败：${e.message}');
     }
-    if (recoveryPassword != null) {
-      p.stdin.write('$recoveryPassword\n');
+    if (stdinLine != null) {
+      p.stdin.write('$stdinLine\n');
       await p.stdin.flush();
     }
     await p.stdin.close();
     final out = await p.stdout.transform(utf8.decoder).join();
     final err = await p.stderr.transform(utf8.decoder).join();
-    final payload = _parseSync(await p.exitCode, out, err);
-    if (payload.isNotEmpty) {
-      try {
-        await File(_authFile(dataDir)).writeAsString(payload);
-      } catch (_) {}
-    }
-    return payload;
+    return _parseSync(await p.exitCode, out, err);
+  }
+
+  /// 保存会话锚点 T（`vault.auth`）；写盘失败不阻断初始化
+  /// （后续会话将重新补建）。
+  static Future<void> _saveAnchor(String dataDir, String payload) async {
+    if (payload.isEmpty) return;
+    try {
+      await File(_authFile(dataDir)).writeAsString(payload);
+    } catch (_) {}
   }
 
   /// 是否已初始化（解析 status JSON；未初始化时后续会话将被拒）。
   static Future<bool> isInitialized(String dataDir) async {
-    final r = Process.runSync(binary, ['status', dataDir]);
+    final r = Process.runSync(binary, ['status', dataDir],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        environment: sanitizedEnvironment(),
+        includeParentEnvironment: false);
     return _parseSync(r.exitCode, r.stdout as String, r.stderr as String)
         .contains('"initialized":true');
   }
 
-  /// 份额锚定模式：`crypto`（LEGACY 单因子）| `os`（OS 份额）| `password`
-  /// （口令派生）| `multiseal`（设备绑定）。
+  /// 份额锚定模式：`crypto`（LEGACY 单因子：K 存 OS 安全存储或文件密钥库）|
+  /// `m1`（slots 仅口令槽）| `m2a`（slots 口令+设备双因子 + 恢复槽）|
+  /// `m2b`（slots 仅设备槽，本机免密）。
   /// **未初始化（`initialized:false`，无 mode 字段）返回 null**——具体加密
   /// 方案由 prefs 偏好兜底（[SecurityPrefs.credentialScheme]，默认 crypto）；
   /// 仅 status 异常/二进制缺失（解析抛 [VaultException]）同样由调用方兜底为 null。
   static Future<String?> mode(String dataDir) async {
-    final r = Process.runSync(binary, ['status', dataDir]);
+    final r = Process.runSync(binary, ['status', dataDir],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        environment: sanitizedEnvironment(),
+        includeParentEnvironment: false);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     final mode = RegExp(r'"mode":"(\w+)"').firstMatch(payload)?.group(1);
     if (mode != null) return mode;
-    // 未初始化（无 mode 字段）→ null（不虚构默认 v1：默认方案由 prefs 决定）
+    // 未初始化（无 mode 字段）→ null（不虚构默认：默认方案由 prefs 决定）
     return null;
   }
 
   /// 份额后端（v4 指纹，status JSON `"backend"`）：`file`=文件密钥模式 /
-  /// `dpapi`/`keychain`/`libsecret`/`insecure`=OS 安全存储。crypto 模式由
-  /// 本字段区分「OS 存储」与「文件密钥」两种实现；未初始化返回 null。
+  /// `dpapi`/`keychain`/`libsecret`=OS 安全存储 / `none`=slots 自包含。
+  /// crypto 模式由本字段区分「OS 存储」与「文件密钥」两种实现；未初始化返回 null。
   static Future<String?> backend(String dataDir) async {
-    final r = Process.runSync(binary, ['status', dataDir]);
+    final r = Process.runSync(binary, ['status', dataDir],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        environment: sanitizedEnvironment(),
+        includeParentEnvironment: false);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     return RegExp(r'"backend":"(\w+)"').firstMatch(payload)?.group(1);
   }
 
-  /// 设备绑定（v3）是否设置了恢复口令封装（kind=1）——决定关闭绑定时是
-  /// 「验证恢复口令」还是「新设 v2 口令」（纯熵绑定对称于免密开启，无需口令）。
-  /// 非 multiseal 一律返回 false。
-  static Future<bool> hasRecovery(String dataDir) async {
-    final r = Process.runSync(binary, ['status', dataDir]);
-    final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
-    return payload.contains('"has_recovery":true');
-  }
-
-  /// 修改恢复口令（多封装，须已解锁）：旧口令立即失效。
-  /// [password] 为当前会话解锁口令（v3 换机恢复场景）。
-  static Future<void> setRecoveryPassword(String dataDir, String newPassword,
-      {String? password}) async {
-    final s = await _VaultSession.open(dataDir, password: password);
-    try {
-      await s.send(
-          'set-recovery-password ${base64Encode(utf8.encode(newPassword))}');
-    } finally {
-      await s.close();
-    }
-  }
-
-  /// 清除恢复口令（多封装，须已解锁）：换机/熵丢失后不可恢复，须谨慎调用。
-  /// 返回是否实际清除了。
-  static Future<bool> clearRecoveryPassword(String dataDir,
-      {String? password}) async {
-    final s = await _VaultSession.open(dataDir, password: password);
-    try {
-      return await s.send('clear-recovery-password') == 'true';
-    } finally {
-      await s.close();
-    }
-  }
-
-  /// 重新绑定当前设备（多封装，须已解锁；换机口令恢复后调用）：
-  /// 用当前设备指纹重密封熵，旧指纹立即失效。返回新熵标识（base64）。
-  static Future<String> rebind(String dataDir, {String? password}) async {
-    final s = await _VaultSession.open(dataDir, password: password);
-    try {
-      return await s.send('rebind');
-    } finally {
-      await s.close();
-    }
-  }
-
-  /// 升级为设备绑定（v1/v2 → v3，§8 迁移）：既有 vault 解锁后补建
-  /// 多封装——生成熵写 device.seal + 熵密封 S（kind=2），可选恢复口令
-  /// （kind=1）。**key_vault 与 K 不变，既有条目直接沿用（无需重加密）**。
-  /// v2（口令模式）须传 [password]（当前会话口令）；v1（OS 模式）无需。
-  /// [recoveryPassword] 非 null 时补建口令封装（换机恢复路径）。
-  /// 返回新熵标识（base64）。涉及设备指纹采集——调用方须先明示隐私提示。
-  static Future<String> upgradeDevice(String dataDir,
-      {String? recoveryPassword, String? password}) async {
-    final s = await _VaultSession.open(dataDir, password: password);
-    try {
-      if (recoveryPassword != null) {
-        return await s.send(
-            'upgrade-device --set-recovery-password ${base64Encode(utf8.encode(recoveryPassword))}');
-      }
-      return await s.send('upgrade-device');
-    } finally {
-      await s.close();
-    }
-  }
-
-  /// v1 ↔ v2 份额迁移（三档切换条：系统保护 ↔ 口令保护）：
-  /// 份额源在 OS 安全存储 ↔ Argon2id 口令间切换，**主密钥 K 不变，
-  /// 既有条目直接沿用（无需重加密）**。
-  ///   target='password'（v1 → v2）：[newPassword] 为新会话口令（必填）
-  ///   target='os'（v2 → v1）：无需口令（会话已解锁持 K）
-  /// [password] 为当前会话口令（v2 → v1 时必填；v1 → v2 时 OS 模式无需）。
-  /// 切换成功后既有数据全部保留；下次启动按新模式解锁。
-  static Future<void> switchMode(String dataDir, String target,
-      {String? newPassword, String? password}) async {
-    final s = await _VaultSession.open(dataDir, password: password);
-    try {
-      if (newPassword != null) {
-        await s.send(
-            'switch-mode $target ${base64Encode(utf8.encode(newPassword))}');
-      } else {
-        await s.send('switch-mode $target');
-      }
-    } finally {
-      await s.close();
-    }
-  }
-
-  /// 关闭设备绑定（清除熵封装，回落口令模式，须已解锁会话）。
-  /// 走 `clear-device-seal <b64口令>` serve 命令——[recoveryPassword] 语义按
-  /// 封装状态分流：
-  ///   - 有恢复口令封装：为当前恢复口令（授权本关闭，口令即新会话口令）；
-  ///   - 无（纯熵绑定，开启时免密）：为新设的 v2 解锁口令（免授权校验，
-  ///     对称于免密开启）。
-  /// 关闭后 vault 降级为 v2 口令模式。返回是否成功关闭。
-  static Future<bool> clearDeviceSeal(String dataDir, String recoveryPassword,
-      {String? password}) async {
-    final s = await _VaultSession.open(dataDir, password: password);
-    try {
-      return await s.send(
-              'clear-device-seal ${base64Encode(utf8.encode(recoveryPassword))}') ==
-          'true';
-    } finally {
-      await s.close();
-    }
-  }
-
-  /// 全量销毁：删 OS 授权份额 + vault 文件 + 本地锚点/标记（密文不可恢复）。
+  /// 全量销毁：删授权侧份额 + vault 文件 + 本地锚点/标记（密文不可恢复）。
   static void destroy(String dataDir) {
-    final r = Process.runSync(binary, ['destroy', dataDir]);
+    final r = Process.runSync(binary, ['destroy', dataDir],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        environment: sanitizedEnvironment(),
+        includeParentEnvironment: false);
     _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     for (final f in [_authFile(dataDir), _markerFile(dataDir)]) {
       try {
@@ -403,10 +423,12 @@ class VaultProcess {
   // ── 凭据命令（会话模式）───────────────────────────────────────────
 
   /// 读取凭据明文（base64 载荷；无条目返回 null）。
-  /// 口令模式 vault 须传 [password]（握手第 4 字段，用后即弃不缓存）。
+  /// m1/m2a 须传 [password]；m2a 设备因子缺失（NEED_RECOVERY）时改传
+  /// [recoveryCode]；crypto/m2b 两者皆无需。
   static Future<String?> get(String dataDir, String uid,
-      {String? password}) async {
-    final s = await _VaultSession.open(dataDir, password: password);
+      {String? password, String? recoveryCode}) async {
+    final s = await _VaultSession.open(dataDir,
+        password: password, recoveryCode: recoveryCode);
     try {
       final payload = await s.send('get $uid');
       return payload == 'null' ? null : payload;
@@ -416,10 +438,11 @@ class VaultProcess {
   }
 
   /// 写入凭据（明文 [plaintext] 经 stdin 传递，不落 argv）。
-  /// 口令模式 vault 须传 [password]。
+  /// m1/m2a 须传 [password]；m2a 恢复路径传 [recoveryCode]。
   static Future<void> set(String dataDir, String uid, String plaintext,
-      {String? password}) async {
-    final s = await _VaultSession.open(dataDir, password: password);
+      {String? password, String? recoveryCode}) async {
+    final s = await _VaultSession.open(dataDir,
+        password: password, recoveryCode: recoveryCode);
     try {
       await s.send('set $uid', payloadLine: base64Encode(utf8.encode(plaintext)));
     } finally {
@@ -427,10 +450,11 @@ class VaultProcess {
     }
   }
 
-  /// 删除单条凭据。口令模式 vault 须传 [password]。
+  /// 删除单条凭据。m1/m2a 须传 [password]；m2a 恢复路径传 [recoveryCode]。
   static Future<void> delete(String dataDir, String uid,
-      {String? password}) async {
-    final s = await _VaultSession.open(dataDir, password: password);
+      {String? password, String? recoveryCode}) async {
+    final s = await _VaultSession.open(dataDir,
+        password: password, recoveryCode: recoveryCode);
     try {
       await s.send('delete $uid');
     } finally {
@@ -458,20 +482,6 @@ class VaultProcess {
 
   static String _authFile(String dataDir) => '$dataDir/vault.auth';
   static String _markerFile(String dataDir) => '$dataDir/vault.marker';
-
-  /// spawn 方声明父进程白名单（血缘校验，vault 侧据此拒绝独立/脚本调用）。
-  /// Windows 下 [Platform.resolvedExecutable] 末段带 `.exe`，而 .NET 侧
-  /// `Process.GetProcessById(ppid).ProcessName` 返回**不含扩展名**的可执行名
-  /// → 必须去掉 `.exe` 才能配对（2026-08-15 修复实录）。
-  static String _parentNames() {
-    final me = Platform.resolvedExecutable
-        .split(Platform.pathSeparator)
-        .last
-        .replaceAll(RegExp(r'\.exe$', caseSensitive: false), '');
-    return [me, 'flutter_tester', 'dart', 'dart_tests', 'flutter']
-        .where((n) => n.isNotEmpty)
-        .join(',');
-  }
 
   static final Random _rng = Random.secure();
 
@@ -611,6 +621,9 @@ class VaultProcess {
   }
 }
 
+/// m2a 初始化结果：会话锚点（已保存于 `vault.auth`）+ 仅此一次展示的恢复码。
+typedef VaultInitM2a = ({String anchor, String recoveryCode});
+
 /// vault 版本异常原因（结构化枚举，UI 按此映射 l10n 文案）：
 ///   - [binaryReplaced]：`--version` 生产标记校验失败（默认路径二进制被替换/
 ///     非官方构建/损坏），副本已删除、解密被拒；
@@ -628,16 +641,22 @@ class _VaultSession {
   bool _closed = false;
 
   /// spawn + 握手。失败时按退出路径记录标记（fail/crash）并抛 [VaultException]。
-  /// 口令模式 vault 须传 [password]（握手第 4 字段 base64；用后即弃不缓存）。
+  /// 握手字段数/标签按 vault 模式（status 读取）构造：crypto/m2b → 3 字段
+  /// （免密）；m1 → 第 4 字段 [password]；m2a → 第 4 字段 [password]
+  /// （+device.key），或 [recoveryCode] 作第 4 字段 + `b64("rec")` 标签
+  /// （第 5 字段）。凭据用后即弃不缓存。
   static Future<_VaultSession> open(String dataDir,
-      {String? password}) async {
+      {String? password, String? recoveryCode}) async {
+    final mode = await VaultProcess.mode(dataDir);
+    final h = VaultProcess._randomB64(32);
+    final c = VaultProcess._randomB64(16);
+    final handshake = _handshakeLine(mode, h, c,
+        password: password, recoveryCode: recoveryCode);
     final Process p;
     try {
       p = await Process.start(VaultProcess.binary, ['serve', dataDir],
-          environment: {
-            ...Platform.environment,
-            VaultProcess.envParentOk: VaultProcess._parentNames(),
-          });
+          environment: VaultProcess.sanitizedEnvironment(),
+          includeParentEnvironment: false);
     } on ProcessException catch (e) {
       throw VaultException('vault 进程启动失败：${e.message}');
     }
@@ -656,11 +675,6 @@ class _VaultSession {
       Log.at(_vaultStderrLevel(line), 'vault', line);
     }, onError: (_) {});
 
-    final h = VaultProcess._randomB64(32);
-    final c = VaultProcess._randomB64(16);
-    final handshake = password == null
-        ? 'handshake $h $c\n'
-        : 'handshake $h $c ${base64Encode(utf8.encode(password))}\n';
     try {
       p.stdin.write(handshake);
       await p.stdin.flush();
@@ -728,6 +742,38 @@ class _VaultSession {
       await VaultProcess._record(dataDir, refusal ? 1 : -1, normal: refusal);
       if (e is VaultException) rethrow;
       throw VaultException('vault 握手失败：$e');
+    }
+  }
+
+  /// 按模式构造握手首行（含 `\n`）：
+  ///   crypto / m2b → `handshake <H> <C>`（免密 3 字段）；
+  ///   m1 → `handshake <H> <C> <b64口令>`（4 字段）；
+  ///   m2a → `handshake <H> <C> <b64口令>`（4 字段，+device.key），或
+  ///         恢复路径 `handshake <H> <C> <b64恢复码> <b64"rec">`（5 字段）。
+  /// 缺凭据（m1/m2a 未传令牌）→ 抛 [VaultException]（清晰失败，不空握）。
+  static String _handshakeLine(String? mode, String h, String c,
+      {String? password, String? recoveryCode}) {
+    String? b64pw;
+    if (password != null && password.isNotEmpty) {
+      b64pw = base64Encode(utf8.encode(password));
+    }
+    switch (mode) {
+      case 'm1':
+        if (b64pw == null) throw VaultException('m1 vault 解锁需要口令');
+        return 'handshake $h $c $b64pw\n';
+      case 'm2a':
+        if (recoveryCode != null && recoveryCode.isNotEmpty) {
+          final code = base64Encode(utf8.encode(recoveryCode));
+          final label = base64Encode(utf8.encode('rec'));
+          return 'handshake $h $c $code $label\n';
+        }
+        if (b64pw == null) {
+          throw VaultException('m2a vault 解锁需要口令或恢复码');
+        }
+        return 'handshake $h $c $b64pw\n';
+      default:
+        // crypto（'C'）/ m2b：免密 3 字段（m2b 设备因子为 device.key）
+        return 'handshake $h $c\n';
     }
   }
 

@@ -11,9 +11,11 @@ import '../../services/streaming/streaming_provider.dart';
 
 /// 播放整张专辑（进入专辑页拉取后播放）。
 Future<void> playStreamingAlbum(WidgetRef ref, StreamingAlbum album) async {
-  final cfg = ref.read(streamingProvider).activeServer;
-  if (cfg == null) return;
+  final id = ref.read(streamingProvider).activeServerId;
+  if (id == null) return;
   try {
+    final cfg = await ref.read(streamingProvider.notifier).resolvedServer(id);
+    if (cfg == null) return;
     final songs = await StreamingClient(cfg).getAlbumSongs(album.id);
     if (songs.isEmpty) return;
     ref.read(playbackProvider.notifier).playQueue(songs);
@@ -27,9 +29,11 @@ Future<void> playStreamingPlaylist(
   WidgetRef ref,
   StreamingPlaylist playlist,
 ) async {
-  final cfg = ref.read(streamingProvider).activeServer;
-  if (cfg == null) return;
+  final id = ref.read(streamingProvider).activeServerId;
+  if (id == null) return;
   try {
+    final cfg = await ref.read(streamingProvider.notifier).resolvedServer(id);
+    if (cfg == null) return;
     final songs = await StreamingClient(cfg).getPlaylistSongs(playlist.id);
     if (songs.isEmpty) return;
     ref.read(playbackProvider.notifier).playQueue(songs);

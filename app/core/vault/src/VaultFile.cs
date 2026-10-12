@@ -11,61 +11,71 @@ namespace Archoera.Vault;
 /// ```
 /// version 字段（1B）= 模式代号——一模式一字母（大写），新增模式用新字母，
 /// 不与历史数字布局纠缠：
-///   'O'(0x4F) OS 模式（2-of-2）：S 存 OS 安全存储，头部含后端指纹
-///   'P'(0x50) 口令模式：S = Argon2id(口令)，KDF 参数随头部存储
-///   'M'(0x4D) 多封装（BitLocker 式）：S 被设备熵/口令密封
 ///   'C'(0x43) LEGACY（crypto 传统单因子）：K 整体存 OS 安全存储，文件无密钥材料
+///   'S'(0x53) slots 容器：头部槽位表封装 K，条目以 K 加密，尾部 HMAC 锚定
 /// 通用布局：
 ///   magic "AVLT"(4B) | version(1B) | 头部(按模式)… | entry_count(u32) | entries…
 ///   entry: uid_len(1B) | uid(utf8) | salt(16B) | nonce(12B) | ct_len(u32) | ciphertext(ct|tag)
-/// 'O'：reserved(3B) | key_vault(32B, K_vault = K ⊕ S) | backend_len(1B) | backend(utf8)
-/// 'P'：kdf(1B)=1 | reserved(2B) | salt(16B) | m(u32) | t(u32) | p(u32)
-///      | key_vault(32B, K_vault = K ⊕ S)
-/// 'M'：flags(1B) | reserved(2B) | key_vault(32B, K_vault = K ⊕ S) | seal_count(1B) | seals…
 /// 'C'：reserved(3B) | key_vault(32B, 零占位) | backend_len(1B) | backend(utf8)
-/// 历史数字版本（1-4）仅读取兼容，不再写入：
-///   1 = OS 模式（v1，无后端指纹）  4 = OS 模式（v4，v1 的辅助增强：追加后端指纹）
-///   2 = 口令模式（v2）             3 = 多封装（v3）
+/// 'S'：vault_id(16B) | created_at_ms(i64) | alg(1B=1 AES-256-GCM) | slot_count(1B)
+///      | slot[slot_count] | entry_count(u32) | entries… | trailer(32B, HMAC-SHA256(K, 前文))
+///      slot: kind(1B) | m(u32) | t(u32) | p(u32) | salt(16B) | nonce(12B)
+///            | wrapped_len(u16) | wrapped(ct‖tag, K 的封装)
+///      kind 1=口令 2=设备 3=恢复 4=口令+设备（m/t/p 仅口令类槽有意义）
 /// ```
-/// v4 是 v1 的辅助增强：头部追加 backend 指纹字段（写入时 S 份额所落的后端标识）。
-/// 解锁时若文件头指纹 ≠ 当前实际后端（如 PROD=libsecret 与 TEST=insecure 混用
-/// 同一数据目录）→ 抛 [VaultShareBackendMismatchException]，把此前模糊的
-/// GCM mismatch 升级为明确错误码；旧数字文件无指纹字段（Backend=null）→
-/// 解锁时跳过校验，保持向后兼容。
-/// LEGACY（'C'）与 'O' 同构，但语义为**单因子**：key_vault 字段不承载份额
-/// （32B 零占位），主密钥 K 整体存 OS 安全存储（vault 文件不含密钥材料，
-/// 窃取文件无 K 无法解密）；backend 指纹照常校验（防构建形态混用）。
+/// LEGACY（'C'）：单因子——key_vault 字段不承载份额（32B 零占位），主密钥 K 整体存
+/// OS 安全存储（vault 文件不含密钥材料，窃取文件无 K 无法解密）；backend 指纹照常
+/// 校验（防不同存储后端（file/libsecret/dpapi/keychain）混用同一数据目录）。
 /// 每条目独立 salt/nonce，AES-256-GCM（tag 16B 附于密文尾）。
-/// 磁盘上仅存密文与 K_vault 份额；主密钥 K 由 [KeySplit] 2-of-2 重建，永不落盘。
-/// 口令模式下 S 份额由 Argon2id 口令派生（[VaultService.InitPassword]），
-/// KDF 参数随文件头存储（口令本身从不落盘）。
-/// v3 多封装（[SealKind]）：S 分别被「设备熵」与「口令」密封，任一方解出即可
-/// 协同重建 K（BitLocker 式：本机免密 + 设备变更走口令恢复，device-bound-vault-plan）。
+/// 'S' slots：无 K_vault 份额概念——K 由槽位表封装（F1 仅口令槽 kind=1，KEK =
+/// Argon2id(口令, ad = vault_id‖kind)），条目直接以 K 加密；尾部
+/// HMAC-SHA256(K, header‖entries) 在解密凭据前校验（verify-before-decrypt）。
 public enum VaultMode
 {
-    /// 默认：S 份额存 OS 安全存储（DPAPI/Keychain/libsecret）。
-    OsStore = 0,
-
-    /// 可选高级：S 份额由用户口令经 Argon2id 派生（防 GPU 爆破）。
-    Password = 1,
-
-    /// v3：S 份额多封装（设备熵 + 可选恢复口令），本机免密、设备变更走恢复。
-    MultiSeal = 2,
-
     /// LEGACY（crypto 传统单因子，推荐）：主密钥 K 整体存 OS 安全存储，vault 文件
     /// 不含密钥材料（key_vault=32B 零占位）；条目仍 AES-256-GCM 加密落盘。
-    Crypto = 3,
+    Crypto = 0,
+
+    /// 新槽位容器（'S'，slots）：主密钥 K 整体由「槽位表」中的封装承载
+    /// （F1 仅口令封装 kind=1），条目以 K 直接 AES-256-GCM 加密，尾部
+    /// HMAC-SHA256(K, header‖entries) 提供 verify-before-decrypt。
+    Slots = 1,
 }
 
-/// S 份额的封装类型（v3，device-bound-vault-plan §4.1）。
-public enum SealKind : byte
+/// 槽位表中单个槽位的封装类型（'S' 容器）。
+/// 每个 kind 决定 KEK 的派生方式（见 [SlotCrypto]），包裹的主密钥 K 与
+/// `ad = vaultId‖kind`、AES-256-GCM 语义对所有 kind 一致。
+public enum SlotKind : byte
 {
-    /// 口令封装：key = Argon2id(口令)，KDF 参数随封装块存储。
+    /// 口令槽：KEK = Argon2id(口令, salt, ad=vaultId‖kind)。
     Password = 1,
 
-    /// 设备熵封装：key = HKDF-SHA256(设备熵 E, "archoera.share-seal")，
-    /// 熵本体 E 存 device.seal（指纹密封），本封装只存 S 的密文与 entropy_id。
-    DeviceEntropy = 2,
+    /// 设备熵槽（F2）：KEK = HKDF-SHA256(deviceSecret, salt, info="archoera.slot.device")。
+    Device = 2,
+
+    /// 恢复槽（F2）：KEK = HKDF-SHA256(recoveryCodeBytes, salt, info="archoera.slot.recovery")。
+    Recovery = 3,
+
+    /// 口令 + 设备双因子槽（F2）：
+    /// KEK = HKDF-SHA256(Argon2id(口令)‖deviceSecret, salt, info="archoera.slot.pwdev")。
+    PasswordDevice = 4,
+}
+
+/// 'S'（slots）容器的**因子模式**（由槽位集合推导，不写入文件头——
+/// 容器 version 恒为 'S'，模式是槽位表的函数）。
+public enum SlotsMode
+{
+    /// 未知 / 空槽位集合。
+    None = 0,
+
+    /// m1：恰好一个口令槽。
+    M1 = 1,
+
+    /// m2a：口令+设备双因子槽（+ 恢复槽）——口令 + device.key，或恢复码。
+    M2a = 2,
+
+    /// m2b：仅设备槽——仅需 device.key（本机免密）。
+    M2b = 3,
 }
 
 /// 加载上限（防恶意构造的 vault 文件 DoS，credential-vault-plan §8）：
@@ -85,85 +95,104 @@ public static class VaultLimits
     public const int MaxKdfIterations = 16;
     public const int MaxKdfParallelism = 8;
 
+    // ── KDF 参数下界（F1）──
+    // 口令槽拒绝过弱的 KDF 参数（如 m=1024 / t=0），避免「防 GPU 爆破」形同虚设。
+    public const int MinKdfMemoryKiB = 8192;
+    public const int MinKdfIterations = 1;
+    public const int MinKdfParallelism = 1;
+
     /// 校验 KDF 参数是否在允许区间；越界抛 [InvalidDataException]（加载/派生前快速拒绝）。
+    /// 下界（F1 新增）：m ≥ 8192 KiB、t ≥ 1、p ≥ 1——防止用极弱 KDF 参数构造口令槽
+    /// 绕过「防 GPU 爆破」的设计目标；上界沿用 SEC-06 的快速拒绝。
     public static void ValidateKdf(int mKiB, int t, int p)
     {
-        if (p < 1 || p > MaxKdfParallelism)
+        if (p < MinKdfParallelism || p > MaxKdfParallelism)
             throw new InvalidDataException($"KDF 并行度参数异常（p={p}），拒绝加载");
-        if (mKiB < 8 * p || mKiB > MaxKdfMemoryKiB)
+        if (mKiB < MinKdfMemoryKiB || mKiB > MaxKdfMemoryKiB)
             throw new InvalidDataException($"KDF 内存参数异常（m={mKiB} KiB），拒绝加载");
-        if (t < 1 || t > MaxKdfIterations)
+        if (t < MinKdfIterations || t > MaxKdfIterations)
             throw new InvalidDataException($"KDF 迭代次数异常（t={t}），拒绝加载");
     }
 }
 
-/// v3 多封装块：S 份额的单个密封（任一方解出 → K = K_vault ⊕ S）。
-public sealed class VaultSeal
+/// 'S'（slots）容器的单个槽位：以某个 KEK 封装主密钥 K。
+/// F1 仅口令槽（[SlotKind.Password]）：KEK = Argon2id(口令, salt, ad=vaultId‖kind)，
+/// 封装 = AES-256-GCM(KEK, K)，[Wrapped] = ct(32B)‖tag(16B)。
+public sealed class VaultSlot
 {
-    public required SealKind Kind { get; init; }
+    public required SlotKind Kind { get; init; }
 
-    /// 口令封装：Argon2id 盐（16B）。
-    public byte[]? Salt { get; init; }
+    /// 槽位 KDF 参数。口令 / 口令+设备槽为 Argon2id 参数；
+    /// 设备 / 恢复槽不使用 KDF 参数（占位 (0,0,0)，加载时跳过下界校验）。
+    public required Argon2id.KdfParams Kdf { get; init; }
 
-    /// 口令封装：KDF 参数。
-    public Argon2id.KdfParams? Kdf { get; init; }
+    /// 槽位 KDF 盐（16B）。
+    public required byte[] Salt { get; init; }
 
-    /// 设备熵封装：指向 device.seal 的熵标识（32B）。
-    public byte[]? EntropyId { get; init; }
-
+    /// 封装 nonce（12B）。
     public required byte[] Nonce { get; init; }
-    public required byte[] Ciphertext { get; init; } // ct|tag（S 的密文）
+
+    /// 被封装的 K（ct‖tag；口令槽 = K 的 AES-256-GCM 密文）。
+    public required byte[] Wrapped { get; init; }
 }
 
 /// 文件头元数据（非密文，供 serve 握手前读取模式/参数）。
-/// v3 返回 [SealKinds]（只读 kind 列表，不加载密文）——serve 据此判定
-/// 是否有口令封装可走恢复（NEED_RECOVERY）。
-/// [Backend]：v4 OS 模式文件记录的份额后端指纹（v1/v2/v3 为 null，不校验）。
+/// 'C' 返回 [Backend]（后端指纹）；'S' 返回 [SlotKinds]（只读 kind 列表，
+/// 不加载密文）——serve/status 据此判定 m1/m2a/m2b。
+/// [Kdf] 为**口令承载槽**（口令 / 口令+设备）的 Argon2id 参数（m1/m2a 可用；
+/// 设备/恢复槽或 crypto 模式为 null）——供 status 展示当前强度，不加载任何密文。
 public sealed record VaultHeader(
     VaultMode Mode,
-    byte[]? Salt,
-    Argon2id.KdfParams? Kdf,
-    IReadOnlyList<SealKind>? SealKinds = null,
-    string? Backend = null);
+    string? Backend = null,
+    IReadOnlyList<SlotKind>? SlotKinds = null,
+    Argon2id.KdfParams? Kdf = null);
 
 public sealed class VaultFile
 {
     public const uint Magic = 0x544C5641; // "AVLT"（小端）
 
     // ── 文件头 version 字段（1B）= 模式代号（一模式一字母，新增模式用新字母）──
-    public const byte ModeOS = (byte)'O';        // OS 模式（2-of-2，S 存 OS 安全存储）
-    public const byte ModePassword = (byte)'P';  // 口令模式（S = Argon2id(口令)）
-    public const byte ModeMultiSeal = (byte)'M'; // 多封装（BitLocker 式）
     public const byte ModeCrypto = (byte)'C';    // LEGACY（crypto 传统单因子）
-
-    // ── 历史数字布局（仅读取兼容，不再写入）──
-    public const byte LegacyV1 = 1;  // OS 模式（v1，无后端指纹）
-    public const byte LegacyV2 = 2;  // 口令模式（v2）
-    public const byte LegacyV3 = 3;  // 多封装（v3）
-    public const byte LegacyV4 = 4;  // OS 模式 + 后端指纹（v4 = v1 的辅助增强）
+    public const byte ModeSlots = (byte)'S';     // 新槽位容器（头部 HMAC 锚定条目）
 
     public const int SaltSize = 16;
     public const int NonceSize = 12;
     public const int TagSize = 16;
 
-    /// 头部 K_vault 份额（32B，明文写盘——单独无法解密，见 [KeySplit]）。
+    // ── 'S'（slots）容器常量 ──
+    public const int VaultIdSize = 16;        // 随机库标识（KDF/GCM 的 AD 域分离）
+    public const byte AlgAes256Gcm = 1;       // 条目加密算法（F1 唯一取值）
+    public const int TrailerSize = 32;        // 尾部 HMAC-SHA256(K, header‖entries)
+
+    /// 头部 K_vault 份额（32B，明文写盘——单独无法解密，见 [KeySplit]；
+    /// LEGACY crypto 为 32B 零占位，slots 无此概念亦为零占位）。
     public required byte[] KeyVault { get; init; }
 
-    /// 份额锚定方式（OS 安全存储 / 口令派生 / 多封装）。
-    public VaultMode Mode { get; init; } = VaultMode.OsStore;
+    /// 份额锚定方式（LEGACY crypto / 'S' slots）。
+    public VaultMode Mode { get; init; } = VaultMode.Crypto;
 
-    /// v4 OS 模式记录的后端指纹（null = v1/v2/v3 旧文件无指纹，解锁不校验）。
-    /// 由 [VaultService.Init]/[SwitchMode] 写入当前 [ISecretStore.Backend]。
+    /// LEGACY crypto 记录的后端指纹（[VaultService.Backend]）。
     public string? Backend { get; init; }
 
-    /// 口令模式的 Argon2id 盐（OS 模式为 null）。
-    public byte[]? Salt { get; init; }
+    // ── 'S'（slots）容器字段（非该模式时为 null/0/空）──
 
-    /// 口令模式的 KDF 参数（OS 模式为 null）。
-    public Argon2id.KdfParams? Kdf { get; init; }
+    /// 库标识（16B，随机；KDF 与 GCM 的 AD = vaultId‖kind）。
+    public byte[]? VaultId { get; init; }
 
-    /// v3 多封装块（S 份额的密封列表；v1/v2 为空）。
-    public List<VaultSeal> Seals { get; } = new();
+    /// 创建时刻（Unix 毫秒）。
+    public long CreatedAtMs { get; init; }
+
+    /// 条目加密算法标识（[AlgAes256Gcm]）。
+    public byte Alg { get; init; }
+
+    /// 槽位表（F1：单个口令槽）。
+    public List<VaultSlot> Slots { get; } = new();
+
+    /// 从磁盘读出的尾部 HMAC（32B；仅 [Load] 填充）。
+    public byte[]? Trailer { get; set; }
+
+    /// 尾部 HMAC 的输入字节（raw[0 .. raw.Length-32]；仅 [Load] 填充）。
+    public byte[]? MacInput { get; set; }
 
     public List<VaultEntry> Entries { get; } = new();
 
@@ -175,80 +204,70 @@ public sealed class VaultFile
         public required byte[] Ciphertext { get; init; }
     }
 
-    /// OS 模式工厂：K_vault 份额 + 后端指纹（非 null → 写 'O' 代号并记录指纹）。
-    public static VaultFile Create(byte[] keyVault, string? backend = null)
-        => new() { KeyVault = keyVault, Backend = backend };
-
-    /// 口令模式工厂：K_vault 份额 + KDF 盐/参数随文件头存储。
-    public static VaultFile CreatePassword(byte[] keyVault, byte[] salt, Argon2id.KdfParams kdf)
-        => new() { KeyVault = keyVault, Mode = VaultMode.Password, Salt = salt, Kdf = kdf };
-
-    /// 多封装工厂：K_vault 份额 + S 份额的密封列表（口令/设备熵，任一方可解）。
-    public static VaultFile CreateMultiSeal(byte[] keyVault, IReadOnlyList<VaultSeal> seals)
-    {
-        var f = new VaultFile { KeyVault = keyVault, Mode = VaultMode.MultiSeal };
-        f.Seals.AddRange(seals);
-        return f;
-    }
-
     /// LEGACY（crypto）方案工厂（单因子，推荐）：主密钥 K 整体存 OS 安全存储，
     /// 文件不含密钥材料——key_vault 为 32B 零占位（[VaultService.InitCrypto]）。
     /// 写 'C' 代号并记录存储后端指纹（[backend] 非 null）。
     public static VaultFile CreateCrypto(string backend)
         => new() { KeyVault = new byte[KeySplit.KeySize], Mode = VaultMode.Crypto, Backend = backend };
 
-    /// 仅读文件头（magic/version/kdf 块）——serve 握手前判定模式用，
+    /// 'S'（slots）容器工厂：头部 = vaultId/createdAt/alg + 槽位表；无 K_vault 份额
+    /// 概念（条目直接以 K 加密），故 key_vault 为 32B 零占位。写入时须向
+    /// [Save] 传入主密钥 K 以计算尾部 HMAC。
+    public static VaultFile CreateSlots(byte[] vaultId, long createdAtMs, byte alg,
+        IReadOnlyList<VaultSlot> slots)
+    {
+        var f = new VaultFile
+        {
+            KeyVault = new byte[KeySplit.KeySize],
+            Mode = VaultMode.Slots,
+            VaultId = vaultId,
+            CreatedAtMs = createdAtMs,
+            Alg = alg,
+        };
+        f.Slots.AddRange(slots);
+        return f;
+    }
+
+    /// 槽位 AD（域分离）= vaultId ‖ kind（KDF 与 AES-GCM 共用同一 AD）。
+    public static byte[] BuildSlotAd(byte[] vaultId, SlotKind kind)
+    {
+        var ad = new byte[vaultId.Length + 1];
+        vaultId.CopyTo(ad, 0);
+        ad[^1] = (byte)kind;
+        return ad;
+    }
+
+    /// 由槽位集合推导因子模式（m1 / m2a / m2b）。优先级：
+    /// 单口令槽 → m1；含口令+设备双因子槽 → m2a；含设备槽 → m2b；
+    /// 其余（空/未知组合）→ [SlotsMode.None]。
+    public static SlotsMode DetectSlotsMode(IReadOnlyList<SlotKind> kinds)
+    {
+        if (kinds.Count == 1 && kinds[0] == SlotKind.Password) return SlotsMode.M1;
+        if (kinds.Any(k => k == SlotKind.PasswordDevice)) return SlotsMode.M2a;
+        if (kinds.Any(k => k == SlotKind.Device)) return SlotsMode.M2b;
+        return SlotsMode.None;
+    }
+
+    /// 尾部完整性 MAC = HMAC-SHA256(K, header‖entries)。
+    /// K 由槽位解出后立即校验（在解密任何条目之前）——header/槽位表/条目任一被篡改
+    /// 都会在凭据解密前 fail-closed（verify-before-decrypt）。
+    public static byte[] ComputeSlotsMac(ReadOnlySpan<byte> masterKey, ReadOnlySpan<byte> body)
+        => HMACSHA256.HashData(masterKey, body);
+
+    /// 仅读文件头（magic/version/参数）——serve 握手前判定模式用，
     /// 不加载/解密任何凭据（§3.8 握手前置：构造只触盘读文件头）。
-    /// 多封装额外返回 [SealKinds]（只读 kind 列表，不读密文）。
     public static VaultHeader ReadHeader(string path)
     {
         using var fs = File.OpenRead(path);
         using var br = new BinaryReader(fs);
         if (br.ReadUInt32() != Magic) throw new InvalidDataException("vault 文件头损坏（magic 不符）");
         var version = br.ReadByte();
-        // 历史数字布局（LegacyV1-4）与当前字母代号（ModeOS/P/M/C）统一分发
         return version switch
         {
-            LegacyV1 => ReadHeaderOs(br, hasBackend: false),
-            LegacyV4 or ModeOS => ReadHeaderOs(br, hasBackend: true),
-            LegacyV2 or ModePassword => ReadHeaderPassword(br),
-            LegacyV3 or ModeMultiSeal => ReadHeaderMultiSeal(br),
             ModeCrypto => ReadHeaderCrypto(br),
+            ModeSlots => ReadHeaderSlots(br),
             _ => throw new InvalidDataException("vault 版本不兼容"),
         };
-    }
-
-    /// 读 OS 模式头部（'O' 恒带后端指纹；数字 v1 无、v4 有）。
-    private static VaultHeader ReadHeaderOs(BinaryReader br, bool hasBackend)
-    {
-        br.ReadBytes(3); // reserved
-        return new VaultHeader(VaultMode.OsStore, null, null, null,
-            hasBackend ? ReadBackend(br) : null);
-    }
-
-    /// 读口令模式头部（kdf 位恒 1；0 = 旧异常文件，回退 OS 语义）。
-    private static VaultHeader ReadHeaderPassword(BinaryReader br)
-    {
-        var kdf = br.ReadByte();
-        br.ReadBytes(2);
-        if (kdf != 1) return new VaultHeader(VaultMode.OsStore, null, null);
-        var salt = br.ReadBytes(SaltSize);
-        var kdfParsed = ReadKdf(br);
-        return new VaultHeader(VaultMode.Password, salt, kdfParsed);
-    }
-
-    /// 读多封装头部（跳过 K_vault，只取 seal kind 列表）。
-    private static VaultHeader ReadHeaderMultiSeal(BinaryReader br)
-    {
-        br.ReadBytes(3); // flags(1B) + reserved(2B)
-        br.ReadBytes(KeySplit.KeySize); // 跳过 K_vault（非密文，不加载凭据）
-        var kinds = new List<SealKind>();
-        var sealCount = br.ReadByte();
-        for (var i = 0; i < sealCount; i++)
-        {
-            kinds.Add(ReadSeal(br).Kind);
-        }
-        return new VaultHeader(VaultMode.MultiSeal, null, null, kinds);
     }
 
     /// 读 LEGACY（crypto）头部：key_vault 零占位（不含密钥材料）+ 后端指纹。
@@ -256,10 +275,71 @@ public sealed class VaultFile
     {
         br.ReadBytes(3);
         br.ReadBytes(KeySplit.KeySize); // 零占位，不含密钥材料
-        return new VaultHeader(VaultMode.Crypto, null, null, null, ReadBackend(br));
+        return new VaultHeader(VaultMode.Crypto, ReadBackend(br));
     }
 
-    /// 读 v4 后端指纹（1B 长度 + UTF8；长度 0 视为无指纹）。
+    /// 读 'S'（slots）头部：vaultId/createdAt/alg + 槽位表（口令类槽校验 KDF 参数）。
+    /// 头部不含任何明文凭据；口令槽 KDF 越界（含新增下界）在此快速拒绝。
+    /// 返回槽位 kind 列表（只读）——serve/status 据此判定 m1/m2a/m2b，不加载密文；
+    /// 同时捕获口令承载槽（口令 / 口令+设备）的 KDF 参数供 status 展示强度。
+    private static VaultHeader ReadHeaderSlots(BinaryReader br)
+    {
+        br.ReadBytes(VaultIdSize); // vaultId
+        br.ReadBytes(sizeof(long)); // createdAtMs
+        br.ReadByte(); // alg
+        var slotCount = br.ReadByte();
+        var kinds = new List<SlotKind>(slotCount);
+        Argon2id.KdfParams? kdf = null;
+        for (var i = 0; i < slotCount; i++)
+        {
+            var slot = ReadSlot(br);
+            kinds.Add(slot.Kind);
+            // 口令承载槽（m1 的口令槽 / m2a 的口令+设备槽）：首个即当前 KDF 强度
+            if (kdf == null && slot.Kind is SlotKind.Password or SlotKind.PasswordDevice)
+                kdf = slot.Kdf;
+        }
+        return new VaultHeader(VaultMode.Slots, SlotKinds: kinds, Kdf: kdf);
+    }
+
+    /// 读单个槽位（kind + KDF 参数 + salt + nonce + wrapped）。
+    /// 口令 / 口令+设备槽的 m/t/p 走 [ValidateKdf]（上下界快速拒绝）；
+    /// 设备 / 恢复槽的参数不使用（占位 (0,0,0)），直接读值不校验。
+    private static VaultSlot ReadSlot(BinaryReader br)
+    {
+        var kind = (SlotKind)br.ReadByte();
+        if ((byte)kind is < 1 or > 4)
+            throw new InvalidDataException($"未知槽位类型 {(byte)kind}");
+        var kdf = kind is SlotKind.Password or SlotKind.PasswordDevice
+            ? ReadKdf(br) // 立即做上/下界校验（SEC-06 + F1 下界）
+            : new Argon2id.KdfParams((int)br.ReadUInt32(), (int)br.ReadUInt32(), (int)br.ReadUInt32());
+        var salt = br.ReadBytes(SaltSize);
+        var nonce = br.ReadBytes(NonceSize);
+        var wrappedLen = br.ReadUInt16();
+        if (wrappedLen < KeySplit.KeySize)
+            throw new InvalidDataException("槽位封装长度异常（小于主密钥），拒绝加载");
+        var wrapped = br.ReadBytes(wrappedLen);
+        return new VaultSlot
+        {
+            Kind = kind, Kdf = kdf, Salt = salt, Nonce = nonce, Wrapped = wrapped,
+        };
+    }
+
+    /// 写单个槽位（kind + KDF 参数 + salt + nonce + wrappedLen + wrapped）。
+    private static void WriteSlot(BinaryWriter bw, VaultSlot slot)
+    {
+        bw.Write((byte)slot.Kind);
+        bw.Write((uint)slot.Kdf.MKiB);
+        bw.Write((uint)slot.Kdf.T);
+        bw.Write((uint)slot.Kdf.P);
+        bw.Write(slot.Salt);
+        bw.Write(slot.Nonce);
+        if (slot.Wrapped.Length > ushort.MaxValue)
+            throw new InvalidDataException("槽位封装过长");
+        bw.Write((ushort)slot.Wrapped.Length);
+        bw.Write(slot.Wrapped);
+    }
+
+    /// 读后端指纹（1B 长度 + UTF8；长度 0 视为无指纹）。
     private static string? ReadBackend(BinaryReader br)
     {
         var len = br.ReadByte();
@@ -277,70 +357,27 @@ public sealed class VaultFile
         return new Argon2id.KdfParams(m, t, p);
     }
 
-    /// 读单个封装块（kind + 参数 + 密文）。
-    private static VaultSeal ReadSeal(BinaryReader br)
-    {
-        var kind = (SealKind)br.ReadByte();
-        return kind switch
-        {
-            SealKind.Password => new VaultSeal
-            {
-                Kind = kind,
-                Salt = br.ReadBytes(SaltSize),
-                Kdf = ReadKdf(br),
-                Nonce = br.ReadBytes(NonceSize),
-                Ciphertext = br.ReadBytes((int)br.ReadUInt32()),
-            },
-            SealKind.DeviceEntropy => new VaultSeal
-            {
-                Kind = kind,
-                EntropyId = br.ReadBytes(DeviceEntropyFile.EntropyIdSize),
-                Nonce = br.ReadBytes(NonceSize),
-                Ciphertext = br.ReadBytes((int)br.ReadUInt32()),
-            },
-            _ => throw new InvalidDataException($"未知封装类型 {(byte)kind}"),
-        };
-    }
-
-    /// 写单个封装块。
-    private static void WriteSeal(BinaryWriter bw, VaultSeal seal)
-    {
-        bw.Write((byte)seal.Kind);
-        switch (seal.Kind)
-        {
-            case SealKind.Password:
-                bw.Write(seal.Salt!);
-                bw.Write((uint)seal.Kdf!.MKiB);
-                bw.Write((uint)seal.Kdf.T);
-                bw.Write((uint)seal.Kdf.P);
-                break;
-            case SealKind.DeviceEntropy:
-                bw.Write(seal.EntropyId!);
-                break;
-            default:
-                throw new InvalidDataException($"未知封装类型 {(byte)seal.Kind}");
-        }
-        bw.Write(seal.Nonce);
-        bw.Write((uint)seal.Ciphertext.Length);
-        bw.Write(seal.Ciphertext);
-    }
-
     public static VaultFile Load(string path)
     {
-        using var fs = File.OpenRead(path);
-        using var br = new BinaryReader(fs);
-        if (fs.Length > VaultLimits.MaxFileSize)
-            throw new InvalidDataException("vault 文件过大（可能被恶意填充），拒绝加载");
+        // 整文件读入（≤16MiB，见 [VaultLimits.MaxFileSize]）：
+        // 'S'（slots）尾部 HMAC 需对 raw[0 .. raw.Length-32] 精确取字节，
+        // 统一走 MemoryStream 解析；对既有模式字节语义不变（流式→内存仅换来源）。
+        byte[] raw;
+        using (var fs = File.OpenRead(path))
+        {
+            if (fs.Length > VaultLimits.MaxFileSize)
+                throw new InvalidDataException("vault 文件过大（可能被恶意填充），拒绝加载");
+            raw = new byte[fs.Length];
+            fs.ReadExactly(raw, 0, raw.Length);
+        }
+        using var ms = new MemoryStream(raw, writable: false);
+        using var br = new BinaryReader(ms);
         if (br.ReadUInt32() != Magic) throw new InvalidDataException("vault 文件头损坏（magic 不符）");
         var version = br.ReadByte();
-        // 历史数字布局（LegacyV1-4）与当前字母代号（ModeOS/P/M/C）统一分发
         var file = version switch
         {
-            LegacyV1 => LoadOs(br, hasBackend: false),
-            LegacyV4 or ModeOS => LoadOs(br, hasBackend: true),
-            LegacyV2 or ModePassword => LoadPassword(br),
-            LegacyV3 or ModeMultiSeal => LoadMultiSeal(br),
             ModeCrypto => LoadCrypto(br),
+            ModeSlots => LoadSlots(br),
             _ => throw new InvalidDataException("vault 版本不兼容"),
         };
         var count = br.ReadUInt32();
@@ -353,7 +390,7 @@ public sealed class VaultFile
             var salt = br.ReadBytes(SaltSize);
             var nonce = br.ReadBytes(NonceSize);
             var ctLen = br.ReadUInt32();
-            if (ctLen > VaultLimits.MaxEntryBytes || ctLen > fs.Length - br.BaseStream.Position)
+            if (ctLen > VaultLimits.MaxEntryBytes || ctLen > raw.Length - br.BaseStream.Position)
                 throw new InvalidDataException("vault 条目长度异常（可能被恶意构造），拒绝加载");
             file.Entries.Add(new VaultEntry
             {
@@ -363,50 +400,14 @@ public sealed class VaultFile
                 Ciphertext = br.ReadBytes((int)ctLen),
             });
         }
-        return file;
-    }
-
-    /// 读 OS 模式负载（'O' 恒带后端指纹；数字 v1 无、v4 有）。
-    private static VaultFile LoadOs(BinaryReader br, bool hasBackend)
-    {
-        br.ReadBytes(3);
-        return new VaultFile
+        // 'S'（slots）：条目之后是尾部 32B HMAC。此处不能放进 [LoadSlots]——
+        // 它在共享条目循环之前执行；循环结束后才可定位尾部并捕获 MAC 输入字节。
+        if (file.Mode == VaultMode.Slots)
         {
-            KeyVault = br.ReadBytes(KeySplit.KeySize),
-            Backend = hasBackend ? ReadBackend(br) : null,
-        };
-    }
-
-    /// 读口令模式负载（kdf 位恒 1；0 = 旧异常文件，回退 OS 语义）。
-    private static VaultFile LoadPassword(BinaryReader br)
-    {
-        var kdfFlag = br.ReadByte();
-        br.ReadBytes(2);
-        if (kdfFlag != 1) return new VaultFile { KeyVault = br.ReadBytes(KeySplit.KeySize) };
-        var salt = br.ReadBytes(SaltSize);
-        var kdf = ReadKdf(br);
-        return new VaultFile
-        {
-            KeyVault = br.ReadBytes(KeySplit.KeySize),
-            Mode = VaultMode.Password,
-            Salt = salt,
-            Kdf = kdf,
-        };
-    }
-
-    /// 读多封装负载（flags + K_vault + seal 列表）。
-    private static VaultFile LoadMultiSeal(BinaryReader br)
-    {
-        br.ReadBytes(3); // flags(1B) + reserved(2B)
-        var file = new VaultFile
-        {
-            KeyVault = br.ReadBytes(KeySplit.KeySize),
-            Mode = VaultMode.MultiSeal,
-        };
-        var sealCount = br.ReadByte();
-        for (var i = 0; i < sealCount; i++)
-        {
-            file.Seals.Add(ReadSeal(br));
+            if (raw.Length < TrailerSize)
+                throw new InvalidDataException("slots vault 缺少尾部 HMAC，拒绝加载");
+            file.Trailer = raw.AsSpan(raw.Length - TrailerSize).ToArray();
+            file.MacInput = raw.AsSpan(0, raw.Length - TrailerSize).ToArray();
         }
         return file;
     }
@@ -423,59 +424,101 @@ public sealed class VaultFile
         };
     }
 
-    public void Save(string path)
+    /// 读 'S'（slots）负载头部：vaultId/createdAt/alg + 槽位表。
+    /// 尾部 HMAC 由 [Load] 在共享条目循环后读取（此处不涉及条目）。
+    private static VaultFile LoadSlots(BinaryReader br)
+    {
+        var vaultId = br.ReadBytes(VaultIdSize);
+        var createdAt = br.ReadInt64();
+        var alg = br.ReadByte();
+        var file = new VaultFile
+        {
+            KeyVault = new byte[KeySplit.KeySize], // slots 无 K_vault 份额概念（零占位）
+            Mode = VaultMode.Slots,
+            VaultId = vaultId,
+            CreatedAtMs = createdAt,
+            Alg = alg,
+        };
+        var slotCount = br.ReadByte();
+        for (var i = 0; i < slotCount; i++)
+        {
+            file.Slots.Add(ReadSlot(br));
+        }
+        return file;
+    }
+
+    /// 保存（非 slots 模式；等价 `Save(path, default)`）。
+    public void Save(string path) => Save(path, default);
+
+    /// 保存。[masterKey] 仅 'S'（slots）模式使用——尾部 HMAC-SHA256(K, header‖entries)
+    /// 需要主密钥 K（其余模式忽略）。
+    /// 原子写（device-bound-vault-plan §8：写临时文件 → fsync → 替换，失败保留原文件）；
+    /// 替换前把当前 `path` 复制为 `path + ".bak"`（best-effort：备份失败不阻断保存）。
+    public void Save(string path, ReadOnlySpan<byte> masterKey)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        // 原子写（device-bound-vault-plan §8：写临时文件 → 校验 → 替换，失败保留原文件）
         var tmp = path + ".tmp";
         using (var fs = File.Create(tmp))
         using (var bw = new BinaryWriter(fs))
         {
-            WriteBody(bw);
+            WriteBody(bw, masterKey);
             bw.Flush();
             fs.Flush(flushToDisk: true);
+        }
+        // 保留上一版为 .bak（复制而非移动：`path` 始终存在，保持替换原子性；
+        // 权限随源文件沿用）。失败不阻断保存（best-effort）。
+        if (File.Exists(path))
+        {
+            try { File.Copy(path, path + ".bak", overwrite: true); }
+            catch { /* 备份失败不阻断保存 */ }
         }
         File.Move(tmp, path, overwrite: true);
     }
 
-    private void WriteBody(BinaryWriter bw)
+    private void WriteBody(BinaryWriter bw, ReadOnlySpan<byte> masterKey)
+    {
+        if (Mode == VaultMode.Slots)
+        {
+            // slots：尾部 HMAC 覆盖 header‖entries，须先缓冲主体再追加 trailer。
+            if (masterKey.Length != KeySplit.KeySize)
+                throw new InvalidDataException("slots 模式写入缺少主密钥（无法计算尾部 HMAC）");
+            byte[] body;
+            using (var ms = new MemoryStream())
+            {
+                using (var bw2 = new BinaryWriter(ms, Encoding.UTF8, leaveOpen: true))
+                {
+                    WriteBodyCore(bw2);
+                    bw2.Flush();
+                }
+                body = ms.ToArray();
+            }
+            bw.Write(body);
+            bw.Write(ComputeSlotsMac(masterKey, body));
+            return;
+        }
+        WriteBodyCore(bw);
+    }
+
+    private void WriteBodyCore(BinaryWriter bw)
     {
         bw.Write(Magic);
         switch (Mode)
         {
-            case VaultMode.Password:
-                bw.Write(ModePassword);
-                bw.Write((byte)1); // kdf = 口令派生
-                bw.Write(new byte[2]);
-                bw.Write(Salt!);
-                bw.Write((uint)Kdf!.MKiB);
-                bw.Write((uint)Kdf.T);
-                bw.Write((uint)Kdf.P);
-                bw.Write(KeyVault);
-                break;
-            case VaultMode.MultiSeal:
-                bw.Write(ModeMultiSeal);
-                bw.Write((byte)0); // flags
-                bw.Write(new byte[2]); // reserved
-                bw.Write(KeyVault);
-                bw.Write((byte)Seals.Count);
-                foreach (var seal in Seals)
+            case VaultMode.Slots:
+                bw.Write(ModeSlots);
+                bw.Write(VaultId!);
+                bw.Write(CreatedAtMs);
+                bw.Write(Alg);
+                bw.Write((byte)Slots.Count);
+                foreach (var slot in Slots)
                 {
-                    WriteSeal(bw, seal);
+                    WriteSlot(bw, slot);
                 }
                 break;
-            case VaultMode.Crypto:
+            default:
                 // LEGACY（crypto）：单因子——key_vault 为零占位，仍写后端指纹防构建形态混用
                 bw.Write(ModeCrypto);
-                bw.Write(new byte[3]);
-                bw.Write(KeyVault);
-                WriteBackend(bw);
-                break;
-            default:
-                // OS 模式恒写 'O'（带后端指纹）。v4 是 v1 的辅助增强，v1 不再写入——
-                // 历史数字布局（1/4）仅在读旧文件时出现。
-                bw.Write(ModeOS);
                 bw.Write(new byte[3]);
                 bw.Write(KeyVault);
                 WriteBackend(bw);

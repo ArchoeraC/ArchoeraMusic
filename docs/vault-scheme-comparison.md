@@ -1,17 +1,19 @@
-# 凭据保护方案比对：vault v1-v3 vs 业界通用方案
+# 凭据保护方案比对：vault 新容器 vs 业界通用方案
 
-> 2026-08-13 · 关联规划：[credential-vault-plan.md](credential-vault-plan.md)
-> ⚠️ 已知缺口与待修复项见 [security-review-2026-10-11.md](security-review-2026-10-11.md)（含 v4-file 单因子 / env 主密钥声明缺口 SEC-02）。
-> 目的：明确我们的三档实现与业界常见凭据保护方案的「优势 / 问题」，供安全决策与演进参考。
+> 2026-10-12（2026-10 重构后重写） · 关联规划：[credential-vault-plan.md](credential-vault-plan.md) · [vault-enhanced-scheme.md](vault-enhanced-scheme.md)
+> ⚠️ 已知缺口与待修复项见 [security-review-2026-10-11.md](security-review-2026-10-11.md)（含 file 单因子声明缺口 SEC-02、应用层信任根 SEC-08/SEC-25）。
+> **重构说明**：旧的 v1（OS 2-of-2）/ v2（口令）/ v3（设备密封多封装）/ v4-file 分层已**移除**，统一为
+> **crypto（默认，`'C'`）** 与 **slots（`'S'`）容器（m1 / m2a / m2b）**；旧 vault 文件报「vault 版本不兼容」，无迁移。
+> 目的：明确我们的实现对业界常见凭据保护方案的「优势 / 问题」，供安全决策与演进参考。
 
 ## 1. 方案速览
 
 | 代号 | 方案 | 密钥/解锁因子模型 |
 |---|---|---|
-| **v1** | OS 安全存储模式（2-of-2） | 主密钥 K 拆两份：K_vault（存 vault 文件）⊕ S（存 OS 安全存储，libsecret/DPAPI/Keychain）；解锁需两者在场 |
-| **v2** | 口令模式 | S = Argon2id(主口令)，口令不落盘、经 stdin 握手传入；KDF 参数随文件头存储 |
-| **v3** | 设备绑定（多封装 MultiSeal） | S 由设备熵 E 经 HKDF 密封（指纹密封 device.seal），可选恢复口令（Password seal 备用）；支持 NEED_RECOVERY / rebind |
-| **v4-file** | 文件密钥模式（LEGACY 兼容方案） | 主密钥 K 整体落盘 `secret.key`（0600）；指定 K 经 `init-file --key-stdin`（stdin，不经 argv/env——原 `ARCHOERA_VAULT_SECRET_KEY` env 已按 SEC-02 移除）；**免 OS 钥匙串**，单因子、无份额配对——对应原 SPlayer-Next 服务端加密形态 |
+| **crypto** | OS 安全存储 / 文件密钥（默认，`'C'`） | 主密钥 K 整体存 OS 安全存储（libsecret/DPAPI/Keychain）或 `file` 后端 `secret.key`（0600）；vault 文件不含密钥材料；**单因子**。OS store 键按数据目录作用域 |
+| **slots-m1** | 口令模式（`'S'`，kind=1） | KEK = Argon2id(口令, salt, ad=vaultId‖kind) 封装 K；口令不落盘、经 stdin 握手传入；自包含、无 OS 钥匙串 |
+| **slots-m2a** | 口令+设备双因子 + 恢复码（`'S'`，kind=4 + kind=3） | KEK = HKDF(Argon2id(口令)‖deviceSecret)；`deviceSecret` 存本地 `device.key`(0600)；恢复槽由一次性高熵 Crockford-Base32 恢复码解锁 |
+| **slots-m2b** | 设备单因子（**本机级 · 较弱**，本机免密，`'S'`，kind=2） | KEK = HKDF(deviceSecret)；仅需**同用户可读**的 `device.key`，无口令、无恢复槽；读到 `device.key` + vault 即离线全解 |
 | A | OS 原生钥匙串直存 | macOS Keychain / Windows DPAPI / Linux libsecret 直接存凭据明文 |
 | B | 主密码加密库 | KeePass / Bitwarden 本地库 / LastPass 本地——单一主密码派生 KEK 加密整个库 |
 | C | 云密码管理器 2-factor | 1Password（Secret Key + 主密码）/ Bitwarden（服务器 + 2FA）——服务器侧托管密文 |
@@ -30,36 +32,35 @@
 
 ## 3. 逐维度对比矩阵
 
-| 维度 | v1 | v2 | v3 | A 钥匙串 | B 主密码库 | C 云 2FA | D 硬件 | F 纯 crypto |
-|---|---|---|---|---|---|---|---|---|
-| 静态密钥不落地 | ✅ 2-of-2 拆分 | ✅ 口令派生不落盘 | ✅ 熵密封 2-of-2 | ❌ 直接存明文 | ⚠️ 密文+单 KEK | ⚠️ 密文+双因子 | ✅ 硬件不导出 | ⚠️ 看 key 来源（硬编码❌ / 裸 keyring 单点） |
-| 解锁因子数 | 2（文件+OS） | 1（口令） | 2（设备熵+可选口令） | 0（OS 直接） | 1（主密码） | 2（SecretKey+主密码） | 1（硬件在场） | 0-1（随 key 来源） |
-| 抗 L1 文件窃取 | ✅ 单份文件不足解密 | ✅ | ✅ | ❌ 拿库即明文 | ⚠️ 可离线爆破主密码 | ✅ 服务器侧 | ✅ | ❌ key 与库同机即全破 |
-| 抗 L2 恶意进程 | ⚠️ 血缘+握手，主程序内被注入仍可能 | 同左 | 同左 | ❌ OS 服务代答 | ❌ 进程内即得 KEK | ⚠️ 取决于客户端隔离 | ✅ 强 | ❌ 进程内解密，无边界 |
-| 抗 L3 离线爆破 | ✅ 无口令面（32B XOR） | ⚠️ Argon2id 防 GPU 但单因子 | ✅ 熵位 + 可选口令 | — | ⚠️ PBKDF2/Argon2 可跑 | ✅ 服务器限流+2FA | ✅ | ⚠️ 自研 KDF/限流缺位，可无限跑 |
-| 丢失恢复 | ⚠️ 任一份额丢失→销毁重建 | ⚠️ 忘口令→销毁重建 | ✅ 恢复口令/rebind | ✅ OS 账户即恢复 | ⚠️ 忘主密码→丢失 | ✅ 恢复码 | ⚠️ 丢硬件→丢失 | ❌ 通常无恢复设计 |
-| 平台依赖 | ⚠️ 三平台 keyring ABI | ✅ 纯 BCL | ⚠️ 三平台指纹 | ⚠️ 平台专属 API | ✅ 纯文件 | ✅ 跨平台 | ⚠️ 平台专属 | ✅ 跨平台 |
-| 可销毁性 | ✅ 删文件+清 keyring | ✅ 删文件即可 | ✅ 删文件+device.seal | ⚠️ 依赖 OS 清理 | ✅ 删库 | ⚠️ 服务器残留 | ⚠️ 硬件密钥无法删 | ⚠️ 取决 key 存放 |
-| 进程边界/内存 | ✅ 独立进程+mlock+握手 | 同左 | 同左 | ❌ 无（调用方进程） | ❌ 无 | ⚠️ 客户端进程 | ✅ 硬件内 | ❌ 无 |
+| 维度 | crypto | slots-m1 | slots-m2a | slots-m2b | A 钥匙串 | B 主密码库 | C 云 2FA | D 硬件 | F 纯 crypto |
+|---|---|---|---|---|---|---|---|---|---|
+| 静态密钥不落地 | ⚠️ K 存 OS store（不落 vault 文件）；file 后端 K 落盘 `secret.key` | ✅ 口令派生不落盘 | ✅ 口令+设备熵，双因子 | ⚠️ 无口令，device.key 落本地 | ❌ 直接存明文 | ⚠️ 密文+单 KEK | ⚠️ 密文+双因子 | ✅ 硬件不导出 | ⚠️ 看 key 来源（硬编码❌ / 裸 keyring 单点） |
+| 解锁因子数 | 1（OS store / 文件） | 1（口令） | 2（口令 + device.key；恢复码兜底） | 1（device.key） | 0（OS 直接） | 1（主密码） | 2（SecretKey+主密码） | 1（硬件在场） | 0-1（随 key 来源） |
+| 抗 L1 文件窃取 | ⚠️ OS 模式文件本身无 K；file 模式拿 `secret.key` 即破 | ✅ | ✅ 缺 device.key 或口令不可解（vault 文件不含 deviceSecret） | ⚠️ 拿到 `device.key` + vault 即可解 | ❌ 拿库即明文 | ⚠️ 可离线爆破主密码 | ✅ 服务器侧 | ✅ | ❌ key 与库同机即全破 |
+| 抗 L2 恶意进程 | ⚠️ 父进程身份校验，主程序内被注入仍可能 | ⚠️ 同左 | ⚠️ 同左 | ⚠️ 同左 | ❌ OS 服务代答 | ❌ 进程内即得 KEK | ⚠️ 取决于客户端隔离 | ✅ 强 | ❌ 进程内解密，无边界 |
+| 抗 L3 离线爆破 | ✅ OS 模式无口令面；file 模式无口令面 | ⚠️ Argon2id 防 GPU 但单因子；KDF 参数有上下限且强度用户可选 | ✅ 需同时破口令与窃取 device.key | ⚠️ 无口令面，但 `device.key` 被窃即全破（**本机级 · 较弱**，非密码学边界） | — | ⚠️ PBKDF2/Argon2 可跑 | ✅ 服务器限流+2FA | ✅ | ⚠️ 自研 KDF/限流缺位，可无限跑 |
+| 丢失恢复 | ⚠️ OS store / 文件丢失即重置 | ⚠️ 忘口令→重置重建 | ✅ 恢复码（device.key 丢失时） | ⚠️ device.key 丢失→重置重建 | ✅ OS 账户即恢复 | ⚠️ 忘主密码→丢失 | ✅ 恢复码 | ⚠️ 丢硬件→丢失 | ❌ 通常无恢复设计 |
+| 平台依赖 | ⚠️ 三平台 keyring ABI；file 后端纯文件 | ✅ 纯 BCL | ⚠️ 依赖本地 `device.key` 文件（尚未接入 OS 钥匙串） | ⚠️ 同左 | ⚠️ 平台专属 API | ✅ 纯文件 | ✅ 跨平台 | ⚠️ 平台专属 | ✅ 跨平台 |
+| 可销毁性 | ✅ 删文件 + 清 OS store / `secret.key` | ✅ 删文件即可 | ✅ 删文件 + `device.key` + `.bak` | ✅ 删文件 + `device.key` + `.bak` | ⚠️ 依赖 OS 清理 | ✅ 删库 | ⚠️ 服务器残留 | ⚠️ 硬件密钥无法删 | ⚠️ 取决 key 存放 |
+| 进程边界/内存 | ✅ 独立进程+mlock+握手 | ✅ | ✅ | ✅ | ❌ 无（调用方进程） | ❌ 无 | ⚠️ 客户端进程 | ✅ 硬件内 | ❌ 无 |
 
 ## 4. 各方案优势与问题
 
-### vault v1（OS 2-of-2）
-- **优势**：静态零泄露面——文件/钥匙串/源码任何单点都不足解密；无口令面可爆破（K 为 32B XOR，暴力不收敛）；与 OS 账户体系天然耦合，解锁零摩擦。
-- **问题**：依赖三平台 keyring（libsecret/DPAPI/Keychain）ABI 行为差异；任一份额丢失即需销毁重建；OS 服务可代答（L2 下攻击者可调用 OS 解密）。
+### vault crypto（OS 安全存储 / 文件密钥，默认，单因子）
+- **优势**：稳定性最高——无份额配对、无口令、无设备熵，不存在「份额丢失导致凭据整体丢失」（旧 v1 的痛点）；OS 模式下 vault 文件不含密钥材料，窃取文件无法解密；解锁零摩擦；OS store 键按数据目录作用域，修复跨目录覆盖。
+- **问题**：**单因子**——OS 钥匙串被攻破 / `file` 后端 `secret.key` 泄露即凭据全泄露（弱于旧 v1 的 2-of-2）；依赖三平台 keyring ABI 行为差异；`file` 后端为显式降级（headless / Docker）。
 
-### vault v2（口令模式）
-- **优势**：纯 BCL 零外部依赖、跨平台一致；口令不落盘不落 argv（stdin 握手）；Argon2id 抗 GPU 爆破；锁定退避阻断在线爆破。
-- **问题**：单因子——口令弱则全破；忘口令=数据丢失（无恢复）；口令输入面（键盘记录属于信任根范畴）。
+### vault slots-m1（口令模式）
+- **优势**：纯 BCL 零外部依赖、跨平台一致、**自包含**（换机复制文件 + 口令即可解）；口令不落盘不落 argv（stdin 握手）；Argon2id 抗 GPU 爆破且 KDF 参数有上下限；尾部 HMAC verify-before-decrypt；锁定退避阻断在线爆破。
+- **问题**：单因子——口令弱则全破；忘口令=数据不可解（无恢复）；口令输入面（键盘记录属于信任根范畴）。
 
-### vault v3（设备绑定多封装）
-- **优势**：继承 2-of-2；熵密封使库与设备强绑定，克隆文件到其他机器不解密；恢复口令提供可恢复性（区别于 v1 的无恢复）；rebind 支持换机/换口令。
-- **问题**：指纹稳定性（硬件变更/系统升级可能触发 NEED_RECOVERY）；三平台指纹实现需真机回归；熵源在 device.seal 文件被一并窃取时降级为纯口令面（与 v2 同档）。
+### vault slots-m2a（口令 + 设备双因子 + 恢复码）
+- **优势**：双因子——离线攻击需同时破口令**且**窃取 `device.key`；恢复码提供可恢复性（`device.key` 丢失时兜底），优于 m1 的无恢复；vault 文件不含 deviceSecret（熵材料独立存 `device.key`）。
+- **问题**：`device.key` 与 vault 文件同机被拷且攻击者持有口令时即失守；恢复码仅初始化输出一次，**当前无「重新生成恢复码」命令**，丢失无法补发；三端 `device.key` 尚未接入 OS 钥匙串（仅 0600 文件）。
 
-### vault v4-file（文件密钥模式，LEGACY 兼容方案）
-- **定位**：解决「无 Secret Service 的 headless Linux / Docker 等场景」无法使用 v1（OS 存储）的问题——`init-file` 或 `ARCHOERA_VAULT_BACKEND=file` 创建，K 落盘 `secret.key`（0600 原子写）；若需在初始化时指定 K，用 `init-file --key-stdin`（stdin 首行 hex64，不经 argv/env），对应原 SPlayer-Next 服务端加密（`secret.key`）。
-- **优势**：零外部依赖（纯文件，CI/容器可直接跑）；后端指纹 `file` 与其他后端互不配对（SHARE_BACKEND_MISMATCH 防护）；复用 crypto 单因子全部配套（握手/fail-closed/目录隔离/可销毁）。
-- **问题**：**本地文件单点**——密钥文件泄露 = 凭据全泄露（弱于 v1 OS 存储）；无份额配对/无口令面；选用即显式接受该降级（不静默，须主动 `init-file` 或设 env）。
+### vault slots-m2b（设备单因子，本机级 · 较弱）
+- **优势**：本机零交互免密；无口令面可爆破。
+- **问题**：**无口令、无恢复**——安全级别等同 `device.key` 的存储强度（本地 0600 文件被窃即失守，且**同用户可读**：实测仅凭 `device.key` + vault 文件即可离线解出全部明文）；`device.key` 丢失即重置重建；须显式告警其弱于 m2a（**本机级 · 较弱**），**推荐 m1/m2a**。
 
 ### F 纯 crypto 库自封装（开发者常见做法：Web Crypto / libsodium / ring / pointycastle 直拼）
 - **优势**：标准原语久经验证（AES-256-GCM / Argon2id / HMAC 与 vault 同级）；跨平台；无外部服务依赖。
@@ -67,23 +68,23 @@
 
 ### A OS 钥匙串直存（对比基线之上限）
 - **优势**：零实现成本、OS 级隔离（DPAPI/Keychain 有账户绑定）。
-- **问题**：**拿库即明文**（无 2-of-2）；无进程边界；无 fail-closed；无篡改检测；可销毁性依赖 OS 清理——这正是我们弃用「裸存」的原因。
+- **问题**：**拿库即明文**（无加密分层）；无进程边界；无 fail-closed；无篡改检测；可销毁性依赖 OS 清理——这正是我们弃用「裸存」的原因。
 
 ### B 主密码加密库（KeePass/Bitwarden 本地）
 - **优势**：实现简单、社区久经验证、主密码即全部。
 - **问题**：单 KEK 单因子——主密码泄露=全破；离线爆破仅靠 KDF 强度；进程内解密无边界；无丢失恢复。
 
 ### C 云密码管理器 2-factor（1Password 等）
-- **优势**：Secret Key 式 2 因子协同（与 v3 同构）；服务器侧密文抗本地窃取；恢复体系成熟。
-- **问题**：**服务器是信任第三方**（拖库+端点攻击风险）；依赖账号体系与网络；我们 v1-v3 定位本地单机，不引入服务器信任面（v3 的熵密封≈Secret Key 的本地等价物）。
+- **优势**：Secret Key 式 2 因子协同（与 m2a 同构）；服务器侧密文抗本地窃取；恢复体系成熟。
+- **问题**：**服务器是信任第三方**（拖库+端点攻击风险）；依赖账号体系与网络；我们定位本地单机，不引入服务器信任面（m2a 的双因子 ≈ Secret Key 的本地等价物）。
 
 ### D 硬件绑定（TPM/Keystore/YubiKey）
 - **优势**：密钥永不离开硬件，抗 L2/L4 最强。
-- **问题**：平台专属 API 差异大、可移植性差；硬件丢失=数据丢失；实现成本高——作为 P2 演进候选（vault 主密钥 mlock→硬件密封），当前未落地。
+- **问题**：平台专属 API 差异大、可移植性差；硬件丢失=数据丢失；实现成本高——作为 P2 演进候选（`device.key` / 主密钥 mlock→硬件密封），当前未落地。
 
 ## 5. 结论与边界
 
-1. **定位**：v1-v3 是「本地密码管理器」范畴的 2-of-2 协同解密方案——在**无服务器**前提下达到近似云 2FA 的因子结构（v3 熵密封 ≈ Secret Key 本地等价物），并叠加密码管理器通常没有的**进程边界 + fail-closed + 篡改检测**。
+1. **定位**：crypto / m1 / m2a / m2b 是「本地密码管理器」范畴的方案——在**无服务器**前提下，m2a 达到近似云 2FA 的因子结构（双因子 + 恢复），并叠加密码管理器通常没有的**进程边界 + fail-closed + 篡改检测**。
 2. **核心差异 vs 通用方案（含纯 crypto 库）**：crypto 库与通用方案解决「加密运算」——算法层大家相同（AES-256-GCM / Argon2id / HMAC）；我们解决「密钥不落地 + 谁有权调用 + 被攻破如何响应」三个工程问题。纯 crypto 自封装（F）把这三个问题全部留给开发者自决，正是自研加密存储最常见的失败点。
-3. **信任根边界（L4）**：vault 全部防线建立在「主程序可信」前提上——主程序+FFI 库同时被替换/内嵌上传时，任何本地方案（含 B/C 客户端）都无法防御，须由 OS 信任链承担（Windows Authenticode / macOS 公证 / 安装包完整性校验，见 credential-vault-plan §1.2-5）。
-4. **演进方向（按性价比）**：D 硬件绑定（TPM/Keystore）→ 密钥不落硬件；C 式多设备同步（引入服务器信任面，与本地定位冲突，需权衡）；L4 加固（签名/完整性清单，已列入待办）。
+3. **信任根边界（L4）**：vault 全部防线建立在「主程序可信」前提上——主程序+FFI 库同时被替换/内嵌上传时，任何本地方案（含 B/C 客户端）都无法防御。**OS 代码签名（Authenticode / 公证）当前不推进**，故应用层以 **key1 签名的原生完整性清单**为真实性机制（见 [vault-security-notes.md](vault-security-notes.md) §应用层信任根 / [supply-chain.md](supply-chain.md) §2），其残余硬上限**如实保留**。
+4. **演进方向（按性价比）**：D 硬件绑定（TPM/Keystore）→ 密钥不落硬件；`device.key` 接入 OS 钥匙串；vault 核心未来可考虑以 **Rust 带外进程**重写（内存安全、无 CLR、可静态 musl 以收紧 seccomp allowlist，仍保持独立进程隔离）——均属未落地项。
