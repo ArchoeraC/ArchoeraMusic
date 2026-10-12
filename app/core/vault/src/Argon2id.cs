@@ -67,6 +67,12 @@ public static class Argon2id
         if (p < 1) throw new ArgumentOutOfRangeException(nameof(p), "并行度必须 ≥ 1");
         if (mKiB < 8 * p) throw new ArgumentOutOfRangeException(nameof(mKiB), "内存必须 ≥ 8p KiB");
         if (t < 1) throw new ArgumentOutOfRangeException(nameof(t), "迭代必须 ≥ 1");
+        // 上限（SEC-06，纵深防御）：即便调用方未先经 VaultLimits.ValidateKdf 校验，
+        // 也不允许恶意/异常参数在此触发巨量内存分配（解锁前 DoS）。
+        if (p > VaultLimits.MaxKdfParallelism || mKiB > VaultLimits.MaxKdfMemoryKiB ||
+            t > VaultLimits.MaxKdfIterations)
+            throw new ArgumentOutOfRangeException(nameof(mKiB),
+                $"KDF 参数超上限（m={mKiB} KiB / t={t} / p={p}），拒绝派生");
         if (salt.Length < 8) throw new ArgumentException("盐长度必须 ≥ 8 字节", nameof(salt));
         if (tagLen < 4) throw new ArgumentOutOfRangeException(nameof(tagLen), "输出长度必须 ≥ 4");
 

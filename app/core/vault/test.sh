@@ -1107,4 +1107,59 @@ run destroy "$DATA12" | grep -q '^ok$' || fail "destroy DATA12 失败"
 [ ! -f "$DATA12/credentials.vault" ] || fail "destroy 应删除 credentials.vault"
 pass "file destroy 全量销毁（secret.key + vault 文件）"
 
+# ── 21. KDF 参数加载上限（SEC-06）：恶意超大 m/t/p 在派生前快速拒绝 ──
+DATA14="$(mktemp -d)"
+trap 'rm -rf "$DATA" "$DATA2" "$DATA3" "$DATA4" "$DATA5" "$DATA6" "$DATA7" "$DATA8" "$DATA9" "$DATA10" "$DATA11" "$DATA12" "$DATA13" "$DATA14"' EXIT
+
+PW5="Kdf-Limit-P@ss"
+OUT=$(printf '%s\n' "$PW5" | "$VAULT" init-password "$DATA14" 2>&1) || true
+case "$OUT" in ok\ *) : ;; *) fail "init-password(DATA14) 失败: $OUT";; esac
+python3 - "$VAULT" "$DATA14" "$PW5" <<'PY' || fail "KDF 上限拒绝失败"
+import base64, os, struct, subprocess, sys, time
+vault, data, pw = sys.argv[1:4]
+path = os.path.join(data, "credentials.vault")
+base = open(path, "rb").read()
+assert base[:4] == b"AVLT" and base[4] == ord("P"), "应为口令模式文件"
+
+def attempt(raw):
+    # 每次尝试前清掉 lockout（否则解锁失败退避会干扰后续正确口令用例）
+    lk = os.path.join(data, "vault.lockout")
+    if os.path.exists(lk):
+        os.remove(lk)
+    open(path, "wb").write(raw)
+    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    pw_b64 = base64.b64encode(pw.encode()).decode()
+    p.stdin.write(("handshake %s %s %s\n" % (
+        base64.b64encode(os.urandom(32)).decode(),
+        base64.b64encode(os.urandom(16)).decode(), pw_b64)).encode())
+    p.stdin.flush()
+    resp = p.stdout.readline().decode().rstrip("\n")
+    p.stdin.close(); p.wait(timeout=5)
+    return resp
+
+# ① 超大内存 m = 2^32-1 KiB（~4 TiB）→ 快速拒绝，不得分配
+bad = bytearray(base); struct.pack_into("<I", bad, 24, 0xFFFFFFFF)
+t0 = time.time(); resp = attempt(bytes(bad)); dt = time.time() - t0
+assert resp.startswith("err"), "超大 m 应被拒: %r" % resp
+assert "KDF" in resp, "应报 KDF 参数异常: %r" % resp
+assert dt < 5, "应在派生前快速拒绝（耗时 %.1fs）" % dt
+
+# ② 超大迭代次数 t
+bad = bytearray(base); struct.pack_into("<I", bad, 28, 100000)
+resp = attempt(bytes(bad))
+assert resp.startswith("err") and "KDF" in resp, "超大 t 应被拒: %r" % resp
+
+# ③ 超大并行度 p
+bad = bytearray(base); struct.pack_into("<I", bad, 32, 4096)
+resp = attempt(bytes(bad))
+assert resp.startswith("err") and "KDF" in resp, "超大 p 应被拒: %r" % resp
+
+# ④ 复原文件 → 合规参数口令解锁仍成功（正常路径未被误伤）
+resp = attempt(base)
+assert resp.startswith("ok handshake"), "合规参数应正常解锁: %r" % resp
+print("ok")
+PY
+pass "KDF 参数加载上限（SEC-06）：超大 m/t/p 派生前拒绝，合规参数正常解锁"
+
 echo "全部通过 ✔"
