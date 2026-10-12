@@ -4,10 +4,34 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:archoera_music/services/security/data_destroyer.dart';
 import 'package:archoera_music/utils/safe_file.dart';
+
+/// 注入 [SafeFile.backend] 的假实现（记录调用参数）。
+class _FakeBackend implements SafeFileBackend {
+  Uint8List? readResult = Uint8List.fromList(utf8.encode('{"k":1}'));
+  final List<String> readPaths = <String>[];
+  final List<String> writtenPaths = <String>[];
+  bool? lastAllowSymlink;
+  int? lastMaxBytes;
+
+  @override
+  Uint8List? readBytes(String path, {required int maxBytes, required bool allowSymlink}) {
+    readPaths.add(path);
+    lastMaxBytes = maxBytes;
+    lastAllowSymlink = allowSymlink;
+    return readResult;
+  }
+
+  @override
+  bool writeAtomic(String path, List<int> bytes) {
+    writtenPaths.add(path);
+    return true;
+  }
+}
 
 /// [SafeFile] 回归：App 层「裸文件调用」收口后的核心语义。
 ///
@@ -98,5 +122,27 @@ void main() {
     expect(r.existed, isTrue);
     expect(r.shredded, isFalse, reason: '非普通文件不得进入覆盖销毁流程');
     expect(victim.readAsStringSync(), 'KEEP-ME', reason: '链接目标必须毫发无损');
+  });
+
+  test('原生后端注入：readBytes/writeAtomic 委派且失败不回退 Dart', () {
+    final fake = _FakeBackend();
+    SafeFile.backend = fake;
+    addTearDown(() => SafeFile.backend = null);
+
+    // 读：委派并透传参数（上限/allowSymlink）。
+    expect(SafeFile.readBytes(p('a.json'), maxBytes: 123, allowSymlink: false),
+        fake.readResult);
+    expect(fake.readPaths, [p('a.json')]);
+    expect(fake.lastMaxBytes, 123);
+    expect(fake.lastAllowSymlink, isFalse);
+
+    // 写：委派（目录已存在时直接调用后端）。
+    expect(SafeFile.writeAtomicString(p('w.json'), 'x'), isTrue);
+    expect(fake.writtenPaths, [p('w.json')]);
+
+    // 后端拒绝 → 权威 null（不回退纯 Dart，避免重新引入 TOCTOU）。
+    File(p('a.json')).writeAsStringSync('{"k":9}');
+    fake.readResult = null;
+    expect(SafeFile.readString(p('a.json')), isNull);
   });
 }

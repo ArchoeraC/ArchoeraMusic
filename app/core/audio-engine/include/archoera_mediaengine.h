@@ -216,6 +216,14 @@ ARCHOERA_MEDIAENGINE_API size_t archoera_mediaengine_stage_drop_samples(
 ARCHOERA_MEDIAENGINE_API long long archoera_mediaengine_mem_available_mb(void);
 
 /**
+ * 测试/诊断：当前活动解码源 URL/路径（prepare→commit 切档后为**新档位**源）。
+ * 返回引擎内部字符串，生命周期到下次切档/销毁；未打开返回 NULL。
+ * 只读；无锁（供测试在引擎线程退出后读取，勿在运行期跨线程并发读）。
+ */
+ARCHOERA_MEDIAENGINE_API const char *archoera_mediaengine_source(
+    const ArchoeraMediaEngine *e);
+
+/**
  * 停止并销毁（请求退出 → join 引擎线程 → 释放资源）。
  * 可重复调用/传 NULL。
  */

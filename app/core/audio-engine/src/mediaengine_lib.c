@@ -219,6 +219,13 @@ typedef struct ArchoeraMediaEngine {
     int     stage_have_origin;  /* stage_origin_ms 已捕获 */
     int     stage_rate;         /* 暂存 PCM 采样率（管线输出采样率） */
     int64_t p_start_ms;         /* 当前管线解码起点的绝对 ms（pipeline_get_position 相对它） */
+    /* 暂存新源 URL（prepare 时 dup；commit 转正为 e->source，discard/destroy 释放）。
+       旧实现只在 commit 换 e->p 而不换 e->source → 切档后 seek 重建仍用**旧档位**
+       URL（在线直链常带时效/会话，可能已失效）→ 重建失败、进度条拖不回原位。 */
+    char   *staged_source;
+    /* deferred carry 余量的首块媒体时间（commit 时的旧源写头 old_ms）；
+       内存播放时间线据此连续（见 mediaengine_flush_carry）。 */
+    double  carry_start_ms;
     float  *stage;              /* 暂存 PCM（交织 float） */
     size_t  stage_len;          /* 已暂存 float 个数 */
     size_t  stage_cap;          /* 容量（float 个数） */
@@ -1006,6 +1013,9 @@ static void mediaengine_discard_next(ArchoeraMediaEngine *e)
     e->carry_pending = 0;
     e->next_ready = 0;
     e->next_start_ms = 0.0;
+    e->carry_start_ms = 0.0;
+    free(e->staged_source);
+    e->staged_source = NULL;
 }
 
 /* 暂存余量延迟续喂：把 e->stage 里剩余的新源 PCM 喂完再继续解码新源，保证
@@ -1021,10 +1031,15 @@ static void mediaengine_flush_carry(ArchoeraMediaEngine *e)
     ch = e->stage_ch > 0 ? e->stage_ch : 2;
     frames = (int)(e->stage_len / (size_t)ch);
     if (frames > 0) {
-        if (e->player && e->player_stream_mode) {
+        /* 余量首块媒体时间 = commit 时的旧源写头（carry_start_ms）：内存播放模式下
+           必须走 on_pcm_out（mem_append + ring），否则该段只进 ring、不进 mem 块列表
+           → 内存 PCM 时间线在切档处**向前跳一段 remain**（频谱/歌词/分析错位）。 */
+        const double pos = e->carry_start_ms > 0.0 ? e->carry_start_ms
+                                                    : (double)e->p_start_ms;
+        if (e->player && e->player_stream_mode && !e->mem_mode) {
             player_stream_write(e->player, e->stage, frames);
         } else {
-            on_pcm_out(e->stage, frames, ch, (double)e->p_start_ms, e);
+            on_pcm_out(e->stage, frames, ch, pos, e);
         }
     }
     e->stage_len = 0;
@@ -1134,6 +1149,9 @@ static void handle_prepare_source(ArchoeraMediaEngine *e, const char *line)
         return;
     }
     e->stage_thread_on = 1;
+    /* 暂存新源 URL：commit 时转正为活动源（seek/重建据此用新档位，见 commit）。 */
+    free(e->staged_source);
+    e->staged_source = strdup(url);
 }
 
 /* commit_source：停止并汇合预取线程后，把已预解码的 stage 续喂同一 ring，新源
@@ -1189,6 +1207,19 @@ static void handle_commit_source(ArchoeraMediaEngine *e)
     pipeline_destroy(e->p);
     e->p = e->p_next;
     e->p_next = NULL;
+    /* 活动源同步为**新档位**（关键修复）：此后 seek 的 mediaengine_stream_rebuild
+       必须用新源 URL；否则会重建旧档位源——在线直链（Subsonic 等）常带时效/会话，
+       可能已过期 → 重建失败、进度条拖不回原位；未过期则静默回退旧音质。新管线为
+       URL 直连（非 SegStore），故一并清空 e->store 让重建走 e->source。
+       e->headers 沿用（同一曲目，请求头不变）。 */
+    if (e->staged_source) {
+        free(e->source);
+        e->source = e->staged_source;
+        e->staged_source = NULL;
+    }
+    e->store = NULL;
+    /* 余量（stage 裁剪后）首块媒体时间 = 旧源写头：内存/位置时间线据此连续。 */
+    e->carry_start_ms = old_ms;
     /* p_start_ms 跟随新管线 cfg.start_offset（= (int64_t)base_ms，截断值，故用
        (int64_t) 而非 llround 保持一致）；session_offset_ms 是 rel 事件零点
        （= cfg.start_offset_ms），切档不改变，后续 seek 仍正确。 */
@@ -2271,6 +2302,11 @@ int archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e)
 long long archoera_mediaengine_mem_available_mb(void)
 {
     return mem_avail_mb();
+}
+
+const char *archoera_mediaengine_source(const ArchoeraMediaEngine *e)
+{
+    return e ? e->source : NULL;
 }
 
 void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)

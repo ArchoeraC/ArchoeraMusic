@@ -734,9 +734,13 @@ pub const HttpStream = struct {
             }
             self.net_pos = start_off;
 
-            // 服务端忽略 Range（返回 200）且目标偏移 > 0：前向丢弃对齐
-            if (head.status == 200 and range_start > 0) {
-                try self.discard(range_start);
+            // 服务端未精确满足 Range：**前向丢弃差值对齐到请求偏移**。
+            //   - 200（忽略 Range，整段从 0 返回）：起点 0 < range_start；
+            //   - 206 但 Content-Range 起点低于请求偏移（部分转码器按帧/块向下对齐）。
+            // 若不补齐，内核逻辑游标（range_start）会领先底层流，后续读取**整体偏早**
+            // （固定偏差），表现为 seek 落点比目标提前。
+            if (range_start > start_off) {
+                try self.discard(range_start - start_off);
                 self.net_pos = range_start;
             }
             return;
@@ -1373,6 +1377,22 @@ fn handleConn(ts: *TestServer, stream: std.Io.net.Stream) void {
     const body = payload[@intCast(start)..];
 
     var hdr: [512]u8 = undefined;
+    if (std.mem.eql(u8, target, "/shift")) {
+        // 206 但 Content-Range 起点**低于请求偏移** 8 字节（部分转码器按帧/块向下
+        // 对齐）：内核必须前向丢弃差值对齐到请求偏移，否则后续读取整体偏早 8 字节。
+        const s2: u64 = if (start >= 8) start - 8 else 0;
+        const b2 = payload[@intCast(s2)..];
+        var h2: [512]u8 = undefined;
+        const hs2 = std.fmt.bufPrint(
+            &h2,
+            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {d}-{d}/{d}\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
+            .{ s2, last, payload.len, b2.len },
+        ) catch return;
+        w.writeAll(hs2) catch return;
+        w.writeAll(b2) catch return;
+        w.flush() catch {};
+        return;
+    }
     const hs = std.fmt.bufPrint(
         &hdr,
         "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {d}-{d}/{d}\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
@@ -1558,6 +1578,27 @@ test "HttpStream: 服务端忽略 Range（恒 200）下前向 seek" {
     var got: [100]u8 = undefined;
     try testing.expectEqual(@as(usize, 100), try readAllInto(hs, &got));
     try testing.expectEqualSlices(u8, payload[3000..3100], &got);
+}
+
+test "HttpStream: 206 Content-Range 起点低于请求偏移时前向对齐（不偏早）" {
+    const payload = try makeTestPayload(testing.allocator, 5000);
+    defer testing.allocator.free(payload);
+    const ts = try TestServer.start(payload);
+    defer ts.stopAndDestroy();
+
+    const url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/shift", .{ts.port});
+    defer testing.allocator.free(url);
+
+    const hs = try HttpStream.open(testing.allocator, url);
+    defer hs.close();
+    // 先读 2000 字节（net 游标 2000），再回退 seek 到 1000 → 触发 Range 重请求。
+    var pre: [2000]u8 = undefined;
+    try testing.expectEqual(@as(usize, 2000), try readAllInto(hs, &pre));
+    try testing.expect(hs.seek(1000, 0, 0));
+    // 服务端返回 Content-Range: bytes 992-…（低 8 字节）：必须丢弃 8 字节对齐到 1000。
+    var got: [64]u8 = undefined;
+    try testing.expectEqual(@as(usize, 64), try readAllInto(hs, &got));
+    try testing.expectEqualSlices(u8, payload[1000..1064], &got);
 }
 
 test "HttpStream: 断流续传（服务端中途断开 → Range 重连）" {

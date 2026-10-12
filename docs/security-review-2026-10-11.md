@@ -506,8 +506,10 @@ OS 份额覆盖、vault 文件 DoS（`VaultLimits`）、uid 路径遍历（锚�
 使符号链接**只被替换、不被穿透**（此前 `writeAsStringSync` 会顺着链接覆盖目标，
 `data_destroyer` 的覆盖写更会把目标文件抹掉）；擦除器增加「仅普通文件」前置判定，
 `openSync` 型流式写先删同名路径再创建并不跟随校验。
-残余（如实）：`dart:io` 无 `O_NONBLOCK`/`O_NOFOLLOW`，判定与读写之间有极窄 TOCTOU 窗口
-（需精确抢时）；彻底关闭需经 `app/native/platform` 走原生 `open(2)`，当前未做。
+残余（如实）：纯 Dart 回退路径下 `dart:io` 无 `O_NONBLOCK`/`O_NOFOLLOW`，判定与读写之间有极窄 TOCTOU 窗口
+（需精确抢时）。**已落地**：平台桥接新增原生 `open(2)` 安全文件能力（`APL_CAP_SECURE_FILE`，ABI v4：
+`apl_file_read`/`apl_file_write_atomic`，`O_NOFOLLOW`/`O_NONBLOCK` + 打开后按句柄 `fstat` 判普通文件；写走独占
+临时名 + rename），能力可用时 `SafeFile` 自动切到原生后端，彻底关闭该窗口（见 docs/platform-native-bridge.md §3.2.1）。
 
 **并发语义（SEC-46，定稿「兼容并发」）**：不使用「最后写者获胜」（会静默丢更新）。写命令以
 **阻塞式跨进程独占锁**（`flock`/`LockFileEx`，内核唤醒、非轮询）保护「加载 → 改 → 保存」：

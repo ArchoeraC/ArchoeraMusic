@@ -18,6 +18,7 @@
 #include "backend.h"
 
 #include "core.h"
+#include "safe_file_posix.h"  // Linux/macOS 共用安全文件原语（header-only）
 
 #include <fcntl.h>
 #include <sys/file.h>
@@ -346,7 +347,8 @@ void setPendingDeepLink(const char* uri) {
 uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
-           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY;
+           CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY |
+           CAP_SECURE_FILE;
 }
 
 int32_t init() {
@@ -665,6 +667,16 @@ int32_t revealPath(const char* path) {
         }
     }
     return OK;
+}
+
+// ── 安全文件原语（POSIX open(2)）───────────────────────────────────
+int32_t fileRead(const char* path, bool allow_symlink, int64_t max_bytes, uint8_t* out,
+                 size_t* inout_len) {
+    return safeFileReadPosix(path, allow_symlink, max_bytes, out, inout_len);
+}
+
+int32_t fileWriteAtomic(const char* path, const uint8_t* data, size_t len) {
+    return safeFileWriteAtomicPosix(path, data, len);
 }
 
 // ── SystemTray（菜单栏状态项 + 扁平上下文菜单）──────────────────────
