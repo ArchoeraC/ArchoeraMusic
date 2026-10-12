@@ -274,6 +274,12 @@ NUGETCFG
           cacert
           curl
         ];
+        # 静态链接所需：build.sh 在无 rustup（Nix 的 rustc/cargo）时走 crt 模式
+        # （`RUSTFLAGS=-C target-feature=+crt-static`，见 app/core/vault-rs/link-mode.sh），
+        # 需 **静态 glibc**（libc.a / libpthread.a / librt.a / libdl.a / libutil.a / libm.a
+        # 及 crt*.o）。Nix 默认 stdenv 只提供动态 glibc，缺之链接报
+        # `cannot find -lc/-lutil/-lrt/-lpthread/-lm/-ldl`。
+        buildInputs = with pkgs; [ glibc.static ];
         strictDeps = false;
         dontConfigure = true;
         preBuild = netEnv;
