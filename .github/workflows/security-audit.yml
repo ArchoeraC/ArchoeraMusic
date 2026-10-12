@@ -1,0 +1,72 @@
+# SEC-26：依赖漏洞扫描（各生态 audit）。
+# 与 Dependabot（.github/dependabot.yml，负责版本更新 / 安全告警）互补：
+# 本工作流在固定节奏上主动跑各生态的漏洞扫描，PR/合并到 main 时也跑一次。
+# 全部 GitHub Actions 依赖固定到 commit SHA（SEC-21）。
+name: Dependency audit
+
+on:
+  schedule:
+    # 每周一 03:17 UTC（错峰）
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [main, ArchoeraOS]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-audit:
+    name: cargo audit (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    # audit-check 对新披露的漏洞会开 issue 跟踪，故需 issues: write；
+    # fork PR 时 token 自动降为只读，此时仅做校验与失败判定（不建 issue）。
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - app/core/downloader
+          - app/core/shell
+          - app/core/subsonic/transcoder
+          - app/core/audio-engine/tempo-rs
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: ${{ matrix.dir }}
+
+  govulncheck:
+    name: govulncheck (subsonic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1
+        with:
+          go-version-input: '1.26'
+          work-dir: app/core/subsonic
+          repo-checkout: false
+
+  dotnet-audit:
+    name: dotnet vulnerable packages (scanner / vault)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: dotnet list package --vulnerable
+        shell: bash
+        run: |
+          set -euo pipefail
+          for proj in app/core/scanner/scanner.csproj \
+                      app/core/scanner/scanner-ffi/scanner-ffi.csproj \
+                      app/core/vault/src/Vault.csproj; do
+            echo "── $proj ──"
+            dotnet list "$proj" package --vulnerable --include-transitive
+          done
