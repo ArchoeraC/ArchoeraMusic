@@ -391,16 +391,16 @@ vault = header{magic,ver,vaultId,kdf,salt,alg} + entries(AEAD_K) + trailer(HMAC_
 
 - **A · LD_PRELOAD 注入（曾经成立，已修）**：vault 为动态链接 PIE、继承环境；`LD_PRELOAD=<evil.so>` hook `read` 即可读到标准输入握手里的明文口令 → 再用该口令离线解出全部凭据（**实测完全失守**）。
   - **修补**：① Dart 侧 spawn vault（`start`+`runSync`）改用**净化环境**（剔除 `LD_PRELOAD`/`LD_AUDIT`/`LD_LIBRARY_PATH`/`DYLD_*`，并以 `includeParentEnvironment:false` 不再合并父环境）；② vault 侧 `VerifyAndArm` 在 Linux 检出 `LD_PRELOAD`/`LD_AUDIT` 非空、macOS 检出 `DYLD_INSERT_LIBRARIES` 非空即**拒绝运行**（在读任何输入之前）。
-  - **残余**：属"提高门槛"而非边界——系统级 `/etc/ld.so.preload`、或已被攻陷的父程序注入不受控。**根治办法是静态链接**（`ld.so` 不参与，`LD_PRELOAD` 失效）；本机 NativeAOT `StaticExecutable` 因链接器断言失败**暂不可行**，列为已知缺口。
+  - **残余**：属"提高门槛"而非边界——系统级 `/etc/ld.so.preload`、或已被攻陷的父程序注入不受控。**根治办法是静态链接**（`ld.so` 不参与，`LD_PRELOAD` 失效）——**Linux 已落地**：`native/archoera-vault` 改由 `app/core/vault-rs` 的 **Rust 静态单文件**承接（`+crt-static`；CI 走 musl 静态），C# NativeAOT 因链接器断言失败无法静态化（§13-E）。**Windows / macOS 仍用 C# vault**，其加载器注入只靠过程护栏（`VerifyAndArm` 拒绝非空注入变量）+ Dart 侧环境净化。
 - **B · `/proc/<pid>/environ`**：被 `PR_SET_DUMPABLE=0` 拒绝（口令也不经 env 传递）。
 - **C · `ARCHOERA_VAULT_BIN` 伪造 vault（曾经成立，已修）**：应用会把明文口令交给 env 指定的二进制，而 marker 与握手 HMAC 均可自算，**不构成对 vault 二进制的认证**。
   - **修补**：`ARCHOERA_VAULT_BIN` **仅在 debug/测试构建生效**（`kDebugMode`；或显式 `ARCHOERA_ALLOW_VAULT_BIN`）；**release 忽略**，走默认解析 + key1 签名清单校验 + 父进程身份校验。
 - **D · 伪造"主程序"满足父进程 pin**：把一份 fork 包装器命名为 `archoera_music` 放在打包布局的预期路径，vault 即接受（已验证 pin 可通过）。此为**"替换主程序"的已知上限**，本地防线无法阻止。
-- **E · 静态链接**：NativeAOT `-r linux-musl-x64 -p:StaticExecutable=true` 在本机 `ld.bfd` 断言失败 → 暂不可得（若换环境可尝试 `lld`；Rust/musl 静态是备选）。
+- **E · 静态链接**：NativeAOT `-r linux-musl-x64 -p:StaticExecutable=true` 在本机 `ld.bfd` 断言失败 → 暂不可得（若换环境可尝试 `lld`）。**已改走备选**：Linux 用 Rust（`app/core/vault-rs`）静态单文件（`+crt-static`；CI 走 musl 静态）替代 C# NativeAOT，从根上消除 `ld.so` 参与。
 
 ## 14. 多端"需真机验证"清单（本地仅 IL 交叉编译）
 
-已在本地通过：`dotnet build -r win-x64 / osx-x64 / osx-arm64 / linux-arm64 / linux-musl-x64` 均 0 error；`vault/test.sh`（Linux）全绿；`dart analyze` 0 issue。以下**必须在对应真机/CI 复验**：
+已在本地通过：`dotnet build -r win-x64 / osx-x64 / osx-arm64 / linux-arm64 / linux-musl-x64` 均 0 error；`vault/test.sh`（Linux）全绿；`dart analyze` 0 issue。**Linux 现用 Rust 版**：`app/core/vault-rs/test.sh` + `app/core/vault-rs/cross_parity.sh`（与 C# 双向互解互读）均已本地全绿。以下**必须在对应真机/CI 复验**：
 
 - **macOS**：`libproc.dylib` 符号在 Apple Silicon 的解析；Keychain `SecItem*` 运行时（`kCFType*CallBacks` + UTF-8 CFString 修复后的实际可用性）；`.app` 单一 `native/` 目录（Xcode 与 CI 一致）后的端到端打包与加载；**NativeAOT 跨端 publish**（Linux 无法交叉 AOT）。
 - **Linux aarch64**：`libsecret` 可变参 P/Invoke（仅 x86-64 验证过）；`g_str_hash`/`g_str_equal` 在真实 Secret Service 下的读写。

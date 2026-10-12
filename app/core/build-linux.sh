@@ -6,7 +6,7 @@
 #    1. audio-engine : CMake（FFmpeg 解码/EQ/FFT + Rust tempo）
 #    2. scraper      : CMake（C++ 元数据刮削）
 #    3. scanner      : dotnet publish (NativeAOT) + libe_sqlite3
-#    4. vault        : dotnet publish (NativeAOT 凭据保险库)
+#    4. vault        : cargo build（vault-rs，Rust 静态链接凭据保险库）
 #    5. downloader   : cargo build --release (cdylib)
 #    6. subsonic     : cargo transcoder + go c-shared + go standalone
 #    7. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
@@ -61,8 +61,13 @@ cmake --build "$ROOT/scraper/build" -j"$JOBS"
 echo "[build-linux] ===== scanner (NativeAOT) ====="
 bash "$ROOT/scanner/build.sh" linux-x64
 
-echo "[build-linux] ===== vault (NativeAOT 凭据保险库) ====="
-bash "$ROOT/vault/build.sh" linux-x64
+# vault（凭据保险库）：Linux 用 vault-rs 的 **Rust 静态单文件**（+crt-static，CI 走
+# musl 静态）替代 C# NativeAOT——ld.so 不参与 → 免疫 LD_PRELOAD/LD_LIBRARY_PATH
+# （见 docs/vault-security-notes.md「Linux：静态 Rust 实现」）；Linux 上 crypto 走
+# file 后端、slots 自包含，不依赖 libsecret。macOS/Windows 仍用 C# NativeAOT vault
+# （见 build-macos.sh / build_windows.bat），待 Rust OS-keystore 端移植后再切换。
+echo "[build-linux] ===== vault (Rust 静态链接, vault-rs) ====="
+bash "$ROOT/vault-rs/build.sh"
 
 echo "[build-linux] ===== downloader (Rust cdylib) ====="
 cargo build --release --manifest-path "$ROOT/downloader/Cargo.toml"

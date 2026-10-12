@@ -68,11 +68,35 @@ KDF 参数有**上限与下限**（[VaultLimits.ValidateKdf]：`m∈[8192 KiB, 2
 - **删状态即可清零退避**：能删除状态文件的同用户攻击者可绕过它；且 **离线暴破根本不经过 vault 进程**——攻击者拿到 vault 文件后可自行离线跑口令猜测，在线退避对其**无效**。
 - **真正的抗暴破杠杆只有两个**：**KDF 成本**（Argon2id 参数强度，见上）与**口令 / 恢复码熵**。请据此设定强度与口令策略，**勿把退避当作保密防线**。
 
+## Linux：静态 Rust 实现（2026-10）
+
+自 2026-10 起，**Linux 发行包**内的 `native/archoera-vault` 改为 `app/core/vault-rs` 的
+**Rust 重实现**，并以**静态链接**单文件（`+crt-static`；CI 走 musl 静态）分发：
+
+- **免疫加载器注入**：静态二进制不依赖 `ld.so`，`LD_PRELOAD` / `LD_AUDIT` / `LD_LIBRARY_PATH`
+  对其**完全失效**——这是 [vault-enhanced-scheme.md §13-A](vault-enhanced-scheme.md)
+  「LD_PRELOAD 曾经完全失守」的**根治**；C# NativeAOT 因链接器限制无法静态化（§13-E），
+  故 Linux 上由 Rust 版取代。
+- **不使用 libsecret**：Rust 版的 OS 钥匙串后端（DPAPI / Keychain / libsecret）在 V1 为**桩**；
+  Linux 上 crypto 模式**走 `file` 后端**（`secret.key`，0600；单因子降级，选用须知悉），
+  slots（m1/m2a/m2b）本就自包含、不依赖 OS store。
+- **字节 / 协议兼容**：容器格式（crypto `'C'` / slots `'S'`）与 C# 版一致，
+  `app/core/vault-rs/cross_parity.sh` 双向互解互读、`app/core/vault-rs/test.sh` 全链路
+  均已通过（与 C# 版同套断言）。
+- **Windows / macOS 仍用 C#（NativeAOT）vault**：Rust 版的 OS 钥匙串后端尚未移植，
+  故暂不切换（待 Rust OS-keystore 端移植后再评估）。
+- **构建 / 打包**：`app/core/build-linux.sh` 编译 vault-rs；`app/linux/CMakeLists.txt`
+  安装 `core/vault-rs/build/archoera-vault` 进 `bundle/native/`；SEC-08 完整性清单
+  仍自动覆盖该文件。
+
 ## 测试构建（无明文后门，SEC-19 已删除）
 
 - `app/core/vault/build-test.sh`（`#if VAULT_TESTING` 条件编译）产出 `archoera-vault-test`，
   **与生产 `build.sh` 唯一区别是构建标记为 `ARCHOERA-VAULT-TEST-*`**（供握手指纹与 negative-marker 测试）；
   **存储行为与生产完全一致，不含任何明文存储分支**。
+- **Linux（Rust）**：`app/core/vault-rs/build-test.sh`（`vault_testing` feature 条件编译）
+  产出 `archoera-vault-test`，同样**仅改构建标记、存储行为与生产一致**；套件为
+  `app/core/vault-rs/test.sh`（与 C# 版同套断言）。
 - 历史上存在测试专用明文存储开关 `ARCHOERA_VAULT_INSECURE_FILE_STORE`（C# `InsecureFileStore`）——
   **已于 SEC-19（2026-10-12）删除**。`test.sh` 与 CI 的 headless 后端改用**生产 `FileStore`**
   （`ARCHOERA_VAULT_BACKEND=file`，文件密钥模式），不再有任何明文存储代码路径；`VAULT_TESTING`

@@ -23,6 +23,9 @@ runs:
     - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
       with:
         toolchain: stable
+        # vault-rs 静态保险库：装 musl target 后 build.sh 自动走 musl 静态链接
+        # （不依赖静态 glibc，Fedora 等未装 glibc-static 的发行版亦可；见 link-mode.sh）。
+        targets: x86_64-unknown-linux-musl
 
     - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
       with:
@@ -105,6 +108,12 @@ runs:
       shell: bash
       run: cargo test --release --manifest-path app/core/subsonic/transcoder/Cargo.toml
 
+    - name: Rust unit tests (vault-rs 静态保险库)
+      shell: bash
+      # 保险库纯函数单测（Argon2id RFC 9106 向量 / 恢复码 Crockford Base32 归一化）。
+      # 全链路 E2E（init/serve/篡改/seccomp）见 app/core/vault-rs/test.sh（本地/真机运行）。
+      run: cargo test --release --manifest-path app/core/vault-rs/Cargo.toml
+
     - name: Go unit tests (subsonic)
       shell: bash
       working-directory: app/core/subsonic
@@ -131,16 +140,17 @@ runs:
       shell: bash
       working-directory: app
       env:
-        # headless runner 无 D-Bus Secret Service：构建测试二进制（VAULT_TESTING
-        # 条件编译，与生产唯一区别是构建标记为 TEST；存储行为完全一致），并经
-        # ARCHOERA_VAULT_BACKEND=file 选择**生产 FileStore**（文件密钥后端）——
+        # headless runner 无 D-Bus Secret Service：构建测试二进制（vault_testing
+        # feature 条件编译，与生产唯一区别是构建标记为 TEST；存储行为完全一致），
+        # 并经 ARCHOERA_VAULT_BACKEND=file 选择**生产 FileStore**（文件密钥后端）——
         # SEC-19 后不再有测试专用明文存储后门。
+        # Linux 已改用 vault-rs 的 Rust 静态单文件（core/vault-rs，免疫 LD_PRELOAD）；
         # 指向绝对路径，避免 working-directory 相对解析。
-        ARCHOERA_VAULT_BIN: ${{ github.workspace }}/app/core/vault/build/archoera-vault-test
+        ARCHOERA_VAULT_BIN: ${{ github.workspace }}/app/core/vault-rs/build/archoera-vault-test
         ARCHOERA_VAULT_BACKEND: 'file'
       run: |
         set -euo pipefail
-        bash core/vault/build-test.sh linux-x64
+        bash core/vault-rs/build-test.sh
         flutter test
 
     - name: Build Flutter Linux (release)
