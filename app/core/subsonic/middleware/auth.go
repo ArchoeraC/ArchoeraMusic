@@ -71,6 +71,12 @@ func authenticate(u, p, t, s string) (*model.SubsonicUser, *SubError) {
 	if pw, ok := credentials.Get(u); ok {
 		password = pw
 	}
+	// fail-closed：密码不可用（迁移后 password_cipher 为空串且内存表未注入 /
+	// 用户密码本身为空）时不得放行——否则 t=md5(""+s) 可被任意客户端构造，
+	// 构成空密码认证绕过。
+	if password == "" {
+		return nil, &SubError{Code: 40, Message: "Wrong username or password"}
+	}
 
 	// token + salt 模式
 	if t != "" && s != "" {
