@@ -516,14 +516,21 @@ fn runtime_handle() -> Option<Handle> {
 // 路径 & 文件名（戒律 13.2：全在 Rust，Dart 只传 title/artist/quality）
 // ============================================================
 
-/// 非法字符替换（对齐设计稿 §3.3：\/:*?"<>| → _）
+/// 非法字符替换 + 路径穿越防护（对齐设计稿 §3.3，与 `local-library` 的 `orgSanitize` 一致）：
+/// - `\ / : * ? " < > |` 与 ASCII 控制字符 → `_`；
+/// - 去掉首尾空白与点号——`"."` / `".."` / 全点串归一为空串，避免由元数据派生的
+///   `..` 段使 `destPath` 越出 `rootDir`（大小写不敏感文件系统亦受益）。
+/// 调用方对空结果有各自回退（ByArtist 空歌手回退平铺；文件名空 → "untitled"）。
 fn sanitize_filename(s: &str) -> String {
-    s.chars()
+    let replaced: String = s
+        .chars()
         .map(|c| match c {
             '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            c if c.is_control() => '_',
             c => c,
         })
-        .collect()
+        .collect();
+    replaced.trim().trim_matches('.').trim().to_string()
 }
 
 /// 渲染文件名模板（占位符 {artist}/{title}/{album}，未知占位符原样保留）。
@@ -905,11 +912,18 @@ async fn download_to_file(
     paused: &AtomicBool,
     task_id: &str,
 ) -> std::result::Result<u64, DownloadError> {
-    // 已存在的 .tmp → 尝试断点续传
-    let existing = tokio::fs::metadata(tmp)
-        .await
-        .map(|m| m.len())
-        .unwrap_or(0);
+    // 已存在的 .tmp → 尝试断点续传。
+    // SEC-33：用 symlink_metadata 不跟随链接；仅「普通文件」可续传。若为符号链接 /
+    // 目录 / 其它非普通文件（下载目录可能被预置同名链接），删除后按全新下载处理，
+    // 宁可丢一次续传也不顺着链接写到目录外。
+    let existing = match tokio::fs::symlink_metadata(tmp).await {
+        Ok(m) if m.file_type().is_file() => m.len(),
+        Ok(_) => {
+            let _ = tokio::fs::remove_file(tmp).await;
+            0
+        }
+        Err(_) => 0,
+    };
 
     let mut req = client.get(&resolved.url).timeout(Duration::from_secs(30));
     if existing > 0 {
@@ -939,12 +953,12 @@ async fn download_to_file(
         let _ = tokio::fs::create_dir_all(parent).await;
     }
     let mut file = if resume {
-        match tokio::fs::OpenOptions::new().append(true).open(tmp).await {
+        match open_tmp_file(tmp, true).await {
             Ok(f) => f,
             Err(e) => return Err(DownloadError { msg: format!("打开临时文件失败: {e}"), cancel: false, paused: false }),
         }
     } else {
-        match tokio::fs::File::create(tmp).await {
+        match open_tmp_file(tmp, false).await {
             Ok(f) => f,
             Err(e) => return Err(DownloadError { msg: format!("创建临时文件失败: {e}"), cancel: false, paused: false }),
         }
@@ -1031,13 +1045,53 @@ async fn download_to_file(
     Ok(received)
 }
 
+/// 打开下载临时文件（SEC-33 安全语义）：
+/// - 新建：`create_new`（`O_CREAT|O_EXCL`）——已存在同名（含符号链接、竞态新建）直接失败，绝不跟随；
+/// - 续传：`append` + `O_NOFOLLOW`——链接路径打开即失败（`ELOOP`）。
+/// `O_NOFOLLOW` 仅 Unix 生效；Windows 创建符号链接默认需特权，风险面较小。
+async fn open_tmp_file(tmp: &PathBuf, append: bool) -> std::io::Result<tokio::fs::File> {
+    let mut opts = tokio::fs::OpenOptions::new();
+    opts.write(true);
+    if append {
+        opts.append(true);
+    } else {
+        opts.create_new(true);
+    }
+    set_nofollow(&mut opts);
+    opts.open(tmp).await
+}
+
+/// 跳过符号链接（Unix `O_NOFOLLOW`；其它平台 no-op）。
+fn set_nofollow(opts: &mut tokio::fs::OpenOptions) {
+    #[cfg(unix)]
+    opts.custom_flags(libc::O_NOFOLLOW);
+    #[cfg(not(unix))]
+    let _ = opts;
+}
+
 /// 临时文件 → 目标文件：先尝试原子 rename；跨盘失败则 copy → fsync → remove 兜底。
+///
+/// SEC-33：rename 前拒绝「目标为目录 / 符号链接」——rename 本身替换链接是安全的，
+/// 但 copy 兜底用 `File::create` 会**跟随**已存在的符号链接写到链接指向处；因此统一在
+/// 入口拒绝，copy 时再叠加 `O_NOFOLLOW` 覆盖竞态。
 async fn finalize_file(tmp: &PathBuf, dest: &PathBuf) -> std::io::Result<()> {
+    if let Ok(m) = tokio::fs::symlink_metadata(dest).await {
+        let ft = m.file_type();
+        if ft.is_dir() || ft.is_symlink() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                "目标路径为目录或符号链接，拒绝写入",
+            ));
+        }
+    }
     match tokio::fs::rename(tmp, dest).await {
         Ok(()) => Ok(()),
         Err(_) => {
             let mut src = tokio::fs::File::open(tmp).await?;
-            let mut out = tokio::fs::File::create(dest).await?;
+            let mut opts = tokio::fs::OpenOptions::new();
+            opts.write(true).create(true).truncate(true);
+            set_nofollow(&mut opts);
+            let mut out = opts.open(dest).await?;
             tokio::io::copy(&mut src, &mut out).await?;
             out.sync_all().await?;
             drop(out);
@@ -1817,6 +1871,69 @@ mod template_tests {
     fn sanitize_illegal_chars() {
         assert_eq!(sanitize_filename("a/b\\c:d*e?f\"g<h>i|j"), "a_b_c_d_e_f_g_h_i_j");
     }
+
+    #[test]
+    fn sanitize_strips_dot_traversal() {
+        // SEC-11：由元数据派生的 `..` 段必须归一，避免 destPath 越出 rootDir
+        assert_eq!(sanitize_filename(".."), "");
+        assert_eq!(sanitize_filename("."), "");
+        assert_eq!(sanitize_filename("..."), "");
+        // 首尾点被去除；路径分隔符已替换为 `_`，故不存在 `..` 路径段
+        assert_eq!(sanitize_filename("../etc"), "_etc");
+        assert_eq!(sanitize_filename("a/../../b"), "a_.._.._b");
+        assert_eq!(sanitize_filename("..\\..\\windows"), "_.._windows");
+        // 控制字符（含 NUL / 换行）归一为 `_`
+        assert_eq!(sanitize_filename("a\u{0000}b\nc"), "a_b_c");
+        // 首尾空白一并去除
+        assert_eq!(sanitize_filename("  ..  "), "");
+    }
+
+    #[test]
+    fn sanitize_absolute_and_drive_not_traversal() {
+        // 绝对路径的前导分隔符被替换为 `_`，join 后仍落在 root 之下
+        assert_eq!(sanitize_filename("/etc/passwd"), "_etc_passwd");
+        assert_eq!(sanitize_filename("C:\\Windows"), "C__Windows");
+    }
+
+    /// destPath 必须始终落在 rootDir 之内（组合校验，覆盖 artist 目录 + 模板两条派生路径）。
+    #[test]
+    fn compute_base_path_stays_within_root() {
+        use super::{compute_base_path, EnqueueRequest, SourcePlatform};
+        use std::path::PathBuf;
+        let root = PathBuf::from("/downloads");
+        let strategies = [0, 1, 2];
+        let templates = ["{artist} - {title}", "{artist}/{title}", "{album}/{artist}/{title}"];
+        let evil = ["..", "../..", "/etc", "..\\..", "a/b", "...."];
+
+        for strategy in strategies {
+            for template in templates {
+                for artist in evil {
+                    for title in evil {
+                        let req = EnqueueRequest {
+                            source: SourcePlatform::Kugou,
+                            title: title.into(),
+                            artist: artist.into(),
+                            album: Some(artist.into()),
+                            ..Default::default()
+                        };
+                        let p = compute_base_path(&root, strategy, template, &req);
+                        assert!(
+                            p.starts_with(&root),
+                            "越界: strategy={strategy} tmpl={template} artist={artist:?} title={title:?} -> {}",
+                            p.display()
+                        );
+                        // 不得出现 `..` 路径段（starts_with 无法识别的中间穿越）
+                        assert!(
+                            !p.components()
+                                .any(|c| matches!(c, std::path::Component::ParentDir)),
+                            "含 ParentDir 段: {}",
+                            p.display()
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1887,5 +2004,85 @@ mod identity_tests {
         // 再次注入 → 立即恢复持久化指纹（开关关闭路径）
         set_identity_json(r#"{"kgMid":"1234567890"}"#);
         assert_eq!(kugou_mid(), "1234567890");
+    }
+}
+
+#[cfg(test)]
+mod finalize_tests {
+    use super::finalize_file;
+    use std::path::PathBuf;
+
+    fn unique_dir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!(
+            "archoera-dl-test-{tag}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// 普通场景：tmp 原子 rename 到不存在的 dest。
+    #[tokio::test]
+    async fn finalize_renames_normal_file() {
+        let d = unique_dir("rename");
+        let tmp = d.join("a.tmp");
+        let dest = d.join("a.mp3");
+        std::fs::write(&tmp, b"hello").unwrap();
+        finalize_file(&tmp, &dest).await.unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), b"hello");
+        assert!(!tmp.exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// SEC-33：dest 为符号链接时必须拒绝，绝不跟随链接覆盖链接指向的文件。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn finalize_rejects_symlink_dest() {
+        let d = unique_dir("symlink");
+        let tmp = d.join("a.tmp");
+        let victim = d.join("victim.txt");
+        let dest = d.join("a.mp3");
+        std::fs::write(&tmp, b"new").unwrap();
+        std::fs::write(&victim, b"sacred").unwrap();
+        std::os::unix::fs::symlink(&victim, &dest).unwrap();
+
+        let err = finalize_file(&tmp, &dest).await.unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+        // 链接指向的文件未被改写，tmp 保留
+        assert_eq!(std::fs::read(&victim).unwrap(), b"sacred");
+        assert!(tmp.exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// SEC-33：dest 为目录时拒绝。
+    #[tokio::test]
+    async fn finalize_rejects_dir_dest() {
+        let d = unique_dir("dir");
+        let tmp = d.join("a.tmp");
+        let dest = d.join("subdir");
+        std::fs::write(&tmp, b"new").unwrap();
+        std::fs::create_dir(&dest).unwrap();
+        assert!(finalize_file(&tmp, &dest).await.is_err());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// SEC-33：预置的符号链接 .tmp 不得被跟随写入。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn open_tmp_file_rejects_symlink() {
+        let d = unique_dir("tmpsymlink");
+        let victim = d.join("victim.txt");
+        let tmp = d.join("a.tmp");
+        std::fs::write(&victim, b"sacred").unwrap();
+        std::os::unix::fs::symlink(&victim, &tmp).unwrap();
+
+        // 新建（非续传）：create_new 命中已存在链接 → 失败，且不跟随
+        assert!(super::open_tmp_file(&tmp, false).await.is_err());
+        // 续传：O_NOFOLLOW 命中链接 → 失败
+        assert!(super::open_tmp_file(&tmp, true).await.is_err());
+        assert_eq!(std::fs::read(&victim).unwrap(), b"sacred");
+        let _ = std::fs::remove_dir_all(&d);
     }
 }
