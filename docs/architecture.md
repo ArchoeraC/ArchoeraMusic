@@ -297,6 +297,18 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - **多账号**：自用单账号起步；多平台多账号切换在 Dart 本地层会话记录中预留（§8 的 `sessions`/`downloads` 表方案已废弃，勿按表实现）
 - KuGou / QQ 登录（Phase 2/3）：对齐 netease 模式，各自 modules 内封装
 
+### 7.5 Subsonic 认证与传输（SEC-32）
+
+- **认证模式**：客户端对自建 Subsonic 服务端**仅使用 token 认证**——每次请求带随机盐 `s`
+  与 `t = md5(密码 + 盐)`（`subsonic_client.dart :: _buildAuth`，12 字符 hex 随机盐），
+  **不发送明文密码**（服务端兼容 `p=` 明文与 `enc:hex:` 形态仅为协议兼容，本客户端不用）。
+- **传输**：外部服务器地址由 `useHttps` 决定 `https://` / `http://`（`subsonic_local.dart ::
+  resolvedServerBaseUrl`）；内嵌自建服务端固定走回环 `http://<host>:<port>`。
+  若用户为外部服务器填 `http://`，令牌 / 搜索词 / 播放内容在链路上可被同网段嗅探——
+  隐私政策（`privacy.md` §5.2）已披露，建议优先 `https://` 或仅在可信内网使用。
+- **不拒绝但警示**：为兼容常见的自建内网 `http://` 服务器，不强制拒绝明文 HTTP（否则大量
+  合法自托管场景不可用）；以文档 / 设置说明提示风险。
+
 ---
 
 ## 8. 数据存储
