@@ -1,8 +1,10 @@
 # 安全评审问题台账（2026-10-11）
 
 > 状态：**修复中**——第一批（文档澄清，SEC-04/07/14/15/17/18/19/20/28/29）已完成（ed17b5f1）；
-> 第二批（凭据统一，SEC-01/02/03）已完成（SEC-02/03：bb7d5787；SEC-01：0ee148f2）；
-> 第三批（防护加固）SEC-05/08/34 文档澄清（bb7d5787）、SEC-09 日志脱敏（be7847b4）、SEC-06 KDF 参数上限（840e6775）已完成。
+> 第二批（凭据统一，SEC-01/02/03）已完成（SEC-02/03：bb7d5787；SEC-01：0ee148f2，补强 eaf4d061）；
+> 第三批（防护加固）SEC-05/08/34 文档澄清（bb7d5787）、SEC-09 日志脱敏（be7847b4）、SEC-06 KDF 参数上限（840e6775）已完成；
+> 第四批（功能面加固，SEC-10/11/12/13/16/30/31/32/33）已完成（SEC-11/33：84ffd9ec；SEC-12：831a541b；
+> SEC-31：57ff8c8c；SEC-10/13/16/30/32 文档：a39ffd41）。
 > 修复后逐项把「状态」改为「已修复」并注明提交 / 版本
 > 范围：**文档层评审**——只读仓库文档与安全相关配置（CI 工作流 / 打包 / 工具脚本 / hooks），未做代码审计、未运行程序；
 > 重点为 **vault 文档未覆盖**的风险面，第二轮（2026-10-11）扩面到 **CI / 发布供应链** 与 **平台能力 / 子系统 / 文档一致性**。
@@ -42,13 +44,13 @@
 | SEC-07 | 中 | `ARCHOERA_VAULT_PARENT_OK` 由发起方注入 → 血缘 + 握手可自造绕过 | credential-vault-plan §3.8/§8.4 | ⚠️ 高估 | 已修复（文档·第一批，ed17b5f1） |
 | SEC-08 | 中 | FFI 库 / 二进制加载顺序劫持（按文件名 + 系统搜索路径） | ffi-libs-layout-plan（Dart 路径解析）；vault-security-notes §二进制替换防护 | ❌ 未提 | 已修复（文档·第三批，bb7d5787） |
 | SEC-09 | 中 | 全链路日志无脱敏，vault stderr 转发入明文日志 | unified-logging §2/§3；archive/robustness-improvement-plan §2 | ❌ 未提 | 已修复（第三批，be7847b4） |
-| SEC-10 | 中 | MCP 密钥明文落盘；局域网模式为明文 HTTP | mcp §1/§5 | ❌ 未提 | 待修复 |
-| SEC-11 | 中 | 下载 / 整理的文件路径由元数据派生，`subDir` 未清洗 `..` | download-module §3.3；local-library §刮削 | ❌ 未提 | 待修复 |
-| SEC-12 | 中 | 原生 HTTP 客户端重定向未限制降级 / 内网 / 非官方主机 | audio-kernel-zig（2026-10-01 / 2026-10-07 落地） | ❌ 未提 | 待修复 |
-| SEC-13 | 中 | 设备指纹与项目自身红线（CONTRIBUTING §2.5）冲突 + 隐私政策未披露 | CONTRIBUTING §2.5；device-bound-vault-plan §5.1；downloader-identity-plan §3.1；privacy §二 | ❌ 未提 | 待修复 |
+| SEC-10 | 中 | MCP 密钥明文落盘；局域网模式为明文 HTTP | mcp §1/§5 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
+| SEC-11 | 中 | 下载 / 整理的文件路径由元数据派生，`subDir` 未清洗 `..` | download-module §3.3；local-library §刮削 | ❌ 未提 | 已修复（第四批，84ffd9ec） |
+| SEC-12 | 中 | 原生 HTTP 客户端重定向未限制降级 / 内网 / 非官方主机 | audio-kernel-zig（2026-10-01 / 2026-10-07 落地） | ❌ 未提 | 已修复（第四批，831a541b） |
+| SEC-13 | 中 | 设备指纹与项目自身红线（CONTRIBUTING §2.5）冲突 + 隐私政策未披露 | CONTRIBUTING §2.5；device-bound-vault-plan §5.1；downloader-identity-plan §3.1；privacy §二 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
 | SEC-14 | 低 | vault 安全声明 env 清单不完整 | vault-security-notes §测试明文存储/§二进制替换防护 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-15 | 低 | OS 份额共享只写「应用副本覆盖」，未写「第三方应用可读」 | vault-security-notes §份额覆盖风险 | ❌ 未提 | 已修复（文档·第一批，ed17b5f1） |
-| SEC-16 | 低 | 迁移 / 模式切换跨存储的崩溃一致性未列风险 | device-bound-vault-plan §8；credential-vault-plan §3.4 | ❌ 未提 | 待修复 |
+| SEC-16 | 低 | 迁移 / 模式切换跨存储的崩溃一致性未列风险 | device-bound-vault-plan §8；credential-vault-plan §3.4 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
 | SEC-17 | 低 | architecture 内部残留（`sessions` 表已废弃 vs cookie 落点） | architecture §7.4/§8 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-18 | 低 | 归档评分件与现行口径不一致（明文密码 / 无哈希 / GetUsers） | archive/archoera-robustness-score §6 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-19 | 低 | 测试后门 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 无删除里程碑 | vault-security-notes §测试明文存储 | ⏳ 已声明计划 | 已修复（文档·第一批，ed17b5f1） |
@@ -62,10 +64,10 @@
 | SEC-27 | 中 | CI 测试面过窄（仅 widget/vault 冒烟，非全量） | actions/build-linux §Test | — | 待修复 |
 | SEC-28 | 中 | 过时设计稿主张运行期提权 + JVM 核心（违反红线） | CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-29 | 低 | 平台能力文档与现行架构/红线冲突（纯 Dart/插件通道 vs 原生桥接） | platform-capability-facade.md §4 vs §7.3 | — | 已修复（文档·第一批，ed17b5f1） |
-| SEC-30 | 低 | `SystemLocation` 敏感权限缺授权/可关闭语义 | platform-capability-facade.md §2.1/§3 | — | 待修复 |
-| SEC-31 | 中 | deep link 与 `apl_reveal_path` 外部输入校验未声明 | platform-native-bridge.md §3.1 | — | 待修复 |
-| SEC-32 | 中 | Subsonic 认证/传输模式未定义（token vs 明文密码、http vs https） | architecture §7；privacy §5.2 | — | 待修复 |
-| SEC-33 | 低 | 下载临时文件与已存在同名路径（符号链接）处理未定义 | download-module.md §3.3 | — | 待修复 |
+| SEC-30 | 低 | `SystemLocation` 敏感权限缺授权/可关闭语义 | platform-capability-facade.md §2.1/§3 | — | 已修复（文档·第四批，a39ffd41） |
+| SEC-31 | 中 | deep link 与 `apl_reveal_path` 外部输入校验未声明 | platform-native-bridge.md §3.1 | — | 已修复（第四批，57ff8c8c） |
+| SEC-32 | 中 | Subsonic 认证/传输模式未定义（token vs 明文密码、http vs https） | architecture §7；privacy §5.2 | — | 已修复（文档·第四批，a39ffd41） |
+| SEC-33 | 低 | 下载临时文件与已存在同名路径（符号链接）处理未定义 | download-module.md §3.3 | — | 已修复（第四批，84ffd9ec） |
 | SEC-34 | 低 | 多运行时同进程的信号处理器/全局符号冲突（DoS/稳定性） | module-on-demand-load-plan.md §2；audio-kernel-zig 2026-10-02 | — | 已修复（文档·第三批，bb7d5787） |
 
 ---
