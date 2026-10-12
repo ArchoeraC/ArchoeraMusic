@@ -1,7 +1,7 @@
 # 安全评审问题台账（2026-10-11）
 
 > 状态：**修复中**——第一批（文档澄清，SEC-04/07/14/15/17/18/19/20/28/29）已完成（ed17b5f1）；
-> 第二批（凭据统一，SEC-02/03）已完成（bb7d5787，SEC-01 实施中）；
+> 第二批（凭据统一，SEC-01/02/03）已完成（SEC-02/03：bb7d5787；SEC-01：0ee148f2）；
 > 第三批（防护加固）SEC-05/08/34 文档澄清（bb7d5787）、SEC-09 日志脱敏（be7847b4）、SEC-06 KDF 参数上限（840e6775）已完成。
 > 修复后逐项把「状态」改为「已修复」并注明提交 / 版本
 > 范围：**文档层评审**——只读仓库文档与安全相关配置（CI 工作流 / 打包 / 工具脚本 / hooks），未做代码审计、未运行程序；
@@ -33,9 +33,9 @@
 
 | ID | 严重度 | 主题 | 关键位置 | vault 文档覆盖 | 状态 |
 |---|---|---|---|---|---|
-| SEC-01 | 高 | 第二套密钥体系 `secret.key` + `user.db` `enc:v1:` 未纳入 vault | architecture §8；credential-vault-plan §3.1/§4 | ❌ 未提 | 待修复 |
-| SEC-02 | 高 | v4-file 单因子 + `ARCHOERA_VAULT_SECRET_KEY` 主密钥走 env | vault-scheme-comparison §1/§4；vault-security-notes | ❌ 未提 | 待修复 |
-| SEC-03 | 高 | 启动预取全量明文常驻 Dart 内存，与「用后即弃」矛盾 | credential-vault-plan §8.2 | ❌ 未提 | 待修复 |
+| SEC-01 | 高 | 第二套密钥体系 `secret.key` + `user.db` `enc:v1:` 未纳入 vault | architecture §8；credential-vault-plan §3.1/§4 | ❌ 未提 | 已修复（第二批，0ee148f2） |
+| SEC-02 | 高 | v4-file 单因子 + `ARCHOERA_VAULT_SECRET_KEY` 主密钥走 env | vault-scheme-comparison §1/§4；vault-security-notes | ❌ 未提 | 已修复（第二批，bb7d5787） |
+| SEC-03 | 高 | 启动预取全量明文常驻 Dart 内存，与「用后即弃」矛盾 | credential-vault-plan §8.2 | ❌ 未提 | 已修复（声明为已知接受项 + 缓解，bb7d5787） |
 | SEC-04 | 高 | PROD marker 被当作「二进制替换主防线」，实为可伪造字符串 | credential-vault-plan §3.8/§8.4；vault-security-notes §二进制替换防护 | ⚠️ 高估 | 已修复（文档·第一批，ed17b5f1） |
 | SEC-05 | 中 | `vault.lockout`/`vault.auth`/`vault.marker` 同用户可写 → 退避 / 锚点 / 崩溃标记可绕过 | credential-vault-plan §8.4；vault-security-notes §份额覆盖 | ❌ 未提 | 已修复（文档·第三批，bb7d5787） |
 | SEC-06 | 中 | Argon2id KDF 参数无加载上限 → 解锁前内存 / CPU DoS | credential-vault-plan §5/§8.6 | ❌ 未提 | 已修复（第三批，840e6775） |
