@@ -13,6 +13,9 @@ pub enum VaultError {
     /// AES-GCM 认证失败（口令/份额错误、文件篡改）。
     AuthTag(String),
     /// OS 安全存储不可用（Linux 无 D-Bus 等）——顶层单独 catch。
+    /// Windows 上 DPAPI/Keychain 路径不构造此变体（仅 Unix 的 libsecret 桩使用），
+    /// 故在该目标允许未构造，避免 dead_code 噪声。
+    #[cfg_attr(windows, allow(dead_code))]
     SecretStoreUnavailable(String),
     /// 设备因子缺失/损坏（环境/恢复场景，非爆破向量）。
     NeedRecovery(String),

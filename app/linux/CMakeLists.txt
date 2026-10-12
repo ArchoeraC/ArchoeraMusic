@@ -298,7 +298,8 @@ install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_transcoder.so"
 # vault（凭据保险库）：Linux 用 vault-rs 的 **Rust 静态单文件**（+crt-static，CI 走
 # musl 静态，见 core/vault-rs/build.sh）——无动态依赖，ld.so 不参与，免疫
 # LD_PRELOAD/LD_LIBRARY_PATH；Linux 上 crypto 走 file 后端、slots 自包含，不依赖
-# libsecret。随包分发供 Dart 按需 spawn。（macOS/Windows 仍用 C# NativeAOT vault。）
+# libsecret。随包分发供 Dart 按需 spawn。（macOS/Windows 亦为 vault-rs，DPAPI/Keychain；
+# 运行路径待真机/Wine 复验。）
 # 独立构建链产出，缺失时跳过（会话降级为内存持久化）。
 set(VAULT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/vault-rs/build")
 install(PROGRAMS "${VAULT_SRC_DIR}/archoera-vault"

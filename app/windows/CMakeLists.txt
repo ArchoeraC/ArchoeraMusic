@@ -144,9 +144,11 @@ install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_subsonic.dll"
 install(FILES "${SUBSONIC_SRC_DIR}/archoera_transcoder.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 
-# vault（凭据保险库）：NativeAOT 可执行（dotnet publish，见 core/vault/build.sh），
-# 随包分发供 Dart 按需 spawn（凭据加解密 2-of-2；OS 授权份额存 DPAPI）。
-set(VAULT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/vault/build")
+# vault（凭据保险库）：Rust 静态链接可执行（core/vault-rs，cargo build --release
+# --target x86_64-pc-windows-msvc -C target-feature=+crt-static；见 core/build_windows.bat），
+# 随包分发供 Dart 按需 spawn（凭据加解密；OS 授权份额存 DPAPI）。
+# Windows 已不再使用 C# NativeAOT vault（core/vault/**）。
+set(VAULT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/vault-rs/build")
 install(PROGRAMS "${VAULT_SRC_DIR}/archoera-vault.exe"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 

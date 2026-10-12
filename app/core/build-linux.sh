@@ -64,8 +64,8 @@ bash "$ROOT/scanner/build.sh" linux-x64
 # vault（凭据保险库）：Linux 用 vault-rs 的 **Rust 静态单文件**（+crt-static，CI 走
 # musl 静态）替代 C# NativeAOT——ld.so 不参与 → 免疫 LD_PRELOAD/LD_LIBRARY_PATH
 # （见 docs/vault-security-notes.md「Linux：静态 Rust 实现」）；Linux 上 crypto 走
-# file 后端、slots 自包含，不依赖 libsecret。macOS/Windows 仍用 C# NativeAOT vault
-# （见 build-macos.sh / build_windows.bat），待 Rust OS-keystore 端移植后再切换。
+# file 后端、slots 自包含，不依赖 libsecret。macOS/Windows 亦为 vault-rs（DPAPI/Keychain
+# + CIG/ACG，见 build-macos.sh / build_windows.bat），其运行路径待真机/Wine 复验。
 echo "[build-linux] ===== vault (Rust 静态链接, vault-rs) ====="
 bash "$ROOT/vault-rs/build.sh"
 

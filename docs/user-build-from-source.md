@@ -84,7 +84,9 @@ bash app/core/build-linux.sh
 3. **scraper（C++）**：同上 CMake 构建 `libarchoera_scraper.so`
 4. **scanner（C# NativeAOT）**：`bash app/core/scanner/build.sh linux-x64`（产出
    `scanner/build/scanner-ffi.so` + `libe_sqlite3.so`）
-5. **vault（C# NativeAOT）**：`bash app/core/vault/build.sh linux-x64`
+5. **vault（Rust 静态链接）**：`bash app/core/vault-rs/build.sh`（产出
+   `vault-rs/build/archoera-vault`；三端统一 Rust 实现，详见
+   [vault-security-notes.md](vault-security-notes.md)）
 6. **downloader（Rust）**：`cargo build --release`；**subsonic**：`bash app/core/subsonic/build.sh`
    （cargo transcoder + go c-shared + go standalone）
 
