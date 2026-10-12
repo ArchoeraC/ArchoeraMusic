@@ -20,8 +20,8 @@ public sealed class SecretStoreUnavailableException : Exception
 /// 实现：Windows DPAPI / macOS Keychain / Linux libsecret。
 public interface ISecretStore
 {
-    /// 存储后端指纹（写入 vault 文件头，解锁时校验——防不同构建形态
-    /// （PROD=OS 安全存储 / TEST=明文文件）混用同一数据目录造成份额与
+    /// 存储后端指纹（写入 vault 文件头，解锁时校验——防不同存储后端
+    /// （file / libsecret / dpapi / keychain）混用同一数据目录造成份额与
     /// 凭据库永久不配对，把 GCM mismatch 升级为明确错误码）。
     string Backend { get; }
 
@@ -30,32 +30,41 @@ public interface ISecretStore
     void Delete(string key);
 }
 
+/// 自包含模式（'S' slots）的无操作后端：密钥材料全部由口令派生并经槽位封装在
+/// vault 文件内（+ 尾部 HMAC），不依赖 OS 钥匙串——headless / 无 Secret Service
+/// 也能 status/serve。语义：
+///   - [Backend]="none"（无 OS 存储后端，[VaultService] 对 slots 模式默认选用）；
+///   - [Load] 恒 null → [VaultLockout] 回退明文 `vault.lockout`（与口令模式一致）；
+///   - [Store]/[Delete] no-op（[VaultService.Destroy] 的 DeleteShare 落在此）。
+public sealed class NullSecretStore : ISecretStore
+{
+    public string Backend => "none";
+
+    public byte[]? Load(string key) => null;
+
+    public void Store(string key, byte[] value) { }
+
+    public void Delete(string key) { }
+}
+
 /// 平台安全存储工厂。
 public static class SecretStoreFactory
 {
     public static ISecretStore Create(string dataDir)
     {
+        var backend = ReadVaultBackend(dataDir);
         // 文件密钥模式（LEGACY 兼容方案）：库为 file 后端时按 vault 文件头分发——
-        // serve/status 无需任何 env；头损坏回落默认分发（由后续指纹/解密暴露）。
-        if (IsFileModeVault(dataDir)) return new FileStore(dataDir);
-        // 初始化路径：vault 文件不存在时，显式 ARCHOERA_VAULT_BACKEND=file 选择
-        // 文件密钥模式（等价 init-file 命令，供主进程经 env 注入启动）；已有 vault
-        // 一律按文件头后端分发（env 不影响既有库，避免误伤其他后端）。
-        // 置于 VAULT_TESTING insecure 分支之前：显式 backend 选择始终优先。
+        // serve/status 无需任何 env；头损坏/无指纹回落默认分发（由后续指纹/解密暴露）。
+        if (backend == "file") return new FileStore(dataDir);
+        // 显式 ARCHOERA_VAULT_BACKEND=file：vault 不存在（初始化路径）或未记录后端
+        // （口令/多封装——份额由口令/熵现场派生、不入库，无后端配对风险）时选择
+        // 文件密钥模式（等价 init-file 命令，供主进程经 env 注入启动）。已记录其他
+        // 后端的 OS/crypto 库不覆盖——保留 v4 指纹不配对保护（防「误伤其他后端」）。
         if (Environment.GetEnvironmentVariable("ARCHOERA_VAULT_BACKEND") == "file"
-            && !File.Exists(Path.Combine(dataDir, VaultService.VaultFileName)))
+            && backend == null)
         {
             return new FileStore(dataDir);
         }
-#if VAULT_TESTING
-        // 测试/CI 专用明文存储（仅 VAULT_TESTING 构建编译，生产二进制不含此分支）：
-        // 须显式设置环境变量才启用（绝不静默降级），用于无 Secret Service 的
-        // headless 环境验证完整加解密/2-of-2/篡改链路。
-        if (Environment.GetEnvironmentVariable("ARCHOERA_VAULT_INSECURE_FILE_STORE") == "1")
-        {
-            return new InsecureFileStore(dataDir);
-        }
-#endif
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             return new DpapiStore(dataDir);
@@ -71,13 +80,14 @@ public static class SecretStoreFactory
         throw new SecretStoreUnavailableException("不支持的平台：无可用 OS 安全存储");
     }
 
-    /// 判断 vault 是否为文件密钥模式（读文件头 backend=file）。
-    private static bool IsFileModeVault(string dataDir)
+    /// 读 vault 文件头记录的后端指纹（无文件 / 头损坏 → null）。
+    /// OS/crypto 库记录 file/libsecret/dpapi/keychain；口令/多封装无此字段（null）。
+    private static string? ReadVaultBackend(string dataDir)
     {
         var vaultPath = Path.Combine(dataDir, VaultService.VaultFileName);
-        if (!File.Exists(vaultPath)) return false;
-        try { return VaultFile.ReadHeader(vaultPath).Backend == "file"; }
-        catch { return false; }
+        if (!File.Exists(vaultPath)) return null;
+        try { return VaultFile.ReadHeader(vaultPath).Backend; }
+        catch { return null; }
     }
 }
 
@@ -87,7 +97,7 @@ public static class SecretStoreFactory
 /// （实测复现：init-crypto 目录 A → init-crypto 目录 B → 目录 A 立即
 /// SHARE_MISMATCH，即用户反馈「每次重新编译后 vault 失效」的机制）。
 /// 新初始化一律写入 scoped 键（含 dataDir）；升级前旧库的 legacy 键在
-/// Load 时回退兼容。文件型后端（InsecureFileStore / DpapiStore）本就按
+/// Load 时回退兼容。文件型后端（FileStore / DpapiStore）本就按
 /// 目录落盘隔离，无需作用域。
 internal static class SecretKeyScope
 {
@@ -101,7 +111,7 @@ internal static class SecretKeyScope
 ///     [security-review SEC-02]）：env 经 `/proc/<pid>/environ` 同用户可读、易进日志/
 ///     崩溃转储/CI 记录。如需在初始化时指定 K，改经 **stdin**（`init-file --key-stdin`），
 ///     不使用 argv/env；容器部署请改为挂载 0600 的 `secret.key`。
-///   - 后端指纹 backend="file"：与其他后端（libsecret/dpapi/keychain/insecure…）
+///   - 后端指纹 backend="file"：与其他后端（libsecret/dpapi/keychain…）
 ///     互不配对——文件密钥库被 OS 存储后端访问 → SHARE_BACKEND_MISMATCH；
 ///   - 安全性：本地文件单点（弱于 OS 存储），无份额配对/无口令——选用即显式
 ///     接受「密钥文件泄露 = 凭据全泄露」。
@@ -119,7 +129,8 @@ public sealed class FileStore : ISecretStore
     {
         if (!File.Exists(KeyPath)) return null;
         var raw = File.ReadAllBytes(KeyPath);
-        return raw.Length == KeySplit.KeySize ? raw : null;
+        // 槽位值：legacy 32B 原始 K，或含退避状态的 ShareBundle（security-review SEC-05）
+        return raw.Length == KeySplit.KeySize || raw.Length >= ShareBundle.Size ? raw : null;
     }
 
     public void Store(string key, byte[] value)
@@ -140,43 +151,6 @@ public sealed class FileStore : ISecretStore
         if (File.Exists(KeyPath)) File.Delete(KeyPath);
     }
 }
-
-#if VAULT_TESTING
-/// 测试/CI 专用明文文件存储（无任何保护，S 明文落盘 ≠ 真实安全等级）。
-/// 仅编译进 VAULT_TESTING 构建（build-test.sh 产物 archoera-vault-test），
-/// 生产二进制（build.sh）不含此类——测试后门不进入发布产物。
-public sealed class InsecureFileStore : ISecretStore
-{
-    private readonly string _dir;
-
-    public InsecureFileStore(string dataDir) => _dir = dataDir;
-
-    /// 默认 `insecure`；测试可用 `ARCHOERA_VAULT_INSECURE_BACKEND` 覆盖后端名
-    /// （模拟「不同构建形态」混用同一数据目录，验证 v4 指纹 SHARE_BACKEND_MISMATCH）。
-    public string Backend =>
-        Environment.GetEnvironmentVariable("ARCHOERA_VAULT_INSECURE_BACKEND") ?? "insecure";
-
-    private string PathFor(string key) => Path.Combine(_dir, $"insecure_{key.Replace('/', '_')}.bin");
-
-    public byte[]? Load(string key)
-    {
-        var p = PathFor(key);
-        return File.Exists(p) ? File.ReadAllBytes(p) : null;
-    }
-
-    public void Store(string key, byte[] value)
-    {
-        Directory.CreateDirectory(_dir);
-        File.WriteAllBytes(PathFor(key), value);
-    }
-
-    public void Delete(string key)
-    {
-        var p = PathFor(key);
-        if (File.Exists(p)) File.Delete(p);
-    }
-}
-#endif
 
 /// Windows DPAPI（CryptProtectData）：密文落盘于 dataDir/sshare.bin，
 /// 密钥由系统账户/凭据绑定（Credential Guard / TPM 绑定可选加固）。
@@ -280,7 +254,8 @@ internal static class ProtectTransforms
         }
     }
 
-    [DllImport("crypt32.dll", SetLastError = true)]
+    // szDataDescr 原生签名为 LPCWSTR → CharSet.Unicode（当前恒传 null，仍保持正确）。
+    [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool CryptProtectData(ref DataBlob pDataIn, string? szDataDescr,
         IntPtr pOptionalEntropy, IntPtr pvReserved, IntPtr pPromptStruct, uint dwFlags, out DataBlob pDataOut);
 
@@ -306,11 +281,28 @@ public sealed class KeychainStore : ISecretStore
     /// 数据目录作用域化 account（防跨目录覆盖；见 [SecretKeyScope]）。
     private string Scoped(string key) => SecretKeyScope.Scoped(_dataDir, key);
 
+    /// CoreFoundation 类型字典回调。`kCFTypeDictionaryKeyCallBacks` /
+    /// `kCFTypeDictionaryValueCallBacks` 是**导出数据符号（非函数）**，解析一次
+    /// 并缓存至进程生命周期。用它们建字典后，字典按 CF 规则 CFRetain 键/值；
+    /// 若传 NULL（版本 0 字典）则不 retain 且键按**指针身份**比较——`SecItem*`
+    /// 查询永不命中，且随后 CFRelease 键/值会悬挂。
+    private static readonly Lazy<(IntPtr Key, IntPtr Value)> _dictCallbacks =
+        new(() =>
+        {
+            var cf = NativeLibrary.Load(
+                "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation");
+            return (NativeLibrary.GetExport(cf, "kCFTypeDictionaryKeyCallBacks"),
+                    NativeLibrary.GetExport(cf, "kCFTypeDictionaryValueCallBacks"));
+        });
+
+    /// 构造 CFString（UTF-8 入参：原生签名为 `const char*` + kCFStringEncodingUTF8，
+    /// 故用 LPUTF8Str 而非 CharSet.Unicode/UTF-16）。
     private static IntPtr _cfStr(string s) => CFStringCreateWithCString(IntPtr.Zero, s, 0x08000100 /* kCFStringEncodingUTF8 */);
 
     private static IntPtr NewDict()
     {
-        var dict = CFDictionaryCreateMutable(IntPtr.Zero, 8, IntPtr.Zero, IntPtr.Zero);
+        var cb = _dictCallbacks.Value;
+        var dict = CFDictionaryCreateMutable(IntPtr.Zero, 8, cb.Key, cb.Value);
         if (dict == IntPtr.Zero) throw new InvalidOperationException("CFDictionaryCreateMutable 失败");
         return dict;
     }
@@ -320,21 +312,19 @@ public sealed class KeychainStore : ISecretStore
         var k = _cfStr(key);
         var v = _cfStr(value);
         CFDictionarySetValue(dict, k, v);
-        CFRelease(k);
-        CFRelease(v);
+        // 字典已 CFRetain 键/值（kCFTypeDictionary*CallBacks）：不释放创建引用，
+        // 保持存活至调用方 finally 的 CFRelease(dict)。
     }
 
-    private static IntPtr SetData(IntPtr dict, string key, byte[] value)
+    private static void SetData(IntPtr dict, string key, byte[] value)
     {
         var k = _cfStr(key);
         var v = Marshal.AllocHGlobal(value.Length);
         Marshal.Copy(value, 0, v, value.Length);
         var data = CFDataCreate(IntPtr.Zero, v, value.Length);
         CFDictionarySetValue(dict, k, data);
-        CFRelease(k);
-        CFRelease(data);
-        Marshal.FreeHGlobal(v);
-        return data;
+        Marshal.FreeHGlobal(v); // CFDataCreate 已复制字节
+        // 同上：data 由字典持有（CFRetain），不释放创建引用。
     }
 
     public byte[]? Load(string key)
@@ -417,8 +407,12 @@ public sealed class KeychainStore : ISecretStore
         public readonly nint Length;
     }
 
-    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", CharSet = CharSet.Unicode)]
-    private static extern IntPtr CFStringCreateWithCString(IntPtr allocator, string str, int encoding);
+    // 原生签名：CFStringCreateWithCString(CFAllocatorRef, const char*, CFStringEncoding)。
+    // str 必须按 UTF-8（LPUTF8Str）编组；此前 CharSet.Unicode 会编成 UTF-16，
+    // 与 kCFStringEncodingUTF8 不符 → 钥匙串键/值错乱、查询永不命中。
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern IntPtr CFStringCreateWithCString(IntPtr allocator,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string str, int encoding);
 
     [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
     private static extern IntPtr CFDictionaryCreateMutable(IntPtr allocator, nint capacity, IntPtr keyCallBacks, IntPtr valueCallBacks);
@@ -499,7 +493,10 @@ public sealed class LibsecretStore : ISecretStore
         ctx.Schema = Marshal.AllocHGlobal(SchemaSize);
         Marshal.StructureToPtr(schema, ctx.Schema, false);
 
-        ctx.Hash = g_hash_table_new(IntPtr.Zero, IntPtr.Zero);
+        // g_hash_table_new(NULL, NULL) 会退化为**指针身份**哈希/相等：同一
+        // account 字符串的不同副本永不相等 → libsecret 查询/删除失效。改用
+        // GLib 的 g_str_hash / g_str_equal 函数指针（缓存委托，保持存活防回收）。
+        ctx.Hash = g_hash_table_new(_gStrHashPtr, _gStrEqualPtr);
         var hashKey = Marshal.StringToHGlobalAnsi("account");
         var hashVal = Marshal.StringToHGlobalAnsi(account);
         ctx.HGlobal!.Add(hashKey);
@@ -633,6 +630,29 @@ public sealed class LibsecretStore : ISecretStore
 
     [DllImport("libsecret-1.so.0")]
     private static extern int secret_password_clearv_sync(IntPtr schema, IntPtr attributes, IntPtr cancellable, out IntPtr error);
+
+    // GLib 字符串哈希/相等回调的函数指针（经缓存委托生成；委托字段须存活，
+    // 否则 GC 回收后 GLib 回调到已失效的 thunk）。
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate uint GStrHashFn(IntPtr key);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int GStrEqualFn(IntPtr a, IntPtr b);
+
+    private static readonly GStrHashFn _gStrHashDelegate = GStrHashCallback;
+    private static readonly GStrEqualFn _gStrEqualDelegate = GStrEqualCallback;
+    private static readonly IntPtr _gStrHashPtr = Marshal.GetFunctionPointerForDelegate(_gStrHashDelegate);
+    private static readonly IntPtr _gStrEqualPtr = Marshal.GetFunctionPointerForDelegate(_gStrEqualDelegate);
+
+    private static uint GStrHashCallback(IntPtr key) => g_str_hash(key);
+
+    private static int GStrEqualCallback(IntPtr a, IntPtr b) => g_str_equal(a, b);
+
+    [DllImport("libglib-2.0.so.0")]
+    private static extern uint g_str_hash(IntPtr key);
+
+    [DllImport("libglib-2.0.so.0")]
+    private static extern int g_str_equal(IntPtr a, IntPtr b);
 
     [DllImport("libglib-2.0.so.0")]
     private static extern IntPtr g_hash_table_new(IntPtr hashFunc, IntPtr keyEqualFunc);

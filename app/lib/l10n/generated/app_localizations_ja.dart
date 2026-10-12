@@ -5760,4 +5760,147 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get playlistRemoveFailed => '削除に失敗しました';
+
+  @override
+  String get settingsSchemeM1Title => 'M1 パスワード';
+
+  @override
+  String get settingsSchemeM1Badge => 'パスワード';
+
+  @override
+  String get settingsSchemeM1Desc =>
+      'パスワードのみのスロット：起動ごとに入力して解錠（Argon2id でラップ、OS キーチェーン不要）。';
+
+  @override
+  String get settingsSchemeM1ModeDesc =>
+      'M1：マスターキーはパスワード由来のキーで保管庫スロット表にラップされます。自己完結型で OS キーチェーン不要。パスワードを忘れないでください。';
+
+  @override
+  String get settingsSchemeM2aTitle => 'M2A パスワード + デバイス';
+
+  @override
+  String get settingsSchemeM2aBadge => '2 要素';
+
+  @override
+  String get settingsSchemeM2aDesc =>
+      'パスワード + ローカル device.key + 一度きりの復旧コード：最も強力。device.key を失った場合は復旧コードで解錠します。';
+
+  @override
+  String get settingsSchemeM2aModeDesc =>
+      'M2A：マスターキーはパスワードと本機のデバイスキーの両方でラップされ、復旧スロットも付属します。機種変更後は復旧コードで解錠します。';
+
+  @override
+  String get settingsSchemeM2bTitle => 'M2B デバイスのみ';
+
+  @override
+  String get settingsSchemeM2bBadge => 'パスワードレス';
+
+  @override
+  String get settingsSchemeM2bDesc =>
+      'ローカル device.key のみ：本機ではパスワードレス、パスワードも復旧コードもなし。device.key を失うと復旧できません。';
+
+  @override
+  String get settingsSchemeM2bModeDesc =>
+      'M2B：デバイスキーのみがマスターキーをラップします（本機はパスワードレス）。復旧スロットはなく、デバイスキー喪失後は復旧できません。';
+
+  @override
+  String get settingsSchemeSwitchEraseWarning =>
+      '続行すると現在の認証情報 vault を破棄します（バックアップ vault と device.key を含む）。保存済みのログイン認証情報とストリーミングのパスワードは消去され、再ログインが必要です。';
+
+  @override
+  String get settingsSchemeResetHint =>
+      '「サードパーティアカウントのセッション」を破棄すると、認証情報 vault、そのバックアップ（.bak）、本機の device.key も同時に削除されます。';
+
+  @override
+  String get settingsSchemeRecoveryDialogTitle => '復旧コードを保存してください';
+
+  @override
+  String get settingsSchemeRecoveryDialogDesc =>
+      '復旧コードが表示されるのは今回だけです。安全な場所に書き写すかコピーしてください。失うと機種変更後に認証情報を解錠できません（他に復旧手段はありません）。';
+
+  @override
+  String get settingsSchemeRecoveryDialogAck => '保存しました';
+
+  @override
+  String get settingsSchemeRecoveryCopy => '復旧コードをコピー';
+
+  @override
+  String get settingsSchemeRecoveryCopied => '復旧コードをコピーしました';
+
+  @override
+  String get settingsSchemeRecoveryReminder =>
+      '復旧コードのバックアップが未確認です。機種変更後に認証情報を解錠できなくなります。今すぐ書き写して保存してください。';
+
+  @override
+  String get settingsSchemeRecoveryReminderAck => '保存しました';
+
+  @override
+  String get settingsSchemePasswordTitle => '解錠パスワードを設定';
+
+  @override
+  String get settingsSchemePasswordDesc =>
+      'このパスワードは認証情報 vault の解錠に使われ、起動ごとに入力が必要です。忘れないでください。復旧はできません。';
+
+  @override
+  String get settingsSchemePasswordHint => 'パスワードを入力';
+
+  @override
+  String get settingsSchemePasswordConfirmHint => 'パスワードを再入力';
+
+  @override
+  String get settingsSchemePasswordMismatch => '入力が一致しません';
+
+  @override
+  String get vaultUnlockRecoveryTitle => '復旧コードで解錠';
+
+  @override
+  String get vaultUnlockRecoveryDesc =>
+      'デバイスキー（device.key）が無いか、別のマシンです。vault 作成時に保存した復旧コードを入力してください。';
+
+  @override
+  String get vaultUnlockRecoveryHint => '復旧コード';
+
+  @override
+  String get vaultUnlockRecoveryAction => '復旧コードを使う';
+
+  @override
+  String get vaultUnlockPasswordAction => 'パスワードを使う';
+
+  @override
+  String get vaultUnlockRecoveryFailed => '復旧コードが正しくありません。もう一度お試しください';
+
+  @override
+  String get vaultUnlockNeedRecovery => 'デバイスキーがありません。復旧コードで解錠してください';
+
+  @override
+  String get settingsKdfTitle => 'Argon2id 強度';
+
+  @override
+  String get settingsKdfSubtitle =>
+      '高いほど総当たり攻撃に強くなりますが、解錠が遅くなります（低 ≈200ms / 中 ≈400ms / 高 ≈1.5s）。パスワード方式（M1/M2A）のみ調整できます。';
+
+  @override
+  String get settingsKdfLow => '低';
+
+  @override
+  String get settingsKdfMedium => '中';
+
+  @override
+  String get settingsKdfHigh => '高';
+
+  @override
+  String get settingsKdfUnsupported => '現在の方式はパスワード KDF を使用しないため、強度を変更できません。';
+
+  @override
+  String get settingsKdfPasswordTitle => '現在のパスワードを確認';
+
+  @override
+  String get settingsKdfPasswordDesc =>
+      'Argon2id 強度の変更はパスワードスロットを再ラップします（マスターキーと保存済みの資格情報は変わりません）。現在の解錠パスワードを入力してください。';
+
+  @override
+  String get settingsKdfPasswordHint => '現在のパスワード';
+
+  @override
+  String get toastKdfRepacked => '再ラップ完了、データは失われません';
 }

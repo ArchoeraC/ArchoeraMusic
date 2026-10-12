@@ -64,7 +64,19 @@ pub fn mcp_port(prefs: &Value) -> u16 {
 }
 
 /// MCP 访问密钥（缺省空串）。
+///
+/// 优先级：
+///   1. 环境变量 `ARCHOERA_MCP_KEY`（GUI 自 SEC-10 起把密钥存入凭据保险库
+///      vault，CLI 无法读取——自动鉴权须经此变量或 `-k/--key` 显式提供）；
+///   2. 历史 `prefs.json` 的 `mcp.accessKey`（SEC-10 前的明文存储，保留向后
+///      兼容：旧版本升级后未迁移/未显式提供时仍可自动鉴权）。
 pub fn mcp_key(prefs: &Value) -> String {
+    if let Some(v) = std::env::var_os("ARCHOERA_MCP_KEY") {
+        let s = v.to_string_lossy().trim().to_string();
+        if !s.is_empty() {
+            return s;
+        }
+    }
     prefs
         .get("mcp.accessKey")
         .and_then(Value::as_str)
@@ -96,5 +108,26 @@ pub fn load_prefs() -> Prefs {
         port: mcp_port(&v),
         key: mcp_key(&v),
         locale: locale(&v),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// SEC-10：密钥优先取环境变量（GUI 已改为 vault 存储，CLI 须显式提供），
+    /// 其次回退历史明文 `mcp.accessKey`。
+    #[test]
+    fn mcp_key_prefers_env_then_legacy() {
+        let legacy = json!({ "mcp.accessKey": "legacy-key" });
+        std::env::set_var("ARCHOERA_MCP_KEY", "  env-key  ");
+        assert_eq!(mcp_key(&legacy), "env-key");
+        // 空/空白环境变量不生效，回退历史明文。
+        std::env::set_var("ARCHOERA_MCP_KEY", "   ");
+        assert_eq!(mcp_key(&legacy), "legacy-key");
+        // 无历史值则空串（由 GUI 按需重新生成）。
+        std::env::remove_var("ARCHOERA_MCP_KEY");
+        assert_eq!(mcp_key(&json!({})), "");
     }
 }

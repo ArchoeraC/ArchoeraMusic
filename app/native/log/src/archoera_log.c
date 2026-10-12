@@ -227,16 +227,23 @@ static size_t era_build_body(char *body, size_t cap, const char *tag,
 /* ── 敏感字段脱敏（SEC-09）──────────────────────────────────────── */
 /*
  * 就地把敏感参数的值替换为等长 '*'（不改长度、无动态分配、O(n)）。
- * 覆盖两类形态：
+ * 覆盖三类形态：
  *   - URL / 表单查询：`key=value`（value 止于 & 空白 引号 ) } ] , ; >）；
- *   - 头 / 字段：`key: value`（value 止于行尾）。
+ *   - 头 / 字段：`key: value`（value 止于行尾）；
+ *   - Subsonic 单字母查询键 p/t/s：仅当处于查询上下文（紧跟 `?`/`&` 且后接
+ *     `=`）时掩码，避免误伤普通文本里的 `top=2`/`step=1`/`t=1`。
  * key 匹配大小写不敏感、要求左边界（前一字符非 [A-Za-z0-9_-]）。
- * 已知局限：单字母短键（如 Subsonic 的 p/t/s）与未知命名不掩码——
- * 属已知接受项，见 docs/security-review-2026-10-11.md SEC-09。
+ * 未知命名不掩码，属已知接受项，见安全评审 SEC-09。
  */
 static int era_is_key_char(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
            (c >= '0' && c <= '9') || c == '_' || c == '-';
+}
+
+/* Subsonic / 通用短键 p(P)/t(T)/s(S)：仅在查询上下文（?/& 前缀且后接 =）掩码。 */
+static int era_is_short_query_key(char c) {
+    return c == 'p' || c == 'P' || c == 't' || c == 'T' || c == 's' ||
+           c == 'S';
 }
 
 static int era_eq_ci(const char *a, const char *b, size_t n) {
@@ -257,7 +264,11 @@ static const char *const era_sensitive_keys[] = {
     "signature",    "sig",          "api_key",       "apikey",
     "api-key",      "access_key",   "authorization", "auth",
     "session",      "sessionid",    "session_id",    "jsessionid",
-    "csrf",         "xsrf",         NULL};
+    "csrf",         "xsrf",
+    /* SEC-10：MCP 访问密钥请求头。`-` 属 key 字符，整个 token 为
+       `x-archoera-key`，故须按整串登记（登记 `archoera-key` 不命中）。 */
+    "x-archoera-key",
+    NULL};
 
 static int era_is_sensitive_key(const char *s, size_t n) {
     int i;
@@ -310,6 +321,12 @@ void archoera_log_scrub(char *s) {
         {
             char *sep = q;
             while (*sep == ' ' || *sep == '\t') sep++;
+            /* 单字母查询键 p/t/s：仅限查询上下文，避免误伤普通文本。 */
+            if ((size_t)(q - p) == 1 && era_is_short_query_key(p[0]) &&
+                p != s && (p[-1] == '?' || p[-1] == '&') && *sep == '=') {
+                p = era_mask_value(sep + 1, 0);
+                continue;
+            }
             if (era_is_sensitive_key(p, (size_t)(q - p))) {
                 if (*sep == '=') {
                     p = era_mask_value(sep + 1, 0);

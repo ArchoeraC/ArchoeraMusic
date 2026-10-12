@@ -213,6 +213,29 @@ int main(void) {
         CHECK(strstr(e, "keepme") != NULL,
               "left-boundary respected (mytoken untouched)");
 
+        /* 单字母查询键 p/t/s：仅查询上下文掩码。 */
+        char q1[] = "GET /rest/stream?u=alice&t=deadbeef&s=cafe&v=1.16.1";
+        archoera_log_scrub(q1);
+        CHECK(strstr(q1, "deadbeef") == NULL, "short t= value masked in query");
+        CHECK(strstr(q1, "cafe") == NULL, "short s= value masked in query");
+        CHECK(strstr(q1, "u=alice") != NULL, "u=alice preserved");
+        CHECK(strstr(q1, "v=1.16.1") != NULL, "v=1.16.1 preserved");
+
+        char q2[] = "?p=hunter2";
+        archoera_log_scrub(q2);
+        CHECK(strstr(q2, "hunter2") == NULL, "short p= value masked in query");
+
+        char q3[] = "step=1 top=2 map=3 t=4";
+        archoera_log_scrub(q3);
+        CHECK(strcmp(q3, "step=1 top=2 map=3 t=4") == 0,
+              "short keys in prose untouched (no ?/& prefix)");
+
+        /* SEC-10：MCP 访问密钥请求头（`-` 属 key 字符，整串需登记）。 */
+        char h1[] = "X-Archoera-Key: MCPSEKRIT";
+        archoera_log_scrub(h1);
+        CHECK(strstr(h1, "MCPSEKRIT") == NULL, "x-archoera-key masked to EOL");
+        CHECK(strncmp(h1, "X-Archoera-Key: ", 16) == 0, "header name preserved");
+
         /* write 落盘路径同样脱敏（含原生组件注入的 sink 文本）。 */
         archoera_log_init(dir, "scrublog", ERA_LOG_INFO, ERA_LOG_COLOR_OFF);
         archoera_log_write(ERA_LOG_INFO, "net", "GET /s?token=ABCDEF&x=1");

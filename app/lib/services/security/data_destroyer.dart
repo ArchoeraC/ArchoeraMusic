@@ -64,6 +64,10 @@ String sessionStorePath() => '${resolveDataDir()}/netease_session.json';
 /// 凭据保险库文件（AES-256-GCM 密文 + K_vault 份额；主密钥 2-of-2 拆分，
 /// 授权侧份额存 OS 安全存储）。销毁会话须连 [VaultProcess.destroy] 一并
 /// 清除 OS 份额，仅删文件不足以失效。
+///
+/// SEC-10：MCP 访问密钥（uid `mcp:accessKey`）亦存于 vault，随本项销毁；
+/// 旧版明文 `prefs.json` 键由 McpKeyStore.clearLegacy 移除（不整文件擦除，
+/// 避免连其它偏好一并销毁）。
 String vaultFilePath() => '${resolveDataDir()}/credentials.vault';
 
 /// 本地 Subsonic 用户库（与 Go 侧 DefaultUserDBPath 同目录推导）。
