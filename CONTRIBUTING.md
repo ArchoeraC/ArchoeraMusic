@@ -446,6 +446,7 @@ PR 描述需包含：
     绝不允许出现在生产构建路径或发布产物；
   - PROD marker 双重校验（`--version` + 握手 marker）逻辑不得削弱，改动需同步
     `docs/vault-security-notes.md` 与 `docs/credential-vault-plan.md`；
+    **注意其定位是「防误用测试构建」而非二进制完整性防护**（marker 为可自报字符串，可被自编译后门伪造，见 `docs/vault-security-notes.md` §构建标记校验）；
   - 新增 env 开关遵循同一信任边界思路：显式 env 只服务测试/CI，生产路径不得设置。
 - **凭据落盘**一律走 vault（2-of-2）或 `enc:v1:` 字段级加密，禁止明文写配置 / 数据库 / 日志。
 - 涉及网络请求的改动注意：桌面端零 TCP 端口（戒律 1），不出网请求只允许既有平台 API / 刮削源 /

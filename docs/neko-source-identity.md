@@ -38,6 +38,12 @@ X-Neko-Client: archoera+<版本>          # 始终表达真实来源
 Android 平台标识、不补浏览器特征头、不参与反爬对抗。服务端一旦落地「自报标识
 `X-Neko-Client` 作为正向证据」的放行逻辑，该头即自动生效，无需针对任何品牌做内置白名单。
 
+> **已知合规边界（SEC-20）**：即便不冒名品牌，复用官方客户端 UA **形状**通过服务端 `isNativeClient`
+> 锚定，仍与 [software-declaration.md](software-declaration.md) §五「勿绕过访问控制」的通用声明存在张力
+> ——本方案**不宣称**该形状是服务端认可的自报身份；长期方向是服务端以 `X-Neko-Client` 作正向放行证据
+> （`network.allow_client_user_agents` 亦为服务端登记的第三客户端路径）。详见
+> [security-review-2026-10-11.md](security-review-2026-10-11.md) SEC-20。
+
 ### 站点图片（封面 / 头像）
 
 图片经全局 `HttpClient`（浏览器 UA）发起，`Image.network` 以 `add` 语义追加

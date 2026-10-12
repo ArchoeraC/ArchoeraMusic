@@ -293,8 +293,8 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - **会话持久化**：各平台登录成功后 cookie 由 Dart 本地层 + vault 持久化，重启不丢
 - **二维码登录流程**（netease）：`login_qr_create` → `login_qr_key` → `login_qr_check` 轮询（Flutter 展示二维码 + 定时探测）→ 成功后 `login_status` 确认 + 会话回写
 - **登录态检测**：启动/打开播放前调 `login_status`（netease）；失效 → 播放返回 403/401 → `player:sourceError` → UI 提示重新登录
-- **登出**：`logout` 清平台 cookie + `sessions` 表
-- **多账号**：自用单账号起步，`sessions` 表结构预留多平台多账号切换
+- **登出**：`logout` 清平台 cookie（Dart 本地层会话记录 + vault 内密文），**不涉及 `sessions` 表**（已废弃，见 §8）
+- **多账号**：自用单账号起步；多平台多账号切换在 Dart 本地层会话记录中预留（§8 的 `sessions`/`downloads` 表方案已废弃，勿按表实现）
 - KuGou / QQ 登录（Phase 2/3）：对齐 netease 模式，各自 modules 内封装
 
 ---

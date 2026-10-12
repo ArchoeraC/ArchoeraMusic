@@ -1,5 +1,13 @@
 # 跨平台通用内存管理与剪裁能力 —— 架构改进建议
 
+> ⚠️ **SUPERSEDED（已被取代，勿据此实施）**——本文为早期设计稿，其 **§3/§4/§5 主张的运行期提权
+> （UAC / `osascript` / `AuthorizationServices` / `sudo` / `pkexec`）与 `drop_caches`（需 root）
+> 直接违反** [AGENTS.md](../AGENTS.md)「运行期一律不得请求提权…需要提权才能实现的能力**放弃或降级**」
+> 与 [CONTRIBUTING.md](../CONTRIBUTING.md) §2.2「禁止非 FFI 大运行时（Node/Python/**JVM**）」红线；
+> 文中建议用 **Kotlin Multiplatform（JVM）** 承载核心逻辑亦被禁止。
+> **现行口径以 [MEMORY_AND_TRIMMING_DEEP_DIVE.md](MEMORY_AND_TRIMMING_DEEP_DIVE.md) 为准**（已明确「本项目无提权面…不引入系统级 purge / 提权」）。
+> 本文仅保留「能力分层 / 原生原语按平台各写」等**抽象视角**供参考（见 [security-review SEC-28](security-review-2026-10-11.md)）。
+
 > 目标：借鉴 Mineradio 的「进程工作集压缩 + 系统级内存 purge + 磁盘缓存 LRU + GPU 显存预算淘汰」
 > 四层能力，把它们从 **Windows / JS / PowerShell 强绑定** 泛化为 **跨平台通用、多语言（可含 Kotlin）可移植**
 > 的能力层。本文是**设计文档**，不包含具体改造代码。
