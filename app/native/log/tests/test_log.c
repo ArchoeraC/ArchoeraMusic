@@ -187,6 +187,43 @@ int main(void) {
         free(text);
     }
 
+    /* 5) 敏感字段脱敏（SEC-09）。 */
+    {
+        char a[] = "GET /x?access_token=SECRET123&foo=bar";
+        archoera_log_scrub(a);
+        CHECK(strstr(a, "SECRET123") == NULL, "access_token masked");
+        CHECK(strstr(a, "foo=bar") != NULL, "non-sensitive preserved");
+
+        char b[] = "Cookie: session=deadbeef; other=1";
+        archoera_log_scrub(b);
+        CHECK(strstr(b, "deadbeef") == NULL, "cookie value masked");
+        CHECK(strncmp(b, "Cookie: ", 8) == 0, "key name preserved");
+
+        char c[] = "Authorization: Bearer TOPSEKRIT";
+        archoera_log_scrub(c);
+        CHECK(strstr(c, "TOPSEKRIT") == NULL, "authorization masked to EOL");
+        CHECK(strstr(c, "Bearer") == NULL, "header value fully masked");
+
+        char d[] = "password=hunter2";
+        archoera_log_scrub(d);
+        CHECK(strstr(d, "hunter2") == NULL, "password masked");
+
+        char e[] = "mytoken=keepme";
+        archoera_log_scrub(e);
+        CHECK(strstr(e, "keepme") != NULL,
+              "left-boundary respected (mytoken untouched)");
+
+        /* write 落盘路径同样脱敏（含原生组件注入的 sink 文本）。 */
+        archoera_log_init(dir, "scrublog", ERA_LOG_INFO, ERA_LOG_COLOR_OFF);
+        archoera_log_write(ERA_LOG_INFO, "net", "GET /s?token=ABCDEF&x=1");
+        archoera_log_shutdown();
+        join(path, sizeof(path), dir, "scrublog.log");
+        text = read_file(path);
+        CHECK(text != NULL && strstr(text, "ABCDEF") == NULL,
+              "write path masks token");
+        if (text != NULL) free(text);
+    }
+
     if (g_fail == 0) fprintf(stderr, "test_log: ALL PASS\n");
     else fprintf(stderr, "test_log: %d FAILED\n", g_fail);
     return g_fail == 0 ? 0 : 1;

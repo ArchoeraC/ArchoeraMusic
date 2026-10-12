@@ -103,6 +103,14 @@ ARCHOERA_LOG_API int archoera_log_set_color(int color_mode);
 ARCHOERA_LOG_API int archoera_log_level(void);
 
 /*
+ * 就地把一行文本中的敏感字段值替换为等长 '*'（SEC-09）。
+ * 覆盖 `key=value`（token/cookie/password/... 见实现）与 `key: value` 两种形态；
+ * 大小写不敏感。write 内部已自动对每条日志调用本函数；导出此符号供单测与
+ * 需要自行预处理的宿主使用。局限（单字母短键不掩码）见安全评审 SEC-09。
+ */
+ARCHOERA_LOG_API void archoera_log_scrub(char *text);
+
+/*
  * sink 函数指针类型：各原生模块通过 `<module>_set_log_sink` 接收宿主注入的
  * 本库 archoera_log_write 指针。message 为已格式化正文（无需再拼接级别/时间）。
  * 回调可在任意线程调用；宿主保证其线程安全。
