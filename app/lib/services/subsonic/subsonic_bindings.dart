@@ -68,6 +68,10 @@ typedef SubsonicShredFilesDart =
       Pointer<Uint8> buf,
       int bufLen,
     );
+typedef SubsonicSetCredentialsNative =
+    Int32 Function(IntPtr handle, Pointer<Utf8> json);
+typedef SubsonicSetCredentialsDart =
+    int Function(int handle, Pointer<Utf8> json);
 typedef SubsonicSetLogSinkNative =
     Void Function(Pointer<NativeFunction<LogWriteNative>> fn, Int32 minLevel);
 typedef SubsonicSetLogSinkDart = void Function(
@@ -103,6 +107,10 @@ class SubsonicBindings {
   late final SubsonicShredFilesDart shredFiles = _lib
       .lookupFunction<SubsonicShredFilesNative, SubsonicShredFilesDart>(
         'archoera_subsonic_shred_files',
+      );
+  late final SubsonicSetCredentialsDart setCredentials = _lib
+      .lookupFunction<SubsonicSetCredentialsNative, SubsonicSetCredentialsDart>(
+        'archoera_subsonic_set_credentials',
       );
 
   static SubsonicBindings get instance =>

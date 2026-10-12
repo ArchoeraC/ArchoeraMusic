@@ -9,10 +9,13 @@
 //      系统分配端口，实际地址经 started 事件回传；密钥自动生成到 dataDir/secret.key）
 //   3. SubsonicLocalServer.register 注册协商信息；客户端开启 isArchoeraServer
 //      仅填主机，端口自动协商（仅换端口、保留主机，覆盖 IPv6/域名）
-//   4. SubsonicAdmin 创建用户（encrypt 密码）
-//   5. SubsonicClient 闭环：ping / listAlbums / getAlbumSongs /
-//      stream 转码（dlopen Rust）/ getLyrics（只读曲库内嵌歌词）
+//   4. SubsonicAdmin 创建用户（密码写入可注入凭据存储；user.db password_cipher 置空串）
+//   5. pushCredentialsToServer 注入 Go 认证表 → SubsonicClient 闭环：
+//      ping / listAlbums / getAlbumSongs / stream 转码（dlopen Rust）/ getLyrics
 //   6. destroy
+//
+// 说明：本冒烟以注入的内存凭据存储（[InMemorySubsonicCredentialStore]）走通逻辑，
+// 不依赖真实 vault 二进制；真实 vault 路径（uid=`subsonic:<username>`）由集成测试覆盖。
 // 用法：dart run tool/subsonic_smoke.dart
 // ignore_for_file: avoid_print
 import 'dart:convert';
@@ -126,16 +129,52 @@ void main() async {
   //     复制到 user.db 并删除媒体库旧表（幂等）
   _checkMigration(dbPath, userDbPath);
 
-  // 4) Admin：创建用户（密码走 FFI encrypt 落盘）——打开独立用户库 user.db
-  final admin = SubsonicAdmin.open(controller, userDbPath);
+  // 4) Admin：创建用户（密码写入凭据存储；user.db password_cipher 置空串）。
+  //    注入内存存储走通逻辑（真实 vault 路径由集成测试覆盖）。
+  final credentialStore = InMemorySubsonicCredentialStore();
+  final admin = await SubsonicAdmin.open(
+    controller,
+    userDbPath,
+    dataDir: dataDir,
+    store: credentialStore,
+  );
   try {
-    admin.createUser(username: 'testuser', password: 'pass1234', isAdmin: true);
+    await admin.createUser(
+        username: 'testuser', password: 'pass1234', isAdmin: true);
     final u = admin.getUserByUsername('testuser');
     if (u == null || u.password != 'pass1234') {
-      print('FAIL: 用户密码加解密闭环失败: $u');
+      print('FAIL: 用户密码（内存缓存）闭环失败: $u');
       exit(1);
     }
-    print('OK: 用户创建 + 密码加解密闭环 (${u.id})');
+
+    // 4a) 凭据已迁出 user.db：password_cipher 必须为空串
+    final checkDb = sql.sqlite3.open(userDbPath);
+    try {
+      final row = checkDb.select(
+          "SELECT password_cipher FROM subsonic_users WHERE username = 'testuser'");
+      if (row.isEmpty || (row.first['password_cipher'] as String).isNotEmpty) {
+        print('FAIL: user.db password_cipher 应为空串（凭据已入 vault），'
+            '实际 ${row.isEmpty ? "<缺行>" : row.first['password_cipher']}');
+        exit(1);
+      }
+    } finally {
+      checkDb.close();
+    }
+
+    // 4b) 密码确实能从凭据存储读回
+    final readBack = await credentialStore.read('testuser');
+    if (readBack != 'pass1234') {
+      print('FAIL: 凭据存储读回失败: $readBack');
+      exit(1);
+    }
+    print('OK: 用户创建 → vault; user.db password_cipher 为空串; 读回成功 (${u.id})');
+
+    // 4c) 注入 Go 服务端认证表（否则 DB 空密码无法认证）
+    if (!admin.pushCredentialsToServer()) {
+      print('FAIL: 凭据注入服务端失败 (archoera_subsonic_set_credentials)');
+      exit(1);
+    }
+    print('OK: 凭据注入服务端认证表');
   } finally {
     admin.close();
   }

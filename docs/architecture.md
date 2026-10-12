@@ -306,15 +306,19 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 | 数据 | 存储 | 归属 / 访问方 |
 |---|---|---|
 | 曲库 tracks（元数据 / 路径 / 时长 / 歌词 / 封面）| SQLite `database/library.db`（WAL）| C# scanner 直写；Go subsonic FFI 直读；Dart（TracksDb）只读 |
-| Subsonic 用户 / 收藏 / 播放列表 / 分享 | SQLite `database/user.db`（WAL，独立加密库）| Go subsonic FFI 与 Dart（SubsonicAdmin）直读直写；敏感字段（密码）以 `enc:v1:` AES-256-GCM 字段级加密落盘 |
+| Subsonic 用户 / 收藏 / 播放列表 / 分享 | SQLite `database/user.db`（WAL，独立库）| Go subsonic FFI 与 Dart（SubsonicAdmin）直读直写；**用户密码已移入凭据保险库**（`uid=subsonic:<username>`，SEC-01），`password_cipher` 列仅存空串占位（旧库 `enc:v1:` 密文在首次打开时解密迁入 vault 后置空，随后仅作迁移回退） |
 | 平台会话 cookie / 下载任务 | Dart 本地层（drift/Hive + vault） | 登录态与下载任务本地持久化（原侧车 `sessions`/`downloads` 表方案已废弃） |
 | 配置 | `config/settings.json`（原子写 + 迁移）| Dart |
 | 队列 / 播放历史 / UI 偏好 | Dart 本地（drift 或 Hive）| Flutter |
 | 日志 | `logs/archoera.log`（单文件，硬上限 4 MiB，超限原地截断）| 全层统一（Dart/桥接/引擎/Rust/Zig）经 `app/native/log` 核心写穿；可在设置页关闭落盘；格式与分级见 `docs/unified-logging.md` |
 
-**拆分原则**：媒体库（高频读写、多进程共享、无敏感数据）与用户数据（低频、含凭据、需加密）物理隔离——
-- 用户库路径 `dataDir/database/user.db`，与媒体库同目录独立文件，密钥自举到 `dataDir/secret.key`；
+**拆分原则**：媒体库（高频读写、多进程共享、无敏感数据）与用户数据（低频、含用户与其社交数据）物理隔离——
+- 用户库路径 `dataDir/database/user.db`，与媒体库同目录独立文件。**Subsonic 用户密码不再由 `dataDir/secret.key`
+  字段级加密承载**（SEC-01）：密码经 vault 统一持久化（`uid=subsonic:<username>`，Dart `VaultSubsonicCredentialStore`），
+  服务端认证经 `archoera_subsonic_set_credentials` 注入内存凭据表；`password_cipher` 仅为空串占位。
+  `secret.key` 仍**保留**——vault 的 file 模式（v4-file）以同一文件名存放主密钥，二者不再交叉；
 - 旧版（library.db 内嵌 subsonic_* 表）数据在服务端启动时经 `MigrateUserDB` 自动迁移到 user.db 并删除媒体库旧表（幂等，密文原样搬运不重加密）；
+  更旧的 `enc:v1:` 用户密码在 `SubsonicAdmin.open` 时解密迁入 vault（成功才置空 `password_cipher`，失败保留待重试）；
 - scanner 直写媒体库、subsonic 服务端直读直写媒体库与用户库、前端读媒体库的四方访问模型保持不变。
 
 ---
