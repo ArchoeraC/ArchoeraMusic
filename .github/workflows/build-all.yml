@@ -198,7 +198,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       # ───────────────────────── macOS（Homebrew 依赖）────────────────
       - name: Install Homebrew deps
@@ -226,7 +226,7 @@ jobs:
       - name: Cache vcpkg installed (恢复；ffmpeg/taglib 等预编译跨 run 秒级恢复)
         if: matrix.os == 'windows'
         id: vcpkg-cache
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           # 同时缓存 vcpkg 二进制缓存（archives）：只缓存 vcpkg_installed 时
           # vcpkg install 仍会因 ABI/完整性校验重编 ffmpeg（~13 分钟）；缓存
@@ -272,7 +272,7 @@ jobs:
       # vcpkg install 成功后立即落缓存，此后任意步骤失败均不影响复用
       - name: Cache vcpkg installed (保存，供下次 run 秒级恢复)
         if: matrix.os == 'windows' && steps.vcpkg-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             app/vcpkg_installed
@@ -283,20 +283,22 @@ jobs:
       # CMake 用 runner 自带版本（ubuntu-24.04 = 3.28.3，满足 FindSQLite3 3.14+）；
       # 不引入 actions-setup-cmake：其版本解析走 GitHub releases 分页，
       # 旧版本号（如 v3.28.7）超出分页范围会报 Unable to find version
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
       - name: Add macOS Rust targets (universal archoerashell staticlib)
         if: matrix.os == 'macos'
         # Release 下 Xcode 按 ARCHS（arm64 x86_64）构建通用二进制，静态库需双架构
         # slice；脚本阶段亦会幂等 rustup target add 兜底（本地开发用）。
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: '1.26'
           cache-dependency-path: app/core/subsonic/go.sum
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: '10.0.x'
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           cache: true
@@ -340,7 +342,7 @@ jobs:
       - name: Cache minimal FFmpeg (macOS)
         if: matrix.os == 'macos'
         id: ffmpeg-cache-macos
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: ~/.local/ffmpeg-minimal
           # tls 段：自包含 mbedTLS 引入后旧缓存（无 .mbedtls-tls 标记）必须失效重建。
@@ -393,7 +395,7 @@ jobs:
 
       - name: Upload Windows build logs (排查用)
         if: matrix.os == 'windows' && always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: windows-build-logs
           path: |
@@ -522,7 +524,7 @@ jobs:
 
       - name: Upload artifact (macOS .app)
         if: matrix.os == 'macos'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-macos-arm64
           path: app/build/macos/Build/Products/Release/archoera_music.app
@@ -530,7 +532,7 @@ jobs:
 
       - name: Upload artifact (Windows runner Release)
         if: matrix.os == 'windows'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-windows-x64
           path: app/build/windows/x64/runner/Release
@@ -538,7 +540,7 @@ jobs:
 
       - name: Upload artifact (Windows installer + portable)
         if: matrix.os == 'windows'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-windows-extra
           path: build/windows-extra/*
@@ -571,7 +573,7 @@ jobs:
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libdbus-1-dev libx11-dev libxi-dev libopus-dev \
             patchelf nasm
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: ./.github/actions/build-linux
         with:
           cache_key_suffix: ubuntu2404
@@ -590,13 +592,13 @@ jobs:
         env:
           DISTRO_TAG: ubuntu24.04
       - name: Upload bundle artifact (原始 bundle)
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-linux-x64
           path: app/build/linux/x64/release/bundle
           if-no-files-found: error
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-linux-deb
           path: dist/linux/*
@@ -631,7 +633,7 @@ jobs:
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libopus-dev \
             libdbus-1-dev libx11-dev libxi-dev \
             patchelf nasm git curl wget xz-utils unzip zip jq file
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
       - uses: ./.github/actions/build-linux
@@ -649,7 +651,7 @@ jobs:
           DISTRO_TAG: deepin25
           DISTRO_NOTE: 仅 Deepin 25（glibc 2.38）；其它发行版请安装对应包
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-linux-deepin
           path: dist/linux/*
@@ -676,7 +678,7 @@ jobs:
             opus-devel libX11-devel libXi-devel \
             rpm-build zstd libarchive
           # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
       - uses: ./.github/actions/build-linux
@@ -693,7 +695,7 @@ jobs:
         env:
           DISTRO_TAG: fedora
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-linux-rpm
           path: dist/linux/*
@@ -720,7 +722,7 @@ jobs:
             taglib curl openssl sqlite nlohmann-json opus \
             gtk3 dbus libx11 libxi
           # 不装系统 ffmpeg：引擎改用自建最小 FFmpeg（见 build-linux action）
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
       - uses: ./.github/actions/build-linux
@@ -747,7 +749,7 @@ jobs:
             "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-arch-x86_64.pkg.tar.zst"
           echo "→ dist/linux/"*.pkg.tar.zst
       - name: Upload packages artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-linux-arch
           path: dist/linux/*
@@ -762,7 +764,7 @@ jobs:
     if: needs.preflight.outputs.linux_appimage == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
@@ -770,7 +772,7 @@ jobs:
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
       - name: Download bundle artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: ArchoeraMusic-linux-x64
           path: bundle
@@ -807,7 +809,7 @@ jobs:
           LINUXDEPLOY: /tmp/linuxdeploy.AppImage
           APPIMAGE_EXTRACT_AND_RUN: '1'
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-linux-appimage
           path: dist/linux/*.AppImage
@@ -820,7 +822,7 @@ jobs:
     if: needs.preflight.outputs.linux_flatpak == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
@@ -828,7 +830,7 @@ jobs:
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
       - name: Download bundle artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: ArchoeraMusic-linux-x64
           path: bundle
@@ -847,7 +849,7 @@ jobs:
         env:
           DISTRO_TAG: flatpak
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-linux-flatpak
           path: dist/linux/*.flatpak
@@ -863,8 +865,8 @@ jobs:
     if: needs.preflight.outputs.linux_nix == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
         with:
           extra-conf: |
             sandbox = false
@@ -883,7 +885,7 @@ jobs:
           tar -czf "dist/linux/ArchoeraMusic-v${{ steps.version.outputs.version }}-nixos-x86_64.tar.gz" -C result .
           ls -la dist/linux/*nixos*.tar.gz
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-linux-nix
           path: dist/linux/*nixos*.tar.gz
@@ -913,12 +915,38 @@ jobs:
     permissions:
       contents: write
       actions: read
+      # SEC-25：供 attest-build-provenance 的 OIDC 令牌与 attestation 写入
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout (签名工具 + 公钥)
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # SEC-23：拒绝「tag 指向未评审提交」。发版 tag 必须指向受保护长分支
+      # （main 或 ArchoeraOS）的祖先提交，否则不放行构建/签名。用 gh api compare
+      # 判定，无需完整 git 历史（浅克隆即可）。
+      - name: 校验发版 tag 指向受保护分支（SEC-23）
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ok=0
+          for base in main ArchoeraOS; do
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/${base}...${GITHUB_SHA}" \
+              --jq .status 2>/dev/null || echo error)
+            echo "compare ${base}...${GITHUB_SHA} => ${status}"
+            case "$status" in
+              behind|identical) echo "OK：tag 指向 ${base} 的祖先提交"; ok=1; break ;;
+            esac
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::发版 tag 未指向 main/ArchoeraOS 的已合并提交，拒绝构建/签名（SEC-23）"
+            exit 1
+          fi
 
       - name: Download all platform build artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           path: artifacts
 
@@ -964,6 +992,16 @@ jobs:
           echo "── release assets ──"
           ls -la assets
 
+      # SEC-25：生成 CycloneDX SBOM（随发布分发，供用户/下游核对依赖）。
+      - name: 生成 SBOM（CycloneDX）
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          path: artifacts
+          format: cyclonedx-json
+          output-file: assets/ARCHOERA-SBOM.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
       # 发布签名 —— CI 用 key1 签 `.sig1`：私钥来自受保护 `release` Environment
       # （需人工批准），Windows runner 不参与。公钥随发布分发。未配置则不签、不阻断。
       - name: 签名发布资产（key1 → .sig1）
@@ -981,13 +1019,23 @@ jobs:
           echo "── final assets ──"
           ls -la assets
 
+      # SEC-25：为最终发布字节写入构建溯源 attestation（Sigstore/OIDC）。
+      # 注：完整的「每个构建作业自带溯源 + macOS 公证 / Windows Authenticode
+      # 代码签名」仍为待办（见 docs/supply-chain.md）。
+      - name: 生成构建溯源 attestation（SEC-25）
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: 'assets/*'
+
       - name: Create GitHub Release (tag v*)
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="${{ github.ref_name }}"
+          # SEC-24：tag 名经环境变量注入，**绝不**用 ${{ github.ref_name }} 内插进
+          # shell（git 允许含 shell 元字符的 tag 名 → 命令注入）。
+          TAG="$GITHUB_REF_NAME"
           VER="${TAG#v}"
 
           # 从 CHANGELOG.md 抽取本 tag 对应段落作为 Release 正文

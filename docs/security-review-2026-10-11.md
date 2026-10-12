@@ -5,6 +5,8 @@
 > 第三批（防护加固）SEC-05/08/34 文档澄清（bb7d5787）、SEC-09 日志脱敏（be7847b4）、SEC-06 KDF 参数上限（840e6775）已完成；
 > 第四批（功能面加固，SEC-10/11/12/13/16/30/31/32/33）已完成（SEC-11/33：84ffd9ec；SEC-12：831a541b；
 > SEC-31：57ff8c8c；SEC-10/13/16/30/32 文档：a39ffd41）。
+> 第五批（发布供应链，SEC-21/22/23/24/25/26/27）已完成——CI/签名溯源加固见
+> [supply-chain.md](supply-chain.md)；SEC-22 经 GitHub ruleset 开启 Code Owners 评审。
 > 修复后逐项把「状态」改为「已修复」并注明提交 / 版本
 > 范围：**文档层评审**——只读仓库文档与安全相关配置（CI 工作流 / 打包 / 工具脚本 / hooks），未做代码审计、未运行程序；
 > 重点为 **vault 文档未覆盖**的风险面，第二轮（2026-10-11）扩面到 **CI / 发布供应链** 与 **平台能力 / 子系统 / 文档一致性**。
@@ -55,13 +57,13 @@
 | SEC-18 | 低 | 归档评分件与现行口径不一致（明文密码 / 无哈希 / GetUsers） | archive/archoera-robustness-score §6 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-19 | 低 | 测试后门 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 无删除里程碑 | vault-security-notes §测试明文存储 | ⏳ 已声明计划 | 已修复（文档·第一批，ed17b5f1） |
 | SEC-20 | 合规 | 声明禁止绕过访问控制，实现却利用服务端 UA 旁路 | software-declaration §五；neko-source-identity；audio-kernel-zig 2026-10-07 | ❌ 未提 | 已修复（文档·第一批，ed17b5f1） |
-| SEC-21 | 中 | GitHub Actions 依赖按可变主版本标签固定、未 pin SHA（含签名作业） | build-all.yml；actions/build-linux | — | 待修复 |
-| SEC-22 | 中 | 关键路径无强制评审（`protect-main` Required approvals=0，CODEOWNERS 不生效） | .github/CODEOWNERS；AGENTS.md §仓库保护 | — | 待修复 |
-| SEC-23 | 高 | 发版 tag 可指向未评审提交 → CI 构建并签名攻击者代码 | build-all.yml（`on.push.tags`+release 构建 `github.ref`） | — | 待修复 |
-| SEC-24 | 中 | 标签名直接内插进 shell（`${{ github.ref_name }}` 命令注入反模式） | build-all.yml:990 | — | 待修复 |
-| SEC-25 | 中 | 无构建溯源 / SBOM；macOS 仅 ad-hoc、Windows 未签名（信任根承诺未兑现） | sign_release.sh；build-all.yml（ad-hoc 注释） | — | 待修复 |
-| SEC-26 | 中 | 无依赖漏洞扫描（无 dependabot / 各生态 audit） | .github；robustness-improvement-plan §3-12 | — | 待修复 |
-| SEC-27 | 中 | CI 测试面过窄（仅 widget/vault 冒烟，非全量） | actions/build-linux §Test | — | 待修复 |
+| SEC-21 | 中 | GitHub Actions 依赖按可变主版本标签固定、未 pin SHA（含签名作业） | build-all.yml；actions/build-linux | — | 已修复（第五批，见 supply-chain.md） |
+| SEC-22 | 中 | 关键路径无强制评审（`protect-main` Required approvals=0，CODEOWNERS 不生效） | .github/CODEOWNERS；AGENTS.md §仓库保护 | — | 已修复（第五批：ruleset 开启 Require review from Code Owners） |
+| SEC-23 | 高 | 发版 tag 可指向未评审提交 → CI 构建并签名攻击者代码 | build-all.yml（`on.push.tags`+release 构建 `github.ref`） | — | 已修复（第五批：release 作业校验 tag 祖先） |
+| SEC-24 | 中 | 标签名直接内插进 shell（`${{ github.ref_name }}` 命令注入反模式） | build-all.yml:990 | — | 已修复（第五批：改用 `$GITHUB_REF_NAME`） |
+| SEC-25 | 中 | 无构建溯源 / SBOM；macOS 仅 ad-hoc、Windows 未签名（信任根承诺未兑现） | sign_release.sh；build-all.yml（ad-hoc 注释） | — | 已修复（第五批：provenance+SBOM；代码签名/公证仍缺口，见 supply-chain §2） |
+| SEC-26 | 中 | 无依赖漏洞扫描（无 dependabot / 各生态 audit） | .github；robustness-improvement-plan §3-12 | — | 已修复（第五批：dependabot.yml + security-audit.yml） |
+| SEC-27 | 中 | CI 测试面过窄（仅 widget/vault 冒烟，非全量） | actions/build-linux §Test | — | 已修复（第五批：完整 flutter test + 各模块单测） |
 | SEC-28 | 中 | 过时设计稿主张运行期提权 + JVM 核心（违反红线） | CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-29 | 低 | 平台能力文档与现行架构/红线冲突（纯 Dart/插件通道 vs 原生桥接） | platform-capability-facade.md §4 vs §7.3 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-30 | 低 | `SystemLocation` 敏感权限缺授权/可关闭语义 | platform-capability-facade.md §2.1/§3 | — | 已修复（文档·第四批，a39ffd41） |

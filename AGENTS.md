@@ -179,14 +179,17 @@ bash app/tool/sign_watermark.sh          # 本地运行；CI 环境会拒绝执�
 - **Environment `release`**：Required reviewers = 维护者；部署仅允许 tag `v*`；
   含 Environment secret `ARCHOERA_WM_KEY1_PEM`（key1 PEM）。
 - **Ruleset `protect-main`**（branch）：要求 PR、禁止强推（non_fast_forward）、禁止删除；
-  Required approvals = 0（单人可自建 PR 自合并）。**禁止直接 push `main`**。
+  **Require review from Code Owners = 开启**（SEC-22：`CODEOWNERS` 覆盖 CI/签名/打包/水印等
+  关键路径，普通写权限者无法自合并这些改动）；Required approvals = 0 且维护者是 bypass actor，
+  故维护者可自建 PR 自合并（不会被锁死）。**禁止直接 push `main`**。
 - **Ruleset `protect-archoeraos`**（branch `ArchoeraOS`）：禁止删除（`deletion`）、禁止强推
   （`non_fast_forward`）；**不要求 PR**（保留维护者直接推送的长期分支工作流）。
   `ArchoeraOS` 是长期维护的发行版分支，承载 shell/网络/蓝牙/安装向导等大量独有提交，
   **不得删除**。
 - **Ruleset `protect-release-tags`**（tag `v*`）：禁止**更新/删除**已发布 tag（不可移动）。
   故打 tag 前务必确认版本号。
-- **CODEOWNERS**：`.github/CODEOWNERS` 把 CI/工具/打包/水印等关键路径指向维护者。
+- **CODEOWNERS**：`.github/CODEOWNERS` 把 CI/工具/打包/水印等关键路径指向维护者；
+  由 `protect-main` 的 **Require review from Code Owners** 强制生效（SEC-22）。
 
 ## 触发一次 Release（端到端）
 1. **升版本**：改 `app/pubspec.yaml` 的 `version:`（如 `0.9.15+8`）。
