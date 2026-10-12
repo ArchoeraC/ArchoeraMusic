@@ -628,7 +628,8 @@ pub const Reader = struct {
   落地）——内核自带 URL 解析 / TCP / TLS / Range / 重定向 / chunked，经 `zk_decoder_open_url`
   直连打开。原生路径优先、失败回退宿主 AVIO 传输与 FFmpeg 主后端（行为可用性不变）；
   可用 `ARCHOERA_ERA_NATIVE_HTTP=0` 关闭原生路径。TLS 密码学原语复用 Zig std（非 FFmpeg），
-  请求/响应解析完全自研。
+  请求/响应解析完全自研。重定向施加上限（≤6 跳）与安全策略（拒绝 `https→http` 降级、拒绝
+  公网源重定向到内网，见下方 2026-10-12 落地 / SEC-12）。
 
 > **落地（2026-10-01）：EraAudio 原生 HTTP(S) 传输（方向② 网络直连增强）**
 > - 内核：新增 `kernel/net.zig`——`HttpStream` 自持 `std.Io.Threaded` 与连接，完成
@@ -708,6 +709,22 @@ pub const Reader = struct {
 >   `--enable-schannel`，无额外 DLL，保持 LGPL-2.1+）。
 > - 验收：`kernel/net.zig` 新增「自定义请求头随请求发送」用例，`zig build test` 731 项全绿；
 >   C 壳增量编译 + `ctest` 36 项全绿；Dart `analyze` 0 issue、`flutter test` 全绿。
+
+> **落地（2026-10-12）：原生 HTTP 重定向安全策略（SEC-12）**
+> - 背景：媒体 URL 来自平台 / 音源返回，若被劫持可诱导内核跟随重定向到环回 / 内网主机
+>   （SSRF 面）或 `https→http` 降级泄露带签名的 URL。此前重定向「原样保留」且无主机策略。
+> - 内核（`kernel/net.zig`）：`HttpStream.start` 在跟随 `Location` 前调用纯函数
+>   `checkRedirectPolicy(origin_local, base_url, new_url)`——
+>   ① `https→http` 明文降级 → `error.InsecureRedirect`（拒绝）；
+>   ② **初始 URL 为公网主机**而重定向目标为回环 / 私网 / 链路本地 / CGNAT
+>   （`isLocalHost`/`isLocalAddr`，含 IPv4-mapped IPv6）→ `error.PrivateRedirect`（拒绝）。
+>   原始 URL 本身即自建内网服务时（`origin_local == true`）允许同域内网重定向，不误伤自托管
+>   Subsonic/Jellyfin。
+> - 已知边界：仅按**主机字面量**判定，不覆盖域名解析后落到私网（DNS rebinding）；HTTPS 仍仅用
+>   std 密码学 + 系统 CA，证书校验失败 fail-closed。新增两个 `NetError` 变体经 `statusOf`
+>   归入 `io_error`（跨语言状态码表不变）。
+> - 验收：`kernel/net.zig` 新增 `isLocalHost` / `checkRedirectPolicy` 单测（回环/私网/链路本地/
+>   IPv4-mapped/公网、降级与公网→内网拒绝、自建源放行）；`zig build test` 744 项全绿。
 
 > **落地（2026-09-21）：callback 形态已从「预留」转为「已接入」**
 > - 内核：`io.Reader.openCallback` + `decoder.openReader`；新导出 `zk_decoder_open_cb`
