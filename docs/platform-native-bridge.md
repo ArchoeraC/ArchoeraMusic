@@ -133,12 +133,24 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 `apl_deep_link_forward` 次实例转发、`apl_window_activate` 置前主窗口；
 接收侧发 `APL_EVENT_DEEP_LINK` 信号，Dart 收到后调用 `apl_deep_link_take`。
 
+> **外部输入契约（SEC-31）**：deep link 接收的是**本机任意程序（含浏览器）都可触发**的
+> 外部 URI，故三端后端只识别**自有方案前缀 `archoera://`**（Linux 命令行 / `OpenUri`、
+> Windows `WM_COPYDATA` / argv、macOS AppleEvent 均在入队前按前缀过滤），其余一律丢弃；
+> 交给 Dart 的内容仍按「只解析自有 host/path 形式、未知 host 忽略」处理。该能力免提权
+> 注册，不接受任意 URL 打开/执行语义。
+
 文件管理器定位（`APL_CAP_REVEAL_PATH`，ABI v2 起）：`apl_reveal_path(path)`
 在系统文件管理器中定位路径（文件 → 打开所在目录并选中；目录 → 打开）——
 音乐库「定位文件」、下载「打开所在目录」、隔离区「打开目录」统一走本能力，
 **不再起 `xdg-open`/`explorer` 等子进程**。Linux 走 `org.freedesktop.FileManager1`
 D-Bus（回退 GIO 默认应用打开所在目录）；Windows 走 `SHOpenFolderAndSelectItems` /
 `ShellExecute`；macOS 走 `NSWorkspace`。
+
+> **输入契约（SEC-31）**：`apl_reveal_path` 只接受应用内已解析的**绝对本地路径**——
+> 在 `apl.cpp` 边界拒绝 URI（`scheme://`，含 `file://`/`http://`）与相对路径
+> （返回 `APL_ERR_STATE`），再由各后端要求路径**存在**。本能力只做「定位 / 打开」，
+> 不执行目标（Windows 对目录 `ShellExecute "open"` 亦交 Explorer）。托盘图标路径
+> 同样由 Dart 落临时文件后传入，属应用自产路径。
 
 系统托盘（`APL_CAP_TRAY`，ABI v3 起）：`apl_tray_create(icon_path)` /
 `apl_tray_destroy` / `apl_tray_set_icon` / `apl_tray_set_tooltip` /

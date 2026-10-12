@@ -132,6 +132,8 @@ APL_API int32_t apl_notify(const char *title, const char *body);
  *   - 目录 → 直接打开该目录。
  * Linux 走 org.freedesktop.FileManager1 D-Bus（回退 GIO 打开所在目录）；
  * Windows 走 SHOpenFolderAndSelectItems / ShellExecute；macOS 走 NSWorkspace。
+ * 输入契约（SEC-31）：仅接受应用内已解析的**绝对本地路径**；URI（`scheme://`）与
+ * 相对路径被拒绝（ERR_STATE）。本能力只定位/打开，不执行目标。
  * 返回 APL_OK / 负错误码（路径不存在 / 无可用文件管理器）。 */
 APL_API int32_t apl_reveal_path(const char *path);
 
