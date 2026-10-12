@@ -4,9 +4,14 @@
 
 //! 平台护栏（与 C# PlatformGuard.cs 语义一致）。
 //!
-//! Linux：血缘校验 + PR_SET_PDEATHSIG + RLIMIT_CORE=0 + PR_SET_DUMPABLE=0 +
-//!        seccomp-BPF denylist（含 socket 按地址族的 arg-aware 特判）；
-//! macOS/Windows：血缘校验 + 对应硬化（V1 仅 Linux 完整实现，其余为最小路径）。
+//! Linux：血缘校验（`/proc/<ppid>/exe`）+ PR_SET_PDEATHSIG + RLIMIT_CORE=0 +
+//!        PR_SET_DUMPABLE=0 + seccomp-BPF denylist（含 socket 按地址族的 arg-aware 特判）；
+//! macOS：血缘校验（`proc_pidpath`，libproc 动态解析）+ 拒绝 `DYLD_INSERT_LIBRARIES`
+//!        + RLIMIT_CORE=0；父死检测由 `getppid` 变更兜底；
+//! Windows：血缘校验（`NtQueryInformationProcess` 取父 pid + `OpenProcess` /
+//!        `QueryFullProcessImageNameW` 取父进程映像路径，大小写不敏感比较）+
+//!        `SetProcessMitigationPolicy`（ACG/CIG/扩展点/严格句柄/CFG/镜像，best-effort）；
+//!        父死检测由 `GetExitCodeProcess` 兜底。
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -64,20 +69,24 @@ pub fn verify_and_arm() -> Result<i32> {
     }
     #[cfg(windows)]
     {
-        // V1：Windows 进程缓解策略（best-effort）——未实现，保持构造契约。
+        apply_windows_mitigations();
     }
     Ok(ppid)
 }
 
-/// 父进程是否已消失。
+/// 父进程是否已消失（Linux/macOS：getppid 变更；Windows：句柄退出码非 STILL_ACTIVE）。
 #[cfg(unix)]
 pub fn parent_gone(parent_pid: i32) -> bool {
     let ppid = get_parent_pid();
     ppid <= 1 || ppid != parent_pid
 }
 
-/// Windows：父死检测由 OS 句柄实现（V1 未实现）——返回未消失，避免过早自退。
-#[cfg(not(unix))]
+#[cfg(windows)]
+pub fn parent_gone(parent_pid: i32) -> bool {
+    !win::parent_alive(parent_pid)
+}
+
+#[cfg(not(any(unix, windows)))]
 pub fn parent_gone(_parent_pid: i32) -> bool {
     false
 }
@@ -87,7 +96,12 @@ fn get_parent_pid() -> i32 {
     unsafe { libc::getppid() as i32 }
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn get_parent_pid() -> i32 {
+    win::parent_pid()
+}
+
+#[cfg(not(any(unix, windows)))]
 fn get_parent_pid() -> i32 {
     -1
 }
@@ -141,8 +155,18 @@ fn verify_parent_identity(ppid: i32) -> Result<()> {
             return Ok(());
         }
     };
+    // 预期主程序候选（按打包布局）：
+    //   - 通用：<parent-of-native>/archoera_music[.exe]（Linux/Windows，及 macOS
+    //     `Contents/MacOS/native` 布局）；
+    //   - macOS `.app`：本可执行文件位于 `Contents/native`（Xcode 与 CI 统一下载
+    //     目录），预期主程序在 `Contents/MacOS/archoera_music`。
+    let main_name = if cfg!(windows) {
+        "archoera_music.exe"
+    } else {
+        "archoera_music"
+    };
     #[allow(unused_mut)]
-    let mut candidates = vec![expected_dir.join("archoera_music")];
+    let mut candidates = vec![expected_dir.join(main_name)];
     #[cfg(target_os = "macos")]
     {
         candidates.push(expected_dir.join("MacOS").join("archoera_music"));
@@ -164,12 +188,28 @@ fn verify_parent_identity(ppid: i32) -> Result<()> {
             ))
         }
     };
-    if canonicalize(Path::new(&parent_path)) != canonicalize(&expected) {
+    if !paths_equal(
+        &canonicalize(Path::new(&parent_path)),
+        &canonicalize(&expected),
+    ) {
         return Err(VaultError::invalid_operation(
             "独立运行被拒：父进程不是预期的主程序",
         ));
     }
     Ok(())
+}
+
+/// 路径相等判定：Windows 忽略大小写，Unix 序数比较（与 C# `PlatformGuard.PathsEqual`
+/// 一致）。
+#[cfg(windows)]
+fn paths_equal(a: &Path, b: &Path) -> bool {
+    a.to_string_lossy()
+        .eq_ignore_ascii_case(&b.to_string_lossy())
+}
+
+#[cfg(not(windows))]
+fn paths_equal(a: &Path, b: &Path) -> bool {
+    a == b
 }
 
 #[cfg(target_os = "linux")]
@@ -189,21 +229,221 @@ fn parent_executable_path(ppid: i32) -> Option<String> {
 }
 
 #[cfg(target_os = "macos")]
-fn parent_executable_path(_ppid: i32) -> Option<String> {
-    // V1：macOS 运行时路径未实现（proc_pidpath）。返回 None → 调用方 fail-closed
-    // 或以 dev 布局放行；打包布局下将明确拒绝。
-    eprintln!("[vault] 血缘校验：macOS proc_pidpath 在 V1 未实现");
-    None
+fn parent_executable_path(ppid: i32) -> Option<String> {
+    macos::parent_path(ppid)
 }
 
 #[cfg(windows)]
-fn parent_executable_path(_ppid: i32) -> Option<String> {
-    None
+fn parent_executable_path(ppid: i32) -> Option<String> {
+    win::process_image_path(ppid)
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
 fn parent_executable_path(_ppid: i32) -> Option<String> {
     None
+}
+
+// ── Windows：血缘校验 + 进程缓解（best-effort）───────────────────────
+
+/// Windows 侧实现：
+///   - 父 pid：`NtQueryInformationProcess(ProcessBasicInformation)`；
+///   - 父进程映像路径：`OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` +
+///     `QueryFullProcessImageNameW`（大小写不敏感比较见 [paths_equal]）；
+///   - 进程缓解：`SetProcessMitigationPolicy`（ACG/CIG/扩展点/严格句柄/CFG/镜像，
+///     best-effort，失败即忽略，绝不阻断启动）。
+#[cfg(windows)]
+mod win {
+    use core::ffi::c_void;
+
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::{CloseHandle, HANDLE, STILL_ACTIVE};
+    use windows::Win32::System::Threading::{
+        GetExitCodeProcess, OpenProcess, QueryFullProcessImageNameW, SetProcessMitigationPolicy,
+        ProcessControlFlowGuardPolicy, ProcessDynamicCodePolicy,
+        ProcessExtensionPointDisablePolicy, ProcessImageLoadPolicy, ProcessSignaturePolicy,
+        ProcessStrictHandleCheckPolicy, PROCESS_MITIGATION_POLICY, PROCESS_NAME_FORMAT,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    // PROCESS_BASIC_INFORMATION：布局与 C# `ProcessBasicInformation` 一致（ntdll 语义）。
+    #[repr(C)]
+    struct ProcessBasicInformation {
+        reserved1: *mut c_void,
+        peb_base_address: *mut c_void,
+        reserved2_0: *mut c_void,
+        reserved2_1: *mut c_void,
+        unique_process_id: usize,
+        inherited_from_unique_process_id: usize,
+    }
+
+    // windows crate 将 NtQueryInformationProcess 置于 `Wdk` 特性下；此处自声明以避免
+    // 额外引入 Wdk / Win32_System_Kernel（仅需 ntdll 链接）。
+    #[link(name = "ntdll")]
+    extern "system" {
+        fn NtQueryInformationProcess(
+            process_handle: HANDLE,
+            process_information_class: u32,
+            process_information: *mut c_void,
+            process_information_length: u32,
+            return_length: *mut u32,
+        ) -> i32;
+    }
+
+    /// 当前进程父 pid（失败返回 -1，调用方按「父进程缺失」处理）。
+    pub fn parent_pid() -> i32 {
+        unsafe {
+            let cur = match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, std::process::id())
+            {
+                Ok(h) => h,
+                Err(_) => return -1,
+            };
+            let mut info = ProcessBasicInformation {
+                reserved1: core::ptr::null_mut(),
+                peb_base_address: core::ptr::null_mut(),
+                reserved2_0: core::ptr::null_mut(),
+                reserved2_1: core::ptr::null_mut(),
+                unique_process_id: 0,
+                inherited_from_unique_process_id: 0,
+            };
+            let mut ret_len = 0u32;
+            let status = NtQueryInformationProcess(
+                cur,
+                0, // ProcessBasicInformation
+                &mut info as *mut _ as *mut c_void,
+                core::mem::size_of::<ProcessBasicInformation>() as u32,
+                &mut ret_len,
+            );
+            let _ = CloseHandle(cur);
+            if status != 0 {
+                return -1;
+            }
+            info.inherited_from_unique_process_id as i32
+        }
+    }
+
+    /// 父进程是否仍存活（`GetExitCodeProcess == STILL_ACTIVE`）。
+    pub fn parent_alive(pid: i32) -> bool {
+        unsafe {
+            let h = match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid as u32) {
+                Ok(h) => h,
+                Err(_) => return false,
+            };
+            let mut code = 0u32;
+            let alive = GetExitCodeProcess(h, &mut code).is_ok() && code == STILL_ACTIVE.0 as u32;
+            let _ = CloseHandle(h);
+            alive
+        }
+    }
+
+    /// 进程完整映像路径（`QueryFullProcessImageNameW`，Win32 格式）。
+    pub fn process_image_path(pid: i32) -> Option<String> {
+        unsafe {
+            let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid as u32).ok()?;
+            let mut buf = vec![0u16; 1024];
+            let mut size = buf.len() as u32;
+            let result = QueryFullProcessImageNameW(
+                h,
+                PROCESS_NAME_FORMAT(0),
+                PWSTR(buf.as_mut_ptr()),
+                &mut size,
+            );
+            let _ = CloseHandle(h);
+            result.ok()?;
+            if size == 0 {
+                return None;
+            }
+            Some(String::from_utf16_lossy(&buf[..size as usize]))
+        }
+    }
+
+    /// 武装进程缓解策略（best-effort，失败即忽略）。
+    pub fn apply_mitigations() {
+        set_mitigation(ProcessDynamicCodePolicy, 0x1); // ProhibitDynamicCode（ACG）
+        set_mitigation(ProcessSignaturePolicy, 0x1); // MicrosoftSignedOnly（CIG）
+        set_mitigation(ProcessExtensionPointDisablePolicy, 0x1); // DisableExtensionPoints
+        set_mitigation(ProcessStrictHandleCheckPolicy, 0x1); // RaiseExceptionOnInvalidHandleReference
+        set_mitigation(ProcessControlFlowGuardPolicy, 0x1); // EnableControlFlowGuard
+        set_mitigation(ProcessImageLoadPolicy, 0x3); // NoRemoteImages | NoLowMandatoryLabelImages
+    }
+
+    fn set_mitigation(policy: PROCESS_MITIGATION_POLICY, flags: u32) {
+        // SAFETY: PROCESS_MITIGATION_* 均为单个 DWORD 位域，dwLength=4（与 C# 一致）。
+        unsafe {
+            let value = flags;
+            let _ = SetProcessMitigationPolicy(
+                policy,
+                &value as *const u32 as *const c_void,
+                core::mem::size_of::<u32>(),
+            );
+        }
+    }
+}
+
+#[cfg(windows)]
+fn apply_windows_mitigations() {
+    win::apply_mitigations();
+}
+
+// ── macOS：血缘校验（proc_pidpath）───────────────────────────────────
+
+/// macOS 侧实现：`proc_pidpath(3)`（libproc）。经 `dlopen`/`dlsym` 解析，优先逻辑名
+/// `libproc.dylib`，回退绝对路径 `/usr/lib/libproc.dylib`——与 C# `MacParentPath`
+/// 的动态加载 + 回退一致，避免链接期对 libproc 的硬依赖；符号不可解析时记一次日志
+/// 并返回 None（调用方 fail-closed，或 dev 布局放行）。
+#[cfg(target_os = "macos")]
+mod macos {
+    use std::ffi::CStr;
+    use std::os::raw::{c_char, c_int, c_void};
+
+    type ProcPidPathFn = unsafe extern "C" fn(c_int, *mut c_void, u32) -> c_int;
+
+    /// 解析 `proc_pidpath` 符号（逻辑名 → 绝对路径回退；全部失败返回 None）。
+    fn proc_pidpath_symbol() -> Option<ProcPidPathFn> {
+        const LIB_NAMES: [&[u8]; 2] = [b"libproc.dylib\0", b"/usr/lib/libproc.dylib\0"];
+        const SYM: &[u8] = b"proc_pidpath\0";
+        for name in LIB_NAMES {
+            // SAFETY: name 为 NUL 结尾的静态字节串。
+            let handle = unsafe { libc::dlopen(name.as_ptr() as *const c_char, libc::RTLD_NOW) };
+            if handle.is_null() {
+                continue;
+            }
+            // SAFETY: handle 为有效 dlopen 句柄；SYM 为 NUL 结尾。
+            let sym = unsafe { libc::dlsym(handle, SYM.as_ptr() as *const c_char) };
+            // 不 dlclose：句柄在进程生命周期内保持（与 C# 缓存一致）。
+            if !sym.is_null() {
+                // SAFETY: sym 指向 proc_pidpath 函数，签名与 ProcPidPathFn 一致。
+                return Some(unsafe { std::mem::transmute::<*mut c_void, ProcPidPathFn>(sym) });
+            }
+        }
+        None
+    }
+
+    pub fn parent_path(ppid: i32) -> Option<String> {
+        let f = match proc_pidpath_symbol() {
+            Some(f) => f,
+            None => {
+                eprintln!(
+                    "[vault] 血缘校验：无法解析 proc_pidpath（libproc.dylib）；macOS 父进程路径校验不可用"
+                );
+                return None;
+            }
+        };
+        let mut buf = vec![0 as c_char; 4096];
+        // SAFETY: buf 为 4096 字节可写缓冲；proc_pidpath 最多写 buffersize 字节。
+        let n = unsafe { f(ppid as c_int, buf.as_mut_ptr() as *mut c_void, buf.len() as u32) };
+        if n <= 0 {
+            return None;
+        }
+        // SAFETY: n>0 时 proc_pidpath 已写入 NUL 结尾路径。
+        let s = unsafe { CStr::from_ptr(buf.as_ptr()) }
+            .to_string_lossy()
+            .into_owned();
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
+    }
 }
 
 fn canonicalize(p: &Path) -> PathBuf {

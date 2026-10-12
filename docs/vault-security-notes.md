@@ -68,26 +68,37 @@ KDF 参数有**上限与下限**（[VaultLimits.ValidateKdf]：`m∈[8192 KiB, 2
 - **删状态即可清零退避**：能删除状态文件的同用户攻击者可绕过它；且 **离线暴破根本不经过 vault 进程**——攻击者拿到 vault 文件后可自行离线跑口令猜测，在线退避对其**无效**。
 - **真正的抗暴破杠杆只有两个**：**KDF 成本**（Argon2id 参数强度，见上）与**口令 / 恢复码熵**。请据此设定强度与口令策略，**勿把退避当作保密防线**。
 
-## Linux：静态 Rust 实现（2026-10）
+## 三端：Rust 实现（2026-10）
 
-自 2026-10 起，**Linux 发行包**内的 `native/archoera-vault` 改为 `app/core/vault-rs` 的
-**Rust 重实现**，并以**静态链接**单文件（`+crt-static`；CI 走 musl 静态）分发：
+自 2026-10 起，**三端发行包**内的 `native/archoera-vault[.exe]` 统一改为
+`app/core/vault-rs` 的 **Rust 重实现**（取代 C# NativeAOT；`app/core/vault/**` 仅
+Linux 历史保留、**不再进入任何平台产物**）：
 
-- **免疫加载器注入**：静态二进制不依赖 `ld.so`，`LD_PRELOAD` / `LD_AUDIT` / `LD_LIBRARY_PATH`
-  对其**完全失效**——这是 [vault-enhanced-scheme.md §13-A](vault-enhanced-scheme.md)
-  「LD_PRELOAD 曾经完全失守」的**根治**；C# NativeAOT 因链接器限制无法静态化（§13-E），
-  故 Linux 上由 Rust 版取代。
-- **不使用 libsecret**：Rust 版的 OS 钥匙串后端（DPAPI / Keychain / libsecret）在 V1 为**桩**；
-  Linux 上 crypto 模式**走 `file` 后端**（`secret.key`，0600；单因子降级，选用须知悉），
-  slots（m1/m2a/m2b）本就自包含、不依赖 OS store。
+- **Linux**：**静态链接**单文件（`+crt-static`；CI 走 musl 静态）分发。
+  **免疫加载器注入**：静态二进制不依赖 `ld.so`，`LD_PRELOAD` / `LD_AUDIT` /
+  `LD_LIBRARY_PATH` 对其**完全失效**——这是 [vault-enhanced-scheme.md §13-A](vault-enhanced-scheme.md)
+  「LD_PRELOAD 曾经完全失守」的**根治**；C# NativeAOT 因链接器限制无法静态化（§13-E）。
+  Linux 上 crypto 模式走 **`file` 后端**（`secret.key`，0600；单因子降级，选用须知悉），
+  slots（m1/m2a/m2b）本就自包含、不依赖 OS store；**不使用 libsecret**（Rust 侧
+  libsecret 仍为桩）。
+- **Windows**：crypto 模式走 **DPAPI**（`CryptProtectData` / `CryptUnprotectData`，
+  `CRYPTPROTECT_UI_FORBIDDEN`，密文落 `<dataDir>/sshare.bin`，后端指纹 `dpapi`）；
+  以 `cargo build --release --target x86_64-pc-windows-msvc -C target-feature=+crt-static`
+  构建（自包含 CRT）。
+- **macOS**：crypto 模式走 **Keychain**（`kSecClassGenericPassword`，service
+  `archoera.vault`，account 按数据目录作用域 `{key}|{dataDir}`，原始字节值）；
+  `aarch64-apple-darwin` + `x86_64-apple-darwin` 双架构经 `lipo` 合成 universal。
 - **字节 / 协议兼容**：容器格式（crypto `'C'` / slots `'S'`）与 C# 版一致，
-  `app/core/vault-rs/cross_parity.sh` 双向互解互读、`app/core/vault-rs/test.sh` 全链路
-  均已通过（与 C# 版同套断言）。
-- **Windows / macOS 仍用 C#（NativeAOT）vault**：Rust 版的 OS 钥匙串后端尚未移植，
-  故暂不切换（待 Rust OS-keystore 端移植后再评估）。
-- **构建 / 打包**：`app/core/build-linux.sh` 编译 vault-rs；`app/linux/CMakeLists.txt`
-  安装 `core/vault-rs/build/archoera-vault` 进 `bundle/native/`；SEC-08 完整性清单
-  仍自动覆盖该文件。
+  `app/core/vault-rs/cross_parity.sh` 双向互解互读、`app/core/vault-rs/test.sh`
+  全链路均已通过（与 C# 版同套断言）。
+- **构建 / 打包**：Linux `app/core/build-linux.sh`；Windows `app/core/build_windows.bat`
+  （install 见 `app/windows/CMakeLists.txt`）；macOS `app/core/build-macos.sh` +
+  `app/macos/Runner.xcodeproj` 拷贝阶段；CI macOS bundle 从 `core/vault-rs/build/` 取。
+  SEC-08 完整性清单仍自动覆盖该文件。
+- **待真机 / Wine 验证（如实）**：Windows DPAPI 路径、macOS Keychain 路径、macOS
+  `proc_pidpath` 父进程校验、Windows `QueryFullProcessImageNameW` + ACG/CIG 进程缓解
+  的**运行期行为尚未在真机 / Wine 上实测**；CI 覆盖三端**原生编译**与纯函数单测，
+  Linux 端到端已实测全绿，Windows/macOS 的运行期路径以相应 runner 产物为准。
 
 ## 测试构建（无明文后门，SEC-19 已删除）
 
@@ -120,12 +131,13 @@ KDF 参数有**上限与下限**（[VaultLimits.ValidateKdf]：`m∈[8192 KiB, 2
 - 现状：vault 校验由 **OS 提供**的父进程 pid + 父进程可执行文件路径，与「**由 vault 自身位置推导出的预期主程序路径**」比对：
   - 父进程 pid 由 OS 取得（Linux/macOS `getppid`；Windows `NtQueryInformationProcess`）；
   - 父进程可执行文件路径由 OS 读取（Linux `/proc/<ppid>/exe`、macOS `proc_pidpath`、Windows `QueryFullProcessImageNameW`）；
+  - **Rust（`app/core/vault-rs`）实现**：Linux `read_link("/proc/<ppid>/exe")`；macOS `proc_pidpath`（libproc 经 `dlopen`/`dlsym` 解析，优先逻辑名 `libproc.dylib`、回退 `/usr/lib/libproc.dylib`，与 C# 一致）；Windows `NtQueryInformationProcess`（父 pid）+ `OpenProcess`/`QueryFullProcessImageNameW`（父进程映像），路径比较**忽略大小写**。**Windows/macOS 运行期路径待真机 / Wine 验证**。
   - 仅**打包布局**（vault 位于 `<dir>/native/<vault>`，预期主程序为 `<dir>/archoera_music[.exe]`）作路径绑定；dev/测试布局（目录名非 `native`）与预期主程序缺失时**放行**（仅记日志，避免自砖）。
 - **残余（如实）**：同用户攻击者若在**预期主程序路径放一个自造二进制**再 spawn vault，本校验无法与「主程序被替换」区分——这正是威胁模型声明的硬上限（见下节），属 L4 信任根范畴。
 
 ## 进程自我保护（F4 · best-effort）
 
-vault 子进程启动时自施 OS 提供的防注入 / 防转储缓解（浏览器同款做法，**不依赖启发式注入检测、不做反调试伪装**）：
+vault 子进程启动时自施 OS 提供的防注入 / 防转储缓解（浏览器同款做法，**不依赖启发式注入检测、不做反调试伪装**）；三端均为 `app/core/vault-rs` 的 Rust 实现（Windows/macOS 运行期行为**待真机 / Wine 验证**）：
 
 - **Linux**：`prctl(PR_SET_PDEATHSIG, SIGTERM)`（父死自动退出）、`RLIMIT_CORE=0`（崩溃不产 core）、`PR_SET_DUMPABLE=0`（禁 `/proc/pid/mem`、ptrace 读取），以及 **seccomp-BPF denylist 过滤器**：命中 `ptrace` / `process_vm_readv|writev` / `execve` / `bpf` / 内核模块 / 命名空间 / `io_uring` 等，以及 **`AF_INET` / `AF_INET6` 的 `socket()`** → `SECCOMP_RET_KILL_PROCESS`（内核以 `SIGSYS` 杀进程）。**`AF_UNIX` 一律放行**，故 libsecret / D-Bus 仍可用；`clone`/`clone3` 等线程创建路径有意放行（避免删 NativeAOT 运行时而自砖）。
 - **Windows**：`SetProcessMitigationPolicy` —— ACG（禁动态码）、CIG（仅可信镜像）、ExtensionPointDisable、StrictHandle、CFG、ImageLoad 约束，**全部 best-effort**（旧系统/与运行时冲突时失败即忽略，不阻断启动）。
