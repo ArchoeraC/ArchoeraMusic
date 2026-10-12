@@ -182,6 +182,16 @@ mediaEngine→ fft / ffmpeg（同一库内依赖，产物平铺于 `native/`，�
 - **释放时机误判**：模块释放须与「进行中任务」互斥（如扫描中不可释放 scanner），
   由引用计数 + 任务态双重保证；
 - 各模块加载点迁移为纯行为等价重构，风险低，可分模块逐个切换验证。
+- **多运行时信号 / 全局符号共存（SEC-34）**：同进程并存 Go runtime / .NET NativeAOT（scanner、vault）/
+  Rust tokio（downloader、transcoder）/ Zig 内核 / FFmpeg，各自可能安装**信号处理器**（栈展开、SIGSEGV 诊断、
+  SIGIO 等）与导出**全局符号**（`RTLD_GLOBAL`）。约束与约定：
+  - **谁安装谁还原**：模块不得在退出/`deinit` 时把处理器「恢复为更早的 handler」而与他人错配——
+    真实缺陷参见 `audio-kernel-zig.md`（2026-10-02：`std.Io.Threaded.deinit` 恢复旧 `SIGIO` handler 致进程被信号终止）、
+    vault NativeAOT 接管 `SIGSEGV`（`credential-vault-plan` §8.4：崩溃联动测试须用 SIGKILL）；
+  - 避免 `RTLD_GLOBAL`（符号互窜/错绑）；sqlite 现用 `RTLD_GLOBAL|DEEPBIND` 属**例外且常驻**，
+    而 `DEEPBIND` 在 glibc 文档中属「不推荐使用」——新增模块**不得**再用 `DEEPBIND`；
+  - 按需加载只做**已验证模块**；卸载顺序须与「无在途调用」互斥（见上方），
+    否则 dlclose 后符号错绑/信号处理错位可致进程终止（DoS / 稳定性）。详见 [security-review SEC-34](security-review-2026-10-11.md)。
 
 ---
 

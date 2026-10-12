@@ -119,6 +119,7 @@ Windows 对应 `.dll`、macOS 对应 `.dylib`，命名规则沿用各模块现�
 | Go transcoder 由 subsonic 侧 dlopen，路径在 Go 侧解析 | `subsonic_controller.dart` 传入绝对路径，Go 侧直接使用 |
 | 改动跨 Dart + 3 平台 CMake + 打包脚本 | 分步落地（见 §6），每步独立可回归 |
 | 旧布局残留目录（`<module>/build/` 在 bundle 内） | 迁移完成后从 CMake install 列表移除，并清理 packaging 工作区 |
+| **加载顺序劫持（SEC-08）**：本库自身按**绝对路径**加载（已缓解裸文件名劫持），但**传递依赖**（FFmpeg / 转码器 / libc 等）仍按动态链接器搜索路径（`LD_LIBRARY_PATH` / `DT_RPATH` / Windows DLL 搜索顺序 / `DYLD_*`）解析；且 dev 态 `cwd` 兜底、`ARCHOERA_NATIVE_DIR` 等 env 指向的目录可写时，可被同用户替换 → 库加载劫持（威胁等级 L2，非 L4） | 现状缓解：产物统一「解析为绝对路径再 `open`」；**待办**：把主程序与全部 FFI 库纳入 credential-vault-plan §8.5 的「安装包完整性清单」（摘要校验 / OS 代码签名）——在此之前该风险如实声明，勿视为已防护（见 [security-review SEC-08](security-review-2026-10-11.md)） |
 
 ## 6. 分步落地
 

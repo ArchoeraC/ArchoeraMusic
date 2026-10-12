@@ -121,14 +121,22 @@ public sealed class VaultService
     /// 稳定性更高（不存在份额丢失导致的凭据整体丢失）；安全性降为单点
     /// （OS 钥匙串被攻破 = 凭据全泄露）。
     /// 失败回滚（授权侧写入失败时不残留半初始化 vault）。
-    public void InitCrypto()
+    public void InitCrypto() => InitCrypto(null);
+
+    /// [master] 非 null 时以其为主密钥 K（不随机生成）——供 headless 经 **stdin** 注入
+    /// （`init-file --key-stdin`，不使用 argv/env，见 security-review SEC-02）；
+    /// 长度须为 [KeySplit.KeySize]；调用方负责清零传入缓冲。
+    public void InitCrypto(byte[]? master)
     {
         if (Initialized) throw new InvalidOperationException("vault 已初始化，请先 destroy");
+        if (master != null && master.Length != KeySplit.KeySize)
+            throw new ArgumentException($"主密钥须为 {KeySplit.KeySize} 字节");
         _lockout.Clear();
-        var master = RandomNumberGenerator.GetBytes(KeySplit.KeySize);
+        var generated = master == null;
+        var k = master ?? RandomNumberGenerator.GetBytes(KeySplit.KeySize);
         try
         {
-            _store.Store(ShareKey, master); // K 整体入 OS 安全存储
+            _store.Store(ShareKey, k); // K 整体入 OS 安全存储 / 文件密钥库
             VaultFile.CreateCrypto(_store.Backend).Save(VaultPath);
         }
         catch
@@ -138,7 +146,7 @@ public sealed class VaultService
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(master);
+            if (generated) CryptographicOperations.ZeroMemory(k);
         }
     }
 

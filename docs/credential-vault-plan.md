@@ -110,7 +110,13 @@ app_config/
 
 - **vault 侧**承载解密——实施为 C# NativeAOT 独立进程 `archoera-vault`（§8.1，非 Go FFI）；桌面端原有「凭据加解密」FFI 保留不复用；
 - **Rust 侧**（downloader）：`setKugouSession`/`setNeteaseCookie` 接收后，请求结束时对内部缓冲 `zeroize` 清零（memsec.rs MlockSecret，§8.3）；
-- **Dart 侧**：仅注入那一行持有明文，不进状态对象、不落日志（日志长度掩码保留）；实施为 VaultSessionStore / StreamingStore 写穿缓存 + 启动预取（§8.2）。
+- **Dart 侧**：原则上仅注入那一行持有明文、不进状态对象、不落日志（日志长度掩码保留）；
+  **已知接受项（SEC-03）**：实施为 VaultSessionStore / StreamingStore 写穿缓存 + **启动预取**（§8.2），
+  即启动时 `preloadSecrets()` 解密全部流媒体凭据并常驻 Dart 堆——**这在事实上违背「用后即弃」**：
+  Dart 字符串不可 zeroize（GC 管理、会复制），且 §3.6 的 mlock / MADV_DONTDUMP / zeroize **只覆盖
+  C#/Rust 缓冲，不覆盖 Dart 侧明文**。该行为**作为已知接受项**记录（风险与缓解见 [security-review SEC-03](security-review-2026-10-11.md)），
+  缓解为：主进程 `PR_SET_DUMPABLE=0`（拒 ptrace/core dump，Linux release 语义）+ `RLIMIT_CORE=0`；
+  其覆盖范围不含「同用户读 `/proc/<pid>/mem`」（该攻击面仍需 OS 隔离，见 §1.2-2）。
 
 ### 3.4 销毁流程（可销毁性）
 
@@ -297,6 +303,7 @@ vault：  校验父进程 → 解锁主密钥（OS 安全存储，§3.2）
 - `VaultSessionStore`：写穿缓存（get/save/clear 同步返回，vault 持久化串行队列异步执行）+ 旧明文 `netease_session.json` 首启一次性迁移后覆写删除；
 - `streaming_servers` 纳入 vault（uid=`streaming:<serverId>`，配置 JSON 只留非敏感字段）；
 - 降级语义：vault 不可用 → 仅内存保留登录态（不静默降级为明文持久化）。
+- **已知接受项（SEC-03）**：`main.dart` 在 `VaultSessionStore.initialize()` 后 `await StreamingStore.preloadSecrets()`（§8.4）——**启动即解密全部流媒体凭据并以写穿缓存常驻 Dart 堆**，作为同步 `load()` 的数据源。Dart 字符串不可 zeroize、不受 §3.6 mlock 保护；缓解为 Linux release 下主进程 `PR_SET_DUMPABLE=0` + `RLIMIT_CORE=0`（不覆盖同用户读 `/proc/<pid>/mem`）。定性见 §3.3 与 [security-review SEC-03](security-review-2026-10-11.md)。
 
 ### 8.3 vault-3：Rust 下载器内存保护
 
@@ -331,8 +338,13 @@ vault：  校验父进程 → 解锁主密钥（OS 安全存储，§3.2）
 - 每次操作 spawn `serve` → 握手（HMAC 自算比对 + **构建 marker 校验** + 锚点校验）→ 命令 → `quit` → 退出状态校验 → 写标记；
 - **握手版本指纹（marker 校验）**：解析应答第 5 字段 `BuildInfo.Marker`——默认路径解析的 vault 必须为 PROD 标记；**缺失或非 PROD（测试/被替换二进制，携带 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 显式启动指令）→ 杀进程 + 删除默认路径副本 + 失效缓存 + 置 `versionFatal`（fail-closed）**；env 显式指定（测试/CI 信任边界）跳过 PROD 校验但 marker 存在性仍校验；
 - `VaultVersionException` + `VaultVersionGate`：版本异常触发时置 `VaultProcess.versionFatal`，UI 顶层 gate 全屏拦截**仅允许退出**（不提供销毁/重试等继续操作）；
-- 锚点 `$dataDir/vault.auth`：首会话返回保存，后续会话必须一致——不一致 = vault 文件被替换 → 拒绝服务；
-- **崩溃联动标记** `$dataDir/vault.marker`：正常收尾 `ok` / 主动报错 `fail`（不联动）/ 非预期退出（信号终止/挂起/EOF）`crash` → 主进程 `exit(86)` fail-closed（`ARCHOERA_VAULT_NO_ABORT=1` 测试豁免，仅写标记）；
+- 锚点 `$dataDir/vault.auth`：首会话返回保存，后续会话必须一致——不一致 = vault 文件被替换 → 拒绝服务。
+  **勿高估（SEC-05）**：`vault.auth` 与 `credentials.vault` 同为 `dataDir` 下普通文件、权限未定义，
+  **同用户攻击者可同时替换两者**使锚点校验失效；退避文件 `vault.lockout` 亦可删除以重置在线爆破节流；
+  这些文件**不构成对同用户攻击者的防线**（只防不一致替换/误操作）。加固方向：锚点与退避状态移入 OS 安全存储
+  或以「HMAC 于 OS 份额」做完整性绑定（列入待办，见 [security-review SEC-05](security-review-2026-10-11.md)）；
+- **崩溃联动标记** `$dataDir/vault.marker`：正常收尾 `ok` / 主动报错 `fail`（不联动）/ 非预期退出（信号终止/挂起/EOF）`crash` → 主进程 `exit(86)` fail-closed（`ARCHOERA_VAULT_NO_ABORT=1` 测试豁免，仅写标记）。
+  **勿高估（SEC-05）**：该标记为普通文件，**同用户可伪造**——写 `crash` 可触发 `exit(86)` + 仅允许退出的 fatal 门（DoS），写 `ok` 可掩盖真实崩溃；故它只是「崩溃可感知性提示」，**不是对同用户攻击者的防线**，加固方向（防伪造/降级为提示）见 [security-review SEC-05](security-review-2026-10-11.md)；
 - `VaultCrashGate`：启动首帧消费 crash 标记 → 显著警告（「销毁并重建」/「知道了」跳转）；
 - `main.dart`：`VaultSessionStore.initialize()` 后 `await StreamingStore.preloadSecrets()`（同步 `load()` 的凭据来源）。
 
